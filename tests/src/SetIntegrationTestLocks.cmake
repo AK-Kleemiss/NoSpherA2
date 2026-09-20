@@ -41,6 +41,7 @@ set_tests_properties(
     TomlIntegrationTests.RGBI_NH3Li
     TomlIntegrationTests.RGBI_NH3Li_ANO
     TomlIntegrationTests.ELI_NH3Li
+    TomlIntegrationTests.ELI_NH3Li_RI
     PROPERTIES
         RESOURCE_LOCK integration_RGBI_groups
 )
@@ -55,6 +56,8 @@ set_tests_properties(
 set_tests_properties(
     TomlIntegrationTests.SALTED
     TomlIntegrationTests.SALTEDChargeConstraint
+    TomlIntegrationTests.SALTED_write_coefs
+    TomlIntegrationTests.SALTED_coef_file
     SALTEDTests.ReadingSALTEDBinaryFile
     BesselTests.AnalyticFourier
     PROPERTIES
@@ -82,4 +85,29 @@ set_tests_properties(
     TomlIntegrationTests.P1_F2_test_XCW_incremental
     PROPERTIES
         RESOURCE_LOCK integration_P1_test
+)
+
+# Tests using tests/epoxide_gbw: all of them write NoSpherA2.log there, the SF_* ones
+# the same experimental.tsc, the cube_* ones the same epoxide_rho.cube
+set_tests_properties(
+    TomlIntegrationTests.RiFit
+    TomlIntegrationTests.RiFitMultipoles
+    TomlIntegrationTests.ri_fit_multipoles_centre
+    TomlIntegrationTests.cube_rho
+    TomlIntegrationTests.cube_esp
+    TomlIntegrationTests.cube_elf
+    TomlIntegrationTests.cube_hirsh
+    TomlIntegrationTests.cube_MO
+    TomlIntegrationTests.esp_isosurface
+    TomlIntegrationTests.density_difference
+    TomlIntegrationTests.dipole_moments
+    TomlIntegrationTests.laplacian_bonds
+    TomlIntegrationTests.tscb_to_tsc
+    TomlIntegrationTests.merge_tscs
+    TomlIntegrationTests.merge_tscs_nocheck
+    TomlIntegrationTests.SF_becke
+    TomlIntegrationTests.SF_mbis
+    TomlIntegrationTests.SF_embis
+    PROPERTIES
+        RESOURCE_LOCK integration_epoxide_gbw
 )

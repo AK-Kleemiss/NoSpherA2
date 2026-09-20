@@ -166,6 +166,7 @@ void BasisSet::gen_auto_aux(const WFN& orbital_wfn) {
 	for (const atom& atm : orbital_wfn.get_atoms()) {
 		const int Z = atm.get_charge();
 		if (std::find(seen_elements.begin(), seen_elements.end(), Z) != seen_elements.end()) continue;
+		if (!_auto_aux_elements.empty() && std::find(_auto_aux_elements.begin(), _auto_aux_elements.end(), Z) == _auto_aux_elements.end()) continue;
 		err_chekf(atm.get_basis_set().size() != 0,
 			"Can not generate auto-aux! Orbital Basis for Element: " + std::to_string(Z) + " is not defined!",
 			std::cout);
@@ -353,8 +354,8 @@ void BasisSet::gen_auto_aux_for_element(const atom& atm) {
 				r_exp[i] += coefs[i] * auto_aux_constants::gaussian_int(shelltype * 2 + 2, exps[i] + exps[j]) * coefs[j];
 			}
 		}
-		const double k = (std::pow(2.0, (2 * shelltype + 1)) * constants::ft[shelltype + 1] * constants::ft[shelltype + 1]) /
-			static_cast<double>(constants::ft[2 * shelltype + 2]);
+		const double k = (std::pow(2.0, (2 * shelltype + 1)) * constants::ftd[shelltype + 1] * constants::ftd[shelltype + 1]) /
+			constants::ftd[2 * shelltype + 2];
 		const double kk2 = 2.0 * k * k;
 		for (int i = 0; i < shellsize; i++) {
 			const double e_eff = (kk2) / (constants::PI * r_exp[i] * r_exp[i]);
@@ -999,7 +1000,7 @@ bool BasisSetLibrary::read_basis_set_missing(const std::filesystem::path& basis_
 	{
 		if (debug)
 			std::cout << "before: " << elements_list[i] << " " << i << endl;
-		if (elements_list[i].find(" "))
+		while (elements_list[i].find(" ") != -1)
 			elements_list[i].erase(elements_list[i].find(" "), 1);
 		elements_list[i].append(":");
 		if (debug)
@@ -1071,6 +1072,9 @@ bool BasisSetLibrary::read_basis_set_missing(const std::filesystem::path& basis_
 			return false;
 		}
 		unsigned int shell = 0;
+		bvec had_basis(wave.get_ncen());
+		for (int h = 0; h < wave.get_ncen(); h++)
+			had_basis[h] = wave.get_atom_basis_set_loaded(h);
 		if (line.find("{") == -1)
 		{
 			getline_universal(ifile, line);
@@ -1123,12 +1127,12 @@ bool BasisSetLibrary::read_basis_set_missing(const std::filesystem::path& basis_
 				// this is where i started copying
 				for (int h = 0; h < wave.get_ncen(); h++)
 				{
-					// skip atoms taht already have a basis set!
-					if (wave.get_atom_basis_set_loaded(h))
+					// skip atoms that already had a basis set before this block
+					if (had_basis[h])
 						continue;
 					string temp_label;
 					temp_label = wave.get_atom_label(h);
-					if (temp_label.find(" "))
+					while (temp_label.find(" ") != -1)
 						temp_label.erase(temp_label.find(" "), 1);
 					temp_label.append(":");
 					if (elements_list[i].find(temp_label) != -1)

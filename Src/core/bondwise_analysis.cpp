@@ -7,6 +7,7 @@
 #include "nos_math.h"
 #include "integration_params.h"
 #include "b2c.h"
+#include "crystal_energies.h"
 #include "spherical_density.h"
 #include <occ/qm/hf.h>
 
@@ -484,6 +485,10 @@ int compute_dens(WFN &wavy, bool debug, int *np, double *origin, double *gvector
         {},
         {},
         {} };
+    cubes[cube_type::Rho].give_parent_wfn(wavy);
+    cubes[cube_type::RDG].give_parent_wfn(wavy);
+    cubes[cube_type::Eli].give_parent_wfn(wavy);
+    cubes[cube_type::Lap].give_parent_wfn(wavy);
 
     std::string Oname = outname;
     std::vector<int> ntyp;
@@ -531,15 +536,9 @@ int compute_dens(WFN &wavy, bool debug, int *np, double *origin, double *gvector
     std::cout << "  *.  Number of primitives      :     " << std::setw(5) << wavy.get_nex() << "                               *.\n";
     std::cout << "  *.  Number of MOs             :       " << std::setw(3) << wavy.get_nmo() << "                               *.\n";
 
-    cube dummy({ 0, 0, 0 });
-    Calc_Prop(
-        cubes,
-        wavy,
-        20.0,
-        std::cout,
-        false,
-        false
-    );
+    //Calc_Prop leaves the Rho cube untouched unless RDG is requested (it hands back sign(lambda2)*rho then)
+    if (rho && !rdg) Calc_Rho(cubes[cube_type::Rho], wavy, 20.0, std::cout, false);
+    if (rdg || eli || lap) Calc_Prop(cubes, wavy, 20.0, std::cout, false, false);
 
     std::cout << "  *.                                                                      *.\n";
     std::cout << "  *.  Writing .cube files ...                                             *.\n";
@@ -2546,16 +2545,8 @@ Roby_information::Roby_information(WFN &wavy, const ivec3 &group_sets, const boo
 
 void bondwise_laplacian_plots(std::filesystem::path &wfn_name)
 {
-    char cwd[1024];
-#ifdef _WIN32
-    if (_getcwd(cwd, sizeof(cwd)) != NULL)
-#else
-    if (getcwd(cwd, sizeof(cwd)) != NULL)
-#endif
-        std::cout << "Current working dir: " << cwd << std::endl;
     WFN wavy(wfn_name);
     wavy.delete_unoccupied_MOs();
-    std::cout << NoSpherA2_message(false) << std::endl << build_date << std::endl;
 
     err_checkf(wavy.get_ncen() != 0, "No Atoms in the wavefunction, this will not work!! ABORTING!!", std::cout);
 
@@ -2565,7 +2556,7 @@ void bondwise_laplacian_plots(std::filesystem::path &wfn_name)
     {
         for (int j = i + 1; j < wavy.get_ncen(); j++)
         {
-            std::filesystem::path path = cwd;
+            std::filesystem::path path = std::filesystem::current_path();
             double distance = sqrt(pow(wavy.get_atom_coordinate(i, 0) - wavy.get_atom_coordinate(j, 0), 2) + pow(wavy.get_atom_coordinate(i, 1) - wavy.get_atom_coordinate(j, 1), 2) + pow(wavy.get_atom_coordinate(i, 2) - wavy.get_atom_coordinate(j, 2), 2));
             double svdW = constants::ang2bohr(constants::covalent_radii[wavy.get_atom_charge(i)] + constants::covalent_radii[wavy.get_atom_charge(j)]);
             if (distance < 1.35 * svdW)
@@ -2602,9 +2593,39 @@ void bondwise_laplacian_plots(std::filesystem::path &wfn_name)
     }
 }
 
-void ELI_analysis(const WFN &wavy, const options &opt) {
+//The fitted density in place of the orbitals for rho and the QTAIM basins when the options
+//ask for it: -ri_fit <basis> before the analysis flag on a wavefunction, or -SALTED
+//<model-dir> on an xyz. rho and its gradient then come from one loop over the auxiliary
+//functions, which is what makes 0.05 A grids affordable. nullptr for the orbital route.
+//ELI-D keeps the orbitals: the density-only estimate (PC07 alpha, the -eli cubes) is a
+//constant wherever alpha is switched off, i.e. over the bonds and lone pairs, and has no
+//basins to find there.
+static std::unique_ptr<Gaussian_Molecule> fitted_source(const WFN &wavy, options &opt, density_field &field, std::ostream &log)
+{
+    if (!Gaussian_Molecule::requested(wavy, opt)) {
+        err_checkf(wavy.get_nmo() > 0, "No orbitals in " + wavy.get_path().string() + "; give -SALTED <model-dir> before the analysis flag to analyse a predicted density", log);
+        return nullptr;
+    }
+    auto fit = std::make_unique<Gaussian_Molecule>(wavy, opt);
+    log << "Density source: " << (wavy.get_nmo() == 0 ? "SALTED prediction from " + opt.salted_model_dir.string() : "RI fit of " + std::to_string(wavy.get_nmo()) + " orbitals")
+        << ", " << fit->n_aux() << " auxiliary functions.\n"
+        << "  rho and its gradient come from one pass over the auxiliary functions, N_aux per point instead of\n"
+        << "  N_basis x N_MO, so grids of 0.05 A and finer are affordable. The QTAIM basins and populations below\n"
+        << "  are those of the fitted density: it matches the orbital density to ~1e-3 e/bohr^3 at bond critical\n"
+        << "  points, and its tail (rho < 0.01) is not reliable. ELI-D "
+        << (wavy.get_nmo() == 0 ? "needs orbitals and is skipped." : "is taken from the orbitals.") << std::endl;
+    const Gaussian_Molecule *f = fit.get();
+    field.rho = [f](const d3 &p) { return f->rho(p); };
+    field.grad = [f](const d3 &p, d3 &g) { double lap; f->values(p, g, lap); };
+    return fit;
+}
+
+void ELI_analysis(const WFN &wavy, options &opt) {
     err_checkf(wavy.get_ncen() != 0, "No Atoms in the wavefunction, this will not work!! ABORTING!!", std::cout);
     std::cout << "Analysing ELI basins in the wavefunction..." << std::endl;
+    density_field field;
+    const std::unique_ptr<Gaussian_Molecule> fit = fitted_source(wavy, opt, field, std::cout);
+    const density_field *fld = fit ? &field : nullptr;
 
     const double radius = opt.properties.radius;
     const double grid_spacing = opt.properties.resolution;
@@ -2649,7 +2670,7 @@ void ELI_analysis(const WFN &wavy, const options &opt) {
     rho.calc_dv();
     eli_cube.calc_dv();
 
-    Calc_RhoEli(rho, eli_cube, l_w, radius);
+    Calc_RhoEli(rho, eli_cube, l_w, radius, fld);
     //An ECP took the core electrons out of the density. The QTAIM basins get them back from
     //Thakkar's spherical core densities, the fill the Hirshfeld grids and the scattering
     //factors apply: the nucleus is a cusp again and its basin holds the atom's full count.
@@ -2691,11 +2712,14 @@ void ELI_analysis(const WFN &wavy, const options &opt) {
     }
     rho.set_path("rho.cube");
     eli_cube.set_path("eli.cube");
-    //rho.write_file(true);
-    //eli_cube.write_file(true);
+    if (opt.debug) { rho.write_file(true); eli_cube.write_file(true); }
 
     const double density_floor = std::max(1e-8, rho.max_value() * 1e-6);
-    std::vector<critical_point> density_critical_points = analyze_cube_critical_points(&rho, l_w, opt.debug, density_floor);
+    //The critical points are refined on the orbitals (V, G and K need them) even when the
+    //basins follow the fitted density; a SALTED prediction has none, so they are skipped
+    std::vector<critical_point> density_critical_points;
+    if (l_w.get_nmo() > 0) density_critical_points = analyze_cube_critical_points(&rho, l_w, opt.debug, density_floor);
+    else std::cout << "No orbitals: critical points (Hessian, V, G, K) need a wavefunction and are skipped." << std::endl;
     //Core shells make critical points of their own and an ECP atom a whole sphere of them,
     //none of which says anything about bonding and none of which any two machines find at
     //the same spots; only the nuclear attractor survives inside an atom's core radius. Sorted
@@ -2823,8 +2847,50 @@ void ELI_analysis(const WFN &wavy, const options &opt) {
     //Every nucleus is a maximum of the density, whatever the grid says
     std::vector<d3> nuclei;
     for (const atom &a : atoms) nuclei.push_back(a.get_pos());
-    std::pair<cubei, std::vector<d4>> qtaim_results = topological_cube_analysis(&rho, atoms, opt.debug, true, 0.0, 1e-10, radius, 5e-3, &nuclei, &l_w, fill_cores ? &core_density : nullptr, fill_cores ? &core_gradient : nullptr);
+    //A fitted density oscillates about zero in the tail, and every positive island out there is
+    //a maximum with no neighbour to merge into (2000 of them on epoxide at 0.05 A, and the
+    //persistence merge is quadratic in their number), so the search stops where the fit is no
+    //longer trusted; its ~1e-3 error at a bond critical point also leaves a bump there that
+    //5e-3 persistence keeps, hence the looser merge
+    const double floor = fld ? 1e-4 : 0.0, persistence = fld ? 2e-2 : 5e-3;
+    std::pair<cubei, std::vector<d4>> qtaim_results = topological_cube_analysis(&rho, atoms, opt.debug, true, floor, 1e-10, radius, persistence, &nuclei, &l_w, fill_cores ? &core_density : nullptr, fill_cores ? &core_gradient : nullptr, fld);
     svec labels = assign_labels_to_basins(qtaim_results.second, atoms, opt.debug);
+
+    //Two integrations of the density over each basin set: the voxel sum, which is what the cube
+    //resolution buys, and the atom-centred quadrature grids with the boundary decided by the
+    //field itself, which is the number to compare with AIMAll and DGrid. The ELI-D basins follow
+    //the orbitals' ELI-D and integrate the orbital density; only the QTAIM set uses the fit
+    auto report = [&](const char *title, const std::pair<cubei, std::vector<d4>> &res, svec &lab, const bool eli) {
+        std::cout << "\n" << title << " (voxel sum):\n";
+        integrate_values_in_basins(&rho, &(res.first), lab, opt.debug);
+        vec vol;
+        double outside = 0.0;
+        const vec pop = integrate_basins_on_atomic_grids(&rho, &(res.first), res.second, l_w, opt.accuracy, eli, vol, outside, fill_cores && !eli ? &core_density : nullptr, fill_cores && !eli ? &core_gradient : nullptr, opt.basin_grid, eli ? nullptr : fld);
+        std::cout << "\n" << title << " (atomic quadrature grids):\n";
+        std::cout << "  basin  label               electrons" << (eli ? "" : "     charge") << "      volume     maximum        x          y          z\n";
+        double total = 0.0;
+        for (size_t b = 0; b < pop.size(); b++) {
+            total += pop[b];
+            std::cout << std::setw(7) << b + 1 << "  " << std::left << std::setw(18) << lab[b] << std::right << std::fixed
+                << std::setprecision(4) << std::setw(11) << pop[b];
+            if (!eli) {
+                //The label names the atom the maximum sits on; a non-nuclear attractor has no charge
+                double Z = -1.0;
+                for (int a = 0; a < l_w.get_ncen(); a++)
+                    if (lab[b] == l_w.get_atom_label(a) + std::to_string(a)) Z = l_w.get_atom_charge(a);
+                if (Z < 0) std::cout << std::setw(11) << "-";
+                else std::cout << std::setw(11) << Z - pop[b];
+            }
+            std::cout << std::setw(12) << vol[b] << std::setw(12) << res.second[b][3]
+                << std::setprecision(3) << std::setw(11) << res.second[b][0] << std::setw(11) << res.second[b][1] << std::setw(11) << res.second[b][2] << "\n";
+        }
+        std::cout << "  total in basins: " << std::setprecision(4) << total << "   outside every basin: " << outside << "\n";
+    };
+    if (l_w.get_nmo() == 0) {
+        report("QTAIM Analysis", qtaim_results, labels, false);
+        std::cout << "\nNo orbitals: the ELI-D basins are skipped." << std::endl;
+        return;
+    }
 
     //ELI-D is a ratio of quantities that both vanish in the density's tail and turns to noise
     //there, so its basins are searched only where the density exceeds 1e-4, the crop DGrid is
@@ -2839,35 +2905,6 @@ void ELI_analysis(const WFN &wavy, const options &opt) {
     const int core_merged = unify_core_basins(eli_results.first, eli_results.second, atoms);
     if (core_merged) std::cout << "Unified " << core_merged << " core-shell basins into their atoms' cores, " << eli_results.second.size() << " ELI-D basins remain." << std::endl;
     svec eli_labels = assign_labels_to_basins(eli_results.second, atoms, opt.debug, 1);
-
-    //Two integrations of the density over each basin set: the voxel sum, which is what the cube
-    //resolution buys, and the atom-centred quadrature grids with the boundary decided by the
-    //field itself, which is the number to compare with AIMAll and DGrid
-    auto report = [&](const char *title, const std::pair<cubei, std::vector<d4>> &res, svec &lab, const bool eli) {
-        std::cout << "\n" << title << " (voxel sum):\n";
-        integrate_values_in_basins(&rho, &(res.first), lab, opt.debug);
-        vec vol;
-        double outside = 0.0;
-        const vec pop = integrate_basins_on_atomic_grids(&rho, &(res.first), res.second, l_w, opt.accuracy, eli, vol, outside, fill_cores && !eli ? &core_density : nullptr, fill_cores && !eli ? &core_gradient : nullptr, opt.basin_grid);
-        std::cout << "\n" << title << " (atomic quadrature grids):\n";
-        std::cout << "  basin  label               electrons" << (eli ? "" : "     charge") << "      volume     maximum        x          y          z\n";
-        double total = 0.0;
-        for (size_t b = 0; b < pop.size(); b++) {
-            total += pop[b];
-            std::cout << std::setw(7) << b + 1 << "  " << std::left << std::setw(18) << lab[b] << std::right << std::fixed
-                << std::setprecision(4) << std::setw(11) << pop[b];
-            if (!eli) {
-                //The label names the atom the maximum sits on
-                double Z = 0.0;
-                for (int a = 0; a < l_w.get_ncen(); a++)
-                    if (lab[b] == l_w.get_atom_label(a) + std::to_string(a)) Z = l_w.get_atom_charge(a);
-                std::cout << std::setw(11) << Z - pop[b];
-            }
-            std::cout << std::setw(12) << vol[b] << std::setw(12) << res.second[b][3]
-                << std::setprecision(3) << std::setw(11) << res.second[b][0] << std::setw(11) << res.second[b][1] << std::setw(11) << res.second[b][2] << "\n";
-        }
-        std::cout << "  total in basins: " << std::setprecision(4) << total << "   outside every basin: " << outside << "\n";
-    };
     report("QTAIM Analysis", qtaim_results, labels, false);
     report("ELI-D Analysis", eli_results, eli_labels, true);
 }
@@ -3003,7 +3040,7 @@ void run_QTAIM_ELI_mask(
     const std::filesystem::path& eli_path,
     const std::vector<int>& selected_indices,
     double background_value,
-    const options& opt,
+    options& opt,
     std::ostream& log
 ) {
     if (!eli_path.empty()) {
@@ -3026,6 +3063,9 @@ void run_QTAIM_ELI_mask(
         log << "Loading wavefunction: " << rho_or_wfn.string() << std::endl;
         WFN wavy(rho_or_wfn, opt.debug);
         wavy.delete_unoccupied_MOs();
+        density_field field;
+        const std::unique_ptr<Gaussian_Molecule> fit = fitted_source(wavy, opt, field, log);
+        err_checkf(wavy.get_nmo() > 0, "ELI-D needs orbitals; -qtaim_eli cannot run on a SALTED density", log);
 
         properties_options prop_opt = opt.properties;
         readxyzMinMax_fromWFN(wavy, prop_opt);
@@ -3053,7 +3093,7 @@ void run_QTAIM_ELI_mask(
         rho.calc_dv();
         eli.calc_dv();
 
-        Calc_RhoEli(rho, eli, wavy, prop_opt.radius);
+        Calc_RhoEli(rho, eli, wavy, prop_opt.radius, fit ? &field : nullptr);
 
         const std::vector<atom> atoms = wavy.get_atoms();
         const std::filesystem::path out =

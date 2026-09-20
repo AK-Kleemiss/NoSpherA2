@@ -94,7 +94,10 @@ bool stored_eri::build(const occ::qm::HartreeFock& hf, const size_t budget_bytes
 		std::vector<double> buffer(local_env.buffer_size_2e()), cache;
 #pragma omp for schedule(static)
 		for (long long i = 0; i < static_cast<long long>(nint); i++) v_[i] = 0.0;
-#pragma omp for schedule(static)
+		//r runs to p, so the work per pq grows along the loop: static chunks left the
+		//last thread with most of it (16 s of barrier in the test suite). Every
+		//integral is written by exactly one pq, so the schedule does not touch the result
+#pragma omp for schedule(dynamic, 8)
 		for (int pq = 0; pq < npq; pq++) {
 			const int p = static_cast<int>((std::sqrt(8.0 * pq + 1.0) - 1.0) / 2.0), qs = pq - p * (p + 1) / 2;
 			if (!significant(p, qs)) continue;
@@ -160,7 +163,9 @@ void stored_eri::JK(const occ::Mat& D, occ::Mat& J, occ::Mat& K, const bool scre
 		std::vector<double> Jl(npk, 0.0), t(n);
 		occ::Mat Kl = occ::Mat::Zero(n, n);
 		double* Kd = Kl.data();
-#pragma omp for schedule(static)
+		//c runs to a: cyclic rows balance the triangle and, unlike a dynamic schedule,
+		//keep the per-thread partials and so the summation order fixed for a thread count
+#pragma omp for schedule(static, 1)
 		for (int k = 0; k < npk; k++) {
 			const int a = pa[k], b = pb[k];
 			if (screen && q_[k] * qmax_ * rmax < threshold) continue;

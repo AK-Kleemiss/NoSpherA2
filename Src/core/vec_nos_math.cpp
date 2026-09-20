@@ -205,7 +205,7 @@ std::vector<T> dot_BLAS(const std::vector<T> &flatMat, const std::vector<T> &vec
                     transp ? CblasTrans : CblasNoTrans,
                     m, n,
                     1.0,
-                    flatMat.data(), transp ? m : n,
+                    flatMat.data(), n, // lda is the row length of the stored (row-major) matrix, Trans is only the op
                     vec.data(), 1,
                     0.0,
                     result.data(), 1);
@@ -218,7 +218,7 @@ std::vector<T> dot_BLAS(const std::vector<T> &flatMat, const std::vector<T> &vec
                     transp ? CblasTrans : CblasNoTrans,
                     m, n,
                     &(one),
-                    reinterpret_cast<const cdouble *>(flatMat.data()), transp ? m : n,
+                    reinterpret_cast<const cdouble *>(flatMat.data()), n,
                     reinterpret_cast<const cdouble *>(vec.data()), 1,
                     &(zero),
                     reinterpret_cast<cdouble *>(result.data()), 1);
@@ -235,6 +235,7 @@ template cvec dot_BLAS(const std::vector<cdouble> &flatMat, const std::vector<cd
 
 // 1D x 1D Vector multiplication
 template <typename T>
+    requires (!std::is_class_v<T> || std::is_same_v<T, cdouble>)
 T self_dot(const std::vector<T> &vec1, const std::vector<T> &vec2, bool conjugate)
 {
     T result{};
@@ -292,8 +293,8 @@ T dot_BLAS(const std::vector<T> &vec1, const std::vector<T> &vec2, bool conjugat
     }
     else if constexpr (std::is_same_v<T, cdouble>)
     {
-        conjugate ? cblas_zdotu_sub((int)vec1.size(), reinterpret_cast<const cdouble *>(vec1.data()), 1, reinterpret_cast<const cdouble *>(vec2.data()), 1, &result)
-                  : cblas_zdotc_sub((int)vec1.size(), reinterpret_cast<const cdouble *>(vec1.data()), 1, reinterpret_cast<const cdouble *>(vec2.data()), 1, &result);
+        conjugate ? cblas_zdotc_sub((int)vec1.size(), reinterpret_cast<const cdouble *>(vec1.data()), 1, reinterpret_cast<const cdouble *>(vec2.data()), 1, &result)
+                  : cblas_zdotu_sub((int)vec1.size(), reinterpret_cast<const cdouble *>(vec1.data()), 1, reinterpret_cast<const cdouble *>(vec2.data()), 1, &result);
         //result = cdouble(t.real, t.imag);
     }
     else

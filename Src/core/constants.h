@@ -7,6 +7,7 @@ namespace constants
 {
     extern double exp_cutoff;
     extern bool hide_gpu_notes;
+    extern bool hide_timings; //-no_date: wall-clock lines would make the log non-reproducible
     //x^lx y^ly z^lz = sum_m sph2cart(l)[cart * n_spher(l) + m] R_lm, cartesians in WFN type order,
     //R_lm the real solid harmonics in ORCA/Gaussian order m = 0,+1,-1,+2,-2,...
     constexpr int n_cart(const int l) { return (l + 1) * (l + 2) / 2; };
@@ -294,6 +295,14 @@ namespace constants
     }
 
     constexpr std::array<size_t, MAX_FACTORIAL> ft = factorial_const();
+    // ft[n] wraps silently from 21! on (> 2^64); use this one wherever n can exceed 20
+    constexpr std::array<double, MAX_FACTORIAL> factorial_double() {
+        std::array<double, MAX_FACTORIAL> f{};
+        f[0] = 1.0;
+        for (int i = 1; i < MAX_FACTORIAL; i++) f[i] = f[i - 1] * i;
+        return f;
+    }
+    constexpr std::array<double, MAX_FACTORIAL> ftd = factorial_double();
 
     constexpr double log_approx(const double &x, int n = 25) {
         if (x <= 0.0) return -1.0; // log is not defined for non-positive values
@@ -562,33 +571,33 @@ namespace constants
             (tmp[0] == 'P' && tmp[1] == 'b' && tmp[2] == '\0') ? 81 :
             (tmp[0] == 'B' && tmp[1] == 'i' && tmp[2] == '\0') ? 82 :
             (tmp[0] == 'P' && tmp[1] == 'o' && tmp[2] == '\0') ? 83 :
-            (tmp[0] == 'A' && tmp[1] == 't' && tmp[2] == '\0') ? 85 :
-            (tmp[0] == 'R' && tmp[1] == 'n' && tmp[2] == '\0') ? 86 :
-            (tmp[0] == 'F' && tmp[1] == 'r' && tmp[2] == '\0') ? 87 :
-            (tmp[0] == 'R' && tmp[1] == 'a' && tmp[2] == '\0') ? 88 :
-            (tmp[0] == 'A' && tmp[1] == 'c' && tmp[2] == '\0') ? 89 :
-            (tmp[0] == 'T' && tmp[1] == 'h' && tmp[2] == '\0') ? 90 :
-            (tmp[0] == 'P' && tmp[1] == 'a' && tmp[2] == '\0') ? 91 :
-            (tmp[0] == 'U' && tmp[1] == '\0') ? 92 :
-            (tmp[0] == 'N' && tmp[1] == 'p' && tmp[2] == '\0') ? 93 :
-            (tmp[0] == 'P' && tmp[1] == 'u' && tmp[2] == '\0') ? 94 :
-            (tmp[0] == 'A' && tmp[1] == 'm' && tmp[2] == '\0') ? 95 :
-            (tmp[0] == 'C' && tmp[1] == 'm' && tmp[2] == '\0') ? 96 :
-            (tmp[0] == 'B' && tmp[1] == 'k' && tmp[2] == '\0') ? 97 :
-            (tmp[0] == 'C' && tmp[1] == 'f' && tmp[2] == '\0') ? 98 :
-            (tmp[0] == 'E' && tmp[1] == 's' && tmp[2] == '\0') ? 99 :
-            (tmp[0] == 'F' && tmp[1] == 'm' && tmp[2] == '\0') ? 100 :
-            (tmp[0] == 'M' && tmp[1] == 'd' && tmp[2] == '\0') ? 101 :
-            (tmp[0] == 'N' && tmp[1] == 'o' && tmp[2] == '\0') ? 102 :
-            (tmp[0] == 'L' && tmp[1] == 'r' && tmp[2] == '\0') ? 103 :
-            (tmp[0] == 'R' && tmp[1] == 'f' && tmp[2] == '\0') ? 104 :
-            (tmp[0] == 'D' && tmp[1] == 'b' && tmp[2] == '\0') ? 105 :
-            (tmp[0] == 'S' && tmp[1] == 'g' && tmp[2] == '\0') ? 106 :
-            (tmp[0] == 'B' && tmp[1] == 'h' && tmp[2] == '\0') ? 107 :
-            (tmp[0] == 'H' && tmp[1] == 's' && tmp[2] == '\0') ? 108 :
-            (tmp[0] == 'M' && tmp[1] == 't' && tmp[2] == '\0') ? 109 :
-            (tmp[0] == 'D' && tmp[1] == 's' && tmp[2] == '\0') ? 110 :
-            (tmp[0] == 'R' && tmp[1] == 'g' && tmp[2] == '\0') ? 111 :
+            (tmp[0] == 'A' && tmp[1] == 't' && tmp[2] == '\0') ? 84 :
+            (tmp[0] == 'R' && tmp[1] == 'n' && tmp[2] == '\0') ? 85 :
+            (tmp[0] == 'F' && tmp[1] == 'r' && tmp[2] == '\0') ? 86 :
+            (tmp[0] == 'R' && tmp[1] == 'a' && tmp[2] == '\0') ? 87 :
+            (tmp[0] == 'A' && tmp[1] == 'c' && tmp[2] == '\0') ? 88 :
+            (tmp[0] == 'T' && tmp[1] == 'h' && tmp[2] == '\0') ? 89 :
+            (tmp[0] == 'P' && tmp[1] == 'a' && tmp[2] == '\0') ? 90 :
+            (tmp[0] == 'U' && tmp[1] == '\0') ? 91 :
+            (tmp[0] == 'N' && tmp[1] == 'p' && tmp[2] == '\0') ? 92 :
+            (tmp[0] == 'P' && tmp[1] == 'u' && tmp[2] == '\0') ? 93 :
+            (tmp[0] == 'A' && tmp[1] == 'm' && tmp[2] == '\0') ? 94 :
+            (tmp[0] == 'C' && tmp[1] == 'm' && tmp[2] == '\0') ? 95 :
+            (tmp[0] == 'B' && tmp[1] == 'k' && tmp[2] == '\0') ? 96 :
+            (tmp[0] == 'C' && tmp[1] == 'f' && tmp[2] == '\0') ? 97 :
+            (tmp[0] == 'E' && tmp[1] == 's' && tmp[2] == '\0') ? 98 :
+            (tmp[0] == 'F' && tmp[1] == 'm' && tmp[2] == '\0') ? 99 :
+            (tmp[0] == 'M' && tmp[1] == 'd' && tmp[2] == '\0') ? 100 :
+            (tmp[0] == 'N' && tmp[1] == 'o' && tmp[2] == '\0') ? 101 :
+            (tmp[0] == 'L' && tmp[1] == 'r' && tmp[2] == '\0') ? 102 :
+            (tmp[0] == 'R' && tmp[1] == 'f' && tmp[2] == '\0') ? 103 :
+            (tmp[0] == 'D' && tmp[1] == 'b' && tmp[2] == '\0') ? 104 :
+            (tmp[0] == 'S' && tmp[1] == 'g' && tmp[2] == '\0') ? 105 :
+            (tmp[0] == 'B' && tmp[1] == 'h' && tmp[2] == '\0') ? 106 :
+            (tmp[0] == 'H' && tmp[1] == 's' && tmp[2] == '\0') ? 107 :
+            (tmp[0] == 'M' && tmp[1] == 't' && tmp[2] == '\0') ? 108 :
+            (tmp[0] == 'D' && tmp[1] == 's' && tmp[2] == '\0') ? 109 :
+            (tmp[0] == 'R' && tmp[1] == 'g' && tmp[2] == '\0') ? 110 :
             -1;
     };
 
@@ -930,7 +939,7 @@ namespace constants
         norms[0][0] = constants::c_1_4p;
         for (int l = 1; l <= ASSOCIATED_LEGENDRE_MAX_L; l++) {
             for (int m = -l; m <= l; m++) {
-                norms[l][m + l] = sqrt(((2 * l + 1) * double(constants::ft[l - m])) / (constants::TWO_PI * double(constants::ft[l + m])));
+                norms[l][m + l] = sqrt(((2 * l + 1) * constants::ftd[l - m]) / (constants::TWO_PI * constants::ftd[l + m]));
             }
             norms[l][l] = sqrt(((2 * l + 1) / constants::FOUR_PI));
         }
@@ -945,11 +954,14 @@ namespace constants
     std::pair<double, double> norm_cartesian_to_spherical(const double &x, const double &y, const double &z);
     //Original implementation after P. Coppens DOI: 10.1107/97809553602060000759 Eq. 1.2.7.2b
     //I omitted the abs(m) in the factorial as most other sources do not include it
+    // N_l|m| P_l^|m|(cos theta) {cos, sin}(|m| phi): std::assoc_legendre takes an unsigned m, a
+    // negative one is m > l there and libstdc++ returns 0 (MSVC happened to give the right value)
     inline double real_spherical(const int &l, const int &m, const double &theta, const double &phi) {
+        const int am = std::abs(m);
 #ifndef __APPLE__
-        return constants::spherical_norms[l][l + m] * std::assoc_legendre(l, m, cos(theta)) * ((m >= 0) ? cos(m * phi) : sin(m * phi));
+        return constants::spherical_norms[l][l + am] * std::assoc_legendre(l, am, cos(theta)) * ((m >= 0) ? cos(am * phi) : sin(am * phi));
 #else
-        return constants::spherical_norms[l][l + m] * associated_legendre_polynomial(l, m, cos(theta)) * ((m >= 0) ? cos(m * phi) : sin(m * phi));
+        return constants::spherical_norms[l][l + am] * associated_legendre_polynomial(l, am, cos(theta)) * ((m >= 0) ? cos(am * phi) : sin(am * phi));
 #endif
     }
 

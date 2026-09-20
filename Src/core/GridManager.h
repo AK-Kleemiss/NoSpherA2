@@ -2,6 +2,7 @@
 
 #include "convenience.h"
 #include "wfn_class.h"
+#include "density_source.h"
 #include "AtomGrid.h"
 #include "cell.h"
 class cube;
@@ -84,6 +85,8 @@ private:
     bool non_spherical_densities_calculated_ = false;
     bool needs_helper_grids_ = false;
     vec grid_key_;
+    //What calculateNonSphericalDensities evaluates; the wave's orbitals when empty
+    DensityBatch density_;
 
     //Everything the points, the weights and the pruning depend on when the partition is
     //geometric; empty when it is not, so such a grid is never reused
@@ -124,6 +127,12 @@ public:
 
     void getDensityVectors(const WFN &wave, const ivec &atom_list, vec2 &d1, vec2 &d2, vec2 &d3, vec2 &dens, const bool get_g = false);
     void getDensityVectorsFromCube(const WFN &wave, const ivec &atom_list, const cube &density_cube, vec2 &d1, vec2 &d2, vec2 &d3, vec2 &dens, vec &atom_electrons);
+
+    //Evaluate this density on the grids instead of the wave's orbitals: a Gaussian_Molecule, a Centred<> atom model,
+    //anything calculate_density takes. Kept by reference, so the source outlives the manager's use of it.
+    template<class S> void setDensitySource(const S& source) { density_ = density_batch(source); }
+    void setDensitySource(DensityBatch source) { density_ = std::move(source); }
+    bool hasDensitySource() const { return static_cast<bool>(density_); }
 
     // Configuration and data access
     void setConfiguration(const GridConfiguration &config) { config_ = config; }

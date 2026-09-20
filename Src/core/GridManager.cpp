@@ -439,7 +439,7 @@ void GridManager::getIntegrationGrid1D(const WFN &wave, const int atom_1, const 
     //Calculate Becke and TFVC weights
     vec pa_b(wave.get_ncen());
     vec pa_tv(wave.get_ncen());
-    vec chi = make_chi(wave, 40, true, config_.debug);
+    vec chi = make_chi(wave, 40, true, config_.debug, density_);
     for (int g = 0; g < grid_data_.atomic_grids.size(); g++) {
         for (int p = 0; p < num_points; p++) {
             std::array<double, 2> result_weights = get_integration_weights(
@@ -613,7 +613,7 @@ void GridManager::generateIntegrationGrids(const WFN &wave, const cell &unit_cel
     //output, and chi is a line-density extremum search over every atom pair
     vec chi_matrix;
     if (total_atoms > 1 && (config_.partition_type == PartitionType::TFVC || config_.debug || config_.all_charges))
-        chi_matrix = make_chi(wave, 40, true, config_.debug);
+        chi_matrix = make_chi(wave, 40, true, config_.debug, density_);
     int first = 0;
 #ifdef NOSPHERA2_USE_GPU
     //The whole molecule in one launch, in chunks of a few million points so the flat
@@ -1423,29 +1423,12 @@ void GridManager::calculateNonSphericalDensities(const WFN &wave, const cell &un
     const int *points = helper ? grid_data_.helper_num_points_per_atom.data() : grid_data_.num_points_per_atom.data();
     vec2 *grids = helper ? grid_data_.helper_grids.data() : grid_data_.atomic_grids.data();
     const int n_grids = helper ? grid_data_.helper_grids.size() : grid_data_.atomic_grids.size();
+    const DensityBatch density = density_ ? density_ : density_batch(wave);
 
-#pragma omp parallel
-    {
-        vec2 d_temp(wave.get_ncen());
-        for (int i = 0; i < wave.get_ncen(); i++)
-        {
-            d_temp[i].resize(16, 0.0);
-        }
-        vec phi_temp(wave.get_nmo(true), 0.0);
-
-        for (int g = 0; g < n_grids; g++) {
-            const int num_points = points[g];
-            vec2 &atom_grid = grids[g];
-            const double *x_ptr = atom_grid[GridData::GridIndex::X].data();
-            const double *y_ptr = atom_grid[GridData::GridIndex::Y].data();
-            const double *z_ptr = atom_grid[GridData::GridIndex::Z].data();
-            double *densy_ptr = atom_grid[GridData::GridIndex::WFN_DENSITY].data();
-#pragma omp for schedule(dynamic, 4)
-            for (int p = 0; p < num_points; p++) {
-                // Calculate WFN density at this point
-                densy_ptr[p] = wave.compute_dens({ x_ptr[p], y_ptr[p], z_ptr[p] }, d_temp, phi_temp);
-            }
-        }
+    for (int g = 0; g < n_grids; g++) {
+        vec2 &atom_grid = grids[g];
+        density(points[g], atom_grid[GridData::GridIndex::X].data(), atom_grid[GridData::GridIndex::Y].data(),
+            atom_grid[GridData::GridIndex::Z].data(), atom_grid[GridData::GridIndex::WFN_DENSITY].data());
     }
     non_spherical_densities_calculated_ = true;
 }

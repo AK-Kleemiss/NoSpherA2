@@ -26,8 +26,7 @@ __device__ double lookup(const double* r, const double* rho, const int n, const 
 	if (nr > max_idx) nr = max_idx;
 	if (nr < max_idx && dist >= r[nr + 1]) ++nr;
 	else if (nr > 0 && dist < r[nr]) --nr;
-	if (nr < 1) nr = 1;
-	const double v = rho[nr] + (rho[nr + 1] - rho[nr]) / (r[nr] - r[nr - 1]) * (dist - r[nr - 1]);
+	const double v = rho[nr] + (rho[nr + 1] - rho[nr]) / (r[nr + 1] - r[nr]) * (dist - r[nr]);
 	return v < 1E-16 ? 0.0 : v;
 }
 

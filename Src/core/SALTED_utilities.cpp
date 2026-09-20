@@ -229,6 +229,19 @@ static metatensor::TensorMap get_feats_projs(featomic::SimpleSystem featomic_sys
     //Do not ask me, why Featomic expects the max_radial to be one less than the actual number of radial basis functions, but it does, so here we are
     SALTED_Utils::FeatomicHyperParameters modif_param = parameters;
     modif_param.max_radial -= 1;
+    //featomic's rayon pool is built on first use from RAYON_NUM_THREADS and otherwise
+    //takes every logical core, ignoring -cpus and OMP_NUM_THREADS (48 threads on an
+    //8-thread run, 51 s of futex in the test suite)
+#ifdef _OPENMP
+    if (std::getenv("RAYON_NUM_THREADS") == nullptr) { // Flawfinder: ignore
+        const std::string n = std::to_string(omp_get_max_threads());
+#ifdef _WIN32
+        _putenv_s("RAYON_NUM_THREADS", n.c_str());
+#else
+        setenv("RAYON_NUM_THREADS", n.c_str(), 1);
+#endif
+    }
+#endif
     auto calculator = featomic::Calculator("spherical_expansion", modif_param.to_json().c_str());
 
     featomic::CalculationOptions calc_opts;
@@ -563,6 +576,18 @@ cdouble aux_density_table::fourier_atom(
     return sf;
 }
 
+double aux_density_table::lap(const double x, const double y, const double z, const double* coefs) const
+{
+    double gx, gy, gz, lap;
+    (*this)(x, y, z, coefs, gx, gy, gz, lap);
+    return lap;
+}
+double aux_density_table::eli(const double x, const double y, const double z, const double* coefs) const
+{
+    double gx, gy, gz, lap;
+    const double rho = (*this)(x, y, z, coefs, gx, gy, gz, lap);
+    return aux_density::eli_from_density(rho, gx * gx + gy * gy + gz * gz, lap);
+}
 double aux_density_table::esp(const double x, const double y, const double z, const double* coefs) const
 {
     return aux_density::esp_at(x, y, z, n_at, cx.data(), cy.data(), cz.data(), Z.data(), sh_start.data(), sh_l.data(), pr_start.data(), coef_off.data(), pr_exp.data(), pr_norm.data(), coefs);

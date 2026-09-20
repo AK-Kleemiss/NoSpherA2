@@ -1,9 +1,6 @@
 #include "pch.h"
 #include "crystal_energies.h"
-#include "SALTED_predictor.h"
-#include "basis_set.h"
 #include "nos_math.h"
-#include "npy.h"
 
 namespace crystal_energies {
     vec2 real_sh_rotation(const int l, const vec2& R)
@@ -122,33 +119,6 @@ namespace crystal_energies {
                 I[i][j] = (M[r1][c1] * M[r2][c2] - M[r1][c2] * M[r2][c1]) / det;
             }
         return I;
-    }
-
-    vec fitted_coefficients(const WFN& wavy, const std::filesystem::path& coef_file, WFN& aux, options& opt)
-    {
-        vec coef;
-        if (!coef_file.empty()) {
-            err_checkf(!opt.aux_basis.empty(), "No auxiliary basis set specified! Use -ri_fit BEFORE the interaction energy flag", std::cout);
-            aux = generate_aux_wfn(wavy, opt.aux_basis);
-            std::vector<unsigned long> shape; bool fortran_order;
-            npy::LoadArrayFromNumpy(coef_file.string(), shape, fortran_order, coef);
-        }
-        else if (opt.SALTED) {
-            err_checkf(!opt.salted_model_dir.empty(), "No SALTED model directory specified! Use -SALTED <model-dir> BEFORE the interaction energy flag", std::cout);
-            SALTEDPredictor SP(wavy, opt);
-            if (!SP.basis_set_loaded()) load_basis_into_WFN(SP.wavy, BasisSetLibrary::get_basis_set(SP.get_dfbasis_name()));
-            coef = SP.gen_SALTED_densities();
-            err_checkf(SP.wavy.get_ncen() == wavy.get_ncen(), "The SALTED model does not cover every atom of " + wavy.get_path().string(), std::cout);
-            aux = SP.wavy;
-            aux.set_origin(e_origin::NOT_YET_DEFINED);
-        }
-        else {
-            err_checkf(!opt.aux_basis.empty(), "No auxiliary basis set specified! Use -ri_fit <basis> or -SALTED <model-dir> BEFORE the interaction energy flag", std::cout);
-            err_checkf(wavy.get_nmo() > 0, "Only a wavefunction can be fitted; " + wavy.get_path().string() + " needs coefficients or -SALTED <model-dir>", std::cout);
-            aux = generate_aux_wfn(wavy, opt.aux_basis);
-            coef = DensityFitting::density_fit(wavy, aux, DensityFitting::config_from_options(opt));
-        }
-        return coef;
     }
 
     namespace {
@@ -313,22 +283,17 @@ namespace crystal_energies {
         const job J = read_job(opt.interaction_energies_job);
         cell c(J.cif, std::cout, opt.debug, true);
         std::cout << std::endl;
+        std::vector<Gaussian_Molecule> mol;
         std::vector<WFN> aux;
-        std::vector<vec> coef;
         for (int i = 0; i < (int)J.structures.size(); i++) {
-            const WFN wavy(J.structures[i]);
-            WFN a;
-            coef.push_back(fitted_coefficients(wavy, J.coefficients[i], a, opt));
-            aux.push_back(a);
+            mol.emplace_back(WFN(J.structures[i]), opt, J.coefficients[i]);
+            aux.push_back(mol.back().basis());
         }
         std::vector<pair> pairs = contacts(c, aux, J.cutoff);
         std::cout << pairs.size() << " molecule pairs within " << J.cutoff << " A" << std::endl;
         const double kJ = constants::kcal_mol_per_hartree * 4.184;
         for (int p = 0; p < (int)pairs.size(); p++) {
-            WFN B = aux[pairs[p].B];
-            vec cB = coef[pairs[p].B];
-            transform(B, cB, pairs[p].R, pairs[p].t);
-            pairs[p].E = DensityFitting::interaction_energy(coef[pairs[p].A], aux[pairs[p].A], cB, B, opt.repulsion_overlap, opt.repulsion_exchange);
+            pairs[p].E = mol[pairs[p].A].interaction(mol[pairs[p].B].transformed(pairs[p].R, pairs[p].t), opt.repulsion_overlap, opt.repulsion_exchange);
             std::cout << "PAIR " << p + 1 << "/" << pairs.size() << " " << pairs[p].A << " " << pairs[p].B << " " << pairs[p].symop << " n=" << pairs[p].n[0] << "," << pairs[p].n[1] << "," << pairs[p].n[2]
                       << std::fixed << std::setprecision(3) << " R=" << pairs[p].distance << " total=" << pairs[p].E.total() * kJ << " kJ/mol" << std::endl;
         }

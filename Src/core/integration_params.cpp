@@ -180,17 +180,14 @@ void Int_Params::collect_basis_data()
                 "overlap computed from this basis will not have a unit diagonal." << std::endl;
         }
 
+        //OCC and NOT_YET_DEFINED store l in get_type(), every file reader (gbw, wfx, tonto, ptb, xtb,
+        //molden, fchk, XCW_fit) stores l + 1
+        const int type_offset = (wfn_origin == e_origin::NOT_YET_DEFINED || wfn_origin == e_origin::OCC) ? 0 : 1;
         int max_l = 1;
         for (int func = 0; func < basis.size(); func++)
         {
-            int new_l = 0;
-            if (wfn_origin == e_origin::NOT_YET_DEFINED || wfn_origin == e_origin::OCC)      new_l = basis[func].get_type();
-            else if (wfn_origin == e_origin::gbw || wfn_origin == e_origin::wfx || wfn_origin == e_origin::tonto || wfn_origin == e_origin::ptb || wfn_origin == e_origin::XCW_fit) new_l = basis[func].get_type() - 1;
-            else {
-                std::cout << "THIS WFN ORIGIN IS UNTESTED, THREAD CAREFULLY!!!!!" << std::endl;
-                new_l = basis[func].get_type() - 1;
-            }
-
+            const int new_l = basis[func].get_type() - type_offset;
+            err_checkf(new_l >= 0, "Negative angular momentum in the basis of atom " + std::to_string(atom_idx) + ", origin " + std::to_string(static_cast<int>(wfn_origin)), std::cout);
             if (new_l > max_l) max_l = new_l;
         }
 
@@ -203,9 +200,7 @@ void Int_Params::collect_basis_data()
                 int curr_funcs = (int)atoms[atom_idx].get_shellcount()[shell_idx];
 
                 //Sort functions regarding the angular momentum
-                if (((basis[n_funcs].get_type()-1 != l) && //First case, function type start with s=1
-                        (wfn_origin == e_origin::gbw || wfn_origin == e_origin::wfx || wfn_origin == e_origin::tonto || wfn_origin == e_origin::ptb || wfn_origin == e_origin::xtb || wfn_origin == e_origin::XCW_fit))  ||
-                        ((basis[n_funcs].get_type() != l) && (wfn_origin == e_origin::NOT_YET_DEFINED || wfn_origin == e_origin::OCC))) {  //Second type s = 0
+                if (basis[n_funcs].get_type() - type_offset != l) {
                     n_funcs += curr_funcs;
                     continue;
                 }

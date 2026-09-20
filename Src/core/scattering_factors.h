@@ -78,12 +78,13 @@ bool stream_mtc_salted(options& opt, std::vector<WFN>& wavy, std::ostream& file,
 
 //everything a disorder part needs for the transform, gathered once; all of it is reflection-independent,
 //which is what lets the -mtc reflection loop be moved outside the parts
+class Gaussian_Molecule;
+
 struct salted_part_prep
 {
-    vec coefs;
+    std::shared_ptr<Gaussian_Molecule> mol;
     ivec asym_atom_list;
     svec labels;
-    const std::vector<atom>* atoms = nullptr;  // owned by the predictor, which outlives this
     vec2 k_pt;
     std::vector<i3> hkl_v;
     //spherical remainder only
@@ -173,7 +174,7 @@ void generate_fractional_hkl(
     const vec2& twin_law,
     cell& unit_cell,
     std::ostream& file,
-    double stepsize,
+    const d3& stepsize,
     bool debug);
 
 /**
@@ -293,12 +294,23 @@ void calc_SF(const int& points,
 
 double fourier_bessel_integral(
     const primitive& p,
-    const double& H);
+    const double& H,
+    const int& l);
 
 cdouble sfac_bessel(
     const primitive& p,
     const double* k_point,
     const double* coefs);
+
+//Form factors of the listed atoms of a fitted density at every k-point, sf[atom][k]: the Fourier-Bessel transform
+//of aux_density_table::fourier_atom with the radial factors tabulated once per k over the distinct (exponent, l)
+void calc_SF_SALTED(
+    const vec2& k_pt,
+    const vec& coefs,
+    const aux_density_table& table,
+    const ivec& asym_atom_list,
+    cvec2& sf,
+    ProgressBar* progress = nullptr);
 
 /**
  * @brief Calculates the diffuse scattering factors.

@@ -97,7 +97,7 @@ void Calc_Rho(
     double radius,
     std::ostream &file,
     bool wrap = true);
-//Any point function on the grid within radius of the atoms of wavy, e.g. rho or the ESP of an ML_density
+//Any point function on the grid within radius of the atoms of wavy
 void Calc_Cube(
     cube &Cube,
     const WFN &wavy,
@@ -395,11 +395,15 @@ void Calc_Hirshfeld_atom(
     std::ostream &file,
     bool wrap = true);
 
+//rho and ELI-D on two cubes from the orbitals. With `field` (a fitted density) rho comes
+//from the fit; ELI-D still needs the orbitals and stays zero without them
+struct density_field;
 void Calc_RhoEli(
     cube &CubeRho,
     cube &CubeEli,
     const WFN &wavy,
-    double radius);
+    double radius,
+    const density_field *field = nullptr);
 
 /**
  * Calculates the properties based on the given options.
@@ -422,8 +426,112 @@ void promolecular_nci_analysis(
 void do_combine_mo(options &opt);
 
 void dipole_moments(options &opt, std::ostream &log2 = std::cout);
-vec2 dipole_moments(WFN &wavy, cube &SPHER, double *MinMax, int *NbSteps, int threads, double radius, std::ostream &log2 = std::cout, bool debug = false);
 void polarizabilities(options &opt, std::ostream &log2 = std::cout);
 
 #include "wfn_class.h"
 #include "cell.h"
+#include "density_source.h"
+
+void print_time(_time_point &start, _time_point &end, std::ostream &file);
+
+//The same cube functions over any density source (density_source.h): a Gaussian_Molecule, a Gaussian_Atom, a
+//Centred atom model. The WFN overloads above keep the orbital kernels; here rho, its derivatives and the ESP come
+//from the source alone, so ELF (orbitals) is refused with a message
+inline bool near_any(const d3 &pos, const std::vector<d3> &centres, double radius_bohr)
+{
+    for (const d3 &c : centres)
+        if (array_length(pos, c) < radius_bohr)
+            return true;
+    return false;
+}
+template <PointDensity S>
+void Calc_Rho(cube &CubeRho, const S &src, double radius, std::ostream &file, bool wrap = true)
+{
+    _time_point start = get_time();
+    const double r = constants::ang2bohr(radius);
+    const std::vector<d3> centres = source_positions(src);
+    CubeRho.evaluate_on_grid([&](const d3 &pos) { return near_any(pos, centres, r) ? calculate_density(src, pos) : 0.0; }, wrap);
+    _time_point end = get_time();
+    print_time(start, end, file);
+}
+template <PointDensity S>
+void Calc_Eli(cube &CubeEli, const S &src, double radius, std::ostream &file = std::cout, bool wrap = false)
+{
+    _time_point start = get_time();
+    const double r = constants::ang2bohr(radius);
+    const std::vector<d3> centres = source_positions(src);
+    CubeEli.evaluate_on_grid([&](const d3 &pos) { return near_any(pos, centres, r) ? calculate_eli(src, pos) : 0.0; }, wrap);
+    _time_point end = get_time();
+    print_time(start, end, file);
+}
+template <PointPotential S>
+void Calc_ESP(cube &CubeESP, const S &src, double radius, bool no_date, std::ostream &file, bool wrap = true)
+{
+    _time_point start = get_time();
+    const double r = constants::ang2bohr(radius);
+    const std::vector<d3> centres = source_positions(src);
+    CubeESP.evaluate_on_grid([&](const d3 &pos) { return near_any(pos, centres, r) ? src.esp(pos) : 0.0; }, wrap);
+    if (!no_date)
+    {
+        _time_point end = get_time();
+        print_time(start, end, file);
+    }
+}
+//RDG visualisations use 101.0 as the mask outside the calculation radius; with wrap every point is visited once per
+//periodic image, so the mask is applied after the loop where rho stayed exactly zero. Rho becomes sign(lambda2) rho
+inline void finish_signed_rho(std::vector<cube> &Cubes, const cube &rho_contrib)
+{
+    Cubes[cube_type::Rho] = rho_contrib;
+    cube &rdg = Cubes[cube_type::RDG];
+    for (int x = 0; x < rdg.get_size(0); x++)
+        for (int y = 0; y < rdg.get_size(1); y++)
+            for (int z = 0; z < rdg.get_size(2); z++)
+                if (rho_contrib.get_value(x, y, z) == 0.0)
+                    rdg.set_value(x, y, z, 101.0);
+}
+//RDG, Laplacian and ELI-D (PC07) of the loaded cubes from the density of src; ELF needs orbitals and exits
+template <PointDensity S>
+void Calc_Prop(std::vector<cube> &Cubes, const S &src, double radius, std::ostream &file, bool test, bool wrap = true)
+{
+    err_checkf(!Cubes[cube_type::Elf].get_loaded(), std::string("ELF needs orbitals, the ") + source_name(src) + " has none", file);
+    const bool rdg = Cubes[cube_type::RDG].get_loaded(), lap_c = Cubes[cube_type::Lap].get_loaded(), eli_c = Cubes[cube_type::Eli].get_loaded();
+    if (!rdg && !lap_c && !eli_c)
+        return;
+    _time_point start = get_time();
+    const double r = constants::ang2bohr(radius);
+    const std::vector<d3> centres = source_positions(src);
+    cube rho_contrib(Cubes[cube_type::Rho]);
+    rho_contrib.evaluate_on_grid(
+        [&](const d3 &pos, const i3 &, const i3 &idx) {
+            if (!near_any(pos, centres, r))
+                return 0.0;
+            d3 g;
+            double lap;
+            double rho = calculate_density(src, pos, g, lap);
+            const double g2 = g[0] * g[0] + g[1] * g[1] + g[2] * g[2];
+            auto add = [&](cube_type t, double v) {
+                Cubes[t].set_value(idx[0], idx[1], idx[2], Cubes[t].get_value(idx[0], idx[1], idx[2]) + (std::isfinite(v) ? v : 0.0));
+            };
+            if (lap_c)
+                add(cube_type::Lap, lap);
+            if (eli_c)
+                add(cube_type::Eli, aux_density::eli_from_density(rho, g2, lap));
+            if (rdg)
+            {
+                add(cube_type::RDG, rho > 0 ? constants::alpha_coef * std::sqrt(g2) / std::pow(rho, constants::c_43) : 0.0);
+                double H[9];
+                calculate_hessian(src, pos, H);
+                if (get_lambda_1(H) < 0)
+                    rho = -rho;
+            }
+            return rho;
+        },
+        wrap);
+    if (rdg)
+        finish_signed_rho(Cubes, rho_contrib);
+    if (!test)
+    {
+        _time_point end = get_time();
+        print_time(start, end, file);
+    }
+}

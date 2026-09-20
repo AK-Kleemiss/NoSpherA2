@@ -21,6 +21,7 @@
 #include "blas_gpu.h"
 #endif
 #include "SALTED_utilities.h"
+#include "gaussian_atom.h"
 #include "GridManager.h"
 #include "cube.h"
 #ifdef NOSPHERA2_USE_GPU
@@ -217,7 +218,7 @@ void read_hkl(const std::filesystem::path& hkl_filename,
 		// if (debug) file << "hkl: ";
 		for (int i = 0; i < 3; i++)
 		{
-			temp = line.substr(4 * size_t(i) + 1, 3);
+			temp = line.substr(4 * size_t(i), 4);
 			temp.erase(remove_if(temp.begin(), temp.end(), ::isspace), temp.end());
 			hkl_[i] = stoi(temp);
 			// if (debug) file << setw(4) << temp;
@@ -345,16 +346,18 @@ hkl_list read_hkl_full(const std::filesystem::path& hkl_filename,
 		// if (debug) file << "hkl: ";
 		for (int i = 0; i < 3; i++)
 		{
-			temp = line.substr(4 * size_t(i) + 1, 4);
+			temp = line.substr(4 * size_t(i), 4);
 			temp.erase(remove_if(temp.begin(), temp.end(), ::isspace), temp.end());
 			hkl_[i] = stoi(temp);
 			// if (debug) file << setw(4) << temp;
 		}
-		temp = line;
-		temp.erase(0, 12);
-		int dot = temp.find_first_of('.');
+		//F2 runs up to two digits past its decimal point, sigma is the rest: this also reads
+		//files whose F2 field is wider than the 3I4,2F8.2 eight characters
+		temp = line.substr(12);
+		const size_t dot = temp.find_first_of('.');
+		err_checkf(dot != std::string::npos, "hkl line without an F2 value: '" + line + "'", file);
 		std::string temp_F = temp.substr(0, dot + 3);
-		std::string temp_sigma = temp.substr(dot + 3, temp.size() - dot - 3);
+		std::string temp_sigma = temp.substr(std::min(dot + 3, temp.size()));
 		temp_sigma.erase(remove_if(temp_sigma.begin(), temp_sigma.end(), ::isspace), temp_sigma.end());
 		sigma2_ = stof(temp_sigma);
 		temp_F.erase(remove_if(temp_F.begin(), temp_F.end(), ::isspace), temp_F.end());
@@ -1014,7 +1017,8 @@ svec read_atoms_from_CIF(std::ifstream& cif_input,
 				err_checkf(position_field[2] != -1, "No z position found, impossible to continue!", std::cout);
 				err_checkf(type_field != -1, "No type found, impossible to continue!", std::cout);
 			}
-			while (trim(line).find("_") > 0 && line.length() > 3)
+			// the next loop_ or data item ends the atom rows
+			while (trim(line).find("_") > 0 && trim(line).find("loop_") != 0 && line.length() > 3)
 			{
 				atoms_read = true;
 				svec fields;
@@ -1134,7 +1138,7 @@ svec read_atoms_from_CIF(std::ifstream& cif_input,
 								if (debug)
 								{
 									file << "\nElement symbol not found in label, this is a problem!\n checking type...";
-									if (type.find(element) == string::npos || label.find(element) > 2)
+									if (type.find(element) != 0)
 									{
 										file << " ALSO FAILED! WILL IGNORE ATOM!\n";
 										continue;
@@ -1142,7 +1146,7 @@ svec read_atoms_from_CIF(std::ifstream& cif_input,
 								}
 								else
 								{
-									if (type.find(element) == string::npos || label.find(element) > 2)
+									if (type.find(element) != 0)
 									{
 										file << "\nAtom " << label << " was not matching by element determined by label reduction or type field, skipping!\n";
 										continue;
@@ -1154,7 +1158,7 @@ svec read_atoms_from_CIF(std::ifstream& cif_input,
 								if (debug)
 								{
 									file << "\nElement symbol not found in label, this is a problem!\n will check type...";
-									if (type.find(element) == string::npos || label.find(element) > 2)
+									if (type.find(element) != 0)
 									{
 										file << " ALSO FAILED! WILL IGNORE ATOM!\n";
 										continue;
@@ -1162,7 +1166,7 @@ svec read_atoms_from_CIF(std::ifstream& cif_input,
 								}
 								else
 								{
-									if (type.find(element) == string::npos || label.find(element) > 2)
+									if (type.find(element) != 0)
 									{
 										file << "\nAtom " << label << " was not matching by element determined by label reduction or type field, skipping!\n";
 										continue;
@@ -1787,7 +1791,7 @@ void calc_SF_SALTED(
 	const aux_density_table& table,
 	const ivec& asym_atom_list,
 	cvec2& sf,
-	ProgressBar* progress = nullptr)
+	ProgressBar* progress)
 {
 	const int num_asym_atoms = static_cast<int>(asym_atom_list.size());
 	const int nk = static_cast<int>(k_pt[0].size());
@@ -2956,7 +2960,7 @@ tsc_block_type calculate_scattering_factors(
 #ifdef NOSPHERA2_USE_GPU
         equicomb_set_gpu(opt.use_gpu && opt.gpu_salted);
 #endif
-        vec coefs = calculator.gen_SALTED_densities();
+        auto ml = std::make_shared<Gaussian_Molecule>(calculator.wavy, calculator.gen_SALTED_densities());
         file << setw(13 * 4) << "... done!" << endl;
         time_points.push_back(get_time());
         time_descriptions.push_back("SALTED prediction");
@@ -2965,7 +2969,7 @@ tsc_block_type calculate_scattering_factors(
 		err_checkf(labels.size() == asym_atom_list.size(),
 			"Inconsistent SALTED atom bookkeeping after disorder filtering!", file);
 
-		vec atom_elecs = calc_atomic_density(calculator.wavy.get_atoms(), coefs);
+		vec atom_elecs = ml->populations();
 		file << "Table of Charges in electrons\n"
 			<< "       Atom      ML" << endl;
 
@@ -2986,10 +2990,9 @@ tsc_block_type calculate_scattering_factors(
 		if (prep_out != NULL)
 		{
 			//-mtc streaming: the reflection loop lives outside, so hand back the reflection-independent part and stop
-			prep_out->coefs = std::move(coefs);
+			prep_out->mol = ml;
 			prep_out->asym_atom_list = asym_atom_list;
 			prep_out->labels = labels;
-			prep_out->atoms = calculator.wavy.get_atoms_ptr();
 			prep_out->k_pt = k_pt;
 			prep_out->hkl_v.assign(hkl.begin(), hkl.end());
 			//carried so the -mtc loop can convert to ED per block without a unit cell of its own
@@ -2999,8 +3002,6 @@ tsc_block_type calculate_scattering_factors(
 			return tsc_block_type();
 		}
 
-		//one table for every block, building it per block cost more than the transform
-		const aux_density_table aux_table(calculator.wavy.get_atoms());
 		if (stream_tsc)
 		{
 			ScattererLabels stream_ids;
@@ -3038,9 +3039,7 @@ tsc_block_type calculate_scattering_factors(
 			stream_blocks(opt, file, "experimental.tscb", stream_ids, hkl_v, n_refl,
 				[&](const size_t lo, const size_t hi, ProgressBar& progress)
 				{
-					cvec2 chunk;
-					calc_SF_SALTED(slice_k_points(k_pt, lo, hi), coefs,
-						aux_table, asym_atom_list, chunk, &progress);
+					cvec2 chunk = ml->scattering_factors(slice_k_points(k_pt, lo, hi), asym_atom_list, &progress);
 					//Mott-Bethe never looks outside one reflection, so a block is as valid a unit as a table
 					if (opt.electron_diffraction)
 						convert_to_ED(asym_atom_list, *wavy, chunk, unit_cell,
@@ -3052,14 +3051,7 @@ tsc_block_type calculate_scattering_factors(
 				});
 		}
 		else
-		{
-			calc_SF_SALTED(
-				k_pt,
-				coefs,
-				aux_table,
-				asym_atom_list,
-				sf);
-		}
+			sf = ml->scattering_factors(k_pt, asym_atom_list);
 		file << setw(13 * 4) << "... done!\n"
 			<< flush;
 		time_points.push_back(get_time());
@@ -3128,13 +3120,13 @@ tsc_block_type calculate_scattering_factors(
             //if (wavy->get_origin() == e_origin::ptb)
             //    config.restraint_strength = 1.0e-4;
 
-            vec coefs = DensityFitting::density_fit(*wavy, wavy_aux, config);
+            const Gaussian_Molecule ml(wavy_aux, DensityFitting::density_fit(*wavy, wavy_aux, config));
             file << setw(12 * 4 + 2) << "... done!\n"
                 << flush;
             time_points.push_back(get_time());
             time_descriptions.push_back("RI-Fit");
 
-            vec atom_elecs = calc_atomic_density(wavy_aux.get_atoms(), coefs);
+            vec atom_elecs = ml.populations();
             file << "Table of Charges in electrons\n"
                 << "       Atom  Charge_RI" << endl;
 
@@ -3153,7 +3145,6 @@ tsc_block_type calculate_scattering_factors(
             time_points.push_back(get_time());
             time_descriptions.push_back("Calculation of Charges");
 
-            const aux_density_table aux_table(wavy_aux.get_atoms());
             if (stream_tsc)
             {
                 //as the SALTED case above, but the atoms come from the auxiliary wavefunction, so no spherical remainder
@@ -3166,9 +3157,7 @@ tsc_block_type calculate_scattering_factors(
                     stream_ids, hkl_v, hkl_v.size(),
                     [&](const size_t lo, const size_t hi, ProgressBar& progress)
                     {
-                        cvec2 chunk;
-                        calc_SF_SALTED(slice_k_points(k_pt, lo, hi), coefs,
-                            aux_table, asym_atom_list, chunk, &progress);
+                        cvec2 chunk = ml.scattering_factors(slice_k_points(k_pt, lo, hi), asym_atom_list, &progress);
                         if (opt.electron_diffraction)
                             convert_to_ED(asym_atom_list, *wavy, chunk, unit_cell,
                                 std::vector<i3>(hkl_v.begin() + lo, hkl_v.begin() + hi));
@@ -3176,14 +3165,7 @@ tsc_block_type calculate_scattering_factors(
                     });
             }
             else
-            {
-                calc_SF_SALTED(
-                    k_pt,
-                    coefs,
-                    aux_table,
-                    asym_atom_list,
-                    sf);
-            }
+                sf = ml.scattering_factors(k_pt, asym_atom_list);
             file << setw(12 * 4 + 2) << "... done!" << endl;
             time_points.push_back(get_time());
             time_descriptions.push_back("Fourier transform");
@@ -3360,10 +3342,6 @@ bool stream_mtc_salted(options& opt, std::vector<WFN>& wavy, std::ostream& file,
 	const size_t n_refl = preps[0].hkl_v.size();
 	file << "Combined tsc: " << ids.size() << " scatterers from "
 		<< n_parts << " parts" << std::endl;
-	std::vector<aux_density_table> aux_tables;
-	for (size_t p = 0; p < preps.size(); p++)
-		aux_tables.emplace_back(*preps[p].atoms);
-
 	//the bar counts reflections * parts, since every part is evaluated for every block
 	stream_blocks(opt, file, "experimental.tscb", ids, preps[0].hkl_v,
 		n_refl * preps.size(),
@@ -3373,9 +3351,7 @@ bool stream_mtc_salted(options& opt, std::vector<WFN>& wavy, std::ostream& file,
 			combined.reserve(ids.size());
 			for (size_t p = 0; p < preps.size(); p++)
 			{
-				cvec2 chunk;
-				calc_SF_SALTED(slice_k_points(preps[p].k_pt, lo, hi), preps[p].coefs,
-					aux_tables[p], preps[p].asym_atom_list, chunk, &progress);
+				cvec2 chunk = preps[p].mol->scattering_factors(slice_k_points(preps[p].k_pt, lo, hi), preps[p].asym_atom_list, &progress);
 				if (opt.electron_diffraction)
 					convert_to_ED(preps[p].asym_atom_list, preds[p]->wavy, chunk,
 						vec(preps[p].stl_of_reflection.begin() + lo,

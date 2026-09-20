@@ -20,9 +20,23 @@ static void warn_about_working_directory()
     }
 }
 
+//Production code leaves std::fixed / setprecision on std::cout (run_app restores it, a direct call does not); a
+//test that then checks printed numbers would read the previous test's format. Reset before every test.
+struct CoutFormatReset : ::testing::EmptyTestEventListener
+{
+    void OnTestStart(const ::testing::TestInfo&) override
+    {
+        std::cout.flags(std::ios::dec | std::ios::skipws);
+        std::cout.precision(6);
+        std::cout.width(0);
+        std::cout.clear();
+    }
+};
+
 int main(int argc, char** argv)
 {
     ::testing::InitGoogleTest(&argc, argv);
+    ::testing::UnitTest::GetInstance()->listeners().Append(new CoutFormatReset);
     warn_about_working_directory();
     return RUN_ALL_TESTS();
 }

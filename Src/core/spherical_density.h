@@ -47,8 +47,8 @@ inline double linear_interpolate_spherical_density(
         return 0;
     else if (dist < spherical_dist[0])
         return radial_dens[0];
-    const int nr = std::max(1, log_spline_index(spherical_dist, dist, lincr, start));
-    result = radial_dens[nr] + (radial_dens[nr + 1] - radial_dens[nr]) / (spherical_dist[nr] - spherical_dist[nr - 1]) * (dist - spherical_dist[nr - 1]);
+    const int nr = log_spline_index(spherical_dist, dist, lincr, start);
+    result = radial_dens[nr] + (radial_dens[nr + 1] - radial_dens[nr]) / (spherical_dist[nr + 1] - spherical_dist[nr]) * (dist - spherical_dist[nr]);
     if (result < 1E-10)
         result = 0;
     return result;
@@ -404,63 +404,6 @@ private:
     double _delta_frac;
     Thakkar _neutral;
     std::unique_ptr<Thakkar> _ion;
-};
-
-class Gaussian_Atom : public Spherical_Atom
-{
-protected:
-    const int* ng, * nh;
-    int first_atomic_number;
-    const int previous_element_coef() const override;
-    void calc_orbs(int& nr_ex,
-        int& nr_coef,
-        const double& dist,
-        const int& offset,
-        const int* n_vector,
-        const int lower_m,
-        const int upper_m,
-        double* Orb) const override;
-    double calc_type(
-        int& nr_ex,
-        int& nr_coef,
-        const double& k_vector,
-        const int& offset,
-        const int* n_vector,
-        const int lower_m,
-        const int upper_m,
-        const int& max,
-        const int& min) const override;
-
-public:
-    Gaussian_Atom(const int g_atom_number, std::string& basis);
-    Gaussian_Atom() = default;
-    const double get_radial_density(const double& dist) const override;
-    const double get_form_factor(const double& k_vector) const override;
-    const double get_core_form_factor(const double& k_vector, const int& core_els) const override;
-    const double get_custom_form_factor(
-        const double& k_vector,
-        const int& max_s,
-        const int& max_p,
-        const int& max_d,
-        const int& max_f,
-        const int& min_s,
-        const int& min_p,
-        const int& min_d,
-        const int& min_f) const override;
-    const double get_custom_form_factor(
-        const double& k_vector,
-        const int& max_s,
-        const int& max_p,
-        const int& max_d,
-        const int& max_f,
-        const int& max_g,
-        const int& max_h,
-        const int& min_s,
-        const int& min_p,
-        const int& min_d,
-        const int& min_f,
-        const int& min_g,
-        const int& min_h) const;
 };
 
 class Spherical_Gaussian_Density

@@ -27,6 +27,7 @@ static std::vector<DensityExtremum> find_line_density_extrema(
     const WFN &wfn,
     int atomA,
     int atomB,
+    const DensityBatch &rho,
     int samples = 400,
     bool refine = true)
 {
@@ -53,7 +54,14 @@ static std::vector<DensityExtremum> find_line_density_extrema(
     const double dt = (t1 - t0) / (samples - 1);
 
     vec dens(samples);
-    vec ts(samples);
+    vec ts(samples), xs(samples), ys(samples), zs(samples);
+    for (int i = 0; i < samples; i++) {
+        ts[i] = t0 + i * dt;
+        xs[i] = pos_a[0] + dx[0] * ts[i];
+        ys[i] = pos_a[1] + dx[1] * ts[i];
+        zs[i] = pos_a[2] + dx[2] * ts[i];
+    }
+    rho(samples, xs.data(), ys.data(), zs.data(), dens.data());
     Thakkar *spherical_temp1 = NULL;
     Thakkar *spherical_temp2 = NULL;
     Spherical_Gaussian_Density *a1 = NULL;
@@ -64,21 +72,14 @@ static std::vector<DensityExtremum> find_line_density_extrema(
         a1 = new Spherical_Gaussian_Density(wfn.get_atom_charge(atomA), wfn.get_ECP_mode());
         a2 = new Spherical_Gaussian_Density(wfn.get_atom_charge(atomB), wfn.get_ECP_mode());
     }
-#pragma omp parallel for
-    for (int i = 0; i < samples; i++) {
-        const double t = t0 + i * dt;
-        ts[i] = t;
-        const d3 Pos = { pos_a[0] + dx[0] * t,
-          pos_a[1] + dx[1] * t,
-          pos_a[2] + dx[2] * t };
-        dens[i] = wfn.compute_dens(Pos);
-        if (wfn.get_ECP_mode() != 0) {
+    if (wfn.get_ECP_mode() != 0)
+        for (int i = 0; i < samples; i++) {
+            const double t = ts[i];
             dens[i] += spherical_temp1->get_core_density(ab_len * t, wfn.get_atom_ECP_electrons(atomA));
             dens[i] += spherical_temp2->get_core_density(ab_len * (1.0 - t), wfn.get_atom_ECP_electrons(atomB));
             dens[i] += a1->get_radial_density(ab_len * t);
             dens[i] += a2->get_radial_density(ab_len * (1.0 - t));
         }
-    }
 
     if (wfn.get_ECP_mode() != 0) {
         delete spherical_temp1;
@@ -115,7 +116,7 @@ static std::vector<DensityExtremum> find_line_density_extrema(
                 const d3 Pos = { pos_a[0] + dx[0] * t_ext,
                   pos_a[1] + dx[1] * t_ext,
                   pos_a[2] + dx[2] * t_ext };
-                f_ext = wfn.compute_dens(Pos);
+                rho(1, &Pos[0], &Pos[1], &Pos[2], &f_ext);
             }
         }
 
@@ -251,14 +252,14 @@ int AtomGrid::get_num_grid_points() const { return (int)atom_grid_x_bohr_.size()
 
 int AtomGrid::get_num_radial_grid_points() const { return num_radial_grid_points_; }
 
-vec make_chi(const WFN& wfn, int samples, bool refine, bool debug) {
+vec make_chi(const WFN& wfn, int samples, bool refine, bool debug, const DensityBatch& density) {
     const int ncen = wfn.get_ncen();
-    const int nmo = wfn.get_nmo();
-    if (nmo == 0) {
+    if (!density && wfn.get_nmo() == 0) {
         if (debug)
             std::cout << "make_chi: No molecular orbitals found, skipping chi calculation." << std::endl;
         return vec(0); // Default to all pairs being "far apart" if no MOs
     }
+    const DensityBatch rho = density ? density : density_batch(wfn);
     vec chi(static_cast<size_t>(ncen) * ncen, 0.0);
     std::vector<std::vector<bool>> neighbours(ncen, bvec(ncen, true));
     double rijx2, rijy2, rijz2, xdist, disth;
@@ -309,7 +310,7 @@ vec make_chi(const WFN& wfn, int samples, bool refine, bool debug) {
                 }
                 else {
                     // If they are neighbours and close enough we do the line search for topology evaluation!
-                    auto extrema = find_line_density_extrema(wfn, a, b, samples, refine);
+                    auto extrema = find_line_density_extrema(wfn, a, b, rho, samples, refine);
                     size_t use_extr = 0;
                     if (wfn.get_atom_ECP_electrons(a) != 0 || wfn.get_atom_ECP_electrons(b) != 0) {
                         double closeness = 1.0;
@@ -431,13 +432,25 @@ void AtomGrid::get_grid(const int num_centers,
 
     if (num_centers > 1) {
         const int np = get_num_grid_points();
+        //The pair distances do not depend on the point; the weight loop used to take
+        //a square root per pair per point for them
+        vec dist_ab((size_t)num_centers * num_centers);
+        for (int a = 0; a < num_centers; a++)
+            for (int b = 0; b < num_centers; b++) {
+                const double vx = x_coordinates_bohr[b] - x_coordinates_bohr[a];
+                const double vy = y_coordinates_bohr[b] - y_coordinates_bohr[a];
+                const double vz = z_coordinates_bohr[b] - z_coordinates_bohr[a];
+                dist_ab[(size_t)a * num_centers + b] = std::sqrt(vx * vx + vy * vy + vz * vz);
+            }
 #pragma omp parallel
         {
             vec pa_b(num_centers);
             vec pa_tv(num_centers);
             std::array<double, 2> result_weights;
             double temp;
-#pragma omp for
+            //The pair loop skips far-away centres, so the outer shells are cheaper than
+            //the inner ones and static chunks end in a 7 s barrier over the test suite
+#pragma omp for schedule(dynamic, 256)
             for (int ipoint = 0; ipoint < np; ipoint++) {
                 grid_x_bohr[ipoint] = atom_grid_x_bohr_[ipoint] + x_coordinates_bohr[center_index];
                 grid_y_bohr[ipoint] = atom_grid_y_bohr_[ipoint] + y_coordinates_bohr[center_index];
@@ -455,7 +468,8 @@ void AtomGrid::get_grid(const int num_centers,
                     grid_z_bohr[ipoint],
                     pa_b,
                     pa_tv,
-                    chi
+                    chi,
+                    dist_ab.data()
                 );
                 grid_becke_w[ipoint] = temp * result_weights[0];
                 grid_TFVC_w[ipoint] = temp * result_weights[1];
@@ -547,27 +561,43 @@ std::array<double, 2> get_integration_weights(const int& num_centers,
     const double& z,
     std::vector<double>& pa_b,
     std::vector<double>& pa_tv,
-    const vec& chi)
+    const vec& chi,
+    const double *dist_ab_table)
 {
     double mu_ab, nu_ab, f, dist_ab;
     double dist_a, dist_b;
     double vx, vy, vz;
     double R_a, R_b, chi_becke, u_ab, chi_mod;
     const double* chi_off, * bragg = constants::bragg_angstrom;
-    double* R_v = new double[num_centers];
     const double& cut = constants::cutoff;
+    //Called once per grid point: no allocation, and the distances to every centre
+    //once instead of once per pair
+    thread_local vec R_v, dist, pair_dist;
+    if (R_v.size() < (size_t)num_centers) { R_v.resize(num_centers); dist.resize(num_centers); }
     for (int a = 0; a < num_centers; a++) {
         pa_b[a] = 1.0;
         pa_tv[a] = 1.0;
         R_v[a] = bragg[proton_charges[a]];
+        vx = x_coordinates_bohr[a] - x;
+        vy = y_coordinates_bohr[a] - y;
+        vz = z_coordinates_bohr[a] - z;
+        dist[a] = std::sqrt(vx * vx + vy * vy + vz * vz);
+    }
+    if (dist_ab_table == nullptr) {
+        pair_dist.resize((size_t)num_centers * num_centers);
+        for (int a = 0; a < num_centers; a++)
+            for (int b = 0; b < num_centers; b++) {
+                vx = x_coordinates_bohr[b] - x_coordinates_bohr[a];
+                vy = y_coordinates_bohr[b] - y_coordinates_bohr[a];
+                vz = z_coordinates_bohr[b] - z_coordinates_bohr[a];
+                pair_dist[(size_t)a * num_centers + b] = std::sqrt(vx * vx + vy * vy + vz * vz);
+            }
+        dist_ab_table = pair_dist.data();
     }
 
     if (chi.size() == 0) [[unlikely]] {
         for (int a = 0; a < num_centers; a++) {
-            vx = x_coordinates_bohr[a] - x;
-            vy = y_coordinates_bohr[a] - y;
-            vz = z_coordinates_bohr[a] - z;
-            dist_a = std::sqrt(vx * vx + vy * vy + vz * vz);
+            dist_a = dist[a];
 
             double &pa_b_a = pa_b[a];
             double &pa_tv_a = pa_tv[a];
@@ -579,20 +609,14 @@ std::array<double, 2> get_integration_weights(const int& num_centers,
             }
 
             R_a = R_v[a];
+            const double *dist_ab_row = dist_ab_table + (size_t)a * num_centers;
 
             for (int b = a + 1; b < num_centers; b++) {
                 double &pa_b_b = pa_b[b];
                 double &pa_tv_b = pa_tv[b];
 
-                vx = x_coordinates_bohr[b] - x_coordinates_bohr[a];
-                vy = y_coordinates_bohr[b] - y_coordinates_bohr[a];
-                vz = z_coordinates_bohr[b] - z_coordinates_bohr[a];
-                dist_ab = std::sqrt(vx * vx + vy * vy + vz * vz);
-
-                vx = x_coordinates_bohr[b] - x;
-                vy = y_coordinates_bohr[b] - y;
-                vz = z_coordinates_bohr[b] - z;
-                dist_b = std::sqrt(vx * vx + vy * vy + vz * vz);
+                dist_ab = dist_ab_row[b];
+                dist_b = dist[b];
                 R_b = R_v[b];
 
                 mu_ab = (dist_a - dist_b) / dist_ab;
@@ -632,10 +656,7 @@ std::array<double, 2> get_integration_weights(const int& num_centers,
     }
     else {
         for (int a = 0; a < num_centers; a++) {
-            vx = x_coordinates_bohr[a] - x;
-            vy = y_coordinates_bohr[a] - y;
-            vz = z_coordinates_bohr[a] - z;
-            dist_a = std::sqrt(vx * vx + vy * vy + vz * vz);
+            dist_a = dist[a];
 
             double &pa_b_a = pa_b[a];
             double &pa_tv_a = pa_tv[a];
@@ -648,20 +669,14 @@ std::array<double, 2> get_integration_weights(const int& num_centers,
 
             R_a = R_v[a];
             chi_off = chi.data() + a * num_centers;
+            const double *dist_ab_row = dist_ab_table + (size_t)a * num_centers;
 
             for (int b = a + 1; b < num_centers; b++) {
                 double &pa_b_b = pa_b[b];
                 double &pa_tv_b = pa_tv[b];
 
-                vx = x_coordinates_bohr[b] - x_coordinates_bohr[a];
-                vy = y_coordinates_bohr[b] - y_coordinates_bohr[a];
-                vz = z_coordinates_bohr[b] - z_coordinates_bohr[a];
-                dist_ab = std::sqrt(vx * vx + vy * vy + vz * vz);
-
-                vx = x_coordinates_bohr[b] - x;
-                vy = y_coordinates_bohr[b] - y;
-                vz = z_coordinates_bohr[b] - z;
-                dist_b = std::sqrt(vx * vx + vy * vy + vz * vz);
+                dist_ab = dist_ab_row[b];
+                dist_b = dist[b];
                 R_b = R_v[b];
 
                 // JCP 139, 071103 (2013), eq. 7
@@ -724,8 +739,6 @@ std::array<double, 2> get_integration_weights(const int& num_centers,
             }
         }
     }
-
-    delete[] R_v;
 
     double w_becke = 0.0, w_tfvc = 0.0;
     for (int a = 0; a < num_centers; a++) {

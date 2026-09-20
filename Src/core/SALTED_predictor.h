@@ -8,18 +8,6 @@
 
 //The SALTED prediction for a structure as a flat table with its coefficients, so rho and the ESP
 //can be evaluated at points without a wavefunction (xyz input); opt.salted_model_dir names the model
-class ML_density
-{
-public:
-    ML_density(const WFN& wavy, options& opt);
-    double rho(const d3& p) const { return table(p[0], p[1], p[2], coefs.data()); }
-    double esp(const d3& p) const { return table.esp(p[0], p[1], p[2], coefs.data()); }
-private:
-    vec coefs;
-    aux_density_table table;
-    std::vector<atom> predict(const WFN& wavy, options& opt);
-};
-
 class SALTEDPredictor
 {
 public:

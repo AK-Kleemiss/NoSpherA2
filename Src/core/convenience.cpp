@@ -13,6 +13,7 @@
 #include "bondwise_analysis.h"
 #include "geometry_aid.h"
 #include "crystal_energies.h"
+#include "SALTED_equicomb.h"
 
 #ifdef _WIN32
 #include <windows.h>
@@ -220,7 +221,14 @@ std::string help_message =
  "                                    directory (also needed for -fchk).\n"
  "  -Becke | -TFVC | -mbis | -embis    Select partitioning (default Hirshfeld).\n"
  "  -ri_fit [basis ...]                RI partitioning; omit a basis or use\n"
- "                                    auto_aux to generate one automatically.\n"
+ "                                    auto_aux to generate one automatically, or\n"
+ "                                    auto_aux <elements> for those elements only\n"
+ "                                    (the rest from the basis sets that follow).\n"
+ "                                    With -rho, -esp, -lap or -eli the cubes\n"
+ "                                    come from the fitted density (ELI as\n"
+ "                                    the orbital-free PC07 estimate). Given\n"
+ "                                    before -eli_analysis or -qtaim_eli the\n"
+ "                                    QTAIM basins follow the fitted density.\n"
  "  -multipole_moments <scheme> <N>    Restrain the RI fit to the Hirshfeld, TFVC,\n"
  "                                    MBIS or EMBIS atomic charges and multipoles\n"
  "                                    up to order N (implies -ri_fit).\n"
@@ -356,11 +364,12 @@ std::string help_message =
  "                                    coloured by the ESP, written as\n"
  "                                    <wfn>_rho_esp.obj (red negative, blue\n"
  "                                    positive). Radius is raised to 2.5 A.\n"
- "                                    -rho, -esp and -esp_isosurface also work\n"
- "                                    from -xyz <file> with -SALTED <model>:\n"
- "                                    the density and its analytic potential\n"
- "                                    come from the ML prediction, no\n"
- "                                    wavefunction needed.\n"
+ "                                    -rho, -esp, -lap, -eli and\n"
+ "                                    -esp_isosurface also work from -xyz\n"
+ "                                    <file> with -SALTED <model>: density,\n"
+ "                                    analytic potential, Laplacian and the\n"
+ "                                    PC07 orbital-free ELI come from the ML\n"
+ "                                    prediction, no wavefunction needed.\n"
  "  -def  -HDEF                        Request deformation density or HDEF.\n"
  "  -MO <number|all>                   Generate a molecular-orbital property.\n"
  "  -fukui                             Fukui functions f+/f-/f0 and the dual\n"
@@ -378,7 +387,8 @@ std::string help_message =
  "                                    Grid settings for property calculations.\n"
  "  -hirsh <atom-index>                Hirshfeld analysis for one atom.\n"
  "  -hirshfeld_surface <wfn1> <wfn2>  Hirshfeld-surface analysis: d_i and d_e\n"
- "                                    coloured surfaces, fingerprint, and the\n"
+ "                                    coloured surfaces, shape index and\n"
+ "                                    curvedness in the .dat, fingerprint, and the\n"
  "                                    ESP-coloured surface when wfn1 has MOs\n"
  "                                    or, for an xyz, with -SALTED <model>.\n"
  "  -rgbi                              Roby-Gould bond-index analysis. With\n"
@@ -397,7 +407,9 @@ std::string help_message =
  "  -qtaim_eli <rho.cube> <eli.cube> <atoms> [background]\n"
  "  -qtaim_eli <wfn> <atoms> [resolution radius background]\n"
  "                                    Keep ELI only in QTAIM basins of 0-based,\n"
- "                                    comma-separated atom indices.\n"
+ "                                    comma-separated atom indices. Runs at\n"
+ "                                    once, so -ri_fit or -SALTED must come\n"
+ "                                    before it (see -eli_analysis).\n"
  "  -laplacian_bonds <wfn>             Plot density Laplacian along bonds.\n\n"
  "CONVERSION, ML, AND SPECIALISED TOOLS\n"
  "  -gbw2wfn -wfn <file.gbw>            Convert GBW input to .wfn.\n"
@@ -406,7 +418,7 @@ std::string help_message =
  "  -SALTED <model-dir>                Predict density with a SALTED model.\n"
  "                                    With -xyz instead of -wfn the prediction\n"
  "                                    is the structure's density for -rho,\n"
- "                                    -esp, -esp_isosurface and the Hirshfeld\n"
+ "                                    -esp, -lap, -eli, -esp_isosurface and the Hirshfeld\n"
  "                                    surface ESP; add\n"
  "                                    -salted_charge_constraint there, a\n"
  "                                    fraction of an electron missing shifts\n"
@@ -459,6 +471,17 @@ std::string help_message =
  "                                    latter from 0.005 to 0.002 e. With -ECP\n"
  "                                    the core an ECP removed is filled from\n"
  "                                    Thakkar densities for the QTAIM basins.\n"
+ "                                    A real analysis needs 0.05 A or finer;\n"
+ "                                    -ri_fit <aux basis> before it (or\n"
+ "                                    -SALTED <model> with an xyz as <wfn>)\n"
+ "                                    takes rho and its gradient from the\n"
+ "                                    fitted density, one pass over the\n"
+ "                                    auxiliary functions instead of the\n"
+ "                                    orbital sum, so the QTAIM basins are\n"
+ "                                    those of the fitted density. ELI-D\n"
+ "                                    stays on the orbitals (a density-only\n"
+ "                                    ELI-D is flat over bonds and lone\n"
+ "                                    pairs) and is skipped without them.\n"
  "  -basin_grid <n>                    Pull the basin quadrature into the core:\n"
  "                                    tightest exponent sharpened n^2-fold, the\n"
  "                                    radial step divided by n, the angular\n"
@@ -472,6 +495,8 @@ std::string help_message =
  "  -geometry_aid_cutoff <r>            SOAP cutoff for the geometry-aid descriptor:\n"
  "                                      3.5 (default) matches the c_only models,\n"
  "                                      3.0 matches the dirty models.\n"
+ "  -geometry_aid_metals                Add Zn as the metal stand-in species (row-2\n"
+ "                                      specialist models, 49,686 long).\n"
  "  -calc_featomic_descriptor           Write descriptor.npy (requires -wfn).\n"
  "  -calc_featomic_descriptors <list>   Same, for many structures in one run.\n"
  "                                      <list> holds one structure path per\n"
@@ -1004,7 +1029,7 @@ std::string shrink_string_to_atom(std::string &input, const int &atom_number)
     }
     std::string temp = constants::atnr2letter(atom_number);
     err_checkf(temp != "PROBLEM", "Problem identifying atoms!", std::cout);
-    if (input.find(temp) != 1)
+    if (input.find(temp) != 0)
         return temp;
     if (temp != "PROBLEM")
         while (input.size() > temp.size())
@@ -2139,11 +2164,11 @@ void swap_sort_multi(ivec order, std::vector<ivec> &v)
     int i = 0;
     ivec temp;
     temp.resize(v.size());
-    while (i < v.size() - 1)
+    while (i < order.size() - 1)
     {
         int new_index = 0;
 #pragma omp parallel for reduction(+ : new_index)
-        for (int j = i; j < v.size(); j++)
+        for (int j = i; j < order.size(); j++)
             if (order[j] < order[i])
                 new_index++;
         if (new_index > 0)
@@ -2379,14 +2404,10 @@ double get_decimal_precision_from_CIF_number(std::string &given_string)
         if (decimal_point != -1)
         {
             digits = open_bracket - decimal_point - 1;
-        }
-        else
-        {
-            digits = close_bracket - open_bracket - 1;
-        }
-        if (digits == 0)
-        {
-            return 0.001;
+            if (digits == 0)
+            {
+                return 0.001;
+            }
         }
         result = abs(precision * pow(10, -digits));
         return result;
@@ -2401,13 +2422,17 @@ static std::vector<std::shared_ptr<BasisSet>> get_aux_basis(const int argc, cons
     // Check if next argument is a valid basis set name or a new argument starting with "-"
     while (next_basis_set < argc && arguments[next_basis_set].find("-") != 0) {
         if (arguments[next_basis_set] == "auto_aux") {
-            double beta = 2.0;
-            //Check if the next argument is a valid double
-            if (next_basis_set + 1 < argc && arguments[next_basis_set + 1].find("-") != 0) {
-                beta = std::stod(arguments[next_basis_set + 1]);
-            }
-            aux_basis.push_back(std::make_shared<BasisSet>());
-            break;
+            // an empty BasisSet is filled by gen_auto_aux (ORCA AutoAux, its own beta table);
+            // element symbols after it restrict that to those elements, the rest comes from
+            // the basis sets that follow: "-ri_fit auto_aux H def2-universal-jkfit"
+            auto generated = std::make_shared<BasisSet>();
+            ivec elements;
+            while (next_basis_set + 1 < argc && constants::get_Z_from_label(arguments[next_basis_set + 1].c_str()) >= 0)
+                elements.push_back(constants::get_Z_from_label(arguments[++next_basis_set].c_str()) + 1);
+            generated->set_auto_aux_elements(elements);
+            aux_basis.push_back(generated);
+            next_basis_set++;
+            continue;
         }
         err_chkf(BasisSetLibrary::check_basis_set_exists(arguments[next_basis_set]),
             "Basis set " + arguments[next_basis_set] + " not found in the library. Exiting.", std::cout);
@@ -2415,7 +2440,7 @@ static std::vector<std::shared_ptr<BasisSet>> get_aux_basis(const int argc, cons
         next_basis_set++;
     }
     if (aux_basis.size() == 0) {
-        std::cout << "No basis set specified. Falling back to automatic generation using beta = 2.0!" << std::endl;
+        std::cout << "No basis set specified. Falling back to automatic generation (auto_aux)!" << std::endl;
         aux_basis.push_back(std::make_shared<BasisSet>());
     }
     return aux_basis;
@@ -2446,7 +2471,7 @@ bool options::digest_io_options(const std::string &temp, int &i)
         WFN wavy(e_origin::NOT_YET_DEFINED);
         wavy.read_known_wavefunction_format(_wfn, std::cout, debug);
         wavy.write_nbo(_wfn.replace_extension(".47"), debug, &std::cout);
-        exit(0);
+        finished = true; return true;
     }
     else if (temp == "-d")
         basis_set_path = arguments[i + 1];
@@ -2601,10 +2626,10 @@ bool options::digest_run_options(const std::string &temp, int &i)
     else if (temp == "-mult")
         mult = stoi(arguments[i + 1]);
     else if (temp == "-no-date" || temp == "-no_date")
-        no_date = constants::hide_gpu_notes = true;
+        no_date = constants::hide_gpu_notes = constants::hide_timings = true;
     else if (temp == "-no_date_but_gpu" || temp == "-no-date-but-gpu")
     {
-        no_date = true;
+        no_date = constants::hide_timings = true;
         constants::hide_gpu_notes = false;
     }
     else if (temp == "-pbc")
@@ -2702,7 +2727,7 @@ bool options::digest_partition_options(const std::string &temp, int &i)
             cdouble res = calc_spherically_averaged_at_k(d1, d2, d3, dens, k);
             std::cout << "k: " << k << " sfac: " << setprecision(9) << setw(16) << scientific << res.real() << " " << setprecision(9) << setw(16) << scientific << res.imag() << endl;
         }
-        exit(0);
+        finished = true; return true;
     }
     else if (temp == "-becke" || temp == "-BECKE" || temp == "-Becke")
         partition_type = PartitionType::Becke;
@@ -2768,7 +2793,7 @@ bool options::digest_partition_options(const std::string &temp, int &i)
             n++;
         }
         merge_tscs("combine", filenames, old_tsc);
-        exit(0);
+        finished = true; return true;
     }
     else if (temp == "-merge_nocheck")
     {
@@ -2780,7 +2805,7 @@ bool options::digest_partition_options(const std::string &temp, int &i)
             n++;
         }
         merge_tscs_without_checks("combine", filenames, old_tsc);
-        exit(0);
+        finished = true; return true;
     }
     else if (temp == "-mtc")
     {
@@ -2852,6 +2877,11 @@ bool options::digest_partition_options(const std::string &temp, int &i)
         err_chkf(!wfn.empty(), "No wavefunction specified! Use -wfn option BEVORE -SALTED_COEFS to specify a wavefunction.", std::cout);
 
         WFN wavy(wfn);
+#ifdef NOSPHERA2_USE_GPU
+        //This runs inside the parser, before run_app_impl sets the GPU globals from opt, so the
+        //descriptor path was whatever the previous run in the process left on. Needs -no_gpu_salted before -SALTED_COEFS.
+        equicomb_set_gpu(use_gpu && gpu_salted);
+#endif
         SALTEDPredictor SP(wavy, *this);
         filesystem::path salted_model_path = SP.get_salted_filename();
         log_file << "Using " << salted_model_path << " for the prediction" << endl;
@@ -2875,7 +2905,7 @@ bool options::digest_partition_options(const std::string &temp, int &i)
         WFN wavy_aux = generate_aux_wfn(wavy, aux_basis);
 
         create_SALTED_training_data(wavy, wavy_aux, *this);
-        exit(0);
+        finished = true; return true;
     }
     else if (temp == "-sfac_diffuse")
     {
@@ -2898,20 +2928,22 @@ bool options::digest_partition_options(const std::string &temp, int &i)
     else if (temp == "-tscb")
     {
         std::filesystem::path name = arguments[i + 1];
-        string cif_name = "test.cif";
+        //the title is the file stem, as the -merge conversion does it; it used to be the placeholder "test"
         if (name.extension() == ".tscb")
         {
             tsc_block<int, cdouble> blocky = read_tsc_table(name);
-            blocky.write_tsc_file(cif_name, name.replace_extension(".tsc"));
+            name.replace_extension(".tsc");
+            blocky.write_tsc_file(name, name);
         }
         else if (name.extension() == ".tsc")
         {
             tsc_block<int, cdouble> blocky = read_tsc_table(name);
-            blocky.write_tscb_file(cif_name, name.replace_extension(".tscb"));
+            name.replace_extension(".tscb");
+            blocky.write_tscb_file(name, name);
         }
         else
             err_checkf(false, "Wrong file ending!", std::cout);
-        exit(0);
+        finished = true; return true;
     }
     else if (temp == "-tsc_labels")
     {
@@ -2928,9 +2960,8 @@ bool options::digest_partition_options(const std::string &temp, int &i)
             output.replace_extension(".labels.tsc");
             if (i + 3 < argc && arguments[i + 3].find('-') != 0)
                 output = arguments[i + 3];
-            if (!convert_tsc_ids_to_labels(table, cif_file, output, std::cout))
-                exit(1);
-            exit(0);
+            err_checkf(convert_tsc_ids_to_labels(table, cif_file, output, std::cout), "Could not convert the tsc labels", std::cout);
+            finished = true; return true;
         }
 
         label_tsc_output = true;
@@ -2961,7 +2992,7 @@ bool options::digest_property_options(const std::string &temp, int &i)
     {
         wfn = arguments[i + 1];
         bondwise_laplacian_plots(wfn);
-        exit(0);
+        finished = true; return true;
     }
     else if (temp == "-atom_dens")
     {
@@ -2970,7 +3001,7 @@ bool options::digest_property_options(const std::string &temp, int &i)
         err_checkf(std::filesystem::exists(wfn), "WFN doesn't exist", std::cout);
         ivec val_MOs;
         ivec val_MOs_beta;
-        if (argc >= i + 3)
+        if (argc > i + 3 && arguments[i + 2][0] != '-')
         {
             val_MOs = split_string<int>(arguments[i + 2], ",");
             std::cout << "Alpha MOs to keep: ";
@@ -2984,14 +3015,14 @@ bool options::digest_property_options(const std::string &temp, int &i)
             std::cout << endl;
         }
         spherically_averaged_density(*this, val_MOs, val_MOs_beta);
-        exit(0);
+        finished = true; return true;
     }
     else if (temp == "-combine_mos")
     {
         combine_mo.push_back(arguments[i + 1]);
         combine_mo.push_back(arguments[i + 2]);
         do_combine_mo(*this);
-        exit(0);
+        finished = true; return true;
     }
     else if (temp == "-cmos1")
     {
@@ -3018,7 +3049,7 @@ bool options::digest_property_options(const std::string &temp, int &i)
     else if (temp == "-dipole_moments")
     {
         dipole_moments(*this);
-        exit(0);
+        finished = true; return true;
     }
     // Visualize the specified orbital using spherical harmonics.
     // Call as -draw_orbits lambda,m,resolution,radius
@@ -3040,7 +3071,7 @@ bool options::digest_property_options(const std::string &temp, int &i)
         }
 
         draw_orbital(l, m, properties.resolution, properties.radius);
-        exit(0);
+        finished = true; return true;
     }
     else if (temp == "-eli")
         properties.eli = true;
@@ -3109,7 +3140,7 @@ bool options::digest_property_options(const std::string &temp, int &i)
         err_checkf(!indices.empty(), "No atom indices parsed from: " + atoms_csv, std::cout);
 
         run_QTAIM_ELI_mask(rho_path, eli_path_arg, indices, bg_val, *this, log_file);
-        exit(0);
+        finished = true; return true;
     }
     else if (temp == "-elf")
         properties.elf = true;
@@ -3220,7 +3251,7 @@ bool options::digest_property_options(const std::string &temp, int &i)
         else
             residual.ewald_sum();
         delete (temp_w);
-        exit(0);
+        finished = true; return true;
     }
     else if (temp == "-fractal")
         fract = true, fract_name = arguments[i + 1];
@@ -3305,6 +3336,8 @@ bool options::digest_property_options(const std::string &temp, int &i)
         properties.promol_nci_single_threaded = true;
     else if (temp == "-rdg")
         properties.rdg = true;
+    else if (temp == "-rho")
+        properties.rho = true; //the help advertised it; until now a density cube was only a by-product of -lap and friends
     else if (temp == "-rho_cube")
     {
         string wfn_name = arguments[i + 1];
@@ -3315,7 +3348,7 @@ bool options::digest_property_options(const std::string &temp, int &i)
             wavy.set_has_ECPs(true);
         std::cout << "Starting cube calculation" << endl;
         wavy.write_rho_cube(properties.radius, properties.resolution);
-        exit(0);
+        finished = true; return true;
     }
     else if (temp.find("-s_rho") < 1)
         properties.s_rho = true;
@@ -3325,7 +3358,7 @@ bool options::digest_property_options(const std::string &temp, int &i)
         filesystem::path name_wfn_2 = arguments[i + 2];
 
         subtract_dens_from_gbw(name_wfn_1, name_wfn_2, 2, 0.05);
-        exit(0);
+        finished = true; return true;
     }
     else if (temp == "-spherical_aver_fukui")
     {
@@ -3344,7 +3377,7 @@ bool options::digest_property_options(const std::string &temp, int &i)
         std::cout << "Data written to output.dat" << endl;
         delete (wavy1);
         delete (wavy2);
-        exit(0);
+        finished = true; return true;
     }
     else if (temp == "-spherical_aver_hirsh")
     {
@@ -3369,16 +3402,16 @@ bool options::digest_property_options(const std::string &temp, int &i)
         }
         std::cout << "Data written to output.dat" << endl;
         delete (wavy);
-        exit(0);
+        finished = true; return true;
     }
     else if (temp == "-spherical_harmonic")
     {
         spherical_harmonic_test();
-        exit(0);
+        finished = true; return true;
     }
     else if (temp == "-spherical_atoms") {
         write_spherical_atoms();
-        exit(0);
+        finished = true; return true;
     }
     else if (temp == "-cube_density" || temp == "-cube")
     {
@@ -3410,7 +3443,7 @@ bool options::digest_property_options(const std::string &temp, int &i)
         string out = "Calculating 1D density between atoms " + wavy.get_atom_label(atom_idx_1) + " (" + std::to_string(atom_idx_1) + ") and " + wavy.get_atom_label(atom_idx_2) + " (" + std::to_string(atom_idx_2) + ") with " + std::to_string(gridpoints) + " gridpoints and " + std::to_string(padding) + " Angstrom padding.";
         std::cout << out << std::endl;
         get1DGridData(wavy, aux_basis, atom_idx_1, atom_idx_2, gridpoints, padding);
-        exit(0);
+        finished = true; return true;
     }
     else if (temp == "-rho_at_points")
     {
@@ -3425,7 +3458,7 @@ bool options::digest_property_options(const std::string &temp, int &i)
         for (int p = 0; p < n; p++) rho[p] = wavy.compute_dens(pts[p]);
         ofstream out(arguments[i + 1] + ".rho"); out << setprecision(12);
         for (int p = 0; p < n; p++) out << rho[p] << "\n";
-        exit(0);
+        finished = true; return true;
     }
     else
         return false;
@@ -3444,6 +3477,11 @@ bool options::digest_ri_options(const std::string &temp, int &i)
         geometry_aid_cutoff = std::stod(arguments[++i]);
         std::cout << "  geometry-aid SOAP cutoff radius set to " << geometry_aid_cutoff << " A ("
                   << (geometry_aid_cutoff > 3.25 ? "c_only" : "dirty") << " model family)" << std::endl;
+    }
+    else if (temp == "-geometry_aid_metals") {
+        //Zn joins the species list as the stand-in for every metal: the row-2 specialist sees the heavy atoms
+        //labelled and every element outside the eleven as Zn, 12 species give 78 pairs, length 49,686
+        geometry_aid_metals = true;
     }
     else if (temp == "-classify_atoms") {
         //-wfn <structure> -classify_atoms <model.bin> [<out.npy>], default probabilities.npy
@@ -3556,7 +3594,7 @@ bool options::digest_ri_options(const std::string &temp, int &i)
         np_coeffs.fortran_order = false;
         np_coeffs.shape = { static_cast<unsigned long>(ri_coefs.size()) };
         npy::write_npy("RI_COEFS.npy", np_coeffs);
-        exit(0);
+        finished = true; return true;
     }
     else if (temp == "-repulsion_overlap") {
         repulsion_overlap = std::stod(arguments[++i]);
@@ -3573,13 +3611,11 @@ bool options::digest_ri_options(const std::string &temp, int &i)
         //<A> <A.npy> <B> <B.npy> takes coefficient files in the fitted_multipoles layout instead
         err_checkf(i + 2 < argc, "-interaction_energy needs two structure files", std::cout);
         const bool from_files = i + 4 < argc && std::filesystem::path(arguments[i + 2]).extension() == ".npy";
-        WFN wavy_A(arguments[i + 1]), wavy_B(arguments[from_files ? i + 3 : i + 2]);
-        WFN aux_A(e_origin::NOT_YET_DEFINED), aux_B(e_origin::NOT_YET_DEFINED);
         if (SALTED && !from_files) std::cout << "Predicting both densities with the SALTED model in " << salted_model_dir << std::endl;
-        const vec coef_A = crystal_energies::fitted_coefficients(wavy_A, from_files ? arguments[i + 2] : "", aux_A, *this);
-        const vec coef_B = crystal_energies::fitted_coefficients(wavy_B, from_files ? arguments[i + 4] : "", aux_B, *this);
-        DensityFitting::print_interaction_energy(DensityFitting::interaction_energy(coef_A, aux_A, coef_B, aux_B, repulsion_overlap, repulsion_exchange), aux_A, aux_B, std::cout);
-        exit(0);
+        Gaussian_Molecule A(WFN(arguments[i + 1]), *this, from_files ? arguments[i + 2] : "");
+        Gaussian_Molecule B(WFN(arguments[from_files ? i + 3 : i + 2]), *this, from_files ? arguments[i + 4] : "");
+        DensityFitting::print_interaction_energy(A.interaction(B, repulsion_overlap, repulsion_exchange), A.basis(), B.basis(), std::cout);
+        finished = true; return true;
     }
     else if (temp == "-interaction_energies") {
         //-interaction_energies <job>: every molecule pair in contact in the crystal, run after the options are parsed
@@ -3623,7 +3659,7 @@ bool options::digest_ri_options(const std::string &temp, int &i)
         //gen_CUBE_for_RI(wavy, "combo-basis-fit", this);
         //gen_CUBE_for_RI(wavy, "cc-pvqz-jkfit", this);
 
-        exit(0);
+        finished = true; return true;
     }
 
     else if (temp == "-test_RI")
@@ -3635,7 +3671,7 @@ bool options::digest_ri_options(const std::string &temp, int &i)
         WFN wavy(wfn);
         WFN wavy_aux = generate_aux_wfn(wavy, aux_basis);
         DensityFitting::demonstrate_enhanced_density_fitting(wavy, wavy_aux);
-        exit(0);
+        finished = true; return true;
 
     }
     else if (temp == "-RI_WFN_DIFF") {
@@ -3644,9 +3680,9 @@ bool options::digest_ri_options(const std::string &temp, int &i)
         WFN wavy(wfn);
         WFN wavy_aux = generate_aux_wfn(wavy, aux_basis);
         DensityFitting::QM_RI_difference_cube(wavy, wavy_aux);
-        exit(0);
+        finished = true; return true;
 
-        //exit(0);
+        //finished = true; return true;
     }
     else
         return false;
@@ -3664,7 +3700,7 @@ bool options::digest_xcw_options(const std::string &temp, int &i)
         std::string stdo = arguments[i + 1];
         std::string step = arguments[i + 2];
         convert_tonto_XCW_lambda_steps(stdo, step, debug, *this);
-        exit(0);
+        finished = true; return true;
     }
     else if (temp == "-do_XCW") {
         do_XCW = true;
@@ -3703,12 +3739,12 @@ bool options::digest_dev_options(const std::string &temp, int &i)
     if (temp == "-lahvatest")
     {
         //_test_lahva();
-        exit(0);
+        finished = true; return true;
     }
     else if (temp == "-NNLS_TEST")
     {
         test_NNLS();
-        exit(0);
+        finished = true; return true;
     }
     else if (temp == "-test")
         std::cout << "Running in test mode!" << endl, test = true;
@@ -3763,6 +3799,8 @@ void options::digest_options()
         string temp = arguments[i];
         if (temp.find("-") > 0)
             continue;
+        if (finished)
+            return;
         //The digesters index arguments[i + n] and call stoi/stod directly; a flag that is
         //last on the line or followed by a non-number used to die as a bare "invalid stod
         //argument" with no hint which option it was

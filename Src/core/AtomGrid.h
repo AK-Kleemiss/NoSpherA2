@@ -2,6 +2,7 @@
 
 #include <vector>
 #include <iosfwd>
+#include "density_source.h"
 
 class AtomGrid
 {
@@ -63,7 +64,8 @@ private:
     vec radial_atom_grid_w_;
 };
 
-vec make_chi(const WFN &wfn, int samples = 50, bool refine = true, bool debug = false);
+//The line density comes from density when set (a fitted density on an aux-only wfn), else from the orbitals of wfn
+vec make_chi(const WFN &wfn, int samples = 50, bool refine = true, bool debug = false, const DensityBatch &density = {});
 
 std::array<double, 2> get_integration_weights(const int &num_centers,
     const int *proton_charges,
@@ -76,7 +78,8 @@ std::array<double, 2> get_integration_weights(const int &num_centers,
     const double &z,
     vec &pa_b,
     vec &pa_tv,
-    const vec &chi);
+    const vec &chi,
+    const double *dist_ab = nullptr); //interatomic distances, num_centers x num_centers, or computed per call
 
 const double get_r_inner(const double &max_error, const double &alpha_inner);
 

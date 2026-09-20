@@ -422,6 +422,10 @@ dMatrix2 cart2sph(const int l, const bool normalized) {
     }
 
     if (l == 0 || l == 1) { //For s and p functions, the transformation is trivial
+        if (l == 1) { //libcint is built with PYPZPX: spherical p comes as py, pz, px
+            std::fill(c_tensor.container().begin(), c_tensor.container().end(), 0.0);
+            c_tensor(1, 0) = c_tensor(2, 1) = c_tensor(0, 2) = 1.0;
+        }
         if (normalized) {
             return c_tensor;
         }
@@ -478,7 +482,7 @@ dMatrix2 get_cart2sph_matrix(const WFN &cart_wfn, const bool normalized) {
 
     std::cout << "Number of cartesian functions: " << n_cart << ", number of spherical functions: " << n_sph << std::endl;
     dMatrix2 c_dm(n_cart, n_sph);
-    int cart_idx = 0;
+    int cart_idx = 0, sph_idx = 0;
     for (const atom &a : cart_wfn.get_atoms()) {
         int prim = 0;
         for (int shell = 0; shell < a.get_shellcount_size(); shell++) {
@@ -489,10 +493,11 @@ dMatrix2 get_cart2sph_matrix(const WFN &cart_wfn, const bool normalized) {
             //Fill in the appropriate block in the c_dm matrix
             for (int i = 0; i < n_cart_shell; i++) {
                 for (int j = 0; j < n_sph_shell; j++) {
-                    c_dm(cart_idx + i, cart_idx + j) = c_sph(i, j);
+                    c_dm(cart_idx + i, sph_idx + j) = c_sph(i, j);
                 }
             }
             cart_idx += n_cart_shell;
+            sph_idx += n_sph_shell;
             prim += a.get_shellcount(shell);
         }
     }
@@ -514,19 +519,17 @@ vec eval_GTO_sph(Int_Params& params, vec2& grid, ivec& shl_slice) {
     vec env = params.get_env();
 
 
-    //grid = numpy.asarray(grid, dtype = numpy.double, order = 'F')
-    vec fortran_grid(grid.size() * 3);
-    for (size_t i = 0; i < grid[0].size(); i++) {
-        for (size_t j = 0; j < 3; j++) {
-			fortran_grid[i + j * grid[0].size()] = grid[j][i];
-
+    //grid = numpy.asarray(grid, dtype = numpy.double, order = 'F'); grid holds the three coordinate rows
+    const int ngrid = (int)grid[0].size();
+    vec fortran_grid((size_t)ngrid * 3);
+    for (int i = 0; i < ngrid; i++) {
+        for (int j = 0; j < 3; j++) {
+            fortran_grid[(size_t)i + (size_t)j * ngrid] = grid[j][i];
         }
-	}
- 
+    }
 
     int nbas = params.get_nbas();
     int nat = params.get_natoms();
-	int ngrid = grid.size();
 
     if (shl_slice.size() == 0) {
 		shl_slice = { 0, nbas};

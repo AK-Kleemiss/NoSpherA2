@@ -492,13 +492,11 @@ bool b2c(const cube *cub, const vector<atom> &atoms, bool debug, bool bcp)
     }
     string temp;
     string replace("E");
-    string path_temp = cub->get_path().replace_extension(".b2c_log").generic_string();
-    path_temp.erase(path_temp.find(".cub"), 5);
-    ofstream logfile(path_temp.c_str(), ios::out);
+    const string base = (cub->get_path().parent_path() / cub->get_path().stem()).generic_string();
+    ofstream logfile((base + ".b2c_log").c_str(), ios::out);
     logfile << "Number of Basins: " << iCP << endl;
     double Integral = 0.0;
-    temp = cub->get_path().generic_string();
-    temp.erase(temp.find(".cub"), 5);
+    temp = base;
     if (basins.size() > 0) {
         temp += "_" + toString<int>((int)basins.size()) + "_basins";
         temp += ".cube";
@@ -554,8 +552,7 @@ bool b2c(const cube *cub, const vector<atom> &atoms, bool debug, bool bcp)
     }
     else {
         for (int f = 0; f < iCP; f++) {
-            temp = cub->get_path().generic_string() + '_' + Labels[f] + '_' + toString<unsigned int>(nrs[f]) + '_' + toString<int>(f) + ".cube";
-            temp.erase(temp.find(".cub"), 5);
+            temp = base + '_' + Labels[f] + '_' + toString<unsigned int>(nrs[f]) + '_' + toString<int>(f) + ".cube";
             ofstream outfile(temp.c_str(), ios::out);
             outfile << s1 << "\n" << s2 << "\n" << setw(5) << atoms.size();
             outfile << fixed << setprecision(6) << setw(12) << xmin << " " << ymin << " " << zmin << "\n";
@@ -944,11 +941,11 @@ std::vector<critical_point> analyze_cube_critical_points(
 //the start and are never merged: a hydroxyl hydrogen's basin is two voxels across at 0.1 A
 //and has no grid maximum of its own. With field_wfn the ascent takes the analytic density
 //gradient instead of grid differences, which is what lets it climb into such a basin.
-std::pair<cubei, std::vector<d4>> topological_cube_analysis(const cube *cub, const vector<atom> &atoms, bool debug, bool bcp, double value_floor, double grad_epsilon, double assignment_radius, double merge_persistence, const std::vector<d3> *seeds, const WFN *field_wfn, const std::function<double(const d3&)> *core_density, const std::function<void(const d3&, d3&)> *core_gradient)
+std::pair<cubei, std::vector<d4>> topological_cube_analysis(const cube *cub, const vector<atom> &atoms, bool debug, bool bcp, double value_floor, double grad_epsilon, double assignment_radius, double merge_persistence, const std::vector<d3> *seeds, const WFN *field_wfn, const std::function<double(const d3&)> *core_density, const std::function<void(const d3&, d3&)> *core_gradient, const density_field *field)
 {
-    auto field_dens = [&](const d3 &p) { return field_wfn->compute_dens(p) + (core_density ? (*core_density)(p) : 0.0); };
+    auto field_dens = [&](const d3 &p) { return (field ? field->rho(p) : field_wfn->compute_dens(p)) + (core_density ? (*core_density)(p) : 0.0); };
     auto field_grad = [&](const d3 &p, d3 &g) {
-        field_wfn->computeGrad(p, g);
+        if (field) field->grad(p, g); else field_wfn->computeGrad(p, g);
         if (core_gradient) { d3 c; (*core_gradient)(p, c); for (int k = 0; k < 3; k++) g[k] += c[k]; }
     };
     const int nx = cub->get_size(0), ny = cub->get_size(1), nz = cub->get_size(2);
@@ -1350,13 +1347,14 @@ int unify_core_basins(cubei &basin_cube, std::vector<d4> &maxima, const std::vec
 //when every voxel within three of it agrees; otherwise it is sent up the analytic field
 //until it comes within two voxels of a maximum, so the boundary is the field's and not the
 //grid's.
-vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, const std::vector<d4> &maxima, const WFN &wavy, const int accuracy, const bool eli_field, vec &volumes, double &outside, const std::function<double(const d3&)> *core_density, const std::function<void(const d3&, d3&)> *core_gradient, const int grid_boost)
+vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, const std::vector<d4> &maxima, const WFN &wavy, const int accuracy, const bool eli_field, vec &volumes, double &outside, const std::function<double(const d3&)> *core_density, const std::function<void(const d3&, d3&)> *core_gradient, const int grid_boost, const density_field *field)
 {
     //The filled core steers the trajectories only. An ECP atom's grid is built for its
     //valence basis and cannot integrate a 1s at Z = 80, so the core electrons are added to
     //the nucleus's basin by count once the valence density is integrated; a Thakkar core
     //lies whole inside its atom's basin
-    auto density = [&](const d3 &p) { return wavy.compute_dens(p) + (core_density ? (*core_density)(p) : 0.0); };
+    auto valence = [&](const d3 &p) { return field ? field->rho(p) : wavy.compute_dens(p); };
+    auto density = [&](const d3 &p) { return valence(p) + (core_density ? (*core_density)(p) : 0.0); };
     const int nb = basin_cube->max_value();
     vec pop(nb, 0.0);
     volumes.assign(nb, 0.0);
@@ -1420,19 +1418,12 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
     };
     auto gradient = [&](const d3 &p, d3 &g) {
         if (!eli_field) {
-            wavy.computeGrad(p, g);
+            if (field) field->grad(p, g); else wavy.computeGrad(p, g);
             if (core_gradient) { d3 c; (*core_gradient)(p, c); for (int k = 0; k < 3; k++) g[k] += c[k]; }
             return;
         }
-        const double d = 0.25 * step;
-        for (int k = 0; k < 3; k++) {
-            d3 a = p, b = p;
-            a[k] += d; b[k] -= d;
-            double ra, ea, rb, eb;
-            wavy.computeRhoELI(a, ra, ea);
-            wavy.computeRhoELI(b, rb, eb);
-            g[k] = (ea - eb) / (2.0 * d);
-        }
+        double e;
+        wavy.computeELIGrad(p, e, g);
     };
     //Level 3 at least: a basin boundary cuts through the atomic shells and the population
     //follows the angular resolution, 0.01 e at level 2, 0.005 at 3 and 0.002 at 4, which
@@ -1515,7 +1506,7 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
             vec lp(nb, 0.0), lv(nb, 0.0);
             double lo = 0.0;
             long long lb = 0, ll = 0;
-#pragma omp for schedule(dynamic, 64)
+#pragma omp for schedule(dynamic, 16)
             for (int i = 0; i < np; i++) {
                 const double w = W[i];
                 if (w == 0.0) continue;
@@ -1530,7 +1521,7 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
                         const double rc = core_shell_radius(at.get_charge()) + 0.5;
                         if (std::pow(p[0] - ap[0], 2) + std::pow(p[1] - ap[1], 2) + std::pow(p[2] - ap[2], 2) < rc * rc) { heavy = true; break; }
                     }
-                const double rho = wavy.compute_dens(p);
+                const double rho = valence(p);
                 if (heavy) {
                     //The cell's weight stays with the quadrature rule; only its share per basin
                     //is decided by the sub-points, each counted with the density it sees
@@ -1543,7 +1534,7 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
                         const double rq = lower + (upper - lower) * (q + 0.5) / radial_split;
                         const double f = rq / radius[i];
                         const d3 pq{ centre[0] + (p[0] - centre[0]) * f, centre[1] + (p[1] - centre[1]) * f, centre[2] + (p[2] - centre[2]) * f };
-                        const double sq = wavy.compute_dens(pq) * f * f;
+                        const double sq = valence(pq) * f * f;
                         const int bq = climb(pq, lb, ll);
                         share[bq] += sq;
                         count[bq] += 1.0;
@@ -1645,6 +1636,9 @@ svec assign_labels_to_basins(const vector<d4> &Maxima, const vector<atom> &atoms
             }
             err_checkf(atom_index >= 0, "No atom found for basin " + toString<size_t>(i) + " at position (" + toString<double>(pos[0]) + ", " + toString<double>(pos[1]) + ", " + toString<double>(pos[2]) + ")!", std::cout);
             result[i] = atoms[atom_index].get_label() + to_string(atom_index);
+            //A maximum off every nucleus is a non-nuclear attractor, real or a grid bump on a
+            //flat bond; it must not carry the atom's label into the charge column
+            if (min_dist > 0.25) result[i] = "NNA near " + result[i];
         }
         break;
         case 1: //ELI case, assign core basins based on atom within, valence basins as the connected basin and bonds as the two closest atoms.

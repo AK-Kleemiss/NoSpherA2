@@ -832,10 +832,15 @@ struct options
     pathvec featomic_structures;
     pathvec classify_structures;
     double geometry_aid_cutoff = 3.5;
+    bool geometry_aid_metals = false;
     std::filesystem::path interaction_energies_job;
 	std::filesystem::path xcw_settings_path;
     properties_options properties;
     bool debug = false;
+    //Set by the one-shot options (-merge, -dipole_moments, -convert_to_47, ...) that used to
+    //exit(0) inside the parser: that killed the host when run_app is a library call (Olex2, the
+    //in-process tests), and no option after them was read. run_app_impl returns 0 instead.
+    bool finished = false;
     bool all_charges = false;
     bool SALTED = false;
     bool Olex2_1_3_switch = false;

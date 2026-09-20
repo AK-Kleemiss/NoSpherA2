@@ -7,7 +7,10 @@
 #include <string>
 #include <array>
 #include <filesystem>
+#include <memory>
 #include "mo_class.h"
+
+class Gaussian_Molecule;
 
 namespace occ::qm
 {
@@ -119,6 +122,8 @@ private:
     std::vector<cube> cub;
     // Vector of atoms/centers in the wavefunction
     std::vector<atom> atoms;
+    //Fitted (RI/SALTED) densities of the molecules in this wavefunction, shared so a Gaussian_Molecule outlives copies of the WFN
+    std::vector<std::shared_ptr<Gaussian_Molecule>> fitted;
 
     // remove a center from the centers vector
     // CAREFUL: also need to remove all primitives associated with that center, as well as the associated coefficients in each MO and reduce nex accordingly
@@ -473,13 +478,13 @@ public:
     /** Add primitive to atom basis (uncontracted entry). */
     bool push_back_atom_basis_set(const int& nr, const double& exponent, const double& coefficient, const int& type, const int& shell)
     {
-        if (nr <= ncen && nr >= 0)
+        if (nr < ncen && nr >= 0)
             return atoms[nr].push_back_basis_set(exponent, coefficient, type, shell);
         else
             return false;
     };
     /** Verbose atom printout. */
-    void print_atom_long(const int& nr) const { if (nr <= ncen && nr >= 0) atoms[nr].print_values_long(); };
+    void print_atom_long(const int& nr) const { if (nr < ncen && nr >= 0) atoms[nr].print_values_long(); };
     /** Atomic number (charge) accessor. */
     const int get_atom_charge(const int& nr) const;
     /** Integer isotope mass lookup. */
@@ -526,6 +531,8 @@ public:
     const double compute_g_cartesian(const d3 &Pos, vec2 &d, vec &phi) const;
     /** Evaluate multiple properties (density, gradient norm, Hessian, ELF/ELI/Laplacian). */
     const void computeValues(const d3& PosGrid, double& Rho, double& normGrad, double* Hess, double& Elf, double& Eli, double& Lap) const;
+    //The one orbital pass behind computeValues: rho, its gradient and Hessian and the kinetic energy density tau
+    void computeValues(const d3& PosGrid, double& Rho, d3& Grad, double* Hess, double& tau) const;
     /** Compute Laplacian, ELI and ELF together. */
     const void computeLapELIELF(const d3& PosGrid, double& Elf, double& Eli, double& Lap) const;
     /** Compute ELI and ELF only. */
@@ -536,6 +543,8 @@ public:
     const double computeLap(const d3& PosGrid) const;
     /** Compute Rho and ELI together. */
     void computeRhoELI(const d3 &PosGrid, double& Rho, double& Eli) const;
+    //ELI-D and its analytic gradient from the orbital values, gradients and Hessians
+    void computeELIGrad(const d3 &PosGrid, double& Eli, d3& gradient) const;
     /** Compute gradient. */
     void computeGrad(const d3 &PosGrid, d3& gradient) const;
     /** Compute ELI alone. */
@@ -598,6 +607,8 @@ public:
     void pop_back_cube();
     /** Return cube by value (copy). */
     const cube get_cube(const int& nr) const { return cub[nr]; };
+    void push_back_molecule(std::shared_ptr<Gaussian_Molecule> m) { fitted.push_back(std::move(m)); };
+    const std::vector<std::shared_ptr<Gaussian_Molecule>>& get_molecules() const { return fitted; };
     /** Pointer to cube (non-owning). */
     const cube* get_cube_ptr(const int& nr) { return &cub[nr]; };
     /** Number of cube objects. */

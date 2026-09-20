@@ -105,6 +105,21 @@ static PartitionType scheme_partition(const DensityFitting::CHARGE_SCHEME scheme
 
 // Grids of every atom partitioned by scheme, set up on the returned copy of
 // wavy without its virtual orbitals.
+//Appends the atoms of aux to w with their basis functions as primitives, which is what the grid generator reads
+static void append_as_primitives(WFN& w, const WFN& aux)
+{
+    const int wfn_type[6] = { 1, 2, 5, 11, 21, 36 };
+    for (int a = 0; a < aux.get_ncen(); a++) {
+        const atom& A = aux.get_atom(a);
+        w.push_back_atom(A);
+        for (int b = 0; b < (int)A.get_basis_set_size(); b++)
+            w.add_exp(w.get_ncen(), wfn_type[std::min(A.get_basis_set_type(b), 5)], A.get_basis_set_exponent(b));
+    }
+}
+
+//An aux WFN carries its basis on the atoms and no primitives or orbitals: the grid is sized from the basis and the
+//density comes from the source set on grid_manager (the fitted density itself); without one no density is evaluated,
+//which serves Becke and Hirshfeld weights only
 static WFN setup_partition_grid(
     const WFN& wavy,
     const DensityFitting::CHARGE_SCHEME scheme,
@@ -114,6 +129,7 @@ static WFN setup_partition_grid(
     config.partition_type = scheme_partition(scheme);
     config.pbc = 0;
     config.debug = false;
+    config.no_density_eval = wavy.get_nex() == 0 && !grid_manager.hasDensitySource();
     grid_manager.setConfiguration(config);
 
     ivec atom_list(wavy.get_ncen());
@@ -121,6 +137,12 @@ static WFN setup_partition_grid(
         atom_list[a] = a;
 
     WFN temp = wavy;
+    if (wavy.get_nex() == 0) {
+        err_checkf(!config.no_density_eval || config.partition_type == PartitionType::Becke || config.partition_type == PartitionType::Hirshfeld,
+            "Partitioning a fitted density by " + config.getPartitionName() + " needs the density itself or the orbital wavefunction", std::cout);
+        temp = WFN(e_origin::NOT_YET_DEFINED);
+        append_as_primitives(temp, wavy);
+    }
     temp.delete_unoccupied_MOs();
     grid_manager.setup3DGridsForMolecule(temp, atom_list);
     return temp;
@@ -254,10 +276,11 @@ struct partition_multipole_data
     vec2 rows;
 };
 
-static partition_multipole_data calculate_partition_multipoles(
+//partition_multipole_rows on a grid already set up on grid_manager
+static vec2 partition_rows(
     const WFN& wavy,
     const aux_density_table& table,
-    const DensityFitting::CHARGE_SCHEME scheme,
+    GridManager& grid_manager,
     const int lmax)
 {
     err_checkf(
@@ -265,18 +288,12 @@ static partition_multipole_data calculate_partition_multipoles(
         "Partition restraints are implemented for 0 <= l <= 8",
         std::cout);
 
-    GridManager grid_manager;
-    const WFN temp = setup_partition_grid(wavy, scheme, grid_manager);
-
-    partition_multipole_data result;
-    result.targets = grid_manager.calculatePartitionedMultipoles(temp, lmax);
-
     const int n_atoms = wavy.get_ncen();
     const int n_mom = (lmax + 1) * (lmax + 1);
     const std::size_t total_rows =
         static_cast<std::size_t>(n_atoms) * static_cast<std::size_t>(n_mom);
 
-    result.rows.assign(
+    vec2 rows(
         total_rows,
         vec(table.n_coef, 0.0));
 
@@ -310,10 +327,33 @@ static partition_multipole_data calculate_partition_multipoles(
             atom_grid[weight_index].data(),
             centre,
             lmax,
-            result.rows,
+            rows,
             a * n_mom);
     }
 
+    return rows;
+}
+
+vec2 DensityFitting::partition_multipole_rows(const WFN& wavy, const aux_density_table& table, const CHARGE_SCHEME scheme, const int lmax, DensityBatch density)
+{
+    GridManager grid_manager;
+    if (density) grid_manager.setDensitySource(std::move(density));
+    setup_partition_grid(wavy, scheme, grid_manager);
+    return partition_rows(wavy, table, grid_manager, lmax);
+}
+
+static partition_multipole_data calculate_partition_multipoles(
+    const WFN& wavy,
+    const aux_density_table& table,
+    const DensityFitting::CHARGE_SCHEME scheme,
+    const int lmax)
+{
+    GridManager grid_manager;
+    const WFN temp = setup_partition_grid(wavy, scheme, grid_manager);
+
+    partition_multipole_data result;
+    result.targets = grid_manager.calculatePartitionedMultipoles(temp, lmax);
+    result.rows = partition_rows(wavy, table, grid_manager, lmax);
     return result;
 }
 
@@ -1176,16 +1216,9 @@ namespace {
     // flattened aux basis, which is where the OpenMP loop or the GPU kernel sits
     void gordon_kim(const vec& coef_A, const WFN& aux_A, const vec& coef_B, const WFN& aux_B, const int x_fun, double* gk)
     {
-        const int wfn_type[6] = { 1, 2, 5, 11, 21, 36 };
-        const WFN* mono[2] = { &aux_A, &aux_B };
         WFN dimer(e_origin::NOT_YET_DEFINED);
-        for (int m = 0; m < 2; m++)
-            for (int a = 0; a < mono[m]->get_ncen(); a++) {
-                const atom& A = mono[m]->get_atom(a);
-                dimer.push_back_atom(A);
-                for (int b = 0; b < (int)A.get_basis_set_size(); b++)
-                    dimer.add_exp(dimer.get_ncen(), wfn_type[std::min(A.get_basis_set_type(b), 5)], A.get_basis_set_exponent(b));
-            }
+        append_as_primitives(dimer, aux_A);
+        append_as_primitives(dimer, aux_B);
         GridConfiguration config;
         config.partition_type = PartitionType::Becke;
         config.no_density_eval = true;
@@ -1262,13 +1295,8 @@ double DensityFitting::exchange_density(const double rho, const double g2, const
         //density with their reoptimised a, b instead of the orbital tau. p = s^2 and q are the reduced gradient and
         //Laplacian, z = GE4M - F_W the part of PC07 beyond von Weizsaecker, alpha = z f_ab(z) / (1 + eta 5p/3)
         const double kf2 = std::pow(3 * constants::PI * constants::PI * rho, 2.0 / 3.0), p = g2 / (4 * kf2 * rho * rho), q = lap / (4 * kf2 * rho);
-        const double a = 1.784720, b = 0.258304, c2 = 0.8, d = 1.24, k1 = 0.065, eta = 0.001, dp2 = 0.361, mu = 10.0 / 81.0, h0 = 1.174, a1 = 4.9479;
-        const double D = 8 * q * q / 81 - p * q / 9 + 8 * p * p / 243, fW = 5 * p / 3, GE4 = 1 + 5 * p / 27 + 20 * q / 9 + D;
-        const double z = GE4 / std::sqrt(1 + D * D / ((1 + fW) * (1 + fW))) - fW;
-        double fab = 0.0;
-        if (z >= 0.975 * a) fab = 1.0;
-        else if (z > 0.025 * a) fab = std::exp(-a * b / z) * std::pow(1 + std::exp(-a / (a - z)), b) / std::pow(std::exp(-a / z) + std::exp(-a / (a - z)), b);
-        const double alpha = z * fab / (1 + eta * fW);
+        const double c2 = 0.8, d = 1.24, k1 = 0.065, eta = 0.001, dp2 = 0.361, mu = 10.0 / 81.0, h0 = 1.174, a1 = 4.9479;
+        const double alpha = aux_density::pc07_alpha(p, q) / (1 + eta * 5 * p / 3);
         //f(alpha) is the rSCAN polynomial up to 2.5 and the SCAN tail beyond; its slope at alpha = 1 sets C2 of the gradient expansion
         const double c[8] = { 1.0, -0.667, -0.4445555, -0.663086601049, 1.451297044490, -0.887998041597, 0.234528941479, -0.023185843322 };
         double f = 0.0, df1 = 0.0;
@@ -1282,7 +1310,7 @@ double DensityFitting::exchange_density(const double rho, const double g2, const
     return C_X * r43;
 }
 
-DensityFitting::INTERACTION DensityFitting::interaction_energy(const vec& coef_A, const WFN& aux_A, const vec& coef_B, const WFN& aux_B, const double repulsion_K, const int x_fun)
+DensityFitting::Interaction_Energy DensityFitting::interaction_energy(const vec& coef_A, const WFN& aux_A, const vec& coef_B, const WFN& aux_B, const double repulsion_K, const int x_fun)
 {
     const aux_density_table table_A(aux_A.get_atoms());
     const aux_density_table table_B(aux_B.get_atoms());
@@ -1308,7 +1336,7 @@ DensityFitting::INTERACTION DensityFitting::interaction_energy(const vec& coef_A
             table_B.sh_l.begin(),
             table_B.sh_l.end());
 
-    INTERACTION E;
+    Interaction_Energy E;
     E.pair.assign(nA, vec(nB, 0.0));
     E.rank.assign(LA + 2, vec(LB + 2, 0.0));
     ivec ZA(nA), ZB(nB);
@@ -1378,7 +1406,7 @@ DensityFitting::INTERACTION DensityFitting::interaction_energy(const vec& coef_A
     return E;
 }
 
-void DensityFitting::print_interaction_energy(const INTERACTION& E, const WFN& aux_A, const WFN& aux_B, std::ostream& file)
+void DensityFitting::print_interaction_energy(const Interaction_Energy& E, const WFN& aux_A, const WFN& aux_B, std::ostream& file)
 {
     const bool KS = E.n_A == 0.0 && E.n_B == 0.0;
     const char* x_names[4] = { "rep. exch. Dirac ", "rep. exch. PBE   ", "rep. exch. B88   ", "rep. exch. r2SCAN" };

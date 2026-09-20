@@ -134,17 +134,17 @@ bool cube::read_values(std::ifstream &file) {
             if (rest2 < 6 && rest2 > 0)
             {
                 for (int j = 0; j < 6 - rest2; j++) {
-                    err_checkf(std::isnan(tmp[j]), "This should not happen! Read a value outside of range!", std::cout);
+                    err_checkf(!std::isnan(tmp[j]), "This should not happen! Read a value outside of range!", std::cout);
                     values[run_x][run_y][size[2] - (6 - rest2) + j] = tmp[j];
                 }
                 if (run_y + 1 < size[1])
                     for (int j = 0; j < rest2; j++) {
-                        err_checkf(std::isnan(tmp[j + (6 - rest2)]), "This should not happen! Read a value outside of range!", std::cout);
+                        err_checkf(!std::isnan(tmp[j + (6 - rest2)]), "This should not happen! Read a value outside of range!", std::cout);
                         values[run_x][run_y + 1][j] = tmp[j + (6 - rest2)];
                     }
                 else if (run_x + 1 < size[0])
                     for (int j = 0; j < rest2; j++) {
-                        err_checkf(std::isnan(tmp[j + (6 - rest2)]), "This should not happen! Read a value outside of range!", std::cout);
+                        err_checkf(!std::isnan(tmp[j + (6 - rest2)]), "This should not happen! Read a value outside of range!", std::cout);
                         values[run_x + 1][0][j] = tmp[j + (6 - rest2)];
                     }
                 else
@@ -291,7 +291,7 @@ bool cube::write_file(const std::filesystem::path &given_path, bool debug)
     of.open(given_path, ios::out);
     of << comment1 << "\n";
     of << comment2 << "\n";
-    of << setw(5) << na << fixed << setw(12) << setprecision(6) << origin[0] << fixed << setw(12) << setprecision(6) << origin[1] << fixed << setw(5) << setprecision(6) << origin[2] << "\n";
+    of << setw(5) << na << fixed << setw(12) << setprecision(6) << origin[0] << fixed << setw(12) << setprecision(6) << origin[1] << fixed << setw(12) << setprecision(6) << origin[2] << "\n";
     for (int i = 0; i < 3; i++)
     {
         of << setw(5) << size[i];
@@ -520,7 +520,7 @@ int cube::get_size(int direction) const
 
 double cube::get_interpolated_value(double x, double y, double z) const
 {
-    if (x < origin[0] || y < origin[1] || z < origin[2] || x > origin[0] + vectors[0][0] * size[0] || y > origin[1] + vectors[1][1] * size[1] || z > origin[2] + vectors[2][2] * size[2])
+    if (x < origin[0] || y < origin[1] || z < origin[2] || x > origin[0] + vectors[0][0] * (size[0] - 1) || y > origin[1] + vectors[1][1] * (size[1] - 1) || z > origin[2] + vectors[2][2] * (size[2] - 1))
         return (0.0);
     double x1 = (x - origin[0]) / vectors[0][0];
     double y1 = (y - origin[1]) / vectors[1][1];
@@ -578,7 +578,7 @@ inline const double dot_(const T &a, const T &b) {
 
 bool has_converged(const double &current_value, double &previous_value, const double rel_threshold, const double rsE, std::deque<double> &history, const int window_size) {
     // Calculate relative and absolute differences
-    double relative_diff = std::abs((current_value - previous_value) / current_value);
+    double relative_diff = current_value == previous_value ? 0.0 : std::abs((current_value - previous_value) / current_value);
     double absolute_diff = std::abs(current_value - previous_value);
 
     // Update history
@@ -663,26 +663,17 @@ double cube::ewald_sum(const int kMax, const double conv) {
 #pragma omp parallel for reduction(+:realSpaceEnergy)
     for (int i = 0; i < size[0]; i++) {
         double length = 0, fac = 0, v1 = 0;
-        double l0 = -i * v00, l1 = -i * v10, l2 = -i * v20;
         for (int j = 0; j < size[1]; j++) {
-            l0 -= j * v01;
-            l1 -= j * v11;
-            l2 -= j * v21;
             for (int k = 0; k < size[2]; k++) {
-                l0 -= k * v02;
-                l1 -= k * v12;
-                l2 -= k * v22;
                 v1 = values[i][j][k];
                 for (int l = 0; l < size[0]; l++) {
-                    l0 += l * v00;
-                    l1 += l * v10;
-                    l2 += l * v20;
                     for (int m = 0; m < size[1]; m++) {
-                        l0 += m * v01;
-                        l1 += m * v11;
-                        l2 += m * v21;
+                        // displacement (l,m,n) - (i,j,k) in the get_pos convention
+                        const double l0 = (l - i) * v00 + (m - j) * v01;
+                        const double l1 = (l - i) * v10 + (m - j) * v11;
+                        const double l2 = (l - i) * v20 + (m - j) * v21;
                         for (int n = 0; n < size[2]; n++) {
-                            length = std::hypot(l0 + n * v02, l1 + n * v12, l2 + n * v22);
+                            length = std::hypot(l0 + (n - k) * v02, l1 + (n - k) * v12, l2 + (n - k) * v22);
                             if (length > 6.0 || length == 0) continue;
                             fac = erfc(alpha * length) / length;
                             if (abs(fac) < 1E-10) continue;
@@ -759,10 +750,10 @@ double cube::ewald_sum(const int kMax, const double conv) {
             }
         }
         res_temp += 4.0 * constants::PI / volume * temp * dv * dv;
+        delete(pb);
         if (has_converged(res_temp, result, conv, realSpaceEnergy, history, window_size)) {
             break;
         }
-        delete(pb);
     }
 
     reciprocalSpaceEnergy = result;
@@ -866,12 +857,12 @@ cube cube::operator/(const cube &right) const
     for (int x = 0; x < size[0]; x++)
         for (int y = 0; y < size[1]; y++)
             for (int z = 0; z < size[2]; z++) {
-                if (right.get_value(x, y, z) == 0)
-                    res_cube.set_value(x, y, z, 1E100);
-                if (values[x][y][z] != 0)
-                    res_cube.set_value(x, y, z, this->get_value(x, y, z) / right.get_value(x, y, z));
-                else
+                if (values[x][y][z] == 0)
                     res_cube.set_value(x, y, z, 0);
+                else if (right.get_value(x, y, z) == 0)
+                    res_cube.set_value(x, y, z, 1E100);
+                else
+                    res_cube.set_value(x, y, z, this->get_value(x, y, z) / right.get_value(x, y, z));
             }
 
     return (res_cube);
@@ -1070,6 +1061,7 @@ bool cube::set_vector(int i, int j, double value)
         vectors[i][j] = value;
     else
         return (false);
+    calc_dv();
     return (true);
 };
 
@@ -1265,19 +1257,17 @@ cube cube::super_cube(int x, int y, int z)
     using namespace std;
     int m[3]{ x, y, z };
     std::filesystem::path new_path(path);
-    WFN super_wfn(parent_wavefunction->get_path());
+    new_path.replace_extension(".cube_super");
+    cube out = cube({ m[0] * size[0], m[1] * size[1], m[2] * size[2] }, m[0] * m[1] * m[2] * parent_wavefunction->get_ncen(), true);
     for (int h = 0; h < m[0]; h++)
         for (int j = 0; j < m[1]; j++)
             for (int k = 0; k < m[2]; k++)
                 for (int a = 0; a < parent_wavefunction->get_ncen(); a++)
                 {
-                    super_wfn.push_back_atom(constants::atnr2letter(parent_wavefunction->get_atom_charge(a)), parent_wavefunction->get_atom_coordinate(a, 0) + h * size[0] * vectors[0][0] + j * size[1] * vectors[1][0] + k * size[2] * vectors[2][0], parent_wavefunction->get_atom_coordinate(a, 1) + h * size[0] * vectors[0][1] + j * size[1] * vectors[1][1] + k * size[2] * vectors[2][1], parent_wavefunction->get_atom_coordinate(a, 2) + h * size[0] * vectors[0][2] + j * size[1] * vectors[1][2] + k * size[2] * vectors[2][2], parent_wavefunction->get_atom_charge(a));
+                    out.parent_wavefunction->push_back_atom(constants::atnr2letter(parent_wavefunction->get_atom_charge(a)), parent_wavefunction->get_atom_coordinate(a, 0) + h * size[0] * vectors[0][0] + j * size[1] * vectors[1][0] + k * size[2] * vectors[2][0], parent_wavefunction->get_atom_coordinate(a, 1) + h * size[0] * vectors[0][1] + j * size[1] * vectors[1][1] + k * size[2] * vectors[2][1], parent_wavefunction->get_atom_coordinate(a, 2) + h * size[0] * vectors[0][2] + j * size[1] * vectors[1][2] + k * size[2] * vectors[2][2], parent_wavefunction->get_atom_charge(a));
                 }
 
-    new_path.replace_extension(".cube_super");
-    cube out = cube({ m[0] * size[0], m[1] * size[1], m[2] * size[2] }, m[0] * m[1] * m[2] * parent_wavefunction->get_ncen(), true);
     out.set_path(new_path);
-    out.parent_wavefunction = &super_wfn;
     out.set_comment1(comment1 + " SUPER CUBE");
     out.set_comment2(comment2);
     for (int i = 0; i < 3; i++) {
@@ -1427,15 +1417,15 @@ void cube::adaptive_refine(std::function<const double(const d3)> const func, dou
                 if (k > 0)           sum_side += values[i][j][k - 1];
                 if (j + 1 < size[1]) sum_side += values[i][j + 1][k];
                 if (j > 0)           sum_side += values[i][j - 1][k];
-                if (i + 1 > size[0]) sum_side += values[i + 1][j][k];
+                if (i + 1 < size[0]) sum_side += values[i + 1][j][k];
                 if (i > 0)           sum_side += values[i - 1][j][k];
 
                 if (i > 0 && j > 0)                     sum_edge += values[i - 1][j - 1][k];
                 if (i > 0 && k > 0)                     sum_edge += values[i - 1][j][k - 1];
                 if (j > 0 && k > 0)                     sum_edge += values[i][j - 1][k - 1];
-                if (k + 1 < size[2] && j + 1 > size[1]) sum_edge += values[i][j + 1][k + 1];
-                if (i + 1 < size[0] && j + 1 > size[1]) sum_edge += values[i + 1][j + 1][k];
-                if (k + 1 < size[2] && i + 1 > size[0]) sum_edge += values[i + 1][j][k + 1];
+                if (k + 1 < size[2] && j + 1 < size[1]) sum_edge += values[i][j + 1][k + 1];
+                if (i + 1 < size[0] && j + 1 < size[1]) sum_edge += values[i + 1][j + 1][k];
+                if (k + 1 < size[2] && i + 1 < size[0]) sum_edge += values[i + 1][j][k + 1];
                 if (k + 1 < size[2] && i > 0)           sum_edge += values[i - 1][j][k + 1];
                 if (j + 1 < size[1] && i > 0)           sum_edge += values[i - 1][j + 1][k];
                 if (k + 1 < size[2] && j > 0)           sum_edge += values[i][j - 1][k + 1];

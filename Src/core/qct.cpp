@@ -727,15 +727,12 @@ int acu_nci(std::vector<WFN>& wavy, options& opt) {
                 false
             );
         }
-        else if (opts.rho || opts.rdg || opts.elf || opts.eli || opts.lap || opts.def) {
-            Calc_Prop(
-                cubes,
-                wavy[run.MoleculeFiles[0]],
-                opts.radius,
-                std::cout,
-                false,
-                false
-            );
+        else {
+            //Calc_Prop leaves the Rho cube untouched unless RDG is requested (it hands back sign(lambda2)*rho then)
+            if (opts.rho && !opts.rdg)
+                Calc_Rho(cubes[cube_type::Rho], wavy[run.MoleculeFiles[0]], opts.radius, std::cout, false);
+            if (opts.rdg || opts.elf || opts.eli || opts.lap || opts.def)
+                Calc_Prop(cubes, wavy[run.MoleculeFiles[0]], opts.radius, std::cout, false, false);
         }
 
         if (opts.def) {
@@ -1447,7 +1444,7 @@ int QCT(options& opt, std::vector<WFN>& wavy)
                         wavy[activewave].list_primitives();
                         std::cout << "Which exponent out of " << wavy[activewave].get_nex() << " do you want to delete?\n";
                         std::cin >> msel;
-                        if (msel<0 || msel>wavy[activewave].get_nex()) {
+                        if (msel < 0 || msel >= wavy[activewave].get_nex()) {
                             std::cout << "Sorry, wrong input";
                             continue;
                         }

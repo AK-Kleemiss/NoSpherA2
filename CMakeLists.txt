@@ -7,6 +7,8 @@ message(STATUS "CMAKE_BUILD_TYPE = ${CMAKE_BUILD_TYPE}")
 option(NOSPHERA2_BUILD_DLL "Build the NoSpherA2 DLL" OFF)
 option(NOSPHERA2_BUILD_TESTS "Build NoSpherA2 tests" OFF)
 option(NOSPHERA2_DEPENDENCIES_ONLY "Build dependencies without building NoSpherA2" OFF)
+option(NOSPHERA2_PROFILE_SYMBOLS "Release code with a PDB, so VTune and the VS profiler resolve functions (scripts/profile_cpu.ps1)" OFF)
+option(NOSPHERA2_COVERAGE "gcc/clang: instrument the NoSpherA2 targets for gcov (scripts/coverage.sh), dependencies stay plain" OFF)
 option(NOSPHERA2_USE_CUDA "Build the CUDA scattering-factor path" OFF)
 option(NOSPHERA2_USE_HIP "Build the HIP (AMD) scattering-factor path" OFF)
 #Apple silicon only: the Metal I tensor path wants unified memory, which an Intel Mac has not.

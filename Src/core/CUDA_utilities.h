@@ -553,10 +553,11 @@ __global__ void gpu_linear_interpolate_spherical_density(
         step0 = logf(step0);
         step0 /= gpu_log_incr[0];
         int step = floorf(step0);
-        if (step > size)
-            result = spherical_dist[size - 1];
+        if (step < 0) step = 0;
+        if (step > size - 2)
+            result = radial_dens[size - 1];
         else {
-            result = radial_dens[step] + (radial_dens[step + 1] - radial_dens[step]) / (spherical_dist[step] - spherical_dist[step - 1]) * (dist[0] - spherical_dist[step - 1]);
+            result = radial_dens[step] + (radial_dens[step + 1] - radial_dens[step]) / (spherical_dist[step + 1] - spherical_dist[step]) * (dist[0] - spherical_dist[step]);
             if (result < 1E-10) return;
         }
     }

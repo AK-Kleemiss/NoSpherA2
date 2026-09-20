@@ -101,10 +101,11 @@
     <ClInclude Include="..\..\Src\core\constants.h" />
     <ClInclude Include="..\..\Src\core\convenience.h" />
     <ClInclude Include="..\..\Src\core\crystal_energies.h" />
+    <ClInclude Include="..\..\Src\core\gaussian_atom.h" />
+    <ClInclude Include="..\..\Src\core\density_source.h" />
     <ClInclude Include="..\..\Src\core\cube.h" />
     <ClInclude Include="..\..\Src\core\cublas_dynamic.h" />
     <ClInclude Include="..\..\Src\core\CUDA_utilities.h" />
-    <ClInclude Include="..\..\Src\core\def2-ECPs_GA.h" />
     <ClInclude Include="..\..\Src\core\early_exit.h" />
     <ClInclude Include="..\..\Src\core\ECPs_corrections.h" />
     <ClInclude Include="..\..\Src\core\fchk.h" />
@@ -155,6 +156,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\Src\core\crystal_energies.cpp" />
+    <ClCompile Include="..\..\Src\core\gaussian_atom.cpp" />
     <ClCompile Include="..\..\Src\core\cublas_dynamic.cpp" />
     <ClCompile Include="..\..\Src\core\geometry_aid.cpp" />
     <ClCompile Include="..\..\Src\core\pch.cpp">

@@ -121,6 +121,16 @@ public:
         this->beta = beta;
         this->gamma = gamma;
         set_system();
+        // identity as the only symmetry operation, like a P1 CIF
+        sym.resize(3);
+        trans.resize(3);
+        for (int i = 0; i < 3; i++)
+        {
+            sym[i].resize(3);
+            for (int j = 0; j < 3; j++)
+                sym[i][j].push_back(i == j);
+            trans[i].push_back(0.0);
+        }
         ca = cos(constants::PI_180 * alpha);
         cb = cos(constants::PI_180 * beta);
         cg = cos(constants::PI_180 * gamma);
@@ -128,6 +138,9 @@ public:
         sb = sin(constants::PI_180 * beta);
         sg = sin(constants::PI_180 * gamma);
         V = a * b * c * sqrt(1 + 2 * ca * cb * cg - ca * ca - cb * cb - cg * cg);
+        as = b * c * sa / V;
+        bs = a * c * sb / V;
+        cs = a * b * sg / V;
         const vec2 trans_matrix = { {a, 0, 0}, {b * cg, b * sg, 0}, {c * cb, c * (ca - cb * cg) / sg, c * std::sqrt(sb * sb - std::pow((ca - cb * cg) / sg, 2))} };
 		const vec2 unit_matrix = { {1, 0, 0}, {0, 1, 0}, {0, 0, 1} };
 
@@ -172,6 +185,17 @@ public:
         rcm[2][2] = constants::TWO_PI * a * b * sg / V;
 
         upper = 1 - pow(ca, 2) - pow(cb, 2) - pow(cg, 2) + 2 * ca * cb * cg;
+
+        // same units as read_CIF: cm in bohr, rcm in 2 pi / bohr
+        for (int i = 0; i < 3; i++)
+            for (int j = 0; j < 3; j++)
+            {
+                if (abs(rcm[i][j]) < 10e-10)
+                    rcm[i][j] = 0.0;
+                else
+                    rcm[i][j] = constants::bohr2ang(rcm[i][j]);
+                cm[i][j] = constants::ang2bohr(cm[i][j]);
+            }
     };
     double get_as() const { return as; };
     double get_bs() const { return bs; };
@@ -185,7 +209,7 @@ public:
     double get_rcm(const int& i, const int& j) const { return rcm[i][j]; };
     double get_cm(const int& i, const int& j) const { return cm[i][j]; };
     double get_rcm_angs(const int& i, const int& j) const { return constants::ang2bohr(rcm[i][j] / constants::TWO_PI); };
-    double get_cm_angs(const int& i, const int& j) const { return constants::bohr2ang(cm[i][j] / constants::TWO_PI); };
+    double get_cm_angs(const int& i, const int& j) const { return constants::bohr2ang(cm[i][j]); };
     double get_sym(const int& i, const int& j, const int& k) const { return sym[i][j][k]; };
     std::vector<ivec2> get_sym() const { return sym; };
     std::vector<vec> get_trans() const { return trans; };
@@ -531,16 +555,13 @@ public:
 
         for (int i = 0; i < 3; i++)
             for (int j = 0; j < 3; j++)
+            {
                 if (abs(rcm[i][j]) < 10e-10)
-                {
                     rcm[i][j] = 0.0;
-                    cm[i][j] = 0.0;
-                }
                 else
-                {
                     rcm[i][j] = constants::bohr2ang(rcm[i][j]);
-                    cm[i][j] = constants::ang2bohr(cm[i][j]);
-                }
+                cm[i][j] = constants::ang2bohr(cm[i][j]);
+            }
 
         cif_input.close();
         return true;

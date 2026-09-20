@@ -321,7 +321,7 @@ T dot_BLAS(const T2& Mat, const T& vec, bool transp)
             transp ? CblasTrans : CblasNoTrans,
             m, n,
             1.0,
-            Mat.data(), transp ? m : n,
+            Mat.data(), n, // lda is the row length of the stored (row-major) matrix, Trans is only the op
             vec.data(), 1,
             0.0,
             result.data(), 1);
@@ -334,7 +334,7 @@ T dot_BLAS(const T2& Mat, const T& vec, bool transp)
             transp ? CblasTrans : CblasNoTrans,
             m, n,
             &(one),
-            reinterpret_cast<const cdouble*>(Mat.data()), transp ? m : n,
+            reinterpret_cast<const cdouble*>(Mat.data()), n,
             reinterpret_cast<const cdouble*>(vec.data()), 1,
             &(zero),
             reinterpret_cast<cdouble*>(result.data()), 1);

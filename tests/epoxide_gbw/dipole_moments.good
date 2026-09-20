@@ -1,0 +1,38 @@
+    _   __     _____       __              ___   ___
+   / | / /___ / ___/____  / /_  ___  _____/   | |__ \
+  /  |/ / __ \\__ \/ __ \/ __ \/ _ \/ ___/ /| | __/ /
+ / /|  / /_/ /__/ / /_/ / / / /  __/ /  / ___ |/ __/
+/_/ |_/\____/____/ .___/_/ /_/\___/_/  /_/  |_/____/
+                /_/
+This software is part of the cuQCT software suite developed by Florian Kleemiss.
+Please give credit and cite corresponding pieces!
+This Software is published with BSD-2 clause license.
+Calculating for 241920 Gridpoints.
+Calcualting Rho... ...done!
+Calcualting spherical Rho... ...done!
+Calcualting Hirshfeld density for atom: 0
+..done!
+Calcualting Hirshfeld density for atom: 1
+..done!
+Calcualting Hirshfeld density for atom: 2
+..done!
+Calcualting Hirshfeld density for atom: 3
+..done!
+Calcualting Hirshfeld density for atom: 4
+..done!
+Calcualting Hirshfeld density for atom: 5
+..done!
+Calcualting Hirshfeld density for atom: 6
+..done!
+ atom   |  dipole moment x,        y,         z
+======================================
+  0 (O) |   9.756811e-02,  -7.898943e-02,  -1.356836e-01
+  1 (C) |  -5.744411e-02,  -3.430091e-02,  -2.834304e-02
+  2 (H) |  -4.004882e-02,   4.431668e-02,  -9.622381e-02
+  3 (H) |  -9.690530e-03,  -1.116446e-01,   2.270412e-02
+  4 (C) |   7.116202e-02,   3.041677e-02,   2.320570e-02
+  5 (H) |   7.773190e-02,  -5.402318e-02,   6.742123e-02
+  6 (H) |   4.753573e-02,   8.736511e-02,  -5.666592e-02
+
+
+Properties calculation done!

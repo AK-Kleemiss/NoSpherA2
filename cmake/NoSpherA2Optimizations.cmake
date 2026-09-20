@@ -41,7 +41,11 @@ function(nosphera2_enable_optimizations target_name)
                     /Zc:inline
                 >
                 $<$<COMPILE_LANGUAGE:CXX>:/openmp:experimental>
+                $<$<AND:$<BOOL:${NOSPHERA2_PROFILE_SYMBOLS}>,$<COMPILE_LANGUAGE:CXX>>:/Zi>
         )
+        if(NOSPHERA2_PROFILE_SYMBOLS)
+            target_link_options("${target_name}" PRIVATE "$<HOST_LINK:/DEBUG>")
+        endif()
 
         #HOST_LINK, because a CUDA target links twice. Link options otherwise reach the
         #device link as well, where nvcc hands what it does not recognise to cl - and cl
@@ -113,6 +117,11 @@ function(nosphera2_enable_optimizations target_name)
                 PRIVATE
                     $<$<COMPILE_LANGUAGE:CXX>:-fopenmp>
             )
+        endif()
+
+        if(NOSPHERA2_COVERAGE)
+            target_compile_options("${target_name}" PRIVATE $<$<COMPILE_LANGUAGE:CXX>:--coverage>)
+            target_link_options("${target_name}" PRIVATE --coverage)
         endif()
 
         get_target_property(target_type "${target_name}" TYPE)

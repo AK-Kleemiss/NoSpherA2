@@ -1,6 +1,7 @@
 #Filetypes to ignore
 *.log
 *.tscb
+!tests/epoxide_gbw/fixture.tscb
 *.densities
 *.cube
 *.user
@@ -115,3 +116,16 @@ tests/intermolecular_nci/unit_surrounding_values.dat
 tests/intermolecular_nci/unit_surrounding_nci.vmd
 tests/intermolecular_nci/unit_surrounding_plot.py
 .vs/
+# outputs of the epoxide_gbw / isosurface / partition / SALTED integration tests
+tests/epoxide_gbw/experimental.tsc
+tests/epoxide_gbw/combined.tsc
+tests/epoxide_gbw/epoxide.gbw_bondwise_laplacian_*.dat
+tests/epoxide_gbw/*.mtl
+tests/epoxide_gbw/NBO/epoxide.inp
+tests/isosurface/Hirshfeld_surface.dat
+tests/isosurface/*.mtl
+tests/partition/DFT.cif
+tests/partition/converted.wfn
+tests/partition/converted.wfx
+tests/partition/occupied.wfn
+tests/SALTED/SALTED_COEFS.npy

@@ -61,7 +61,10 @@ public:
 
     void gen_auto_aux(const WFN& orbital_wfn);
     void gen_auto_aux_for_element(const atom& atm);
+    // Z values gen_auto_aux is limited to; empty = every element of the wfn
+    void set_auto_aux_elements(const ivec& elements) { _auto_aux_elements = elements; }
 
+    ivec _auto_aux_elements;
     bool has_element(const int& element) const {
         return _elementCounts[element - 1] != 0;
     }

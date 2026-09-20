@@ -12,6 +12,8 @@
 #include "GridManager.h"
 #include "isosurface.h"
 #include "SALTED_predictor.h"
+#include "crystal_energies.h"
+#include "b2c.h"
 
 std::vector<Thakkar> make_thakkar_interpolators()
 {
@@ -30,12 +32,19 @@ std::vector<Thakkar> make_thakkar_interpolators()
 }
 
 void print_time(_time_point &start, _time_point &end, std::ostream &file) {
+    if (constants::hide_timings)
+        return;
+    //fixed/setprecision(0) must not leak into the caller's later prints
+    const std::ios_base::fmtflags flags = file.flags();
+    const std::streamsize prec = file.precision();
     if (get_sec(start, end) < 60)
         file << "Time to calculate Values: " << std::fixed << std::setprecision(0) << get_sec(start, end) << " s" << std::endl;
     else if (get_sec(start, end) < 3600)
         file << "Time to calculate Values: " << std::fixed << std::setprecision(0) << get_sec(start, end) / 60 << " m " << get_sec(start, end) % 60 << " s" << std::endl;
     else
         file << "Time to calculate Values: " << std::fixed << std::setprecision(0) << get_sec(start, end) / 3600 << " h " << (get_sec(start, end) % 3600) / 60 << " m" << std::endl;
+    file.flags(flags);
+    file.precision(prec);
 }
 
 namespace {
@@ -507,7 +516,8 @@ void Calc_RhoEli(
     cube &CubeRho,
     cube &CubeEli,
     const WFN &wavy,
-    double radius)
+    double radius,
+    const density_field *field)
 {
     using namespace std;
     err_checkf(CubeRho.get_size(0) == CubeEli.get_size(0) && CubeRho.get_size(1) == CubeEli.get_size(1) && CubeRho.get_size(2) == CubeEli.get_size(2), "Cube sizes do not match", std::cout);
@@ -524,7 +534,11 @@ void Calc_RhoEli(
         [&](const d3 &pos, const i3 &, const i3 &mapped_idx) {
             double rho = 0.0;
             double eli = 0.0;
-            wavy.computeRhoELI(pos, rho, eli);
+            if (!field) wavy.computeRhoELI(pos, rho, eli);
+            else {
+                rho = field->rho(pos);
+                if (wavy.get_nmo() > 0) eli = wavy.computeELI(pos);
+            }
             CubeEli.set_value(mapped_idx[0], mapped_idx[1], mapped_idx[2], eli);
             return rho;
         });
@@ -533,7 +547,7 @@ void Calc_RhoEli(
 
 void Calc_Rho_spherical_harmonics(
     cube &CubeRho,
-    WFN &wavy,
+    const WFN &wavy,
     std::ostream &file)
 {
     using namespace std;
@@ -548,7 +562,7 @@ void Calc_Rho_spherical_harmonics(
             d[i].resize(16, 0.0);
         const int n = wavy.get_nmo(true);
         vec phi(n, 0.0);
-        // #pragma omp for schedule(dynamic)
+#pragma omp for schedule(dynamic)
         for (int i = 0; i < CubeRho.get_size(0); i++)
         {
             for (int j = 0; j < CubeRho.get_size(1); j++)
@@ -565,7 +579,7 @@ void Calc_Rho_spherical_harmonics(
 
 void Calc_MO_spherical_harmonics(
     cube &CubeMO,
-    WFN &wavy,
+    const WFN &wavy,
     int MO,
     std::ostream &file,
     bool nodate)
@@ -596,7 +610,7 @@ void Calc_MO_spherical_harmonics(
 
 void Calc_S_Rho(
     cube &Cube_S_Rho,
-    WFN &wavy,
+    const WFN &wavy,
     std::ostream &file,
     bool &nodate)
 {
@@ -609,10 +623,8 @@ void Calc_S_Rho(
 #pragma omp parallel for schedule(dynamic)
     for (int i = 0; i < Cube_S_Rho.get_size(0); i++)
     {
-        vec2 d(16);
+        vec2 d(wavy.get_ncen(), vec(16, 0.0));
         vec phi(wavy.get_nmo(), 0.0);
-        for (int p = 0; p < 16; p++)
-            d[p].resize(wavy.get_ncen());
         for (int j = 0; j < Cube_S_Rho.get_size(1); j++)
             for (int k = 0; k < Cube_S_Rho.get_size(2); k++)
                 Cube_S_Rho.set_value(i, j, k, wavy.compute_spin_dens(Cube_S_Rho.get_pos(i, j, k), d, phi));
@@ -654,19 +666,8 @@ void Calc_Prop(
         wrap);
 
     // Calc_Rho already filled Rho; only the RDG run replaces it by sign(lambda2)*rho.
-    // RDG visualizations use 101.0 as an explicit mask value outside the calculation
-    // radius; with wrap every point is visited once per periodic image, so the mask
-    // is applied after the loop where rho stayed exactly zero.
     if (Cubes[cube_type::RDG].get_loaded())
-    {
-        Cubes[cube_type::Rho] = rho_contrib;
-        cube &rdg = Cubes[cube_type::RDG];
-        for (int x = 0; x < rdg.get_size(0); x++)
-            for (int y = 0; y < rdg.get_size(1); y++)
-                for (int z = 0; z < rdg.get_size(2); z++)
-                    if (rho_contrib.get_value(x, y, z) == 0.0)
-                        rdg.set_value(x, y, z, 101.0);
-    }
+        finish_signed_rho(Cubes, rho_contrib);
 
     if (!test)
     {
@@ -1711,13 +1712,28 @@ void properties_calculation(options &opt)
 
     err_checkf(opt.wfn != "", "Error, no wfn file specified!", log2);
     WFN wavy(opt.wfn);
-    //Without MOs (xyz input) rho and the ESP come from the SALTED prediction
-    std::unique_ptr<ML_density> ml;
-    if (opt.SALTED && wavy.get_nmo() == 0) {
-        log2 << "No orbitals in " << opt.wfn << ", rho and ESP from the SALTED model " << opt.salted_model_dir << endl;
-        ml = std::make_unique<ML_density>(wavy, opt);
+    //Without MOs (xyz input) rho, ESP, Laplacian and ELI come from the SALTED prediction; with -ri_fit <basis> from the RI fit of the orbitals
+    std::unique_ptr<Gaussian_Molecule> ml;
+    if (Gaussian_Molecule::requested(wavy, opt)) {
+        if (wavy.get_nmo() == 0) log2 << "No orbitals in " << opt.wfn << ", rho, ESP, Laplacian and ELI from the SALTED model " << opt.salted_model_dir << endl;
+        else log2 << "rho, ESP, Laplacian and ELI from the RI fit of " << opt.wfn << endl;
+        ml = std::make_unique<Gaussian_Molecule>(wavy, opt);
+        //Orbital-only properties on the fitted density: say so and drop them, the density properties still run
+        auto refuse = [&](bool& flag, const char* what) {
+            if (!flag) return;
+            log2 << "ERROR: " << what << " need orbitals, the fitted density has none - skipped" << endl;
+            flag = false;
+        };
+        refuse(opt.properties.elf, "ELF");
+        if (wavy.get_nmo() == 0) {
+            refuse(opt.properties.s_rho, "spin density");
+            refuse(opt.properties.fukui, "Fukui functions");
+            refuse(opt.properties.all_mos, "MOs");
+            bool mos = !opt.properties.MO_numbers.empty();
+            refuse(mos, "MOs");
+            opt.properties.MO_numbers.clear();
+        }
     }
-    auto ml_rho = [&](const d3& p) { return ml->rho(p); };
     auto ml_esp = [&](const d3& p) { return ml->esp(p); };
     if (opt.debug)
         log2 << "Starting calculation of properties" << endl;
@@ -1873,7 +1889,7 @@ void properties_calculation(options &opt)
 
     log2 << "Calculating for " << fixed << setprecision(0) << opt.properties.NbSteps[0] * opt.properties.NbSteps[1] * opt.properties.NbSteps[2] << " Gridpoints." << endl;
 
-    if (ml) Calc_Cube(cubes[cube_type::Rho], wavy, ml_rho, opt.properties.radius, log2, opt.cif != "");
+    if (ml) Calc_Rho(cubes[cube_type::Rho], *ml, opt.properties.radius, log2, opt.cif != "");
     else Calc_Rho(cubes[cube_type::Rho], wavy, opt.properties.radius, log2, opt.cif != "");
 
     if (opt.properties.integral_accuracy != -1) {
@@ -2076,8 +2092,10 @@ void properties_calculation(options &opt)
         }
     }
 
-    if (opt.properties.lap || opt.properties.eli || opt.properties.elf || opt.properties.rdg || opt.properties.esp)
-        Calc_Prop(cubes, wavy, opt.properties.radius, log2, opt.no_date, opt.cif != "");
+    if (opt.properties.lap || opt.properties.eli || opt.properties.elf || opt.properties.rdg || opt.properties.esp) {
+        if (ml) Calc_Prop(cubes, *ml, opt.properties.radius, log2, opt.no_date, opt.cif != "");
+        else Calc_Prop(cubes, wavy, opt.properties.radius, log2, opt.no_date, opt.cif != "");
+    }
 
     if (opt.properties.s_rho)
         Calc_S_Rho(cubes[cube_type::Spin_Density], wavy, log2, opt.no_date);
@@ -2090,7 +2108,7 @@ void properties_calculation(options &opt)
         cubes[cube_type::Rho].set_path((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_rho.cube");
         cubes[cube_type::Rho].write_file(true, true);
     }
-    else if (opt.properties.lap || opt.properties.eli || opt.properties.elf || opt.properties.esp)
+    else if (opt.properties.rho || opt.properties.lap || opt.properties.eli || opt.properties.elf || opt.properties.esp)
         cubes[cube_type::Rho].write_file(true);
     if (opt.properties.rdg)
         cubes[cube_type::RDG].write_file(true);
@@ -2118,7 +2136,7 @@ void properties_calculation(options &opt)
         WFN temp = wavy;
         temp.delete_unoccupied_MOs();
         temp.delete_Qs();
-        if (ml) Calc_Cube(cubes[cube_type::ESP], wavy, ml_esp, opt.properties.radius, log2);
+        if (ml) Calc_ESP(cubes[cube_type::ESP], *ml, opt.properties.radius, opt.no_date, log2);
         else Calc_ESP(cubes[cube_type::ESP], temp, opt.properties.radius, opt.no_date, log2);
         log2 << "Writing cube to Disk..." << flush;
         cubes[cube_type::ESP].write_file(true);
@@ -2132,7 +2150,7 @@ void properties_calculation(options &opt)
         { // the cell grid clips the molecule, so take rho on its own box
             properties_options box_opts = opt.properties;
             box = box_cube(wavy, box_opts);
-            if (ml) Calc_Cube(box, wavy, ml_rho, box_opts.radius, log2, false);
+            if (ml) Calc_Rho(box, *ml, box_opts.radius, log2, false);
             else Calc_Rho(box, wavy, box_opts.radius, log2, false);
         }
         std::vector<Triangle> triangles = marchingCubes(opt.cif != "" ? box : cubes[cube_type::Rho], opt.properties.esp_isosurface);
@@ -2216,14 +2234,14 @@ void do_combine_mo(options &opt)
     for (int v1 = 0; v1 < opt.cmo1.size(); v1++)
     {
         MO1.set_zero();
-        Calc_MO(MO1, opt.cmo1[v1] - 1, wavy1, 40, std::cout);
+        Calc_MO(MO1, opt.cmo1[v1] - 1, wavy1, 40, std::cout, false);
         for (int j = 0; j < opt.cmo2.size(); j++)
         {
             counter++;
             std::cout << "Running: " << counter << " of " << opt.cmo2.size() * opt.cmo1.size() << endl;
             string filename("");
             MO2.set_zero();
-            Calc_MO(MO2, opt.cmo2[j] - 1, wavy2, 40, std::cout);
+            Calc_MO(MO2, opt.cmo2[j] - 1, wavy2, 40, std::cout, false);
             std::cout << "writing files..." << flush;
             filename = wavy1.get_path().stem().string() + "_" + std::to_string(opt.cmo1[v1]) + "+" + wavy2.get_path().stem().string() + "_" + std::to_string(opt.cmo2[j]) + ".cube";
             fns.push_back(filename);

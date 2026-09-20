@@ -96,6 +96,31 @@ namespace aux_density
     {
         return at_deriv<true>(x, y, z, n_at, cx, cy, cz, r2_max, sh_start, sh_l, pr_start, coef_off, pr_exp, pr_norm, coefs, gx, gy, gz, lap);
     }
+    //PC07 iso-orbital indicator alpha = tau_P / tau_TF (Perdew and Constantin, Phys. Rev. B 75, 155109 (2007)) with the
+    //a, b of r2SCAN-L, from the reduced gradient p = s^2 and the reduced Laplacian q: z = GE4M - F_W is the part of the
+    //fourth-order gradient expansion beyond von Weizsaecker, f_ab(z) switches it off where it would go negative
+    AUX_HD inline double pc07_alpha(const double p, const double q)
+    {
+        const double a = 1.784720, b = 0.258304;
+        const double D = 8 * q * q / 81 - p * q / 9 + 8 * p * p / 243, fW = 5 * p / 3, GE4 = 1 + 5 * p / 27 + 20 * q / 9 + D;
+        const double z = GE4 / sqrt(1 + D * D / ((1 + fW) * (1 + fW))) - fW;
+        if (z >= 0.975 * a) return z;
+        if (z <= 0.025 * a) return 0.0;
+        return z * exp(-a * b / z) * pow(1 + exp(-a / (a - z)), b) / pow(exp(-a / z) + exp(-a / (a - z)), b);
+    }
+    //ELI-D from the density alone: WFN::computeELI's 0.5 rho (48 / (rho tau - |grad rho|^2 / 4))^(3/8) is, with its
+    //tau = 2 tau_conv, 0.5 rho (24 / (rho tau_P))^(3/8) in the Pauli kinetic energy density tau_P = tau - tau_W, and
+    //tau_P = alpha_PC07 tau_TF is the deorbitalised estimate. Zero where the density is negligible.
+    //ponytail: alpha floored at 0.05 - PC07 switches to 0 in single-orbital-like tails where the exact ELI is merely high,
+    //and the floor caps the estimate near the exact maximum (epoxide: 3.4 vs 4.7, valence corr 0.66); tune if a case needs it
+    AUX_HD inline double eli_from_density(const double rho, const double g2, const double lap)
+    {
+        if (rho < 1E-10) return 0.0;
+        const double kf2 = pow(3 * 3.1415926535897932384626433832795028 * 3.1415926535897932384626433832795028 * rho, 2.0 / 3.0);
+        double alpha = pc07_alpha(g2 / (4 * kf2 * rho * rho), lap / (4 * kf2 * rho));
+        if (alpha < 0.05) alpha = 0.05;
+        return 0.5 * rho * pow(24.0 / (rho * alpha * 0.3 * kf2 * rho), 0.375);
+    }
     //gamma(l+3/2, x) / x^(l+3/2), the lower incomplete gamma without its leading power so the
     //potential below has no r^-(l+1) to cancel: the series below a+1, the erf recurrence above
     AUX_HD inline double lower_gamma_scaled(const int l, const double x)

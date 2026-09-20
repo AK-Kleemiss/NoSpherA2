@@ -107,6 +107,8 @@ static int run_app_impl(int argc, char **argv)
 
     options opt(argc, argv, log_file);
     opt.digest_options();
+    if (opt.finished)
+        return 0;
     opt.cwd = cwd;
 #ifdef NOSPHERA2_USE_GPU
     //Every GPU toggle, from opt alone, once per run. These are globals and used to be set
@@ -208,7 +210,8 @@ static int run_app_impl(int argc, char **argv)
         wavy.emplace_back(opt.hirshfeld_surface2, opt.debug);
         std::vector<_time_point> tp{ get_time() };
         std::vector<std::string> tp_desc;
-        std::vector<Triangle> triangles_i = Hirshfeld_surface(wavy[0], wavy[1], opt.properties, log_file);
+        cube weight;
+        std::vector<Triangle> triangles_i = Hirshfeld_surface(wavy[0], wavy[1], opt.properties, log_file, &weight);
         tp.push_back(get_time()); tp_desc.push_back("weight grid + marching cubes");
         if (triangles_i.empty())
         {
@@ -237,39 +240,42 @@ static int run_app_impl(int argc, char **argv)
             d_e[i] = calc_d_i(pos, wavy[1]);
             d_norm[i] = calc_d_norm_term(pos, wavy[0]) + calc_d_norm_term(pos, wavy[1]);
         }
-        tp.push_back(get_time()); tp_desc.push_back("d_i, d_e, d_norm");
+        vec shape_index, curvedness;
+        surface_curvature(triangles_i, weight, shape_index, curvedness);
+        tp.push_back(get_time()); tp_desc.push_back("d_i, d_e, d_norm, curvature");
         vec esp;
         if (wavy[0].get_nmo() > 0)
             esp = surface_ESP(triangles_i, wavy[0]);
         else if (opt.SALTED)
         {
-            const ML_density ml(wavy[0], opt);
+            const Gaussian_Molecule ml(wavy[0], opt);
             esp = surface_ESP(triangles_i, [&](const d3& p) { return ml.esp(p); });
         }
         tp.push_back(get_time()); tp_desc.push_back("surface ESP");
-        // one row per face in obj order (d_i, d_e in Angstrom, esp in a.u.): Olex2 colours the surface from these, columns 1-2 are the fingerprint plot
+        // one row per face in obj order (d_i, d_e in Angstrom, curvature in 1/Angstrom, esp in a.u.): Olex2 colours the surface from these, columns 1-2 are the fingerprint plot
         ofstream dat("Hirshfeld_surface.dat");
-        dat << "# d_i d_e d_norm" << (esp.empty() ? "" : " esp") << "\n";
+        dat << "# d_i d_e d_norm shape_index curvedness" << (esp.empty() ? "" : " esp") << "\n";
         for (int i = 0; i < nt; i++)
         {
-            dat << constants::bohr2ang(d_i[i]) << "\t" << constants::bohr2ang(d_e[i]) << "\t" << d_norm[i];
+            dat << constants::bohr2ang(d_i[i]) << "\t" << constants::bohr2ang(d_e[i]) << "\t" << d_norm[i] << "\t" << shape_index[i] << "\t" << curvedness[i];
             if (!esp.empty())
                 dat << "\t" << esp[i];
             dat << "\n";
         }
         dat.close();
-        const auto [lo_i, hi_i] = std::minmax_element(d_i.begin(), d_i.end());
-        const auto [lo_e, hi_e] = std::minmax_element(d_e.begin(), d_e.end());
-        const auto [lo_n, hi_n] = std::minmax_element(d_norm.begin(), d_norm.end());
-        std::cout << "d_i is scaled from " << *lo_i << " to " << *hi_i * 0.9 << endl;
-        std::cout << "d_e is scaled from " << *lo_e << " to " << *hi_e * 0.9 << endl;
-        std::cout << "d_norm from " << *lo_n << " to " << *hi_n << ", red (" << *lo_n << ") white (0) blue (" << *hi_n << ")" << endl;
+        // plain values, not structured bindings: clang's OpenMP cannot capture those (macOS CI)
+        const double lo_i = *std::min_element(d_i.begin(), d_i.end()), hi_i = *std::max_element(d_i.begin(), d_i.end());
+        const double lo_e = *std::min_element(d_e.begin(), d_e.end()), hi_e = *std::max_element(d_e.begin(), d_e.end());
+        const double lo_n = *std::min_element(d_norm.begin(), d_norm.end()), hi_n = *std::max_element(d_norm.begin(), d_norm.end());
+        std::cout << "d_i is scaled from " << lo_i << " to " << hi_i * 0.9 << endl;
+        std::cout << "d_e is scaled from " << lo_e << " to " << hi_e * 0.9 << endl;
+        std::cout << "d_norm from " << lo_n << " to " << hi_n << ", red (" << lo_n << ") white (0) blue (" << hi_n << ")" << endl;
 #pragma omp parallel for
         for (int i = 0; i < nt; i++)
         {
-            triangles_i[i].set_colour(mix_colour(d_i[i], Colourcode, *lo_i, *hi_i * 0.9));
-            triangles_e[i].set_colour(mix_colour(d_e[i], Colourcode, *lo_e, *hi_e * 0.9));
-            triangles_n[i].set_colour(d_norm[i] < 0 ? mix_colour(d_norm[i], Colourcode, *lo_n, -*lo_n) : mix_colour(d_norm[i], Colourcode, -*hi_n, *hi_n));
+            triangles_i[i].set_colour(mix_colour(d_i[i], Colourcode, lo_i, hi_i * 0.9));
+            triangles_e[i].set_colour(mix_colour(d_e[i], Colourcode, lo_e, hi_e * 0.9));
+            triangles_n[i].set_colour(d_norm[i] < 0 ? mix_colour(d_norm[i], Colourcode, lo_n, -lo_n) : mix_colour(d_norm[i], Colourcode, -hi_n, hi_n));
         }
         std::cout << "Total area: " << area << endl;
         std::cout << "Total volume: " << volume << endl;
@@ -353,7 +359,7 @@ static int run_app_impl(int argc, char **argv)
     if (opt.pol_wfns.size() != 0)
     {
         polarizabilities(opt, log_file);
-        exit(0);
+        return 0;
     }
     // Performs MTC and CMTC calcualtions, that is multiple wfns with either one or multiple cifs and 1 common hkl.
     if (opt.cif_based_combined_tsc_calc || opt.combined_tsc_calc)

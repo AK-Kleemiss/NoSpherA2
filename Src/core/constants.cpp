@@ -7,6 +7,7 @@
 namespace constants {
     double exp_cutoff = -23.5;
     bool hide_gpu_notes = false;
+    bool hide_timings = false;
     namespace {
         //rows in WFN type order, columns m = 0,+1,-1,...; s to g are rational * sqrt(rational), h and up are libcint's real solid harmonics
         //with ORCA's phase (-1 for |m| = 3, 4, 7, 8) over ORCA's angular norm sqrt((2l+1)/(4 pi)), see Sph2CartTests.MatchesLibcintWithOrcaPhase

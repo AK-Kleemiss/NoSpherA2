@@ -759,6 +759,12 @@ double read_fchk_double(std::ifstream& in, const char* search, bool rewind)
     return read_fchk_double(temp);
 };
 
+//(2a/pi)^(3/4) (4a)^(l/2) / sqrt((2l-1)!!): the norm of x^l exp(-a r^2), the primitive normalisation fchk contraction coefficients leave out
+static double axial_prim_norm(const int l, const double a)
+{
+    return pow(pow(2, 3 + 4 * l) * pow(a, 2 * l + 3) / constants::PI3 / pow(constants::double_ft[std::max(2 * l - 1, 0)], 2), 0.25);
+}
+
 bool free_fchk(std::ostream &file, const std::filesystem::path &fchk_name, const std::filesystem::path &basis_set_path, WFN &wave, const bool &debug, const bool force_overwrite)
 {
     using namespace std;
@@ -787,6 +793,16 @@ bool free_fchk(std::ostream &file, const std::filesystem::path &fchk_name, const
         file << "alpha, beta, elcount: " << setw(5) << alpha_els << setw(5) << beta_els << setw(5) << elcount << endl;
     }
     const bool write_beta = wave.get_is_unrestricted() && wave.get_multi() > 1;
+    if (write_beta)
+    {
+        // the alpha/beta blocks are written by MO operator, so the electron counts must follow the occupations
+        // per operator as well: occ-built doublets carry the unpaired electron in the op-1 block
+        double occ_a = 0.0, occ_b = 0.0;
+        for (int m = 0; m < wave.get_nmo(); m++)
+            (wave.get_MO_op(m) == 0 ? occ_a : occ_b) += wave.get_MO_occ(m);
+        alpha_els = static_cast<int>(std::round(occ_a));
+        beta_els = static_cast<int>(std::round(occ_b));
+    }
     if (wave.get_nr_basis_set_loaded() == 0)
     {
         if (debug)
@@ -809,7 +825,7 @@ bool free_fchk(std::ostream &file, const std::filesystem::path &fchk_name, const
     {
         file << "Origin: " << wave.get_origin() << endl;
     }
-    if (wave.get_origin() == e_origin::wfn || wave.get_origin() == e_origin::ffn || wave.get_origin() == e_origin::gbw || wave.get_origin() == e_origin::molden || wave.get_origin() == e_origin::tonto)
+    if (wave.get_origin() == e_origin::wfn || wave.get_origin() == e_origin::ffn || wave.get_origin() == e_origin::gbw || wave.get_origin() == e_origin::molden || wave.get_origin() == e_origin::tonto || wave.get_origin() == e_origin::fchk)
     {
         //-----------------------check ordering and order accordingly----------------------
         wave.sort_wfn(wave.check_order(debug), debug);
@@ -832,33 +848,18 @@ bool free_fchk(std::ostream &file, const std::filesystem::path &fchk_name, const
         }
 
         //-------------------normalize the basis set shell wise into a copy vector---------
+        //gbw and molden carry ORCA's normalised contraction coefficients, the basis set library the raw ones
+        const bool normalised = wave.get_origin() == e_origin::gbw || wave.get_origin() == e_origin::molden || wave.get_origin() == e_origin::fchk;
         vec2 basis_coefficients(wave.get_ncen());
 #pragma omp parallel for
         for (int a = 0; a < wave.get_ncen(); a++)
         {
             for (int p = 0; p < wave.get_atom_primitive_count(a); p++)
             {
-                double temp_c = wave.get_atom_basis_set_exponent(a, p);
-                switch (wave.get_atom_primitive_type(a, p))
-                {
-                case 1:
-                    temp_c = 8 * pow(temp_c, 3) / constants::PI3;
-                    break;
-                case 2:
-                    temp_c = 128 * pow(temp_c, 5) / constants::PI3;
-                    break;
-                case 3:
-                    temp_c = 2048 * pow(temp_c, 7) / (9 * constants::PI3);
-                    break;
-                case 4:
-                    temp_c = 32768 * pow(temp_c, 9) / (225 * constants::PI3);
-                    break;
-                case -1:
-                    file << "Sorry, the type reading went wrong somwhere, look where it may have gone crazy..." << endl;
-                    break;
-                }
-                temp_c = pow(temp_c, 0.25) * wave.get_atom_basis_set_coefficient(a, p);
-                basis_coefficients[a].push_back(temp_c);
+                const int l = wave.get_atom_primitive_type(a, p) - 1;
+                err_chkf(l >= 0, "Sorry, the type reading went wrong somwhere, look where it may have gone crazy...", file);
+                const double c = wave.get_atom_basis_set_coefficient(a, p);
+                basis_coefficients[a].push_back(normalised ? c : axial_prim_norm(l, wave.get_atom_basis_set_exponent(a, p)) * c);
             }
         }
         for (int a = 0; a < wave.get_ncen(); a++)
@@ -1499,7 +1500,8 @@ bool free_fchk(std::ostream &file, const std::filesystem::path &fchk_name, const
             for (int sh = 0; sh < wave.get_atom_shell_count(a); sh++)
                 for (int p = 0; p < wave.get_atom_shell_primitives(a, sh); p++)
                 {
-                    fchk << uppercase << scientific << setw(16) << setprecision(8) << wave.get_atom_basis_set_coefficient(a, p_run);
+                    const double c = wave.get_atom_basis_set_coefficient(a, p_run);
+                    fchk << uppercase << scientific << setw(16) << setprecision(8) << (normalised ? c / axial_prim_norm(wave.get_atom_primitive_type(a, p_run) - 1, wave.get_atom_basis_set_exponent(a, p_run)) : c);
                     runs++;
                     p_run++;
                     if ((runs % 5 == 0 && runs != 0) || (a == wave.get_ncen() - 1 && sh == wave.get_atom_shell_count(a) - 1 && p == wave.get_atom_shell_primitives(a, sh) - 1))

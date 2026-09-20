@@ -88,14 +88,14 @@ dMatrix2 elementWiseExponentiation(dMatrix2& matrix, double exponent)
     return result_m;
 }
 
-void solve_linear_system(const vec2& A, vec& b)
+int solve_linear_system(const vec2& A, vec& b)
 {
     err_checkf(A.size() == b.size(), "Inconsitent size of arrays in linear_solve", std::cout);
     vec temp = flatten<double>(A);
-    solve_linear_system(temp, A.size(), b);
+    return solve_linear_system(temp, A.size(), b);
 }
 
-void solve_linear_system(vec& A, const size_t& size_A, vec& b)
+int solve_linear_system(vec& A, const size_t& size_A, vec& b)
 {
 
     err_checkf(size_A == b.size(), "Inconsitent size of arrays in linear_solve", std::cout);
@@ -128,9 +128,10 @@ void solve_linear_system(vec& A, const size_t& size_A, vec& b)
     {
         std::cout << "Error: LAPACKE_dgesv returned " << info << std::endl;
     }
+    return info;
 }
 
-void solve_linear_system(vec& A, const unsigned long long& rows_A, const unsigned long long& cols_A, vec& b)
+int solve_linear_system(vec& A, const unsigned long long& rows_A, const unsigned long long& cols_A, vec& b)
 {
     err_checkf(rows_A == b.size(), "Inconsitent size of arrays in linear_solve", std::cout);
     // LAPACK variables
@@ -172,12 +173,18 @@ void solve_linear_system(vec& A, const unsigned long long& rows_A, const unsigne
     {
         error += b[i] * b[i];
     }
+    // std::fixed/precision are sticky on std::cout; restore them so later prints keep their format
+    const std::ios_base::fmtflags flags = std::cout.flags();
+    const std::streamsize prec = std::cout.precision();
     std::cout << std::fixed << std::showpoint << std::setprecision(12) << std::sqrt(error) << std::endl;
+    std::cout.flags(flags);
+    std::cout.precision(prec);
 
     if (info != 0)
     {
-        std::cout << "Error: LAPACKE_dgesv returned " << info << std::endl;
+        std::cout << "Error: LAPACKE_dgels returned " << info << std::endl;
     }
+    return info;
 }
 
 //#include <linalg.hpp>

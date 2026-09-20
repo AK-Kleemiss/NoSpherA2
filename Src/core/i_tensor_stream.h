@@ -101,11 +101,19 @@ public:
 
     void finish_write() { if (f_) fflush(f_); }
 
+    // A rejected file must not stay open: the caller may delete or rewrite it.
     void open(const std::filesystem::path &p, const size_t window_blocks)
     {
         close();
         f_ = fopen(p.string().c_str(), "rb");
         if (!f_) throw std::runtime_error("i_tensor_file: cannot open " + p.string());
+        try { read_header(p, window_blocks); }
+        catch (...) { close(); throw; }
+    }
+
+private:
+    void read_header(const std::filesystem::path &p, const size_t window_blocks)
+    {
         int64_t h[5] = { 0, 0, 0, 0, 0 };
         if (fread(h, sizeof(int64_t), 5, f_) != 5 || h[0] != magic_)
             throw std::runtime_error("i_tensor_file: " + p.string() + " is not an I tensor in the compact layout");
@@ -149,6 +157,8 @@ public:
         path_ = p;
         set_window(window_blocks);
     }
+
+public:
 
     void set_window(size_t window_blocks)
     {

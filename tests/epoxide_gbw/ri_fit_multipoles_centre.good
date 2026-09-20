@@ -1,0 +1,130 @@
+    _   __     _____       __              ___   ___
+   / | / /___ / ___/____  / /_  ___  _____/   | |__ \
+  /  |/ / __ \\__ \/ __ \/ __ \/ _ \/ ___/ /| | __/ /
+ / /|  / /_/ /__/ / /_/ / / / /  __/ /  / ___ |/ __/
+/_/ |_/\____/____/ .___/_/ /_/\___/_/  /_/  |_/____/
+                /_/
+This software is part of the cuQCT software suite developed by Florian Kleemiss.
+Please give credit and cite corresponding pieces!
+This Software is published with BSD-2 clause license.
+Reading:                                "epoxide.gbw" done!
+Number of atoms in Wavefunction file: 7 Number of MOs: 62
+Number of protons: 24
+Number of electrons: 24.000000
+Reading:                                "epoxide.cif" done!
+Generating hkl indices up to d=:              0.40... done!
+Nr of reflections generated:                  8261
+Number of symmetry operations:                   2
+Nr of reflections to be used:                 8261
+Generating k-points...                            ... done!
+Number of k-points to evaluate: 8261
+
+Generating densities... 
+
+=== Density Fitting ===
+Normal basis functions: 62
+Auxiliary basis functions: 522
+Metric: Coulomb
+Screened out 0 atom pairs due to overlap criteria.
+[                   Calculating Eri3c Matrix                  ]
+[#############################################################] 100% 
+Fit controls:
+  Tikhonov: off
+  Atomic charge restraints: on (Hirshfeld)
+  Multipole restraints: on (lmax=2, Hirshfeld)
+  Restraint definition: atom centred
+  Exact total-electron constraint: off
+GridManager: Setting up prototype grids for atom types...
+GridManager: Generating integration grids for atoms...
+GridManager: Generated total of 1422 grid points.
+GridManager: Setting up prototype grids for atom types...
+GridManager: Generating integration grids for atoms...
+GridManager: Generated total of 32776 grid points.
+Added charge restraints for 7 atoms.
+Added multipole restraints up to l=2 for 7 atoms.
+Solving density-fitting system...
+
+Atomic multipoles of the fitted density, Racah normalisation, e bohr^l
+  Atom  l  m       target       fitted    deviation
+     O  0  0     8.199220     0.000000    -8.199220
+     O  1 -1    -0.089836    -0.093560    -0.003724
+     O  1  0    -0.133125    -0.135556    -0.002432
+     O  1  1     0.105917     0.093856    -0.012061
+     O  2 -2    -0.113283    -0.113168     0.000115
+     O  2 -1    -0.111682    -0.112296    -0.000614
+     O  2  0     0.063128     0.062874    -0.000254
+     O  2  1    -0.068680    -0.068738    -0.000058
+     O  2  2    -0.111904    -0.112049    -0.000145
+     C  0  0     5.993789     0.000000    -5.993789
+     C  1 -1    -0.027893    -0.031643    -0.003750
+     C  1  0    -0.016717    -0.019595    -0.002878
+     C  1  1    -0.056914    -0.072030    -0.015116
+     C  2 -2     0.097284     0.096981    -0.000303
+     C  2 -1     0.070959     0.071186     0.000227
+     C  2  0    -0.020223    -0.020349    -0.000126
+     C  2  1     0.096169     0.095310    -0.000859
+     C  2  2     0.020677     0.020925     0.000247
+     H  0  0     0.949494     0.000000    -0.949494
+     H  1 -1     0.043854     0.043475    -0.000379
+     H  1  0    -0.093139    -0.093796    -0.000657
+     H  1  1    -0.038205    -0.040190    -0.001985
+     H  2 -2    -0.009236    -0.009238    -0.000002
+     H  2 -1    -0.017555    -0.017553     0.000002
+     H  2  0     0.030095     0.030087    -0.000008
+     H  2  1     0.026978     0.026960    -0.000019
+     H  2  2     0.019879     0.019885     0.000005
+     H  0  0     0.950786     0.000000    -0.950786
+     H  1 -1    -0.108268    -0.108905    -0.000636
+     H  1  0     0.022640     0.022329    -0.000311
+     H  1  1    -0.008623    -0.010419    -0.001796
+     H  2 -2     0.017905     0.017897    -0.000008
+     H  2 -1    -0.007446    -0.007446     0.000001
+     H  2  0    -0.035104    -0.035105    -0.000000
+     H  2  1    -0.008110    -0.008121    -0.000011
+     H  2  2    -0.027961    -0.027949     0.000012
+     C  0  0     5.996334     0.000000    -5.996334
+     C  1 -1     0.027497     0.025053    -0.002444
+     C  1  0     0.028191     0.028362     0.000170
+     C  1  1     0.062914     0.050107    -0.012807
+     C  2 -2     0.077587     0.077234    -0.000353
+     C  2 -1     0.013478     0.013724     0.000245
+     C  2  0    -0.064561    -0.064468     0.000093
+     C  2  1     0.050239     0.049485    -0.000754
+     C  2  2     0.100642     0.100512    -0.000129
+     H  0  0     0.954474     0.000000    -0.954474
+     H  1 -1    -0.052768    -0.053064    -0.000296
+     H  1  0     0.065885     0.066123     0.000237
+     H  1  1     0.075142     0.073878    -0.001264
+     H  2 -2    -0.030708    -0.030704     0.000004
+     H  2 -1    -0.009398    -0.009388     0.000010
+     H  2  0    -0.001091    -0.001089     0.000002
+     H  2  1     0.034831     0.034818    -0.000014
+     H  2  2     0.008878     0.008872    -0.000005
+     H  0  0     0.955820     0.000000    -0.955820
+     H  1 -1     0.085078     0.084907    -0.000171
+     H  1  0    -0.055262    -0.055244     0.000018
+     H  1  1     0.045560     0.044125    -0.001435
+     H  2 -2     0.036995     0.036987    -0.000008
+     H  2 -1    -0.018791    -0.018780     0.000011
+     H  2  0    -0.002866    -0.002862     0.000004
+     H  2  1    -0.022067    -0.022070    -0.000003
+     H  2  2    -0.017147    -0.017147    -0.000000
+==============================================
+
+                                        ... done!
+Table of Charges in electrons
+       Atom  Charge_RI
+        O1    -0.229
+        C2     0.013
+       H2a     0.035
+       H2b     0.039
+        C3     0.077
+       H3a     0.041
+       H3b     0.044
+Total number of analytical Electrons: 23.9796
+Streaming tsc in blocks of 1000 reflections
+[               Generating scattering factors...              ]
+[#############################################################] 100% 
+                                         ... done!
+Writing tsc file...  ... done!
+  (written block by block while the factors were computed)

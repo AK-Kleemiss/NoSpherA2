@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "cube.h"
 #include "isosurface.h"
+#include <set>
 #include "properties.h"
 
 // --------------------------------------------------------------------------
@@ -454,7 +455,7 @@ cube box_cube(WFN& wfn, properties_options& opts)
     return grid;
 }
 
-std::vector<Triangle> Hirshfeld_surface(WFN& mol, WFN& env, properties_options& opts, std::ostream& log)
+std::vector<Triangle> Hirshfeld_surface(WFN& mol, WFN& env, properties_options& opts, std::ostream& log, cube* weight_out)
 {
     if (opts.radius < 2.5) {
         log << "Resetting Radius to at least 2.5!" << std::endl;
@@ -477,7 +478,53 @@ std::vector<Triangle> Hirshfeld_surface(WFN& mol, WFN& env, properties_options& 
     std::vector<Triangle> triangles = marchingCubes(weight, 0.5);
     log << "Found " << triangles.size() << " triangles on the " << weight.get_size(0) << "x" << weight.get_size(1) << "x" << weight.get_size(2)
         << " grid in " << get_msec(start, get_time()) << " ms" << std::endl;
+    if (weight_out) *weight_out = std::move(weight);
     return triangles;
+}
+
+//The level set of w has the shape operator -P H P / |grad w| (P = 1 - n n^T) when w decreases outward, as the
+//Hirshfeld weight does; its two non-zero eigenvalues are the principal curvatures, found from the trace and the
+//sum of the principal 2x2 minors, so a convex sphere of radius R gives +1/R twice.
+void surface_curvature(const std::vector<Triangle>& triangles, const cube& field, vec& shape_index, vec& curvedness)
+{
+    const int nt = (int)triangles.size();
+    shape_index.assign(nt, 0.0);
+    curvedness.assign(nt, 0.0);
+    double h[3];
+    for (int k = 0; k < 3; k++) h[k] = constants::bohr2ang(field.get_vector(k, k));
+#pragma omp parallel for
+    for (int t = 0; t < nt; t++) {
+        const d3 c = triangles[t].calc_center();
+        int idx[3];
+        for (int k = 0; k < 3; k++)
+            idx[k] = std::clamp((int)std::lround((c[k] - field.get_origin(k)) / field.get_vector(k, k)), 1, field.get_size(k) - 2);
+        auto w = [&](const int di, const int dj, const int dk) { return field.get_value(idx[0] + di, idx[1] + dj, idx[2] + dk); };
+        const double w0 = w(0, 0, 0);
+        double g[3], H[3][3];
+        g[0] = (w(1, 0, 0) - w(-1, 0, 0)) / (2 * h[0]);
+        g[1] = (w(0, 1, 0) - w(0, -1, 0)) / (2 * h[1]);
+        g[2] = (w(0, 0, 1) - w(0, 0, -1)) / (2 * h[2]);
+        H[0][0] = (w(1, 0, 0) - 2 * w0 + w(-1, 0, 0)) / (h[0] * h[0]);
+        H[1][1] = (w(0, 1, 0) - 2 * w0 + w(0, -1, 0)) / (h[1] * h[1]);
+        H[2][2] = (w(0, 0, 1) - 2 * w0 + w(0, 0, -1)) / (h[2] * h[2]);
+        H[0][1] = H[1][0] = (w(1, 1, 0) - w(1, -1, 0) - w(-1, 1, 0) + w(-1, -1, 0)) / (4 * h[0] * h[1]);
+        H[0][2] = H[2][0] = (w(1, 0, 1) - w(1, 0, -1) - w(-1, 0, 1) + w(-1, 0, -1)) / (4 * h[0] * h[2]);
+        H[1][2] = H[2][1] = (w(0, 1, 1) - w(0, 1, -1) - w(0, -1, 1) + w(0, -1, -1)) / (4 * h[1] * h[2]);
+        const double gn = std::sqrt(g[0] * g[0] + g[1] * g[1] + g[2] * g[2]);
+        if (gn < 1E-12) continue;
+        double n[3], M[3][3], Hn[3];
+        for (int k = 0; k < 3; k++) n[k] = g[k] / gn;
+        for (int i = 0; i < 3; i++) Hn[i] = H[i][0] * n[0] + H[i][1] * n[1] + H[i][2] * n[2];
+        const double nHn = n[0] * Hn[0] + n[1] * Hn[1] + n[2] * Hn[2];
+        for (int i = 0; i < 3; i++)
+            for (int j = 0; j < 3; j++)
+                M[i][j] = -(H[i][j] - n[i] * Hn[j] - Hn[i] * n[j] + n[i] * n[j] * nHn) / gn;
+        const double tr = M[0][0] + M[1][1] + M[2][2];
+        const double m2 = M[0][0] * M[1][1] - M[0][1] * M[1][0] + M[0][0] * M[2][2] - M[0][2] * M[2][0] + M[1][1] * M[2][2] - M[1][2] * M[2][1];
+        const double disc = std::sqrt(std::max(tr * tr - 4 * m2, 0.0)), k1 = 0.5 * (tr + disc), k2 = 0.5 * (tr - disc);
+        shape_index[t] = 2.0 / constants::PI * std::atan2(k1 + k2, k1 - k2);
+        curvedness[t] = 2.0 / constants::PI * std::log(std::sqrt(0.5 * (k1 * k1 + k2 * k2)) + 1E-300);
+    }
 }
 
 vec surface_ESP(const std::vector<Triangle>& triangles, const WFN& wavy)
@@ -547,7 +594,10 @@ std::vector<Triangle> marchingCubes(const cube& volumeData, const double isoVal)
     if (nz < 2) return triangles; // not enough data
 
 
-    // We will iterate through each "voxel" (cube) in the volume
+    // We will iterate through each "voxel" (cube) in the volume. One buffer per x
+    // slab, joined in x order below: a shared push_back under omp critical gave a
+    // thread-order dependent triangle list, so the obj/dat files differed run to run.
+    std::vector<std::vector<Triangle>> slabs(nx - 1);
 #pragma omp parallel for
     for (int x = 0; x < nx - 1; x++) {
         for (int y = 0; y < ny - 1; y++) {
@@ -623,14 +673,13 @@ std::vector<Triangle> marchingCubes(const cube& volumeData, const double isoVal)
                         break; // no more triangles for this cubeIndex
                     }
 
-                    Triangle tri(vertList[e0], vertList[e1], vertList[e2]);
-#pragma omp critical
-                    triangles.push_back(tri);
+                    slabs[x].emplace_back(vertList[e0], vertList[e1], vertList[e2]);
                 }
             }
         }
     }
-
+    for (auto& slab : slabs)
+        triangles.insert(triangles.end(), slab.begin(), slab.end());
 
     return triangles;
 }
@@ -694,7 +743,7 @@ bool writeColourObj(const std::filesystem::path& filename, std::vector<Triangle>
         file << "v " << tri.get_v(2)[0] << " " << tri.get_v(2)[1] << " " << tri.get_v(2)[2] << "\n";
         file << "v " << tri.get_v(3)[0] << " " << tri.get_v(3)[1] << " " << tri.get_v(3)[2] << "\n";
     }
-    writeMTL(mtl_filename, triangles);
+    writeMTL((filename.parent_path() / mtl_filename).string(), triangles);  // next to the obj, not in the cwd
 
     // 2) Write faces
     //    Each triangle is 3 vertices, so the i-th triangle’s vertices
@@ -704,7 +753,7 @@ bool writeColourObj(const std::filesystem::path& filename, std::vector<Triangle>
         size_t i2 = 3 * i + 2;
         size_t i3 = 3 * i + 3;
         // "f index1 index2 index3"
-        file << "usemtl FaceMaterial_" << triangles[i].get_colour_index() << "\n";
+        file << "usemtl " << mtl_name(triangles[i].get_colour()) << "\n";
         file << "f " << i1 << " " << i2 << " " << i3 << "\n";
     }
 
@@ -713,7 +762,15 @@ bool writeColourObj(const std::filesystem::path& filename, std::vector<Triangle>
     return true;
 }
 
-// We'll assume faces[i] has color faceColors[i]
+// The material is named by its colour, so a one-byte colour difference (a
+// platform's last ULP of the ESP at a ramp step) changes that face's lines
+// only; a running index renumbered every material after it
+std::string mtl_name(const RGB &c)
+{
+    return "FaceMaterial_" + std::to_string(c[0]) + "_" + std::to_string(c[1]) + "_" + std::to_string(c[2]);
+}
+
+// One "newmtl" block per distinct colour, in order of first appearance
 bool writeMTL(const std::string& mtlFilename,
     std::vector<Triangle>& triangles)
 {
@@ -721,25 +778,13 @@ bool writeMTL(const std::string& mtlFilename,
     if (!out.is_open()) {
         return false;
     }
-    std::vector<RGB> faceColors;
+    std::set<RGB> faceColors;
 
     out << "# Materials\n\n";
 
-    // Write one "newmtl" block per face
     for (int i = 0; i < triangles.size(); i++) {
-        //look if we already have this colour
-        bool found = false;
-        for (int j = 0; j < faceColors.size(); j++) {
-            if (faceColors[j] == triangles[i].get_colour()) {
-                found = true;
-                triangles[i].set_colour_index(j);
-                break;
-            }
-        }
-        if (found) continue;
-        faceColors.push_back(triangles[i].get_colour());
-        triangles[i].set_colour_index(faceColors.size() - 1);
-        out << "newmtl FaceMaterial_" << faceColors.size() - 1 << "\n";
+        if (!faceColors.insert(triangles[i].get_colour()).second) continue;
+        out << "newmtl " << mtl_name(triangles[i].get_colour()) << "\n";
         out << "Ka 1 1 1 \n";  // ambient is often set to white
         out << "Kd " << triangles[i].get_colour()[0] / 255.0 << " "
             << triangles[i].get_colour()[1] / 255.0 << " "

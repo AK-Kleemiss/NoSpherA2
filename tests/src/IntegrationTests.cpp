@@ -777,6 +777,12 @@ TEST(TomlIntegrationTests, ELI_NH3Li)
     EXPECT_TRUE(result.success) << result.message;
 }
 
+TEST(TomlIntegrationTests, ELI_NH3Li_RI)
+{
+    const UT_Result result = run_inprocess_test(get_repo_root(), "ELI_NH3Li_RI");
+    EXPECT_TRUE(result.success) << result.message;
+}
+
 TEST(TomlIntegrationTests, ELI_HgH2_ECP)
 {
     const UT_Result result = run_inprocess_test(get_repo_root(), "ELI_HgH2_ECP");
@@ -792,6 +798,137 @@ TEST(TomlIntegrationTests, ELI_UH6)
 TEST(TomlIntegrationTests, RGBI_NH3Li_ANO)
 {
     const UT_Result result = run_inprocess_test(get_repo_root(), "RGBI_NH3Li_ANO");
+    EXPECT_TRUE(result.success) << result.message;
+}
+TEST(TomlIntegrationTests, cube_rho)
+{
+    const UT_Result result = run_inprocess_test(get_repo_root(), "cube_rho");
+    EXPECT_TRUE(result.success) << result.message;
+}
+
+TEST(TomlIntegrationTests, cube_esp)
+{
+    const UT_Result result = run_inprocess_test(get_repo_root(), "cube_esp");
+    EXPECT_TRUE(result.success) << result.message;
+}
+
+TEST(TomlIntegrationTests, cube_elf)
+{
+    const UT_Result result = run_inprocess_test(get_repo_root(), "cube_elf");
+    EXPECT_TRUE(result.success) << result.message;
+}
+
+TEST(TomlIntegrationTests, cube_hirsh)
+{
+    const UT_Result result = run_inprocess_test(get_repo_root(), "cube_hirsh");
+    EXPECT_TRUE(result.success) << result.message;
+}
+
+TEST(TomlIntegrationTests, cube_MO)
+{
+    const UT_Result result = run_inprocess_test(get_repo_root(), "cube_MO");
+    EXPECT_TRUE(result.success) << result.message;
+}
+
+TEST(TomlIntegrationTests, esp_isosurface)
+{
+    const UT_Result result = run_inprocess_test(get_repo_root(), "esp_isosurface");
+    EXPECT_TRUE(result.success) << result.message;
+}
+
+TEST(TomlIntegrationTests, density_difference)
+{
+    const UT_Result result = run_inprocess_test(get_repo_root(), "density_difference");
+    EXPECT_TRUE(result.success) << result.message;
+}
+
+TEST(TomlIntegrationTests, dipole_moments)
+{
+    const UT_Result result = run_inprocess_test(get_repo_root(), "dipole_moments");
+    EXPECT_TRUE(result.success) << result.message;
+}
+
+TEST(TomlIntegrationTests, laplacian_bonds)
+{
+    const UT_Result result = run_inprocess_test(get_repo_root(), "laplacian_bonds");
+    EXPECT_TRUE(result.success) << result.message;
+}
+
+TEST(TomlIntegrationTests, convert_to_47)
+{
+    const UT_Result result = run_inprocess_test(get_repo_root(), "convert_to_47");
+    EXPECT_TRUE(result.success) << result.message;
+}
+
+TEST(TomlIntegrationTests, tscb_to_tsc)
+{
+    const UT_Result result = run_inprocess_test(get_repo_root(), "tscb_to_tsc");
+    EXPECT_TRUE(result.success) << result.message;
+}
+
+TEST(TomlIntegrationTests, merge_tscs)
+{
+    const UT_Result result = run_inprocess_test(get_repo_root(), "merge_tscs");
+    EXPECT_TRUE(result.success) << result.message;
+}
+
+TEST(TomlIntegrationTests, merge_tscs_nocheck)
+{
+    const UT_Result result = run_inprocess_test(get_repo_root(), "merge_tscs_nocheck");
+    EXPECT_TRUE(result.success) << result.message;
+}
+
+TEST(TomlIntegrationTests, SF_becke)
+{
+    const UT_Result result = run_inprocess_test(get_repo_root(), "SF_becke");
+    EXPECT_TRUE(result.success) << result.message;
+}
+
+TEST(TomlIntegrationTests, SF_mbis)
+{
+    const UT_Result result = run_inprocess_test(get_repo_root(), "SF_mbis");
+    EXPECT_TRUE(result.success) << result.message;
+}
+
+TEST(TomlIntegrationTests, SF_embis)
+{
+    const UT_Result result = run_inprocess_test(get_repo_root(), "SF_embis");
+    EXPECT_TRUE(result.success) << result.message;
+}
+
+TEST(TomlIntegrationTests, ri_fit_multipoles_centre)
+{
+    const UT_Result result = run_inprocess_test(get_repo_root(), "ri_fit_multipoles_centre");
+    EXPECT_TRUE(result.success) << result.message;
+}
+
+TEST(TomlIntegrationTests, hirshfeld_surface)
+{
+    const UT_Result result = run_inprocess_test(get_repo_root(), "hirshfeld_surface");
+    EXPECT_TRUE(result.success) << result.message;
+}
+
+TEST(TomlIntegrationTests, polarizabilities)
+{
+    const UT_Result result = run_inprocess_test(get_repo_root(), "polarizabilities");
+    EXPECT_TRUE(result.success) << result.message;
+}
+
+TEST(TomlIntegrationTests, gbw2wfn)
+{
+    const UT_Result result = run_inprocess_test(get_repo_root(), "gbw2wfn");
+    EXPECT_TRUE(result.success) << result.message;
+}
+
+TEST(TomlIntegrationTests, SALTED_write_coefs)
+{
+    const UT_Result result = run_inprocess_test(get_repo_root(), "SALTED_write_coefs");
+    EXPECT_TRUE(result.success) << result.message;
+}
+
+TEST(TomlIntegrationTests, SALTED_coef_file)
+{
+    const UT_Result result = run_inprocess_test(get_repo_root(), "SALTED_coef_file");
     EXPECT_TRUE(result.success) << result.message;
 }
 }

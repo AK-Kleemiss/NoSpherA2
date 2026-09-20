@@ -108,11 +108,11 @@ public:
 
 };
 
-bond do_bonds(WFN& wavy, int mode_general, int mode_sel, bool mode_leng, bool mode_res, double res[], bool cub, double boxsize[], int atom1, int atom2, int atom3, const bool& debug, const bool& bohr, int runnumber, bool rho, bool rdg, bool eli, bool lap);
+bond do_bonds(WFN& wavy, int mode_sel, bool mode_leng, bool mode_res, double res[], bool cub, double boxsize[], int atom1, int atom2, int atom3, const bool& debug, const bool& bohr, int runnumber, bool rho, bool rdg, bool eli, bool lap);
 int autobonds(bool debug, WFN& wavy, const std::filesystem::path& inputfile, const bool& bohr);
 
 void bondwise_laplacian_plots(std::filesystem::path &wfn_name);
-void ELI_analysis(const WFN &wavy, const options &opt);
+void ELI_analysis(const WFN &wavy, options &opt);
 
 // QTAIM-guided ELI masking:
 //   Run QTAIM basin analysis on `rho`, keep ELI values only for voxels in the
@@ -139,7 +139,7 @@ void run_QTAIM_ELI_mask(
     const std::filesystem::path& eli_path,
     const std::vector<int>& selected_indices,
     double background_value,
-    const options& opt,
+    options& opt,
     std::ostream& log
 );
 

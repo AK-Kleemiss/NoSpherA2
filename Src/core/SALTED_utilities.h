@@ -140,6 +140,8 @@ struct aux_density_table
     double operator()(const double x, const double y, const double z, const double* coefs, double& gx, double& gy, double& gz, double& lap) const;
     //Electrostatic potential of nuclei and fitted density, see aux_density::esp_at
     double esp(const double x, const double y, const double z, const double* coefs) const;
+    double lap(const double x, const double y, const double z, const double* coefs) const;
+    double eli(const double x, const double y, const double z, const double* coefs) const;
 
     // Convenience function for one atom
     cdouble fourier_atom(double kx, double ky, double kz, const double* coefs, int atom_idx) const;

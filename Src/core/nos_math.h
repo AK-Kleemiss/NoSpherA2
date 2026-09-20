@@ -122,6 +122,10 @@ std::vector<T> self_dot(const std::vector<std::vector<T>>& mat, const std::vecto
 // Wrapper for BLAS dot product
 template <typename T>
 T dot(const std::vector<T>& vec1, const std::vector<T>& vec2, bool conjugate = false);
+// Plain loop version of the same, conj(vec1)·vec2 when conjugate (scalar T only, vec2 x vec2 keeps the matrix overload)
+template <typename T>
+    requires (!std::is_class_v<T> || std::is_same_v<T, cdouble>)
+T self_dot(const std::vector<T>& vec1, const std::vector<T>& vec2, bool conjugate = false);
 
 //BLAS implementation of matrix multiplication 1D x 1D
 template <typename T>
@@ -162,9 +166,6 @@ vec mat_sqrt(vec& A, vec& W, const double cutoff = 1E-5);
 template <typename T>
 void swap_rows_cols_symm(T& mat, const int i, const int j);
 
-// Self written matrix multiplication with flat vectors
-template <typename T>
-std::vector<T> dot(const std::vector<T>& mat, const std::vector<T>& vec, bool transp = false);
 
 template <typename T>
 Kokkos::Experimental::mdarray<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>> diag_dot(const Kokkos::Experimental::mdarray<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>>& mat, const std::vector<T>& _vec, bool transp1 = false);
@@ -176,16 +177,17 @@ dMatrix2 elementWiseExponentiation(dMatrix2& matrix, double exponent);
 void _test_openblas();
 void _test_lahva();
 
-void solve_linear_system(const vec2& A, vec& b);
-void solve_linear_system(vec& A, const size_t& size_A, vec& b);
-void solve_linear_system(vec& A, const unsigned long long& rows_A, const unsigned long long& cols_A, vec& b);
+// all three overwrite b with the solution and return the LAPACK info (0 = success)
+int solve_linear_system(const vec2& A, vec& b);
+int solve_linear_system(vec& A, const size_t& size_A, vec& b);
+int solve_linear_system(vec& A, const unsigned long long& rows_A, const unsigned long long& cols_A, vec& b);
 
 //Small implementation of the non-negative least squares problem
 // A small struct to hold results
 struct NNLSResult {
     vec x;   // solution
     double rnorm;            // residual norm
-    int status;              // 0 if success, -1 if iteration limit, or other codes
+    int status;              // 0 if success, 1 if the iteration limit was hit
 };
 
 /*

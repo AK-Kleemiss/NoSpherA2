@@ -1,5 +1,6 @@
 #pragma once
 #include "convenience.h"
+#include "density_source.h"
 struct aux_density_table;
 
 
@@ -59,6 +60,10 @@ namespace DensityFitting
     vec calculate_expected_populations(const WFN& wavy, const WFN& wavy_aux, const CHARGE_SCHEME & = CHARGE_SCHEME::NUCLEAR);
     // Grid moments of the partitioned density about each nucleus, [atom][l*l+l+m] for l = 0..lmax, electrons only
     vec2 calculate_expected_multipoles(const WFN& wavy, const CHARGE_SCHEME& scheme, const int lmax);
+    // Rows [atom*(lmax+1)^2 + l*l+l+m] over the aux functions whose product with the coefficients is Int w_a rho r^l Y_lm
+    // about each nucleus, w_a the partition weight of scheme on the atoms of wavy; TFVC/MBIS/EMBIS take the density from
+    // density (density_batch of a Gaussian_Molecule) or else from wavy's orbitals
+    vec2 partition_multipole_rows(const WFN& wavy, const aux_density_table& table, const CHARGE_SCHEME scheme, const int lmax, DensityBatch density = {});
 
     void analyze_density_fit_quality(const vec& coefficients, const WFN& wavy_aux, const aux_density_table& aux_density, const vec& expected_charges = vec());
     // Per-atom row weight of the restraints
@@ -69,23 +74,26 @@ namespace DensityFitting
     // monomer energy, overlap = Int rhoA rhoB; rep = K * overlap when K > 0, else Gordon-Kim rep_kin + rep_x, the
     // Thomas-Fermi kinetic and the exchange (x_fun: 0 Dirac, 1 PBE, 2 B88, 3 r2SCAN-L) energy of the dimer minus the
     // monomers on a Becke grid that integrates the densities to n_A, n_B; rep_vw is the 1/9 von Weizsaecker term, reported only.
-    struct INTERACTION {
+    struct Interaction_Energy {
         double nuc_nuc = 0.0, nucA_rhoB = 0.0, nucB_rhoA = 0.0, rho_rho = 0.0;
         double pol_A = 0.0, pol_B = 0.0, disp = 0.0, overlap = 0.0, rep = 0.0, rep_kin = 0.0, rep_vw = 0.0, rep_x = 0.0, n_A = 0.0, n_B = 0.0;
         int x_fun = 0;
         double electrostatic() const { return nuc_nuc + nucA_rhoB + nucB_rhoA + rho_rho; };
-        double total() const { return electrostatic() + pol_A + pol_B + disp + rep; };
+        double polarization() const { return pol_A + pol_B; };
+        double exchange_repulsion() const { return rep; };
+        double dispersion() const { return disp; };
+        double total() const { return electrostatic() + polarization() + disp + rep; };
         vec2 pair, rank;
     };
     // Lower incomplete gamma function gamma(l+3/2, x)
     double lower_gamma_half(const int l, const double x);
     // Coulomb potential Int chi(r)/|r-R| of one aux primitive centred at the origin, Y_lm(R^) included
     double aux_potential(const double exponent, const double coef, const int l, const int m, const double* R);
-    INTERACTION interaction_energy(const vec& coef_A, const WFN& aux_A, const vec& coef_B, const WFN& aux_B, const double repulsion_K = 0.0, const int x_fun = 0);
+    Interaction_Energy interaction_energy(const vec& coef_A, const WFN& aux_A, const vec& coef_B, const WFN& aux_B, const double repulsion_K = 0.0, const int x_fun = 0);
     // Exchange energy density of the closed-shell rho with |grad rho|^2 = g2 and Laplacian lap: x_fun 0 Dirac, 1 PBE, 2 B88,
     // 3 r2SCAN-L, the meta-GGA r2SCAN with its kinetic energy density deorbitalised through PC07opt, which needs lap
     double exchange_density(const double rho, const double g2, const int x_fun, const double lap = 0.0);
-    void print_interaction_energy(const INTERACTION& E, const WFN& aux_A, const WFN& aux_B, std::ostream& file);
+    void print_interaction_energy(const Interaction_Energy& E, const WFN& aux_A, const WFN& aux_B, std::ostream& file);
 
     // Demonstration function
     void demonstrate_enhanced_density_fitting(WFN& wavy, const WFN& wavy_aux);

@@ -271,13 +271,12 @@ PolynomialFit fit_polynomial(const vec& x, const vec& y, int degree) {
         rhs[j] = xj;
     }
 
-    solve_linear_system(M, rhs); // overwrites rhs with the solution in place; logs and leaves it
-                                  // unusable (checked below) if the system is singular.
-    for (const double c : rhs) {
-        if (!std::isfinite(c)) {
-            return fit; // singular system (e.g. duplicate/too-clustered x values)
-        }
-    }
+    // overwrites rhs with the solution in place; a singular system (duplicate/too-clustered x) reports info != 0
+    if (solve_linear_system(M, rhs) != 0)
+        return fit;
+    for (const double c : rhs)
+        if (!std::isfinite(c))
+            return fit;
     fit.coeffs = rhs;
 
     double rss = 0.0, mean_y = 0.0;
