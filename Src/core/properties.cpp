@@ -1861,7 +1861,7 @@ void properties_calculation(options &opt)
     log2 << "\nCalculating:" << endl;
     if (opt.properties.hdef || opt.properties.def || opt.properties.hirsh)
         log2 << "Rho, ";
-    if (opt.properties.hdef || opt.properties.hirsh)
+    if (opt.properties.hdef || opt.properties.def || opt.properties.hirsh)
         log2 << "Spherical Rho, ";
     if (opt.properties.def)
         log2 << "Static deformation density, ";
@@ -2055,9 +2055,10 @@ void properties_calculation(options &opt)
             for (int j = 0; j < 3; j++)
                 cubes[cube_type::spherical_density].set_vector(i, j, cell_matrix[i][j]);
         }
-        if (opt.properties.hdef || opt.properties.hirsh)
+        // -def alone used to skip this and hand back rho as the deformation density
+        if (opt.properties.hdef || opt.properties.def || opt.properties.hirsh)
         {
-            log2 << "Calcualting spherical Rho...";
+            log2 << "Calculating spherical Rho...";
             Calc_Spherical_Dens(cubes[cube_type::spherical_density], wavy, opt.properties.radius, log2, opt.cif != "");
             log2 << " ...done!" << endl;
         }
@@ -2065,10 +2066,7 @@ void properties_calculation(options &opt)
         if (opt.properties.def)
         {
             log2 << "Calculating static deformation density...";
-            if (opt.properties.hdef)
-                Calc_Static_Def(cubes, wavy, opt.properties.radius, log2, opt.cif != "");
-            else
-                Calc_Static_Def(cubes, wavy, opt.properties.radius, log2, opt.cif != "");
+            Calc_Static_Def(cubes, wavy, opt.properties.radius, log2, opt.cif != "");
             log2 << " ...done!" << endl;
         }
 

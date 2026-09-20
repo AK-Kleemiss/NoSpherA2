@@ -1007,4 +1007,31 @@ namespace
         std::filesystem::remove(xyz);
         std::filesystem::remove(molden);
     }
+
+    //every reader stops with an error on a file cut at 50 % and at 90 %: the fuzzing of 18 Sep 2026
+    //found access violations (molden, gbw, xtb) and endless getline loops (wfx) on exactly these;
+    //a regression shows as a crash code or a hanging death test rather than the err_checkf exit
+    TEST(WfnReadDeathTest, TruncatedFilesOfEveryFormatExit)
+    {
+        const std::filesystem::path root = nos_test_repo_root() / "tests";
+        const std::filesystem::path fixtures[] = {
+            root / "molden_file" / "f_ref.wfn", root / "molden_file" / "f_ref.wfx", root / "molden_file" / "epoxide.molden",
+            root / "epoxide_gbw" / "epoxide.gbw", root / "ptb_H_file" / "wfn.xtb" };
+        for (const auto& src : fixtures)
+        {
+            if (!std::filesystem::exists(src)) { ADD_FAILURE() << "Missing " << src; continue; }
+            std::ifstream in(src, std::ios::binary);
+            const std::string bytes((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+            for (const double keep : { 0.5, 0.9 })
+            {
+                // a molden MO list is open-ended and the 90 % cut of epoxide.molden ends inside a coefficient
+                // ("16  0.5" for 0.5656): a shorter valid file, nothing a text reader can refuse
+                if (keep > 0.5 && src.extension() == ".molden") continue;
+                const std::filesystem::path cut = tmp_path("truncated" + src.extension().string());
+                std::ofstream(cut, std::ios::binary) << bytes.substr(0, static_cast<size_t>(keep * bytes.size()));
+                EXPECT_EXIT({ WFN w(cut); }, ::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), ".*") << src.filename() << " cut at " << keep;
+                std::filesystem::remove(cut);
+            }
+        }
+    }
 }

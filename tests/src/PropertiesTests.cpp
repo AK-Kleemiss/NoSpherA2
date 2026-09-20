@@ -1297,3 +1297,30 @@ TEST(PropertiesBasinTests, LegacyB2cWritesLogAndSelectedBasinCube)
     EXPECT_TRUE(std::filesystem::exists(dir / "h2_1_basins.cube"));
     std::filesystem::remove_all(dir);
 }
+
+// -def on its own goes through properties_calculation: the spherical density must be computed
+// for it too, otherwise the "deformation" cube is a copy of rho (it was, until 20 Sep 2026)
+TEST(PropertiesDriverTests, StaticDeformationAloneSubtractsTheSphericalAtoms)
+{
+    const auto input = nos_test_repo_root() / "tests" / "epoxide_gbw" / "epoxide.gbw";
+    if (!std::filesystem::exists(input)) GTEST_SKIP() << "Missing " << input;
+    const std::filesystem::path dir = temp_dir("def_alone");
+    std::filesystem::copy_file(input, dir / "epoxide.gbw");
+    options opt;
+    opt.wfn = (dir / "epoxide.gbw").string();
+    opt.properties.def = true;
+    opt.properties.resolution = 0.5;
+    opt.properties.radius = 1.5;
+    properties_calculation(opt);
+    std::ostringstream log;
+    WFN wave(dir / "epoxide.gbw", false);
+    const cube rho(dir / "epoxide_rho.cube", true, wave, log);
+    const cube def(dir / "epoxide_def.cube", true, wave, log);
+    const double rho_max = rho.max_value();
+    const double def_max = std::max(def.max_value(), -def.min_value());
+    EXPECT_GT(rho_max, 1.0);
+    // the Thakkar atoms take the nuclear peaks out; what is left is the bonding rearrangement
+    EXPECT_GT(def_max, 0.02);
+    EXPECT_LT(def_max, 0.1 * rho_max);
+    std::filesystem::remove_all(dir);
+}
