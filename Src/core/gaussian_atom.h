@@ -135,3 +135,16 @@ inline std::vector<d3> source_positions(const Gaussian_Molecule& m)
     return c;
 }
 inline const char* source_name(const Gaussian_Molecule&) { return "fitted density"; }
+//The batch forms of density_source.h on the fitted density's kernel: OpenMP over the shells per point, or the GPU
+inline void calculate_density(const Gaussian_Molecule& m, const int n, const double* x, const double* y, const double* z, double* rho)
+{
+    calc_aux_density(m.table(), m.coefficients(), n, x, y, z, rho);
+}
+inline void calculate_density(const Gaussian_Molecule& m, const int n, const double* x, const double* y, const double* z, double* rho, double* gx, double* gy, double* gz, double* lap)
+{
+    calc_aux_density(m.table(), m.coefficients(), n, x, y, z, rho, gx, gy, gz, lap);
+}
+inline void calculate_hessian(const Gaussian_Molecule& m, const int n, const double* x, const double* y, const double* z, double* rho, double* gx, double* gy, double* gz, double* H)
+{
+    calc_aux_density(m.table(), m.coefficients(), n, x, y, z, rho, gx, gy, gz, nullptr, H);
+}

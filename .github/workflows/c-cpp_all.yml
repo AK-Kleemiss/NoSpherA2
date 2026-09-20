@@ -167,6 +167,10 @@ jobs:
           submodules: recursive
           fetch-depth: 1
 
+      # The .sln lists its sources by hand, CMake globs them
+      - name: Check the Visual Studio projects against the CMake globs
+        shell: bash
+        run: python scripts/check_vcxproj.py
 
       - name: Compute dependency fingerprint
         id: dependency-fingerprint

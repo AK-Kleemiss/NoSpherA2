@@ -44,40 +44,15 @@ inline double calculate_density(const WFN& w, const d3& p, d3& grad, double& lap
     return rho;
 }
 template<PointDensityWithDerivatives S> double calculate_density(const S& s, const d3& p, d3& grad, double& lap) { return s.values(p, grad, lap); }
-//ponytail: central differences for a source that only has rho; analytic derivatives when a case needs them
-template<PointDensity S> requires (!PointDensityWithDerivatives<S>)
-double calculate_density(const S& s, const d3& p, d3& grad, double& lap)
-{
-    const double h = 1E-4, rho = s.rho(p);
-    lap = 0.0;
-    for (int k = 0; k < 3; k++) {
-        d3 pp = p, pm = p;
-        pp[k] += h;
-        pm[k] -= h;
-        const double rp = s.rho(pp), rm = s.rho(pm);
-        grad[k] = (rp - rm) / (2 * h);
-        lap += (rp + rm - 2 * rho) / (h * h);
-    }
-    return rho;
-}
-//rho(r), rho', rho'' of a radial model: analytic where the model has them, otherwise one central difference
-//(the model is even in r)
-template<RadialModelWithDerivatives A> double radial_derivatives(const A& m, const double r, double& d1, double& d2) { return m.get_radial_density(r, d1, d2); }
-template<RadialModel A> requires (!RadialModelWithDerivatives<A>)
-double radial_derivatives(const A& m, const double r, double& d1, double& d2)
-{
-    const double h = 1E-4, rho = m.get_radial_density(r);
-    const double rp = m.get_radial_density(r + h), rm = m.get_radial_density(std::abs(r - h));
-    d1 = (rp - rm) / (2 * h), d2 = (rp + rm - 2 * rho) / (h * h);
-    return rho;
-}
+//Every source has analytic derivatives (Thakkar, MBIS, EMBIS, the fitted density, the WFN); a model without
+//them (HE_Spherical_Atom, Spherical_Gaussian_Density) does not compile here rather than getting a stencil
 //A radial model: lap = rho'' + 2 rho' / r
-template<RadialModel A> double calculate_density(const Centred<A>& s, const d3& p, d3& grad, double& lap)
+template<RadialModelWithDerivatives A> double calculate_density(const Centred<A>& s, const d3& p, d3& grad, double& lap)
 {
     const double h = 1E-4;
     const d3 d{ p[0] - s.centre[0], p[1] - s.centre[1], p[2] - s.centre[2] };
     double d1, d2;
-    const double r = array_length(d), rho = radial_derivatives(s.model, r, d1, d2);
+    const double r = array_length(d), rho = s.model.get_radial_density(r, d1, d2);
     if (r < h) {
         grad = { 0.0, 0.0, 0.0 };
         lap = 3 * d2;
@@ -134,26 +109,27 @@ template<class A> const char* source_name(const Centred<A>&) { return "atom mode
 //A source that also carries a potential (the fitted density with its nuclei)
 template<class S> concept PointPotential = requires(const S& s, const d3& p) { { s.esp(p) } -> std::convertible_to<double>; };
 
-//Hessian of rho at p, row-major 3x3
-inline void calculate_hessian(const WFN& w, const d3& p, double* H)
+//rho at p with its gradient and Hessian (row-major 3x3); the Hessian-only form drops the rest
+inline double calculate_hessian(const WFN& w, const d3& p, d3& grad, double* H)
 {
     double rho, tau;
-    d3 g;
-    w.computeValues(p, rho, g, H, tau);
+    w.computeValues(p, rho, grad, H, tau);
+    return rho;
 }
-template<PointDensityWithHessian S> void calculate_hessian(const S& s, const d3& p, double* H)
+template<PointDensityWithHessian S> double calculate_hessian(const S& s, const d3& p, d3& grad, double* H) { return s.hessian(p, grad, H); }
+template<class S> void calculate_hessian(const S& s, const d3& p, double* H)
 {
     d3 g;
-    s.hessian(p, g, H);
+    calculate_hessian(s, p, g, H);
 }
 //A radial model, one evaluation of rho', rho'': grad = rho' u, H = rho'' u u^T + rho'/r (1 - u u^T); at the nucleus
 //every direction is radial, grad = 0 and H = rho'' 1
-template<RadialModel A> double calculate_hessian(const Centred<A>& s, const d3& p, d3& grad, double* H)
+template<RadialModelWithDerivatives A> double calculate_hessian(const Centred<A>& s, const d3& p, d3& grad, double* H)
 {
     const double h = 1E-4;
     const d3 d{ p[0] - s.centre[0], p[1] - s.centre[1], p[2] - s.centre[2] };
     double d1, d2;
-    const double r = array_length(d), rho = radial_derivatives(s.model, r, d1, d2);
+    const double r = array_length(d), rho = s.model.get_radial_density(r, d1, d2);
     for (int i = 0; i < 3; i++) {
         grad[i] = r < h ? 0.0 : d1 * d[i] / r;
         for (int j = 0; j < 3; j++) {
@@ -167,24 +143,26 @@ template<RadialModel A> double calculate_hessian(const Centred<A>& s, const d3& 
     }
     return rho;
 }
-template<RadialModel A> void calculate_hessian(const Centred<A>& s, const d3& p, double* H)
+
+//rho with its gradient and Laplacian, and with its gradient and Hessian (9 per point, row-major), at n points in
+//parallel over the points; the fitted density replaces both with its batch kernel (gaussian_atom.h), on the GPU
+//when one is enabled
+template<class S> void calculate_density(const S& s, const int n, const double* x, const double* y, const double* z, double* rho, double* gx, double* gy, double* gz, double* lap)
 {
-    d3 grad;
-    calculate_hessian(s, p, grad, H);
+#pragma omp parallel for schedule(dynamic, 64)
+    for (int p = 0; p < n; p++) {
+        d3 g;
+        rho[p] = calculate_density(s, d3{ x[p], y[p], z[p] }, g, lap[p]);
+        gx[p] = g[0], gy[p] = g[1], gz[p] = g[2];
+    }
 }
-//ponytail: central differences of the gradient, six evaluations, for a source without an analytic Hessian (none today)
-template<class S> requires (!PointDensityWithHessian<S>)
-void calculate_hessian(const S& s, const d3& p, double* H)
+template<class S> void calculate_hessian(const S& s, const int n, const double* x, const double* y, const double* z, double* rho, double* gx, double* gy, double* gz, double* H)
 {
-    const double h = 1E-4;
-    for (int k = 0; k < 3; k++) {
-        d3 pp = p, pm = p, gp, gm;
-        double lap;
-        pp[k] += h;
-        pm[k] -= h;
-        calculate_density(s, pp, gp, lap);
-        calculate_density(s, pm, gm, lap);
-        for (int j = 0; j < 3; j++) H[3 * k + j] = (gp[j] - gm[j]) / (2 * h);
+#pragma omp parallel for schedule(dynamic, 64)
+    for (int p = 0; p < n; p++) {
+        d3 g;
+        rho[p] = calculate_hessian(s, d3{ x[p], y[p], z[p] }, g, H + 9 * (size_t)p);
+        gx[p] = g[0], gy[p] = g[1], gz[p] = g[2];
     }
 }
 

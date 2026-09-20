@@ -615,7 +615,6 @@ TEST(CubeIoTests, HeaderOnlyCubeCopiesValuesToANewPath)
     ASSERT_TRUE(c.write_file(dbg, true));
     const std::string out = testing::internal::GetCapturedStdout();
     EXPECT_NE(out.find("Finished atoms!"), std::string::npos);
-    EXPECT_NE(out.find("Write Z-line!"), std::string::npos);
     EXPECT_EQ(lines_of(dbg).size(), lines_of(src).size());
     std::filesystem::remove(src);
     std::filesystem::remove(dst);

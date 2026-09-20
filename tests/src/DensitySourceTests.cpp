@@ -318,6 +318,23 @@ TEST(DensitySourceTests, CubeFunctionsTakeAFittedDensity)
                 EXPECT_NEAR(eli.get_value(i, j, k), M.eli(p), 1e-9);
                 EXPECT_NEAR(esp.get_value(i, j, k), M.esp(p), 1e-10);
             }
+    //with wrap every grid point collects its 27 periodic images, those within the radius of an atom
+    std::vector<cube> wrapped;
+    for (int t = 0; t < 16; t++) wrapped.push_back(grid(t == cube_type::Rho || t == cube_type::Lap));
+    Calc_Prop(wrapped, M, radius, quiet, true, true);
+    const std::vector<d3> centres = source_positions(M);
+    for (int i = 0; i < n; i++)
+        for (int j = 0; j < n; j++)
+            for (int k = 0; k < n; k++) {
+                double lap_sum = 0.0;
+                for (int di = -1; di <= 1; di++)
+                    for (int dj = -1; dj <= 1; dj++)
+                        for (int dk = -1; dk <= 1; dk++) {
+                            const d3 p = esp.get_pos(i + di * n, j + dj * n, k + dk * n);
+                            if (near_any(p, centres, constants::ang2bohr(radius))) lap_sum += M.lap(p);
+                        }
+                EXPECT_NEAR(wrapped[cube_type::Lap].get_value(i, j, k), lap_sum, 1e-10);
+            }
     //outside the radius the cube stays 0
     cube outside = grid(true);
     Calc_Rho(outside, M, 0.01, quiet, false);
