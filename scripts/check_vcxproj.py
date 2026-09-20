@@ -13,7 +13,7 @@ PAIRS = [
      {"vec_nos_math.cpp", "mat_nos_math.cpp", "hip_runtime_shim.cpp", "gpu_dispatch.cpp"}),
     ("Windows/Tests/Tests.vcxproj", "tests/src", set()),
 ]
-EXTENSIONS = (".cpp", ".cc", ".cxx")
+EXTENSIONS = (".cpp", ".cc", ".cxx", ".cu")  # .cu files sit in the CudaCompile (CUDA) and CustomBuild (HIP) groups
 
 
 def sources_on_disk(directory, extensions):
@@ -31,7 +31,7 @@ def sources_in_vcxproj(vcxproj, directory):
         text = fh.read()
     project_dir = os.path.dirname(os.path.join(ROOT, vcxproj))
     listed = set()
-    for inc in re.findall(r'<ClCompile Include="([^"]+)"', text):
+    for inc in re.findall(r'<(?:ClCompile|CudaCompile|CustomBuild) Include="([^"]+)"', text):
         full = os.path.normpath(os.path.join(project_dir, inc.replace("\\", "/")))
         rel = os.path.relpath(full, os.path.join(ROOT, directory)).replace("\\", "/")
         if not rel.startswith(".."):

@@ -210,6 +210,7 @@
     <CudaCompile Include="..\..\Src\core\itensor_gpu.cu" />
     <CudaCompile Include="..\..\Src\core\salted_gpu.cu" />
     <CudaCompile Include="..\..\Src\core\sf_gpu.cu" />
+    <CudaCompile Include="..\..\Src\core\spherical_density_gpu.cu" />
   </ItemGroup>
   <ItemGroup Condition="'$(NosFatGpu)' == 'true'">
     <ClCompile Include="..\..\Src\core\gpu_dispatch.cpp">
@@ -228,5 +229,6 @@
     <CustomBuild Include="..\..\Src\core\itensor_gpu.cu" />
     <CustomBuild Include="..\..\Src\core\salted_gpu.cu" />
     <CustomBuild Include="..\..\Src\core\sf_gpu.cu" />
+    <CustomBuild Include="..\..\Src\core\spherical_density_gpu.cu" />
   </ItemGroup>
 </Project>
