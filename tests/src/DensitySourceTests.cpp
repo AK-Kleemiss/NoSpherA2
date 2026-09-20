@@ -292,7 +292,7 @@ TEST(DensitySourceTests, CubeFunctionsTakeAFittedDensity)
     Calc_Prop(cubes, M, radius, quiet, true, false);
     cube esp = grid(true), eli = grid(true);
     Calc_ESP(esp, M, radius, true, quiet, false);
-    Calc_Eli(eli, M, radius, quiet);
+    Calc_Eli(eli, M, radius, quiet, false);
     for (int i = 0; i < n; i++)
         for (int j = 0; j < n; j++)
             for (int k = 0; k < n; k++) {

@@ -49,7 +49,7 @@ void Calc_Static_Def(
     const WFN &wavy,
     double radius,
     std::ostream &file,
-    bool wrap = true);
+    bool wrap);
 
 /**
  * Calculates the static definition of a cube.
@@ -68,7 +68,7 @@ void Calc_Static_Def(
     const WFN &wavy,
     double radius,
     std::ostream &file,
-    bool wrap = true);
+    bool wrap);
 /**
  * Calculates the spherical density of a cube using the given WFN object.
  *
@@ -82,7 +82,7 @@ void Calc_Spherical_Dens(
     const WFN &wavy,
     double radius,
     std::ostream &file,
-    bool wrap = true);
+    bool wrap);
 /**
  * Calculates the density (Rho) for a given cube and WFN object.
  *
@@ -96,22 +96,13 @@ void Calc_Rho(
     const WFN &wavy,
     double radius,
     std::ostream &file,
-    bool wrap = true);
-//Any point function on the grid within radius of the atoms of wavy
-void Calc_Cube(
-    cube &Cube,
-    const WFN &wavy,
-    const std::function<double(const d3 &)> &f,
-    double radius,
-    std::ostream &file,
-    bool wrap = true);
-
+    bool wrap);
 void Calc_Eli(
     cube &CubeRho,
     const WFN &wavy,
     double radius,
-    std::ostream &file = std::cout,
-    bool wrap = false);
+    std::ostream &file,
+    bool wrap);
 
 /**
  * Calculates the density based on a wfn with spherical harmonicsand stores the result in the given cube.
@@ -158,7 +149,7 @@ void Calc_Prop(
     double radius,
     std::ostream &file,
     bool test,
-    bool wrap = true);
+    bool wrap);
 /**
  * Calculates the Electrostatic Potential (ESP) for a given cube and WFN object.
  *
@@ -174,7 +165,7 @@ void Calc_ESP(
     double radius,
     bool no_date,
     std::ostream &file,
-    bool wrap = true);
+    bool wrap);
 /**
  * Calculates the molecular orbital (MO) for a given cube.
  *
@@ -190,7 +181,7 @@ void Calc_MO(
     const WFN &wavy,
     double radius,
     std::ostream &file,
-    bool wrap = true);
+    bool wrap);
 /**
  * Locates the frontier molecular orbitals (HOMO and LUMO) of a wavefunction.
  *
@@ -253,7 +244,7 @@ void Calc_Fukui(
     int lumo,
     double radius,
     std::ostream &file,
-    bool wrap = true);
+    bool wrap);
 /**
  * Condensed (atom-summed) Fukui functions under all five atomic partitions.
  *
@@ -355,7 +346,7 @@ void Calc_Hirshfeld(
     double radius,
     int ignore_atom,
     std::ostream &file,
-    bool wrap = true);
+    bool wrap);
 /**
  * Calculates the Hirshfeld Deformation Density for a given set of parameters.
  *
@@ -375,7 +366,7 @@ void Calc_Hirshfeld(
     double radius,
     int ignore,
     std::ostream &file,
-    bool wrap = true);
+    bool wrap);
 /**
  * Calculates the Hirshfeld atom electron density.
  *
@@ -393,7 +384,7 @@ void Calc_Hirshfeld_atom(
     double radius,
     int ignore_atom,
     std::ostream &file,
-    bool wrap = true);
+    bool wrap);
 
 //rho and ELI-D on two cubes from the orbitals. With `field` (a fitted density) rho comes
 //from the fit; ELI-D still needs the orbitals and stays zero without them
@@ -444,8 +435,19 @@ inline bool near_any(const d3 &pos, const std::vector<d3> &centres, double radiu
             return true;
     return false;
 }
+//Any point function on the grid within radius of the atoms; wrap sums the 27 periodic images (a CIF grid)
+template <typename F>
+void Calc_Cube(cube &Cube, const WFN &wavy, F &&f, double radius, std::ostream &file, bool wrap)
+{
+    _time_point start = get_time();
+    const double r = constants::ang2bohr(radius);
+    const std::vector<d3> centres = source_positions(wavy);
+    Cube.evaluate_on_grid([&](const d3 &pos) { return near_any(pos, centres, r) ? f(pos) : 0.0; }, wrap);
+    _time_point end = get_time();
+    print_time(start, end, file);
+}
 template <PointDensity S>
-void Calc_Rho(cube &CubeRho, const S &src, double radius, std::ostream &file, bool wrap = true)
+void Calc_Rho(cube &CubeRho, const S &src, double radius, std::ostream &file, bool wrap)
 {
     _time_point start = get_time();
     const double r = constants::ang2bohr(radius);
@@ -455,7 +457,7 @@ void Calc_Rho(cube &CubeRho, const S &src, double radius, std::ostream &file, bo
     print_time(start, end, file);
 }
 template <PointDensity S>
-void Calc_Eli(cube &CubeEli, const S &src, double radius, std::ostream &file = std::cout, bool wrap = false)
+void Calc_Eli(cube &CubeEli, const S &src, double radius, std::ostream &file, bool wrap)
 {
     _time_point start = get_time();
     const double r = constants::ang2bohr(radius);
@@ -465,7 +467,7 @@ void Calc_Eli(cube &CubeEli, const S &src, double radius, std::ostream &file = s
     print_time(start, end, file);
 }
 template <PointPotential S>
-void Calc_ESP(cube &CubeESP, const S &src, double radius, bool no_date, std::ostream &file, bool wrap = true)
+void Calc_ESP(cube &CubeESP, const S &src, double radius, bool no_date, std::ostream &file, bool wrap)
 {
     _time_point start = get_time();
     const double r = constants::ang2bohr(radius);
@@ -491,7 +493,7 @@ inline void finish_signed_rho(std::vector<cube> &Cubes, const cube &rho_contrib)
 }
 //RDG, Laplacian and ELI-D (PC07) of the loaded cubes from the density of src; ELF needs orbitals and exits
 template <PointDensity S>
-void Calc_Prop(std::vector<cube> &Cubes, const S &src, double radius, std::ostream &file, bool test, bool wrap = true)
+void Calc_Prop(std::vector<cube> &Cubes, const S &src, double radius, std::ostream &file, bool test, bool wrap)
 {
     err_checkf(!Cubes[cube_type::Elf].get_loaded(), std::string("ELF needs orbitals, the ") + source_name(src) + " has none", file);
     const bool rdg = Cubes[cube_type::RDG].get_loaded(), lap_c = Cubes[cube_type::Lap].get_loaded(), eli_c = Cubes[cube_type::Eli].get_loaded();

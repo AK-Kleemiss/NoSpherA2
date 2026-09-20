@@ -214,7 +214,7 @@ TEST(PropertiesGridTests, CalcCubeMasksByRadiusAndWrapSumsTwentySevenImages)
     const H2Model m(1.0, 1.0);
     cube one = make_grid(N, H);
     std::ostringstream log;
-    const std::function<double(const d3 &)> unity = [](const d3 &) { return 1.0; };
+    const auto unity = [](const d3 &) { return 1.0; };
     Calc_Cube(one, m.wavy, unity, RADIUS, log, false);
     int expected = 0;
     for (int x = 0; x < N; x++)
@@ -232,7 +232,7 @@ TEST(PropertiesGridTests, CalcCubeMasksByRadiusAndWrapSumsTwentySevenImages)
             for (int z = 0; z < 5; z++)
                 EXPECT_NEAR(wrapped.get_value(x, y, z), 27.0, 1e-12);
 
-    const std::function<double(const d3 &)> quad = [](const d3 &p) { return p[0] * p[0] + p[1]; };
+    const auto quad = [](const d3 &p) { return p[0] * p[0] + p[1]; };
     Calc_Cube(wrapped, m.wavy, quad, 100.0, log, true);
     const double L = 5 * H;
     for (int x = 0; x < 5; x++)
@@ -253,7 +253,7 @@ TEST(PropertiesGridTests, CalcEliMatchesAnalyticEliDAndMask)
     const H2Model m(1.0, 1.0, true, 2.0);
     cube eli = make_grid(N, H);
     std::ostringstream log;
-    Calc_Eli(eli, m.wavy, RADIUS, log);
+    Calc_Eli(eli, m.wavy, RADIUS, log, false);
     for (int x = 0; x < N; x++)
         for (int y = 0; y < N; y++)
             for (int z = 0; z < N; z++)

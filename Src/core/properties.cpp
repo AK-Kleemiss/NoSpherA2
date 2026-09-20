@@ -473,20 +473,6 @@ void Calc_Rho(
     print_time(start, end, file);
 };
 
-void Calc_Cube(
-    cube &Cube,
-    const WFN &wavy,
-    const std::function<double(const d3 &)> &f,
-    double radius,
-    std::ostream &file,
-    bool wrap)
-{
-    _time_point start = get_time();
-    evaluate_cube_in_radius(Cube, wrap, wavy.get_atoms(), constants::ang2bohr(radius), f);
-    _time_point end = get_time();
-    print_time(start, end, file);
-};
-
 void Calc_Eli(
     cube &CubeEli,
     const WFN &wavy,
@@ -2134,8 +2120,8 @@ void properties_calculation(options &opt)
         WFN temp = wavy;
         temp.delete_unoccupied_MOs();
         temp.delete_Qs();
-        if (ml) Calc_ESP(cubes[cube_type::ESP], *ml, opt.properties.radius, opt.no_date, log2);
-        else Calc_ESP(cubes[cube_type::ESP], temp, opt.properties.radius, opt.no_date, log2);
+        if (ml) Calc_ESP(cubes[cube_type::ESP], *ml, opt.properties.radius, opt.no_date, log2, opt.cif != "");
+        else Calc_ESP(cubes[cube_type::ESP], temp, opt.properties.radius, opt.no_date, log2, opt.cif != "");
         log2 << "Writing cube to Disk..." << flush;
         cubes[cube_type::ESP].write_file(true);
         log2 << "  done!" << endl;
@@ -2456,7 +2442,7 @@ void dipole_moments(options &opt, std::ostream &log2)
     log2 << "Calcualting Rho...";
     Calc_Rho(Rho, wavy, opt.properties.radius, log2, false);
     log2 << " ...done!\nCalcualting spherical Rho...";
-    Calc_Spherical_Dens(SPHER, wavy, opt.properties.radius, log2);
+    Calc_Spherical_Dens(SPHER, wavy, opt.properties.radius, log2, false);
     log2 << " ...done!" << endl;
     vec2 dipole_moments;
     dipole_moments.reserve(wavy.get_ncen());
@@ -2511,7 +2497,7 @@ vec2 dipole_moments(WFN &wavy, cube &SPHER, const properties_options &opts, int 
     log2 << "Calcualting Rho...";
     Calc_Rho(Rho, wavy, opts.radius, log2, false);
     log2 << " ...done!\nCalcualting spherical Rho...";
-    Calc_Spherical_Dens(SPHER, wavy, opts.radius, log2);
+    Calc_Spherical_Dens(SPHER, wavy, opts.radius, log2, false);
     log2 << " ...done!" << endl;
     vec2 dipole_moments;
     for (int i = 0; i < wavy.get_ncen(); i++)
