@@ -57,6 +57,7 @@
     <ClCompile Include="..\..\tests\src\ConvenienceCoverageTests.cpp" />
     <ClCompile Include="..\..\tests\src\FittingIoCoverageTests.cpp" />
     <ClCompile Include="..\..\tests\src\PropertiesCoverageTests.cpp" />
+    <ClCompile Include="..\..\tests\src\QctTests.cpp" />
     <ClCompile Include="..\..\tests\src\ScatteringCoverageTests.cpp" />
     <ClCompile Include="..\..\tests\src\WfnCoverageTests.cpp" />
     <ClCompile Include="..\..\tests\src\XcwHaltingReportTests.cpp" />

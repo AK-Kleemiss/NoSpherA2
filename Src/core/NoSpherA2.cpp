@@ -174,6 +174,7 @@ static int run_app_impl(int argc, char **argv)
         std::cout.rdbuf(_coutbuf);
         cls();
         std::cout << "Starting QCT menu..." << endl;
+        if (!opt.wfn.empty()) wavy.emplace_back(opt.wfn, opt.debug);  // -wfn preloads the menu
         return QCT(opt, wavy);
     }
     //Conceptual-DFT reactivity analysis and quit; its table goes to stdout, not the log

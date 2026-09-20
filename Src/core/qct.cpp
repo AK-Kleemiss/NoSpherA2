@@ -1,2036 +1,676 @@
-#include "cube.h"
+// QCT interactive menu (-qct): read, convert, edit and analyse wavefunctions and
+// cubes from the terminal. Every analysis routes through the same functions as
+// the command-line flags, so the menu carries no numerics of its own.
 #include "pch.h"
+#include "cube.h"
 #include "convenience.h"
 #include "fchk.h"
+#include "tsc_block.h"
+#include "cif.h"
 #include "basis_set.h"
 #include "wfn_class.h"
 #include "b2c.h"
 #include "bondwise_analysis.h"
 #include "properties.h"
 
-struct sel {
-    int* selection;
-    int* NbAtoms;
-    int* MoleculeFiles;
-    double* Radius;
-    double* Increments;
-    double* Cutplot;
-    double Intermolecular;
-    double Cutoffs[2];
-    std::string Oname;
-    bool* selection2;
-    int NbFiles = 1;
-    double Ligand[2];
-    std::vector<int> ignore;
-    int Frames;
-    int Output;
-    sel() {
-        selection = (int*)malloc(sizeof(int) * 7);
-        NbAtoms = nullptr;
-        MoleculeFiles = nullptr;
-        Radius = (double*)malloc(sizeof(double) * 4);
-        Increments = (double*)malloc(sizeof(double) * 3);
-        Cutplot = (double*)malloc(sizeof(double) * 2);
-        Ligand[0] = 1;
-        Ligand[1] = 4.0;
-        Intermolecular = 0.9;
-        Cutplot[0] = 0.05; Cutplot[1] = 0.5;
-        Increments[0] = 0.1; Increments[1] = 0.1; Increments[2] = 0.1;
-        Cutoffs[0] = 0.2; Cutoffs[1] = 1.0;
-        Radius[0] = 0.0; Radius[1] = 0.0; Radius[2] = 0.0; Radius[3] = 3.0;
-        Frames = 1;
-        Oname = "out";
-        Output = 3;
-    }
-};
+namespace {
+constexpr int kWidth = 76;
+constexpr int kCol = 38;
+// Set once std::cin fails or hits EOF; every loop in the menu ends on it so a
+// closed pipe (or a script that ran out of lines) can never spin.
+bool input_closed = false;
 
-sel menu(
-    options& opt,
-    const std::vector<WFN>& wavy,
-    sel& res)
-{
-    using namespace std;
-    bool run_o = false;
-    res.NbAtoms = (int*)malloc(sizeof(int) * wavy.size());
-    res.MoleculeFiles = (int*)malloc(sizeof(int) * wavy.size());
-    res.NbAtoms[0] = wavy[0].get_ncen();
-    res.MoleculeFiles[0] = 0;
-    while (!run_o) {
-        cout << "The following options are available (select preceding number to change them):" << endl;
-        cout << "1) Select wavefunctions to use, the # of Files already loaded is: ";
-        if (wavy.size() > 0) {
-            cout << wavy.size() << endl;
-            for (int i = 0; i < wavy.size(); i++) {
-                cout << "   File " << i << ": " << wavy[i].get_path();
-                if (res.MoleculeFiles[0] == i) cout << " *";
-                if (wavy.size() > 1 && res.MoleculeFiles[i] == i) cout << " #";
-                cout << endl;
-            }
+std::string rule(char c) { return "+" + std::string(kWidth - 2, c) + "+"; }
+std::string boxed(std::string text) {
+    if ((int)text.size() > kWidth - 4) text.resize(kWidth - 4);
+    return "| " + text + std::string(kWidth - 4 - text.size(), ' ') + " |";
+}
+std::string centred(const std::string& text) {
+    const int pad = std::max(0, (kWidth - 4 - (int)text.size()) / 2);
+    return boxed(std::string(pad, ' ') + text);
+}
+std::string two_col(std::string left, const std::string& right) {
+    if ((int)left.size() > kCol - 1) left.resize(kCol - 1);
+    left.resize(kCol, ' ');
+    return boxed(left + right);
+}
+void banner(const std::string& title) {
+    std::cout << rule('=') << '\n' << centred(title) << '\n' << rule('=') << std::endl;
+}
+void notice(const std::string& text) { std::cout << rule('-') << '\n' << boxed(text) << '\n' << rule('-') << std::endl; }
+
+std::string trim(std::string s) {
+    const auto b = s.find_first_not_of(" \t\r\n");
+    if (b == std::string::npos) return "";
+    return s.substr(b, s.find_last_not_of(" \t\r\n") - b + 1);
+}
+// One prompt, one line. False means the input is gone, never "empty answer".
+bool ask_line(const std::string& prompt, std::string& out) {
+    if (input_closed) return false;
+    std::cout << "  " << prompt << " > " << std::flush;
+    if (!std::getline(std::cin, out)) {
+        input_closed = true;
+        std::cout << "\n" << std::flush;
+        return false;
+    }
+    out = trim(out);
+    return true;
+}
+template <class T> bool ask(const std::string& prompt, T& value) {
+    std::string s;
+    if (!ask_line(prompt, s)) return false;
+    std::istringstream in(s);
+    if (!(in >> value)) {
+        std::cout << "  '" << s << "' is not a valid number." << std::endl;
+        return false;
+    }
+    return true;
+}
+bool confirm(const std::string& prompt) {
+    std::string s;
+    return ask_line(prompt + " (y/n)", s) && !s.empty() && (s[0] == 'y' || s[0] == 'Y');
+}
+// Some WFN editors (change_center & co) still read with std::cin >>; drop the tail of their line.
+void drop_rest_of_line() {
+    if (std::cin.good()) std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+    else input_closed = true;
+}
+char key_of(const std::string& s) { return s.empty() ? '\0' : (char)std::toupper((unsigned char)s[0]); }
+
+std::string origin_name(const e_origin o) {
+    switch (o) {
+    case e_origin::CRYSTAL: return "crystal";
+    case e_origin::wfn: return "wfn";
+    case e_origin::cub: return "cube";
+    case e_origin::ffn: return "ffn";
+    case e_origin::fchk: return "fchk";
+    case e_origin::wfx: return "wfx";
+    case e_origin::xyz: return "xyz";
+    case e_origin::molden: return "molden";
+    case e_origin::gbw: return "gbw";
+    case e_origin::tonto: return "tonto";
+    case e_origin::xtb: return "xtb";
+    case e_origin::ptb: return "ptb";
+    case e_origin::OCC: return "occ";
+    case e_origin::XCW_fit: return "xcw-fit";
+    default: return "undefined";
+    }
+}
+const std::vector<std::string> kWfnExt = { ".wfn", ".ffn", ".wfx", ".fch", ".fchk", ".FCh", ".FChK", ".FChk",
+    ".xyz", ".molden", ".gbw", ".xtb", ".stda", ".orbital_energies,restricted", ".MO_energies,r",
+    ".molecular_orbitals,restricted", ".MOs,r" };
+bool is_cube_ext(const std::filesystem::path& p) { return p.extension() == ".cube" || p.extension() == ".cub"; }
+bool is_wfn_ext(const std::filesystem::path& p) {
+    return std::find(kWfnExt.begin(), kWfnExt.end(), p.extension().string()) != kWfnExt.end();
+}
+
+std::string yes_no(bool b) { return b ? "on" : "off"; }
+
+void print_menu(const std::vector<WFN>& wavy, const int active, const bool expert, const options& opt) {
+    banner("NoSpherA2 -- QCT interactive menu");
+    if (wavy.empty())
+        std::cout << boxed("No wavefunction loaded - press R to read one.") << '\n';
+    else {
+        const WFN& w = wavy[active];
+        std::string status = "Active [" + std::to_string(active) + "] " + w.get_path().filename().string()
+            + "  (" + origin_name(w.get_origin()) + ")";
+        if (w.get_modified()) status += "  MODIFIED";
+        std::cout << boxed(status) << '\n';
+        std::ostringstream o;
+        o << "atoms " << w.get_ncen() << "  MOs " << w.get_nmo() << "  primitives " << w.get_nex()
+            << "  cubes " << w.get_cube_count() << "  charge " << w.get_charge() << "  mult " << w.get_multi();
+        std::cout << boxed(o.str()) << '\n';
+        const std::string basis = trim(w.get_basis_set_name()); //the WFN constructor seeds the name with a single space
+        std::cout << boxed("basis: " + (basis.empty() ? std::string("<none>") : basis)
+            + "   loaded: " + std::to_string(wavy.size()) + " wavefunction(s)") << '\n';
+    }
+    std::ostringstream s;
+    s << "threads " << opt.threads << "  grid radius " << opt.properties.radius << " A  resolution "
+        << opt.properties.resolution << " A  expert " << yes_no(expert) << "  debug " << yes_no(opt.debug);
+    std::cout << boxed(s.str()) << '\n' << rule('-') << '\n'
+        << two_col("FILES", "EDIT") << '\n'
+        << two_col("  R  read a file (wfn / cube)", "  M  modify atoms and primitives") << '\n'
+        << two_col("  X  close active wavefunction", "  O  sort primitives (.wfn/.ffn)") << '\n'
+        << two_col("  S  save / convert", "  B  load a basis set") << '\n'
+        << two_col("  A  activate another wavefunction", "  C  cube arithmetic and basins") << '\n'
+        << rule('-') << '\n'
+        << two_col("ANALYSIS", "SETTINGS") << '\n'
+        << two_col("  P  property cubes (rho, ESP, ...)", "  L  threads (-1 = all)") << '\n'
+        << two_col("  F  Fukui / reactivity table", "  T  grid radius and resolution") << '\n'
+        << two_col("  I  ELI / QTAIM basins", "  E  expert mode toggle") << '\n'
+        << two_col("  G  Roby-Gould bond indices", "  D  debug output toggle") << '\n'
+        << two_col("  N  bonding analysis (planes, NCI)", "  Q  quit") << '\n'
+        << two_col("  U  units check (bohr / Angstrom)", "") << '\n'
+        << rule('-') << '\n'
+        << boxed("Hirshfeld surfaces, tsc/XCW and SALTED stay on the command line (see -h).") << '\n'
+        << rule('=') << std::endl;
+}
+
+bool need_wfn(const std::vector<WFN>& wavy) {
+    if (!wavy.empty()) return true;
+    notice("First you need to read a wavefunction!");
+    return false;
+}
+
+// Flat numbered list of every cube of every wavefunction; returns (wfn, cube) or false.
+bool pick_cube(std::vector<WFN>& wavy, int& w, int& c, const std::string& what) {
+    std::vector<std::pair<int, int>> all;
+    for (int i = 0; i < (int)wavy.size(); i++)
+        for (int j = 0; j < wavy[i].get_cube_count(); j++) all.emplace_back(i, j);
+    if (all.empty()) {
+        notice("No cubes loaded - read one with R or compute some with P.");
+        return false;
+    }
+    for (size_t n = 0; n < all.size(); n++)
+        std::cout << "  " << std::setw(3) << n + 1 << "  [" << all[n].first << "] " << wavy[all[n].first].get_cube_path(all[n].second).filename().string() << '\n';
+    int n = 0;
+    if (!ask(what + " (number)", n) || n < 1 || n > (int)all.size()) return false;
+    w = all[n - 1].first;
+    c = all[n - 1].second;
+    return true;
+}
+const cube* loaded_cube(std::vector<WFN>& wavy, int w, int c, bool expert) {
+    if (!wavy[w].get_cube_loaded(c) && !wavy[w].read_cube(c, true, false, expert)) {
+        notice("Could not read " + wavy[w].get_cube_path(c).string());
+        return nullptr;
+    }
+    return wavy[w].get_cube_ptr(c);
+}
+std::filesystem::path ask_output(const std::filesystem::path& def) {
+    std::string s;
+    if (!ask_line("Output file [" + def.string() + "]", s) || s.empty()) return def;
+    return s;
+}
+bool ok_to_write(const std::filesystem::path& p) {
+    return !std::filesystem::exists(p) || confirm(p.string() + " exists, overwrite");
+}
+
+void read_file(options& opt, std::vector<WFN>& wavy, int& active, bool expert) {
+    std::cout << boxed("wavefunctions: " + std::string(".wfn .ffn .wfx .fchk .molden .gbw .xtb .stda .xyz, Tonto MO files")) << '\n'
+        << boxed("cubes: .cube .cub (attached to the active wavefunction)") << std::endl;
+    std::string s;
+    if (!ask_line("File", s) || s.empty()) return;
+    const std::filesystem::path p(s);
+    if (!std::filesystem::exists(p)) {
+        notice("No such file: " + p.string());
+        return;
+    }
+    if (is_cube_ext(p)) {
+        if (wavy.empty()) {
+            wavy.emplace_back(e_origin::cub);
+            active = 0;
         }
-        else cout << "No Files loaded yet!" << endl;
-        if (res.NbFiles > 1) {
-            cout << "2) Ligand is file # and radius (in A) around it: ";
-            if (res.selection[1]) cout << res.Ligand[0] << " " << res.Ligand[1] << endl;
-            else cout << "disabled" << endl;
-        }
-        cout << "3) Cutoff for intermolecular is: ";
-        if (!res.selection[4]) cout << "disabled" << endl;
-        else cout << res.Intermolecular << endl;
-        cout << "4) The output name is: " << res.Oname << endl
-            << "5) Level of output (1=.out only, 2= .cubes only, 3= all): " << res.Output << endl
-            << "6) Point separation of the cubes is: " << res.Increments[0] << " " << res.Increments[1] << " " << res.Increments[2] << endl
-            << "7) Cutplot: " << res.Cutplot[0] << " " << res.Cutplot[1] << endl
-            << "8) Select radius around molecule. Current value: " << opt.properties.radius << endl
-            << "9) select origin of the cube. Current value: ";
-        if (!res.selection[6])
-            cout << "default" << endl;
+        if (wavy[active].push_back_cube(p.string(), true, expert))
+            notice("Attached " + p.filename().string() + " as cube " + std::to_string(wavy[active].get_cube_count() - 1));
         else
-            cout << "(" << res.Radius[0] << "," << res.Radius[1] << "," << res.Radius[2] << ")" << endl;
-        cout << "10) Enable Calculation of ELF (Currently: ";
-        if (opt.properties.elf) cout << "YES)";
-        else cout << "NO)";
-        cout << endl
-            << "11) Enable ELI-D Calculation (Currently: ";
-        if (opt.properties.eli) cout << "YES)";
-        else cout << "NO)";
-        cout << endl
-            << "12) Enable Laplacian Calculation (Currently: ";
-        if (opt.properties.lap) cout << "YES)";
-        else cout << "NO)";
-        cout << endl;
-        if (res.NbFiles > 1) {
-            cout << "13) Save Hirshfeld surface cube: ";
-            if (opt.properties.hirsh) cout << "YES)";
-            else cout << "NO)";
-        }
-        else cout << "--) Save Hirshfeld surface cube: ";
-        cout << endl
-            << "14) Enable ESP Calculation (Currently: ";
-        if (opt.properties.esp) cout << "YES)";
-        else cout << "NO)";
-        /*    cout << endl;
-            << "15) Enable Electric Field Calculation (Currently: ";
-        if(opt.doef) cout << "YES)";
-        else cout << "NO)";*/
-        cout << endl
-            << "16) Enable Rho Calculation (Currently: ";
-        if (opt.properties.rho) cout << "YES)";
-        else cout << "NO)";
-        cout << endl
-            << "17) Enable RDG Calculation (Currently: ";
-        if (opt.properties.rdg) cout << "YES)";
-        else cout << "NO)";
-        cout << endl
-            << "18) Enable deformation density Calculation (Currently: ";
-        if (opt.properties.def) cout << "YES)";
-        else cout << "NO)";
-        cout << endl
-            << "19) Select atoms to ignore during calculation: ";
-        if (opt.ignore.size() == 0)
-            cout << "None" << endl;
+            notice("Could not read " + p.string());
+        return;
+    }
+    if (!is_wfn_ext(p)) {
+        notice("Unknown extension '" + p.extension().string() + "'.");
+        return;
+    }
+    // ponytail: a malformed file still leaves through err_checkf, as on the command line.
+    wavy.emplace_back(p, opt.debug);
+    active = (int)wavy.size() - 1;
+    notice("Read " + p.filename().string() + ": " + std::to_string(wavy[active].get_ncen()) + " atoms, "
+        + std::to_string(wavy[active].get_nmo()) + " MOs, " + std::to_string(wavy[active].get_nex()) + " primitives");
+}
+
+void save_menu(options& opt, std::vector<WFN>& wavy, int active, bool expert) {
+    WFN& w = wavy[active];
+    std::cout << rule('-') << '\n' << boxed("SAVE / CONVERT   active: " + w.get_path().filename().string()) << '\n' << rule('-') << '\n'
+        << two_col("  1  .wfn  (all MOs)", "  6  .xyz  (coordinates, Angstrom)") << '\n'
+        << two_col("  2  .wfn  (occupied MOs only)", "  7  .cif  (atoms + wavefunction)") << '\n'
+        << two_col("  3  .wfx", "  8  cube -> .cube") << '\n'
+        << two_col("  4  .fchk (needs a basis set)", "  9  cube -> .dgrid") << '\n'
+        << two_col("  5  .47   (NBO archive)", " 10  cube -> .xdgrid") << '\n'
+        << two_col("  0  back", "") << '\n' << rule('-') << std::endl;
+    int sel = 0;
+    if (!ask("Choice", sel) || sel == 0) return;
+    std::filesystem::path def = w.get_path();
+    bool ok = false;
+    switch (sel) {
+    case 1:
+    case 2:
+    case 3:
+    case 5:
+    case 6:
+    case 7: {
+        static const std::map<int, std::string> ext = { {1, ".wfn"}, {2, ".wfn"}, {3, ".wfx"}, {5, ".47"}, {6, ".xyz"}, {7, ".cif"} };
+        const std::filesystem::path out = ask_output(def.replace_extension(ext.at(sel)));
+        if (input_closed || !ok_to_write(out)) return;
+        if (sel == 1) ok = w.write_wfn(out, opt.debug, false);
+        else if (sel == 2) ok = w.write_wfn(out, opt.debug, true);
+        else if (sel == 3) ok = w.write_wfx(out, false);
+        else if (sel == 5) ok = w.write_nbo(out, opt.debug, &std::cout);
+        else if (sel == 6) ok = w.write_xyz(out);
         else {
-            for (int i = 0; i < opt.ignore.size(); i++)
-                cout << std::setw(3) << opt.ignore[i];
-            cout << endl;
+            write_wfn_CIF(w, out);
+            ok = std::filesystem::exists(out);
         }
-        cout << "20) Enable deformation hirshfeld density Calculation (Currently: ";
-        if (opt.properties.hdef) cout << "YES)" << endl;
-        else cout << "NO)" << endl;
-        cout << "-1) End the program without a calculation" << endl
-            << "0) Start the calculations based on the options selected above" << endl
-            << "Your selection: ";
-        int _sel;
-        std::cin >> _sel;
-        cls();
-        switch (_sel) {
-        case 0:
-            run_o = true;
-            break;
-        case 1: {
-            cout << "How many files do you want to include? ";
-            int temp;
-            cin >> temp;
-            if (temp >= wavy.size()) {
-                cout << "Sorry, only number of loaded files supported" << endl;
-                break;
-            }
-            int temp2;
-            for (int i = 0; i < temp; i++) {
-                cout << "# of wavefunction to use as #" << i + 1 << " (from list above): ";
-                cin >> temp2;
-                temp2--;
-                if (temp2 < 0 || temp2 >= wavy.size()) {
-                    cout << "Invalid choice, try again!" << endl;
-                    i--;
-                    continue;
-                }
-                res.MoleculeFiles[i] = temp2;
-            }
+        notice(ok ? "Written " + out.string() : "Writing " + out.string() + " failed.");
+        return;
+    }
+    case 4: {
+        std::string basis;
+        if (!ask_line("Basis set name [" + (w.get_basis_set_name().empty() ? "def2-SVP" : w.get_basis_set_name()) + "]", basis)) return;
+        if (!basis.empty()) w.set_basis_set_name(basis);
+        else if (w.get_basis_set_name().empty()) w.set_basis_set_name("def2-SVP");
+        const std::filesystem::path out = ask_output(def.replace_extension(".fchk"));
+        if (input_closed || !ok_to_write(out)) return;
+        w.assign_charge(w.calculate_charge());
+        if (w.get_multi() == 0 && !w.guess_multiplicity(std::cout)) {
+            notice("Could not guess the multiplicity.");
+            return;
         }
-              break;
-        case 2: {
-            bool run = false;
-            int temp = 0;
-            double temp_r = 0;
-            while (!run) {
-                cout << "Please select one of the following molecule(s) to be considered as the ligand:" << endl;
-                for (int i = 0; i < res.NbFiles; i++)
-                    cout << "   File " << res.MoleculeFiles[i] << ": " << wavy[i].get_path() << endl;
-                cin >> temp;
-                if (temp >= res.NbFiles || temp < 0) cout << "ERROR, invalid choice of molecule" << endl;
-                else {
-                    run = true;
-                    res.Ligand[0] = (double)temp;
-                }
-            }
-            run = false;
-            while (!run) {
-                cout << "select radius: ";
-                cin >> temp_r;
-                if (temp_r < 0) cout << "Negative radius is invalid, please try again" << endl;
-                else if (temp_r > 20) cout << "Please stay realistic! Select smaller radius or ask the programmer to make the threshold bigger!" << endl;
-                else {
-                    run = true;
-                    res.Ligand[1] = temp_r;
-                }
-            }
-            res.selection[1] = true;
-        }
-              break;
-        case 3: {
-            bool run = false;
-            float temp = 0;
-            while (!run) {
-                cout << "Please select the cutoff for intermolecular:" << endl;
-                cin >> temp;
-                if (temp < 0) cout << "ERROR, invalid choice of Intermolecular cutoff" << endl;
-                else if (temp > 20) cout << "Please stay realistic! Select smaller radius or ask the programmer to make the threshold bigger!" << endl;
-                else {
-                    run = true;
-                    res.Intermolecular = temp;
-                }
-            }
-            res.selection[4] = true;
-            continue;
-        }
-              break;
+        ok = free_fchk(std::cout, out, opt.basis_set_path, w, opt.debug, true);
+        notice(ok ? "Written " + out.string() : "Writing " + out.string() + " failed.");
+        return;
+    }
+    case 8:
+    case 9:
+    case 10: {
+        int cw, cc;
+        if (!pick_cube(wavy, cw, cc, "Which cube")) return;
+        if (!loaded_cube(wavy, cw, cc, expert)) return;
+        std::filesystem::path cdef = wavy[cw].get_cube_path(cc);
+        cdef.replace_extension(sel == 8 ? ".cube" : sel == 9 ? ".dgrid" : ".xdgrid");
+        const std::filesystem::path out = ask_output(cdef);
+        if (input_closed || !ok_to_write(out)) return;
+        if (sel == 10) wavy[cw].write_cube_xdgraph(cc, out, opt.debug);
+        else wavy[cw].write_cube_file(cc, out, opt.debug);
+        ok = std::filesystem::exists(out);
+        notice(ok ? "Written " + out.string() : "Writing " + out.string() + " failed.");
+        return;
+    }
+    default:
+        notice("Sorry, I did not get that.");
+    }
+}
+
+void modify_menu(std::vector<WFN>& wavy, int active) {
+    WFN& w = wavy[active];
+    std::cout << rule('-') << '\n' << boxed("MODIFY   active: " + w.get_path().filename().string()) << '\n' << rule('-') << '\n'
+        << two_col("  1  list centres", "  6  add a primitive") << '\n'
+        << two_col("  2  list primitives", "  7  change centre of a primitive") << '\n'
+        << two_col("  3  delete a centre", "  8  change type of a primitive") << '\n'
+        << two_col("  4  delete a primitive", "  9  change exponent of a primitive") << '\n'
+        << two_col("  5  add an atom", " 10  set one MO coefficient") << '\n'
+        << two_col("  0  back", "") << '\n' << rule('-') << std::endl;
+    int sel = 0;
+    if (!ask("Choice", sel) || sel == 0) return;
+    int nr = 0;
+    switch (sel) {
+    case 1: w.list_centers(); return;
+    case 2: w.list_primitives(); return;
+    case 3:
+        w.list_centers();
+        if (!ask("Centre to delete", nr) || nr < 0 || nr >= w.get_ncen()) return notice("No such centre.");
+        if (w.remove_center(nr)) { w.set_modified(); notice("Deleted centre " + std::to_string(nr)); }
+        else notice("Could not delete centre " + std::to_string(nr));
+        return;
+    case 4:
+        if (!ask("Primitive to delete (0-" + std::to_string(w.get_nex() - 1) + ")", nr) || nr < 0 || nr >= w.get_nex()) return notice("No such primitive.");
+        if (w.remove_primitive(nr)) { w.set_modified(); notice("Deleted primitive " + std::to_string(nr)); }
+        else notice("Could not delete primitive " + std::to_string(nr));
+        return;
+    case 5: {
+        std::string label;
+        double x, y, z;
+        int charge;
+        if (!ask_line("Label", label) || !ask("x (bohr)", x) || !ask("y (bohr)", y) || !ask("z (bohr)", z) || !ask("nuclear charge", charge)) return;
+        if (charge < 1 || charge > 118) return notice("That element is not discovered yet.");
+        if (w.push_back_atom(label, x, y, z, charge)) { w.set_modified(); notice("Added " + label); }
+        else notice("Could not add the atom.");
+        return;
+    }
+    case 6: {
+        int cen, type;
+        double e;
+        if (!ask("Centre (1-" + std::to_string(w.get_ncen()) + ")", cen) || !ask("Type (1=s 2-4=p ...)", type) || !ask("Exponent", e)) return;
+        std::string line;
+        if (!ask_line("MO coefficients (" + std::to_string(w.get_nmo()) + " numbers, empty = zeros)", line)) return;
+        vec coef(w.get_nmo(), 0.0);
+        std::istringstream in(line);
+        for (int i = 0; i < w.get_nmo() && (in >> coef[i]); i++);
+        if (w.add_primitive(cen, type, e, coef.data())) { w.set_modified(); notice("Added primitive " + std::to_string(w.get_nex() - 1)); }
+        else notice("Could not add the primitive.");
+        return;
+    }
+    case 7:
+    case 8:
+    case 9:
+        if (!ask("Primitive (0-" + std::to_string(w.get_nex() - 1) + ")", nr) || nr < 0 || nr >= w.get_nex()) return notice("No such primitive.");
+        w.print_primitive(nr);
+        if (sel == 7) w.change_center(nr);
+        else if (sel == 8) w.change_type(nr);
+        else w.change_exponent(nr);
+        drop_rest_of_line();
+        w.set_modified();
+        return;
+    case 10: {
+        int mo, prim;
+        double val;
+        if (!ask("MO (0-" + std::to_string(w.get_nmo() - 1) + ")", mo) || mo < 0 || mo >= w.get_nmo()) return notice("No such MO.");
+        if (!ask("Primitive (0-" + std::to_string(w.get_nex() - 1) + ")", prim) || prim < 0 || prim >= w.get_nex()) return notice("No such primitive.");
+        if (!ask("New coefficient", val)) return;
+        if (w.set_MO_coef(mo, prim, val)) { w.set_modified(); notice("Coefficient set."); }
+        else notice("Could not set the coefficient.");
+        return;
+    }
+    default:
+        notice("Sorry, I did not get that.");
+    }
+}
+
+void cube_menu(options& opt, std::vector<WFN>& wavy, bool expert) {
+    std::cout << rule('-') << '\n' << boxed("CUBES") << '\n' << rule('-') << '\n'
+        << two_col("  1  integrate", "  8  A / B   -> new cube") << '\n'
+        << two_col("  2  integrate |value|", "  9  real-space R value") << '\n'
+        << two_col("  3  write 2x2x2 super cube", " 10  weighted Jaccard similarity") << '\n'
+        << two_col("  4  threshold in place", " 11  mask A where B != 0") << '\n'
+        << two_col("  5  A + B   -> new cube", " 12  mask A where B == 0") << '\n'
+        << two_col("  6  A - B   -> new cube", " 13  mask A where B < threshold") << '\n'
+        << two_col("  7  A * B   -> new cube", " 14  basins (b2c)     15  BCPs") << '\n'
+        << two_col("  0  back", expert ? " 16-19  A += -= *= /= B in place" : "") << '\n' << rule('-') << std::endl;
+    int sel = 0;
+    if (!ask("Choice", sel) || sel == 0) return;
+    if (sel < 1 || sel > 19 || (sel > 15 && !expert)) return notice("Sorry, I did not get that.");
+    int wa, ca;
+    if (!pick_cube(wavy, wa, ca, sel >= 5 && sel <= 13 || sel >= 16 ? "Cube A" : "Which cube")) return;
+    const cube* a = loaded_cube(wavy, wa, ca, expert);
+    if (!a) return;
+    std::ostringstream o;
+    o << std::scientific << std::setprecision(8);
+    if (sel <= 4 || sel >= 14) {
+        switch (sel) {
+        case 1: o << "Integrated value: " << a->sum(); break;
+        case 2: o << "Integrated absolute value: " << a->diff_sum(); break;
+        case 3: o << "Super cube written: " << wavy[wa].make_super_cube(ca).string(); break;
         case 4: {
-            bool run = false;
-            std::filesystem::path temp;
-            while (!run) {
-                cout << "Please select the name for the ouput files:" << endl;
-                cin >> temp;
-                std::filesystem::path temp2;
-                temp2 = temp;
-                temp2.replace_extension(".out");
-                while (exists(temp2)) {
-                    cout << "File " << temp2 << " already exists, do you want to overwrite it? ";
-                    if (!yesno()) {
-                        cout << "then enter an alternative name: ";
-                        cin >> temp;
-                    }
-                }
-                run = true;
-                res.Oname = temp.string();
-            }
-            continue;
+            double t;
+            if (!ask("Threshold", t)) return;
+            o << (wavy[wa].apply_cube_thresh(ca, t) ? "Threshold applied." : "Threshold failed.");
+            break;
         }
-              break;
-        case 5: {
-            bool run = false;
-            int temp;
-            while (!run) {
-                cout << "select output level: ";
-                cin >> temp;
-                if (temp < 4 && temp>0) {
-                    res.Output = temp;
-                    run = true;
-                }
-                else cout << "invalid selection!" << endl;
-            }
-            continue;
+        case 14: o << (b2c(a, wavy[wa].get_atoms(), opt.debug, false) ? "Basin analysis done." : "Basin analysis failed."); break;
+        case 15: o << (b2c(a, wavy[wa].get_atoms(), opt.debug, true) ? "BCP analysis done." : "BCP analysis failed."); break;
         }
-              break;
-        case 6: {
-            bool run = false;
-            float temp[3];
-            while (!run) {
-                cout << "Please enter the separation of points in all three dimensions, starting with X: ";
-                cin >> temp[0];
-                cout << "Now y: ";
-                cin >> temp[1];
-                cout << "Now z: ";
-                cin >> temp[2];
-                run = true;
-                for (int i = 0; i < 3; i++) {
-                    if (temp[i] > 0 && temp[i] < 1) {
-                        if (run)
-                            res.Increments[i] = temp[i];
-                        else {
-                            cout << "invalid selection in dimension " << i << endl;
-                            run = false;
-                        }
-                    }
-                }
-            }
-            continue;
-        }
-              break;
-        case 7: {
-            bool run = false;
-            while (!run) {
-                cout << "Select Cutoff for plots:" << endl << "Low cutof: ";
-                float temp[2];
-                cin >> temp[0];
-                if (temp[0] < 0 || temp[0] > 2)
-                    cout << "invalid choice, cutoff must be between 0 and 2, try again!" << endl;
-                else {
-                    cout << "High Cutoff: ";
-                    cin >> temp[1];
-                    if (temp[1] < temp[0] || temp[1] > 2)
-                        cout << "invalid choice, cutoff must be bigger than low cutoff and smaller than 2, try again!" << endl;
-                    else {
-                        res.Cutplot[0] = temp[0];
-                        res.Cutplot[1] = temp[1];
-                        run = true;
-                    }
-                }
-            }
-            continue;
-        }
-              break;
-        case 10: {
-            if (opt.properties.eli) opt.properties.eli = false;
-            if (opt.properties.elf) opt.properties.elf = false;
-            else opt.properties.elf = true;
-
-        }
-               break;
-        case 11: {
-            if (opt.properties.elf) opt.properties.elf = false;
-            if (opt.properties.eli) opt.properties.eli = false;
-            else opt.properties.eli = true;
-        }
-               break;
-        case 12: {
-            opt.properties.lap = !opt.properties.lap;
-        }
-               break;
-        case 9: {
-            cout << "Select starting point:" << endl;
-            float temp[3];
-            cout << "X: ";
-            cin >> temp[0];
-            cout << "Y: ";
-            cin >> temp[1];
-            cout << "Z: ";
-            cin >> temp[2];
-            res.Radius[0] = temp[0];
-            res.Radius[1] = temp[1];
-            res.Radius[2] = temp[2];
-            res.selection[6] = true;
-        }
-              break;
-        case 8: {
-            bool run = false;
-            while (!run) {
-                cout << "Select positive radius: ";
-                double temp;
-                cin >> temp;
-                if (temp <= 0.0 || temp > 100.0)
-                    cout << "invalid choice!" << endl;
-                else {
-                    opt.properties.radius = temp;
-                    res.selection[2] = true;
-                    break;
-                }
-            }
-        }
-              break;
-        case 13: {
-            if (res.NbFiles > 1)
-                opt.properties.hirsh = !opt.properties.hirsh;
-        }
-               break;
-        case 14: {
-            opt.properties.esp = !opt.properties.esp;
-        }
-               break;
-               /*    case 15: {
-                       opt.doef = !opt.doef;
-                   }
-                   break;*/
-        case 16: {
-            if (opt.properties.hdef)
-                opt.properties.rho = true;
-            opt.properties.rho = !opt.properties.rho;
-        }
-               break;
-        case 17: {
-            opt.properties.rdg = !opt.properties.rdg;
-            if (opt.properties.rdg && !opt.properties.rho) opt.properties.rho = true;
-        }
-               break;
-        case 18: {
-            opt.properties.def = !opt.properties.def;
-            if (opt.properties.def && !opt.properties.rho) opt.properties.rho = true;
-        }
-               break;
-        case 19: {
-            cls();
-            while (true) {
-                cout << "Which atoms to exlude? (marked with *)" << endl;
-                for (int a = 0; a < wavy[res.MoleculeFiles[0]].get_ncen(); a++) {
-                    cout << setw(4) << a << ") " << setw(4) << constants::atnr2letter(wavy[res.MoleculeFiles[0]].get_atom_charge(a))
-                        << setw(14) << scientific << wavy[res.MoleculeFiles[0]].get_atom_coordinate(a, 0)
-                        << setw(14) << scientific << wavy[res.MoleculeFiles[0]].get_atom_coordinate(a, 1)
-                        << setw(14) << scientific << wavy[res.MoleculeFiles[0]].get_atom_coordinate(a, 2);
-                    for (int i = 0; i < opt.ignore.size(); i++)
-                        if (opt.ignore[i] == a)
-                            cout << "*";
-                    cout << endl;
-                }
-                cout << " -10) Accept selection and return to previous menu" << endl
-                    << "Select atom number: ";
-                int input;
-                cin >> input;
-                if (input == -10)
-                    break;
-                if (input >= wavy[res.MoleculeFiles[0]].get_ncen() || input < 0) {
-                    cls();
-                    cout << "Index out of range!" << endl;
-                    continue;
-                }
-                if (opt.ignore.size() == 0) {
-                    opt.ignore.push_back(input);
-                    cls();
-                    continue;
-                }
-                for (int i = 0; i < opt.ignore.size(); i++) {
-                    if (input == opt.ignore[i]) {
-                        opt.ignore.erase(opt.ignore.begin() + i);
-                        cls();
-                        break;
-                    }
-                    else if (i == opt.ignore.size() - 1) {
-                        opt.ignore.push_back(input);
-                        cls();
-                        break;
-                    }
-                }
-            }
-        }
-               break;
-        case 20: {
-            opt.properties.hdef = !opt.properties.hdef;
-            if (opt.properties.hdef) {
-                cout << "Which atom to use?" << endl;
-                for (int a = 0; a < wavy[res.MoleculeFiles[0]].get_ncen(); a++)
-                    cout << setw(4) << a << ") " << setw(4) << constants::atnr2letter(wavy[res.MoleculeFiles[0]].get_atom_charge(a))
-                    << setw(14) << scientific << wavy[res.MoleculeFiles[0]].get_atom_coordinate(a, 0)
-                    << setw(14) << scientific << wavy[res.MoleculeFiles[0]].get_atom_coordinate(a, 1)
-                    << setw(14) << scientific << wavy[res.MoleculeFiles[0]].get_atom_coordinate(a, 2) << endl;
-                int input;
-                cin >> input;
-                if (input == -10)
-                    break;
-                else if (input >= wavy[res.MoleculeFiles[0]].get_ncen() || input < 0) {
-                    cls();
-                    cout << "Index out of range!" << endl;
-                    continue;
-                }
-                else
-                    for (int a = 0; a < wavy[res.MoleculeFiles[0]].get_ncen(); a++)
-                        if (a != input)
-                            opt.ignore.push_back(a);
-                cout << "Select positive radius: ";
-                double temp;
-                cin >> temp;
-                if (temp <= 0.0 || temp > 100.0)
-                    cout << "invalid choice!" << endl;
-                else {
-                    res.Radius[3] = temp;
-                    res.selection[2] = true;
-                }
-                opt.properties.rho = true;
-            }
-        }
-               break;
-        case -1:
-            return res;
-        default:
-            cls();
-            cout << "Invalid selection!" << endl;
-            continue;
-        }
+        notice(o.str());
+        return;
     }
-    if (!opt.properties.rho) {
-        if (opt.properties.rdg) {
-            cout << "MUST calcualate Rho when using EDG, enabling RHO" << endl;
-            opt.properties.rho = true;
-        }
-        if (opt.properties.def)
-        {
-            cout << "MUST calcualate Rho when using deformation density, enabling RHO" << endl;
-            opt.properties.rho = true;
-        }
+    int wb, cb;
+    if (!pick_cube(wavy, wb, cb, "Cube B")) return;
+    const cube* b = loaded_cube(wavy, wb, cb, expert);
+    if (!b) return;
+    bool ok = true;
+    switch (sel) {
+    case 5: wavy[wa].push_back_cube(*a + *b); break;
+    case 6: wavy[wa].push_back_cube(*a - *b); break;
+    case 7: wavy[wa].push_back_cube(*a * *b); break;
+    case 8: wavy[wa].push_back_cube(*a / *b); break;
+    case 9: o << "Real-space R value: " << a->rrs(*b); break;
+    case 10: o << "Weighted Jaccard similarity: " << a->jaccard(*b); break;
+    case 11: ok = wavy[wa].apply_cube_mask(ca, *b); break;
+    case 12: ok = wavy[wa].apply_cube_negative_mask(ca, *b); break;
+    case 13: {
+        double t;
+        if (!ask("Threshold", t)) return;
+        ok = wavy[wa].apply_cube_thresh(ca, *b, t);
+        break;
     }
-    return res;
+    case 16: ok = wavy[wa].cube_add(ca, *b); break;
+    case 17: ok = wavy[wa].cube_subtract(ca, *b); break;
+    case 18: ok = wavy[wa].cube_multiply(ca, *b); break;
+    case 19: ok = wavy[wa].cube_divide(ca, *b); break;
+    }
+    if (sel >= 5 && sel <= 8) {
+        if (wavy[wa].get_cube_ptr(wavy[wa].get_cube_count() - 1)->get_size(0) == 0) {
+            wavy[wa].pop_back_cube();
+            ok = false;
+        }
+        else o << "New cube " << wavy[wa].get_cube_count() - 1 << " attached to wavefunction " << wa;
+    }
+    if (o.str().empty()) o << (ok ? "Operation successful!" : "Operation failed - do the grids match?");
+    notice(o.str());
 }
 
-int acu_nci(std::vector<WFN>& wavy, options& opt) {
-    using namespace std;
-    vector<std::filesystem::path> names;
-    for (int i = 0; i < wavy.size(); i++)
-        names.push_back(wavy[i].get_path());
-
-    bool promolecular = false; //whether to calculate with a wavefunction or the promolecular density
-
-    sel run;
-    run.Oname = wavy[0].get_path().string();
-
-    /*execute the interactive menu*/
-    run = menu(opt, wavy, run);
-
-    if (run.Frames != 1 || run.NbFiles > 1)
-        promolecular = true;
-
-    properties_options opts = opt.properties;
-    opts.resolution = run.Increments[0];
-
-    readxyzMinMax_fromWFN(
-        wavy[run.MoleculeFiles[0]],
-        opts);
-
-    cube persistant_cube_rho(opts.NbSteps, wavy[run.MoleculeFiles[0]].get_ncen(), opts.rho && run.Frames > 1);
-    cube persistant_cube_RDG(opts.NbSteps, wavy[run.MoleculeFiles[0]].get_ncen(), opts.rdg && run.Frames > 1);
-    cube persistant_cube_Elf(opts.NbSteps, wavy[run.MoleculeFiles[0]].get_ncen(), opts.elf && run.Frames > 1);
-    cube persistant_cube_Eli(opts.NbSteps, wavy[run.MoleculeFiles[0]].get_ncen(), opts.eli && run.Frames > 1);
-    cube persistant_cube_Lap(opts.NbSteps, wavy[run.MoleculeFiles[0]].get_ncen(), opts.lap && run.Frames > 1);
-    cube persistant_cube_ESP(opts.NbSteps, wavy[run.MoleculeFiles[0]].get_ncen(), opts.esp && run.Frames > 1);
-    //cube* persistant_cube_EF;
-    //cube* persistant_cube_Hirsh;
-    //cube *persistant_cube_def;
-
-    if (run.NbFiles == 1)
-        run.Intermolecular = 1;
-
-    int counter_100 = 0;
-    vector<vector<vector<int> > > sign_counter;
-    vector<vector<vector<int> > > ignore_RDG;
-    int negative_signs = 0;
-
-    run.Oname = wavy[run.MoleculeFiles[0]].get_path().filename().string();
-    std::vector<cube> cubes = { {opts.NbSteps, wavy[run.MoleculeFiles[0]].get_ncen(), opts.rho || opts.eli || opts.lap},
-        {},
-       {opts.NbSteps, wavy[run.MoleculeFiles[0]].get_ncen(), opts.rdg},
-       {opts.NbSteps, wavy[run.MoleculeFiles[0]].get_ncen(), opts.elf},
-       {opts.NbSteps, wavy[run.MoleculeFiles[0]].get_ncen(), opts.eli},
-       {opts.NbSteps, wavy[run.MoleculeFiles[0]].get_ncen(), opts.lap},
-       {opts.NbSteps, wavy[run.MoleculeFiles[0]].get_ncen(), opts.esp},
-        {},
-       {opts.NbSteps, wavy[run.MoleculeFiles[0]].get_ncen(), opts.hdef},
-        {opts.NbSteps, wavy[run.MoleculeFiles[0]].get_ncen(), opts.def},
-        {},
-        {},
-        {} };
-    cubes[cube_type::Rho].give_parent_wfn(wavy[run.MoleculeFiles[0]]);
-    cubes[cube_type::DEF].give_parent_wfn(wavy[run.MoleculeFiles[0]]);
-    cubes[cube_type::RDG].give_parent_wfn(wavy[run.MoleculeFiles[0]]);
-    cubes[cube_type::Elf].give_parent_wfn(wavy[run.MoleculeFiles[0]]);
-    cubes[cube_type::Eli].give_parent_wfn(wavy[run.MoleculeFiles[0]]);
-    cubes[cube_type::Lap].give_parent_wfn(wavy[run.MoleculeFiles[0]]);
-    cubes[cube_type::ESP].give_parent_wfn(wavy[run.MoleculeFiles[0]]);
-    cubes[cube_type::HDEF].give_parent_wfn(wavy[run.MoleculeFiles[0]]);
-
-    //CubeHirsh(opt.NbSteps[0], opt.NbSteps[1], opt.NbSteps[2], wavy[opt.MoleculeFiles[0]].get_ncen(), opt.dohirsh);
-
-    //persistant_cube_Hirsh = new cube(opt.NbSteps[0], opt.NbSteps[1], opt.NbSteps[2], wavy[opt.MoleculeFiles[0]].get_ncen(), opt.dohirsh);
-
-    //persistant_cube_EF = new cube(opt.NbSteps[0], opt.NbSteps[1], opt.NbSteps[2], wavy[opt.MoleculeFiles[0]].get_ncen(), opt.doef);
-    //persistant_cube_def = new cube(opt.NbSteps[0], opt.NbSteps[1], opt.NbSteps[2], wavy[opt.MoleculeFiles[0]].get_ncen(), opt.dodef);
-
-    for (int i = 0; i < 3; i++) {
-        cubes[cube_type::Rho].set_origin(i, opts.MinMax[i]);
-        cubes[cube_type::RDG].set_origin(i, opts.MinMax[i]);
-        cubes[cube_type::Elf].set_origin(i, opts.MinMax[i]);
-        cubes[cube_type::Eli].set_origin(i, opts.MinMax[i]);
-        cubes[cube_type::Lap].set_origin(i, opts.MinMax[i]);
-        cubes[cube_type::ESP].set_origin(i, opts.MinMax[i]);
-        cubes[cube_type::HDEF].set_origin(i, opts.MinMax[i]);
-        cubes[cube_type::DEF].set_origin(i, opts.MinMax[i]);
-        for (int j = 0; j < 3; j++) {
-            if (i == j) {
-                cubes[cube_type::Rho].set_vector(i, j, run.Increments[i]);
-                cubes[cube_type::RDG].set_vector(i, j, run.Increments[i]);
-                cubes[cube_type::Elf].set_vector(i, j, run.Increments[i]);
-                cubes[cube_type::Eli].set_vector(i, j, run.Increments[i]);
-                cubes[cube_type::Lap].set_vector(i, j, run.Increments[i]);
-                cubes[cube_type::ESP].set_vector(i, j, run.Increments[i]);
-                cubes[cube_type::HDEF].set_vector(i, j, run.Increments[i]);
-                cubes[cube_type::DEF].set_vector(i, j, run.Increments[i]);
-            }
-            else {
-                cubes[cube_type::Rho].set_vector(i, j, 0);
-                cubes[cube_type::RDG].set_vector(i, j, 0);
-                cubes[cube_type::Elf].set_vector(i, j, 0);
-                cubes[cube_type::Eli].set_vector(i, j, 0);
-                cubes[cube_type::Lap].set_vector(i, j, 0);
-                cubes[cube_type::ESP].set_vector(i, j, 0);
-                cubes[cube_type::HDEF].set_vector(i, j, 0);
-                cubes[cube_type::DEF].set_vector(i, j, 0);
-            }
+// Property cubes go through properties_calculation, which re-reads the file on disk.
+void property_menu(options& opt, std::vector<WFN>& wavy, int active) {
+    const WFN& w = wavy[active];
+    if (w.get_modified()) notice("The wavefunction is modified in memory - save it first, cubes use the file on disk.");
+    std::cout << rule('-') << '\n' << boxed("PROPERTY CUBES   written next to " + w.get_path().filename().string()) << '\n' << rule('-') << '\n'
+        << boxed("Space-separated keywords, any of:") << '\n'
+        << boxed("  rho rdg elf eli lap esp def hdef hirsh srho fukui mos mo=<n>[,<m>] hirsh=<atom>") << '\n'
+        << boxed("Example: rho rdg   (NCI plot)      rho esp   (ESP on the density)") << '\n' << rule('-') << std::endl;
+    std::string line;
+    if (!ask_line("Properties", line) || line.empty()) return;
+    properties_options p;
+    p.radius = opt.properties.radius;
+    p.resolution = opt.properties.resolution;
+    std::istringstream in(line);
+    std::string tok;
+    bool any = false;
+    while (in >> tok) {
+        any = true;
+        if (tok == "rho") p.rho = true;
+        else if (tok == "rdg") p.rdg = true;
+        else if (tok == "elf") p.elf = true;
+        else if (tok == "eli") p.eli = true;
+        else if (tok == "lap") p.lap = true;
+        else if (tok == "esp") p.esp = true;
+        else if (tok == "def") p.def = true;
+        else if (tok == "hdef") p.hdef = true;
+        else if (tok == "hirsh") p.hirsh = true;
+        else if (tok == "srho") p.s_rho = true;
+        else if (tok == "fukui") p.fukui = true;
+        else if (tok == "mos") p.all_mos = true;
+        else if (tok.rfind("mo=", 0) == 0) {
+            std::istringstream nums(tok.substr(3));
+            std::string n;
+            while (std::getline(nums, n, ',')) p.MO_numbers.push_back(std::stoi(n));
         }
+        else if (tok.rfind("hirsh=", 0) == 0) { p.hirsh = true; p.hirsh_number = std::stoi(tok.substr(6)); }
+        else return notice("Unknown keyword '" + tok + "'.");
     }
-    cubes[cube_type::Rho].set_comment1("Calculated density using QCT");
-    cubes[cube_type::RDG].set_comment1("Calculated reduced density gradient using QCT");
-    cubes[cube_type::Elf].set_comment1("Calculated electron localization function using QCT");
-    cubes[cube_type::Eli].set_comment1("Calculated same-spin electron localizability indicator using QCT");
-    cubes[cube_type::Lap].set_comment1("Calculated laplacian of electron density using QCT");
-    cubes[cube_type::ESP].set_comment1("Calculated electrostatic potential using QCT");
-    cubes[cube_type::HDEF].set_comment1("Calculated Hirshfeld deformation density using QCT");
-    cubes[cube_type::Rho].set_comment2("from " + wavy[run.MoleculeFiles[0]].get_path().string());
-    cubes[cube_type::RDG].set_comment2("from " + wavy[run.MoleculeFiles[0]].get_path().string());
-    cubes[cube_type::Elf].set_comment2("from " + wavy[run.MoleculeFiles[0]].get_path().string());
-    cubes[cube_type::Lap].set_comment2("from " + wavy[run.MoleculeFiles[0]].get_path().string());
-    cubes[cube_type::ESP].set_comment2("from " + wavy[run.MoleculeFiles[0]].get_path().string());
-    cubes[cube_type::HDEF].set_comment2("from " + wavy[run.MoleculeFiles[0]].get_path().string());
-    cubes[cube_type::Rho].set_path(run.Oname + "_rho.cube");
-    cubes[cube_type::RDG].set_path(run.Oname + "_rdg.cube");
-    cubes[cube_type::Elf].set_path(run.Oname + "_elf.cube");
-    cubes[cube_type::Eli].set_path(run.Oname + "_eli.cube");
-    cubes[cube_type::Lap].set_path(run.Oname + "_lap.cube");
-    cubes[cube_type::ESP].set_path(run.Oname + "_esp.cube");
-    cubes[cube_type::HDEF].set_path(run.Oname + "_hdef.cube");
-    cubes[cube_type::DEF].set_path(run.Oname + "_def.cube");
-
-    for (int iframe = 0; iframe < run.Frames; iframe++)
-    {
-        std::cout << "  *                                                                       *" << std::endl;
-        std::cout << "  *   Working on Frame          : " << std::setw(5) << iframe + 1 << " /" << std::setw(5) << run.Frames << "                            * " << std::endl;
-        /*Read file(s) .xyz and find min and max*/
-
-        string filenames[2];
-
-        if (iframe == 0) { //print Header
-            std::cout << "\n          ___________________________________________________________" << std::endl;
-            std::cout << "  *                                                                       *" << std::endl;
-            std::cout << "  *   NbFiles                   : " << std::setw(1) << run.NbFiles << "                                       *  " << std::endl;
-            for (int i = 0; i < run.NbFiles; i++) {
-#ifdef _WIN32
-                std::wcout << L"  *   MoleculeFile[" << std::setw(2) << i << L"]          : " << std::left << std::setw(20) << wavy[run.MoleculeFiles[i]].get_path().filename().c_str() << L" / " << std::setw(5) << run.NbAtoms[i] << L" atoms      *" << std::endl;
-#else
-                std::cout << "  *   MoleculeFile[" << std::setw(2) << i << "]          : " << std::left << std::setw(20) << wavy[run.MoleculeFiles[i]].get_path().filename().string() << " / " << std::setw(5) << run.NbAtoms[i] << " atoms      *" << std::endl;
-#endif
-            }
-            std::cout << "  *   OutPut filename Prefix    : " << std::setw(20) << run.Oname << "                    *" << std::endl;
-            std::cout << "  *                                                                       *" << std::endl;
-
-            std::cout << "  *   gridBox Min               : " << std::fixed << std::setprecision(6)
-                << std::setw(11) << opts.MinMax[0] << " "
-                << std::setw(11) << opts.MinMax[1] << " "
-                << std::setw(11) << opts.MinMax[2] << "     *" << std::endl;
-            std::cout << "  *   gridBox Max               : " << std::fixed << std::setprecision(6)
-                << std::setw(11) << opts.MinMax[3] << " "
-                << std::setw(11) << opts.MinMax[4] << " "
-                << std::setw(11) << opts.MinMax[5] << "     *" << std::endl;
-            std::cout << "  *   Increments(bohr)          : " << std::fixed << std::setprecision(6)
-                << std::setw(11) << run.Increments[0] << " "
-                << std::setw(11) << run.Increments[1] << " "
-                << std::setw(11) << run.Increments[2] << "     *" << std::endl;
-            std::cout << "  *   NbSteps                   : " << std::setw(11) << opts.NbSteps[0] << " "
-                << std::setw(11) << opts.NbSteps[1] << " "
-                << std::setw(11) << opts.NbSteps[2] << "     *" << std::endl;
-            std::cout << "  *                                                                       * " << std::endl;
-            if (run.NbFiles == 2)
-                std::cout << "  *   Intermolecular            :" << std::fixed << std::setprecision(2) << std::setw(5) << run.Intermolecular << "                                    * " << std::endl;
-            if (!promolecular) {
-                std::cout << "  *   Number of primitives      :     " << std::setw(5) << wavy[run.MoleculeFiles[0]].get_nex() << "                               * " << std::endl;
-                std::cout << "  *   Number of MOs             :     " << std::setw(5) << wavy[run.MoleculeFiles[0]].get_nmo() << "                               * " << std::endl;
-            }
-            if (run.Frames > 1) {
-                ignore_RDG.resize(opts.NbSteps[0]);
-                sign_counter.resize(opts.NbSteps[0]);
-                for (int i = 0; i < opts.NbSteps[0]; i++) {
-                    ignore_RDG[i].resize(opts.NbSteps[1]);
-                    sign_counter[i].resize(opts.NbSteps[1]);
-                    for (int j = 0; j < opts.NbSteps[1]; j++) {
-                        ignore_RDG[i][j].resize(opts.NbSteps[2]);
-                        sign_counter[i][j].resize(opts.NbSteps[2]);
-                    }
-                }
-                for (int i = 0; i < 3; i++) {
-                    persistant_cube_rho.set_origin(i, opts.MinMax[i]);
-                    persistant_cube_RDG.set_origin(i, opts.MinMax[i]);
-                    persistant_cube_Elf.set_origin(i, opts.MinMax[i]);
-                    persistant_cube_Eli.set_origin(i, opts.MinMax[i]);
-                    persistant_cube_Lap.set_origin(i, opts.MinMax[i]);
-                    persistant_cube_ESP.set_origin(i, opts.MinMax[i]);
-                    for (int j = 0; j < 3; j++) {
-                        if (i == j) {
-                            persistant_cube_rho.set_vector(i, j, run.Increments[i]);
-                            persistant_cube_RDG.set_vector(i, j, run.Increments[i]);
-                            persistant_cube_Elf.set_vector(i, j, run.Increments[i]);
-                            persistant_cube_Eli.set_vector(i, j, run.Increments[i]);
-                            persistant_cube_Lap.set_vector(i, j, run.Increments[i]);
-                            persistant_cube_ESP.set_vector(i, j, run.Increments[i]);
-                        }
-                        else {
-                            persistant_cube_rho.set_vector(i, j, 0);
-                            persistant_cube_RDG.set_vector(i, j, 0);
-                            persistant_cube_Elf.set_vector(i, j, 0);
-                            persistant_cube_Eli.set_vector(i, j, 0);
-                            persistant_cube_Lap.set_vector(i, j, 0);
-                            persistant_cube_ESP.set_vector(i, j, 0);
-                        }
-                    }
-                }
-                persistant_cube_rho.set_comment1("Calculated density using QCT");
-                persistant_cube_RDG.set_comment1("Calculated reduced density gradient using QCT");
-                persistant_cube_Elf.set_comment1("Calculated electron localization function using QCT");
-                persistant_cube_Eli.set_comment1("Calculated same-spin electron localizability indicator using QCT");
-                persistant_cube_Lap.set_comment1("Calculated laplacian of electron density using QCT");
-                persistant_cube_ESP.set_comment1("Calculated electrostatic potential using QCT");
-                persistant_cube_rho.set_comment2("from " + wavy[run.MoleculeFiles[0]].get_path().string());
-                persistant_cube_RDG.set_comment2("from " + wavy[run.MoleculeFiles[0]].get_path().string());
-                persistant_cube_Elf.set_comment2("from " + wavy[run.MoleculeFiles[0]].get_path().string());
-                persistant_cube_Lap.set_comment2("from " + wavy[run.MoleculeFiles[0]].get_path().string());
-                persistant_cube_ESP.set_comment2("from " + wavy[run.MoleculeFiles[0]].get_path().string());
-                persistant_cube_rho.set_path(run.Oname + "_rho.cube");
-                persistant_cube_RDG.set_path(run.Oname + "_rdg.cube");
-                persistant_cube_Elf.set_path(run.Oname + "_elf.cube");
-                persistant_cube_Eli.set_path(run.Oname + "_eli.cube");
-                persistant_cube_Lap.set_path(run.Oname + "_lap.cube");
-                persistant_cube_ESP.set_path(run.Oname + "_esp.cube");
-                for (int x = 0; x < opts.NbSteps[0]; x++)
-                    for (int y = 0; y < opts.NbSteps[1]; y++)
-                        for (int z = 0; z < opts.NbSteps[2]; z++) {
-                            if (opts.rho) persistant_cube_rho.set_value(x, y, z, 0.0);
-                            if (opts.rdg) persistant_cube_RDG.set_value(x, y, z, 0.0);
-                            if (opts.elf || opts.eli) persistant_cube_Elf.set_value(x, y, z, 0.0);
-                            if (opts.lap) persistant_cube_Lap.set_value(x, y, z, 0.0);
-                            //if (opts.dohirsh) persistant_cube_Hirsh[0].set_value(x, y, z, 0.0);
-                            if (opts.esp) persistant_cube_ESP.set_value(x, y, z, 0.0);
-                            //if (opts.doef) persistant_cube_EF[0].set_value(x, y, z, 0.0);
-                            //if (opts.dodef) persistant_cube_def[0].set_value(x, y, z, 0.0);
-                            ignore_RDG[x][y][z] = 0;
-                            sign_counter[x][y][z] = 0;
-                        }
-            }
-        }
-        if (opt.ignore.size() > 0 && opts.rho && !opts.hdef) {
-            Calc_Rho(
-                cubes[cube_type::Rho],
-                wavy[run.MoleculeFiles[0]],
-                opts.radius,
-                std::cout,
-                false
-            );
-        }
-        else {
-            //Calc_Prop leaves the Rho cube untouched unless RDG is requested (it hands back sign(lambda2)*rho then)
-            if (opts.rho && !opts.rdg)
-                Calc_Rho(cubes[cube_type::Rho], wavy[run.MoleculeFiles[0]], opts.radius, std::cout, false);
-            if (opts.rdg || opts.elf || opts.eli || opts.lap || opts.def)
-                Calc_Prop(cubes, wavy[run.MoleculeFiles[0]], opts.radius, std::cout, false, false);
-        }
-
-        if (opts.def) {
-            Calc_Static_Def(
-                cubes,
-                wavy[0],
-                opts.radius,
-                std::cout,
-                false
-            );
-        }
-
-        if (opts.hdef)
-            Calc_Hirshfeld(
-                cubes,
-                wavy[run.MoleculeFiles[0]],
-                opts.radius,
-                opt.ignore[0],
-                std::cout,
-                false
-            );
-
-        if (opts.esp)
-            Calc_ESP(
-                cubes[cube_type::ESP],
-                wavy[run.MoleculeFiles[0]],
-                opts.radius,
-                opt.no_date,
-                std::cout,
-                false
-            );
-        int z_counter = 0;
-        if (run.Frames > 1) {
-            for (int x = 0; x < opts.NbSteps[0]; x++)
-                for (int y = 0; y < opts.NbSteps[1]; y++)
-                    for (int z = 0; z < opts.NbSteps[2]; z++) {
-                        if (opts.rho) {
-                            if (cubes[cube_type::Rho].get_value(x, y, z) < 0) {
-                                persistant_cube_rho.set_value(x, y, z, persistant_cube_rho.get_value(x, y, z) - cubes[cube_type::Rho].get_value(x, y, z));
-                                sign_counter[x][y][z]--;
-                            }
-                            else {
-                                if (opt.debug && cubes[cube_type::Rho].get_value(x, y, z) == 0.0) z_counter++;
-                                persistant_cube_rho.set_value(x, y, z, persistant_cube_rho.get_value(x, y, z) + cubes[cube_type::Rho].get_value(x, y, z));
-                                sign_counter[x][y][z]++;
-                            }
-                        }
-                        if (opts.rdg) {
-                            if (cubes[cube_type::RDG].get_value(x, y, z) < 0)
-                                ignore_RDG[x][y][z]++;
-                            persistant_cube_RDG.set_value(x, y, z, persistant_cube_RDG.get_value(x, y, z) + abs(cubes[cube_type::RDG].get_value(x, y, z)));
-                        }
-                        if (opts.elf || opts.eli) persistant_cube_Elf.set_value(x, y, z, persistant_cube_Elf.get_value(x, y, z) + cubes[cube_type::Elf].get_value(x, y, z));
-                        if (opts.lap) persistant_cube_Lap.set_value(x, y, z, persistant_cube_Lap.get_value(x, y, z) + cubes[cube_type::Lap].get_value(x, y, z));
-                        if (opts.esp) persistant_cube_ESP.set_value(x, y, z, persistant_cube_ESP.get_value(x, y, z) + cubes[cube_type::ESP].get_value(x, y, z));
-                        //if (opts.dodef) persistant_cube_def[i] += CubeDEF[i];
-                    }
-            if (opt.debug) std::cout << "\nFinished frame " << iframe << ", count_100= " << counter_100 << ", count_0= " << z_counter << "\n";
-        }
-    } //END FRAMES
-
-    if (opt.debug) std::cout << "Finished with all frames!\n";
-    if (run.Frames > 1) {
-        if (opt.debug) cout << "Now making averages and RDG from calculated rho and gradients\n" << endl;
-        for (int x = 0; x < opts.NbSteps[0]; x++)
-            for (int y = 0; y < opts.NbSteps[1]; y++)
-                for (int z = 0; z < opts.NbSteps[2]; z++) {
-                    if (opts.rho) {
-                        if (sign_counter[x][y][z] >= 0)
-                            persistant_cube_rho.set_value(x, y, z, persistant_cube_rho.get_value(x, y, z) / run.Frames);
-                        else {
-                            persistant_cube_rho.set_value(x, y, z, persistant_cube_rho.get_value(x, y, z) / -run.Frames);
-                            negative_signs++;
-                        }
-                    }
-                    if (opts.rdg) {
-                        if (ignore_RDG[x][y][z] != run.Frames)
-                            persistant_cube_RDG.set_value(x, y, z, persistant_cube_RDG.get_value(x, y, z) / (run.Frames - ignore_RDG[x][y][z]));
-                        else
-                            persistant_cube_RDG.set_value(x, y, z, 100.0);
-                    }
-                    if (opts.elf || opts.eli) persistant_cube_Elf.set_value(x, y, z, persistant_cube_Elf.get_value(x, y, z) / run.Frames);
-                    if (opts.lap) persistant_cube_Lap.set_value(x, y, z, persistant_cube_Lap.get_value(x, y, z) / run.Frames);
-                    //if (opts.dohirsh) persistant_cube_Hirsh[i] /= opt.Frames;
-                    if (opts.esp)persistant_cube_ESP.set_value(x, y, z, persistant_cube_ESP.get_value(x, y, z) / run.Frames);
-                    //if (opts.doef) persistant_cube_EF[i] /= opt.Frames;
-                    //if (opts.dodef) persistant_cube_def[i] /= opt.Frames;
-                }
-        if (opt.debug) std::cout << "\n\n100_counter= " << counter_100 << ", points in vector= " << opts.n_grid_points() << ", frames= " << run.Frames << ", negative signs= " << negative_signs << "\n";
-        if (opts.rdg)
-            for (int x = 0; x < opts.NbSteps[0]; x++)
-                for (int y = 0; y < opts.NbSteps[1]; y++)
-                    for (int z = 0; z < opts.NbSteps[2]; z++)
-                        if (persistant_cube_RDG.get_value(x, y, z) != 0.0 && persistant_cube_rho.get_value(x, y, z) != 0.0)
-                            persistant_cube_RDG.set_value(x, y, z, persistant_cube_RDG.get_value(x, y, z) / pow(abs(persistant_cube_rho.get_value(x, y, z)), (double)1.3333333333333333333333));
-    }
-    else
-        if (opts.rdg)
-            for (int x = 0; x < opts.NbSteps[0]; x++)
-                for (int y = 0; y < opts.NbSteps[1]; y++)
-                    for (int z = 0; z < opts.NbSteps[2]; z++)
-                        if (cubes[cube_type::RDG].get_value(x, y, z) != 0.0 && cubes[cube_type::Rho].get_value(x, y, z) != 0.0)
-                            cubes[cube_type::RDG].set_value(x, y, z, cubes[cube_type::RDG].get_value(x, y, z) / pow(abs(cubes[cube_type::Rho].get_value(x, y, z)), (double)1.3333333333333333333333));
-
-    /*if (opt.Output == 1 || opt.Output == 3)
-    {
-        if(opt.dorho && opt.dordg){
-            std::cout << "  *                                                                       *\n";
-            std::cout << "  *   Writing .dat file ...                                               *\n";
-            if(opt.Frames>1)
-                outdat(opt.Oname.c_str(),
-                        opt.Cutoffs,
-                        opt.NbSteps,
-                        persistant_cube_rho,
-                        persistant_cube_RDG);
-            else
-                outdat(opt.Oname.c_str(),
-                        opt.Cutoffs,
-                        opt.NbSteps,
-                        CubeRho,
-                        CubeRDG);
-        }
-    }*/
-    if (run.Output == 2 || run.Output == 3)
-    {
-        std::cout << "  *                                                                       *\n";
-        std::cout << "  *   Writing .cube files ...                                             *\n";
-        if (run.Frames > 1) {
-            if (opts.rho && !opts.rdg) {
-                persistant_cube_rho.set_path(run.Oname + "_rho.cube");
-                persistant_cube_rho.write_file(true, true);
-            }
-            if (opts.rdg) {
-                persistant_cube_rho.set_path(run.Oname + "_signed_rho.cube");
-                persistant_cube_rho.write_file(true);
-                persistant_cube_rho.set_path(run.Oname + "_rho.cube");
-                persistant_cube_rho.write_file(true, true);
-                persistant_cube_RDG.write_file(true);
-            }
-            if (opts.elf || opts.eli) persistant_cube_Elf.write_file(true);
-            if (opts.lap) persistant_cube_Lap.write_file(true);
-            if (opts.esp) persistant_cube_ESP.write_file(true);
-            //if (opts.doef) outCubeEF(opts.Oname.c_str(),
-            //if (opts.dodef) outCubeDEF(opts.Oname.c_str(),
-            //if (opts.dohirsh) outCubeHirsh(opts.Oname.c_str(),
-        }
-        else {
-            if (opts.rho && !opts.rdg) {
-                cubes[cube_type::Rho].set_path(run.Oname + "_rho.cube");
-                cubes[cube_type::Rho].write_file(true, true);
-            }
-            if (opts.rdg) {
-                cubes[cube_type::Rho].set_path(run.Oname + "_signed_rho.cube");
-                cubes[cube_type::Rho].write_file(true);
-                cubes[cube_type::Rho].set_path(run.Oname + "_rho.cube");
-                cubes[cube_type::Rho].write_file(true, true);
-                cubes[cube_type::RDG].write_file(true);
-            }
-            if (opts.elf) cubes[cube_type::Elf].write_file(true);
-            if (opts.eli) cubes[cube_type::Eli].write_file(true);
-            if (opts.lap) cubes[cube_type::Lap].write_file(true);
-            if (opts.esp) cubes[cube_type::ESP].write_file(true);
-            if (opts.hdef) cubes[cube_type::HDEF].write_file(true);
-            if (opts.def) cubes[cube_type::DEF].write_file(true);
-            //if(opt.dohirsh) outCubeHirsh(opt.Oname.c_str(),
-            //if(opt.doef) outCubeEF(opt.Oname.c_str(),
-        }
-        if (opts.rdg) wavy[run.MoleculeFiles[0]].push_back_cube(run.Oname + "_rdg.cube", false, false);
-        if (opts.rho) {
-            wavy[run.MoleculeFiles[0]].push_back_cube(run.Oname + "_rho.cube", false, false);
-            if (opts.rdg)
-                wavy[run.MoleculeFiles[0]].push_back_cube(run.Oname + "_signed_rho.cube", false, false);
-        }
-        if (opts.elf) wavy[run.MoleculeFiles[0]].push_back_cube(run.Oname + "_elf.cube", false, false);
-        else if (opts.eli) wavy[run.MoleculeFiles[0]].push_back_cube(run.Oname + "_eli.cube", false, false);
-        if (opts.lap) wavy[run.MoleculeFiles[0]].push_back_cube(run.Oname + "_lap.cube", false, false);
-        //if(opt.dohirsh) wavy[opt.MoleculeFiles[0]].push_back_cube(opt.Oname + "-hirshfeld.cube", false, false);
-        if (opts.esp) wavy[run.MoleculeFiles[0]].push_back_cube(run.Oname + "_esp.cube", false, false);
-        //if(opt.doef) wavy[opt.MoleculeFiles[0]].push_back_cube(opt.Oname + "-ef_x.cube", false, false);
-        //if(opt.doef) wavy[opt.MoleculeFiles[0]].push_back_cube(opt.Oname + "-ef_y.cube", false, false);
-        //if(opt.doef) wavy[opt.MoleculeFiles[0]].push_back_cube(opt.Oname + "-ef_z.cube", false, false);
-        //if(opt.doef) wavy[opt.MoleculeFiles[0]].push_back_cube(opt.Oname + "-ef_amp.cube", false, false);
-        //if(opt.dodef) wavy[opt.MoleculeFiles[0]].push_back_cube(opt.Oname + "-def.cube", false, false);
-    }
-
-    std::cout << "  *                                                                       *" << std::endl;
-    std::cout << "  *                                                                       *" << std::endl;
-    std::cout << "          __________________________________________________________" << std::endl << std::endl << std::endl;
-    return 0;
+    if (!any) return;
+    const properties_options saved = opt.properties;
+    const std::filesystem::path saved_wfn = opt.wfn;
+    opt.properties = p;
+    opt.wfn = w.get_path();
+    std::cout << "  Calculating (details in NoSpherA2_cube.log) ..." << std::flush;
+    properties_calculation(opt);
+    std::cout << " done!" << std::endl;
+    opt.properties = saved;
+    opt.wfn = saved_wfn;
+    notice("Cubes written next to " + w.get_path().string());
 }
+
+void bonding_menu(options& opt, std::vector<WFN>& wavy, int active) {
+    std::cout << rule('-') << '\n' << boxed("BONDING ANALYSIS") << '\n' << rule('-') << '\n'
+        << boxed("  1  cubes in a bond plane (rho / RDG / ELI-D / Laplacian around 2-3 atoms)") << '\n'
+        << boxed("  2  the same for every bond listed in a definition file (-bonds format)") << '\n'
+        << boxed("  3  Laplacian profile along every bond (bond_<i>_<j>_lap.dat)") << '\n'
+        << boxed("  4  ELI-D basins in QTAIM basins of chosen atoms (masked cube)") << '\n'
+        << boxed("  5  Roby-Gould bond indices (RGBI)      6  ELI-D / QTAIM basin integration") << '\n'
+        << boxed("  7  promolecular NCI between fragments (.xyz files)") << '\n'
+        << boxed("  8  dipole moment of the active wavefunction") << '\n'
+        << boxed("  0  back") << '\n' << rule('-') << std::endl;
+    int sel = 0;
+    if (!ask("Choice", sel) || sel == 0) return;
+    if (sel != 7 && !need_wfn(wavy)) return;
+    const std::filesystem::path saved_wfn = opt.wfn;
+    switch (sel) {
+    case 1: {
+        WFN& w = wavy[active];
+        w.list_centers();
+        int mode, a1, a2, a3;
+        std::cout << boxed("orientation: 1 = around atom 1   2 = bond 1-2   3 = plane 1-2-3   4 = ring centroid") << std::endl;
+        if (!ask("Orientation (1-4)", mode) || !ask("Atom 1 (1-based)", a1) || !ask("Atom 2", a2) || !ask("Atom 3", a3)) return;
+        std::string props;
+        if (!ask_line("Properties [rho rdg eli lap]", props)) return;
+        if (props.empty()) props = "rho rdg eli lap";
+        const bool rho = props.find("rho") != std::string::npos, rdg = props.find("rdg") != std::string::npos,
+            eli = props.find("eli") != std::string::npos, lap = props.find("lap") != std::string::npos;
+        double res[3] = { opt.properties.resolution, opt.properties.resolution, opt.properties.resolution };
+        double box[3] = { 0.0, 0.0, 0.0 }; // 0 = default extent from the bond length
+        const bond b = do_bonds(w, mode, true, true, res, true, box, a1, a2, a3, opt.debug, false, 1, rho, rdg, eli, lap);
+        if (!b.success) return notice("Bond plane calculation failed - see the messages above.");
+        for (const auto& [on, suffix] : { std::pair{rho, "_rho"}, {rdg, "_rdg"}, {eli, "_eli"}, {lap, "_lap"} })
+            if (on) w.push_back_cube(b.filename + suffix + ".cube", false, false);
+        notice("Cubes " + b.filename + "_*.cube attached to the active wavefunction.");
+        return;
+    }
+    case 2: {
+        std::string f;
+        if (!ask_line("Bond definition file", f) || f.empty()) return;
+        if (!std::filesystem::exists(f)) return notice("No such file: " + f);
+        notice(autobonds(opt.debug, wavy[active], f, false) == 1 ? "Bondwise analysis done." : "Bondwise analysis failed.");
+        return;
+    }
+    case 3: {
+        std::filesystem::path p = wavy[active].get_path();
+        bondwise_laplacian_plots(p);
+        notice("Laplacian profiles written next to " + p.string());
+        return;
+    }
+    case 4: {
+        std::string line;
+        if (!ask_line("Atoms (0-based, comma separated)", line) || line.empty()) return;
+        ivec idx;
+        std::istringstream in(line);
+        for (std::string n; std::getline(in, n, ',');) idx.push_back(std::stoi(trim(n)));
+        double bg = 0.0;
+        if (!ask("Background value outside the basins", bg)) return;
+        run_QTAIM_ELI_mask(wavy[active].get_path(), {}, idx, bg, opt, std::cout);
+        return;
+    }
+    case 5:
+        if (wavy[active].get_nmo() == 0) return notice("Roby-Gould bond indices need molecular orbitals.");
+        { Roby_information roby(wavy[active], opt.rgbi_group_sets, !opt.rgbi_no_sym, opt.rgbi_orbital_basis == RGBIOrbitalBasis::ANO, opt.rgbi_EVs, opt.rgbi_theta); }
+        return;
+    case 6: ELI_analysis(wavy[active], opt); return;
+    case 7: {
+        std::string line;
+        if (!ask_line("Fragment .xyz files (space separated)", line) || line.empty()) return;
+        pathvec frags;
+        std::istringstream in(line);
+        for (std::string f; in >> f;) {
+            if (!std::filesystem::exists(f)) return notice("No such file: " + f);
+            frags.emplace_back(f);
+        }
+        if (frags.size() < 2) return notice("Need at least two fragments.");
+        promolecular_nci_analysis(frags, opt.properties, std::cout);
+        notice("Promolecular NCI done.");
+        return;
+    }
+    case 8:
+        opt.wfn = wavy[active].get_path();
+        dipole_moments(opt, std::cout);
+        opt.wfn = saved_wfn;
+        return;
+    default:
+        notice("Sorry, I did not get that.");
+    }
+}
+} // namespace
 
 int QCT(options& opt, std::vector<WFN>& wavy)
 {
     using namespace std;
+    input_closed = false;
     bool expert = false;
-    bool end = false;
-    int activewave = 0;
-    string wavename;
-    while (!end) {
-        char sel;
-        std::cout << "This Executable was built on: " + string(__DATE__) + " " + string(__TIME__) + "\n";
-        std::cout << "What do you want to do?\n";
-        if (wavy.size() > 0) {
-            std::cout << "Active Wavefunction: " << wavy[activewave].get_path();
-            string temp = wavy[activewave].get_basis_set_name();
-            if (temp.length() > 2)std::cout << " (" << temp << ") ";
-            else std::cout << " (no basis set loaded)";
-            if (opt.debug)std::cout << temp;
-            if (wavy[activewave].get_modified())std::cout << "*";
-            if (expert)std::cout << " EXPERT MODE!";
-            std::cout << endl;
-        }
-        std::cout << "R) Read in a new file" << endl;
-        if (wavy.size() > 0) {
-            std::cout << "M) Modify an already loaded wavefunction" << endl
-                << "S) Save the active wavefunction";
-            if (wavy[activewave].get_cube_count() > 0)
-                std::cout << "or cube(s)" << endl;
-            else std::cout << endl;
-            std::cout << "O) Sort the exponents in the wavefunction" << endl
-                << "N) Start NCI/Cube calculation plugin" << endl
-                << "B) Read a basis set" << endl
-                << "U) Check the unit of the atom positions" << endl;
-            if (wavy.size() > 1)std::cout << "A) Activate another wavefunction" << endl;
-            else std::cout << "-) Activate another wavefunction" << endl;
-            if (wavy[activewave].get_cube_count() > 0)std::cout << "C) Work with cube files loaded" << endl;
-            else std::cout << "-) Work with cube files loaded" << endl;
-        }
-        else {
-            std::cout << "-) Modify an already loaded wavefunction" << endl
-                << "-) Save the active wavefunction" << endl
-                << "-) Sort the exponents in the wavefunction" << endl
-                << "-) Start NCI/Cube calculation plugin" << endl
-                << "-) Read a basis set" << endl
-                << "-) Check the unit of the atom positions" << endl;
-            if (wavy.size() > 1)std::cout << "A) Activate another wavefunction" << endl;
-            else std::cout << "-) Activate another wavefunction" << endl;
-            if (wavy.size() > 0 && wavy[activewave].get_cube_count() > 0)std::cout << "C) Work with cube files loaded" << endl;
-            else std::cout << "-) Work with cube files loaded" << endl;
-        }
-        std::cout << "E) Toggle Expert mode (Disable assumptions)" << endl
-            << "L) Limit the number of CPUs being used. Current value (-1 corresponds to all): " << opt.threads << endl
-            << "Q) Quit the program" << endl;
-        std::cin >> sel;
-        cls();
-        vector < vector <unsigned int> > selection;
-        switch (sel) {
-        case 'c':
-        case 'C': {
-            unsigned int nr_cubes = 0;
-            selection.resize(2);
-            for (int w = 0; w < wavy.size(); w++) for (int c = 0; c < wavy[w].get_cube_count(); c++) nr_cubes++;
-            std::cout << "What do you want to do?" << endl
-                << "1) Perform mathematic operation on one cube" << endl;
-            if (nr_cubes > 1)std::cout << "2) Perform mathematic operation on two cubes" << endl;
-            std::cout << "3) Analyze a cube" << endl
-                << "0) Go back to main menu" << endl;
-            int temp;
-            std::cin >> temp;
-            cls();
-            switch (temp) {
-            case 1: {
-                if (nr_cubes <= 0) {
-                    std::cout << "No cubes loaded!" << endl;
-                    break;
-                }
-                std::cout << "Which operation do you want to perform?" << endl
-                    << "1) Integrate values inside a cube" << endl
-                    << "2) Periodically replicate a cube" << endl
-                    << "3) Apply a threshhold to a cube" << endl
-                    << "0) Get back to previous menu" << endl;
-                int _sel = 0;
-                std::cin >> _sel;
-                selection[0].resize(1);
-                selection[1].resize(1);
-                if (nr_cubes >= 1 && _sel != 0)    select_cubes(selection, wavy, 1);
-                if (wavy[selection[0][0]].get_cube_loaded(selection[1][0]) == false) {
-                    if (opt.debug)std::cout << "Loading full file now!" << endl;
-                    wavy[selection[0][0]].read_cube(selection[1][0], true, false, expert);
-                }
-                switch (_sel) {
-                case 1: {
-                    cls();
-                    std::cout << "Integrated value of this cube is: ";
-                    std::cout << scientific << setprecision(8) << setw(16) << wavy[selection[0][0]].get_cube_ptr(selection[1][0])->sum() << endl;
-                    break;
-                }
-                case 2: {
-                    cls();
-                    std::cout << "New cube saved as: " << wavy[selection[0][0]].make_super_cube(selection[1][0]) << endl;
-                    break;
-                }
-                case 3: {
-                    double thresh = 0.0;
-                    std::cout << "Please enter threshhold: ";
-                    std::cin >> thresh;
-                    wavy[selection[0][0]].apply_cube_thresh(selection[1][0], thresh);
-                    break;
-                }
-                case 4: {
-                    cls();
-                    std::cout << "Integrated absolute_differnce value of this cube is: ";
-                    std::cout << scientific << setprecision(8) << setw(16) << wavy[selection[0][0]].get_cube_ptr(selection[1][0])->diff_sum() << endl;
-                    break;
-                }
-                case 0: {
-                    end = true;
-                    break;
-                }
-                default:
-                    std::cout << "Sorry, i did not get that ..." << endl;
-                    break;
-                }
-                break;
-            }
-            case 2: {
-                if (nr_cubes > 1) {
-                    while (!end) {
-                        std::cout << "Which operation do you want to perform? ";
-                        if (expert)std::cout << "(The 1. cube selected will be altered by the 2. one in cases of x=)";
-                        std::cout << endl
-                            << "1) +" << endl
-                            << "2) -" << endl
-                            << "3) *" << endl
-                            << "4) /" << endl
-                            << "5) RSR (Real space R-Value)" << endl
-                            << "6) Mask (if(value!=0) value, else 0)" << endl
-                            << "7) Negative mask (if(value==0) value, else 0" << endl
-                            << "8) Mask with threshhold (if value(2) < thresh = 0, else = value(1))" << endl
-                            << "9) Weighted Jaccord similarity and distance" << endl;
-                        if (expert)std::cout << "11) +=" << endl
-                            << "12) -=" << endl
-                            << "13) *=" << endl
-                            << "14) /=" << endl;
-                        std::cout << "0) Go back to previous menu" << endl;
-                        std::cin >> temp;
-                        selection[0].resize(2);
-                        selection[1].resize(2);
-                        if (nr_cubes >= 2 && temp != 0) {
-                            select_cubes(selection, wavy, 2);
-                            if (opt.debug) {
-                                std::cout << "Selection:" << endl;
-                                for (int i = 0; i < 2; i++)
-                                    std::cout << selection[0][i] << "." << selection[1][i] << endl;
-                            }
-                        }
-                        cls();
-                        if (temp >= 1 && temp < 5 && !wavy[selection[0][1]].get_cube_loaded(selection[1][1])) {
-                            std::cout << "Loading full file now!" << endl;
-                            wavy[selection[0][1]].read_cube(selection[1][1], true, false, expert);
-                        }
-                        switch (temp) {
-                        case 1: {
-                            wavy[selection[0][0]].push_back_cube(*wavy[selection[0][0]].get_cube_ptr(selection[1][0]) + *wavy[selection[0][1]].get_cube_ptr(selection[1][1]));
-                            if (wavy[selection[0][0]].get_cube_ptr(wavy[selection[0][0]].get_cube_count() - 1)->get_size(0) != 0)
-                                std::cout << "Operation succesfull!" << endl;
-                            else
-                                std::cout << "Sorry, something went wrong!" << endl;
-                        }
-                              break;
-                        case 2: {
-                            wavy[selection[0][0]].push_back_cube(*wavy[selection[0][0]].get_cube_ptr(selection[1][0]) - *wavy[selection[0][1]].get_cube_ptr(selection[1][1]));
-                            if (wavy[selection[0][0]].get_cube_ptr(wavy[selection[0][0]].get_cube_count() - 1)->get_size(0) != 0)
-                                std::cout << "Operation succesfull!" << endl;
-                            else
-                                std::cout << "Sorry, something went wrong!" << endl;
-                        }
-                              break;
-                        case 3: {
-                            wavy[selection[0][0]].push_back_cube(*wavy[selection[0][0]].get_cube_ptr(selection[1][0]) * *wavy[selection[0][1]].get_cube_ptr(selection[1][1]));
-                            if (wavy[selection[0][0]].get_cube_ptr(wavy[selection[0][0]].get_cube_count() - 1)->get_size(0) != 0)
-                                std::cout << "Operation succesfull!" << endl;
-                            else
-                                std::cout << "Sorry, something went wrong!" << endl;
-                        }
-                              break;
-                        case 4: {
-                            wavy[selection[0][0]].push_back_cube(*wavy[selection[0][0]].get_cube_ptr(selection[1][0]) / *wavy[selection[0][1]].get_cube_ptr(selection[1][1]));
-                            if (wavy[selection[0][0]].get_cube_ptr(wavy[selection[0][0]].get_cube_count() - 1)->get_size(0) != 0)
-                                std::cout << "Operation succesfull!" << endl;
-                            else
-                                std::cout << "Sorry, something went wrong!" << endl;
-                        }
-                              break;
-                        case 5: {
-                            for (int i = 0; i < 2; i++)
-                                if (wavy[selection[0][i]].get_cube_loaded(selection[1][i]) == false) {
-                                    if (opt.debug)std::cout << "Loading full file now!" << endl;
-                                    wavy[selection[0][i]].read_cube(selection[1][i], true, false, expert);
-                                }
-                            double result = wavy[selection[0][0]].get_cube_ptr(selection[1][0])->rrs(*wavy[selection[0][1]].get_cube_ptr(selection[1][1]));
-                            if (result != -1) {
-                                std::cout << "Operation succesfull!" << endl;
-                                std::cout << "RSR: " << result << endl;
-                            }
-                            else std::cout << "Sorry, something went wrong!" << endl;
-                        }
-                              break;
-                        case 6: {
-                            for (int i = 0; i < 2; i++)
-                                if (wavy[selection[0][i]].get_cube_loaded(selection[1][i]) == false) {
-                                    if (opt.debug)std::cout << "Loading full file now!" << endl;
-                                    wavy[selection[0][i]].read_cube(selection[1][i], true, false, expert);
-                                }
-                            if (wavy[selection[0][0]].apply_cube_mask(selection[1][0], *wavy[selection[0][1]].get_cube_ptr(selection[1][1])))
-                                std::cout << "Operation succesfull!" << endl;
-                            else
-                                std::cout << "Sorry, something went wrong!" << endl;
-                        }
-                              break;
-                        case 7:
-                            for (int i = 0; i < 2; i++)
-                                if (wavy[selection[0][i]].get_cube_loaded(selection[1][i]) == false) {
-                                    if (opt.debug)
-                                        std::cout << "Loading full file now!" << endl;
-                                    wavy[selection[0][i]].read_cube(selection[1][i], true, false, expert);
-                                }
-                            if (wavy[selection[0][0]].apply_cube_negative_mask(selection[1][0], *wavy[selection[0][1]].get_cube_ptr(selection[1][1])))
-                                std::cout << "Operation succesfull!" << endl;
-                            else
-                                std::cout << "Sorry, something went wrong!" << endl;
-                            break;
-                        case 8: {
-                            for (int i = 0; i < 2; i++)
-                                if (wavy[selection[0][i]].get_cube_loaded(selection[1][i]) == false) {
-                                    if (opt.debug)
-                                        std::cout << "Loading full file now!" << endl;
-                                    wavy[selection[0][i]].read_cube(selection[1][i], true, false, expert);
-                                }
-                            std::cout << "Please give threshhold to use: ";
-                            double thresh = 0.0;
-                            std::cin >> thresh;
-                            if (wavy[selection[0][0]].apply_cube_thresh(selection[1][0], *wavy[selection[0][1]].get_cube_ptr(selection[1][1]), thresh))
-                                std::cout << "Operation succesfull!" << endl;
-                            else
-                                std::cout << "Sorry, something went wrong!" << endl;
-                            break;
-                        }
-                        case 9: {
-                            for (int i = 0; i < 2; i++)
-                                if (wavy[selection[0][i]].get_cube_loaded(selection[1][i]) == false) {
-                                    if (opt.debug)std::cout << "Loading full file now!" << endl;
-                                    wavy[selection[0][i]].read_cube(selection[1][i], true, false, expert);
-                                }
-                            double result = wavy[selection[0][0]].get_cube_ptr(selection[1][0])->jaccard(*wavy[selection[0][1]].get_cube_ptr(selection[1][1]));
-                            if (result != -1) {
-                                std::cout << "Operation succesfull!" << endl;
-                                std::cout << "Jaccord similarity: " << result << " Jaccord distance: " << 1 - result << endl;
-                            }
-                            else
-                                std::cout << "Sorry, something went wrong!" << endl;
-                        }
-                              break;
-                        case 11:
-                            for (int i = 0; i < 2; i++)
-                                if (wavy[selection[0][i]].get_cube_loaded(selection[1][i]) == false) {
-                                    if (opt.debug)std::cout << "Loading full file now!" << endl;
-                                    wavy[selection[0][i]].read_cube(selection[1][i], true, false, expert);
-                                }
-                            if (wavy[selection[0][0]].cube_add(selection[1][0], *wavy[selection[0][1]].get_cube_ptr(selection[1][1])))
-                                std::cout << "Operation succesfull!" << endl;
-                            else
-                                std::cout << "Sorry, something went wrong!" << endl;
-                            break;
-                        case 12:
-                            for (int i = 0; i < 2; i++)
-                                if (wavy[selection[0][i]].get_cube_loaded(selection[1][i]) == false) {
-                                    if (opt.debug)std::cout << "Loading full file now!" << endl;
-                                    wavy[selection[0][i]].read_cube(selection[1][i], true, false, expert);
-                                }
-                            if (wavy[selection[0][0]].cube_subtract(selection[1][0], *wavy[selection[0][1]].get_cube_ptr(selection[1][1])))
-                                std::cout << "Operation succesfull!" << endl;
-                            else
-                                std::cout << "Sorry, something went wrong!" << endl;
-                            break;
-                        case 13:
-                            for (int i = 0; i < 2; i++)
-                                if (wavy[selection[0][i]].get_cube_loaded(selection[1][i]) == false) {
-                                    if (opt.debug)std::cout << "Loading full file now!" << endl;
-                                    wavy[selection[0][i]].read_cube(selection[1][i], true, false, expert);
-                                }
-                            if (wavy[selection[0][0]].cube_multiply(selection[1][0], *wavy[selection[0][1]].get_cube_ptr(selection[1][1])))
-                                std::cout << "Operation succesfull!" << endl;
-                            else
-                                std::cout << "Sorry, something went wrong!" << endl;
-                            break;
-                        case 14:
-                            for (int i = 0; i < 2; i++)
-                                if (wavy[selection[0][i]].get_cube_loaded(selection[1][i]) == false) {
-                                    if (opt.debug)std::cout << "Loading full file now!" << endl;
-                                    wavy[selection[0][i]].read_cube(selection[1][i], true, false, expert);
-                                }
-                            if (wavy[selection[0][0]].cube_divide(selection[1][0], *wavy[selection[0][1]].get_cube_ptr(selection[1][1])))
-                                std::cout << "Operation succesfull!" << endl;
-                            else
-                                std::cout << "Sorry, something went wrong!" << endl;
-                            break;
-                        case 0:
-                            end = true;
-                            break;
-                        default:
-                            std::cout << "Sorry, i did not get that..." << endl;
-                            break;
-                        }
-                    }
-                    end = false;
-                }
-                break;
-            }
-            case 3:
-                std::cout << "Which analysis do you want to perform?" << endl
-                    << "1) Separate into Basins according to critical point search" << endl;
-                //and try new BCP implementation"
-                if (expert)std::cout << "2) Separate into Basins according to critical point search and try new BCP implementation" << endl;
-                std::cout << "0) Go back to selection" << endl;
-                std::cin >> temp;
-                selection[0].resize(1);
-                selection[1].resize(1);
-                if (nr_cubes >= 1 && temp != 0) select_cubes(selection, wavy, 1, false, opt.debug);
-                if (opt.debug) std::cout << "selection: " << selection[0][0] << " " << selection[1][0] << endl;
-                switch (temp) {
-                case 1:
-                    if (wavy[selection[0][0]].get_cube_loaded(selection[1][0]) == false) {
-                        std::cout << "Loading full file now!" << endl;
-                        if (wavy[selection[0][0]].read_cube(selection[1][0], true, false, expert) == false)
-                        {
-                            std::cout << "ERROR reading full file! Aborting" << endl;
-                            break;
-                        }
-                    }
-                    if (b2c(wavy[selection[0][0]].get_cube_ptr(selection[1][0]), wavy[selection[0][0]].get_atoms(), opt.debug, false) == false)
-                        std::cout << "something went wrong!" << endl;
-                    break;
-                case 2:
-                    if (expert) {
-                        if (wavy[selection[0][0]].get_cube_loaded(selection[1][0]) == false) {
-                            std::cout << "loading full file now!" << endl;
-                            if (wavy[selection[0][0]].read_cube(selection[1][0], true, false, expert) == false) {
-                                std::cout << "ERROR reading full file! Aborting!" << endl;
-                                break;
-                            }
-                        }
-                        if (b2c(wavy[selection[0][0]].get_cube_ptr(selection[1][0]), wavy[selection[0][0]].get_atoms(), opt.debug, true) == false)
-                            std::cout << "something went wrong" << endl;
-                        break;
-                    }
-                    break;
-                case 0:
-                    break;
-                default:
-                    std::cout << "sorry, i did not understand that, please try again!" << endl;
-                    break;
-                }
-            }
+    int active = wavy.empty() ? 0 : (int)wavy.size() - 1;
+    while (!input_closed) {
+        print_menu(wavy, active, expert, opt);
+        string s;
+        if (!ask_line("Choice", s)) break;
+        switch (key_of(s)) {
+        case 'R': read_file(opt, wavy, active, expert); break;
+        case 'X':
+            if (!need_wfn(wavy)) break;
+            if (wavy[active].get_modified() && !confirm("Unsaved changes - close anyway")) break;
+            wavy.erase(wavy.begin() + active);
+            active = wavy.empty() ? 0 : min(active, (int)wavy.size() - 1);
+            notice("Closed.");
+            break;
+        case 'S': if (need_wfn(wavy)) save_menu(opt, wavy, active, expert); break;
+        case 'A': {
+            if (!need_wfn(wavy)) break;
+            for (int i = 0; i < (int)wavy.size(); i++)
+                cout << "  " << setw(3) << i << "  " << wavy[i].get_path().filename().string() << " (" << origin_name(wavy[i].get_origin()) << ")\n";
+            int n;
+            if (ask("Activate", n) && n >= 0 && n < (int)wavy.size()) active = n;
+            else notice("No such wavefunction.");
             break;
         }
-        case 'r':
-        case 'R': {
-            if (expert) {
-                std::cout << "What kind of file do you want to load?" << endl
-                    << "W) Wavefunction in known format (gbw/wfn/wfx/fchk/molden)" << endl
-                    << "G) Grid or Cube file" << endl
-                    << "E) Exit to main menu" << endl;
-                std::cin >> sel;
-                cls();
-                switch (sel) {
-                case 'G':
-                case 'g': {
-                    std::filesystem::path path;
-                    while (!exists(path)) {
-                        std::cout << "Please give Path to the cube you want to read: ";
-                        std::cin >> path;
-                        if (exists(path)) break;
-                        else std::cout << "Sorry, couldn't find the file! Try again!" << endl;
-                    }
-                    if (wavy.size() == 0) {
-                        activewave = 0;
-                        wavy.emplace_back(path);
-                    }
-                    wavy[activewave].push_back_cube(cube(path, false, wavy[activewave], std::cout, expert));
-                    cls();
-                    break;
-                }
-                case 'W':
-                case 'w': {
-                    while (!end) {
-                        string path;
-                        bool new_wfn = false;
-                        std::cout << "Path to the wavefunction file: ";
-                        std::cin >> path;
-                        int tries = 0;
-                        if (path.find(".wfn") == -1 && path.find(".ffn") == -1) {
-                            do {
-                                std::cout << "This doesn't look like a .wfn or .ffn file, try again: " << endl;
-                                tries++;
-                                std::cin >> path;
-                            } while (path.find(".wfn") == -1 && path.find(".ffn") == -1 && tries < 3);
-                            if (tries == 3) {
-                                std::cout << "Sorry, make sure you know the filename and try again!" << endl;
-                                break;
-                            }
-                        }
-                        if (activewave < wavy.size() && wavy.size()>0) {
-                            std::cout << "This will delete the previously loaded wavefunction " << wavy[activewave].get_path() << "! Are you sure?";
-                            if (!yesno()) {
-                                std::cout << "Do you want to load it as a new wavefunction? " << endl;
-                                if (yesno()) new_wfn = true;
-                                end = true;
-                                break;
-                            }
-                            wavy.erase(wavy.begin() + activewave);
-                            if (path.find(".wfn") != -1) wavy.insert(wavy.begin() + activewave - 1, WFN(e_origin::wfn));
-                            else wavy.insert(wavy.begin() + activewave - 1, WFN(e_origin::ffn));
-                        }
-                        else if (wavy.size() == 0 || activewave == wavy.size() || new_wfn) {
-                            if (opt.debug) std::cout << "Making a new wavefunction!" << endl;
-                            if (path.find(".wfn") != -1) wavy.emplace_back(e_origin::wfn);
-                            else wavy.emplace_back(e_origin::ffn);
-                            if (wavy.size() > 1) activewave++;
-                            if (opt.debug) std::cout << "Size: " << wavy.size() << " active: " << activewave << endl;
-                        }
-                        wavy[activewave].read_known_wavefunction_format(path, std::cout, opt.debug);
-                        cls();
-                        if (opt.debug) std::cout << wavy[activewave].get_ncen() << endl;
-                        break;
-                    }
-                    cls();
-                    end = false;
-                    break;
-                }
-                case 'e':
-                case 'E':
-                    break;
-                default:
-                    std::cout << "Sorry, did not understand that, going back to main menu!" << endl;
-                    break;
-                }
-            }
-            else {
-                std::filesystem::path filename;
-                vector <string> temp;
-                temp.resize(3);
-                temp[0] = "Wavefunction files (wfn,ffn,fchk,wfx) | *.wfn *.ffn *.Fchk *.fchk *.FChk *.wfx *gbw *.molden *.molden.input *.xtb";
-                temp[1] = "Cube files (cub, cube, grd) | *.cube *.cub *.grd";
-                temp[2] = "All filetypes | *";
-                if (!open_file_dialog(filename, opt.debug, temp, opt.cwd.string())) {
-                    std::cout << "Error encountered!" << endl;
-                    break;
-                }
-                else {
-                    if (wavy.size() > activewave && wavy.size() > 0) {
-                        std::cout << "This will delete the previously loaded wavefunction " << wavy[activewave].get_path() << "! Are you sure?";
-                        if (!yesno()) {
-                            std::cout << "Do you want to load it as a new wavefunction? " << endl;
-                            if (yesno()) activewave++;
-                            else continue;
-                        }
-                        wavy.erase(wavy.begin() + activewave);
-                    }
-                    wavy.emplace(wavy.begin() + activewave, filename, opt.debug);
-                }
-            }
-            break;
-        }
-        case 'M':
-        case 'm': {
-            if (wavy.size() < 1) {
-                std::cout << "First you need to read a wavefunction!" << endl;
-                break;
-            }
-            int msel = 0;
-            string label = "?";
-            float x, y, z = 0.0;
-            int charge = 0;
-            std::cout << "What do you want to do?" << endl
-                << "D) Delete a center or set of values for a certain function" << endl
-                << "A) Add a center" << endl
-                << "C) Change a value" << endl
-                << "E) Exit to Main Menu" << endl;
-            std::cin >> sel;
-            cls();
-            switch (sel) {
-            case 'D':
-            case 'd':
-                std::cout << "A) Atom" << endl
-                    << "E) Exponent" << endl
-                    << "B) Back to main menu" << endl;
-                std::cin >> sel;
-                end = false;
-                switch (sel) {
-                case 'A':
-                case 'a':
-                    std::cout << "The list of centers:\n";
-                    wavy[activewave].list_centers();
-                    std::cout << "Which center do you want to delete?\n";
-                    std::cin >> msel;
-                    if (msel >= 0) {
-                        if (wavy[activewave].remove_center(msel)) {
-                            std::cout << "Deleted center nr " << msel << " succesfully! Going back to Main Menu.\n";
-                            wavy[activewave].set_modified();
-                        }
-                        else std::cout << "Something went wrong... Sorry, let's start again...\n";
-                    }
-                    else std::cout << "Wrong selection, start again!\n";
-                    break;
-                case 'E':
-                case 'e':
-                    while (!end) {
-                        wavy[activewave].list_primitives();
-                        std::cout << "Which exponent out of " << wavy[activewave].get_nex() << " do you want to delete?\n";
-                        std::cin >> msel;
-                        if (msel < 0 || msel >= wavy[activewave].get_nex()) {
-                            std::cout << "Sorry, wrong input";
-                            continue;
-                        }
-                        std::cout << "This is the set of information you requested:\n";
-                        wavy[activewave].print_primitive(msel);
-                        end = true;
-                    }
-                    break;
-                case 'B':
-                case 'b':
-                    cls();
-                    break;
-                }
-                break;
-            case 'A':
-            case 'a':
-                std::cout << "A) Atom\nE) Exponent\nB) Back to main menu" << endl;
-                std::cin >> sel;
-                end = false;
-                switch (sel) {
-                case 'E':
-                case 'e':
-                    while (!end) {
-                        std::cout << "Please remember that this exponent will be apended to the data structure, "
-                            << "it will not be sorted in any way!\nCentre Assignement: ";
-                        int temp_cen = 0;
-                        std::cin >> temp_cen;
-                        if (temp_cen > wavy[activewave].get_ncen() || temp_cen < 0) {
-                            std::cout << "Wrong input, start over!";
-                            continue;
-                        }
-                        std::cout << "Type: ";
-                        int temp_type = 0;
-                        std::cin >> temp_type;
-                        std::cout << "Exponent: ";
-                        double temp_exp = 0.0;
-                        std::cin >> temp_exp;
-                        vector<double> temp_val;
-                        temp_val.resize(wavy[activewave].get_nmo());
-                        for (int i = 0; i < wavy[activewave].get_nmo(); i++) {
-                            std::cout << "Enter coefficient for MO " << i << ":";
-                            std::cin >> temp_val[i];
-                            if (temp_val[i] < -1000 || temp_val[i]>1000) {
-                                std::cout << "Wrong input, please try again...\n";
-                                i--;
-                                continue;
-                            }
-                        }
-                        std::cout << "Let me recapitulate: Center " << temp_cen << " type: " << temp_type << " exp: " << temp_exp
-                            << " and the MO coefficients:\n";
-                        for (int i = 0; i < wavy[activewave].get_nmo(); i++) {
-                            std::cout << temp_val[i] << "   ";
-                            if (i % 5 == 0)std::cout << endl;
-                        }
-                        std::cout << "is this correct?";
-                        if (yesno()) end = true;
-                    }
-                    break;
-                case 'A':
-                case 'a':
-                    while (!end) {
-                        std::cout << "The list of centers:\n";
-                        wavy[activewave].list_centers();
-                        std::cout << "Which center do you want to add?\nlabel:";
-                        std::cin >> label;
-                        std::cout << "x: ";
-                        std::cin >> x;
-                        if (x < -99.999 || x > 99.999) {
-                            std::cout << "Sorry, number too large\n";
-                            continue;
-                        }
-                        std::cout << "y: ";
-                        std::cin >> y;
-                        if (y < -99.999 || y > 99.999) {
-                            std::cout << "Sorry, number too large\n";
-                            continue;
-                        }
-                        std::cout << "z: ";
-                        std::cin >> z;
-                        if (z < -99.999 || z > 99.999) {
-                            std::cout << "Sorry, number too large\n";
-                            continue;
-                        }
-                        std::cout << "charge: ";
-                        std::cin >> charge;
-                        if (charge <= 0 || charge > 118) {
-                            std::cout << "Sorry, that atom is not yet disovered\n";
-                            continue;
-                        }
-                        wavy[activewave].push_back_atom(label, x, y, z, charge);
-                    }
-                    break;
-                case 'B':
-                case 'b':
-                    cls();
-                    break;
-                }
-                break;
-            case 'C':
-            case 'c':
-                if (wavy.size() < 1) continue;
-                std::cout << "The center/type/exponent status until now is:\n";
-                wavy[activewave].list_primitives();
-                std::cout << "What do you want to change?\nC) Center Assignement\nT) Type assignement\nE) Exponent\nM) MO coefficient\nQ) Quit\n";
-                std::cin >> sel;
-                switch (sel) {
-                case 'Q':
-                case 'q':
-                    cls();
-                    break;
-                case 'C':
-                case 'c':
-                    std::cout << "Which one do you want to change? (0=return to menu)";
-                    std::cin >> msel;
-                    if (msel > wavy[activewave].get_nex() || msel < 0) {
-                        std::cout << "Wrong input, start again!\n";
-                        break;
-                    }
-                    else if (msel == 0) break;
-                    wavy[activewave].change_center(msel);
-                    break;
-                case 'E':
-                case 'e':
-                    std::cout << "What is the nr. of the exponent you want to change? (0=return to menu)" << endl;
-                    std::cin >> msel;
-                    if (msel > wavy[activewave].get_nex() || msel < 0) {
-                        std::cout << "Wrong input, start again!\n";
-                        break;
-                    }
-                    else if (msel == 0) break;
-                    wavy[activewave].change_exponent(msel);
-                    break;
-                case 'T':
-                case 't':
-                    std::cout << "What is the nr. of the type you want to change? (0=return to menu)" << endl;
-                    std::cin >> msel;
-                    if (msel > wavy[activewave].get_nex() || msel < 0) {
-                        std::cout << "Wrong input, start again!\n";
-                        break;
-                    }
-                    else if (msel == 0) break;
-                    wavy[activewave].change_type(msel);
-                    break;
-                case 'M':
-                case 'm':
-                    bool _end = false;
-                    while (!_end) {
-                        std::cout << "Which MO out of " << wavy[activewave].get_nmo() << " MOs? (0=return to menu)\n";
-                        int MOsel;
-                        std::cin >> MOsel;
-                        if (MOsel > wavy[activewave].get_nmo() || MOsel < 0) {
-                            std::cout << "This is not a valid choice...\n";
-                            continue;
-                        }
-                        else if (MOsel == 0) break;
-                        else {
-                            int coef_sel = 0;
-                            std::cout << "Which coefficient do you want to change? (0=return to menu)\n";
-                            std::cin >> coef_sel;
-                            if (coef_sel > wavy[activewave].get_nex() || coef_sel < 0) {
-                                std::cout << "This is not a valid choice...\n";
-                                continue;
-                            }
-                            else if (coef_sel == 0) break;
-                            else {
-                                std::cout << "Please enter the new value for the coefficient: ";
-                                double new_coef;
-                                std::cin >> new_coef;
-                                wavy[activewave].set_MO_coef(MOsel, coef_sel, new_coef);
-                            }
-                            Enter();
-                            _end = true;
-                        }
-                    }
-                    break;
-                }
-            case 'E':
-            case 'e':
-                break;
-            }
-            break;
-        }
-        case 'n':
-        case 'N': {
-            std::cout << "Bondwise analysis (B) or NCIplot features (N)? ";
-            char seln;
-            std::cin >> seln;
-            switch (seln) {
-            case 'B':
-            case 'b': {
-                string inputfile;
-                std::cout << "Which file to use for definition of bonds?" << endl;
-                std::cin >> inputfile;
-                if (autobonds(opt.debug, wavy[activewave], inputfile, false) != 1) std::cout << "Sorry, looks like something went wrong..." << endl;
-                break;
-            }
-            case 'N':
-            case 'n': {
-                std::cout << "Starting acuNCI..." << endl;
-                acu_nci(wavy, opt);
-                break;
-            }
-            default:
-                std::cout << "sorry, didn't understand that" << endl;
-                break;
-            }
-            //cls();
-            break;
-        }
-        case 'S':
-        case 's': {
-            if (wavy.size() < 1) {
-                cls();
-                continue;
-            }
-            vector <string> endings;
-            bool w_or_c = true;
-            bool convert = false;
-            if (wavy[activewave].get_cube_count() > 0 && wavy[activewave].get_origin() != 3) {
-                while (true) {
-                    std::cout << "Do you want to save the wavefunction (W) or associated cubes (C) or convert cubes into non-cube format (N)? ";
-                    char input;
-                    std::cin >> input;
-                    switch (input) {
-                    case 'C':
-                    case 'c': {
-                        w_or_c = false;
-                        break;
-                    }
-                    case 'W':
-                    case 'w': {
-                        w_or_c = true;
-                        break;
-                    }
-                    case 'n':
-                    case 'N': {
-                        convert = true;
-                        break;
-                    }
-                    default:
-                        std::cout << "Sorry, i did not get that! Try again!" << endl;
-                        continue;
-                    }
-                    break;
-                }
-            }
-            else if (wavy[activewave].get_origin() == 3) {
-                while (true) {
-                    std::cout << "Do you want to save the cube in .cube (C) format or convert cubes into non-cube format (N)? ";
-                    char input;
-                    std::cin >> input;
-                    switch (input) {
-                    case 'C':
-                    case 'c': {
-                        convert = false;
-                        break;
-                    }
-                    case 'n':
-                    case 'N': {
-                        convert = true;
-                        break;
-                    }
-                    default:
-                        std::cout << "Sorry, i did not get that! Try again!" << endl;
-                        continue;
-                    }
-                    break;
-                }
-            }
-
-            if (convert) {
-                while (true) {
-                    std::cout << "Which format do you want to convert to?\nD) DGrid\nX) XD-Graph\n";
-                    char input;
-                    std::cin >> input;
-                    switch (input) {
-                    case 'D':
-                    case 'd': {
-                        if (wavy[activewave].get_cube_count() >= 1) {
-                            std::cout << "Which cube do you want to save?" << endl;
-                            selection.resize(2);
-                            selection[0].resize(1);
-                            selection[1].resize(1);
-                            if (!expert) select_cubes(selection, wavy, 1);
-                            else {
-                                int nr1 = 0;
-                                for (int i = 0; i < wavy[selection[0][0]].get_cube_count(); i++) {
-                                    std::cout << " " << i << ") " << wavy[activewave].get_cube_path(i);
-                                    if (!exists(wavy[activewave].get_cube_path(i)))std::cout << " (MEM ONLY)";
-                                    std::cout << endl;
-                                }
-                                std::cout << "Cube 1: "; cin >> nr1;
-                                while (nr1 >= wavy[activewave].get_cube_count() || nr1 < 0) {
-                                    std::cout << "Invalid choice, select again: ";
-                                    std::cin >> nr1;
-                                }
-                                selection[0][0] = activewave;
-                                selection[1][0] = nr1;
-                            }
-                        }
-                        std::filesystem::path path = wavy[selection[0][0]].get_cube_path(selection[1][0]);
-                        if (!wavy[selection[0][0]].get_cube_loaded(selection[1][0]))
-                            wavy[selection[0][0]].read_cube(selection[1][0], true, false, false);
-                        wavy[selection[0][0]].write_cube_file(selection[1][0], path.replace_extension(".dgrid"), opt.debug);
-                        break;
-                    }
-                    case 'X':
-                    case 'x': {
-                        if (wavy[activewave].get_cube_count() >= 1) {
-                            std::cout << "Which cube do you want to save?" << endl;
-                            selection.resize(2);
-                            selection[0].resize(1);
-                            selection[1].resize(1);
-                            if (!expert) select_cubes(selection, wavy, 1);
-                            else {
-                                int nr1 = 0;
-                                for (int i = 0; i < wavy[selection[0][0]].get_cube_count(); i++) {
-                                    std::cout << " " << i << ") " << wavy[activewave].get_cube_path(i);
-                                    if (!exists(wavy[activewave].get_cube_path(i)))std::cout << " (MEM ONLY)";
-                                    std::cout << endl;
-                                }
-                                std::cout << "Cube 1: "; cin >> nr1;
-                                while (nr1 >= wavy[activewave].get_cube_count() || nr1 < 0) {
-                                    std::cout << "Invalid choice, select again: ";
-                                    std::cin >> nr1;
-                                }
-                                selection[0][0] = activewave;
-                                selection[1][0] = nr1;
-                            }
-                        }
-                        std::filesystem::path path = wavy[selection[0][0]].get_cube_path(selection[1][0]);
-                        if (!wavy[selection[0][0]].get_cube_loaded(selection[1][0]))
-                            wavy[selection[0][0]].read_cube(selection[1][0], true, false, false);
-                        wavy[selection[0][0]].write_cube_xdgraph(selection[1][0], path.replace_extension(".xdgrid"), opt.debug);
-                        break;
-                    }
-                    default:
-                        std::cout << "Sorry, i did not get that! Try again!" << endl;
-                        continue;
-                    }
-                    break;
-                }
-            }
-            else {
-                if ((wavy[activewave].get_origin() == 2 || wavy[activewave].get_origin() == 4) && w_or_c) {
-                    std::cout << "Which format do you want to save the wavefunction in?" << endl
-                        << "W) WFN format" << endl
-                        << "F) Fchk format" << endl;
-                    std::cin >> sel;
-                    switch (sel) {
-                    case 'W':
-                    case 'w': {
-                        endings.push_back(".wfn");
-                        endings.push_back(".ffn");
-                        std::filesystem::path path;
-                        if (!expert) save_file_dialog(path, opt.debug, endings, opt.cwd.string());
-                        else {
-                            std::cout << "Enter filename: ";
-                            std::cin >> path;
-                            while (exists(path)) {
-                                std::cout << path << " exists, do you want to overwrite it? ";
-                                if (!yesno()) {
-                                    std::cout << "Then try again: ";
-                                    std::cin >> path;
-                                }
-                            }
-                        }
-                        bool all = false;
-                        if (path.extension() == ".wfn") {
-                            std::cout << "Do you want to write all MOs?" << endl;
-                            all = yesno();
-                        }
-                        if (!wavy[activewave].write_wfn(path, opt.debug, !all)) {
-                            Enter();
-                            cls();
-                        }
-                        else {
-                            if (opt.debug) Enter();
-                            cls();
-                            std::cout << "Wrote Wavefunction!\n";
-                        }
-                        break;
-                    }
-                    case 'F':
-                    case 'f': {
-                        endings.push_back(".fchk");
-                        endings.push_back(".Fchk");
-                        endings.push_back(".FChk");
-                        std::filesystem::path outputname = wavy[activewave].get_path();
-                        if (opt.debug)std::cout << "Loaded path..." << endl;
-                        if (!expert) save_file_dialog(outputname, opt.debug, endings, opt.cwd.string());
-                        else {
-                            std::cout << "Enter filename: ";
-                            std::cin >> outputname;
-                            while (exists(outputname)) {
-                                std::cout << outputname << " exists, do you want to overwrite it? ";
-                                if (!yesno()) {
-                                    std::cout << "Then try again: ";
-                                    std::cin >> outputname;
-                                }
-                            }
-                        }
-                        outputname.replace_extension(".fchk");
-                        string basis_temp = wavy[activewave].get_basis_set_name();
-                        if (basis_temp.length() < 3) {
-                            int tries = 0;
-                            bool _end = false;
-                            string temp;
-                            while (!_end && tries != 3) {
-                                std::cout << "Please give the name of the basis set you want to use: ";
-                                std::cin >> temp;
-                                std::filesystem::path basis_set_file(opt.basis_set_path);
-                                basis_set_file.append(temp);
-                                if (opt.debug)std::cout << "looking for: " << basis_set_file << endl;
-                                if (exists(basis_set_file)) _end = true;
-                                else tries++;
-                            }
-                            if (tries == 3) {
-                                std::cout << "Sorry, this takes too long... please make sure you know what you want and try again!" << endl;
-                                Enter();
-                                break;
-                            }
-                            wavy[activewave].change_basis_set_name(temp);
-                        }
-                        if (expert) {
-                            std::cout << "What is the charge of your molecule?" << endl;
-                            int temp = 0;
-                            std::cin >> temp;
-                            wavy[activewave].assign_charge(temp);
-                        }
-                        else wavy[activewave].assign_charge(wavy[activewave].calculate_charge());
-                        if (wavy[activewave].get_multi() == 0) wavy[activewave].guess_multiplicity(std::cout);
-                        free_fchk(std::cout, outputname, opt.basis_set_path, wavy[activewave], opt.debug);
-                        break;
-                    }
-                    default: {
-                        std::cout << "Sorry, i didn't get that, could you try it again?\n";
-                        Enter();
-                        cls();
-                    }
-                    }
-                }
-                else if (wavy[activewave].get_origin() == 3 || !w_or_c) {
-                    std::filesystem::path path;
-                    if (wavy[activewave].get_cube_count() <= 0) {
-                        std::cout << "No cubes loaded!" << endl;
-                        break;
-                    }
-                    int nr1 = 0;
-                    if (wavy[activewave].get_cube_count() >= 1) {
-                        std::cout << "Which cube do you want to save?" << endl;
-                        selection.resize(2);
-                        selection[0].resize(1);
-                        selection[1].resize(1);
-                        if (!expert) select_cubes(selection, wavy, 1);
-                        else {
-                            for (int i = 0; i < wavy[selection[0][0]].get_cube_count(); i++) {
-                                std::cout << " " << i << ") " << wavy[activewave].get_cube_path(i);
-                                if (!exists(wavy[activewave].get_cube_path(i)))std::cout << " (MEM ONLY)";
-                                std::cout << endl;
-                            }
-                            std::cout << "Cube 1: "; cin >> nr1;
-                            while (nr1 >= wavy[activewave].get_cube_count() || nr1 < 0) {
-                                std::cout << "Invalid choice, select again: ";
-                                std::cin >> nr1;
-                            }
-                            selection[0][0] = activewave;
-                            selection[1][0] = nr1;
-                        }
-                    }
-
-                    endings.push_back(".cube");
-                    endings.push_back(".cub");
-                    if (!expert)
-                        save_file_dialog(path, opt.debug, endings, opt.cwd.string());
-                    else {
-                        std::cout << "Give filepath please: ";
-                        std::cin >> path;
-                    }
-                    wavy[selection[0][0]].write_cube_file(selection[1][0], path, opt.debug);
-                }
-            }
-            endings.resize(0);
-            break;
-        }
+        case 'M': if (need_wfn(wavy)) modify_menu(wavy, active); break;
         case 'O':
-        case 'o': {
-            if (wavy.size() < 1) {
-                std::cout << "First you need to read a wavefunction!" << endl;
-                break;
-            }
-            if (wavy[activewave].get_origin() == 2 || wavy[activewave].get_origin() == 4) {
-                std::cout << "Sorting wavefunction!" << endl;
-                wavy[activewave].sort_wfn(wavy[activewave].check_order(opt.debug), opt.debug);
-                if (opt.debug) Enter();
-                cls();
-            }
-            else {
-                std::cout << "I can only sort .wfn/ffn files!" << endl;
-                Enter();
-                std::cout << endl;
-            }
+            if (!need_wfn(wavy)) break;
+            if (wavy[active].get_origin() != e_origin::wfn && wavy[active].get_origin() != e_origin::ffn) { notice("I can only sort .wfn/.ffn files!"); break; }
+            cout << "  Sorting wavefunction ..." << flush;
+            wavy[active].sort_wfn(wavy[active].check_order(opt.debug), opt.debug);
+            cout << " done!" << endl;
+            break;
+        case 'B': {
+            if (!need_wfn(wavy)) break;
+            string name;
+            if (!ask_line("Basis set name [" + (wavy[active].get_basis_set_name().empty() ? "def2-SVP" : wavy[active].get_basis_set_name()) + "]", name)) break;
+            if (!name.empty()) wavy[active].set_basis_set_name(name);
+            else if (wavy[active].get_basis_set_name().empty()) wavy[active].set_basis_set_name("def2-SVP");
+            notice(BasisSetLibrary::read_basis_set_vanilla(opt.basis_set_path, wavy[active], opt.debug) ? "Basis set loaded." : "Could not load the basis set.");
             break;
         }
-        case 'B':
-        case 'b': {
-            if (wavy.size() < 1) {
-                std::cout << "First you need to read a wavefunction!" << endl;
-                break;
-            }
-            if (!BasisSetLibrary::read_basis_set_vanilla(opt.basis_set_path, wavy[activewave], opt.debug))std::cout << "Problem during reading of the basis set!" << endl;
-            if (opt.debug) Enter();
-            cls();
-            break;
-        case 'a':
-        case 'A':
-            if (wavy.size() < 1) {
-                cls();
-                break;
-            }
-            vector < vector < unsigned int > > _selection;
-            _selection.resize(1);
-            select_cubes(_selection, wavy, 1, true);
-            activewave = _selection[0][0];
-            cls();
+        case 'C': cube_menu(opt, wavy, expert); break;
+        case 'P': if (need_wfn(wavy)) property_menu(opt, wavy, active); break;
+        case 'F': {
+            if (!need_wfn(wavy)) break;
+            const filesystem::path saved = opt.wfn;
+            opt.wfn = wavy[active].get_path();
+            fukui_analysis(opt, cout);
+            opt.wfn = saved;
             break;
         }
-        case 'e':
-        case 'E':
-            if (expert) expert = false;
-            else expert = true;
+        case 'I': if (need_wfn(wavy)) ELI_analysis(wavy[active], opt); break;
+        case 'G':
+            if (!need_wfn(wavy)) break;
+            if (wavy[active].get_nmo() == 0) { notice("Roby-Gould bond indices need molecular orbitals."); break; }
+            { Roby_information roby(wavy[active], opt.rgbi_group_sets, !opt.rgbi_no_sym, opt.rgbi_orbital_basis == RGBIOrbitalBasis::ANO, opt.rgbi_EVs, opt.rgbi_theta); }
             break;
-        case 'q':
-        case 'Q':
-            if (!unsaved_files(wavy))
-                end = true;
-            else {
-                std::cout << "There are unsaved files! Are you sure you want to exit? ";
-                if (yesno())
-                    end = true;
-            }
-            break;
-        case 'l':
-        case 'L':
-            cout << "Please give the number of cpus to use (-1 = all): ";
-            int threads;
-            cin >> threads;
-            if (threads < -1 || threads == 0) {
-                cout << "Sorry, that is not a valid number of threads!" << endl;
-                break;
-            }
-            opt.threads = threads;
-            if (opt.threads != -1)
-            {
-#ifdef _OPENMP
-                omp_set_num_threads(opt.threads);
-#endif
-            }
-            std::cout << "Number of threads set to " << opt.threads << endl;
-            break;
-        case 'd':
-        case 'D':
-            opt.debug = true;
-            cls();
-            break;
-        case 'u':
+        case 'N': bonding_menu(opt, wavy, active); break;
         case 'U':
-            if (check_bohr(wavy[activewave], opt.debug)) {
-                cls();
-                std::cout << "Appears to be in bohr!" << endl;
-            }
-            else {
-                cls();
-                std::cout << "Appears to be in Angström!" << endl;
-            }
+            if (!need_wfn(wavy)) break;
+            notice(check_bohr(wavy[active], opt.debug) ? "Appears to be in bohr!" : "Appears to be in Angstrom!");
+            break;
+        case 'L': {
+            int t;
+            if (!ask("Number of threads (-1 = all)", t)) break;
+            if (t < -1 || t == 0) { notice("Invalid value, keeping " + to_string(opt.threads)); break; }
+            opt.threads = t;
+            if (t > 0) omp_set_num_threads(t);
+            notice("Number of threads set to " + to_string(t));
+            break;
+        }
+        case 'T': {
+            double r, res;
+            if (!ask("Grid radius around the molecule (A)", r) || !ask("Grid resolution (A)", res)) break;
+            if (r <= 0 || res <= 0) { notice("Both must be positive."); break; }
+            opt.properties.radius = r;
+            opt.properties.resolution = res;
+            break;
+        }
+        case 'E': expert = !expert; notice(expert ? "EXPERT MODE!" : "Expert mode off."); break;
+        case 'D': opt.debug = !opt.debug; notice(opt.debug ? "Debug output on." : "Debug output off."); break;
+        case 'Q':
+            if ((unsaved_files(wavy) || any_of(wavy.begin(), wavy.end(), [](const WFN& w) { return w.get_modified(); }))
+                && !confirm("There are unsaved wavefunctions - quit anyway")) break;
+            if (!input_closed) { banner("Bye!"); return 0; }
             break;
         default:
-            if (opt.debug) {
-                std::cout << "This command is unknown!" << endl;
-                Enter();
-            }
-            cls();
-            std::cout << "Sorry, i didn't get that, could you try it again?\n";
-            break;
+            notice("Sorry, I did not get that, could you try it again?");
         }
     }
-    cls();
+    notice("Input closed - leaving the QCT menu.");
     return 0;
 }
