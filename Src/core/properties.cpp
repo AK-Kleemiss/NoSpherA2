@@ -1781,7 +1781,7 @@ void properties_calculation(options &opt)
     cubes.emplace_back(opt.properties.NbSteps, wavy.get_ncen(), opt.properties.hdef);
     cubes.emplace_back(opt.properties.NbSteps, wavy.get_ncen(), opt.properties.def);
     cubes.emplace_back(opt.properties.NbSteps, wavy.get_ncen(), opt.properties.hirsh);
-    cubes.emplace_back(opt.properties.NbSteps, wavy.get_ncen(), opt.properties.hirsh);
+    cubes.emplace_back(opt.properties.NbSteps, wavy.get_ncen(), opt.properties.s_rho);
     cubes.emplace_back(opt.properties.NbSteps, wavy.get_ncen(), opt.properties.hdef || opt.properties.hirsh);
     // Fukui_plus / Fukui_minus / Fukui_zero / Dual_Descriptor. All four are
     // allocated together: they come out of a single grid pass over the same two

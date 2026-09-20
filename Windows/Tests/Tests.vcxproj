@@ -53,6 +53,14 @@
     <ClCompile Include="..\..\tests\src\WfnOpsTests.cpp" />
     <ClCompile Include="..\..\tests\src\WfnReadTests.cpp" />
     <ClCompile Include="..\..\tests\src\XcwTests.cpp" />
+    <ClCompile Include="..\..\tests\src\BondwiseCoverageTests.cpp" />
+    <ClCompile Include="..\..\tests\src\ConvenienceCoverageTests.cpp" />
+    <ClCompile Include="..\..\tests\src\FittingIoCoverageTests.cpp" />
+    <ClCompile Include="..\..\tests\src\PropertiesCoverageTests.cpp" />
+    <ClCompile Include="..\..\tests\src\ScatteringCoverageTests.cpp" />
+    <ClCompile Include="..\..\tests\src\WfnCoverageTests.cpp" />
+    <ClCompile Include="..\..\tests\src\XcwHaltingReportTests.cpp" />
+    <ClCompile Include="..\..\tests\src\XcwScfTests.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\tests\src\pch.h" />

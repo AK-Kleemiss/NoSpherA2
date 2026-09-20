@@ -2140,8 +2140,12 @@ void WFN::computeRhoELI(
     }
     //ELI-D of one spin channel of a closed shell, Kohout's definition and DGrid's alpha-alpha
     //field: rho_s (12 / g_s)^(3/8) with g_s = rho_s tau_s - |grad rho_s|^2 / 4 and every
-    //sigma quantity half the total, which is where the 1/2 and the 48 come from
-    out_Eli = 0.5 * Rho * pow(48 / (Rho * tau - 0.25 * (pow(Grad[0], 2) + pow(Grad[1], 2) + pow(Grad[2], 2))), constants::c_38);
+    //sigma quantity half the total, which is where the 1/2 and the 48 come from.
+    //g vanishes where a single orbital carries the density (also where the exponent cutoff
+    //has dropped every other one); ELI-D has no finite value there and the grid holds 0,
+    //as the basin climb in computeELIGrad does, instead of an inf or NaN no cube reader parses
+    const double g = Rho * tau - 0.25 * (pow(Grad[0], 2) + pow(Grad[1], 2) + pow(Grad[2], 2));
+    out_Eli = g > 0 ? 0.5 * Rho * pow(48 / g, constants::c_38) : 0.0;
     out_Rho = Rho;
 };
 

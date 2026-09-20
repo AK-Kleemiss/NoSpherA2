@@ -1927,7 +1927,9 @@ bool read_fracs_ADPs_from_CIF(const std::filesystem::path &cif, WFN &wavy, std::
                         wavy.set_atom_ADPs(a, ADPs);
                         if (grown) {
                             for (int b = 0; b < symmetry_linking_list[a].size(); b++) {
-                                wavy.set_atom_ADPs(symmetry_linking_list[a][b][0], ADPs);
+                                if (symmetry_linking_list[a][b].size() != 0) {
+                                    wavy.set_atom_ADPs(b, ADPs);
+                                }
                             }
                         }
                         atom_found = true;
@@ -1995,11 +1997,13 @@ bool read_fracs_ADPs_from_CIF(const std::filesystem::path &cif, WFN &wavy, std::
                         ADPs[2].resize(15);
                         for (int i = 0; i < 15; i++) {
                             ADPs[2][fields[i]] = stof(entries[i + 1]);
-                        }                
+                        }
                         wavy.set_atom_ADPs(a, ADPs);
                         if (grown) {
                             for (int b = 0; b < symmetry_linking_list[a].size(); b++) {
-                                wavy.set_atom_ADPs(symmetry_linking_list[a][b][0], ADPs);
+                                if (symmetry_linking_list[a][b].size() != 0) {
+                                    wavy.set_atom_ADPs(b, ADPs);
+                                }
                             }
                         }
                         atom_found = true;

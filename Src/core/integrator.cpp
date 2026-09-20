@@ -1698,7 +1698,11 @@ void DensityFitting::demonstrate_enhanced_density_fitting(WFN& wavy, const WFN& 
     temp.delete_unoccupied_MOs();
     // Setup grids for the molecule
     grid_manager.setup3DGridsForMolecule(temp, asym_atom_list);
-    GridData grid_data = grid_manager.getGridData();
+    const GridData& grid_data = grid_manager.getGridData();
+    //all_charges puts the grids into the helper set, indexed by atom
+    const bool helper = grid_manager.getNeedsHelper();
+    const vec3& atomic_grids = helper ? grid_data.helper_grids : grid_data.atomic_grids;
+    const ivec& num_points_per_atom = helper ? grid_data.helper_num_points_per_atom : grid_data.num_points_per_atom;
 
     enum DiffDensityIndex { DIFF_UNRESTRAINED = 0, DIFF_ENHANCED = 1, DIFF_HYBRID = 2 };
     enum SumIndex { SUM_NO_DIFF = 0, RRS = 1, ABS_SUM = 2, SUM = 3 };
@@ -1709,14 +1713,14 @@ void DensityFitting::demonstrate_enhanced_density_fitting(WFN& wavy, const WFN& 
     int coef_idx = 0;
     for (int i = 0; i < wavy.get_ncen(); i++) {
         const aux_density_table t({ wavy_aux.get_atoms()[i] });
-        const int natom_points = grid_data.num_points_per_atom[i];
+        const int natom_points = num_points_per_atom[i];
 
         auto calc_density = [&](vec& coeff) {
             vec ri_density(natom_points);
             vec atom_coefs(t.n_coef);
             std::copy(coeff.data() + coef_idx, coeff.data() + coef_idx + t.n_coef, atom_coefs.begin());
             calc_density_ML(t, atom_coefs, natom_points,
-                grid_data.atomic_grids[i][GridData::GridIndex::X].data(), grid_data.atomic_grids[i][GridData::GridIndex::Y].data(), grid_data.atomic_grids[i][GridData::GridIndex::Z].data(),
+                atomic_grids[i][GridData::GridIndex::X].data(), atomic_grids[i][GridData::GridIndex::Y].data(), atomic_grids[i][GridData::GridIndex::Z].data(),
                 ri_density.data());
             return ri_density;
             };
@@ -1726,13 +1730,13 @@ void DensityFitting::demonstrate_enhanced_density_fitting(WFN& wavy, const WFN& 
         for (int p = 0; p < natom_points; p++) {
             diff_densities[i][DiffDensityIndex::DIFF_UNRESTRAINED][SumIndex::SUM_NO_DIFF] += riDensity[p];
 
-            double val = riDensity[p] - (grid_data.atomic_grids[i][weight_index][p] * grid_data.atomic_grids[i][GridData::WFN_DENSITY][p]);
-            diff_pos += std::abs(riDensity[p] + (grid_data.atomic_grids[i][weight_index][p] * grid_data.atomic_grids[i][GridData::WFN_DENSITY][p]));
+            double val = riDensity[p] - (atomic_grids[i][weight_index][p] * atomic_grids[i][GridData::WFN_DENSITY][p]);
+            diff_pos += std::abs(riDensity[p] + (atomic_grids[i][weight_index][p] * atomic_grids[i][GridData::WFN_DENSITY][p]));
             diff_neg += std::abs(val);
 
             diff_densities[i][DiffDensityIndex::DIFF_UNRESTRAINED][SumIndex::SUM] += val;
             diff_densities[i][DiffDensityIndex::DIFF_UNRESTRAINED][SumIndex::ABS_SUM] += std::abs(val) / 2;
-            partitioned_densities[i] += grid_data.atomic_grids[i][weight_index][p] * grid_data.atomic_grids[i][GridData::WFN_DENSITY][p];
+            partitioned_densities[i] += atomic_grids[i][weight_index][p] * atomic_grids[i][GridData::WFN_DENSITY][p];
 
         }
         diff_densities[i][DiffDensityIndex::DIFF_UNRESTRAINED][SumIndex::RRS] = diff_neg / diff_pos;
@@ -1742,8 +1746,8 @@ void DensityFitting::demonstrate_enhanced_density_fitting(WFN& wavy, const WFN& 
         for (int p = 0; p < natom_points; p++) {
             diff_densities[i][DiffDensityIndex::DIFF_ENHANCED][SumIndex::SUM_NO_DIFF] += riDensity[p];
 
-            double val = riDensity[p] - (grid_data.atomic_grids[i][weight_index][p] * grid_data.atomic_grids[i][GridData::WFN_DENSITY][p]);
-            diff_pos += std::abs(riDensity[p] + (grid_data.atomic_grids[i][weight_index][p] * grid_data.atomic_grids[i][GridData::WFN_DENSITY][p]));
+            double val = riDensity[p] - (atomic_grids[i][weight_index][p] * atomic_grids[i][GridData::WFN_DENSITY][p]);
+            diff_pos += std::abs(riDensity[p] + (atomic_grids[i][weight_index][p] * atomic_grids[i][GridData::WFN_DENSITY][p]));
             diff_neg += std::abs(val);
 
             diff_densities[i][DiffDensityIndex::DIFF_ENHANCED][SumIndex::SUM] += val;
@@ -1757,8 +1761,8 @@ void DensityFitting::demonstrate_enhanced_density_fitting(WFN& wavy, const WFN& 
         for (int p = 0; p < natom_points; p++) {
             diff_densities[i][DiffDensityIndex::DIFF_HYBRID][SumIndex::SUM_NO_DIFF] += riDensity[p];
 
-            double val = riDensity[p] - (grid_data.atomic_grids[i][weight_index][p] * grid_data.atomic_grids[i][GridData::WFN_DENSITY][p]);
-            diff_pos += std::abs(riDensity[p] + (grid_data.atomic_grids[i][weight_index][p] * grid_data.atomic_grids[i][GridData::WFN_DENSITY][p]));
+            double val = riDensity[p] - (atomic_grids[i][weight_index][p] * atomic_grids[i][GridData::WFN_DENSITY][p]);
+            diff_pos += std::abs(riDensity[p] + (atomic_grids[i][weight_index][p] * atomic_grids[i][GridData::WFN_DENSITY][p]));
             diff_neg += std::abs(val);
 
             diff_densities[i][DiffDensityIndex::DIFF_HYBRID][SumIndex::SUM] += val;

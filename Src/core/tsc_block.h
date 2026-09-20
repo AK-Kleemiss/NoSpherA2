@@ -36,16 +36,10 @@ private:
 
     static constexpr const char* nan_message_ = "NaN in SF!";
 
+    //std::isnan, not x != x: /fp:fast (NoSpherA2Optimizations.cmake) folds the self-compare to false
     static bool has_nan(const cdouble& value)
     {
-        return value.real() != value.real() ||
-            value.imag() != value.imag();
-    }
-
-    template <typename Value>
-    static bool has_nan(const Value& value)
-    {
-        return value != value;
+        return std::isnan(value.real()) || std::isnan(value.imag());
     }
 
     static void validate_sf_row(const cvec& row)

@@ -472,19 +472,13 @@ int compute_dens(WFN &wavy, bool debug, int *np, double *origin, double *gvector
     opts.resolution = *incr;
     opts.NbSteps = { np[0], np[1], np[2] };
 
-    std::vector<cube> cubes = { {opts.NbSteps, wavy.get_ncen(), opts.rho || opts.eli || opts.lap},
-        {},
+    //indexed by cube_type: Rho, RDG, Elf, Eli, Lap, then the eleven properties this run never asks for
+    std::vector<cube> cubes = { {opts.NbSteps, wavy.get_ncen(), opts.rho || opts.rdg || opts.eli || opts.lap},
         {opts.NbSteps, wavy.get_ncen(), opts.rdg},
         {},
         {opts.NbSteps, wavy.get_ncen(), opts.eli},
         {opts.NbSteps, wavy.get_ncen(), opts.lap},
-        {},
-        {},
-        {},
-        {},
-        {},
-        {},
-        {} };
+        {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {} };
     cubes[cube_type::Rho].give_parent_wfn(wavy);
     cubes[cube_type::RDG].give_parent_wfn(wavy);
     cubes[cube_type::Eli].give_parent_wfn(wavy);

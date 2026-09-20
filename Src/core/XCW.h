@@ -91,10 +91,13 @@ private:
 		double MaxP_diff;
 		double current_MaxP_diff;
 		bool conv_MaxP_diff = false;
-		double diis_stop_damping;
+		//The four damping/shift values default to off: `fast_conv` only clears the apply
+		//flags, yet run_lambda copies alpha and level_shift and SCF_iteration mixes the
+		//density with alpha regardless of the flag
+		double diis_stop_damping = 0;
 		bool apply_shift = true;
 		bool method_apply_shift = true;
-		double diis_stop_shift;
+		double diis_stop_shift = 0;
 		bool apply_damping = true;
 		bool method_apply_damping = true;
 		std::string basis_set_name;
@@ -108,8 +111,8 @@ private:
 		int refine_against;
 		int XWR_type;
 		occ::qm::SpinorbitalKind hf_type;
-		double alpha;
-		double level_shift;
+		double alpha = 0;
+		double level_shift = 0;
 		double xcw_start_value;
 		int num_xcw_steps;
 		double xcw_step_size;
