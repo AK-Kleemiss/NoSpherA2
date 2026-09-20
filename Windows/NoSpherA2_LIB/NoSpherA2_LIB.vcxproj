@@ -197,6 +197,8 @@
     <ClCompile Include="..\..\Src\core\sphere_lebedev_rule.cpp" />
     <ClCompile Include="..\..\Src\core\spherical_density.cpp" />
     <ClCompile Include="..\..\Src\core\wfn_class.cpp" />
+    <ClCompile Include="..\..\Src\core\wfn_density.cpp" />
+    <ClCompile Include="..\..\Src\core\wfn_io.cpp" />
     <ClCompile Include="..\..\Src\core\XCW.cpp" />
     <ClCompile Include="..\..\Src\core\stored_eri.cpp" />
     <ClCompile Include="..\..\Src\core\xcw_halting.cpp" />
