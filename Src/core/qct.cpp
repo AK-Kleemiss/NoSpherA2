@@ -1,7 +1,7 @@
-// QCT interactive menu (-qct): read, convert, edit and analyse wavefunctions and
-// cubes from the terminal. Every analysis routes through the same functions as
-// the command-line flags, so the menu carries no numerics of its own.
 #include "pch.h"
+//QCT interactive menu (-qct): read, convert, edit and analyse wavefunctions and
+//cubes from the terminal. Every analysis routes through the same functions as
+//the command-line flags, so the menu carries no numerics of its own.
 #include "cube.h"
 #include "convenience.h"
 #include "fchk.h"

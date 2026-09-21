@@ -196,7 +196,7 @@ namespace {
     {
         i_tensor_file f;
         f.create(p, tiny_nr, tiny_nmo, tiny_mu, tiny_nu, single);
-        std::vector<cdouble> block(tiny_mu.size());
+        cvec block(tiny_mu.size());
         //Out of order on purpose: the writer seeks by index
         for (const int r : { 2, 0, 1 }) {
             for (size_t i = 0; i < block.size(); i++) block[i] = tiny_value(r, i);

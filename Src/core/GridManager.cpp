@@ -399,7 +399,7 @@ void GridManager::getIntegrationGrid1D(const WFN &wave, const int atom_1, const 
         bond[i] = pos2[i] - pos1[i];
     }
     double distance = sqrt(pow(pos2[0] - pos1[0], 2) + pow(pos2[1] - pos1[1], 2) + pow(pos2[2] - pos1[2], 2));
-    err_chkf(distance > 1e-8, "Error: Atoms are at the same position!", std::cout);
+    err_checkf(distance > 1e-8, "Error: Atoms are at the same position!", std::cout);
     for (int i = 0; i < 3; i++) {
         pos1[i] -= padding * (bond[i] / distance);
         pos2[i] += padding * (bond[i] / distance);
@@ -925,7 +925,7 @@ void GridManager::getDensityVectors(const WFN &wave, const ivec &atom_list, vec2
         //        for (int p = 0; p < n_points; p++) {
         //            const int keep = std::fabs(res[p]) > cutoff;
         //            const int idx = accepted_points;
-        //            
+        //
         //            res[idx] = res[p];
         //            d1_ptr[idx] = x[p] - x0;
         //            d2_ptr[idx] = y[p] - y0;
@@ -1618,7 +1618,7 @@ bvec GridManager::determineAtomsNeedingGrids(const WFN &wave, const ivec &asym_a
 
 void  GridManager::writeSimpleGrid(const std::filesystem::path &filename, const vec2 &grid_points, std::vector<std::pair<std::string, vec>> data) const {
     for (auto &[label, vals] : data) {
-        err_chkf(grid_points[0].size() == vals.size(), "Size mismatch between given data and expected lengh", std::cout);
+        err_checkf(grid_points[0].size() == vals.size(), "Size mismatch between given data and expected lengh", std::cout);
     }
 
     std::ofstream file(filename);

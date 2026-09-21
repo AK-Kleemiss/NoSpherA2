@@ -318,7 +318,7 @@ void WFN::wfn_to_occ_wavefunction(occ::qm::Wavefunction& occ_wf)
     for (int i = 0; i < n_atoms; i++) {
         const atom& at = get_atom(i);
         occ_atoms[i].atomic_number = at.get_charge();
-        occ_atoms[i].x = at.get_pos()[0];  
+        occ_atoms[i].x = at.get_pos()[0];
         occ_atoms[i].y = at.get_pos()[1];
         occ_atoms[i].z = at.get_pos()[2];
     }
@@ -346,7 +346,7 @@ void WFN::wfn_to_occ_wavefunction(occ::qm::Wavefunction& occ_wf)
                 scan++;
             }
 
-            std::vector<double> exp_v(n_prim);
+            vec exp_v(n_prim);
             for (int i = 0; i < n_prim; i++)
                 exp_v[i] = get_exponent(pos + i);
 
@@ -358,7 +358,7 @@ void WFN::wfn_to_occ_wavefunction(occ::qm::Wavefunction& occ_wf)
             rs.nex_start = pos;
             rs.exponents = Eigen::Map<occ::Vec>(exp_v.data(), n_prim);
             rebuilt_shells.push_back(rs);
-            pos += n_prim * n_cart; 
+            pos += n_prim * n_cart;
         }
     }
 
@@ -366,7 +366,7 @@ void WFN::wfn_to_occ_wavefunction(occ::qm::Wavefunction& occ_wf)
     const double* mo0_coeffs = mo0.get_coefficient_ptr();
     ShellListT occ_shells;
     occ_shells.reserve(rebuilt_shells.size());
-    std::vector<occ::Vec> actual_contraction_coeffs(rebuilt_shells.size()); 
+    std::vector<occ::Vec> actual_contraction_coeffs(rebuilt_shells.size());
 
     for (size_t k = 0; k < rebuilt_shells.size(); k++) {
         const auto& rs = rebuilt_shells[k];
@@ -383,7 +383,7 @@ void WFN::wfn_to_occ_wavefunction(occ::qm::Wavefunction& occ_wf)
         occ::Vec ratio = dest_block0.col(j_ref);
         const double scalar = std::pow(2.0, 0.5 * l) / std::pow(constants::PI3, 0.25) / std::sqrt(constants::sph2cart_norm2[l]);
         const double p = (2.0 * l + 3.0) / 4.0;
-        std::vector<double> cc_input(n_prim), expo(n_prim);
+        vec cc_input(n_prim), expo(n_prim);
         for (int i = 0; i < n_prim; i++) {
             expo[i] = rs.exponents(i);
             cc_input[i] = ratio(i) / (scalar * std::pow(2.0 * expo[i], p));
@@ -1334,7 +1334,7 @@ bool WFN::build_DM(std::string basis_set_path, bool debug) {
             for (int s = 0; s < get_atom_shell_count(a); s++)
             {
                 int type_temp = get_shell_type(a, s);
-                err_chkf(type_temp != -1, "ERROR in type assignement!!", std::cout);
+                err_checkf(type_temp != -1, "ERROR in type assignement!!", std::cout);
                 if (debug)
                 {
                     std::cout << "Shell: " << s << " of atom: " << a << " Shell type: " << type_temp << endl
@@ -2397,7 +2397,7 @@ void WFN::set_has_ECPs(const bool &in, const bool &apply_to_atoms, const int &EC
 void WFN::set_ECPs(ivec &nr, ivec &elcount)
 {
     has_ECPs = true;
-    err_chkf(nr.size() == elcount.size(), "mismatch in size of atoms and ECP electrons!", std::cout);
+    err_checkf(nr.size() == elcount.size(), "mismatch in size of atoms and ECP electrons!", std::cout);
 #pragma omp parallel for
     for (int i = 0; i < ncen; i++)
     {

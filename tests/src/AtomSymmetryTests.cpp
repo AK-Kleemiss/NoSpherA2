@@ -42,7 +42,7 @@ static constexpr double PI_VAL = 3.14159265358979323846;
 namespace NoSpherA2UnitTests
 {
     // -----------------------------------------------------------------------
-    // Atom Tests 
+    // Atom Tests
     // -----------------------------------------------------------------------
     class AtomTest : public ::testing::Test {
     protected:

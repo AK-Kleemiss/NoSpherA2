@@ -1,4 +1,4 @@
-﻿#include "pch.h"
+#include "pch.h"
 #include "constants.h"
 #include "libCintMain.h"
 #include "libCintKernels.h"
@@ -143,7 +143,7 @@ void calc_screend_functions_and_max_ij(
 
     // --- 1) Precompute worst exponents per atom (parallel) ---
 
-    std::vector<double> worst_exp(natoms);
+    vec worst_exp(natoms);
 
 #pragma omp parallel for schedule(static)
     for (int i = 0; i < natoms; ++i) {
@@ -438,7 +438,7 @@ dMatrix2 cart2sph(const int l, const bool normalized) {
         }
     }
 
-    err_chkf(l <= 15, "cart2sph_matrix: l must be <= 15", std::cout);
+    err_checkf(l <= 15, "cart2sph_matrix: l must be <= 15", std::cout);
 
     int n_sph = 2 * l + 1;
     vec c_sph(static_cast<size_t>(n_sph) * n_cart, 0.0);

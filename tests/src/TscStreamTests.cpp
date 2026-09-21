@@ -20,8 +20,8 @@ namespace
         std::mt19937 rng(12345);          // fixed: the comparison must be repeatable
         std::uniform_real_distribution<double> uniform(-5.0, 5.0);
 
-        std::vector<std::vector<cdouble>> sf(n_scatterers,
-            std::vector<cdouble>(n_reflections));
+        cvec2 sf(n_scatterers,
+            cvec(n_reflections));
         for (auto& row : sf)
             for (auto& value : row)
                 value = cdouble(uniform(rng), uniform(rng));
@@ -30,7 +30,7 @@ namespace
         for (int i = 0; i < n_scatterers; ++i)
             labels.push_back("C" + std::to_string(i + 1));
 
-        std::vector<std::vector<int>> idx(3, std::vector<int>(n_reflections));
+        ivec2 idx(3, ivec(n_reflections));
         for (int r = 0; r < n_reflections; ++r)
         {
             idx[0][r] = r % 17 - 8;
@@ -67,7 +67,7 @@ TEST(TscStream, StreamedFileMatchesOneShotFile)
         for (std::size_t lo = 0; lo < static_cast<std::size_t>(n_reflections); lo += block_size)
         {
             const std::size_t hi = std::min<std::size_t>(lo + block_size, n_reflections);
-            std::vector<std::vector<int>> idx(3, std::vector<int>(hi - lo));
+            ivec2 idx(3, ivec(hi - lo));
             for (std::size_t d = 0; d < 3; ++d)
                 for (std::size_t r = lo; r < hi; ++r)
                     idx[d][r - lo] = source.get_indices(r)[d];
@@ -98,13 +98,13 @@ TEST(TscStream, BlocksSubmittedOutOfOrderAreWrittenInOrder)
     source.write_tscb_file("ignored.cif", reference);
 
     const std::size_t block_size = 100;
-    struct pending { std::size_t id; std::vector<std::vector<int>> idx; cvec2 sf; };
+    struct pending { std::size_t id; ivec2 idx; cvec2 sf; };
     std::vector<pending> blocks;
     std::size_t id = 0;
     for (std::size_t lo = 0; lo < static_cast<std::size_t>(n_reflections); lo += block_size)
     {
         const std::size_t hi = std::min<std::size_t>(lo + block_size, n_reflections);
-        std::vector<std::vector<int>> idx(3, std::vector<int>(hi - lo));
+        ivec2 idx(3, ivec(hi - lo));
         for (std::size_t d = 0; d < 3; ++d)
             for (std::size_t r = lo; r < hi; ++r)
                 idx[d][r - lo] = source.get_indices(r)[d];

@@ -108,7 +108,7 @@ void equicomb(int natoms, int nrad1, int nrad2,
     // rather than assumed; anything not two-per-row is an error.
     struct c2r_entry { int j; double re, im; };
     std::vector<c2r_entry> c2r_nz(static_cast<size_t>(l21) * 2, c2r_entry{0, 0.0, 0.0});
-    std::vector<int> c2r_cnt(l21, 0);
+    ivec c2r_cnt(l21, 0);
     for (int i2 = 0; i2 < l21; ++i2)
     {
         int cnt = 0;
@@ -205,7 +205,7 @@ void equicomb(int natoms, int nrad1, int nrad2,
     // printed after the loop but before that is silently overwritten.
     {
     ProgressBar pb(natoms, 60, "#", " ", "Calculating descriptors for l = " + toString(lam));
-#pragma omp parallel 
+#pragma omp parallel
     {
         vec ptemp(static_cast<size_t>(l21) * featsize, 0.0);
         vec pcmplx_real(l21);

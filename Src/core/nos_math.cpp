@@ -161,7 +161,7 @@ int solve_linear_system(vec& A, const unsigned long long& rows_A, const unsigned
     double work_query = 0.0;
     dgels_(&trans, &m_work, &n_work, &nrhs_work, A_col_major.data(), &lda_cm, b.data(), &ldb_cm, &work_query, &lwork, &info);
     lwork = static_cast<int>(work_query);
-    std::vector<double> work(lwork);
+    vec work(lwork);
     dgels_(&trans, &m_work, &n_work, &nrhs_work, A_col_major.data(), &lda_cm, b.data(), &ldb_cm, work.data(), &lwork, &info);
 #else
     info = LAPACKE_dgels(LAPACK_COL_MAJOR, 'T', n, m, nrhs, A.data(), lda, b.data(), ldb);

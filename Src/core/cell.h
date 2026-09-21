@@ -31,8 +31,8 @@ private:
     double cm[3][3];
     double upper;
     std::string crystal_system;
-    std::vector<ivec2> sym;
-    std::vector<vec> trans;
+    ivec3 sym;
+    vec2 trans;
 
     void convert_to_fracs(std::vector<asym_atom>& atoms, const std::string input_unit);
     vec apply_symmetry(const vec& pos, const int sym_op);
@@ -211,9 +211,9 @@ public:
     double get_rcm_angs(const int& i, const int& j) const { return constants::ang2bohr(rcm[i][j] / constants::TWO_PI); };
     double get_cm_angs(const int& i, const int& j) const { return constants::bohr2ang(cm[i][j]); };
     double get_sym(const int& i, const int& j, const int& k) const { return sym[i][j][k]; };
-    std::vector<ivec2> get_sym() const { return sym; };
-    std::vector<vec> get_trans() const { return trans; };
-    void set_sym(std::vector<ivec2>& set_vector) { sym = set_vector; };
+    ivec3 get_sym() const { return sym; };
+    vec2 get_trans() const { return trans; };
+    void set_sym(ivec3& set_vector) { sym = set_vector; };
     double get_a() const { return a; };
     double get_b() const { return b; };
     double get_c() const { return c; };

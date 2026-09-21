@@ -508,7 +508,7 @@ struct scatterer_id_masks_d5 {
         c_sig = 0x0400000000000000,
         d_mask = 0xF800000000000000,
         mask_m = 0x000000000000FFFF; // max crd value
-    const static int a_shift = 16; 
+    const static int a_shift = 16;
     //The groups in refinement are defined positive and negative, so we need to shift the group number by 16 to make it positive and fit.
     // E.g. group 0 becomes 16, group 1 becomes 17, group -1 becomes 15, etc.
     const static int group_shift = 16;

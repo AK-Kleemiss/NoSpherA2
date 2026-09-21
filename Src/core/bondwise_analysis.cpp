@@ -160,8 +160,8 @@ namespace {
             err_checkf(l >= 0,
                 "Encountered an invalid shell angular momentum while building an OCC atomic basis.",
                 std::cout);
-            std::vector<double> exponents;
-            std::vector<double> coefficients;
+            vec exponents;
+            vec coefficients;
             while (primitive_idx < static_cast<int>(basis_set.size()) &&
                 static_cast<int>(basis_set[primitive_idx].get_shell()) == shell_id) {
                 exponents.push_back(basis_set[primitive_idx].get_exponent());
@@ -485,7 +485,7 @@ int compute_dens(WFN &wavy, bool debug, int *np, double *origin, double *gvector
     cubes[cube_type::Lap].give_parent_wfn(wavy);
 
     std::string Oname = outname;
-    std::vector<int> ntyp;
+    ivec ntyp;
     for (int i = 0; i < 3; i++) {
         if (debug) {
             std::cout << "gvector before: ";
@@ -1014,7 +1014,7 @@ dMatrix2 change_basis_general(const dMatrix2 &in, const dMatrix2 &transformation
  */
 Roby_information::NAOResult Roby_information::calculateAtomicNAO(const dMatrix2 &D_full,
     const dMatrix2 &S_full,
-    const std::vector<int> &atom_indices,
+    const ivec &atom_indices,
     const ivec &shell_angular_momenta,
     const bool spherical,
     const double occupancy_cutoff,
@@ -1171,7 +1171,7 @@ Roby_information::NAOResult Roby_information::calculateAtomicNAO(const dMatrix2 
  */
 
  /* CURRENTLY NOT IN USE
- std::vector<double> orthogonalizePNAOs(const vec& C_PNAO,
+ vec orthogonalizePNAOs(const vec& C_PNAO,
      const vec& S_AO,
      int n) {
 
@@ -1423,7 +1423,7 @@ void Roby_information::computeAllAtomicNAOs(WFN &wavy, const bool symmetrize, co
                 //if (wavy.get_origin() != e_origin::tonto && wavy.get_origin() != e_origin::OCC)
                 //    bf.get_type() == 1 ? nr_indices = 1 : (bf.get_type() == 2 ? nr_indices = 3 : (bf.get_type() == 3 ? nr_indices = 5 : nr_indices = 7));
                 //else {
-                //    
+                //
                 //    bf.get_type() == 1 ? nr_indices = 1 : (bf.get_type() == 2 ? nr_indices = 3 : (bf.get_type() == 3 ? nr_indices = 6 : nr_indices = 10));
                 //    if (bf.get_type() == 3 && wavy.get_origin() == e_origin::tonto) {
                 //        //2 - 4; 3 - 6; 5 - 6
@@ -2912,7 +2912,7 @@ void QTAIM_ELI_mask(
     cube& eli,
     WFN& parent_wfn,
     const std::vector<atom>& atoms,
-    const std::vector<int>& selected_indices,
+    const ivec& selected_indices,
     double background_value,
     const std::filesystem::path& output_path,
     bool debug,
@@ -3032,7 +3032,7 @@ void QTAIM_ELI_mask(
 void run_QTAIM_ELI_mask(
     const std::filesystem::path& rho_or_wfn,
     const std::filesystem::path& eli_path,
-    const std::vector<int>& selected_indices,
+    const ivec& selected_indices,
     double background_value,
     options& opt,
     std::ostream& log

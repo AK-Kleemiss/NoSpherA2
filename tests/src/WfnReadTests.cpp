@@ -908,7 +908,7 @@ namespace
         for (const auto& at : atoms)
             for (int l = 0; l <= 1; l++)
             {
-                shells.emplace_back(l, std::vector<double>{ l == 0 ? 1.2 : 0.9 }, std::vector<vec>{ { 1.0 } }, std::array<double, 3>{ at.x, at.y, at.z });
+                shells.emplace_back(l, vec{ l == 0 ? 1.2 : 0.9 }, vec2{ { 1.0 } }, std::array<double, 3>{ at.x, at.y, at.z });
                 shells.back().kind = occ::gto::Shell::Kind::Spherical;
                 shells.back().incorporate_shell_norm();
             }

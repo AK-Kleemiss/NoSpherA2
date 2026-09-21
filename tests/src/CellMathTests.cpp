@@ -536,9 +536,9 @@ namespace NoSpherA2UnitTests
         w.push_back_MO(0, 2.0, -1.0, 0);
         w.push_back_MO(1, 1.0, -0.5, 1);
         w.push_back_MO(2, 0.0, 0.5, 7);
-        const std::vector<std::vector<cdouble>> ff = { { cdouble(1.5, -0.25), cdouble(2.0, 0.5) } };
+        const cvec2 ff = { { cdouble(1.5, -0.25), cdouble(2.0, 0.5) } };
         const std::vector<atomID> ids = { atomID(0.1, 0.2, 0.3, 0, 6) };
-        const std::vector<std::vector<int>> hkl = { { 1, 2 }, { 0, -1 }, { 3, 0 } };
+        const ivec2 hkl = { { 1, 2 }, { 0, -1 }, { 3, 0 } };
         tsc_block<int, cdouble> block(ff, ids, hkl);
         options opt;
         const std::filesystem::path p = cellmath_tmp("single.cif");
@@ -743,7 +743,7 @@ namespace NoSpherA2UnitTests
         const cvec fc = flatten<cdouble>(c2);
         ASSERT_EQ(fc.size(), 3u);
         EXPECT_EQ(fc[2], cdouble(5, 6));
-        const std::vector<ivec2> i3 = { { { 1 }, { 2, 3 } }, { { 4 } } };
+        const ivec3 i3 = { { { 1 }, { 2, 3 } }, { { 4 } } };
         EXPECT_EQ(flatten<int>(i3), (ivec{ 1, 2, 3, 4 }));
         const cvec3 c3 = { { { cdouble(0, 1) } }, { { cdouble(2, 0), cdouble(0, 3) } } };
         const cvec fc3 = flatten<cdouble>(c3);

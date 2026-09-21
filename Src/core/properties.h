@@ -243,8 +243,8 @@ void Calc_Fukui(
 struct CondensedFukuiResults {
     bool valid = false;
     std::vector<std::string> labels;
-    std::vector<std::vector<double>> f_plus;   // [partition][atom]
-    std::vector<std::vector<double>> f_minus;  // [partition][atom]
+    vec2 f_plus;   // [partition][atom]
+    vec2 f_minus;  // [partition][atom]
 };
 /**
  * Integrates the frontier-orbital densities against every atomic partition
@@ -479,7 +479,7 @@ void Calc_Prop(std::vector<cube> &Cubes, const S &src, double radius, std::ostre
     cube rho_contrib(Cubes[cube_type::Rho]);
     rho_contrib.set_zero();
     const i3 n = rho_contrib.get_sizes();
-    std::vector<double> x, y, z, rho, gx, gy, gz, lap, H;
+    vec x, y, z, rho, gx, gy, gz, lap, H;
     std::vector<i3> idx;
     auto flush = [&]() {
         const int np = static_cast<int>(x.size());

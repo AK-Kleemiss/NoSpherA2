@@ -23,7 +23,7 @@ public:
     cube();
     cube(const std::array<int, 3> xyz, int g_na = 0, bool grow_values = false);
     cube(const std::filesystem::path& filepath, bool read, WFN& wave, std::ostream& file, const bool expert = false, const bool header = true);
-    cube(const int g_na, const std::vector <int>& g_size, const std::vector <double>& g_origin, const std::vector < std::vector<double> >& g_vectors, const std::vector<std::vector<std::vector<double> > >& g_values);
+    cube(const int g_na, const ivec& g_size, const vec& g_origin, const vec2& g_vectors, const vec3& g_values);
     cube(const cube& given);
     int get_size(int direction) const;
     i3 get_sizes() const { return size; };
@@ -46,7 +46,7 @@ public:
     double rrs(const cube& right) const;
     double sum() const;
     double diff_sum() const;
-    std::vector<double> double_sum() const;
+    vec double_sum() const;
     double min_value() const {
         if (size[0] == 0 || size[1] == 0 || size[2] == 0)
             return 0.0;

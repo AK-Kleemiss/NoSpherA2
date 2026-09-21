@@ -13,7 +13,7 @@
 #include "aux_density_gpu.h"
 #endif
 
-std::vector<cvec2> SALTED_Utils::complex_to_real_transformation(std::vector<int> sizes)
+cvec3 SALTED_Utils::complex_to_real_transformation(ivec sizes)
 {
     const double sqrt_2 = sqrt(2.0);
     using namespace std;
@@ -230,8 +230,7 @@ static metatensor::TensorMap get_feats_projs(featomic::SimpleSystem featomic_sys
     SALTED_Utils::FeatomicHyperParameters modif_param = parameters;
     modif_param.max_radial -= 1;
     //featomic's rayon pool is built on first use from RAYON_NUM_THREADS and otherwise
-    //takes every logical core, ignoring -cpus and OMP_NUM_THREADS (48 threads on an
-    //8-thread run, 51 s of futex in the test suite)
+    //takes every logical core, ignoring -cpus and OMP_NUM_THREADS
 #ifdef _OPENMP
     if (std::getenv("RAYON_NUM_THREADS") == nullptr) { // Flawfinder: ignore
         const std::string n = std::to_string(omp_get_max_threads());
@@ -414,7 +413,7 @@ aux_density_table::aux_density_table(const std::vector<atom>& atoms)
             const int l = atoms[a].get_basis_set_type(prim);
             err_checkf(l <= 8, "Aux basis shells above l = 8 are not supported on the grid", std::cout);
             sh_l.push_back(l), pr_start.push_back(n_pr), coef_off.push_back(n_coef), sh_atom.push_back(a);
-            
+
             for (int m = -l; m <= l; ++m)
             {
                 coef_shell.push_back(n_sh);
@@ -1023,9 +1022,9 @@ void create_SALTED_training_data(const WFN& orbital, const WFN& aux, const optio
     dMatrix2 overlap_mat(nao_max, nao_max);
     overlap_mat.container() = overlap;
 
-    npy::write_npy("coefficients.npy", 
+    npy::write_npy("coefficients.npy",
         npy::npy_data<double>{
-            coefs, 
+            coefs,
             { static_cast<unsigned long>(coefs.size()) },
             false}
     );

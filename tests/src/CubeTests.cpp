@@ -1049,24 +1049,24 @@ TEST(CubeNpyTests, EveryDtypeRoundTrips)
 TEST(CubeNpyTests, OldInterfaceRoundTrip)
 {
     const unsigned long shape[2] = { 2, 3 };
-    const std::vector<double> data{ 1.5, 2.5, 3.5, 4.5, 5.5, 6.5 };
+    const vec data{ 1.5, 2.5, 3.5, 4.5, 5.5, 6.5 };
     const auto file = tmp("npy_old.npy");
     npy::SaveArrayAsNumpy<double>(file, true, 2, shape, data);
     std::vector<unsigned long> got_shape;
     bool fortran = false;
-    std::vector<double> got{ -1.0 };
+    vec got{ -1.0 };
     npy::LoadArrayFromNumpy<double>(file, got_shape, fortran, got);
     EXPECT_EQ(got_shape, (std::vector<unsigned long>{ 2, 3 }));
     EXPECT_TRUE(fortran);
-    EXPECT_EQ(got, (std::vector<double>{ -1.0, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5 })) << "loading appends";
+    EXPECT_EQ(got, (vec{ -1.0, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5 })) << "loading appends";
 
     const int ints[3] = { 7, 8, 9 };
     const unsigned long one[1] = { 3 };
     npy::SaveArrayAsNumpy<int>(file, false, 1, one, ints);
-    std::vector<int> got_ints;
+    ivec got_ints;
     npy::LoadArrayFromNumpy<int>(file, got_shape, got_ints);
     EXPECT_EQ(got_shape, (std::vector<unsigned long>{ 3 }));
-    EXPECT_EQ(got_ints, (std::vector<int>{ 7, 8, 9 }));
+    EXPECT_EQ(got_ints, (ivec{ 7, 8, 9 }));
     std::filesystem::remove(file);
 }
 

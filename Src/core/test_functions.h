@@ -454,7 +454,7 @@ void calc_partition_densities()
 
     ProgressBar *pb = new ProgressBar(size, 100, "=", "", "Calculating densities");
 
-#pragma omp parallel 
+#pragma omp parallel
     {
         vec2 d(DFT.get_ncen());
         for (int i = 0; i < DFT.get_ncen(); i++)
@@ -1012,9 +1012,9 @@ void gen_CUBE_for_RI(WFN wavy, const std::string aux_basis, const options *opt)
 }
 
 // Convert a row-major matrix to column-major format
-std::vector<double> rowToColMajor(const std::vector<double> &rowMajorMatrix, int rows, int cols)
+vec rowToColMajor(const vec &rowMajorMatrix, int rows, int cols)
 {
-    std::vector<double> colMajorMatrix((size_t)rows * cols);
+    vec colMajorMatrix((size_t)rows * cols);
 
     for (int r = 0; r < rows; ++r)
     {
@@ -1029,7 +1029,7 @@ std::vector<double> rowToColMajor(const std::vector<double> &rowMajorMatrix, int
 void test_NNLS()
 {
     // Define the matrix A in column-major order (Fortran-style storage)
-    std::vector<double> A_in = {
+    vec A_in = {
         54.88135039, 71.51893664, 60.27633761, 54.4883183, 42.36547993,
         64.58941131, 43.75872113, 89.17730008, 96.36627605, 38.34415188,
         79.17250381, 52.88949198, 56.80445611, 92.55966383, 7.10360582,
@@ -1044,7 +1044,7 @@ void test_NNLS()
     const int m = 10; // Number of rows
     const int n = 5;  // Number of columns
     //Right-hand side vector B
-    std::vector<double> B_in = { 57.01967704, 43.86015135, 98.83738381, 10.20448107, 20.88767561, 16.13095179, 65.31083255, 25.32916025, 46.63107729, 24.4425592 };
+    vec B_in = { 57.01967704, 43.86015135, 98.83738381, 10.20448107, 20.88767561, 16.13095179, 65.31083255, 25.32916025, 46.63107729, 24.4425592 };
 
     dMatrix1 B(B_in.size());
     std::copy(B_in.begin(), B_in.end(), B.data());
@@ -1066,7 +1066,7 @@ void test_NNLS()
     std::cout << "Residual: " << res.rnorm << std::endl;
 
     // Check vs correct solution
-    std::vector<double> correct = { 0.00370583, 0.58600469, 0.14755389, 0.04786599, 0.0 };
+    vec correct = { 0.00370583, 0.58600469, 0.14755389, 0.04786599, 0.0 };
     for (int i = 0; i < res.x.size(); i++)
     {
         if (std::abs(res.x[i] - correct[i]) > 1E-8)

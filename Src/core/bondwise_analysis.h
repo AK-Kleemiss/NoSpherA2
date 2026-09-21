@@ -74,7 +74,7 @@ private:
     std::vector<group_bond_index_result> RGBI_groups;
     ivec ano_fallback_atoms;
     NAOResult calculateAtomicNAO(const dMatrix2& D_full, const dMatrix2& S_full,
-        const std::vector<int>& atom_indices, const ivec& shell_angular_momenta = {},
+        const ivec& atom_indices, const ivec& shell_angular_momenta = {},
         bool spherical = false, double occupancy_cutoff = 1.0 / 6.0,
         int leading_orbitals_to_skip = 0, bool EVs = false);
     double projection_matrix_and_expectation(const ivec& indices, const ivec& eigvals = {}, const ivec& eigvecs = {}, dMatrix2* given_NAO = nullptr, dMatrix2* proj_out = nullptr);
@@ -124,7 +124,7 @@ void QTAIM_ELI_mask(
     cube& eli,
     WFN& parent_wfn,
     const std::vector<atom>& atoms,
-    const std::vector<int>& selected_indices,
+    const ivec& selected_indices,
     double background_value,
     const std::filesystem::path& output_path,
     bool debug,
@@ -137,7 +137,7 @@ void QTAIM_ELI_mask(
 void run_QTAIM_ELI_mask(
     const std::filesystem::path& rho_or_wfn,
     const std::filesystem::path& eli_path,
-    const std::vector<int>& selected_indices,
+    const ivec& selected_indices,
     double background_value,
     options& opt,
     std::ostream& log

@@ -175,10 +175,10 @@ AtomGrid::AtomGrid(const double radial_precision,
 
     for (int l = 0; l <= max_l_quantum_number; l++) {
         if (alpha_min[l] > 0.0) {
-            //if (debug) 
-            //    file << "ATOM GRID: " 
-            //       << "l= " << l 
-            //       << " r_inner: " << r_inner 
+            //if (debug)
+            //    file << "ATOM GRID: "
+            //       << "l= " << l
+            //       << " r_inner: " << r_inner
             //       << " alpha_min: " << alpha_min[l] << endl;
             r_outer = (((r_outer) > (get_r_outer(radial_precision, alpha_min[l], l, 4.0 * constants::bragg_angstrom[proton_charge]))) ? (r_outer) : (get_r_outer(radial_precision, alpha_min[l], l, 4.0 * constants::bragg_angstrom[proton_charge])));
             h = (((h) < (get_h(radial_precision, l, 0.1 * (r_outer - r_inner)))) ? (h) : (get_h(radial_precision, l, 0.1 * (r_outer - r_inner))));
@@ -449,7 +449,7 @@ void AtomGrid::get_grid(const int num_centers,
             std::array<double, 2> result_weights;
             double temp;
             //The pair loop skips far-away centres, so the outer shells are cheaper than
-            //the inner ones and static chunks end in a 7 s barrier over the test suite
+            //the inner ones and static chunks end in a long barrier
 #pragma omp for schedule(dynamic, 256)
             for (int ipoint = 0; ipoint < np; ipoint++) {
                 grid_x_bohr[ipoint] = atom_grid_x_bohr_[ipoint] + x_coordinates_bohr[center_index];
@@ -559,8 +559,8 @@ std::array<double, 2> get_integration_weights(const int& num_centers,
     const double& x,
     const double& y,
     const double& z,
-    std::vector<double>& pa_b,
-    std::vector<double>& pa_tv,
+    vec& pa_b,
+    vec& pa_tv,
     const vec& chi,
     const double *dist_ab_table)
 {
@@ -1155,7 +1155,7 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
     ivec ECP_els(ncen);
     std::vector<Thakkar> ECP_electron_helper;
     std::vector<Spherical_Gaussian_Density> ECP_correction_helper;
-    std::vector<int> has_ECP(ncen);
+    ivec has_ECP(ncen);
     for (int j = 0; j < ncen; j++) {
         atom_coords[j * 3 + 0] = atoms[j].get_coordinate(0);
         atom_coords[j * 3 + 1] = atoms[j].get_coordinate(1);

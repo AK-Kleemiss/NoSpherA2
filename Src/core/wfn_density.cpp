@@ -462,7 +462,7 @@ const double WFN::eval_ao(
     const std::vector<primitive>& prims,
     const int &m
 ) const
-{   
+{
 
     // normalize distances for spherical harmonic
     const int type = prims[0].get_type();
@@ -472,15 +472,15 @@ const double WFN::eval_ao(
 	d[2] *= scale;
     const double rl = std::pow(d[3], type);
     d[3] *= d[3];
-	
+
     double radial = 0;
     const primitive* p = prims.data();
     const primitive* const p_end = p + prims.size();
-    
+
     for (; p != p_end; p++) {
         radial += p->eval_gaussian_unnormalized(rl, d[3]);
     }
-    
+
     return radial * constants::spherical_harmonic(type, m, d.data());
     // err_checkf(coef_counter == exp_coefs, "WRONG NUMBER OF COEFFICIENTS! " + std::to_string(coef_counter) + " vs. " + std::to_string(exp_coefs), std::cout);
 }
@@ -2397,7 +2397,7 @@ void WFN::computeGrad(
     gradient[0] = Grad[0];
     gradient[1] = Grad[1];
     gradient[2] = Grad[2];
-    
+
 };
 
 const double WFN::computeELF(
@@ -2992,9 +2992,9 @@ static double boys(const int m, const double T, const double expn)
 {
     constexpr int mmax = 24 + 6, nT = 301;
     constexpr double step = 0.1;
-    static const std::vector<double> table = []()
+    static const vec table = []()
     {
-        std::vector<double> F((size_t)nT * (mmax + 1));
+        vec F((size_t)nT * (mmax + 1));
         for (int i = 0; i < nT; i++)
         {
             const double T0 = i * step, e = exp(-T0);

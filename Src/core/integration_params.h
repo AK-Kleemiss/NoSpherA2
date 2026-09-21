@@ -55,7 +55,7 @@ public:
     vec get_env() const { return _env; };
 
     unsigned long long get_nbas() const { return nbas; };  // Number of basis segments
-    unsigned long long get_nao() const { return nao; };    // Number of atomic orbitals  
+    unsigned long long get_nao() const { return nao; };    // Number of atomic orbitals
     unsigned long long get_natoms() const { return ncen; };
 
     std::map<int, LibCintBasis> get_basis_sets() const { return basis_sets; };

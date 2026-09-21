@@ -540,7 +540,7 @@ TEST(ConvenienceCoverageCubeTests, UnsavedFilesReportsCubesWithoutAFile)
 TEST(ConvenienceCoverageBinaryTests, IntRecordReadsPayloadAndRejectsDamage)
 {
     ScratchDir scratch("fortran_int");
-    auto write_record = [&](const std::string& name, const int head, const std::vector<int>& payload, const int tail)
+    auto write_record = [&](const std::string& name, const int head, const ivec& payload, const int tail)
     {
         std::ofstream f(scratch.file(name), std::ios::binary);
         f.write(reinterpret_cast<const char*>(&head), sizeof(int));
@@ -551,7 +551,7 @@ TEST(ConvenienceCoverageBinaryTests, IntRecordReadsPayloadAndRejectsDamage)
     write_record("tail.bin", 12, { 1, 2, 3 }, 8);
     write_record("neg.bin", -4, {}, -4);
 
-    std::vector<int> v;
+    ivec v;
     {
         std::ifstream f(scratch.file("good.bin"), std::ios::binary);
         EXPECT_TRUE(read_block_from_fortran_binary(f, v));
@@ -562,14 +562,14 @@ TEST(ConvenienceCoverageBinaryTests, IntRecordReadsPayloadAndRejectsDamage)
     EXPECT_EQ(v[2], 3);
     {
         std::ifstream f(scratch.file("tail.bin"), std::ios::binary);
-        std::vector<int> t;
+        ivec t;
         CoutCapture cap;
         EXPECT_FALSE(read_block_from_fortran_binary(f, t));
         EXPECT_NE(cap.str().find("12 vs. 8"), std::string::npos);
     }
     {
         std::ifstream f(scratch.file("neg.bin"), std::ios::binary);
-        std::vector<int> n;
+        ivec n;
         CoutCapture cap;
         EXPECT_FALSE(read_block_from_fortran_binary(f, n));
         EXPECT_NE(cap.str().find("record of -4 bytes"), std::string::npos);

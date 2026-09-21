@@ -6,8 +6,8 @@
 
 // --------------------------------------------------------------------------
 // 1) Minimal Edge Table
-//    For each of the 256 possible bit configurations, edgeTable tells you 
-//    which edges are intersected by the isosurface. Each bit in edgeTable[cubeIndex] 
+//    For each of the 256 possible bit configurations, edgeTable tells you
+//    which edges are intersected by the isosurface. Each bit in edgeTable[cubeIndex]
 //    corresponds to one of the 12 edges of the cube. If the bit is set, that edge is intersected.
 //
 constexpr int edgeTable[256] = {
@@ -46,8 +46,8 @@ constexpr int edgeTable[256] = {
 
 // --------------------------------------------------------------------------
 // 2) Minimal Triangle Table
-//    triTable[cubeIndex] is an array of up to 16 integers, grouped in triples. 
-//    Each triple indicates the edge indices that form one triangle. A value of -1 
+//    triTable[cubeIndex] is an array of up to 16 integers, grouped in triples.
+//    Each triple indicates the edge indices that form one triangle. A value of -1
 //    indicates the end of the list for that cubeIndex.
 //
 constexpr int triTable[256][16] =
@@ -330,7 +330,7 @@ static const int cornerIndexB[12] = {
 
 // --------------------------------------------------------------------------
 // A tiny helper to linearly interpolate a point along an edge between two corners
-// based on the isosurface value. 
+// based on the isosurface value.
 //
 d3 interpolateIso(const d3& p1, const d3& p2, const double valP1, const double valP2, const double isoVal)
 {

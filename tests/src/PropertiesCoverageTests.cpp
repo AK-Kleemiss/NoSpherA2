@@ -1047,7 +1047,7 @@ TEST(PropertiesCoverageBasinTests, DISABLED_LegacyB2cTwoBasinBcp)
 TEST(PropertiesCoverageSaltedTests, ConjugateFlipsImaginaryParts)
 {
     SALTEDDescriptors d(2, 3, 1);
-    std::vector<cdouble> &v = d.values();
+    cvec &v = d.values();
     ASSERT_EQ(v.size(), 24u);
     for (size_t i = 0; i < v.size(); i++)
         v[i] = cdouble((double)i, -(double)i);

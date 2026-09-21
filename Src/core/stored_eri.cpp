@@ -95,7 +95,7 @@ bool stored_eri::build(const occ::qm::HartreeFock& hf, const size_t budget_bytes
 #pragma omp for schedule(static)
 		for (long long i = 0; i < static_cast<long long>(nint); i++) v_[i] = 0.0;
 		//r runs to p, so the work per pq grows along the loop: static chunks left the
-		//last thread with most of it (16 s of barrier in the test suite). Every
+		//last thread with most of it. Every
 		//integral is written by exactly one pq, so the schedule does not touch the result
 #pragma omp for schedule(dynamic, 8)
 		for (int pq = 0; pq < npq; pq++) {

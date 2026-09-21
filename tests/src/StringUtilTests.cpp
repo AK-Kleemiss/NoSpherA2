@@ -229,7 +229,7 @@ namespace NoSpherA2UnitTests
         vec v;
         EXPECT_NEAR(0.0, vec_length(v), 1e-12);
     }
-    
+
     // -----------------------------------------------------------------------
 
     TEST(StringUtilTests2, Trim_LeadingTrailingSpaces)

@@ -90,7 +90,7 @@ private:
     void* raw_handle_ = nullptr;   // Windows HANDLE; unused elsewhere
     int raw_fd_ = -1;              // POSIX descriptor; unused on Windows
     bool read_header();
-    
+
 
     template <typename T>
     void read_dataset(std::vector<T>& data, std::vector<size_t>& dims);

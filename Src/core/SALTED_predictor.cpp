@@ -109,7 +109,7 @@ SALTEDPredictor::SALTEDPredictor(WFN wavy_in, options& opt_in)
     //config.predict_filename = "temp_rascaline.xyz";
 
     natoms = wavy.get_ncen();
-    
+
     if (wavy.get_nmo() != 0)
         wavy.clear_MOs(); // Delete unneccesarry MOs, since we are predicting anyway.
 
@@ -514,7 +514,7 @@ vec SALTEDPredictor::predict()
                 // int Mcut = static_cast<int>(psi_nm[spe + to_string(l)][0].size());
                 int Mcut = static_cast<int>(psi_nm[spe_idx][l].extent(1));
                 // Check if isize + Mcut > weights.size()
-                err_chekf(isize + Mcut <= weights.size(), "isize + Mcut > weights.size()", std::cout);
+                err_checkf(isize + Mcut <= weights.size(), "isize + Mcut > weights.size()", std::cout);
 
                 dMatrix1 weights_subset(Mcut);
                 std::copy(weights.data() + isize, weights.data() + isize + Mcut, weights_subset.data());
@@ -604,7 +604,7 @@ vec SALTEDPredictor::gen_SALTED_densities()
     using namespace std;
     if (coef_file != "")
     {
-        std::vector<double> coefs{};
+        vec coefs{};
         std::cout << "Reading coefficients from file: " << coef_file << endl;
         read_npy<double>(coef_file, coefs);
         vec double_coefs(coefs.size());

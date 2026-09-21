@@ -64,7 +64,7 @@ void read_npy(std::filesystem::path &filename, std::vector<Scalar> &data)
     bool fortran_order;
     npy::LoadArrayFromNumpy(filename, shape, fortran_order, data);
 }
-template void read_npy(std::filesystem::path &filename, std::vector<double> &data);
+template void read_npy(std::filesystem::path &filename, vec &data);
 template void read_npy(std::filesystem::path &filename, std::vector<float> &data);
 
 template <typename T>
@@ -79,7 +79,7 @@ std::unordered_map<int, std::vector<T>> read_fps(std::filesystem::path &filename
     }
     return vfps;
 }
-template std::unordered_map<int, std::vector<double>> read_fps(std::filesystem::path &filename, int lmax_max);
+template std::unordered_map<int, vec> read_fps(std::filesystem::path &filename, int lmax_max);
 template std::unordered_map<int, std::vector<int64_t>> read_fps(std::filesystem::path &filename, int lmax_max);
 
 template <class T>
@@ -117,8 +117,8 @@ std::vector<T> readVectorFromFile(const std::filesystem::path &filename)
 
     return result;
 }
-template std::vector<double> readVectorFromFile(const std::filesystem::path &filename);
-template std::vector<int> readVectorFromFile(const std::filesystem::path &filename);
+template vec readVectorFromFile(const std::filesystem::path &filename);
+template ivec readVectorFromFile(const std::filesystem::path &filename);
 
 // ----------------- Functions to populate the Config struct -----------------
 
@@ -225,16 +225,16 @@ std::string SALTED_BINARY_FILE::read_string_remove_NULL(const int length) {
         std::cerr << "Invalid string length: " << length << std::endl;
         return std::string();
     }
-    
+
     std::vector<char> string_out(length, '\0');
     file.read(string_out.data(), length);
-    
+
     // Check if the read operation succeeded
     if (!file.good()) {
         std::cerr << "Error reading string data from file!" << std::endl;
         return std::string();
     }
-    
+
     //Remove null characters from the string
     string_out.erase(std::remove(string_out.begin(), string_out.end(), '\0'), string_out.end());
     return trim(std::string(string_out.begin(), string_out.end()));
@@ -343,13 +343,13 @@ bool SALTED_BINARY_FILE::read_header() {
         std::cerr << "Error reading number of blocks from file!" << std::endl;
         return false;
     }
-    
+
     // Validate numBlocks to prevent excessive memory usage or infinite loops
     if (numBlocks < 0 || numBlocks > kMaxSaltedBlocks) { // Reasonable upper limit
         std::cerr << "Invalid number of blocks: " << numBlocks << std::endl;
         return false;
     }
-    
+
     if (debug) std::cout << "Number of blocks: " << numBlocks << std::endl;
 
     //Now follows (Chunkname (5b str), location (4b int)) * numBlocks
@@ -360,14 +360,14 @@ bool SALTED_BINARY_FILE::read_header() {
             std::cerr << "Error reading chunk name at block " << i << std::endl;
             return false;
         }
-        
+
         int location;
         file.read((char*)&location, sizeof(int));
         if (!file.good()) {
             std::cerr << "Error reading location at block " << i << std::endl;
             return false;
         }
-        
+
         table_of_contents[chunkname] = location;
         if (debug) std::cout << "Chunk: " << chunkname << " at location: " << location << std::endl;
     }
@@ -497,7 +497,7 @@ T SALTED_BINARY_FILE::read_generic_blocks(const std::string& key, std::function<
     read_exact(file, n_blocks, "block count for " + key);
     err_checkf(n_blocks >= 0 && n_blocks <= kMaxSaltedBlocks,
         "Invalid SALTED block count for " + key + ": " + std::to_string(n_blocks), std::cout);
-    
+
     T result;
     if constexpr (std::is_same_v<T, std::shared_ptr<BasisSet>>) {
         result = std::make_shared<BasisSet>();
@@ -562,8 +562,8 @@ std::unordered_map<int, vec> SALTED_BINARY_FILE::read_wigners() {
 
 vec SALTED_BINARY_FILE::read_weights() {
     vec weights;
-    read_generic_blocks<std::vector<vec>>("WEIGH",
-        [this, &weights](std::vector<vec>&, int i) {
+    read_generic_blocks<vec2>("WEIGH",
+        [this, &weights](vec2&, int i) {
             std::vector<size_t> dims;
             vec data;
             read_dataset(data, dims);

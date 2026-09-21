@@ -540,7 +540,7 @@ namespace constants {
                 SH = (1.0 / 32.0) * std::sqrt(1365.0 / (2 * PI)) * (33 * z * z * z * z - 18 * z * z + 1) * (x * x - y * y);
                 break;
             case -2:
-                // -1/256 i sqrt(1365/PI) sin^2(theta) (60 cos(2 theta) + 33 cos(4 theta) + 35) sin(2 phi) 
+                // -1/256 i sqrt(1365/PI) sin^2(theta) (60 cos(2 theta) + 33 cos(4 theta) + 35) sin(2 phi)
                 SH = (1.0 / 32.0) * std::sqrt(1365.0 / (2 * PI)) * (33 * z * z * z * z - 18 * z * z + 1) * 2 * x * y;
                 break;
             case 3:
@@ -769,7 +769,7 @@ namespace constants {
     }
 
     // Collapsed version of the spherical harmonic
-    // Calculates all values for one l at once 
+    // Calculates all values for one l at once
     //l = principal quantum number
     //d = cartesian coordinates
     //coefs = coefficients (2*l+1 many)

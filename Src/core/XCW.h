@@ -25,7 +25,7 @@ public:
 
 	// Calculates F_calc without DW factors (=1), needs rework
 	//void calc_F_calc_fast();
-	
+
 	// Does the XCW fitting routine
 	void run_XCW_fitting();
 
@@ -47,7 +47,7 @@ private:
 		cdouble dispersion;
 	};
 
-	// Miscellaneous crystallographic data 
+	// Miscellaneous crystallographic data
 	struct cryst_info {
 		int nr_small;
 		int nr;

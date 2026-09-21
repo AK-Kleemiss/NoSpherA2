@@ -617,7 +617,7 @@ void XCW::eval_DW(cvec2& DW_fact) {
 	DW_fact.resize(cryst.ncen, cvec(cryst.nr, 0));
 	//Converts angstrom to bohr OR MORE IMPORTANTLY reciprocal bohr to reciprocal angstrom
 	const double angstrom2bohr = constants::ang2bohr(1);
-	std::vector<int> level;
+	ivec level;
 	level.reserve(cryst.ncen);
 	//Figure out which level of anisotropic displacements parameters are avaialable
 	for (int a = 0; a < cryst.ncen; a++) {
@@ -1296,8 +1296,8 @@ void XCW::decide_i_storage() {
 	//The settings file budget wins, then -mem; with neither, what the process can actually
 	//have. Left to a keyword this is the single most expensive decision in an XCW run and
 	//the wrong answer is silent: both SCF walks re-read the whole tensor every iteration, so
-	//streaming a tensor that would have fit cost 5.45 s per iteration against 0.30 s
-	//measured on a V100 node, an 18x on the stage a 200-step lambda scan spends its life in.
+	//streaming a tensor that would have fit is many times slower on the stage a
+	//lambda scan spends its life in.
 	//Nobody should have to know that to get it right.
 	const char* source = "";
 	bool automatic = false;
@@ -1595,9 +1595,9 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 	//Work is sum over blocks of n_active^2 * points, so this is quadratic in what it saves.
 	//Sums over points are order independent, so the reordering changes no result.
 	//Compaction and the AO threshold are worth nothing apart and a great deal together:
-	//measured on the twisted ethylene at def2-TZVP, reordering alone is 1.39x SLOWER (the
-	//blocks shrink and n_active does not), the threshold alone moves the work by 2%, and
-	//together they are 1.29x faster with the GooF, energies and convergence lines identical.
+	//reordering alone is slower (the blocks shrink and n_active does not), the threshold
+	//alone barely moves the work, and together they are faster with the GooF, energies and
+	//convergence lines identical.
 	//So only reorder when the threshold can actually prune: at -acc 4 cutoff() is 1e-30 and
 	//nothing would be dropped, and paying the compaction cost for that would make asking for
 	//more accuracy slower for no reason.

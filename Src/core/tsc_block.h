@@ -967,7 +967,7 @@ namespace tsc_merge_detail
     inline bool parse_data_row(
         const std::string& line,
         ReflectionKey& key,
-        std::vector<std::complex<double>>& values)
+        cvec& values)
     {
         std::istringstream input(line);
         if (!(input >> key.h >> key.k >> key.l))
@@ -1020,7 +1020,7 @@ namespace tsc_merge_detail
     inline void assign_values(
         cvec2& form_factors,
         const ParsedHeader& parsed,
-        const std::vector<std::complex<double>>& values,
+        const cvec& values,
         std::size_t reflection,
         bool conjugate)
     {
@@ -1047,7 +1047,7 @@ namespace tsc_merge_detail
     {
         std::string line;
         ReflectionKey key;
-        std::vector<std::complex<double>> values;
+        cvec values;
 
         while (getline_universal(input, line))
         {
@@ -1089,7 +1089,7 @@ namespace tsc_merge_detail
     {
         std::string line;
         ReflectionKey key;
-        std::vector<std::complex<double>> values;
+        cvec values;
         std::size_t reflection = 0;
 
         while (getline_universal(input, line))

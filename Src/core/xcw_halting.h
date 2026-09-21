@@ -116,5 +116,5 @@ PolynomialFit fit_polynomial(const vec& x, const vec& y, int degree);
 // (including invalid ones) in the same order as `degrees`, for reporting
 // which functional forms were tried. Returns an invalid PolynomialFit if
 // none of `degrees` had enough points.
-PolynomialFit choose_best_polynomial_fit(const vec& x, const vec& y, const std::vector<int>& degrees,
+PolynomialFit choose_best_polynomial_fit(const vec& x, const vec& y, const ivec& degrees,
     std::vector<PolynomialFit>* all_candidates = nullptr);

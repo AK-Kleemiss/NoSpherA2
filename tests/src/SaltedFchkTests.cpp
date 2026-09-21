@@ -65,15 +65,15 @@ namespace
     };
 
     // the synthetic model: two species, two lambdas for H and one for O
-    const std::vector<double> feats_h0{ 1, 2, 3, 4, 5, 6 }, feats_h1{ 7, 8 }, feats_o0{ 9, 10, 11, 12, 13, 14 };
-    const std::vector<double> weights{ 0.1, 0.2, 0.3, 0.4 };
+    const vec feats_h0{ 1, 2, 3, 4, 5, 6 }, feats_h1{ 7, 8 }, feats_o0{ 9, 10, 11, 12, 13, 14 };
+    const vec weights{ 0.1, 0.2, 0.3, 0.4 };
 
     void lambda_block(salted_writer& w, const double scale)
     {
         w.block_head(2);
         w.tag("H");
         w.raw(static_cast<int32_t>(2));
-        std::vector<double> a(feats_h0), b(feats_h1), c(feats_o0);
+        vec a(feats_h0), b(feats_h1), c(feats_o0);
         for (auto* v : { &a, &b, &c })
             for (double& x : *v)
                 x *= scale;
@@ -106,16 +106,16 @@ namespace
             salted_writer w;
             w.block_head(2);
             w.tag("H");
-            w.dataset(std::vector<double>{ 0.5 }, { 1 });
+            w.dataset(vec{ 0.5 }, { 1 });
             w.tag("O");
-            w.dataset(std::vector<double>{ 1.0, 2.0 }, { 2 });
+            w.dataset(vec{ 1.0, 2.0 }, { 2 });
             blocks.emplace_back("AVERG", w.buf);
         }
         {
             salted_writer w;
             w.block_head(2);
-            w.dataset(std::vector<double>{ 1.0, 2.0, 3.0 }, { 3 });
-            w.dataset(std::vector<double>{ 4.0 }, { 1 });
+            w.dataset(vec{ 1.0, 2.0, 3.0 }, { 3 });
+            w.dataset(vec{ 4.0 }, { 1 });
             blocks.emplace_back("WIG", w.buf);
         }
         {
@@ -146,11 +146,11 @@ namespace
             salted_writer w;
             w.block_head(3);
             w.tag("MODE");
-            w.dataset(std::vector<double>{ 1.0 }, { 1 });
+            w.dataset(vec{ 1.0 }, { 1 });
             w.tag("DEFCT");
-            w.dataset(std::vector<double>{ -0.00235 }, { 1 });
+            w.dataset(vec{ -0.00235 }, { 1 });
             w.tag("NCAL");
-            w.dataset(std::vector<double>{ 600.0 }, { 1 });
+            w.dataset(vec{ 600.0 }, { 1 });
             blocks.emplace_back("NORMC", w.buf);
         }
         if (with_basis)
@@ -160,13 +160,13 @@ namespace
             w.raw(static_cast<int32_t>(1));
             w.dataset(std::vector<int32_t>{ 1 }, { 1 });
             w.dataset(std::vector<int32_t>{ 0 }, { 1 });
-            w.dataset(std::vector<double>{ 1.5 }, { 1 });
-            w.dataset(std::vector<double>{ 1.0 }, { 1 });
+            w.dataset(vec{ 1.5 }, { 1 });
+            w.dataset(vec{ 1.0 }, { 1 });
             w.raw(static_cast<int32_t>(8));
             w.dataset(std::vector<int32_t>{ 1, 1 }, { 2 });
             w.dataset(std::vector<int32_t>{ 0, 1 }, { 2 });
-            w.dataset(std::vector<double>{ 2.0, 0.7 }, { 2 });
-            w.dataset(std::vector<double>{ 1.0, 1.0 }, { 2 });
+            w.dataset(vec{ 2.0, 0.7 }, { 2 });
+            w.dataset(vec{ 1.0, 1.0 }, { 2 });
             blocks.emplace_back("BASIS", w.buf);
         }
         salted_writer h;
@@ -224,7 +224,7 @@ namespace
         for (const auto& at : atoms)
             for (int l = 0; l <= 1; l++)
             {
-                shells.emplace_back(l, std::vector<double>{ l == 0 ? 1.2 : 0.9 }, std::vector<vec>{ { 1.0 } }, std::array<double, 3>{ at.x, at.y, at.z });
+                shells.emplace_back(l, vec{ l == 0 ? 1.2 : 0.9 }, vec2{ { 1.0 } }, std::array<double, 3>{ at.x, at.y, at.z });
                 shells.back().kind = occ::gto::Shell::Kind::Spherical;
                 shells.back().incorporate_shell_norm();
             }
@@ -319,8 +319,8 @@ TEST(SaltedFchkIoTests, ReadVectorFromFileSkipsUnparsableLines)
         std::ofstream out(p);
         out << "1.5\nabc\n-2.25\n\n7\n";
     }
-    const std::vector<double> d = readVectorFromFile<double>(p);
-    const std::vector<int> i = readVectorFromFile<int>(p);
+    const vec d = readVectorFromFile<double>(p);
+    const ivec i = readVectorFromFile<int>(p);
     std::filesystem::remove(p);
     ASSERT_EQ(d.size(), 3u);
     EXPECT_NEAR(d[0], 1.5, 1e-15);

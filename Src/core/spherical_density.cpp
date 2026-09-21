@@ -235,7 +235,7 @@ void Thakkar::calc_custom_orbs(
     const int upper_ex = n_vector[atomic_number - 1];
     const int m_start = lower_m + min;
     const int m_threshold = lower_m + max;
-    
+
     // Early exit if no valid m range
     if (m_start >= upper_m || m_start >= m_threshold) {
         // Still need to advance counters correctly
@@ -248,15 +248,15 @@ void Thakkar::calc_custom_orbs(
         }
         return;
     }
-    
+
     for (int ex = 0; ex < upper_ex; ex++, nr_ex++)
     {
         const double _z = z[nr_ex];
         const int _n = n[nr_ex] - 1;
-        
+
         // Precompute exponent once per outer loop - major optimization
         const double exponent = -_z * dist;
-        
+
         // Early exit if exponent too small - moved outside inner loop
         if (exponent <= -46.5) {
             // Skip this exponential entirely but advance coefficient counter
@@ -267,14 +267,14 @@ void Thakkar::calc_custom_orbs(
             }
             continue;
         }
-        
+
         // Compute exp once per outer iteration instead of per inner iteration
         const double exp_val = exp(exponent);
-        
+
         if (_n != 0) {
             const double dist_pow = fast_int_pow(dist, _n);
             const double combined = exp_val * dist_pow;
-            
+
             for (int m = m_start; m < upper_m; m++)
             {
                 if (occ[offset + m] != 0) {

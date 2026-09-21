@@ -73,7 +73,7 @@ namespace LibcintDispatchTestHelpers
     // block-diagonal cart -> sph matrix of a 0-based-type wavefunction, one cart2sph(l, true) block per shell
     dMatrix2 block_cart2sph(const WFN &w0)
     {
-        std::vector<int> ls;
+        ivec ls;
         for (const atom &a : w0.get_atoms())
             for (int shell = 0, prim = 0; shell < a.get_shellcount_size(); prim += a.get_shellcount(shell++))
                 ls.push_back(a.get_basis_set_type(prim));

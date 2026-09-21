@@ -1993,7 +1993,7 @@ bool WFN::write_nbo(const std::filesystem::path &fileName, const bool &debug, st
         for (int s = 0; s < get_atom_shell_count(a); s++)
         {
             int type_temp = get_shell_type(a, s);
-            err_chkf(type_temp != -1, "ERROR in type assignement!!", std::cout);
+            err_checkf(type_temp != -1, "ERROR in type assignement!!", std::cout);
             if (debug)
             {
                 std::cout << "Shell: " << s << " of atom: " << a << " Shell type: " << type_temp << endl

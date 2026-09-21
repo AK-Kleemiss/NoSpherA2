@@ -4,8 +4,8 @@
 #include "constants.h"
 #include <charconv>
 
-//The value block of a cube file, %13.5E six per line, formatted with to_chars: the iostream formatting took 4 s
-//per 77 MB cube (measured 20 Sep 2026, promolecular NCI, 5.8 M values, byte-identical output), this takes 0.7 s
+//The value block of a cube file, %13.5E six per line, formatted with to_chars: byte-identical to the
+//iostream formatting and several times faster
 static void write_cube_values(std::ostream& of, const vec3& values, const i3& size, const bool absolute)
 {
     std::string line;

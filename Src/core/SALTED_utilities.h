@@ -36,11 +36,11 @@ public:
             + (static_cast<size_t>(atom) * _nchannels + channel) * (2 * static_cast<size_t>(l) + 1);
     }
 
-    std::vector<cdouble>& values() noexcept { return _values; }
+    cvec& values() noexcept { return _values; }
 
     //Flat view for the GPU path: block(atom, channel, l) is offsets[l] +
     //(atom * nchannels + channel) * (2l+1), which the device reproduces
-    const std::vector<cdouble>& values() const noexcept { return _values; }
+    const cvec& values() const noexcept { return _values; }
     const std::vector<size_t>& offsets() const noexcept { return _offsets; }
     int nchannels() const noexcept { return _nchannels; }
 
@@ -58,12 +58,12 @@ public:
 private:
     int _nchannels = 0;
     std::vector<size_t> _offsets;
-    std::vector<cdouble> _values;
+    cvec _values;
 };
 
 namespace SALTED_Utils
 {
-    std::vector<cvec2> complex_to_real_transformation(std::vector<int> sizes);
+    cvec3 complex_to_real_transformation(ivec sizes);
     //Removes the atoms the model cannot predict from wavy; returns which of the input atoms were removed
     std::vector<char> filter_input(WFN& wavy, options& opt, const SALTEDConfig& config);
     void set_lmax_nmax(std::unordered_map<std::string, int> &lmax, std::unordered_map<std::string, int> &nmax, const std::array<std::vector<primitive>, 118> &basis_set, std::vector<std::string> species);

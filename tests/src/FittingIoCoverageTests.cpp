@@ -24,9 +24,9 @@
 //Non-static helpers of integrator.cpp and basis_set.cpp that have no header declaration.
 vec einsum_ijk_ij_p(const dMatrix3& v1, const dMatrix2& v2);
 vec reorder_p(vec coefs_in, WFN aux_basis);
-std::vector<double> dedup_exponents(std::vector<double> exps, double tol);
-std::vector<int> pivoted_cholesky(dMatrix2& A, double threshold);
-std::vector<double> prune_element_candidates_for_L(int L, const std::vector<double>& exponents, double threshold);
+vec dedup_exponents(vec exps, double tol);
+ivec pivoted_cholesky(dMatrix2& A, double threshold);
+vec prune_element_candidates_for_L(int L, const vec& exponents, double threshold);
 
 namespace
 {
@@ -117,7 +117,7 @@ namespace
         for (const auto& at : atoms)
             for (int l = 0; l <= 1; l++)
             {
-                shells.emplace_back(l, std::vector<double>{ l == 0 ? 1.2 : 0.9 }, std::vector<vec>{ { 1.0 } }, std::array<double, 3>{ at.x, at.y, at.z });
+                shells.emplace_back(l, vec{ l == 0 ? 1.2 : 0.9 }, vec2{ { 1.0 } }, std::array<double, 3>{ at.x, at.y, at.z });
                 shells.back().kind = occ::gto::Shell::Kind::Spherical;
                 shells.back().incorporate_shell_norm();
             }
@@ -736,13 +736,13 @@ TEST(FittingIoCoverageIntegratorTests, QmRiDifferenceCubeWritesThreeCubes)
 //Sorted descending, 1.0 is dropped against 1.05 (relative gap 0.048 < 0.1), the rest survive.
 TEST(FittingIoCoverageBasisTests, DedupExponentsDropsNearDuplicates)
 {
-    const std::vector<double> out = dedup_exponents({ 1.0, 1.05, 2.0, 0.5 }, 0.1);
+    const vec out = dedup_exponents({ 1.0, 1.05, 2.0, 0.5 }, 0.1);
     ASSERT_EQ(out.size(), 3u);
     EXPECT_DOUBLE_EQ(out[0], 2.0);
     EXPECT_DOUBLE_EQ(out[1], 1.05);
     EXPECT_DOUBLE_EQ(out[2], 0.5);
     EXPECT_TRUE(dedup_exponents({}, 0.1).empty());
-    const std::vector<double> single = dedup_exponents({ 3.0 }, 0.1);
+    const vec single = dedup_exponents({ 3.0 }, 0.1);
     ASSERT_EQ(single.size(), 1u);
     EXPECT_DOUBLE_EQ(single[0], 3.0);
 }
@@ -753,17 +753,17 @@ TEST(FittingIoCoverageBasisTests, DedupExponentsDropsNearDuplicates)
 TEST(FittingIoCoverageBasisTests, PivotedCholeskyOrdersAndStops)
 {
     dMatrix2 D = reshape<dMatrix2>(vec{ 1.0, 0, 0, 0, 4.0, 0, 0, 0, 0.01 }, Shape2D(3, 3));
-    const std::vector<int> piv = pivoted_cholesky(D, 0.1);
+    const ivec piv = pivoted_cholesky(D, 0.1);
     ASSERT_EQ(piv.size(), 2u);
     EXPECT_EQ(piv[0], 1);
     EXPECT_EQ(piv[1], 0);
 
     dMatrix2 C = reshape<dMatrix2>(vec{ 1.0, 0.9, 0.9, 1.0 }, Shape2D(2, 2));
-    const std::vector<int> one = pivoted_cholesky(C, 0.5);
+    const ivec one = pivoted_cholesky(C, 0.5);
     ASSERT_EQ(one.size(), 1u);
     EXPECT_EQ(one[0], 0);
     dMatrix2 C2 = reshape<dMatrix2>(vec{ 1.0, 0.9, 0.9, 1.0 }, Shape2D(2, 2));
-    const std::vector<int> two = pivoted_cholesky(C2, 0.1);
+    const ivec two = pivoted_cholesky(C2, 0.1);
     ASSERT_EQ(two.size(), 2u);
     EXPECT_EQ(two[0], 0);
     EXPECT_EQ(two[1], 1);
@@ -776,20 +776,20 @@ TEST(FittingIoCoverageBasisTests, PivotedCholeskyOrdersAndStops)
 TEST(FittingIoCoverageBasisTests, PruneCandidatesKeepsWellConditionedExponents)
 {
     EXPECT_TRUE(prune_element_candidates_for_L(0, {}, 0.5).empty());
-    const std::vector<double> single = prune_element_candidates_for_L(0, { 2.0 }, 0.5);
+    const vec single = prune_element_candidates_for_L(0, { 2.0 }, 0.5);
     ASSERT_EQ(single.size(), 1u);
     EXPECT_DOUBLE_EQ(single[0], 2.0);
-    const std::vector<double> near_pair = prune_element_candidates_for_L(0, { 1.0, 1.05 }, 0.5);
+    const vec near_pair = prune_element_candidates_for_L(0, { 1.0, 1.05 }, 0.5);
     ASSERT_EQ(near_pair.size(), 1u);
     EXPECT_DOUBLE_EQ(near_pair[0], 1.05);
 
     StreamCapture out(std::cout);
-    const std::vector<double> s_both = prune_element_candidates_for_L(0, { 0.1, 10.0 }, 0.5);
+    const vec s_both = prune_element_candidates_for_L(0, { 0.1, 10.0 }, 0.5);
     ASSERT_EQ(s_both.size(), 2u);
     EXPECT_DOUBLE_EQ(s_both[0], 10.0);
     EXPECT_DOUBLE_EQ(s_both[1], 0.1);
     EXPECT_EQ(prune_element_candidates_for_L(0, { 0.1, 10.0 }, 0.9).size(), 1u);
-    const std::vector<double> p_both = prune_element_candidates_for_L(1, { 0.1, 10.0 }, 0.5);
+    const vec p_both = prune_element_candidates_for_L(1, { 0.1, 10.0 }, 0.5);
     ASSERT_EQ(p_both.size(), 2u);
     EXPECT_DOUBLE_EQ(p_both[0], 10.0);
     EXPECT_DOUBLE_EQ(p_both[1], 0.1);
@@ -864,8 +864,8 @@ TEST(FittingIoCoverageBasisTests, AutoAuxLithiumWithSpShells)
     const auto span = bs[2];
     ASSERT_EQ(span.size(), 8u);
     const double b = 1.8;
-    const std::vector<double> exps{ 1.0 * b * b * b, 1.0 * b * b, 1.0 * b, 1.0, 1.3 * b * b, 1.3 * b, 1.3, 1.6 };
-    const std::vector<int> types{ 0, 0, 0, 0, 1, 1, 1, 2 };
+    const vec exps{ 1.0 * b * b * b, 1.0 * b * b, 1.0 * b, 1.0, 1.3 * b * b, 1.3 * b, 1.3, 1.6 };
+    const ivec types{ 0, 0, 0, 0, 1, 1, 1, 2 };
     for (size_t i = 0; i < 8; i++)
     {
         EXPECT_NEAR(span[i].exp, exps[i], 1e-9) << i;
@@ -897,8 +897,8 @@ TEST(FittingIoCoverageBasisTests, AutoAuxTinyContractionTriggersLargeExponentGua
     ASSERT_EQ(bs.get_owned_primitive_count(), 9u);
     const auto span = bs[0];
     ASSERT_EQ(span.size(), 9u);
-    const std::vector<double> exps{ 5.832, 3.24, 1.8, 1.0, 5.2, 2.6, 1.3, 3.52, 1.6 };
-    const std::vector<int> types{ 0, 0, 0, 0, 1, 1, 1, 2, 2 };
+    const vec exps{ 5.832, 3.24, 1.8, 1.0, 5.2, 2.6, 1.3, 3.52, 1.6 };
+    const ivec types{ 0, 0, 0, 0, 1, 1, 1, 2, 2 };
     for (size_t i = 0; i < 9; i++)
     {
         EXPECT_NEAR(span[i].exp, exps[i], 1e-9) << i;
@@ -925,7 +925,7 @@ TEST(FittingIoCoverageBasisTests, DISABLED_AutoAuxPotassiumKeepsAuxWithinLmax)
     ASSERT_EQ(bs.get_owned_primitive_count(), 8u);
     const auto span = bs[18];
     const double b = 1.8;
-    const std::vector<double> exps{ 1.0 * b * b * b, 1.0 * b * b, 1.0 * b, 1.0, 1.3 * b * b, 1.3 * b, 1.3, 1.6 };
+    const vec exps{ 1.0 * b * b * b, 1.0 * b * b, 1.0 * b, 1.0, 1.3 * b * b, 1.3 * b, 1.3, 1.6 };
     for (size_t i = 0; i < 8; i++)
         EXPECT_NEAR(span[i].exp, exps[i], 1e-9) << i;
 }
@@ -956,7 +956,7 @@ TEST(FittingIoCoverageBasisTests, ReadMissingTurbomoleAllShellTypes)
     StreamCapture out(std::cout);
     ASSERT_TRUE(BasisSetLibrary::read_basis_set_missing(s.dir, w, true));
     ASSERT_EQ(w.get_atom_basis_set_size(0), 4);
-    const std::vector<double> exps{ 2.0, 0.8, 1.1, 0.7 };
+    const vec exps{ 2.0, 0.8, 1.1, 0.7 };
     for (int k = 0; k < 4; k++)
     {
         EXPECT_EQ((int)w.get_atom_basis_set_entry(0, k).get_type(), k + 1) << k;

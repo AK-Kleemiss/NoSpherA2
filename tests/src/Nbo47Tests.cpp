@@ -19,7 +19,7 @@ std::string read_file(const std::filesystem::path& path)
     return out.str();
 }
 
-std::vector<double> extract_section_numbers(const std::string& text, const std::string& section)
+vec extract_section_numbers(const std::string& text, const std::string& section)
 {
     const auto start = text.find(section);
     if (start == std::string::npos) {
@@ -32,7 +32,7 @@ std::vector<double> extract_section_numbers(const std::string& text, const std::
     }
     static const std::regex number_pattern(R"([-+]?\d*\.?\d+(?:[eE][-+]?\d+)?)");
     const std::string content = text.substr(content_start, end - content_start);
-    std::vector<double> values;
+    vec values;
     for (auto it = std::sregex_iterator(content.begin(), content.end(), number_pattern);
          it != std::sregex_iterator();
          ++it) {
@@ -87,12 +87,12 @@ bool wsl_gennbo_available()
     return std::system("wsl bash -lc \"test -x ~/nbo7/gennbo\"") == 0;
 }
 
-std::vector<double> parse_natural_charges(const std::filesystem::path& nbo_path)
+vec parse_natural_charges(const std::filesystem::path& nbo_path)
 {
     std::ifstream in(nbo_path);
     std::string line;
     bool in_summary = false;
-    std::vector<double> charges;
+    vec charges;
     const std::regex charge_line(R"(^\s+[A-Z][a-z]?\s+\d+\s+([-+]?\d*\.?\d+))");
     while (std::getline(in, line)) {
         if (line.find("Summary of Natural Population Analysis") != std::string::npos) {
@@ -127,7 +127,7 @@ std::optional<double> parse_total_electrons(const std::filesystem::path& nbo_pat
     return std::nullopt;
 }
 
-double packed_trace_product(const std::vector<double>& density, const std::vector<double>& overlap, int nbasis)
+double packed_trace_product(const vec& density, const vec& overlap, int nbasis)
 {
     double trace = 0.0;
     for (int i = 0; i < nbasis; i++) {

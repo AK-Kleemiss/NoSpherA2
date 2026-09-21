@@ -329,7 +329,7 @@ PolynomialFit fit_polynomial(const vec& x, const vec& y, int degree) {
     return fit;
 }
 
-PolynomialFit choose_best_polynomial_fit(const vec& x, const vec& y, const std::vector<int>& degrees,
+PolynomialFit choose_best_polynomial_fit(const vec& x, const vec& y, const ivec& degrees,
     std::vector<PolynomialFit>* all_candidates) {
     PolynomialFit best;
     for (const int degree : degrees) {

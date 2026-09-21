@@ -85,7 +85,7 @@ occ::qm::AOBasis BasisSet::to_AOBasis(const std::vector<occ::core::Atom>& atoms)
 	std::vector<occ::gto::Shell> shells;
 	std::vector<occ::gto::Shell> ecp_shells;
 
-	std::vector<int> ecp_electrons(atoms.size(), 0);
+	ivec ecp_electrons(atoms.size(), 0);
 	//int nsh_ecp = 0;
 	for (size_t a = 0; a < atoms.size(); ++a) {
 		std::array<double, 3> origin = { atoms[a].x, atoms[a].y, atoms[a].z };
@@ -94,8 +94,8 @@ occ::qm::AOBasis BasisSet::to_AOBasis(const std::vector<occ::core::Atom>& atoms)
 		int primitive_idx = 0;
 		for (int shell_nr = 0; shell_nr <= primitives.back().shell; shell_nr++) {
 			int l = primitives[primitive_idx].type;
-			std::vector<double> exponents;
-			std::vector<double> coefficients;
+			vec exponents;
+			vec coefficients;
 			while (primitive_idx < primitives.size() && shell_nr == primitives[primitive_idx].shell) {
 				exponents.push_back(primitives[primitive_idx].exp);
 				coefficients.push_back(primitives[primitive_idx].coefficient);
@@ -145,9 +145,9 @@ occ::qm::AOBasis BasisSet::to_AOBasis(const std::vector<occ::core::Atom>& atoms)
 namespace auto_aux_constants {
 	inline constexpr double BETA_SMALL = 1.8;
 	// Index by total L (0..), fallback used if L exceeds size
-	inline const std::vector<double> BETA_BIG = { 1.8, 2.0, 2.2, 2.2, 2.2, 2.3, 3.0, 3.0, 3.0, 3.0 };
+	inline const vec BETA_BIG = { 1.8, 2.0, 2.2, 2.2, 2.2, 2.3, 3.0, 3.0, 3.0, 3.0 };
 	// Cap factors for compact L (0..2*l_val)
-	inline const std::vector<double> F_LAUX = { 20, 7.0, 4.0, 4.0, 3.5, 2.5, 2.0, 2.0, 2.0, 2.0 };
+	inline const vec F_LAUX = { 20, 7.0, 4.0, 4.0, 3.5, 2.5, 2.0, 2.0, 2.0, 2.0 };
 
 	inline double gaussian_int(int n, double exp) {
 		double n1 = (n + 1) * 0.5;
@@ -167,7 +167,7 @@ void BasisSet::gen_auto_aux(const WFN& orbital_wfn) {
 		const int Z = atm.get_charge();
 		if (std::find(seen_elements.begin(), seen_elements.end(), Z) != seen_elements.end()) continue;
 		if (!_auto_aux_elements.empty() && std::find(_auto_aux_elements.begin(), _auto_aux_elements.end(), Z) == _auto_aux_elements.end()) continue;
-		err_chekf(atm.get_basis_set().size() != 0,
+		err_checkf(atm.get_basis_set().size() != 0,
 			"Can not generate auto-aux! Orbital Basis for Element: " + std::to_string(Z) + " is not defined!",
 			std::cout);
 		seen_elements.emplace_back(Z);
@@ -179,9 +179,9 @@ void BasisSet::gen_auto_aux(const WFN& orbital_wfn) {
 }
 
 /// Deduplicate candidates within tolerance on same atom
-std::vector<double> dedup_exponents(std::vector<double> exps, double tol = 0.1) {
+vec dedup_exponents(vec exps, double tol = 0.1) {
 	std::sort(exps.begin(), exps.end(), std::greater<double>());
-	std::vector<double> out;
+	vec out;
 	for (double e : exps) {
 		bool dup = false;
 		for (double x : out) {
@@ -196,15 +196,15 @@ std::vector<double> dedup_exponents(std::vector<double> exps, double tol = 0.1) 
 }
 
 /// Pivoted Cholesky decomposition for selecting linearly independent functions
-std::vector<int> pivoted_cholesky(dMatrix2& A, double threshold) {
+ivec pivoted_cholesky(dMatrix2& A, double threshold) {
 	const int n = A.extent(0);
-	std::vector<int> pivot_idx;
+	ivec pivot_idx;
 	vec diag(n);
 	for (int i = 0; i < n; ++i) {
 		diag[i] = A(i, i);
 	}
 	dMatrix2 L(n, n);
-	std::vector<int> perm(n);
+	ivec perm(n);
 	std::iota(perm.begin(), perm.end(), 0);
 
 	for (int k = 0; k < n; ++k) {
@@ -251,14 +251,14 @@ std::vector<int> pivoted_cholesky(dMatrix2& A, double threshold) {
 	return pivot_idx;
 }
 
-std::vector<double> prune_element_candidates_for_L(
+vec prune_element_candidates_for_L(
 	int L,
-	const std::vector<double>& exponents,
+	const vec& exponents,
 	double threshold)
 {
 	if (exponents.empty()) return {};
 
-	std::vector<double> unique_exps = dedup_exponents(exponents, 0.1);
+	vec unique_exps = dedup_exponents(exponents, 0.1);
 	const int n = static_cast<int>(unique_exps.size());
 	if (n <= 1) return unique_exps;
 
@@ -305,7 +305,7 @@ std::vector<double> prune_element_candidates_for_L(
 
 	auto keep = pivoted_cholesky(V_shell, threshold);
 
-	std::vector<double> pruned;
+	vec pruned;
 	pruned.reserve(keep.size());
 	for (int idx : keep) {
 		pruned.push_back(unique_exps[idx]);
@@ -325,9 +325,9 @@ void BasisSet::gen_auto_aux_for_element(const atom& atm) {
 	}
 	const int l_max1 = l_max + 1;
 
-	std::vector<double> a_min_by_l(l_max1, std::numeric_limits<double>::infinity());
-	std::vector<double> a_max_by_l(l_max1, 0.0);
-	std::vector<double> a_eff_by_l(l_max1, 0.0); // can be tuned; we use max of "effective" primitives
+	vec a_min_by_l(l_max1, std::numeric_limits<double>::infinity());
+	vec a_max_by_l(l_max1, 0.0);
+	vec a_eff_by_l(l_max1, 0.0); // can be tuned; we use max of "effective" primitives
 
 	int prim_idx = 0;
 	for (unsigned int shell = 0; shell < atm.get_shellcount_size(); shell++)
@@ -342,7 +342,7 @@ void BasisSet::gen_auto_aux_for_element(const atom& atm) {
 			a_max_by_l[shelltype] = std::max(a_max_by_l[shelltype], exps[i]);
 		}
 		prim_idx += shellsize;
-		coefs = Int_Params::normalize_gto(coefs, exps, shelltype);  //TODO: What norm is better, we have to still figure out.... 
+		coefs = Int_Params::normalize_gto(coefs, exps, shelltype);  //TODO: What norm is better, we have to still figure out....
 		//for (int i = 0; i < coefs.size(); i++)
 		//{
 		//    coefs[i] *= std::sqrt(constants::PI * 4 / constants::double_ft[2 * shelltype + 1]); // Conversion factor from GBW to libcint  ... something something, spherical harmonics...
@@ -501,7 +501,7 @@ namespace {
 		exact = false;
 
 		//3: the name followed by any suffix, e.g. "def2-svpd" -> "def2-svpd-rifit"
-		std::vector<int> hits;
+		ivec hits;
 		const std::string prefix = basis_name + "-";
 		for (int i = 0; i < count; i++)
 			if (basis_sets[i].name.substr(0, std::min(prefix.size(), basis_sets[i].name.size())) == prefix) hits.push_back(i);

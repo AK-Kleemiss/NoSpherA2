@@ -8,12 +8,12 @@
 
 #include "convenience.h"
 #include "molecule.h"
-using namespace std;
 
 // UNFINISHED WORKFLOW AND FILE!
 
 bool molecule::read_molecule(std::string path)
 {
+    using namespace std;
     if (!std::filesystem::exists(path))
     {
         cout << "ERROR: Could not open file for reading!" << endl;

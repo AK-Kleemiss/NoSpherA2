@@ -58,8 +58,8 @@ namespace crystal_energies {
 
     std::vector<symop> symops(const cell& c)
     {
-        const std::vector<ivec2> sym = c.get_sym();
-        const std::vector<vec> trans = c.get_trans();
+        const ivec3 sym = c.get_sym();
+        const vec2 trans = c.get_trans();
         std::vector<symop> ops(trans[0].size());
         for (int s = 0; s < (int)ops.size(); s++) {
             ops[s].rot.assign(3, ivec(3));
@@ -151,7 +151,7 @@ namespace crystal_energies {
         const vec2 M = cell_matrix(c), Mi = inverse3(M);
         const double cut = constants::ang2bohr(cutoff), cut2 = cut * cut;
         const int nm = (int)mol.size();
-        std::vector<vec> cen(nm, vec(3, 0.0));
+        vec2 cen(nm, vec(3, 0.0));
         vec rad(nm, 0.0), spacing(3);
         for (int i = 0; i < nm; i++) {
             const int na = mol[i].get_ncen();

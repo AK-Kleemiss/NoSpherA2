@@ -251,7 +251,7 @@ void read_hkl(const std::filesystem::path& hkl_filename,
 	if (debug)
 		file << "Number of reflections after twin: " << hkl.size() << std::endl;
 
-	std::vector<std::vector<ivec>> sym(3);
+	ivec3 sym(3);
 	for (int i = 0; i < 3; i++)
 		sym[i].resize(3);
 	sym = unit_cell.get_sym();
@@ -405,7 +405,7 @@ hkl_list read_hkl_full(const std::filesystem::path& hkl_filename,
 	if (debug)
 		file << "Number of reflections after twin: " << hkl.size() << std::endl;
 
-	std::vector<std::vector<ivec>> sym(3);
+	ivec3 sym(3);
 	for (int i = 0; i < 3; i++)
 		sym[i].resize(3);
 	sym = unit_cell.get_sym();
@@ -2321,10 +2321,10 @@ void append_scatterer_ids(ScattererLabels& ids,
 }
 
 //reflections [lo, hi) transposed to [dimension][reflection], the layout write_tscb_reflection_block expects
-std::vector<std::vector<int>> slice_hkl(const std::vector<i3>& hkl_v,
+ivec2 slice_hkl(const std::vector<i3>& hkl_v,
     const size_t lo, const size_t hi)
 {
-    std::vector<std::vector<int>> idx(3, std::vector<int>(hi - lo));
+    ivec2 idx(3, ivec(hi - lo));
     for (size_t r = lo; r < hi; r++)
         for (int dm = 0; dm < 3; dm++)
             idx[dm][r - lo] = hkl_v[r][dm];

@@ -8,16 +8,16 @@
 
 /**
  * @brief Computes 2-center integrals using the specified kernel type.
- * 
+ *
  * This function calculates 2-center integrals (overlap or Coulomb) based on the
  * integration parameters provided. The specific integral type is determined by
  * the kernel implementation used internally.
- * 
- * @param params Integration parameters containing basis set information, 
+ *
+ * @param params Integration parameters containing basis set information,
  *               atomic coordinates, and computational settings
  * @param ret Output vector to store the computed 2-center integral values
- * 
- * @note The function automatically handles optimization setup and memory 
+ *
+ * @note The function automatically handles optimization setup and memory
  *       management based on the kernel requirements (NeedsOpt flag)
  * @see Coulomb2C, Overlap2C for supported 2-center integral types
  */

@@ -1,7 +1,7 @@
+#include "pch.h"
 #ifdef NOSPHERA2_USE_GPU
 #include "blas_gpu.h"
 #endif
-#include "pch.h"
 #include "nos_math.h"
 
 
@@ -549,7 +549,7 @@ bool isSymmetricViaEigenvalues(const T& A, int n, double tol) {
                &info);
 
         lwork = static_cast<int>(work_query);
-        std::vector<double> work(static_cast<size_t>(lwork));
+        vec work(static_cast<size_t>(lwork));
 
         dgeev_("N", "N",
                &n_clpk,
@@ -578,9 +578,9 @@ bool isSymmetricViaEigenvalues(const T& A, int n, double tol) {
         //     lapack_complex_double* vl, lapack_int ldvl,
         //     lapack_complex_double* vr, lapack_int ldvr
         // //ISSUE WITH MKL COMPLEX TYPES I AM CURRENTL Y NOT INTERESTED IN SOLVING!
-           //LAPACKE_zgeev(LAPACK_ROW_MAJOR, 'N', 'N', 
-           //    n, reinterpret_cast<const cdouble*>(A_copy.data()), 
-           //    n, reinterpret_cast<const cdouble*>(wr.data()), 
+           //LAPACKE_zgeev(LAPACK_ROW_MAJOR, 'N', 'N',
+           //    n, reinterpret_cast<const cdouble*>(A_copy.data()),
+           //    n, reinterpret_cast<const cdouble*>(wr.data()),
            //    reinterpret_cast<const cdouble*>(wi.data()), n, nullptr, n);
         return false;
     }

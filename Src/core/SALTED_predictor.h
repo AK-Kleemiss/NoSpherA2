@@ -46,8 +46,8 @@ private:
     std::filesystem::path coef_file;
     bool debug;
     std::vector<std::string> atomic_symbols{};
-    std::unordered_map<std::string, std::vector<int>> atom_idx{};
-    
+    std::unordered_map<std::string, ivec> atom_idx{};
+
     std::unordered_map<std::string, int> natom_dict{}, lmax{}, nmax{};
     SALTEDDescriptors v1, v2;
     // Both hyperparameter sets identical: v2 is conj(v1), never filled, equicomb conjugates on read

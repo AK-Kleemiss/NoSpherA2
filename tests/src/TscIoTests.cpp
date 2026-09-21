@@ -115,13 +115,13 @@ namespace NoSpherA2UnitTests
 {
     TEST(TscBlockTests, ConstructorWarnsForDuplicateScattererIds)
     {
-        const std::vector<std::vector<cdouble>> form_factors = {
+        const cvec2 form_factors = {
             { cdouble(1.0, 0.0) },
             { cdouble(2.0, 0.0) },
             { cdouble(3.0, 0.0) }
         };
         const std::vector<atomID> scatterer_ids = { {0.1, 0.1, 0.1, 0, 1 }, {0.5, 0.2, 0.4, 0, 2 }, {0.1, 0.1, 0.1, 0, 1 } };
-        const std::vector<std::vector<int>> indices = { { 1 }, { 0 }, { 0 } };
+        const ivec2 indices = { { 1 }, { 0 }, { 0 } };
 
         testing::internal::CaptureStdout();
         tsc_block<int, cdouble> block(form_factors, scatterer_ids, indices);
@@ -132,12 +132,12 @@ namespace NoSpherA2UnitTests
 
     TEST(TscBlockTests, AppendWarnsForDuplicateScattererIds)
     {
-        const std::vector<std::vector<int>> indices = { { 1 }, { 0 }, { 0 } };
-        const std::vector<std::vector<cdouble>> lhs_form_factors = {
+        const ivec2 indices = { { 1 }, { 0 }, { 0 } };
+        const cvec2 lhs_form_factors = {
             { cdouble(1.0, 0.0) }
         };
         const std::vector<atomID> lhs_scatterer_ids{ {0.1, 0.1, 0.1, 0, 1 } };
-        const std::vector<std::vector<cdouble>> rhs_form_factors = {
+        const cvec2 rhs_form_factors = {
             { cdouble(2.0, 0.0) },
             { cdouble(3.0, 0.0) }
         };
@@ -157,7 +157,7 @@ namespace NoSpherA2UnitTests
 
     TEST(TscBlockTests, BinaryFileRoundTripsWith32BitSizes)
     {
-        const std::vector<std::vector<cdouble>> form_factors = {
+        const cvec2 form_factors = {
             { cdouble(1.25, -0.5), cdouble(2.5, 0.75) },
             { cdouble(-3.0, 1.5), cdouble(4.25, -2.0) }
         };
@@ -165,7 +165,7 @@ namespace NoSpherA2UnitTests
             atomID(0.1, 0.2, 0.3, 1, 6),
             atomID(0.4, 0.5, 0.6, 2, 8)
         };
-        const std::vector<std::vector<int>> indices = {
+        const ivec2 indices = {
             { 1, -2 }, { 0, 3 }, { -1, 4 }
         };
         const std::filesystem::path path =

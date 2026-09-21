@@ -375,7 +375,7 @@ namespace NoSpherA2UnitTests
         }
 
         const int m = 17, n = 11, k = 23;   // deliberately unequal, so a swapped extent shows
-        std::vector<double> A((size_t)m * k), B((size_t)k * n);
+        vec A((size_t)m * k), B((size_t)k * n);
         for (size_t i = 0; i < A.size(); i++) A[i] = 0.5 - std::sin(0.37 * (double)i);
         for (size_t i = 0; i < B.size(); i++) B[i] = 0.25 + std::cos(0.21 * (double)i);
 
@@ -388,7 +388,7 @@ namespace NoSpherA2UnitTests
                 // follow how the operand is stored rather than how it is used
                 const int lda = tA ? m : k;
                 const int ldb = tB ? k : n;
-                std::vector<double> C((size_t)m * n, 0.0);
+                vec C((size_t)m * n, 0.0);
                 const bool ran = blas_gpu_dgemm(tA != 0, tB != 0, m, n, k, 1.0,
                     A.data(), lda, B.data(), ldb, 0.0, C.data(), n);
                 ASSERT_TRUE(ran) << "device declined transA=" << tA << " transB=" << tB;
@@ -429,14 +429,14 @@ namespace NoSpherA2UnitTests
         }
 
         const int m = 9, n = 7, k = 4096;   // one tile of output, many slices of depth
-        std::vector<double> A((size_t)m * k), B((size_t)k * n);
+        vec A((size_t)m * k), B((size_t)k * n);
         for (size_t i = 0; i < A.size(); i++) A[i] = 0.5 - std::sin(0.37 * (double)i);
         for (size_t i = 0; i < B.size(); i++) B[i] = 0.25 + std::cos(0.21 * (double)i);
 
         blas_gpu_set_enabled(true);
         set_min_flop_env("1");
 
-        std::vector<double> C1((size_t)m * n, 0.0), C2((size_t)m * n, 0.0);
+        vec C1((size_t)m * n, 0.0), C2((size_t)m * n, 0.0);
         ASSERT_TRUE(blas_gpu_dgemm(false, false, m, n, k, 1.0,
             A.data(), k, B.data(), n, 0.0, C1.data(), n));
         ASSERT_TRUE(blas_gpu_dgemm(false, false, m, n, k, 1.0,
@@ -462,7 +462,7 @@ namespace NoSpherA2UnitTests
     TEST(BlasGpuTests, SmallShapesAreDeclinedSoTheyStayOnTheHost)
     {
         blas_gpu_set_enabled(true);
-        std::vector<double> A(16, 1.0), B(16, 1.0), C(16, 0.0);
+        vec A(16, 1.0), B(16, 1.0), C(16, 0.0);
         EXPECT_FALSE(blas_gpu_dgemm(false, false, 4, 4, 4, 1.0,
             A.data(), 4, B.data(), 4, 0.0, C.data(), 4));
         blas_gpu_set_enabled(false);

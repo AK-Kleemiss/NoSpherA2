@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "atoms.h"
 #include "cube.h"

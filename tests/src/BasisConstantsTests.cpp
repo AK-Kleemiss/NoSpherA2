@@ -672,7 +672,7 @@ TEST(BasisConstantsLibraryTests, AutoAuxWithPShellCoversLUpToTwo)
     const std::span<const SimplePrimitive> s = aux[0];
     const double beta[3] = { 1.8, 2.0, 2.2 };
     const double a_min[3] = { 2 * sto3g_h_exp[2], sto3g_h_exp[2] + 0.8, 1.6 };
-    std::vector<std::vector<double>> per_l(3);
+    vec2 per_l(3);
     for (const SimplePrimitive& p : s)
     {
         ASSERT_GE(p.type, 0);

@@ -372,7 +372,7 @@ TEST(ConvenienceTests, ShellTablesMatchTheirCounts)
     EXPECT_EQ(shell2function(-2, 1), -4);
     EXPECT_EQ(shell2function(7, 0), 0);
     // the f permutation covers 11..20 exactly once
-    std::vector<int> f;
+    ivec f;
     for (int p = 0; p < 10; p++)
         f.push_back(shell2function(3, p));
     std::sort(f.begin(), f.end());
@@ -600,7 +600,7 @@ TEST(ConvenienceMathTests, SwapSortOrdersValuesByKey)
     }
 
     ivec order3{ 1, 2, 0 };
-    std::vector<ivec> table{ { 7, 5, 9 }, { 17, 15, 19 }, { 27, 25, 29 } };
+    ivec2 table{ { 7, 5, 9 }, { 17, 15, 19 }, { 27, 25, 29 } };
     swap_sort_multi(order3, table);
     for (int row = 0; row < 3; row++)
     {
@@ -683,7 +683,7 @@ TEST(ConvenienceIoTests, FortranBinaryRecordsRoundTripAndRejectDamage)
         o.write(reinterpret_cast<const char*>(&wrong), sizeof(int));
     }
     std::ifstream f(good.path, std::ios::binary);
-    std::vector<double> v;
+    vec v;
     ASSERT_TRUE(read_block_from_fortran_binary(f, v));
     ASSERT_EQ(v.size(), 3u);
     EXPECT_NEAR(v[1], -2.25, 1e-15);
@@ -693,7 +693,7 @@ TEST(ConvenienceIoTests, FortranBinaryRecordsRoundTripAndRejectDamage)
     EXPECT_FALSE(read_block_from_fortran_binary(f, v)) << "nothing left to read";
 
     std::ifstream b(bad.path, std::ios::binary);
-    std::vector<double> w;
+    vec w;
     EXPECT_FALSE(read_block_from_fortran_binary(b, w));
     std::ifstream b2(bad.path, std::ios::binary);
     double tiny[1] = { 0.0 };

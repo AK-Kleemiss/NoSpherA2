@@ -58,7 +58,7 @@ std::vector<T> flatten(const std::vector<std::vector<std::vector<T>>> &vec3D)
 }
 template vec flatten(const vec3 &vec3D);
 template cvec flatten(const cvec3 &vec3D);
-template ivec flatten(const std::vector<ivec2> &vec3D);
+template ivec flatten(const ivec3 &vec3D);
 
 // Matrix multiplication
 // 2D x 2D MATRIX MULTIPLICATION
@@ -262,8 +262,8 @@ T self_dot(const std::vector<T> &vec1, const std::vector<T> &vec2, bool conjugat
     }
     return result;
 }
-template double self_dot(const std::vector<double> &vec1, const std::vector<double> &vec2, bool conjugate);
-template cdouble self_dot(const std::vector<cdouble> &vec1, const std::vector<cdouble> &vec2, bool conjugate);
+template double self_dot(const vec &vec1, const vec &vec2, bool conjugate);
+template cdouble self_dot(const cvec &vec1, const cvec &vec2, bool conjugate);
 
 template <typename T>
 T dot(const std::vector<T> &vec1, const std::vector<T> &vec2, bool conjugate)
@@ -280,8 +280,8 @@ T dot(const std::vector<T> &vec1, const std::vector<T> &vec2, bool conjugate)
 
     return dot_BLAS(vec1, vec2, conjugate);
 }
-template double dot(const std::vector<double> &vec1, const std::vector<double> &vec2, bool conjugate);
-template cdouble dot(const std::vector<cdouble> &vec1, const std::vector<cdouble> &vec2, bool conjugate);
+template double dot(const vec &vec1, const vec &vec2, bool conjugate);
+template cdouble dot(const cvec &vec1, const cvec &vec2, bool conjugate);
 
 template <typename T>
 T dot_BLAS(const std::vector<T> &vec1, const std::vector<T> &vec2, bool conjugate)
@@ -304,8 +304,8 @@ T dot_BLAS(const std::vector<T> &vec1, const std::vector<T> &vec2, bool conjugat
     }
     return result;
 }
-template double dot_BLAS(const std::vector<double> &vec1, const std::vector<double> &vec2, bool conjugate);
-template cdouble dot_BLAS(const std::vector<cdouble> &vec1, const std::vector<cdouble> &vec2, bool conjugate);
+template double dot_BLAS(const vec &vec1, const vec &vec2, bool conjugate);
+template cdouble dot_BLAS(const cvec &vec1, const cvec &vec2, bool conjugate);
 
 
 // TRANSPOSES
@@ -340,7 +340,7 @@ std::vector<std::vector<std::vector<T>>> transpose(const std::vector<std::vector
 }
 template vec3 transpose(const vec3 &originalVec);
 template cvec3 transpose(const cvec3 &originalVec);
-template std::vector<ivec2> transpose(const std::vector<ivec2> &originalVec);
+template ivec3 transpose(const ivec3 &originalVec);
 
 // 2D MATRIX
 template <class T>

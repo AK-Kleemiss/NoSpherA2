@@ -183,14 +183,14 @@ namespace
         ASSERT_TRUE(w.write_wfn(path, false, false));
     }
 
-    std::vector<std::vector<double>> read_tsc_rows(const fs::path& path)
+    vec2 read_tsc_rows(const fs::path& path)
     {
         std::ifstream in(path);
         std::string line;
         while (std::getline(in, line) && line != "DATA:")
         {
         }
-        std::vector<std::vector<double>> rows;
+        vec2 rows;
         while (std::getline(in, line))
         {
             if (line.empty())
@@ -199,7 +199,7 @@ namespace
                 if (c == ',')
                     c = ' ';
             std::istringstream ss(line);
-            std::vector<double> v(5);
+            vec v(5);
             ss >> v[0] >> v[1] >> v[2] >> v[3] >> v[4];
             rows.push_back(v);
         }
@@ -459,7 +459,7 @@ TEST(ScatteringCoverageIamTests, IamRowsAreThakkarFactors)
     ASSERT_EQ(block.scatterer_size(), 1u);
     ASSERT_EQ(block.reflection_size(), 3u);
     EXPECT_EQ(std::get<atomID>(block.get_scatterer(0)).to_hex_string(), atomID(0.25, 0.25, 0.25, 0, 6).to_hex_string());
-    EXPECT_EQ(block.get_index_vector(), (std::vector<std::vector<int>>{ { 0, 1, 1 }, { 2, 0, 1 }, { 0, 0, 1 } }));
+    EXPECT_EQ(block.get_index_vector(), (ivec2{ { 0, 1, 1 }, { 2, 0, 1 }, { 0, 0, 1 } }));
     expect_iam_rows(block, 0, 6, false);
     EXPECT_FALSE(s.opt.tsc_written_by_stream);
 }
@@ -562,9 +562,9 @@ TEST(ScatteringCoverageIamTests, DISABLED_IamStreamsTextTableWithElectronDiffrac
     s.run(log);
     EXPECT_NE(log.str().find("Streaming tsc in blocks of 3 reflections"), std::string::npos);
     ASSERT_TRUE(fs::exists(cwd.dir / "experimental.tsc"));
-    const std::vector<std::vector<double>> rows = read_tsc_rows(cwd.dir / "experimental.tsc");
+    const vec2 rows = read_tsc_rows(cwd.dir / "experimental.tsc");
     ASSERT_EQ(rows.size(), 3u);
-    for (const std::vector<double>& row : rows)
+    for (const vec& row : rows)
     {
         const i3 hkl{ int(row[0]), int(row[1]), int(row[2]) };
         const cdouble e = iam_expected(hkl, 6, true);
@@ -722,11 +722,11 @@ TEST(ScatteringCoverageDiffuseTests, GaussianDiffuseTableMatchesAnalyticTransfor
     ASSERT_TRUE(fs::exists(cwd.dir / "experimental.tsc"));
     const fractional_sphere ref(opt.dmin, false);
     EXPECT_EQ(parse_after(log.str(), "Nr of reflections to be used: "), (long)ref.expected.size());
-    const std::vector<std::vector<double>> rows = read_tsc_rows(cwd.dir / "experimental.tsc");
+    const vec2 rows = read_tsc_rows(cwd.dir / "experimental.tsc");
     ASSERT_EQ(rows.size(), ref.expected.size());
     hkl_list_d seen;
     const double g = constants::TWO_PI / constants::ang2bohr(kA);
-    for (const std::vector<double>& row : rows)
+    for (const vec& row : rows)
     {
         seen.insert(d3{ row[0], row[1], row[2] });
         const double k2 = g * g * (row[0] * row[0] + row[1] * row[1] + row[2] * row[2]);
@@ -872,15 +872,15 @@ TEST(ScatteringCoverageBlockTests, ValidateDimensionsThrowsOnBrokenTables)
     scoped_cwd cwd("dims");
     const cvec2 one{ cvec{ cdouble(1.0, 0.0) } };
     {
-        const itsc_block two_dims(one, svec{ "C1" }, std::vector<std::vector<int>>{ { 1 }, { 0 } });
+        const itsc_block two_dims(one, svec{ "C1" }, ivec2{ { 1 }, { 0 } });
         EXPECT_THROW(two_dims.write_tsc_file("a.cif", "a.tsc"), std::runtime_error);
     }
     {
-        const itsc_block ragged(one, svec{ "C1" }, std::vector<std::vector<int>>{ { 1 }, { 0 }, { 0, 1 } });
+        const itsc_block ragged(one, svec{ "C1" }, ivec2{ { 1 }, { 0 }, { 0, 1 } });
         EXPECT_THROW(ragged.write_tscb_file("a.cif", "a.tscb"), std::runtime_error);
     }
     {
-        const itsc_block short_row(one, svec{ "C1" }, std::vector<std::vector<int>>{ { 1, 2 }, { 0, 0 }, { 0, 0 } });
+        const itsc_block short_row(one, svec{ "C1" }, ivec2{ { 1, 2 }, { 0, 0 }, { 0, 0 } });
         EXPECT_THROW(short_row.write_tsc_file("a.cif", "a.tsc"), std::runtime_error);
     }
     {

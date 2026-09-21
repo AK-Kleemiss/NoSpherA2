@@ -1170,9 +1170,8 @@ PromolecularFragmentDensities promolecular_fragment_densities_at(
             current_fragment = atom.fragment;
         }
         // Table lookup for the mask pass only; lambda2 and the RDG come from the
-        // analytic Thakkar derivatives in promolecular_derivatives_at(). Measured
-        // 20 Sep 2026, 10 M points x 165 atoms, 8 threads: the exact Slater sums
-        // here take the run from 13 s to 54 s and move 2 of 34343 kept points
+        // analytic Thakkar derivatives in promolecular_derivatives_at(); the exact
+        // Slater sums here cost several times the run for a handful of kept points
         const double contribution = atom_models[atom.charge - 1].get_interpolated_density_spline(array_length(pos, atom.pos));
         fragment_sum += contribution;
         result.sum += contribution;

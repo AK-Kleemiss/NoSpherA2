@@ -31,7 +31,7 @@ namespace
         return std::filesystem::temp_directory_path() / ("bondwise_tests_" + name);
     }
 
-    dMatrix2 diagonal_matrix(const std::vector<double>& diag)
+    dMatrix2 diagonal_matrix(const vec& diag)
     {
         const int n = static_cast<int>(diag.size());
         dMatrix2 m(n, n);
@@ -70,9 +70,9 @@ namespace
     }
 
     //the numeric columns of the first table row that contains key, e.g. "N - Li   9.420 ..."
-    std::vector<double> row_numbers_after(const std::string& text, const std::string& key)
+    vec row_numbers_after(const std::string& text, const std::string& key)
     {
-        std::vector<double> out;
+        vec out;
         const size_t pos = text.find(key);
         if (pos == std::string::npos)
             return out;
@@ -287,7 +287,7 @@ TEST(BondwiseSymmetrizeTests, CartesianFgDiagonalAveragesOverExponentOrbits)
         const int n = (l + 1) * (l + 2) / 2;
         const int first_type = l * (l + 1) * (l + 2) / 6 + 1;
         std::vector<std::array<int, 3>> orbit(n);
-        std::vector<double> d(n);
+        vec d(n);
         for (int i = 0; i < n; i++) {
             int e[3];
             constants::type2vector(first_type + i, e);
@@ -340,7 +340,7 @@ TEST(BondwiseSymmetrizeTests, SphericalDShellSplitsIntoT2gAndEg)
 //and zeroes every cross block
 TEST(BondwiseSymmetrizeTests, SphericalMultiShellOffsets)
 {
-    std::vector<double> d(9);
+    vec d(9);
     for (int i = 0; i < 9; i++)
         d[i] = i + 1.0;
     dMatrix2 m = diagonal_matrix(d);
@@ -465,7 +465,7 @@ TEST(BondwiseQtaimMaskTests, SelectedSecondAtomShiftsOriginAndPartitionsGrid)
     QTAIM_ELI_mask(rho, eli, parent, parent.get_atoms(), { 0 }, 0.0, out_first, false, log);
     const MaskedCube first = read_masked(out_first, 0.0, log);
     std::filesystem::remove(out_first);
-    std::vector<int> owners(grid_nx * grid_ny * grid_nz, 0);
+    ivec owners(grid_nx * grid_ny * grid_nz, 0);
     for (const auto& k : first.kept)
         owners[(k[0] * grid_ny + k[1]) * grid_nz + k[2]]++;
     for (const auto& k : m.kept)
@@ -777,7 +777,7 @@ TEST(BondwiseRobyTests, NaoBondTableMatchesGolden)
     const std::string out = roby_output({}, true, false, false, false);
     if (out.empty())
         GTEST_SKIP() << "tests/RGBI_groups/nh3li.gbw not found";
-    const std::vector<double> li = row_numbers_after(out, "N - Li");
+    const vec li = row_numbers_after(out, "N - Li");
     ASSERT_EQ(li.size(), 9u);
     const double golden_li[9] = { 9.420, 3.110, 12.393, 0.137, 0.184, 0.421, 0.459, 15.972, 26.173 };
     for (int i = 0; i < 9; i++)
@@ -786,7 +786,7 @@ TEST(BondwiseRobyTests, NaoBondTableMatchesGolden)
     EXPECT_NEAR(li[7], 100.0 * li[4] * li[4] / (li[6] * li[6]), 0.3);
     EXPECT_NEAR(li[8], 200.0 * std::asin(li[4] / li[6]) / constants::PI, 0.3);
 
-    const std::vector<double> h = row_numbers_after(out, "N -  H");
+    const vec h = row_numbers_after(out, "N -  H");
     ASSERT_EQ(h.size(), 9u);
     const double golden_h[9] = { 9.420, 1.437, 9.615, 1.243, 0.905, 0.296, 0.952, 90.322, 79.861 };
     for (int i = 0; i < 9; i++)
@@ -844,7 +844,7 @@ TEST(BondwiseRobyTests, ThetaInfoReportsEveryBond)
                 }
             }
         }
-        const std::vector<double> row = row_numbers_after(out, table_keys[b]);
+        const vec row = row_numbers_after(out, table_keys[b]);
         ASSERT_EQ(row.size(), 9u) << table_keys[b];
         //the printed rows carry three decimals, so half a unit in the last place per summed row
         EXPECT_NEAR(row[4], cov_sum, 5e-4 * summed + 2e-3) << table_keys[b];
@@ -879,7 +879,7 @@ TEST(BondwiseRobyTests, SingletonGroupsReproduceAtomPopulations)
     EXPECT_NE(out.find("G1: atoms 4(Li)"), std::string::npos);
     EXPECT_NEAR(value_after(out, "Population of G0 (N)"), 9.42047, 2e-3);
     EXPECT_NEAR(value_after(out, "Population of G1 (Li)"), 3.1097, 2e-3);
-    const std::vector<double> g = row_numbers_after(out, "G0 - G1");
+    const vec g = row_numbers_after(out, "G0 - G1");
     ASSERT_EQ(g.size(), 9u);
     EXPECT_NEAR(g[0], 9.420, 3e-3);
     EXPECT_NEAR(g[1], 3.110, 3e-3);
@@ -904,7 +904,7 @@ TEST(BondwiseRobyTests, Nh3LiGroupPairSpansFullBasis)
     EXPECT_GT(g0, 9.42047);
     EXPECT_LE(g0, 13.0 + 1e-3);
     EXPECT_NEAR(value_after(out, "Population of G1 (Li)"), 3.1097, 2e-3);
-    const std::vector<double> g = row_numbers_after(out, "G0 - G1");
+    const vec g = row_numbers_after(out, "G0 - G1");
     ASSERT_EQ(g.size(), 9u);
     EXPECT_NEAR(g[0], g0, 3e-3);
     EXPECT_NEAR(g[1], 3.110, 3e-3);
@@ -946,7 +946,7 @@ TEST(BondwiseRobyTests, AnoBasisMatchesGoldenWithoutFallback)
     for (int i = 0; i < 5; i++)
         EXPECT_NEAR(value_after(out, "Population of atom " + std::to_string(i) + ": "), golden[i], 5e-3) << i;
     EXPECT_NEAR(value_after(out, "Total Population: "), 12.8475, 5e-3);
-    const std::vector<double> h = row_numbers_after(out, "N -  H");
+    const vec h = row_numbers_after(out, "N -  H");
     ASSERT_EQ(h.size(), 9u);
     EXPECT_NEAR(h[4], 0.885, 5e-3);
     EXPECT_NEAR(h[5], 0.295, 5e-3);

@@ -8,8 +8,6 @@
 #include <map>
 #include <mutex>
 
-using namespace std;
-
 namespace {
 
 d3 get_axis_lengths(const cube *cub)
@@ -238,8 +236,9 @@ bool try_merge_critical_point(std::vector<critical_point> &points, const critica
 
 } // namespace
 
-bool b2c(const cube *cub, const vector<atom> &atoms, bool debug, bool bcp)
+bool b2c(const cube *cub, const std::vector<atom> &atoms, bool debug, bool bcp)
 {
+    using namespace std;
     iMatrix3 CP(cub->get_size(0), cub->get_size(1), cub->get_size(2));
     ivec2 Liste(3);
     double GradMax, xlength, ylength, zlength;
@@ -681,7 +680,7 @@ std::vector<critical_point_seed> find_cube_critical_point_seeds(const cube *cub,
     });
 
     if (debug)
-        std::cout << "Found " << seeds.size() << " cube-based critical-point seeds" << endl;
+        std::cout << "Found " << seeds.size() << " cube-based critical-point seeds" << std::endl;
     return seeds;
 }
 
@@ -800,9 +799,9 @@ std::vector<critical_point> refine_cube_critical_points(
         }
 
         critical_point point = evaluate_critical_point(seed, position, wavy, iterations, converged);
-        
+
         // Check if this CP is at a known atomic position (nuclear attractor).
-        // Nuclear attractors should be kept even if density is very low (e.g., H atoms), 
+        // Nuclear attractors should be kept even if density is very low (e.g., H atoms),
         // and even if not fully converged, as long as the Hessian indicates it's an attractor.
         bool is_nuclear_attractor = false;
         if (point.type == "attractor") {
@@ -813,7 +812,7 @@ std::vector<critical_point> refine_cube_critical_points(
                 }
             }
         }
-        
+
         // For non-nuclear CPs, require that they exceed the normal density floor
         if (!is_nuclear_attractor && point.density <= density_floor)
             continue;
@@ -831,7 +830,7 @@ std::vector<critical_point> refine_cube_critical_points(
     });
 
     if (debug)
-        std::cout << "Refined " << points.size() << " unique critical points from cube seeds" << endl;
+        std::cout << "Refined " << points.size() << " unique critical points from cube seeds" << std::endl;
     return points;
 }
 std::vector<critical_point> analyze_cube_critical_points(
@@ -923,11 +922,11 @@ std::vector<critical_point> analyze_cube_critical_points(
     }
 
     if (debug)
-        std::cout << "Total seeds (grid + atom + bond): " << seeds.size() << endl;
+        std::cout << "Total seeds (grid + atom + bond): " << seeds.size() << std::endl;
 
     // Refine all the seed critical points
     auto points = refine_cube_critical_points(cub, wavy, seeds, debug, value_floor, gradient_tolerance, step_tolerance, max_iterations);
-    
+
     return points;
 }
 
@@ -941,7 +940,7 @@ std::vector<critical_point> analyze_cube_critical_points(
 //the start and are never merged: a hydroxyl hydrogen's basin is two voxels across at 0.1 A
 //and has no grid maximum of its own. With field_wfn the ascent takes the analytic density
 //gradient instead of grid differences, which is what lets it climb into such a basin.
-std::pair<cubei, std::vector<d4>> topological_cube_analysis(const cube *cub, const vector<atom> &atoms, bool debug, bool bcp, double value_floor, double grad_epsilon, double assignment_radius, double merge_persistence, const std::vector<d3> *seeds, const WFN *field_wfn, const std::function<double(const d3&)> *core_density, const std::function<void(const d3&, d3&)> *core_gradient, const density_field *field)
+std::pair<cubei, std::vector<d4>> topological_cube_analysis(const cube *cub, const std::vector<atom> &atoms, bool debug, bool bcp, double value_floor, double grad_epsilon, double assignment_radius, double merge_persistence, const std::vector<d3> *seeds, const WFN *field_wfn, const std::function<double(const d3&)> *core_density, const std::function<void(const d3&, d3&)> *core_gradient, const density_field *field)
 {
     auto field_dens = [&](const d3 &p) { return (field ? field->rho(p) : field_wfn->compute_dens(p)) + (core_density ? (*core_density)(p) : 0.0); };
     auto field_grad = [&](const d3 &p, d3 &g) {
@@ -991,11 +990,11 @@ std::pair<cubei, std::vector<d4>> topological_cube_analysis(const cube *cub, con
                 }
         return best > grad_epsilon;
     };
-    std::vector<int> basin(n, 0);
+    ivec basin(n, 0);
     std::vector<d4> Maxima;
     std::vector<bool> on_rim;
     std::vector<unsigned char> seeded(n, 0);
-    std::vector<int> stamp(n, 0);
+    ivec stamp(n, 0);
     int path_id = 0;
     if (seeds)
         for (const d3 &p : *seeds) {
@@ -1095,7 +1094,7 @@ std::pair<cubei, std::vector<d4>> topological_cube_analysis(const cube *cub, con
         //a half of a seed, in a voxel some earlier trajectory settled, or where the gradient
         //dies, and every voxel it crossed takes the answer. Threads share the answers as they
         //come; a stale read only makes a trajectory run a little further.
-        std::cout << "Assigning basins along the density gradient..." << endl;
+        std::cout << "Assigning basins along the density gradient..." << std::endl;
         const double hmax = std::max({ h[0], h[1], h[2] });
         const double catch2 = 2.25 * hmax * hmax;
         const double hmin = std::min({ h[0], h[1], h[2] });
@@ -1109,7 +1108,7 @@ std::pair<cubei, std::vector<d4>> topological_cube_analysis(const cube *cub, con
         std::sort(order.begin(), order.end(), [&](int a, int b) { return v[a] > v[b] || (v[a] == v[b] && a < b); });
         const size_t chunk = std::max<size_t>(1, order.size() / 64 + 1);
         ivec result(n, 0);
-        std::vector<int> unresolved;
+        ivec unresolved;
         auto voxel_of = [&](const d3 &p, int *c) {
             for (int d = 0; d < 3; d++) {
                 c[d] = static_cast<int>(std::lround((p[d] - cub->get_origin(d)) / cub->get_vector(d, d)));
@@ -1199,7 +1198,7 @@ std::pair<cubei, std::vector<d4>> topological_cube_analysis(const cube *cub, con
         }
     }
     else {
-        std::cout << "Assigning basins by near-grid ascent..." << endl;
+        std::cout << "Assigning basins by near-grid ascent..." << std::endl;
         for (int x = 0; x < nx; x++)
             for (int y = 0; y < ny; y++)
                 for (int z = 0; z < nz; z++) {
@@ -1222,7 +1221,7 @@ std::pair<cubei, std::vector<d4>> topological_cube_analysis(const cube *cub, con
                 }
             }
     if (!field_wfn) {
-        std::vector<int> refined(basin);
+        ivec refined(basin);
         for (size_t i = 0; i < n; i++) {
             if (!valid[i] || interior[i]) continue;
             const int x = static_cast<int>(i / (static_cast<size_t>(ny) * nz)), y = static_cast<int>((i / nz) % ny), z = static_cast<int>(i % nz);
@@ -1231,7 +1230,7 @@ std::pair<cubei, std::vector<d4>> topological_cube_analysis(const cube *cub, con
         basin.swap(refined);
     }
     int nb = static_cast<int>(Maxima.size());
-    std::cout << "I found " << nb << " Basins." << endl;
+    std::cout << "I found " << nb << " Basins." << std::endl;
     //Persistence merge: the saddle between two basins is the highest of the lower values over
     //their shared faces; a maximum less than merge_persistence of its height above its highest
     //saddle is grid noise and joins the basin behind that saddle
@@ -1253,7 +1252,7 @@ std::pair<cubei, std::vector<d4>> topological_cube_analysis(const cube *cub, con
                         if (s > e) e = s;
                     }
                 }
-        std::vector<int> target(nb + 1);
+        ivec target(nb + 1);
         for (int b = 0; b <= nb; b++) target[b] = b;
         auto root = [&](int b) { while (target[b] != b) b = target[b]; return b; };
         for (;;) {
@@ -1275,15 +1274,15 @@ std::pair<cubei, std::vector<d4>> topological_cube_analysis(const cube *cub, con
                 if (rel < worst_rel) { worst_rel = rel; worst = b; into = nb_into; }
             }
             if (worst < 0) break;
-            if (debug) std::cout << "Merging basin " << worst << " into " << into << " (persistence " << worst_rel << ")" << endl;
+            if (debug) std::cout << "Merging basin " << worst << " into " << into << " (persistence " << worst_rel << ")" << std::endl;
             target[worst] = into;
         }
-        std::vector<int> renumber(nb + 1, 0);
+        ivec renumber(nb + 1, 0);
         std::vector<d4> kept;
         for (int b = 1; b <= nb; b++)
             if (root(b) == b) { kept.push_back(Maxima[b - 1]); renumber[b] = static_cast<int>(kept.size()); }
         for (size_t i = 0; i < n; i++) if (basin[i]) basin[i] = renumber[root(basin[i])];
-        if (kept.size() != Maxima.size()) std::cout << "Merged " << Maxima.size() - kept.size() << " noise maxima, " << kept.size() << " basins remain." << endl;
+        if (kept.size() != Maxima.size()) std::cout << "Merged " << Maxima.size() - kept.size() << " noise maxima, " << kept.size() << " basins remain." << std::endl;
         Maxima.swap(kept);
     }
     for (int x = 0; x < nx; x++)
@@ -1568,7 +1567,7 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
             if (b > 0) pop[b - 1] += ncore;
             else outside += ncore;
         }
-    std::cout << "Quadrature points sent along the field: " << boundary_points << ", left the grid: " << lost << endl;
+    std::cout << "Quadrature points sent along the field: " << boundary_points << ", left the grid: " << lost << std::endl;
     return pop;
 }
 
@@ -1581,7 +1580,7 @@ vec integrate_values_in_basins(const cube *cub, const cubei *basin_cube, svec& b
     err_checkf(basin_cube->get_size(0) == cub->get_size(0) && basin_cube->get_size(1) == cub->get_size(1) && basin_cube->get_size(2) == cub->get_size(2), "Basin cube and original cube must have the same dimensions!", std::cout);
     err_checkf(basin_cube->get_dv() - cub->get_dv() < 1E-10, "Basin must have reasonable size!", std::cout);
     if (debug)
-        std::cout << "dv: " << dv << " iCP: " << basin_count << endl;
+        std::cout << "dv: " << dv << " iCP: " << basin_count << std::endl;
 
 #ifdef _OPENMP
 #pragma omp parallel for collapse(3) schedule(static)
@@ -1604,17 +1603,18 @@ vec integrate_values_in_basins(const cube *cub, const cubei *basin_cube, svec& b
             }
     for (int a = 0; a < basin_count; a++) {
         if (EDS[a] > 0.001)
-            std::cout << "basin: " << setw(4) << a << " label: " << setw(16) << basin_label[a] << " integrated value: " << setw(8) << std::setprecision(4) << std::fixed << EDS[a] << " volume:" << setw(10) << VOL[a] << endl;
+            std::cout << "basin: " << std::setw(4) << a << " label: " << std::setw(16) << basin_label[a] << " integrated value: " << std::setw(8) << std::setprecision(4) << std::fixed << EDS[a] << " volume:" << std::setw(10) << VOL[a] << std::endl;
     }
     for (int a = 0; a < basin_count; a++) {
         if (EDS[a] < 0.001)
-            std::cout << "WARNING: Integrated value in basin " << a + 1 << " is very low (" << EDS[a] << ") and might be inaccurate due to numerical errors!" << endl;
+            std::cout << "WARNING: Integrated value in basin " << a + 1 << " is very low (" << EDS[a] << ") and might be inaccurate due to numerical errors!" << std::endl;
     }
     return EDS;
 };
 
-svec assign_labels_to_basins(const vector<d4> &Maxima, const vector<atom> &atoms, bool debug, int type_switch)
+svec assign_labels_to_basins(const std::vector<d4> &Maxima, const std::vector<atom> &atoms, bool debug, int type_switch)
 {
+    using namespace std;
     svec result(Maxima.size());
     //type switch defines the field that was analyzed and will define how we assign labels to the basins
     switch (type_switch) {

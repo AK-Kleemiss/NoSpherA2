@@ -1,8 +1,7 @@
 //
 // Created by Lucas on 09/12/25.
 //
-#ifndef NOSPHERA2_DEBUG_UTILS_H
-#define NOSPHERA2_DEBUG_UTILS_H
+#pragma once
 #include <iostream>
 #include <cstdlib>
 
@@ -88,4 +87,3 @@ inline void wait_for_debugger() {
     std::raise(SIGTRAP);
 #endif
 }
-#endif //NOSPHERA2_DEBUG_UTILS_H

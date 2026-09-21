@@ -106,7 +106,7 @@ namespace {
             for (double v : b) std::cout << v << " ";
             std::cout << std::endl;
         }
-    } 
+    }
 
     void test_openblas()
     {
@@ -834,7 +834,7 @@ namespace NoSpherA2UnitTests
                                       { 1, 0, { 2.2 } }, { 1, 1, { 1.1, 0.4 } }, { 1, 2, { 0.6 } } };
         const vec occ{ 2.0, 1.0 };
         //coef[mo][shell][m][s]: deterministic pseudo-random, m in ORCA order 0,+1,-1,+2,-2,...
-        std::vector<std::vector<vec2>> coef(occ.size(), std::vector<vec2>(shells.size()));
+        std::vector<vec3> coef(occ.size(), vec3(shells.size()));
         int seed = 0;
         for (int mo = 0; mo < (int)occ.size(); mo++)
             for (int i = 0; i < (int)shells.size(); i++)
@@ -848,7 +848,7 @@ namespace NoSpherA2UnitTests
         wavy.push_back_atom("C", centres[1][0], centres[1][1], centres[1][2], 6);
         for (int mo = 0; mo < (int)occ.size(); mo++) wavy.push_back_MO(mo + 1, occ[mo], -1.0 - mo);
         std::vector<primitive> prims;
-        std::vector<int> start;
+        ivec start;
         for (const sh& s : shells)
         {
             start.push_back((int)prims.size());

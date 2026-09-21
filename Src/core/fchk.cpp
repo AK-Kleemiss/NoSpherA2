@@ -857,7 +857,7 @@ bool free_fchk(std::ostream &file, const std::filesystem::path &fchk_name, const
             for (int p = 0; p < wave.get_atom_primitive_count(a); p++)
             {
                 const int l = wave.get_atom_primitive_type(a, p) - 1;
-                err_chkf(l >= 0, "Sorry, the type reading went wrong somwhere, look where it may have gone crazy...", file);
+                err_checkf(l >= 0, "Sorry, the type reading went wrong somwhere, look where it may have gone crazy...", file);
                 const double c = wave.get_atom_basis_set_coefficient(a, p);
                 basis_coefficients[a].push_back(normalised ? c : axial_prim_norm(l, wave.get_atom_basis_set_exponent(a, p)) * c);
             }
@@ -869,7 +869,7 @@ bool free_fchk(std::ostream &file, const std::filesystem::path &fchk_name, const
             for (int s = 0; s < wave.get_atom_shell_count(a); s++)
             {
                 int type_temp = wave.get_shell_type(a, s);
-                err_chkf(type_temp != -1, "ERROR in type assignement!!", file);
+                err_checkf(type_temp != -1, "ERROR in type assignement!!", file);
                 if (debug)
                 {
                     file << "Shell: " << s << " of atom: " << a << " Shell type: " << type_temp << endl
