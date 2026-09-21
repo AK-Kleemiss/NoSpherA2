@@ -67,7 +67,8 @@ namespace geometry_aid
     // that differs between the shipped models, 3.5 for c_only (all-carbon input) and 3.0 for dirty (may be iterated).
     // With metals Zn stands in for every element outside the eleven (row-2 specialist, 78 pairs, 49,686).
     // The environment overrides are for timing only and are announced as such.
-    SALTED_Utils::FeatomicHyperParameters hyperparameters(double cutoff_radius, bool metals)
+    // center_weight 0 masks the centre atom: the label-aware model sees the neighbours' labels but not its own.
+    SALTED_Utils::FeatomicHyperParameters hyperparameters(double cutoff_radius, bool metals, double center_weight)
     {
         std::vector<std::string> species{ "B", "C", "N", "O", "F", "Si", "P", "S", "Cl", "Br", "I" };
         if (metals) species.push_back("Zn");
@@ -93,7 +94,7 @@ namespace geometry_aid
             .max_radial = max_radial,
             .max_angular = max_angular,
             .atomic_gaussian_width = 0.2,
-            .center_atom_weight = 1.0,
+            .center_atom_weight = center_weight,
             .species = species,
             .neighspe = species,
             .radial_basis = {.type = "Gto", .spline_accuracy = spline_accuracy },
@@ -309,7 +310,7 @@ namespace geometry_aid
     // What the flags queued, in one process; the exit code of the run.
     int run(const options& opt)
     {
-        const SALTED_Utils::FeatomicHyperParameters hyperparams = hyperparameters(opt.geometry_aid_cutoff, opt.geometry_aid_metals);
+        const SALTED_Utils::FeatomicHyperParameters hyperparams = hyperparameters(opt.geometry_aid_cutoff, opt.geometry_aid_metals, opt.geometry_aid_center_weight);
         jobvec descriptors, probabilities;
         if (opt.calc_featomic_descriptor)
         {

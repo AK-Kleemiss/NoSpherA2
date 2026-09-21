@@ -497,6 +497,8 @@ std::string help_message =
  "                                      3.0 matches the dirty models.\n"
  "  -geometry_aid_metals                Add Zn as the metal stand-in species (row-2\n"
  "                                      specialist models, 49,686 long).\n"
+ "  -geometry_aid_center_weight <w>     SOAP centre-atom weight, 0 masks the centre\n"
+ "                                      (label-aware models, default 1).\n"
  "  -calc_featomic_descriptor           Write descriptor.npy (requires -wfn).\n"
  "  -calc_featomic_descriptors <list>   Same, for many structures in one run.\n"
  "                                      <list> holds one structure path per\n"
@@ -3481,6 +3483,10 @@ bool options::digest_ri_options(const std::string &temp, int &i)
         geometry_aid_cutoff = std::stod(arguments[++i]);
         std::cout << "  geometry-aid SOAP cutoff radius set to " << geometry_aid_cutoff << " A ("
                   << (geometry_aid_cutoff > 3.25 ? "c_only" : "dirty") << " model family)" << std::endl;
+    }
+    else if (temp == "-geometry_aid_center_weight") {
+        err_checkf(i + 1 < argc, "-geometry_aid_center_weight needs a weight", std::cout);
+        geometry_aid_center_weight = std::stod(arguments[++i]);
     }
     else if (temp == "-geometry_aid_metals") {
         //Zn joins the species list as the stand-in for every metal: the row-2 specialist sees the heavy atoms

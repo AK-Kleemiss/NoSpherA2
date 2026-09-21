@@ -833,6 +833,7 @@ struct options
     pathvec classify_structures;
     double geometry_aid_cutoff = 3.5;
     bool geometry_aid_metals = false;
+    double geometry_aid_center_weight = 1.0;
     std::filesystem::path interaction_energies_job;
 	std::filesystem::path xcw_settings_path;
     properties_options properties;
