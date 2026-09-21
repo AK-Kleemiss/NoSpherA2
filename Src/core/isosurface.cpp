@@ -539,9 +539,14 @@ vec surface_ESP(const std::vector<Triangle>& triangles, const WFN& wavy)
 vec surface_ESP(const std::vector<Triangle>& triangles, const std::function<double(const d3&)>& esp_at)
 {
 	vec esp(triangles.size());
+	// the ESP at every face is the long part of a coloured surface; Olex2 tails this bar while the window stays alive
+	ProgressBar pb(triangles.size(), 50, "=", " ", "Surface ESP");
 #pragma omp parallel for
 	for (int i = 0; i < (int)triangles.size(); i++)
+	{
 		esp[i] = esp_at(triangles[i].calc_center());
+		pb.update();
+	}
 	return esp;
 }
 
