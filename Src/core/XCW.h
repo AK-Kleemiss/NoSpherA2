@@ -111,6 +111,9 @@ private:
 		bool slow_conv = false;
 		//`soscf`: second-order steps as soon as the DIIS error is below soscf_start_, see soscf_step
 		bool soscf = false;
+		//`check_hessian`: finite-difference check of the Hessian-vector product on the first
+		//second-order step, reported in XCW.log
+		bool check_hessian = false;
 		//`i_sigma <x>`: only reflections with I/sigma(I) >= x enter chi^2 and the scale, as in
 		//Tonto. Under the reader's sigma(F) = sigma(I)/2F that is F/sigma(F) >= 2x, so the
 		//default 2 is SHELX's I > 2 sigma(I) and F > 4 sigma(F) at once
@@ -309,6 +312,9 @@ private:
 
 	// Calculates the perturbation matrix elements
 	void calc_perturb(occ::Mat& perturb, const occ::qm::SCF<occ::qm::HartreeFock>& scf);
+	// Sum_r Re(pre_r I_r(mu,nu)) over the fit set, the walk calc_perturb and the Hessian-vector
+	// product share; out is nmo x nmo, symmetric, without any prefactor
+	void contract_I(occ::Mat& out, const cvec& pre);
 
 	// Executes a single SCF solver (for specific lambda step)
 	void small_basis_guess(occ::qm::SCF<occ::qm::HartreeFock>& scf);
@@ -343,27 +349,38 @@ private:
 
 	// The way out of a plateau the Roothaan/DIIS map does not leave (Fe(phen)2(SCN)2 UHF
 	// singlet at lambda 0.04: E and chi^2 flat for 130 iterations, orbital gradient stuck at
-	// 1.5e-2, damping and rescue cycling): quasi-Newton on the occupied-virtual rotations of
-	// E + lambda chi^2, the functional the perturbed Fock matrix is the gradient of. L-BFGS
-	// preconditioned by the orbital-energy differences, a trust radius on the rotation, the
-	// orbitals moved by the Cayley transform, and a step that raises the functional is halved
-	// from the orbitals it left. It descends monotonically, so it cannot cycle, and it keeps the
-	// occupation, so it cannot swap orbitals. Entered when the orbital gradient has not halved
-	// in soscf_patience_ iterations, or with `soscf` once the DIIS error is below soscf_start_;
-	// it stays on for the rest of the lambda step.
+	// 1.5e-2, damping and rescue cycling): trust-region augmented-Hessian steps (TRAH) on the
+	// occupied-virtual rotations of E + lambda chi^2, the functional the perturbed Fock matrix
+	// is the gradient of. Each macro step solves the augmented-Hessian eigenproblem by Davidson
+	// micro-iterations with the exact Hessian-vector product (Fock response plus the response
+	// of the perturbation, scale included), the level shift set so the step fits the trust
+	// radius, the orbitals moved by the Cayley transform, and the trust radius updated from the
+	// ratio of the actual to the predicted decrease; a step that raises the functional is
+	// re-solved at half the radius from the retained subspace. It keeps the occupation, so it
+	// cannot swap orbitals. Entered when the orbital gradient has not halved in
+	// soscf_patience_ iterations, or with `soscf` once the DIIS error is below soscf_start_;
+	// it stays on for the rest of the lambda step. Micro-iterations do not count towards
+	// max_iter; L-BFGS with a diagonal Hessian wandered for 100+ iterations on the same case
+	// (E +-5e-6 Eh, a halved step every 2-3 iterations) where the curvature of chi^2 is stiff.
 	bool soscf_ = false;
 	int soscf_patience_iter_ = 0;
 	double soscf_patience_grad_ = 0;
-	static constexpr int soscf_patience_ = 30;
-	static constexpr double soscf_start_ = 1e-2, soscf_trust_max_ = 0.5, soscf_trust_first_ = 0.2;
+	static constexpr int soscf_patience_ = 30, trah_micro_max_ = 30;
+	static constexpr double soscf_start_ = 1e-2, soscf_trust_max_ = 1.0, soscf_trust_first_ = 0.5, soscf_noise_ = 1e-8;
 	double soscf_trust_ = soscf_trust_first_;
-	static constexpr size_t lbfgs_memory_ = 10;
-	std::deque<occ::Vec> lbfgs_s_, lbfgs_y_;
-	occ::Vec soscf_kappa_, soscf_grad_;
+	std::vector<occ::Vec> trah_B_, trah_HB_;
+	occ::Vec soscf_kappa_, soscf_grad_, soscf_hdiag_;
 	occ::Mat soscf_C_;
-	double soscf_phi_ = 0;
+	double soscf_phi_ = 0, soscf_pred_ = 0;
+	bool soscf_boundary_ = false;
+	int trah_micro_total_ = 0;
 	void soscf_reset();
-	void soscf_step(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double phi);
+	void soscf_step(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double lambda, const double phi);
+	void trah_solve(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double lambda, const bool extend);
+	occ::Vec hessian_vector(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double lambda, const occ::Vec& v);
+	double rebuild_at(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double lambda, const occ::Mat& C_from, const occ::Vec& kappa);
+	occ::Vec gradient_at(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double lambda, const occ::Mat& C_from, const occ::Vec& kappa);
+	void check_hessian(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double lambda);
 	occ::Vec orbital_rotation_gradient(const occ::qm::SCF<occ::qm::HartreeFock>& scf, occ::Vec& diagonal_hessian) const;
 	void rotate_orbitals(occ::qm::SCF<occ::qm::HartreeFock>& scf, const occ::Mat& C_from, const occ::Vec& kappa) const;
 

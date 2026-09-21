@@ -1045,17 +1045,37 @@ TEST(XcwScfTests, ScaleIsStationaryForTheCriterion)
 }
 
 //`soscf` hands the step to the second-order solver once the DIIS error is below 1e-2; from
-//there the quasi-Newton steps on the orbital rotations have to reach the same lambda = 0
-//minimum as the Roothaan/DIIS iterations
+//there the trust-region augmented-Hessian steps on the orbital rotations have to reach the
+//same lambda = 0 minimum as the Roothaan/DIIS iterations, with micro-iterations reported
 TEST(XcwScfTests, SecondOrderStepsReachTheGoldenEnergy)
 {
 	if (p1_fixture().empty()) GTEST_SKIP() << "fixture tests/P1_test not found";
 	const auto dir = scratch_dir();
 	const p1_run run = run_on_p1(dir, common + "f rhf start 0 step_size 0.01 end 0 soscf", true);
 	EXPECT_NE(run.log.find("second-order steps on the orbital rotations from here"), std::string::npos) << run.log;
+	EXPECT_NE(run.log.find("TRAH: "), std::string::npos) << run.log;
 	EXPECT_NE(run.log.find("***SCF converged in"), std::string::npos) << run.log;
 	const auto rows = lambda_rows(run.out);
 	ASSERT_EQ(rows.size(), 1u) << run.out;
 	EXPECT_NEAR(rows[0].d(rows[0].energy), golden_energy, 1e-6);
 	std::filesystem::remove_all(dir);
+}
+
+//The exact Hessian-vector product behind the second-order steps (Fock response plus the
+//response of the perturbation with the scale moving) against a central finite difference of
+//the gradient, at a lambda where the perturbation is on, for both spin treatments; the
+//tensor in double so the difference quotient is not limited by fp32 noise in the gradient
+TEST(XcwScfTests, HessianVectorProductMatchesFiniteDifference)
+{
+	if (p1_fixture().empty()) GTEST_SKIP() << "fixture tests/P1_test not found";
+	for (const std::string kind : { "f rhf", "f2 uhf" }) {
+		const auto dir = scratch_dir();
+		const p1_run run = run_on_p1(dir, common + kind + " start 0.02 step_size 0.01 end 0.02 i_double soscf check_hessian", true);
+		const size_t at = run.log.find("Hessian check: |Hv - FD| / |FD| = ");
+		ASSERT_NE(at, std::string::npos) << run.log;
+		const double rel = std::stod(run.log.substr(at + std::string("Hessian check: |Hv - FD| / |FD| = ").size()));
+		EXPECT_LT(rel, 1e-4) << kind << ": " << run.log.substr(at, 160);
+		std::cout << kind << ": " << run.log.substr(at, 130) << std::endl;
+		std::filesystem::remove_all(dir);
+	}
 }

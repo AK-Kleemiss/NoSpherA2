@@ -9,6 +9,7 @@
 #include "basis_set.h"
 #include "bondwise_analysis.h"
 #include <mutex>
+#include <random>
 
 void XCW::construct(const options& opt_in) {
 	opt = &opt_in;
@@ -140,7 +141,7 @@ XCW::SCF_settings XCW::loadSettings(const std::filesystem::path& settings_path) 
 
 	settings.grown = false;
 	std::string conv_preset = "normal";
-	bool soscf = false;
+	bool soscf = false, check_hessian = false;
 	std::string speed_preset = "normal_conv";
 
 	/* 1: Classical Jayatilaka XWR
@@ -313,6 +314,10 @@ XCW::SCF_settings XCW::loadSettings(const std::filesystem::path& settings_path) 
 
 		handlers["soscf"] = [&](std::istream&) {
 			soscf = true;
+			};
+
+		handlers["check_hessian"] = [&](std::istream&) {
+			check_hessian = true;
 			};
 
 		handlers["fast_conv"] = [&](std::istream&) {
@@ -498,6 +503,7 @@ XCW::SCF_settings XCW::loadSettings(const std::filesystem::path& settings_path) 
 	settings.df_basis_name = df_basis_name;
 	settings.guess_basis_name = guess_basis_name;
 	settings.soscf = soscf;
+	settings.check_hessian = check_hessian;
 
 	return settings;
 }
@@ -2580,7 +2586,6 @@ void XCW::calc_F_calc(const dMatrix2& D) {
 
 void XCW::calc_perturb(occ::Mat& perturb, const occ::qm::SCF<occ::qm::HartreeFock>& scf) {
 	ensure_inv_H2_weights();
-	perturb.setZero(cryst.nmo, cryst.nmo);
 
 	//The four (XWR_type, refine_against) combinations differ only in the per-reflection
 	//scalar and the prefactor, so one walk over I serves all of them
@@ -2594,10 +2599,11 @@ void XCW::calc_perturb(occ::Mat& perturb, const occ::qm::SCF<occ::qm::HartreeFoc
 		? 4.0 * scale_sq / (cryst.n_fit - settings.n_params)
 		: 2.0 * cryst.F_scale / (cryst.n_fit - settings.n_params);
 
-	const int step = std::max(1, i_streamed_ ? i_window_ : cryst.nr_small);
-	auto precompute_of = [&](const int r) {
+	cvec pre(cryst.nr_small);
+#pragma omp parallel for
+	for (int r = 0; r < cryst.nr_small; r++) {
+		if (!valid || !fit_mask_[r]) continue;
 		cdouble precompute;
-		if (!fit_mask_[r]) return precompute;
 		if (against_F2) {
 			const double F_calc_abs_sq = std::pow(std::abs(F_calc[0][r]), 2);
 			precompute = std::conj(F_calc[0][r]) * (scale_sq * F_calc_abs_sq - obs[r].F_obs2) / (obs[r].sigma_obs2 * obs[r].sigma_obs2);
@@ -2607,17 +2613,26 @@ void XCW::calc_perturb(occ::Mat& perturb, const occ::qm::SCF<occ::qm::HartreeFoc
 			precompute = std::conj(F_calc[0][r]) * (cryst.F_scale * F_calc_abs - obs[r].abs_F_obs) / (obs[r].sigma_obs * obs[r].sigma_obs * F_calc_abs);
 		}
 		if (weighted) precompute *= inv_H2_[r];
-		return precompute;
-	};
+		pre[r] = precompute;
+	}
+	contract_I(perturb, pre);
+	perturb *= prefactor;
+	if (scf.ctx.mo.kind == occ::qm::SpinorbitalKind::Unrestricted) {
+		perturb.conservativeResize(2 * cryst.nmo, Eigen::NoChange);
+		perturb.bottomRows(cryst.nmo) = perturb.topRows(cryst.nmo);
+	}
+	//closing function
+}
+
+void XCW::contract_I(occ::Mat& out, const cvec& pre) {
+	out.setZero(cryst.nmo, cryst.nmo);
+	const int step = std::max(1, i_streamed_ ? i_window_ : cryst.nr_small);
 	bool on_device = false;
 #if defined(NOSPHERA2_USE_GPU) || defined(NOSPHERA2_USE_METAL)
-	if (i_on_device_ && valid) {
-		cvec pre(cryst.nr_small);
-#pragma omp parallel for
-		for (int r = 0; r < cryst.nr_small; r++) pre[r] = precompute_of(r);
-		vec out(i_compact_);
-		err_checkf(itensor_gpu_cols(pre.data(), out.data()), "I tensor walk on the device failed", std::cout);
-		for (size_t k = 0; k < i_compact_; k++) perturb(i_pair_mu_[k], i_pair_nu_[k]) = out[k];
+	if (i_on_device_) {
+		vec dev(i_compact_);
+		err_checkf(itensor_gpu_cols(pre.data(), dev.data()), "I tensor walk on the device failed", std::cout);
+		for (size_t k = 0; k < i_compact_; k++) out(i_pair_mu_[k], i_pair_nu_[k]) = dev[k];
 		on_device = true;
 	}
 #endif
@@ -2630,7 +2645,7 @@ void XCW::calc_perturb(occ::Mat& perturb, const occ::qm::SCF<occ::qm::HartreeFoc
 	{
 		occ::Mat local = occ::Mat::Zero(cryst.nmo, cryst.nmo);
 		double* local_ptr = local.data();
-		for (int r0 = 0; valid && !on_device && r0 < cryst.nr_small; r0 += step) {
+		for (int r0 = 0; !on_device && r0 < cryst.nr_small; r0 += step) {
 			const int r1 = std::min(r0 + step, cryst.nr_small);
 			if (i_streamed_) {
 #pragma omp single
@@ -2643,7 +2658,8 @@ void XCW::calc_perturb(occ::Mat& perturb, const occ::qm::SCF<occ::qm::HartreeFoc
 #pragma omp for
 			for (int r = r0; r < r1; r++) {
 				if (!io_error.empty()) continue;
-				const cdouble precompute = precompute_of(r);
+				const cdouble precompute = pre[r];
+				if (precompute == cdouble(0.0, 0.0)) continue;
 				//As in calc_F_calc: one walk over whichever element type is resident, with
 				//the accumulation in double either way.
 				auto accumulate = [&](const auto* I_r) {
@@ -2669,21 +2685,15 @@ void XCW::calc_perturb(occ::Mat& perturb, const occ::qm::SCF<occ::qm::HartreeFoc
 				double sum = 0.0;
 				for (int t = 0; t < static_cast<int>(parts.size()); t++)
 					if (parts[t].size() != 0) sum += parts[t](mu, nu);
-				perturb(mu, nu) = sum;
+				out(mu, nu) = sum;
 			}
 		}
 	}
-	perturb *= prefactor;
 	for (int mu = 0; mu < cryst.nmo; mu++) {
 		for (int nu = mu + 1; nu < cryst.nmo; nu++) {
-			perturb(nu, mu) = perturb(mu, nu);
+			out(nu, mu) = out(mu, nu);
 		}
 	}
-	if (scf.ctx.mo.kind == occ::qm::SpinorbitalKind::Unrestricted) {
-		perturb.conservativeResize(2 * cryst.nmo, Eigen::NoChange);
-		perturb.bottomRows(cryst.nmo) = perturb.topRows(cryst.nmo);
-	}
-	//closing function
 }
 
 void XCW::setup_SCF_mol(occ::core::Molecule& mol) {
@@ -3159,7 +3169,7 @@ bool XCW::SCF_iteration(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& l
 		}
 	}
 	if (soscf_) {
-		soscf_step(scf, phi);
+		soscf_step(scf, lambda, phi);
 		dm_last = dm_old;
 		return false;
 	}
@@ -3201,13 +3211,17 @@ void XCW::soscf_reset() {
 	soscf_ = false;
 	soscf_patience_iter_ = 0;
 	soscf_patience_grad_ = 0;
-	lbfgs_s_.clear();
-	lbfgs_y_.clear();
+	trah_B_.clear();
+	trah_HB_.clear();
 	soscf_kappa_.resize(0);
 	soscf_grad_.resize(0);
+	soscf_hdiag_.resize(0);
 	soscf_C_.resize(0, 0);
 	soscf_phi_ = std::numeric_limits<double>::infinity();
+	soscf_pred_ = 0;
+	soscf_boundary_ = false;
 	soscf_trust_ = soscf_trust_first_;
+	trah_micro_total_ = 0;
 }
 
 //The gradient of E + lambda chi^2 with respect to the rotation kappa_ai of occupied orbital i
@@ -3267,58 +3281,315 @@ void XCW::rotate_orbitals(occ::qm::SCF<occ::qm::HartreeFock>& scf, const occ::Ma
 	mo.update_density_matrix();
 }
 
-//One second-order iteration, see soscf_ in the header. phi is E + lambda chi^2 at the current
-//orbitals, which the last step produced: above the functional it left by more than the noise
-//of a Fock build, the step is halved from those orbitals and so is the trust radius (a step
-//below 1e-6 is accepted); otherwise the pair (step, gradient change) feeds L-BFGS, the trust
-//radius grows back, and the next step is the L-BFGS direction scaled into it.
-void XCW::soscf_step(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double phi) {
-	if (soscf_kappa_.size() > 0 && phi > soscf_phi_ + 1e-8 && soscf_kappa_.cwiseAbs().maxCoeff() > 1e-6) {
-		soscf_trust_ *= 0.5;
+//One second-order macro iteration, see soscf_ in the header. phi is E + lambda chi^2 at the
+//current orbitals, which the last step produced. Above the functional it left by more than
+//the noise of a Fock build, the step is rejected: the trust radius halves and the step is
+//re-solved in the subspace the micro-iterations already built, from the orbitals it left.
+//Otherwise the trust radius follows the ratio of the actual to the predicted decrease
+//(doubled after a good step that reached the boundary, halved after a poor one) and a fresh
+//gradient starts the next macro step.
+void XCW::soscf_step(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double lambda, const double phi) {
+	const bool stepped = soscf_kappa_.size() > 0;
+	if (stepped && phi > soscf_phi_ + soscf_noise_ && soscf_kappa_.cwiseAbs().maxCoeff() > 1e-6) {
+		soscf_trust_ = 0.5 * std::min(soscf_trust_, soscf_kappa_.norm());
 		std::ostringstream what;
-		what << "***E + lambda chi^2 " << std::scientific << std::setprecision(1) << phi - soscf_phi_ << " Eh above the orbitals the step left: half step***";
+		what << "***E + lambda chi^2 " << std::scientific << std::setprecision(1) << phi - soscf_phi_
+			<< " Eh above the orbitals the step left: trust radius " << std::fixed << std::setprecision(3) << soscf_trust_ << ", step re-solved***";
 		print_centered_message(what.str(), 84, XCW_log);
-		soscf_kappa_ *= 0.5;
+		trah_solve(scf, lambda, false);
 		rotate_orbitals(scf, soscf_C_, soscf_kappa_);
 		return;
 	}
-	occ::Vec h;
-	const occ::Vec g = orbital_rotation_gradient(scf, h);
-	if (soscf_kappa_.size() > 0) {
-		const occ::Vec y = g - soscf_grad_;
-		const double sy = soscf_kappa_.dot(y);
-		if (sy > 1e-12) {
-			lbfgs_s_.push_back(soscf_kappa_);
-			lbfgs_y_.push_back(y);
-			if (lbfgs_s_.size() > lbfgs_memory_) {
-				lbfgs_s_.pop_front();
-				lbfgs_y_.pop_front();
+	if (stepped && soscf_pred_ < 0) {
+		const double rho = (phi - soscf_phi_) / soscf_pred_;
+		if (rho > 0.75 && soscf_boundary_) soscf_trust_ = std::min(2.0 * soscf_trust_, soscf_trust_max_);
+		else if (rho < 0.25) soscf_trust_ *= 0.5;
+	}
+	//The Roothaan iterations damp the density, so the Fock matrix of the iteration that hands
+	//over belongs to a mix of densities, not to the orbitals: rebuilt from them once, so the
+	//first gradient, Hessian and reference functional are consistent
+	soscf_phi_ = stepped ? phi : rebuild_at(scf, lambda, scf.ctx.mo.C, occ::Vec());
+	soscf_grad_ = orbital_rotation_gradient(scf, soscf_hdiag_);
+	trah_B_.clear();
+	trah_HB_.clear();
+	soscf_C_ = scf.ctx.mo.C;
+	if (settings.check_hessian && !stepped) check_hessian(scf, lambda);
+	trah_solve(scf, lambda, true);
+	rotate_orbitals(scf, soscf_C_, soscf_kappa_);
+}
+
+//The step of the current macro iteration: the lowest eigenvector of the augmented Hessian
+//[[0, a g^T], [a g, H]] in the Davidson subspace trah_B_ (H trah_B_ in trah_HB_), scaled to
+//kappa = x / (a x0), with a >= 1 raised by bisection until |kappa| fits the trust radius
+//(a = 1 is the plain augmented-Hessian step). With extend, the subspace grows by the
+//preconditioned residual of the level-shifted Newton equation (H - theta) kappa = -g, one
+//exact Hessian-vector product per micro-iteration, until the residual is below a fraction of
+//the gradient that shrinks with it, or trah_micro_max_ is reached; without, the retained
+//subspace is re-solved at the current radius (after a rejected step the Fock matrix belongs
+//to the rejected orbitals, so no product could be added). Sets soscf_kappa_, the predicted
+//decrease g.kappa + kappa.H kappa / 2 and whether the step lies on the boundary.
+void XCW::trah_solve(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double lambda, const bool extend) {
+	const occ::Vec& g = soscf_grad_;
+	const double gnorm = g.norm();
+	const double tol = gnorm * std::min(0.1, std::max(1e-3, std::sqrt(gnorm)));
+	auto add = [&](occ::Vec b) {
+		for (int pass = 0; pass < 2; pass++)
+			for (const occ::Vec& Bk : trah_B_) b -= Bk.dot(b) * Bk;
+		const double nb = b.norm();
+		if (nb < 1e-10) return false;
+		b /= nb;
+		trah_HB_.push_back(hessian_vector(scf, lambda, b));
+		trah_B_.push_back(b);
+		return true;
+	};
+	if (extend && trah_B_.empty()) add(-g.cwiseQuotient(soscf_hdiag_));
+	//the small problem at shift parameter a: theta, x0, xs and |kappa|
+	occ::Mat Hs;
+	occ::Vec gs;
+	double theta = 0, x0 = 1, alpha = 1;
+	occ::Vec xs;
+	auto reduced = [&](const double a, double& th, double& v0, occ::Vec& v) {
+		const Eigen::Index m = gs.size();
+		occ::Mat A = occ::Mat::Zero(m + 1, m + 1);
+		A(0, 0) = 0;
+		A.block(0, 1, 1, m) = a * gs.transpose();
+		A.block(1, 0, m, 1) = a * gs;
+		A.block(1, 1, m, m) = Hs;
+		Eigen::SelfAdjointEigenSolver<occ::Mat> es(A);
+		th = es.eigenvalues()(0);
+		const occ::Vec ev = es.eigenvectors().col(0);
+		v0 = ev(0);
+		v = ev.tail(m);
+		return std::abs(v0) > 1e-14 ? v.norm() / (a * std::abs(v0)) : std::numeric_limits<double>::infinity();
+	};
+	int micro = 0;
+	double knorm = 0, rnorm = 0;
+	occ::Vec kappa, Hkappa;
+	for (;;) {
+		const Eigen::Index m = static_cast<Eigen::Index>(trah_B_.size());
+		Hs.resize(m, m);
+		gs.resize(m);
+		for (Eigen::Index i = 0; i < m; i++) {
+			gs(i) = trah_B_[i].dot(g);
+			for (Eigen::Index j = 0; j <= i; j++) Hs(i, j) = Hs(j, i) = 0.5 * (trah_B_[i].dot(trah_HB_[j]) + trah_B_[j].dot(trah_HB_[i]));
+		}
+		alpha = 1;
+		knorm = reduced(alpha, theta, x0, xs);
+		soscf_boundary_ = knorm > soscf_trust_;
+		if (soscf_boundary_) {
+			//|kappa| falls monotonically with a: bracket, then bisect on log a
+			double lo = 1, hi = 1;
+			while (hi < 1e8 && reduced(hi, theta, x0, xs) > soscf_trust_) { lo = hi; hi *= 2; }
+			for (int it = 0; it < 60 && hi / lo > 1 + 1e-6; it++) {
+				const double mid = std::sqrt(lo * hi);
+				if (reduced(mid, theta, x0, xs) > soscf_trust_) lo = mid; else hi = mid;
+			}
+			alpha = hi;
+			knorm = reduced(alpha, theta, x0, xs);
+		}
+		kappa = occ::Vec::Zero(g.size());
+		Hkappa = occ::Vec::Zero(g.size());
+		for (Eigen::Index i = 0; i < m; i++) {
+			kappa += xs(i) * trah_B_[i];
+			Hkappa += xs(i) * trah_HB_[i];
+		}
+		if (std::isfinite(knorm)) {
+			kappa /= alpha * x0;
+			Hkappa /= alpha * x0;
+			//the bisection tolerance may leave the step a hair outside: scale, do not resolve
+			if (knorm > soscf_trust_) {
+				kappa *= soscf_trust_ / knorm;
+				Hkappa *= soscf_trust_ / knorm;
+				knorm = soscf_trust_;
 			}
 		}
+		else {
+			//no finite step from the subspace: the preconditioned gradient, scaled into the radius
+			kappa = -g.cwiseQuotient(soscf_hdiag_);
+			kappa *= soscf_trust_ / kappa.norm();
+			Hkappa = hessian_vector(scf, lambda, kappa);
+			knorm = soscf_trust_;
+			soscf_boundary_ = true;
+		}
+		const occ::Vec r = g + Hkappa - theta * kappa;
+		rnorm = r.norm();
+		if (!extend || rnorm < tol || micro >= trah_micro_max_) break;
+		if (!add(-r.cwiseQuotient((soscf_hdiag_.array() - theta).max(1e-2).matrix()))) break;
+		micro++;
 	}
-	//L-BFGS two-loop recursion with the diagonal Hessian as H0
-	occ::Vec q = g;
-	const int m = static_cast<int>(lbfgs_s_.size());
-	std::vector<double> rho(m), a(m);
-	for (int k = m - 1; k >= 0; k--) {
-		rho[k] = 1.0 / lbfgs_s_[k].dot(lbfgs_y_[k]);
-		a[k] = rho[k] * lbfgs_s_[k].dot(q);
-		q -= a[k] * lbfgs_y_[k];
+	trah_micro_total_ += micro;
+	soscf_kappa_ = kappa;
+	soscf_pred_ = g.dot(kappa) + 0.5 * kappa.dot(Hkappa);
+	XCW_log << "\t\tTRAH: " << micro << " micro-iterations (" << trah_micro_total_ << " in this lambda step), |g| " << std::scientific << std::setprecision(1) << gnorm
+		<< ", residual " << rnorm << ", |kappa| " << knorm << (soscf_boundary_ ? " on" : " within") << " the trust radius " << std::fixed << std::setprecision(3) << soscf_trust_
+		<< ", shift " << std::scientific << std::setprecision(1) << theta << ", predicted " << soscf_pred_ << " Eh" << std::endl;
+}
+
+//H v for the rotation direction v, the derivative of orbital_rotation_gradient along it:
+//dC_occ = C_vir V, dC_vir = -C_occ V^T from C exp(kappa); dD from the density's own
+//convention (C_occ C_occ^T, halved per spin block for UHF); dF = G(dD) by the same Fock
+//build the SCF uses, plus lambda times the response of the perturbation, which is the
+//derivative of calc_perturb's per-reflection scalar with the scale moving along (the scale
+//minimises chi^2, so the gradient does not see it but the Hessian does); and
+//H v = fac (dC_vir^T F C_occ + C_vir^T dF C_occ + C_vir^T F dC_occ) with F the perturbed
+//Fock matrix of the current orbitals. The occupied-occupied and virtual-virtual parts of
+//the second-order orbital change leave the functional alone, so this is the exact Hessian.
+occ::Vec XCW::hessian_vector(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double lambda, const occ::Vec& v) {
+	occ::qm::MolecularOrbitals& mo = scf.ctx.mo;
+	const int n = cryst.nmo, nb = mo.kind == occ::qm::SpinorbitalKind::Unrestricted ? 2 : 1;
+	const double fac = nb == 1 ? 4.0 : 2.0, dfac = nb == 1 ? 1.0 : 0.5;
+	occ::Mat dC = occ::Mat::Zero(mo.C.rows(), n), dD = occ::Mat::Zero(mo.D.rows(), n);
+	Eigen::Index at = 0;
+	for (int b = 0; b < nb; b++) {
+		const Eigen::Index nocc = static_cast<Eigen::Index>(b == 0 ? mo.n_alpha : mo.n_beta), nvir = n - nocc, row = static_cast<Eigen::Index>(b) * n;
+		occ::Mat V(nvir, nocc);
+		for (Eigen::Index i = 0; i < nocc; i++)
+			for (Eigen::Index a = 0; a < nvir; a++, at++) V(a, i) = v(at);
+		const occ::Mat Cocc = mo.C.block(row, 0, n, nocc), Cvir = mo.C.block(row, nocc, n, nvir);
+		dC.block(row, 0, n, nocc) = Cvir * V;
+		dC.block(row, nocc, n, nvir) = -Cocc * V.transpose();
+		const occ::Mat dCocc = dC.block(row, 0, n, nocc);
+		dD.middleRows(row, n) = dfac * (dCocc * Cocc.transpose() + Cocc * dCocc.transpose());
 	}
-	occ::Vec d = q.cwiseQuotient(h);
-	for (int k = 0; k < m; k++) {
-		const double beta = rho[k] * lbfgs_y_[k].dot(d);
-		d += (a[k] - beta) * lbfgs_s_[k];
+	//G(dD): the Fock build reads mo.D, and a screen on the density would drop the small dD
+	std::swap(mo.D, dD);
+	occ::Mat dF = eri_ ? eri_fock(mo, false) : scf.m_procedure.compute_fock(mo, scf.ctx.K);
+	std::swap(mo.D, dD);
+	if (lambda != 0) {
+		//dF_r = Sum c I_r dD_eff: calc_F_calc's walk with the fixed part zeroed
+		dMatrix2 dD_eff(n, n);
+		build_effective_dm(scf, dD_eff, dD);
+		const cvec F0 = F_calc[0], fixed = F_calc[1];
+		std::fill(F_calc[1].begin(), F_calc[1].end(), cdouble(0.0, 0.0));
+		calc_F_calc(dD_eff);
+		const cvec dFr = F_calc[0];
+		F_calc[0] = F0;
+		F_calc[1] = fixed;
+		//the scale's response from the weighted least-squares scale of eval_scale
+		const bool against_F2 = settings.refine_against == 2, weighted = settings.XWR_type == 2;
+		const double k = cryst.F_scale, s = k * k;
+		const int chunk = 128, nchunk = (cryst.nr_small + chunk - 1) / chunk;
+		vec dnum(nchunk), dden(nchunk), den(nchunk);
+#pragma omp parallel for schedule(static)
+		for (int ch = 0; ch < nchunk; ch++) {
+			for (int r = ch * chunk; r < std::min((ch + 1) * chunk, cryst.nr_small); r++) {
+				if (!fit_mask_[r]) continue;
+				const double w = weighted ? inv_H2_[r] : 1.0, Fa = std::abs(F0[r]);
+				const double dFa = Fa > 0 ? std::real(std::conj(F0[r]) * dFr[r]) / Fa : 0.0;
+				if (against_F2) {
+					const double wi = w / (obs[r].sigma_obs2 * obs[r].sigma_obs2);
+					dnum[ch] += wi * 2.0 * Fa * dFa * obs[r].F_obs2;
+					dden[ch] += wi * 4.0 * Fa * Fa * Fa * dFa;
+					den[ch] += wi * Fa * Fa * Fa * Fa;
+				}
+				else {
+					const double wi = w / (obs[r].sigma_obs * obs[r].sigma_obs);
+					dnum[ch] += wi * dFa * obs[r].F_obs;
+					dden[ch] += wi * 2.0 * Fa * dFa;
+					den[ch] += wi * Fa * Fa;
+				}
+			}
+		}
+		double dnum_sum = 0, dden_sum = 0, den_sum = 0;
+		for (int ch = 0; ch < nchunk; ch++) { dnum_sum += dnum[ch]; dden_sum += dden[ch]; den_sum += den[ch]; }
+		//F: dk = (dN - k dD) / D; F^2: ds = (dN - s dD) / D for s = k^2
+		const double dscale = den_sum != 0 ? (dnum_sum - (against_F2 ? s : k) * dden_sum) / den_sum : 0.0;
+		//d(q_r) for q_r = prefactor's scale power times calc_perturb's scalar, both moving:
+		//F: q = w conj(F) (k^2 - k Fo / |F|) / sigma^2; F^2: q = w conj(F) (s^2 |F|^2 - s Fo^2) / sigma_I^2
+		cvec dq(cryst.nr_small);
+#pragma omp parallel for
+		for (int r = 0; r < cryst.nr_small; r++) {
+			if (!fit_mask_[r]) continue;
+			const double w = weighted ? inv_H2_[r] : 1.0, Fa = std::abs(F0[r]);
+			if (Fa == 0) continue;
+			const double dFa = std::real(std::conj(F0[r]) * dFr[r]) / Fa;
+			if (against_F2) {
+				const double wi = w / (obs[r].sigma_obs2 * obs[r].sigma_obs2), Fo2 = obs[r].F_obs2;
+				dq[r] = wi * (std::conj(dFr[r]) * (s * s * Fa * Fa - s * Fo2)
+					+ std::conj(F0[r]) * (2.0 * s * dscale * Fa * Fa + 2.0 * s * s * Fa * dFa - dscale * Fo2));
+			}
+			else {
+				const double wi = w / (obs[r].sigma_obs * obs[r].sigma_obs), Fo = obs[r].abs_F_obs;
+				dq[r] = wi * (std::conj(dFr[r]) * (k * k - k * Fo / Fa)
+					+ std::conj(F0[r]) * (dscale * (2.0 * k - Fo / Fa) + k * Fo * dFa / (Fa * Fa)));
+			}
+		}
+		occ::Mat dP;
+		contract_I(dP, dq);
+		dP *= (against_F2 ? 4.0 : 2.0) / (cryst.n_fit - settings.n_params) * lambda;
+		for (int b = 0; b < nb; b++) dF.middleRows(static_cast<Eigen::Index>(b) * n, n) += dP;
 	}
-	d = -d;
-	soscf_trust_ = std::min(2.0 * soscf_trust_, soscf_trust_max_);
-	const double longest = d.cwiseAbs().maxCoeff();
-	if (longest > soscf_trust_) d *= soscf_trust_ / longest;
-	soscf_C_ = scf.ctx.mo.C;
-	soscf_phi_ = phi;
-	soscf_grad_ = g;
-	soscf_kappa_ = d;
-	rotate_orbitals(scf, soscf_C_, soscf_kappa_);
+	occ::Vec Hv(v.size());
+	at = 0;
+	for (int b = 0; b < nb; b++) {
+		const Eigen::Index nocc = static_cast<Eigen::Index>(b == 0 ? mo.n_alpha : mo.n_beta), nvir = n - nocc, row = static_cast<Eigen::Index>(b) * n;
+		const occ::Mat Cocc = mo.C.block(row, 0, n, nocc), Cvir = mo.C.block(row, nocc, n, nvir);
+		const occ::Mat dCocc = dC.block(row, 0, n, nocc), dCvir = dC.block(row, nocc, n, nvir);
+		const occ::Mat F = scf.ctx.F.middleRows(row, n), dFb = dF.middleRows(row, n);
+		const occ::Mat M = fac * (dCvir.transpose() * F * Cocc + Cvir.transpose() * dFb * Cocc + Cvir.transpose() * F * dCocc);
+		for (Eigen::Index i = 0; i < nocc; i++)
+			for (Eigen::Index a = 0; a < nvir; a++, at++) Hv(at) = M(a, i);
+	}
+	return Hv;
+}
+
+//The orbitals C_from exp(kappa) (the current ones, density rebuilt from them, for an empty
+//kappa) with everything that depends on them rebuilt: structure factors, scale, criteria,
+//perturbation, Fock matrix and energy, the way SCF_iteration does it. Returns E + lambda chi^2
+//there.
+double XCW::rebuild_at(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double lambda, const occ::Mat& C_from, const occ::Vec& kappa) {
+	if (kappa.size() > 0) rotate_orbitals(scf, C_from, kappa);
+	else {
+		scf.ctx.mo.update_occupied_orbitals();
+		scf.ctx.mo.update_density_matrix();
+	}
+	dMatrix2 dm_eff(cryst.nmo, cryst.nmo);
+	build_effective_dm(scf, dm_eff, scf.ctx.mo.D);
+	calc_F_calc(dm_eff);
+	eval_scale();
+	calc_criteria();
+	occ::Mat perturbation;
+	calc_perturb(perturbation, scf);
+	scf.ctx.F = scf.ctx.H + (eri_ ? eri_fock(scf.ctx.mo, false) : scf.m_procedure.compute_fock(scf.ctx.mo, scf.ctx.K));
+	scf.update_scf_energy(false);
+	const double crit = criterion(false);
+	scf.ctx.F += lambda * perturbation;
+	return scf.ctx.energy["total"] + lambda * crit * crit;
+}
+
+//orbital_rotation_gradient at C_from exp(kappa), rebuilt there and put back afterwards. Only
+//the Hessian check pays for it.
+occ::Vec XCW::gradient_at(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double lambda, const occ::Mat& C_from, const occ::Vec& kappa) {
+	const occ::qm::MolecularOrbitals mo_saved = scf.ctx.mo;
+	const occ::Mat F_saved = scf.ctx.F;
+	const auto energy_saved = scf.ctx.energy;
+	const cvec F0_saved = F_calc[0];
+	const double scale_saved = cryst.F_scale;
+	rebuild_at(scf, lambda, C_from, kappa);
+	occ::Vec h;
+	const occ::Vec g = orbital_rotation_gradient(scf, h);
+	scf.ctx.mo = mo_saved;
+	scf.ctx.F = F_saved;
+	scf.ctx.energy = energy_saved;
+	F_calc[0] = F0_saved;
+	cryst.F_scale = scale_saved;
+	return g;
+}
+
+//Central finite difference of the gradient along a fixed pseudo-random direction against
+//hessian_vector, reported to XCW.log; `check_hessian` runs it on the first second-order step
+void XCW::check_hessian(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double lambda) {
+	std::mt19937 rng(7);
+	std::normal_distribution<double> gauss;
+	occ::Vec v(soscf_grad_.size());
+	for (Eigen::Index i = 0; i < v.size(); i++) v(i) = gauss(rng);
+	v /= v.norm();
+	const occ::Vec Hv = hessian_vector(scf, lambda, v);
+	const double eps = 1e-4;
+	const occ::Mat C0 = scf.ctx.mo.C;
+	const occ::Vec fd = (gradient_at(scf, lambda, C0, eps * v) - gradient_at(scf, lambda, C0, -eps * v)) / (2.0 * eps);
+	XCW_log << "\t\tHessian check: |Hv - FD| / |FD| = " << std::scientific << std::setprecision(2) << (Hv - fd).norm() / fd.norm()
+		<< " (|Hv| " << Hv.norm() << ", |FD| " << fd.norm() << ", v.Hv " << v.dot(Hv) << ", v.FD " << v.dot(fd) << ")" << std::endl;
 }
 
 //The rescue of a lost SCF step, see best_mo_ in the header. True when it restarted the step:
