@@ -1246,7 +1246,7 @@ svec read_atoms_from_CIF(std::ifstream& cif_input,
 
 	for (int i = 0; i < atom_type_list.size(); i++)
 		err_checkf((atom_type_list[i] <= 113 || atom_type_list[i] == 119) && atom_type_list[i] > 0, "Unreasonable atom type detected: " + toString(atom_type_list[i]) + " (Happens if Atoms were not identified correctly)", file);
-	file << " done!" << endl;
+	// the "Reading: <cif> done!" line is closed by the cell ctor (cell.h)
 	if (debug)
 	{
 		file << "There are " << atom_type_list.size() << " types of atoms" << endl;

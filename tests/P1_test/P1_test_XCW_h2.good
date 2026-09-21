@@ -7,13 +7,15 @@
 This software is part of the cuQCT software suite developed by Florian Kleemiss.
 Please give credit and cite corresponding pieces!
 This Software is published with BSD-2 clause license.
-Reading:                            "P1_test_NA2.cif"Reading:                              "P1_subset.hkl" done!
+Reading:                            "P1_test_NA2.cif" done!
+Reading:                              "P1_subset.hkl" done!
 Nr of reflections read from file: 402
 Number of symmetry operations: 1
 Nr of reflections to be used: 402
 Generating k-points...                            ... done!
 Number of k-points to evaluate: 402
 XCW orbital basis set: sto-3g-basis
+XCW: I/sigma(I) >= 2 (F/sigma(F) >= 4): 394 of 402 reflections in the fit; R1 and Criterion are over these, R1(all) and Crit(all) over all
 GridManager: Setting up prototype grids for atom types...
 GridManager: Generating integration grids for atoms...
 GridManager: Generated total of 93098 grid points.
@@ -24,12 +26,12 @@ Skipped evaluation of 8004222 grids (16.16%)
 More detailed output in XCW.log file...
 XCW: fitting against the 1/|H|^2-weighted residual self-energy criterion Criterion below is this weighted quantity, not the classical GoF.
 ____________________________________________________________________________________
- Lambda		Criterion	GooF(F2)	Total Energy	Perturbation	Target quantity 
+ Lambda		Criterion	GooF(F2)	R1(gt)		Total Energy	Perturbation	Target quantity	Crit(all)	R1(all)
 										(Eh)		   (a. u.)			(a. u.)
 ____________________________________________________________________________________
-0.00000		10.327		5.389		-1961.923538820		0.000		-1961.923538820
-0.01000		6.372		3.970		-1961.756333483		0.064		-1961.692616395
-XCW: retrying lambda 0.01500000 with step 0.00500000
-0.01500		5.838		3.780		-1961.674095064		0.088		-1961.586521569
-0.02000		5.461		3.643		-1961.597429396		0.109		-1961.488204603
+0.00000		10.506		5.497		0.0250		-1961.923538820		0.000		-1961.923538820		10.319		0.0254
+0.01000		6.286		4.013		0.0226		-1961.744817998		0.063		-1961.681953386		6.175		0.0230
+WARNING: Unexpected number of extrema (0) found between atoms 8 and 9. Setting chi to 1.0.
+0.02000		5.318		3.666		0.0218		-1961.584448514		0.106		-1961.478092620		5.224		0.0222
+WARNING: Unexpected number of extrema (0) found between atoms 8 and 9. Setting chi to 1.0.
 Finished XCW fitting procedure.
