@@ -999,3 +999,47 @@ TEST(XcwScfTests, ISigmaCutoffShrinksFitSetAndReportsAllReflections)
 	EXPECT_NE(fields[8], fields[3]);
 	std::filesystem::remove_all(dir);
 }
+
+//`slow_conv` keeps its damping for the perturbed steps; the unperturbed first step runs the
+//normal schedule, which reaches the golden lambda = 0 energy where slow damping stalls
+TEST(XcwScfTests, SlowConvStartsFromTheNormalSchedule)
+{
+	if (p1_fixture().empty()) GTEST_SKIP() << "fixture tests/P1_test not found";
+	const auto dir = scratch_dir();
+	const p1_run run = run_on_p1(dir, common + "f rhf start 0 step_size 0.01 end 0.01 slow_conv", true);
+	EXPECT_NE(run.out.find("XCW: slow_conv - the unperturbed first step runs the normal schedule"), std::string::npos) << run.out;
+	const auto rows = lambda_rows(run.out);
+	ASSERT_EQ(rows.size(), 2u) << run.out;
+	EXPECT_NEAR(rows[0].d(rows[0].energy), golden_energy, 1e-6);
+	EXPECT_GT(rows[1].d(rows[1].energy), golden_energy);
+	std::filesystem::remove_all(dir);
+}
+
+//The scale is the minimiser of the criterion the SCF descends, so at the scale the dump
+//prints d(chi^2)/dk = Sum (k|Fc| - |Fo|)|Fc|/sigma^2 vanishes over the fit set (I/sigma(I) >= 2,
+//i.e. |F|/sigma(F) >= 4). The unweighted fit it replaced left the ratio at 1.2e-3 on this
+//subset; the four-decimal dump columns leave ~1e-5.
+TEST(XcwScfTests, ScaleIsStationaryForTheCriterion)
+{
+	if (p1_fixture().empty()) GTEST_SKIP() << "fixture tests/P1_test not found";
+	const auto dir = scratch_dir();
+	const p1_run run = run_on_p1(dir, common + "f rhf start 0 step_size 0.01 end 0", true);
+	std::istringstream dump(read_text(dir / "NA2_0000000_Fcalc.txt"));
+	std::string line;
+	double numerator = 0.0, denominator = 0.0;
+	int in_fit = 0;
+	while (std::getline(dump, line)) {
+		if (line.empty() || line[0] == '#') continue;
+		std::istringstream cols(line);
+		int h, k, l;
+		double fo, sig, kfc, phase;
+		cols >> h >> k >> l >> fo >> sig >> kfc >> phase;
+		if (!(fo > 0.0) || fo / (2.0 * sig) < 2.0) continue;
+		in_fit++;
+		numerator += (kfc - fo) * kfc / (sig * sig);
+		denominator += kfc * kfc / (sig * sig);
+	}
+	ASSERT_GT(in_fit, 100) << run.out;
+	EXPECT_LT(std::abs(numerator / denominator), 1e-4) << "d(chi^2)/dk is not zero at the printed scale: " << numerator / denominator;
+	std::filesystem::remove_all(dir);
+}

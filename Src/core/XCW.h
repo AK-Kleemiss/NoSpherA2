@@ -107,6 +107,8 @@ private:
 		//flags, yet run_lambda copies alpha and level_shift and SCF_iteration mixes the
 		//density with alpha regardless of the flag
 		double diis_stop_damping = 0;
+		//`slow_conv` chosen: the unperturbed first step still runs the normal schedule, see run_XCW_fitting
+		bool slow_conv = false;
 		//`i_sigma <x>`: only reflections with I/sigma(I) >= x enter chi^2 and the scale, as in
 		//Tonto. Under the reader's sigma(F) = sigma(I)/2F that is F/sigma(F) >= 2x, so the
 		//default 2 is SHELX's I > 2 sigma(I) and F > 4 sigma(F) at once

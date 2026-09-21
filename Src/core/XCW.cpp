@@ -437,6 +437,7 @@ XCW::SCF_settings XCW::loadSettings(const std::filesystem::path& settings_path) 
 	}
 
 	if (speed_preset == "slow_conv") {
+		settings.slow_conv = true;
 		settings.alpha = 0.8;
 		settings.level_shift = 1;
 		settings.diis_stop_damping = 1e-5;
@@ -865,7 +866,16 @@ void XCW::eval_anom_disp(cvec2& DW_fact, cvec2& phase_fact, cvec2& translation_p
 	}
 }
 
+//The scale that minimises the criterion the SCF descends: k over the fit set from
+//Sum w (k|Fc| - |Fo|)^2 / sigma^2, or k^2 from Sum w (k^2|Fc|^2 - Fo^2)^2 / sigma(I)^2 against
+//F^2, with w the 1/|H|^2 weights of XWR_type 2. calc_perturb takes the scale as given, so the
+//scale had better be stationary for the criterion, or the SCF descends a different
+//functional than the one it prints: an unweighted fit of k put Fe(phen)2(SCN)2 (chi^2 12.96
+//vs 12.30 at the weighted k, dchi^2/dk 2e3) 4 mEh above the previous step's orbitals at
+//every converged lambda >= 0.03.
 void XCW::eval_scale() {
+	ensure_inv_H2_weights();
+	const bool against_F2 = settings.refine_against == 2, weighted = settings.XWR_type == 2;
 	const int chunk = 128, nchunk = (cryst.nr_small + chunk - 1) / chunk;
 	vec numerators(nchunk), denominators(nchunk);
 #pragma omp parallel for schedule(static)
@@ -873,9 +883,18 @@ void XCW::eval_scale() {
 		const int first = c * chunk, last = std::min(first + chunk, cryst.nr_small);
 		for (int i = first; i < last; i++) {
 			if (!fit_mask_[i]) continue;
+			const double w = weighted ? inv_H2_[i] : 1.0;
 			const double calc = std::abs(F_calc[0][i]);
-			numerators[c] += calc * obs[i].F_obs;
-			denominators[c] += calc * calc;
+			if (against_F2) {
+				const double calc2 = calc * calc, wi = w / (obs[i].sigma_obs2 * obs[i].sigma_obs2);
+				numerators[c] += wi * calc2 * obs[i].F_obs2;
+				denominators[c] += wi * calc2 * calc2;
+			}
+			else {
+				const double wi = w / (obs[i].sigma_obs * obs[i].sigma_obs);
+				numerators[c] += wi * calc * obs[i].F_obs;
+				denominators[c] += wi * calc * calc;
+			}
 		}
 	}
 	double numerator = 0.0, denominator = 0.0;
@@ -883,7 +902,8 @@ void XCW::eval_scale() {
 		numerator += numerators[c];
 		denominator += denominators[c];
 	}
-	cryst.F_scale = (denominator != 0.0) ? numerator / denominator : 1.0;
+	const double ratio = (denominator != 0.0) ? numerator / denominator : 1.0;
+	cryst.F_scale = against_F2 ? std::sqrt(std::max(ratio, 0.0)) : ratio;
 }
 
 void XCW::calc_criteria() {
@@ -3253,7 +3273,7 @@ void XCW::create_tscb(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& lam
 	{
 		ensure_hkl_ordered();
 		std::ofstream fc("NA2_" + value + "_Fcalc.txt");
-		fc << "#    h    k    l          F_obs        sig(F)   scale*|F_calc|     phase(deg)   R1(gt) = " << std::setprecision(5) << cryst.R1 << " R1(all) = " << cryst.R1_all << " scale = " << cryst.F_scale << "\n";
+		fc << "#    h    k    l          F_obs        sig(F)   scale*|F_calc|     phase(deg)   R1(gt) = " << std::setprecision(5) << cryst.R1 << " R1(all) = " << cryst.R1_all << " scale = " << std::setprecision(10) << cryst.F_scale << "\n";
 		for (int r = 0; r < cryst.nr_small; r++) {
 			const cdouble& f = F_calc[0][r];
 			fc << std::setw(5) << hkl_ordered_[r][0] << std::setw(5) << hkl_ordered_[r][1] << std::setw(5) << hkl_ordered_[r][2]
@@ -3501,8 +3521,22 @@ void XCW::run_XCW_fitting() {
 	};
 	const double min_lambda_step = settings.xcw_step_size / 128.0;
 	double last_lambda = settings.xcw_start_value;
+	//slow_conv's damping (alpha 0.8, shift 1) is for the perturbed steps, which start from
+	//converged orbitals; from the core guess it runs out of iterations (Fe(phen)2(SCN)2 UHF:
+	//200 iterations, RMSD still 4e-5). The first step without a guess takes the normal
+	//schedule, every later one the slow settings from the file
+	const bool slow_start = settings.slow_conv && !has_guess;
+	const double slow_alpha = settings.alpha, slow_shift = settings.level_shift, slow_stop_damping = settings.diis_stop_damping, slow_stop_shift = settings.diis_stop_shift;
+	if (slow_start) {
+		settings.alpha = 0.5; settings.level_shift = 0.5; settings.diis_stop_damping = 1e-3; settings.diis_stop_shift = 1e-2;
+		std::cout << "XCW: slow_conv - the unperturbed first step runs the normal schedule, slow damping from the second step on" << std::endl;
+		XCW_log << "XCW: slow_conv - the unperturbed first step runs the normal schedule, slow damping from the second step on" << std::endl;
+	}
 	for (int step = 0; step < settings.num_xcw_steps; step++) {
 		const double lambda = step * settings.xcw_step_size + settings.xcw_start_value;
+		if (slow_start && step == 1) {
+			settings.alpha = slow_alpha; settings.level_shift = slow_shift; settings.diis_stop_damping = slow_stop_damping; settings.diis_stop_shift = slow_stop_shift;
+		}
 		const occ::qm::Wavefunction previous_wfn = last_wfn;
 		occ::qm::Wavefunction guess = last_wfn;
 		if (opt->xcw_extrapolate && step >= 2 && settings.hf_type == occ::qm::SpinorbitalKind::Restricted) {
