@@ -31,6 +31,104 @@ static void write_cube_values(std::ostream& of, const vec3& values, const i3& si
 	}
 }
 
+bool cube::binary_output = false;
+
+// .cubeb layout, little-endian, all fixed width:
+//   char[8] "NSA2CUBE" | uint32 version | uint32 header_bytes (offset of the values)
+//   int32 na | int32 size[3] | double origin[3] | double vectors[3][3]
+//   uint32 len, char[len] comment1 | uint32 len, char[len] comment2
+//   na x { int32 Z, double xyz[3] }
+//   double values[size0*size1*size2], x slowest and z fastest like the text cube
+static constexpr char CUBEB_MAGIC[8] = { 'N', 'S', 'A', '2', 'C', 'U', 'B', 'E' };
+static constexpr uint32_t CUBEB_VERSION = 1;
+
+template <typename T> static void put(std::ostream& of, const T& v) { of.write(reinterpret_cast<const char*>(&v), sizeof(T)); }
+template <typename T> static T get(std::istream& in) { T v{}; in.read(reinterpret_cast<char*>(&v), sizeof(T)); return v; }
+static void put_string(std::ostream& of, const std::string& s) { put<uint32_t>(of, (uint32_t)s.size()); of.write(s.data(), s.size()); }
+static std::string get_string(std::istream& in) { std::string s(get<uint32_t>(in), '\0'); in.read(s.data(), s.size()); return s; }
+
+bool cube::is_binary_file(const std::filesystem::path& file)
+{
+	char magic[8] = {};
+	std::ifstream in(file, std::ios::binary);
+	in.read(magic, 8);
+	return in.gcount() == 8 && std::equal(magic, magic + 8, CUBEB_MAGIC);
+}
+
+bool cube::write_binary(const std::filesystem::path& given_path, bool absolute) const
+{
+	err_checkf(loaded, "write_binary: no values loaded", std::cout);
+	std::ofstream of(given_path, std::ios::binary);
+	err_checkf(of.good(), "write_binary: cannot open " + given_path.string(), std::cout);
+	of.write(CUBEB_MAGIC, 8);
+	put<uint32_t>(of, CUBEB_VERSION);
+	const auto header_bytes_pos = of.tellp();
+	put<uint32_t>(of, 0);
+	put<int32_t>(of, na);
+	for (int i = 0; i < 3; i++) put<int32_t>(of, size[i]);
+	for (int i = 0; i < 3; i++) put<double>(of, origin[i]);
+	for (int i = 0; i < 3; i++) for (int j = 0; j < 3; j++) put<double>(of, vectors[i][j]);
+	put_string(of, comment1);
+	put_string(of, comment2);
+	for (int i = 0; i < na; i++)
+	{
+		put<int32_t>(of, parent_wavefunction->get_atom_charge(i));
+		for (int j = 0; j < 3; j++) put<double>(of, parent_wavefunction->get_atom_coordinate(i, j));
+	}
+	const uint32_t header_bytes = (uint32_t)of.tellp();
+	std::vector<double> row(size[2]);
+	for (int x = 0; x < size[0]; x++)
+		for (int y = 0; y < size[1]; y++)
+		{
+			for (int z = 0; z < size[2]; z++) row[z] = absolute ? std::abs(values[x][y][z]) : values[x][y][z];
+			of.write(reinterpret_cast<const char*>(row.data()), row.size() * sizeof(double));
+		}
+	of.seekp(header_bytes_pos);
+	put<uint32_t>(of, header_bytes);
+	return of.good();
+}
+
+bool cube::read_binary(bool full, bool header, bool expert)
+{
+	std::ifstream in(path, std::ios::binary);
+	char magic[8] = {};
+	in.read(magic, 8);
+	err_checkf(std::equal(magic, magic + 8, CUBEB_MAGIC), "Not a NoSpherA2 binary cube: " + path.string(), std::cout);
+	const uint32_t version = get<uint32_t>(in);
+	err_checkf(version == CUBEB_VERSION, "Binary cube " + path.string() + " has version " + std::to_string(version) + ", this NoSpherA2 reads version " + std::to_string(CUBEB_VERSION), std::cout);
+	const uint32_t header_bytes = get<uint32_t>(in);
+	const int32_t file_na = get<int32_t>(in);
+	i3 file_size;
+	for (int i = 0; i < 3; i++) file_size[i] = get<int32_t>(in);
+	if (header)
+	{
+		na = file_na;
+		size = file_size;
+		for (int i = 0; i < 3; i++) origin[i] = get<double>(in);
+		for (int i = 0; i < 3; i++) for (int j = 0; j < 3; j++) vectors[i][j] = get<double>(in);
+		calc_dv();
+		comment1 = get_string(in);
+		comment2 = get_string(in);
+		if (expert || parent_wavefunction->get_ncen() == 0)
+			for (int i = 0; i < na; i++)
+			{
+				const int atnr = get<int32_t>(in);
+				double atp[3];
+				for (int j = 0; j < 3; j++) atp[j] = get<double>(in);
+				parent_wavefunction->push_back_atom(constants::atnr2letter(atnr), atp[0], atp[1], atp[2], atnr);
+			}
+	}
+	if (!full) return in.good();
+	in.seekg(header_bytes);
+	values.assign(size[0], vec2(size[1], vec(size[2])));
+	for (int x = 0; x < size[0]; x++)
+		for (int y = 0; y < size[1]; y++)
+			in.read(reinterpret_cast<char*>(values[x][y].data()), size[2] * sizeof(double));
+	err_checkf(in.good(), "Binary cube " + path.string() + " ended before all values were read", std::cout);
+	loaded = true;
+	return true;
+}
+
 void cube::reset()
 {
 	dv = 0.0;
@@ -77,11 +175,14 @@ cube::cube(const std::array<int, 3> xyz, int g_na, bool grow_values)
 
 cube::cube(const std::filesystem::path &filepath, bool read, WFN &wave, std::ostream &file, const bool expert, const bool header)
 {
-	err_checkf(exists(filepath), "Sorry, this file does not exist!", file);
 	reset();
 	parent_wavefunction = &wave;
 	na = parent_wavefunction->get_ncen();
 	path = filepath;
+	// a .cube that -cubeb wrote as .cubeb (bondwise/qct re-open what do_bonds just wrote by the text name)
+	if (!exists(path) && path.extension() == ".cube" && exists(std::filesystem::path(path).replace_extension(".cubeb")))
+		path.replace_extension(".cubeb");
+	err_checkf(exists(path), "Sorry, this file does not exist!", file);
 	err_checkf(read_file(read, header, expert), "Sorry, something went wrong while reading!", file);
 	loaded = read;
 	calc_dv();
@@ -213,6 +314,8 @@ bool cube::read_values(std::ifstream &file) {
 bool cube::read_file(bool full, bool header, bool expert)
 {
 	using namespace std;
+	if (is_binary_file(path))
+		return read_binary(full, header, expert);
 	ifstream file(path);
 	string line;
 	if (header)
@@ -255,6 +358,7 @@ bool cube::read_file(bool full, bool header, bool expert)
 
 bool cube::write_file(bool force, bool absolute)
 {
+	if (binary_output) path.replace_extension(".cubeb");
 	if (exists(path))
 	{
 		if (force)
@@ -265,6 +369,8 @@ bool cube::write_file(bool force, bool absolute)
 			return false;
 		}
 	}
+	if (binary_output || path.extension() == ".cubeb")
+		return write_binary(path, absolute);
 	using namespace std;
 	std::vector<char> file_buffer(16 * 1024 * 1024);
 	std::ofstream of;
@@ -294,6 +400,12 @@ bool cube::write_file(bool force, bool absolute)
 bool cube::write_file(const std::filesystem::path &given_path, bool debug)
 {
 	using namespace std;
+	if (binary_output || given_path.extension() == ".cubeb")
+	{
+		if (!get_loaded()) read_file(true, false, true);
+		path = binary_output ? std::filesystem::path(given_path).replace_extension(".cubeb") : given_path;
+		return write_binary(path);
+	}
 	std::vector<char> file_buffer(16 * 1024 * 1024);
 	ofstream of;
 	of.rdbuf()->pubsetbuf(file_buffer.data(), static_cast<std::streamsize>(file_buffer.size()));
@@ -317,6 +429,8 @@ bool cube::write_file(const std::filesystem::path &given_path, bool debug)
 	}
 	if (debug)
 		std::cout << "Finished atoms!" << endl;
+	if (!get_loaded() && is_binary_file(path))
+		read_binary(true, false, true);
 	if (get_loaded())
 		write_cube_values(of, values, size, false);
 	else

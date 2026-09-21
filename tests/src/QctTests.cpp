@@ -154,11 +154,13 @@ TEST(QctTests, ReadConvertPropertyCubeAndIntegrate)
 		"R\nh2_rho.cube\n"
 		"C\n1\n1\n"         //integrate cube 1
 		"C\n99\n"
+		"S\n11\n1\n\n"      //cube 1 -> .cubeb, default name
+		"R\nh2_rho.cubeb\n"
 		"Q\n";
 	EXPECT_EQ(run(keys, opt, wavy, printed), 0);
 	ASSERT_EQ(wavy.size(), 1u);
 	EXPECT_EQ(wavy[0].get_ncen(), 2);
-	EXPECT_EQ(wavy[0].get_cube_count(), 1);
+	EXPECT_EQ(wavy[0].get_cube_count(), 2);
 	EXPECT_NE(printed.find("Read h2.wfn: 2 atoms, 2 MOs"), std::string::npos);
 	EXPECT_NE(printed.find("Active [0] h2.wfn  (wfn)"), std::string::npos);
 	EXPECT_NE(printed.find("Appears to be in bohr!"), std::string::npos);
@@ -167,6 +169,9 @@ TEST(QctTests, ReadConvertPropertyCubeAndIntegrate)
 	EXPECT_TRUE(std::filesystem::exists(s.dir / "h2_occ.wfn"));
 	EXPECT_TRUE(std::filesystem::exists(s.dir / "h2_rho.cube"));
 	EXPECT_NE(printed.find("Attached h2_rho.cube as cube 0"), std::string::npos);
+	EXPECT_TRUE(cube::is_binary_file(s.dir / "h2_rho.cubeb"));
+	EXPECT_NE(printed.find("Attached h2_rho.cubeb as cube 1"), std::string::npos);
+	EXPECT_EQ(wavy[0].get_cube_ptr(1)->get_value(1, 1, 1), wavy[0].get_cube_ptr(0)->get_value(1, 1, 1));
 	const auto at = printed.find("Integrated value: ");
 	ASSERT_NE(at, std::string::npos);
 	EXPECT_GT(std::stod(printed.substr(at + 18)), 0.0);

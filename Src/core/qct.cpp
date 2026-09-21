@@ -99,7 +99,7 @@ std::string origin_name(const e_origin o) {
 const std::vector<std::string> kWfnExt = { ".wfn", ".ffn", ".wfx", ".fch", ".fchk", ".FCh", ".FChK", ".FChk",
 	".xyz", ".molden", ".gbw", ".xtb", ".stda", ".orbital_energies,restricted", ".MO_energies,r",
 	".molecular_orbitals,restricted", ".MOs,r" };
-bool is_cube_ext(const std::filesystem::path& p) { return p.extension() == ".cube" || p.extension() == ".cub"; }
+bool is_cube_ext(const std::filesystem::path& p) { return p.extension() == ".cube" || p.extension() == ".cub" || p.extension() == ".cubeb"; }
 bool is_wfn_ext(const std::filesystem::path& p) {
 	return std::find(kWfnExt.begin(), kWfnExt.end(), p.extension().string()) != kWfnExt.end();
 }
@@ -187,7 +187,7 @@ bool ok_to_write(const std::filesystem::path& p) {
 
 void read_file(options& opt, std::vector<WFN>& wavy, int& active, bool expert) {
 	std::cout << boxed("wavefunctions: " + std::string(".wfn .ffn .wfx .fchk .molden .gbw .xtb .stda .xyz, Tonto MO files")) << '\n'
-		<< boxed("cubes: .cube .cub (attached to the active wavefunction)") << std::endl;
+		<< boxed("cubes: .cube .cub .cubeb (attached to the active wavefunction)") << std::endl;
 	std::string s;
 	if (!ask_line("File", s) || s.empty()) return;
 	const std::filesystem::path p(s);
@@ -225,7 +225,7 @@ void save_menu(options& opt, std::vector<WFN>& wavy, int active, bool expert) {
 		<< two_col("  3  .wfx", "  8  cube -> .cube") << '\n'
 		<< two_col("  4  .fchk (needs a basis set)", "  9  cube -> .dgrid") << '\n'
 		<< two_col("  5  .47   (NBO archive)", " 10  cube -> .xdgrid") << '\n'
-		<< two_col("  0  back", "") << '\n' << rule('-') << std::endl;
+		<< two_col("  0  back", " 11  cube -> .cubeb (binary, -cube_convert turns it back)") << '\n' << rule('-') << std::endl;
 	int sel = 0;
 	if (!ask("Choice", sel) || sel == 0) return;
 	std::filesystem::path def = w.get_path();
@@ -270,12 +270,13 @@ void save_menu(options& opt, std::vector<WFN>& wavy, int active, bool expert) {
 	}
 	case 8:
 	case 9:
-	case 10: {
+	case 10:
+	case 11: {
 		int cw, cc;
 		if (!pick_cube(wavy, cw, cc, "Which cube")) return;
 		if (!loaded_cube(wavy, cw, cc, expert)) return;
 		std::filesystem::path cdef = wavy[cw].get_cube_path(cc);
-		cdef.replace_extension(sel == 8 ? ".cube" : sel == 9 ? ".dgrid" : ".xdgrid");
+		cdef.replace_extension(sel == 8 ? ".cube" : sel == 9 ? ".dgrid" : sel == 10 ? ".xdgrid" : ".cubeb");
 		const std::filesystem::path out = ask_output(cdef);
 		if (input_closed || !ok_to_write(out)) return;
 		if (sel == 10) wavy[cw].write_cube_xdgraph(cc, out, opt.debug);

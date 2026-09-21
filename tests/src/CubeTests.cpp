@@ -581,6 +581,98 @@ TEST(CubeIoTests, WriteReadRoundTrip)
 	std::filesystem::remove(path);
 }
 
+//.cubeb: a .cubeb path or cube::binary_output writes the binary; the reading constructor sniffs the magic, the header,
+//atoms and values (exact, not %.5E) survive; a wrong magic is not binary and a newer version is refused;
+//write_file(text path) on a binary-backed header-only cube converts (the -cube_convert path)
+TEST(CubeIoTests, BinaryCubebRoundTripAndVersionCheck)
+{
+	WFN atoms(e_origin::NOT_YET_DEFINED);
+	atoms.push_back_atom("O", 0.5, -1.0, 2.0, 8);
+	atoms.push_back_atom("H", 1.5, 0.0, 0.0, 1);
+	cube c = grid(3, 0.5, -0.25, [](int x, int y, int z) { return std::sqrt(1.0 + 9 * x + 3 * y + z) - 1.7; });
+	c.set_na(2);
+	c.give_parent_wfn(atoms);
+	c.set_comment1("first comment");
+	c.set_comment2("");
+	const auto bin = tmp("roundtrip.cubeb"), txt = tmp("roundtrip_from_bin.cube");
+	c.set_path(bin);
+	std::filesystem::remove(bin);
+	ASSERT_TRUE(c.write_file(true));
+	ASSERT_TRUE(cube::is_binary_file(bin));
+	EXPECT_EQ(std::filesystem::file_size(bin), 8 + 4 + 4 + 4 + 12 + 24 + 72 + 4 + 13 + 4 + 2 * 28 + 27 * 8);
+
+	WFN fresh(e_origin::NOT_YET_DEFINED);
+	std::ostringstream log;
+	const cube r(bin, true, fresh, log);
+	EXPECT_TRUE(r.get_loaded());
+	EXPECT_EQ(r.get_comment1(), "first comment");
+	EXPECT_EQ(r.get_comment2(), "");
+	EXPECT_EQ(r.get_na(), 2);
+	EXPECT_EQ(r.get_sizes(), (i3{ 3, 3, 3 }));
+	EXPECT_EQ(r.get_origin(0), -0.25);
+	EXPECT_EQ(r.get_vector(1, 1), 0.5);
+	EXPECT_NEAR(r.get_dv(), 0.125, 1e-12);
+	ASSERT_EQ(fresh.get_ncen(), 2);
+	EXPECT_EQ(fresh.get_atom_charge(0), 8);
+	EXPECT_EQ(fresh.get_atom_coordinate(1, 0), 1.5);
+	for (int x = 0; x < 3; x++)
+		for (int y = 0; y < 3; y++)
+			for (int z = 0; z < 3; z++)
+				EXPECT_EQ(r.get_value(x, y, z), c.get_value(x, y, z)) << "binary values are bit-exact";
+
+	//header only from the binary, then written as text: the conversion
+	WFN conv(e_origin::NOT_YET_DEFINED);
+	cube h(bin, false, conv, log);
+	EXPECT_FALSE(h.get_loaded());
+	ASSERT_TRUE(h.write_file(txt));
+	EXPECT_FALSE(cube::is_binary_file(txt));
+	WFN back(e_origin::NOT_YET_DEFINED);
+	cube t(txt, true, back, log);
+	EXPECT_EQ(t.get_sizes(), (i3{ 3, 3, 3 }));
+	EXPECT_NEAR(t.get_value(2, 1, 0), c.get_value(2, 1, 0), 1e-5);
+	EXPECT_EQ(back.get_ncen(), 2);
+
+	//and back to binary through the extension of the target
+	std::filesystem::remove(bin);
+	ASSERT_TRUE(t.write_file(bin));
+	EXPECT_TRUE(cube::is_binary_file(bin));
+
+	//binary_output redirects a .cube path to .cubeb
+	cube::binary_output = true;
+	c.set_path(tmp("redirected.cube"));
+	ASSERT_TRUE(c.write_file(true));
+	cube::binary_output = false;
+	EXPECT_EQ(c.get_path().extension(), ".cubeb");
+	EXPECT_TRUE(cube::is_binary_file(c.get_path()));
+	//and opening it by the .cube name (bondwise/qct re-open what do_bonds wrote) finds the .cubeb
+	const cube by_text_name(tmp("redirected.cube"), true, fresh, log);
+	EXPECT_EQ(by_text_name.get_path().extension(), ".cubeb");
+	EXPECT_EQ(by_text_name.get_value(1, 2, 0), c.get_value(1, 2, 0));
+	std::filesystem::remove(c.get_path());
+
+	std::filesystem::remove(bin);
+	std::filesystem::remove(txt);
+}
+
+//a .cubeb of a version this reader does not know is refused (error_check exits)
+TEST(CubeIoDeathTest, BinaryCubebNewerVersionIsRefused)
+{
+	cube c = counting_cube("versioned");
+	const auto bin = tmp("versioned.cubeb");
+	c.set_path(bin);
+	ASSERT_TRUE(c.write_file(true));
+	{
+		std::fstream f(bin, std::ios::in | std::ios::out | std::ios::binary);
+		f.seekp(8);
+		const uint32_t v = 99;
+		f.write(reinterpret_cast<const char*>(&v), 4);
+	}
+	WFN w(e_origin::NOT_YET_DEFINED);
+	std::ostringstream log;
+	EXPECT_EXIT(cube bad(bin, true, w, log), ::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), ".*");
+	std::filesystem::remove(bin);
+}
+
 //a header-only cube copies the raw value lines when written to a new path, and write_file(path, debug) reports progress
 TEST(CubeIoTests, HeaderOnlyCubeCopiesValuesToANewPath)
 {

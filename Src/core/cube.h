@@ -83,6 +83,12 @@ public:
 	bool read_file(bool full, bool header, bool expert = false);
 	bool write_file(bool force = false, bool absolute = false);
 	bool write_file(const std::filesystem::path& given_path, bool debug = false);
+	// .cubeb: the cube in native binary ("NSA2CUBE", version, header, float64 values in cube order),
+	// ~100x faster to load than the text; -cubeb makes every write_file produce it, -cube_convert translates
+	static bool is_binary_file(const std::filesystem::path& file);
+	bool read_binary(bool full, bool header, bool expert = false);
+	bool write_binary(const std::filesystem::path& given_path, bool absolute = false) const;
+	static bool binary_output;
 	bool write_xdgraph(const std::filesystem::path& given_path, bool debug = false);
 	bool fractal_dimension(const double stepsize) const;
 	double get_vector(int i, int j) const;

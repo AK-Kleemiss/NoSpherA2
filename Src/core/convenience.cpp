@@ -3424,6 +3424,17 @@ bool options::digest_property_options(const std::string &temp, int &i)
         cube_density = arguments[i + 1];
         err_checkf(std::filesystem::exists(cube_density), "Cube density file does not exist!", std::cout);
     }
+    else if (temp == "-cubeb")
+        cube::binary_output = true;
+    else if (temp == "-cube_convert")
+    {
+        // -cube_convert <in> <out>: text .cube <-> binary .cubeb, the format follows the extension of <out>
+        err_checkf(i + 2 < argc, "-cube_convert needs <in> <out>", std::cout);
+        WFN wavy(e_origin::cub);
+        cube in(arguments[i + 1], true, wavy, std::cout, true);
+        err_checkf(in.write_file(std::filesystem::path(arguments[i + 2])), "cube conversion failed", std::cout);
+        finished = true; return true;
+    }
     else if (temp == "-calc_dens_1D")
     {
         err_chkf(!wfn.empty(), "No wavefunction specified! Use -wfn option BEVORE -calc_dens_1D to specify a wavefunction.", std::cout);
