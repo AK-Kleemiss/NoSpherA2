@@ -3,41 +3,41 @@
 
 struct Shape2D
 {
-    unsigned long long rows;
-    unsigned long long cols;
-    Shape2D() : rows(0), cols(0) {}
-    Shape2D(unsigned long long rows, unsigned long long cols) : rows(rows), cols(cols) {
-        err_checkf(rows >= 0, "cannot have negative size!", std::cout);
-        err_checkf(cols >= 0, "cannot have negative cols!", std::cout);
-    }
+	unsigned long long rows;
+	unsigned long long cols;
+	Shape2D() : rows(0), cols(0) {}
+	Shape2D(unsigned long long rows, unsigned long long cols) : rows(rows), cols(cols) {
+		err_checkf(rows >= 0, "cannot have negative size!", std::cout);
+		err_checkf(cols >= 0, "cannot have negative cols!", std::cout);
+	}
 };
 
 struct Shape3D
 {
-    unsigned long long depth;
-    unsigned long long rows;
-    unsigned long long cols;
-    Shape3D() : depth(0), rows(0), cols(0) {}
-    Shape3D(unsigned long long depth, unsigned long long rows, unsigned long long cols) : depth(depth), rows(rows), cols(cols) {
-        err_checkf(depth >= 0, "cannot have negative size!", std::cout);
-        err_checkf(rows >= 0, "cannot have negative size!", std::cout);
-        err_checkf(cols >= 0, "cannot have negative size!", std::cout);
-    }
+	unsigned long long depth;
+	unsigned long long rows;
+	unsigned long long cols;
+	Shape3D() : depth(0), rows(0), cols(0) {}
+	Shape3D(unsigned long long depth, unsigned long long rows, unsigned long long cols) : depth(depth), rows(rows), cols(cols) {
+		err_checkf(depth >= 0, "cannot have negative size!", std::cout);
+		err_checkf(rows >= 0, "cannot have negative size!", std::cout);
+		err_checkf(cols >= 0, "cannot have negative size!", std::cout);
+	}
 };
 
 struct Shape4D
 {
-    unsigned long long depth;
-    unsigned long long rows;
-    unsigned long long cols;
-    unsigned long long time;
-    Shape4D() : depth(0), rows(0), cols(0), time(0) {}
-    Shape4D(unsigned long long depth, unsigned long long rows, unsigned long long cols, unsigned long long time) : depth(depth), rows(rows), cols(cols), time(time) {
-        err_checkf(depth >= 0, "cannot have negative size!", std::cout);
-        err_checkf(rows >= 0, "cannot have negative size!", std::cout);
-        err_checkf(cols >= 0, "cannot have negative size!", std::cout);
-        err_checkf(time >= 0, "cannot have negative size!", std::cout);
-    }
+	unsigned long long depth;
+	unsigned long long rows;
+	unsigned long long cols;
+	unsigned long long time;
+	Shape4D() : depth(0), rows(0), cols(0), time(0) {}
+	Shape4D(unsigned long long depth, unsigned long long rows, unsigned long long cols, unsigned long long time) : depth(depth), rows(rows), cols(cols), time(time) {
+		err_checkf(depth >= 0, "cannot have negative size!", std::cout);
+		err_checkf(rows >= 0, "cannot have negative size!", std::cout);
+		err_checkf(cols >= 0, "cannot have negative size!", std::cout);
+		err_checkf(time >= 0, "cannot have negative size!", std::cout);
+	}
 };
 
 template <typename mat_t, typename vec_t, typename Shape_t>
@@ -100,13 +100,13 @@ T self_dot(const T& mat1, const T& mat2, bool transp1 = false, bool transp2 = fa
 // Wrapper for BLAS dot product
 template <typename T>
 std::vector<T> dot(const std::vector<std::vector<T>>& mat,
-    const std::vector<T>& vec,
-    bool transp = false);
+	const std::vector<T>& vec,
+	bool transp = false);
 
 template <typename T, typename T2>
 T dot(const T2& mat,
-    const T& vec,
-    bool transp = false);
+	const T& vec,
+	bool transp = false);
 
 //BLAS implementation of matrix multiplication 2D x 1D
 template <typename T>
@@ -124,7 +124,7 @@ template <typename T>
 T dot(const std::vector<T>& vec1, const std::vector<T>& vec2, bool conjugate = false);
 // Plain loop version of the same, conj(vec1)·vec2 when conjugate (scalar T only, vec2 x vec2 keeps the matrix overload)
 template <typename T>
-    requires (!std::is_class_v<T> || std::is_same_v<T, cdouble>)
+	requires (!std::is_class_v<T> || std::is_same_v<T, cdouble>)
 T self_dot(const std::vector<T>& vec1, const std::vector<T>& vec2, bool conjugate = false);
 
 //BLAS implementation of matrix multiplication 1D x 1D
@@ -185,9 +185,9 @@ int solve_linear_system(vec& A, const unsigned long long& rows_A, const unsigned
 //Small implementation of the non-negative least squares problem
 // A small struct to hold results
 struct NNLSResult {
-    vec x;   // solution
-    double rnorm;            // residual norm
-    int status;              // 0 if success, 1 if the iteration limit was hit
+	vec x;   // solution
+	double rnorm;            // residual norm
+	int status;              // 0 if success, 1 if the iteration limit was hit
 };
 
 /*
@@ -209,9 +209,9 @@ struct NNLSResult {
  * - Requires LAPACKE and CBLAS libraries for matrix operations
  * - If LAPACKE or CBLAS is not available, the function will terminate with an error message
  * - Bro, Rasmus and de Jong, Sijmen, "A Fast Non-Negativity-
-       Constrained Least Squares Algorithm", Journal Of Chemometrics, 1997,
-       :doi:`10.1002/(SICI)1099-128X(199709/10)11:5<393::AID-CEM483>3.0.CO;2-L`
+	   Constrained Least Squares Algorithm", Journal Of Chemometrics, 1997,
+	   :doi:`10.1002/(SICI)1099-128X(199709/10)11:5<393::AID-CEM483>3.0.CO;2-L`
  */
 NNLSResult nnls(
-    dMatrix2& A, dMatrix1& B,
-    int maxiter = -1);
+	dMatrix2& A, dMatrix1& B,
+	int maxiter = -1);

@@ -16,175 +16,175 @@
 template <typename T>
 T conj(const T& val)
 {
-    if constexpr (std::is_same_v<T, cdouble> || std::is_same_v<T, std::complex<int>>)
-    {
-        return std::conj(val);
-    }
-    else
-    {
-        return val;
-    }
+	if constexpr (std::is_same_v<T, cdouble> || std::is_same_v<T, std::complex<int>>)
+	{
+		return std::conj(val);
+	}
+	else
+	{
+		return val;
+	}
 }
 
 // Reorder 3D Vectors following a given order
 template <typename T>
 std::vector<std::vector<std::vector<T>>> reorder3D(const std::vector<std::vector<std::vector<T>>>& original)
 {
-    if (original.empty() || original[0].empty() || original[0][0].empty())
-    {
-        return {}; // Return an empty vector if the original vector is empty or not properly sized
-    }
+	if (original.empty() || original[0].empty() || original[0][0].empty())
+	{
+		return {}; // Return an empty vector if the original vector is empty or not properly sized
+	}
 
-    size_t size1 = original.size();       // Original first dimension size
-    size_t size2 = original[0].size();    // Original second dimension size
-    size_t size3 = original[0][0].size(); // Original third dimension size
+	size_t size1 = original.size();       // Original first dimension size
+	size_t size2 = original[0].size();    // Original second dimension size
+	size_t size3 = original[0][0].size(); // Original third dimension size
 
-    // New vector with dimensions rearranged according to (2, 0, 1)
-    std::vector<std::vector<std::vector<T>>> transposed(size3, std::vector<std::vector<T>>(size1, std::vector<T>(size2)));
+	// New vector with dimensions rearranged according to (2, 0, 1)
+	std::vector<std::vector<std::vector<T>>> transposed(size3, std::vector<std::vector<T>>(size1, std::vector<T>(size2)));
 
-    for (size_t i = 0; i < size1; ++i)
-    {
-        for (size_t j = 0; j < size2; ++j)
-        {
-            for (size_t k = 0; k < size3; ++k)
-            {
-                transposed[k][i][j] = original[i][j][k];
-            }
-        }
-    }
+	for (size_t i = 0; i < size1; ++i)
+	{
+		for (size_t j = 0; j < size2; ++j)
+		{
+			for (size_t k = 0; k < size3; ++k)
+			{
+				transposed[k][i][j] = original[i][j][k];
+			}
+		}
+	}
 
-    return transposed;
+	return transposed;
 }
 template vec3 reorder3D(const vec3& original);
 
 // Element-wise exponentiation of a matrix
 vec2 elementWiseExponentiation(const vec2& matrix, double exponent)
 {
-    vec2 result = matrix; // Copy the original matrix to preserve its dimensions
+	vec2 result = matrix; // Copy the original matrix to preserve its dimensions
 
-    for (size_t i = 0; i < matrix.size(); ++i)
-    { // Iterate over rows
-        for (size_t j = 0; j < matrix[i].size(); ++j)
-        {                                                    // Iterate over columns
-            result[i][j] = std::pow(matrix[i][j], exponent); // Apply exponentiation
-        }
-    }
+	for (size_t i = 0; i < matrix.size(); ++i)
+	{ // Iterate over rows
+		for (size_t j = 0; j < matrix[i].size(); ++j)
+		{                                                    // Iterate over columns
+			result[i][j] = std::pow(matrix[i][j], exponent); // Apply exponentiation
+		}
+	}
 
-    return result;
+	return result;
 }
 dMatrix2 elementWiseExponentiation(dMatrix2& matrix, double exponent)
 {
-    vec result(matrix.size(), 0.0);
-    dMatrix2 result_m = reshape<dMatrix2>(result, Shape2D({ matrix.extent(0), matrix.extent(1) }));
+	vec result(matrix.size(), 0.0);
+	dMatrix2 result_m = reshape<dMatrix2>(result, Shape2D({ matrix.extent(0), matrix.extent(1) }));
 
 #ifdef __APPLE__
-    std::transform(matrix.container().begin(), matrix.container().end(), result_m.data(), [exponent](double val)
-        { return std::pow(val, exponent); });
+	std::transform(matrix.container().begin(), matrix.container().end(), result_m.data(), [exponent](double val)
+		{ return std::pow(val, exponent); });
 #else
-    std::transform(std::execution::par, matrix.container().begin(), matrix.container().end(), result_m.data(), [exponent](double val)
-        { return std::pow(val, exponent); });
+	std::transform(std::execution::par, matrix.container().begin(), matrix.container().end(), result_m.data(), [exponent](double val)
+		{ return std::pow(val, exponent); });
 #endif
 
-    return result_m;
+	return result_m;
 }
 
 int solve_linear_system(const vec2& A, vec& b)
 {
-    err_checkf(A.size() == b.size(), "Inconsitent size of arrays in linear_solve", std::cout);
-    vec temp = flatten<double>(A);
-    return solve_linear_system(temp, A.size(), b);
+	err_checkf(A.size() == b.size(), "Inconsitent size of arrays in linear_solve", std::cout);
+	vec temp = flatten<double>(A);
+	return solve_linear_system(temp, A.size(), b);
 }
 
 int solve_linear_system(vec& A, const size_t& size_A, vec& b)
 {
 
-    err_checkf(size_A == b.size(), "Inconsitent size of arrays in linear_solve", std::cout);
-    // LAPACK variables
-    const lapack_int n = (int)size_A; // The order of the matrix eri2c
-    const lapack_int nrhs = 1;   // Number of right-hand sides (columns of rho and )
-    const lapack_int lda = n;    // Leading dimension of eri2c
-    const lapack_int ldb = 1;    // Leading dimension of rho
-    ivec ipiv(n, 0);              // Pivot indices
-    lapack_int info = 0;
+	err_checkf(size_A == b.size(), "Inconsitent size of arrays in linear_solve", std::cout);
+	// LAPACK variables
+	const lapack_int n = (int)size_A; // The order of the matrix eri2c
+	const lapack_int nrhs = 1;   // Number of right-hand sides (columns of rho and )
+	const lapack_int lda = n;    // Leading dimension of eri2c
+	const lapack_int ldb = 1;    // Leading dimension of rho
+	ivec ipiv(n, 0);              // Pivot indices
+	lapack_int info = 0;
 
 #if defined(__APPLE__)
-    // Convert row-major to column-major for Accelerate
-    vec A_col_major(A.size());
-    for (int i = 0; i < n; ++i) {
-        for (int j = 0; j < n; ++j) {
-            A_col_major[j * n + i] = A[i * n + j]; // Transpose
-        }
-    }
-    int n_copy = n;
-    int nrhs_copy = nrhs;
-    int lda_copy = n;
-    int ldb_copy = n;
-    dgesv_(&n_copy, &nrhs_copy, A_col_major.data(), &lda_copy, ipiv.data(), b.data(), &ldb_copy, &info);
+	// Convert row-major to column-major for Accelerate
+	vec A_col_major(A.size());
+	for (int i = 0; i < n; ++i) {
+		for (int j = 0; j < n; ++j) {
+			A_col_major[j * n + i] = A[i * n + j]; // Transpose
+		}
+	}
+	int n_copy = n;
+	int nrhs_copy = nrhs;
+	int lda_copy = n;
+	int ldb_copy = n;
+	dgesv_(&n_copy, &nrhs_copy, A_col_major.data(), &lda_copy, ipiv.data(), b.data(), &ldb_copy, &info);
 #else
-    // MKL/LAPACKE: C interface, row-major
-    info = LAPACKE_dgesv(LAPACK_ROW_MAJOR, n, nrhs, A.data(), lda, (lapack_int*)ipiv.data(), b.data(), ldb);
+	// MKL/LAPACKE: C interface, row-major
+	info = LAPACKE_dgesv(LAPACK_ROW_MAJOR, n, nrhs, A.data(), lda, (lapack_int*)ipiv.data(), b.data(), ldb);
 #endif
-    if (info != 0)
-    {
-        std::cout << "Error: LAPACKE_dgesv returned " << info << std::endl;
-    }
-    return info;
+	if (info != 0)
+	{
+		std::cout << "Error: LAPACKE_dgesv returned " << info << std::endl;
+	}
+	return info;
 }
 
 int solve_linear_system(vec& A, const unsigned long long& rows_A, const unsigned long long& cols_A, vec& b)
 {
-    err_checkf(rows_A == b.size(), "Inconsitent size of arrays in linear_solve", std::cout);
-    // LAPACK variables
-    const int m = (int)rows_A;
-    const int n = (int)cols_A; // colums of matrix A
-    const int nrhs = 1;   // Number of right-hand sides (columns of rho and X)
-    const int lda = n;    // Leading dimension of eri2c
-    const int ldb = m;    // Leading dimension of rho
-    int info = 0;
+	err_checkf(rows_A == b.size(), "Inconsitent size of arrays in linear_solve", std::cout);
+	// LAPACK variables
+	const int m = (int)rows_A;
+	const int n = (int)cols_A; // colums of matrix A
+	const int nrhs = 1;   // Number of right-hand sides (columns of rho and X)
+	const int lda = n;    // Leading dimension of eri2c
+	const int ldb = m;    // Leading dimension of rho
+	int info = 0;
 
-    // Call LAPACK function to solve the system
+	// Call LAPACK function to solve the system
 #if defined(__APPLE__)
-    // Convert row-major to column-major for Accelerate
-    vec A_col_major(A.size());
-    for (int i = 0; i < m; ++i) {
-        for (int j = 0; j < n; ++j) {
-            A_col_major[j * m + i] = A[i * n + j]; // Transpose
-        }
-    }
-    char trans = 'N'; // Column-major layout already stored in A_col_major
-    int m_work = m;
-    int n_work = n;
-    int nrhs_work = nrhs;
-    int lda_cm = m;
-    int ldb_cm = m;
-    int lwork = -1;
-    double work_query = 0.0;
-    dgels_(&trans, &m_work, &n_work, &nrhs_work, A_col_major.data(), &lda_cm, b.data(), &ldb_cm, &work_query, &lwork, &info);
-    lwork = static_cast<int>(work_query);
-    vec work(lwork);
-    dgels_(&trans, &m_work, &n_work, &nrhs_work, A_col_major.data(), &lda_cm, b.data(), &ldb_cm, work.data(), &lwork, &info);
+	// Convert row-major to column-major for Accelerate
+	vec A_col_major(A.size());
+	for (int i = 0; i < m; ++i) {
+		for (int j = 0; j < n; ++j) {
+			A_col_major[j * m + i] = A[i * n + j]; // Transpose
+		}
+	}
+	char trans = 'N'; // Column-major layout already stored in A_col_major
+	int m_work = m;
+	int n_work = n;
+	int nrhs_work = nrhs;
+	int lda_cm = m;
+	int ldb_cm = m;
+	int lwork = -1;
+	double work_query = 0.0;
+	dgels_(&trans, &m_work, &n_work, &nrhs_work, A_col_major.data(), &lda_cm, b.data(), &ldb_cm, &work_query, &lwork, &info);
+	lwork = static_cast<int>(work_query);
+	vec work(lwork);
+	dgels_(&trans, &m_work, &n_work, &nrhs_work, A_col_major.data(), &lda_cm, b.data(), &ldb_cm, work.data(), &lwork, &info);
 #else
-    info = LAPACKE_dgels(LAPACK_COL_MAJOR, 'T', n, m, nrhs, A.data(), lda, b.data(), ldb);
+	info = LAPACKE_dgels(LAPACK_COL_MAJOR, 'T', n, m, nrhs, A.data(), lda, b.data(), ldb);
 #endif
 
-    double error = 0.0;
-    std::cout << "Error: ";
-    for (int i = n; i < m; i++)
-    {
-        error += b[i] * b[i];
-    }
-    // std::fixed/precision are sticky on std::cout; restore them so later prints keep their format
-    const std::ios_base::fmtflags flags = std::cout.flags();
-    const std::streamsize prec = std::cout.precision();
-    std::cout << std::fixed << std::showpoint << std::setprecision(12) << std::sqrt(error) << std::endl;
-    std::cout.flags(flags);
-    std::cout.precision(prec);
+	double error = 0.0;
+	std::cout << "Error: ";
+	for (int i = n; i < m; i++)
+	{
+		error += b[i] * b[i];
+	}
+	// std::fixed/precision are sticky on std::cout; restore them so later prints keep their format
+	const std::ios_base::fmtflags flags = std::cout.flags();
+	const std::streamsize prec = std::cout.precision();
+	std::cout << std::fixed << std::showpoint << std::setprecision(12) << std::sqrt(error) << std::endl;
+	std::cout.flags(flags);
+	std::cout.precision(prec);
 
-    if (info != 0)
-    {
-        std::cout << "Error: LAPACKE_dgels returned " << info << std::endl;
-    }
-    return info;
+	if (info != 0)
+	{
+		std::cout << "Error: LAPACKE_dgels returned " << info << std::endl;
+	}
+	return info;
 }
 
 //#include <linalg.hpp>
@@ -207,230 +207,230 @@ int solve_linear_system(vec& A, const unsigned long long& rows_A, const unsigned
 
 
 NNLSResult nnls(dMatrix2& A,
-    dMatrix1& b,
-    int maxiter) {
+	dMatrix1& b,
+	int maxiter) {
 
-    int m = A.extent(0), n = A.extent(1);
+	int m = A.extent(0), n = A.extent(1);
 
-    if (maxiter == -1) maxiter = 3 * n;
+	if (maxiter == -1) maxiter = 3 * n;
 
-    ivec inds(n);
-    vec w(n), x(n), work(m), zz(m);
+	ivec inds(n);
+	vec w(n), x(n), work(m), zz(m);
 
-    for (int i = 0; i < n; ++i)
-        inds[i] = i;
+	for (int i = 0; i < n; ++i)
+		inds[i] = i;
 
-    int iteration = 0, iz1 = 0, nrow = 0, nsetp = 0, jj = 0;
-    double tau = 0.0, unorm = 0.0, alpha, beta, cc, ss, wmax, T, tmp;
-    bool skip = false;
+	int iteration = 0, iz1 = 0, nrow = 0, nsetp = 0, jj = 0;
+	double tau = 0.0, unorm = 0.0, alpha, beta, cc, ss, wmax, T, tmp;
+	bool skip = false;
 
-    while (iz1 < n && nsetp < m) {
-        // simulating a goto from col independence check
-        if (skip) {
-            skip = false;
-        }
-        else {
-            std::fill(w.begin() + iz1, w.end(), 0.0);
-            for (int i = iz1; i < n; ++i) {
-                for (int j = nrow; j < m; ++j) {
-                    w[i] += b(j) * A(j, inds[i]);
-                }
-            }
-        }
+	while (iz1 < n && nsetp < m) {
+		// simulating a goto from col independence check
+		if (skip) {
+			skip = false;
+		}
+		else {
+			std::fill(w.begin() + iz1, w.end(), 0.0);
+			for (int i = iz1; i < n; ++i) {
+				for (int j = nrow; j < m; ++j) {
+					w[i] += b(j) * A(j, inds[i]);
+				}
+			}
+		}
 
-        //Find the largest w[j] and its index.
-        vec::iterator max_it = std::max_element(w.begin() + iz1, w.end());
-        wmax = *max_it;
-        int izmax = std::distance(w.begin(), max_it);
+		//Find the largest w[j] and its index.
+		vec::iterator max_it = std::max_element(w.begin() + iz1, w.end());
+		wmax = *max_it;
+		int izmax = std::distance(w.begin(), max_it);
 
-        int iz = izmax;
-        int j = inds[iz];
+		int iz = izmax;
+		int j = inds[iz];
 
-        // If wmax <= 0.0, terminate since this is a KKT certificate.
-        if (wmax <= 0.0) break;
+		// If wmax <= 0.0, terminate since this is a KKT certificate.
+		if (wmax <= 0.0) break;
 
-        //# The sign of wmax is OK for j to be moved to set p.Begin the transformation
-        for (int i = nrow; i < m; ++i) {
-            work[i] = A(i, j);
-        }
-        int tmpint = m - nrow;
-
-#if defined(__APPLE__)
-        lapack_int incx = 1;
-        dlarfg_(&tmpint, &work[nrow], &work[nrow + 1], &incx, &tau);
-#else
-        LAPACKE_dlarfg(tmpint, &work[nrow], &work[nrow + 1], 1, &tau);
-#endif
-        beta = work[nrow];
-        work[nrow] = 1.0;
-        unorm = 0.0;
-        if (nsetp > 0) {
-            for (int i = 0; i < nsetp; ++i) {
-                unorm += A(i, j) * A(i, j);
-            }
-            unorm = std::sqrt(unorm);
-        }
-        if (unorm + std::abs(beta) * 0.01 - unorm > 0.0) {
-            // Column j is sufficiently independent.Copy b into zz and solve for
-            // ztest which is the new prospective value for x[j].
-            std::copy(b.data(), b.data() + m, zz.begin());
+		//# The sign of wmax is OK for j to be moved to set p.Begin the transformation
+		for (int i = nrow; i < m; ++i) {
+			work[i] = A(i, j);
+		}
+		int tmpint = m - nrow;
 
 #if defined(__APPLE__)
-            char side = 'L';
-            lapack_int one = 1;
-            vec work_temp(tmpint, 0.0);
-            dlarfx_(&side, &tmpint, &one, &work[nrow], &tau, &zz[nrow], &tmpint, work_temp.data());
+		lapack_int incx = 1;
+		dlarfg_(&tmpint, &work[nrow], &work[nrow + 1], &incx, &tau);
 #else
-            LAPACKE_dlarfx(LAPACK_COL_MAJOR, 'L', tmpint, 1.0, &work[nrow], tau, &zz[nrow], tmpint, &tmp);
+		LAPACKE_dlarfg(tmpint, &work[nrow], &work[nrow + 1], 1, &tau);
 #endif
+		beta = work[nrow];
+		work[nrow] = 1.0;
+		unorm = 0.0;
+		if (nsetp > 0) {
+			for (int i = 0; i < nsetp; ++i) {
+				unorm += A(i, j) * A(i, j);
+			}
+			unorm = std::sqrt(unorm);
+		}
+		if (unorm + std::abs(beta) * 0.01 - unorm > 0.0) {
+			// Column j is sufficiently independent.Copy b into zz and solve for
+			// ztest which is the new prospective value for x[j].
+			std::copy(b.data(), b.data() + m, zz.begin());
 
-            if (zz[nrow] / beta <= 0.0) {
-                // reject column j as a candidate to be moved from set z to set p.
-                // Set w[j] to 0.0 and move to the next greatest entry in w.
-                w[j] = 0.0;
-                continue;
-            }
-        }
-        else {
-            // Column j is not numerically independent, reject column j
-            w[j] = 0.0;
-            continue;
-        }
-        // column j accepted
-        A(nrow, j) = beta;
-        std::copy(zz.begin(), zz.end(), b.data());
-        inds[iz] = inds[iz1];
-        inds[iz1] = j;
-        iz1 += 1;
-        nsetp += 1;
-
-        if (iz1 < n) {
-            for (int i = iz1; i < n; ++i) {
-                int col = inds[i];
-                for (int _j = nrow; _j < m; ++_j) {
-                    zz[_j] = A(_j, col);
-                }
 #if defined(__APPLE__)
-                char side = 'L';
-                lapack_int one = 1;
-                vec work_temp(tmpint, 0.0);
-                dlarfx_(&side, &tmpint, &one, &work[nrow], &tau, &zz[nrow], &tmpint, work_temp.data());
+			char side = 'L';
+			lapack_int one = 1;
+			vec work_temp(tmpint, 0.0);
+			dlarfx_(&side, &tmpint, &one, &work[nrow], &tau, &zz[nrow], &tmpint, work_temp.data());
 #else
-                LAPACKE_dlarfx(LAPACK_COL_MAJOR, 'L', tmpint, 1.0, &work[nrow], tau, &zz[nrow], tmpint, &tmp);
+			LAPACKE_dlarfx(LAPACK_COL_MAJOR, 'L', tmpint, 1.0, &work[nrow], tau, &zz[nrow], tmpint, &tmp);
 #endif
-                for (int _j = nrow; _j < m; ++_j) {
-                    A(_j, col) = zz[_j];
-                }
-            }
-        }
-        nrow += 1;
 
-        if (nsetp < m - 1) {
-            for (int i = nrow; i < m; ++i) {
-                A(i, j) = 0.0;
-            }
-        }
-        w[j] = 0.0;
+			if (zz[nrow] / beta <= 0.0) {
+				// reject column j as a candidate to be moved from set z to set p.
+				// Set w[j] to 0.0 and move to the next greatest entry in w.
+				w[j] = 0.0;
+				continue;
+			}
+		}
+		else {
+			// Column j is not numerically independent, reject column j
+			w[j] = 0.0;
+			continue;
+		}
+		// column j accepted
+		A(nrow, j) = beta;
+		std::copy(zz.begin(), zz.end(), b.data());
+		inds[iz] = inds[iz1];
+		inds[iz1] = j;
+		iz1 += 1;
+		nsetp += 1;
 
-        std::copy(b.container().begin(), b.container().end(), zz.begin());
-        for (int k = 0; k < nsetp; ++k) {
-            int ip = nsetp - k - 1;
-            if (k != 0) {
-                for (int ii = 0; ii < ip + 1; ++ii) {
-                    zz[ii] -= A(ii, jj) * zz[ip + 1];
-                }
-            }
-            jj = inds[ip];
-            zz[ip] /= A(ip, jj);
-        }
-
-        while (true) {
-            iteration++;
-            if (iteration > maxiter) {
-                std::cerr << "NNLS did not converge after " << maxiter << " iterations.\n";
-                return NNLSResult{ x, 0.0, 1 };
-            }
-
-            alpha = 2.0;
-            for (int ip = 0; ip < nsetp; ++ip) {
-                int k = inds[ip];
-                if (zz[ip] <= 0.0) {
-                    T = -x[k] / (zz[ip] - x[k]);
-                    if (alpha > T) {
-                        alpha = T;
-                        jj = ip;
-                    }
-                }
-            }
-            if (alpha == 2.0) break;
-
-            for (int i = 0; i < nsetp; ++i) {
-                x[inds[i]] = (1 - alpha) * x[inds[i]] + alpha * zz[i];
-            }
-
-            // Modify A, B, and the indices to move coefficient
-            // i from set p to set z.While loop simulates a goto
-            int i = inds[jj];
-            while (true)
-            {
-                x[i] = 0.0;
-                if (jj != nsetp) {
-                    jj += 1;
-                    for (int j = jj; j < nsetp; ++j) {
-                        int ii = inds[j];
-                        inds[j - 1] = ii;
+		if (iz1 < n) {
+			for (int i = iz1; i < n; ++i) {
+				int col = inds[i];
+				for (int _j = nrow; _j < m; ++_j) {
+					zz[_j] = A(_j, col);
+				}
 #if defined(__APPLE__)
-                        dlartg_(&A(j - 1, ii), &A(j, ii), &cc, &ss, &A(j - 1, ii));
+				char side = 'L';
+				lapack_int one = 1;
+				vec work_temp(tmpint, 0.0);
+				dlarfx_(&side, &tmpint, &one, &work[nrow], &tau, &zz[nrow], &tmpint, work_temp.data());
 #else
-                        LAPACKE_dlartgp(A(j - 1, ii), A(j, ii), &cc, &ss, &A(j - 1, ii));
+				LAPACKE_dlarfx(LAPACK_COL_MAJOR, 'L', tmpint, 1.0, &work[nrow], tau, &zz[nrow], tmpint, &tmp);
 #endif
-                        A(j, ii) = 0.0;
-                        for (int col = 0; col < n; ++col) {
-                            if (col != ii) {
-                                tmp = A(j - 1, col);
-                                A(j - 1, col) = cc * tmp + ss * A(j, col);
-                                A(j, col) = -ss * tmp + cc * A(j, col);
-                            }
-                        }
-                        tmp = b(j - 1);
-                        b(j - 1) = cc * tmp + ss * b(j);
-                        b(j) = -ss * tmp + cc * b(j);
-                    }
-                }
-                nrow -= 1;
-                nsetp -= 1;
-                iz1 -= 1;
-                inds[iz1] = i;
-                bool loop_broken = false;
-                for (int _jj = 0; _jj < nsetp; ++_jj) {
-                    i = inds[_jj];
-                    if (x[i] <= 0.0) {
-                        loop_broken = true;
-                        break;
-                    }
-                }
-                if (!loop_broken) break;
-            }
-            std::copy(b.container().begin(), b.container().end(), zz.begin());
-            for (int k = 0; k < nsetp; ++k) {
-                int ip = nsetp - k - 1;
-                if (k != 0) {
-                    for (int ii = 0; ii < ip + 1; ++ii) {
-                        zz[ii] -= A(ii, jj) * zz[ip + 1];
-                    }
-                }
-                jj = inds[ip];
-                zz[ip] /= A(ip, jj);
-            }
-        }
-        for (int i = 0; i < nsetp; ++i) {
-            x[inds[i]] = zz[i];
-        }
+				for (int _j = nrow; _j < m; ++_j) {
+					A(_j, col) = zz[_j];
+				}
+			}
+		}
+		nrow += 1;
 
-    }
-    //Calculate the residual np.linalg.norm(b[nrow:])
-    double res = cblas_dnrm2(m - nrow, &b(nrow), 1);
-    return NNLSResult{ x, res, 0 };
+		if (nsetp < m - 1) {
+			for (int i = nrow; i < m; ++i) {
+				A(i, j) = 0.0;
+			}
+		}
+		w[j] = 0.0;
+
+		std::copy(b.container().begin(), b.container().end(), zz.begin());
+		for (int k = 0; k < nsetp; ++k) {
+			int ip = nsetp - k - 1;
+			if (k != 0) {
+				for (int ii = 0; ii < ip + 1; ++ii) {
+					zz[ii] -= A(ii, jj) * zz[ip + 1];
+				}
+			}
+			jj = inds[ip];
+			zz[ip] /= A(ip, jj);
+		}
+
+		while (true) {
+			iteration++;
+			if (iteration > maxiter) {
+				std::cerr << "NNLS did not converge after " << maxiter << " iterations.\n";
+				return NNLSResult{ x, 0.0, 1 };
+			}
+
+			alpha = 2.0;
+			for (int ip = 0; ip < nsetp; ++ip) {
+				int k = inds[ip];
+				if (zz[ip] <= 0.0) {
+					T = -x[k] / (zz[ip] - x[k]);
+					if (alpha > T) {
+						alpha = T;
+						jj = ip;
+					}
+				}
+			}
+			if (alpha == 2.0) break;
+
+			for (int i = 0; i < nsetp; ++i) {
+				x[inds[i]] = (1 - alpha) * x[inds[i]] + alpha * zz[i];
+			}
+
+			// Modify A, B, and the indices to move coefficient
+			// i from set p to set z.While loop simulates a goto
+			int i = inds[jj];
+			while (true)
+			{
+				x[i] = 0.0;
+				if (jj != nsetp) {
+					jj += 1;
+					for (int j = jj; j < nsetp; ++j) {
+						int ii = inds[j];
+						inds[j - 1] = ii;
+#if defined(__APPLE__)
+						dlartg_(&A(j - 1, ii), &A(j, ii), &cc, &ss, &A(j - 1, ii));
+#else
+						LAPACKE_dlartgp(A(j - 1, ii), A(j, ii), &cc, &ss, &A(j - 1, ii));
+#endif
+						A(j, ii) = 0.0;
+						for (int col = 0; col < n; ++col) {
+							if (col != ii) {
+								tmp = A(j - 1, col);
+								A(j - 1, col) = cc * tmp + ss * A(j, col);
+								A(j, col) = -ss * tmp + cc * A(j, col);
+							}
+						}
+						tmp = b(j - 1);
+						b(j - 1) = cc * tmp + ss * b(j);
+						b(j) = -ss * tmp + cc * b(j);
+					}
+				}
+				nrow -= 1;
+				nsetp -= 1;
+				iz1 -= 1;
+				inds[iz1] = i;
+				bool loop_broken = false;
+				for (int _jj = 0; _jj < nsetp; ++_jj) {
+					i = inds[_jj];
+					if (x[i] <= 0.0) {
+						loop_broken = true;
+						break;
+					}
+				}
+				if (!loop_broken) break;
+			}
+			std::copy(b.container().begin(), b.container().end(), zz.begin());
+			for (int k = 0; k < nsetp; ++k) {
+				int ip = nsetp - k - 1;
+				if (k != 0) {
+					for (int ii = 0; ii < ip + 1; ++ii) {
+						zz[ii] -= A(ii, jj) * zz[ip + 1];
+					}
+				}
+				jj = inds[ip];
+				zz[ip] /= A(ip, jj);
+			}
+		}
+		for (int i = 0; i < nsetp; ++i) {
+			x[inds[i]] = zz[i];
+		}
+
+	}
+	//Calculate the residual np.linalg.norm(b[nrow:])
+	double res = cblas_dnrm2(m - nrow, &b(nrow), 1);
+	return NNLSResult{ x, res, 0 };
 }
 
 //NNLSResult nnls(dMatrix2& A,

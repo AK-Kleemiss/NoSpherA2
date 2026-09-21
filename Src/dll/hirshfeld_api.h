@@ -28,7 +28,7 @@ using bvec = std::vector<bool>;
 using pathvec = std::vector<std::filesystem::path>;
 
 NOS_API std::vector<Triangle> NOS_CALLCONV compute_Hirshfeld_suface_i(
-    const std::filesystem::path& fn1,
-    const std::filesystem::path& fn2,
-    double resolution,
-    double radius);
+	const std::filesystem::path& fn1,
+	const std::filesystem::path& fn2,
+	double resolution,
+	double radius);

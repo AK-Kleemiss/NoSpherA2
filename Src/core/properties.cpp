@@ -18,788 +18,788 @@
 
 std::vector<Thakkar> make_thakkar_interpolators()
 {
-    // atom_models[atom.charge - 1] is the lookup convention (see
-    // promolecular_fragment_densities_at), so index a must hold atomic
-    // number a+1, not a=0 (which would build a bogus atomic-number-0 model
-    // and read Thakkar_ns/np/nd/nf out of bounds for every real element).
-    std::vector<Thakkar> atom_models;
-    atom_models.reserve(92);
-    for (int a = 0; a < 92; a++)
-    {
-        atom_models.emplace_back(a + 1);
-        atom_models[a].make_interpolator(1.005 * 1.005 * 1.005, 1E-7);
-    }
-    return atom_models;
+	// atom_models[atom.charge - 1] is the lookup convention (see
+	// promolecular_fragment_densities_at), so index a must hold atomic
+	// number a+1, not a=0 (which would build a bogus atomic-number-0 model
+	// and read Thakkar_ns/np/nd/nf out of bounds for every real element).
+	std::vector<Thakkar> atom_models;
+	atom_models.reserve(92);
+	for (int a = 0; a < 92; a++)
+	{
+		atom_models.emplace_back(a + 1);
+		atom_models[a].make_interpolator(1.005 * 1.005 * 1.005, 1E-7);
+	}
+	return atom_models;
 }
 
 void print_time(_time_point &start, _time_point &end, std::ostream &file) {
-    if (constants::hide_timings)
-        return;
-    //fixed/setprecision(0) must not leak into the caller's later prints
-    const std::ios_base::fmtflags flags = file.flags();
-    const std::streamsize prec = file.precision();
-    if (get_sec(start, end) < 60)
-        file << "Time to calculate Values: " << std::fixed << std::setprecision(0) << get_sec(start, end) << " s" << std::endl;
-    else if (get_sec(start, end) < 3600)
-        file << "Time to calculate Values: " << std::fixed << std::setprecision(0) << get_sec(start, end) / 60 << " m " << get_sec(start, end) % 60 << " s" << std::endl;
-    else
-        file << "Time to calculate Values: " << std::fixed << std::setprecision(0) << get_sec(start, end) / 3600 << " h " << (get_sec(start, end) % 3600) / 60 << " m" << std::endl;
-    file.flags(flags);
-    file.precision(prec);
+	if (constants::hide_timings)
+		return;
+	//fixed/setprecision(0) must not leak into the caller's later prints
+	const std::ios_base::fmtflags flags = file.flags();
+	const std::streamsize prec = file.precision();
+	if (get_sec(start, end) < 60)
+		file << "Time to calculate Values: " << std::fixed << std::setprecision(0) << get_sec(start, end) << " s" << std::endl;
+	else if (get_sec(start, end) < 3600)
+		file << "Time to calculate Values: " << std::fixed << std::setprecision(0) << get_sec(start, end) / 60 << " m " << get_sec(start, end) % 60 << " s" << std::endl;
+	else
+		file << "Time to calculate Values: " << std::fixed << std::setprecision(0) << get_sec(start, end) / 3600 << " h " << (get_sec(start, end) % 3600) / 60 << " m" << std::endl;
+	file.flags(flags);
+	file.precision(prec);
 }
 
 namespace {
 
 bool is_within_radius(const d3 &pos, const std::vector<atom> &atoms, double radius_bohr)
 {
-    for (const atom &entry : atoms)
-        if (array_length(pos, entry.get_pos()) < radius_bohr)
-            return true;
-    return false;
+	for (const atom &entry : atoms)
+		if (array_length(pos, entry.get_pos()) < radius_bohr)
+			return true;
+	return false;
 }
 
 double sanitize_finite(double value)
 {
-    if (std::isnan(value) || std::isinf(value))
-        return 0.0;
-    return value;
+	if (std::isnan(value) || std::isinf(value))
+		return 0.0;
+	return value;
 }
 
 template <typename EvalFn>
 void evaluate_cube_in_radius(
-    cube &target,
-    bool wrap,
-    const std::vector<atom> &atoms,
-    double radius_bohr,
-    EvalFn &&evaluate_inside)
+	cube &target,
+	bool wrap,
+	const std::vector<atom> &atoms,
+	double radius_bohr,
+	EvalFn &&evaluate_inside)
 {
-    target.evaluate_on_grid(
-        [&](const d3 &pos) {
-            if (!is_within_radius(pos, atoms, radius_bohr))
-                return 0.0;
-            return evaluate_inside(pos);
-        },
-        wrap);
+	target.evaluate_on_grid(
+		[&](const d3 &pos) {
+			if (!is_within_radius(pos, atoms, radius_bohr))
+				return 0.0;
+			return evaluate_inside(pos);
+		},
+		wrap);
 }
 
 template <typename EvalFn>
 void evaluate_cube_in_radius_mapped(
-    cube &target,
-    bool wrap,
-    const std::vector<atom> &atoms,
-    double radius_bohr,
-    EvalFn &&evaluate_inside_mapped)
+	cube &target,
+	bool wrap,
+	const std::vector<atom> &atoms,
+	double radius_bohr,
+	EvalFn &&evaluate_inside_mapped)
 {
-    target.evaluate_on_grid(
-        [&](const d3 &pos, const i3 &raw_idx, const i3 &mapped_idx) {
-            if (!is_within_radius(pos, atoms, radius_bohr))
-                return 0.0;
-            return evaluate_inside_mapped(pos, raw_idx, mapped_idx);
-        },
-        wrap);
+	target.evaluate_on_grid(
+		[&](const d3 &pos, const i3 &raw_idx, const i3 &mapped_idx) {
+			if (!is_within_radius(pos, atoms, radius_bohr))
+				return 0.0;
+			return evaluate_inside_mapped(pos, raw_idx, mapped_idx);
+		},
+		wrap);
 }
 
 template <typename EvalFn>
 void evaluate_cube_near_atom_mapped(
-    cube &target,
-    bool wrap,
-    const d3 &atom_pos,
-    double radius_bohr,
-    EvalFn &&evaluate_inside_mapped)
+	cube &target,
+	bool wrap,
+	const d3 &atom_pos,
+	double radius_bohr,
+	EvalFn &&evaluate_inside_mapped)
 {
-    target.evaluate_on_grid(
-        [&](const d3 &pos, const i3 &raw_idx, const i3 &mapped_idx) {
-            if (array_length(pos, atom_pos) >= radius_bohr)
-                return 0.0;
-            return evaluate_inside_mapped(pos, raw_idx, mapped_idx);
-        },
-        wrap);
+	target.evaluate_on_grid(
+		[&](const d3 &pos, const i3 &raw_idx, const i3 &mapped_idx) {
+			if (array_length(pos, atom_pos) >= radius_bohr)
+				return 0.0;
+			return evaluate_inside_mapped(pos, raw_idx, mapped_idx);
+		},
+		wrap);
 }
 
 struct PropValues {
-    double rho = 0.0;
-    double grad = 0.0;
-    double elf = 0.0;
-    double eli = 0.0;
-    double lap = 0.0;
-    double hess[9]{ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
+	double rho = 0.0;
+	double grad = 0.0;
+	double elf = 0.0;
+	double eli = 0.0;
+	double lap = 0.0;
+	double hess[9]{ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
 };
 
 PropValues compute_prop_values(const std::vector<cube> &cubes, const WFN &wavy, const d3 &pos)
 {
-    PropValues values;
+	PropValues values;
 
-    const bool rdg_loaded = cubes[cube_type::RDG].get_loaded();
-    const bool lap_loaded = cubes[cube_type::Lap].get_loaded();
-    const bool elf_loaded = cubes[cube_type::Elf].get_loaded();
-    const bool eli_loaded = cubes[cube_type::Eli].get_loaded();
+	const bool rdg_loaded = cubes[cube_type::RDG].get_loaded();
+	const bool lap_loaded = cubes[cube_type::Lap].get_loaded();
+	const bool elf_loaded = cubes[cube_type::Elf].get_loaded();
+	const bool eli_loaded = cubes[cube_type::Eli].get_loaded();
 
-    if (cubes[cube_type::ESP].get_loaded() && !rdg_loaded)
-        values.rho = wavy.compute_dens(pos);
+	if (cubes[cube_type::ESP].get_loaded() && !rdg_loaded)
+		values.rho = wavy.compute_dens(pos);
 
-    if (rdg_loaded && lap_loaded && (elf_loaded || eli_loaded))
-        wavy.computeValues(pos, values.rho, values.grad, values.hess, values.elf, values.eli, values.lap);
-    else if (elf_loaded && eli_loaded && !rdg_loaded && !lap_loaded)
-        wavy.computeELIELF(pos, values.elf, values.eli);
-    else if (elf_loaded && !eli_loaded && !rdg_loaded && !lap_loaded)
-        values.elf = wavy.computeELF(pos);
-    else if (!elf_loaded && eli_loaded && !rdg_loaded && !lap_loaded)
-        values.eli = wavy.computeELI(pos);
-    else if (elf_loaded && eli_loaded && lap_loaded && !rdg_loaded)
-        wavy.computeLapELIELF(pos, values.elf, values.eli, values.lap);
-    else if (!elf_loaded && eli_loaded && lap_loaded && !rdg_loaded)
-        wavy.computeLapELI(pos, values.eli, values.lap);
-    else if (!elf_loaded && !eli_loaded && lap_loaded && !rdg_loaded)
-        values.lap = wavy.computeLap(pos);
-    else
-        wavy.computeValues(pos, values.rho, values.grad, values.hess, values.elf, values.eli, values.lap);
+	if (rdg_loaded && lap_loaded && (elf_loaded || eli_loaded))
+		wavy.computeValues(pos, values.rho, values.grad, values.hess, values.elf, values.eli, values.lap);
+	else if (elf_loaded && eli_loaded && !rdg_loaded && !lap_loaded)
+		wavy.computeELIELF(pos, values.elf, values.eli);
+	else if (elf_loaded && !eli_loaded && !rdg_loaded && !lap_loaded)
+		values.elf = wavy.computeELF(pos);
+	else if (!elf_loaded && eli_loaded && !rdg_loaded && !lap_loaded)
+		values.eli = wavy.computeELI(pos);
+	else if (elf_loaded && eli_loaded && lap_loaded && !rdg_loaded)
+		wavy.computeLapELIELF(pos, values.elf, values.eli, values.lap);
+	else if (!elf_loaded && eli_loaded && lap_loaded && !rdg_loaded)
+		wavy.computeLapELI(pos, values.eli, values.lap);
+	else if (!elf_loaded && !eli_loaded && lap_loaded && !rdg_loaded)
+		values.lap = wavy.computeLap(pos);
+	else
+		wavy.computeValues(pos, values.rho, values.grad, values.hess, values.elf, values.eli, values.lap);
 
-    if (rdg_loaded)
-        values.rho = get_lambda_1(values.hess) < 0 ? -values.rho : values.rho;
+	if (rdg_loaded)
+		values.rho = get_lambda_1(values.hess) < 0 ? -values.rho : values.rho;
 
-    return values;
+	return values;
 }
 
 void accumulate_prop_values(std::vector<cube> &cubes, const i3 &mapped_idx, const PropValues &values)
 {
-    const int x = mapped_idx[0];
-    const int y = mapped_idx[1];
-    const int z = mapped_idx[2];
+	const int x = mapped_idx[0];
+	const int y = mapped_idx[1];
+	const int z = mapped_idx[2];
 
-    if (cubes[cube_type::RDG].get_loaded())
-        cubes[cube_type::RDG].set_value(x, y, z, cubes[cube_type::RDG].get_value(x, y, z) + sanitize_finite(values.grad));
-    if (cubes[cube_type::Lap].get_loaded())
-        cubes[cube_type::Lap].set_value(x, y, z, cubes[cube_type::Lap].get_value(x, y, z) + sanitize_finite(values.lap));
-    if (cubes[cube_type::Elf].get_loaded())
-        cubes[cube_type::Elf].set_value(x, y, z, cubes[cube_type::Elf].get_value(x, y, z) + sanitize_finite(values.elf));
-    if (cubes[cube_type::Eli].get_loaded())
-        cubes[cube_type::Eli].set_value(x, y, z, cubes[cube_type::Eli].get_value(x, y, z) + sanitize_finite(values.eli));
+	if (cubes[cube_type::RDG].get_loaded())
+		cubes[cube_type::RDG].set_value(x, y, z, cubes[cube_type::RDG].get_value(x, y, z) + sanitize_finite(values.grad));
+	if (cubes[cube_type::Lap].get_loaded())
+		cubes[cube_type::Lap].set_value(x, y, z, cubes[cube_type::Lap].get_value(x, y, z) + sanitize_finite(values.lap));
+	if (cubes[cube_type::Elf].get_loaded())
+		cubes[cube_type::Elf].set_value(x, y, z, cubes[cube_type::Elf].get_value(x, y, z) + sanitize_finite(values.elf));
+	if (cubes[cube_type::Eli].get_loaded())
+		cubes[cube_type::Eli].set_value(x, y, z, cubes[cube_type::Eli].get_value(x, y, z) + sanitize_finite(values.eli));
 }
 
 } // namespace
 
 void Calc_Spherical_Dens(
-    cube &CubeSpher,
-    const WFN &wavy,
-    double radius,
-    std::ostream &file,
-    bool wrap)
+	cube &CubeSpher,
+	const WFN &wavy,
+	double radius,
+	std::ostream &file,
+	bool wrap)
 {
-    using namespace std;
-    _time_point start = get_time();
+	using namespace std;
+	_time_point start = get_time();
 
-    const vector<Thakkar> atom_models = make_thakkar_interpolators();
-    const double radius_bohr = constants::ang2bohr(radius);
-    const vector<atom> wavy_atoms = wavy.get_atoms();
+	const vector<Thakkar> atom_models = make_thakkar_interpolators();
+	const double radius_bohr = constants::ang2bohr(radius);
+	const vector<atom> wavy_atoms = wavy.get_atoms();
 
 #ifdef NOSPHERA2_USE_GPU
-    //Only the elements present travel to the device; wrap sums periodic images with atomics and stays on the host
-    if (!wrap && aux_density_gpu_enabled())
-    {
-        const int ncen = wavy.get_ncen();
-        vector<double> ax(ncen), ay(ncen), az(ncen);
-        vector<int> at_tab(ncen), tab_of_z(92, -1), tab_off{ 0 };
-        vector<double> r_tab, rho_tab;
-        for (int a = 0; a < ncen; a++)
-        {
-            const int z = wavy.get_atom_charge(a) - 1;
-            if (tab_of_z[z] < 0)
-            {
-                tab_of_z[z] = (int)tab_off.size() - 1;
-                const vec &r = atom_models[z].get_radial_dist(), &rho = atom_models[z].get_radial_density_table();
-                r_tab.insert(r_tab.end(), r.begin(), r.end());
-                rho_tab.insert(rho_tab.end(), rho.begin(), rho.end());
-                tab_off.push_back((int)r_tab.size());
-            }
-            at_tab[a] = tab_of_z[z];
-            const d3 pos = wavy.get_atom_pos(a);
-            ax[a] = pos[0], ay[a] = pos[1], az[a] = pos[2];
-        }
-        const i3 n = CubeSpher.get_sizes();
-        double origin[3], vectors[9];
-        for (int i = 0; i < 3; i++)
-        {
-            origin[i] = CubeSpher.get_origin(i);
-            for (int j = 0; j < 3; j++)
-                vectors[3 * i + j] = CubeSpher.get_vector(i, j);
-        }
-        vector<double> out((size_t)n[0] * n[1] * n[2]);
-        if (spherical_density_gpu_eval(n[0], n[1], n[2], origin, vectors, ncen, ax.data(), ay.data(), az.data(), at_tab.data(),
-                                       (int)tab_off.size() - 1, tab_off.data(), r_tab.data(), rho_tab.data(),
-                                       atom_models[0].get_lincr(), atom_models[0].get_start(), radius_bohr, out.data()))
-        {
-            if (!constants::hide_gpu_notes)
-                file << "GPU in use: spherical density grid" << endl;
-            const double *v = out.data();
-            for (int x = 0; x < n[0]; x++)
-                for (int y = 0; y < n[1]; y++)
-                    for (int z = 0; z < n[2]; z++)
-                        CubeSpher.set_value(x, y, z, *v++);
-            _time_point end = get_time();
-            print_time(start, end, file);
-            return;
-        }
-    }
+	//Only the elements present travel to the device; wrap sums periodic images with atomics and stays on the host
+	if (!wrap && aux_density_gpu_enabled())
+	{
+		const int ncen = wavy.get_ncen();
+		vector<double> ax(ncen), ay(ncen), az(ncen);
+		vector<int> at_tab(ncen), tab_of_z(92, -1), tab_off{ 0 };
+		vector<double> r_tab, rho_tab;
+		for (int a = 0; a < ncen; a++)
+		{
+			const int z = wavy.get_atom_charge(a) - 1;
+			if (tab_of_z[z] < 0)
+			{
+				tab_of_z[z] = (int)tab_off.size() - 1;
+				const vec &r = atom_models[z].get_radial_dist(), &rho = atom_models[z].get_radial_density_table();
+				r_tab.insert(r_tab.end(), r.begin(), r.end());
+				rho_tab.insert(rho_tab.end(), rho.begin(), rho.end());
+				tab_off.push_back((int)r_tab.size());
+			}
+			at_tab[a] = tab_of_z[z];
+			const d3 pos = wavy.get_atom_pos(a);
+			ax[a] = pos[0], ay[a] = pos[1], az[a] = pos[2];
+		}
+		const i3 n = CubeSpher.get_sizes();
+		double origin[3], vectors[9];
+		for (int i = 0; i < 3; i++)
+		{
+			origin[i] = CubeSpher.get_origin(i);
+			for (int j = 0; j < 3; j++)
+				vectors[3 * i + j] = CubeSpher.get_vector(i, j);
+		}
+		vector<double> out((size_t)n[0] * n[1] * n[2]);
+		if (spherical_density_gpu_eval(n[0], n[1], n[2], origin, vectors, ncen, ax.data(), ay.data(), az.data(), at_tab.data(),
+									   (int)tab_off.size() - 1, tab_off.data(), r_tab.data(), rho_tab.data(),
+									   atom_models[0].get_lincr(), atom_models[0].get_start(), radius_bohr, out.data()))
+		{
+			if (!constants::hide_gpu_notes)
+				file << "GPU in use: spherical density grid" << endl;
+			const double *v = out.data();
+			for (int x = 0; x < n[0]; x++)
+				for (int y = 0; y < n[1]; y++)
+					for (int z = 0; z < n[2]; z++)
+						CubeSpher.set_value(x, y, z, *v++);
+			_time_point end = get_time();
+			print_time(start, end, file);
+			return;
+		}
+	}
 #endif
 
-    evaluate_cube_in_radius(
-        CubeSpher,
-        wrap,
-        wavy_atoms,
-        radius_bohr,
-        [&](const d3 &pos) {
-            vector<double> dists(wavy.get_ncen(), 0.0);
-            for (int a = 0; a < wavy.get_ncen(); a++)
-                dists[a] = array_length(pos, wavy.get_atom_pos(a));
+	evaluate_cube_in_radius(
+		CubeSpher,
+		wrap,
+		wavy_atoms,
+		radius_bohr,
+		[&](const d3 &pos) {
+			vector<double> dists(wavy.get_ncen(), 0.0);
+			for (int a = 0; a < wavy.get_ncen(); a++)
+				dists[a] = array_length(pos, wavy.get_atom_pos(a));
 
-            double dens_all = 0.0;
-            for (int a = 0; a < wavy.get_ncen(); a++)
-                dens_all += atom_models[wavy.get_atom_charge(a) - 1].get_interpolated_density(dists[a]);
-            return dens_all;
-        });
+			double dens_all = 0.0;
+			for (int a = 0; a < wavy.get_ncen(); a++)
+				dens_all += atom_models[wavy.get_atom_charge(a) - 1].get_interpolated_density(dists[a]);
+			return dens_all;
+		});
 
-    _time_point end = get_time();
-    print_time(start, end, file);
+	_time_point end = get_time();
+	print_time(start, end, file);
 };
 
 void Calc_Static_Def(
-    cube &CubeDEF,
-    cube &CubeRho,
-    const WFN &wavy,
-    double radius,
-    std::ostream &file,
-    bool wrap)
+	cube &CubeDEF,
+	cube &CubeRho,
+	const WFN &wavy,
+	double radius,
+	std::ostream &file,
+	bool wrap)
 {
-    using namespace std;
-    _time_point start = get_time();
-    vector<Thakkar> atoms;
-    atoms.reserve(wavy.get_ncen());
-    for (int a = 0; a < wavy.get_ncen(); a++)
-        atoms.emplace_back(wavy.get_atom_charge(a));
-    const double radius_bohr = constants::ang2bohr(radius);
-    const vector<atom> wavy_atoms = wavy.get_atoms();
+	using namespace std;
+	_time_point start = get_time();
+	vector<Thakkar> atoms;
+	atoms.reserve(wavy.get_ncen());
+	for (int a = 0; a < wavy.get_ncen(); a++)
+		atoms.emplace_back(wavy.get_atom_charge(a));
+	const double radius_bohr = constants::ang2bohr(radius);
+	const vector<atom> wavy_atoms = wavy.get_atoms();
 
-    evaluate_cube_in_radius_mapped(
-        CubeDEF,
-        wrap,
-        wavy_atoms,
-        radius_bohr,
-        [&](const d3 &pos, const i3 &, const i3 &mapped_idx) {
-            vector<double> dists(wavy.get_ncen(), 0.0);
-            for (int a = 0; a < wavy.get_ncen(); a++)
-                dists[a] = array_length(pos, wavy.get_atom_pos(a));
+	evaluate_cube_in_radius_mapped(
+		CubeDEF,
+		wrap,
+		wavy_atoms,
+		radius_bohr,
+		[&](const d3 &pos, const i3 &, const i3 &mapped_idx) {
+			vector<double> dists(wavy.get_ncen(), 0.0);
+			for (int a = 0; a < wavy.get_ncen(); a++)
+				dists[a] = array_length(pos, wavy.get_atom_pos(a));
 
-            double dens_all = 0.0;
-            for (int a = 0; a < wavy.get_ncen(); a++)
-                dens_all += atoms[a].get_radial_density(dists[a]);
+			double dens_all = 0.0;
+			for (int a = 0; a < wavy.get_ncen(); a++)
+				dens_all += atoms[a].get_radial_density(dists[a]);
 
-            dens_all -= CubeRho.get_value(mapped_idx[0], mapped_idx[1], mapped_idx[2]);
-            return -dens_all;
-        });
+			dens_all -= CubeRho.get_value(mapped_idx[0], mapped_idx[1], mapped_idx[2]);
+			return -dens_all;
+		});
 
-    _time_point end = get_time();
-    print_time(start, end, file);
+	_time_point end = get_time();
+	print_time(start, end, file);
 };
 
 void Calc_Static_Def(
-    std::vector<cube> &Cubes,
-    const WFN &wavy,
-    double radius,
-    std::ostream &file,
-    bool wrap)
+	std::vector<cube> &Cubes,
+	const WFN &wavy,
+	double radius,
+	std::ostream &file,
+	bool wrap)
 {
-    using namespace std;
-    _time_point start = get_time();
-    const double radius_bohr = constants::ang2bohr(radius);
-    const vector<atom> wavy_atoms = wavy.get_atoms();
+	using namespace std;
+	_time_point start = get_time();
+	const double radius_bohr = constants::ang2bohr(radius);
+	const vector<atom> wavy_atoms = wavy.get_atoms();
 
-    evaluate_cube_in_radius_mapped(
-        Cubes[cube_type::DEF],
-        wrap,
-        wavy_atoms,
-        radius_bohr,
-        [&](const d3 &, const i3 &, const i3 &mapped_idx) {
-            const int x = mapped_idx[0];
-            const int y = mapped_idx[1];
-            const int z = mapped_idx[2];
-            const double rho = Cubes[cube_type::Rho].get_value(x, y, z);
-            const double spher = Cubes[cube_type::spherical_density].get_value(x, y, z);
-            return rho - spher;
-        });
+	evaluate_cube_in_radius_mapped(
+		Cubes[cube_type::DEF],
+		wrap,
+		wavy_atoms,
+		radius_bohr,
+		[&](const d3 &, const i3 &, const i3 &mapped_idx) {
+			const int x = mapped_idx[0];
+			const int y = mapped_idx[1];
+			const int z = mapped_idx[2];
+			const double rho = Cubes[cube_type::Rho].get_value(x, y, z);
+			const double spher = Cubes[cube_type::spherical_density].get_value(x, y, z);
+			return rho - spher;
+		});
 
-    _time_point end = get_time();
-    print_time(start, end, file);
+	_time_point end = get_time();
+	print_time(start, end, file);
 };
 
 void Calc_Hirshfeld(
-    std::vector<cube> &Cubes,
-    const WFN &wavy,
-    double radius,
-    int ignore_atom,
-    std::ostream &file,
-    bool wrap)
+	std::vector<cube> &Cubes,
+	const WFN &wavy,
+	double radius,
+	int ignore_atom,
+	std::ostream &file,
+	bool wrap)
 {
-    using namespace std;
-    _time_point start = get_time();
+	using namespace std;
+	_time_point start = get_time();
 
-    vector<Thakkar> atoms;
-    atoms.reserve(wavy.get_ncen());
-    for (int a = 0; a < wavy.get_ncen(); a++)
-        atoms.emplace_back(wavy.get_atom_charge(a));
-    const double radius_bohr = constants::ang2bohr(radius);
-    const vector<atom> focus_atom{ wavy.get_atoms()[ignore_atom] };
+	vector<Thakkar> atoms;
+	atoms.reserve(wavy.get_ncen());
+	for (int a = 0; a < wavy.get_ncen(); a++)
+		atoms.emplace_back(wavy.get_atom_charge(a));
+	const double radius_bohr = constants::ang2bohr(radius);
+	const vector<atom> focus_atom{ wavy.get_atoms()[ignore_atom] };
 
-    evaluate_cube_in_radius_mapped(
-        Cubes[cube_type::HDEF],
-        wrap,
-        focus_atom,
-        radius_bohr,
-        [&](const d3 &pos, const i3 &, const i3 &mapped_idx) {
-            double dens_choice = 0.0;
-            double dens_all = 0.0;
-            for (int a = 0; a < wavy.get_ncen(); a++)
-            {
-                const double dist = array_length(pos, wavy.get_atom_pos(a));
-                const double temp = atoms[a].get_radial_density(dist);
-                if (ignore_atom == a)
-                    dens_choice = temp;
-                dens_all += temp;
-            }
+	evaluate_cube_in_radius_mapped(
+		Cubes[cube_type::HDEF],
+		wrap,
+		focus_atom,
+		radius_bohr,
+		[&](const d3 &pos, const i3 &, const i3 &mapped_idx) {
+			double dens_choice = 0.0;
+			double dens_all = 0.0;
+			for (int a = 0; a < wavy.get_ncen(); a++)
+			{
+				const double dist = array_length(pos, wavy.get_atom_pos(a));
+				const double temp = atoms[a].get_radial_density(dist);
+				if (ignore_atom == a)
+					dens_choice = temp;
+				dens_all += temp;
+			}
 
-            if (std::abs(dens_all) < 1E-20)
-                return 0.0;
+			if (std::abs(dens_all) < 1E-20)
+				return 0.0;
 
-            const double rho = Cubes[cube_type::Rho].get_value(mapped_idx[0], mapped_idx[1], mapped_idx[2]);
-            return dens_choice / dens_all * rho - dens_choice;
-        });
+			const double rho = Cubes[cube_type::Rho].get_value(mapped_idx[0], mapped_idx[1], mapped_idx[2]);
+			return dens_choice / dens_all * rho - dens_choice;
+		});
 
-    _time_point end = get_time();
-    print_time(start, end, file);
+	_time_point end = get_time();
+	print_time(start, end, file);
 };
 
 void Calc_Hirshfeld(
-    cube &CubeHDEF,
-    cube &CubeRho,
-    cube &CubeSpherical,
-    const WFN &wavy,
-    double radius,
-    int ignore_atom,
-    std::ostream &file,
-    bool wrap)
+	cube &CubeHDEF,
+	cube &CubeRho,
+	cube &CubeSpherical,
+	const WFN &wavy,
+	double radius,
+	int ignore_atom,
+	std::ostream &file,
+	bool wrap)
 {
-    using namespace std;
-    _time_point start = get_time();
-    Thakkar atom_model(wavy.get_atom_charge(ignore_atom));
-    const double radius_bohr = constants::ang2bohr(radius);
+	using namespace std;
+	_time_point start = get_time();
+	Thakkar atom_model(wavy.get_atom_charge(ignore_atom));
+	const double radius_bohr = constants::ang2bohr(radius);
 
-    evaluate_cube_near_atom_mapped(
-        CubeHDEF,
-        wrap,
-        wavy.get_atom_pos(ignore_atom),
-        radius_bohr,
-        [&](const d3 &pos, const i3 &, const i3 &mapped_idx) {
-            const double dist = array_length(pos, wavy.get_atom_pos(ignore_atom));
-            const int x = mapped_idx[0];
-            const int y = mapped_idx[1];
-            const int z = mapped_idx[2];
-            const double spherical = CubeSpherical.get_value(x, y, z);
-            if (std::abs(spherical) < 1E-20)
-                return 0.0;
+	evaluate_cube_near_atom_mapped(
+		CubeHDEF,
+		wrap,
+		wavy.get_atom_pos(ignore_atom),
+		radius_bohr,
+		[&](const d3 &pos, const i3 &, const i3 &mapped_idx) {
+			const double dist = array_length(pos, wavy.get_atom_pos(ignore_atom));
+			const int x = mapped_idx[0];
+			const int y = mapped_idx[1];
+			const int z = mapped_idx[2];
+			const double spherical = CubeSpherical.get_value(x, y, z);
+			if (std::abs(spherical) < 1E-20)
+				return 0.0;
 
-            const double dens_choice = atom_model.get_radial_density(dist);
-            return (dens_choice / spherical * CubeRho.get_value(x, y, z)) - dens_choice;
-        });
+			const double dens_choice = atom_model.get_radial_density(dist);
+			return (dens_choice / spherical * CubeRho.get_value(x, y, z)) - dens_choice;
+		});
 
-    _time_point end = get_time();
-    print_time(start, end, file);
+	_time_point end = get_time();
+	print_time(start, end, file);
 };
 
 void Calc_Hirshfeld_atom(
-    std::vector<cube> &Cubes,
-    const WFN &wavy,
-    double radius,
-    int ignore_atom,
-    std::ostream &file,
-    bool wrap)
+	std::vector<cube> &Cubes,
+	const WFN &wavy,
+	double radius,
+	int ignore_atom,
+	std::ostream &file,
+	bool wrap)
 {
-    using namespace std;
-    _time_point start = get_time();
-    Thakkar atom_model(wavy.get_atom_charge(ignore_atom));
-    const double radius_bohr = constants::ang2bohr(radius);
+	using namespace std;
+	_time_point start = get_time();
+	Thakkar atom_model(wavy.get_atom_charge(ignore_atom));
+	const double radius_bohr = constants::ang2bohr(radius);
 
-    evaluate_cube_near_atom_mapped(
-        Cubes[cube_type::Hirsh],
-        wrap,
-        wavy.get_atom_pos(ignore_atom),
-        radius_bohr,
-        [&](const d3 &pos, const i3 &, const i3 &mapped_idx) {
-            const double dist = array_length(pos, wavy.get_atom_pos(ignore_atom));
-            const double dens_choice = atom_model.get_radial_density(dist);
-            const int x = mapped_idx[0];
-            const int y = mapped_idx[1];
-            const int z = mapped_idx[2];
-            const double spherical = Cubes[cube_type::spherical_density].get_value(x, y, z);
-            if (std::abs(spherical) < 1E-20)
-                return 0.0;
+	evaluate_cube_near_atom_mapped(
+		Cubes[cube_type::Hirsh],
+		wrap,
+		wavy.get_atom_pos(ignore_atom),
+		radius_bohr,
+		[&](const d3 &pos, const i3 &, const i3 &mapped_idx) {
+			const double dist = array_length(pos, wavy.get_atom_pos(ignore_atom));
+			const double dens_choice = atom_model.get_radial_density(dist);
+			const int x = mapped_idx[0];
+			const int y = mapped_idx[1];
+			const int z = mapped_idx[2];
+			const double spherical = Cubes[cube_type::spherical_density].get_value(x, y, z);
+			if (std::abs(spherical) < 1E-20)
+				return 0.0;
 
-            return dens_choice / spherical * Cubes[cube_type::Rho].get_value(x, y, z);
-        });
+			return dens_choice / spherical * Cubes[cube_type::Rho].get_value(x, y, z);
+		});
 
-    _time_point end = get_time();
-    print_time(start, end, file);
+	_time_point end = get_time();
+	print_time(start, end, file);
 };
 
 
 void Calc_RhoEli(
-    cube &CubeRho,
-    cube &CubeEli,
-    const WFN &wavy,
-    double radius,
-    const density_field *field)
+	cube &CubeRho,
+	cube &CubeEli,
+	const WFN &wavy,
+	double radius,
+	const density_field *field)
 {
-    using namespace std;
-    err_checkf(CubeRho.get_size(0) == CubeEli.get_size(0) && CubeRho.get_size(1) == CubeEli.get_size(1) && CubeRho.get_size(2) == CubeEli.get_size(2), "Cube sizes do not match", std::cout);
+	using namespace std;
+	err_checkf(CubeRho.get_size(0) == CubeEli.get_size(0) && CubeRho.get_size(1) == CubeEli.get_size(1) && CubeRho.get_size(2) == CubeEli.get_size(2), "Cube sizes do not match", std::cout);
 
-    const double radius_bohr = constants::ang2bohr(radius);
-    const vector<atom> atoms = wavy.get_atoms();
-    CubeEli.set_zero();
+	const double radius_bohr = constants::ang2bohr(radius);
+	const vector<atom> atoms = wavy.get_atoms();
+	CubeEli.set_zero();
 
-    evaluate_cube_in_radius_mapped(
-        CubeRho,
-        false,
-        atoms,
-        radius_bohr,
-        [&](const d3 &pos, const i3 &, const i3 &mapped_idx) {
-            double rho = 0.0;
-            double eli = 0.0;
-            if (!field) wavy.computeRhoELI(pos, rho, eli);
-            else {
-                rho = field->rho(pos);
-                if (wavy.get_nmo() > 0) eli = wavy.computeELI(pos);
-            }
-            CubeEli.set_value(mapped_idx[0], mapped_idx[1], mapped_idx[2], eli);
-            return rho;
-        });
+	evaluate_cube_in_radius_mapped(
+		CubeRho,
+		false,
+		atoms,
+		radius_bohr,
+		[&](const d3 &pos, const i3 &, const i3 &mapped_idx) {
+			double rho = 0.0;
+			double eli = 0.0;
+			if (!field) wavy.computeRhoELI(pos, rho, eli);
+			else {
+				rho = field->rho(pos);
+				if (wavy.get_nmo() > 0) eli = wavy.computeELI(pos);
+			}
+			CubeEli.set_value(mapped_idx[0], mapped_idx[1], mapped_idx[2], eli);
+			return rho;
+		});
 
 };
 
 void Calc_Rho_spherical_harmonics(
-    cube &CubeRho,
-    const WFN &wavy,
-    std::ostream &file)
+	cube &CubeRho,
+	const WFN &wavy,
+	std::ostream &file)
 {
-    using namespace std;
-    _time_point start = get_time();
+	using namespace std;
+	_time_point start = get_time();
 
-    ProgressBar *progress = new ProgressBar(CubeRho.get_size(0), 50, "=", " ", "Calculating Rho");
+	ProgressBar *progress = new ProgressBar(CubeRho.get_size(0), 50, "=", " ", "Calculating Rho");
 
 #pragma omp parallel shared(CubeRho)
-    {
-        vec2 d(wavy.get_ncen());
-        for (int i = 0; i < wavy.get_ncen(); i++)
-            d[i].resize(16, 0.0);
-        const int n = wavy.get_nmo(true);
-        vec phi(n, 0.0);
+	{
+		vec2 d(wavy.get_ncen());
+		for (int i = 0; i < wavy.get_ncen(); i++)
+			d[i].resize(16, 0.0);
+		const int n = wavy.get_nmo(true);
+		vec phi(n, 0.0);
 #pragma omp for schedule(dynamic)
-        for (int i = 0; i < CubeRho.get_size(0); i++)
-        {
-            for (int j = 0; j < CubeRho.get_size(1); j++)
-                for (int k = 0; k < CubeRho.get_size(2); k++)
-                    CubeRho.set_value(i, j, k, wavy.compute_dens(CubeRho.get_pos(i, j, k), d, phi));
-            progress->update();
-        }
-    }
-    delete (progress);
+		for (int i = 0; i < CubeRho.get_size(0); i++)
+		{
+			for (int j = 0; j < CubeRho.get_size(1); j++)
+				for (int k = 0; k < CubeRho.get_size(2); k++)
+					CubeRho.set_value(i, j, k, wavy.compute_dens(CubeRho.get_pos(i, j, k), d, phi));
+			progress->update();
+		}
+	}
+	delete (progress);
 
-    _time_point end = get_time();
-    print_time(start, end, file);
+	_time_point end = get_time();
+	print_time(start, end, file);
 };
 
 void Calc_MO_spherical_harmonics(
-    cube &CubeMO,
-    const WFN &wavy,
-    int MO,
-    std::ostream &file,
-    bool nodate)
+	cube &CubeMO,
+	const WFN &wavy,
+	int MO,
+	std::ostream &file,
+	bool nodate)
 {
-    using namespace std;
-    _time_point start = get_time();
-    ProgressBar *progress = NULL;
-    if (!nodate)
-        progress = new ProgressBar(CubeMO.get_size(0), 50, "=", " ", "Calculating Values");
+	using namespace std;
+	_time_point start = get_time();
+	ProgressBar *progress = NULL;
+	if (!nodate)
+		progress = new ProgressBar(CubeMO.get_size(0), 50, "=", " ", "Calculating Values");
 
 #pragma omp parallel for schedule(dynamic)
-    for (int i = 0; i < CubeMO.get_size(0); i++)
-    {
-        for (int j = 0; j < CubeMO.get_size(1); j++)
-            for (int k = 0; k < CubeMO.get_size(2); k++)
-                CubeMO.set_value(i, j, k, wavy.compute_MO_spherical(CubeMO.get_pos(i, j, k), MO));
-        if (!nodate)
-            progress->update();
-    }
-    if (!nodate)
-    {
-        delete (progress);
+	for (int i = 0; i < CubeMO.get_size(0); i++)
+	{
+		for (int j = 0; j < CubeMO.get_size(1); j++)
+			for (int k = 0; k < CubeMO.get_size(2); k++)
+				CubeMO.set_value(i, j, k, wavy.compute_MO_spherical(CubeMO.get_pos(i, j, k), MO));
+		if (!nodate)
+			progress->update();
+	}
+	if (!nodate)
+	{
+		delete (progress);
 
-        _time_point end = get_time();
-        print_time(start, end, file);
-    }
+		_time_point end = get_time();
+		print_time(start, end, file);
+	}
 };
 
 void Calc_S_Rho(
-    cube &Cube_S_Rho,
-    const WFN &wavy,
-    std::ostream &file,
-    bool &nodate)
+	cube &Cube_S_Rho,
+	const WFN &wavy,
+	std::ostream &file,
+	bool &nodate)
 {
-    using namespace std;
-    _time_point start = get_time();
-    ProgressBar *progress = NULL;
-    if (!nodate)
-        progress = new ProgressBar(Cube_S_Rho.get_size(0), 50, "=", " ", "Calculating Values");
+	using namespace std;
+	_time_point start = get_time();
+	ProgressBar *progress = NULL;
+	if (!nodate)
+		progress = new ProgressBar(Cube_S_Rho.get_size(0), 50, "=", " ", "Calculating Values");
 
 #pragma omp parallel for schedule(dynamic)
-    for (int i = 0; i < Cube_S_Rho.get_size(0); i++)
-    {
-        vec2 d(wavy.get_ncen(), vec(16, 0.0));
-        vec phi(wavy.get_nmo(), 0.0);
-        for (int j = 0; j < Cube_S_Rho.get_size(1); j++)
-            for (int k = 0; k < Cube_S_Rho.get_size(2); k++)
-                Cube_S_Rho.set_value(i, j, k, wavy.compute_spin_dens(Cube_S_Rho.get_pos(i, j, k), d, phi));
-        if (!nodate)
-            progress->update();
-    }
-    if (!nodate)
-    {
-        delete (progress);
+	for (int i = 0; i < Cube_S_Rho.get_size(0); i++)
+	{
+		vec2 d(wavy.get_ncen(), vec(16, 0.0));
+		vec phi(wavy.get_nmo(), 0.0);
+		for (int j = 0; j < Cube_S_Rho.get_size(1); j++)
+			for (int k = 0; k < Cube_S_Rho.get_size(2); k++)
+				Cube_S_Rho.set_value(i, j, k, wavy.compute_spin_dens(Cube_S_Rho.get_pos(i, j, k), d, phi));
+		if (!nodate)
+			progress->update();
+	}
+	if (!nodate)
+	{
+		delete (progress);
 
-        _time_point end = get_time();
-        print_time(start, end, file);
-    }
+		_time_point end = get_time();
+		print_time(start, end, file);
+	}
 };
 
 void Calc_Prop(
-    std::vector<cube> &Cubes,
-    const WFN &wavy,
-    double radius,
-    std::ostream &file,
-    bool test,
-    bool wrap)
+	std::vector<cube> &Cubes,
+	const WFN &wavy,
+	double radius,
+	std::ostream &file,
+	bool test,
+	bool wrap)
 {
-    using namespace std;
-    _time_point start = get_time();
-    const double radius_bohr = constants::ang2bohr(radius);
-    const vector<atom> atoms = wavy.get_atoms();
-    cube rho_contrib(Cubes[cube_type::Rho]);
+	using namespace std;
+	_time_point start = get_time();
+	const double radius_bohr = constants::ang2bohr(radius);
+	const vector<atom> atoms = wavy.get_atoms();
+	cube rho_contrib(Cubes[cube_type::Rho]);
 
-    rho_contrib.evaluate_on_grid(
-        [&](const d3 &pos_grid, const i3 &, const i3 &mapped_idx) {
-            if (!is_within_radius(pos_grid, atoms, radius_bohr))
-                return 0.0;
+	rho_contrib.evaluate_on_grid(
+		[&](const d3 &pos_grid, const i3 &, const i3 &mapped_idx) {
+			if (!is_within_radius(pos_grid, atoms, radius_bohr))
+				return 0.0;
 
-            const PropValues values = compute_prop_values(Cubes, wavy, pos_grid);
-            accumulate_prop_values(Cubes, mapped_idx, values);
-            return values.rho;
-        },
-        wrap);
+			const PropValues values = compute_prop_values(Cubes, wavy, pos_grid);
+			accumulate_prop_values(Cubes, mapped_idx, values);
+			return values.rho;
+		},
+		wrap);
 
-    // Calc_Rho already filled Rho; only the RDG run replaces it by sign(lambda2)*rho.
-    if (Cubes[cube_type::RDG].get_loaded())
-        finish_signed_rho(Cubes, rho_contrib);
+	// Calc_Rho already filled Rho; only the RDG run replaces it by sign(lambda2)*rho.
+	if (Cubes[cube_type::RDG].get_loaded())
+		finish_signed_rho(Cubes, rho_contrib);
 
-    if (!test)
-    {
-        _time_point end = get_time();
-        print_time(start, end, file);
-    }
+	if (!test)
+	{
+		_time_point end = get_time();
+		print_time(start, end, file);
+	}
 };
 
 void Calc_ESP(
-    cube &CubeESP,
-    const WFN &wavy,
-    double radius,
-    bool no_date,
-    std::ostream &file,
-    bool wrap)
+	cube &CubeESP,
+	const WFN &wavy,
+	double radius,
+	bool no_date,
+	std::ostream &file,
+	bool wrap)
 {
-    using namespace std;
-    _time_point start = get_time();
+	using namespace std;
+	_time_point start = get_time();
 
-    const WFN::ESP_pairs pairs = wavy.build_ESP_pairs();
-    const double radius_bohr = constants::ang2bohr(radius);
-    const vector<atom> atoms = wavy.get_atoms();
+	const WFN::ESP_pairs pairs = wavy.build_ESP_pairs();
+	const double radius_bohr = constants::ang2bohr(radius);
+	const vector<atom> atoms = wavy.get_atoms();
 
-    evaluate_cube_in_radius(
-        CubeESP,
-        wrap,
-        atoms,
-        radius_bohr,
-        [&](const d3 &pos) {
-            return wavy.computeESP(pos, pairs);
-        });
+	evaluate_cube_in_radius(
+		CubeESP,
+		wrap,
+		atoms,
+		radius_bohr,
+		[&](const d3 &pos) {
+			return wavy.computeESP(pos, pairs);
+		});
 
-    if (!no_date)
-    {
-        _time_point end = get_time();
-        print_time(start, end, file);
-    }
+	if (!no_date)
+	{
+		_time_point end = get_time();
+		print_time(start, end, file);
+	}
 };
 
 void Calc_MO(
-    cube &CubeMO,
-    int mo,
-    const WFN &wavy,
-    double radius,
-    std::ostream &file,
-    bool wrap)
+	cube &CubeMO,
+	int mo,
+	const WFN &wavy,
+	double radius,
+	std::ostream &file,
+	bool wrap)
 {
-    using namespace std;
-    err_checkf(mo <= wavy.get_nmo(), to_string(mo) + " bigger MO selected than " + to_string(wavy.get_nmo()) + " contained in the wavefunctions!", file);
-    _time_point start = get_time();
-    const double radius_bohr = constants::ang2bohr(radius);
-    const vector<atom> atoms = wavy.get_atoms();
+	using namespace std;
+	err_checkf(mo <= wavy.get_nmo(), to_string(mo) + " bigger MO selected than " + to_string(wavy.get_nmo()) + " contained in the wavefunctions!", file);
+	_time_point start = get_time();
+	const double radius_bohr = constants::ang2bohr(radius);
+	const vector<atom> atoms = wavy.get_atoms();
 
-    evaluate_cube_in_radius(
-        CubeMO,
-        wrap,
-        atoms,
-        radius_bohr,
-        [&](const d3 &pos) {
-            return wavy.computeMO(pos, mo);
-        });
+	evaluate_cube_in_radius(
+		CubeMO,
+		wrap,
+		atoms,
+		radius_bohr,
+		[&](const d3 &pos) {
+			return wavy.computeMO(pos, mo);
+		});
 
-    _time_point end = get_time();
-    print_time(start, end, file);
+	_time_point end = get_time();
+	print_time(start, end, file);
 };
 
 bool find_frontier_orbitals(
-    const WFN &wavy,
-    int &homo,
-    int &lumo,
-    bool &unrestricted)
+	const WFN &wavy,
+	int &homo,
+	int &lumo,
+	bool &unrestricted)
 {
-    homo = -1;
-    lumo = -1;
-    unrestricted = wavy.get_is_unrestricted();
+	homo = -1;
+	lumo = -1;
+	unrestricted = wavy.get_is_unrestricted();
 
-    const int n = wavy.get_nmo();
-    if (n <= 0)
-        return false;
+	const int n = wavy.get_nmo();
+	if (n <= 0)
+		return false;
 
-    // Some formats (notably plain .wfn) carry no orbital energies at all. Only
-    // trust energy ordering if at least one energy is non-zero.
-    bool have_energies = false;
-    for (int i = 0; i < n; i++) {
-        if (wavy.get_MO_energy(i) != 0.0) {
-            have_energies = true;
-            break;
-        }
-    }
+	// Some formats (notably plain .wfn) carry no orbital energies at all. Only
+	// trust energy ordering if at least one energy is non-zero.
+	bool have_energies = false;
+	for (int i = 0; i < n; i++) {
+		if (wavy.get_MO_energy(i) != 0.0) {
+			have_energies = true;
+			break;
+		}
+	}
 
-    // An occupation of exactly zero marks a virtual orbital. Use a small
-    // threshold so that near-zero natural-orbital occupations from correlated
-    // methods are still treated as occupied rather than virtual.
-    constexpr double occ_threshold = 1.0e-6;
+	// An occupation of exactly zero marks a virtual orbital. Use a small
+	// threshold so that near-zero natural-orbital occupations from correlated
+	// methods are still treated as occupied rather than virtual.
+	constexpr double occ_threshold = 1.0e-6;
 
-    double best_occ_energy = 0.0;
-    double best_vir_energy = 0.0;
-    for (int i = 0; i < n; i++) {
-        const double occ = wavy.get_MO_occ(i);
-        const double ener = wavy.get_MO_energy(i);
-        if (occ > occ_threshold) {
-            if (homo == -1 || (have_energies ? (ener > best_occ_energy) : (i > homo))) {
-                homo = i;
-                best_occ_energy = ener;
-            }
-        }
-        else {
-            if (lumo == -1 || (have_energies ? (ener < best_vir_energy) : (i < lumo))) {
-                lumo = i;
-                best_vir_energy = ener;
-            }
-        }
-    }
+	double best_occ_energy = 0.0;
+	double best_vir_energy = 0.0;
+	for (int i = 0; i < n; i++) {
+		const double occ = wavy.get_MO_occ(i);
+		const double ener = wavy.get_MO_energy(i);
+		if (occ > occ_threshold) {
+			if (homo == -1 || (have_energies ? (ener > best_occ_energy) : (i > homo))) {
+				homo = i;
+				best_occ_energy = ener;
+			}
+		}
+		else {
+			if (lumo == -1 || (have_energies ? (ener < best_vir_energy) : (i < lumo))) {
+				lumo = i;
+				best_vir_energy = ener;
+			}
+		}
+	}
 
-    return (homo != -1 && lumo != -1);
+	return (homo != -1 && lumo != -1);
 }
 
 void Calc_Fukui(
-    std::vector<cube> &Cubes,
-    const WFN &wavy,
-    int homo,
-    int lumo,
-    double radius,
-    std::ostream &file,
-    bool wrap)
+	std::vector<cube> &Cubes,
+	const WFN &wavy,
+	int homo,
+	int lumo,
+	double radius,
+	std::ostream &file,
+	bool wrap)
 {
-    using namespace std;
-    _time_point start = get_time();
-    const double radius_bohr = constants::ang2bohr(radius);
-    const vector<atom> atoms = wavy.get_atoms();
+	using namespace std;
+	_time_point start = get_time();
+	const double radius_bohr = constants::ang2bohr(radius);
+	const vector<atom> atoms = wavy.get_atoms();
 
-    if (!Cubes[cube_type::Fukui_plus].get_loaded())
-        return;
+	if (!Cubes[cube_type::Fukui_plus].get_loaded())
+		return;
 
-    // The caller is expected to have obtained these from find_frontier_orbitals,
-    // which returns false rather than a negative index when no frontier pair
-    // exists. Guard anyway: a negative index reaches computeMO as an
-    // out-of-bounds orbital lookup, which is undefined rather than merely wrong.
-    err_checkf(homo >= 0 && homo < wavy.get_nmo(), "Invalid HOMO index " + std::to_string(homo) + " for Fukui calculation!", file);
-    err_checkf(lumo >= 0 && lumo < wavy.get_nmo(), "Invalid LUMO index " + std::to_string(lumo) + " for Fukui calculation!", file);
+	// The caller is expected to have obtained these from find_frontier_orbitals,
+	// which returns false rather than a negative index when no frontier pair
+	// exists. Guard anyway: a negative index reaches computeMO as an
+	// out-of-bounds orbital lookup, which is undefined rather than merely wrong.
+	err_checkf(homo >= 0 && homo < wavy.get_nmo(), "Invalid HOMO index " + std::to_string(homo) + " for Fukui calculation!", file);
+	err_checkf(lumo >= 0 && lumo < wavy.get_nmo(), "Invalid LUMO index " + std::to_string(lumo) + " for Fukui calculation!", file);
 
-    // Deliberately TWO grid passes, each returning its value, rather than one
-    // pass that fills all four cubes from a single lambda.
-    //
-    // The tempting single-pass version writes the other three cubes from inside
-    // the functor with a get_value/set_value read-modify-write. That is a data
-    // race in the wrapped (periodic) path: evaluate_on_grid parallelises over
-    // the outer index and several raw indices wrap onto the SAME voxel, so two
-    // threads can read-modify-write one value concurrently. Only the functor's
-    // RETURN value is protected, by the "#pragma omp atomic" in evaluate_on_grid.
-    //
-    // Two passes cost exactly the same: one computeMO per point each, versus two
-    // per point in a single pass. The orbital evaluation dominates, so this is
-    // free, and f0 and the dual descriptor then follow elementwise from the two
-    // finished cubes where nothing is shared between threads.
-    evaluate_cube_in_radius(
-        Cubes[cube_type::Fukui_plus],
-        wrap,
-        atoms,
-        radius_bohr,
-        [&](const d3 &pos) {
-            // computeMO returns the orbital AMPLITUDE psi, so square it here.
-            const double psi_lumo = wavy.computeMO(pos, lumo);
-            return sanitize_finite(psi_lumo * psi_lumo);
-        });
+	// Deliberately TWO grid passes, each returning its value, rather than one
+	// pass that fills all four cubes from a single lambda.
+	//
+	// The tempting single-pass version writes the other three cubes from inside
+	// the functor with a get_value/set_value read-modify-write. That is a data
+	// race in the wrapped (periodic) path: evaluate_on_grid parallelises over
+	// the outer index and several raw indices wrap onto the SAME voxel, so two
+	// threads can read-modify-write one value concurrently. Only the functor's
+	// RETURN value is protected, by the "#pragma omp atomic" in evaluate_on_grid.
+	//
+	// Two passes cost exactly the same: one computeMO per point each, versus two
+	// per point in a single pass. The orbital evaluation dominates, so this is
+	// free, and f0 and the dual descriptor then follow elementwise from the two
+	// finished cubes where nothing is shared between threads.
+	evaluate_cube_in_radius(
+		Cubes[cube_type::Fukui_plus],
+		wrap,
+		atoms,
+		radius_bohr,
+		[&](const d3 &pos) {
+			// computeMO returns the orbital AMPLITUDE psi, so square it here.
+			const double psi_lumo = wavy.computeMO(pos, lumo);
+			return sanitize_finite(psi_lumo * psi_lumo);
+		});
 
-    evaluate_cube_in_radius(
-        Cubes[cube_type::Fukui_minus],
-        wrap,
-        atoms,
-        radius_bohr,
-        [&](const d3 &pos) {
-            const double psi_homo = wavy.computeMO(pos, homo);
-            return sanitize_finite(psi_homo * psi_homo);
-        });
+	evaluate_cube_in_radius(
+		Cubes[cube_type::Fukui_minus],
+		wrap,
+		atoms,
+		radius_bohr,
+		[&](const d3 &pos) {
+			const double psi_homo = wavy.computeMO(pos, homo);
+			return sanitize_finite(psi_homo * psi_homo);
+		});
 
-    // f0 = (f+ + f-) / 2 and df = f+ - f-, elementwise. Each voxel is written by
-    // exactly one thread here, so no synchronisation is needed.
-    const i3 sizes = Cubes[cube_type::Fukui_plus].get_sizes();
+	// f0 = (f+ + f-) / 2 and df = f+ - f-, elementwise. Each voxel is written by
+	// exactly one thread here, so no synchronisation is needed.
+	const i3 sizes = Cubes[cube_type::Fukui_plus].get_sizes();
 #pragma omp parallel for schedule(dynamic)
-    for (int x = 0; x < sizes[0]; x++)
-        for (int y = 0; y < sizes[1]; y++)
-            for (int z = 0; z < sizes[2]; z++)
-            {
-                const double f_plus = Cubes[cube_type::Fukui_plus].get_value(x, y, z);
-                const double f_minus = Cubes[cube_type::Fukui_minus].get_value(x, y, z);
-                Cubes[cube_type::Fukui_zero].set_value(x, y, z, 0.5 * (f_plus + f_minus));
-                Cubes[cube_type::Dual_Descriptor].set_value(x, y, z, f_plus - f_minus);
-            }
-    // All four cubes were allocated together with loaded = true, so no flag needs
-    // setting here; evaluate_on_grid has already re-set it for f+ and f-.
+	for (int x = 0; x < sizes[0]; x++)
+		for (int y = 0; y < sizes[1]; y++)
+			for (int z = 0; z < sizes[2]; z++)
+			{
+				const double f_plus = Cubes[cube_type::Fukui_plus].get_value(x, y, z);
+				const double f_minus = Cubes[cube_type::Fukui_minus].get_value(x, y, z);
+				Cubes[cube_type::Fukui_zero].set_value(x, y, z, 0.5 * (f_plus + f_minus));
+				Cubes[cube_type::Dual_Descriptor].set_value(x, y, z, f_plus - f_minus);
+			}
+	// All four cubes were allocated together with loaded = true, so no flag needs
+	// setting here; evaluate_on_grid has already re-set it for f+ and f-.
 
-    _time_point end = get_time();
-    print_time(start, end, file);
+	_time_point end = get_time();
+	print_time(start, end, file);
 };
 
 namespace {
@@ -818,1738 +818,1738 @@ namespace {
 // orbitals - the grid itself is built from a pruned copy (see below).
 void fill_density_column_with_orbital(GridManager &gm, const WFN &wavy, int mo)
 {
-    GridData &gd = gm.getGridData();
-    const bool helper = gm.getNeedsHelper();
-    vec3 &grids = helper ? gd.helper_grids : gd.atomic_grids;
-    const ivec &npts = helper ? gd.helper_num_points_per_atom : gd.num_points_per_atom;
+	GridData &gd = gm.getGridData();
+	const bool helper = gm.getNeedsHelper();
+	vec3 &grids = helper ? gd.helper_grids : gd.atomic_grids;
+	const ivec &npts = helper ? gd.helper_num_points_per_atom : gd.num_points_per_atom;
 
-    const int n_grids = static_cast<int>(grids.size());
-    for (int g = 0; g < n_grids; g++) {
-        vec2 &atom_grid = grids[g];
-        const int num_points = npts[g];
-        const double *x = atom_grid[GridData::GridIndex::X].data();
-        const double *y = atom_grid[GridData::GridIndex::Y].data();
-        const double *z = atom_grid[GridData::GridIndex::Z].data();
-        double *dens = atom_grid[GridData::GridIndex::WFN_DENSITY].data();
+	const int n_grids = static_cast<int>(grids.size());
+	for (int g = 0; g < n_grids; g++) {
+		vec2 &atom_grid = grids[g];
+		const int num_points = npts[g];
+		const double *x = atom_grid[GridData::GridIndex::X].data();
+		const double *y = atom_grid[GridData::GridIndex::Y].data();
+		const double *z = atom_grid[GridData::GridIndex::Z].data();
+		double *dens = atom_grid[GridData::GridIndex::WFN_DENSITY].data();
 #pragma omp parallel for schedule(dynamic, 64)
-        for (int p = 0; p < num_points; p++) {
-            const double psi = wavy.computeMO({ x[p], y[p], z[p] }, mo);
-            dens[p] = psi * psi;
-        }
-    }
+		for (int p = 0; p < num_points; p++) {
+			const double psi = wavy.computeMO({ x[p], y[p], z[p] }, mo);
+			dens[p] = psi * psi;
+		}
+	}
 }
 
 } // namespace
 
 CondensedFukuiResults Calc_Condensed_Fukui(
-    const WFN &wavy,
-    int homo,
-    int lumo,
-    const cell &unit_cell,
-    int accuracy,
-    std::ostream &file)
+	const WFN &wavy,
+	int homo,
+	int lumo,
+	const cell &unit_cell,
+	int accuracy,
+	std::ostream &file)
 {
-    CondensedFukuiResults out;
-    const int ncen = wavy.get_ncen();
-    if (ncen <= 0 || homo < 0 || lumo < 0)
-        return out;
+	CondensedFukuiResults out;
+	const int ncen = wavy.get_ncen();
+	if (ncen <= 0 || homo < 0 || lumo < 0)
+		return out;
 
-    GridConfiguration config;
-    config.accuracy = accuracy;
-    config.pbc = 0;
-    config.debug = false;
-    // Forces calculatePartitionedCharges down its five-wide branch, so one pass
-    // yields Becke, Hirshfeld, TFVC, MBIS and EMBIS together.
-    config.all_charges = true;
+	GridConfiguration config;
+	config.accuracy = accuracy;
+	config.pbc = 0;
+	config.debug = false;
+	// Forces calculatePartitionedCharges down its five-wide branch, so one pass
+	// yields Becke, Hirshfeld, TFVC, MBIS and EMBIS together.
+	config.all_charges = true;
 
-    ivec atom_list(ncen);
-    for (int i = 0; i < ncen; i++)
-        atom_list[i] = i;
+	ivec atom_list(ncen);
+	for (int i = 0; i < ncen; i++)
+		atom_list[i] = i;
 
-    out.labels.resize(ncen);
-    const std::vector<atom> atoms = wavy.get_atoms();
-    for (int i = 0; i < ncen; i++)
-        out.labels[i] = atoms[i].get_label();
+	out.labels.resize(ncen);
+	const std::vector<atom> atoms = wavy.get_atoms();
+	for (int i = 0; i < ncen; i++)
+		out.labels[i] = atoms[i].get_label();
 
-    GridManager gm(config);
+	GridManager gm(config);
 
-    // Build the grid and the five weight sets from a copy with the virtual
-    // orbitals removed. Two reasons, and the first is a crash rather than a
-    // preference: compute_dens sizes its scratch array by get_nmo(true), so
-    // leaving several hundred virtuals in place overruns it. Second, the
-    // partition weights are properties of the GROUND-STATE density - MBIS and
-    // EMBIS are refined self-consistently against it - so they must be built
-    // from rho, not from a frontier orbital. Only the integrand changes below.
-    WFN temp = wavy;
-    temp.delete_unoccupied_MOs();
-    gm.setup3DGridsForMolecule(temp, atom_list, {}, unit_cell, false, file);
+	// Build the grid and the five weight sets from a copy with the virtual
+	// orbitals removed. Two reasons, and the first is a crash rather than a
+	// preference: compute_dens sizes its scratch array by get_nmo(true), so
+	// leaving several hundred virtuals in place overruns it. Second, the
+	// partition weights are properties of the GROUND-STATE density - MBIS and
+	// EMBIS are refined self-consistently against it - so they must be built
+	// from rho, not from a frontier orbital. Only the integrand changes below.
+	WFN temp = wavy;
+	temp.delete_unoccupied_MOs();
+	gm.setup3DGridsForMolecule(temp, atom_list, {}, unit_cell, false, file);
 
-    // ECP cores are added to the populations by calculatePartitionedCharges.
-    // That is right for a charge and wrong for a Fukui function, which knows
-    // nothing about core electrons, so it is subtracted back out below.
-    const bool has_ecps = temp.get_has_ECPs();
+	// ECP cores are added to the populations by calculatePartitionedCharges.
+	// That is right for a charge and wrong for a Fukui function, which knows
+	// nothing about core electrons, so it is subtracted back out below.
+	const bool has_ecps = temp.get_has_ECPs();
 
-    auto accumulate = [&](int mo, vec2 &dest) {
-        fill_density_column_with_orbital(gm, wavy, mo);
-        PartitionResults res = gm.calculatePartitionedCharges(temp, unit_cell);
-        dest.resize(5);
-        for (int s = 0; s < 5; s++) {
-            dest[s].resize(ncen, 0.0);
-            for (int a = 0; a < ncen && a < static_cast<int>(res.atom_charges[s].size()); a++) {
-                double v = res.atom_charges[s][a];
-                if (has_ecps)
-                    v -= temp.get_atom_ECP_electrons(a);
-                dest[s][a] = v;
-            }
-        }
-    };
+	auto accumulate = [&](int mo, vec2 &dest) {
+		fill_density_column_with_orbital(gm, wavy, mo);
+		PartitionResults res = gm.calculatePartitionedCharges(temp, unit_cell);
+		dest.resize(5);
+		for (int s = 0; s < 5; s++) {
+			dest[s].resize(ncen, 0.0);
+			for (int a = 0; a < ncen && a < static_cast<int>(res.atom_charges[s].size()); a++) {
+				double v = res.atom_charges[s][a];
+				if (has_ecps)
+					v -= temp.get_atom_ECP_electrons(a);
+				dest[s][a] = v;
+			}
+		}
+	};
 
-    accumulate(lumo, out.f_plus);
-    accumulate(homo, out.f_minus);
-    out.valid = true;
-    return out;
+	accumulate(lumo, out.f_plus);
+	accumulate(homo, out.f_minus);
+	out.valid = true;
+	return out;
 }
 
 void print_condensed_fukui(
-    const CondensedFukuiResults &r,
-    std::ostream &file)
+	const CondensedFukuiResults &r,
+	std::ostream &file)
 {
-    if (!r.valid)
-        return;
-    using namespace std;
-    // Column order matches PartitionResults::CHARGE_ORDER.
-    static const char *scheme[5] = { "Becke", "TFVC", "Hirshfeld", "MBIS", "EMBIS" };
-    static const int order[5] = {
-        PartitionResults::CHARGE_ORDER::S_HIRSH,
-        PartitionResults::CHARGE_ORDER::S_BECKE,
-        PartitionResults::CHARGE_ORDER::S_TFVC,
-        PartitionResults::CHARGE_ORDER::S_MBIS,
-        PartitionResults::CHARGE_ORDER::S_EMBIS
-    };
-    static const char *order_name[5] = { "Hirshfeld", "Becke", "TFVC", "MBIS", "EMBIS" };
-    (void)scheme;
+	if (!r.valid)
+		return;
+	using namespace std;
+	// Column order matches PartitionResults::CHARGE_ORDER.
+	static const char *scheme[5] = { "Becke", "TFVC", "Hirshfeld", "MBIS", "EMBIS" };
+	static const int order[5] = {
+		PartitionResults::CHARGE_ORDER::S_HIRSH,
+		PartitionResults::CHARGE_ORDER::S_BECKE,
+		PartitionResults::CHARGE_ORDER::S_TFVC,
+		PartitionResults::CHARGE_ORDER::S_MBIS,
+		PartitionResults::CHARGE_ORDER::S_EMBIS
+	};
+	static const char *order_name[5] = { "Hirshfeld", "Becke", "TFVC", "MBIS", "EMBIS" };
+	(void)scheme;
 
-    const size_t n = r.labels.size();
-    file << "\nCondensed (atom-summed) Fukui functions" << endl;
-    file << "  f+_A = integral of w_A(r) |psi_LUMO(r)|^2   (A is attacked by a nucleophile -> electrophilic site)" << endl;
-    file << "  f-_A = integral of w_A(r) |psi_HOMO(r)|^2   (A is attacked by an electrophile -> nucleophilic site)" << endl;
-    file << "  df_A = f+_A - f-_A                          (> 0 electrophilic, < 0 nucleophilic)" << endl;
-    file << "  Each column uses a different atomic partition w_A. Sum over atoms is 1 for each of f+ and f-." << endl;
+	const size_t n = r.labels.size();
+	file << "\nCondensed (atom-summed) Fukui functions" << endl;
+	file << "  f+_A = integral of w_A(r) |psi_LUMO(r)|^2   (A is attacked by a nucleophile -> electrophilic site)" << endl;
+	file << "  f-_A = integral of w_A(r) |psi_HOMO(r)|^2   (A is attacked by an electrophile -> nucleophilic site)" << endl;
+	file << "  df_A = f+_A - f-_A                          (> 0 electrophilic, < 0 nucleophilic)" << endl;
+	file << "  Each column uses a different atomic partition w_A. Sum over atoms is 1 for each of f+ and f-." << endl;
 
-    for (int quantity = 0; quantity < 3; quantity++) {
-        const char *qname = (quantity == 0) ? "f+" : (quantity == 1) ? "f-" : "dual descriptor (f+ - f-)";
-        file << "\n  " << qname << endl;
-        file << "  " << setw(8) << left << "Atom" << right;
-        for (int s = 0; s < 5; s++)
-            file << setw(13) << order_name[s];
-        file << endl;
-        file << "  " << string(8 + 5 * 13, '-') << endl;
-        vec totals(5, 0.0);
-        for (size_t a = 0; a < n; a++) {
-            file << "  " << setw(8) << left << r.labels[a] << right;
-            for (int s = 0; s < 5; s++) {
-                const int idx = order[s];
-                double v = 0.0;
-                if (quantity == 0)
-                    v = r.f_plus[idx][a];
-                else if (quantity == 1)
-                    v = r.f_minus[idx][a];
-                else
-                    v = r.f_plus[idx][a] - r.f_minus[idx][a];
-                totals[s] += v;
-                file << setw(13) << fixed << setprecision(5) << v;
-            }
-            file << endl;
-        }
-        file << "  " << string(8 + 5 * 13, '-') << endl;
-        file << "  " << setw(8) << left << "sum" << right;
-        for (int s = 0; s < 5; s++)
-            file << setw(13) << fixed << setprecision(5) << totals[s];
-        file << endl;
-    }
-    file << endl;
+	for (int quantity = 0; quantity < 3; quantity++) {
+		const char *qname = (quantity == 0) ? "f+" : (quantity == 1) ? "f-" : "dual descriptor (f+ - f-)";
+		file << "\n  " << qname << "\n";
+		file << "  " << setw(8) << left << "Atom" << right;
+		for (int s = 0; s < 5; s++)
+			file << setw(13) << order_name[s];
+		file << "\n";
+		file << "  " << string(8 + 5 * 13, '-') << "\n";
+		vec totals(5, 0.0);
+		for (size_t a = 0; a < n; a++) {
+			file << "  " << setw(8) << left << r.labels[a] << right;
+			for (int s = 0; s < 5; s++) {
+				const int idx = order[s];
+				double v = 0.0;
+				if (quantity == 0)
+					v = r.f_plus[idx][a];
+				else if (quantity == 1)
+					v = r.f_minus[idx][a];
+				else
+					v = r.f_plus[idx][a] - r.f_minus[idx][a];
+				totals[s] += v;
+				file << setw(13) << fixed << setprecision(5) << v;
+			}
+			file << "\n";
+		}
+		file << "  " << string(8 + 5 * 13, '-') << "\n";
+		file << "  " << setw(8) << left << "sum" << right;
+		for (int s = 0; s < 5; s++)
+			file << setw(13) << fixed << setprecision(5) << totals[s];
+		file << "\n";
+	}
+	file << endl;
 }
 
 void fukui_analysis(options &opt, std::ostream &log2)
 {
-    using namespace std;
-    log2 << NoSpherA2_message(opt.no_date);
-    if (!opt.no_date)
-        log2 << build_date;
+	using namespace std;
+	log2 << NoSpherA2_message(opt.no_date);
+	if (!opt.no_date)
+		log2 << build_date;
 
-    err_checkf(opt.wfn != "", "Error, no wfn file specified! Use -fukui_analysis <wfn> or -wfn <wfn>.", log2);
-    WFN wavy(opt.wfn);
-    log2 << "\nConceptual-DFT reactivity analysis of " << opt.wfn.string() << endl;
-    log2 << "Read " << wavy.get_ncen() << " atoms and " << wavy.get_nmo()
-         << " molecular orbitals (" << wavy.get_nmo(true) << " occupied)." << endl;
+	err_checkf(opt.wfn != "", "Error, no wfn file specified! Use -fukui_analysis <wfn> or -wfn <wfn>.", log2);
+	WFN wavy(opt.wfn);
+	log2 << "\nConceptual-DFT reactivity analysis of " << opt.wfn.string() << endl;
+	log2 << "Read " << wavy.get_ncen() << " atoms and " << wavy.get_nmo()
+		 << " molecular orbitals (" << wavy.get_nmo(true) << " occupied)." << endl;
 
-    int homo = -1, lumo = -1;
-    bool unrestricted = false;
-    if (!find_frontier_orbitals(wavy, homo, lumo, unrestricted))
-    {
-        log2 << "\nERROR: no HOMO/LUMO pair found (HOMO index " << homo
-             << ", LUMO index " << lumo << ")." << endl;
-        if (lumo == -1)
-            log2 << "This wavefunction stores no virtual orbitals, so no Fukui function can be\n"
-                 << "formed from it. Plain .wfn files and many .wfx files keep only the occupied\n"
-                 << "orbitals; use a .gbw, .molden or .fchk instead." << endl;
-        return;
-    }
+	int homo = -1, lumo = -1;
+	bool unrestricted = false;
+	if (!find_frontier_orbitals(wavy, homo, lumo, unrestricted))
+	{
+		log2 << "\nERROR: no HOMO/LUMO pair found (HOMO index " << homo
+			 << ", LUMO index " << lumo << ")." << endl;
+		if (lumo == -1)
+			log2 << "This wavefunction stores no virtual orbitals, so no Fukui function can be\n"
+				 << "formed from it. Plain .wfn files and many .wfx files keep only the occupied\n"
+				 << "orbitals; use a .gbw, .molden or .fchk instead." << endl;
+		return;
+	}
 
-    log2 << "HOMO = MO " << homo << "  energy " << fixed << setprecision(6) << wavy.get_MO_energy(homo)
-         << "  occupation " << setprecision(3) << wavy.get_MO_occ(homo) << endl;
-    log2 << "LUMO = MO " << lumo << "  energy " << setprecision(6) << wavy.get_MO_energy(lumo)
-         << "  occupation " << setprecision(3) << wavy.get_MO_occ(lumo) << endl;
-    const double gap = wavy.get_MO_energy(lumo) - wavy.get_MO_energy(homo);
-    log2 << "HOMO-LUMO gap: " << setprecision(6) << gap << " Hartree ("
-         << setprecision(3) << gap * constants::keV_per_hartree * 1000.0 << " eV)" << endl;
-    if (unrestricted)
-    {
-        // Say which manifold actually supplied the pair, and what each manifold's
-        // own frontier is. "Taken across both manifolds" on its own is not
-        // actionable: for an open-shell system the answer usually comes entirely
-        // from one spin, and which one changes the chemistry being described.
-        static const char *spin_name[2] = { "alpha", "beta" };
-        const int homo_op = wavy.get_MO_op(homo);
-        const int lumo_op = wavy.get_MO_op(lumo);
-        log2 << "\nUnrestricted wavefunction." << endl;
-        log2 << "  The frontier pair is the globally highest occupied and globally lowest virtual\n"
-             << "  spin orbital, i.e. the electron that is easiest to remove and the level an added\n"
-             << "  electron would enter, regardless of spin. That is the spin-UNRESOLVED Fukui\n"
-             << "  function; it is not a spin-polarised (f_N / f_S) treatment." << endl;
-        log2 << "  Chosen HOMO is " << spin_name[homo_op == 1 ? 1 : 0]
-             << ", chosen LUMO is " << spin_name[lumo_op == 1 ? 1 : 0] << "." << endl;
+	log2 << "HOMO = MO " << homo << "  energy " << fixed << setprecision(6) << wavy.get_MO_energy(homo)
+		 << "  occupation " << setprecision(3) << wavy.get_MO_occ(homo) << endl;
+	log2 << "LUMO = MO " << lumo << "  energy " << setprecision(6) << wavy.get_MO_energy(lumo)
+		 << "  occupation " << setprecision(3) << wavy.get_MO_occ(lumo) << endl;
+	const double gap = wavy.get_MO_energy(lumo) - wavy.get_MO_energy(homo);
+	log2 << "HOMO-LUMO gap: " << setprecision(6) << gap << " Hartree ("
+		 << setprecision(3) << gap * constants::keV_per_hartree * 1000.0 << " eV)" << endl;
+	if (unrestricted)
+	{
+		// Say which manifold actually supplied the pair, and what each manifold's
+		// own frontier is. "Taken across both manifolds" on its own is not
+		// actionable: for an open-shell system the answer usually comes entirely
+		// from one spin, and which one changes the chemistry being described.
+		static const char *spin_name[2] = { "alpha", "beta" };
+		const int homo_op = wavy.get_MO_op(homo);
+		const int lumo_op = wavy.get_MO_op(lumo);
+		log2 << "\nUnrestricted wavefunction." << endl;
+		log2 << "  The frontier pair is the globally highest occupied and globally lowest virtual\n"
+			 << "  spin orbital, i.e. the electron that is easiest to remove and the level an added\n"
+			 << "  electron would enter, regardless of spin. That is the spin-UNRESOLVED Fukui\n"
+			 << "  function; it is not a spin-polarised (f_N / f_S) treatment." << endl;
+		log2 << "  Chosen HOMO is " << spin_name[homo_op == 1 ? 1 : 0]
+			 << ", chosen LUMO is " << spin_name[lumo_op == 1 ? 1 : 0] << "." << endl;
 
-        // Per-manifold frontiers, so a suspicious global answer can be checked.
-        for (int op = 0; op < 2; op++)
-        {
-            int h = -1, l = -1;
-            double he = 0.0, le = 0.0;
-            for (int i = 0; i < wavy.get_nmo(); i++)
-            {
-                if (wavy.get_MO_op(i) != op)
-                    continue;
-                const double o = wavy.get_MO_occ(i);
-                const double e = wavy.get_MO_energy(i);
-                if (o > 1.0e-6) {
-                    if (h == -1 || e > he) { h = i; he = e; }
-                }
-                else {
-                    if (l == -1 || e < le) { l = i; le = e; }
-                }
-            }
-            if (h == -1 && l == -1)
-                continue;
-            log2 << "  " << setw(5) << spin_name[op] << ": HOMO = MO ";
-            if (h >= 0) log2 << h << " (" << fixed << setprecision(6) << he << ")"; else log2 << "none";
-            log2 << ", LUMO = MO ";
-            if (l >= 0) log2 << l << " (" << fixed << setprecision(6) << le << ")"; else log2 << "none";
-            log2 << endl;
-        }
-        if (homo_op == lumo_op)
-            log2 << "  Both come from the " << spin_name[homo_op == 1 ? 1 : 0]
-                 << " manifold, so this is effectively a " << spin_name[homo_op == 1 ? 1 : 0]
-                 << "-only Fukui function." << endl;
-        else
-            log2 << "  They come from DIFFERENT manifolds, so f+ and f- describe different spin\n"
-                 << "  channels. Interpret the dual descriptor with care." << endl;
-        log2 << "  For a high-spin system the lowest virtual is often the spatial partner of a\n"
-             << "  singly-occupied orbital, which makes f+ and f- describe nearly the same region\n"
-             << "  and drives the dual descriptor toward zero. That is a property of the\n"
-             << "  approximation, not a statement about the molecule." << endl;
-    }
+		// Per-manifold frontiers, so a suspicious global answer can be checked.
+		for (int op = 0; op < 2; op++)
+		{
+			int h = -1, l = -1;
+			double he = 0.0, le = 0.0;
+			for (int i = 0; i < wavy.get_nmo(); i++)
+			{
+				if (wavy.get_MO_op(i) != op)
+					continue;
+				const double o = wavy.get_MO_occ(i);
+				const double e = wavy.get_MO_energy(i);
+				if (o > 1.0e-6) {
+					if (h == -1 || e > he) { h = i; he = e; }
+				}
+				else {
+					if (l == -1 || e < le) { l = i; le = e; }
+				}
+			}
+			if (h == -1 && l == -1)
+				continue;
+			log2 << "  " << setw(5) << spin_name[op] << ": HOMO = MO ";
+			if (h >= 0) log2 << h << " (" << fixed << setprecision(6) << he << ")"; else log2 << "none";
+			log2 << ", LUMO = MO ";
+			if (l >= 0) log2 << l << " (" << fixed << setprecision(6) << le << ")"; else log2 << "none";
+			log2 << "\n";
+		}
+		if (homo_op == lumo_op)
+			log2 << "  Both come from the " << spin_name[homo_op == 1 ? 1 : 0]
+				 << " manifold, so this is effectively a " << spin_name[homo_op == 1 ? 1 : 0]
+				 << "-only Fukui function." << endl;
+		else
+			log2 << "  They come from DIFFERENT manifolds, so f+ and f- describe different spin\n"
+				 << "  channels. Interpret the dual descriptor with care." << endl;
+		log2 << "  For a high-spin system the lowest virtual is often the spatial partner of a\n"
+			 << "  singly-occupied orbital, which makes f+ and f- describe nearly the same region\n"
+			 << "  and drives the dual descriptor toward zero. That is a property of the\n"
+			 << "  approximation, not a statement about the molecule." << endl;
+	}
 
-    const CondensedFukuiResults condensed =
-        Calc_Condensed_Fukui(wavy, homo, lumo, cell(), opt.accuracy, log2);
-    if (!condensed.valid)
-    {
-        log2 << "Condensed Fukui functions could not be calculated." << endl;
-        return;
-    }
-    print_condensed_fukui(condensed, log2);
+	const CondensedFukuiResults condensed =
+		Calc_Condensed_Fukui(wavy, homo, lumo, cell(), opt.accuracy, log2);
+	if (!condensed.valid)
+	{
+		log2 << "Condensed Fukui functions could not be calculated." << endl;
+		return;
+	}
+	print_condensed_fukui(condensed, log2);
 
-    // The "so what" line. Ranked on the Hirshfeld column because that is the
-    // partition the condensed-Fukui literature uses, so it is the one a reader
-    // can compare against published numbers.
-    const int H = PartitionResults::CHARGE_ORDER::S_HIRSH;
-    const size_t n = condensed.labels.size();
-    if (n > 0)
-    {
-        size_t most_electrophilic = 0, most_nucleophilic = 0;
-        double best_pos = -1e300, best_neg = 1e300;
-        for (size_t a = 0; a < n; a++)
-        {
-            const double df = condensed.f_plus[H][a] - condensed.f_minus[H][a];
-            if (df > best_pos) { best_pos = df; most_electrophilic = a; }
-            if (df < best_neg) { best_neg = df; most_nucleophilic = a; }
-        }
-        log2 << "Summary (Hirshfeld partition):" << endl;
-        log2 << "  Most ELECTROPHILIC site (a nucleophile attacks here): "
-             << condensed.labels[most_electrophilic]
-             << "   df = " << fixed << setprecision(5) << best_pos << endl;
-        log2 << "  Most NUCLEOPHILIC site (an electrophile attacks here): "
-             << condensed.labels[most_nucleophilic]
-             << "   df = " << fixed << setprecision(5) << best_neg << endl;
-        log2 << "\nNote: these atom-summed values, not the cube maxima, are what carry the\n"
-             << "chemistry. A point-wise Fukui function peaks near the heaviest nucleus\n"
-             << "regardless of where the molecule actually reacts." << endl;
-    }
+	// The "so what" line. Ranked on the Hirshfeld column because that is the
+	// partition the condensed-Fukui literature uses, so it is the one a reader
+	// can compare against published numbers.
+	const int H = PartitionResults::CHARGE_ORDER::S_HIRSH;
+	const size_t n = condensed.labels.size();
+	if (n > 0)
+	{
+		size_t most_electrophilic = 0, most_nucleophilic = 0;
+		double best_pos = -1e300, best_neg = 1e300;
+		for (size_t a = 0; a < n; a++)
+		{
+			const double df = condensed.f_plus[H][a] - condensed.f_minus[H][a];
+			if (df > best_pos) { best_pos = df; most_electrophilic = a; }
+			if (df < best_neg) { best_neg = df; most_nucleophilic = a; }
+		}
+		log2 << "Summary (Hirshfeld partition):" << endl;
+		log2 << "  Most ELECTROPHILIC site (a nucleophile attacks here): "
+			 << condensed.labels[most_electrophilic]
+			 << "   df = " << fixed << setprecision(5) << best_pos << endl;
+		log2 << "  Most NUCLEOPHILIC site (an electrophile attacks here): "
+			 << condensed.labels[most_nucleophilic]
+			 << "   df = " << fixed << setprecision(5) << best_neg << endl;
+		log2 << "\nNote: these atom-summed values, not the cube maxima, are what carry the\n"
+			 << "chemistry. A point-wise Fukui function peaks near the heaviest nucleus\n"
+			 << "regardless of where the molecule actually reacts." << endl;
+	}
 
-    // Machine-readable copy beside the wavefunction, same format as the -fukui run.
-    const std::filesystem::path summary_path =
-        (wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_fukui.dat";
-    ofstream summary(summary_path, ios::out);
-    summary << "# NoSpherA2 condensed Fukui analysis\n";
-    summary << "# Frontier-orbital approximation; no cubes were calculated.\n";
-    summary << fixed;
-    summary << "HOMO_index " << homo << "\n";
-    summary << "HOMO_energy " << setprecision(6) << wavy.get_MO_energy(homo) << "\n";
-    summary << "LUMO_index " << lumo << "\n";
-    summary << "LUMO_energy " << setprecision(6) << wavy.get_MO_energy(lumo) << "\n";
-    summary << "unrestricted " << (unrestricted ? 1 : 0) << "\n";
-    static const int ord[5] = {
-        PartitionResults::CHARGE_ORDER::S_HIRSH,
-        PartitionResults::CHARGE_ORDER::S_BECKE,
-        PartitionResults::CHARGE_ORDER::S_TFVC,
-        PartitionResults::CHARGE_ORDER::S_MBIS,
-        PartitionResults::CHARGE_ORDER::S_EMBIS
-    };
-    static const char *ord_name[5] = { "hirshfeld", "becke", "tfvc", "mbis", "embis" };
-    summary << "# condensed Fukui: atom f+ f- df, one block per partition\n";
-    for (int s = 0; s < 5; s++)
-    {
-        summary << "partition " << ord_name[s] << "\n";
-        for (size_t a = 0; a < n; a++)
-        {
-            const double fp = condensed.f_plus[ord[s]][a];
-            const double fm = condensed.f_minus[ord[s]][a];
-            summary << "  " << condensed.labels[a]
-                    << " " << setprecision(6) << fp
-                    << " " << setprecision(6) << fm
-                    << " " << setprecision(6) << (fp - fm) << "\n";
-        }
-    }
-    summary.close();
-    log2 << "\nWrote " << summary_path.filename().string() << endl;
+	// Machine-readable copy beside the wavefunction, same format as the -fukui run.
+	const std::filesystem::path summary_path =
+		(wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_fukui.dat";
+	ofstream summary(summary_path, ios::out);
+	summary << "# NoSpherA2 condensed Fukui analysis\n";
+	summary << "# Frontier-orbital approximation; no cubes were calculated.\n";
+	summary << fixed;
+	summary << "HOMO_index " << homo << "\n";
+	summary << "HOMO_energy " << setprecision(6) << wavy.get_MO_energy(homo) << "\n";
+	summary << "LUMO_index " << lumo << "\n";
+	summary << "LUMO_energy " << setprecision(6) << wavy.get_MO_energy(lumo) << "\n";
+	summary << "unrestricted " << (unrestricted ? 1 : 0) << "\n";
+	static const int ord[5] = {
+		PartitionResults::CHARGE_ORDER::S_HIRSH,
+		PartitionResults::CHARGE_ORDER::S_BECKE,
+		PartitionResults::CHARGE_ORDER::S_TFVC,
+		PartitionResults::CHARGE_ORDER::S_MBIS,
+		PartitionResults::CHARGE_ORDER::S_EMBIS
+	};
+	static const char *ord_name[5] = { "hirshfeld", "becke", "tfvc", "mbis", "embis" };
+	summary << "# condensed Fukui: atom f+ f- df, one block per partition\n";
+	for (int s = 0; s < 5; s++)
+	{
+		summary << "partition " << ord_name[s] << "\n";
+		for (size_t a = 0; a < n; a++)
+		{
+			const double fp = condensed.f_plus[ord[s]][a];
+			const double fm = condensed.f_minus[ord[s]][a];
+			summary << "  " << condensed.labels[a]
+					<< " " << setprecision(6) << fp
+					<< " " << setprecision(6) << fm
+					<< " " << setprecision(6) << (fp - fm) << "\n";
+		}
+	}
+	summary.close();
+	log2 << "\nWrote " << summary_path.filename().string() << endl;
 }
 
 namespace {
 
 struct PromolecularFragmentDensities {
-    double sum = 0.0;      // over all fragments
-    double dominant = 0.0; // largest single-fragment contribution
+	double sum = 0.0;      // over all fragments
+	double dominant = 0.0; // largest single-fragment contribution
 
-    double total() const
-    {
-        return sum;
-    }
+	double total() const
+	{
+		return sum;
+	}
 };
 
 struct PromolecularAtom {
-    d3 pos;
-    int charge = 1;
-    int fragment = 0;
+	d3 pos;
+	int charge = 1;
+	int fragment = 0;
 };
 
 PromolecularFragmentDensities promolecular_fragment_densities_at(
-    const d3 &pos,
-    const std::vector<PromolecularAtom> &atoms,
-    const std::vector<Thakkar> &atom_models)
+	const d3 &pos,
+	const std::vector<PromolecularAtom> &atoms,
+	const std::vector<Thakkar> &atom_models)
 {
-    PromolecularFragmentDensities result;
-    // atoms are grouped by fragment (add_promolecular_atoms appends whole fragments),
-    // so a running per-fragment sum needs no per-fragment storage
-    double fragment_sum = 0.0;
-    int current_fragment = atoms.empty() ? 0 : atoms.front().fragment;
-    for (const PromolecularAtom &atom : atoms)
-    {
-        if (atom.fragment != current_fragment)
-        {
-            result.dominant = std::max(result.dominant, fragment_sum);
-            fragment_sum = 0.0;
-            current_fragment = atom.fragment;
-        }
-        // Table lookup for the mask pass only; lambda2 and the RDG come from the
-        // analytic Thakkar derivatives in promolecular_derivatives_at(); the exact
-        // Slater sums here cost several times the run for a handful of kept points
-        const double contribution = atom_models[atom.charge - 1].get_interpolated_density_spline(array_length(pos, atom.pos));
-        fragment_sum += contribution;
-        result.sum += contribution;
-    }
-    result.dominant = std::max(result.dominant, fragment_sum);
-    return result;
+	PromolecularFragmentDensities result;
+	// atoms are grouped by fragment (add_promolecular_atoms appends whole fragments),
+	// so a running per-fragment sum needs no per-fragment storage
+	double fragment_sum = 0.0;
+	int current_fragment = atoms.empty() ? 0 : atoms.front().fragment;
+	for (const PromolecularAtom &atom : atoms)
+	{
+		if (atom.fragment != current_fragment)
+		{
+			result.dominant = std::max(result.dominant, fragment_sum);
+			fragment_sum = 0.0;
+			current_fragment = atom.fragment;
+		}
+		// Table lookup for the mask pass only; lambda2 and the RDG come from the
+		// analytic Thakkar derivatives in promolecular_derivatives_at(); the exact
+		// Slater sums here cost several times the run for a handful of kept points
+		const double contribution = atom_models[atom.charge - 1].get_interpolated_density_spline(array_length(pos, atom.pos));
+		fragment_sum += contribution;
+		result.sum += contribution;
+	}
+	result.dominant = std::max(result.dominant, fragment_sum);
+	return result;
 }
 
 bool is_promolecular_nci_point(
-    const PromolecularFragmentDensities &densities,
-    double total_density,
-    double dominant_density_cutoff,
-    double fragment_sum_cutoff)
+	const PromolecularFragmentDensities &densities,
+	double total_density,
+	double dominant_density_cutoff,
+	double fragment_sum_cutoff)
 {
-    total_density = std::abs(total_density);
-    if (total_density <= 1E-20)
-        return false;
+	total_density = std::abs(total_density);
+	if (total_density <= 1E-20)
+		return false;
 
-    const double fragment_density = densities.total();
-    if (fragment_density <= 1E-20)
-        return false;
+	const double fragment_density = densities.total();
+	if (fragment_density <= 1E-20)
+		return false;
 
-    if (densities.dominant >= fragment_density * dominant_density_cutoff)
-        return false;
+	if (densities.dominant >= fragment_density * dominant_density_cutoff)
+		return false;
 
-    return fragment_density >= total_density * fragment_sum_cutoff;
+	return fragment_density >= total_density * fragment_sum_cutoff;
 }
 
 // rho, grad rho and the Hessian of the promolecule at pos, each Thakkar atom's analytic rho', rho''
 // summed through Centred<Thakkar>; replaces the finite-difference stencils on the rho cube, whose
 // error scaled with the grid step and whose edge points were clamped
 double promolecular_derivatives_at(
-    const d3 &pos,
-    const std::vector<PromolecularAtom> &atoms,
-    const std::vector<Thakkar> &atom_models,
-    d3 &grad,
-    double *hessian)
+	const d3 &pos,
+	const std::vector<PromolecularAtom> &atoms,
+	const std::vector<Thakkar> &atom_models,
+	d3 &grad,
+	double *hessian)
 {
-    double rho = 0.0;
-    grad = { 0.0, 0.0, 0.0 };
-    std::fill(hessian, hessian + 9, 0.0);
-    for (const PromolecularAtom &atom : atoms)
-    {
-        const Centred<Thakkar> source{ atom_models[atom.charge - 1], atom.pos };
-        d3 g;
-        double H[9];
-        rho += calculate_hessian(source, pos, g, H);
-        for (int k = 0; k < 3; k++)
-            grad[k] += g[k];
-        for (int k = 0; k < 9; k++)
-            hessian[k] += H[k];
-    }
-    return rho;
+	double rho = 0.0;
+	grad = { 0.0, 0.0, 0.0 };
+	std::fill(hessian, hessian + 9, 0.0);
+	for (const PromolecularAtom &atom : atoms)
+	{
+		const Centred<Thakkar> source{ atom_models[atom.charge - 1], atom.pos };
+		d3 g;
+		double H[9];
+		rho += calculate_hessian(source, pos, g, H);
+		for (int k = 0; k < 3; k++)
+			grad[k] += g[k];
+		for (int k = 0; k < 9; k++)
+			hessian[k] += H[k];
+	}
+	return rho;
 }
 
 double reduced_density_gradient(const double rho, const d3 &grad)
 {
-    if (std::abs(rho) <= 1E-20)
-        return 0.0;
-    const double rdg_factor = 2.0 * std::pow(3.0 * constants::PI * constants::PI, 1.0 / 3.0);
-    return array_length(grad) / (rdg_factor * std::pow(std::abs(rho), 4.0 / 3.0));
+	if (std::abs(rho) <= 1E-20)
+		return 0.0;
+	const double rdg_factor = 2.0 * std::pow(3.0 * constants::PI * constants::PI, 1.0 / 3.0);
+	return array_length(grad) / (rdg_factor * std::pow(std::abs(rho), 4.0 / 3.0));
 }
 
 void add_promolecular_atoms(
-    const WFN &fragment,
-    int fragment_id,
-    std::vector<PromolecularAtom> &atoms)
+	const WFN &fragment,
+	int fragment_id,
+	std::vector<PromolecularAtom> &atoms)
 {
-    for (int i = 0; i < fragment.get_ncen(); i++)
-    {
-        PromolecularAtom atom_entry;
-        atom_entry.pos = fragment.get_atom_pos(i);
-        atom_entry.charge = fragment.get_atom_charge(i);
-        atom_entry.fragment = fragment_id;
-        atoms.push_back(atom_entry);
-    }
+	for (int i = 0; i < fragment.get_ncen(); i++)
+	{
+		PromolecularAtom atom_entry;
+		atom_entry.pos = fragment.get_atom_pos(i);
+		atom_entry.charge = fragment.get_atom_charge(i);
+		atom_entry.fragment = fragment_id;
+		atoms.push_back(atom_entry);
+	}
 }
 
 void add_atoms_to_combined_wfn(const WFN &fragment, WFN &combined)
 {
-    for (int i = 0; i < fragment.get_ncen(); i++)
-        combined.push_back_atom(
-            fragment.get_atom_label(i),
-            fragment.get_atom_coordinate(i, 0),
-            fragment.get_atom_coordinate(i, 1),
-            fragment.get_atom_coordinate(i, 2),
-            fragment.get_atom_charge(i));
+	for (int i = 0; i < fragment.get_ncen(); i++)
+		combined.push_back_atom(
+			fragment.get_atom_label(i),
+			fragment.get_atom_coordinate(i, 0),
+			fragment.get_atom_coordinate(i, 1),
+			fragment.get_atom_coordinate(i, 2),
+			fragment.get_atom_charge(i));
 }
 
 std::string tcl_quote_path(const std::filesystem::path &path)
 {
-    const std::string input = path.generic_string();
-    std::string output = "\"";
-    for (const char c : input)
-    {
-        if (c == '\\' || c == '"' || c == '$' || c == '[' || c == ']')
-            output += '\\';
-        output += c;
-    }
-    output += '"';
-    return output;
+	const std::string input = path.generic_string();
+	std::string output = "\"";
+	for (const char c : input)
+	{
+		if (c == '\\' || c == '"' || c == '$' || c == '[' || c == ']')
+			output += '\\';
+		output += c;
+	}
+	output += '"';
+	return output;
 }
 
 void write_promolecular_nci_vmd(
-    const pathvec &xyz_files,
-    const std::filesystem::path &output_base,
-    const properties_options &opts,
-    std::ostream &log)
+	const pathvec &xyz_files,
+	const std::filesystem::path &output_base,
+	const properties_options &opts,
+	std::ostream &log)
 {
-    const std::filesystem::path signed_rho_path = output_base.string() + "_signed_rho.cube";
-    const std::filesystem::path rdg_path = output_base.string() + "_rdg.cube";
-    const std::filesystem::path vmd_path = output_base.string() + "_nci.vmd";
+	const std::filesystem::path signed_rho_path = output_base.string() + "_signed_rho.cube";
+	const std::filesystem::path rdg_path = output_base.string() + "_rdg.cube";
+	const std::filesystem::path vmd_path = output_base.string() + "_nci.vmd";
 
-    std::ofstream vmd_file(vmd_path, std::ios::out);
-    err_checkf(vmd_file.good(), "Could not open " + vmd_path.string() + " for writing.", log);
+	std::ofstream vmd_file(vmd_path, std::ios::out);
+	err_checkf(vmd_file.good(), "Could not open " + vmd_path.string() + " for writing.", log);
 
-    vmd_file
-        << "# VMD visualization for promolecular NCI/RDG analysis\n"
-        << "# Load with: vmd -e " << vmd_path.filename().string() << "\n"
-        << "display projection Orthographic\n"
-        << "display depthcue off\n"
-        << "axes location Off\n"
-        << "color Display Background white\n"
-        << "color scale method BGR\n"
-        << "\n";
-    for (size_t f = 0; f < xyz_files.size(); f++)
-        vmd_file
-            << "mol new " << tcl_quote_path(std::filesystem::absolute(xyz_files[f])) << " type xyz waitfor all\n"
-            << "set frag" << f + 1 << " [molinfo top]\n"
-            << "mol delrep 0 $frag" << f + 1 << "\n"
-            << "mol representation CPK\n"
-            << "mol color Name\n"
-            << "mol selection all\n"
-            << "mol material Opaque\n"
-            << "mol addrep $frag" << f + 1 << "\n"
-            << "\n";
-    vmd_file
-        << "mol new " << tcl_quote_path(std::filesystem::absolute(signed_rho_path)) << " type cube first 0 last -1 step 1 waitfor 1 volsets {0 }\n"
-        << "set nci [molinfo top]\n"
-        << "mol delrep 0 $nci\n"
-        << "mol addfile " << tcl_quote_path(std::filesystem::absolute(rdg_path)) << " type cube first 0 last -1 step 1 waitfor 1 volsets {0 } $nci\n"
-        << "while {[molinfo $nci get numreps] > 0} {\n"
-        << "    mol delrep 0 $nci\n"
-        << "}\n"
-        << "mol addrep $nci\n"
-        << "mol modselect 0 $nci all\n"
-        << "mol modstyle 0 $nci Isosurface 0.5 1 0 0 1 1\n"
-        << "mol modcolor 0 $nci Volume 0\n"
-        << "mol modmaterial 0 $nci Opaque\n"
-        << "mol colupdate 0 $nci on\n"
-        << "mol scaleminmax $nci 0 " << -opts.promol_nci_colour_max << " " << opts.promol_nci_colour_max << "\n"
-        << "color scale method BGR\n"
-        << "color scale midpoint 0.5\n"
-        << "\n"
-        << "display resetview\n";
+	vmd_file
+		<< "# VMD visualization for promolecular NCI/RDG analysis\n"
+		<< "# Load with: vmd -e " << vmd_path.filename().string() << "\n"
+		<< "display projection Orthographic\n"
+		<< "display depthcue off\n"
+		<< "axes location Off\n"
+		<< "color Display Background white\n"
+		<< "color scale method BGR\n"
+		<< "\n";
+	for (size_t f = 0; f < xyz_files.size(); f++)
+		vmd_file
+			<< "mol new " << tcl_quote_path(std::filesystem::absolute(xyz_files[f])) << " type xyz waitfor all\n"
+			<< "set frag" << f + 1 << " [molinfo top]\n"
+			<< "mol delrep 0 $frag" << f + 1 << "\n"
+			<< "mol representation CPK\n"
+			<< "mol color Name\n"
+			<< "mol selection all\n"
+			<< "mol material Opaque\n"
+			<< "mol addrep $frag" << f + 1 << "\n"
+			<< "\n";
+	vmd_file
+		<< "mol new " << tcl_quote_path(std::filesystem::absolute(signed_rho_path)) << " type cube first 0 last -1 step 1 waitfor 1 volsets {0 }\n"
+		<< "set nci [molinfo top]\n"
+		<< "mol delrep 0 $nci\n"
+		<< "mol addfile " << tcl_quote_path(std::filesystem::absolute(rdg_path)) << " type cube first 0 last -1 step 1 waitfor 1 volsets {0 } $nci\n"
+		<< "while {[molinfo $nci get numreps] > 0} {\n"
+		<< "    mol delrep 0 $nci\n"
+		<< "}\n"
+		<< "mol addrep $nci\n"
+		<< "mol modselect 0 $nci all\n"
+		<< "mol modstyle 0 $nci Isosurface 0.5 1 0 0 1 1\n"
+		<< "mol modcolor 0 $nci Volume 0\n"
+		<< "mol modmaterial 0 $nci Opaque\n"
+		<< "mol colupdate 0 $nci on\n"
+		<< "mol scaleminmax $nci 0 " << -opts.promol_nci_colour_max << " " << opts.promol_nci_colour_max << "\n"
+		<< "color scale method BGR\n"
+		<< "color scale midpoint 0.5\n"
+		<< "\n"
+		<< "display resetview\n";
 
-    log << "Wrote " << vmd_path << std::endl;
+	log << "Wrote " << vmd_path << std::endl;
 }
 
 void write_promolecular_nci_plot_script(
-    const std::filesystem::path &output_base,
-    const properties_options &opts,
-    std::ostream &log)
+	const std::filesystem::path &output_base,
+	const properties_options &opts,
+	std::ostream &log)
 {
-    const std::filesystem::path values_path = output_base.string() + "_values.dat";
-    const std::filesystem::path plot_path = output_base.string() + "_plot.py";
+	const std::filesystem::path values_path = output_base.string() + "_values.dat";
+	const std::filesystem::path plot_path = output_base.string() + "_plot.py";
 
-    std::ofstream plot_file(plot_path, std::ios::out);
-    err_checkf(plot_file.good(), "Could not open " + plot_path.string() + " for writing.", log);
+	std::ofstream plot_file(plot_path, std::ios::out);
+	err_checkf(plot_file.good(), "Could not open " + plot_path.string() + " for writing.", log);
 
-    plot_file
-        << "from pathlib import Path\n"
-        << "import sys\n"
-        << "\n"
-        << "import matplotlib.pyplot as plt\n"
-        << "import numpy as np\n"
-        << "from matplotlib.colors import LinearSegmentedColormap, TwoSlopeNorm\n"
-        << "\n"
-        << "def read_float_arg(name, default):\n"
-        << "    if name not in sys.argv[1:]:\n"
-        << "        return default\n"
-        << "    idx = sys.argv.index(name)\n"
-        << "    if idx + 1 >= len(sys.argv):\n"
-        << "        raise SystemExit(f\"{name} requires a numeric value\")\n"
-        << "    return float(sys.argv[idx + 1])\n"
-        << "\n"
-        << "dat_path = Path(__file__).with_name(" << std::quoted(values_path.filename().string()) << ")\n"
-        << "data = np.loadtxt(dat_path, comments=\"#\")\n"
-        << "if data.ndim == 1:\n"
-        << "    data = data.reshape(1, -1)\n"
-        << "\n"
-        << "signed_rho = data[:, 0]\n"
-        << "rdg = data[:, 1]\n"
-        << "xmax = " << std::setprecision(16) << opts.promol_nci_rho_abs_max << "\n"
-        << "ymax = " << std::setprecision(16) << opts.promol_nci_rdg_max << "\n"
-        << "xmax = read_float_arg(\"-xmax\", None if xmax < 0.0 else xmax)\n"
-        << "ymax = read_float_arg(\"-ymax\", None if ymax < 0.0 else ymax)\n"
-        << "mask = np.ones_like(signed_rho, dtype=bool)\n"
-        << "if xmax is not None:\n"
-        << "    mask &= np.abs(signed_rho) <= xmax\n"
-        << "if ymax is not None:\n"
-        << "    mask &= rdg <= ymax\n"
-        << "signed_rho = signed_rho[mask]\n"
-        << "rdg = rdg[mask]\n"
-        << "if signed_rho.size == 0:\n"
-        << "    raise SystemExit(\"No points remain after applying plot limits\")\n"
-        << "rho_min = float(np.min(signed_rho))\n"
-        << "rho_max = float(np.max(signed_rho))\n"
-        << "\n"
-        << "cmap = LinearSegmentedColormap.from_list(\"nci_bgr\", [\"blue\", \"green\", \"red\"])\n"
-        << "if rho_min < 0.0 < rho_max:\n"
-        << "    norm = TwoSlopeNorm(vmin=rho_min, vcenter=0.0, vmax=rho_max)\n"
-        << "else:\n"
-        << "    norm = None\n"
-        << "\n"
-        << "fig, ax = plt.subplots(figsize=(7.0, 5.0), constrained_layout=True)\n"
-        << "scatter = ax.scatter(signed_rho, rdg, c=signed_rho, s=4, cmap=cmap, norm=norm, linewidths=0)\n"
-        << "ax.axvline(0.0, color=\"0.65\", linewidth=0.8)\n"
-        << "ax.set_xlabel(\"signed rho\")\n"
-        << "ax.set_ylabel(\"RDG\")\n"
-        << "if xmax is not None:\n"
-        << "    ax.set_xlim(-xmax, xmax)\n"
-        << "if ymax is not None:\n"
-        << "    ax.set_ylim(0.0, ymax)\n"
-        << "ax.set_title(dat_path.stem.replace(\"_values\", \"\"))\n"
-        << "cbar = fig.colorbar(scatter, ax=ax)\n"
-        << "cbar.set_label(\"signed rho\")\n"
-        << "png_path = dat_path.with_name(dat_path.stem.replace(\"_values\", \"_plot\") + \".png\")\n"
-        << "fig.savefig(png_path, dpi=300)\n"
-        << "print(f\"Wrote {png_path}\")\n"
-        << "if \"-show\" in sys.argv[1:]:\n"
-        << "    plt.show()\n"
-        << "else:\n"
-        << "    plt.close(fig)\n";
+	plot_file
+		<< "from pathlib import Path\n"
+		<< "import sys\n"
+		<< "\n"
+		<< "import matplotlib.pyplot as plt\n"
+		<< "import numpy as np\n"
+		<< "from matplotlib.colors import LinearSegmentedColormap, TwoSlopeNorm\n"
+		<< "\n"
+		<< "def read_float_arg(name, default):\n"
+		<< "    if name not in sys.argv[1:]:\n"
+		<< "        return default\n"
+		<< "    idx = sys.argv.index(name)\n"
+		<< "    if idx + 1 >= len(sys.argv):\n"
+		<< "        raise SystemExit(f\"{name} requires a numeric value\")\n"
+		<< "    return float(sys.argv[idx + 1])\n"
+		<< "\n"
+		<< "dat_path = Path(__file__).with_name(" << std::quoted(values_path.filename().string()) << ")\n"
+		<< "data = np.loadtxt(dat_path, comments=\"#\")\n"
+		<< "if data.ndim == 1:\n"
+		<< "    data = data.reshape(1, -1)\n"
+		<< "\n"
+		<< "signed_rho = data[:, 0]\n"
+		<< "rdg = data[:, 1]\n"
+		<< "xmax = " << std::setprecision(16) << opts.promol_nci_rho_abs_max << "\n"
+		<< "ymax = " << std::setprecision(16) << opts.promol_nci_rdg_max << "\n"
+		<< "xmax = read_float_arg(\"-xmax\", None if xmax < 0.0 else xmax)\n"
+		<< "ymax = read_float_arg(\"-ymax\", None if ymax < 0.0 else ymax)\n"
+		<< "mask = np.ones_like(signed_rho, dtype=bool)\n"
+		<< "if xmax is not None:\n"
+		<< "    mask &= np.abs(signed_rho) <= xmax\n"
+		<< "if ymax is not None:\n"
+		<< "    mask &= rdg <= ymax\n"
+		<< "signed_rho = signed_rho[mask]\n"
+		<< "rdg = rdg[mask]\n"
+		<< "if signed_rho.size == 0:\n"
+		<< "    raise SystemExit(\"No points remain after applying plot limits\")\n"
+		<< "rho_min = float(np.min(signed_rho))\n"
+		<< "rho_max = float(np.max(signed_rho))\n"
+		<< "\n"
+		<< "cmap = LinearSegmentedColormap.from_list(\"nci_bgr\", [\"blue\", \"green\", \"red\"])\n"
+		<< "if rho_min < 0.0 < rho_max:\n"
+		<< "    norm = TwoSlopeNorm(vmin=rho_min, vcenter=0.0, vmax=rho_max)\n"
+		<< "else:\n"
+		<< "    norm = None\n"
+		<< "\n"
+		<< "fig, ax = plt.subplots(figsize=(7.0, 5.0), constrained_layout=True)\n"
+		<< "scatter = ax.scatter(signed_rho, rdg, c=signed_rho, s=4, cmap=cmap, norm=norm, linewidths=0)\n"
+		<< "ax.axvline(0.0, color=\"0.65\", linewidth=0.8)\n"
+		<< "ax.set_xlabel(\"signed rho\")\n"
+		<< "ax.set_ylabel(\"RDG\")\n"
+		<< "if xmax is not None:\n"
+		<< "    ax.set_xlim(-xmax, xmax)\n"
+		<< "if ymax is not None:\n"
+		<< "    ax.set_ylim(0.0, ymax)\n"
+		<< "ax.set_title(dat_path.stem.replace(\"_values\", \"\"))\n"
+		<< "cbar = fig.colorbar(scatter, ax=ax)\n"
+		<< "cbar.set_label(\"signed rho\")\n"
+		<< "png_path = dat_path.with_name(dat_path.stem.replace(\"_values\", \"_plot\") + \".png\")\n"
+		<< "fig.savefig(png_path, dpi=300)\n"
+		<< "print(f\"Wrote {png_path}\")\n"
+		<< "if \"-show\" in sys.argv[1:]:\n"
+		<< "    plt.show()\n"
+		<< "else:\n"
+		<< "    plt.close(fig)\n";
 
-    log << "Wrote " << plot_path << std::endl;
+	log << "Wrote " << plot_path << std::endl;
 }
 
 } // namespace
 
 void promolecular_nci_analysis(
-    const pathvec &xyz_files,
-    const properties_options &opts,
-    std::ostream &log,
-    const std::filesystem::path &cif)
+	const pathvec &xyz_files,
+	const properties_options &opts,
+	std::ostream &log,
+	const std::filesystem::path &cif)
 {
-    using namespace std;
-    const _time_point t_start = get_time();
+	using namespace std;
+	const _time_point t_start = get_time();
 
-    err_checkf(xyz_files.size() >= 2, "Promolecular NCI needs at least two XYZ fragments.", log);
+	err_checkf(xyz_files.size() >= 2, "Promolecular NCI needs at least two XYZ fragments.", log);
 
-    // Output names join every fragment stem: a_b_c_values.dat etc.
-    std::string joined_stems = xyz_files.front().stem().string();
-    std::string joined_names = xyz_files.front().string();
-    for (size_t f = 1; f < xyz_files.size(); f++)
-    {
-        joined_stems += "_" + xyz_files[f].stem().string();
-        joined_names += (f + 1 == xyz_files.size() ? " and " : ", ") + xyz_files[f].string();
-    }
+	// Output names join every fragment stem: a_b_c_values.dat etc.
+	std::string joined_stems = xyz_files.front().stem().string();
+	std::string joined_names = xyz_files.front().string();
+	for (size_t f = 1; f < xyz_files.size(); f++)
+	{
+		joined_stems += "_" + xyz_files[f].stem().string();
+		joined_names += (f + 1 == xyz_files.size() ? " and " : ", ") + xyz_files[f].string();
+	}
 
-    WFN combined(e_origin::xyz);
-    combined.set_path(xyz_files.front().parent_path() / (joined_stems + ".xyz"));
-    vector<PromolecularAtom> atoms;
-    for (size_t f = 0; f < xyz_files.size(); f++)
-    {
-        err_checkf(std::filesystem::exists(xyz_files[f]), "XYZ file does not exist: " + xyz_files[f].string(), log);
-        WFN fragment(e_origin::xyz);
-        fragment.read_xyz(xyz_files[f], log, false);
-        add_atoms_to_combined_wfn(fragment, combined);
-        add_promolecular_atoms(fragment, static_cast<int>(f) + 1, atoms);
-    }
+	WFN combined(e_origin::xyz);
+	combined.set_path(xyz_files.front().parent_path() / (joined_stems + ".xyz"));
+	vector<PromolecularAtom> atoms;
+	for (size_t f = 0; f < xyz_files.size(); f++)
+	{
+		err_checkf(std::filesystem::exists(xyz_files[f]), "XYZ file does not exist: " + xyz_files[f].string(), log);
+		WFN fragment(e_origin::xyz);
+		fragment.read_xyz(xyz_files[f], log, false);
+		add_atoms_to_combined_wfn(fragment, combined);
+		add_promolecular_atoms(fragment, static_cast<int>(f) + 1, atoms);
+	}
 
-    properties_options local_opts = opts;
-    // grid: a box around the fragments, or the unit cell when a cif is given (Olex2's xgrid spans the cell)
-    vec2 cell_matrix(3, vec(3, 0.0));
-    if (cif.empty())
-    {
-        readxyzMinMax_fromWFN(combined, local_opts);
-        for (int i = 0; i < 3; i++)
-            cell_matrix[i][i] = (local_opts.MinMax[i + 3] - local_opts.MinMax[i]) / local_opts.NbSteps[i];
-    }
-    else
-        readxyzMinMax_fromCIF(cif, local_opts, cell_matrix);
-    err_checkf(local_opts.NbSteps[0] > 1 && local_opts.NbSteps[1] > 1 && local_opts.NbSteps[2] > 1,
-        "Promolecular NCI grid is too small; decrease -resolution or increase -radius.", log);
+	properties_options local_opts = opts;
+	// grid: a box around the fragments, or the unit cell when a cif is given (Olex2's xgrid spans the cell)
+	vec2 cell_matrix(3, vec(3, 0.0));
+	if (cif.empty())
+	{
+		readxyzMinMax_fromWFN(combined, local_opts);
+		for (int i = 0; i < 3; i++)
+			cell_matrix[i][i] = (local_opts.MinMax[i + 3] - local_opts.MinMax[i]) / local_opts.NbSteps[i];
+	}
+	else
+		readxyzMinMax_fromCIF(cif, local_opts, cell_matrix);
+	err_checkf(local_opts.NbSteps[0] > 1 && local_opts.NbSteps[1] > 1 && local_opts.NbSteps[2] > 1,
+		"Promolecular NCI grid is too small; decrease -resolution or increase -radius.", log);
 
-    const std::filesystem::path output_base = xyz_files.front().parent_path() / joined_stems;
+	const std::filesystem::path output_base = xyz_files.front().parent_path() / joined_stems;
 
-    const vector<Thakkar> atom_models = make_thakkar_interpolators();
+	const vector<Thakkar> atom_models = make_thakkar_interpolators();
 
-    cube rho_cube(local_opts.NbSteps, combined.get_ncen(), true);
-    cube signed_rho_cube(local_opts.NbSteps, combined.get_ncen(), true);
-    cube rdg_cube(local_opts.NbSteps, combined.get_ncen(), true);
-    rho_cube.give_parent_wfn(combined);
-    signed_rho_cube.give_parent_wfn(combined);
-    rdg_cube.give_parent_wfn(combined);
+	cube rho_cube(local_opts.NbSteps, combined.get_ncen(), true);
+	cube signed_rho_cube(local_opts.NbSteps, combined.get_ncen(), true);
+	cube rdg_cube(local_opts.NbSteps, combined.get_ncen(), true);
+	rho_cube.give_parent_wfn(combined);
+	signed_rho_cube.give_parent_wfn(combined);
+	rdg_cube.give_parent_wfn(combined);
 
-    for (int i = 0; i < 3; i++)
-    {
-        rho_cube.set_origin(i, local_opts.MinMax[i]);
-        signed_rho_cube.set_origin(i, local_opts.MinMax[i]);
-        rdg_cube.set_origin(i, local_opts.MinMax[i]);
-        for (int j = 0; j < 3; j++)
-        {
-            rho_cube.set_vector(i, j, cell_matrix[i][j]);
-            signed_rho_cube.set_vector(i, j, cell_matrix[i][j]);
-            rdg_cube.set_vector(i, j, cell_matrix[i][j]);
-        }
-    }
-    rho_cube.calc_dv();
-    signed_rho_cube.calc_dv();
-    rdg_cube.calc_dv();
+	for (int i = 0; i < 3; i++)
+	{
+		rho_cube.set_origin(i, local_opts.MinMax[i]);
+		signed_rho_cube.set_origin(i, local_opts.MinMax[i]);
+		rdg_cube.set_origin(i, local_opts.MinMax[i]);
+		for (int j = 0; j < 3; j++)
+		{
+			rho_cube.set_vector(i, j, cell_matrix[i][j]);
+			signed_rho_cube.set_vector(i, j, cell_matrix[i][j]);
+			rdg_cube.set_vector(i, j, cell_matrix[i][j]);
+		}
+	}
+	rho_cube.calc_dv();
+	signed_rho_cube.calc_dv();
+	rdg_cube.calc_dv();
 
-    rho_cube.set_comment1("Promolecular density using Thakkar spherical atoms");
-    rho_cube.set_comment2("from " + joined_names);
-    signed_rho_cube.set_comment1("Promolecular signed density using Thakkar spherical atoms");
-    signed_rho_cube.set_comment2("from " + joined_names);
-    rdg_cube.set_comment1("Promolecular reduced density gradient using Thakkar spherical atoms");
-    rdg_cube.set_comment2("from " + joined_names);
+	rho_cube.set_comment1("Promolecular density using Thakkar spherical atoms");
+	rho_cube.set_comment2("from " + joined_names);
+	signed_rho_cube.set_comment1("Promolecular signed density using Thakkar spherical atoms");
+	signed_rho_cube.set_comment2("from " + joined_names);
+	rdg_cube.set_comment1("Promolecular reduced density gradient using Thakkar spherical atoms");
+	rdg_cube.set_comment2("from " + joined_names);
 
-    log << "Promolecular NCI analysis for " << xyz_files.size() << " fragments: " << joined_names << endl;
-    log << "Grid points: " << local_opts.n_grid_points() << endl;
-    log << "Dominant-fragment density discard cutoff: " << opts.promol_nci_rcut1 << endl;
-    log << "Fragment-sum density keep cutoff: " << opts.promol_nci_rcut2 << endl;
+	log << "Promolecular NCI analysis for " << xyz_files.size() << " fragments: " << joined_names << endl;
+	log << "Grid points: " << local_opts.n_grid_points() << endl;
+	log << "Dominant-fragment density discard cutoff: " << opts.promol_nci_rcut1 << endl;
+	log << "Fragment-sum density keep cutoff: " << opts.promol_nci_rcut2 << endl;
 
-    const _time_point t_mask = get_time();
-    ProgressBar density_progress(rho_cube.get_size(0), 50, "=", " ", "Calculating promolecular rho");
+	const _time_point t_mask = get_time();
+	ProgressBar density_progress(rho_cube.get_size(0), 50, "=", " ", "Calculating promolecular rho");
 #pragma omp parallel for schedule(dynamic)
-    for (int x = 0; x < rho_cube.get_size(0); x++)
-    {
-        for (int y = 0; y < rho_cube.get_size(1); y++)
-            for (int z = 0; z < rho_cube.get_size(2); z++)
-            {
-                const d3 pos = rho_cube.get_pos(x, y, z);
-                const PromolecularFragmentDensities densities = promolecular_fragment_densities_at(pos, atoms, atom_models);
-                const double rho = densities.total();
-                rho_cube.set_value(x, y, z, rho);
-                rdg_cube.set_value(
-                    x,
-                    y,
-                    z,
-                    is_promolecular_nci_point(densities, rho, opts.promol_nci_rcut1, opts.promol_nci_rcut2) ? 1.0 : 101.0);
-            }
-        density_progress.update();
-    }
-    std::cout << std::endl;
+	for (int x = 0; x < rho_cube.get_size(0); x++)
+	{
+		for (int y = 0; y < rho_cube.get_size(1); y++)
+			for (int z = 0; z < rho_cube.get_size(2); z++)
+			{
+				const d3 pos = rho_cube.get_pos(x, y, z);
+				const PromolecularFragmentDensities densities = promolecular_fragment_densities_at(pos, atoms, atom_models);
+				const double rho = densities.total();
+				rho_cube.set_value(x, y, z, rho);
+				rdg_cube.set_value(
+					x,
+					y,
+					z,
+					is_promolecular_nci_point(densities, rho, opts.promol_nci_rcut1, opts.promol_nci_rcut2) ? 1.0 : 101.0);
+			}
+		density_progress.update();
+	}
+	std::cout << std::endl;
 
-    i3 shrink_lower;
-    i3 shrink_upper;
-    if (rdg_cube.find_value_bounds(shrink_lower, shrink_upper, 101.0))
-    {
-        rho_cube.shrink_to_bounds(shrink_lower, shrink_upper);
-        signed_rho_cube.shrink_to_bounds(shrink_lower, shrink_upper);
-        rdg_cube.shrink_to_bounds(shrink_lower, shrink_upper);
-        log << "Shrunk promolecular NCI work grid to "
-            << rdg_cube.get_size(0) << " x "
-            << rdg_cube.get_size(1) << " x "
-            << rdg_cube.get_size(2)
-            << " grid points, ignoring RDG mask value 101." << endl;
-    }
+	i3 shrink_lower;
+	i3 shrink_upper;
+	if (rdg_cube.find_value_bounds(shrink_lower, shrink_upper, 101.0))
+	{
+		rho_cube.shrink_to_bounds(shrink_lower, shrink_upper);
+		signed_rho_cube.shrink_to_bounds(shrink_lower, shrink_upper);
+		rdg_cube.shrink_to_bounds(shrink_lower, shrink_upper);
+		log << "Shrunk promolecular NCI work grid to "
+			<< rdg_cube.get_size(0) << " x "
+			<< rdg_cube.get_size(1) << " x "
+			<< rdg_cube.get_size(2)
+			<< " grid points, ignoring RDG mask value 101." << endl;
+	}
 
-    const _time_point t_rdg = get_time();
-    ofstream values_file(output_base.string() + "_values.dat", ios::out);
-    err_checkf(values_file.good(), "Could not open " + output_base.string() + "_values.dat for writing.", log);
-    values_file << "# signed_rho rdg\n";
-    values_file << "# rcut1 " << opts.promol_nci_rcut1 << " rcut2 " << opts.promol_nci_rcut2 << "\n";
+	const _time_point t_rdg = get_time();
+	ofstream values_file(output_base.string() + "_values.dat", ios::out);
+	err_checkf(values_file.good(), "Could not open " + output_base.string() + "_values.dat for writing.", log);
+	values_file << "# signed_rho rdg\n";
+	values_file << "# rcut1 " << opts.promol_nci_rcut1 << " rcut2 " << opts.promol_nci_rcut2 << "\n";
 
-    unsigned long long kept_points = 0;
+	unsigned long long kept_points = 0;
 #ifdef _OPENMP
-    // schedule(dynamic) below makes the mapping of grid points to threads (and
-    // therefore the row order in values_by_thread) non-deterministic between
-    // runs; -promol_nci_single_thread pins this region to one thread so output
-    // ordering is reproducible, e.g. for golden-file test generation.
-    const int nci_write_threads = opts.promol_nci_single_threaded ? 1 : omp_get_max_threads();
+	// schedule(dynamic) below makes the mapping of grid points to threads (and
+	// therefore the row order in values_by_thread) non-deterministic between
+	// runs; -promol_nci_single_thread pins this region to one thread so output
+	// ordering is reproducible, e.g. for golden-file test generation.
+	const int nci_write_threads = opts.promol_nci_single_threaded ? 1 : omp_get_max_threads();
 #else
-    const int nci_write_threads = 1;
+	const int nci_write_threads = 1;
 #endif
-    std::vector<std::ostringstream> values_by_thread(nci_write_threads);
-    ProgressBar rdg_progress(rho_cube.get_size(0), 50, "=", " ", "Calculating promolecular RDG");
+	std::vector<std::ostringstream> values_by_thread(nci_write_threads);
+	ProgressBar rdg_progress(rho_cube.get_size(0), 50, "=", " ", "Calculating promolecular RDG");
 #pragma omp parallel reduction(+ : kept_points) num_threads(nci_write_threads)
-    {
-        int thread_id = 0;
+	{
+		int thread_id = 0;
 #ifdef _OPENMP
-        thread_id = omp_get_thread_num();
+		thread_id = omp_get_thread_num();
 #endif
-        std::ostringstream &local_values = values_by_thread[thread_id];
+		std::ostringstream &local_values = values_by_thread[thread_id];
 #pragma omp for schedule(dynamic)
-    for (int x = 0; x < rho_cube.get_size(0); x++)
-    {
-        for (int y = 0; y < rho_cube.get_size(1); y++)
-        {
-            for (int z = 0; z < rho_cube.get_size(2); z++)
-            {
-                if (std::abs(rdg_cube.get_value(x, y, z) - 101.0) <= 1E-12)
-                {
-                    signed_rho_cube.set_value(x, y, z, 0.0);
-                    rdg_cube.set_value(x, y, z, 101.0);
-                    continue;
-                }
+	for (int x = 0; x < rho_cube.get_size(0); x++)
+	{
+		for (int y = 0; y < rho_cube.get_size(1); y++)
+		{
+			for (int z = 0; z < rho_cube.get_size(2); z++)
+			{
+				if (std::abs(rdg_cube.get_value(x, y, z) - 101.0) <= 1E-12)
+				{
+					signed_rho_cube.set_value(x, y, z, 0.0);
+					rdg_cube.set_value(x, y, z, 101.0);
+					continue;
+				}
 
-                d3 grad;
-                double hessian[9];
-                const double rho = promolecular_derivatives_at(rho_cube.get_pos(x, y, z), atoms, atom_models, grad, hessian);
-                const double lambda2 = get_lambda_1(hessian);
-                const double signed_rho = lambda2 < 0.0 ? -rho : rho;
-                const double rdg = sanitize_finite(reduced_density_gradient(rho, grad));
+				d3 grad;
+				double hessian[9];
+				const double rho = promolecular_derivatives_at(rho_cube.get_pos(x, y, z), atoms, atom_models, grad, hessian);
+				const double lambda2 = get_lambda_1(hessian);
+				const double signed_rho = lambda2 < 0.0 ? -rho : rho;
+				const double rdg = sanitize_finite(reduced_density_gradient(rho, grad));
 
-                signed_rho_cube.set_value(x, y, z, signed_rho);
-                rdg_cube.set_value(x, y, z, rdg);
+				signed_rho_cube.set_value(x, y, z, signed_rho);
+				rdg_cube.set_value(x, y, z, rdg);
 
-                if (opts.promol_nci_rho_abs_max >= 0.0 && std::abs(signed_rho) > opts.promol_nci_rho_abs_max)
-                    continue;
-                if (opts.promol_nci_rdg_max >= 0.0 && rdg > opts.promol_nci_rdg_max)
-                    continue;
+				if (opts.promol_nci_rho_abs_max >= 0.0 && std::abs(signed_rho) > opts.promol_nci_rho_abs_max)
+					continue;
+				if (opts.promol_nci_rdg_max >= 0.0 && rdg > opts.promol_nci_rdg_max)
+					continue;
 
-                local_values << scientific << setprecision(10) << signed_rho << " " << rdg << "\n";
-                kept_points++;
-            }
-        }
-        rdg_progress.update();
-    }
-    }
-    for (const std::ostringstream &local_values : values_by_thread)
-        values_file << local_values.str();
-    const _time_point t_write = get_time();
+				local_values << scientific << setprecision(10) << signed_rho << " " << rdg << "\n";
+				kept_points++;
+			}
+		}
+		rdg_progress.update();
+	}
+	}
+	for (const std::ostringstream &local_values : values_by_thread)
+		values_file << local_values.str();
+	const _time_point t_write = get_time();
 
-    signed_rho_cube.set_path(output_base.string() + "_signed_rho.cube");
-    rdg_cube.set_path(output_base.string() + "_rdg.cube");
-    signed_rho_cube.write_file(true);
-    rdg_cube.write_file(true);
-    write_promolecular_nci_vmd(xyz_files, output_base, opts, log);
-    write_promolecular_nci_plot_script(output_base, opts, log);
-    if (!constants::hide_timings)
-        log << "Promolecular NCI setup: " << get_msec(t_start, t_mask) << " ms, mask pass: " << get_msec(t_mask, t_rdg)
-            << " ms, RDG pass: " << get_msec(t_rdg, t_write) << " ms, cube writing: " << get_msec(t_write, get_time()) << " ms" << endl;
+	signed_rho_cube.set_path(output_base.string() + "_signed_rho.cube");
+	rdg_cube.set_path(output_base.string() + "_rdg.cube");
+	signed_rho_cube.write_file(true);
+	rdg_cube.write_file(true);
+	write_promolecular_nci_vmd(xyz_files, output_base, opts, log);
+	write_promolecular_nci_plot_script(output_base, opts, log);
+	if (!constants::hide_timings)
+		log << "Promolecular NCI setup: " << get_msec(t_start, t_mask) << " ms, mask pass: " << get_msec(t_mask, t_rdg)
+			<< " ms, RDG pass: " << get_msec(t_rdg, t_write) << " ms, cube writing: " << get_msec(t_write, get_time()) << " ms" << endl;
 
-    log << "Wrote " << signed_rho_cube.get_path() << endl;
-    log << "Wrote " << rdg_cube.get_path() << endl;
-    log << "Wrote " << output_base.string() + "_values.dat" << " with " << kept_points << " points" << endl;
+	log << "Wrote " << signed_rho_cube.get_path() << endl;
+	log << "Wrote " << rdg_cube.get_path() << endl;
+	log << "Wrote " << output_base.string() + "_values.dat" << " with " << kept_points << " points" << endl;
 }
 
 void properties_calculation(options &opt)
 {
-    using namespace std;
-    ofstream log2("NoSpherA2_cube.log", ios::out);
-    auto _coutbuf = std::cout.rdbuf(log2.rdbuf()); // save and redirect
-    log2 << NoSpherA2_message(opt.no_date);
-    if (!opt.no_date)
-    {
-        log2 << build_date;
-    }
-    log2.flush();
+	using namespace std;
+	ofstream log2("NoSpherA2_cube.log", ios::out);
+	auto _coutbuf = std::cout.rdbuf(log2.rdbuf()); // save and redirect
+	log2 << NoSpherA2_message(opt.no_date);
+	if (!opt.no_date)
+	{
+		log2 << build_date;
+	}
+	log2.flush();
 
-    err_checkf(opt.wfn != "", "Error, no wfn file specified!", log2);
-    WFN wavy(opt.wfn);
-    //Without MOs (xyz input) rho, ESP, Laplacian and ELI come from the SALTED prediction; with -ri_fit <basis> from the RI fit of the orbitals
-    std::unique_ptr<Gaussian_Molecule> ml;
-    if (Gaussian_Molecule::requested(wavy, opt)) {
-        if (wavy.get_nmo() == 0) log2 << "No orbitals in " << opt.wfn << ", rho, ESP, Laplacian and ELI from the SALTED model " << opt.salted_model_dir << endl;
-        else log2 << "rho, ESP, Laplacian and ELI from the RI fit of " << opt.wfn << endl;
-        ml = std::make_unique<Gaussian_Molecule>(wavy, opt);
-        //Orbital-only properties on the fitted density: say so and drop them, the density properties still run
-        auto refuse = [&](bool& flag, const char* what) {
-            if (!flag) return;
-            log2 << "ERROR: " << what << " need orbitals, the fitted density has none - skipped" << endl;
-            flag = false;
-        };
-        refuse(opt.properties.elf, "ELF");
-        if (wavy.get_nmo() == 0) {
-            refuse(opt.properties.s_rho, "spin density");
-            refuse(opt.properties.fukui, "Fukui functions");
-            refuse(opt.properties.all_mos, "MOs");
-            bool mos = !opt.properties.MO_numbers.empty();
-            refuse(mos, "MOs");
-            opt.properties.MO_numbers.clear();
-        }
-    }
-    auto ml_esp = [&](const d3& p) { return ml->esp(p); };
-    if (opt.debug)
-        log2 << "Starting calculation of properties" << endl;
-    if (opt.properties.all_mos)
-        for (int mo = 0; mo < wavy.get_nmo(); mo++)
-            opt.properties.MO_numbers.push_back(mo);
-    if (opt.debug)
-        log2 << "Size of MOs: " << opt.properties.MO_numbers.size() << endl;
+	err_checkf(opt.wfn != "", "Error, no wfn file specified!", log2);
+	WFN wavy(opt.wfn);
+	//Without MOs (xyz input) rho, ESP, Laplacian and ELI come from the SALTED prediction; with -ri_fit <basis> from the RI fit of the orbitals
+	std::unique_ptr<Gaussian_Molecule> ml;
+	if (Gaussian_Molecule::requested(wavy, opt)) {
+		if (wavy.get_nmo() == 0) log2 << "No orbitals in " << opt.wfn << ", rho, ESP, Laplacian and ELI from the SALTED model " << opt.salted_model_dir << endl;
+		else log2 << "rho, ESP, Laplacian and ELI from the RI fit of " << opt.wfn << endl;
+		ml = std::make_unique<Gaussian_Molecule>(wavy, opt);
+		//Orbital-only properties on the fitted density: say so and drop them, the density properties still run
+		auto refuse = [&](bool& flag, const char* what) {
+			if (!flag) return;
+			log2 << "ERROR: " << what << " need orbitals, the fitted density has none - skipped" << endl;
+			flag = false;
+		};
+		refuse(opt.properties.elf, "ELF");
+		if (wavy.get_nmo() == 0) {
+			refuse(opt.properties.s_rho, "spin density");
+			refuse(opt.properties.fukui, "Fukui functions");
+			refuse(opt.properties.all_mos, "MOs");
+			bool mos = !opt.properties.MO_numbers.empty();
+			refuse(mos, "MOs");
+			opt.properties.MO_numbers.clear();
+		}
+	}
+	auto ml_esp = [&](const d3& p) { return ml->esp(p); };
+	if (opt.debug)
+		log2 << "Starting calculation of properties" << endl;
+	if (opt.properties.all_mos)
+		for (int mo = 0; mo < wavy.get_nmo(); mo++)
+			opt.properties.MO_numbers.push_back(mo);
+	if (opt.debug)
+		log2 << "Size of MOs: " << opt.properties.MO_numbers.size() << endl;
 
-    vec2 cell_matrix;
-    cell_matrix.resize(3);
-    for (int i = 0; i < 3; i++)
-        cell_matrix[i].resize(3, 0.0);
-    if (opt.debug)
-    {
-        log2 << "cif|resolution|res(bohr)|radius|rad(bohr): " << opt.cif << "|" << opt.properties.resolution << "|" << constants::ang2bohr(opt.properties.resolution) << "|" << opt.properties.radius << "|" << constants::ang2bohr(opt.properties.radius) << endl;
-        for (int a = 0; a < wavy.get_ncen(); a++)
-            log2 << "Atom " << a << " at " << wavy.get_atom_coordinate(a, 0) << " " << wavy.get_atom_coordinate(a, 1) << " " << wavy.get_atom_coordinate(a, 2) << endl;
-    }
-    if (opt.properties.esp_isosurface > 0 && opt.properties.radius < 2.5)
-    {
-        log2 << "Resetting Radius to at least 2.5 for the isosurface!" << endl;
-        opt.properties.radius = 2.5;
-    }
-    if (opt.cif != "")
-        readxyzMinMax_fromCIF(opt.cif, opt.properties, cell_matrix);
-    else
-    {
-        readxyzMinMax_fromWFN(wavy, opt.properties);
-        for (int i = 0; i < 3; i++)
-            cell_matrix[i][i] = constants::ang2bohr(opt.properties.resolution);
-    }
-    if (opt.debug)
-    {
-        log2 << "MinMax: ";
-        for (int i = 0; i < 6; i++)
-            log2 << setw(14) << scientific << opt.properties.MinMax[i];
-        log2 << endl;
-        log2 << "Steps: ";
-        for (int i = 0; i < 3; i++)
-            log2 << setw(14) << scientific << opt.properties.NbSteps[i];
-        log2 << endl;
-        log2 << "Cell Matrix:" << endl;
-        for (int i = 0; i < 3; i++)
-        {
-            for (int j = 0; j < 3; j++)
-                log2 << setw(14) << scientific << cell_matrix[i][j];
-            log2 << endl;
-        }
-    }
-    std::vector<cube> cubes;
-    cubes.emplace_back(opt.properties.NbSteps, wavy.get_ncen(), true);
-    cubes.emplace_back(opt.properties.NbSteps, wavy.get_ncen(), opt.properties.rdg);
-    cubes.emplace_back(opt.properties.NbSteps, wavy.get_ncen(), opt.properties.elf);
-    cubes.emplace_back(opt.properties.NbSteps, wavy.get_ncen(), opt.properties.eli);
-    cubes.emplace_back(opt.properties.NbSteps, wavy.get_ncen(), opt.properties.lap);
-    cubes.emplace_back(opt.properties.NbSteps, wavy.get_ncen(), opt.properties.esp);
-    cubes.emplace_back(opt.properties.NbSteps, wavy.get_ncen(), true);
-    cubes.emplace_back(opt.properties.NbSteps, wavy.get_ncen(), opt.properties.hdef);
-    cubes.emplace_back(opt.properties.NbSteps, wavy.get_ncen(), opt.properties.def);
-    cubes.emplace_back(opt.properties.NbSteps, wavy.get_ncen(), opt.properties.hirsh);
-    cubes.emplace_back(opt.properties.NbSteps, wavy.get_ncen(), opt.properties.s_rho);
-    cubes.emplace_back(opt.properties.NbSteps, wavy.get_ncen(), opt.properties.hdef || opt.properties.hirsh);
-    // Fukui_plus / Fukui_minus / Fukui_zero / Dual_Descriptor. All four are
-    // allocated together: they come out of a single grid pass over the same two
-    // frontier orbitals, so computing one and not the others saves nothing, and
-    // an unloaded cube has no storage allocated at all (see cube's grow_values
-    // constructor) which would make the shared evaluation path unsafe.
-    cubes.emplace_back(opt.properties.NbSteps, wavy.get_ncen(), opt.properties.fukui);
-    cubes.emplace_back(opt.properties.NbSteps, wavy.get_ncen(), opt.properties.fukui);
-    cubes.emplace_back(opt.properties.NbSteps, wavy.get_ncen(), opt.properties.fukui);
-    cubes.emplace_back(opt.properties.NbSteps, wavy.get_ncen(), opt.properties.fukui);
+	vec2 cell_matrix;
+	cell_matrix.resize(3);
+	for (int i = 0; i < 3; i++)
+		cell_matrix[i].resize(3, 0.0);
+	if (opt.debug)
+	{
+		log2 << "cif|resolution|res(bohr)|radius|rad(bohr): " << opt.cif << "|" << opt.properties.resolution << "|" << constants::ang2bohr(opt.properties.resolution) << "|" << opt.properties.radius << "|" << constants::ang2bohr(opt.properties.radius) << endl;
+		for (int a = 0; a < wavy.get_ncen(); a++)
+			log2 << "Atom " << a << " at " << wavy.get_atom_coordinate(a, 0) << " " << wavy.get_atom_coordinate(a, 1) << " " << wavy.get_atom_coordinate(a, 2) << "\n";
+	}
+	if (opt.properties.esp_isosurface > 0 && opt.properties.radius < 2.5)
+	{
+		log2 << "Resetting Radius to at least 2.5 for the isosurface!" << endl;
+		opt.properties.radius = 2.5;
+	}
+	if (opt.cif != "")
+		readxyzMinMax_fromCIF(opt.cif, opt.properties, cell_matrix);
+	else
+	{
+		readxyzMinMax_fromWFN(wavy, opt.properties);
+		for (int i = 0; i < 3; i++)
+			cell_matrix[i][i] = constants::ang2bohr(opt.properties.resolution);
+	}
+	if (opt.debug)
+	{
+		log2 << "MinMax: ";
+		for (int i = 0; i < 6; i++)
+			log2 << setw(14) << scientific << opt.properties.MinMax[i];
+		log2 << endl;
+		log2 << "Steps: ";
+		for (int i = 0; i < 3; i++)
+			log2 << setw(14) << scientific << opt.properties.NbSteps[i];
+		log2 << endl;
+		log2 << "Cell Matrix:" << endl;
+		for (int i = 0; i < 3; i++)
+		{
+			for (int j = 0; j < 3; j++)
+				log2 << setw(14) << scientific << cell_matrix[i][j];
+			log2 << "\n";
+		}
+	}
+	std::vector<cube> cubes;
+	cubes.emplace_back(opt.properties.NbSteps, wavy.get_ncen(), true);
+	cubes.emplace_back(opt.properties.NbSteps, wavy.get_ncen(), opt.properties.rdg);
+	cubes.emplace_back(opt.properties.NbSteps, wavy.get_ncen(), opt.properties.elf);
+	cubes.emplace_back(opt.properties.NbSteps, wavy.get_ncen(), opt.properties.eli);
+	cubes.emplace_back(opt.properties.NbSteps, wavy.get_ncen(), opt.properties.lap);
+	cubes.emplace_back(opt.properties.NbSteps, wavy.get_ncen(), opt.properties.esp);
+	cubes.emplace_back(opt.properties.NbSteps, wavy.get_ncen(), true);
+	cubes.emplace_back(opt.properties.NbSteps, wavy.get_ncen(), opt.properties.hdef);
+	cubes.emplace_back(opt.properties.NbSteps, wavy.get_ncen(), opt.properties.def);
+	cubes.emplace_back(opt.properties.NbSteps, wavy.get_ncen(), opt.properties.hirsh);
+	cubes.emplace_back(opt.properties.NbSteps, wavy.get_ncen(), opt.properties.s_rho);
+	cubes.emplace_back(opt.properties.NbSteps, wavy.get_ncen(), opt.properties.hdef || opt.properties.hirsh);
+	// Fukui_plus / Fukui_minus / Fukui_zero / Dual_Descriptor. All four are
+	// allocated together: they come out of a single grid pass over the same two
+	// frontier orbitals, so computing one and not the others saves nothing, and
+	// an unloaded cube has no storage allocated at all (see cube's grow_values
+	// constructor) which would make the shared evaluation path unsafe.
+	cubes.emplace_back(opt.properties.NbSteps, wavy.get_ncen(), opt.properties.fukui);
+	cubes.emplace_back(opt.properties.NbSteps, wavy.get_ncen(), opt.properties.fukui);
+	cubes.emplace_back(opt.properties.NbSteps, wavy.get_ncen(), opt.properties.fukui);
+	cubes.emplace_back(opt.properties.NbSteps, wavy.get_ncen(), opt.properties.fukui);
 
-    for (cube &cube : cubes)
-        cube.give_parent_wfn(wavy);
+	for (cube &cube : cubes)
+		cube.give_parent_wfn(wavy);
 
 
-    for (int i = 0; i < 3; i++)
-    {
-        for (cube &cube : cubes)
-            cube.set_origin(i, opt.properties.MinMax[i]);
+	for (int i = 0; i < 3; i++)
+	{
+		for (cube &cube : cubes)
+			cube.set_origin(i, opt.properties.MinMax[i]);
 
-        for (int j = 0; j < 3; j++)
-        {
-            for (cube &cube : cubes)
-                cube.set_vector(i, j, cell_matrix[i][j]);
-        }
-    }
-    for (cube &cube : cubes)
-        cube.calc_dv();
-    if (opt.debug)
-        log2 << "Origins etc. are set up" << endl;
-    cubes[cube_type::Rho].set_comment1("Calculated density using NoSpherA2");
-    cubes[cube_type::RDG].set_comment1("Calculated reduced density gradient using NoSpherA2");
-    cubes[cube_type::Elf].set_comment1("Calculated electron localization function using NoSpherA2");
-    cubes[cube_type::Eli].set_comment1("Calculated same-spin electron localizability indicator using NoSpherA2");
-    cubes[cube_type::Lap].set_comment1("Calculated laplacian of electron density using NoSpherA2");
-    cubes[cube_type::ESP].set_comment1("Calculated electrostatic potential using NoSpherA2");
-    cubes[cube_type::MO_val].set_comment1("Calcualted MO values using NoSpherA2");
-    cubes[cube_type::HDEF].set_comment1("Calculated Atomic Hirshfeld deformation density values using NoSpherA2");
-    cubes[cube_type::DEF].set_comment1("Calculated static deformation density values using NoSpherA2");
-    cubes[cube_type::Hirsh].set_comment1("Calculated Hirshfeld atom density values using NoSpherA2");
-    cubes[cube_type::Spin_Density].set_comment1("Calculated spin density using NoSpherA2");
-    cubes[cube_type::Fukui_plus].set_comment1("Calculated Fukui f+ (LUMO density, nucleophilic attack) using NoSpherA2");
-    cubes[cube_type::Fukui_minus].set_comment1("Calculated Fukui f- (HOMO density, electrophilic attack) using NoSpherA2");
-    cubes[cube_type::Fukui_zero].set_comment1("Calculated Fukui f0 (radical attack) using NoSpherA2");
-    cubes[cube_type::Dual_Descriptor].set_comment1("Calculated dual descriptor f+ minus f- using NoSpherA2");
-    for (auto cube : cubes)
-        cube.set_comment2("from " + wavy.get_path().string());
+		for (int j = 0; j < 3; j++)
+		{
+			for (cube &cube : cubes)
+				cube.set_vector(i, j, cell_matrix[i][j]);
+		}
+	}
+	for (cube &cube : cubes)
+		cube.calc_dv();
+	if (opt.debug)
+		log2 << "Origins etc. are set up" << endl;
+	cubes[cube_type::Rho].set_comment1("Calculated density using NoSpherA2");
+	cubes[cube_type::RDG].set_comment1("Calculated reduced density gradient using NoSpherA2");
+	cubes[cube_type::Elf].set_comment1("Calculated electron localization function using NoSpherA2");
+	cubes[cube_type::Eli].set_comment1("Calculated same-spin electron localizability indicator using NoSpherA2");
+	cubes[cube_type::Lap].set_comment1("Calculated laplacian of electron density using NoSpherA2");
+	cubes[cube_type::ESP].set_comment1("Calculated electrostatic potential using NoSpherA2");
+	cubes[cube_type::MO_val].set_comment1("Calcualted MO values using NoSpherA2");
+	cubes[cube_type::HDEF].set_comment1("Calculated Atomic Hirshfeld deformation density values using NoSpherA2");
+	cubes[cube_type::DEF].set_comment1("Calculated static deformation density values using NoSpherA2");
+	cubes[cube_type::Hirsh].set_comment1("Calculated Hirshfeld atom density values using NoSpherA2");
+	cubes[cube_type::Spin_Density].set_comment1("Calculated spin density using NoSpherA2");
+	cubes[cube_type::Fukui_plus].set_comment1("Calculated Fukui f+ (LUMO density, nucleophilic attack) using NoSpherA2");
+	cubes[cube_type::Fukui_minus].set_comment1("Calculated Fukui f- (HOMO density, electrophilic attack) using NoSpherA2");
+	cubes[cube_type::Fukui_zero].set_comment1("Calculated Fukui f0 (radical attack) using NoSpherA2");
+	cubes[cube_type::Dual_Descriptor].set_comment1("Calculated dual descriptor f+ minus f- using NoSpherA2");
+	for (auto cube : cubes)
+		cube.set_comment2("from " + wavy.get_path().string());
 
-    cubes[cube_type::Rho].set_path((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_rho.cube");
-    cubes[cube_type::RDG].set_path((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_rdg.cube");
-    cubes[cube_type::Elf].set_path((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_elf.cube");
-    cubes[cube_type::Eli].set_path((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_eli.cube");
-    cubes[cube_type::Lap].set_path((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_lap.cube");
-    cubes[cube_type::ESP].set_path((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_esp.cube");
-    cubes[cube_type::DEF].set_path((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_def.cube");
-    cubes[cube_type::Hirsh].set_path((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_hirsh.cube");
-    cubes[cube_type::Spin_Density].set_path((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_s_rho.cube");
-    cubes[cube_type::Fukui_plus].set_path((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_fukui_plus.cube");
-    cubes[cube_type::Fukui_minus].set_path((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_fukui_minus.cube");
-    cubes[cube_type::Fukui_zero].set_path((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_fukui_zero.cube");
-    cubes[cube_type::Dual_Descriptor].set_path((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_dual_descriptor.cube");
+	cubes[cube_type::Rho].set_path((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_rho.cube");
+	cubes[cube_type::RDG].set_path((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_rdg.cube");
+	cubes[cube_type::Elf].set_path((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_elf.cube");
+	cubes[cube_type::Eli].set_path((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_eli.cube");
+	cubes[cube_type::Lap].set_path((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_lap.cube");
+	cubes[cube_type::ESP].set_path((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_esp.cube");
+	cubes[cube_type::DEF].set_path((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_def.cube");
+	cubes[cube_type::Hirsh].set_path((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_hirsh.cube");
+	cubes[cube_type::Spin_Density].set_path((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_s_rho.cube");
+	cubes[cube_type::Fukui_plus].set_path((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_fukui_plus.cube");
+	cubes[cube_type::Fukui_minus].set_path((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_fukui_minus.cube");
+	cubes[cube_type::Fukui_zero].set_path((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_fukui_zero.cube");
+	cubes[cube_type::Dual_Descriptor].set_path((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_dual_descriptor.cube");
 
-    log2 << "\nCalculating:" << endl;
-    if (opt.properties.hdef || opt.properties.def || opt.properties.hirsh)
-        log2 << "Rho, ";
-    if (opt.properties.hdef || opt.properties.def || opt.properties.hirsh)
-        log2 << "Spherical Rho, ";
-    if (opt.properties.def)
-        log2 << "Static deformation density, ";
-    if (opt.properties.hdef)
-        log2 << "Hirshfeld deformation density, ";
-    if (opt.properties.hirsh)
-        log2 << "Hirshfeld density, ";
-    if (opt.properties.lap)
-        log2 << "Laplacian, ";
-    if (opt.properties.eli)
-        log2 << "ELI, ";
-    if (opt.properties.elf)
-        log2 << "ELF, ";
-    if (opt.properties.rdg)
-        log2 << "RDG, ";
-    if (opt.properties.esp)
-        log2 << "ESP, ";
-    if (opt.properties.MO_numbers.size() != 0)
-        log2 << "MOs, ";
-    if (opt.properties.s_rho)
-        log2 << "Spin density, ";
-    if (opt.properties.fukui)
-        log2 << "Fukui functions and dual descriptor, ";
-    log2 << endl;
+	log2 << "\nCalculating:" << endl;
+	if (opt.properties.hdef || opt.properties.def || opt.properties.hirsh)
+		log2 << "Rho, ";
+	if (opt.properties.hdef || opt.properties.def || opt.properties.hirsh)
+		log2 << "Spherical Rho, ";
+	if (opt.properties.def)
+		log2 << "Static deformation density, ";
+	if (opt.properties.hdef)
+		log2 << "Hirshfeld deformation density, ";
+	if (opt.properties.hirsh)
+		log2 << "Hirshfeld density, ";
+	if (opt.properties.lap)
+		log2 << "Laplacian, ";
+	if (opt.properties.eli)
+		log2 << "ELI, ";
+	if (opt.properties.elf)
+		log2 << "ELF, ";
+	if (opt.properties.rdg)
+		log2 << "RDG, ";
+	if (opt.properties.esp)
+		log2 << "ESP, ";
+	if (opt.properties.MO_numbers.size() != 0)
+		log2 << "MOs, ";
+	if (opt.properties.s_rho)
+		log2 << "Spin density, ";
+	if (opt.properties.fukui)
+		log2 << "Fukui functions and dual descriptor, ";
+	log2 << endl;
 
-    log2 << "Calculating for " << fixed << setprecision(0) << opt.properties.NbSteps[0] * opt.properties.NbSteps[1] * opt.properties.NbSteps[2] << " Gridpoints." << endl;
+	log2 << "Calculating for " << fixed << setprecision(0) << opt.properties.NbSteps[0] * opt.properties.NbSteps[1] * opt.properties.NbSteps[2] << " Gridpoints." << endl;
 
-    if (ml) Calc_Rho(cubes[cube_type::Rho], *ml, opt.properties.radius, log2, opt.cif != "");
-    else Calc_Rho(cubes[cube_type::Rho], wavy, opt.properties.radius, log2, opt.cif != "");
+	if (ml) Calc_Rho(cubes[cube_type::Rho], *ml, opt.properties.radius, log2, opt.cif != "");
+	else Calc_Rho(cubes[cube_type::Rho], wavy, opt.properties.radius, log2, opt.cif != "");
 
-    if (opt.properties.integral_accuracy != -1) {
-        log2 << "Refining grid files to integral accuracy of " << opt.properties.integral_accuracy << " ..." << flush;
-        vec2 d(16, vec(wavy.get_ncen(), 0.0));
-        vec phi(wavy.get_nmo(true), 0.0);
-        cubes[cube_type::Rho].adaptive_refine([&wavy](const d3 &pos) { return wavy.compute_dens(pos); }, opt.properties.integral_accuracy, 8, 3);
-    }
+	if (opt.properties.integral_accuracy != -1) {
+		log2 << "Refining grid files to integral accuracy of " << opt.properties.integral_accuracy << " ..." << flush;
+		vec2 d(16, vec(wavy.get_ncen(), 0.0));
+		vec phi(wavy.get_nmo(true), 0.0);
+		cubes[cube_type::Rho].adaptive_refine([&wavy](const d3 &pos) { return wavy.compute_dens(pos); }, opt.properties.integral_accuracy, 8, 3);
+	}
 
-    if (opt.properties.MO_numbers.size() != 0)
-        for (int i = 0; i < opt.properties.MO_numbers.size(); i++)
-        {
-            log2 << "Calcualting MO: " << opt.properties.MO_numbers[i] << endl;
-            cubes[cube_type::MO_val].set_zero();
-            cubes[cube_type::MO_val].set_path((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_MO_" + to_string(opt.properties.MO_numbers[i]) + ".cube");
-            Calc_MO(cubes[cube_type::MO_val], opt.properties.MO_numbers[i], wavy, opt.properties.radius, log2, opt.cif != "");
-            cubes[cube_type::MO_val].write_file(true);
-        }
+	if (opt.properties.MO_numbers.size() != 0)
+		for (int i = 0; i < opt.properties.MO_numbers.size(); i++)
+		{
+			log2 << "Calcualting MO: " << opt.properties.MO_numbers[i] << endl;
+			cubes[cube_type::MO_val].set_zero();
+			cubes[cube_type::MO_val].set_path((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_MO_" + to_string(opt.properties.MO_numbers[i]) + ".cube");
+			Calc_MO(cubes[cube_type::MO_val], opt.properties.MO_numbers[i], wavy, opt.properties.radius, log2, opt.cif != "");
+			cubes[cube_type::MO_val].write_file(true);
+		}
 
-    // The Fukui functions need the LUMO, which is an UNOCCUPIED orbital. This
-    // block must therefore stay above the delete_unoccupied_MOs() call below -
-    // moving it further down leaves the virtual space empty and silently yields
-    // an all-zero f+ cube rather than an error that names the cause.
-    if (opt.properties.fukui)
-    {
-        int homo = -1, lumo = -1;
-        bool unrestricted = false;
-        const bool found = find_frontier_orbitals(wavy, homo, lumo, unrestricted);
-        if (!found)
-        {
-            log2 << "WARNING: Could not identify a HOMO/LUMO pair (found HOMO index " << homo
-                 << ", LUMO index " << lumo << "). "
-                 << "The wavefunction has no virtual orbitals, or no occupied ones. "
-                 << "Skipping the Fukui functions." << endl;
-        }
-        else
-        {
-            log2 << "Frontier orbitals: HOMO = MO " << homo
-                 << " (energy " << fixed << setprecision(6) << wavy.get_MO_energy(homo)
-                 << ", occupation " << setprecision(3) << wavy.get_MO_occ(homo) << "), "
-                 << "LUMO = MO " << lumo
-                 << " (energy " << setprecision(6) << wavy.get_MO_energy(lumo)
-                 << ", occupation " << setprecision(3) << wavy.get_MO_occ(lumo) << ")" << endl;
-            if (unrestricted)
-                log2 << "WARNING: unrestricted wavefunction. The frontier pair is taken across both "
-                     << "spin manifolds, so the result is not a spin-resolved Fukui function." << endl;
-            log2 << "Calculating Fukui functions..." << endl;
-            Calc_Fukui(cubes, wavy, homo, lumo, opt.properties.radius, log2, opt.cif != "");
+	// The Fukui functions need the LUMO, which is an UNOCCUPIED orbital. This
+	// block must therefore stay above the delete_unoccupied_MOs() call below -
+	// moving it further down leaves the virtual space empty and silently yields
+	// an all-zero f+ cube rather than an error that names the cause.
+	if (opt.properties.fukui)
+	{
+		int homo = -1, lumo = -1;
+		bool unrestricted = false;
+		const bool found = find_frontier_orbitals(wavy, homo, lumo, unrestricted);
+		if (!found)
+		{
+			log2 << "WARNING: Could not identify a HOMO/LUMO pair (found HOMO index " << homo
+				 << ", LUMO index " << lumo << "). "
+				 << "The wavefunction has no virtual orbitals, or no occupied ones. "
+				 << "Skipping the Fukui functions." << endl;
+		}
+		else
+		{
+			log2 << "Frontier orbitals: HOMO = MO " << homo
+				 << " (energy " << fixed << setprecision(6) << wavy.get_MO_energy(homo)
+				 << ", occupation " << setprecision(3) << wavy.get_MO_occ(homo) << "), "
+				 << "LUMO = MO " << lumo
+				 << " (energy " << setprecision(6) << wavy.get_MO_energy(lumo)
+				 << ", occupation " << setprecision(3) << wavy.get_MO_occ(lumo) << ")" << endl;
+			if (unrestricted)
+				log2 << "WARNING: unrestricted wavefunction. The frontier pair is taken across both "
+					 << "spin manifolds, so the result is not a spin-resolved Fukui function." << endl;
+			log2 << "Calculating Fukui functions..." << endl;
+			Calc_Fukui(cubes, wavy, homo, lumo, opt.properties.radius, log2, opt.cif != "");
 
-            // Written here, next to the MO cubes, rather than in the common
-            // write block further down: everything below this point runs after
-            // the virtual orbitals have been discarded.
-            cubes[cube_type::Fukui_plus].write_file(true);
-            cubes[cube_type::Fukui_minus].write_file(true);
-            cubes[cube_type::Fukui_zero].write_file(true);
-            cubes[cube_type::Dual_Descriptor].write_file(true);
+			// Written here, next to the MO cubes, rather than in the common
+			// write block further down: everything below this point runs after
+			// the virtual orbitals have been discarded.
+			cubes[cube_type::Fukui_plus].write_file(true);
+			cubes[cube_type::Fukui_minus].write_file(true);
+			cubes[cube_type::Fukui_zero].write_file(true);
+			cubes[cube_type::Dual_Descriptor].write_file(true);
 
-            // Integrated norms. For the exact Fukui function each of f+ and f-
-            // integrates to 1; in the frontier-orbital approximation this holds
-            // only as far as the orbital is normalised inside the evaluated
-            // radius, so a value below 1 means the grid or the radius is
-            // clipping the orbital rather than that anything is wrong with the
-            // theory. Cheap, and the honest self-check to print.
-            // cube::sum() already multiplies by the volume element dv, so it
-            // returns the integral rather than a bare sum. Multiplying by
-            // get_dv() here as well would apply dv twice and make the reported
-            // norm scale with the grid spacing.
-            const double int_plus = cubes[cube_type::Fukui_plus].sum();
-            const double int_minus = cubes[cube_type::Fukui_minus].sum();
-            log2 << "Integrated f+ over the grid: " << fixed << setprecision(4) << int_plus
-                 << " (exact value 1.0)" << endl;
-            log2 << "Integrated f- over the grid: " << fixed << setprecision(4) << int_minus
-                 << " (exact value 1.0)" << endl;
+			// Integrated norms. For the exact Fukui function each of f+ and f-
+			// integrates to 1; in the frontier-orbital approximation this holds
+			// only as far as the orbital is normalised inside the evaluated
+			// radius, so a value below 1 means the grid or the radius is
+			// clipping the orbital rather than that anything is wrong with the
+			// theory. Cheap, and the honest self-check to print.
+			// cube::sum() already multiplies by the volume element dv, so it
+			// returns the integral rather than a bare sum. Multiplying by
+			// get_dv() here as well would apply dv twice and make the reported
+			// norm scale with the grid spacing.
+			const double int_plus = cubes[cube_type::Fukui_plus].sum();
+			const double int_minus = cubes[cube_type::Fukui_minus].sum();
+			log2 << "Integrated f+ over the grid: " << fixed << setprecision(4) << int_plus
+				 << " (exact value 1.0)" << endl;
+			log2 << "Integrated f- over the grid: " << fixed << setprecision(4) << int_minus
+				 << " (exact value 1.0)" << endl;
 
-            // Machine-readable summary beside the cubes. This exists separately
-            // from the log because the log carries wall-clock timings, which are
-            // not reproducible and so cannot be used as golden-file test output.
-            const std::filesystem::path summary_path =
-                (wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_fukui.dat";
-            ofstream summary(summary_path, ios::out);
-            summary << "# NoSpherA2 Fukui function summary\n";
-            summary << "# Frontier-orbital (frozen-orbital) approximation:\n";
-            summary << "#   f+ = |psi_LUMO|^2, f- = |psi_HOMO|^2, f0 = (f+ + f-)/2, df = f+ - f-\n";
-            summary << "# The integrals are over the evaluated grid only; each equals 1 for the\n";
-            summary << "# exact function, so a smaller value means the grid or radius is clipping\n";
-            summary << "# the orbital rather than that anything is wrong.\n";
-            summary << fixed;
-            summary << "HOMO_index " << homo << "\n";
-            summary << "HOMO_energy " << setprecision(6) << wavy.get_MO_energy(homo) << "\n";
-            summary << "HOMO_occupation " << setprecision(6) << wavy.get_MO_occ(homo) << "\n";
-            summary << "LUMO_index " << lumo << "\n";
-            summary << "LUMO_energy " << setprecision(6) << wavy.get_MO_energy(lumo) << "\n";
-            summary << "LUMO_occupation " << setprecision(6) << wavy.get_MO_occ(lumo) << "\n";
-            summary << "unrestricted " << (unrestricted ? 1 : 0) << "\n";
-            summary << "integral_f_plus " << setprecision(6) << int_plus << "\n";
-            summary << "integral_f_minus " << setprecision(6) << int_minus << "\n";
+			// Machine-readable summary beside the cubes. This exists separately
+			// from the log because the log carries wall-clock timings, which are
+			// not reproducible and so cannot be used as golden-file test output.
+			const std::filesystem::path summary_path =
+				(wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_fukui.dat";
+			ofstream summary(summary_path, ios::out);
+			summary << "# NoSpherA2 Fukui function summary\n";
+			summary << "# Frontier-orbital (frozen-orbital) approximation:\n";
+			summary << "#   f+ = |psi_LUMO|^2, f- = |psi_HOMO|^2, f0 = (f+ + f-)/2, df = f+ - f-\n";
+			summary << "# The integrals are over the evaluated grid only; each equals 1 for the\n";
+			summary << "# exact function, so a smaller value means the grid or radius is clipping\n";
+			summary << "# the orbital rather than that anything is wrong.\n";
+			summary << fixed;
+			summary << "HOMO_index " << homo << "\n";
+			summary << "HOMO_energy " << setprecision(6) << wavy.get_MO_energy(homo) << "\n";
+			summary << "HOMO_occupation " << setprecision(6) << wavy.get_MO_occ(homo) << "\n";
+			summary << "LUMO_index " << lumo << "\n";
+			summary << "LUMO_energy " << setprecision(6) << wavy.get_MO_energy(lumo) << "\n";
+			summary << "LUMO_occupation " << setprecision(6) << wavy.get_MO_occ(lumo) << "\n";
+			summary << "unrestricted " << (unrestricted ? 1 : 0) << "\n";
+			summary << "integral_f_plus " << setprecision(6) << int_plus << "\n";
+			summary << "integral_f_minus " << setprecision(6) << int_minus << "\n";
 
-            // Condensed (atom-summed) Fukui functions under all five partitions.
-            // Uses its own Becke-style atomic integration grid rather than the
-            // cube grid: the cube is a display object, clipped by -radius and
-            // coarse enough that integrating it per atom would be a much worse
-            // number than the one GridManager already knows how to produce.
-            log2 << "\nCalculating condensed Fukui functions..." << endl;
-            _time_point cf_start = get_time();
-            // Default cell with pbc = 0, i.e. the MOLECULAR treatment - the same
-            // choice integrator.cpp makes for atomic charges. The condensed
-            // values therefore describe the molecule in the wavefunction, even
-            // when a CIF was supplied for the cube grid.
-            const CondensedFukuiResults condensed =
-                Calc_Condensed_Fukui(wavy, homo, lumo, cell(), opt.accuracy, log2);
-            _time_point cf_end = get_time();
-            if (condensed.valid) {
-                print_condensed_fukui(condensed, log2);
-                log2 << "Time for condensed Fukui functions: "
-                     << fixed << setprecision(1) << get_sec(cf_start, cf_end) << " s" << endl;
-                // Same values into the machine-readable summary, Hirshfeld first
-                // because it is the scheme the condensed-Fukui literature uses.
-                static const int ord[5] = {
-                    PartitionResults::CHARGE_ORDER::S_HIRSH,
-                    PartitionResults::CHARGE_ORDER::S_BECKE,
-                    PartitionResults::CHARGE_ORDER::S_TFVC,
-                    PartitionResults::CHARGE_ORDER::S_MBIS,
-                    PartitionResults::CHARGE_ORDER::S_EMBIS
-                };
-                static const char *ord_name[5] = { "hirshfeld", "becke", "tfvc", "mbis", "embis" };
-                summary << "# condensed Fukui: atom f+ f- df, one block per partition\n";
-                for (int s = 0; s < 5; s++) {
-                    summary << "partition " << ord_name[s] << "\n";
-                    for (size_t a = 0; a < condensed.labels.size(); a++) {
-                        const double fp = condensed.f_plus[ord[s]][a];
-                        const double fm = condensed.f_minus[ord[s]][a];
-                        summary << "  " << condensed.labels[a]
-                                << " " << setprecision(6) << fp
-                                << " " << setprecision(6) << fm
-                                << " " << setprecision(6) << (fp - fm) << "\n";
-                    }
-                }
-            }
-            else {
-                log2 << "Condensed Fukui functions could not be calculated." << endl;
-            }
+			// Condensed (atom-summed) Fukui functions under all five partitions.
+			// Uses its own Becke-style atomic integration grid rather than the
+			// cube grid: the cube is a display object, clipped by -radius and
+			// coarse enough that integrating it per atom would be a much worse
+			// number than the one GridManager already knows how to produce.
+			log2 << "\nCalculating condensed Fukui functions..." << endl;
+			_time_point cf_start = get_time();
+			// Default cell with pbc = 0, i.e. the MOLECULAR treatment - the same
+			// choice integrator.cpp makes for atomic charges. The condensed
+			// values therefore describe the molecule in the wavefunction, even
+			// when a CIF was supplied for the cube grid.
+			const CondensedFukuiResults condensed =
+				Calc_Condensed_Fukui(wavy, homo, lumo, cell(), opt.accuracy, log2);
+			_time_point cf_end = get_time();
+			if (condensed.valid) {
+				print_condensed_fukui(condensed, log2);
+				log2 << "Time for condensed Fukui functions: "
+					 << fixed << setprecision(1) << get_sec(cf_start, cf_end) << " s" << endl;
+				// Same values into the machine-readable summary, Hirshfeld first
+				// because it is the scheme the condensed-Fukui literature uses.
+				static const int ord[5] = {
+					PartitionResults::CHARGE_ORDER::S_HIRSH,
+					PartitionResults::CHARGE_ORDER::S_BECKE,
+					PartitionResults::CHARGE_ORDER::S_TFVC,
+					PartitionResults::CHARGE_ORDER::S_MBIS,
+					PartitionResults::CHARGE_ORDER::S_EMBIS
+				};
+				static const char *ord_name[5] = { "hirshfeld", "becke", "tfvc", "mbis", "embis" };
+				summary << "# condensed Fukui: atom f+ f- df, one block per partition\n";
+				for (int s = 0; s < 5; s++) {
+					summary << "partition " << ord_name[s] << "\n";
+					for (size_t a = 0; a < condensed.labels.size(); a++) {
+						const double fp = condensed.f_plus[ord[s]][a];
+						const double fm = condensed.f_minus[ord[s]][a];
+						summary << "  " << condensed.labels[a]
+								<< " " << setprecision(6) << fp
+								<< " " << setprecision(6) << fm
+								<< " " << setprecision(6) << (fp - fm) << "\n";
+					}
+				}
+			}
+			else {
+				log2 << "Condensed Fukui functions could not be calculated." << endl;
+			}
 
-            summary.close();
-            log2 << "Wrote Fukui summary to " << summary_path.filename().string() << endl;
-        }
-    }
+			summary.close();
+			log2 << "Wrote Fukui summary to " << summary_path.filename().string() << endl;
+		}
+	}
 
-    wavy.delete_unoccupied_MOs();
-    wavy.delete_Qs();
+	wavy.delete_unoccupied_MOs();
+	wavy.delete_Qs();
 
-    for (int i = 1; i < cubes.size(); i++) {
-        if (cubes[i].get_loaded())
-            cubes[i].resize(cubes[cube_type::Rho].get_sizes());
-        cubes[i].set_vectors(cubes[cube_type::Rho].get_vectors());
-    }
+	for (int i = 1; i < cubes.size(); i++) {
+		if (cubes[i].get_loaded())
+			cubes[i].resize(cubes[cube_type::Rho].get_sizes());
+		cubes[i].set_vectors(cubes[cube_type::Rho].get_vectors());
+	}
 
-    if (opt.properties.hdef || opt.properties.def || opt.properties.hirsh)
-    {
-        cubes[cube_type::spherical_density].resize(cubes[cube_type::Rho].get_sizes());
-        for (int i = 0; i < 3; i++)
-        {
-            cubes[cube_type::spherical_density].set_origin(i, opt.properties.MinMax[i]);
-            for (int j = 0; j < 3; j++)
-                cubes[cube_type::spherical_density].set_vector(i, j, cell_matrix[i][j]);
-        }
-        // -def alone used to skip this and hand back rho as the deformation density
-        if (opt.properties.hdef || opt.properties.def || opt.properties.hirsh)
-        {
-            log2 << "Calculating spherical Rho...";
-            Calc_Spherical_Dens(cubes[cube_type::spherical_density], wavy, opt.properties.radius, log2, opt.cif != "");
-            log2 << " ...done!" << endl;
-        }
+	if (opt.properties.hdef || opt.properties.def || opt.properties.hirsh)
+	{
+		cubes[cube_type::spherical_density].resize(cubes[cube_type::Rho].get_sizes());
+		for (int i = 0; i < 3; i++)
+		{
+			cubes[cube_type::spherical_density].set_origin(i, opt.properties.MinMax[i]);
+			for (int j = 0; j < 3; j++)
+				cubes[cube_type::spherical_density].set_vector(i, j, cell_matrix[i][j]);
+		}
+		// -def alone used to skip this and hand back rho as the deformation density
+		if (opt.properties.hdef || opt.properties.def || opt.properties.hirsh)
+		{
+			log2 << "Calculating spherical Rho...";
+			Calc_Spherical_Dens(cubes[cube_type::spherical_density], wavy, opt.properties.radius, log2, opt.cif != "");
+			log2 << " ...done!" << endl;
+		}
 
-        if (opt.properties.def)
-        {
-            log2 << "Calculating static deformation density...";
-            Calc_Static_Def(cubes, wavy, opt.properties.radius, log2, opt.cif != "");
-            log2 << " ...done!" << endl;
-        }
+		if (opt.properties.def)
+		{
+			log2 << "Calculating static deformation density...";
+			Calc_Static_Def(cubes, wavy, opt.properties.radius, log2, opt.cif != "");
+			log2 << " ...done!" << endl;
+		}
 
-        if (opt.properties.hdef)
-        {
-            for (int a = 0; a < wavy.get_ncen(); a++)
-            {
-                log2 << "Calcualting Hirshfeld deformation density for atom: " << a << endl;
-                cubes[cube_type::HDEF].set_path((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_HDEF_" + to_string(a) + ".cube");
-                Calc_Hirshfeld(cubes, wavy, opt.properties.radius, a, log2, opt.cif != "");
-                cubes[cube_type::HDEF].write_file(true);
-                cubes[cube_type::HDEF].set_zero();
-            }
-        }
+		if (opt.properties.hdef)
+		{
+			for (int a = 0; a < wavy.get_ncen(); a++)
+			{
+				log2 << "Calcualting Hirshfeld deformation density for atom: " << a << endl;
+				cubes[cube_type::HDEF].set_path((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_HDEF_" + to_string(a) + ".cube");
+				Calc_Hirshfeld(cubes, wavy, opt.properties.radius, a, log2, opt.cif != "");
+				cubes[cube_type::HDEF].write_file(true);
+				cubes[cube_type::HDEF].set_zero();
+			}
+		}
 
-        if (opt.properties.hirsh)
-        {
-            log2 << "Calcualting Hirshfeld density for atom: " << opt.properties.hirsh_number << endl;
-            Calc_Hirshfeld_atom(cubes, wavy, opt.properties.radius, opt.properties.hirsh_number, log2, opt.cif != "");
-            log2 << "..done!" << endl;
-        }
-    }
+		if (opt.properties.hirsh)
+		{
+			log2 << "Calcualting Hirshfeld density for atom: " << opt.properties.hirsh_number << endl;
+			Calc_Hirshfeld_atom(cubes, wavy, opt.properties.radius, opt.properties.hirsh_number, log2, opt.cif != "");
+			log2 << "..done!" << endl;
+		}
+	}
 
-    if (opt.properties.lap || opt.properties.eli || opt.properties.elf || opt.properties.rdg || opt.properties.esp) {
-        if (ml) Calc_Prop(cubes, *ml, opt.properties.radius, log2, opt.no_date, opt.cif != "");
-        else Calc_Prop(cubes, wavy, opt.properties.radius, log2, opt.no_date, opt.cif != "");
-    }
+	if (opt.properties.lap || opt.properties.eli || opt.properties.elf || opt.properties.rdg || opt.properties.esp) {
+		if (ml) Calc_Prop(cubes, *ml, opt.properties.radius, log2, opt.no_date, opt.cif != "");
+		else Calc_Prop(cubes, wavy, opt.properties.radius, log2, opt.no_date, opt.cif != "");
+	}
 
-    if (opt.properties.s_rho)
-        Calc_S_Rho(cubes[cube_type::Spin_Density], wavy, log2, opt.no_date);
+	if (opt.properties.s_rho)
+		Calc_S_Rho(cubes[cube_type::Spin_Density], wavy, log2, opt.no_date);
 
-    log2 << "Writing cubes to Disk..." << flush;
-    if (opt.properties.rdg)
-    {
-        cubes[cube_type::Rho].set_path((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_signed_rho.cube");
-        cubes[cube_type::Rho].write_file(true);
-        cubes[cube_type::Rho].set_path((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_rho.cube");
-        cubes[cube_type::Rho].write_file(true, true);
-    }
-    else if (opt.properties.rho || opt.properties.lap || opt.properties.eli || opt.properties.elf || opt.properties.esp)
-        cubes[cube_type::Rho].write_file(true);
-    if (opt.properties.rdg)
-        cubes[cube_type::RDG].write_file(true);
-    if (opt.properties.lap)
-        cubes[cube_type::Lap].write_file(true);
-    if (opt.properties.elf)
-        cubes[cube_type::Elf].write_file(true);
-    if (opt.properties.eli)
-        cubes[cube_type::Eli].write_file(true);
-    if (opt.properties.s_rho)
-        cubes[cube_type::Spin_Density].write_file(true);
-    if (opt.properties.def)
-    {
-        cubes[cube_type::DEF].write_file(true);
-        cubes[cube_type::Rho].write_file(true);
-    }
-    if (opt.properties.hirsh)
-        cubes[cube_type::Hirsh].write_file(true);
+	log2 << "Writing cubes to Disk..." << flush;
+	if (opt.properties.rdg)
+	{
+		cubes[cube_type::Rho].set_path((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_signed_rho.cube");
+		cubes[cube_type::Rho].write_file(true);
+		cubes[cube_type::Rho].set_path((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_rho.cube");
+		cubes[cube_type::Rho].write_file(true, true);
+	}
+	else if (opt.properties.rho || opt.properties.lap || opt.properties.eli || opt.properties.elf || opt.properties.esp)
+		cubes[cube_type::Rho].write_file(true);
+	if (opt.properties.rdg)
+		cubes[cube_type::RDG].write_file(true);
+	if (opt.properties.lap)
+		cubes[cube_type::Lap].write_file(true);
+	if (opt.properties.elf)
+		cubes[cube_type::Elf].write_file(true);
+	if (opt.properties.eli)
+		cubes[cube_type::Eli].write_file(true);
+	if (opt.properties.s_rho)
+		cubes[cube_type::Spin_Density].write_file(true);
+	if (opt.properties.def)
+	{
+		cubes[cube_type::DEF].write_file(true);
+		cubes[cube_type::Rho].write_file(true);
+	}
+	if (opt.properties.hirsh)
+		cubes[cube_type::Hirsh].write_file(true);
 
-    log2 << " done!" << endl;
+	log2 << " done!" << endl;
 
-    if (opt.properties.esp)
-    {
-        log2 << "Calculating ESP..." << flush;
-        WFN temp = wavy;
-        temp.delete_unoccupied_MOs();
-        temp.delete_Qs();
-        if (ml) Calc_ESP(cubes[cube_type::ESP], *ml, opt.properties.radius, opt.no_date, log2, opt.cif != "");
-        else Calc_ESP(cubes[cube_type::ESP], temp, opt.properties.radius, opt.no_date, log2, opt.cif != "");
-        log2 << "Writing cube to Disk..." << flush;
-        cubes[cube_type::ESP].write_file(true);
-        log2 << "  done!" << endl;
-    }
-    if (opt.properties.esp_isosurface > 0)
-    {
-        log2 << std::defaultfloat << std::setprecision(4) << "Colouring the rho = " << opt.properties.esp_isosurface << " au isosurface by the ESP..." << endl;
-        cube box;
-        if (opt.cif != "")
-        { // the cell grid clips the molecule, so take rho on its own box
-            properties_options box_opts = opt.properties;
-            box = box_cube(wavy, box_opts);
-            if (ml) Calc_Rho(box, *ml, box_opts.radius, log2, false);
-            else Calc_Rho(box, wavy, box_opts.radius, log2, false);
-        }
-        std::vector<Triangle> triangles = marchingCubes(opt.cif != "" ? box : cubes[cube_type::Rho], opt.properties.esp_isosurface);
-        log2 << "Found " << triangles.size() << " triangles" << endl;
-        if (ml) colour_by_ESP(triangles, surface_ESP(triangles, ml_esp), log2);
-        else colour_by_ESP(triangles, wavy, log2);
-        writeColourObj((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_rho_esp.obj", triangles);
-    }
-    // return output tostd::cout
-    std::cout.rdbuf(_coutbuf);
-    log2.close();
-    std::cout << "Properties calculation done!" << std::endl;
+	if (opt.properties.esp)
+	{
+		log2 << "Calculating ESP..." << flush;
+		WFN temp = wavy;
+		temp.delete_unoccupied_MOs();
+		temp.delete_Qs();
+		if (ml) Calc_ESP(cubes[cube_type::ESP], *ml, opt.properties.radius, opt.no_date, log2, opt.cif != "");
+		else Calc_ESP(cubes[cube_type::ESP], temp, opt.properties.radius, opt.no_date, log2, opt.cif != "");
+		log2 << "Writing cube to Disk..." << flush;
+		cubes[cube_type::ESP].write_file(true);
+		log2 << "  done!" << endl;
+	}
+	if (opt.properties.esp_isosurface > 0)
+	{
+		log2 << std::defaultfloat << std::setprecision(4) << "Colouring the rho = " << opt.properties.esp_isosurface << " au isosurface by the ESP..." << endl;
+		cube box;
+		if (opt.cif != "")
+		{ // the cell grid clips the molecule, so take rho on its own box
+			properties_options box_opts = opt.properties;
+			box = box_cube(wavy, box_opts);
+			if (ml) Calc_Rho(box, *ml, box_opts.radius, log2, false);
+			else Calc_Rho(box, wavy, box_opts.radius, log2, false);
+		}
+		std::vector<Triangle> triangles = marchingCubes(opt.cif != "" ? box : cubes[cube_type::Rho], opt.properties.esp_isosurface);
+		log2 << "Found " << triangles.size() << " triangles" << endl;
+		if (ml) colour_by_ESP(triangles, surface_ESP(triangles, ml_esp), log2);
+		else colour_by_ESP(triangles, wavy, log2);
+		writeColourObj((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_rho_esp.obj", triangles);
+	}
+	// return output tostd::cout
+	std::cout.rdbuf(_coutbuf);
+	log2.close();
+	std::cout << "Properties calculation done!" << std::endl;
 }
 
 void do_combine_mo(options &opt)
 {
-    using namespace std;
-    WFN wavy1(e_origin::wfn);
-    WFN wavy2(e_origin::wfn);
-    WFN wavy3(e_origin::wfn);
-    wavy1.read_wfn(opt.combine_mo[0], false, std::cout);
-    wavy2.read_wfn(opt.combine_mo[1], false, std::cout);
-    for (int i = 0; i < wavy1.get_ncen(); i++)
-    {
-        wavy3.push_back_atom(wavy1.get_atom(i));
-    }
-    for (int i = 0; i < wavy2.get_ncen(); i++)
-    {
-        wavy3.push_back_atom(wavy2.get_atom(i));
-    }
-    std::cout << "In total we have " << wavy3.get_ncen() << " atoms" << endl;
+	using namespace std;
+	WFN wavy1(e_origin::wfn);
+	WFN wavy2(e_origin::wfn);
+	WFN wavy3(e_origin::wfn);
+	wavy1.read_wfn(opt.combine_mo[0], false, std::cout);
+	wavy2.read_wfn(opt.combine_mo[1], false, std::cout);
+	for (int i = 0; i < wavy1.get_ncen(); i++)
+	{
+		wavy3.push_back_atom(wavy1.get_atom(i));
+	}
+	for (int i = 0; i < wavy2.get_ncen(); i++)
+	{
+		wavy3.push_back_atom(wavy2.get_atom(i));
+	}
+	std::cout << "In total we have " << wavy3.get_ncen() << " atoms" << endl;
 
-    readxyzMinMax_fromWFN(wavy1, opt.properties);
-    properties_options prop2 = opt.properties;
-    readxyzMinMax_fromWFN(wavy2, prop2);
+	readxyzMinMax_fromWFN(wavy1, opt.properties);
+	properties_options prop2 = opt.properties;
+	readxyzMinMax_fromWFN(wavy2, prop2);
 
-    std::cout << "Read input\nCalculating for MOs ";
-    for (int v1 = 0; v1 < opt.cmo1.size(); v1++)
-    {
-        std::cout << opt.cmo1[v1] << " ";
-    }
-    std::cout << "of fragment 1 and MOs ";
-    for (int v1 = 0; v1 < opt.cmo2.size(); v1++)
-    {
-        std::cout << opt.cmo2[v1] << " ";
-    }
-    std::cout << "of fragment 2" << endl;
-    std::array<double, 6> MinMax = { 100, 100, 100, -100, -100, -100 };
-    std::array<int, 3> steps = { 0, 0, 0 };
-    for (int i = 0; i < 3; i++)
-    {
-        if (opt.properties.MinMax[i] < MinMax[i])
-            MinMax[i] = opt.properties.MinMax[i];
-        if (opt.properties.MinMax[i + 3] > MinMax[i + 3])
-            MinMax[i + 3] = opt.properties.MinMax[i + 3];
-    }
-    for (int i = 0; i < 3; i++)
-    {
-        if (prop2.MinMax[i] < MinMax[i])
-            MinMax[i] = prop2.MinMax[i];
-        if (prop2.MinMax[i + 3] > MinMax[i + 3])
-            MinMax[i + 3] = prop2.MinMax[i + 3];
-        steps[i] = (int)ceil(constants::bohr2ang(MinMax[i + 3] - MinMax[i]) / 0.1);
-    }
-    int counter = 0;
-    cube total(steps, 0, true);
-    cube MO1(steps, 0, true);
-    MO1.give_parent_wfn(wavy3);
-    MO1.set_na(wavy3.get_ncen());
-    cube MO2(steps, 0, true);
-    svec fns;
-    for (int i = 0; i < 3; i++)
-    {
-        MO1.set_origin(i, MinMax[i]);
-        MO1.set_vector(i, i, (MinMax[i + 3] - MinMax[i]) / steps[i]);
-        total.set_origin(i, MinMax[i]);
-        total.set_vector(i, i, (MinMax[i + 3] - MinMax[i]) / steps[i]);
-        MO2.set_origin(i, MinMax[i]);
-        MO2.set_vector(i, i, (MinMax[i + 3] - MinMax[i]) / steps[i]);
-    }
-    for (int v1 = 0; v1 < opt.cmo1.size(); v1++)
-    {
-        MO1.set_zero();
-        Calc_MO(MO1, opt.cmo1[v1] - 1, wavy1, 40, std::cout, false);
-        for (int j = 0; j < opt.cmo2.size(); j++)
-        {
-            counter++;
-            std::cout << "Running: " << counter << " of " << opt.cmo2.size() * opt.cmo1.size() << endl;
-            string filename("");
-            MO2.set_zero();
-            Calc_MO(MO2, opt.cmo2[j] - 1, wavy2, 40, std::cout, false);
-            std::cout << "writing files..." << flush;
-            filename = wavy1.get_path().stem().string() + "_" + std::to_string(opt.cmo1[v1]) + "+" + wavy2.get_path().stem().string() + "_" + std::to_string(opt.cmo2[j]) + ".cube";
-            fns.push_back(filename);
-            total.set_zero();
-            total = MO1;
-            total += MO2;
-            total.write_file(filename, false);
-            filename = wavy1.get_path().stem().string() + "_" + std::to_string(opt.cmo1[v1]) + "-" + wavy2.get_path().stem().string() + "_" + std::to_string(opt.cmo2[j]) + ".cube";
-            fns.push_back(filename);
-            total.set_zero();
-            total = MO1;
-            total -= MO2;
-            total.write_file(filename, false);
-            std::cout << " ... done!" << endl;
-        }
-    }
-    ofstream vmd("read_files.vmd");
-    vmd << "mol addrep 0\nmol new {" + fns[0] + "} type {cube} first 0 last -1 step 1 waitfor 1 volsets {0 }\n";
-    vmd << "animate style Loop\n";
-    for (int i = 1; i < fns.size(); i++)
-        vmd << "mol addfile {" + fns[i] + "} type {cube} first 0 last -1 step 1 waitfor 1 volsets {0 } 0\n";
-    vmd << "animate style Loop\ndisplay projection Orthographic\ndisplay depthcue off\n";
-    vmd << "axes location Off\ndisplay rendermode GLSL\ncolor Display Background white\ncolor Element P purple\n";
-    vmd << "color Element Ni green\ncolor Element C gray\nmol modstyle 0 0 CPK 1.000000 0.300000 12.000000 12.000000\n";
-    vmd << "mol modcolor 0 0 Element\nmol color Element\nmol representation CPK 1.000000 0.300000 22.000000 22.000000\n";
-    vmd << "mol selection all\nmol material Transparent\nmol addrep 0\nmol modstyle 1 0 Isosurface 0.020000 0 0 0 1 1\n";
-    vmd << "mol modcolor 1 0 ColorID 0\nmol selection all\nmol material Transparent\nmol addrep 0\nmol modstyle 2 0 Isosurface -0.020000 0 0 0 1 1\nmol modcolor 2 0 ColorID 1\n";
-    vmd << "mol selection all\nmol material Transparent\n";
-    vmd.flush();
-    vmd.close();
+	std::cout << "Read input\nCalculating for MOs ";
+	for (int v1 = 0; v1 < opt.cmo1.size(); v1++)
+	{
+		std::cout << opt.cmo1[v1] << " ";
+	}
+	std::cout << "of fragment 1 and MOs ";
+	for (int v1 = 0; v1 < opt.cmo2.size(); v1++)
+	{
+		std::cout << opt.cmo2[v1] << " ";
+	}
+	std::cout << "of fragment 2" << endl;
+	std::array<double, 6> MinMax = { 100, 100, 100, -100, -100, -100 };
+	std::array<int, 3> steps = { 0, 0, 0 };
+	for (int i = 0; i < 3; i++)
+	{
+		if (opt.properties.MinMax[i] < MinMax[i])
+			MinMax[i] = opt.properties.MinMax[i];
+		if (opt.properties.MinMax[i + 3] > MinMax[i + 3])
+			MinMax[i + 3] = opt.properties.MinMax[i + 3];
+	}
+	for (int i = 0; i < 3; i++)
+	{
+		if (prop2.MinMax[i] < MinMax[i])
+			MinMax[i] = prop2.MinMax[i];
+		if (prop2.MinMax[i + 3] > MinMax[i + 3])
+			MinMax[i + 3] = prop2.MinMax[i + 3];
+		steps[i] = (int)ceil(constants::bohr2ang(MinMax[i + 3] - MinMax[i]) / 0.1);
+	}
+	int counter = 0;
+	cube total(steps, 0, true);
+	cube MO1(steps, 0, true);
+	MO1.give_parent_wfn(wavy3);
+	MO1.set_na(wavy3.get_ncen());
+	cube MO2(steps, 0, true);
+	svec fns;
+	for (int i = 0; i < 3; i++)
+	{
+		MO1.set_origin(i, MinMax[i]);
+		MO1.set_vector(i, i, (MinMax[i + 3] - MinMax[i]) / steps[i]);
+		total.set_origin(i, MinMax[i]);
+		total.set_vector(i, i, (MinMax[i + 3] - MinMax[i]) / steps[i]);
+		MO2.set_origin(i, MinMax[i]);
+		MO2.set_vector(i, i, (MinMax[i + 3] - MinMax[i]) / steps[i]);
+	}
+	for (int v1 = 0; v1 < opt.cmo1.size(); v1++)
+	{
+		MO1.set_zero();
+		Calc_MO(MO1, opt.cmo1[v1] - 1, wavy1, 40, std::cout, false);
+		for (int j = 0; j < opt.cmo2.size(); j++)
+		{
+			counter++;
+			std::cout << "Running: " << counter << " of " << opt.cmo2.size() * opt.cmo1.size() << endl;
+			string filename("");
+			MO2.set_zero();
+			Calc_MO(MO2, opt.cmo2[j] - 1, wavy2, 40, std::cout, false);
+			std::cout << "writing files..." << flush;
+			filename = wavy1.get_path().stem().string() + "_" + std::to_string(opt.cmo1[v1]) + "+" + wavy2.get_path().stem().string() + "_" + std::to_string(opt.cmo2[j]) + ".cube";
+			fns.push_back(filename);
+			total.set_zero();
+			total = MO1;
+			total += MO2;
+			total.write_file(filename, false);
+			filename = wavy1.get_path().stem().string() + "_" + std::to_string(opt.cmo1[v1]) + "-" + wavy2.get_path().stem().string() + "_" + std::to_string(opt.cmo2[j]) + ".cube";
+			fns.push_back(filename);
+			total.set_zero();
+			total = MO1;
+			total -= MO2;
+			total.write_file(filename, false);
+			std::cout << " ... done!" << endl;
+		}
+	}
+	ofstream vmd("read_files.vmd");
+	vmd << "mol addrep 0\nmol new {" + fns[0] + "} type {cube} first 0 last -1 step 1 waitfor 1 volsets {0 }\n";
+	vmd << "animate style Loop\n";
+	for (int i = 1; i < fns.size(); i++)
+		vmd << "mol addfile {" + fns[i] + "} type {cube} first 0 last -1 step 1 waitfor 1 volsets {0 } 0\n";
+	vmd << "animate style Loop\ndisplay projection Orthographic\ndisplay depthcue off\n";
+	vmd << "axes location Off\ndisplay rendermode GLSL\ncolor Display Background white\ncolor Element P purple\n";
+	vmd << "color Element Ni green\ncolor Element C gray\nmol modstyle 0 0 CPK 1.000000 0.300000 12.000000 12.000000\n";
+	vmd << "mol modcolor 0 0 Element\nmol color Element\nmol representation CPK 1.000000 0.300000 22.000000 22.000000\n";
+	vmd << "mol selection all\nmol material Transparent\nmol addrep 0\nmol modstyle 1 0 Isosurface 0.020000 0 0 0 1 1\n";
+	vmd << "mol modcolor 1 0 ColorID 0\nmol selection all\nmol material Transparent\nmol addrep 0\nmol modstyle 2 0 Isosurface -0.020000 0 0 0 1 1\nmol modcolor 2 0 ColorID 1\n";
+	vmd << "mol selection all\nmol material Transparent\n";
+	vmd.flush();
+	vmd.close();
 }
 
 static void Calc_Hirshfeld_atom_2(
-    cube &CubeHirsh,
-    cube &CubeRho,
-    cube &CubeSpherical,
-    WFN &wavy,
-    int _atom,
-    std::ostream &file)
+	cube &CubeHirsh,
+	cube &CubeRho,
+	cube &CubeSpherical,
+	WFN &wavy,
+	int _atom,
+	std::ostream &file)
 {
-    (void)file;
-    using namespace std;
-    Thakkar atom(wavy.get_atom_charge(_atom));
+	(void)file;
+	using namespace std;
+	Thakkar atom(wavy.get_atom_charge(_atom));
 
 #pragma omp parallel for schedule(dynamic)
-    for (int i = 0; i < CubeHirsh.get_size(0); i++)
-    {
-        for (int j = 0; j < CubeHirsh.get_size(1); j++)
-            for (int k = 0; k < CubeHirsh.get_size(2); k++)
-            {
+	for (int i = 0; i < CubeHirsh.get_size(0); i++)
+	{
+		for (int j = 0; j < CubeHirsh.get_size(1); j++)
+			for (int k = 0; k < CubeHirsh.get_size(2); k++)
+			{
 
-                const d3 PosGrid{ i * CubeHirsh.get_vector(0, 0) + j * CubeHirsh.get_vector(0, 1) + k * CubeHirsh.get_vector(0, 2) + CubeHirsh.get_origin(0),
-                                        i * CubeHirsh.get_vector(1, 0) + j * CubeHirsh.get_vector(1, 1) + k * CubeHirsh.get_vector(1, 2) + CubeHirsh.get_origin(1),
-                                        i * CubeHirsh.get_vector(2, 0) + j * CubeHirsh.get_vector(2, 1) + k * CubeHirsh.get_vector(2, 2) + CubeHirsh.get_origin(2) };
+				const d3 PosGrid{ i * CubeHirsh.get_vector(0, 0) + j * CubeHirsh.get_vector(0, 1) + k * CubeHirsh.get_vector(0, 2) + CubeHirsh.get_origin(0),
+										i * CubeHirsh.get_vector(1, 0) + j * CubeHirsh.get_vector(1, 1) + k * CubeHirsh.get_vector(1, 2) + CubeHirsh.get_origin(1),
+										i * CubeHirsh.get_vector(2, 0) + j * CubeHirsh.get_vector(2, 1) + k * CubeHirsh.get_vector(2, 2) + CubeHirsh.get_origin(2) };
 
-                // bool skip = true;
+				// bool skip = true;
 
-                const double dens_choice = atom.get_radial_density(array_length(PosGrid, wavy.get_atom_pos(_atom)));
-                const double temp_val = CubeSpherical.get_value(i, j, k);
-                if (temp_val != 0)
-                    CubeHirsh.set_value(i, j, k, (dens_choice / temp_val * CubeRho.get_value(i, j, k)));
-            }
-    }
+				const double dens_choice = atom.get_radial_density(array_length(PosGrid, wavy.get_atom_pos(_atom)));
+				const double temp_val = CubeSpherical.get_value(i, j, k);
+				if (temp_val != 0)
+					CubeHirsh.set_value(i, j, k, (dens_choice / temp_val * CubeRho.get_value(i, j, k)));
+			}
+	}
 };
 
 enum class dipole_types
 {
-    atom,
-    geometry,
-    hirshfeld,
-    vdW,
-    Unknown
+	atom,
+	geometry,
+	hirshfeld,
+	vdW,
+	Unknown
 };
 
 dipole_types stringTodipole_types(const std::string &str)
 {
-    static const std::unordered_map<std::string, dipole_types> stringToEnumMap = {
-        {"atom", dipole_types::atom},
-        {"geometry", dipole_types::geometry},
-        {"hirshfeld", dipole_types::hirshfeld},
-        {"vdW", dipole_types::vdW} };
+	static const std::unordered_map<std::string, dipole_types> stringToEnumMap = {
+		{"atom", dipole_types::atom},
+		{"geometry", dipole_types::geometry},
+		{"hirshfeld", dipole_types::hirshfeld},
+		{"vdW", dipole_types::vdW} };
 
-    auto it = stringToEnumMap.find(str);
-    if (it != stringToEnumMap.end())
-    {
-        return it->second;
-    }
-    else
-    {
-        return dipole_types::Unknown;
-    }
+	auto it = stringToEnumMap.find(str);
+	if (it != stringToEnumMap.end())
+	{
+		return it->second;
+	}
+	else
+	{
+		return dipole_types::Unknown;
+	}
 }
 
 vec calc_dipole_for_atom(WFN &wavy, const int &i, cube &Hirshfeld_atom, vec &charges, std::string type = "atom")
 {
-    double mu_x = 0, mu_y = 0, mu_z = 0;
-    double scratch = 0;
-    const d3 ax = wavy.get_atom_pos(i);
-    double dv = Hirshfeld_atom.get_dv();
-    // const int c = wavy.get_atom_charge(i);
-    double charge = 0;
-    vec origin{ 0, 0, 0 };
-    vec bound_atoms;
-    for (int j = 0; j < wavy.get_ncen(); j++)
-    {
-        if (i == j)
-            continue;
-        const double dist = array_length(ax, wavy.get_atom_pos(j));
-        const double svdW = constants::covalent_radii[wavy.get_atom_charge(i)] + constants::covalent_radii[wavy.get_atom_charge(j)];
-        if (dist < 1.1 * svdW)
-        {
-            bound_atoms.push_back(j);
-        }
-    }
-    const double v[9] = { Hirshfeld_atom.get_vector(0, 0), Hirshfeld_atom.get_vector(0, 1), Hirshfeld_atom.get_vector(0, 2),
-                         Hirshfeld_atom.get_vector(1, 0), Hirshfeld_atom.get_vector(1, 1), Hirshfeld_atom.get_vector(1, 2),
-                         Hirshfeld_atom.get_vector(2, 0), Hirshfeld_atom.get_vector(2, 1), Hirshfeld_atom.get_vector(2, 2) };
-    switch (stringTodipole_types(type))
-    {
-    case dipole_types::atom:
-        origin = { ax[0], ax[1], ax[2] };
-        break;
-    case dipole_types::geometry:
-        err_not_impl_f("geometry position not yet implemented", std::cout);
-        origin = { 0, 0, 0 };
-        break;
-    case dipole_types::hirshfeld:
-        err_not_impl_f("hirshfeld centers not yet implemented", std::cout);
-        break;
-    case dipole_types::vdW:
-        err_not_impl_f("vdW radius basis not implemented", std::cout);
-        break;
-    case dipole_types::Unknown:
-        err_not_impl_f("Unknown dipole type", std::cout);
-        break;
-    }
+	double mu_x = 0, mu_y = 0, mu_z = 0;
+	double scratch = 0;
+	const d3 ax = wavy.get_atom_pos(i);
+	double dv = Hirshfeld_atom.get_dv();
+	// const int c = wavy.get_atom_charge(i);
+	double charge = 0;
+	vec origin{ 0, 0, 0 };
+	vec bound_atoms;
+	for (int j = 0; j < wavy.get_ncen(); j++)
+	{
+		if (i == j)
+			continue;
+		const double dist = array_length(ax, wavy.get_atom_pos(j));
+		const double svdW = constants::covalent_radii[wavy.get_atom_charge(i)] + constants::covalent_radii[wavy.get_atom_charge(j)];
+		if (dist < 1.1 * svdW)
+		{
+			bound_atoms.push_back(j);
+		}
+	}
+	const double v[9] = { Hirshfeld_atom.get_vector(0, 0), Hirshfeld_atom.get_vector(0, 1), Hirshfeld_atom.get_vector(0, 2),
+						 Hirshfeld_atom.get_vector(1, 0), Hirshfeld_atom.get_vector(1, 1), Hirshfeld_atom.get_vector(1, 2),
+						 Hirshfeld_atom.get_vector(2, 0), Hirshfeld_atom.get_vector(2, 1), Hirshfeld_atom.get_vector(2, 2) };
+	switch (stringTodipole_types(type))
+	{
+	case dipole_types::atom:
+		origin = { ax[0], ax[1], ax[2] };
+		break;
+	case dipole_types::geometry:
+		err_not_impl_f("geometry position not yet implemented", std::cout);
+		origin = { 0, 0, 0 };
+		break;
+	case dipole_types::hirshfeld:
+		err_not_impl_f("hirshfeld centers not yet implemented", std::cout);
+		break;
+	case dipole_types::vdW:
+		err_not_impl_f("vdW radius basis not implemented", std::cout);
+		break;
+	case dipole_types::Unknown:
+		err_not_impl_f("Unknown dipole type", std::cout);
+		break;
+	}
 #pragma omp parallel for reduction(+ : mu_x, mu_y, mu_z, charge) private(scratch)
-    for (int x = 0; x < Hirshfeld_atom.get_size(0); x++)
-    {
-        for (int y = 0; y < Hirshfeld_atom.get_size(1); y++)
-        {
-            for (int z = 0; z < Hirshfeld_atom.get_size(2); z++)
-            {
-                const d3 PosGrid{
-                    x * v[0] + y * v[1] + z * v[2] + Hirshfeld_atom.get_origin(0),
-                    x * v[3] + y * v[4] + z * v[5] + Hirshfeld_atom.get_origin(1),
-                    x * v[6] + y * v[7] + z * v[8] + Hirshfeld_atom.get_origin(2) };
-                scratch = Hirshfeld_atom.get_value(x, y, z) * dv;
-                charge += scratch;
-                mu_x += (PosGrid[0] - origin[0]) * scratch;
-                mu_y += (PosGrid[1] - origin[1]) * scratch;
-                mu_z += (PosGrid[2] - origin[2]) * scratch;
-            }
-        }
-    }
-    return { mu_x, mu_y, mu_z, charge };
+	for (int x = 0; x < Hirshfeld_atom.get_size(0); x++)
+	{
+		for (int y = 0; y < Hirshfeld_atom.get_size(1); y++)
+		{
+			for (int z = 0; z < Hirshfeld_atom.get_size(2); z++)
+			{
+				const d3 PosGrid{
+					x * v[0] + y * v[1] + z * v[2] + Hirshfeld_atom.get_origin(0),
+					x * v[3] + y * v[4] + z * v[5] + Hirshfeld_atom.get_origin(1),
+					x * v[6] + y * v[7] + z * v[8] + Hirshfeld_atom.get_origin(2) };
+				scratch = Hirshfeld_atom.get_value(x, y, z) * dv;
+				charge += scratch;
+				mu_x += (PosGrid[0] - origin[0]) * scratch;
+				mu_y += (PosGrid[1] - origin[1]) * scratch;
+				mu_z += (PosGrid[2] - origin[2]) * scratch;
+			}
+		}
+	}
+	return { mu_x, mu_y, mu_z, charge };
 }
 
 void dipole_moments(options &opt, std::ostream &log2)
 {
-    using namespace std;
-    log2 << NoSpherA2_message(opt.no_date);
-    if (!opt.no_date)
-        log2 << build_date;
-    err_checkf(opt.wfn != "", "Error, no wfn file specified!", log2);
-    WFN wavy(opt.wfn);
-    if (opt.debug)
-        log2 << "Starting calculation of dipole moment" << endl;
+	using namespace std;
+	log2 << NoSpherA2_message(opt.no_date);
+	if (!opt.no_date)
+		log2 << build_date;
+	err_checkf(opt.wfn != "", "Error, no wfn file specified!", log2);
+	WFN wavy(opt.wfn);
+	if (opt.debug)
+		log2 << "Starting calculation of dipole moment" << endl;
 
-    if (opt.debug)
-        log2 << opt.cif << " " << opt.properties.resolution << " " << opt.properties.radius << endl;
-    readxyzMinMax_fromWFN(wavy, opt.properties);
-    if (opt.debug)
-    {
-        log2 << "Resolution: " << opt.properties.resolution << endl;
-        log2 << "MinMax:" << endl;
-        for (int i = 0; i < 6; i++)
-            log2 << setw(14) << scientific << opt.properties.MinMax[i];
-        log2 << endl;
-        log2 << "Steps:" << endl;
-        for (int i = 0; i < 3; i++)
-            log2 << setw(14) << scientific << opt.properties.NbSteps[i];
-        log2 << endl;
-    }
-    cube Rho(opt.properties.NbSteps, wavy.get_ncen(), true);
-    cube SPHER(opt.properties.NbSteps, wavy.get_ncen(), true);
+	if (opt.debug)
+		log2 << opt.cif << " " << opt.properties.resolution << " " << opt.properties.radius << endl;
+	readxyzMinMax_fromWFN(wavy, opt.properties);
+	if (opt.debug)
+	{
+		log2 << "Resolution: " << opt.properties.resolution << endl;
+		log2 << "MinMax:" << endl;
+		for (int i = 0; i < 6; i++)
+			log2 << setw(14) << scientific << opt.properties.MinMax[i];
+		log2 << endl;
+		log2 << "Steps:" << endl;
+		for (int i = 0; i < 3; i++)
+			log2 << setw(14) << scientific << opt.properties.NbSteps[i];
+		log2 << endl;
+	}
+	cube Rho(opt.properties.NbSteps, wavy.get_ncen(), true);
+	cube SPHER(opt.properties.NbSteps, wavy.get_ncen(), true);
 
-    Rho.give_parent_wfn(wavy);
-    SPHER.give_parent_wfn(wavy);
-    vec stepsizes{ (opt.properties.MinMax[3] - opt.properties.MinMax[0]) / opt.properties.NbSteps[0],
-                  (opt.properties.MinMax[4] - opt.properties.MinMax[1]) / opt.properties.NbSteps[1],
-                  (opt.properties.MinMax[5] - opt.properties.MinMax[2]) / opt.properties.NbSteps[2] };
+	Rho.give_parent_wfn(wavy);
+	SPHER.give_parent_wfn(wavy);
+	vec stepsizes{ (opt.properties.MinMax[3] - opt.properties.MinMax[0]) / opt.properties.NbSteps[0],
+				  (opt.properties.MinMax[4] - opt.properties.MinMax[1]) / opt.properties.NbSteps[1],
+				  (opt.properties.MinMax[5] - opt.properties.MinMax[2]) / opt.properties.NbSteps[2] };
 
-    for (int i = 0; i < 3; i++)
-    {
-        Rho.set_origin(i, opt.properties.MinMax[i]);
-        SPHER.set_origin(i, opt.properties.MinMax[i]);
-        Rho.set_vector(i, i, stepsizes[i]);
-        SPHER.set_vector(i, i, stepsizes[i]);
-    }
-    if (opt.debug)
-        log2 << "Origins etc are set up" << endl;
-    Rho.set_comment1("Calculated density using NoSpherA2");
-    SPHER.set_comment1("Calculated Atomic Hirshfeld deformation density values using NoSpherA2");
-    Rho.set_comment2("from " + wavy.get_path().string());
-    SPHER.set_comment2("from" + wavy.get_path().string());
-    Rho.set_path((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_rho.cube");
-    SPHER.set_path((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_spher.cube");
-    vector<cube> Hirsh(wavy.get_ncen(), Rho);
-    vec charges(wavy.get_ncen(), 0);
+	for (int i = 0; i < 3; i++)
+	{
+		Rho.set_origin(i, opt.properties.MinMax[i]);
+		SPHER.set_origin(i, opt.properties.MinMax[i]);
+		Rho.set_vector(i, i, stepsizes[i]);
+		SPHER.set_vector(i, i, stepsizes[i]);
+	}
+	if (opt.debug)
+		log2 << "Origins etc are set up" << endl;
+	Rho.set_comment1("Calculated density using NoSpherA2");
+	SPHER.set_comment1("Calculated Atomic Hirshfeld deformation density values using NoSpherA2");
+	Rho.set_comment2("from " + wavy.get_path().string());
+	SPHER.set_comment2("from" + wavy.get_path().string());
+	Rho.set_path((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_rho.cube");
+	SPHER.set_path((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_spher.cube");
+	vector<cube> Hirsh(wavy.get_ncen(), Rho);
+	vec charges(wavy.get_ncen(), 0);
 
-    log2 << "Calculating for " << fixed << setprecision(0) << opt.properties.NbSteps[0] * opt.properties.NbSteps[1] * opt.properties.NbSteps[2] << " Gridpoints." << endl;
+	log2 << "Calculating for " << fixed << setprecision(0) << opt.properties.NbSteps[0] * opt.properties.NbSteps[1] * opt.properties.NbSteps[2] << " Gridpoints." << endl;
 
-    log2 << "Calcualting Rho...";
-    Calc_Rho(Rho, wavy, opt.properties.radius, log2, false);
-    log2 << " ...done!\nCalcualting spherical Rho...";
-    Calc_Spherical_Dens(SPHER, wavy, opt.properties.radius, log2, false);
-    log2 << " ...done!" << endl;
-    vec2 dipole_moments;
-    dipole_moments.reserve(wavy.get_ncen());
-    for (int i = 0; i < wavy.get_ncen(); i++)
-    {
-        Hirsh[i].calc_dv();
-        Hirsh[i].give_parent_wfn(wavy);
-        Hirsh[i].set_zero();
-        log2 << "Calcualting Hirshfeld density for atom: " << i << endl;
-        Calc_Hirshfeld_atom_2(Hirsh[i], Rho, SPHER, wavy, i, log2);
-        charges[i] = Hirsh[i].sum();
-        log2 << "..done!" << endl;
-    }
-    for (int i = 0; i < wavy.get_ncen(); i++)
-        dipole_moments.emplace_back(calc_dipole_for_atom(wavy, i, Hirsh[i], charges));
-    log2 << " atom   |  dipole moment x,        y,         z" << endl
-        << "======================================" << endl;
-    for (int i = 0; i < wavy.get_ncen(); i++)
-    {
-        log2 << setw(3) << i << " (" << constants::atnr2letter(wavy.get_atom_charge(i)) << ") | " << scientific << setprecision(6) << setw(14) << dipole_moments[i][0] << ", " << setw(14) << dipole_moments[i][1] << ", " << setw(14) << dipole_moments[i][2] << endl;
-    }
-    std::cout << "\n\nProperties calculation done!" << std::endl;
+	log2 << "Calcualting Rho...";
+	Calc_Rho(Rho, wavy, opt.properties.radius, log2, false);
+	log2 << " ...done!\nCalcualting spherical Rho...";
+	Calc_Spherical_Dens(SPHER, wavy, opt.properties.radius, log2, false);
+	log2 << " ...done!" << endl;
+	vec2 dipole_moments;
+	dipole_moments.reserve(wavy.get_ncen());
+	for (int i = 0; i < wavy.get_ncen(); i++)
+	{
+		Hirsh[i].calc_dv();
+		Hirsh[i].give_parent_wfn(wavy);
+		Hirsh[i].set_zero();
+		log2 << "Calcualting Hirshfeld density for atom: " << i << endl;
+		Calc_Hirshfeld_atom_2(Hirsh[i], Rho, SPHER, wavy, i, log2);
+		charges[i] = Hirsh[i].sum();
+		log2 << "..done!" << endl;
+	}
+	for (int i = 0; i < wavy.get_ncen(); i++)
+		dipole_moments.emplace_back(calc_dipole_for_atom(wavy, i, Hirsh[i], charges));
+	log2 << " atom   |  dipole moment x,        y,         z" << endl
+		<< "======================================" << endl;
+	for (int i = 0; i < wavy.get_ncen(); i++)
+	{
+		log2 << setw(3) << i << " (" << constants::atnr2letter(wavy.get_atom_charge(i)) << ") | " << scientific << setprecision(6) << setw(14) << dipole_moments[i][0] << ", " << setw(14) << dipole_moments[i][1] << ", " << setw(14) << dipole_moments[i][2] << "\n";
+	}
+	std::cout << "\n\nProperties calculation done!" << std::endl;
 }
 
 vec2 dipole_moments(WFN &wavy, cube &SPHER, const properties_options &opts, int threads, std::ostream &log2, bool debug)
 {
-    using namespace std;
-    if (debug)
-        log2 << "Starting calculation of dipole moment" << endl;
-    cube Rho(opts.NbSteps, wavy.get_ncen(), true);
+	using namespace std;
+	if (debug)
+		log2 << "Starting calculation of dipole moment" << endl;
+	cube Rho(opts.NbSteps, wavy.get_ncen(), true);
 
-    Rho.give_parent_wfn(wavy);
-    vec stepsizes{ (opts.MinMax[3] - opts.MinMax[0]) / opts.NbSteps[0],
-                  (opts.MinMax[4] - opts.MinMax[1]) / opts.NbSteps[1],
-                  (opts.MinMax[5] - opts.MinMax[2]) / opts.NbSteps[2] };
+	Rho.give_parent_wfn(wavy);
+	vec stepsizes{ (opts.MinMax[3] - opts.MinMax[0]) / opts.NbSteps[0],
+				  (opts.MinMax[4] - opts.MinMax[1]) / opts.NbSteps[1],
+				  (opts.MinMax[5] - opts.MinMax[2]) / opts.NbSteps[2] };
 
-    for (int i = 0; i < 3; i++)
-    {
-        Rho.set_origin(i, opts.MinMax[i]);
-        Rho.set_vector(i, i, stepsizes[i]);
-    }
-    if (debug)
-        log2 << "Origins etc are set up" << endl;
-    Rho.set_comment1("Calculated density using NoSpherA2");
-    Rho.set_comment2("from " + wavy.get_path().string());
-    Rho.set_path((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_rho.cube");
-    vector<cube> Hirsh(wavy.get_ncen(), Rho);
-    vec charges(wavy.get_ncen(), 0);
+	for (int i = 0; i < 3; i++)
+	{
+		Rho.set_origin(i, opts.MinMax[i]);
+		Rho.set_vector(i, i, stepsizes[i]);
+	}
+	if (debug)
+		log2 << "Origins etc are set up" << endl;
+	Rho.set_comment1("Calculated density using NoSpherA2");
+	Rho.set_comment2("from " + wavy.get_path().string());
+	Rho.set_path((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_rho.cube");
+	vector<cube> Hirsh(wavy.get_ncen(), Rho);
+	vec charges(wavy.get_ncen(), 0);
 
-    log2 << "Calculating for " << fixed << setprecision(0) << opts.n_grid_points() << " Gridpoints." << endl;
+	log2 << "Calculating for " << fixed << setprecision(0) << opts.n_grid_points() << " Gridpoints." << endl;
 
-    log2 << "Calcualting Rho...";
-    Calc_Rho(Rho, wavy, opts.radius, log2, false);
-    log2 << " ...done!\nCalcualting spherical Rho...";
-    Calc_Spherical_Dens(SPHER, wavy, opts.radius, log2, false);
-    log2 << " ...done!" << endl;
-    vec2 dipole_moments;
-    for (int i = 0; i < wavy.get_ncen(); i++)
-    {
-        Hirsh[i].calc_dv();
-        Hirsh[i].give_parent_wfn(wavy);
-        Hirsh[i].set_zero();
-        log2 << "Calcualting Hirshfeld density for atom: " << i << endl;
-        Calc_Hirshfeld_atom_2(Hirsh[i], Rho, SPHER, wavy, i, log2);
-        charges[i] = Hirsh[i].sum();
-        log2 << "..done!" << endl;
-    }
-    for (int i = 0; i < wavy.get_ncen(); i++)
-        dipole_moments.push_back(calc_dipole_for_atom(wavy, i, Hirsh[i], charges));
-    log2 << "...done!" << endl;
-    log2 << " atom   |    charge    | dipole moment x,        y,         z" << endl
-        << "===================================================" << endl;
-    for (int i = 0; i < wavy.get_ncen(); i++)
-    {
-        log2 << setw(3) << i << " (" << constants::atnr2letter(wavy.get_atom_charge(i)) << ") |" << scientific << setprecision(6) << setw(13) << dipole_moments[i][3] - wavy.get_atom_charge(i) << " | " << scientific << setprecision(6) << setw(14) << dipole_moments[i][0] << ", " << setw(14) << dipole_moments[i][1] << ", " << setw(14) << dipole_moments[i][2] << endl;
-    }
-    return dipole_moments;
+	log2 << "Calcualting Rho...";
+	Calc_Rho(Rho, wavy, opts.radius, log2, false);
+	log2 << " ...done!\nCalcualting spherical Rho...";
+	Calc_Spherical_Dens(SPHER, wavy, opts.radius, log2, false);
+	log2 << " ...done!" << endl;
+	vec2 dipole_moments;
+	for (int i = 0; i < wavy.get_ncen(); i++)
+	{
+		Hirsh[i].calc_dv();
+		Hirsh[i].give_parent_wfn(wavy);
+		Hirsh[i].set_zero();
+		log2 << "Calcualting Hirshfeld density for atom: " << i << endl;
+		Calc_Hirshfeld_atom_2(Hirsh[i], Rho, SPHER, wavy, i, log2);
+		charges[i] = Hirsh[i].sum();
+		log2 << "..done!" << endl;
+	}
+	for (int i = 0; i < wavy.get_ncen(); i++)
+		dipole_moments.push_back(calc_dipole_for_atom(wavy, i, Hirsh[i], charges));
+	log2 << "...done!" << endl;
+	log2 << " atom   |    charge    | dipole moment x,        y,         z" << endl
+		<< "===================================================" << endl;
+	for (int i = 0; i < wavy.get_ncen(); i++)
+	{
+		log2 << setw(3) << i << " (" << constants::atnr2letter(wavy.get_atom_charge(i)) << ") |" << scientific << setprecision(6) << setw(13) << dipole_moments[i][3] - wavy.get_atom_charge(i) << " | " << scientific << setprecision(6) << setw(14) << dipole_moments[i][0] << ", " << setw(14) << dipole_moments[i][1] << ", " << setw(14) << dipole_moments[i][2] << "\n";
+	}
+	return dipole_moments;
 }
 
 void polarizabilities(options &opt, std::ostream &log2)
 {
-    using namespace std;
-    std::vector<WFN> wavy;
-    for (int i = 0; i < 7; i++)
-    {
-        wavy.emplace_back(e_origin::NOT_YET_DEFINED);
-        wavy[i].read_known_wavefunction_format(opt.pol_wfns[i], log2, opt.debug);
-    }
+	using namespace std;
+	std::vector<WFN> wavy;
+	for (int i = 0; i < 7; i++)
+	{
+		wavy.emplace_back(e_origin::NOT_YET_DEFINED);
+		wavy[i].read_known_wavefunction_format(opt.pol_wfns[i], log2, opt.debug);
+	}
 
-    // check that all WFN have the same number of atoms
+	// check that all WFN have the same number of atoms
 
-    if (opt.debug)
-        log2 << "Starting calculation of Polarizabilities" << endl;
+	if (opt.debug)
+		log2 << "Starting calculation of Polarizabilities" << endl;
 
-    if (opt.debug)
-        log2 << opt.properties.resolution << " " << opt.properties.radius << endl;
-    readxyzMinMax_fromWFN(wavy[0], opt.properties);
-    if (opt.debug)
-    {
-        log2 << "Resolution: " << opt.properties.resolution << endl;
-        log2 << "MinMax:" << endl;
-        for (int i = 0; i < 6; i++)
-            log2 << setw(14) << scientific << opt.properties.MinMax[i];
-        log2 << endl;
-        log2 << "Steps:" << endl;
-        for (int i = 0; i < 3; i++)
-            log2 << setw(14) << scientific << opt.properties.NbSteps[i];
-        log2 << endl;
-    }
-    cube SPHER(opt.properties.NbSteps, wavy[0].get_ncen(), true);
+	if (opt.debug)
+		log2 << opt.properties.resolution << " " << opt.properties.radius << endl;
+	readxyzMinMax_fromWFN(wavy[0], opt.properties);
+	if (opt.debug)
+	{
+		log2 << "Resolution: " << opt.properties.resolution << endl;
+		log2 << "MinMax:" << endl;
+		for (int i = 0; i < 6; i++)
+			log2 << setw(14) << scientific << opt.properties.MinMax[i];
+		log2 << endl;
+		log2 << "Steps:" << endl;
+		for (int i = 0; i < 3; i++)
+			log2 << setw(14) << scientific << opt.properties.NbSteps[i];
+		log2 << endl;
+	}
+	cube SPHER(opt.properties.NbSteps, wavy[0].get_ncen(), true);
 
-    SPHER.give_parent_wfn(wavy[0]);
-    vec stepsizes{ (opt.properties.MinMax[3] - opt.properties.MinMax[0]) / opt.properties.NbSteps[0],
-                  (opt.properties.MinMax[4] - opt.properties.MinMax[1]) / opt.properties.NbSteps[1],
-                  (opt.properties.MinMax[5] - opt.properties.MinMax[2]) / opt.properties.NbSteps[2] };
+	SPHER.give_parent_wfn(wavy[0]);
+	vec stepsizes{ (opt.properties.MinMax[3] - opt.properties.MinMax[0]) / opt.properties.NbSteps[0],
+				  (opt.properties.MinMax[4] - opt.properties.MinMax[1]) / opt.properties.NbSteps[1],
+				  (opt.properties.MinMax[5] - opt.properties.MinMax[2]) / opt.properties.NbSteps[2] };
 
-    for (int i = 0; i < 3; i++)
-    {
-        SPHER.set_origin(i, opt.properties.MinMax[i]);
-        SPHER.set_vector(i, i, stepsizes[i]);
-    }
-    if (opt.debug)
-        log2 << "Origins etc are set up" << endl;
-    SPHER.set_comment1("Calculated Atomic Hirshfeld deformation density values using NoSpherA2");
-    SPHER.set_comment2("from" + wavy[0].get_path().string());
-    SPHER.set_path((wavy[0].get_path().parent_path() / wavy[0].get_path().stem()).string() + "_spher.cube");
+	for (int i = 0; i < 3; i++)
+	{
+		SPHER.set_origin(i, opt.properties.MinMax[i]);
+		SPHER.set_vector(i, i, stepsizes[i]);
+	}
+	if (opt.debug)
+		log2 << "Origins etc are set up" << endl;
+	SPHER.set_comment1("Calculated Atomic Hirshfeld deformation density values using NoSpherA2");
+	SPHER.set_comment2("from" + wavy[0].get_path().string());
+	SPHER.set_path((wavy[0].get_path().parent_path() / wavy[0].get_path().stem()).string() + "_spher.cube");
 
-    log2 << "Calculating for " << fixed << setprecision(0) << opt.properties.n_grid_points() << " Gridpoints." << endl;
+	log2 << "Calculating for " << fixed << setprecision(0) << opt.properties.n_grid_points() << " Gridpoints." << endl;
 
-    log2 << "Calcualting spherical Rho...";
-    Calc_Spherical_Dens(SPHER, wavy[0], opt.properties.radius, log2, false);
-    log2 << " ...done!" << endl;
-    vec3 dipoles(7); // 0, +x, -x, +y, -y, +z, -z
-    for (int i = 0; i < 7; i++)
-    {
-        dipoles[i] = dipole_moments(wavy[i], SPHER, opt.properties, opt.threads, log2, opt.debug);
-    }
-    vec3 polarizabilities(wavy[0].get_ncen());
-    for (int i = 0; i < wavy[0].get_ncen(); i++)
-    {
-        polarizabilities[i] = { {0, 0, 0}, {0, 0, 0}, {0, 0, 0} };
-        vec dx = { (dipoles[1][i][0] - dipoles[2][i][0]),
-                  (dipoles[3][i][0] - dipoles[4][i][0]),
-                  (dipoles[5][i][0] - dipoles[6][i][0]) };
-        vec dy = { (dipoles[1][i][1] - dipoles[2][i][1]),
-                  (dipoles[3][i][1] - dipoles[4][i][1]),
-                  (dipoles[5][i][1] - dipoles[6][i][1]) };
-        vec dz = { (dipoles[1][i][2] - dipoles[2][i][2]),
-                  (dipoles[3][i][2] - dipoles[4][i][2]),
-                  (dipoles[5][i][2] - dipoles[6][i][2]) };
-        polarizabilities[i][0][0] = dx[0] / 2 / opt.efield;
-        polarizabilities[i][0][1] = dx[1] / 2 / opt.efield;
-        polarizabilities[i][0][2] = dx[2] / 2 / opt.efield;
-        polarizabilities[i][1][0] = dy[0] / 2 / opt.efield;
-        polarizabilities[i][1][1] = dy[1] / 2 / opt.efield;
-        polarizabilities[i][1][2] = dy[2] / 2 / opt.efield;
-        polarizabilities[i][2][0] = dz[0] / 2 / opt.efield;
-        polarizabilities[i][2][1] = dz[1] / 2 / opt.efield;
-        polarizabilities[i][2][2] = dz[2] / 2 / opt.efield;
-    }
-    // print the results per atom
-    log2 << "Polarizabilities:\n atom   |    charge    |       xx,            xy,            xz,            yx,            yy,            yz,            zx,            zy,            zz" << endl
-        << "========|==============|=======================================================================================================================================" << endl;
-    for (int i = 0; i < wavy[0].get_ncen(); i++)
-    {
-        log2 << setw(3) << i << " (" << constants::atnr2letter(wavy[0].get_atom_charge(i)) << ") |"
-            << scientific << setprecision(6) << setw(13) << dipoles[0][i][3] - wavy[0].get_atom_charge(i) << " |"
-            << setw(14) << polarizabilities[i][0][0] << ","
-            << setw(14) << polarizabilities[i][0][1] << ","
-            << setw(14) << polarizabilities[i][0][2] << ","
-            << setw(14) << polarizabilities[i][1][0] << ","
-            << setw(14) << polarizabilities[i][1][1] << ","
-            << setw(14) << polarizabilities[i][1][2] << ","
-            << setw(14) << polarizabilities[i][2][0] << ","
-            << setw(14) << polarizabilities[i][2][1] << ","
-            << setw(14) << polarizabilities[i][2][2] << endl;
-    }
-    std::cout << "\n\nProperties calculation done!" << std::endl;
+	log2 << "Calcualting spherical Rho...";
+	Calc_Spherical_Dens(SPHER, wavy[0], opt.properties.radius, log2, false);
+	log2 << " ...done!" << endl;
+	vec3 dipoles(7); // 0, +x, -x, +y, -y, +z, -z
+	for (int i = 0; i < 7; i++)
+	{
+		dipoles[i] = dipole_moments(wavy[i], SPHER, opt.properties, opt.threads, log2, opt.debug);
+	}
+	vec3 polarizabilities(wavy[0].get_ncen());
+	for (int i = 0; i < wavy[0].get_ncen(); i++)
+	{
+		polarizabilities[i] = { {0, 0, 0}, {0, 0, 0}, {0, 0, 0} };
+		vec dx = { (dipoles[1][i][0] - dipoles[2][i][0]),
+				  (dipoles[3][i][0] - dipoles[4][i][0]),
+				  (dipoles[5][i][0] - dipoles[6][i][0]) };
+		vec dy = { (dipoles[1][i][1] - dipoles[2][i][1]),
+				  (dipoles[3][i][1] - dipoles[4][i][1]),
+				  (dipoles[5][i][1] - dipoles[6][i][1]) };
+		vec dz = { (dipoles[1][i][2] - dipoles[2][i][2]),
+				  (dipoles[3][i][2] - dipoles[4][i][2]),
+				  (dipoles[5][i][2] - dipoles[6][i][2]) };
+		polarizabilities[i][0][0] = dx[0] / 2 / opt.efield;
+		polarizabilities[i][0][1] = dx[1] / 2 / opt.efield;
+		polarizabilities[i][0][2] = dx[2] / 2 / opt.efield;
+		polarizabilities[i][1][0] = dy[0] / 2 / opt.efield;
+		polarizabilities[i][1][1] = dy[1] / 2 / opt.efield;
+		polarizabilities[i][1][2] = dy[2] / 2 / opt.efield;
+		polarizabilities[i][2][0] = dz[0] / 2 / opt.efield;
+		polarizabilities[i][2][1] = dz[1] / 2 / opt.efield;
+		polarizabilities[i][2][2] = dz[2] / 2 / opt.efield;
+	}
+	// print the results per atom
+	log2 << "Polarizabilities:\n atom   |    charge    |       xx,            xy,            xz,            yx,            yy,            yz,            zx,            zy,            zz" << endl
+		<< "========|==============|=======================================================================================================================================" << endl;
+	for (int i = 0; i < wavy[0].get_ncen(); i++)
+	{
+		log2 << setw(3) << i << " (" << constants::atnr2letter(wavy[0].get_atom_charge(i)) << ") |"
+			<< scientific << setprecision(6) << setw(13) << dipoles[0][i][3] - wavy[0].get_atom_charge(i) << " |"
+			<< setw(14) << polarizabilities[i][0][0] << ","
+			<< setw(14) << polarizabilities[i][0][1] << ","
+			<< setw(14) << polarizabilities[i][0][2] << ","
+			<< setw(14) << polarizabilities[i][1][0] << ","
+			<< setw(14) << polarizabilities[i][1][1] << ","
+			<< setw(14) << polarizabilities[i][1][2] << ","
+			<< setw(14) << polarizabilities[i][2][0] << ","
+			<< setw(14) << polarizabilities[i][2][1] << ","
+			<< setw(14) << polarizabilities[i][2][2] << "\n";
+	}
+	std::cout << "\n\nProperties calculation done!" << std::endl;
 }
 
 // end here

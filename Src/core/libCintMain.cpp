@@ -14,108 +14,108 @@
 // Function to compute three-center two-electron integrals (eri3c)
 template <typename Kernel>
 void computeEri3c(Int_Params &param1,
-    Int_Params &param2,
-    vec &eri3c)
+	Int_Params &param2,
+	vec &eri3c)
 {
-    int nQM = param1.get_nbas();
-    int nAux = param2.get_nbas();
+	int nQM = param1.get_nbas();
+	int nAux = param2.get_nbas();
 
-    Int_Params combined(param1, param2);
-    // combined.print_data("combined");
+	Int_Params combined(param1, param2);
+	// combined.print_data("combined");
 
-    ivec bas = combined.get_bas();
-    ivec atm = combined.get_atm();
-    vec env = combined.get_env();
+	ivec bas = combined.get_bas();
+	ivec atm = combined.get_atm();
+	vec env = combined.get_env();
 
-    ivec shl_slice = {
-        0,
-        nQM,
-        0,
-        nQM,
-        nQM,
-        nQM + nAux,
-    };
+	ivec shl_slice = {
+		0,
+		nQM,
+		0,
+		nQM,
+		nQM,
+		nQM + nAux,
+	};
 
-    int nat = combined.get_natoms();
-    int nbas = combined.get_nbas();
+	int nat = combined.get_natoms();
+	int nbas = combined.get_nbas();
 
-    assert(shl_slice[1] <= nbas);
-    assert(shl_slice[3] <= nbas);
-    assert(shl_slice[5] <= nbas);
+	assert(shl_slice[1] <= nbas);
+	assert(shl_slice[3] <= nbas);
+	assert(shl_slice[5] <= nbas);
 
-    ivec aoloc = Kernel::gen_loc(bas, nbas);
-    int naoi = aoloc[shl_slice[1]] - aoloc[shl_slice[0]];
-    int naoj = aoloc[shl_slice[3]] - aoloc[shl_slice[2]];
-    int naok = aoloc[shl_slice[5]] - aoloc[shl_slice[4]];
+	ivec aoloc = Kernel::gen_loc(bas, nbas);
+	int naoi = aoloc[shl_slice[1]] - aoloc[shl_slice[0]];
+	int naoj = aoloc[shl_slice[3]] - aoloc[shl_slice[2]];
+	int naok = aoloc[shl_slice[5]] - aoloc[shl_slice[4]];
 
-    libcint::CINTOpt* opty = nullptr;
-    Kernel::optimizer(opty, atm.data(), nat, bas.data(), nbas, env.data());
+	libcint::CINTOpt* opty = nullptr;
+	Kernel::optimizer(opty, atm.data(), nat, bas.data(), nbas, env.data());
 
-    // Compute integrals
-    vec res((size_t)naoi * (size_t)naoj * (size_t)naok, 0.0);
-    eri3c.resize((size_t)naoi * (size_t)naoj * (size_t)naok, 0.0);
+	// Compute integrals
+	vec res((size_t)naoi * (size_t)naoj * (size_t)naok, 0.0);
+	eri3c.resize((size_t)naoi * (size_t)naoj * (size_t)naok, 0.0);
 
-    Kernel::drv(res.data(),
-        1,
-        shl_slice.data(),
-        aoloc.data(),
-        opty,
-        atm.data(), nat,
-        bas.data(), nbas,
-        env.data());
+	Kernel::drv(res.data(),
+		1,
+		shl_slice.data(),
+		aoloc.data(),
+		opty,
+		atm.data(), nat,
+		bas.data(), nbas,
+		env.data());
 
-    // FOR TESTING PURPOSES!!!!
-    // GTOnr3c_drv(int3c2e_sph, res.data(), 1, shl_slice.data(), aoloc.data(), NULL, atm.data(), nat, bas.data(), nbas, env.data());
+	// FOR TESTING PURPOSES!!!!
+	// GTOnr3c_drv(int3c2e_sph, res.data(), 1, shl_slice.data(), aoloc.data(), NULL, atm.data(), nat, bas.data(), nbas, env.data());
 
-    // res is in fortran order, write the result in regular ordering
-    for (int k = 0; k < naok; k++)
-    {
-        for (int j = 0; j < naoj; j++)
-        {
-            for (int i = 0; i < naoi; i++)
-            {
-                std::size_t idx_F = i + j * (size_t)naoi + k * ((size_t)naoi * (size_t)naoj);
-                std::size_t idx_C = i * ((size_t)naoj * (size_t)naok) + j * (size_t)naok + k;
-                eri3c[idx_C] = res[idx_F];
-            }
-        }
-    }
+	// res is in fortran order, write the result in regular ordering
+	for (int k = 0; k < naok; k++)
+	{
+		for (int j = 0; j < naoj; j++)
+		{
+			for (int i = 0; i < naoi; i++)
+			{
+				std::size_t idx_F = i + j * (size_t)naoi + k * ((size_t)naoi * (size_t)naoj);
+				std::size_t idx_C = i * ((size_t)naoj * (size_t)naok) + j * (size_t)naok + k;
+				eri3c[idx_C] = res[idx_F];
+			}
+		}
+	}
 }
 template void computeEri3c<Coulomb3C_SPH>(Int_Params &param1,
-    Int_Params &param2,
-    vec &eri3c);
+	Int_Params &param2,
+	vec &eri3c);
 
 template <typename Kernel>
 void compute2C(Int_Params &params, vec &ret) {
-    ivec bas = params.get_bas();
-    ivec atm = params.get_atm();
-    vec env = params.get_env();
+	ivec bas = params.get_bas();
+	ivec atm = params.get_atm();
+	vec env = params.get_env();
 
-    int nbas = params.get_nbas();
-    int nat = params.get_natoms();
+	int nbas = params.get_nbas();
+	int nat = params.get_natoms();
 
-    ivec shl_slice = { 0, nbas, 0, nbas };
-    ivec aoloc = Kernel::gen_loc(bas, nbas);
+	ivec shl_slice = { 0, nbas, 0, nbas };
+	ivec aoloc = Kernel::gen_loc(bas, nbas);
 
-    int naoi = aoloc[shl_slice[1]] - aoloc[shl_slice[0]];
-    int naoj = aoloc[shl_slice[3]] - aoloc[shl_slice[2]];
+	int naoi = aoloc[shl_slice[1]] - aoloc[shl_slice[0]];
+	int naoj = aoloc[shl_slice[3]] - aoloc[shl_slice[2]];
 
-    libcint::CINTOpt* opty = nullptr;
-    Kernel::optimizer(opty, atm.data(), nat, bas.data(), nbas, env.data());
+	libcint::CINTOpt* opty = nullptr;
+	Kernel::optimizer(opty, atm.data(), nat, bas.data(), nbas, env.data());
 
-    // Compute integrals
-    vec res((size_t)naoi * (size_t)naoj, 0.0);
-    ret.resize((size_t)naoi * (size_t)naoj, 0.0);
-    Kernel::drv(res.data(), 1, shl_slice.data(), aoloc.data(), opty, atm.data(), nat, bas.data(), nbas, env.data());
+	// Compute integrals
+	vec res((size_t)naoi * (size_t)naoj, 0.0);
+	ret.resize((size_t)naoi * (size_t)naoj, 0.0);
+	Kernel::drv(res.data(), 1, shl_slice.data(), aoloc.data(), opty, atm.data(), nat, bas.data(), nbas, env.data());
 
-    // res is in fortran order, write the result in regular ordering
-    for (int i = 0; i < naoi; i++)
-    {
-        for (int j = 0; j < naoj; j++)
-        {
-            ret[(size_t)j * (size_t)naoi + i] = res[(size_t)i * (size_t)naoj + j];
-        }
-    }
+	// res is in fortran order, write the result in regular ordering
+	for (int i = 0; i < naoi; i++)
+	{
+		for (int j = 0; j < naoj; j++)
+		{
+			ret[(size_t)j * (size_t)naoi + i] = res[(size_t)i * (size_t)naoj + j];
+		}
+	}
 }
 template void compute2C<Coulomb2C_SPH>(Int_Params &params, vec &ret);
 template void compute2C<Coulomb2C_CRT>(Int_Params &params, vec &ret);
@@ -124,96 +124,96 @@ template void compute2C<Overlap2C_CRT>(Int_Params &params, vec &ret);
 
 
 void calc_screend_functions_and_max_ij(
-    const std::vector<atom> &atoms,
-    const ivec &aoloc,
-    const ivec &bas_orbital_indices,
-    bvec2 &screened,
-    int &max_ij
+	const std::vector<atom> &atoms,
+	const ivec &aoloc,
+	const ivec &bas_orbital_indices,
+	bvec2 &screened,
+	int &max_ij
 ) {
-    const int natoms = static_cast<int>(atoms.size());
-    if (natoms == 0) {
-        screened.clear();
-        max_ij = 0.0;
-        return;
-    }
+	const int natoms = static_cast<int>(atoms.size());
+	if (natoms == 0) {
+		screened.clear();
+		max_ij = 0.0;
+		return;
+	}
 
-    // Initialize screened matrix (natoms x natoms) only once
-    screened.assign(natoms, bvec(natoms, false));
-    max_ij = 0.0;
+	// Initialize screened matrix (natoms x natoms) only once
+	screened.assign(natoms, bvec(natoms, false));
+	max_ij = 0.0;
 
-    // --- 1) Precompute worst exponents per atom (parallel) ---
+	// --- 1) Precompute worst exponents per atom (parallel) ---
 
-    vec worst_exp(natoms);
+	vec worst_exp(natoms);
 
 #pragma omp parallel for schedule(static)
-    for (int i = 0; i < natoms; ++i) {
-        const int nbas = atoms[i].get_basis_set_size();
+	for (int i = 0; i < natoms; ++i) {
+		const int nbas = atoms[i].get_basis_set_size();
 
-        // Use a local variable; std::numeric_limits<double>::infinity() is more "semantic"
-        double w = std::numeric_limits<double>::infinity();
-        for (int s = 0; s < nbas; ++s) {
-            const double e = atoms[i].get_basis_set_exponent(s);
-            if (e < w) w = e;
-        }
-        worst_exp[i] = w;
-    }
+		// Use a local variable; std::numeric_limits<double>::infinity() is more "semantic"
+		double w = std::numeric_limits<double>::infinity();
+		for (int s = 0; s < nbas; ++s) {
+			const double e = atoms[i].get_basis_set_exponent(s);
+			if (e < w) w = e;
+		}
+		worst_exp[i] = w;
+	}
 
-    // --- 2) Loop over atom pairs and do screening + max-block computation (parallel) ---
+	// --- 2) Loop over atom pairs and do screening + max-block computation (parallel) ---
 
-    std::string output = "";    //Only used for debug output
+	std::string output = "";    //Only used for debug output
 
-    int max_block_ij = 0;
+	int max_block_ij = 0;
 #pragma omp parallel
-    {
-        int local_max = 0;
-        std::string local_output = "";
+	{
+		int local_max = 0;
+		std::string local_output = "";
 
 #pragma omp for schedule(dynamic) nowait
-        for (int atom_i = 0; atom_i < natoms; ++atom_i) {
-            for (int atom_j = atom_i; atom_j < natoms; ++atom_j) {
-                const double dist = atoms[atom_i].distance_to(atoms[atom_j]);
-                const double dist2 = dist * dist;
+		for (int atom_i = 0; atom_i < natoms; ++atom_i) {
+			for (int atom_j = atom_i; atom_j < natoms; ++atom_j) {
+				const double dist = atoms[atom_i].distance_to(atoms[atom_j]);
+				const double dist2 = dist * dist;
 
-                //Gaussian product prefactor exp(-a b / (a + b) d^2) of the two most diffuse primitives
-                const double crit = -dist2 * worst_exp[atom_i] * worst_exp[atom_j] / (worst_exp[atom_i] + worst_exp[atom_j]);
-                if (crit < constants::exp_cutoff) {
-                    //if (false){
-                        //local_output += "Screening atom pair (" + std::to_string(atom_i) + ", " + std::to_string(atom_j) + ") with distance " + std::to_string(dist) + " and criterion " + std::to_string(crit) + " < " + std::to_string(exp_cutoff) + "\n";
-                    screened[atom_i][atom_j] = true;
-                    continue;
-                }
+				//Gaussian product prefactor exp(-a b / (a + b) d^2) of the two most diffuse primitives
+				const double crit = -dist2 * worst_exp[atom_i] * worst_exp[atom_j] / (worst_exp[atom_i] + worst_exp[atom_j]);
+				if (crit < constants::exp_cutoff) {
+					//if (false){
+						//local_output += "Screening atom pair (" + std::to_string(atom_i) + ", " + std::to_string(atom_j) + ") with distance " + std::to_string(dist) + " and criterion " + std::to_string(crit) + " < " + std::to_string(exp_cutoff) + "\n";
+					screened[atom_i][atom_j] = true;
+					continue;
+				}
 
-                const int bi = bas_orbital_indices[atom_i];
-                const int bip1 = bas_orbital_indices[atom_i + 1];
-                const int bj = bas_orbital_indices[atom_j];
-                const int bjp1 = bas_orbital_indices[atom_j + 1];
+				const int bi = bas_orbital_indices[atom_i];
+				const int bip1 = bas_orbital_indices[atom_i + 1];
+				const int bj = bas_orbital_indices[atom_j];
+				const int bjp1 = bas_orbital_indices[atom_j + 1];
 
-                const int naoi = aoloc[bip1] - aoloc[bi];
-                const int naoj = aoloc[bjp1] - aoloc[bj];
+				const int naoi = aoloc[bip1] - aoloc[bi];
+				const int naoj = aoloc[bjp1] - aoloc[bj];
 
-                const int block_ij = naoi * naoj;
-                if (block_ij > local_max) {
-                    local_max = block_ij;
-                }
-            }
-        }
+				const int block_ij = naoi * naoj;
+				if (block_ij > local_max) {
+					local_max = block_ij;
+				}
+			}
+		}
 #pragma omp critical
-        {
-            if (local_max > max_block_ij) {
-                max_block_ij = local_max;
-            }
-            output += local_output;    //Only used for debug output
-        }
+		{
+			if (local_max > max_block_ij) {
+				max_block_ij = local_max;
+			}
+			output += local_output;    //Only used for debug output
+		}
 
-    }
-    max_ij = max_block_ij;    //Only used for debug output
+	}
+	max_ij = max_block_ij;    //Only used for debug output
 
-    std::cout << output << std::flush;
-    int skipped = std::accumulate(screened.begin(), screened.end(), 0,
-        [](int sum, const bvec &row) {
-            return sum + std::count(row.begin(), row.end(), true);
-        });
-    std::cout << "Screened out " << skipped << " atom pairs due to overlap criteria." << std::endl;
+	std::cout << output << std::flush;
+	int skipped = std::accumulate(screened.begin(), screened.end(), 0,
+		[](int sum, const bvec &row) {
+			return sum + std::count(row.begin(), row.end(), true);
+		});
+	std::cout << "Screened out " << skipped << " atom pairs due to overlap criteria." << std::endl;
 }
 
 //Ivec contains the ao indices for the given wave object
@@ -221,188 +221,188 @@ void calc_screend_functions_and_max_ij(
 //So that ao indices for atom i are in [ao_indices_per_atom[i-1], ao_indices_per_atom[i])
 ivec generate_bas_indices_per_atom(const Int_Params &params)
 {
-    const ivec bas = params.get_bas();
-    int nbas = params.get_nbas();
-    const int natoms = params.get_natoms();
-    ivec bas_indices_per_atom(natoms, 0);
-    for (int i = 0; i < nbas; i++)
-    {
-        bas_indices_per_atom[bas(ATOM_OF, i)]++;
-    }
+	const ivec bas = params.get_bas();
+	int nbas = params.get_nbas();
+	const int natoms = params.get_natoms();
+	ivec bas_indices_per_atom(natoms, 0);
+	for (int i = 0; i < nbas; i++)
+	{
+		bas_indices_per_atom[bas(ATOM_OF, i)]++;
+	}
 
-    ivec bas_indices_location(natoms + 1, 0);
-    std::partial_sum(bas_indices_per_atom.begin(), bas_indices_per_atom.end(), bas_indices_location.begin() + 1);
+	ivec bas_indices_location(natoms + 1, 0);
+	std::partial_sum(bas_indices_per_atom.begin(), bas_indices_per_atom.end(), bas_indices_location.begin() + 1);
 
-    return bas_indices_location;
+	return bas_indices_location;
 }
 
 template <typename Kernel>
 void computeRho(
-    const Int_Params &normal_basis,
-    const Int_Params &aux_basis,
-    const dMatrix2 &dm,
-    vec &rho,
-    const std::optional<ivec> asym_atm_list)
+	const Int_Params &normal_basis,
+	const Int_Params &aux_basis,
+	const dMatrix2 &dm,
+	vec &rho,
+	const std::optional<ivec> asym_atm_list)
 {
-    Int_Params combined(normal_basis, aux_basis);
+	Int_Params combined(normal_basis, aux_basis);
 
-    ivec bas = combined.get_bas();
-    ivec atm = combined.get_atm();
-    vec  env = combined.get_env();
+	ivec bas = combined.get_bas();
+	ivec atm = combined.get_atm();
+	vec  env = combined.get_env();
 
-    const int natoms = normal_basis.get_natoms();
-    const int nQM = normal_basis.get_nbas();
-    const int nAux = aux_basis.get_nbas();
-    const int nat = combined.get_natoms();
-    const int nbas = combined.get_nbas();
+	const int natoms = normal_basis.get_natoms();
+	const int nQM = normal_basis.get_nbas();
+	const int nAux = aux_basis.get_nbas();
+	const int nat = combined.get_natoms();
+	const int nbas = combined.get_nbas();
 
-    ivec aoloc = Kernel::gen_loc(bas, nbas);
+	ivec aoloc = Kernel::gen_loc(bas, nbas);
 
-    rho.resize(aoloc[nQM + nAux] - aoloc[nQM], 0.0);
+	rho.resize(aoloc[nQM + nAux] - aoloc[nQM], 0.0);
 
-    ivec bas_orbital_indices = generate_bas_indices_per_atom(normal_basis);
-    ivec bas_aux_indices = generate_bas_indices_per_atom(aux_basis);
+	ivec bas_orbital_indices = generate_bas_indices_per_atom(normal_basis);
+	ivec bas_aux_indices = generate_bas_indices_per_atom(aux_basis);
 
-    bvec2 screened;
-    int max_block_ij = 0;
-    calc_screend_functions_and_max_ij(
-        normal_basis.get_atoms(),
-        aoloc,
-        bas_orbital_indices,
-        screened,
-        max_block_ij
-    );
+	bvec2 screened;
+	int max_block_ij = 0;
+	calc_screend_functions_and_max_ij(
+		normal_basis.get_atoms(),
+		aoloc,
+		bas_orbital_indices,
+		screened,
+		max_block_ij
+	);
 
-    libcint::CINTOpt* opty = nullptr;
-    Kernel::optimizer(opty, atm.data(), nat, bas.data(), nbas, env.data());
+	libcint::CINTOpt* opty = nullptr;
+	Kernel::optimizer(opty, atm.data(), nat, bas.data(), nbas, env.data());
 
-    ProgressBar pb(natoms, 60, "#", " ", "Calculating Eri3c Matrix");
+	ProgressBar pb(natoms, 60, "#", " ", "Calculating Eri3c Matrix");
 #pragma omp parallel for schedule(dynamic) shared(pb, rho)
-    for (int atm_idx = 0; atm_idx < natoms; atm_idx++) {
-        //if (asym_atm_list.has_value() && std::find(asym_atm_list->begin(), asym_atm_list->end(), atm_idx) == asym_atm_list->end()) { //Frag mal Florian.... dass sollte irgendwie gehen?
-        //    // Skip this atom if it's not in the asymmetry list
-        //    pb.update(std::cout);
-        //    continue;
-        //}
-        double *rho_atom = rho.data() + aoloc[nQM + bas_aux_indices[atm_idx]] - aoloc[nQM];
-        int shl_slice[6] = {
-            0, 0,  // i shells
-            0,0,  // j shells
-            nQM + bas_aux_indices[atm_idx], nQM + bas_aux_indices[atm_idx + 1] };
+	for (int atm_idx = 0; atm_idx < natoms; atm_idx++) {
+		//if (asym_atm_list.has_value() && std::find(asym_atm_list->begin(), asym_atm_list->end(), atm_idx) == asym_atm_list->end()) { //Frag mal Florian.... dass sollte irgendwie gehen?
+		//    // Skip this atom if it's not in the asymmetry list
+		//    pb.update(std::cout);
+		//    continue;
+		//}
+		double *rho_atom = rho.data() + aoloc[nQM + bas_aux_indices[atm_idx]] - aoloc[nQM];
+		int shl_slice[6] = {
+			0, 0,  // i shells
+			0,0,  // j shells
+			nQM + bas_aux_indices[atm_idx], nQM + bas_aux_indices[atm_idx + 1] };
 
-        int naok = aoloc[shl_slice[5]] - aoloc[shl_slice[4]];
+		int naok = aoloc[shl_slice[5]] - aoloc[shl_slice[4]];
 
-        vec res(static_cast<size_t>(max_block_ij) * naok);
-        vec dm_slice(max_block_ij);
-        for (int atom_i = 0; atom_i < natoms; atom_i++) {
-            shl_slice[0] = bas_orbital_indices[atom_i];
-            shl_slice[1] = bas_orbital_indices[atom_i + 1];
-            const int naoi = aoloc[shl_slice[1]] - aoloc[shl_slice[0]];
-            for (int atom_j = atom_i; atom_j < natoms; atom_j++) {
-                if (screened[atom_i][atom_j]) continue;
-                // Hoist weight calculation before kernel call
-                const double weight = 2.0 - static_cast<double>(atom_i == atom_j);
+		vec res(static_cast<size_t>(max_block_ij) * naok);
+		vec dm_slice(max_block_ij);
+		for (int atom_i = 0; atom_i < natoms; atom_i++) {
+			shl_slice[0] = bas_orbital_indices[atom_i];
+			shl_slice[1] = bas_orbital_indices[atom_i + 1];
+			const int naoi = aoloc[shl_slice[1]] - aoloc[shl_slice[0]];
+			for (int atom_j = atom_i; atom_j < natoms; atom_j++) {
+				if (screened[atom_i][atom_j]) continue;
+				// Hoist weight calculation before kernel call
+				const double weight = 2.0 - static_cast<double>(atom_i == atom_j);
 
-                shl_slice[2] = bas_orbital_indices[atom_j];
-                shl_slice[3] = bas_orbital_indices[atom_j + 1];
+				shl_slice[2] = bas_orbital_indices[atom_j];
+				shl_slice[3] = bas_orbital_indices[atom_j + 1];
 
-                const int naoj = aoloc[shl_slice[3]] - aoloc[shl_slice[2]];
-                const int block_ij = naoi * naoj;
+				const int naoj = aoloc[shl_slice[3]] - aoloc[shl_slice[2]];
+				const int block_ij = naoi * naoj;
 
-                Kernel::drv(res.data(),
-                    1,
-                    shl_slice,
-                    aoloc.data(),
-                    opty,
-                    atm.data(), nat,
-                    bas.data(), nbas,
-                    env.data());
+				Kernel::drv(res.data(),
+					1,
+					shl_slice,
+					aoloc.data(),
+					opty,
+					atm.data(), nat,
+					bas.data(), nbas,
+					env.data());
 
-                // Inline optimized matrix slice extraction
-                const int row_start = aoloc[shl_slice[2]];
-                const int row_end = aoloc[shl_slice[3]];
-                const int col_start = aoloc[shl_slice[0]];
-                const int col_end = aoloc[shl_slice[1]];
+				// Inline optimized matrix slice extraction
+				const int row_start = aoloc[shl_slice[2]];
+				const int row_end = aoloc[shl_slice[3]];
+				const int col_start = aoloc[shl_slice[0]];
+				const int col_end = aoloc[shl_slice[1]];
 
-                int idx = 0;
-                for (int i = row_start; i < row_end; i++) {
-                    for (int j = col_start; j < col_end; j++) {
-                        dm_slice[idx++] = dm(i, j) * weight;
-                    }
-                }
+				int idx = 0;
+				for (int i = row_start; i < row_end; i++) {
+					for (int j = col_start; j < col_end; j++) {
+						dm_slice[idx++] = dm(i, j) * weight;
+					}
+				}
 
-                // accumulate into rho[aux_ao0 .. aux_ao0+naok)
-                cblas_dgemv(CblasRowMajor,
-                    CblasNoTrans,
-                    naok,
-                    block_ij,
-                    1.0,
-                    res.data(),
-                    block_ij,
-                    dm_slice.data(),
-                    1,
-                    1.0,
-                    rho_atom,
-                    1);
-            }
-        }
-        pb.update();
-    }
-    if (opty) {
-        delete opty;
-        opty = nullptr;
-    }
+				// accumulate into rho[aux_ao0 .. aux_ao0+naok)
+				cblas_dgemv(CblasRowMajor,
+					CblasNoTrans,
+					naok,
+					block_ij,
+					1.0,
+					res.data(),
+					block_ij,
+					dm_slice.data(),
+					1,
+					1.0,
+					rho_atom,
+					1);
+			}
+		}
+		pb.update();
+	}
+	if (opty) {
+		delete opty;
+		opty = nullptr;
+	}
 }
 template void computeRho<Coulomb3C_SPH>(
-    const Int_Params &normal_basis,
-    const Int_Params &aux_basis,
-    const dMatrix2 &dm,
-    vec &rho,
-    const std::optional<ivec> asym_atm_list);
+	const Int_Params &normal_basis,
+	const Int_Params &aux_basis,
+	const dMatrix2 &dm,
+	vec &rho,
+	const std::optional<ivec> asym_atm_list);
 template void computeRho<Coulomb3C_CRT>(
-    const Int_Params &normal_basis,
-    const Int_Params &aux_basis,
-    const dMatrix2 &dm,
-    vec &rho,
-    const std::optional<ivec> asym_atm_list);
+	const Int_Params &normal_basis,
+	const Int_Params &aux_basis,
+	const dMatrix2 &dm,
+	vec &rho,
+	const std::optional<ivec> asym_atm_list);
 template void computeRho<Overlap3C_SPH>(
-    const Int_Params &normal_basis,
-    const Int_Params &aux_basis,
-    const dMatrix2 &dm,
-    vec &rho,
-    const std::optional<ivec> asym_atm_list);
+	const Int_Params &normal_basis,
+	const Int_Params &aux_basis,
+	const dMatrix2 &dm,
+	vec &rho,
+	const std::optional<ivec> asym_atm_list);
 
 
 template <typename Kernel>
 void compute3C(Int_Params &param1,
-    Int_Params &param2,
-    vec &eri3c) {
-    int nQM = param1.get_nbas();
-    int nAux = param2.get_nbas();
-    Int_Params combined(param1, param2);
-    ivec bas = combined.get_bas();
-    ivec atm = combined.get_atm();
-    vec env = combined.get_env();
-    int nat = combined.get_natoms();
-    int nbas = combined.get_nbas();
-    //ivec aoloc = make_loc(bas, nbas);
-    ivec aoloc = Kernel::gen_loc(bas, nbas);
-    unsigned long long int naoi = aoloc[nQM] - aoloc[0];
-    unsigned long long int naoj = aoloc[nQM] - aoloc[0];
-    unsigned long long int naok = aoloc[nQM + nAux] - aoloc[nQM];
-    eri3c.resize(naoi * naoj * naok, 0.0);
-    libcint::CINTOpt* opty = nullptr;
-    Kernel::optimizer(opty, atm.data(), nat, bas.data(), nbas, env.data());
-    ivec shl_slice = { 0, nQM, 0, nQM, nQM, nQM + nAux };
-    Kernel::drv(eri3c.data(), 1, shl_slice.data(), aoloc.data(), opty, atm.data(), nat, bas.data(), nbas, env.data());
+	Int_Params &param2,
+	vec &eri3c) {
+	int nQM = param1.get_nbas();
+	int nAux = param2.get_nbas();
+	Int_Params combined(param1, param2);
+	ivec bas = combined.get_bas();
+	ivec atm = combined.get_atm();
+	vec env = combined.get_env();
+	int nat = combined.get_natoms();
+	int nbas = combined.get_nbas();
+	//ivec aoloc = make_loc(bas, nbas);
+	ivec aoloc = Kernel::gen_loc(bas, nbas);
+	unsigned long long int naoi = aoloc[nQM] - aoloc[0];
+	unsigned long long int naoj = aoloc[nQM] - aoloc[0];
+	unsigned long long int naok = aoloc[nQM + nAux] - aoloc[nQM];
+	eri3c.resize(naoi * naoj * naok, 0.0);
+	libcint::CINTOpt* opty = nullptr;
+	Kernel::optimizer(opty, atm.data(), nat, bas.data(), nbas, env.data());
+	ivec shl_slice = { 0, nQM, 0, nQM, nQM, nQM + nAux };
+	Kernel::drv(eri3c.data(), 1, shl_slice.data(), aoloc.data(), opty, atm.data(), nat, bas.data(), nbas, env.data());
 
 }
 template void compute3C<Coulomb3C_SPH>(Int_Params &param1,
-    Int_Params &param2,
-    vec &eri3c);
+	Int_Params &param2,
+	vec &eri3c);
 template void compute3C<Overlap3C_SPH>(Int_Params &param1,
-    Int_Params &param2,
-    vec &eri3c);
+	Int_Params &param2,
+	vec &eri3c);
 
 
 
@@ -414,145 +414,145 @@ template void compute3C<Overlap3C_SPH>(Int_Params &param1,
 //functions are normalized(this is the convention used by libcint
 //    library).
 dMatrix2 cart2sph(const int l, const bool normalized) {
-    int n_cart = (l + 1) * (l + 2) / 2;
+	int n_cart = (l + 1) * (l + 2) / 2;
 
-    dMatrix2 c_tensor(n_cart, n_cart);
-    for (int i = 0; i < n_cart; i++) {
-        c_tensor(i, i) = 1.0;
-    }
+	dMatrix2 c_tensor(n_cart, n_cart);
+	for (int i = 0; i < n_cart; i++) {
+		c_tensor(i, i) = 1.0;
+	}
 
-    if (l == 0 || l == 1) { //For s and p functions, the transformation is trivial
-        if (l == 1) { //libcint is built with PYPZPX: spherical p comes as py, pz, px
-            std::fill(c_tensor.container().begin(), c_tensor.container().end(), 0.0);
-            c_tensor(1, 0) = c_tensor(2, 1) = c_tensor(0, 2) = 1.0;
-        }
-        if (normalized) {
-            return c_tensor;
-        }
-        else {
-            double norm_factor = (l == 0) ? 0.282094791773878143 : 0.488602511902919921;
-            for (auto &val : c_tensor.container()) {
-                val *= norm_factor;
-            }
-            return c_tensor;
-        }
-    }
+	if (l == 0 || l == 1) { //For s and p functions, the transformation is trivial
+		if (l == 1) { //libcint is built with PYPZPX: spherical p comes as py, pz, px
+			std::fill(c_tensor.container().begin(), c_tensor.container().end(), 0.0);
+			c_tensor(1, 0) = c_tensor(2, 1) = c_tensor(0, 2) = 1.0;
+		}
+		if (normalized) {
+			return c_tensor;
+		}
+		else {
+			double norm_factor = (l == 0) ? 0.282094791773878143 : 0.488602511902919921;
+			for (auto &val : c_tensor.container()) {
+				val *= norm_factor;
+			}
+			return c_tensor;
+		}
+	}
 
-    err_checkf(l <= 15, "cart2sph_matrix: l must be <= 15", std::cout);
+	err_checkf(l <= 15, "cart2sph_matrix: l must be <= 15", std::cout);
 
-    int n_sph = 2 * l + 1;
-    vec c_sph(static_cast<size_t>(n_sph) * n_cart, 0.0);
+	int n_sph = 2 * l + 1;
+	vec c_sph(static_cast<size_t>(n_sph) * n_cart, 0.0);
 
-    libcint::CINTc2s_ket_sph(c_sph.data(), n_cart, c_tensor.data(), l);
-    //Transform back to row-major order
-    dMatrix2 c_sph_RM(n_cart, n_sph);
-    for (int i = 0; i < n_cart; i++) {
-        for (int j = 0; j < n_sph; j++) {
-            c_sph_RM(i, j) = c_sph[j * n_cart + i];
-        }
-    }
-    return c_sph_RM;
+	libcint::CINTc2s_ket_sph(c_sph.data(), n_cart, c_tensor.data(), l);
+	//Transform back to row-major order
+	dMatrix2 c_sph_RM(n_cart, n_sph);
+	for (int i = 0; i < n_cart; i++) {
+		for (int j = 0; j < n_sph; j++) {
+			c_sph_RM(i, j) = c_sph[j * n_cart + i];
+		}
+	}
+	return c_sph_RM;
 }
 
 
 //Returns a n_cart*n_sph matrix used in transforming a cartesian DM to a spherical DM
 dMatrix2 get_cart2sph_matrix(const WFN &cart_wfn, const bool normalized) {
-    //First collect the complete number of spherical and cartesian functions used in the wavefunction
-    int max_l = 0;
-    int n_cart = 0, n_sph = 0;
-    for (const atom &a : cart_wfn.get_atoms()) {
-        int prim = 0;
-        for (int shell = 0; shell < a.get_shellcount_size(); shell++) {
-            const int type = a.get_basis_set_type(prim) - 1;
+	//First collect the complete number of spherical and cartesian functions used in the wavefunction
+	int max_l = 0;
+	int n_cart = 0, n_sph = 0;
+	for (const atom &a : cart_wfn.get_atoms()) {
+		int prim = 0;
+		for (int shell = 0; shell < a.get_shellcount_size(); shell++) {
+			const int type = a.get_basis_set_type(prim) - 1;
 
-            n_cart += ((type + 1) * (type + 2)) / 2;
-            n_sph += 2 * type + 1;
-            if (type > max_l) {
-                max_l = type;
-            }
+			n_cart += ((type + 1) * (type + 2)) / 2;
+			n_sph += 2 * type + 1;
+			if (type > max_l) {
+				max_l = type;
+			}
 
-            prim += a.get_shellcount(shell);
-        }
-    }
+			prim += a.get_shellcount(shell);
+		}
+	}
 
-    std::vector<dMatrix2> conversion_matrices(max_l + 1);
-    for (int l = 0; l <= max_l; l++) {
-        conversion_matrices[l] = cart2sph(l, normalized);
-    }
+	std::vector<dMatrix2> conversion_matrices(max_l + 1);
+	for (int l = 0; l <= max_l; l++) {
+		conversion_matrices[l] = cart2sph(l, normalized);
+	}
 
-    std::cout << "Number of cartesian functions: " << n_cart << ", number of spherical functions: " << n_sph << std::endl;
-    dMatrix2 c_dm(n_cart, n_sph);
-    int cart_idx = 0, sph_idx = 0;
-    for (const atom &a : cart_wfn.get_atoms()) {
-        int prim = 0;
-        for (int shell = 0; shell < a.get_shellcount_size(); shell++) {
-            const int type = a.get_basis_set_type(prim) - 1;
-            const dMatrix2 &c_sph = conversion_matrices[type];
-            const int n_cart_shell = ((type + 1) * (type + 2)) / 2;
-            const int n_sph_shell = 2 * type + 1;
-            //Fill in the appropriate block in the c_dm matrix
-            for (int i = 0; i < n_cart_shell; i++) {
-                for (int j = 0; j < n_sph_shell; j++) {
-                    c_dm(cart_idx + i, sph_idx + j) = c_sph(i, j);
-                }
-            }
-            cart_idx += n_cart_shell;
-            sph_idx += n_sph_shell;
-            prim += a.get_shellcount(shell);
-        }
-    }
-    ////print all of c_dm
-    //for (int i = 0; i < c_dm.extent(0); i++) {
-    //    for (int j = 0; j < c_dm.extent(1); j++) {
-    //        std::cout << c_dm(i, j) << " ";
-    //    }
-    //    std::cout << std::endl;
-    //}
+	std::cout << "Number of cartesian functions: " << n_cart << ", number of spherical functions: " << n_sph << std::endl;
+	dMatrix2 c_dm(n_cart, n_sph);
+	int cart_idx = 0, sph_idx = 0;
+	for (const atom &a : cart_wfn.get_atoms()) {
+		int prim = 0;
+		for (int shell = 0; shell < a.get_shellcount_size(); shell++) {
+			const int type = a.get_basis_set_type(prim) - 1;
+			const dMatrix2 &c_sph = conversion_matrices[type];
+			const int n_cart_shell = ((type + 1) * (type + 2)) / 2;
+			const int n_sph_shell = 2 * type + 1;
+			//Fill in the appropriate block in the c_dm matrix
+			for (int i = 0; i < n_cart_shell; i++) {
+				for (int j = 0; j < n_sph_shell; j++) {
+					c_dm(cart_idx + i, sph_idx + j) = c_sph(i, j);
+				}
+			}
+			cart_idx += n_cart_shell;
+			sph_idx += n_sph_shell;
+			prim += a.get_shellcount(shell);
+		}
+	}
+	////print all of c_dm
+	//for (int i = 0; i < c_dm.extent(0); i++) {
+	//    for (int j = 0; j < c_dm.extent(1); j++) {
+	//        std::cout << c_dm(i, j) << " ";
+	//    }
+	//    std::cout << std::endl;
+	//}
 
-    return c_dm;
+	return c_dm;
 }
 
 
 vec eval_GTO_sph(Int_Params& params, vec2& grid, ivec& shl_slice) {
-    ivec bas = params.get_bas();
-    ivec atm = params.get_atm();
-    vec env = params.get_env();
+	ivec bas = params.get_bas();
+	ivec atm = params.get_atm();
+	vec env = params.get_env();
 
 
-    //grid = numpy.asarray(grid, dtype = numpy.double, order = 'F'); grid holds the three coordinate rows
-    const int ngrid = (int)grid[0].size();
-    vec fortran_grid((size_t)ngrid * 3);
-    for (int i = 0; i < ngrid; i++) {
-        for (int j = 0; j < 3; j++) {
-            fortran_grid[(size_t)i + (size_t)j * ngrid] = grid[j][i];
-        }
-    }
+	//grid = numpy.asarray(grid, dtype = numpy.double, order = 'F'); grid holds the three coordinate rows
+	const int ngrid = (int)grid[0].size();
+	vec fortran_grid((size_t)ngrid * 3);
+	for (int i = 0; i < ngrid; i++) {
+		for (int j = 0; j < 3; j++) {
+			fortran_grid[(size_t)i + (size_t)j * ngrid] = grid[j][i];
+		}
+	}
 
-    int nbas = params.get_nbas();
-    int nat = params.get_natoms();
+	int nbas = params.get_nbas();
+	int nat = params.get_natoms();
 
-    if (shl_slice.size() == 0) {
+	if (shl_slice.size() == 0) {
 		shl_slice = { 0, nbas};
-    }
-    //ivec aoloc = Kernel::gen_loc(bas, nbas);
-    ivec aoloc = make_loc<COORDINATE_TYPE::SPH>(bas, nbas);
+	}
+	//ivec aoloc = Kernel::gen_loc(bas, nbas);
+	ivec aoloc = make_loc<COORDINATE_TYPE::SPH>(bas, nbas);
 	int nao = aoloc[shl_slice[1]] - aoloc[shl_slice[0]];
 
-    //non0tab = numpy.ones(((ngrids+BLKSIZE-1)//BLKSIZE,nbas),dtype = numpy.uint8)
+	//non0tab = numpy.ones(((ngrids+BLKSIZE-1)//BLKSIZE,nbas),dtype = numpy.uint8)
 	std::vector<uint8_t> non0table(static_cast<size_t>((ngrid + 56 - 1) / 56) * nbas, 1);
 
-    // Compute integrals
-    vec res((size_t)nao * (size_t)ngrid, 0.0);
-    GTOval_sph(ngrid, shl_slice.data(), aoloc.data(), res.data(), fortran_grid.data(), non0table.data(), atm.data(), nat, bas.data(), nbas, env.data());
+	// Compute integrals
+	vec res((size_t)nao * (size_t)ngrid, 0.0);
+	GTOval_sph(ngrid, shl_slice.data(), aoloc.data(), res.data(), fortran_grid.data(), non0table.data(), atm.data(), nat, bas.data(), nbas, env.data());
 
-    vec ret((size_t)nao * (size_t)ngrid, 0.0);
-    // res is in fortran order, write the result in regular ordering
-    for (int i = 0; i < nao; i++)
-    {
-        for (int j = 0; j < ngrid; j++)
-        {
-            ret[(size_t)j * (size_t)nao + i] = res[(size_t)i * (size_t)ngrid + j];
-        }
-    }
-    return ret;
+	vec ret((size_t)nao * (size_t)ngrid, 0.0);
+	// res is in fortran order, write the result in regular ordering
+	for (int i = 0; i < nao; i++)
+	{
+		for (int j = 0; j < ngrid; j++)
+		{
+			ret[(size_t)j * (size_t)nao + i] = res[(size_t)i * (size_t)ngrid + j];
+		}
+	}
+	return ret;
 }

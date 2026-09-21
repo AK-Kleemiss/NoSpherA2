@@ -5,247 +5,247 @@
 //-----------------Definition of atoms and basis sets--------------------
 
 basis_set_entry::basis_set_entry() {
-    coefficient = 0.0;
-    exponent = 0.0;
-    type = 0;
-    shell = 0;
+	coefficient = 0.0;
+	exponent = 0.0;
+	type = 0;
+	shell = 0;
 };
 
 basis_set_entry::basis_set_entry(double g_coefficient, double g_exponent, unsigned int g_type, unsigned int g_shell) {
-    coefficient = g_coefficient;
-    exponent = g_exponent;
-    type = g_type;
-    shell = g_shell;
-    p = primitive(0, type, exponent, coefficient);
+	coefficient = g_coefficient;
+	exponent = g_exponent;
+	type = g_type;
+	shell = g_shell;
+	p = primitive(0, type, exponent, coefficient);
 };
 
 atom::atom() {
-    reset();
+	reset();
 };
 
 atom::atom(const std::string& l,
-    const atomID& id,
-    const int& n,
-    const double& c1,
-    const double& c2,
-    const double& c3,
-    const int& ch) : atom(l, id, n, c1, c2, c3, ch, 0) {
+	const atomID& id,
+	const int& n,
+	const double& c1,
+	const double& c2,
+	const double& c3,
+	const int& ch) : atom(l, id, n, c1, c2, c3, ch, 0) {
 };
 
 atom::atom(const std::string& l,
-    const atomID& id,
-    const int& n,
-    const double& c1,
-    const double& c2,
-    const double& c3,
-    const int& ch,
-    const int& ECP_els) {
-    reset();
-    label = l;
-    ID = id;
-    nr = n;
-    x = c1;
-    y = c2;
-    z = c3;
-    charge = ch;
-    ECP_electrons = ECP_els;
+	const atomID& id,
+	const int& n,
+	const double& c1,
+	const double& c2,
+	const double& c3,
+	const int& ch,
+	const int& ECP_els) {
+	reset();
+	label = l;
+	ID = id;
+	nr = n;
+	x = c1;
+	y = c2;
+	z = c3;
+	charge = ch;
+	ECP_electrons = ECP_els;
 };
 
 atom::atom(const atom& rhs) {
-    reset();
-    *this = rhs;
+	reset();
+	*this = rhs;
 };
 
 void atom::reset() {
-    label = '?';
-    ID = atomID();
-    nr = 0;
-    charge = 0;
-    ECP_electrons = 0;
-    x = 0.0;
-    y = 0.0;
-    z = 0.0;
-    frac_coords = { 0.,0.,0. };
-    basis_set.clear();
-    basis_set_id = 0;
-    shellcount.clear();
-    ADPs.clear();
-    is_asym = false;
-    group_nr = 0;
+	label = '?';
+	ID = atomID();
+	nr = 0;
+	charge = 0;
+	ECP_electrons = 0;
+	x = 0.0;
+	y = 0.0;
+	z = 0.0;
+	frac_coords = { 0.,0.,0. };
+	basis_set.clear();
+	basis_set_id = 0;
+	shellcount.clear();
+	ADPs.clear();
+	is_asym = false;
+	group_nr = 0;
 };
 
 atom& atom::operator= (const atom& rhs) {
-    if (this == &rhs)
-        return *this;
-    reset();
-    label = rhs.label;
-    ID = rhs.ID;
-    nr = rhs.nr;
-    charge = rhs.charge;
-    ECP_electrons = rhs.ECP_electrons;
-    x = rhs.x;
-    y = rhs.y;
-    z = rhs.z;
-    frac_coords = rhs.frac_coords;
-    basis_set = rhs.basis_set;
-    basis_set_id = rhs.basis_set_id;
-    shellcount = rhs.shellcount;
-    ADPs = rhs.ADPs;
-    is_asym = rhs.is_asym;
-    group_nr = rhs.group_nr;
-    return *this;
+	if (this == &rhs)
+		return *this;
+	reset();
+	label = rhs.label;
+	ID = rhs.ID;
+	nr = rhs.nr;
+	charge = rhs.charge;
+	ECP_electrons = rhs.ECP_electrons;
+	x = rhs.x;
+	y = rhs.y;
+	z = rhs.z;
+	frac_coords = rhs.frac_coords;
+	basis_set = rhs.basis_set;
+	basis_set_id = rhs.basis_set_id;
+	shellcount = rhs.shellcount;
+	ADPs = rhs.ADPs;
+	is_asym = rhs.is_asym;
+	group_nr = rhs.group_nr;
+	return *this;
 };
 
 void atom::print_values() const {
-    std::cout << "nr: " << nr << " label: " << label << " x: " << x << " y: " << y << " z: " << z << " charge: " << charge << std::endl;
+	std::cout << "nr: " << nr << " label: " << label << " x: " << x << " y: " << y << " z: " << z << " charge: " << charge << std::endl;
 };
 
 bool atom::is_anharm() const {
-    return ADPs.size() > 1;
+	return ADPs.size() > 1;
 };
 
 void atom::print_values_long() const {
-    std::cout << "nr: " << nr << " label: " << label << " x: " << x << " y: " << y << " z: " << z << " charge: " << charge << std::endl;
-    if (basis_set.size() > 0) {
-        for (unsigned int i = 0; i < basis_set.size(); i++) {
-            std::cout << "basis set entry " << i << ": expo: " << basis_set[i].get_exponent() << " coef: " << basis_set[i].get_coefficient() << " type: " << basis_set[i].get_type() << " shell: " << basis_set[i].get_shell() << std::endl;
-        }
-    }
-    if (shellcount.size() > 0) {
-        for (unsigned int i = 0; i < shellcount.size(); i++) {
-            std::cout << "shellcount " << i << ": value: " << shellcount[i] << std::endl;
-        }
-    }
+	std::cout << "nr: " << nr << " label: " << label << " x: " << x << " y: " << y << " z: " << z << " charge: " << charge << std::endl;
+	if (basis_set.size() > 0) {
+		for (unsigned int i = 0; i < basis_set.size(); i++) {
+			std::cout << "basis set entry " << i << ": expo: " << basis_set[i].get_exponent() << " coef: " << basis_set[i].get_coefficient() << " type: " << basis_set[i].get_type() << " shell: " << basis_set[i].get_shell() << "\n";
+		}
+	}
+	if (shellcount.size() > 0) {
+		for (unsigned int i = 0; i < shellcount.size(); i++) {
+			std::cout << "shellcount " << i << ": value: " << shellcount[i] << "\n";
+		}
+	}
 };
 
 bool atom::push_back_basis_set(const double& exponent, const double& coefficient, const int& type, const int& shell) {
-    if (shell == shellcount.size())
-        shellcount.emplace_back((unsigned int)1);
-    else
-        shellcount[shell]++;
-    if (type >= 0 && shell >= 0) {
-        basis_set.emplace_back(coefficient, exponent, type, shell);
-        return true;
-    }
-    else {
-        if (type >= 10) err_checkf(false, "h and higher types are not yet supported!", std::cout);
-        std::cout << "This is not a valid basis set entry!" << std::endl;
-        std::cout << "Exponent: " << exponent << " coefficient: " << coefficient << " type: " << type << " shell: " << shell << std::endl;
-        return false;
-    }
+	if (shell == shellcount.size())
+		shellcount.emplace_back((unsigned int)1);
+	else
+		shellcount[shell]++;
+	if (type >= 0 && shell >= 0) {
+		basis_set.emplace_back(coefficient, exponent, type, shell);
+		return true;
+	}
+	else {
+		if (type >= 10) err_checkf(false, "h and higher types are not yet supported!", std::cout);
+		std::cout << "This is not a valid basis set entry!" << std::endl;
+		std::cout << "Exponent: " << exponent << " coefficient: " << coefficient << " type: " << type << " shell: " << shell << std::endl;
+		return false;
+	}
 };
 
 bool atom::get_basis_set_loaded() const {
-    if (basis_set.size() > 0) return true;
-    else return false;
+	if (basis_set.size() > 0) return true;
+	else return false;
 };
 
 void atom::assign_ADPs(double& Uiso) {
-    ADPs.resize(1);
-    ADPs[0].resize(6);
-    ADPs[0][0] = ADPs[0][1] = ADPs[0][2] = Uiso;
+	ADPs.resize(1);
+	ADPs[0].resize(6);
+	ADPs[0][0] = ADPs[0][1] = ADPs[0][2] = Uiso;
 };
 
 void atom::assign_ADPs(vec& second) {
-    if (second.size() != 6) {
-        std::cout << "Wrong size of second order ADP!" << std::endl;
-        return;
-    }
-    else {
-        ADPs.resize(1);
-        ADPs[0].resize(6);
-        ADPs[0] = second;
-    }
+	if (second.size() != 6) {
+		std::cout << "Wrong size of second order ADP!" << std::endl;
+		return;
+	}
+	else {
+		ADPs.resize(1);
+		ADPs[0].resize(6);
+		ADPs[0] = second;
+	}
 };
 
 void atom::assign_ADPs(vec& second, vec& third, vec& fourth) {
-    if (second.size() != 6) {
-        std::cout << "Wrong size of second order ADP!" << std::endl;
-        return;
-    }
-    if (third.size() == 0 && second.size() != 0) {
-        ADPs.resize(1);
-        ADPs[0].resize(6);
-        ADPs[0] = second;
-    }
-    else if (third.size() != 0 && second.size() != 0) {
-        if (third.size() != 10) {
-            std::cout << "Wrong size of third order ADP!" << std::endl;
-            return;
-        }
-        if (fourth.size() != 15) {
-            std::cout << "Wrong size of fourth order ADP!" << std::endl;
-            return;
-        }
-        ADPs.resize(3);
-        ADPs[0].resize(6);
-        ADPs[1].resize(10);
-        ADPs[2].resize(15);
-        ADPs[0] = second;
-        ADPs[1] = third;
-        ADPs[2] = fourth;
-    }
+	if (second.size() != 6) {
+		std::cout << "Wrong size of second order ADP!" << std::endl;
+		return;
+	}
+	if (third.size() == 0 && second.size() != 0) {
+		ADPs.resize(1);
+		ADPs[0].resize(6);
+		ADPs[0] = second;
+	}
+	else if (third.size() != 0 && second.size() != 0) {
+		if (third.size() != 10) {
+			std::cout << "Wrong size of third order ADP!" << std::endl;
+			return;
+		}
+		if (fourth.size() != 15) {
+			std::cout << "Wrong size of fourth order ADP!" << std::endl;
+			return;
+		}
+		ADPs.resize(3);
+		ADPs[0].resize(6);
+		ADPs[1].resize(10);
+		ADPs[2].resize(15);
+		ADPs[0] = second;
+		ADPs[1] = third;
+		ADPs[2] = fourth;
+	}
 };
 
 void atom::set_ID(const atomID& ID_in) {
-    ID = ID_in;
+	ID = ID_in;
 };
 
 atomID atom::get_ID() {
-    if (ID.is_initialized()) {
-        return ID;
-    }
-    ID = atomID(frac_coords[0], frac_coords[1], frac_coords[2], group_nr, charge);
-    return ID;
+	if (ID.is_initialized()) {
+		return ID;
+	}
+	ID = atomID(frac_coords[0], frac_coords[1], frac_coords[2], group_nr, charge);
+	return ID;
 };
 
 double atom::get_coordinate(const unsigned int& axis) const {
-    if (axis == 0) return x;
-    else if (axis == 1) return y;
-    else if (axis == 2) return z;
-    else return 0.0;
+	if (axis == 0) return x;
+	else if (axis == 1) return y;
+	else if (axis == 2) return z;
+	else return 0.0;
 };
 
 void atom::set_coordinate(const unsigned int& axis, const double& value) {
-    if (axis == 0) x = value;
-    else if (axis == 1) y = value;
-    else if (axis == 2) z = value;
+	if (axis == 0) x = value;
+	else if (axis == 1) y = value;
+	else if (axis == 2) z = value;
 };
 
 double atom::get_frac_coordinate(const unsigned int& axis) const {
-    if (axis == 0) return frac_coords[0];
-    else if (axis == 1) return frac_coords[1];
-    else if (axis == 2) return frac_coords[2];
-    else return 0.0;
+	if (axis == 0) return frac_coords[0];
+	else if (axis == 1) return frac_coords[1];
+	else if (axis == 2) return frac_coords[2];
+	else return 0.0;
 };
 
 void atom::set_frac_coords(const d3& frac) {
-    frac_coords = frac;
-    if (charge >= 1 && charge <= 255)
-        ID = atomID(frac_coords[0], frac_coords[1], frac_coords[2], group_nr, charge);
+	frac_coords = frac;
+	if (charge >= 1 && charge <= 255)
+		ID = atomID(frac_coords[0], frac_coords[1], frac_coords[2], group_nr, charge);
 };
 
 bool atom::operator==(const atom& other) const {
-    if (this == &other) {
-        return true;
-    }
+	if (this == &other) {
+		return true;
+	}
 
-    return label == other.label &&
-        nr == other.nr &&
-        charge == other.charge &&
-        ECP_electrons == other.ECP_electrons &&
-        x == other.x &&
-        y == other.y &&
-        z == other.z &&
-        frac_coords == other.frac_coords &&
-        basis_set == other.basis_set &&
-        shellcount == other.shellcount &&
-        ADPs == other.ADPs;
+	return label == other.label &&
+		nr == other.nr &&
+		charge == other.charge &&
+		ECP_electrons == other.ECP_electrons &&
+		x == other.x &&
+		y == other.y &&
+		z == other.z &&
+		frac_coords == other.frac_coords &&
+		basis_set == other.basis_set &&
+		shellcount == other.shellcount &&
+		ADPs == other.ADPs;
 }
 
 double atom::distance_to(const atom& other) const {
-    const double dx = x - other.x;
-    const double dy = y - other.y;
-    const double dz = z - other.z;
-    return std::hypot(dx, dy, dz);
+	const double dx = x - other.x;
+	const double dy = y - other.y;
+	const double dz = z - other.z;
+	return std::hypot(dx, dy, dz);
 }

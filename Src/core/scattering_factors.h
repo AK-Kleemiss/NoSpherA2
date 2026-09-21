@@ -34,44 +34,44 @@ class cell;
  */
 struct options;
 struct scattering_data {
-    double F_obs;
-    double abs_F_obs;
-    double F_obs2;
-    double sigma_obs;
-    double sigma_obs2;
+	double F_obs;
+	double abs_F_obs;
+	double F_obs2;
+	double sigma_obs;
+	double sigma_obs2;
 };
 
 enum GridIndex
 {
-    x_coord = 0,
-    y_coord = 1,
-    z_coord = 2,
-    atomic_weight = 3,
-    electron_density = 4,
-    molecular_becke_weight = 5,
-    molecular_TFVC_weight = 6
+	x_coord = 0,
+	y_coord = 1,
+	z_coord = 2,
+	atomic_weight = 3,
+	electron_density = 4,
+	molecular_becke_weight = 5,
+	molecular_TFVC_weight = 6
 };
 
 enum TotalGridIndex
 {
-    X = 0,
-    Y = 1,
-    Z = 2,
-    quadrature_weight = 3,
-    spherical_electron_density = 4,
-    wavefunction_electron_density = 5,
-    becke_weight = 6,
-    TFVC_weight = 7,
-    MBIS_weight = 8
+	X = 0,
+	Y = 1,
+	Z = 2,
+	quadrature_weight = 3,
+	spherical_electron_density = 4,
+	wavefunction_electron_density = 5,
+	becke_weight = 6,
+	TFVC_weight = 7,
+	MBIS_weight = 8
 };
 
 void make_k_pts(const bool& read_k_pts,
-    const bool& save_k_pts,
-    const cell& unit_cell,
-    hkl_list& hkl,
-    vec2& k_pt,
-    std::ostream& file,
-    bool debug = false);
+	const bool& save_k_pts,
+	const cell& unit_cell,
+	hkl_list& hkl,
+	vec2& k_pt,
+	std::ostream& file,
+	bool debug = false);
 
 //streams a combined (-mtc) SALTED table in reflection blocks; false means nothing was written, take the ordinary path
 bool stream_mtc_salted(options& opt, std::vector<WFN>& wavy, std::ostream& file, vec2* known_kpts);
@@ -82,17 +82,17 @@ class Gaussian_Molecule;
 
 struct salted_part_prep
 {
-    std::shared_ptr<Gaussian_Molecule> mol;
-    ivec asym_atom_list;
-    svec labels;
-    vec2 k_pt;
-    std::vector<i3> hkl_v;
-    //spherical remainder only
-    ivec atom_type_list;
-    ivec asym_atom_to_type_list;
-    vec k_of_reflection;
-    //stl of the same reflections, carried rather than inverted out of k (which would undo a 4*pi and a unit conversion)
-    vec stl_of_reflection;
+	std::shared_ptr<Gaussian_Molecule> mol;
+	ivec asym_atom_list;
+	svec labels;
+	vec2 k_pt;
+	std::vector<i3> hkl_v;
+	//spherical remainder only
+	ivec atom_type_list;
+	ivec asym_atom_to_type_list;
+	vec k_of_reflection;
+	//stl of the same reflections, carried rather than inverted out of k (which would undo a 4*pi and a unit conversion)
+	vec stl_of_reflection;
 };
 
 /**
@@ -107,13 +107,13 @@ struct salted_part_prep
  */
 template<typename tsc_block_type, typename calculator_type>
 tsc_block_type calculate_scattering_factors(
-    options& opt,
-    calculator_type calculator,
-    std::ostream& file,
-    svec& known_atoms,
-    const int& nr,
-    vec2* kpts = NULL,
-    salted_part_prep* prep_out = NULL  // set: stop after the prediction and hand it back
+	options& opt,
+	calculator_type calculator,
+	std::ostream& file,
+	svec& known_atoms,
+	const int& nr,
+	vec2* kpts = NULL,
+	salted_part_prep* prep_out = NULL  // set: stop after the prediction and hand it back
 );
 
 /**
@@ -128,13 +128,13 @@ tsc_block_type calculate_scattering_factors(
  *        only the point-group orbit (with Friedel mates) of the box is kept from the sphere.
  */
 void generate_hkl(
-    const double& dmin,
-    hkl_list& hkl,
-    const vec2& twin_law,
-    cell& unit_cell,
-    std::ostream& file,
-    bool debug = false,
-    const ivec2& hkl_min_max = ivec2());
+	const double& dmin,
+	hkl_list& hkl,
+	const vec2& twin_law,
+	cell& unit_cell,
+	std::ostream& file,
+	bool debug = false,
+	const ivec2& hkl_min_max = ivec2());
 
 /**
  * @brief Fills the hkl list from the options: -dmin and -hkl_min_max together give the
@@ -143,19 +143,19 @@ void generate_hkl(
  * box is ignored, since the dynamical calculation needs every beam to that resolution.
  */
 void generate_hkl_from_options(
-    const options& opt,
-    hkl_list& hkl,
-    cell& unit_cell,
-    std::ostream& file);
+	const options& opt,
+	hkl_list& hkl,
+	cell& unit_cell,
+	std::ostream& file);
 
 void generate_hkl(
-    const ivec2& hkl_min_max,
-    hkl_list& hkl,
-    const vec2& twin_law,
-    cell& unit_cell,
-    std::ostream& file,
-    bool debug = false,
-    bool ED = false);
+	const ivec2& hkl_min_max,
+	hkl_list& hkl,
+	const vec2& twin_law,
+	cell& unit_cell,
+	std::ostream& file,
+	bool debug = false,
+	bool ED = false);
 
 /**
  * @brief Generates the fractional hkl (Miller indices) list.
@@ -169,13 +169,13 @@ void generate_hkl(
  */
 
 void generate_fractional_hkl(
-    const double& dmin,
-    hkl_list_d& hkl,
-    const vec2& twin_law,
-    cell& unit_cell,
-    std::ostream& file,
-    const d3& stepsize,
-    bool debug);
+	const double& dmin,
+	hkl_list_d& hkl,
+	const vec2& twin_law,
+	cell& unit_cell,
+	std::ostream& file,
+	const d3& stepsize,
+	bool debug);
 
 /**
  * @brief Reads atoms from CIF (Crystallographic Information File).
@@ -201,30 +201,30 @@ void generate_fractional_hkl(
 double cutoff(const int& accuracy);
 
 svec read_atoms_from_CIF(
-    std::ifstream& cif_input,
-    const ivec& input_groups,
-    const cell& unit_cell,
-    WFN& wave,
-    const svec& known_atoms,
-    ivec& atom_type_list,
-    ivec& asym_atom_to_type_list,
-    ivec& asym_atom_list,
-    bvec& needs_grid,
-    std::ostream& file,
-    const bool debug = false,
-    //a spherical fill of an already covered part finds no atoms; everywhere else zero means a broken CIF
-    const bool allow_empty = false);
+	std::ifstream& cif_input,
+	const ivec& input_groups,
+	const cell& unit_cell,
+	WFN& wave,
+	const svec& known_atoms,
+	ivec& atom_type_list,
+	ivec& asym_atom_to_type_list,
+	ivec& asym_atom_list,
+	bvec& needs_grid,
+	std::ostream& file,
+	const bool debug = false,
+	//a spherical fill of an already covered part finds no atoms; everywhere else zero means a broken CIF
+	const bool allow_empty = false);
 
 
 /**
  * Reads atoms from a CIF file and performs necessary operations. Works without wavefunction for XCW routine.
  */
 void read_atoms_from_CIF(std::ifstream& cif_input,
-    const cell& unit_cell,
-    int& ncen,
-    bvec& needs_grid,
-    std::vector<asym_atom>& asym_atoms,
-    const bool debug);
+	const cell& unit_cell,
+	int& ncen,
+	bvec& needs_grid,
+	std::vector<asym_atom>& asym_atoms,
+	const bool debug);
 
 //svec read_anom_disp_from_CIF(std::ifstream& cif_input,
 //    const ivec& input_groups,
@@ -252,14 +252,14 @@ void read_atoms_from_CIF(std::ifstream& cif_input,
  * @param debug Flag indicating whether to enable debug mode.
  */
 static void add_ECP_contribution(
-    const ivec& asym_atom_list,
-    const WFN& wave,
-    cvec2& sf,
-    const cell& cell,
-    hkl_list& hkl,
-    std::ostream& file,
-    const int& mode = 0,
-    const bool debug = false);
+	const ivec& asym_atom_list,
+	const WFN& wave,
+	cvec2& sf,
+	const cell& cell,
+	hkl_list& hkl,
+	std::ostream& file,
+	const int& mode = 0,
+	const bool debug = false);
 
 /**
  * @brief Calculates the scattering factors.
@@ -276,41 +276,41 @@ static void add_ECP_contribution(
  * @param debug Flag indicating whether to enable debug mode.
  */
 void calc_SF(const int& points,
-    const vec2& k_pt,
-    const vec2& d1,
-    const vec2& d2,
-    const vec2& d3,
-    const vec2& dens,
-    cvec2& sf,
-    std::ostream& file,
-    _time_point& start,
-    _time_point& end1,
-    bool debug,
-    bool no_date = false,
-    bool do_XCW = false,
-    bool use_gpu = true,
-    bool gpu_fp64 = false,
-    bool gpu_fp32 = false);
+	const vec2& k_pt,
+	const vec2& d1,
+	const vec2& d2,
+	const vec2& d3,
+	const vec2& dens,
+	cvec2& sf,
+	std::ostream& file,
+	_time_point& start,
+	_time_point& end1,
+	bool debug,
+	bool no_date = false,
+	bool do_XCW = false,
+	bool use_gpu = true,
+	bool gpu_fp64 = false,
+	bool gpu_fp32 = false);
 
 double fourier_bessel_integral(
-    const primitive& p,
-    const double& H,
-    const int& l);
+	const primitive& p,
+	const double& H,
+	const int& l);
 
 cdouble sfac_bessel(
-    const primitive& p,
-    const double* k_point,
-    const double* coefs);
+	const primitive& p,
+	const double* k_point,
+	const double* coefs);
 
 //Form factors of the listed atoms of a fitted density at every k-point, sf[atom][k]: the Fourier-Bessel transform
 //of aux_density_table::fourier_atom with the radial factors tabulated once per k over the distinct (exponent, l)
 void calc_SF_SALTED(
-    const vec2& k_pt,
-    const vec& coefs,
-    const aux_density_table& table,
-    const ivec& asym_atom_list,
-    cvec2& sf,
-    ProgressBar* progress = nullptr);
+	const vec2& k_pt,
+	const vec& coefs,
+	const aux_density_table& table,
+	const ivec& asym_atom_list,
+	cvec2& sf,
+	ProgressBar* progress = nullptr);
 
 /**
  * @brief Calculates the diffuse scattering factors.
@@ -320,16 +320,16 @@ void calc_SF_SALTED(
 void calc_sfac_diffuse(const options& opt, std::ostream& log_file);
 
 itsc_block calculate_scattering_factors_from_cube(
-    options& opt,
-    WFN& wave,
-    const cube& density_cube,
-    std::ostream& file);
+	options& opt,
+	WFN& wave,
+	const cube& density_cube,
+	std::ostream& file);
 
 struct hkl_sym {
-    int h;
-    int k;
-    int l;
-    int sym;
+	int h;
+	int k;
+	int l;
+	int sym;
 };
 
 void read_hkl(const std::filesystem::path& hkl_filename, hkl_list& hkl, const vec2& twin_law, cell& unit_cell, std::ostream& file, bool debug = false);

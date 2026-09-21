@@ -917,7 +917,7 @@ bool itensor_gpu_submit(const int slot, const int n_refl, const int num_syms,
 	const std::complex<double>* factors)
 {
 	return g_fp64 ? submit_impl<double>(slot, n_refl, num_syms, kx, ky, kz, factors)
-	              : submit_impl<float>(slot, n_refl, num_syms, kx, ky, kz, factors);
+				  : submit_impl<float>(slot, n_refl, num_syms, kx, ky, kz, factors);
 }
 
 bool itensor_gpu_collect(const int slot, std::complex<double>* I_r, const long long row_stride)

@@ -16,22 +16,22 @@ struct properties_options;
 // inserting the matching emplace_back at the same index silently shifts every
 // later property by one. Always append new entries at the end.
 enum cube_type {
-    Rho = 0,
-    RDG = 1,
-    Elf = 2,
-    Eli = 3,
-    Lap = 4,
-    ESP = 5,
-    MO_val = 6,
-    HDEF = 7,
-    DEF = 8,
-    Hirsh = 9,
-    Spin_Density = 10,
-    spherical_density = 11,
-    Fukui_plus = 12,
-    Fukui_minus = 13,
-    Fukui_zero = 14,
-    Dual_Descriptor = 15
+	Rho = 0,
+	RDG = 1,
+	Elf = 2,
+	Eli = 3,
+	Lap = 4,
+	ESP = 5,
+	MO_val = 6,
+	HDEF = 7,
+	DEF = 8,
+	Hirsh = 9,
+	Spin_Density = 10,
+	spherical_density = 11,
+	Fukui_plus = 12,
+	Fukui_minus = 13,
+	Fukui_zero = 14,
+	Dual_Descriptor = 15
 };
 
 /**
@@ -44,12 +44,12 @@ enum cube_type {
  * @param file The output stream to write the results to.
  */
 void Calc_Static_Def(
-    cube &CubeDEF,
-    cube &CubeRho,
-    const WFN &wavy,
-    double radius,
-    std::ostream &file,
-    bool wrap);
+	cube &CubeDEF,
+	cube &CubeRho,
+	const WFN &wavy,
+	double radius,
+	std::ostream &file,
+	bool wrap);
 
 /**
  * Calculates the static definition of a cube.
@@ -64,11 +64,11 @@ void Calc_Static_Def(
  * @param file The output stream to write the results to.
  */
 void Calc_Static_Def(
-    std::vector<cube> &Cubes,
-    const WFN &wavy,
-    double radius,
-    std::ostream &file,
-    bool wrap);
+	std::vector<cube> &Cubes,
+	const WFN &wavy,
+	double radius,
+	std::ostream &file,
+	bool wrap);
 /**
  * Calculates the spherical density of a cube using the given WFN object.
  *
@@ -78,11 +78,11 @@ void Calc_Static_Def(
  * @param file The output stream to write the results to.
  */
 void Calc_Spherical_Dens(
-    cube &CubeSpher,
-    const WFN &wavy,
-    double radius,
-    std::ostream &file,
-    bool wrap);
+	cube &CubeSpher,
+	const WFN &wavy,
+	double radius,
+	std::ostream &file,
+	bool wrap);
 /**
  * Calculates the density (Rho) for a given cube and WFN object.
  *
@@ -99,9 +99,9 @@ void Calc_Spherical_Dens(
  * @param file The output stream to write the result to.
  */
 void Calc_Rho_spherical_harmonics(
-    cube &CubeRho,
-    const WFN &wavy,
-    std::ostream &file);
+	cube &CubeRho,
+	const WFN &wavy,
+	std::ostream &file);
 /**
  * Calculates the molecular orbital (MO) using the spherical harmonics.
  *
@@ -111,11 +111,11 @@ void Calc_Rho_spherical_harmonics(
  * @param file The output stream to write the calculated spherical harmonics.
  */
 void Calc_MO_spherical_harmonics(
-    cube &CubeRho,
-    const WFN &wavy,
-    int MO,
-    std::ostream &file,
-    bool nodate = false);
+	cube &CubeRho,
+	const WFN &wavy,
+	int MO,
+	std::ostream &file,
+	bool nodate = false);
 /**
  * Calculates the properties of the given cubes and WFN object.
  *
@@ -131,12 +131,12 @@ void Calc_MO_spherical_harmonics(
  * @param test A boolean flag indicating whether to run the function in test mode.
  */
 void Calc_Prop(
-    std::vector<cube> &Cubes,
-    const WFN &wavy,
-    double radius,
-    std::ostream &file,
-    bool test,
-    bool wrap);
+	std::vector<cube> &Cubes,
+	const WFN &wavy,
+	double radius,
+	std::ostream &file,
+	bool test,
+	bool wrap);
 /**
  * Calculates the Electrostatic Potential (ESP) for a given cube and WFN object.
  *
@@ -147,12 +147,12 @@ void Calc_Prop(
  * @param file The output stream to write the ESP results.
  */
 void Calc_ESP(
-    cube &CubeESP,
-    const WFN &wavy,
-    double radius,
-    bool no_date,
-    std::ostream &file,
-    bool wrap);
+	cube &CubeESP,
+	const WFN &wavy,
+	double radius,
+	bool no_date,
+	std::ostream &file,
+	bool wrap);
 /**
  * Calculates the molecular orbital (MO) for a given cube.
  *
@@ -163,12 +163,12 @@ void Calc_ESP(
  * @param file The output stream to write the calculated MO.
  */
 void Calc_MO(
-    cube &CubeMO,
-    int mo,
-    const WFN &wavy,
-    double radius,
-    std::ostream &file,
-    bool wrap);
+	cube &CubeMO,
+	int mo,
+	const WFN &wavy,
+	double radius,
+	std::ostream &file,
+	bool wrap);
 /**
  * Locates the frontier molecular orbitals (HOMO and LUMO) of a wavefunction.
  *
@@ -192,10 +192,10 @@ void Calc_MO(
  * @return true if BOTH a HOMO and a LUMO were found.
  */
 bool find_frontier_orbitals(
-    const WFN &wavy,
-    int &homo,
-    int &lumo,
-    bool &unrestricted);
+	const WFN &wavy,
+	int &homo,
+	int &lumo,
+	bool &unrestricted);
 /**
  * Calculates the Fukui functions and the dual descriptor in the
  * frontier-orbital (frozen-orbital) approximation.
@@ -225,13 +225,13 @@ bool find_frontier_orbitals(
  * @param wrap Whether to wrap the grid periodically (set when a CIF is given).
  */
 void Calc_Fukui(
-    std::vector<cube> &Cubes,
-    const WFN &wavy,
-    int homo,
-    int lumo,
-    double radius,
-    std::ostream &file,
-    bool wrap);
+	std::vector<cube> &Cubes,
+	const WFN &wavy,
+	int homo,
+	int lumo,
+	double radius,
+	std::ostream &file,
+	bool wrap);
 /**
  * Condensed (atom-summed) Fukui functions under all five atomic partitions.
  *
@@ -241,10 +241,10 @@ void Calc_Fukui(
 // Spelled with explicit std types rather than the svec/vec2 aliases: those live
 // in convenience.h, which properties.h deliberately does not include.
 struct CondensedFukuiResults {
-    bool valid = false;
-    std::vector<std::string> labels;
-    vec2 f_plus;   // [partition][atom]
-    vec2 f_minus;  // [partition][atom]
+	bool valid = false;
+	std::vector<std::string> labels;
+	vec2 f_plus;   // [partition][atom]
+	vec2 f_minus;  // [partition][atom]
 };
 /**
  * Integrates the frontier-orbital densities against every atomic partition
@@ -273,20 +273,20 @@ struct CondensedFukuiResults {
  * @param file Output stream for GridManager's own progress reporting.
  */
 CondensedFukuiResults Calc_Condensed_Fukui(
-    const WFN &wavy,
-    int homo,
-    int lumo,
-    const cell &unit_cell,
-    int accuracy,
-    std::ostream &file);
+	const WFN &wavy,
+	int homo,
+	int lumo,
+	const cell &unit_cell,
+	int accuracy,
+	std::ostream &file);
 /**
  * Prints the condensed Fukui table: f+, f- and the dual descriptor, one column
  * per partition, with the per-quantity sum over atoms as a normalisation check
  * (each should be 1).
  */
 void print_condensed_fukui(
-    const CondensedFukuiResults &r,
-    std::ostream &file);
+	const CondensedFukuiResults &r,
+	std::ostream &file);
 /**
  * Standalone conceptual-DFT reactivity analysis of one wavefunction.
  *
@@ -313,10 +313,10 @@ void fukui_analysis(options &opt, std::ostream &log2 = std::cout);
  * @param nodate A boolean flag indicating whether to include the date in the output.
  */
 void Calc_S_Rho(
-    cube &Cube_S_Rho,
-    const WFN &wavy,
-    std::ostream &file,
-    bool &nodate);
+	cube &Cube_S_Rho,
+	const WFN &wavy,
+	std::ostream &file,
+	bool &nodate);
 /**
  * Calculates the Hirshfeld Deformation Density for a given set of parameters.
  *
@@ -328,12 +328,12 @@ void Calc_S_Rho(
  * @param file The output stream to write the results to.
  */
 void Calc_Hirshfeld(
-    std::vector<cube> &Cubes,
-    const WFN &wavy,
-    double radius,
-    int ignore_atom,
-    std::ostream &file,
-    bool wrap);
+	std::vector<cube> &Cubes,
+	const WFN &wavy,
+	double radius,
+	int ignore_atom,
+	std::ostream &file,
+	bool wrap);
 /**
  * Calculates the Hirshfeld Deformation Density for a given set of parameters.
  *
@@ -346,14 +346,14 @@ void Calc_Hirshfeld(
  * @param file The output stream to write the results to.
  */
 void Calc_Hirshfeld(
-    cube &CubeHDEF,
-    cube &CubeRho,
-    cube &CubeSpherical,
-    const WFN &wavy,
-    double radius,
-    int ignore,
-    std::ostream &file,
-    bool wrap);
+	cube &CubeHDEF,
+	cube &CubeRho,
+	cube &CubeSpherical,
+	const WFN &wavy,
+	double radius,
+	int ignore,
+	std::ostream &file,
+	bool wrap);
 /**
  * Calculates the Hirshfeld atom electron density.
  *
@@ -366,22 +366,22 @@ void Calc_Hirshfeld(
  * @param file The output stream to write the results to.
  */
 void Calc_Hirshfeld_atom(
-    std::vector<cube> &Cubes,
-    const WFN &wavy,
-    double radius,
-    int ignore_atom,
-    std::ostream &file,
-    bool wrap);
+	std::vector<cube> &Cubes,
+	const WFN &wavy,
+	double radius,
+	int ignore_atom,
+	std::ostream &file,
+	bool wrap);
 
 //rho and ELI-D on two cubes from the orbitals. With `field` (a fitted density) rho comes
 //from the fit; ELI-D still needs the orbitals and stays zero without them
 struct density_field;
 void Calc_RhoEli(
-    cube &CubeRho,
-    cube &CubeEli,
-    const WFN &wavy,
-    double radius,
-    const density_field *field = nullptr);
+	cube &CubeRho,
+	cube &CubeEli,
+	const WFN &wavy,
+	double radius,
+	const density_field *field = nullptr);
 
 /**
  * Calculates the properties based on the given options.
@@ -391,10 +391,10 @@ void Calc_RhoEli(
 void properties_calculation(options &opt);
 
 void promolecular_nci_analysis(
-    const pathvec& xyz_files,
-    const properties_options& opts,
-    std::ostream& log,
-    const std::filesystem::path& cif = {}); // cif: grid = the unit cell instead of a box around the fragments
+	const pathvec& xyz_files,
+	const properties_options& opts,
+	std::ostream& log,
+	const std::filesystem::path& cif = {}); // cif: grid = the unit cell instead of a box around the fragments
 
 /**
  * Combines the MO (Molecular Orbital) files based on the given options.
@@ -417,51 +417,51 @@ void print_time(_time_point &start, _time_point &end, std::ostream &file);
 //here rho, its derivatives and the ESP come from the source alone, so ELF (orbitals) is refused with a message
 inline bool near_any(const d3 &pos, const std::vector<d3> &centres, double radius_bohr)
 {
-    for (const d3 &c : centres)
-        if (array_length(pos, c) < radius_bohr)
-            return true;
-    return false;
+	for (const d3 &c : centres)
+		if (array_length(pos, c) < radius_bohr)
+			return true;
+	return false;
 }
 //Any point function on the grid within radius of the source; wrap sums the 27 periodic images (a CIF grid)
 template <class S, typename F>
 void Calc_Cube(cube &Cube, const S &src, F &&f, double radius, std::ostream &file, bool wrap, bool no_date = false)
 {
-    _time_point start = get_time();
-    const double r = constants::ang2bohr(radius);
-    const std::vector<d3> centres = source_positions(src);
-    Cube.evaluate_on_grid([&](const d3 &pos) { return near_any(pos, centres, r) ? f(pos) : 0.0; }, wrap);
-    if (!no_date)
-    {
-        _time_point end = get_time();
-        print_time(start, end, file);
-    }
+	_time_point start = get_time();
+	const double r = constants::ang2bohr(radius);
+	const std::vector<d3> centres = source_positions(src);
+	Cube.evaluate_on_grid([&](const d3 &pos) { return near_any(pos, centres, r) ? f(pos) : 0.0; }, wrap);
+	if (!no_date)
+	{
+		_time_point end = get_time();
+		print_time(start, end, file);
+	}
 }
 template <class S>
 void Calc_Rho(cube &CubeRho, const S &src, double radius, std::ostream &file, bool wrap)
 {
-    Calc_Cube(CubeRho, src, [&](const d3 &pos) { return calculate_density(src, pos); }, radius, file, wrap);
+	Calc_Cube(CubeRho, src, [&](const d3 &pos) { return calculate_density(src, pos); }, radius, file, wrap);
 }
 template <class S>
 void Calc_Eli(cube &CubeEli, const S &src, double radius, std::ostream &file, bool wrap)
 {
-    Calc_Cube(CubeEli, src, [&](const d3 &pos) { return calculate_eli(src, pos); }, radius, file, wrap);
+	Calc_Cube(CubeEli, src, [&](const d3 &pos) { return calculate_eli(src, pos); }, radius, file, wrap);
 }
 template <PointPotential S>
 void Calc_ESP(cube &CubeESP, const S &src, double radius, bool no_date, std::ostream &file, bool wrap)
 {
-    Calc_Cube(CubeESP, src, [&](const d3 &pos) { return src.esp(pos); }, radius, file, wrap, no_date);
+	Calc_Cube(CubeESP, src, [&](const d3 &pos) { return src.esp(pos); }, radius, file, wrap, no_date);
 }
 //RDG visualisations use 101.0 as the mask outside the calculation radius; with wrap every point is visited once per
 //periodic image, so the mask is applied after the loop where rho stayed exactly zero. Rho becomes sign(lambda2) rho
 inline void finish_signed_rho(std::vector<cube> &Cubes, const cube &rho_contrib)
 {
-    Cubes[cube_type::Rho] = rho_contrib;
-    cube &rdg = Cubes[cube_type::RDG];
-    for (int x = 0; x < rdg.get_size(0); x++)
-        for (int y = 0; y < rdg.get_size(1); y++)
-            for (int z = 0; z < rdg.get_size(2); z++)
-                if (rho_contrib.get_value(x, y, z) == 0.0)
-                    rdg.set_value(x, y, z, 101.0);
+	Cubes[cube_type::Rho] = rho_contrib;
+	cube &rdg = Cubes[cube_type::RDG];
+	for (int x = 0; x < rdg.get_size(0); x++)
+		for (int y = 0; y < rdg.get_size(1); y++)
+			for (int z = 0; z < rdg.get_size(2); z++)
+				if (rho_contrib.get_value(x, y, z) == 0.0)
+					rdg.set_value(x, y, z, 101.0);
 }
 //RDG, Laplacian and ELI-D (PC07) of the loaded cubes from the density of src; ELF needs orbitals and exits. The
 //grid points within radius go to the batch forms of density_source.h in chunks (with the Hessian only when the RDG
@@ -469,71 +469,71 @@ inline void finish_signed_rho(std::vector<cube> &Cubes, const cube &rho_contrib)
 template <class S>
 void Calc_Prop(std::vector<cube> &Cubes, const S &src, double radius, std::ostream &file, bool test, bool wrap)
 {
-    err_checkf(!Cubes[cube_type::Elf].get_loaded(), std::string("ELF needs orbitals, the ") + source_name(src) + " has none", file);
-    const bool rdg = Cubes[cube_type::RDG].get_loaded(), lap_c = Cubes[cube_type::Lap].get_loaded(), eli_c = Cubes[cube_type::Eli].get_loaded();
-    if (!rdg && !lap_c && !eli_c)
-        return;
-    _time_point start = get_time();
-    const double r = constants::ang2bohr(radius);
-    const std::vector<d3> centres = source_positions(src);
-    cube rho_contrib(Cubes[cube_type::Rho]);
-    rho_contrib.set_zero();
-    const i3 n = rho_contrib.get_sizes();
-    vec x, y, z, rho, gx, gy, gz, lap, H;
-    std::vector<i3> idx;
-    auto flush = [&]() {
-        const int np = static_cast<int>(x.size());
-        rho.resize(np), gx.resize(np), gy.resize(np), gz.resize(np), lap.resize(np);
-        if (rdg)
-        {
-            H.resize(9 * static_cast<size_t>(np));
-            calculate_hessian(src, np, x.data(), y.data(), z.data(), rho.data(), gx.data(), gy.data(), gz.data(), H.data());
-            for (int p = 0; p < np; p++)
-                lap[p] = H[9 * (size_t)p] + H[9 * (size_t)p + 4] + H[9 * (size_t)p + 8];
-        }
-        else
-            calculate_density(src, np, x.data(), y.data(), z.data(), rho.data(), gx.data(), gy.data(), gz.data(), lap.data());
-        for (int p = 0; p < np; p++)
-        {
-            const i3 &i = idx[p];
-            const double g2 = gx[p] * gx[p] + gy[p] * gy[p] + gz[p] * gz[p];
-            auto add = [&](cube &c, double v) { c.set_value(i[0], i[1], i[2], c.get_value(i[0], i[1], i[2]) + (std::isfinite(v) ? v : 0.0)); };
-            if (lap_c)
-                add(Cubes[cube_type::Lap], lap[p]);
-            if (eli_c)
-                add(Cubes[cube_type::Eli], aux_density::eli_from_density(rho[p], g2, lap[p]));
-            double v = rho[p];
-            if (rdg)
-            {
-                add(Cubes[cube_type::RDG], v > 0 ? constants::alpha_coef * std::sqrt(g2) / std::pow(v, constants::c_43) : 0.0);
-                if (get_lambda_1(H.data() + 9 * (size_t)p) < 0)
-                    v = -v;
-            }
-            add(rho_contrib, v);
-        }
-        x.clear(), y.clear(), z.clear(), idx.clear();
-    };
-    //ponytail: 2^20 points per chunk = 136 MB of arrays on the host or the device; the gather is serial
-    constexpr int chunk = 1 << 20;
-    const int lo = wrap ? -1 : 0, hi = wrap ? 2 : 1;
-    for (int i = lo * n[0]; i < hi * n[0]; i++)
-        for (int j = lo * n[1]; j < hi * n[1]; j++)
-            for (int k = lo * n[2]; k < hi * n[2]; k++)
-            {
-                const d3 pos = rho_contrib.get_pos(i, j, k);
-                if (!near_any(pos, centres, r))
-                    continue;
-                x.push_back(pos[0]), y.push_back(pos[1]), z.push_back(pos[2]);
-                idx.push_back({ (i + n[0]) % n[0], (j + n[1]) % n[1], (k + n[2]) % n[2] });
-                if (static_cast<int>(x.size()) == chunk)
-                    flush();
-            }
-    flush();
-    if (rdg)
-        finish_signed_rho(Cubes, rho_contrib);
-    if (!test)
-    {
-        _time_point end = get_time();
-        print_time(start, end, file);
-    }
+	err_checkf(!Cubes[cube_type::Elf].get_loaded(), std::string("ELF needs orbitals, the ") + source_name(src) + " has none", file);
+	const bool rdg = Cubes[cube_type::RDG].get_loaded(), lap_c = Cubes[cube_type::Lap].get_loaded(), eli_c = Cubes[cube_type::Eli].get_loaded();
+	if (!rdg && !lap_c && !eli_c)
+		return;
+	_time_point start = get_time();
+	const double r = constants::ang2bohr(radius);
+	const std::vector<d3> centres = source_positions(src);
+	cube rho_contrib(Cubes[cube_type::Rho]);
+	rho_contrib.set_zero();
+	const i3 n = rho_contrib.get_sizes();
+	vec x, y, z, rho, gx, gy, gz, lap, H;
+	std::vector<i3> idx;
+	auto flush = [&]() {
+		const int np = static_cast<int>(x.size());
+		rho.resize(np), gx.resize(np), gy.resize(np), gz.resize(np), lap.resize(np);
+		if (rdg)
+		{
+			H.resize(9 * static_cast<size_t>(np));
+			calculate_hessian(src, np, x.data(), y.data(), z.data(), rho.data(), gx.data(), gy.data(), gz.data(), H.data());
+			for (int p = 0; p < np; p++)
+				lap[p] = H[9 * (size_t)p] + H[9 * (size_t)p + 4] + H[9 * (size_t)p + 8];
+		}
+		else
+			calculate_density(src, np, x.data(), y.data(), z.data(), rho.data(), gx.data(), gy.data(), gz.data(), lap.data());
+		for (int p = 0; p < np; p++)
+		{
+			const i3 &i = idx[p];
+			const double g2 = gx[p] * gx[p] + gy[p] * gy[p] + gz[p] * gz[p];
+			auto add = [&](cube &c, double v) { c.set_value(i[0], i[1], i[2], c.get_value(i[0], i[1], i[2]) + (std::isfinite(v) ? v : 0.0)); };
+			if (lap_c)
+				add(Cubes[cube_type::Lap], lap[p]);
+			if (eli_c)
+				add(Cubes[cube_type::Eli], aux_density::eli_from_density(rho[p], g2, lap[p]));
+			double v = rho[p];
+			if (rdg)
+			{
+				add(Cubes[cube_type::RDG], v > 0 ? constants::alpha_coef * std::sqrt(g2) / std::pow(v, constants::c_43) : 0.0);
+				if (get_lambda_1(H.data() + 9 * (size_t)p) < 0)
+					v = -v;
+			}
+			add(rho_contrib, v);
+		}
+		x.clear(), y.clear(), z.clear(), idx.clear();
+	};
+	//ponytail: 2^20 points per chunk = 136 MB of arrays on the host or the device; the gather is serial
+	constexpr int chunk = 1 << 20;
+	const int lo = wrap ? -1 : 0, hi = wrap ? 2 : 1;
+	for (int i = lo * n[0]; i < hi * n[0]; i++)
+		for (int j = lo * n[1]; j < hi * n[1]; j++)
+			for (int k = lo * n[2]; k < hi * n[2]; k++)
+			{
+				const d3 pos = rho_contrib.get_pos(i, j, k);
+				if (!near_any(pos, centres, r))
+					continue;
+				x.push_back(pos[0]), y.push_back(pos[1]), z.push_back(pos[2]);
+				idx.push_back({ (i + n[0]) % n[0], (j + n[1]) % n[1], (k + n[2]) % n[2] });
+				if (static_cast<int>(x.size()) == chunk)
+					flush();
+			}
+	flush();
+	if (rdg)
+		finish_signed_rho(Cubes, rho_contrib);
+	if (!test)
+	{
+		_time_point end = get_time();
+		print_time(start, end, file);
+	}
 }

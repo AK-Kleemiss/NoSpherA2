@@ -29,34 +29,34 @@
 //tests/tests.toml. Empty when neither is found.
 inline std::filesystem::path nos_test_find_repo_root()
 {
-    if (const char* env = std::getenv("NOS_REPO_ROOT")) {
-        return std::filesystem::path(env);
-    }
-    auto p = std::filesystem::current_path();
-    for (int i = 0; i < 8; ++i) {
-        if (std::filesystem::exists(p / "tests" / "tests.toml")) {
-            return p;
-        }
-        if (!p.has_parent_path()) {
-            break;
-        }
-        p = p.parent_path();
-    }
-    return {};
+	if (const char* env = std::getenv("NOS_REPO_ROOT")) {
+		return std::filesystem::path(env);
+	}
+	auto p = std::filesystem::current_path();
+	for (int i = 0; i < 8; ++i) {
+		if (std::filesystem::exists(p / "tests" / "tests.toml")) {
+			return p;
+		}
+		if (!p.has_parent_path()) {
+			break;
+		}
+		p = p.parent_path();
+	}
+	return {};
 }
 
 //The root, or the working directory when there is none, so a failing test names the path it tried
 inline std::filesystem::path nos_test_repo_root()
 {
-    const auto root = nos_test_find_repo_root();
-    return root.empty() ? std::filesystem::current_path() : root;
+	const auto root = nos_test_find_repo_root();
+	return root.empty() ? std::filesystem::current_path() : root;
 }
 
 //The working directory the tests are written for: tests/src, which ctest sets
 //(tests/src/CMakeLists.txt). The geometry-aid and SALTED-model cases open their inputs relative to it.
 inline std::filesystem::path nos_test_expected_cwd()
 {
-    return nos_test_find_repo_root() / "tests" / "src";
+	return nos_test_find_repo_root() / "tests" / "src";
 }
 
 // error_check ends the process with exit(-1). Windows reports the full value back

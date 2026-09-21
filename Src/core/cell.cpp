@@ -135,7 +135,7 @@ void cell::convert_to_fracs(std::vector<asym_atom>& atoms, const std::string inp
 			inv_cell << constants::bohr2ang(cm[0][0]), constants::bohr2ang(cm[0][1]), constants::bohr2ang(cm[0][2]), constants::bohr2ang(cm[1][0]), constants::bohr2ang(cm[1][1]), constants::bohr2ang(cm[1][2]), constants::bohr2ang(cm[2][0]), constants::bohr2ang(cm[2][1]), constants::bohr2ang(cm[2][2]);
 		}
 		else {
-			std::cerr << "Unknown input unit. Choose 'bohr' or 'angstrom'." << std::endl;
+			std::cerr << "Unknown input unit. Choose 'bohr' or 'angstrom'.\n";
 		}
 		inv_cell = inv_cell.inverse();
 		occ::Vec frac_vec = inv_cell * temp_cart_pos;
@@ -285,7 +285,7 @@ ivec cell::confirm_applied_symmetry(ivec3& linking_list) {
 				}
 			}
 			if (counter != counter2) {
-				std::cerr << "Warning: Symmetry operation not fully matched. Structure seems to be grown improperly!" << std::endl;
+				std::cerr << "Warning: Symmetry operation not fully matched. Structure seems to be grown improperly!\n";
 			}
 		}
 	}

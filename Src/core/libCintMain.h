@@ -40,23 +40,23 @@ void compute2C(Int_Params& params, vec& ret);
  */
 template <typename Kernel>
 void computeRho(
-    const Int_Params& normal_basis,
-    const Int_Params& aux_basis,
-    const dMatrix2& dm,
-    vec& rho,
-    const std::optional<ivec> asym_atm_list = std::nullopt);
+	const Int_Params& normal_basis,
+	const Int_Params& aux_basis,
+	const dMatrix2& dm,
+	vec& rho,
+	const std::optional<ivec> asym_atm_list = std::nullopt);
 
 
 //DEPRICATED::Function to compute electron repulsion integrals
 template <typename Kernel>
 void computeEri3c(Int_Params& param1,
-    Int_Params& param2,
-    vec& eri3c);
+	Int_Params& param2,
+	vec& eri3c);
 
 template <typename Kernel>
 void compute3C(Int_Params& param1,
-    Int_Params& param2,
-    vec& eri3c);
+	Int_Params& param2,
+	vec& eri3c);
 
 
 dMatrix2 get_cart2sph_matrix(const WFN& cart_wfn, const bool normalized);

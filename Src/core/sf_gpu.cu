@@ -119,18 +119,18 @@ bool sf_gpu_available()
 		//NOSPHERA2_CUDA_PORTABLE would be the wrong advice on an AMD card.
 #ifdef NOSPHERA2_USE_HIP
 		std::fprintf(stderr, "NoSpherA2: a GPU is present but this build contains no code "
-		             "for it (%s), so every GPU path will use the CPU. Rebuild with this "
-		             "card's architecture in CMAKE_HIP_ARCHITECTURES.\n", gpuGetErrorString(e));
+					 "for it (%s), so every GPU path will use the CPU. Rebuild with this "
+					 "card's architecture in CMAKE_HIP_ARCHITECTURES.\n", gpuGetErrorString(e));
 #else
 		gpuDeviceProp_t prop{};
 		int dev = 0;
 		if (gpuGetDevice(&dev) == gpuSuccess && gpuGetDeviceProperties(&prop, dev) == gpuSuccess)
 			std::fprintf(stderr, "NoSpherA2: a GPU is present (compute %d.%d) but this build "
-			             "contains no code for it, so every GPU path will use the CPU. "
-			             "Rebuild with -DNOSPHERA2_CUDA_PORTABLE=ON.\n", prop.major, prop.minor);
+						 "contains no code for it, so every GPU path will use the CPU. "
+						 "Rebuild with -DNOSPHERA2_CUDA_PORTABLE=ON.\n", prop.major, prop.minor);
 		else
 			std::fprintf(stderr, "NoSpherA2: a GPU is present but unusable (%s); "
-			             "every GPU path will use the CPU.\n", gpuGetErrorString(e));
+						 "every GPU path will use the CPU.\n", gpuGetErrorString(e));
 #endif
 		return false;
 	}();

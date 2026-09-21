@@ -20,28 +20,28 @@
 // One entry of the Gaussian halting diagnostics, computed once per
 // converged lambda step (see XCW::evaluate_gaussian_halting).
 struct GaussianHaltEntry {
-    double lambda = 0.0;
-    int n_total = 0;      // reflections available before any filtering
-    int n_used = 0;        // reflections actually used (after strong cutoff)
-    double sigma_scale = 1.0; // global rescale applied so <z^2> ~ 1 before the Gaussian test (see XCW_plan.md 4.1)
+	double lambda = 0.0;
+	int n_total = 0;      // reflections available before any filtering
+	int n_used = 0;        // reflections actually used (after strong cutoff)
+	double sigma_scale = 1.0; // global rescale applied so <z^2> ~ 1 before the Gaussian test (see XCW_plan.md 4.1)
 
-    double A2 = 0.0;        // Anderson-Darling statistic against N(0,1)
-    bool ad_reject_5pct = false; // true if A2 exceeds the 5% critical value for a fully specified N(0,1) (2.492)
+	double A2 = 0.0;        // Anderson-Darling statistic against N(0,1)
+	bool ad_reject_5pct = false; // true if A2 exceeds the 5% critical value for a fully specified N(0,1) (2.492)
 
-    double pp_slope = 0.0;    // normal probability plot (Abrahams-Keve) slope, ->1 expected
-    double pp_intercept = 0.0; // ->0 expected
+	double pp_slope = 0.0;    // normal probability plot (Abrahams-Keve) slope, ->1 expected
+	double pp_intercept = 0.0; // ->0 expected
 
-    double skewness = 0.0;    // ->0 expected
-    double excess_kurtosis = 0.0; // ->0 expected
-    double jarque_bera = 0.0;
+	double skewness = 0.0;    // ->0 expected
+	double excess_kurtosis = 0.0; // ->0 expected
+	double jarque_bera = 0.0;
 
-    double resolution_trend_slope = 0.0; // slope of <z^2> vs resolution bin center
-    double resolution_trend_r = 0.0;     // Spearman correlation of <z^2> vs resolution bin
-    bool resolution_trend_flagged = false;
+	double resolution_trend_slope = 0.0; // slope of <z^2> vs resolution bin center
+	double resolution_trend_r = 0.0;     // Spearman correlation of <z^2> vs resolution bin
+	bool resolution_trend_flagged = false;
 
-    double intensity_trend_slope = 0.0; // slope of <z^2> vs |F| decile bin center
-    double intensity_trend_r = 0.0;
-    bool intensity_trend_flagged = false;
+	double intensity_trend_slope = 0.0; // slope of <z^2> vs |F| decile bin center
+	double intensity_trend_r = 0.0;
+	bool intensity_trend_flagged = false;
 };
 
 // Standard normal CDF (Phi) and its inverse (probit), needed for the
@@ -58,8 +58,8 @@ double anderson_darling_statistic(vec z);
 inline constexpr double ANDERSON_DARLING_CRITICAL_5PCT = 2.492;
 
 struct ProbabilityPlotFit {
-    double slope = 1.0;
-    double intercept = 0.0;
+	double slope = 1.0;
+	double intercept = 0.0;
 };
 // Least-squares fit of sorted `z` against the expected standard normal
 // order statistics Phi^-1((i-0.5)/n) (Abrahams & Keve 1971).
@@ -73,9 +73,9 @@ double sample_excess_kurtosis(const vec& z);
 double jarque_bera_statistic(const vec& z);
 
 struct BinnedTrend {
-    double slope = 0.0;
-    double spearman_r = 0.0;
-    bool flagged = false;
+	double slope = 0.0;
+	double spearman_r = 0.0;
+	bool flagged = false;
 };
 // Bins `z` into `n_bins` groups ordered by `key` (e.g. resolution or |F|),
 // computes <z^2> per bin, and reports the linear-regression slope and
@@ -85,17 +85,17 @@ struct BinnedTrend {
 BinnedTrend binned_z_squared_trend(const vec& z, const vec& key, int n_bins, double flag_threshold = 0.5);
 
 struct PolynomialFit {
-    bool valid = false;     // false if not enough points for this degree, or the fit is singular
-    int degree = 0;
-    vec coeffs;              // coeffs[k] is the x^k coefficient; y = Sum_k coeffs[k]*x^k
-    double rss = 0.0;         // residual sum of squares, Sum (y_i - yhat_i)^2
-    double r_squared = 0.0;   // 1 - RSS/TSS, coefficient of determination
-    double aic = std::numeric_limits<double>::infinity(); // Akaike Information Criterion (lower is better)
-    bool has_minimum = false; // true if the fitted curve has an interior local minimum
-                               // (positive curvature) within the search range used by
-                               // choose_best_polynomial_fit
-    double vertex_x = 0.0;    // location of that minimum, only meaningful if has_minimum
-    double vertex_y = 0.0;    // fitted value at vertex_x
+	bool valid = false;     // false if not enough points for this degree, or the fit is singular
+	int degree = 0;
+	vec coeffs;              // coeffs[k] is the x^k coefficient; y = Sum_k coeffs[k]*x^k
+	double rss = 0.0;         // residual sum of squares, Sum (y_i - yhat_i)^2
+	double r_squared = 0.0;   // 1 - RSS/TSS, coefficient of determination
+	double aic = std::numeric_limits<double>::infinity(); // Akaike Information Criterion (lower is better)
+	bool has_minimum = false; // true if the fitted curve has an interior local minimum
+							   // (positive curvature) within the search range used by
+							   // choose_best_polynomial_fit
+	double vertex_x = 0.0;    // location of that minimum, only meaningful if has_minimum
+	double vertex_y = 0.0;    // fitted value at vertex_x
 };
 
 // Least-squares fit of y = Sum_{k=0..degree} coeffs[k]*x^k through (x_i,y_i)
@@ -117,4 +117,4 @@ PolynomialFit fit_polynomial(const vec& x, const vec& y, int degree);
 // which functional forms were tried. Returns an invalid PolynomialFit if
 // none of `degrees` had enough points.
 PolynomialFit choose_best_polynomial_fit(const vec& x, const vec& y, const ivec& degrees,
-    std::vector<PolynomialFit>* all_candidates = nullptr);
+	std::vector<PolynomialFit>* all_candidates = nullptr);

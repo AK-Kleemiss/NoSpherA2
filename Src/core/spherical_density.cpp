@@ -10,1036 +10,1036 @@
 // Optimized integer power function for small exponents
 // This is much faster than std::pow for integer exponents
 inline double fast_int_pow(const double base, const int exponent) {
-    // Handle negative exponents
-    if (exponent < 0) return 1.0 / fast_int_pow(base, -exponent);
+	// Handle negative exponents
+	if (exponent < 0) return 1.0 / fast_int_pow(base, -exponent);
 
-    // Use switch for optimal jump table generation
-    switch (exponent) {
-        case 0: return 1.0;
-        case 1: return base;
-        case 2: return base * base;
-        case 3: return base * base * base;
-        case 4: {
-            const double base2 = base * base;
-            return base2 * base2;
-        }
-        case 5: {
-            const double base2 = base * base;
-            return base2 * base2 * base;
-        }
-        case 6: {
-            const double base2 = base * base;
-            return base2 * base2 * base2;
-        }
-        case 7: {
-            const double base2 = base * base;
-            return base2 * base2 * base2 * base;
-        }
-        case 8: {
-            const double base2 = base * base;
-            const double base4 = base2 * base2;
-            return base4 * base4;
-        }
-        default: {
-            // For larger exponents, use binary exponentiation
-            double result = 1.0;
-            double current_base = base;
-            int exp = exponent;
+	// Use switch for optimal jump table generation
+	switch (exponent) {
+		case 0: return 1.0;
+		case 1: return base;
+		case 2: return base * base;
+		case 3: return base * base * base;
+		case 4: {
+			const double base2 = base * base;
+			return base2 * base2;
+		}
+		case 5: {
+			const double base2 = base * base;
+			return base2 * base2 * base;
+		}
+		case 6: {
+			const double base2 = base * base;
+			return base2 * base2 * base2;
+		}
+		case 7: {
+			const double base2 = base * base;
+			return base2 * base2 * base2 * base;
+		}
+		case 8: {
+			const double base2 = base * base;
+			const double base4 = base2 * base2;
+			return base4 * base4;
+		}
+		default: {
+			// For larger exponents, use binary exponentiation
+			double result = 1.0;
+			double current_base = base;
+			int exp = exponent;
 
-            while (exp > 0) {
-                if (exp & 1) result *= current_base;
-                current_base *= current_base;
-                exp >>= 1;
-            }
-            return result;
-        }
-    }
+			while (exp > 0) {
+				if (exp & 1) result *= current_base;
+				current_base *= current_base;
+				exp >>= 1;
+			}
+			return result;
+		}
+	}
 }
 
 Thakkar::Thakkar(const int g_atom_number, const int ECP_m) : Spherical_Atom(g_atom_number, ECP_m)
 {
-    nex = &(Thakkar_nex[0]);
-    _first_ex = first_ex();
-    ns = &(Thakkar_ns[0]);
-    np = &(Thakkar_np[0]);
-    nd = &(Thakkar_nd[0]);
-    nf = &(Thakkar_nf[0]);
-    occ = &(Thakkar_occ[0]);
-    n = &(Thakkar_n[0]);
-    z = &(Thakkar_z[0]);
-    c = &(Thakkar_c[0]);
-    if (atomic_number == 1)
-        _prev_coef = 0;
-    else
-        _prev_coef = previous_element_coef();
+	nex = &(Thakkar_nex[0]);
+	_first_ex = first_ex();
+	ns = &(Thakkar_ns[0]);
+	np = &(Thakkar_np[0]);
+	nd = &(Thakkar_nd[0]);
+	nf = &(Thakkar_nf[0]);
+	occ = &(Thakkar_occ[0]);
+	n = &(Thakkar_n[0]);
+	z = &(Thakkar_z[0]);
+	c = &(Thakkar_c[0]);
+	if (atomic_number == 1)
+		_prev_coef = 0;
+	else
+		_prev_coef = previous_element_coef();
 };
 Thakkar::Thakkar() : Spherical_Atom()
 {
-    nex = &(Thakkar_nex[0]);
-    _first_ex = first_ex();
-    ns = &(Thakkar_ns[0]);
-    np = &(Thakkar_np[0]);
-    nd = &(Thakkar_nd[0]);
-    nf = &(Thakkar_nf[0]);
-    occ = &(Thakkar_occ[0]);
-    n = &(Thakkar_n[0]);
-    z = &(Thakkar_z[0]);
-    c = &(Thakkar_c[0]);
-    if (atomic_number == 1)
-        _prev_coef = 0;
-    else
-        _prev_coef = previous_element_coef();
+	nex = &(Thakkar_nex[0]);
+	_first_ex = first_ex();
+	ns = &(Thakkar_ns[0]);
+	np = &(Thakkar_np[0]);
+	nd = &(Thakkar_nd[0]);
+	nf = &(Thakkar_nf[0]);
+	occ = &(Thakkar_occ[0]);
+	n = &(Thakkar_n[0]);
+	z = &(Thakkar_z[0]);
+	c = &(Thakkar_c[0]);
+	if (atomic_number == 1)
+		_prev_coef = 0;
+	else
+		_prev_coef = previous_element_coef();
 };
 
 const int Spherical_Atom::first_ex() const
 {
-    if (atomic_number == 1)
-        return 0;
-    else if (atomic_number > 113)
-        return 200000000;
-    int ex = 0;
-    for (int i = 0; i < atomic_number - 1; i++)
-        ex += nex[i];
-    return ex;
+	if (atomic_number == 1)
+		return 0;
+	else if (atomic_number > 113)
+		return 200000000;
+	int ex = 0;
+	for (int i = 0; i < atomic_number - 1; i++)
+		ex += nex[i];
+	return ex;
 };
 
 const int Spherical_Atom::previous_element_coef() const
 {
-    if (atomic_number <= 2)
-        return 0;
-    int counter = 0;
-    for (int temp = atomic_number - 2; temp >= 0; temp--)
-    {
-        for (int m = 0; m < 7; m++)
-            if (occ[temp * 19 + 0 + m] != 0)
-                counter += ns[temp];
-        for (int m = 0; m < 6; m++)
-            if (occ[temp * 19 + 7 + m] != 0)
-                counter += np[temp];
-        for (int m = 0; m < 4; m++)
-            if (occ[temp * 19 + 13 + m] != 0)
-                counter += nd[temp];
-        for (int m = 0; m < 2; m++)
-            if (occ[temp * 19 + 17 + m] != 0)
-                counter += nf[temp];
-    }
-    return counter;
+	if (atomic_number <= 2)
+		return 0;
+	int counter = 0;
+	for (int temp = atomic_number - 2; temp >= 0; temp--)
+	{
+		for (int m = 0; m < 7; m++)
+			if (occ[temp * 19 + 0 + m] != 0)
+				counter += ns[temp];
+		for (int m = 0; m < 6; m++)
+			if (occ[temp * 19 + 7 + m] != 0)
+				counter += np[temp];
+		for (int m = 0; m < 4; m++)
+			if (occ[temp * 19 + 13 + m] != 0)
+				counter += nd[temp];
+		for (int m = 0; m < 2; m++)
+			if (occ[temp * 19 + 17 + m] != 0)
+				counter += nf[temp];
+	}
+	return counter;
 };
 
 void Thakkar::calc_orbs(
-    int &nr_ex,
-    int &nr_coef,
-    const double &dist,
-    const int &offset,
-    const int *n_vector,
-    const int lower_m,
-    const int upper_m,
-    double *Orb) const
+	int &nr_ex,
+	int &nr_coef,
+	const double &dist,
+	const int &offset,
+	const int *n_vector,
+	const int lower_m,
+	const int upper_m,
+	double *Orb) const
 {
-    // Kahan compensated summation: the terms below are a Slater-type
-    // expansion with large-magnitude, alternating-sign contributions that
-    // can nearly cancel in the density tail (far from the nucleus). Naive
-    // accumulation loses precision to rounding error from the addition
-    // order itself; compensated summation removes that source, leaving
-    // only the true per-term input differences (e.g. libm rounding).
-    double exponent;
-    double comp[19] = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
-    for (int ex = 0; ex < n_vector[atomic_number - 1]; ex++)
-    {
-        for (int m = lower_m; m < upper_m; m++)
-        {
-            if (occ[offset + m] == 0)
-                continue;
-            exponent = -z[nr_ex] * dist;
-            if (exponent > -46.5)
-            { // Corresponds to at least 1E-20
-                const double term = (n[nr_ex] == 1)
-                    ? c[nr_coef] * exp(exponent)
-                    : c[nr_coef] * fast_int_pow(dist, n[nr_ex] - 1) * exp(exponent);
-                const double y = term - comp[m];
-                const double t = Orb[m] + y;
-                comp[m] = (t - Orb[m]) - y;
-                Orb[m] = t;
-            }
-            nr_coef++;
-        }
-        nr_ex++;
-    }
+	// Kahan compensated summation: the terms below are a Slater-type
+	// expansion with large-magnitude, alternating-sign contributions that
+	// can nearly cancel in the density tail (far from the nucleus). Naive
+	// accumulation loses precision to rounding error from the addition
+	// order itself; compensated summation removes that source, leaving
+	// only the true per-term input differences (e.g. libm rounding).
+	double exponent;
+	double comp[19] = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
+	for (int ex = 0; ex < n_vector[atomic_number - 1]; ex++)
+	{
+		for (int m = lower_m; m < upper_m; m++)
+		{
+			if (occ[offset + m] == 0)
+				continue;
+			exponent = -z[nr_ex] * dist;
+			if (exponent > -46.5)
+			{ // Corresponds to at least 1E-20
+				const double term = (n[nr_ex] == 1)
+					? c[nr_coef] * exp(exponent)
+					: c[nr_coef] * fast_int_pow(dist, n[nr_ex] - 1) * exp(exponent);
+				const double y = term - comp[m];
+				const double t = Orb[m] + y;
+				comp[m] = (t - Orb[m]) - y;
+				Orb[m] = t;
+			}
+			nr_coef++;
+		}
+		nr_ex++;
+	}
 }
 
 //ponytail: plain summation, the Kahan compensation of calc_orbs is for the density tail where the derivatives are not used
 void Thakkar::calc_orbs_deriv(int& nr_ex, int& nr_coef, const double& dist, const int& offset, const int* n_vector,
-    const int lower_m, const int upper_m, double* Orb, double* dOrb, double* ddOrb) const
+	const int lower_m, const int upper_m, double* Orb, double* dOrb, double* ddOrb) const
 {
-    for (int ex = 0; ex < n_vector[atomic_number - 1]; ex++) {
-        for (int m = lower_m; m < upper_m; m++) {
-            if (occ[offset + m] == 0) continue;
-            const double zz = z[nr_ex], exponent = -zz * dist;
-            if (exponent > -46.5) {
-                //r^(n-1) exp(-z r): the powers r^(n-1), r^(n-2), r^(n-3), each 0 where its exponent is negative
-                const int nn = n[nr_ex];
-                const double e = c[nr_coef] * exp(exponent);
-                const double p1 = nn >= 2 ? fast_int_pow(dist, nn - 1) : 1.0;
-                const double p2 = nn >= 3 ? fast_int_pow(dist, nn - 2) : (nn == 2 ? 1.0 : 0.0);
-                const double p3 = nn >= 4 ? fast_int_pow(dist, nn - 3) : (nn == 3 ? 1.0 : 0.0);
-                Orb[m] += e * p1;
-                dOrb[m] += e * ((nn - 1) * p2 - zz * p1);
-                ddOrb[m] += e * ((nn - 1) * (nn - 2) * p3 - 2 * zz * (nn - 1) * p2 + zz * zz * p1);
-            }
-            nr_coef++;
-        }
-        nr_ex++;
-    }
+	for (int ex = 0; ex < n_vector[atomic_number - 1]; ex++) {
+		for (int m = lower_m; m < upper_m; m++) {
+			if (occ[offset + m] == 0) continue;
+			const double zz = z[nr_ex], exponent = -zz * dist;
+			if (exponent > -46.5) {
+				//r^(n-1) exp(-z r): the powers r^(n-1), r^(n-2), r^(n-3), each 0 where its exponent is negative
+				const int nn = n[nr_ex];
+				const double e = c[nr_coef] * exp(exponent);
+				const double p1 = nn >= 2 ? fast_int_pow(dist, nn - 1) : 1.0;
+				const double p2 = nn >= 3 ? fast_int_pow(dist, nn - 2) : (nn == 2 ? 1.0 : 0.0);
+				const double p3 = nn >= 4 ? fast_int_pow(dist, nn - 3) : (nn == 3 ? 1.0 : 0.0);
+				Orb[m] += e * p1;
+				dOrb[m] += e * ((nn - 1) * p2 - zz * p1);
+				ddOrb[m] += e * ((nn - 1) * (nn - 2) * p3 - 2 * zz * (nn - 1) * p2 + zz * zz * p1);
+			}
+			nr_coef++;
+		}
+		nr_ex++;
+	}
 }
 
 const double Thakkar::get_radial_density(const double& dist, double& d1, double& d2) const
 {
-    if (atomic_number == 1) {
-        const double rho = 6.0835 * exp(-2.3 * dist) / constants::FOUR_PI;
-        d1 = -2.3 * rho;
-        d2 = 2.3 * 2.3 * rho;
-        return rho;
-    }
-    d1 = d2 = 0.0;
-    if (_first_ex == 200000000) return -20;
-    int nr_coef = _prev_coef, nr_ex = _first_ex;
-    double Orb[19] = {}, dOrb[19] = {}, ddOrb[19] = {};
-    calc_orbs_deriv(nr_ex, nr_coef, dist, _offset, ns, 0, 7, Orb, dOrb, ddOrb);
-    calc_orbs_deriv(nr_ex, nr_coef, dist, _offset, np, 7, 13, Orb, dOrb, ddOrb);
-    calc_orbs_deriv(nr_ex, nr_coef, dist, _offset, nd, 13, 17, Orb, dOrb, ddOrb);
-    calc_orbs_deriv(nr_ex, nr_coef, dist, _offset, nf, 17, 19, Orb, dOrb, ddOrb);
-    double Rho = 0.0;
-    for (int m = 0; m < 19; m++) {
-        if (occ[_offset + m] == 0) continue;
-        Rho += occ[_offset + m] * Orb[m] * Orb[m];
-        d1 += occ[_offset + m] * 2 * Orb[m] * dOrb[m];
-        d2 += occ[_offset + m] * 2 * (dOrb[m] * dOrb[m] + Orb[m] * ddOrb[m]);
-    }
-    d1 /= constants::FOUR_PI;
-    d2 /= constants::FOUR_PI;
-    return Rho / constants::FOUR_PI;
+	if (atomic_number == 1) {
+		const double rho = 6.0835 * exp(-2.3 * dist) / constants::FOUR_PI;
+		d1 = -2.3 * rho;
+		d2 = 2.3 * 2.3 * rho;
+		return rho;
+	}
+	d1 = d2 = 0.0;
+	if (_first_ex == 200000000) return -20;
+	int nr_coef = _prev_coef, nr_ex = _first_ex;
+	double Orb[19] = {}, dOrb[19] = {}, ddOrb[19] = {};
+	calc_orbs_deriv(nr_ex, nr_coef, dist, _offset, ns, 0, 7, Orb, dOrb, ddOrb);
+	calc_orbs_deriv(nr_ex, nr_coef, dist, _offset, np, 7, 13, Orb, dOrb, ddOrb);
+	calc_orbs_deriv(nr_ex, nr_coef, dist, _offset, nd, 13, 17, Orb, dOrb, ddOrb);
+	calc_orbs_deriv(nr_ex, nr_coef, dist, _offset, nf, 17, 19, Orb, dOrb, ddOrb);
+	double Rho = 0.0;
+	for (int m = 0; m < 19; m++) {
+		if (occ[_offset + m] == 0) continue;
+		Rho += occ[_offset + m] * Orb[m] * Orb[m];
+		d1 += occ[_offset + m] * 2 * Orb[m] * dOrb[m];
+		d2 += occ[_offset + m] * 2 * (dOrb[m] * dOrb[m] + Orb[m] * ddOrb[m]);
+	}
+	d1 /= constants::FOUR_PI;
+	d2 /= constants::FOUR_PI;
+	return Rho / constants::FOUR_PI;
 }
 
 void Thakkar::calc_custom_orbs(
-    int &nr_ex,
-    int &nr_coef,
-    const double &dist,
-    const int &offset,
-    const int *n_vector,
-    const int lower_m,
-    const int upper_m,
-    const int &max,
-    const int &min,
-    double *Orb) const
+	int &nr_ex,
+	int &nr_coef,
+	const double &dist,
+	const int &offset,
+	const int *n_vector,
+	const int lower_m,
+	const int upper_m,
+	const int &max,
+	const int &min,
+	double *Orb) const
 {
-    const int upper_ex = n_vector[atomic_number - 1];
-    const int m_start = lower_m + min;
-    const int m_threshold = lower_m + max;
+	const int upper_ex = n_vector[atomic_number - 1];
+	const int m_start = lower_m + min;
+	const int m_threshold = lower_m + max;
 
-    // Early exit if no valid m range
-    if (m_start >= upper_m || m_start >= m_threshold) {
-        // Still need to advance counters correctly
-        for (int ex = 0; ex < upper_ex; ex++, nr_ex++) {
-            for (int m = m_start; m < upper_m; m++) {
-                if (occ[offset + m] != 0) {
-                    nr_coef++;
-                }
-            }
-        }
-        return;
-    }
+	// Early exit if no valid m range
+	if (m_start >= upper_m || m_start >= m_threshold) {
+		// Still need to advance counters correctly
+		for (int ex = 0; ex < upper_ex; ex++, nr_ex++) {
+			for (int m = m_start; m < upper_m; m++) {
+				if (occ[offset + m] != 0) {
+					nr_coef++;
+				}
+			}
+		}
+		return;
+	}
 
-    for (int ex = 0; ex < upper_ex; ex++, nr_ex++)
-    {
-        const double _z = z[nr_ex];
-        const int _n = n[nr_ex] - 1;
+	for (int ex = 0; ex < upper_ex; ex++, nr_ex++)
+	{
+		const double _z = z[nr_ex];
+		const int _n = n[nr_ex] - 1;
 
-        // Precompute exponent once per outer loop - major optimization
-        const double exponent = -_z * dist;
+		// Precompute exponent once per outer loop - major optimization
+		const double exponent = -_z * dist;
 
-        // Early exit if exponent too small - moved outside inner loop
-        if (exponent <= -46.5) {
-            // Skip this exponential entirely but advance coefficient counter
-            for (int m = m_start; m < upper_m; m++) {
-                if (occ[offset + m] != 0) {
-                    nr_coef++;
-                }
-            }
-            continue;
-        }
+		// Early exit if exponent too small - moved outside inner loop
+		if (exponent <= -46.5) {
+			// Skip this exponential entirely but advance coefficient counter
+			for (int m = m_start; m < upper_m; m++) {
+				if (occ[offset + m] != 0) {
+					nr_coef++;
+				}
+			}
+			continue;
+		}
 
-        // Compute exp once per outer iteration instead of per inner iteration
-        const double exp_val = exp(exponent);
+		// Compute exp once per outer iteration instead of per inner iteration
+		const double exp_val = exp(exponent);
 
-        if (_n != 0) {
-            const double dist_pow = fast_int_pow(dist, _n);
-            const double combined = exp_val * dist_pow;
+		if (_n != 0) {
+			const double dist_pow = fast_int_pow(dist, _n);
+			const double combined = exp_val * dist_pow;
 
-            for (int m = m_start; m < upper_m; m++)
-            {
-                if (occ[offset + m] != 0) {
-                    if (m < m_threshold) {
-                        Orb[m] += c[nr_coef] * combined;
-                    }
-                    nr_coef++;
-                }
-            }
-        }
-        else {
-            // Fast path for _n == 0 case (no power calculation needed)
-            for (int m = m_start; m < upper_m; m++)
-            {
-                if (occ[offset + m] != 0) {
-                    if (m < m_threshold) {
-                        Orb[m] += c[nr_coef] * exp_val;
-                    }
-                    nr_coef++;
-                }
-            }
-        }
-    }
+			for (int m = m_start; m < upper_m; m++)
+			{
+				if (occ[offset + m] != 0) {
+					if (m < m_threshold) {
+						Orb[m] += c[nr_coef] * combined;
+					}
+					nr_coef++;
+				}
+			}
+		}
+		else {
+			// Fast path for _n == 0 case (no power calculation needed)
+			for (int m = m_start; m < upper_m; m++)
+			{
+				if (occ[offset + m] != 0) {
+					if (m < m_threshold) {
+						Orb[m] += c[nr_coef] * exp_val;
+					}
+					nr_coef++;
+				}
+			}
+		}
+	}
 }
 
 const double Thakkar::get_radial_density(const double &dist) const
 {
-    // Speedup things for H
-    if (atomic_number == 1)
-        return 6.0835 * exp(-2.3 * dist) / constants::FOUR_PI;
+	// Speedup things for H
+	if (atomic_number == 1)
+		return 6.0835 * exp(-2.3 * dist) / constants::FOUR_PI;
 
-    double Rho = 0.0;
-    if (_first_ex == 200000000)
-        return -20;
-    int nr_coef = _prev_coef;
-    int nr_ex = _first_ex;
+	double Rho = 0.0;
+	if (_first_ex == 200000000)
+		return -20;
+	int nr_coef = _prev_coef;
+	int nr_ex = _first_ex;
 
-    double Orb[19] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+	double Orb[19] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
-    calc_orbs(nr_ex, nr_coef, dist, _offset, ns, 0, 7, Orb);
-    calc_orbs(nr_ex, nr_coef, dist, _offset, np, 7, 13, Orb);
-    calc_orbs(nr_ex, nr_coef, dist, _offset, nd, 13, 17, Orb);
-    calc_orbs(nr_ex, nr_coef, dist, _offset, nf, 17, 19, Orb);
+	calc_orbs(nr_ex, nr_coef, dist, _offset, ns, 0, 7, Orb);
+	calc_orbs(nr_ex, nr_coef, dist, _offset, np, 7, 13, Orb);
+	calc_orbs(nr_ex, nr_coef, dist, _offset, nd, 13, 17, Orb);
+	calc_orbs(nr_ex, nr_coef, dist, _offset, nf, 17, 19, Orb);
 
-    for (int m = 0; m < 19; m++)
-    {
-        if (Orb[m] == 0 || occ[_offset + m] == 0)
-            continue;
-        Rho += occ[_offset + m] * pow(Orb[m], 2);
-    }
-    return Rho / (constants::FOUR_PI);
+	for (int m = 0; m < 19; m++)
+	{
+		if (Orb[m] == 0 || occ[_offset + m] == 0)
+			continue;
+		Rho += occ[_offset + m] * pow(Orb[m], 2);
+	}
+	return Rho / (constants::FOUR_PI);
 };
 
 const double Thakkar::get_radial_custom_density(const double &dist,
-    const int &max_s,
-    const int &max_p,
-    const int &max_d,
-    const int &max_f,
-    const int &min_s,
-    const int &min_p,
-    const int &min_d,
-    const int &min_f) const
+	const int &max_s,
+	const int &max_p,
+	const int &max_d,
+	const int &max_f,
+	const int &min_s,
+	const int &min_p,
+	const int &min_d,
+	const int &min_f) const
 {
-    // Speedup things for H
-    if (atomic_number == 1)
-        return 6.0835 * exp(-2.3 * dist) / constants::FOUR_PI;
+	// Speedup things for H
+	if (atomic_number == 1)
+		return 6.0835 * exp(-2.3 * dist) / constants::FOUR_PI;
 
-    double Rho = 0.0;
-    if (_first_ex == 200000000)
-        return -20;
+	double Rho = 0.0;
+	if (_first_ex == 200000000)
+		return -20;
 
-    double Orb[19] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-    int nr_coef = _prev_coef;
-    int nr_ex = _first_ex;
+	double Orb[19] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+	int nr_coef = _prev_coef;
+	int nr_ex = _first_ex;
 
-    calc_custom_orbs(nr_ex, nr_coef, dist, _offset, ns, 0, 7, max_s, min_s, Orb);
-    calc_custom_orbs(nr_ex, nr_coef, dist, _offset, np, 7, 13, max_p, min_p, Orb);
-    calc_custom_orbs(nr_ex, nr_coef, dist, _offset, nd, 13, 17, max_d, min_d, Orb);
-    calc_custom_orbs(nr_ex, nr_coef, dist, _offset, nf, 17, 19, max_f, min_f, Orb);
+	calc_custom_orbs(nr_ex, nr_coef, dist, _offset, ns, 0, 7, max_s, min_s, Orb);
+	calc_custom_orbs(nr_ex, nr_coef, dist, _offset, np, 7, 13, max_p, min_p, Orb);
+	calc_custom_orbs(nr_ex, nr_coef, dist, _offset, nd, 13, 17, max_d, min_d, Orb);
+	calc_custom_orbs(nr_ex, nr_coef, dist, _offset, nf, 17, 19, max_f, min_f, Orb);
 
-    for (int m = 0; m < 19; m++)
-    {
-        if (Orb[m] == 0 || occ[_offset + m] == 0)
-            continue;
-        Rho += occ[_offset + m] * pow(Orb[m], 2);
-    }
-    return Rho / (constants::FOUR_PI);
+	for (int m = 0; m < 19; m++)
+	{
+		if (Orb[m] == 0 || occ[_offset + m] == 0)
+			continue;
+		Rho += occ[_offset + m] * pow(Orb[m], 2);
+	}
+	return Rho / (constants::FOUR_PI);
 };
 
 constexpr double cosinus_integral(const int N, const double z, const double k);
 
 static constexpr double sinus_integral(const int N, const double z, const double k)
 {
-    // Calculates the integral 0 - inf r ^ N e ^ -zr sin(kr) dr through recursion using the general integral int e^ax sin(bx) dx = -e^-ax/(a^2+b^2) * (a sin(bx) + b cos(bx)) and partial integration
-    if (N == 0)
-        return k / (z * z + k * k);
-    else
-        return N / (z * z + k * k) * (z * sinus_integral(N - 1, z, k) + k * cosinus_integral(N - 1, z, k));
+	// Calculates the integral 0 - inf r ^ N e ^ -zr sin(kr) dr through recursion using the general integral int e^ax sin(bx) dx = -e^-ax/(a^2+b^2) * (a sin(bx) + b cos(bx)) and partial integration
+	if (N == 0)
+		return k / (z * z + k * k);
+	else
+		return N / (z * z + k * k) * (z * sinus_integral(N - 1, z, k) + k * cosinus_integral(N - 1, z, k));
 };
 
 constexpr double cosinus_integral(const int N, const double z, const double k)
 {
-    // Calculates the integral 0 - inf r ^ N e ^ -zr cos(kr) dr through recursion using the general integral int e^ax cos(bx) dx = -e^-ax/(a^2+b^2) * (a cos(bx) - b sin(bx)) and partial integration
-    if (N == 0)
-        return z / (z * z + k * k);
-    else
-        return N / (z * z + k * k) * (z * cosinus_integral(N - 1, z, k) - k * sinus_integral(N - 1, z, k));
+	// Calculates the integral 0 - inf r ^ N e ^ -zr cos(kr) dr through recursion using the general integral int e^ax cos(bx) dx = -e^-ax/(a^2+b^2) * (a cos(bx) - b sin(bx)) and partial integration
+	if (N == 0)
+		return z / (z * z + k * k);
+	else
+		return N / (z * z + k * k) * (z * cosinus_integral(N - 1, z, k) - k * sinus_integral(N - 1, z, k));
 };
 
 const double Thakkar::get_form_factor(const double &k_vector) const
 {
-    return get_custom_form_factor(k_vector, 7, 6, 4, 2, 0, 0, 0, 0);
+	return get_custom_form_factor(k_vector, 7, 6, 4, 2, 0, 0, 0, 0);
 };
 
 void set_core_counts(int *max_s, int *max_p, int *max_d, int *max_f, const int &core_els, const int &ECP_mode)
 {
-    if (ECP_mode == 1 || ECP_mode == 3)
-    {
-        // If there are no core electrons, there is nothing to set for core orbital counts, so return early.
-        if (core_els == 0)
-            return;
-        if (core_els == 2)
-        {
-            *max_s = 1;
-            *max_p = 0;
-            *max_d = 0;
-            *max_f = 0;
-        }
-        else if (core_els == 10)
-        {
-            *max_s = 2;
-            *max_p = 1;
-            *max_d = 0;
-            *max_f = 0;
-        }
-        else if (core_els == 18)
-        {
-            *max_s = 3;
-            *max_p = 2;
-            *max_d = 0;
-            *max_f = 0;
-        }
-        else if (core_els == 28)
-        {
-            *max_s = 3;
-            *max_p = 2;
-            *max_d = 1;
-            *max_f = 0;
-        }
-        else if (core_els == 46)
-        {
-            *max_s = 4;
-            *max_p = 3;
-            *max_d = 2;
-            *max_f = 0;
-        }
-        else if (core_els == 60)
-        {
-            *max_s = 4;
-            *max_p = 3;
-            *max_d = 2;
-            *max_f = 1;
-        }
-        else if (core_els == 78)
-        {
-            *max_s = 5;
-            *max_p = 4;
-            *max_d = 3;
-            *max_f = 1;
-        }
-        else
-        {
-            err_not_impl_f("PLEASE DO NOT MAKE MORE ELECTRONS CORE ELECTRONS!", std::cout);
-            return;
-        }
-    }
-    else if (ECP_mode == 2)
-    {
-        if (core_els == 0)
-            return;
-        if (core_els == 2)
-        {
-            *max_s = 1;
-            *max_p = 0;
-            *max_d = 0;
-            *max_f = 0;
-        }
-        else if (core_els == 10)
-        {
-            *max_s = 2;
-            *max_p = 1;
-            *max_d = 0;
-            *max_f = 0;
-        }
-        else if (core_els == 18)
-        {
-            *max_s = 3;
-            *max_p = 2;
-            *max_d = 0;
-            *max_f = 0;
-        }
-        else if (core_els == 28)
-        {
-            *max_s = 3;
-            *max_p = 2;
-            *max_d = 1;
-            *max_f = 0;
-        }
-        else if (core_els == 36)
-        {
-            *max_s = 4;
-            *max_p = 3;
-            *max_d = 1;
-            *max_f = 0;
-        }
-        else if (core_els == 46)
-        {
-            *max_s = 4;
-            *max_p = 3;
-            *max_d = 2;
-            *max_f = 0;
-        }
-        else if (core_els == 54)
-        {
-            *max_s = 5;
-            *max_p = 4;
-            *max_d = 2;
-            *max_f = 0;
-        }
-        else if (core_els > 54 && core_els < 69)
-        {
-            *max_s = 5;
-            *max_p = 4;
-            *max_d = 2;
-            *max_f = 1;
-        }
-        else if (core_els == 78)
-        {
-            *max_s = 5;
-            *max_p = 4;
-            *max_d = 3;
-            *max_f = 1;
-        }
-        else
-        {
-            err_not_impl_f("PLEASE DO NOT MAKE MORE ELECTRONS CORE ELECTRONS!", std::cout);
-            return;
-        }
-    }
-    else
-    {
-        err_not_impl_f("PLEASE DO NOT MAKE MORE ELECTRONS CORE ELECTRONS!", std::cout);
-        return;
-    }
+	if (ECP_mode == 1 || ECP_mode == 3)
+	{
+		// If there are no core electrons, there is nothing to set for core orbital counts, so return early.
+		if (core_els == 0)
+			return;
+		if (core_els == 2)
+		{
+			*max_s = 1;
+			*max_p = 0;
+			*max_d = 0;
+			*max_f = 0;
+		}
+		else if (core_els == 10)
+		{
+			*max_s = 2;
+			*max_p = 1;
+			*max_d = 0;
+			*max_f = 0;
+		}
+		else if (core_els == 18)
+		{
+			*max_s = 3;
+			*max_p = 2;
+			*max_d = 0;
+			*max_f = 0;
+		}
+		else if (core_els == 28)
+		{
+			*max_s = 3;
+			*max_p = 2;
+			*max_d = 1;
+			*max_f = 0;
+		}
+		else if (core_els == 46)
+		{
+			*max_s = 4;
+			*max_p = 3;
+			*max_d = 2;
+			*max_f = 0;
+		}
+		else if (core_els == 60)
+		{
+			*max_s = 4;
+			*max_p = 3;
+			*max_d = 2;
+			*max_f = 1;
+		}
+		else if (core_els == 78)
+		{
+			*max_s = 5;
+			*max_p = 4;
+			*max_d = 3;
+			*max_f = 1;
+		}
+		else
+		{
+			err_not_impl_f("PLEASE DO NOT MAKE MORE ELECTRONS CORE ELECTRONS!", std::cout);
+			return;
+		}
+	}
+	else if (ECP_mode == 2)
+	{
+		if (core_els == 0)
+			return;
+		if (core_els == 2)
+		{
+			*max_s = 1;
+			*max_p = 0;
+			*max_d = 0;
+			*max_f = 0;
+		}
+		else if (core_els == 10)
+		{
+			*max_s = 2;
+			*max_p = 1;
+			*max_d = 0;
+			*max_f = 0;
+		}
+		else if (core_els == 18)
+		{
+			*max_s = 3;
+			*max_p = 2;
+			*max_d = 0;
+			*max_f = 0;
+		}
+		else if (core_els == 28)
+		{
+			*max_s = 3;
+			*max_p = 2;
+			*max_d = 1;
+			*max_f = 0;
+		}
+		else if (core_els == 36)
+		{
+			*max_s = 4;
+			*max_p = 3;
+			*max_d = 1;
+			*max_f = 0;
+		}
+		else if (core_els == 46)
+		{
+			*max_s = 4;
+			*max_p = 3;
+			*max_d = 2;
+			*max_f = 0;
+		}
+		else if (core_els == 54)
+		{
+			*max_s = 5;
+			*max_p = 4;
+			*max_d = 2;
+			*max_f = 0;
+		}
+		else if (core_els > 54 && core_els < 69)
+		{
+			*max_s = 5;
+			*max_p = 4;
+			*max_d = 2;
+			*max_f = 1;
+		}
+		else if (core_els == 78)
+		{
+			*max_s = 5;
+			*max_p = 4;
+			*max_d = 3;
+			*max_f = 1;
+		}
+		else
+		{
+			err_not_impl_f("PLEASE DO NOT MAKE MORE ELECTRONS CORE ELECTRONS!", std::cout);
+			return;
+		}
+	}
+	else
+	{
+		err_not_impl_f("PLEASE DO NOT MAKE MORE ELECTRONS CORE ELECTRONS!", std::cout);
+		return;
+	}
 };
 
 const double Thakkar::get_core_form_factor(const double &k_vector, const int &core_els) const
 {
-    int max_s = 0, max_p = 0, max_d = 0, max_f = 0;
-    set_core_counts(&max_s, &max_p, &max_d, &max_f, core_els, ECP_mode);
-    return get_custom_form_factor(k_vector, max_s, max_p, max_d, max_f, 0, 0, 0, 0);
+	int max_s = 0, max_p = 0, max_d = 0, max_f = 0;
+	set_core_counts(&max_s, &max_p, &max_d, &max_f, core_els, ECP_mode);
+	return get_custom_form_factor(k_vector, max_s, max_p, max_d, max_f, 0, 0, 0, 0);
 };
 
 const double Thakkar::get_core_density(const double &dist, const int &core_els)
 {
-    int max_s = 0, max_p = 0, max_d = 0, max_f = 0;
-    set_core_counts(&max_s, &max_p, &max_d, &max_f, core_els, ECP_mode);
-    return get_radial_custom_density(dist, max_s, max_p, max_d, max_f, 0, 0, 0, 0);
+	int max_s = 0, max_p = 0, max_d = 0, max_f = 0;
+	set_core_counts(&max_s, &max_p, &max_d, &max_f, core_els, ECP_mode);
+	return get_radial_custom_density(dist, max_s, max_p, max_d, max_f, 0, 0, 0, 0);
 };
 
 static double calc_int(const int &occ, const double &coef, const double &exp, const int &radial_exp, const double &k_vector)
 {
-    return occ * coef * sinus_integral(radial_exp, exp, k_vector);
+	return occ * coef * sinus_integral(radial_exp, exp, k_vector);
 }
 
 static double calc_int_at_k0(const int &occ, const double &coef, const double &exp, const int &radial_exp, const double &)
 {
-    // k -> 0 limit of sinus_integral(N, z, k) / k = Int r^(N+1) e^{-zr} dr = (N+1)! / z^(N+2)
-    return occ * coef * constants::ft[radial_exp + 1] / pow(exp, radial_exp + 2);
+	// k -> 0 limit of sinus_integral(N, z, k) / k = Int r^(N+1) e^{-zr} dr = (N+1)! / z^(N+2)
+	return occ * coef * constants::ft[radial_exp + 1] / pow(exp, radial_exp + 2);
 }
 
 double Thakkar::calc_type(
-    int &nr_ex,
-    int &nr_coef,
-    const double &k_vector,
-    const int &offset,
-    const int *n_vector,
-    const int lower_m,
-    const int upper_m,
-    const int &max,
-    const int &min) const
+	int &nr_ex,
+	int &nr_coef,
+	const double &k_vector,
+	const int &offset,
+	const int *n_vector,
+	const int lower_m,
+	const int upper_m,
+	const int &max,
+	const int &min) const
 {
 
-    std::function<double(const int &, const double &, const double &, const int &, const double &)> func;
-    if (k_vector == 0)
-        func = calc_int_at_k0;
-    else
-        func = calc_int;
-    const int l_n = n_vector[atomic_number - 1];
-    double temp, result = 0;
-    int i_j_distance = 0;
-    for (int m = lower_m; m < upper_m; m++)
-        if (occ[offset + m] != 0)
-            i_j_distance++;
-    for (int m = lower_m + min; m < lower_m + max; m++)
-    {
-        const int offset_m = offset + m;
-        if (occ[offset_m] == 0)
-            continue;
-        const int coef_n = nr_coef + m - lower_m;
-        for (int i = 0; i < l_n; i++)
-        {
-            const int nr_ex_i = nr_ex + i;
-            for (int j = 0; j < l_n - i; j++)
-            {
-                temp = func(occ[offset_m],
-                    c[coef_n + i * i_j_distance] * c[coef_n + (i + j) * i_j_distance],
-                    z[nr_ex_i] + z[nr_ex_i + j],
-                    n[nr_ex_i] + n[nr_ex_i + j] - 1,
-                    k_vector);
-                if (j != 0)
-                    result += 2 * temp;
-                else
-                    result += temp;
-            }
-        }
-    }
-    nr_coef += i_j_distance * l_n;
-    nr_ex += l_n;
-    return result;
+	std::function<double(const int &, const double &, const double &, const int &, const double &)> func;
+	if (k_vector == 0)
+		func = calc_int_at_k0;
+	else
+		func = calc_int;
+	const int l_n = n_vector[atomic_number - 1];
+	double temp, result = 0;
+	int i_j_distance = 0;
+	for (int m = lower_m; m < upper_m; m++)
+		if (occ[offset + m] != 0)
+			i_j_distance++;
+	for (int m = lower_m + min; m < lower_m + max; m++)
+	{
+		const int offset_m = offset + m;
+		if (occ[offset_m] == 0)
+			continue;
+		const int coef_n = nr_coef + m - lower_m;
+		for (int i = 0; i < l_n; i++)
+		{
+			const int nr_ex_i = nr_ex + i;
+			for (int j = 0; j < l_n - i; j++)
+			{
+				temp = func(occ[offset_m],
+					c[coef_n + i * i_j_distance] * c[coef_n + (i + j) * i_j_distance],
+					z[nr_ex_i] + z[nr_ex_i + j],
+					n[nr_ex_i] + n[nr_ex_i + j] - 1,
+					k_vector);
+				if (j != 0)
+					result += 2 * temp;
+				else
+					result += temp;
+			}
+		}
+	}
+	nr_coef += i_j_distance * l_n;
+	nr_ex += l_n;
+	return result;
 }
 
 const double Thakkar::get_custom_form_factor(
-    const double &k_vector,
-    const int &max_s,
-    const int &max_p,
-    const int &max_d,
-    const int &max_f,
-    const int &min_s,
-    const int &min_p,
-    const int &min_d,
-    const int &min_f) const
+	const double &k_vector,
+	const int &max_s,
+	const int &max_p,
+	const int &max_d,
+	const int &max_f,
+	const int &min_s,
+	const int &min_p,
+	const int &min_d,
+	const int &min_f) const
 {
 
-    double result(0.0);
+	double result(0.0);
 
-    if (_first_ex == 200000000)
-        return -20;
-    int nr_coef = _prev_coef;
-    int nr_ex = _first_ex;
+	if (_first_ex == 200000000)
+		return -20;
+	int nr_coef = _prev_coef;
+	int nr_ex = _first_ex;
 
-    result += calc_type(nr_ex, nr_coef, k_vector, _offset, ns, 0, 7, max_s, min_s);
-    result += calc_type(nr_ex, nr_coef, k_vector, _offset, np, 7, 13, max_p, min_p);
-    result += calc_type(nr_ex, nr_coef, k_vector, _offset, nd, 13, 17, max_d, min_d);
-    result += calc_type(nr_ex, nr_coef, k_vector, _offset, nf, 17, 19, max_f, min_f);
+	result += calc_type(nr_ex, nr_coef, k_vector, _offset, ns, 0, 7, max_s, min_s);
+	result += calc_type(nr_ex, nr_coef, k_vector, _offset, np, 7, 13, max_p, min_p);
+	result += calc_type(nr_ex, nr_coef, k_vector, _offset, nd, 13, 17, max_d, min_d);
+	result += calc_type(nr_ex, nr_coef, k_vector, _offset, nf, 17, 19, max_f, min_f);
 
-    if (k_vector != 0)
-        return result / k_vector;
-    else
-        return result;
+	if (k_vector != 0)
+		return result / k_vector;
+	else
+		return result;
 };
 
 void Thakkar::make_interpolator(const double &incr, const double &min_dist) {
-    lincr = log(incr);
-    start = min_dist;
-    double current = 1;
-    double _dist = min_dist;
-    while (current > 1E-12)
-    {
-        radial_dist.push_back(_dist);
-        current = get_radial_density(_dist);
-        radial_density.push_back(current);
-        _dist *= incr;
-    }
-    radial_second_deriv = natural_cubic_spline_second_derivatives(radial_dist, radial_density);
+	lincr = log(incr);
+	start = min_dist;
+	double current = 1;
+	double _dist = min_dist;
+	while (current > 1E-12)
+	{
+		radial_dist.push_back(_dist);
+		current = get_radial_density(_dist);
+		radial_density.push_back(current);
+		_dist *= incr;
+	}
+	radial_second_deriv = natural_cubic_spline_second_derivatives(radial_dist, radial_density);
 };
 
 double Thakkar::get_interpolated_density(const double &dist) const {
-    double result = 0;
-    if (dist > radial_dist.back())
-        return 0;
-    else if (dist < radial_dist[0])
-        return radial_density[0];
-    const int nr = log_spline_index(radial_dist, dist, lincr, start);
-    result = radial_density[nr] + (radial_density[nr + 1] - radial_density[nr]) / (radial_dist[nr + 1] - radial_dist[nr]) * (dist - radial_dist[nr]);
-    if (result < 1E-16)
-        return 0;
-    return result;
+	double result = 0;
+	if (dist > radial_dist.back())
+		return 0;
+	else if (dist < radial_dist[0])
+		return radial_density[0];
+	const int nr = log_spline_index(radial_dist, dist, lincr, start);
+	result = radial_density[nr] + (radial_density[nr + 1] - radial_density[nr]) / (radial_dist[nr + 1] - radial_dist[nr]) * (dist - radial_dist[nr]);
+	if (result < 1E-16)
+		return 0;
+	return result;
 };
 
 double Thakkar::get_interpolated_density_spline(const double &dist) const {
-    return cubic_spline_interpolate_spherical_density(radial_density, radial_dist, radial_second_deriv, dist, lincr, start);
+	return cubic_spline_interpolate_spherical_density(radial_density, radial_dist, radial_second_deriv, dist, lincr, start);
 };
 
 MBIS_Atom::MBIS_Atom(const int g_atom_number, const vec &g_sig, const vec &g_pop)
 {
-    sig = g_sig;
-    pop = g_pop;
-    atomic_number = g_atom_number;
-    charge = 0;
+	sig = g_sig;
+	pop = g_pop;
+	atomic_number = g_atom_number;
+	charge = 0;
 };
 MBIS_Atom::MBIS_Atom()
 {
-    sig = {};
-    pop = {};
-    atomic_number = 1;
-    charge = 0;
+	sig = {};
+	pop = {};
+	atomic_number = 1;
+	charge = 0;
 };
 
 const double MBIS_Atom::get_radial_density(const double &dist) const
 {
-    double Rho = 0.0;
-    for (int m = 0; m < constants::MBIS_function[atomic_number]; m++)
-    {
-        const double sigval = 1.0 / sig[m];
-        Rho += pop[m] * constants::INV_EIGHT_PI * pow(sigval, 3) * exp(-dist * sigval);
-    }
-    return Rho;
+	double Rho = 0.0;
+	for (int m = 0; m < constants::MBIS_function[atomic_number]; m++)
+	{
+		const double sigval = 1.0 / sig[m];
+		Rho += pop[m] * constants::INV_EIGHT_PI * pow(sigval, 3) * exp(-dist * sigval);
+	}
+	return Rho;
 };
 
 const double MBIS_Atom::get_radial_density(const double& dist, double& d1, double& d2) const
 {
-    double Rho = 0.0;
-    d1 = d2 = 0.0;
-    for (int m = 0; m < constants::MBIS_function[atomic_number]; m++) {
-        const double sigval = 1.0 / sig[m], rho_m = pop[m] * constants::INV_EIGHT_PI * pow(sigval, 3) * exp(-dist * sigval);
-        Rho += rho_m;
-        d1 -= rho_m * sigval;
-        d2 += rho_m * sigval * sigval;
-    }
-    return Rho;
+	double Rho = 0.0;
+	d1 = d2 = 0.0;
+	for (int m = 0; m < constants::MBIS_function[atomic_number]; m++) {
+		const double sigval = 1.0 / sig[m], rho_m = pop[m] * constants::INV_EIGHT_PI * pow(sigval, 3) * exp(-dist * sigval);
+		Rho += rho_m;
+		d1 -= rho_m * sigval;
+		d2 += rho_m * sigval * sigval;
+	}
+	return Rho;
 }
 
 void MBIS_Atom::make_interpolator(const double &incr, const double &min_dist) {
-    lincr = log(incr);
-    start = min_dist;
-    double current = 1;
-    double _dist = min_dist;
-    while (current > 1E-12)
-    {
-        radial_dist.push_back(_dist);
-        current = get_radial_density(_dist);
-        radial_density.push_back(current);
-        _dist *= incr;
-    }
+	lincr = log(incr);
+	start = min_dist;
+	double current = 1;
+	double _dist = min_dist;
+	while (current > 1E-12)
+	{
+		radial_dist.push_back(_dist);
+		current = get_radial_density(_dist);
+		radial_density.push_back(current);
+		_dist *= incr;
+	}
 };
 
 double MBIS_Atom::get_interpolated_density(const double &dist) const {
-    double result = 0;
-    if (dist > radial_dist.back())
-        return 0;
-    else if (dist < radial_dist[0])
-        return radial_density[0];
-    const int nr = log_spline_index(radial_dist, dist, lincr, start);
-    result = radial_density[nr] + (radial_density[nr + 1] - radial_density[nr]) / (radial_dist[nr + 1] - radial_dist[nr]) * (dist - radial_dist[nr]);
-    if (result < 1E-16)
-        return 0;
-    return result;
+	double result = 0;
+	if (dist > radial_dist.back())
+		return 0;
+	else if (dist < radial_dist[0])
+		return radial_density[0];
+	const int nr = log_spline_index(radial_dist, dist, lincr, start);
+	result = radial_density[nr] + (radial_density[nr + 1] - radial_density[nr]) / (radial_dist[nr + 1] - radial_dist[nr]) * (dist - radial_dist[nr]);
+	if (result < 1E-16)
+		return 0;
+	return result;
 };
 
 EMBIS_Atom::EMBIS_Atom(const int g_atom_number, const vec2 &g_alpha, const vec &g_pop)
 {
-    this->alpha = g_alpha;
-    this->pop = g_pop;
-    atomic_number = g_atom_number;
-    charge = 0;
-    for (int m = 0; m < constants::MBIS_function[atomic_number]; m++)
-        sqrt_det.emplace_back(sqrt(alpha[m][0] * alpha[m][3] * alpha[m][5] -
-            alpha[m][0] * alpha[m][4] * alpha[m][4] -
-            alpha[m][3] * alpha[m][2] * alpha[m][2] -
-            alpha[m][5] * alpha[m][1] * alpha[m][1] +
-            2 * alpha[m][1] * alpha[m][2] * alpha[m][4]));
+	this->alpha = g_alpha;
+	this->pop = g_pop;
+	atomic_number = g_atom_number;
+	charge = 0;
+	for (int m = 0; m < constants::MBIS_function[atomic_number]; m++)
+		sqrt_det.emplace_back(sqrt(alpha[m][0] * alpha[m][3] * alpha[m][5] -
+			alpha[m][0] * alpha[m][4] * alpha[m][4] -
+			alpha[m][3] * alpha[m][2] * alpha[m][2] -
+			alpha[m][5] * alpha[m][1] * alpha[m][1] +
+			2 * alpha[m][1] * alpha[m][2] * alpha[m][4]));
 };
 EMBIS_Atom::EMBIS_Atom()
 {
-    alpha = {};
-    pop = {};
-    sqrt_det = {};
-    atomic_number = 1;
-    charge = 0;
+	alpha = {};
+	pop = {};
+	sqrt_det = {};
+	atomic_number = 1;
+	charge = 0;
 };
 const double EMBIS_Atom::get_density(const d3 &pos) const
 {
-    double Rho = 0.0, g = 0.0;
-    for (int m = 0; m < constants::MBIS_function[atomic_number]; m++)
-    {
-        g = sqrt(alpha[m][0] * pos[0] * pos[0] +
-            alpha[m][3] * pos[1] * pos[1] +
-            alpha[m][5] * pos[2] * pos[2] +
-            2 * alpha[m][1] * pos[0] * pos[1] +
-            2 * alpha[m][2] * pos[0] * pos[2] +
-            2 * alpha[m][4] * pos[1] * pos[2]);
-        Rho += pop[m] * constants::INV_EIGHT_PI * sqrt_det[m] * exp(-g);
-    }
-    return Rho;
+	double Rho = 0.0, g = 0.0;
+	for (int m = 0; m < constants::MBIS_function[atomic_number]; m++)
+	{
+		g = sqrt(alpha[m][0] * pos[0] * pos[0] +
+			alpha[m][3] * pos[1] * pos[1] +
+			alpha[m][5] * pos[2] * pos[2] +
+			2 * alpha[m][1] * pos[0] * pos[1] +
+			2 * alpha[m][2] * pos[0] * pos[2] +
+			2 * alpha[m][4] * pos[1] * pos[2]);
+		Rho += pop[m] * constants::INV_EIGHT_PI * sqrt_det[m] * exp(-g);
+	}
+	return Rho;
 };
 
 // rho_m = c exp(-g), g = sqrt(p^T A p): grad g = A p / g, so
 // grad rho_m = -rho_m A p / g and lap rho_m = rho_m (|A p|^2 (1/g^2 + 1/g^3) - tr A / g)
 const double EMBIS_Atom::get_density(const d3 &pos, d3 &grad, double &lap) const
 {
-    double Rho = 0.0;
-    grad = { 0.0, 0.0, 0.0 };
-    lap = 0.0;
-    for (int m = 0; m < constants::MBIS_function[atomic_number]; m++)
-    {
-        const vec &a = alpha[m];
-        const d3 Ap = { a[0] * pos[0] + a[1] * pos[1] + a[2] * pos[2],
-                        a[1] * pos[0] + a[3] * pos[1] + a[4] * pos[2],
-                        a[2] * pos[0] + a[4] * pos[1] + a[5] * pos[2] };
-        const double g = sqrt(Ap[0] * pos[0] + Ap[1] * pos[1] + Ap[2] * pos[2]);
-        const double rho_m = pop[m] * constants::INV_EIGHT_PI * sqrt_det[m] * exp(-g);
-        Rho += rho_m;
-        if (g < 1E-12) continue;
-        const double Ap2 = Ap[0] * Ap[0] + Ap[1] * Ap[1] + Ap[2] * Ap[2];
-        for (int k = 0; k < 3; k++) grad[k] -= rho_m * Ap[k] / g;
-        lap += rho_m * (Ap2 * (1.0 / (g * g) + 1.0 / (g * g * g)) - (a[0] + a[3] + a[5]) / g);
-    }
-    return Rho;
+	double Rho = 0.0;
+	grad = { 0.0, 0.0, 0.0 };
+	lap = 0.0;
+	for (int m = 0; m < constants::MBIS_function[atomic_number]; m++)
+	{
+		const vec &a = alpha[m];
+		const d3 Ap = { a[0] * pos[0] + a[1] * pos[1] + a[2] * pos[2],
+						a[1] * pos[0] + a[3] * pos[1] + a[4] * pos[2],
+						a[2] * pos[0] + a[4] * pos[1] + a[5] * pos[2] };
+		const double g = sqrt(Ap[0] * pos[0] + Ap[1] * pos[1] + Ap[2] * pos[2]);
+		const double rho_m = pop[m] * constants::INV_EIGHT_PI * sqrt_det[m] * exp(-g);
+		Rho += rho_m;
+		if (g < 1E-12) continue;
+		const double Ap2 = Ap[0] * Ap[0] + Ap[1] * Ap[1] + Ap[2] * Ap[2];
+		for (int k = 0; k < 3; k++) grad[k] -= rho_m * Ap[k] / g;
+		lap += rho_m * (Ap2 * (1.0 / (g * g) + 1.0 / (g * g * g)) - (a[0] + a[3] + a[5]) / g);
+	}
+	return Rho;
 };
 
 // H rho_m = rho_m ((A p)(A p)^T (1/g^2 + 1/g^3) - A / g)
 const double EMBIS_Atom::get_density(const d3 &pos, d3 &grad, double *H) const
 {
-    double Rho = 0.0;
-    grad = { 0.0, 0.0, 0.0 };
-    for (int i = 0; i < 9; i++) H[i] = 0.0;
-    for (int m = 0; m < constants::MBIS_function[atomic_number]; m++)
-    {
-        const vec &a = alpha[m];
-        const double A[9] = { a[0], a[1], a[2], a[1], a[3], a[4], a[2], a[4], a[5] };
-        const d3 Ap = { A[0] * pos[0] + A[1] * pos[1] + A[2] * pos[2],
-                        A[3] * pos[0] + A[4] * pos[1] + A[5] * pos[2],
-                        A[6] * pos[0] + A[7] * pos[1] + A[8] * pos[2] };
-        const double g = sqrt(Ap[0] * pos[0] + Ap[1] * pos[1] + Ap[2] * pos[2]);
-        const double rho_m = pop[m] * constants::INV_EIGHT_PI * sqrt_det[m] * exp(-g);
-        Rho += rho_m;
-        if (g < 1E-12) continue;
-        const double f = 1.0 / (g * g) + 1.0 / (g * g * g);
-        for (int i = 0; i < 3; i++) {
-            grad[i] -= rho_m * Ap[i] / g;
-            for (int j = 0; j < 3; j++) H[3 * i + j] += rho_m * (Ap[i] * Ap[j] * f - A[3 * i + j] / g);
-        }
-    }
-    return Rho;
+	double Rho = 0.0;
+	grad = { 0.0, 0.0, 0.0 };
+	for (int i = 0; i < 9; i++) H[i] = 0.0;
+	for (int m = 0; m < constants::MBIS_function[atomic_number]; m++)
+	{
+		const vec &a = alpha[m];
+		const double A[9] = { a[0], a[1], a[2], a[1], a[3], a[4], a[2], a[4], a[5] };
+		const d3 Ap = { A[0] * pos[0] + A[1] * pos[1] + A[2] * pos[2],
+						A[3] * pos[0] + A[4] * pos[1] + A[5] * pos[2],
+						A[6] * pos[0] + A[7] * pos[1] + A[8] * pos[2] };
+		const double g = sqrt(Ap[0] * pos[0] + Ap[1] * pos[1] + Ap[2] * pos[2]);
+		const double rho_m = pop[m] * constants::INV_EIGHT_PI * sqrt_det[m] * exp(-g);
+		Rho += rho_m;
+		if (g < 1E-12) continue;
+		const double f = 1.0 / (g * g) + 1.0 / (g * g * g);
+		for (int i = 0; i < 3; i++) {
+			grad[i] -= rho_m * Ap[i] / g;
+			for (int j = 0; j < 3; j++) H[3 * i + j] += rho_m * (Ap[i] * Ap[j] * f - A[3 * i + j] / g);
+		}
+	}
+	return Rho;
 };
 
 bool Thakkar_Anion::available(const int g_atom_number)
 {
-    return g_atom_number >= 1 && g_atom_number <= 103 &&
-           SlaterAn_available[g_atom_number - 1] != 0;
+	return g_atom_number >= 1 && g_atom_number <= 103 &&
+		   SlaterAn_available[g_atom_number - 1] != 0;
 }
 
 Thakkar_Anion::Thakkar_Anion(int g_atom_number) : Thakkar(g_atom_number)
 {
-    // Was: only H, C, O, P and Cl, everything else aborted. The compiled-in
-    // Slater set covers 43 anions. Ask available() first; this still refuses
-    // rather than returning a silently neutral density.
-    err_checkf(available(g_atom_number),
-        "No anion density for Z = " + std::to_string(g_atom_number) +
-        "; call Thakkar_Anion::available() and fall back to the neutral.", std::cout);
-    nex = &(SlaterAn_nex[0]);
-    _first_ex = first_ex();
-    ns = &(SlaterAn_ns[0]);
-    np = &(SlaterAn_np[0]);
-    nd = &(SlaterAn_nd[0]);
-    nf = &(SlaterAn_nf[0]);
-    occ = &(SlaterAn_occ[0]);
-    n = &(SlaterAn_n[0]);
-    z = &(SlaterAn_z[0]);
-    c = &(SlaterAn_c[0]);
-    charge = -1;
-    if (atomic_number == 1)
-        _prev_coef = 0;
-    else
-        _prev_coef = previous_element_coef();
+	// Was: only H, C, O, P and Cl, everything else aborted. The compiled-in
+	// Slater set covers 43 anions. Ask available() first; this still refuses
+	// rather than returning a silently neutral density.
+	err_checkf(available(g_atom_number),
+		"No anion density for Z = " + std::to_string(g_atom_number) +
+		"; call Thakkar_Anion::available() and fall back to the neutral.", std::cout);
+	nex = &(SlaterAn_nex[0]);
+	_first_ex = first_ex();
+	ns = &(SlaterAn_ns[0]);
+	np = &(SlaterAn_np[0]);
+	nd = &(SlaterAn_nd[0]);
+	nf = &(SlaterAn_nf[0]);
+	occ = &(SlaterAn_occ[0]);
+	n = &(SlaterAn_n[0]);
+	z = &(SlaterAn_z[0]);
+	c = &(SlaterAn_c[0]);
+	charge = -1;
+	if (atomic_number == 1)
+		_prev_coef = 0;
+	else
+		_prev_coef = previous_element_coef();
 };
 
 bool Thakkar_Cation::available(const int g_atom_number)
 {
-    return g_atom_number >= 1 && g_atom_number <= 103 &&
-           SlaterCat_available[g_atom_number - 1] != 0;
+	return g_atom_number >= 1 && g_atom_number <= 103 &&
+		   SlaterCat_available[g_atom_number - 1] != 0;
 }
 
 Thakkar_Cation::Thakkar_Cation(int g_atom_number) : Thakkar(g_atom_number)
 {
-    // Was: 3 <= Z <= 29 only, so Pd, Ag, Zn, Cd, I, Br ... all aborted. The
-    // compiled-in Slater set covers 53 cations.
-    err_checkf(available(g_atom_number),
-        "No cation density for Z = " + std::to_string(g_atom_number) +
-        "; call Thakkar_Cation::available() and fall back to the neutral.", std::cout);
-    nex = &(SlaterCat_nex[0]);
-    _first_ex = first_ex();
-    ns = &(SlaterCat_ns[0]);
-    np = &(SlaterCat_np[0]);
-    nd = &(SlaterCat_nd[0]);
-    nf = &(SlaterCat_nf[0]);
-    occ = &(SlaterCat_occ[0]);
-    n = &(SlaterCat_n[0]);
-    z = &(SlaterCat_z[0]);
-    c = &(SlaterCat_c[0]);
-    charge = +1;
-    if (atomic_number == 1)
-        _prev_coef = 0;
-    else
-        _prev_coef = previous_element_coef();
+	// Was: 3 <= Z <= 29 only, so Pd, Ag, Zn, Cd, I, Br ... all aborted. The
+	// compiled-in Slater set covers 53 cations.
+	err_checkf(available(g_atom_number),
+		"No cation density for Z = " + std::to_string(g_atom_number) +
+		"; call Thakkar_Cation::available() and fall back to the neutral.", std::cout);
+	nex = &(SlaterCat_nex[0]);
+	_first_ex = first_ex();
+	ns = &(SlaterCat_ns[0]);
+	np = &(SlaterCat_np[0]);
+	nd = &(SlaterCat_nd[0]);
+	nf = &(SlaterCat_nf[0]);
+	occ = &(SlaterCat_occ[0]);
+	n = &(SlaterCat_n[0]);
+	z = &(SlaterCat_z[0]);
+	c = &(SlaterCat_c[0]);
+	charge = +1;
+	if (atomic_number == 1)
+		_prev_coef = 0;
+	else
+		_prev_coef = previous_element_coef();
 };
 
 namespace
 {
-    // The delta_k tables live on two fixed grids, both indexable in O(1): r is
-    // LOG-uniform, s is LINEAR-uniform. get_form_factor runs per reflection per
-    // atom type, so a search here would be felt.
-    double delta_rho_at(const int table, const double r)
-    {
-        static const double log_rmin = std::log(SlaterDelta_r_min);
-        static const double dlog =
-            (std::log(SlaterDelta_r_max) - log_rmin) / (SlaterDelta_n_r - 1);
-        const double *t = SlaterDelta_rho + static_cast<size_t>(table) * SlaterDelta_n_r;
-        // Outside the grid the difference is clamped rather than run on: below
-        // r_min it is flat on this scale, above r_max it has decayed to ~0
-        // because delta_k is a valence effect.
-        if (r <= SlaterDelta_r_min) return t[0];
-        if (r >= SlaterDelta_r_max) return t[SlaterDelta_n_r - 1];
-        const double x = (std::log(r) - log_rmin) / dlog;
-        const int i = static_cast<int>(x);
-        const double f = x - i;
-        return (1.0 - f) * t[i] + f * t[i + 1];
-    }
+	// The delta_k tables live on two fixed grids, both indexable in O(1): r is
+	// LOG-uniform, s is LINEAR-uniform. get_form_factor runs per reflection per
+	// atom type, so a search here would be felt.
+	double delta_rho_at(const int table, const double r)
+	{
+		static const double log_rmin = std::log(SlaterDelta_r_min);
+		static const double dlog =
+			(std::log(SlaterDelta_r_max) - log_rmin) / (SlaterDelta_n_r - 1);
+		const double *t = SlaterDelta_rho + static_cast<size_t>(table) * SlaterDelta_n_r;
+		// Outside the grid the difference is clamped rather than run on: below
+		// r_min it is flat on this scale, above r_max it has decayed to ~0
+		// because delta_k is a valence effect.
+		if (r <= SlaterDelta_r_min) return t[0];
+		if (r >= SlaterDelta_r_max) return t[SlaterDelta_n_r - 1];
+		const double x = (std::log(r) - log_rmin) / dlog;
+		const int i = static_cast<int>(x);
+		const double f = x - i;
+		return (1.0 - f) * t[i] + f * t[i + 1];
+	}
 
-    double delta_f_at(const int table, const double s)
-    {
-        static const double ds =
-            (SlaterDelta_s_max - SlaterDelta_s_min) / (SlaterDelta_n_s - 1);
-        const double *t = SlaterDelta_f + static_cast<size_t>(table) * SlaterDelta_n_s;
-        if (s <= SlaterDelta_s_min) return t[0];
-        if (s >= SlaterDelta_s_max) return t[SlaterDelta_n_s - 1];
-        const double x = (s - SlaterDelta_s_min) / ds;
-        const int i = static_cast<int>(x);
-        const double f = x - i;
-        return (1.0 - f) * t[i] + f * t[i + 1];
-    }
+	double delta_f_at(const int table, const double s)
+	{
+		static const double ds =
+			(SlaterDelta_s_max - SlaterDelta_s_min) / (SlaterDelta_n_s - 1);
+		const double *t = SlaterDelta_f + static_cast<size_t>(table) * SlaterDelta_n_s;
+		if (s <= SlaterDelta_s_min) return t[0];
+		if (s >= SlaterDelta_s_max) return t[SlaterDelta_n_s - 1];
+		const double x = (s - SlaterDelta_s_min) / ds;
+		const int i = static_cast<int>(x);
+		const double f = x - i;
+		return (1.0 - f) * t[i] + f * t[i + 1];
+	}
 
-    int delta_table(const int Z, const int k)
-    {
-        if (Z < 1 || Z > 103) return -1;
-        if (k < SlaterDelta_k_min || k > SlaterDelta_k_max) return -1;
-        const int span = SlaterDelta_k_max - SlaterDelta_k_min + 1;
-        return SlaterDelta_offset[(Z - 1) * span + (k - SlaterDelta_k_min)];
-    }
+	int delta_table(const int Z, const int k)
+	{
+		if (Z < 1 || Z > 103) return -1;
+		if (k < SlaterDelta_k_min || k > SlaterDelta_k_max) return -1;
+		const int span = SlaterDelta_k_max - SlaterDelta_k_min + 1;
+		return SlaterDelta_offset[(Z - 1) * span + (k - SlaterDelta_k_min)];
+	}
 
-    // The caller's k is 4 pi s a0 (see k_of_reflection); the tables are in s.
-    double s_of_k(const double k)
-    {
-        return constants::ang2bohr(k) / constants::FOUR_PI;
-    }
+	// The caller's k is 4 pi s a0 (see k_of_reflection); the tables are in s.
+	double s_of_k(const double k)
+	{
+		return constants::ang2bohr(k) / constants::FOUR_PI;
+	}
 }
 
 HE_Spherical_Atom::HE_Spherical_Atom(const int atomic_number, const double charge)
-    : _Z(atomic_number), _charge(charge), _weight(std::abs(charge)),
-      _electrons(static_cast<double>(atomic_number)), _most_negative(0.0),
-      _has_ion(false), _use_delta(false), _delta_n(0), _delta_frac(0.0),
-      _neutral(atomic_number)
+	: _Z(atomic_number), _charge(charge), _weight(std::abs(charge)),
+	  _electrons(static_cast<double>(atomic_number)), _most_negative(0.0),
+	  _has_ion(false), _use_delta(false), _delta_n(0), _delta_frac(0.0),
+	  _neutral(atomic_number)
 {
-    if (std::abs(charge) < 1e-12)
-        return;   // neutral: nothing to blend
+	if (std::abs(charge) < 1e-12)
+		return;   // neutral: nothing to blend
 
-    const bool want_cation = charge > 0.0;
-    const bool have = want_cation ? Thakkar_Cation::available(atomic_number)
-                                  : Thakkar_Anion::available(atomic_number);
-    if (!have)
-    {
-        // No reference state for this element. Returning the neutral is the
-        // honest fallback - it is what the caller would otherwise have used -
-        // but used_ion() reports false so the caller can say the charge was
-        // not applied instead of silently believing it was.
-        _weight = 0.0;
-        return;
-    }
+	const bool want_cation = charge > 0.0;
+	const bool have = want_cation ? Thakkar_Cation::available(atomic_number)
+								  : Thakkar_Anion::available(atomic_number);
+	if (!have)
+	{
+		// No reference state for this element. Returning the neutral is the
+		// honest fallback - it is what the caller would otherwise have used -
+		// but used_ion() reports false so the caller can say the charge was
+		// not applied instead of silently believing it was.
+		_weight = 0.0;
+		return;
+	}
 
-    if (want_cation)
-        _ion = std::make_unique<Thakkar_Cation>(atomic_number);
-    else
-        _ion = std::make_unique<Thakkar_Anion>(atomic_number);
-    _has_ion = true;
-    _electrons = static_cast<double>(atomic_number) - charge;
+	if (want_cation)
+		_ion = std::make_unique<Thakkar_Cation>(atomic_number);
+	else
+		_ion = std::make_unique<Thakkar_Anion>(atomic_number);
+	_has_ion = true;
+	_electrons = static_cast<double>(atomic_number) - charge;
 
-    // Past +1 the plain blend would give the neutral a negative weight. If the
-    // delta series reaches this charge state we can instead walk DOWN through
-    // bound states, which keeps every weight in [0, 1]:
-    //
-    //     rho_q = rho_n - f * delta_{n+1},   rho_n = rho_1 - sum_{k=2..n} delta_k
-    //
-    // for q = n + f. Cations only: atomic anions past -1 are unbound, so no
-    // such reference states exist and those keep the old extrapolation.
-    if (want_cation && _weight > 1.0)
-    {
-        const int n = static_cast<int>(std::floor(charge));
-        const double frac = charge - n;
-        // An exact integer charge stops at rho_n; a fractional one needs the
-        // next difference as well to interpolate towards rho_{n+1}.
-        const int need = (frac > 1e-12) ? n + 1 : n;
-        bool ok = (need >= SlaterDelta_k_min) &&
-                  (need <= SlaterDelta_kmax[atomic_number - 1]);
-        // rho_m is a running sum, so every step from k_min up to need must be
-        // present - a gap anywhere strands the whole chain.
-        for (int k = SlaterDelta_k_min; ok && k <= need; k++)
-            ok = delta_table(atomic_number, k) >= 0;
-        if (ok)
-        {
-            _use_delta = true;
-            _delta_n = n;
-            _delta_frac = frac;
-        }
-    }
+	// Past +1 the plain blend would give the neutral a negative weight. If the
+	// delta series reaches this charge state we can instead walk DOWN through
+	// bound states, which keeps every weight in [0, 1]:
+	//
+	//     rho_q = rho_n - f * delta_{n+1},   rho_n = rho_1 - sum_{k=2..n} delta_k
+	//
+	// for q = n + f. Cations only: atomic anions past -1 are unbound, so no
+	// such reference states exist and those keep the old extrapolation.
+	if (want_cation && _weight > 1.0)
+	{
+		const int n = static_cast<int>(std::floor(charge));
+		const double frac = charge - n;
+		// An exact integer charge stops at rho_n; a fractional one needs the
+		// next difference as well to interpolate towards rho_{n+1}.
+		const int need = (frac > 1e-12) ? n + 1 : n;
+		bool ok = (need >= SlaterDelta_k_min) &&
+				  (need <= SlaterDelta_kmax[atomic_number - 1]);
+		// rho_m is a running sum, so every step from k_min up to need must be
+		// present - a gap anywhere strands the whole chain.
+		for (int k = SlaterDelta_k_min; ok && k <= need; k++)
+			ok = delta_table(atomic_number, k) >= 0;
+		if (ok)
+		{
+			_use_delta = true;
+			_delta_n = n;
+			_delta_frac = frac;
+		}
+	}
 
-    // Scan for a negative excursion. Only possible when |q| > 1; with the delta
-    // route it should come back clean, and that is worth measuring rather than
-    // assuming. The caller decides whether a dip is acceptable rather than
-    // having it silently clipped here.
-    if (_weight > 1.0)
-    {
-        for (double r = 1e-4; r < 30.0; r *= 1.05)
-        {
-            const double d = get_radial_density(r);
-            if (d < _most_negative) _most_negative = d;
-        }
-    }
+	// Scan for a negative excursion. Only possible when |q| > 1; with the delta
+	// route it should come back clean, and that is worth measuring rather than
+	// assuming. The caller decides whether a dip is acceptable rather than
+	// having it silently clipped here.
+	if (_weight > 1.0)
+	{
+		for (double r = 1e-4; r < 30.0; r *= 1.05)
+		{
+			const double d = get_radial_density(r);
+			if (d < _most_negative) _most_negative = d;
+		}
+	}
 }
 
 double HE_Spherical_Atom::get_radial_density(const double &r) const
 {
-    if (_use_delta)
-    {
-        // rho_1 stays the tabulated Slater cation; only the steps down from it
-        // come from the delta tables.
-        double d = _ion->get_radial_density(r);
-        for (int k = SlaterDelta_k_min; k <= _delta_n; k++)
-            d -= delta_rho_at(delta_table(_Z, k), r);
-        if (_delta_frac > 0.0)
-            d -= _delta_frac * delta_rho_at(delta_table(_Z, _delta_n + 1), r);
-        return d;
-    }
-    const double n = _neutral.get_radial_density(r);
-    if (!_has_ion) return n;
-    return (1.0 - _weight) * n + _weight * _ion->get_radial_density(r);
+	if (_use_delta)
+	{
+		// rho_1 stays the tabulated Slater cation; only the steps down from it
+		// come from the delta tables.
+		double d = _ion->get_radial_density(r);
+		for (int k = SlaterDelta_k_min; k <= _delta_n; k++)
+			d -= delta_rho_at(delta_table(_Z, k), r);
+		if (_delta_frac > 0.0)
+			d -= _delta_frac * delta_rho_at(delta_table(_Z, _delta_n + 1), r);
+		return d;
+	}
+	const double n = _neutral.get_radial_density(r);
+	if (!_has_ion) return n;
+	return (1.0 - _weight) * n + _weight * _ion->get_radial_density(r);
 }
 
 double HE_Spherical_Atom::get_form_factor(const double &k) const
 {
-    if (_use_delta)
-    {
-        // Same walk in reciprocal space - the transform is linear, so the
-        // electron count comes out as f(0) = (Z-1) - (n-1) - frac = Z - q.
-        const double s = s_of_k(k);
-        double d = _ion->get_form_factor(k);
-        for (int kk = SlaterDelta_k_min; kk <= _delta_n; kk++)
-            d -= delta_f_at(delta_table(_Z, kk), s);
-        if (_delta_frac > 0.0)
-            d -= _delta_frac * delta_f_at(delta_table(_Z, _delta_n + 1), s);
-        return d;
-    }
-    const double n = _neutral.get_form_factor(k);
-    if (!_has_ion) return n;
-    return (1.0 - _weight) * n + _weight * _ion->get_form_factor(k);
+	if (_use_delta)
+	{
+		// Same walk in reciprocal space - the transform is linear, so the
+		// electron count comes out as f(0) = (Z-1) - (n-1) - frac = Z - q.
+		const double s = s_of_k(k);
+		double d = _ion->get_form_factor(k);
+		for (int kk = SlaterDelta_k_min; kk <= _delta_n; kk++)
+			d -= delta_f_at(delta_table(_Z, kk), s);
+		if (_delta_frac > 0.0)
+			d -= _delta_frac * delta_f_at(delta_table(_Z, _delta_n + 1), s);
+		return d;
+	}
+	const double n = _neutral.get_form_factor(k);
+	if (!_has_ion) return n;
+	return (1.0 - _weight) * n + _weight * _ion->get_form_factor(k);
 }
 
 const double gauss_cos_integral(const int &N, const double &exp, const double &k_vector);
@@ -1048,57 +1048,57 @@ const double gauss_cos_integral(const int &N, const double &exp, const double &k
 // S(N) = (N-1)/(2z) S(N-2) + k/(2z) C(N-1) and C(N) = (N-1)/(2z) C(N-2) - k/(2z) S(N-1), down to C(0) = sqrt(pi/z)/2 exp(-k^2/4z)
 static const double gauss_sin_integral(const int &N, const double &exp, const double &k_vector)
 {
-    if (N < 1)
-        return 0.0; // S(0) is never reached: only odd N (even radial powers) occur, and S(1) = k/(2z) C(0)
-    if (N == 1)
-        return k_vector / (2. * exp) * gauss_cos_integral(0, exp, k_vector);
-    return (N - 1) / (2. * exp) * gauss_sin_integral(N - 2, exp, k_vector) + k_vector / (2. * exp) * gauss_cos_integral(N - 1, exp, k_vector);
+	if (N < 1)
+		return 0.0; // S(0) is never reached: only odd N (even radial powers) occur, and S(1) = k/(2z) C(0)
+	if (N == 1)
+		return k_vector / (2. * exp) * gauss_cos_integral(0, exp, k_vector);
+	return (N - 1) / (2. * exp) * gauss_sin_integral(N - 2, exp, k_vector) + k_vector / (2. * exp) * gauss_cos_integral(N - 1, exp, k_vector);
 };
 const double gauss_cos_integral(const int &N, const double &exp, const double &k_vector)
 {
-    if (N == 0)
-        return constants::sqr_pi * std::exp(-k_vector * k_vector / 4. / exp) / 2. / pow(exp, 1. / 2.);
-    if (N == 1)
-        return 1. / (2. * exp) - k_vector / (2. * exp) * gauss_sin_integral(0, exp, k_vector);
-    return (N - 1) / (2. * exp) * gauss_cos_integral(N - 2, exp, k_vector) - k_vector / (2. * exp) * gauss_sin_integral(N - 1, exp, k_vector);
+	if (N == 0)
+		return constants::sqr_pi * std::exp(-k_vector * k_vector / 4. / exp) / 2. / pow(exp, 1. / 2.);
+	if (N == 1)
+		return 1. / (2. * exp) - k_vector / (2. * exp) * gauss_sin_integral(0, exp, k_vector);
+	return (N - 1) / (2. * exp) * gauss_cos_integral(N - 2, exp, k_vector) - k_vector / (2. * exp) * gauss_sin_integral(N - 1, exp, k_vector);
 };
 
 // spherical Fourier transform of the density term coef r^(N-1) exp(-z r^2): 4 pi Int r^2 rho(r) sin(kr)/(kr) dr = 4 pi / k S(N)
 static double calc_Gaussian_int(const int &occ, const double &coef, const double &exp, const int &radial_exp, const double &k_vector)
 {
-    return occ * coef * constants::FOUR_PI * gauss_sin_integral(radial_exp, exp, k_vector) / k_vector;
+	return occ * coef * constants::FOUR_PI * gauss_sin_integral(radial_exp, exp, k_vector) / k_vector;
 }
 
 static double calc_Gaussian_int_at_k0(const int &occ, const double &coef, const double &exp, const int &radial_exp, const double &k_vector)
 {
-    // k -> 0 limit of calc_Gaussian_int: 4 pi Int r^(N+1) e^{-z r^2} dr = 4 pi Gamma((N+2)/2) / (2 z^((N+2)/2))
-    const double N = radial_exp;
-    return constants::FOUR_PI * tgamma((N + 2.) / 2.) / (2. * pow(exp, (N + 2.) / 2.)) * coef * occ;
-    (void)k_vector;
+	// k -> 0 limit of calc_Gaussian_int: 4 pi Int r^(N+1) e^{-z r^2} dr = 4 pi Gamma((N+2)/2) / (2 z^((N+2)/2))
+	const double N = radial_exp;
+	return constants::FOUR_PI * tgamma((N + 2.) / 2.) / (2. * pow(exp, (N + 2.) / 2.)) * coef * occ;
+	(void)k_vector;
 }
 
 const double Spherical_Gaussian_Density::get_radial_density(const double &dist) const
 {
-    double res = 0;
-    const double d2 = dist * dist;
-    for (int i = 0; i < nex; i++)
-    {
-        res += c[i] * exp(-z[i] * d2);
-    }
-    return res;
+	double res = 0;
+	const double d2 = dist * dist;
+	for (int i = 0; i < nex; i++)
+	{
+		res += c[i] * exp(-z[i] * d2);
+	}
+	return res;
 }
 
 const double Spherical_Gaussian_Density::get_form_factor(const double &k_vector) const
 {
-    std::function<double(const int &, const double &, const double &, const int &, const double &)> func;
-    if (k_vector == 0)
-        func = calc_Gaussian_int_at_k0;
-    else
-        func = calc_Gaussian_int;
-    double res = 0;
-    for (int i = 0; i < nex; i++)
-    {
-        res += func(1, c[i], z[i], 1, k_vector);
-    }
-    return res;
+	std::function<double(const int &, const double &, const double &, const int &, const double &)> func;
+	if (k_vector == 0)
+		func = calc_Gaussian_int_at_k0;
+	else
+		func = calc_Gaussian_int;
+	double res = 0;
+	for (int i = 0; i < nex; i++)
+	{
+		res += func(1, c[i], z[i], 1, k_vector);
+	}
+	return res;
 }

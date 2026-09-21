@@ -1063,7 +1063,7 @@ void XCW::report_halting_progress_estimate(bool is_final) {
 			*s << " -- WARNING: binned <z^2> trend test flagged at this lambda; "
 				<< "residuals may be spatially correlated, inspect before trusting lambda*.";
 		}
-		*s << std::endl;
+		*s << "\n";
 
 		for (const PolynomialFit& c : candidates) {
 			*s << "  candidate fit: degree=" << c.degree;
@@ -1073,7 +1073,7 @@ void XCW::report_halting_progress_estimate(bool is_final) {
 			}
 			*s << " RSS=" << std::setprecision(4) << c.rss << " R^2=" << c.r_squared
 				<< " AIC=" << c.aic << ((fit.valid && c.degree == fit.degree) ? " [chosen]" : "")
-				<< std::endl;
+				<< "\n";
 		}
 
 		if (at_boundary) {
@@ -1093,7 +1093,7 @@ void XCW::report_halting_progress_estimate(bool is_final) {
 				*s << " The trend so far is not curving upward yet within the search window; "
 					<< "cannot extrapolate a stopping estimate, extend the scan further.";
 			}
-			*s << std::endl;
+			*s << "\n";
 		}
 	}
 }

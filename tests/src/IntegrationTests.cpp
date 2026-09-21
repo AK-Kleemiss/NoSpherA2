@@ -8,442 +8,442 @@
 namespace {
 
 struct UT_Result {
-    bool success;
-    std::string message;
+	bool success;
+	std::string message;
 };
 
 static const std::regex kNumberPattern(R"([-+]?\d*\.?\d+(?:[eE][-+]?\d+)?)");
 
 static std::vector<std::string> read_lines_stripped(const std::filesystem::path& path)
 {
-    std::ifstream f(path);
-    std::vector<std::string> lines;
-    std::string line;
-    while (std::getline(f, line)) {
-        if (!line.empty() && line.back() == '\r') {
-            line.pop_back();
-        }
-        if (!line.empty()) {
-            lines.push_back(line);
-        }
-    }
-    return lines;
+	std::ifstream f(path);
+	std::vector<std::string> lines;
+	std::string line;
+	while (std::getline(f, line)) {
+		if (!line.empty() && line.back() == '\r') {
+			line.pop_back();
+		}
+		if (!line.empty()) {
+			lines.push_back(line);
+		}
+	}
+	return lines;
 }
 
 static std::vector<double> extract_floats(const std::string& line)
 {
-    std::vector<double> result;
-    for (auto it = std::sregex_iterator(line.begin(), line.end(), kNumberPattern);
-         it != std::sregex_iterator();
-         ++it) {
-        result.push_back(std::stod((*it).str()));
-    }
-    return result;
+	std::vector<double> result;
+	for (auto it = std::sregex_iterator(line.begin(), line.end(), kNumberPattern);
+		 it != std::sregex_iterator();
+		 ++it) {
+		result.push_back(std::stod((*it).str()));
+	}
+	return result;
 }
 
 static std::string normalize_whitespace(const std::string& s)
 {
-    std::istringstream iss(s);
-    std::ostringstream oss;
-    std::string token;
-    bool first = true;
-    while (iss >> token) {
-        if (!first) {
-            oss << ' ';
-        }
-        oss << token;
-        first = false;
-    }
-    return oss.str();
+	std::istringstream iss(s);
+	std::ostringstream oss;
+	std::string token;
+	bool first = true;
+	while (iss >> token) {
+		if (!first) {
+			oss << ' ';
+		}
+		oss << token;
+		first = false;
+	}
+	return oss.str();
 }
 
 static std::string make_skeleton(const std::string& line)
 {
-    return normalize_whitespace(std::regex_replace(line, kNumberPattern, "<num>"));
+	return normalize_whitespace(std::regex_replace(line, kNumberPattern, "<num>"));
 }
 
 static bool numeric_line_matches(const std::string& expected,
-    const std::string& actual,
-    double rtol)
+	const std::string& actual,
+	double rtol)
 {
-    const auto exp_nums = extract_floats(expected);
-    const auto act_nums = extract_floats(actual);
-    if (exp_nums.empty() || act_nums.empty() || exp_nums.size() != act_nums.size()) {
-        return false;
-    }
-    if (make_skeleton(expected) != make_skeleton(actual)) {
-        return false;
-    }
-    for (size_t i = 0; i < exp_nums.size(); ++i) {
-        const double diff = std::abs(exp_nums[i] - act_nums[i]);
-        const double allowed = std::max(rtol, std::abs(act_nums[i]) * rtol);
-        if (diff > allowed) {
-            return false;
-        }
-    }
-    return true;
+	const auto exp_nums = extract_floats(expected);
+	const auto act_nums = extract_floats(actual);
+	if (exp_nums.empty() || act_nums.empty() || exp_nums.size() != act_nums.size()) {
+		return false;
+	}
+	if (make_skeleton(expected) != make_skeleton(actual)) {
+		return false;
+	}
+	for (size_t i = 0; i < exp_nums.size(); ++i) {
+		const double diff = std::abs(exp_nums[i] - act_nums[i]);
+		const double allowed = std::max(rtol, std::abs(act_nums[i]) * rtol);
+		if (diff > allowed) {
+			return false;
+		}
+	}
+	return true;
 }
 
 static std::string compare_files_numeric(const std::filesystem::path& good_path,
-    const std::filesystem::path& actual_path,
-    double rtol)
+	const std::filesystem::path& actual_path,
+	double rtol)
 {
-    const auto expected = read_lines_stripped(good_path);
-    const auto actual = read_lines_stripped(actual_path);
+	const auto expected = read_lines_stripped(good_path);
+	const auto actual = read_lines_stripped(actual_path);
 
-    std::ostringstream failures;
-    bool bad = false;
-    const size_t n = (expected.size() > actual.size()) ? expected.size() : actual.size();
-    for (size_t i = 0; i < n; ++i) {
-        if (i >= expected.size()) {
-            failures << "  Extra line " << (i + 1) << " in actual: " << actual[i] << "\n";
-            bad = true;
-        }
-        else if (i >= actual.size()) {
-            failures << "  Missing line " << (i + 1) << ": " << expected[i] << "\n";
-            bad = true;
-        }
-        else if (expected[i] == actual[i]) {
-            continue;
-        }
-        else if (numeric_line_matches(expected[i], actual[i], rtol)) {
-            continue;
-        }
-        else {
-            failures << "  Line " << (i + 1) << ":\n"
-                     << "    expected: " << expected[i] << "\n"
-                     << "    actual:   " << actual[i] << "\n";
-            bad = true;
-        }
-    }
-    return bad ? failures.str() : std::string{};
+	std::ostringstream failures;
+	bool bad = false;
+	const size_t n = (expected.size() > actual.size()) ? expected.size() : actual.size();
+	for (size_t i = 0; i < n; ++i) {
+		if (i >= expected.size()) {
+			failures << "  Extra line " << (i + 1) << " in actual: " << actual[i] << "\n";
+			bad = true;
+		}
+		else if (i >= actual.size()) {
+			failures << "  Missing line " << (i + 1) << ": " << expected[i] << "\n";
+			bad = true;
+		}
+		else if (expected[i] == actual[i]) {
+			continue;
+		}
+		else if (numeric_line_matches(expected[i], actual[i], rtol)) {
+			continue;
+		}
+		else {
+			failures << "  Line " << (i + 1) << ":\n"
+					 << "    expected: " << expected[i] << "\n"
+					 << "    actual:   " << actual[i] << "\n";
+			bad = true;
+		}
+	}
+	return bad ? failures.str() : std::string{};
 }
 
 struct TomlTestDef {
-    std::string directory;
-    std::string goodFile;
-    std::string actualFile;
-    bool full = false;
-    // Each entry is a flat list of CLI tokens to append after "-key".
-    // For scalar args this is a single value; for array args this is N values.
-    std::vector<std::pair<std::string, std::vector<std::string>>> args;
+	std::string directory;
+	std::string goodFile;
+	std::string actualFile;
+	bool full = false;
+	// Each entry is a flat list of CLI tokens to append after "-key".
+	// For scalar args this is a single value; for array args this is N values.
+	std::vector<std::pair<std::string, std::vector<std::string>>> args;
 };
 
 static std::string trim(std::string s)
 {
-    auto is_space = [](unsigned char c) { return std::isspace(c) != 0; };
-    while (!s.empty() && is_space(static_cast<unsigned char>(s.front()))) {
-        s.erase(s.begin());
-    }
-    while (!s.empty() && is_space(static_cast<unsigned char>(s.back()))) {
-        s.pop_back();
-    }
-    return s;
+	auto is_space = [](unsigned char c) { return std::isspace(c) != 0; };
+	while (!s.empty() && is_space(static_cast<unsigned char>(s.front()))) {
+		s.erase(s.begin());
+	}
+	while (!s.empty() && is_space(static_cast<unsigned char>(s.back()))) {
+		s.pop_back();
+	}
+	return s;
 }
 
 static std::string unquote_if_needed(std::string v)
 {
-    v = trim(v);
-    if (v.size() >= 2 && v.front() == '"' && v.back() == '"') {
-        return v.substr(1, v.size() - 2);
-    }
-    return v;
+	v = trim(v);
+	if (v.size() >= 2 && v.front() == '"' && v.back() == '"') {
+		return v.substr(1, v.size() - 2);
+	}
+	return v;
 }
 
 static std::string strip_comment(const std::string& line)
 {
-    // TOML comments start with #, but ignore if inside a quoted string.
-    bool in_quotes = false;
-    for (size_t i = 0; i < line.size(); ++i) {
-        char c = line[i];
-        if (c == '"') {
-            in_quotes = !in_quotes;
-        }
-        if (!in_quotes && c == '#') {
-            return line.substr(0, i);
-        }
-    }
-    return line;
+	// TOML comments start with #, but ignore if inside a quoted string.
+	bool in_quotes = false;
+	for (size_t i = 0; i < line.size(); ++i) {
+		char c = line[i];
+		if (c == '"') {
+			in_quotes = !in_quotes;
+		}
+		if (!in_quotes && c == '#') {
+			return line.substr(0, i);
+		}
+	}
+	return line;
 }
 
 static std::optional<std::string> parse_section_name(const std::string& line)
 {
-    // [section]
-    auto t = trim(line);
-    if (t.size() < 3 || t.front() != '[' || t.back() != ']') {
-        return std::nullopt;
-    }
-    auto inner = t.substr(1, t.size() - 2);
-    inner = trim(inner);
-    if (inner.empty()) {
-        return std::nullopt;
-    }
-    return inner;
+	// [section]
+	auto t = trim(line);
+	if (t.size() < 3 || t.front() != '[' || t.back() != ']') {
+		return std::nullopt;
+	}
+	auto inner = t.substr(1, t.size() - 2);
+	inner = trim(inner);
+	if (inner.empty()) {
+		return std::nullopt;
+	}
+	return inner;
 }
 
 static std::optional<std::pair<std::string, std::string>> parse_kv(const std::string& line)
 {
-    // key = value
-    auto pos = line.find('=');
-    if (pos == std::string::npos) {
-        return std::nullopt;
-    }
+	// key = value
+	auto pos = line.find('=');
+	if (pos == std::string::npos) {
+		return std::nullopt;
+	}
 
-    std::string key = trim(line.substr(0, pos));
-    std::string value = trim(line.substr(pos + 1));
-    if (key.empty() || value.empty()) {
-        return std::nullopt;
-    }
-    return std::make_pair(key, value);
+	std::string key = trim(line.substr(0, pos));
+	std::string value = trim(line.substr(pos + 1));
+	if (key.empty() || value.empty()) {
+		return std::nullopt;
+	}
+	return std::make_pair(key, value);
 }
 
 static bool is_array_start(const std::string& v)
 {
-    auto t = trim(v);
-    return !t.empty() && t.front() == '[';
+	auto t = trim(v);
+	return !t.empty() && t.front() == '[';
 }
 
 static bool is_array_end(const std::string& v)
 {
-    auto t = trim(v);
-    return !t.empty() && t.back() == ']';
+	auto t = trim(v);
+	return !t.empty() && t.back() == ']';
 }
 
 static std::vector<std::string> split_array_items(const std::string& inner)
 {
-    // Minimal TOML array splitting: handles quoted strings and numbers/bools.
-    // No nested arrays.
-    std::vector<std::string> out;
-    std::string cur;
-    bool in_quotes = false;
-    for (size_t i = 0; i < inner.size(); ++i) {
-        char c = inner[i];
-        if (c == '"') {
-            in_quotes = !in_quotes;
-            cur.push_back(c);
-            continue;
-        }
-        if (!in_quotes && c == ',') {
-            auto tok = trim(cur);
-            if (!tok.empty()) {
-                out.push_back(unquote_if_needed(tok));
-            }
-            cur.clear();
-            continue;
-        }
-        cur.push_back(c);
-    }
-    auto tok = trim(cur);
-    if (!tok.empty()) {
-        out.push_back(unquote_if_needed(tok));
-    }
-    return out;
+	// Minimal TOML array splitting: handles quoted strings and numbers/bools.
+	// No nested arrays.
+	std::vector<std::string> out;
+	std::string cur;
+	bool in_quotes = false;
+	for (size_t i = 0; i < inner.size(); ++i) {
+		char c = inner[i];
+		if (c == '"') {
+			in_quotes = !in_quotes;
+			cur.push_back(c);
+			continue;
+		}
+		if (!in_quotes && c == ',') {
+			auto tok = trim(cur);
+			if (!tok.empty()) {
+				out.push_back(unquote_if_needed(tok));
+			}
+			cur.clear();
+			continue;
+		}
+		cur.push_back(c);
+	}
+	auto tok = trim(cur);
+	if (!tok.empty()) {
+		out.push_back(unquote_if_needed(tok));
+	}
+	return out;
 }
 
 static std::optional<std::vector<std::string>> parse_array_value(std::string value,
-    std::istream& in)
+	std::istream& in)
 {
-    // Supports:
-    //   key = [1, 2, 3]
-    //   key = [
-    //     "a",
-    //     1,
-    //   ]
-    value = strip_comment(value);
-    value = trim(value);
-    if (!is_array_start(value)) {
-        return std::nullopt;
-    }
+	// Supports:
+	//   key = [1, 2, 3]
+	//   key = [
+	//     "a",
+	//     1,
+	//   ]
+	value = strip_comment(value);
+	value = trim(value);
+	if (!is_array_start(value)) {
+		return std::nullopt;
+	}
 
-    std::string buf = value;
-    while (!is_array_end(buf)) {
-        std::string more;
-        if (!std::getline(in, more)) {
-            break;
-        }
-        more = strip_comment(more);
-        more = trim(more);
-        if (more.empty()) {
-            continue;
-        }
-        buf += " " + more;
-    }
+	std::string buf = value;
+	while (!is_array_end(buf)) {
+		std::string more;
+		if (!std::getline(in, more)) {
+			break;
+		}
+		more = strip_comment(more);
+		more = trim(more);
+		if (more.empty()) {
+			continue;
+		}
+		buf += " " + more;
+	}
 
-    auto t = trim(buf);
-    if (t.size() < 2 || t.front() != '[' || t.back() != ']') {
-        return std::nullopt;
-    }
-    auto inner = t.substr(1, t.size() - 2);
-    inner = trim(inner);
-    if (inner.empty()) {
-        return std::vector<std::string>{};
-    }
-    return split_array_items(inner);
+	auto t = trim(buf);
+	if (t.size() < 2 || t.front() != '[' || t.back() != ']') {
+		return std::nullopt;
+	}
+	auto inner = t.substr(1, t.size() - 2);
+	inner = trim(inner);
+	if (inner.empty()) {
+		return std::vector<std::string>{};
+	}
+	return split_array_items(inner);
 }
 
 static std::optional<TomlTestDef> load_test_def_from_toml(const std::filesystem::path& toml_path,
-    const std::string& test_name)
+	const std::string& test_name)
 {
-    std::ifstream in(toml_path);
-    if (!in) {
-        return std::nullopt;
-    }
+	std::ifstream in(toml_path);
+	if (!in) {
+		return std::nullopt;
+	}
 
-    const std::string section_main = test_name;
-    const std::string section_args = test_name + ".args";
+	const std::string section_main = test_name;
+	const std::string section_args = test_name + ".args";
 
-    enum class Mode { None, InMain, InArgs };
-    Mode mode = Mode::None;
+	enum class Mode { None, InMain, InArgs };
+	Mode mode = Mode::None;
 
-    TomlTestDef def;
-    // Defaults from [defaults] in tests/tests.toml, mirrored here.
-    def.args.emplace_back("all_charges", std::vector<std::string>{"true"});
-    def.args.emplace_back("no_date", std::vector<std::string>{"true"});
-    // The integration grid weights went to the GPU by default, which adds a line to
-    // the log on a machine with a card and none on a machine without, so every
-    // reference log here matched on one kind of machine and failed on the other.
-    // Pin the CPU path the way the fp32/fp64 tests pin theirs; the tests that want
-    // the device pass -gpu_grid themselves and, coming after this one, win.
-    def.args.emplace_back("no_gpu_grid", std::vector<std::string>{"true"});
-    std::string line;
-    while (std::getline(in, line)) {
-        line = strip_comment(line);
-        line = trim(line);
-        if (line.empty()) {
-            continue;
-        }
+	TomlTestDef def;
+	// Defaults from [defaults] in tests/tests.toml, mirrored here.
+	def.args.emplace_back("all_charges", std::vector<std::string>{"true"});
+	def.args.emplace_back("no_date", std::vector<std::string>{"true"});
+	// The integration grid weights went to the GPU by default, which adds a line to
+	// the log on a machine with a card and none on a machine without, so every
+	// reference log here matched on one kind of machine and failed on the other.
+	// Pin the CPU path the way the fp32/fp64 tests pin theirs; the tests that want
+	// the device pass -gpu_grid themselves and, coming after this one, win.
+	def.args.emplace_back("no_gpu_grid", std::vector<std::string>{"true"});
+	std::string line;
+	while (std::getline(in, line)) {
+		line = strip_comment(line);
+		line = trim(line);
+		if (line.empty()) {
+			continue;
+		}
 
-        if (auto sec = parse_section_name(line); sec.has_value()) {
-            if (sec.value() == section_main) {
-                mode = Mode::InMain;
-            } else if (sec.value() == section_args) {
-                mode = Mode::InArgs;
-            } else {
-                mode = Mode::None;
-            }
-            continue;
-        }
+		if (auto sec = parse_section_name(line); sec.has_value()) {
+			if (sec.value() == section_main) {
+				mode = Mode::InMain;
+			} else if (sec.value() == section_args) {
+				mode = Mode::InArgs;
+			} else {
+				mode = Mode::None;
+			}
+			continue;
+		}
 
-        auto kv = parse_kv(line);
-        if (!kv.has_value()) {
-            continue;
-        }
+		auto kv = parse_kv(line);
+		if (!kv.has_value()) {
+			continue;
+		}
 
-        const std::string key = kv->first;
-        std::string value = kv->second;
+		const std::string key = kv->first;
+		std::string value = kv->second;
 
-        if (mode == Mode::InMain) {
-            if (key == "directory") {
-                def.directory = unquote_if_needed(value);
-            } else if (key == "good") {
-                def.goodFile = unquote_if_needed(value);
-            } else if (key == "actual") {
-                def.actualFile = unquote_if_needed(value);
-            } else if (key == "full") {
-                auto v = unquote_if_needed(value);
-                def.full = (v == "true" || v == "True" || v == "1");
-            }
-        } else if (mode == Mode::InArgs) {
-            // Scalars or arrays.
-            if (auto arr = parse_array_value(value, in); arr.has_value()) {
-                std::vector<std::string> vals;
-                vals.reserve(arr->size());
-                for (const auto& v : *arr) {
-                    vals.push_back(unquote_if_needed(v));
-                }
-                def.args.emplace_back(key, vals);
-            } else {
-                def.args.emplace_back(key, std::vector<std::string>{unquote_if_needed(value)});
-            }
-        }
-    }
+		if (mode == Mode::InMain) {
+			if (key == "directory") {
+				def.directory = unquote_if_needed(value);
+			} else if (key == "good") {
+				def.goodFile = unquote_if_needed(value);
+			} else if (key == "actual") {
+				def.actualFile = unquote_if_needed(value);
+			} else if (key == "full") {
+				auto v = unquote_if_needed(value);
+				def.full = (v == "true" || v == "True" || v == "1");
+			}
+		} else if (mode == Mode::InArgs) {
+			// Scalars or arrays.
+			if (auto arr = parse_array_value(value, in); arr.has_value()) {
+				std::vector<std::string> vals;
+				vals.reserve(arr->size());
+				for (const auto& v : *arr) {
+					vals.push_back(unquote_if_needed(v));
+				}
+				def.args.emplace_back(key, vals);
+			} else {
+				def.args.emplace_back(key, std::vector<std::string>{unquote_if_needed(value)});
+			}
+		}
+	}
 
-    if (def.directory.empty()) {
-        return std::nullopt;
-    }
+	if (def.directory.empty()) {
+		return std::nullopt;
+	}
 
-    return def;
+	return def;
 }
 
 static UT_Result run_inprocess_test(const std::filesystem::path& repo_root,
-    const std::string& test_name)
+	const std::string& test_name)
 {
-    const auto toml_path = repo_root / "tests" / "tests.toml";
-    auto def_opt = load_test_def_from_toml(toml_path, test_name);
-    if (!def_opt.has_value()) {
-        return UT_Result{false, "Test definition not found for test '" + test_name + "'"};
-    }
+	const auto toml_path = repo_root / "tests" / "tests.toml";
+	auto def_opt = load_test_def_from_toml(toml_path, test_name);
+	if (!def_opt.has_value()) {
+		return UT_Result{false, "Test definition not found for test '" + test_name + "'"};
+	}
 
-    const auto test_src_dir = repo_root / "tests" / def_opt->directory;
-    if (!std::filesystem::exists(test_src_dir)) {
-        return UT_Result{false, "Test source directory does not exist: " + test_src_dir.string()};
-    }
+	const auto test_src_dir = repo_root / "tests" / def_opt->directory;
+	if (!std::filesystem::exists(test_src_dir)) {
+		return UT_Result{false, "Test source directory does not exist: " + test_src_dir.string()};
+	}
 
-    // Inject OCC_DATA_PATH for in-process runs.
-    const std::string occDataPath = (repo_root / "occ" / "share").string();
+	// Inject OCC_DATA_PATH for in-process runs.
+	const std::string occDataPath = (repo_root / "occ" / "share").string();
 #ifdef _WIN32
-    _putenv_s("OCC_DATA_PATH", occDataPath.c_str());
+	_putenv_s("OCC_DATA_PATH", occDataPath.c_str());
 #else
-    setenv("OCC_DATA_PATH", occDataPath.c_str(), 1);
+	setenv("OCC_DATA_PATH", occDataPath.c_str(), 1);
 #endif
 
-    // Build argv: NoSpherA2 -key value...
-    std::vector<std::string> argv_storage;
-    argv_storage.emplace_back("NoSpherA2");
-    for (const auto& kv : def_opt->args) {
-        const std::string flag = "-" + kv.first;
-        argv_storage.emplace_back(flag);
-        for (const auto& val : kv.second) {
-            if (val == "true" || val == "True" || val == "") {
-                // flag-only semantics: keep just -key
-                continue;
-            }
-            if (val == "false" || val == "False") {
-                // omit false values
-                continue;
-            }
-            argv_storage.emplace_back(val);
-        }
-    }
+	// Build argv: NoSpherA2 -key value...
+	std::vector<std::string> argv_storage;
+	argv_storage.emplace_back("NoSpherA2");
+	for (const auto& kv : def_opt->args) {
+		const std::string flag = "-" + kv.first;
+		argv_storage.emplace_back(flag);
+		for (const auto& val : kv.second) {
+			if (val == "true" || val == "True" || val == "") {
+				// flag-only semantics: keep just -key
+				continue;
+			}
+			if (val == "false" || val == "False") {
+				// omit false values
+				continue;
+			}
+			argv_storage.emplace_back(val);
+		}
+	}
 
-    std::vector<char*> argv;
-    argv.reserve(argv_storage.size() + 1);
-    for (auto& s : argv_storage) {
-        argv.push_back(s.data());
-    }
-    argv.push_back(nullptr);
+	std::vector<char*> argv;
+	argv.reserve(argv_storage.size() + 1);
+	for (auto& s : argv_storage) {
+		argv.push_back(s.data());
+	}
+	argv.push_back(nullptr);
 
-    const auto old_cwd = std::filesystem::current_path();
-    // Move to the directory of the test:
-    std::filesystem::current_path(test_src_dir);
-    int rc = run_app(static_cast<int>(argv_storage.size()), argv.data());
-    std::filesystem::current_path(old_cwd);
-    if (rc != 0) {
-        return UT_Result{false, "Test failed with error code: " + std::to_string(rc)};
-    }
+	const auto old_cwd = std::filesystem::current_path();
+	// Move to the directory of the test:
+	std::filesystem::current_path(test_src_dir);
+	int rc = run_app(static_cast<int>(argv_storage.size()), argv.data());
+	std::filesystem::current_path(old_cwd);
+	if (rc != 0) {
+		return UT_Result{false, "Test failed with error code: " + std::to_string(rc)};
+	}
 
-    std::filesystem::path out_file = test_src_dir / "NoSpherA2.log";
-    if (!def_opt->actualFile.empty()) {
-        out_file = test_src_dir / def_opt->actualFile;
-    }
+	std::filesystem::path out_file = test_src_dir / "NoSpherA2.log";
+	if (!def_opt->actualFile.empty()) {
+		out_file = test_src_dir / def_opt->actualFile;
+	}
 
-    if (!std::filesystem::exists(out_file)) {
-        return UT_Result{false, "Output file does not exist: " + out_file.string()};
-    }
+	if (!std::filesystem::exists(out_file)) {
+		return UT_Result{false, "Output file does not exist: " + out_file.string()};
+	}
 
-    const std::string good_name = def_opt->goodFile.empty() ? (test_name + ".good") : def_opt->goodFile;
-    const auto good_path = test_src_dir / good_name;
+	const std::string good_name = def_opt->goodFile.empty() ? (test_name + ".good") : def_opt->goodFile;
+	const auto good_path = test_src_dir / good_name;
 
-    if (!std::filesystem::exists(good_path)) {
-        return UT_Result{false, "Good file does not exist: " + good_path.string()};
-    }
+	if (!std::filesystem::exists(good_path)) {
+		return UT_Result{false, "Good file does not exist: " + good_path.string()};
+	}
 
-    const auto diff = compare_files_numeric(good_path, out_file, 0.01);
-    if (!diff.empty()) {
-        return UT_Result{false, "Logfile location: " + out_file.string() + "\nFiles differ: " + diff};
-    }
+	const auto diff = compare_files_numeric(good_path, out_file, 0.01);
+	if (!diff.empty()) {
+		return UT_Result{false, "Logfile location: " + out_file.string() + "\nFiles differ: " + diff};
+	}
 
-    return UT_Result{true, ""};
+	return UT_Result{true, ""};
 }
 
 } // namespace
@@ -453,33 +453,33 @@ namespace NoSpherA2Integration {
 static std::filesystem::path repo_root;
 std::filesystem::path get_repo_root()
 {
-    if (repo_root.empty()) {
-        repo_root = nos_test_repo_root();
-    }
-    return repo_root;
+	if (repo_root.empty()) {
+		repo_root = nos_test_repo_root();
+	}
+	return repo_root;
 }
 TEST(TomlIntegrationTests, AlanineOcc)
 {
-    const UT_Result result = run_inprocess_test(get_repo_root(), "alanine_occ");
-    EXPECT_TRUE(result.success) << result.message;
+	const UT_Result result = run_inprocess_test(get_repo_root(), "alanine_occ");
+	EXPECT_TRUE(result.success) << result.message;
 }
 
 TEST(TomlIntegrationTests, AlanineIntegratedOcc)
 {
-    const UT_Result result = run_inprocess_test(get_repo_root(), "alanine_integrated_occ");
-    EXPECT_TRUE(result.success) << result.message;
+	const UT_Result result = run_inprocess_test(get_repo_root(), "alanine_integrated_occ");
+	EXPECT_TRUE(result.success) << result.message;
 }
 
 TEST(TomlIntegrationTests, DisorderTHPP)
 {
-    const UT_Result result = run_inprocess_test(get_repo_root(), "disorder_THPP");
-    EXPECT_TRUE(result.success) << result.message;
+	const UT_Result result = run_inprocess_test(get_repo_root(), "disorder_THPP");
+	EXPECT_TRUE(result.success) << result.message;
 }
 
 TEST(TomlIntegrationTests, P1_test_XCW)
 {
-    const UT_Result result = run_inprocess_test(get_repo_root(), "P1_test_XCW");
-    EXPECT_TRUE(result.success) << result.message;
+	const UT_Result result = run_inprocess_test(get_repo_root(), "P1_test_XCW");
+	EXPECT_TRUE(result.success) << result.message;
 }
 
 // Longer lambda scan (11 steps vs. P1_test_XCW's 2), with -xcw_gaussian_halt
@@ -494,9 +494,9 @@ TEST(TomlIntegrationTests, P1_test_XCW)
 static bool gpu_device_present()
 {
 #ifdef NOSPHERA2_USE_GPU
-    return sf_gpu_available();
+	return sf_gpu_available();
 #else
-    return false;
+	return false;
 #endif
 }
 
@@ -504,22 +504,22 @@ static bool gpu_device_present()
 // held to the CPU reference rather than a reference of its own.
 TEST(TomlIntegrationTests, sucrose_SF_gpu_grid)
 {
-    if (!gpu_device_present()) {
-        GTEST_SKIP() << "No GPU device present; the -gpu_grid path cannot run here";
-    }
-    const UT_Result result = run_inprocess_test(get_repo_root(), "sucrose_SF_gpu_grid");
-    EXPECT_TRUE(result.success) << result.message;
+	if (!gpu_device_present()) {
+		GTEST_SKIP() << "No GPU device present; the -gpu_grid path cannot run here";
+	}
+	const UT_Result result = run_inprocess_test(get_repo_root(), "sucrose_SF_gpu_grid");
+	EXPECT_TRUE(result.success) << result.message;
 }
 
 // The I tensor path contracts in single precision, which moves the total energy in the
 // ninth decimal, so it carries its own reference.
 TEST(TomlIntegrationTests, P1_test_XCW_gpu_itensor)
 {
-    if (!gpu_device_present()) {
-        GTEST_SKIP() << "No GPU device present; the -gpu_itensor path cannot run here";
-    }
-    const UT_Result result = run_inprocess_test(get_repo_root(), "P1_test_XCW_gpu_itensor");
-    EXPECT_TRUE(result.success) << result.message;
+	if (!gpu_device_present()) {
+		GTEST_SKIP() << "No GPU device present; the -gpu_itensor path cannot run here";
+	}
+	const UT_Result result = run_inprocess_test(get_repo_root(), "P1_test_XCW_gpu_itensor");
+	EXPECT_TRUE(result.success) << result.message;
 }
 
 // The two sincos kernels, each pinned by flag. Left on Auto the card decides, so on this
@@ -529,29 +529,29 @@ TEST(TomlIntegrationTests, P1_test_XCW_gpu_itensor)
 // AGENTS.md, not just a smoke test that the kernel launches.
 TEST(TomlIntegrationTests, sucrose_SF_gpu_fp64)
 {
-    if (!gpu_device_present()) {
-        GTEST_SKIP() << "No GPU device present; the -gpu_fp64 path cannot run here";
-    }
-    const UT_Result result = run_inprocess_test(get_repo_root(), "sucrose_SF_gpu_fp64");
-    EXPECT_TRUE(result.success) << result.message;
+	if (!gpu_device_present()) {
+		GTEST_SKIP() << "No GPU device present; the -gpu_fp64 path cannot run here";
+	}
+	const UT_Result result = run_inprocess_test(get_repo_root(), "sucrose_SF_gpu_fp64");
+	EXPECT_TRUE(result.success) << result.message;
 }
 
 TEST(TomlIntegrationTests, sucrose_SF_gpu_fp32)
 {
-    if (!gpu_device_present()) {
-        GTEST_SKIP() << "No GPU device present; the -gpu_fp32 path cannot run here";
-    }
-    const UT_Result result = run_inprocess_test(get_repo_root(), "sucrose_SF_gpu_fp32");
-    EXPECT_TRUE(result.success) << result.message;
+	if (!gpu_device_present()) {
+		GTEST_SKIP() << "No GPU device present; the -gpu_fp32 path cannot run here";
+	}
+	const UT_Result result = run_inprocess_test(get_repo_root(), "sucrose_SF_gpu_fp32");
+	EXPECT_TRUE(result.success) << result.message;
 }
 
 TEST(TomlIntegrationTests, P1_test_XCW_full)
 {
-    if (const char* env = std::getenv("RUN_FULL_TEST"); !env || std::string(env) == "0" || std::string(env) == "false") {
-        GTEST_SKIP() << "Set RUN_FULL_TEST=1 to run the full P1 XCW lambda scan (several minutes)";
-    }
-    const UT_Result result = run_inprocess_test(get_repo_root(), "P1_test_XCW_full");
-    EXPECT_TRUE(result.success) << result.message;
+	if (const char* env = std::getenv("RUN_FULL_TEST"); !env || std::string(env) == "0" || std::string(env) == "false") {
+		GTEST_SKIP() << "Set RUN_FULL_TEST=1 to run the full P1 XCW lambda scan (several minutes)";
+	}
+	const UT_Result result = run_inprocess_test(get_repo_root(), "P1_test_XCW_full");
+	EXPECT_TRUE(result.success) << result.message;
 }
 
 // -xcw_h2_weighting variant of P1_test_XCW (2 lambda steps): fits against
@@ -559,26 +559,26 @@ TEST(TomlIntegrationTests, P1_test_XCW_full)
 // classical GoF^2 (see Src/core/xcw_halting.h and XCW::ensure_inv_H2_weights).
 TEST(TomlIntegrationTests, P1_test_XCW_h2)
 {
-    const UT_Result result = run_inprocess_test(get_repo_root(), "P1_test_XCW_h2");
-    EXPECT_TRUE(result.success) << result.message;
+	const UT_Result result = run_inprocess_test(get_repo_root(), "P1_test_XCW_h2");
+	EXPECT_TRUE(result.success) << result.message;
 }
 
 // -xcw_h2_weighting variant of P1_test_XCW_full (11 lambda steps, to
 // lambda=0.1). Slow, same RUN_FULL_TEST gating as P1_test_XCW_full.
 TEST(TomlIntegrationTests, P1_test_XCW_h2_full)
 {
-    if (const char* env = std::getenv("RUN_FULL_TEST"); !env || std::string(env) == "0" || std::string(env) == "false") {
-        GTEST_SKIP() << "Set RUN_FULL_TEST=1 to run the full P1 XCW H2-weighted lambda scan (several minutes)";
-    }
-    const UT_Result result = run_inprocess_test(get_repo_root(), "P1_test_XCW_h2_full");
-    EXPECT_TRUE(result.success) << result.message;
+	if (const char* env = std::getenv("RUN_FULL_TEST"); !env || std::string(env) == "0" || std::string(env) == "false") {
+		GTEST_SKIP() << "Set RUN_FULL_TEST=1 to run the full P1 XCW H2-weighted lambda scan (several minutes)";
+	}
+	const UT_Result result = run_inprocess_test(get_repo_root(), "P1_test_XCW_h2_full");
+	EXPECT_TRUE(result.success) << result.message;
 }
 
 // XCW test with F^2 criterion
 TEST(TomlIntegrationTests, P1_F2_test_XCW)
 {
-    const UT_Result result = run_inprocess_test(get_repo_root(), "P1_F2_test_XCW");
-    EXPECT_TRUE(result.success) << result.message;
+	const UT_Result result = run_inprocess_test(get_repo_root(), "P1_F2_test_XCW");
+	EXPECT_TRUE(result.success) << result.message;
 }
 
 // The three quick fits again with -xcw_incremental: the two-electron part of the Fock
@@ -587,348 +587,348 @@ TEST(TomlIntegrationTests, P1_F2_test_XCW)
 // convergence, so this is where a broken segment skip would show.
 TEST(TomlIntegrationTests, P1_test_XCW_incremental)
 {
-    const UT_Result result = run_inprocess_test(get_repo_root(), "P1_test_XCW_incremental");
-    EXPECT_TRUE(result.success) << result.message;
+	const UT_Result result = run_inprocess_test(get_repo_root(), "P1_test_XCW_incremental");
+	EXPECT_TRUE(result.success) << result.message;
 }
 
 TEST(TomlIntegrationTests, P1_test_XCW_h2_incremental)
 {
-    const UT_Result result = run_inprocess_test(get_repo_root(), "P1_test_XCW_h2_incremental");
-    EXPECT_TRUE(result.success) << result.message;
+	const UT_Result result = run_inprocess_test(get_repo_root(), "P1_test_XCW_h2_incremental");
+	EXPECT_TRUE(result.success) << result.message;
 }
 
 TEST(TomlIntegrationTests, P1_F2_test_XCW_incremental)
 {
-    const UT_Result result = run_inprocess_test(get_repo_root(), "P1_F2_test_XCW_incremental");
-    EXPECT_TRUE(result.success) << result.message;
+	const UT_Result result = run_inprocess_test(get_repo_root(), "P1_F2_test_XCW_incremental");
+	EXPECT_TRUE(result.success) << result.message;
 }
 
 TEST(TomlIntegrationTests, P1_F2_test_XCW_full)
 {
-    if (const char* env = std::getenv("RUN_FULL_TEST"); !env || std::string(env) == "0" || std::string(env) == "false") {
-        GTEST_SKIP() << "Set RUN_FULL_TEST=1 to run the full P1 XCW lambda scan (several minutes)";
-    }
-    const UT_Result result = run_inprocess_test(get_repo_root(), "P1_F2_test_XCW_full");
-    EXPECT_TRUE(result.success) << result.message;
+	if (const char* env = std::getenv("RUN_FULL_TEST"); !env || std::string(env) == "0" || std::string(env) == "false") {
+		GTEST_SKIP() << "Set RUN_FULL_TEST=1 to run the full P1 XCW lambda scan (several minutes)";
+	}
+	const UT_Result result = run_inprocess_test(get_repo_root(), "P1_F2_test_XCW_full");
+	EXPECT_TRUE(result.success) << result.message;
 }
 
 TEST(TomlIntegrationTests, P1_F2_test_XCW_h2)
 {
-    const UT_Result result = run_inprocess_test(get_repo_root(), "P1_F2_test_XCW_h2");
-    EXPECT_TRUE(result.success) << result.message;
+	const UT_Result result = run_inprocess_test(get_repo_root(), "P1_F2_test_XCW_h2");
+	EXPECT_TRUE(result.success) << result.message;
 }
 
 TEST(TomlIntegrationTests, P1_F2_test_XCW_h2_full)
 {
-    if (const char* env = std::getenv("RUN_FULL_TEST"); !env || std::string(env) == "0" || std::string(env) == "false") {
-        GTEST_SKIP() << "Set RUN_FULL_TEST=1 to run the full P1 XCW H2-weighted lambda scan (several minutes)";
-    }
-    const UT_Result result = run_inprocess_test(get_repo_root(), "P1_F2_test_XCW_h2_full");
-    EXPECT_TRUE(result.success) << result.message;
+	if (const char* env = std::getenv("RUN_FULL_TEST"); !env || std::string(env) == "0" || std::string(env) == "false") {
+		GTEST_SKIP() << "Set RUN_FULL_TEST=1 to run the full P1 XCW H2-weighted lambda scan (several minutes)";
+	}
+	const UT_Result result = run_inprocess_test(get_repo_root(), "P1_F2_test_XCW_h2_full");
+	EXPECT_TRUE(result.success) << result.message;
 }
 
 TEST(TomlIntegrationTests, Fractal)
 {
-    const UT_Result result = run_inprocess_test(get_repo_root(), "fractal");
-    EXPECT_TRUE(result.success) << result.message;
+	const UT_Result result = run_inprocess_test(get_repo_root(), "fractal");
+	EXPECT_TRUE(result.success) << result.message;
 }
 
 TEST(TomlIntegrationTests, GrownWater)
 {
-    const UT_Result result = run_inprocess_test(get_repo_root(), "grown_water");
-    EXPECT_TRUE(result.success) << result.message;
+	const UT_Result result = run_inprocess_test(get_repo_root(), "grown_water");
+	EXPECT_TRUE(result.success) << result.message;
 }
 
 TEST(TomlIntegrationTests, HybridMode)
 {
-    const UT_Result result = run_inprocess_test(get_repo_root(), "Hybrid_mode");
-    EXPECT_TRUE(result.success) << result.message;
+	const UT_Result result = run_inprocess_test(get_repo_root(), "Hybrid_mode");
+	EXPECT_TRUE(result.success) << result.message;
 }
 
 TEST(TomlIntegrationTests, MalbacSfEcp)
 {
-    const UT_Result result = run_inprocess_test(get_repo_root(), "malbac_SF_ECP");
-    EXPECT_TRUE(result.success) << result.message;
+	const UT_Result result = run_inprocess_test(get_repo_root(), "malbac_SF_ECP");
+	EXPECT_TRUE(result.success) << result.message;
 }
 
 TEST(TomlIntegrationTests, Properties)
 {
-    const UT_Result result = run_inprocess_test(get_repo_root(), "properties");
-    EXPECT_TRUE(result.success) << result.message;
+	const UT_Result result = run_inprocess_test(get_repo_root(), "properties");
+	EXPECT_TRUE(result.success) << result.message;
 }
 
 TEST(TomlIntegrationTests, IntermolecularNCI)
 {
-    const UT_Result result = run_inprocess_test(get_repo_root(), "intermolecular_nci");
-    EXPECT_TRUE(result.success) << result.message;
+	const UT_Result result = run_inprocess_test(get_repo_root(), "intermolecular_nci");
+	EXPECT_TRUE(result.success) << result.message;
 }
 
 TEST(TomlIntegrationTests, Fukui)
 {
-    const UT_Result result = run_inprocess_test(get_repo_root(), "fukui");
-    EXPECT_TRUE(result.success) << result.message;
+	const UT_Result result = run_inprocess_test(get_repo_root(), "fukui");
+	EXPECT_TRUE(result.success) << result.message;
 }
 
 TEST(TomlIntegrationTests, FukuiPBC)
 {
-    const UT_Result result = run_inprocess_test(get_repo_root(), "fukui_pbc");
-    EXPECT_TRUE(result.success) << result.message;
+	const UT_Result result = run_inprocess_test(get_repo_root(), "fukui_pbc");
+	EXPECT_TRUE(result.success) << result.message;
 }
 
 TEST(TomlIntegrationTests, RiFit)
 {
-    const UT_Result result = run_inprocess_test(get_repo_root(), "ri_fit");
-    EXPECT_TRUE(result.success) << result.message;
+	const UT_Result result = run_inprocess_test(get_repo_root(), "ri_fit");
+	EXPECT_TRUE(result.success) << result.message;
 }
 
 TEST(TomlIntegrationTests, RiFitMultipoles)
 {
-    const UT_Result result = run_inprocess_test(get_repo_root(), "ri_fit_multipoles");
-    EXPECT_TRUE(result.success) << result.message;
+	const UT_Result result = run_inprocess_test(get_repo_root(), "ri_fit_multipoles");
+	EXPECT_TRUE(result.success) << result.message;
 }
 
 TEST(TomlIntegrationTests, RubredoxinCmtc)
 {
-    const UT_Result result = run_inprocess_test(get_repo_root(), "rubredoxin_cmtc");
-    EXPECT_TRUE(result.success) << result.message;
+	const UT_Result result = run_inprocess_test(get_repo_root(), "rubredoxin_cmtc");
+	EXPECT_TRUE(result.success) << result.message;
 }
 
 TEST(TomlIntegrationTests, SALTED)
 {
-    const UT_Result result = run_inprocess_test(get_repo_root(), "SALTED");
-    EXPECT_TRUE(result.success) << result.message;
+	const UT_Result result = run_inprocess_test(get_repo_root(), "SALTED");
+	EXPECT_TRUE(result.success) << result.message;
 }
 
 TEST(TomlIntegrationTests, SALTEDChargeConstraint)
 {
-    const UT_Result result = run_inprocess_test(get_repo_root(), "SALTED_charge_constraint");
-    EXPECT_TRUE(result.success) << result.message;
+	const UT_Result result = run_inprocess_test(get_repo_root(), "SALTED_charge_constraint");
+	EXPECT_TRUE(result.success) << result.message;
 }
 
 TEST(TomlIntegrationTests, SucroseIAM)
 {
-    const UT_Result result = run_inprocess_test(get_repo_root(), "sucrose_IAM");
-    EXPECT_TRUE(result.success) << result.message;
+	const UT_Result result = run_inprocess_test(get_repo_root(), "sucrose_IAM");
+	EXPECT_TRUE(result.success) << result.message;
 }
 
 TEST(TomlIntegrationTests, SucrosePtb)
 {
-    const UT_Result result = run_inprocess_test(get_repo_root(), "sucrose_ptb");
-    EXPECT_TRUE(result.success) << result.message;
+	const UT_Result result = run_inprocess_test(get_repo_root(), "sucrose_ptb");
+	EXPECT_TRUE(result.success) << result.message;
 }
 
 TEST(TomlIntegrationTests, SucroseSF)
 {
-    const UT_Result result = run_inprocess_test(get_repo_root(), "sucrose_SF");
-    EXPECT_TRUE(result.success) << result.message;
+	const UT_Result result = run_inprocess_test(get_repo_root(), "sucrose_SF");
+	EXPECT_TRUE(result.success) << result.message;
 }
 
 TEST(TomlIntegrationTests, SucroseTwin)
 {
-    const UT_Result result = run_inprocess_test(get_repo_root(), "sucrose_twin");
-    EXPECT_TRUE(result.success) << result.message;
+	const UT_Result result = run_inprocess_test(get_repo_root(), "sucrose_twin");
+	EXPECT_TRUE(result.success) << result.message;
 }
 
 TEST(TomlIntegrationTests, WfnReading)
 {
-    const UT_Result result = run_inprocess_test(get_repo_root(), "wfn_reading");
-    EXPECT_TRUE(result.success) << result.message;
+	const UT_Result result = run_inprocess_test(get_repo_root(), "wfn_reading");
+	EXPECT_TRUE(result.success) << result.message;
 }
 
 TEST(TomlIntegrationTests, FchkConversion)
 {
-    const UT_Result result = run_inprocess_test(get_repo_root(), "fchk_conversion");
-    EXPECT_TRUE(result.success) << result.message;
+	const UT_Result result = run_inprocess_test(get_repo_root(), "fchk_conversion");
+	EXPECT_TRUE(result.success) << result.message;
 }
 
 TEST(TomlIntegrationTests, TFVC)
 {
-    const UT_Result result = run_inprocess_test(get_repo_root(), "TFVC");
-    EXPECT_TRUE(result.success) << result.message;
+	const UT_Result result = run_inprocess_test(get_repo_root(), "TFVC");
+	EXPECT_TRUE(result.success) << result.message;
 }
 
 TEST(TomlIntegrationTests, TFVCEcp)
 {
-    const UT_Result result = run_inprocess_test(get_repo_root(), "TFVC_ECP");
-    EXPECT_TRUE(result.success) << result.message;
+	const UT_Result result = run_inprocess_test(get_repo_root(), "TFVC_ECP");
+	EXPECT_TRUE(result.success) << result.message;
 }
 
 TEST(TomlIntegrationTests, RGBI_Groups_NH3BH3_sym)
 {
-    const UT_Result result = run_inprocess_test(get_repo_root(), "RGBI_Groups_NH3BH3_sym");
-    EXPECT_TRUE(result.success) << result.message;
+	const UT_Result result = run_inprocess_test(get_repo_root(), "RGBI_Groups_NH3BH3_sym");
+	EXPECT_TRUE(result.success) << result.message;
 }
 
 TEST(TomlIntegrationTests, RGBI_Groups_NH3BH3_sym_ANO)
 {
-    const UT_Result result = run_inprocess_test(get_repo_root(), "RGBI_Groups_NH3BH3_sym_ANO");
-    EXPECT_TRUE(result.success) << result.message;
+	const UT_Result result = run_inprocess_test(get_repo_root(), "RGBI_Groups_NH3BH3_sym_ANO");
+	EXPECT_TRUE(result.success) << result.message;
 }
 
 TEST(TomlIntegrationTests, RGBI_NH3Li)
 {
-    const UT_Result result = run_inprocess_test(get_repo_root(), "RGBI_NH3Li");
-    EXPECT_TRUE(result.success) << result.message;
+	const UT_Result result = run_inprocess_test(get_repo_root(), "RGBI_NH3Li");
+	EXPECT_TRUE(result.success) << result.message;
 }
 
 TEST(TomlIntegrationTests, ELI_NH3Li)
 {
-    const UT_Result result = run_inprocess_test(get_repo_root(), "ELI_NH3Li");
-    EXPECT_TRUE(result.success) << result.message;
+	const UT_Result result = run_inprocess_test(get_repo_root(), "ELI_NH3Li");
+	EXPECT_TRUE(result.success) << result.message;
 }
 
 TEST(TomlIntegrationTests, ELI_NH3Li_RI)
 {
-    const UT_Result result = run_inprocess_test(get_repo_root(), "ELI_NH3Li_RI");
-    EXPECT_TRUE(result.success) << result.message;
+	const UT_Result result = run_inprocess_test(get_repo_root(), "ELI_NH3Li_RI");
+	EXPECT_TRUE(result.success) << result.message;
 }
 
 TEST(TomlIntegrationTests, ELI_HgH2_ECP)
 {
-    const UT_Result result = run_inprocess_test(get_repo_root(), "ELI_HgH2_ECP");
-    EXPECT_TRUE(result.success) << result.message;
+	const UT_Result result = run_inprocess_test(get_repo_root(), "ELI_HgH2_ECP");
+	EXPECT_TRUE(result.success) << result.message;
 }
 
 TEST(TomlIntegrationTests, ELI_UH6)
 {
-    const UT_Result result = run_inprocess_test(get_repo_root(), "ELI_UH6");
-    EXPECT_TRUE(result.success) << result.message;
+	const UT_Result result = run_inprocess_test(get_repo_root(), "ELI_UH6");
+	EXPECT_TRUE(result.success) << result.message;
 }
 
 TEST(TomlIntegrationTests, RGBI_NH3Li_ANO)
 {
-    const UT_Result result = run_inprocess_test(get_repo_root(), "RGBI_NH3Li_ANO");
-    EXPECT_TRUE(result.success) << result.message;
+	const UT_Result result = run_inprocess_test(get_repo_root(), "RGBI_NH3Li_ANO");
+	EXPECT_TRUE(result.success) << result.message;
 }
 TEST(TomlIntegrationTests, cube_rho)
 {
-    const UT_Result result = run_inprocess_test(get_repo_root(), "cube_rho");
-    EXPECT_TRUE(result.success) << result.message;
+	const UT_Result result = run_inprocess_test(get_repo_root(), "cube_rho");
+	EXPECT_TRUE(result.success) << result.message;
 }
 
 TEST(TomlIntegrationTests, cube_esp)
 {
-    const UT_Result result = run_inprocess_test(get_repo_root(), "cube_esp");
-    EXPECT_TRUE(result.success) << result.message;
+	const UT_Result result = run_inprocess_test(get_repo_root(), "cube_esp");
+	EXPECT_TRUE(result.success) << result.message;
 }
 
 TEST(TomlIntegrationTests, cube_elf)
 {
-    const UT_Result result = run_inprocess_test(get_repo_root(), "cube_elf");
-    EXPECT_TRUE(result.success) << result.message;
+	const UT_Result result = run_inprocess_test(get_repo_root(), "cube_elf");
+	EXPECT_TRUE(result.success) << result.message;
 }
 
 TEST(TomlIntegrationTests, cube_hirsh)
 {
-    const UT_Result result = run_inprocess_test(get_repo_root(), "cube_hirsh");
-    EXPECT_TRUE(result.success) << result.message;
+	const UT_Result result = run_inprocess_test(get_repo_root(), "cube_hirsh");
+	EXPECT_TRUE(result.success) << result.message;
 }
 
 TEST(TomlIntegrationTests, cube_MO)
 {
-    const UT_Result result = run_inprocess_test(get_repo_root(), "cube_MO");
-    EXPECT_TRUE(result.success) << result.message;
+	const UT_Result result = run_inprocess_test(get_repo_root(), "cube_MO");
+	EXPECT_TRUE(result.success) << result.message;
 }
 
 TEST(TomlIntegrationTests, esp_isosurface)
 {
-    const UT_Result result = run_inprocess_test(get_repo_root(), "esp_isosurface");
-    EXPECT_TRUE(result.success) << result.message;
+	const UT_Result result = run_inprocess_test(get_repo_root(), "esp_isosurface");
+	EXPECT_TRUE(result.success) << result.message;
 }
 
 TEST(TomlIntegrationTests, density_difference)
 {
-    const UT_Result result = run_inprocess_test(get_repo_root(), "density_difference");
-    EXPECT_TRUE(result.success) << result.message;
+	const UT_Result result = run_inprocess_test(get_repo_root(), "density_difference");
+	EXPECT_TRUE(result.success) << result.message;
 }
 
 TEST(TomlIntegrationTests, dipole_moments)
 {
-    const UT_Result result = run_inprocess_test(get_repo_root(), "dipole_moments");
-    EXPECT_TRUE(result.success) << result.message;
+	const UT_Result result = run_inprocess_test(get_repo_root(), "dipole_moments");
+	EXPECT_TRUE(result.success) << result.message;
 }
 
 TEST(TomlIntegrationTests, laplacian_bonds)
 {
-    const UT_Result result = run_inprocess_test(get_repo_root(), "laplacian_bonds");
-    EXPECT_TRUE(result.success) << result.message;
+	const UT_Result result = run_inprocess_test(get_repo_root(), "laplacian_bonds");
+	EXPECT_TRUE(result.success) << result.message;
 }
 
 TEST(TomlIntegrationTests, convert_to_47)
 {
-    const UT_Result result = run_inprocess_test(get_repo_root(), "convert_to_47");
-    EXPECT_TRUE(result.success) << result.message;
+	const UT_Result result = run_inprocess_test(get_repo_root(), "convert_to_47");
+	EXPECT_TRUE(result.success) << result.message;
 }
 
 TEST(TomlIntegrationTests, tscb_to_tsc)
 {
-    const UT_Result result = run_inprocess_test(get_repo_root(), "tscb_to_tsc");
-    EXPECT_TRUE(result.success) << result.message;
+	const UT_Result result = run_inprocess_test(get_repo_root(), "tscb_to_tsc");
+	EXPECT_TRUE(result.success) << result.message;
 }
 
 TEST(TomlIntegrationTests, merge_tscs)
 {
-    const UT_Result result = run_inprocess_test(get_repo_root(), "merge_tscs");
-    EXPECT_TRUE(result.success) << result.message;
+	const UT_Result result = run_inprocess_test(get_repo_root(), "merge_tscs");
+	EXPECT_TRUE(result.success) << result.message;
 }
 
 TEST(TomlIntegrationTests, merge_tscs_nocheck)
 {
-    const UT_Result result = run_inprocess_test(get_repo_root(), "merge_tscs_nocheck");
-    EXPECT_TRUE(result.success) << result.message;
+	const UT_Result result = run_inprocess_test(get_repo_root(), "merge_tscs_nocheck");
+	EXPECT_TRUE(result.success) << result.message;
 }
 
 TEST(TomlIntegrationTests, SF_becke)
 {
-    const UT_Result result = run_inprocess_test(get_repo_root(), "SF_becke");
-    EXPECT_TRUE(result.success) << result.message;
+	const UT_Result result = run_inprocess_test(get_repo_root(), "SF_becke");
+	EXPECT_TRUE(result.success) << result.message;
 }
 
 TEST(TomlIntegrationTests, SF_mbis)
 {
-    const UT_Result result = run_inprocess_test(get_repo_root(), "SF_mbis");
-    EXPECT_TRUE(result.success) << result.message;
+	const UT_Result result = run_inprocess_test(get_repo_root(), "SF_mbis");
+	EXPECT_TRUE(result.success) << result.message;
 }
 
 TEST(TomlIntegrationTests, SF_embis)
 {
-    const UT_Result result = run_inprocess_test(get_repo_root(), "SF_embis");
-    EXPECT_TRUE(result.success) << result.message;
+	const UT_Result result = run_inprocess_test(get_repo_root(), "SF_embis");
+	EXPECT_TRUE(result.success) << result.message;
 }
 
 TEST(TomlIntegrationTests, ri_fit_multipoles_centre)
 {
-    const UT_Result result = run_inprocess_test(get_repo_root(), "ri_fit_multipoles_centre");
-    EXPECT_TRUE(result.success) << result.message;
+	const UT_Result result = run_inprocess_test(get_repo_root(), "ri_fit_multipoles_centre");
+	EXPECT_TRUE(result.success) << result.message;
 }
 
 TEST(TomlIntegrationTests, hirshfeld_surface)
 {
-    const UT_Result result = run_inprocess_test(get_repo_root(), "hirshfeld_surface");
-    EXPECT_TRUE(result.success) << result.message;
+	const UT_Result result = run_inprocess_test(get_repo_root(), "hirshfeld_surface");
+	EXPECT_TRUE(result.success) << result.message;
 }
 
 TEST(TomlIntegrationTests, polarizabilities)
 {
-    const UT_Result result = run_inprocess_test(get_repo_root(), "polarizabilities");
-    EXPECT_TRUE(result.success) << result.message;
+	const UT_Result result = run_inprocess_test(get_repo_root(), "polarizabilities");
+	EXPECT_TRUE(result.success) << result.message;
 }
 
 TEST(TomlIntegrationTests, gbw2wfn)
 {
-    const UT_Result result = run_inprocess_test(get_repo_root(), "gbw2wfn");
-    EXPECT_TRUE(result.success) << result.message;
+	const UT_Result result = run_inprocess_test(get_repo_root(), "gbw2wfn");
+	EXPECT_TRUE(result.success) << result.message;
 }
 
 TEST(TomlIntegrationTests, SALTED_write_coefs)
 {
-    const UT_Result result = run_inprocess_test(get_repo_root(), "SALTED_write_coefs");
-    EXPECT_TRUE(result.success) << result.message;
+	const UT_Result result = run_inprocess_test(get_repo_root(), "SALTED_write_coefs");
+	EXPECT_TRUE(result.success) << result.message;
 }
 
 TEST(TomlIntegrationTests, SALTED_coef_file)
 {
-    const UT_Result result = run_inprocess_test(get_repo_root(), "SALTED_coef_file");
-    EXPECT_TRUE(result.success) << result.message;
+	const UT_Result result = run_inprocess_test(get_repo_root(), "SALTED_coef_file");
+	EXPECT_TRUE(result.success) << result.message;
 }
 }

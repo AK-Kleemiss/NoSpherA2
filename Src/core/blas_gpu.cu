@@ -69,7 +69,7 @@ bool blas_gpu_dgemm(const bool transA, const bool transB, const int m, const int
 	if (gpuMalloc(&dP, p_bytes) != gpuSuccess) { gpuFree(dA); gpuFree(dB); gpuFree(dC); return false; }
 
 	bool ok = gpuMemcpy(dA, A, a_bytes, gpuMemcpyHostToDevice) == gpuSuccess
-	       && gpuMemcpy(dB, B, b_bytes, gpuMemcpyHostToDevice) == gpuSuccess;
+		   && gpuMemcpy(dB, B, b_bytes, gpuMemcpyHostToDevice) == gpuSuccess;
 	if (ok && beta != 0.0)
 		ok = gpuMemcpy(dC, C, c_bytes, gpuMemcpyHostToDevice) == gpuSuccess;
 

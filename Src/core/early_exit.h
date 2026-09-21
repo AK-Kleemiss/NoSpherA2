@@ -16,7 +16,7 @@
 
 struct NosEarlyExit
 {
-    int code;
+	int code;
 };
 
 // Internal throwing function — named differently so the macro below can
@@ -29,14 +29,14 @@ struct NosEarlyExit
 // exception keep propagating.
 inline void nos_do_exit(int code)
 {
-    if (std::uncaught_exceptions() > 0)
-    {
-        // A destructor is calling exit() while an exception is being propagated.
-        // We cannot throw — just return so the destructor finishes cleanly and
-        // the original exception continues to unwind.
-        return;
-    }
-    throw NosEarlyExit{ code };
+	if (std::uncaught_exceptions() > 0)
+	{
+		// A destructor is calling exit() while an exception is being propagated.
+		// We cannot throw — just return so the destructor finishes cleanly and
+		// the original exception continues to unwind.
+		return;
+	}
+	throw NosEarlyExit{ code };
 }
 
 // Redefine exit() for all code compiled after this header.

@@ -10,43 +10,43 @@ class WFN;
 class cube;
 
 struct cubepoint {
-    int x;
-    int y;
-    int z;
-    double value;
+	int x;
+	int y;
+	int z;
+	double value;
 };
 
 struct critical_point_seed {
-    i3 grid_index;
-    d3 position;
-    double value;
-    double gradient_norm;
-    bool is_nuclear_seed = false;
-    int nucleus_index = -1;
+	i3 grid_index;
+	d3 position;
+	double value;
+	double gradient_norm;
+	bool is_nuclear_seed = false;
+	int nucleus_index = -1;
 };
 
 struct critical_point {
-    i3 grid_index;
-    d3 seed_position;
-    d3 position;
-    d3 gradient;
-    d3 hessian_eigenvalues;
-    std::array<d3, 3> hessian_eigenvectors;
-    double seed_value;
-    double density;
-    double gradient_norm;
-    double laplacian;
-    double ellipticity;
-    double virial_field;
-    double kinetic_lagrangian;
-    double kinetic_hamiltonian;
-    double lagrangian_density;
-    std::string type;
-    int negative_eigenvalues;
-    int positive_eigenvalues;
-    int zero_eigenvalues;
-    int iterations;
-    bool converged;
+	i3 grid_index;
+	d3 seed_position;
+	d3 position;
+	d3 gradient;
+	d3 hessian_eigenvalues;
+	std::array<d3, 3> hessian_eigenvectors;
+	double seed_value;
+	double density;
+	double gradient_norm;
+	double laplacian;
+	double ellipticity;
+	double virial_field;
+	double kinetic_lagrangian;
+	double kinetic_hamiltonian;
+	double lagrangian_density;
+	std::string type;
+	int negative_eigenvalues;
+	int positive_eigenvalues;
+	int zero_eigenvalues;
+	int iterations;
+	bool converged;
 };
 
 bool b2c(const cube* cub, const std::vector<atom> &atoms, bool debug, bool bcp);
@@ -54,8 +54,8 @@ bool b2c(const cube* cub, const std::vector<atom> &atoms, bool debug, bool bcp);
 //these is given, which -ri_fit and -SALTED do with the fitted density: one loop over the
 //auxiliary functions for rho and its gradient instead of a sum over orbitals
 struct density_field {
-    std::function<double(const d3&)> rho;
-    std::function<void(const d3&, d3&)> grad;
+	std::function<double(const d3&)> rho;
+	std::function<void(const d3&, d3&)> grad;
 };
 //core_density and core_gradient, when given, are added to the wavefunction's density and
 //gradient wherever the field is followed: the spherical core an ECP took out
