@@ -966,3 +966,36 @@ TEST(XcwScfTests, ITensorOfH2MatchesAnalyticGaussianTransform)
 	f.close();
 	std::filesystem::remove_all(dir);
 }
+
+//`i_sigma <x>` keeps only I/sigma(I) >= x in the fit: the run says how many, the lambda
+//table adds Crit(all) and R1(all) behind the seven fit-set columns, and the lambda = 0
+//energy does not depend on which reflections are scored.
+TEST(XcwScfTests, ISigmaCutoffShrinksFitSetAndReportsAllReflections)
+{
+	if (p1_fixture().empty()) GTEST_SKIP() << "fixture tests/P1_test not found";
+	const auto dir = scratch_dir();
+	const p1_run run = run_on_p1(dir, common + "f rhf start 0 step_size 0.01 end 0 i_sigma 20", true);
+
+	const auto rows = lambda_rows(run.out);
+	ASSERT_EQ(rows.size(), 1u) << run.out;
+	EXPECT_NEAR(rows[0].d(rows[0].energy), golden_energy, 1e-6);
+
+	const size_t at = run.out.find("XCW: I/sigma(I) >= 20 ");
+	ASSERT_NE(at, std::string::npos) << run.out;
+	int n_fit = 0, nr = 0;
+	std::istringstream(run.out.substr(run.out.find("): ", at) + 3)) >> n_fit;
+	std::istringstream(run.out.substr(run.out.find(" of ", at) + 4)) >> nr;
+	EXPECT_GT(n_fit, 0);
+	EXPECT_LT(n_fit, nr) << run.out;
+
+	//the nine columns of the converged row: fit-set criterion and R1(gt) differ from Crit(all) and R1(all)
+	const size_t row = run.out.find("\n0.00000\t");
+	ASSERT_NE(row, std::string::npos) << run.out;
+	std::vector<std::string> fields;
+	std::istringstream cols(run.out.substr(row + 1, run.out.find('\n', row + 1) - row - 1));
+	for (std::string f; std::getline(cols, f, '\t');) if (!f.empty()) fields.push_back(f);
+	ASSERT_EQ(fields.size(), 9u) << run.out;
+	EXPECT_NE(fields[7], fields[1]);
+	EXPECT_NE(fields[8], fields[3]);
+	std::filesystem::remove_all(dir);
+}

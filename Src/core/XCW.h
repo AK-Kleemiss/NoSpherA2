@@ -63,8 +63,15 @@ private:
 		double GooF2;
 		double weighted_GooF1;
 		double weighted_GooF2;
-		// R1 = sum ||F_obs| - scale |F_calc|| / sum |F_obs|
+		// R1 = sum ||F_obs| - scale |F_calc|| / sum |F_obs|, over the fit set (Tonto's R1(gt))
 		double R1;
+		// The same numbers over every reflection, next to the fit-set ones above
+		double R1_all;
+		double GooF1_all;
+		double GooF2_all;
+		double weighted_GooF1_all;
+		double weighted_GooF2_all;
+		int n_fit;
 		vec U_iso;
 
 		void grow_U_iso(const std::vector<asym_atom>& asym_atoms, const ivec3& symmetry_linking_list) {
@@ -100,6 +107,10 @@ private:
 		//flags, yet run_lambda copies alpha and level_shift and SCF_iteration mixes the
 		//density with alpha regardless of the flag
 		double diis_stop_damping = 0;
+		//`i_sigma <x>`: only reflections with I/sigma(I) >= x enter chi^2 and the scale, as in
+		//Tonto. Under the reader's sigma(F) = sigma(I)/2F that is F/sigma(F) >= 2x, so the
+		//default 2 is SHELX's I > 2 sigma(I) and F > 4 sigma(F) at once
+		double i_sigma_cutoff = 2;
 		bool apply_shift = true;
 		bool method_apply_shift = true;
 		double diis_stop_shift = 0;
@@ -409,6 +420,10 @@ private:
 	std::vector<i3> hkl_ordered_;
 	// 1/|H_r|^2 per reflection, see ensure_inv_H2_weights.
 	vec inv_H2_;
+	// Reflection r is in the fit set (I/sigma(I) >= i_sigma_cutoff), see construct
+	bvec fit_mask_;
+	// The criterion the SCF descends (XWR_type x refine_against), over the fit set or over all
+	double criterion(bool all) const;
 	// Per-lambda Gaussian halting diagnostics, see evaluate_gaussian_halting.
 	std::vector<GaussianHaltEntry> gaussian_halt_history_;
 	const options* opt;
