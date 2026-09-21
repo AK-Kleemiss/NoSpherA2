@@ -314,6 +314,17 @@ private:
 	static constexpr size_t diis_subspace_ = 8;
 	occ::qm::ADIIS adiis_;
 	occ::qm::EDIIS ediis_;
+	// The best orbitals of the running lambda step and their E + lambda chi^2, the functional
+	// the perturbed Fock matrix descends. A step climbing more than rescue_rise_ above that
+	// best has lost the SCF (seen on the
+	// Fe(phen)2(SCN)2 UHF singlet at lambda 0.04, right after the level shift went off):
+	// rescue_scf restarts it from these orbitals with DIIS cleared and the level shift and
+	// damping back on for ten times longer, up to three times per step
+	occ::qm::MolecularOrbitals best_mo_;
+	double best_quant_ = 0;
+	int rescues_ = 0;
+	static constexpr double rescue_rise_ = 1.0;
+	bool rescue_scf(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double quant, double& alpha);
 
 	// Computes the orbital gradient for usage as a convergence criterion
 	double compute_orbital_gradient(const occ::qm::SCF<occ::qm::HartreeFock>& scf);

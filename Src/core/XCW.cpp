@@ -2759,6 +2759,8 @@ bool XCW::do_SCF(const double& lambda, double& alpha, occ::qm::SCF<occ::qm::Hart
 	diis_E_.clear();
 	adiis_.reset();
 	ediis_.reset();
+	best_quant_ = std::numeric_limits<double>::infinity();
+	rescues_ = 0;
 
 	XCW_log << "Starting XCW SCF solver with lambda = " << std::fixed << std::setprecision(5) << lambda << "\n";
 	XCW_log << "____________________________________________________________________________________\n";
@@ -3102,6 +3104,10 @@ bool XCW::SCF_iteration(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& l
 	// Prints output line for iteration
 	XCW_log << "\t" << scf.iter << "\t\t" << std::fixed << std::setprecision(3) << current_criterion << "\t\t" << cryst.GooF2 << "\t\t" << std::setprecision(4) << cryst.R1 << "\t\t" << std::fixed << std::setprecision(9) << scf.ctx.energy["total"] << "\t\t" << std::fixed << std::setprecision(3) << temp_penalty << "\t\t" << std::fixed << std::setprecision(9) << quant << std::endl;
 
+	//calc_perturb is the gradient of lambda * criterion^2 (the chi^2 of Jayatilaka's functional),
+	//so that, not the printed lambda * criterion, is what the SCF descends and what the rescue ranks by
+	if (rescue_scf(scf, scf.ctx.energy["total"] + lambda * current_criterion * current_criterion, alpha)) return false;
+
 	// DIIS extrapolation
 	occ::Mat F_diis = diis_update(scf);
 	settings.current_max_diis_error = scf.diis_error;
@@ -3146,6 +3152,38 @@ bool XCW::SCF_iteration(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& l
 	return false;
 
 	//closing function
+}
+
+//The rescue of a lost SCF step, see best_mo_ in the header. True when it restarted the step:
+//the orbitals are the best ones again, the iteration ends here and the next one rebuilds
+//their Fock matrix in full. The stabiliser thresholds stay tightened for the later steps,
+//which are at least as hard.
+bool XCW::rescue_scf(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double quant, double& alpha) {
+	if (quant < best_quant_) {
+		best_quant_ = quant;
+		best_mo_ = scf.ctx.mo;
+		return false;
+	}
+	if (quant - best_quant_ < rescue_rise_ || rescues_ >= 3) return false;
+	rescues_++;
+	settings.diis_stop_shift /= 10;
+	settings.diis_stop_damping /= 10;
+	std::ostringstream what;
+	what << "***E + lambda chi^2 " << std::fixed << std::setprecision(3) << quant - best_quant_
+		<< " Eh above its best: back to the best orbitals, level shift and damping on until DIIS error "
+		<< std::scientific << std::setprecision(0) << settings.diis_stop_shift << " / " << settings.diis_stop_damping
+		<< " (rescue " << rescues_ << "/3)***";
+	print_centered_message(what.str(), 84, XCW_log);
+	scf.ctx.mo = best_mo_;
+	G_last_.resize(0, 0);
+	diis_F_.clear();
+	diis_E_.clear();
+	adiis_.reset();
+	ediis_.reset();
+	settings.apply_shift = settings.method_apply_shift;
+	settings.apply_damping = settings.method_apply_damping;
+	alpha = settings.alpha;
+	return true;
 }
 
 bool XCW::SCF_convergence_check(occ::qm::SCF<occ::qm::HartreeFock>& scf, occ::Mat& dm_last) {
