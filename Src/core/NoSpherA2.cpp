@@ -110,6 +110,9 @@ static int run_app_impl(int argc, char **argv)
 	if (opt.finished)
 		return 0;
 	opt.cwd = cwd;
+	//Geometry-aid descriptors or element probabilities and quit; the flags queue jobs, so -wfn and -geometry_aid_cutoff may come in any order; before the GPU block, whose device query and context creation cost 0.1 s a call
+	if (opt.calc_featomic_descriptor || !opt.featomic_structures.empty() || !opt.classify_atoms_out.empty() || !opt.classify_structures.empty())
+		return geometry_aid::run(opt);
 #ifdef NOSPHERA2_USE_GPU
 	//Every GPU toggle, from opt alone, once per run. These are globals and used to be set
 	//only inside the scattering-factor entry points, so a run reaching XCW instead inherited
@@ -163,9 +166,6 @@ static int run_app_impl(int argc, char **argv)
 		return 0;
 	}
 
-	//Geometry-aid descriptors or element probabilities and quit; the flags queue jobs, so -wfn and -geometry_aid_cutoff may come in any order
-	if (opt.calc_featomic_descriptor || !opt.featomic_structures.empty() || !opt.classify_atoms_out.empty() || !opt.classify_structures.empty())
-		return geometry_aid::run(opt);
 	if (!opt.interaction_energies_job.empty())
 		return crystal_energies::run(opt);
 	//Start QCT menu and leave
