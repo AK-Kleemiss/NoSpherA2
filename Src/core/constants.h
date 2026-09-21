@@ -920,15 +920,11 @@ namespace constants
 	std::pair<double, double> norm_cartesian_to_spherical(const double &x, const double &y, const double &z);
 	//Original implementation after P. Coppens DOI: 10.1107/97809553602060000759 Eq. 1.2.7.2b
 	//I omitted the abs(m) in the factorial as most other sources do not include it
-	// N_l|m| P_l^|m|(cos theta) {cos, sin}(|m| phi): std::assoc_legendre takes an unsigned m, a
-	// negative one is m > l there and libstdc++ returns 0 (MSVC happened to give the right value)
+	// N_l|m| P_l^|m|(cos theta) {cos, sin}(|m| phi); P through the tables and their recurrence
+	// on every platform (libc++ has no std::assoc_legendre)
 	inline double real_spherical(const int &l, const int &m, const double &theta, const double &phi) {
 		const int am = std::abs(m);
-#ifndef __APPLE__
-		return constants::spherical_norms[l][l + am] * std::assoc_legendre(l, am, cos(theta)) * ((m >= 0) ? cos(am * phi) : sin(am * phi));
-#else
 		return constants::spherical_norms[l][l + am] * associated_legendre_polynomial(l, am, cos(theta)) * ((m >= 0) ? cos(am * phi) : sin(am * phi));
-#endif
 	}
 
 	static constexpr double POLY_SMALLX_R0[] = {

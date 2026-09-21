@@ -146,12 +146,9 @@ TEST(BasisConstantsTests, CollapsedSphericalHarmonicSumsAboveL8)
 }
 
 //the default branch of the switch (l > 9) goes through cartesian_to_spherical and real_spherical;
-//the Apple build has no Legendre polynomials above l = 8 on that path
+//the recurrence above l = 8 must agree with ylm_ref there
 TEST(BasisConstantsTests, SphericalHarmonicDefaultBranchUsesRealSpherical)
 {
-#ifdef __APPLE__
-	GTEST_SKIP() << "associated_legendre_polynomial above l = 8 is not implemented on Apple";
-#else
 	for (const auto& p : unit_points())
 	{
 		const double d[3] = { p[0], p[1], p[2] };
@@ -162,7 +159,6 @@ TEST(BasisConstantsTests, SphericalHarmonicDefaultBranchUsesRealSpherical)
 				EXPECT_NEAR(constants::real_spherical(l, m, std::acos(p[2]), std::atan2(p[1], p[0])), ylm_ref(l, m, p[0], p[1], p[2]), 1e-10) << "l " << l << " m " << m;
 			}
 	}
-#endif
 }
 
 //addition theorem: sum_m Y_lm^2 = (2l+1)/(4 pi) at every point, the normalisation of each l
@@ -206,17 +202,13 @@ TEST(BasisConstantsTests, AssociatedLegendreNegativeMFollowsFactorialRatio)
 			}
 }
 
-//above l = 8 the function falls back to std::assoc_legendre, which must agree with the recurrence
+//above l = 8 the function runs its own recurrence, which must agree with the reference one
 TEST(BasisConstantsTests, AssociatedLegendreDefaultBranchAboveL8)
 {
-#ifdef __APPLE__
-	GTEST_SKIP() << "associated_legendre_polynomial above l = 8 is not implemented on Apple";
-#else
 	for (const double x : { -0.7, 0.13, 0.9 })
 		for (int l = 9; l <= 12; l++)
 			for (int m = 0; m <= l; m++)
 				EXPECT_NEAR(constants::associated_legendre_polynomial(l, m, x), legendre_ref(l, m, x), 1e-9 * std::max(1.0, std::abs(legendre_ref(l, m, x)))) << "l " << l << " m " << m;
-#endif
 }
 
 //the constexpr norm table is sqrt((2l+1)(l-m)!/(2 pi (l+m)!)) at column l + m with the m = 0 column at sqrt((2l+1)/4pi);

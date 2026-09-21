@@ -1076,13 +1076,29 @@ namespace constants {
 				return std::numeric_limits<double>::infinity();
 			}
 			break;
-		default:
-#ifndef __APPLE__
-			return std::assoc_legendre(l, m, x) * ((m < 0) ? ((m % 2 == 0) ? -1 : 1) : 1);
-#else
-			err_checkf(false, "Legendre Polynomials l > 8 not implemented on APPLE yet!", std::cout);
-			return std::numeric_limits<double>::infinity();
-#endif
+		default: {
+			// Above the tables: P_m^m = (2m-1)!! (1-x^2)^(m/2), then the upward recurrence in l,
+			// no Condon-Shortley phase like the tables and std::assoc_legendre. libc++ on Apple
+			// has no std::assoc_legendre, and the tables' negative m is
+			// (-1)^m (l-m)!/(l+m)! P_l^m, which std::assoc_legendre never took anyway
+			const int am = std::abs(m);
+			if (am > l) return 0.0;
+			double pmm = 1.0;
+			const double s = std::sqrt(1.0 - x * x);
+			for (int k = 1; k <= am; k++) pmm *= (2 * k - 1) * s;
+			double p = pmm;
+			if (l > am) {
+				double pm1 = x * (2 * am + 1) * pmm;
+				p = pm1;
+				for (int ll = am + 2; ll <= l; ll++) {
+					p = ((2 * ll - 1) * x * pm1 - (ll + am - 1) * pmm) / (ll - am);
+					pmm = pm1;
+					pm1 = p;
+				}
+			}
+			if (m < 0) p *= ((am % 2) ? -1.0 : 1.0) * constants::ftd[l - am] / constants::ftd[l + am];
+			return p;
+		}
 		}
 	};
 
