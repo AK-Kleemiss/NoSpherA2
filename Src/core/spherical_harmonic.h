@@ -15,6 +15,7 @@
 
 namespace constants
 {
+	constexpr double PI = 3.1415926535897932384626433832795028;
 	AUX_HD double constexpr sqrtNewtonRaphson(double x, double curr, double prev)
 	{
 		return curr == prev
@@ -38,7 +39,6 @@ namespace constants
 	template <class T>
 	AUX_HD inline T spherical_harmonic(const int l, const T x, const T y, const T z, const double* coefs)
 	{
-		constexpr double PI = 3.1415926535897932384626433832795028;
 		//Named so the Newton-Raphson sqrt runs at compile time: as a plain call inside the
 		//expressions below MSVC evaluated it per point, 10 % of a sucrose ELI run (VTune, 19 Sep 2026)
 		constexpr double sq_1_4 = sqrt(1.0 / (4 * PI));

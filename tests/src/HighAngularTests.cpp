@@ -36,8 +36,6 @@
 #include "core/aux_density_gpu.h"
 #endif
 
-static constexpr double PI_VAL = 3.14159265358979323846;
-
 
 namespace NoSpherA2UnitTests
 {

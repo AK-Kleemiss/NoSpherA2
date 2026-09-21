@@ -36,8 +36,6 @@
 #include "core/aux_density_gpu.h"
 #endif
 
-static constexpr double PI_VAL = 3.14159265358979323846;
-
 namespace {
 	void test_reading_SALTED_binary_file() {
 		std::filesystem::path path("../../../tests/SALTED/Model/model.salted");

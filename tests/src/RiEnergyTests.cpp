@@ -36,8 +36,6 @@
 #include "core/aux_density_gpu.h"
 #endif
 
-static constexpr double PI_VAL = 3.14159265358979323846;
-
 namespace {
 	int test_analytical_fourier()
 	{
@@ -523,7 +521,7 @@ namespace NoSpherA2UnitTests
 
 				if (l == 0)
 				{
-					EXPECT_NEAR(std::sqrt(4.0 * PI_VAL) * t.shell_radial_moment(0), t.shell_population_integral(0), 1e-12 );
+					EXPECT_NEAR(std::sqrt(4.0 * constants::PI) * t.shell_radial_moment(0), t.shell_population_integral(0), 1e-12 );
 				}
 			}
 		}
@@ -620,7 +618,7 @@ namespace NoSpherA2UnitTests
 
 		EXPECT_NEAR(
 			population,
-			std::sqrt(4.0 * PI_VAL) * Q[0][0],
+			std::sqrt(4.0 * constants::PI) * Q[0][0],
 			1e-6 * std::max(1.0, std::abs(population))
 		);
 	}

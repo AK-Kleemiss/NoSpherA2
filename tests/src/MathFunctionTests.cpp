@@ -36,8 +36,6 @@
 #include "core/aux_density_gpu.h"
 #endif
 
-static constexpr double PI_VAL = 3.14159265358979323846;
-
 namespace {
 	template <typename MatType1, typename MatType2>
 	void compare_matrices(const MatType1& mat, const MatType2& vecMat) {
@@ -504,7 +502,7 @@ namespace NoSpherA2UnitTests
 	TEST(BesselTests, BesselJ0_AtPi)
 	{
 		// j₀(π) = sin(π)/π ≈ 0
-		EXPECT_NEAR(std::sin(PI_VAL) / PI_VAL, bessel_first_kind(0, PI_VAL), 1e-12);
+		EXPECT_NEAR(std::sin(constants::PI) / constants::PI, bessel_first_kind(0, constants::PI), 1e-12);
 	}
 
 	TEST(BesselTests, BesselJ_HigherOrder_PositiveAndFinite)
@@ -604,7 +602,7 @@ namespace NoSpherA2UnitTests
 		// N = (2α/π)^(9/4) * sqrt(1/1) = (2α/π)^(9/4)
 		// For α=1: N = (2/π)^(9/4)
 		double alpha = 1.0;
-		double expected = std::pow(2.0 * alpha / PI_VAL, 9.0 / 4.0);
+		double expected = std::pow(2.0 * alpha / constants::PI, 9.0 / 4.0);
 		double result = constants::normgauss(1, alpha);
 		EXPECT_NEAR(expected, result, 1e-10);
 	}
@@ -670,7 +668,7 @@ namespace NoSpherA2UnitTests
 	{
 		vec r = constants::cartesian_to_spherical(1.0, 0.0, 0.0);
 		EXPECT_NEAR(1.0, r[0], 1e-12); // r=1
-		EXPECT_NEAR(PI_VAL / 2.0, r[1], 1e-12); // theta=pi/2
+		EXPECT_NEAR(constants::PI / 2.0, r[1], 1e-12); // theta=pi/2
 		EXPECT_NEAR(0.0, r[2], 1e-12); // phi=0
 	}
 
@@ -685,7 +683,7 @@ namespace NoSpherA2UnitTests
 	{
 		vec r = constants::cartesian_to_spherical(0.0, 1.0, 0.0);
 		EXPECT_NEAR(1.0, r[0], 1e-12); // r=1
-		EXPECT_NEAR(PI_VAL / 2.0, r[2], 1e-12); // phi=pi/2
+		EXPECT_NEAR(constants::PI / 2.0, r[2], 1e-12); // phi=pi/2
 	}
 
 	TEST(CartesianToSphericalTests, Radius_Is_Euclidean_Norm)

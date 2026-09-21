@@ -248,7 +248,6 @@ bool modify_fchk(const string& fchk_name, const string& basis_set_path, WFN& wav
 				return false;
 			}
 		}
-		double pi = 3.14159265358979;
 		//---------------normalize basis set---------------------------------
 		if (debug)std::cout << "starting to normalize the basis set" << endl;
 		vec norm_const;
@@ -272,28 +271,28 @@ bool modify_fchk(const string& fchk_name, const string& basis_set_path, WFN& wav
 				double temp = wave.get_atom_basis_set_exponent(a, p);
 				switch (wave.get_atom_primitive_type(a, p)) {
 				case 1:
-					temp = 2 * temp / pi;
+					temp = 2 * temp / constants::PI;
 					temp = pow(temp, 0.75);
 					temp = temp * wave.get_atom_basis_set_coefficient(a, p);
 					wave.change_atom_basis_set_coefficient(a, p, temp);
 					break;
 				case 2:
 					temp = 128 * pow(temp, 5);
-					temp = temp / pow(pi, 3);
+					temp = temp / constants::PI3;
 					temp = pow(temp, 0.25);
 					temp = wave.get_atom_basis_set_coefficient(a, p) * temp;
 					wave.change_atom_basis_set_coefficient(a, p, temp);
 					break;
 				case 3:
 					temp = 2048 * pow(temp, 7);
-					temp = temp / (9 * pow(pi, 3));
+					temp = temp / (9 * constants::PI3);
 					temp = pow(temp, 0.25);
 					temp = wave.get_atom_basis_set_coefficient(a, p) * temp;
 					wave.change_atom_basis_set_coefficient(a, p, temp);
 					break;
 				case 4:
 					temp = 32768 * pow(temp, 9);
-					temp = temp / (225 * pow(pi, 3));
+					temp = temp / (225 * constants::PI3);
 					temp = pow(temp, 0.25);
 					temp = wave.get_atom_basis_set_coefficient(a, p) * temp;
 					wave.change_atom_basis_set_coefficient(a, p, temp);
@@ -324,7 +323,7 @@ bool modify_fchk(const string& fchk_name, const string& basis_set_path, WFN& wav
 					for (int i = wave.get_shell_start(a, s, false); i <= wave.get_shell_end(a, s, false); i++) {
 						for (int j = wave.get_shell_start(a, s, false); j <= wave.get_shell_end(a, s, false); j++) {
 							aiaj = wave.get_atom_basis_set_exponent(a, i) + wave.get_atom_basis_set_exponent(a, j);
-							double term = (pi / aiaj);
+							double term = (constants::PI / aiaj);
 							term = pow(term, 1.5);
 							factor += wave.get_atom_basis_set_coefficient(a, i) * wave.get_atom_basis_set_coefficient(a, j) * term;
 						}
@@ -347,7 +346,7 @@ bool modify_fchk(const string& fchk_name, const string& basis_set_path, WFN& wav
 						for (int j = wave.get_shell_start(a, s, false); j <= wave.get_shell_end(a, s, false); j++) {
 							aiaj = wave.get_atom_basis_set_exponent(a, i) + wave.get_atom_basis_set_exponent(a, j);
 							double term = 4 * pow(aiaj, 5);
-							term = pow(pi, 3) / term;
+							term = constants::PI3 / term;
 							term = pow(term, 0.5);
 							factor += wave.get_atom_basis_set_coefficient(a, i) * wave.get_atom_basis_set_coefficient(a, j) * term;
 						}
@@ -370,7 +369,7 @@ bool modify_fchk(const string& fchk_name, const string& basis_set_path, WFN& wav
 						for (int j = wave.get_shell_start(a, s, false); j <= wave.get_shell_end(a, s, false); j++) {
 							aiaj = wave.get_atom_basis_set_exponent(a, i) + wave.get_atom_basis_set_exponent(a, j);
 							double term = 16 * pow(aiaj, 7);
-							term = pow(pi, 3) / term;
+							term = constants::PI3 / term;
 							term = pow(term, 0.5);
 							factor += wave.get_atom_basis_set_coefficient(a, i) * wave.get_atom_basis_set_coefficient(a, j) * term;
 						}
@@ -394,7 +393,7 @@ bool modify_fchk(const string& fchk_name, const string& basis_set_path, WFN& wav
 						for (int j = wave.get_shell_start(a, s, false); j <= wave.get_shell_end(a, s, false); j++) {
 							aiaj = wave.get_atom_basis_set_exponent(a, i) + wave.get_atom_basis_set_exponent(a, j);
 							double term = 64 * pow((aiaj), 9);
-							term = pow(pi, 3) / term;
+							term = constants::PI3 / term;
 							term = pow(term, 0.5);
 							factor += wave.get_atom_basis_set_coefficient(a, i) * wave.get_atom_basis_set_coefficient(a, j) * term;
 						}
@@ -759,7 +758,7 @@ double read_fchk_double(std::ifstream& in, const char* search, bool rewind)
 		return read_fchk_double(temp);
 };
 
-//(2a/pi)^(3/4) (4a)^(l/2) / sqrt((2l-1)!!): the norm of x^l exp(-a r^2), the primitive normalisation fchk contraction coefficients leave out
+//(2a/constants::PI)^(3/4) (4a)^(l/2) / sqrt((2l-1)!!): the norm of x^l exp(-a r^2), the primitive normalisation fchk contraction coefficients leave out
 static double axial_prim_norm(const int l, const double a)
 {
 		return pow(pow(2, 3 + 4 * l) * pow(a, 2 * l + 3) / constants::PI3 / pow(constants::double_ft[std::max(2 * l - 1, 0)], 2), 0.25);

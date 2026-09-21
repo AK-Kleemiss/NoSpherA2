@@ -54,8 +54,7 @@ namespace
 	{
 		const int am = std::abs(m);
 		const double theta = std::acos(z), phi = std::atan2(y, x);
-		const double pi = 3.14159265358979323846;
-		const double norm = am == 0 ? std::sqrt((2 * l + 1) / (4 * pi)) : std::sqrt((2 * l + 1) * fact(l - am) / (2 * pi * fact(l + am)));
+		const double norm = am == 0 ? std::sqrt((2 * l + 1) / (4 * constants::PI)) : std::sqrt((2 * l + 1) * fact(l - am) / (2 * constants::PI * fact(l + am)));
 		return norm * legendre_ref(l, am, std::cos(theta)) * (m >= 0 ? std::cos(am * phi) : std::sin(am * phi));
 	}
 

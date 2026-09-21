@@ -201,7 +201,7 @@ namespace aux_density
 	AUX_HD inline double eli_from_density(const double rho, const double g2, const double lap)
 	{
 		if (rho < 1E-10) return 0.0;
-		const double kf2 = pow(3 * 3.1415926535897932384626433832795028 * 3.1415926535897932384626433832795028 * rho, 2.0 / 3.0);
+		const double kf2 = pow(3 * constants::PI * constants::PI * rho, 2.0 / 3.0);
 		double alpha = pc07_alpha(g2 / (4 * kf2 * rho * rho), lap / (4 * kf2 * rho));
 		if (alpha < 0.05) alpha = 0.05;
 		return 0.5 * rho * pow(24.0 / (rho * alpha * 0.3 * kf2 * rho), 0.375);
@@ -242,7 +242,7 @@ namespace aux_density
 				double radial = 0.0;
 				for (int p = pr_start[s]; p < pr_start[s + 1]; p++)
 					radial += pr_norm[p] * (0.5 * rl * r2 * lower_gamma_scaled(l, pr_exp[p] * r2) + 0.5 * rl * exp(-pr_exp[p] * r2) / pr_exp[p]);
-				esp -= 4.0 * 3.1415926535897932384626433832795028 / (2 * l + 1) * radial * constants::spherical_harmonic(l, ux, uy, uz, coefs + coef_off[s]);
+				esp -= 4.0 * constants::PI / (2 * l + 1) * radial * constants::spherical_harmonic(l, ux, uy, uz, coefs + coef_off[s]);
 			}
 		}
 		return esp;
