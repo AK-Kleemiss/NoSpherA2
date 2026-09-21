@@ -128,39 +128,6 @@ namespace constants
 	constexpr std::complex<double> cone = std::complex<double>(0.0, 1.0);
 
 	constexpr double ctelf = 0.21940410461360746;
-	constexpr double c_1_4p = sqrt(1.0 / (FOUR_PI));
-	constexpr double c_3_4p = sqrt(3.0 / (FOUR_PI));
-	constexpr double c_5_4p = sqrt(5.0 / (FOUR_PI));
-	constexpr double c_7_4p = sqrt(7.0 / (FOUR_PI));
-	constexpr double c_9_4p = sqrt(9.0 / (FOUR_PI));
-	constexpr double c_11_4p = sqrt(11.0 / (FOUR_PI));
-	constexpr double c_13_4p = sqrt(13.0 / (FOUR_PI));
-	constexpr double c_15_4p = sqrt(15.0 / (FOUR_PI));
-	constexpr double c_17_4p = sqrt(17.0 / (FOUR_PI));
-	constexpr double c_19_4p = sqrt(19.0 / (FOUR_PI));
-	constexpr double c_5_16p = sqrt(5.0 / (16.0 * PI));
-	constexpr double c_7_16p = sqrt(7.0 / (16.0 * PI));
-	constexpr double c_9_256p = sqrt(9.0 / (256.0 * PI));
-	constexpr double c_11_256p = sqrt(11.0 / (256.0 * PI));
-	constexpr double c_13_1024p = sqrt(13.0 / (1024.0 * PI));
-	constexpr double c_15_16p = sqrt(15.0 / (16.0 * PI));
-	constexpr double c_21_32p = sqrt(21.0 / (32.0 * PI));
-	constexpr double c_35_32p = sqrt(35.0 / (32.0 * PI));
-	constexpr double c_45_16p = sqrt(45.0 / (16.0 * PI));
-	constexpr double c_45_32p = sqrt(45.0 / (32.0 * PI));
-	constexpr double c_45_64p = sqrt(45.0 / (64.0 * PI));
-	constexpr double c_105_4p = sqrt(105.0 / (FOUR_PI));
-	constexpr double c_105_16p = sqrt(105.0 / (16.0 * PI));
-	constexpr double c_165_256p = sqrt(165.0 / (256.0 * PI));
-	constexpr double c_273_256p = sqrt(273.0 / (256.0 * PI));
-	constexpr double c_315_16p = sqrt(315.0 / (16.0 * PI));
-	constexpr double c_315_32p = sqrt(315.0 / (32.0 * PI));
-	constexpr double c_315_256p = sqrt(315.0 / (256.0 * PI));
-	constexpr double c_385_512p = sqrt(385.0 / (512.0 * PI));
-	constexpr double c_693_2048p = sqrt(693.0 / (2048.0 * PI));
-	constexpr double c_1155_64p = sqrt(1155.0 / (64.0 * PI));
-	constexpr double c_3465_256p = sqrt(3465.0 / (256.0 * PI));
-	constexpr double c_3003_2048p = sqrt(3003.0 / (2048.0 * PI));
 
 	constexpr int pow_2[] = { 1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144, 524288, 1048576 };
 
