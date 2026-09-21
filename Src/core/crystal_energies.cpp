@@ -294,8 +294,9 @@ namespace crystal_energies {
 		const double kJ = constants::kcal_mol_per_hartree * 4.184;
 		for (int p = 0; p < (int)pairs.size(); p++) {
 			pairs[p].E = mol[pairs[p].A].interaction(mol[pairs[p].B].transformed(pairs[p].R, pairs[p].t), opt.repulsion_overlap, opt.repulsion_exchange);
+			// flushed per pair: Olex2 tails this line for its progress display
 			std::cout << "PAIR " << p + 1 << "/" << pairs.size() << " " << pairs[p].A << " " << pairs[p].B << " " << pairs[p].symop << " n=" << pairs[p].n[0] << "," << pairs[p].n[1] << "," << pairs[p].n[2]
-					  << std::fixed << std::setprecision(3) << " R=" << pairs[p].distance << " total=" << pairs[p].E.total() * kJ << " kJ/mol\n";
+					  << std::fixed << std::setprecision(3) << " R=" << pairs[p].distance << " total=" << pairs[p].E.total() * kJ << " kJ/mol" << std::endl;
 		}
 		std::ofstream out(J.output);
 		err_checkf(out.good(), "Could not write " + J.output.string(), std::cout);
