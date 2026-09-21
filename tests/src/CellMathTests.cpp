@@ -376,6 +376,9 @@ namespace NoSpherA2UnitTests
 		cl.set_symmetry_factors(asym, links);
 		EXPECT_NEAR(asym[0].asym_fact, 0.5, 1e-12);
 		EXPECT_NEAR(asym[1].asym_fact, 0.5, 1e-12);
+		// the image remembers the operation that made it, the parent has none
+		EXPECT_EQ(asym[0].sym_op, -1);
+		EXPECT_EQ(asym[1].sym_op, 1);
 	}
 
 	// when only one of two asymmetric atoms has its inversion image present the
@@ -406,6 +409,203 @@ namespace NoSpherA2UnitTests
 		EXPECT_NEAR(asym[0].asym_fact, 0.5, 1e-12);
 		EXPECT_NEAR(asym[1].asym_fact, 1.0, 1e-12);
 		EXPECT_NEAR(asym[2].asym_fact, 0.5, 1e-12);
+		EXPECT_EQ(asym[2].sym_op, 1);
+	}
+
+	namespace
+	{
+		// P21/c with an orthogonal 8 x 8 x 6 A cell: 0 identity, 1 screw, 2 inversion, 3 glide
+		std::string p21c_cif()
+		{
+			return "data_test\n"
+				"_cell_length_a 8.0\n"
+				"_cell_length_b 8.0\n"
+				"_cell_length_c 6.0\n"
+				"_cell_angle_alpha 90.0\n"
+				"_cell_angle_beta 90.0\n"
+				"_cell_angle_gamma 90.0\n"
+				"_cell_volume 384.0\n"
+				"loop_\n"
+				"_space_group_symop_operation_xyz\n"
+				"'x, y, z'\n"
+				"'-x, y+1/2, -z+1/2'\n"
+				"'-x, -y, -z'\n"
+				"'x, -y+1/2, z+1/2'\n";
+		}
+
+		cell p21c_cell()
+		{
+			const std::filesystem::path p = write_text("p21c.cif", p21c_cif());
+			std::ostringstream log;
+			cell cl(p, log, false, true);
+			std::filesystem::remove(p);
+			return cl;
+		}
+	}
+
+	// composition is matched modulo lattice translations: the screw squared is
+	// (x, y+1, z), i.e. the identity, and screw after inversion is the glide
+	TEST(CellMathIoTests, ComposeOpsMatchesModuloLattice)
+	{
+		cell cl = p21c_cell();
+		ASSERT_EQ(cl.get_sym()[0][0].size(), 4u);
+		EXPECT_EQ(cl.compose_ops(1, 1), 0);
+		EXPECT_EQ(cl.compose_ops(2, 2), 0);
+		EXPECT_EQ(cl.compose_ops(1, 2), 3);
+		EXPECT_EQ(cl.compose_ops(3, 1), 2);
+		EXPECT_EQ(cl.compose_ops(0, 3), 3);
+	}
+
+	// a molecule grown across the screw axis is one orbit of H = {1, 2_1}: the
+	// structure factor sum needs only the identity and inversion cosets and the
+	// atoms keep weight 1 because nothing in the cluster is repeated by a coset
+	TEST(CellMathIoTests, GrownScrewImageProjectsOntoTwoCosets)
+	{
+		cell cl = p21c_cell();
+		std::vector<asym_atom> asym = { make_asym("C1", 6, { 0.1, 0.2, 0.3 }) };
+		std::vector<asym_atom> xyz = {
+			make_xyz(cl, "x0", 6, 0.1, 0.2, 0.3),
+			make_xyz(cl, "x1", 6, -0.1, 0.7, 0.2) };
+		cl.grow_asym_atoms(asym, xyz);
+		ASSERT_EQ(asym.size(), 2u);
+		ivec3 links;
+		cl.eval_symm(asym, 1, links);
+		const ivec H = cl.grown_subgroup(links);
+		ASSERT_EQ(H, (ivec{ 0, 1 }));
+		const ivec reps = cl.coset_representatives(H);
+		ASSERT_EQ(reps.size(), 2u);
+		EXPECT_EQ(reps[0], 0);
+		EXPECT_EQ(reps[1], 2);
+		cl.set_symmetry_factors(asym, links);
+		EXPECT_NEAR(asym[0].asym_fact, 0.5, 1e-12);
+		cl.set_subgroup_factors(asym, links, H);
+		EXPECT_NEAR(asym[0].asym_fact, 1.0, 1e-12);
+		EXPECT_NEAR(asym[1].asym_fact, 1.0, 1e-12);
+	}
+
+	// an atom on the inversion centre with a ligand and its inversion image: H is
+	// {1, -1}, the centre's stabiliser lies inside H so it keeps weight 1 while
+	// the full-group scheme would have halved it
+	TEST(CellMathIoTests, GrownSiteSymmetricClusterKeepsUnitWeights)
+	{
+		cell cl = p21c_cell();
+		std::vector<asym_atom> asym = {
+			make_asym("Fe1", 26, { 0.0, 0.0, 0.0 }),
+			make_asym("N1", 7, { 0.1, 0.15, 0.2 }) };
+		std::vector<asym_atom> xyz = {
+			make_xyz(cl, "x0", 26, 0.0, 0.0, 0.0),
+			make_xyz(cl, "x1", 7, 0.1, 0.15, 0.2),
+			make_xyz(cl, "x2", 7, -0.1, -0.15, -0.2) };
+		cl.grow_asym_atoms(asym, xyz);
+		ASSERT_EQ(asym.size(), 3u);
+		ivec3 links;
+		cl.eval_symm(asym, 2, links);
+		ASSERT_EQ(links[0][0].size(), 2u);
+		const ivec H = cl.grown_subgroup(links);
+		ASSERT_EQ(H, (ivec{ 0, 2 }));
+		const ivec reps = cl.coset_representatives(H);
+		ASSERT_EQ(reps.size(), 2u);
+		EXPECT_EQ(reps[0], 0);
+		EXPECT_EQ(reps[1], 1);
+		cl.set_symmetry_factors(asym, links);
+		EXPECT_NEAR(asym[0].asym_fact, 0.5, 1e-12);
+		EXPECT_NEAR(asym[1].asym_fact, 0.5, 1e-12);
+		cl.set_subgroup_factors(asym, links, H);
+		EXPECT_NEAR(asym[0].asym_fact, 1.0, 1e-12);
+		EXPECT_NEAR(asym[1].asym_fact, 1.0, 1e-12);
+		EXPECT_NEAR(asym[2].asym_fact, 1.0, 1e-12);
+	}
+
+	// a whole unit cell of a general-position atom is one orbit of G itself: a
+	// single coset, and the image atoms take their parent's weight
+	TEST(CellMathIoTests, GrownUnitCellSumsOneCoset)
+	{
+		cell cl = p21c_cell();
+		std::vector<asym_atom> asym = { make_asym("C1", 6, { 0.1, 0.2, 0.3 }) };
+		std::vector<asym_atom> xyz = {
+			make_xyz(cl, "x0", 6, 0.1, 0.2, 0.3),
+			make_xyz(cl, "x1", 6, -0.1, 0.7, 0.2),
+			make_xyz(cl, "x2", 6, -0.1, -0.2, -0.3),
+			make_xyz(cl, "x3", 6, 0.1, 0.3, 0.8) };
+		cl.grow_asym_atoms(asym, xyz);
+		ASSERT_EQ(asym.size(), 4u);
+		ivec3 links;
+		cl.eval_symm(asym, 1, links);
+		const ivec H = cl.grown_subgroup(links);
+		ASSERT_EQ(H.size(), 4u);
+		EXPECT_EQ(cl.coset_representatives(H), (ivec{ 0 }));
+		cl.set_subgroup_factors(asym, links, H);
+		for (const asym_atom& a : asym) EXPECT_NEAR(a.asym_fact, 1.0, 1e-12);
+	}
+
+	// clusters no operation beyond the identity maps onto themselves keep the full
+	// sum with the full-group weights: screw and inversion images without the glide
+	// image, an image of only one of two asymmetric atoms, and nothing grown at all
+	TEST(CellMathIoTests, ClustersWithoutSymmetryKeepTheFullSum)
+	{
+		cell cl = p21c_cell();
+		{
+			std::vector<asym_atom> asym = { make_asym("C1", 6, { 0.1, 0.2, 0.3 }) };
+			std::vector<asym_atom> xyz = {
+				make_xyz(cl, "x0", 6, 0.1, 0.2, 0.3),
+				make_xyz(cl, "x1", 6, -0.1, 0.7, 0.2),
+				make_xyz(cl, "x2", 6, -0.1, -0.2, -0.3) };
+			cl.grow_asym_atoms(asym, xyz);
+			ivec3 links;
+			cl.eval_symm(asym, 1, links);
+			const ivec H = cl.grown_subgroup(links);
+			EXPECT_EQ(H, (ivec{ 0 }));
+			EXPECT_EQ(cl.coset_representatives(H).size(), 4u);
+			cl.set_subgroup_factors(asym, links, H);
+			for (const asym_atom& a : asym) EXPECT_NEAR(a.asym_fact, 1.0 / 3.0, 1e-12);
+		}
+		{
+			std::vector<asym_atom> asym = {
+				make_asym("C1", 6, { 0.1, 0.2, 0.3 }),
+				make_asym("N1", 7, { 0.35, 0.15, 0.05 }) };
+			std::vector<asym_atom> xyz = { make_xyz(cl, "x", 6, -0.1, -0.2, -0.3) };
+			cl.grow_asym_atoms(asym, xyz);
+			ivec3 links;
+			cl.eval_symm(asym, 2, links);
+			EXPECT_EQ(cl.grown_subgroup(links), (ivec{ 0 }));
+		}
+		{
+			std::vector<asym_atom> asym = { make_asym("C1", 6, { 0.1, 0.2, 0.3 }) };
+			ivec3 links;
+			cl.eval_symm(asym, 1, links);
+			EXPECT_EQ(cl.grown_subgroup(links), (ivec{ 0 }));
+			EXPECT_EQ(cl.coset_representatives({ 0 }).size(), 4u);
+		}
+	}
+
+	// a cluster that is H-invariant without being one H-orbit per atom: the
+	// central atom on the inversion centre with both its screw image and the
+	// inversion image of a ligand. H = {1, -1} maps it onto itself, the centre and
+	// its screw image are two H-orbits and share the weight |H| / (|stab_G| * copies)
+	TEST(CellMathIoTests, GrownTwoOrbitClusterSharesTheWeight)
+	{
+		cell cl = p21c_cell();
+		std::vector<asym_atom> asym = {
+			make_asym("Fe1", 26, { 0.0, 0.0, 0.0 }),
+			make_asym("N1", 7, { 0.1, 0.15, 0.2 }) };
+		std::vector<asym_atom> xyz = {
+			make_xyz(cl, "x0", 26, 0.0, 0.0, 0.0),
+			make_xyz(cl, "x1", 26, 0.0, 0.5, 0.5),
+			make_xyz(cl, "x2", 7, 0.1, 0.15, 0.2),
+			make_xyz(cl, "x3", 7, -0.1, -0.15, -0.2) };
+		cl.grow_asym_atoms(asym, xyz);
+		ASSERT_EQ(asym.size(), 4u);
+		ivec3 links;
+		cl.eval_symm(asym, 2, links);
+		const ivec H = cl.grown_subgroup(links);
+		ASSERT_EQ(H, (ivec{ 0, 2 }));
+		EXPECT_EQ(cl.coset_representatives(H), (ivec{ 0, 1 }));
+		cl.set_subgroup_factors(asym, links, H);
+		// asymmetric atoms first (Fe1, N1), then the grown images (Fe1 screw image, N1 inversion image)
+		EXPECT_NEAR(asym[0].asym_fact, 0.5, 1e-12);
+		EXPECT_NEAR(asym[1].asym_fact, 1.0, 1e-12);
+		EXPECT_NEAR(asym[2].asym_fact, 0.5, 1e-12);
+		EXPECT_NEAR(asym[3].asym_fact, 1.0, 1e-12);
 	}
 
 	// xyz atoms that coincide with an asymmetric atom, also when shifted by a

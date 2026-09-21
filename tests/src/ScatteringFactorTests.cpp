@@ -543,16 +543,17 @@ TEST(ScatteringFactorTests, ReadHklFullObservationsAndSymmetryExpansion)
 	std::ostringstream log;
 	const hkl_list enlarged = read_hkl_full(hklfile, hkl, {}, c, log, obs, true);
 	fs::remove(hklfile);
-	ASSERT_EQ(obs.size(), 3u);
-	EXPECT_DOUBLE_EQ(obs[0].F_obs2, 100.0);
-	EXPECT_DOUBLE_EQ(obs[0].abs_F_obs, 10.0);
-	EXPECT_DOUBLE_EQ(obs[0].F_obs, 10.0);
-	EXPECT_DOUBLE_EQ(obs[0].sigma_obs2, 2.0);
-	EXPECT_DOUBLE_EQ(obs[0].sigma_obs, 0.1);
+	//obs is in the order of the hkl set ((0,0,1) before (1,0,0)) and the 0 0 0 row is dropped with its reflection
+	ASSERT_EQ(obs.size(), 2u);
 	EXPECT_DOUBLE_EQ(obs[1].F_obs2, 100.0);
-	EXPECT_DOUBLE_EQ(obs[1].F_obs, -10.0);
 	EXPECT_DOUBLE_EQ(obs[1].abs_F_obs, 10.0);
-	EXPECT_DOUBLE_EQ(obs[1].sigma_obs, 0.2);
+	EXPECT_DOUBLE_EQ(obs[1].F_obs, 10.0);
+	EXPECT_DOUBLE_EQ(obs[1].sigma_obs2, 2.0);
+	EXPECT_DOUBLE_EQ(obs[1].sigma_obs, 0.1);
+	EXPECT_DOUBLE_EQ(obs[0].F_obs2, 100.0);
+	EXPECT_DOUBLE_EQ(obs[0].F_obs, -10.0);
+	EXPECT_DOUBLE_EQ(obs[0].abs_F_obs, 10.0);
+	EXPECT_DOUBLE_EQ(obs[0].sigma_obs, 0.2);
 	EXPECT_EQ(hkl, (hkl_list{ i3{ 1, 0, 0 }, i3{ 0, 0, 1 } }));
 	//the sixfold axis turns (1,0,0) into the six in-plane vectors; (0,0,1) is invariant
 	hkl_list expected{ i3{ 0, 0, 1 } };

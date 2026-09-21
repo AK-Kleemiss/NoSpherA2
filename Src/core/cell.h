@@ -13,6 +13,8 @@ struct asym_atom {
 	double asym_fact;
 	cdouble anom;
 	bool grown = false;
+	// symmetry operation that generates a grown atom from its asymmetric parent, -1 for the parent itself
+	int sym_op = -1;
 };
 
 /**
@@ -67,6 +69,17 @@ public:
 	ivec apply_grown(ivec3& linking_list);
 
 	void set_symmetry_factors(std::vector<asym_atom>& asym_atoms, const ivec3& linking_list);
+
+	// Grown clusters and the subgroup H of the space group that maps the cluster onto itself:
+	// the subgroup (only the identity when nothing else does, empty only for an operation list
+	// without one), one operation per left coset gH (identity first) and the weights
+	// |H| / (|stab_G(parent)| * explicit copies) that make the coset sum over the cluster
+	// reproduce the cell density
+	ivec grown_subgroup(const ivec3& linking_list);
+	ivec coset_representatives(const ivec& subgroup);
+	void set_subgroup_factors(std::vector<asym_atom>& asym_atoms, const ivec3& linking_list, const ivec& subgroup);
+	// Index of the operation equal (mod lattice translations) to op_a applied after op_b, -1 if the list has none
+	int compose_ops(const int op_a, const int op_b);
 
 	cell()
 	{

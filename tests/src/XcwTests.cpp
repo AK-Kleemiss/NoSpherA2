@@ -500,6 +500,62 @@ namespace
 	// XCW settings file, through the constructor
 
 	// a missing settings file is refused before anything else is opened
+	//transform_ADPs takes M and applies T'_{ij..} = sum M_pi M_qj .. T_pq.. : for the rank-2 U that is
+	//M^T U M, checked against a hand-multiplied three-fold (which tells M from M^T), and for C and D the
+	//sign pattern of a two-fold along b (every 0 or 2 index flips the sign)
+	TEST(XcwAdpTests, TransformAdpsRotatesUCDAsContravariantTensors)
+	{
+		vec2 adps = { { 0.01, 0.02, 0.03, 0.004, 0.005, 0.006 },
+					  { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 },
+					  { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 } };
+		const vec2 U = { { adps[0][0], adps[0][3], adps[0][4] },
+						 { adps[0][3], adps[0][1], adps[0][5] },
+						 { adps[0][4], adps[0][5], adps[0][2] } };
+		// x' = -y, y' = x - y, z' = z handed in transposed, as cell stores it
+		const vec2 M = { { 0, 1, 0 }, { -1, -1, 0 }, { 0, 0, 1 } };
+		vec2 rotated = adps;
+		transform_ADPs(rotated, M);
+		for (int i = 0; i < 3; i++) {
+			for (int j = 0; j < 3; j++) {
+				double expect = 0.0;
+				for (int p = 0; p < 3; p++)
+					for (int q = 0; q < 3; q++)
+						expect += M[p][i] * M[q][j] * U[p][q];
+				const int voigt[3][3] = { { 0, 3, 4 }, { 3, 1, 5 }, { 4, 5, 2 } };
+				EXPECT_NEAR(rotated[0][voigt[i][j]], expect, 1e-15) << i << j;
+			}
+		}
+		// U is no longer the input: the three-fold mixes a and b
+		EXPECT_NE(rotated[0][0], adps[0][0]);
+		// the higher ranks were transformed too (a three-fold moves C111 into a mix of C222 and friends)
+		EXPECT_NE(rotated[1][0], adps[1][0]);
+		EXPECT_NE(rotated[2][0], adps[2][0]);
+
+		const vec2 twofold_b = { { -1, 0, 0 }, { 0, 1, 0 }, { 0, 0, -1 } };
+		rotated = adps;
+		transform_ADPs(rotated, twofold_b);
+		const int map3[10][3] = { { 0, 0, 0 }, { 0, 0, 1 }, { 0, 0, 2 }, { 0, 1, 1 }, { 0, 1, 2 }, { 0, 2, 2 }, { 1, 1, 1 }, { 1, 1, 2 }, { 1, 2, 2 }, { 2, 2, 2 } };
+		const int map4[15][4] = { { 0, 0, 0, 0 }, { 0, 0, 0, 1 }, { 0, 0, 0, 2 }, { 0, 0, 1, 1 }, { 0, 0, 1, 2 }, { 0, 0, 2, 2 }, { 0, 1, 1, 1 }, { 0, 1, 1, 2 }, { 0, 1, 2, 2 }, { 0, 2, 2, 2 }, { 1, 1, 1, 1 }, { 1, 1, 1, 2 }, { 1, 1, 2, 2 }, { 1, 2, 2, 2 }, { 2, 2, 2, 2 } };
+		const double sign_u[6] = { 1, 1, 1, -1, 1, -1 };
+		for (int i = 0; i < 6; i++)
+			EXPECT_DOUBLE_EQ(rotated[0][i], sign_u[i] * adps[0][i]) << i;
+		for (int i = 0; i < 10; i++) {
+			double sign = 1.0;
+			for (int k = 0; k < 3; k++) sign *= twofold_b[map3[i][k]][map3[i][k]];
+			EXPECT_DOUBLE_EQ(rotated[1][i], sign * adps[1][i]) << i;
+		}
+		for (int i = 0; i < 15; i++) {
+			double sign = 1.0;
+			for (int k = 0; k < 4; k++) sign *= twofold_b[map4[i][k]][map4[i][k]];
+			EXPECT_DOUBLE_EQ(rotated[2][i], sign * adps[2][i]) << i;
+		}
+
+		// an atom without ADPs is left alone
+		vec2 none(3);
+		transform_ADPs(none, M);
+		EXPECT_TRUE(none[0].empty() && none[1].empty() && none[2].empty());
+	}
+
 	TEST(XcwSettingsTests, MissingSettingsFileThrows)
 	{
 		options opt;

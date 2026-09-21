@@ -174,11 +174,11 @@ namespace {
 	}
 
 	//One line of the lambda table run_XCW_fitting prints per converged step:
-	//lambda(5) criterion(3) GooF2(3) energy(9) lambda*criterion(3) quant(9), tab separated.
-	//An XCW.log iteration row has the same six columns behind a leading tab, with the
+	//lambda(5) criterion(3) GooF2(3) R1(4) energy(9) lambda*criterion(3) quant(9), tab separated.
+	//An XCW.log iteration row has the same seven columns behind a leading tab, with the
 	//iteration count in the first.
 	struct lambda_row {
-		std::string lambda, criterion, goof2, energy, penalty, quant;
+		std::string lambda, criterion, goof2, r1, energy, penalty, quant;
 		double d(const std::string& s) const { return std::stod(s); }
 	};
 
@@ -199,10 +199,10 @@ namespace {
 			while (std::getline(cols, f, '\t')) {
 				if (!f.empty()) fields.push_back(f);
 			}
-			if (fields.size() < 6) {
+			if (fields.size() < 7) {
 				continue;
 			}
-			rows.push_back({ fields[0], fields[1], fields[2], fields[3], fields[4], fields[5] });
+			rows.push_back({ fields[0], fields[1], fields[2], fields[3], fields[4], fields[5], fields[6] });
 		}
 		return rows;
 	}
@@ -825,9 +825,9 @@ TEST(XcwScfTests, MaxIterOneStopsScanWithoutTscb)
 	EXPECT_NE(run.log.find("\t1\t\t"), std::string::npos);
 	EXPECT_EQ(run.log.find("\t2\t\t"), std::string::npos);
 
-	//step / 128 with step 0.01 = 7.8125e-5, whose double lies just above the tie, so eight
-	//decimals round up
-	const std::string stop = "XCW: unable to converge lambda 0.00000000 with a continuation step above 0.00007813; stopping scan.";
+	//step 0 has no converged neighbour to halve the step towards, so the message names the
+	//iteration cap instead of a continuation step
+	const std::string stop = "XCW: unable to converge lambda 0.00000000 in 1 SCF iterations (raise max_iter or loosen the criteria); stopping scan.";
 	EXPECT_NE(run.out.find(stop), std::string::npos) << run.out;
 	EXPECT_NE(run.log.find(stop), std::string::npos);
 	EXPECT_EQ(run.out.find("retrying lambda"), std::string::npos);

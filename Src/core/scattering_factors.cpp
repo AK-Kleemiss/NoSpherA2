@@ -7,6 +7,7 @@
 #include "tsc_block.h"
 #include "tsc_stream.h"
 #include "scattering_factors.h"
+#include <map>
 #include "convenience.h"
 #include "cell.h"
 #include "wfn_class.h"
@@ -332,6 +333,9 @@ hkl_list read_hkl_full(const std::filesystem::path& hkl_filename,
 	hkl_input.seekg(0, hkl_input.beg);
 	std::regex r{ R"([abcdefghijklmnopqrstuvwxyz\(\)ABCDEFGHIJKLMNOPQRSTUVW])" };
 	std::string line, temp;
+	//hkl is a set, so it hands the reflections back in (h,k,l) order whatever the file order;
+	//obs has to follow that order, or F_calc[i] meets the wrong observation
+	std::map<i3, scattering_data> obs_by_hkl;
 	while (!hkl_input.eof())
 	{
 		getline_universal(hkl_input, line);
@@ -377,8 +381,7 @@ hkl_list read_hkl_full(const std::filesystem::path& hkl_filename,
 		}
 		// if (debug) file << endl;
 		hkl.emplace(hkl_);
-		scattering_data temp_data = { F_, abs_F_, F2_, sigma_, sigma2_ };
-		obs.push_back(temp_data);
+		obs_by_hkl.try_emplace(hkl_, scattering_data{ F_, abs_F_, F2_, sigma_, sigma2_ });
 	}
 	hkl_list_it found = hkl.find(i3{ 0, 0, 0 });
 	if (found != hkl.end())
@@ -389,6 +392,9 @@ hkl_list read_hkl_full(const std::filesystem::path& hkl_filename,
 	}
 	hkl_input.close();
 	err_checkf(!hkl.empty(), "No reflections read from " + hkl_filename.string(), file);
+	obs.clear();
+	for (const i3& h : hkl)
+		obs.push_back(obs_by_hkl.at(h));
 	file << " done!\nNr of reflections read from file: " << hkl.size() << std::endl;
 
 	if (debug)

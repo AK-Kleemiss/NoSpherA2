@@ -263,12 +263,12 @@ TEST(XcwHaltingReportTests, HaltingReportsAcrossSixLambdaSteps)
 	//the cout table carries the A^2 column, equal to the summary row's A^2
 	EXPECT_NE(out.find("Target quantity \tA^2 (halt)"), std::string::npos) << out;
 	const std::vector<std::string> row0 = table_row(out, "0.00000");
-	ASSERT_EQ(row0.size(), 7u) << out;
+	ASSERT_EQ(row0.size(), 8u) << out;
 	const size_t srow = log.find("\n\t0.00000\t");
 	ASSERT_NE(srow, std::string::npos);
 	const size_t a2_start = srow + std::string("\n\t0.00000\t").size();
 	const std::string summary_a2 = log.substr(a2_start, log.find('\t', a2_start) - a2_start);
-	EXPECT_EQ(row0[6], summary_a2);
+	EXPECT_EQ(row0[7], summary_a2);
 
 	//decide_i_storage: held, double precision, budget named
 	EXPECT_NE(out.find("I tensor held in memory: "), std::string::npos) << out;
@@ -311,12 +311,13 @@ TEST(XcwHaltingReportTests, HaltingReportsAcrossSixLambdaSteps)
 	for (const std::string lambda : { "0.00000", "0.01000" }) {
 		const std::vector<std::string> a = table_row(out, lambda);
 		const std::vector<std::string> b = table_row(out2, lambda);
-		ASSERT_EQ(a.size(), 7u) << out;
-		ASSERT_EQ(b.size(), 7u) << out2;
+		ASSERT_EQ(a.size(), 8u) << out;
+		ASSERT_EQ(b.size(), 8u) << out2;
 		EXPECT_NEAR(std::stod(a[1]), std::stod(b[1]), 2e-3) << "criterion at " << lambda;
 		EXPECT_NEAR(std::stod(a[2]), std::stod(b[2]), 2e-3) << "GooF at " << lambda;
-		EXPECT_NEAR(std::stod(a[3]), std::stod(b[3]), 1e-4) << "energy at " << lambda;
-		EXPECT_NEAR(std::stod(a[4]), std::stod(b[4]), 2e-3) << "perturbation at " << lambda;
+		EXPECT_NEAR(std::stod(a[3]), std::stod(b[3]), 1e-3) << "R1 at " << lambda;
+		EXPECT_NEAR(std::stod(a[4]), std::stod(b[4]), 1e-4) << "energy at " << lambda;
+		EXPECT_NEAR(std::stod(a[5]), std::stod(b[5]), 2e-3) << "perturbation at " << lambda;
 	}
 
 	if (!::testing::Test::HasFailure()) {
@@ -360,8 +361,8 @@ TEST(XcwHaltingReportTests, StreamedTensorRoundTrip)
 	EXPECT_EQ(log.find("Recommended halting lambda*"), std::string::npos);
 	EXPECT_EQ(out.find("Recommended halting lambda*"), std::string::npos);
 	const std::vector<std::string> row = table_row(out, "0.00000");
-	ASSERT_EQ(row.size(), 7u) << out;
-	EXPECT_EQ(row[6], "0.0000");
+	ASSERT_EQ(row.size(), 8u) << out;
+	EXPECT_EQ(row[7], "0.0000");
 
 	//no_date off prints the integral timing
 	EXPECT_NE(out.find("Time taken for XCW integrals: "), std::string::npos) << out;
@@ -399,10 +400,10 @@ TEST(XcwHaltingReportTests, StreamedTensorRoundTrip)
 	EXPECT_EQ(out2.find("Screened out"), std::string::npos);
 	EXPECT_EQ(out2.find("I tensor streamed to disk"), std::string::npos);
 	const std::vector<std::string> row2 = table_row(out2, "0.00000");
-	ASSERT_EQ(row2.size(), 6u) << out2;
+	ASSERT_EQ(row2.size(), 7u) << out2;
 	EXPECT_NEAR(std::stod(row[1]), std::stod(row2[1]), 2e-3);
 	EXPECT_NEAR(std::stod(row[2]), std::stod(row2[2]), 2e-3);
-	EXPECT_NEAR(std::stod(row[3]), std::stod(row2[3]), 1e-4);
+	EXPECT_NEAR(std::stod(row[4]), std::stod(row2[4]), 1e-4);
 
 	if (!::testing::Test::HasFailure()) {
 		std::filesystem::remove_all(dir);

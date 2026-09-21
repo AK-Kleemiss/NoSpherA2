@@ -55,6 +55,23 @@ void XCW::construct(const options& opt_in) {
 
 	unit_cell.set_symmetry_factors(asym_atoms, symmetry_linking_list);
 
+	// Structure factors sum over every operation, unless the grown cluster is a union of complete
+	// orbits of a subgroup H: then one operation per coset of H covers the cell with |H| times fewer
+	// terms and the cluster's own symmetry is not applied a second time
+	sym_ops_.resize(unit_cell.get_trans()[0].size());
+	std::iota(sym_ops_.begin(), sym_ops_.end(), 0);
+	if (settings.grown) {
+		const ivec subgroup = unit_cell.grown_subgroup(symmetry_linking_list);
+		if (subgroup.size() < 2)
+			std::cout << "XCW: grown cluster is mapped onto itself by no symmetry operation, summing all " << sym_ops_.size() << " operations" << std::endl;
+		else {
+			sym_ops_ = unit_cell.coset_representatives(subgroup);
+			unit_cell.set_subgroup_factors(asym_atoms, symmetry_linking_list, subgroup);
+			std::cout << "XCW: grown cluster is mapped onto itself by a subgroup of order " << subgroup.size() << ", summing "
+				<< sym_ops_.size() << " coset representatives instead of " << unit_cell.get_trans()[0].size() << " operations" << std::endl;
+		}
+	}
+
 	// Generate WFN object from asym_atoms
 	dummy_wave.assign_charge(settings.charge);
 	dummy_wave.assign_multi(settings.multiplicity);
@@ -496,103 +513,8 @@ void XCW::U_cif2U_star() {
 	}
 }
 
-void XCW::U_star2U_cart() {
-	const double scale = constants::bohr2ang(1);
-	vec2 cart_matrix(3, vec(3));
-	for (int i = 0; i < 3; i++) {
-		for (int j = 0; j < 3; j++) {
-			cart_matrix[i][j] = unit_cell.get_cm(i, j);
-		}
-	}
-	std::transform(cart_matrix.begin(), cart_matrix.end(), cart_matrix.begin(), [scale](std::vector<double>& vec) {
-		std::transform(vec.begin(), vec.end(), vec.begin(), [scale](double x) { return x * scale; });
-		return vec; });
-	for (int a = 0; a < cryst.ncen; a++) {
-		vec2 ADPs = dummy_wave.get_atom(a).get_ADPs();
-		if (dummy_wave.get_atom(a).get_ADPs()[0].size() > 0) {
-			vec2 U_star(3, vec(3));
-			U_star[0][0] = ADPs[0][0];
-			U_star[0][1] = ADPs[0][3];
-			U_star[0][2] = ADPs[0][4];
-			U_star[1][0] = ADPs[0][3];
-			U_star[1][1] = ADPs[0][1];
-			U_star[1][2] = ADPs[0][5];
-			U_star[2][0] = ADPs[0][4];
-			U_star[2][1] = ADPs[0][5];
-			U_star[2][2] = ADPs[0][2];
-			U_star = self_dot(self_dot(cart_matrix, U_star, true, false), cart_matrix, false, false);
-			ADPs[0][0] = U_star[0][0];
-			ADPs[0][1] = U_star[1][1];
-			ADPs[0][2] = U_star[2][2];
-			ADPs[0][3] = U_star[0][1];
-			ADPs[0][4] = U_star[0][2];
-			ADPs[0][5] = U_star[1][2];
-			dummy_wave.set_atom_ADPs(a, ADPs);
-		}
-		if (dummy_wave.get_atom(a).get_ADPs()[1].size() > 0) {
-			int running_idx = 0;
-			vec C_cart(10);
-			for (int i = 0; i < 3; i++) {
-				for (int j = i; j < 3; j++) {
-					for (int k = j; k < 3; k++) {
-						double sum = 0;
-						for (int p = 0; p < 3; p++) {
-							for (int q = 0; q < 3; q++) {
-								for (int r = 0; r < 3; r++) {
-									ivec sorted_idx = { p, q, r };
-									std::sort(sorted_idx.begin(), sorted_idx.end());
-									int ADP_idx;
-									get_voigt_index(sorted_idx, ADP_idx);
-									sum += cart_matrix[p][i] * cart_matrix[q][j] * cart_matrix[r][k] * ADPs[1][ADP_idx];
-								}
-							}
-						}
-						C_cart[running_idx] = sum;
-						running_idx++;
-					}
-				}
-			}
-			for (int i = 0; i < 10; i++) {
-				ADPs[1][i] = C_cart[i];
-			}
-			dummy_wave.set_atom_ADPs(a, ADPs);
-		}
-		if (dummy_wave.get_atom(a).get_ADPs()[2].size() > 0) {
-			int running_idx = 0;
-			vec D_cart(15);
-			for (int i = 0; i < 3; i++) {
-				for (int j = i; j < 3; j++) {
-					for (int k = j; k < 3; k++) {
-						for (int l = k; l < 3; l++) {
-							double sum = 0;
-							for (int p = 0; p < 3; p++) {
-								for (int q = 0; q < 3; q++) {
-									for (int r = 0; r < 3; r++) {
-										for (int s = 0; s < 3; s++) {
-											ivec sorted_idx = { p, q, r, s };
-											std::sort(sorted_idx.begin(), sorted_idx.end());
-											int ADP_idx;
-											get_voigt_index(sorted_idx, ADP_idx);
-											sum += cart_matrix[p][i] * cart_matrix[q][j] * cart_matrix[r][k] * cart_matrix[s][l] * ADPs[2][ADP_idx];
-										}
-									}
-								}
-							}
-							D_cart[running_idx] = sum;
-							running_idx++;
-						}
-					}
-				}
-			}
-			for (int i = 0; i < 15; i++) {
-				ADPs[2][i] = D_cart[i];
-			}
-			dummy_wave.set_atom_ADPs(a, ADPs);
-		}
-	}
-}
-
-void XCW::get_voigt_index(const ivec& indices, int& ADP_idx) {
+// Position of a sorted index triple/quadruple in the Voigt storage of C (10) and D (15)
+static void get_voigt_index(const ivec& indices, int& ADP_idx) {
 	ivec2 map3, map4;
 	ivec mult3, mult4;
 	map3 = { { 0, 0, 0 }, { 0, 0, 1 }, { 0, 0, 2 }, { 0, 1, 1 }, {0, 1, 2}, {0, 2, 2}, {1, 1, 1}, { 1, 1, 2 }, { 1, 2, 2 }, { 2, 2, 2 } };
@@ -610,6 +532,118 @@ void XCW::get_voigt_index(const ivec& indices, int& ADP_idx) {
 			idx++;
 		}
 		ADP_idx = idx;
+	}
+}
+
+// T'_{ij..} = sum M_pi M_qj .. T_pq.. for the U (rank 2), C (rank 3) and D (rank 4) tensors in their
+// Voigt storage: U_star2U_cart hands in the cell matrix, the grown-atom rotation the transposed symmetry operation
+void transform_ADPs(vec2& ADPs, const vec2& M) {
+	if (ADPs.size() > 0 && ADPs[0].size() > 0) {
+		vec2 U(3, vec(3));
+		U[0][0] = ADPs[0][0];
+		U[0][1] = ADPs[0][3];
+		U[0][2] = ADPs[0][4];
+		U[1][0] = ADPs[0][3];
+		U[1][1] = ADPs[0][1];
+		U[1][2] = ADPs[0][5];
+		U[2][0] = ADPs[0][4];
+		U[2][1] = ADPs[0][5];
+		U[2][2] = ADPs[0][2];
+		U = self_dot(self_dot(M, U, true, false), M, false, false);
+		ADPs[0][0] = U[0][0];
+		ADPs[0][1] = U[1][1];
+		ADPs[0][2] = U[2][2];
+		ADPs[0][3] = U[0][1];
+		ADPs[0][4] = U[0][2];
+		ADPs[0][5] = U[1][2];
+	}
+	if (ADPs.size() > 1 && ADPs[1].size() > 0) {
+		int running_idx = 0;
+		vec C_out(10);
+		for (int i = 0; i < 3; i++) {
+			for (int j = i; j < 3; j++) {
+				for (int k = j; k < 3; k++) {
+					double sum = 0;
+					for (int p = 0; p < 3; p++) {
+						for (int q = 0; q < 3; q++) {
+							for (int r = 0; r < 3; r++) {
+								ivec sorted_idx = { p, q, r };
+								std::sort(sorted_idx.begin(), sorted_idx.end());
+								int ADP_idx;
+								get_voigt_index(sorted_idx, ADP_idx);
+								sum += M[p][i] * M[q][j] * M[r][k] * ADPs[1][ADP_idx];
+							}
+						}
+					}
+					C_out[running_idx] = sum;
+					running_idx++;
+				}
+			}
+		}
+		ADPs[1] = C_out;
+	}
+	if (ADPs.size() > 2 && ADPs[2].size() > 0) {
+		int running_idx = 0;
+		vec D_out(15);
+		for (int i = 0; i < 3; i++) {
+			for (int j = i; j < 3; j++) {
+				for (int k = j; k < 3; k++) {
+					for (int l = k; l < 3; l++) {
+						double sum = 0;
+						for (int p = 0; p < 3; p++) {
+							for (int q = 0; q < 3; q++) {
+								for (int r = 0; r < 3; r++) {
+									for (int s = 0; s < 3; s++) {
+										ivec sorted_idx = { p, q, r, s };
+										std::sort(sorted_idx.begin(), sorted_idx.end());
+										int ADP_idx;
+										get_voigt_index(sorted_idx, ADP_idx);
+										sum += M[p][i] * M[q][j] * M[r][k] * M[s][l] * ADPs[2][ADP_idx];
+									}
+								}
+							}
+						}
+						D_out[running_idx] = sum;
+						running_idx++;
+					}
+				}
+			}
+		}
+		ADPs[2] = D_out;
+	}
+}
+
+void XCW::U_star2U_cart() {
+	const double scale = constants::bohr2ang(1);
+	vec2 cart_matrix(3, vec(3));
+	for (int i = 0; i < 3; i++) {
+		for (int j = 0; j < 3; j++) {
+			cart_matrix[i][j] = unit_cell.get_cm(i, j) * scale;
+		}
+	}
+	for (int a = 0; a < cryst.ncen; a++) {
+		vec2 ADPs = dummy_wave.get_atom(a).get_ADPs();
+		transform_ADPs(ADPs, cart_matrix);
+		dummy_wave.set_atom_ADPs(a, ADPs);
+	}
+}
+
+// A grown atom carries a copy of its parent's ADPs (read_fracs_ADPs_from_CIF); U*, C and D are
+// contravariant tensors in the fractional basis, so the image's are T' = R T R^T with R the rotation
+// of the linking operation (x' = R x + t). cell stores R transposed, which is what transform_ADPs takes.
+void XCW::rotate_grown_ADPs() {
+	for (int a = 0; a < cryst.ncen; a++) {
+		const int op = asym_atoms[a].sym_op;
+		if (op < 0) continue;
+		vec2 M(3, vec(3));
+		for (int i = 0; i < 3; i++) {
+			for (int j = 0; j < 3; j++) {
+				M[i][j] = unit_cell.get_sym(i, j, op);
+			}
+		}
+		vec2 ADPs = dummy_wave.get_atom(a).get_ADPs();
+		transform_ADPs(ADPs, M);
+		dummy_wave.set_atom_ADPs(a, ADPs);
 	}
 }
 
@@ -642,6 +676,7 @@ void XCW::eval_DW(cvec2& DW_fact) {
 	}
 	// Convert ADPs from cif format to Cartesian coordinates
 	U_cif2U_star();
+	rotate_grown_ADPs();
 	U_star2U_cart();
 	vec2 q(cryst.nr, vec(3));
 	for (int h = 0; h < cryst.nr; h++) {
@@ -739,7 +774,7 @@ void XCW::eval_phase(cvec2& phase_fact) {
 }
 
 void XCW::eval_translation_phase(cvec2& translation_phase) {
-	translation_phase.resize(cryst.nr_small, cvec(unit_cell.get_trans()[0].size(), 0));
+	translation_phase.resize(cryst.nr_small, cvec(sym_ops_.size(), 0));
 	const double angstrom2bohr = constants::ang2bohr(1);
 	const double bohr2angstrom = constants::bohr2ang(1);
 	vec2 trans = unit_cell.get_trans();
@@ -753,8 +788,9 @@ void XCW::eval_translation_phase(cvec2& translation_phase) {
 		ivec asym_list = generate_asym_lookup(r);
 		vec q_temp = { k_pt[0][asym_list[0]], k_pt[1][asym_list[0]], k_pt[2][asym_list[0]] };
 		std::transform(q_temp.begin(), q_temp.end(), q_temp.begin(), [angstrom2bohr](double x) { return x * angstrom2bohr; });
-		for (int t = 0; t < trans[0].size(); t++) {
-			vec trans_temp = { trans[0][t], trans[1][t], trans[2][t] };
+		for (int t = 0; t < sym_ops_.size(); t++) {
+			const int op = sym_ops_[t];
+			vec trans_temp = { trans[0][op], trans[1][op], trans[2][op] };
 			trans_temp = dot(cm, trans_temp, true);
 			cdouble exponent(0, dot_BLAS(q_temp, trans_temp, false));
 			translation_phase[r][t] = std::exp(exponent);
@@ -837,6 +873,7 @@ void XCW::calc_criteria() {
 	double prefactor = 1.0 / static_cast<double>(cryst.nr_small - settings.n_params);
 	const int chunk = 128, nchunk = (cryst.nr_small + chunk - 1) / chunk;
 	vec sum_goof1_parts(nchunk), sum_goof2_parts(nchunk), sum_weighted_goof1_parts(nchunk), sum_weighted_goof2_parts(nchunk);
+	vec sum_r1_num_parts(nchunk), sum_r1_den_parts(nchunk);
 	const double scale = cryst.F_scale;
 	const cdouble* F_calc_0 = F_calc[0].data();
 #pragma omp parallel for schedule(static)
@@ -855,6 +892,8 @@ void XCW::calc_criteria() {
 			const double weighted_diff2_sq = weighted_diff2 * weighted_diff2;
 			sum_goof1_parts[c] += weighted_diff1_sq;
 			sum_goof2_parts[c] += weighted_diff2_sq;
+			sum_r1_num_parts[c] += std::abs(scaled_F_calc - obs_ptr.abs_F_obs);
+			sum_r1_den_parts[c] += obs_ptr.abs_F_obs;
 			if (settings.XWR_type == 2) {
 				const double w = inv_H2_[i];
 				sum_weighted_goof1_parts[c] += weighted_diff1_sq * w;
@@ -862,13 +901,16 @@ void XCW::calc_criteria() {
 			}
 		}
 	}
-	double sum_goof1 = 0, sum_goof2 = 0, sum_weighted_goof1 = 0, sum_weighted_goof2 = 0;
+	double sum_goof1 = 0, sum_goof2 = 0, sum_weighted_goof1 = 0, sum_weighted_goof2 = 0, r1_num = 0, r1_den = 0;
 	for (int c = 0; c < nchunk; c++) {
 		sum_goof1 += sum_goof1_parts[c];
 		sum_goof2 += sum_goof2_parts[c];
 		sum_weighted_goof1 += sum_weighted_goof1_parts[c];
 		sum_weighted_goof2 += sum_weighted_goof2_parts[c];
+		r1_num += sum_r1_num_parts[c];
+		r1_den += sum_r1_den_parts[c];
 	}
+	cryst.R1 = r1_den > 0.0 ? r1_num / r1_den : 0.0;
 	cryst.GooF1 = std::sqrt(prefactor * sum_goof1);
 	cryst.GooF2 = std::sqrt(prefactor * sum_goof2);
 	cryst.weighted_GooF1 = std::sqrt(prefactor * sum_weighted_goof1);
@@ -1127,7 +1169,7 @@ ivec XCW::generate_asym_lookup(const int r) {
 	ivec3 rots = unit_cell.get_sym();
 	i3 tempv;
 	const i3& hkl_temp = *it;
-	for (int s = 0; s < rots[0][0].size(); s++) {
+	for (const int s : sym_ops_) {
 		tempv = { 0, 0, 0 };
 		for (int h = 0; h < 3; h++) {
 			for (int j = 0; j < 3; j++) {
@@ -2720,8 +2762,8 @@ bool XCW::do_SCF(const double& lambda, double& alpha, occ::qm::SCF<occ::qm::Hart
 
 	XCW_log << "Starting XCW SCF solver with lambda = " << std::fixed << std::setprecision(5) << lambda << "\n";
 	XCW_log << "____________________________________________________________________________________\n";
-	XCW_log << " Iteration	Criterion	GooF(F^2)	Total Energy	Perturbation	Target quantity \n";
-	XCW_log << "										(Eh)		   (a. u.)			(a. u.)\n";
+	XCW_log << " Iteration	Criterion	GooF(F^2)	R1		Total Energy	Perturbation	Target quantity \n";
+	XCW_log << "												(Eh)		   (a. u.)			(a. u.)\n";
 	XCW_log << "____________________________________________________________________________________\n";
 
 	// Compute first guess and update the energy according to this guess
@@ -2787,7 +2829,7 @@ bool XCW::do_SCF(const double& lambda, double& alpha, occ::qm::SCF<occ::qm::Hart
 			break;
 		}
 		}
-		std::cout << std::fixed << std::setprecision(5) << lambda << "\t\t" << std::fixed << std::setprecision(3) << current_criterion << "\t\t" << cryst.GooF2 << "\t\t" << std::fixed << std::setprecision(9) << scf.ctx.energy["total"] << "\t\t" << std::fixed << std::setprecision(3) << lambda * current_criterion << "\t\t" << std::fixed << std::setprecision(9) << quant;
+		std::cout << std::fixed << std::setprecision(5) << lambda << "\t\t" << std::fixed << std::setprecision(3) << current_criterion << "\t\t" << cryst.GooF2 << "\t\t" << std::setprecision(4) << cryst.R1 << "\t\t" << std::fixed << std::setprecision(9) << scf.ctx.energy["total"] << "\t\t" << std::fixed << std::setprecision(3) << lambda * current_criterion << "\t\t" << std::fixed << std::setprecision(9) << quant;
 		if (opt->xcw_gaussian_halt && !gaussian_halt_history_.empty()) {
 			std::cout << "\t\t" << std::setprecision(4) << gaussian_halt_history_.back().A2;
 		}
@@ -3058,7 +3100,7 @@ bool XCW::SCF_iteration(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& l
 	scf.ctx.F += perturbation * lambda;
 
 	// Prints output line for iteration
-	XCW_log << "\t" << scf.iter << "\t\t" << std::fixed << std::setprecision(3) << current_criterion << "\t\t" << cryst.GooF2 << "\t\t" << std::fixed << std::setprecision(9) << scf.ctx.energy["total"] << "\t\t" << std::fixed << std::setprecision(3) << temp_penalty << "\t\t" << std::fixed << std::setprecision(9) << quant << std::endl;
+	XCW_log << "\t" << scf.iter << "\t\t" << std::fixed << std::setprecision(3) << current_criterion << "\t\t" << cryst.GooF2 << "\t\t" << std::setprecision(4) << cryst.R1 << "\t\t" << std::fixed << std::setprecision(9) << scf.ctx.energy["total"] << "\t\t" << std::fixed << std::setprecision(3) << temp_penalty << "\t\t" << std::fixed << std::setprecision(9) << quant << std::endl;
 
 	// DIIS extrapolation
 	occ::Mat F_diis = diis_update(scf);
@@ -3173,6 +3215,19 @@ void XCW::create_tscb(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& lam
 	std::ostringstream oss2;
 	oss2 << "NA2_" << value << ".wfn";
 	sf_wave_vec[0].write_wfn(oss2.str(), false, true);
+	//the structure factors this step was scored on, for an R-factor against another route
+	//(an ORCA tsc through Olex2, or a Laue check between symmetry-equivalent rows)
+	{
+		ensure_hkl_ordered();
+		std::ofstream fc("NA2_" + value + "_Fcalc.txt");
+		fc << "#    h    k    l          F_obs        sig(F)   scale*|F_calc|     phase(deg)   R1 = " << std::setprecision(5) << cryst.R1 << " scale = " << cryst.F_scale << "\n";
+		for (int r = 0; r < cryst.nr_small; r++) {
+			const cdouble& f = F_calc[0][r];
+			fc << std::setw(5) << hkl_ordered_[r][0] << std::setw(5) << hkl_ordered_[r][1] << std::setw(5) << hkl_ordered_[r][2]
+				<< std::fixed << std::setprecision(4) << std::setw(15) << obs[r].F_obs << std::setw(14) << obs[r].sigma_obs
+				<< std::setw(17) << cryst.F_scale * std::abs(f) << std::setw(15) << std::arg(f) * 180.0 / constants::PI << "\n";
+		}
+	}
 	std::ostringstream oss3;
 	oss3 << "NA2_" << value << ".fchk";
 	//OCC's fchk writer reorders to Gaussian's basis functions but keeps libcint's phases,
@@ -3390,7 +3445,7 @@ void XCW::run_XCW_fitting() {
 			<< "Criterion below are this weighted quantity, not the classical GoF." << std::endl;
 	}
 	std::cout << "____________________________________________________________________________________\n";
-	std::cout << " Lambda\t\tCriterion\tGooF(F2)\tTotal Energy\tPerturbation\tTarget quantity ";
+	std::cout << " Lambda\t\tCriterion\tGooF(F2)\tR1\t\tTotal Energy\tPerturbation\tTarget quantity ";
 	if (opt->xcw_gaussian_halt) {
 		std::cout << "\tA^2 (halt)";
 	}
@@ -3452,10 +3507,15 @@ void XCW::run_XCW_fitting() {
 			}
 		}
 		if (!result.first) {
-			XCW_log << "XCW: unable to converge lambda " << std::fixed << std::setprecision(8) << lambda
-				<< " with a continuation step above " << min_lambda_step << "; stopping scan." << std::endl;
-			std::cout << "XCW: unable to converge lambda " << std::fixed << std::setprecision(8) << lambda
-				<< " with a continuation step above " << min_lambda_step << "; stopping scan." << std::endl;
+			//step 0 has no converged neighbour to continue from, so the halving loop never ran
+			std::ostringstream why;
+			why << "XCW: unable to converge lambda " << std::fixed << std::setprecision(8) << lambda;
+			if (step == 0)
+				why << " in " << settings.max_scf_iterations << " SCF iterations (raise max_iter or loosen the criteria); stopping scan.";
+			else
+				why << " with a continuation step above " << min_lambda_step << "; stopping scan.";
+			XCW_log << why.str() << std::endl;
+			std::cout << why.str() << std::endl;
 			break;
 		}
 		prev_wfn = previous_wfn;

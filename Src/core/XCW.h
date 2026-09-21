@@ -12,6 +12,9 @@
 #include <thread>
 #include <deque>
 
+// Applies M to the U/C/D tensors of one atom in their Voigt storage: T'_{ij..} = sum_pq.. M_pi M_qj .. T_pq..
+void transform_ADPs(vec2& ADPs, const vec2& M);
+
 class XCW {
 public:
 
@@ -60,6 +63,8 @@ private:
 		double GooF2;
 		double weighted_GooF1;
 		double weighted_GooF2;
+		// R1 = sum ||F_obs| - scale |F_calc|| / sum |F_obs|
+		double R1;
 		vec U_iso;
 
 		void grow_U_iso(const std::vector<asym_atom>& asym_atoms, const ivec3& symmetry_linking_list) {
@@ -185,9 +190,6 @@ private:
 	// Loads the convergence settings
 	SCF_settings loadSettings(const std::filesystem::path& settings_path);
 
-	// Helper function that transforms indices into voigt notation
-	void get_voigt_index(const ivec& indices, int& ADP_idx);
-
 	// Helper function for flattening the I tensor
 	size_t tri_index(int mu, int nu) const noexcept;
 	// Helper function for flattening the I tensor
@@ -196,6 +198,8 @@ private:
 	void U_cif2U_star();
 	// Converts all ADP tensors from reciprocal space into real space
 	void U_star2U_cart();
+	// Rotates the ADP tensors copied onto grown atoms by their linking symmetry operation
+	void rotate_grown_ADPs();
 
 	// Generates a list that links the symmetry operations to symmetry-generated reflexes for given reflex r
 	ivec generate_asym_lookup(const int r);
@@ -385,6 +389,9 @@ private:
 	std::vector<scattering_data> obs;
 	hkl_list hkl;
 	hkl_list hkl_enlarged;
+	// Symmetry operations the structure factors are summed over: all of them, or one per coset
+	// of the subgroup a grown cluster is closed under (cell::grown_subgroup)
+	ivec sym_ops_;
 	GridManager tsc_grids;
 	// Ordered snapshot of `hkl` (see ensure_hkl_ordered), i.e. hkl_ordered_[r]
 	// is the Miller index of reflection r as used for obs[r]/F_calc[0][r].

@@ -263,14 +263,15 @@ TEST(ScatteringCoverageHklTests, ReadHklFullDerivesFAndSigma)
 	fs::remove(path);
 	EXPECT_EQ(hkl, (hkl_list{ i3{ 0, 0, 1 }, i3{ 1, 0, 0 } }));
 	EXPECT_EQ(enlarged, hkl);
+	//obs follows the (h,k,l) order of the set, not the file: (0,0,1) comes first
 	ASSERT_EQ(obs.size(), 2u);
-	EXPECT_DOUBLE_EQ(obs[0].F_obs2, 100.0);
-	EXPECT_DOUBLE_EQ(obs[0].F_obs, 10.0);
-	EXPECT_DOUBLE_EQ(obs[0].abs_F_obs, 10.0);
-	EXPECT_DOUBLE_EQ(obs[0].sigma_obs2, 10.0);
-	EXPECT_DOUBLE_EQ(obs[0].sigma_obs, 0.5);
-	EXPECT_DOUBLE_EQ(obs[1].F_obs, 20.0);
+	EXPECT_DOUBLE_EQ(obs[1].F_obs2, 100.0);
+	EXPECT_DOUBLE_EQ(obs[1].F_obs, 10.0);
+	EXPECT_DOUBLE_EQ(obs[1].abs_F_obs, 10.0);
+	EXPECT_DOUBLE_EQ(obs[1].sigma_obs2, 10.0);
 	EXPECT_DOUBLE_EQ(obs[1].sigma_obs, 0.5);
+	EXPECT_DOUBLE_EQ(obs[0].F_obs, 20.0);
+	EXPECT_DOUBLE_EQ(obs[0].sigma_obs, 0.5);
 	EXPECT_EQ(parse_after(log.str(), "Nr of reflections read from file: "), 2);
 	EXPECT_EQ(parse_after(log.str(), "Number of symmetry operations: "), 1);
 	EXPECT_EQ(parse_after(log.str(), "Nr of reflections to be used: "), 2);
