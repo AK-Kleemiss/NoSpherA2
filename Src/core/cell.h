@@ -107,6 +107,7 @@ public:
 		trans.resize(3);
 		read_CIF(filename, file, debug);
 		read_symm_CIF(filename, file, debug, do_XCW);
+		file << " done!" << std::endl;
 		if (debug)
 		{
 			file << "RCM done!" << std::endl;
