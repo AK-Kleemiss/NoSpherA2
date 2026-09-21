@@ -204,8 +204,8 @@ static vec2 analytic_multipole_rows(
 		{
 			const int l = t.sh_l[s];
 
-			// l=0 handled separately through population restraints
-			if (l == 0 || l > lmax)
+			// l=0 is penalised through population_rows, the row here only feeds the report
+			if (l > lmax)
 				continue;
 
 			const double I_l =
@@ -369,8 +369,8 @@ struct restraint_data
 	// electron constraint. Empty when neither is needed.
 	vec2 population_rows;
 
-	// Full atom*(lmax+1)^2 table. In partitioned mode l=0 is also populated;
-	// in analytic mode only l>=1 is used.
+	// Full atom*(lmax+1)^2 table. The penalty uses l>=1 in analytic mode, l>=0 partitioned;
+	// the report reads every row.
 	vec2 multipole_rows;
 };
 

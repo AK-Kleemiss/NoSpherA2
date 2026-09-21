@@ -556,6 +556,15 @@ TEST(FittingIoCoverageIntegratorTests, AtomCentredMultipoleRestraintsReport)
 	EXPECT_NE(log.find("Added multipole restraints up to l=1 for 7 atoms."), std::string::npos);
 	EXPECT_NE(log.find("Atomic multipoles of the fitted density, Racah normalisation"), std::string::npos);
 	EXPECT_NE(log.find("  Atom  l  m       target       fitted    deviation"), std::string::npos);
+	//the l=0 rows are the atomic populations, not an empty row: they sum to the electron count
+	double monopoles = 0.0;
+	std::istringstream lines(log.substr(log.find("  Atom  l  m")));
+	for (std::string line; std::getline(lines, line);) {
+		std::istringstream f(line);
+		std::string label; int l, m; double target, fitted;
+		if (f >> label >> l >> m >> target >> fitted && l == 0) monopoles += fitted;
+	}
+	EXPECT_NEAR(monopoles, fitted_electrons(population_rows(aux), c), 1e-6);
 }
 
 //Grid-partitioned charge restraints (Hirshfeld targets) keep the electron count and are
