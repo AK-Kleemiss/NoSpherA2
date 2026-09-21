@@ -1043,3 +1043,19 @@ TEST(XcwScfTests, ScaleIsStationaryForTheCriterion)
 	EXPECT_LT(std::abs(numerator / denominator), 1e-4) << "d(chi^2)/dk is not zero at the printed scale: " << numerator / denominator;
 	std::filesystem::remove_all(dir);
 }
+
+//`soscf` hands the step to the second-order solver once the DIIS error is below 1e-2; from
+//there the quasi-Newton steps on the orbital rotations have to reach the same lambda = 0
+//minimum as the Roothaan/DIIS iterations
+TEST(XcwScfTests, SecondOrderStepsReachTheGoldenEnergy)
+{
+	if (p1_fixture().empty()) GTEST_SKIP() << "fixture tests/P1_test not found";
+	const auto dir = scratch_dir();
+	const p1_run run = run_on_p1(dir, common + "f rhf start 0 step_size 0.01 end 0 soscf", true);
+	EXPECT_NE(run.log.find("second-order steps on the orbital rotations from here"), std::string::npos) << run.log;
+	EXPECT_NE(run.log.find("***SCF converged in"), std::string::npos) << run.log;
+	const auto rows = lambda_rows(run.out);
+	ASSERT_EQ(rows.size(), 1u) << run.out;
+	EXPECT_NEAR(rows[0].d(rows[0].energy), golden_energy, 1e-6);
+	std::filesystem::remove_all(dir);
+}

@@ -140,6 +140,7 @@ XCW::SCF_settings XCW::loadSettings(const std::filesystem::path& settings_path) 
 
 	settings.grown = false;
 	std::string conv_preset = "normal";
+	bool soscf = false;
 	std::string speed_preset = "normal_conv";
 
 	/* 1: Classical Jayatilaka XWR
@@ -308,6 +309,10 @@ XCW::SCF_settings XCW::loadSettings(const std::filesystem::path& settings_path) 
 
 		handlers["normal_conv"] = [&](std::istream&) {
 			speed_preset = "normal_conv";
+			};
+
+		handlers["soscf"] = [&](std::istream&) {
+			soscf = true;
 			};
 
 		handlers["fast_conv"] = [&](std::istream&) {
@@ -492,6 +497,7 @@ XCW::SCF_settings XCW::loadSettings(const std::filesystem::path& settings_path) 
 	settings.nbo_output = nbo_output;
 	settings.df_basis_name = df_basis_name;
 	settings.guess_basis_name = guess_basis_name;
+	settings.soscf = soscf;
 
 	return settings;
 }
@@ -2811,6 +2817,7 @@ bool XCW::do_SCF(const double& lambda, double& alpha, occ::qm::SCF<occ::qm::Hart
 	ediis_.reset();
 	best_quant_ = std::numeric_limits<double>::infinity();
 	rescues_ = 0;
+	soscf_reset();
 
 	XCW_log << "Starting XCW SCF solver with lambda = " << std::fixed << std::setprecision(5) << lambda << "\n";
 	XCW_log << "____________________________________________________________________________________\n";
@@ -3121,7 +3128,8 @@ bool XCW::SCF_iteration(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& l
 
 	//calc_perturb is the gradient of lambda * criterion^2 (the chi^2 of Jayatilaka's functional),
 	//so that, not the printed lambda * criterion, is what the SCF descends and what the rescue ranks by
-	if (rescue_scf(scf, scf.ctx.energy["total"] + lambda * current_criterion * current_criterion, alpha)) return false;
+	const double phi = scf.ctx.energy["total"] + lambda * current_criterion * current_criterion;
+	if (!soscf_ && rescue_scf(scf, phi, alpha)) return false;
 
 	// DIIS extrapolation
 	occ::Mat F_diis = diis_update(scf);
@@ -3135,6 +3143,26 @@ bool XCW::SCF_iteration(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& l
 		return true;
 	}
 	last_quant = quant;
+
+	if (!soscf_) {
+		if (scf.iter == 1 || settings.current_gradient < 0.5 * soscf_patience_grad_) {
+			soscf_patience_grad_ = settings.current_gradient;
+			soscf_patience_iter_ = scf.iter;
+		}
+		const bool stuck = scf.iter - soscf_patience_iter_ >= soscf_patience_;
+		if (stuck || (settings.soscf && scf.diis_error < soscf_start_)) {
+			soscf_ = true;
+			std::ostringstream what;
+			what << "***" << (stuck ? "Orbital gradient not halved in " + std::to_string(soscf_patience_) + " iterations" : "DIIS error below 1e-2")
+				<< ": second-order steps on the orbital rotations from here***";
+			print_centered_message(what.str(), 84, XCW_log);
+		}
+	}
+	if (soscf_) {
+		soscf_step(scf, phi);
+		dm_last = dm_old;
+		return false;
+	}
 
 	// Apply level shift
 	if (settings.apply_shift) {
@@ -3167,6 +3195,130 @@ bool XCW::SCF_iteration(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& l
 	return false;
 
 	//closing function
+}
+
+void XCW::soscf_reset() {
+	soscf_ = false;
+	soscf_patience_iter_ = 0;
+	soscf_patience_grad_ = 0;
+	lbfgs_s_.clear();
+	lbfgs_y_.clear();
+	soscf_kappa_.resize(0);
+	soscf_grad_.resize(0);
+	soscf_C_.resize(0, 0);
+	soscf_phi_ = std::numeric_limits<double>::infinity();
+	soscf_trust_ = soscf_trust_first_;
+}
+
+//The gradient of E + lambda chi^2 with respect to the rotation kappa_ai of occupied orbital i
+//into virtual a, C -> C exp(kappa), one spin block after the other: 4 F_ai for the restricted
+//density 2 C_occ C_occ^T, 2 F_ai per spin block otherwise, F the perturbed Fock matrix in the
+//MO basis. diagonal_hessian gets the usual approximation of its diagonal, 4 (e_a - e_i) or
+//2 (e_a - e_i) over the diagonal of that F, floored so a near-degenerate pair cannot blow up
+//the step.
+occ::Vec XCW::orbital_rotation_gradient(const occ::qm::SCF<occ::qm::HartreeFock>& scf, occ::Vec& diagonal_hessian) const {
+	const occ::qm::MolecularOrbitals& mo = scf.ctx.mo;
+	const int n = cryst.nmo, nb = mo.kind == occ::qm::SpinorbitalKind::Unrestricted ? 2 : 1;
+	const double fac = nb == 1 ? 4.0 : 2.0, gap_floor = 0.02;
+	Eigen::Index size = 0;
+	for (int b = 0; b < nb; b++) {
+		const Eigen::Index nocc = static_cast<Eigen::Index>(b == 0 ? mo.n_alpha : mo.n_beta);
+		size += nocc * (n - nocc);
+	}
+	occ::Vec g(size);
+	diagonal_hessian.resize(size);
+	Eigen::Index at = 0;
+	for (int b = 0; b < nb; b++) {
+		const Eigen::Index nocc = static_cast<Eigen::Index>(b == 0 ? mo.n_alpha : mo.n_beta), nvir = n - nocc;
+		const occ::Mat Cb = mo.C.middleRows(static_cast<Eigen::Index>(b) * n, n);
+		const occ::Mat F_mo = Cb.transpose() * scf.ctx.F.middleRows(static_cast<Eigen::Index>(b) * n, n) * Cb;
+		const occ::Vec e = F_mo.diagonal();
+		for (Eigen::Index i = 0; i < nocc; i++) {
+			for (Eigen::Index a = 0; a < nvir; a++, at++) {
+				g(at) = fac * F_mo(nocc + a, i);
+				diagonal_hessian(at) = fac * std::max(e(nocc + a) - e(i), gap_floor);
+			}
+		}
+	}
+	return g;
+}
+
+//C_from exp(kappa) by the Cayley transform (I - K/2)^-1 (I + K/2), exactly orthogonal for the
+//antisymmetric K that carries kappa in its occupied-virtual blocks, so the orbitals stay
+//S-orthonormal. The first nocc columns stay the occupied ones; the density follows.
+void XCW::rotate_orbitals(occ::qm::SCF<occ::qm::HartreeFock>& scf, const occ::Mat& C_from, const occ::Vec& kappa) const {
+	occ::qm::MolecularOrbitals& mo = scf.ctx.mo;
+	const int n = cryst.nmo, nb = mo.kind == occ::qm::SpinorbitalKind::Unrestricted ? 2 : 1;
+	Eigen::Index at = 0;
+	for (int b = 0; b < nb; b++) {
+		const Eigen::Index nocc = static_cast<Eigen::Index>(b == 0 ? mo.n_alpha : mo.n_beta), nvir = n - nocc;
+		occ::Mat K = occ::Mat::Zero(n, n);
+		for (Eigen::Index i = 0; i < nocc; i++) {
+			for (Eigen::Index a = 0; a < nvir; a++, at++) {
+				K(nocc + a, i) = 0.5 * kappa(at);
+				K(i, nocc + a) = -0.5 * kappa(at);
+			}
+		}
+		const occ::Mat I = occ::Mat::Identity(n, n);
+		const occ::Mat U = (I - K).partialPivLu().solve(I + K);
+		mo.C.middleRows(static_cast<Eigen::Index>(b) * n, n) = C_from.middleRows(static_cast<Eigen::Index>(b) * n, n) * U;
+	}
+	mo.update_occupied_orbitals();
+	mo.update_density_matrix();
+}
+
+//One second-order iteration, see soscf_ in the header. phi is E + lambda chi^2 at the current
+//orbitals, which the last step produced: above the functional it left by more than the noise
+//of a Fock build, the step is halved from those orbitals and so is the trust radius (a step
+//below 1e-6 is accepted); otherwise the pair (step, gradient change) feeds L-BFGS, the trust
+//radius grows back, and the next step is the L-BFGS direction scaled into it.
+void XCW::soscf_step(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double phi) {
+	if (soscf_kappa_.size() > 0 && phi > soscf_phi_ + 1e-8 && soscf_kappa_.cwiseAbs().maxCoeff() > 1e-6) {
+		soscf_trust_ *= 0.5;
+		std::ostringstream what;
+		what << "***E + lambda chi^2 " << std::scientific << std::setprecision(1) << phi - soscf_phi_ << " Eh above the orbitals the step left: half step***";
+		print_centered_message(what.str(), 84, XCW_log);
+		soscf_kappa_ *= 0.5;
+		rotate_orbitals(scf, soscf_C_, soscf_kappa_);
+		return;
+	}
+	occ::Vec h;
+	const occ::Vec g = orbital_rotation_gradient(scf, h);
+	if (soscf_kappa_.size() > 0) {
+		const occ::Vec y = g - soscf_grad_;
+		const double sy = soscf_kappa_.dot(y);
+		if (sy > 1e-12) {
+			lbfgs_s_.push_back(soscf_kappa_);
+			lbfgs_y_.push_back(y);
+			if (lbfgs_s_.size() > lbfgs_memory_) {
+				lbfgs_s_.pop_front();
+				lbfgs_y_.pop_front();
+			}
+		}
+	}
+	//L-BFGS two-loop recursion with the diagonal Hessian as H0
+	occ::Vec q = g;
+	const int m = static_cast<int>(lbfgs_s_.size());
+	std::vector<double> rho(m), a(m);
+	for (int k = m - 1; k >= 0; k--) {
+		rho[k] = 1.0 / lbfgs_s_[k].dot(lbfgs_y_[k]);
+		a[k] = rho[k] * lbfgs_s_[k].dot(q);
+		q -= a[k] * lbfgs_y_[k];
+	}
+	occ::Vec d = q.cwiseQuotient(h);
+	for (int k = 0; k < m; k++) {
+		const double beta = rho[k] * lbfgs_y_[k].dot(d);
+		d += (a[k] - beta) * lbfgs_s_[k];
+	}
+	d = -d;
+	soscf_trust_ = std::min(2.0 * soscf_trust_, soscf_trust_max_);
+	const double longest = d.cwiseAbs().maxCoeff();
+	if (longest > soscf_trust_) d *= soscf_trust_ / longest;
+	soscf_C_ = scf.ctx.mo.C;
+	soscf_phi_ = phi;
+	soscf_grad_ = g;
+	soscf_kappa_ = d;
+	rotate_orbitals(scf, soscf_C_, soscf_kappa_);
 }
 
 //The rescue of a lost SCF step, see best_mo_ in the header. True when it restarted the step:

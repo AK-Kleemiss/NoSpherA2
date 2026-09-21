@@ -109,6 +109,8 @@ private:
 		double diis_stop_damping = 0;
 		//`slow_conv` chosen: the unperturbed first step still runs the normal schedule, see run_XCW_fitting
 		bool slow_conv = false;
+		//`soscf`: second-order steps as soon as the DIIS error is below soscf_start_, see soscf_step
+		bool soscf = false;
 		//`i_sigma <x>`: only reflections with I/sigma(I) >= x enter chi^2 and the scale, as in
 		//Tonto. Under the reader's sigma(F) = sigma(I)/2F that is F/sigma(F) >= 2x, so the
 		//default 2 is SHELX's I > 2 sigma(I) and F > 4 sigma(F) at once
@@ -338,6 +340,32 @@ private:
 	int rescues_ = 0;
 	static constexpr double rescue_rise_ = 1.0;
 	bool rescue_scf(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double quant, double& alpha);
+
+	// The way out of a plateau the Roothaan/DIIS map does not leave (Fe(phen)2(SCN)2 UHF
+	// singlet at lambda 0.04: E and chi^2 flat for 130 iterations, orbital gradient stuck at
+	// 1.5e-2, damping and rescue cycling): quasi-Newton on the occupied-virtual rotations of
+	// E + lambda chi^2, the functional the perturbed Fock matrix is the gradient of. L-BFGS
+	// preconditioned by the orbital-energy differences, a trust radius on the rotation, the
+	// orbitals moved by the Cayley transform, and a step that raises the functional is halved
+	// from the orbitals it left. It descends monotonically, so it cannot cycle, and it keeps the
+	// occupation, so it cannot swap orbitals. Entered when the orbital gradient has not halved
+	// in soscf_patience_ iterations, or with `soscf` once the DIIS error is below soscf_start_;
+	// it stays on for the rest of the lambda step.
+	bool soscf_ = false;
+	int soscf_patience_iter_ = 0;
+	double soscf_patience_grad_ = 0;
+	static constexpr int soscf_patience_ = 30;
+	static constexpr double soscf_start_ = 1e-2, soscf_trust_max_ = 0.5, soscf_trust_first_ = 0.2;
+	double soscf_trust_ = soscf_trust_first_;
+	static constexpr size_t lbfgs_memory_ = 10;
+	std::deque<occ::Vec> lbfgs_s_, lbfgs_y_;
+	occ::Vec soscf_kappa_, soscf_grad_;
+	occ::Mat soscf_C_;
+	double soscf_phi_ = 0;
+	void soscf_reset();
+	void soscf_step(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double phi);
+	occ::Vec orbital_rotation_gradient(const occ::qm::SCF<occ::qm::HartreeFock>& scf, occ::Vec& diagonal_hessian) const;
+	void rotate_orbitals(occ::qm::SCF<occ::qm::HartreeFock>& scf, const occ::Mat& C_from, const occ::Vec& kappa) const;
 
 	// Computes the orbital gradient for usage as a convergence criterion
 	double compute_orbital_gradient(const occ::qm::SCF<occ::qm::HartreeFock>& scf);
