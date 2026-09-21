@@ -127,20 +127,22 @@ const double WFN::compute_dens_cartesian(
 	const double *exponents_data = exponents.data();
 	const MO *MOs_data = MOs.data();
 	double *phi_data = phi.data();
-	const double exp_cutoff = constants::exp_cutoff;
 	//Primitive-major: every MO for one primitive is contiguous, where MOs keeps them nex
 	//apart. Same arithmetic in the same order, and no per-point allocation.
 	const double *const coefs = get_coef_primitive_major();
+	thread_local vec exps;
+	if (exps.size() < group_exponent.size()) exps.resize(group_exponent.size());
+	exp_table([&d](const int c) { return d[c][3]; }, exps.data());
+	const int *group = prim_exp_group.data();
 
 	for (j = 0; j < nex; j++)
 	{
-		d_ = d[centers_data[j] - 1].data();
-		ex = -exponents_data[j] * d_[3];
-		if (ex < exp_cutoff)
+		ex = exps[group[j]];
+		if (ex == 0.0)
 		{ // corresponds to cutoff of maximum density contribution of 1E-5
 			continue;
 		}
-		ex = exp(ex);
+		d_ = d[centers_data[j] - 1].data();
 		switch (types_data[j])
 		{
 		case 0:  break;
@@ -1563,8 +1565,32 @@ const double* WFN::get_coef_primitive_major() const
 		for (int j = 0; j < nex; j++)
 			coef_primitive_major[(size_t)j * _nmo + mo] = src[j];
 	}
+	build_exp_groups();
 	valid.store(true, std::memory_order_release);
 	return coef_primitive_major.data();
+}
+
+void WFN::build_exp_groups() const
+{
+	std::vector<vec> per_center(ncen);
+	ivec local(nex);
+	for (int j = 0; j < nex; j++) {
+		vec &e = per_center[centers[j] - 1];
+		const size_t g = std::find(e.begin(), e.end(), exponents[j]) - e.begin();
+		if (g == e.size()) e.push_back(exponents[j]);
+		local[j] = (int)g;
+	}
+	group_exponent.clear();
+	center_group_start.assign((size_t)ncen + 1, 0);
+	center_min_exponent.assign(ncen, 0.0);
+	for (int c = 0; c < ncen; c++) {
+		center_group_start[c] = (int)group_exponent.size();
+		group_exponent.insert(group_exponent.end(), per_center[c].begin(), per_center[c].end());
+		if (!per_center[c].empty()) center_min_exponent[c] = *std::min_element(per_center[c].begin(), per_center[c].end());
+	}
+	center_group_start[ncen] = (int)group_exponent.size();
+	prim_exp_group.resize(nex);
+	for (int j = 0; j < nex; j++) prim_exp_group[j] = center_group_start[centers[j] - 1] + local[j];
 }
 
 const void WFN::computeValues(
@@ -2024,16 +2050,22 @@ void WFN::computeRhoELI(
 	const int *centers_data = centers.data();
 	const int *types_data = types.data();
 	const double *exponents_data = exponents.data();
-	const double exp_cutoff = constants::exp_cutoff;
 
 	const MO *MOs_data = MOs.data();
 	//Primitive-major coefficients: every MO for one primitive is contiguous here, where
 	//MOs keeps them nex apart. Identical arithmetic in identical order - one sequential
 	//read per primitive instead of nmo scattered ones, and no per-point heap allocation.
 	const double *const coefs = get_coef_primitive_major();
+	thread_local vec exps;
+	if (exps.size() < group_exponent.size()) exps.resize(group_exponent.size());
+	exp_table([r2 = d.data()](const int c) { return r2[16 * (size_t)c + 3]; }, exps.data());
+	const int *group = prim_exp_group.data();
 
 	for (j = 0; j < nex; j++)
 	{
+		ex = exps[group[j]];
+		if (ex == 0.0)
+			continue;
 		const double *d_ = d.data() + 16 * (centers_data[j] - 1);
 		const int type = types_data[j];
 		const int type_index = (type - 1) * 3;
@@ -2045,11 +2077,6 @@ void WFN::computeRhoELI(
 			ly = constants::type_vector[type_index + 1];
 			lz = constants::type_vector[type_index + 2];
 		}
-
-		double temp = -exponents_data[j] * d_[3];
-		if (temp < exp_cutoff)
-			continue;
-		ex = exp(temp);
 
 		double x0 = 1.0, x1 = 0.0, xnext = d_[0];
 		double y0 = 1.0, y1 = 0.0, ynext = d_[1];
@@ -2171,13 +2198,17 @@ void WFN::computeELIGrad(
 		d_[3] = d_[0] * d_[0] + d_[1] * d_[1] + d_[2] * d_[2];
 	}
 	const double *const coefs = get_coef_primitive_major();
+	thread_local vec exps;
+	if (exps.size() < group_exponent.size()) exps.resize(group_exponent.size());
+	exp_table([r2 = d.data()](const int c) { return r2[4 * (size_t)c + 3]; }, exps.data());
+	const int *group = prim_exp_group.data();
 	for (int j = 0; j < nex; j++)
 	{
-		const double *d_ = d.data() + 4 * (centers[j] - 1);
-		const double temp = -exponents[j] * d_[3];
-		if (temp < constants::exp_cutoff)
+		const double ex = exps[group[j]];
+		if (ex == 0.0)
 			continue;
-		const double ex = exp(temp), ex2 = 2 * exponents[j];
+		const double *d_ = d.data() + 4 * (centers[j] - 1);
+		const double ex2 = 2 * exponents[j];
 		int l[3]{ 0, 0, 0 };
 		constants::type2vector(types[j], l);
 		if (l[0] < 0) continue; //type outside 1..286 (l > 10)
@@ -2284,16 +2315,22 @@ void WFN::computeGrad(
 	const int *centers_data = centers.data();
 	const int *types_data = types.data();
 	const double *exponents_data = exponents.data();
-	const double exp_cutoff = constants::exp_cutoff;
 
 	const MO *MOs_data = MOs.data();
 	//Primitive-major coefficients: every MO for one primitive is contiguous here, where
 	//MOs keeps them nex apart. Identical arithmetic in identical order - one sequential
 	//read per primitive instead of nmo scattered ones, and no per-point heap allocation.
 	const double *const coefs = get_coef_primitive_major();
+	thread_local vec exps;
+	if (exps.size() < group_exponent.size()) exps.resize(group_exponent.size());
+	exp_table([r2 = d.data()](const int c) { return r2[16 * (size_t)c + 3]; }, exps.data());
+	const int *group = prim_exp_group.data();
 
 	for (j = 0; j < nex; j++)
 	{
+		ex = exps[group[j]];
+		if (ex == 0.0)
+			continue;
 		const double *d_ = d.data() + 16 * (centers_data[j] - 1);
 		const int type = types_data[j];
 		const int type_index = (type - 1) * 3;
@@ -2305,11 +2342,6 @@ void WFN::computeGrad(
 			ly = constants::type_vector[type_index + 1];
 			lz = constants::type_vector[type_index + 2];
 		}
-
-		double temp = -exponents_data[j] * d_[3];
-		if (temp < exp_cutoff)
-			continue;
-		ex = exp(temp);
 
 		double x0 = 1.0, x1 = 0.0, xnext = d_[0];
 		double y0 = 1.0, y1 = 0.0, ynext = d_[1];

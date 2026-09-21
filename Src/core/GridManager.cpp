@@ -709,7 +709,7 @@ vec2 GridManager::calculatePartitionedMultipoles(const WFN &wave, const int lmax
 	vec3 *grid = needs_helper_grids_ ? &grid_data_.helper_grids : &grid_data_.atomic_grids;
 	const int num_atoms = (int)grid->size();
 	const GridData::GridIndex weight_index = partitionWeightIndex();
-	vec2 moments(num_atoms, vec((lmax + 1) * (lmax + 1), 0.0));
+	vec2 moments(num_atoms, vec((size_t)(lmax + 1) * (lmax + 1), 0.0));
 #pragma omp parallel for schedule(dynamic)
 	for (int atom = 0; atom < num_atoms; atom++) {
 		const vec2 &atomic_grid = (*grid)[atom];

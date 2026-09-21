@@ -286,14 +286,18 @@ NNLSResult nnls(dMatrix2& A,
 
 			if (zz[nrow] / beta <= 0.0) {
 				// reject column j as a candidate to be moved from set z to set p.
-				// Set w[j] to 0.0 and move to the next greatest entry in w.
-				w[j] = 0.0;
+				// Set its w to 0.0 and move to the next greatest entry in w without
+				// recomputing w (scipy's skip): recomputing gives the rejected column its
+				// gradient back and a dependent column with a +eps gradient never ends.
+				w[iz] = 0.0;
+				skip = true;
 				continue;
 			}
 		}
 		else {
 			// Column j is not numerically independent, reject column j
-			w[j] = 0.0;
+			w[iz] = 0.0;
+			skip = true;
 			continue;
 		}
 		// column j accepted

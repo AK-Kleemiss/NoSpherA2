@@ -54,6 +54,10 @@ void WFN::reset()
 	MOs.clear();
 	coef_primitive_major.clear();
 	coef_primitive_major_valid = false;
+	prim_exp_group.clear();
+	group_exponent.clear();
+	center_group_start.clear();
+	center_min_exponent.clear();
 	centers.clear();
 	types.clear();
 	exponents.clear();
@@ -715,6 +719,7 @@ void WFN::change_exponent(const int &nr)
 			continue;
 		}
 		exponents[nr - 1] = new_exp;
+		invalidate_coef_cache();
 		end = true;
 		set_modified();
 	}
@@ -734,6 +739,7 @@ void WFN::change_center(const int &nr)
 			continue;
 		}
 		centers[nr - 1] = new_center;
+		invalidate_coef_cache();
 		end = true;
 		set_modified();
 	}

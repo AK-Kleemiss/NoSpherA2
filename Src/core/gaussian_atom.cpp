@@ -9,7 +9,7 @@
 
 Multipoles Gaussian_Atom::electrical_moments(const int lmax) const
 {
-	Multipoles M{ lmax, vec((lmax + 1) * (lmax + 1), 0.0) };
+	Multipoles M{ lmax, vec((size_t)(lmax + 1) * (lmax + 1), 0.0) };
 	M.q[0] = electrons();
 	for (int s = 0; s < tab.n_sh; s++) {
 		const int l = tab.sh_l[s];

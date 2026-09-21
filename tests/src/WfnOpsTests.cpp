@@ -95,6 +95,28 @@ namespace
 
 	static const d3 probe{ 0.6, 0.2, -0.1 };
 
+	//one exp per distinct (centre, exponent): make_wfn has 0.80 twice on He, so 11 groups for 12 primitives;
+	//the table reproduces exp(-a r^2) of every primitive and zeroes a whole centre once its most diffuse
+	//primitive is below exp_cutoff, exactly where the per-primitive test would have skipped it
+	TEST(WfnOpsTests, ExpTableMatchesPerPrimitiveExp)
+	{
+		WFN w = make_wfn();
+		w.get_coef_primitive_major();
+		EXPECT_EQ(w.get_exp_group_count(), w.get_nex() - 1);
+		vec r2{ 0.3, 2.0 };
+		vec ex(w.get_exp_group_count(), -1.0);
+		w.exp_table([&r2](const int c) { return r2[c]; }, ex.data());
+		for (int j = 0; j < w.get_nex(); j++)
+			EXPECT_DOUBLE_EQ(ex[w.get_exp_group(j)], std::exp(-w.get_exponent(j) * r2[w.get_center(j) - 1]));
+		r2[1] = -constants::exp_cutoff / 0.55 + 1.0; //past the cutoff even for the most diffuse H primitive
+		w.exp_table([&r2](const int c) { return r2[c]; }, ex.data());
+		for (int j = 0; j < w.get_nex(); j++)
+			if (w.get_center(j) == 2)
+				EXPECT_EQ(ex[w.get_exp_group(j)], 0.0);
+			else
+				EXPECT_GT(ex[w.get_exp_group(j)], 0.0);
+	}
+
 	//compute_g_cartesian ignores the MO coefficients: it is nmo times the squared sum of all primitives,
 	//so the hand-built primitive sum from type2vector must reproduce it
 	TEST(WfnOpsTests, GCartesianIsNmoTimesSquaredPrimitiveSum)

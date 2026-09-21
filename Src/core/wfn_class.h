@@ -9,6 +9,7 @@
 #include <filesystem>
 #include <memory>
 #include "mo_class.h"
+#include "constants.h"
 
 class Gaussian_Molecule;
 
@@ -90,6 +91,14 @@ private:
 	// call invalidate_coef_cache().
 	mutable vec coef_primitive_major;
 	mutable bool coef_primitive_major_valid = false;
+	// One exp(-a r^2) per distinct (centre, exponent) instead of per primitive: the wfn
+	// order repeats an exponent for every Cartesian component of its shell. Groups are
+	// numbered centre by centre. Built with coef_primitive_major, same invalidation.
+	mutable ivec prim_exp_group;     // [nex] -> group
+	mutable vec group_exponent;      // [groups]
+	mutable ivec center_group_start; // [ncen + 1]: the groups of centre c are [start[c], start[c + 1])
+	mutable vec center_min_exponent; // [ncen]: the most diffuse primitive on the centre
+	void build_exp_groups() const;
 	// Vector of centeres that primitives are base on
 	ivec centers;
 	// Vector of types of primitives
@@ -180,6 +189,30 @@ public:
 	const double* get_coef_primitive_major() const;
 	/** Drop the cache above. Call after anything that changes MO coefficients or nex. */
 	void invalidate_coef_cache() const { coef_primitive_major_valid = false; }
+	int get_exp_group(const int nr) const { return prim_exp_group[nr]; }
+	int get_exp_group_count() const { return (int)group_exponent.size(); }
+	/** exp(-a r^2) of every (centre, exponent) group at one point, 0 below exp_cutoff,
+	 *  into ex[groups]; r2(c) is the squared distance from centre c. A centre whose most
+	 *  diffuse primitive is below the cutoff is skipped as a whole. The evaluators read
+	 *  ex[prim_exp_group[j]] in the primitive loop, which keeps their summation order.
+	 *  Call after get_coef_primitive_major(), which builds the groups. */
+	template <class R2>
+	void exp_table(R2 r2, double *ex) const
+	{
+		const double cutoff = constants::exp_cutoff;
+		for (int c = 0; c < ncen; c++) {
+			const int g0 = center_group_start[c], g1 = center_group_start[c + 1];
+			const double R = r2(c);
+			if (-center_min_exponent[c] * R < cutoff) {
+				std::fill(ex + g0, ex + g1, 0.0);
+				continue;
+			}
+			for (int g = g0; g < g1; g++) {
+				const double t = -group_exponent[g] * R;
+				ex[g] = t < cutoff ? 0.0 : exp(t);
+			}
+		}
+	}
 
 	/** @name Constructors */
 	///@{
@@ -661,3 +694,4 @@ public:
 };
 
 #include "mo_class.h"
+#include "constants.h"
