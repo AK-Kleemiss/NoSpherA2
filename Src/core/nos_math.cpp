@@ -270,7 +270,12 @@ NNLSResult nnls(dMatrix2& A,
 			}
 			unorm = std::sqrt(unorm);
 		}
-		if (unorm + std::abs(beta) * 0.01 - unorm > 0.0) {
+		// Lawson-Hanson's DIFF(unorm + |beta|*0.01, unorm) > 0 spelled out: it asks
+		// whether |beta|*0.01 survives rounding against unorm. Written as the
+		// rounding trick, /fp:fast folds it to |beta|*0.01 > 0 and a duplicated
+		// column whose Householder residue is 1e-16 instead of 0 (MKL's kernel
+		// choice differs by CPU) enters the active set and divides by that residue.
+		if (std::abs(beta) * 0.01 > unorm * std::numeric_limits<double>::epsilon()) {
 			// Column j is sufficiently independent.Copy b into zz and solve for
 			// ztest which is the new prospective value for x[j].
 			std::copy(b.data(), b.data() + m, zz.begin());
