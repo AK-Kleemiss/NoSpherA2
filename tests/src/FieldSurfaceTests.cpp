@@ -183,6 +183,28 @@ namespace NoSpherA2UnitTests
 			EXPECT_NEAR(wave.computeESP(pos, pairs), esp, 1E-5); // the cube header rounds the grid positions to 1E-6 bohr
 	}
 
+	//A valence-only wavefunction (xTB/pTB, ECP) is neutral once the core electrons are counted as screening the
+	//nucleus: far outside the molecule the ESP of neutral sucrose vanishes. With the full Z in the nuclear term
+	//it would be ~ (46 core electrons) / r instead
+	TEST(EspTests, EcpCoreScreensTheNucleus)
+	{
+		const auto input = nos_test_repo_root() / "tests" / "sucrose_IAM_SF" / "wfn.xtb";
+		if (!std::filesystem::exists(input)) GTEST_SKIP() << "Missing " << input;
+		WFN wave(input, false);
+		ASSERT_GT(wave.get_nr_ECP_electrons(), 0); // read_ptb tags the atoms even without -ECP
+		const WFN::ESP_pairs pairs = wave.build_ESP_pairs();
+		d3 centre = { 0, 0, 0 };
+		for (int a = 0; a < wave.get_ncen(); a++)
+			for (int k = 0; k < 3; k++)
+				centre[k] += wave.get_atom_coordinate(a, k) / wave.get_ncen();
+		const double r = 60.0;
+		for (const d3 dir : { d3{ 1, 0, 0 }, d3{ 0, 1, 0 }, d3{ 0, 0, 1 } })
+		{
+			const d3 pos = { centre[0] + r * dir[0], centre[1] + r * dir[1], centre[2] + r * dir[2] };
+			EXPECT_NEAR(wave.computeESP(pos, pairs) * r, 0.0, 0.05) << "net charge seen from " << r << " bohr";
+		}
+	}
+
 	//The analytic ELI-D gradient (orbital Hessians) against a central difference of computeRhoELI
 	TEST(EliTests, AnalyticGradientMatchesFiniteDifference)
 	{

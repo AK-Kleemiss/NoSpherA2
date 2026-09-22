@@ -3167,7 +3167,7 @@ const double WFN::computeESP(const d3 &PosGrid, const ESP_pairs &t) const
 		double r2 = 0;
 		for (int k = 0; k < 3; k++)
 			r2 += pow(PosGrid[k] - atoms[iat].get_coordinate(k), 2);
-		ESP += get_atom_charge(iat) / sqrt(r2);
+		ESP += (get_atom_charge(iat) - atoms[iat].get_ECP_electrons()) / sqrt(r2); // ECP/xTB/pTB: only the valence electrons are in the MOs, so the core must not count as nuclear charge
 	}
 
 	double Fn[25], pcp[3][9], Al[506], Am[506], An[506]; // l_i, l_j <= 4 per axis (pre tables)
