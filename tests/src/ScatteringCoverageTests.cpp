@@ -549,37 +549,29 @@ TEST(ScatteringCoverageIamTests, IamStreamsBlocksToTscb)
 	EXPECT_EQ(block.reflection_size(), 0u);
 }
 
-//the text writer is used when -tsc was asked for, and the ED rows are streamed already converted
-//suspected defect: Src/core/scattering_factors.cpp:2911 stream_blocks only has the binary tsc_stream_writer, so with binary_tsc=false the tscb payload is written under the name experimental.tsc
-TEST(ScatteringCoverageIamTests, DISABLED_IamStreamsTextTableWithElectronDiffraction)
+//the stream writer is binary only: a text table (no tscb, or -old_tsc) with a block size is kept
+//in memory and returned with the ED rows, and nothing is written under experimental.tsc*
+TEST(ScatteringCoverageIamTests, IamTextTableIsNotStreamed)
 {
 	scoped_cwd cwd("iam_stream_txt");
-	iam_setup s("iam_stream_txt");
-	s.opt.tsc_block_size = 1000;
-	s.opt.binary_tsc = false;
-	s.opt.electron_diffraction = true;
-	s.opt.label_tsc_output = true;
-	std::ostringstream log;
-	s.run(log);
-	EXPECT_NE(log.str().find("Streaming tsc in blocks of 3 reflections"), std::string::npos);
-	ASSERT_TRUE(fs::exists(cwd.dir / "experimental.tsc"));
-	const vec2 rows = read_tsc_rows(cwd.dir / "experimental.tsc");
-	ASSERT_EQ(rows.size(), 3u);
-	for (const vec& row : rows)
+	for (const bool old_tsc : { false, true })
 	{
-		const i3 hkl{ int(row[0]), int(row[1]), int(row[2]) };
-		const cdouble e = iam_expected(hkl, 6, true);
-		EXPECT_NEAR(row[3], e.real(), 1e-7 * std::abs(e.real()) + 1e-10) << hkl[0] << hkl[1] << hkl[2];
-		EXPECT_NEAR(row[4], 0.0, 1e-12);
+		iam_setup s("iam_stream_txt");
+		s.opt.tsc_block_size = 1000;
+		s.opt.binary_tsc = old_tsc;
+		s.opt.old_tsc = old_tsc;
+		s.opt.electron_diffraction = true;
+		std::ostringstream log;
+		const itsc_block block = s.run(log);
+		EXPECT_EQ(log.str().find("Streaming tsc in blocks"), std::string::npos) << old_tsc;
+		EXPECT_NE(log.str().find("Text tsc requested: the table is kept in memory"), std::string::npos) << old_tsc;
+		EXPECT_FALSE(s.opt.tsc_written_by_stream) << old_tsc;
+		EXPECT_FALSE(fs::exists(cwd.dir / "experimental.tsc")) << old_tsc;
+		EXPECT_FALSE(fs::exists(cwd.dir / "experimental.tscb")) << old_tsc;
+		ASSERT_EQ(block.scatterer_size(), 1u) << old_tsc;
+		ASSERT_EQ(block.reflection_size(), 3u) << old_tsc;
+		expect_iam_rows(block, 0, 6, true);
 	}
-	std::ifstream in(cwd.dir / "experimental.tsc");
-	std::string head;
-	std::getline(in, head);
-	EXPECT_EQ(head, "TITLE: iam_stream_txt");
-	std::getline(in, head);
-	EXPECT_EQ(head, "SYMM: expanded");
-	std::getline(in, head);
-	EXPECT_EQ(head, "SCATTERERS: C1");
 }
 
 //-cif_based -mtc reads the part's own CIF from the combined list instead of -cif

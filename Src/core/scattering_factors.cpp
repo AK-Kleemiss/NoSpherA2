@@ -2869,10 +2869,14 @@ tsc_block_type calculate_scattering_factors(
 	//table needs every part present - stream_mtc_salted() at the bottom inverts those loops instead
 	//tsc_block_for returns 0 when -mem says the table fits whole; not named tsc_block, that is the class template below
 	const size_t block_reflections = opt.tsc_block_for(hkl.size(), asym_atom_list.size());
+	//the stream writer only produces the binary format, so a text table (-old_tsc or no tscb) keeps the whole table in memory
 	const bool stream_tsc = block_reflections > 0
 		&& prep_out == NULL
 		&& !opt.spherical_fill
-		&& opt.combined_tsc_calc_files.size() <= 1;
+		&& opt.combined_tsc_calc_files.size() <= 1
+		&& opt.binary_tsc && !opt.old_tsc;
+	if (block_reflections > 0 && !stream_tsc && (!opt.binary_tsc || opt.old_tsc))
+		file << "Text tsc requested: the table is kept in memory instead of streamed in blocks" << std::endl;
 	cvec2 sf;
 	if (!stream_tsc)
 	{
@@ -2913,8 +2917,7 @@ tsc_block_type calculate_scattering_factors(
 			ScattererLabels stream_ids;
 			append_scatterer_ids(stream_ids, opt, labels, *wavy, asym_atom_list);
 
-			stream_blocks(opt, file,
-				opt.binary_tsc ? "experimental.tscb" : "experimental.tsc",
+			stream_blocks(opt, file, "experimental.tscb",
 				stream_ids, hkl_vector, hkl_vector.size(),
 				[&](const size_t lo, const size_t hi, ProgressBar& progress)
 				{
@@ -3158,8 +3161,7 @@ tsc_block_type calculate_scattering_factors(
 				append_scatterer_ids(stream_ids, opt, labels, *wavy, asym_atom_list);
 
 				const std::vector<i3> hkl_v(hkl.begin(), hkl.end());
-				stream_blocks(opt, file,
-					opt.binary_tsc ? "experimental.tscb" : "experimental.tsc",
+				stream_blocks(opt, file, "experimental.tscb",
 					stream_ids, hkl_v, hkl_v.size(),
 					[&](const size_t lo, const size_t hi, ProgressBar& progress)
 					{
@@ -3263,7 +3265,8 @@ bool stream_mtc_salted(options& opt, std::vector<WFN>& wavy, std::ostream& file,
 {
 	const size_t n_parts = opt.combined_tsc_calc_files.size();
 	//electron diffraction is not excluded: the prep carries the stl, so no unit cell is needed down here
-	if (opt.tsc_block_size == 0 || !opt.SALTED || n_parts < 2 || opt.iam_switch)
+	//the stream writer is binary only, a text table has to go through the in-memory path
+	if (opt.tsc_block_size == 0 || !opt.SALTED || n_parts < 2 || opt.iam_switch || !opt.binary_tsc || opt.old_tsc)
 		return false;
 
 	std::vector<std::shared_ptr<SALTEDPredictor>> preds;

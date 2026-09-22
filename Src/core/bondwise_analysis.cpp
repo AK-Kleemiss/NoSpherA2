@@ -570,9 +570,13 @@ bond do_bonds(WFN &wavy,
 	int na = 0;
 	double z[3], x[3], y[3], help[3], size[3], s2[3];
 	int np[3];
-	double ang2bohr;
-	if (bohr)ang2bohr = 0.52917720859;
-	else ang2bohr = 1.0;
+	//bohr: the user's lengths (box lengths when mode_leng, spacings when !mode_res) are Angstrom; everything below is bohr
+	double res_b[3], boxsize_b[3];
+	for (int r = 0; r < 3; r++)
+	{
+		res_b[r] = (bohr && !mode_res) ? constants::ang2bohr(res[r]) : res[r];
+		boxsize_b[r] = (bohr && mode_leng) ? constants::ang2bohr(boxsize[r]) : boxsize[r];
+	}
 	na = wavy.get_ncen();
 	if (atom1 <= 0 || atom2 <= 0 || atom3 <= 0 || mode_sel <= 0 || mode_sel > 4 || atom1 > na || atom2 > na || atom3 > na || atom1 == atom2 || atom2 == atom3 || atom1 == atom3)
 	{
@@ -663,21 +667,21 @@ bond do_bonds(WFN &wavy,
 			switch (mode_sel)
 			{
 			case 1:
-				size[0] = ceil(9 * znorm / ang2bohr) / 10;
+				size[0] = ceil(9 * znorm) / 10;
 				break;
 			case 2:
-				size[0] = ceil(15 * znorm / ang2bohr) / 10;
+				size[0] = ceil(15 * znorm) / 10;
 				break;
 			case 3:
-				size[0] = ceil(15 * hnorm / ang2bohr) / 10;
+				size[0] = ceil(15 * hnorm) / 10;
 				break;
 			case 4:
-				size[0] = ceil(30 * hnorm / ang2bohr) / 10;
+				size[0] = ceil(30 * hnorm) / 10;
 				break;
 			}
 			for (int r = 0; r < 3; r++)
 			{
-				if (boxsize[r] != 0) size[r] = boxsize[r] / ang2bohr;
+				if (boxsize_b[r] != 0) size[r] = boxsize_b[r];
 				else if (r > 0 || cub == true) size[r] = size[0];
 				s2[r] = size[r] / 2;
 			}
@@ -691,17 +695,18 @@ bond do_bonds(WFN &wavy,
 				{
 					if (debug) std::cout << "I'm making things cubic!\n";
 					s2[r] = s2[0];
+					size[r] = size[0];
 					continue;
 				}
 				switch (mode_sel)
 				{
 				case 1:
 				case 2:
-					size[r] = znorm / ang2bohr;
+					size[r] = znorm;
 					break;
 				case 3:
 				case 4:
-					size[r] = hnorm / ang2bohr;
+					size[r] = hnorm;
 					break;
 				}
 				if (boxsize[r] != 0) size[r] = size[r] * boxsize[r];
@@ -709,23 +714,23 @@ bond do_bonds(WFN &wavy,
 					switch (mode_sel)
 					{
 					case 1:
-						size[r] = ceil(9 * znorm / ang2bohr) / 10;
+						size[r] = ceil(9 * znorm) / 10;
 						break;
 					case 2:
-						size[r] = ceil(15 * znorm / ang2bohr) / 10;
+						size[r] = ceil(15 * znorm) / 10;
 						break;
 					case 3:
-						size[r] = ceil(15 * hnorm / ang2bohr) / 10;
+						size[r] = ceil(15 * hnorm) / 10;
 						break;
 					case 4:
-						size[r] = ceil(30 * hnorm / ang2bohr) / 10;
+						size[r] = ceil(30 * hnorm) / 10;
 						break;
 					}
 				}
 				s2[r] = size[r] / 2;
 			}
 		}
-		for (int r = 0; r < 3; r++) np[r] = (int)round((2 * s2[r]) / res[r]) + 1;
+		for (int r = 0; r < 3; r++) np[r] = (int)round((2 * s2[r]) / res_b[cub ? 0 : r]) + 1;
 	}
 	else
 	{
@@ -741,22 +746,22 @@ bond do_bonds(WFN &wavy,
 			switch (mode_sel)
 			{
 			case 1:
-				size[0] = ceil(9 * znorm / ang2bohr) / 10;
+				size[0] = ceil(9 * znorm) / 10;
 				break;
 			case 2:
-				size[0] = ceil(15 * znorm / ang2bohr) / 10;
+				size[0] = ceil(15 * znorm) / 10;
 				break;
 			case 3:
-				size[0] = ceil(15 * hnorm / ang2bohr) / 10;
+				size[0] = ceil(15 * hnorm) / 10;
 				break;
 			case 4:
-				size[0] = ceil(30 * hnorm / ang2bohr) / 10;
+				size[0] = ceil(30 * hnorm) / 10;
 				break;
 			}
 			for (int r = 0; r < 3; r++)
 			{
 				if (debug) std::cout << r + 1 << ". Axis:";
-				if (boxsize[r] != 0) size[r] = boxsize[r];
+				if (boxsize_b[r] != 0) size[r] = boxsize_b[r];
 				else if (r > 0 || cub == true) size[r] = size[0];
 				s2[r] = size[r] / 2;
 			}
@@ -778,11 +783,11 @@ bond do_bonds(WFN &wavy,
 				{
 				case 1:
 				case 2:
-					size[r] = znorm / ang2bohr;
+					size[r] = znorm;
 					break;
 				case 3:
 				case 4:
-					size[r] = hnorm / ang2bohr;
+					size[r] = hnorm;
 					break;
 				}
 				if (boxsize[r] != 0) size[r] = size[r] * boxsize[r];
@@ -790,16 +795,16 @@ bond do_bonds(WFN &wavy,
 					switch (mode_sel)
 					{
 					case 1:
-						size[r] = ceil(9 * znorm / ang2bohr) / 10;
+						size[r] = ceil(9 * znorm) / 10;
 						break;
 					case 2:
-						size[r] = ceil(15 * znorm / ang2bohr) / 10;
+						size[r] = ceil(15 * znorm) / 10;
 						break;
 					case 3:
-						size[r] = ceil(15 * hnorm / ang2bohr) / 10;
+						size[r] = ceil(15 * hnorm) / 10;
 						break;
 					case 4:
-						size[r] = ceil(30 * hnorm / ang2bohr) / 10;
+						size[r] = ceil(30 * hnorm) / 10;
 						break;
 					}
 				}
@@ -807,6 +812,11 @@ bond do_bonds(WFN &wavy,
 			}
 		}
 	}
+	//grid spacing: the requested one when res is a spacing, box length / points otherwise
+	double incr[3];
+	for (int i = 0; i < 3; i++)
+		incr[i] = mode_res ? size[i] / np[i] : res_b[cub ? 0 : i];
+	//origin = centre - half the grid extent (np - 1 steps per axis), so the grid points are symmetric about the centre
 	double o[3] = {};
 	if (debug) std::cout << "This is the origin:\n";
 	for (int d = 0; d < 3; d++)
@@ -814,18 +824,19 @@ bond do_bonds(WFN &wavy,
 		switch (mode_sel)
 		{
 		case 1:
-			o[d] = coords2[d] - (s2[0] * x[d] + s2[1] * y[d] + s2[2] * z[d]) / ang2bohr;
+			o[d] = coords1[d];
 			break;
 		case 2:
-			o[d] = (coords1[d] - (coords1[d] - coords2[d]) / 2) - (s2[0] * x[d] + s2[1] * y[d] + s2[2] * z[d]) / ang2bohr;
+			o[d] = (coords1[d] + coords2[d]) / 2;
 			break;
 		case 3:
-			o[d] = (coords3[d] - (coords3[d] - coords1[d]) / 2) - (s2[0] * x[d] + s2[1] * y[d] + s2[2] * z[d]) / ang2bohr;
+			o[d] = (coords3[d] + coords1[d]) / 2;
 			break;
 		case 4:
-			o[d] = ringhelp[d] - (s2[0] * x[d] + s2[1] * y[d] + s2[2] * z[d]) / ang2bohr;
+			o[d] = ringhelp[d];
 			break;
 		}
+		o[d] -= 0.5 * ((np[0] - 1) * incr[0] * x[d] + (np[1] - 1) * incr[1] * y[d] + (np[2] - 1) * incr[2] * z[d]);
 		if (debug) std::cout << o[d] << "\n";
 	}
 	std::string outname = { "" };
@@ -842,13 +853,10 @@ bond do_bonds(WFN &wavy,
 	outname += "_";
 	outname += std::to_string(runnumber);
 	double v[9];
-	double incr[3];
 	for (int i = 0; i < 3; i++) {
 		v[i] = x[i];
 		v[i + 3] = y[i];
 		v[i + 6] = z[i];
-		incr[i] = size[i] / np[i];
-		//incr[i]=res[i];
 	}
 	if (compute_dens(wavy, debug, np, o, v, incr, outname, rho, rdg, eli, lap) == 0) {
 		results.success = true;

@@ -457,9 +457,9 @@ namespace
 		EXPECT_EXIT(w.read_gbw(p, log, false, true), ::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), ".*");
 	}
 
-	//HgH2 with the def2 ECP on Hg: 60 core electrons should arrive on the mercury atom
-	//suspected defect: Src/core/wfn_io.cpp:1442 the ECP pointer is read from byte 32 whatever the magic number says; a magic -1 file keeps its geometry pointer there, so the atom block is parsed as ECP entries and err_checkf(Z > 0) exits, while every magic 40 fixture (Rb.gbw with an ECP included) holds 0 there and exits on the pointer check
-	TEST(WfnCoverageIoTests, DISABLED_GbwEcpBlockOnCurrentFormat)
+	//HgH2 with the def2 ECP on Hg, magic -1 layout: the ECP pointer sits at byte 56 and the two H atoms
+	//are flag-0 entries that carry no record
+	TEST(WfnCoverageIoTests, GbwEcpBlockOnCurrentFormat)
 	{
 		const std::filesystem::path p = nos_test_repo_root() / "tests" / "ELI_heavy" / "hgh2_ecp.gbw";
 		ASSERT_TRUE(std::filesystem::exists(p));
@@ -469,6 +469,24 @@ namespace
 		ASSERT_EQ(w.get_ncen(), 3);
 		EXPECT_TRUE(w.get_has_ECPs());
 		EXPECT_EQ(w.get_atom_ECP_electrons(0), 60);
+		EXPECT_EQ(w.get_atom_ECP_electrons(1), 0);
+		EXPECT_EQ(w.get_atom_ECP_electrons(2), 0);
 		EXPECT_EQ(w.get_nr_ECP_electrons(), 60u);
+	}
+
+	//Au2Br2 in the magic 40 layout: pointer at byte 32, two Au with 60 core electrons each, 51 flag-0 atoms
+	TEST(WfnCoverageIoTests, GbwEcpBlockOnClassicFormat)
+	{
+		const std::filesystem::path p = nos_test_repo_root() / "tests" / "ECP_SF" / "Au2Br2.gbw";
+		ASSERT_TRUE(std::filesystem::exists(p));
+		std::ostringstream log;
+		WFN w(e_origin::NOT_YET_DEFINED);
+		ASSERT_TRUE(w.read_gbw(p, log, false, true));
+		ASSERT_EQ(w.get_ncen(), 53);
+		EXPECT_TRUE(w.get_has_ECPs());
+		EXPECT_EQ(w.get_atom_ECP_electrons(0), 60);
+		EXPECT_EQ(w.get_atom_ECP_electrons(1), 60);
+		EXPECT_EQ(w.get_atom_ECP_electrons(2), 0);
+		EXPECT_EQ(w.get_nr_ECP_electrons(), 120u);
 	}
 }

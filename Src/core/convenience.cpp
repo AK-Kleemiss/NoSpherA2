@@ -1685,7 +1685,7 @@ bool read_fracs_ADPs_from_CIF(const std::filesystem::path& cif, WFN& wavy, cell&
                     if (fields[label_field] == wavy.get_atom_label(i))
                     {
                         Cijk[i].resize(10);
-                        for (int j = 0; j < 6; j++)
+                        for (int j = 0; j < 10; j++)
                             Cijk[i][j] = stod(fields[ADP_field[j]]);
                         found_this_one = true;
                         break;
@@ -1770,7 +1770,7 @@ bool read_fracs_ADPs_from_CIF(const std::filesystem::path& cif, WFN& wavy, cell&
                     if (fields[label_field] == wavy.get_atom_label(i))
                     {
                         Dijkl[i].resize(15);
-                        for (int j = 0; j < 6; j++)
+                        for (int j = 0; j < 15; j++)
                             Dijkl[i][j] = stod(fields[ADP_field[j]]);
                         found_this_one = true;
                         break;
@@ -2091,6 +2091,8 @@ vec read_U_iso_from_CIF(const std::filesystem::path &cif, WFN &wavy, cell &unit_
                     << " frac_position: " << stod(fields[position_field[0]])
                     << " " << stod(fields[position_field[1]])
                     << " " << stod(fields[position_field[2]]) << endl;
+                err_checkf(labels.size() < positions.size(),
+                    "The CIF lists more atoms than the wavefunction has centres, cannot assign U_iso!", std::cout);
                 positions[labels.size()] = unit_cell.get_coords_cartesian(
                     stod(fields[position_field[0]]),
                     stod(fields[position_field[1]]),

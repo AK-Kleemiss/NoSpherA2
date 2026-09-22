@@ -805,8 +805,8 @@ TEST(FittingIoCoverageBasisTests, PruneCandidatesKeepsWellConditionedExponents)
 	EXPECT_EQ(prune_element_candidates_for_L(1, { 0.1, 10.0 }, 0.999).size(), 1u);
 }
 
-//One hydrogen with a d, f, g and h shell: the coefficient count is 5 + 7 + 9 + 11 = 32 and the
-//complete pass emits one primitive per spherical function.
+//One hydrogen with a d, f, g and h shell: the coefficient count is 5 + 7 + 9 + 11 = 32 (spherical),
+//while the complete pass emits one Cartesian wfn primitive per function, 6 + 10 + 15 + 21 = 52.
 TEST(FittingIoCoverageBasisTests, LoadBasisCompleteEmitsSphericalCountForHighShells)
 {
 	auto bs = std::make_shared<BasisSet>();
@@ -818,7 +818,7 @@ TEST(FittingIoCoverageBasisTests, LoadBasisCompleteEmitsSphericalCountForHighShe
 	WFN w(e_origin::NOT_YET_DEFINED);
 	w.push_back_atom("H", 0.0, 0.0, 0.0, 1);
 	EXPECT_EQ(load_basis_into_WFN(w, bs, true, true), 32);
-	EXPECT_EQ(w.get_nex(), 32);
+	EXPECT_EQ(w.get_nex(), 52);
 	ASSERT_EQ(w.get_atom_basis_set_size(0), 4);
 	for (int k = 0; k < 4; k++)
 	{
@@ -826,17 +826,16 @@ TEST(FittingIoCoverageBasisTests, LoadBasisCompleteEmitsSphericalCountForHighShe
 		EXPECT_EQ(w.get_atom_basis_set_entry(0, k).get_shell(), k) << k;
 		EXPECT_DOUBLE_EQ(w.get_atom_basis_set_entry(0, k).get_coefficient(), 1.0) << k;
 	}
-	for (int i = 0; i < 32; i++)
+	for (int i = 0; i < 52; i++)
 		EXPECT_EQ(w.get_center(i), 1) << i;
 	EXPECT_NEAR(w.get_exponent(0), 2.0, 1e-15);
-	EXPECT_NEAR(w.get_exponent(31), 0.7, 1e-15);
+	EXPECT_NEAR(w.get_exponent(51), 0.7, 1e-15);
 }
 
 //The complete pass numbers the primitives in the Cartesian wfn scheme (d = 5..10, f = 11..20,
 //g = 21..35, h = 36..56), which has 6/10/15/21 functions per shell, so a d+f+g+h hydrogen
-//should carry 52 primitives with the d block being exactly types 5..10.
-//suspected defect: Src/core/basis_set.cpp load_basis_into_WFN complete pass emits 2l+1 entries per shell but numbers them in the Cartesian wfn scheme (5..10 for d), so d and higher shells are truncated
-TEST(FittingIoCoverageBasisTests, DISABLED_LoadBasisCompleteUsesCartesianNumbering)
+//carries 52 primitives with the d block being exactly types 5..10.
+TEST(FittingIoCoverageBasisTests, LoadBasisCompleteUsesCartesianNumbering)
 {
 	auto bs = std::make_shared<BasisSet>();
 	bs->set_count_for_element(0, 4);
@@ -921,8 +920,7 @@ TEST(FittingIoCoverageBasisTests, AutoAuxTinyContractionTriggersLargeExponentGua
 
 //Potassium (l_occ = 2) with the same s, s, p shells: l_max_aux = min(4, 2) = 2, so the aux set
 //is the same eight functions as for lithium.
-//suspected defect: Src/core/basis_set.cpp gen_auto_aux_for_element a_max_adjusted loop runs to 2*l_occ_max beyond size l_max_aux+1
-TEST(FittingIoCoverageBasisTests, DISABLED_AutoAuxPotassiumKeepsAuxWithinLmax)
+TEST(FittingIoCoverageBasisTests, AutoAuxPotassiumKeepsAuxWithinLmax)
 {
 	atom k("K", atomID(), 1, 0.0, 0.0, 0.0, 19);
 	ASSERT_TRUE(k.push_back_basis_set(2.0, 1.0, 1, 0));
@@ -940,8 +938,7 @@ TEST(FittingIoCoverageBasisTests, DISABLED_AutoAuxPotassiumKeepsAuxWithinLmax)
 }
 
 //An s-only lithium (exponent 2.0): l_max = 0, l_max_aux = 0, one s aux function of exponent 4.0.
-//suspected defect: Src/core/basis_set.cpp gen_auto_aux_for_element a_max_adjusted loop runs to 2*l_occ_max beyond size l_max_aux+1
-TEST(FittingIoCoverageBasisTests, DISABLED_AutoAuxSOnlyLithium)
+TEST(FittingIoCoverageBasisTests, AutoAuxSOnlyLithium)
 {
 	atom li("Li", atomID(), 1, 0.0, 0.0, 0.0, 3);
 	ASSERT_TRUE(li.push_back_basis_set(2.0, 1.0, 1, 0));

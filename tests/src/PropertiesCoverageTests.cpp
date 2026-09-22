@@ -769,10 +769,9 @@ TEST(PropertiesCoverageSphericalTests, CustomRadialDensityPartitions)
 	EXPECT_NEAR(c_all, 6.0, 2e-2 * 6.0);
 }
 
-//suspected defect: Src/core/spherical_density.cpp:243 calc_custom_orbs counts coefficients from m_start = lower_m + min, so with min > 0 nr_coef skips the excluded orbitals' coefficients and every later orbital reads the wrong c[]
 //excluding the 1s shell of copper must leave the other 27 electrons: the min-shell density plus
 //the 1s density is the full density, and its integral matches the k -> 0 form factor of the same selection
-TEST(PropertiesCoverageSphericalTests, DISABLED_CustomRadialDensityExcludesInnerShells)
+TEST(PropertiesCoverageSphericalTests, CustomRadialDensityExcludesInnerShells)
 {
 	Thakkar copper(29);
 	for (const double r : { 0.02, 0.2, 0.7, 1.5, 3.0 })
@@ -1015,18 +1014,25 @@ TEST(PropertiesCoverageBasinTests, LegacyB2cSingleBasinBcpSearch)
 	std::filesystem::remove_all(dir);
 }
 
-//suspected defect: Src/core/b2c.cpp:392 neighbours (size iCP) is indexed by the 1-based basin id CP(x, y, z); with two basins neighbours[2] is out of range
 //the BCP of two mirror basins sits on the mid-plane: reported density = rho at the border voxels
 //(x = +-0.25), and the two labels are the two hydrogens
-TEST(PropertiesCoverageBasinTests, DISABLED_LegacyB2cTwoBasinBcp)
+TEST(PropertiesCoverageBasinTests, LegacyB2cTwoBasinBcp)
 {
 	ScopedGlobals guard;
 	const std::filesystem::path dir = temp_dir("b2c_two_basin_bcp");
 	H2Model m(1.0, 1.25);
-	cube rho = make_grid(10, 0.5);
+	//even x count keeps the mid-plane between voxels, odd y/z counts put the nuclei on grid points
+	//(an even count leaves four equal voxels around each nucleus and the steepest ascent stops at each)
+	cube rho({ 10, 9, 9 }, 0, true);
+	for (int k = 0; k < 3; k++)
+	{
+		rho.set_origin(k, -0.5 * (rho.get_size(k) - 1) * 0.5);
+		rho.set_vector(k, k, 0.5);
+	}
+	rho.calc_dv();
 	for (int i = 0; i < 10; i++)
-		for (int j = 0; j < 10; j++)
-			for (int k = 0; k < 10; k++)
+		for (int j = 0; j < 9; j++)
+			for (int k = 0; k < 9; k++)
 				rho.set_value(i, j, k, m.rho(rho.get_pos(i, j, k)));
 	rho.set_na(2);
 	rho.give_parent_wfn(m.wavy);
@@ -1039,7 +1045,7 @@ TEST(PropertiesCoverageBasinTests, DISABLED_LegacyB2cTwoBasinBcp)
 	std::cin.rdbuf(old_cin);
 	EXPECT_TRUE(ok);
 	EXPECT_NE(console.find("I found 2 Basins."), std::string::npos);
-	EXPECT_NEAR(number_after(console, "BCP: H-H ED: "), m.rho({ 0.25, 0.0, 0.0 }), 1e-6 * m.rho({ 0.25, 0.0, 0.0 }));
+	EXPECT_NEAR(number_after(console, "BCP: H-H ED: "), m.rho({ 0.25, 0.0, 0.0 }), 5e-6); //console prints 6 significant digits
 	std::filesystem::remove_all(dir);
 }
 

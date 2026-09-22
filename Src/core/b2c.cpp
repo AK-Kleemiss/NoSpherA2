@@ -387,17 +387,16 @@ bool b2c(const cube *cub, const std::vector<atom> &atoms, bool debug, bool bcp)
 								//    Tests if this voxel has neighboring voxels, that are from a different basin and assigns list of neighbors for each basin
 								if (CP(ix, iy, iz) != CP(x, y, z)) {
 									border[x][y][z] = true;
-									int found = false;
-									for (int i = 0; i < neighbours[CP(x, y, z)].size(); i++)
-										if (neighbours[CP(x, y, z)][i] == CP(ix, iy, iz))
-											found = true;
-									if (!found)
-										neighbours[CP(x, y, z)].push_back(CP(ix, iy, iz));
+									//CP holds 1-based basin ids, neighbours/BCPs are 0-based
+									ivec& nb = neighbours[CP(x, y, z) - 1];
+									const int other = CP(ix, iy, iz) - 1;
+									if (find(nb.begin(), nb.end(), other) == nb.end())
+										nb.push_back(other);
 								}
 							}
 		//sanity check, all basins must be neighboring each other pairwise!
 		for (int b = 0; b < iCP; b++)
-			for (int n = 0; n < neighbours[b].size(); n++)
+			for (const int n : neighbours[b])
 				if (find(neighbours[n].begin(), neighbours[n].end(), b) == neighbours[n].end()) {
 					std::cout << "ERROR: Basins should be neighbours in a pairwise way! Basin " << b << " has neighbour " << n << ", but it does not appear to be the case the other way around!\n";
 					return false;
@@ -412,7 +411,7 @@ bool b2c(const cube *cub, const std::vector<atom> &atoms, bool debug, bool bcp)
 							//check that we are on A) A border B) in the basin we want C) the neighboring basin we look at is at this border D) the value is bigger than the previously found maximum
 							if (!border[x][y][z])
 								continue;
-							if (CP(x, y, z) != b)
+							if (CP(x, y, z) != b + 1)
 								continue;
 							bool found = false;
 							for (int ix = x - 1; ix < x + 2; ix++)
@@ -421,7 +420,7 @@ bool b2c(const cube *cub, const std::vector<atom> &atoms, bool debug, bool bcp)
 										if (ix == x && iy == y && iz == z) continue;
 										if (ix <= 0 || iy <= 0 || iz <= 0) continue;
 										if (ix >= cub->get_size(0) || iy >= cub->get_size(1) || iz >= cub->get_size(2)) continue;
-										if (CP(ix, iy, iz) != n) continue;
+										if (CP(ix, iy, iz) != neighbours[b][n] + 1) continue;
 										else found = true;
 									}
 							if (found && cub->get_value(x, y, z) > Max.value)

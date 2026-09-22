@@ -280,8 +280,7 @@ TEST(ConvenienceCoverageCifTests, AdpReaderWithCellAssignsLabelsFracsAndUij)
 	EXPECT_NE(text.find("I DID NOT FIND THIS ATOM"), std::string::npos); //N9
 }
 
-//suspected defect: Src/core/convenience.cpp:1686 the Cijk loop copies only j < 6 of the 10 C_ijk columns
-TEST(ConvenienceCoverageCifTests, DISABLED_AdpReaderWithCellCopiesAllTenCijk)
+TEST(ConvenienceCoverageCifTests, AdpReaderWithCellCopiesAllTenCijk)
 {
 	ScratchDir scratch("adp_cell_cijk");
 	write_text(scratch.file("a.cif"), cif_text);
@@ -295,8 +294,7 @@ TEST(ConvenienceCoverageCifTests, DISABLED_AdpReaderWithCellCopiesAllTenCijk)
 		EXPECT_DOUBLE_EQ(c1[1][j], 1.0 + j) << j;
 }
 
-//suspected defect: Src/core/convenience.cpp:1771 the Dijkl loop copies only j < 6 of the 15 D_ijkl columns
-TEST(ConvenienceCoverageCifTests, DISABLED_AdpReaderWithCellCopiesAllFifteenDijkl)
+TEST(ConvenienceCoverageCifTests, AdpReaderWithCellCopiesAllFifteenDijkl)
 {
 	ScratchDir scratch("adp_cell_dijkl");
 	write_text(scratch.file("a.cif"), cif_text);
@@ -1056,8 +1054,7 @@ TEST(ConvenienceCoverageDeathTest, AdpReaderDiesWhenTheCifHasMoreAtomsThanTheWav
 	}, ::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), ".*");
 }
 
-//suspected defect: Src/core/convenience.cpp:2088 read_U_iso_from_CIF has no labels.size() < positions.size() guard and writes past the end when the CIF lists more atoms than the wavefunction has centres
-TEST(ConvenienceCoverageDeathTest, DISABLED_UisoReaderDiesWhenTheCifHasMoreAtomsThanTheWavefunction)
+TEST(ConvenienceCoverageDeathTest, UisoReaderDiesWhenTheCifHasMoreAtomsThanTheWavefunction)
 {
 	ScratchDir scratch("uiso_overflow");
 	write_text(scratch.file("a.cif"), cif_text);

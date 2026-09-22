@@ -73,8 +73,8 @@ namespace
 	//the same three atoms with two doubly occupied s orbitals on C, exp(-r^2 / 2) and exp(-r^2 / 4), so
 	//rho = 2 exp(-r^2) + 2 exp(-r^2 / 2). Two orbitals because the ELI-D of one alone diverges (its pair
 	//volume rho tau - |grad rho|^2 / 4 is identically zero); exponents below 0.92 because the primitive
-	//cutoff set from density_accuracy drops exp(-a r^2) beyond a r^2 = 9.9 and the 6^3 box of the
-	//property test reaches r^2 = 10.75
+	//cutoff set from density_accuracy drops exp(-a r^2) beyond a r^2 = 9.9 and the 5^3 box of the
+	//property test reaches r^2 = 6
 	WFN two_shell_wfn()
 	{
 		WFN wavy(e_origin::NOT_YET_DEFINED);
@@ -157,7 +157,7 @@ namespace
 		return std::sqrt(s);
 	}
 
-	//the box centre the origin formula of do_bonds aims at: origin + sum_i (size_i / 2) axis_i with size_i = np_i |v_i|
+	//the centre of the grid points: origin + sum_i ((np_i - 1) / 2) v_i
 	d3 box_centre(const cube& c)
 	{
 		d3 r{};
@@ -165,7 +165,7 @@ namespace
 		{
 			r[i] = c.get_origin(i);
 			for (int j = 0; j < 3; j++)
-				r[i] += 0.5 * c.get_size(j) * c.get_vector(j, i);
+				r[i] += 0.5 * (c.get_size(j) - 1) * c.get_vector(j, i);
 		}
 		return r;
 	}
@@ -332,7 +332,7 @@ namespace
 }
 
 //mode 2 with grid-point counts and box lengths in every axis (mode_res, mode_leng): np = res, |v| = box / np,
-//origin = midpoint(atom1, atom2) - sum_i (box_i / 2) axis_i = (0,0,1) - (-1, 1.5, -2)
+//origin = midpoint(atom1, atom2) - sum_i ((np_i - 1) |v_i| / 2) axis_i = (0,0,1) - (-0.75, 1.25, -1.75)
 TEST(BondwiseCoverageBoxTests, ModeTwoPointCountsAndBoxLengths)
 {
 	Scratch s("ModeTwoPointCountsAndBoxLengths");
@@ -343,9 +343,9 @@ TEST(BondwiseCoverageBoxTests, ModeTwoPointCountsAndBoxLengths)
 	const cube c = read_cube(rho_file);
 	expect_box(c, { 4, 6, 8 }, { 0.0, 0.0, 1.0 });
 	expect_axes(c);
-	EXPECT_NEAR(c.get_origin(0), 1.0, 1e-5);
-	EXPECT_NEAR(c.get_origin(1), -1.5, 1e-5);
-	EXPECT_NEAR(c.get_origin(2), 3.0, 1e-5);
+	EXPECT_NEAR(c.get_origin(0), 0.75, 1e-5);
+	EXPECT_NEAR(c.get_origin(1), -1.25, 1e-5);
+	EXPECT_NEAR(c.get_origin(2), 2.75, 1e-5);
 	for (int i = 0; i < 3; i++)
 		EXPECT_NEAR(axis_length(c, i), 0.5, 1e-5) << "axis " << i;
 	EXPECT_FALSE(std::filesystem::exists(prefix + "_rdg.cube"));
@@ -409,8 +409,7 @@ TEST(BondwiseCoverageBoxTests, ModeThreePointCountsWithMultipliers)
 
 //"cube selection 1 = all selections in x-direction will be applied in the y and z direction": with spacings and
 //multipliers the three axes must share the x length 3.0 and the spacing, i.e. |v_1| = |v_2| = |v_0|
-//suspected defect: Src/core/bondwise_analysis.cpp:699 the cubic branch copies s2[r] but never sets size[r], so incr[r] = size[r] / np[r] reads an uninitialised length
-TEST(BondwiseCoverageBoxTests, DISABLED_CubicSpacingAxesShareOneLength)
+TEST(BondwiseCoverageBoxTests, CubicSpacingAxesShareOneLength)
 {
 	Scratch s("CubicSpacingAxesShareOneLength");
 	WFN wavy = three_atom_wfn();
@@ -421,25 +420,23 @@ TEST(BondwiseCoverageBoxTests, DISABLED_CubicSpacingAxesShareOneLength)
 		EXPECT_NEAR(axis_length(c, i), axis_length(c, 0), 1e-9) << "axis " << i;
 }
 
-//"orientation_selection 1 = atom1 centered": a 2 x 2 x 2 box of 4 points per axis around atom 1 at the origin
-//has its origin at a1 - (x + y + z) = (1, -1, 1)
-//suspected defect: Src/core/bondwise_analysis.cpp:823 mode 1 builds the origin on coords2 (atom 2), not on atom 1 as input.example documents
-TEST(BondwiseCoverageBoxTests, DISABLED_ModeOneCentresOnAtomOne)
+//"orientation_selection 1 = atom1 centered": a 2 x 2 x 2 box of 4 points per axis (steps of 0.5) around atom 1 at
+//the origin has its origin at a1 - 0.75 (x + y + z) = (0.75, -0.75, 0.75)
+TEST(BondwiseCoverageBoxTests, ModeOneCentresOnAtomOne)
 {
 	Scratch s("ModeOneCentresOnAtomOne");
 	WFN wavy = three_atom_wfn();
 	const std::string prefix = run_bond(wavy, s, 1, true, true, { 4.0, 4.0, 4.0 }, false, { 2.0, 2.0, 2.0 }, false, false, 1, true, false, false, false);
 	const cube c = read_cube(prefix + "_rho.cube");
 	expect_box(c, { 4, 4, 4 }, { 0.0, 0.0, 0.0 });
-	EXPECT_NEAR(c.get_origin(0), 1.0, 1e-5);
-	EXPECT_NEAR(c.get_origin(1), -1.0, 1e-5);
-	EXPECT_NEAR(c.get_origin(2), 1.0, 1e-5);
+	EXPECT_NEAR(c.get_origin(0), 0.75, 1e-5);
+	EXPECT_NEAR(c.get_origin(1), -0.75, 1e-5);
+	EXPECT_NEAR(c.get_origin(2), 0.75, 1e-5);
 }
 
 //"resolution selection 0 = res will contain distance between gridpoints": the written cube vectors must have the
 //requested lengths 0.5, 0.5 and 1.0
-//suspected defect: Src/core/bondwise_analysis.cpp:856 incr[i] = size[i] / np[i] with np = round(size / res) + 1 gives a spacing of size / (size / res + 1), never the requested res (the //incr[i]=res[i] line is commented out)
-TEST(BondwiseCoverageBoxTests, DISABLED_SpacingModeUsesTheRequestedSpacing)
+TEST(BondwiseCoverageBoxTests, SpacingModeUsesTheRequestedSpacing)
 {
 	Scratch s("SpacingModeUsesTheRequestedSpacing");
 	WFN wavy = three_atom_wfn();
@@ -452,8 +449,7 @@ TEST(BondwiseCoverageBoxTests, DISABLED_SpacingModeUsesTheRequestedSpacing)
 
 //with bohr = true the box lengths are Angstrom ("1 = box will contain length in angstrom"): a 2 A box of 4 points
 //has vectors of 0.5 A = 0.94486 bohr and stays centred on the bond midpoint (0, 0, 1) bohr
-//suspected defect: Src/core/bondwise_analysis.cpp:826 the origin offset is divided by ang2bohr while incr (line 856) keeps the Angstrom length, so the box is shifted off its centre by s2 (1/ang2bohr - 1) per axis and its vectors stay in Angstrom
-TEST(BondwiseCoverageBoxTests, DISABLED_BohrBoxStaysCentredOnTheBond)
+TEST(BondwiseCoverageBoxTests, BohrBoxStaysCentredOnTheBond)
 {
 	Scratch s("BohrBoxStaysCentredOnTheBond");
 	WFN wavy = three_atom_wfn();
@@ -477,7 +473,8 @@ TEST(BondwiseCoveragePropertyTests, DebugRunWritesEveryPropertyCube)
 	Scratch s("DebugRunWritesEveryPropertyCube");
 	WFN wavy = two_shell_wfn();
 	std::string out;
-	const std::string prefix = run_bond(wavy, s, 2, true, true, { 6.0, 6.0, 6.0 }, false, { 3.0, 3.0, 3.0 }, true, false, 1, true, true, true, true, &out);
+	//5 points over 2.5 bohr: an odd count puts one grid point on the nucleus at (0, 0, 0)
+	const std::string prefix = run_bond(wavy, s, 2, true, true, { 5.0, 5.0, 5.0 }, false, { 2.5, 2.5, 2.5 }, true, false, 1, true, true, true, true, &out);
 	EXPECT_NE(out.find("The Atoms found corresponding to your selection are:"), std::string::npos);
 	EXPECT_NE(out.find("mode_leng=true; using boxsize"), std::string::npos);
 	EXPECT_NE(out.find("gvector before: "), std::string::npos);
@@ -488,12 +485,12 @@ TEST(BondwiseCoveragePropertyTests, DebugRunWritesEveryPropertyCube)
 	const cube rdg = read_cube(prefix + "_rdg.cube");
 	const cube eli = read_cube(prefix + "_eli.cube");
 	const cube lap = read_cube(prefix + "_lap.cube");
-	expect_box(rho, { 6, 6, 6 }, { 0.0, 0.0, 1.0 });
+	expect_box(rho, { 5, 5, 5 }, { 0.0, 0.0, 1.0 });
 	const double kf = std::cbrt(3.0 * constants::PI * constants::PI);
 	int checked = 0;
-	for (int i = 0; i < 6; i++)
-		for (int j = 0; j < 6; j++)
-			for (int k = 0; k < 6; k++)
+	for (int i = 0; i < 5; i++)
+		for (int j = 0; j < 5; j++)
+			for (int k = 0; k < 5; k++)
 			{
 				const double r = rho.get_value(i, j, k);
 				EXPECT_DOUBLE_EQ(signed_rho.get_value(i, j, k), -r);
@@ -518,7 +515,7 @@ TEST(BondwiseCoveragePropertyTests, DebugRunWritesEveryPropertyCube)
 				EXPECT_NEAR(e, expected_eli, 2e-5 * expected_eli);
 				checked++;
 			}
-	EXPECT_EQ(checked, 6 * 6 * 6 - 1);
+	EXPECT_EQ(checked, 5 * 5 * 5 - 1);
 }
 
 //the epoxide C-C bond has equal nuclear charges, so the row is written by the el_a <= el_b branch: the higher index

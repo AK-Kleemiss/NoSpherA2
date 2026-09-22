@@ -412,7 +412,8 @@ void BasisSet::gen_auto_aux_for_element(const atom& atm) {
 		a_aux_by_l_aux[ll] = aux_val;
 	}
 	vec a_max_adjusted(l_max_aux + 1);
-	for (int l = 0; l <= l_occ_max * 2; ++l) {
+	//l_max_aux can be below 2*l_occ_max (K with an s-only basis), so the first loop must stop at l_max_aux
+	for (int l = 0; l <= std::min(l_occ_max * 2, l_max_aux); ++l) {
 		a_max_adjusted[l] = std::min(
 			auto_aux_constants::F_LAUX[l] * a_aux_by_l_aux[l],
 			a_max_by_l_aux[l]
@@ -594,7 +595,8 @@ int load_basis_into_WFN(WFN& wavy,const std::shared_ptr<BasisSet> b, const bool 
 				int temp_type = bf_.get_type();
 				double temp_exp = bf_.get_exponent();
 				int effective_type = 0;
-				int end = 2 * temp_type + 1;
+				//the wfn primitive types are Cartesian (d = 5..10, f = 11..20, ...), so a shell of l emits (l+1)(l+2)/2 primitives
+				int end = (temp_type + 1) * (temp_type + 2) / 2;
 				switch (temp_type) {
 				case(0):
 					effective_type = 1;

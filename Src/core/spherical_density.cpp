@@ -233,69 +233,24 @@ void Thakkar::calc_custom_orbs(
 	double *Orb) const
 {
 	const int upper_ex = n_vector[atomic_number - 1];
+	//c[] holds one coefficient per exponent and occupied m in [lower_m, upper_m), so the counter
+	//must walk all of them; only the [min, max) window of the shell contributes to Orb
 	const int m_start = lower_m + min;
 	const int m_threshold = lower_m + max;
 
-	// Early exit if no valid m range
-	if (m_start >= upper_m || m_start >= m_threshold) {
-		// Still need to advance counters correctly
-		for (int ex = 0; ex < upper_ex; ex++, nr_ex++) {
-			for (int m = m_start; m < upper_m; m++) {
-				if (occ[offset + m] != 0) {
-					nr_coef++;
-				}
-			}
-		}
-		return;
-	}
-
 	for (int ex = 0; ex < upper_ex; ex++, nr_ex++)
 	{
-		const double _z = z[nr_ex];
-		const int _n = n[nr_ex] - 1;
+		const double exponent = -z[nr_ex] * dist;
+		// Corresponds to at least 1E-20
+		const double radial = (exponent <= -46.5) ? 0.0
+			: (n[nr_ex] == 1 ? exp(exponent) : fast_int_pow(dist, n[nr_ex] - 1) * exp(exponent));
 
-		// Precompute exponent once per outer loop - major optimization
-		const double exponent = -_z * dist;
-
-		// Early exit if exponent too small - moved outside inner loop
-		if (exponent <= -46.5) {
-			// Skip this exponential entirely but advance coefficient counter
-			for (int m = m_start; m < upper_m; m++) {
-				if (occ[offset + m] != 0) {
-					nr_coef++;
-				}
-			}
-			continue;
-		}
-
-		// Compute exp once per outer iteration instead of per inner iteration
-		const double exp_val = exp(exponent);
-
-		if (_n != 0) {
-			const double dist_pow = fast_int_pow(dist, _n);
-			const double combined = exp_val * dist_pow;
-
-			for (int m = m_start; m < upper_m; m++)
-			{
-				if (occ[offset + m] != 0) {
-					if (m < m_threshold) {
-						Orb[m] += c[nr_coef] * combined;
-					}
-					nr_coef++;
-				}
-			}
-		}
-		else {
-			// Fast path for _n == 0 case (no power calculation needed)
-			for (int m = m_start; m < upper_m; m++)
-			{
-				if (occ[offset + m] != 0) {
-					if (m < m_threshold) {
-						Orb[m] += c[nr_coef] * exp_val;
-					}
-					nr_coef++;
-				}
-			}
+		for (int m = lower_m; m < upper_m; m++)
+		{
+			if (occ[offset + m] == 0) continue;
+			if (radial != 0.0 && m >= m_start && m < m_threshold)
+				Orb[m] += c[nr_coef] * radial;
+			nr_coef++;
 		}
 	}
 }

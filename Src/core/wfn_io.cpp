@@ -1132,6 +1132,7 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
 	int geo_start_bit = 8;
 	int basis_start_bit = 16;
 	int MO_start_bit = 24;
+	int ECP_start_bit = 32;
 	int soi = constants::soi;
 	int geo_int_lim = 5;
 
@@ -1144,6 +1145,7 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
 			geo_start_bit += 24;
 			basis_start_bit += 24;
 			MO_start_bit += 24;
+			ECP_start_bit += 24;
 			soi = 8;
 			geo_int_lim = 1;
 		}
@@ -1438,23 +1440,29 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
 		{
 			has_ECPs = true;
 			vector<ECP_primitive> ECP_prims;
-			// Reading ECPs?
-			rf.seekg(32, ios::beg);
-			long int ECP_start = 0;
+			// Reading ECPs? The pointer sits after the MO pointer in both layouts (byte 32, or 56 with magic -1)
+			rf.seekg(ECP_start_bit, ios::beg);
+			int64_t ECP_start = 0;
 			rd(&ECP_start, sizeof(ECP_start), "ECP pointer");
 			err_checkf(ECP_start != 0, "Could not read ECP information location from GBW file!", file);
+			check_offset(ECP_start, "ECP section");
 			if (debug)
 				file << "I read the pointer of ECP successfully" << endl;
 			rf.seekg(ECP_start, ios::beg);
-			long int i1 = 0;
+			int64_t i1 = 0; //8 bytes in the file, a long is 4 on MSVC
 			int i2 = 0;
 			const int soi = 4;
 			const int sod = 8;
 			rd(&i1, 8, "ECP count");
+			check_count(i1, "ECP count");
+			err_checkf(i1 <= (int64_t)atoms.size(), "ECP block lists more atoms than the geometry", file);
 			file << "First line: " << i1 << endl;
 			for (int i = 0; i < i1; i++)
 			{
 				rd(&i2, 1, "ECP flag");
+				//an atom without ECP is the flag byte alone, the record fields only follow flag 1
+				if (i2 == 0)
+					continue;
 				int Z = 0;
 				int nr_core = 0;
 				int temp_0 = 0;
@@ -1480,7 +1488,7 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
 				rd(&max_angular, soi, "max_angular");
 				err_checkf(max_angular > 0, "Error reading max_angular in ECPs", file);
 				rd(&center, soi, "center");
-				err_checkf(center > 0, "Error reading center in ECPs", file);
+				err_checkf(center >= 0 && center < (int)atoms.size(), "Error reading center in ECPs", file); //0-based atom index
 				file << "I read " << Z << " " << temp_0 << " " << nr_core << " " << max_contract << " " << max_angular << "\n";
 				for (int l = 0; l < max_angular; l++)
 				{
@@ -1493,12 +1501,14 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
 					for (int fun = 0; fun < exps; fun++)
 					{
 
+						//Stuttgart order: r power, exponent, coefficient (Hg def2 f term: 2, 3.8857911, -30.3649964);
+						//coefficients reach 275 and are often negative, so only garbage is rejected
 						rd(&n, sod, "n");
-						err_checkf(n < 200, "This Exponent will give me a headache...", file);
-						rd(&c, sod, "c");
-						err_checkf(c < 200, "This Coefficient will give me a headache...", file);
+						err_checkf(std::isfinite(n) && n >= 0 && n < 10, "Unreasonable r power in ECPs: " + to_string(n), file);
 						rd(&e, sod, "e");
-						err_checkf(e < 200, "This Exponent will give me a headache...", file);
+						err_checkf(std::isfinite(e) && e > 0, "Unreasonable exponent in ECPs: " + to_string(e), file);
+						rd(&c, sod, "c");
+						err_checkf(std::isfinite(c), "Unreasonable coefficient in ECPs", file);
 						file << fun << " " << c << " " << e << " " << n << "\n";
 						ECP_prims.push_back(ECP_primitive(center, type, e, c, static_cast<int>(n)));
 					}
