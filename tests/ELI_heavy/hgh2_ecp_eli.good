@@ -70,7 +70,7 @@ Merged 22 noise maxima, 6 basins remain.
 Unified 1 core-shell basins into their atoms' cores, 5 ELI-D basins remain.
 
 QTAIM Analysis (voxel sum):
-basin:    0 label:              Hg0 integrated value:  77.6422 volume:  485.0438
+basin:    0 label:              Hg0 integrated value:  78.6104 volume:  485.0438
 basin:    1 label:               H1 integrated value:   1.2874 volume:  445.7662
 basin:    2 label:               H2 integrated value:   1.2874 volume:  445.7662
 GridManager: Setting up prototype grids for atom types...
@@ -80,7 +80,7 @@ Quadrature points sent along the field: 328799, left the grid: 0
 
 QTAIM Analysis (atomic quadrature grids):
   basin  label               electrons     charge      volume     maximum        x          y          z
-      1  Hg0                   79.4314     0.5686    808.4662   4840.4723      0.000      0.000      0.000
+      1  Hg0                   79.4314     0.5686    808.4662   4856.9128      0.000      0.000      0.000
       2  H1                     1.2826    -0.2826    744.9110      0.3415      0.000      0.000      3.118
       3  H2                     1.2826    -0.2826    748.7134      0.3415      0.000      0.000     -3.118
   total in basins: 81.9965   outside every basin: 0.0035
@@ -89,8 +89,8 @@ ELI-D Analysis (voxel sum):
 basin:    0 label:      H2-Hg0 bond integrated value:   0.5034 volume:  280.5199
 basin:    1 label:      H1-Hg0 bond integrated value:   0.4627 volume:  274.8942
 basin:    2 label:               H2 integrated value:   1.3938 volume:   32.6140
-basin:    3 label:               H1 integrated value:   1.4345 volume:   38.2732
-basin:    4 label:         Hg0 core integrated value:  76.4011 volume:  232.3914
+basin:    3 label:               H1 integrated value:   1.4346 volume:   38.2732
+basin:    4 label:         Hg0 core integrated value:  77.3692 volume:  232.3914
 GridManager: Setting up prototype grids for atom types...
 GridManager: Generating integration grids for atoms...
 GridManager: Generated total of 65266 grid points.

@@ -9,7 +9,7 @@ namespace geometry_aid
 {
     typedef std::vector<std::pair<std::filesystem::path, std::filesystem::path>> jobvec;
 
-    SALTED_Utils::FeatomicHyperParameters hyperparameters(double cutoff_radius = 3.5);
+    SALTED_Utils::FeatomicHyperParameters hyperparameters(double cutoff_radius = 3.5, bool metals = false, double center_weight = 1.0);
 
     // The PCA and the dense layers Olex2 used to run in Python, same arithmetic; weights from geometry_aid_model.bin
     // (make_geometry_aid_bin.py), since the .npz is a deflated ZIP and there is no zlib here.

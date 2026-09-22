@@ -7,6 +7,7 @@
 #include "tsc_block.h"
 #include "tsc_stream.h"
 #include "scattering_factors.h"
+#include <map>
 #include "convenience.h"
 #include "cell.h"
 #include "wfn_class.h"
@@ -21,6 +22,7 @@
 #include "blas_gpu.h"
 #endif
 #include "SALTED_utilities.h"
+#include "gaussian_atom.h"
 #include "GridManager.h"
 #include "cube.h"
 #ifdef NOSPHERA2_USE_GPU
@@ -217,7 +219,7 @@ void read_hkl(const std::filesystem::path& hkl_filename,
 		// if (debug) file << "hkl: ";
 		for (int i = 0; i < 3; i++)
 		{
-			temp = line.substr(4 * size_t(i) + 1, 3);
+			temp = line.substr(4 * size_t(i), 4);
 			temp.erase(remove_if(temp.begin(), temp.end(), ::isspace), temp.end());
 			hkl_[i] = stoi(temp);
 			// if (debug) file << setw(4) << temp;
@@ -250,7 +252,7 @@ void read_hkl(const std::filesystem::path& hkl_filename,
 	if (debug)
 		file << "Number of reflections after twin: " << hkl.size() << std::endl;
 
-	std::vector<std::vector<ivec>> sym(3);
+	ivec3 sym(3);
 	for (int i = 0; i < 3; i++)
 		sym[i].resize(3);
 	sym = unit_cell.get_sym();
@@ -264,9 +266,9 @@ void read_hkl(const std::filesystem::path& hkl_filename,
 			{
 				for (int y = 0; y < 3; y++)
 					file << std::setw(3) << sym[y][x][i];
-				file << std::endl;
+				file << "\n";
 			}
-			file << std::endl;
+			file << "\n";
 		}
 	}
 	else
@@ -331,6 +333,9 @@ hkl_list read_hkl_full(const std::filesystem::path& hkl_filename,
 	hkl_input.seekg(0, hkl_input.beg);
 	std::regex r{ R"([abcdefghijklmnopqrstuvwxyz\(\)ABCDEFGHIJKLMNOPQRSTUVW])" };
 	std::string line, temp;
+	//hkl is a set, so it hands the reflections back in (h,k,l) order whatever the file order;
+	//obs has to follow that order, or F_calc[i] meets the wrong observation
+	std::map<i3, scattering_data> obs_by_hkl;
 	while (!hkl_input.eof())
 	{
 		getline_universal(hkl_input, line);
@@ -345,16 +350,18 @@ hkl_list read_hkl_full(const std::filesystem::path& hkl_filename,
 		// if (debug) file << "hkl: ";
 		for (int i = 0; i < 3; i++)
 		{
-			temp = line.substr(4 * size_t(i) + 1, 4);
+			temp = line.substr(4 * size_t(i), 4);
 			temp.erase(remove_if(temp.begin(), temp.end(), ::isspace), temp.end());
 			hkl_[i] = stoi(temp);
 			// if (debug) file << setw(4) << temp;
 		}
-		temp = line;
-		temp.erase(0, 12);
-		int dot = temp.find_first_of('.');
+		//F2 runs up to two digits past its decimal point, sigma is the rest: this also reads
+		//files whose F2 field is wider than the 3I4,2F8.2 eight characters
+		temp = line.substr(12);
+		const size_t dot = temp.find_first_of('.');
+		err_checkf(dot != std::string::npos, "hkl line without an F2 value: '" + line + "'", file);
 		std::string temp_F = temp.substr(0, dot + 3);
-		std::string temp_sigma = temp.substr(dot + 3, temp.size() - dot - 3);
+		std::string temp_sigma = temp.substr(std::min(dot + 3, temp.size()));
 		temp_sigma.erase(remove_if(temp_sigma.begin(), temp_sigma.end(), ::isspace), temp_sigma.end());
 		sigma2_ = stof(temp_sigma);
 		temp_F.erase(remove_if(temp_F.begin(), temp_F.end(), ::isspace), temp_F.end());
@@ -374,8 +381,7 @@ hkl_list read_hkl_full(const std::filesystem::path& hkl_filename,
 		}
 		// if (debug) file << endl;
 		hkl.emplace(hkl_);
-		scattering_data temp_data = { F_, abs_F_, F2_, sigma_, sigma2_ };
-		obs.push_back(temp_data);
+		obs_by_hkl.try_emplace(hkl_, scattering_data{ F_, abs_F_, F2_, sigma_, sigma2_ });
 	}
 	hkl_list_it found = hkl.find(i3{ 0, 0, 0 });
 	if (found != hkl.end())
@@ -386,6 +392,9 @@ hkl_list read_hkl_full(const std::filesystem::path& hkl_filename,
 	}
 	hkl_input.close();
 	err_checkf(!hkl.empty(), "No reflections read from " + hkl_filename.string(), file);
+	obs.clear();
+	for (const i3& h : hkl)
+		obs.push_back(obs_by_hkl.at(h));
 	file << " done!\nNr of reflections read from file: " << hkl.size() << std::endl;
 
 	if (debug)
@@ -402,7 +411,7 @@ hkl_list read_hkl_full(const std::filesystem::path& hkl_filename,
 	if (debug)
 		file << "Number of reflections after twin: " << hkl.size() << std::endl;
 
-	std::vector<std::vector<ivec>> sym(3);
+	ivec3 sym(3);
 	for (int i = 0; i < 3; i++)
 		sym[i].resize(3);
 	sym = unit_cell.get_sym();
@@ -416,9 +425,9 @@ hkl_list read_hkl_full(const std::filesystem::path& hkl_filename,
 			{
 				for (int y = 0; y < 3; y++)
 					file << std::setw(3) << sym[y][x][i];
-				file << std::endl;
+				file << "\n";
 			}
-			file << std::endl;
+			file << "\n";
 		}
 	}
 	else
@@ -547,9 +556,9 @@ void generate_hkl(const double& dmin,
 			{
 				for (int y = 0; y < 3; y++)
 					file << setw(3) << sym[y][x][i];
-				file << endl;
+				file << "\n";
 			}
-			file << endl;
+			file << "\n";
 		}
 	}
 	else
@@ -682,9 +691,9 @@ void generate_hkl(const ivec2& hkl_min_max,
 			{
 				for (int y = 0; y < 3; y++)
 					file << setw(3) << sym[y][x][i];
-				file << endl;
+				file << "\n";
 			}
-			file << endl;
+			file << "\n";
 		}
 	}
 	else
@@ -829,9 +838,9 @@ void generate_fractional_hkl(const double& dmin,
 			{
 				for (int y = 0; y < 3; y++)
 					file << setw(3) << sym[y][x][i];
-				file << endl;
+				file << "\n";
 			}
-			file << endl;
+			file << "\n";
 		}
 	}
 	else
@@ -911,36 +920,36 @@ void generate_fractional_hkl(const double& dmin,
 // the last line consumed, which is what the surrounding loops expect.
 static bool read_cif_loop_row(std::istream &input, std::string &line, int n, svec &fields)
 {
-    fields.assign(n, "");
-    int got = 0;
-    std::string rest = line;
-    while (true)
-    {
-        size_t i = 0;
-        while (got < n && i < rest.size())
-        {
-            while (i < rest.size() && std::isspace(static_cast<unsigned char>(rest[i]))) i++;
-            if (i >= rest.size()) break;
-            std::string value;
-            const char c = rest[i];
-            if (c == 0x27 || c == '"')
-            {
-                const char quote = c;
-                i++;
-                while (i < rest.size() && rest[i] != quote) value.push_back(rest[i++]);
-                if (i < rest.size()) i++;              // closing quote
-            }
-            else
-            {
-                while (i < rest.size() && !std::isspace(static_cast<unsigned char>(rest[i])))
-                    value.push_back(rest[i++]);
-            }
-            fields[got++] = value;
-        }
-        if (got >= n) return true;
-        if (!getline_universal(input, rest)) return false;
-        line = rest;
-    }
+	fields.assign(n, "");
+	int got = 0;
+	std::string rest = line;
+	while (true)
+	{
+		size_t i = 0;
+		while (got < n && i < rest.size())
+		{
+			while (i < rest.size() && std::isspace(static_cast<unsigned char>(rest[i]))) i++;
+			if (i >= rest.size()) break;
+			std::string value;
+			const char c = rest[i];
+			if (c == 0x27 || c == '"')
+			{
+				const char quote = c;
+				i++;
+				while (i < rest.size() && rest[i] != quote) value.push_back(rest[i++]);
+				if (i < rest.size()) i++;              // closing quote
+			}
+			else
+			{
+				while (i < rest.size() && !std::isspace(static_cast<unsigned char>(rest[i])))
+					value.push_back(rest[i++]);
+			}
+			fields[got++] = value;
+		}
+		if (got >= n) return true;
+		if (!getline_universal(input, rest)) return false;
+		line = rest;
+	}
 }
 
 
@@ -984,7 +993,7 @@ svec read_atoms_from_CIF(std::ifstream& cif_input,
 			count_fields = 0;
 			getline_universal(cif_input, line);
 			if (debug)
-				file << "line in loop field definition: " << trim(line) << endl;
+				file << "line in loop field definition: " << trim(line) << "\n";
 			while (trim(line).find("_") == 0)
 			{
 				if (line.find("label") != string::npos)
@@ -1002,7 +1011,7 @@ svec read_atoms_from_CIF(std::ifstream& cif_input,
 				else if (label_field == 1000)
 				{
 					if (debug)
-						file << "I don't think this is the atom block.. moving on!" << endl;
+						file << "I don't think this is the atom block.. moving on!\n";
 					break;
 				}
 				getline_universal(cif_input, line);
@@ -1014,7 +1023,8 @@ svec read_atoms_from_CIF(std::ifstream& cif_input,
 				err_checkf(position_field[2] != -1, "No z position found, impossible to continue!", std::cout);
 				err_checkf(type_field != -1, "No type found, impossible to continue!", std::cout);
 			}
-			while (trim(line).find("_") > 0 && line.length() > 3)
+			// the next loop_ or data item ends the atom rows
+			while (trim(line).find("_") > 0 && trim(line).find("loop_") != 0 && line.length() > 3)
 			{
 				atoms_read = true;
 				svec fields;
@@ -1026,7 +1036,7 @@ svec read_atoms_from_CIF(std::ifstream& cif_input,
 					file << "label: " << setw(8) << fields[label_field] << " type: " << fields[type_field] << " frac. pos: "
 					<< setw(6) << fixed << setprecision(3) << stod(fields[position_field[0]]) << "+/-" << get_decimal_precision_from_CIF_number(fields[position_field[0]]) << " "
 					<< setw(6) << fixed << setprecision(3) << stod(fields[position_field[1]]) << "+/-" << get_decimal_precision_from_CIF_number(fields[position_field[1]]) << " "
-					<< setw(6) << fixed << setprecision(3) << stod(fields[position_field[2]]) << "+/-" << get_decimal_precision_from_CIF_number(fields[position_field[2]]) << " " << flush;
+					<< setw(6) << fixed << setprecision(3) << stod(fields[position_field[2]]) << "+/-" << get_decimal_precision_from_CIF_number(fields[position_field[2]]) << " ";
 				vec position = unit_cell.get_coords_cartesian(
 					stod(fields[position_field[0]]),
 					stod(fields[position_field[1]]),
@@ -1040,7 +1050,7 @@ svec read_atoms_from_CIF(std::ifstream& cif_input,
 					precisions[i] = abs(precisions[i]);
 				}
 				if (debug)
-					file << " cart. pos.: " << setw(8) << position[0] << "+/-" << precisions[0] << " " << setw(8) << position[1] << "+/-" << precisions[1] << " " << setw(8) << position[2] << "+/-" << precisions[2] << endl;
+					file << " cart. pos.: " << setw(8) << position[0] << "+/-" << precisions[0] << " " << setw(8) << position[1] << "+/-" << precisions[1] << " " << setw(8) << position[2] << "+/-" << precisions[2] << "\n";
 
 				int group_nr = 0;
 				if (group_field != -1 && fields[group_field] != "." && fields[group_field] != "?"
@@ -1050,7 +1060,7 @@ svec read_atoms_from_CIF(std::ifstream& cif_input,
 					try { group_nr = std::stoi(fields[group_field]); }
 					catch (const std::exception &) {
 						file << "Could not read disorder group for atom " << fields[label_field]
-							 << "; treating it as 0." << std::endl;
+							 << "; treating it as 0.\n";
 						group_nr = 0;
 					}
 				}
@@ -1062,7 +1072,7 @@ svec read_atoms_from_CIF(std::ifstream& cif_input,
 					std::find(input_groups.begin(), input_groups.end(), group_nr) == input_groups.end())
 				{
 					if (debug)
-						file << "Wrong part!" << endl;
+						file << "Wrong part!\n";
 					getline_universal(cif_input, line);
 					continue;
 				}
@@ -1079,7 +1089,7 @@ svec read_atoms_from_CIF(std::ifstream& cif_input,
 					{
 						old_atom = true;
 						if (debug)
-							file << "I already know this one! " << fields[label_field] << " " << known_atoms[run] << endl;
+							file << "I already know this one! " << fields[label_field] << " " << known_atoms[run] << "\n";
 					}
 				}
 				if (old_atom)
@@ -1104,7 +1114,7 @@ svec read_atoms_from_CIF(std::ifstream& cif_input,
 					if (is_similar_abs(position[0], wave.get_atom_coordinate(i, 0), tolerances[0]) && is_similar_abs(position[1], wave.get_atom_coordinate(i, 1), tolerances[1]) && is_similar_abs(position[2], wave.get_atom_coordinate(i, 2), tolerances[2]))
 					{
 						wave.set_atom_frac_coords(i, { stod(fields[position_field[0]]), stod(fields[position_field[1]]), stod(fields[position_field[2]]) });
-                        wave.set_atom_group_nr(i, group_nr);
+						wave.set_atom_group_nr(i, group_nr);
 						// Store exactly the identifier used above for the MTC duplicate check.
 						wave.set_id_for_atom(i, cif_atom_id);
 						string element = constants::atnr2letter(wave.get_atom_charge(i));
@@ -1119,7 +1129,7 @@ svec read_atoms_from_CIF(std::ifstream& cif_input,
 							file << "ASYM:  " << setw(8) << element << " charge: " << setw(17) << wave.get_atom_charge(i) << "                             wfn cart. pos: "
 								<< fixed << setprecision(3) << setw(16) << wave.get_atom_coordinate(i, 0) << " "
 								<< fixed << setprecision(3) << setw(16) << wave.get_atom_coordinate(i, 1) << " "
-								<< fixed << setprecision(3) << setw(16) << wave.get_atom_coordinate(i, 2) << flush;
+								<< fixed << setprecision(3) << setw(16) << wave.get_atom_coordinate(i, 2);
 							if (input_groups.size() > 0 && group_field != -1)
 							{
 								file << " checking disorder group: " << fields[group_field] << " vs. ";
@@ -1134,7 +1144,7 @@ svec read_atoms_from_CIF(std::ifstream& cif_input,
 								if (debug)
 								{
 									file << "\nElement symbol not found in label, this is a problem!\n checking type...";
-									if (type.find(element) == string::npos || label.find(element) > 2)
+									if (type.find(element) != 0)
 									{
 										file << " ALSO FAILED! WILL IGNORE ATOM!\n";
 										continue;
@@ -1142,7 +1152,7 @@ svec read_atoms_from_CIF(std::ifstream& cif_input,
 								}
 								else
 								{
-									if (type.find(element) == string::npos || label.find(element) > 2)
+									if (type.find(element) != 0)
 									{
 										file << "\nAtom " << label << " was not matching by element determined by label reduction or type field, skipping!\n";
 										continue;
@@ -1154,7 +1164,7 @@ svec read_atoms_from_CIF(std::ifstream& cif_input,
 								if (debug)
 								{
 									file << "\nElement symbol not found in label, this is a problem!\n will check type...";
-									if (type.find(element) == string::npos || label.find(element) > 2)
+									if (type.find(element) != 0)
 									{
 										file << " ALSO FAILED! WILL IGNORE ATOM!\n";
 										continue;
@@ -1162,7 +1172,7 @@ svec read_atoms_from_CIF(std::ifstream& cif_input,
 								}
 								else
 								{
-									if (type.find(element) == string::npos || label.find(element) > 2)
+									if (type.find(element) != 0)
 									{
 										file << "\nAtom " << label << " was not matching by element determined by label reduction or type field, skipping!\n";
 										continue;
@@ -1179,7 +1189,7 @@ svec read_atoms_from_CIF(std::ifstream& cif_input,
 					}
 				}
 				if (debug)
-					file << " nr= " << nr << endl;
+					file << " nr= " << nr << "\n";
 				if (nr != -1)
 				{
 					bool already_there = false;
@@ -1205,7 +1215,7 @@ svec read_atoms_from_CIF(std::ifstream& cif_input,
 						{
 							file << setw(12) << fixed << setprecision(8) << tolerances[j];
 						}
-						file << endl;
+						file << "\n";
 					}
 				}
 				getline_universal(cif_input, line);
@@ -1236,7 +1246,7 @@ svec read_atoms_from_CIF(std::ifstream& cif_input,
 
 	for (int i = 0; i < atom_type_list.size(); i++)
 		err_checkf((atom_type_list[i] <= 113 || atom_type_list[i] == 119) && atom_type_list[i] > 0, "Unreasonable atom type detected: " + toString(atom_type_list[i]) + " (Happens if Atoms were not identified correctly)", file);
-	file << " done!" << endl;
+	// the "Reading: <cif> done!" line is closed by the cell ctor (cell.h)
 	if (debug)
 	{
 		file << "There are " << atom_type_list.size() << " types of atoms" << endl;
@@ -1787,7 +1797,7 @@ void calc_SF_SALTED(
 	const aux_density_table& table,
 	const ivec& asym_atom_list,
 	cvec2& sf,
-	ProgressBar* progress = nullptr)
+	ProgressBar* progress)
 {
 	const int num_asym_atoms = static_cast<int>(asym_atom_list.size());
 	const int nk = static_cast<int>(k_pt[0].size());
@@ -1934,8 +1944,8 @@ void calc_SF(const int& points,
 				_time_point gend = get_time();
 				const int ratio = sf_gpu_fp64_ratio();
 				file << "GPU in use: scattering-factor Fourier transform on " << sf_gpu_backend() << ": " << get_msec(end1, gend) << " ms ("
-				     << (sf_gpu_uses_fp32(prec) ? "reduced-argument f32 sincos" : "f64 sincos")
-				     << ", fp32:fp64 ratio " << ratio << ")" << std::endl;
+					 << (sf_gpu_uses_fp32(prec) ? "reduced-argument f32 sincos" : "f64 sincos")
+					 << ", fp32:fp64 ratio " << ratio << ")" << std::endl;
 			}
 			return;
 		}
@@ -2175,7 +2185,7 @@ static void add_ECP_contribution(const ivec& asym_atom_list,
 					file << "Atom nr: " << wave.get_atom_charge(asym_atom_list[i]) << " core f000: "
 					<< scientific << setw(14) << setprecision(8)
 					<< wave.get_atom_ECP_electrons(asym_atom_list[i])
-					<< " and at 1 angstrom: " << exp(-pow(constants::bohr2ang(k), 2) / 16.0 / constants::PI) * wave.get_atom_ECP_electrons(asym_atom_list[i]) << endl;
+					<< " and at 1 angstrom: " << exp(-pow(constants::bohr2ang(k), 2) / 16.0 / constants::PI) * wave.get_atom_ECP_electrons(asym_atom_list[i]) << "\n";
 			}
 		}
 #pragma omp parallel for private(it, k)
@@ -2208,7 +2218,7 @@ static void add_ECP_contribution(const ivec& asym_atom_list,
 						double k_0001 = temp[charge].get_core_form_factor(0, wave.get_atom_ECP_electrons(asym_atom_list[i]));
 						double k_1 = temp[charge].get_core_form_factor(constants::FOUR_PI * constants::bohr2ang(1.0), wave.get_atom_ECP_electrons(asym_atom_list[i]));
 						file << "Atom nr: " << charge << " number of ECP electrons: " << wave.get_atom_ECP_electrons(asym_atom_list[i]) << " core f(0) : "
-							<< scientific << setw(14) << setprecision(8) << k_0001 << " and at 1 Ang: " << k_1 << endl;
+							<< scientific << setw(14) << setprecision(8) << k_0001 << " and at 1 Ang: " << k_1 << "\n";
 					}
 				}
 			}
@@ -2265,14 +2275,14 @@ void convert_to_ED(const ivec& asym_atom_list,
 	cvec2& sf,
 	const vec& stl)
 {
-    const int n = (int)stl.size();
+	const int n = (int)stl.size();
 #pragma omp parallel for
-    for (int s = 0; s < n; s++)
-    {
-        const double h2 = pow(stl[s], 2);
-        for (int i = 0; i < asym_atom_list.size(); i++)
-            sf[i][s] = cdouble(constants::ED_fact * (wave.get_atom_charge(asym_atom_list[i]) - sf[i][s].real()) / h2, -constants::ED_fact * sf[i][s].imag() / h2);
-    }
+	for (int s = 0; s < n; s++)
+	{
+		const double h2 = pow(stl[s], 2);
+		for (int i = 0; i < asym_atom_list.size(); i++)
+			sf[i][s] = cdouble(constants::ED_fact * (wave.get_atom_charge(asym_atom_list[i]) - sf[i][s].real()) / h2, -constants::ED_fact * sf[i][s].imag() / h2);
+	}
 }
 
 void convert_to_ED(const ivec& asym_atom_list,
@@ -2281,10 +2291,10 @@ void convert_to_ED(const ivec& asym_atom_list,
 	const cell& unit_cell,
 	const std::vector<i3>& hkl_vector)
 {
-    vec stl(hkl_vector.size());
-    for (size_t s = 0; s < hkl_vector.size(); s++)
-        stl[s] = unit_cell.get_stl_of_hkl(hkl_vector[s]);
-    convert_to_ED(asym_atom_list, wave, sf, stl);
+	vec stl(hkl_vector.size());
+	for (size_t s = 0; s < hkl_vector.size(); s++)
+		stl[s] = unit_cell.get_stl_of_hkl(hkl_vector[s]);
+	convert_to_ED(asym_atom_list, wave, sf, stl);
 }
 
 void convert_to_ED(const ivec& asym_atom_list,
@@ -2293,8 +2303,8 @@ void convert_to_ED(const ivec& asym_atom_list,
 	const cell& unit_cell,
 	const hkl_list& hkl)
 {
-    convert_to_ED(asym_atom_list, wave, sf, unit_cell,
-        std::vector<i3>(hkl.begin(), hkl.end()));
+	convert_to_ED(asym_atom_list, wave, sf, unit_cell,
+		std::vector<i3>(hkl.begin(), hkl.end()));
 }
 
 //shared machinery of the streamed tsc writes; the fill of one reflection block is all that differs
@@ -2302,63 +2312,63 @@ namespace {
 
 //a table must hold either all labels or all atomIDs, mixed ones are rejected on write
 void append_scatterer_ids(ScattererLabels& ids,
-    const options& opt,
-    const svec& labels,
-    WFN& wave,                 // non-const: get_id_for_atom() is not a const method
-    const ivec& asym_atom_list)
+	const options& opt,
+	const svec& labels,
+	WFN& wave,                 // non-const: get_id_for_atom() is not a const method
+	const ivec& asym_atom_list)
 {
-    for (size_t a = 0; a < asym_atom_list.size(); a++)
-    {
-        if (opt.label_tsc_output)
-            ids.emplace_back(labels[a]);
-        else
-            ids.emplace_back(wave.get_id_for_atom(asym_atom_list[a]));
-    }
+	for (size_t a = 0; a < asym_atom_list.size(); a++)
+	{
+		if (opt.label_tsc_output)
+			ids.emplace_back(labels[a]);
+		else
+			ids.emplace_back(wave.get_id_for_atom(asym_atom_list[a]));
+	}
 }
 
 //reflections [lo, hi) transposed to [dimension][reflection], the layout write_tscb_reflection_block expects
-std::vector<std::vector<int>> slice_hkl(const std::vector<i3>& hkl_v,
-    const size_t lo, const size_t hi)
+ivec2 slice_hkl(const std::vector<i3>& hkl_v,
+	const size_t lo, const size_t hi)
 {
-    std::vector<std::vector<int>> idx(3, std::vector<int>(hi - lo));
-    for (size_t r = lo; r < hi; r++)
-        for (int dm = 0; dm < 3; dm++)
-            idx[dm][r - lo] = hkl_v[r][dm];
-    return idx;
+	ivec2 idx(3, ivec(hi - lo));
+	for (size_t r = lo; r < hi; r++)
+		for (int dm = 0; dm < 3; dm++)
+			idx[dm][r - lo] = hkl_v[r][dm];
+	return idx;
 }
 
 //calc_SF_SALTED sizes its output from the k-points it is handed, so a slice needs no change on its side
 vec2 slice_k_points(const vec2& k_pt, const size_t lo, const size_t hi)
 {
-    vec2 k_slice(3, vec(hi - lo));
-    for (size_t r = lo; r < hi; r++)
-        for (int dm = 0; dm < 3; dm++)
-            k_slice[dm][r - lo] = k_pt[dm][r];
-    return k_slice;
+	vec2 k_slice(3, vec(hi - lo));
+	for (size_t r = lo; r < hi; r++)
+		for (int dm = 0; dm < 3; dm++)
+			k_slice[dm][r - lo] = k_pt[dm][r];
+	return k_slice;
 }
 
 //one Thakkar evaluator per element; depends on the element list alone, so it is built outside the block loop
 std::vector<Thakkar> make_spherical_evaluators(const ivec& atom_type_list)
 {
-    std::vector<Thakkar> spheres;
-    spheres.reserve(atom_type_list.size());
-    for (size_t t = 0; t < atom_type_list.size(); t++)
-        spheres.emplace_back(atom_type_list[t]);
-    return spheres;
+	std::vector<Thakkar> spheres;
+	spheres.reserve(atom_type_list.size());
+	for (size_t t = 0; t < atom_type_list.size(); t++)
+		spheres.emplace_back(atom_type_list[t]);
+	return spheres;
 }
 
 //the file list a spherical fill runs over, and the index into it; nr also selects opt.groups[nr] and the part's cif,
 //so it must be the whole file list: a one-element vector takes part 0's atoms whatever part is filled, or reads tempy[1] if nr is passed
 int build_fill_wavefunctions(const options& opt, const int nr, std::vector<WFN>& tempy)
 {
-    if (!opt.wfn.empty())
-    {
-        tempy.emplace_back(opt.wfn);
-        return 0;
-    }
-    for (const std::filesystem::path& part_file : opt.combined_tsc_calc_files)
-        tempy.emplace_back(part_file);
-    return nr;
+	if (!opt.wfn.empty())
+	{
+		tempy.emplace_back(opt.wfn);
+		return 0;
+	}
+	for (const std::filesystem::path& part_file : opt.combined_tsc_calc_files)
+		tempy.emplace_back(part_file);
+	return nr;
 }
 
 //One evaluator per ATOM, not per element type. Two atoms of the same element in
@@ -2370,76 +2380,76 @@ int build_fill_wavefunctions(const options& opt, const int nr, std::vector<WFN>&
 //An atom with no recorded charge, or an element with no tabulated ion, falls
 //back to the neutral density.
 std::vector<HE_Spherical_Atom> make_he_evaluators(const salted_part_prep& sph,
-    const WFN& fill_wavy, const options& opt, std::ostream& file)
+	const WFN& fill_wavy, const options& opt, std::ostream& file)
 {
-    std::vector<HE_Spherical_Atom> out;
-    out.reserve(sph.asym_atom_list.size());
-    int n_charged = 0, n_extrap = 0, n_nofit = 0, n_delta = 0;
-    double worst_neg = 0.0;
-    for (size_t a = 0; a < sph.asym_atom_list.size(); a++)
-    {
-        const int idx = sph.asym_atom_list[a];
-        const int Z = fill_wavy.get_atom_charge(idx);
-        double q = 0.0;
-        double best = 1e-3;   // squared tolerance in the wavefunction's units
-        for (const auto& e : opt.spherical_fill_charges)
-        {
-            double d = 0.0;
-            for (int ax = 0; ax < 3; ax++)
-            {
-                const double dx = fill_wavy.get_atom_coordinate(idx, ax) - e[ax];
-                d += dx * dx;
-            }
-            if (d < best) { best = d; q = e[3]; }
-        }
-        if (std::abs(q) > 1e-6) n_charged++;
-        else if (!opt.spherical_fill_charges.empty()) n_nofit++;
-        out.emplace_back(Z, q);
-        if (out.back().is_extrapolating()) n_extrap++;
-        if (out.back().uses_delta_series()) n_delta++;
-        worst_neg = std::min(worst_neg, out.back().most_negative_density());
-    }
-    if (n_charged)
-    {
-        file << "Spherical fill: " << n_charged << " of " << out.size()
-             << " atom(s) given a fractional charge";
-        if (n_delta)
-            file << ", " << n_delta << " past +1 via the delta_k series (interpolated between bound states)";
-        if (n_extrap)
-            file << ", " << n_extrap << " beyond the tabulated +/-1 ion (shape extrapolated)";
-        file << "." << std::endl;
-        if (worst_neg < -1e-8)
-            file << "      most negative density from the blend: " << worst_neg
-                 << " e/bohr^3 - an extrapolation artefact, not clipped." << std::endl;
-        if (n_nofit)
-            file << "      " << n_nofit << " atom(s) had no charge recorded and stay neutral." << std::endl;
-    }
-    return out;
+	std::vector<HE_Spherical_Atom> out;
+	out.reserve(sph.asym_atom_list.size());
+	int n_charged = 0, n_extrap = 0, n_nofit = 0, n_delta = 0;
+	double worst_neg = 0.0;
+	for (size_t a = 0; a < sph.asym_atom_list.size(); a++)
+	{
+		const int idx = sph.asym_atom_list[a];
+		const int Z = fill_wavy.get_atom_charge(idx);
+		double q = 0.0;
+		double best = 1e-3;   // squared tolerance in the wavefunction's units
+		for (const auto& e : opt.spherical_fill_charges)
+		{
+			double d = 0.0;
+			for (int ax = 0; ax < 3; ax++)
+			{
+				const double dx = fill_wavy.get_atom_coordinate(idx, ax) - e[ax];
+				d += dx * dx;
+			}
+			if (d < best) { best = d; q = e[3]; }
+		}
+		if (std::abs(q) > 1e-6) n_charged++;
+		else if (!opt.spherical_fill_charges.empty()) n_nofit++;
+		out.emplace_back(Z, q);
+		if (out.back().is_extrapolating()) n_extrap++;
+		if (out.back().uses_delta_series()) n_delta++;
+		worst_neg = std::min(worst_neg, out.back().most_negative_density());
+	}
+	if (n_charged)
+	{
+		file << "Spherical fill: " << n_charged << " of " << out.size()
+			 << " atom(s) given a fractional charge";
+		if (n_delta)
+			file << ", " << n_delta << " past +1 via the delta_k series (interpolated between bound states)";
+		if (n_extrap)
+			file << ", " << n_extrap << " beyond the tabulated +/-1 ion (shape extrapolated)";
+		file << "." << std::endl;
+		if (worst_neg < -1e-8)
+			file << "      most negative density from the blend: " << worst_neg
+				 << " e/bohr^3 - an extrapolation artefact, not clipped." << std::endl;
+		if (n_nofit)
+			file << "      " << n_nofit << " atom(s) had no charge recorded and stay neutral." << std::endl;
+	}
+	return out;
 }
 
 //rows for atoms the SALTED model could not predict (unknown species, or nothing inside the descriptor cutoff)
 //a Thakkar factor depends only on element and reflection, so these chunk like everything else here
 void append_spherical_rows(cvec2& chunk,
-    const salted_part_prep& sph,
-    const std::vector<HE_Spherical_Atom>& spheres,
-    const bool electron_diffraction,
-    const size_t lo, const size_t hi)
+	const salted_part_prep& sph,
+	const std::vector<HE_Spherical_Atom>& spheres,
+	const bool electron_diffraction,
+	const size_t lo, const size_t hi)
 {
-    for (size_t a = 0; a < sph.asym_atom_list.size(); a++)
-    {
-        const int t = sph.asym_atom_to_type_list[a];
-        cvec row(hi - lo);
-        for (size_t r = lo; r < hi; r++)
-        {
-            const double f = spheres[a].get_form_factor(sph.k_of_reflection[r]);
-            //IAM form of Mott-Bethe: tabulated charge, no imaginary part
-            row[r - lo] = electron_diffraction
-                ? cdouble(constants::ED_fact * (sph.atom_type_list[t] - f) /
-                    pow(sph.stl_of_reflection[r], 2), 0.0)
-                : cdouble(f, 0.0);
-        }
-        chunk.push_back(std::move(row));
-    }
+	for (size_t a = 0; a < sph.asym_atom_list.size(); a++)
+	{
+		const int t = sph.asym_atom_to_type_list[a];
+		cvec row(hi - lo);
+		for (size_t r = lo; r < hi; r++)
+		{
+			const double f = spheres[a].get_form_factor(sph.k_of_reflection[r]);
+			//IAM form of Mott-Bethe: tabulated charge, no imaginary part
+			row[r - lo] = electron_diffraction
+				? cdouble(constants::ED_fact * (sph.atom_type_list[t] - f) /
+					pow(sph.stl_of_reflection[r], 2), 0.0)
+				: cdouble(f, 0.0);
+		}
+		chunk.push_back(std::move(row));
+	}
 }
 
 //writes a tsc as a sequence of reflection blocks; peak memory is queue depth * scatterers * block size * 16 bytes
@@ -2447,58 +2457,58 @@ void append_spherical_rows(cvec2& chunk,
 //progress_items is the bar total: reflections, or reflections * parts when a block is filled part by part
 template <typename FillBlock>
 void stream_blocks(options& opt,
-    std::ostream& file,
-    const std::filesystem::path& name,
-    const ScattererLabels& ids,
-    const std::vector<i3>& hkl_v,
-    const size_t progress_items,
-    FillBlock fill_block)
+	std::ostream& file,
+	const std::filesystem::path& name,
+	const ScattererLabels& ids,
+	const std::vector<i3>& hkl_v,
+	const size_t progress_items,
+	FillBlock fill_block)
 {
-    const size_t n_refl = hkl_v.size();
-    const size_t derived = opt.tsc_block_for(n_refl, ids.size());
-    const size_t bs = std::min(derived ? derived : n_refl, n_refl ? n_refl : 1);
-    file << "Streaming tsc in blocks of " << bs << " reflections" << std::endl;
+	const size_t n_refl = hkl_v.size();
+	const size_t derived = opt.tsc_block_for(n_refl, ids.size());
+	const size_t bs = std::min(derived ? derived : n_refl, n_refl ? n_refl : 1);
+	file << "Streaming tsc in blocks of " << bs << " reflections" << std::endl;
 
-    tsc_stream_writer<int, cdouble> writer(name, ids, std::string(), n_refl, 2);
-    //declared after the writer so it is destroyed first: the bar rewinds to its own line and must finish first
-    ProgressBar progress(progress_items, 60, "#", " ", "Generating scattering factors...");
-    size_t block_id = 0;
-    for (size_t lo = 0; lo < n_refl; lo += bs)
-    {
-        const size_t hi = std::min(lo + bs, n_refl);
-        writer.submit(block_id++, slice_hkl(hkl_v, lo, hi), fill_block(lo, hi, progress));
-    }
-    writer.finish();
-    opt.tsc_written_by_stream = true;
+	tsc_stream_writer<int, cdouble> writer(name, ids, std::string(), n_refl, 2);
+	//declared after the writer so it is destroyed first: the bar rewinds to its own line and must finish first
+	ProgressBar progress(progress_items, 60, "#", " ", "Generating scattering factors...");
+	size_t block_id = 0;
+	for (size_t lo = 0; lo < n_refl; lo += bs)
+	{
+		const size_t hi = std::min(lo + bs, n_refl);
+		writer.submit(block_id++, slice_hkl(hkl_v, lo, hi), fill_block(lo, hi, progress));
+	}
+	writer.finish();
+	opt.tsc_written_by_stream = true;
 }
 
 //runs a nested calculate_scattering_factors() as a spherical (Thakkar) fill over exactly the reflections written
 //restores every flag on the way out, exceptions included: these flags are read all over this file
 struct spherical_fill_scope
 {
-    options& opt;
-    const bool saved_iam;
-    const hkl_list saved_hkl;
+	options& opt;
+	const bool saved_iam;
+	const hkl_list saved_hkl;
 
-    spherical_fill_scope(options& o, const hkl_list& reflections)
-        : opt(o), saved_iam(o.iam_switch), saved_hkl(o.m_hkl_list)
-    {
-        //pin the fill to our reflections, else it builds its own list of a different length and is read off the end
-        opt.m_hkl_list = reflections;
-        opt.iam_switch = true;
-        opt.allow_empty_asym = true;
-        opt.spherical_fill = true;
-    }
-    ~spherical_fill_scope()
-    {
-        opt.m_hkl_list = saved_hkl;
-        opt.iam_switch = saved_iam;
-        opt.allow_empty_asym = false;
-        opt.spherical_fill = false;
-    }
+	spherical_fill_scope(options& o, const hkl_list& reflections)
+		: opt(o), saved_iam(o.iam_switch), saved_hkl(o.m_hkl_list)
+	{
+		//pin the fill to our reflections, else it builds its own list of a different length and is read off the end
+		opt.m_hkl_list = reflections;
+		opt.iam_switch = true;
+		opt.allow_empty_asym = true;
+		opt.spherical_fill = true;
+	}
+	~spherical_fill_scope()
+	{
+		opt.m_hkl_list = saved_hkl;
+		opt.iam_switch = saved_iam;
+		opt.allow_empty_asym = false;
+		opt.spherical_fill = false;
+	}
 
-    spherical_fill_scope(const spherical_fill_scope&) = delete;
-    spherical_fill_scope& operator=(const spherical_fill_scope&) = delete;
+	spherical_fill_scope(const spherical_fill_scope&) = delete;
+	spherical_fill_scope& operator=(const spherical_fill_scope&) = delete;
 };
 
 }  // namespace
@@ -2654,7 +2664,7 @@ itsc_block calculate_scattering_factors_from_cube(
 	{
 		const int atom_index = asym_atom_list[i];
 		file << setw(10) << labels[i]
-			<< fixed << setw(12) << setprecision(3) << wave.get_atom_charge(atom_index) - atom_electrons[i] << endl;
+			<< fixed << setw(12) << setprecision(3) << wave.get_atom_charge(atom_index) - atom_electrons[i] << "\n";
 	}
 	const double electron_sum = reduce(atom_electrons.begin(), atom_electrons.end(), 0.0);
 	file << setprecision(4) << "Total number of partitioned electrons from cube: " << electron_sum << endl;
@@ -2859,10 +2869,14 @@ tsc_block_type calculate_scattering_factors(
 	//table needs every part present - stream_mtc_salted() at the bottom inverts those loops instead
 	//tsc_block_for returns 0 when -mem says the table fits whole; not named tsc_block, that is the class template below
 	const size_t block_reflections = opt.tsc_block_for(hkl.size(), asym_atom_list.size());
+	//the stream writer only produces the binary format, so a text table (-old_tsc or no tscb) keeps the whole table in memory
 	const bool stream_tsc = block_reflections > 0
 		&& prep_out == NULL
 		&& !opt.spherical_fill
-		&& opt.combined_tsc_calc_files.size() <= 1;
+		&& opt.combined_tsc_calc_files.size() <= 1
+		&& opt.binary_tsc && !opt.old_tsc;
+	if (block_reflections > 0 && !stream_tsc && (!opt.binary_tsc || opt.old_tsc))
+		file << "Text tsc requested: the table is kept in memory instead of streamed in blocks" << std::endl;
 	cvec2 sf;
 	if (!stream_tsc)
 	{
@@ -2872,100 +2886,99 @@ tsc_block_type calculate_scattering_factors(
 			sf[i].resize(hkl.size());
 	}
 
-    if (opt.iam_switch) {
-        if (prep_out != NULL)
-        {
-            // hand back what a per-block spherical calculation needs and stop
-            const std::vector<i3> hv(hkl.begin(), hkl.end());
-            prep_out->asym_atom_list = asym_atom_list;
-            prep_out->labels = labels;
-            prep_out->atom_type_list = atom_type_list;
-            prep_out->asym_atom_to_type_list = asym_atom_to_type_list;
-            prep_out->hkl_v = hv;
-            prep_out->k_of_reflection.resize(hv.size());
-            prep_out->stl_of_reflection.resize(hv.size());
-            for (size_t s = 0; s < hv.size(); s++)
-            {
-                const double stl = unit_cell.get_stl_of_hkl(hv[s]);
-                prep_out->stl_of_reflection[s] = stl;
-                prep_out->k_of_reflection[s] = constants::bohr2ang(constants::FOUR_PI * stl);
-            }
-            return tsc_block_type();
-        }
-        std::vector<Thakkar> spherical_atoms = make_spherical_evaluators(atom_type_list);
-        const int imax = (int)asym_atom_list.size();
-        const std::vector<i3> hkl_vector(hkl.begin(), hkl.end());
-        const int hkl_max = hkl.size();
+	if (opt.iam_switch) {
+		if (prep_out != NULL)
+		{
+			// hand back what a per-block spherical calculation needs and stop
+			const std::vector<i3> hv(hkl.begin(), hkl.end());
+			prep_out->asym_atom_list = asym_atom_list;
+			prep_out->labels = labels;
+			prep_out->atom_type_list = atom_type_list;
+			prep_out->asym_atom_to_type_list = asym_atom_to_type_list;
+			prep_out->hkl_v = hv;
+			prep_out->k_of_reflection.resize(hv.size());
+			prep_out->stl_of_reflection.resize(hv.size());
+			for (size_t s = 0; s < hv.size(); s++)
+			{
+				const double stl = unit_cell.get_stl_of_hkl(hv[s]);
+				prep_out->stl_of_reflection[s] = stl;
+				prep_out->k_of_reflection[s] = constants::bohr2ang(constants::FOUR_PI * stl);
+			}
+			return tsc_block_type();
+		}
+		std::vector<Thakkar> spherical_atoms = make_spherical_evaluators(atom_type_list);
+		const int imax = (int)asym_atom_list.size();
+		const std::vector<i3> hkl_vector(hkl.begin(), hkl.end());
+		const int hkl_max = hkl.size();
 
-        if (stream_tsc)
-        {
-            //a Thakkar factor depends on element and reflection alone, so no state crosses a block boundary
-            ScattererLabels stream_ids;
-            append_scatterer_ids(stream_ids, opt, labels, *wavy, asym_atom_list);
+		if (stream_tsc)
+		{
+			//a Thakkar factor depends on element and reflection alone, so no state crosses a block boundary
+			ScattererLabels stream_ids;
+			append_scatterer_ids(stream_ids, opt, labels, *wavy, asym_atom_list);
 
-            stream_blocks(opt, file,
-                opt.binary_tsc ? "experimental.tscb" : "experimental.tsc",
-                stream_ids, hkl_vector, hkl_vector.size(),
-                [&](const size_t lo, const size_t hi, ProgressBar& progress)
-                {
-                    cvec2 chunk(imax, cvec(hi - lo));
+			stream_blocks(opt, file, "experimental.tscb",
+				stream_ids, hkl_vector, hkl_vector.size(),
+				[&](const size_t lo, const size_t hi, ProgressBar& progress)
+				{
+					cvec2 chunk(imax, cvec(hi - lo));
 #pragma omp parallel for
-                    for (int s = 0; s < (int)(hi - lo); s++)
-                    {
-                        const double stl = unit_cell.get_stl_of_hkl(hkl_vector[lo + s]);
-                        const double k = constants::bohr2ang(constants::FOUR_PI * stl);
-                        const double h2 = pow(stl, 2);
-                        for (int i = 0; i < imax; i++)
-                        {
-                            const int type = asym_atom_to_type_list[i];
-                            const double f = spherical_atoms[type].get_form_factor(k);
-                            //IAM form of Mott-Bethe: tabulated charge, no imaginary part
-                            chunk[i][s] = opt.electron_diffraction
-                                ? cdouble(constants::ED_fact * (atom_type_list[type] - f) / h2, 0.0)
-                                : cdouble(f, 0.0);
-                        }
-                    }
-                    progress.update(hi - lo);
-                    return chunk;
-                });
-        }
-        else
-        {
+					for (int s = 0; s < (int)(hi - lo); s++)
+					{
+						const double stl = unit_cell.get_stl_of_hkl(hkl_vector[lo + s]);
+						const double k = constants::bohr2ang(constants::FOUR_PI * stl);
+						const double h2 = pow(stl, 2);
+						for (int i = 0; i < imax; i++)
+						{
+							const int type = asym_atom_to_type_list[i];
+							const double f = spherical_atoms[type].get_form_factor(k);
+							//IAM form of Mott-Bethe: tabulated charge, no imaginary part
+							chunk[i][s] = opt.electron_diffraction
+								? cdouble(constants::ED_fact * (atom_type_list[type] - f) / h2, 0.0)
+								: cdouble(f, 0.0);
+						}
+					}
+					progress.update(hi - lo);
+					return chunk;
+				});
+		}
+		else
+		{
 #pragma omp parallel for shared(hkl_vector)
-            for (int s = 0; s < hkl_max; s++)
-            {
-                const double stl = unit_cell.get_stl_of_hkl(hkl_vector[s]);
-                const double k = constants::bohr2ang(constants::FOUR_PI * stl);
-                const double h2 = pow(stl, 2);
-                for (int i = 0; i < imax; i++)
-                {
-                    const int type = asym_atom_to_type_list[i];
-                    const double f = spherical_atoms[type].get_form_factor(k);
-                    //IAM form of Mott-Bethe: tabulated charge, no imaginary part
-                    sf[i][s] = opt.electron_diffraction
-                        ? cdouble(constants::ED_fact * (atom_type_list[type] - f) / h2, 0.0)
-                        : cdouble(f, 0.0);
-                }
-            }
-        }
-    }
-    else if constexpr (std::is_same_v<calculator_type, SALTEDPredictor &>)
-    {
-        // Generation of SALTED density coefficients
-        file << "\nGenerating densities... " << endl;
+			for (int s = 0; s < hkl_max; s++)
+			{
+				const double stl = unit_cell.get_stl_of_hkl(hkl_vector[s]);
+				const double k = constants::bohr2ang(constants::FOUR_PI * stl);
+				const double h2 = pow(stl, 2);
+				for (int i = 0; i < imax; i++)
+				{
+					const int type = asym_atom_to_type_list[i];
+					const double f = spherical_atoms[type].get_form_factor(k);
+					//IAM form of Mott-Bethe: tabulated charge, no imaginary part
+					sf[i][s] = opt.electron_diffraction
+						? cdouble(constants::ED_fact * (atom_type_list[type] - f) / h2, 0.0)
+						: cdouble(f, 0.0);
+				}
+			}
+		}
+	}
+	else if constexpr (std::is_same_v<calculator_type, SALTEDPredictor &>)
+	{
+		// Generation of SALTED density coefficients
+		file << "\nGenerating densities... " << endl;
 #ifdef NOSPHERA2_USE_GPU
-        equicomb_set_gpu(opt.use_gpu && opt.gpu_salted);
+		equicomb_set_gpu(opt.use_gpu && opt.gpu_salted);
 #endif
-        vec coefs = calculator.gen_SALTED_densities();
-        file << setw(13 * 4) << "... done!" << endl;
-        time_points.push_back(get_time());
-        time_descriptions.push_back("SALTED prediction");
-        calculator.shrink_intermediate_vectors();
+		auto ml = std::make_shared<Gaussian_Molecule>(calculator.wavy, calculator.gen_SALTED_densities());
+		file << setw(13 * 4) << "... done!" << endl;
+		time_points.push_back(get_time());
+		time_descriptions.push_back("SALTED prediction");
+		calculator.shrink_intermediate_vectors();
 
 		err_checkf(labels.size() == asym_atom_list.size(),
 			"Inconsistent SALTED atom bookkeeping after disorder filtering!", file);
 
-		vec atom_elecs = calc_atomic_density(calculator.wavy.get_atoms(), coefs);
+		vec atom_elecs = ml->populations();
 		file << "Table of Charges in electrons\n"
 			<< "       Atom      ML" << endl;
 
@@ -2976,7 +2989,7 @@ tsc_block_type calculate_scattering_factors(
 				<< fixed << setw(10) << setprecision(3) << wavy->get_atom_charge(atom_index) - atom_elecs[atom_index];
 			if (opt.debug)
 				file << " " << setw(4) << wavy->get_atom_charge(atom_index) << " " << fixed << setw(10) << setprecision(3) << atom_elecs[atom_index];
-			file << endl;
+			file << "\n";
 		}
 		auto el_sum = reduce(atom_elecs.begin(), atom_elecs.end(), 0.0);
 		file << setprecision(4) << "Total number of analytical Electrons: " << el_sum << endl;
@@ -2986,10 +2999,9 @@ tsc_block_type calculate_scattering_factors(
 		if (prep_out != NULL)
 		{
 			//-mtc streaming: the reflection loop lives outside, so hand back the reflection-independent part and stop
-			prep_out->coefs = std::move(coefs);
+			prep_out->mol = ml;
 			prep_out->asym_atom_list = asym_atom_list;
 			prep_out->labels = labels;
-			prep_out->atoms = calculator.wavy.get_atoms_ptr();
 			prep_out->k_pt = k_pt;
 			prep_out->hkl_v.assign(hkl.begin(), hkl.end());
 			//carried so the -mtc loop can convert to ED per block without a unit cell of its own
@@ -2999,8 +3011,6 @@ tsc_block_type calculate_scattering_factors(
 			return tsc_block_type();
 		}
 
-		//one table for every block, building it per block cost more than the transform
-		const aux_density_table aux_table(calculator.wavy.get_atoms());
 		if (stream_tsc)
 		{
 			ScattererLabels stream_ids;
@@ -3038,9 +3048,7 @@ tsc_block_type calculate_scattering_factors(
 			stream_blocks(opt, file, "experimental.tscb", stream_ids, hkl_v, n_refl,
 				[&](const size_t lo, const size_t hi, ProgressBar& progress)
 				{
-					cvec2 chunk;
-					calc_SF_SALTED(slice_k_points(k_pt, lo, hi), coefs,
-						aux_table, asym_atom_list, chunk, &progress);
+					cvec2 chunk = ml->scattering_factors(slice_k_points(k_pt, lo, hi), asym_atom_list, &progress);
 					//Mott-Bethe never looks outside one reflection, so a block is as valid a unit as a table
 					if (opt.electron_diffraction)
 						convert_to_ED(asym_atom_list, *wavy, chunk, unit_cell,
@@ -3052,14 +3060,7 @@ tsc_block_type calculate_scattering_factors(
 				});
 		}
 		else
-		{
-			calc_SF_SALTED(
-				k_pt,
-				coefs,
-				aux_table,
-				asym_atom_list,
-				sf);
-		}
+			sf = ml->scattering_factors(k_pt, asym_atom_list);
 		file << setw(13 * 4) << "... done!\n"
 			<< flush;
 		time_points.push_back(get_time());
@@ -3120,100 +3121,89 @@ tsc_block_type calculate_scattering_factors(
 			file << "\nGenerating densities... " << endl;
 			WFN wavy_aux = generate_aux_wfn(*wavy, opt.aux_basis, false);
 
-            //TODO: only compute coefs for atoms that are actually in the symmetric unit!
-            DensityFitting::CONFIG config = DensityFitting::config_from_options(opt);
-            config.asym_atm_list = asym_atom_list;
-            //config.restrain_type = DensityFitting::RESTRAINT_TYPE::SIMPLE_AND_TIK;
-            //config.charge_scheme = DensityFitting::CHARGE_SCHEME::HIRSHFELD;
-            //if (wavy->get_origin() == e_origin::ptb)
-            //    config.restraint_strength = 1.0e-4;
+			//TODO: only compute coefs for atoms that are actually in the symmetric unit!
+			DensityFitting::CONFIG config = DensityFitting::config_from_options(opt);
+			config.asym_atm_list = asym_atom_list;
+			//config.restrain_type = DensityFitting::RESTRAINT_TYPE::SIMPLE_AND_TIK;
+			//config.charge_scheme = DensityFitting::CHARGE_SCHEME::HIRSHFELD;
+			//if (wavy->get_origin() == e_origin::ptb)
+			//    config.restraint_strength = 1.0e-4;
 
-            vec coefs = DensityFitting::density_fit(*wavy, wavy_aux, config);
-            file << setw(12 * 4 + 2) << "... done!\n"
-                << flush;
-            time_points.push_back(get_time());
-            time_descriptions.push_back("RI-Fit");
+			const Gaussian_Molecule ml(wavy_aux, DensityFitting::density_fit(*wavy, wavy_aux, config));
+			file << setw(12 * 4 + 2) << "... done!\n"
+				<< flush;
+			time_points.push_back(get_time());
+			time_descriptions.push_back("RI-Fit");
 
-            vec atom_elecs = calc_atomic_density(wavy_aux.get_atoms(), coefs);
-            file << "Table of Charges in electrons\n"
-                << "       Atom  Charge_RI" << endl;
+			vec atom_elecs = ml.populations();
+			file << "Table of Charges in electrons\n"
+				<< "       Atom  Charge_RI" << endl;
 
-            for (int i = 0; i < asym_atom_list.size(); i++)
-            {
-                int a = asym_atom_list[i];
-                file << setw(10) << labels[i]
-                    << fixed << setw(10) << setprecision(3) << wavy_aux.get_atom_charge(a) - atom_elecs[a];
-                if (opt.debug)
-                    file << " " << setw(4) << wavy_aux.get_atom_charge(a) << " " << fixed << setw(10) << setprecision(3) << atom_elecs[a];
-                file << endl;
-            }
+			for (int i = 0; i < asym_atom_list.size(); i++)
+			{
+				int a = asym_atom_list[i];
+				file << setw(10) << labels[i]
+					<< fixed << setw(10) << setprecision(3) << wavy_aux.get_atom_charge(a) - atom_elecs[a];
+				if (opt.debug)
+					file << " " << setw(4) << wavy_aux.get_atom_charge(a) << " " << fixed << setw(10) << setprecision(3) << atom_elecs[a];
+				file << "\n";
+			}
 
-            auto el_sum = reduce(atom_elecs.begin(), atom_elecs.end(), 0.0);
-            file << setprecision(4) << "Total number of analytical Electrons: " << el_sum << endl;
-            time_points.push_back(get_time());
-            time_descriptions.push_back("Calculation of Charges");
+			auto el_sum = reduce(atom_elecs.begin(), atom_elecs.end(), 0.0);
+			file << setprecision(4) << "Total number of analytical Electrons: " << el_sum << endl;
+			time_points.push_back(get_time());
+			time_descriptions.push_back("Calculation of Charges");
 
-            const aux_density_table aux_table(wavy_aux.get_atoms());
-            if (stream_tsc)
-            {
-                //as the SALTED case above, but the atoms come from the auxiliary wavefunction, so no spherical remainder
-                ScattererLabels stream_ids;
-                append_scatterer_ids(stream_ids, opt, labels, *wavy, asym_atom_list);
+			if (stream_tsc)
+			{
+				//as the SALTED case above, but the atoms come from the auxiliary wavefunction, so no spherical remainder
+				ScattererLabels stream_ids;
+				append_scatterer_ids(stream_ids, opt, labels, *wavy, asym_atom_list);
 
-                const std::vector<i3> hkl_v(hkl.begin(), hkl.end());
-                stream_blocks(opt, file,
-                    opt.binary_tsc ? "experimental.tscb" : "experimental.tsc",
-                    stream_ids, hkl_v, hkl_v.size(),
-                    [&](const size_t lo, const size_t hi, ProgressBar& progress)
-                    {
-                        cvec2 chunk;
-                        calc_SF_SALTED(slice_k_points(k_pt, lo, hi), coefs,
-                            aux_table, asym_atom_list, chunk, &progress);
-                        if (opt.electron_diffraction)
-                            convert_to_ED(asym_atom_list, *wavy, chunk, unit_cell,
-                                std::vector<i3>(hkl_v.begin() + lo, hkl_v.begin() + hi));
-                        return chunk;
-                    });
-            }
-            else
-            {
-                calc_SF_SALTED(
-                    k_pt,
-                    coefs,
-                    aux_table,
-                    asym_atom_list,
-                    sf);
-            }
-            file << setw(12 * 4 + 2) << "... done!" << endl;
-            time_points.push_back(get_time());
-            time_descriptions.push_back("Fourier transform");
-        }
-        else {
-            std::cout << "Unknown Partition type, stopping here!" << std::endl;
-        }
-        if (wavy->get_has_ECPs())
-        {
-            add_ECP_contribution(
-                asym_atom_list,
-                *wavy,
-                sf,
-                unit_cell,
-                hkl,
-                file,
-                opt.ECP_mode,
-                opt.debug);
-        }
-    }
+				const std::vector<i3> hkl_v(hkl.begin(), hkl.end());
+				stream_blocks(opt, file, "experimental.tscb",
+					stream_ids, hkl_v, hkl_v.size(),
+					[&](const size_t lo, const size_t hi, ProgressBar& progress)
+					{
+						cvec2 chunk = ml.scattering_factors(slice_k_points(k_pt, lo, hi), asym_atom_list, &progress);
+						if (opt.electron_diffraction)
+							convert_to_ED(asym_atom_list, *wavy, chunk, unit_cell,
+								std::vector<i3>(hkl_v.begin() + lo, hkl_v.begin() + hi));
+						return chunk;
+					});
+			}
+			else
+				sf = ml.scattering_factors(k_pt, asym_atom_list);
+			file << setw(12 * 4 + 2) << "... done!" << endl;
+			time_points.push_back(get_time());
+			time_descriptions.push_back("Fourier transform");
+		}
+		else {
+			std::cout << "Unknown Partition type, stopping here!" << std::endl;
+		}
+		if (wavy->get_has_ECPs())
+		{
+			add_ECP_contribution(
+				asym_atom_list,
+				*wavy,
+				sf,
+				unit_cell,
+				hkl,
+				file,
+				opt.ECP_mode,
+				opt.debug);
+		}
+	}
 
-    //not when streaming: sf is empty there and each block was converted as it was produced
-    if (opt.electron_diffraction && !opt.iam_switch && !stream_tsc)
-    {
-        convert_to_ED(asym_atom_list,
-            *wavy,
-            sf,
-            unit_cell,
-            hkl);
-    }
+	//not when streaming: sf is empty there and each block was converted as it was produced
+	if (opt.electron_diffraction && !opt.iam_switch && !stream_tsc)
+	{
+		convert_to_ED(asym_atom_list,
+			*wavy,
+			sf,
+			unit_cell,
+			hkl);
+	}
 
 	tsc_block_type blocky;
 	if (opt.label_tsc_output)
@@ -3230,25 +3220,25 @@ tsc_block_type calculate_scattering_factors(
 	}
 
 
-    if (opt.needs_Thakkar_fill)
-    {
-        file << "Performing the remaining calculation of spherical atoms..." << std::endl;
-        opt.needs_Thakkar_fill = false;
-        std::vector<WFN> tempy;
-        const int fill_nr = build_fill_wavefunctions(opt, nr, tempy);
-        //no_date is not part of spherical_fill_scope: only this caller suppresses the banner
-        const bool no_date_was = opt.no_date;
-        opt.no_date = true;
-        tsc_block<int, cdouble> blocky_thakkar;
-        {
-            const spherical_fill_scope fill(opt, hkl);
-            blocky_thakkar = calculate_scattering_factors<itsc_block, std::vector<WFN> &>(opt, tempy, file, labels, fill_nr);
-        }
-        opt.no_date = no_date_was;
-        blocky.append(std::move(blocky_thakkar), file);
-        time_points.push_back(get_time());
-        time_descriptions.push_back("Spherical Atoms");
-    }
+	if (opt.needs_Thakkar_fill)
+	{
+		file << "Performing the remaining calculation of spherical atoms..." << std::endl;
+		opt.needs_Thakkar_fill = false;
+		std::vector<WFN> tempy;
+		const int fill_nr = build_fill_wavefunctions(opt, nr, tempy);
+		//no_date is not part of spherical_fill_scope: only this caller suppresses the banner
+		const bool no_date_was = opt.no_date;
+		opt.no_date = true;
+		tsc_block<int, cdouble> blocky_thakkar;
+		{
+			const spherical_fill_scope fill(opt, hkl);
+			blocky_thakkar = calculate_scattering_factors<itsc_block, std::vector<WFN> &>(opt, tempy, file, labels, fill_nr);
+		}
+		opt.no_date = no_date_was;
+		blocky.append(std::move(blocky_thakkar), file);
+		time_points.push_back(get_time());
+		time_descriptions.push_back("Spherical Atoms");
+	}
 
 	time_points.push_back(get_time());
 	time_descriptions.push_back("tsc calculation");
@@ -3275,7 +3265,8 @@ bool stream_mtc_salted(options& opt, std::vector<WFN>& wavy, std::ostream& file,
 {
 	const size_t n_parts = opt.combined_tsc_calc_files.size();
 	//electron diffraction is not excluded: the prep carries the stl, so no unit cell is needed down here
-	if (opt.tsc_block_size == 0 || !opt.SALTED || n_parts < 2 || opt.iam_switch)
+	//the stream writer is binary only, a text table has to go through the in-memory path
+	if (opt.tsc_block_size == 0 || !opt.SALTED || n_parts < 2 || opt.iam_switch || !opt.binary_tsc || opt.old_tsc)
 		return false;
 
 	std::vector<std::shared_ptr<SALTEDPredictor>> preds;
@@ -3360,10 +3351,6 @@ bool stream_mtc_salted(options& opt, std::vector<WFN>& wavy, std::ostream& file,
 	const size_t n_refl = preps[0].hkl_v.size();
 	file << "Combined tsc: " << ids.size() << " scatterers from "
 		<< n_parts << " parts" << std::endl;
-	std::vector<aux_density_table> aux_tables;
-	for (size_t p = 0; p < preps.size(); p++)
-		aux_tables.emplace_back(*preps[p].atoms);
-
 	//the bar counts reflections * parts, since every part is evaluated for every block
 	stream_blocks(opt, file, "experimental.tscb", ids, preps[0].hkl_v,
 		n_refl * preps.size(),
@@ -3373,9 +3360,7 @@ bool stream_mtc_salted(options& opt, std::vector<WFN>& wavy, std::ostream& file,
 			combined.reserve(ids.size());
 			for (size_t p = 0; p < preps.size(); p++)
 			{
-				cvec2 chunk;
-				calc_SF_SALTED(slice_k_points(preps[p].k_pt, lo, hi), preps[p].coefs,
-					aux_tables[p], preps[p].asym_atom_list, chunk, &progress);
+				cvec2 chunk = preps[p].mol->scattering_factors(slice_k_points(preps[p].k_pt, lo, hi), preps[p].asym_atom_list, &progress);
 				if (opt.electron_diffraction)
 					convert_to_ED(preps[p].asym_atom_list, preds[p]->wavy, chunk,
 						vec(preps[p].stl_of_reflection.begin() + lo,

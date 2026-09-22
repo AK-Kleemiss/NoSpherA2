@@ -85,7 +85,7 @@ occ::qm::AOBasis BasisSet::to_AOBasis(const std::vector<occ::core::Atom>& atoms)
 	std::vector<occ::gto::Shell> shells;
 	std::vector<occ::gto::Shell> ecp_shells;
 
-	std::vector<int> ecp_electrons(atoms.size(), 0);
+	ivec ecp_electrons(atoms.size(), 0);
 	//int nsh_ecp = 0;
 	for (size_t a = 0; a < atoms.size(); ++a) {
 		std::array<double, 3> origin = { atoms[a].x, atoms[a].y, atoms[a].z };
@@ -94,8 +94,8 @@ occ::qm::AOBasis BasisSet::to_AOBasis(const std::vector<occ::core::Atom>& atoms)
 		int primitive_idx = 0;
 		for (int shell_nr = 0; shell_nr <= primitives.back().shell; shell_nr++) {
 			int l = primitives[primitive_idx].type;
-			std::vector<double> exponents;
-			std::vector<double> coefficients;
+			vec exponents;
+			vec coefficients;
 			while (primitive_idx < primitives.size() && shell_nr == primitives[primitive_idx].shell) {
 				exponents.push_back(primitives[primitive_idx].exp);
 				coefficients.push_back(primitives[primitive_idx].coefficient);
@@ -145,9 +145,9 @@ occ::qm::AOBasis BasisSet::to_AOBasis(const std::vector<occ::core::Atom>& atoms)
 namespace auto_aux_constants {
 	inline constexpr double BETA_SMALL = 1.8;
 	// Index by total L (0..), fallback used if L exceeds size
-	inline const std::vector<double> BETA_BIG = { 1.8, 2.0, 2.2, 2.2, 2.2, 2.3, 3.0, 3.0, 3.0, 3.0 };
+	inline const vec BETA_BIG = { 1.8, 2.0, 2.2, 2.2, 2.2, 2.3, 3.0, 3.0, 3.0, 3.0 };
 	// Cap factors for compact L (0..2*l_val)
-	inline const std::vector<double> F_LAUX = { 20, 7.0, 4.0, 4.0, 3.5, 2.5, 2.0, 2.0, 2.0, 2.0 };
+	inline const vec F_LAUX = { 20, 7.0, 4.0, 4.0, 3.5, 2.5, 2.0, 2.0, 2.0, 2.0 };
 
 	inline double gaussian_int(int n, double exp) {
 		double n1 = (n + 1) * 0.5;
@@ -166,7 +166,8 @@ void BasisSet::gen_auto_aux(const WFN& orbital_wfn) {
 	for (const atom& atm : orbital_wfn.get_atoms()) {
 		const int Z = atm.get_charge();
 		if (std::find(seen_elements.begin(), seen_elements.end(), Z) != seen_elements.end()) continue;
-		err_chekf(atm.get_basis_set().size() != 0,
+		if (!_auto_aux_elements.empty() && std::find(_auto_aux_elements.begin(), _auto_aux_elements.end(), Z) == _auto_aux_elements.end()) continue;
+		err_checkf(atm.get_basis_set().size() != 0,
 			"Can not generate auto-aux! Orbital Basis for Element: " + std::to_string(Z) + " is not defined!",
 			std::cout);
 		seen_elements.emplace_back(Z);
@@ -178,9 +179,9 @@ void BasisSet::gen_auto_aux(const WFN& orbital_wfn) {
 }
 
 /// Deduplicate candidates within tolerance on same atom
-std::vector<double> dedup_exponents(std::vector<double> exps, double tol = 0.1) {
+vec dedup_exponents(vec exps, double tol = 0.1) {
 	std::sort(exps.begin(), exps.end(), std::greater<double>());
-	std::vector<double> out;
+	vec out;
 	for (double e : exps) {
 		bool dup = false;
 		for (double x : out) {
@@ -195,15 +196,15 @@ std::vector<double> dedup_exponents(std::vector<double> exps, double tol = 0.1) 
 }
 
 /// Pivoted Cholesky decomposition for selecting linearly independent functions
-std::vector<int> pivoted_cholesky(dMatrix2& A, double threshold) {
+ivec pivoted_cholesky(dMatrix2& A, double threshold) {
 	const int n = A.extent(0);
-	std::vector<int> pivot_idx;
+	ivec pivot_idx;
 	vec diag(n);
 	for (int i = 0; i < n; ++i) {
 		diag[i] = A(i, i);
 	}
 	dMatrix2 L(n, n);
-	std::vector<int> perm(n);
+	ivec perm(n);
 	std::iota(perm.begin(), perm.end(), 0);
 
 	for (int k = 0; k < n; ++k) {
@@ -250,23 +251,23 @@ std::vector<int> pivoted_cholesky(dMatrix2& A, double threshold) {
 	return pivot_idx;
 }
 
-std::vector<double> prune_element_candidates_for_L(
+vec prune_element_candidates_for_L(
 	int L,
-	const std::vector<double>& exponents,
+	const vec& exponents,
 	double threshold)
 {
 	if (exponents.empty()) return {};
 
-	std::vector<double> unique_exps = dedup_exponents(exponents, 0.1);
+	vec unique_exps = dedup_exponents(exponents, 0.1);
 	const int n = static_cast<int>(unique_exps.size());
 	if (n <= 1) return unique_exps;
 
-    atom tmp_atom("H", {}, 1, 0.0, 0.0, 0.0, 1);
-    for (int i = 0; i < unique_exps.size(); i++) {
-        tmp_atom.push_back_basis_set(unique_exps[i], 1.0, L, i);
-    }
-    WFN tmp_wfn(e_origin::NOT_YET_DEFINED);
-    tmp_wfn.push_back_atom(tmp_atom);
+	atom tmp_atom("H", {}, 1, 0.0, 0.0, 0.0, 1);
+	for (int i = 0; i < unique_exps.size(); i++) {
+		tmp_atom.push_back_basis_set(unique_exps[i], 1.0, L, i);
+	}
+	WFN tmp_wfn(e_origin::NOT_YET_DEFINED);
+	tmp_wfn.push_back_atom(tmp_atom);
 
 	Int_Params tmp_params(tmp_wfn);
 	vec res;
@@ -304,7 +305,7 @@ std::vector<double> prune_element_candidates_for_L(
 
 	auto keep = pivoted_cholesky(V_shell, threshold);
 
-	std::vector<double> pruned;
+	vec pruned;
 	pruned.reserve(keep.size());
 	for (int idx : keep) {
 		pruned.push_back(unique_exps[idx]);
@@ -324,9 +325,9 @@ void BasisSet::gen_auto_aux_for_element(const atom& atm) {
 	}
 	const int l_max1 = l_max + 1;
 
-	std::vector<double> a_min_by_l(l_max1, std::numeric_limits<double>::infinity());
-	std::vector<double> a_max_by_l(l_max1, 0.0);
-	std::vector<double> a_eff_by_l(l_max1, 0.0); // can be tuned; we use max of "effective" primitives
+	vec a_min_by_l(l_max1, std::numeric_limits<double>::infinity());
+	vec a_max_by_l(l_max1, 0.0);
+	vec a_eff_by_l(l_max1, 0.0); // can be tuned; we use max of "effective" primitives
 
 	int prim_idx = 0;
 	for (unsigned int shell = 0; shell < atm.get_shellcount_size(); shell++)
@@ -341,7 +342,7 @@ void BasisSet::gen_auto_aux_for_element(const atom& atm) {
 			a_max_by_l[shelltype] = std::max(a_max_by_l[shelltype], exps[i]);
 		}
 		prim_idx += shellsize;
-		coefs = Int_Params::normalize_gto(coefs, exps, shelltype);  //TODO: What norm is better, we have to still figure out.... 
+		coefs = Int_Params::normalize_gto(coefs, exps, shelltype);  //TODO: What norm is better, we have to still figure out....
 		//for (int i = 0; i < coefs.size(); i++)
 		//{
 		//    coefs[i] *= std::sqrt(constants::PI * 4 / constants::double_ft[2 * shelltype + 1]); // Conversion factor from GBW to libcint  ... something something, spherical harmonics...
@@ -353,8 +354,8 @@ void BasisSet::gen_auto_aux_for_element(const atom& atm) {
 				r_exp[i] += coefs[i] * auto_aux_constants::gaussian_int(shelltype * 2 + 2, exps[i] + exps[j]) * coefs[j];
 			}
 		}
-		const double k = (std::pow(2.0, (2 * shelltype + 1)) * constants::ft[shelltype + 1] * constants::ft[shelltype + 1]) /
-			static_cast<double>(constants::ft[2 * shelltype + 2]);
+		const double k = (std::pow(2.0, (2 * shelltype + 1)) * constants::ftd[shelltype + 1] * constants::ftd[shelltype + 1]) /
+			constants::ftd[2 * shelltype + 2];
 		const double kk2 = 2.0 * k * k;
 		for (int i = 0; i < shellsize; i++) {
 			const double e_eff = (kk2) / (constants::PI * r_exp[i] * r_exp[i]);
@@ -411,7 +412,8 @@ void BasisSet::gen_auto_aux_for_element(const atom& atm) {
 		a_aux_by_l_aux[ll] = aux_val;
 	}
 	vec a_max_adjusted(l_max_aux + 1);
-	for (int l = 0; l <= l_occ_max * 2; ++l) {
+	//l_max_aux can be below 2*l_occ_max (K with an s-only basis), so the first loop must stop at l_max_aux
+	for (int l = 0; l <= std::min(l_occ_max * 2, l_max_aux); ++l) {
 		a_max_adjusted[l] = std::min(
 			auto_aux_constants::F_LAUX[l] * a_aux_by_l_aux[l],
 			a_max_by_l_aux[l]
@@ -450,7 +452,7 @@ void BasisSet::gen_auto_aux_for_element(const atom& atm) {
 		//    ++added_functions;
 		//}
 
-		std::cout << "Beta for Element " << Z << " and l " << l << " : " << beta << " with " << n_funcs << " Functions." << std::endl;
+		std::cout << "Beta for Element " << Z << " and l " << l << " : " << beta << " with " << n_funcs << " Functions.\n";
 		if (n_funcs <= 0) continue;
 		for (int i = n_funcs - 1; i >= 0; --i, ++added_functions, shell++) {
 			double exp = a_min_by_l_aux[l] * std::pow(beta, i);
@@ -500,7 +502,7 @@ namespace {
 		exact = false;
 
 		//3: the name followed by any suffix, e.g. "def2-svpd" -> "def2-svpd-rifit"
-		std::vector<int> hits;
+		ivec hits;
 		const std::string prefix = basis_name + "-";
 		for (int i = 0; i < count; i++)
 			if (basis_sets[i].name.substr(0, std::min(prefix.size(), basis_sets[i].name.size())) == prefix) hits.push_back(i);
@@ -593,7 +595,8 @@ int load_basis_into_WFN(WFN& wavy,const std::shared_ptr<BasisSet> b, const bool 
 				int temp_type = bf_.get_type();
 				double temp_exp = bf_.get_exponent();
 				int effective_type = 0;
-				int end = 2 * temp_type + 1;
+				//the wfn primitive types are Cartesian (d = 5..10, f = 11..20, ...), so a shell of l emits (l+1)(l+2)/2 primitives
+				int end = (temp_type + 1) * (temp_type + 2) / 2;
 				switch (temp_type) {
 				case(0):
 					effective_type = 1;
@@ -636,7 +639,7 @@ void gen_missing_basis_auto_aux(const WFN& orbital_wfn, std::shared_ptr<BasisSet
 		const int Z = atm.get_charge();
 		if (!current_basis->has_element(Z) && !missing_basis->has_element(Z)) {
 			missing_basis->gen_auto_aux_for_element(atm);
-			std::cout << "Element " << Z << " was missing in the auxiliary basis set! Generated using auto-aux!" << std::endl;
+			std::cout << "Element " << Z << " was missing in the auxiliary basis set! Generated using auto-aux!\n";
 		}
 	}
 	(*current_basis) += (*missing_basis);
@@ -695,12 +698,12 @@ bool BasisSetLibrary::read_basis_set_vanilla(const std::filesystem::path& basis_
 		if (exists(temp_name))
 		{
 			if (debug)
-				std::cout << "basis set is valid, continuing..." << endl;
+				std::cout << "basis set is valid, continuing...\n";
 			end = true;
 		}
 		else
 		{
-			std::cout << "sorry, could not find this basis set in the basis set directory specified in the programs.config file!" << endl;
+			std::cout << "sorry, could not find this basis set in the basis set directory specified in the programs.config file!\n";
 			return false;
 			//std::cout << "What is the name of the basis set in the directory: ";
 			// cin >> basis_set_name;
@@ -716,19 +719,19 @@ bool BasisSetLibrary::read_basis_set_vanilla(const std::filesystem::path& basis_
 	for (int i = 0; i < wave.get_ncen(); i++)
 	{
 		if (debug)
-			std::cout << "i: " << i << endl;
+			std::cout << "i: " << i << "\n";
 		for (int j = 0; j < elements_list.size(); j++)
 		{
 			if (elements_list[j].compare(wave.get_atom_label(i)) == 0)
 				found = true;
 			if (debug)
-				std::cout << "   j: " << j << " Atom label: " << wave.get_atom_label(i) << endl;
+				std::cout << "   j: " << j << " Atom label: " << wave.get_atom_label(i) << "\n";
 		}
 		if (!found)
 		{
 			elements_list.emplace_back(wave.get_atom_label(i));
 			if (debug)
-				std::cout << "Added an atom which was not there yet! " << wave.get_atom_label(i) << "!" << endl;
+				std::cout << "Added an atom which was not there yet! " << wave.get_atom_label(i) << "!\n";
 		}
 		found = false;
 	}
@@ -737,13 +740,13 @@ bool BasisSetLibrary::read_basis_set_vanilla(const std::filesystem::path& basis_
 		std::cout << "Number of elements in elements_list: " << elements_list.size() << endl;
 		std::cout << "This is the elements list:" << endl;
 		for (int l = 0; l < elements_list.size(); l++)
-			std::cout << l << ": " << elements_list[l] << "," << endl;
+			std::cout << l << ": " << elements_list[l] << ",\n";
 	}
 	// int found_counter = 0;
 	for (int i = 0; i < elements_list.size(); i++)
 	{
 		if (debug)
-			std::cout << "before: " << elements_list[i] << " " << i << endl;
+			std::cout << "before: " << elements_list[i] << " " << i << "\n";
 		while (elements_list[i].find(" ") != -1)
 		{
 			elements_list[i].erase(elements_list[i].find(" "), 1);
@@ -751,7 +754,7 @@ bool BasisSetLibrary::read_basis_set_vanilla(const std::filesystem::path& basis_
 		elements_list[i].append(":");
 		if (debug)
 		{
-			std::cout << "after: " << elements_list[i] << " " << i << endl;
+			std::cout << "after: " << elements_list[i] << " " << i << "\n";
 		}
 		// scan the tonto style basis set file for the entries we are looking or:
 		string line;
@@ -762,58 +765,58 @@ bool BasisSetLibrary::read_basis_set_vanilla(const std::filesystem::path& basis_
 			getline_universal(ifile, line);
 		if (debug)
 		{
-			std::cout << "Line after looking for keys=: " << line << endl;
+			std::cout << "Line after looking for keys=: " << line << "\n";
 		}
 		if (line.find("keys=") < line.size() && debug)
-			std::cout << "Found keys=!" << endl;
+			std::cout << "Found keys=!\n";
 		if (line.find("turbomole") < line.size())
 		{
 			file_type = 1;
 			if (debug)
-				std::cout << "This file is written in turbomole type!" << endl;
+				std::cout << "This file is written in turbomole type!\n";
 		}
 		else if (line.find("gamess-us") < line.size())
 		{
 			file_type = 2;
 			if (debug)
-				std::cout << "This file is written in gamess-us type!" << endl;
+				std::cout << "This file is written in gamess-us type!\n";
 		}
 		else if (line.find("gaussian") < line.size())
 		{
 			file_type = 3;
 			if (debug)
-				std::cout << "This file is written in gaussian type!" << endl;
+				std::cout << "This file is written in gaussian type!\n";
 		}
 		else if (line.find("CRYSTAL") < line.size())
 		{
 			file_type = 1;
 			wave.set_d_f_switch(true);
 			if (debug)
-				std::cout << "This file is written in CRYSTAL type!" << endl;
+				std::cout << "This file is written in CRYSTAL type!\n";
 		}
 		else
 		{
-			std::cout << "This type of file is not supported, please provide another basis set!" << endl;
+			std::cout << "This type of file is not supported, please provide another basis set!\n";
 			return false;
 		}
 		if (ifile.eof())
 		{
 			std::cout << "Please provide a basis set in the turbomole, gaussian or gamess-us format compatible with tonto."
-				<< "Look at the example files \"examble.basis\" and \"examble2.basis\" in the wfn_cpp folder if you want to see how it has to look like" << endl;
+				<< "Look at the example files \"examble.basis\" and \"examble2.basis\" in the wfn_cpp folder if you want to see how it has to look like\n";
 			return false;
 		}
 		while (!(line.find(elements_list[i]) < line.size()) && !ifile.eof())
 			getline_universal(ifile, line);
 		if (debug)
-			std::cout << "line while search for " << elements_list[i] << " :" << line << endl;
+			std::cout << "line while search for " << elements_list[i] << " :" << line << "\n";
 		if (debug && line.find(elements_list[i]) != -1)
 		{
-			std::cout << "I found an entry i know from the element list!" << endl;
-			std::cout << "The line is: " << line << endl;
+			std::cout << "I found an entry i know from the element list!\n";
+			std::cout << "The line is: " << line << "\n";
 		}
 		if (ifile.eof())
 		{
-			std::cout << "Could not find the atom you were looking for in the basis set file... " << endl;
+			std::cout << "Could not find the atom you were looking for in the basis set file... \n";
 			return false;
 		}
 		unsigned int shell = 0;
@@ -822,7 +825,7 @@ bool BasisSetLibrary::read_basis_set_vanilla(const std::filesystem::path& basis_
 			getline_universal(ifile, line);
 			if (debug)
 			{
-				std::cout << "I read an additional line!" << endl;
+				std::cout << "I read an additional line!\n";
 			}
 		}
 		while (line.find("}") == string::npos && !ifile.eof())
@@ -841,20 +844,20 @@ bool BasisSetLibrary::read_basis_set_vanilla(const std::filesystem::path& basis_
 			{
 				stream >> count >> c_temp;
 				if (debug)
-					std::cout << "count: " << count << " type: " << c_temp << endl;
+					std::cout << "count: " << count << " type: " << c_temp << "\n";
 			}
 			else if (file_type == 2 || file_type == 3)
 			{
 				stream >> c_temp >> count;
 				if (debug)
-					std::cout << "count: " << count << " type: " << c_temp << endl;
+					std::cout << "count: " << count << " type: " << c_temp << "\n";
 			}
 			for (int j = 0; j < count; j++)
 			{
 				getline_universal(ifile, line);
 				if (debug)
 				{
-					std::cout << "read the " << j << ". line: " << line << endl;
+					std::cout << "read the " << j << ". line: " << line << "\n";
 				}
 				stringstream stream2;
 				stream2 << line;
@@ -894,31 +897,31 @@ bool BasisSetLibrary::read_basis_set_vanilla(const std::filesystem::path& basis_
 							type = 4;
 							break;
 						default:
-							std::cout << "Sorry, orbital types higher than f-type are not yet supported!" << endl;
+							std::cout << "Sorry, orbital types higher than f-type are not yet supported!\n";
 							return false;
 						} // end switch of types
 						if (!wave.push_back_atom_basis_set(h, temp_vals[0], temp_vals[1], type, shell))
 						{
-							std::cout << "ERROR while pushing back atoms basis set" << endl;
+							std::cout << "ERROR while pushing back atoms basis set\n";
 						}
 						if (debug)
 							std::cout << "Pushing back on atom: " << h + 1 << " with coef: " << temp_vals[1]
-							<< " and exp: " << temp_vals[0] << " and type " << type << endl;
+							<< " and exp: " << temp_vals[0] << " and type " << type << "\n";
 					} // end if(find atom_label + :
 				}     // end for h = ncen
 				//nr_exp++;
 				if (debug)
-					std::cout << "recapitulation[" << j << "]... type: " << c_temp << " coef: " << temp_vals[0] << " exp: " << temp_vals[1] << endl;
+					std::cout << "recapitulation[" << j << "]... type: " << c_temp << " coef: " << temp_vals[0] << " exp: " << temp_vals[1] << "\n";
 				if (dum > count)
 				{
-					std::cout << "this should not happen, lets stop before i do something silly!" << endl;
+					std::cout << "this should not happen, lets stop before i do something silly!\n";
 					return false;
 				}
 			}
 			shell++;
 		} // end while line != }
 		if (debug)
-			std::cout << "I found }: " << line << endl;
+			std::cout << "I found }: " << line << "\n";
 		ifile.seekg(0);
 	} // end for element_list.size()
 	if (debug)
@@ -950,12 +953,12 @@ bool BasisSetLibrary::read_basis_set_missing(const std::filesystem::path& basis_
 		if (exists(temp_p))
 		{
 			if (debug)
-				std::cout << "basis set is valid, continueing..." << endl;
+				std::cout << "basis set is valid, continueing...\n";
 			end = true;
 		}
 		else
 		{
-			std::cout << "sorry, could not find this basis set in the basis set directory specified in the programs.config file!" << endl;
+			std::cout << "sorry, could not find this basis set in the basis set directory specified in the programs.config file!\n";
 			return false;
 			// manual = true;
 			//std::cout << "What is the name of the basis set in the directory: ";
@@ -971,19 +974,19 @@ bool BasisSetLibrary::read_basis_set_missing(const std::filesystem::path& basis_
 	for (int i = 0; i < wave.get_ncen(); i++)
 	{
 		if (debug)
-			std::cout << "i: " << i << endl;
+			std::cout << "i: " << i << "\n";
 		for (int j = 0; j < elements_list.size(); j++)
 		{
 			if (elements_list[j].find(wave.get_atom_label(i)) != -1)
 				found = true;
 			if (debug)
-				std::cout << "   j: " << j << endl;
+				std::cout << "   j: " << j << "\n";
 		}
 		if (!found)
 		{
 			elements_list.emplace_back(wave.get_atom_label(i));
 			if (debug)
-				std::cout << "Added an atom which was not there yet! " << wave.get_atom_label(i) << endl;
+				std::cout << "Added an atom which was not there yet! " << wave.get_atom_label(i) << "\n";
 		}
 		found = false;
 	}
@@ -992,19 +995,19 @@ bool BasisSetLibrary::read_basis_set_missing(const std::filesystem::path& basis_
 		std::cout << "Number of elements in elements_list: " << elements_list.size() << endl;
 		std::cout << "This is the elements list:" << endl;
 		for (int l = 0; l < elements_list.size(); l++)
-			std::cout << l << ": " << elements_list[l] << endl;
+			std::cout << l << ": " << elements_list[l] << "\n";
 	}
 	// int found_counter = 0;
 	for (int i = 0; i < elements_list.size(); i++)
 	{
 		if (debug)
-			std::cout << "before: " << elements_list[i] << " " << i << endl;
-		if (elements_list[i].find(" "))
+			std::cout << "before: " << elements_list[i] << " " << i << "\n";
+		while (elements_list[i].find(" ") != -1)
 			elements_list[i].erase(elements_list[i].find(" "), 1);
 		elements_list[i].append(":");
 		if (debug)
 		{
-			std::cout << "after: " << elements_list[i] << " " << i << endl;
+			std::cout << "after: " << elements_list[i] << " " << i << "\n";
 		}
 		// scan the tonto style basis set file for the entries we are looking or:
 		string line;
@@ -1015,67 +1018,70 @@ bool BasisSetLibrary::read_basis_set_missing(const std::filesystem::path& basis_
 		{
 			if (debug)
 			{
-				std::cout << "line.size of first line: " << line.size() << "line.find(\"keys=\"): " << line.find("keys=") << endl;
+				std::cout << "line.size of first line: " << line.size() << "line.find(\"keys=\"): " << line.find("keys=") << "\n";
 			}
 			getline_universal(ifile, line);
 		}
 		if (debug)
 		{
-			std::cout << "Line after looking for keys=: " << line << endl;
+			std::cout << "Line after looking for keys=: " << line << "\n";
 		}
 		if (line.find("keys=") < line.size() && debug)
-			std::cout << "Found keys=!" << endl;
+			std::cout << "Found keys=!\n";
 		if (line.find("turbomole") < line.size())
 		{
 			file_type = 1;
 			if (debug)
-				std::cout << "This file is written in turbomole type!" << endl;
+				std::cout << "This file is written in turbomole type!\n";
 		}
 		else if (line.find("gamess-us") < line.size())
 		{
 			file_type = 2;
 			if (debug)
-				std::cout << "This file is written in gamess-us type!" << endl;
+				std::cout << "This file is written in gamess-us type!\n";
 		}
 		else if (line.find("gaussian") < line.size())
 		{
 			file_type = 3;
 			if (debug)
-				std::cout << "This file is written in gaussian type!" << endl;
+				std::cout << "This file is written in gaussian type!\n";
 		}
 		else
 		{
-			std::cout << "This type of file is not supported, please provide another basis set!" << endl;
+			std::cout << "This type of file is not supported, please provide another basis set!\n";
 			return false;
 		}
 		if (ifile.eof())
 		{
 			std::cout << "Please provide a basis set in the turbomole, gaussian or gamess-us format compatible with tonto."
-				<< "Look at the example files \"examble.basis\" and \"examble2.basis\" in the wfn_cpp folder if you want to see how it has to look like" << endl;
+				<< "Look at the example files \"examble.basis\" and \"examble2.basis\" in the wfn_cpp folder if you want to see how it has to look like\n";
 			return false;
 		}
 		while (!(line.find(elements_list[i]) < line.size()) && !ifile.eof())
 		{
 			getline_universal(ifile, line);
 			if (debug)
-				std::cout << "line while search for " << elements_list[i] << " :" << line << endl;
+				std::cout << "line while search for " << elements_list[i] << " :" << line << "\n";
 		}
 		if (debug && line.find(elements_list[i]) != -1)
 		{
-			std::cout << "I found an entry i know from the element list!" << endl;
-			std::cout << "The line is: " << line << endl;
+			std::cout << "I found an entry i know from the element list!\n";
+			std::cout << "The line is: " << line << "\n";
 		}
 		if (ifile.eof())
 		{
-			std::cout << "Could not find the atom you were looking for in the basis set file... " << endl;
+			std::cout << "Could not find the atom you were looking for in the basis set file... \n";
 			return false;
 		}
 		unsigned int shell = 0;
+		bvec had_basis(wave.get_ncen());
+		for (int h = 0; h < wave.get_ncen(); h++)
+			had_basis[h] = wave.get_atom_basis_set_loaded(h);
 		if (line.find("{") == -1)
 		{
 			getline_universal(ifile, line);
 			if (debug)
-				std::cout << "I read an additional line!" << endl;
+				std::cout << "I read an additional line!\n";
 		}
 		while (line.find("}") == -1 && !ifile.eof())
 		{
@@ -1091,26 +1097,26 @@ bool BasisSetLibrary::read_basis_set_missing(const std::filesystem::path& basis_
 			{
 				stream >> count >> c_temp;
 				if (debug)
-					std::cout << "count: " << count << " type: " << c_temp << endl;
+					std::cout << "count: " << count << " type: " << c_temp << "\n";
 			}
 			else if (file_type == 2)
 			{
 				stream >> c_temp >> count;
 				if (debug)
-					std::cout << "count: " << count << " type: " << c_temp << endl;
+					std::cout << "count: " << count << " type: " << c_temp << "\n";
 			}
 			else if (file_type == 3)
 			{
 				stream >> c_temp >> count;
 				if (debug)
-					std::cout << "count: " << count << " type: " << c_temp << endl;
+					std::cout << "count: " << count << " type: " << c_temp << "\n";
 			}
 			for (int j = 0; j < count; j++)
 			{
 				getline_universal(ifile, line);
 				if (debug)
 				{
-					std::cout << "read the " << j << ". line: " << line << endl;
+					std::cout << "read the " << j << ". line: " << line << "\n";
 				}
 				stringstream stream2;
 				stream2 << line;
@@ -1123,20 +1129,20 @@ bool BasisSetLibrary::read_basis_set_missing(const std::filesystem::path& basis_
 				// this is where i started copying
 				for (int h = 0; h < wave.get_ncen(); h++)
 				{
-					// skip atoms taht already have a basis set!
-					if (wave.get_atom_basis_set_loaded(h))
+					// skip atoms that already had a basis set before this block
+					if (had_basis[h])
 						continue;
 					string temp_label;
 					temp_label = wave.get_atom_label(h);
-					if (temp_label.find(" "))
+					while (temp_label.find(" ") != -1)
 						temp_label.erase(temp_label.find(" "), 1);
 					temp_label.append(":");
 					if (elements_list[i].find(temp_label) != -1)
 					{
 						if (debug)
 						{
-							std::cout << "It's a match!" << endl;
-							std::cout << "element_label: " << elements_list[i] << " temp_label: " << temp_label << endl;
+							std::cout << "It's a match!\n";
+							std::cout << "element_label: " << elements_list[i] << " temp_label: " << temp_label << "\n";
 						}
 						switch (c_temp)
 						{
@@ -1144,61 +1150,61 @@ bool BasisSetLibrary::read_basis_set_missing(const std::filesystem::path& basis_
 						case 'S':
 							if (!wave.push_back_atom_basis_set(h, temp_num[0], temp_num[1], 1, shell))
 							{
-								std::cout << "ERROR while pushing back atoms basis set" << endl;
+								std::cout << "ERROR while pushing back atoms basis set\n";
 							}
 							if (debug)
 								std::cout << "Pushing back on atom: " << h + 1 << " with coef: " << temp_num[1]
-								<< " and exp: " << temp_num[0] << " and type S" << endl;
+								<< " and exp: " << temp_num[0] << " and type S\n";
 							break;
 						case 'p':
 						case 'P':
 							if (!wave.push_back_atom_basis_set(h, temp_num[0], temp_num[1], 2, shell))
 							{
-								std::cout << "ERROR while pushing back atoms basis set" << endl;
+								std::cout << "ERROR while pushing back atoms basis set\n";
 							}
 							if (debug)
 								std::cout << "Pushing back on atom: " << h + 1 << " with coef: " << temp_num[1]
-								<< " and exp: " << temp_num[0] << " and type P" << endl;
+								<< " and exp: " << temp_num[0] << " and type P\n";
 							break;
 						case 'd':
 						case 'D':
 							if (!wave.push_back_atom_basis_set(h, temp_num[0], temp_num[1], 3, shell))
 							{
-								std::cout << "ERROR while pushing back atoms basis set" << endl;
+								std::cout << "ERROR while pushing back atoms basis set\n";
 							}
 							if (debug)
 								std::cout << "Pushing back on atom: " << h + 1 << " with coef: " << temp_num[1]
-								<< " and exp: " << temp_num[0] << " and type D" << endl;
+								<< " and exp: " << temp_num[0] << " and type D\n";
 							break;
 						case 'f':
 						case 'F':
 							if (!wave.push_back_atom_basis_set(h, temp_num[0], temp_num[1], 4, shell))
 							{
-								std::cout << "ERROR while pushing back atoms basis set" << endl;
+								std::cout << "ERROR while pushing back atoms basis set\n";
 							}
 							if (debug)
 								std::cout << "Pushing back on atom: " << h + 1 << " with coef: " << temp_num[1]
-								<< " and exp: " << temp_num[0] << " and type F" << endl;
+								<< " and exp: " << temp_num[0] << " and type F\n";
 							break;
 						default:
-							std::cout << "Sorry, orbital types higher than f-type are not yet supported!" << endl;
+							std::cout << "Sorry, orbital types higher than f-type are not yet supported!\n";
 							return false;
 						} // end switch of types
 					}     // end if(find atom_label + :
 				}         // end for h = ncen
 				//nr_exp++;
 				if (debug)
-					std::cout << "recapitulation[" << j << "]... type: " << c_temp << " coef: " << temp_num[0] << " exp: " << temp_num[1] << endl;
+					std::cout << "recapitulation[" << j << "]... type: " << c_temp << " coef: " << temp_num[0] << " exp: " << temp_num[1] << "\n";
 				if (dum > count)
 				{
-					std::cout << "this should not happen, lets stop before i do something silly!" << endl;
+					std::cout << "this should not happen, lets stop before i do something silly!\n";
 					return false;
 				}
 			}
 			shell++;
 		} // end while line != }
 		if (debug)
-			std::cout << "I found }!" << endl;
+			std::cout << "I found }!\n";
 		ifile.seekg(0);
 	} // end for element_list.size()
 	if (debug)

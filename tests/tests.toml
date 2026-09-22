@@ -330,6 +330,14 @@ good = "nh3li_eli.good"
 [ELI_NH3Li.args]
 eli_analysis = ["../RGBI_groups/nh3li.gbw", 0.1, 3.0]
 
+[ELI_NH3Li_RI]
+directory = "RGBI"
+good = "nh3li_eli_ri.good"
+
+[ELI_NH3Li_RI.args]
+ri_fit = "def2-universal-jkfit"
+eli_analysis = ["../RGBI_groups/nh3li.gbw", 0.1, 3.0]
+
 [ELI_HgH2_ECP]
 directory = "ELI_heavy"
 good = "hgh2_ecp_eli.good"
@@ -368,6 +376,16 @@ rgbi = ""
 # pass on a machine with no usable GPU and fail on one with a card, which is the same trap
 # the fp32/fp64 tests further down already document. P1_test_XCW_gpu_itensor is the
 # deliberate exception and carries its own reference.
+#
+# P1_subset.hkl is every 8th reflection of P1_test.hkl (402 of 3215), the same subset
+# XcwScfTests builds. The I tensor costs 3 s on it instead of 100+ s, and the seven
+# non-full cases below run on it: the Hartree-Fock energy at lambda 0 is unchanged, the
+# GooFs and the lambda trajectory are those of the subset. The RUN_FULL_TEST scans and
+# the GPU I tensor case keep the full hkl - their goldens record the halting criterion
+# and the device path on the real data set. The goldens carry the -all_charges default,
+# so the TFVC pass in each tscb creation is part of them: from lambda 0.04 on the subset
+# density has no minimum along N8-H8 and the F/F2 scans log its 'Unexpected number of
+# extrema (0)' line twice.
 
 [P1_test_XCW]
 directory = "P1_test"
@@ -377,7 +395,7 @@ good = "P1_test_XCW.good"
 do_XCW = ""
 no_gpu = ""
 cif = "P1_test_NA2.cif"
-hkl = "P1_test.hkl"
+hkl = "P1_subset.hkl"
 anom_disp = "anom_disp.txt"
 XCW_settings = "test_settings.txt"
 no_date = ""
@@ -412,7 +430,7 @@ good = "P1_test_XCW_h2.good"
 do_XCW = ""
 no_gpu = ""
 cif = "P1_test_NA2.cif"
-hkl = "P1_test.hkl"
+hkl = "P1_subset.hkl"
 anom_disp = "anom_disp.txt"
 XCW_settings = "h2_test_settings.txt"
 no_date = ""
@@ -456,7 +474,7 @@ no_gpu = ""
 xcw_incremental = ""
 xcw_int_precision = "1e-12"
 cif = "P1_test_NA2.cif"
-hkl = "P1_test.hkl"
+hkl = "P1_subset.hkl"
 anom_disp = "anom_disp.txt"
 XCW_settings = "test_settings.txt"
 no_date = ""
@@ -471,7 +489,7 @@ no_gpu = ""
 xcw_incremental = ""
 xcw_int_precision = "1e-12"
 cif = "P1_test_NA2.cif"
-hkl = "P1_test.hkl"
+hkl = "P1_subset.hkl"
 anom_disp = "anom_disp.txt"
 XCW_settings = "h2_test_settings.txt"
 no_date = ""
@@ -486,7 +504,7 @@ no_gpu = ""
 xcw_incremental = ""
 xcw_int_precision = "1e-12"
 cif = "P1_test_NA2.cif"
-hkl = "P1_test.hkl"
+hkl = "P1_subset.hkl"
 anom_disp = "anom_disp.txt"
 XCW_settings = "test_settings_f2.txt"
 no_date = ""
@@ -501,7 +519,7 @@ good = "P1_F2_test_XCW.good"
 do_XCW = ""
 no_gpu = ""
 cif = "P1_test_NA2.cif"
-hkl = "P1_test.hkl"
+hkl = "P1_subset.hkl"
 anom_disp = "anom_disp.txt"
 XCW_settings = "test_settings_f2.txt"
 no_date = ""
@@ -532,7 +550,7 @@ good = "P1_F2_test_XCW_h2.good"
 do_XCW = ""
 no_gpu = ""
 cif = "P1_test_NA2.cif"
-hkl = "P1_test.hkl"
+hkl = "P1_subset.hkl"
 anom_disp = "anom_disp.txt"
 XCW_settings = "h2_test_settings_f2.txt"
 no_date = ""
@@ -628,3 +646,240 @@ hkl = "olex2/Wfn_job/sucrose.hkl"
 wfn = "olex2/Wfn_job/sucrose.wfx"
 acc = 1
 gpu_fp32 = ""
+
+# ---------------------------------------------------------------------------
+# One-shot options and property cubes (19 Sep 2026). Each of these ran zero
+# times under the gtest suite before; they are small inputs on coarse grids so
+# the whole block costs seconds. Where the log carries no numbers the golden is
+# the file the option writes (a cube, a tsc, a .47, a surface table).
+# ---------------------------------------------------------------------------
+
+# Property cubes on epoxide (7 atoms, 62 MOs), 0.5 A grid in a 2 A box.
+[cube_rho]
+directory = "epoxide_gbw"
+actual = "epoxide_rho.cube"
+
+[cube_rho.args]
+wfn = "epoxide.gbw"
+rho = true
+resolution = 0.5
+radius = 2.0
+
+[cube_esp]
+directory = "epoxide_gbw"
+actual = "epoxide_esp.cube"
+
+[cube_esp.args]
+wfn = "epoxide.gbw"
+esp = true
+resolution = 0.5
+radius = 2.0
+
+[cube_elf]
+directory = "epoxide_gbw"
+actual = "epoxide_elf.cube"
+
+[cube_elf.args]
+wfn = "epoxide.gbw"
+elf = true
+resolution = 0.5
+radius = 2.0
+
+# -HDEF writes one deformation-density cube per atom, -hirsh the Hirshfeld density of atom 1
+[cube_hirsh]
+directory = "epoxide_gbw"
+actual = "epoxide_hirsh.cube"
+
+[cube_hirsh.args]
+wfn = "epoxide.gbw"
+HDEF = true
+hirsh = 1
+resolution = 0.5
+radius = 2.0
+
+[cube_MO]
+directory = "epoxide_gbw"
+actual = "epoxide_MO_5.cube"
+
+[cube_MO.args]
+wfn = "epoxide.gbw"
+MO = 5
+resolution = 0.5
+radius = 2.0
+
+# Rho isosurface coloured by the ESP, written as an obj mesh
+[esp_isosurface]
+directory = "epoxide_gbw"
+actual = "epoxide_rho_esp.obj"
+
+[esp_isosurface.args]
+wfn = "epoxide.gbw"
+esp_isosurface = 0.01
+resolution = 0.5
+radius = 2.0
+
+# Difference density between the full and the 61-MO wavefunction
+[density_difference]
+directory = "epoxide_gbw"
+actual = "epoxide_61_diff.cube"
+
+[density_difference.args]
+wfn = "epoxide.gbw"
+density_difference = "epoxide_61.gbw"
+resolution = 0.5
+radius = 2.0
+
+[dipole_moments]
+directory = "epoxide_gbw"
+
+[dipole_moments.args]
+wfn = "epoxide.gbw"
+dipole_moments = true
+
+# Bondwise Laplacian line plots; the log lists which atom pairs count as bonded
+[laplacian_bonds]
+directory = "epoxide_gbw"
+
+[laplacian_bonds.args]
+laplacian_bonds = "epoxide.gbw"
+
+# .47 export, checked against our own output; the first 9948 numbers agree with
+# the ORCA-written NBO/reference.47 to 6e-10 (the reference carries extra sections)
+[convert_to_47]
+directory = "epoxide_gbw/NBO"
+actual = "epoxide.47"
+
+[convert_to_47.args]
+convert_to_47 = "epoxide.gbw"
+
+# tsc/tscb conversion and merging. fixture.tsc/fixture.tscb are the SF_becke table,
+# round-tripped once so that the tscb -> tsc conversion rewrites fixture.tsc
+# byte-identically (the TITLE becomes "test", the cif name -tscb hardcodes).
+# *.tscb is gitignored, the fixture is whitelisted.
+[tscb_to_tsc]
+directory = "epoxide_gbw"
+actual = "fixture.tsc"
+
+[tscb_to_tsc.args]
+tscb = "fixture.tscb"
+
+[merge_tscs]
+directory = "epoxide_gbw"
+actual = "combined.tsc"
+
+[merge_tscs.args]
+old_tsc = true
+merge = ["fixture.tscb", "fixture.tscb"]
+
+[merge_tscs_nocheck]
+directory = "epoxide_gbw"
+actual = "combined.tsc"
+
+[merge_tscs_nocheck.args]
+old_tsc = true
+merge_nocheck = ["fixture.tsc", "fixture.tsc"]
+
+# Partition schemes for the scattering factors. The log is the same for all of
+# them (the charge table is -all_charges), so the golden is the text tsc itself:
+# Becke vs MBIS differ by up to 0.4 in the form factors at this resolution,
+# MBIS vs EMBIS by 0.06.
+[SF_becke]
+directory = "epoxide_gbw"
+actual = "experimental.tsc"
+
+[SF_becke.args]
+wfn = "epoxide.gbw"
+cif = "epoxide.cif"
+dmin = 1.5
+acc = 1
+becke = true
+old_tsc = true
+tsc_block = 50
+
+[SF_mbis]
+directory = "epoxide_gbw"
+actual = "experimental.tsc"
+
+[SF_mbis.args]
+wfn = "epoxide.gbw"
+cif = "epoxide.cif"
+dmin = 1.5
+acc = 1
+mbis = true
+old_tsc = true
+
+[SF_embis]
+directory = "epoxide_gbw"
+actual = "experimental.tsc"
+
+[SF_embis.args]
+wfn = "epoxide.gbw"
+cif = "epoxide.cif"
+dmin = 1.5
+acc = 1
+embis = true
+old_tsc = true
+
+# Centre-moment restraints instead of the partition default, with a non-default weight
+[ri_fit_multipoles_centre]
+directory = "epoxide_gbw"
+
+[ri_fit_multipoles_centre.args]
+wfn = "epoxide.gbw"
+cif = "epoxide.cif"
+dmin = 0.4
+ri_fit = "combo_basis_fit"
+multipole_moments = ["Hirshfeld", 2]
+multipole_centre = true
+multipole_strength = 0.5
+
+# Promolecular Hirshfeld surface of the asymmetric unit inside the packed cluster;
+# the golden is the per-vertex d_i/d_e/d_norm/shape-index/curvedness table
+[hirshfeld_surface]
+directory = "isosurface"
+actual = "Hirshfeld_surface.dat"
+
+[hirshfeld_surface.args]
+hirshfeld_surface = ["asu.xyz", "pack.xyz"]
+resolution = 0.8
+
+# Finite-field atomic polarizabilities of acetylene from seven wavefunctions
+[polarizabilities]
+directory = "polarizabilities"
+
+[polarizabilities.args]
+polarizabilities = ["zero.wfn", "xp.wfn", "xm.wfn", "yp.wfn", "ym.wfn", "zp.wfn", "zm.wfn"]
+
+# gbw -> wfn/wfx conversion plus the CIF of the wavefunction geometry. Runs in
+# tests/partition because -wfn_cif writes <wfn stem>.cif next to the input and
+# would overwrite the real epoxide.cif in epoxide_gbw.
+[gbw2wfn]
+directory = "partition"
+actual = "DFT.cif"
+
+[gbw2wfn.args]
+wfn = "DFT.gbw"
+gbw2wfn = true
+wfn_cif = true
+
+# SALTED: write the predicted coefficients to SALTED_COEFS.npy and, separately,
+# scattering factors from a stored coefficient file (-coef) instead of a model
+[SALTED_write_coefs]
+directory = "SALTED"
+
+[SALTED_write_coefs.args]
+no_gpu_salted = ""
+wfn = "test_cysteine.xyz"
+SALTED_COEFS = "Model"
+cif = "test_cysteine.cif"
+dmin = 0.73
+
+[SALTED_coef_file]
+directory = "SALTED"
+
+[SALTED_coef_file.args]
+wfn = "test_cysteine.xyz"
+cif = "test_cysteine.cif"
+dmin = 0.73
+coef = ["test_cysteine.npy", "cc-pvqz-jkfit"]
+no_gpu_salted = ""

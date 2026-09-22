@@ -41,9 +41,12 @@ correct. Nine questions:
    off? 40 % of `if` and 24 % of `for` bodies here are braceless.
 8. **Scaffolding.** New RAII guard, `member_` trailing underscores, deleted copy
    constructors, condition variables — in a file that has none? Justify or drop.
-9. **Whitespace.** Tabs in a tab file, spaces in a space file. Did the diff
-   convert any? `scattering_factors.cpp`, `XCW.cpp`, `basis_set.cpp`,
-   `convenience.h`, `XCW.h`, `cell.cpp` are tab-indented.
+9. **Whitespace.** Leading indentation is tabs in every file (since 21 Sep
+   2026); the editor decides how wide they render. Spaces after the tabs for
+   aligning a continuation line are fine. Did the diff add space-indented
+   lines?
+10. **Flushing.** `std::endl` or `flush` inside a loop? Only if the reader is
+   waiting on that line (see *Errors and logging*).
 
 If a hunk fails any of these, fix it before committing. Do not reformat
 untouched code to compensate.
@@ -92,6 +95,13 @@ untouched code to compensate.
 - Do not convert `err_checkf` sites to exceptions.
 - Log to the injected `std::ostream& file` parameter, not `std::cout`, whenever
   the function has one. Gate verbose output behind `if (debug)`.
+- Flush only where the reader is waiting: `std::endl` for an SCF / MBIS /
+  lambda-scan iteration line, a stage banner before a long computation, per-file
+  progress in a batch, an interactive prompt, and at loop depth 0 in general.
+  Per-item output inside loops — atom charges, basin / shell / reflection
+  tables, per-point lines, warnings, debug dumps, file writers — ends in
+  `"\n"`; `std::endl` there is a flush per line. Never `.flush()` before
+  `close()`, and never `<< flush << endl`.
 
 ### Files
 - `#include "pch.h"` is line 1 of every `.cpp` in `Src/core`.
@@ -109,7 +119,6 @@ These are genuinely split. Match the file; never "fix" them repo-wide:
   `SALTED_equicomb.cpp` 100 % Allman), but a coin flip inside `fchk.cpp`,
   `cube.cpp`, `basis_set.cpp`. Function-definition braces sit on their own line
   even in K&R files.
-- **Tabs vs spaces**: six large files are tab-indented.
 - **Function naming**: `snake_case` (dominant), `camelCase` (`computeELF`),
   `Calc_Pascal_Snake` (`Calc_Rho`). New free functions → `snake_case`; new
   members of an existing family → follow the family.
@@ -128,5 +137,5 @@ a report.
 ## Background
 
 Full evidence, the measured percentages and the four divergence tells:
-`Software-Notes\NoSpherA2-Codebase\NoSpherA2-House-Code-Style-27-Aug-V1.0.md`
+`Software-Notes\NoSpherA2-Codebase\NoSpherA2-House-Code-Style-21-Sep-V1.5.md`
 in the Obsidian vault.

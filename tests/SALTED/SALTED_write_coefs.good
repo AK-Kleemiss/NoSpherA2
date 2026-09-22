@@ -1,0 +1,39 @@
+Using "model.salted" for the prediction
+Descriptor sets identical: sharing one copy
+[              Calculating descriptors for l = 0              ]
+[#############################################################] 100% 
+[              Calculating descriptors for l = 1              ]
+[#############################################################] 100% 
+[              Calculating descriptors for l = 2              ]
+[#############################################################] 100% 
+[              Calculating descriptors for l = 3              ]
+[#############################################################] 100% 
+[              Calculating descriptors for l = 4              ]
+[#############################################################] 100% 
+[              Calculating descriptors for l = 5              ]
+[#############################################################] 100% 
+    _   __     _____       __              ___   ___
+   / | / /___ / ___/____  / /_  ___  _____/   | |__ \
+  /  |/ / __ \\__ \/ __ \/ __ \/ _ \/ ___/ /| | __/ /
+ / /|  / /_/ /__/ / /_/ / / / /  __/ /  / ___ |/ __/
+/_/ |_/\____/____/ .___/_/ /_/\___/_/  /_/  |_/____/
+                /_/
+This software is part of the cuQCT software suite developed by Florian Kleemiss.
+Please give credit and cite corresponding pieces!
+This Software is published with BSD-2 clause license.
+Reading:                          "test_cysteine.xyz" done!
+Number of atoms in Wavefunction file: 14 Number of MOs: 0
+Number of protons: 64
+Number of electrons: 0.000000
+Reading:                          "test_cysteine.cif" done!
+Generating hkl indices up to d=:              0.73... done!
+Nr of reflections generated:                  2878
+Number of symmetry operations:                   4
+Nr of reflections to be used:                 2878
+Generating k-points...                            ... done!
+Number of k-points to evaluate: 2878
+Streaming tsc in blocks of 1000 reflections
+[               Generating scattering factors...              ]
+[#############################################################] 100% 
+Writing tsc file...  ... done!
+  (written block by block while the factors were computed)

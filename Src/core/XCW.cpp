@@ -9,6 +9,7 @@
 #include "basis_set.h"
 #include "bondwise_analysis.h"
 #include <mutex>
+#include <random>
 
 void XCW::construct(const options& opt_in) {
 	opt = &opt_in;
@@ -55,6 +56,23 @@ void XCW::construct(const options& opt_in) {
 
 	unit_cell.set_symmetry_factors(asym_atoms, symmetry_linking_list);
 
+	// Structure factors sum over every operation, unless the grown cluster is a union of complete
+	// orbits of a subgroup H: then one operation per coset of H covers the cell with |H| times fewer
+	// terms and the cluster's own symmetry is not applied a second time
+	sym_ops_.resize(unit_cell.get_trans()[0].size());
+	std::iota(sym_ops_.begin(), sym_ops_.end(), 0);
+	if (settings.grown) {
+		const ivec subgroup = unit_cell.grown_subgroup(symmetry_linking_list);
+		if (subgroup.size() < 2)
+			std::cout << "XCW: grown cluster is mapped onto itself by no symmetry operation, summing all " << sym_ops_.size() << " operations" << std::endl;
+		else {
+			sym_ops_ = unit_cell.coset_representatives(subgroup);
+			unit_cell.set_subgroup_factors(asym_atoms, symmetry_linking_list, subgroup);
+			std::cout << "XCW: grown cluster is mapped onto itself by a subgroup of order " << subgroup.size() << ", summing "
+				<< sym_ops_.size() << " coset representatives instead of " << unit_cell.get_trans()[0].size() << " operations" << std::endl;
+		}
+	}
+
 	// Generate WFN object from asym_atoms
 	dummy_wave.assign_charge(settings.charge);
 	dummy_wave.assign_multi(settings.multiplicity);
@@ -91,8 +109,20 @@ void XCW::construct(const options& opt_in) {
 	std::cout << "XCW orbital basis set: " << basis->get_name() << std::endl;
 	XCW_log << "XCW orbital basis set: " << basis->get_name() << std::endl;
 
+	// The fit set, see i_sigma_cutoff. F_obs2 is |I|, the sign lives in F_obs
+	fit_mask_.assign(cryst.nr_small, false);
+	cryst.n_fit = 0;
+	for (int r = 0; r < cryst.nr_small; r++) {
+		const double I_over_sigma = (obs[r].F_obs < 0 ? -obs[r].F_obs2 : obs[r].F_obs2) / obs[r].sigma_obs2;
+		fit_mask_[r] = obs[r].sigma_obs2 > 0 && I_over_sigma >= settings.i_sigma_cutoff;
+		cryst.n_fit += fit_mask_[r];
+	}
+	err_checkf(cryst.n_fit > settings.n_params, "Fewer reflections above the I/sigma cutoff than parameters", std::cout);
+	std::cout << "XCW: I/sigma(I) >= " << settings.i_sigma_cutoff << " (F/sigma(F) >= " << 2 * settings.i_sigma_cutoff << "): " << cryst.n_fit << " of " << cryst.nr_small << " reflections in the fit; R1 and Criterion are over these, R1(all) and Crit(all) over all" << std::endl;
+	XCW_log << "XCW: I/sigma(I) >= " << settings.i_sigma_cutoff << ": " << cryst.n_fit << " of " << cryst.nr_small << " reflections in the fit" << std::endl;
+
 	// Precompute GooF scaling factor
-	cryst.inv_scale = 1.0 / (cryst.nr_small - settings.n_params);
+	cryst.inv_scale = 1.0 / (cryst.n_fit - settings.n_params);
 
 	// Set F_calc sizes
 	F_calc.resize(2);
@@ -111,6 +141,7 @@ XCW::SCF_settings XCW::loadSettings(const std::filesystem::path& settings_path) 
 
 	settings.grown = false;
 	std::string conv_preset = "normal";
+	bool soscf = false, check_hessian = false;
 	std::string speed_preset = "normal_conv";
 
 	/* 1: Classical Jayatilaka XWR
@@ -208,6 +239,11 @@ XCW::SCF_settings XCW::loadSettings(const std::filesystem::path& settings_path) 
 			refine_against = 2;
 			};
 
+		handlers["i_sigma"] = [&](std::istream& is) {
+			if (!(is >> settings.i_sigma_cutoff))
+				throw std::runtime_error("Expected value after 'i_sigma'");
+			};
+
 		handlers["weighted"] = [&](std::istream&) {
 			settings.XWR_type = 2;
 			};
@@ -274,6 +310,14 @@ XCW::SCF_settings XCW::loadSettings(const std::filesystem::path& settings_path) 
 
 		handlers["normal_conv"] = [&](std::istream&) {
 			speed_preset = "normal_conv";
+			};
+
+		handlers["soscf"] = [&](std::istream&) {
+			soscf = true;
+			};
+
+		handlers["check_hessian"] = [&](std::istream&) {
+			check_hessian = true;
 			};
 
 		handlers["fast_conv"] = [&](std::istream&) {
@@ -403,6 +447,7 @@ XCW::SCF_settings XCW::loadSettings(const std::filesystem::path& settings_path) 
 	}
 
 	if (speed_preset == "slow_conv") {
+		settings.slow_conv = true;
 		settings.alpha = 0.8;
 		settings.level_shift = 1;
 		settings.diis_stop_damping = 1e-5;
@@ -457,6 +502,8 @@ XCW::SCF_settings XCW::loadSettings(const std::filesystem::path& settings_path) 
 	settings.nbo_output = nbo_output;
 	settings.df_basis_name = df_basis_name;
 	settings.guess_basis_name = guess_basis_name;
+	settings.soscf = soscf;
+	settings.check_hessian = check_hessian;
 
 	return settings;
 }
@@ -496,103 +543,8 @@ void XCW::U_cif2U_star() {
 	}
 }
 
-void XCW::U_star2U_cart() {
-	const double scale = constants::bohr2ang(1);
-	vec2 cart_matrix(3, vec(3));
-	for (int i = 0; i < 3; i++) {
-		for (int j = 0; j < 3; j++) {
-			cart_matrix[i][j] = unit_cell.get_cm(i, j);
-		}
-	}
-	std::transform(cart_matrix.begin(), cart_matrix.end(), cart_matrix.begin(), [scale](std::vector<double>& vec) {
-		std::transform(vec.begin(), vec.end(), vec.begin(), [scale](double x) { return x * scale; });
-		return vec; });
-	for (int a = 0; a < cryst.ncen; a++) {
-		vec2 ADPs = dummy_wave.get_atom(a).get_ADPs();
-		if (dummy_wave.get_atom(a).get_ADPs()[0].size() > 0) {
-			vec2 U_star(3, vec(3));
-			U_star[0][0] = ADPs[0][0];
-			U_star[0][1] = ADPs[0][3];
-			U_star[0][2] = ADPs[0][4];
-			U_star[1][0] = ADPs[0][3];
-			U_star[1][1] = ADPs[0][1];
-			U_star[1][2] = ADPs[0][5];
-			U_star[2][0] = ADPs[0][4];
-			U_star[2][1] = ADPs[0][5];
-			U_star[2][2] = ADPs[0][2];
-			U_star = self_dot(self_dot(cart_matrix, U_star, true, false), cart_matrix, false, false);
-			ADPs[0][0] = U_star[0][0];
-			ADPs[0][1] = U_star[1][1];
-			ADPs[0][2] = U_star[2][2];
-			ADPs[0][3] = U_star[0][1];
-			ADPs[0][4] = U_star[0][2];
-			ADPs[0][5] = U_star[1][2];
-			dummy_wave.set_atom_ADPs(a, ADPs);
-		}
-		if (dummy_wave.get_atom(a).get_ADPs()[1].size() > 0) {
-			int running_idx = 0;
-			vec C_cart(10);
-			for (int i = 0; i < 3; i++) {
-				for (int j = i; j < 3; j++) {
-					for (int k = j; k < 3; k++) {
-						double sum = 0;
-						for (int p = 0; p < 3; p++) {
-							for (int q = 0; q < 3; q++) {
-								for (int r = 0; r < 3; r++) {
-									ivec sorted_idx = { p, q, r };
-									std::sort(sorted_idx.begin(), sorted_idx.end());
-									int ADP_idx;
-									get_voigt_index(sorted_idx, ADP_idx);
-									sum += cart_matrix[p][i] * cart_matrix[q][j] * cart_matrix[r][k] * ADPs[1][ADP_idx];
-								}
-							}
-						}
-						C_cart[running_idx] = sum;
-						running_idx++;
-					}
-				}
-			}
-			for (int i = 0; i < 10; i++) {
-				ADPs[1][i] = C_cart[i];
-			}
-			dummy_wave.set_atom_ADPs(a, ADPs);
-		}
-		if (dummy_wave.get_atom(a).get_ADPs()[2].size() > 0) {
-			int running_idx = 0;
-			vec D_cart(15);
-			for (int i = 0; i < 3; i++) {
-				for (int j = i; j < 3; j++) {
-					for (int k = j; k < 3; k++) {
-						for (int l = k; l < 3; l++) {
-							double sum = 0;
-							for (int p = 0; p < 3; p++) {
-								for (int q = 0; q < 3; q++) {
-									for (int r = 0; r < 3; r++) {
-										for (int s = 0; s < 3; s++) {
-											ivec sorted_idx = { p, q, r, s };
-											std::sort(sorted_idx.begin(), sorted_idx.end());
-											int ADP_idx;
-											get_voigt_index(sorted_idx, ADP_idx);
-											sum += cart_matrix[p][i] * cart_matrix[q][j] * cart_matrix[r][k] * cart_matrix[s][l] * ADPs[2][ADP_idx];
-										}
-									}
-								}
-							}
-							D_cart[running_idx] = sum;
-							running_idx++;
-						}
-					}
-				}
-			}
-			for (int i = 0; i < 15; i++) {
-				ADPs[2][i] = D_cart[i];
-			}
-			dummy_wave.set_atom_ADPs(a, ADPs);
-		}
-	}
-}
-
-void XCW::get_voigt_index(const ivec& indices, int& ADP_idx) {
+// Position of a sorted index triple/quadruple in the Voigt storage of C (10) and D (15)
+static void get_voigt_index(const ivec& indices, int& ADP_idx) {
 	ivec2 map3, map4;
 	ivec mult3, mult4;
 	map3 = { { 0, 0, 0 }, { 0, 0, 1 }, { 0, 0, 2 }, { 0, 1, 1 }, {0, 1, 2}, {0, 2, 2}, {1, 1, 1}, { 1, 1, 2 }, { 1, 2, 2 }, { 2, 2, 2 } };
@@ -613,11 +565,123 @@ void XCW::get_voigt_index(const ivec& indices, int& ADP_idx) {
 	}
 }
 
+// T'_{ij..} = sum M_pi M_qj .. T_pq.. for the U (rank 2), C (rank 3) and D (rank 4) tensors in their
+// Voigt storage: U_star2U_cart hands in the cell matrix, the grown-atom rotation the transposed symmetry operation
+void transform_ADPs(vec2& ADPs, const vec2& M) {
+	if (ADPs.size() > 0 && ADPs[0].size() > 0) {
+		vec2 U(3, vec(3));
+		U[0][0] = ADPs[0][0];
+		U[0][1] = ADPs[0][3];
+		U[0][2] = ADPs[0][4];
+		U[1][0] = ADPs[0][3];
+		U[1][1] = ADPs[0][1];
+		U[1][2] = ADPs[0][5];
+		U[2][0] = ADPs[0][4];
+		U[2][1] = ADPs[0][5];
+		U[2][2] = ADPs[0][2];
+		U = self_dot(self_dot(M, U, true, false), M, false, false);
+		ADPs[0][0] = U[0][0];
+		ADPs[0][1] = U[1][1];
+		ADPs[0][2] = U[2][2];
+		ADPs[0][3] = U[0][1];
+		ADPs[0][4] = U[0][2];
+		ADPs[0][5] = U[1][2];
+	}
+	if (ADPs.size() > 1 && ADPs[1].size() > 0) {
+		int running_idx = 0;
+		vec C_out(10);
+		for (int i = 0; i < 3; i++) {
+			for (int j = i; j < 3; j++) {
+				for (int k = j; k < 3; k++) {
+					double sum = 0;
+					for (int p = 0; p < 3; p++) {
+						for (int q = 0; q < 3; q++) {
+							for (int r = 0; r < 3; r++) {
+								ivec sorted_idx = { p, q, r };
+								std::sort(sorted_idx.begin(), sorted_idx.end());
+								int ADP_idx;
+								get_voigt_index(sorted_idx, ADP_idx);
+								sum += M[p][i] * M[q][j] * M[r][k] * ADPs[1][ADP_idx];
+							}
+						}
+					}
+					C_out[running_idx] = sum;
+					running_idx++;
+				}
+			}
+		}
+		ADPs[1] = C_out;
+	}
+	if (ADPs.size() > 2 && ADPs[2].size() > 0) {
+		int running_idx = 0;
+		vec D_out(15);
+		for (int i = 0; i < 3; i++) {
+			for (int j = i; j < 3; j++) {
+				for (int k = j; k < 3; k++) {
+					for (int l = k; l < 3; l++) {
+						double sum = 0;
+						for (int p = 0; p < 3; p++) {
+							for (int q = 0; q < 3; q++) {
+								for (int r = 0; r < 3; r++) {
+									for (int s = 0; s < 3; s++) {
+										ivec sorted_idx = { p, q, r, s };
+										std::sort(sorted_idx.begin(), sorted_idx.end());
+										int ADP_idx;
+										get_voigt_index(sorted_idx, ADP_idx);
+										sum += M[p][i] * M[q][j] * M[r][k] * M[s][l] * ADPs[2][ADP_idx];
+									}
+								}
+							}
+						}
+						D_out[running_idx] = sum;
+						running_idx++;
+					}
+				}
+			}
+		}
+		ADPs[2] = D_out;
+	}
+}
+
+void XCW::U_star2U_cart() {
+	const double scale = constants::bohr2ang(1);
+	vec2 cart_matrix(3, vec(3));
+	for (int i = 0; i < 3; i++) {
+		for (int j = 0; j < 3; j++) {
+			cart_matrix[i][j] = unit_cell.get_cm(i, j) * scale;
+		}
+	}
+	for (int a = 0; a < cryst.ncen; a++) {
+		vec2 ADPs = dummy_wave.get_atom(a).get_ADPs();
+		transform_ADPs(ADPs, cart_matrix);
+		dummy_wave.set_atom_ADPs(a, ADPs);
+	}
+}
+
+// A grown atom carries a copy of its parent's ADPs (read_fracs_ADPs_from_CIF); U*, C and D are
+// contravariant tensors in the fractional basis, so the image's are T' = R T R^T with R the rotation
+// of the linking operation (x' = R x + t). cell stores R transposed, which is what transform_ADPs takes.
+void XCW::rotate_grown_ADPs() {
+	for (int a = 0; a < cryst.ncen; a++) {
+		const int op = asym_atoms[a].sym_op;
+		if (op < 0) continue;
+		vec2 M(3, vec(3));
+		for (int i = 0; i < 3; i++) {
+			for (int j = 0; j < 3; j++) {
+				M[i][j] = unit_cell.get_sym(i, j, op);
+			}
+		}
+		vec2 ADPs = dummy_wave.get_atom(a).get_ADPs();
+		transform_ADPs(ADPs, M);
+		dummy_wave.set_atom_ADPs(a, ADPs);
+	}
+}
+
 void XCW::eval_DW(cvec2& DW_fact) {
 	DW_fact.resize(cryst.ncen, cvec(cryst.nr, 0));
 	//Converts angstrom to bohr OR MORE IMPORTANTLY reciprocal bohr to reciprocal angstrom
 	const double angstrom2bohr = constants::ang2bohr(1);
-	std::vector<int> level;
+	ivec level;
 	level.reserve(cryst.ncen);
 	//Figure out which level of anisotropic displacements parameters are avaialable
 	for (int a = 0; a < cryst.ncen; a++) {
@@ -642,6 +706,7 @@ void XCW::eval_DW(cvec2& DW_fact) {
 	}
 	// Convert ADPs from cif format to Cartesian coordinates
 	U_cif2U_star();
+	rotate_grown_ADPs();
 	U_star2U_cart();
 	vec2 q(cryst.nr, vec(3));
 	for (int h = 0; h < cryst.nr; h++) {
@@ -739,7 +804,7 @@ void XCW::eval_phase(cvec2& phase_fact) {
 }
 
 void XCW::eval_translation_phase(cvec2& translation_phase) {
-	translation_phase.resize(cryst.nr_small, cvec(unit_cell.get_trans()[0].size(), 0));
+	translation_phase.resize(cryst.nr_small, cvec(sym_ops_.size(), 0));
 	const double angstrom2bohr = constants::ang2bohr(1);
 	const double bohr2angstrom = constants::bohr2ang(1);
 	vec2 trans = unit_cell.get_trans();
@@ -753,8 +818,9 @@ void XCW::eval_translation_phase(cvec2& translation_phase) {
 		ivec asym_list = generate_asym_lookup(r);
 		vec q_temp = { k_pt[0][asym_list[0]], k_pt[1][asym_list[0]], k_pt[2][asym_list[0]] };
 		std::transform(q_temp.begin(), q_temp.end(), q_temp.begin(), [angstrom2bohr](double x) { return x * angstrom2bohr; });
-		for (int t = 0; t < trans[0].size(); t++) {
-			vec trans_temp = { trans[0][t], trans[1][t], trans[2][t] };
+		for (int t = 0; t < sym_ops_.size(); t++) {
+			const int op = sym_ops_[t];
+			vec trans_temp = { trans[0][op], trans[1][op], trans[2][op] };
 			trans_temp = dot(cm, trans_temp, true);
 			cdouble exponent(0, dot_BLAS(q_temp, trans_temp, false));
 			translation_phase[r][t] = std::exp(exponent);
@@ -812,16 +878,35 @@ void XCW::eval_anom_disp(cvec2& DW_fact, cvec2& phase_fact, cvec2& translation_p
 	}
 }
 
+//The scale that minimises the criterion the SCF descends: k over the fit set from
+//Sum w (k|Fc| - |Fo|)^2 / sigma^2, or k^2 from Sum w (k^2|Fc|^2 - Fo^2)^2 / sigma(I)^2 against
+//F^2, with w the 1/|H|^2 weights of XWR_type 2. calc_perturb takes the scale as given, so the
+//scale had better be stationary for the criterion, or the SCF descends a different
+//functional than the one it prints: an unweighted fit of k put Fe(phen)2(SCN)2 (chi^2 12.96
+//vs 12.30 at the weighted k, dchi^2/dk 2e3) 4 mEh above the previous step's orbitals at
+//every converged lambda >= 0.03.
 void XCW::eval_scale() {
+	ensure_inv_H2_weights();
+	const bool against_F2 = settings.refine_against == 2, weighted = settings.XWR_type == 2;
 	const int chunk = 128, nchunk = (cryst.nr_small + chunk - 1) / chunk;
 	vec numerators(nchunk), denominators(nchunk);
 #pragma omp parallel for schedule(static)
 	for (int c = 0; c < nchunk; c++) {
 		const int first = c * chunk, last = std::min(first + chunk, cryst.nr_small);
 		for (int i = first; i < last; i++) {
+			if (!fit_mask_[i]) continue;
+			const double w = weighted ? inv_H2_[i] : 1.0;
 			const double calc = std::abs(F_calc[0][i]);
-			numerators[c] += calc * obs[i].F_obs;
-			denominators[c] += calc * calc;
+			if (against_F2) {
+				const double calc2 = calc * calc, wi = w / (obs[i].sigma_obs2 * obs[i].sigma_obs2);
+				numerators[c] += wi * calc2 * obs[i].F_obs2;
+				denominators[c] += wi * calc2 * calc2;
+			}
+			else {
+				const double wi = w / (obs[i].sigma_obs * obs[i].sigma_obs);
+				numerators[c] += wi * calc * obs[i].F_obs;
+				denominators[c] += wi * calc * calc;
+			}
 		}
 	}
 	double numerator = 0.0, denominator = 0.0;
@@ -829,14 +914,16 @@ void XCW::eval_scale() {
 		numerator += numerators[c];
 		denominator += denominators[c];
 	}
-	cryst.F_scale = (denominator != 0.0) ? numerator / denominator : 1.0;
+	const double ratio = (denominator != 0.0) ? numerator / denominator : 1.0;
+	cryst.F_scale = against_F2 ? std::sqrt(std::max(ratio, 0.0)) : ratio;
 }
 
 void XCW::calc_criteria() {
 	ensure_inv_H2_weights();
-	double prefactor = 1.0 / static_cast<double>(cryst.nr_small - settings.n_params);
+	//index 0: the fit set, 1: all reflections
+	const double prefactor[2] = { 1.0 / static_cast<double>(cryst.n_fit - settings.n_params), 1.0 / static_cast<double>(cryst.nr_small - settings.n_params) };
 	const int chunk = 128, nchunk = (cryst.nr_small + chunk - 1) / chunk;
-	vec sum_goof1_parts(nchunk), sum_goof2_parts(nchunk), sum_weighted_goof1_parts(nchunk), sum_weighted_goof2_parts(nchunk);
+	vec2 goof1(2, vec(nchunk)), goof2(2, vec(nchunk)), wgoof1(2, vec(nchunk)), wgoof2(2, vec(nchunk)), r1_num(2, vec(nchunk)), r1_den(2, vec(nchunk));
 	const double scale = cryst.F_scale;
 	const cdouble* F_calc_0 = F_calc[0].data();
 #pragma omp parallel for schedule(static)
@@ -847,32 +934,48 @@ void XCW::calc_criteria() {
 			const double scaled_F_calc = scale * std::abs(F_calc_0[i]);
 			const double scaled_difference = scaled_F_calc - obs_ptr.F_obs;
 			const double diff2 = (scaled_F_calc * scaled_F_calc) - obs_ptr.F_obs2;
-			const double inv_sigma_obs = 1.0 / obs_ptr.sigma_obs;
-			const double inv_sigma_obs2 = 1.0 / obs_ptr.sigma_obs2;
-			const double weighted_diff1 = scaled_difference * inv_sigma_obs;
-			const double weighted_diff2 = diff2 * inv_sigma_obs2;
+			const double weighted_diff1 = scaled_difference / obs_ptr.sigma_obs;
+			const double weighted_diff2 = diff2 / obs_ptr.sigma_obs2;
 			const double weighted_diff1_sq = weighted_diff1 * weighted_diff1;
 			const double weighted_diff2_sq = weighted_diff2 * weighted_diff2;
-			sum_goof1_parts[c] += weighted_diff1_sq;
-			sum_goof2_parts[c] += weighted_diff2_sq;
-			if (settings.XWR_type == 2) {
-				const double w = inv_H2_[i];
-				sum_weighted_goof1_parts[c] += weighted_diff1_sq * w;
-				sum_weighted_goof2_parts[c] += weighted_diff2_sq * w;
+			const double w = settings.XWR_type == 2 ? inv_H2_[i] : 0.0;
+			for (int set = fit_mask_[i] ? 0 : 1; set < 2; set++) {
+				goof1[set][c] += weighted_diff1_sq;
+				goof2[set][c] += weighted_diff2_sq;
+				wgoof1[set][c] += weighted_diff1_sq * w;
+				wgoof2[set][c] += weighted_diff2_sq * w;
+				r1_num[set][c] += std::abs(scaled_F_calc - obs_ptr.abs_F_obs);
+				r1_den[set][c] += obs_ptr.abs_F_obs;
 			}
 		}
 	}
-	double sum_goof1 = 0, sum_goof2 = 0, sum_weighted_goof1 = 0, sum_weighted_goof2 = 0;
-	for (int c = 0; c < nchunk; c++) {
-		sum_goof1 += sum_goof1_parts[c];
-		sum_goof2 += sum_goof2_parts[c];
-		sum_weighted_goof1 += sum_weighted_goof1_parts[c];
-		sum_weighted_goof2 += sum_weighted_goof2_parts[c];
+	double sum[6][2] = {};
+	for (int set = 0; set < 2; set++) {
+		for (int c = 0; c < nchunk; c++) {
+			sum[0][set] += goof1[set][c];
+			sum[1][set] += goof2[set][c];
+			sum[2][set] += wgoof1[set][c];
+			sum[3][set] += wgoof2[set][c];
+			sum[4][set] += r1_num[set][c];
+			sum[5][set] += r1_den[set][c];
+		}
 	}
-	cryst.GooF1 = std::sqrt(prefactor * sum_goof1);
-	cryst.GooF2 = std::sqrt(prefactor * sum_goof2);
-	cryst.weighted_GooF1 = std::sqrt(prefactor * sum_weighted_goof1);
-	cryst.weighted_GooF2 = std::sqrt(prefactor * sum_weighted_goof2);
+	cryst.R1 = sum[5][0] > 0.0 ? sum[4][0] / sum[5][0] : 0.0;
+	cryst.R1_all = sum[5][1] > 0.0 ? sum[4][1] / sum[5][1] : 0.0;
+	cryst.GooF1 = std::sqrt(prefactor[0] * sum[0][0]);
+	cryst.GooF2 = std::sqrt(prefactor[0] * sum[1][0]);
+	cryst.weighted_GooF1 = std::sqrt(prefactor[0] * sum[2][0]);
+	cryst.weighted_GooF2 = std::sqrt(prefactor[0] * sum[3][0]);
+	cryst.GooF1_all = std::sqrt(prefactor[1] * sum[0][1]);
+	cryst.GooF2_all = std::sqrt(prefactor[1] * sum[1][1]);
+	cryst.weighted_GooF1_all = std::sqrt(prefactor[1] * sum[2][1]);
+	cryst.weighted_GooF2_all = std::sqrt(prefactor[1] * sum[3][1]);
+}
+
+double XCW::criterion(const bool all) const {
+	const bool weighted = settings.XWR_type == 2, against_F2 = settings.refine_against == 2;
+	if (all) return weighted ? (against_F2 ? cryst.weighted_GooF2_all : cryst.weighted_GooF1_all) : (against_F2 ? cryst.GooF2_all : cryst.GooF1_all);
+	return weighted ? (against_F2 ? cryst.weighted_GooF2 : cryst.weighted_GooF1) : (against_F2 ? cryst.GooF2 : cryst.GooF1);
 }
 
 void XCW::ensure_hkl_ordered() {
@@ -1063,7 +1166,7 @@ void XCW::report_halting_progress_estimate(bool is_final) {
 			*s << " -- WARNING: binned <z^2> trend test flagged at this lambda; "
 				<< "residuals may be spatially correlated, inspect before trusting lambda*.";
 		}
-		*s << std::endl;
+		*s << "\n";
 
 		for (const PolynomialFit& c : candidates) {
 			*s << "  candidate fit: degree=" << c.degree;
@@ -1073,7 +1176,7 @@ void XCW::report_halting_progress_estimate(bool is_final) {
 			}
 			*s << " RSS=" << std::setprecision(4) << c.rss << " R^2=" << c.r_squared
 				<< " AIC=" << c.aic << ((fit.valid && c.degree == fit.degree) ? " [chosen]" : "")
-				<< std::endl;
+				<< "\n";
 		}
 
 		if (at_boundary) {
@@ -1093,7 +1196,16 @@ void XCW::report_halting_progress_estimate(bool is_final) {
 				*s << " The trend so far is not curving upward yet within the search window; "
 					<< "cannot extrapolate a stopping estimate, extend the scan further.";
 			}
-			*s << std::endl;
+			else {
+				//fit.vertex_x <= max_valid_lambda: the fitted curve turns before the last step
+				//while the observed A^2 is still falling there - a flat, noisy trend, so no
+				//estimate is offered
+				*s << " The degree-" << fit.degree << " fit places its minimum at lambda ~= "
+					<< std::setprecision(5) << fit.vertex_x << ", inside the range already scanned, "
+					<< "which contradicts A^2 still falling at the last step; the trend is too flat "
+					<< "here to extrapolate from, only further steps can decide it.";
+			}
+			*s << "\n";
 		}
 	}
 }
@@ -1127,7 +1239,7 @@ ivec XCW::generate_asym_lookup(const int r) {
 	ivec3 rots = unit_cell.get_sym();
 	i3 tempv;
 	const i3& hkl_temp = *it;
-	for (int s = 0; s < rots[0][0].size(); s++) {
+	for (const int s : sym_ops_) {
 		tempv = { 0, 0, 0 };
 		for (int h = 0; h < 3; h++) {
 			for (int j = 0; j < 3; j++) {
@@ -1296,8 +1408,8 @@ void XCW::decide_i_storage() {
 	//The settings file budget wins, then -mem; with neither, what the process can actually
 	//have. Left to a keyword this is the single most expensive decision in an XCW run and
 	//the wrong answer is silent: both SCF walks re-read the whole tensor every iteration, so
-	//streaming a tensor that would have fit cost 5.45 s per iteration against 0.30 s
-	//measured on a V100 node, an 18x on the stage a 200-step lambda scan spends its life in.
+	//streaming a tensor that would have fit is many times slower on the stage a
+	//lambda scan spends its life in.
 	//Nobody should have to know that to get it right.
 	const char* source = "";
 	bool automatic = false;
@@ -1595,9 +1707,9 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 	//Work is sum over blocks of n_active^2 * points, so this is quadratic in what it saves.
 	//Sums over points are order independent, so the reordering changes no result.
 	//Compaction and the AO threshold are worth nothing apart and a great deal together:
-	//measured on the twisted ethylene at def2-TZVP, reordering alone is 1.39x SLOWER (the
-	//blocks shrink and n_active does not), the threshold alone moves the work by 2%, and
-	//together they are 1.29x faster with the GooF, energies and convergence lines identical.
+	//reordering alone is slower (the blocks shrink and n_active does not), the threshold
+	//alone barely moves the work, and together they are faster with the GooF, energies and
+	//convergence lines identical.
 	//So only reorder when the threshold can actually prune: at -acc 4 cutoff() is 1e-30 and
 	//nothing would be dropped, and paying the compaction cost for that would make asking for
 	//more accuracy slower for no reason.
@@ -2483,7 +2595,6 @@ void XCW::calc_F_calc(const dMatrix2& D) {
 
 void XCW::calc_perturb(occ::Mat& perturb, const occ::qm::SCF<occ::qm::HartreeFock>& scf) {
 	ensure_inv_H2_weights();
-	perturb.setZero(cryst.nmo, cryst.nmo);
 
 	//The four (XWR_type, refine_against) combinations differ only in the per-reflection
 	//scalar and the prefactor, so one walk over I serves all of them
@@ -2494,11 +2605,13 @@ void XCW::calc_perturb(occ::Mat& perturb, const occ::qm::SCF<occ::qm::HartreeFoc
 	if (!valid) XCW_log << "Invalid refinement option" << std::endl;
 	const double scale_sq = cryst.F_scale * cryst.F_scale;
 	const double prefactor = against_F2
-		? 4.0 * scale_sq / (cryst.nr_small - settings.n_params)
-		: 2.0 * cryst.F_scale / (cryst.nr_small - settings.n_params);
+		? 4.0 * scale_sq / (cryst.n_fit - settings.n_params)
+		: 2.0 * cryst.F_scale / (cryst.n_fit - settings.n_params);
 
-	const int step = std::max(1, i_streamed_ ? i_window_ : cryst.nr_small);
-	auto precompute_of = [&](const int r) {
+	cvec pre(cryst.nr_small);
+#pragma omp parallel for
+	for (int r = 0; r < cryst.nr_small; r++) {
+		if (!valid || !fit_mask_[r]) continue;
 		cdouble precompute;
 		if (against_F2) {
 			const double F_calc_abs_sq = std::pow(std::abs(F_calc[0][r]), 2);
@@ -2509,17 +2622,26 @@ void XCW::calc_perturb(occ::Mat& perturb, const occ::qm::SCF<occ::qm::HartreeFoc
 			precompute = std::conj(F_calc[0][r]) * (cryst.F_scale * F_calc_abs - obs[r].abs_F_obs) / (obs[r].sigma_obs * obs[r].sigma_obs * F_calc_abs);
 		}
 		if (weighted) precompute *= inv_H2_[r];
-		return precompute;
-	};
+		pre[r] = precompute;
+	}
+	contract_I(perturb, pre);
+	perturb *= prefactor;
+	if (scf.ctx.mo.kind == occ::qm::SpinorbitalKind::Unrestricted) {
+		perturb.conservativeResize(2 * cryst.nmo, Eigen::NoChange);
+		perturb.bottomRows(cryst.nmo) = perturb.topRows(cryst.nmo);
+	}
+	//closing function
+}
+
+void XCW::contract_I(occ::Mat& out, const cvec& pre) {
+	out.setZero(cryst.nmo, cryst.nmo);
+	const int step = std::max(1, i_streamed_ ? i_window_ : cryst.nr_small);
 	bool on_device = false;
 #if defined(NOSPHERA2_USE_GPU) || defined(NOSPHERA2_USE_METAL)
-	if (i_on_device_ && valid) {
-		cvec pre(cryst.nr_small);
-#pragma omp parallel for
-		for (int r = 0; r < cryst.nr_small; r++) pre[r] = precompute_of(r);
-		vec out(i_compact_);
-		err_checkf(itensor_gpu_cols(pre.data(), out.data()), "I tensor walk on the device failed", std::cout);
-		for (size_t k = 0; k < i_compact_; k++) perturb(i_pair_mu_[k], i_pair_nu_[k]) = out[k];
+	if (i_on_device_) {
+		vec dev(i_compact_);
+		err_checkf(itensor_gpu_cols(pre.data(), dev.data()), "I tensor walk on the device failed", std::cout);
+		for (size_t k = 0; k < i_compact_; k++) out(i_pair_mu_[k], i_pair_nu_[k]) = dev[k];
 		on_device = true;
 	}
 #endif
@@ -2532,7 +2654,7 @@ void XCW::calc_perturb(occ::Mat& perturb, const occ::qm::SCF<occ::qm::HartreeFoc
 	{
 		occ::Mat local = occ::Mat::Zero(cryst.nmo, cryst.nmo);
 		double* local_ptr = local.data();
-		for (int r0 = 0; valid && !on_device && r0 < cryst.nr_small; r0 += step) {
+		for (int r0 = 0; !on_device && r0 < cryst.nr_small; r0 += step) {
 			const int r1 = std::min(r0 + step, cryst.nr_small);
 			if (i_streamed_) {
 #pragma omp single
@@ -2545,7 +2667,8 @@ void XCW::calc_perturb(occ::Mat& perturb, const occ::qm::SCF<occ::qm::HartreeFoc
 #pragma omp for
 			for (int r = r0; r < r1; r++) {
 				if (!io_error.empty()) continue;
-				const cdouble precompute = precompute_of(r);
+				const cdouble precompute = pre[r];
+				if (precompute == cdouble(0.0, 0.0)) continue;
 				//As in calc_F_calc: one walk over whichever element type is resident, with
 				//the accumulation in double either way.
 				auto accumulate = [&](const auto* I_r) {
@@ -2571,21 +2694,15 @@ void XCW::calc_perturb(occ::Mat& perturb, const occ::qm::SCF<occ::qm::HartreeFoc
 				double sum = 0.0;
 				for (int t = 0; t < static_cast<int>(parts.size()); t++)
 					if (parts[t].size() != 0) sum += parts[t](mu, nu);
-				perturb(mu, nu) = sum;
+				out(mu, nu) = sum;
 			}
 		}
 	}
-	perturb *= prefactor;
 	for (int mu = 0; mu < cryst.nmo; mu++) {
 		for (int nu = mu + 1; nu < cryst.nmo; nu++) {
-			perturb(nu, mu) = perturb(mu, nu);
+			out(nu, mu) = out(mu, nu);
 		}
 	}
-	if (scf.ctx.mo.kind == occ::qm::SpinorbitalKind::Unrestricted) {
-		perturb.conservativeResize(2 * cryst.nmo, Eigen::NoChange);
-		perturb.bottomRows(cryst.nmo) = perturb.topRows(cryst.nmo);
-	}
-	//closing function
 }
 
 void XCW::setup_SCF_mol(occ::core::Molecule& mol) {
@@ -2717,11 +2834,14 @@ bool XCW::do_SCF(const double& lambda, double& alpha, occ::qm::SCF<occ::qm::Hart
 	diis_E_.clear();
 	adiis_.reset();
 	ediis_.reset();
+	best_quant_ = std::numeric_limits<double>::infinity();
+	rescues_ = 0;
+	soscf_reset();
 
 	XCW_log << "Starting XCW SCF solver with lambda = " << std::fixed << std::setprecision(5) << lambda << "\n";
 	XCW_log << "____________________________________________________________________________________\n";
-	XCW_log << " Iteration	Criterion	GooF(F^2)	Total Energy	Perturbation	Target quantity \n";
-	XCW_log << "										(Eh)		   (a. u.)			(a. u.)\n";
+	XCW_log << " Iteration\t\tCriterion\tGooF(F^2)\tR1(gt)\t\tTotal Energy\t\tPerturbation\tTarget quantity\n";
+	XCW_log << "\t\t\t\t\t\t\t\t\t(Eh)\t\t\t(a. u.)\t\t(a. u.)\n";
 	XCW_log << "____________________________________________________________________________________\n";
 
 	// Compute first guess and update the energy according to this guess
@@ -2768,26 +2888,9 @@ bool XCW::do_SCF(const double& lambda, double& alpha, occ::qm::SCF<occ::qm::Hart
 		}
 
 
-		double current_criterion = 0;
-		switch ((static_cast<int>(settings.XWR_type) << 16) | static_cast<int>(settings.refine_against)) {
-		case (1 << 16) | 1: {
-			current_criterion = cryst.GooF1;
-			break;
-		}
-		case (1 << 16) | 2: {
-			current_criterion = cryst.GooF2;
-			break;
-		}
-		case (2 << 16) | 1: {
-			current_criterion = cryst.weighted_GooF1;
-			break;
-		}
-		case (2 << 16) | 2: {
-			current_criterion = cryst.weighted_GooF2;
-			break;
-		}
-		}
-		std::cout << std::fixed << std::setprecision(5) << lambda << "\t\t" << std::fixed << std::setprecision(3) << current_criterion << "\t\t" << cryst.GooF2 << "\t\t" << std::fixed << std::setprecision(9) << scf.ctx.energy["total"] << "\t\t" << std::fixed << std::setprecision(3) << lambda * current_criterion << "\t\t" << std::fixed << std::setprecision(9) << quant;
+		const double current_criterion = criterion(false);
+		std::cout << std::fixed << std::setprecision(5) << lambda << "\t\t" << std::fixed << std::setprecision(4) << current_criterion << "\t\t" << cryst.GooF2 << "\t\t" << std::setprecision(5) << cryst.R1 << "\t\t" << std::fixed << std::setprecision(9) << scf.ctx.energy["total"] << "\t\t" << std::fixed << std::setprecision(3) << lambda * current_criterion << "\t\t" << std::fixed << std::setprecision(9) << quant
+			<< "\t\t" << std::setprecision(4) << criterion(true) << "\t\t" << std::setprecision(5) << cryst.R1_all;
 		if (opt->xcw_gaussian_halt && !gaussian_halt_history_.empty()) {
 			std::cout << "\t\t" << std::setprecision(4) << gaussian_halt_history_.back().A2;
 		}
@@ -3033,32 +3136,19 @@ bool XCW::SCF_iteration(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& l
 	throughput::record_time("XCW Fock build (OCC)", eri_on_device_, get_msec(fock_t0, get_time()));
 	scf.update_scf_energy(false);
 
-	double current_criterion = 0;
-	switch ((static_cast<int>(settings.XWR_type) << 16) | static_cast<int>(settings.refine_against)) {
-	case (1 << 16) | 1: {
-		current_criterion = cryst.GooF1;
-		break;
-	}
-	case (1 << 16) | 2: {
-		current_criterion = cryst.GooF2;
-		break;
-	}
-	case (2 << 16) | 1: {
-		current_criterion = cryst.weighted_GooF1;
-		break;
-	}
-	case (2 << 16) | 2: {
-		current_criterion = cryst.weighted_GooF2;
-		break;
-	}
-	}
+	const double current_criterion = criterion(false);
 	const double temp_penalty = current_criterion * lambda;
 	quant = scf.ctx.energy["total"] + temp_penalty;
 
 	scf.ctx.F += perturbation * lambda;
 
 	// Prints output line for iteration
-	XCW_log << "\t" << scf.iter << "\t\t" << std::fixed << std::setprecision(3) << current_criterion << "\t\t" << cryst.GooF2 << "\t\t" << std::fixed << std::setprecision(9) << scf.ctx.energy["total"] << "\t\t" << std::fixed << std::setprecision(3) << temp_penalty << "\t\t" << std::fixed << std::setprecision(9) << quant << std::endl;
+	XCW_log << "\t" << scf.iter << "\t\t" << std::fixed << std::setprecision(4) << current_criterion << "\t\t" << cryst.GooF2 << "\t\t" << std::setprecision(5) << cryst.R1 << "\t\t" << std::fixed << std::setprecision(9) << scf.ctx.energy["total"] << "\t\t" << std::fixed << std::setprecision(3) << temp_penalty << "\t\t" << std::fixed << std::setprecision(9) << quant << std::endl;
+
+	//calc_perturb is the gradient of lambda * criterion^2 (the chi^2 of Jayatilaka's functional),
+	//so that, not the printed lambda * criterion, is what the SCF descends and what the rescue ranks by
+	const double phi = scf.ctx.energy["total"] + lambda * current_criterion * current_criterion;
+	if (!soscf_ && rescue_scf(scf, phi, alpha)) return false;
 
 	// DIIS extrapolation
 	occ::Mat F_diis = diis_update(scf);
@@ -3072,6 +3162,29 @@ bool XCW::SCF_iteration(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& l
 		return true;
 	}
 	last_quant = quant;
+
+	if (!soscf_) {
+		if (scf.iter == 1 || settings.current_gradient < 0.5 * soscf_patience_grad_) {
+			soscf_patience_grad_ = settings.current_gradient;
+			soscf_patience_iter_ = scf.iter;
+		}
+		//with soscf requested the DIIS stage only has to reach the quadratic region; Fe_phen HS lambda 0.08
+		//oscillated for 30 iterations above the 1e-2 gate while TRAH converged in 6 from that very point
+		const int patience = settings.soscf ? soscf_patience_requested_ : soscf_patience_;
+		const bool stuck = scf.iter - soscf_patience_iter_ >= patience;
+		if (stuck || (settings.soscf && scf.diis_error < soscf_start_)) {
+			soscf_ = true;
+			std::ostringstream what;
+			what << "***" << (stuck ? "Orbital gradient not halved in " + std::to_string(patience) + " iterations" : "DIIS error below 1e-2")
+				<< ": second-order steps on the orbital rotations from here***";
+			print_centered_message(what.str(), 84, XCW_log);
+		}
+	}
+	if (soscf_) {
+		soscf_step(scf, lambda, phi);
+		dm_last = dm_old;
+		return false;
+	}
 
 	// Apply level shift
 	if (settings.apply_shift) {
@@ -3104,6 +3217,423 @@ bool XCW::SCF_iteration(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& l
 	return false;
 
 	//closing function
+}
+
+void XCW::soscf_reset() {
+	soscf_ = false;
+	soscf_patience_iter_ = 0;
+	soscf_patience_grad_ = 0;
+	trah_B_.clear();
+	trah_HB_.clear();
+	soscf_kappa_.resize(0);
+	soscf_grad_.resize(0);
+	soscf_hdiag_.resize(0);
+	soscf_C_.resize(0, 0);
+	soscf_phi_ = std::numeric_limits<double>::infinity();
+	soscf_pred_ = 0;
+	soscf_boundary_ = false;
+	soscf_trust_ = soscf_trust_first_;
+	trah_micro_total_ = 0;
+}
+
+//The gradient of E + lambda chi^2 with respect to the rotation kappa_ai of occupied orbital i
+//into virtual a, C -> C exp(kappa), one spin block after the other: 4 F_ai for the restricted
+//density 2 C_occ C_occ^T, 2 F_ai per spin block otherwise, F the perturbed Fock matrix in the
+//MO basis. diagonal_hessian gets the usual approximation of its diagonal, 4 (e_a - e_i) or
+//2 (e_a - e_i) over the diagonal of that F, floored so a near-degenerate pair cannot blow up
+//the step.
+occ::Vec XCW::orbital_rotation_gradient(const occ::qm::SCF<occ::qm::HartreeFock>& scf, occ::Vec& diagonal_hessian) const {
+	const occ::qm::MolecularOrbitals& mo = scf.ctx.mo;
+	const int n = cryst.nmo, nb = mo.kind == occ::qm::SpinorbitalKind::Unrestricted ? 2 : 1;
+	const double fac = nb == 1 ? 4.0 : 2.0, gap_floor = 0.02;
+	Eigen::Index size = 0;
+	for (int b = 0; b < nb; b++) {
+		const Eigen::Index nocc = static_cast<Eigen::Index>(b == 0 ? mo.n_alpha : mo.n_beta);
+		size += nocc * (n - nocc);
+	}
+	occ::Vec g(size);
+	diagonal_hessian.resize(size);
+	Eigen::Index at = 0;
+	for (int b = 0; b < nb; b++) {
+		const Eigen::Index nocc = static_cast<Eigen::Index>(b == 0 ? mo.n_alpha : mo.n_beta), nvir = n - nocc;
+		const occ::Mat Cb = mo.C.middleRows(static_cast<Eigen::Index>(b) * n, n);
+		const occ::Mat F_mo = Cb.transpose() * scf.ctx.F.middleRows(static_cast<Eigen::Index>(b) * n, n) * Cb;
+		const occ::Vec e = F_mo.diagonal();
+		for (Eigen::Index i = 0; i < nocc; i++) {
+			for (Eigen::Index a = 0; a < nvir; a++, at++) {
+				g(at) = fac * F_mo(nocc + a, i);
+				diagonal_hessian(at) = fac * std::max(e(nocc + a) - e(i), gap_floor);
+			}
+		}
+	}
+	return g;
+}
+
+//C_from exp(kappa) by the Cayley transform (I - K/2)^-1 (I + K/2), exactly orthogonal for the
+//antisymmetric K that carries kappa in its occupied-virtual blocks, so the orbitals stay
+//S-orthonormal. The first nocc columns stay the occupied ones; the density follows.
+void XCW::rotate_orbitals(occ::qm::SCF<occ::qm::HartreeFock>& scf, const occ::Mat& C_from, const occ::Vec& kappa) const {
+	occ::qm::MolecularOrbitals& mo = scf.ctx.mo;
+	const int n = cryst.nmo, nb = mo.kind == occ::qm::SpinorbitalKind::Unrestricted ? 2 : 1;
+	Eigen::Index at = 0;
+	for (int b = 0; b < nb; b++) {
+		const Eigen::Index nocc = static_cast<Eigen::Index>(b == 0 ? mo.n_alpha : mo.n_beta), nvir = n - nocc;
+		occ::Mat K = occ::Mat::Zero(n, n);
+		for (Eigen::Index i = 0; i < nocc; i++) {
+			for (Eigen::Index a = 0; a < nvir; a++, at++) {
+				K(nocc + a, i) = 0.5 * kappa(at);
+				K(i, nocc + a) = -0.5 * kappa(at);
+			}
+		}
+		const occ::Mat I = occ::Mat::Identity(n, n);
+		const occ::Mat U = (I - K).partialPivLu().solve(I + K);
+		mo.C.middleRows(static_cast<Eigen::Index>(b) * n, n) = C_from.middleRows(static_cast<Eigen::Index>(b) * n, n) * U;
+	}
+	mo.update_occupied_orbitals();
+	mo.update_density_matrix();
+}
+
+//One second-order macro iteration, see soscf_ in the header. phi is E + lambda chi^2 at the
+//current orbitals, which the last step produced. Above the functional it left by more than
+//the noise of a Fock build, the step is rejected: the trust radius halves and the step is
+//re-solved in the subspace the micro-iterations already built, from the orbitals it left.
+//Otherwise the trust radius follows the ratio of the actual to the predicted decrease
+//(doubled after a good step that reached the boundary, halved after a poor one) and a fresh
+//gradient starts the next macro step.
+void XCW::soscf_step(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double lambda, const double phi) {
+	const bool stepped = soscf_kappa_.size() > 0;
+	if (stepped && phi > soscf_phi_ + soscf_noise_ && soscf_kappa_.cwiseAbs().maxCoeff() > 1e-6) {
+		soscf_trust_ = 0.5 * std::min(soscf_trust_, soscf_kappa_.norm());
+		std::ostringstream what;
+		what << "***E + lambda chi^2 " << std::scientific << std::setprecision(1) << phi - soscf_phi_
+			<< " Eh above the orbitals the step left: trust radius " << std::fixed << std::setprecision(3) << soscf_trust_ << ", step re-solved***";
+		print_centered_message(what.str(), 84, XCW_log);
+		trah_solve(scf, lambda, false);
+		rotate_orbitals(scf, soscf_C_, soscf_kappa_);
+		return;
+	}
+	if (stepped && soscf_pred_ < 0) {
+		const double rho = (phi - soscf_phi_) / soscf_pred_;
+		if (rho > 0.75 && soscf_boundary_) soscf_trust_ = std::min(2.0 * soscf_trust_, soscf_trust_max_);
+		else if (rho < 0.25) soscf_trust_ *= 0.5;
+	}
+	//The Roothaan iterations damp the density, so the Fock matrix of the iteration that hands
+	//over belongs to a mix of densities, not to the orbitals: rebuilt from them once, so the
+	//first gradient, Hessian and reference functional are consistent
+	soscf_phi_ = stepped ? phi : rebuild_at(scf, lambda, scf.ctx.mo.C, occ::Vec());
+	soscf_grad_ = orbital_rotation_gradient(scf, soscf_hdiag_);
+	trah_B_.clear();
+	trah_HB_.clear();
+	soscf_C_ = scf.ctx.mo.C;
+	if (settings.check_hessian && !stepped) check_hessian(scf, lambda);
+	trah_solve(scf, lambda, true);
+	rotate_orbitals(scf, soscf_C_, soscf_kappa_);
+}
+
+//The step of the current macro iteration: the lowest eigenvector of the augmented Hessian
+//[[0, a g^T], [a g, H]] in the Davidson subspace trah_B_ (H trah_B_ in trah_HB_), scaled to
+//kappa = x / (a x0), with a >= 1 raised by bisection until |kappa| fits the trust radius
+//(a = 1 is the plain augmented-Hessian step). With extend, the subspace grows by the
+//preconditioned residual of the level-shifted Newton equation (H - theta) kappa = -g, one
+//exact Hessian-vector product per micro-iteration, until the residual is below a fraction of
+//the gradient that shrinks with it, or trah_micro_max_ is reached; without, the retained
+//subspace is re-solved at the current radius (after a rejected step the Fock matrix belongs
+//to the rejected orbitals, so no product could be added). Sets soscf_kappa_, the predicted
+//decrease g.kappa + kappa.H kappa / 2 and whether the step lies on the boundary.
+void XCW::trah_solve(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double lambda, const bool extend) {
+	const occ::Vec& g = soscf_grad_;
+	const double gnorm = g.norm();
+	const double tol = gnorm * std::min(0.1, std::max(1e-3, std::sqrt(gnorm)));
+	auto add = [&](occ::Vec b) {
+		for (int pass = 0; pass < 2; pass++)
+			for (const occ::Vec& Bk : trah_B_) b -= Bk.dot(b) * Bk;
+		const double nb = b.norm();
+		if (nb < 1e-10) return false;
+		b /= nb;
+		trah_HB_.push_back(hessian_vector(scf, lambda, b));
+		trah_B_.push_back(b);
+		return true;
+	};
+	if (extend && trah_B_.empty()) add(-g.cwiseQuotient(soscf_hdiag_));
+	//the small problem at shift parameter a: theta, x0, xs and |kappa|
+	occ::Mat Hs;
+	occ::Vec gs;
+	double theta = 0, x0 = 1, alpha = 1;
+	occ::Vec xs;
+	auto reduced = [&](const double a, double& th, double& v0, occ::Vec& v) {
+		const Eigen::Index m = gs.size();
+		occ::Mat A = occ::Mat::Zero(m + 1, m + 1);
+		A(0, 0) = 0;
+		A.block(0, 1, 1, m) = a * gs.transpose();
+		A.block(1, 0, m, 1) = a * gs;
+		A.block(1, 1, m, m) = Hs;
+		Eigen::SelfAdjointEigenSolver<occ::Mat> es(A);
+		th = es.eigenvalues()(0);
+		const occ::Vec ev = es.eigenvectors().col(0);
+		v0 = ev(0);
+		v = ev.tail(m);
+		return std::abs(v0) > 1e-14 ? v.norm() / (a * std::abs(v0)) : std::numeric_limits<double>::infinity();
+	};
+	int micro = 0;
+	double knorm = 0, rnorm = 0;
+	occ::Vec kappa, Hkappa;
+	for (;;) {
+		const Eigen::Index m = static_cast<Eigen::Index>(trah_B_.size());
+		Hs.resize(m, m);
+		gs.resize(m);
+		for (Eigen::Index i = 0; i < m; i++) {
+			gs(i) = trah_B_[i].dot(g);
+			for (Eigen::Index j = 0; j <= i; j++) Hs(i, j) = Hs(j, i) = 0.5 * (trah_B_[i].dot(trah_HB_[j]) + trah_B_[j].dot(trah_HB_[i]));
+		}
+		alpha = 1;
+		knorm = reduced(alpha, theta, x0, xs);
+		soscf_boundary_ = knorm > soscf_trust_;
+		if (soscf_boundary_) {
+			//|kappa| falls monotonically with a: bracket, then bisect on log a
+			double lo = 1, hi = 1;
+			while (hi < 1e8 && reduced(hi, theta, x0, xs) > soscf_trust_) { lo = hi; hi *= 2; }
+			for (int it = 0; it < 60 && hi / lo > 1 + 1e-6; it++) {
+				const double mid = std::sqrt(lo * hi);
+				if (reduced(mid, theta, x0, xs) > soscf_trust_) lo = mid; else hi = mid;
+			}
+			alpha = hi;
+			knorm = reduced(alpha, theta, x0, xs);
+		}
+		kappa = occ::Vec::Zero(g.size());
+		Hkappa = occ::Vec::Zero(g.size());
+		for (Eigen::Index i = 0; i < m; i++) {
+			kappa += xs(i) * trah_B_[i];
+			Hkappa += xs(i) * trah_HB_[i];
+		}
+		if (std::isfinite(knorm)) {
+			kappa /= alpha * x0;
+			Hkappa /= alpha * x0;
+			//the bisection tolerance may leave the step a hair outside: scale, do not resolve
+			if (knorm > soscf_trust_) {
+				kappa *= soscf_trust_ / knorm;
+				Hkappa *= soscf_trust_ / knorm;
+				knorm = soscf_trust_;
+			}
+		}
+		else {
+			//no finite step from the subspace: the preconditioned gradient, scaled into the radius
+			kappa = -g.cwiseQuotient(soscf_hdiag_);
+			kappa *= soscf_trust_ / kappa.norm();
+			Hkappa = hessian_vector(scf, lambda, kappa);
+			knorm = soscf_trust_;
+			soscf_boundary_ = true;
+		}
+		const occ::Vec r = g + Hkappa - theta * kappa;
+		rnorm = r.norm();
+		if (!extend || rnorm < tol || micro >= trah_micro_max_) break;
+		if (!add(-r.cwiseQuotient((soscf_hdiag_.array() - theta).max(1e-2).matrix()))) break;
+		micro++;
+	}
+	trah_micro_total_ += micro;
+	soscf_kappa_ = kappa;
+	soscf_pred_ = g.dot(kappa) + 0.5 * kappa.dot(Hkappa);
+	XCW_log << "\t\tTRAH: " << micro << " micro-iterations (" << trah_micro_total_ << " in this lambda step), |g| " << std::scientific << std::setprecision(1) << gnorm
+		<< ", residual " << rnorm << ", |kappa| " << knorm << (soscf_boundary_ ? " on" : " within") << " the trust radius " << std::fixed << std::setprecision(3) << soscf_trust_
+		<< ", shift " << std::scientific << std::setprecision(1) << theta << ", predicted " << soscf_pred_ << " Eh" << std::endl;
+}
+
+//H v for the rotation direction v, the derivative of orbital_rotation_gradient along it:
+//dC_occ = C_vir V, dC_vir = -C_occ V^T from C exp(kappa); dD from the density's own
+//convention (C_occ C_occ^T, halved per spin block for UHF); dF = G(dD) by the same Fock
+//build the SCF uses, plus lambda times the response of the perturbation, which is the
+//derivative of calc_perturb's per-reflection scalar with the scale moving along (the scale
+//minimises chi^2, so the gradient does not see it but the Hessian does); and
+//H v = fac (dC_vir^T F C_occ + C_vir^T dF C_occ + C_vir^T F dC_occ) with F the perturbed
+//Fock matrix of the current orbitals. The occupied-occupied and virtual-virtual parts of
+//the second-order orbital change leave the functional alone, so this is the exact Hessian.
+occ::Vec XCW::hessian_vector(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double lambda, const occ::Vec& v) {
+	occ::qm::MolecularOrbitals& mo = scf.ctx.mo;
+	const int n = cryst.nmo, nb = mo.kind == occ::qm::SpinorbitalKind::Unrestricted ? 2 : 1;
+	const double fac = nb == 1 ? 4.0 : 2.0, dfac = nb == 1 ? 1.0 : 0.5;
+	occ::Mat dC = occ::Mat::Zero(mo.C.rows(), n), dD = occ::Mat::Zero(mo.D.rows(), n);
+	Eigen::Index at = 0;
+	for (int b = 0; b < nb; b++) {
+		const Eigen::Index nocc = static_cast<Eigen::Index>(b == 0 ? mo.n_alpha : mo.n_beta), nvir = n - nocc, row = static_cast<Eigen::Index>(b) * n;
+		occ::Mat V(nvir, nocc);
+		for (Eigen::Index i = 0; i < nocc; i++)
+			for (Eigen::Index a = 0; a < nvir; a++, at++) V(a, i) = v(at);
+		const occ::Mat Cocc = mo.C.block(row, 0, n, nocc), Cvir = mo.C.block(row, nocc, n, nvir);
+		dC.block(row, 0, n, nocc) = Cvir * V;
+		dC.block(row, nocc, n, nvir) = -Cocc * V.transpose();
+		const occ::Mat dCocc = dC.block(row, 0, n, nocc);
+		dD.middleRows(row, n) = dfac * (dCocc * Cocc.transpose() + Cocc * dCocc.transpose());
+	}
+	//G(dD): the Fock build reads mo.D, and a screen on the density would drop the small dD
+	std::swap(mo.D, dD);
+	occ::Mat dF = eri_ ? eri_fock(mo, false) : scf.m_procedure.compute_fock(mo, scf.ctx.K);
+	std::swap(mo.D, dD);
+	if (lambda != 0) {
+		//dF_r = Sum c I_r dD_eff: calc_F_calc's walk with the fixed part zeroed
+		dMatrix2 dD_eff(n, n);
+		build_effective_dm(scf, dD_eff, dD);
+		const cvec F0 = F_calc[0], fixed = F_calc[1];
+		std::fill(F_calc[1].begin(), F_calc[1].end(), cdouble(0.0, 0.0));
+		calc_F_calc(dD_eff);
+		const cvec dFr = F_calc[0];
+		F_calc[0] = F0;
+		F_calc[1] = fixed;
+		//the scale's response from the weighted least-squares scale of eval_scale
+		const bool against_F2 = settings.refine_against == 2, weighted = settings.XWR_type == 2;
+		const double k = cryst.F_scale, s = k * k;
+		const int chunk = 128, nchunk = (cryst.nr_small + chunk - 1) / chunk;
+		vec dnum(nchunk), dden(nchunk), den(nchunk);
+#pragma omp parallel for schedule(static)
+		for (int ch = 0; ch < nchunk; ch++) {
+			for (int r = ch * chunk; r < std::min((ch + 1) * chunk, cryst.nr_small); r++) {
+				if (!fit_mask_[r]) continue;
+				const double w = weighted ? inv_H2_[r] : 1.0, Fa = std::abs(F0[r]);
+				const double dFa = Fa > 0 ? std::real(std::conj(F0[r]) * dFr[r]) / Fa : 0.0;
+				if (against_F2) {
+					const double wi = w / (obs[r].sigma_obs2 * obs[r].sigma_obs2);
+					dnum[ch] += wi * 2.0 * Fa * dFa * obs[r].F_obs2;
+					dden[ch] += wi * 4.0 * Fa * Fa * Fa * dFa;
+					den[ch] += wi * Fa * Fa * Fa * Fa;
+				}
+				else {
+					const double wi = w / (obs[r].sigma_obs * obs[r].sigma_obs);
+					dnum[ch] += wi * dFa * obs[r].F_obs;
+					dden[ch] += wi * 2.0 * Fa * dFa;
+					den[ch] += wi * Fa * Fa;
+				}
+			}
+		}
+		double dnum_sum = 0, dden_sum = 0, den_sum = 0;
+		for (int ch = 0; ch < nchunk; ch++) { dnum_sum += dnum[ch]; dden_sum += dden[ch]; den_sum += den[ch]; }
+		//F: dk = (dN - k dD) / D; F^2: ds = (dN - s dD) / D for s = k^2
+		const double dscale = den_sum != 0 ? (dnum_sum - (against_F2 ? s : k) * dden_sum) / den_sum : 0.0;
+		//d(q_r) for q_r = prefactor's scale power times calc_perturb's scalar, both moving:
+		//F: q = w conj(F) (k^2 - k Fo / |F|) / sigma^2; F^2: q = w conj(F) (s^2 |F|^2 - s Fo^2) / sigma_I^2
+		cvec dq(cryst.nr_small);
+#pragma omp parallel for
+		for (int r = 0; r < cryst.nr_small; r++) {
+			if (!fit_mask_[r]) continue;
+			const double w = weighted ? inv_H2_[r] : 1.0, Fa = std::abs(F0[r]);
+			if (Fa == 0) continue;
+			const double dFa = std::real(std::conj(F0[r]) * dFr[r]) / Fa;
+			if (against_F2) {
+				const double wi = w / (obs[r].sigma_obs2 * obs[r].sigma_obs2), Fo2 = obs[r].F_obs2;
+				dq[r] = wi * (std::conj(dFr[r]) * (s * s * Fa * Fa - s * Fo2)
+					+ std::conj(F0[r]) * (2.0 * s * dscale * Fa * Fa + 2.0 * s * s * Fa * dFa - dscale * Fo2));
+			}
+			else {
+				const double wi = w / (obs[r].sigma_obs * obs[r].sigma_obs), Fo = obs[r].abs_F_obs;
+				dq[r] = wi * (std::conj(dFr[r]) * (k * k - k * Fo / Fa)
+					+ std::conj(F0[r]) * (dscale * (2.0 * k - Fo / Fa) + k * Fo * dFa / (Fa * Fa)));
+			}
+		}
+		occ::Mat dP;
+		contract_I(dP, dq);
+		dP *= (against_F2 ? 4.0 : 2.0) / (cryst.n_fit - settings.n_params) * lambda;
+		for (int b = 0; b < nb; b++) dF.middleRows(static_cast<Eigen::Index>(b) * n, n) += dP;
+	}
+	occ::Vec Hv(v.size());
+	at = 0;
+	for (int b = 0; b < nb; b++) {
+		const Eigen::Index nocc = static_cast<Eigen::Index>(b == 0 ? mo.n_alpha : mo.n_beta), nvir = n - nocc, row = static_cast<Eigen::Index>(b) * n;
+		const occ::Mat Cocc = mo.C.block(row, 0, n, nocc), Cvir = mo.C.block(row, nocc, n, nvir);
+		const occ::Mat dCocc = dC.block(row, 0, n, nocc), dCvir = dC.block(row, nocc, n, nvir);
+		const occ::Mat F = scf.ctx.F.middleRows(row, n), dFb = dF.middleRows(row, n);
+		const occ::Mat M = fac * (dCvir.transpose() * F * Cocc + Cvir.transpose() * dFb * Cocc + Cvir.transpose() * F * dCocc);
+		for (Eigen::Index i = 0; i < nocc; i++)
+			for (Eigen::Index a = 0; a < nvir; a++, at++) Hv(at) = M(a, i);
+	}
+	return Hv;
+}
+
+//The orbitals C_from exp(kappa) (the current ones, density rebuilt from them, for an empty
+//kappa) with everything that depends on them rebuilt: structure factors, scale, criteria,
+//perturbation, Fock matrix and energy, the way SCF_iteration does it. Returns E + lambda chi^2
+//there.
+double XCW::rebuild_at(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double lambda, const occ::Mat& C_from, const occ::Vec& kappa) {
+	if (kappa.size() > 0) rotate_orbitals(scf, C_from, kappa);
+	else {
+		scf.ctx.mo.update_occupied_orbitals();
+		scf.ctx.mo.update_density_matrix();
+	}
+	dMatrix2 dm_eff(cryst.nmo, cryst.nmo);
+	build_effective_dm(scf, dm_eff, scf.ctx.mo.D);
+	calc_F_calc(dm_eff);
+	eval_scale();
+	calc_criteria();
+	occ::Mat perturbation;
+	calc_perturb(perturbation, scf);
+	scf.ctx.F = scf.ctx.H + (eri_ ? eri_fock(scf.ctx.mo, false) : scf.m_procedure.compute_fock(scf.ctx.mo, scf.ctx.K));
+	scf.update_scf_energy(false);
+	const double crit = criterion(false);
+	scf.ctx.F += lambda * perturbation;
+	return scf.ctx.energy["total"] + lambda * crit * crit;
+}
+
+//orbital_rotation_gradient at C_from exp(kappa), rebuilt there and put back afterwards. Only
+//the Hessian check pays for it.
+occ::Vec XCW::gradient_at(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double lambda, const occ::Mat& C_from, const occ::Vec& kappa) {
+	const occ::qm::MolecularOrbitals mo_saved = scf.ctx.mo;
+	const occ::Mat F_saved = scf.ctx.F;
+	const auto energy_saved = scf.ctx.energy;
+	const cvec F0_saved = F_calc[0];
+	const double scale_saved = cryst.F_scale;
+	rebuild_at(scf, lambda, C_from, kappa);
+	occ::Vec h;
+	const occ::Vec g = orbital_rotation_gradient(scf, h);
+	scf.ctx.mo = mo_saved;
+	scf.ctx.F = F_saved;
+	scf.ctx.energy = energy_saved;
+	F_calc[0] = F0_saved;
+	cryst.F_scale = scale_saved;
+	return g;
+}
+
+//Central finite difference of the gradient along a fixed pseudo-random direction against
+//hessian_vector, reported to XCW.log; `check_hessian` runs it on the first second-order step
+void XCW::check_hessian(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double lambda) {
+	std::mt19937 rng(7);
+	std::normal_distribution<double> gauss;
+	occ::Vec v(soscf_grad_.size());
+	for (Eigen::Index i = 0; i < v.size(); i++) v(i) = gauss(rng);
+	v /= v.norm();
+	const occ::Vec Hv = hessian_vector(scf, lambda, v);
+	const double eps = 1e-4;
+	const occ::Mat C0 = scf.ctx.mo.C;
+	const occ::Vec fd = (gradient_at(scf, lambda, C0, eps * v) - gradient_at(scf, lambda, C0, -eps * v)) / (2.0 * eps);
+	XCW_log << "\t\tHessian check: |Hv - FD| / |FD| = " << std::scientific << std::setprecision(2) << (Hv - fd).norm() / fd.norm()
+		<< " (|Hv| " << Hv.norm() << ", |FD| " << fd.norm() << ", v.Hv " << v.dot(Hv) << ", v.FD " << v.dot(fd) << ")" << std::endl;
+}
+
+//The rescue of a lost SCF step, see best_mo_ in the header. True when it restarted the step:
+//the orbitals are the best ones again, the iteration ends here and the next one rebuilds
+//their Fock matrix in full. The stabiliser thresholds stay tightened for the later steps,
+//which are at least as hard.
+bool XCW::rescue_scf(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double quant, double& alpha) {
+	if (quant < best_quant_) {
+		best_quant_ = quant;
+		best_mo_ = scf.ctx.mo;
+		return false;
+	}
+	if (quant - best_quant_ < rescue_rise_ || rescues_ >= 3) return false;
+	rescues_++;
+	settings.diis_stop_shift /= 10;
+	settings.diis_stop_damping /= 10;
+	std::ostringstream what;
+	what << "***E + lambda chi^2 " << std::fixed << std::setprecision(3) << quant - best_quant_
+		<< " Eh above its best: back to the best orbitals, level shift and damping on until DIIS error "
+		<< std::scientific << std::setprecision(0) << settings.diis_stop_shift << " / " << settings.diis_stop_damping
+		<< " (rescue " << rescues_ << "/3)***";
+	print_centered_message(what.str(), 84, XCW_log);
+	scf.ctx.mo = best_mo_;
+	G_last_.resize(0, 0);
+	diis_F_.clear();
+	diis_E_.clear();
+	adiis_.reset();
+	ediis_.reset();
+	settings.apply_shift = settings.method_apply_shift;
+	settings.apply_damping = settings.method_apply_damping;
+	alpha = settings.alpha;
+	return true;
 }
 
 bool XCW::SCF_convergence_check(occ::qm::SCF<occ::qm::HartreeFock>& scf, occ::Mat& dm_last) {
@@ -3173,6 +3703,19 @@ void XCW::create_tscb(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& lam
 	std::ostringstream oss2;
 	oss2 << "NA2_" << value << ".wfn";
 	sf_wave_vec[0].write_wfn(oss2.str(), false, true);
+	//the structure factors this step was scored on, for an R-factor against another route
+	//(an ORCA tsc through Olex2, or a Laue check between symmetry-equivalent rows)
+	{
+		ensure_hkl_ordered();
+		std::ofstream fc("NA2_" + value + "_Fcalc.txt");
+		fc << "#    h    k    l          F_obs        sig(F)   scale*|F_calc|     phase(deg)   R1(gt) = " << std::setprecision(5) << cryst.R1 << " R1(all) = " << cryst.R1_all << " scale = " << std::setprecision(10) << cryst.F_scale << "\n";
+		for (int r = 0; r < cryst.nr_small; r++) {
+			const cdouble& f = F_calc[0][r];
+			fc << std::setw(5) << hkl_ordered_[r][0] << std::setw(5) << hkl_ordered_[r][1] << std::setw(5) << hkl_ordered_[r][2]
+				<< std::fixed << std::setprecision(4) << std::setw(15) << obs[r].F_obs << std::setw(14) << obs[r].sigma_obs
+				<< std::setw(17) << cryst.F_scale * std::abs(f) << std::setw(15) << std::arg(f) * 180.0 / constants::PI << "\n";
+		}
+	}
 	std::ostringstream oss3;
 	oss3 << "NA2_" << value << ".fchk";
 	//OCC's fchk writer reorders to Gaussian's basis functions but keeps libcint's phases,
@@ -3390,12 +3933,12 @@ void XCW::run_XCW_fitting() {
 			<< "Criterion below are this weighted quantity, not the classical GoF." << std::endl;
 	}
 	std::cout << "____________________________________________________________________________________\n";
-	std::cout << " Lambda\t\tCriterion\tGooF(F2)\tTotal Energy\tPerturbation\tTarget quantity ";
+	std::cout << " Lambda\t\tCriterion\tGooF(F2)\tR1(gt)\t\tTotal Energy\t\tPerturbation\tTarget quantity\t\tCrit(all)\tR1(all)";
 	if (opt->xcw_gaussian_halt) {
-		std::cout << "\tA^2 (halt)";
+		std::cout << "\t\tA^2 (halt)";
 	}
 	std::cout << "\n";
-	std::cout << "										(Eh)		   (a. u.)			(a. u.)\n";
+	std::cout << "\t\t\t\t\t\t\t\t(Eh)\t\t\t(a. u.)\t\t(a. u.)\n";
 	std::cout << "____________________________________________________________________________________\n";
 
 	// Runs the lambda steps for XCW fitting
@@ -3413,8 +3956,31 @@ void XCW::run_XCW_fitting() {
 	};
 	const double min_lambda_step = settings.xcw_step_size / 128.0;
 	double last_lambda = settings.xcw_start_value;
-	for (int step = 0; step < settings.num_xcw_steps; step++) {
+	//slow_conv's damping (alpha 0.8, shift 1) is for the perturbed steps, which start from
+	//converged orbitals; from the core guess it runs out of iterations (Fe(phen)2(SCN)2 UHF:
+	//200 iterations, RMSD still 4e-5). The first step without a guess takes the normal
+	//schedule, every later one the slow settings from the file
+	const bool slow_start = settings.slow_conv && !has_guess;
+	const double slow_alpha = settings.alpha, slow_shift = settings.level_shift, slow_stop_damping = settings.diis_stop_damping, slow_stop_shift = settings.diis_stop_shift;
+	if (slow_start) {
+		settings.alpha = 0.5; settings.level_shift = 0.5; settings.diis_stop_damping = 1e-3; settings.diis_stop_shift = 1e-2;
+		std::cout << "XCW: slow_conv - the unperturbed first step runs the normal schedule, slow damping from the second step on" << std::endl;
+		XCW_log << "XCW: slow_conv - the unperturbed first step runs the normal schedule, slow damping from the second step on" << std::endl;
+	}
+	//The scan used to stop at max_value even when A^2 was still falling there, i.e. on the
+	//scan boundary instead of on lambda*, and only printed "extend the scan" afterwards.
+	//The perturbed steps start from converged orbitals and TRAH takes the ones that DIIS
+	//cannot, so running past the requested range is stable enough to just do it. Capped at
+	//the requested number of steps, so a trend that never curves upward at most doubles the
+	//scan rather than running away
+	int planned_steps = settings.num_xcw_steps;
+	const int max_extra_steps = settings.num_xcw_steps;
+	int extra_steps = 0;
+	for (int step = 0; step < planned_steps; step++) {
 		const double lambda = step * settings.xcw_step_size + settings.xcw_start_value;
+		if (slow_start && step == 1) {
+			settings.alpha = slow_alpha; settings.level_shift = slow_shift; settings.diis_stop_damping = slow_stop_damping; settings.diis_stop_shift = slow_stop_shift;
+		}
 		const occ::qm::Wavefunction previous_wfn = last_wfn;
 		occ::qm::Wavefunction guess = last_wfn;
 		if (opt->xcw_extrapolate && step >= 2 && settings.hf_type == occ::qm::SpinorbitalKind::Restricted) {
@@ -3452,10 +4018,15 @@ void XCW::run_XCW_fitting() {
 			}
 		}
 		if (!result.first) {
-			XCW_log << "XCW: unable to converge lambda " << std::fixed << std::setprecision(8) << lambda
-				<< " with a continuation step above " << min_lambda_step << "; stopping scan." << std::endl;
-			std::cout << "XCW: unable to converge lambda " << std::fixed << std::setprecision(8) << lambda
-				<< " with a continuation step above " << min_lambda_step << "; stopping scan." << std::endl;
+			//step 0 has no converged neighbour to continue from, so the halving loop never ran
+			std::ostringstream why;
+			why << "XCW: unable to converge lambda " << std::fixed << std::setprecision(8) << lambda;
+			if (step == 0)
+				why << " in " << settings.max_scf_iterations << " SCF iterations (raise max_iter or loosen the criteria); stopping scan.";
+			else
+				why << " with a continuation step above " << min_lambda_step << "; stopping scan.";
+			XCW_log << why.str() << std::endl;
+			std::cout << why.str() << std::endl;
 			break;
 		}
 		prev_wfn = previous_wfn;
@@ -3463,9 +4034,34 @@ void XCW::run_XCW_fitting() {
 		last_lambda = lambda;
 		has_guess = true;
 
+		//At the end of the planned scan, keep going while the minimum is still ahead
+		if (opt->xcw_gaussian_halt && step + 1 == planned_steps) {
+			double estimated_minimum = 0.0;
+			if (halting_minimum_beyond_scan(gaussian_halt_history_, estimated_minimum)) {
+				std::ostringstream msg;
+				msg << std::fixed << std::setprecision(5)
+					<< "XCW: A^2 is still falling at lambda " << lambda << ", so the minimum is outside the requested range - ";
+				if (extra_steps < max_extra_steps) {
+					planned_steps++;
+					extra_steps++;
+					msg << "extending the scan to lambda " << (lambda + settings.xcw_step_size)
+						<< " (extra step " << extra_steps << " of at most " << max_extra_steps << ")";
+					if (estimated_minimum > 0.0) {
+						msg << ", extrapolated minimum near lambda ~= " << estimated_minimum;
+					}
+				}
+				else {
+					msg << "stopping anyway, the scan has already been extended by its limit of "
+						<< max_extra_steps << " steps; raise max_value in -do_XCW to continue";
+				}
+				XCW_log << msg.str() << std::endl;
+				std::cout << msg.str() << std::endl;
+			}
+		}
+
 		//Progress estimate every 5 lambda steps; the last step is skipped because the
 		//summary below always prints a final one
-		if (opt->xcw_gaussian_halt && (step + 1) % 5 == 0 && step + 1 < settings.num_xcw_steps) {
+		if (opt->xcw_gaussian_halt && (step + 1) % 5 == 0 && step + 1 < planned_steps) {
 			report_halting_progress_estimate(false);
 		}
 	}

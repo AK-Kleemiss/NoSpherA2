@@ -1,12 +1,13 @@
 #include "pch.h"
 #include "cube.h"
 #include "isosurface.h"
+#include <set>
 #include "properties.h"
 
 // --------------------------------------------------------------------------
 // 1) Minimal Edge Table
-//    For each of the 256 possible bit configurations, edgeTable tells you 
-//    which edges are intersected by the isosurface. Each bit in edgeTable[cubeIndex] 
+//    For each of the 256 possible bit configurations, edgeTable tells you
+//    which edges are intersected by the isosurface. Each bit in edgeTable[cubeIndex]
 //    corresponds to one of the 12 edges of the cube. If the bit is set, that edge is intersected.
 //
 constexpr int edgeTable[256] = {
@@ -45,8 +46,8 @@ constexpr int edgeTable[256] = {
 
 // --------------------------------------------------------------------------
 // 2) Minimal Triangle Table
-//    triTable[cubeIndex] is an array of up to 16 integers, grouped in triples. 
-//    Each triple indicates the edge indices that form one triangle. A value of -1 
+//    triTable[cubeIndex] is an array of up to 16 integers, grouped in triples.
+//    Each triple indicates the edge indices that form one triangle. A value of -1
 //    indicates the end of the list for that cubeIndex.
 //
 constexpr int triTable[256][16] =
@@ -320,216 +321,267 @@ constexpr int triTable[256][16] =
 //      (x, y+1,z+1)-> corner 7
 //
 static const int cornerIndexA[12] = {
-    0, 1, 2, 3, 4, 5, 6, 7, 0, 1, 2, 3
+	0, 1, 2, 3, 4, 5, 6, 7, 0, 1, 2, 3
 };
 static const int cornerIndexB[12] = {
-    1, 2, 3, 0, 5, 6, 7, 4, 4, 5, 6, 7
+	1, 2, 3, 0, 5, 6, 7, 4, 4, 5, 6, 7
 };
 
 
 // --------------------------------------------------------------------------
 // A tiny helper to linearly interpolate a point along an edge between two corners
-// based on the isosurface value. 
+// based on the isosurface value.
 //
 d3 interpolateIso(const d3& p1, const d3& p2, const double valP1, const double valP2, const double isoVal)
 {
-    // If valP1 == valP2, avoid divide-by-zero; just return midpoint
-    if (std::fabs(valP2 - valP1) < 1e-12) {
-        return { 0.5 * (p1[0] + p2[0]), 0.5 * (p1[1] + p2[1]), 0.5 * (p1[2] + p2[2])};
-    }
-    double t = (isoVal - valP1) / (valP2 - valP1);
-    return {
-        p1[0] + t * (p2[0] - p1[0]),
-        p1[1] + t * (p2[1] - p1[1]),
-        p1[2] + t * (p2[2] - p1[2])
-    };
+	// If valP1 == valP2, avoid divide-by-zero; just return midpoint
+	if (std::fabs(valP2 - valP1) < 1e-12) {
+		return { 0.5 * (p1[0] + p2[0]), 0.5 * (p1[1] + p2[1]), 0.5 * (p1[2] + p2[2])};
+	}
+	double t = (isoVal - valP1) / (valP2 - valP1);
+	return {
+		p1[0] + t * (p2[0] - p1[0]),
+		p1[1] + t * (p2[1] - p1[1]),
+		p1[2] + t * (p2[2] - p1[2])
+	};
 }
 
 void get_colour(Triangle& t, const cube& volumeData, std::array<std::array<int, 3>, 3> Colourcode, double low_lim, double high_lim) {
-    RGB colour;
-    d3 p = t.calc_center();
-    double val = volumeData.get_interpolated_value(p[0], p[1], p[2]);
-    if (val < low_lim) {
-        colour = Colourcode[0];
-    }
-    else if (val > high_lim) {
-        colour = Colourcode[2];
-    }
-    else {
-        //Mix colours
-        if (val < 0)
-            colour = { int(val / low_lim * Colourcode[0][0] + (1 - val / low_lim) * Colourcode[1][0]),
-                       int(val / low_lim * Colourcode[0][1] + (1 - val / low_lim) * Colourcode[1][1]),
-                       int(val / low_lim * Colourcode[0][2] + (1 - val / low_lim) * Colourcode[1][2])};
-        else if (val > 0)
-            colour = { int(val / high_lim * Colourcode[2][0] + (1 - val / high_lim) * Colourcode[1][0]),
-                       int(val / high_lim * Colourcode[2][1] + (1 - val / high_lim) * Colourcode[1][1]),
-                       int(val / high_lim * Colourcode[2][2] + (1 - val / high_lim) * Colourcode[1][2])};
-        else
-            colour = Colourcode[1];
-    }
-    for (int i = 0; i < 3; i++)
-        if (colour[i] > 255)
-            colour[i] = 255;
-        else if (colour[i] < 0)
-            colour[i] = 0;
-    t.set_colour(colour);
+	RGB colour;
+	d3 p = t.calc_center();
+	double val = volumeData.get_interpolated_value(p[0], p[1], p[2]);
+	if (val < low_lim) {
+		colour = Colourcode[0];
+	}
+	else if (val > high_lim) {
+		colour = Colourcode[2];
+	}
+	else {
+		//Mix colours
+		if (val < 0)
+			colour = { int(val / low_lim * Colourcode[0][0] + (1 - val / low_lim) * Colourcode[1][0]),
+					   int(val / low_lim * Colourcode[0][1] + (1 - val / low_lim) * Colourcode[1][1]),
+					   int(val / low_lim * Colourcode[0][2] + (1 - val / low_lim) * Colourcode[1][2])};
+		else if (val > 0)
+			colour = { int(val / high_lim * Colourcode[2][0] + (1 - val / high_lim) * Colourcode[1][0]),
+					   int(val / high_lim * Colourcode[2][1] + (1 - val / high_lim) * Colourcode[1][1]),
+					   int(val / high_lim * Colourcode[2][2] + (1 - val / high_lim) * Colourcode[1][2])};
+		else
+			colour = Colourcode[1];
+	}
+	for (int i = 0; i < 3; i++)
+		if (colour[i] > 255)
+			colour[i] = 255;
+		else if (colour[i] < 0)
+			colour[i] = 0;
+	t.set_colour(colour);
 };
 
 double calc_d_i(const d3& p_t, const WFN& wavy) {
-    double d_i = 1E100;
-    d3 p_a = { 0, 0, 0 };
-    for (int i = 0; i < wavy.get_ncen(); i++) {
-        p_a = { p_t[0] - wavy.get_atom_coordinate(i,0), p_t[1] - wavy.get_atom_coordinate(i,1), p_t[2] - wavy.get_atom_coordinate(i,2) };
-        double d = array_length(p_a);
-        if (d < d_i)
-            d_i = d;
-    }
-    return d_i;
+	double d_i = 1E100;
+	d3 p_a = { 0, 0, 0 };
+	for (int i = 0; i < wavy.get_ncen(); i++) {
+		p_a = { p_t[0] - wavy.get_atom_coordinate(i,0), p_t[1] - wavy.get_atom_coordinate(i,1), p_t[2] - wavy.get_atom_coordinate(i,2) };
+		double d = array_length(p_a);
+		if (d < d_i)
+			d_i = d;
+	}
+	return d_i;
 }
 
 double calc_d_norm_term(const d3& p_t, const WFN& wavy) {
-    // (d - r_vdW) / r_vdW of the nearest atom; d_norm is this term for the molecule plus the one for the environment
-    double d_i = 1E100;
-    int nearest = 0;
-    for (int i = 0; i < wavy.get_ncen(); i++) {
-        const d3 p_a = { p_t[0] - wavy.get_atom_coordinate(i,0), p_t[1] - wavy.get_atom_coordinate(i,1), p_t[2] - wavy.get_atom_coordinate(i,2) };
-        const double d = array_length(p_a);
-        if (d < d_i) {
-            d_i = d;
-            nearest = i;
-        }
-    }
-    const double r = constants::ang2bohr(constants::vdW_radii[wavy.get_atom_charge(nearest)]);
-    return (d_i - r) / r;
+	// (d - r_vdW) / r_vdW of the nearest atom; d_norm is this term for the molecule plus the one for the environment
+	double d_i = 1E100;
+	int nearest = 0;
+	for (int i = 0; i < wavy.get_ncen(); i++) {
+		const d3 p_a = { p_t[0] - wavy.get_atom_coordinate(i,0), p_t[1] - wavy.get_atom_coordinate(i,1), p_t[2] - wavy.get_atom_coordinate(i,2) };
+		const double d = array_length(p_a);
+		if (d < d_i) {
+			d_i = d;
+			nearest = i;
+		}
+	}
+	const double r = constants::ang2bohr(constants::vdW_radii[wavy.get_atom_charge(nearest)]);
+	return (d_i - r) / r;
 }
 
 RGB mix_colour(double val, const std::array<std::array<int, 3>, 3>& Colourcode, double low_lim, double high_lim) {
-    const double mid_point = (low_lim + high_lim) / 2.0;
-    RGB colour;
-    if (val < low_lim) {
-        colour = Colourcode[0];
-    }
-    else if (val > high_lim) {
-        colour = Colourcode[2];
-    }
-    else {
-        //Mix colours
-        if (val < mid_point) {
-            double factor = (val - low_lim) / (mid_point - low_lim);
-            colour = { int((1 - factor) * Colourcode[0][0] + factor * Colourcode[1][0]),
-                       int((1 - factor) * Colourcode[0][1] + factor * Colourcode[1][1]),
-                       int((1 - factor) * Colourcode[0][2] + factor * Colourcode[1][2]) };
-        }
-        else if (val > mid_point) {
-            double factor = (val - mid_point) / (high_lim - mid_point);
-            colour = { int((1 - factor) * Colourcode[1][0] + factor * Colourcode[2][0]),
-                       int((1 - factor) * Colourcode[1][1] + factor * Colourcode[2][1]),
-                       int((1 - factor) * Colourcode[1][2] + factor * Colourcode[2][2]) };
-        }
-        else
-            colour = Colourcode[1];
-    }
-    for (int i = 0; i < 3; i++)
-        if (colour[i] > 255)
-            colour[i] = 255;
-        else if (colour[i] < 0)
-            colour[i] = 0;
-    return colour;
+	const double mid_point = (low_lim + high_lim) / 2.0;
+	RGB colour;
+	if (val < low_lim) {
+		colour = Colourcode[0];
+	}
+	else if (val > high_lim) {
+		colour = Colourcode[2];
+	}
+	else {
+		//Mix colours
+		if (val < mid_point) {
+			double factor = (val - low_lim) / (mid_point - low_lim);
+			colour = { int((1 - factor) * Colourcode[0][0] + factor * Colourcode[1][0]),
+					   int((1 - factor) * Colourcode[0][1] + factor * Colourcode[1][1]),
+					   int((1 - factor) * Colourcode[0][2] + factor * Colourcode[1][2]) };
+		}
+		else if (val > mid_point) {
+			double factor = (val - mid_point) / (high_lim - mid_point);
+			colour = { int((1 - factor) * Colourcode[1][0] + factor * Colourcode[2][0]),
+					   int((1 - factor) * Colourcode[1][1] + factor * Colourcode[2][1]),
+					   int((1 - factor) * Colourcode[1][2] + factor * Colourcode[2][2]) };
+		}
+		else
+			colour = Colourcode[1];
+	}
+	for (int i = 0; i < 3; i++)
+		if (colour[i] > 255)
+			colour[i] = 255;
+		else if (colour[i] < 0)
+			colour[i] = 0;
+	return colour;
 };
 
 void get_colour(Triangle& t, double(*func)(const d3&, const WFN&), const WFN& wavy, std::array<std::array<int, 3>, 3> Colourcode, double low_lim, double high_lim) {
-    t.set_colour(mix_colour(func(t.calc_center(), wavy), Colourcode, low_lim, high_lim));
+	t.set_colour(mix_colour(func(t.calc_center(), wavy), Colourcode, low_lim, high_lim));
 };
 
 cube box_cube(WFN& wfn, properties_options& opts)
 {
-    readxyzMinMax_fromWFN(wfn, opts);
-    cube grid(opts.NbSteps, wfn.get_ncen(), true);
-    grid.give_parent_wfn(wfn);
-    for (int i = 0; i < 3; i++) {
-        grid.set_origin(i, opts.MinMax[i]);
-        grid.set_vector(i, i, (opts.MinMax[3 + i] - opts.MinMax[i]) / opts.NbSteps[i]);
-    }
-    return grid;
+	readxyzMinMax_fromWFN(wfn, opts);
+	cube grid(opts.NbSteps, wfn.get_ncen(), true);
+	grid.give_parent_wfn(wfn);
+	for (int i = 0; i < 3; i++) {
+		grid.set_origin(i, opts.MinMax[i]);
+		grid.set_vector(i, i, (opts.MinMax[3 + i] - opts.MinMax[i]) / opts.NbSteps[i]);
+	}
+	return grid;
 }
 
-std::vector<Triangle> Hirshfeld_surface(WFN& mol, WFN& env, properties_options& opts, std::ostream& log)
+std::vector<Triangle> Hirshfeld_surface(WFN& mol, WFN& env, properties_options& opts, std::ostream& log, cube* weight_out)
 {
-    if (opts.radius < 2.5) {
-        log << "Resetting Radius to at least 2.5!" << std::endl;
-        opts.radius = 2.5;
-    }
-    cube grid_mol = box_cube(mol, opts);
-    cube grid_env(opts.NbSteps, env.get_ncen(), true);
-    grid_env.give_parent_wfn(env);
-    for (int i = 0; i < 3; i++) {
-        grid_env.set_origin(i, opts.MinMax[i]);
-        grid_env.set_vector(i, i, grid_mol.get_vector(i, i));
-    }
-    Calc_Spherical_Dens(grid_mol, mol, opts.radius, log, false);
-    Calc_Spherical_Dens(grid_env, env, opts.radius, log, false);
-    cube total = grid_mol + grid_env;
-    total.give_parent_wfn(mol);
-    cube weight = grid_mol / total;
-    weight.give_parent_wfn(mol);
-    _time_point start = get_time();
-    std::vector<Triangle> triangles = marchingCubes(weight, 0.5);
-    log << "Found " << triangles.size() << " triangles on the " << weight.get_size(0) << "x" << weight.get_size(1) << "x" << weight.get_size(2)
-        << " grid in " << get_msec(start, get_time()) << " ms" << std::endl;
-    return triangles;
+	if (opts.radius < 2.5) {
+		log << "Resetting Radius to at least 2.5!" << std::endl;
+		opts.radius = 2.5;
+	}
+	cube grid_mol = box_cube(mol, opts);
+	cube grid_env(opts.NbSteps, env.get_ncen(), true);
+	grid_env.give_parent_wfn(env);
+	for (int i = 0; i < 3; i++) {
+		grid_env.set_origin(i, opts.MinMax[i]);
+		grid_env.set_vector(i, i, grid_mol.get_vector(i, i));
+	}
+	Calc_Spherical_Dens(grid_mol, mol, opts.radius, log, false);
+	Calc_Spherical_Dens(grid_env, env, opts.radius, log, false);
+	cube total = grid_mol + grid_env;
+	total.give_parent_wfn(mol);
+	cube weight = grid_mol / total;
+	weight.give_parent_wfn(mol);
+	_time_point start = get_time();
+	std::vector<Triangle> triangles = marchingCubes(weight, 0.5);
+	log << "Found " << triangles.size() << " triangles on the " << weight.get_size(0) << "x" << weight.get_size(1) << "x" << weight.get_size(2)
+		<< " grid in " << get_msec(start, get_time()) << " ms" << std::endl;
+	if (weight_out) *weight_out = std::move(weight);
+	return triangles;
+}
+
+//The level set of w has the shape operator -P H P / |grad w| (P = 1 - n n^T) when w decreases outward, as the
+//Hirshfeld weight does; its two non-zero eigenvalues are the principal curvatures, found from the trace and the
+//sum of the principal 2x2 minors, so a convex sphere of radius R gives +1/R twice.
+void surface_curvature(const std::vector<Triangle>& triangles, const cube& field, vec& shape_index, vec& curvedness)
+{
+	const int nt = (int)triangles.size();
+	shape_index.assign(nt, 0.0);
+	curvedness.assign(nt, 0.0);
+	double h[3];
+	for (int k = 0; k < 3; k++) h[k] = constants::bohr2ang(field.get_vector(k, k));
+#pragma omp parallel for
+	for (int t = 0; t < nt; t++) {
+		const d3 c = triangles[t].calc_center();
+		int idx[3];
+		for (int k = 0; k < 3; k++)
+			idx[k] = std::clamp((int)std::lround((c[k] - field.get_origin(k)) / field.get_vector(k, k)), 1, field.get_size(k) - 2);
+		auto w = [&](const int di, const int dj, const int dk) { return field.get_value(idx[0] + di, idx[1] + dj, idx[2] + dk); };
+		const double w0 = w(0, 0, 0);
+		double g[3], H[3][3];
+		g[0] = (w(1, 0, 0) - w(-1, 0, 0)) / (2 * h[0]);
+		g[1] = (w(0, 1, 0) - w(0, -1, 0)) / (2 * h[1]);
+		g[2] = (w(0, 0, 1) - w(0, 0, -1)) / (2 * h[2]);
+		H[0][0] = (w(1, 0, 0) - 2 * w0 + w(-1, 0, 0)) / (h[0] * h[0]);
+		H[1][1] = (w(0, 1, 0) - 2 * w0 + w(0, -1, 0)) / (h[1] * h[1]);
+		H[2][2] = (w(0, 0, 1) - 2 * w0 + w(0, 0, -1)) / (h[2] * h[2]);
+		H[0][1] = H[1][0] = (w(1, 1, 0) - w(1, -1, 0) - w(-1, 1, 0) + w(-1, -1, 0)) / (4 * h[0] * h[1]);
+		H[0][2] = H[2][0] = (w(1, 0, 1) - w(1, 0, -1) - w(-1, 0, 1) + w(-1, 0, -1)) / (4 * h[0] * h[2]);
+		H[1][2] = H[2][1] = (w(0, 1, 1) - w(0, 1, -1) - w(0, -1, 1) + w(0, -1, -1)) / (4 * h[1] * h[2]);
+		const double gn = std::sqrt(g[0] * g[0] + g[1] * g[1] + g[2] * g[2]);
+		if (gn < 1E-12) continue;
+		double n[3], M[3][3], Hn[3];
+		for (int k = 0; k < 3; k++) n[k] = g[k] / gn;
+		for (int i = 0; i < 3; i++) Hn[i] = H[i][0] * n[0] + H[i][1] * n[1] + H[i][2] * n[2];
+		const double nHn = n[0] * Hn[0] + n[1] * Hn[1] + n[2] * Hn[2];
+		for (int i = 0; i < 3; i++)
+			for (int j = 0; j < 3; j++)
+				M[i][j] = -(H[i][j] - n[i] * Hn[j] - Hn[i] * n[j] + n[i] * n[j] * nHn) / gn;
+		const double tr = M[0][0] + M[1][1] + M[2][2];
+		const double m2 = M[0][0] * M[1][1] - M[0][1] * M[1][0] + M[0][0] * M[2][2] - M[0][2] * M[2][0] + M[1][1] * M[2][2] - M[1][2] * M[2][1];
+		const double disc = std::sqrt(std::max(tr * tr - 4 * m2, 0.0)), k1 = 0.5 * (tr + disc), k2 = 0.5 * (tr - disc);
+		shape_index[t] = 2.0 / constants::PI * std::atan2(k1 + k2, k1 - k2);
+		curvedness[t] = 2.0 / constants::PI * std::log(std::sqrt(0.5 * (k1 * k1 + k2 * k2)) + 1E-300);
+	}
 }
 
 vec surface_ESP(const std::vector<Triangle>& triangles, const WFN& wavy)
 {
-    WFN temp = wavy;
-    temp.delete_unoccupied_MOs();
-    temp.delete_Qs();
-    const WFN::ESP_pairs pairs = temp.build_ESP_pairs();
-    return surface_ESP(triangles, [&](const d3& p) { return temp.computeESP(p, pairs); });
+	WFN temp = wavy;
+	temp.delete_unoccupied_MOs();
+	temp.delete_Qs();
+	const WFN::ESP_pairs pairs = temp.build_ESP_pairs();
+	return surface_ESP(triangles, [&](const d3& p) { return temp.computeESP(p, pairs); });
 }
 
 vec surface_ESP(const std::vector<Triangle>& triangles, const std::function<double(const d3&)>& esp_at)
 {
-    vec esp(triangles.size());
+	vec esp(triangles.size());
+	// the ESP at every face is the long part of a coloured surface; Olex2 tails this bar while the window stays alive
+	ProgressBar pb(triangles.size(), 50, "=", " ", "Surface ESP");
 #pragma omp parallel for
-    for (int i = 0; i < (int)triangles.size(); i++)
-        esp[i] = esp_at(triangles[i].calc_center());
-    return esp;
+	for (int i = 0; i < (int)triangles.size(); i++)
+	{
+		esp[i] = esp_at(triangles[i].calc_center());
+		pb.update();
+	}
+	return esp;
 }
 
 void colour_by_ESP(std::vector<Triangle>& triangles, const WFN& wavy, std::ostream& log)
 {
-    if (!triangles.empty())
-        colour_by_ESP(triangles, surface_ESP(triangles, wavy), log);
+	if (!triangles.empty())
+		colour_by_ESP(triangles, surface_ESP(triangles, wavy), log);
 }
 
 void colour_by_ESP(std::vector<Triangle>& triangles, const vec& esp, std::ostream& log)
 {
-    const auto [lo, hi] = std::minmax_element(esp.begin(), esp.end());
-    const double lim = std::max(std::fabs(*lo), std::fabs(*hi));
-    log << std::defaultfloat << std::setprecision(4) << "ESP on the surface from " << *lo << " to " << *hi << " au, coloured red (-" << lim << ") white (0) blue (+" << lim << ")" << std::endl;
-    const std::array<std::array<int, 3>, 3> Colourcode{ { {255, 0, 0}, {255, 255, 255}, {0, 0, 255} } };
-    for (int i = 0; i < (int)triangles.size(); i++)
-        triangles[i].set_colour(mix_colour(esp[i], Colourcode, -lim, lim));
+	const auto [lo, hi] = std::minmax_element(esp.begin(), esp.end());
+	const double lim = std::max(std::fabs(*lo), std::fabs(*hi));
+	log << std::defaultfloat << std::setprecision(4) << "ESP on the surface from " << *lo << " to " << *hi << " au, coloured red (-" << lim << ") white (0) blue (+" << lim << ")" << std::endl;
+	const std::array<std::array<int, 3>, 3> Colourcode{ { {255, 0, 0}, {255, 255, 255}, {0, 0, 255} } };
+	for (int i = 0; i < (int)triangles.size(); i++)
+		triangles[i].set_colour(mix_colour(esp[i], Colourcode, -lim, lim));
 }
 
 // Function to subdivide a cube into smaller cubes
 std::vector<d3> subdivideCube(const d3& p1, const d3& p2, int level) {
-    std::vector<d3> points;
-    double step = 1.0 / level;
-    for (int i = 0; i <= level; ++i) {
-        for (int j = 0; j <= level; ++j) {
-            for (int k = 0; k <= level; ++k) {
-                points.push_back({
-                    p1[0] + i * step * (p2[0] - p1[0]),
-                    p1[1] + j * step * (p2[1] - p1[1]),
-                    p1[2] + k * step * (p2[2] - p1[2])
-                    });
-            }
-        }
-    }
-    return points;
+	std::vector<d3> points;
+	double step = 1.0 / level;
+	for (int i = 0; i <= level; ++i) {
+		for (int j = 0; j <= level; ++j) {
+			for (int k = 0; k <= level; ++k) {
+				points.push_back({
+					p1[0] + i * step * (p2[0] - p1[0]),
+					p1[1] + j * step * (p2[1] - p1[1]),
+					p1[2] + k * step * (p2[2] - p1[2])
+					});
+			}
+		}
+	}
+	return points;
 }
 
 // --------------------------------------------------------------------------
@@ -537,220 +589,218 @@ std::vector<d3> subdivideCube(const d3& p1, const d3& p2, int level) {
 //
 std::vector<Triangle> marchingCubes(const cube& volumeData, const double isoVal)//, const int subdivisionLevel)
 {
-    std::vector<Triangle> triangles;
+	std::vector<Triangle> triangles;
 
-    int nx = static_cast<int>(volumeData.get_size(0));
-    if (nx < 2) return triangles; // not enough data
-    int ny = static_cast<int>(volumeData.get_size(1));
-    if (ny < 2) return triangles; // not enough data
-    int nz = static_cast<int>(volumeData.get_size(2));
-    if (nz < 2) return triangles; // not enough data
+	int nx = static_cast<int>(volumeData.get_size(0));
+	if (nx < 2) return triangles; // not enough data
+	int ny = static_cast<int>(volumeData.get_size(1));
+	if (ny < 2) return triangles; // not enough data
+	int nz = static_cast<int>(volumeData.get_size(2));
+	if (nz < 2) return triangles; // not enough data
 
 
-    // We will iterate through each "voxel" (cube) in the volume
+	// We will iterate through each "voxel" (cube) in the volume. One buffer per x
+	// slab, joined in x order below: a shared push_back under omp critical gave a
+	// thread-order dependent triangle list, so the obj/dat files differed run to run.
+	std::vector<std::vector<Triangle>> slabs(nx - 1);
 #pragma omp parallel for
-    for (int x = 0; x < nx - 1; x++) {
-        for (int y = 0; y < ny - 1; y++) {
-            for (int z = 0; z < nz - 1; z++) {
+	for (int x = 0; x < nx - 1; x++) {
+		for (int y = 0; y < ny - 1; y++) {
+			for (int z = 0; z < nz - 1; z++) {
 
-                //  Collect corner positions and values
-                //    corners: (x,   y,   z)
-                //             (x+1, y,   z)
-                //             (x+1, y+1, z)
-                //             (x,   y+1, z)
-                //             (x,   y,   z+1)
-                //             (x+1, y,   z+1)
-                //             (x+1, y+1, z+1)
-                //             (x,   y+1, z+1)
-                d3 cornerPos[8] = {
-                    volumeData.get_pos(x,y,z),
-                    volumeData.get_pos(x + 1,y,z),
-                    volumeData.get_pos(x + 1,y + 1,z),
-                    volumeData.get_pos(x,y + 1,z),
-                    volumeData.get_pos(x,y,z + 1),
-                    volumeData.get_pos(x + 1,y,z + 1),
-                    volumeData.get_pos(x + 1,y + 1,z + 1),
-                    volumeData.get_pos(x,y + 1,z + 1)
-                };
+				//  Collect corner positions and values
+				//    corners: (x,   y,   z)
+				//             (x+1, y,   z)
+				//             (x+1, y+1, z)
+				//             (x,   y+1, z)
+				//             (x,   y,   z+1)
+				//             (x+1, y,   z+1)
+				//             (x+1, y+1, z+1)
+				//             (x,   y+1, z+1)
+				d3 cornerPos[8] = {
+					volumeData.get_pos(x,y,z),
+					volumeData.get_pos(x + 1,y,z),
+					volumeData.get_pos(x + 1,y + 1,z),
+					volumeData.get_pos(x,y + 1,z),
+					volumeData.get_pos(x,y,z + 1),
+					volumeData.get_pos(x + 1,y,z + 1),
+					volumeData.get_pos(x + 1,y + 1,z + 1),
+					volumeData.get_pos(x,y + 1,z + 1)
+				};
 
-                double cornerVal[8] = {
-                    volumeData.get_value(x,y,z),
-                    volumeData.get_value(x + 1,y,z),
-                    volumeData.get_value(x + 1,y + 1,z),
-                    volumeData.get_value(x,y + 1,z),
-                    volumeData.get_value(x,y,z + 1),
-                    volumeData.get_value(x + 1,y,z + 1),
-                    volumeData.get_value(x + 1,y + 1,z + 1),
-                    volumeData.get_value(x,y + 1,z + 1)
-                };
-
-
-                // Build the "cubeIndex" from which corners are >= isoVal
-                int cubeIndex = 0;
-                for (int j = 0; j < 8; j++) {
-                    if (cornerVal[j] >= isoVal) {
-                        cubeIndex |= (1 << j);
-                    }
-                }
-
-                // If this cube is entirely below or entirely above isoVal => no intersection
-                if (edgeTable[cubeIndex] == 0) {
-                    continue;
-                }
-
-                // Find the points where the isosurface intersects the edges of this cube
-                d3 vertList[12];
-                int edges = edgeTable[cubeIndex]; // bitmask of edges
-                for (int j = 0; j < 12; j++) {
-                    if (edges & (1 << j)) {
-                        int cA = cornerIndexA[j];
-                        int cB = cornerIndexB[j];
-                        vertList[j] = interpolateIso(
-                            cornerPos[cA], cornerPos[cB],
-                            cornerVal[cA], cornerVal[cB],
-                            isoVal
-                        );
-                    }
-                }
-
-                // Create triangles from the vertList using the triTable
-                for (int j = 0; j < 16; j += 3) {
-                    int e0 = triTable[cubeIndex][j + 0];
-                    int e1 = triTable[cubeIndex][j + 1];
-                    int e2 = triTable[cubeIndex][j + 2];
-
-                    if (e0 == -1 || e1 == -1 || e2 == -1) {
-                        break; // no more triangles for this cubeIndex
-                    }
-
-                    Triangle tri(vertList[e0], vertList[e1], vertList[e2]);
-#pragma omp critical
-                    triangles.push_back(tri);
-                }
-            }
-        }
-    }
+				double cornerVal[8] = {
+					volumeData.get_value(x,y,z),
+					volumeData.get_value(x + 1,y,z),
+					volumeData.get_value(x + 1,y + 1,z),
+					volumeData.get_value(x,y + 1,z),
+					volumeData.get_value(x,y,z + 1),
+					volumeData.get_value(x + 1,y,z + 1),
+					volumeData.get_value(x + 1,y + 1,z + 1),
+					volumeData.get_value(x,y + 1,z + 1)
+				};
 
 
-    return triangles;
+				// Build the "cubeIndex" from which corners are >= isoVal
+				int cubeIndex = 0;
+				for (int j = 0; j < 8; j++) {
+					if (cornerVal[j] >= isoVal) {
+						cubeIndex |= (1 << j);
+					}
+				}
+
+				// If this cube is entirely below or entirely above isoVal => no intersection
+				if (edgeTable[cubeIndex] == 0) {
+					continue;
+				}
+
+				// Find the points where the isosurface intersects the edges of this cube
+				d3 vertList[12];
+				int edges = edgeTable[cubeIndex]; // bitmask of edges
+				for (int j = 0; j < 12; j++) {
+					if (edges & (1 << j)) {
+						int cA = cornerIndexA[j];
+						int cB = cornerIndexB[j];
+						vertList[j] = interpolateIso(
+							cornerPos[cA], cornerPos[cB],
+							cornerVal[cA], cornerVal[cB],
+							isoVal
+						);
+					}
+				}
+
+				// Create triangles from the vertList using the triTable
+				for (int j = 0; j < 16; j += 3) {
+					int e0 = triTable[cubeIndex][j + 0];
+					int e1 = triTable[cubeIndex][j + 1];
+					int e2 = triTable[cubeIndex][j + 2];
+
+					if (e0 == -1 || e1 == -1 || e2 == -1) {
+						break; // no more triangles for this cubeIndex
+					}
+
+					slabs[x].emplace_back(vertList[e0], vertList[e1], vertList[e2]);
+				}
+			}
+		}
+	}
+	for (auto& slab : slabs)
+		triangles.insert(triangles.end(), slab.begin(), slab.end());
+
+	return triangles;
 }
 
 // Writes a mesh (list of triangles) to an .obj file:
 bool writeObj(const std::filesystem::path& filename, const std::vector<Triangle>& triangles)
 {
-    std::ofstream file(filename);
-    if (!file.is_open()) {
-        std::cerr << "Failed to open file: " << filename << std::endl;
-        return false;
-    }
+	std::ofstream file(filename);
+	if (!file.is_open()) {
+		std::cerr << "Failed to open file: " << filename << std::endl;
+		return false;
+	}
 
-    // 1) Write each triangle’s vertices
-    //    Keep track of how many vertices we’ve written so far
-    //    so we can index them properly in the 'f' lines.
-    //size_t vertexCount = 0;
-    for (const auto& tri : triangles) {
-        // "v x y z"
-        file << "v " << tri.get_v(1)[0] << " " << tri.get_v(1)[1] << " " << tri.get_v(1)[2] << "\n";
-        file << "v " << tri.get_v(2)[0] << " " << tri.get_v(2)[1] << " " << tri.get_v(2)[2] << "\n";
-        file << "v " << tri.get_v(3)[0] << " " << tri.get_v(3)[1] << " " << tri.get_v(3)[2] << "\n";
-    }
+	// 1) Write each triangle’s vertices
+	//    Keep track of how many vertices we’ve written so far
+	//    so we can index them properly in the 'f' lines.
+	//size_t vertexCount = 0;
+	for (const auto& tri : triangles) {
+		// "v x y z"
+		file << "v " << tri.get_v(1)[0] << " " << tri.get_v(1)[1] << " " << tri.get_v(1)[2] << "\n";
+		file << "v " << tri.get_v(2)[0] << " " << tri.get_v(2)[1] << " " << tri.get_v(2)[2] << "\n";
+		file << "v " << tri.get_v(3)[0] << " " << tri.get_v(3)[1] << " " << tri.get_v(3)[2] << "\n";
+	}
 
-    // 2) Write faces
-    //    Each triangle is 3 vertices, so the i-th triangle’s vertices
-    //    have indices: 3*i+1, 3*i+2, 3*i+3 (1-based)
-    for (size_t i = 0; i < triangles.size(); i++) {
-        size_t i1 = 3 * i + 1;
-        size_t i2 = 3 * i + 2;
-        size_t i3 = 3 * i + 3;
-        // "f index1 index2 index3"
-        file << "f " << i1 << " " << i2 << " " << i3 << "\n";
-    }
+	// 2) Write faces
+	//    Each triangle is 3 vertices, so the i-th triangle’s vertices
+	//    have indices: 3*i+1, 3*i+2, 3*i+3 (1-based)
+	for (size_t i = 0; i < triangles.size(); i++) {
+		size_t i1 = 3 * i + 1;
+		size_t i2 = 3 * i + 2;
+		size_t i3 = 3 * i + 3;
+		// "f index1 index2 index3"
+		file << "f " << i1 << " " << i2 << " " << i3 << "\n";
+	}
 
-    file.close();
-    std::cout << "OBJ file written to " << filename << std::endl;
-    return true;
+	file.close();
+	std::cout << "OBJ file written to " << filename << std::endl;
+	return true;
 }
 
 // Writes a mesh (list of triangles) to an .obj file:
 bool writeColourObj(const std::filesystem::path& filename, std::vector<Triangle>& triangles)
 {
-    std::ofstream file(filename);
-    if (!file.is_open()) {
-        std::cerr << "Failed to open file: " << filename << std::endl;
-        return false;
-    }
+	std::ofstream file(filename);
+	if (!file.is_open()) {
+		std::cerr << "Failed to open file: " << filename << std::endl;
+		return false;
+	}
 
-    std::string mtl_filename = filename.stem().string() + ".mtl";
+	std::string mtl_filename = filename.stem().string() + ".mtl";
 
-    file << "mtllib " << mtl_filename << std::endl;
+	file << "mtllib " << mtl_filename << std::endl;
 
-    // 1) Write each triangle’s vertices
-    //    Keep track of how many vertices we’ve written so far
-    //    so we can index them properly in the 'f' lines.
-    //size_t vertexCount = 0;
-    for (const auto& tri : triangles) {
-        // "v x y z"
-        file << "v " << tri.get_v(1)[0] << " " << tri.get_v(1)[1] << " " << tri.get_v(1)[2] << "\n";
-        file << "v " << tri.get_v(2)[0] << " " << tri.get_v(2)[1] << " " << tri.get_v(2)[2] << "\n";
-        file << "v " << tri.get_v(3)[0] << " " << tri.get_v(3)[1] << " " << tri.get_v(3)[2] << "\n";
-    }
-    writeMTL(mtl_filename, triangles);
+	// 1) Write each triangle’s vertices
+	//    Keep track of how many vertices we’ve written so far
+	//    so we can index them properly in the 'f' lines.
+	//size_t vertexCount = 0;
+	for (const auto& tri : triangles) {
+		// "v x y z"
+		file << "v " << tri.get_v(1)[0] << " " << tri.get_v(1)[1] << " " << tri.get_v(1)[2] << "\n";
+		file << "v " << tri.get_v(2)[0] << " " << tri.get_v(2)[1] << " " << tri.get_v(2)[2] << "\n";
+		file << "v " << tri.get_v(3)[0] << " " << tri.get_v(3)[1] << " " << tri.get_v(3)[2] << "\n";
+	}
+	writeMTL((filename.parent_path() / mtl_filename).string(), triangles);  // next to the obj, not in the cwd
 
-    // 2) Write faces
-    //    Each triangle is 3 vertices, so the i-th triangle’s vertices
-    //    have indices: 3*i+1, 3*i+2, 3*i+3 (1-based)
-    for (size_t i = 0; i < triangles.size(); i++) {
-        size_t i1 = 3 * i + 1;
-        size_t i2 = 3 * i + 2;
-        size_t i3 = 3 * i + 3;
-        // "f index1 index2 index3"
-        file << "usemtl FaceMaterial_" << triangles[i].get_colour_index() << "\n";
-        file << "f " << i1 << " " << i2 << " " << i3 << "\n";
-    }
+	// 2) Write faces
+	//    Each triangle is 3 vertices, so the i-th triangle’s vertices
+	//    have indices: 3*i+1, 3*i+2, 3*i+3 (1-based)
+	for (size_t i = 0; i < triangles.size(); i++) {
+		size_t i1 = 3 * i + 1;
+		size_t i2 = 3 * i + 2;
+		size_t i3 = 3 * i + 3;
+		// "f index1 index2 index3"
+		file << "usemtl " << mtl_name(triangles[i].get_colour()) << "\n";
+		file << "f " << i1 << " " << i2 << " " << i3 << "\n";
+	}
 
-    file.close();
-    std::cout << "OBJ file written to " << filename << std::endl;
-    return true;
+	file.close();
+	std::cout << "OBJ file written to " << filename << std::endl;
+	return true;
 }
 
-// We'll assume faces[i] has color faceColors[i]
-bool writeMTL(const std::string& mtlFilename,
-    std::vector<Triangle>& triangles)
+// The material is named by its colour, so a one-byte colour difference (a
+// platform's last ULP of the ESP at a ramp step) changes that face's lines
+// only; a running index renumbered every material after it
+std::string mtl_name(const RGB &c)
 {
-    std::ofstream out(mtlFilename);
-    if (!out.is_open()) {
-        return false;
-    }
-    std::vector<RGB> faceColors;
+	return "FaceMaterial_" + std::to_string(c[0]) + "_" + std::to_string(c[1]) + "_" + std::to_string(c[2]);
+}
 
-    out << "# Materials\n\n";
+// One "newmtl" block per distinct colour, in order of first appearance
+bool writeMTL(const std::string& mtlFilename,
+	std::vector<Triangle>& triangles)
+{
+	std::ofstream out(mtlFilename);
+	if (!out.is_open()) {
+		return false;
+	}
+	std::set<RGB> faceColors;
 
-    // Write one "newmtl" block per face
-    for (int i = 0; i < triangles.size(); i++) {
-        //look if we already have this colour
-        bool found = false;
-        for (int j = 0; j < faceColors.size(); j++) {
-            if (faceColors[j] == triangles[i].get_colour()) {
-                found = true;
-                triangles[i].set_colour_index(j);
-                break;
-            }
-        }
-        if (found) continue;
-        faceColors.push_back(triangles[i].get_colour());
-        triangles[i].set_colour_index(faceColors.size() - 1);
-        out << "newmtl FaceMaterial_" << faceColors.size() - 1 << "\n";
-        out << "Ka 1 1 1 \n";  // ambient is often set to white
-        out << "Kd " << triangles[i].get_colour()[0] / 255.0 << " "
-            << triangles[i].get_colour()[1] / 255.0 << " "
-            << triangles[i].get_colour()[2] / 255.0 << "\n";  // diffuse
-        out << "Ks 0.0 0.0 0.0\n";
-        out << "Ns 0.0\n";
-        out << "d 1.0\n";
-        out << "illum 1\n\n";
-    }
+	out << "# Materials\n\n";
 
-    out.close();
-    std::cout << "MTL file written to " << mtlFilename << std::endl;
-    return true;
+	for (int i = 0; i < triangles.size(); i++) {
+		if (!faceColors.insert(triangles[i].get_colour()).second) continue;
+		out << "newmtl " << mtl_name(triangles[i].get_colour()) << "\n";
+		out << "Ka 1 1 1 \n";  // ambient is often set to white
+		out << "Kd " << triangles[i].get_colour()[0] / 255.0 << " "
+			<< triangles[i].get_colour()[1] / 255.0 << " "
+			<< triangles[i].get_colour()[2] / 255.0 << "\n";  // diffuse
+		out << "Ks 0.0 0.0 0.0\n";
+		out << "Ns 0.0\n";
+		out << "d 1.0\n";
+		out << "illum 1\n\n";
+	}
+
+	out.close();
+	std::cout << "MTL file written to " << mtlFilename << std::endl;
+	return true;
 }

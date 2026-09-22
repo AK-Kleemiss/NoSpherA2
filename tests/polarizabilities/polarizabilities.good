@@ -1,0 +1,147 @@
+    _   __     _____       __              ___   ___
+   / | / /___ / ___/____  / /_  ___  _____/   | |__ \
+  /  |/ / __ \\__ \/ __ \/ __ \/ _ \/ ___/ /| | __/ /
+ / /|  / /_/ /__/ / /_/ / / / /  __/ /  / ___ |/ __/
+/_/ |_/\____/____/ .___/_/ /_/\___/_/  /_/  |_/____/
+                /_/
+This software is part of the cuQCT software suite developed by Florian Kleemiss.
+Please give credit and cite corresponding pieces!
+This Software is published with BSD-2 clause license.
+Calculating for 118400 Gridpoints.
+Calcualting spherical Rho... ...done!
+Calculating for 118400 Gridpoints.
+Calcualting Rho... ...done!
+Calcualting spherical Rho... ...done!
+Calcualting Hirshfeld density for atom: 0
+..done!
+Calcualting Hirshfeld density for atom: 1
+..done!
+Calcualting Hirshfeld density for atom: 2
+..done!
+Calcualting Hirshfeld density for atom: 3
+..done!
+...done!
+ atom   |    charge    | dipole moment x,        y,         z
+===================================================
+  0 (C) | 4.275101e-01 |  -5.551115e-16,   1.676987e-15,  -2.706434e-01
+  1 (C) | 4.275101e-01 |  -4.884981e-15,   1.569034e-16,   2.706433e-01
+  2 (H) |-1.164363e-01 |   9.992007e-16,   3.403371e-16,   1.411023e-01
+  3 (H) |-1.164364e-01 |  -1.235123e-15,  -4.710975e-17,  -1.411026e-01
+Calculating for 118400 Gridpoints.
+Calcualting Rho... ...done!
+Calcualting spherical Rho... ...done!
+Calcualting Hirshfeld density for atom: 0
+..done!
+Calcualting Hirshfeld density for atom: 1
+..done!
+Calcualting Hirshfeld density for atom: 2
+..done!
+Calcualting Hirshfeld density for atom: 3
+..done!
+...done!
+ atom   |    charge    | dipole moment x,        y,         z
+===================================================
+  0 (C) | 4.274010e-01 |   2.647845e-02,   7.153100e-16,  -2.706087e-01
+  1 (C) | 4.274010e-01 |   2.647845e-02,  -2.351181e-16,   2.706086e-01
+  2 (H) |-1.164690e-01 |   4.530154e-03,   1.635093e-16,   1.411109e-01
+  3 (H) |-1.164690e-01 |   4.530154e-03,  -3.027842e-16,  -1.411113e-01
+Calculating for 118400 Gridpoints.
+Calcualting Rho... ...done!
+Calcualting spherical Rho... ...done!
+Calcualting Hirshfeld density for atom: 0
+..done!
+Calcualting Hirshfeld density for atom: 1
+..done!
+Calcualting Hirshfeld density for atom: 2
+..done!
+Calcualting Hirshfeld density for atom: 3
+..done!
+...done!
+ atom   |    charge    | dipole moment x,        y,         z
+===================================================
+  0 (C) | 4.274010e-01 |  -2.647845e-02,   2.438328e-16,  -2.706087e-01
+  1 (C) | 4.274010e-01 |  -2.647845e-02,  -5.829422e-16,   2.706086e-01
+  2 (H) |-1.164690e-01 |  -4.530154e-03,   9.565026e-17,   1.411109e-01
+  3 (H) |-1.164690e-01 |  -4.530154e-03,  -2.275680e-16,  -1.411113e-01
+Calculating for 118400 Gridpoints.
+Calcualting Rho... ...done!
+Calcualting spherical Rho... ...done!
+Calcualting Hirshfeld density for atom: 0
+..done!
+Calcualting Hirshfeld density for atom: 1
+..done!
+Calcualting Hirshfeld density for atom: 2
+..done!
+Calcualting Hirshfeld density for atom: 3
+..done!
+...done!
+ atom   |    charge    | dipole moment x,        y,         z
+===================================================
+  0 (C) | 4.274010e-01 |   8.104628e-15,   2.647845e-02,  -2.706087e-01
+  1 (C) | 4.274010e-01 |   8.548717e-15,   2.647845e-02,   2.706086e-01
+  2 (H) |-1.164690e-01 |   1.387779e-16,   4.530154e-03,   1.411109e-01
+  3 (H) |-1.164690e-01 |  -1.264613e-15,   4.530154e-03,  -1.411113e-01
+Calculating for 118400 Gridpoints.
+Calcualting Rho... ...done!
+Calcualting spherical Rho... ...done!
+Calcualting Hirshfeld density for atom: 0
+..done!
+Calcualting Hirshfeld density for atom: 1
+..done!
+Calcualting Hirshfeld density for atom: 2
+..done!
+Calcualting Hirshfeld density for atom: 3
+..done!
+...done!
+ atom   |    charge    | dipole moment x,        y,         z
+===================================================
+  0 (C) | 4.274010e-01 |  -1.443290e-15,  -2.647845e-02,  -2.706087e-01
+  1 (C) | 4.274010e-01 |  -1.154632e-14,  -2.647845e-02,   2.706086e-01
+  2 (H) |-1.164690e-01 |   4.163336e-16,  -4.530154e-03,   1.411109e-01
+  3 (H) |-1.164690e-01 |  -2.192690e-15,  -4.530154e-03,  -1.411113e-01
+Calculating for 118400 Gridpoints.
+Calcualting Rho... ...done!
+Calcualting spherical Rho... ...done!
+Calcualting Hirshfeld density for atom: 0
+..done!
+Calcualting Hirshfeld density for atom: 1
+..done!
+Calcualting Hirshfeld density for atom: 2
+..done!
+Calcualting Hirshfeld density for atom: 3
+..done!
+...done!
+ atom   |    charge    | dipole moment x,        y,         z
+===================================================
+  0 (C) | 4.437192e-01 |   1.110223e-16,   1.594925e-15,  -2.550825e-01
+  1 (C) | 4.109574e-01 |  -2.775558e-15,  -2.957137e-16,   2.857259e-01
+  2 (H) |-1.265501e-01 |   6.800116e-16,   4.019482e-16,   1.464672e-01
+  3 (H) |-1.062175e-01 |  -1.956768e-15,  -9.281745e-17,  -1.354445e-01
+Calculating for 118400 Gridpoints.
+Calcualting Rho... ...done!
+Calcualting spherical Rho... ...done!
+Calcualting Hirshfeld density for atom: 0
+..done!
+Calcualting Hirshfeld density for atom: 1
+..done!
+Calcualting Hirshfeld density for atom: 2
+..done!
+Calcualting Hirshfeld density for atom: 3
+..done!
+...done!
+ atom   |    charge    | dipole moment x,        y,         z
+===================================================
+  0 (C) | 4.109574e-01 |   4.447831e-15,   1.486712e-15,  -2.857261e-01
+  1 (C) | 4.437193e-01 |  -8.548717e-15,  -8.054549e-16,   2.550824e-01
+  2 (H) |-1.062174e-01 |   3.275158e-15,   5.958011e-16,   1.354441e-01
+  3 (H) |-1.265502e-01 |  -1.554312e-15,  -9.788779e-17,  -1.464675e-01
+Polarizabilities:
+ atom   |    charge    |       xx,            xy,            xz,            yx,            yy,            yz,            zx,            zy,            zz
+========|==============|=======================================================================================================================================
+  0 (C) | 4.275101e-01 |  5.295691e+00,  9.547918e-13, -4.336809e-13,  4.714772e-14,  5.295691e+00,  1.082129e-14, -1.094736e-08, -4.547857e-09,  3.064353e+00
+  1 (C) | 4.275101e-01 |  5.295691e+00,  2.009504e-12,  5.773160e-13,  3.478242e-14,  5.295691e+00,  5.097412e-14,  1.157757e-09,  2.255390e-09,  3.064353e+00
+  2 (H) |-1.164363e-01 |  9.060308e-01, -2.775558e-14, -2.595146e-13,  6.785901e-15,  9.060308e-01, -1.938530e-14,  1.445910e-09,  1.630224e-10,  1.102310e+00
+  3 (H) |-1.164364e-01 |  9.060308e-01,  9.280771e-14, -4.024558e-14, -7.521621e-15,  9.060308e-01,  5.070339e-16, -4.270376e-09, -3.546219e-10,  1.102303e+00
+
+
+Properties calculation done!

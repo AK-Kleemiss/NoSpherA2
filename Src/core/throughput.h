@@ -31,13 +31,13 @@ void reset();
 //as its two results, and a complex accumulate. Eleven.
 inline double flops_ndft(double atoms_times_points, double k_points)
 {
-    return 11.0 * atoms_times_points * k_points;
+	return 11.0 * atoms_times_points * k_points;
 }
 
 //Dense matrix product, the one unambiguous count here
 inline double flops_gemm(double m, double n, double k)
 {
-    return 2.0 * m * n * k;
+	return 2.0 * m * n * k;
 }
 
 //equicomb: Wigner-3j weighted contraction over (atom, nrad1, nrad2, ll, mu), a complex
@@ -45,7 +45,7 @@ inline double flops_gemm(double m, double n, double k)
 //lower bound on the rate and both paths are counted the same way.
 inline double flops_equicomb(double natoms, double nrad1, double nrad2, double llmax, double l21)
 {
-    return 8.0 * natoms * nrad1 * nrad2 * llmax * l21;
+	return 8.0 * natoms * nrad1 * nrad2 * llmax * l21;
 }
 
 } //namespace throughput

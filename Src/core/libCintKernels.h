@@ -2,14 +2,14 @@
 #include <occ/3rdparty/cint_wrapper.h>
 
 #define DECLARE_CINT_KERNEL(NAME, NEEDS_OPT) \
-    struct NAME { \
-        static constexpr bool NeedsOpt = NEEDS_OPT; \
-        static void optimizer (libcint::CINTOpt*& opt, \
-        int* atm, int nat, int* bas, int nbas, double* env); \
-        static void drv(double* out, int comp, int* shl_slice, int* aoloc, \
-            libcint::CINTOpt* opt, int* atm, int nat, int* bas, int nbas, double* env); \
-        static ivec gen_loc(ivec& bas, int nbas); \
-    };
+	struct NAME { \
+		static constexpr bool NeedsOpt = NEEDS_OPT; \
+		static void optimizer (libcint::CINTOpt*& opt, \
+		int* atm, int nat, int* bas, int nbas, double* env); \
+		static void drv(double* out, int comp, int* shl_slice, int* aoloc, \
+			libcint::CINTOpt* opt, int* atm, int nat, int* bas, int nbas, double* env); \
+		static ivec gen_loc(ivec& bas, int nbas); \
+	};
 
 /*
 Declares a libCint Kernel struct with optimizer and drv functions.
@@ -30,13 +30,13 @@ DECLARE_CINT_KERNEL(Overlap3C_SPH, false);
 #undef DECLARE_CINT_KERNEL
 
 enum COORDINATE_TYPE {
-    SPH = 1,
-    CART = 2
+	SPH = 1,
+	CART = 2
 };
 //ao_loc of a bas table: shell offsets in spherical or cartesian functions
 template<COORDINATE_TYPE CT>
 ivec make_loc(ivec& bas, int nbas);
 
 void GTOval_sph(int ngrids, int* shls_slice, int* ao_loc,
-    double* ao, double* coord, uint8_t* non0table,
-    int* atm, int natm, int* bas, int nbas, double* env);
+	double* ao, double* coord, uint8_t* non0table,
+	int* atm, int natm, int* bas, int nbas, double* env);

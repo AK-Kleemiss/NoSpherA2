@@ -1886,7 +1886,10 @@
     <ClInclude Include="..\..\Src\core\CUDA_utilities.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Src\core\def2-ECPs_GA.h">
+    <ClInclude Include="..\..\Src\core\gaussian_atom.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Src\core\density_source.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Src\core\ECPs_corrections.h">

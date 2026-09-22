@@ -33,295 +33,302 @@ static std::filesystem::path current_log_path;
 //Wrapper so an exception from deep inside a file parser reports instead of fail-fast
 int run_app(int argc, char **argv)
 {
-    //Remember the console before run_app_impl() redirects cout into NoSpherA2.log; in the catch block the log file is already destroyed
-    std::streambuf *const console = std::cout.rdbuf();
-    auto report = [&](const std::string &what) {
-        std::cout.rdbuf(console);
-        const std::string message = "\nNoSpherA2 stopped with an unhandled error: " + what +
-            "\n\tThis usually means one of the input files is malformed or an option is missing." +
-            "\n\tThe last thing that was read is at the end of " + current_log_path.string() + ".";
-        std::cout << message << std::endl;
-        std::ofstream(current_log_path, std::ios::app) << message << std::endl;
-        return -1;
-    };
-    try
-    {
-        return run_app_impl(argc, argv);
-    }
-    catch (const std::exception &e)
-    {
-        return report(e.what());
-    }
-    catch (...)
-    {
-        return report("unknown type");
-    }
+	//Remember the console before run_app_impl() redirects cout into NoSpherA2.log; in the catch block the log file is already destroyed
+	std::streambuf *const console = std::cout.rdbuf();
+	auto report = [&](const std::string &what) {
+		std::cout.rdbuf(console);
+		const std::string message = "\nNoSpherA2 stopped with an unhandled error: " + what +
+			"\n\tThis usually means one of the input files is malformed or an option is missing." +
+			"\n\tThe last thing that was read is at the end of " + current_log_path.string() + ".";
+		std::cout << message << std::endl;
+		std::ofstream(current_log_path, std::ios::app) << message << std::endl;
+		return -1;
+	};
+	try
+	{
+		return run_app_impl(argc, argv);
+	}
+	catch (const std::exception &e)
+	{
+		return report(e.what());
+	}
+	catch (...)
+	{
+		return report("unknown type");
+	}
 }
 
 static int run_app_impl(int argc, char **argv)
 {
-    using namespace std;
-    const std::filesystem::path cwd = std::filesystem::current_path();
+	using namespace std;
+	const std::filesystem::path cwd = std::filesystem::current_path();
 	string output_file = "NoSpherA2.log";
-    {
-        for (int i = 0; i < argc; i++) {
-            string temp = argv[i];
-            if (temp == "-out") {
-                err_checkf(i + 1 < argc && argv[i + 1][0] != '-',
-                    "Missing argument for -out option",
-                    std::cout);
-                output_file = argv[i + 1];
-                i++;
-            }
-        }
-    }
+	{
+		for (int i = 0; i < argc; i++) {
+			string temp = argv[i];
+			if (temp == "-out") {
+				err_checkf(i + 1 < argc && argv[i + 1][0] != '-',
+					"Missing argument for -out option",
+					std::cout);
+				output_file = argv[i + 1];
+				i++;
+			}
+		}
+	}
 
-    current_log_path = output_file;
-    ofstream log_file(output_file, ios::out);
-    std::streambuf *_coutbuf = std::cout.rdbuf(log_file.rdbuf()); // save and redirect
+	current_log_path = output_file;
+	ofstream log_file(output_file, ios::out);
+	std::streambuf *_coutbuf = std::cout.rdbuf(log_file.rdbuf()); // save and redirect
 
-    //Restores cout's buffer AND its sticky fixed/setprecision state on every exit path, including an unwinding exception
-    //Declared after log_file so it detaches cout while that buffer is still alive
-    struct cout_restorer
-    {
-        std::streambuf *saved_buf;
-        std::ios::fmtflags saved_flags;
-        std::streamsize saved_precision;
-        std::streamsize saved_width;
-        ~cout_restorer()
-        {
-            std::cout.rdbuf(saved_buf);
-            std::cout.flags(saved_flags);
-            std::cout.precision(saved_precision);
-            std::cout.width(saved_width);
-        }
-    } restore_cout{_coutbuf, std::cout.flags(), std::cout.precision(), std::cout.width()};
+	//Restores cout's buffer AND its sticky fixed/setprecision state on every exit path, including an unwinding exception
+	//Declared after log_file so it detaches cout while that buffer is still alive
+	struct cout_restorer
+	{
+		std::streambuf *saved_buf;
+		std::ios::fmtflags saved_flags;
+		std::streamsize saved_precision;
+		std::streamsize saved_width;
+		~cout_restorer()
+		{
+			std::cout.rdbuf(saved_buf);
+			std::cout.flags(saved_flags);
+			std::cout.precision(saved_precision);
+			std::cout.width(saved_width);
+		}
+	} restore_cout{_coutbuf, std::cout.flags(), std::cout.precision(), std::cout.width()};
 
-    //A destructor because run_app_impl returns from a dozen places, and log_file rather than
-    //cout because most of those places put cout back on the console first.
-    struct throughput_reporter
-    {
-        std::ostream& out;
-        ~throughput_reporter() { throughput::report(out); }
-    } report_throughput{log_file};
+	//A destructor because run_app_impl returns from a dozen places, and log_file rather than
+	//cout because most of those places put cout back on the console first.
+	struct throughput_reporter
+	{
+		std::ostream& out;
+		~throughput_reporter() { throughput::report(out); }
+	} report_throughput{log_file};
 
-    options opt(argc, argv, log_file);
-    opt.digest_options();
-    opt.cwd = cwd;
+	options opt(argc, argv, log_file);
+	opt.digest_options();
+	if (opt.finished)
+		return 0;
+	opt.cwd = cwd;
+	//Geometry-aid descriptors or element probabilities and quit; the flags queue jobs, so -wfn and -geometry_aid_cutoff may come in any order; before the GPU block, whose device query and context creation cost 0.1 s a call
+	if (opt.calc_featomic_descriptor || !opt.featomic_structures.empty() || !opt.classify_atoms_out.empty() || !opt.classify_structures.empty())
+		return geometry_aid::run(opt);
 #ifdef NOSPHERA2_USE_GPU
-    //Every GPU toggle, from opt alone, once per run. These are globals and used to be set
-    //only inside the scattering-factor entry points, so a run reaching XCW instead inherited
-    //whatever the previous run in the process had left on. Olex2 calls run_app repeatedly.
-    grid_gpu_set_enabled(opt.use_gpu && opt.gpu_grid);
-    aux_density_gpu_set_enabled(opt.use_gpu && opt.gpu_density);
-    blas_gpu_set_enabled(opt.gpu_blas);
-    equicomb_set_gpu(opt.use_gpu && opt.gpu_salted);
-    cublas_dynamic_set_enabled(opt.gpu_cublas);
-    //Started here so context creation overlaps the file reading rather than landing inside
-    //whichever kernel runs first.
-    if (opt.use_gpu && (opt.gpu_grid || opt.gpu_salted || opt.gpu_itensor || opt.gpu_blas))
-        sf_gpu_warmup_start();
-    //A destructor for the same reason as the two above, and because only calc_SF waits for
-    //this thread: a run that never reaches the transform - IAM, properties, RGBI, RI fit -
-    //used to leave it running. What then joined it was the destructor of the static future
-    //in sf_gpu.cu, which runs after the CUDA runtime's own atexit teardown, so the thread
-    //was still inside cuDevicePrimaryCtxRetain with the driver already torn down under it.
-    //That is a crash or a hang depending on the timing, and it needs a real device and a
-    //slow context creation to show up - six test processes sharing two V100s does it, a
-    //single run does not. Waiting here costs nothing: by this point the warm-up is long
-    //done in any run that did any work.
-    struct warmup_joiner
-    {
-        ~warmup_joiner()
-        {
-            //A destructor, so nothing may escape it; the warm-up has no result to report.
-            try { sf_gpu_warmup_wait(); } catch (...) {}
-        }
-    } join_warmup;
+	//Every GPU toggle, from opt alone, once per run. These are globals and used to be set
+	//only inside the scattering-factor entry points, so a run reaching XCW instead inherited
+	//whatever the previous run in the process had left on. Olex2 calls run_app repeatedly.
+	grid_gpu_set_enabled(opt.use_gpu && opt.gpu_grid);
+	aux_density_gpu_set_enabled(opt.use_gpu && opt.gpu_density);
+	blas_gpu_set_enabled(opt.gpu_blas);
+	equicomb_set_gpu(opt.use_gpu && opt.gpu_salted);
+	cublas_dynamic_set_enabled(opt.gpu_cublas);
+	//Started here so context creation overlaps the file reading rather than landing inside
+	//whichever kernel runs first.
+	if (opt.use_gpu && (opt.gpu_grid || opt.gpu_salted || opt.gpu_itensor || opt.gpu_blas))
+		sf_gpu_warmup_start();
+	//A destructor for the same reason as the two above, and because only calc_SF waits for
+	//this thread: a run that never reaches the transform - IAM, properties, RGBI, RI fit -
+	//used to leave it running. What then joined it was the destructor of the static future
+	//in sf_gpu.cu, which runs after the CUDA runtime's own atexit teardown, so the thread
+	//was still inside cuDevicePrimaryCtxRetain with the driver already torn down under it.
+	//That is a crash or a hang depending on the timing, and it needs a real device and a
+	//slow context creation to show up - six test processes sharing two V100s does it, a
+	//single run does not. Waiting here costs nothing: by this point the warm-up is long
+	//done in any run that did any work.
+	struct warmup_joiner
+	{
+		~warmup_joiner()
+		{
+			//A destructor, so nothing may escape it; the warm-up has no result to report.
+			try { sf_gpu_warmup_wait(); } catch (...) {}
+		}
+	} join_warmup;
 #endif
-    vector<WFN> wavy;
+	vector<WFN> wavy;
 
-    //Header first, before any job: a job that fails while reading its input otherwise leaves an empty log
-    log_file << NoSpherA2_message(opt.no_date);
-    if (!opt.no_date)
-    {
-        log_file << build_date;
-    }
-    log_file.flush();
+	//Header first, before any job: a job that fails while reading its input otherwise leaves an empty log
+	log_file << NoSpherA2_message(opt.no_date);
+	if (!opt.no_date)
+	{
+		log_file << build_date;
+	}
+	log_file.flush();
 
-    if (opt.promol_nci)
-    {
-        promolecular_nci_analysis(
-            opt.promol_nci_xyz,
-            opt.properties,
-            std::cout,
-            opt.cif);
-        log_file.flush();
-        std::cout.rdbuf(_coutbuf);
-        return 0;
-    }
+	if (opt.promol_nci)
+	{
+		promolecular_nci_analysis(
+			opt.promol_nci_xyz,
+			opt.properties,
+			std::cout,
+			opt.cif);
+		log_file.flush();
+		std::cout.rdbuf(_coutbuf);
+		return 0;
+	}
 
-    //Geometry-aid descriptors or element probabilities and quit; the flags queue jobs, so -wfn and -geometry_aid_cutoff may come in any order
-    if (opt.calc_featomic_descriptor || !opt.featomic_structures.empty() || !opt.classify_atoms_out.empty() || !opt.classify_structures.empty())
-        return geometry_aid::run(opt);
-    if (!opt.interaction_energies_job.empty())
-        return crystal_energies::run(opt);
-    //Start QCT menu and leave
-    if (opt.qct) {
-        //restore cout
-        std::cout.rdbuf(_coutbuf);
-        cls();
-        std::cout << "Starting QCT menu..." << endl;
-        return QCT(opt, wavy);
-    }
-    //Conceptual-DFT reactivity analysis and quit; its table goes to stdout, not the log
-    if (opt.fukui_analysis_run)
-    {
-        log_file.flush();
-        std::cout.rdbuf(_coutbuf); // reset to standard output again
-        fukui_analysis(opt, std::cout);
-        return 0;
-    }
-    //Basin analysis and quit; the tables stay in the log, which is what the golden test reads
-    if (opt.eli_analysis_run)
-    {
-        WFN basins(opt.wfn);
-        if (opt.ECP) basins.set_has_ECPs(true, true, opt.ECP_mode);
-        ELI_analysis(basins, opt);
-        return 0;
-    }
-    // Perform fractal dimensional analysis and quit
-    if (opt.fract)
-    {
-        wavy.emplace_back(e_origin::NOT_YET_DEFINED);
-        cube residual(opt.fract_name, true, wavy[0], std::cout, opt.debug);
-        residual.fractal_dimension(0.01);
-        log_file.flush();
-        std::cout.rdbuf(_coutbuf); // reset to standard output again
-        std::cout << "Finished writing fractal dimensions plot to *.cube_fractal_plot file!" << endl;
-        return 0;
-    }
-    // Perform Hirshfeld surface based on input and quit
-    if (opt.hirshfeld_surface != "")
-    {
-        wavy.emplace_back(opt.hirshfeld_surface, opt.debug);
-        wavy.emplace_back(opt.hirshfeld_surface2, opt.debug);
-        std::vector<_time_point> tp{ get_time() };
-        std::vector<std::string> tp_desc;
-        std::vector<Triangle> triangles_i = Hirshfeld_surface(wavy[0], wavy[1], opt.properties, log_file);
-        tp.push_back(get_time()); tp_desc.push_back("weight grid + marching cubes");
-        if (triangles_i.empty())
-        {
-            std::cout.rdbuf(_coutbuf);
-            std::cout << "No Hirshfeld surface found, check the two fragments!" << endl;
-            return 1;
-        }
-        std::array<std::array<int, 3>, 3> Colourcode;
+	if (!opt.interaction_energies_job.empty())
+		return crystal_energies::run(opt);
+	//Start QCT menu and leave
+	if (opt.qct) {
+		//restore cout
+		std::cout.rdbuf(_coutbuf);
+		cls();
+		std::cout << "Starting QCT menu..." << endl;
+		if (!opt.wfn.empty()) wavy.emplace_back(opt.wfn, opt.debug);  // -wfn preloads the menu
+		return QCT(opt, wavy);
+	}
+	//Conceptual-DFT reactivity analysis and quit; its table goes to stdout, not the log
+	if (opt.fukui_analysis_run)
+	{
+		log_file.flush();
+		std::cout.rdbuf(_coutbuf); // reset to standard output again
+		fukui_analysis(opt, std::cout);
+		return 0;
+	}
+	//Basin analysis and quit; the tables stay in the log, which is what the golden test reads
+	if (opt.eli_analysis_run)
+	{
+		WFN basins(opt.wfn);
+		if (opt.ECP) basins.set_has_ECPs(true, true, opt.ECP_mode);
+		ELI_analysis(basins, opt);
+		return 0;
+	}
+	// Perform fractal dimensional analysis and quit
+	if (opt.fract)
+	{
+		wavy.emplace_back(e_origin::NOT_YET_DEFINED);
+		cube residual(opt.fract_name, true, wavy[0], std::cout, opt.debug);
+		residual.fractal_dimension(0.01);
+		log_file.flush();
+		std::cout.rdbuf(_coutbuf); // reset to standard output again
+		std::cout << "Finished writing fractal dimensions plot to *.cube_fractal_plot file!" << endl;
+		return 0;
+	}
+	// Perform Hirshfeld surface based on input and quit
+	if (opt.hirshfeld_surface != "")
+	{
+		wavy.emplace_back(opt.hirshfeld_surface, opt.debug);
+		wavy.emplace_back(opt.hirshfeld_surface2, opt.debug);
+		std::vector<_time_point> tp{ get_time() };
+		std::vector<std::string> tp_desc;
+		cube weight;
+		std::vector<Triangle> triangles_i = Hirshfeld_surface(wavy[0], wavy[1], opt.properties, log_file, &weight);
+		tp.push_back(get_time()); tp_desc.push_back("weight grid + marching cubes");
+		if (triangles_i.empty())
+		{
+			std::cout.rdbuf(_coutbuf);
+			std::cout << "No Hirshfeld surface found, check the two fragments!" << endl;
+			return 1;
+		}
+		std::array<std::array<int, 3>, 3> Colourcode;
 
-        Colourcode[0] = { 255, 0, 0 };
-        Colourcode[1] = { 255, 255, 255 };
-        Colourcode[2] = { 0, 0, 255 };
-        auto triangles_e = triangles_i;
-        auto triangles_n = triangles_i;
-        const int nt = (int)triangles_i.size();
-        vec d_i(nt), d_e(nt), d_norm(nt);
-        double area = 0.0;
-        double volume = 0.0;
+		Colourcode[0] = { 255, 0, 0 };
+		Colourcode[1] = { 255, 255, 255 };
+		Colourcode[2] = { 0, 0, 255 };
+		auto triangles_e = triangles_i;
+		auto triangles_n = triangles_i;
+		const int nt = (int)triangles_i.size();
+		vec d_i(nt), d_e(nt), d_norm(nt);
+		double area = 0.0;
+		double volume = 0.0;
 #pragma omp parallel for reduction(+ : area, volume)
-        for (int i = 0; i < nt; i++)
-        {
-            area += triangles_i[i].calc_area();
-            volume += triangles_i[i].calc_inner_volume();
-            const d3 pos = triangles_i[i].calc_center();
-            d_i[i] = calc_d_i(pos, wavy[0]);
-            d_e[i] = calc_d_i(pos, wavy[1]);
-            d_norm[i] = calc_d_norm_term(pos, wavy[0]) + calc_d_norm_term(pos, wavy[1]);
-        }
-        tp.push_back(get_time()); tp_desc.push_back("d_i, d_e, d_norm");
-        vec esp;
-        if (wavy[0].get_nmo() > 0)
-            esp = surface_ESP(triangles_i, wavy[0]);
-        else if (opt.SALTED)
-        {
-            const ML_density ml(wavy[0], opt);
-            esp = surface_ESP(triangles_i, [&](const d3& p) { return ml.esp(p); });
-        }
-        tp.push_back(get_time()); tp_desc.push_back("surface ESP");
-        // one row per face in obj order (d_i, d_e in Angstrom, esp in a.u.): Olex2 colours the surface from these, columns 1-2 are the fingerprint plot
-        ofstream dat("Hirshfeld_surface.dat");
-        dat << "# d_i d_e d_norm" << (esp.empty() ? "" : " esp") << "\n";
-        for (int i = 0; i < nt; i++)
-        {
-            dat << constants::bohr2ang(d_i[i]) << "\t" << constants::bohr2ang(d_e[i]) << "\t" << d_norm[i];
-            if (!esp.empty())
-                dat << "\t" << esp[i];
-            dat << "\n";
-        }
-        dat.close();
-        const auto [lo_i, hi_i] = std::minmax_element(d_i.begin(), d_i.end());
-        const auto [lo_e, hi_e] = std::minmax_element(d_e.begin(), d_e.end());
-        const auto [lo_n, hi_n] = std::minmax_element(d_norm.begin(), d_norm.end());
-        std::cout << "d_i is scaled from " << *lo_i << " to " << *hi_i * 0.9 << endl;
-        std::cout << "d_e is scaled from " << *lo_e << " to " << *hi_e * 0.9 << endl;
-        std::cout << "d_norm from " << *lo_n << " to " << *hi_n << ", red (" << *lo_n << ") white (0) blue (" << *hi_n << ")" << endl;
+		for (int i = 0; i < nt; i++)
+		{
+			area += triangles_i[i].calc_area();
+			volume += triangles_i[i].calc_inner_volume();
+			const d3 pos = triangles_i[i].calc_center();
+			d_i[i] = calc_d_i(pos, wavy[0]);
+			d_e[i] = calc_d_i(pos, wavy[1]);
+			d_norm[i] = calc_d_norm_term(pos, wavy[0]) + calc_d_norm_term(pos, wavy[1]);
+		}
+		vec shape_index, curvedness;
+		surface_curvature(triangles_i, weight, shape_index, curvedness);
+		tp.push_back(get_time()); tp_desc.push_back("d_i, d_e, d_norm, curvature");
+		vec esp;
+		if (wavy[0].get_nmo() > 0)
+			esp = surface_ESP(triangles_i, wavy[0]);
+		else if (opt.SALTED)
+		{
+			const Gaussian_Molecule ml(wavy[0], opt);
+			esp = surface_ESP(triangles_i, [&](const d3& p) { return ml.esp(p); });
+		}
+		tp.push_back(get_time()); tp_desc.push_back("surface ESP");
+		// one row per face in obj order (d_i, d_e in Angstrom, curvature in 1/Angstrom, esp in a.u.): Olex2 colours the surface from these, columns 1-2 are the fingerprint plot
+		ofstream dat("Hirshfeld_surface.dat");
+		dat << "# d_i d_e d_norm shape_index curvedness" << (esp.empty() ? "" : " esp") << "\n";
+		for (int i = 0; i < nt; i++)
+		{
+			dat << constants::bohr2ang(d_i[i]) << "\t" << constants::bohr2ang(d_e[i]) << "\t" << d_norm[i] << "\t" << shape_index[i] << "\t" << curvedness[i];
+			if (!esp.empty())
+				dat << "\t" << esp[i];
+			dat << "\n";
+		}
+		dat.close();
+		// plain values, not structured bindings: clang's OpenMP cannot capture those (macOS CI)
+		const double lo_i = *std::min_element(d_i.begin(), d_i.end()), hi_i = *std::max_element(d_i.begin(), d_i.end());
+		const double lo_e = *std::min_element(d_e.begin(), d_e.end()), hi_e = *std::max_element(d_e.begin(), d_e.end());
+		const double lo_n = *std::min_element(d_norm.begin(), d_norm.end()), hi_n = *std::max_element(d_norm.begin(), d_norm.end());
+		std::cout << "d_i is scaled from " << lo_i << " to " << hi_i * 0.9 << endl;
+		std::cout << "d_e is scaled from " << lo_e << " to " << hi_e * 0.9 << endl;
+		std::cout << "d_norm from " << lo_n << " to " << hi_n << ", red (" << lo_n << ") white (0) blue (" << hi_n << ")" << endl;
 #pragma omp parallel for
-        for (int i = 0; i < nt; i++)
-        {
-            triangles_i[i].set_colour(mix_colour(d_i[i], Colourcode, *lo_i, *hi_i * 0.9));
-            triangles_e[i].set_colour(mix_colour(d_e[i], Colourcode, *lo_e, *hi_e * 0.9));
-            triangles_n[i].set_colour(d_norm[i] < 0 ? mix_colour(d_norm[i], Colourcode, *lo_n, -*lo_n) : mix_colour(d_norm[i], Colourcode, -*hi_n, *hi_n));
-        }
-        std::cout << "Total area: " << area << endl;
-        std::cout << "Total volume: " << volume << endl;
-        writeColourObj("Hirshfeld_surface_i.obj", triangles_i);
-        writeColourObj("Hirshfeld_surface_e.obj", triangles_e);
-        writeColourObj("Hirshfeld_surface_norm.obj", triangles_n);
-        if (!esp.empty())
-        {
-            colour_by_ESP(triangles_i, esp, std::cout);
-            writeColourObj("Hirshfeld_surface_esp.obj", triangles_i);
-        }
-        tp.push_back(get_time()); tp_desc.push_back("dat + obj files");
-        write_timing_to_file(std::cout, tp, tp_desc);
-        std::cout.rdbuf(_coutbuf); // reset to standard output again
-        std::cout << "Finished!" << endl;
-        return 0;
-    }
-    // Perform calculation of difference between two wavefunctions using the resolution, radius, wfn and wfn2 keywords. wfn2 keaword is provided by density-difference flag
-    if (!opt.wfn2.empty())
-    {
-        wavy.emplace_back(opt.wfn, opt.debug);
-        wavy.emplace_back(opt.wfn2, opt.debug);
-        if (opt.debug)
-            std::cout << opt.wfn << " vs " << opt.wfn2 << endl;
-        wavy[0].delete_unoccupied_MOs();
-        wavy[1].delete_unoccupied_MOs();
-        readxyzMinMax_fromWFN(wavy[0], opt.properties);
-        cube Rho1(opt.properties.NbSteps, wavy[0].get_ncen(), true);
-        cube Rho2(opt.properties.NbSteps, wavy[0].get_ncen(), true);
-        Rho1.give_parent_wfn(wavy[0]);
-        Rho2.give_parent_wfn(wavy[1]);
-        double len[3]{ 0, 0, 0 };
-        for (int i = 0; i < 3; i++)
-        {
-            len[i] = (opt.properties.MinMax[3 + i] - opt.properties.MinMax[i]) / opt.properties.NbSteps[i];
-        }
-        for (int i = 0; i < 3; i++)
-        {
-            Rho1.set_origin(i, opt.properties.MinMax[i]);
-            Rho2.set_origin(i, opt.properties.MinMax[i]);
-            Rho1.set_vector(i, i, len[i]);
-            Rho2.set_vector(i, i, len[i]);
-        }
-        Rho1.set_comment1("Calculated density using NoSpherA2");
-        Rho1.set_comment2("from " + wavy[0].get_path().string());
-        Rho2.set_comment1("Calculated density using NoSpherA2");
-        Rho2.set_comment2("from " + wavy[1].get_path().string());
-        Rho1.set_path(std::filesystem::path(wavy[0].get_path().stem().string() + "_rho.cube"));
-        Rho2.set_path(std::filesystem::path(wavy[1].get_path().stem().string() + "_rho.cube"));
-        Calc_Rho(Rho1, wavy[0], opt.properties.radius, log_file, false);
-        Calc_Rho(Rho2, wavy[1], opt.properties.radius, log_file, false);
-        cube Rho_diff = Rho1 - Rho2;
+		for (int i = 0; i < nt; i++)
+		{
+			triangles_i[i].set_colour(mix_colour(d_i[i], Colourcode, lo_i, hi_i * 0.9));
+			triangles_e[i].set_colour(mix_colour(d_e[i], Colourcode, lo_e, hi_e * 0.9));
+			triangles_n[i].set_colour(d_norm[i] < 0 ? mix_colour(d_norm[i], Colourcode, lo_n, -lo_n) : mix_colour(d_norm[i], Colourcode, -hi_n, hi_n));
+		}
+		std::cout << "Total area: " << area << endl;
+		std::cout << "Total volume: " << volume << endl;
+		writeColourObj("Hirshfeld_surface_i.obj", triangles_i);
+		writeColourObj("Hirshfeld_surface_e.obj", triangles_e);
+		writeColourObj("Hirshfeld_surface_norm.obj", triangles_n);
+		if (!esp.empty())
+		{
+			colour_by_ESP(triangles_i, esp, std::cout);
+			writeColourObj("Hirshfeld_surface_esp.obj", triangles_i);
+		}
+		tp.push_back(get_time()); tp_desc.push_back("dat + obj files");
+		write_timing_to_file(std::cout, tp, tp_desc);
+		std::cout.rdbuf(_coutbuf); // reset to standard output again
+		std::cout << "Finished!" << endl;
+		return 0;
+	}
+	// Perform calculation of difference between two wavefunctions using the resolution, radius, wfn and wfn2 keywords. wfn2 keaword is provided by density-difference flag
+	if (!opt.wfn2.empty())
+	{
+		wavy.emplace_back(opt.wfn, opt.debug);
+		wavy.emplace_back(opt.wfn2, opt.debug);
+		if (opt.debug)
+			std::cout << opt.wfn << " vs " << opt.wfn2 << endl;
+		wavy[0].delete_unoccupied_MOs();
+		wavy[1].delete_unoccupied_MOs();
+		readxyzMinMax_fromWFN(wavy[0], opt.properties);
+		cube Rho1(opt.properties.NbSteps, wavy[0].get_ncen(), true);
+		cube Rho2(opt.properties.NbSteps, wavy[0].get_ncen(), true);
+		Rho1.give_parent_wfn(wavy[0]);
+		Rho2.give_parent_wfn(wavy[1]);
+		double len[3]{ 0, 0, 0 };
+		for (int i = 0; i < 3; i++)
+		{
+			len[i] = (opt.properties.MinMax[3 + i] - opt.properties.MinMax[i]) / opt.properties.NbSteps[i];
+		}
+		for (int i = 0; i < 3; i++)
+		{
+			Rho1.set_origin(i, opt.properties.MinMax[i]);
+			Rho2.set_origin(i, opt.properties.MinMax[i]);
+			Rho1.set_vector(i, i, len[i]);
+			Rho2.set_vector(i, i, len[i]);
+		}
+		Rho1.set_comment1("Calculated density using NoSpherA2");
+		Rho1.set_comment2("from " + wavy[0].get_path().string());
+		Rho2.set_comment1("Calculated density using NoSpherA2");
+		Rho2.set_comment2("from " + wavy[1].get_path().string());
+		Rho1.set_path(std::filesystem::path(wavy[0].get_path().stem().string() + "_rho.cube"));
+		Rho2.set_path(std::filesystem::path(wavy[1].get_path().stem().string() + "_rho.cube"));
+		Calc_Rho(Rho1, wavy[0], opt.properties.radius, log_file, false);
+		Calc_Rho(Rho2, wavy[1], opt.properties.radius, log_file, false);
+		cube Rho_diff = Rho1 - Rho2;
 //#pragma omp parallel for schedule(dynamic)
 //        for (int i = 0; i < Rho1.get_size(0); i++)
 //        {
@@ -331,471 +338,471 @@ static int run_app_impl(int argc, char **argv)
 //                    Rho_diff.set_value(i, j, k, Rho1.get_value(i, j, k) - Rho2.get_value(i, j, k));
 //                }
 //        }
-        for (int i = 0; i < 3; i++)
-        {
-            Rho_diff.set_origin(i, opt.properties.MinMax[i]);
-            Rho_diff.set_vector(i, i, len[i]);
-        }
-        Rho_diff.give_parent_wfn(wavy[0]);
-        std::cout << "RSR between the two cubes: " << setw(16) << scientific << setprecision(16) << Rho1.rrs(Rho2) << endl;
-        std::cout << "Ne of shifted electrons: " << Rho_diff.diff_sum() << endl;
-        std::cout << "Writing cube 1..." << flush;
-        Rho1.write_file(Rho1.get_path(), false);
-        std::cout << " ... done!\nWriting cube 2..." << flush;
-        Rho2.write_file(Rho2.get_path(), false);
-        Rho_diff.set_path(wavy[1].get_path().stem().string() + "_diff.cube");
-        std::cout << " ... done\nWriting difference..." << flush;
-        Rho_diff.write_file(Rho_diff.get_path(), false);
-        std::cout << " ... done :)" << endl;
-        std::cout << "Bye Bye!" << endl;
-        return 0;
-    }
-    if (opt.pol_wfns.size() != 0)
-    {
-        polarizabilities(opt, log_file);
-        exit(0);
-    }
-    // Performs MTC and CMTC calcualtions, that is multiple wfns with either one or multiple cifs and 1 common hkl.
-    if (opt.cif_based_combined_tsc_calc || opt.combined_tsc_calc)
-    {
-        err_checkf(opt.hkl != "" || opt.dmin != 99.0 || opt.hkl_min_max[0][0] != -100, "No hkl specified and no dmin value given", log_file);
-        if (opt.combined_tsc_calc)
-            err_checkf(opt.cif != "", "No cif specified", log_file);
-        // First make sure all files exist
-        if (opt.cif_based_combined_tsc_calc)
-        {
-            err_checkf(opt.combined_tsc_calc_files.size() == opt.combined_tsc_calc_cifs.size(), "Unequal number of CIFs and WFNs impossible!", log_file);
-        }
-        err_checkf(opt.combined_tsc_calc_mult.size() == opt.combined_tsc_calc_files.size(), "Unequal number of WFNs and mults impossible!", log_file);
-        err_checkf(opt.combined_tsc_calc_charge.size() == opt.combined_tsc_calc_files.size(), "Unequal number of WFNs and charges impossible!", log_file);
-        err_checkf(opt.combined_tsc_calc_ECP.size() == opt.combined_tsc_calc_files.size(), "Unequal number of WFNs and ECPs impossible!", log_file);
+		for (int i = 0; i < 3; i++)
+		{
+			Rho_diff.set_origin(i, opt.properties.MinMax[i]);
+			Rho_diff.set_vector(i, i, len[i]);
+		}
+		Rho_diff.give_parent_wfn(wavy[0]);
+		std::cout << "RSR between the two cubes: " << setw(16) << scientific << setprecision(16) << Rho1.rrs(Rho2) << endl;
+		std::cout << "Ne of shifted electrons: " << Rho_diff.diff_sum() << endl;
+		std::cout << "Writing cube 1..." << flush;
+		Rho1.write_file(Rho1.get_path(), false);
+		std::cout << " ... done!\nWriting cube 2..." << flush;
+		Rho2.write_file(Rho2.get_path(), false);
+		Rho_diff.set_path(wavy[1].get_path().stem().string() + "_diff.cube");
+		std::cout << " ... done\nWriting difference..." << flush;
+		Rho_diff.write_file(Rho_diff.get_path(), false);
+		std::cout << " ... done :)" << endl;
+		std::cout << "Bye Bye!" << endl;
+		return 0;
+	}
+	if (opt.pol_wfns.size() != 0)
+	{
+		polarizabilities(opt, log_file);
+		return 0;
+	}
+	// Performs MTC and CMTC calcualtions, that is multiple wfns with either one or multiple cifs and 1 common hkl.
+	if (opt.cif_based_combined_tsc_calc || opt.combined_tsc_calc)
+	{
+		err_checkf(opt.hkl != "" || opt.dmin != 99.0 || opt.hkl_min_max[0][0] != -100, "No hkl specified and no dmin value given", log_file);
+		if (opt.combined_tsc_calc)
+			err_checkf(opt.cif != "", "No cif specified", log_file);
+		// First make sure all files exist
+		if (opt.cif_based_combined_tsc_calc)
+		{
+			err_checkf(opt.combined_tsc_calc_files.size() == opt.combined_tsc_calc_cifs.size(), "Unequal number of CIFs and WFNs impossible!", log_file);
+		}
+		err_checkf(opt.combined_tsc_calc_mult.size() == opt.combined_tsc_calc_files.size(), "Unequal number of WFNs and mults impossible!", log_file);
+		err_checkf(opt.combined_tsc_calc_charge.size() == opt.combined_tsc_calc_files.size(), "Unequal number of WFNs and charges impossible!", log_file);
+		err_checkf(opt.combined_tsc_calc_ECP.size() == opt.combined_tsc_calc_files.size(), "Unequal number of WFNs and ECPs impossible!", log_file);
 
-        for (int i = 0; i < opt.combined_tsc_calc_files.size(); i++)
-        {
-            err_checkf(std::filesystem::exists(opt.combined_tsc_calc_files[i]), "Specified file for combined calculation doesn't exist! " + opt.combined_tsc_calc_files[i].string(), log_file);
-            if (opt.cif_based_combined_tsc_calc)
-                err_checkf(std::filesystem::exists(opt.combined_tsc_calc_cifs[i]), "Specified file for combined calculation doesn't exist! " + opt.combined_tsc_calc_cifs[i].string(), log_file);
-        }
-        for (int i = 0; i < opt.combined_tsc_calc_files.size(); i++)
-        {
-            //If the files is a .toml file, we run OCC; otherwise we read it as a wfn file. This allows to easily run OCC for multiple files in one go, without having to run OCC separately for each file beforehand.
-            if (opt.combined_tsc_calc_files[i].extension() == ".toml")
-            {
-                if (!ensure_occ_data_path((argc > 0) ? argv[0] : nullptr))
-                {
-                    std::cerr << "ERROR: OCC basis set data directory not found.\n"
-                              << "  Set OCC_DATA_PATH to the 'share/occ' directory (must contain 'basis' and 'methods' subdirectories).\n"
-                              << "  Example: OCC_DATA_PATH=/path/to/occ/share/occ\n";
-                    log_file << "ERROR: OCC_DATA_PATH not set or invalid. Cannot run OCC calculation." << std::endl;
-                    return 1;
-                }
-                log_file << "Running OCC for " << opt.combined_tsc_calc_files[i] << "..." << endl;
-                occ::io::OccInput config = occ::io::read_occ_input_file(opt.combined_tsc_calc_files[i].string());
-                std::filesystem::path log_path = opt.combined_tsc_calc_files[i].stem().string() + ".log";
-                occ::log::set_log_file(log_path.string());
-                occ::parallel::set_num_threads(config.runtime.threads);
-                wavy.emplace_back(occ::main::run_scf_external(config, true));
-                occ::main::shutdown();
-                wavy[i].set_multi(opt.combined_tsc_calc_mult[i]);
-                wavy[i].set_charge(opt.combined_tsc_calc_charge[i]);
-                if (opt.combined_tsc_calc_ECP[i] != 0)
-                {
-                    wavy[i].set_has_ECPs(true, true, opt.combined_tsc_calc_ECP[i]);
-                }
-            }
-            else {
-                log_file << "Reading: " << setw(44) << opt.combined_tsc_calc_files[i] << flush;
-                if (opt.debug)
-                {
-                    log_file << "\nmult: " << opt.combined_tsc_calc_mult[i] << endl;
-                    log_file << "charge: " << opt.combined_tsc_calc_charge[i] << "\n";
-                    log_file << "ECP: " << opt.combined_tsc_calc_ECP[i] << "\n";
-                }
-                wavy.emplace_back(opt.combined_tsc_calc_files[i], opt.debug);
-                wavy[i].set_multi(opt.combined_tsc_calc_mult[i]);
-                wavy[i].set_charge(opt.combined_tsc_calc_charge[i]);
-                if (opt.combined_tsc_calc_ECP[i] != 0)
-                {
-                    wavy[i].set_has_ECPs(true, true, opt.combined_tsc_calc_ECP[i]);
-                }
-            }
-            log_file << " done!\nNumber of atoms in Wavefunction file: " << wavy[i].get_ncen() << " Number of MOs: " << wavy[i].get_nmo() << endl;
-        }
+		for (int i = 0; i < opt.combined_tsc_calc_files.size(); i++)
+		{
+			err_checkf(std::filesystem::exists(opt.combined_tsc_calc_files[i]), "Specified file for combined calculation doesn't exist! " + opt.combined_tsc_calc_files[i].string(), log_file);
+			if (opt.cif_based_combined_tsc_calc)
+				err_checkf(std::filesystem::exists(opt.combined_tsc_calc_cifs[i]), "Specified file for combined calculation doesn't exist! " + opt.combined_tsc_calc_cifs[i].string(), log_file);
+		}
+		for (int i = 0; i < opt.combined_tsc_calc_files.size(); i++)
+		{
+			//If the files is a .toml file, we run OCC; otherwise we read it as a wfn file. This allows to easily run OCC for multiple files in one go, without having to run OCC separately for each file beforehand.
+			if (opt.combined_tsc_calc_files[i].extension() == ".toml")
+			{
+				if (!ensure_occ_data_path((argc > 0) ? argv[0] : nullptr))
+				{
+					std::cerr << "ERROR: OCC basis set data directory not found.\n"
+							  << "  Set OCC_DATA_PATH to the 'share/occ' directory (must contain 'basis' and 'methods' subdirectories).\n"
+							  << "  Example: OCC_DATA_PATH=/path/to/occ/share/occ\n";
+					log_file << "ERROR: OCC_DATA_PATH not set or invalid. Cannot run OCC calculation." << std::endl;
+					return 1;
+				}
+				log_file << "Running OCC for " << opt.combined_tsc_calc_files[i] << "..." << endl;
+				occ::io::OccInput config = occ::io::read_occ_input_file(opt.combined_tsc_calc_files[i].string());
+				std::filesystem::path log_path = opt.combined_tsc_calc_files[i].stem().string() + ".log";
+				occ::log::set_log_file(log_path.string());
+				occ::parallel::set_num_threads(config.runtime.threads);
+				wavy.emplace_back(occ::main::run_scf_external(config, true));
+				occ::main::shutdown();
+				wavy[i].set_multi(opt.combined_tsc_calc_mult[i]);
+				wavy[i].set_charge(opt.combined_tsc_calc_charge[i]);
+				if (opt.combined_tsc_calc_ECP[i] != 0)
+				{
+					wavy[i].set_has_ECPs(true, true, opt.combined_tsc_calc_ECP[i]);
+				}
+			}
+			else {
+				log_file << "Reading: " << setw(44) << opt.combined_tsc_calc_files[i] << flush;
+				if (opt.debug)
+				{
+					log_file << "\nmult: " << opt.combined_tsc_calc_mult[i] << endl;
+					log_file << "charge: " << opt.combined_tsc_calc_charge[i] << "\n";
+					log_file << "ECP: " << opt.combined_tsc_calc_ECP[i] << "\n";
+				}
+				wavy.emplace_back(opt.combined_tsc_calc_files[i], opt.debug);
+				wavy[i].set_multi(opt.combined_tsc_calc_mult[i]);
+				wavy[i].set_charge(opt.combined_tsc_calc_charge[i]);
+				if (opt.combined_tsc_calc_ECP[i] != 0)
+				{
+					wavy[i].set_has_ECPs(true, true, opt.combined_tsc_calc_ECP[i]);
+				}
+			}
+			log_file << " done!\nNumber of atoms in Wavefunction file: " << wavy[i].get_ncen() << " Number of MOs: " << wavy[i].get_nmo() << endl;
+		}
 
-        svec known_scatterer;
-        vec2 known_kpts;
-        tsc_block<int, cdouble> result;
-        //Streamed combined table when eligible: parts first, then one pass over reflection blocks; falls through to the loop otherwise
-        if (stream_mtc_salted(opt, wavy, log_file, &known_kpts))
-        {
-            //Olex2 greps the log for this exact string; changing it reads as a failed run
-            log_file << "Writing tsc file...  ... done!" << endl;
-            log_file << "  (written block by block while the factors were computed)" << endl;
-            log_file.flush();
-            std::cout.rdbuf(_coutbuf);
-            std::cout << "Finished!" << endl;
-            return 0;
-        }
+		svec known_scatterer;
+		vec2 known_kpts;
+		tsc_block<int, cdouble> result;
+		//Streamed combined table when eligible: parts first, then one pass over reflection blocks; falls through to the loop otherwise
+		if (stream_mtc_salted(opt, wavy, log_file, &known_kpts))
+		{
+			//Olex2 greps the log for this exact string; changing it reads as a failed run
+			log_file << "Writing tsc file...  ... done!" << endl;
+			log_file << "  (written block by block while the factors were computed)" << endl;
+			log_file.flush();
+			std::cout.rdbuf(_coutbuf);
+			std::cout << "Finished!" << endl;
+			return 0;
+		}
 
-        for (int i = 0; i < opt.combined_tsc_calc_files.size(); i++)
-        {
-            known_scatterer = result.get_scatterers_string();
-            if (!opt.SALTED)
-            {
-                if (wavy[i].get_origin() == 7)
-                    opt.iam_switch = true;
-                result.append(calculate_scattering_factors<itsc_block, std::vector<WFN>&>(
-                    opt,
-                    wavy,
-                    log_file,
-                    known_scatterer,
-                    i,
-                    &known_kpts),
-                    log_file);
-            }
-            else if (opt.SALTED)
-            {
-                std::shared_ptr<SALTEDPredictor> temp_pred = std::make_shared<SALTEDPredictor>(wavy[i], opt);
-                filesystem::path salted_model_path = temp_pred->get_salted_filename();
-                log_file << "Using " << salted_model_path << " for the prediction" << endl;
+		for (int i = 0; i < opt.combined_tsc_calc_files.size(); i++)
+		{
+			known_scatterer = result.get_scatterers_string();
+			if (!opt.SALTED)
+			{
+				if (wavy[i].get_origin() == 7)
+					opt.iam_switch = true;
+				result.append(calculate_scattering_factors<itsc_block, std::vector<WFN>&>(
+					opt,
+					wavy,
+					log_file,
+					known_scatterer,
+					i,
+					&known_kpts),
+					log_file);
+			}
+			else if (opt.SALTED)
+			{
+				std::shared_ptr<SALTEDPredictor> temp_pred = std::make_shared<SALTEDPredictor>(wavy[i], opt);
+				filesystem::path salted_model_path = temp_pred->get_salted_filename();
+				log_file << "Using " << salted_model_path << " for the prediction" << endl;
 
-                if (!temp_pred->basis_set_loaded()) {
-                    string df_basis_name = temp_pred->get_dfbasis_name();
-                    std::shared_ptr<BasisSet> aux_basis = BasisSetLibrary::get_basis_set(df_basis_name);
-                    load_basis_into_WFN(temp_pred->wavy, aux_basis);
-                }
+				if (!temp_pred->basis_set_loaded()) {
+					string df_basis_name = temp_pred->get_dfbasis_name();
+					std::shared_ptr<BasisSet> aux_basis = BasisSetLibrary::get_basis_set(df_basis_name);
+					load_basis_into_WFN(temp_pred->wavy, aux_basis);
+				}
 
-                if (opt.debug)
-                    log_file << "Entering scattering ML Factor Calculation with H part!" << endl;
-                result.append(calculate_scattering_factors<itsc_block, SALTEDPredictor &>(
-                    opt,
-                    *temp_pred,
-                    log_file,
-                    known_scatterer,
-                    i,
-                    &known_kpts),
-                    log_file);
-            }
-        }
+				if (opt.debug)
+					log_file << "Entering scattering ML Factor Calculation with H part!" << endl;
+				result.append(calculate_scattering_factors<itsc_block, SALTEDPredictor &>(
+					opt,
+					*temp_pred,
+					log_file,
+					known_scatterer,
+					i,
+					&known_kpts),
+					log_file);
+			}
+		}
 
-        if (opt.tsc_written_by_stream)
-        {
-            //the streamed path already wrote the file block by block; writing the (empty) in-memory block now would truncate it
-            log_file << "Writing tsc file...  ... done!" << endl;
-            log_file << "  (written block by block while the factors were computed)" << endl;
-            log_file.flush();
-            std::cout.rdbuf(_coutbuf);
-            std::cout << "Finished!" << endl;
-            return 0;
-        }
-        known_scatterer = result.get_scatterers_string();
-        log_file << "Final number of atoms in .tsc file: " << known_scatterer.size() << endl;
-        _time_point start = get_time();
-        log_file << "Writing tsc file... " << flush;
-        if (opt.binary_tsc)
-            result.write_tscb_file();
-        if (opt.old_tsc)
-        {
-            result.write_tsc_file(opt.cif);
-        }
-        log_file << " ... done!" << endl;
-        if (!opt.no_date)
-        {
-            _time_point end_write = get_time();
-            if (get_sec(start, end_write) < 60)
-                log_file << "Writing Time: " << fixed << setprecision(0) << get_sec(start, end_write) << " s\n";
-            else if (get_sec(start, end_write) < 3600)
-                log_file << "Writing Time: " << fixed << setprecision(0) << floor(get_sec(start, end_write) / 60) << " m " << get_sec(start, end_write) % 60 << " s\n";
-            else
-                log_file << "Writing Time: " << fixed << setprecision(0) << floor(get_sec(start, end_write) / 3600) << " h " << (get_sec(start, end_write) % 3600) / 60 << " m\n";
-            log_file << endl;
-            if (opt.write_CIF)
-                write_wfn_CIF(wavy, "test.wfn_cif", result, opt);
-        }
-        log_file.flush();
-        std::cout.rdbuf(_coutbuf); // reset to standard output again
-        std::cout << "Finished!" << endl;
-        return 0;
-    }
-    // Performs the Thakkar IAM
-    if (opt.iam_switch)
-    {
-        if (opt.debug)
-        {
-            log_file << "I am doing a Thakkar IAM!" << endl;
-        }
-        err_checkf(opt.xyz_file != "", "No xyz specified", log_file);
-        err_checkf(exists(opt.xyz_file), "xyz doesn't exist", log_file);
-        wavy.emplace_back(opt.xyz_file, opt.debug);
+		if (opt.tsc_written_by_stream)
+		{
+			//the streamed path already wrote the file block by block; writing the (empty) in-memory block now would truncate it
+			log_file << "Writing tsc file...  ... done!" << endl;
+			log_file << "  (written block by block while the factors were computed)" << endl;
+			log_file.flush();
+			std::cout.rdbuf(_coutbuf);
+			std::cout << "Finished!" << endl;
+			return 0;
+		}
+		known_scatterer = result.get_scatterers_string();
+		log_file << "Final number of atoms in .tsc file: " << known_scatterer.size() << endl;
+		_time_point start = get_time();
+		log_file << "Writing tsc file... " << flush;
+		if (opt.binary_tsc)
+			result.write_tscb_file();
+		if (opt.old_tsc)
+		{
+			result.write_tsc_file(opt.cif);
+		}
+		log_file << " ... done!" << endl;
+		if (!opt.no_date)
+		{
+			_time_point end_write = get_time();
+			if (get_sec(start, end_write) < 60)
+				log_file << "Writing Time: " << fixed << setprecision(0) << get_sec(start, end_write) << " s\n";
+			else if (get_sec(start, end_write) < 3600)
+				log_file << "Writing Time: " << fixed << setprecision(0) << floor(get_sec(start, end_write) / 60) << " m " << get_sec(start, end_write) % 60 << " s\n";
+			else
+				log_file << "Writing Time: " << fixed << setprecision(0) << floor(get_sec(start, end_write) / 3600) << " h " << (get_sec(start, end_write) % 3600) / 60 << " m\n";
+			log_file << endl;
+			if (opt.write_CIF)
+				write_wfn_CIF(wavy, "test.wfn_cif", result, opt);
+		}
+		log_file.flush();
+		std::cout.rdbuf(_coutbuf); // reset to standard output again
+		std::cout << "Finished!" << endl;
+		return 0;
+	}
+	// Performs the Thakkar IAM
+	if (opt.iam_switch)
+	{
+		if (opt.debug)
+		{
+			log_file << "I am doing a Thakkar IAM!" << endl;
+		}
+		err_checkf(opt.xyz_file != "", "No xyz specified", log_file);
+		err_checkf(exists(opt.xyz_file), "xyz doesn't exist", log_file);
+		wavy.emplace_back(opt.xyz_file, opt.debug);
 
-        if (opt.electron_diffraction && opt.debug)
-            log_file << "Making Electron diffraction scattering factors, be carefull what you are doing!" << endl;
-        if (opt.debug)
-            log_file << "Entering scattering Factor Calculation!" << endl;
-        svec empty({});
-        //use atoms of group 0
-        opt.groups[0].push_back(0);
-        itsc_block res = calculate_scattering_factors<itsc_block, std::vector<WFN> &>(opt, wavy, log_file, empty, 0);
-        //the streamed path already wrote the file; res is the empty placeholder and writing it would truncate
-        if (opt.tsc_written_by_stream)
-        {
-            log_file << "Writing tsc file...  ... done!" << endl;
-            log_file << "  (written block by block while the factors were computed)" << endl;
-        }
-        else
-        {
-            log_file << "Writing tsc file... " << flush;
-            if (opt.binary_tsc)
-                res.write_tscb_file();
-            if (opt.old_tsc)
-            {
-                res.write_tsc_file(opt.cif);
-            }
-            log_file << " ... done!" << endl;
-            if (opt.write_CIF)
-                write_wfn_CIF(wavy, "test.wfn_cif", res, opt);
-        }
-        log_file.flush();
-        std::cout.rdbuf(_coutbuf); // reset to standard output again
-        std::cout << "Finished!" << endl;
-        return 0;
-    }
-    // Partition electron density read from a cube file and perform Fourier transform to TSC.
-    if (opt.cube_density != "")
-    {
-        err_checkf(opt.cif != "", "Cube-density SF calculation requires -cif.", log_file);
-        err_checkf(opt.hkl != "" || opt.dmin != 99.0 || opt.hkl_min_max[0][0] != -100,
-            "No hkl specified and no dmin value given", log_file);
+		if (opt.electron_diffraction && opt.debug)
+			log_file << "Making Electron diffraction scattering factors, be carefull what you are doing!" << endl;
+		if (opt.debug)
+			log_file << "Entering scattering Factor Calculation!" << endl;
+		svec empty({});
+		//use atoms of group 0
+		opt.groups[0].push_back(0);
+		itsc_block res = calculate_scattering_factors<itsc_block, std::vector<WFN> &>(opt, wavy, log_file, empty, 0);
+		//the streamed path already wrote the file; res is the empty placeholder and writing it would truncate
+		if (opt.tsc_written_by_stream)
+		{
+			log_file << "Writing tsc file...  ... done!" << endl;
+			log_file << "  (written block by block while the factors were computed)" << endl;
+		}
+		else
+		{
+			log_file << "Writing tsc file... " << flush;
+			if (opt.binary_tsc)
+				res.write_tscb_file();
+			if (opt.old_tsc)
+			{
+				res.write_tsc_file(opt.cif);
+			}
+			log_file << " ... done!" << endl;
+			if (opt.write_CIF)
+				write_wfn_CIF(wavy, "test.wfn_cif", res, opt);
+		}
+		log_file.flush();
+		std::cout.rdbuf(_coutbuf); // reset to standard output again
+		std::cout << "Finished!" << endl;
+		return 0;
+	}
+	// Partition electron density read from a cube file and perform Fourier transform to TSC.
+	if (opt.cube_density != "")
+	{
+		err_checkf(opt.cif != "", "Cube-density SF calculation requires -cif.", log_file);
+		err_checkf(opt.hkl != "" || opt.dmin != 99.0 || opt.hkl_min_max[0][0] != -100,
+			"No hkl specified and no dmin value given", log_file);
 
-        WFN cube_wave(e_origin::cub);
-        cube density_cube(opt.cube_density, true, cube_wave, log_file, opt.debug);
+		WFN cube_wave(e_origin::cub);
+		cube density_cube(opt.cube_density, true, cube_wave, log_file, opt.debug);
 
-        if (opt.properties.integral_accuracy > 0)
-        {
-            log_file << "Refining cube grid (interpolative) to integral accuracy "
-                << opt.properties.integral_accuracy << "..." << std::endl;
-            density_cube.adaptive_refine(
-                [&density_cube](const d3& pos)
-                {
-                    return density_cube.get_interpolated_value(pos[0], pos[1], pos[2]);
-                },
-                opt.properties.integral_accuracy,
-                4,
-                2);
-        }
+		if (opt.properties.integral_accuracy > 0)
+		{
+			log_file << "Refining cube grid (interpolative) to integral accuracy "
+				<< opt.properties.integral_accuracy << "..." << std::endl;
+			density_cube.adaptive_refine(
+				[&density_cube](const d3& pos)
+				{
+					return density_cube.get_interpolated_value(pos[0], pos[1], pos[2]);
+				},
+				opt.properties.integral_accuracy,
+				4,
+				2);
+		}
 
-        if (opt.groups.empty())
-            opt.groups.resize(1);
-        if (opt.groups[0].empty())
-            opt.groups[0].push_back(0);
+		if (opt.groups.empty())
+			opt.groups.resize(1);
+		if (opt.groups[0].empty())
+			opt.groups[0].push_back(0);
 
-        itsc_block res = calculate_scattering_factors_from_cube(opt, cube_wave, density_cube, log_file);
-        log_file << "Writing tsc file... " << flush;
-        if (opt.binary_tsc)
-            res.write_tscb_file();
-        if (opt.old_tsc)
-            res.write_tsc_file(opt.cif);
-        log_file << " ... done!" << endl;
+		itsc_block res = calculate_scattering_factors_from_cube(opt, cube_wave, density_cube, log_file);
+		log_file << "Writing tsc file... " << flush;
+		if (opt.binary_tsc)
+			res.write_tscb_file();
+		if (opt.old_tsc)
+			res.write_tsc_file(opt.cif);
+		log_file << " ... done!" << endl;
 
-        log_file.flush();
-        std::cout.rdbuf(_coutbuf);
-        std::cout << "Finished!" << endl;
-        return 0;
-    }
-    // This one has conversion to fchk and calculation of one single tsc file
-    if ((opt.wfn != "" || opt.occ != "") && !opt.properties.calc() && !opt.gbw2wfn && opt.d_sfac_scan == 0.0 && !opt.do_XCW)
-    {
-        if (opt.occ != "") {
-            log_file << "Calculating WFN from input file: " << setw(44) << opt.occ << flush;
-            if (opt.occ.ends_with(".toml")) {
-                if (!ensure_occ_data_path((argc > 0) ? argv[0] : nullptr))
-                {
-                    std::cerr << "ERROR: OCC basis set data directory not found.\n"
-                              << "  Set OCC_DATA_PATH to the 'share/occ' directory (must contain 'basis' and 'methods' subdirectories).\n"
-                              << "  Example: OCC_DATA_PATH=/path/to/occ/share/occ\n";
-                    log_file << "ERROR: OCC_DATA_PATH not set or invalid. Cannot run OCC calculation." << std::endl;
-                    return 1;
-                }
-                occ::io::OccInput config = occ::io::read_occ_input_file(opt.occ);
-                occ::log::set_log_file("NoSpherA2_OCC.log");
-                occ::parallel::set_num_threads(config.runtime.threads);
-                wavy.emplace_back(occ::main::run_scf_external(config, true));
-                occ::main::shutdown();
-            }
-            else {
-                occ::qm::Wavefunction wfn = occ::qm::Wavefunction::load(opt.occ);
-                wavy.emplace_back(wfn, true);
-            }
+		log_file.flush();
+		std::cout.rdbuf(_coutbuf);
+		std::cout << "Finished!" << endl;
+		return 0;
+	}
+	// This one has conversion to fchk and calculation of one single tsc file
+	if ((opt.wfn != "" || opt.occ != "") && !opt.properties.calc() && !opt.gbw2wfn && opt.d_sfac_scan == 0.0 && !opt.do_XCW)
+	{
+		if (opt.occ != "") {
+			log_file << "Calculating WFN from input file: " << setw(44) << opt.occ << flush;
+			if (opt.occ.ends_with(".toml")) {
+				if (!ensure_occ_data_path((argc > 0) ? argv[0] : nullptr))
+				{
+					std::cerr << "ERROR: OCC basis set data directory not found.\n"
+							  << "  Set OCC_DATA_PATH to the 'share/occ' directory (must contain 'basis' and 'methods' subdirectories).\n"
+							  << "  Example: OCC_DATA_PATH=/path/to/occ/share/occ\n";
+					log_file << "ERROR: OCC_DATA_PATH not set or invalid. Cannot run OCC calculation." << std::endl;
+					return 1;
+				}
+				occ::io::OccInput config = occ::io::read_occ_input_file(opt.occ);
+				occ::log::set_log_file("NoSpherA2_OCC.log");
+				occ::parallel::set_num_threads(config.runtime.threads);
+				wavy.emplace_back(occ::main::run_scf_external(config, true));
+				occ::main::shutdown();
+			}
+			else {
+				occ::qm::Wavefunction wfn = occ::qm::Wavefunction::load(opt.occ);
+				wavy.emplace_back(wfn, true);
+			}
 
-            wavy[0].set_method(opt.method);
-            wavy[0].set_multi(opt.mult);
-            wavy[0].set_charge(opt.charge);
-        }
-        else {
-            log_file << "Reading: " << setw(44) << opt.wfn << flush;
-            wavy.emplace_back(opt.wfn, opt.charge, opt.mult, opt.debug);
-            wavy[0].set_method(opt.method);
-            wavy[0].set_multi(opt.mult);
-            wavy[0].set_charge(opt.charge);
-        }
-        if (opt.debug)
-            log_file << "method/mult/charge: " << opt.method << " " << opt.mult << " " << opt.charge << endl;
+			wavy[0].set_method(opt.method);
+			wavy[0].set_multi(opt.mult);
+			wavy[0].set_charge(opt.charge);
+		}
+		else {
+			log_file << "Reading: " << setw(44) << opt.wfn << flush;
+			wavy.emplace_back(opt.wfn, opt.charge, opt.mult, opt.debug);
+			wavy[0].set_method(opt.method);
+			wavy[0].set_multi(opt.mult);
+			wavy[0].set_charge(opt.charge);
+		}
+		if (opt.debug)
+			log_file << "method/mult/charge: " << opt.method << " " << opt.mult << " " << opt.charge << endl;
 
-        if (opt.ECP)
-        {
-            wavy[0].set_has_ECPs(true, true, opt.ECP_mode);
-        }
-        log_file << " done!\nNumber of atoms in Wavefunction file: " << wavy[0].get_ncen() << " Number of MOs: " << wavy[0].get_nmo() << endl;
+		if (opt.ECP)
+		{
+			wavy[0].set_has_ECPs(true, true, opt.ECP_mode);
+		}
+		log_file << " done!\nNumber of atoms in Wavefunction file: " << wavy[0].get_ncen() << " Number of MOs: " << wavy[0].get_nmo() << endl;
 
-        if (opt.rgbi) {
-            Roby_information Roby(wavy[0], opt.rgbi_group_sets, !opt.rgbi_no_sym,
-                opt.rgbi_orbital_basis == RGBIOrbitalBasis::ANO, opt.rgbi_EVs, opt.rgbi_theta);
-        }
+		if (opt.rgbi) {
+			Roby_information Roby(wavy[0], opt.rgbi_group_sets, !opt.rgbi_no_sym,
+				opt.rgbi_orbital_basis == RGBIOrbitalBasis::ANO, opt.rgbi_EVs, opt.rgbi_theta);
+		}
 
-        // this one is for generation of an fchk file
-        if (opt.fchk != "")
-        {
-            filesystem::path tmp = opt.basis_set_path / opt.basis_set;
-            if (opt.debug)
-                log_file << "Checking for " << opt.basis_set_path << " " << exists(opt.basis_set_path) << endl;
-            // err_checkf(exists(opt.basis_set_path), "Basis set file does not exist!", log_file);
-            wavy[0].set_basis_set_name(tmp.string());
+		// this one is for generation of an fchk file
+		if (opt.fchk != "")
+		{
+			filesystem::path tmp = opt.basis_set_path / opt.basis_set;
+			if (opt.debug)
+				log_file << "Checking for " << opt.basis_set_path << " " << exists(opt.basis_set_path) << endl;
+			// err_checkf(exists(opt.basis_set_path), "Basis set file does not exist!", log_file);
+			wavy[0].set_basis_set_name(tmp.string());
 
-            std::filesystem::path outputname;
-            if (opt.fchk != "")
-                outputname = opt.fchk;
-            else
-            {
-                outputname = wavy[0].get_path();
-                outputname.replace_extension(".fchk");
-            }
-            wavy[0].assign_charge(wavy[0].calculate_charge());
-            if (opt.mult == 0)
-                err_checkf(wavy[0].guess_multiplicity(log_file), "Error guessing multiplicity", log_file);
-            free_fchk(log_file, outputname, "", wavy[0], opt.debug, true);
-            if (opt.write_CIF) {
-                write_wfn_CIF(wavy[0], opt.wfn.replace_extension(".cif"));
-            }
-        }
+			std::filesystem::path outputname;
+			if (opt.fchk != "")
+				outputname = opt.fchk;
+			else
+			{
+				outputname = wavy[0].get_path();
+				outputname.replace_extension(".fchk");
+			}
+			wavy[0].assign_charge(wavy[0].calculate_charge());
+			if (opt.mult == 0)
+				err_checkf(wavy[0].guess_multiplicity(log_file), "Error guessing multiplicity", log_file);
+			free_fchk(log_file, outputname, "", wavy[0], opt.debug, true);
+			if (opt.write_CIF) {
+				write_wfn_CIF(wavy[0], opt.wfn.replace_extension(".cif"));
+			}
+		}
 
-        // This one will calcualte a single tsc/tscb file form a single wfn
-        if (opt.cif != "" || opt.hkl != "")
-        {
-            //in any case we work with group 0
-            opt.groups[0].push_back(0);
-            itsc_block res;
-            svec empty({});
-            if (!opt.SALTED)
-            {
-                // Calculate tsc file from given files
-                if (opt.debug)
-                    log_file << "Entering scattering Factor Calculation!" << endl;
-                if (opt.electron_diffraction)
-                    log_file << "Making Electron diffraction scattering factors, be carefull what you are doing!" << endl;
-                if (wavy[0].get_origin() == 7)
-                    opt.iam_switch = true;
-                res = calculate_scattering_factors<itsc_block, std::vector<WFN> &>(
-                    opt,
-                    wavy,
-                    log_file,
-                    empty,
-                    0);
-            }
-            else
-            {
-                // Fill WFN wil the primitives of the JKFit basis (currently hardcoded)
-                // const std::vector<std::vector<primitive>> basis(QZVP_JKfit.begin(), QZVP_JKfit.end());
+		// This one will calcualte a single tsc/tscb file form a single wfn
+		if (opt.cif != "" || opt.hkl != "")
+		{
+			//in any case we work with group 0
+			opt.groups[0].push_back(0);
+			itsc_block res;
+			svec empty({});
+			if (!opt.SALTED)
+			{
+				// Calculate tsc file from given files
+				if (opt.debug)
+					log_file << "Entering scattering Factor Calculation!" << endl;
+				if (opt.electron_diffraction)
+					log_file << "Making Electron diffraction scattering factors, be carefull what you are doing!" << endl;
+				if (wavy[0].get_origin() == 7)
+					opt.iam_switch = true;
+				res = calculate_scattering_factors<itsc_block, std::vector<WFN> &>(
+					opt,
+					wavy,
+					log_file,
+					empty,
+					0);
+			}
+			else
+			{
+				// Fill WFN wil the primitives of the JKFit basis (currently hardcoded)
+				// const std::vector<std::vector<primitive>> basis(QZVP_JKfit.begin(), QZVP_JKfit.end());
 
-                std::unique_ptr<SALTEDPredictor> temp_pred = std::make_unique<SALTEDPredictor>(wavy[0], opt);
-                string df_basis_name = temp_pred->get_dfbasis_name();
-                filesystem::path salted_model_path = temp_pred->get_salted_filename();
-                log_file << "Using " << salted_model_path << " for the prediction" << endl;
-                std::shared_ptr<BasisSet> aux_basis = BasisSetLibrary::get_basis_set(df_basis_name);
-                if (!temp_pred->basis_set_loaded()) { //If the basis set was supplied by the SALTED model file, do not overwrite it
-                    std::shared_ptr<BasisSet> aux_basis = BasisSetLibrary::get_basis_set(df_basis_name);
-                    load_basis_into_WFN(temp_pred->wavy, aux_basis);
-                }
+				std::unique_ptr<SALTEDPredictor> temp_pred = std::make_unique<SALTEDPredictor>(wavy[0], opt);
+				string df_basis_name = temp_pred->get_dfbasis_name();
+				filesystem::path salted_model_path = temp_pred->get_salted_filename();
+				log_file << "Using " << salted_model_path << " for the prediction" << endl;
+				std::shared_ptr<BasisSet> aux_basis = BasisSetLibrary::get_basis_set(df_basis_name);
+				if (!temp_pred->basis_set_loaded()) { //If the basis set was supplied by the SALTED model file, do not overwrite it
+					std::shared_ptr<BasisSet> aux_basis = BasisSetLibrary::get_basis_set(df_basis_name);
+					load_basis_into_WFN(temp_pred->wavy, aux_basis);
+				}
 
-                if (opt.debug)
-                    log_file << "Entering scattering ML Factor Calculation with H part!" << endl;
-                res = calculate_scattering_factors<itsc_block, SALTEDPredictor &>(
-                    opt,
-                    *temp_pred,
-                    log_file,
-                    empty,
-                    0);
-            }
-            //as above: the streamed path already wrote the file itself
-            if (opt.tsc_written_by_stream)
-            {
-                log_file << "Writing tsc file...  ... done!" << endl;
-                log_file << "  (written block by block while the factors were computed)" << endl;
-            }
-            else
-            {
-                log_file << "Writing tsc file... " << flush;
-                if (opt.binary_tsc)
-                    res.write_tscb_file();
-                if (opt.old_tsc)
-                {
-                    res.write_tsc_file(opt.cif);
-                }
-                log_file << " ... done!" << endl;
-                if (opt.write_CIF)
-                    write_wfn_CIF(wavy, "test.wfn_cif", res, opt);
-            }
-        }
-        log_file.flush();
-        std::cout.rdbuf(_coutbuf); // reset to standard output again
-        std::cout << "Finished!" << endl;
-        return 0;
-    }
-    // Performs XCW
-    if (!opt.properties.calc() && opt.do_XCW)
-    {
-        opt.groups[0].push_back(0);
-        XCW xcw(opt);
-        if(!opt.calc_F_calc)
-        {
-            xcw.run_XCW_fitting();
-        }
-        if (opt.calc_F_calc) {
+				if (opt.debug)
+					log_file << "Entering scattering ML Factor Calculation with H part!" << endl;
+				res = calculate_scattering_factors<itsc_block, SALTEDPredictor &>(
+					opt,
+					*temp_pred,
+					log_file,
+					empty,
+					0);
+			}
+			//as above: the streamed path already wrote the file itself
+			if (opt.tsc_written_by_stream)
+			{
+				log_file << "Writing tsc file...  ... done!" << endl;
+				log_file << "  (written block by block while the factors were computed)" << endl;
+			}
+			else
+			{
+				log_file << "Writing tsc file... " << flush;
+				if (opt.binary_tsc)
+					res.write_tscb_file();
+				if (opt.old_tsc)
+				{
+					res.write_tsc_file(opt.cif);
+				}
+				log_file << " ... done!" << endl;
+				if (opt.write_CIF)
+					write_wfn_CIF(wavy, "test.wfn_cif", res, opt);
+			}
+		}
+		log_file.flush();
+		std::cout.rdbuf(_coutbuf); // reset to standard output again
+		std::cout << "Finished!" << endl;
+		return 0;
+	}
+	// Performs XCW
+	if (!opt.properties.calc() && opt.do_XCW)
+	{
+		opt.groups[0].push_back(0);
+		XCW xcw(opt);
+		if(!opt.calc_F_calc)
+		{
+			xcw.run_XCW_fitting();
+		}
+		if (opt.calc_F_calc) {
 			std::cout << "Currently not implemented..." << std::endl;
-            //xcw.calc_F_calc_fast();
-        }
-        log_file.flush();
-        std::cout.rdbuf(_coutbuf);
-        return 0;
-    }
-    // Contains all calculations of properties and cubes
-    if (opt.properties.calc())
-    {
-        properties_calculation(opt);
-        log_file.flush();
-        std::cout.rdbuf(_coutbuf); // reset to standard output again
-        std::cout << "Finished!" << endl;
-        return 0;
-    }
-    // Converts gbw file to wfn file and leaves
-    if (opt.gbw2wfn)
-    {
-        err_checkf(opt.wfn != "", "No Wavefunction given!", log_file);
-        wavy.emplace_back(opt.wfn, opt.debug);
-        wavy[0].write_wfn("converted.wfn", false, false);
-        wavy[0].write_wfn("occupied.wfn", false, true);
-        wavy[0].write_wfx("converted.wfx", false);
-        log_file.flush();
-        std::cout.rdbuf(_coutbuf); // reset to standard output again
-        std::cout << "Finished!" << endl;
-        if (opt.write_CIF)
-            write_wfn_CIF(wavy[0], opt.wfn.replace_extension(".cif"));
-        return 0;
-    }
-    std::cout << NoSpherA2_message(opt.no_date);
-    if (!opt.no_date)
-        std::cout << build_date;
-    std::cout << "Did not understand the task to perform!\n"
-        << help_message << endl;
-    log_file.flush();
-    return 0;
+			//xcw.calc_F_calc_fast();
+		}
+		log_file.flush();
+		std::cout.rdbuf(_coutbuf);
+		return 0;
+	}
+	// Contains all calculations of properties and cubes
+	if (opt.properties.calc())
+	{
+		properties_calculation(opt);
+		log_file.flush();
+		std::cout.rdbuf(_coutbuf); // reset to standard output again
+		std::cout << "Finished!" << endl;
+		return 0;
+	}
+	// Converts gbw file to wfn file and leaves
+	if (opt.gbw2wfn)
+	{
+		err_checkf(opt.wfn != "", "No Wavefunction given!", log_file);
+		wavy.emplace_back(opt.wfn, opt.debug);
+		wavy[0].write_wfn("converted.wfn", false, false);
+		wavy[0].write_wfn("occupied.wfn", false, true);
+		wavy[0].write_wfx("converted.wfx", false);
+		log_file.flush();
+		std::cout.rdbuf(_coutbuf); // reset to standard output again
+		std::cout << "Finished!" << endl;
+		if (opt.write_CIF)
+			write_wfn_CIF(wavy[0], opt.wfn.replace_extension(".cif"));
+		return 0;
+	}
+	std::cout << NoSpherA2_message(opt.no_date);
+	if (!opt.no_date)
+		std::cout << build_date;
+	std::cout << "Did not understand the task to perform!\n"
+		<< help_message << endl;
+	log_file.flush();
+	return 0;
 }

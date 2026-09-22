@@ -8,9 +8,9 @@
 
 inline void not_implemented_SA(const std::string& file, const int& line, const std::string& function, const std::string& error_mesasge, std::ostream& log_file)
 {
-    log_file << function << " at: " << file << ":" << line << " " << error_mesasge << std::endl;
-    log_file.flush();
-    exit(-1);
+	log_file << function << " at: " << file << ":" << line << " " << error_mesasge << std::endl;
+	log_file.flush();
+	exit(-1);
 };
 #define err_not_impl_SA() not_implemented_SA(__FILE__, __LINE__, __func__, "Virtual_function", std::cout);
 
@@ -20,61 +20,61 @@ inline void not_implemented_SA(const std::string& file, const int& line, const s
 // exact comparisons against the stored table, ensuring identical results
 // on all platforms regardless of platform-specific log() rounding.
 inline int log_spline_index(
-    const vec& table,
-    const double dist,
-    const double lincr,
-    const double start)
+	const vec& table,
+	const double dist,
+	const double lincr,
+	const double start)
 {
-    const int max_idx = static_cast<int>(table.size()) - 2;
-    int nr = static_cast<int>(floor(log(dist / start) / lincr));
-    if (nr < 0) nr = 0;
-    if (nr > max_idx) nr = max_idx;
-    // Correct for potential 1-ULP rounding in log()
-    if (nr < max_idx && dist >= table[nr + 1]) ++nr;
-    else if (nr > 0 && dist < table[nr]) --nr;
-    return nr;
+	const int max_idx = static_cast<int>(table.size()) - 2;
+	int nr = static_cast<int>(floor(log(dist / start) / lincr));
+	if (nr < 0) nr = 0;
+	if (nr > max_idx) nr = max_idx;
+	// Correct for potential 1-ULP rounding in log()
+	if (nr < max_idx && dist >= table[nr + 1]) ++nr;
+	else if (nr > 0 && dist < table[nr]) --nr;
+	return nr;
 }
 
 inline double linear_interpolate_spherical_density(
-    const vec& radial_dens,
-    const vec& spherical_dist,
-    const double dist,
-    const double lincr,
-    const double start)
+	const vec& radial_dens,
+	const vec& spherical_dist,
+	const double dist,
+	const double lincr,
+	const double start)
 {
-    double result = 0;
-    if (dist > spherical_dist[spherical_dist.size() - 1])
-        return 0;
-    else if (dist < spherical_dist[0])
-        return radial_dens[0];
-    const int nr = std::max(1, log_spline_index(spherical_dist, dist, lincr, start));
-    result = radial_dens[nr] + (radial_dens[nr + 1] - radial_dens[nr]) / (spherical_dist[nr] - spherical_dist[nr - 1]) * (dist - spherical_dist[nr - 1]);
-    if (result < 1E-10)
-        result = 0;
-    return result;
+	double result = 0;
+	if (dist > spherical_dist[spherical_dist.size() - 1])
+		return 0;
+	else if (dist < spherical_dist[0])
+		return radial_dens[0];
+	const int nr = log_spline_index(spherical_dist, dist, lincr, start);
+	result = radial_dens[nr] + (radial_dens[nr + 1] - radial_dens[nr]) / (spherical_dist[nr + 1] - spherical_dist[nr]) * (dist - spherical_dist[nr]);
+	if (result < 1E-10)
+		result = 0;
+	return result;
 }
 
 // Natural cubic spline second derivatives over (x, y) (Numerical-Recipes-style
 // tridiagonal solve, O(n)). Boundary condition: y''(x0) = y''(x_{n-1}) = 0.
 inline vec natural_cubic_spline_second_derivatives(const vec& x, const vec& y)
 {
-    const size_t n = x.size();
-    vec y2(n, 0.0);
-    if (n < 3)
-        return y2;
+	const size_t n = x.size();
+	vec y2(n, 0.0);
+	if (n < 3)
+		return y2;
 
-    vec u(n, 0.0);
-    for (size_t i = 1; i < n - 1; i++)
-    {
-        const double sig = (x[i] - x[i - 1]) / (x[i + 1] - x[i - 1]);
-        const double p = sig * y2[i - 1] + 2.0;
-        y2[i] = (sig - 1.0) / p;
-        const double du = (y[i + 1] - y[i]) / (x[i + 1] - x[i]) - (y[i] - y[i - 1]) / (x[i] - x[i - 1]);
-        u[i] = (6.0 * du / (x[i + 1] - x[i - 1]) - sig * u[i - 1]) / p;
-    }
-    for (size_t k = n - 1; k-- > 0;)
-        y2[k] = y2[k] * y2[k + 1] + u[k];
-    return y2;
+	vec u(n, 0.0);
+	for (size_t i = 1; i < n - 1; i++)
+	{
+		const double sig = (x[i] - x[i - 1]) / (x[i + 1] - x[i - 1]);
+		const double p = sig * y2[i - 1] + 2.0;
+		y2[i] = (sig - 1.0) / p;
+		const double du = (y[i + 1] - y[i]) / (x[i + 1] - x[i]) - (y[i] - y[i - 1]) / (x[i] - x[i - 1]);
+		u[i] = (6.0 * du / (x[i + 1] - x[i - 1]) - sig * u[i - 1]) / p;
+	}
+	for (size_t k = n - 1; k-- > 0;)
+		y2[k] = y2[k] * y2[k + 1] + u[k];
+	return y2;
 }
 
 // Cubic-spline counterpart of linear_interpolate_spherical_density(): same table
@@ -82,274 +82,285 @@ inline vec natural_cubic_spline_second_derivatives(const vec& x, const vec& y)
 // nodes). radial_second_deriv must be natural_cubic_spline_second_derivatives(
 // spherical_dist, radial_dens).
 inline double cubic_spline_interpolate_spherical_density(
-    const vec& radial_dens,
-    const vec& spherical_dist,
-    const vec& radial_second_deriv,
-    const double dist,
-    const double lincr,
-    const double start)
+	const vec& radial_dens,
+	const vec& spherical_dist,
+	const vec& radial_second_deriv,
+	const double dist,
+	const double lincr,
+	const double start)
 {
-    if (dist > spherical_dist[spherical_dist.size() - 1])
-        return 0;
-    else if (dist < spherical_dist[0])
-        return radial_dens[0];
-    const int nr = log_spline_index(spherical_dist, dist, lincr, start);
-    const double h = spherical_dist[nr + 1] - spherical_dist[nr];
-    const double a = (spherical_dist[nr + 1] - dist) / h;
-    const double b = 1.0 - a;
-    const double result = a * radial_dens[nr] + b * radial_dens[nr + 1] +
-        ((a * a * a - a) * radial_second_deriv[nr] + (b * b * b - b) * radial_second_deriv[nr + 1]) * (h * h) / 6.0;
-    return result < 1E-10 ? 0.0 : result;
+	if (dist > spherical_dist[spherical_dist.size() - 1])
+		return 0;
+	else if (dist < spherical_dist[0])
+		return radial_dens[0];
+	const int nr = log_spline_index(spherical_dist, dist, lincr, start);
+	const double h = spherical_dist[nr + 1] - spherical_dist[nr];
+	const double a = (spherical_dist[nr + 1] - dist) / h;
+	const double b = 1.0 - a;
+	const double result = a * radial_dens[nr] + b * radial_dens[nr + 1] +
+		((a * a * a - a) * radial_second_deriv[nr] + (b * b * b - b) * radial_second_deriv[nr + 1]) * (h * h) / 6.0;
+	return result < 1E-10 ? 0.0 : result;
 }
 
 class Spherical_Atom
 {
 protected:
-    int atomic_number;
-    int ECP_mode;
-    const int first_ex() const;
-    virtual const int previous_element_coef() const;
-    const int* nex, * ns, * np, * nd, * nf, * occ, * n;
-    const double* z, * c;
-    int charge;
-    int _prev_coef, _offset, _first_ex;
-    vec radial_density, radial_dist;
-    double lincr, start;
-    virtual void calc_orbs(int& nr_ex,
-        int& nr_coef,
-        const double& dist,
-        const int& offset,
-        const int* n_vector,
-        const int lower_m,
-        const int upper_m,
-        double* Orb) const
-    {
-        err_not_impl_SA();
-        (void)nr_ex;
-        (void)nr_coef;
-        (void)dist;
-        (void)offset;
-        (void)n_vector;
-        (void)lower_m;
-        (void)upper_m;
-        (void)Orb;
-    };
-    virtual double calc_type(
-        int& nr_ex,
-        int& nr_coef,
-        const double& k_vector,
-        const int& offset,
-        const int* n_vector,
-        const int lower_m,
-        const int upper_m,
-        const int& max,
-        const int& min) const
-    {
-        err_not_impl_SA();
-        (void)nr_ex;
-        (void)nr_coef;
-        (void)k_vector;
-        (void)offset;
-        (void)n_vector;
-        (void)lower_m;
-        (void)upper_m;
-        (void)max;
-        (void)min;
-        return -1;
-    };
+	int atomic_number;
+	int ECP_mode;
+	const int first_ex() const;
+	virtual const int previous_element_coef() const;
+	const int* nex, * ns, * np, * nd, * nf, * occ, * n;
+	const double* z, * c;
+	int charge;
+	int _prev_coef, _offset, _first_ex;
+	vec radial_density, radial_dist;
+	double lincr, start;
+	virtual void calc_orbs(int& nr_ex,
+		int& nr_coef,
+		const double& dist,
+		const int& offset,
+		const int* n_vector,
+		const int lower_m,
+		const int upper_m,
+		double* Orb) const
+	{
+		err_not_impl_SA();
+		(void)nr_ex;
+		(void)nr_coef;
+		(void)dist;
+		(void)offset;
+		(void)n_vector;
+		(void)lower_m;
+		(void)upper_m;
+		(void)Orb;
+	};
+	virtual double calc_type(
+		int& nr_ex,
+		int& nr_coef,
+		const double& k_vector,
+		const int& offset,
+		const int* n_vector,
+		const int lower_m,
+		const int upper_m,
+		const int& max,
+		const int& min) const
+	{
+		err_not_impl_SA();
+		(void)nr_ex;
+		(void)nr_coef;
+		(void)k_vector;
+		(void)offset;
+		(void)n_vector;
+		(void)lower_m;
+		(void)upper_m;
+		(void)max;
+		(void)min;
+		return -1;
+	};
 
 public:
-    Spherical_Atom(const int g_atom_number, const int ECP_m = 1) : atomic_number(g_atom_number),
-        _offset((atomic_number - 1) * 19), _first_ex(0), _prev_coef(0), c(NULL), n(NULL), nd(NULL), ns(NULL), np(NULL), nf(NULL), nex(NULL), occ(NULL), z(NULL)
-    {
-        ECP_mode = ECP_m;
-        charge = 0;
-    };
-    Spherical_Atom() : _first_ex(0), _offset(0), _prev_coef(0), c(NULL), n(NULL), nd(NULL), ns(NULL), np(NULL), nf(NULL), nex(NULL), occ(NULL), z(NULL)
-    {
-        ECP_mode = 1;
-        atomic_number = 1;
-        charge = 0;
-    };
-    //The interpolation table of make_interpolator(), for kernels that replicate get_interpolated_density
-    const vec& get_radial_dist() const { return radial_dist; }
-    const vec& get_radial_density_table() const { return radial_density; }
-    double get_lincr() const { return lincr; }
-    double get_start() const { return start; }
-    virtual const double get_radial_density(const double& dist) const
-    {
-        err_not_impl_SA();
-        (void)dist;
-        return -1;
-    };
-    virtual const double get_form_factor(const double& k_vector) const
-    {
-        err_not_impl_SA();
-        (void)k_vector;
-        return -1;
-    };
-    virtual const double get_core_form_factor(const double& k_vector, const int& core_els) const
-    {
-        err_not_impl_SA();
-        (void)k_vector;
-        (void)core_els;
-        return -1;
-    };
-    virtual const double get_custom_form_factor(
-        const double& k_vector,
-        const int& max_s,
-        const int& max_p,
-        const int& max_d,
-        const int& max_f,
-        const int& min_s,
-        const int& min_p,
-        const int& min_d,
-        const int& min_f) const
-    {
-        err_not_impl_SA();
-        (void)k_vector;
-        (void)max_s;
-        (void)max_p;
-        (void)max_d;
-        (void)max_f;
-        (void)min_s;
-        (void)min_p;
-        (void)min_d;
-        (void)min_f;
-        return -1;
-    };
-    virtual void make_interpolator(const double& incr, const double& min_dist) {
-        err_not_impl_SA();
-        (void)incr;
-        (void)min_dist;
-    };
-    virtual double get_interpolated_density(const double& dist) const {
-        err_not_impl_SA();
-        (void)dist;
-        return -1.0;
-    };
-    const int get_atomic_number() const { return atomic_number; };
-    const int get_charge() const { return charge; };
+	Spherical_Atom(const int g_atom_number, const int ECP_m = 1) : atomic_number(g_atom_number),
+		_offset((atomic_number - 1) * 19), _first_ex(0), _prev_coef(0), c(NULL), n(NULL), nd(NULL), ns(NULL), np(NULL), nf(NULL), nex(NULL), occ(NULL), z(NULL)
+	{
+		ECP_mode = ECP_m;
+		charge = 0;
+	};
+	Spherical_Atom() : _first_ex(0), _offset(0), _prev_coef(0), c(NULL), n(NULL), nd(NULL), ns(NULL), np(NULL), nf(NULL), nex(NULL), occ(NULL), z(NULL)
+	{
+		ECP_mode = 1;
+		atomic_number = 1;
+		charge = 0;
+	};
+	//The interpolation table of make_interpolator(), for kernels that replicate get_interpolated_density
+	const vec& get_radial_dist() const { return radial_dist; }
+	const vec& get_radial_density_table() const { return radial_density; }
+	double get_lincr() const { return lincr; }
+	double get_start() const { return start; }
+	virtual const double get_radial_density(const double& dist) const
+	{
+		err_not_impl_SA();
+		(void)dist;
+		return -1;
+	};
+	virtual const double get_form_factor(const double& k_vector) const
+	{
+		err_not_impl_SA();
+		(void)k_vector;
+		return -1;
+	};
+	virtual const double get_core_form_factor(const double& k_vector, const int& core_els) const
+	{
+		err_not_impl_SA();
+		(void)k_vector;
+		(void)core_els;
+		return -1;
+	};
+	virtual const double get_custom_form_factor(
+		const double& k_vector,
+		const int& max_s,
+		const int& max_p,
+		const int& max_d,
+		const int& max_f,
+		const int& min_s,
+		const int& min_p,
+		const int& min_d,
+		const int& min_f) const
+	{
+		err_not_impl_SA();
+		(void)k_vector;
+		(void)max_s;
+		(void)max_p;
+		(void)max_d;
+		(void)max_f;
+		(void)min_s;
+		(void)min_p;
+		(void)min_d;
+		(void)min_f;
+		return -1;
+	};
+	virtual void make_interpolator(const double& incr, const double& min_dist) {
+		err_not_impl_SA();
+		(void)incr;
+		(void)min_dist;
+	};
+	virtual double get_interpolated_density(const double& dist) const {
+		err_not_impl_SA();
+		(void)dist;
+		return -1.0;
+	};
+	const int get_atomic_number() const { return atomic_number; };
+	const int get_charge() const { return charge; };
 };
 
 class Thakkar : public Spherical_Atom
 {
 protected:
-    // Natural cubic spline second derivatives over (radial_dist, radial_density),
-    // built alongside the linear-interpolation table in make_interpolator(). Used
-    // by get_interpolated_density_spline() for callers that differentiate the
-    // density numerically and need a curvature-continuous field, at similar
-    // per-query cost to the plain linear table lookup.
-    vec radial_second_deriv;
-    void calc_orbs(int& nr_ex,
-        int& nr_coef,
-        const double& dist,
-        const int& offset,
-        const int* n_vector,
-        const int lower_m,
-        const int upper_m,
-        double* Orb) const override;
-    void calc_custom_orbs(int& nr_ex,
-        int& nr_coef,
-        const double& dist,
-        const int& offset,
-        const int* n_vector,
-        const int lower_m,
-        const int upper_m,
-        const int& max,
-        const int& min,
-        double* Orb) const;
-    double calc_type(
-        int& nr_ex,
-        int& nr_coef,
-        const double& k_vector,
-        const int& offset,
-        const int* n_vector,
-        const int lower_m,
-        const int upper_m,
-        const int& max,
-        const int& min) const override;
+	// Natural cubic spline second derivatives over (radial_dist, radial_density),
+	// built alongside the linear-interpolation table in make_interpolator(). Used
+	// by get_interpolated_density_spline() for callers that differentiate the
+	// density numerically and need a curvature-continuous field, at similar
+	// per-query cost to the plain linear table lookup.
+	vec radial_second_deriv;
+	void calc_orbs(int& nr_ex,
+		int& nr_coef,
+		const double& dist,
+		const int& offset,
+		const int* n_vector,
+		const int lower_m,
+		const int upper_m,
+		double* Orb) const override;
+	//calc_orbs with the first and second radial derivatives of every orbital
+	void calc_orbs_deriv(int& nr_ex, int& nr_coef, const double& dist, const int& offset, const int* n_vector,
+		const int lower_m, const int upper_m, double* Orb, double* dOrb, double* ddOrb) const;
+	void calc_custom_orbs(int& nr_ex,
+		int& nr_coef,
+		const double& dist,
+		const int& offset,
+		const int* n_vector,
+		const int lower_m,
+		const int upper_m,
+		const int& max,
+		const int& min,
+		double* Orb) const;
+	double calc_type(
+		int& nr_ex,
+		int& nr_coef,
+		const double& k_vector,
+		const int& offset,
+		const int* n_vector,
+		const int lower_m,
+		const int upper_m,
+		const int& max,
+		const int& min) const override;
 
 public:
-    Thakkar(const int g_atom_number, const int ECP_mode = 1);
-    Thakkar();
-    const double get_radial_density(const double& dist) const override;
-    const double get_radial_custom_density(
-        const double& dist,
-        const int& max_s,
-        const int& max_p,
-        const int& max_d,
-        const int& max_f,
-        const int& min_s,
-        const int& min_p,
-        const int& min_d,
-        const int& min_f) const;
-    const double get_form_factor(const double& k_vector) const override;
-    const double get_core_form_factor(const double& k_vector, const int& core_els) const override;
-    const double get_core_density(const double& dist, const int& core_els);
-    const double get_custom_form_factor(
-        const double& k_vector,
-        const int& max_s,
-        const int& max_p,
-        const int& max_d,
-        const int& max_f,
-        const int& min_s,
-        const int& min_p,
-        const int& min_d,
-        const int& min_f) const override;
-    void make_interpolator(const double& incr, const double& min_dist) override;
-    double get_interpolated_density(const double& dist) const override;
-    // Same table as get_interpolated_density(), but evaluated as a natural cubic
-    // spline (C2-continuous) instead of piecewise-linear.
-    double get_interpolated_density_spline(const double& dist) const;
+	Thakkar(const int g_atom_number, const int ECP_mode = 1);
+	Thakkar();
+	const double get_radial_density(const double& dist) const override;
+	//rho with its analytic first and second radial derivatives
+	const double get_radial_density(const double& dist, double& d1, double& d2) const;
+	const double get_radial_custom_density(
+		const double& dist,
+		const int& max_s,
+		const int& max_p,
+		const int& max_d,
+		const int& max_f,
+		const int& min_s,
+		const int& min_p,
+		const int& min_d,
+		const int& min_f) const;
+	const double get_form_factor(const double& k_vector) const override;
+	const double get_core_form_factor(const double& k_vector, const int& core_els) const override;
+	const double get_core_density(const double& dist, const int& core_els);
+	const double get_custom_form_factor(
+		const double& k_vector,
+		const int& max_s,
+		const int& max_p,
+		const int& max_d,
+		const int& max_f,
+		const int& min_s,
+		const int& min_p,
+		const int& min_d,
+		const int& min_f) const override;
+	void make_interpolator(const double& incr, const double& min_dist) override;
+	double get_interpolated_density(const double& dist) const override;
+	// Same table as get_interpolated_density(), but evaluated as a natural cubic
+	// spline (C2-continuous) instead of piecewise-linear.
+	double get_interpolated_density_spline(const double& dist) const;
 };
 
 class MBIS_Atom
 {
 private:
-    vec sig, pop;
-    int atomic_number;
-    int ECP_mode;
-    int charge;
-    vec radial_density, radial_dist;
-    double lincr, start;
+	vec sig, pop;
+	int atomic_number;
+	int ECP_mode;
+	int charge;
+	vec radial_density, radial_dist;
+	double lincr, start;
 
 public:
-    MBIS_Atom(const int g_atom_number, const vec& sig, const vec& pop);
-    MBIS_Atom();
-    const double get_radial_density(const double& dist) const;
-    void make_interpolator(const double& incr, const double& min_dist);
-    double get_interpolated_density(const double& dist) const;
+	MBIS_Atom(const int g_atom_number, const vec& sig, const vec& pop);
+	MBIS_Atom();
+	const double get_radial_density(const double& dist) const;
+	//rho with its analytic first and second radial derivatives
+	const double get_radial_density(const double& dist, double& d1, double& d2) const;
+	void make_interpolator(const double& incr, const double& min_dist);
+	double get_interpolated_density(const double& dist) const;
 };
 
 class EMBIS_Atom
 {
 private:
-    vec2 alpha;
-    vec sqrt_det;
-    vec pop;
-    int atomic_number;
-    int charge;
+	vec2 alpha;
+	vec sqrt_det;
+	vec pop;
+	int atomic_number;
+	int charge;
 public:
-    EMBIS_Atom(const int g_atom_number, const vec2& alpha, const vec& pop);
-    EMBIS_Atom();
-    const double get_density(const d3& pos) const;
+	EMBIS_Atom(const int g_atom_number, const vec2& alpha, const vec& pop);
+	EMBIS_Atom();
+	const double get_density(const d3& pos) const;
+	// rho with its analytic gradient and Laplacian; at the nucleus (the cusp) both are set to 0
+	const double get_density(const d3& pos, d3& grad, double& lap) const;
+	// rho with its analytic gradient and Hessian (row-major 3x3), 0 at the cusp
+	const double get_density(const d3& pos, d3& grad, double* H) const;
 };
 
 class Thakkar_Anion : public Thakkar
 {
 public:
-    Thakkar_Anion(const int g_atom_number);
-    // Ask before constructing: 43 anions are tabulated, the rest are not.
-    static bool available(const int g_atom_number);
+	Thakkar_Anion(const int g_atom_number);
+	// Ask before constructing: 43 anions are tabulated, the rest are not.
+	static bool available(const int g_atom_number);
 };
 
 class Thakkar_Cation : public Thakkar
 {
 public:
-    Thakkar_Cation(const int g_atom_number);
-    // Ask before constructing: 53 cations are tabulated, the rest are not.
-    static bool available(const int g_atom_number);
+	Thakkar_Cation(const int g_atom_number);
+	// Ask before constructing: 53 cations are tabulated, the rest are not.
+	static bool available(const int g_atom_number);
 };
 
 // Fractionally charged spherical atom, built from the tabulated integer states.
@@ -369,165 +380,108 @@ public:
 class HE_Spherical_Atom
 {
 public:
-    // Falls back to the neutral density if no ion is tabulated for this element.
-    HE_Spherical_Atom(const int atomic_number, const double charge);
+	// Falls back to the neutral density if no ion is tabulated for this element.
+	HE_Spherical_Atom(const int atomic_number, const double charge);
 
-    double get_radial_density(const double &r) const;
-    double get_form_factor(const double &k) const;
+	double get_radial_density(const double &r) const;
+	double get_form_factor(const double &k) const;
 
-    // f(0), i.e. how many electrons this density actually carries. Equals
-    // Z - charge when an ion was available, Z when it fell back.
-    double electrons() const { return _electrons; }
-    bool used_ion() const { return _has_ion; }
-    // |q| > 1 that could NOT be reached from tabulated data, so the shape is
-    // extrapolated even though the electron count stays exact. False once the
-    // delta series covers the charge: that blend is between two adjacent BOUND
-    // states, with every weight in [0, 1].
-    bool is_extrapolating() const { return _weight > 1.0 && !_use_delta; }
-    // |q| > 1 reached by walking down the delta_k series rather than
-    // extrapolating. Cations only - atomic anions past -1 are unbound, so there
-    // is no honest reference state to walk towards.
-    bool uses_delta_series() const { return _use_delta; }
-    // Extrapolation gives a negative weight to the neutral once |q| > 1 and the
-    // density can then dip below zero. Reports the most negative value found on
-    // a scan, 0.0 when the density stayed non-negative.
-    double most_negative_density() const { return _most_negative; }
+	// f(0), i.e. how many electrons this density actually carries. Equals
+	// Z - charge when an ion was available, Z when it fell back.
+	double electrons() const { return _electrons; }
+	bool used_ion() const { return _has_ion; }
+	// |q| > 1 that could NOT be reached from tabulated data, so the shape is
+	// extrapolated even though the electron count stays exact. False once the
+	// delta series covers the charge: that blend is between two adjacent BOUND
+	// states, with every weight in [0, 1].
+	bool is_extrapolating() const { return _weight > 1.0 && !_use_delta; }
+	// |q| > 1 reached by walking down the delta_k series rather than
+	// extrapolating. Cations only - atomic anions past -1 are unbound, so there
+	// is no honest reference state to walk towards.
+	bool uses_delta_series() const { return _use_delta; }
+	// Extrapolation gives a negative weight to the neutral once |q| > 1 and the
+	// density can then dip below zero. Reports the most negative value found on
+	// a scan, 0.0 when the density stayed non-negative.
+	double most_negative_density() const { return _most_negative; }
 
 private:
-    int _Z;
-    double _charge, _weight, _electrons, _most_negative;
-    bool _has_ion;
-    // Delta-series route for |q| > 1: rho_q = rho_{_delta_n} - _delta_frac *
-    // delta_{_delta_n+1}, itself built as rho_1 - sum_{k=2.._delta_n} delta_k.
-    bool _use_delta;
-    int _delta_n;
-    double _delta_frac;
-    Thakkar _neutral;
-    std::unique_ptr<Thakkar> _ion;
-};
-
-class Gaussian_Atom : public Spherical_Atom
-{
-protected:
-    const int* ng, * nh;
-    int first_atomic_number;
-    const int previous_element_coef() const override;
-    void calc_orbs(int& nr_ex,
-        int& nr_coef,
-        const double& dist,
-        const int& offset,
-        const int* n_vector,
-        const int lower_m,
-        const int upper_m,
-        double* Orb) const override;
-    double calc_type(
-        int& nr_ex,
-        int& nr_coef,
-        const double& k_vector,
-        const int& offset,
-        const int* n_vector,
-        const int lower_m,
-        const int upper_m,
-        const int& max,
-        const int& min) const override;
-
-public:
-    Gaussian_Atom(const int g_atom_number, std::string& basis);
-    Gaussian_Atom() = default;
-    const double get_radial_density(const double& dist) const override;
-    const double get_form_factor(const double& k_vector) const override;
-    const double get_core_form_factor(const double& k_vector, const int& core_els) const override;
-    const double get_custom_form_factor(
-        const double& k_vector,
-        const int& max_s,
-        const int& max_p,
-        const int& max_d,
-        const int& max_f,
-        const int& min_s,
-        const int& min_p,
-        const int& min_d,
-        const int& min_f) const override;
-    const double get_custom_form_factor(
-        const double& k_vector,
-        const int& max_s,
-        const int& max_p,
-        const int& max_d,
-        const int& max_f,
-        const int& max_g,
-        const int& max_h,
-        const int& min_s,
-        const int& min_p,
-        const int& min_d,
-        const int& min_f,
-        const int& min_g,
-        const int& min_h) const;
+	int _Z;
+	double _charge, _weight, _electrons, _most_negative;
+	bool _has_ion;
+	// Delta-series route for |q| > 1: rho_q = rho_{_delta_n} - _delta_frac *
+	// delta_{_delta_n+1}, itself built as rho_1 - sum_{k=2.._delta_n} delta_k.
+	bool _use_delta;
+	int _delta_n;
+	double _delta_frac;
+	Thakkar _neutral;
+	std::unique_ptr<Thakkar> _ion;
 };
 
 class Spherical_Gaussian_Density
 {
 protected:
-    const int atomic_number;
-    const int ECP_mode;
-    int nex;
-    const double* z, * c;
-    int charge;
+	const int atomic_number;
+	const int ECP_mode;
+	int nex;
+	const double* z, * c;
+	int charge;
 
 public:
-    Spherical_Gaussian_Density(const int g_atom_number, const int ECP_m = 1) : atomic_number(g_atom_number),
-        ECP_mode(ECP_m),
-        charge(0)
-    {
-        int temp_Z;
-        switch (ECP_m)
-        {
-        case 2:
-            temp_Z = atomic_number - 2;
-            if (temp_Z < 0) {
-                nex = 0;
-                z = NULL;
-                c = NULL;
-            }
-            else {
-                nex = static_cast<int>(xtb_corrections::c[temp_Z].size());
-                z = xtb_corrections::z[temp_Z].data();
-                c = xtb_corrections::c[temp_Z].data();
-            }
-            break;
-        case 3:
-            temp_Z = atomic_number - 2;
-            if (temp_Z < 0) {
-                nex = 0;
-                z = NULL;
-                c = NULL;
-            }
-            else {
-                nex = static_cast<int>(ptb_corrections::c[temp_Z].size());
-                z = ptb_corrections::z[temp_Z].data();
-                c = ptb_corrections::c[temp_Z].data();
-            }
-            break;
-        case 1:
-            temp_Z = atomic_number - 37;
-            if (temp_Z < 0) {
-                nex = 0;
-                z = NULL;
-                c = NULL;
-            }
-            else {
-                nex = static_cast<int>(def_corrections::c[temp_Z].size());
-                z = def_corrections::z[temp_Z].data();
-                c = def_corrections::c[temp_Z].data();
-            }
-            break;
-        default:
-            z = NULL;
-            c = NULL;
-            nex = 0;
-        }
-    };
-    Spherical_Gaussian_Density() : c(NULL), nex(0), z(NULL), charge(0), atomic_number(1), ECP_mode(1) {};
-    virtual const double get_radial_density(const double& dist) const;
-    virtual const double get_form_factor(const double& k_vector) const;
-    const int get_atomic_number() const { return atomic_number; };
-    const int get_charge() const { return charge; };
+	Spherical_Gaussian_Density(const int g_atom_number, const int ECP_m = 1) : atomic_number(g_atom_number),
+		ECP_mode(ECP_m),
+		charge(0)
+	{
+		int temp_Z;
+		switch (ECP_m)
+		{
+		case 2:
+			temp_Z = atomic_number - 2;
+			if (temp_Z < 0) {
+				nex = 0;
+				z = NULL;
+				c = NULL;
+			}
+			else {
+				nex = static_cast<int>(xtb_corrections::c[temp_Z].size());
+				z = xtb_corrections::z[temp_Z].data();
+				c = xtb_corrections::c[temp_Z].data();
+			}
+			break;
+		case 3:
+			temp_Z = atomic_number - 2;
+			if (temp_Z < 0) {
+				nex = 0;
+				z = NULL;
+				c = NULL;
+			}
+			else {
+				nex = static_cast<int>(ptb_corrections::c[temp_Z].size());
+				z = ptb_corrections::z[temp_Z].data();
+				c = ptb_corrections::c[temp_Z].data();
+			}
+			break;
+		case 1:
+			temp_Z = atomic_number - 37;
+			if (temp_Z < 0) {
+				nex = 0;
+				z = NULL;
+				c = NULL;
+			}
+			else {
+				nex = static_cast<int>(def_corrections::c[temp_Z].size());
+				z = def_corrections::z[temp_Z].data();
+				c = def_corrections::c[temp_Z].data();
+			}
+			break;
+		default:
+			z = NULL;
+			c = NULL;
+			nex = 0;
+		}
+	};
+	Spherical_Gaussian_Density() : c(NULL), nex(0), z(NULL), charge(0), atomic_number(1), ECP_mode(1) {};
+	virtual const double get_radial_density(const double& dist) const;
+	virtual const double get_form_factor(const double& k_vector) const;
+	const int get_atomic_number() const { return atomic_number; };
+	const int get_charge() const { return charge; };
 };

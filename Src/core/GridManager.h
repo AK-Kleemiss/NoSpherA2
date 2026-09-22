@@ -2,28 +2,29 @@
 
 #include "convenience.h"
 #include "wfn_class.h"
+#include "density_source.h"
 #include "AtomGrid.h"
 #include "cell.h"
 class cube;
 template<typename AtomType>
 double make_sphericals(
-    vec2 &dens,
-    vec2 &dist,
-    vec2 &second_deriv,
-    const ivec &atom_type_list,
-    std::ostream &file,
-    const std::vector<std::pair<vec, vec>> &pop_sig,
-    bool debug = false,
-    double incr_start = 1.005,
-    double min_dist = 0.0000001,
-    int accuracy = 2);
+	vec2 &dens,
+	vec2 &dist,
+	vec2 &second_deriv,
+	const ivec &atom_type_list,
+	std::ostream &file,
+	const std::vector<std::pair<vec, vec>> &pop_sig,
+	bool debug = false,
+	double incr_start = 1.005,
+	double min_dist = 0.0000001,
+	int accuracy = 2);
 
 
 // Add this structure to hold grid parameters
 struct LebedevGridParams {
-    int lebedev_low;
-    int lebedev_high;
-    double radial_accuracy;
+	int lebedev_low;
+	int lebedev_high;
+	double radial_accuracy;
 };
 
 // Add this constexpr function declaration in the header
@@ -31,123 +32,131 @@ constexpr LebedevGridParams getLebedevGridParams(int accuracy, int atom_type, in
 
 
 struct GridConfiguration {
-    int accuracy = 2;
-    //A grid pulled into the core: the tightest exponent, which sets the inner radius and the
-    //radial step, is sharpened by alpha_max_scale, the step divided by radial_step_scale and
-    //the Lebedev order stepped up angular_boost entries. The basin integration uses it.
-    double alpha_max_scale = 1.0;
-    double radial_step_scale = 1.0;
-    int angular_boost = 0;
-    int pbc = 0;
-    PartitionType partition_type = PartitionType::Hirshfeld;
-    bool debug = false;
-    bool all_charges = false;
-    bool no_density_eval = false;
+	int accuracy = 2;
+	//A grid pulled into the core: the tightest exponent, which sets the inner radius and the
+	//radial step, is sharpened by alpha_max_scale, the step divided by radial_step_scale and
+	//the Lebedev order stepped up angular_boost entries. The basin integration uses it.
+	double alpha_max_scale = 1.0;
+	double radial_step_scale = 1.0;
+	int angular_boost = 0;
+	int pbc = 0;
+	PartitionType partition_type = PartitionType::Hirshfeld;
+	bool debug = false;
+	bool all_charges = false;
+	bool no_density_eval = false;
 
-    double getCutoff() const;
-    std::string getPartitionName() const;
+	double getCutoff() const;
+	std::string getPartitionName() const;
 };
 
 struct GridData {
-    const int grid_data_size = 11;
-    enum GridIndex { X = 0, Y = 1, Z = 2, WEIGHT = 3, HIRSH_WEIGHT = 4, BECKE_WEIGHT = 5, TFVC_WEIGHT = 6, WFN_DENSITY = 7, MBIS_WEIGHT = 8, EMBIS_WEIGHT = 9, g_DENSITY = 10 };
-    vec3 atomic_grids;           // [atom][coord_type][point]
-    ivec num_points_per_atom;    // Number of points for each atom
-    vec3 helper_grids;           // [atom][coord_type][point] - Used for intermediate calculations (e.g. on grown stuff)
-    ivec helper_num_points_per_atom; // Number of points for each atom in the helper grids
-    int total_points = 0;
+	const int grid_data_size = 11;
+	enum GridIndex { X = 0, Y = 1, Z = 2, WEIGHT = 3, HIRSH_WEIGHT = 4, BECKE_WEIGHT = 5, TFVC_WEIGHT = 6, WFN_DENSITY = 7, MBIS_WEIGHT = 8, EMBIS_WEIGHT = 9, g_DENSITY = 10 };
+	vec3 atomic_grids;           // [atom][coord_type][point]
+	ivec num_points_per_atom;    // Number of points for each atom
+	vec3 helper_grids;           // [atom][coord_type][point] - Used for intermediate calculations (e.g. on grown stuff)
+	ivec helper_num_points_per_atom; // Number of points for each atom in the helper grids
+	int total_points = 0;
 
-    void clear();
-    void resizeForAtoms(int num_atoms, bool helper = false);
+	void clear();
+	void resizeForAtoms(int num_atoms, bool helper = false);
 };
 
 struct PartitionResults {
-    vec2 atom_charges;           // [atom][partition type]
-    vec overall_charges;      // Total charges by partition type
-    enum CHARGE_ORDER { S_BECKE = 0, S_TFVC = 1, S_HIRSH = 2, S_MBIS = 3, S_EMBIS = 4 };
-    double nrmsd = 0.0;
-    double r_value = 0.0;
+	vec2 atom_charges;           // [atom][partition type]
+	vec overall_charges;      // Total charges by partition type
+	enum CHARGE_ORDER { S_BECKE = 0, S_TFVC = 1, S_HIRSH = 2, S_MBIS = 3, S_EMBIS = 4 };
+	double nrmsd = 0.0;
+	double r_value = 0.0;
 };
 
 class GridManager {
 private:
-    GridConfiguration config_;
-    std::vector<AtomGrid> prototype_grids_;
-    GridData grid_data_;
-    vec2 radial_density_;
-    vec2 radial_distances_;
-    vec2 radial_second_deriv_;
-    ivec atom_type_list_;
-    double lincr_ = 0.0;
-    double start_dist_ = 1E-7;
-    std::vector<std::tuple<std::string, _time_point>> timing_points_;
-    bool non_spherical_densities_calculated_ = false;
-    bool needs_helper_grids_ = false;
-    vec grid_key_;
+	GridConfiguration config_;
+	std::vector<AtomGrid> prototype_grids_;
+	GridData grid_data_;
+	vec2 radial_density_;
+	vec2 radial_distances_;
+	vec2 radial_second_deriv_;
+	ivec atom_type_list_;
+	double lincr_ = 0.0;
+	double start_dist_ = 1E-7;
+	std::vector<std::tuple<std::string, _time_point>> timing_points_;
+	bool non_spherical_densities_calculated_ = false;
+	bool needs_helper_grids_ = false;
+	vec grid_key_;
+	//What calculateNonSphericalDensities evaluates; the wave's orbitals when empty
+	DensityBatch density_;
 
-    //Everything the points, the weights and the pruning depend on when the partition is
-    //geometric; empty when it is not, so such a grid is never reused
-    vec gridKey(const WFN &wave, const ivec &atom_list, const bvec &needs_grid) const;
+	//Everything the points, the weights and the pruning depend on when the partition is
+	//geometric; empty when it is not, so such a grid is never reused
+	vec gridKey(const WFN &wave, const ivec &atom_list, const bvec &needs_grid) const;
 
-    // Internal helper methods
-    void setupPrototypeGrids(const WFN &wave, const ivec &atom_types, std::ostream& file = std::cout);
+	// Internal helper methods
+	void setupPrototypeGrids(const WFN &wave, const ivec &atom_types, std::ostream& file = std::cout);
 
-    void generateIntegrationGrids(const WFN &wave, const cell &unit_cell,
-        const ivec &atom_list, std::ostream& file = std::cout);
-    void getIntegrationGrid1D(const WFN &wave, const int atom_1, const int atom_2, const int num_points, const double padding);
+	void generateIntegrationGrids(const WFN &wave, const cell &unit_cell,
+		const ivec &atom_list, std::ostream& file = std::cout);
+	void getIntegrationGrid1D(const WFN &wave, const int atom_1, const int atom_2, const int num_points, const double padding);
 
-    void calculateSphericalDensities(const WFN &wave, const cell &unit_cell, const ivec &atom_list, vec2 &single_spherical_density, vec2 &combined_spherical_density, const std::vector<std::pair<vec, vec>> sig_pop = {});
-    void calculateHirshfeldWeights(const WFN &wave, const cell &unit_cell, const ivec &atom_list);
-    std::vector<std::pair<vec, vec>> calculateMBISWeights(const WFN &wave, const cell &unit_cell, const ivec &atom_list, const bvec &needs_grid, std::ostream &file = std::cout);
-    void calculateEMBISWeights(const WFN &wave, const cell &unit_cell, const ivec &atom_list, const std::vector<std::pair<vec, vec>> &MBIS_weights, const bvec &needs_grid, std::ostream &file = std::cout);
-    void pruneGrid();
+	void calculateSphericalDensities(const WFN &wave, const cell &unit_cell, const ivec &atom_list, vec2 &single_spherical_density, vec2 &combined_spherical_density, const std::vector<std::pair<vec, vec>> sig_pop = {});
+	void calculateHirshfeldWeights(const WFN &wave, const cell &unit_cell, const ivec &atom_list);
+	std::vector<std::pair<vec, vec>> calculateMBISWeights(const WFN &wave, const cell &unit_cell, const ivec &atom_list, const bvec &needs_grid, std::ostream &file = std::cout);
+	void calculateEMBISWeights(const WFN &wave, const cell &unit_cell, const ivec &atom_list, const std::vector<std::pair<vec, vec>> &MBIS_weights, const bvec &needs_grid, std::ostream &file = std::cout);
+	void pruneGrid();
 
-    void addTimingPoint(const std::string &label) {
-        timing_points_.emplace_back(label, std::chrono::high_resolution_clock::now());
-    };
+	void addTimingPoint(const std::string &label) {
+		timing_points_.emplace_back(label, std::chrono::high_resolution_clock::now());
+	};
 public:
-    GridManager(const GridConfiguration &config = GridConfiguration{});
-    ~GridManager() = default;
+	GridManager(const GridConfiguration &config = GridConfiguration{});
+	~GridManager() = default;
 
-    // Main interface methods
-    void setup3DGridsForMolecule(const WFN &wave, const ivec &atom_list = {},
-        const bvec &needs_grid = {}, const cell &unit_cell = cell(), const bool get_g = false, std::ostream& file = std::cout);
+	// Main interface methods
+	void setup3DGridsForMolecule(const WFN &wave, const ivec &atom_list = {},
+		const bvec &needs_grid = {}, const cell &unit_cell = cell(), const bool get_g = false, std::ostream& file = std::cout);
 
-    void setup1DGridsForMolecule(const WFN &wave, const int atom_1, const int atom_2, const int gridpoints, const double padding);
+	void setup1DGridsForMolecule(const WFN &wave, const int atom_1, const int atom_2, const int gridpoints, const double padding);
 
-    void calculateNonSphericalDensities(const WFN &wave, const cell &unit_cell);
-    void calculateNonSphericalg(const WFN &wave, const cell &unit_cell);
+	void calculateNonSphericalDensities(const WFN &wave, const cell &unit_cell);
+	void calculateNonSphericalg(const WFN &wave, const cell &unit_cell);
 
-    PartitionResults calculatePartitionedCharges(const WFN &wave, const cell &unit_cell = cell());
-    //Sum_p rho w_A r^l Y_lm(r_hat) about each nucleus for the configured scheme, [atom][l*l+l+m], l = 0..lmax
-    vec2 calculatePartitionedMultipoles(const WFN &wave, const int lmax);
+	PartitionResults calculatePartitionedCharges(const WFN &wave, const cell &unit_cell = cell());
+	//Sum_p rho w_A r^l Y_lm(r_hat) about each nucleus for the configured scheme, [atom][l*l+l+m], l = 0..lmax
+	vec2 calculatePartitionedMultipoles(const WFN &wave, const int lmax);
 
-    void getDensityVectors(const WFN &wave, const ivec &atom_list, vec2 &d1, vec2 &d2, vec2 &d3, vec2 &dens, const bool get_g = false);
-    void getDensityVectorsFromCube(const WFN &wave, const ivec &atom_list, const cube &density_cube, vec2 &d1, vec2 &d2, vec2 &d3, vec2 &dens, vec &atom_electrons);
+	void getDensityVectors(const WFN &wave, const ivec &atom_list, vec2 &d1, vec2 &d2, vec2 &d3, vec2 &dens, const bool get_g = false);
+	void getDensityVectorsFromCube(const WFN &wave, const ivec &atom_list, const cube &density_cube, vec2 &d1, vec2 &d2, vec2 &d3, vec2 &dens, vec &atom_electrons);
 
-    // Configuration and data access
-    void setConfiguration(const GridConfiguration &config) { config_ = config; }
-    const GridConfiguration &getConfiguration() const { return config_; }
-    const GridData &getGridData() const { return grid_data_; }
+	//Evaluate this density on the grids instead of the wave's orbitals: a Gaussian_Molecule, a Centred<> atom model,
+	//anything calculate_density takes. Kept by reference, so the source outlives the manager's use of it.
+	template<class S> void setDensitySource(const S& source) { density_ = density_batch(source); }
+	void setDensitySource(DensityBatch source) { density_ = std::move(source); }
+	bool hasDensitySource() const { return static_cast<bool>(density_); }
+
+	// Configuration and data access
+	void setConfiguration(const GridConfiguration &config) { config_ = config; }
+	const GridConfiguration &getConfiguration() const { return config_; }
+	const GridData &getGridData() const { return grid_data_; }
 	GridData& getGridData() { return grid_data_; }  //Access to a mutable reference if deeper access is needed
 	const bool& getNeedsHelper() const { return needs_helper_grids_; }
-    GridData::GridIndex partitionWeightIndex() const;
-    int getTotalGridPoints() const { return grid_data_.total_points; }
-    int getNumPointsForAtom(const int &atom_index) const { return grid_data_.num_points_per_atom[atom_index]; }
+	GridData::GridIndex partitionWeightIndex() const;
+	int getTotalGridPoints() const { return grid_data_.total_points; }
+	int getNumPointsForAtom(const int &atom_index) const { return grid_data_.num_points_per_atom[atom_index]; }
 
-    // Utility methods
-    static ivec identifyAtomTypes(const WFN &wave);
-    static bvec determineAtomsNeedingGrids(const WFN &wave, const ivec &asym_atom_list);
+	// Utility methods
+	static ivec identifyAtomTypes(const WFN &wave);
+	static bvec determineAtomsNeedingGrids(const WFN &wave, const ivec &asym_atom_list);
 
-    void addTimingInfoToVecs(std::vector<_time_point> &time_points, svec &time_descriptions) {
-        for (const auto [label, time] : timing_points_) {
-            time_points.push_back(time);
-            time_descriptions.push_back(label);
-        }
-    }
-    void writeSimpleGrid(const std::filesystem::path &filename, const vec2 &grid_points, std::vector<std::pair<std::string, vec>> data) const;
+	void addTimingInfoToVecs(std::vector<_time_point> &time_points, svec &time_descriptions) {
+		for (const auto [label, time] : timing_points_) {
+			time_points.push_back(time);
+			time_descriptions.push_back(label);
+		}
+	}
+	void writeSimpleGrid(const std::filesystem::path &filename, const vec2 &grid_points, std::vector<std::pair<std::string, vec>> data) const;
 
-    vec evaluateFunctionOnGrid(const vec2 &grid_points, std::function<double(double, double, double)> func) const;
+	vec evaluateFunctionOnGrid(const vec2 &grid_points, std::function<double(double, double, double)> func) const;
 
-    void printChargeTable(const svec &labels, const WFN &wave, const ivec atom_list, std::ostream &file, const PartitionResults &results) const;
+	void printChargeTable(const svec &labels, const WFN &wave, const ivec atom_list, std::ostream &file, const PartitionResults &results) const;
 };
