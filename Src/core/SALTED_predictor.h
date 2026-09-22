@@ -23,9 +23,30 @@ public:
 	WFN wavy;
 	void shrink_intermediate_vectors();
 	const bool basis_set_loaded() const { return bbasis_set_loaded; };
+	//The basis this model predicts in: its own BASIS block if it has one, else the library set it names
+	std::shared_ptr<BasisSet> get_model_basis() const;
 
 private:
 	bool bbasis_set_loaded = false;
+	//Kept so several models can be stitched together: an atom's coefficients only
+	//mean anything together with the basis they were trained on
+	std::shared_ptr<BasisSet> model_basis{};
+	// Several models in one prediction: every element is predicted by the first
+	// model on the command line that was trained on it, and the per-atom blocks
+	// are stitched back together. Empty for a single model.
+	std::vector<std::unique_ptr<SALTEDPredictor>> sub_models{};
+	// Per atom of the merged structure: which sub model predicts it, and its index there
+	ivec atom_model{}, atom_in_model{};
+	// A sub model must not rescale its share to the whole system's electron count;
+	// the stitched density is constrained once, at the end
+	bool skip_charge_constraint = false;
+	void build_merged(const WFN& wavy_in, options& opt_in);
+	vec merge_predictions();
+	// Estimate what the spherically filled atoms should carry, so the size of the
+	// neutral-fill assumption is reported rather than hidden
+	void estimate_fill_charges(const WFN& wavy_in, const std::vector<char>& use_thakkar, options& opt_in);
+	// Does this model ask for the electron count to be imposed on its prediction?
+	bool wants_charge_constraint() const;
 	// Set when atoms were moved to the spherical Thakkar fill. The charge
 	// constraint needs it: with a mixed ML/Thakkar system the split of a net
 	// charge between the two regions is undefined.

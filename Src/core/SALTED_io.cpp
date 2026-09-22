@@ -701,12 +701,14 @@ std::shared_ptr<BasisSet> SALTED_BINARY_FILE::read_basis_set() {
 				err_checkf(contraction < angular_momenta_per_shell.size(),
 					"SALTED basis angular-momentum array shorter than contraction array", std::cout);
 				int angular_momentum = angular_momenta_per_shell[contraction];
+				// The angular momentum is per shell, the exponents and coefficients are
+				// per primitive: a contracted shell has more of the latter than of the
+				// former, so only those two may be indexed by the primitive.
 				for (int func = 0; func < contractions[contraction]; func++, primitive_index++) {
-					err_checkf(primitive_index < angular_momenta_per_shell.size()
-						&& primitive_index < exponents_per_shell.size()
+					err_checkf(primitive_index < exponents_per_shell.size()
 						&& primitive_index < coefficients.size(),
 						"SALTED basis primitive arrays have inconsistent sizes", std::cout);
-					bs->add_owned_primitive({ 1, angular_momenta_per_shell[primitive_index], exponents_per_shell[primitive_index], coefficients[primitive_index], contraction });
+					bs->add_owned_primitive({ 1, angular_momentum, exponents_per_shell[primitive_index], coefficients[primitive_index], contraction });
 				}
 			}
 		}

@@ -91,7 +91,9 @@ Gaussian_Molecule::Gaussian_Molecule(WFN aux_basis, vec coefficients)
 //One Gaussian_Atom per atom with its contiguous run of the coefficients
 void Gaussian_Molecule::slice()
 {
-	err_checkf(static_cast<int>(coefs.size()) == tab.n_coef, "Coefficient count does not match the auxiliary basis", std::cout);
+	err_checkf(static_cast<int>(coefs.size()) == tab.n_coef,
+		"Coefficient count does not match the auxiliary basis: " + std::to_string(coefs.size())
+		+ " coefficients for a basis of " + std::to_string(tab.n_coef), std::cout);
 	const std::vector<::atom>& atoms = *aux.get_atoms_ptr();
 	ats.reserve(tab.n_at);
 	for (int a = 0; a < tab.n_at; a++) {

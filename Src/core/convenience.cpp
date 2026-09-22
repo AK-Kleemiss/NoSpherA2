@@ -415,7 +415,11 @@ std::string help_message =
  "  -gbw2wfn -wfn <file.gbw>            Convert GBW input to .wfn.\n"
  "  -convert_to_47 <wfn>               Write an NBO File47 (.47).\n"
  "  -fchk <output.fchk>                Write FCHK output (requires -b and -d).\n"
- "  -SALTED <model-dir>                Predict density with a SALTED model.\n"
+ "  -SALTED <model> [<model> ...]      Predict density with a SALTED model.\n"
+ "                                    A model is a directory or a .salted file.\n"
+ "                                    With several, each element is predicted by\n"
+ "                                    the first model trained on it and the\n"
+ "                                    per-atom blocks are stitched together.\n"
  "                                    With -xyz instead of -wfn the prediction\n"
  "                                    is the structure's density for -rho,\n"
  "                                    -esp, -lap, -eli, -esp_isosurface and the Hirshfeld\n"
@@ -2875,7 +2879,13 @@ bool options::digest_partition_options(const std::string &temp, int &i)
     else if (temp == "-SALTED" || temp == "-salted")
     {
         SALTED = true;
-        salted_model_dir = arguments[i + 1];
+        // Several models may follow, like -ri_fit takes several basis sets. The
+        // first one keeps salted_model_dir so every single-model path is unchanged.
+        int next = i + 1;
+        while (next < argc && arguments[next].find("-") != 0)
+            salted_model_dirs.push_back(arguments[next++]);
+        err_chkf(!salted_model_dirs.empty(), "No SALTED model given after -SALTED.", std::cout);
+        salted_model_dir = salted_model_dirs[0];
     }
     else if (temp == "-SALTED_COEFS" || temp == "-salted_coefs")
     {

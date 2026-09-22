@@ -801,6 +801,8 @@ struct options
     ivec cmo2;
     ivec ignore;
     std::filesystem::path salted_model_dir;
+    //Every model given to -SALTED, in that order; salted_model_dir is the first of them
+    pathvec salted_model_dirs;
     std::vector<std::shared_ptr<BasisSet>> aux_basis;
     std::filesystem::path wfn;
     std::filesystem::path wfn2;
