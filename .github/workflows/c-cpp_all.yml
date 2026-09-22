@@ -505,6 +505,26 @@ jobs:
           submodules: recursive
           fetch-depth: 1
 
+      - name: Bootstrap micromamba environment
+        shell: bash
+        run: cmake -P scripts/BootstrapMicromamba.cmake
+
+      # The dependencies are built before CodeQL starts tracing, and this is
+      # what keeps the job short. For a compiled language the paths-ignore in
+      # codeql-config.yml only filters the alert list - every translation unit
+      # the traced build compiles still ends up in the database, and both TRAP
+      # import and query evaluation scale with it. This build has 943 of them,
+      # of which 895 are third-party: tracing all of them cost ~18 min of build,
+      # ~8 min of TRAP import and ~38 min of queries to analyse 48 files we own.
+      # Code that is already compiled when the tracer starts is never extracted.
+      - name: Build dependencies untraced
+        shell: bash
+        run: >-
+          cmake --preset release-linux
+          -DNOSPHERA2_BUILD_TESTS=OFF
+          -DNOSPHERA2_DEPENDENCIES_ONLY=ON
+          && cmake --build --preset release-linux --parallel 4
+
       - name: Initialize CodeQL
         uses: github/codeql-action/init@b96794f015dfd88f77b49b1c93e0fa7110f94c63 # v4.38.0
         with:
@@ -513,10 +533,8 @@ jobs:
           # Restricts analysis to code this repository owns; see the file for why.
           config-file: ./.github/codeql/codeql-config.yml
 
-      - name: Bootstrap micromamba environment
-        shell: bash
-        run: cmake -P scripts/BootstrapMicromamba.cmake
-
+      # Same build tree, so this reconfigure only adds the NoSpherA2 targets:
+      # the dependency objects are up to date and are not compiled again.
       - name: Configure project for CodeQL
         shell: bash
         run: >-
