@@ -3159,11 +3159,14 @@ bool XCW::SCF_iteration(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& l
 			soscf_patience_grad_ = settings.current_gradient;
 			soscf_patience_iter_ = scf.iter;
 		}
-		const bool stuck = scf.iter - soscf_patience_iter_ >= soscf_patience_;
+		//with soscf requested the DIIS stage only has to reach the quadratic region; Fe_phen HS lambda 0.08
+		//oscillated for 30 iterations above the 1e-2 gate while TRAH converged in 6 from that very point
+		const int patience = settings.soscf ? soscf_patience_requested_ : soscf_patience_;
+		const bool stuck = scf.iter - soscf_patience_iter_ >= patience;
 		if (stuck || (settings.soscf && scf.diis_error < soscf_start_)) {
 			soscf_ = true;
 			std::ostringstream what;
-			what << "***" << (stuck ? "Orbital gradient not halved in " + std::to_string(soscf_patience_) + " iterations" : "DIIS error below 1e-2")
+			what << "***" << (stuck ? "Orbital gradient not halved in " + std::to_string(patience) + " iterations" : "DIIS error below 1e-2")
 				<< ": second-order steps on the orbital rotations from here***";
 			print_centered_message(what.str(), 84, XCW_log);
 		}

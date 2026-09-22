@@ -365,7 +365,7 @@ private:
 	bool soscf_ = false;
 	int soscf_patience_iter_ = 0;
 	double soscf_patience_grad_ = 0;
-	static constexpr int soscf_patience_ = 30, trah_micro_max_ = 30;
+	static constexpr int soscf_patience_ = 30, soscf_patience_requested_ = 8, trah_micro_max_ = 30;
 	static constexpr double soscf_start_ = 1e-2, soscf_trust_max_ = 1.0, soscf_trust_first_ = 0.5, soscf_noise_ = 1e-8;
 	double soscf_trust_ = soscf_trust_first_;
 	std::vector<occ::Vec> trah_B_, trah_HB_;
