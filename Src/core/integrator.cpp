@@ -1541,7 +1541,9 @@ vec DensityFitting::calculate_expected_populations(const WFN& wavy, const WFN& w
 	else if (scheme == CHARGE_SCHEME::TFVC || scheme == CHARGE_SCHEME::HIRSHFELD || scheme == CHARGE_SCHEME::MBIS || scheme == CHARGE_SCHEME::EMBIS) {
 		PartitionType type = scheme_partition(scheme);
 		GridConfiguration config;
-		config.accuracy = 0;
+		// These populations are restraint TARGETS, so their integration error goes straight
+		// into the fitted density: accuracy 0 (coarsest Lebedev) carried ~0.5 e over 35 atoms.
+		// The struct default is what the fit analysis one page down already uses.
 		config.partition_type = type;
 		config.pbc = 0;
 		config.debug = false;
