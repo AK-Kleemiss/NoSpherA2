@@ -22,10 +22,13 @@ namespace NoSpherA2UnitTests
 	namespace
 	{
 		// every temporary file of this suite lives in the system temp directory
-		// under a unique name and is removed by the test that wrote it
+		// under a name unique to the test (ctest runs tests in parallel, and
+		// Windows cannot remove a file another process still reads) and is
+		// removed by the test that wrote it
 		std::filesystem::path cellmath_tmp(const std::string& name)
 		{
-			return std::filesystem::temp_directory_path() / ("nosphera2_cellmath_" + name);
+			const std::string test = ::testing::UnitTest::GetInstance()->current_test_info()->name();
+			return std::filesystem::temp_directory_path() / ("nosphera2_cellmath_" + test + "_" + name);
 		}
 
 		std::filesystem::path write_text(const std::string& name, const std::string& text)
