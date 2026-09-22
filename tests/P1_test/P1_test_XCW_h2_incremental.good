@@ -26,12 +26,12 @@ Skipped evaluation of 8004222 grids (16.16%)
 More detailed output in XCW.log file...
 XCW: fitting against the 1/|H|^2-weighted residual self-energy criterion Criterion below is this weighted quantity, not the classical GoF.
 ____________________________________________________________________________________
- Lambda		Criterion	GooF(F2)	R1(gt)		Total Energy	Perturbation	Target quantity	Crit(all)	R1(all)
-										(Eh)		   (a. u.)			(a. u.)
+ Lambda		Criterion	GooF(F2)	R1(gt)		Total Energy		Perturbation	Target quantity		Crit(all)	R1(all)
+								(Eh)			(a. u.)		(a. u.)
 ____________________________________________________________________________________
-0.00000		10.506		5.497		0.0250		-1961.923538820		0.000		-1961.923538820		10.319		0.0254
-0.01000		6.286		4.013		0.0226		-1961.744817998		0.063		-1961.681953386		6.175		0.0230
+0.00000		10.5060		5.4968		0.02502		-1961.923538820		0.000		-1961.923538820		10.3187		0.02538
+0.01000		6.2865		4.0130		0.02264		-1961.744817998		0.063		-1961.681953386		6.1753		0.02300
 WARNING: Unexpected number of extrema (0) found between atoms 8 and 9. Setting chi to 1.0.
-0.02000		5.318		3.666		0.0218		-1961.584448501		0.106		-1961.478092609		5.224		0.0222
+0.02000		5.3178		3.6665		0.02178		-1961.584448515		0.106		-1961.478092621		5.2241		0.02215
 WARNING: Unexpected number of extrema (0) found between atoms 8 and 9. Setting chi to 1.0.
 Finished XCW fitting procedure.
