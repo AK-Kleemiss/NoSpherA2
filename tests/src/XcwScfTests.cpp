@@ -174,7 +174,7 @@ namespace {
 	}
 
 	//One line of the lambda table run_XCW_fitting prints per converged step:
-	//lambda(5) criterion(3) GooF2(3) R1(4) energy(9) lambda*criterion(3) quant(9), tab separated.
+	//lambda(5) criterion(4) GooF2(4) R1(5) energy(9) lambda*criterion(3) quant(9), tab separated.
 	//An XCW.log iteration row has the same seven columns behind a leading tab, with the
 	//iteration count in the first.
 	struct lambda_row {

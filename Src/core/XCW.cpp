@@ -2831,8 +2831,8 @@ bool XCW::do_SCF(const double& lambda, double& alpha, occ::qm::SCF<occ::qm::Hart
 
 	XCW_log << "Starting XCW SCF solver with lambda = " << std::fixed << std::setprecision(5) << lambda << "\n";
 	XCW_log << "____________________________________________________________________________________\n";
-	XCW_log << " Iteration	Criterion	GooF(F^2)	R1(gt)		Total Energy	Perturbation	Target quantity \n";
-	XCW_log << "												(Eh)		   (a. u.)			(a. u.)\n";
+	XCW_log << " Iteration\t\tCriterion\tGooF(F^2)\tR1(gt)\t\tTotal Energy\t\tPerturbation\tTarget quantity\n";
+	XCW_log << "\t\t\t\t\t\t\t\t\t(Eh)\t\t\t(a. u.)\t\t(a. u.)\n";
 	XCW_log << "____________________________________________________________________________________\n";
 
 	// Compute first guess and update the energy according to this guess
@@ -2880,8 +2880,8 @@ bool XCW::do_SCF(const double& lambda, double& alpha, occ::qm::SCF<occ::qm::Hart
 
 
 		const double current_criterion = criterion(false);
-		std::cout << std::fixed << std::setprecision(5) << lambda << "\t\t" << std::fixed << std::setprecision(3) << current_criterion << "\t\t" << cryst.GooF2 << "\t\t" << std::setprecision(4) << cryst.R1 << "\t\t" << std::fixed << std::setprecision(9) << scf.ctx.energy["total"] << "\t\t" << std::fixed << std::setprecision(3) << lambda * current_criterion << "\t\t" << std::fixed << std::setprecision(9) << quant
-			<< "\t\t" << std::setprecision(3) << criterion(true) << "\t\t" << std::setprecision(4) << cryst.R1_all;
+		std::cout << std::fixed << std::setprecision(5) << lambda << "\t\t" << std::fixed << std::setprecision(4) << current_criterion << "\t\t" << cryst.GooF2 << "\t\t" << std::setprecision(5) << cryst.R1 << "\t\t" << std::fixed << std::setprecision(9) << scf.ctx.energy["total"] << "\t\t" << std::fixed << std::setprecision(3) << lambda * current_criterion << "\t\t" << std::fixed << std::setprecision(9) << quant
+			<< "\t\t" << std::setprecision(4) << criterion(true) << "\t\t" << std::setprecision(5) << cryst.R1_all;
 		if (opt->xcw_gaussian_halt && !gaussian_halt_history_.empty()) {
 			std::cout << "\t\t" << std::setprecision(4) << gaussian_halt_history_.back().A2;
 		}
@@ -3134,7 +3134,7 @@ bool XCW::SCF_iteration(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& l
 	scf.ctx.F += perturbation * lambda;
 
 	// Prints output line for iteration
-	XCW_log << "\t" << scf.iter << "\t\t" << std::fixed << std::setprecision(3) << current_criterion << "\t\t" << cryst.GooF2 << "\t\t" << std::setprecision(4) << cryst.R1 << "\t\t" << std::fixed << std::setprecision(9) << scf.ctx.energy["total"] << "\t\t" << std::fixed << std::setprecision(3) << temp_penalty << "\t\t" << std::fixed << std::setprecision(9) << quant << std::endl;
+	XCW_log << "\t" << scf.iter << "\t\t" << std::fixed << std::setprecision(4) << current_criterion << "\t\t" << cryst.GooF2 << "\t\t" << std::setprecision(5) << cryst.R1 << "\t\t" << std::fixed << std::setprecision(9) << scf.ctx.energy["total"] << "\t\t" << std::fixed << std::setprecision(3) << temp_penalty << "\t\t" << std::fixed << std::setprecision(9) << quant << std::endl;
 
 	//calc_perturb is the gradient of lambda * criterion^2 (the chi^2 of Jayatilaka's functional),
 	//so that, not the printed lambda * criterion, is what the SCF descends and what the rescue ranks by
@@ -3924,12 +3924,12 @@ void XCW::run_XCW_fitting() {
 			<< "Criterion below are this weighted quantity, not the classical GoF." << std::endl;
 	}
 	std::cout << "____________________________________________________________________________________\n";
-	std::cout << " Lambda\t\tCriterion\tGooF(F2)\tR1(gt)\t\tTotal Energy\tPerturbation\tTarget quantity\tCrit(all)\tR1(all)";
+	std::cout << " Lambda\t\tCriterion\tGooF(F2)\tR1(gt)\t\tTotal Energy\t\tPerturbation\tTarget quantity\t\tCrit(all)\tR1(all)";
 	if (opt->xcw_gaussian_halt) {
-		std::cout << "\tA^2 (halt)";
+		std::cout << "\t\tA^2 (halt)";
 	}
 	std::cout << "\n";
-	std::cout << "										(Eh)		   (a. u.)			(a. u.)\n";
+	std::cout << "\t\t\t\t\t\t\t\t(Eh)\t\t\t(a. u.)\t\t(a. u.)\n";
 	std::cout << "____________________________________________________________________________________\n";
 
 	// Runs the lambda steps for XCW fitting

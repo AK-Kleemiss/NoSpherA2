@@ -261,7 +261,7 @@ TEST(XcwHaltingReportTests, HaltingReportsAcrossSixLambdaSteps)
 	EXPECT_EQ(count_of(log, "candidate fit: degree=2 RSS="), 2);
 
 	//the cout table carries the A^2 column, equal to the summary row's A^2
-	EXPECT_NE(out.find("Target quantity\tCrit(all)\tR1(all)\tA^2 (halt)"), std::string::npos) << out;
+	EXPECT_NE(out.find("Target quantity\t\tCrit(all)\tR1(all)\t\tA^2 (halt)"), std::string::npos) << out;
 	const std::vector<std::string> row0 = table_row(out, "0.00000");
 	ASSERT_EQ(row0.size(), 10u) << out;
 	const size_t srow = log.find("\n\t0.00000\t");
