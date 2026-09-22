@@ -748,6 +748,30 @@ TEST(BasisConstantsLibraryTests, GenerateAuxWfnCombinesSeveralSets)
 	EXPECT_EQ(aux.get_atom_label(1), "He");
 }
 
+//the fitted density carries the charge of the density it fits: a neutral aux wavefunction made an
+//anion's electron count come out short of the fit by exactly the charge
+TEST(BasisConstantsLibraryTests, GenerateAuxWfnKeepsChargeAndMultiplicity)
+{
+	std::shared_ptr<BasisSet> set = std::make_shared<BasisSet>();
+	set->set_name("a");
+	set->set_count_for_element(0, 1);
+	set->add_owned_primitive({ 0, 0, 2.0, 0.3, 0 });
+
+	WFN orb(e_origin::NOT_YET_DEFINED);
+	orb.push_back_atom("H", 0.0, 0.0, 0.0, 1);
+	orb.set_charge(-2);
+	orb.set_multi(3);
+	std::vector<std::shared_ptr<BasisSet>> sets{ set };
+	//no orbitals: the stored charge is all there is
+	EXPECT_EQ(generate_aux_wfn(orb, sets).get_charge(), -2);
+	EXPECT_EQ(generate_aux_wfn(orb, sets).get_multi(), 3u);
+
+	//with orbitals the occupations win: files that leave the charge at 0 are the common case
+	orb.push_back_MO(1, 2.0, -0.5);
+	orb.set_charge(0);
+	EXPECT_EQ(generate_aux_wfn(orb, sets).get_charge(), -1);
+}
+
 //the tonto-style turbomole fixture shipped with the NiP3 test: every atom of an element gets the
 //element's block, shells numbered per block, types s..f as 1..4
 TEST(BasisConstantsIoTests, ReadVanillaTurbomoleFixture)

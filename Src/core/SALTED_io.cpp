@@ -375,6 +375,27 @@ bool SALTED_BINARY_FILE::read_header() {
 
 	header_end = file.tellg();
 
+	// A .salted that stopped copying part-way still has a perfectly good header:
+	// the table of contents is written first and lists blocks that are simply not
+	// there. Reading one then fails deep inside whichever block was asked for
+	// first, with a message about that block rather than about the file. Compare
+	// the offsets against the file size here and say what is actually wrong.
+	// A negative offset means the same thing for a >2 GB model: the location is
+	// an int32 in the format, so it wrapped.
+	file.seekg(0, std::ios::end);
+	const std::streamoff file_size = file.tellg();
+	file.seekg(header_end, std::ios::beg);
+	for (const auto& entry : table_of_contents) {
+		if (static_cast<std::streamoff>(entry.second) >= 0
+			&& static_cast<std::streamoff>(entry.second) < file_size)
+			continue;
+		std::cerr << "SALTED file " << filepath.string() << " is incomplete: block "
+			<< entry.first << " is announced at byte " << entry.second
+			<< " but the file is only " << file_size
+			<< " bytes long. Copy or download it again." << std::endl;
+		return false;
+	}
+
 	return true;
 }
 

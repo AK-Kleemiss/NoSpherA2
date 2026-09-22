@@ -605,6 +605,18 @@ TEST(SaltedFchkIoTests, CorruptHeaderExits)
 	std::filesystem::remove(trunc);
 }
 
+// a model that stopped copying part-way keeps a valid header listing blocks that are
+// no longer in the file; it has to say so instead of failing inside the first block read
+TEST(SaltedFchkIoTests, TruncatedFileExits)
+{
+	const auto p = tmp_path("truncated.salted");
+	write_synthetic_model(p, 3, true, true);
+	const auto full = std::filesystem::file_size(p);
+	std::filesystem::resize_file(p, full / 2);
+	EXPECT_EXIT(SALTED_BINARY_FILE f(p), ::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), "is incomplete");
+	std::filesystem::remove(p);
+}
+
 // asking for a block the table of contents does not list is fatal
 TEST(SaltedFchkIoTests, MissingBlockExits)
 {

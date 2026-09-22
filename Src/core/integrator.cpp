@@ -659,6 +659,16 @@ static vec total_population_row(
 // density. Molecular charge is included.
 static double explicit_electron_count(const WFN& wavy)
 {
+	// When there are orbitals they say it outright. Files like .gbw leave the
+	// stored charge at 0, which turns the nuclear sum below into the count of a
+	// neutral molecule - wrong for every ion.
+	if (wavy.get_nmo() > 0) {
+		double occupied = 0.0;
+		for (int mo = 0; mo < wavy.get_nmo(); ++mo)
+			occupied += wavy.get_MO_occ(mo);
+		return occupied;
+	}
+
 	double electrons = -wavy.get_charge();
 
 	for (int a = 0; a < wavy.get_ncen(); ++a) {
@@ -983,7 +993,8 @@ vec DensityFitting::density_fit(
 			aux_table,
 			config.restrain_charges
 			? restraints.expected_populations
-			: vec());
+			: vec(),
+			restraints.partitioned);
 
 	std::cout << "==============================================\n"
 		<< std::endl;
@@ -1004,6 +1015,12 @@ DensityFitting::CONFIG DensityFitting::config_from_options(const options& opt)
 		config.multipole_lmax = opt.multipole_lmax;
 		config.multipole_strength = opt.multipole_strength;
 		config.partition_restraints = opt.multipole_partition;
+
+		// Atom-centred targets are the populations of overlapping atoms, so the
+		// soft penalty pulls each centre up and the molecule ends up with a few
+		// tenths of an electron too many. Pin the sum. Grid-partitioned targets
+		// already add up to the electron count by construction.
+		config.constrain_total_electrons = !config.partition_restraints;
 
 		switch (opt.multipole_scheme) {
 		case PartitionType::TFVC:
@@ -1563,16 +1580,30 @@ vec DensityFitting::calculate_expected_populations(const WFN& wavy, const WFN& w
 	return expected_populations;
 }
 
-// Analyze the quality of density fitting. Atomic populations are evaluated
-// with exactly the same auxiliary-function integrals used by the charge
-// restraints, so diagnostics and constraints cannot silently disagree.
+// Analyze the quality of density fitting. The population of an atom is the
+// integral of the auxiliary functions sitting on that atom, which is what a
+// consumer that decomposes the coefficients per atom sees. With atom-centred
+// restraints that is the quantity the restraints constrain; with grid
+// partitioned ones it is not - see the note printed below.
 void DensityFitting::analyze_density_fit_quality(
 	const vec& coefficients,
 	const WFN& wavy_aux,
 	const aux_density_table& aux_density,
-	const vec& expected_populations)
+	const vec& expected_populations,
+	const bool partitioned)
 {
 	std::cout << "\n=== Density Fitting Quality Analysis ===" << std::endl;
+	std::cout
+		<< "Population: the auxiliary functions on that centre only."
+		<< std::endl;
+
+	if (partitioned)
+		std::cout
+			<< "Expected: the grid-partitioned population the restraints target.\n"
+			<< "Those restraints fix the partitioned moments of the total fitted\n"
+			<< "density, not the per-centre sums, so a deviation here is density\n"
+			<< "carried by the neighbours' functions, not a failure of the fit."
+			<< std::endl;
 
 	const size_t n_aux = coefficients.size();
 	const vec2 population_rows = atomic_population_rows(aux_density);
@@ -1581,6 +1612,7 @@ void DensityFitting::analyze_density_fit_quality(
 
 	double real_total_electrons = 0.0;
 	double expected_total_electrons = -wavy_aux.get_charge();
+	int delocalised_atoms = 0;
 
 	for (int a = 0; a < wavy_aux.get_ncen(); ++a) {
 		const atom A = wavy_aux.get_atom(a);
@@ -1618,12 +1650,22 @@ void DensityFitting::analyze_density_fit_quality(
 				<< ", Expected = " << expected_charge
 				<< ", Deviation = " << deviation;
 
-			if (deviation > 1.0)
+			if (deviation > 1.0) {
+				++delocalised_atoms;
 				std::cout << "  WARNING: significant deviation";
+			}
 		}
 
 		std::cout << "\n";
 	}
+
+	if (partitioned && delocalised_atoms > 0)
+		std::cout
+			<< delocalised_atoms
+			<< " atoms hold more than 1 e of their partitioned density on other\n"
+			   "centres. Use -multipole_centre when the coefficients are taken apart\n"
+			   "per atom downstream (SALTED training, per-atom densities)."
+			<< std::endl;
 
 	std::cout
 		<< "Expected / Real total electrons: "
