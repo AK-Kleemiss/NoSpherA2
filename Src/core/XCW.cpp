@@ -1196,6 +1196,15 @@ void XCW::report_halting_progress_estimate(bool is_final) {
 				*s << " The trend so far is not curving upward yet within the search window; "
 					<< "cannot extrapolate a stopping estimate, extend the scan further.";
 			}
+			else {
+				//fit.vertex_x <= max_valid_lambda: the fitted curve turns before the last step
+				//while the observed A^2 is still falling there - a flat, noisy trend, so no
+				//estimate is offered
+				*s << " The degree-" << fit.degree << " fit places its minimum at lambda ~= "
+					<< std::setprecision(5) << fit.vertex_x << ", inside the range already scanned, "
+					<< "which contradicts A^2 still falling at the last step; the trend is too flat "
+					<< "here to extrapolate from, only further steps can decide it.";
+			}
 			*s << "\n";
 		}
 	}
@@ -3958,7 +3967,16 @@ void XCW::run_XCW_fitting() {
 		std::cout << "XCW: slow_conv - the unperturbed first step runs the normal schedule, slow damping from the second step on" << std::endl;
 		XCW_log << "XCW: slow_conv - the unperturbed first step runs the normal schedule, slow damping from the second step on" << std::endl;
 	}
-	for (int step = 0; step < settings.num_xcw_steps; step++) {
+	//The scan used to stop at max_value even when A^2 was still falling there, i.e. on the
+	//scan boundary instead of on lambda*, and only printed "extend the scan" afterwards.
+	//The perturbed steps start from converged orbitals and TRAH takes the ones that DIIS
+	//cannot, so running past the requested range is stable enough to just do it. Capped at
+	//the requested number of steps, so a trend that never curves upward at most doubles the
+	//scan rather than running away
+	int planned_steps = settings.num_xcw_steps;
+	const int max_extra_steps = settings.num_xcw_steps;
+	int extra_steps = 0;
+	for (int step = 0; step < planned_steps; step++) {
 		const double lambda = step * settings.xcw_step_size + settings.xcw_start_value;
 		if (slow_start && step == 1) {
 			settings.alpha = slow_alpha; settings.level_shift = slow_shift; settings.diis_stop_damping = slow_stop_damping; settings.diis_stop_shift = slow_stop_shift;
@@ -4016,9 +4034,34 @@ void XCW::run_XCW_fitting() {
 		last_lambda = lambda;
 		has_guess = true;
 
+		//At the end of the planned scan, keep going while the minimum is still ahead
+		if (opt->xcw_gaussian_halt && step + 1 == planned_steps) {
+			double estimated_minimum = 0.0;
+			if (halting_minimum_beyond_scan(gaussian_halt_history_, estimated_minimum)) {
+				std::ostringstream msg;
+				msg << std::fixed << std::setprecision(5)
+					<< "XCW: A^2 is still falling at lambda " << lambda << ", so the minimum is outside the requested range - ";
+				if (extra_steps < max_extra_steps) {
+					planned_steps++;
+					extra_steps++;
+					msg << "extending the scan to lambda " << (lambda + settings.xcw_step_size)
+						<< " (extra step " << extra_steps << " of at most " << max_extra_steps << ")";
+					if (estimated_minimum > 0.0) {
+						msg << ", extrapolated minimum near lambda ~= " << estimated_minimum;
+					}
+				}
+				else {
+					msg << "stopping anyway, the scan has already been extended by its limit of "
+						<< max_extra_steps << " steps; raise max_value in -do_XCW to continue";
+				}
+				XCW_log << msg.str() << std::endl;
+				std::cout << msg.str() << std::endl;
+			}
+		}
+
 		//Progress estimate every 5 lambda steps; the last step is skipped because the
 		//summary below always prints a final one
-		if (opt->xcw_gaussian_halt && (step + 1) % 5 == 0 && step + 1 < settings.num_xcw_steps) {
+		if (opt->xcw_gaussian_halt && (step + 1) % 5 == 0 && step + 1 < planned_steps) {
 			report_halting_progress_estimate(false);
 		}
 	}

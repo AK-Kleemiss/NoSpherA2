@@ -343,3 +343,31 @@ PolynomialFit choose_best_polynomial_fit(const vec& x, const vec& y, const ivec&
 	}
 	return best;
 }
+
+bool halting_minimum_beyond_scan(const std::vector<GaussianHaltEntry>& history, double& estimated_minimum) {
+	estimated_minimum = 0.0;
+	vec fit_lambda, fit_A2;
+	double best_A2 = 0.0, best_lambda = 0.0, max_lambda = 0.0;
+	for (const GaussianHaltEntry& e : history) {
+		if (e.n_used < 8) {
+			continue;
+		}
+		if (fit_lambda.empty() || e.A2 < best_A2) {
+			best_A2 = e.A2;
+			best_lambda = e.lambda;
+		}
+		max_lambda = std::max(max_lambda, e.lambda);
+		fit_lambda.push_back(e.lambda);
+		fit_A2.push_back(e.A2);
+	}
+	//A single point is not a trend, and an argmin away from the last lambda means the
+	//scan has already walked past an interior minimum
+	if (fit_lambda.size() < 2 || best_lambda < max_lambda - 1e-12) {
+		return false;
+	}
+	const PolynomialFit fit = choose_best_polynomial_fit(fit_lambda, fit_A2, { 2, 4 });
+	if (fit.valid && fit.has_minimum && fit.vertex_x > max_lambda) {
+		estimated_minimum = fit.vertex_x;
+	}
+	return true;
+}

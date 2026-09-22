@@ -496,6 +496,46 @@ namespace
 		EXPECT_FALSE(fit_polynomial(x, y, 2).valid);
 	}
 
+	// the decision the lambda scan extends itself on: A^2 = (lambda - 0.12)^2 sampled up to
+	// 0.05 is still falling at the last step (extend, target extrapolated), the same curve
+	// scanned past its minimum is not (stop), and a scan too short to fit still extends but
+	// without naming a target
+	TEST(XcwHaltingTests, MinimumBeyondScanDrivesTheScanExtension)
+	{
+		auto history = [](int n_steps) {
+			std::vector<GaussianHaltEntry> h;
+			for (int i = 0; i < n_steps; i++) {
+				GaussianHaltEntry e;
+				e.lambda = 0.01 * i;
+				e.A2 = (e.lambda - 0.12) * (e.lambda - 0.12);
+				e.n_used = 40;
+				h.push_back(e);
+			}
+			return h;
+			};
+
+		double target = -1.0;
+		EXPECT_TRUE(halting_minimum_beyond_scan(history(6), target));
+		EXPECT_NEAR(target, 0.12, 0.005);
+
+		// scanned to 0.20, so A^2 turned upward long before the last step
+		target = -1.0;
+		EXPECT_FALSE(halting_minimum_beyond_scan(history(21), target));
+
+		// three points: falling, but degree 2 needs five, so no extrapolated target
+		target = -1.0;
+		EXPECT_TRUE(halting_minimum_beyond_scan(history(3), target));
+		EXPECT_EQ(target, 0.0);
+
+		// a single usable point is not a trend; the weak ones are skipped as in the report
+		std::vector<GaussianHaltEntry> weak = history(6);
+		for (size_t i = 1; i < weak.size(); i++) {
+			weak[i].n_used = 7;
+		}
+		target = -1.0;
+		EXPECT_FALSE(halting_minimum_beyond_scan(weak, target));
+	}
+
 	// ------------------------------------------------------------------
 	// XCW settings file, through the constructor
 

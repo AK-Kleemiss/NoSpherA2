@@ -118,3 +118,13 @@ PolynomialFit fit_polynomial(const vec& x, const vec& y, int degree);
 // none of `degrees` had enough points.
 PolynomialFit choose_best_polynomial_fit(const vec& x, const vec& y, const ivec& degrees,
 	std::vector<PolynomialFit>* all_candidates = nullptr);
+
+// True while the lowest A^2 of the scan still sits at its last evaluated
+// lambda, i.e. the minimum lies beyond the scanned range and the scan would
+// end on its own boundary rather than on a found lambda*. Entries with fewer
+// than 8 usable reflections are skipped, as in the halting report.
+// `estimated_minimum` receives the AIC-chosen polynomial's vertex when that
+// lies beyond the last lambda, and 0 otherwise (too few points to fit, or a
+// fit whose vertex contradicts the still-falling data) - an extension is
+// warranted either way, there is just no target lambda to name.
+bool halting_minimum_beyond_scan(const std::vector<GaussianHaltEntry>& history, double& estimated_minimum);

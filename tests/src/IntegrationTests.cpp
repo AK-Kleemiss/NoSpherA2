@@ -482,12 +482,14 @@ TEST(TomlIntegrationTests, P1_test_XCW)
 	EXPECT_TRUE(result.success) << result.message;
 }
 
-// Longer lambda scan (11 steps vs. P1_test_XCW's 2), with -xcw_gaussian_halt
-// enabled so the Gaussian halting criterion (tests/P1_test/XCW_plan.md) gets
-// exercised against a real trajectory instead of two points. This takes
-// several minutes (a fresh SCF plus ~10 warm-started XCW steps), so it only
-// runs when RUN_FULL_TEST is set, matching the python harness's convention
-// documented in UNIT_TESTS_STATUS.md.
+// Longer lambda scan (6 requested steps vs. P1_test_XCW's 2), with
+// -xcw_gaussian_halt enabled so the Gaussian halting criterion
+// (tests/P1_test/XCW_plan.md) gets exercised against a real trajectory
+// instead of two points; A^2 still falls at 0.05 in the F-weighted cases, so
+// those extend themselves to twelve steps. Tens of seconds per case (a fresh
+// SCF plus warm-started XCW steps), so they only run when RUN_FULL_TEST is
+// set, matching the python harness's convention documented in
+// UNIT_TESTS_STATUS.md.
 // GPU variants. They ask the runtime whether a device is present rather than being gated
 // on an environment variable, so the suite stays green on a CPU-only machine and actually
 // exercises the device on one that has it - a path nothing selects is a path nothing tests.

@@ -212,11 +212,13 @@ namespace {
 
 }
 
-//Six lambda steps with the halting criterion on: a per-lambda block for each, one progress
-//update after the fifth step, the summary table with six rows and the final recommendation on
-//both streams; the double-precision tensor is held in memory under the i_tensor_mb budget and
-//saved on the writer thread, and a second run reads it back instead of rebuilding it.
-TEST(XcwHaltingReportTests, HaltingReportsAcrossSixLambdaSteps)
+//Six requested lambda steps with the halting criterion on. A^2 never turns upward on this
+//fixture, so the scan extends itself by its cap of six more steps: a per-lambda block for each
+//of the twelve, progress updates after the fifth and tenth, the summary table with twelve rows
+//and the final recommendation on both streams; the double-precision tensor is held in memory
+//under the i_tensor_mb budget and saved on the writer thread, and a second run reads it back
+//instead of rebuilding it.
+TEST(XcwHaltingReportTests, HaltingReportsAcrossTheExtendedLambdaScan)
 {
 	if (!fixture_present()) {
 		GTEST_SKIP() << "P1 fixture missing under " << fixture_dir();
@@ -234,31 +236,41 @@ TEST(XcwHaltingReportTests, HaltingReportsAcrossSixLambdaSteps)
 	const std::string out = run_xcw(dir, opt);
 	const std::string log = read_file(dir / "XCW.log");
 
-	//evaluate_gaussian_halting: every step used the same strong set
-	EXPECT_EQ(count_of(log, "Gaussian halting criterion at lambda="), 6) << log;
-	const std::string n_used = "n_used=" + std::to_string(n_strong) + "/" + std::to_string(n_written) + " (|F|/sigma >= 3.00000)";
-	EXPECT_EQ(count_of(log, n_used), 6) << log;
-	EXPECT_EQ(count_of(log, "resolution-binned <z^2> trend: slope="), 6);
-	EXPECT_EQ(count_of(log, "|F|-binned <z^2> trend: slope="), 6);
+	//halting_minimum_beyond_scan: A^2 falls to the end of the requested range on this
+	//fixture, so the scan adds its six permitted steps and then says why it stops anyway
+	const std::string extending = "so the minimum is outside the requested range - extending the scan";
+	EXPECT_EQ(count_of(out, extending), 6) << out;
+	EXPECT_EQ(count_of(log, extending), 6) << log;
+	EXPECT_EQ(count_of(out, "the scan has already been extended by its limit of 6 steps"), 1) << out;
 
-	//report_halting_progress_estimate(false) once, after step 5 of 6, on both streams
-	EXPECT_EQ(count_of(log, "Gaussian halting criterion: progress update after 5 lambda steps"), 1) << log;
-	EXPECT_EQ(count_of(out, "Gaussian halting criterion: progress update after 5 lambda steps"), 1) << out;
+	//evaluate_gaussian_halting: every step used the same strong set
+	EXPECT_EQ(count_of(log, "Gaussian halting criterion at lambda="), 12) << log;
+	const std::string n_used = "n_used=" + std::to_string(n_strong) + "/" + std::to_string(n_written) + " (|F|/sigma >= 3.00000)";
+	EXPECT_EQ(count_of(log, n_used), 12) << log;
+	EXPECT_EQ(count_of(log, "resolution-binned <z^2> trend: slope="), 12);
+	EXPECT_EQ(count_of(log, "|F|-binned <z^2> trend: slope="), 12);
+
+	//report_halting_progress_estimate(false) after steps 5 and 10, on both streams
+	for (const std::string& n : { std::string("5"), std::string("10") }) {
+		const std::string update = "Gaussian halting criterion: progress update after " + n + " lambda steps";
+		EXPECT_EQ(count_of(log, update), 1) << log;
+		EXPECT_EQ(count_of(out, update), 1) << out;
+	}
 
 	//report_gaussian_halting_summary: header and one row per lambda
 	EXPECT_NE(log.find("Gaussian halting criterion summary (tests/P1_test/XCW_plan.md)"), std::string::npos);
 	EXPECT_NE(log.find(" Lambda\t\tA^2\treject5%\tpp_slope\tpp_intercept\tskew\tkurt\tres_trend_r\tint_trend_r\tn_used\n"), std::string::npos);
-	for (int x = 0; x < 6; x++) {
-		const std::string row_key = "\n\t0.0" + std::to_string(x) + "000\t";
+	for (int x = 0; x < 12; x++) {
+		const std::string row_key = "\n\t0." + std::string(x < 10 ? "0" : "") + std::to_string(x) + "000\t";
 		EXPECT_NE(log.find(row_key), std::string::npos) << "summary row missing for step " << x;
 	}
-	//the final recommendation, once in the progress update and once in the summary
-	EXPECT_EQ(count_of(log, "Recommended halting lambda* = 0.0"), 2) << log;
-	EXPECT_EQ(count_of(out, "Recommended halting lambda* = 0.0"), 2) << out;
-	//degree 2 needs 5 points (fits at step 5 and at the end), degree 4 needs 7 (never here)
-	EXPECT_EQ(count_of(out, "candidate fit: degree=2 RSS="), 2);
-	EXPECT_EQ(count_of(out, "candidate fit: degree=4 -- not enough points yet (need >= degree+3 evaluated lambda steps)"), 2);
-	EXPECT_EQ(count_of(log, "candidate fit: degree=2 RSS="), 2);
+	//the final recommendation, once per progress update and once in the summary
+	EXPECT_EQ(count_of(log, "Recommended halting lambda* = 0."), 3) << log;
+	EXPECT_EQ(count_of(out, "Recommended halting lambda* = 0."), 3) << out;
+	//degree 2 needs 5 points (all three reports), degree 4 needs 7 (only the step-5 report is short)
+	EXPECT_EQ(count_of(out, "candidate fit: degree=2 RSS="), 3);
+	EXPECT_EQ(count_of(out, "candidate fit: degree=4 -- not enough points yet (need >= degree+3 evaluated lambda steps)"), 1);
+	EXPECT_EQ(count_of(log, "candidate fit: degree=2 RSS="), 3);
 
 	//the cout table carries the A^2 column, equal to the summary row's A^2
 	EXPECT_NE(out.find("Target quantity\t\tCrit(all)\tR1(all)\t\tA^2 (halt)"), std::string::npos) << out;
