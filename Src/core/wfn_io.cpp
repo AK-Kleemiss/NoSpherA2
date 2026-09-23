@@ -487,6 +487,24 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
 	err_checkf(ncen > 0, "No atoms in molden file", file);
 	err_checkf(line.find("[GTO]") != string::npos, "Expected [GTO] after the atoms but found: '" + line + "'", file);
 	//----------------------------- Basis: per atom "index 0", shells "type nprim 1.0", primitives, blank line ------------------------------
+	//The contraction coefficients are taken as multiplying bare x^l exp(-a r^2), with the
+	//contracted shell already normalised - what ORCA and orca_2mkl write. The format's own
+	//documentation describes the other convention (coefficients multiply individually normalised
+	//primitives, the contracted shell renormalised afterwards) and nothing in a molden file says
+	//which one it is in: no file we have carries a "program=" keyword, and the [Title] line is
+	//not evidence either - F2.molden has an empty title and is ORCA-convention.
+	//
+	//Do not add a norm-based detector without reading this first: the contracted self-overlap is
+	//not an l-independent discriminator. Co2.molden's contracted d shell has bare self-overlap
+	//1.000 for the xx component while Ce_full.molden's uncontracted d shells have 3.000 - both
+	//ORCA files, differing only in which cartesian component the writer normalised. What does
+	//discriminate is per-MO: the file's own MO vectors are orthonormal in whatever convention it
+	//was written in. tests/src/MoldenConventionTests.cpp records those numbers for F2.molden
+	//(1.00000 per MO and 14.000000 electrons under this reading, 0.889..1.344 and 13.727 under
+	//the other) and pins the density against an evaluator independent of this code. Applying that
+	//test inside the reader means building the contracted AO overlap, and not one file in the
+	//corpus or the test set is in the other convention, so it is not built. Symptom if one ever
+	//turns up: a density wrong by a factor of thousands, not by a little.
 	int atoms_with_basis = 0;
 	while (atoms_with_basis < ncen && (read_line_or_fail(rf, line, "the basis set", file), line.find("[") == string::npos))
 	{
@@ -1849,11 +1867,19 @@ bool WFN::write_wfx(const std::filesystem::path &fileName, const bool occupied) 
 	return rf.good();
 };
 
-bool WFN::write_nbo(const std::filesystem::path &fileName, const bool &debug, std::ostream* progress_log)
+bool WFN::write_nbo(const std::filesystem::path &fileName, const bool &debug, std::ostream* progress_log, const std::string& nbo_keywords)
 {
 	using namespace std;
 
-	err_checkf(get_nr_basis_set_loaded() == ncen, "Can only write .47 file if basis set is present!", std::cout);
+	//A FILE47 needs the contracted shell structure ($BASIS/$CONTRACT) and an AO overlap
+	//computed over it. A .wfn/.wfx carries primitives only - the shells, their contraction
+	//coefficients and the primitive-to-shell ordering are all gone - so no archive can be
+	//built from one without guessing, and a guessed archive produces plausible-looking but
+	//wrong NBO output. Convert through .molden/.fchk/.gbw instead.
+	err_checkf(get_nr_basis_set_loaded() == ncen,
+		"Can only write a .47 file when a contracted basis set is present. A primitive-only source"
+		" (.wfn/.wfx) does not carry one - use the .gbw, .fchk or .molden of the same calculation.",
+		std::cout);
 	const auto nbo_start_time = std::chrono::high_resolution_clock::now();
 	auto progress_elapsed_seconds = [&]() {
 		return std::chrono::duration_cast<std::chrono::seconds>(std::chrono::high_resolution_clock::now() - nbo_start_time).count();

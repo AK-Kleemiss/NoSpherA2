@@ -108,9 +108,34 @@ def compare(reference, candidate):
                   [("energy_kcal", "E(2)")])
 
     rn, cn = reference.get("nrt", {}), candidate.get("nrt", {})
+    # Structures are matched by what changed relative to the reference structure, not by their
+    # number: starting the search from a different Lewis structure renumbers the list and swaps
+    # the descriptions of equivalent structures without moving a single weight.
+    def wkey(w):
+        return "%s%s" % (" ".join(w.get("changes", "").split()) or "(leading)",
+                         (" " + w["spin"]) if w["spin"] else "")
+
     compare_keyed(add("NRT weight", "weight_percent"), rn.get("weights", []), cn.get("weights", []),
-                  lambda w: "struct %d%s" % (w["structure"], (" " + w["spin"]) if w["spin"] else ""),
-                  [("weight_percent", "%")])
+                  wkey, [("weight_percent", "%")])
+
+    # And by rank, which survives that relabelling. This is the one that has to hold; the
+    # by-description comparison above tells you whether the labels also match.
+    def ranked(n):
+        out = []
+        for spin in sorted({w["spin"] for w in n.get("weights", [])}):
+            ws = sorted((w for w in n["weights"] if w["spin"] == spin),
+                        key=lambda w: -w["weight_percent"])
+            for i, w in enumerate(ws):
+                out.append({"_key": "rank %d%s" % (i + 1, (" " + spin) if spin else ""),
+                            "weight_percent": w["weight_percent"]})
+        return out
+
+    compare_keyed(add("NRT weight by rank", "weight_percent"), ranked(rn), ranked(cn),
+                  lambda w: w["_key"], [("weight_percent", "%")])
+    compare_keyed(add("NRT valency", "bond_order"), rn.get("valencies", []), cn.get("valencies", []),
+                  lambda v: "atom %d%s" % (v["atom"], (" " + v["spin"]) if v["spin"] else ""),
+                  [("valency", "val"), ("covalency", "cov"), ("electrovalency", "ion"),
+                   ("electron_count", "N")])
     compare_keyed(add("NRT bond order", "bond_order"), rn.get("bond_orders", []),
                   cn.get("bond_orders", []),
                   lambda b: "%d-%d%s" % (b["atom1"], b["atom2"],

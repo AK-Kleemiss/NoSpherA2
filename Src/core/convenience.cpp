@@ -432,7 +432,9 @@ std::string help_message =
 "                                    -nbo_dir <dir>. Without -nbo_exe it calls\n"
 "                                    ~/nbo7/gennbo through WSL on Windows and\n"
 "                                    gennbo from PATH elsewhere.\n"
- "  -fchk <output.fchk>                Write FCHK output (requires -b and -d).\n"
+"  -nbo_parse <out.nbo>               Parse an NBO output that already exists into\n"
+"                                    <stem>.nbo.json. Options: -nbo_json <file>.\n"
+ "  -fchk <output.fchk>              Write FCHK output (requires -b and -d).\n"
  "  -SALTED <model> [<model> ...]      Predict density with a SALTED model.\n"
  "                                    A model is a directory or a .salted file.\n"
  "                                    With several, each element is predicted by\n"
@@ -2533,6 +2535,21 @@ bool options::digest_io_options(const std::string &temp, int &i)
         }
         finished = true;
         return run_nbo(opt, std::cout) == 0;
+    }
+    else if (temp == "-nbo_parse") {
+        //Same parser as -nbo, on an output that already exists: the spread study re-runs gennbo
+        //itself on one archive with different keylists and only needs the reading back.
+        err_checkf(argc >= i + 2, "Not enough arguments for -nbo_parse\nPlease provide an NBO output file!", std::cout);
+        std::filesystem::path out = arguments[i + 1];
+        err_checkf(std::filesystem::exists(out), "NBO output doesn't exist: " + out.string(), std::cout);
+        std::filesystem::path json = out.parent_path() / (out.stem().string() + ".nbo.json");
+        for (int j = i + 2; j + 1 < argc; j++)
+            if (arguments[j] == "-nbo_json") json = arguments[j + 1];
+        NboResults r = parse_nbo_output(out);
+        write_nbo_json(r, json);
+        std::cout << "wrote " << json.string() << std::endl;
+        finished = true;
+        return true;
     }
     else if (temp == "-d")
         basis_set_path = arguments[i + 1];
