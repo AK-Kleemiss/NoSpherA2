@@ -978,9 +978,6 @@ struct options
     //-basin_grid <n>: the quadrature of the basin analysis pulled into the core, tightest
     //exponent sharpened n^2-fold, radial step divided by n, Lebedev order up n - 1 entries
     int basin_grid = 1;
-    //-basin_cube: go back to finding the QTAIM basins on the cube. The default takes their
-    //attractors from the analytic critical-point search instead, which no voxel can add to
-    bool basin_cube = false;
     int threads = -1;
     int pbc = 0;
     int charge = 0;

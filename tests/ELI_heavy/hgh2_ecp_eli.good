@@ -26,7 +26,7 @@ Density Critical Points (5 found):
     GradRho   :         0.0000         0.0000         0.0000   |GradRho| :         0.0000
     HessRho_EigVals:    -6.9607e+00    -6.9607e+00    -6.8000e+00
     DelSqRho  :       -20.7215
-   V         :    -5.1878e+00   G         :         0.0037   K         :     5.1841e+00   L         :     5.1804e+00
+   V         :     5.1804e+00   G         :         0.0037   K         :     5.1841e+00   L         :     5.1804e+00
 
   CP   2  [attractor   ]  converged   H1
     Position  :         0.0000         0.0000         3.1029
@@ -34,7 +34,7 @@ Density Critical Points (5 found):
     GradRho   :         0.0000         0.0000         0.0000   |GradRho| :         0.0000
     HessRho_EigVals:    -6.9607e+00    -6.9607e+00    -6.8000e+00
     DelSqRho  :       -20.7215
-   V         :    -5.1878e+00   G         :         0.0037   K         :     5.1841e+00   L         :     5.1804e+00
+   V         :     5.1804e+00   G         :         0.0037   K         :     5.1841e+00   L         :     5.1804e+00
 
   CP   3  [attractor   ]  converged   Hg0
     Position  :         0.0000         0.0000         0.0000
@@ -42,7 +42,7 @@ Density Critical Points (5 found):
     GradRho   :         0.0000         0.0000         0.0000   |GradRho| :         0.0000
     HessRho_EigVals:    -7.5323e-02    -7.5323e-02    -6.7014e-02
     DelSqRho  :        -0.2177
-   V         :    -8.5216e-02   G         :         0.0154   K         :     6.9816e-02   L         :     5.4415e-02
+   V         :     5.4415e-02   G         :         0.0154   K         :     6.9816e-02   L         :     5.4415e-02
 
   CP   4  [bond        ]  converged   H2-Hg0 bond
     Position  :         0.0000         0.0000        -2.1083
@@ -51,7 +51,7 @@ Density Critical Points (5 found):
     HessRho_EigVals:    -2.2404e-01    -2.2404e-01     4.6573e-01
     DelSqRho  :         0.0176
     Bond Ellipticity:         0.0000
-   V         :    -1.7929e-01   G         :         0.0918   K         :     8.7438e-02   L         :    -4.4108e-03
+   V         :    -4.4108e-03   G         :         0.0918   K         :     8.7438e-02   L         :    -4.4108e-03
 
   CP   5  [bond        ]  converged   H1-Hg0 bond
     Position  :         0.0000         0.0000         2.1083
@@ -60,40 +60,30 @@ Density Critical Points (5 found):
     HessRho_EigVals:    -2.2404e-01    -2.2404e-01     4.6573e-01
     DelSqRho  :         0.0176
     Bond Ellipticity:         0.0000
-   V         :    -1.7929e-01   G         :         0.0918   K         :     8.7438e-02   L         :    -4.4108e-03
+   V         :    -4.4108e-03   G         :         0.0918   K         :     8.7438e-02   L         :    -4.4108e-03
 
-QTAIM attractors from the analytic field: 3 (3 nuclei, 0 non-nuclear)
+Assigning basins along the density gradient...
+I found 3 Basins.
 Assigning basins by near-grid ascent...
 I found 28 Basins.
 Merged 22 noise maxima, 6 basins remain.
 Unified 1 core-shell basins into their atoms' cores, 5 ELI-D basins remain.
+
+QTAIM Analysis (voxel sum):
+basin:    0 label:              Hg0 integrated value:  78.6104 volume:  485.0438
+basin:    1 label:               H1 integrated value:   1.2874 volume:  445.7662
+basin:    2 label:               H2 integrated value:   1.2874 volume:  445.7662
 GridManager: Setting up prototype grids for atom types...
 GridManager: Generating integration grids for atoms...
 GridManager: Generated total of 65266 grid points.
-Quadrature points sent along the field: 200532, left the grid: 0
+Quadrature points sent along the field: 328799, left the grid: 0
 
 QTAIM Analysis (atomic quadrature grids):
-  basin  label               electrons     charge      volume         maximum        x          y          z
-      1  Hg0                   79.4496     0.5504  12826.9643     367149.1320      0.000      0.000      0.000
-      2  H1                     1.2752    -0.2752   8969.6491          0.3478      0.000      0.000      3.118
-      3  H2                     1.2752    -0.2752   8969.4513          0.3478      0.000      0.000     -3.118
-  total in basins: 82.0000   outside every basin: 0.0000
-
-Delocalization indices (11 occupied orbitals):
-  sum over all basins of S^A - identity: 1.57e-06   (the quadrature's own error; AIMAll's integrations reach ~1e-3)
-
-  basin  label                 N(A)     lambda(A)   sum_B delta(A,B)/2   residual
-      1  Hg0                   19.4496     18.4677            0.9818     -0.0000
-      2  H1                     1.2752      0.7409            0.5343     -0.0000
-      3  H2                     1.2752      0.7409            0.5343     -0.0000
-
-  basin pair                                delta(A,B)
-  Hg0               H2                      0.9818
-  Hg0               H1                      0.9818
-  H1                H2                      0.0868
-  0 further pairs below 0.01
-  An ECP took core electrons out of the orbitals: N(A) here is the valence count
-  and is short of the basin population above by the core the Thakkar fill added.
+  basin  label               electrons     charge      volume     maximum        x          y          z
+      1  Hg0                   79.4314     0.5686    808.4662   4856.9128      0.000      0.000      0.000
+      2  H1                     1.2826    -0.2826    744.9110      0.3415      0.000      0.000      3.118
+      3  H2                     1.2826    -0.2826    748.7134      0.3415      0.000      0.000     -3.118
+  total in basins: 81.9965   outside every basin: 0.0035
 
 ELI-D Analysis (voxel sum):
 basin:    0 label:      H2-Hg0 bond integrated value:   0.5034 volume:  280.5199
@@ -104,13 +94,13 @@ basin:    4 label:         Hg0 core integrated value:  77.3692 volume:  232.3914
 GridManager: Setting up prototype grids for atom types...
 GridManager: Generating integration grids for atoms...
 GridManager: Generated total of 65266 grid points.
-Quadrature points sent along the field: 15023, left the grid: 16
+Quadrature points sent along the field: 5532, left the grid: 0
 
 ELI-D Analysis (atomic quadrature grids):
-  basin  label               electrons      volume         maximum        x          y          z
-      1  H2-Hg0 bond            0.4779    273.5132          5.0732      0.000      0.000     -5.028
-      2  H1-Hg0 bond            0.4603    270.8072          5.0732      0.000      0.000      5.028
-      3  H2                     1.4243     35.1692          7.2167      0.000      0.000     -3.148
-      4  H1                     1.4419     37.8794          7.2167      0.000      0.000      3.148
-      5  Hg0 core              18.1626    213.6038          1.4330      0.283     -0.472      0.705
-  total in basins: 21.9670   outside every basin: 0.0330
+  basin  label               electrons      volume     maximum        x          y          z
+      1  H2-Hg0 bond            0.4667    284.1871      5.0732      0.000      0.000     -5.028
+      2  H1-Hg0 bond            0.4506    281.7936      5.0732      0.000      0.000      5.028
+      3  H2                     1.4321     36.9442      7.2167      0.000      0.000     -3.148
+      4  H1                     1.4482     39.3377      7.2167      0.000      0.000      3.148
+      5  Hg0 core              18.1725    213.0064      1.4330      0.283     -0.472      0.705
+  total in basins: 21.9700   outside every basin: 0.0300
