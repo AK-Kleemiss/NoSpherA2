@@ -141,17 +141,17 @@ Unified 15 core-shell basins into their atoms' cores, 13 ELI-D basins remain.
 GridManager: Setting up prototype grids for atom types...
 GridManager: Generating integration grids for atoms...
 GridManager: Generated total of 143592 grid points.
-Quadrature points sent along the field: 392802, left the grid: 0
+Quadrature points sent along the field: 389262, left the grid: 0
 
 QTAIM Analysis (atomic quadrature grids):
   basin  label               electrons     charge      volume         maximum        x          y          z
-      1  U0                    89.0542     2.9458   2867.9363   27946116.9797      0.000      0.000      0.000
-      2  H1                     1.4909    -0.4909   6170.8242          0.3601      3.779      0.000      0.000
-      3  H2                     1.4909    -0.4909   6170.8398          0.3601     -3.779      0.000      0.000
-      4  H3                     1.4909    -0.4909   6171.3113          0.3601      0.000      3.779      0.000
-      5  H4                     1.4909    -0.4909   6171.3268          0.3601      0.000     -3.779      0.000
-      6  H5                     1.4909    -0.4909   6171.7407          0.3601      0.000      0.000      3.779
-      7  H6                     1.4909    -0.4909   6171.7554          0.3601      0.000      0.000     -3.779
+      1  U0                    89.0542     2.9458   3814.7903   27946116.9797      0.000      0.000      0.000
+      2  H1                     1.4909    -0.4909   6613.0320          0.3601      3.779      0.000      0.000
+      3  H2                     1.4909    -0.4909   6613.0471          0.3601     -3.779      0.000      0.000
+      4  H3                     1.4909    -0.4909   6613.5181          0.3601      0.000      3.779      0.000
+      5  H4                     1.4909    -0.4909   6613.5332          0.3601      0.000     -3.779      0.000
+      6  H5                     1.4909    -0.4909   6613.9481          0.3601      0.000      0.000      3.779
+      7  H6                     1.4909    -0.4909   6613.9631          0.3601      0.000      0.000     -3.779
   total in basins: 97.9998   outside every basin: 0.0000
 
 Delocalization indices (49 occupied orbitals):
@@ -204,21 +204,21 @@ basin:   12 label:       H1-U0 bond integrated value:   0.3240 volume:  174.4557
 GridManager: Setting up prototype grids for atom types...
 GridManager: Generating integration grids for atoms...
 GridManager: Generated total of 143592 grid points.
-Quadrature points sent along the field: 60197, left the grid: 84
+Quadrature points sent along the field: 56754, left the grid: 24
 
 ELI-D Analysis (atomic quadrature grids):
   basin  label               electrons      volume         maximum        x          y          z
-      1  H2-U0 bond             0.3169    163.3359         11.0925     -5.513     -0.093     -0.093
-      2  H4-U0 bond             0.3131    161.5198         11.0925      0.093     -5.513     -0.093
-      3  H4                     1.7228     66.8054         12.3869      0.093     -3.831     -0.093
-      4  H6                     1.7370     73.0492         12.3869      0.093      0.093     -3.831
-      5  H2                     1.7139     62.5235         12.3869     -3.831      0.093     -0.093
-      6  H6-U0 bond             0.3109    159.9422         11.0925      0.093     -0.093     -5.513
-      7  H5-U0 bond             0.3106    159.9976         11.0925      0.093      0.093      5.513
-      8  H5                     1.7135     56.9440         12.3869     -0.093     -0.093      3.831
-      9  H3                     1.7212     65.5209         12.3869      0.093      3.831      0.093
-     10  H3-U0 bond             0.3143    162.5604         11.0925      0.093      5.513     -0.093
+      1  H2-U0 bond             0.3184    174.6183         11.0925     -5.513     -0.093     -0.093
+      2  H4-U0 bond             0.3145    172.3387         11.0925      0.093     -5.513     -0.093
+      3  H4                     1.7229     67.1940         12.3869      0.093     -3.831     -0.093
+      4  H6                     1.7371     73.7736         12.3869      0.093      0.093     -3.831
+      5  H2                     1.7139     62.6844         12.3869     -3.831      0.093     -0.093
+      6  H6-U0 bond             0.3124    170.7804         11.0925      0.093     -0.093     -5.513
+      7  H5-U0 bond             0.3120    170.9252         11.0925      0.093      0.093      5.513
+      8  H5                     1.7135     57.0439         12.3869     -0.093     -0.093      3.831
+      9  H3                     1.7212     66.0117         12.3869      0.093      3.831      0.093
+     10  H3-U0 bond             0.3157    173.3794         11.0925      0.093      5.513     -0.093
      11  U0 core               85.7429     67.6509          1.3679      1.028      1.028      1.028
-     12  H1                     1.7155     59.6327         12.3869      3.831     -0.093      0.093
-     13  H1-U0 bond             0.3219    165.8431         11.0925      5.513      0.093     -0.093
-  total in basins: 97.9543   outside every basin: 0.0454
+     12  H1                     1.7155     59.8938         12.3869      3.831     -0.093      0.093
+     13  H1-U0 bond             0.3233    176.6657         11.0925      5.513      0.093     -0.093
+  total in basins: 97.9633   outside every basin: 0.0365

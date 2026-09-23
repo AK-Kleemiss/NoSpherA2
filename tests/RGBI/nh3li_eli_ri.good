@@ -128,16 +128,16 @@ basin:    4 label:              Li4 integrated value:   2.6546 volume:  458.0394
 GridManager: Setting up prototype grids for atom types...
 GridManager: Generating integration grids for atoms...
 GridManager: Generated total of 111906 grid points.
-Quadrature points sent along the field: 306852, left the grid: 0
+Quadrature points sent along the field: 303862, left the grid: 0
 
 QTAIM Analysis (atomic quadrature grids):
   basin  label               electrons     charge      volume         maximum        x          y          z
-      1  N0                     8.2226    -1.2226    620.3344        130.3622    -10.483     10.089      2.209
-      2  H1                     0.6515     0.3485    362.3663          0.3315     -9.421      9.375      3.711
-      3  H2                     0.6515     0.3485    503.2471          0.3273    -12.306      9.343      2.332
-      4  H3                     0.6513     0.3487    390.9280          0.3529     -9.671      9.459      0.524
-      5  Li4                    2.7769     0.2231   1617.9908          6.5636    -10.574     13.775      2.315
-  total in basins: 12.9539   outside every basin: 0.0482
+      1  N0                     8.2229    -1.2229    641.9395        130.3622    -10.483     10.089      2.209
+      2  H1                     0.6516     0.3484    376.1380          0.3315     -9.421      9.375      3.711
+      3  H2                     0.6516     0.3484    517.7741          0.3273    -12.306      9.343      2.332
+      4  H3                     0.6514     0.3486    402.0340          0.3529     -9.671      9.459      0.524
+      5  Li4                    2.7824     0.2176   1689.0582          6.5636    -10.574     13.775      2.315
+  total in basins: 12.9599   outside every basin: 0.0421
 
 ELI-D Analysis (voxel sum):
 basin:    0 label:      Li4-N0 bond integrated value:   0.7493 volume:  725.8598
@@ -151,16 +151,16 @@ basin:    7 label:          N0 core integrated value:   2.4625 volume:    0.4640
 GridManager: Setting up prototype grids for atom types...
 GridManager: Generating integration grids for atoms...
 GridManager: Generated total of 111906 grid points.
-Quadrature points sent along the field: 115910, left the grid: 3434
+Quadrature points sent along the field: 113488, left the grid: 1685
 
 ELI-D Analysis (atomic quadrature grids):
   basin  label               electrons      volume         maximum        x          y          z
-      1  Li4-N0 bond            0.7321    688.9831         14.5518    -10.676     19.256      2.401
-      2  H2-Li4 bond            0.0009      5.4754          2.0067    -15.917     12.873     -0.240
-      3  H2                     1.9336    115.5043          4.4973    -12.361      9.306      2.401
+      1  Li4-N0 bond            0.7558    765.2255         14.5518    -10.676     19.256      2.401
+      2  H2-Li4 bond            0.0010      7.0246          2.0067    -15.917     12.873     -0.240
+      3  H2                     1.9339    117.3126          4.4973    -12.361      9.306      2.401
       4  N0 LP                  2.1609     56.2477          1.9588    -10.489     11.371      2.212
-      5  H3                     1.9257    117.2269          4.2793     -9.741      9.494      0.514
-      6  H1                     1.9222    115.5195          4.5130     -9.366      9.306      3.721
+      5  H3                     1.9259    119.5662          4.2793     -9.741      9.494      0.514
+      6  H1                     1.9225    117.8379          4.5130     -9.366      9.306      3.721
       7  Li4 core               2.0219     16.7421         26.2968    -10.489     13.812      2.401
       8  N0 core                2.1094      0.4465          9.4356    -10.489     10.057      2.212
-  total in basins: 12.8066   outside every basin: 0.2011
+  total in basins: 12.8313   outside every basin: 0.1764

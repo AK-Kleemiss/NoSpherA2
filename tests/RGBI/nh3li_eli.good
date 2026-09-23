@@ -104,15 +104,15 @@ Merged 1 noise maxima, 10 basins remain.
 GridManager: Setting up prototype grids for atom types...
 GridManager: Generating integration grids for atoms...
 GridManager: Generated total of 111906 grid points.
-Quadrature points sent along the field: 325719, left the grid: 0
+Quadrature points sent along the field: 323619, left the grid: 0
 
 QTAIM Analysis (atomic quadrature grids):
   basin  label               electrons     charge      volume         maximum        x          y          z
-      1  N0                     8.2860    -1.2860  10384.2487        198.5481    -10.483     10.089      2.209
-      2  H1                     0.6358     0.3642   5200.6959          0.4000     -9.421      9.375      3.711
-      3  H2                     0.6351     0.3649   5030.2263          0.4000    -12.306      9.343      2.332
-      4  H3                     0.6355     0.3645   5164.1370          0.4000     -9.671      9.459      0.524
-      5  Li4                    2.8153     0.1847  29470.1426         13.6761    -10.574     13.775      2.315
+      1  N0                     8.2860    -1.2860  10438.8259        198.5481    -10.483     10.089      2.209
+      2  H1                     0.6358     0.3642   5229.5157          0.4000     -9.421      9.375      3.711
+      3  H2                     0.6351     0.3649   5056.1666          0.4000    -12.306      9.343      2.332
+      4  H3                     0.6355     0.3645   5191.0919          0.4000     -9.671      9.459      0.524
+      5  Li4                    2.8153     0.1847  29697.3395         13.6761    -10.574     13.775      2.315
   total in basins: 13.0077   outside every basin: 0.0000
 
 Delocalization indices (13 occupied orbitals):
@@ -152,18 +152,18 @@ WARNING: Integrated value in basin 10 is very low (0.0002) and might be inaccura
 GridManager: Setting up prototype grids for atom types...
 GridManager: Generating integration grids for atoms...
 GridManager: Generated total of 111906 grid points.
-Quadrature points sent along the field: 115997, left the grid: 3230
+Quadrature points sent along the field: 113496, left the grid: 1617
 
 ELI-D Analysis (atomic quadrature grids):
   basin  label               electrons      volume         maximum        x          y          z
-      1  Li4-N0 bond            0.7319    685.2752         14.5518    -10.676     19.256      2.401
-      2  H2-Li4 bond            0.0008      4.4605          2.0067    -15.917     12.873     -0.240
-      3  H2                     1.9336    115.1887          4.4973    -12.361      9.306      2.401
+      1  Li4-N0 bond            0.7547    753.5119         14.5518    -10.676     19.256      2.401
+      2  H2-Li4 bond            0.0009      5.6914          2.0067    -15.917     12.873     -0.240
+      3  H2                     1.9339    116.9715          4.4973    -12.361      9.306      2.401
       4  N0 LP                  2.1609     56.2477          1.9588    -10.489     11.371      2.212
-      5  H3                     1.9257    116.7850          4.2793     -9.741      9.494      0.514
-      6  H1                     1.9222    115.1432          4.5130     -9.366      9.306      3.721
+      5  H3                     1.9259    118.4040          4.2793     -9.741      9.494      0.514
+      6  H1                     1.9224    116.8678          4.5130     -9.366      9.306      3.721
       7  Li4 core               2.0219     16.7421         26.2968    -10.489     13.812      2.401
       8  N0 core                2.1094      0.4465          9.4356    -10.489     10.057      2.212
-      9  H3-H1 bond             0.0001      0.4797          1.1127     -4.313     11.183      1.080
-     10  H3-H1 bond             0.0002      1.3028          1.0215     -4.313     10.996      1.458
-  total in basins: 12.8066   outside every basin: 0.2011
+      9  H3-H1 bond             0.0002      1.2915          1.1127     -4.313     11.183      1.080
+     10  H3-H1 bond             0.0003      1.8507          1.0215     -4.313     10.996      1.458
+  total in basins: 12.8304   outside every basin: 0.1772

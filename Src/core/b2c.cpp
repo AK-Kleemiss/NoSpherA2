@@ -1708,14 +1708,25 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 					const double f = r / radius[i];
 					return d3{ centre[0] + (p[0] - centre[0]) * f, centre[1] + (p[1] - centre[1]) * f, centre[2] + (p[2] - centre[2]) * f };
 				};
-				const int bi = climb(along(inner), lb, ll), bo = climb(along(outer), lb, ll);
+				//A probe is not a sample. The centre of this cell has already climbed to a basin;
+				//the edges are asked only to find out whether a boundary lies between them, and an
+				//edge that climbs off the cube answers nothing. Handing the cell's weight to
+				//"outside" on that basis throws away density the centre had already placed - it is
+				//how UH6's ELI-D lost 0.009 e when this refinement landed, the edge probes of the
+				//cells near the crop being further out than the centres they stand in for. A probe
+				//that fails defers to the point it was probing for
+				int bi = climb(along(inner), lb, ll), bo = climb(along(outer), lb, ll);
+				if (bi == 0) bi = b;
+				if (bo == 0) bo = b;
 				if (bi == bo) { give(bi, 1.0); continue; }
 				//ponytail: one crossing per cell. Three basins meeting inside a single quadrature
 				//cell is a smaller thing than the rule's own error; bisect for more if it is not
 				double lo_r = inner, hi_r = outer;
 				for (int it = 0; it < bisections; it++) {
 					const double mid = 0.5 * (lo_r + hi_r);
-					if (climb(along(mid), lb, ll) == bi) lo_r = mid; else hi_r = mid;
+					int bm = climb(along(mid), lb, ll);
+					if (bm == 0) bm = b;
+					if (bm == bi) lo_r = mid; else hi_r = mid;
 				}
 				const double rc = 0.5 * (lo_r + hi_r);
 				//Each side gets the density it carries over its own part of the shell segment,
