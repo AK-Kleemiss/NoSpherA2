@@ -123,14 +123,19 @@ TEST(EliFamily, EliaReportsWhyItIsNotComputable)
 
 //----------------------------------------------------------------------------------------------
 //Regression rows straight off DGrid 5.2's own grids.  How to regrow them:
-//  1. DGrid converts the molden first, and it picks the convention from the header - "program=
-//     ORCA" -> <name>.molden.orca, contraction coefficients already carry the primitive
-//     normalisation; "program= MOLDEN" -> <name>.molden.md, they multiply normalised primitives
-//     and the contracted shell is renormalised.  NoSpherA2's molden reader assumes the ORCA
-//     convention unconditionally, so ALL FOUR fixtures below are ORCA-convention files.  Do not
-//     add a MOLDEN-convention one (F2.molden and epoxide.molden are two) until the reader tells
-//     them apart - on F2.molden the two codes differ by 695x at the nucleus, which is a reader
-//     question and not an ELI one.
+//  1. DGrid converts the molden first, and it GUESSES the coefficient convention from the [Title]
+//     line - an ORCA-looking title -> <name>.molden.orca, coefficients already carry the primitive
+//     normalisation ("bare"); anything else -> <name>.molden.md, coefficients multiply normalised
+//     primitives and the contracted shell is renormalised ("normprim").  NoSpherA2 always reads
+//     bare.  A file does not say which it is, but its MOs do: an SCF's MO vectors are orthonormal
+//     in the convention the file was written in, so read it both ways and keep the one that gives
+//     unit MO norms - see tests/src/MoldenConventionTests.cpp.  By that test F2.molden is bare
+//     DESPITE an empty [Title] (norms 1.00000, 14.000000 electrons; normprim gives 0.889..1.344
+//     and 13.727), so the 695x difference at its nucleus is DGRID applying normprim to a bare
+//     file, not a reader bug here.  Use that test, never the title, to decide whether a DGrid
+//     number on a new fixture is even a valid reference.
+//     ALL FOUR fixtures below are orca_2mkl output with the ORCA title, so both codes read them
+//     bare and agree on the convention; that is why the rows are comparable at all.
 //  2. compute / using wfn_1 / <property> / save field_1 / mesh=0.3 rho=0.0001, once per property:
 //     "rho alpha", "ELI-D alpha-alpha", "ELI-D beta-beta", "ELI-q alpha-alpha", "ELI-D triplet-pair".
 //  3. The FIELD-DATA header's origin and I/J/K columns are FULL SPANS, so step = vec/(n-1), and
