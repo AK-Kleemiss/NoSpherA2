@@ -517,6 +517,11 @@ std::string help_message =
  "                                    tightest exponent sharpened n^2-fold, the\n"
  "                                    radial step divided by n, the angular\n"
  "                                    order up n-1 steps. For heavy atoms.\n"
+ "  -basin_cube                        Find the QTAIM basins on the cube, as\n"
+ "                                    before. The default takes their attractors\n"
+ "                                    from the analytic critical-point search, so\n"
+ "                                    the grid can no longer invent one; use this\n"
+ "                                    to compare against the older behaviour.\n"
  "  -ewal_sum <cube> [kmax] [accuracy] Ewald sum of a cube.\n"
  "  -atom_dens <wfn> [alpha-MOs beta-MOs]\n"
  "  -atom_dens_diff <gbw1> <gbw2>      Difference density from two GBW files.\n"
@@ -2567,6 +2572,8 @@ bool options::digest_run_options(const std::string &temp, int &i)
         accuracy = stoi(arguments[i + 1]);
     else if (temp == "-basin_grid")
         basin_grid = std::max(1, stoi(arguments[i + 1]));
+    else if (temp == "-basin_cube")
+        basin_cube = true;
     else if (temp == "-Anion")
     {
         int n = 1;
