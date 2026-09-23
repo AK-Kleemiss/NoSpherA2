@@ -14,6 +14,7 @@
 #include "geometry_aid.h"
 #include "crystal_energies.h"
 #include "SALTED_equicomb.h"
+#include "nbo_run.h"
 
 #ifdef _WIN32
 #include <windows.h>
@@ -413,7 +414,18 @@ std::string help_message =
  "  -laplacian_bonds <wfn>             Plot density Laplacian along bonds.\n\n"
  "CONVERSION, ML, AND SPECIALISED TOOLS\n"
  "  -gbw2wfn -wfn <file.gbw>            Convert GBW input to .wfn.\n"
- "  -convert_to_47 <wfn>               Write an NBO File47 (.47).\n"
+ "  -convert_to_47 <wfn>               Write an NBO File47 (.47). Add\n"
+"                                    -nbo_keywords \"NRT NRTE2=5\" to fill the\n"
+"                                    $NBO keylist.\n"
+"  -nbo <wfn>                         Write the .47, run the external NBO on it\n"
+"                                    and parse the output into <stem>.nbo.json:\n"
+"                                    NPA, NAO, NBOs with hybridisations, the E2\n"
+"                                    donor-acceptor table and NRT weights and\n"
+"                                    bond orders. Options: -nbo_keywords,\n"
+"                                    -nbo_exe <gennbo>, -nbo_json <file>,\n"
+"                                    -nbo_dir <dir>. Without -nbo_exe it calls\n"
+"                                    ~/nbo7/gennbo through WSL on Windows and\n"
+"                                    gennbo from PATH elsewhere.\n"
  "  -fchk <output.fchk>                Write FCHK output (requires -b and -d).\n"
  "  -SALTED <model> [<model> ...]      Predict density with a SALTED model.\n"
  "                                    A model is a directory or a .salted file.\n"
@@ -2480,10 +2492,27 @@ bool options::digest_io_options(const std::string &temp, int &i)
     else if (temp == "-convert_to_47") {
         err_checkf(argc >= i + 2, "Not enough arguments for -convert_to_47\nPlease provide at least stdout name!", std::cout);
         std::filesystem::path _wfn = arguments[i + 1];
+        std::string keys;
+        for (int j = i + 2; j + 1 < argc; j++)
+            if (arguments[j] == "-nbo_keywords") keys = arguments[j + 1];
         WFN wavy(e_origin::NOT_YET_DEFINED);
         wavy.read_known_wavefunction_format(_wfn, std::cout, debug);
-        wavy.write_nbo(_wfn.replace_extension(".47"), debug, &std::cout);
+        wavy.write_nbo(_wfn.replace_extension(".47"), debug, &std::cout, keys);
         finished = true; return true;
+    }
+    else if (temp == "-nbo") {
+        err_checkf(argc >= i + 2, "Not enough arguments for -nbo\nPlease provide a wavefunction!", std::cout);
+        NboRunOptions opt;
+        opt.wavefunction = arguments[i + 1];
+        opt.debug = debug;
+        for (int j = i + 2; j + 1 < argc; j++) {
+            if (arguments[j] == "-nbo_keywords") opt.keywords = arguments[j + 1];
+            else if (arguments[j] == "-nbo_exe") opt.executable = arguments[j + 1];
+            else if (arguments[j] == "-nbo_json") opt.json_out = arguments[j + 1];
+            else if (arguments[j] == "-nbo_dir") opt.work_dir = arguments[j + 1];
+        }
+        finished = true;
+        return run_nbo(opt, std::cout) == 0;
     }
     else if (temp == "-d")
         basis_set_path = arguments[i + 1];

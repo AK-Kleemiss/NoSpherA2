@@ -1,6 +1,7 @@
 #include "pch.h"
 
 #include "core/wfn_class.h"
+#include "core/nbo_run.h"
 
 #include <stdexcept>
 
@@ -274,6 +275,9 @@ TEST(Nbo47, OpenShellNh3LiGbwWritesValidFile47)
 	ASSERT_NE(text.find("$DENSITY"), std::string::npos);
 	ASSERT_NE(text.find("$FOCK"), std::string::npos);
 	ASSERT_NE(text.find("$LCAOMO"), std::string::npos);
+	//Without OPEN, NBO reads the archive as restricted and silently halves the electron
+	//count it finds; the doubled blocks below are only meaningful together with it.
+	ASSERT_NE(text.find(" OPEN "), std::string::npos);
 
 	EXPECT_EQ(parse_key_int(text, "NATOMS").value_or(-1), 5);
 	EXPECT_EQ(parse_key_int(text, "NBAS").value_or(-1), 63);
@@ -285,11 +289,19 @@ TEST(Nbo47, OpenShellNh3LiGbwWritesValidFile47)
 	const auto fock = extract_section_numbers(text, "$FOCK");
 	const auto lcaomo = extract_section_numbers(text, "$LCAOMO");
 	const int nbasis = 63;
-	EXPECT_EQ(overlap.size(), static_cast<size_t>(nbasis * (nbasis + 1) / 2));
-	EXPECT_EQ(density.size(), static_cast<size_t>(nbasis * (nbasis + 1) / 2));
-	EXPECT_EQ(fock.size(), static_cast<size_t>(nbasis * (nbasis + 1) / 2));
-	EXPECT_EQ(lcaomo.size(), static_cast<size_t>(nbasis * nbasis));
-	EXPECT_NEAR(packed_trace_product(density, overlap, nbasis), 13.0, 1.0e-5);
+	const size_t ntri = static_cast<size_t>(nbasis) * (nbasis + 1) / 2;
+	//$OVERLAP stays single; $DENSITY, $FOCK and $LCAOMO carry an alpha block then a beta one.
+	EXPECT_EQ(overlap.size(), ntri);
+	ASSERT_EQ(density.size(), 2 * ntri);
+	EXPECT_EQ(fock.size(), 2 * ntri);
+	EXPECT_EQ(lcaomo.size(), 2 * static_cast<size_t>(nbasis) * nbasis);
+
+	const vec alpha_density(density.begin(), density.begin() + ntri);
+	const vec beta_density(density.begin() + ntri, density.end());
+	//13 electrons in a doublet: 7 alpha, 6 beta. A spin-summed archive would give 13 here
+	//twice, and a swapped one 6 then 7.
+	EXPECT_NEAR(packed_trace_product(alpha_density, overlap, nbasis), 7.0, 1.0e-5);
+	EXPECT_NEAR(packed_trace_product(beta_density, overlap, nbasis), 6.0, 1.0e-5);
 }
 
 TEST(Nbo47, OpenShellNh3LiGennboProducesEnergyAnalysisWhenAvailable)
@@ -325,4 +337,119 @@ TEST(Nbo47, OpenShellNh3LiGennboProducesEnergyAnalysisWhenAvailable)
 	const auto actual_electrons = parse_total_electrons(generated_nbo);
 	ASSERT_TRUE(actual_electrons.has_value());
 	EXPECT_NEAR(*actual_electrons, 13.0, 1.0e-5);
+}
+
+TEST(NboRun, ParsesReferenceOutputOfTheEpoxideFixture)
+{
+	const auto reference_nbo = repo_root() / "tests" / "epoxide_gbw" / "NBO" / "reference.nbo";
+	if (!std::filesystem::exists(reference_nbo)) {
+		GTEST_SKIP() << "NBO reference fixture is not available";
+	}
+
+	const NboResults r = parse_nbo_output(reference_nbo);
+	EXPECT_FALSE(r.open_shell);
+	ASSERT_EQ(r.npa.size(), 7u);
+	EXPECT_EQ(r.npa[0].element, "O");
+	EXPECT_NEAR(r.npa[0].charge, -0.56088, 1.0e-5);
+	EXPECT_NEAR(r.npa[0].total, 8.56088, 1.0e-5);
+	double charge_sum = 0.0;
+	for (const auto& a : r.npa) charge_sum += a.charge;
+	EXPECT_NEAR(charge_sum, 0.0, 1.0e-4);
+
+	ASSERT_FALSE(r.nao.empty());
+	EXPECT_EQ(r.nao.front().type, "Cor");
+	EXPECT_NEAR(r.nao.front().occupancy, 1.99997, 1.0e-5);
+
+	//An NBO with a bond has two hybrids that add up to the whole orbital, and each hybrid's
+	//s/p/d percentages add up to 100 - the two things a wrong parse gets wrong first.
+	ASSERT_FALSE(r.orbitals.empty());
+	const NboOrbital* bond = nullptr;
+	for (const auto& o : r.orbitals) if (o.type == "BD" && o.centers.size() == 2) { bond = &o; break; }
+	ASSERT_NE(bond, nullptr);
+	ASSERT_EQ(bond->hybrids.size(), 2u);
+	EXPECT_NEAR(bond->hybrids[0].weight_percent + bond->hybrids[1].weight_percent, 100.0, 0.05);
+	for (const auto& h : bond->hybrids) EXPECT_NEAR(h.s + h.p + h.d + h.f, 100.0, 0.05);
+	EXPECT_LT(bond->energy, 0.0);
+
+	ASSERT_FALSE(r.e2.empty());
+	EXPECT_NE(r.e2.front().donor.find("LP"), std::string::npos);
+	for (const auto& e : r.e2) {
+		EXPECT_GT(e.energy_kcal, 0.0);
+		EXPECT_NE(e.donor_index, e.acceptor_index);
+	}
+}
+
+TEST(NboRun, ComparisonPassesAgainstItselfAndCatchesAShiftedCharge)
+{
+	const auto reference_nbo = repo_root() / "tests" / "epoxide_gbw" / "NBO" / "reference.nbo";
+	if (!std::filesystem::exists(reference_nbo)) {
+		GTEST_SKIP() << "NBO reference fixture is not available";
+	}
+
+	const NboResults reference = parse_nbo_output(reference_nbo);
+	const NboComparison same = compare_nbo_results(reference, reference);
+	EXPECT_TRUE(same.ok) << same.report();
+	for (const auto& q : same.quantities) EXPECT_EQ(q.missing, 0) << q.quantity;
+
+	NboResults shifted = reference;
+	shifted.npa.front().charge += 0.01;
+	shifted.e2.front().energy_kcal += 1.0;
+	const NboComparison differs = compare_nbo_results(reference, shifted);
+	EXPECT_FALSE(differs.ok);
+
+	NboResults truncated = reference;
+	truncated.orbitals.pop_back();
+	const NboComparison missing = compare_nbo_results(reference, truncated);
+	EXPECT_FALSE(missing.ok);
+}
+
+TEST(NboRun, OpenShellNh3LiSpinResolvedNpaMatchesOrcaSpinPopulations)
+{
+	if (!wsl_gennbo_available()) {
+		GTEST_SKIP() << "WSL ~/nbo7/gennbo is not available";
+	}
+
+	const auto input_gbw = repo_root() / "tests" / "RGBI_groups" / "nh3li.gbw";
+	ASSERT_TRUE(std::filesystem::exists(input_gbw));
+
+	const auto temp_dir = make_temp_dir();
+	const auto generated_47 = temp_dir / "nh3li.47";
+	const auto generated_nbo = temp_dir / "nh3li.nbo";
+
+	WFN wave(input_gbw, false);
+	ASSERT_TRUE(wave.write_nbo(generated_47, false));
+	const std::string command = "wsl bash -lc \"cd '" + windows_path_to_wsl(temp_dir) + "' && ~/nbo7/gennbo nh3li\"";
+	ASSERT_EQ(std::system(command.c_str()), 0);
+	ASSERT_TRUE(std::filesystem::exists(generated_nbo));
+
+	const NboResults r = parse_nbo_output(generated_nbo);
+	EXPECT_TRUE(r.open_shell);
+	ASSERT_EQ(r.npa.size(), 5u);
+
+	double spin_sum = 0.0, charge_sum = 0.0;
+	for (const auto& a : r.npa) { spin_sum += a.spin_density; charge_sum += a.charge; ASSERT_TRUE(a.has_spin_density); }
+	EXPECT_NEAR(spin_sum, 1.0, 1.0e-4);
+	EXPECT_NEAR(charge_sum, 0.0, 1.0e-4);
+
+	//Independent reference: ORCA 6.1.1 on the same wavefunction puts 0.99 (Mulliken) / 0.90
+	//(Loewdin) of the unpaired electron on Li and leaves N slightly negative. NPA is a third
+	//partitioning, so only the pattern is compared - but a spin-summed or spin-swapped
+	//archive gets the pattern wrong, which is what this pins down.
+	const NboAtomPopulation* li = nullptr;
+	const NboAtomPopulation* n = nullptr;
+	for (const auto& a : r.npa) { if (a.element == "Li") li = &a; if (a.element == "N") n = &a; }
+	ASSERT_NE(li, nullptr);
+	ASSERT_NE(n, nullptr);
+	EXPECT_GT(li->spin_density, 0.80);
+	EXPECT_LT(std::abs(n->spin_density), 0.15);
+	EXPECT_LT(n->charge, 0.0);
+
+	//The unrestricted analysis has to reach the spin-resolved NBO sections as well.
+	bool alpha = false, beta = false;
+	for (const auto& o : r.orbitals) { alpha |= o.spin == "alpha"; beta |= o.spin == "beta"; }
+	EXPECT_TRUE(alpha);
+	EXPECT_TRUE(beta);
+	bool spin_e2 = false;
+	for (const auto& e : r.e2) spin_e2 |= !e.spin.empty();
+	EXPECT_TRUE(spin_e2);
 }

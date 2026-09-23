@@ -1926,7 +1926,13 @@ bool WFN::write_nbo(const std::filesystem::path &fileName, const bool &debug, st
 			const int type = get_shell_type(a, s);
 			const int cart_count = constants::n_cart(type - 1);
 			const int nbo_count = constants::n_spher(type - 1);
-			err_checkf(type <= 5, "Unsupported basis shell in .47 writer", std::cout);
+			//FILE47 itself goes further than g: it has label codes for h (Cartesian 501-521,
+			//spherical 551-563) and i (601-628 / 651-665) and $CONTRACT arrays CH and CI. The
+			//ceiling here is NoSpherA2's, not the archive's - constants::n_cart / n_spher and
+			//constants::sph2cart stop at g, and no basis used with NoSpherA2 (def2, cc-pVnZ up
+			//to quadruple zeta, jorge, x2c) carries an h shell. Add CH/CI here if one ever does.
+			err_checkf(type <= 5, "Unsupported basis shell in .47 writer: shells beyond g need"
+				" constants::sph2cart extended first (FILE47 itself supports h and i)", std::cout);
 			NboShell shell;
 			shell.atom = a;
 			shell.shell = s;
@@ -2182,36 +2188,57 @@ bool WFN::write_nbo(const std::filesystem::path &fileName, const bool &debug, st
 	progress("Building density matrix");
 	int naotr = nbo_nao * (nbo_nao + 1) / 2;
 	vec CDM(naotr, 0.0);
-	auto build_mo_density = [&]() {
+	//Occupations and energies per spin, in the row order of CMO / CMO_beta. An open-shell
+	//FILE47 carries $DENSITY, $FOCK and $LCAOMO twice - alpha block then beta block - while
+	//$OVERLAP stays single; a closed-shell one carries the spin sum once.
+	vec occ_spin[2], energy_spin[2];
+	for (int m = 0; m < get_nmo(); m++) {
+		const int op = MOs[m].get_op();
+		if (op != 0 && op != 1)
+			continue;
+		occ_spin[op].push_back(get_MO_occ(m));
+		energy_spin[op].push_back(get_MO_energy(m));
+	}
+	const bool open_shell = get_is_unrestricted() && beta_mos > 0;
+	auto build_mo_density = [&](const int op) {
+		const vec2& C = op == 0 ? CMO : CMO_beta;
+		const vec& occs = occ_spin[op];
+		const int nmo_spin = std::min(static_cast<int>(C.size()), static_cast<int>(occs.size()));
 		vec density(naotr, 0.0);
 		int density_progress_next = 10;
 #pragma omp parallel for schedule(dynamic)
 		for (int iu = 0; iu < nbo_nao; iu++) {
 			for (int iv = 0; iv <= iu; iv++) {
 				const int iuv = (iu * (iu + 1) / 2) + iv;
-				int alpha_index = 0;
-				int beta_index = 0;
-				for (int m = 0; m < get_nmo(); m++) {
-					const double occ = get_MO_occ(m);
-					if (MOs[m].get_op() == 0) {
-						if (occ != 0.0)
-							density[iuv] += occ * CMO[alpha_index][iu] * CMO[alpha_index][iv];
-						alpha_index++;
-					}
-					else if (MOs[m].get_op() == 1) {
-						if (occ != 0.0)
-							density[iuv] += occ * CMO_beta[beta_index][iu] * CMO_beta[beta_index][iv];
-						beta_index++;
-					}
-				}
+				for (int m = 0; m < nmo_spin; m++)
+					if (occs[m] != 0.0)
+						density[iuv] += occs[m] * C[m][iu] * C[m][iv];
 			}
 #pragma omp critical(nbo_progress)
 			progress_percent("Density build", iu + 1, nbo_nao, density_progress_next);
 		}
 		return density;
 	};
+	auto build_total_density = [&]() {
+		vec density = build_mo_density(0);
+		if (beta_mos > 0) {
+			const vec beta_density = build_mo_density(1);
+			for (int i = 0; i < naotr; i++)
+				density[i] += beta_density[i];
+		}
+		return density;
+	};
+	vec CDM_alpha, CDM_beta;
 	bool density_from_cached_dm = false;
-	if (static_cast<int>(DM.extent(0)) == nbo_nao && static_cast<int>(DM.extent(1)) == nbo_nao) {
+	if (open_shell) {
+		progress("Building spin-resolved density matrices for the open-shell FILE47");
+		CDM_alpha = build_mo_density(0);
+		CDM_beta = build_mo_density(1);
+		for (int i = 0; i < naotr; i++)
+			CDM[i] = CDM_alpha[i] + CDM_beta[i];
+	}
+	//A cached DM is the spin sum, so it can only serve the closed-shell layout.
+	else if (static_cast<int>(DM.extent(0)) == nbo_nao && static_cast<int>(DM.extent(1)) == nbo_nao) {
 		density_from_cached_dm = true;
 		for (int iu = 0; iu < nbo_nao; iu++) {
 			for (int iv = 0; iv <= iu; iv++) {
@@ -2221,7 +2248,7 @@ bool WFN::write_nbo(const std::filesystem::path &fileName, const bool &debug, st
 		}
 	}
 	else {
-		CDM = build_mo_density();
+		CDM = build_total_density();
 	}
 
 	vec OVLP_matrix = {};
@@ -2271,7 +2298,7 @@ bool WFN::write_nbo(const std::filesystem::path &fileName, const bool &debug, st
 		progress("Cached GBW density is inconsistent with FILE47 overlap: Tr(P*S)=" +
 			std::to_string(density_electrons) + ", expected=" + std::to_string(expected_electrons) +
 			". Rebuilding density from NBO-ordered MO coefficients");
-		CDM = build_mo_density();
+		CDM = build_total_density();
 		density_from_cached_dm = false;
 		density_electrons = packed_trace_product(CDM);
 	}
@@ -2283,23 +2310,27 @@ bool WFN::write_nbo(const std::filesystem::path &fileName, const bool &debug, st
 					  << " (" << progress_elapsed_seconds() << " s)" << std::endl;
 		progress_log->flush();
 	}
-	vec2 FOCK_nbo;
-	if (alpha_mos == nbo_nao) {
-		progress("Building Fock matrix from MO energies with BLAS");
-		FOCK_nbo = vec2(nbo_nao, vec(nbo_nao, 0.0));
+	auto build_fock = [&](const vec2& C, const vec& energies, const std::string& label) {
+		vec2 result;
+		if (static_cast<int>(C.size()) != nbo_nao || static_cast<int>(energies.size()) < nbo_nao) {
+			progress("Skipping " + label + " Fock matrix: MO count does not match NBO basis size");
+			return result;
+		}
+		progress("Building " + label + " Fock matrix from MO energies with BLAS");
+		result = vec2(nbo_nao, vec(nbo_nao, 0.0));
 		dMatrix2 overlap(nbo_nao, nbo_nao);
 		dMatrix2 cmo(nbo_nao, nbo_nao);
 		for (int i = 0; i < nbo_nao; i++) {
 			for (int j = 0; j < nbo_nao; j++)
 				overlap(i, j) = OVLP_nbo[i][j];
 			for (int m = 0; m < nbo_nao; m++)
-				cmo(m, i) = CMO[m][i];
+				cmo(m, i) = C[m][i];
 		}
 		dMatrix2 eps_cmo(nbo_nao, nbo_nao);
 #pragma omp parallel for schedule(dynamic)
 		for (int m = 0; m < nbo_nao; m++)
 			for (int i = 0; i < nbo_nao; i++)
-				eps_cmo(m, i) = get_MO_energy(m) * cmo(m, i);
+				eps_cmo(m, i) = energies[m] * cmo(m, i);
 		progress("Fock build: C^T * eps * C");
 		dMatrix2 ctc = dot<dMatrix2>(cmo, eps_cmo, true, false);
 		progress("Fock build: S * (C^T * eps * C)");
@@ -2309,10 +2340,20 @@ bool WFN::write_nbo(const std::filesystem::path &fileName, const bool &debug, st
 #pragma omp parallel for schedule(dynamic)
 		for (int i = 0; i < nbo_nao; i++)
 			for (int j = 0; j < nbo_nao; j++)
-				FOCK_nbo[i][j] = fock(i, j);
-	}
-	else {
-		progress("Skipping Fock matrix: alpha MO count does not match NBO basis size");
+				result[i][j] = fock(i, j);
+		return result;
+	};
+	vec2 FOCK_nbo = build_fock(CMO, energy_spin[0], open_shell ? "alpha" : "total");
+	vec2 FOCK_beta;
+	if (open_shell) {
+		FOCK_beta = build_fock(CMO_beta, energy_spin[1], "beta");
+		//An open-shell $FOCK is read as two blocks; one alone would be parsed as the alpha
+		//block and leave NBO reading the next section as beta, so it is both or neither.
+		if (FOCK_nbo.empty() || FOCK_beta.empty()) {
+			FOCK_nbo.clear();
+			FOCK_beta.clear();
+			progress("Skipping $FOCK entirely: an open-shell FILE47 needs both spin blocks");
+		}
 	}
 
 	ofstream rf(fileName, ios::out);
@@ -2370,8 +2411,8 @@ bool WFN::write_nbo(const std::filesystem::path &fileName, const bool &debug, st
 		rf << endl;
 	};
 
-	rf << " $GENNBO NATOMS=" << ncen << " NBAS=" << nbo_nao << " UPPER BODM FORMAT=PRECISE $END" << endl;
-	rf << " $NBO $END" << endl;
+	rf << " $GENNBO NATOMS=" << ncen << " NBAS=" << nbo_nao << (open_shell ? " OPEN" : "") << " UPPER BODM FORMAT=PRECISE $END" << endl;
+	rf << " $NBO" << (nbo_keywords.empty() ? "" : " " + nbo_keywords) << " $END" << endl;
 	rf << " $COORD" << endl;
 	rf << " .47 file generated by NoSpherA2 based on " << path << endl;
 	for (int i = 0; i < ncen; i++)
@@ -2435,43 +2476,62 @@ bool WFN::write_nbo(const std::filesystem::path &fileName, const bool &debug, st
 		if (count % 4 == 0)
 			rf << "\n";
 	};
+	//NBO reads each spin block with its own Fortran READ, so the beta block has to start on a
+	//fresh record. Streaming both blocks as one run of values makes TINP report
+	//"error reading $LCAOMO" whenever a block length is not a multiple of four.
+	auto end_block = [&](int& count) {
+		if (count % 4 != 0)
+			rf << "\n";
+		count = 0;
+	};
 
 	rf << " $OVERLAP" << endl;
 	int runner = 0;
 	for (int i = 0; i < nbo_nao; i++)
 		for (int j = 0; j <= i; j++)
 			write_precise_value(OVLP_nbo[i][j], runner);
-	if (runner % 4 != 0)
-		rf << "\n";
+	end_block(runner);
 	rf << " $END" << endl;
 	rf << " $DENSITY" << endl;
-	runner = 0;
 	for (int i = 0; i < naotr; i++)
-		write_precise_value(CDM[i], runner);
-	if (runner % 4 != 0)
-		rf << "\n";
+		write_precise_value(open_shell ? CDM_alpha[i] : CDM[i], runner);
+	end_block(runner);
+	if (open_shell) {
+		for (int i = 0; i < naotr; i++)
+			write_precise_value(CDM_beta[i], runner);
+		end_block(runner);
+	}
 	rf << " $END" << endl;
 	if (!FOCK_nbo.empty()) {
+		auto write_fock_block = [&](const vec2& fock) {
+			for (int i = 0; i < nbo_nao; i++)
+				for (int j = 0; j <= i; j++)
+					write_precise_value(fock[i][j], runner);
+			end_block(runner);
+		};
 		rf << " $FOCK" << endl;
-		runner = 0;
-		for (int i = 0; i < nbo_nao; i++)
-			for (int j = 0; j <= i; j++)
-				write_precise_value(FOCK_nbo[i][j], runner);
-		if (runner % 4 != 0)
-			rf << "\n";
+		write_fock_block(FOCK_nbo);
+		if (open_shell)
+			write_fock_block(FOCK_beta);
 		rf << " $END" << endl;
 	}
+	//$LCAOMO is nbas x nbas per spin block whatever the MO count, so a wavefunction that
+	//carries fewer MOs than basis functions is zero-padded - a short block would otherwise
+	//shift every value after it (and, open shell, the whole beta block).
+	auto write_lcaomo_block = [&](const vec2& C) {
+		for (int mo_counter = 0; mo_counter < nbo_nao; mo_counter++)
+		{
+			if (debug)
+				std::cout << "Writing MO #" << mo_counter + 1 << "...\n";
+			for (int i = 0; i < nbo_nao; i++)
+				write_precise_value(mo_counter < static_cast<int>(C.size()) ? C[mo_counter][i] : 0.0, runner);
+		}
+		end_block(runner);
+	};
 	rf << " $LCAOMO" << endl;
-	runner = 0;
-	for (int mo_counter = 0; mo_counter < std::min(alpha_mos, nbo_nao); mo_counter++)
-	{
-		if (debug)
-			std::cout << "Writing MO #" << mo_counter + 1 << "...\n";
-		for (int i = 0; i < nbo_nao; i++)
-			write_precise_value(CMO[mo_counter][i], runner);
-	}
-	if (runner % 4 != 0)
-		rf << "\n";
+	write_lcaomo_block(CMO);
+	if (open_shell)
+		write_lcaomo_block(CMO_beta);
 	rf << " $END" << endl;
 	rf.close();
 	progress("Finished .47 conversion");
