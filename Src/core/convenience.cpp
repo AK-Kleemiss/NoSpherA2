@@ -15,6 +15,7 @@
 #include "crystal_energies.h"
 #include "SALTED_equicomb.h"
 #include "nbo_run.h"
+#include "eli_family.h"
 
 #ifdef _WIN32
 #include <windows.h>
@@ -482,6 +483,15 @@ std::string help_message =
  "                                    indistinguishable from the CPU result.\n"
  "  -draw_orbits l,m[,resolution,radius]\n"
  "                                    Draw a spherical-harmonic orbital.\n"
+ "  -eli_family <wfn> [points_file]\n"
+ "                                    The rest of Kohout's ELI family as point\n"
+ "                                    values: ELI-D for alpha-alpha, beta-beta and\n"
+ "                                    triplet-coupled pairs and ELI-q, in DGrid 5.2\n"
+ "                                    conventions. Without a points file only the\n"
+ "                                    status of each member is printed; with one\n"
+ "                                    ('x y z' per line, bohr) every field at every\n"
+ "                                    point. ELIA needs a correlated 2-matrix and is\n"
+ "                                    not available - the report says why.\n"
  "  -eli_analysis <wfn> <resolution> <radius>\n"
  "                                    QTAIM and ELI-D basins of the density and\n"
  "                                    ELI-D cubes (resolution and radius in\n"
@@ -3134,6 +3144,14 @@ bool options::digest_property_options(const std::string &temp, int &i)
         properties.radius = stod(arguments[i + 3]);
         eli_analysis_run = true;
         i += 3;
+    }
+    //The rest of Kohout's ELI family (ELI-D alpha/beta/triplet, ELI-q) as point values; runs here
+    //rather than setting a flag, it has no cube or basin output to schedule
+    else if (temp == "-eli_family") {
+        err_checkf(argc >= i + 2, "Not enough arguments for -eli_family\nPlease provide at least a wfn!", std::cout);
+        const bool has_points = argc >= i + 3 && arguments[i + 2].size() > 0 && arguments[i + 2][0] != '-';
+        eli_family::report(arguments[i + 1], has_points ? std::filesystem::path(arguments[i + 2]) : std::filesystem::path());
+        finished = true; return true;
     }
     else if (temp == "-qtaim_eli") {
         // Cube-files mode:  -qtaim_eli <rho.cube> <eli.cube> <atoms_csv> [<bg_value>]
