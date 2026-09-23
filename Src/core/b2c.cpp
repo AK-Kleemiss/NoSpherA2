@@ -1342,7 +1342,7 @@ int unify_core_basins(cubei &basin_cube, std::vector<d4> &maxima, const std::vec
 //when every voxel within three of it agrees; otherwise it is sent up the analytic field
 //until it comes within two voxels of a maximum, so the boundary is the field's and not the
 //grid's.
-vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, const std::vector<d4> &maxima, const WFN &wavy, const int accuracy, const bool eli_field, vec &volumes, double &outside, const std::function<double(const d3&)> *core_density, const std::function<void(const d3&, d3&)> *core_gradient, const int grid_boost, const density_field *field)
+vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, const std::vector<d4> &maxima, const WFN &wavy, const int accuracy, const bool eli_field, vec &volumes, double &outside, const std::function<double(const d3&)> *core_density, const std::function<void(const d3&, d3&)> *core_gradient, const int grid_boost, const density_field *field, basin_overlaps *ovl)
 {
 	//The filled core steers the trajectories only. An ECP atom's grid is built for its
 	//valence basis and cannot integrate a 1s at Z = 80, so the core electrons are added to
@@ -1351,6 +1351,17 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 	auto valence = [&](const d3 &p) { return field ? field->rho(p) : wavy.compute_dens(p); };
 	auto density = [&](const d3 &p) { return valence(p) + (core_density ? (*core_density)(p) : 0.0); };
 	const int nb = basin_cube->max_value();
+	//The overlap matrices ride along on the same points and the same weights as the populations:
+	//the density a point contributes is sum_i occ_i phi_i^2, so the diagonal of what is
+	//accumulated here sums to exactly the population below and the two can never disagree
+	if (ovl && field) ovl = nullptr;
+	if (ovl) {
+		ovl->mo_index.clear();
+		for (int m = 0; m < wavy.get_nmo(); m++)
+			if (std::abs(wavy.get_MO_occ(m)) > 1e-8) ovl->mo_index.push_back(m);
+		ovl->nmo = static_cast<int>(ovl->mo_index.size());
+		ovl->S.assign(nb, vec(ovl->triangle(), 0.0));
+	}
 	vec pop(nb, 0.0);
 	volumes.assign(nb, 0.0);
 	outside = 0.0;
@@ -1501,6 +1512,29 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 			vec lp(nb, 0.0), lv(nb, 0.0);
 			double lo = 0.0;
 			long long lb = 0, ll = 0;
+			//ponytail: one triangle per basin per thread, nb * nmo^2 / 2 doubles each; the caller
+			//sizes the job, a molecule big enough to hurt here has other limits first
+			vec2 ls;
+			vec phi;
+			vec2 dbuf;
+			if (ovl) {
+				ls.assign(nb, vec(ovl->triangle(), 0.0));
+				phi.resize(wavy.get_nmo(), 0.0);
+				dbuf.assign(wavy.get_ncen(), vec(16, 0.0));
+			}
+			//Rank-1 update of one basin's triangle: the point's share of the quadrature weight
+			//times the outer product of the orbitals it sees
+			auto accumulate = [&](const int b, const double wq) {
+				if (!ovl || b <= 0 || wq == 0.0) return;
+				double *Sb = ls[b - 1].data();
+				const int *idx = ovl->mo_index.data();
+				for (int a2 = 0; a2 < ovl->nmo; a2++) {
+					const double pa = wq * phi[idx[a2]];
+					if (pa == 0.0) continue;
+					double *row = Sb + (size_t)a2 * (a2 + 1) / 2;
+					for (int b2 = 0; b2 <= a2; b2++) row[b2] += pa * phi[idx[b2]];
+				}
+			};
 #pragma omp for schedule(dynamic, 16)
 			for (int i = 0; i < np; i++) {
 				const double w = W[i];
@@ -1516,7 +1550,8 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 						const double rc = core_shell_radius(at.get_charge()) + 0.5;
 						if (std::pow(p[0] - ap[0], 2) + std::pow(p[1] - ap[1], 2) + std::pow(p[2] - ap[2], 2) < rc * rc) { heavy = true; break; }
 					}
-				const double rho = valence(p);
+				//The same density, taken from the orbital pass that also hands out phi
+				const double rho = ovl ? wavy.compute_dens(p, dbuf, phi) : valence(p);
 				if (heavy) {
 					//The cell's weight stays with the quadrature rule; only its share per basin
 					//is decided by the sub-points, each counted with the density it sees
@@ -1537,17 +1572,21 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 					}
 					if (sum > 0.0) {
 						lo += w * rho * share[0] / sum;
-						for (int bq = 1; bq <= nb; bq++) { lp[bq - 1] += w * rho * share[bq] / sum; lv[bq - 1] += w * count[bq] / radial_split; }
+						//The overlaps take the same split of the cell's weight as the population
+						for (int bq = 1; bq <= nb; bq++) { lp[bq - 1] += w * rho * share[bq] / sum; lv[bq - 1] += w * count[bq] / radial_split; accumulate(bq, w * share[bq] / sum); }
 					}
 					continue;
 				}
 				if (!eli_field || (b != 0 && !settled)) b = climb(p, lb, ll);
 				if (b == 0) lo += w * rho;
-				else { lp[b - 1] += w * rho; lv[b - 1] += w; }
+				else { lp[b - 1] += w * rho; lv[b - 1] += w; accumulate(b, w); }
 			}
 #pragma omp critical
 			{
 				for (int b = 0; b < nb; b++) { pop[b] += lp[b]; volumes[b] += lv[b]; }
+				if (ovl)
+					for (int b = 0; b < nb; b++)
+						for (size_t t = 0; t < ovl->S[b].size(); t++) ovl->S[b][t] += ls[b][t];
 				outside += lo;
 				boundary_points += lb;
 				lost += ll;
@@ -1565,6 +1604,113 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 		}
 	std::cout << "Quadrature points sent along the field: " << boundary_points << ", left the grid: " << lost << std::endl;
 	return pop;
+}
+
+//The pair-density of a single determinant, partitioned twice: delta(A,B) counts the electron
+//pairs shared between two basins and lambda(A) those kept inside one. Both come out of the
+//overlap matrices alone, so they cost nothing beyond the integration that already ran. A
+//restricted wavefunction lists one set of MOs for both spins, hence m = 2 and the occupations
+//halved to the spin-orbital ones; alpha and beta listed separately give m = 1
+delocalization_result delocalization_indices(const WFN &wavy, const basin_overlaps &ovl)
+{
+	delocalization_result r;
+	const int nb = static_cast<int>(ovl.S.size());
+	const int n = ovl.nmo;
+	r.lambda.assign(nb, 0.0);
+	r.population.assign(nb, 0.0);
+	if (nb == 0 || n == 0) return r;
+	//What decides m is the occupation, not the operator flag: a spin orbital cannot hold more
+	//than one electron, so an MO occupied twice is a spatial one standing for both spins. The
+	//flag is a guess in every reader that has to infer the spin blocks - the .wfn reader starts
+	//a beta block wherever the orbital energies stop rising, so a degenerate pair in a closed
+	//shell (the two pi lone pairs of OH-) is enough to label the second of them beta. Believing
+	//that gave m = 1 with occ = 2 and every lambda and delta exactly twice too large, while the
+	//population m * occ * S_ii stayed right and hid it
+	double max_occ = 0.0;
+	for (int i = 0; i < n; i++) max_occ = std::max(max_occ, std::abs(wavy.get_MO_occ(ovl.mo_index[i])));
+	const bool restricted = max_occ > 1.0 + 1e-6;
+	const double m = restricted ? 2.0 : 1.0;
+	vec occ(n);
+	ivec spin(n);
+	for (int i = 0; i < n; i++) {
+		occ[i] = wavy.get_MO_occ(ovl.mo_index[i]) / m;
+		//Spatial orbitals stand for both spins and all of them exchange with one another; only
+		//a genuinely spin-resolved set has an alpha and a beta block that must not mix
+		spin[i] = restricted ? 0 : wavy.get_MO_op(ovl.mo_index[i]);
+	}
+	for (int b = 0; b < nb; b++)
+		for (int i = 0; i < n; i++)
+			r.population[b] += m * occ[i] * ovl.at(b, i, i);
+	//The overlap matrices of all basins add up to the identity, whatever the basins are; what
+	//they miss is what the quadrature missed, and it is the only error estimate here that does
+	//not need a reference
+	for (int i = 0; i < n; i++)
+		for (int j = 0; j <= i; j++) {
+			if (spin[i] != spin[j]) continue;
+			double s = 0.0;
+			for (int b = 0; b < nb; b++) s += ovl.at(b, i, j);
+			r.identity_error = std::max(r.identity_error, std::abs(s - (i == j ? 1.0 : 0.0)));
+		}
+	//The pair sum is symmetric in i and j, so the triangle is taken once and doubled off the
+	//diagonal
+	auto pair_sum = [&](const int a, const int b) {
+		double s = 0.0;
+		for (int i = 0; i < n; i++)
+			for (int j = 0; j <= i; j++) {
+				if (spin[i] != spin[j]) continue;
+				const double t = occ[i] * occ[j] * ovl.at(a, i, j) * ovl.at(b, i, j);
+				s += i == j ? t : 2.0 * t;
+			}
+		return s;
+	};
+	for (int b = 0; b < nb; b++) r.lambda[b] = m * pair_sum(b, b);
+	for (int a = 0; a < nb; a++)
+		for (int b = a + 1; b < nb; b++) {
+			r.pairs.push_back({ a, b });
+			r.di.push_back(2.0 * m * pair_sum(a, b));
+		}
+	return r;
+}
+
+void report_delocalization(const WFN &wavy, const basin_overlaps &ovl, const svec &labels, std::ostream &log, const double threshold)
+{
+	const delocalization_result r = delocalization_indices(wavy, ovl);
+	const int nb = static_cast<int>(r.lambda.size());
+	if (nb == 0 || ovl.nmo == 0) return;
+	auto name = [&](const int b) { return b < static_cast<int>(labels.size()) ? labels[b] : std::to_string(b + 1); };
+	log << "\nDelocalization indices (" << ovl.nmo << " occupied orbitals):\n";
+	log << "  sum over all basins of S^A - identity: " << std::scientific << std::setprecision(2) << r.identity_error
+		<< std::fixed << "   (the quadrature's own error; AIMAll's integrations reach ~1e-3)\n";
+	//delta(A,B) summed over B is the count an atom shares with everything else; with lambda(A)
+	//it has to give the population back, and the residual says which basin the grid missed
+	log << "\n  basin  label                 N(A)     lambda(A)   sum_B delta(A,B)/2   residual\n";
+	for (int b = 0; b < nb; b++) {
+		double half = 0.0;
+		for (size_t p = 0; p < r.pairs.size(); p++)
+			if (r.pairs[p][0] == b || r.pairs[p][1] == b) half += 0.5 * r.di[p];
+		log << std::setw(7) << b + 1 << "  " << std::left << std::setw(18) << name(b) << std::right << std::fixed << std::setprecision(4)
+			<< std::setw(11) << r.population[b] << std::setw(12) << r.lambda[b] << std::setw(18) << half
+			<< std::setw(12) << r.lambda[b] + half - r.population[b] << "\n";
+	}
+	ivec order(r.di.size());
+	std::iota(order.begin(), order.end(), 0);
+	std::sort(order.begin(), order.end(), [&](const int a, const int b) { return r.di[a] > r.di[b]; });
+	log << "\n  basin pair                                delta(A,B)\n";
+	int shown = 0;
+	for (const int p : order) {
+		if (r.di[p] < threshold) break;
+		log << "  " << std::left << std::setw(18) << name(r.pairs[p][0]) << std::setw(18) << name(r.pairs[p][1])
+			<< std::right << std::fixed << std::setprecision(4) << std::setw(12) << r.di[p] << "\n";
+		shown++;
+	}
+	if (!shown) log << "  none above " << threshold << "\n";
+	else log << "  " << static_cast<int>(r.di.size()) - shown << " further pairs below " << std::setprecision(2) << threshold << "\n";
+	for (int a = 0; a < wavy.get_ncen(); a++)
+		if (wavy.get_atom_ECP_electrons(a) > 0) {
+			log << "  An ECP took core electrons out of the orbitals: N(A) here is the valence count\n"
+				<< "  and is short of the basin population above by the core the Thakkar fill added.\n";
+			break;
+		}
 }
 
 vec integrate_values_in_basins(const cube *cub, const cubei *basin_cube, svec& basin_label, bool debug)

@@ -2866,7 +2866,17 @@ void ELI_analysis(const WFN &wavy, options &opt) {
 		integrate_values_in_basins(&rho, &(res.first), lab, opt.debug);
 		vec vol;
 		double outside = 0.0;
-		const vec pop = integrate_basins_on_atomic_grids(&rho, &(res.first), res.second, l_w, opt.accuracy, eli, vol, outside, fill_cores && !eli ? &core_density : nullptr, fill_cores && !eli ? &core_gradient : nullptr, opt.basin_grid, eli ? nullptr : fld);
+		//The overlap matrices come out of the same point loop as the populations, at one triangle
+		//per basin per thread; past a couple of hundred megabytes that is no longer a free ride
+		//and the delocalization indices are left out rather than the run
+		basin_overlaps ovl;
+		const bool orbitals = !eli && !fld && l_w.get_nmo() > 0;
+		const size_t aom_bytes = orbitals ? (size_t)l_w.get_nmo() * (l_w.get_nmo() + 1) / 2 * res.second.size() * omp_get_max_threads() * sizeof(double) : 0;
+		const bool want_aom = orbitals && aom_bytes < (size_t)512 * 1024 * 1024;
+		if (orbitals && !want_aom)
+			std::cout << "  Delocalization indices skipped: " << l_w.get_nmo() << " orbitals over " << res.second.size()
+				<< " basins on " << omp_get_max_threads() << " threads would need " << aom_bytes / (1024 * 1024) << " MB of overlap matrices.\n";
+		const vec pop = integrate_basins_on_atomic_grids(&rho, &(res.first), res.second, l_w, opt.accuracy, eli, vol, outside, fill_cores && !eli ? &core_density : nullptr, fill_cores && !eli ? &core_gradient : nullptr, opt.basin_grid, eli ? nullptr : fld, want_aom ? &ovl : nullptr);
 		std::cout << "\n" << title << " (atomic quadrature grids):\n";
 		std::cout << "  basin  label               electrons" << (eli ? "" : "     charge") << "      volume     maximum        x          y          z\n";
 		double total = 0.0;
@@ -2886,6 +2896,7 @@ void ELI_analysis(const WFN &wavy, options &opt) {
 				<< std::setprecision(3) << std::setw(11) << res.second[b][0] << std::setw(11) << res.second[b][1] << std::setw(11) << res.second[b][2] << "\n";
 		}
 		std::cout << "  total in basins: " << std::setprecision(4) << total << "   outside every basin: " << outside << "\n";
+		if (want_aom) report_delocalization(l_w, ovl, lab, std::cout);
 	};
 	if (l_w.get_nmo() == 0) {
 		report("QTAIM Analysis", qtaim_results, labels, false);
