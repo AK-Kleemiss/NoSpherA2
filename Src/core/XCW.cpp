@@ -50,28 +50,43 @@ void XCW::construct(const options& opt_in) {
 
 	// Warn if a grown structure's explicit atoms don't consistently cover the same
 	// symmetry operations for every asymmetric atom
+	ivec applied_symmetry;
 	if (settings.grown) {
-		unit_cell.apply_grown(symmetry_linking_list);
+		// Below is working
+		//unit_cell.apply_grown(symmetry_linking_list);
+		applied_symmetry = unit_cell.apply_grown(hkl, hkl_enlarged, asym_atoms, symmetry_linking_list, original_rotations);
 	}
 
-	unit_cell.set_symmetry_factors(asym_atoms, symmetry_linking_list);
+	//unit_cell.set_symmetry_factors(asym_atoms, symmetry_linking_list);
+	unit_cell.set_symmetry_factors(asym_atoms, symmetry_linking_list, applied_symmetry);
 
+	if (std::getenv("NOSPHERA2_DEBUG_ASYMFACT")) { // Flawfinder: ignore
+		std::cerr << "applied_symmetry (deleted):";
+		for (int s : applied_symmetry) std::cerr << " " << s;
+		std::cerr << std::endl << "surviving sym ops: " << unit_cell.get_trans()[0].size() << std::endl;
+		for (size_t i = 0; i < asym_atoms.size(); i++)
+			std::cerr << i << " grown=" << asym_atoms[i].grown << " sym_op=" << asym_atoms[i].sym_op
+				<< " asym_fact=" << asym_atoms[i].asym_fact << std::endl;
+		std::cerr << "hkl_enlarged size: " << hkl_enlarged.size() << std::endl;
+	}
+
+	// Below is working
 	// Structure factors sum over every operation, unless the grown cluster is a union of complete
 	// orbits of a subgroup H: then one operation per coset of H covers the cell with |H| times fewer
 	// terms and the cluster's own symmetry is not applied a second time
-	sym_ops_.resize(unit_cell.get_trans()[0].size());
-	std::iota(sym_ops_.begin(), sym_ops_.end(), 0);
-	if (settings.grown) {
-		const ivec subgroup = unit_cell.grown_subgroup(symmetry_linking_list);
-		if (subgroup.size() < 2)
-			std::cout << "XCW: grown cluster is mapped onto itself by no symmetry operation, summing all " << sym_ops_.size() << " operations" << std::endl;
-		else {
-			sym_ops_ = unit_cell.coset_representatives(subgroup);
-			unit_cell.set_subgroup_factors(asym_atoms, symmetry_linking_list, subgroup);
-			std::cout << "XCW: grown cluster is mapped onto itself by a subgroup of order " << subgroup.size() << ", summing "
-				<< sym_ops_.size() << " coset representatives instead of " << unit_cell.get_trans()[0].size() << " operations" << std::endl;
-		}
-	}
+	//sym_ops_.resize(unit_cell.get_trans()[0].size());
+	//std::iota(sym_ops_.begin(), sym_ops_.end(), 0);
+	//if (settings.grown) {
+	//	const ivec subgroup = unit_cell.grown_subgroup(symmetry_linking_list);
+	//	if (subgroup.size() < 2)
+	//		std::cout << "XCW: grown cluster is mapped onto itself by no symmetry operation, summing all " << sym_ops_.size() << " operations" << std::endl;
+	//	else {
+	//		sym_ops_ = unit_cell.coset_representatives(subgroup);
+	//		unit_cell.set_subgroup_factors(asym_atoms, symmetry_linking_list, subgroup);
+	//		std::cout << "XCW: grown cluster is mapped onto itself by a subgroup of order " << subgroup.size() << ", summing "
+	//			<< sym_ops_.size() << " coset representatives instead of " << unit_cell.get_trans()[0].size() << " operations" << std::endl;
+	//	}
+	//}
 
 	// Generate WFN object from asym_atoms
 	dummy_wave.assign_charge(settings.charge);
@@ -668,7 +683,8 @@ void XCW::rotate_grown_ADPs() {
 		vec2 M(3, vec(3));
 		for (int i = 0; i < 3; i++) {
 			for (int j = 0; j < 3; j++) {
-				M[i][j] = unit_cell.get_sym(i, j, op);
+				M[i][j] = original_rotations[i][j][op];
+				//M[i][j] = unit_cell.get_sym(i, j, op);
 			}
 		}
 		vec2 ADPs = dummy_wave.get_atom(a).get_ADPs();
@@ -803,8 +819,36 @@ void XCW::eval_phase(cvec2& phase_fact) {
 	}
 }
 
+// Below is working
+//void XCW::eval_translation_phase(cvec2& translation_phase) {
+//	translation_phase.resize(cryst.nr_small, cvec(sym_ops_.size(), 0));
+//	const double angstrom2bohr = constants::ang2bohr(1);
+//	const double bohr2angstrom = constants::bohr2ang(1);
+//	vec2 trans = unit_cell.get_trans();
+//	vec2 cm = { { unit_cell.get_cm(0,0), unit_cell.get_cm(0,1), unit_cell.get_cm(0,2)},
+//								  { unit_cell.get_cm(1,0), unit_cell.get_cm(1,1), unit_cell.get_cm(1,2)},
+//								  { unit_cell.get_cm(2,0), unit_cell.get_cm(2,1), unit_cell.get_cm(2,2)} };
+//	std::transform(cm.begin(), cm.end(), cm.begin(), [bohr2angstrom](std::vector<double>& vec) {
+//		std::transform(vec.begin(), vec.end(), vec.begin(), [bohr2angstrom](double x) { return x * bohr2angstrom; });
+//		return vec; });
+//	for (int r = 0; r < cryst.nr_small; r++) {
+//		ivec asym_list = generate_asym_lookup(r);
+//		vec q_temp = { k_pt[0][asym_list[0]], k_pt[1][asym_list[0]], k_pt[2][asym_list[0]] };
+//		std::transform(q_temp.begin(), q_temp.end(), q_temp.begin(), [angstrom2bohr](double x) { return x * angstrom2bohr; });
+//		for (int t = 0; t < sym_ops_.size(); t++) {
+//			const int op = sym_ops_[t];
+//			vec trans_temp = { trans[0][op], trans[1][op], trans[2][op] };
+//			trans_temp = dot(cm, trans_temp, true);
+//			cdouble exponent(0, dot_BLAS(q_temp, trans_temp, false));
+//			translation_phase[r][t] = std::exp(exponent);
+//		}
+//	}
+//	// closing function
+//}
+
+// sym_ops_ is the opp
 void XCW::eval_translation_phase(cvec2& translation_phase) {
-	translation_phase.resize(cryst.nr_small, cvec(sym_ops_.size(), 0));
+	translation_phase.resize(cryst.nr_small, cvec(unit_cell.get_trans()[0].size(), 0));
 	const double angstrom2bohr = constants::ang2bohr(1);
 	const double bohr2angstrom = constants::bohr2ang(1);
 	vec2 trans = unit_cell.get_trans();
@@ -818,9 +862,8 @@ void XCW::eval_translation_phase(cvec2& translation_phase) {
 		ivec asym_list = generate_asym_lookup(r);
 		vec q_temp = { k_pt[0][asym_list[0]], k_pt[1][asym_list[0]], k_pt[2][asym_list[0]] };
 		std::transform(q_temp.begin(), q_temp.end(), q_temp.begin(), [angstrom2bohr](double x) { return x * angstrom2bohr; });
-		for (int t = 0; t < sym_ops_.size(); t++) {
-			const int op = sym_ops_[t];
-			vec trans_temp = { trans[0][op], trans[1][op], trans[2][op] };
+		for (int t = 0; t < trans[0].size(); t++) {
+			vec trans_temp = { trans[0][t], trans[1][t], trans[2][t] };
 			trans_temp = dot(cm, trans_temp, true);
 			cdouble exponent(0, dot_BLAS(q_temp, trans_temp, false));
 			translation_phase[r][t] = std::exp(exponent);
@@ -1239,7 +1282,7 @@ ivec XCW::generate_asym_lookup(const int r) {
 	ivec3 rots = unit_cell.get_sym();
 	i3 tempv;
 	const i3& hkl_temp = *it;
-	for (const int s : sym_ops_) {
+	for (int s = 0; s < rots[0][0].size(); s++) {
 		tempv = { 0, 0, 0 };
 		for (int h = 0; h < 3; h++) {
 			for (int j = 0; j < 3; j++) {
@@ -1256,6 +1299,7 @@ ivec XCW::generate_asym_lookup(const int r) {
 	return asym_list;
 	// closing function
 }
+
 
 size_t XCW::tri_index(int mu, int nu) const noexcept {
 	return mu * cryst.nmo - (mu * (mu - 1)) / 2 + (nu - mu);
@@ -1512,6 +1556,33 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 		asym_lookup[r] = generate_asym_lookup(r);
 	}
 	const unsigned int num_syms = asym_lookup[0].size();
+
+	if (std::getenv("NOSPHERA2_DEBUG_LOOKUP")) { // Flawfinder: ignore
+		long long misses = 0, total = 0;
+		for (r = 0; r < cryst.nr_small; r++) {
+			for (int s = 0; s < static_cast<int>(num_syms); s++) {
+				total++;
+				if (asym_lookup[r][s] == 0) {
+					// index 0 is ambiguous: a genuine hit on hkl_enlarged's first entry, or the
+					// silent "not found" fallback in generate_asym_lookup. Recompute by hand to
+					// tell them apart.
+					auto it = hkl.begin();
+					std::advance(it, r);
+					ivec3 rots = unit_cell.get_sym();
+					i3 tempv{ 0,0,0 };
+					const i3& hkl_temp = *it;
+					for (int h = 0; h < 3; h++)
+						for (int j = 0; j < 3; j++)
+							tempv[j] += hkl_temp[h] * rots[j][h][s];
+					if (hkl_enlarged.find(tempv) == hkl_enlarged.end()) misses++;
+				}
+			}
+		}
+		std::cerr << "asym_lookup misses: " << misses << " of " << total
+			<< "  (hkl_enlarged size " << hkl_enlarged.size() << ")" << std::endl;
+		std::cerr.flush();
+		std::exit(0);
+	}
 
 	vec2 grid_positions(cryst.ncen);
 	for (int at = 0; at < cryst.ncen; at++) {

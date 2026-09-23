@@ -458,6 +458,7 @@ private:
 	std::vector<scattering_data> obs;
 	hkl_list hkl;
 	hkl_list hkl_enlarged;
+	ivec3 original_rotations;
 	// Symmetry operations the structure factors are summed over: all of them, or one per coset
 	// of the subgroup a grown cluster is closed under (cell::grown_subgroup)
 	ivec sym_ops_;

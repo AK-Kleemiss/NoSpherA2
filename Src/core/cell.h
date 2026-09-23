@@ -39,11 +39,22 @@ private:
 	void convert_to_fracs(std::vector<asym_atom>& atoms, const std::string input_unit);
 	vec apply_symmetry(const vec& pos, const int sym_op);
 	bool check_special(const vec& pos1, const vec& pos2, const double& tolerance = 1e-10);
-	ivec confirm_applied_symmetry(ivec3& linking_list);
 	bool check_identity(const int& sym_op);
-	static int orbit_copies(const ivec2& atom_links);
+	//static int orbit_copies(const ivec2& atom_links);
+
+	// Subgroup projection for grown structures
+	void project_into_subgroup(ivec& applied_symmetry, hkl_list& hkl_enlarged, const hkl_list& hkl, ivec3& linking_list);
+	ivec confirm_applied_symmetry(ivec3& linking_list);
+	int equal_to_concatenation(const int op_a, const int op_b);
+	
 
 public:
+
+	// Subgroup projection for grown structures
+	void set_symmetry_factors(std::vector<asym_atom>& asym_atoms, const ivec3& linking_list, const ivec& applied_symmetry);
+	ivec apply_grown(const hkl_list& hkl, hkl_list& hkl_enlarged, std::vector<asym_atom>& asym_atoms, ivec3& linking_list, ivec3& original_rotations);
+
+
 	/**
 	 * @brief Parses a CIF symmetry operation such as "-x+1/2,y,-z+1/2".
 	 *
@@ -70,16 +81,18 @@ public:
 
 	void set_symmetry_factors(std::vector<asym_atom>& asym_atoms, const ivec3& linking_list);
 
+	// This is an old but working implementation for grown structures.
+	// It is not used currently but kept for reference purposes in case something goes wrong with the new implementation.
 	// Grown clusters and the subgroup H of the space group that maps the cluster onto itself:
 	// the subgroup (only the identity when nothing else does, empty only for an operation list
 	// without one), one operation per left coset gH (identity first) and the weights
 	// |H| / (|stab_G(parent)| * explicit copies) that make the coset sum over the cluster
 	// reproduce the cell density
-	ivec grown_subgroup(const ivec3& linking_list);
-	ivec coset_representatives(const ivec& subgroup);
-	void set_subgroup_factors(std::vector<asym_atom>& asym_atoms, const ivec3& linking_list, const ivec& subgroup);
-	// Index of the operation equal (mod lattice translations) to op_a applied after op_b, -1 if the list has none
-	int compose_ops(const int op_a, const int op_b);
+	//ivec grown_subgroup(const ivec3& linking_list);
+	//ivec coset_representatives(const ivec& subgroup);
+	//void set_subgroup_factors(std::vector<asym_atom>& asym_atoms, const ivec3& linking_list, const ivec& subgroup);
+	//// Index of the operation equal (mod lattice translations) to op_a applied after op_b, -1 if the list has none
+	//int compose_ops(const int op_a, const int op_b);
 
 	cell()
 	{

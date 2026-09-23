@@ -199,7 +199,9 @@
     <ClCompile Include="..\..\Src\core\wfn_class.cpp" />
     <ClCompile Include="..\..\Src\core\wfn_density.cpp" />
     <ClCompile Include="..\..\Src\core\wfn_io.cpp" />
-    <ClCompile Include="..\..\Src\core\XCW.cpp" />
+    <ClCompile Include="..\..\Src\core\XCW.cpp">
+      <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
     <ClCompile Include="..\..\Src\core\stored_eri.cpp" />
     <ClCompile Include="..\..\Src\core\xcw_halting.cpp" />
   </ItemGroup>
