@@ -72,7 +72,10 @@ struct NboE2Entry {
 
 struct NboResonanceWeight {
 	int structure = 0;
-	double weight_percent = 0.0;
+	double weight_percent = 0.0;    //the 2-decimal table value
+	double weight_fraction = 0.0;   //the 5-decimal value of the NRTDTL weight vector, 0 without NRTDTL
+	int idxres = 0;                 //NBO's internal structure id, only under NRTDTL
+	std::string changes;            //"Added(Removed)" column, verbatim
 	std::string spin;
 };
 
@@ -82,7 +85,60 @@ struct NboBondOrder {
 	double total = 0.0;
 	double covalent = 0.0;
 	double ionic = 0.0;
+	//The printed table is symmetric, so only its upper triangle and diagonal are kept. On the
+	//diagonal NBO prints a total and "---" for covalent and ionic, which are left at zero here.
+	bool diagonal = false;
 	std::string spin;           //"", "alpha", "beta", "composite"
+};
+
+//What NRT derives from the converged weights per atom; the valency is the atom's bond-order sum.
+struct NboValency {
+	int atom = 0;
+	std::string element;
+	double valency = 0.0;
+	double covalency = 0.0;
+	double electrovalency = 0.0;
+	double electron_count = 0.0;
+	std::string spin;
+};
+
+//One line of the NRT search table: how the candidate set and the objective function moved.
+//This is the problem size that drives the cost, so it belongs to the timing baseline.
+struct NboNrtCycle {
+	int cycle = 0;
+	int structures_used = 0;
+	int structures_found = 0;
+	double d_w = 0.0;
+	int kmax = 0, choose = 0, ion = 0, e2 = 0, sym = 0;
+	double dbmax = 0.0, dbrms = 0.0;
+	std::string spin;
+};
+
+//Integer bond-topology matrix, as printed.
+struct NboTopo {
+	std::string spin;
+	std::vector<std::vector<int>> matrix;
+};
+
+//A candidate resonance structure of the NRT search, printed only under NRTDTL. The candidate
+//list is what a screening scheme has to reproduce: everything examined, not only what survived.
+struct NboNrtCandidate {
+	int structure = 0;
+	int idxres = 0;
+	double rho_nl = 0.0;
+	std::string spin;
+	std::vector<std::vector<int>> topo;
+};
+
+//One step of the QP minimisation, printed only under NRTDTL.
+struct NboQpIteration {
+	int iteration = 0;
+	int structures = 0;
+	double d_w = 0.0;
+	std::string kkt;
+	double rho_nl = 0.0;
+	int added = 0;              //structure that entered at this step, 0 if none
+	std::string spin;
 };
 
 struct NboNrt {
@@ -100,8 +156,20 @@ struct NboNrt {
 	//reproducible with it recorded.
 	double parent_threshold_percent = 0.0;
 	double deloc_threshold_kcal = 0.0;
+	int max_search_cycles = 0;
+	int initial_topo = 0, initial_nls = 0, initial_nbi = 0, initial_sym = 0;
+	std::string symmetry;       //"Dih symmetry, 32 symmetry operator(s), ...", verbatim
 	std::vector<NboResonanceWeight> weights;
 	std::vector<NboBondOrder> bond_orders;
+	std::vector<NboValency> valencies;
+	std::vector<NboNrtCycle> cycles;
+	std::vector<NboTopo> leading_topo;
+	//NRTDTL only.
+	std::vector<NboNrtCandidate> candidates;
+	std::vector<NboQpIteration> qp_iterations;
+	std::vector<std::string> arrows;          //"ARROWS generates N new structures from ..." lines
+	std::vector<std::string> symmetry_forms;  //"Symmetry equivalent resonance forms" block
+	std::string nrtstr_keylist;               //the $NRTSTR block NBO writes back, verbatim
 };
 
 struct NboResults {
@@ -111,7 +179,11 @@ struct NboResults {
 	std::string keywords;       //what went into the $NBO keylist
 	bool open_shell = false;
 	double file47_seconds = 0.0;
-	double nbo_seconds = 0.0;
+	double nbo_seconds = 0.0;      //wall clock around the gennbo process, wrapper-measured
+	//NBO's own closing line, "completed in X CPU seconds (Y wall seconds)". NBO 7.0.9 is serial
+	//(its binaries carry no OpenMP or pthread symbols), so CPU time is one thread's time.
+	double nbo_cpu_seconds = 0.0;
+	double nbo_reported_wall_seconds = 0.0;
 	//The two E2 printing thresholds NBO echoes; below them the table is simply not printed, so a
 	//comparison that does not know them cannot tell a missing interaction from a small one.
 	double e2_threshold_kcal = 0.0;

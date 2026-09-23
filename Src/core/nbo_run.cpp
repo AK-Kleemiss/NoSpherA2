@@ -3,6 +3,7 @@
 #include "convenience.h"
 #include "wfn_class.h"
 
+#include <algorithm>
 #include <chrono>
 #include <cstdlib>
 #include <fstream>
@@ -32,7 +33,8 @@ namespace {
 	const std::regex re_bo_total(R"(^\s*(\d+)\.\s+([A-Za-z]{1,2})\s+t\s+(.*)$)");
 	const std::regex re_bo_cov(R"(^\s*c\s+(.*)$)");
 	const std::regex re_bo_ion(R"(^\s*i\s+(.*)$)");
-	const std::regex re_weight(R"(^\s*(\d+)\s+(\d+\.\d+)\s*(.*)$)");
+	//The leading structure carries a "*" right after its number ("1*    95.70").
+	const std::regex re_weight(R"(^\s*(\d+)\*?\s+(\d+\.\d+)\s*(.*)$)");
 	const std::regex re_qpnrt(R"(QPNRT\((\d+)/(\d+)\):\s*D\(0\)=([\d.eE+-]+);\s*D\(w\)=([\d.eE+-]+))");
 	const std::regex re_timing(R"(Timing\(sec\):\s*search=([\d.]+);\s*Gram matrix=([\d.]+);\s*minimize=([\d.]+);\s*other=([\d.]+))");
 	const std::regex re_version(R"(Cite this program \[(.+?)\])");
@@ -40,6 +42,20 @@ namespace {
 	const std::regex re_e2_inter(R"(^\s*\(Intermolecular threshold:\s*([\d.]+) kcal/mol)");
 	const std::regex re_parent_thresh(R"(Parent structure threshold:\s*([\d.]+)% of leading weight)");
 	const std::regex re_deloc_thresh(R"(Delocalization list threshold:\s*([\d.]+) kcal/mol)");
+	const std::regex re_max_cycles(R"(Maximum search cycles:\s*(\d+))");
+	const std::regex re_symmetry(R"(^\s*(\S+ symmetry,\s*\d+ symmetry operator\(s\).*\S)\s*$)");
+	const std::regex re_initial_topo(R"(^\s*(\d+) initial TOPO matrices:\s*NLS\s*=\s*(\d+);\s*NBI\s*=\s*(\d+);\s*SYM\s*=\s*(\d+))");
+	const std::regex re_cycle(R"(^\s*(\d+)\s+(\d+)/(\d+)\s+([\d.]+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+([\d.]+)\s+([\d.]+)\s*$)");
+	const std::regex re_topo_row(R"(^\s*(\d+)\.\s+([A-Za-z]{1,2})\s+((?:-?\d+\s+)*-?\d+)\s*$)");
+	const std::regex re_valency(R"(^\s*(\d+)\.\s+([A-Za-z]{1,2})\s+(-?\d+\.\d+)\s+(-?\d+\.\d+)\s+(-?\d+\.\d+)\s+(-?\d+\.\d+)\s*$)");
+	const std::regex re_candidate(R"(^\s*Resonance structure:\s*(\d+)\s*\[\s*(\d+)\s*\])");
+	const std::regex re_rhonl(R"(^\s*rhoNL\(\s*(\d+)\s*\)\s*=\s*([\d.]+))");
+	const std::regex re_qp_row(R"(^\s*(\d+)\s+(\d+)\s+([\d.]+)\s+([01]+)(?:\s+([\d.]+)\s+\+\s+(\d+))?\s*$)");
+	//Iteration 0: the row before the first step, only rhoNL and the structure count.
+	const std::regex re_qp_start(R"(^\s+(\d+\.\d+)\s+(\d+)\s*$)");
+	const std::regex re_weight_fraction(R"(([\d.]+)\(\s*(\d+)\s*\))");
+	const std::regex re_weight_idxres(R"(([\d.]+)\[\s*(\d+)\s*\])");
+	const std::regex re_completed(R"(NBO analysis completed in\s*([\d.]+) CPU seconds\s*\((\d+) wall seconds\))");
 
 	double to_d(const std::string& s) { return s.empty() ? 0.0 : std::stod(s); }
 
@@ -95,10 +111,17 @@ NboResults parse_nbo_output(const std::filesystem::path& nbo_file) {
 	NboResults r;
 	r.name = nbo_file.stem().string();
 
-	enum class Section { none, npa, nao, hybrids, summary, e2, weights };
+	enum class Section { none, npa, nao, hybrids, summary, e2, weights, cycles, topo, valencies, qp, symforms, nrtstr };
 	Section section = Section::none;
 	std::string spin;             //"", "alpha", "beta"
 	std::map<std::pair<std::string, int>, size_t> orbital_index;  //(spin, NBO number) -> position
+	//The TOPO matrices of the leading structure and, under NRTDTL, of every candidate are the
+	//same table in different places, so one target pointer fills whichever is open.
+	std::vector<std::vector<int>>* topo_target = nullptr;
+	size_t valencies_at_section_start = 0;
+	//The NRTDTL weight vector is reprinted after every cycle; only the last one per spin counts.
+	std::map<std::string, std::vector<std::pair<int, double>>> weight_fractions;  //spin -> (structure, weight)
+	std::map<std::string, std::vector<int>> weight_idxres;                        //spin -> idxres, same order
 
 	std::string line;
 	while (std::getline(in, line)) {
@@ -117,7 +140,66 @@ NboResults parse_nbo_output(const std::filesystem::path& nbo_file) {
 		if (line.find("Natural Bond Order") != std::string::npos) { section = Section::none; r.nrt.present = true; continue; }
 		if (line.find("RS   Weight(%)") != std::string::npos) { section = Section::weights; r.nrt.present = true; continue; }
 		if (line.find("NATURAL RESONANCE THEORY ANALYSIS") != std::string::npos) { r.nrt.present = true; section = Section::none; continue; }
-		if (line.find("TOPO matrix") != std::string::npos || line.find("Natural Atomic Valencies") != std::string::npos) { section = Section::none; continue; }
+		if (line.find("TOPO matrix for the leading") != std::string::npos) {
+			r.nrt.leading_topo.push_back(NboTopo{ spin, {} });
+			topo_target = &r.nrt.leading_topo.back().matrix;
+			section = Section::topo;
+			continue;
+		}
+		if (line.find("Natural Atomic Valencies") != std::string::npos) { section = Section::valencies; valencies_at_section_start = r.nrt.valencies.size(); continue; }
+		if (line.find("cycle  structures") != std::string::npos) { section = Section::cycles; continue; }
+		if (line.find("iter  nres") != std::string::npos) { section = Section::qp; continue; }
+		if (line.find("Symmetry equivalent resonance forms") != std::string::npos) { section = Section::symforms; continue; }
+		if (line.find("ARROWS") != std::string::npos) { r.nrt.arrows.push_back(normalize(line)); continue; }
+		if (line.find("$NRTSTR") != std::string::npos) { r.nrt.nrtstr_keylist = line + "\n"; section = Section::nrtstr; continue; }
+		//NRTDTL prints every candidate structure with its TOPO matrix and non-Lewis density.
+		if (std::regex_search(line, m, re_candidate)) {
+			NboNrtCandidate c;
+			c.structure = std::stoi(m[1].str());
+			c.idxres = std::stoi(m[2].str());
+			c.spin = spin;
+			r.nrt.candidates.push_back(c);
+			topo_target = &r.nrt.candidates.back().topo;
+			section = Section::topo;
+			continue;
+		}
+		if (std::regex_search(line, m, re_rhonl)) {
+			const int idx = std::stoi(m[1].str());
+			for (auto it = r.nrt.candidates.rbegin(); it != r.nrt.candidates.rend(); ++it)
+				if (it->structure == idx && it->spin == spin) { it->rho_nl = to_d(m[2].str()); break; }
+			section = Section::none;
+			continue;
+		}
+		if (line.find("weights by resonance structure") != std::string::npos) {
+			auto& v = weight_fractions[spin];
+			v.clear();
+			for (std::string l; std::getline(in, l) && l.find_first_not_of(" \t") != std::string::npos; )
+				for (std::sregex_iterator it(l.begin(), l.end(), re_weight_fraction), end; it != end; ++it)
+					v.emplace_back(std::stoi((*it)[2].str()), to_d((*it)[1].str()));
+			continue;
+		}
+		if (line.find("weights by IDXRES index") != std::string::npos) {
+			auto& v = weight_idxres[spin];
+			v.clear();
+			for (std::string l; std::getline(in, l) && l.find_first_not_of(" \t") != std::string::npos; )
+				for (std::sregex_iterator it(l.begin(), l.end(), re_weight_idxres), end; it != end; ++it)
+					v.push_back(std::stoi((*it)[2].str()));
+			continue;
+		}
+		if (r.nrt.max_search_cycles == 0 && std::regex_search(line, m, re_max_cycles)) { r.nrt.max_search_cycles = std::stoi(m[1].str()); continue; }
+		if (r.nrt.symmetry.empty() && std::regex_match(line, m, re_symmetry)) { r.nrt.symmetry = m[1].str(); continue; }
+		if (std::regex_search(line, m, re_initial_topo)) {
+			r.nrt.initial_topo = std::stoi(m[1].str());
+			r.nrt.initial_nls = std::stoi(m[2].str());
+			r.nrt.initial_nbi = std::stoi(m[3].str());
+			r.nrt.initial_sym = std::stoi(m[4].str());
+			continue;
+		}
+		if (std::regex_search(line, m, re_completed)) {
+			r.nbo_cpu_seconds = to_d(m[1].str());
+			r.nbo_reported_wall_seconds = to_d(m[2].str());
+			continue;
+		}
 
 		if (std::regex_search(line, m, re_qpnrt)) {
 			r.nrt.structures_used = std::stoi(m[1].str());
@@ -243,16 +325,125 @@ NboResults parse_nbo_output(const std::filesystem::path& nbo_file) {
 			break;
 		}
 		case Section::weights: {
-			if (line.find("* Total *") != std::string::npos || line.find("---") != std::string::npos) break;
-			if (!std::regex_match(line, m, re_weight)) { if (line.find_first_not_of(" \t") != std::string::npos) section = Section::none; break; }
+			if (line.find("* Total *") != std::string::npos) { section = Section::none; break; }
+			if (line.find("---") != std::string::npos || line.find("others") != std::string::npos) break;
+			if (!std::regex_match(line, m, re_weight)) {
+				//The Added(Removed) column wraps onto continuation lines; they belong to the
+				//structure above, and treating them as the end of the table truncated the list.
+				if (line.find_first_not_of(" \t") == std::string::npos) { section = Section::none; break; }
+				if (!r.nrt.weights.empty()) r.nrt.weights.back().changes += " " + normalize(line);
+				break;
+			}
 			NboResonanceWeight w;
 			w.structure = std::stoi(m[1].str());
 			w.weight_percent = to_d(m[2].str());
+			w.changes = normalize(m[3].str());
 			w.spin = spin;
 			r.nrt.weights.push_back(w);
 			break;
 		}
+		case Section::cycles: {
+			if (line.find("---") != std::string::npos) break;
+			if (!std::regex_match(line, m, re_cycle)) { if (line.find_first_not_of(" \t") != std::string::npos) section = Section::none; break; }
+			NboNrtCycle c;
+			c.cycle = std::stoi(m[1].str());
+			c.structures_used = std::stoi(m[2].str());
+			c.structures_found = std::stoi(m[3].str());
+			c.d_w = to_d(m[4].str());
+			c.kmax = std::stoi(m[5].str());
+			c.choose = std::stoi(m[6].str());
+			c.ion = std::stoi(m[7].str());
+			c.e2 = std::stoi(m[8].str());
+			c.sym = std::stoi(m[9].str());
+			c.dbmax = to_d(m[10].str());
+			c.dbrms = to_d(m[11].str());
+			c.spin = spin;
+			r.nrt.cycles.push_back(c);
+			break;
+		}
+		case Section::topo: {
+			if (!topo_target) { section = Section::none; break; }
+			if (line.find("Atom") != std::string::npos || line.find("---") != std::string::npos) break;
+			if (!std::regex_match(line, m, re_topo_row)) { if (line.find_first_not_of(" \t") != std::string::npos) section = Section::none; break; }
+			const size_t atom = static_cast<size_t>(std::stoi(m[1].str()));
+			const std::vector<std::string> cells = split_numbers(m[3].str());
+			if (topo_target->size() < atom) topo_target->resize(atom);
+			std::vector<int>& row_v = (*topo_target)[atom - 1];
+			for (const auto& c : cells) row_v.push_back(std::stoi(c));
+			break;
+		}
+		case Section::valencies: {
+			//Two blank lines and a two-line column header sit between the title and the rows, so
+			//nothing before the first row may end the section.
+			if (!std::regex_match(line, m, re_valency)) { if (r.nrt.valencies.size() > valencies_at_section_start) section = Section::none; break; }
+			NboValency v;
+			v.atom = std::stoi(m[1].str());
+			v.element = m[2].str();
+			v.valency = to_d(m[3].str());
+			v.covalency = to_d(m[4].str());
+			v.electrovalency = to_d(m[5].str());
+			v.electron_count = to_d(m[6].str());
+			v.spin = spin;
+			r.nrt.valencies.push_back(v);
+			break;
+		}
+		case Section::qp: {
+			if (line.find("---") != std::string::npos) break;
+			if (!std::regex_match(line, m, re_qp_row)) {
+				//The table opens with a header-less row holding only the starting rhoNL and the
+				//number of structures; ending the section on it dropped every iteration.
+				if (line.find_first_not_of(" \t") == std::string::npos) { section = Section::none; break; }
+				if (std::regex_match(line, m, re_qp_start)) {
+					NboQpIteration q0;
+					q0.rho_nl = to_d(m[1].str());
+					q0.structures = std::stoi(m[2].str());
+					q0.spin = spin;
+					r.nrt.qp_iterations.push_back(q0);
+				}
+				break;
+			}
+			NboQpIteration q;
+			q.iteration = std::stoi(m[1].str());
+			q.structures = std::stoi(m[2].str());
+			q.d_w = to_d(m[3].str());
+			q.kkt = m[4].str();
+			if (m[5].matched) q.rho_nl = to_d(m[5].str());
+			if (m[6].matched) q.added = std::stoi(m[6].str());
+			q.spin = spin;
+			r.nrt.qp_iterations.push_back(q);
+			break;
+		}
+		case Section::symforms: {
+			if (line.find_first_not_of(" \t") == std::string::npos) { section = Section::none; break; }
+			r.nrt.symmetry_forms.push_back(normalize(line));
+			break;
+		}
+		case Section::nrtstr: {
+			r.nrt.nrtstr_keylist += line + "\n";
+			if (line.find("$END") != std::string::npos) section = Section::none;
+			break;
+		}
 		default: break;
+		}
+	}
+	//Under NRTDTL the weight vector carries five decimals and, unlike the printed table, the
+	//zero-weight tail of the candidate set. Structures the table left out are added here, so
+	//"how many were examined" and "how many were kept" are both readable from the dataset.
+	for (const auto& [sp, fractions] : weight_fractions) {
+		const auto idx = weight_idxres.find(sp);
+		for (size_t i = 0; i < fractions.size(); i++) {
+			auto it = std::find_if(r.nrt.weights.begin(), r.nrt.weights.end(),
+				[&](const NboResonanceWeight& w) { return w.spin == sp && w.structure == fractions[i].first; });
+			if (it == r.nrt.weights.end()) {
+				NboResonanceWeight w;
+				w.structure = fractions[i].first;
+				w.weight_percent = 100.0 * fractions[i].second;
+				w.spin = sp;
+				r.nrt.weights.push_back(w);
+				it = r.nrt.weights.end() - 1;
+			}
+			it->weight_fraction = fractions[i].second;
+			if (idx != weight_idxres.end() && i < idx->second.size()) it->idxres = idx->second[i];
 		}
 	}
 	parse_bond_orders(nbo_file, r.nrt);
@@ -275,16 +466,19 @@ static void parse_bond_orders(const std::filesystem::path& nbo_file, NboNrt& nrt
 	auto flush = [&](const std::vector<std::string>& ions) {
 		const size_t n = std::min({ columns.size(), totals.size(), covs.size(), ions.size() });
 		for (size_t c = 0; c < n; c++) {
-			if (columns[c] <= row) continue;         //upper triangle only; "---" marks the diagonal
-			if (totals[c] == "---" || covs[c] == "---" || ions[c] == "---") continue;
+			//The matrix is symmetric, so the lower triangle is dropped; the diagonal and the
+			//zero entries are kept, because "this pair has bond order zero" is a statement a
+			//candidate implementation has to reproduce.
+			if (columns[c] < row) continue;
 			NboBondOrder b;
 			b.atom1 = row;
 			b.atom2 = columns[c];
-			b.total = to_d(totals[c]);
-			b.covalent = to_d(covs[c]);
-			b.ionic = to_d(ions[c]);
+			b.diagonal = columns[c] == row;
+			b.total = totals[c] == "---" ? 0.0 : to_d(totals[c]);
+			b.covalent = covs[c] == "---" ? 0.0 : to_d(covs[c]);   //"---" on the diagonal
+			b.ionic = ions[c] == "---" ? 0.0 : to_d(ions[c]);
 			b.spin = spin;
-			if (b.total != 0.0 || b.covalent != 0.0 || b.ionic != 0.0) nrt.bond_orders.push_back(b);
+			nrt.bond_orders.push_back(b);
 		}
 		totals.clear(); covs.clear();
 	};
@@ -341,7 +535,10 @@ void write_nbo_json(const NboResults& r, const std::filesystem::path& json_file)
 	f << "  \"nbo_version\": " << jstr(r.version) << ",\n";
 	f << "  \"keywords\": " << jstr(r.keywords) << ",\n";
 	f << "  \"open_shell\": " << (r.open_shell ? "true" : "false") << ",\n";
-	f << "  \"timings\": {\"file47_seconds\": " << jnum(r.file47_seconds) << ", \"nbo_seconds\": " << jnum(r.nbo_seconds) << "},\n";
+	//nbo_seconds wraps the process; the other two are NBO's own closing line. NBO 7 is serial.
+	f << "  \"timings\": {\"file47_seconds\": " << jnum(r.file47_seconds) << ", \"nbo_seconds\": " << jnum(r.nbo_seconds)
+		<< ", \"nbo_reported_cpu_seconds\": " << jnum(r.nbo_cpu_seconds)
+		<< ", \"nbo_reported_wall_seconds\": " << jnum(r.nbo_reported_wall_seconds) << "},\n";
 	f << "  \"thresholds\": {\"e2_kcal\": " << jnum(r.e2_threshold_kcal)
 		<< ", \"e2_intermolecular_kcal\": " << jnum(r.e2_intermolecular_threshold_kcal)
 		<< ", \"nrt_parent_percent\": " << jnum(r.nrt.parent_threshold_percent)
@@ -401,12 +598,19 @@ void write_nbo_json(const NboResults& r, const std::filesystem::path& json_file)
 	f << "  \"nrt\": {\"present\": " << (r.nrt.present ? "true" : "false")
 		<< ", \"structures_used\": " << r.nrt.structures_used << ", \"structures_found\": " << r.nrt.structures_found
 		<< ", \"d_0\": " << jnum(r.nrt.d_0) << ", \"d_w\": " << jnum(r.nrt.d_w)
+		<< ", \"max_search_cycles\": " << r.nrt.max_search_cycles
+		<< ", \"symmetry\": " << jstr(r.nrt.symmetry)
+		<< ", \"initial_structures\": {\"total\": " << r.nrt.initial_topo << ", \"nls\": " << r.nrt.initial_nls
+		<< ", \"nbi\": " << r.nrt.initial_nbi << ", \"sym\": " << r.nrt.initial_sym << "}"
+		<< ", \"nrtstr_keylist\": " << jstr(r.nrt.nrtstr_keylist)
 		<< ", \"seconds\": {\"search\": " << jnum(r.nrt.search_seconds) << ", \"gram\": " << jnum(r.nrt.gram_seconds)
 		<< ", \"minimize\": " << jnum(r.nrt.minimize_seconds) << ", \"other\": " << jnum(r.nrt.other_seconds) << "},\n";
 	f << "    \"weights\": [\n";
 	for (size_t i = 0; i < r.nrt.weights.size(); i++) {
 		const auto& w = r.nrt.weights[i];
 		f << "      {\"structure\": " << w.structure << ", \"weight_percent\": " << jnum(w.weight_percent)
+			<< ", \"weight_fraction\": " << jnum(w.weight_fraction) << ", \"idxres\": " << w.idxres
+			<< ", \"changes\": " << jstr(w.changes)
 			<< ", \"spin\": " << jstr(w.spin) << "}" << (i + 1 < r.nrt.weights.size() ? "," : "") << "\n";
 	}
 	f << "    ],\n    \"bond_orders\": [\n";
@@ -414,9 +618,65 @@ void write_nbo_json(const NboResults& r, const std::filesystem::path& json_file)
 		const auto& b = r.nrt.bond_orders[i];
 		f << "      {\"atom1\": " << b.atom1 << ", \"atom2\": " << b.atom2 << ", \"total\": " << jnum(b.total)
 			<< ", \"covalent\": " << jnum(b.covalent) << ", \"ionic\": " << jnum(b.ionic)
+			<< ", \"diagonal\": " << (b.diagonal ? "true" : "false")
 			<< ", \"spin\": " << jstr(b.spin) << "}" << (i + 1 < r.nrt.bond_orders.size() ? "," : "") << "\n";
 	}
-	f << "    ]\n  }\n}\n";
+	f << "    ],\n    \"valencies\": [\n";
+	for (size_t i = 0; i < r.nrt.valencies.size(); i++) {
+		const auto& v = r.nrt.valencies[i];
+		f << "      {\"atom\": " << v.atom << ", \"element\": " << jstr(v.element) << ", \"valency\": " << jnum(v.valency)
+			<< ", \"covalency\": " << jnum(v.covalency) << ", \"electrovalency\": " << jnum(v.electrovalency)
+			<< ", \"electron_count\": " << jnum(v.electron_count) << ", \"spin\": " << jstr(v.spin)
+			<< "}" << (i + 1 < r.nrt.valencies.size() ? "," : "") << "\n";
+	}
+	f << "    ],\n    \"cycles\": [\n";
+	for (size_t i = 0; i < r.nrt.cycles.size(); i++) {
+		const auto& c = r.nrt.cycles[i];
+		f << "      {\"cycle\": " << c.cycle << ", \"structures_used\": " << c.structures_used
+			<< ", \"structures_found\": " << c.structures_found << ", \"d_w\": " << jnum(c.d_w)
+			<< ", \"kmax\": " << c.kmax << ", \"choose\": " << c.choose << ", \"ion\": " << c.ion
+			<< ", \"e2\": " << c.e2 << ", \"sym\": " << c.sym << ", \"dbmax\": " << jnum(c.dbmax)
+			<< ", \"dbrms\": " << jnum(c.dbrms) << ", \"spin\": " << jstr(c.spin)
+			<< "}" << (i + 1 < r.nrt.cycles.size() ? "," : "") << "\n";
+	}
+	auto write_topo = [&f](const std::vector<std::vector<int>>& t) {
+		f << "[";
+		for (size_t i = 0; i < t.size(); i++) {
+			f << (i ? ", [" : "[");
+			for (size_t j = 0; j < t[i].size(); j++) f << (j ? ", " : "") << t[i][j];
+			f << "]";
+		}
+		f << "]";
+	};
+	f << "    ],\n    \"leading_topo\": [\n";
+	for (size_t i = 0; i < r.nrt.leading_topo.size(); i++) {
+		f << "      {\"spin\": " << jstr(r.nrt.leading_topo[i].spin) << ", \"matrix\": ";
+		write_topo(r.nrt.leading_topo[i].matrix);
+		f << "}" << (i + 1 < r.nrt.leading_topo.size() ? "," : "") << "\n";
+	}
+	f << "    ],\n    \"candidates\": [\n";
+	for (size_t i = 0; i < r.nrt.candidates.size(); i++) {
+		const auto& c = r.nrt.candidates[i];
+		f << "      {\"structure\": " << c.structure << ", \"idxres\": " << c.idxres << ", \"rho_nl\": " << jnum(c.rho_nl)
+			<< ", \"spin\": " << jstr(c.spin) << ", \"topo\": ";
+		write_topo(c.topo);
+		f << "}" << (i + 1 < r.nrt.candidates.size() ? "," : "") << "\n";
+	}
+	f << "    ],\n    \"qp_iterations\": [\n";
+	for (size_t i = 0; i < r.nrt.qp_iterations.size(); i++) {
+		const auto& q = r.nrt.qp_iterations[i];
+		f << "      {\"iteration\": " << q.iteration << ", \"structures\": " << q.structures << ", \"d_w\": " << jnum(q.d_w)
+			<< ", \"kkt\": " << jstr(q.kkt) << ", \"rho_nl\": " << jnum(q.rho_nl) << ", \"added\": " << q.added
+			<< ", \"spin\": " << jstr(q.spin) << "}" << (i + 1 < r.nrt.qp_iterations.size() ? "," : "") << "\n";
+	}
+	auto write_strings = [&f](const std::vector<std::string>& v) {
+		for (size_t i = 0; i < v.size(); i++) f << (i ? ", " : "") << jstr(v[i]);
+	};
+	f << "    ],\n    \"arrows\": [";
+	write_strings(r.nrt.arrows);
+	f << "],\n    \"symmetry_forms\": [";
+	write_strings(r.nrt.symmetry_forms);
+	f << "]\n  }\n}\n";
 }
 
 //---------------------------------------------------------------------------------------------
@@ -492,6 +752,13 @@ NboComparison compare_nbo_results(const NboResults& ref, const NboResults& cand,
 		e2_key, [](const NboE2Entry& e) { return e.energy_kcal; }, tol.e2_kcal));
 	c.quantities.push_back(compare_quantity<NboBondOrder>("NRT bond order", ref.nrt.bond_orders, cand.nrt.bond_orders,
 		bo_key, [](const NboBondOrder& b) { return b.total; }, tol.bond_order));
+	c.quantities.push_back(compare_quantity<NboBondOrder>("NRT bond order (cov)", ref.nrt.bond_orders, cand.nrt.bond_orders,
+		bo_key, [](const NboBondOrder& b) { return b.covalent; }, tol.bond_order));
+	c.quantities.push_back(compare_quantity<NboBondOrder>("NRT bond order (ion)", ref.nrt.bond_orders, cand.nrt.bond_orders,
+		bo_key, [](const NboBondOrder& b) { return b.ionic; }, tol.bond_order));
+	c.quantities.push_back(compare_quantity<NboValency>("NRT valency", ref.nrt.valencies, cand.nrt.valencies,
+		[](const NboValency& v) { return v.spin + "|" + std::to_string(v.atom); },
+		[](const NboValency& v) { return v.valency; }, tol.bond_order));
 	c.quantities.push_back(compare_quantity<NboResonanceWeight>("NRT weight", ref.nrt.weights, cand.nrt.weights,
 		[](const NboResonanceWeight& w) { return w.spin + "|" + std::to_string(w.structure); },
 		[](const NboResonanceWeight& w) { return w.weight_percent; }, tol.weight_percent));

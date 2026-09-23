@@ -453,3 +453,85 @@ TEST(NboRun, OpenShellNh3LiSpinResolvedNpaMatchesOrcaSpinPopulations)
 	for (const auto& e : r.e2) spin_e2 |= !e.spin.empty();
 	EXPECT_TRUE(spin_e2);
 }
+
+/*
+ * The NRT capture, against the acetylene output of the reference set (NRT E2PERT NRTLST=0.1
+ * NRTDTL). Everything asserted here is a number NBO 7.0.9 printed, so a parser that starts
+ * dropping rows - the zero-weight tail, the diagonal of the bond-order matrix, a resonance
+ * structure whose Added(Removed) column wrapped onto a second line - fails here rather than
+ * silently shipping a short reference.
+ */
+TEST(NboRun, CapturesTheFullNrtSectionOfTheAcetyleneReference)
+{
+	const auto nbo = repo_root() / "tests" / "nbo_reference" / "acetylene_nrtdtl.nbo";
+	if (!std::filesystem::exists(nbo)) GTEST_SKIP() << "NRT reference fixture is not available";
+
+	const NboResults r = parse_nbo_output(nbo);
+	ASSERT_TRUE(r.nrt.present);
+	EXPECT_EQ(r.nrt.structures_used, 7);
+	EXPECT_EQ(r.nrt.structures_found, 15);
+	EXPECT_NEAR(r.nrt.d_w, 0.01830453, 1.0e-8);
+	EXPECT_NEAR(r.nrt.d_0, 0.01884235, 1.0e-8);
+	EXPECT_EQ(r.nrt.max_search_cycles, 3);
+	EXPECT_EQ(r.nrt.initial_topo, 1);
+	EXPECT_NE(r.nrt.symmetry.find("symmetry operator"), std::string::npos);
+	EXPECT_GT(r.nbo_cpu_seconds, 0.0);
+
+	//The search table: two cycles, the second one generating nothing new.
+	ASSERT_EQ(r.nrt.cycles.size(), 2u);
+	EXPECT_EQ(r.nrt.cycles[0].structures_found, 1);
+	EXPECT_EQ(r.nrt.cycles[1].structures_used, 7);
+	EXPECT_EQ(r.nrt.cycles[1].structures_found, 15);
+	EXPECT_EQ(r.nrt.cycles[1].e2, 0);
+
+	//All 15 candidates, not only the 7 with weight: the ratio is what a screening scheme has
+	//to beat, so the zero-weight tail has to survive the parse.
+	ASSERT_EQ(r.nrt.weights.size(), 15u);
+	EXPECT_NEAR(r.nrt.weights[0].weight_percent, 95.70, 1.0e-6);
+	EXPECT_NEAR(r.nrt.weights[0].weight_fraction, 0.95696, 1.0e-6);
+	EXPECT_NE(r.nrt.weights[1].changes.find("C 1- C 2"), std::string::npos);
+	int zero_weight = 0;
+	for (const auto& w : r.nrt.weights) if (w.weight_fraction == 0.0) zero_weight++;
+	EXPECT_EQ(zero_weight, 8);
+	ASSERT_EQ(r.nrt.candidates.size(), 15u);
+	EXPECT_NEAR(r.nrt.candidates[0].rho_nl, 0.02527, 1.0e-6);
+	ASSERT_EQ(r.nrt.candidates[0].topo.size(), 4u);
+	EXPECT_EQ(r.nrt.candidates[0].topo[0][1], 3);   //the C-C triple bond of the leading structure
+
+	//The QP path, so a candidate implementation can be compared step by step and not only at
+	//the converged answer.
+	ASSERT_GE(r.nrt.qp_iterations.size(), 8u);
+	EXPECT_NEAR(r.nrt.qp_iterations.back().d_w, 0.01830453, 1.0e-8);
+	//Two "Perform ARROWS on structures of weight > X%" lines (the parent threshold as NBO applied
+	//it, once per cycle) and the one line naming the parent structure and the E2 depth used.
+	ASSERT_EQ(r.nrt.arrows.size(), 3u);
+	EXPECT_NE(r.nrt.arrows[1].find("generates 6 new structures from structure 1"), std::string::npos);
+	EXPECT_NE(r.nrt.arrows[1].find("E(2)=1.0 kcal/mol"), std::string::npos);
+
+	//The bond-order matrix as printed: upper triangle plus diagonal of a 4-atom system.
+	ASSERT_EQ(r.nrt.bond_orders.size(), 10u);
+	const NboBondOrder* cc = nullptr;
+	const NboBondOrder* diag = nullptr;
+	for (const auto& b : r.nrt.bond_orders) {
+		if (b.atom1 == 1 && b.atom2 == 2) cc = &b;
+		if (b.atom1 == 1 && b.atom2 == 1) diag = &b;
+	}
+	ASSERT_NE(cc, nullptr);
+	ASSERT_NE(diag, nullptr);
+	EXPECT_NEAR(cc->total, 2.9938, 1.0e-6);
+	EXPECT_NEAR(cc->covalent, 2.9938, 1.0e-6);
+	EXPECT_NEAR(cc->ionic, 0.0, 1.0e-6);
+	EXPECT_TRUE(diag->diagonal);
+	EXPECT_NEAR(diag->total, 0.0198, 1.0e-6);
+
+	//Valencies, the atom-by-atom sum of those bond orders.
+	ASSERT_EQ(r.nrt.valencies.size(), 4u);
+	EXPECT_EQ(r.nrt.valencies[0].element, "C");
+	EXPECT_NEAR(r.nrt.valencies[0].valency, 3.9631, 1.0e-6);
+	EXPECT_NEAR(r.nrt.valencies[0].covalency, 3.7369, 1.0e-6);
+	EXPECT_NEAR(r.nrt.valencies[0].electron_count, 7.9657, 1.0e-6);
+
+	ASSERT_EQ(r.nrt.leading_topo.size(), 1u);
+	EXPECT_EQ(r.nrt.leading_topo[0].matrix[1][0], 3);
+	EXPECT_NE(r.nrt.nrtstr_keylist.find("STR"), std::string::npos);
+}
