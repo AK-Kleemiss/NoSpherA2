@@ -64,6 +64,7 @@ void WFN::reset()
 	UT_DensityMatrix.clear();
 	UT_SpinDensityMatrix.clear();
 	DM = dMatrix2();
+	DM_beta = dMatrix2();
 	MO_sph = dMatrix2();
 	basis_set = NULL;
 	cub.clear();
@@ -2452,6 +2453,7 @@ WFN &WFN::operator=(const WFN &right)
 	UT_DensityMatrix = right.UT_DensityMatrix;
 	UT_SpinDensityMatrix = right.UT_SpinDensityMatrix;
 	DM = right.DM;
+	DM_beta = right.DM_beta;
 	MO_sph = right.MO_sph;
 	basis_set = right.basis_set;
 	cub = right.cub;

@@ -897,6 +897,10 @@ struct options
 	double xcw_strong_cutoff = 3.0;
     bool calc_F_calc = false;
     bool rgbi = false;
+    //-npa: natural atomic orbitals and natural population analysis (NAO/NPA), run in-process
+    bool npa = false;
+    //-npa_naos: also print the per-NAO occupancy table, as NBO's NATURAL POPULATIONS block
+    bool npa_orbitals = true;
     bool rgbi_no_sym = false;
     bool rgbi_EVs = false;
     bool rgbi_theta = false;

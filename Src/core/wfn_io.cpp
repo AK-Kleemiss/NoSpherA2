@@ -559,7 +559,7 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
 	//----------------------------- MOs: "Key= value" header lines, then "index coefficient" lines ------------------------------
 	//One row per MO of either spin: the density matrix is sum_i occ_i c_i c_i^T whatever the spin
 	vec2 coefficients;
-	vec occ;
+	vec occ, occ_beta;
 	int nmo = 0;
 	while (getline_universal(rf, line) && line.find("[") == string::npos)
 	{
@@ -585,6 +585,7 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
 			is_unrestricted = true;
 		push_back_MO(nmo + 1, occup, ene, spin);
 		occ.push_back(occup);
+		occ_beta.push_back(spin ? occup : 0.0);
 		coefficients.push_back(vec());
 		int run = 0, basis_run = 0;
 		vec2 shell;
@@ -619,6 +620,10 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
 	dMatrix2 m_coefs = reshape<dMatrix2>(_coefficients, Shape2D(nmo, expected_coefs));
 	dMatrix2 temp_co = diag_dot(m_coefs, occ, true);
 	DM = dot(temp_co, m_coefs);
+	if (is_unrestricted) {
+		dMatrix2 temp_b = diag_dot(m_coefs, occ_beta, true);
+		DM_beta = dot(temp_b, m_coefs);
+	}
 	set_exp_cutoff();
 	return true;
 };
@@ -1429,6 +1434,7 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
 			std::transform(DM_s1.container().begin(), DM_s1.container().end(), DM_s2.data(), DM_s1.data(), std::plus<double>());
 
 			DM = DM_s1;
+			DM_beta = DM_s2;
 		}
 
 		if (debug)

@@ -73,6 +73,9 @@ private:
 	std::vector<bond_index_result> RGBI;
 	std::vector<group_bond_index_result> RGBI_groups;
 	ivec ano_fallback_atoms;
+	//Roby-Gould atomic natural orbitals: one atom at a time, plain Loewdin S^-1/2, no
+	//orthogonalisation between atoms - what the RGBI projections want, and a different quantity
+	//from the NAOs of nao.h, whose occupancies sum to the exact electron count.
 	NAOResult calculateAtomicNAO(const dMatrix2& D_full, const dMatrix2& S_full,
 		const ivec& atom_indices, const ivec& shell_angular_momenta = {},
 		bool spherical = false, double occupancy_cutoff = 1.0 / 6.0,

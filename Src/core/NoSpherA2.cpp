@@ -13,6 +13,7 @@
 #include "XCW.h"
 #include "geometry_aid.h"
 #include "crystal_energies.h"
+#include "nao.h"
 #ifdef NOSPHERA2_USE_GPU
 #include "grid_gpu.h"
 #include "aux_density_gpu.h"
@@ -657,6 +658,16 @@ static int run_app_impl(int argc, char **argv)
 		if (opt.rgbi) {
 			Roby_information Roby(wavy[0], opt.rgbi_group_sets, !opt.rgbi_no_sym,
 				opt.rgbi_orbital_basis == RGBIOrbitalBasis::ANO, opt.rgbi_EVs, opt.rgbi_theta);
+		}
+
+		if (opt.npa) {
+			NPAResult npa = natural_population_analysis(wavy[0]);
+			if (!opt.npa_orbitals) {
+				npa.total.orbitals.clear();
+				npa.alpha.orbitals.clear();
+				npa.beta.orbitals.clear();
+			}
+			print_npa(npa, log_file);
 		}
 
 		// this one is for generation of an fchk file

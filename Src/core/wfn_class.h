@@ -122,6 +122,9 @@ private:
 	vec UT_SpinDensityMatrix;
 	// Density Matrix in mdarray
 	dMatrix2 DM;
+	// Beta-spin part of DM, same order and size. Only filled by readers that separate the spins
+	// (gbw, molden); empty for a restricted case and for readers that only sum the two.
+	dMatrix2 DM_beta;
 	// Spherical MO coefficients as OCC converged them, rows = AO in OCC's m = -l..l order
 	// (beta block below alpha when unrestricted), columns = MO. Filled by the OCC constructor.
 	dMatrix2 MO_sph;
@@ -620,6 +623,10 @@ public:
 	dMatrix2 get_dm() const { return DM; };
 	/** Set density matrix*/
 	void set_dm(const dMatrix2& in) { DM = in; };
+	/** Beta-spin density matrix if the reader kept one, empty otherwise. */
+	dMatrix2 get_dm_beta() const { return DM_beta; };
+	/** Set beta-spin density matrix*/
+	void set_dm_beta(const dMatrix2& in) { DM_beta = in; };
 	//----------S_DM Handling--------------------------------
 	/** Append spin density matrix element. */
 	void push_back_SDM(const double& value = 0.0);

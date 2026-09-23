@@ -397,6 +397,11 @@ std::string help_message =
  "                                    wavefunction and writes\n"
  "                                    NA2_<lambda>_RGBI.txt; the .wfn and\n"
  "                                    .fchk written there cannot carry it.\n"
+ "  -npa                               Natural atomic orbitals and natural\n"
+ "                                    population analysis (NAO/NPA). Needs a\n"
+ "                                    contracted spherical basis, so a .gbw,\n"
+ "                                    .molden or .fchk, not a .wfn/.wfx.\n"
+ "  -npa_summary                       -npa without the per-orbital NAO table.\n"
  "  -rgbi_no_sym                       RGBI without atomic O_h symmetrization.\n"
  "  -rgbi_basis <nao|ano>              RGBI basis: occupied NAO or ANO [ano].\n"
  "  -rgbi-groups <range ...>           RGBI groups, e.g. 0-5,7; repeat option\n"
@@ -3569,6 +3574,12 @@ bool options::digest_ri_options(const std::string &temp, int &i)
         //them because the calculator setup costs 0.7 s against 0.0009 s per atom (cached_calculator).
         err_checkf(i + 1 < argc, "-calc_featomic_descriptors needs the list file", std::cout);
         featomic_structures = geometry_aid::read_structure_list(arguments[++i]);
+    }
+    else if (temp == "-npa")
+        npa = true;
+    else if (temp == "-npa_summary") {
+        npa = true;
+        npa_orbitals = false;
     }
     else if (temp == "-rgbi")
         rgbi = true;
