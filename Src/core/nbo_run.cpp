@@ -38,6 +38,11 @@ namespace {
 	const std::regex re_qpnrt(R"(QPNRT\((\d+)/(\d+)\):\s*D\(0\)=([\d.eE+-]+);\s*D\(w\)=([\d.eE+-]+))");
 	const std::regex re_timing(R"(Timing\(sec\):\s*search=([\d.]+);\s*Gram matrix=([\d.]+);\s*minimize=([\d.]+);\s*other=([\d.]+))");
 	const std::regex re_version(R"(Cite this program \[(.+?)\])");
+	//NBO echoes each keyword it recognised as "/NRTLST / : Set to 0.1%". That is the keylist as
+	//NBO understood it rather than as we wrote it - it also shows the defaults a keyword pulled in
+	//and drops anything misspelled - so it is what the reference set records, and it is the only
+	//source available when the parser runs on an output alone (-nbo_parse).
+	const std::regex re_keyword(R"(^\s*/([A-Z0-9]+)\s*/ : )");
 	const std::regex re_e2_thresh(R"(^\s*Threshold for printing:\s*([\d.]+) kcal/mol)");
 	const std::regex re_e2_inter(R"(^\s*\(Intermolecular threshold:\s*([\d.]+) kcal/mol)");
 	const std::regex re_parent_thresh(R"(Parent structure threshold:\s*([\d.]+)% of leading weight)");
@@ -127,6 +132,10 @@ NboResults parse_nbo_output(const std::filesystem::path& nbo_file) {
 	while (std::getline(in, line)) {
 		std::smatch m;
 		if (r.version.empty() && std::regex_search(line, m, re_version)) r.version = m[1].str();
+		if (std::regex_search(line, m, re_keyword)) {
+			if (!r.keywords_reported.empty()) r.keywords_reported += " ";
+			r.keywords_reported += m[1].str();
+		}
 		if (line.find("Alpha spin orbitals") != std::string::npos) { spin = "alpha"; r.open_shell = true; section = Section::none; continue; }
 		if (line.find("Beta  spin orbitals") != std::string::npos || line.find("Beta spin orbitals") != std::string::npos) { spin = "beta"; r.open_shell = true; section = Section::none; continue; }
 
@@ -534,6 +543,7 @@ void write_nbo_json(const NboResults& r, const std::filesystem::path& json_file)
 	f << "  \"source\": " << jstr(r.source) << ",\n";
 	f << "  \"nbo_version\": " << jstr(r.version) << ",\n";
 	f << "  \"keywords\": " << jstr(r.keywords) << ",\n";
+	f << "  \"keywords_reported\": " << jstr(r.keywords_reported) << ",\n";
 	f << "  \"open_shell\": " << (r.open_shell ? "true" : "false") << ",\n";
 	//nbo_seconds wraps the process; the other two are NBO's own closing line. NBO 7 is serial.
 	f << "  \"timings\": {\"file47_seconds\": " << jnum(r.file47_seconds) << ", \"nbo_seconds\": " << jnum(r.nbo_seconds)

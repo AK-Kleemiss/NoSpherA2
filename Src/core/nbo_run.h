@@ -177,6 +177,9 @@ struct NboResults {
 	std::string source;         //the wavefunction the archive came from
 	std::string version;        //NBO banner
 	std::string keywords;       //what went into the $NBO keylist
+	//the keywords NBO echoed back, space separated, in the order it printed them. Not the same
+	//thing: it shows what NBO actually recognised and is all there is when only the output is read
+	std::string keywords_reported;
 	bool open_shell = false;
 	double file47_seconds = 0.0;
 	double nbo_seconds = 0.0;      //wall clock around the gennbo process, wrapper-measured

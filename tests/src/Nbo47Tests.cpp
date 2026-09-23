@@ -467,6 +467,10 @@ TEST(NboRun, CapturesTheFullNrtSectionOfTheAcetyleneReference)
 	if (!std::filesystem::exists(nbo)) GTEST_SKIP() << "NRT reference fixture is not available";
 
 	const NboResults r = parse_nbo_output(nbo);
+	//The keylist as NBO echoed it back. Re-deriving a stored reference after a parser change goes
+	//through -nbo_parse, and then this is the only record of what the run was asked for:
+	//r.keywords stays empty because nothing passed a keylist in.
+	EXPECT_EQ(r.keywords_reported, "NRT NRTLST NRTDTL E2PERT");
 	ASSERT_TRUE(r.nrt.present);
 	EXPECT_EQ(r.nrt.structures_used, 7);
 	EXPECT_EQ(r.nrt.structures_found, 15);
