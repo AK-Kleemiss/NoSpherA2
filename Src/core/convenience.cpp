@@ -16,6 +16,7 @@
 #include "SALTED_equicomb.h"
 #include "nbo_run.h"
 #include "eli_family.h"
+#include "topology.h"
 
 #ifdef _WIN32
 #include <windows.h>
@@ -417,7 +418,12 @@ std::string help_message =
  "                                    comma-separated atom indices. Runs at\n"
  "                                    once, so -ri_fit or -SALTED must come\n"
  "                                    before it (see -eli_analysis).\n"
- "  -laplacian_bonds <wfn>             Plot density Laplacian along bonds.\n\n"
+ "  -laplacian_bonds <wfn>             Plot density Laplacian along bonds.\n"
+ "  -topology <wfn>                    All critical points of rho (nuclear,\n"
+ "                                    bond, ring, cage) by Newton-Raphson on\n"
+ "                                    the analytic Hessian, with the\n"
+ "                                    Poincare-Hopf completeness check and any\n"
+ "                                    non-nuclear attractors.\n\n"
  "CONVERSION, ML, AND SPECIALISED TOOLS\n"
  "  -gbw2wfn -wfn <file.gbw>            Convert GBW input to .wfn.\n"
  "  -convert_to_47 <wfn>               Write an NBO File47 (.47). Add\n"
@@ -3175,6 +3181,13 @@ bool options::digest_property_options(const std::string &temp, int &i)
         err_checkf(argc >= i + 2, "Not enough arguments for -eli_family\nPlease provide at least a wfn!", std::cout);
         const bool has_points = argc >= i + 3 && arguments[i + 2].size() > 0 && arguments[i + 2][0] != '-';
         eli_family::report(arguments[i + 1], has_points ? std::filesystem::path(arguments[i + 2]) : std::filesystem::path());
+        finished = true; return true;
+    }
+    //Every critical point of rho - nuclear, bond, ring and cage - from the analytic Hessian, with
+    //Poincare-Hopf as the check that none is missing. No cube: the seeding comes from the topology
+    else if (temp == "-topology") {
+        err_checkf(argc >= i + 2, "Not enough arguments for -topology\nPlease provide a wfn!", std::cout);
+        topology::report(arguments[i + 1], std::cout);
         finished = true; return true;
     }
     else if (temp == "-qtaim_eli") {

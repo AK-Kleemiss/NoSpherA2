@@ -49,6 +49,7 @@
     <ClCompile Include="..\..\tests\src\ScatteringFactorTests.cpp" />
     <ClCompile Include="..\..\tests\src\StoredEriTests.cpp" />
     <ClCompile Include="..\..\tests\src\StringUtilTests.cpp" />
+    <ClCompile Include="..\..\tests\src\TopologyTests.cpp" />
     <ClCompile Include="..\..\tests\src\TscIoTests.cpp" />
     <ClCompile Include="..\..\tests\src\WfnOpsTests.cpp" />
     <ClCompile Include="..\..\tests\src\WfnReadTests.cpp" />
