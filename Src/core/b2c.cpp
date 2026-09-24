@@ -1465,6 +1465,22 @@ std::vector<d4> streaming_density_attractors(const WFN &wavy, const std::vector<
 	return maxima;
 }
 
+static bool g_beta_spheres = true;
+void beta_spheres_set_enabled(const bool on) { g_beta_spheres = on; }
+bool beta_spheres_enabled() { return g_beta_spheres; }
+static double g_basin_step_scale = 1.0;
+void basin_step_scale_set(const double f) { g_basin_step_scale = f > 0.0 ? f : 1.0; }
+double basin_step_scale() { return g_basin_step_scale; }
+static bool g_basin_timing = false;
+void basin_timing_set_enabled(const bool on) { g_basin_timing = on; }
+bool basin_timing_enabled() { return g_basin_timing; }
+void basin_stage_timer::lap(const std::string &what) {
+	const auto now = std::chrono::steady_clock::now();
+	const double s = std::chrono::duration<double>(now - t).count();
+	t = now;
+	if (g_basin_timing) std::cout << "  [timing] " << what << ": " << std::fixed << std::setprecision(2) << s << " s" << std::endl;
+}
+
 //Populations of the basins integrated on the molecule's atom-centred quadrature grids, which
 //carry the cusps a uniform cube cannot. A quadrature point takes the basin of its cube cell
 //when every voxel within three of it agrees; otherwise it is sent up the analytic field
@@ -1514,13 +1530,14 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 	//of every nucleus the field is smooth enough for a whole voxel.
 	const double voxel = std::min({ h[0], h[1], h[2] });
 	const std::vector<atom> atoms = wavy.get_atoms();
+	const double sscale = basin_step_scale();
 	auto step_at = [&](const d3 &p) {
 		double d2 = std::numeric_limits<double>::max();
 		for (const atom &at : atoms) {
 			const d3 ap = at.get_pos();
 			d2 = std::min(d2, std::pow(p[0] - ap[0], 2) + std::pow(p[1] - ap[1], 2) + std::pow(p[2] - ap[2], 2));
 		}
-		if (d2 < 2.25) return 0.3 * voxel;
+		if (d2 < 2.25) return sscale * 0.3 * voxel;
 		//Beyond six bohr of every nucleus the density is a smooth decaying tail with no basin
 		//boundary a step could miss, and the streaming path has to walk points out there all the
 		//way back in - the cube used to stop at its own edge and hand them to "outside". The step
@@ -1529,8 +1546,8 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 		//Streaming only: with a cube the long step jumps over its edge, and a point that leaves
 		//is lost to "outside" rather than slow - it cost NH3Li's ELI-D 0.02 e when it applied
 		//to both paths.
-		if (streaming && d2 > 36.0) return std::min(0.25 * std::sqrt(d2), 4.0);
-		return voxel;
+		if (streaming && d2 > 36.0) return sscale * std::min(0.25 * std::sqrt(d2), 4.0);
+		return sscale * voxel;
 	};
 	const double step = 0.3 * voxel;
 	//Cube cell of a position and the position within it; false outside the cube
@@ -1568,10 +1585,23 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 	//ELI-D maximum, which is broad; a nucleus gets a tenth of a bohr, since a hydroxyl
 	//hydrogen's basin is 0.4 bohr thick and a wider net catches the oxygen's electrons
 	const double catch2 = eli_field ? std::pow(2.0 * std::max({ h[0], h[1], h[2] }), 2) : 0.01;
+	//The beta sphere of each maximum, squared, and the centre it is drawn around; both filled
+	//below once the gradient is available and left at zero / the maximum itself wherever there is
+	//no sphere, which is exactly the old catch2 behaviour.
+	//The centre is separate because the maxima come out of the cube and sit at voxel centres, up
+	//to half a voxel from the attractor they stand for. The sphere is an acceleration structure,
+	//so it is drawn around the attractor the short ascent below actually finds; nothing that gets
+	//reported moves.
+	vec beta2(maxima.size(), 0.0);
+	std::vector<d3> bcen(maxima.size());
+	for (size_t m = 0; m < maxima.size(); m++) bcen[m] = d3{ maxima[m][0], maxima[m][1], maxima[m][2] };
 	auto at_maximum = [&](const d3 &p) {
-		for (size_t m = 0; m < maxima.size(); m++)
+		for (size_t m = 0; m < maxima.size(); m++) {
 			if (std::pow(p[0] - maxima[m][0], 2) + std::pow(p[1] - maxima[m][1], 2) + std::pow(p[2] - maxima[m][2], 2) < catch2)
 				return basin_of(m);
+			if (beta2[m] > 0.0 && std::pow(p[0] - bcen[m][0], 2) + std::pow(p[1] - bcen[m][1], 2) + std::pow(p[2] - bcen[m][2], 2) < beta2[m])
+				return basin_of(m);
+		}
 		return 0;
 	};
 	//The basin of the maximum nearest p, 0 when the nearest is further than reach. A stalled
@@ -1607,6 +1637,98 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 		gradient(p, g);
 		return density(p);
 	};
+	//Beta spheres. Around an attractor there is a radius inside which no ascent trajectory can
+	//get out: if grad f . rhat < 0 at every point of the sphere then a path leaving it would have
+	//to cross outwards while the gradient it is following points inwards, which it cannot. Every
+	//point inside therefore belongs to the one maximum inside without being climbed at all, and a
+	//trajectory that enters is finished on the spot. That second part is where the time is:
+	//catch2 is a tenth of a bohr for the density and step_at shrinks the step to 0.3 voxel within
+	//1.5 bohr of a nucleus, so every trajectory otherwise walks the whole cusp in tens of steps of
+	//two gradient calls each - and there are three to nine trajectories per quadrature point.
+	//The radius is the smallest over a spiral of directions marched outwards until the radial
+	//derivative stops being negative, kept at 70 % of it. Capped at 0.45 of the distance to the
+	//nearest other maximum so two spheres can never meet and only one attractor is ever inside -
+	//a saddle between two maxima stops the march by itself, the radial derivative past it
+	//pointing at the other one.
+	//The direction count and the margin are not free parameters to be picked small. The first
+	//version sampled 26 directions and kept 90 %: on NH3Li the three chemically equivalent
+	//hydrogens came out 0.6358 / 0.6384 / 0.6542 e against 0.6358 / 0.6351 / 0.6355 with the
+	//spheres off, i.e. one sphere in three had poked through the N-H separatrix between two
+	//samples and eaten 0.019 e of nitrogen. 45 degrees between samples is far too coarse for a
+	//surface that comes within 0.4 bohr of a hydrogen, and 10 % of margin does not cover the
+	//difference between the smallest sampled radius and the smallest radius there is. 302
+	//directions put the samples ~7 degrees apart and cost 302 * cap / march gradient calls per
+	//maximum - some hundred thousand for a 45-atom molecule, against the 10^9 the quadrature
+	//itself spends, so there is no reason to be stingy.
+	//ponytail: still a sample, so still only exact at the sampled directions. -no_beta_spheres is
+	//the A/B that says whether it is tight enough, and BetaSpheres.AgreeWithTheFullClimbOnHydroxide
+	//is the check that it stays so.
+	basin_stage_timer T;
+	const std::string fieldname = eli_field ? "ELI-D " : "QTAIM ";
+	if (streaming && beta_spheres_enabled() && !maxima.empty()) {
+		constexpr int ndir = 302;
+		static const std::vector<d3> dirs = [] {
+			std::vector<d3> d(ndir);
+			for (int i = 0; i < ndir; i++) {
+				const double z = 1.0 - 2.0 * (i + 0.5) / ndir;
+				const double s = std::sqrt(std::max(0.0, 1.0 - z * z));
+				const double phi = 2.39996322972865332 * i;   //golden angle: no two samples line up
+				d[i] = d3{ s * std::cos(phi), s * std::sin(phi), z };
+			}
+			return d;
+		}();
+		const double march = 0.05;   //bohr; the radius is only ever needed to within a step
+		const int nm = static_cast<int>(maxima.size());
+#pragma omp parallel for schedule(dynamic)
+		for (int m = 0; m < nm; m++) {
+			//Ascend onto the attractor first. A cube maximum is a voxel centre, so half a voxel
+			//out on the far side of the true top the radial derivative already points back in:
+			//the march stops at its very first sample and the sphere collapses to nothing. That
+			//is the whole reason the density gained (its maxima are nuclei, exact to the last
+			//digit) and ELI-D gained not one trajectory.
+			d3 c{ maxima[m][0], maxima[m][1], maxima[m][2] };
+			{
+				d3 g;
+				double f = value_and_gradient(c, g), sl = 0.5 * voxel;
+				for (int it = 0; it < 60 && sl > 1e-4; it++) {
+					const double gn = std::sqrt(g[0] * g[0] + g[1] * g[1] + g[2] * g[2]);
+					if (gn < 1e-12) break;
+					const d3 t{ c[0] + sl * g[0] / gn, c[1] + sl * g[1] / gn, c[2] + sl * g[2] / gn };
+					d3 gt;
+					const double ft = value_and_gradient(t, gt);
+					if (ft > f) { c = t; f = ft; g = gt; }
+					else sl *= 0.5;
+				}
+			}
+			//Walked further than a voxel and a half: that is not this maximum refined any more,
+			//it is a different attractor, and a sphere around it would answer for the wrong
+			//basin. Such a maximum keeps the plain catch radius and no sphere.
+			if (std::pow(c[0] - maxima[m][0], 2) + std::pow(c[1] - maxima[m][1], 2) + std::pow(c[2] - maxima[m][2], 2) > std::pow(1.5 * voxel, 2))
+				continue;
+			double cap = 3.0;
+			for (int n = 0; n < nm; n++) {
+				if (n == m || basin_of(n) == basin_of(m)) continue;
+				const double d = std::sqrt(std::pow(c[0] - maxima[n][0], 2) + std::pow(c[1] - maxima[n][1], 2) + std::pow(c[2] - maxima[n][2], 2));
+				cap = std::min(cap, 0.45 * d);
+			}
+			double r = cap;
+			for (const d3 &u : dirs) {
+				double rr = march;
+				for (; rr <= cap + 1e-12; rr += march) {
+					const d3 q{ c[0] + rr * u[0], c[1] + rr * u[1], c[2] + rr * u[2] };
+					d3 g;
+					gradient(q, g);
+					if (g[0] * u[0] + g[1] * u[1] + g[2] * u[2] >= 0.0) break;
+				}
+				r = std::min(r, rr - march);
+				if (r <= march) break;
+			}
+			if (r <= 2.0 * march) continue;
+			bcen[m] = c;
+			beta2[m] = std::pow(0.7 * r, 2);
+		}
+	}
+	T.lap(fieldname + "beta spheres");
 	//Level 3 at least: a basin boundary cuts through the atomic shells and the population
 	//follows the angular resolution, 0.01 e at level 2, 0.005 at 3 and 0.002 at 4, which
 	//costs five times level 3
@@ -1622,6 +1744,7 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 	std::iota(every_atom.begin(), every_atom.end(), 0);
 	grids.setup3DGridsForMolecule(wavy, every_atom);
 	const GridData &gd = grids.getGridData();
+	T.lap(fieldname + "atomic quadrature grids");
 	//For a gridded ELI-D a point's cell decides when its neighbourhood agrees and only a
 	//straddling cell sends a trajectory; a point below the cube's crop is left outside, as DGrid
 	//does. For the density every point rides its own trajectory to a nucleus: the cube cannot
@@ -1639,7 +1762,21 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 	//ponytail: Euclidean nearest, not the separatrix it should be. It only ever decides points the
 	//field has gone flat on, whose weight is in the last digit of a basin; trace the separatrix if
 	//that ever stops being true
+	//"However far" needs the second half of that sentence: only where there is something to
+	//partition. ELI-D's g goes to zero throughout the vacuum tail, so every outermost quadrature
+	//point stalls, and a nearest-maximum with no reach turned the tail into a Voronoi carve-up of
+	//all space. The populations did not show it - rho is zero out there - but volume goes as r^3:
+	//HgH2's bond basin came out at 52433 bohr^3 against the cube's 286, and asymmetric on a
+	//symmetric molecule, while 0.0002 e of grid debris in NH3Li grew to 0.025 e. Where there is no
+	//density there is no basin to be in, and the point belongs outside where it is reported.
 	const double stall_reach = eli_field ? 1e30 : 1.0;
+	//e/bohr^3. Two orders below the cube's own 1e-4 crop, so this keeps what the crop threw away
+	//and still cannot hand a printable population to the vacuum
+	const double stall_floor = 1e-6;
+	auto stalled = [&](const d3 &r) {
+		if (eli_field && valence(r) < stall_floor) return 0;
+		return nearest_maximum(r, stall_reach);
+	};
 	auto climb = [&](const d3 &p, long long &lb, long long &ll) {
 		bool settled;
 		int b = lookup(p, settled);
@@ -1649,6 +1786,9 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 		int c[3]; d3 f;
 		//Off the cube there is nothing to integrate; streaming has no cube to be off
 		if (!streaming && !cell(p, c, f)) return 0;
+		//Already inside a beta sphere (or on a maximum): the answer needs no trajectory, so it is
+		//not counted as one either
+		if (const int m0 = at_maximum(p)) return m0;
 		lb++;
 		d3 r = p, g;
 		double last_value = -1.0;
@@ -1661,7 +1801,7 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 			if (!eli_field || streaming) {
 				const double here = value_and_gradient(r, g);
 				if (here <= last_value) {
-					const int n = nearest_maximum(r, stall_reach);
+					const int n = stalled(r);
 					if (n) return n;
 					break;
 				}
@@ -1685,7 +1825,7 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 		}
 		//A streaming ELI-D trajectory that died, ran its 2000 steps out or lost its gradient has
 		//nowhere to report to; the gridded one still has the cube's answer in b
-		if (eli_field && streaming) return nearest_maximum(r, stall_reach);
+		if (eli_field && streaming) return stalled(r);
 		return b;
 	};
 	//Local refinement. A quadrature cell is a shell segment, and the error the basin boundary
@@ -1707,6 +1847,61 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 		shells = radius;
 		std::sort(shells.begin(), shells.end());
 		shells.erase(std::unique(shells.begin(), shells.end(), [](double x, double y) { return std::abs(x - y) < 1e-8; }), shells.end());
+		//The cell of point i as a shell segment: the two radii halfway to the neighbouring
+		//shells. False for a cell with no radial extent, which is given to one basin whole.
+		auto cell_edges = [&](const int i, double &in, double &out) {
+			const size_t k = std::lower_bound(shells.begin(), shells.end(), radius[i] - 1e-8) - shells.begin();
+			in = k > 0 ? 0.5 * (shells[k - 1] + shells[k]) : 0.0;
+			out = k + 1 < shells.size() ? 0.5 * (shells[k] + shells[k + 1]) : shells[k];
+			return radius[i] > 1e-8 && out > in + 1e-8;
+		};
+		//A point at radius r along point i's direction
+		auto along_i = [&](const int i, const double r) {
+			const double f = r / radius[i];
+			return d3{ centre[0] + (X[i] - centre[0]) * f, centre[1] + (Y[i] - centre[1]) * f, centre[2] + (Z[i] - centre[2]) * f };
+		};
+		//Who owns the same probe one shell further in. The grid is emitted shell by shell, each
+		//shell one Lebedev set, so two adjacent shells of equal size hold the same directions in
+		//the same order - but "equal size" is a guess about the generator, and the direction is
+		//not, so every candidate pair is confirmed by its own dot product before it is used.
+		ivec partner(np, -1);
+		{
+			ivec start;
+			for (int i = 0; i < np; i++)
+				if (i == 0 || std::abs(radius[i] - radius[i - 1]) > 1e-8) start.push_back(i);
+			start.push_back(np);
+			for (size_t s = 1; s + 1 < start.size(); s++) {
+				const int a0 = start[s - 1], a1 = start[s], a2 = start[s + 1];
+				if (a1 - a0 != a2 - a1) continue;
+				//Only a cell whose inner edge is the previous cell's outer edge, which needs the
+				//two shells to be neighbours in shells[] - a pair closer than the 1e-8 the unique
+				//pass merges on shares one entry and has no edge between them
+				double i0, o0, i1, o1;
+				if (!cell_edges(a0, i0, o0) || !cell_edges(a1, i1, o1) || o0 != i1) continue;
+				for (int j = 0; j < a1 - a0; j++) {
+					const int lo = a0 + j, hi = a1 + j;
+					const double dot = ((X[lo] - centre[0]) * (X[hi] - centre[0]) + (Y[lo] - centre[1]) * (Y[hi] - centre[1]) + (Z[lo] - centre[2]) * (Z[hi] - centre[2])) / (radius[lo] * radius[hi]);
+					if (dot > 1.0 - 1e-12) partner[hi] = lo;
+				}
+			}
+		}
+		//Every cell's outer probe, climbed once. A gridded ELI-D takes most cells from the cube
+		//without probing at all, so it keeps the old on-demand path and this pass is skipped.
+		ivec outer_probe(np, -1);
+		if (!(eli_field && !streaming)) {
+#pragma omp parallel
+			{
+				long long lb = 0, ll = 0;
+#pragma omp for schedule(dynamic, 16)
+				for (int i = 0; i < np; i++) {
+					double in, out;
+					if (W[i] == 0.0 || !cell_edges(i, in, out)) continue;
+					outer_probe[i] = climb(along_i(i, out), lb, ll);
+				}
+#pragma omp critical
+				{ boundary_points += lb; lost += ll; }
+			}
+		}
 #pragma omp parallel
 		{
 			vec lp(nb, 0.0), lv(nb, 0.0);
@@ -1756,25 +1951,31 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 				//For a gridded ELI-D a cell whose neighbourhood agrees is taken from the grid, as
 				//before; streaming has no grid to take it from and every cell is refined
 				if (eli_field && !streaming && (b == 0 || settled)) { give(b, 1.0); continue; }
-				b = climb(p, lb, ll);
-				const size_t k = std::lower_bound(shells.begin(), shells.end(), radius[i] - 1e-8) - shells.begin();
-				const double inner = k > 0 ? 0.5 * (shells[k - 1] + shells[k]) : 0.0;
-				const double outer = k + 1 < shells.size() ? 0.5 * (shells[k] + shells[k + 1]) : shells[k];
-				if (radius[i] <= 1e-8 || outer <= inner + 1e-8) { give(b, 1.0); continue; }
-				auto along = [&](const double r) {
-					const double f = r / radius[i];
-					return d3{ centre[0] + (p[0] - centre[0]) * f, centre[1] + (p[1] - centre[1]) * f, centre[2] + (p[2] - centre[2]) * f };
-				};
-				//A probe is not a sample. The centre of this cell has already climbed to a basin;
-				//the edges are asked only to find out whether a boundary lies between them, and an
-				//edge that climbs off the cube answers nothing. Handing the cell's weight to
+				//The cell centre's own trajectory, climbed on demand. It decides nothing by itself:
+				//where both radial probes answer and agree the cell is interior and the weight goes
+				//to their answer, not to this one. What is left for it is a probe that climbed off
+				//the grid and a cell with no radial extent - rare enough that climbing it up front
+				//was a third of every trajectory the quadrature fires, thrown away.
+				int bc = -1;
+				auto centre_basin = [&]() { if (bc < 0) bc = climb(p, lb, ll); return bc; };
+				double inner, outer;
+				if (!cell_edges(i, inner, outer)) { give(centre_basin(), 1.0); continue; }
+				auto along = [&](const double r) { return along_i(i, r); };
+				//A probe is not a sample. The edges are asked only whether a boundary lies between
+				//them, and an edge that climbs off the cube answers nothing. Handing the cell's weight to
 				//"outside" on that basis throws away density the centre had already placed - it is
 				//how UH6's ELI-D lost 0.009 e when this refinement landed, the edge probes of the
 				//cells near the crop being further out than the centres they stand in for. A probe
 				//that fails defers to the point it was probing for
-				int bi = climb(along(inner), lb, ll), bo = climb(along(outer), lb, ll);
-				if (bi == 0) bi = b;
-				if (bo == 0) bo = b;
+				//Both edges come from the pass above wherever it ran: this cell's own entry for the
+				//outer edge, and the cell one shell in for the inner one. A -1 is a probe nobody
+				//computed - the innermost shell, a shell the pruning changed the angular order at, or
+				//the gridded ELI-D path that skips the pass - and is climbed here as before.
+				const int pin = partner[i];
+				int bi = pin >= 0 && outer_probe[pin] >= 0 ? outer_probe[pin] : climb(along(inner), lb, ll);
+				int bo = outer_probe[i] >= 0 ? outer_probe[i] : climb(along(outer), lb, ll);
+				if (bi == 0) bi = centre_basin();
+				if (bo == 0) bo = centre_basin();
 				if (bi == bo) { give(bi, 1.0); continue; }
 				//ponytail: one crossing per cell. Three basins meeting inside a single quadrature
 				//cell is a smaller thing than the rule's own error; bisect for more if it is not
@@ -1782,7 +1983,7 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 				for (int it = 0; it < bisections; it++) {
 					const double mid = 0.5 * (lo_r + hi_r);
 					int bm = climb(along(mid), lb, ll);
-					if (bm == 0) bm = b;
+					if (bm == 0) bm = centre_basin();
 					if (bm == bi) lo_r = mid; else hi_r = mid;
 				}
 				const double rc = 0.5 * (lo_r + hi_r);
@@ -1792,7 +1993,7 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 				const double wo = valence(along(0.5 * (rc + outer))) * (outer * outer * outer - rc * rc * rc);
 				const double sum = wi + wo;
 				if (sum > 0.0) { give(bi, wi / sum); give(bo, wo / sum); }
-				else give(b, 1.0);
+				else give(centre_basin(), 1.0);
 			}
 #pragma omp critical
 			{
@@ -1817,6 +2018,7 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 			if (b > 0) pop[b - 1] += ncore;
 			else outside += ncore;
 		}
+	T.lap(fieldname + "point loop");
 	std::cout << "Quadrature points sent along the field: " << boundary_points << ", left the grid: " << lost << std::endl;
 	return pop;
 }

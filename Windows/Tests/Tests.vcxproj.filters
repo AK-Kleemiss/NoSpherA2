@@ -24,6 +24,9 @@
     <ClCompile Include="..\..\tests\src\main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\tests\src\BetaSphereTests.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\tests\src\DeltaSeriesTests.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

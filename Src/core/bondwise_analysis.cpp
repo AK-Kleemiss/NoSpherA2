@@ -2772,7 +2772,9 @@ void ELI_analysis(const WFN &wavy, options &opt) {
 	rho.calc_dv();
 	eli_cube.calc_dv();
 
+	basin_stage_timer T;
 	Calc_RhoEli(rho, eli_cube, l_w, radius, fld);
+	T.lap("rho and ELI-D cube");
 	//An ECP took the core electrons out of the density. The QTAIM basins get them back from
 	//Thakkar's spherical core densities, the fill the Hirshfeld grids and the scattering
 	//factors apply: the nucleus is a cusp again and its basin holds the atom's full count.
@@ -2822,6 +2824,7 @@ void ELI_analysis(const WFN &wavy, options &opt) {
 	std::vector<critical_point> density_critical_points;
 	if (l_w.get_nmo() > 0) density_critical_points = analyze_cube_critical_points(&rho, l_w, opt.debug, density_floor);
 	else std::cout << "No orbitals: critical points (Hessian, V, G, K) need a wavefunction and are skipped." << std::endl;
+	T.lap("density critical points");
 	//Core shells make critical points of their own and an ECP atom a whole sphere of them,
 	//none of which says anything about bonding and none of which any two machines find at
 	//the same spots; only the nuclear attractor survives inside an atom's core radius. Sorted
@@ -2967,6 +2970,7 @@ void ELI_analysis(const WFN &wavy, options &opt) {
 	}
 	else
 		qtaim_results = topological_cube_analysis(&rho, atoms, opt.debug, true, floor, 1e-10, radius, persistence, &nuclei, &l_w, fill_cores ? &core_density : nullptr, fill_cores ? &core_gradient : nullptr, fld);
+	T.lap("QTAIM attractors");
 	svec labels = assign_labels_to_basins(qtaim_results.second, atoms, opt.debug);
 
 	//Two integrations of the density over each basin set: the voxel sum, which is what the cube
@@ -2984,6 +2988,7 @@ void ELI_analysis(const WFN &wavy, options &opt) {
 		if (!stream) {
 			std::cout << "\n" << title << " (voxel sum):\n";
 			integrate_values_in_basins(&rho, &(res.first), lab, opt.debug);
+			T.lap(std::string(title) + " voxel sum");
 		}
 		vec vol;
 		double outside = 0.0;
@@ -3036,7 +3041,9 @@ void ELI_analysis(const WFN &wavy, options &opt) {
 		for (int y = 0; y < eli_cube.get_size(1); y++)
 			for (int z = 0; z < eli_cube.get_size(2); z++)
 				if (rho.get_value(x, y, z) < 1e-4) eli_cube.set_value(x, y, z, 0.0);
+	T.lap("ELI-D tail crop");
 	std::pair<cubei, std::vector<d4>> eli_results = topological_cube_analysis(&eli_cube, atoms, opt.debug, false, 0.0, 1e-10, radius);
+	T.lap("ELI-D cube topology");
 	//The cube keeps the topology: there is no critical-point search for this field to take
 	//attractors from, and no analytic Hessian to test a maximum with - computeELIGrad is all there
 	//is. Testing the grid's ELI-D maxima against the analytic gradient was tried and removed: a

@@ -2,6 +2,7 @@
 #include "atoms.h"
 #include "cube.h"
 #include <array>
+#include <chrono>
 #include <functional>
 #include <string>
 #include <vector>
@@ -114,6 +115,27 @@ void report_delocalization(const WFN& wavy, const basin_overlaps& ovl, const sve
 //then assumed for the trajectory's step and the radius that counts as arrival.
 //maximum_basin, when given, is the 1-based basin of each maximum, as unify_core_basins reports
 //it: several maxima then share one basin and the returned vector is one entry per basin.
+//Beta spheres: around an attractor there is a radius inside which no ascent trajectory can get
+//out, so every point inside belongs to it without being climbed and a trajectory that enters is
+//finished on the spot. On by default, and only for the streaming quadrature, which is where the
+//time goes; -no_beta_spheres turns them off and is what the equivalence test compares against.
+void beta_spheres_set_enabled(const bool on);
+bool beta_spheres_enabled();
+//-basin_timing: the wall clock of every stage of the analysis, which is the only way to say
+//where the time of a 45-atom molecule actually sits. Off by default, and it has to be: the
+//golden files are captures of this console log and no timing line ever reproduces.
+//-basin_step <f>: the trajectory step of the streaming quadrature, times f. The step is a
+//fraction of the cube's voxel, which is a resolution and not an accuracy: this is the knob
+//that says how much of it the basins actually need. 1.0 leaves the binary as it was.
+void basin_step_scale_set(const double f);
+double basin_step_scale();
+void basin_timing_set_enabled(const bool on);
+bool basin_timing_enabled();
+struct basin_stage_timer {
+	std::chrono::steady_clock::time_point t = std::chrono::steady_clock::now();
+	//Seconds since the last lap (or since construction), printed only under -basin_timing.
+	void lap(const std::string &what);
+};
 vec integrate_basins_on_atomic_grids(const cube* cub, const cubei* basin_cube, const std::vector<d4>& maxima, const WFN& wavy, const int accuracy, const bool eli_field, vec& volumes, double& outside, const std::function<double(const d3&)>* core_density = nullptr, const std::function<void(const d3&, d3&)>* core_gradient = nullptr, const int grid_boost = 1, const density_field* field = nullptr, basin_overlaps* ovl = nullptr, const ivec* maximum_basin = nullptr);
 std::vector<critical_point_seed> find_cube_critical_point_seeds(const cube* cub, bool debug, double value_floor = -1.0, double gradient_epsilon = -1.0);
 std::vector<critical_point> refine_cube_critical_points(const cube* cub, const WFN& wavy, const std::vector<critical_point_seed>& seeds, bool debug, double value_floor = -1.0, double gradient_tolerance = 1e-8, double step_tolerance = 1e-6, int max_iterations = 32);

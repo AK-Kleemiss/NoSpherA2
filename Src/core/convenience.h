@@ -984,9 +984,13 @@ struct options
     //-basin_grid <n>: the quadrature of the basin analysis pulled into the core, tightest
     //exponent sharpened n^2-fold, radial step divided by n, Lebedev order up n - 1 entries
     int basin_grid = 1;
-    //-basin_cube: go back to finding the QTAIM basins on the cube. The default takes their
-    //attractors from the analytic critical-point search instead, which no voxel can add to
+    //-basin_cube: go back to finding the QTAIM and ELI-D basins on the cube. The default takes
+    //the density's attractors from the analytic critical-point search instead, which no voxel can
+    //add to, and sends every quadrature point up the analytic field for its basin
     bool basin_cube = false;
+    //-basin_analytic: the analytic ELI-D boundaries even below the 10 electrons they need to be
+    //defined everywhere, where the automatic choice would fall back to the cube
+    bool basin_analytic = false;
     int threads = -1;
     int pbc = 0;
     int charge = 0;
