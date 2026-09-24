@@ -3118,6 +3118,15 @@ WFN::ESP_pairs WFN::build_ESP_pairs() const
 	const double *coef = get_coef_primitive_major(); // [prim][mo]
 	int l_i[3], l_j[3];
 	double Pi[3], Pj[3];
+	// The (l,r,s) tables here and in computeESP are sized for a g x g pair: Afac_pre is [9][5][9],
+	// so an axis takes l_i + l_j <= 8, pcp is [3][9] and Fn is [25]. An h primitive indexes straight
+	// past all three, silently, and the OCC WFN constructor accepts shells up to l = 10 - so say so.
+	for (int iprim = 0; iprim < nprim; iprim++)
+	{
+		constants::type2vector(get_type(iprim), l_i);
+		if (l_i[0] < 0 || l_i[0] + l_i[1] + l_i[2] > 4)
+			err_not_impl_f("ESP of a primitive beyond g functions (type " + std::to_string(get_type(iprim)) + ")", std::cout);
+	}
 	t.off.push_back(0);
 	for (int iprim = 0; iprim < nprim; iprim++)
 	{

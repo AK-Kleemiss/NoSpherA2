@@ -318,6 +318,26 @@ namespace
 		}
 	}
 
+	//The ESP pair table's (l,r,s) tables stop at a g x g pair - Afac_pre is [9][5][9], pcp is [3][9], Fn is [25] -
+	//and the OCC WFN constructor accepts shells up to l = 10, so an h primitive has to be refused rather than
+	//indexed past all three
+	TEST(WfnOpsTests, EspRefusesPrimitivesBeyondG)
+	{
+		int l[3];
+		constants::type2vector(36, l);
+		ASSERT_EQ(l[0] + l[1] + l[2], 5) << "type 36 is meant to be the first h cartesian";
+		WFN w(e_origin::NOT_YET_DEFINED);
+		w.push_back_atom("He", 0.0, 0.0, 0.0, 2);
+		w.push_back_MO(1, 1.0, -0.9);
+		double c = 1.0;
+		w.add_primitive(1, 36, 1.0, &c);
+		w.set_exp_cutoff();
+		//not_implemented puts std::cout back on the original buffer before it prints, so its message escapes the
+		//death test's capture and only the exit code can be asserted - the message itself is checked by the run
+		//on tests/CuF2_i_func (cc-pV5Z, h and i shells), which prints it and exits
+		EXPECT_EXIT(w.build_ESP_pairs(), ::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), ".*");
+	}
+
 	//MO::hdr writes the fixed-width wfn MO line: occupation branches for 2, 0 and fractional, energy padding per decade
 	TEST(WfnOpsMoTests, HeaderFormatsOccupationAndEnergy)
 	{

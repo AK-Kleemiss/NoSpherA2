@@ -186,14 +186,54 @@ namespace NoSpherA2UnitTests
 			EXPECT_NEAR(wave.computeESP(pos, pairs), esp, 1E-5); // the cube header rounds the grid positions to 1E-6 bohr
 	}
 
+	//The (l,r,s) tables in computeESP and build_ESP_pairs stop at a g x g pair, so g is the exact upper
+	//edge of what the ESP path supports - and nothing in-tree exercised it. Reference: orca_vpot from
+	//ORCA 6.1.1 on tests/esp_g_ref/g_ref.inp (HF/def2-QZVPP water: a g shell on O, an f shell on H),
+	//evaluated at vpot_pts.inp, its output kept as vpot_orca611.txt next to the wavefunction.
+	TEST(EspTests, GPrimitivesAgreeWithOrcaVpot)
+	{
+		const auto input = nos_test_repo_root() / "tests" / "esp_g_ref" / "g_ref.gbw";
+		if (!std::filesystem::exists(input)) GTEST_SKIP() << "Missing " << input;
+		WFN wave(input, false);
+		int max_l = 0;
+		for (int p = 0; p < wave.get_nex(); p++)
+		{
+			int l[3];
+			constants::type2vector(wave.get_type(p), l);
+			max_l = std::max(max_l, l[0] + l[1] + l[2]);
+		}
+		ASSERT_EQ(max_l, 4) << "def2-QZVPP is meant to put g primitives in this wavefunction";
+		const WFN::ESP_pairs pairs = wave.build_ESP_pairs();
+		const std::array<std::pair<d3, double>, 4> reference = { {
+			{ { 0.0, 0.0, -2.0 }, -0.0701658972531333 },   // behind the oxygen, on the lone-pair side
+			{ { 2.5, 0.0, 1.0 }, -0.0243475067049982 },
+			{ { 0.0, 3.0, 2.0 }, 0.1107006768580323 },     // out past one hydrogen
+			{ { 1.0, -1.5, -2.5 }, -0.0538336472988921 } } };
+		std::vector<d3> pts;
+		double worst = 0;
+		for (const auto& [pos, esp] : reference)
+		{
+			const double mine = wave.computeESP(pos, pairs);
+			std::cout << "orca_vpot " << esp << "  ours " << mine << "  diff " << mine - esp << std::endl;
+			worst = std::max(worst, std::abs(mine - esp));
+			pts.push_back(pos);
+		}
+		EXPECT_LT(worst, 1E-7) << "ESP of a g wavefunction against an external reference"; // measured 1.4E-8, the Boys table's interpolation error
+		vec batch(pts.size());
+		wave.computeESP_batch(pts, pairs, batch.data());
+		for (size_t i = 0; i < pts.size(); i++)
+			EXPECT_NEAR(batch[i], reference[i].second, 1E-7) << "batch, point " << i;
+	}
+
 	//computeESP_batch does a whole point set in one call, on a device when there is one. It has to
 	//agree with the per-point computeESP it replaces. The set is deliberately big enough to clear the
 	//gate esp_gpu_eval puts on (points x pairs). The test binary never parses -no_gpu_density, so the
 	//toggle the app sets in NoSpherA2.cpp is off here and the first pass is always the OpenMP
 	//fallback; the second pass calls the CUDA kernel itself, which is the only way it gets tested.
-	TEST(EspTests, BatchMatchesThePerPointLoop)
+	//Called once per wavefunction: epoxide (s..f) and the def2-QZVPP water above (g), because the
+	//kernel's (l,r,s) loops are where a high-angular-momentum pair would diverge from the host.
+	static void check_esp_batch_against_loop(const std::filesystem::path& input)
 	{
-		const auto input = nos_test_repo_root() / "tests" / "epoxide_gbw" / "epoxide.gbw";
 		if (!std::filesystem::exists(input)) GTEST_SKIP() << "Missing " << input;
 		WFN wave(input, false);
 		const WFN::ESP_pairs pairs = wave.build_ESP_pairs();
@@ -261,6 +301,16 @@ namespace NoSpherA2UnitTests
 		//gate next door is 1E-5, so this is four orders tighter than anything that reads the numbers
 		EXPECT_LT(worst_dev, 1E-9);
 #endif
+	}
+
+	TEST(EspTests, BatchMatchesThePerPointLoop)
+	{
+		check_esp_batch_against_loop(nos_test_repo_root() / "tests" / "epoxide_gbw" / "epoxide.gbw");
+	}
+
+	TEST(EspTests, BatchMatchesThePerPointLoopWithGFunctions)
+	{
+		check_esp_batch_against_loop(nos_test_repo_root() / "tests" / "esp_g_ref" / "g_ref.gbw");
 	}
 
 	//A valence-only wavefunction (xTB/pTB, ECP) is neutral once the core electrons are counted as screening the
