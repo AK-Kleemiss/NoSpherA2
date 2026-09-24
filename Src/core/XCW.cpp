@@ -8,6 +8,7 @@
 #include "nos_math.h"
 #include "basis_set.h"
 #include "bondwise_analysis.h"
+#include "citations.h"
 #include <mutex>
 #include <random>
 
@@ -3256,6 +3257,7 @@ bool XCW::SCF_iteration(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& l
 			what << "***" << (stuck ? "Orbital gradient not halved in " + std::to_string(patience) + " iterations" : "DIIS error below 1e-2")
 				<< ": second-order steps on the orbital rotations from here***";
 			print_centered_message(what.str(), 84, XCW_log);
+			citations::cite(citations::Method::TRAH, XCW_log);
 		}
 	}
 	if (soscf_) {

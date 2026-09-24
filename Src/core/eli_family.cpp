@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "eli_family.h"
 #include "constants.h"
+#include "citations.h"
 
 //The spin-resolved evaluator.  Structurally WFN::computeELIELF (wfn_density.cpp), i.e. the same
 //4-component primitive loop (value + three Cartesian derivatives), but the MO accumulation is split
@@ -196,6 +197,7 @@ namespace eli_family
 		const double factor = triplet_density_factor(wave);
 		std::string warning;
 		const std::vector<Member> members = eli_variants_for(wave, &warning);
+		citations::cite(citations::Method::ELIFamily, std::cout);
 		std::cout << "ELI family for " << wfn_path.string() << "\n"
 			<< "  " << (unrestricted ? "unrestricted" : "restricted") << ", N = " << N
 			<< ", N_alpha = " << N - Nb << ", N_beta = " << Nb << "\n"

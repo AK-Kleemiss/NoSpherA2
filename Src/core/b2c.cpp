@@ -4,6 +4,7 @@
 #include "constants.h"
 #include "b2c.h"
 #include "nos_math.h"
+#include "citations.h"
 #include "GridManager.h"
 #include <map>
 #include <mutex>
@@ -1837,6 +1838,7 @@ void report_delocalization(const WFN &wavy, const basin_overlaps &ovl, const sve
 	if (nb == 0 || ovl.nmo == 0) return;
 	auto name = [&](const int b) { return b < static_cast<int>(labels.size()) ? labels[b] : std::to_string(b + 1); };
 	log << "\nDelocalization indices (" << ovl.nmo << " occupied orbitals):\n";
+	citations::cite(citations::Method::LIDI, log);
 	log << "  sum over all basins of S^A - identity: " << std::scientific << std::setprecision(2) << r.identity_error
 		<< std::fixed << "   (the quadrature's own error; AIMAll's integrations reach ~1e-3)\n";
 	//delta(A,B) summed over B is the count an atom shares with everything else; with lambda(A)

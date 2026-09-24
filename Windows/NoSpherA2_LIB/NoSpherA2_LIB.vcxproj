@@ -172,6 +172,7 @@
     <ClCompile Include="..\..\Src\core\bondwise_analysis.cpp" />
     <ClCompile Include="..\..\Src\core\cell.cpp" />
     <ClCompile Include="..\..\Src\core\cif.cpp" />
+    <ClCompile Include="..\..\Src\core\citations.cpp" />
     <ClCompile Include="..\..\Src\core\constants.cpp" />
     <ClCompile Include="..\..\Src\core\convenience.cpp" />
     <ClCompile Include="..\..\Src\core\cube.cpp" />

@@ -10,6 +10,7 @@
 #include "libCintMain.h"
 #include "integrator.h"
 #include "cell.h"
+#include "citations.h"
 
 
 const std::string WFN::hdr(const bool &occupied) const
@@ -455,6 +456,8 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
 		<< GetCurrentDir << endl;
 	origin = e_origin::molden;
 	isBohr = true;
+	//The format this reader follows, and the only written specification of it.
+	citations::cite(citations::Method::Molden, file);
 	ifstream rf(filename.c_str());
 	if (rf.good())
 		path = filename;
@@ -2803,6 +2806,7 @@ bool WFN::read_ptb(const std::filesystem::path &filename, std::ostream &file, co
 	origin = e_origin::ptb;
 	isBohr = true;
 	path = filename;
+	citations::cite(citations::Method::PTB, file);
 	if (debug)
 		file << "Reading pTB file: " << filename << std::endl;
 	std::ifstream inFile(filename, std::ios::binary | std::ios::in);

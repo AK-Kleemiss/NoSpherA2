@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "topology.h"
 #include "constants.h"
+#include "citations.h"
 #include <iomanip>
 #include <iostream>
 #include <functional>
@@ -306,8 +307,9 @@ namespace topology
 
 	void report_topology(const result& r, const std::vector<nucleus>& nuclei, std::ostream& log, const options& opt)
 	{
-		log << "\n---------------- Topological analysis of rho ----------------\n"
-			<< "Newton-Raphson on grad rho = 0 with the analytic Hessian. Positions in bohr.\n"
+		log << "\n---------------- Topological analysis of rho ----------------\n";
+		citations::cite(citations::Method::QTAIM, log);
+		log << "Newton-Raphson on grad rho = 0 with the analytic Hessian. Positions in bohr.\n"
 			//A rejected point is as much a result as an accepted one, so the thresholds that did the
 			//rejecting are printed: a critical point below the density floor would not appear above
 			<< "Accepted when |grad rho| <= " << opt.gradient_tolerance << " and <= "

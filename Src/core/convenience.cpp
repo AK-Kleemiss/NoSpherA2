@@ -18,6 +18,7 @@
 #include "nbo.h"
 #include "eli_family.h"
 #include "topology.h"
+#include "citations.h"
 
 #ifdef _WIN32
 #include <windows.h>
@@ -2582,6 +2583,7 @@ bool options::digest_io_options(const std::string &temp, int &i)
             if (arguments[j] == "-nbo_keywords") keys = arguments[j + 1];
         WFN wavy(e_origin::NOT_YET_DEFINED);
         wavy.read_known_wavefunction_format(_wfn, std::cout, debug);
+        citations::cite(citations::Method::NBOProgram, std::cout);
         wavy.write_nbo(_wfn.replace_extension(".47"), debug, &std::cout, keys);
         finished = true; return true;
     }
@@ -2597,6 +2599,7 @@ bool options::digest_io_options(const std::string &temp, int &i)
             else if (arguments[j] == "-nbo_dir") opt.work_dir = arguments[j + 1];
         }
         finished = true;
+        citations::cite(citations::Method::NBOProgram, std::cout);
         return run_nbo(opt, std::cout) == 0;
     }
     else if (temp == "-nbo_parse") {
@@ -2652,6 +2655,13 @@ bool options::digest_io_options(const std::string &temp, int &i)
             else if (arguments[j] == "-nbo_keep47") opt.keep_file47 = true;
         WFN wavy(e_origin::NOT_YET_DEFINED);
         wavy.read_known_wavefunction_format(_wfn, std::cout, debug);
+        //Cited from here rather than from nbo.cpp/nrt.cpp, so the search and the resonance
+        //weights each name their paper without a second session's optimisation work colliding.
+        citations::cite(citations::Method::NAONPA, std::cout);
+        citations::cite(citations::Method::NBO, std::cout);
+        citations::cite(citations::Method::E2, std::cout);
+        if (opt.nrt)
+            citations::cite(citations::Method::NRT, std::cout);
         NboResults r = native_nbo(wavy, opt, std::cout);
         r.name = _wfn.stem().string();
         print_nbo(r, std::cout);

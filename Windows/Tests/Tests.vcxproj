@@ -37,6 +37,7 @@
     <ClCompile Include="..\..\tests\src\BasisConstantsTests.cpp" />
     <ClCompile Include="..\..\tests\src\BondwiseTests.cpp" />
     <ClCompile Include="..\..\tests\src\CellMathTests.cpp" />
+    <ClCompile Include="..\..\tests\src\CitationTests.cpp" />
     <ClCompile Include="..\..\tests\src\ConvenienceTests.cpp" />
     <ClCompile Include="..\..\tests\src\CubeTests.cpp" />
     <ClCompile Include="..\..\tests\src\DelocalizationTests.cpp" />

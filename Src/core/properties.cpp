@@ -15,6 +15,7 @@
 #include "crystal_energies.h"
 #include "b2c.h"
 #include "density_source.h"
+#include "citations.h"
 
 std::vector<Thakkar> make_thakkar_interpolators()
 {
@@ -980,6 +981,7 @@ void fukui_analysis(options &opt, std::ostream &log2)
 	err_checkf(opt.wfn != "", "Error, no wfn file specified! Use -fukui_analysis <wfn> or -wfn <wfn>.", log2);
 	WFN wavy(opt.wfn);
 	log2 << "\nConceptual-DFT reactivity analysis of " << opt.wfn.string() << endl;
+	citations::cite(citations::Method::Fukui, log2);
 	log2 << "Read " << wavy.get_ncen() << " atoms and " << wavy.get_nmo()
 		 << " molecular orbitals (" << wavy.get_nmo(true) << " occupied)." << endl;
 
@@ -1422,6 +1424,7 @@ void promolecular_nci_analysis(
 	const _time_point t_start = get_time();
 
 	err_checkf(xyz_files.size() >= 2, "Promolecular NCI needs at least two XYZ fragments.", log);
+	citations::cite(citations::Method::NCI, log);
 
 	// Output names join every fragment stem: a_b_c_values.dat etc.
 	std::string joined_stems = xyz_files.front().stem().string();
@@ -1801,6 +1804,20 @@ void properties_calculation(options &opt)
 	if (opt.properties.fukui)
 		log2 << "Fukui functions and dual descriptor, ";
 	log2 << endl;
+
+	//Which paper each of those grids implements.  Same guards as the list above.
+	if (opt.properties.hdef || opt.properties.def || opt.properties.hirsh)
+		citations::cite(citations::Method::Hirshfeld, log2);
+	if (opt.properties.eli)
+		citations::cite(citations::Method::ELID, log2);
+	if (opt.properties.elf)
+		citations::cite(citations::Method::ELF, log2);
+	if (opt.properties.rdg)
+		citations::cite(citations::Method::NCI, log2);
+	if (opt.properties.esp)
+		citations::cite(citations::Method::ESP, log2);
+	if (opt.properties.fukui)
+		citations::cite(citations::Method::Fukui, log2);
 
 	log2 << "Calculating for " << fixed << setprecision(0) << opt.properties.NbSteps[0] * opt.properties.NbSteps[1] * opt.properties.NbSteps[2] << " Gridpoints." << endl;
 

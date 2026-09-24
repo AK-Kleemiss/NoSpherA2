@@ -7,6 +7,7 @@
 #include "basis_set.h"
 #include "SALTED_utilities.h"
 #include "aux_density.h"
+#include "citations.h"
 #include <occ/disp/d4.h>
 #include <occ/interaction/polarization.h>
 
@@ -858,6 +859,7 @@ vec DensityFitting::density_fit(
 	const dMatrix2 dm = wavy.get_dm();
 
 	std::cout << "\n=== Density Fitting ===" << std::endl;
+	citations::cite(citations::Method::RIFit, std::cout);
 	std::cout << "Normal basis functions: "
 		<< normal_basis.get_nao() << std::endl;
 	std::cout << "Auxiliary basis functions: "
@@ -1434,6 +1436,8 @@ void DensityFitting::print_interaction_energy(const Interaction_Energy& E, const
 	for (int i = 0; i < (KS ? 12 : 13); i++) {
 		if (i == 5) {
 			file << "\nBeyond electrostatics: Thakkar polarizabilities in the partner's field, D4 with PBE damping, density overlap S = Int rhoA rhoB\n";
+			citations::cite(citations::Method::D4, file);
+			if (!KS) citations::cite(citations::Method::GordonKim, file);
 			file << "  S                " << std::scientific << std::setprecision(6) << std::setw(14) << E.overlap << " e^2/bohr^3" << std::fixed;
 			if (KS) file << "  (repulsion K*S)\n";
 			else file << "  (repulsion Gordon-Kim on a Becke grid holding " << std::setprecision(4) << E.n_A << " / " << E.n_B << " e)\n";

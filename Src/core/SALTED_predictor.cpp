@@ -12,6 +12,7 @@
 #include "constants.h"
 #include "wfn_class.h"
 #include "basis_set.h"
+#include "citations.h"
 #include <filesystem>
 #include <future>
 
@@ -865,6 +866,7 @@ bool SALTEDPredictor::wants_charge_constraint() const
 vec SALTEDPredictor::gen_SALTED_densities()
 {
 	using namespace std;
+	citations::cite(citations::Method::SALTED, std::cout);
 	if (!sub_models.empty())
 		return merge_predictions();
 	if (coef_file != "")

@@ -3,6 +3,7 @@
 #include "isosurface.h"
 #include <set>
 #include "properties.h"
+#include "citations.h"
 
 // --------------------------------------------------------------------------
 // 1) Minimal Edge Table
@@ -457,6 +458,7 @@ cube box_cube(WFN& wfn, properties_options& opts)
 
 std::vector<Triangle> Hirshfeld_surface(WFN& mol, WFN& env, properties_options& opts, std::ostream& log, cube* weight_out)
 {
+	citations::cite(citations::Method::HirshfeldSurface, log);
 	if (opts.radius < 2.5) {
 		log << "Resetting Radius to at least 2.5!" << std::endl;
 		opts.radius = 2.5;

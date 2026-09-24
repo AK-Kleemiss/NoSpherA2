@@ -5,6 +5,7 @@
 #include "libCintMain.h"
 #include "constants.h"
 #include "nos_math.h"
+#include "citations.h"
 
 #include <Eigen/Dense>
 
@@ -540,6 +541,7 @@ namespace
 
 void print_npa(const NPAResult &result, std::ostream &out)
 {
+    citations::cite(citations::Method::NAONPA, out);
     if (result.spin_resolved) {
         print_one(result.alpha, "alpha spin natural atomic orbital occupancies", out, false);
         print_one(result.beta, "beta spin natural atomic orbital occupancies", out, false);

@@ -9,6 +9,7 @@
 #include "b2c.h"
 #include "crystal_energies.h"
 #include "spherical_density.h"
+#include "citations.h"
 #include <occ/qm/hf.h>
 
 namespace {
@@ -2101,6 +2102,7 @@ void Roby_information::computeGroupAnalysis(const ivec2 &group_defs, const vec &
 
 Roby_information::Roby_information(WFN &wavy, const ivec3 &group_sets, const bool symmetrize, const bool use_ano_basis, const bool EVs, const bool theta_info) {
 	auto bonds = get_bonded_atom_pairs(wavy);
+	citations::cite(citations::Method::RGBI, std::cout);
 	const char *orbital_label = use_ano_basis ? "ANOs" : "NAOs";
 	std::cout << "Calculating " << orbital_label << " for all atoms...                 " << std::flush;
 	computeAllAtomicNAOs(wavy, symmetrize, use_ano_basis, EVs);
@@ -2624,9 +2626,13 @@ static std::unique_ptr<Gaussian_Molecule> fitted_source(const WFN &wavy, options
 void ELI_analysis(const WFN &wavy, options &opt) {
 	err_checkf(wavy.get_ncen() != 0, "No Atoms in the wavefunction, this will not work!! ABORTING!!", std::cout);
 	std::cout << "Analysing ELI basins in the wavefunction..." << std::endl;
+	citations::cite(citations::Method::ELID, std::cout);
 	density_field field;
 	const std::unique_ptr<Gaussian_Molecule> fit = fitted_source(wavy, opt, field, std::cout);
 	const density_field *fld = fit ? &field : nullptr;
+	//A fitted source has no orbitals, so ELI comes from the density alone.
+	if (fld)
+		citations::cite(citations::Method::ELIOrbitalFree, std::cout);
 
 	const double radius = opt.properties.radius;
 	const double grid_spacing = opt.properties.resolution;
