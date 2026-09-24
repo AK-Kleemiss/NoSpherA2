@@ -390,3 +390,62 @@ TEST(NrtTests, ASmallCandidateBudgetKeepsTheExpensiveArrowsAndMoreThanTheParent)
         EXPECT_EQ(a.rfind("ARROWS", 0), 0u) << a;
     EXPECT_FALSE(tight.notes.empty());
 }
+
+//-nrt reported nowhere a reader looks: on tests/TFVC/Rh.gbw the search spent 6.6 s, wrote a complete
+//nrt block into Rh.native.nbo.json, and NoSpherA2.log carried the two NRT citations and not one
+//number - from the outside that is indistinguishable from a flag that was parsed and then dropped,
+//which is the failure mode this pass is looking for.  print_nrt prints the three tables; this asserts
+//every row the result carries reaches the text, so a table that silently stops being printed fails.
+TEST(NrtTests, EveryResonanceRowTheResultCarriesIsAlsoPrinted)
+{
+    const NAOResult nao = h_chain(3);
+    const double r = 1.0 / std::sqrt(3.0);
+    const dMatrix2 gamma = rank_one({ r, r, r });
+    NboLewis lewis = one_bond(gamma, 3);
+    NboOptions opt;
+    opt.nrt = true;
+    opt.nrt_exhaustive = true;
+    NboResults res;
+    std::ostringstream log;
+    native_nrt(res.nrt, nao, lewis, {}, chain_bondable(3), opt, "", 2.0, log);
+    ASSERT_TRUE(res.nrt.present);
+    ASSERT_FALSE(res.nrt.weights.empty());
+    ASSERT_FALSE(res.nrt.bond_orders.empty());
+    ASSERT_FALSE(res.nrt.valencies.empty());
+
+    std::ostringstream out;
+    print_nrt(res, out);
+    const std::string text = out.str();
+    const auto fixed_str = [](const double v, const int prec) {
+        std::ostringstream s;
+        s << std::fixed << std::setprecision(prec) << v;
+        return s.str();
+    };
+    const auto printed = [&text](const std::string& needle) {
+        return text.find(needle) != std::string::npos;
+    };
+
+    EXPECT_TRUE(printed("NATURAL RESONANCE THEORY")) << text;
+    EXPECT_TRUE(printed(fixed_str(res.nrt.d_w, 5))) << text;
+    for (const NboResonanceWeight& w : res.nrt.weights)
+        EXPECT_TRUE(printed(fixed_str(w.weight_percent, 2)))
+            << "weight of structure " << w.structure << " missing from\n" << text;
+    for (const NboBondOrder& b : res.nrt.bond_orders)
+        EXPECT_TRUE(printed(fixed_str(b.total, 4)))
+            << "bond order " << b.atom1 << "-" << b.atom2 << " missing from\n" << text;
+    for (const NboValency& v : res.nrt.valencies)
+        EXPECT_TRUE(printed(fixed_str(v.electron_count, 4)))
+            << "electron count of atom " << v.atom << " missing from\n" << text;
+    for (const std::string& s : res.nrt.notes)
+        EXPECT_TRUE(printed(s)) << "note missing from\n" << text;
+    //the element labels come from the populations table, which only a full native run fills; the
+    //valencies carry them too, so the printer must not fall back to "?" here
+    EXPECT_TRUE(printed("H1")) << text;
+    EXPECT_FALSE(printed("?")) << text;
+
+    //and nothing at all when the analysis did not run, so a run without -nrt keeps the log it had
+    NboResults empty;
+    std::ostringstream none;
+    print_nrt(empty, none);
+    EXPECT_TRUE(none.str().empty()) << none.str();
+}

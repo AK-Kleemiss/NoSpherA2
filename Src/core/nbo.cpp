@@ -897,6 +897,70 @@ NboResults native_nbo(WFN& wavy, const NboOptions& options, std::ostream& log)
     return res;
 }
 
+//-nrt spends most of a run's time and used to report nowhere a reader looks: the resonance weights,
+//the bond orders and the valencies went into <stem>.native.nbo.json and NoSpherA2.log carried only
+//the two NRT citations, so a 6.6 s search on a 14-atom complex was indistinguishable from an
+//ignored flag.  The layout follows gennbo's own headings on purpose, so the two routes can be read
+//side by side; every number printed here is the one written to the JSON, unrounded there.
+void print_nrt(const NboResults& r, std::ostream& out)
+{
+    using namespace std;
+    const NboNrt& n = r.nrt;
+    if (!n.present) return;
+    const ostream_format_guard restore_format(out);
+    //bond orders carry atom indices only; the populations table is where the elements are
+    std::map<int, std::string> element;
+    for (const NboAtomPopulation& p : r.npa) element[p.index] = p.element;
+    for (const NboValency& v : n.valencies) element[v.atom] = v.element;
+    const auto label = [&element](const int a) {
+        const auto it = element.find(a);
+        return (it == element.end() ? std::string("?") : it->second) + std::to_string(a);
+    };
+
+    out << "\n NATURAL RESONANCE THEORY ANALYSIS (in house):\n\n"
+        << " " << n.structures_used << " of " << n.structures_found
+        << " resonance structures carry the fit, D(0) = " << fixed << setprecision(5) << n.d_0
+        << ", D(w) = " << n.d_w << "\n";
+    for (const std::string& s : n.notes) out << "   " << s << "\n";
+
+    if (!n.weights.empty()) {
+        out << "\n  RS   Weight(%)   Added(Removed)\n"
+            << " ---------------------------------------------------------------------------------\n";
+        for (const NboResonanceWeight& w : n.weights)
+            out << setw(4) << w.structure << setprecision(2) << setw(11) << w.weight_percent << "   "
+                << (w.spin.empty() ? "" : w.spin + ": ") << w.changes << "\n";
+    }
+    if (!n.bond_orders.empty()) {
+        out << "\n Natural Bond Order\n"
+            << "   Atom  Atom      Total   Covalent      Ionic\n"
+            << " ---------------------------------------------------------------------------------\n";
+        for (const NboBondOrder& b : n.bond_orders) {
+            out << "  " << left << setw(6) << label(b.atom1) << setw(6)
+                << (b.diagonal ? std::string() : label(b.atom2)) << right << fixed << setprecision(4)
+                << setw(11) << b.total;
+            if (b.diagonal)
+                out << "        ---        ---";
+            else
+                out << setw(11) << b.covalent << setw(11) << b.ionic;
+            if (!b.spin.empty()) out << "  " << b.spin;
+            out << "\n";
+        }
+    }
+    if (!n.valencies.empty()) {
+        out << "\n Natural Atomic Valencies\n"
+            << "   Atom    Valency  Covalency  Electroval.   Electrons\n"
+            << " ---------------------------------------------------------------------------------\n";
+        for (const NboValency& v : n.valencies) {
+            out << "  " << left << setw(6) << (v.element + std::to_string(v.atom)) << right << fixed
+                << setprecision(4) << setw(11) << v.valency << setw(11) << v.covalency << setw(11)
+                << v.electrovalency << setw(12) << v.electron_count;
+            if (!v.spin.empty()) out << "  " << v.spin;
+            out << "\n";
+        }
+    }
+    for (const std::string& s : n.symmetry_forms) out << " " << s << "\n";
+}
+
 void print_nbo(const NboResults& r, std::ostream& out)
 {
     using namespace std;
@@ -918,12 +982,14 @@ void print_nbo(const NboResults& r, std::ostream& out)
                 << "%)p" << setw(7) << h.p << "%  d" << setw(7) << h.d << "%  f" << setw(6) << h.f
                 << "%\n";
     }
-    if (r.e2.empty()) return;
-    out << "\n SECOND ORDER PERTURBATION THEORY ANALYSIS OF FOCK MATRIX IN NBO BASIS\n\n"
-        << "     Donor NBO              Acceptor NBO            E(2)   E(NL)-E(L)  F(L,NL)\n"
-        << " ---------------------------------------------------------------------------------\n";
-    for (const NboE2Entry& e : r.e2)
-        out << " " << left << setw(22) << e.donor << setw(22) << e.acceptor << right << fixed
-            << setprecision(2) << setw(8) << e.energy_kcal << setprecision(3) << setw(11)
-            << e.e_diff << setw(10) << e.fij << (e.spin.empty() ? "" : "  " + e.spin) << "\n";
+    if (!r.e2.empty()) {
+        out << "\n SECOND ORDER PERTURBATION THEORY ANALYSIS OF FOCK MATRIX IN NBO BASIS\n\n"
+            << "     Donor NBO              Acceptor NBO            E(2)   E(NL)-E(L)  F(L,NL)\n"
+            << " ---------------------------------------------------------------------------------\n";
+        for (const NboE2Entry& e : r.e2)
+            out << " " << left << setw(22) << e.donor << setw(22) << e.acceptor << right << fixed
+                << setprecision(2) << setw(8) << e.energy_kcal << setprecision(3) << setw(11)
+                << e.e_diff << setw(10) << e.fij << (e.spin.empty() ? "" : "  " + e.spin) << "\n";
+    }
+    print_nrt(r, out);
 }

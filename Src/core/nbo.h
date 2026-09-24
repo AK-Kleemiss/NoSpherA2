@@ -142,3 +142,7 @@ NboResults native_nbo(WFN& wavy, const NboOptions& options, std::ostream& log);
 
 /** Print the tables of a native result in NBO's layout. */
 void print_nbo(const NboResults& results, std::ostream& out);
+
+/** The resonance tables of a native result, in NBO's layout. Called by print_nbo; separate so a
+ *  test can print a hand-built result without an SCF. Prints nothing unless results.nrt.present. */
+void print_nrt(const NboResults& results, std::ostream& out);
