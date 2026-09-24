@@ -10,6 +10,10 @@ Every flag below was read out of the option parser in
 Notation: `<x>` is required, `[x]` optional, `x|y` alternatives. Angstrom is
 the unit unless stated otherwise.
 
+Either separator works in every flag: `-rgbi_groups` and `-rgbi-groups` are the
+same option, and the spelling in the tables is the canonical one. Case is not
+normalised, so where a flag has an upper-case form it is listed separately.
+
 **Before you compose a long command line, read
 [flag order matters](Troubleshooting.md#flag-order-matters).** Several options
 run inside the parser and stop it, so options placed after them are silently
@@ -173,7 +177,7 @@ is a separate flag and several can be written in one run.
 | `-cubeb` | 0 | off | Write cubes in the binary `.cubeb` format. |
 | `-cube <file>` | 1 | | Read a density cube instead of computing one. Also `-cube_density`. |
 | `-rho_cube <wfn>` | 1 | | Density cube for a wavefunction and nothing else. Set `-radius`/`-resolution` **before** this flag. One-shot. |
-| `-density_difference <wfn2>` | 1 | | Subtract the density of a second wavefunction from the first. Also `-density-difference`. |
+| `-density_difference <wfn2>` | 1 | | Subtract the density of a second wavefunction from the first. |
 | `-atom_dens <wfn> [alpha_MOs] [beta_MOs]` | 1-3 | | Spherically averaged atomic density; MO lists are comma-separated. One-shot. |
 | `-atom_dens_diff <wfn1> <wfn2>` | 2 | | Difference of two spherically averaged densities. One-shot. |
 | `-spherical_aver_fukui <wfn1> <wfn2>` | 2 | | Radial Fukui profile to `fukui_averaged_density_wfn.dat`. |
@@ -259,7 +263,7 @@ All of these need a contracted basis, so `.gbw`, `.fchk` or `.molden` — not
 | `-npa` | 0 | off | Natural population analysis with the per-orbital table. |
 | `-npa_summary` | 0 | off | NPA, totals only. |
 | `-rgbi` | 0 | off | Resonance-group bond indices. |
-| `-rgbi-groups <"i,j,k"> [...]` | 1+ | | Explicit atom groups (comma-separated, per group). |
+| `-rgbi_groups <"i,j,k"> [...]` | 1+ | | Explicit atom groups (comma-separated, per group). |
 | `-rgbi_basis nao\|ano` | 1 | `ano` | Orbital basis used for RGBI. |
 | `-rgbi_no_sym` | 0 | off | Disable symmetry use in RGBI. |
 | `-rgbi_theta` | 0 | off | Report the RGBI mixing angles. |
@@ -286,7 +290,7 @@ available from it.
 | --- | --- | --- | --- |
 | `-ri_fit <basis> [basis ...]` | 1+ | | RI-fit the density in these auxiliary basis sets, and use RI partitioning. Also `-RI_FIT`. |
 | `-ri_fit auto_aux [elements...] [basis...]` | 1+ | | Generate the auxiliary set automatically; element symbols right after `auto_aux` restrict which elements it is generated for, the basis names that follow fill the rest (first match wins). |
-| `-multipole_moments <scheme> <lmax>` | 2 | off (`lmax -1`) | Restrain the fit's multipole moments up to `lmax` (0-8), using `Hirshfeld`, `Becke`, `TFVC`, `MBIS` or `EMBIS` moments. Also `-multipole-moments`. |
+| `-multipole_moments <scheme> <lmax>` | 2 | off (`lmax -1`) | Restrain the fit's multipole moments up to `lmax` (0-8), using `Hirshfeld`, `Becke`, `TFVC`, `MBIS` or `EMBIS` moments. |
 | `-multipole_strength <w>` | 1 | `1.0` | Weight of the multipole restraints. Must be positive. |
 | `-multipole_partition` | 0 | on | Restrain partitioned atomic moments (the default). |
 | `-multipole_centre` | 0 | | Restrain moments about a single centre instead. Also `-multipole_center`. |

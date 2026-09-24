@@ -1092,6 +1092,17 @@ TEST(ConvenienceOptionsTests, RgbiGroupsParseRangesAndBasis)
 	EXPECT_EQ(parse({ "-rgbi-groups" }).rgbi_group_sets.size(), 0u) << "no group after the flag adds no set";
 }
 
+// a flag may be written with either separator, and a negative value is not a flag
+TEST(ConvenienceOptionsTests, EitherSeparatorNamesTheSameFlag)
+{
+	EXPECT_EQ(parse({ "-rgbi-groups", "1,2" }).rgbi_group_sets, parse({ "-rgbi_groups", "1,2" }).rgbi_group_sets);
+	EXPECT_EQ(parse({ "-density-difference", "b.wfn" }).wfn2, parse({ "-density_difference", "b.wfn" }).wfn2);
+	EXPECT_EQ(parse({ "-multipole-moments", "TFVC", "2" }).multipole_lmax, parse({ "-multipole_moments", "TFVC", "2" }).multipole_lmax);
+	EXPECT_EQ(parse({ "-multipole-moments", "TFVC", "2" }).multipole_lmax, 2);
+	// -charge does not advance i, so the value is read again in flag position next round
+	EXPECT_EQ(parse({ "-charge", "-1" }).charge, -1);
+}
+
 // a one-shot option sets finished and stops the parse, so nothing after it is read
 TEST(ConvenienceOptionsTests, FinishedStopsTheParse)
 {

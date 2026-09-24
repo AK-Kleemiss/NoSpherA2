@@ -255,7 +255,7 @@ or `.wfx` is rejected.
 ```
 
 ```powershell
-.\NoSpherA2.exe -wfn nh3bh3.gbw -rgbi -rgbi-groups "0,4,5,7" "1,2,3,6" -rgbi_basis ano
+.\NoSpherA2.exe -wfn nh3bh3.gbw -rgbi -rgbi_groups "0,4,5,7" "1,2,3,6" -rgbi_basis ano
 ```
 
 ## 15. RI-fitted density, with multipole restraints

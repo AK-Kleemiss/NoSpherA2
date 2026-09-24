@@ -178,7 +178,9 @@ std::string help_message =
  "============================================================================\n"
  "Syntax: NoSpherA2 [options]\n"
  "Values in [brackets] are optional.  Repeatable options may be supplied more\n"
- "than once.  Input files and options may be given in any order unless noted.\n\n"
+ "than once.  Input files and options may be given in any order unless noted.\n"
+ "Every option accepts either separator: -rgbi_groups and -rgbi-groups are the\n"
+ "same flag, and the spelling below is the canonical one.\n\n"
  "GETTING STARTED\n"
  "  HAR/TSC:  -cif model.cif -hkl data.hkl -wfn wavefunction.wfx -acc 2\n"
  "  IAM TSC:  -cif model.cif -hkl data.hkl -xyz model.xyz -IAM -acc 2\n\n"
@@ -408,7 +410,7 @@ std::string help_message =
  "  -npa_summary                       -npa without the per-orbital NAO table.\n"
  "  -rgbi_no_sym                       RGBI without atomic O_h symmetrization.\n"
  "  -rgbi_basis <nao|ano>              RGBI basis: occupied NAO or ANO [ano].\n"
- "  -rgbi-groups <range ...>           RGBI groups, e.g. 0-5,7; repeat option\n"
+ "  -rgbi_groups <range ...>           RGBI groups, e.g. 0-5,7; repeat option\n"
  "                                    for multiple group sets.\n"
  "  -promol_nci <a.xyz> <b.xyz> [c.xyz ...] [rcut1 rcut2 rho_max rdg_max colour_max]\n"
  "                                    Promolecular NCI/RDG outputs. Defaults:\n"
@@ -580,9 +582,9 @@ std::string help_message =
  "  -v | -v2 | -debug                  Verbose diagnostic output.\n"
  "  -profiling [tests-root]            Run the internal profiling suite\n"
  "                                    [./tests]. Alias: -profile.\n"
- "  -no-date                           Suppress date information and the GPU notes, so\n"
+ "  -no_date                           Suppress date information and the GPU notes, so\n"
  "                                    output does not depend on the machine it ran on.\n"
- "  -no_date_but_gpu                   As -no-date, but keeps the GPU notes. For the\n"
+ "  -no_date_but_gpu                   As -no_date, but keeps the GPU notes. For the\n"
  "                                    tests whose reference has to show that the device\n"
  "                                    did the work, a silent fallback being otherwise\n"
  "                                    indistinguishable from the CPU result.\n"
@@ -2826,9 +2828,9 @@ bool options::digest_run_options(const std::string &temp, int &i)
         method = arguments[i + 1];
     else if (temp == "-mult")
         mult = stoi(arguments[i + 1]);
-    else if (temp == "-no-date" || temp == "-no_date")
+    else if (temp == "-no_date")
         no_date = constants::hide_gpu_notes = constants::hide_timings = true;
-    else if (temp == "-no_date_but_gpu" || temp == "-no-date-but-gpu")
+    else if (temp == "-no_date_but_gpu")
     {
         no_date = constants::hide_timings = true;
         constants::hide_gpu_notes = false;
@@ -3250,7 +3252,7 @@ bool options::digest_property_options(const std::string &temp, int &i)
             j++;
         }
     }
-    else if (temp == "-density_difference" || temp == "-density-difference")
+    else if (temp == "-density_difference")
     {
         wfn2 = arguments[i + 1];
     }
@@ -3782,7 +3784,7 @@ bool options::digest_ri_options(const std::string &temp, int &i)
         else
             err_checkf(false, "Invalid -rgbi_basis value '" + basis + "'. Use 'nao' or 'ano'.", std::cout);
     }
-    else if (temp == "-rgbi-groups") {
+    else if (temp == "-rgbi_groups") {
         int n = 1;
         ivec2 group_set;
         while (i + n < argc && string(arguments[i + n]).find("-") > 0) {
@@ -3802,7 +3804,7 @@ bool options::digest_ri_options(const std::string &temp, int &i)
         partition_type = PartitionType::RI;
         aux_basis = get_aux_basis(argc, arguments, i);
     }
-    else if (temp == "-multipole_moments" || temp == "-multipole-moments") {
+    else if (temp == "-multipole_moments") {
         err_checkf(i + 2 < argc, "-multipole_moments needs a partitioning scheme and the highest order, e.g. -multipole_moments Hirshfeld 2", std::cout);
         std::string scheme = arguments[++i];
         std::transform(scheme.begin(), scheme.end(), scheme.begin(),
@@ -4049,6 +4051,11 @@ void options::digest_options()
             continue;
         if (finished)
             return;
+        //Either separator names the same flag, so -rgbi-groups and -rgbi_groups are one option.
+        //The digesters compare against the underscore spelling; a negative number keeps its
+        //dashes because the character after the first one is not a letter
+        if (temp.size() > 1 && isalpha(static_cast<unsigned char>(temp[1])))
+            replace(temp.begin() + 1, temp.end(), '-', '_');
         //The digesters index arguments[i + n] and call stoi/stod directly; a flag that is
         //last on the line or followed by a non-number used to die as a bare "invalid stod
         //argument" with no hint which option it was
