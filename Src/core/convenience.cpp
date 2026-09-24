@@ -2574,6 +2574,10 @@ bool options::digest_io_options(const std::string &temp, int &i)
             else if (arguments[j] == "-nbo_threads") opt.threads = std::stoi(arguments[j + 1]);
             else if (arguments[j] == "-nrt") opt.nrt = true;
             else if (arguments[j] == "-nrt_e2") opt.nrt_e2_kcal = std::stod(arguments[j + 1]);
+            else if (arguments[j] == "-nrt_arrows") opt.nrt_max_arrows = std::stoi(arguments[j + 1]);
+            else if (arguments[j] == "-nrt_bond_scale")
+                opt.nrt_bond_scale = std::stod(arguments[j + 1]);
+            else if (arguments[j] == "-nrt_max") opt.nrt_max_candidates = std::stoi(arguments[j + 1]);
             else if (arguments[j] == "-nrt_atoms") {
                 //a comma separated 1-based atom list, NBO's "NRT <atoms>" subspace
                 std::string s = arguments[j + 1];

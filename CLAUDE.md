@@ -253,6 +253,16 @@ Key core modules live in `Src/core`:
 
 ## Current Validation Notes
 
+As of 2026-09-24, the in-house NBO analysis (`-nbo_native`, `Src/core/nbo.cpp` and
+`Src/core/nrt.cpp`) is checked in two places: `NrtTests`, `Nbo47Tests` and
+`NaoTests.OverlapCarriesTheDensitysPhaseConvention` as gtests, and
+`py -3.12 tests/nbo_reference/compare_nbo.py --all .` against the 22 stored NBO 7.0.9 references,
+which reports **22 PASS, exit 0**. NRT weights are compared by rank and never by label - gennbo
+reproduces TiCl4's `D(w)`, valencies and bond orders exactly while individual weights move 7.1
+points. `NoSpherA2_Tests` cannot be linked by CMake (`tests/src/CellMathTests.cpp` calls `cell`
+members that no longer exist), so a suite is hand-linked from the ninja objects without that one
+object. See `UNIT_TESTS_STATUS.md`.
+
 As of 2026-09-08, `ctest --preset release-linux` reports **267/267 passing** outside the XCW
 cases (`-E XCW`), including the new `TomlIntegrationTests.ELI_NH3Li` golden case for the
 rewritten `-eli_analysis` basin analysis; the nine XCW cases pass on a V100 node, a CPU node

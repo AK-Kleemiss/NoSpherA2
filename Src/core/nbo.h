@@ -61,8 +61,16 @@ struct NboLewis {
 struct NboOptions {
     double occupancy_threshold = 1.90; //start of the ladder, NBO's default
     double e2_threshold_kcal = 0.5;    //what enters the printed E2 table
-    double nrt_e2_kcal = 5.0;          //what enters the resonance search, NBO's NRTE2
+    //What enters the resonance search, NBO's NRTE2.  Calibrated, not inherited: ethane's strongest
+    //interaction is 3.52 kcal (sigma(C-H) -> RY C) and its hyperconjugative sigma -> sigma* is
+    //2.80 kcal, yet NBO finds ethane's six resonance structures, while water's strongest is 1.01 kcal
+    //and NBO finds water one structure.  The gate has to sit between the two.
+    double nrt_e2_kcal = 2.0;
     int nrt_max_arrows = 2;            //depth of the arrow-driven candidate generation
+    //Bond-length screen for resonance candidates, looser than the search's 1.3: a resonance structure
+    //may put a bond where the parent has none at all.  Ozone's third-largest reference structure at
+    //23.63 % is the ring, O 1- O 3 at 2.24 A against a covalent-radius sum of 1.32 A.
+    double nrt_bond_scale = 1.75;
     int nrt_max_candidates = 4000;
     double nrt_weight_floor = 5.0e-5;  //weights below this are dropped from the reported set
     bool nrt = false;
@@ -109,6 +117,23 @@ NboLewis nbo_search(const NAOResult& nao, const dMatrix2& gamma, const bvec2& bo
  * come from - this is the only place they are known - and they are filled in here.
  */
 std::vector<NboE2Entry> nbo_e2(NboLewis& lewis, const dMatrix2& fock_nao, double threshold_kcal);
+
+/**
+ * Natural resonance theory on one spin's NAO basis, appended to nrt: the candidate resonance
+ * structures, the convex quadratic program that weights them, and the bond orders, valencies and
+ * topology matrices the converged weights imply.  lewis supplies the parent structure and the NAO
+ * density, e2 the delocalisation graph the a-priori screens work on (its donor/acceptor indices must
+ * still be 1-based into lewis.orbitals, i.e. it has to be passed before analyse_spin renumbers it),
+ * bondable which pairs a candidate may put a bond on, and scale the occupancy of a full orbital.
+ *
+ * D(w) here is the plain Frobenius norm of Gamma - sum_a w_a Gamma_a; NBO's printed D carries a
+ * normalisation this code does not reproduce, so the quantities to compare a reference against are
+ * the weights by rank, the bond orders, the valencies and the retained-structure count.
+ */
+void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
+                const std::vector<NboE2Entry>& e2, const bvec2& bondable,
+                const NboOptions& options, const std::string& spin, double scale,
+                std::ostream& log);
 
 //The whole in-house analysis, in the shape the NBO 7 reference is stored in.  wavy is not const
 //because writing the FILE47 is not: WFN::write_nbo() renormalises the stored basis on the way.

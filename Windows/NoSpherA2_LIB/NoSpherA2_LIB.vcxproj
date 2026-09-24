@@ -190,6 +190,7 @@
     <ClCompile Include="..\..\Src\core\nbo_run.cpp" />
     <ClCompile Include="..\..\Src\core\NoSpherA2.cpp" />
     <ClCompile Include="..\..\Src\core\nos_math.cpp" />
+    <ClCompile Include="..\..\Src\core\nrt.cpp" />
     <ClCompile Include="..\..\Src\core\properties.cpp" />
     <ClCompile Include="..\..\Src\core\qct.cpp" />
     <ClCompile Include="..\..\Src\core\SALTED_equicomb.cpp" />

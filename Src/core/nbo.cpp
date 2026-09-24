@@ -676,7 +676,8 @@ namespace
 {
     //One spin's worth of the analysis, appended to the results.
     void analyse_spin(NboResults& res, const NboInput& in, const NAOResult& nao,
-                      const bvec2& bondable, const dMatrix2& density, const dMatrix2& fock,
+                      const bvec2& bondable, const bvec2& nrt_bondable, const dMatrix2& density,
+                      const dMatrix2& fock,
                       const int n_pairs, const double scale, const std::string& spin,
                       const NboOptions& options, std::vector<NboLewis>& out_lewis)
     {
@@ -684,6 +685,9 @@ namespace
         const dMatrix2 fock_nao = fock.extent(0) ? nao_operator(fock, nao.C) : dMatrix2();
         NboLewis lewis = nbo_search(nao, gamma, bondable, n_pairs, scale, options);
         std::vector<NboE2Entry> e2 = nbo_e2(lewis, fock_nao, options.e2_threshold_kcal);
+        //before the renumbering below, while e2's indices still point into lewis.orbitals
+        if (options.nrt)
+            native_nrt(res.nrt, nao, lewis, e2, nrt_bondable, options, spin, scale, std::cout);
 
         //NBO numbers its NBOs by type group: the Lewis set in the order it was found, then the
         //non-Lewis set as LV, BD*, RY
@@ -794,6 +798,7 @@ NboResults native_nbo(WFN& wavy, const NboOptions& options, std::ostream& log)
 
     std::vector<atom> atoms = wavy.get_atoms();
     const bvec2 bondable = bondable_pairs(atoms);
+    const bvec2 nrt_bondable = bondable_pairs(atoms, options.nrt_bond_scale);
     ivec ecp(atoms.size(), 0);
     if (wavy.get_has_ECPs())
         for (size_t a = 0; a < atoms.size(); a++)
@@ -805,7 +810,7 @@ NboResults native_nbo(WFN& wavy, const NboOptions& options, std::ostream& log)
         double electrons = 0.0;
         for (const NAOAtom& a : nao.atoms) electrons += a.population;
         const int n_pairs = static_cast<int>(std::llround(electrons / 2.0));
-        analyse_spin(res, in, nao, bondable, in.density[0],
+        analyse_spin(res, in, nao, bondable, nrt_bondable, in.density[0],
                      in.fock.empty() ? dMatrix2() : in.fock[0], n_pairs, 2.0, "", options, lewis);
         vec occ(nao.orbitals.size(), 0.0);
         for (size_t i = 0; i < occ.size(); i++) occ[i] = nao.orbitals[i].occupation;
@@ -830,7 +835,7 @@ NboResults native_nbo(WFN& wavy, const NboOptions& options, std::ostream& log)
             const NAOResult& nao = s ? b_nao : a_nao;
             double electrons = 0.0;
             for (const NAOAtom& a : nao.atoms) electrons += a.population;
-            analyse_spin(res, in, nao, bondable, in.density[s],
+            analyse_spin(res, in, nao, bondable, nrt_bondable, in.density[s],
                          static_cast<int>(in.fock.size()) > s ? in.fock[s] : dMatrix2(),
                          static_cast<int>(std::llround(electrons)), 1.0, s ? "beta" : "alpha",
                          options, lewis);
