@@ -200,6 +200,14 @@ Whenever an agent adds, removes, modifies, or investigates a test in `tests/test
 
 `tests/tests.toml`, `tests/src`, and `Windows/Tests/Tests.cpp` should stay in sync where they cover the same workflows. Check all relevant harnesses when adding or removing tests.
 
+### Keep the wiki in shape
+
+`docs/wiki/` holds the four pages of the GitHub wiki — `Home.md`, `Command-Reference.md`, `Use-Cases.md`, `Troubleshooting.md` — and is the source; the published copy is its own repository, `https://github.com/AK-Kleemiss/NoSpherA2.wiki.git`, cloned and pushed by hand. A flag that is added, renamed or given a new default must be updated in `docs/wiki/Command-Reference.md` in the same commit, or the wiki is wrong the moment the change lands.
+
+- Document what the parser accepts, not what `-h` claims. The pages were written from the seven `digest_*` functions in `Src/core/convenience.cpp` and the defaults in `struct options` and `struct properties_options`; reading them that way is what found `-hdef`, the cuBLAS default and the `acc = 0` examples.
+- Every command shown on a page must be one that runs. Take it from `tests/tests.toml` rather than composing it.
+- The published copy links pages without the extension (`](Troubleshooting#flag-order-matters)`), the in-repo copy with it. That is the only permitted difference between the two.
+
 ### Respect submodule boundaries
 
 Do not casually edit vendored submodules. For local parent-side workarounds, prefer generated-source or CMake target augmentation in the parent project. If an OCC source fix is required, commit it inside `occ` first, then update the parent submodule pointer.
