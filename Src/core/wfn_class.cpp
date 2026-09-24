@@ -1052,42 +1052,22 @@ const int WFN::get_shell_start_in_primitives(const unsigned int &nr_atom, const 
 {
 	if (static_cast<int>(nr_atom) < ncen && nr_shell < atoms[nr_atom].get_shellcount_size())
 	{
+		//The cartesian components of a shell are the gap between consecutive WFN type blocks:
+		//1, 3, 6, 10, 15, ... A switch over s/p/d/f used to stand here and added nothing at all for
+		//g and above, so every primitive index behind the first g shell of a wavefunction was short
+		//by 15 per g shell - which is how Fe.gbw's atom 2 asked for its s shell and was handed a g
+		//primitive 540 places later, then wrote past the end of a 1-component buffer.
+		const auto cart_components = [](const int shell_type) {
+			return (shell_type >= 1 && shell_type < static_cast<int>(std::size(constants::first_type)))
+				? constants::first_type[shell_type] - constants::first_type[shell_type - 1]
+				: 0;
+		};
 		int primitive_counter = 0;
 		for (unsigned int a = 0; a < nr_atom; a++)
 			for (unsigned int s = 0; s < atoms[a].get_shellcount_size(); s++)
-				switch (get_shell_type(a, s))
-				{
-				case 1:
-					primitive_counter += atoms[a].get_shellcount(s);
-					break;
-				case 2:
-					primitive_counter += (3 * atoms[a].get_shellcount(s));
-					break;
-				case 3:
-					primitive_counter += (6 * atoms[a].get_shellcount(s));
-					break;
-				case 4:
-					primitive_counter += (10 * atoms[a].get_shellcount(s));
-					break;
-				}
+				primitive_counter += cart_components(get_shell_type(a, s)) * atoms[a].get_shellcount(s);
 		for (unsigned int s = 0; s < nr_shell; s++)
-		{
-			switch (get_shell_type(nr_atom, s))
-			{
-			case 1:
-				primitive_counter += atoms[nr_atom].get_shellcount(s);
-				break;
-			case 2:
-				primitive_counter += (3 * atoms[nr_atom].get_shellcount(s));
-				break;
-			case 3:
-				primitive_counter += (6 * atoms[nr_atom].get_shellcount(s));
-				break;
-			case 4:
-				primitive_counter += (10 * atoms[nr_atom].get_shellcount(s));
-				break;
-			}
-		}
+			primitive_counter += cart_components(get_shell_type(nr_atom, s)) * atoms[nr_atom].get_shellcount(s);
 		return primitive_counter;
 	}
 	else

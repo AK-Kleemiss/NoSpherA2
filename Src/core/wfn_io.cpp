@@ -2213,7 +2213,18 @@ bool WFN::write_nbo(const std::filesystem::path &fileName, const bool &debug, st
 			//the components may be permuted as well (gbw stores p as z, x, y): the type says which row
 			for (int c = 0; c < shell.cart_components; c++) {
 				const int prim = primitive_start + c * stride + rep_offset;
-				cart_values[get_type(prim) - constants::first_type[shell.type - 1]] = get_MO_coef(m, prim) / contraction;
+				//A foreign wavefunction decides this index: the primitive picked is this shell's
+				//component c only if its primitive order really is the one detected above. An index
+				//off either end used to walk over cart_values' heap buffer and abort in free()
+				//afterwards, with nothing said about which shell was misread.
+				const int component = get_type(prim) - constants::first_type[shell.type - 1];
+				err_checkf(component >= 0 && component < shell.cart_components,
+					"Primitive order not understood in the .47 writer: atom " + std::to_string(shell.atom + 1)
+					+ ", shell " + std::to_string(shell.shell) + " of type " + std::to_string(shell.type)
+					+ ", component " + std::to_string(c) + " -> primitive " + std::to_string(prim)
+					+ " of type " + std::to_string(get_type(prim)) + " (component index " + std::to_string(component)
+					+ " of " + std::to_string(shell.cart_components) + ")", std::cout);
+				cart_values[component] = get_MO_coef(m, prim) / contraction;
 			}
 			const vec nbo_values = project_to_nbo(shell.type, cart_values);
 			for (int c = 0; c < shell.nbo_components; c++)

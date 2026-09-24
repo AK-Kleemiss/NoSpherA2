@@ -539,3 +539,51 @@ TEST(NboRun, CapturesTheFullNrtSectionOfTheAcetyleneReference)
 	EXPECT_EQ(r.nrt.leading_topo[0].matrix[1][0], 3);
 	EXPECT_NE(r.nrt.nrtstr_keylist.find("STR"), std::string::npos);
 }
+
+TEST(Nbo47, GShellWavefunctionWritesFile47WithCorrectElectronCount)
+{
+	//A basis with g functions is what broke get_shell_start_in_primitives: its switch covered
+	//s, p, d and f and added nothing for g, so every primitive index behind the first g shell
+	//was short by 15 per g shell.  Fe.gbw's atom 2 then asked for its s shell and was handed a
+	//g primitive, wrote past the end of a one-component buffer and aborted in the heap later.
+	//Tr(P S) is what says the coefficients that came back are the right ones, not merely that
+	//nothing crashed.
+	const auto root = repo_root();
+	const auto input_gbw = root / "tests" / "Fe_gbw" / "Fe.gbw";
+	ASSERT_TRUE(std::filesystem::exists(input_gbw));
+
+	const auto temp_dir = make_temp_dir();
+	const auto generated_47 = temp_dir / "fe.47";
+
+	WFN wave(input_gbw, false);
+	int highest_shell = 0;
+	for (int a = 0; a < wave.get_ncen(); a++)
+		for (int s = 0; s < wave.get_atom_shell_count(a); s++)
+			highest_shell = std::max(highest_shell, wave.get_shell_type(a, s));
+	ASSERT_GE(highest_shell, 5) << "fixture no longer carries g functions";
+
+	ASSERT_TRUE(wave.write_nbo(generated_47, false));
+	ASSERT_TRUE(std::filesystem::exists(generated_47));
+
+	const std::string text = read_file(generated_47);
+	const int nbasis = parse_key_int(text, "NBAS").value_or(-1);
+	ASSERT_GT(nbasis, 0);
+	const size_t ntri = static_cast<size_t>(nbasis) * (nbasis + 1) / 2;
+	const auto overlap = extract_section_numbers(text, "$OVERLAP");
+	const auto density = extract_section_numbers(text, "$DENSITY");
+	ASSERT_EQ(overlap.size(), ntri);
+	const bool open_shell = density.size() == 2 * ntri;
+	ASSERT_TRUE(open_shell || density.size() == ntri);
+
+	double electrons = 0.0;
+	for (size_t block = 0; block < density.size() / ntri; block++)
+		electrons += packed_trace_product(
+			vec(density.begin() + block * ntri, density.begin() + (block + 1) * ntri), overlap, nbasis);
+	//Against the wavefunction's own occupations, not against the nuclear charges: this fixture
+	//integrates to 128 while Z - charge gives 126, which is a question about the gbw charge field
+	//and not about whether the archive reproduces the wavefunction it was written from.
+	double occupied = 0.0;
+	for (int m = 0; m < wave.get_nmo(); m++)
+		occupied += wave.get_MO_occ(m);
+	EXPECT_NEAR(electrons, occupied, 1.0e-3);
+}
