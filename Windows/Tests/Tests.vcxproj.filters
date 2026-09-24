@@ -30,6 +30,9 @@
     <ClCompile Include="..\..\tests\src\DensitySourceTests.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\tests\src\CliRefusalTests.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\tests\src\Nbo47Tests.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

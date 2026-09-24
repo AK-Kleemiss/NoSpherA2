@@ -150,6 +150,52 @@ TEST(CliRefusal, PositionalWavefunctionThatDoesNotExistIsFatal)
 				::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), ".*");
 }
 
+//The refusal above is a trap for whoever adds the next option: a flag in one of the analysis
+//families that no digester claims is now fatal. Almost every option is safe by construction - a
+//digester claims it, and a claimed flag never reaches the refusal - but the -nbo/-nbo_native
+//handlers read their own -nbo_*/-nrt_* options from the tokens after their wavefunction, where no
+//digester sees them, and those need an entry in nbo_family_suboptions(). This reads the parser's
+//own source and asserts every family flag it mentions is one of the two, so a new option added the
+//second way cannot reach a release aborting runs that used to work.
+TEST(CliRefusal, AnalysisFlagsAreEitherDigestedOrListed)
+{
+	const auto src = nos_test_repo_root() / "Src" / "core" / "convenience.cpp";
+	std::ifstream in(src);
+	ASSERT_TRUE(in.good()) << src;
+	const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+
+	//every "-flag" string literal in the file, and separately the ones a digester compares against
+	std::set<std::string> mentioned, digested;
+	for (size_t p = text.find("\"-"); p != std::string::npos; p = text.find("\"-", p + 1))
+	{
+		const size_t end = text.find('"', p + 1);
+		if (end == std::string::npos) break;
+		const std::string flag = text.substr(p + 1, end - p - 1);
+		if (flag.size() < 2 || !isalpha(static_cast<unsigned char>(flag[1]))) continue;
+		if (flag.find_first_of(" \t<>") != std::string::npos) continue; // help text, not a flag
+		if (!owning_analysis(flag)) continue;
+		size_t before = p;
+		while (before > 0 && (text[before - 1] == ' ' || text[before - 1] == '\t')) before--;
+		if (before > 0 && text[before - 1] == '{')
+			continue; // {"-basin", "QTAIM basin"} - owning_analysis' own table of prefixes
+		mentioned.insert(flag);
+		//"temp == \"-flag\"" on the same line - the digesters' only way of claiming one
+		const size_t line_start = text.rfind('\n', p) + 1;
+		if (text.substr(line_start, p - line_start).find("temp ==") != std::string::npos)
+			digested.insert(flag);
+	}
+	ASSERT_GT(mentioned.size(), 10u) << "the scan found nothing - did the parser move?";
+
+	std::vector<std::string> orphans;
+	for (const auto& flag : mentioned)
+		if (digested.count(flag) == 0 && nbo_family_suboptions().count(flag) == 0)
+			orphans.push_back(flag);
+	EXPECT_TRUE(orphans.empty())
+		<< "these flags name an analysis family but no digester compares against them and they are "
+		   "not in nbo_family_suboptions(), so digest_options will refuse them as misspellings: "
+		<< [&] { std::string s; for (const auto& o : orphans) s += o + " "; return s; }();
+}
+
 //The other half of the check: an option that is real must still parse. -nrt and -nbo_json are
 //consumed by the -nbo_native handler, so at the top level no digester claims them - they must not
 //be mistaken for typos whichever order they were written in.
@@ -157,7 +203,7 @@ TEST(CliRefusal, RealOptionsStillParse)
 {
 	parse({"-rgbi", "-rgbi_no_sym", "-rgbi_EVs"});
 	parse({"-nrt", "-nrt_exhaustive", "-nbo_json", "out.json", "-nbo_threads", "4"});
-	parse({"-basin_grid"});
+	parse({"-basin_grid", "3", "-basin_cube"});
 	parse({"-rgbi", "-rgbi_theta", "-rgbi_legacy_cutoff"});
 	SUCCEED();
 }

@@ -1040,6 +1040,19 @@ struct options
 	};
 };
 
+/** @brief The analysis whose options begin with this flag's prefix, nullptr for a flag that names
+ *  none. digest_options refuses an unclaimed flag inside one of those families instead of dropping
+ *  it, so a misspelling cannot hand back the analysis' default. */
+const char *owning_analysis(const std::string &flag);
+
+/** @brief The -nbo_*/-nrt_* options the -nbo/-nbo_parse/-nbo_native/-convert_to_47 handlers read
+ *  from the tokens after their own wavefunction rather than through a digester. This is the only
+ *  list of flags the parser keeps: every other option is known by the digester that claims it, and
+ *  a flag a digester claims never reaches the unknown-option refusal. Adding an option to a
+ *  digester is therefore enough; adding one to a handler's own scan loop needs an entry here, which
+ *  is what CliRefusalTests' AnalysisFlagsAreEitherDigestedOrListed asserts. */
+const std::set<std::string> &nbo_family_suboptions();
+
 void convert_tonto_XCW_lambda_steps(const std::string& str, const std::string& lambda_step, bool debug, options& opt);
 
 double hypergeometric(double a, double b, double c, double x);

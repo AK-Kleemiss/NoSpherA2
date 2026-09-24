@@ -2560,22 +2560,22 @@ static std::vector<std::shared_ptr<BasisSet>> get_aux_basis(const int argc, cons
     return aux_basis;
 }
 
-namespace {
-    //Options the -nbo / -nbo_parse / -nbo_native / -convert_to_47 handlers read themselves, from
-    //the tokens after their wavefunction, instead of through a digester. Listed once so both
-    //readers of the list agree: those handlers refuse a -nbo_*/-nrt_* spelling that is not here,
-    //and digest_options knows these as options rather than as typos when they are written before
-    //the flag that consumes them.
-    const std::set<std::string> &nbo_family_suboptions()
-    {
-        static const std::set<std::string> known = {
-            "-nbo", "-nbo_parse", "-nbo_native", "-nbo_keywords", "-nbo_exe", "-nbo_json",
-            "-nbo_dir", "-nbo_47", "-nbo_e2min", "-nbo_threads", "-nbo_keep47", "-nrt",
-            "-nrt_e2", "-nrt_arrows", "-nrt_bond_scale", "-nrt_max", "-nrt_atoms",
-            "-nrt_exhaustive", "-nrt_no_symmetry", "-nrt_no_components", "-nrt_no_ion"};
-        return known;
-    }
+//Options the -nbo / -nbo_parse / -nbo_native / -convert_to_47 handlers read themselves, from
+//the tokens after their wavefunction, instead of through a digester. Listed once so both
+//readers of the list agree: those handlers refuse a -nbo_*/-nrt_* spelling that is not here,
+//and digest_options knows these as options rather than as typos when they are written before
+//the flag that consumes them.
+const std::set<std::string> &nbo_family_suboptions()
+{
+    static const std::set<std::string> known = {
+        "-nbo", "-nbo_parse", "-nbo_native", "-nbo_keywords", "-nbo_exe", "-nbo_json",
+        "-nbo_dir", "-nbo_47", "-nbo_e2min", "-nbo_threads", "-nbo_keep47", "-nrt",
+        "-nrt_e2", "-nrt_arrows", "-nrt_bond_scale", "-nrt_max", "-nrt_atoms",
+        "-nrt_exhaustive", "-nrt_no_symmetry", "-nrt_no_components", "-nrt_no_ion"};
+    return known;
+}
 
+namespace {
     //A -nbo_*/-nrt_* token that the handlers' own loops do not know is read by nobody: the option
     //was dropped and the analysis ran with its default, exit code 0. digest_options cannot catch
     //these, they are consumed here rather than by a digester.
@@ -4100,22 +4100,20 @@ bool options::digest_dev_options(const std::string &temp, int &i)
     return true;
 };
 
-namespace {
-    //The analysis an option's prefix names. A flag that starts with one of these and that no
-    //digester claimed is a misspelling of one of that analysis' options, and a misspelling the
-    //parser drops is a run that silently ignored its own arguments: `-rgbi_gruops 0,1 2,3` used
-    //to compute RGBI for the default groups and exit 0.
-    const char *owning_analysis(const std::string &flag)
-    {
-        static const std::pair<const char *, const char *> families[] = {
-            {"-rgbi", "RGBI"}, {"-npa", "NPA"}, {"-nbo", "NBO"}, {"-nrt", "NRT"},
-            {"-nao", "NAO"}, {"-eli", "ELI-D"}, {"-elf", "ELF"}, {"-qtaim", "QTAIM"},
-            {"-basin", "QTAIM basin"}, {"-topology", "topology"}};
-        for (const auto &f : families)
-            if (flag.rfind(f.first, 0) == 0)
-                return f.second;
-        return nullptr;
-    }
+//The analysis an option's prefix names. A flag that starts with one of these and that no
+//digester claimed is a misspelling of one of that analysis' options, and a misspelling the
+//parser drops is a run that silently ignored its own arguments: `-rgbi_gruops 0,1 2,3` used
+//to compute RGBI for the default groups and exit 0.
+const char *owning_analysis(const std::string &flag)
+{
+    static const std::pair<const char *, const char *> families[] = {
+        {"-rgbi", "RGBI"}, {"-npa", "NPA"}, {"-nbo", "NBO"}, {"-nrt", "NRT"},
+        {"-nao", "NAO"}, {"-eli", "ELI-D"}, {"-elf", "ELF"}, {"-qtaim", "QTAIM"},
+        {"-basin", "QTAIM basin"}, {"-topology", "topology"}};
+    for (const auto &f : families)
+        if (flag.rfind(f.first, 0) == 0)
+            return f.second;
+    return nullptr;
 }
 
 void options::digest_options()
