@@ -300,3 +300,51 @@ TEST(FusedDensityGradient, MatchesComputeDensWithGHIShells)
 	if (!std::filesystem::exists(wfn)) GTEST_SKIP() << "fixture missing: " << wfn.string();
 	expect_fused_density_matches(wfn);
 }
+
+//A basin population belongs to the wavefunction, not to the file format it arrived in. The
+//streaming walk never touches the file - it asks the WFN for a gradient - so the readers are the
+//one place where a basin number can go wrong without any of the geometry being wrong, and the
+//failure mode is specific: a reader that orders a shell's primitives differently, or normalises
+//one of them differently, still produces a density that looks like a fluorine atom and integrates
+//to something that is not nine electrons.
+//
+//An isolated atom is the fixture for that, and deliberately so. It has one attractor and no
+//separatrix, so nothing here can be blamed on the assignment: whatever the three files disagree
+//about is the density itself. The nuclear count is the reference, which is what makes this a check
+//and not a golden - no captured output to go stale, and nothing to regenerate if it goes red.
+namespace
+{
+	double lone_atom_population(const std::filesystem::path &wfn, double &outside, double &electrons)
+	{
+		const WFN wavy(wfn);
+		electrons = wavy.count_nr_electrons();
+		const cube rho = seed_cube(wavy, 0.25, 3.0);
+		const std::vector<critical_point> cps = analyze_cube_critical_points(&rho, wavy, false, std::max(1e-8, rho.max_value() * 1e-6));
+		const std::vector<d4> maxima = streaming_density_attractors(wavy, cps, nullptr, nullptr, false);
+		EXPECT_EQ(maxima.size(), 1u) << "an isolated atom has one attractor: " << wfn.filename().string();
+		if (maxima.size() != 1) return 0.0;
+		vec v;
+		outside = 0.0;
+		const vec pops = integrate_basins_on_atomic_grids(nullptr, nullptr, maxima, wavy, 3, false, v, outside);
+		return pops.empty() ? 0.0 : pops[0];
+	}
+}
+
+TEST(BasinReaders, TheSameFluorineThroughThreeReaders)
+{
+	const std::filesystem::path dir = nos_test_repo_root() / "tests" / "molden_file";
+	const char *files[] = { "f_ref.wfn", "f_ref.wfx", "F_full.molden" };
+	double first = 0.0;
+	const char *first_name = nullptr;
+	for (const char *name : files) {
+		const std::filesystem::path f = dir / name;
+		if (!std::filesystem::exists(f)) continue;
+		double outside = 0.0, electrons = 0.0;
+		const double pop = lone_atom_population(f, outside, electrons);
+		EXPECT_NEAR(pop, electrons, 0.01) << name << " did not integrate to its own electron count";
+		EXPECT_NEAR(outside, 0.0, 1e-3) << name << " left density outside the one basin there is";
+		if (!first_name) { first = pop; first_name = name; }
+		else EXPECT_NEAR(pop, first, 1e-3) << name << " disagrees with " << first_name;
+	}
+	if (!first_name) GTEST_SKIP() << "no fluorine fixture under " << dir.string();
+}
