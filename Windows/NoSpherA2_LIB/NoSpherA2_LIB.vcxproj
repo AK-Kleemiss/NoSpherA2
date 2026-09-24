@@ -176,6 +176,7 @@
     <ClCompile Include="..\..\Src\core\convenience.cpp" />
     <ClCompile Include="..\..\Src\core\cube.cpp" />
     <ClCompile Include="..\..\Src\core\ECPs_corrections.cpp" />
+    <ClCompile Include="..\..\Src\core\eli_family.cpp" />
     <ClCompile Include="..\..\Src\core\fchk.cpp" />
     <ClCompile Include="..\..\Src\core\GridManager.cpp" />
     <ClCompile Include="..\..\Src\core\integration_params.cpp" />
@@ -184,6 +185,8 @@
     <ClCompile Include="..\..\Src\core\libCintKernels.cpp" />
     <ClCompile Include="..\..\Src\core\libCintMain.cpp" />
     <ClCompile Include="..\..\Src\core\molecule.cpp" />
+    <ClCompile Include="..\..\Src\core\nao.cpp" />
+    <ClCompile Include="..\..\Src\core\nbo_run.cpp" />
     <ClCompile Include="..\..\Src\core\NoSpherA2.cpp" />
     <ClCompile Include="..\..\Src\core\nos_math.cpp" />
     <ClCompile Include="..\..\Src\core\properties.cpp" />
