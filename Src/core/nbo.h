@@ -72,6 +72,7 @@ struct NboOptions {
     //23.63 % is the ring, O 1- O 3 at 2.24 A against a covalent-radius sum of 1.32 A.
     double nrt_bond_scale = 1.75;
     int nrt_max_candidates = 4000;
+    bool nrt_max_set = false;          //-nrt_max given: obey the number, skip the size guard
     double nrt_weight_floor = 5.0e-5;  //weights below this are dropped from the reported set
     bool nrt = false;
     bool nrt_exhaustive = false;       //enumerate every feasible topology instead of arrows

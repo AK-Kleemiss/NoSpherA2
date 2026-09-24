@@ -294,3 +294,90 @@ TEST(NrtTests, TheSweepRecoversTheExactOrbitalsOutOfOverlappingBlocks)
     for (const NboBondOrder& o : nrt.bond_orders) pairs += o.total;
     EXPECT_NEAR(pairs, 2.0, 1e-3);
 }
+
+//A candidate limit has to return a subset of the answer, not a different answer.  It used to truncate
+//in generation order, and the depth-1 half-moves that are discarded later spent the whole budget
+//first: sucrose at -nrt_max 20 came back with one structure, the parent alone, and its bond orders
+//were the parent's.  Here the 2-3 bond can form under a 25 kcal/mol interaction and the 3-4
+//bond under a 2 kcal/mol one, so a budget of four has to be spent on the first: the cheap
+//structure is the one to lose.
+TEST(NrtTests, ASmallCandidateBudgetKeepsTheExpensiveArrowsAndMoreThanTheParent)
+{
+    const NAOResult nao = h_chain(4);
+    //Gamma has to contain the delocalised structure, or the check cannot see it: nrt.candidates holds
+    //the structures that survive the weight floor, so a gamma the parent reproduces exactly puts all
+    //the weight on the parent and reports one structure however many were generated.  So: 85 % of
+    //BD(1,2) + LP(3) + LP(4) and 15 % of the structure the 25 kcal/mol arrow makes, LP(1) + BD(2,3)
+    //+ LP(4).  Both are three pairs over the four NAOs, so the trace stays at six electrons.
+    const double r = 1.0 / std::sqrt(2.0);
+    dMatrix2 gamma(4, 4);
+    const std::vector<std::pair<double, std::vector<vec>>> mix = {
+        { 0.85, { vec{ r, r, 0.0, 0.0 }, vec{ 0.0, 0.0, 1.0, 0.0 }, vec{ 0.0, 0.0, 0.0, 1.0 } } },
+        { 0.15, { vec{ 1.0, 0.0, 0.0, 0.0 }, vec{ 0.0, r, r, 0.0 }, vec{ 0.0, 0.0, 0.0, 1.0 } } },
+    };
+    for (const auto& part : mix)
+        for (const vec& v : part.second)
+            for (size_t i = 0; i < 4; i++)
+                for (size_t j = 0; j < 4; j++)
+                    gamma(i, j) += part.first * 2.0 * v[i] * v[j];
+
+    NboLewis lewis;
+    lewis.gamma = gamma;
+    NboFunction bd;
+    bd.centers = { 0, 1 };
+    bd.type = "BD";
+    bd.multiplicity = 1;
+    bd.occupancy = 2.0;
+    lewis.orbitals.push_back(bd);
+    for (const int a : { 2, 3 }) {
+        NboFunction lp;
+        lp.centers = { a };
+        lp.type = "LP";
+        lp.multiplicity = 1;
+        lp.occupancy = 2.0;
+        lewis.orbitals.push_back(lp);
+    }
+    lewis.n_lewis = 3;
+    lewis.topo.assign(4, ivec(4, 0));
+    lewis.topo[0][1] = lewis.topo[1][0] = 1;
+    lewis.topo[2][2] = lewis.topo[3][3] = 1;
+
+    //The prices: LP(3)->BD(1,2) covers atoms 1,2,3 and so marks the 1-2 and 2-3 bonds at 25, while
+    //LP(4)->LP(3) marks 3-4 at 2.  Both are above the 1 kcal/mol resonance threshold, so a search
+    //with room for everything finds structures in both regions.
+    std::vector<NboE2Entry> e2(2);
+    e2[0].donor_index = 2;      //LP on atom 3
+    e2[0].acceptor_index = 1;   //BD 1-2
+    e2[0].energy_kcal = 25.0;
+    e2[1].donor_index = 3;      //LP on atom 4
+    e2[1].acceptor_index = 2;   //LP on atom 3
+    e2[1].energy_kcal = 2.0;
+
+    const auto pair_seen = [](const NboNrt& n, const int a, const int b) {
+        for (const NboNrtCandidate& c : n.candidates)
+            if (c.topo[a][b] > 0) return true;
+        return false;
+    };
+
+    NboOptions opt;
+    opt.nrt = true;
+    opt.nrt_e2_kcal = 1.0;
+    opt.nrt_max_set = true;     //obey the number, do not let the size guard pick one
+    std::ostringstream log;
+
+    opt.nrt_max_candidates = 10000;
+    NboNrt full;
+    native_nrt(full, nao, lewis, e2, chain_bondable(4), opt, "", 2.0, log);
+    ASSERT_TRUE(full.present);
+    ASSERT_GT(full.structures_found, 2);
+    ASSERT_TRUE(pair_seen(full, 1, 2));   //the 25 kcal/mol structure carries weight, so it is visible
+
+    opt.nrt_max_candidates = 4;
+    NboNrt tight;
+    native_nrt(tight, nao, lewis, e2, chain_bondable(4), opt, "", 2.0, log);
+    ASSERT_TRUE(tight.present);
+    EXPECT_GT(tight.structures_found, 1);                      //not the parent alone
+    EXPECT_LE(tight.structures_found, full.structures_found);
+    EXPECT_TRUE(pair_seen(tight, 1, 2));                       //the 25 kcal/mol arrows survive
+    EXPECT_LE(tight.d_w, tight.d_0 + 1e-9);
+}

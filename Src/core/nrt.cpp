@@ -46,6 +46,17 @@ using Eigen::VectorXd;
 
 namespace
 {
+    //Candidates to generate per octet slot of a delocalising atom - the default budget's only free
+    //number, and the block that uses it explains the budget.  Calibrated by sweeping it over the 22
+    //reference molecules against their uncapped runs and asking not for D(w) to the last digit but
+    //for the bond orders and valencies a chemist reads: 4 is enough for water and N2, 8 for SO2,
+    //16 for the main-group multiple bonds (ethene, ozone, formate, nitromethane), 32 for benzene,
+    //SF6, PF5, TiCl4 and even ethane, and 64 for Ni(CO)4 and pyridine, which are the last to come in.
+    //64 is nearly free where it is not needed, because the generator saturates: ethane produces the
+    //same 103 candidates at 32 and at 64, TiCl4 the same 71, and no reference run reached 5 s.  On a
+    //molecule big enough for the number to bite, the machine guard below binds long before it does.
+    constexpr int NRT_PER_SLOT = 64;
+
     MatrixXd to_eigen(const dMatrix2& m)
     {
         const int r = static_cast<int>(m.extent(0)), c = static_cast<int>(m.extent(1));
@@ -114,6 +125,22 @@ namespace
         Eigen::SelfAdjointEigenSolver<MatrixXd> es(B);
         embed(es.eigenvectors().col(k - 1));
         return es.eigenvalues()(k - 1);
+    }
+
+    //x^T A x over idx x idx only.  Every orbital the sweep produces is exactly zero outside its own
+    //block, so the rows and columns outside contribute exactly 0.0 and this is the same number the
+    //full product returns - for sucrose's 998 NAOs and a 60-wide block, 1/270 of the work, and it is
+    //called once per orbital per sweep.
+    double block_quad(const MatrixXd& A, const ivec& idx, const VectorXd& x)
+    {
+        const int k = static_cast<int>(idx.size());
+        double s = 0.0;
+        for (int i = 0; i < k; i++) {
+            double r = 0.0;
+            for (int j = 0; j < k; j++) r += A(idx[i], idx[j]) * x(idx[j]);
+            s += x(idx[i]) * r;
+        }
+        return s;
     }
 
     //A += s x x^T over idx x idx only.  Every orbital leading_block returns is exactly zero outside
@@ -245,10 +272,13 @@ namespace
     //looks harmless, is what made water generate nine ionic structures where NBO 7 generates one
     //structure and finds one: NBO's candidate count for a molecule with no delocalisation above the
     //threshold is one, and that is a consequence of this gate, not of a weight floor.
-    bvec2 delocalisation_graph(const NboLewis& lewis, const std::vector<NboE2Entry>& e2,
-                               const double kcal, const int na, const bvec2& bondable)
+    //It also carries the price: the strongest E2 interaction covering the pair, in kcal/mol, which is
+    //what licensed the pair in the first place.  A move across a 30 kcal pair is a structure a chemist
+    //would draw; a move across a 2.1 kcal pair is the last permille.  Zero means closed.
+    vec2 delocalisation_graph(const NboLewis& lewis, const std::vector<NboE2Entry>& e2,
+                              const double kcal, const int na, const bvec2& bondable)
     {
-        bvec2 g(na, bvec(na, false));
+        vec2 g(na, vec(na, 0.0));
         for (const NboE2Entry& e : e2) {
             if (e.energy_kcal < kcal) continue;
             ivec c = lewis.orbitals[e.donor_index - 1].centers;
@@ -256,8 +286,10 @@ namespace
             c.insert(c.end(), ac.begin(), ac.end());
             for (size_t i = 0; i < c.size(); i++)
                 for (size_t j = i + 1; j < c.size(); j++)
-                    if (c[i] != c[j] && bondable[c[i]][c[j]])
-                        g[c[i]][c[j]] = g[c[j]][c[i]] = true;
+                    if (c[i] != c[j] && bondable[c[i]][c[j]]) {
+                        const double p = std::max(g[c[i]][c[j]], e.energy_kcal);
+                        g[c[i]][c[j]] = g[c[j]][c[i]] = p;
+                    }
         }
         return g;
     }
@@ -265,7 +297,7 @@ namespace
     //Screen (a): connected components of that graph.  Two moves in different components describe
     //independent resonance, whose joint weight factorises, so the product of the two candidate sets
     //is combinatorial waste.
-    ivec components(const bvec2& g)
+    ivec components(const vec2& g)
     {
         const int n = static_cast<int>(g.size());
         ivec comp(n, -1);
@@ -278,7 +310,7 @@ namespace
                 const int x = stack.back();
                 stack.pop_back();
                 for (int y = 0; y < n; y++)
-                    if (g[x][y] && comp[y] < 0) { comp[y] = c; stack.push_back(y); }
+                    if (g[x][y] > 0.0 && comp[y] < 0) { comp[y] = c; stack.push_back(y); }
             }
             c++;
         }
@@ -293,6 +325,7 @@ namespace
         Topology topo;
         int depth = 0;
         int component = -1;       //which component of the delocalisation graph the moves touched
+        double score = 0.0;       //sum of the E2 prices of the arrows that made it, kcal/mol
         //filled by the orbital construction
         bool feasible = false;
         double g = 0.0;           //s Tr(V^T Gamma V)
@@ -305,7 +338,16 @@ namespace
         ivec cap;            //orbitals an atom may carry
         bvec free_atom;      //may a move touch this atom at all (subspace screen)
         bvec2 bondable;      //geometry screen
-        bvec2 deloc;         //E2 screen
+        vec2 deloc;          //E2 screen, and the kcal/mol price of each open pair
+        //Components confine a candidate's arrows to one connected delocalisation, so a budget that
+        //spends per component rather than per price was the obvious second remedy for the three
+        //molecules above 600 NAOs that still miss their converged bond orders.  It cannot help them:
+        //reconstructing which atoms each retained structure moves (its topology minus the leading
+        //one's, merged into connected regions) puts sucrose, malbac and Au2Br2 in ONE region in both
+        //the capped and the uncapped run - 74 retained structures over 1 region uncapped, 62 over the
+        //same 1 region at the default - and no region of any uncapped run is left untouched by its
+        //capped one.  These molecules are one delocalisation, not many local ones; the cap thins it
+        //evenly, and nothing can be rebalanced between components that all live in the same component.
         ivec comp;           //component of each atom
         int max_charge = 2;  //how far a candidate may move an atom's Lewis electron count
         ivec parent_electrons;
@@ -337,13 +379,14 @@ namespace
             const int comp = L.comp[x];
             if (L.use_components && c.component >= 0 && comp != c.component) return;
             d.component = comp;
+            d.score = c.score + L.deloc[x][y];
             out.push_back(std::move(d));
         };
         for (int a = 0; a < n; a++) {
             //a lone pair becomes a bond, or moves to another atom
             if (c.topo.at(a, a) > 0) {
                 for (int b = 0; b < n; b++) {
-                    if (b == a || !L.deloc[a][b]) continue;
+                    if (b == a || L.deloc[a][b] <= 0.0) continue;
                     Topology s = c.topo;
                     s.at(a, a)--;
                     s.set(a, b, s.at(a, b) + 1);
@@ -358,7 +401,7 @@ namespace
             }
             //a bond becomes a lone pair on either end, or shifts to a neighbouring pair
             for (int b = 0; b < n; b++) {
-                if (b == a || c.topo.at(a, b) <= 0 || !L.deloc[a][b]) continue;
+                if (b == a || c.topo.at(a, b) <= 0 || L.deloc[a][b] <= 0.0) continue;
                 if (L.ion) {
                     Topology s = c.topo;
                     s.set(a, b, s.at(a, b) - 1);
@@ -366,7 +409,7 @@ namespace
                     emit(std::move(s), a, b);
                 }
                 for (int d = 0; d < n; d++) {
-                    if (d == a || d == b || !L.deloc[a][d]) continue;
+                    if (d == a || d == b || L.deloc[a][d] <= 0.0) continue;
                     Topology s = c.topo;
                     s.set(a, b, s.at(a, b) - 1);
                     s.set(a, d, s.at(a, d) + 1);
@@ -507,7 +550,7 @@ namespace
                 v[col] = x;
                 blk[col] = &idx;
                 owner[col] = { sl.a, sl.b };
-                occ[col] = x.dot(G0 * x);
+                occ[col] = block_quad(G0, idx, x);
                 rank1_block(sum, idx, occ[col], x);
                 col++;
             }
@@ -534,7 +577,7 @@ namespace
                 if (x.dot(v[j]) < 0.0) x = -x;
                 change = std::max(change, (x - v[j]).norm());
                 v[j] = x;
-                occ[j] = x.dot(G0 * x);
+                occ[j] = block_quad(G0, *blk[j], x);
                 rank1_block(sum, *blk[j], occ[j], x);
             }
             if (change < 1e-9) break;
@@ -648,6 +691,13 @@ namespace
         const double L = std::max(2.0 * lam, 1e-12);
         VectorXd y = w, wp = w;
         double t = 1.0, f = objective(G, g, trg2, w);
+        //The per-iteration test below wants df < 1e-14 f AND a step under 1e-12 at the same moment,
+        //which a Hessian this badly conditioned never delivers, so every call ran its full maxit: the
+        //symmetry-orbit solve at maxit 200000 spent 292 of polyene C12H14's 296 s in the minimiser,
+        //polishing the 11th digit of D.  A window is the honest test - a restart makes one iteration
+        //look stalled when it is not - but 500 iterations that together buy less than 1e-11 of an
+        //objective of order 1 are a plateau, and the weights they feed are reported to 1e-4.
+        double f_window = f;
         for (int it = 1; it <= maxit; it++) {
             VectorXd wn = y - (2.0 / L) * (G * y - g);
             project_simplex(wn);
@@ -673,6 +723,10 @@ namespace
                 trace->push_back(q);
             }
             if (df < 1e-14 * std::max(1.0, std::abs(f)) && step < 1e-12) break;
+            if (it % 500 == 0) {
+                if (f_window - f < 1e-11 * std::max(1.0, std::abs(f))) break;
+                f_window = f;
+            }
         }
         w = wp;
         return f;
@@ -730,6 +784,74 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
         for (int a = 0; a < na; a++) L.cap[a] = std::max(nval[a], parent.used(a));
     }
 
+    //--- how many candidates this molecule is worth, and how many it can afford --------------------
+    //Two different numbers, and the default is the smaller of them.
+    //
+    //(1) What the chemistry can produce.  A flat 4000 is the wrong shape: it is far more than ethene
+    //needs and far less than an alkane generates.  An atom only takes part in resonance if something
+    //above the E2 threshold reaches it, and then it can hand its pair on, or take one into a slot its
+    //octet leaves free - cap minus what the parent already put there, where cap is the atom's own
+    //valence NAO count, so H stops at one pair, first-row atoms at four, and a metal or a
+    //hypervalent centre gets the slots it actually has.  Summing 1 + free over the delocalising
+    //atoms scales with the molecule the way the answer does: the structures above the reporting floor
+    //grow linearly with size (C2 to C12 alkanes: 7, 19, 31, 43, 55, 66) while the candidates
+    //generated grow as the square (103 to 2863), so the flat cap throws almost all its work away.
+    //NRT_PER_SLOT is that linear count with room over it, calibrated below.
+    //
+    //(2) What the machine can afford.  The Gram matrix is nc^2/2 products of two n x k orbital sets,
+    //so it grows as nc^2 k^2 n, and the weight QP on top of it is nc^2 per iteration.  Measured on
+    //sucrose (45 atoms, 998 NAOs) with the plateau break in place: 93 candidates cost 0.9 s of Gram
+    //and 0.03 s of QP, 400 cost 7.4 s and 0.5 s, 804 cost 25 s and 2.2 s, and 2062 cost 147 s and
+    //69 s to move D(w) by 1.5 %.  It is the backstop for a molecule whose octet estimate is generous,
+    //not the main rule.
+    //
+    //The constant was first set from that curve alone, at 5.0e11, and an aromatic then showed that
+    //Gram seconds are the wrong thing to calibrate a chemistry default against: at 5.0e11 tetracene
+    //could afford 667 of the 2308 structures its two arrows reach, and reported the C9-C10 bond order
+    //0.49 away from the converged answer (which -nrt_max 8000 and 16000 agree on to every digit).
+    //Ranking better inside the smaller budget does not substitute for raising it; see the note at the
+    //shortlist below, where that was tried and measured worse, and the one at Limits::comp, where
+    //spending the budget per delocalisation rather than per price was tried and cannot apply.
+    //
+    //1.0e14 is where it stands, and it was chosen by chemistry too.  Gram seconds are exactly
+    //proportional to this constant (sucrose: 1.2 s at 5.0e11, predicted 5.6 and measured 5.59 at
+    //4.0e12), and afford as its square root, so every trial value is one run at
+    //-nrt_max = min(chem, m * afford) with the two numbers the default already prints - no rebuild.
+    //Measured that way against each molecule's own converged run: 4.0e12 leaves sucrose 0.07 and
+    //malbac 0.32 in bond order and 0.90 in valency away from it; 1.6e13 changes nothing (malbac
+    //0.38); 1.0e14 makes sucrose and rubredoxin residue 2 exact and leaves malbac and Au2Br2
+    //differing by 0.13, on a hydrogen.  It is free where it does not bind - tetracene's octet number
+    //is 1920 against an afford of 1887, so it runs the same 8 s it did - and it is paid only above
+    //~600 NAOs, where it buys sucrose 53 s -> 158 s and malbac 79 s -> 176 s.
+    //
+    //-nrt_max puts the user's number back, both of them out of the way.
+    int budget = options.nrt_max_candidates;
+    if (!options.nrt_max_set) {
+        int slots = 0, active = 0;
+        for (int a = 0; a < na; a++) {
+            bool deloc = false;
+            for (int b = 0; b < na && !deloc; b++) deloc = L.deloc[a][b] > 0.0;
+            if (!deloc) continue;
+            active++;
+            slots += 1 + std::max(0, L.cap[a] - parent.used(a));
+        }
+        int ncore_total = 0;
+        for (const int c : ncore) ncore_total += c;
+        const double k = n_pairs + ncore_total;
+        const int afford = static_cast<int>(std::sqrt(1.0e14 / std::max(k * k * nn, 1.0)));
+        const int chem = std::max(64, NRT_PER_SLOT * slots);
+        const int want = std::min(chem, std::max(64, afford));
+        if (want < budget) {
+            budget = want;
+            nrt.arrows.push_back("candidate budget " + std::to_string(budget) + " of " +
+                                 std::to_string(options.nrt_max_candidates) + ": " +
+                                 std::to_string(active) + " delocalising atom(s), " +
+                                 std::to_string(slots) + " octet slot(s) -> " + std::to_string(chem) +
+                                 ", machine guard " + std::to_string(afford) + " at " +
+                                 std::to_string(nn) + " NAOs (-nrt_max overrides both)");
+        }
+    }
+
     //--- candidates --------------------------------------------------------------------------------
     std::vector<Candidate> cands;
     std::map<ivec, int> seen;
@@ -742,7 +864,7 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
     const auto t_search0 = clock();
     if (options.nrt_exhaustive) {
         std::vector<Candidate> all;
-        enumerate(parent, L, n_pairs, static_cast<size_t>(options.nrt_max_candidates), all);
+        enumerate(parent, L, n_pairs, static_cast<size_t>(budget), all);
         for (Candidate& c : all)
             if (seen.emplace(c.topo.key(), static_cast<int>(cands.size())).second)
                 cands.push_back(std::move(c));
@@ -750,15 +872,43 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
                              " feasible topologies");
     }
     else {
-        size_t level_begin = 0;
+        //A budget has to buy the best structures, not the first ones.  Truncating in generation order
+        //is what made sucrose at -nrt_max 20 and at 60 return its parent alone - no resonance at all -
+        //because the depth-one half-moves dropped below were spending the whole of it.  So the
+        //intermediates get a generous cap of their own instead of the budget (they are not free: each
+        //one is expanded again), and each level is ranked by the summed E2 price of the arrows that
+        //made it before any cap bites.  stable_sort, not nth_element, so equal prices keep generation
+        //order and two runs of the same molecule agree.
+        const auto richer = [](const Candidate& a, const Candidate& b) { return a.score > b.score; };
+        //A diversity-aware cut was tried here and measured worse, which is worth writing down because
+        //the reasoning for it is seductive: tetracene's 66 first arrows are all pi -> pi*, so their
+        //prices are near-degenerate and a price sort looks arbitrary.  Keeping the best structure of
+        //every starting bond in turn instead raised D(w) on anthracene from 2.79613 (uncapped) to
+        //2.96935 and moved a bond order by 0.22, because a round robin buys the best of a bad root at
+        //the price of the second best of a good one.  The price order is the right order; the acene
+        //was short of budget, not badly ranked, and the machine guard above is where that was fixed.
+        const auto shortlist = [&richer](std::vector<Candidate>& v, const size_t keep) {
+            std::stable_sort(v.begin(), v.end(), richer);
+            if (v.size() > keep) v.resize(keep);
+        };
+        size_t level_begin = 0, paid = 0;
         for (int depth = 1; depth <= options.nrt_max_arrows; depth++) {
             const size_t level_end = cands.size();
+            const size_t level_cap = (depth == 1) ? 4 * static_cast<size_t>(budget)
+                                                  : static_cast<size_t>(budget) - paid;
             std::vector<Candidate> made;
-            for (size_t i = level_begin; i < level_end; i++) expand(cands[i], L, made);
+            for (size_t i = level_begin; i < level_end; i++) {
+                expand(cands[i], L, made);
+                //a parent has O(n^2) children, so the pile of a level is O(nc n^2): 45 atoms and a few
+                //thousand parents is millions of Topologies, and the sort would then throw all but a
+                //few hundred away.  Prune when it outgrows the cap by an order of magnitude.
+                if (made.size() > 8 * level_cap + 1024) shortlist(made, level_cap);
+            }
+            shortlist(made, level_cap);
             size_t added = 0;
             for (Candidate& c : made) {
-                if (cands.size() >= static_cast<size_t>(options.nrt_max_candidates)) break;
                 if (seen.emplace(c.topo.key(), static_cast<int>(cands.size())).second) {
+                    if (c.depth > 1) paid++;
                     cands.push_back(std::move(c));
                     added++;
                 }
@@ -767,7 +917,7 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
                                  std::to_string(added) + " new structures from " +
                                  std::to_string(level_end - level_begin));
             level_begin = level_end;
-            if (!added) break;
+            if (!added || paid >= static_cast<size_t>(budget)) break;
         }
         //A single pair-move is never a resonance structure of its own, only half of one.  Count the
         //entries in the "changes" column of all 588 structures the 22 references list: 78 carry none

@@ -525,7 +525,7 @@ std::string help_message =
  "                                    resonance structure may bond atoms the\n"
  "                                    parent does not - ozone's ring structure at\n"
  "                                    23.6 % spans 2.24 A against 1.32 A.\n"
- "  -nrt_max <n>                       Candidate limit, default 4000.\n"
+ "  -nrt_max <n>                       Candidate limit, default 4000 capped by a size guard on big molecules.\n"
  "  -nrt_atoms <a,b,...>               Subspace NRT: only these 1-based atoms may\n"
  "                                    change, the rest keep the parent structure's\n"
  "                                    bonding. NBO's 'NRT <atoms>'.\n"
@@ -2650,7 +2650,10 @@ bool options::digest_io_options(const std::string &temp, int &i)
             else if (arguments[j] == "-nrt_arrows") opt.nrt_max_arrows = std::stoi(arguments[j + 1]);
             else if (arguments[j] == "-nrt_bond_scale")
                 opt.nrt_bond_scale = std::stod(arguments[j + 1]);
-            else if (arguments[j] == "-nrt_max") opt.nrt_max_candidates = std::stoi(arguments[j + 1]);
+            else if (arguments[j] == "-nrt_max") {
+                opt.nrt_max_candidates = std::stoi(arguments[j + 1]);
+                opt.nrt_max_set = true;
+            }
             else if (arguments[j] == "-nrt_atoms") {
                 //a comma separated 1-based atom list, NBO's "NRT <atoms>" subspace
                 std::string s = arguments[j + 1];
