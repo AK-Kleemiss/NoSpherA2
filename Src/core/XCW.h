@@ -6,6 +6,7 @@
 #include "cell.h"
 #include "basis_set.h"
 #include "xcw_halting.h"
+#include "extinction.h"
 #include <occ/qm/hf.h>
 #include <occ/qm/second_order_scf.h>
 #include "i_tensor_stream.h"
@@ -131,6 +132,13 @@ private:
 		//(smaller) basis by OCC's own driver, its density projected into the orbital basis
 		std::string guess_basis_name;
 		bool grown = false;
+		//`extinction <shelx|bc_gaussian|bc_lorentzian> [iso|aniso] [fixed] [start value]`
+		extinction::model extinction_model = extinction::model::none;
+		bool extinction_aniso = false;
+		bool extinction_refine = true;
+		double extinction_start = 1e-4;
+		//`wavelength <lambda>`, in Angstrom; overrides _diffrn_radiation_wavelength from the CIF
+		double wavelength = 0.0;
 		int n_params;
 		int refine_against;
 		int XWR_type;
@@ -266,8 +274,11 @@ private:
 	// Parses the anomalous dispersion information from a CIF style .txt file
 	void parse_anom_atoms(std::vector<anom_atom>& anom_atoms);
 
-	// Evaluates the scaling factor for |F_calc| by least squares fitting
+	// Evaluates the scaling factor for |F_calc| by least squares fitting, and with it the
+	// extinction coefficients when a model is being refined
 	void eval_scale();
+	// The closed-form weighted least-squares scale alone, with the extinction shape as it is
+	void solve_scale();
 
 	// Calculates quality criteria like GooF and chi^2. When
 	// h2 weighting is set, both are computed with an additional
@@ -278,6 +289,40 @@ private:
 	// Builds (once) the per-reflection 1/|H|^2 cache used by calc_criteria/
 	// calc_perturb when h2 weighting is set. No-op otherwise.
 	void ensure_inv_H2_weights();
+
+	// Reads the wavelength (settings file, else _diffrn_radiation_wavelength in the CIF),
+	// sizes the coefficient vector and builds the per-reflection extinction geometry. No-op
+	// when no extinction model was asked for. Called once from construct.
+	void setup_extinction(const std::filesystem::path& cif);
+	// Recomputes y_r, sqrt(y_r), dI/d|Fc|^2 and d|Fc_ext|/d|Fc| from the current F_calc and
+	// the current coefficients. No-op when no model is active.
+	void update_extinction();
+	// One Levenberg-damped Gauss-Newton step on the coefficients against the same weighted
+	// residual eval_scale minimises for the scale, with the scale held at its current value.
+	// False when the step was negligible or had to be rejected.
+	bool refine_extinction_step();
+	// "ext 0.000123" or the six tensor components, for the per-lambda log
+	std::string extinction_report() const;
+	// The parameters the criteria divide by: the settings file's `params` plus the extinction
+	// coefficients, but only while those are actually being refined
+	int n_params() const {
+		return settings.n_params + static_cast<int>(settings.extinction_refine ? ext_p_.size() : 0);
+	}
+	// The extinction shape of reflection r, 1 where no model is active
+	double ext_y(const int r) const { return ext_y_.empty() ? 1.0 : ext_y_[r]; }
+	double ext_sqrt_y(const int r) const { return ext_sqrt_y_.empty() ? 1.0 : ext_sqrt_y_[r]; }
+	// dI/d|Fc|^2 and d(sqrt(y)|Fc|)/d|Fc|, the chain factors the gradient needs
+	double ext_g(const int r) const { return ext_g_.empty() ? 1.0 : ext_g_[r]; }
+	double ext_m(const int r) const { return ext_m_.empty() ? 1.0 : ext_m_[r]; }
+	// a_{r,p} of x_r = sum_p a_{r,p} P_p; 1 for the isotropic models, which have one P
+	double ext_a(const int r, const size_t p) const {
+		return ext_a_.empty() ? 1.0 : ext_a_[static_cast<size_t>(r) * ext_p_.size() + p];
+	}
+	double ext_x(const int r) const {
+		double x = 0.0;
+		for (size_t p = 0; p < ext_p_.size(); p++) x += ext_a(r, p) * ext_p_[p];
+		return x;
+	}
 
 	// Distributional (Gaussian) halting criterion (see xcw_halting.h and
 	// tests/P1_test/XCW_plan.md). Computes standardized residuals z_h from
@@ -475,6 +520,16 @@ private:
 	std::vector<i3> hkl_ordered_;
 	// 1/|H_r|^2 per reflection, see ensure_inv_H2_weights.
 	vec inv_H2_;
+	// The refined extinction coefficient, or the six Voigt components X11 X22 X33 X12 X13 X23
+	// of the anisotropic tensor. Empty when no model is active, which is what every extinction
+	// branch tests on.
+	vec ext_p_;
+	// Per-reflection geometry, built once: 0.001 lambda^3/sin(2 theta), cos(2 theta), and (for
+	// the anisotropic models only) the nr_small x 6 coefficients a_{r,p}
+	vec ext_c_, ext_cos2t_, ext_a_;
+	// Per-iteration shape, see update_extinction. ext_dyc_ is dy/dt * c_r * |Fc_r|^2, so that
+	// dy/dP_p = ext_dyc_[r] * a_{r,p}.
+	vec ext_y_, ext_sqrt_y_, ext_g_, ext_m_, ext_dyc_;
 	// Reflection r is in the fit set (I/sigma(I) >= i_sigma_cutoff), see construct
 	bvec fit_mask_;
 	// The criterion the SCF descends (XWR_type x refine_against), over the fit set or over all

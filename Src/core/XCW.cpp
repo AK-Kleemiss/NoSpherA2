@@ -10,6 +10,7 @@
 #include "bondwise_analysis.h"
 #include "citations.h"
 #include <mutex>
+#include <limits>
 #include <random>
 
 void XCW::construct(const options& opt_in) {
@@ -133,12 +134,13 @@ void XCW::construct(const options& opt_in) {
 		fit_mask_[r] = obs[r].sigma_obs2 > 0 && I_over_sigma >= settings.i_sigma_cutoff;
 		cryst.n_fit += fit_mask_[r];
 	}
-	err_checkf(cryst.n_fit > settings.n_params, "Fewer reflections above the I/sigma cutoff than parameters", std::cout);
+	setup_extinction(cif);
+	err_checkf(cryst.n_fit > n_params(), "Fewer reflections above the I/sigma cutoff than parameters", std::cout);
 	std::cout << "XCW: I/sigma(I) >= " << settings.i_sigma_cutoff << " (F/sigma(F) >= " << 2 * settings.i_sigma_cutoff << "): " << cryst.n_fit << " of " << cryst.nr_small << " reflections in the fit; R1 and Criterion are over these, R1(all) and Crit(all) over all" << std::endl;
 	XCW_log << "XCW: I/sigma(I) >= " << settings.i_sigma_cutoff << ": " << cryst.n_fit << " of " << cryst.nr_small << " reflections in the fit" << std::endl;
 
 	// Precompute GooF scaling factor
-	cryst.inv_scale = 1.0 / (cryst.n_fit - settings.n_params);
+	cryst.inv_scale = 1.0 / (cryst.n_fit - n_params());
 
 	// Set F_calc sizes
 	F_calc.resize(2);
@@ -168,6 +170,9 @@ XCW::SCF_settings XCW::loadSettings(const std::filesystem::path& settings_path) 
 	std::string basis_set_name = "Undefined";
 	std::string df_basis_name, guess_basis_name;
 	bool grown = false, read_tensor = false, read_first_guess = false, nbo_output = false;
+	extinction::model extinction_model = extinction::model::none;
+	bool extinction_aniso = false, extinction_refine = true;
+	double extinction_start = 1e-4, wavelength = 0.0;
 	bool i_tensor_single = false, i_tensor_double = false;
 	std::filesystem::path i_tensor_file_path;
 	std::filesystem::path i_tensor_save_path;
@@ -185,6 +190,32 @@ XCW::SCF_settings XCW::loadSettings(const std::filesystem::path& settings_path) 
 		handlers["conv"] = [&](std::istream& is) {
 			if (!(is >> quant_diff))
 				throw std::runtime_error("Expected value after 'conv'");
+			};
+
+		handlers["extinction"] = [&](std::istream& is) {
+			//`extinction <model> [iso|aniso] [fixed] [start value]`, the rest of the line in
+			//any order: a word names the model or a flag, a number is the start value
+			std::string rest, token;
+			std::getline(is, rest);
+			std::istringstream words(rest);
+			while (words >> token) {
+				const std::string low = lowercase(token);
+				if (low == "aniso" || low == "anisotropic") extinction_aniso = true;
+				else if (low == "iso" || low == "isotropic") extinction_aniso = false;
+				else if (low == "fixed" || low == "fix") extinction_refine = false;
+				else if (extinction::from_string(low) != extinction::model::none) extinction_model = extinction::from_string(low);
+				else {
+					try { extinction_start = std::stod(token); }
+					catch (const std::exception&) { throw std::runtime_error("Could not read '" + token + "' after 'extinction'"); }
+				}
+			}
+			if (extinction_model == extinction::model::none)
+				throw std::runtime_error("Expected a model (shelx, bc_gaussian or bc_lorentzian) after 'extinction'");
+			};
+
+		handlers["wavelength"] = [&](std::istream& is) {
+			if (!(is >> wavelength))
+				throw std::runtime_error("Expected value after 'wavelength'");
 			};
 
 		handlers["diis_damping"] = [&](std::istream& is) {
@@ -497,6 +528,11 @@ XCW::SCF_settings XCW::loadSettings(const std::filesystem::path& settings_path) 
 	settings.charge = (charge != 32768) ? charge : settings.charge;
 	settings.multiplicity = (multiplicity != 32768) ? multiplicity : settings.multiplicity;
 	if (n_params != 32768) settings.n_params = n_params;
+	settings.extinction_model = extinction_model;
+	settings.extinction_aniso = extinction_aniso;
+	settings.extinction_refine = extinction_refine;
+	settings.extinction_start = extinction_start;
+	settings.wavelength = wavelength;
 	if (refine_against != 32768) settings.refine_against = refine_against;
 	settings.xcw_start_value = (start != 32768) ? start : 0;
 	settings.xcw_step_size = (step_size != 32768) ? step_size : 0.01;
@@ -922,6 +958,155 @@ void XCW::eval_anom_disp(cvec2& DW_fact, cvec2& phase_fact, cvec2& translation_p
 	}
 }
 
+//The wavelength the extinction models need. NoSpherA2 reads no wavelength anywhere else, so
+//it comes from the settings file's `wavelength` or from the CIF.
+//ponytail: only the inline `_diffrn_radiation_wavelength <value>` form is read, not the loop_
+//form of a multi-wavelength experiment - those pass `wavelength <lambda>` in the settings file.
+static double read_cif_wavelength(const std::filesystem::path& cif) {
+	std::ifstream input(cif, std::ios::in);
+	std::string line;
+	while (input.good() && !input.eof()) {
+		getline_universal(input, line);
+		std::istringstream words(line);
+		std::string tag, value;
+		if (!(words >> tag) || tag != "_diffrn_radiation_wavelength") continue;
+		if (!(words >> value)) continue;
+		try { return std::stod(value.substr(0, value.find('('))); }
+		catch (const std::exception&) { return 0.0; }
+	}
+	return 0.0;
+}
+
+void XCW::setup_extinction(const std::filesystem::path& cif) {
+	if (settings.extinction_model == extinction::model::none) return;
+	const double lambda = settings.wavelength > 0.0 ? settings.wavelength : read_cif_wavelength(cif);
+	err_checkf(lambda > 0.0, "Extinction needs a wavelength: put `wavelength <lambda>` in the XCW "
+		"settings file, or _diffrn_radiation_wavelength in " + cif.string(), std::cout);
+	ensure_hkl_ordered();
+	const size_t np = settings.extinction_aniso ? 6 : 1;
+	//the anisotropic tensor starts isotropic, where x(h) is the start value for every h
+	ext_p_.assign(np, 0.0);
+	for (size_t p = 0; p < (settings.extinction_aniso ? 3u : 1u); p++) ext_p_[p] = settings.extinction_start;
+	ext_c_.resize(cryst.nr_small);
+	ext_cos2t_.resize(cryst.nr_small);
+	if (settings.extinction_aniso) ext_a_.resize(static_cast<size_t>(cryst.nr_small) * np);
+	for (int r = 0; r < cryst.nr_small; r++) {
+		const double stl = unit_cell.get_stl_of_hkl(hkl_ordered_[r]);
+		ext_c_[r] = extinction::geometry_constant(lambda, stl);
+		ext_cos2t_[r] = extinction::cos_2theta(lambda, stl);
+		if (!settings.extinction_aniso) continue;
+		//the scattering vector in Cartesian, |h| = 1/d: rcm's rows are the Cartesian
+		//components, its columns the reciprocal basis vectors
+		std::array<double, 3> h_unit{ 0.0, 0.0, 0.0 };
+		for (int i = 0; i < 3; i++)
+			for (int j = 0; j < 3; j++) h_unit[i] += unit_cell.get_rcm_angs(i, j) * hkl_ordered_[r][j];
+		const double norm = std::sqrt(h_unit[0] * h_unit[0] + h_unit[1] * h_unit[1] + h_unit[2] * h_unit[2]);
+		if (norm > 0.0) for (double& v : h_unit) v /= norm;
+		std::array<double, 6> a{};
+		extinction::aniso_coefficients(h_unit, a);
+		for (size_t p = 0; p < np; p++) ext_a_[static_cast<size_t>(r) * np + p] = a[p];
+	}
+	ext_y_.assign(cryst.nr_small, 1.0);
+	ext_sqrt_y_.assign(cryst.nr_small, 1.0);
+	ext_g_.assign(cryst.nr_small, 1.0);
+	ext_m_.assign(cryst.nr_small, 1.0);
+	ext_dyc_.assign(cryst.nr_small, 0.0);
+	std::ostringstream banner;
+	banner << "XCW extinction: " << extinction::name(settings.extinction_model)
+		<< (settings.extinction_aniso ? ", anisotropic (azimuth-averaged, 6 parameters)" : ", isotropic (1 parameter)")
+		<< (settings.extinction_refine ? ", refined with the scale" : ", held fixed")
+		<< ", lambda = " << lambda << " A, start value " << settings.extinction_start;
+	std::cout << banner.str() << std::endl;
+	XCW_log << banner.str() << std::endl;
+}
+
+//y_r and the chain factors, from the current F_calc and the current coefficients
+void XCW::update_extinction() {
+	if (ext_p_.empty()) return;
+	const extinction::model m = settings.extinction_model;
+#pragma omp parallel for
+	for (int r = 0; r < cryst.nr_small; r++) {
+		const double u = std::norm(F_calc[0][r]);
+		const double t = ext_c_[r] * ext_x(r) * u;
+		double dydt = 0.0;
+		const double y = extinction::correction(m, ext_cos2t_[r], t, &dydt);
+		ext_y_[r] = y;
+		ext_sqrt_y_[r] = std::sqrt(y);
+		//I = y u, so dI/du = y + t dy/dt, and the amplitude's slope is that over sqrt(y)
+		ext_g_[r] = y + t * dydt;
+		ext_m_[r] = ext_sqrt_y_[r] > 0.0 ? ext_g_[r] / ext_sqrt_y_[r] : 1.0;
+		ext_dyc_[r] = dydt * ext_c_[r] * u;
+	}
+}
+
+//One Gauss-Newton step on the coefficients against the criterion's own weighted residual,
+//with the scale held where solve_scale put it. Accepted only if it lowers that residual and
+//leaves x_r >= 0 everywhere, since a negative coefficient is not extinction.
+bool XCW::refine_extinction_step() {
+	const Eigen::Index np = static_cast<Eigen::Index>(ext_p_.size());
+	const bool against_F2 = settings.refine_against == 2, weighted = settings.XWR_type == 2;
+	const double k = cryst.F_scale, s = k * k;
+	auto residual_sum = [&]() {
+		update_extinction();
+		double sum = 0.0;
+		for (int r = 0; r < cryst.nr_small; r++) {
+			if (!fit_mask_[r]) continue;
+			if (ext_x(r) < 0.0) return std::numeric_limits<double>::infinity();
+			const double w = weighted ? inv_H2_[r] : 1.0;
+			const double d = against_F2
+				? (s * ext_y_[r] * std::norm(F_calc[0][r]) - obs[r].F_obs2) / obs[r].sigma_obs2
+				: (k * ext_sqrt_y_[r] * std::abs(F_calc[0][r]) - obs[r].abs_F_obs) / obs[r].sigma_obs;
+			sum += w * d * d;
+		}
+		return sum;
+		};
+
+	occ::Mat JtJ = occ::Mat::Zero(np, np);
+	occ::Vec JtR = occ::Vec::Zero(np), J(np);
+	double chi2 = 0.0;
+	for (int r = 0; r < cryst.nr_small; r++) {
+		if (!fit_mask_[r]) continue;
+		const double w = weighted ? inv_H2_[r] : 1.0, Fm = std::abs(F_calc[0][r]);
+		double resid = 0.0, dmodel = 0.0;   //d(model)/dP_p = dmodel * a_{r,p}
+		if (against_F2) {
+			resid = (s * ext_y_[r] * Fm * Fm - obs[r].F_obs2) / obs[r].sigma_obs2;
+			dmodel = s * Fm * Fm * ext_dyc_[r] / obs[r].sigma_obs2;
+		}
+		else {
+			if (ext_sqrt_y_[r] <= 0.0) continue;
+			resid = (k * ext_sqrt_y_[r] * Fm - obs[r].abs_F_obs) / obs[r].sigma_obs;
+			dmodel = k * Fm * ext_dyc_[r] / (2.0 * ext_sqrt_y_[r] * obs[r].sigma_obs);
+		}
+		chi2 += w * resid * resid;
+		if (dmodel == 0.0) continue;
+		for (Eigen::Index p = 0; p < np; p++) J(p) = dmodel * ext_a(r, static_cast<size_t>(p));
+		JtJ += w * J * J.transpose();
+		JtR += w * resid * J;
+	}
+	//Levenberg damping, so a direction the data barely sees does not throw the step
+	for (Eigen::Index p = 0; p < np; p++) JtJ(p, p) *= 1.001;
+	const occ::Vec step = JtJ.ldlt().solve(-JtR);
+	if (!step.allFinite() || step.norm() == 0.0) return false;
+	const vec start = ext_p_;
+	for (int half = 0; half < 8; half++) {
+		const double f = std::pow(0.5, half);
+		for (Eigen::Index p = 0; p < np; p++) ext_p_[p] = start[p] + f * step(p);
+		if (residual_sum() < chi2) return true;
+	}
+	ext_p_ = start;
+	update_extinction();
+	return false;
+}
+
+std::string XCW::extinction_report() const {
+	if (ext_p_.empty()) return "";
+	std::ostringstream out;
+	out << "extinction(" << extinction::name(settings.extinction_model)
+		<< (settings.extinction_aniso ? ", aniso)" : ")") << std::scientific << std::setprecision(4);
+	for (const double p : ext_p_) out << " " << p;
+	return out.str();
+}
+
 //The scale that minimises the criterion the SCF descends: k over the fit set from
 //Sum w (k|Fc| - |Fo|)^2 / sigma^2, or k^2 from Sum w (k^2|Fc|^2 - Fo^2)^2 / sigma(I)^2 against
 //F^2, with w the 1/|H|^2 weights of XWR_type 2. calc_perturb takes the scale as given, so the
@@ -931,6 +1116,19 @@ void XCW::eval_anom_disp(cvec2& DW_fact, cvec2& phase_fact, cvec2& translation_p
 //every converged lambda >= 0.03.
 void XCW::eval_scale() {
 	ensure_inv_H2_weights();
+	update_extinction();
+	solve_scale();
+	if (ext_p_.empty() || !settings.extinction_refine) return;
+	//the scale and the extinction coefficients are coupled through the same residual, so
+	//alternate: a Gauss-Newton step on the coefficients, then the closed-form scale again
+	for (int it = 0; it < 5; it++) {
+		if (!refine_extinction_step()) break;
+		update_extinction();
+		solve_scale();
+	}
+}
+
+void XCW::solve_scale() {
 	const bool against_F2 = settings.refine_against == 2, weighted = settings.XWR_type == 2;
 	const int chunk = 128, nchunk = (cryst.nr_small + chunk - 1) / chunk;
 	vec numerators(nchunk), denominators(nchunk);
@@ -940,7 +1138,7 @@ void XCW::eval_scale() {
 		for (int i = first; i < last; i++) {
 			if (!fit_mask_[i]) continue;
 			const double w = weighted ? inv_H2_[i] : 1.0;
-			const double calc = std::abs(F_calc[0][i]);
+			const double calc = ext_sqrt_y(i) * std::abs(F_calc[0][i]);
 			if (against_F2) {
 				const double calc2 = calc * calc, wi = w / (obs[i].sigma_obs2 * obs[i].sigma_obs2);
 				numerators[c] += wi * calc2 * obs[i].F_obs2;
@@ -965,7 +1163,7 @@ void XCW::eval_scale() {
 void XCW::calc_criteria() {
 	ensure_inv_H2_weights();
 	//index 0: the fit set, 1: all reflections
-	const double prefactor[2] = { 1.0 / static_cast<double>(cryst.n_fit - settings.n_params), 1.0 / static_cast<double>(cryst.nr_small - settings.n_params) };
+	const double prefactor[2] = { 1.0 / static_cast<double>(cryst.n_fit - n_params()), 1.0 / static_cast<double>(cryst.nr_small - n_params()) };
 	const int chunk = 128, nchunk = (cryst.nr_small + chunk - 1) / chunk;
 	vec2 goof1(2, vec(nchunk)), goof2(2, vec(nchunk)), wgoof1(2, vec(nchunk)), wgoof2(2, vec(nchunk)), r1_num(2, vec(nchunk)), r1_den(2, vec(nchunk));
 	const double scale = cryst.F_scale;
@@ -975,7 +1173,7 @@ void XCW::calc_criteria() {
 		const int first = c * chunk, last = std::min(first + chunk, cryst.nr_small);
 		for (int i = first; i < last; i++) {
 			const scattering_data& obs_ptr = obs[i];
-			const double scaled_F_calc = scale * std::abs(F_calc_0[i]);
+			const double scaled_F_calc = scale * ext_sqrt_y(i) * std::abs(F_calc_0[i]);
 			const double scaled_difference = scaled_F_calc - obs_ptr.F_obs;
 			const double diff2 = (scaled_F_calc * scaled_F_calc) - obs_ptr.F_obs2;
 			const double weighted_diff1 = scaled_difference / obs_ptr.sigma_obs;
@@ -2677,21 +2875,24 @@ void XCW::calc_perturb(occ::Mat& perturb, const occ::qm::SCF<occ::qm::HartreeFoc
 	if (!valid) XCW_log << "Invalid refinement option" << std::endl;
 	const double scale_sq = cryst.F_scale * cryst.F_scale;
 	const double prefactor = against_F2
-		? 4.0 * scale_sq / (cryst.n_fit - settings.n_params)
-		: 2.0 * cryst.F_scale / (cryst.n_fit - settings.n_params);
+		? 4.0 * scale_sq / (cryst.n_fit - n_params())
+		: 2.0 * cryst.F_scale / (cryst.n_fit - n_params());
 
 	cvec pre(cryst.nr_small);
 #pragma omp parallel for
 	for (int r = 0; r < cryst.nr_small; r++) {
 		if (!valid || !fit_mask_[r]) continue;
 		cdouble precompute;
+		//with extinction the model is I = y |Fc|^2, so the residual carries sqrt(y)|Fc| and the
+		//carrier d/dD picks up dI/d|Fc|^2 (F^2) or d(sqrt(y)|Fc|)/d|Fc| (F); both are 1 without
+		//a model, and the expressions below are then exactly the ones this always used
 		if (against_F2) {
-			const double F_calc_abs_sq = std::pow(std::abs(F_calc[0][r]), 2);
-			precompute = std::conj(F_calc[0][r]) * (scale_sq * F_calc_abs_sq - obs[r].F_obs2) / (obs[r].sigma_obs2 * obs[r].sigma_obs2);
+			const double I = ext_y(r) * std::pow(std::abs(F_calc[0][r]), 2);
+			precompute = ext_g(r) * std::conj(F_calc[0][r]) * (scale_sq * I - obs[r].F_obs2) / (obs[r].sigma_obs2 * obs[r].sigma_obs2);
 		}
 		else {
 			const double F_calc_abs = std::abs(F_calc[0][r]);
-			precompute = std::conj(F_calc[0][r]) * (cryst.F_scale * F_calc_abs - obs[r].abs_F_obs) / (obs[r].sigma_obs * obs[r].sigma_obs * F_calc_abs);
+			precompute = ext_m(r) * std::conj(F_calc[0][r]) * (cryst.F_scale * ext_sqrt_y(r) * F_calc_abs - obs[r].abs_F_obs) / (obs[r].sigma_obs * obs[r].sigma_obs * F_calc_abs);
 		}
 		if (weighted) precompute *= inv_H2_[r];
 		pre[r] = precompute;
@@ -3593,8 +3794,12 @@ occ::Vec XCW::hessian_vector(occ::qm::SCF<occ::qm::HartreeFock>& scf, const doub
 		for (int ch = 0; ch < nchunk; ch++) {
 			for (int r = ch * chunk; r < std::min((ch + 1) * chunk, cryst.nr_small); r++) {
 				if (!fit_mask_[r]) continue;
-				const double w = weighted ? inv_H2_[r] : 1.0, Fa = std::abs(F0[r]);
-				const double dFa = Fa > 0 ? std::real(std::conj(F0[r]) * dFr[r]) / Fa : 0.0;
+				//ponytail: the extinction shape is frozen over the step (dy/d|Fc| dropped), so
+				//sqrt(y)|Fc| and m d|Fc| reproduce I and dI exactly but their own curvature is
+				//neglected. Only the Hessian's step proposal degrades - TRAH accepts on the
+				//exact energy rebuild_at returns, and calc_perturb's gradient stays exact.
+				const double w = weighted ? inv_H2_[r] : 1.0, Fa = ext_sqrt_y(r) * std::abs(F0[r]);
+				const double dFa = std::abs(F0[r]) > 0 ? ext_m(r) * std::real(std::conj(F0[r]) * dFr[r]) / std::abs(F0[r]) : 0.0;
 				if (against_F2) {
 					const double wi = w / (obs[r].sigma_obs2 * obs[r].sigma_obs2);
 					dnum[ch] += wi * 2.0 * Fa * dFa * obs[r].F_obs2;
@@ -3619,23 +3824,27 @@ occ::Vec XCW::hessian_vector(occ::qm::SCF<occ::qm::HartreeFock>& scf, const doub
 #pragma omp parallel for
 		for (int r = 0; r < cryst.nr_small; r++) {
 			if (!fit_mask_[r]) continue;
-			const double w = weighted ? inv_H2_[r] : 1.0, Fa = std::abs(F0[r]);
-			if (Fa == 0) continue;
-			const double dFa = std::real(std::conj(F0[r]) * dFr[r]) / Fa;
+			const double w = weighted ? inv_H2_[r] : 1.0, Fm = std::abs(F0[r]);
+			if (Fm == 0) continue;
+			//as above: the model amplitude is sqrt(y)|Fc| and its response m d|Fc|, with the
+			//shape frozen. The carrier conj(F) keeps calc_perturb's chain factor.
+			const double Fa = ext_sqrt_y(r) * Fm, dFa = ext_m(r) * std::real(std::conj(F0[r]) * dFr[r]) / Fm;
+			const cdouble carrier = (against_F2 ? ext_g(r) : ext_m(r)) * std::conj(F0[r]);
+			const cdouble dcarrier = (against_F2 ? ext_g(r) : ext_m(r)) * std::conj(dFr[r]);
 			if (against_F2) {
 				const double wi = w / (obs[r].sigma_obs2 * obs[r].sigma_obs2), Fo2 = obs[r].F_obs2;
-				dq[r] = wi * (std::conj(dFr[r]) * (s * s * Fa * Fa - s * Fo2)
-					+ std::conj(F0[r]) * (2.0 * s * dscale * Fa * Fa + 2.0 * s * s * Fa * dFa - dscale * Fo2));
+				dq[r] = wi * (dcarrier * (s * s * Fa * Fa - s * Fo2)
+					+ carrier * (2.0 * s * dscale * Fa * Fa + 2.0 * s * s * Fa * dFa - dscale * Fo2));
 			}
 			else {
 				const double wi = w / (obs[r].sigma_obs * obs[r].sigma_obs), Fo = obs[r].abs_F_obs;
-				dq[r] = wi * (std::conj(dFr[r]) * (k * k - k * Fo / Fa)
-					+ std::conj(F0[r]) * (dscale * (2.0 * k - Fo / Fa) + k * Fo * dFa / (Fa * Fa)));
+				dq[r] = wi * (dcarrier * (k * k * ext_sqrt_y(r) - k * Fo / Fm)
+					+ carrier * (dscale * (2.0 * k * ext_sqrt_y(r) - Fo / Fm) + k * Fo * std::real(std::conj(F0[r]) * dFr[r]) / (Fm * Fm * Fm)));
 			}
 		}
 		occ::Mat dP;
 		contract_I(dP, dq);
-		dP *= (against_F2 ? 4.0 : 2.0) / (cryst.n_fit - settings.n_params) * lambda;
+		dP *= (against_F2 ? 4.0 : 2.0) / (cryst.n_fit - n_params()) * lambda;
 		for (int b = 0; b < nb; b++) dF.middleRows(static_cast<Eigen::Index>(b) * n, n) += dP;
 	}
 	occ::Vec Hv(v.size());
@@ -3815,12 +4024,16 @@ void XCW::create_tscb(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& lam
 	{
 		ensure_hkl_ordered();
 		std::ofstream fc("NA2_" + value + "_Fcalc.txt");
+		if (!ext_p_.empty()) {
+			std::cout << "XCW lambda " << lambda << ": " << extinction_report() << std::endl;
+			XCW_log << "XCW lambda " << lambda << ": " << extinction_report() << std::endl;
+		}
 		fc << "#    h    k    l          F_obs        sig(F)   scale*|F_calc|     phase(deg)   R1(gt) = " << std::setprecision(5) << cryst.R1 << " R1(all) = " << cryst.R1_all << " scale = " << std::setprecision(10) << cryst.F_scale << "\n";
 		for (int r = 0; r < cryst.nr_small; r++) {
 			const cdouble& f = F_calc[0][r];
 			fc << std::setw(5) << hkl_ordered_[r][0] << std::setw(5) << hkl_ordered_[r][1] << std::setw(5) << hkl_ordered_[r][2]
 				<< std::fixed << std::setprecision(4) << std::setw(15) << obs[r].F_obs << std::setw(14) << obs[r].sigma_obs
-				<< std::setw(17) << cryst.F_scale * std::abs(f) << std::setw(15) << std::arg(f) * 180.0 / constants::PI << "\n";
+				<< std::setw(17) << cryst.F_scale * ext_sqrt_y(r) * std::abs(f) << std::setw(15) << std::arg(f) * 180.0 / constants::PI << "\n";
 		}
 	}
 	std::ostringstream oss3;
