@@ -1468,6 +1468,23 @@ std::vector<d4> streaming_density_attractors(const WFN &wavy, const std::vector<
 static bool g_beta_spheres = true;
 void beta_spheres_set_enabled(const bool on) { g_beta_spheres = on; }
 bool beta_spheres_enabled() { return g_beta_spheres; }
+//The four numbers the angle-adaptive step is made of, all four measured rather than chosen: a knob
+//matrix run against AdaptiveStep.* (which integrates both ways and compares basin by basin) put
+//every looser combination outside 1e-3 electrons on NH3Li. The reach fraction is the one that
+//decides it - the turn test sees curvature, and a separatrix crossed sideways through a straight
+//stretch of field is not curvature, so only the distance to the nearest attractor can bound it -
+//but the cosine has to be tight as well, because curvature is the other way to lose the sheet.
+static const double g_adp_cap = 8.0;    //at most this many times the validated floor step
+static const double g_adp_grow = 0.99999;   //midpoint cosine that earns a doubling
+static const double g_adp_keep = 0.999;   //below this the step is thrown away and retaken at the floor
+static const double g_adp_reach = 0.25;  //fraction of the distance to the nearest maximum
+//Off by default, and the reason is a measurement rather than caution: at the settings above the
+//grown step costs at most 8e-4 electrons per basin against the floor-step integration, and on NH3Li
+//it puts 8e-4 electrons outside every basin that the floor step accounts for. That is inside the
+//tolerance the equivalence test asserts and it is still a changed number, so it is -adaptive_step.
+static bool g_adaptive_step = false;
+void basin_adaptive_step_set_enabled(const bool on) { g_adaptive_step = on; }
+bool basin_adaptive_step_enabled() { return g_adaptive_step; }
 static double g_basin_step_scale = 1.0;
 void basin_step_scale_set(const double f) { g_basin_step_scale = f > 0.0 ? f : 1.0; }
 double basin_step_scale() { return g_basin_step_scale; }
@@ -1614,6 +1631,15 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 			if (q < d2) { d2 = q; best = basin_of(m); }
 		}
 		return best;
+	};
+	//Half the distance to the nearest maximum. A step longer than the validated one must still
+	//land inside the catch radius (or the beta sphere) of the attractor it is walking into, since
+	//at_maximum only ever looks at where the walk landed. Only a grown step pays for this loop.
+	auto reach_limit = [&](const d3 &p) {
+		double d2 = std::numeric_limits<double>::max();
+		for (size_t m = 0; m < maxima.size(); m++)
+			d2 = std::min(d2, std::pow(p[0] - maxima[m][0], 2) + std::pow(p[1] - maxima[m][1], 2) + std::pow(p[2] - maxima[m][2], 2));
+		return g_adp_reach * std::sqrt(d2);
 	};
 	//With a value pointer the density rides along on the gradient's own orbital pass, which is
 	//what the climb wants: rho and grad at the same point used to be two passes over every
@@ -1793,30 +1819,65 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 		lb++;
 		d3 r = p, g;
 		double last_value = -1.0;
+		//The step step_at hands out is the one the populations were validated at, and scaling it up
+		//everywhere is not free: at 1.5x ZP2's ELI-D moves 0.039 e and NH3Li puts 0.0219 e outside
+		//every basin. So it is a floor here, never a target, and a multiplier above it has to be
+		//earned step by step: the midpoint gradient the RK2 step already computed says how far the
+		//field turned over the step just taken, and only a field that turned less than a degree
+		//doubles the next one. Any doubt - a turn over two and a half degrees, or a value that
+		//stopped rising - drops straight back to the floor and redoes that step there. Where the
+		//field curves this is the old walk, evaluation for evaluation; the saving is the long
+		//straight run in from the tail and through the outer valence, which is where the steps are.
+		double mult = 1.0;
+		d3 r_prev = p;
+		const bool grow = basin_adaptive_step_enabled();
+		double value_prev = -1.0;
 		for (int s = 0; s < 2000; s++) {
 			const int m = at_maximum(r);
 			if (m) return m;
-			const double sl = step_at(r);
+			const double floor_step = step_at(r);
 			//The gridded ELI-D climb is steered by the cube below and never asked whether it is
 			//still rising; every streaming walk is, since nothing else can stop it
+			double here = last_value;
 			if (!eli_field || streaming) {
-				const double here = value_and_gradient(r, g);
+				here = value_and_gradient(r, g);
 				if (here <= last_value) {
+					//A grown step can cross a ridge the floor step would have followed round, so
+					//the step is blamed before the path is: at the floor there is nothing to blame
+					if (mult > 1.0) { r = r_prev; last_value = value_prev; mult = 1.0; continue; }
 					const int n = stalled(r);
 					if (n) return n;
 					break;
 				}
-				last_value = here;
 			}
 			else gradient(r, g);
 			double gn = std::sqrt(g[0] * g[0] + g[1] * g[1] + g[2] * g[2]);
 			if (gn < 1e-12) break;
-			d3 mid;
-			for (int k = 0; k < 3; k++) mid[k] = r[k] + 0.5 * sl * g[k] / gn;
-			gradient(mid, g);
-			gn = std::sqrt(g[0] * g[0] + g[1] * g[1] + g[2] * g[2]);
-			if (gn < 1e-12) break;
+			const d3 dir{ g[0] / gn, g[1] / gn, g[2] / gn };
+			//Too much turning for the step that was taken: throw it away and retake it at the floor
+			//from the same point. It has to be retaken right here, not by restarting the iteration -
+			//that would meet the monotonicity test at a point whose value is already recorded in
+			//last_value, read "stopped rising", and end the trajectory in mid flight.
+			double sl = floor_step;
+			double cosine = 0.0;
+			bool stepped = false;
+			for (int attempt = 0; attempt < 2 && !stepped; attempt++) {
+				sl = mult > 1.0 ? std::min(floor_step * mult, std::max(floor_step, reach_limit(r))) : floor_step;
+				d3 mid;
+				for (int k = 0; k < 3; k++) mid[k] = r[k] + 0.5 * sl * dir[k];
+				gradient(mid, g);
+				gn = std::sqrt(g[0] * g[0] + g[1] * g[1] + g[2] * g[2]);
+				if (gn < 1e-12) break;
+				cosine = (g[0] * dir[0] + g[1] * dir[1] + g[2] * dir[2]) / gn;
+				if (mult > 1.0 && cosine < g_adp_keep) { mult = 1.0; continue; }
+				stepped = true;
+			}
+			if (!stepped) break;
+			r_prev = r;
+			value_prev = last_value;
+			last_value = here;
 			for (int k = 0; k < 3; k++) r[k] += sl * g[k] / gn;
+			if (cosine > g_adp_grow && mult < g_adp_cap && grow) mult *= 2.0;
 			if (!streaming) {
 				const int b2 = lookup(r, settled);
 				if (b2 == 0 && eli_field) { ll++; break; }

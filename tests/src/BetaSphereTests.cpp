@@ -69,6 +69,11 @@ namespace
 		~beta_guard() { beta_spheres_set_enabled(was); }
 	};
 
+	struct adaptive_guard {
+		bool was = basin_adaptive_step_enabled();
+		~adaptive_guard() { basin_adaptive_step_set_enabled(was); }
+	};
+
 	//The same streaming QTAIM integration twice out of one binary, once with the spheres and once
 	//with every trajectory climbed the whole way, compared basin by basin
 	void expect_same_basins(const std::filesystem::path &wfn, const size_t nmax)
@@ -94,6 +99,61 @@ namespace
 		}
 		EXPECT_NEAR(out_on, out_off, 1e-3) << "the beta spheres changed what falls outside every basin";
 	}
+}
+
+//The angle-adaptive step is the same argument in the other direction: the midpoint gradient an RK2
+//step already computes says how far the field turned over the step just taken, and a field that
+//turned less than a degree cannot hide a separatrix in the next one. So the step is allowed to
+//double, and any doubt drops it straight back to the floor step the populations were validated at.
+//
+//That is again an argument, and its weak joint is what a rejected step does next. The first version
+//rejected by restarting the iteration from the same point - where the monotonicity test met a value
+//it had already recorded in last_value, read "the walk stopped rising" and ended the trajectory in
+//mid flight. Nothing about the totals showed it: UH6 still integrated to its electron count, it had
+//just moved 0.0132 e between basins. The check below is the one that sees that, because it compares
+//basin by basin against the same integration with the growth switched off.
+void expect_adaptive_matches_floor(const std::filesystem::path &wfn, const size_t nmax)
+{
+	const WFN wavy(wfn);
+	const cube rho = seed_cube(wavy, 0.25, 3.0);
+	const std::vector<critical_point> cps = analyze_cube_critical_points(&rho, wavy, false, std::max(1e-8, rho.max_value() * 1e-6));
+	const std::vector<d4> maxima = streaming_density_attractors(wavy, cps, nullptr, nullptr, false);
+	ASSERT_EQ(maxima.size(), nmax);
+
+	adaptive_guard guard;
+	vec v_on, v_off;
+	double out_on = 0.0, out_off = 0.0;
+	basin_adaptive_step_set_enabled(true);
+	const vec on = integrate_basins_on_atomic_grids(nullptr, nullptr, maxima, wavy, 3, false, v_on, out_on);
+	basin_adaptive_step_set_enabled(false);
+	const vec off = integrate_basins_on_atomic_grids(nullptr, nullptr, maxima, wavy, 3, false, v_off, out_off);
+
+	ASSERT_EQ(on.size(), off.size());
+	double moved = 0.0;
+	for (size_t b = 0; b < on.size(); b++) {
+		moved += std::abs(on[b] - off[b]);
+		EXPECT_NEAR(on[b], off[b], 1e-3) << "basin " << b + 1 << " population moved when a step was allowed to grow";
+		EXPECT_NEAR(v_on[b], v_off[b], 0.005 * std::max(1.0, v_off[b])) << "basin " << b + 1 << " volume moved";
+	}
+	EXPECT_NEAR(out_on, out_off, 1e-3) << "the grown steps changed what falls outside every basin";
+	//A total that survives a redistribution is exactly what the mid-flight bug looked like, so the
+	//sum of the moves is asserted as well and not only the conserved total
+	EXPECT_LT(moved, 2e-3) << "the populations were redistributed between basins";
+}
+
+TEST(AdaptiveStep, AgreesWithTheFloorStepOnHydroxide)
+{
+	const std::filesystem::path wfn = nos_test_repo_root() / "tests" / "cytidine_tonto" / "OH.wfn";
+	if (!std::filesystem::exists(wfn)) GTEST_SKIP() << "fixture missing: " << wfn.string();
+	expect_adaptive_matches_floor(wfn, 2u);
+}
+
+//The fixture with three separatrices meeting at an angle, which is where a long step would cross
+TEST(AdaptiveStep, AgreesWithTheFloorStepOnNH3Li)
+{
+	const std::filesystem::path wfn = nos_test_repo_root() / "tests" / "RGBI_groups" / "nh3li.gbw";
+	if (!std::filesystem::exists(wfn)) GTEST_SKIP() << "fixture missing: " << wfn.string();
+	expect_adaptive_matches_floor(wfn, 5u);
 }
 
 TEST(BetaSpheres, AgreeWithTheFullClimbOnHydroxide)

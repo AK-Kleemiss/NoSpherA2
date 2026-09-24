@@ -472,6 +472,13 @@ std::string help_message =
  "  -basin_timing                      Print the wall clock of every stage of the\n"
  "                                    basin analysis: the cube, the critical\n"
  "                                    points, the beta spheres, the quadrature.\n"
+ "  -adaptive_step                     Let a straight run of field earn a longer\n"
+ "                                    ascent step than the validated one: sucrose\n"
+ "                                    363 -> 296 s, UH6 26 -> 13 s, at up to 8e-4\n"
+ "                                    electrons per basin. Off by default.\n"
+ "  -no_adaptive_step                  Every ascent step at the validated step\n"
+ "                                    length. The default, and the reference the\n"
+ "                                    equivalence check compares against.\n"
  "  -no_beta_spheres                   Climb every quadrature point the whole way\n"
  "                                    instead of stopping it at the radius around\n"
  "                                    an attractor that no ascent path can leave.\n"
@@ -2755,6 +2762,10 @@ bool options::digest_run_options(const std::string &temp, int &i)
         basin_timing_set_enabled(true);
     else if (temp == "-no_beta_spheres")
         beta_spheres_set_enabled(false);
+    else if (temp == "-no_adaptive_step")
+        basin_adaptive_step_set_enabled(false);
+    else if (temp == "-adaptive_step")
+        basin_adaptive_step_set_enabled(true);
     else if (temp == "-beta_spheres")
         beta_spheres_set_enabled(true);
     else if (temp == "-Anion")

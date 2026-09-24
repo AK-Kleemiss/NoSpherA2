@@ -121,6 +121,13 @@ void report_delocalization(const WFN& wavy, const basin_overlaps& ovl, const sve
 //time goes; -no_beta_spheres turns them off and is what the equivalence test compares against.
 void beta_spheres_set_enabled(const bool on);
 bool beta_spheres_enabled();
+//Angle-adaptive RK2 step: the step step_at hands out is the one the populations were validated
+//at, so it is a floor, and a longer one has to be earned from the midpoint gradient the step
+//already computed. Off by default because it is not free: 1.2x on sucrose and 2x on UH6, at up to
+//8e-4 electrons per basin. -adaptive_step turns it on, and the equivalence test integrates both
+//ways and compares basin by basin, which is what puts a number on that cost.
+void basin_adaptive_step_set_enabled(const bool on);
+bool basin_adaptive_step_enabled();
 //-basin_timing: the wall clock of every stage of the analysis, which is the only way to say
 //where the time of a 45-atom molecule actually sits. Off by default, and it has to be: the
 //golden files are captures of this console log and no timing line ever reproduces.
