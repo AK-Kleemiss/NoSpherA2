@@ -2068,9 +2068,15 @@ void properties_calculation(options &opt)
 		}
 		std::vector<Triangle> triangles = marchingCubes(opt.cif != "" ? box : cubes[cube_type::Rho], opt.properties.esp_isosurface);
 		log2 << "Found " << triangles.size() << " triangles" << endl;
+		// same staging as the Hirshfeld run: the isosurface is done, the per-face ESP below is the long pole, so the
+		// bare shape goes out first for Olex2 to show while it runs - in its own file, the coloured one must only ever
+		// appear complete
+		const std::string esp_stem = (wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_rho_esp";
+		writeColourObj(esp_stem + "_shape.obj", triangles);
+		{ ofstream stage1(esp_stem + "_shape.obj.stage1"); stage1 << triangles.size() << "\n"; }
 		if (ml) colour_by_ESP(triangles, surface_ESP(triangles, ml_esp), log2);
 		else colour_by_ESP(triangles, wavy, log2);
-		writeColourObj((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_rho_esp.obj", triangles);
+		writeColourObj(esp_stem + ".obj", triangles);
 	}
 	// return output tostd::cout
 	std::cout.rdbuf(_coutbuf);
