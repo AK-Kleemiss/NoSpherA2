@@ -843,12 +843,13 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
         const int want = std::min(chem, std::max(64, afford));
         if (want < budget) {
             budget = want;
-            nrt.arrows.push_back("candidate budget " + std::to_string(budget) + " of " +
-                                 std::to_string(options.nrt_max_candidates) + ": " +
-                                 std::to_string(active) + " delocalising atom(s), " +
-                                 std::to_string(slots) + " octet slot(s) -> " + std::to_string(chem) +
-                                 ", machine guard " + std::to_string(afford) + " at " +
-                                 std::to_string(nn) + " NAOs (-nrt_max overrides both)");
+            //The budget changes the answer, so say so on every run, not only under -debug.  It used to
+            //be pushed into nrt.arrows, which is the ARROWS data of the NRT report - a diagnostic in a
+            //data array is a fake arrow to anything parsing the JSON.
+            log << "NRT" << (spin.empty() ? "" : " " + spin) << ": candidate budget " << budget
+                << " of " << options.nrt_max_candidates << ": " << active << " delocalising atom(s), "
+                << slots << " octet slot(s) -> " << chem << ", machine guard " << afford << " at "
+                << nn << " NAOs (-nrt_max overrides both)\n";
         }
     }
 
