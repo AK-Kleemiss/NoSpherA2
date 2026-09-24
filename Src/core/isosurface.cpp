@@ -4,6 +4,9 @@
 #include <set>
 #include "properties.h"
 #include "citations.h"
+#ifdef NOSPHERA2_USE_GPU
+#include "aux_density_gpu.h"
+#endif
 
 // --------------------------------------------------------------------------
 // 1) Minimal Edge Table
@@ -544,7 +547,16 @@ vec surface_ESP(const std::vector<Triangle>& triangles, const WFN& wavy)
 	// Olex2 tails it while the window stays alive
 	const int n = (int)triangles.size();
 	vec esp(n);
-	const int slice = std::max(4096, n / 50);
+	// A device needs the whole set in one launch to fill itself - sucrose's 87312 faces in 4096-point
+	// slices is 32 blocks of 128 on 80 SMs, and they took 18056 ms against 6171 ms for a cube of 3x as
+	// many points handed over in one call. Without a device the slices are independent OpenMP loops that
+	// cost nothing (measured: the same 159 us per point either way), so there the bar stays fine grained.
+#ifdef NOSPHERA2_USE_GPU
+	const bool one_call = aux_density_gpu_enabled() && aux_density_gpu_available();
+#else
+	const bool one_call = false;
+#endif
+	const int slice = one_call ? n : std::max(4096, n / 50);
 	ProgressBar pb((n + slice - 1) / slice, 50, "=", " ", "Surface ESP");
 	std::vector<d3> centres;
 	for (int first = 0; first < n; first += slice)

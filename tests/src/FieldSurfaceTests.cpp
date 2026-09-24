@@ -313,6 +313,49 @@ namespace NoSpherA2UnitTests
 		check_esp_batch_against_loop(nos_test_repo_root() / "tests" / "esp_g_ref" / "g_ref.gbw");
 	}
 
+	//The host fallback picks how many points share one pass over the pair table from the point count and
+	//the thread count - 64 while every thread can still be given a block, then 8, then 1 - and each width
+	//leaves its own remainder to the scalar path. So walk the sizes that straddle both thresholds and land
+	//on both sides of a block boundary. The two tests above only ever exercise the widest tier.
+	//The device is switched off here on purpose: it is the host tiers that are on trial.
+	TEST(EspTests, EveryHostPassWidthMatchesTheScalarPath)
+	{
+		const auto input = nos_test_repo_root() / "tests" / "epoxide_gbw" / "epoxide.gbw";
+		if (!std::filesystem::exists(input)) GTEST_SKIP() << "Missing " << input;
+		WFN wave(input, false);
+		const WFN::ESP_pairs pairs = wave.build_ESP_pairs();
+#ifdef _OPENMP
+		const int nthr = omp_get_max_threads();
+#else
+		const int nthr = 1;
+#endif
+#if defined(NOSPHERA2_USE_GPU)
+		const bool device_was_on = aux_density_gpu_enabled();
+		aux_density_gpu_set_enabled(false);
+#endif
+		for (const int np : { 1, 7, 8 * nthr - 1, 8 * nthr + 3, 64 * nthr, 64 * nthr + 5 })
+		{
+			std::vector<d3> pts((size_t)np);
+			for (int i = 0; i < np; i++)
+			{
+				const double a = 0.37 * i, r = 3.0 + 0.003 * i; // a spiral out of the molecule, nuclei or not: both paths use the same formula
+				pts[i] = { 1.7 + r * std::cos(a), 13.0 + r * std::sin(a), 1.5 + 0.01 * i };
+			}
+			vec batch((size_t)np);
+			wave.computeESP_batch(pts, pairs, batch.data());
+			double worst = 0;
+			for (int i = 0; i < np; i++)
+				worst = std::max(worst, std::abs(batch[i] - wave.computeESP(pts[i], pairs)));
+			//every lane replays the scalar operations in the scalar order, so this is 0 in practice; the
+			//bound is there because FMA contraction is allowed to differ between a vectorised width and
+			//the scalar one, and any indexing mistake is orders of magnitude bigger than 1E-12
+			EXPECT_LT(worst, 1E-12) << np << " points on " << nthr << " threads, max |batch - per point| " << worst;
+		}
+#if defined(NOSPHERA2_USE_GPU)
+		aux_density_gpu_set_enabled(device_was_on);
+#endif
+	}
+
 	//A valence-only wavefunction (xTB/pTB, ECP) is neutral once the core electrons are counted as screening the
 	//nucleus: far outside the molecule the ESP of neutral sucrose vanishes. With the full Z in the nuclear term
 	//it would be ~ (46 core electrons) / r instead
