@@ -79,7 +79,7 @@ partitioning scheme, the grid, the ECP treatment, each property, the NBO/NRT
 analysis, SALTED, the dispersion model, and so on. Copy those lines out of your
 log rather than guessing from a table here.
 
-The reference list lives in `Src/core/citations.cpp` (33 methods, DOIs
+The reference list lives in `Src/core/citations.cpp` (40 methods, DOIs
 Crossref-checked on 24 Sep 2026) and is the single place it is maintained. If a
 method you used did not print a citation, that is a bug worth reporting.
 

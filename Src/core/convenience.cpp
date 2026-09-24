@@ -2968,7 +2968,8 @@ bool options::digest_partition_options(const std::string &temp, int &i)
     {
         partition_type = PartitionType::EMBIS;
     }
-    else if (temp == "-HDEF")
+    //Both spellings: the help text mentions the flag as -hdef in one place and -HDEF in the other.
+    else if (temp == "-HDEF" || temp == "-hdef")
         properties.hdef = true;
     else if (temp == "-hirsh")
         properties.hirsh = true, properties.hirsh_number = stoi(arguments[i + 1]);
