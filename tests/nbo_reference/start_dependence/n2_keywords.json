@@ -1,0 +1,54 @@
+{
+ "molecule": "n2",
+ "runs": [
+  "base",
+  "cyc1",
+  "ion_on",
+  "nbi_off",
+  "sym_off"
+ ],
+ "d_w": {
+  "min": 0.0162894,
+  "max": 0.0162894,
+  "range": 0.0,
+  "stdev": 0.0
+ },
+ "weights": {
+  "(leading)": {
+   "min": 100.0,
+   "max": 100.0,
+   "range": 0.0,
+   "stdev": 0.0,
+   "present_in": 5
+  }
+ },
+ "weights_by_rank": {
+  "1": {
+   "min": 100.0,
+   "max": 100.0,
+   "range": 0.0,
+   "stdev": 0.0,
+   "runs": 5
+  }
+ },
+ "bond_orders": {
+  "1-1": {
+   "min": 1.0,
+   "max": 1.0,
+   "range": 0.0,
+   "stdev": 0.0
+  },
+  "1-2": {
+   "min": 3.0,
+   "max": 3.0,
+   "range": 0.0,
+   "stdev": 0.0
+  },
+  "2-2": {
+   "min": 1.0,
+   "max": 1.0,
+   "range": 0.0,
+   "stdev": 0.0
+  }
+ }
+}
