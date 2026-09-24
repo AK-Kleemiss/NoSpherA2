@@ -39,6 +39,13 @@ namespace
 
     MatrixXd sym_power(const MatrixXd& M, const double p, const double rel_floor = 1e-10)
     {
+        //A spin with nothing in it is a legitimate input: the beta spin of a hydrogen atom has no
+        //occupied NAO, so the Lewis set is empty and this is called on a 0 x 0 matrix.  Eigen's
+        //maxCoeff() on an empty expression is undefined - in a release build it reads past the end
+        //and segfaults, which is how -nbo_native on a one-electron wavefunction died.  The power of
+        //an empty matrix is that matrix, and every product below is already well defined for it.
+        if (M.rows() == 0 || M.cols() == 0)
+            return M;
         Eigen::SelfAdjointEigenSolver<MatrixXd> es(M);
         VectorXd w = es.eigenvalues();
         const double cut = rel_floor * std::max(w.maxCoeff(), 1e-300);
