@@ -582,7 +582,10 @@ public:
 	//ELI-D and its analytic gradient from the orbital values, gradients and Hessians
 	void computeELIGrad(const d3 &PosGrid, double& Eli, d3& gradient) const;
 	/** Compute gradient. */
-	void computeGrad(const d3 &PosGrid, d3& gradient) const;
+	//rho comes out of the same orbital pass when a pointer is given: the reduction already
+	//has phi, so the density is one multiply-add per MO instead of a second pass over every
+	//primitive.  The QTAIM climb needs both at every step.
+	void computeGrad(const d3 &PosGrid, d3& gradient, double *rho = nullptr) const;
 	/** Compute ELI alone. */
 	const double computeELI(const d3& PosGrid) const;
 	/** Compute ELF alone. */

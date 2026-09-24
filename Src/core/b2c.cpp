@@ -1493,7 +1493,6 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 	//the nucleus's basin by count once the valence density is integrated; a Thakkar core
 	//lies whole inside its atom's basin
 	auto valence = [&](const d3 &p) { return field ? field->rho(p) : wavy.compute_dens(p); };
-	auto density = [&](const d3 &p) { return valence(p) + (core_density ? (*core_density)(p) : 0.0); };
 	//Streaming: no cube and no basin cube, the maxima are the whole topology and every point
 	//finds its basin by walking the field
 	const bool streaming = cub == nullptr || basin_cube == nullptr;
@@ -1616,26 +1615,28 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 		}
 		return best;
 	};
-	auto gradient = [&](const d3 &p, d3 &g) {
+	//With a value pointer the density rides along on the gradient's own orbital pass, which is
+	//what the climb wants: rho and grad at the same point used to be two passes over every
+	//primitive, and the analytic field is where the streaming basins spend their time.
+	auto gradient = [&](const d3 &p, d3 &g, double *val = nullptr) {
 		if (!eli_field) {
-			if (field) field->grad(p, g); else wavy.computeGrad(p, g);
+			if (field) { field->grad(p, g); if (val) *val = field->rho(p); }
+			else wavy.computeGrad(p, g, val);
 			if (core_gradient) { d3 c; (*core_gradient)(p, c); for (int k = 0; k < 3; k++) g[k] += c[k]; }
+			if (val && core_density) *val += (*core_density)(p);
 			return;
 		}
 		double e;
 		wavy.computeELIGrad(p, e, g);
+		if (val) *val = e;
 	};
 	//The field's value at p and its gradient in one call, which is what the climb needs to see
 	//that it has stopped rising: ELI-D's value costs nothing beside its gradient, computeELIGrad
 	//building both from the same orbital pass
 	auto value_and_gradient = [&](const d3 &p, d3 &g) {
-		if (eli_field) {
-			double e;
-			wavy.computeELIGrad(p, e, g);
-			return e;
-		}
-		gradient(p, g);
-		return density(p);
+		double v = 0.0;
+		gradient(p, g, &v);
+		return v;
 	};
 	//Beta spheres. Around an attractor there is a radius inside which no ascent trajectory can
 	//get out: if grad f . rhat < 0 at every point of the sphere then a path leaving it would have

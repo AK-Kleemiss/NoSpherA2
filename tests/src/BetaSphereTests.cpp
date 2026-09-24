@@ -167,3 +167,76 @@ TEST(BetaSpheres, NoAscentPathLeavesTheSphereItChose)
 		}
 	}
 }
+
+//The climb needs the field's value and its gradient at the same point at every single step, and
+//it used to take two passes over every primitive for them: computeGrad, then compute_dens.  The
+//reduction in computeGrad already holds phi, so the density is one multiply-add per MO - a
+//pointer asks for it.  What has to hold is that the density it hands back is the same number
+//compute_dens produces, and that asking for it does not disturb the gradient.  The two build
+//their polynomial factors by different groupings of the same products, so they agree to rounding
+//rather than to the last bit; a relative 1e-12 is two orders tighter than anything the basin
+//integration can see.
+namespace
+{
+	void expect_fused_density_matches(const std::filesystem::path &wfn)
+	{
+		const WFN wavy = load(wfn);
+		const std::vector<atom> atoms = wavy.get_atoms();
+		ASSERT_FALSE(atoms.empty());
+		//Points on and off the nuclei, in the bonds and out in the tail, where the density spans
+		//several orders of magnitude and a cancelling term would show
+		std::vector<d3> probes;
+		for (const atom &a : atoms) {
+			const d3 c = a.get_pos();
+			probes.push_back(c);
+			for (int k = 0; k < 3; k++) {
+				d3 q = c; q[k] += 0.37; probes.push_back(q);
+				q = c; q[k] -= 1.9; probes.push_back(q);
+			}
+		}
+		for (size_t i = 1; i < atoms.size(); i++) {
+			const d3 a = atoms[0].get_pos(), b = atoms[i].get_pos();
+			for (double t : { 0.25, 0.5, 0.75 })
+				probes.push_back(d3{ a[0] + t * (b[0] - a[0]), a[1] + t * (b[1] - a[1]), a[2] + t * (b[2] - a[2]) });
+		}
+		for (const d3 &q : probes) {
+			d3 g_plain, g_fused;
+			double rho = -1.0;
+			wavy.computeGrad(q, g_plain);
+			wavy.computeGrad(q, g_fused, &rho);
+			const double ref = wavy.compute_dens(q);
+			EXPECT_NEAR(rho, ref, 1e-12 * std::max(1e-30, std::abs(ref)))
+				<< "the density riding along on the gradient pass disagrees with compute_dens at ("
+				<< q[0] << ", " << q[1] << ", " << q[2] << ")";
+			for (int k = 0; k < 3; k++)
+				EXPECT_DOUBLE_EQ(g_fused[k], g_plain[k])
+					<< "asking for the density changed component " << k << " of the gradient";
+		}
+	}
+}
+
+TEST(FusedDensityGradient, MatchesComputeDensOnOH)
+{
+	const std::filesystem::path wfn = nos_test_repo_root() / "tests" / "cytidine_tonto" / "OH.wfn";
+	if (!std::filesystem::exists(wfn)) GTEST_SKIP() << "fixture missing: " << wfn.string();
+	expect_fused_density_matches(wfn);
+}
+
+//A .gbw carrying virtuals and a Li whose basin boundary sits close to the nucleus: the reduction
+//skips the empty MOs, so this also checks that the density and the gradient skip the same ones
+TEST(FusedDensityGradient, MatchesComputeDensOnNH3Li)
+{
+	const std::filesystem::path wfn = nos_test_repo_root() / "tests" / "RGBI_groups" / "nh3li.gbw";
+	if (!std::filesystem::exists(wfn)) GTEST_SKIP() << "fixture missing: " << wfn.string();
+	expect_fused_density_matches(wfn);
+}
+
+//g, h and i shells, open shell, and read through the molden reader rather than the gbw one: the
+//high angular momenta are where the value and the gradient take different branches of the
+//polynomial switch, so this is the case that would catch one of them being wrong
+TEST(FusedDensityGradient, MatchesComputeDensWithGHIShells)
+{
+	const std::filesystem::path wfn = nos_test_repo_root() / "tests" / "CuF2_i_func" / "71" / "calc_occupied.molden";
+	if (!std::filesystem::exists(wfn)) GTEST_SKIP() << "fixture missing: " << wfn.string();
+	expect_fused_density_matches(wfn);
+}

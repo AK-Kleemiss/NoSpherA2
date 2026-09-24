@@ -2276,7 +2276,8 @@ void WFN::computeELIGrad(
 
 void WFN::computeGrad(
 	const d3 &PosGrid, // [3] vector with current position on te grid
-	d3& gradient
+	d3& gradient,
+	double *rho
 ) const
 {
 	const int _nmo = get_nmo(false);
@@ -2412,7 +2413,7 @@ void WFN::computeGrad(
 		}
 	}
 
-	double Grad[3]{ 0, 0, 0 };
+	double Grad[3]{ 0, 0, 0 }, Rho = 0.0;
 
 	for (int mo = 0; mo < _nmo; mo++)
 	{
@@ -2424,11 +2425,13 @@ void WFN::computeGrad(
 			Grad[0] += docc * *phi_temp * phi_temp[1];
 			Grad[1] += docc * *phi_temp * phi_temp[2];
 			Grad[2] += docc * *phi_temp * phi_temp[3];
+			if (rho) Rho += occ * *phi_temp * *phi_temp;
 		}
 	}
 	gradient[0] = Grad[0];
 	gradient[1] = Grad[1];
 	gradient[2] = Grad[2];
+	if (rho) *rho = Rho;
 
 };
 
