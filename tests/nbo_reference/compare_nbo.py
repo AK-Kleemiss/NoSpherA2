@@ -3,6 +3,12 @@
     python compare_nbo.py water.nbo.json candidate.json
     python compare_nbo.py --all <candidate_dir>     # every molecule of the dataset
 
+<candidate_dir> is the directory holding the candidate <molecule>.nbo.json files; the
+references are always read from the directory this script lives in, so `--all .` run from
+tests/nbo_reference compares the dataset against itself. In --all mode a reference molecule
+with no candidate file is a failure, so pointing the gate at the wrong directory cannot
+pass by comparing nothing.
+
 Both files are the JSON that `NoSpherA2 -nbo` writes (see nbo_run.h for the structures);
 an in-house implementation only has to emit the same keys. The reference drives: every
 reference entry must have a counterpart in the candidate, extra candidate entries are
@@ -181,16 +187,21 @@ def main(argv):
     if len(argv) == 3 and argv[1] == "--all":
         names = [f[:-len(".nbo.json")] for f in sorted(os.listdir(here))
                  if f.endswith(".nbo.json")]
-        ok, skipped = True, []
+        passed, failed, missing = 0, 0, []
         for n in names:
             cand = os.path.join(argv[2], n + ".nbo.json")
             if not os.path.exists(cand):
-                skipped.append(n)
+                missing.append(n)
                 continue
-            ok &= run(os.path.join(here, n + ".nbo.json"), cand)
-        if skipped:
-            print("no candidate for: " + " ".join(skipped))
-        return 0 if ok else 1
+            if run(os.path.join(here, n + ".nbo.json"), cand):
+                passed += 1
+            else:
+                failed += 1
+        if missing:
+            print("no candidate in %s for: %s" % (argv[2], " ".join(missing)))
+        print("%d of %d reference molecules PASS, %d FAIL, %d without a candidate file"
+              % (passed, len(names), failed, len(missing)))
+        return 0 if passed and not failed and not missing else 1
     if len(argv) != 3:
         print(__doc__)
         return 2
