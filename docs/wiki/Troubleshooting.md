@@ -64,6 +64,14 @@ loop that starts at the position of the parent flag, so `-nrt -nbo_native x.gbw`
 runs an NBO analysis with no NRT and says nothing about it. Always write the
 parent flag first.
 
+`-mtc` and `-cmtc` are the mirror image: they swallow tokens *forwards* until one
+begins with `-`, in pairs (`wfn parts`) or triples (`wfn cif parts`). Two
+consequences. `-mtc a.gbw -group 1 2 3` does not do what it reads like — there is
+no `-group` in this syntax, `-group` terminates the list, and the atom indices
+after it are then taken as further wavefunction names. And `-mtc_mult`,
+`-mtc_charge`, `-mtc_ECP` must come **after** the complete `-mtc` list, in
+fragment order.
+
 ## "Option X needs more values than were given after it"
 
 Exactly what it says: the flag takes more arguments than are left on the line, or
@@ -157,8 +165,8 @@ box by 1.89 about the origin for any molecule whose shortest bond exceeds
 1.058 A — i.e. anything without an O-H or N-H — producing clipped, shifted
 surfaces. Update the binary rather than fiddling with the box.
 
-Note that `-hdef` in lowercase is **not** accepted; only `-HDEF` is, despite what
-some versions of the help text say.
+`-hdef` in lowercase used to be rejected while only `-HDEF` worked, which is what
+older help texts disagreed about. Current builds accept both.
 
 ## Surfaces are not reproducible file-by-file
 
@@ -251,6 +259,9 @@ restricted wavefunction — it writes a plausible constant artefact (about
   changes the answer, not just the precision.
 * Compare NRT weights **by rank, never by structure description**, and always
   quote the threshold alongside the number.
+* **`-cpus` does not reach this code.** The native search reads `-nbo_threads`,
+  and falls back to `omp_get_max_threads()` when it is absent — so `-cpus 1`
+  still runs on every core, and a timing taken that way is not a serial timing.
 
 ## The tsc NaN guard was dead in Release builds
 

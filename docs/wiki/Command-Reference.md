@@ -119,13 +119,26 @@ what the NoSpherA2 paper describes.
 
 For a structure that needs more than one wavefunction: disorder parts,
 independent molecules, or a mixed treatment where some fragments are aspherical
-and others IAM. Each fragment gets its own wavefunction and its own `-group`
-list; `-mtc` collects them.
+and others IAM.
+
+`-mtc` and `-cmtc` do **not** use the separate `-group` flag. Each takes
+alternating tokens of its own and keeps reading until the next token that begins
+with `-`:
+
+* `-mtc <wfn> <parts> <wfn> <parts> ...`
+* `-cmtc <wfn> <cif> <parts> <wfn> <cif> <parts> ...`
+
+`<parts>` is a **single token** listing the CIF disorder parts that wavefunction
+covers, separated by a comma or a dot — so `0.1` means parts 0 **and** 1, not
+"part 0.1". Part 0 is every atom whose `_atom_site_disorder_group` is absent or
+unreadable, i.e. the ordered backbone, which is why a disorder job is normally
+`0.1` and `0.2` rather than `1` and `2`. The numbers are matched against that
+CIF field directly.
 
 | Flag | Arguments | Meaning |
 | --- | --- | --- |
-| `-mtc <wfn> ... -group <...> ...` | varies | Multi-tsc mode: several wavefunctions, each with its own atom group. |
-| `-cmtc <wfn> ... -group <...> ...` | varies | As `-mtc`, for fragments related by crystallographic symmetry. |
+| `-mtc <wfn> <parts> ...` | 2 per fragment | Multi-tsc mode: several wavefunctions, each with the parts it covers. |
+| `-cmtc <wfn> <cif> <parts> ...` | 3 per fragment | As `-mtc`, each fragment bringing its own CIF. |
 | `-mtc_mult <n> [n ...]` | 1+ | Per-fragment multiplicities, in `-mtc` order. |
 | `-mtc_charge <n> [n ...]` | 1+ | Per-fragment charges. |
 | `-mtc_ECP <n> [n ...]` | 1+ | Per-fragment ECP modes. |
@@ -151,7 +164,7 @@ is a separate flag and several can be written in one run.
 | `-esp` | 0 | off | Electrostatic potential. |
 | `-rdg` | 0 | off | Reduced density gradient (NCI). |
 | `-def` | 0 | off | Static deformation density. Also `-DEF`. |
-| `-HDEF` | 0 | off | Hirshfeld deformation density. (Lowercase `-hdef` is **not** accepted.) |
+| `-HDEF` | 0 | off | Hirshfeld deformation density. Also `-hdef`. |
 | `-MO <n>\|all` | 1 | | One molecular orbital, or every one. Repeat for several. |
 | `-s_rho` | 0 | off | Spin density. |
 | `-fukui` | 0 | off | Fukui function. Also `-Fukui`. Needs the virtual orbitals. |
@@ -327,7 +340,7 @@ for the sizes of the differences.
 
 | Flag | Arguments | Default | Meaning |
 | --- | --- | --- | --- |
-| `-cpus <n>` | 1 | all | OpenMP threads. |
+| `-cpus <n>` | 1 | all | OpenMP threads. **Does not reach the native NBO/NRT search** — that reads `-nbo_threads` only, and without it takes every core regardless of `-cpus`. |
 | `-mem <MB>` | 1 | `1000.0` | Memory budget (drives the tsc block size). |
 | `-no_gpu` | 0 | | Disable every GPU path. |
 | `-gpu_fp64` | 0 | off | Double precision on the GPU throughout. |

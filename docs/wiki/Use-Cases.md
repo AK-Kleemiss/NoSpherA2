@@ -64,15 +64,27 @@ wavefunction was computed with those ECPs.
 
 ## 5. A disordered structure: one wavefunction per part
 
-Each fragment gets a wavefunction and its own atom group, in the same order.
+`-mtc` takes alternating pairs of its own — a wavefunction, then the disorder
+parts it covers as one token. It is **not** the separate `-group` flag, and the
+part token is a list: `0.1` means parts 0 and 1, part 0 being the ordered atoms
+that carry no `_atom_site_disorder_group` in the CIF. So both fragments include
+the backbone, and each adds its own part:
 
 ```powershell
-.\NoSpherA2.exe -cif THPP.cif -hkl THPP.hkl -acc 2 -mtc part1.gbw -group 1 2 3 4 5 6 -mtc part2.gbw -group 7 8 9 10 11 12 -mtc_mult 1 1 -mtc_charge 0 0
+.\NoSpherA2.exe -cif thpp.cif -hkl thpp.hkl -acc 1 -mtc part_1/thpp.wfx 0.1 part_2/thpp.wfx 0.2 -mtc_mult 1 1 -mtc_charge 0 0 -mtc_ECP 0 0
 ```
 
-Use `-cmtc` in place of `-mtc` when the fragments are related by
-crystallographic symmetry. Check the scatterer count in the log against the
-number of atoms in the CIF before you refine against the table.
+`-cmtc` is the same with a CIF per fragment — wavefunction, CIF, parts — for
+fragments that come with their own asymmetric unit:
+
+```powershell
+.\NoSpherA2.exe -hkl 1yk4_h.hkl -acc 1 -cmtc residues/1.gbw residues/1.cif 0 residues/2.gbw residues/2.cif 0.1 residues/3.gbw residues/3.cif 0.2
+```
+
+Both keep consuming tokens until one begins with `-`, so put `-mtc_mult`,
+`-mtc_charge` and `-mtc_ECP` after the whole list, in fragment order. Check the
+scatterer count in the log against the number of atoms in the CIF before you
+refine against the table.
 
 ## 6. Convert a wavefunction between formats
 
