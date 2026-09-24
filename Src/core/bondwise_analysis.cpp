@@ -12,6 +12,7 @@
 #include "citations.h"
 #include "nao.h"
 #include <occ/qm/hf.h>
+#include <occ/qm/guess_kind.h>
 
 namespace {
 	struct OhOperation {
@@ -309,8 +310,25 @@ namespace {
 				"read as one - pass -ECP - or its cores are counted against a basis that never "
 				"described them.");
 
+		//Named before the SCF, not after it: when occ dies inside it there is otherwise nothing at all
+		//to say which atom was being computed.
+		if (std::getenv("NOS_RGBI_DEBUG") != nullptr)
+			std::cout << "\nFREEATOM-START " << atm.get_label() << " Z=" << effective_atomic_number
+				<< " mult=" << multiplicity << (restricted ? " restricted" : " unrestricted")
+				<< " nbf=" << basis.nbf() << " nsh=" << basis.size() << " n_alpha=" << n_alpha
+				<< std::endl;
+
 		occ::qm::HartreeFock hf(basis);
 		occ::qm::SCF<occ::qm::HartreeFock> scf(hf, spin_kind);
+		//The core Hamiltonian, explicitly, which is what occ itself starts its own one-atom SCFs
+		//from: a single atom starts well enough from it, and it is also what stops occ's atomic
+		//guess recursing into a nested atomic SCF of the same atom. The automatic choice picks that
+		//nested route for any centre the shipped minimal basis does not reach, Z > 54, and its
+		//guess density comes back as one square nbf x nbf matrix while carrying the outer spin
+		//kind - so for an unrestricted free atom the unrestricted Fock build writes a beta block
+		//that the matrix has no rows for. Ce and U corrupted the heap there and aborted in a
+		//malloc inside libcint, with nothing in the output to say what had happened.
+		scf.set_guess_kind(occ::qm::GuessKind::Core);
 		scf.set_charge_multiplicity(0, multiplicity);
 		const double scf_energy = scf.compute_scf_energy();
 
@@ -1516,6 +1534,15 @@ void Roby_information::computeAllAtomicNAOs(WFN &wavy, const bool symmetrize, co
 	ano_fallback_atoms.clear();
 
 	density_matrix = wavy.get_dm();
+	//Every index below reads this matrix by basis-function number.  A reader that leaves it empty -
+	//the .fchk readers keep the density in triangular form in UT_DensityMatrix and never fill DM -
+	//sent the first read straight past the end: -rgbi on a .fchk segfaulted with no message.  The
+	//basis is there and the file is not at fault, so say what is missing rather than what is wrong.
+	err_checkf(density_matrix.extent(0) > 0 && density_matrix.extent(1) == density_matrix.extent(0),
+		"RGBI needs the density matrix over the contracted basis, and " + wavy.get_path().filename().string() +
+		" carries none: its reader stores the density in triangular form only. Use the .gbw or the "
+		".molden of the same calculation.",
+		std::cout);
 
 	if (wavy.get_d_f_switch()) {
 		Int_Params basis(wavy);
