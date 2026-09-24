@@ -396,7 +396,25 @@ dMatrix2 ao_overlap(const WFN &wavy)
     vec S_flat;
     compute2C<Overlap2C_SPH>(params, S_flat);
     const size_t n = static_cast<size_t>(std::llround(std::sqrt(static_cast<double>(S_flat.size()))));
-    return reshape<dMatrix2>(S_flat, Shape2D(n, n));
+    dMatrix2 S = reshape<dMatrix2>(S_flat, Shape2D(n, n));
+    //ORCA stores the |m| >= 3 components - f(+-3), g(+-3), g(+-4) - with the sign opposite to
+    //libcint's, and the gbw reader keeps its convention in the density, so the overlap next to that
+    //density has to take ORCA's sign as well.  This is the same correction the FILE47 writer
+    //applies; without it Tr(P S) misses up to 0.3 e (SF6) and every NAO population inherits it.
+    if (wavy.get_origin() == e_origin::gbw) {
+        const ivec bas = params.get_bas();
+        bvec flip(n, false);
+        size_t k = 0;
+        for (size_t s = 0; s < params.get_nbas() && k < n; s++) {
+            const int l = bas[8 * s + 1];
+            for (int m = -l; m <= l && k < n; m++, k++)
+                flip[k] = std::abs(m) >= 3;
+        }
+        for (size_t i = 0; i < n; i++)
+            for (size_t j = 0; j < n; j++)
+                if (flip[i] != flip[j]) S(i, j) = -S(i, j);
+    }
+    return S;
 }
 
 NPAResult natural_population_analysis(const WFN &wavy)

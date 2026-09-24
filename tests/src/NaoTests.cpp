@@ -114,6 +114,29 @@ TEST(NaoBasisMapTests, EpoxideAoMapMatchesTheOverlap)
 		}
 }
 
+//The overlap has to carry the same convention as the coefficients the reader kept.  ORCA writes the
+//|m| >= 3 components of an f or g shell - f(+-3), g(+-3), g(+-4) - with the sign opposite to
+//libcint's, and the gbw reader keeps ORCA's convention in the density, so an uncorrected overlap
+//makes Tr(P S) miss the electron count: 0.018 e here, 0.009 e on Zn(NH3), 0.31 of SF6's 70.  It
+//hides in every linear molecule, because the sign cancels between two flipped functions and the
+//surviving cross terms vanish by axial symmetry - which is why the diatomic references never showed
+//it.  ao_overlap() applies the same correction the FILE47 writer does; what is checked here is the
+//exact statement, that the natural populations sum to the nuclear charge whatever the partition
+//does with them.  The epoxide and ethane fixtures cannot see this and pass either way.
+TEST(NaoBasisMapTests, OverlapCarriesTheDensitysPhaseConvention)
+{
+	const auto p = fixture("RGBI_groups", "nh3bh3.gbw");
+	if (p.empty()) GTEST_SKIP() << "tests/RGBI_groups/nh3bh3.gbw not found";
+	WFN wavy(p);
+	const NPAResult npa = natural_population_analysis(wavy);
+	EXPECT_NEAR(trace_PS(wavy), 18.0, 1e-9);
+	EXPECT_NEAR(npa.total.population, 18.0, 1e-9);
+	double charge_sum = 0.0;
+	for (const NAOAtom& a : npa.total.atoms)
+		charge_sum += a.charge;
+	EXPECT_NEAR(charge_sum, 0.0, 1e-9);
+}
+
 TEST(NaoEpoxideTests, OccupanciesSumToTheElectronCountAndTheTransformIsOrthogonal)
 {
 	const auto p = fixture("epoxide_gbw", "epoxide.gbw");
@@ -136,9 +159,14 @@ TEST(NaoEpoxideTests, OccupanciesSumToTheElectronCountAndTheTransformIsOrthogona
 //cause: the OWSO formula (re-derived), equal-weight Loewdin instead of OWSO (much worse), the
 //core definition (exact), the step-4 class merge (intra-atomic and unitary), self-consistent
 //weights (converges to hydrogens at +0.66) and one OWSO over the whole natural minimal basis
-//instead of core before valence (worse here and on nh3bh3 and benzene).  The bound below is the
-//measured agreement; if a
-//later change makes it pass at a tighter one, tighten it.
+//instead of core before valence (worse here and on nh3bh3 and benzene).  Also ruled out: NBO's
+//symmetry averaging, which the 22-molecule reference spine now makes testable and which does not
+//explain it - the reference prints distinct charges for symmetry-equivalent atoms wherever the
+//geometry allows, and where it does not our spread is zero too.  The overlap phase convention was
+//a real cause and is fixed (see OverlapCarriesTheDensitysPhaseConvention): it carried the whole
+//error on the hypervalent and heavy-atom references, PF5 0.099 -> 0.013 e and SF6 0.080 -> 0.016,
+//but none of this one, which has no |m| >= 3 cross terms.  The bound below is the measured
+//agreement; if a later change makes it pass at a tighter one, tighten it.
 TEST(NaoEpoxideTests, NaturalChargesMatchNbo7)
 {
 	const auto p = fixture("epoxide_gbw", "epoxide.gbw");
