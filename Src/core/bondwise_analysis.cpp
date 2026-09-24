@@ -27,6 +27,29 @@ namespace {
 		return (l + 1) * (l + 2) / 2;
 	}
 
+	//The dimension of the free atom's occupied orbital space, filled in Aufbau order and counted
+	//with full m degeneracy, so Li -> 2 (1s, 2s), B through Ne -> 5 (1s, 2s, 2p), Fe -> 15.
+	//This is the atomic subspace Roby's definition asks for, and unlike a threshold on the
+	//occupation numbers it is a property of the element alone: the rank of the atomic projector
+	//cannot change when a bond stretches or a torsion turns, which is what makes the resulting
+	//index a continuous function of the geometry and comparable between two molecules. A partly
+	//filled shell counts in full, because the atomic subspace has to be spherically complete.
+	int free_atom_orbital_count(const int atomic_number) {
+		//(n, l) in Aufbau filling order; the list covers every element up to Z = 118
+		static constexpr int shells[][2] = {
+			{1, 0}, {2, 0}, {2, 1}, {3, 0}, {3, 1}, {4, 0}, {3, 2}, {4, 1}, {5, 0}, {4, 2},
+			{5, 1}, {6, 0}, {4, 3}, {5, 2}, {6, 1}, {7, 0}, {5, 3}, {6, 2}, {7, 1} };
+		int electrons = atomic_number;
+		int dimension = 0;
+		for (const auto &shell : shells) {
+			if (electrons <= 0) break;
+			const int size = 2 * shell[1] + 1;
+			dimension += size;
+			electrons -= 2 * size;
+		}
+		return dimension;
+	}
+
 	int atomic_shell_size(const int l, const bool cartesian) {
 		return cartesian ? cartesian_shell_size(l) : 2 * l + 1;
 	}
@@ -1028,7 +1051,8 @@ Roby_information::NAOResult Roby_information::calculateAtomicNAO(const dMatrix2 
 	const bool spherical,
 	const double occupancy_cutoff,
 	const int leading_orbitals_to_skip,
-	const bool EVs) {
+	const bool EVs,
+	const int keep_orbitals) {
 
 	err_checkf(D_full.extent(0) == D_full.extent(1), "Density matrix D must be square.", std::cout);
 	err_checkf(S_full.extent(0) == S_full.extent(1), "Overlap matrix S must be square.", std::cout);
@@ -1148,10 +1172,16 @@ Roby_information::NAOResult Roby_information::calculateAtomicNAO(const dMatrix2 
 	}
 
 	const int skip_orbitals = std::clamp(leading_orbitals_to_skip, 0, n);
+	//A non-negative keep_orbitals fixes the rank of the atomic subspace and ignores the occupancy
+	//threshold; the eigenvalues are already sorted, so this keeps the most occupied ones. The
+	//threshold branch is the legacy behaviour and steps whenever an occupation crosses it.
+	const int keep = std::clamp(keep_orbitals, 0, std::max(0, n - skip_orbitals));
 	for (int i = 0; i < n; i++) {
 		int original_idx = idx[i];
 		const bool omit_orbital = i < skip_orbitals ||
-			(occupancy_cutoff >= 0.0 && result.eigenvalues[original_idx] < occupancy_cutoff);
+			(keep_orbitals >= 0
+				? i >= skip_orbitals + keep
+				: (occupancy_cutoff >= 0.0 && result.eigenvalues[original_idx] < occupancy_cutoff));
 		vec &target_evals = omit_orbital ? omitted_evals : sorted_evals;
 		vec &target_evecs = omit_orbital ? omitted_evecs : sorted_evecs;
 
@@ -1378,7 +1408,7 @@ double Roby_information::Roby_population_analysis(const ivec atoms) {
 	return P;
 }
 
-void Roby_information::computeAllAtomicNAOs(WFN &wavy, const bool symmetrize, const bool use_ano_basis, const bool EVs) {
+void Roby_information::computeAllAtomicNAOs(WFN &wavy, const bool symmetrize, const bool use_ano_basis, const bool EVs, const bool legacy_occupancy_cutoff) {
 	const int N_atoms = wavy.get_ncen();
 	const std::vector<atom> ats = wavy.get_atoms();
 	NAOs.reserve(N_atoms);
@@ -1401,6 +1431,12 @@ void Roby_information::computeAllAtomicNAOs(WFN &wavy, const bool symmetrize, co
 
 	//err_checkf()
 
+	//The legacy subspace rule: keep every natural orbital whose occupation exceeds a fixed number.
+	//Those occupations move continuously with the geometry, so the rank of the atomic projector -
+	//and with it every index built on it - steps whenever one of them crosses. Li in LiH is the
+	//clean example: its second NAO passes 1/6 at 1.5875 A and the bond index jumps from 0.06 to
+	//0.95 across 0.025 A of bond length. Unless legacy_occupancy_cutoff asks for that behaviour,
+	//the subspace is fixed by the element instead - see free_atom_orbital_count.
 	const double occupancy_cutoff = use_ano_basis ? 1.0 / 14.0 : 1.0 / 6.0;
 
 	int last_index = 0;
@@ -1455,6 +1491,7 @@ void Roby_information::computeAllAtomicNAOs(WFN &wavy, const bool symmetrize, co
 			std::stable_sort(shell_angular_momenta.begin(), shell_angular_momenta.end());
 
 		const bool spherical = !wavy.get_d_f_switch();
+		const int keep_orbitals = legacy_occupancy_cutoff ? -1 : free_atom_orbital_count(a.get_charge());
 
 		auto make_molecular_fallback = [&]() {
 			auto fallback = calculateAtomicNAO(density_matrix, overlap_matrix,
@@ -1463,7 +1500,8 @@ void Roby_information::computeAllAtomicNAOs(WFN &wavy, const bool symmetrize, co
 				spherical,
 				occupancy_cutoff,
 				0,
-				EVs);
+				EVs,
+				keep_orbitals);
 			fallback.atom_index = a.get_nr() - 1;
 			return fallback;
 		};
@@ -1482,13 +1520,17 @@ void Roby_information::computeAllAtomicNAOs(WFN &wavy, const bool symmetrize, co
 				vec S_sub(static_cast<size_t>(n_local) * n_local, 0.0);
 				get_submatrix(overlap_matrix, S_sub, indices[a.get_nr() - 1]);
 				const dMatrix2 atomic_overlap = reshape<dMatrix2>(S_sub, Shape2D(n_local, n_local));
+				//the ANO route thresholds free atom occupations, which are element constants, so
+				//its rank never depended on the geometry - passing the same count keeps the
+				//subspace it already picked and makes the two routes say the same thing.
 				auto ano = calculateAtomicNAO(atomic_density, atomic_overlap,
 					local_indices,
 					symmetrize ? shell_angular_momenta : ivec{},
 					spherical,
 					occupancy_cutoff,
 					0,
-					EVs);
+					EVs,
+					keep_orbitals);
 				ano.sub_OM = S_sub;
 				ano.sub_DM = atomic_density.container();
 				ano.matrix_elements = indices[a.get_nr() - 1];
@@ -2107,12 +2149,14 @@ void Roby_information::computeGroupAnalysis(const ivec2 &group_defs, const vec &
 	std::cout << sep << "\n";
 }
 
-Roby_information::Roby_information(WFN &wavy, const ivec3 &group_sets, const bool symmetrize, const bool use_ano_basis, const bool EVs, const bool theta_info) {
+Roby_information::Roby_information(WFN &wavy, const ivec3 &group_sets, const bool symmetrize, const bool use_ano_basis, const bool EVs, const bool theta_info, const bool legacy_occupancy_cutoff) {
 	auto bonds = get_bonded_atom_pairs(wavy);
 	citations::cite(citations::Method::RGBI, std::cout);
 	const char *orbital_label = use_ano_basis ? "ANOs" : "NAOs";
 	std::cout << "Calculating " << orbital_label << " for all atoms...                 " << std::flush;
-	computeAllAtomicNAOs(wavy, symmetrize, use_ano_basis, EVs);
+	if (legacy_occupancy_cutoff)
+		std::cout << "\n  (legacy occupancy cutoff: atomic subspace ranks follow the occupation numbers)\n";
+	computeAllAtomicNAOs(wavy, symmetrize, use_ano_basis, EVs, legacy_occupancy_cutoff);
 	std::cout << " ...done!" << std::endl;
 	if (theta_info)
 		std::cout << "RGBI theta-subspace reports enabled." << std::endl;

@@ -3764,6 +3764,10 @@ bool options::digest_ri_options(const std::string &temp, int &i)
         rgbi = true;
         rgbi_theta = true;
     }
+    else if (temp == "-rgbi_legacy_cutoff") {
+        rgbi = true;
+        rgbi_legacy_cutoff = true;
+    }
     else if (temp == "-rgbi_basis") {
         err_checkf(i + 1 < argc, "Not enough arguments for -rgbi_basis. Use 'nao' or 'ano'.", std::cout);
         rgbi = true;

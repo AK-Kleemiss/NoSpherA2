@@ -669,7 +669,8 @@ static int run_app_impl(int argc, char **argv)
 
 		if (opt.rgbi) {
 			Roby_information Roby(wavy[0], opt.rgbi_group_sets, !opt.rgbi_no_sym,
-				opt.rgbi_orbital_basis == RGBIOrbitalBasis::ANO, opt.rgbi_EVs, opt.rgbi_theta);
+				opt.rgbi_orbital_basis == RGBIOrbitalBasis::ANO, opt.rgbi_EVs, opt.rgbi_theta,
+				opt.rgbi_legacy_cutoff);
 		}
 
 		if (opt.npa) {

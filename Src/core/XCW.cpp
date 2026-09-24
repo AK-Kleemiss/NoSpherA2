@@ -3847,7 +3847,8 @@ void XCW::create_tscb(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& lam
 		std::ofstream rgbi_out(oss5.str());
 		std::streambuf* const cout_buf = std::cout.rdbuf(rgbi_out.rdbuf());
 		Roby_information Roby(sf_wave_vec[0], opt->rgbi_group_sets, !opt->rgbi_no_sym,
-			opt->rgbi_orbital_basis == RGBIOrbitalBasis::ANO, opt->rgbi_EVs, opt->rgbi_theta);
+			opt->rgbi_orbital_basis == RGBIOrbitalBasis::ANO, opt->rgbi_EVs, opt->rgbi_theta,
+			opt->rgbi_legacy_cutoff);
 		std::cout.rdbuf(cout_buf);
 		XCW_log << "RGBI analysis written to " << oss5.str() << std::endl;
 	}

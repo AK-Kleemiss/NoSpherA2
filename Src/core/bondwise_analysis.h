@@ -76,12 +76,16 @@ private:
 	//Roby-Gould atomic natural orbitals: one atom at a time, plain Loewdin S^-1/2, no
 	//orthogonalisation between atoms - what the RGBI projections want, and a different quantity
 	//from the NAOs of nao.h, whose occupancies sum to the exact electron count.
+	//keep_orbitals >= 0 fixes the rank of the atomic subspace and ignores occupancy_cutoff: the
+	//projector then depends on the element rather than on where an occupation number happens to sit
+	//relative to a threshold, which is what keeps the indices continuous in the geometry.
 	NAOResult calculateAtomicNAO(const dMatrix2& D_full, const dMatrix2& S_full,
 		const ivec& atom_indices, const ivec& shell_angular_momenta = {},
 		bool spherical = false, double occupancy_cutoff = 1.0 / 6.0,
-		int leading_orbitals_to_skip = 0, bool EVs = false);
+		int leading_orbitals_to_skip = 0, bool EVs = false, int keep_orbitals = -1);
 	double projection_matrix_and_expectation(const ivec& indices, const ivec& eigvals = {}, const ivec& eigvecs = {}, dMatrix2* given_NAO = nullptr, dMatrix2* proj_out = nullptr);
-	void computeAllAtomicNAOs(WFN& wavy, bool symmetrize, bool use_ano_basis, bool EVs= false);
+	void computeAllAtomicNAOs(WFN& wavy, bool symmetrize, bool use_ano_basis, bool EVs= false,
+		bool legacy_occupancy_cutoff = false);
 	ivec find_eigenvalue_pairs(const vec& eigvals, const double tolerance = 1E-4);
 	void transform_Ionic_eigenvectors_to_Ionic_orbitals(dMatrix2& EVC,
 		const vec& eigvals,
@@ -107,7 +111,7 @@ public:
 	Roby_information() = default;
 	~Roby_information() = default;
 	Roby_information(const Roby_information&) = default;
-	Roby_information(WFN& wavy, const ivec3& group_sets = {}, bool symmetrize = true, bool use_ano_basis = false, bool EVs = false, bool theta_info = false);
+	Roby_information(WFN& wavy, const ivec3& group_sets = {}, bool symmetrize = true, bool use_ano_basis = false, bool EVs = false, bool theta_info = false, bool legacy_occupancy_cutoff = false);
 
 };
 

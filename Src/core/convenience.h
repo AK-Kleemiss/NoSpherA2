@@ -904,6 +904,12 @@ struct options
     bool rgbi_no_sym = false;
     bool rgbi_EVs = false;
     bool rgbi_theta = false;
+    //-rgbi_legacy_cutoff: pick the atomic subspace by thresholding the occupation numbers (1/6 for
+    //NAOs, 1/14 for ANOs) as releases before this one did, instead of by the element's free-atom
+    //orbital count. The threshold makes the rank of the atomic projector, and therefore every bond
+    //index, jump when an occupation crosses it - LiH moves from 0.06 to 0.95 over 0.025 A - so this
+    //is only for reproducing older numbers.
+    bool rgbi_legacy_cutoff = false;
     RGBIOrbitalBasis rgbi_orbital_basis = RGBIOrbitalBasis::ANO;
     ivec3 rgbi_group_sets;
     bool fract = false;
