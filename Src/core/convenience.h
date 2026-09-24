@@ -1023,6 +1023,11 @@ struct options
 	//development and test-only switches
 	bool digest_dev_options(const std::string &temp, int &i);
 	void digest_options();
+	/** @brief The error for an analysis that was asked for and has nothing to run on, "" when the
+	 *  command line is runnable. Everything it reports only runs inside run_app_impl's
+	 *  wavefunction branch, so without -wfn/-occ it is skipped in silence - which is how
+	 *  `-rgbi water.gbw` (RGBI has no positional form) came to exit 0 having done nothing. */
+	std::string unrunnable_analysis() const;
 
 	options() : log_file(std::cout)
 	{

@@ -2560,6 +2560,42 @@ static std::vector<std::shared_ptr<BasisSet>> get_aux_basis(const int argc, cons
     return aux_basis;
 }
 
+namespace {
+    //Options the -nbo / -nbo_parse / -nbo_native / -convert_to_47 handlers read themselves, from
+    //the tokens after their wavefunction, instead of through a digester. Listed once so both
+    //readers of the list agree: those handlers refuse a -nbo_*/-nrt_* spelling that is not here,
+    //and digest_options knows these as options rather than as typos when they are written before
+    //the flag that consumes them.
+    const std::set<std::string> &nbo_family_suboptions()
+    {
+        static const std::set<std::string> known = {
+            "-nbo", "-nbo_parse", "-nbo_native", "-nbo_keywords", "-nbo_exe", "-nbo_json",
+            "-nbo_dir", "-nbo_47", "-nbo_e2min", "-nbo_threads", "-nbo_keep47", "-nrt",
+            "-nrt_e2", "-nrt_arrows", "-nrt_bond_scale", "-nrt_max", "-nrt_atoms",
+            "-nrt_exhaustive", "-nrt_no_symmetry", "-nrt_no_components", "-nrt_no_ion"};
+        return known;
+    }
+
+    //A -nbo_*/-nrt_* token that the handlers' own loops do not know is read by nobody: the option
+    //was dropped and the analysis ran with its default, exit code 0. digest_options cannot catch
+    //these, they are consumed here rather than by a digester.
+    void refuse_unknown_nbo_suboption(const std::vector<std::string> &arguments, int from,
+                                      const std::string &after)
+    {
+        for (int j = from; j < (int)arguments.size(); j++)
+        {
+            const std::string &o = arguments[j];
+            if ((o.rfind("-nbo", 0) == 0 || o.rfind("-nrt", 0) == 0) &&
+                nbo_family_suboptions().count(o) == 0)
+                err_checkf(false, "Unknown option " + o + " after " + after +
+                                      ": it names no NBO/NRT option this build has. Check the "
+                                      "spelling, -h lists them; running on with it ignored would "
+                                      "give you a default you did not ask for",
+                           std::cout);
+        }
+    }
+}
+
 //file, format and conversion options
 bool options::digest_io_options(const std::string &temp, int &i)
 {
@@ -2581,6 +2617,7 @@ bool options::digest_io_options(const std::string &temp, int &i)
     }
     else if (temp == "-convert_to_47") {
         err_checkf(argc >= i + 2, "Not enough arguments for -convert_to_47\nPlease provide at least stdout name!", std::cout);
+        refuse_unknown_nbo_suboption(arguments, i + 2, "-convert_to_47");
         std::filesystem::path _wfn = arguments[i + 1];
         std::string keys;
         for (int j = i + 2; j + 1 < argc; j++)
@@ -2593,6 +2630,7 @@ bool options::digest_io_options(const std::string &temp, int &i)
     }
     else if (temp == "-nbo") {
         err_checkf(argc >= i + 2, "Not enough arguments for -nbo\nPlease provide a wavefunction!", std::cout);
+        refuse_unknown_nbo_suboption(arguments, i + 2, "-nbo");
         NboRunOptions opt;
         opt.wavefunction = arguments[i + 1];
         opt.debug = debug;
@@ -2604,12 +2642,20 @@ bool options::digest_io_options(const std::string &temp, int &i)
         }
         finished = true;
         citations::cite(citations::Method::NBOProgram, std::cout);
-        return run_nbo(opt, std::cout) == 0;
+        //Returning false here only told digest_options that nobody had claimed the option;
+        //run_app_impl saw finished and exited 0, so a gennbo that never ran looked like a run
+        //that had nothing to print.
+        const int nbo_rc = run_nbo(opt, std::cout);
+        err_checkf(nbo_rc == 0, "-nbo: gennbo did not finish (exit code " + std::to_string(nbo_rc) +
+                                    "), see the messages above",
+                   std::cout);
+        return true;
     }
     else if (temp == "-nbo_parse") {
         //Same parser as -nbo, on an output that already exists: the spread study re-runs gennbo
         //itself on one archive with different keylists and only needs the reading back.
         err_checkf(argc >= i + 2, "Not enough arguments for -nbo_parse\nPlease provide an NBO output file!", std::cout);
+        refuse_unknown_nbo_suboption(arguments, i + 2, "-nbo_parse");
         std::filesystem::path out = arguments[i + 1];
         err_checkf(std::filesystem::exists(out), "NBO output doesn't exist: " + out.string(), std::cout);
         std::filesystem::path json = out.parent_path() / (out.stem().string() + ".nbo.json");
@@ -2625,6 +2671,7 @@ bool options::digest_io_options(const std::string &temp, int &i)
         //The in-house analysis, writing the same JSON -nbo writes, so the two are comparable by
         //tests/nbo_reference/compare_nbo.py without a second format.
         err_checkf(argc >= i + 2, "Not enough arguments for -nbo_native\nPlease provide a wavefunction!", std::cout);
+        refuse_unknown_nbo_suboption(arguments, i + 2, "-nbo_native");
         std::filesystem::path _wfn = arguments[i + 1];
         err_checkf(std::filesystem::exists(_wfn), "wavefunction doesn't exist: " + _wfn.string(), std::cout);
         NboOptions opt;
@@ -3303,6 +3350,9 @@ bool options::digest_property_options(const std::string &temp, int &i)
     else if (temp == "-eli_analysis") {
         err_checkf(argc >= i + 4, "Not enough arguments for -eli_analysis\nPlease provide at least wfn, resolution and radius!", std::cout);
         wfn = arguments[i + 1];
+        //-wfn refuses a file that is not there; the positional forms took the name on trust and
+        //failed later, or not at all
+        err_checkf(std::filesystem::exists(wfn), "-eli_analysis: wavefunction does not exist: " + wfn.string(), std::cout);
         properties.resolution = stod(arguments[i + 2]);
         properties.radius = stod(arguments[i + 3]);
         eli_analysis_run = true;
@@ -3312,6 +3362,7 @@ bool options::digest_property_options(const std::string &temp, int &i)
     //rather than setting a flag, it has no cube or basin output to schedule
     else if (temp == "-eli_family") {
         err_checkf(argc >= i + 2, "Not enough arguments for -eli_family\nPlease provide at least a wfn!", std::cout);
+        err_checkf(std::filesystem::exists(arguments[i + 1]), "-eli_family: wavefunction does not exist: " + arguments[i + 1], std::cout);
         const bool has_points = argc >= i + 3 && arguments[i + 2].size() > 0 && arguments[i + 2][0] != '-';
         eli_family::report(arguments[i + 1], has_points ? std::filesystem::path(arguments[i + 2]) : std::filesystem::path());
         finished = true; return true;
@@ -3320,6 +3371,7 @@ bool options::digest_property_options(const std::string &temp, int &i)
     //Poincare-Hopf as the check that none is missing. No cube: the seeding comes from the topology
     else if (temp == "-topology") {
         err_checkf(argc >= i + 2, "Not enough arguments for -topology\nPlease provide a wfn!", std::cout);
+        err_checkf(std::filesystem::exists(arguments[i + 1]), "-topology: wavefunction does not exist: " + arguments[i + 1], std::cout);
         topology::report(arguments[i + 1], std::cout);
         finished = true; return true;
     }
@@ -3335,6 +3387,7 @@ bool options::digest_property_options(const std::string &temp, int &i)
             std::cout);
 
         std::filesystem::path arg1 = arguments[i + 1];
+        err_checkf(std::filesystem::exists(arg1), "-qtaim_eli: input does not exist: " + arg1.string(), std::cout);
         const bool cube_mode = (arg1.extension() == ".cube");
 
         std::filesystem::path rho_path, eli_path_arg;
@@ -4047,6 +4100,23 @@ bool options::digest_dev_options(const std::string &temp, int &i)
     return true;
 };
 
+namespace {
+    //The analysis an option's prefix names. A flag that starts with one of these and that no
+    //digester claimed is a misspelling of one of that analysis' options, and a misspelling the
+    //parser drops is a run that silently ignored its own arguments: `-rgbi_gruops 0,1 2,3` used
+    //to compute RGBI for the default groups and exit 0.
+    const char *owning_analysis(const std::string &flag)
+    {
+        static const std::pair<const char *, const char *> families[] = {
+            {"-rgbi", "RGBI"}, {"-npa", "NPA"}, {"-nbo", "NBO"}, {"-nrt", "NRT"},
+            {"-nao", "NAO"}, {"-eli", "ELI-D"}, {"-elf", "ELF"}, {"-qtaim", "QTAIM"},
+            {"-basin", "QTAIM basin"}, {"-topology", "topology"}};
+        for (const auto &f : families)
+            if (flag.rfind(f.first, 0) == 0)
+                return f.second;
+        return nullptr;
+    }
+}
 
 void options::digest_options()
 {
@@ -4074,22 +4144,13 @@ void options::digest_options()
         //The digesters index arguments[i + n] and call stoi/stod directly; a flag that is
         //last on the line or followed by a non-number used to die as a bare "invalid stod
         //argument" with no hint which option it was
+        bool claimed = false;
         try
         {
-            if (digest_io_options(temp, i))
-                continue;
-            if (digest_run_options(temp, i))
-                continue;
-            if (digest_partition_options(temp, i))
-                continue;
-            if (digest_property_options(temp, i))
-                continue;
-            if (digest_ri_options(temp, i))
-                continue;
-            if (digest_xcw_options(temp, i))
-                continue;
-            if (digest_dev_options(temp, i))
-                continue;
+            claimed = digest_io_options(temp, i) || digest_run_options(temp, i) ||
+                      digest_partition_options(temp, i) || digest_property_options(temp, i) ||
+                      digest_ri_options(temp, i) || digest_xcw_options(temp, i) ||
+                      digest_dev_options(temp, i);
         }
         catch (const missing_argument &)
         {
@@ -4099,6 +4160,35 @@ void options::digest_options()
         {
             err_checkf(false, "Option " + temp + ": " + e.what() + " - check the value(s) that follow it", log_file);
         }
+        if (claimed)
+            continue;
+        //An inline handler (-nbo, -eli_family, -topology, ...) that ran and failed returns false
+        //with finished set. It claimed the command line all the same, so it must not be reported
+        //as an unknown option; run_app_impl turns the unfinished task into a non-zero exit.
+        if (finished)
+            return;
+        //No digester wanted it. That used to be silent, so a typo in an option name cost nothing
+        //at parse time and everything at read time: the run went ahead with the default and said
+        //so nowhere. A value that happens to start with a dash (a negative number) is not an
+        //option, same test as the separator normalisation above.
+        if (!(temp.size() > 1 && isalpha(static_cast<unsigned char>(temp[1]))))
+            continue;
+        //look_for_debug() handles these before any digester sees them
+        if (temp == "-v" || temp == "-v2" || temp == "-debug" || temp == "-h" || temp == "--h" ||
+            temp == "-help" || temp == "--help")
+            continue;
+        //consumed by the -nbo/-nbo_native handler itself, in whichever order they were written
+        if (nbo_family_suboptions().count(temp))
+            continue;
+        if (const char *family = owning_analysis(temp))
+            err_checkf(false, "Unknown option " + temp + ": it names no " + family +
+                                  " option this build has. Check the spelling, -h lists them; "
+                                  "running on with it ignored would give you a default you did "
+                                  "not ask for",
+                       log_file);
+        log_file << "WARNING: ignoring unknown option " << temp << endl;
+        if (log_file.rdbuf() != std::cout.rdbuf())
+            std::cout << "WARNING: ignoring unknown option " << temp << endl;
     }
 
     // SALTED predicts a density from atom positions.  Historically its
@@ -4115,6 +4205,26 @@ void options::digest_options()
     if (multipole_lmax >= 0 && aux_basis.empty())
         aux_basis.push_back(std::make_shared<BasisSet>());
 };
+
+std::string options::unrunnable_analysis() const
+{
+    if (!wfn.empty() || !occ.empty())
+        return "";
+    //Each of these runs only inside run_app_impl's wavefunction branch, and that branch is
+    //skipped without a word when there is nothing to read - the command then fell through to the
+    //help text and exit 0, which reads exactly like a run that had nothing to report.
+    const std::pair<bool, const char *> needs_a_wavefunction[] = {
+        {rgbi, "-rgbi (Roby-Gould bond indices)"},
+        {npa, "-npa (natural population analysis)"},
+        {!fchk.empty(), "-fchk (conversion to a formatted checkpoint)"},
+        {!cif.empty() || !hkl.empty(), "-cif/-hkl (scattering factor table)"}};
+    for (const auto &a : needs_a_wavefunction)
+        if (a.first)
+            return std::string(a.second) + " was asked for, but no wavefunction was given.\n" +
+                   "       Name one with -wfn <file.gbw|.wfx|.fchk|.molden|.wfn> or with -occ;\n" +
+                   "       this option does not take the wavefunction as a bare argument.";
+    return "";
+}
 
 namespace {
     // Captured during static initialisation, so it still refers to the console after

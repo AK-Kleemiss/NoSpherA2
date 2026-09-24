@@ -821,11 +821,20 @@ static int run_app_impl(int argc, char **argv)
 			write_wfn_CIF(wavy[0], opt.wfn.replace_extension(".cif"));
 		return 0;
 	}
+	//Nothing above claimed the task. This used to write the help text into NoSpherA2.log and
+	//return 0, so `-rgbi water.gbw` - RGBI has no positional form, it wants -wfn - looked like a
+	//successful run that had simply printed no table. Say which input was missing, put it where
+	//the user can see it, and fail: nobody must be able to read this as an analysis that ran.
+	std::cout.rdbuf(_coutbuf);
 	std::cout << NoSpherA2_message(opt.no_date);
 	if (!opt.no_date)
 		std::cout << build_date;
-	std::cout << "Did not understand the task to perform!\n"
-		<< help_message << endl;
+	const std::string missing = opt.unrunnable_analysis();
+	if (!missing.empty())
+		std::cout << "ERROR: " << missing << endl;
+	else
+		std::cout << "Did not understand the task to perform!\n"
+			<< help_message << endl;
 	log_file.flush();
-	return 0;
+	return 1;
 }
