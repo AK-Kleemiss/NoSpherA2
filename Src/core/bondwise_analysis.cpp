@@ -11,6 +11,7 @@
 #include "spherical_density.h"
 #include "citations.h"
 #include "nao.h"
+#include <occ/core/parallel.h>
 #include <occ/qm/hf.h>
 #include <occ/qm/guess_kind.h>
 #include <occ/qm/initial_guess.h>
@@ -285,9 +286,54 @@ namespace {
 		spdlog::level::level_enum previous_level = spdlog::level::info;
 	};
 
+	//occ parallelises with TBB, and occ::parallel::nthreads is a bookkeeping variable: until
+	//set_num_threads() installs a tbb::global_control, TBB runs at its own default parallelism no
+	//matter what nthreads says. Nothing on the RGBI path ever called it - only the -occ branch of
+	//NoSpherA2.cpp does - so every free-atom Fock build reduced in whatever order TBB's work
+	//stealing produced, and neither OMP_NUM_THREADS nor -cpus touches a TBB pool.
+	//
+	//That is not a rounding curiosity here. A free atom's open shell spans a degenerate manifold, so
+	//last-bit noise in the Fock matrix picks a different member of it: the two chemically identical Au
+	//atoms of tests/ECP_SF/Au2Br2.gbw came out of the same run with free-atom densities 1.1 electrons
+	//apart in sum(D) at the same energy to 1e-5 Ha, and the reported Roby populations moved by 1.6e-2
+	//electrons between two runs of the same binary on the same file. A bond index nobody can reproduce
+	//cannot be compared to anything.
+	//
+	//One thread makes the reduction deterministic. These are one-atom SCFs of a few dozen functions,
+	//so there is nothing here for TBB to win, and a reproducible published number is worth more than
+	//the difference either way.
+	//
+	//Restoring it is the part that is easy to get wrong, and the first version of this guard did:
+	//get_num_threads() reads the bookkeeping variable, which is 1 before anything installs a control,
+	//so set_num_threads(previous) in the destructor would *install* a control at 1 and leave occ pinned
+	//to one thread for the rest of the process - every later occ user in the same binary, the whole
+	//test suite included, silently serial. If there was no control on the way in, there must be none
+	//on the way out.
+	class ScopedOccSingleThread {
+	public:
+		ScopedOccSingleThread()
+			: had_control(occ::parallel::get_tbb_control() != nullptr),
+			previous(occ::parallel::get_num_threads()) {
+			occ::parallel::set_num_threads(1);
+		}
+		~ScopedOccSingleThread() {
+			if (had_control)
+				occ::parallel::set_num_threads(previous);
+			else {
+				occ::parallel::shutdown_tbb();
+				occ::parallel::nthreads = previous; //keep get_num_threads() honest
+			}
+		}
+
+	private:
+		bool had_control = false;
+		int previous = 1;
+	};
+
 	dMatrix2 compute_tonto_style_atomic_density(
 		const atom &atm, const e_origin origin, const bool cartesian) {
 		ScopedOccLogLevel quiet_occ_logs(spdlog::level::err);
+		const ScopedOccSingleThread deterministic_reduction;
 		const occ::gto::AOBasis basis = build_occ_atomic_basis_from_wfn_atom(atm, origin, cartesian);
 		const int effective_atomic_number = atm.get_charge() - atm.get_ECP_electrons();
 		const int multiplicity = std::max(1, tonto_ground_state_multiplicity(effective_atomic_number));

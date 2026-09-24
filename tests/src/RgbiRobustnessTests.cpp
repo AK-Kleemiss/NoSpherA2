@@ -2,6 +2,8 @@
 #include "core/wfn_class.h"
 #include "core/bondwise_analysis.h"
 
+#include <occ/core/parallel.h>
+
 #include <cmath>
 #include <sstream>
 #include <string>
@@ -189,4 +191,92 @@ TEST(RgbiRobustnessTests, TontoWaterRobyGouldNumbersAreReproduced)
 		rows++;
 	}
 	EXPECT_EQ(rows, 2); //O-H1 and O-H2
+}
+
+//The free-atom SCFs run through occ, and occ parallelises with TBB. Pinning them to one thread for
+//reproducibility is only half a fix: the guard that does it has to put the process back the way it
+//found it, or the first RGBI analysis leaves every later occ user in the same binary serial. Before
+//anything installs a tbb::global_control, occ::parallel::get_num_threads() already answers 1, so a
+//guard that naively restores "what get_num_threads() said" installs a control at 1 and never lifts it.
+TEST(RgbiRobustnessTests, TheAnalysisLeavesOccsThreadCountAsItFoundIt)
+{
+	const auto p = water_he_fixture();
+	if (p.empty())
+		GTEST_SKIP() << "tests/TFVC/water.gbw not found";
+
+	//case 1: a caller who had asked for a thread count gets that count back
+	occ::parallel::set_num_threads(3);
+	(void)rgbi_ano_output(false);
+	EXPECT_EQ(occ::parallel::get_num_threads(), 3);
+
+	//case 2: a caller who never set one is left without a control at all, not pinned to 1
+	occ::parallel::shutdown_tbb();
+	occ::parallel::nthreads = 4; //bookkeeping says 4, no control installed - occ's own starting state
+	(void)rgbi_ano_output(false);
+	EXPECT_EQ(occ::parallel::get_tbb_control(), nullptr);
+	EXPECT_EQ(occ::parallel::get_num_threads(), 4);
+
+	occ::parallel::shutdown_tbb();
+	occ::parallel::nthreads = 1;
+}
+
+//The reproducibility check that has teeth. tests/ECP_SF/Au2Br2.gbw is centrosymmetric: its two Au
+//atoms are one orbit, as are the two Au-Br bonds and the two Au-P bonds, so the molecule's own
+//symmetry is a reference that needs no second program. Those numbers used to disagree inside a single
+//run - populations 16.040429 against 16.029264, bond totals apart by 0.019 and covalent percentages
+//by 1.4 - because each free-atom Fock matrix reduced in whatever order TBB's work stealing produced
+//and a free atom's open shell is degenerate enough for the last bit to pick a different member of the
+//manifold. Symmetry-equivalent centres now agree to every digit, which is the only way a published
+//bond index can be compared to anything.
+TEST(RgbiRobustnessTests, SymmetryEquivalentGoldCentresAgreeToEveryDigit_full)
+{
+	if (const char *env = std::getenv("RUN_FULL_TEST"); !env || std::string(env) == "0" || std::string(env) == "false")
+		GTEST_SKIP() << "Set RUN_FULL_TEST=1 for the 53-atom Au2Br2 Roby-Gould analysis";
+	const auto p = nos_test_repo_root() / "tests" / "ECP_SF" / "Au2Br2.gbw";
+	if (!std::filesystem::exists(p))
+		GTEST_SKIP() << "tests/ECP_SF/Au2Br2.gbw not found";
+	std::string out;
+	{
+		CoutCapture cap;
+		WFN wavy(p);
+		Roby_information roby(wavy, {}, true, true, false, false);
+		out = cap.str();
+	}
+
+	//the two gold atoms
+	const double au0 = value_after(out, "Population of atom 0: ");
+	const double au1 = value_after(out, "Population of atom 1: ");
+	ASSERT_TRUE(std::isfinite(au0) && std::isfinite(au1)) << "no populations in the output";
+	EXPECT_DOUBLE_EQ(au0, au1);
+
+	//and the two bond orbits. The inversion centre maps 0<->1 (Au), 2<->3 (Br), 4<->5 (P), so the
+	//rows "0 - 2" and "1 - 3" are one bond, as are "0 - 4" and "1 - 5".
+	auto bond_row = [&out](const std::string &pair) {
+		vec numbers;
+		std::istringstream in(out);
+		std::string line;
+		while (std::getline(in, line)) {
+			//the pair has to be the first thing on the line, or "0 - 2" also matches "10 - 2"
+			const size_t start = line.find_first_not_of(" \t");
+			if (start == std::string::npos || line.compare(start, pair.size(), pair) != 0)
+				continue;
+			const size_t at = start;
+			std::istringstream cells(line.substr(line.find_first_of("ABCDEFGHIJKLMNOPQRSTUVWXYZ", at)));
+			std::string element_a, dash, element_b;
+			cells >> element_a >> dash >> element_b;
+			double v = 0.0;
+			while (cells >> v)
+				numbers.push_back(v);
+			break;
+		}
+		return numbers;
+	};
+	const char *orbits[][2] = { { "0 - 2", "1 - 3" }, { "0 - 4", "1 - 5" } };
+	for (const auto &orbit : orbits) {
+		const vec first = bond_row(orbit[0]), second = bond_row(orbit[1]);
+		ASSERT_EQ(first.size(), 9u) << "no bond row " << orbit[0];
+		ASSERT_EQ(second.size(), 9u) << "no bond row " << orbit[1];
+		for (size_t i = 0; i < 9; i++)
+			EXPECT_DOUBLE_EQ(first[i], second[i]) << "column " << i << " of " << orbit[0] << " vs " << orbit[1];
+	}
 }
