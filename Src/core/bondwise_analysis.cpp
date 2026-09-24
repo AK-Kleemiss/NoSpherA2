@@ -35,15 +35,17 @@ namespace {
 	//index a continuous function of the geometry and comparable between two molecules. A partly
 	//filled shell counts in full, because the atomic subspace has to be spherically complete.
 	constexpr int free_atom_orbital_count(const int atomic_number) {
-		//(n, l) in Aufbau filling order; the list covers every element up to Z = 118
-		constexpr int shells[][2] = {
-			{1, 0}, {2, 0}, {2, 1}, {3, 0}, {3, 1}, {4, 0}, {3, 2}, {4, 1}, {5, 0}, {4, 2},
-			{5, 1}, {6, 0}, {4, 3}, {5, 2}, {6, 1}, {7, 0}, {5, 3}, {6, 2}, {7, 1} };
+		//l of each shell in Aufbau filling order - 1s 2s 2p 3s 3p 4s 3d 4p 5s 4d 5p 6s 4f 5d 6p
+		//7s 5f 6d 7p - which covers every element up to Z = 118. Only l is needed; n never enters
+		//the count, so the table is one-dimensional. MSVC 14.44 rejects a range-for over a local
+		//constexpr int[][2] inside a constexpr function ("a non-constant (sub-)expression was
+		//encountered"), which an index loop over a flat array sidesteps.
+		constexpr int shell_l[] = { 0, 0, 1, 0, 1, 0, 2, 1, 0, 2, 1, 0, 3, 2, 1, 0, 3, 2, 1 };
 		int electrons = atomic_number;
 		int dimension = 0;
-		for (const auto &shell : shells) {
+		for (int i = 0; i < static_cast<int>(sizeof(shell_l) / sizeof(shell_l[0])); i++) {
 			if (electrons <= 0) break;
-			const int size = 2 * shell[1] + 1;
+			const int size = 2 * shell_l[i] + 1;
 			dimension += size;
 			electrons -= 2 * size;
 		}
