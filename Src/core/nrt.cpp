@@ -521,6 +521,13 @@ namespace
         int k = static_cast<int>(B.core.size());
         for (const Slot& sl : slots) k += sl.mult;
         if (k > n) return;
+        //A spin channel can ask for no orbitals at all: a hydrogen atom's beta channel holds no
+        //electrons, so there is no core and every slot multiplicity is zero.  k = 0 then reached the
+        //OWSO overlap check below as a 0x0 SelfAdjointEigenSolver, and Eigen's first step there is
+        //maxCoeff() over an empty matrix - a segfault, not an exception, and -nbo_native H.gbw -nrt
+        //died in it with nothing printed after the citation block.  A candidate with no orbitals
+        //cannot be built, which is what infeasible means everywhere else in this function.
+        if (k == 0) return;
         std::vector<VectorXd> v(k);
         std::vector<const ivec*> blk(k, nullptr);
         std::vector<std::pair<int, int>> owner(k, { -1, -1 });

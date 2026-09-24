@@ -136,6 +136,20 @@ TEST(CliRefusal, MisspelledNrtOptionAfterNboNativeIsFatal)
 				::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), ".*");
 }
 
+//Few electrons is its own input kind. -nbo_native on a lone hydrogen runs; adding -nrt segfaulted,
+//because that spin channel asks for no orbitals at all - no core and no electron pair - and a
+//candidate of rank zero reached the OWSO overlap check as a 0x0 SelfAdjointEigenSolver, whose first
+//step is maxCoeff() over an empty matrix. Such a candidate is now infeasible, which leaves the
+//parent-structure check to refuse the run by name. A death test because err_checkf exits.
+TEST(CliRefusal, NrtOnAOneElectronWavefunctionRefusesInsteadOfCrashing)
+{
+	const auto wfn = fixture("ptb_H_file/H.gbw");
+	if (!std::filesystem::exists(wfn))
+		GTEST_SKIP() << wfn.string() << " not found";
+	EXPECT_EXIT(parse({"-nbo_native", wfn.string(), "-nrt"}),
+				::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), ".*");
+}
+
 //-wfn refuses a file that is not there; the positional forms of the ELI and topology analyses
 //took the name on trust
 TEST(CliRefusal, PositionalWavefunctionThatDoesNotExistIsFatal)
