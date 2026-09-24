@@ -470,16 +470,29 @@ NboLewis nbo_search(const NAOResult& nao, const dMatrix2& gamma, const bvec2& bo
         bool progress = true;
         while (progress && static_cast<int>(res.orbitals.size()) < n_pairs) {
             progress = false;
+            //The candidates of one accept step are independent small eigensolves of the same
+            //density - one per atom here, one per bondable pair below - and only the choice between
+            //them is sequential.  Evaluating them in parallel and choosing serially in index order
+            //makes exactly the choice the serial scan made, ties included: leading_block() is a
+            //single-threaded Eigen eigensolve of its own block, so its result does not depend on how
+            //many threads are running, and the comparison chain is untouched.
+            vec lam1(natoms, 0.0);
+            ivec have1(natoms, 0);
+            std::vector<VectorXd> cand1(natoms);
+#pragma omp parallel for schedule(dynamic) num_threads(nthreads)
+            for (int a = 0; a < natoms; a++) {
+                if (idx[a].valence.empty()) continue;
+                if (!relax && used[a] >= cap[a]) continue;
+                lam1[a] = leading_block(G, idx[a].all, cand1[a]);
+                have1[a] = 1;
+            }
             double best = t;
             VectorXd bv;
             int ba = -1;
             for (int a = 0; a < natoms; a++) {
-                if (idx[a].valence.empty()) continue;
-                if (!relax && used[a] >= cap[a]) continue;
-                VectorXd v;
+                if (!have1[a]) continue;
                 n_eig1++;
-                const double lam = leading_block(G, idx[a].all, v);
-                if (lam > best) { best = lam; bv = v; ba = a; }
+                if (lam1[a] > best) { best = lam1[a]; bv = cand1[a]; ba = a; }
             }
             if (ba >= 0) {
                 accept(bv, "LP", { ba });
@@ -494,6 +507,7 @@ NboLewis nbo_search(const NAOResult& nao, const dMatrix2& gamma, const bvec2& bo
             int pa = -1, pb = -1;
             //every bondable atom pair, O(N^2) small diagonalisations per accepted bond; at
             //reference scale the whole search is milliseconds
+            ivec2 plist;
             for (int a = 0; a < natoms; a++) {
                 if (idx[a].valence.empty()) continue;
                 if (!relax && used[a] >= cap[a]) continue;
@@ -501,26 +515,34 @@ NboLewis nbo_search(const NAOResult& nao, const dMatrix2& gamma, const bvec2& bo
                     if (idx[b].valence.empty()) continue;
                     if (!relax && used[b] >= cap[b]) continue;
                     if (!bondable.empty() && !bondable[a][b]) continue;
-                    ivec pair = idx[a].all;
-                    pair.insert(pair.end(), idx[b].all.begin(), idx[b].all.end());
-                    VectorXd v;
-                    n_eig2++;
-                    const double lam = leading_block(G, pair, v);
-                    if (lam <= bestp) continue;
-                    const double wa = weight_on(v, idx[a].all);
-                    const double wb = weight_on(v, idx[b].all);
-                    //A candidate that sits almost entirely on one centre is a lone pair, not a
-                    //bond, and accepting it as a bond costs a whole electron pair of the Lewis
-                    //structure: formate took a 93 %-on-oxygen "third C-O bond" at occupancy 1.977
-                    //in place of the reference's third lone pair on O, because the ladder always
-                    //accepts the most occupied candidate and that one wins at the top rung.  The
-                    //floor is the polarity at which NBO stops calling something a bond.
-                    if (std::min(wa, wb) < bond_minority_floor() * (wa + wb)) continue;
-                    bestp = lam;
-                    bvp = v;
-                    pa = a;
-                    pb = b;
+                    plist.push_back({ a, b });
                 }
+            }
+            const int np = static_cast<int>(plist.size());
+            vec lam2(np, 0.0);
+            std::vector<VectorXd> cand2(np);
+#pragma omp parallel for schedule(dynamic) num_threads(nthreads)
+            for (int c = 0; c < np; c++) {
+                ivec pair = idx[plist[c][0]].all;
+                pair.insert(pair.end(), idx[plist[c][1]].all.begin(), idx[plist[c][1]].all.end());
+                lam2[c] = leading_block(G, pair, cand2[c]);
+            }
+            for (int c = 0; c < np; c++) {
+                n_eig2++;
+                if (lam2[c] <= bestp) continue;
+                const double wa = weight_on(cand2[c], idx[plist[c][0]].all);
+                const double wb = weight_on(cand2[c], idx[plist[c][1]].all);
+                //A candidate that sits almost entirely on one centre is a lone pair, not a
+                //bond, and accepting it as a bond costs a whole electron pair of the Lewis
+                //structure: formate took a 93 %-on-oxygen "third C-O bond" at occupancy 1.977
+                //in place of the reference's third lone pair on O, because the ladder always
+                //accepts the most occupied candidate and that one wins at the top rung.  The
+                //floor is the polarity at which NBO stops calling something a bond.
+                if (std::min(wa, wb) < bond_minority_floor() * (wa + wb)) continue;
+                bestp = lam2[c];
+                bvp = cand2[c];
+                pa = plist[c][0];
+                pb = plist[c][1];
             }
             if (pa >= 0) {
                 accept(bvp, "BD", { pa, pb });
