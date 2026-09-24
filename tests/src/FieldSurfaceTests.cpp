@@ -186,14 +186,54 @@ namespace NoSpherA2UnitTests
 			EXPECT_NEAR(wave.computeESP(pos, pairs), esp, 1E-5); // the cube header rounds the grid positions to 1E-6 bohr
 	}
 
+	//The (l,r,s) tables in computeESP and build_ESP_pairs stop at a g x g pair, so g is the exact upper
+	//edge of what the ESP path supports - and nothing in-tree exercised it. Reference: orca_vpot from
+	//ORCA 6.1.1 on tests/esp_g_ref/g_ref.inp (HF/def2-QZVPP water: a g shell on O, an f shell on H),
+	//evaluated at vpot_pts.inp, its output kept as vpot_orca611.txt next to the wavefunction.
+	TEST(EspTests, GPrimitivesAgreeWithOrcaVpot)
+	{
+		const auto input = nos_test_repo_root() / "tests" / "esp_g_ref" / "g_ref.gbw";
+		if (!std::filesystem::exists(input)) GTEST_SKIP() << "Missing " << input;
+		WFN wave(input, false);
+		int max_l = 0;
+		for (int p = 0; p < wave.get_nex(); p++)
+		{
+			int l[3];
+			constants::type2vector(wave.get_type(p), l);
+			max_l = std::max(max_l, l[0] + l[1] + l[2]);
+		}
+		ASSERT_EQ(max_l, 4) << "def2-QZVPP is meant to put g primitives in this wavefunction";
+		const WFN::ESP_pairs pairs = wave.build_ESP_pairs();
+		const std::array<std::pair<d3, double>, 4> reference = { {
+			{ { 0.0, 0.0, -2.0 }, -0.0701658972531333 },   // behind the oxygen, on the lone-pair side
+			{ { 2.5, 0.0, 1.0 }, -0.0243475067049982 },
+			{ { 0.0, 3.0, 2.0 }, 0.1107006768580323 },     // out past one hydrogen
+			{ { 1.0, -1.5, -2.5 }, -0.0538336472988921 } } };
+		std::vector<d3> pts;
+		double worst = 0;
+		for (const auto& [pos, esp] : reference)
+		{
+			const double mine = wave.computeESP(pos, pairs);
+			std::cout << "orca_vpot " << esp << "  ours " << mine << "  diff " << mine - esp << std::endl;
+			worst = std::max(worst, std::abs(mine - esp));
+			pts.push_back(pos);
+		}
+		EXPECT_LT(worst, 1E-7) << "ESP of a g wavefunction against an external reference"; // measured 1.4E-8, the Boys table's interpolation error
+		vec batch(pts.size());
+		wave.computeESP_batch(pts, pairs, batch.data());
+		for (size_t i = 0; i < pts.size(); i++)
+			EXPECT_NEAR(batch[i], reference[i].second, 1E-7) << "batch, point " << i;
+	}
+
 	//computeESP_batch does a whole point set in one call, on a device when there is one. It has to
 	//agree with the per-point computeESP it replaces. The set is deliberately big enough to clear the
 	//gate esp_gpu_eval puts on (points x pairs). The test binary never parses -no_gpu_density, so the
 	//toggle the app sets in NoSpherA2.cpp is off here and the first pass is always the OpenMP
 	//fallback; the second pass calls the CUDA kernel itself, which is the only way it gets tested.
-	TEST(EspTests, BatchMatchesThePerPointLoop)
+	//Called once per wavefunction: epoxide (s..f) and the def2-QZVPP water above (g), because the
+	//kernel's (l,r,s) loops are where a high-angular-momentum pair would diverge from the host.
+	static void check_esp_batch_against_loop(const std::filesystem::path& input)
 	{
-		const auto input = nos_test_repo_root() / "tests" / "epoxide_gbw" / "epoxide.gbw";
 		if (!std::filesystem::exists(input)) GTEST_SKIP() << "Missing " << input;
 		WFN wave(input, false);
 		const WFN::ESP_pairs pairs = wave.build_ESP_pairs();
@@ -260,6 +300,160 @@ namespace NoSpherA2UnitTests
 		//only nvcc's FMA contraction and the device exp() separate the two, and the ESP reference
 		//gate next door is 1E-5, so this is four orders tighter than anything that reads the numbers
 		EXPECT_LT(worst_dev, 1E-9);
+#endif
+	}
+
+	TEST(EspTests, BatchMatchesThePerPointLoop)
+	{
+		check_esp_batch_against_loop(nos_test_repo_root() / "tests" / "epoxide_gbw" / "epoxide.gbw");
+	}
+
+	TEST(EspTests, BatchMatchesThePerPointLoopWithGFunctions)
+	{
+		check_esp_batch_against_loop(nos_test_repo_root() / "tests" / "esp_g_ref" / "g_ref.gbw");
+	}
+
+	//The host fallback picks how many points share one pass over the pair table from the point count and
+	//the thread count - 64 while every thread can still be given a block, then 8, then 1 - and each width
+	//leaves its own remainder to the scalar path. So walk the sizes that straddle both thresholds and land
+	//on both sides of a block boundary. The two tests above only ever exercise the widest tier.
+	//The device is switched off here on purpose: it is the host tiers that are on trial.
+	TEST(EspTests, EveryHostPassWidthMatchesTheScalarPath)
+	{
+		const auto input = nos_test_repo_root() / "tests" / "epoxide_gbw" / "epoxide.gbw";
+		if (!std::filesystem::exists(input)) GTEST_SKIP() << "Missing " << input;
+		WFN wave(input, false);
+		const WFN::ESP_pairs pairs = wave.build_ESP_pairs();
+#ifdef _OPENMP
+		const int nthr = omp_get_max_threads();
+#else
+		const int nthr = 1;
+#endif
+#if defined(NOSPHERA2_USE_GPU)
+		const bool device_was_on = aux_density_gpu_enabled();
+		aux_density_gpu_set_enabled(false);
+#endif
+		for (const int np : { 1, 7, 8 * nthr - 1, 8 * nthr + 3, 64 * nthr, 64 * nthr + 5 })
+		{
+			std::vector<d3> pts((size_t)np);
+			for (int i = 0; i < np; i++)
+			{
+				const double a = 0.37 * i, r = 3.0 + 0.003 * i; // a spiral out of the molecule, nuclei or not: both paths use the same formula
+				pts[i] = { 1.7 + r * std::cos(a), 13.0 + r * std::sin(a), 1.5 + 0.01 * i };
+			}
+			vec batch((size_t)np);
+			wave.computeESP_batch(pts, pairs, batch.data());
+			double worst = 0;
+			for (int i = 0; i < np; i++)
+				worst = std::max(worst, std::abs(batch[i] - wave.computeESP(pts[i], pairs)));
+			//every lane replays the scalar operations in the scalar order, so this is 0 in practice; the
+			//bound is there because FMA contraction is allowed to differ between a vectorised width and
+			//the scalar one, and any indexing mistake is orders of magnitude bigger than 1E-12
+			EXPECT_LT(worst, 1E-12) << np << " points on " << nthr << " threads, max |batch - per point| " << worst;
+		}
+#if defined(NOSPHERA2_USE_GPU)
+		aux_density_gpu_set_enabled(device_was_on);
+#endif
+	}
+
+	//A block of lanes shares one pass over the pair table, so everything that used to be decided per point -
+	//the exp(-T) gate, the Boys table's large-T branch, the 1/r at a nucleus - is now decided inside a block
+	//that may hold points of wildly different magnitude. Three awkward sets, and the far field doubles as an
+	//accuracy check that needs no reference file: a neutral molecule seen from far away has no monopole left,
+	//while the nuclear and electronic halves it cancels out of are each 24/r.
+	TEST(EspTests, AwkwardPointSetsAndTheFarFieldNetCharge)
+	{
+		const auto input = nos_test_repo_root() / "tests" / "epoxide_gbw" / "epoxide.gbw";
+		if (!std::filesystem::exists(input)) GTEST_SKIP() << "Missing " << input;
+		WFN wave(input, false);
+		const WFN::ESP_pairs pairs = wave.build_ESP_pairs();
+		const int ncen = wave.get_ncen(), npairs = (int)pairs.weight.size();
+
+		// an empty set writes nothing and returns
+		vec canary{ -7.0 };
+		wave.computeESP_batch({}, pairs, canary.data());
+		EXPECT_EQ(canary[0], -7.0);
+
+		// exactly on a nucleus Z/r diverges, and both paths have to diverge the same way instead of handing
+		// back a NaN - and one such lane must not disturb the 63 beside it, which the mixed set below checks
+		std::vector<d3> nuclei;
+		d3 centre{ 0, 0, 0 };
+		double Ztot = 0;
+		for (int a = 0; a < ncen; a++)
+		{
+			nuclei.push_back({ wave.get_atom_coordinate(a, 0), wave.get_atom_coordinate(a, 1), wave.get_atom_coordinate(a, 2) });
+			Ztot += wave.get_atom_charge(a) - wave.get_atom_ECP_electrons(a);
+			for (int k = 0; k < 3; k++) centre[k] += nuclei.back()[k] / ncen;
+		}
+		vec at_nuc(nuclei.size());
+		wave.computeESP_batch(nuclei, pairs, at_nuc.data());
+		for (size_t i = 0; i < nuclei.size(); i++)
+		{
+			EXPECT_TRUE(std::isinf(at_nuc[i])) << "nucleus " << i;
+			EXPECT_EQ(at_nuc[i], wave.computeESP(nuclei[i], pairs)) << "nucleus " << i;
+		}
+
+		// The far field: for a neutral molecule the leading term is the dipole, so |ESP| r^2 stays of the order
+		// of the dipole moment in atomic units at any distance. Only the electronic monopole cancelling the
+		// nuclear one to twelve digits can produce that - at r = 1E4 each half is 2.4E-3 - and every point out
+		// here is past the Boys table into the sqrt(pi/4T) branch with exp(-T) gated to zero.
+		ASSERT_NEAR(Ztot, 24.0, 1E-9); // C2H4O, no ECP
+		for (const double r : { 1E3, 1E4, 1E5 })
+			for (const d3 dir : { d3{ 1, 0, 0 }, d3{ 0, 0.6, 0.8 } })
+			{
+				const d3 p{ centre[0] + r * dir[0], centre[1] + r * dir[1], centre[2] + r * dir[2] };
+				const double esp = wave.computeESP(p, pairs);
+				EXPECT_LT(std::abs(esp) * r * r, 5.0) << "r = " << r << ", ESP " << esp << ": only the dipole may survive";
+				vec one(1);
+				wave.computeESP_batch({ p }, pairs, one.data());
+				EXPECT_EQ(one[0], esp) << "r = " << r;
+			}
+
+		// One lane block holding both a 0.1 hartree point and a 1E-8 one, which is where a decision taken once
+		// per block instead of once per lane would show. Sized so the device branch fires wherever there is one.
+#ifdef _OPENMP
+		const int nthr = omp_get_max_threads();
+#else
+		const int nthr = 1;
+#endif
+		const int np = std::max(64 * nthr + 3, (int)((1LL << 22) / std::max(1, npairs)) + 64);
+		std::vector<d3> mixed((size_t)np);
+		for (int i = 0; i < np; i++)
+		{
+			const double a = 0.37 * i, r = (i % 2) ? 1E4 + i : 2.5 + 0.001 * (i % 997);
+			mixed[i] = { centre[0] + r * std::cos(a), centre[1] + r * std::sin(a) * 0.6, centre[2] + r * std::sin(a) * 0.8 };
+		}
+		vec batch((size_t)np);
+#if defined(NOSPHERA2_USE_GPU)
+		const bool dev_was_on = aux_density_gpu_enabled();
+		aux_density_gpu_set_enabled(false);
+#endif
+		wave.computeESP_batch(mixed, pairs, batch.data());
+		double worst = 0;
+		for (int i = 0; i < np; i++)
+		{
+			const double ref = wave.computeESP(mixed[i], pairs);
+			ASSERT_TRUE(std::isfinite(ref)) << "point " << i;
+			worst = std::max(worst, std::abs(batch[i] - ref));
+		}
+		EXPECT_LT(worst, 1E-12) << np << " mixed points, max |batch - per point| " << worst;
+		for (int i = 1; i < np; i += 2)
+			ASSERT_LT(std::abs(batch[i]), 1E-6) << "far lane " << i << " sharing a block with near ones";
+#if defined(NOSPHERA2_USE_GPU)
+		if (aux_density_gpu_available())
+		{
+			aux_density_gpu_set_enabled(true);
+			vec dev((size_t)np);
+			wave.computeESP_batch(mixed, pairs, dev.data());
+			double worst_dev = 0;
+			for (int i = 0; i < np; i++)
+				worst_dev = std::max(worst_dev, std::abs(dev[i] - batch[i]));
+			std::cout << np << " mixed points, max |device - host| " << worst_dev << std::endl;
+			EXPECT_LT(worst_dev, 1E-9);
+			for (int i = 1; i < np; i += 2)
+				ASSERT_LT(std::abs(dev[i]), 1E-6) << "far lane " << i << " on the device";
+		}
+		aux_density_gpu_set_enabled(dev_was_on);
 #endif
 	}
 

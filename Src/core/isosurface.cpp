@@ -4,6 +4,9 @@
 #include <set>
 #include "properties.h"
 #include "citations.h"
+#ifdef NOSPHERA2_USE_GPU
+#include "aux_density_gpu.h"
+#endif
 
 // --------------------------------------------------------------------------
 // 1) Minimal Edge Table
@@ -417,17 +420,21 @@ RGB mix_colour(double val, const std::array<std::array<int, 3>, 3>& Colourcode, 
 	}
 	else {
 		//Mix colours
+		// a + f * (b - a), not (1 - f) * a + f * b: the second form returns 254.99999999999997 for a
+		// channel that is 255 at both ends, and int() truncates that to 254. The red of a red-white
+		// ramp then depends on the last bits of val, which is how a 1E-16 change in the ESP moved the
+		// colour of a face (IsosurfaceTests.EspColourOfRhoIsosurface). With this form f * 0 == 0 exactly.
 		if (val < mid_point) {
 			double factor = (val - low_lim) / (mid_point - low_lim);
-			colour = { int((1 - factor) * Colourcode[0][0] + factor * Colourcode[1][0]),
-					   int((1 - factor) * Colourcode[0][1] + factor * Colourcode[1][1]),
-					   int((1 - factor) * Colourcode[0][2] + factor * Colourcode[1][2]) };
+			colour = { int(Colourcode[0][0] + factor * (Colourcode[1][0] - Colourcode[0][0])),
+					   int(Colourcode[0][1] + factor * (Colourcode[1][1] - Colourcode[0][1])),
+					   int(Colourcode[0][2] + factor * (Colourcode[1][2] - Colourcode[0][2])) };
 		}
 		else if (val > mid_point) {
 			double factor = (val - mid_point) / (high_lim - mid_point);
-			colour = { int((1 - factor) * Colourcode[1][0] + factor * Colourcode[2][0]),
-					   int((1 - factor) * Colourcode[1][1] + factor * Colourcode[2][1]),
-					   int((1 - factor) * Colourcode[1][2] + factor * Colourcode[2][2]) };
+			colour = { int(Colourcode[1][0] + factor * (Colourcode[2][0] - Colourcode[1][0])),
+					   int(Colourcode[1][1] + factor * (Colourcode[2][1] - Colourcode[1][1])),
+					   int(Colourcode[1][2] + factor * (Colourcode[2][2] - Colourcode[1][2])) };
 		}
 		else
 			colour = Colourcode[1];
@@ -540,7 +547,16 @@ vec surface_ESP(const std::vector<Triangle>& triangles, const WFN& wavy)
 	// Olex2 tails it while the window stays alive
 	const int n = (int)triangles.size();
 	vec esp(n);
-	const int slice = std::max(4096, n / 50);
+	// A device needs the whole set in one launch to fill itself - sucrose's 87312 faces in 4096-point
+	// slices is 32 blocks of 128 on 80 SMs, and they took 18056 ms against 6171 ms for a cube of 3x as
+	// many points handed over in one call. Without a device the slices are independent OpenMP loops that
+	// cost nothing (measured: the same 159 us per point either way), so there the bar stays fine grained.
+#ifdef NOSPHERA2_USE_GPU
+	const bool one_call = aux_density_gpu_enabled() && aux_density_gpu_available();
+#else
+	const bool one_call = false;
+#endif
+	const int slice = one_call ? n : std::max(4096, n / 50);
 	ProgressBar pb((n + slice - 1) / slice, 50, "=", " ", "Surface ESP");
 	std::vector<d3> centres;
 	for (int first = 0; first < n; first += slice)

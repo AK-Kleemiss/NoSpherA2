@@ -16,15 +16,19 @@ NOSPHERA2_GPU_API_BEGIN
 
 namespace {
 
-//esp_axis_terms in wfn_density.cpp: the (l, r, s) count of one axis with l_i + l_j = L
+//esp_axis_terms in wfn_density.cpp: the (l, r, s) count of one axis with l_i + l_j = L, tabulated
+//the same way - three of these per pair is no place for a nested loop
+__device__ __constant__ int d_axis_terms[9] = { 1, 2, 5, 8, 14, 20, 30, 40, 55 };
 __device__ int axis_terms(const int L)
 {
-	int n = 0;
-	for (int l = 0; l <= L; l++)
-		for (int r = 0; r <= l / 2; r++)
-			n += (l - 2 * r) / 2 + 1;
-	return n;
+	return d_axis_terms[L];
 }
+
+//dT^k / k! and 1 / (2n - 1) as constants: a double division on a device is a software sequence and
+//the kernel did five per Boys call plus one per step of the F_n recursion. wfn_density.cpp carries
+//the same two tables, so host and device stay comparable to the 1E-9 the unit test gates on.
+__device__ __constant__ double d_inv_k[6] = { 0.0, 1.0, 0.5, 1.0 / 3.0, 0.25, 0.2 };
+__device__ __constant__ double d_inv_odd[9] = { 0.0, 1.0, 1.0 / 3.0, 0.2, 1.0 / 7.0, 1.0 / 9.0, 1.0 / 11.0, 1.0 / 13.0, 1.0 / 15.0 };
 
 //the boys() of wfn_density.cpp, same table and same branches
 __device__ double boys_dev(const int m, const double T, const double expn,
@@ -37,12 +41,12 @@ __device__ double boys_dev(const int m, const double T, const double expn,
 			f = ((2 * n - 1) * f - expn) / (2 * T);
 		return f;
 	}
-	const int i = (int)(T / step + 0.5);
+	const int i = (int)(T * (1.0 / step) + 0.5);
 	const double dT = i * step - T;
 	const double* row = tab + (size_t)i * stride + m;
-	double f = 0, pw = 1;
-	for (int k = 0; k <= 5; k++, pw *= dT / k)
-		f += row[k] * pw;
+	double f = row[0], pw = 1;
+	for (int k = 1; k <= 5; k++)
+		pw *= dT * d_inv_k[k], f += row[k] * pw;
 	return f;
 }
 
@@ -64,7 +68,9 @@ __global__ void esp_kernel(
 		ESP += q[a] / sqrt(dx * dx + dy * dy + dz * dz);
 	}
 
-	double Fn[25], pcp[3][9];
+	//build_ESP_pairs refuses past g, so MaxFn = |l_i| + |l_j| <= 8. B[axis][k] is the axis summed by
+	//F index and pw the powers of one axis' PC, reused - 45 doubles of per-thread state
+	double Fn[9], B[3][9], pw[9];
 	for (int p = 0; p < npairs; p++)
 	{
 		const double ex = ex_sum[p];
@@ -72,39 +78,48 @@ __global__ void esp_kernel(
 		const int MaxFn = L0 + L1 + L2;
 		const double PCx = P[3 * p] - gx, PCy = P[3 * p + 1] - gy, PCz = P[3 * p + 2] - gz;
 		const double sqpc = PCx * PCx + PCy * PCy + PCz * PCz;
-		const int c = off[p];
+		int c = off[p];
 		if (MaxFn == 0)
 		{
 			//s-s: one term per axis, every PC power 0, and F_0 never touches exp(-T)
 			ESP -= weight[p] * ((coef[c] * coef[c + 1]) * coef[c + 2] * boys_dev(0, ex * sqpc, 0.0, tab, nT, stride, step));
 			continue;
 		}
-		pcp[0][0] = pcp[1][0] = pcp[2][0] = 1.0;
-		for (int n = 1; n <= L0; n++) pcp[0][n] = pcp[0][n - 1] * PCx;
-		for (int n = 1; n <= L1; n++) pcp[1][n] = pcp[1][n - 1] * PCy;
-		for (int n = 1; n <= L2; n++) pcp[2][n] = pcp[2][n - 1] * PCz;
-
-		const double expc = exp(-ex * sqpc);
-		Fn[MaxFn] = boys_dev(MaxFn, ex * sqpc, expc, tab, nT, stride, step);
-		const double twoexpc = 2 * ex * sqpc;
+		//the host's gate, on the device: past T = 60 exp(-T) is 8.8E-27 against an F_0 of 0.114
+		//and an F_8 of 7E-12, so it sits below the last bit of every term it is added to. Most of
+		//a 45-atom table is distant from any one point, and exp() is the only transcendental here.
+		const double T = ex * sqpc;
+		const double expc = T < 60.0 ? exp(-T) : 0.0;
+		Fn[MaxFn] = boys_dev(MaxFn, T, expc, tab, nT, stride, step);
+		const double twoexpc = 2 * T;
 		for (int nu = MaxFn - 1; nu >= 0; nu--)
-			Fn[nu] = (expc + twoexpc * Fn[nu + 1]) / (2 * (nu + 1) - 1);
+			Fn[nu] = (expc + twoexpc * Fn[nu + 1]) * d_inv_odd[nu + 1];
 
-		const int nl = axis_terms(L0), nm = axis_terms(L1), nn = axis_terms(L2);
-		const int cl = c, cm = c + nl, cn = c + nl + nm;
-		double term = 0.0;
-		for (int l = 0; l < nl; l++)
+		//every (l, r, s) term of an axis multiplies exactly one F index, so summing each axis into
+		//B[k] first replaces nl * nm * nn products - each of them three global loads deep - with
+		//nl + nm + nn loads and (L0+1)(L1+1)(L2+1) register products indexed by the loop counters
+		const int Lv[3] = { L0, L1, L2 };
+		const double PCv[3] = { PCx, PCy, PCz };
+#pragma unroll
+		for (int k = 0; k < 3; k++)
 		{
-			const double Al = coef[cl + l] * pcp[0][pc_pow[cl + l]];
-			const int ml = fn_idx[cl + l];
-			for (int m = 0; m < nm; m++)
-			{
-				const double lm = Al * (coef[cm + m] * pcp[1][pc_pow[cm + m]]);
-				const int mm = ml + fn_idx[cm + m];
-				for (int n = 0; n < nn; n++)
-					term += lm * (coef[cn + n] * pcp[2][pc_pow[cn + n]]) * Fn[mm + fn_idx[cn + n]];
-			}
+			pw[0] = 1.0;
+			for (int n = 1; n <= Lv[k]; n++)
+				pw[n] = pw[n - 1] * PCv[k];
+			for (int i = 0; i <= Lv[k]; i++)
+				B[k][i] = 0.0;
+			for (int i = axis_terms(Lv[k]); i--; c++)
+				B[k][fn_idx[c]] += coef[c] * pw[pc_pow[c]];
 		}
+
+		double term = 0.0;
+		for (int kx = 0; kx <= L0; kx++)
+			for (int ky = 0; ky <= L1; ky++)
+			{
+				const double bxy = B[0][kx] * B[1][ky];
+				for (int kz = 0; kz <= L2; kz++)
+					term += bxy * B[2][kz] * Fn[kx + ky + kz];
+			}
 		ESP -= weight[p] * term;
 	}
 	out[g] = ESP;
