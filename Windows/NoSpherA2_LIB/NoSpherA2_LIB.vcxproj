@@ -108,6 +108,7 @@
     <ClInclude Include="..\..\Src\core\CUDA_utilities.h" />
     <ClInclude Include="..\..\Src\core\early_exit.h" />
     <ClInclude Include="..\..\Src\core\ECPs_corrections.h" />
+    <ClInclude Include="..\..\Src\core\extinction.h" />
     <ClInclude Include="..\..\Src\core\fchk.h" />
     <ClInclude Include="..\..\Src\core\geometry_aid.h" />
     <ClInclude Include="..\..\Src\core\gemm_gpu.cuh" />

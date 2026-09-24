@@ -42,6 +42,7 @@
     <ClCompile Include="..\..\tests\src\CubeTests.cpp" />
     <ClCompile Include="..\..\tests\src\DelocalizationTests.cpp" />
     <ClCompile Include="..\..\tests\src\EliFamilyTests.cpp" />
+    <ClCompile Include="..\..\tests\src\ExtinctionTests.cpp" />
     <ClCompile Include="..\..\tests\src\FieldSurfaceTests.cpp" />
     <ClCompile Include="..\..\tests\src\GridTests.cpp" />
     <ClCompile Include="..\..\tests\src\HighAngularTests.cpp" />
