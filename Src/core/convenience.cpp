@@ -627,6 +627,7 @@ std::string help_message =
  "  -refine [accuracy]                  Set refinement integral accuracy [0.1].\n"
  "  -rgbi_EVs                           Include RGBI eigenvectors.\n"
  "  -rgbi_theta                         Include per-bond Roby-Gould theta-subspace populations and indices.\n"
+ "  -rgbi_legacy_cutoff                 RGBI atomic subspaces from occupation-number thresholds (pre-fix, jumps with geometry).\n"
  "  -sfac_diffuse x y z cif wfn dmin    Calculate diffuse scattering factors.\n\n"
  "EXPERIMENTAL AND DEVELOPER COMMANDS\n"
  "  -coef <file>                        Use externally supplied SALTED\n"

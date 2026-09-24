@@ -34,9 +34,9 @@ namespace {
 	//cannot change when a bond stretches or a torsion turns, which is what makes the resulting
 	//index a continuous function of the geometry and comparable between two molecules. A partly
 	//filled shell counts in full, because the atomic subspace has to be spherically complete.
-	int free_atom_orbital_count(const int atomic_number) {
+	constexpr int free_atom_orbital_count(const int atomic_number) {
 		//(n, l) in Aufbau filling order; the list covers every element up to Z = 118
-		static constexpr int shells[][2] = {
+		constexpr int shells[][2] = {
 			{1, 0}, {2, 0}, {2, 1}, {3, 0}, {3, 1}, {4, 0}, {3, 2}, {4, 1}, {5, 0}, {4, 2},
 			{5, 1}, {6, 0}, {4, 3}, {5, 2}, {6, 1}, {7, 0}, {5, 3}, {6, 2}, {7, 1} };
 		int electrons = atomic_number;
@@ -49,6 +49,38 @@ namespace {
 		}
 		return dimension;
 	}
+
+	//An ECP removed the innermost shells from the basis altogether, so free_atom_orbital_count would
+	//ask for orbitals that are not there and the rank would clamp to the whole atomic block - every
+	//diffuse and polarisation NAO included, which is not Roby's atomic subspace. The replaced core is
+	//always a set of complete shells filled in (n, then l) order, so counting orbitals until the
+	//ECP's electron count is used up gives the rank the core would have had: a 60-electron ECP on Au
+	//covers 1s through 4d plus 4f, 30 of the free atom's 40 orbitals, leaving the 10 that 5s, 5p, 5d
+	//and 6s span.
+	constexpr int ecp_core_orbital_count(const int ecp_electrons) {
+		int electrons = ecp_electrons;
+		int dimension = 0;
+		for (int n = 1; electrons > 0 && n <= 7; n++)
+			for (int l = 0; l < n && electrons > 0; l++) {
+				const int size = 2 * l + 1;
+				dimension += size;
+				electrons -= 2 * size;
+			}
+		return dimension;
+	}
+
+	//The subspace rank is the whole point of the fix, so it is checked where it is defined rather
+	//than in a test that needs a wavefunction to run.
+	static_assert(free_atom_orbital_count(3) == 2, "Li spans 1s and 2s");
+	static_assert(free_atom_orbital_count(7) == 5, "N spans 1s, 2s and 2p - a half-filled shell in full");
+	static_assert(free_atom_orbital_count(26) == 15, "Fe spans 1s..4s and 3d");
+	static_assert(free_atom_orbital_count(118) == 59, "the Aufbau list reaches the last element");
+	static_assert(ecp_core_orbital_count(0) == 0, "no ECP removes nothing");
+	static_assert(ecp_core_orbital_count(28) == 14, "a 28-electron ECP covers 1s..3d");
+	static_assert(free_atom_orbital_count(53) - ecp_core_orbital_count(28) == 13,
+		"iodine with a 28-electron ECP keeps 4s, 4p, 4d, 5s and 5p");
+	static_assert(free_atom_orbital_count(79) - ecp_core_orbital_count(60) == 10,
+		"gold with a 60-electron ECP keeps 5s, 5p, 5d and 6s");
 
 	int atomic_shell_size(const int l, const bool cartesian) {
 		return cartesian ? cartesian_shell_size(l) : 2 * l + 1;
@@ -1491,7 +1523,9 @@ void Roby_information::computeAllAtomicNAOs(WFN &wavy, const bool symmetrize, co
 			std::stable_sort(shell_angular_momenta.begin(), shell_angular_momenta.end());
 
 		const bool spherical = !wavy.get_d_f_switch();
-		const int keep_orbitals = legacy_occupancy_cutoff ? -1 : free_atom_orbital_count(a.get_charge());
+		const int keep_orbitals = legacy_occupancy_cutoff
+			? -1
+			: free_atom_orbital_count(a.get_charge()) - ecp_core_orbital_count(a.get_ECP_electrons());
 
 		auto make_molecular_fallback = [&]() {
 			auto fallback = calculateAtomicNAO(density_matrix, overlap_matrix,
