@@ -1613,16 +1613,18 @@ void Roby_information::transform_Ionic_eigenvectors_to_Ionic_orbitals(
 		fa = 0.5 * ((fm + fp) + c * (fm - fp));
 		fb = 0.5 * (c * (fm + fp) + (fm - fp));
 
-		if (abs(fa - 1.0) > 1E-8) {
-			A = dot_BLAS<dMatrix1, dMatrix2>(PAS, EVC_column, false);
+		//A and B live outside the loop, so skipping the projection would leave the previous pair's
+		//vector in place. The second test also read fa where it meant fb. Projecting
+		//unconditionally and only dividing is both correct and shorter; the division is a no-op
+		//when the factor is 1.
+		A = dot_BLAS<dMatrix1, dMatrix2>(PAS, EVC_column, false);
+		if (abs(fa - 1.0) > 1E-8)
 			for (int a = 0; a < n_a; a++)
 				A(a) /= fa;
-		}
-		if (abs(fa - 1.0) > 1E-8) {
-			B = dot_BLAS<dMatrix1, dMatrix2>(PBS, EVC_column, false);
+		B = dot_BLAS<dMatrix1, dMatrix2>(PBS, EVC_column, false);
+		if (abs(fb - 1.0) > 1E-8)
 			for (int b = 0; b < n_b; b++)
 				B(b) /= fb;
-		}
 
 #ifdef NSA2DEBUG
 		std::cout << "fa: " << fa << std::endl << "fb: " << fb << std::endl;
@@ -1805,16 +1807,16 @@ void Roby_information::transform_group_Ionic_orbitals(
 		double fa = 0.5 * ((fm + fp) + c * (fm - fp));
 		double fb = 0.5 * (c * (fm + fp) + (fm - fp));
 
-		if (abs(fa - 1.0) > 1E-8) {
-			A = dot_BLAS<dMatrix1, dMatrix2>(PAS, EVC_column, false);
+		//see transform_Ionic_eigenvectors_to_Ionic_orbitals: A and B outlive the loop body, so the
+		//projection has to happen on every pair even when the scaling factor is 1.
+		A = dot_BLAS<dMatrix1, dMatrix2>(PAS, EVC_column, false);
+		if (abs(fa - 1.0) > 1E-8)
 			for (int a = 0; a < n_a; a++)
 				A(a) /= fa;
-		}
-		if (abs(fb - 1.0) > 1E-8) {
-			B = dot_BLAS<dMatrix1, dMatrix2>(PBS, EVC_column, false);
+		B = dot_BLAS<dMatrix1, dMatrix2>(PBS, EVC_column, false);
+		if (abs(fb - 1.0) > 1E-8)
 			for (int b = 0; b < n_b; b++)
 				B(b) /= fb;
-		}
 
 		// Build antibonding partner in column pairs[i]
 		fa = 0.5 * (fm - fp);
@@ -2041,10 +2043,15 @@ void Roby_information::computeGroupAnalysis(const ivec2 &group_defs, const vec &
 			// Lone-pair orbitals localized almost entirely within one group have
 			// eigvals near ±1.  In the group basis the inter-group contamination
 			// can push these to ~0.996 rather than exactly 1, so they evade the
-			// angle cutoff (84.6° < 89.99°) and corrupt the ionic index with large
-			// contributions of the wrong sign.  Exclude any pair whose positive
-			// eigval exceeds this threshold.
-			constexpr double lone_pair_eigval_threshold = 0.99;
+			// angle cutoff (84.6° is well inside the 0.573° window this cutoff
+			// actually draws, not the 89.99° the old comment claimed) and corrupt
+			// the ionic index with large contributions of the wrong sign.
+			// Exclude any pair whose positive eigval exceeds this threshold.
+			// NOTE: the atom-pair loop has no equivalent guard, so the two paths
+			// currently answer differently for the same lone pair - on the H2O2 O-O
+			// bond, 0.800 here against 0.645 there.  Which of the two is the
+			// intended Roby-Gould definition is a method question, not a bug fix.
+			const double lone_pair_eigval_threshold = 0.99;
 			for (int i = 0; i < n0; i++) {
 				if (covalent_info['A'](i, 0) < zero_angle_cutoff || covalent_info['A'](i, 0) > 90.0 - zero_angle_cutoff)
 					continue;
