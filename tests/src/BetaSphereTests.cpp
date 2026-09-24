@@ -371,3 +371,52 @@ TEST(BasinReaders, TheOpenShellFluorineAtThreeSpinStates)
 	}
 	if (!seen) GTEST_SKIP() << "no open-shell fluorine fixture under " << dir.string();
 }
+
+//An isolated atom has no second-nearest atom, and the ELI-D branch of the label assignment
+//demanded one anyway: err_checkf(atom_index2 >= 0, "Only one atom found for basin ...") took the
+//exit path, so every -eli_analysis run on a single atom died at b2c.cpp with rc=255 before it
+//printed a single basin. Sc_full and Ce_full both failed that way, as molden and as wfn, at every
+//resolution tried.
+//
+//The integration was never the problem - TheSameFluorineThroughThreeReaders integrates a lone
+//fluorine to its nuclear count on this very fixture - so the defect was the labelling refusing to
+//name a basin it could not call a bond. Two smaller things were wrong in the same lines: core_dist
+//dereferenced atoms[atom_index1] before the check that atom_index1 was found at all, and the final
+//else read atoms[atom_index2] with no guarantee it existed, which for a lone He or Li+ (charge <= 2,
+//so neither the proton nor the core nor the LP branch takes it) was an out-of-bounds read rather
+//than an abort.
+//
+//This test integrates nothing. It hands the labeller exactly what the failing path saw - a one-atom
+//system and two maxima, one on the nucleus and one out in the valence shell - and asserts that both
+//come back named after the atom. A lone atom's non-core basin is its own valence shell, never a bond.
+TEST(BasinLabels, ALoneAtomHasNoBondBasin)
+{
+	const std::filesystem::path wfn = nos_test_repo_root() / "tests" / "molden_file" / "F_full.molden";
+	if (!std::filesystem::exists(wfn)) GTEST_SKIP() << "fixture missing: " << wfn.string();
+	const WFN wavy(wfn);
+	ASSERT_EQ(wavy.get_ncen(), 1) << "this fixture is meant to be one atom";
+	const std::vector<atom> atoms = wavy.get_atoms();
+	const double x = wavy.get_atom_coordinate(0, 0);
+	const double y = wavy.get_atom_coordinate(0, 1);
+	const double z = wavy.get_atom_coordinate(0, 2);
+	//One maximum on the nucleus (a core basin) and one 1.4 bohr out along z (the valence shell).
+	const std::vector<d4> maxima = { { x, y, z, 1.0 }, { x, y, z + 1.4, 0.1 } };
+
+	const svec eli = assign_labels_to_basins(maxima, atoms, false, 1);
+	ASSERT_EQ(eli.size(), maxima.size());
+	for (size_t i = 0; i < eli.size(); i++) {
+		EXPECT_NE(eli[i].find(atoms[0].get_label()), std::string::npos)
+			<< "ELI label " << i << " (\"" << eli[i] << "\") does not name the only atom there is";
+		EXPECT_EQ(eli[i].find("bond"), std::string::npos)
+			<< "ELI label " << i << " (\"" << eli[i] << "\") calls a lone atom's basin a bond";
+	}
+	EXPECT_NE(eli[0].find("core"), std::string::npos) << "the maximum on the nucleus is the core basin: \"" << eli[0] << "\"";
+
+	//The QTAIM branch never needed a second atom; it is asserted here so the fix cannot silently
+	//trade one branch for the other.
+	const svec qtaim = assign_labels_to_basins(maxima, atoms, false, 0);
+	ASSERT_EQ(qtaim.size(), maxima.size());
+	EXPECT_NE(qtaim[0].find(atoms[0].get_label()), std::string::npos) << "QTAIM label 0: \"" << qtaim[0] << "\"";
+	EXPECT_NE(qtaim[1].find("NNA"), std::string::npos)
+		<< "a maximum 1.4 bohr off the only nucleus is a non-nuclear attractor: \"" << qtaim[1] << "\"";
+}

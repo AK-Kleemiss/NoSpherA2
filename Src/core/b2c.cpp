@@ -2298,15 +2298,21 @@ svec assign_labels_to_basins(const std::vector<d4> &Maxima, const std::vector<at
 						atom_index2 = j;
 					}
 				}
-				const double core_dist = std::pow(core_shell_radius(atoms[atom_index1].get_charge()), 2);
 				err_checkf(atom_index1 >= 0, "No atom found for basin " + toString<size_t>(i) + " at position (" + toString<double>(pos[0]) + ", " + toString<double>(pos[1]) + ", " + toString<double>(pos[2]) + ")!", std::cout);
-				err_checkf(atom_index2 >= 0, "Only one atom found for basin " + toString<size_t>(i) + " at position (" + toString<double>(pos[0]) + ", " + toString<double>(pos[1]) + ", " + toString<double>(pos[2]) + ")!", std::cout);
-				double ratio = std::max(1e-5, min_dist1) / std::max(1e-5, min_dist2);
+				//A one-atom wavefunction has no second-nearest atom, and a lone atom cannot have a bond
+				//basin. Demanding one aborted every ELI-D run on an isolated atom - the integration was
+				//fine, only the labelling refused - so a second atom is required just when there is one.
+				const bool has_second = atom_index2 >= 0;
+				err_checkf(has_second || atoms.size() == 1, "Only one atom found for basin " + toString<size_t>(i) + " at position (" + toString<double>(pos[0]) + ", " + toString<double>(pos[1]) + ", " + toString<double>(pos[2]) + ")!", std::cout);
+				const double core_dist = std::pow(core_shell_radius(atoms[atom_index1].get_charge()), 2);
+				double ratio = has_second ? std::max(1e-5, min_dist1) / std::max(1e-5, min_dist2) : 0.0;
 				if (atoms[atom_index1].get_charge() == 1 && min_dist1 < 0.36) // The basin holding a proton: its maximum sits within 0.6 bohr of the nucleus
 					result[i] = atoms[atom_index1].get_label() + to_string(atom_index1);
 				else if (min_dist1 < core_dist && atoms[atom_index1].get_charge() > 2) // If the maximum is very close to an atom, we assume it's a core basin and label it with that atom
 					result[i] = atoms[atom_index1].get_label() + to_string(atom_index1) + " core";
 				else if ((ratio < 0.333 || ratio > 3) && atoms[atom_index1].get_charge() > 2) // If the maximum is significantly closer to one atom than to the other, we assume it's a valence basin and label it with the closest atom
+					result[i] = atoms[atom_index1].get_label() + to_string(atom_index1) + " LP";
+				else if (!has_second) // A lone atom: whatever is not its core is its own valence shell
 					result[i] = atoms[atom_index1].get_label() + to_string(atom_index1) + " LP";
 				else // Otherwise, we assume it's a bond basin and label it with both atoms
 					result[i] = atoms[atom_index1].get_label() + to_string(atom_index1) + "-" + atoms[atom_index2].get_label() + to_string(atom_index2) + " bond";
