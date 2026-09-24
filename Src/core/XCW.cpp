@@ -3189,7 +3189,14 @@ bool XCW::SCF_iteration(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& l
 	//the DIIS error has fallen tenfold since the last full build, as OCC's own loop does, so the
 	//screening error does not accumulate. A device that holds the integrals contracts the whole
 	//density each time, nothing to skip.
-	const bool incremental = opt->xcw_incremental && !eri_on_device_ && scf.m_procedure.fock_build_properties().density_screened && G_last_.size() > 0
+	//Off once TRAH is steering: a step is accepted or rejected on a rise of E + lambda chi^2
+	//against the value at the orbitals it left, and trah_.noise puts that threshold at 1e-8 Eh,
+	//far below the screening error of a difference build. Comparing one against the other made
+	//good steps read as rises, and a rejection can only shrink the trust radius, so a single
+	//artefact capped it for the rest of the lambda step. A rotation moves the density by a whole
+	//step anyway, so there was little left to skip. OCC's own loop does the same (it forces a
+	//full rebuild while the second-order step is active).
+	const bool incremental = opt->xcw_incremental && !soscf_ && !eri_on_device_ && scf.m_procedure.fock_build_properties().density_screened && G_last_.size() > 0
 		&& scf.iter - last_full_build_ < 8 && scf.diis_error > next_full_build_error_;
 	if (incremental) {
 		occ::Mat D_diff = scf.ctx.mo.D - D_last_build_;
@@ -3241,9 +3248,9 @@ bool XCW::SCF_iteration(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& l
 		}
 		//with soscf requested the DIIS stage only has to reach the quadratic region; Fe_phen HS lambda 0.08
 		//oscillated for 30 iterations above the 1e-2 gate while TRAH converged in 6 from that very point
-		const int patience = settings.soscf ? soscf_patience_requested_ : soscf_patience_;
+		const int patience = settings.soscf ? trah_.patience_requested : trah_.patience;
 		const bool stuck = scf.iter - soscf_patience_iter_ >= patience;
-		if (stuck || (settings.soscf && scf.diis_error < soscf_start_)) {
+		if (stuck || (settings.soscf && scf.diis_error < trah_.start_threshold)) {
 			soscf_ = true;
 			std::ostringstream what;
 			what << "***" << (stuck ? "Orbital gradient not halved in " + std::to_string(patience) + " iterations" : "DIIS error below 1e-2")
@@ -3303,7 +3310,12 @@ void XCW::soscf_reset() {
 	soscf_phi_ = std::numeric_limits<double>::infinity();
 	soscf_pred_ = 0;
 	soscf_boundary_ = false;
-	soscf_trust_ = soscf_trust_first_;
+	soscf_floored_ = 0;
+	//The radius the last lambda step earned carries into this one - consecutive lambda steps are
+	//nearly the same problem, which is the point of ramping lambda at all, and re-learning the
+	//radius from 0.5 costs a rejected macro step, hence up to micro_max Fock builds, per halving.
+	//Never above the default, so an easy lambda cannot set a hard one up for a fall.
+	soscf_trust_ = std::clamp(soscf_trust_, trah_.trust_min, trah_.trust_first);
 	trah_micro_total_ = 0;
 }
 
@@ -3366,28 +3378,48 @@ void XCW::rotate_orbitals(occ::qm::SCF<occ::qm::HartreeFock>& scf, const occ::Ma
 
 //One second-order macro iteration, see soscf_ in the header. phi is E + lambda chi^2 at the
 //current orbitals, which the last step produced. Above the functional it left by more than
-//the noise of a Fock build, the step is rejected: the trust radius halves and the step is
-//re-solved in the subspace the micro-iterations already built, from the orbitals it left.
-//Otherwise the trust radius follows the ratio of the actual to the predicted decrease
-//(doubled after a good step that reached the boundary, halved after a poor one) and a fresh
-//gradient starts the next macro step.
+//the noise of a Fock build, the step is rejected: the step is re-solved at the smaller radius
+//in the subspace the micro-iterations already built, from the orbitals it left. The radius
+//itself follows occ::qm::trust_radius_update either way - the cube root of the model error the
+//step revealed, so the region tracks how far the quadratic model is actually worth trusting,
+//and it only moves for a step the region actually stopped or one the model got wrong.
+//Two rejections at the smallest radius end the second-order phase and give DIIS the orbitals
+//back. Otherwise a fresh gradient starts the next macro step.
 void XCW::soscf_step(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double lambda, const double phi) {
 	const bool stepped = soscf_kappa_.size() > 0;
-	if (stepped && phi > soscf_phi_ + soscf_noise_ && soscf_kappa_.cwiseAbs().maxCoeff() > 1e-6) {
-		soscf_trust_ = 0.5 * std::min(soscf_trust_, soscf_kappa_.norm());
+	if (stepped) {
+		const double actual = phi - soscf_phi_;
+		XCW_log << "\t\tTRAH: predicted " << std::scientific << std::setprecision(3) << soscf_pred_
+			<< ", actual " << actual << " Eh, rho " << std::fixed << std::setprecision(2)
+			<< (soscf_pred_ < 0 ? actual / soscf_pred_ : 0.0) << ", model error "
+			<< std::scientific << std::setprecision(1) << std::abs(actual - soscf_pred_) << std::endl;
+		soscf_trust_ = occ::qm::trust_radius_update(soscf_trust_, soscf_kappa_.norm(), soscf_pred_, actual, soscf_boundary_, trah_);
+	}
+	if (stepped && phi > soscf_phi_ + trah_.noise && soscf_kappa_.cwiseAbs().maxCoeff() > 1e-6) {
+		//A radius this small is the model saying it is worthless at these orbitals, not that the
+		//step should be shorter again. Two in a row and DIIS gets the orbitals back, with the
+		//rescue path available again, rather than the lambda step grinding out max_iter on steps
+		//too short to move anything.
+		soscf_floored_ = soscf_trust_ <= trah_.trust_min * 1.000001 ? soscf_floored_ + 1 : 0;
+		if (soscf_floored_ >= 2) {
+			std::ostringstream give_up;
+			give_up << "***E + lambda chi^2 still rising at the smallest trust radius: back to DIIS***";
+			print_centered_message(give_up.str(), 84, XCW_log);
+			//hand DIIS the orbitals the last accepted step left, not the rejected ones
+			rotate_orbitals(scf, soscf_C_, occ::Vec::Zero(soscf_kappa_.size()));
+			soscf_ = false;
+			soscf_kappa_.resize(0);
+			return;
+		}
 		std::ostringstream what;
 		what << "***E + lambda chi^2 " << std::scientific << std::setprecision(1) << phi - soscf_phi_
-			<< " Eh above the orbitals the step left: trust radius " << std::fixed << std::setprecision(3) << soscf_trust_ << ", step re-solved***";
+			<< " Eh above the orbitals the step left: trust radius " << std::scientific << std::setprecision(2) << soscf_trust_ << ", step re-solved***";
 		print_centered_message(what.str(), 84, XCW_log);
 		trah_solve(scf, lambda, false);
 		rotate_orbitals(scf, soscf_C_, soscf_kappa_);
 		return;
 	}
-	if (stepped && soscf_pred_ < 0) {
-		const double rho = (phi - soscf_phi_) / soscf_pred_;
-		if (rho > 0.75 && soscf_boundary_) soscf_trust_ = std::min(2.0 * soscf_trust_, soscf_trust_max_);
-		else if (rho < 0.25) soscf_trust_ *= 0.5;
-	}
+	soscf_floored_ = 0;
 	//The Roothaan iterations damp the density, so the Fock matrix of the iteration that hands
 	//over belongs to a mix of densities, not to the orbitals: rebuilt from them once, so the
 	//first gradient, Hessian and reference functional are consistent
@@ -3407,7 +3439,7 @@ void XCW::soscf_step(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double lambd
 //(a = 1 is the plain augmented-Hessian step). With extend, the subspace grows by the
 //preconditioned residual of the level-shifted Newton equation (H - theta) kappa = -g, one
 //exact Hessian-vector product per micro-iteration, until the residual is below a fraction of
-//the gradient that shrinks with it, or trah_micro_max_ is reached; without, the retained
+//the gradient that shrinks with it, or trah_.micro_max is reached; without, the retained
 //subspace is re-solved at the current radius (after a rejected step the Fock matrix belongs
 //to the rejected orbitals, so no product could be added). Sets soscf_kappa_, the predicted
 //decrease g.kappa + kappa.H kappa / 2 and whether the step lies on the boundary.
@@ -3487,16 +3519,18 @@ void XCW::trah_solve(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double lambd
 			}
 		}
 		else {
-			//no finite step from the subspace: the preconditioned gradient, scaled into the radius
+			//no finite step from the subspace: the preconditioned gradient, scaled into the radius.
+			//Its curvature may come from a Fock build only while the Fock matrix still belongs to
+			//these orbitals - after a rejected step (!extend) the diagonal is all there is
 			kappa = -g.cwiseQuotient(soscf_hdiag_);
 			kappa *= soscf_trust_ / kappa.norm();
-			Hkappa = hessian_vector(scf, lambda, kappa);
+			Hkappa = extend ? hessian_vector(scf, lambda, kappa) : soscf_hdiag_.cwiseProduct(kappa);
 			knorm = soscf_trust_;
 			soscf_boundary_ = true;
 		}
 		const occ::Vec r = g + Hkappa - theta * kappa;
 		rnorm = r.norm();
-		if (!extend || rnorm < tol || micro >= trah_micro_max_) break;
+		if (!extend || rnorm < tol || micro >= trah_.micro_max) break;
 		if (!add(-r.cwiseQuotient((soscf_hdiag_.array() - theta).max(1e-2).matrix()))) break;
 		micro++;
 	}

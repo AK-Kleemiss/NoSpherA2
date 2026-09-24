@@ -85,3 +85,49 @@ TEST(OccSecondOrderScf, GgaDftMatchesDiis)
 	EXPECT_TRUE(engaged);
 	EXPECT_NEAR(trah, diis, 1e-7);
 }
+
+//The trust radius itself: the tests above only compare final energies, which a radius policy
+//can get right while wasting Fock builds on the way. These drive occ::qm::trust_radius_update
+//with the three numbers a macro step reports and check the properties the SCF relies on.
+TEST(OccSecondOrderScf, TrustRadiusFollowsTheModelError)
+{
+	const occ::qm::SecondOrderSettings s;
+	//a good step that the radius stopped may go twice as far next time
+	EXPECT_NEAR(occ::qm::trust_radius_update(0.1, 0.1, -1e-3, -1e-3 + 1e-9, true, s), 0.2, 1e-12);
+	//a good step that stopped short of the boundary leaves the radius alone: what stopped it was
+	//the model, not the region, so its error says nothing about how far the region should reach.
+	//Sizing the radius from that step instead collapsed it as the steps shrank towards
+	//convergence, and P1 then spent seven macro steps per lambda climbing back out.
+	EXPECT_EQ(occ::qm::trust_radius_update(0.5, 0.01, -1e-3, -1e-3 + 1e-9, false, s), 0.5);
+	//a step whose model was badly wrong shrinks wherever it stopped: 80 % of the predicted
+	//decrease missing asks for cbrt(0.1/0.8) = 0.5 of it
+	EXPECT_NEAR(occ::qm::trust_radius_update(1.0, 0.5, -1.0, -0.2, false, s), 0.25, 1e-2);
+	//a merely mediocre step keeps the radius it ran in. Sizing that band from the model error
+	//instead held the iron case at a radius of 0.37 where the plain rule had reached 1.0, and it
+	//cost ten macro steps
+	EXPECT_EQ(occ::qm::trust_radius_update(0.4, 0.4, -1.0, -0.5, true, s), 0.4);
+	//a shrink is bounded against the radius, so one bad step cannot collapse the region
+	EXPECT_GE(occ::qm::trust_radius_update(0.4, 0.4, -1.0, -1e-9, true, s), 0.04);
+	//every outcome stays inside the region's bounds
+	EXPECT_LE(occ::qm::trust_radius_update(0.9, 0.9, -1.0, -1.0, true, s), s.trust_max);
+	EXPECT_GE(occ::qm::trust_radius_update(1e-9, 1e-9, -1e-9, 1e-3, true, s), s.trust_min);
+}
+
+TEST(OccSecondOrderScf, RejectedStepAlwaysShrinksBelowWhatItTried)
+{
+	const occ::qm::SecondOrderSettings s;
+	//the re-solve after a rejection runs in the subspace that produced the rejected step, so a
+	//radius that did not fall below |kappa| would hand back the same step and the SCF would sit
+	for (const double taken : {1e-3, 0.01, 0.1, 0.5, 1.0})
+		for (const double predicted : {-1e-8, -1e-4, -1.0})
+			for (const double actual : {1e-7, 1e-3, 1.0, 1e3})
+				for (const bool boundary : {false, true})
+					EXPECT_LT(occ::qm::trust_radius_update(1.0, taken, predicted, actual, boundary, s),
+					          std::max(taken, s.trust_min * 1.000001))
+						<< "taken " << taken << " predicted " << predicted << " actual " << actual;
+	//nonsense from a failed solve must not produce a nonsense radius
+	const double nan = std::numeric_limits<double>::quiet_NaN();
+	EXPECT_GE(occ::qm::trust_radius_update(0.5, 0.5, -1e-3, nan, true, s), s.trust_min);
+	EXPECT_LE(occ::qm::trust_radius_update(0.5, 0.5, -1e-3, nan, true, s), s.trust_max);
+	EXPECT_GE(occ::qm::trust_radius_update(0.5, 0.0, 0.0, 0.0, false, s), s.trust_min);
+}

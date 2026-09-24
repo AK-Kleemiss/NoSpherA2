@@ -7,6 +7,7 @@
 #include "basis_set.h"
 #include "xcw_halting.h"
 #include <occ/qm/hf.h>
+#include <occ/qm/second_order_scf.h>
 #include "i_tensor_stream.h"
 #include "stored_eri.h"
 #include <thread>
@@ -109,7 +110,7 @@ private:
 		double diis_stop_damping = 0;
 		//`slow_conv` chosen: the unperturbed first step still runs the normal schedule, see run_XCW_fitting
 		bool slow_conv = false;
-		//`soscf`: second-order steps as soon as the DIIS error is below soscf_start_, see soscf_step
+		//`soscf`: second-order steps as soon as the DIIS error is below trah_.start_threshold, see soscf_step
 		bool soscf = false;
 		//`check_hessian`: finite-difference check of the Hessian-vector product on the first
 		//second-order step, reported in XCW.log
@@ -354,20 +355,26 @@ private:
 	// is the gradient of. Each macro step solves the augmented-Hessian eigenproblem by Davidson
 	// micro-iterations with the exact Hessian-vector product (Fock response plus the response
 	// of the perturbation, scale included), the level shift set so the step fits the trust
-	// radius, the orbitals moved by the Cayley transform, and the trust radius updated from the
-	// ratio of the actual to the predicted decrease; a step that raises the functional is
-	// re-solved at half the radius from the retained subspace. It keeps the occupation, so it
+	// radius, the orbitals moved by the Cayley transform, and the trust radius updated by
+	// occ::qm::trust_radius_update from the model error the step revealed; a step that raises
+	// the functional is re-solved at the smaller radius from the retained subspace, and two
+	// rejections at trust_min hand the orbitals back to DIIS. It keeps the occupation, so it
 	// cannot swap orbitals. Entered when the orbital gradient has not halved in
-	// soscf_patience_ iterations, or with `soscf` once the DIIS error is below soscf_start_;
-	// it stays on for the rest of the lambda step. Micro-iterations do not count towards
+	// trah_.patience iterations, or with `soscf` once the DIIS error is below its
+	// start_threshold; it stays on for the rest of the lambda step, and the radius it earned
+	// carries into the next one. Micro-iterations do not count towards
 	// max_iter; L-BFGS with a diagonal Hessian wandered for 100+ iterations on the same case
 	// (E +-5e-6 Eh, a halved step every 2-3 iterations) where the curvature of chi^2 is stiff.
 	bool soscf_ = false;
 	int soscf_patience_iter_ = 0;
 	double soscf_patience_grad_ = 0;
-	static constexpr int soscf_patience_ = 30, soscf_patience_requested_ = 8, trah_micro_max_ = 30;
-	static constexpr double soscf_start_ = 1e-2, soscf_trust_max_ = 1.0, soscf_trust_first_ = 0.5, soscf_noise_ = 1e-8;
-	double soscf_trust_ = soscf_trust_first_;
+	// The patience, radius and noise knobs, and the policy that moves the radius, are
+	// occ's: the same algorithm runs for plain -occ jobs out of second_order_scf.h, and
+	// two copies of a convergence heuristic drift.
+	occ::qm::SecondOrderSettings trah_;
+	double soscf_trust_ = trah_.trust_first;
+	// Consecutive rejected steps taken at the smallest radius.
+	int soscf_floored_ = 0;
 	std::vector<occ::Vec> trah_B_, trah_HB_;
 	occ::Vec soscf_kappa_, soscf_grad_, soscf_hdiag_;
 	occ::Mat soscf_C_;
