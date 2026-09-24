@@ -207,7 +207,11 @@ WFN::WFN(const occ::qm::Wavefunction &occ_WF, bool from_file) : WFN()
 		}
 		// insert_into_centers(std::views::repeat(atom+1, n_cart*nprim));
 		for (int j = 0; j < shell.exponents.size(); j++) {
-			push_back_atom_basis_set(atom, shell.exponents(j), shell.contraction_coefficients(j), shell.l + 1, k);
+			//An OCC-origin basis stores l itself, not l + 1: Int_Params and the RGBI atom blocks
+			//both read it back with a zero offset for this origin (integration_params.cpp), and
+			//an l + 1 here made every shell one unit too high - the overlap and the atomic
+			//index blocks were then built for the wrong angular momenta.
+			push_back_atom_basis_set(atom, shell.exponents(j), shell.contraction_coefficients(j), shell.l, k);
 		}
 		k++;
 		auto repeated = std::views::iota(0u, n_cart * nprim) | std::views::transform([&](auto) { return atom + 1; });
