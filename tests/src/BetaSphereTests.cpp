@@ -348,3 +348,26 @@ TEST(BasinReaders, TheSameFluorineThroughThreeReaders)
 	}
 	if (!first_name) GTEST_SKIP() << "no fluorine fixture under " << dir.string();
 }
+
+//The same atom with its shells no longer paired. Three spin states, three different electron
+//counts, and each one has to land on its own - an open-shell wavefunction is where a per-MO
+//occupancy taken from the wrong place still produces something that looks like a fluorine and
+//integrates to the count of a different one, which the closed-shell check above cannot see.
+TEST(BasinReaders, TheOpenShellFluorineAtThreeSpinStates)
+{
+	const std::filesystem::path dir = nos_test_repo_root() / "tests" / "molden_file";
+	const char *files[] = { "F_open.molden", "F_s1.molden", "F_s32.molden" };
+	int seen = 0;
+	for (const char *name : files) {
+		const std::filesystem::path f = dir / name;
+		if (!std::filesystem::exists(f)) continue;
+		double outside = 0.0, electrons = 0.0;
+		const double pop = lone_atom_population(f, outside, electrons);
+		EXPECT_GT(electrons, 0.0) << name << " reported no electrons at all";
+		EXPECT_NEAR(pop, electrons, 0.01) << name << " integrated to " << pop << " and not to its own "
+			<< electrons << " electrons";
+		EXPECT_NEAR(outside, 0.0, 1e-3) << name << " left density outside the one basin there is";
+		seen++;
+	}
+	if (!seen) GTEST_SKIP() << "no open-shell fluorine fixture under " << dir.string();
+}
