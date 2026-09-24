@@ -26,6 +26,12 @@ __device__ int axis_terms(const int L)
 	return n;
 }
 
+//dT^k / k! and 1 / (2n - 1) as constants: a double division on a device is a software sequence and
+//the kernel did five per Boys call plus one per step of the F_n recursion. wfn_density.cpp carries
+//the same two tables, so host and device stay comparable to the 1E-9 the unit test gates on.
+__device__ __constant__ double d_inv_k[6] = { 0.0, 1.0, 0.5, 1.0 / 3.0, 0.25, 0.2 };
+__device__ __constant__ double d_inv_odd[9] = { 0.0, 1.0, 1.0 / 3.0, 0.2, 1.0 / 7.0, 1.0 / 9.0, 1.0 / 11.0, 1.0 / 13.0, 1.0 / 15.0 };
+
 //the boys() of wfn_density.cpp, same table and same branches
 __device__ double boys_dev(const int m, const double T, const double expn,
 	const double* tab, const int nT, const int stride, const double step)
@@ -37,12 +43,12 @@ __device__ double boys_dev(const int m, const double T, const double expn,
 			f = ((2 * n - 1) * f - expn) / (2 * T);
 		return f;
 	}
-	const int i = (int)(T / step + 0.5);
+	const int i = (int)(T * (1.0 / step) + 0.5);
 	const double dT = i * step - T;
 	const double* row = tab + (size_t)i * stride + m;
-	double f = 0, pw = 1;
-	for (int k = 0; k <= 5; k++, pw *= dT / k)
-		f += row[k] * pw;
+	double f = row[0], pw = 1;
+	for (int k = 1; k <= 5; k++)
+		pw *= dT * d_inv_k[k], f += row[k] * pw;
 	return f;
 }
 
@@ -64,7 +70,7 @@ __global__ void esp_kernel(
 		ESP += q[a] / sqrt(dx * dx + dy * dy + dz * dz);
 	}
 
-	double Fn[25], pcp[3][9];
+	double Fn[9], pcp[3][9]; //build_ESP_pairs refuses past g, so MaxFn = |l_i| + |l_j| <= 8
 	for (int p = 0; p < npairs; p++)
 	{
 		const double ex = ex_sum[p];
@@ -88,7 +94,7 @@ __global__ void esp_kernel(
 		Fn[MaxFn] = boys_dev(MaxFn, ex * sqpc, expc, tab, nT, stride, step);
 		const double twoexpc = 2 * ex * sqpc;
 		for (int nu = MaxFn - 1; nu >= 0; nu--)
-			Fn[nu] = (expc + twoexpc * Fn[nu + 1]) / (2 * (nu + 1) - 1);
+			Fn[nu] = (expc + twoexpc * Fn[nu + 1]) * d_inv_odd[nu + 1];
 
 		const int nl = axis_terms(L0), nm = axis_terms(L1), nn = axis_terms(L2);
 		const int cl = c, cm = c + nl, cn = c + nl + nm;

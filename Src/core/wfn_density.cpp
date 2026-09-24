@@ -3024,8 +3024,16 @@ const double WFN::computeMO(
 
 // Boys function F_m(T) by a 6-term Taylor expansion around a tabulated grid (step 0.1 up to
 // T = 30, error < 1E-10), asymptotic beyond (1E-14); expn = exp(-T), which the caller has anyway
-static constexpr int boys_mmax = 24 + 6, boys_nT = 301;
+// build_ESP_pairs refuses anything past g, so MaxFn = |l_i| + |l_j| <= 8 and the Taylor reads
+// m .. m + 5: a row of 15 doubles instead of 31 halves the table to 36 KB, which is the difference
+// between a row spanning four cache lines and two
+static constexpr int boys_mmax = 8 + 6, boys_nT = 301;
 static constexpr double boys_step = 0.1;
+// dT^k / k! by one multiply per term: a division by the loop counter was 5 of them per Boys call,
+// and on a device a double division is a software sequence
+static constexpr double boys_inv_k[6] = { 0.0, 1.0, 0.5, 1.0 / 3.0, 0.25, 0.2 };
+// 1 / (2n - 1) for the downward F_n recursion, n = 1 .. MaxFn, same reason
+static constexpr double boys_inv_odd[9] = { 0.0, 1.0, 1.0 / 3.0, 0.2, 1.0 / 7.0, 1.0 / 9.0, 1.0 / 11.0, 1.0 / 13.0, 1.0 / 15.0 };
 // file scope rather than a function-local static, so the hot loop carries no guard check and
 // the GPU kernel can be handed the same table through esp_boys_table()
 static const vec boys_tab = []()
@@ -3061,11 +3069,11 @@ static double boys(const int m, const double T, const double expn)
 			f = ((2 * n - 1) * f - expn) / (2 * T);
 		return f;
 	}
-	const int i = (int)(T / boys_step + 0.5);
+	const int i = (int)(T * (1.0 / boys_step) + 0.5);
 	const double dT = i * boys_step - T, *row = boys_tab.data() + (size_t)i * (boys_mmax + 1) + m;
-	double f = 0, pw = 1;
-	for (int k = 0; k <= 5; k++, pw *= dT / k)
-		f += row[k] * pw;
+	double f = row[0], pw = 1;
+	for (int k = 1; k <= 5; k++)
+		pw *= dT * boys_inv_k[k], f += row[k] * pw;
 	return f;
 }
 const double WFN::fj(int &j, int &l, int &m, double &aa, double &bb) const
@@ -3192,7 +3200,7 @@ const double WFN::computeESP(const d3 &PosGrid, const ESP_pairs &t) const
 		ESP += (get_atom_charge(iat) - atoms[iat].get_ECP_electrons()) / sqrt(r2); // ECP/xTB/pTB: only the valence electrons are in the MOs, so the core must not count as nuclear charge
 	}
 
-	double Fn[25], pcp[3][9], Al[506], Am[506], An[506]; // l_i, l_j <= 4 per axis (pre tables)
+	double Fn[9], pcp[3][9], Al[506], Am[506], An[506]; // MaxFn <= 8 and L[k] <= 8 for a g x g pair
 	int mapl[506], mapm[506], mapn[506];
 	const int npairs = (int)t.weight.size();
 	for (int p = 0; p < npairs; p++)
@@ -3224,7 +3232,7 @@ const double WFN::computeESP(const d3 &PosGrid, const ESP_pairs &t) const
 		Fn[MaxFn] = boys(MaxFn, ex_sum * sqpc, expc);
 		const double twoexpc = 2 * ex_sum * sqpc;
 		for (int nu = MaxFn - 1; nu >= 0; nu--)
-			Fn[nu] = (expc + twoexpc * Fn[nu + 1]) / (2 * (nu + 1) - 1);
+			Fn[nu] = (expc + twoexpc * Fn[nu + 1]) * boys_inv_odd[nu + 1];
 
 		int c = t.off[p];
 		const int nl = esp_axis_terms(L[0]), nm = esp_axis_terms(L[1]), nn = esp_axis_terms(L[2]);
