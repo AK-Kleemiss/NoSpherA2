@@ -15,6 +15,7 @@
 #include "crystal_energies.h"
 #include "SALTED_equicomb.h"
 #include "nbo_run.h"
+#include "nbo.h"
 #include "eli_family.h"
 #include "topology.h"
 
@@ -2552,6 +2553,48 @@ bool options::digest_io_options(const std::string &temp, int &i)
         for (int j = i + 2; j + 1 < argc; j++)
             if (arguments[j] == "-nbo_json") json = arguments[j + 1];
         NboResults r = parse_nbo_output(out);
+        write_nbo_json(r, json);
+        std::cout << "wrote " << json.string() << std::endl;
+        finished = true;
+        return true;
+    }
+    else if (temp == "-nbo_native") {
+        //The in-house analysis, writing the same JSON -nbo writes, so the two are comparable by
+        //tests/nbo_reference/compare_nbo.py without a second format.
+        err_checkf(argc >= i + 2, "Not enough arguments for -nbo_native\nPlease provide a wavefunction!", std::cout);
+        std::filesystem::path _wfn = arguments[i + 1];
+        err_checkf(std::filesystem::exists(_wfn), "wavefunction doesn't exist: " + _wfn.string(), std::cout);
+        NboOptions opt;
+        opt.debug = debug;
+        std::filesystem::path json = _wfn.parent_path() / (_wfn.stem().string() + ".native.nbo.json");
+        for (int j = i + 2; j + 1 < argc; j++) {
+            if (arguments[j] == "-nbo_json") json = arguments[j + 1];
+            else if (arguments[j] == "-nbo_47") opt.file47 = arguments[j + 1];
+            else if (arguments[j] == "-nbo_e2min") opt.e2_threshold_kcal = std::stod(arguments[j + 1]);
+            else if (arguments[j] == "-nbo_threads") opt.threads = std::stoi(arguments[j + 1]);
+            else if (arguments[j] == "-nrt") opt.nrt = true;
+            else if (arguments[j] == "-nrt_e2") opt.nrt_e2_kcal = std::stod(arguments[j + 1]);
+            else if (arguments[j] == "-nrt_atoms") {
+                //a comma separated 1-based atom list, NBO's "NRT <atoms>" subspace
+                std::string s = arguments[j + 1];
+                for (char& c : s) if (c == ',') c = ' ';
+                std::istringstream is(s);
+                int a = 0;
+                while (is >> a) opt.nrt_subspace.push_back(a);
+            }
+        }
+        for (int j = i + 2; j < argc; j++)
+            if (arguments[j] == "-nrt") opt.nrt = true;
+            else if (arguments[j] == "-nrt_exhaustive") opt.nrt_exhaustive = true;
+            else if (arguments[j] == "-nrt_no_symmetry") opt.nrt_symmetry = false;
+            else if (arguments[j] == "-nrt_no_components") opt.nrt_components = false;
+            else if (arguments[j] == "-nrt_no_ion") opt.nrt_ion = false;
+            else if (arguments[j] == "-nbo_keep47") opt.keep_file47 = true;
+        WFN wavy(e_origin::NOT_YET_DEFINED);
+        wavy.read_known_wavefunction_format(_wfn, std::cout, debug);
+        NboResults r = native_nbo(wavy, opt, std::cout);
+        r.name = _wfn.stem().string();
+        print_nbo(r, std::cout);
         write_nbo_json(r, json);
         std::cout << "wrote " << json.string() << std::endl;
         finished = true;

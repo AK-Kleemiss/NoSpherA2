@@ -186,6 +186,7 @@
     <ClCompile Include="..\..\Src\core\libCintMain.cpp" />
     <ClCompile Include="..\..\Src\core\molecule.cpp" />
     <ClCompile Include="..\..\Src\core\nao.cpp" />
+    <ClCompile Include="..\..\Src\core\nbo.cpp" />
     <ClCompile Include="..\..\Src\core\nbo_run.cpp" />
     <ClCompile Include="..\..\Src\core\NoSpherA2.cpp" />
     <ClCompile Include="..\..\Src\core\nos_math.cpp" />
