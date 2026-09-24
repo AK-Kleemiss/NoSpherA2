@@ -212,9 +212,7 @@ namespace {
 
 		while (primitive_idx < static_cast<int>(basis_set.size())) {
 			const int shell_id = static_cast<int>(basis_set[primitive_idx].get_shell());
-			const int l = origin == e_origin::OCC
-				? static_cast<int>(basis_set[primitive_idx].get_type())
-				: static_cast<int>(basis_set[primitive_idx].get_type()) - 1;
+			const int l = static_cast<int>(basis_set[primitive_idx].get_type()) - 1;
 			err_checkf(l >= 0,
 				"Encountered an invalid shell angular momentum while building an OCC atomic basis.",
 				std::cout);
@@ -1484,9 +1482,7 @@ void Roby_information::computeAllAtomicNAOs(WFN &wavy, const bool symmetrize, co
 		for (auto &bf : basis_set) {
 			if (bf.get_shell() != current_shell) {
 				current_shell++;
-				const int l = wavy.get_origin() == e_origin::OCC
-					? static_cast<int>(bf.get_type())
-					: static_cast<int>(bf.get_type()) - 1;
+				const int l = static_cast<int>(bf.get_type()) - 1;
 				err_checkf(l >= 0,
 					"Encountered an invalid shell angular momentum while building RGBI atomic NAOs.",
 					std::cout);
