@@ -380,4 +380,13 @@ TEST(NrtTests, ASmallCandidateBudgetKeepsTheExpensiveArrowsAndMoreThanTheParent)
     EXPECT_LE(tight.structures_found, full.structures_found);
     EXPECT_TRUE(pair_seen(tight, 1, 2));                       //the 25 kcal/mol arrows survive
     EXPECT_LE(tight.d_w, tight.d_0 + 1e-9);
+
+    //The nbo_json writes `arrows` as an array of strings, and a consumer reading it cannot tell an
+    //arrow generation from a budget decision when the two share the field.  The budget of four and
+    //the dropped half-arrow intermediates are notes about the search, not arrows.
+    for (const std::string& a : tight.arrows)
+        EXPECT_EQ(a.rfind("ARROWS", 0), 0u) << a;
+    for (const std::string& a : full.arrows)
+        EXPECT_EQ(a.rfind("ARROWS", 0), 0u) << a;
+    EXPECT_FALSE(tight.notes.empty());
 }

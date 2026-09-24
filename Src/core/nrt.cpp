@@ -843,7 +843,7 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
         const int want = std::min(chem, std::max(64, afford));
         if (want < budget) {
             budget = want;
-            nrt.arrows.push_back("candidate budget " + std::to_string(budget) + " of " +
+            nrt.notes.push_back("candidate budget " + std::to_string(budget) + " of " +
                                  std::to_string(options.nrt_max_candidates) + ": " +
                                  std::to_string(active) + " delocalising atom(s), " +
                                  std::to_string(slots) + " octet slot(s) -> " + std::to_string(chem) +
@@ -868,7 +868,7 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
         for (Candidate& c : all)
             if (seen.emplace(c.topo.key(), static_cast<int>(cands.size())).second)
                 cands.push_back(std::move(c));
-        nrt.arrows.push_back("exhaustive enumeration yields " + std::to_string(cands.size()) +
+        nrt.notes.push_back("exhaustive enumeration yields " + std::to_string(cands.size()) +
                              " feasible topologies");
     }
     else {
@@ -930,7 +930,7 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
         cands.erase(std::remove_if(cands.begin() + 1, cands.end(),
                                    [](const Candidate& c) { return c.depth == 1; }),
                     cands.end());
-        nrt.arrows.push_back("half-arrow intermediates dropped: " +
+        nrt.notes.push_back("half-arrow intermediates dropped: " +
                              std::to_string(before - cands.size()) + " of " +
                              std::to_string(before));
     }

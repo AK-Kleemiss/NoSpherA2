@@ -726,6 +726,8 @@ void write_nbo_json(const NboResults& r, const std::filesystem::path& json_file)
 	};
 	f << "    ],\n    \"arrows\": [";
 	write_strings(r.nrt.arrows);
+	f << "],\n    \"notes\": [";
+	write_strings(r.nrt.notes);
 	f << "],\n    \"symmetry_forms\": [";
 	write_strings(r.nrt.symmetry_forms);
 	f << "]\n  }\n}\n";

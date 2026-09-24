@@ -174,6 +174,11 @@ struct NboNrt {
 	std::vector<NboNrtCandidate> candidates;
 	std::vector<NboQpIteration> qp_iterations;
 	std::vector<std::string> arrows;          //"ARROWS generates N new structures from ..." lines
+	//Everything else the search has to say about how it got there: the candidate budget it settled
+	//on, an exhaustive count, the half-arrow intermediates it dropped.  These were pushed into
+	//`arrows` too, so a consumer reading the JSON's "arrows" array could not tell an arrow
+	//generation from a budget decision.
+	std::vector<std::string> notes;
 	std::vector<std::string> symmetry_forms;  //"Symmetry equivalent resonance forms" block
 	std::string nrtstr_keylist;               //the $NRTSTR block NBO writes back, verbatim
 };
