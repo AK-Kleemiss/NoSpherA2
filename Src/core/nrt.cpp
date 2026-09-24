@@ -632,6 +632,23 @@ namespace
         return trg2 - 2.0 * g.dot(w) + w.dot(G * w);
     }
 
+    //G v, with the exactly-zero entries of v left out.  project_simplex zeroes all but the support,
+    //and the support is tens of structures out of thousands, so this reads those columns of G and not
+    //all of them: sucrose's 1480x1480 G is 17.5 MB, a 66-column gather is 0.8 MB and stays in L2,
+    //and the minimiser was bandwidth bound on streaming the whole matrix twice per iteration.  It is
+    //not an approximation and not a screen: the terms dropped are multiplications by exactly 0.0,
+    //whose products are exactly 0.0 and whose sums leave the accumulator unchanged.
+    void gather_mv(const MatrixXd& G, const VectorXd& v, VectorXd& out)
+    {
+        const int n = static_cast<int>(v.size());
+        out.setZero(n);
+        for (int j = 0; j < n; j++) {
+            const double vj = v(j);
+            if (vj == 0.0) continue;
+            out.noalias() += vj * G.col(j);
+        }
+    }
+
     //On a fixed support the only remaining constraint is the one equality sum(w)=1, so the KKT
     //system is (m+1)x(m+1) and one factorisation replaces the iteration entirely.  A negative
     //component means the support was too wide, so the most negative one is dropped and the system
@@ -698,19 +715,31 @@ namespace
         //look stalled when it is not - but 500 iterations that together buy less than 1e-11 of an
         //objective of order 1 are a plateau, and the weights they feed are reported to 1e-4.
         double f_window = f;
+        //One matvec an iteration, not two.  The old loop formed G y for the gradient step and G wn
+        //for the objective; wn is the only new point, and y is an affine combination of wn and the
+        //previous wn, so G y is the same combination of two products already in hand.  Exact in
+        //exact arithmetic and the rounding does not accumulate - both operands are products of the
+        //current and the previous iterate, never of a derived quantity.
+        VectorXd Gy(n), Gwn(n), Gwp(n);
+        gather_mv(G, y, Gy);
+        Gwp = Gy;                                     //wp == y == w on entry
         for (int it = 1; it <= maxit; it++) {
-            VectorXd wn = y - (2.0 / L) * (G * y - g);
+            VectorXd wn = y - (2.0 / L) * (Gy - g);
             project_simplex(wn);
-            const double fn = objective(G, g, trg2, wn);
-            if (fn > f) { y = wn; t = 1.0; }          //restart: the momentum overshot
+            gather_mv(G, wn, Gwn);
+            const double fn = trg2 - 2.0 * g.dot(wn) + wn.dot(Gwn);
+            if (fn > f) { y = wn; t = 1.0; Gy = Gwn; }  //restart: the momentum overshot
             else {
                 const double tn = 0.5 * (1.0 + std::sqrt(1.0 + 4.0 * t * t));
-                y = wn + ((t - 1.0) / tn) * (wn - wp);
+                const double c = (t - 1.0) / tn;
+                y = wn + c * (wn - wp);
+                Gy = Gwn + c * (Gwn - Gwp);
                 t = tn;
             }
             const double step = (wn - wp).cwiseAbs().maxCoeff();
             const double df = std::abs(fn - f);
             wp = wn;
+            Gwp = Gwn;
             f = fn;
             if (trace && (it <= 10 || it % 50 == 0)) {
                 NboQpIteration q;
@@ -999,14 +1028,121 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
     VectorXd g(nc);
     vec rho(nc, 0.0);
     for (int i = 0; i < nc; i++) { g(i) = cands[i].g; rho[i] = cands[i].rho_nl; }
+    const double orbital_seconds = secs(t_gram0, clock());
+    const auto t_pairs0 = clock();
+
+    //G is a Gram matrix, so it is one product and not nc^2/2 of them - the work is finding the
+    //vectors it is a Gram matrix of.  Cyclic invariance of the trace turns the pair entry into an
+    //inner product of two objects that depend on one candidate each:
+    //
+    //    || V_a^T V_b ||_F^2 = Tr(V_b^T V_a V_a^T V_b) = Tr(P_a P_b) = <vec P_a, vec P_b>,
+    //                                                    P_a = V_a V_a^T  (nn x nn, symmetric),
+    //
+    //so G = s^2 Z^T Z with column a of Z the flattened P_a.  Z is nn^2 x nc, which is 11.8 TB for
+    //sucrose, but the identity holds one block of the (p, q) index at a time: P_a[R, C] is
+    //V_a[R, :] (V_a[C, :])^T, and summing Z_blk^T Z_blk over the blocks is the same sum over (p, q).
+    //
+    //Only the blocks with R <= C are formed.  P_a is symmetric, so P_a[C, R] = P_a[R, C]^T, and a
+    //Frobenius inner product does not see a transpose applied to both of its arguments: the (C, R)
+    //block contributes exactly what the (R, C) block does.  Doubling the off-diagonal blocks and
+    //counting the diagonal ones once is therefore the whole sum over (p, q) at half the work.  The
+    //two are accumulated apart so that the factor two is an exact scaling of a finished sum, rather
+    //than a sqrt(2) folded into every element of Z.
+    //
+    //In multiplies: the pair loop is nc^2/2 * k^2 * nn, this is nc^2/4 * nn^2 + nc/2 * nn^2 * k, so
+    //it wins when k^2 > nn/2 - and it replaces a million 91x998x91 products, each allocating its own
+    //temporary, with a few thousand big GEMMs.  Sucrose has k = 91 and nn = 998: a factor 16 in
+    //flops on top of the shape.  The inequality goes the other way on small molecules, so the cost
+    //model below chooses.  No screen and no threshold is involved either way - both routes compute
+    //the same G, and the probe check at the end of the branch is the proof that they do, on every
+    //run rather than on the inputs a test happens to cover.
+    int kmax = 0;
+    for (const Candidate& c : cands) kmax = std::max(kmax, static_cast<int>(c.V.cols()));
+    const double dnc = static_cast<double>(nc), dnn = static_cast<double>(nn);
+    const double cost_pairs = 0.5 * dnc * dnc * static_cast<double>(kmax) * kmax * dnn;
+    const double cost_proj = 0.25 * dnc * dnc * dnn * dnn + 0.5 * dnc * dnn * dnn * kmax;
+    const bool projector = cost_proj < cost_pairs;
+    if (projector) {
+        //One (R, C) block of the nn index per pass, the block side chosen so that the whole of Z for
+        //that pass - nc columns of wr*wc rows - stays near 128 MB.
+        int nbs = static_cast<int>(std::sqrt(134217728.0 / (8.0 * std::max(1, nc))));
+        nbs = std::max(16, std::min(nbs, nn));
+        const int nblk = (nn + nbs - 1) / nbs;
+        std::vector<std::pair<int, int>> blocks;
+        for (int R = 0; R < nblk; R++)
+            for (int C = R; C < nblk; C++) blocks.push_back({ R, C });
+        std::vector<double> Zbuf(static_cast<size_t>(nbs) * nbs * nc);
+        MatrixXd Goff = MatrixXd::Zero(nc, nc);      //blocks with R < C, counted twice below
+        G.setZero();                                 //blocks with R == C, counted once
+        //tiles of the candidate index, upper triangle only.  A diagonal tile computes its own lower
+        //half as well, which at 128 candidates to a tile is a few per cent of the total and buys a
+        //plain GEMM in every tile instead of a triangular kernel Eigen does not parallelise.
+        const int tile = 128;
+        std::vector<std::pair<int, int>> tiles;
+        for (int I = 0; I < nc; I += tile)
+            for (int J = I; J < nc; J += tile) tiles.push_back({ I, J });
+        const int ntiles = static_cast<int>(tiles.size());
+        for (const std::pair<int, int>& blk : blocks) {
+            const int r0 = blk.first * nbs, c0 = blk.second * nbs;
+            const int wr = std::min(nbs, nn - r0), wc = std::min(nbs, nn - c0);
+            const size_t rows = static_cast<size_t>(wr) * wc;
+#pragma omp parallel for schedule(static) num_threads(nthreads)
+            for (int a = 0; a < nc; a++) {
+                Eigen::Map<MatrixXd> Y(Zbuf.data() + static_cast<size_t>(a) * rows, wr, wc);
+                Y.noalias() = cands[a].V.middleRows(r0, wr) *
+                              cands[a].V.middleRows(c0, wc).transpose();
+            }
+            const Eigen::Map<const MatrixXd> Z(Zbuf.data(), static_cast<Eigen::Index>(rows), nc);
+            MatrixXd& acc = (blk.first == blk.second) ? G : Goff;
 #pragma omp parallel for schedule(dynamic) num_threads(nthreads)
-    for (int i = 0; i < nc; i++)
-        for (int j = i; j < nc; j++) {
-            const double v = scale * scale *
-                             (cands[i].V.transpose() * cands[j].V).squaredNorm();
-            G(i, j) = v;
-            G(j, i) = v;
+            for (int t = 0; t < ntiles; t++) {
+                const int I = tiles[t].first, J = tiles[t].second;
+                const int wi = std::min(tile, nc - I), wj = std::min(tile, nc - J);
+                acc.block(I, J, wi, wj).noalias() +=
+                    Z.middleCols(I, wi).transpose() * Z.middleCols(J, wj);
+            }
         }
+        const double s2 = scale * scale;
+        for (int i = 0; i < nc; i++)
+            for (int j = i; j < nc; j++) {
+                G(i, j) = s2 * (G(i, j) + 2.0 * Goff(i, j));
+                G(j, i) = G(i, j);
+            }
+
+        //The identity is proved above; the blocking and the tiling are not, and an off-by-one in
+        //either produces an O(1) error in some entries and none in the rest, which no aggregate
+        //check sees.  So a stride of pairs is recomputed the direct way, on every run: at 96 pairs
+        //this is 96/nc^2 of the pair loop - 0.02 s of sucrose - and it is the reason the route can be
+        //trusted on an input no test covers.
+        const int probes = 96;
+        const int stride = std::max(1, nc * nc / probes);
+        double worst = 0.0, scale_ref = 1e-300;
+        int bad_i = -1, bad_j = -1;
+        for (int p = 0; p < nc * nc; p += stride) {
+            const int i = p / nc, j = p % nc;
+            if (j < i) continue;
+            const double direct = s2 * (cands[i].V.transpose() * cands[j].V).squaredNorm();
+            const double d = std::abs(direct - G(i, j));
+            scale_ref = std::max(scale_ref, std::abs(direct));
+            if (d > worst) { worst = d; bad_i = i; bad_j = j; }
+        }
+        err_checkf(worst <= 1e-8 * scale_ref,
+                   "NRT: the projector route disagrees with the pair product at G(" +
+                       std::to_string(bad_i) + "," + std::to_string(bad_j) + ") by " +
+                       std::to_string(worst),
+                   log);
+    }
+    else {
+#pragma omp parallel for schedule(dynamic) num_threads(nthreads)
+        for (int i = 0; i < nc; i++)
+            for (int j = i; j < nc; j++) {
+                const double v = scale * scale *
+                                 (cands[i].V.transpose() * cands[j].V).squaredNorm();
+                G(i, j) = v;
+                G(j, i) = v;
+            }
+    }
+    const double pair_seconds = secs(t_pairs0, clock());
     const double trg2 = gamma.squaredNorm();
     const double gram_seconds = secs(t_gram0, clock());
 
@@ -1248,6 +1384,8 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
     if (options.debug)
         log << "NRT" << (spin.empty() ? "" : " " + spin) << ": " << nc << " candidates, "
             << order.size() << " retained, D(0) = " << nrt.d_0 << ", D(w) = " << nrt.d_w
-            << " (search " << search_seconds << " s, gram " << gram_seconds << " s, minimise "
+            << " (search " << search_seconds << " s, gram " << gram_seconds << " s [orbitals "
+            << orbital_seconds << " s, pairs " << pair_seconds << " s, "
+            << (projector ? "projector" : "pair loop") << "], minimise "
             << minimize_seconds << " s)\n";
 }
