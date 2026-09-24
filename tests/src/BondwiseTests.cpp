@@ -771,10 +771,23 @@ TEST(BondwiseRobyTests, NaoPopulationsMatchGolden)
 	const std::string out = roby_output({}, true, false, false, false);
 	if (out.empty())
 		GTEST_SKIP() << "tests/RGBI_groups/nh3li.gbw not found";
-	const double golden[5] = { 9.42047, 1.4373, 1.4353, 1.43756, 3.1097 };
+	const double golden[5] = { 9.42047, 1.43777, 1.43777, 1.43777, 3.1097 };
 	for (int i = 0; i < 5; i++)
 		EXPECT_NEAR(value_after(out, "Population of atom " + std::to_string(i) + ": "), golden[i], 2e-3) << i;
 	EXPECT_NEAR(value_after(out, "Total Population: "), 12.9218, 2e-3);
+
+	//The three hydrogens are one symmetry orbit of this C3v molecule, so their population is one
+	//number printed three times.  The golden these three replace read 1.4373, 1.4353 and 1.43756 - a
+	//2.5e-3 spread over three equivalent atoms.  That spread was the fixed-rank atomic subspace
+	//padding itself out of the degenerate null space of the projected density, and which direction it
+	//took was not reproducible; capping the rank at the occupied eigenvectors removed the padding.
+	//N and Li, whose subspaces never reached into the null space, did not move at all.  So this is
+	//the assertion with the content: equivalent atoms have to agree, which the old numbers did not.
+	const double h[3] = { value_after(out, "Population of atom 1: "),
+						  value_after(out, "Population of atom 2: "),
+						  value_after(out, "Population of atom 3: ") };
+	EXPECT_NEAR(h[0], h[1], 1e-4);
+	EXPECT_NEAR(h[0], h[2], 1e-4);
 }
 
 //the N-Li and N-H rows match the golden table, and the printed Tot. and Pyth. columns follow from Cov. and Ion.
@@ -785,7 +798,11 @@ TEST(BondwiseRobyTests, NaoBondTableMatchesGolden)
 		GTEST_SKIP() << "tests/RGBI_groups/nh3li.gbw not found";
 	const vec li = row_numbers_after(out, "N - Li");
 	ASSERT_EQ(li.size(), 9u);
-	const double golden_li[9] = { 9.420, 3.110, 12.393, 0.137, 0.184, 0.421, 0.459, 15.972, 26.173 };
+	//columns 7 and 8 - Pyth. and Arak. - are percentages of a ratio of small numbers, so the 2.5e-3
+	//population shift of the previous test moves them by 0.015 and 0.012 while Cov., Ion. and Tot.
+	//themselves stay inside 3e-3.  They are re-recorded, and the two EXPECT_NEARs below derive them
+	//from Cov. and Ion. independently, which is what actually checks them.
+	const double golden_li[9] = { 9.420, 3.110, 12.393, 0.137, 0.184, 0.421, 0.459, 15.957, 26.161 };
 	for (int i = 0; i < 9; i++)
 		EXPECT_NEAR(li[i], golden_li[i], 3e-3) << i;
 	EXPECT_NEAR(li[6], std::sqrt(li[4] * li[4] + li[5] * li[5]), 2e-3);
@@ -794,10 +811,24 @@ TEST(BondwiseRobyTests, NaoBondTableMatchesGolden)
 
 	const vec h = row_numbers_after(out, "N -  H");
 	ASSERT_EQ(h.size(), 9u);
-	const double golden_h[9] = { 9.420, 1.437, 9.615, 1.243, 0.905, 0.296, 0.952, 90.322, 79.861 };
+	const double golden_h[9] = { 9.420, 1.438, 9.615, 1.243, 0.905, 0.296, 0.952, 90.348, 79.888 };
 	for (int i = 0; i < 9; i++)
 		EXPECT_NEAR(h[i], golden_h[i], 3e-3) << i;
 	EXPECT_EQ(count_occurrences(out, "N -  H"), 3);
+
+	//and the three N-H rows are one symmetry orbit: printed to three decimals they are the same row.
+	//row_numbers_after takes the first match, so the rows are addressed by their atom pair.
+	const char* const nh_rows[3] = { "   0 -   1    N -  H", "   0 -   2    N -  H", "   0 -   3    N -  H" };
+	for (int r = 1; r < 3; r++) {
+		const vec other = row_numbers_after(out, nh_rows[r]);
+		ASSERT_EQ(other.size(), 9u) << nh_rows[r];
+		const vec first = row_numbers_after(out, nh_rows[0]);
+		ASSERT_EQ(first.size(), 9u);
+		//the two percentage columns amplify the last printed digit of Cov. and Ion., so 90.348 against
+		//90.346 is the three rows agreeing, not disagreeing
+		for (int i = 0; i < 9; i++)
+			EXPECT_NEAR(other[i], first[i], i < 7 ? 1e-3 : 5e-3) << nh_rows[r] << " column " << i;
+	}
 }
 
 //theta_info prints one theta-subspace table per bonded pair; each row's Total is sqrt(Cov^2 + Ion^2) and the
@@ -862,13 +893,20 @@ TEST(BondwiseRobyTests, ThetaInfoReportsEveryBond)
 	EXPECT_NEAR(value_after(out, "Population of atom 0: "), 9.42047, 2e-3);
 }
 
-//EVs=true prints the unsorted projected-density eigenvalues per atom without changing the numbers
+//EVs=true prints the projected-density occupations per atom without changing the numbers.  The print
+//used to be headed "Eigenvalues of projected density P (unsorted):" and to come before the subspace
+//was split; it now comes after, says which rank was kept, and marks every value kept or omitted,
+//because where the boundary falls is the whole reason to ask for it.  This assertion went on
+//matching zero occurrences of a string the program no longer prints, so it now checks the split.
 TEST(BondwiseRobyTests, EigenvaluePrintsLeavePopulationsUnchanged)
 {
 	const std::string out = roby_output({}, true, false, true, false);
 	if (out.empty())
 		GTEST_SKIP() << "tests/RGBI_groups/nh3li.gbw not found";
-	EXPECT_GE(count_occurrences(out, "Eigenvalues of projected density P (unsorted):"), 5);
+	EXPECT_GE(count_occurrences(out, "Occupations of the projected density P, rank "), 5);
+	//one kept orbital per atom at least, and something omitted: the basis is far larger than the rank
+	EXPECT_GE(count_occurrences(out, "  kept"), 5);
+	EXPECT_GT(count_occurrences(out, "  omitted"), count_occurrences(out, "  kept"));
 	EXPECT_NE(out.find("theta_I after Ionic"), std::string::npos);
 	EXPECT_NEAR(value_after(out, "Population of atom 0: "), 9.42047, 2e-3);
 	EXPECT_NEAR(value_after(out, "Population of atom 4: "), 3.1097, 2e-3);
