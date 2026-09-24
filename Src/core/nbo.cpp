@@ -967,6 +967,31 @@ void print_nbo(const NboResults& r, std::ostream& out)
     //fixed/setprecision below stay on the stream after this table, so everything printed through it
     //afterwards would carry two decimals
     const ostream_format_guard restore_format(out);
+    //The populations were JSON-only for the same reason the resonance tables were: nobody wrote the
+    //branch.  NPA charges are the most-read line of an NBO run, and on -nbo_native they appeared
+    //nowhere in NoSpherA2.log.  The per-NAO table stays in <stem>.native.nbo.json - it is 189 rows
+    //on a 14-atom complex and the populations are its summary.
+    if (!r.npa.empty()) {
+        const bool spin = r.npa.front().has_spin_density;
+        out << "\n NATURAL POPULATION ANALYSIS (in house):\n\n"
+            << "   Atom      Charge       Core    Valence    Rydberg      Total"
+            << (spin ? "   Spin dens.\n" : "\n")
+            << " ---------------------------------------------------------------------------------\n";
+        double charge_sum = 0.0, total_sum = 0.0;
+        for (const NboAtomPopulation& p : r.npa) {
+            out << "  " << left << setw(4) << (p.element + std::to_string(p.index)) << right << fixed
+                << setprecision(5) << setw(12) << p.charge << setw(11) << p.core << setw(11)
+                << p.valence << setw(11) << p.rydberg << setw(11) << p.total;
+            if (p.has_spin_density) out << setw(13) << p.spin_density;
+            out << "\n";
+            charge_sum += p.charge;
+            total_sum += p.total;
+        }
+        //the two sums are the check a reader can make on the spot: the charges add to the molecular
+        //charge and the populations to the number of electrons the wavefunction carries
+        out << "  " << left << setw(4) << "sum" << right << setw(12) << charge_sum << setw(44)
+            << total_sum << "\n";
+    }
     out << "\n NATURAL BOND ORBITAL ANALYSIS (in house):\n\n"
         << "                                                      Principal Delocalizations\n"
         << "  NBO                         Occupancy    Energy\n"
