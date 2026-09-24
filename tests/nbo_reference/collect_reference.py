@@ -59,6 +59,24 @@ NOTES = {
            "weights 27.58/27.58/22.42/22.42 and symmetric S-O bond orders of 1.5000. NBO checks "
            "the pair count of every supplied structure ('Structure 4 of the $NRTSTR keylist has "
            "1 too many electron pair(s)'), so a wrong $NRTSTR fails loudly rather than quietly.",
+    "ni_co_4": "NRTE2=5 is required. At the default delocalisation threshold the search was "
+               "still enumerating candidates after 90 minutes on one core; with NRTE2=5 it "
+               "converges in 693 s wall / 153 s CPU to 16 of 136 candidates retained, "
+               "D(w)=0.06910797. The threshold is not a convergence knob - NRTE2=10 and "
+               "NRTE2=20 both truncate to 4 candidates and a worse D(w)=0.07174346 - so this "
+               "molecule's NRT numbers may only be compared against a run at NRTE2=5. "
+               "NPA, NAO, NBO and E2 are unaffected: they are computed before NRT.",
+    "ticl4": "NRTE2=20 is required; at the default threshold the search had 1696 distinct "
+             "candidates behind it and was still in its Gram-matrix phase after 90 minutes on "
+             "one core. NRTE2=10 was run afterwards as a check and reproduces this reference "
+             "exactly where it matters: same 16 of 45 retained, same D(0)=0.08511395 and "
+             "D(w)=0.06741150, and all 45 bond orders identical to the printed 4 decimals - but "
+             "individual resonance weights differ by up to 7.1 percentage points, and still by "
+             "3.1 when matched by rank. That is the sharpest statement in the set of which NRT "
+             "quantities survive a changed search: D(w), the bond orders and the valencies do, "
+             "the weight of any one structure does not, because a different threshold changes "
+             "which structures are in the pool that the weights are distributed over. NRTE2=50 "
+             "is a different answer altogether (15 of 62, D(w)=0.08344777).",
 }
 
 # key -> (regex, converter). All anchored on what ORCA prints, not on what was passed in.
@@ -213,9 +231,18 @@ def main(argv):
                       "the symmetry-equivalence map. NRTDTL=EXTRA produced a byte-identical "
                       "output on this build; NRTDTL=EXCESS only adds NAO-basis density "
                       "matrices and nothing about the search.",
-            "NRTE2": "not passed, so the NRT delocalisation-list threshold is whatever the "
-                     "NBO default is; the value NBO reported for each run is in "
-                     "thresholds_reported_by_nbo.nrt_deloc_kcal",
+            "NRTE2": "not passed for any main-group molecule, so their NRT delocalisation-list "
+                     "threshold is whatever the NBO default is; the value NBO reported for each "
+                     "run is in thresholds_reported_by_nbo.nrt_deloc_kcal. It is passed for the "
+                     "transition-metal cases, where the default makes the search intractable - "
+                     "see molecules[].note. The threshold is not a convergence parameter: on "
+                     "Ni(CO)4, NRTE2=5 retains 16 of 136 candidates at D(w)=0.06910797 while "
+                     "NRTE2=10 and NRTE2=20 both collapse to the same 4 candidates at "
+                     "D(w)=0.07174346. Two runs at different NRTE2 are not comparable entry by "
+                     "entry, and TiCl4 says which entries: 10 against 20 gives identical D(w) "
+                     "and identical bond orders with individual weights up to 7.1 percentage "
+                     "points apart. Compare D(w), bond orders and valencies across thresholds; "
+                     "do not compare the weight of one structure.",
             "NRTSUB": "does not exist in NBO 7.0.9. A subspace analysis is asked for with the "
                       "bracket form 'NRT <atom list>' or by supplying $NRTSTR.",
             "NRTSYM=off": "only sf6, and not a choice: NRT's symmetry detection aborts the "

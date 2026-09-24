@@ -10,7 +10,7 @@
   "E2PERT": "second-order perturbative donor-acceptor (E2) table",
   "NRTLST=0.1": "print the $NRTSTR keylist down to 0.1% weight, so the reference carries the bond topology of the small structures too",
   "NRTDTL": "per-candidate TOPO matrices and rhoNL, the QP iteration path, the 5-decimal weight vector including the zero tail, the ARROWS lines and the symmetry-equivalence map. NRTDTL=EXTRA produced a byte-identical output on this build; NRTDTL=EXCESS only adds NAO-basis density matrices and nothing about the search.",
-  "NRTE2": "not passed, so the NRT delocalisation-list threshold is whatever the NBO default is; the value NBO reported for each run is in thresholds_reported_by_nbo.nrt_deloc_kcal",
+  "NRTE2": "not passed for any main-group molecule, so their NRT delocalisation-list threshold is whatever the NBO default is; the value NBO reported for each run is in thresholds_reported_by_nbo.nrt_deloc_kcal. It is passed for the transition-metal cases, where the default makes the search intractable - see molecules[].note. The threshold is not a convergence parameter: on Ni(CO)4, NRTE2=5 retains 16 of 136 candidates at D(w)=0.06910797 while NRTE2=10 and NRTE2=20 both collapse to the same 4 candidates at D(w)=0.07174346. Two runs at different NRTE2 are not comparable entry by entry, and TiCl4 says which entries: 10 against 20 gives identical D(w) and identical bond orders with individual weights up to 7.1 percentage points apart. Compare D(w), bond orders and valencies across thresholds; do not compare the weight of one structure.",
   "NRTSUB": "does not exist in NBO 7.0.9. A subspace analysis is asked for with the bracket form 'NRT <atom list>' or by supplying $NRTSTR.",
   "NRTSYM=off": "only sf6, and not a choice: NRT's symmetry detection aborts the whole analysis on it. See molecules[].note.",
   "$NRTSTR": "only so2, and not a choice either: NRT cannot start from the Lewis structure NBO itself localises. See molecules[].note. A $NRTSTR or $CHOOSE keylist must be appended AFTER the data blocks of the .47; placed directly behind the $NBO line NBO reports \"$CHOOSE error: 'END' is not an acceptable orbital type\"."
@@ -657,6 +657,62 @@
    }
   },
   {
+   "name": "ni_co_4",
+   "file": "ni_co_4.nbo.json",
+   "motifs": [
+    "transition metal",
+    "d10",
+    "backbonding",
+    "CO ligand"
+   ],
+   "open_shell": false,
+   "orca": {
+    "version": "6.1.1",
+    "basis": "def2-TZVP",
+    "keyword_line": "! B3LYP def2-TZVP TightSCF Opt",
+    "exchange": "B88",
+    "correlation": "LYP",
+    "hf_type": "RHF",
+    "charge": 0,
+    "multiplicity": 1,
+    "basis_functions": 293,
+    "final_energy_hartree": -1961.652333068655,
+    "optimisation_converged": true
+   },
+   "atoms": 9,
+   "naos": 293,
+   "nbos": 293,
+   "e2_entries": 389,
+   "nrt_structures_used": 16,
+   "nrt_structures_found": 136,
+   "nrt_candidates_printed": 3304,
+   "nrt_weights_listed": 136,
+   "nrt_zero_weight_structures": 120,
+   "nrt_search_cycles": 2,
+   "nrt_qp_iterations": 18,
+   "nrt_d_w": 0.06910797,
+   "nrt_d_0": 0.07447839,
+   "nrt_symmetry": "Td symmetry, 24 symmetry operator(s), 24 unique atom permutation(s)",
+   "nrt_bond_orders": 45,
+   "nbo_keywords": "",
+   "nbo_keywords_reported": "NRT NRTE2 NRTLST NRTDTL E2PERT",
+   "note": "NRTE2=5 is required. At the default delocalisation threshold the search was still enumerating candidates after 90 minutes on one core; with NRTE2=5 it converges in 693 s wall / 153 s CPU to 16 of 136 candidates retained, D(w)=0.06910797. The threshold is not a convergence knob - NRTE2=10 and NRTE2=20 both truncate to 4 candidates and a worse D(w)=0.07174346 - so this molecule's NRT numbers may only be compared against a run at NRTE2=5. NPA, NAO, NBO and E2 are unaffected: they are computed before NRT.",
+   "nrt_nrtstr_supplied": false,
+   "nbo_version": "NBO 7.0.9 (21-May-2020)",
+   "timings_seconds": {
+    "file47_seconds": 0,
+    "nbo_seconds": 0,
+    "nbo_reported_cpu_seconds": 152.89,
+    "nbo_reported_wall_seconds": 693
+   },
+   "thresholds_reported_by_nbo": {
+    "e2_kcal": 0.5,
+    "e2_intermolecular_kcal": 0.05,
+    "nrt_parent_percent": 50,
+    "nrt_deloc_kcal": 5
+   }
+  },
+  {
    "name": "nitromethane",
    "file": "nitromethane.nbo.json",
    "motifs": [
@@ -1096,6 +1152,61 @@
    }
   },
   {
+   "name": "ticl4",
+   "file": "ticl4.nbo.json",
+   "motifs": [
+    "transition metal",
+    "d0",
+    "polar M-Cl"
+   ],
+   "open_shell": false,
+   "orca": {
+    "version": "6.1.1",
+    "basis": "def2-TZVP",
+    "keyword_line": "! B3LYP def2-TZVP TightSCF Opt",
+    "exchange": "B88",
+    "correlation": "LYP",
+    "hf_type": "RHF",
+    "charge": 0,
+    "multiplicity": 1,
+    "basis_functions": 193,
+    "final_energy_hartree": -2690.326772804035,
+    "optimisation_converged": true
+   },
+   "atoms": 5,
+   "naos": 193,
+   "nbos": 193,
+   "e2_entries": 80,
+   "nrt_structures_used": 16,
+   "nrt_structures_found": 45,
+   "nrt_candidates_printed": 1323,
+   "nrt_weights_listed": 66,
+   "nrt_zero_weight_structures": 45,
+   "nrt_search_cycles": 1,
+   "nrt_qp_iterations": 64,
+   "nrt_d_w": 0.0674115,
+   "nrt_d_0": 0.08511395,
+   "nrt_symmetry": "Td symmetry, 24 symmetry operator(s), 24 unique atom permutation(s)",
+   "nrt_bond_orders": 15,
+   "nbo_keywords": "",
+   "nbo_keywords_reported": "NRT NRTE2 NRTLST NRTDTL E2PERT",
+   "note": "NRTE2=20 is required; at the default threshold the search had 1696 distinct candidates behind it and was still in its Gram-matrix phase after 90 minutes on one core. NRTE2=10 was run afterwards as a check and reproduces this reference exactly where it matters: same 16 of 45 retained, same D(0)=0.08511395 and D(w)=0.06741150, and all 45 bond orders identical to the printed 4 decimals - but individual resonance weights differ by up to 7.1 percentage points, and still by 3.1 when matched by rank. That is the sharpest statement in the set of which NRT quantities survive a changed search: D(w), the bond orders and the valencies do, the weight of any one structure does not, because a different threshold changes which structures are in the pool that the weights are distributed over. NRTE2=50 is a different answer altogether (15 of 62, D(w)=0.08344777).",
+   "nrt_nrtstr_supplied": false,
+   "nbo_version": "NBO 7.0.9 (21-May-2020)",
+   "timings_seconds": {
+    "file47_seconds": 0,
+    "nbo_seconds": 0,
+    "nbo_reported_cpu_seconds": 80.17,
+    "nbo_reported_wall_seconds": 369
+   },
+   "thresholds_reported_by_nbo": {
+    "e2_kcal": 0.5,
+    "e2_intermolecular_kcal": 0,
+    "nrt_parent_percent": 50,
+    "nrt_deloc_kcal": 20
+   }
+  },
+  {
    "name": "water",
    "file": "water.nbo.json",
    "motifs": [
@@ -1150,13 +1261,7 @@
    }
   }
  ],
- "pending": {
-  "molecules": [
-   "ni_co_4",
-   "ticl4"
-  ],
-  "why": "NRT on a transition-metal complex is where the combinatorics bite. With the uniform keylist TiCl4 had enumerated 1696 distinct candidate structures and then sat in its Gram-matrix phase, and Ni(CO)4 was still generating, both past 90 minutes on one core. A second pass at NRTE2=5 (the delocalisation threshold that decides which E2 interactions enter the search; the feasibility measurement put 1 -> 5 at 15x cheaper for 0.0007 in D(w)) is running. Their NPA, NAO, NBO and E2 data exist and are correct; only the NRT section is unfinished, and a half-converged NRT section is worse in a reference than an absent one. They are the two molecules that should have gone to the AKL cluster."
- },
+ "pending": {},
  "validation": {
   "open_shell_archive": "ch3_orca_reference.47 is the FILE.47 ORCA 6.1.1 wrote itself for an unrestricted r2SCAN0/def2-TZVP CH3 doublet (! r2scan0 def2-tzvp d4 NBO). Feeding the same .gbw to NoSpherA2 -nbo and running gennbo on both archives gives byte-identical NPA summaries in all three blocks (alpha, beta, total), identical occupied NBO occupancies and hybridisations and an identical E2 table. compare_47.py on the two archives: $OVERLAP agrees to 6.6e-16, $DENSITY (both spin blocks, 2450 values) to 2.1e-10, $LCAOMO to 1.2e-9, $FOCK to 1.5e-5 - the Fock matrix is rebuilt from the orbital energies and coefficients rather than read, so it carries the SCF residual. The only visible consequence is the energies and compositions of the zero-occupancy Rydberg orbitals, which no analysed quantity depends on.",
   "scripts": [

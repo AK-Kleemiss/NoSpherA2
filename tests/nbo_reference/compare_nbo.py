@@ -50,16 +50,21 @@ class Quantity:
 
 
 def compare_keyed(q, ref_items, cand_items, key, fields):
-    """fields: list of (json key, label suffix). Entries are matched by key()."""
+    """fields: list of (json key, label suffix). Entries are matched by key(). A key is not
+    unique - two resonance structures can carry the same Added(Removed) description, and
+    acetylene has four such pairs - so entries sharing a key pair up in order of appearance
+    instead of all comparing against the first one. Without that a file fails against itself."""
     index = {}
     for it in cand_items:
-        index.setdefault(key(it), it)
+        index.setdefault(key(it), []).append(it)
+    taken = {}
     for it in ref_items:
         k = key(it)
-        other = index.get(k)
-        if other is None:
+        queue, n = index.get(k, []), taken.get(k, 0)
+        if n >= len(queue):
             q.missing += 1
             continue
+        taken[k], other = n + 1, queue[n]
         for f, suffix in fields:
             if f in it:
                 q.check("%s %s" % (k, suffix), it[f], other.get(f, float("nan")))
