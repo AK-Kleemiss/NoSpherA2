@@ -114,6 +114,35 @@ TEST(RgbiRobustnessTests, KeptAnoOrbitalsAreOccupied)
 	EXPECT_EQ(out.find("cuts through a degenerate"), std::string::npos);
 }
 
+//A centre the shipped minimal basis does not reach - cerium - takes occ's other guess route, and
+//that route used to corrupt the heap for an unrestricted free atom and abort in a malloc inside
+//libcint.  It is fixed by starting that one case from the core Hamiltonian instead, and the case
+//has to stay that one case: starting *every* free atom there moved the light-atom populations
+//above by up to 0.84 electrons, which is a different converged atom and not a better one.  So this
+//pins both halves - the heavy atom completes and really computes its own free atom, and the light
+//atoms are left to the automatic choice, which the goldens in BondwiseTests.cpp check.
+TEST(RgbiRobustnessTests, CeriumFreeAtomRunsAndIsNotFallenBackOn)
+{
+	const auto p = nos_test_repo_root() / "tests" / "molden_file" / "Ce_full.molden";
+	if (!std::filesystem::exists(p))
+		GTEST_SKIP() << "tests/molden_file/Ce_full.molden not found";
+	std::string out;
+	{
+		CoutCapture cap;
+		WFN wavy(p);
+		Roby_information roby(wavy, {}, true, true, false, false);
+		out = cap.str();
+	}
+	//the free atom was computed, not replaced by the molecular local orbitals
+	EXPECT_NE(out.find("ANO fallback summary: no atom-level fallbacks were needed."), std::string::npos);
+	//and the projected population is a population: finite, positive, and short of Z only by what
+	//the ANO cutoff leaves outside, which the run reports separately
+	const double population = value_after(out, "Population of atom 0: ");
+	EXPECT_TRUE(std::isfinite(population));
+	EXPECT_GT(population, 0.5 * 58.0);
+	EXPECT_LT(population, 58.0 + 1e-6);
+}
+
 //The external reference.  tests/RGBI/stdout is Tonto 26.01.05's own Roby-Gould output for the
 //archive next to it, and it states the option set it used: NAOs, no spherical averaging, def2-SVP,
 //Cartesian d functions.  Run with those options, every number NoSpherA2 prints has to be the number

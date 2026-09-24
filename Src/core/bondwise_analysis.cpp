@@ -13,6 +13,7 @@
 #include "nao.h"
 #include <occ/qm/hf.h>
 #include <occ/qm/guess_kind.h>
+#include <occ/qm/initial_guess.h>
 
 namespace {
 	struct OhOperation {
@@ -320,15 +321,21 @@ namespace {
 
 		occ::qm::HartreeFock hf(basis);
 		occ::qm::SCF<occ::qm::HartreeFock> scf(hf, spin_kind);
-		//The core Hamiltonian, explicitly, which is what occ itself starts its own one-atom SCFs
-		//from: a single atom starts well enough from it, and it is also what stops occ's atomic
-		//guess recursing into a nested atomic SCF of the same atom. The automatic choice picks that
-		//nested route for any centre the shipped minimal basis does not reach, Z > 54, and its
-		//guess density comes back as one square nbf x nbf matrix while carrying the outer spin
-		//kind - so for an unrestricted free atom the unrestricted Fock build writes a beta block
-		//that the matrix has no rows for. Ce and U corrupted the heap there and aborted in a
-		//malloc inside libcint, with nothing in the output to say what had happened.
-		scf.set_guess_kind(occ::qm::GuessKind::Core);
+		//occ chooses the guess itself, and wherever the shipped minimal basis reaches it chooses
+		//SOAD - the good start, and the one every reference number of this analysis was produced
+		//from. Only for a centre that basis does not cover does it fall back to a nested atomic
+		//SCF of the same atom, and that is the route that breaks: the guess density comes back as
+		//one square nbf x nbf matrix while carrying the outer spin kind, so an unrestricted Fock
+		//build writes a beta block into rows the matrix does not have. Ce and U corrupted the heap
+		//there and died in a malloc inside libcint with nothing in the output to say why.
+		//
+		//So take the core Hamiltonian for exactly that case and nothing else. It is what occ's own
+		//one-atom SCF starts from, so a free atom reaches its ground state from it; asking for it
+		//everywhere is what a first version of this fix did, and it moved light-atom ANO
+		//populations by up to 0.84 electrons - a different converged atom, not a better one.
+		if (spin_kind == occ::qm::SpinorbitalKind::Unrestricted &&
+			!occ::qm::minimal_basis_covers(basis))
+			scf.set_guess_kind(occ::qm::GuessKind::Core);
 		scf.set_charge_multiplicity(0, multiplicity);
 		const double scf_energy = scf.compute_scf_energy();
 
