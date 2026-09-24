@@ -565,8 +565,16 @@ namespace {
 		return out + "\"";
 	}
 	std::string jnum(const double v) {
+		//Ten digits is what a reader wants.  NBO_JSON_DIGITS raises it, because the only way to
+		//prove an optimisation of the search changed nothing is to compare every reported number at
+		//full double precision - at ten digits a shift in the last bits of an orbital hides.
+		static const int digits = [] {
+			const char* e = std::getenv("NBO_JSON_DIGITS");
+			const int d = e ? std::atoi(e) : 10;
+			return (d >= 1 && d <= 20) ? d : 10;
+		}();
 		std::ostringstream o;
-		o << std::setprecision(10) << v;
+		o << std::setprecision(digits) << v;
 		return o.str();
 	}
 }
