@@ -456,8 +456,9 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
 		<< GetCurrentDir << endl;
 	origin = e_origin::molden;
 	isBohr = true;
-	//The format this reader follows, and the only written specification of it.
-	citations::cite(citations::Method::Molden, file);
+	//The format this reader follows, and the only written specification of it.  Queued, not
+	//printed: the caller is in the middle of its "Reading: <file> ... done!" line.
+	citations::queue(citations::Method::Molden);
 	ifstream rf(filename.c_str());
 	if (rf.good())
 		path = filename;
@@ -2806,7 +2807,7 @@ bool WFN::read_ptb(const std::filesystem::path &filename, std::ostream &file, co
 	origin = e_origin::ptb;
 	isBohr = true;
 	path = filename;
-	citations::cite(citations::Method::PTB, file);
+	citations::queue(citations::Method::PTB); //see read_molden: the caller's line is still open
 	if (debug)
 		file << "Reading pTB file: " << filename << std::endl;
 	std::ifstream inFile(filename, std::ios::binary | std::ios::in);

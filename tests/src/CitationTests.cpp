@@ -54,6 +54,31 @@ TEST(Citations, FormatsOneLinePerReference)
 	EXPECT_NE(har.find("10.1107/S2052252514014845"), std::string::npos);
 }
 
+// A reader cites from inside the caller's open "Reading: <file> ... done!" line, so it queues
+// instead of printing. The failure this guards against is the one that broke TomlIntegrationTests
+// .SucrosePtb: a citation landing mid-line and shifting every following line of the log.
+TEST(Citations, QueueDefersUntilFlushAndThenForgets)
+{
+	std::ostringstream drain;
+	citations::flush(drain); // whatever an earlier test queued, so this one starts empty
+	drain.str("");
+
+	citations::queue(citations::Method::PTB);
+	citations::queue(citations::Method::Molden);
+	EXPECT_TRUE(drain.str().empty()) << "queue() must not write anything";
+
+	std::ostringstream os;
+	citations::flush(os);
+	const std::string out = os.str();
+	EXPECT_NE(out.find("10.1063/5.0137838"), std::string::npos) << "pTB reference missing";
+	EXPECT_NE(out.find("10.1023/A:1008193805436"), std::string::npos) << "molden reference missing";
+	EXPECT_EQ(out.front(), '[') << "a flushed citation starts its own line";
+
+	std::ostringstream again;
+	citations::flush(again);
+	EXPECT_TRUE(again.str().empty()) << "flush() must clear the queue";
+}
+
 // Two methods sharing a DOI is legitimate (the .tsc format and the program are one paper), but two
 // identical entries are a copy-paste slip.
 TEST(Citations, NoDuplicateEntries)

@@ -14,6 +14,7 @@
 #include "geometry_aid.h"
 #include "crystal_energies.h"
 #include "nao.h"
+#include "citations.h"
 #ifdef NOSPHERA2_USE_GPU
 #include "grid_gpu.h"
 #include "aux_density_gpu.h"
@@ -437,6 +438,7 @@ static int run_app_impl(int argc, char **argv)
 				}
 			}
 			log_file << " done!\nNumber of atoms in Wavefunction file: " << wavy[i].get_ncen() << " Number of MOs: " << wavy[i].get_nmo() << endl;
+			citations::flush(log_file); //whatever the reader queued while this line was open
 		}
 
 		svec known_scatterer;
@@ -663,6 +665,7 @@ static int run_app_impl(int argc, char **argv)
 			wavy[0].set_has_ECPs(true, true, opt.ECP_mode);
 		}
 		log_file << " done!\nNumber of atoms in Wavefunction file: " << wavy[0].get_ncen() << " Number of MOs: " << wavy[0].get_nmo() << endl;
+		citations::flush(log_file); //whatever the reader queued while this line was open
 
 		if (opt.rgbi) {
 			Roby_information Roby(wavy[0], opt.rgbi_group_sets, !opt.rgbi_no_sym,

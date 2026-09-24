@@ -72,4 +72,12 @@ namespace citations
 
     //The same, to std::cout.
     void cite(Method method);
+
+    //A wavefunction reader runs inside the caller's open "Reading: <file> ... done!" line, so a
+    //citation printed from there lands in the middle of it and shifts every following line of the
+    //log.  Readers queue their reference instead and whoever closes the line flushes it.
+    void queue(Method method);
+
+    //Write every queued reference, then forget them.  Safe to call when nothing is queued.
+    void flush(std::ostream &os);
 }

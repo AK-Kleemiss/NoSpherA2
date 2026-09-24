@@ -70,4 +70,26 @@ namespace citations
     {
         cite(method, std::cout);
     }
+
+    namespace
+    {
+        //Readers run one after another on one thread, so a plain vector is enough.
+        std::vector<Method> &queued()
+        {
+            static std::vector<Method> pending;
+            return pending;
+        }
+    }
+
+    void queue(Method method)
+    {
+        queued().push_back(method);
+    }
+
+    void flush(std::ostream &os)
+    {
+        for (const Method method : queued())
+            cite(method, os);
+        queued().clear();
+    }
 }
