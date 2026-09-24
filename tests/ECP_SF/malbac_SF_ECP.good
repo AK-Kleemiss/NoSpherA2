@@ -7,7 +7,9 @@
 This software is part of the cuQCT software suite developed by Florian Kleemiss.
 Please give credit and cite corresponding pieces!
 This Software is published with BSD-2 clause license.
-Reading:                                 "malbac.gbw" done!
+Reading:                                 "malbac.gbw"
+The orbitals hold 248 electrons, 28 fewer than the nuclei carry, and that is exactly the def2 ECP core of these atoms: treating them as ECP atoms, as -ECP would.
+ done!
 Number of atoms in Wavefunction file: 52 Number of MOs: 1133
 Number of protons: 276
 Number of electrons: 248.000000

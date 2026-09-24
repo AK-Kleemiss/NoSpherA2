@@ -7,6 +7,8 @@
 This software is part of the cuQCT software suite developed by Florian Kleemiss.
 Please give credit and cite corresponding pieces!
 This Software is published with BSD-2 clause license.
+
+The orbitals hold 22 electrons, 60 fewer than the nuclei carry, and that is exactly the def2 ECP core of these atoms: treating them as ECP atoms, as -ECP would.
 Analysing ELI basins in the wavefunction...
 Calcualting grid of size 120 x 120 x 187...
 Number of points: 2692800
