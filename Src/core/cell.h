@@ -79,7 +79,10 @@ public:
 	void eval_symm(std::vector<asym_atom>& asym_atoms, const int& asymmetric_atoms, ivec3& linking_list);
 	ivec apply_grown(ivec3& linking_list);
 
-	void set_symmetry_factors(std::vector<asym_atom>& asym_atoms, const ivec3& linking_list);
+	// Retired together with orbit_copies below. A declaration whose definition is commented out
+	// does not fail where it is called, it fails at link time in whichever target calls it - which
+	// is how this one took NoSpherA2_Tests down while every other target linked fine.
+	//void set_symmetry_factors(std::vector<asym_atom>& asym_atoms, const ivec3& linking_list);
 
 	// This is an old but working implementation for grown structures.
 	// It is not used currently but kept for reference purposes in case something goes wrong with the new implementation.

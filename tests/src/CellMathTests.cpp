@@ -375,13 +375,10 @@ namespace NoSpherA2UnitTests
 		const ivec applied = cl.apply_grown(links);
 		ASSERT_EQ(applied.size(), 1u);
 		EXPECT_EQ(applied[0], 1);
-
-		cl.set_symmetry_factors(asym, links);
-		EXPECT_NEAR(asym[0].asym_fact, 0.5, 1e-12);
-		EXPECT_NEAR(asym[1].asym_fact, 0.5, 1e-12);
-		// the image remembers the operation that made it, the parent has none
-		EXPECT_EQ(asym[0].sym_op, -1);
-		EXPECT_EQ(asym[1].sym_op, 1);
+		// The weights and sym_op used to be checked here through the two-argument
+		// set_symmetry_factors, which is retired with orbit_copies (see below). The live
+		// three-argument overload divides by |linking_list[i][i]| alone, so it does not
+		// reproduce the 0.5 these two tests asserted - that factor was orbit_copies.
 	}
 
 	// when only one of two asymmetric atoms has its inversion image present the
@@ -408,11 +405,9 @@ namespace NoSpherA2UnitTests
 		const std::string err = testing::internal::GetCapturedStderr();
 		EXPECT_TRUE(applied.empty());
 		EXPECT_NE(err.find("Symmetry operation not fully matched"), std::string::npos);
-		cl.set_symmetry_factors(asym, links);
-		EXPECT_NEAR(asym[0].asym_fact, 0.5, 1e-12);
-		EXPECT_NEAR(asym[1].asym_fact, 1.0, 1e-12);
-		EXPECT_NEAR(asym[2].asym_fact, 0.5, 1e-12);
-		EXPECT_EQ(asym[2].sym_op, 1);
+		// Same as above: the asym_fact/sym_op half of this test specified the retired
+		// two-argument set_symmetry_factors. What is live here is that a partially grown
+		// structure applies no operation and says so on stderr.
 	}
 
 	namespace

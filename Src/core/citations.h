@@ -25,6 +25,7 @@ namespace citations
         BeckeGrid,          //the multicentre atomic integration grid
         TFVC,               //topological fuzzy Voronoi cell partitioning
         MBIS,               //minimal basis iterative stockholder partitioning
+        EMBIS,              //ellipsoidal MBIS - the sigma tensors of make_EMBIS_tensors
         ECP,                //the ECP core correction
         RIFit,              //RI / density-fitted partitioning and form factors
         Embedding,          //electrostatic and multi-layer embedding for HAR

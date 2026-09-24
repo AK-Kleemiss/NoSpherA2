@@ -860,6 +860,21 @@ vec DensityFitting::density_fit(
 
 	std::cout << "\n=== Density Fitting ===" << std::endl;
 	citations::cite(citations::Method::RIFit, std::cout);
+	//The restraint targets are somebody's partitioning, so a restrained fit credits that too - this
+	//path never went through the grid routine in scattering_factors.cpp that cites the others.
+	if (config.restrain_charges) {
+		switch (config.charge_scheme) {
+		case CHARGE_SCHEME::TFVC:  citations::cite(citations::Method::TFVC, std::cout); break;
+		case CHARGE_SCHEME::MBIS:
+		case CHARGE_SCHEME::EMBIS:
+			citations::cite(citations::Method::MBIS, std::cout);
+			if (config.charge_scheme == CHARGE_SCHEME::EMBIS)
+				citations::cite(citations::Method::EMBIS, std::cout);
+			break;
+		case CHARGE_SCHEME::HIRSHFELD: citations::cite(citations::Method::Hirshfeld, std::cout); break;
+		default: break;  //Nuclear, Mulliken and the Sanderson estimate are not anybody's method here.
+		}
+	}
 	std::cout << "Normal basis functions: "
 		<< normal_basis.get_nao() << std::endl;
 	std::cout << "Auxiliary basis functions: "

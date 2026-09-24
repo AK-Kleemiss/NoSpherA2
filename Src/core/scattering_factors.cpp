@@ -2526,8 +2526,12 @@ int make_atomic_grids_wrapper(
 		citations::cite(citations::Method::Hirshfeld, file);
 	else if (opt.partition_type == PartitionType::TFVC)
 		citations::cite(citations::Method::TFVC, file);
-	else if (opt.partition_type == PartitionType::MBIS || opt.partition_type == PartitionType::EMBIS)
+	else if (opt.partition_type == PartitionType::MBIS || opt.partition_type == PartitionType::EMBIS) {
 		citations::cite(citations::Method::MBIS, file);
+		//EMBIS is MBIS with an ellipsoidal sigma, so it rests on both papers.
+		if (opt.partition_type == PartitionType::EMBIS)
+			citations::cite(citations::Method::EMBIS, file);
+	}
 
 	const int atoms_with_grids = vec_sum(needs_grid);
 	err_checkf(atoms_with_grids > 0, "No atoms with grids to generate!", file);

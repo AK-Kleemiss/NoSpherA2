@@ -763,7 +763,8 @@ std::string NoSpherA2_message(bool no_date)
         t.append("Aux basis /RI partitioning  : Seifert et al. Z. Krist. - Cryst. Mat. 2026, 241, 283 - 295.\n");
         t.append("Embedding for HAR at        : Landeros-Rivera & Kleemiss, J. Appl. Cryst. 2026, 59, 10.1107/S160057672600717X.\n");
         t.append("TFVC partitioning at        : Gimferrer et al. TBA.\n");
-        t.append("MBIS/EMBIS partitioning at  : Nielsen et al. TBA.\n");
+        t.append("MBIS partitioning at        : Verstraelen et al. J. Chem. Theory Comput. 2016, 12, 3894 - 3912.\n");
+        t.append("EMBIS partitioning at       : Nielsen & Jensen, J. Chem. Theory Comput. 2025, 21, 8753 - 8761.\n");
     }
     return t;
 }

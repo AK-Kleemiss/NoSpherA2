@@ -18,6 +18,8 @@ namespace citations
             {Method::BeckeGrid, "Becke grid", "Becke, J. Chem. Phys. 88 (1988) 2547", "10.1063/1.454033"},
             {Method::TFVC, "TFVC", "Salvador & Ramos-Cordoba, J. Chem. Phys. 139 (2013) 071103", "10.1063/1.4818751"},
             {Method::MBIS, "MBIS", "Verstraelen et al., J. Chem. Theory Comput. 12 (2016) 3894", "10.1021/acs.jctc.6b00456"},
+            //The E is "ellipsoidal": this is the anisotropic sigma tensor, not a variant name of ours.
+            {Method::EMBIS, "EMBIS", "Nielsen & Jensen, J. Chem. Theory Comput. 21 (2025) 8753", "10.1021/acs.jctc.5c00788"},
             {Method::ECP, "ECP", "Kleemiss et al., J. Appl. Cryst. 58 (2025) 374", "10.1107/S1600576725000901"},
             {Method::RIFit, "RI fit", "Seifert et al., Z. Kristallogr. Cryst. Mater. 241 (2026) 283", "10.1515/zkri-2026-0013"},
             {Method::Embedding, "Embedding", "Landeros-Rivera & Kleemiss, J. Appl. Cryst. 59 (2026)", "10.1107/S160057672600717X"},
