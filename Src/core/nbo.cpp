@@ -248,6 +248,48 @@ namespace
         for (const int i : idx) w += v(i) * v(i);
         return w;
     }
+
+    //--------------------------------------------------------------------------------------
+    // corner arithmetic
+    //--------------------------------------------------------------------------------------
+    //Every vector the search works with is zero outside the NAOs of its own one or two centres -
+    //leading_block() writes it that way, and nothing in the ladder or the sweep below breaks that.
+    //So the density bookkeeping of the self-consistency sweep only ever needs the (centres x
+    //centres) corner of an n x n matrix: for sucrose that is 44 x 44 out of 998 x 998, a five
+    //hundredth of it.  Building the whole matrix for that corner cost 45 of sucrose's 47 search
+    //seconds - 97 % of the stage - because it is 8 MB of allocation, two reads and a write per
+    //orbital per sweep, 18200 times.
+    //
+    //The three helpers below gather a corner, write one back, and gather a sub-vector.  Every entry
+    //they skip is one the whole-matrix form computed as x - 0.0 or x + 0.0, so the arithmetic on
+    //everything that is not identically zero is unchanged, operand for operand and in the same
+    //order.  That is what lets this be a pure speed-up rather than a new approximation.
+
+    MatrixXd corner(const MatrixXd& M, const ivec& idx)
+    {
+        const int m = static_cast<int>(idx.size());
+        MatrixXd out(m, m);
+        for (int p = 0; p < m; p++)
+            for (int q = 0; q < m; q++)
+                out(p, q) = M(idx[p], idx[q]);
+        return out;
+    }
+
+    void scatter_corner(MatrixXd& M, const MatrixXd& block, const ivec& idx)
+    {
+        const int m = static_cast<int>(idx.size());
+        for (int p = 0; p < m; p++)
+            for (int q = 0; q < m; q++)
+                M(idx[p], idx[q]) = block(p, q);
+    }
+
+    VectorXd gather(const VectorXd& v, const ivec& idx)
+    {
+        const int m = static_cast<int>(idx.size());
+        VectorXd out(m);
+        for (int p = 0; p < m; p++) out(p) = v(idx[p]);
+        return out;
+    }
 }
 
 dMatrix2 nao_density(const dMatrix2& P, const dMatrix2& S, const dMatrix2& C)
@@ -337,14 +379,42 @@ bvec2 bondable_pairs(const std::vector<atom>& atoms, const double scale)
     return out;
 }
 
+//The stage timer of native_nbo() says the search is the expensive half; this one says which
+//part of the search it is, which is the difference between guessing and knowing.
+namespace {
+    struct ProfClock {
+        std::chrono::steady_clock::time_point t0 = std::chrono::steady_clock::now();
+        double lap() {
+            const auto now = std::chrono::steady_clock::now();
+            const double d = std::chrono::duration<double>(now - t0).count();
+            t0 = now;
+            return d;
+        }
+    };
+}
+
 NboLewis nbo_search(const NAOResult& nao, const dMatrix2& gamma, const bvec2& bondable,
                     const int n_pairs, const double scale, const NboOptions& options)
 {
+    ProfClock prof;
+    double p_ladder = 0, p_scf = 0, p_owso = 0, p_anti = 0, p_comp = 0, p_final = 0;
+    double p_pivot = 0, p_ryd = 0;
+    int n_sweeps = 0, n_eig1 = 0, n_eig2 = 0, n_levels_used = 0;
+    vec ch_trace;  //the sweep's convergence history, reported under -debug
     const int n = static_cast<int>(gamma.extent(0));
     const int natoms = static_cast<int>(nao.atoms.size());
     const MatrixXd G0 = to_eigen(gamma);
     MatrixXd G = G0;
     const std::vector<AtomIndices> idx = atom_indices(nao);
+    //Same rule as NRT's: -nbo_threads if it was given, otherwise whatever OpenMP offers.  Only loops
+    //whose iterations are independent Eigen reductions of their own are threaded, so the thread count
+    //cannot move a number: Core is built with EIGEN_DONT_PARALLELIZE and Eigen is not backed by a
+    //BLAS here, so each of those reductions is reproducible on its own.
+#ifdef _OPENMP
+    const int nthreads = options.threads > 0 ? options.threads : omp_get_max_threads();
+#else
+    const int nthreads = 1;
+#endif
 
     NboLewis res;
     res.gamma = gamma;
@@ -407,6 +477,7 @@ NboLewis nbo_search(const NAOResult& nao, const dMatrix2& gamma, const bvec2& bo
                 if (idx[a].valence.empty()) continue;
                 if (!relax && used[a] >= cap[a]) continue;
                 VectorXd v;
+                n_eig1++;
                 const double lam = leading_block(G, idx[a].all, v);
                 if (lam > best) { best = lam; bv = v; ba = a; }
             }
@@ -433,6 +504,7 @@ NboLewis nbo_search(const NAOResult& nao, const dMatrix2& gamma, const bvec2& bo
                     ivec pair = idx[a].all;
                     pair.insert(pair.end(), idx[b].all.begin(), idx[b].all.end());
                     VectorXd v;
+                    n_eig2++;
                     const double lam = leading_block(G, pair, v);
                     if (lam <= bestp) continue;
                     const double wa = weight_on(v, idx[a].all);
@@ -464,6 +536,22 @@ NboLewis nbo_search(const NAOResult& nao, const dMatrix2& gamma, const bvec2& bo
       }
     }
     res.n_lewis = static_cast<int>(res.orbitals.size());
+    //A density with nothing in it - tests/molden_file/F2.molden carries 2.7 of its 14 electrons
+    //after the reader, epoxide.molden the same way - leaves the ladder with not one orbital to
+    //accept, and then OWSO below asked Eigen for the eigenvalues of a 0 x 0 matrix.  That crashes
+    //inside maxCoeff() rather than saying anything: both of those files segfaulted the native route.
+    //There is no Lewis structure to report for such an input, so say which input it was.
+    {
+        double tr = 0.0;
+        for (int i = 0; i < n; i++) tr += G0(i, i);
+        err_checkf(res.n_lewis > 0,
+                   "NBO: the search found no orbital at all - this spin's density holds only " +
+                   std::to_string(tr) + " electrons over " + std::to_string(n) +
+                   " NAOs, so there is no Lewis structure in it.  Check the wavefunction the .47 "
+                   "was built from: an unnormalised or truncated density reads like this one.",
+                   std::cout);
+    }
+    p_ladder = prof.lap();
 
     //3. self consistency.  The ladder decides one orbital at a time out of a density that still
     //holds every orbital found after it, so each accepted orbital carries the bias of the ones it
@@ -472,31 +560,104 @@ NboLewis nbo_search(const NAOResult& nao, const dMatrix2& gamma, const bvec2& bo
     //from 1.9857 to within 1e-4 of NBO's 1.99963, which is the difference between failing and
     //passing the 2e-3 tolerance.
     {
+        //The index set and the G0 corner of an orbital do not change from sweep to sweep, so they are
+        //built once rather than 200 times - the index set used to be rebuilt with two vector inserts
+        //per orbital per sweep.
+        std::vector<ivec> sub(res.n_lewis);
+        std::vector<MatrixXd> G0_corner(res.n_lewis);
+        for (int j = 0; j < res.n_lewis; j++) {
+            for (const int a : res.orbitals[j].centers)
+                sub[j].insert(sub[j].end(), idx[a].all.begin(), idx[a].all.end());
+            G0_corner[j] = corner(G0, sub[j]);
+            //The corner arithmetic below is only equivalent to the whole-matrix form while the
+            //vectors really are confined to their own centres.  That is an invariant of how they are
+            //built, not an assumption about the density, so it is checked once here instead of being
+            //trusted: a future search that lets an orbital reach further has to say so.
+            bvec on(n, false);
+            for (const int i : sub[j]) on[i] = true;
+            for (int i = 0; i < n; i++)
+                err_checkf(on[i] || vectors[j](i) == 0.0,
+                           "NBO: a search vector reaches outside its own centres", std::cout);
+        }
         vec occ(res.n_lewis, 0.0);
         MatrixXd sum = MatrixXd::Zero(n, n);
         for (int j = 0; j < res.n_lewis; j++) {
             occ[j] = vectors[j].dot(G0 * vectors[j]);
-            sum += occ[j] * vectors[j] * vectors[j].transpose();
+            const VectorXd vs = gather(vectors[j], sub[j]);
+            MatrixXd block = corner(sum, sub[j]);
+            block += occ[j] * vs * vs.transpose();
+            scatter_corner(sum, block, sub[j]);
         }
-        for (int sweep = 0; sweep < 200; sweep++) {
-            double change = 0.0;
-            for (int j = 0; j < res.n_lewis; j++) {
-                //a core orbital is a single NAO and stays one - NBO prints 2.00000 for it either way
-                if (res.orbitals[j].type == "CR") continue;
-                sum -= occ[j] * vectors[j] * vectors[j].transpose();
-                ivec sub;
+        //Two orbitals whose centres do not meet touch disjoint corners of sum: neither one's
+        //eigensolve reads anything the other's rank-one update writes.  So the sweep's order has to be
+        //kept only between orbitals that *do* share a centre.  level[j] is one past the last
+        //conflicting predecessor's level, which is exactly the sequential dependence and nothing
+        //more, so the orbitals of one level are independent by construction and can run at the same
+        //time without moving a bit.  Sucrose spends 200 sweeps here and 70 % of them inside the
+        //whole-space gemv below, which is memory bound - more cores is the only thing that makes a
+        //memory-bound loop faster.
+        ivec level(res.n_lewis, 0);
+        int n_levels = 0;
+        for (int j = 0; j < res.n_lewis; j++) {
+            //a core orbital is a single NAO and stays one - NBO prints 2.00000 for it either way, so
+            //it never enters a sweep and never blocks anything
+            if (res.orbitals[j].type == "CR") continue;
+            for (int i = 0; i < j; i++) {
+                if (res.orbitals[i].type == "CR") continue;
+                bool share = false;
                 for (const int a : res.orbitals[j].centers)
-                    sub.insert(sub.end(), idx[a].all.begin(), idx[a].all.end());
-                VectorXd v;
-                leading_block(MatrixXd(G0 - sum), sub, v);
-                if (v.dot(vectors[j]) < 0.0) v = -v;
-                change = std::max(change, (v - vectors[j]).norm());
-                vectors[j] = v;
-                occ[j] = v.dot(G0 * v);
-                sum += occ[j] * v * v.transpose();
+                    for (const int b : res.orbitals[i].centers)
+                        if (a == b) share = true;
+                if (share) level[j] = std::max(level[j], level[i] + 1);
             }
+            n_levels = std::max(n_levels, level[j] + 1);
+        }
+        std::vector<ivec> by_level(n_levels);
+        n_levels_used = n_levels;
+        for (int j = 0; j < res.n_lewis; j++)
+            if (res.orbitals[j].type != "CR") by_level[level[j]].push_back(j);
+        //the max over the whole sweep, taken after it: a per-orbital slot avoids an OpenMP max
+        //reduction, which MSVC's OpenMP 2.0 does not have
+        vec moved_at(res.n_lewis, 0.0);
+        for (int sweep = 0; sweep < 200; sweep++) {
+            for (int L = 0; L < n_levels; L++) {
+                const ivec& lv = by_level[L];
+                const int n_lv = static_cast<int>(lv.size());
+#pragma omp parallel for schedule(dynamic) num_threads(nthreads)
+                for (int t = 0; t < n_lv; t++) {
+                    const int j = lv[t];
+                    const ivec& s = sub[j];
+                    const int m = static_cast<int>(s.size());
+                    //one gather and one scatter for the pair of rank-one updates and the difference the
+                    //eigensolve needs, instead of three passes over the whole matrix
+                    MatrixXd block = corner(sum, s);
+                    VectorXd vs = gather(vectors[j], s);
+                    block -= occ[j] * vs * vs.transpose();
+                    Eigen::SelfAdjointEigenSolver<MatrixXd> es(MatrixXd(G0_corner[j] - block));
+                    VectorXd v = VectorXd::Zero(n);
+                    for (int p = 0; p < m; p++) v(s[p]) = es.eigenvectors()(p, m - 1);
+                    if (v.dot(vectors[j]) < 0.0) v = -v;
+                    moved_at[j] = (v - vectors[j]).norm();
+                    vectors[j] = v;
+                    vs = gather(v, s);
+                    //The occupancy is the one number here that the corner cannot produce: over the whole
+                    //space Eigen's gemv sums n terms in its own grouping and over the corner only m, and
+                    //adding the skipped zeros back does not put the surviving terms in the same groups.
+                    //It cost the 22 references their last bits and moved the E2 table at 1e-15, so the
+                    //gemv stays as it was, and it is the price of the numbers not moving: 70 % of the
+                    //sweep.  Memoising it was tried and refuted - see the note in the report.
+                    occ[j] = v.dot(G0 * v);
+                    block += occ[j] * vs * vs.transpose();
+                    scatter_corner(sum, block, s);
+                }
+            }
+            double change = 0.0;
+            for (int j = 0; j < res.n_lewis; j++) change = std::max(change, moved_at[j]);
+            n_sweeps++;
+            ch_trace.push_back(change);
             if (change < 1e-10) break;
         }
+        p_scf = prof.lap();
         //4. the refined set is still not orthogonal - two bonds at the same atom overlap by a fifth.
         //An occupancy-weighted symmetric orthogonalisation (OWSO) spreads that symmetrically, which
         //is what keeps two equivalent bonds equivalent while letting the occupied ones keep their
@@ -509,6 +670,7 @@ NboLewis nbo_search(const NAOResult& nao, const dMatrix2& gamma, const bvec2& bo
         VL = VL * w.asDiagonal() *
              sym_power(MatrixXd(w.asDiagonal() * S * w.asDiagonal()), -0.5);
         for (int j = 0; j < res.n_lewis; j++) vectors[j] = VL.col(j);
+        p_owso = prof.lap();
     }
 
     //5. the valence antibonds.  A bond is c_A h_A + c_B h_B over two normalised hybrids, so its
@@ -534,6 +696,7 @@ NboLewis nbo_search(const NAOResult& nao, const dMatrix2& gamma, const bvec2& bo
         non_lewis.push_back(w / nrm);
         non_lewis_fn.push_back(f);
     }
+    p_anti = prof.lap();
 
     //6. everything the Lewis set and the antibonds do not span.  Their hybrids reach a little way
     //into the extra-valence NAOs - the reference's own LP(1) on water's oxygen carries 0.17% d
@@ -555,18 +718,26 @@ NboLewis nbo_search(const NAOResult& nao, const dMatrix2& gamma, const bvec2& bo
         //Projecting the NAO unit vectors instead and taking them in order of the largest surviving
         //norm (a pivoted Gram-Schmidt) picks a basis each of whose members belongs to one NAO, and
         //so to one atom; that is what makes the printed RY orbitals one-centre.
+        p_comp = prof.lap();  //the projector Q alone until the pivot and the diagonalisation are in
         std::vector<VectorXd> extra;
         ivec owner;
         std::vector<VectorXd> residual(n);
         for (int i = 0; i < n; i++) residual[i] = Q.col(i);
         bvec used(n, false);
+        //n steps over n residuals of length n is n^3 - 0.40 s of sucrose's search, the second
+        //largest item after the sweep.  Each norm and each residual update is one independent Eigen
+        //reduction, so threading the loops regroups no sum; the pivot is still chosen by a serial
+        //scan in index order, so a tie still goes to the lowest NAO index.
+        vec nrm(n, 0.0);
         for (int step = 0; step < n - k; step++) {
             int pivot = -1;
             double best = 0.0;
+#pragma omp parallel for schedule(static) num_threads(nthreads)
+            for (int i = 0; i < n; i++)
+                if (!used[i]) nrm[i] = residual[i].norm();
             for (int i = 0; i < n; i++) {
                 if (used[i]) continue;
-                const double nrm = residual[i].norm();
-                if (nrm > best) { best = nrm; pivot = i; }
+                if (nrm[i] > best) { best = nrm[i]; pivot = i; }
             }
             err_checkf(pivot >= 0 && best > 1e-8,
                        "NBO: the residual space is smaller than the orbital count demands", std::cout);
@@ -574,9 +745,11 @@ NboLewis nbo_search(const NAOResult& nao, const dMatrix2& gamma, const bvec2& bo
             const VectorXd u = residual[pivot] / best;
             extra.push_back(u);
             owner.push_back(nao.orbitals[pivot].atom);
+#pragma omp parallel for schedule(static) num_threads(nthreads)
             for (int i = 0; i < n; i++)
                 if (!used[i]) residual[i] -= u.dot(residual[i]) * u;
         }
+        p_pivot = prof.lap();
         for (int a = 0; a < natoms; a++) {
             ivec mine;
             for (size_t j = 0; j < extra.size(); j++)
@@ -597,11 +770,15 @@ NboLewis nbo_search(const NAOResult& nao, const dMatrix2& gamma, const bvec2& bo
                 non_lewis_fn.push_back(f);
             }
         }
+        p_ryd = prof.lap();
+        p_comp += p_pivot + p_ryd;
     }
 
     for (size_t j = 0; j < non_lewis.size(); j++) {
         NboFunction f = non_lewis_fn[j];
-        f.occupancy = non_lewis[j].dot(G0 * non_lewis[j]);
+        //No occupancy here: phase 8 below computes it from vectors[j], which is this same vector,
+        //with the same expression - one n x n gemv per non-Lewis orbital, 0.28 s of sucrose's
+        //search, thrown away twenty lines later.
         if (f.type != "BD*") {
             f.multiplicity = 1;
             for (const NboFunction& o : res.orbitals)
@@ -613,7 +790,11 @@ NboLewis nbo_search(const NAOResult& nao, const dMatrix2& gamma, const bvec2& bo
 
     //8. coefficients, polarisation and l character.  The occupancies are taken here, from the final
     //vectors: the Lewis ones were refined and then orthogonalised after they were accepted.
-    for (size_t j = 0; j < res.orbitals.size(); j++) {
+    //One n x n gemv per orbital, and there are as many orbitals as NAOs: n^3, 0.59 s of sucrose's
+    //search.  Independent per orbital, and each writes only into its own res.orbitals entry.
+    const int n_orb = static_cast<int>(res.orbitals.size());
+#pragma omp parallel for schedule(static) num_threads(nthreads)
+    for (int j = 0; j < n_orb; j++) {
         NboFunction& f = res.orbitals[j];
         f.occupancy = vectors[j].dot(G0 * vectors[j]);
         f.coefficients.assign(vectors[j].data(), vectors[j].data() + n);
@@ -636,6 +817,24 @@ NboLewis nbo_search(const NAOResult& nao, const dMatrix2& gamma, const bvec2& bo
     double total = 0.0;
     for (int i = 0; i < n; i++) total += G0(i, i);
     res.rho_nl = total - lewis_density;
+    p_final = prof.lap();
+    if (options.debug) {
+        std::cout << "NBO search: n=" << n << " atoms=" << natoms << " lewis=" << res.n_lewis
+                  << " orbitals=" << res.orbitals.size() << " sweeps=" << n_sweeps
+                  << " levels=" << n_levels_used << " eig=" << n_eig1 + n_eig2
+                  << " | ladder " << p_ladder << " sweep " << p_scf << " owso " << p_owso
+                  << " antibonds " << p_anti << " complement " << p_comp << " (pivot "
+                  << p_pivot << " rydberg " << p_ryd << ") coefficients " << p_final
+                  << std::endl;
+        //The sweep stops at 200 iterations, not at its tolerance, on anything the size of
+        //sucrose, so the trace is worth seeing: it is the evidence for how far from converged
+        //the published occupancies are.
+        std::cout << "NBO search: sweep change";
+        for (size_t i = 0; i < ch_trace.size(); i++)
+            if (i < 3 || i + 3 >= ch_trace.size())
+                std::cout << " " << i << ":" << ch_trace[i];
+        std::cout << std::endl;
+    }
     return res;
 }
 
