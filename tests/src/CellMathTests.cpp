@@ -446,6 +446,15 @@ namespace NoSpherA2UnitTests
 		}
 	}
 
+	// The six tests below specify cell::compose_ops, grown_subgroup,
+	// coset_representatives and set_subgroup_factors - the old grown-structure
+	// implementation, which is commented out in cell.h, in cell.cpp and at its
+	// XCW.cpp call site as "an old but working implementation ... kept for reference
+	// purposes in case something goes wrong with the new implementation". These
+	// tests were the only live callers left, so every platform's build stopped on
+	// them. They are disabled the same way the code they specify is, and belong in
+	// whichever commit brings that implementation back.
+#if 0
 	// composition is matched modulo lattice translations: the screw squared is
 	// (x, y+1, z), i.e. the identity, and screw after inversion is the glide
 	TEST(CellMathIoTests, ComposeOpsMatchesModuloLattice)
@@ -610,6 +619,7 @@ namespace NoSpherA2UnitTests
 		EXPECT_NEAR(asym[2].asym_fact, 0.5, 1e-12);
 		EXPECT_NEAR(asym[3].asym_fact, 1.0, 1e-12);
 	}
+#endif
 
 	// xyz atoms that coincide with an asymmetric atom, also when shifted by a
 	// lattice translation, must not be appended a second time
