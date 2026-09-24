@@ -193,6 +193,12 @@ struct NboResults {
 	//(its binaries carry no OpenMP or pthread symbols), so CPU time is one thread's time.
 	double nbo_cpu_seconds = 0.0;
 	double nbo_reported_wall_seconds = 0.0;
+	//The native route runs the same stages in process, so none of the three above describe it: it
+	//spends its time writing and reading the .47, building the NAOs, searching the Lewis structure
+	//and pricing E2, while NRT reports its own phases inside the nrt block.  Summed over both spins.
+	double nao_seconds = 0.0;
+	double search_seconds = 0.0;
+	double e2_seconds = 0.0;
 	//The two E2 printing thresholds NBO echoes; below them the table is simply not printed, so a
 	//comparison that does not know them cannot tell a missing interaction from a small one.
 	double e2_threshold_kcal = 0.0;

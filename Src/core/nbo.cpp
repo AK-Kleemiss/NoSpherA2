@@ -683,8 +683,15 @@ namespace
     {
         const dMatrix2 gamma = nao_density(density, in.overlap, nao.C);
         const dMatrix2 fock_nao = fock.extent(0) ? nao_operator(fock, nao.C) : dMatrix2();
+        //A stage nobody times is a stage nobody can make faster: sucrose spent 50 of its 54 s
+        //somewhere in here while the only phase line in the log was NRT's own 1.4 s.
+        const auto clock = [] { return std::chrono::steady_clock::now(); };
+        auto t = clock();
         NboLewis lewis = nbo_search(nao, gamma, bondable, n_pairs, scale, options);
+        res.search_seconds += std::chrono::duration<double>(clock() - t).count();
+        t = clock();
         std::vector<NboE2Entry> e2 = nbo_e2(lewis, fock_nao, options.e2_threshold_kcal);
+        res.e2_seconds += std::chrono::duration<double>(clock() - t).count();
         //before the renumbering below, while e2's indices still point into lewis.orbitals
         if (options.nrt)
             native_nrt(res.nrt, nao, lewis, e2, nrt_bondable, options, spin, scale, std::cout);
@@ -776,6 +783,8 @@ namespace
 
 NboResults native_nbo(WFN& wavy, const NboOptions& options, std::ostream& log)
 {
+    const auto clock = [] { return std::chrono::steady_clock::now(); };
+    const auto t_f47 = clock();
     std::filesystem::path f47 = options.file47;
     bool temporary = false;
     if (f47.empty()) {
@@ -790,6 +799,7 @@ NboResults native_nbo(WFN& wavy, const NboOptions& options, std::ostream& log)
     if (temporary) std::filesystem::remove(f47);
 
     NboResults res;
+    res.file47_seconds = std::chrono::duration<double>(clock() - t_f47).count();
     res.name = wavy.get_path().stem().string();
     res.source = wavy.get_path().string();
     res.version = "NoSpherA2 native NBO";
@@ -806,7 +816,9 @@ NboResults native_nbo(WFN& wavy, const NboOptions& options, std::ostream& log)
 
     std::vector<NboLewis> lewis;
     if (!in.open_shell) {
+        const auto t_nao = clock();
         const NAOResult nao = build_naos(in.density[0], in.overlap, in.ao, atoms, ecp);
+        res.nao_seconds = std::chrono::duration<double>(clock() - t_nao).count();
         double electrons = 0.0;
         for (const NAOAtom& a : nao.atoms) electrons += a.population;
         const int n_pairs = static_cast<int>(std::llround(electrons / 2.0));
@@ -829,8 +841,10 @@ NboResults native_nbo(WFN& wavy, const NboOptions& options, std::ostream& log)
     }
     else {
         //NBO analyses the two spin densities independently and prints a spin-summed NAO table
+        const auto t_nao = clock();
         const NAOResult a_nao = build_naos(in.density[0], in.overlap, in.ao, atoms, ecp);
         const NAOResult b_nao = build_naos(in.density[1], in.overlap, in.ao, atoms, ecp);
+        res.nao_seconds = std::chrono::duration<double>(clock() - t_nao).count();
         for (int s = 0; s < 2; s++) {
             const NAOResult& nao = s ? b_nao : a_nao;
             double electrons = 0.0;
@@ -864,10 +878,14 @@ NboResults native_nbo(WFN& wavy, const NboOptions& options, std::ostream& log)
             res.npa.push_back(p);
         }
     }
-    if (options.debug)
+    if (options.debug) {
         for (const NboLewis& l : lewis)
             log << "native NBO: " << l.n_lewis << " Lewis orbitals, rho(NL) = " << l.rho_nl
                 << ", threshold " << l.threshold << std::endl;
+        log << "native NBO phases: file47 " << res.file47_seconds << " s, NAO " << res.nao_seconds
+            << " s, search " << res.search_seconds << " s, E2 " << res.e2_seconds
+            << " s (NRT reports its own)" << std::endl;
+    }
     return res;
 }
 

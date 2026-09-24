@@ -584,7 +584,11 @@ void write_nbo_json(const NboResults& r, const std::filesystem::path& json_file)
 	//nbo_seconds wraps the process; the other two are NBO's own closing line. NBO 7 is serial.
 	f << "  \"timings\": {\"file47_seconds\": " << jnum(r.file47_seconds) << ", \"nbo_seconds\": " << jnum(r.nbo_seconds)
 		<< ", \"nbo_reported_cpu_seconds\": " << jnum(r.nbo_cpu_seconds)
-		<< ", \"nbo_reported_wall_seconds\": " << jnum(r.nbo_reported_wall_seconds) << "},\n";
+		<< ", \"nbo_reported_wall_seconds\": " << jnum(r.nbo_reported_wall_seconds)
+		//the native route's own stages; zero on the gennbo route, which has no in-process stages
+		<< ", \"nao_seconds\": " << jnum(r.nao_seconds)
+		<< ", \"search_seconds\": " << jnum(r.search_seconds)
+		<< ", \"e2_seconds\": " << jnum(r.e2_seconds) << "},\n";
 	f << "  \"thresholds\": {\"e2_kcal\": " << jnum(r.e2_threshold_kcal)
 		<< ", \"e2_intermolecular_kcal\": " << jnum(r.e2_intermolecular_threshold_kcal)
 		<< ", \"nrt_parent_percent\": " << jnum(r.nrt.parent_threshold_percent)
