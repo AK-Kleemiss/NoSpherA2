@@ -3829,6 +3829,7 @@ bool options::digest_ri_options(const std::string &temp, int &i)
         rgbi_no_sym = true;
     }
     else if (temp == "-rgbi_EVs") {
+        rgbi = true; //like every other -rgbi_* option: on its own this used to be silently inert
         rgbi_EVs = true;
     }
     else if (temp == "-rgbi_theta") {

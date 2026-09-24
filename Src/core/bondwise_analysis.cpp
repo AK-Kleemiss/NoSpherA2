@@ -125,6 +125,13 @@ namespace {
 		case 0:
 			return 1;
 		case 1:
+			//The first period has two columns, not eight, and its second column is already the closed
+			//shell: helium fell through to the s1p1 case below and its free atom was built as a
+			//triplet, i.e. 1s(1)2s(1). That density has two exactly degenerate natural orbitals, the
+			//rank-1 atomic subspace then cut straight through the degeneracy, and which of the two the
+			//threaded eigensolver returned first changed from run to run - a He population that moved
+			//over a whole electron between two identical RGBI runs.
+			return column >= 2 ? 1 : 2;
 		case 2:
 		case 3:
 			switch (column) {
@@ -205,7 +212,14 @@ namespace {
 
 	occ::gto::AOBasis build_occ_atomic_basis_from_wfn_atom(
 		const atom &atm, const e_origin origin, const bool cartesian) {
-		std::vector<occ::core::Atom> occ_atoms{ { atm.get_charge(), 0.0, 0.0, 0.0 } };
+		//The ECP core is taken off the nucleus, not declared as frozen electrons. occ is given no ECP
+		//potential shells here - the readers keep the core electron count but not the potential - so
+		//declaring 60 frozen electrons on a Z = 80 nucleus builds the free atom as an Hg(60+) ion:
+		//its valence basis collapses onto its tightest primitives and the atomic subspace that comes
+		//out captures 8 of the 21.6 electrons the molecule puts on that atom. A nucleus of Z - N_core
+		//carrying Z - N_core electrons is the neutral pseudo-atom the valence basis was fitted for.
+		const int effective_Z = atm.get_charge() - atm.get_ECP_electrons();
+		std::vector<occ::core::Atom> occ_atoms{ { effective_Z, 0.0, 0.0, 0.0 } };
 		std::vector<occ::gto::Shell> shells;
 		const auto basis_set = atm.get_basis_set();
 		int primitive_idx = 0;
@@ -232,7 +246,8 @@ namespace {
 
 		occ::gto::AOBasis result(occ_atoms, shells, "wfn-atomic-basis");
 		result.set_pure(!cartesian);
-		result.set_ecp_electrons({ atm.get_ECP_electrons() });
+		//No set_ecp_electrons: the core is already off the nucleus above, and declaring it here as
+		//well would freeze the electrons twice - occ counts active = Z - ecp_electrons.
 		return result;
 	}
 
@@ -278,14 +293,35 @@ namespace {
 			? occ::qm::SpinorbitalKind::Restricted
 			: occ::qm::SpinorbitalKind::Unrestricted;
 
+		//An SCF cannot occupy more orbitals than the basis has, and occ does not say so: it writes
+		//past the end of its occupied block and the corruption surfaces later, in a malloc inside
+		//libcint. Au2Br2.gbw read without -ECP is the case - 79 electrons on Au and the 32 functions
+		//of a valence-only basis - and it dies with no message at all. Say which atom and why; the
+		//caller catches this and falls back to the molecular local orbitals.
+		const int n_alpha = (effective_atomic_number + multiplicity - 1) / 2;
+		if (n_alpha > static_cast<int>(basis.nbf()))
+			throw std::runtime_error(
+				"The free-atom SCF for " + atm.get_label() + " (Z = " + std::to_string(atm.get_charge()) +
+				", ECP core " + std::to_string(atm.get_ECP_electrons()) + ") would fill " +
+				std::to_string(n_alpha) + " orbitals of a basis that has only " +
+				std::to_string(basis.nbf()) + " functions. A wavefunction computed with an ECP has to be "
+				"read as one - pass -ECP - or its cores are counted against a basis that never "
+				"described them.");
+
 		occ::qm::HartreeFock hf(basis);
 		occ::qm::SCF<occ::qm::HartreeFock> scf(hf, spin_kind);
 		scf.set_charge_multiplicity(0, multiplicity);
-		scf.compute_scf_energy();
+		const double scf_energy = scf.compute_scf_energy();
 
 		occ::qm::MolecularOrbitals mo = scf.wavefunction().mo;
 		mo.update_occupied_orbitals();
 		mo.update_density_matrix();
+		if (std::getenv("NOS_RGBI_DEBUG") != nullptr)
+			std::cout << "\nFREEATOM " << atm.get_label() << " Z=" << effective_atomic_number
+				<< " mult=" << multiplicity << (restricted ? " restricted" : " unrestricted")
+				<< " nbf=" << basis.nbf() << " na=" << mo.n_alpha << " nb=" << mo.n_beta
+				<< std::setprecision(14) << " E=" << scf_energy
+				<< " sumD=" << mo.D.sum() << " normD=" << mo.D.norm() << "\n";
 
 		if (spin_kind == occ::qm::SpinorbitalKind::Restricted)
 			return eigen_matrix_to_dmatrix2(2.0 * mo.D);
@@ -1183,8 +1219,14 @@ Roby_information::NAOResult Roby_information::calculateAtomicNAO(const dMatrix2 
 	ivec idx(n);
 	std::iota(idx.begin(), idx.end(), 0);
 
+	//Ties must not be resolved by std::sort's internal order: a run-to-run sign flip on a numerical
+	//zero (+0.0 vs -0.0 compare equal) is enough to reshuffle them, and the kept subspace changes
+	//with the order.  The basis-function index is a deterministic tie-break.
 	std::sort(idx.begin(), idx.end(), [&](int i1, int i2) {
-		return result.eigenvalues[i1] > result.eigenvalues[i2];
+		const double a = result.eigenvalues[i1], b = result.eigenvalues[i2];
+		if (a != b)
+			return a > b;
+		return i1 < i2;
 		});
 
 	// Reorder based on sorted indices
@@ -1195,19 +1237,35 @@ Roby_information::NAOResult Roby_information::calculateAtomicNAO(const dMatrix2 
 	sorted_evecs.reserve(static_cast<size_t>(n) * n);
 	omitted_evecs.reserve(static_cast<size_t>(n) * n);
 
-	if (EVs) {
-		std::cout << "Eigenvalues of projected density P (unsorted):\n";
-		for (int i = 0; i < n; i++) {
-			int original_idx = idx[i];
-			std::cout << std::setw(14) << std::setprecision(8) << std::fixed << result.eigenvalues[original_idx] << "\n";
-		}
-	}
 
 	const int skip_orbitals = std::clamp(leading_orbitals_to_skip, 0, n);
 	//A non-negative keep_orbitals fixes the rank of the atomic subspace and ignores the occupancy
 	//threshold; the eigenvalues are already sorted, so this keeps the most occupied ones. The
 	//threshold branch is the legacy behaviour and steps whenever an occupation crosses it.
-	const int keep = std::clamp(keep_orbitals, 0, std::max(0, n - skip_orbitals));
+	//An eigenvector with numerically zero occupation carries no atomic density, and the null space of
+	//the free-atom density is degenerate, so any direction in it is as good as any other.  When the
+	//fixed rank reaches into that null space the kept subspace is padded with an arbitrary direction
+	//that still projects molecular density onto the atom: tests/TFVC/water.gbw, water plus a
+	//non-bonded helium, moved by 1.3 electrons between two identical ANO runs that way, because the
+	//padding direction changed.  The rank of the
+	//atomic subspace is therefore capped at the eigenvectors that are actually occupied.
+	constexpr double null_occupation = 1E-8;
+	int occupied_eigenvectors = 0;
+	for (int i = skip_orbitals; i < n; i++)
+		if (result.eigenvalues[idx[i]] > null_occupation)
+			occupied_eigenvectors++;
+	const int keep = std::min(std::clamp(keep_orbitals, 0, std::max(0, n - skip_orbitals)),
+		keep_orbitals >= 0 ? occupied_eigenvectors : n);
+	//A rank boundary inside a degenerate set is ambiguous for the same reason, but there the omitted
+	//partner is occupied, so no cap can help: say so instead of reporting an arbitrary number.
+	if (keep_orbitals >= 0 && keep > 0 && skip_orbitals + keep < n) {
+		const double last = result.eigenvalues[idx[skip_orbitals + keep - 1]];
+		const double first_out = result.eigenvalues[idx[skip_orbitals + keep]];
+		if (first_out > null_occupation && std::abs(last - first_out) < 1E-6)
+			std::cout << "\n  WARNING: the atomic subspace of rank " << keep << " cuts through a degenerate "
+			<< "occupation (" << std::setprecision(8) << last << " = " << first_out << "); which partner is "
+			<< "kept is arbitrary and this atom's population is not well defined.\n";
+	}
 	for (int i = 0; i < n; i++) {
 		int original_idx = idx[i];
 		const bool omit_orbital = i < skip_orbitals ||
@@ -1228,6 +1286,16 @@ Roby_information::NAOResult Roby_information::calculateAtomicNAO(const dMatrix2 
 	result.eigenvectors = sorted_evecs;
 	result.omitted_eigenvalues = omitted_evals;
 	result.omitted_eigenvectors = omitted_evecs;
+
+	//Printed after the split, not before it: where the rank boundary falls is the interesting part.
+	if (EVs) {
+		std::cout << "Occupations of the projected density P, rank " << sorted_evals.size()
+			<< " of " << n << ":\n";
+		for (size_t i = 0; i < sorted_evals.size(); i++)
+			std::cout << std::setw(14) << std::setprecision(8) << std::fixed << sorted_evals[i] << "  kept\n";
+		for (size_t i = 0; i < omitted_evals.size(); i++)
+			std::cout << std::setw(14) << std::setprecision(8) << std::fixed << omitted_evals[i] << "  omitted\n";
+	}
 
 	return result;
 }
@@ -2203,6 +2271,10 @@ void Roby_information::computeGroupAnalysis(const ivec2 &group_defs, const vec &
 }
 
 Roby_information::Roby_information(WFN &wavy, const ivec3 &group_sets, const bool symmetrize, const bool use_ano_basis, const bool EVs, const bool theta_info, const bool legacy_occupancy_cutoff) {
+	//The tables below print at three and four decimals, and that precision used to stay on cout:
+	//a second RGBI analysis in the same process printed a population as 1.295 where the first
+	//printed 1.29453, and every later line of the run lost digits the same way.
+	const ostream_format_guard restore_cout_format(std::cout);
 	auto bonds = get_bonded_atom_pairs(wavy);
 	//Both routes need a per-atom basis set, and a plain .wfn has none: it lists primitives by
 	//centre without shell structure, so every atom's basis comes back empty.  Unguarded, the ANO
@@ -2596,13 +2668,20 @@ Roby_information::Roby_information(WFN &wavy, const ivec3 &group_sets, const boo
 #endif
 	if (theta_info)
 		std::cout << theta_reports << std::endl;
-	const double number_of_electrons = wavy.get_nr_electrons();
+	//get_nr_electrons() is the sum over the nuclei; an ECP wavefunction never described the core, so
+	//measuring the analysis against it reported 21 % accounted for on HgH2 where 78 % is the truth.
+	const double number_of_electrons =
+		wavy.get_nr_electrons() - static_cast<double>(wavy.get_nr_ECP_electrons());
 	const double omitted_population = use_ano_basis
 		? all_atom_population_with_omitted - all_atom_population
 		: 0.0;
 
 	std::cout << "\nRoby-Gould Bond Indices (RGBI) Analysis\n----------------------------------------------\n";
-	std::cout << "Number of electrons in system:         " << number_of_electrons << "\n";
+	std::cout << "Number of electrons in system:         " << number_of_electrons;
+	if (wavy.get_nr_ECP_electrons() > 0)
+		std::cout << "  (" << wavy.get_nr_ECP_electrons() << " core electrons sit in ECPs and are "
+		"not described by this wavefunction)";
+	std::cout << "\n";
 	std::cout << "Number of electrons in Roby Analysis:  " << all_atom_population << "\n";
 	if (use_ano_basis) {
 		std::cout << "Number of cutoff electrons:            " << omitted_population << "\n";
