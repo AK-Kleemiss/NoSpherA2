@@ -951,9 +951,13 @@ TEST(ConvenienceOptionsTests, IsosurfaceAndAnalysisOptionsReadOptionalValues)
 	EXPECT_TRUE(def.properties.rho);
 	const options val = parse({ "-esp_isosurface", "0.01" });
 	EXPECT_NEAR(val.properties.esp_isosurface, 0.01, 1e-15);
-	const options eli = parse({ "-eli_analysis", "mol.wfn", "0.05", "3.5", "-acc", "4" });
+	//a real file, because -eli_analysis refuses a positional wavefunction that is not there: the
+	//name used to be taken on trust and the run died minutes later, or not at all
+	const TempFile mol("eli_analysis", ".wfn");
+	mol.write_text("");
+	const options eli = parse({ "-eli_analysis", mol.path.string(), "0.05", "3.5", "-acc", "4" });
 	EXPECT_TRUE(eli.eli_analysis_run);
-	EXPECT_EQ(eli.wfn, std::filesystem::path("mol.wfn"));
+	EXPECT_EQ(eli.wfn, mol.path);
 	EXPECT_NEAR(eli.properties.resolution, 0.05, 1e-15);
 	EXPECT_NEAR(eli.properties.radius, 3.5, 1e-15);
 	EXPECT_EQ(eli.accuracy, 4);
