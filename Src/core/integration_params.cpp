@@ -133,7 +133,13 @@ void Int_Params::collect_basis_data()
 			exponents.push_back(basis[shell].get_exponent());
 		}
 		// Normalize the GTOs depending on the context
-		if (wfn_origin == e_origin::gbw || wfn_origin == e_origin::wfx)
+		//A molden written by orca_2mkl carries the gbw's own contraction coefficients - they
+		//multiply bare x^l exp(-a r^2) with the contracted shell already normalised, which is what
+		//the molden reader documents and reads them as - so they need the gbw's conversion factor
+		//and not a second normalisation.  Without this branch a molden fell through to the
+		//"tread carefully" default, the overlap had no unit diagonal, and every analysis that pairs
+		//Int_Params with the density matrix (NPA/NBO, RGBI, Mulliken, the density fit) inherited it.
+		if (wfn_origin == e_origin::gbw || wfn_origin == e_origin::wfx || wfn_origin == e_origin::molden)
 		{
 			for (int i = 0; i < coefficients.size(); i++)
 			{

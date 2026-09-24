@@ -675,6 +675,51 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
 	err_checkf(nmo > 0, "No MOs in molden file", file);
 	vec _coefficients = flatten<double>(coefficients);
 	dMatrix2 m_coefs = reshape<dMatrix2>(_coefficients, Shape2D(nmo, expected_coefs));
+	//Every consumer of DM - NPA/NBO, RGBI, the Mulliken charges, the density fit - pairs it with an
+	//overlap from Int_Params, and Int_Params sorts an atom's shells by angular momentum and orders a
+	//shell's components in libcint's convention.  The molden lists shells in its own order and a
+	//pure shell in ORCA's m order (a p shell as x, y, z).  The gbw reader permutes its coefficients
+	//for exactly this reason; without the same permutation here the two matrices are indexed
+	//differently and nothing says so: Tr(P S) came out 1.51 of the 9 electrons of a fluorine atom.
+	if (spherical) {
+		ivec perm(expected_coefs, -1);
+		int file_idx = 0, internal = 0;
+		for (int a = 0; a < ncen; a++) {
+			ivec shell_l;
+			int current_shell = -1;
+			for (unsigned int s = 0; s < atoms[a].get_basis_set_size(); s++)
+				if ((int)atoms[a].get_basis_set_shell(s) != current_shell) {
+					shell_l.push_back(atoms[a].get_basis_set_type(s) - 1);
+					current_shell++;
+				}
+			//the internal index of each of this atom's shells: all s shells, then all p, then all d
+			ivec internal_off(shell_l.size(), 0);
+			const int max_l = shell_l.empty() ? 0 : *std::max_element(shell_l.begin(), shell_l.end());
+			for (int l = 0; l <= max_l; l++)
+				for (size_t sh = 0; sh < shell_l.size(); sh++)
+					if (shell_l[sh] == l) {
+						internal_off[sh] = internal;
+						internal += 2 * l + 1;
+					}
+			for (size_t sh = 0; sh < shell_l.size(); sh++) {
+				const int l = shell_l[sh];
+				for (int idx = 0; idx <= 2 * l; idx++) {
+					//l = 1 is the one shell the file writes cartesian whatever the [5D] flags
+					const std::optional<std::size_t> to = (l == 1) ? std::optional<std::size_t>(std::array<std::size_t, 3>{2, 0, 1}[idx])
+						: constants::orca_2_pySCF(l, idx);
+					err_checkf(to.has_value(), "No component order known for l = " + to_string(l) + " in " + filename.string(), file);
+					perm[file_idx++] = internal_off[sh] + static_cast<int>(to.value());
+				}
+			}
+		}
+		err_checkf(file_idx == expected_coefs && internal == expected_coefs,
+			"Molden basis walk found " + to_string(file_idx) + "/" + to_string(internal) + " of " + to_string(expected_coefs) + " basis functions", file);
+		dMatrix2 reordered(nmo, expected_coefs);
+		for (int mo = 0; mo < nmo; mo++)
+			for (int i = 0; i < expected_coefs; i++)
+				reordered(mo, perm[i]) = m_coefs(mo, i);
+		m_coefs = reordered;
+	}
 	dMatrix2 temp_co = diag_dot(m_coefs, occ, true);
 	DM = dot(temp_co, m_coefs);
 	if (is_unrestricted) {
@@ -2344,9 +2389,10 @@ bool WFN::write_nbo(const std::filesystem::path &fileName, const bool &debug, st
 	dMatrixRef2 OVLP_sph(OVLP_matrix.data(), nbo_nao, nbo_nao);
 	//libcint and OCC use the standard phases; ORCA's f(+-3), g(+-3), g(+-4) have the opposite
 	//sign and the gbw reader keeps them, so the overlap takes ORCA's sign there. Other origins
-	//with ORCA-like conventions may need the same and are not checked.
+	//with ORCA-like conventions need the same: origin_has_orca_pure_phases names them, and a molden
+	//written by orca_2mkl is one.
 	vec phase(nbo_nao, 1.0);
-	if (get_origin() == e_origin::gbw)
+	if (origin_has_orca_pure_phases(get_origin()))
 		for (const auto& shell : shells)
 			for (int c = 5; c < shell.nbo_components; c++)
 				phase[shell.nbo_start + c] = -1.0;

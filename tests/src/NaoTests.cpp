@@ -230,3 +230,72 @@ TEST(NaoOpenShellTests, HydrogenAtomCarriesOneUnpairedElectron)
 	EXPECT_NEAR(npa.alpha.population, 1.0, 1e-9);
 	EXPECT_NEAR(npa.beta.population, 0.0, 1e-9);
 }
+
+//Tr(P S) is the electron count by construction, whatever reader built P and whatever basis it is in,
+//so it is the one number that catches a density matrix and an overlap that are not in the same basis.
+//It caught three such defects on the molden route, all fixed: Int_Params had no normalisation branch
+//for a molden origin (the log said "tread carefully" and nothing else), the molden reader left the
+//coefficients in the file's own AO order while Int_Params sorts an atom's shells by l and orders a
+//shell's components in libcint's convention, and the ORCA |m| >= 3 sign convention was gated on the
+//gbw origin alone although orca_2mkl writes the gbw's own coefficients.  F_open came out at 1.512 of
+//its 9 electrons, Ce_full at 47.11 of 56, CuF2's i-shell molden at 17.57 of 47.  The reference each
+//file is checked against is its own sum of MO occupations, so this test needs no external number and
+//cannot be satisfied by making the reader and the integrals agree on something wrong.
+TEST(NaoReaderConsistencyTests, EveryReaderConservesTheElectronCount)
+{
+	struct Case { const char* dir; const char* file; double tol; };
+	const Case cases[] = {
+		//the moldens - a closed shell, an open shell, a 3d and a 4f element.  A molden prints its MO
+		//coefficients to about ten digits, so the density it carries is only that precise: Ce_full
+		//misses its 56 electrons by 1.5e-9 and the other three are exact to 1e-9.
+		{ "molden_file", "F_open.molden",   1e-7 },
+		{ "molden_file", "F_full.molden",   1e-7 },
+		{ "molden_file", "Sc_full.molden",  1e-7 },
+		{ "molden_file", "Ce_full.molden",  1e-7 },
+		//g, h and i shells, where the |m| >= 3 phase convention is worth 0.042 e.  The 1e-3 is not
+		//this code's error bar: the same 7.1e-4 is there for the gbw of the same calculation (see
+		//MoldenAndGbwOfTheSameCalculationAgree), a pre-existing high-l matter that is not a phase
+		//convention - flipping every |m| >= 3 is the best of the three candidate rules, measured.
+		{ "CuF2_i_func/71", "calc_occupied.molden", 1e-3 },
+		{ "CuF2_i_func/71", "calc.gbw",             1e-3 },
+		//gbw controls: ECP, an open shell, one electron, and the epoxide reference
+		{ "ECP_SF", "Au2Br2.gbw",       1e-9 },
+		{ "RGBI_groups", "nh3li.gbw",   1e-9 },
+		{ "ptb_H_file", "H.gbw",        1e-9 },
+		{ "epoxide_gbw", "epoxide.gbw", 1e-9 },
+	};
+	for (const Case& c : cases) {
+		const auto p = fixture(c.dir, c.file);
+		if (p.empty()) { GTEST_LOG_(INFO) << "skipping absent " << c.dir << "/" << c.file; continue; }
+		WFN wavy(p);
+		//a reader that fills no contracted density, or a cartesian basis, is a refusal and not this
+		//test's business - NaoRefusalTests and the CLI cover those
+		if (wavy.get_dm().extent(0) == 0 || wavy.get_d_f_switch()) {
+			GTEST_LOG_(INFO) << "no spherical contracted density in " << c.file;
+			continue;
+		}
+		double occ = 0.0;
+		for (int i = 0; i < wavy.get_nmo(); i++)
+			occ += wavy.get_MO_occ(i);
+		EXPECT_NEAR(trace_PS(wavy), occ, c.tol) << c.dir << "/" << c.file;
+	}
+}
+
+//The same ORCA calculation read two ways has to give the same density in the same basis.  Before the
+//molden fixes these two differed by 29.4 electrons of 47 and nothing said so; the gbw was right and
+//the molden was not, which is why the reference here is the gbw.  Both now sit at 46.99929, and the
+//7.1e-4 they share is what remains to explain about h and i shells.
+TEST(NaoReaderConsistencyTests, MoldenAndGbwOfTheSameCalculationAgree)
+{
+	const auto g = fixture("CuF2_i_func/71", "calc.gbw");
+	const auto m = fixture("CuF2_i_func/71", "calc_occupied.molden");
+	if (g.empty() || m.empty()) GTEST_SKIP() << "tests/CuF2_i_func/71 fixtures not found";
+	WFN gbw(g), mol(m);
+	ASSERT_EQ(gbw.get_origin(), e_origin::gbw);
+	ASSERT_EQ(mol.get_origin(), e_origin::molden);
+	EXPECT_NEAR(trace_PS(mol), trace_PS(gbw), 1e-4);
+	const NPAResult a = natural_population_analysis(gbw), b = natural_population_analysis(mol);
+	ASSERT_EQ(a.total.atoms.size(), b.total.atoms.size());
+	for (size_t i = 0; i < a.total.atoms.size(); i++)
+		EXPECT_NEAR(b.total.atoms[i].charge, a.total.atoms[i].charge, 5e-3) << "atom " << i + 1;
+}

@@ -398,11 +398,14 @@ dMatrix2 ao_overlap(const WFN &wavy)
     compute2C<Overlap2C_SPH>(params, S_flat);
     const size_t n = static_cast<size_t>(std::llround(std::sqrt(static_cast<double>(S_flat.size()))));
     dMatrix2 S = reshape<dMatrix2>(S_flat, Shape2D(n, n));
-    //ORCA stores the |m| >= 3 components - f(+-3), g(+-3), g(+-4) - with the sign opposite to
-    //libcint's, and the gbw reader keeps its convention in the density, so the overlap next to that
-    //density has to take ORCA's sign as well.  This is the same correction the FILE47 writer
-    //applies; without it Tr(P S) misses up to 0.3 e (SF6) and every NAO population inherits it.
-    if (wavy.get_origin() == e_origin::gbw) {
+    //An ORCA-convention density (gbw, and a molden written from one) carries the opposite sign on the
+    //|m| >= 3 components, so the overlap next to it has to take that sign as well - see
+    //origin_has_orca_pure_phases.  This is the same correction the FILE47 writer applies; without it
+    //Tr(P S) misses up to 0.3 e (SF6) and every NAO population inherits it.  Scanned against the
+    //electron count on CuF2_i_func/71/calc.gbw (shells up to i): flipping every |m| >= 3 gives
+    //46.99929 of 47, stopping at |m| <= 3 gives 46.99845, flipping nothing 46.95769 - so "all |m| >= 3"
+    //it is, and the 7e-4 that remains is a separate high-l matter, identical for the gbw and the molden.
+    if (origin_has_orca_pure_phases(wavy.get_origin())) {
         const ivec bas = params.get_bas();
         bvec flip(n, false);
         size_t k = 0;

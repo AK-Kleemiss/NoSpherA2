@@ -40,6 +40,18 @@ enum e_origin {
 	XCW_fit = 14
 };
 
+//ORCA stores the pure components with |m| >= 3 - f(+-3), g(+-3), g(+-4) and the same for h and i -
+//with the sign opposite to libcint's, and a reader that keeps ORCA's coefficients keeps that
+//convention in its density matrix.  Two readers do: the gbw reader, and the molden reader, because
+//orca_2mkl writes the gbw's own coefficients.  An overlap paired with such a density has to take
+//ORCA's sign there as well; in the ORCA component order (m = 0, +1, -1, +2, -2, ...) that is every
+//component index from 5 on.  Measured on tests/CuF2_i_func/71/calc_occupied.molden, which carries
+//shells up to i: without it Tr(P S) is 46.958 of the file's 47 electrons.
+inline bool origin_has_orca_pure_phases(const e_origin o)
+{
+	return o == e_origin::gbw || o == e_origin::molden;
+}
+
 /**
  * @class WFN
  * @brief Container for a quantum-mechanical wavefunction including atoms, basis primitives, molecular orbitals and derived properties.

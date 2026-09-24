@@ -10,6 +10,7 @@
 #include "crystal_energies.h"
 #include "spherical_density.h"
 #include "citations.h"
+#include "nao.h"
 #include <occ/qm/hf.h>
 
 namespace {
@@ -1516,14 +1517,19 @@ void Roby_information::computeAllAtomicNAOs(WFN &wavy, const bool symmetrize, co
 
 	density_matrix = wavy.get_dm();
 
-	Int_Params basis(wavy);
-	vec S_full;
-	if (wavy.get_d_f_switch())
+	if (wavy.get_d_f_switch()) {
+		Int_Params basis(wavy);
+		vec S_full;
 		compute2C<Overlap2C_CRT>(basis, S_full);
-	else
-		compute2C<Overlap2C_SPH>(basis, S_full);
-
-	overlap_matrix = reshape<dMatrix2>(S_full, Shape2D(density_matrix.extent(0), density_matrix.extent(1)));
+		overlap_matrix = reshape<dMatrix2>(S_full, Shape2D(density_matrix.extent(0), density_matrix.extent(1)));
+	}
+	else {
+		//The spherical overlap in the phase convention of the density beside it: an ORCA-convention
+		//density (a gbw, or a molden written from one) has the opposite sign on the |m| >= 3
+		//components, so a plain Overlap2C_SPH is the wrong metric for every molecule with f or higher
+		//shells.  ao_overlap is the one place that correction lives.
+		overlap_matrix = ao_overlap(wavy);
+	}
 
 #ifdef NSA2DEBUG
 	print_dmatrix2(overlap_matrix, "Overlap matrix");
