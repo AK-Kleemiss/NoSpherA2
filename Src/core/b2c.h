@@ -78,8 +78,12 @@ std::vector<d4> streaming_density_attractors(const WFN& wavy, const std::vector<
 //element keeps beneath its valence peaks at about 0.7 bohr for the first transition row
 double core_shell_radius(const int Z);
 //Every basin whose maximum lies within an atom's core radius becomes that atom's one core
-//basin, as DGrid's ELIDcore does; returns the number of basins merged away
-int unify_core_basins(cubei& basin_cube, std::vector<d4>& maxima, const std::vector<atom>& atoms);
+//basin, as DGrid's ELIDcore does; returns the number of basins merged away.
+//basin_map, when given, comes back sized maxima.size() + 1 and holds the 1-based basin each of
+//the maxima the call was handed ends up in. A streaming integration needs both halves of that:
+//the walk has to be able to reach every core shell's own maximum, while the report wants the
+//one merged core basin per atom.
+int unify_core_basins(cubei& basin_cube, std::vector<d4>& maxima, const std::vector<atom>& atoms, ivec* basin_map = nullptr);
 //Atomic overlap matrices S^b_ij = int_b phi_i phi_j, taken on the same quadrature points and
 //with the same basin assignment as the populations, so a basin's trace is its population by
 //construction. One packed lower triangle per basin over the occupied MOs
@@ -105,9 +109,12 @@ delocalization_result delocalization_indices(const WFN& wavy, const basin_overla
 void report_delocalization(const WFN& wavy, const basin_overlaps& ovl, const svec& labels, std::ostream& log, const double threshold = 0.01);
 //ovl, when given, is filled with the basin overlap matrices. Only meaningful for the orbital
 //density (field == nullptr): it is the orbitals that are being partitioned.
-//cub and basin_cube may both be null: the quadrature then runs streaming, every point sent up
-//the analytic field to one of the given maxima with no grid in the loop and no cube in memory
-vec integrate_basins_on_atomic_grids(const cube* cub, const cubei* basin_cube, const std::vector<d4>& maxima, const WFN& wavy, const int accuracy, const bool eli_field, vec& volumes, double& outside, const std::function<double(const d3&)>* core_density = nullptr, const std::function<void(const d3&, d3&)>* core_gradient = nullptr, const int grid_boost = 1, const density_field* field = nullptr, basin_overlaps* ovl = nullptr);
+//cub or basin_cube null: the quadrature then runs streaming, every point sent up the analytic
+//field to one of the given maxima with no grid deciding any boundary. A 0.1 A grid's spacing is
+//then assumed for the trajectory's step and the radius that counts as arrival.
+//maximum_basin, when given, is the 1-based basin of each maximum, as unify_core_basins reports
+//it: several maxima then share one basin and the returned vector is one entry per basin.
+vec integrate_basins_on_atomic_grids(const cube* cub, const cubei* basin_cube, const std::vector<d4>& maxima, const WFN& wavy, const int accuracy, const bool eli_field, vec& volumes, double& outside, const std::function<double(const d3&)>* core_density = nullptr, const std::function<void(const d3&, d3&)>* core_gradient = nullptr, const int grid_boost = 1, const density_field* field = nullptr, basin_overlaps* ovl = nullptr, const ivec* maximum_basin = nullptr);
 std::vector<critical_point_seed> find_cube_critical_point_seeds(const cube* cub, bool debug, double value_floor = -1.0, double gradient_epsilon = -1.0);
 std::vector<critical_point> refine_cube_critical_points(const cube* cub, const WFN& wavy, const std::vector<critical_point_seed>& seeds, bool debug, double value_floor = -1.0, double gradient_tolerance = 1e-8, double step_tolerance = 1e-6, int max_iterations = 32);
 std::vector<critical_point> analyze_cube_critical_points(const cube* cub, const WFN& wavy, bool debug, double value_floor = -1.0, double gradient_epsilon = -1.0, double gradient_tolerance = 1e-8, double step_tolerance = 1e-6, int max_iterations = 32);

@@ -2973,6 +2973,11 @@ void ELI_analysis(const WFN &wavy, options &opt) {
 	//resolution buys, and the atom-centred quadrature grids with the boundary decided by the
 	//field itself, which is the number to compare with AIMAll and DGrid. The ELI-D basins follow
 	//the orbitals' ELI-D and integrate the orbital density; only the QTAIM set uses the fit
+	//A streaming ELI-D has to be able to walk to every core shell's own maximum while the report
+	//keeps the one merged core basin per atom, so the integrator gets the unmerged list of maxima
+	//and the map from it to the basins alongside it
+	std::vector<d4> eli_maxima_all;
+	ivec eli_core_map;
 	auto report = [&](const char *title, const std::pair<cubei, std::vector<d4>> &res, svec &lab, const bool eli, const bool stream) {
 		//The voxel sum is a property of the basin cube; streaming has none, and the number it
 		//gave was the worse of the two anyway
@@ -2992,7 +2997,8 @@ void ELI_analysis(const WFN &wavy, options &opt) {
 		if (orbitals && !want_aom)
 			std::cout << "  Delocalization indices skipped: " << l_w.get_nmo() << " orbitals over " << res.second.size()
 				<< " basins on " << omp_get_max_threads() << " threads would need " << aom_bytes / (1024 * 1024) << " MB of overlap matrices.\n";
-		const vec pop = integrate_basins_on_atomic_grids(stream ? nullptr : &rho, stream ? nullptr : &(res.first), res.second, l_w, opt.accuracy, eli, vol, outside, fill_cores && !eli ? &core_density : nullptr, fill_cores && !eli ? &core_gradient : nullptr, opt.basin_grid, eli ? nullptr : fld, want_aom ? &ovl : nullptr);
+		const bool mapped = eli && stream && !eli_core_map.empty();
+		const vec pop = integrate_basins_on_atomic_grids(stream ? nullptr : &rho, stream ? nullptr : &(res.first), mapped ? eli_maxima_all : res.second, l_w, opt.accuracy, eli, vol, outside, fill_cores && !eli ? &core_density : nullptr, fill_cores && !eli ? &core_gradient : nullptr, opt.basin_grid, eli ? nullptr : fld, want_aom ? &ovl : nullptr, mapped ? &eli_core_map : nullptr);
 		std::cout << "\n" << title << " (atomic quadrature grids):\n";
 		//The maximum column is 16 wide, not 12: it carries rho at the attractor, and at a uranium
 		//nucleus that is 3.3e8 - it used to run into the volume beside it
@@ -3023,25 +3029,36 @@ void ELI_analysis(const WFN &wavy, options &opt) {
 	}
 
 	//ELI-D is a ratio of quantities that both vanish in the density's tail and turns to noise
-	//there, so its basins are searched only where the density exceeds 1e-4, the crop DGrid is
-	//run with here; what lies beyond is reported as outside
+	//there, so its maxima are searched only where the density exceeds 1e-4, the crop DGrid is
+	//run with here; on the cube what lies beyond is reported as outside, while a streaming walk
+	//starts out there too and climbs back in
 	for (int x = 0; x < eli_cube.get_size(0); x++)
 		for (int y = 0; y < eli_cube.get_size(1); y++)
 			for (int z = 0; z < eli_cube.get_size(2); z++)
 				if (rho.get_value(x, y, z) < 1e-4) eli_cube.set_value(x, y, z, 0.0);
 	std::pair<cubei, std::vector<d4>> eli_results = topological_cube_analysis(&eli_cube, atoms, opt.debug, false, 0.0, 1e-10, radius);
+	//The cube keeps the topology: there is no critical-point search for this field to take
+	//attractors from, and no analytic Hessian to test a maximum with - computeELIGrad is all there
+	//is. Testing the grid's ELI-D maxima against the analytic gradient was tried and removed: a
+	//hydrogen valence basin converges to a non-maximum of the gradient and the test ate six real H
+	//basins in UH6 and one in NH3Li. Only the boundaries become the field's, by sending every
+	//quadrature point up computeELIGrad to one of those maxima instead of reading a voxel's basin
+	//number, which is what leaves the crop above outside every basin.
+	//ELI-D needs g = rho tau - |grad rho|^2 / 4 > 0 to exist at all, and g vanishes wherever a
+	//single orbital carries the density - everywhere in a two-electron system - so there the walk
+	//has no slope to follow and the grid stays in charge.
+	const double electrons = l_w.count_nr_electrons();
+	const bool stream_eli = !opt.basin_cube && (opt.basin_analytic || electrons >= 10.0);
+	std::cout << "ELI-D basin boundaries from " << (stream_eli ? "the analytic field" : "the cube") << " ("
+		<< (opt.basin_cube ? "-basin_cube" : opt.basin_analytic ? "-basin_analytic" : stream_eli ? "the default" : "fewer than 10 electrons in the orbitals, " + std::to_string((int)std::lround(electrons))) << ")." << std::endl;
+	if (stream_eli) eli_maxima_all = eli_results.second;
 	//The shells of a heavy atom's core structure ELI-D into several basins each; one core
 	//basin per atom is what a bonding analysis wants, and what DGrid's ELIDcore gives
-	const int core_merged = unify_core_basins(eli_results.first, eli_results.second, atoms);
+	const int core_merged = unify_core_basins(eli_results.first, eli_results.second, atoms, stream_eli ? &eli_core_map : nullptr);
 	if (core_merged) std::cout << "Unified " << core_merged << " core-shell basins into their atoms' cores, " << eli_results.second.size() << " ELI-D basins remain." << std::endl;
-	//ELI-D keeps the cube: it is the cube that carries its topology, there is no critical-point
-	//search for this field to take attractors from, and no analytic Hessian to test a maximum
-	//with - computeELIGrad is all there is. Testing the grid's ELI-D maxima against the analytic
-	//gradient was tried and removed: a hydrogen valence basin converges to a non-maximum of the
-	//gradient and the test ate six real H basins in UH6 and one in NH3Li
 	svec eli_labels = assign_labels_to_basins(eli_results.second, atoms, opt.debug, 1);
 	report("QTAIM Analysis", qtaim_results, labels, false, stream_qtaim);
-	report("ELI-D Analysis", eli_results, eli_labels, true, false);
+	report("ELI-D Analysis", eli_results, eli_labels, true, stream_eli);
 }
 
 // ---------------------------------------------------------------------------

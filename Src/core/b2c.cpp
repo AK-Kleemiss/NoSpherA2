@@ -1302,7 +1302,7 @@ double core_shell_radius(const int Z)
 	return 1.8;
 }
 
-int unify_core_basins(cubei &basin_cube, std::vector<d4> &maxima, const std::vector<atom> &atoms)
+int unify_core_basins(cubei &basin_cube, std::vector<d4> &maxima, const std::vector<atom> &atoms, ivec *basin_map)
 {
 	const int nb = static_cast<int>(maxima.size());
 	ivec owner(nb, -1);
@@ -1336,6 +1336,12 @@ int unify_core_basins(cubei &basin_cube, std::vector<d4> &maxima, const std::vec
 				const int b = basin_cube.get_value(x, y, z);
 				if (b > 0) basin_cube.set_value(x, y, z, renumber[target[b]]);
 			}
+	//The swap above only ever exchanges two maxima of the same atom's core, and every member of
+	//that group shares one target, so renumber[target[b]] is the same number before and after it
+	if (basin_map) {
+		basin_map->assign(nb + 1, 0);
+		for (int b = 1; b <= nb; b++) (*basin_map)[b] = renumber[target[b]];
+	}
 	const int merged = nb - static_cast<int>(kept.size());
 	maxima.swap(kept);
 	return merged;
@@ -1464,7 +1470,7 @@ std::vector<d4> streaming_density_attractors(const WFN &wavy, const std::vector<
 //when every voxel within three of it agrees; otherwise it is sent up the analytic field
 //until it comes within two voxels of a maximum, so the boundary is the field's and not the
 //grid's.
-vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, const std::vector<d4> &maxima, const WFN &wavy, const int accuracy, const bool eli_field, vec &volumes, double &outside, const std::function<double(const d3&)> *core_density, const std::function<void(const d3&, d3&)> *core_gradient, const int grid_boost, const density_field *field, basin_overlaps *ovl)
+vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, const std::vector<d4> &maxima, const WFN &wavy, const int accuracy, const bool eli_field, vec &volumes, double &outside, const std::function<double(const d3&)> *core_density, const std::function<void(const d3&, d3&)> *core_gradient, const int grid_boost, const density_field *field, basin_overlaps *ovl, const ivec *maximum_basin)
 {
 	//The filled core steers the trajectories only. An ECP atom's grid is built for its
 	//valence basis and cannot integrate a 1s at Z = 80, so the core electrons are added to
@@ -1475,7 +1481,12 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 	//Streaming: no cube and no basin cube, the maxima are the whole topology and every point
 	//finds its basin by walking the field
 	const bool streaming = cub == nullptr || basin_cube == nullptr;
-	const int nb = streaming ? static_cast<int>(maxima.size()) : basin_cube->max_value();
+	//The basin a maximum belongs to, 1-based; without a map that is the maximum's own index
+	auto basin_of = [&](const size_t m) { return maximum_basin ? (*maximum_basin)[m + 1] : static_cast<int>(m) + 1; };
+	int nb = 0;
+	if (!streaming) nb = basin_cube->max_value();
+	else if (!maximum_basin) nb = static_cast<int>(maxima.size());
+	else for (size_t m = 0; m < maxima.size(); m++) nb = std::max(nb, basin_of(m));
 	//The overlap matrices ride along on the same points and the same weights as the populations:
 	//the density a point contributes is sum_i occ_i phi_i^2, so the diagonal of what is
 	//accumulated here sums to exactly the population below and the two can never disagree
@@ -1495,7 +1506,7 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 	//a 0.1 A grid: the integrator is then the one the gridded path has been validated against
 	//and only the basin bookkeeping changes
 	d3 h{ constants::ang2bohr(0.1), constants::ang2bohr(0.1), constants::ang2bohr(0.1) };
-	if (!streaming)
+	if (cub)
 		for (int i = 0; i < 3; i++)
 			h[i] = std::sqrt(cub->get_vector(0, i) * cub->get_vector(0, i) + cub->get_vector(1, i) * cub->get_vector(1, i) + cub->get_vector(2, i) * cub->get_vector(2, i));
 	//A third of a voxel with a midpoint step near a nucleus: the Euler step at half a voxel
@@ -1560,8 +1571,20 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 	auto at_maximum = [&](const d3 &p) {
 		for (size_t m = 0; m < maxima.size(); m++)
 			if (std::pow(p[0] - maxima[m][0], 2) + std::pow(p[1] - maxima[m][1], 2) + std::pow(p[2] - maxima[m][2], 2) < catch2)
-				return static_cast<int>(m) + 1;
+				return basin_of(m);
 		return 0;
+	};
+	//The basin of the maximum nearest p, 0 when the nearest is further than reach. A stalled
+	//trajectory has nowhere else to go: the field it was climbing has run out of slope, and the
+	//point still has to belong to somebody
+	auto nearest_maximum = [&](const d3 &p, const double reach) {
+		int best = 0;
+		double d2 = reach * reach;
+		for (size_t m = 0; m < maxima.size(); m++) {
+			const double q = std::pow(p[0] - maxima[m][0], 2) + std::pow(p[1] - maxima[m][1], 2) + std::pow(p[2] - maxima[m][2], 2);
+			if (q < d2) { d2 = q; best = basin_of(m); }
+		}
+		return best;
 	};
 	auto gradient = [&](const d3 &p, d3 &g) {
 		if (!eli_field) {
@@ -1571,6 +1594,18 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 		}
 		double e;
 		wavy.computeELIGrad(p, e, g);
+	};
+	//The field's value at p and its gradient in one call, which is what the climb needs to see
+	//that it has stopped rising: ELI-D's value costs nothing beside its gradient, computeELIGrad
+	//building both from the same orbital pass
+	auto value_and_gradient = [&](const d3 &p, d3 &g) {
+		if (eli_field) {
+			double e;
+			wavy.computeELIGrad(p, e, g);
+			return e;
+		}
+		gradient(p, g);
+		return density(p);
 	};
 	//Level 3 at least: a basin boundary cuts through the atomic shells and the population
 	//follows the angular resolution, 0.01 e at level 2, 0.005 at 3 and 0.002 at 4, which
@@ -1587,37 +1622,52 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 	std::iota(every_atom.begin(), every_atom.end(), 0);
 	grids.setup3DGridsForMolecule(wavy, every_atom);
 	const GridData &gd = grids.getGridData();
-	//For ELI-D a point's cell decides when its neighbourhood agrees and only a straddling
-	//cell sends a trajectory. For the density every point rides its own trajectory to a
-	//nucleus: the cube cannot place a cusp basin two voxels across, and AIMAll's surfaces
-	//are what this has to reproduce. A point below the crop climbs in all the same - the
-	//density's tail belongs to somebody - while ELI-D leaves it outside, as DGrid does.
+	//For a gridded ELI-D a point's cell decides when its neighbourhood agrees and only a
+	//straddling cell sends a trajectory; a point below the cube's crop is left outside, as DGrid
+	//does. For the density every point rides its own trajectory to a nucleus: the cube cannot
+	//place a cusp basin two voxels across, and AIMAll's surfaces are what this has to reproduce.
+	//A point below the crop climbs in all the same - the density's tail belongs to somebody.
+	//Streaming ELI-D does the same for the same reason: the outermost valence basin's separatrix
+	//runs to infinity, so the crop was never physics, only the cube's reach.
+	//Stopped climbing: for the density that is the sphere of maxima an ECP leaves around its
+	//nucleus, a bohr wide, and a trajectory that dies anywhere else is left outside where it can
+	//be seen - rho has a gradient everywhere, so there is no excuse for one. ELI-D does run out
+	//of slope, wherever g = rho tau - |grad rho|^2 / 4 goes to zero: one orbital carrying the
+	//density, which is the far tail of any molecule and all of a two-electron system. Out there
+	//the field does not exist to be followed and the nearest attractor, however far, is the only
+	//thing left to say who the point belongs to.
+	//ponytail: Euclidean nearest, not the separatrix it should be. It only ever decides points the
+	//field has gone flat on, whose weight is in the last digit of a basin; trace the separatrix if
+	//that ever stops being true
+	const double stall_reach = eli_field ? 1e30 : 1.0;
 	auto climb = [&](const d3 &p, long long &lb, long long &ll) {
 		bool settled;
 		int b = lookup(p, settled);
-		if (eli_field && (settled || b == 0)) return b;
+		//A gridded ELI-D takes a settled cell straight from the cube and leaves the crop outside;
+		//streaming has no cube to ask and walks from every point
+		if (eli_field && !streaming && (settled || b == 0)) return b;
 		int c[3]; d3 f;
 		//Off the cube there is nothing to integrate; streaming has no cube to be off
 		if (!streaming && !cell(p, c, f)) return 0;
 		lb++;
 		d3 r = p, g;
-		double last_rho = -1.0;
+		double last_value = -1.0;
 		for (int s = 0; s < 2000; s++) {
 			const int m = at_maximum(r);
 			if (m) return m;
-			if (!eli_field) {
-				//Stopped climbing: the sphere of maxima around an ECP nucleus; that nucleus
-				//owns it when it is the seed within a bohr
-				const double rho_here = density(r);
-				if (rho_here <= last_rho) {
-					for (size_t q = 0; q < maxima.size(); q++)
-						if (std::pow(r[0] - maxima[q][0], 2) + std::pow(r[1] - maxima[q][1], 2) + std::pow(r[2] - maxima[q][2], 2) < 1.0) return static_cast<int>(q) + 1;
+			const double sl = step_at(r);
+			//The gridded ELI-D climb is steered by the cube below and never asked whether it is
+			//still rising; every streaming walk is, since nothing else can stop it
+			if (!eli_field || streaming) {
+				const double here = value_and_gradient(r, g);
+				if (here <= last_value) {
+					const int n = nearest_maximum(r, stall_reach);
+					if (n) return n;
 					break;
 				}
-				last_rho = rho_here;
+				last_value = here;
 			}
-			const double sl = step_at(r);
-			gradient(r, g);
+			else gradient(r, g);
 			double gn = std::sqrt(g[0] * g[0] + g[1] * g[1] + g[2] * g[2]);
 			if (gn < 1e-12) break;
 			d3 mid;
@@ -1626,11 +1676,16 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 			gn = std::sqrt(g[0] * g[0] + g[1] * g[1] + g[2] * g[2]);
 			if (gn < 1e-12) break;
 			for (int k = 0; k < 3; k++) r[k] += sl * g[k] / gn;
-			const int b2 = lookup(r, settled);
-			if (b2 == 0 && eli_field) { ll++; break; }
-			if (b2) b = b2;
-			if (settled && eli_field) break;
+			if (!streaming) {
+				const int b2 = lookup(r, settled);
+				if (b2 == 0 && eli_field) { ll++; break; }
+				if (b2) b = b2;
+				if (settled && eli_field) break;
+			}
 		}
+		//A streaming ELI-D trajectory that died, ran its 2000 steps out or lost its gradient has
+		//nowhere to report to; the gridded one still has the cube's answer in b
+		if (eli_field && streaming) return nearest_maximum(r, stall_reach);
 		return b;
 	};
 	//Local refinement. A quadrature cell is a shell segment, and the error the basin boundary
@@ -1698,8 +1753,9 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 					lv[bb - 1] += w * fr;
 					accumulate(bb, w * fr);
 				};
-				//For ELI-D a cell whose neighbourhood agrees is taken from the grid, as before
-				if (eli_field && (b == 0 || settled)) { give(b, 1.0); continue; }
+				//For a gridded ELI-D a cell whose neighbourhood agrees is taken from the grid, as
+				//before; streaming has no grid to take it from and every cell is refined
+				if (eli_field && !streaming && (b == 0 || settled)) { give(b, 1.0); continue; }
 				b = climb(p, lb, ll);
 				const size_t k = std::lower_bound(shells.begin(), shells.end(), radius[i] - 1e-8) - shells.begin();
 				const double inner = k > 0 ? 0.5 * (shells[k - 1] + shells[k]) : 0.0;
