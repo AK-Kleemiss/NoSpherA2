@@ -390,6 +390,33 @@ void append_numbers(const std::string& line, std::vector<T>& out, const std::str
 	err_checkf(is.eof(), "Not a number in " + what + ": '" + line + "'", log);
 }
 
+/** @brief Restores a stream's sticky format state - flags, precision, width - when it goes out of
+ *  scope, on every path including an unwinding exception.
+ *
+ *  std::fixed and std::setprecision stay set on the stream after the statement that wrote them, and
+ *  the analyses here print tables at three or four decimals. Everything printed afterwards through
+ *  the same stream then carries that precision: the second of two RGBI analyses in one process
+ *  printed a population as 1.295 where the first printed 1.29453, the same number in fewer digits.
+ *  An analysis that prints has no business changing how the rest of the program prints, so every
+ *  entry point that formats its output holds one of these. */
+struct ostream_format_guard
+{
+	std::ostream& stream;
+	const std::ios_base::fmtflags flags;
+	const std::streamsize precision;
+	const std::streamsize width;
+	explicit ostream_format_guard(std::ostream& s)
+		: stream(s), flags(s.flags()), precision(s.precision()), width(s.width()) {}
+	ostream_format_guard(const ostream_format_guard&) = delete;
+	ostream_format_guard& operator=(const ostream_format_guard&) = delete;
+	~ostream_format_guard()
+	{
+		stream.flags(flags);
+		stream.precision(precision);
+		stream.width(width);
+	}
+};
+
 inline void print_centered_text(const std::string& text, int& bar_width, std::ostream& file = std::cout)
 {
 	const int text_length = static_cast<int>(text.length());
@@ -1045,7 +1072,7 @@ struct options
  *  it, so a misspelling cannot hand back the analysis' default. */
 const char *owning_analysis(const std::string &flag);
 
-/** @brief The -nbo_*/-nrt_* options the -nbo/-nbo_parse/-nbo_native/-convert_to_47 handlers read
+/** @brief The -nbo_ and -nrt_ options the -nbo/-nbo_parse/-nbo_native/-convert_to_47 handlers read
  *  from the tokens after their own wavefunction rather than through a digester. This is the only
  *  list of flags the parser keeps: every other option is known by the digester that claims it, and
  *  a flag a digester claims never reaches the unknown-option refusal. Adding an option to a

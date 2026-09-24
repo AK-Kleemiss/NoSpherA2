@@ -294,6 +294,11 @@ public:
 	bool add_exp(const int& cent, const int& type, const double& e);
 	/** Auto-detect file type and read wavefunction. */
 	void read_known_wavefunction_format(const std::filesystem::path& fileName, std::ostream& file, const bool debug = false);
+	/** @brief Declare def2 ECP cores when the orbitals hold exactly that many electrons fewer than
+	 *  the nuclei carry. No file format states an ECP unless -ECP is passed, and an analysis that
+	 *  fills orbitals from Z then works with electrons the basis does not describe. Only an exact
+	 *  match against constants::ECP_electrons acts; anything else is left alone. */
+	void declare_ECPs_if_core_electrons_are_missing(std::ostream& file);
 	/** Read legacy .wfn /.ffn file. */
 	bool read_wfn(const std::filesystem::path& fileName, const bool& debug, std::ostream& file);
 	/** Read .wfx file. */

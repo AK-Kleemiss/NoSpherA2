@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -26,6 +26,7 @@
     <ClCompile Include="..\..\tests\src\DeltaSeriesTests.cpp" />
     <ClCompile Include="..\..\tests\src\DensitySourceTests.cpp" />
     <ClCompile Include="..\..\tests\src\CliRefusalTests.cpp" />
+    <ClCompile Include="..\..\tests\src\BondingGuardsTests.cpp" />
     <ClCompile Include="..\..\tests\src\Nbo47Tests.cpp" />
     <ClCompile Include="..\..\tests\src\NrtTests.cpp" />
     <ClCompile Include="..\..\tests\src\pch.cpp">

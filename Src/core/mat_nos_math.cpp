@@ -471,6 +471,20 @@ template iMatrix2 get_rectangle(const iMatrix2& a, const ivec& rows);
 template dMatrix2 get_rectangle(const dMatrix2& a, const ivec& rows);
 template cMatrix2 get_rectangle(const cMatrix2& a, const ivec& rows);
 
+//Every caller of these helpers hands over a list of basis function indices it built itself, from a
+//shell description of the wavefunction. Those lists have been wrong - a shell layout the reader
+//describes differently from the density matrix it delivered - and the loops below index the full
+//matrix with them unchecked, so a list that runs past the matrix read whatever memory followed it:
+//a segfault on a good day, a plausible number on a bad one. Say which index and how big the matrix
+//is instead; whoever built the list can then be found.
+static void check_submatrix_indices(const ivec& indices, const size_t extent, const char* what) {
+	for (const int index : indices)
+		err_checkf(index >= 0 && static_cast<size_t>(index) < extent,
+			std::string(what) + " index " + std::to_string(index) + " is outside the " +
+			std::to_string(extent) + "-function matrix it addresses",
+			std::cout);
+}
+
 template <typename T, typename T2>
 void get_submatrix(const T2& full,
 	T& sub,
@@ -479,6 +493,7 @@ void get_submatrix(const T2& full,
 	const int n = static_cast<int>(indices.size());
 	err_checkf(full.extent(0) == full.extent(1), "Matrix must be square.", std::cout);
 	err_checkf(sub.size() == static_cast<size_t>(n) * n, "Submatrix has incorrect size.", std::cout);
+	check_submatrix_indices(indices, full.extent(0), "Submatrix");
 
 	for (int i = 0; i < n; ++i) {
 		const int global_i = indices[i];
@@ -503,6 +518,8 @@ void get_submatrix(const T2& full,
 	err_checkf(n1 > 0, "Val indices list is empty.", std::cout);
 	err_checkf(n2 > 0, "Vec indices list is empty.", std::cout);
 	err_checkf(sub.size() == static_cast<size_t>(n1) * n2, "Submatrix has incorrect size.", std::cout);
+	check_submatrix_indices(val_indices, full.extent(0), "Submatrix row");
+	check_submatrix_indices(vec_indices, full.extent(1), "Submatrix column");
 
 	for (int i = 0; i < n1; ++i) {
 		const int global_i = val_indices[i];
@@ -607,6 +624,7 @@ void get_submatrices(const T2& D_full,
 	err_checkf(D_full.extent(0) == S_full.extent(0), "Density and Overlap matrices must be of the same size.", std::cout);
 	err_checkf(D_sub.size() == static_cast<size_t>(n) * n, "Density submatrix has incorrect size.", std::cout);
 	err_checkf(S_sub.size() == static_cast<size_t>(n) * n, "Overlap submatrix has incorrect size.", std::cout);
+	check_submatrix_indices(indices, D_full.extent(0), "Submatrix");
 
 	for (int i = 0; i < n; ++i) {
 		const int global_i = indices[i];

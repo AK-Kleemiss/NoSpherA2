@@ -60,6 +60,41 @@ void WFN::read_known_wavefunction_format(const std::filesystem::path &fileName, 
 		err_checkf(read_tonto(fileName, file, debug), "Problem reading tonto file", file);
 	else
 		err_checkf(false, "Unknown filetype!", file);
+	declare_ECPs_if_core_electrons_are_missing(file);
+};
+
+//A wavefunction computed with an ECP describes fewer electrons than its nuclei carry, and none of
+//the formats above says so unless the user remembers -ECP: the atoms keep their full charge, and
+//every analysis that fills orbitals from Z then works with electrons the basis does not describe.
+//RGBI's free-atom SCF is where that ended worst - Au2Br2.gbw put 79 electrons into the 32 functions
+//of a valence-only basis and corrupted the heap inside libcint. The missing core is not guessed
+//here: it is declared only when the shortfall matches the def2 core counts exactly, which is the
+//same table -ECP applies. Any other shortfall (a charge the reader missed, a different ECP family)
+//leaves the wavefunction alone and is caught where it is used.
+void WFN::declare_ECPs_if_core_electrons_are_missing(std::ostream &file)
+{
+	if (has_ECPs || nmo <= 0 || ncen <= 0)
+		return;
+	const double occupied = count_nr_electrons();
+	if (occupied <= 0.0)
+		return; //a geometry without orbitals says nothing about electrons
+	constexpr int table_size = static_cast<int>(sizeof(constants::ECP_electrons) / sizeof(int));
+	int table_core = 0;
+	for (int i = 0; i < ncen; i++)
+	{
+		const int Z = get_atom_charge(i);
+		if (Z >= 0 && Z < table_size)
+			table_core += constants::ECP_electrons[Z];
+	}
+	if (table_core == 0)
+		return;
+	const long long missing = static_cast<long long>(get_nr_electrons()) - std::llround(occupied);
+	if (missing != table_core)
+		return;
+	file << "The orbitals hold " << std::llround(occupied) << " electrons, " << missing
+		<< " fewer than the nuclei carry, and that is exactly the def2 ECP core of these atoms: "
+		<< "treating them as ECP atoms, as -ECP would.\n";
+	set_has_ECPs(true, true, 1);
 };
 
 bool WFN::read_wfn(const std::filesystem::path &fileName, const bool &debug, std::ostream &file)

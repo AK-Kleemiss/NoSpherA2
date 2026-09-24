@@ -1514,6 +1514,18 @@ void Roby_information::computeAllAtomicNAOs(WFN &wavy, const bool symmetrize, co
 			}
 		}
 
+		//This walk assumes the shell description the reader left on the atoms and the density matrix
+		//it delivered agree, and nothing checked it: an atom whose shells add up to more rows than
+		//the matrix has sent every later index past its end, which is how Au2Br2.gbw died in a
+		//malloc far from here. The shells are what to report - the matrix is not wrong, the
+		//description of it is.
+		err_checkf(last_index <= static_cast<int>(density_matrix.extent(0)),
+			"The basis of atom " + std::to_string(a.get_nr()) + " (" + a.get_label() + ") describes " +
+			std::to_string(last_index) + " basis functions by its shells, more than the " +
+			std::to_string(density_matrix.extent(0)) + " the density matrix has. RGBI cannot index a "
+			"matrix it has been given a wrong shell layout for.",
+			std::cout);
+
 		// The GBW reader converts ORCA components to PySCF/libcint order and
 		// groups an atom's shells by increasing angular momentum.  Mirror that
 		// layout here so each symmetry block describes the corresponding DM rows.
@@ -1590,6 +1602,15 @@ void Roby_information::computeAllAtomicNAOs(WFN &wavy, const bool symmetrize, co
 		}
 		NAOs.back().atom_index = a.get_nr() - 1;
 	}
+
+	//The other direction of the same disagreement: fewer indices than rows leaves basis functions
+	//in no atom's subspace, and the Roby indices are then built from part of the density without
+	//saying so - the numbers come out plausible and low.
+	err_checkf(last_index == static_cast<int>(density_matrix.extent(0)),
+		"The atoms' shells account for " + std::to_string(last_index) + " basis functions but the "
+		"density matrix has " + std::to_string(density_matrix.extent(0)) + ". RGBI would leave the "
+		"difference in no atom's subspace; the shell description of this wavefunction is incomplete.",
+		std::cout);
 #ifdef NSA2DEBUG
 	print_dmatrix2(overlap_matrix, "Overlap matrix repaired");
 #endif

@@ -2,6 +2,7 @@
 #include "nbo.h"
 #include "wfn_class.h"
 #include "constants.h"
+#include "convenience.h"
 
 #include <Eigen/Dense>
 #include <fstream>
@@ -892,6 +893,9 @@ NboResults native_nbo(WFN& wavy, const NboOptions& options, std::ostream& log)
 void print_nbo(const NboResults& r, std::ostream& out)
 {
     using namespace std;
+    //fixed/setprecision below stay on the stream after this table, so everything printed through it
+    //afterwards would carry two decimals
+    const ostream_format_guard restore_format(out);
     out << "\n NATURAL BOND ORBITAL ANALYSIS (in house):\n\n"
         << "                                                      Principal Delocalizations\n"
         << "  NBO                         Occupancy    Energy\n"

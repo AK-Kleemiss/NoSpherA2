@@ -33,6 +33,9 @@
     <ClCompile Include="..\..\tests\src\CliRefusalTests.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\tests\src\BondingGuardsTests.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\tests\src\Nbo47Tests.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
