@@ -55,20 +55,37 @@ namespace
         return out;
     }
 
-    //Leading eigenpair of the block of R over idx, embedded back into the full space.  A copy of
-    //nbo.cpp's helper; ten lines duplicated is cheaper than a header two files under parallel
-    //development both have to include.
-    double leading_block(const MatrixXd& R, const ivec& idx, VectorXd& v)
+    //Leading eigenpair of the block of R (less minus, if given) over idx, embedded back into the full
+    //space.  A copy of nbo.cpp's helper; ten lines duplicated is cheaper than a header two files under
+    //parallel development both have to include.  minus exists because the self-consistency sweep below
+    //wants the block of G0 - sum and nothing else of it: materialising the n x n difference to read a
+    //57 x 57 corner of it cost 11 s of Ni(CO)4's 145.
+    double leading_block(const MatrixXd& R, const ivec& idx, VectorXd& v,
+                         const MatrixXd* minus = nullptr)
     {
         const int k = static_cast<int>(idx.size());
         MatrixXd B(k, k);
         for (int i = 0; i < k; i++)
             for (int j = 0; j < k; j++)
-                B(i, j) = R(idx[i], idx[j]);
+                B(i, j) = minus ? R(idx[i], idx[j]) - (*minus)(idx[i], idx[j])
+                                : R(idx[i], idx[j]);
         Eigen::SelfAdjointEigenSolver<MatrixXd> es(B);
         v = VectorXd::Zero(R.rows());
         for (int i = 0; i < k; i++) v(idx[i]) = es.eigenvectors()(i, k - 1);
         return es.eigenvalues()(k - 1);
+    }
+
+    //A += s x x^T over idx x idx only.  Every orbital leading_block returns is exactly zero outside
+    //its own block, so the rest of the outer product adds exactly 0.0 and skipping it is not an
+    //approximation: for Ni(CO)4's 293 NAOs and a 57-wide block it is 3.8 % of the writes, and the two
+    //updates per sweep step were 36 s of the 145.
+    void rank1_block(MatrixXd& A, const ivec& idx, const double s, const VectorXd& x)
+    {
+        const int k = static_cast<int>(idx.size());
+        for (int i = 0; i < k; i++) {
+            const double xi = s * x(idx[i]);
+            for (int j = 0; j < k; j++) A(idx[i], idx[j]) += xi * x(idx[j]);
+        }
     }
 
     //--------------------------------------------------------------------------------------
@@ -445,28 +462,35 @@ namespace
             for (int m = 0; m < sl.mult; m++) {
                 VectorXd x;
                 const double lam = leading_block(R, idx, x);
-                R -= lam * x * x.transpose();
+                rank1_block(R, idx, -lam, x);
                 v[col] = x;
                 blk[col] = &idx;
                 owner[col] = { sl.a, sl.b };
                 occ[col] = x.dot(G0 * x);
-                sum += occ[col] * x * x.transpose();
+                rank1_block(sum, idx, occ[col], x);
                 col++;
             }
         }
 
         //3. self consistency: every orbital against the density with all the others removed
+        //ponytail: this loop is 87 % of single-thread NRT and all of it is the SelfAdjointEigenSolver
+        //inside leading_block - 298 371 dense 57x57 solves for Ni(CO)4, at 7.6 GFlop/s, so there is no
+        //waste left to remove, only work.  Measured, not guessed: the change < 1e-9 exit never fires
+        //(all 234 candidates run all 50 sweeps) and only 265 of 292 500 orbital updates leave the
+        //orbital standing, so neither a lower sweep cap nor memoising an unchanged block would help.
+        //The upgrade path is a warm-started Lanczos for the leading eigenpair instead of a full solve,
+        //worth ~2x; it is not taken because it changes the arithmetic and D(w) has to stay bit-identical.
         for (int s = 0; s < max_sweeps; s++) {
             double change = 0.0;
             for (int j = first_valence; j < k; j++) {
-                sum -= occ[j] * v[j] * v[j].transpose();
+                rank1_block(sum, *blk[j], -occ[j], v[j]);
                 VectorXd x;
-                leading_block(MatrixXd(G0 - sum), *blk[j], x);
+                leading_block(G0, *blk[j], x, &sum);
                 if (x.dot(v[j]) < 0.0) x = -x;
                 change = std::max(change, (x - v[j]).norm());
                 v[j] = x;
                 occ[j] = x.dot(G0 * x);
-                sum += occ[j] * x * x.transpose();
+                rank1_block(sum, *blk[j], occ[j], x);
             }
             if (change < 1e-9) break;
         }
