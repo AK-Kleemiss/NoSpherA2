@@ -2635,6 +2635,16 @@ bool options::digest_io_options(const std::string &temp, int &i)
             else if (arguments[j] == "-nbo_47") opt.file47 = arguments[j + 1];
             else if (arguments[j] == "-nbo_e2min") opt.e2_threshold_kcal = std::stod(arguments[j + 1]);
             else if (arguments[j] == "-nbo_threads") opt.threads = std::stoi(arguments[j + 1]);
+            //This branch runs the analysis inline and returns, so a -cpus written after
+            //-nbo_native never reached the main digester and was silently dropped.
+            else if (arguments[j] == "-cpus") {
+                threads = std::stoi(arguments[j + 1]);
+                MKL_Set_Num_Threads(threads);
+#ifdef _OPENMP
+                omp_set_num_threads(threads);
+                omp_set_dynamic(0);
+#endif
+            }
             else if (arguments[j] == "-nrt") opt.nrt = true;
             else if (arguments[j] == "-nrt_e2") opt.nrt_e2_kcal = std::stod(arguments[j + 1]);
             else if (arguments[j] == "-nrt_arrows") opt.nrt_max_arrows = std::stoi(arguments[j + 1]);
@@ -2657,6 +2667,8 @@ bool options::digest_io_options(const std::string &temp, int &i)
             else if (arguments[j] == "-nrt_no_components") opt.nrt_components = false;
             else if (arguments[j] == "-nrt_no_ion") opt.nrt_ion = false;
             else if (arguments[j] == "-nbo_keep47") opt.keep_file47 = true;
+        //-nbo_threads wins, then -cpus, then the OpenMP default; NRT read only the first of the three.
+        if (opt.threads <= 0 && threads > 0) opt.threads = threads;
         WFN wavy(e_origin::NOT_YET_DEFINED);
         wavy.read_known_wavefunction_format(_wfn, std::cout, debug);
         //Cited from here rather than from nbo.cpp/nrt.cpp, so the search and the resonance

@@ -2183,6 +2183,18 @@ void Roby_information::computeGroupAnalysis(const ivec2 &group_defs, const vec &
 
 Roby_information::Roby_information(WFN &wavy, const ivec3 &group_sets, const bool symmetrize, const bool use_ano_basis, const bool EVs, const bool theta_info, const bool legacy_occupancy_cutoff) {
 	auto bonds = get_bonded_atom_pairs(wavy);
+	//Both routes need a per-atom basis set, and a plain .wfn has none: it lists primitives by
+	//centre without shell structure, so every atom's basis comes back empty.  Unguarded, the ANO
+	//route hands OCC a shell-less AOBasis and dies in gensqrtinv - a segfault no try/catch around
+	//the call can intercept - while the NAO route reports an empty index list from three frames
+	//deeper.  One check for both, before either can start.
+	for (int a = 0; a < wavy.get_ncen(); a++)
+		err_checkf(!wavy.get_atom(a).get_basis_set().empty(),
+			"RGBI needs the basis set of every atom, and " + wavy.get_path().filename().string() +
+			" carries none for atom " + std::to_string(a + 1) + " (" +
+			constants::atnr2letter(wavy.get_atom(a).get_charge()) + "). A plain .wfn stores "
+			"primitives without their shell structure; run RGBI on a .wfx, .fchk, .molden, .gbw or "
+			"a Tonto archive instead.", std::cout);
 	citations::cite(citations::Method::RGBI, std::cout);
 	const char *orbital_label = use_ano_basis ? "ANOs" : "NAOs";
 	std::cout << "Calculating " << orbital_label << " for all atoms...                 " << std::flush;

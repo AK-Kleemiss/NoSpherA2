@@ -33,7 +33,12 @@ struct NboNao {
 	std::string type;       //Cor, Val, Ryd
 	std::string shell;      //"1s", "2p", ...
 	double occupancy = 0.0;
-	double energy = 0.0;    //"Spin" column in the spin-summed block of an open-shell run
+	//An open-shell run prints Occupancy/Spin in the spin-summed table and Occupancy/Energy per
+	//spin, so an open-shell NAO energy comes from the alpha table - the same operator the native
+	//analysis diagonalises for this column.
+	double energy = 0.0;
+	double spin_density = 0.0;
+	bool has_spin_density = false;
 };
 
 //One hybrid of an NBO: its polarisation weight, coefficient and %s/%p/%d/%f content.
@@ -71,7 +76,8 @@ struct NboE2Entry {
 };
 
 struct NboResonanceWeight {
-	int structure = 0;
+	int structure = 0;              //the structure the weight vector names, not the table's RS column
+	int rank = 0;                   //position in the printed table, which is sorted by weight
 	double weight_percent = 0.0;    //the 2-decimal table value
 	double weight_fraction = 0.0;   //the 5-decimal value of the NRTDTL weight vector, 0 without NRTDTL
 	int idxres = 0;                 //NBO's internal structure id, only under NRTDTL

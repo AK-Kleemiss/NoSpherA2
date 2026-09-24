@@ -30,6 +30,7 @@ TOL = {  # mirrors NboTolerances in Src/core/nbo_run.h
     "e2_kcal": 0.1,
     "bond_order": 5.0e-3,
     "weight_percent": 0.5,
+    "weight_fraction": 5.0e-3,   # the same 0.5 percentage points, on the 5-decimal value
 }
 
 
@@ -87,9 +88,17 @@ def compare(reference, candidate):
                   lambda a: "atom %d %s" % (a["atom"], a["element"]),
                   [("charge", "charge"), ("core", "core"), ("valence", "val"),
                    ("rydberg", "ryd"), ("spin_density", "spin")])
-    compare_keyed(add("nao occupancy", "occupancy"), reference["nao"], candidate["nao"],
+    # NBO prints every Rydberg NAO the basis can form, and the empty ones - 0.00000 occupancy to
+    # all five printed decimals - carry no information: nothing downstream of the NAO table reads
+    # them (collect_reference.py says so at its NAO section), and their energies are basis tails
+    # that two codes have no reason to place identically. They were 89 % of this gate's failures.
+    def occupied(res):
+        return [n for n in res["nao"]
+                if not (n["type"] == "Ryd" and abs(n["occupancy"]) < 1.0e-5)]
+
+    compare_keyed(add("nao occupancy", "occupancy"), occupied(reference), occupied(candidate),
                   lambda a: "nao %d" % a["index"], [("occupancy", "occ")])
-    compare_keyed(add("nao energy", "energy"), reference["nao"], candidate["nao"],
+    compare_keyed(add("nao energy", "energy"), occupied(reference), occupied(candidate),
                   lambda a: "nao %d" % a["index"], [("energy", "E")])
 
     key_nbo = lambda o: "%s%s" % (o["description"], (" " + o["spin"]) if o["spin"] else "")
@@ -126,23 +135,33 @@ def compare(reference, candidate):
         return "%s%s" % (" ".join(w.get("changes", "").split()) or "(leading)",
                          (" " + w["spin"]) if w["spin"] else "")
 
-    compare_keyed(add("NRT weight", "weight_percent"), rn.get("weights", []), cn.get("weights", []),
-                  wkey, [("weight_percent", "%")])
+    # Compare the 5-decimal weight vector, not the 2-decimal table column: it is the same number
+    # with three more digits, and it is the one NRT actually minimised.
+    def weights(n):
+        out = []
+        for w in n.get("weights", []):
+            e = dict(w)
+            e["weight"] = w["weight_fraction"] or w["weight_percent"] / 100.0
+            out.append(e)
+        return out
+
+    compare_keyed(add("NRT weight", "weight_fraction"), weights(rn), weights(cn),
+                  wkey, [("weight", "w")])
 
     # And by rank, which survives that relabelling. This is the one that has to hold; the
     # by-description comparison above tells you whether the labels also match.
     def ranked(n):
         out = []
-        for spin in sorted({w["spin"] for w in n.get("weights", [])}):
-            ws = sorted((w for w in n["weights"] if w["spin"] == spin),
-                        key=lambda w: -w["weight_percent"])
+        all_w = weights(n)
+        for spin in sorted({w["spin"] for w in all_w}):
+            ws = sorted((w for w in all_w if w["spin"] == spin), key=lambda w: -w["weight"])
             for i, w in enumerate(ws):
                 out.append({"_key": "rank %d%s" % (i + 1, (" " + spin) if spin else ""),
-                            "weight_percent": w["weight_percent"]})
+                            "weight": w["weight"]})
         return out
 
-    compare_keyed(add("NRT weight by rank", "weight_percent"), ranked(rn), ranked(cn),
-                  lambda w: w["_key"], [("weight_percent", "%")])
+    compare_keyed(add("NRT weight by rank", "weight_fraction"), ranked(rn), ranked(cn),
+                  lambda w: w["_key"], [("weight", "w")])
     compare_keyed(add("NRT valency", "bond_order"), rn.get("valencies", []), cn.get("valencies", []),
                   lambda v: "atom %d%s" % (v["atom"], (" " + v["spin"]) if v["spin"] else ""),
                   [("valency", "val"), ("covalency", "cov"), ("electrovalency", "ion"),

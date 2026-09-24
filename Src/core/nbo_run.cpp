@@ -119,6 +119,7 @@ NboResults parse_nbo_output(const std::filesystem::path& nbo_file) {
 	enum class Section { none, npa, nao, hybrids, summary, e2, weights, cycles, topo, valencies, qp, symforms, nrtstr };
 	Section section = Section::none;
 	std::string spin;             //"", "alpha", "beta"
+	bool nao_column_is_spin = false;  //set from each NAO table's own header, see Section::nao
 	std::map<std::pair<std::string, int>, size_t> orbital_index;  //(spin, NBO number) -> position
 	//The TOPO matrices of the leading structure and, under NRTDTL, of every candidate are the
 	//same table in different places, so one target pointer fills whichever is open.
@@ -250,11 +251,29 @@ NboResults parse_nbo_output(const std::filesystem::path& nbo_file) {
 			break;
 		}
 		case Section::nao: {
+			//The second numeric column is the energy in a closed-shell run and in each spin block
+			//of an open-shell one, but the SPIN DENSITY in the spin-summed table of an open-shell
+			//run.  Reading it blind put spin densities in the energy field, where they were zero
+			//for every Cor and Ryd row and nothing else in the gate noticed.
+			if (line.find("Type(AO)") != std::string::npos) {
+				nao_column_is_spin = line.find("Spin") != std::string::npos;
+				break;
+			}
 			if (!std::regex_match(line, m, re_nao)) {
 				if (!r.nao.empty() && line.find("---") == std::string::npos && line.find_first_not_of(" \t") != std::string::npos) section = Section::none;
 				break;
 			}
-			if (!spin.empty()) break;
+			if (!spin.empty()) {
+				//The per-spin tables are the only place an open-shell run prints NAO energies, and
+				//alpha is the set the spin-summed table is labelled from, so its energies belong on
+				//those rows.
+				if (spin == "alpha" && !nao_column_is_spin) {
+					const size_t at = static_cast<size_t>(std::stoi(m[1].str())) - 1;
+					if (at < r.nao.size() && r.nao[at].element == m[2].str() && r.nao[at].lang == m[4].str())
+						r.nao[at].energy = to_d(m[8].str());
+				}
+				break;
+			}
 			NboNao n;
 			n.index = std::stoi(m[1].str());
 			n.element = m[2].str();
@@ -263,7 +282,8 @@ NboResults parse_nbo_output(const std::filesystem::path& nbo_file) {
 			n.type = m[5].str();
 			n.shell = normalize(m[6].str());
 			n.occupancy = to_d(m[7].str());
-			n.energy = to_d(m[8].str());
+			if (nao_column_is_spin) { n.spin_density = to_d(m[8].str()); n.has_spin_density = true; }
+			else n.energy = to_d(m[8].str());
 			r.nao.push_back(n);
 			break;
 		}
@@ -344,7 +364,8 @@ NboResults parse_nbo_output(const std::filesystem::path& nbo_file) {
 				break;
 			}
 			NboResonanceWeight w;
-			w.structure = std::stoi(m[1].str());
+			w.rank = std::stoi(m[1].str());
+			w.structure = w.rank;   //replaced below by the structure the weight vector names
 			w.weight_percent = to_d(m[2].str());
 			w.changes = normalize(m[3].str());
 			w.spin = spin;
@@ -438,22 +459,37 @@ NboResults parse_nbo_output(const std::filesystem::path& nbo_file) {
 	//Under NRTDTL the weight vector carries five decimals and, unlike the printed table, the
 	//zero-weight tail of the candidate set. Structures the table left out are added here, so
 	//"how many were examined" and "how many were kept" are both readable from the dataset.
+	//The table's RS column is a RANK, not a structure number: both it and the $NRTSTR keylist are
+	//sorted by descending weight, while the weight vector names its structures explicitly
+	//(acetylene prints RS 2 = 0.92 % against 0.00486(2)).  Matching the two by that column paired
+	//every row with another structure's fraction and appended the survivors a second time, which
+	//is why NO's alpha weights summed to 200 %.  So pair rank k with the k-th largest fraction.
 	for (const auto& [sp, fractions] : weight_fractions) {
+		std::vector<size_t> order(fractions.size());
+		for (size_t i = 0; i < order.size(); i++) order[i] = i;
+		std::stable_sort(order.begin(), order.end(),
+			[&](const size_t a, const size_t b) { return fractions[a].second > fractions[b].second; });
 		const auto idx = weight_idxres.find(sp);
-		for (size_t i = 0; i < fractions.size(); i++) {
-			auto it = std::find_if(r.nrt.weights.begin(), r.nrt.weights.end(),
-				[&](const NboResonanceWeight& w) { return w.spin == sp && w.structure == fractions[i].first; });
-			if (it == r.nrt.weights.end()) {
-				NboResonanceWeight w;
-				w.structure = fractions[i].first;
-				w.weight_percent = 100.0 * fractions[i].second;
-				w.spin = sp;
-				r.nrt.weights.push_back(w);
-				it = r.nrt.weights.end() - 1;
+		std::vector<size_t> rows;   //this spin's printed rows, in printed order
+		for (size_t j = 0; j < r.nrt.weights.size(); j++)
+			if (r.nrt.weights[j].spin == sp) rows.push_back(j);
+		std::vector<NboResonanceWeight> tail;   //structures the table cut off below NRTLST
+		for (size_t k = 0; k < order.size(); k++) {
+			const size_t i = order[k];
+			NboResonanceWeight* w;
+			if (k < rows.size()) w = &r.nrt.weights[rows[k]];
+			else {
+				tail.emplace_back();
+				w = &tail.back();
+				w->spin = sp;
+				w->weight_percent = 100.0 * fractions[i].second;
 			}
-			it->weight_fraction = fractions[i].second;
-			if (idx != weight_idxres.end() && i < idx->second.size()) it->idxres = idx->second[i];
+			w->rank = static_cast<int>(k) + 1;
+			w->structure = fractions[i].first;
+			w->weight_fraction = fractions[i].second;
+			if (idx != weight_idxres.end() && i < idx->second.size()) w->idxres = idx->second[i];
 		}
+		for (const auto& t : tail) r.nrt.weights.push_back(t);
 	}
 	parse_bond_orders(nbo_file, r.nrt);
 	return r;
@@ -571,8 +607,9 @@ void write_nbo_json(const NboResults& r, const std::filesystem::path& json_file)
 		const auto& n = r.nao[i];
 		f << "    {\"index\": " << n.index << ", \"element\": " << jstr(n.element) << ", \"atom\": " << n.center
 			<< ", \"lang\": " << jstr(n.lang) << ", \"type\": " << jstr(n.type) << ", \"shell\": " << jstr(n.shell)
-			<< ", \"occupancy\": " << jnum(n.occupancy) << ", \"energy\": " << jnum(n.energy)
-			<< "}" << (i + 1 < r.nao.size() ? "," : "") << "\n";
+			<< ", \"occupancy\": " << jnum(n.occupancy) << ", \"energy\": " << jnum(n.energy);
+		if (n.has_spin_density) f << ", \"spin_density\": " << jnum(n.spin_density);
+		f << "}" << (i + 1 < r.nao.size() ? "," : "") << "\n";
 	}
 	f << "  ],\n";
 
@@ -618,7 +655,8 @@ void write_nbo_json(const NboResults& r, const std::filesystem::path& json_file)
 	f << "    \"weights\": [\n";
 	for (size_t i = 0; i < r.nrt.weights.size(); i++) {
 		const auto& w = r.nrt.weights[i];
-		f << "      {\"structure\": " << w.structure << ", \"weight_percent\": " << jnum(w.weight_percent)
+		f << "      {\"structure\": " << w.structure << ", \"rank\": " << w.rank
+			<< ", \"weight_percent\": " << jnum(w.weight_percent)
 			<< ", \"weight_fraction\": " << jnum(w.weight_fraction) << ", \"idxres\": " << w.idxres
 			<< ", \"changes\": " << jstr(w.changes)
 			<< ", \"spin\": " << jstr(w.spin) << "}" << (i + 1 < r.nrt.weights.size() ? "," : "") << "\n";

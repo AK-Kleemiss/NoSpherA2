@@ -5,6 +5,7 @@
 #include <Eigen/Dense>
 #include <chrono>
 #include <functional>
+#include <limits>
 #include <map>
 
 using Eigen::MatrixXd;
@@ -588,6 +589,44 @@ namespace
         return trg2 - 2.0 * g.dot(w) + w.dot(G * w);
     }
 
+    //On a fixed support the only remaining constraint is the one equality sum(w)=1, so the KKT
+    //system is (m+1)x(m+1) and one factorisation replaces the iteration entirely.  A negative
+    //component means the support was too wide, so the most negative one is dropped and the system
+    //re-solved - textbook active set, and the support is tens of structures, not thousands.
+    //completeOrthogonalDecomposition because G is near-singular by construction (candidates that
+    //differ by one arrow are near-collinear) and the minimum-norm solution is the one we want.
+    double solve_qp_support(const MatrixXd& G, const VectorXd& g, const double trg2, VectorXd& w)
+    {
+        const int n = static_cast<int>(G.rows());
+        ivec act(n);
+        for (int i = 0; i < n; i++) act[i] = i;
+        for (int sweep = 0; sweep < n && !act.empty(); sweep++) {
+            const int m = static_cast<int>(act.size());
+            MatrixXd K = MatrixXd::Zero(m + 1, m + 1);
+            VectorXd rhs(m + 1);
+            for (int i = 0; i < m; i++) {
+                for (int j = 0; j < m; j++) K(i, j) = G(act[i], act[j]);
+                K(i, m) = 1.0;
+                K(m, i) = 1.0;
+                rhs(i) = g(act[i]);
+            }
+            rhs(m) = 1.0;
+            const VectorXd sol = K.completeOrthogonalDecomposition().solve(rhs);
+            if (!sol.allFinite()) break;
+            int worst = -1;
+            double least = 0.0;
+            for (int i = 0; i < m; i++)
+                if (sol(i) < least) { least = sol(i); worst = i; }
+            if (worst < 0) {
+                w.setZero();
+                for (int i = 0; i < m; i++) w(act[i]) = sol(i);
+                return objective(G, g, trg2, w);
+            }
+            act.erase(act.begin() + worst);
+        }
+        return std::numeric_limits<double>::infinity();
+    }
+
     //Accelerated projected gradient (FISTA with adaptive restart).  The Hessian 2G is badly
     //conditioned by construction - candidates that differ by one arrow are near-collinear - so this
     //runs to identify the support and the support problem is then solved again on its own.
@@ -853,7 +892,10 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
             for (int j = 0; j < ns; j++) Gs(i, j) = G(support[i], support[j]);
         }
         project_simplex(ws);
-        const double fs = solve_qp(Gs, gs, trg2, ws, 200000, &rs, spin, nullptr);
+        VectorXd wq = ws;
+        double fs = solve_qp_support(Gs, gs, trg2, wq);
+        if (fs <= f + 1e-12) ws = wq;
+        else fs = solve_qp(Gs, gs, trg2, ws, 200000, &rs, spin, nullptr);   //singular: iterate instead
         if (fs <= f + 1e-12) {
             w.setZero();
             for (int i = 0; i < ns; i++) w(support[i]) = ws(i);
