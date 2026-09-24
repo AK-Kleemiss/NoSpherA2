@@ -542,6 +542,31 @@ namespace
 		EXPECT_FALSE(w.get_has_ECPs());
 	}
 
+	//the tables stop at Rn: an actinide used to index past the end of one and come back with
+	//Z = -543649293 core electrons, and the run segfaulted rather than saying anything
+	TEST(WfnOpsAtomTests, EcpTablesEndAtRadonAndAnActinideGetsNoCore)
+	{
+		EXPECT_EQ(constants::heaviest_ECP_element, 86);
+		EXPECT_EQ(constants::ECP_core_electrons(constants::ECP_electrons, 86), 60);
+		for (const int Z : { 87, 90, 92, 103, 118, 1000, -1 })
+		{
+			EXPECT_EQ(constants::ECP_core_electrons(constants::ECP_electrons, Z), 0) << "Z = " << Z;
+			EXPECT_EQ(constants::ECP_core_electrons(constants::ECP_electrons_xTB, Z), 0) << "Z = " << Z;
+			EXPECT_EQ(constants::ECP_core_electrons(constants::ECP_electrons_pTB, Z), 0) << "Z = " << Z;
+		}
+		WFN w(e_origin::NOT_YET_DEFINED);
+		w.push_back_atom("U", 0.0, 0.0, 0.0, 92);
+		w.push_back_atom("H", 1.0, 0.0, 0.0, 1);
+		std::ostringstream captured;
+		std::streambuf *const previous = std::cout.rdbuf(captured.rdbuf());
+		w.set_has_ECPs(true, true, 1);
+		std::cout.rdbuf(previous);
+		EXPECT_EQ(w.get_atom_ECP_electrons(0), 0);
+		EXPECT_EQ(w.get_atom_ECP_electrons(1), 0);
+		//and it says so, rather than quietly counting 92 nuclear charges against a valence basis
+		EXPECT_NE(captured.str().find("Z = 92"), std::string::npos) << captured.str();
+	}
+
 	//charge = sum Z - sum occ, -1000 for an untyped atom; the multiplicity guess is 1 for even and 2 for odd electron counts
 	TEST(WfnOpsAtomTests, ChargeAndMultiplicityFromOccupations)
 	{

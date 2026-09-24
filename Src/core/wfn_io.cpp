@@ -78,20 +78,17 @@ void WFN::declare_ECPs_if_core_electrons_are_missing(std::ostream &file)
 	const double occupied = count_nr_electrons();
 	if (occupied <= 0.0)
 		return; //a geometry without orbitals says nothing about electrons
-	constexpr int table_size = static_cast<int>(sizeof(constants::ECP_electrons) / sizeof(int));
 	int table_core = 0;
 	for (int i = 0; i < ncen; i++)
-	{
-		const int Z = get_atom_charge(i);
-		if (Z >= 0 && Z < table_size)
-			table_core += constants::ECP_electrons[Z];
-	}
+		table_core += constants::ECP_core_electrons(constants::ECP_electrons, get_atom_charge(i));
 	if (table_core == 0)
 		return;
 	const long long missing = static_cast<long long>(get_nr_electrons()) - std::llround(occupied);
 	if (missing != table_core)
 		return;
-	file << "The orbitals hold " << std::llround(occupied) << " electrons, " << missing
+	//The newline first: this runs inside the read, between the caller's "Reading: x" and its
+	//" done!", and a message that lands in the middle of somebody else's line reads as corruption.
+	file << "\nThe orbitals hold " << std::llround(occupied) << " electrons, " << missing
 		<< " fewer than the nuclei carry, and that is exactly the def2 ECP core of these atoms: "
 		<< "treating them as ECP atoms, as -ECP would.\n";
 	set_has_ECPs(true, true, 1);
@@ -3034,9 +3031,10 @@ bool WFN::read_ptb(const std::filesystem::path &filename, std::ostream &file, co
 		file << "elcount: " << elcount << std::endl;
 	for (int i = 0; i < ncen; i++)
 	{
+		const int core = constants::ECP_core_electrons(constants::ECP_electrons_pTB, get_atom_charge(i));
 		elcount += get_atom_charge(i);
-		elcount -= constants::ECP_electrons_pTB[get_atom_charge(i)];
-		atoms[i].set_ECP_electrons(constants::ECP_electrons_pTB[get_atom_charge(i)]);
+		elcount -= core;
+		atoms[i].set_ECP_electrons(core);
 	}
 	if (debug)
 		file << "elcount after: " << elcount << std::endl;

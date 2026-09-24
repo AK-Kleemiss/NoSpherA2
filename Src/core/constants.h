@@ -420,6 +420,26 @@ namespace constants
 									 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 46, 46, 46, 46, 46, 46,
 									 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 60, 60, 60, 60, 60, 60, 60, 60, 60, 78, 78, 78, 78, 78, 78 };
 
+	//All three tables stop at Rn, Z = 86, because that is where the def2, xTB and pTB core
+	//definitions they transcribe stop. Indexing them directly by atomic number is therefore only
+	//safe up to Rn, and an actinide walked off the end: `-rgbi uh6.gbw -ECP 1` read whatever
+	//followed the table and declared uranium to hold Z = -543649293 core electrons before
+	//segfaulting. A centre heavier than the table has no core defined for it, which is zero - the
+	//all-electron reading of the file, which is what the file is - so say that instead of guessing.
+	template <std::size_t N>
+	constexpr int ECP_core_electrons(const int(&table)[N], const int Z) noexcept
+	{
+		return (Z >= 0 && static_cast<std::size_t>(Z) < N) ? table[Z] : 0;
+	}
+
+	//The heaviest element any of the tables above describes. One place to ask, so a caller that
+	//wants to warn rather than silently take the zero does not hardcode 86 of its own.
+	constexpr int heaviest_ECP_element = static_cast<int>(sizeof(ECP_electrons) / sizeof(int)) - 1;
+	static_assert(sizeof(ECP_electrons_xTB) == sizeof(ECP_electrons) &&
+		sizeof(ECP_electrons_pTB) == sizeof(ECP_electrons),
+		"the three ECP core tables are indexed by the same atomic number and reported by the same "
+		"heaviest_ECP_element, so they have to end at the same element");
+
 	constexpr std::complex<double> i_pows[] = {
 		std::complex<double>(1.0, 0.0),
 		std::complex<double>(0.0, 1.0),

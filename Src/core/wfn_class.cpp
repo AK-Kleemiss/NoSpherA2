@@ -1207,7 +1207,7 @@ bool WFN::build_DM(std::string basis_set_path, bool debug) {
 	for (int i = 0; i < ncen; i++)
 	{
 		elcount += get_atom_charge(i);
-		elcount -= constants::ECP_electrons_pTB[get_atom_charge(i)];
+		elcount -= constants::ECP_core_electrons(constants::ECP_electrons_pTB, get_atom_charge(i));
 	}
 	if (debug)
 		std::cout << "elcount after: " << elcount << std::endl;
@@ -2359,39 +2359,44 @@ void WFN::set_has_ECPs(const bool &in, const bool &apply_to_atoms, const int &EC
 {
 	has_ECPs = in;
 	ECP_m = ECP_mode;
-	if (apply_to_atoms && ECP_mode == 1) // This is the def2 ECPs
-	{
-#pragma omp parallel for
-		for (int i = 0; i < ncen; i++)
+	if (!apply_to_atoms)
+		return;
+	//1 = def2, 2 = xTB, 3 = pTB. One loop over the atoms for all three, because the only difference
+	//between them was which table a table lookup read - and the bound-checked accessor is what keeps
+	//an atom heavier than the tables describe from reading past the end of one. A table lookup per
+	//atom does not need a thread each, so the three omp loops this replaces are no loss.
+	auto core_of = [ECP_mode](const int Z)
 		{
-			if (constants::ECP_electrons[get_atom_charge(i)] != 0)
+			switch (ECP_mode)
 			{
-				atoms[i].set_ECP_electrons(constants::ECP_electrons[get_atom_charge(i)]);
+			case 1: return constants::ECP_core_electrons(constants::ECP_electrons, Z);
+			case 2: return constants::ECP_core_electrons(constants::ECP_electrons_xTB, Z);
+			case 3: return constants::ECP_core_electrons(constants::ECP_electrons_pTB, Z);
+			default: return 0;
 			}
-		}
-	}
-	if (apply_to_atoms && ECP_mode == 2) // xTB ECPs
+		};
+	if (ECP_mode < 1 || ECP_mode > 3)
+		return;
+	//An atom past the end of the tables gets zero from the accessor, which is the right answer - no
+	//core is defined for it - but a silent zero on a run that asked for ECP cores would quietly
+	//count its cores as valence. Name the heaviest one instead; the number is in the tables, not here.
+	int heaviest_beyond_tables = 0;
+	for (int i = 0; i < ncen; i++)
 	{
-#pragma omp parallel for
-		for (int i = 0; i < ncen; i++)
-		{
-			if (constants::ECP_electrons_xTB[get_atom_charge(i)] != 0)
-			{
-				atoms[i].set_ECP_electrons(constants::ECP_electrons_xTB[get_atom_charge(i)]);
-			}
-		}
+		const int Z = get_atom_charge(i);
+		if (Z > constants::heaviest_ECP_element)
+			heaviest_beyond_tables = std::max(heaviest_beyond_tables, Z);
+		//Zero means the table declares no core for this element, and that is not the same as a
+		//declaration of zero: a count read from the file itself stays, as it did before.
+		const int core = core_of(Z);
+		if (core != 0)
+			atoms[i].set_ECP_electrons(core);
 	}
-	if (apply_to_atoms && ECP_mode == 3) // pTB ECPs
-	{
-#pragma omp parallel for
-		for (int i = 0; i < ncen; i++)
-		{
-			if (constants::ECP_electrons_pTB[get_atom_charge(i)] != 0)
-			{
-				atoms[i].set_ECP_electrons(constants::ECP_electrons_pTB[get_atom_charge(i)]);
-			}
-		}
-	}
+	if (heaviest_beyond_tables != 0)
+		std::cout << "\nECP cores were asked for, but the tables stop at Z = "
+		<< constants::heaviest_ECP_element << " and this structure contains Z = "
+		<< heaviest_beyond_tables << ": those atoms are treated as all-electron, which is what "
+		"their basis set has to be for the electron count to add up.\n";
 };
 
 void WFN::set_ECPs(ivec &nr, ivec &elcount)
