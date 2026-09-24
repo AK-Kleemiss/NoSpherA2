@@ -78,6 +78,55 @@ namespace {
         return L;
     }
 
+    //Several s NAOs per atom, so an atom block is wider than the one orbital taken out of it and a
+    //pair block is wider still.  h_chain's one-per-atom basis makes every block 1 or 2 wide, where
+    //the leading eigenpair is the only eigenpair and any way of computing it looks correct.
+    NAOResult h_chain_shells(const int na, const int per_atom)
+    {
+        NAOResult nao;
+        nao.C = dMatrix2(static_cast<size_t>(na) * per_atom, static_cast<size_t>(na) * per_atom);
+        for (int a = 0; a < na; a++) {
+            for (int s = 0; s < per_atom; s++) {
+                NAO o;
+                o.atom = a;
+                o.l = 0;
+                o.m = 0;
+                o.shell = s;
+                o.n = s + 1;
+                o.type = NAOClass::Valence;
+                o.occupation = 0.0;
+                nao.orbitals.push_back(o);
+            }
+            NAOAtom at;
+            at.index = a;
+            at.Z = 1;
+            at.label = "H" + std::to_string(a + 1);
+            at.Z_eff = 1.0;
+            nao.atoms.push_back(at);
+        }
+        return nao;
+    }
+
+    //Gamma = 2 (v1 v1^T + v2 v2^T) for orthonormal v1, v2: two doubly occupied orbitals.
+    dMatrix2 rank_two(const vec& v1, const vec& v2)
+    {
+        const size_t n = v1.size();
+        dMatrix2 g(n, n);
+        for (size_t i = 0; i < n; i++)
+            for (size_t j = 0; j < n; j++)
+                g(i, j) = 2.0 * (v1[i] * v1[j] + v2[i] * v2[j]);
+        return g;
+    }
+
+    vec normalised(vec v)
+    {
+        double n = 0.0;
+        for (const double x : v) n += x * x;
+        n = std::sqrt(n);
+        for (double& x : v) x /= n;
+        return v;
+    }
+
     const NboValency& valency_of(const NboNrt& nrt, const int atom)
     {
         for (const NboValency& v : nrt.valencies)
@@ -191,4 +240,57 @@ TEST(NrtTests, DerivedQuantitiesAreConsistentOverAMultiStructureFit)
     double pairs = 0.0;
     for (const NboBondOrder& o : nrt.bond_orders) pairs += o.total;
     EXPECT_NEAR(pairs, 1.0, 1e-3);
+}
+
+//The self-consistency sweep has to find the exact orbitals, and greedy filling alone cannot: gamma is
+//2(v1 v1^T + v2 v2^T) with v1 on atoms 1-2 and v2 on atoms 2-3, so the first 4-wide block the greedy
+//pass looks at contains all of v1 but also the part of v2 that reaches into it, and its leading
+//eigenvector is a mixture of the two.  Only removing the other orbital and re-solving recovers v1 and
+//v2 themselves, at which point the parent spans the density exactly and D(w) is 0.  Two NAOs per atom
+//is what makes this a real eigenproblem - with one, every block is 1 or 2 wide and the leading
+//eigenpair is not a choice.  This is the check the warm-started power iteration in leading_block has
+//to pass: a wrong eigenpair at any step of any sweep leaves D(w) above zero.
+TEST(NrtTests, TheSweepRecoversTheExactOrbitalsOutOfOverlappingBlocks)
+{
+    const NAOResult nao = h_chain_shells(3, 2);
+    //orthogonal by construction: they meet only on atom 2, where v2 is antisymmetric and v1 is not
+    const vec v1 = normalised({ 1.0, 1.0, 0.5, 0.5, 0.0, 0.0 });
+    const vec v2 = normalised({ 0.0, 0.0, 0.5, -0.5, 1.0, 1.0 });
+    const dMatrix2 gamma = rank_two(v1, v2);
+
+    NboLewis lewis;
+    lewis.gamma = gamma;
+    for (const std::pair<int, int> b : { std::make_pair(0, 1), std::make_pair(1, 2) }) {
+        NboFunction f;
+        f.centers = { b.first, b.second };
+        f.type = "BD";
+        f.multiplicity = 1;
+        f.occupancy = 2.0;
+        lewis.orbitals.push_back(f);
+    }
+    lewis.n_lewis = 2;
+    lewis.topo.assign(3, ivec(3, 0));
+    lewis.topo[0][1] = lewis.topo[1][0] = 1;
+    lewis.topo[1][2] = lewis.topo[2][1] = 1;
+
+    NboOptions opt;
+    opt.nrt = true;
+    NboNrt nrt;
+    std::ostringstream log;
+    native_nrt(nrt, nao, lewis, {}, chain_bondable(3), opt, "", 2.0, log);
+
+    ASSERT_TRUE(nrt.present);
+    ASSERT_FALSE(nrt.candidates.empty());
+    //The floor here is the sweep's own fixed point, not the eigenpair: 50 sweeps of a linearly
+    //convergent iteration leave D(w) at 4.2e-8 with the warm-started power iteration and 5.2e-8 with
+    //the full eigensolve.  Measured both ways - which is the point of the number being in a comment
+    //rather than the tolerance being widened until it passed.
+    EXPECT_NEAR(nrt.d_w, 0.0, 1e-7);                      //the parent reproduces gamma
+    EXPECT_NEAR(nrt.candidates[0].rho_nl, 0.0, 1e-7);     //nothing left outside the Lewis set
+    EXPECT_NEAR(bond_total(nrt, 1, 2), 1.0, 1e-6);
+    EXPECT_NEAR(bond_total(nrt, 2, 3), 1.0, 1e-6);
+    //four electrons, two pairs: bond orders plus lone pairs
+    double pairs = 0.0;
+    for (const NboBondOrder& o : nrt.bond_orders) pairs += o.total;
+    EXPECT_NEAR(pairs, 2.0, 1e-3);
 }

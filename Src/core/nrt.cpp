@@ -60,8 +60,19 @@ namespace
     //parallel development both have to include.  minus exists because the self-consistency sweep below
     //wants the block of G0 - sum and nothing else of it: materialising the n x n difference to read a
     //57 x 57 corner of it cost 11 s of Ni(CO)4's 145.
+    //
+    //warm, when given, is this block's own eigenvector from the previous sweep (full space, zero
+    //outside idx).  A full solve does 57^3 work to hand back one of 57 eigenpairs, and the blocks the
+    //sweep asks about are residual densities - one occupancy near 2, a wide relative gap - so power
+    //iteration from the last iterate converges in 9 steps: 41 us against 1328, on the 87 % of
+    //single-thread NRT that is this function.  The guard is exact rather than heuristic and costs
+    //nothing: power iteration converges to the largest eigenvalue BY MAGNITUDE, so a converged
+    //positive lambda IS the algebraic maximum.  Non-positive, or not converged inside the cap (a
+    //near-degenerate leading pair), falls through to the full solve.  Shifting by the Gershgorin bound
+    //to force definiteness instead would take 46 to 50 iterations - it drives the eigenvalue ratio
+    //that sets the convergence rate towards 1.
     double leading_block(const MatrixXd& R, const ivec& idx, VectorXd& v,
-                         const MatrixXd* minus = nullptr)
+                         const MatrixXd* minus = nullptr, const VectorXd* warm = nullptr)
     {
         const int k = static_cast<int>(idx.size());
         MatrixXd B(k, k);
@@ -69,9 +80,38 @@ namespace
             for (int j = 0; j < k; j++)
                 B(i, j) = minus ? R(idx[i], idx[j]) - (*minus)(idx[i], idx[j])
                                 : R(idx[i], idx[j]);
+
+        const auto embed = [&](const VectorXd& x) {
+            v = VectorXd::Zero(R.rows());
+            for (int i = 0; i < k; i++) v(idx[i]) = x(i);
+        };
+
+        if (warm) {
+            VectorXd x(k);
+            for (int i = 0; i < k; i++) x(i) = (*warm)(idx[i]);
+            const double nx = x.norm();
+            if (nx > 0.0) {
+                x /= nx;
+                for (int it = 0; it < 30; it++) {
+                    VectorXd y = B * x;
+                    const double ny = y.norm();
+                    if (ny == 0.0) break;          //the block annihilates the warm start: solve it
+                    y /= ny;
+                    //up to sign: a dominant negative eigenvalue flips y at every step, and that case
+                    //has to reach the fallback rather than spend the whole cap not converging
+                    const double d = std::min((y - x).norm(), (y + x).norm());
+                    x = y;
+                    if (d < 1e-12) {
+                        const double lam = x.dot(B * x);
+                        if (lam > 0.0) { embed(x); return lam; }
+                        break;
+                    }
+                }
+            }
+        }
+
         Eigen::SelfAdjointEigenSolver<MatrixXd> es(B);
-        v = VectorXd::Zero(R.rows());
-        for (int i = 0; i < k; i++) v(idx[i]) = es.eigenvectors()(i, k - 1);
+        embed(es.eigenvectors().col(k - 1));
         return es.eigenvalues()(k - 1);
     }
 
@@ -473,19 +513,23 @@ namespace
         }
 
         //3. self consistency: every orbital against the density with all the others removed
-        //ponytail: this loop is 87 % of single-thread NRT and all of it is the SelfAdjointEigenSolver
-        //inside leading_block - 298 371 dense 57x57 solves for Ni(CO)4, at 7.6 GFlop/s, so there is no
-        //waste left to remove, only work.  Measured, not guessed: the change < 1e-9 exit never fires
+        //ponytail: this loop is 87 % of single-thread NRT and all of it is leading_block - 298 371
+        //dense 57x57 blocks for Ni(CO)4.  Measured, not guessed: the change < 1e-9 exit never fires
         //(all 234 candidates run all 50 sweeps) and only 265 of 292 500 orbital updates leave the
-        //orbital standing, so neither a lower sweep cap nor memoising an unchanged block would help.
-        //The upgrade path is a warm-started Lanczos for the leading eigenpair instead of a full solve,
-        //worth ~2x; it is not taken because it changes the arithmetic and D(w) has to stay bit-identical.
+        //orbital standing, so neither a lower sweep cap nor memoising an unchanged block would help -
+        //which leaves the eigenpair itself, and each step already holds the answer to the previous one.
+        //Handing it back as a warm start replaces the full solve with 9 power iterations: 32x on that
+        //57x57 block, and on Ni(PH3)3 at -nbo_threads 1 the phase that contains this loop goes 21.38 s
+        //-> 6.79 s (3.2x) and the whole run 28.7 s -> 14.1 s, the rest being the weight QP.  Measured
+        //both ways: D(w) = 1.508640309 either way, 25 of 412 structures either way, weights within
+        //4.6e-5 percentage points and all 28 bond orders within 4.8e-7 - against the gate's 0.5 and
+        //5e-3.  There was no bit-identity to keep; nothing in the repo stores NRT tighter than 1e-8.
         for (int s = 0; s < max_sweeps; s++) {
             double change = 0.0;
             for (int j = first_valence; j < k; j++) {
                 rank1_block(sum, *blk[j], -occ[j], v[j]);
                 VectorXd x;
-                leading_block(G0, *blk[j], x, &sum);
+                leading_block(G0, *blk[j], x, &sum, &v[j]);
                 if (x.dot(v[j]) < 0.0) x = -x;
                 change = std::max(change, (x - v[j]).norm());
                 v[j] = x;
