@@ -535,7 +535,25 @@ vec surface_ESP(const std::vector<Triangle>& triangles, const WFN& wavy)
 	temp.delete_unoccupied_MOs();
 	temp.delete_Qs();
 	const WFN::ESP_pairs pairs = temp.build_ESP_pairs();
-	return surface_ESP(triangles, [&](const d3& p) { return temp.computeESP(p, pairs); });
+	// the face centres in batches, so a device sees many at once (the generic overload below stays
+	// for callers that hand in their own per-point function); the bar still ticks per batch, since
+	// Olex2 tails it while the window stays alive
+	const int n = (int)triangles.size();
+	vec esp(n);
+	const int slice = std::max(4096, n / 50);
+	ProgressBar pb((n + slice - 1) / slice, 50, "=", " ", "Surface ESP");
+	std::vector<d3> centres;
+	for (int first = 0; first < n; first += slice)
+	{
+		const int m = std::min(slice, n - first);
+		centres.resize(m);
+#pragma omp parallel for
+		for (int i = 0; i < m; i++)
+			centres[i] = triangles[first + i].calc_center();
+		temp.computeESP_batch(centres, pairs, esp.data() + first);
+		pb.update();
+	}
+	return esp;
 }
 
 vec surface_ESP(const std::vector<Triangle>& triangles, const std::function<double(const d3&)>& esp_at)

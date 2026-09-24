@@ -606,6 +606,8 @@ public:
 	ESP_pairs build_ESP_pairs() const;
 	/** Electrostatic potential including nuclear cores. */
 	const double computeESP(const d3& PosGrid, const ESP_pairs& pairs) const;
+	/** computeESP for a whole point set, out holds points.size() values; GPU when one is there, OpenMP otherwise. */
+	void computeESP_batch(const std::vector<d3>& points, const ESP_pairs& pairs, double* out) const;
 	//----------DM Handling--------------------------------
 	/** Build density (and optionally spin density) matrix; loads basis if required. */
 	bool build_DM(std::string basis_set_path, bool debug = false);

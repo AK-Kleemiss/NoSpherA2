@@ -66,6 +66,40 @@ double sanitize_finite(double value)
 	return value;
 }
 
+// The in-radius points of the grid in one batch instead of one call each: the ESP walks the whole
+// primitive-pair table per point, so the whole set is worth handing to a device at once. Points
+// outside stay zero as in evaluate_cube_in_radius, and wrap sums the periodic images per cell.
+template <typename BatchFn>
+void evaluate_cube_in_radius_batched(
+	cube &target,
+	bool wrap,
+	const std::vector<atom> &atoms,
+	double radius_bohr,
+	BatchFn &&batch)
+{
+	std::vector<d3> points;
+	std::vector<i3> cells;
+	target.evaluate_on_grid(
+		[&](const d3 &pos, const i3 &, const i3 &mapped) {
+			if (!is_within_radius(pos, atoms, radius_bohr))
+				return 0.0;
+#pragma omp critical(cube_gather)
+			{
+				points.push_back(pos);
+				cells.push_back(mapped);
+			}
+			return 0.0;
+		},
+		wrap);
+	vec values(points.size());
+	batch(points, values.data());
+	for (size_t i = 0; i < points.size(); i++)
+	{
+		const i3 &c = cells[i];
+		target.set_value(c[0], c[1], c[2], target.get_value(c[0], c[1], c[2]) + values[i]);
+	}
+}
+
 template <typename EvalFn>
 void evaluate_cube_in_radius(
 	cube &target,
@@ -630,13 +664,13 @@ void Calc_ESP(
 	const double radius_bohr = constants::ang2bohr(radius);
 	const vector<atom> atoms = wavy.get_atoms();
 
-	evaluate_cube_in_radius(
+	evaluate_cube_in_radius_batched(
 		CubeESP,
 		wrap,
 		atoms,
 		radius_bohr,
-		[&](const d3 &pos) {
-			return wavy.computeESP(pos, pairs);
+		[&](const std::vector<d3> &points, double *out) {
+			wavy.computeESP_batch(points, pairs, out);
 		});
 
 	if (!no_date)

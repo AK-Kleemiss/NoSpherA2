@@ -10,6 +10,10 @@
 #include "libCintMain.h"
 #include "integrator.h"
 #include "cell.h"
+#ifdef NOSPHERA2_USE_GPU
+#include "aux_density_gpu.h"
+#include "esp_gpu.h"
+#endif
 
 
 const double WFN::compute_dens(
@@ -3020,36 +3024,45 @@ const double WFN::computeMO(
 
 // Boys function F_m(T) by a 6-term Taylor expansion around a tabulated grid (step 0.1 up to
 // T = 30, error < 1E-10), asymptotic beyond (1E-14); expn = exp(-T), which the caller has anyway
+static constexpr int boys_mmax = 24 + 6, boys_nT = 301;
+static constexpr double boys_step = 0.1;
+// file scope rather than a function-local static, so the hot loop carries no guard check and
+// the GPU kernel can be handed the same table through esp_boys_table()
+static const vec boys_tab = []()
+{
+	vec F((size_t)boys_nT * (boys_mmax + 1));
+	for (int i = 0; i < boys_nT; i++)
+	{
+		const double T0 = i * boys_step, e = exp(-T0);
+		// F_mmax by its series e^-T sum_k (2T)^k / ((2m+1)...(2m+2k+1)), then downward
+		double term = 1.0 / (2 * boys_mmax + 1), sum = term;
+		for (int k = 1; term > 1E-17 * sum; k++)
+			term *= 2 * T0 / (2 * boys_mmax + 2 * k + 1), sum += term;
+		double *row = F.data() + (size_t)i * (boys_mmax + 1);
+		row[boys_mmax] = e * sum;
+		for (int n = boys_mmax - 1; n >= 0; n--)
+			row[n] = (2 * T0 * row[n + 1] + e) / (2 * n + 1);
+	}
+	return F;
+}();
+
+const double *esp_boys_table(int &nT, int &stride, double &step)
+{
+	nT = boys_nT, stride = boys_mmax + 1, step = boys_step;
+	return boys_tab.data();
+}
+
 static double boys(const int m, const double T, const double expn)
 {
-	constexpr int mmax = 24 + 6, nT = 301;
-	constexpr double step = 0.1;
-	static const vec table = []()
-	{
-		vec F((size_t)nT * (mmax + 1));
-		for (int i = 0; i < nT; i++)
-		{
-			const double T0 = i * step, e = exp(-T0);
-			// F_mmax by its series e^-T sum_k (2T)^k / ((2m+1)...(2m+2k+1)), then downward
-			double term = 1.0 / (2 * mmax + 1), sum = term;
-			for (int k = 1; term > 1E-17 * sum; k++)
-				term *= 2 * T0 / (2 * mmax + 2 * k + 1), sum += term;
-			double *row = F.data() + (size_t)i * (mmax + 1);
-			row[mmax] = e * sum;
-			for (int n = mmax - 1; n >= 0; n--)
-				row[n] = (2 * T0 * row[n + 1] + e) / (2 * n + 1);
-		}
-		return F;
-	}();
-	if (T >= (nT - 1) * step)
+	if (T >= (boys_nT - 1) * boys_step)
 	{
 		double f = 0.5 * sqrt(constants::PI / T); // F_0, then upward, stable at this T
 		for (int n = 1; n <= m; n++)
 			f = ((2 * n - 1) * f - expn) / (2 * T);
 		return f;
 	}
-	const int i = (int)(T / step + 0.5);
-	const double dT = i * step - T, *row = table.data() + (size_t)i * (mmax + 1) + m;
+	const int i = (int)(T / boys_step + 0.5);
+	const double dT = i * boys_step - T, *row = boys_tab.data() + (size_t)i * (boys_mmax + 1) + m;
 	double f = 0, pw = 1;
 	for (int k = 0; k <= 5; k++, pw *= dT / k)
 		f += row[k] * pw;
@@ -3177,17 +3190,28 @@ const double WFN::computeESP(const d3 &PosGrid, const ESP_pairs &t) const
 	{
 		const double ex_sum = t.ex_sum[p];
 		const std::array<int, 3> &L = t.L[p];
-		double sqpc = 0;
+		const int MaxFn = L[0] + L[1] + L[2];
+		double PC[3], sqpc = 0;
 		for (int k = 0; k < 3; k++)
 		{
-			const double PC = t.P[p][k] - PosGrid[k];
-			sqpc += PC * PC;
+			PC[k] = t.P[p][k] - PosGrid[k];
+			sqpc += PC[k] * PC[k];
+		}
+		// s-s pairs (the bulk of the table) have one (l,r,s) term per axis, every PC power 0, and
+		// F_0 never touches exp(-T) on either branch: bitwise the general path below, without the exp
+		if (MaxFn == 0)
+		{
+			const int c = t.off[p];
+			ESP -= t.weight[p] * ((t.coef[c] * t.coef[c + 1]) * t.coef[c + 2] * boys(0, ex_sum * sqpc, 0.0));
+			continue;
+		}
+		for (int k = 0; k < 3; k++)
+		{
 			pcp[k][0] = 1.0;
 			for (int n = 1; n <= L[k]; n++)
-				pcp[k][n] = pcp[k][n - 1] * PC;
+				pcp[k][n] = pcp[k][n - 1] * PC[k];
 		}
-		double expc = exp(-ex_sum * sqpc);
-		int MaxFn = L[0] + L[1] + L[2];
+		const double expc = exp(-ex_sum * sqpc);
 		Fn[MaxFn] = boys(MaxFn, ex_sum * sqpc, expc);
 		const double twoexpc = 2 * ex_sum * sqpc;
 		for (int nu = MaxFn - 1; nu >= 0; nu--)
@@ -3214,3 +3238,38 @@ const double WFN::computeESP(const d3 &PosGrid, const ESP_pairs &t) const
 	}
 	return ESP;
 };
+
+// One call per point set instead of one per point: the pair table is O(nprim^2) and every point
+// walks all of it, so a whole grid is worth shipping to a device at once. Falls back to the
+// OpenMP loop over computeESP when there is no device (or the set is too small to pay the copies).
+void WFN::computeESP_batch(const std::vector<d3> &points, const ESP_pairs &t, double *out) const
+{
+	const int np = (int)points.size();
+	if (np == 0)
+		return;
+#ifdef NOSPHERA2_USE_GPU
+	const int ncen = get_ncen(), npairs = (int)t.weight.size();
+	// the pair table stays resident on the device between calls, so a slice only pays its own point
+	// upload and result download; 4M pair-point evaluations already beat the OpenMP loop comfortably
+	if (npairs > 0 && (long long)np * npairs >= (1LL << 22) && aux_density_gpu_enabled())
+	{
+		vec ax(ncen), ay(ncen), az(ncen), q(ncen);
+		for (int a = 0; a < ncen; a++)
+		{
+			ax[a] = atoms[a].get_coordinate(0), ay[a] = atoms[a].get_coordinate(1), az[a] = atoms[a].get_coordinate(2);
+			q[a] = get_atom_charge(a) - atoms[a].get_ECP_electrons();
+		}
+		int nT = 0, stride = 0;
+		double step = 0;
+		const double *tab = esp_boys_table(nT, stride, step);
+		if (esp_gpu_eval(ncen, ax.data(), ay.data(), az.data(), q.data(),
+						 npairs, t.ex_sum.data(), t.weight.data(), t.P[0].data(), t.L[0].data(),
+						 t.off.data(), t.coef.data(), t.pc_pow.data(), t.fn_idx.data(),
+						 nT, stride, step, tab, np, points[0].data(), out))
+			return;
+	}
+#endif
+#pragma omp parallel for schedule(static)
+	for (int i = 0; i < np; i++)
+		out[i] = computeESP(points[i], t);
+}

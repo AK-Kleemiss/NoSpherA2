@@ -34,6 +34,9 @@
 #ifdef NOSPHERA2_USE_GPU
 #include "core/blas_gpu.h"
 #include "core/aux_density_gpu.h"
+#include "core/esp_gpu.h"
+//defined next to boys() in wfn_density.cpp, which has no header of its own
+const double* esp_boys_table(int& nT, int& stride, double& step);
 #endif
 
 
@@ -181,6 +184,83 @@ namespace NoSpherA2UnitTests
 			{ { 2.843936, 16.109981, 3.407357 }, 0.039717 } } };
 		for (const auto& [pos, esp] : reference)
 			EXPECT_NEAR(wave.computeESP(pos, pairs), esp, 1E-5); // the cube header rounds the grid positions to 1E-6 bohr
+	}
+
+	//computeESP_batch does a whole point set in one call, on a device when there is one. It has to
+	//agree with the per-point computeESP it replaces. The set is deliberately big enough to clear the
+	//gate esp_gpu_eval puts on (points x pairs). The test binary never parses -no_gpu_density, so the
+	//toggle the app sets in NoSpherA2.cpp is off here and the first pass is always the OpenMP
+	//fallback; the second pass calls the CUDA kernel itself, which is the only way it gets tested.
+	TEST(EspTests, BatchMatchesThePerPointLoop)
+	{
+		const auto input = nos_test_repo_root() / "tests" / "epoxide_gbw" / "epoxide.gbw";
+		if (!std::filesystem::exists(input)) GTEST_SKIP() << "Missing " << input;
+		WFN wave(input, false);
+		const WFN::ESP_pairs pairs = wave.build_ESP_pairs();
+		d3 lo{ 1E30, 1E30, 1E30 }, hi{ -1E30, -1E30, -1E30 };
+		for (int a = 0; a < wave.get_ncen(); a++)
+			for (int k = 0; k < 3; k++)
+			{
+				lo[k] = std::min(lo[k], wave.get_atom_coordinate(a, k));
+				hi[k] = std::max(hi[k], wave.get_atom_coordinate(a, k));
+			}
+		const int n = 26;
+		std::vector<d3> pts;
+		for (int i = 0; i < n; i++)
+			for (int j = 0; j < n; j++)
+				for (int k = 0; k < n; k++)
+				{
+					const d3 p = { lo[0] - 2 + (hi[0] - lo[0] + 4) * i / (n - 1.0),
+								   lo[1] - 2 + (hi[1] - lo[1] + 4) * j / (n - 1.0),
+								   lo[2] - 2 + (hi[2] - lo[2] + 4) * k / (n - 1.0) };
+					bool at_nucleus = false;
+					for (int a = 0; a < wave.get_ncen(); a++)
+					{
+						double r2 = 0;
+						for (int c = 0; c < 3; c++)
+							r2 += std::pow(p[c] - wave.get_atom_coordinate(a, c), 2);
+						at_nucleus |= r2 < 0.25; // the nuclear term diverges, so keep clear of the cores
+					}
+					if (!at_nucleus)
+						pts.push_back(p);
+				}
+		vec batch(pts.size());
+		wave.computeESP_batch(pts, pairs, batch.data());
+		double worst = 0;
+		for (size_t i = 0; i < pts.size(); i++)
+			worst = std::max(worst, std::abs(batch[i] - wave.computeESP(pts[i], pairs)));
+		std::cout << pairs.weight.size() << " pairs x " << pts.size() << " points, max |batch - per point| " << worst << std::endl;
+		EXPECT_LT(worst, 1E-10);
+#if defined(NOSPHERA2_USE_GPU)
+		if (!aux_density_gpu_available()) GTEST_SKIP() << "no device for the second pass";
+		// computeESP_batch falls back to the OpenMP loop whenever the kernel declines, and that fallback
+		// compared with itself reads as a perfect match, so call the kernel the same way and insist it ran
+		const int ncen = wave.get_ncen(), npairs = (int)pairs.weight.size();
+		vec ax(ncen), ay(ncen), az(ncen), q(ncen);
+		for (int a = 0; a < ncen; a++)
+		{
+			ax[a] = wave.get_atom_coordinate(a, 0), ay[a] = wave.get_atom_coordinate(a, 1), az[a] = wave.get_atom_coordinate(a, 2);
+			q[a] = wave.get_atom_charge(a) - wave.get_atom_ECP_electrons(a);
+		}
+		int nT = 0, stride = 0;
+		double step = 0;
+		const double* tab = esp_boys_table(nT, stride, step);
+		vec device(pts.size());
+		aux_density_gpu_set_enabled(true);
+		const bool ran = esp_gpu_eval(ncen, ax.data(), ay.data(), az.data(), q.data(),
+									  npairs, pairs.ex_sum.data(), pairs.weight.data(), pairs.P[0].data(), pairs.L[0].data(),
+									  pairs.off.data(), pairs.coef.data(), pairs.pc_pow.data(), pairs.fn_idx.data(),
+									  nT, stride, step, tab, (int)pts.size(), pts[0].data(), device.data());
+		aux_density_gpu_set_enabled(false); // leave the flag as the rest of the suite found it
+		ASSERT_TRUE(ran) << "the CUDA kernel declined, so this would compare the host loop with itself";
+		double worst_dev = 0;
+		for (size_t i = 0; i < pts.size(); i++)
+			worst_dev = std::max(worst_dev, std::abs(device[i] - batch[i]));
+		std::cout << "max |device - host| " << worst_dev << std::endl;
+		//only nvcc's FMA contraction and the device exp() separate the two, and the ESP reference
+		//gate next door is 1E-5, so this is four orders tighter than anything that reads the numbers
+		EXPECT_LT(worst_dev, 1E-9);
+#endif
 	}
 
 	//A valence-only wavefunction (xTB/pTB, ECP) is neutral once the core electrons are counted as screening the
