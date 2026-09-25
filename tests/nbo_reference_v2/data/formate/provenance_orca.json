@@ -1,0 +1,16 @@
+{
+  "stage": "orca_opt",
+  "molecule": "formate",
+  "threads": 4,
+  "wall_seconds": 60,
+  "exit_code": 0,
+  "hostname": "AKL064",
+  "node_cores_total": 96,
+  "slurm_job_id": "578522",
+  "slurm_partition": "Active",
+  "slurm_cpus_on_node": "4",
+  "finished_utc": "2026-09-25T01:37:34Z",
+  "orca_path": "/work/software/spack/opt/spack/linux-skylake_avx512/orca-avx2-6.1.1-xqm3jnzqmabhd6xks5r3o25jeweo57q5/bin/orca",
+  "orca_module": "orca/avx2-6.1.1-xqm3jnz",
+  "orca_mpi_procs": 4
+}

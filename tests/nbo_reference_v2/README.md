@@ -239,8 +239,12 @@ bin/ (this directory)         make_inputs.py, accept.py, config.py, compare_all.
 ratio_probe.py                native/gennbo per matched pair, resolution-aware
 nrt_spin_test.py              each spin's NRT value against its own gennbo counterpart
 e2_threshold_probe.sh         both sides at one low E2 print threshold
-results/<mol>/                <mol>.out, <mol>.47, <mol>_native.47, <mol>.nbo,
-                              <mol>.gennbo.nbo.json, <mol>.native.nbo.json,
-                              provenance_orca.json, provenance_nbo.json
-accepted.json, comparison.json
+data/<mol>/                   the committed record of the run: <mol>.inp, _start.xyz, .xyz,
+                              _trj.xyz, .out, .nbo, both .nbo.json, both provenance files.
+                              NOT .gbw (27 MB) or .47 (42 MB) - those stay on the cluster and
+                              are one command to rebuild. data/README.md carries the recipe and
+                              the acceptance table, which is what tests/nbo_reference/ lacks.
+data/accepted.json            per-molecule acceptance verdict, keyed by molecule name
+$ROOT/<mol>/ on the cluster   the live run directory both stages write, by default
+                              /work/akkleemiss/florian/nbo_ref_v2; also holds .gbw and .47
 ```
