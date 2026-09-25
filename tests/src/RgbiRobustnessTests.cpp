@@ -151,6 +151,68 @@ TEST(RgbiRobustnessTests, CeriumFreeAtomRunsAndIsNotFallenBackOn)
 	EXPECT_TRUE(std::isfinite(population));
 	EXPECT_GT(population, 0.5 * 58.0);
 	EXPECT_LT(population, 58.0 + 1e-6);
+	//And the part this test used to pass over in silence: in the suite's own run, pinned to one thread,
+	//Ce's free-atom SCF did not converge - occ's full 100 iterations with |dE|/E at 9.9e-10 and
+	//max|FDS-SDF| stalled at 7.7e-5, logged at error level, the last density returned rather than
+	//thrown, and used and cached as cerium's free-atom reference. The population above was still a
+	//population and this test still passed, which is why the run now warns.
+	//
+	//Not asserted here, deliberately, and measured rather than assumed: whether it converges depends on
+	//the threading. Unpinned with 8 threads (NOS_RGBI_NO_PIN=1, AKL007, 96 cores) the same binary and
+	//fixture converged in 37.5 s and printed no warning; the pinned run took 2414 s and never did. An
+	//expectation either way would be asserting the node's thread count. The warning itself is checked by
+	//AFreeAtomThatRunsOutOfIterationsSaysSo below, on water, in about a second.
+}
+
+//occ does not throw when an SCF runs out of iterations - scf_impl.h logs one line at error level and
+//returns the last energy - so RGBI used, and cached, free-atom densities that never converged, and the
+//only fixture that reached that state costs 2414 s and answers differently depending on the thread pin.
+//NOS_RGBI_FREE_ATOM_MAXITER caps the iterations so the reporting can be checked on water: both
+//directions, because a warning that is always printed is not a warning.
+TEST(RgbiRobustnessTests, AFreeAtomThatRunsOutOfIterationsSaysSo)
+{
+	if (water_he_fixture().empty())
+		GTEST_SKIP() << "tests/TFVC/water.gbw not found";
+	const auto count = [](const std::string &hay, const std::string &token) {
+		size_t n = 0;
+		for (size_t at = hay.find(token); at != std::string::npos; at = hay.find(token, at + 1))
+			n++;
+		return n;
+		};
+	const std::string token = "WARNING: the free-atom SCF of ";
+
+	//the control arm, cold so it really runs the SCFs: O, H and He all converge and nothing is said
+	clear_rgbi_free_atom_cache();
+	const std::string quiet = rgbi_ano_output(false);
+	ASSERT_FALSE(quiet.empty()) << "the analysis produced no output at all";
+	EXPECT_EQ(count(quiet, token), 0u) << "water's free atoms converge, so there is nothing to warn about:\n"
+		<< quiet;
+
+	clear_rgbi_free_atom_cache();
+#ifdef _WIN32
+	_putenv_s("NOS_RGBI_FREE_ATOM_MAXITER", "1");
+#else
+	setenv("NOS_RGBI_FREE_ATOM_MAXITER", "1", 1);
+#endif
+	const std::string capped = rgbi_ano_output(false);
+#ifdef _WIN32
+	_putenv_s("NOS_RGBI_FREE_ATOM_MAXITER", "");
+#else
+	unsetenv("NOS_RGBI_FREE_ATOM_MAXITER");
+#endif
+	//and never leave a one-iteration density in the cache for whatever test runs next
+	clear_rgbi_free_atom_cache();
+	ASSERT_FALSE(capped.empty()) << "the capped arm produced no output at all";
+
+	//three distinct free atoms, three warnings, each naming its element by Z and carrying both residuals
+	EXPECT_EQ(count(capped, token), 3u) << "water plus helium has 3 distinct free atoms:\n" << capped;
+	EXPECT_NE(capped.find("(Z=8,"), std::string::npos) << capped;
+	EXPECT_NE(capped.find("(Z=1,"), std::string::npos) << capped;
+	EXPECT_NE(capped.find("(Z=2,"), std::string::npos) << capped;
+	EXPECT_EQ(count(capped, "did not converge in 1 iterations"), 3u) << capped;
+	EXPECT_EQ(count(capped, "max|FDS-SDF|="), 3u) << capped;
+	//and it reports rather than refuses: the analysis still finishes and still prints its populations
+	EXPECT_TRUE(std::isfinite(value_after(capped, "Population of atom 0: "))) << capped;
 }
 
 //The external reference.  tests/RGBI/stdout is Tonto 26.01.05's own Roby-Gould output for the
@@ -350,10 +412,11 @@ TEST(RgbiRobustnessTests, IdenticalCentresShareOneFreeAtomScf)
 
 	//The half that makes this a check and not a stopwatch. NOS_RGBI_NO_FREEATOM_CACHE recomputes every
 	//centre in this same process, so the cached bond table has something to be identical to. Without it
-	//the cache offers no evidence at all: it is not faster. On the one fixture it exists for,
-	//tests/Fe_gbw/Fe.gbw, the uncached run has now produced its table - 21 SCFs in 411.3 s against the
-	//cached 4 in 1727.1 s, md5 1672c4eae0c8 both ways - so the eighth fixture is verified and the cache's
-	//justification is entirely this identity.
+	//the cache offers no evidence at all: it is barely faster. On the one fixture it exists for,
+	//tests/Fe_gbw/Fe.gbw, all four arms of job 582380 print md5 1672c4eae0c8 and 20 rows - cached 4 SCFs
+	//in 404.0 s against uncached 21 in 410.5 s unpinned, 1729.1 s against 1731.8 s pinned - and the 17
+	//repeats it removes are worth 1.0 s of that unpinned run, the non-Fe SCFs summing to 0.3 s against
+	//1.3 s. So the eighth fixture is verified and the cache's justification is entirely this identity.
 #ifdef _WIN32
 	_putenv_s("NOS_RGBI_NO_FREEATOM_CACHE", "1");
 #else
@@ -390,9 +453,11 @@ TEST(RgbiRobustnessTests, IdenticalCentresShareOneFreeAtomScf)
 }
 
 //The cache removes the repeats; it does not make the remaining SCFs any faster, and on
-//tests/Fe_gbw/Fe.gbw it makes the run about 1300 s slower than recomputing all 21. The distinct SCFs run
+//tests/Fe_gbw/Fe.gbw the repeats it removes are worth 1.0 s of a 404.0 s run - the earlier claim that it
+//cost about 1300 s was the pin measured across two jobs, not this cache. The distinct SCFs run
 //one behind the other and do not depend on each other, so NOS_RGBI_PARALLEL_FREEATOM runs them up front
-//and concurrently. How much that saves is being measured and is not claimed here. The risk it buys is
+//and concurrently. On this fixture that can reach only the 1.0 s, because 402.653 s of the run is one Fe;
+//the fixture where it could pay is one with many distinct heavy centres. The risk it buys is
 //the only one worth testing for: occ's SCF is not documented re-entrant, and a free-atom density that
 //comes out subtly different under concurrency would be invisible in a timing table.
 //

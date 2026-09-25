@@ -525,7 +525,8 @@ namespace {
 		//a count, and that is not a measurement of an SCF - it is a measurement of the whole run with the
 		//SCF's name on it. It produced "430 s per free-atom SCF" from one fixture's total, and job 580121
 		//then reported the same binary doing 21 of these SCFs in 411.3 s and 4 of them in 1727.1 s, which
-		//no division can reconcile because the 21 include the 4. One of those totals is not spent here.
+		//no division can reconcile because the 21 include the 4. These lines resolved it: both totals are
+		//spent here, in one atom, and the two jobs differed in the pin rather than in the cache.
 		const auto scf_t0 = std::chrono::steady_clock::now();
 
 		occ::qm::HartreeFock hf(basis);
@@ -546,7 +547,45 @@ namespace {
 			!occ::qm::minimal_basis_covers(basis))
 			scf.set_guess_kind(occ::qm::GuessKind::Core);
 		scf.set_charge_multiplicity(0, multiplicity);
+		//A cap, so that the warning below is testable without a forty-minute fixture. occ's own default
+		//is 100 iterations and nothing in this tree reached a non-converged free atom in less than that;
+		//the only case that did - cerium - takes 2414 s and changes its verdict with the thread pin, so
+		//it could not be the check. With NOS_RGBI_FREE_ATOM_MAXITER=1 any molecule reaches the warning
+		//in a second. Unset, which is the shipped behaviour, occ's default is left exactly alone.
+		if (const char *cap = std::getenv("NOS_RGBI_FREE_ATOM_MAXITER")) {
+			const int capped_iterations = std::atoi(cap);
+			if (capped_iterations > 0)
+				scf.maxiter = capped_iterations;
+		}
 		const double scf_energy = scf.compute_scf_energy();
+
+		//occ does not throw when an SCF runs out of iterations: scf_impl.h logs one line at error
+		//level and returns the last energy, so the density of an atom that never converged is used
+		//and cached exactly as if it were the answer, and the comment further down claiming that only
+		//a converged SCF is cached was true only of the routes that throw. The live case is cerium, not
+		//iron: RgbiRobustnessTests.CeriumFreeAtomRunsAndIsNotFallenBackOn PASSED for 2414 s in the
+		//suite's own log (25 Sep 04:38) on a free atom that ran all 100 iterations with |dE|/E down at
+		//9.9e-10 while max|FDS-SDF| stalled at 7.7e-5. Whether it converges is not a property of cerium
+		//alone - the same binary and fixture, unpinned with 8 threads, converged in 37 s and printed no
+		//warning at all - which is why the check that this warning works is the water test, not that one.
+		//
+		//Said, not refused. The energy is converged to a part in 1e9, and throwing here would drop the
+		//whole ANO route for that element through the caller's catch - a larger change to published
+		//numbers than the residual it avoids - so the density is used and cached as before and the run
+		//stays reproducible. What changes is that the person reading the table is told which element's
+		//free-atom reference is unconverged and by how much, which they could not see before: the occ
+		//line goes through spdlog, and the RGBI path holds spdlog at error level from two places, so on
+		//a quiet terminal it was there and on the test log it was buried in several hundred lines.
+		if (!scf.ctx.converged) {
+			std::ostringstream line;
+			line << "  WARNING: the free-atom SCF of " << atm.get_label() << " (Z="
+				<< effective_atomic_number << ", " << basis.nbf() << " functions) did not converge in "
+				<< scf.iter << " iterations: |dE|/E=" << std::scientific << std::setprecision(3)
+				<< scf.ediff_rel << ", max|FDS-SDF|=" << scf.diis_error
+				<< ". Its density is used as the free-atom reference for every atom of this element, so"
+				<< " the bond indices below inherit that residual.";
+			rgbi_debug_line(line.str());
+		}
 
 		occ::qm::MolecularOrbitals mo = scf.wavefunction().mo;
 		mo.update_occupied_orbitals();
@@ -577,8 +616,12 @@ namespace {
 		dMatrix2 result = (spin_kind == occ::qm::SpinorbitalKind::Restricted)
 			? eigen_matrix_to_dmatrix2(2.0 * mo.D)
 			: eigen_matrix_to_dmatrix2(occ::Mat(occ::qm::block::a(mo.D) + occ::qm::block::b(mo.D)));
-		//Only a converged SCF is cached: the throw above and any occ failure leave the cache untouched,
-		//so a fallback stays a fallback and is not remembered as an answer.
+		//An SCF that threw is not cached: the throw above and any occ failure leave the cache untouched,
+		//so a fallback stays a fallback and is not remembered as an answer. An SCF that merely ran out
+		//of iterations IS cached, deliberately - occ returns it rather than throwing, every atom of the
+		//element must get the same reference for the table to be reproducible, and the warning above is
+		//how that case is declared instead. This comment used to say "only a converged SCF is cached",
+		//which was the one case it did not cover.
 		if (!cache_disabled) {
 			const std::lock_guard<std::mutex> hold(free_atom_cache_mutex);
 			free_atom_cache.push_back({ key, result });
@@ -586,14 +629,20 @@ namespace {
 		return result;
 	}
 
-	//The cache turns 21 free-atom SCFs into 4 on tests/Fe_gbw/Fe.gbw. What those 4 cost is not known: an
-	//earlier version of this comment divided the run's half hour by them and got about 430 s each, which
-	//was arithmetic on the wrong quantity. Measured from one binary on one node with only
-	//NOS_RGBI_NO_FREEATOM_CACHE between the arms, 21 SCFs take 411.3 s and 4 take 1727.1 s, and the 21
-	//contain the 4 - so most of at least one total is not spent in the free-atom SCFs at all, and on this
-	//fixture the cache buys byte-identical output for about 1300 s of net loss. The cache is an accuracy
-	//and determinism device and not a speed one. FREEATOM-TIME under NOS_RGBI_DEBUG times each SCF from
-	//inside, which is the only way to get a per-SCF number here.
+	//The cache turns 21 free-atom SCFs into 4 on tests/Fe_gbw/Fe.gbw, and it is worth about a second.
+	//Two earlier versions of this comment got that wrong the same way, by quoting an aggregate: the first
+	//divided a half-hour run by 4 and called it 430 s per SCF, the second compared 411.3 s against
+	//1727.1 s across two jobs whose pin state differed and charged the gap to the cache. Job 582380 ran
+	//all four arms from one binary on one node at OMP_NUM_THREADS=4 with only the two switches between
+	//them, and FREEATOM-TIME priced the SCFs from inside: unpinned, Fe 402.653 s, S 0.324232 s,
+	//C 0.0296981 s, H 0.0023573 s. One atom is the run. Removing the 17 repeats is worth 1.0 s unpinned
+	//- the non-Fe SCFs sum to 0.3 s cached against 1.3 s uncached - and 3.3 s pinned, on runs of 404.0 s
+	//and 1729.1 s. Do not read the whole-run difference instead: the Fe SCF, computed exactly once in
+	//every arm, moved 402.7 -> 408.2 s between the two unpinned arms, so 5.5 s of the 6.5 s gap between
+	//them is that variance and not this cache. The ~1300 s once charged here is the pin below, 1729.1 s
+	//against 404.0 s with nothing else changed. The cache is an accuracy and determinism device and not
+	//a speed one, and Au2Br2 answering 53 centres with 5 SCFs is what it is for. FREEATOM-TIME under
+	//NOS_RGBI_DEBUG times each SCF from inside, which is the only way to get a per-SCF number here.
 	//
 	//The SCFs are independent of each other and the loop that consumes them is not: it mutates the
 	//overlap matrix, accumulates a basis-function index and appends to NAOs in order. So they can be run
