@@ -975,9 +975,41 @@ std::pair<cubei, std::vector<d4>> topological_cube_analysis(const cube *cub, con
 				valid[i] = in ? 1 : 0;
 			}
 	auto ok = [&](int x, int y, int z) { return x >= 0 && y >= 0 && z >= 0 && x < nx && y < ny && z < nz && valid[lin(x, y, z)]; };
+	//How much of the near-grid partition below was decided by the loop order rather than by the field?
+	//steepest() takes the steepest of the 26 neighbours with a strict >, so when two are exactly equally
+	//steep the one the (ix,iy,iz) loops reach first wins - always the smaller index, i.e. -x before +x.
+	//That order is a property of the array, not of the molecule, so symmetry-equivalent basins are not
+	//treated equivalently: octahedral UH6 with its six hydrogens on the cartesian axes and the grid
+	//centred on the uranium - so the grid itself carries the symmetry - comes out with six ELI-D
+	//hydrogen basins whose voxel volumes differ by 37 % and whose electron counts differ by 3 %, while
+	//the QTAIM basins of the same run, which take the analytic-gradient path instead, hold the same
+	//orbit to every printed digit. The spread does not fall when the spacing goes 0.20 -> 0.08 A
+	//(1.37 -> 1.34 % in electrons), so it is not discretisation error that a finer grid would remove.
+	//A tied step is genuinely ambiguous - no single winner can be symmetric - so the count is printed
+	//rather than hidden: it is the honest error bar on every near-grid basin this routine reports.
+	long long steep_calls = 0, steep_tied = 0, tied_paths = 0;
+	bool path_tied = false;
+	//The other way a step can be arbitrary, and the one that turns out to matter here. The stepper below
+	//rounds each gradient component's share f = s[d]/max|s| to a whole voxel step with lround(), so a
+	//component sitting at f = 0.5 is one rounding away from stepping and one from not. The field on the
+	//grid is symmetric only as far as its own arithmetic is: values at mirror-image points agree to
+	//within the last bit, not exactly, because a grid coordinate is origin + i*h and the mirror of that
+	//is not the same sum. A decision within that distance of 0.5 therefore resolves one way on one side
+	//of the molecule and the other way on the other, which is how a 1e-16 asymmetry becomes a 37 %
+	//difference in basin volume. min_margin says how close the closest call was; a run whose margin
+	//never drops near the field's own noise would REFUTE this explanation.
+	long long marginal_1e9 = 0, marginal_1e5 = 0, step_decisions = 0;
+	double min_margin = 1.0;
+	//And the one that decides where the attractors land: grad_epsilon is ABSOLUTE, so on a field whose
+	//values are around 11 a top that varies in the eleventh digit counts as flat and the walk stops at
+	//whichever voxel of it the path entered. flat_stops counts those stops and max_flat_best says how
+	//much uphill was still there when the walk gave up; a count of zero would refute this too.
+	long long flat_stops = 0;
+	double max_flat_best = 0.0;
 	//Highest 26-neighbour; false when none is higher
 	auto steepest = [&](int x, int y, int z, int &bx, int &by, int &bz) {
 		double best = 0.0;
+		int n_best = 0;
 		bx = x; by = y; bz = z;
 		const double c = v[lin(x, y, z)];
 		for (int ix = x - 1; ix <= x + 1; ix++)
@@ -986,8 +1018,23 @@ std::pair<cubei, std::vector<d4>> topological_cube_analysis(const cube *cub, con
 					if ((ix == x && iy == y && iz == z) || !ok(ix, iy, iz)) continue;
 					const double d = std::sqrt(std::pow((ix - x) * h[0], 2) + std::pow((iy - y) * h[1], 2) + std::pow((iz - z) * h[2], 2));
 					const double g = (v[lin(ix, iy, iz)] - c) / d;
-					if (g > best) { best = g; bx = ix; by = iy; bz = iz; }
+					if (g > best) { best = g; bx = ix; by = iy; bz = iz; n_best = 1; }
+					else if (n_best && g == best) n_best++;   //just as steep, reached later: the winner was picked by loop order alone
 				}
+		steep_calls++;
+		if (n_best > 1) { steep_tied++; path_tied = true; }
+		//A third way for a step to be arbitrary, and on UH6 the one that decides where the attractors
+		//land. grad_epsilon is an absolute number (1e-10) on a field whose values here are around 11, so
+		//the top of a hydrogen's ELI-D basin - a shell where ELI-D varies in the eleventh digit - counts
+		//as flat and the walk stops at whichever voxel of it the path entered. Which voxel that is
+		//depends on where the path came from, so the six symmetry-equivalent hydrogens get attractors at
+		//six DIFFERENT transverse offsets: H3 at (+0.139, +4.043, +0.139) against H4 at (+0.139, -4.043,
+		//-0.139), which is not the mirror image the group requires. The nearest-attractor quadrature then
+		//inherits that, which is why its volumes spread 32 % while its maxima all read 11.2258.
+		if (best > 0.0 && best <= grad_epsilon) {
+			flat_stops++;
+			if (best > max_flat_best) max_flat_best = best;
+		}
 		return best > grad_epsilon;
 	};
 	ivec basin(n, 0);
@@ -1015,6 +1062,7 @@ std::pair<cubei, std::vector<d4>> topological_cube_analysis(const cube *cub, con
 	auto ascend = [&](int x, int y, int z, const std::vector<unsigned char> *interior, const bool assign) {
 		path.clear();
 		path_id++;
+		path_tied = false;
 		d3 dr{ 0.0, 0.0, 0.0 };
 		int cx = x, cy = y, cz = z;
 		for (size_t guard = 0; guard < n; guard++) {
@@ -1046,6 +1094,12 @@ std::pair<cubei, std::vector<d4>> topological_cube_analysis(const cube *cub, con
 				int step[3];
 				for (int d = 0; d < 3; d++) {
 					const double f = s[d] / m;
+					//how far is this component from the nearest lround() boundary at a half-integer?
+					const double margin = std::abs(std::abs(f) - std::floor(std::abs(f)) - 0.5);
+					step_decisions++;
+					if (margin < min_margin) min_margin = margin;
+					if (margin < 1e-9) marginal_1e9++;
+					if (margin < 1e-5) marginal_1e5++;
 					step[d] = static_cast<int>(std::lround(f));
 					dr[d] += f - step[d];
 					if (dr[d] > 0.5) { step[d]++; dr[d] -= 1.0; }
@@ -1077,6 +1131,7 @@ std::pair<cubei, std::vector<d4>> topological_cube_analysis(const cube *cub, con
 						id = static_cast<int>(Maxima.size());
 					}
 					if (assign) for (const int q : path) basin[q] = id;
+					if (path_tied) tied_paths++;
 					return id;
 				}
 			}
@@ -1084,6 +1139,7 @@ std::pair<cubei, std::vector<d4>> topological_cube_analysis(const cube *cub, con
 		}
 		const int id = basin[lin(cx, cy, cz)];
 		if (assign) for (const int q : path) basin[q] = id;
+		if (path_tied) tied_paths++;
 		return id;
 	};
 	if (field_wfn) {
@@ -1196,9 +1252,22 @@ std::pair<cubei, std::vector<d4>> topological_cube_analysis(const cube *cub, con
 	}
 	else {
 		std::cout << "Assigning basins by near-grid ascent..." << std::endl;
-		for (int x = 0; x < nx; x++)
-			for (int y = 0; y < ny; y++)
-				for (int z = 0; z < nz; z++) {
+		//A path stops at the first already-assigned voxel and adopts its basin, which is only exact if
+		//the answer at that voxel is the answer this path would have reached. It is not: the stepper
+		//above carries a rounding residual dr from the voxels it has already crossed, so where a path
+		//goes on from a voxel depends on how it arrived there. The partition is therefore decided partly
+		//by which path reaches a voxel FIRST, i.e. by the order of the three loops below - and that order
+		//is not one of the molecule's symmetry operations. Reversing it changes nothing if this
+		//explanation is wrong, which is what the environment variable is for; it is a diagnostic, never a
+		//mode anyone should run, and the default is the historical order.
+		const bool reverse_scan = std::getenv("NOS_BASIN_SCAN_REVERSE") != nullptr;
+		if (reverse_scan) std::cout << "NOS_BASIN_SCAN_REVERSE is set: scanning seed voxels in the opposite order (diagnostic)" << std::endl;
+		for (int xr = 0; xr < nx; xr++)
+			for (int yr = 0; yr < ny; yr++)
+				for (int zr = 0; zr < nz; zr++) {
+					const int x = reverse_scan ? nx - 1 - xr : xr;
+					const int y = reverse_scan ? ny - 1 - yr : yr;
+					const int z = reverse_scan ? nz - 1 - zr : zr;
 					const size_t i = lin(x, y, z);
 					if (basin[i] == 0 && valid[i]) ascend(x, y, z, nullptr, true);
 				}
@@ -1225,6 +1294,18 @@ std::pair<cubei, std::vector<d4>> topological_cube_analysis(const cube *cub, con
 			refined[i] = ascend(x, y, z, &interior, false);
 		}
 		basin.swap(refined);
+		//Both near-grid passes counted together; see steepest() above for what a tie means and for the
+		//UH6 measurement that says the asymmetry it causes does not go away with a finer grid
+		std::cout << "Near-grid ascent: " << steep_calls << " steepest-neighbour steps, " << steep_tied
+			<< " of them tied (" << std::fixed << std::setprecision(3)
+			<< (steep_calls ? 100.0 * static_cast<double>(steep_tied) / static_cast<double>(steep_calls) : 0.0)
+			<< " %), " << tied_paths << " voxel paths went through at least one tie" << std::endl;
+		std::cout << "Near-grid ascent: " << step_decisions << " rounded step decisions, " << marginal_1e5
+			<< " within 1e-5 of flipping and " << marginal_1e9 << " within 1e-9, closest margin "
+			<< std::scientific << std::setprecision(3) << min_margin << std::defaultfloat << std::endl;
+		std::cout << "Near-grid ascent: " << flat_stops << " walks stopped on a top that grad_epsilon ("
+			<< std::scientific << std::setprecision(1) << grad_epsilon << ") calls flat, largest uphill "
+			<< std::setprecision(3) << max_flat_best << " still available there" << std::defaultfloat << std::endl;
 	}
 	int nb = static_cast<int>(Maxima.size());
 	std::cout << "I found " << nb << " Basins." << std::endl;
