@@ -1145,14 +1145,30 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
     const auto t_other0 = clock();
     vec2 bo(na, vec(na, 0.0));        //bond orders, diagonal = lone pairs
     vec2 pol(na, vec(na, 0.0));       //weight-summed c_A^2 - c_B^2 of the bonds on the pair
+    //topo counts TOPOLOGY UNITS, and the comment at the top of this file says what one unit is: an
+    //electron PAIR on the closed-shell route, a SINGLE ELECTRON per spin on the open-shell one. A bond
+    //order is conventionally counted in pairs, so a one-electron alpha sigma bond is half a bond and not
+    //one. Summing units straight into bo therefore printed every open-shell number at exactly twice its
+    //value, which is what a comparison against gennbo measured: on ch3, no and o2 with their references
+    //re-parsed, dividing native by two repairs 26 of 26 bond-order totals, 16 of 16 valencies and 16 of
+    //16 electron counts with nothing left over, and it is a factor of exactly 2 rather than a fitted one
+    //(ch3 valency 3.0000 against 1.5000, electron count 8 against 4, every C-H order 1.0000 against
+    //0.5000). `scale` is already 2.0 closed shell and 1.0 per spin, so scale/2 is 1 on the closed-shell
+    //route and no closed-shell number moves.
+    //What this does NOT repair is the ionic/covalent SPLIT of those totals, which is a second and
+    //independent defect: after halving, ch3's alpha C-H ionic share is 0.2478 against gennbo's 0.1920 and
+    //its beta share 0.0514 against 0.1360, wrong in opposite directions per spin, and even the two spins
+    //summed give 0.1496 against 0.1640. The split is left as it is and reported, because guessing at it
+    //would put a fitted number where a derived one belongs.
+    const double unit = scale / 2.0;
     for (int i = 0; i < nc; i++) {
         if (w(i) <= 0.0) continue;
         for (int a = 0; a < na; a++)
             for (int b = a; b < na; b++)
-                bo[a][b] += w(i) * cands[i].topo.at(a, b);
+                bo[a][b] += unit * w(i) * cands[i].topo.at(a, b);
         for (const std::array<double, 3>& p : cands[i].polarity) {
             const int a = static_cast<int>(p[0]), b = static_cast<int>(p[1]);
-            pol[std::min(a, b)][std::max(a, b)] += w(i) * ((a < b) ? p[2] : -p[2]);
+            pol[std::min(a, b)][std::max(a, b)] += unit * w(i) * ((a < b) ? p[2] : -p[2]);
         }
     }
 
