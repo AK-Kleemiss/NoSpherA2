@@ -1229,6 +1229,42 @@ TEST(PropertiesBasinTests, EliLabelsCoreLonePairBondAndProton)
 	EXPECT_EQ(labels[4], "O1 core");
 }
 
+// A free atom has no second atom to bond to, and it is the system ELI-D is calibrated against.
+// The labeller used to abort on it - err_checkf(atom_index2 >= 0, "Only one atom found for basin
+// ...") - which made -eli_analysis impossible on every monoatomic input: six of the twenty-two
+// reader inputs in the robustness matrix failed here and nowhere else (H.gbw, f_ref.wfx,
+// f_ref.wfn, F_open.molden, Ce_full.molden, sc.molden). Every basin of a lone atom belongs to
+// that atom: inside its core radius a core shell, outside it the valence shell.
+TEST(PropertiesBasinTests, EliLabelsAFreeAtomInsteadOfAborting)
+{
+	std::vector<atom> atoms;
+	atoms.emplace_back("Ce", atomID(), 1, 0.0, 0.0, 0.0, 58);
+	const std::vector<d4> maxima{
+		d4{ 0.05, 0.0, 0.0, 900.0 },  // inside Ce's core radius
+		d4{ 2.60, 0.0, 0.0, 3.0 },    // outside it: the valence shell
+	};
+	const svec labels = assign_labels_to_basins(maxima, atoms, false, 1);
+	ASSERT_EQ(labels.size(), 2u);
+	EXPECT_EQ(labels[0], "Ce0 core");
+	EXPECT_EQ(labels[1], "Ce0 LP");
+
+	// the two elements whose core radius is zero must not fall through into the bond branch and
+	// label themselves as bonded to themselves
+	std::vector<atom> one_h;
+	one_h.emplace_back("H", atomID(), 1, 0.0, 0.0, 0.0, 1);
+	const std::vector<d4> h_maxima{ d4{ 0.2, 0.0, 0.0, 1.0 }, d4{ 1.4, 0.0, 0.0, 0.3 } };
+	const svec h_labels = assign_labels_to_basins(h_maxima, one_h, false, 1);
+	ASSERT_EQ(h_labels.size(), 2u);
+	EXPECT_EQ(h_labels[0], "H0");      // within 0.6 bohr of the proton
+	EXPECT_EQ(h_labels[1], "H0 LP");   // further out, and still H's own
+	std::vector<atom> one_he;
+	one_he.emplace_back("He", atomID(), 1, 0.0, 0.0, 0.0, 2);
+	const std::vector<d4> he_maxima{ d4{ 0.1, 0.0, 0.0, 30.0 } };
+	const svec he_labels = assign_labels_to_basins(he_maxima, one_he, false, 1);
+	ASSERT_EQ(he_labels.size(), 1u);
+	EXPECT_EQ(he_labels[0], "He0 LP");
+}
+
 // core_shell_radius steps by period; unify_core_basins folds every maximum inside an atom's
 // core radius into one basin per atom keeping the highest, renumbers the cube and reports the
 // number merged
