@@ -453,13 +453,24 @@ the number.
 
 The open-shell composite NAO table prints `Occupancy` and `Spin` - it has **no Energy column**.
 The `energy` on a composite record in the reference JSON is therefore taken from elsewhere, and
-it is measurably gennbo's **alpha** energy: equal on **124/124** rows of `cf3`, 43/43, 43/43,
-92/92, and to the beta energy on **0** rows of any of them. `spinsplit.py --selfcheck` asserts
-this so it cannot drift silently. It is the same defect family as the `[:packed]` slice in
-`read_47` (`53f11d7f`) and the label beside the binary - an alpha quantity wearing a total
-label - and `nboref_sidebyside.py` prints that field in a column headed `E g`, so read that
-column as alpha on any open-shell molecule. No measured number in this README depends on it:
-every column here is built from occupancies and charges.
+it is measurably the **alpha** energy: equal to alpha on every row of all **10** open-shell
+molecules of both sets (`allyl` 123, `ch3` 49, `hco` 68, `no` 62, `no2` 93, `o2` 62, `c2h5` 92,
+`cf3` 124, `ch2` 43, `hs` 43) and to beta on **0** rows of any of them. It is the same defect
+family as the `[:packed]` slice in `read_47` (`53f11d7f`) and the label beside the binary - an
+alpha quantity wearing a total label - and `nboref_sidebyside.py` prints that field in a column
+headed `E g`, so read that column as alpha on any open-shell molecule.
+
+**Bounded: mislabelled, not miscomputed.** `compare_nbo.compare` defines a `nao energy` quantity
+that reads this field (`tests/nbo_reference/compare_nbo.py:113`), which would matter if the two
+sides disagreed about what the field holds. They do not: the composite `energy` is the alpha
+energy on **gennbo, the renat5 arm and the baseline arm alike**, all rows, all 10 molecules,
+which `spinsplit.py --selfcheck` now asserts **per side** rather than on gennbo alone. So that
+quantity compares alpha against alpha and the counts built on it stand. The asymmetric case is
+the one that would invalidate them, so the check names each side it verified and fails with that
+sentence if any side ever stops matching - asserting one side and assuming the other is exactly
+how this lane has been caught before. Composite `nao` *occupancy* is a genuine spin sum
+(`ch3` 8.99997 against alpha+beta 8.99996), so only `energy` carries the wrong label. No column
+in this README depends on it either way: every one is built from occupancies and charges.
 
 ### Trap: a blank line inside gennbo's NAO table separates atoms
 

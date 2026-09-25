@@ -133,15 +133,32 @@ def selfcheck(d):
                     for x, y, z in zip(a, b, t))
         assert worst <= 3 * DP, f"{mol}: alpha+beta != composite by {worst}"
         # ... and the composite 'energy' must be the ALPHA energy, not a total,
-        # which is trap 2 above stated as an executable claim
-        if t[0].get("energy") is not None:
-            same_a = sum(abs(x.get("energy", 0) - z.get("energy", 0)) < DP
-                         for x, z in zip(a, t))
-            assert same_a == len(t), \
-                f"{mol}: composite energy is not the alpha energy ({same_a}/{len(t)})"
+        # which is trap 2 above stated as an executable claim.  Checked on EVERY
+        # side present, not just gennbo: the claim that a consumer of this field
+        # compares alpha against alpha - and is therefore mislabelled rather than
+        # miscomputed - is only true if the defect is symmetric.  Asserting it on
+        # one side and assuming the other is how this lane keeps getting caught.
+        sides = [("gennbo", gen)]
+        for nm, suffix in (("renat5", ".native.nbo.json"),
+                           ("baseline", ".baseline.native.nbo.json")):
+            p = os.path.join(d, mol, mol + suffix)
+            if os.path.exists(p):
+                sides.append((nm, load(p)))
+        for nm, j in sides:
+            ta, tt = j["nao_alpha"], j["nao"]
+            assert len(ta) == len(tt), f"{mol}/{nm}: {len(ta)} vs {len(tt)}"
+            if tt[0].get("energy") is None:
+                continue
+            same_a = sum(abs(x.get("energy", 0) - z.get("energy", 0)) < 2 * DP
+                         for x, z in zip(ta, tt))
+            assert same_a == len(tt), (
+                f"{mol}/{nm}: composite energy is not the alpha energy "
+                f"({same_a}/{len(tt)}) - a consumer of this field is NOT "
+                f"comparing alpha against alpha and its counts need re-stating")
         print(f"  {mol:10s} open shell, {len(a)} rows/spin, "
               f"alpha+beta==composite within {worst / DP:.1f} floors, "
-              f"composite energy == alpha on {len(t)}/{len(t)}")
+              f"composite energy == alpha on {len(t)}/{len(t)} for "
+              f"{'+'.join(nm for nm, _ in sides)}")
     assert n_open >= 4, f"expected at least 4 open shells, found {n_open}"
     print(f"selfcheck OK: {n_open} open-shell molecules, {len(mols)} total")
 
