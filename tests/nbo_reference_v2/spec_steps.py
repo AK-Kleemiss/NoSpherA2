@@ -257,18 +257,22 @@ def orthogonalize(B, S, w, heavy_light):
 
 
 def cascade(Cpre, pre_occ, cls, S, SPS, lbl, two_class=False, renat=False, ryd_w="pre",
-            heavy_light=False):
+            heavy_light=False, nrb_first=False):
     """Steps 3-6 as one parametrised cascade; native's own choices are the defaults.
 
     two_class    pool core and valence into one OWSO (spec step 3) instead of native's three classes
     renat        run spec step 5 on the Rydberg set after the Schmidt
     ryd_w        "pre" (native), "post" (current m-averaged occupancies), "step5" (spec)
     heavy_light  the spec's heavy/light Rydberg scheme instead of one OWSO
+    nrb_first    orthogonalise the NRB first and Schmidt the NMB against IT - the reversed Schmidt
+                 order, one axis of the 144-combination grid in fit144.py
     """
     assert ryd_w in ("pre", "post", "step5"), ryd_w
     assert ryd_w != "step5" or renat, "step5 weights need step 5"
     C = Cpre.copy()
     groups = ([[0, 1], [2]] if two_class else [[0], [1], [2]])
+    if nrb_first:
+        groups = groups[::-1]
     done = np.zeros((C.shape[0], 0))
     for g in groups:
         cols = [i for i, k in enumerate(cls) if k in g]
