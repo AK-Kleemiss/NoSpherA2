@@ -1,0 +1,584 @@
+compare_all on Flowoffice, python 3.12.10
+gennbo 7 (reference side) vs -nbo_native (candidate side), same .47
+
+two views: `ungated` is every printed orbital, `gated` drops empty Rydberg NBOs and
+E2 rows accepting into one. Both are shown; the ungated verdict is the verdict.
+
+molecule       | ungat  points   fail   miss   surp | gated  points   fail   miss   surp |   -pts  native host/threads
+----------------------------------------------------------------------------------------------------------------------
+acetylene      | FAIL      729    385     45     37 | FAIL      362    173     44     15 |    367  AKL025/8
+    gate dropped 50/52 empty Rydberg NBOs (gennbo/native) and 10/25 Rydberg-acceptor E2 rows, 367 comparisons in total
+    native printed 37 entries gennbo did not: E2 22, NRT weight 7, nao energy 4, nao occupancy 4
+    note: thresholds differs: gennbo {'e2_kcal': 0.5, 'e2_intermolecular_kcal': 0, 'nrt_parent_percent': 50, 'nrt_deloc_kcal': 1}, native {'e2_kcal': 0.5, 'e2_intermolecular_kcal': 0, 'nrt_parent_percent': 0, 'nrt_deloc_kcal': 1}
+    npa charge           FAIL    16 pts  12 fail   0 miss   0 surp  max dev     0.028474 | gated   16 pts  12 fail   0 surp  max dev     0.028474
+        worst ungated: atom 1 C ryd
+    nao occupancy        FAIL    46 pts  16 fail   6 miss   4 surp  max dev     0.018641 | gated   46 pts  16 fail   4 surp  max dev     0.018641
+        worst ungated: nao 63 occ
+    nao energy           FAIL    46 pts  44 fail   6 miss   4 surp  max dev     2.023634 | gated   46 pts  44 fail   4 surp  max dev     2.023634
+        worst ungated: nao 44 E
+    nbo occupancy        FAIL    74 pts   3 fail   0 miss   0 surp  max dev     0.003395 | gated   22 pts   3 fail   0 surp  max dev     0.003395
+        worst ungated: BD* (3) C 1- C 2 occ
+    nbo energy           FAIL    74 pts  69 fail   0 miss   0 surp  max dev    13.208613 | gated   22 pts  18 fail   0 surp  max dev     2.714578
+        worst ungated: RY (23) C 1 s E
+    hybrid %s/%p         FAIL   420 pts 210 fail   0 miss   0 surp  max dev   100.000000 | gated  160 pts  52 fail   0 surp  max dev    81.221695
+        worst ungated: RY (15) C 2 s h0 %f
+    E2                   FAIL     9 pts   7 fail   7 miss  22 surp  max dev     9.984278 | gated    6 pts   4 fail   0 surp  max dev     3.036813
+        worst ungated: BD ( 1) C 1- H 3 -> RY ( 1) C 2 E(2)
+    NRT weight           FAIL     0 pts   0 fail  15 miss   7 surp  max dev     0.000000 | gated    0 pts   0 fail   7 surp  max dev     0.000000
+        worst ungated: 
+    NRT weight by rank   FAIL     7 pts   2 fail   8 miss   0 surp  max dev     0.005037 | gated    7 pts   2 fail   0 surp  max dev     0.005037
+        worst ungated: rank 2 w
+    NRT valency          FAIL    16 pts  14 fail   0 miss   0 surp  max dev     0.021364 | gated   16 pts  14 fail   0 surp  max dev     0.021364
+        worst ungated: atom 4 cov
+    NRT bond order       FAIL    21 pts   8 fail   3 miss   0 surp  max dev     0.021364 | gated   21 pts   8 fail   0 surp  max dev     0.021364
+        worst ungated: 2-4 cov
+ammonia        | FAIL      510    237      8      9 | FAIL      283     96      8      3 |    227  AKL025/8
+    gate dropped 32/32 empty Rydberg NBOs (gennbo/native) and 3/9 Rydberg-acceptor E2 rows, 227 comparisons in total
+    native printed 9 entries gennbo did not: E2 6, NRT weight 1, nao energy 1, nao occupancy 1
+    note: thresholds differs: gennbo {'e2_kcal': 0.5, 'e2_intermolecular_kcal': 0, 'nrt_parent_percent': 50, 'nrt_deloc_kcal': 1}, native {'e2_kcal': 0.5, 'e2_intermolecular_kcal': 0, 'nrt_parent_percent': 0, 'nrt_deloc_kcal': 1}
+    npa charge           FAIL    16 pts   9 fail   0 miss   0 surp  max dev     0.026768 | gated   16 pts   9 fail   0 surp  max dev     0.026768
+        worst ungated: atom 1 N val
+    nao occupancy        FAIL    40 pts  11 fail   2 miss   1 surp  max dev     0.012601 | gated   40 pts  11 fail   1 surp  max dev     0.012601
+        worst ungated: nao 6 occ
+    nao energy           FAIL    40 pts  38 fail   2 miss   1 surp  max dev     0.463198 | gated   40 pts  38 fail   1 surp  max dev     0.463198
+        worst ungated: nao 35 E
+    nbo occupancy        FAIL    49 pts   1 fail   0 miss   0 surp  max dev     0.003198 | gated   17 pts   1 fail   0 surp  max dev     0.003198
+        worst ungated: LP (1) N 1 s occ
+    nbo energy           FAIL    49 pts  45 fail   0 miss   0 surp  max dev     9.517524 | gated   17 pts  13 fail   0 surp  max dev     0.401573
+        worst ungated: RY (24) N 1 s E
+    hybrid %s/%p         FAIL   275 pts 130 fail   0 miss   0 surp  max dev    98.044470 | gated  115 pts  24 fail   0 surp  max dev    56.184558
+        worst ungated: RY (14) N 1 s h0 %f
+    E2                   FAIL     3 pts   3 fail   0 miss   6 surp  max dev     0.567683 | gated (gone)
+        worst ungated: LP ( 1) N 1 -> RY ( 1) H 3 E(2)
+    NRT weight           FAIL     0 pts   0 fail   1 miss   1 surp  max dev     0.000000 | gated    0 pts   0 fail   1 surp  max dev     0.000000
+        worst ungated: 
+    NRT weight by rank   ok       1 pts   0 fail   0 miss   0 surp  max dev     0.000000 | gated    1 pts   0 fail   0 surp  max dev     0.000000
+        worst ungated: 
+    NRT valency          ok      16 pts   0 fail   0 miss   0 surp  max dev     0.004670 | gated   16 pts   0 fail   0 surp  max dev     0.004670
+        worst ungated: atom 1 cov
+    NRT bond order       FAIL    21 pts   0 fail   3 miss   0 surp  max dev     0.001667 | gated   21 pts   0 fail   0 surp  max dev     0.001667
+        worst ungated: 1-2 cov
+benzene        | FAIL     2284   1337    211    202 | FAIL     1590    896    165     56 |    694  AKL025/8
+    gate dropped 96/96 empty Rydberg NBOs (gennbo/native) and 68/168 Rydberg-acceptor E2 rows, 694 comparisons in total
+    native printed 202 entries gennbo did not: E2 158, NRT weight 6, hybrid %s/%p 10, nao energy 8, nao occupancy 8, nbo energy 6, nbo occupancy 6
+    note: thresholds differs: gennbo {'e2_kcal': 0.5, 'e2_intermolecular_kcal': 0, 'nrt_parent_percent': 50, 'nrt_deloc_kcal': 1}, native {'e2_kcal': 0.5, 'e2_intermolecular_kcal': 0, 'nrt_parent_percent': 0, 'nrt_deloc_kcal': 1}
+    npa charge           FAIL    48 pts  36 fail   0 miss   0 surp  max dev     0.050390 | gated   48 pts  36 fail   0 surp  max dev     0.050390
+        worst ungated: atom 1 C ryd
+    nao occupancy        FAIL   208 pts  66 fail   6 miss   8 surp  max dev     0.018489 | gated  208 pts  66 fail   8 surp  max dev     0.018489
+        worst ungated: nao 99 occ
+    nao energy           FAIL   208 pts 198 fail   6 miss   8 surp  max dev     3.044910 | gated  208 pts 198 fail   8 surp  max dev     3.044910
+        worst ungated: nao 159 E
+    nbo occupancy        FAIL   216 pts  31 fail   6 miss   6 surp  max dev     0.316416 | gated  120 pts  31 fail   6 surp  max dev     0.316416
+        worst ungated: BD* (1) C 5- C 6 occ
+    nbo energy           FAIL   216 pts 210 fail   6 miss   6 surp  max dev    10.628861 | gated  120 pts 114 fail   6 surp  max dev     2.828934
+        worst ungated: RY (26) C 4 s E
+    hybrid %s/%p         FAIL  1200 pts 675 fail  10 miss  10 surp  max dev    96.765636 | gated  720 pts 340 fail  10 surp  max dev    94.949684
+        worst ungated: RY (23) C 1 s h0 %f
+    E2                   FAIL    62 pts  28 fail  65 miss 158 surp  max dev     7.676209 | gated   40 pts  18 fail  12 surp  max dev     0.899807
+        worst ungated: BD ( 1) C 2- C 3 -> RY ( 1) C 4 E(2)
+    NRT weight           FAIL     0 pts   0 fail  32 miss   6 surp  max dev     0.000000 | gated    0 pts   0 fail   6 surp  max dev     0.000000
+        worst ungated: 
+    NRT weight by rank   FAIL     6 pts   4 fail  26 miss   0 surp  max dev     0.103547 | gated    6 pts   4 fail   0 surp  max dev     0.103547
+        worst ungated: rank 1 w
+    NRT valency          FAIL    48 pts  45 fail   0 miss   0 surp  max dev     0.086825 | gated   48 pts  45 fail   0 surp  max dev     0.086825
+        worst ungated: atom 1 cov
+    NRT bond order       FAIL    72 pts  44 fail  54 miss   0 surp  max dev     0.040600 | gated   72 pts  44 fail   0 surp  max dev     0.040600
+        worst ungated: 1-7 tot
+ch3            | FAIL      904    495     18     14 | FAIL      435    215     18      8 |    469  AKL025/8
+    gate dropped 67/67 empty Rydberg NBOs (gennbo/native) and 0/6 Rydberg-acceptor E2 rows, 469 comparisons in total
+    native printed 14 entries gennbo did not: E2 12, NRT weight 2
+    note: thresholds differs: gennbo {'e2_kcal': 0.25, 'e2_intermolecular_kcal': 0, 'nrt_parent_percent': 50, 'nrt_deloc_kcal': 1}, native {'e2_kcal': 0.25, 'e2_intermolecular_kcal': 0, 'nrt_parent_percent': 0, 'nrt_deloc_kcal': 1}
+    npa charge           FAIL    20 pts  16 fail   0 miss   0 surp  max dev     0.211780 | gated   20 pts  16 fail   0 surp  max dev     0.211780
+        worst ungated: atom 1 C spin
+    nao occupancy        FAIL    31 pts  16 fail   3 miss   0 surp  max dev     0.029088 | gated   31 pts  16 fail   0 surp  max dev     0.029088
+        worst ungated: nao 6 occ
+    nao energy           FAIL    31 pts  29 fail   3 miss   0 surp  max dev     1.504322 | gated   31 pts  29 fail   0 surp  max dev     1.504322
+        worst ungated: nao 33 E
+    nbo occupancy        ok      98 pts   0 fail   0 miss   0 surp  max dev     0.001588 | gated   31 pts   0 fail   0 surp  max dev     0.001588
+        worst ungated: BD* (1) C 1- H 4 beta occ
+    nbo energy           FAIL    98 pts  89 fail   0 miss   0 surp  max dev    16.748109 | gated   31 pts  22 fail   0 surp  max dev     0.915436
+        worst ungated: RY (4) C 1 s alpha E
+    hybrid %s/%p         FAIL   550 pts 294 fail   0 miss   0 surp  max dev    99.771086 | gated  215 pts  81 fail   0 surp  max dev    98.340846
+        worst ungated: RY (5) H 2 s beta h0 %p
+    E2                   FAIL     0 pts   0 fail   0 miss  12 surp  max dev     0.000000 | gated    0 pts   0 fail   6 surp  max dev     0.000000
+        worst ungated: 
+    NRT weight           FAIL     0 pts   0 fail   2 miss   2 surp  max dev     0.000000 | gated    0 pts   0 fail   2 surp  max dev     0.000000
+        worst ungated: 
+    NRT weight by rank   ok       2 pts   0 fail   0 miss   0 surp  max dev     0.000000 | gated    2 pts   0 fail   0 surp  max dev     0.000000
+        worst ungated: 
+    NRT valency          FAIL    32 pts  32 fail   4 miss   0 surp  max dev     4.000000 | gated   32 pts  32 fail   0 surp  max dev     4.000000
+        worst ungated: atom 1 alpha N
+    NRT bond order       FAIL    42 pts  19 fail   6 miss   0 surp  max dev     0.516633 | gated   42 pts  19 fail   0 surp  max dev     0.516633
+        worst ungated: 1-2 beta cov
+ethane         | FAIL     1050    560     32     64 | FAIL      686    321     32     19 |    364  AKL025/8
+    gate dropped 52/52 empty Rydberg NBOs (gennbo/native) and 0/45 Rydberg-acceptor E2 rows, 364 comparisons in total
+    native printed 64 entries gennbo did not: E2 45, NRT weight 7, nao energy 6, nao occupancy 6
+    note: thresholds differs: gennbo {'e2_kcal': 0.5, 'e2_intermolecular_kcal': 0, 'nrt_parent_percent': 50, 'nrt_deloc_kcal': 1}, native {'e2_kcal': 0.5, 'e2_intermolecular_kcal': 0, 'nrt_parent_percent': 0, 'nrt_deloc_kcal': 1}
+    npa charge           FAIL    32 pts  18 fail   0 miss   0 surp  max dev     0.059297 | gated   32 pts  18 fail   0 surp  max dev     0.059297
+        worst ungated: atom 2 C val
+    nao occupancy        FAIL    86 pts  28 fail   2 miss   6 surp  max dev     0.015753 | gated   86 pts  28 fail   6 surp  max dev     0.015753
+        worst ungated: nao 37 occ
+    nao energy           FAIL    86 pts  84 fail   2 miss   6 surp  max dev     1.776633 | gated   86 pts  84 fail   6 surp  max dev     1.776633
+        worst ungated: nao 14 E
+    nbo occupancy        FAIL    98 pts  19 fail   0 miss   0 surp  max dev     0.010469 | gated   46 pts  19 fail   0 surp  max dev     0.010469
+        worst ungated: BD (1) C 1- C 2 occ
+    nbo energy           FAIL    98 pts  89 fail   0 miss   0 surp  max dev    10.908233 | gated   46 pts  37 fail   0 surp  max dev     0.632862
+        worst ungated: RY (24) C 2 s E
+    hybrid %s/%p         FAIL   560 pts 291 fail   0 miss   0 surp  max dev    99.082778 | gated  300 pts 104 fail   0 surp  max dev    80.254348
+        worst ungated: RY (16) C 2 s h0 %f
+    E2                   FAIL     6 pts   6 fail   0 miss  45 surp  max dev     0.190527 | gated    6 pts   6 fail   0 surp  max dev     0.190527
+        worst ungated: BD ( 1) C 1- H 5 -> BD*( 1) C 2- H 6 E(2)
+    NRT weight           FAIL     0 pts   0 fail   7 miss   7 surp  max dev     0.000000 | gated    0 pts   0 fail   7 surp  max dev     0.000000
+        worst ungated: 
+    NRT weight by rank   FAIL     7 pts   1 fail   0 miss   0 surp  max dev     0.018617 | gated    7 pts   1 fail   0 surp  max dev     0.018617
+        worst ungated: rank 1 w
+    NRT valency          FAIL    32 pts  16 fail   0 miss   0 surp  max dev     0.008071 | gated   32 pts  16 fail   0 surp  max dev     0.008071
+        worst ungated: atom 2 cov
+    NRT bond order       FAIL    45 pts   8 fail  21 miss   0 surp  max dev     0.018617 | gated   45 pts   8 fail   0 surp  max dev     0.018617
+        worst ungated: 1-2 tot
+ethene         | FAIL      908    481     27     29 | FAIL      508    232     39     15 |    400  AKL025/8
+    gate dropped 52/56 empty Rydberg NBOs (gennbo/native) and 8/22 Rydberg-acceptor E2 rows, 400 comparisons in total
+    native printed 29 entries gennbo did not: E2 18, NRT weight 8, NRT weight by rank 3
+    note: thresholds differs: gennbo {'e2_kcal': 0.5, 'e2_intermolecular_kcal': 0, 'nrt_parent_percent': 50, 'nrt_deloc_kcal': 1}, native {'e2_kcal': 0.5, 'e2_intermolecular_kcal': 0, 'nrt_parent_percent': 0, 'nrt_deloc_kcal': 1}
+    npa charge           FAIL    24 pts  18 fail   0 miss   0 surp  max dev     0.040550 | gated   24 pts  18 fail   0 surp  max dev     0.040550
+        worst ungated: atom 1 C ryd
+    nao occupancy        FAIL    72 pts  24 fail   6 miss   0 surp  max dev     0.018915 | gated   72 pts  24 fail   0 surp  max dev     0.018915
+        worst ungated: nao 23 occ
+    nao energy           FAIL    72 pts  66 fail   6 miss   0 surp  max dev    15.945479 | gated   72 pts  66 fail   0 surp  max dev    15.945479
+        worst ungated: nao 4 E
+    nbo occupancy        FAIL    86 pts   7 fail   0 miss   0 surp  max dev     0.004028 | gated   30 pts   7 fail   0 surp  max dev     0.004028
+        worst ungated: BD (2) C 1- C 2 occ
+    nbo energy           FAIL    86 pts  82 fail   0 miss   0 surp  max dev    16.535602 | gated   30 pts  26 fail   0 surp  max dev     0.978212
+        worst ungated: RY (26) C 1 s E
+    hybrid %s/%p         FAIL   490 pts 239 fail   0 miss   0 surp  max dev    98.449326 | gated  210 pts  54 fail   0 surp  max dev    64.531427
+        worst ungated: RY (16) C 2 s h0 %p
+    E2                   FAIL    16 pts  16 fail   0 miss  18 surp  max dev     2.912690 | gated    8 pts   8 fail   4 surp  max dev     0.255115
+        worst ungated: BD ( 1) C 2- H 5 -> RY ( 1) C 1 E(2)
+    NRT weight           FAIL     0 pts   0 fail   5 miss   8 surp  max dev     0.000000 | gated    0 pts   0 fail   8 surp  max dev     0.000000
+        worst ungated: 
+    NRT weight by rank   FAIL     5 pts   1 fail   0 miss   3 surp  max dev     0.013420 | gated    5 pts   1 fail   3 surp  max dev     0.013420
+        worst ungated: rank 1 w
+    NRT valency          FAIL    24 pts  20 fail   0 miss   0 surp  max dev     0.011961 | gated   24 pts  20 fail   0 surp  max dev     0.011961
+        worst ungated: atom 1 cov
+    NRT bond order       FAIL    33 pts   8 fail  10 miss   0 surp  max dev     0.008388 | gated   33 pts   8 fail   0 surp  max dev     0.008388
+        worst ungated: 1-4 cov
+formaldehyde   | FAIL      698    406     79     42 | FAIL      341    176     39     36 |    357  AKL025/8
+    gate dropped 47/50 empty Rydberg NBOs (gennbo/native) and 56/13 Rydberg-acceptor E2 rows, 357 comparisons in total
+    native printed 42 entries gennbo did not: E2 6, NRT weight 8, NRT weight by rank 4, hybrid %s/%p 8, nao energy 4, nao occupancy 4, nbo energy 4, nbo occupancy 4
+    note: thresholds differs: gennbo {'e2_kcal': 0.5, 'e2_intermolecular_kcal': 0.05, 'nrt_parent_percent': 50, 'nrt_deloc_kcal': 1}, native {'e2_kcal': 0.5, 'e2_intermolecular_kcal': 0, 'nrt_parent_percent': 0, 'nrt_deloc_kcal': 1}
+    npa charge           FAIL    16 pts  10 fail   0 miss   0 surp  max dev     0.032273 | gated   16 pts  10 fail   0 surp  max dev     0.032273
+        worst ungated: atom 1 C val
+    nao occupancy        FAIL    60 pts  18 fail   1 miss   4 surp  max dev     0.016157 | gated   60 pts  18 fail   4 surp  max dev     0.016157
+        worst ungated: nao 9 occ
+    nao energy           FAIL    60 pts  54 fail   1 miss   4 surp  max dev     1.750203 | gated   60 pts  54 fail   4 surp  max dev     1.750203
+        worst ungated: nao 34 E
+    nbo occupancy        FAIL    70 pts   2 fail   4 miss   4 surp  max dev     0.002792 | gated   20 pts   2 fail   4 surp  max dev     0.002792
+        worst ungated: RY (1) C 1 s occ
+    nbo energy           FAIL    70 pts  65 fail   4 miss   4 surp  max dev    34.995249 | gated   20 pts  15 fail   4 surp  max dev     0.553330
+        worst ungated: RY (5) O 2 s E
+    hybrid %s/%p         FAIL   370 pts 214 fail   4 miss   8 surp  max dev    99.050976 | gated  120 pts  41 fail   8 surp  max dev    78.160824
+        worst ungated: RY (24) O 2 s h0 %p
+    E2                   FAIL    11 pts  11 fail  58 miss   6 surp  max dev     1.747770 | gated    4 pts   4 fail   0 surp  max dev     1.747770
+        worst ungated: LP ( 2) O 2 -> BD*( 1) C 1- H 4 E(2)
+    NRT weight           FAIL     0 pts   0 fail   4 miss   8 surp  max dev     0.000000 | gated    0 pts   0 fail   8 surp  max dev     0.000000
+        worst ungated: 
+    NRT weight by rank   FAIL     4 pts   4 fail   0 miss   4 surp  max dev     0.060396 | gated    4 pts   4 fail   4 surp  max dev     0.060396
+        worst ungated: rank 1 w
+    NRT valency          FAIL    16 pts  15 fail   0 miss   0 surp  max dev     0.115781 | gated   16 pts  15 fail   0 surp  max dev     0.115781
+        worst ungated: atom 2 val
+    NRT bond order       FAIL    21 pts  13 fail   3 miss   0 surp  max dev     0.115781 | gated   21 pts  13 fail   0 surp  max dev     0.115781
+        worst ungated: 1-2 tot
+formate        | FAIL     1002    580     25     31 | FAIL      542    287     14     19 |    460  AKL025/8
+    gate dropped 64/63 empty Rydberg NBOs (gennbo/native) and 23/27 Rydberg-acceptor E2 rows, 460 comparisons in total
+    native printed 31 entries gennbo did not: E2 19, NRT weight 7, NRT weight by rank 1, nao energy 2, nao occupancy 2
+    note: thresholds differs: gennbo {'e2_kcal': 0.5, 'e2_intermolecular_kcal': 0, 'nrt_parent_percent': 50, 'nrt_deloc_kcal': 1}, native {'e2_kcal': 0.5, 'e2_intermolecular_kcal': 0, 'nrt_parent_percent': 0, 'nrt_deloc_kcal': 1}
+    npa charge           FAIL    16 pts  11 fail   0 miss   0 surp  max dev     0.038554 | gated   16 pts  11 fail   0 surp  max dev     0.038554
+        worst ungated: atom 1 C val
+    nao occupancy        FAIL    94 pts  18 fail   0 miss   2 surp  max dev     0.014939 | gated   94 pts  18 fail   2 surp  max dev     0.014939
+        worst ungated: nao 6 occ
+    nao energy           FAIL    94 pts  83 fail   0 miss   2 surp  max dev     1.691374 | gated   94 pts  83 fail   2 surp  max dev     1.691374
+        worst ungated: nao 21 E
+    nbo occupancy        FAIL    99 pts   7 fail   0 miss   0 surp  max dev     0.337567 | gated   35 pts   7 fail   1 surp  max dev     0.337567
+        worst ungated: BD* (1) C 1- O 2 occ
+    nbo energy           FAIL    99 pts  90 fail   0 miss   0 surp  max dev    36.539025 | gated   35 pts  26 fail   1 surp  max dev     2.401348
+        worst ungated: RY (10) O 2 s E
+    hybrid %s/%p         FAIL   535 pts 326 fail   0 miss   0 surp  max dev    98.390000 | gated  215 pts 105 fail   1 surp  max dev    98.390000
+        worst ungated: RY (3) H 4 s h0 %p
+    E2                   FAIL    19 pts  13 fail  17 miss  19 surp  max dev     0.993905 | gated    7 pts   5 fail   4 surp  max dev     0.993905
+        worst ungated: LP ( 2) O 2 -> BD*( 1) C 1- O 3 E(2)
+    NRT weight           FAIL     0 pts   0 fail   6 miss   7 surp  max dev     0.000000 | gated    0 pts   0 fail   7 surp  max dev     0.000000
+        worst ungated: 
+    NRT weight by rank   FAIL     6 pts   5 fail   0 miss   1 surp  max dev     0.059659 | gated    6 pts   5 fail   1 surp  max dev     0.059659
+        worst ungated: rank 3 w
+    NRT valency          FAIL    16 pts  12 fail   0 miss   0 surp  max dev     0.284892 | gated   16 pts  12 fail   0 surp  max dev     0.284892
+        worst ungated: atom 2 val
+    NRT bond order       FAIL    24 pts  15 fail   2 miss   0 surp  max dev     0.309637 | gated   24 pts  15 fail   0 surp  max dev     0.309637
+        worst ungated: 2-2 tot
+hcn            | FAIL      658    330     11      6 | FAIL      298    126     11      3 |    360  AKL025/8
+    gate dropped 50/51 empty Rydberg NBOs (gennbo/native) and 6/6 Rydberg-acceptor E2 rows, 360 comparisons in total
+    native printed 6 entries gennbo did not: E2 3, NRT weight 3
+    note: thresholds differs: gennbo {'e2_kcal': 0.5, 'e2_intermolecular_kcal': 0, 'nrt_parent_percent': 50, 'nrt_deloc_kcal': 1}, native {'e2_kcal': 0.5, 'e2_intermolecular_kcal': 0, 'nrt_parent_percent': 0, 'nrt_deloc_kcal': 1}
+    npa charge           FAIL    12 pts   7 fail   0 miss   0 surp  max dev     0.016791 | gated   12 pts   7 fail   0 surp  max dev     0.016791
+        worst ungated: atom 2 N ryd
+    nao occupancy        FAIL    47 pts  14 fail   1 miss   0 surp  max dev     0.016924 | gated   47 pts  14 fail   0 surp  max dev     0.016924
+        worst ungated: nao 54 occ
+    nao energy           FAIL    47 pts  43 fail   1 miss   0 surp  max dev     3.974139 | gated   47 pts  43 fail   0 surp  max dev     3.974139
+        worst ungated: nao 34 E
+    nbo occupancy        FAIL    68 pts   3 fail   0 miss   0 surp  max dev     0.002383 | gated   17 pts   3 fail   0 surp  max dev     0.002383
+        worst ungated: BD (1) C 1- H 3 occ
+    nbo energy           FAIL    68 pts  60 fail   0 miss   0 surp  max dev    25.752507 | gated   17 pts  10 fail   0 surp  max dev     0.677753
+        worst ungated: RY (26) N 2 s E
+    hybrid %s/%p         FAIL   380 pts 180 fail   0 miss   0 surp  max dev    99.999992 | gated  125 pts  29 fail   0 surp  max dev    95.290000
+        worst ungated: RY (12) C 1 s h0 %f
+    E2                   FAIL     6 pts   4 fail   3 miss   3 surp  max dev     2.634024 | gated    3 pts   1 fail   0 surp  max dev     1.873219
+        worst ungated: BD ( 3) C 1- N 2 -> RY ( 1) H 3 E(2)
+    NRT weight           FAIL     0 pts   0 fail   4 miss   3 surp  max dev     0.000000 | gated    0 pts   0 fail   3 surp  max dev     0.000000
+        worst ungated: 
+    NRT weight by rank   FAIL     3 pts   3 fail   1 miss   0 surp  max dev     0.016523 | gated    3 pts   3 fail   0 surp  max dev     0.016523
+        worst ungated: rank 1 w
+    NRT valency          FAIL    12 pts   9 fail   0 miss   0 surp  max dev     0.032549 | gated   12 pts   9 fail   0 surp  max dev     0.032549
+        worst ungated: atom 1 ion
+    NRT bond order       FAIL    15 pts   7 fail   1 miss   0 surp  max dev     0.026839 | gated   15 pts   7 fail   0 surp  max dev     0.026839
+        worst ungated: 1-3 cov
+lif            | FAIL      379    139     16      9 | FAIL      146     32      7      7 |    233  AKL025/8
+    gate dropped 33/33 empty Rydberg NBOs (gennbo/native) and 11/4 Rydberg-acceptor E2 rows, 233 comparisons in total
+    native printed 9 entries gennbo did not: E2 2, NRT weight 1, nao energy 3, nao occupancy 3
+    note: thresholds differs: gennbo {'e2_kcal': 0.5, 'e2_intermolecular_kcal': 0.05, 'nrt_parent_percent': 50, 'nrt_deloc_kcal': 1}, native {'e2_kcal': 0.5, 'e2_intermolecular_kcal': 0, 'nrt_parent_percent': 0, 'nrt_deloc_kcal': 1}
+    npa charge           FAIL     8 pts   1 fail   0 miss   0 surp  max dev     0.002178 | gated    8 pts   1 fail   0 surp  max dev     0.002178
+        worst ungated: atom 1 Li ryd
+    nao occupancy        FAIL    19 pts   0 fail   2 miss   3 surp  max dev     0.000718 | gated   19 pts   0 fail   3 surp  max dev     0.000718
+        worst ungated: nao 37 occ
+    nao energy           FAIL    19 pts  13 fail   2 miss   3 surp  max dev     2.823924 | gated   19 pts  13 fail   3 surp  max dev     2.823924
+        worst ungated: nao 17 E
+    nbo occupancy        ok      45 pts   0 fail   0 miss   0 surp  max dev     0.000695 | gated   12 pts   0 fail   0 surp  max dev     0.000695
+        worst ungated: RY (1) Li 1 s occ
+    nbo energy           FAIL    45 pts  41 fail   0 miss   0 surp  max dev    46.016357 | gated   12 pts   8 fail   0 surp  max dev     0.210812
+        worst ungated: RY (6) F 2 s E
+    hybrid %s/%p         FAIL   225 pts  82 fail   0 miss   0 surp  max dev    99.993150 | gated   60 pts  10 fail   0 surp  max dev    14.713554
+        worst ungated: RY (17) F 2 s h0 %f
+    E2                   FAIL     3 pts   2 fail  10 miss   2 surp  max dev     0.577511 | gated    1 pts   0 fail   0 surp  max dev     0.058376
+        worst ungated: LP ( 2) F 2 -> RY ( 3)Li 1 E(2)
+    NRT weight           FAIL     0 pts   0 fail   1 miss   1 surp  max dev     0.000000 | gated    0 pts   0 fail   1 surp  max dev     0.000000
+        worst ungated: 
+    NRT weight by rank   ok       1 pts   0 fail   0 miss   0 surp  max dev     0.000000 | gated    1 pts   0 fail   0 surp  max dev     0.000000
+        worst ungated: 
+    NRT valency          ok       8 pts   0 fail   0 miss   0 surp  max dev     0.000000 | gated    8 pts   0 fail   0 surp  max dev     0.000000
+        worst ungated: 
+    NRT bond order       FAIL     6 pts   0 fail   1 miss   0 surp  max dev     0.000000 | gated    6 pts   0 fail   0 surp  max dev     0.000000
+        worst ungated: 
+n2             | FAIL      563    280     18     11 | FAIL      208     76      3      9 |    355  AKL025/8
+    gate dropped 50/50 empty Rydberg NBOs (gennbo/native) and 20/7 Rydberg-acceptor E2 rows, 355 comparisons in total
+    native printed 11 entries gennbo did not: E2 2, NRT weight 1, nao energy 4, nao occupancy 4
+    note: thresholds differs: gennbo {'e2_kcal': 0.5, 'e2_intermolecular_kcal': 0, 'nrt_parent_percent': 50, 'nrt_deloc_kcal': 1}, native {'e2_kcal': 0.5, 'e2_intermolecular_kcal': 0, 'nrt_parent_percent': 0, 'nrt_deloc_kcal': 1}
+    npa charge           FAIL     8 pts   4 fail   0 miss   0 surp  max dev     0.011980 | gated    8 pts   4 fail   0 surp  max dev     0.011980
+        worst ungated: atom 1 N val
+    nao occupancy        FAIL    34 pts   8 fail   0 miss   4 surp  max dev     0.017151 | gated   34 pts   8 fail   4 surp  max dev     0.017151
+        worst ungated: nao 23 occ
+    nao energy           FAIL    34 pts  32 fail   0 miss   4 surp  max dev     3.514683 | gated   34 pts  32 fail   4 surp  max dev     3.514683
+        worst ungated: nao 45 E
+    nbo occupancy        ok      62 pts   0 fail   0 miss   0 surp  max dev     0.001081 | gated   12 pts   0 fail   0 surp  max dev     0.001081
+        worst ungated: LP (1) N 1 s occ
+    nbo energy           FAIL    62 pts  56 fail   0 miss   0 surp  max dev    16.330794 | gated   12 pts   6 fail   0 surp  max dev     0.948893
+        worst ungated: RY (24) N 2 s E
+    hybrid %s/%p         FAIL   340 pts 175 fail   0 miss   0 surp  max dev   100.000000 | gated   90 pts  26 fail   0 surp  max dev    40.167918
+        worst ungated: RY (19) N 2 s h0 %d
+    E2                   FAIL     5 pts   5 fail  17 miss   2 surp  max dev     0.559781 | gated    0 pts   0 fail   0 surp  max dev     0.000000
+        worst ungated: LP ( 1) N 1 -> RY ( 8) N 2 E(2)
+    NRT weight           FAIL     0 pts   0 fail   1 miss   1 surp  max dev     0.000000 | gated    0 pts   0 fail   1 surp  max dev     0.000000
+        worst ungated: 
+    NRT weight by rank   ok       1 pts   0 fail   0 miss   0 surp  max dev     0.000000 | gated    1 pts   0 fail   0 surp  max dev     0.000000
+        worst ungated: 
+    NRT valency          ok       8 pts   0 fail   0 miss   0 surp  max dev     0.000000 | gated    8 pts   0 fail   0 surp  max dev     0.000000
+        worst ungated: atom 1 cov
+    NRT bond order       ok       9 pts   0 fail   0 miss   0 surp  max dev     0.000000 | gated    9 pts   0 fail   0 surp  max dev     0.000000
+        worst ungated: 1-2 cov
+ni_co_4        | FAIL     2820   1538    662    323 | FAIL     1734    899    415    215 |   1086  AKL025/8
+    gate dropped 147/147 empty Rydberg NBOs (gennbo/native) and 284/145 Rydberg-acceptor E2 rows, 1086 comparisons in total
+    native printed 323 entries gennbo did not: E2 224, NRT weight 27, hybrid %s/%p 24, nao energy 12, nao occupancy 12, nbo energy 12, nbo occupancy 12
+    note: thresholds differs: gennbo {'e2_kcal': 0.5, 'e2_intermolecular_kcal': 0.05, 'nrt_parent_percent': 50, 'nrt_deloc_kcal': 5}, native {'e2_kcal': 0.5, 'e2_intermolecular_kcal': 0, 'nrt_parent_percent': 0, 'nrt_deloc_kcal': 5}
+    npa charge           FAIL    36 pts  19 fail   0 miss   0 surp  max dev     0.055528 | gated   36 pts  19 fail   0 surp  max dev     0.055528
+        worst ungated: atom 1 Ni charge
+    nao occupancy        FAIL   261 pts  56 fail   9 miss  12 surp  max dev     0.008323 | gated  261 pts  56 fail  12 surp  max dev     0.008323
+        worst ungated: nao 119 occ
+    nao energy           FAIL   261 pts 220 fail   9 miss  12 surp  max dev     2.596373 | gated  261 pts 220 fail  12 surp  max dev     2.596373
+        worst ungated: nao 265 E
+    nbo occupancy        FAIL   281 pts  34 fail  12 miss  12 surp  max dev     1.220484 | gated  129 pts  34 fail  17 surp  max dev     1.220484
+        worst ungated: BD* (1) Ni 1- C 3 occ
+    nbo energy           FAIL   281 pts 265 fail  12 miss  12 surp  max dev    30.604834 | gated  129 pts 113 fail  17 surp  max dev    27.065745
+        worst ungated: RY (18) O 6 s E
+    hybrid %s/%p         FAIL  1535 pts 808 fail  12 miss  24 surp  max dev    99.999949 | gated  775 pts 341 fail  29 surp  max dev    99.996025
+        worst ungated: RY (26) O 7 s h0 %f
+    E2                   FAIL    39 pts  35 fail 335 miss 224 surp  max dev     7.367092 | gated   17 pts  15 fail 101 surp  max dev     5.233673
+        worst ungated: LP ( 1) O 7 -> RY ( 1) C 3 E(2)
+    NRT weight           FAIL     0 pts   0 fail 138 miss  27 surp  max dev     0.000000 | gated    0 pts   0 fail  27 surp  max dev     0.000000
+        worst ungated: 
+    NRT weight by rank   FAIL    27 pts  24 fail 111 miss   0 surp  max dev     0.079729 | gated   27 pts  24 fail   0 surp  max dev     0.079729
+        worst ungated: rank 4 w
+    NRT valency          FAIL    36 pts  35 fail   0 miss   0 surp  max dev     6.008026 | gated   36 pts  35 fail   0 surp  max dev     6.008026
+        worst ungated: atom 1 val
+    NRT bond order       FAIL    63 pts  42 fail  24 miss   0 surp  max dev     3.255694 | gated   63 pts  42 fail   0 surp  max dev     3.255694
+        worst ungated: 1-1 tot
+nitromethane   | FAIL     1445    845    144     82 | FAIL      897    478    117     51 |    548  AKL025/8
+    gate dropped 77/72 empty Rydberg NBOs (gennbo/native) and 36/55 Rydberg-acceptor E2 rows, 548 comparisons in total
+    native printed 82 entries gennbo did not: E2 55, NRT weight 17, hybrid %s/%p 4, nao energy 1, nao occupancy 1, nbo energy 2, nbo occupancy 2
+    note: thresholds differs: gennbo {'e2_kcal': 0.5, 'e2_intermolecular_kcal': 0, 'nrt_parent_percent': 50, 'nrt_deloc_kcal': 1}, native {'e2_kcal': 0.5, 'e2_intermolecular_kcal': 0, 'nrt_parent_percent': 0, 'nrt_deloc_kcal': 1}
+    npa charge           FAIL    28 pts  16 fail   0 miss   0 surp  max dev     0.048138 | gated   28 pts  16 fail   0 surp  max dev     0.048138
+        worst ungated: atom 2 N val
+    nao occupancy        FAIL   133 pts  30 fail   1 miss   1 surp  max dev     0.018103 | gated  133 pts  30 fail   1 surp  max dev     0.018103
+        worst ungated: nao 43 occ
+    nao energy           FAIL   133 pts 124 fail   1 miss   1 surp  max dev     4.500994 | gated  133 pts 124 fail   1 surp  max dev     4.500994
+        worst ungated: nao 35 E
+    nbo occupancy        FAIL   140 pts  12 fail   2 miss   2 surp  max dev     0.526514 | gated   63 pts  12 fail   7 surp  max dev     0.526514
+        worst ungated: BD* (1) N 2- O 4 occ
+    nbo energy           FAIL   140 pts 132 fail   2 miss   2 surp  max dev    28.005439 | gated   63 pts  55 fail   7 surp  max dev     3.037796
+        worst ungated: RY (15) O 3 s E
+    hybrid %s/%p         FAIL   760 pts 452 fail   2 miss   4 surp  max dev    99.152492 | gated  375 pts 171 fail   9 surp  max dev    73.499357
+        worst ungated: RY (19) C 1 s h0 %f
+    E2                   FAIL    18 pts  17 fail  41 miss  55 surp  max dev     2.121729 | gated    9 pts   8 fail   9 surp  max dev     1.122161
+        worst ungated: LP ( 3) O 3 -> RY ( 3) N 2 E(2)
+    NRT weight           FAIL     0 pts   0 fail  50 miss  17 surp  max dev     0.000000 | gated    0 pts   0 fail  17 surp  max dev     0.000000
+        worst ungated: 
+    NRT weight by rank   FAIL    17 pts  11 fail  33 miss   0 surp  max dev     0.106902 | gated   17 pts  11 fail   0 surp  max dev     0.106902
+        worst ungated: rank 1 w
+    NRT valency          FAIL    28 pts  24 fail   0 miss   0 surp  max dev     0.154736 | gated   28 pts  24 fail   0 surp  max dev     0.154736
+        worst ungated: atom 1 cov
+    NRT bond order       FAIL    48 pts  27 fail  12 miss   0 surp  max dev     0.168234 | gated   48 pts  27 fail   0 surp  max dev     0.168234
+        worst ungated: 1-2 tot
+no             | FAIL     1041    597     49     17 | FAIL      348    174     31     14 |    693  AKL025/8
+    gate dropped 98/98 empty Rydberg NBOs (gennbo/native) and 25/10 Rydberg-acceptor E2 rows, 693 comparisons in total
+    native printed 17 entries gennbo did not: E2 7, NRT weight 2, hybrid %s/%p 4, nbo energy 2, nbo occupancy 2
+    note: thresholds differs: gennbo {'e2_kcal': 0.25, 'e2_intermolecular_kcal': 0, 'nrt_parent_percent': 50, 'nrt_deloc_kcal': 1}, native {'e2_kcal': 0.25, 'e2_intermolecular_kcal': 0, 'nrt_parent_percent': 0, 'nrt_deloc_kcal': 1}
+    npa charge           FAIL    10 pts   8 fail   0 miss   0 surp  max dev     0.053424 | gated   10 pts   8 fail   0 surp  max dev     0.053424
+        worst ungated: atom 1 N spin
+    nao occupancy        FAIL    47 pts   9 fail   6 miss   0 surp  max dev     0.015200 | gated   47 pts   9 fail   0 surp  max dev     0.015200
+        worst ungated: nao 12 occ
+    nao energy           FAIL    47 pts  43 fail   6 miss   0 surp  max dev     2.561805 | gated   47 pts  43 fail   0 surp  max dev     2.561805
+        worst ungated: nao 4 E
+    nbo occupancy        FAIL   122 pts   3 fail   2 miss   2 surp  max dev     0.003492 | gated   24 pts   3 fail   2 surp  max dev     0.003492
+        worst ungated: BD* (1) N 1- O 2 beta occ
+    nbo energy           FAIL   122 pts 113 fail   2 miss   2 surp  max dev    34.391901 | gated   24 pts  15 fail   2 surp  max dev     0.775614
+        worst ungated: RY (8) O 2 s alpha E
+    hybrid %s/%p         FAIL   650 pts 389 fail   2 miss   4 surp  max dev    99.943508 | gated  160 pts  70 fail   4 surp  max dev    23.624952
+        worst ungated: RY (12) N 1 s alpha h0 %f
+    E2                   FAIL     7 pts   6 fail  27 miss   7 surp  max dev     1.251205 | gated    0 pts   0 fail   4 surp  max dev     0.000000
+        worst ungated: LP ( 1) N 1 -> RY ( 1) O 2 beta E(2)
+    NRT weight           FAIL     0 pts   0 fail   2 miss   2 surp  max dev     0.000000 | gated    0 pts   0 fail   2 surp  max dev     0.000000
+        worst ungated: 
+    NRT weight by rank   ok       2 pts   0 fail   0 miss   0 surp  max dev     0.000000 | gated    2 pts   0 fail   0 surp  max dev     0.000000
+        worst ungated: 
+    NRT valency          FAIL    16 pts  16 fail   2 miss   0 surp  max dev     4.000000 | gated   16 pts  16 fail   0 surp  max dev     4.000000
+        worst ungated: atom 1 alpha N
+    NRT bond order       FAIL    18 pts  10 fail   0 miss   0 surp  max dev     1.500000 | gated   18 pts  10 fail   0 surp  max dev     1.500000
+        worst ungated: 1-2 beta tot
+o2             | FAIL     1040    489     15      5 | FAIL      362    112     12      2 |    678  AKL025/8
+    gate dropped 96/96 empty Rydberg NBOs (gennbo/native) and 9/9 Rydberg-acceptor E2 rows, 678 comparisons in total
+    native printed 5 entries gennbo did not: E2 3, NRT weight 2
+    note: thresholds differs: gennbo {'e2_kcal': 0.25, 'e2_intermolecular_kcal': 0, 'nrt_parent_percent': 50, 'nrt_deloc_kcal': 1}, native {'e2_kcal': 0.25, 'e2_intermolecular_kcal': 0, 'nrt_parent_percent': 0, 'nrt_deloc_kcal': 1}
+    npa charge           ok      10 pts   0 fail   0 miss   0 surp  max dev     0.001797 | gated   10 pts   0 fail   0 surp  max dev     0.001797
+        worst ungated: atom 2 O ryd
+    nao occupancy        FAIL    40 pts   6 fail   4 miss   0 surp  max dev     0.004607 | gated   40 pts   6 fail   0 surp  max dev     0.004607
+        worst ungated: nao 54 occ
+    nao energy           FAIL    40 pts  32 fail   4 miss   0 surp  max dev     2.100773 | gated   40 pts  32 fail   0 surp  max dev     2.100773
+        worst ungated: nao 4 E
+    nbo occupancy        ok     124 pts   0 fail   0 miss   0 surp  max dev     0.000835 | gated   28 pts   0 fail   0 surp  max dev     0.000835
+        worst ungated: RY (1) O 1 s beta occ
+    nbo energy           FAIL   124 pts 109 fail   0 miss   0 surp  max dev    33.762617 | gated   28 pts  14 fail   0 surp  max dev     0.590853
+        worst ungated: RY (4) O 1 s beta E
+    hybrid %s/%p         FAIL   660 pts 316 fail   0 miss   0 surp  max dev   100.000000 | gated  180 pts  40 fail   0 surp  max dev    27.402033
+        worst ungated: RY (12) O 2 s beta h0 %f
+    E2                   FAIL     6 pts   6 fail   3 miss   3 surp  max dev     1.519135 | gated (gone)
+        worst ungated: LP ( 1) O 2 -> RY ( 1) O 1 beta E(2)
+    NRT weight           FAIL     0 pts   0 fail   2 miss   2 surp  max dev     0.000000 | gated    0 pts   0 fail   2 surp  max dev     0.000000
+        worst ungated: 
+    NRT weight by rank   ok       2 pts   0 fail   0 miss   0 surp  max dev     0.000000 | gated    2 pts   0 fail   0 surp  max dev     0.000000
+        worst ungated: 
+    NRT valency          FAIL    16 pts  12 fail   2 miss   0 surp  max dev     4.000000 | gated   16 pts  12 fail   0 surp  max dev     4.000000
+        worst ungated: atom 1 alpha N
+    NRT bond order       FAIL    18 pts   8 fail   0 miss   0 surp  max dev     1.500000 | gated   18 pts   8 fail   0 surp  max dev     1.500000
+        worst ungated: 1-1 alpha tot
+ozone          | FAIL      922    495     22     14 | FAIL      470    199     20      4 |    452  AKL025/8
+    gate dropped 63/63 empty Rydberg NBOs (gennbo/native) and 13/21 Rydberg-acceptor E2 rows, 452 comparisons in total
+    native printed 14 entries gennbo did not: E2 10, NRT weight 4
+    note: thresholds differs: gennbo {'e2_kcal': 0.5, 'e2_intermolecular_kcal': 0, 'nrt_parent_percent': 50, 'nrt_deloc_kcal': 1}, native {'e2_kcal': 0.5, 'e2_intermolecular_kcal': 0, 'nrt_parent_percent': 0, 'nrt_deloc_kcal': 1}
+    npa charge           FAIL    12 pts   7 fail   0 miss   0 surp  max dev     0.017725 | gated   12 pts   7 fail   0 surp  max dev     0.017725
+        worst ungated: atom 1 O val
+    nao occupancy        FAIL    89 pts   6 fail   1 miss   0 surp  max dev     0.010743 | gated   89 pts   6 fail   0 surp  max dev     0.010743
+        worst ungated: nao 6 occ
+    nao energy           FAIL    89 pts  81 fail   1 miss   0 surp  max dev     2.159032 | gated   89 pts  81 fail   0 surp  max dev     2.159032
+        worst ungated: nao 35 E
+    nbo occupancy        FAIL    93 pts   3 fail   0 miss   0 surp  max dev     0.002612 | gated   30 pts   3 fail   0 surp  max dev     0.002612
+        worst ungated: LP (1) O 1 s occ
+    nbo energy           FAIL    93 pts  82 fail   0 miss   0 surp  max dev    24.410968 | gated   30 pts  19 fail   0 surp  max dev     2.995165
+        worst ungated: RY (14) O 2 s E
+    hybrid %s/%p         FAIL   495 pts 274 fail   0 miss   0 surp  max dev    98.623348 | gated  180 pts  52 fail   0 surp  max dev    17.558440
+        worst ungated: RY (16) O 2 s h0 %f
+    E2                   FAIL    17 pts  17 fail   2 miss  10 surp  max dev    63.907577 | gated    6 pts   6 fail   0 surp  max dev    63.907577
+        worst ungated: LP ( 3) O 2 -> BD*( 1) O 1- O 3 E(2)
+    NRT weight           FAIL     0 pts   0 fail  11 miss   4 surp  max dev     0.000000 | gated    0 pts   0 fail   4 surp  max dev     0.000000
+        worst ungated: 
+    NRT weight by rank   FAIL     4 pts   4 fail   7 miss   0 surp  max dev     0.089854 | gated    4 pts   4 fail   0 surp  max dev     0.089854
+        worst ungated: rank 1 w
+    NRT valency          FAIL    12 pts   9 fail   0 miss   0 surp  max dev     0.266137 | gated   12 pts   9 fail   0 surp  max dev     0.266137
+        worst ungated: atom 1 cov
+    NRT bond order       FAIL    18 pts  12 fail   0 miss   0 surp  max dev     0.208940 | gated   18 pts  12 fail   0 surp  max dev     0.208940
+        worst ungated: 1-3 cov
+pf5            | FAIL     1806    956    265     77 | FAIL     1090    519    192     53 |    716  AKL025/8
+    gate dropped 93/97 empty Rydberg NBOs (gennbo/native) and 122/61 Rydberg-acceptor E2 rows, 716 comparisons in total
+    native printed 77 entries gennbo did not: E2 51, NRT weight 11, hybrid %s/%p 5, nao energy 2, nao occupancy 2, nbo energy 3, nbo occupancy 3
+    note: thresholds differs: gennbo {'e2_kcal': 0.5, 'e2_intermolecular_kcal': 0.05, 'nrt_parent_percent': 50, 'nrt_deloc_kcal': 1}, native {'e2_kcal': 0.5, 'e2_intermolecular_kcal': 0, 'nrt_parent_percent': 0, 'nrt_deloc_kcal': 1}
+    npa charge           FAIL    24 pts  18 fail   0 miss   0 surp  max dev     0.013062 | gated   24 pts  18 fail   0 surp  max dev     0.013062
+        worst ungated: atom 1 P charge
+    nao occupancy        FAIL   142 pts  12 fail   9 miss   2 surp  max dev     0.004047 | gated  142 pts  12 fail   2 surp  max dev     0.004047
+        worst ungated: nao 17 occ
+    nao energy           FAIL   142 pts 112 fail   9 miss   2 surp  max dev     6.664797 | gated  142 pts 112 fail   2 surp  max dev     6.664797
+        worst ungated: nao 41 E
+    nbo occupancy        FAIL   189 pts   9 fail   3 miss   3 surp  max dev     0.010175 | gated   92 pts   9 fail   3 surp  max dev     0.010175
+        worst ungated: BD (1) P 1- F 5 occ
+    nbo energy           FAIL   189 pts 166 fail   3 miss   3 surp  max dev    43.307768 | gated   92 pts  70 fail   3 surp  max dev     4.208858
+        worst ungated: RY (17) F 4 s E
+    hybrid %s/%p         FAIL   975 pts 530 fail   5 miss   5 surp  max dev    99.996652 | gated  490 pts 214 fail   5 surp  max dev    99.996652
+        worst ungated: RY (9) P 1 s h0 %f
+    E2                   FAIL    62 pts  50 fail 102 miss  51 surp  max dev     4.176202 | gated   25 pts  25 fail  27 surp  max dev     0.528629
+        worst ungated: LP ( 3) F 6 -> RY ( 3) P 1 E(2)
+    NRT weight           FAIL     0 pts   0 fail  70 miss  11 surp  max dev     0.000000 | gated    0 pts   0 fail  11 surp  max dev     0.000000
+        worst ungated: 
+    NRT weight by rank   FAIL    11 pts  11 fail  59 miss   0 surp  max dev     0.114498 | gated   11 pts  11 fail   0 surp  max dev     0.114498
+        worst ungated: rank 2 w
+    NRT valency          FAIL    24 pts  18 fail   0 miss   0 surp  max dev     0.148465 | gated   24 pts  18 fail   0 surp  max dev     0.148465
+        worst ungated: atom 1 val
+    NRT bond order       FAIL    48 pts  30 fail   5 miss   0 surp  max dev     0.148465 | gated   48 pts  30 fail   0 surp  max dev     0.148465
+        worst ungated: 1-1 tot
+pyridine       | FAIL     2301   1353    101    167 | FAIL     1616    908     98     40 |    685  AKL025/8
+    gate dropped 92/94 empty Rydberg NBOs (gennbo/native) and 32/150 Rydberg-acceptor E2 rows, 685 comparisons in total
+    native printed 167 entries gennbo did not: E2 132, NRT weight 21, nao energy 7, nao occupancy 7
+    note: thresholds differs: gennbo {'e2_kcal': 0.5, 'e2_intermolecular_kcal': 0, 'nrt_parent_percent': 50, 'nrt_deloc_kcal': 1}, native {'e2_kcal': 0.5, 'e2_intermolecular_kcal': 0, 'nrt_parent_percent': 0, 'nrt_deloc_kcal': 1}
+    npa charge           FAIL    44 pts  29 fail   0 miss   0 surp  max dev     0.048556 | gated   44 pts  29 fail   0 surp  max dev     0.048556
+        worst ungated: atom 4 C ryd
+    nao occupancy        FAIL   204 pts  65 fail   3 miss   7 surp  max dev     0.020355 | gated  204 pts  65 fail   7 surp  max dev     0.020355
+        worst ungated: nao 99 occ
+    nao energy           FAIL   204 pts 196 fail   3 miss   7 surp  max dev     4.830124 | gated  204 pts 196 fail   7 surp  max dev     4.830124
+        worst ungated: nao 97 E
+    nbo occupancy        FAIL   216 pts  27 fail   0 miss   0 surp  max dev     0.013641 | gated  121 pts  27 fail   1 surp  max dev     0.013641
+        worst ungated: BD (1) C 3- C 4 occ
+    nbo energy           FAIL   216 pts 210 fail   0 miss   0 surp  max dev    17.353513 | gated  121 pts 115 fail   1 surp  max dev     4.061368
+        worst ungated: RY (19) N 1 s E
+    hybrid %s/%p         FAIL  1220 pts 686 fail   0 miss   0 surp  max dev    97.316334 | gated  745 pts 354 fail   1 surp  max dev    92.701313
+        worst ungated: RY (21) C 5 s h0 %f
+    E2                   FAIL    66 pts  42 fail  12 miss 132 surp  max dev     7.887679 | gated   46 pts  24 fail   2 surp  max dev     5.364800
+        worst ungated: BD ( 1) C 5- C 6 -> RY ( 1) C 4 E(2)
+    NRT weight           FAIL     0 pts   0 fail  30 miss  21 surp  max dev     0.000000 | gated    0 pts   0 fail  21 surp  max dev     0.000000
+        worst ungated: 
+    NRT weight by rank   FAIL    21 pts  19 fail   9 miss   0 surp  max dev     0.206687 | gated   21 pts  19 fail   0 surp  max dev     0.206687
+        worst ungated: rank 2 w
+    NRT valency          FAIL    44 pts  39 fail   0 miss   0 surp  max dev     0.495585 | gated   44 pts  39 fail   0 surp  max dev     0.495585
+        worst ungated: atom 1 cov
+    NRT bond order       FAIL    66 pts  40 fail  44 miss   0 surp  max dev     0.489323 | gated   66 pts  40 fail   0 surp  max dev     0.489323
+        worst ungated: 1-6 cov
+sf6            | FAIL     2150   1101    433    123 | FAIL     1331    620    263     69 |    819  AKL025/8
+    gate dropped 109/103 empty Rydberg NBOs (gennbo/native) and 226/128 Rydberg-acceptor E2 rows, 819 comparisons in total
+    native printed 123 entries gennbo did not: E2 100, NRT weight 12, hybrid %s/%p 5, nbo energy 3, nbo occupancy 3
+    note: thresholds differs: gennbo {'e2_kcal': 0.5, 'e2_intermolecular_kcal': 0.05, 'nrt_parent_percent': 50, 'nrt_deloc_kcal': 1}, native {'e2_kcal': 0.5, 'e2_intermolecular_kcal': 0, 'nrt_parent_percent': 0, 'nrt_deloc_kcal': 1}
+    npa charge           FAIL    28 pts  15 fail   0 miss   0 surp  max dev     0.019035 | gated   28 pts  15 fail   0 surp  max dev     0.019035
+        worst ungated: atom 1 S val
+    nao occupancy        FAIL   184 pts  15 fail   0 miss   0 surp  max dev     0.004839 | gated  184 pts  15 fail   0 surp  max dev     0.004839
+        worst ungated: nao 17 occ
+    nao energy           FAIL   184 pts 152 fail   0 miss   0 surp  max dev     3.932118 | gated  184 pts 152 fail   0 surp  max dev     3.932118
+        worst ungated: nao 196 E
+    nbo occupancy        FAIL   220 pts   8 fail   3 miss   3 surp  max dev     0.052418 | gated  111 pts   8 fail   9 surp  max dev     0.052418
+        worst ungated: BD* (1) S 1- F 3 occ
+    nbo energy           FAIL   220 pts 193 fail   3 miss   3 surp  max dev    10.207320 | gated  111 pts  84 fail   9 surp  max dev     3.965424
+        worst ungated: RY (16) S 1 s E
+    hybrid %s/%p         FAIL  1130 pts 566 fail   5 miss   5 surp  max dev   100.000000 | gated  585 pts 245 fail  11 surp  max dev    99.998556
+        worst ungated: RY (18) S 1 s h0 %d
+    E2                   FAIL    87 pts  82 fail 205 miss 100 surp  max dev    33.707613 | gated   31 pts  31 fail  28 surp  max dev    33.707613
+        worst ungated: LP ( 4) F 6 -> BD*( 1) S 1- F 4 E(2)
+    NRT weight           FAIL     0 pts   0 fail 110 miss  12 surp  max dev     0.000000 | gated    0 pts   0 fail  12 surp  max dev     0.000000
+        worst ungated: 
+    NRT weight by rank   FAIL    12 pts  12 fail  98 miss   0 surp  max dev     0.147916 | gated   12 pts  12 fail   0 surp  max dev     0.147916
+        worst ungated: rank 1 w
+    NRT valency          FAIL    28 pts  21 fail   0 miss   0 surp  max dev     0.167906 | gated   28 pts  21 fail   0 surp  max dev     0.167906
+        worst ungated: atom 5 val
+    NRT bond order       FAIL    57 pts  37 fail   9 miss   0 surp  max dev     0.225810 | gated   57 pts  37 fail   0 surp  max dev     0.225810
+        worst ungated: 1-6 tot
+so2            | FAIL      943    529     59     43 | FAIL      488    227     41     19 |    455  AKL025/8
+    gate dropped 63/65 empty Rydberg NBOs (gennbo/native) and 28/28 Rydberg-acceptor E2 rows, 455 comparisons in total
+    native printed 43 entries gennbo did not: E2 24, NRT weight 5, hybrid %s/%p 2, nao energy 4, nao occupancy 4, nbo energy 2, nbo occupancy 2
+    note: thresholds differs: gennbo {'e2_kcal': 0.5, 'e2_intermolecular_kcal': 0, 'nrt_parent_percent': 50, 'nrt_deloc_kcal': 1}, native {'e2_kcal': 0.5, 'e2_intermolecular_kcal': 0, 'nrt_parent_percent': 0, 'nrt_deloc_kcal': 1}
+    npa charge           FAIL    12 pts   7 fail   0 miss   0 surp  max dev     0.028030 | gated   12 pts   7 fail   0 surp  max dev     0.028030
+        worst ungated: atom 1 S charge
+    nao occupancy        FAIL    90 pts  18 fail   2 miss   4 surp  max dev     0.019781 | gated   90 pts  18 fail   4 surp  max dev     0.019781
+        worst ungated: nao 4 occ
+    nao energy           FAIL    90 pts  73 fail   2 miss   4 surp  max dev     1.041745 | gated   90 pts  73 fail   4 surp  max dev     1.041745
+        worst ungated: nao 22 E
+    nbo occupancy        FAIL    97 pts   9 fail   2 miss   2 surp  max dev     0.108648 | gated   33 pts   9 fail   1 surp  max dev     0.108648
+        worst ungated: BD (1) S 1- O 2 occ
+    nbo energy           FAIL    97 pts  88 fail   2 miss   2 surp  max dev    21.668451 | gated   33 pts  25 fail   1 surp  max dev     2.798468
+        worst ungated: RY (24) O 2 s E
+    hybrid %s/%p         FAIL   515 pts 302 fail   4 miss   2 surp  max dev    93.402660 | gated  195 pts  68 fail   1 surp  max dev    60.512300
+        worst ungated: RY (19) O 2 s h0 %f
+    E2                   FAIL    10 pts   7 fail  31 miss  24 surp  max dev    14.599060 | gated    3 pts   2 fail   3 surp  max dev    14.599060
+        worst ungated: LP ( 3) O 2 -> BD*( 1) S 1- O 3 E(2)
+    NRT weight           FAIL     0 pts   0 fail  10 miss   5 surp  max dev     0.000000 | gated    0 pts   0 fail   5 surp  max dev     0.000000
+        worst ungated: 
+    NRT weight by rank   FAIL     5 pts   5 fail   5 miss   0 surp  max dev     0.241414 | gated    5 pts   5 fail   0 surp  max dev     0.241414
+        worst ungated: rank 1 w
+    NRT valency          FAIL    12 pts  11 fail   0 miss   0 surp  max dev     0.292092 | gated   12 pts  11 fail   0 surp  max dev     0.292092
+        worst ungated: atom 2 val
+    NRT bond order       FAIL    15 pts   9 fail   1 miss   0 surp  max dev     0.292092 | gated   15 pts   9 fail   0 surp  max dev     0.292092
+        worst ungated: 1-2 tot
+ticl4          | FAIL     1869    877    115    102 | FAIL     1171    479    107      8 |    698  AKL025/8
+    gate dropped 92/96 empty Rydberg NBOs (gennbo/native) and 46/120 Rydberg-acceptor E2 rows, 698 comparisons in total
+    native printed 102 entries gennbo did not: E2 96, NRT weight 6
+    note: thresholds differs: gennbo {'e2_kcal': 0.5, 'e2_intermolecular_kcal': 0, 'nrt_parent_percent': 50, 'nrt_deloc_kcal': 20}, native {'e2_kcal': 0.5, 'e2_intermolecular_kcal': 0, 'nrt_parent_percent': 0, 'nrt_deloc_kcal': 20}
+    npa charge           FAIL    20 pts  11 fail   0 miss   0 surp  max dev     0.018931 | gated   20 pts  11 fail   0 surp  max dev     0.018931
+        worst ungated: atom 1 Ti val
+    nao occupancy        FAIL   174 pts   9 fail   3 miss   0 surp  max dev     0.006070 | gated  174 pts   9 fail   0 surp  max dev     0.006070
+        worst ungated: nao 19 occ
+    nao energy           FAIL   174 pts 137 fail   3 miss   0 surp  max dev     4.418431 | gated  174 pts 137 fail   0 surp  max dev     4.418431
+        worst ungated: nao 86 E
+    nbo occupancy        FAIL   193 pts   4 fail   0 miss   0 surp  max dev     0.009915 | gated   97 pts   4 fail   0 surp  max dev     0.009915
+        worst ungated: BD* (1) Ti 1-Cl 5 occ
+    nbo energy           FAIL   193 pts 162 fail   0 miss   0 surp  max dev    14.978041 | gated   97 pts  66 fail   0 surp  max dev    14.978041
+        worst ungated: CR (5) Ti 1 s E
+    hybrid %s/%p         FAIL  1005 pts 459 fail   0 miss   0 surp  max dev   100.000000 | gated  525 pts 180 fail   0 surp  max dev   100.000000
+        worst ungated: RY (9) Ti 1 s h0 %f
+    E2                   FAIL    57 pts  54 fail  25 miss  96 surp  max dev    18.072690 | gated   31 pts  31 fail   2 surp  max dev    18.072690
+        worst ungated: LP ( 3)Cl 2 -> LV ( 2)Ti 1 E(2)
+    NRT weight           FAIL     0 pts   0 fail  42 miss   6 surp  max dev     0.000000 | gated    0 pts   0 fail   6 surp  max dev     0.000000
+        worst ungated: 
+    NRT weight by rank   FAIL     6 pts   6 fail  36 miss   0 surp  max dev     0.300750 | gated    6 pts   6 fail   0 surp  max dev     0.300750
+        worst ungated: rank 1 w
+    NRT valency          FAIL    20 pts  18 fail   0 miss   0 surp  max dev     0.635365 | gated   20 pts  18 fail   0 surp  max dev     0.635365
+        worst ungated: atom 2 val
+    NRT bond order       FAIL    27 pts  17 fail   6 miss   0 surp  max dev     0.656631 | gated   27 pts  17 fail   0 surp  max dev     0.656631
+        worst ungated: 2-2 tot
+water          | FAIL      429    201     12     15 | FAIL      217     72      8      9 |    212  AKL025/8
+    gate dropped 30/30 empty Rydberg NBOs (gennbo/native) and 6/8 Rydberg-acceptor E2 rows, 212 comparisons in total
+    native printed 15 entries gennbo did not: E2 6, NRT weight 4, NRT weight by rank 3, nao energy 1, nao occupancy 1
+    note: thresholds differs: gennbo {'e2_kcal': 0.5, 'e2_intermolecular_kcal': 0, 'nrt_parent_percent': 50, 'nrt_deloc_kcal': 1}, native {'e2_kcal': 0.5, 'e2_intermolecular_kcal': 0, 'nrt_parent_percent': 0, 'nrt_deloc_kcal': 1}
+    npa charge           FAIL    12 pts   6 fail   0 miss   0 surp  max dev     0.007371 | gated   12 pts   6 fail   0 surp  max dev     0.007371
+        worst ungated: atom 1 O val
+    nao occupancy        FAIL    33 pts   7 fail   3 miss   1 surp  max dev     0.007177 | gated   33 pts   7 fail   1 surp  max dev     0.007177
+        worst ungated: nao 15 occ
+    nao energy           FAIL    33 pts  29 fail   3 miss   1 surp  max dev     0.639480 | gated   33 pts  29 fail   1 surp  max dev     0.639480
+        worst ungated: nao 40 E
+    nbo occupancy        ok      43 pts   0 fail   0 miss   0 surp  max dev     0.001111 | gated   13 pts   0 fail   0 surp  max dev     0.001111
+        worst ungated: BD (1) O 1- H 2 occ
+    nbo energy           FAIL    43 pts  39 fail   0 miss   0 surp  max dev    24.705968 | gated   13 pts   9 fail   0 surp  max dev     0.752679
+        worst ungated: RY (2) O 1 s E
+    hybrid %s/%p         FAIL   235 pts 113 fail   0 miss   0 surp  max dev    96.407712 | gated   85 pts  16 fail   0 surp  max dev    28.950000
+        worst ungated: RY (26) O 1 s h0 %p
+    E2                   FAIL     2 pts   2 fail   4 miss   6 surp  max dev     0.470672 | gated (gone)
+        worst ungated: LP ( 2) O 1 -> RY ( 1) H 2 E(2)
+    NRT weight           FAIL     0 pts   0 fail   1 miss   4 surp  max dev     0.000000 | gated    0 pts   0 fail   4 surp  max dev     0.000000
+        worst ungated: 
+    NRT weight by rank   FAIL     1 pts   0 fail   0 miss   3 surp  max dev     0.004917 | gated    1 pts   0 fail   3 surp  max dev     0.004917
+        worst ungated: rank 1 w
+    NRT valency          FAIL    12 pts   4 fail   0 miss   0 surp  max dev     0.012005 | gated   12 pts   4 fail   0 surp  max dev     0.012005
+        worst ungated: atom 1 cov
+    NRT bond order       FAIL    15 pts   1 fail   1 miss   0 surp  max dev     0.008965 | gated   15 pts   1 fail   0 surp  max dev     0.008965
+        worst ungated: 1-2 cov
+
+0 PASS, 22 FAIL, 0 without both JSONs; 26451 data points compared
+gated view for the same molecules: 0 PASS, 22 FAIL, 15123 data points (11328 dropped)
+wrote C:/Users/florian/AppData/Local/Temp/claude/E--Dropbox-Obsidian-LLM-Infos/61956d9d-87f0-40dc-840f-98dbefbee2d4/scratchpad/out/legacy.summary.json

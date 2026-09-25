@@ -625,6 +625,169 @@ reference in its original form, so a reader fix is a local re-parse), the native
 AONAO run's parsed JSON, both jobs' stdout and the full comparison table.  The `.47` is not duplicated
 here - it is the same `<mol>_native.47` listed under "Deliberately not committed" in `data/README.md`.
 
+## Spec step 5 ported into `nao.cpp` (`renat5`) — an improvement, not an agreement
+
+Read this heading twice. `-nbo_native` disagrees with NBO 7 on **22 of 22** molecules before this
+change and on **22 of 22** after it: `0 PASS / 22 FAIL` in both arms, the same verdict from the same
+`accept.py`. Every number below is a defect getting smaller, not a molecule closing. Nothing here
+licenses "native now agrees", in a paper, a commit message, a comment or a conversation.
+
+### What the arm is, operation by operation
+
+`renat5` is `ARMS` entry `("renat5", dict(renat=True, ryd_w="step5"))`, `spec_steps.py:308` — the
+file's own comment calls it "spec minus two_class", and that is exactly what the keyword arguments
+say. Walking `cascade` (`spec_steps.py:259`) with those two arguments and nothing else:
+
+1. **Three classes, not two.** `groups = [[0], [1], [2]]` (line 273), because `two_class` is
+   false. Core, then valence, then Rydberg, each orthogonalised within itself.
+2. **Schmidt against everything already done** (lines 281-283) and renormalise in `S`
+   (line 284) — unchanged from the pre-change cascade.
+3. **The default weights are the pre-NAO occupancies**, `w = max(pre_occ[cols], 0)` (line 285).
+   This stays true for core and valence.
+4. **On the Rydberg class only** (`if g == [2]`, line 286) the Schmidt-projected vectors are
+   written back (line 287) and, `renat` being true, **spec step 5 runs**: `naturalize` at line 289,
+   defined at `spec_steps.py:180-208`. Per `(atom, l)` group (`al_groups`, 157-166) it m-averages
+   the local overlap and the local `S P S` (`m_average`, 170-177), forms `X = Sb^-1/2`, solves
+   `eigh(X Pb X)`, and rebuilds each shell as that eigenvector's combination of the group's
+   columns, `m` by `m`, in **descending** eigenvalue order (`k = ns - 1 - sh`, line 203). The
+   `(2l+1)` components of a shell share one eigenvalue, so a shell stays degenerate.
+5. **Those eigenvalues become the OWSO weights**, `w = max(wn[cols], 0)` (line 292), because
+   `ryd_w == "step5"`. This is the half of the arm that is *not* just a rotation: the weights
+   change, so the OWSO changes.
+6. **One OWSO per class** (`orthogonalize`, 226-256, with `heavy_light` false — `renat5_hl` is the
+   arm that turns it on, and it is a different arm). `T = W (W G W)^-1/2` followed by a Löwdin
+   tidy-up, line 295, and the result is appended to `done` (line 297).
+
+Not in this arm, and deliberately: `two_class` (pooled core+valence, i.e. `spec`), `heavy_light`
+(`renat5_hl`), `ryd_w="post"` (the refuted self-consistent `weights` arm), `nrb_first`.
+
+`Src/core/nao.cpp` now does 1-6, with the step-5 block guarded by `cls == 2 && !legacy_cascade`.
+
+### `split` needed no port — it has been the default since `60055d4b`
+
+The task brief asked for "`+split` as the default core block key" as if it were a second change. It
+is not: `step4_blocks(lbl, core_own_block=True)` → `[[0], [1, 2]]` (`step4_core_block.py:163-186`)
+is what the C++ step 4 has done since `60055d4b`, with `NAO_CORE_POOLED=1` as its escape hatch.
+`NAO_CLASS_SPLIT` is a *different*, refuted three-way class split and is not this. No change was
+made for `split` and none was needed; the claim is checked, not assumed.
+
+### Port fidelity — the C++ really runs the arm that was measured
+
+`fidelity22.py` (output: `data_renat5/fidelity22.txt`) compares the binary's own dumped AO→NAO
+matrix against `spec_steps.cascade` + `step4` with the same `.47` on both sides, with
+`step4_core_block.fidelity` as the single instrument, in radians, on the 8 closed-loop molecules:
+
+| comparison | worst column | worst subspace |
+|---|---|---|
+| legacy C++ vs numpy `base` | 1.654e-05 | 4.681e-06 |
+| **renat5 C++ vs numpy `renat5`** | **4.326e-05** | **8.079e-06** |
+| renat5 C++ vs numpy `base` | 9.975e-01 | 4.397e-01 |
+| legacy C++ vs renat5 C++ | 9.975e-01 | 4.397e-01 |
+
+Per-molecule floors run 5.68e-05 (lif) to 7.50e-05 (ammonia), so **both agreement rows sit below
+every molecule's own floor** — the accepted tolerance is the floor itself, because a deviation
+under it is the dump's 6-digit print precision and not a difference. The two discrimination rows
+are 4 orders of magnitude above it, which is what makes the first two rows readable at all. The
+subspace cells print their own sample size: degenerate columns exist only on ammonia (2/23) and
+water (2/19), and `0.00e+00` over `0/N` is an **empty maximum**, not an agreement.
+
+### The measurement, 8 closed-loop molecules, against gennbo's own `.33`
+
+`sines22.py` → `data_renat5/sines22.txt`. The headline is the Rydberg population, in electrons,
+against the arbiter's printed NAO occupancies:
+
+| molecule | floor | Ryd sine legacy → renat5 | Ryd pop e: gennbo / legacy / renat5 | \|dpop\| |
+|---|---|---|---|---|
+| ammonia | 7.50e-05 | 0.1025 → 0.0036 | 0.0302 / 0.0598 / 0.0299 | 0.0296 → 0.0003 |
+| benzene | 6.74e-05 | 0.2445 → 0.0301 | 0.1155 / 0.4316 / 0.1205 | **0.3161 → 0.0050** |
+| ethane | 7.26e-05 | 0.1746 → 0.0115 | 0.0249 / 0.1547 / 0.0252 | 0.1299 → 0.0004 |
+| lif | 5.68e-05 | 0.0859 → 0.0101 | 0.0512 / 0.0524 / 0.0512 | 0.0012 → 0.0000 |
+| pf5 | 6.19e-05 | 0.0913 → 0.0026 | 0.2685 / 0.2490 / 0.2683 | 0.0194 → 0.0001 |
+| sf6 | 7.06e-05 | 0.0960 → 0.0062 | 0.3574 / 0.3485 / 0.3578 | 0.0089 → 0.0004 |
+| so2 | 6.29e-05 | 0.0906 → 0.0062 | 0.2960 / 0.2791 / 0.2939 | 0.0169 → 0.0021 |
+| water | 7.02e-05 | 0.0898 → 0.0049 | 0.0265 / 0.0392 / 0.0276 | 0.0127 → 0.0011 |
+
+Closer on **8 of 8** for both the sine and the population, further on 0, flat on 0. Worst Rydberg
+population error **0.3161 e → 0.0050 e**, a factor of 63. The core sine is 0.0000 in both arms.
+
+Two things this table is not. The **Val** sine column (printed in the file) is *equal* to the Ryd
+column on all 8, and that is an identity: with the core exact, Val and Ryd are complementary
+subspaces of one fixed span, and complementary subspaces share their principal angles — one
+measurement, printed twice. And **0.0050 is not zero**: it is 88x the floor, and `renat5`'s Rydberg
+sines are within 10x their own floor on **0 of 8**. The defect shrank; it did not close.
+
+### The measurement, all 22, with the gate
+
+`renat5_gate.sh` (job 594785, `data_renat5/renat5_gate_594785.out`) runs three arms on the same 22
+wavefunctions and the same `.47` archives: the new binary as built, the new binary with
+`NAO_LEGACY_CASCADE=1`, and the **preserved pre-change binary**. That third arm is the control, and
+it matters: without it a difference is as likely to be the rebuild as the port.
+
+- **Control**, legacy arm vs the pre-change binary, by `arm_diff.py`: **0 of 22 molecules moved
+  beyond 0, 0 structural differences, worst 0.000e+00**. The env var restores the old cascade
+  exactly, so everything below is one binary. (The script's own `cmp -s` control said "22
+  different" and was blind: the native JSON carries a `timings` dict of sub-millisecond floats and
+  can never byte-match. `arm_diff.py` excludes timing paths on purpose. Do not re-add a `cmp`.)
+- **Discrimination**, renat5 vs legacy: **22 of 22 moved**, worst 2.490e+02 at
+  `nrt.qp_iterations.14.iteration` — an iteration count, i.e. the change reaches the far end of the
+  pipeline.
+
+`table22.py` over the two `compare_all.py` summaries (`data_renat5/table22.txt`, and the full
+per-quantity text in `legacy.compare.txt` / `renat5.compare.txt`):
+
+| quantity | worst over 22, legacy → renat5 | failed/compared | improved / flat / worse |
+|---|---|---|---|
+| NPA charge, max \|dq\| | 0.211780 → 0.210597 e | 278/452 → 63/452 | 22 / 0 / 0 |
+| NAO occupancy, max \|dpop\| | 0.029088 → 0.014606 e | 452/2134 → 39/2089 | 22 / 0 / 0 |
+
+Total failed comparison points over every quantity: **14211 → 11477** ungated, **7317/15123 →
+4737/14782** gated. Per-molecule totals improved on 21 of 22 and the verdict is unchanged:
+`0 PASS / 22 FAIL` in both arms.
+
+**The one regression, in full.** `o2`, ungated total failed points **489 → 492, +3**. All three sit
+in `hybrid %s/%p` (316 → 329 of the same 660 points) with `max_dev` pinned at ~100.0 in both arms —
+a rotation inside an *empty* Rydberg space, where a percentage has no denominator worth having. Its
+`nbo energy` `max_dev` moves 33.76 → 34.44 with `failed` unchanged at 109/124. In the gated view
+`o2` has no hybrid regression at all (40/180 → 40/180, `max_dev` 27.40 → 27.04) and its total drops
+112 → 104, so the gated view is 22 of 22 better and 0 worse. It is reported here rather than
+averaged away; it is not a reason to hold the change, and it is not nothing either.
+
+### The suite, both arms of one binary
+
+`renat5_tests.sh` (job 594822, AKL008, 8 threads; counts in `data_renat5/tests22.txt`, stdout in
+`data_renat5/renat5_tests_594822.out`) runs the whole gtest suite twice from the *same* executable,
+the second time with `NAO_LEGACY_CASCADE=1`:
+
+| arm | ran | PASSED | FAILED | SKIPPED | time |
+|---|---|---|---|---|---|
+| renat5 (default) | 1129 / 177 suites | 1114 | **0** | 15 | 455 s |
+| legacy (`NAO_LEGACY_CASCADE=1`) | 1129 / 177 suites | 1114 | **0** | 15 | 497 s |
+
+`FAILED` is 0 in both arms and the 15 skips are the identical set (all `_full`, GPU or
+gennbo-availability gated), so there is no new failure to attribute to the change and no
+pre-existing failure to subtract — the fallback run on `60055d4b` was not needed. The NAO/NBO
+suites all ran and passed with `renat5` as the default: `NaoMinimalBasisTests` 1,
+`NaoBasisMapTests` 2, `NaoEpoxideTests` 2, `NaoOpenShellTests` 2, `NboRun` 4, `Nbo47` 6. The
+measured bounds in `NaoEpoxideTests.NaturalChargesMatchNbo7` (2.5e-2) and `NaoOpenShellTests`
+(6e-3 / 3e-2) were **not** tightened, even though the new default clears them more comfortably: a
+bound retuned to fit the current arm stops being a check on the next one.
+
+### Reproducing it
+
+```
+sbatch renat5_gate.sh                    # 3 arms x 22 molecules + the NAO_DUMP_C dumps
+py -3.12 arm_diff.py  <legacy dir> <oldbin dir>       # the control, NOT cmp
+py -3.12 compare_all.py ... --json legacy.summary.json ; same for renat5
+py -3.12 table22.py     legacy.summary.json renat5.summary.json
+py -3.12 fidelity22.py  <sides dir> <fid dir>         # port fidelity, 8 molecules
+py -3.12 sines22.py     <sides dir> <fid dir>         # per-class sine + Rydberg population
+sbatch renat5_tests.sh                   # the gtest suite, both arms of one binary
+```
+
+`renat5_tests.sh` starts the suite in `<repo>/tests/src` and sets `NOS_REPO_ROOT`; run it anywhere
+else and a handful of tests fail on `std::filesystem::exists` — that is the harness in the wrong
+directory, not a defect (job 594821 did exactly that).
+
 ## Layout
 
 ```
