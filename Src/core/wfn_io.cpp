@@ -433,7 +433,25 @@ void WFN::push_back_spherical_shell(const int mo, const int l, const vec2& shell
 //the neglected tail of c x^a y^b z^c exp(-ar^2) is bounded by c (u/a)^(l/2) exp(-u) for u = a r^2 beyond l/2,
 //so the cutoff on -a r^2 alone loses 1e-3 electrons per l = 10 orbital; three fixed-point steps per primitive, the minimum wins
 void WFN::set_exp_cutoff() const {
-	const double cut0 = std::log(constants::density_accuracy / get_maximum_MO_coefficient());
+	//The accuracy the primitive screening is asked to hold, and it is not slack. The default 5e-5 is
+	//the square root of 2.5e-9 in the density, which looks five orders tighter than the 3e-4 e a basin
+	//population is reproducible to - and a medium molecule's basin walk evaluates the field a few
+	//billion times, so the margin was swept. It buys real time (ZP2's QTAIM point loop 17.61 s at 5e-5
+	//against 9.45 s at 1e-1, eight threads) and it costs more than it buys at every setting tried:
+	//1e-3 already moves a basin by 9e-4 e (QTAIM) and 1.0e-3 e (ELI-D), 1e-2 by 3.6e-2 e, and 1e-1 by
+	//3.27 e with ten spurious H-H maxima invented by the attractor search. ELI-D amplifies it because
+	//g = rho tau - |grad rho|^2/4 is a difference of large terms, so a truncation invisible in rho is
+	//not invisible in the field the walk climbs. The default therefore stands; the knob is kept so the
+	//claim can be re-checked, and BetaSphereTests' ExpCutoff test pins its range check.
+	double acc = constants::density_accuracy;
+	if (const char *e = std::getenv("NOS_DENSITY_ACCURACY")) {
+		try {
+			const double v = std::stod(e);
+			if (std::isfinite(v) && v > 0.0 && v < 1.0) acc = v;
+		}
+		catch (...) {}
+	}
+	const double cut0 = std::log(acc / get_maximum_MO_coefficient());
 	double cut = cut0;
 	for (int i = 0; i < nex; i++) {
 		int v[3];

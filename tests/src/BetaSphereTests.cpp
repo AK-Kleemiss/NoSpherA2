@@ -575,3 +575,40 @@ TEST(BasinLabels, ALoneAtomHasNoBondBasin)
 	EXPECT_NE(qtaim[1].find("NNA"), std::string::npos)
 		<< "a maximum 1.4 bohr off the only nucleus is a non-nuclear attractor: \"" << qtaim[1] << "\"";
 }
+
+//The primitive screening asks for constants::density_accuracy in the density, and every one of the
+//billions of field evaluations in a basin walk pays for it. 5e-5 (2.5e-9 in the density) looks five
+//orders tighter than the 3e-4 e a basin population is reproducible to, so NOS_DENSITY_ACCURACY exists
+//to price that margin - and the answer is that the margin is load-bearing, not slack. On ZP2 at eight
+//threads the QTAIM point loop runs 17.61 s at the shipped 5e-5 and 9.45 s at 1e-1, but:
+//  1e-3 (cutoff -10.89): worst basin 9e-4 e QTAIM, 1.0e-3 e ELI-D - already 3x the noise floor
+//  1e-2 (cutoff  -8.32): 1.2e-2 e / 3.6e-2 e, with 35 of 45 ELI-D basins moved
+//  1e-1 (cutoff  -5.62): 3.27 e, and the attractor search invents ten spurious H-H maxima
+//ELI-D amplifies the truncation because g = rho tau - |grad rho|^2/4 is a difference of large terms:
+//an error invisible in rho is not invisible in the field the walk climbs. So the default stays where
+//it is, and this test pins only that the knob is read and cannot be handed a value that is not an
+//accuracy. If someone ever does loosen it, the numbers above say what they are spending.
+TEST(ExpCutoff, ScreeningAccuracyIsSettableAndRangeChecked)
+{
+	const WFN wavy = load(nos_test_repo_root() / "tests" / "cytidine_tonto" / "OH.wfn");
+	wavy.set_exp_cutoff();
+	const double shipped = constants::exp_cutoff;
+	ASSERT_LT(shipped, 0.0);
+	{
+		const env_guard g("NOS_DENSITY_ACCURACY", "1e-2");
+		wavy.set_exp_cutoff();
+		//a looser accuracy is a cutoff nearer zero: fewer primitives survive it
+		EXPECT_GT(constants::exp_cutoff, shipped);
+	}
+	//Out of range or unreadable: the shipped accuracy stands. 1.0 and above is not an accuracy, and a
+	//zero or negative one would make the logarithm meaningless rather than fast.
+	for (const char *bad : { "1.0", "2", "0", "-1e-3", "not-a-number", "" })
+	{
+		const env_guard g("NOS_DENSITY_ACCURACY", bad);
+		wavy.set_exp_cutoff();
+		EXPECT_DOUBLE_EQ(constants::exp_cutoff, shipped) << "accepted " << bad;
+	}
+	//and the guard really did clear it, so no later test in this binary screens differently
+	wavy.set_exp_cutoff();
+	EXPECT_DOUBLE_EQ(constants::exp_cutoff, shipped);
+}
