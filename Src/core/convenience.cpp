@@ -3372,8 +3372,24 @@ bool options::digest_property_options(const std::string &temp, int &i)
     else if (temp == "-topology") {
         err_checkf(argc >= i + 2, "Not enough arguments for -topology\nPlease provide a wfn!", std::cout);
         err_checkf(std::filesystem::exists(arguments[i + 1]), "-topology: wavefunction does not exist: " + arguments[i + 1], std::cout);
-        topology::report(arguments[i + 1], std::cout);
-        finished = true; return true;
+        {
+            const bool complete = topology::report(arguments[i + 1], std::cout);
+            finished = true;
+            //The table above is still worth reading, but INCOMPLETE means the set provably does not
+            //close, and a run that prints INCOMPLETE and exits 0 is indistinguishable from a complete
+            //one to anything that reads the exit code. Same rule as -nbo, which exits non-zero when
+            //gennbo does not finish. The message deliberately does not name Poincare-Hopf alone:
+            //three of the eight fixtures that fail this have a BALANCED alternating sum and are
+            //caught by the bond-graph rank instead, so naming only the sum would be false on exactly
+            //the cases the new term exists for.
+            err_checkf(complete, "-topology: the set of critical points printed above is INCOMPLETE "
+                                 "for " + arguments[i + 1] + " - either the Poincare-Hopf sum does "
+                                 "not close, or it closes while contradicting the bond graph. See the "
+                                 "diagnosis printed with the verdict for which class is short or "
+                                 "spurious",
+                       std::cout);
+        }
+        return true;
     }
     else if (temp == "-qtaim_eli") {
         // Cube-files mode:  -qtaim_eli <rho.cube> <eli.cube> <atoms_csv> [<bg_value>]

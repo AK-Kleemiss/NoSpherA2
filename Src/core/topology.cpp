@@ -251,6 +251,34 @@ namespace topology
 		return cycles;
 	}
 
+	bool covalently_bonded(const nucleus& a, const nucleus& b, const options& opt)
+	{
+		const double ra = a.Z > 0 && a.Z < 114 ? constants::covalent_radii[a.Z] : 1.5;
+		const double rb = b.Z > 0 && b.Z < 114 ? constants::covalent_radii[b.Z] : 1.5;
+		return array_length(a.pos, b.pos) <= constants::ang2bohr(opt.bond_scale * (ra + rb));
+	}
+
+	int covalent_fragment_count(const std::vector<nucleus>& nuclei, const options& opt)
+	{
+		const int V = (int)nuclei.size();
+		if (V <= 1)
+			return 1;
+		//Union-find over the pair criterion.  Quadratic in the nuclei, which is what the bond seeding
+		//already is, and it runs once
+		std::vector<int> parent(V);
+		for (int a = 0; a < V; a++) parent[a] = a;
+		auto root = [&parent](int x) { while (parent[x] != x) { parent[x] = parent[parent[x]]; x = parent[x]; } return x; };
+		for (int a = 0; a < V; a++)
+			for (int b = a + 1; b < V; b++)
+				if (covalently_bonded(nuclei[a], nuclei[b], opt)) {
+					const int ra = root(a), rb = root(b);
+					if (ra != rb) parent[ra] = rb;
+				}
+		int components = 0;
+		for (int a = 0; a < V; a++) if (root(a) == a) components++;
+		return components;
+	}
+
 	void tally(result& r, const options& opt)
 	{
 		r.n_attractor = r.n_bond = r.n_ring = r.n_cage = r.n_degenerate = r.n_nna = 0;
@@ -265,9 +293,26 @@ namespace topology
 		}
 		r.sum = r.n_attractor - r.n_bond + r.n_ring - r.n_cage;
 		r.target = opt.poincare_hopf_target;
+		//The molecular form's 1 is ONE isolated molecule's index sum.  C of them, with rho -> 0
+		//between them, sum to C: tests/TFVC/water.gbw is a water with a helium 13.2 bohr away, its 4
+		//attractors and 2 bond points sum to 2, and it was refused for a deficit of -1 while its own
+		//diagnosis read "the bond graph falls into 2 covalent fragments".
+		//
+		//C is taken from the bond paths that were FOUND, not from the covalent geometry, because a
+		//closed-shell contact makes a bond path where the covalent criterion sees none: a
+		//hydrogen-bonded dimer is covalently two fragments and its sum is 1, so a geometric count
+		//would refuse it.  What that costs is stated and paid for separately: dropping a bridging bond
+		//point splits a component and raises the sum, moving both sides of sum == C together, so the
+		//sum alone can no longer see it.  covalent_fragments is what sees it - the found graph must
+		//not be MORE disconnected than the geometry, checked with graph_consistent below.
+		//
+		//Only the molecular default is raised.  An explicit poincare_hopf_target - the periodic Morse
+		//form's 0 among them - is the caller's choice and is left alone.
+		if (opt.poincare_hopf_target == 1 && r.graph_components > 1)
+			r.target = r.graph_components;
 		r.balanced = r.sum == r.target;
 		r.found_ring_minus_cage = r.n_ring - r.n_cage;
-		r.complete = r.balanced && r.n_degenerate == 0;
+		//r.complete is set below, once the bond-graph consistency it now depends on has been worked out
 
 		std::ostringstream d;
 		if (r.n_degenerate > 0)
@@ -283,7 +328,24 @@ namespace topology
 				d << "The search is short of " << deficit << " attractor or ring point(s), or has that many spurious bond or cage points. ";
 			else
 				d << "The search is short of " << -deficit << " bond or cage point(s), or has that many spurious attractor or ring points. ";
-			if (r.graph_vertices > 0) {
+		}
+		//The bond-graph accounting used to sit inside the block above, so it was only ever consulted
+		//once the sum had already failed - and the sum is a necessary condition, not a sufficient one.
+		//A spurious bond point and a spurious ring point cancel in the alternating sum: HgH2 (3 nuclei,
+		//2 bonds, no ring) came out at 3 - 4 + 2 - 0 = 1, balanced, and was reported COMPLETE with two
+		//bond points and two ring points that cannot exist.  The graph rank is what catches that, and
+		//the code already computed it.
+		{
+			const bool rings_ok = r.found_ring_minus_cage == r.required_ring_minus_cage;
+			const bool attractors_ok = r.n_attractor == r.graph_vertices + r.n_nna;
+			//The bond paths cannot be MORE disconnected than the covalent geometry: a closed-shell
+			//contact joins fragments the covalent criterion keeps apart, never the other way round.
+			//This is what pays for taking the target from the found graph - a missing bridging bond
+			//point moves the sum and the component count together and so is invisible to the sum, but
+			//it leaves one covalent fragment split in two, which is visible here.
+			const bool connected_ok = r.graph_components <= r.covalent_fragments;
+			r.graph_consistent = r.graph_vertices == 0 || (rings_ok && attractors_ok && connected_ok);
+			if (r.graph_vertices > 0 && !(r.balanced && r.graph_consistent)) {
 				d << "The bond graph has " << r.graph_vertices << " nuclei, " << r.graph_edges
 				  << " bonds and " << r.graph_components << " component(s), cycle rank "
 				  << r.required_ring_minus_cage << "; found n_ring - n_cage = " << r.found_ring_minus_cage << ". ";
@@ -296,12 +358,15 @@ namespace topology
 				if (r.n_attractor != r.graph_vertices + r.n_nna)
 					d << "Attractors (" << r.n_attractor << ") do not match nuclei plus non-nuclear attractors ("
 					  << r.graph_vertices << " + " << r.n_nna << "): nuclear seeding is the likely gap. ";
-				if (r.graph_components > 1 && r.target == 1)
-					d << "The bond graph falls into " << r.graph_components << " covalent fragments; a genuinely "
-					  << "separated set of molecules sums to the number of fragments, and the closed-shell contacts "
-					  << "that join them carry bond and ring points the covalent graph does not predict. ";
+				if (r.graph_components > r.covalent_fragments)
+					d << "The bond paths fall into " << r.graph_components << " component(s) where the covalent "
+					  << "geometry has only " << r.covalent_fragments << ": " << (r.graph_components - r.covalent_fragments)
+					  << " covalently bonded pair(s) carry no bond critical point, so a bridging bond point is "
+					  << "missing - and that is the one gap the alternating sum cannot see, because losing a "
+					  << "bridge raises the sum and splits a component at the same time. ";
 			}
 		}
+		r.complete = r.balanced && r.n_degenerate == 0 && r.graph_consistent;
 		r.diagnosis = d.str();
 	}
 
@@ -346,6 +411,13 @@ namespace topology
 		log << "Poincare-Hopf (molecular form, isolated molecule): n_NCP - n_BCP + n_RCP - n_CCP = "
 			<< r.n_attractor << " - " << r.n_bond << " + " << r.n_ring << " - " << r.n_cage
 			<< " = " << r.sum << " (expected " << r.target << ")\n";
+		//Where a target above 1 comes from, said out loud: an unexplained "expected 2" is worse than
+		//the wrong "expected 1" it replaced
+		if (r.target > 1 && opt.poincare_hopf_target == 1)
+			log << "The bond paths fall into " << r.graph_components << " disconnected component(s), so the "
+				<< "expected sum is " << r.target << " and not 1: each separated fragment contributes 1. The "
+				<< "covalent geometry has " << r.covalent_fragments << " fragment(s), and a component count "
+				<< "above that would mean a bond path is missing rather than that the system is separated.\n";
 		if (r.escalated) {
 			int from_grid = 0;
 			for (const cp& p : r.points) if (p.from == seed_class::grid) from_grid++;
@@ -353,7 +425,8 @@ namespace topology
 				<< "contributed " << from_grid << " point(s).\n";
 		}
 		if (r.complete)
-			log << "The set of critical points is COMPLETE: the relation holds and no point is degenerate.\n";
+			log << "The set of critical points is COMPLETE: the relation holds, no point is degenerate, and "
+				"n_ring - n_cage matches the bond graph's cycle rank of " << r.required_ring_minus_cage << ".\n";
 		else
 			log << "The set of critical points is INCOMPLETE. " << r.diagnosis << "\n";
 
@@ -375,7 +448,7 @@ namespace topology
 		log << "------------------------------------------------------------\n";
 	}
 
-	void report(const std::filesystem::path& wfn_path, std::ostream& log)
+	bool report(const std::filesystem::path& wfn_path, std::ostream& log)
 	{
 		err_checkf(std::filesystem::exists(wfn_path), "Could not find " + wfn_path.string(), log);
 		WFN wavy(wfn_path);
@@ -385,5 +458,7 @@ namespace topology
 		const options opt{};
 		const result r = analyze_topology(wavy, n, opt);
 		report_topology(r, n, log, opt);
+		//the verdict is a result, not decoration: the caller exits non-zero when it is false
+		return r.complete;
 	}
 }

@@ -481,28 +481,38 @@ TEST(Topology, NonNuclearAttractorIsReportedWithItsDistance)
 
 //The report must print the sum, the counts and, when it does not close, the diagnosis - the point
 //of the exercise is that a user sees the gap rather than a plausible-looking number.
+//This test used to build two hydrogen atoms 10 bohr apart, each with one maximum and no bond point,
+//and assert that a sum of 2 was a deficit against 1.  That was the bug, written down as an
+//expectation: two separated atoms have index sum 2, and the case is COMPLETE - see
+//SeparatedFragmentsSumToTheirNumber below.  The wording it checks is worth keeping, so it now runs on
+//a case that really is short a point: one bonded pair (one covalent fragment), one attractor found
+//where there should be two, sum 0 against 1.
 TEST(Topology, ReportNamesTheAssumedFormAndTheDeficit)
 {
 	topology::result r;
-	topology::cp attractor;
-	attractor.kind = topology::cp_kind::attractor;
-	r.points.assign(2, attractor);
+	topology::cp p;
+	p.kind = topology::cp_kind::attractor;
+	r.points.push_back(p);
+	p.kind = topology::cp_kind::bond;
+	r.points.push_back(p);
 	r.graph_vertices = 2;
-	r.graph_edges = 0;
-	r.graph_components = 2;
+	r.graph_edges = 1;
+	r.graph_components = 1;
+	r.covalent_fragments = 1;
 	topology::tally(r);
-	EXPECT_EQ(r.sum, 2);
+	EXPECT_EQ(r.sum, 0);
+	EXPECT_EQ(r.target, 1);
 	EXPECT_FALSE(r.balanced);
 
 	std::ostringstream out;
-	topology::report_topology(r, { { { 0.0, 0.0, 0.0 }, 1 }, { { 10.0, 0.0, 0.0 }, 1 } }, out);
+	topology::report_topology(r, { { { 0.0, 0.0, 0.0 }, 1 }, { { 1.4, 0.0, 0.0 }, 1 } }, out);
 	const std::string text = out.str();
 	//which Poincare-Hopf form is being assumed, stated in the output
 	EXPECT_NE(text.find("molecular form"), std::string::npos);
 	EXPECT_NE(text.find("INCOMPLETE"), std::string::npos);
-	EXPECT_NE(text.find("deficit"), std::string::npos);
-	//two covalent fragments is a named possibility, not silently folded into a wrong sum
-	EXPECT_NE(text.find("fragment"), std::string::npos) << text;
+	EXPECT_NE(text.find("deficit"), std::string::npos) << text;
+	//and which class is short, rather than only that something is
+	EXPECT_NE(text.find("attractor or ring point"), std::string::npos) << text;
 	//the thresholds that did the rejecting are printed too
 	EXPECT_NE(text.find("Accepted when"), std::string::npos);
 }
@@ -624,4 +634,172 @@ TEST(Topology, ACentrosymmetricDensityHasACentrosymmetricCriticalPointSet)
 	for (size_t a = 0; a < nuc.size(); a++)
 		if (partner[a] >= 0)
 			EXPECT_EQ(attractors_of[a], 1) << "nucleus " << a + 1 << " (Z=" << nuc[a].Z << ")";
+}
+
+//Poincare-Hopf is a necessary condition and not a sufficient one, and the code used to treat it as
+//sufficient: a spurious bond point and a spurious ring point cancel in n_NCP - n_BCP + n_RCP - n_CCP.
+//tests/ELI_heavy/hgh2_ecp.gbw is the case that exposed it - a linear H-Hg-H, three nuclei, two bonds
+//and no ring anywhere - and -topology printed
+//    Counts: 3 attractor, 4 bond, 2 ring, 0 cage      3 - 4 + 2 - 0 = 1 (expected 1)
+//    The set of critical points is COMPLETE
+//and exited 0.  Two of those bond points and both ring points cannot exist: a molecule whose bond
+//graph is a path has cycle rank 0, so n_ring - n_cage must be 0.  That rank was already being
+//computed; it just sat inside "if (!r.balanced)" and so was only ever consulted after the sum had
+//already failed.  The counts below are that fixture's, entered by hand - tally() is public so the
+//verdict can be checked without a search, and none of these three arms needs a wavefunction.
+namespace
+{
+	//fragments defaults to C: one covalent fragment per component of the found bond graph, which is
+	//the ordinary case.  Pass it explicitly to separate the two - a closed-shell contact gives
+	//fragments > C, a missing bridging bond point gives fragments < C
+	topology::result graph_case(int n_attractor, int n_bond, int n_ring, int V, int E, int C, int fragments = -1)
+	{
+		topology::result r;
+		topology::cp p;
+		for (int k = 0; k < n_attractor; k++) { p.kind = topology::cp_kind::attractor; r.points.push_back(p); }
+		for (int k = 0; k < n_bond; k++) { p.kind = topology::cp_kind::bond; r.points.push_back(p); }
+		for (int k = 0; k < n_ring; k++) { p.kind = topology::cp_kind::ring; r.points.push_back(p); }
+		r.graph_vertices = V;
+		r.graph_edges = E;
+		r.graph_components = C;
+		r.covalent_fragments = fragments >= 0 ? fragments : std::max(C, 1);
+		//what bond_graph_cycles() computes, reproduced here because that function needs the points'
+		//positions and these have none
+		r.required_ring_minus_cage = E - V + C;
+		topology::tally(r);
+		return r;
+	}
+}
+
+TEST(Topology, ABalancedSumThatContradictsTheBondGraphIsNotComplete)
+{
+	//HgH2: three nuclei, two bonds, one component -> cycle rank 0, and two ring points found
+	topology::result r = graph_case(3, 4, 2, 3, 2, 1);
+	ASSERT_EQ(r.sum, 1);
+	ASSERT_TRUE(r.balanced) << "the arm is vacuous unless the alternating sum still closes";
+	ASSERT_EQ(r.required_ring_minus_cage, 0);
+	ASSERT_EQ(r.found_ring_minus_cage, 2);
+	EXPECT_FALSE(r.graph_consistent);
+	EXPECT_FALSE(r.complete) << "a path graph has no ring, so 2 ring points with a balanced sum is "
+		"two spurious bond points and two spurious ring points cancelling: " << r.diagnosis;
+	EXPECT_NE(r.diagnosis.find("cycle rank"), std::string::npos) << r.diagnosis;
+
+	//and the printed verdict has to agree with the flag, because -topology's exit code is now the flag
+	std::ostringstream out;
+	topology::report_topology(r, { { { 0.0, 0.0, 0.0 }, 80 }, { { 3.1, 0.0, 0.0 }, 1 }, { { -3.1, 0.0, 0.0 }, 1 } }, out);
+	EXPECT_NE(out.str().find("INCOMPLETE"), std::string::npos) << out.str();
+}
+
+TEST(Topology, ANucleusWithoutAnAttractorIsNotComplete)
+{
+	//tests/ECP_SF/Au2Br2.gbw's shape: the sum closes (51 - 57 + 9 - 2 = 1) while two of its 53 nuclei
+	//carry no maximum at all.  Every nucleus of a density with core electrons there has a cusp, so
+	//n_attractor must be n_nuclei + n_NNA; scaled down to 4 nuclei, 3 bonds, 3 attractors found
+	topology::result r = graph_case(3, 2, 0, 4, 3, 1);
+	ASSERT_EQ(r.sum, 1);
+	ASSERT_TRUE(r.balanced);
+	ASSERT_EQ(r.required_ring_minus_cage, 0);
+	ASSERT_EQ(r.found_ring_minus_cage, 0) << "the ring arm must not be what fails here";
+	EXPECT_FALSE(r.graph_consistent);
+	EXPECT_FALSE(r.complete) << r.diagnosis;
+	EXPECT_NE(r.diagnosis.find("nuclear seeding"), std::string::npos) << r.diagnosis;
+}
+
+TEST(Topology, AGenuineRingStaysComplete)
+{
+	//The other direction, which is what keeps the new term from being a blanket refusal: epoxide as
+	//-topology finds it, 7 nuclei and 7 bonds in one component, cycle rank 1, one ring point.  14 of
+	//the 22 fixtures swept stay COMPLETE, so this arm is the majority case and not the exception.
+	topology::result r = graph_case(7, 7, 1, 7, 7, 1);
+	ASSERT_EQ(r.sum, 1);
+	ASSERT_EQ(r.required_ring_minus_cage, 1);
+	EXPECT_TRUE(r.graph_consistent);
+	EXPECT_TRUE(r.complete) << r.diagnosis;
+
+	//no bond graph at all - a single atom, or a source with no nuclei - must not be refused either
+	topology::result lone = graph_case(1, 0, 0, 0, 0, 0);
+	EXPECT_TRUE(lone.graph_consistent);
+	EXPECT_TRUE(lone.complete) << lone.diagnosis;
+}
+
+//The index sum of ONE isolated molecule is 1; C of them, with rho -> 0 between them, sum to C.
+//tests/TFVC/water.gbw is a water with a helium atom 13.2 bohr away: 4 attractors, 2 bond points, no
+//ring, no cage, a sum of 2 - and it was reported INCOMPLETE with "deficit -1" while its own
+//diagnosis already read "the bond graph falls into 2 covalent fragments".  Harmless while -topology
+//exited 0 regardless; a hard failure on a perfectly good input once it does not.
+TEST(Topology, SeparatedFragmentsSumToTheirNumber)
+{
+	//water + He: 4 nuclei, 2 bond points, the bond graph in 2 components, 2 covalent fragments
+	topology::result r = graph_case(4, 2, 0, 4, 2, 2);
+	EXPECT_EQ(r.target, 2) << "two separated fragments have index sum 2";
+	EXPECT_EQ(r.sum, 2);
+	EXPECT_TRUE(r.balanced);
+	EXPECT_TRUE(r.graph_consistent);
+	EXPECT_TRUE(r.complete) << r.diagnosis;
+
+	//and the same molecule as one fragment still expects 1, so the default is not simply relaxed
+	topology::result one = graph_case(4, 3, 0, 4, 3, 1);
+	EXPECT_EQ(one.target, 1);
+	EXPECT_TRUE(one.complete) << one.diagnosis;
+
+	//An explicit target is the caller's choice and must survive: the periodic Morse form is 0 however
+	//many fragments the cell contains
+	topology::result r2;
+	topology::cp p;
+	for (int k = 0; k < 4; k++) { p.kind = topology::cp_kind::attractor; r2.points.push_back(p); }
+	for (int k = 0; k < 2; k++) { p.kind = topology::cp_kind::bond; r2.points.push_back(p); }
+	r2.graph_vertices = 4; r2.graph_edges = 2; r2.graph_components = 2; r2.covalent_fragments = 2;
+	topology::options morse;
+	morse.poincare_hopf_target = 0;
+	topology::tally(r2, morse);
+	EXPECT_EQ(r2.target, 0) << "an explicit Poincare-Hopf target must not be overwritten";
+}
+
+//What taking the target from the FOUND bond paths costs, and the check that pays for it.  The count
+//has to come from the found paths: a hydrogen-bonded dimer is covalently two fragments and its
+//density has a bridging bond point, so its sum is 1 and a geometric count would refuse it.  The
+//price is that dropping a bridging bond point raises the sum by 1 and splits a component at the
+//same time, so sum == C cannot see it.  The covalent geometry can: bond paths may be LESS
+//disconnected than the covalent graph (that is what a closed-shell contact is) and never more.
+TEST(Topology, FoundBondPathsMayNotBeMoreDisconnectedThanTheGeometry)
+{
+	//one covalent molecule of 4 nuclei, but only 2 bond points found, so the paths fall in 2 pieces
+	topology::result missing = graph_case(4, 2, 0, 4, 2, 2, 1);
+	EXPECT_EQ(missing.target, 2);
+	EXPECT_TRUE(missing.balanced) << "the arm is vacuous unless the sum still closes against 2";
+	EXPECT_FALSE(missing.graph_consistent);
+	EXPECT_FALSE(missing.complete) << missing.diagnosis;
+	EXPECT_NE(missing.diagnosis.find("bridging bond point"), std::string::npos) << missing.diagnosis;
+
+	//the other direction is legitimate and must pass: a dimer held by one closed-shell contact has 2
+	//covalent fragments, 1 connected set of bond paths, and a sum of 1
+	topology::result hbond = graph_case(6, 5, 0, 6, 5, 1, 2);
+	EXPECT_EQ(hbond.target, 1);
+	EXPECT_TRUE(hbond.graph_consistent);
+	EXPECT_TRUE(hbond.complete) << hbond.diagnosis;
+}
+
+//The fragment count itself, off the geometry alone - no density, no search.  The helium sits 11.9
+//bohr (6.3 A) from the nearest hydrogen, and bond_scale 1.3 could only reach that with a covalent
+//radius near 2.2 A, which no element in the table has - so the separation does not depend on which
+//radius helium is given.
+TEST(Topology, CovalentFragmentCountIsGeometryOnly)
+{
+	const std::vector<topology::nucleus> water_and_he{
+		{ { 0.0, 0.0, 0.2318 }, 8 }, { { 0.0, 1.39815, -0.89997 }, 1 }, { { 0.0, -1.39815, -0.89997 }, 1 },
+		{ { 0.0, 13.22808, 0.0 }, 2 } };   //tests/TFVC/water.gbw's geometry, in bohr
+	topology::options opt;
+	EXPECT_EQ(topology::covalent_fragment_count(water_and_he, opt), 2);
+
+	//the water alone is one fragment, and each atom on its own is its own
+	const std::vector<topology::nucleus> water(water_and_he.begin(), water_and_he.begin() + 3);
+	EXPECT_EQ(topology::covalent_fragment_count(water, opt), 1);
+	EXPECT_EQ(topology::covalent_fragment_count({}, opt), 1) << "an empty system is not a deficit";
+	EXPECT_EQ(topology::covalent_fragment_count({ water_and_he[0] }, opt), 1);
+	EXPECT_EQ(topology::covalent_fragment_count({ water_and_he[1], water_and_he[3] }, opt), 2);
+
+	//and a large enough bond_scale joins everything, which is the knob doing the work rather than a
+	//hard-coded distance
+	opt.bond_scale = 10.0;
+	EXPECT_EQ(topology::covalent_fragment_count(water_and_he, opt), 1);
 }

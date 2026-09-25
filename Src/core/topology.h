@@ -122,9 +122,30 @@ namespace topology
 		int graph_components = 0;
 		int required_ring_minus_cage = 0; //E - V + C: what Poincare-Hopf needs of the two classes
 		int found_ring_minus_cage = 0;
+		//n_ring - n_cage matches the bond graph's cycle rank, and the attractors match nuclei plus
+		//NNAs.  Poincare-Hopf is necessary and not sufficient - a spurious bond point and a spurious
+		//ring point cancel in the alternating sum - so this is the check that a balanced sum was
+		//balanced for the right reason.  True when there is no bond graph to compare against.
+		bool graph_consistent = true;
+		//Connected components of the COVALENT graph, from the nuclear geometry alone - not of the
+		//graph the bond critical points build.  The index sum for C separated molecules is C and not
+		//1, so this is what target is taken from; tests/TFVC/water.gbw is a water with a helium atom
+		//13.2 bohr away, its sum is 2, and it was reported INCOMPLETE with a deficit of -1 while its
+		//own diagnosis said "the bond graph falls into 2 covalent fragments".  Geometry rather than
+		//found points on purpose: taking C from the found bond points would make the relation blind
+		//to a missing one, because dropping a bond point raises the sum by 1 and splits a fragment,
+		//moving both sides of sum == C together.
+		int covalent_fragments = 1;
 		bool escalated = false; //a coarse grid of seeds was added
 		std::string diagnosis;  //empty when complete, otherwise what is missing and where
 	};
+
+	//Two nuclei are covalently bonded when they are closer than bond_scale * (r_cov + r_cov).  One
+	//function rather than the criterion written out twice: the bond seeding and the fragment count
+	//have to agree, or the search seeds bonds the accounting does not expect.
+	bool covalently_bonded(const nucleus& a, const nucleus& b, const options& opt);
+	//Connected components of that graph.  An empty system gives 1, so it is not read as a deficit.
+	int covalent_fragment_count(const std::vector<nucleus>& nuclei, const options& opt);
 
 	//Classification of a stationary point from its Hessian alone (row-major 3x3).  Split out so
 	//the signature logic can be checked against a matrix whose eigenvalues are known exactly,
@@ -297,9 +318,7 @@ namespace topology
 			const size_t first = seeds.size();
 			for (size_t a = 0; a < nuclei.size(); a++)
 				for (size_t b = a + 1; b < nuclei.size(); b++) {
-					const double ra = nuclei[a].Z > 0 && nuclei[a].Z < 114 ? constants::covalent_radii[nuclei[a].Z] : 1.5;
-					const double rb = nuclei[b].Z > 0 && nuclei[b].Z < 114 ? constants::covalent_radii[nuclei[b].Z] : 1.5;
-					if (array_length(nuclei[a].pos, nuclei[b].pos) > constants::ang2bohr(opt.bond_scale * (ra + rb)))
+					if (!covalently_bonded(nuclei[a], nuclei[b], opt))
 						continue;
 					for (int i = 1; i < 10; i++) {
 						const double t = 0.1 * i;
@@ -349,6 +368,8 @@ namespace topology
 			run(first);
 		}
 
+		//What the sum is compared against, before anything is compared: C separated molecules give C
+		r.covalent_fragments = covalent_fragment_count(nuclei, opt);
 		tally(r, opt);
 
 		//5. the sum did not close.  A coarse grid over the nuclear bounding box is the only seeding
@@ -369,6 +390,10 @@ namespace topology
 							seed_class::grid);
 			run(first);
 			r.escalated = true;
+			//The grid can add bond points, and the verdict now depends on the bond graph they build -
+			//so it is rebuilt before the second tally rather than left as step 3 found it.  The
+			//returned cycles are discarded: the ring seeding has already happened
+			bond_graph_cycles(r, nuclei);
 			tally(r, opt);
 		}
 		return r;
@@ -376,6 +401,9 @@ namespace topology
 
 	//Every critical point of a wavefunction's density with the Poincare-Hopf verdict, printed
 	void report_topology(const result& r, const std::vector<nucleus>& nuclei, std::ostream& log, const options& opt = {});
-	//-topology <wfn>: load, analyze, report
-	void report(const std::filesystem::path& wfn_path, std::ostream& log);
+	//-topology <wfn>: load, analyze, report.  Returns the Poincare-Hopf verdict - true when the set of
+	//critical points is complete - so the caller can exit non-zero on a set that is provably missing
+	//points.  It used to be void, and -topology exited 0 on an INCOMPLETE set: a script could not tell
+	//the two apart, and four of the matrix's own cells are INCOMPLETE.
+	bool report(const std::filesystem::path& wfn_path, std::ostream& log);
 }

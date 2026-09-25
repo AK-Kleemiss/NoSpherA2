@@ -1935,8 +1935,9 @@ void Roby_information::computeAllAtomicNAOs(WFN &wavy, const bool symmetrize, co
 		err_checkf(highest <= 5,
 			"RGBI's atomic O_h symmetrization supports shells from s through h, and the basis of " +
 			wavy.get_path().filename().string() + " carries l = " + std::to_string(highest) +
-			" (" + std::string(1, "spdfghiklm"[std::min(highest, 9)]) + " shells). Run -rgbi_no_sym "
-			"to analyse it without the symmetrization.",
+			" (" + std::string(1, "spdfghiklm"[std::min(highest, 9)]) + " shells). -rgbi_no_sym analyses "
+			"it without the symmetrization, but expect it to be slow: on the 670-function i-shell file "
+			"in the test set it produced no output in 1800 s.",
 			std::cout);
 	}
 
