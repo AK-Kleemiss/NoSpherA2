@@ -755,3 +755,48 @@ TEST(BondwiseCoverageEliTests, TheEcpBasinTablesCloseOnTheirOwnElectronCounts)
 	EXPECT_NEAR(qtaim - eli, cores, 2e-2 * cores)
 		<< "the difference between the two arms is the ECP core the one fills and the other cannot see";
 }
+
+// A free atom is the system ELI-D is calibrated against, and until af99fa2a the analysis could not
+// run on one: the ELI label branch looked for the two atoms nearest each maximum and aborted the
+// process when there was only one. Six of the twenty-two reader inputs in the robustness matrix
+// failed there and nowhere else, five of them the only ELI coverage their reader has. This is the
+// cheapest of the six, and it checks the two things a lone atom must satisfy: the basins plus
+// whatever left them close on the electron count the file itself declares, and no basin is a bond,
+// because there is nothing to bond to. If the abort comes back this test kills the whole binary
+// rather than failing, which is the nature of err_checkf and worth knowing when it happens.
+TEST(BondwiseCoverageEliTests, AFreeAtomIsAnalysedAndItsBasinsCloseOnItsOwnElectrons)
+{
+	const std::filesystem::path p = nos_test_repo_root() / "tests" / "molden_file" / "f_ref.wfx";
+	if (!std::filesystem::exists(p))
+		GTEST_SKIP() << "tests/molden_file/f_ref.wfx not found";
+	Scratch s("AFreeAtomIsAnalysedAndItsBasinsCloseOnItsOwnElectrons");
+	std::filesystem::current_path(s.dir);
+
+	WFN wavy(p);
+	ASSERT_EQ(wavy.get_ncen(), 1) << "the fixture is meant to be a single fluoride ion";
+	const double electrons = wavy.count_nr_electrons();
+	ASSERT_NEAR(electrons, 10.0, 1e-9) << "f_ref.wfx declares 10 electrons (F-)";
+
+	options opt;
+	opt.properties.radius = 2.5;
+	opt.properties.resolution = 0.3;
+	std::string out;
+	{
+		CoutCapture cap;
+		ELI_analysis(wavy, opt);
+		out = cap.str();
+	}
+
+	const auto totals = parse_basin_totals(out);
+	ASSERT_EQ(totals.size(), 2u) << "expected a QTAIM table and an ELI-D table\n" << out;
+	EXPECT_NEAR(totals[0].first + totals[0].second, electrons, 1e-2 * electrons)
+		<< "QTAIM on one atom: everything is in that atom's basin\n" << out;
+	EXPECT_NEAR(totals[1].first + totals[1].second, electrons, 1e-2 * electrons)
+		<< "ELI-D on one atom: core shells plus valence, and nothing may go missing\n" << out;
+	EXPECT_EQ(out.find(" bond"), std::string::npos)
+		<< "a lone atom has no bond basin, so no label may carry one\n" << out;
+	//the label is the atom's own label with its index appended, so this fixture prints "F10":
+	//its single atom is named F1. Read the name from the wavefunction rather than spelling it out.
+	const std::string own = wavy.get_atom_label(0) + "0";
+	EXPECT_NE(out.find(own), std::string::npos) << "every basin belongs to atom " << own << "\n" << out;
+}
