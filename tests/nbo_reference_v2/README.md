@@ -507,9 +507,16 @@ two worst (0.43950 over 136).
 sf6 was **VOID on the first pass** with a 0-byte lfn 33 and `rc=0`, and the cause is worth keeping: NBO
 stopped at `SYMOPS: generated 48 symmetry operator(s) for Th but expected 24` after 0.02 CPU seconds,
 which is *before* the NAO stage, so it produced a valid-looking `.nbo` of 1190 bytes and no matrix at
-all.  `NRTSYM=OFF` suppresses it and job 589634 recovered the full 1.15 MB matrix; the keyword is
-applied to sf6 alone on purpose, because the other seven's numbers were produced with `AONAO=W` by
-itself.  A job that exits 0 and writes an empty file is exactly what the VOID denominator exists for.
+all.  `NRTSYM=OFF` suppresses it and job 589634 recovered the full 1.15 MB matrix.  A job that exits 0
+and writes an empty file is exactly what the VOID denominator exists for.
+
+That left one keyword in sf6's keylist and not in the other seven's - a per-molecule input difference
+inside the very gate that rests on sf6 - so it was measured rather than argued about.  Job 589969 reran
+lif and water with `AONAO=W NRTSYM=OFF`, on the same node, against the same `.47`, and both lfn 33 files
+came back **byte-identical** to the committed ones (`md5 4b7206f8...` and `a2d5f3e1...`; the only
+difference anywhere in the input is the keylist line itself).  `NRTSYM` does not reach the NAO stage, at
+`0.0e+00` and not at a tolerance, so sf6's matrix is comparable with the other seven's and the contrast
+gate is not mixing two inputs.  The record is `data_nao_split/aonao/nrtsym_probe_589969.txt`.
 
 Three arms, because a rank pairing is not physics and a unit-normalised shell is not a population:
 
@@ -547,6 +554,59 @@ are built with a small shape error that carries a lot of charge, and it surfaces
 
 This is the fourth metric on this branch to rank the wrong thing until it was weighted the way the
 failure is, so the charge-scale arm is printed next to the mean and neither is quoted alone.
+
+### Where that weight goes, and whether it reaches the final table
+
+The out-of-block weight can only be two things, and they mean different things, so they are split:
+
+| electrons | in-block, other shell | same atom, other l | another atom |
+|---|---|---|---|
+| Core    | 0.00025 | 0.00000 | 0.00001 |
+| Valence | 0.42780 | 0.14081 | 0.37405 |
+| Rydberg | 0.19995 | 0.05639 | 0.13834 |
+| total   | 0.62800 | 0.19719 | 0.51240 |
+
+Of the valence set's 0.94266 e, 0.42780 e mixes another shell of the **same** (atom, l) - which is the
+valence/Rydberg swap the final tables report, seen on the donor side - 0.14081 e crosses l on the same
+atom, and 0.37405 e sits on **another atom entirely**.  So the intra-atomic part, the only part that can
+move population between classes of one atom, is 0.56861 e, and within it the same-l channel is three
+times the cross-l one.  That is *not* the same decomposition as the final table's "92 % of the excess is
+inter-l" (that one is a receiver-side statement about (atom, l) blocks with no valence shell), and the
+two must not be quoted as the same number: the cross-l channel is real here but it is the smaller half
+of the intra-atomic weight.
+
+The inter-atomic 0.37405 e has nowhere to go in a class table, and it does not show up as charge either:
+the worst atomic charge deviation across the eight is 0.02802 e, a factor of 13 smaller.  Inter-atomic
+mis-shape is largely reciprocal between bonded partners, so it cancels - the same cancellation that made
+the NPA charge agreement meaningless, now measured one level upstream.
+
+Per molecule, against the final table's own class error `d(Val)` (native minus gennbo, from the stamped
+reference JSONs, not copied from an earlier printout):
+
+| molecule | d(Val) | intra Val | intra Ryd | ratio | inter Val | worst dq |
+|---|---|---|---|---|---|---|
+| ammonia | -0.02959 | 0.02990 | 0.00352 | 1.13 | 0.01592 | 0.00996 |
+| benzene | -0.31611 | 0.36191 | 0.13222 | 1.56 | 0.22158 | 0.00673 |
+| ethane  | -0.12989 | 0.13181 | 0.07932 | 1.63 | 0.05841 | 0.00903 |
+| lif     | -0.00116 | 0.00037 | 0.00060 | 0.83 | 0.00010 | 0.00197 |
+| pf5     | +0.01945 | 0.00884 | 0.01435 | 1.19 | 0.02523 | 0.01308 |
+| sf6     | +0.00885 | 0.01162 | 0.01179 | 2.65 | 0.03157 | 0.01632 |
+| so2     | +0.01701 | 0.01424 | 0.01213 | 1.55 | 0.01357 | 0.02802 |
+| water   | -0.01268 | 0.00992 | 0.00241 | 0.97 | 0.00768 | 0.00165 |
+
+The intermediate and the final table are the same size on every molecule, and on the two that matter -
+benzene at 0.31611 e and ethane at 0.12989 e, the largest class errors in the set - the intra-atomic
+valence mis-shape alone is 0.36191 e and 0.13181 e, i.e. 114 % and 101 % of what the final table shows.
+The ratio never exceeds 2.65 and never falls below 0.83.  That is the bridge: the AO -> NAO matrix
+carries enough mis-shape, on the right atoms and in the right class, to produce the population error
+that `-nbo_native` fails on, and nothing downstream has to be invoked to explain it.
+
+What it is **not** is proof that nothing downstream also contributes.  The occupancy weight is an
+estimate - the population a mis-shaped shell actually moves is `w*(occ_a - occ_b)` and this uses
+`w*occ_a`, and M is m-averaged, so a shell's components are assumed to share its occupancy.  On the four
+molecules whose `d(Val)` is 0.001-0.03 e the ratio scatters 0.83-1.19 either side of 1, which is the
+estimate's own resolution; nothing here can check the **sign**, since a mixing weight is positive while
+pf5/so2/sf6 have native's valence set too large and the other five have it too small.
 
 Two read defects were caught by the gates on the way, both of the family this branch keeps meeting:
 

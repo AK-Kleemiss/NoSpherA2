@@ -1,3 +1,4 @@
+aonao_compare on Flowoffice, 1 thread (numpy on matrices of a few hundred), root C:/Users/florian/AppData/Local/Temp/claude/E--Dropbox-Obsidian-LLM-Infos/61956d9d-87f0-40dc-840f-98dbefbee2d4/scratchpad/aonao
 ammonia    n=49   lfn33 column-major  |C^T S C-1|=2.8e-09  occ (C^T S P S C) vs printed 5.0e-06  vs stamped ref 0.0e+00
    shells 23   in-block leak max 0.41936 mean 0.15812   out-of-block max 0.41048   rank mismatches 0
      atom  0 l=0 rank 2 Ryd/Ryd 3s   occ  0.00038/ 0.00010  M[a][a]=0.58064  best rank 2 (0.58064)  in-block 0.58952
@@ -70,9 +71,12 @@ where the shape error sits (mean weight outside the shell's own (atom,l) block, 
   by class Cor: 0.00000 (34)  Ryd: 0.17676 (273)  Val: 0.00367 (72)
 
 on the charge scale (sum (2l+1)*occ*leak, electrons):
-  rank-paired           Cor: 0.00026  Ryd: 0.39467  Val: 0.94266   total 1.33759
-  ordering-insensitive  Cor: 0.00026  Ryd: 0.31255  Val: 0.94266   total 1.25547
-  out-of-block          Cor: 0.00001  Ryd: 0.19472  Val: 0.51486   total 0.70960
+  rank-paired                   Cor: 0.00026  Ryd: 0.39467  Val: 0.94266   total 1.33759
+  ordering-insensitive          Cor: 0.00026  Ryd: 0.31255  Val: 0.94266   total 1.25547
+  out-of-block                  Cor: 0.00001  Ryd: 0.19472  Val: 0.51486   total 0.70960
+    of that, same atom other l  Cor: 0.00000  Ryd: 0.05639  Val: 0.14081   total 0.19719
+    of that, another atom       Cor: 0.00001  Ryd: 0.13834  Val: 0.37405   total 0.51240
+  in-block, other shell         Cor: 0.00025  Ryd: 0.19995  Val: 0.42780   total 0.62800
 
 completeness gate (sum_b M[a][b] over ALL gennbo NAOs must be 1, exactly):
   ammonia    max |sum - 1| = 2.74e-09 over 23 shells
@@ -94,3 +98,17 @@ pairing diagnostic (argmax within the (atom, l) block vs the rank partner):
   so2        on partner 31/35   offsets -1:2 +0:31 +1:2   worst off-partner gap 0.70374
   water      on partner 19/19   offsets +0:19
 contrast gate: mean in-block leak 0.17423 on the already-right pf5/so2/sf6 (182 shells) vs 0.43950 on ethane/benzene (136 shells) -> tracks the final-table error
+
+bridge to the final table (electrons):
+  molecule       d(Val)  intra Val  intra Ryd   ratio  inter Val   worst dq
+  ammonia      -0.02959    0.02990    0.00352    1.13    0.01592    0.00996
+  benzene      -0.31611    0.36191    0.13222    1.56    0.22158    0.00673
+  ethane       -0.12989    0.13181    0.07932    1.63    0.05841    0.00903
+  lif          -0.00116    0.00037    0.00060    0.83    0.00010    0.00197
+  pf5          +0.01945    0.00884    0.01435    1.19    0.02523    0.01308
+  sf6          +0.00885    0.01162    0.01179    2.65    0.03157    0.01632
+  so2          +0.01701    0.01424    0.01213    1.55    0.01357    0.02802
+  water        -0.01268    0.00992    0.00241    0.97    0.00768    0.00165
+  -> the intra-atomic mis-shape is SMALLER than the final class error on lif (0.83, d(Val) 0.00116 e), water (0.97, d(Val) 0.01268 e)
+     all of those have |d(Val)| under 0.05 e, which is the estimate's own resolution - not a refutation on its own
+  inter-atomic valence weight totals 0.37405 e, worst atomic charge deviation 0.02802 e (13x cancellation)

@@ -471,7 +471,17 @@ NAOResult build_naos(const dMatrix2 &P_in, const dMatrix2 &S_in, const std::vect
     //construction while the charge that moves is valence, which is what d(Val) = -d(Ryd) looks like
     //one level down - and only the electron-weighted number is commensurable with the NPA failure.
     //Do not quote the per-shell mean alone: it ranks a badly-shaped empty Rydberg shell above a
-    //nearly-right doubly-occupied valence one.  Tables in tests/nbo_reference_v2/README.md.
+    //nearly-right doubly-occupied valence one.
+    //
+    //Where the valence 0.94266 e goes: 0.42780 e into another shell of the SAME (atom, l), 0.14081 e
+    //across l on the same atom, 0.37405 e onto ANOTHER atom.  The intra-atomic part, 0.56861 e, is the
+    //only part that can move population between classes of one atom, and it is enough: per molecule it
+    //is 114 % of benzene's final class error (0.36191 e against d(Val) 0.31611 e) and 101 % of
+    //ethane's (0.13181 against 0.12989), ratio 0.83-2.65 over all eight.  The inter-atomic 0.37405 e
+    //is 13x the worst atomic charge deviation (0.02802 e) because it is reciprocal between bonded
+    //partners and cancels - which is why the NPA charges agreed while this was wrong.  A candidate fix
+    //has to move the intra-atomic valence weight, with pf5/so2/sf6 held flat.
+    //Tables in tests/nbo_reference_v2/README.md.
     if (nao_env("NAO_DUMP_C")) {
         std::cout << "NAOC index atom l m shell class occ coefficients[" << nao << "]" << std::endl;
         for (int i = 0; i < nao; i++) {

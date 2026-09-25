@@ -42,6 +42,7 @@ worth nothing - three have been retired on this branch for exactly that):
 import json
 import os
 import re
+import socket
 import sys
 
 import contextlib
@@ -177,17 +178,21 @@ def mixing(Cn, Cg, S, rows, cols):
 
     `rows` and `cols` are lists of shells, each a list of the (2l+1) indices of its components, so
     neither side's component order has to match the other's - the m sum is over all pairs.
+
+    Returns (M, total, w), with w[a][j] the m-averaged weight of native shell a on gennbo NAO j, so
+    any other grouping of the columns - same atom other l, other atom - is a sum over w and needs no
+    second pass over the matrices.
     """
     flat = [i for sh in rows for i in sh]
     nm = len(rows[0])
     O = Cn[:, flat].T @ S @ Cg  # native block rows against ALL gennbo NAOs
+    w = (O ** 2).reshape(len(rows), nm, -1).sum(axis=1) / nm
     M = np.zeros((len(rows), len(cols)))
     for a in range(len(rows)):
-        ra = O[a * nm:(a + 1) * nm, :]
         for b, cb in enumerate(cols):
-            M[a, b] = (ra[:, cb] ** 2).sum() / nm
-    total = (O ** 2).sum(axis=1).reshape(len(rows), nm).sum(axis=1) / nm  # 1.0 by completeness
-    return M, total
+            M[a, b] = w[a, cb].sum()
+    total = w.sum(axis=1)  # 1.0 by completeness
+    return M, total, w
 
 
 def compare(mol, d, verbose=False):
@@ -224,6 +229,12 @@ def compare(mol, d, verbose=False):
             ref_err = float(np.abs(ro - printed).max()) if ro.shape == printed.shape else float("inf")
 
     gb = gennbo_blocks(naos)
+    #Which atom and which l each GENNBO column belongs to, so the out-of-block weight can be split
+    #into the two things it can be.  Same atom, different l is an intra-atomic cross-l mix, which is
+    #what the final table's 92 %-inter-l excess would look like one level down; different atom cannot
+    #be that and would move charge between atoms instead.
+    g_atom = np.array([e["atom"] - 1 for e in naos])
+    g_l = np.array([LANG_L[e["lang"][0].lower()] for e in naos])
     rows = []
     for (atom, l), gshells in sorted(gb.items()):
         nm = 2 * l + 1
@@ -232,7 +243,9 @@ def compare(mol, d, verbose=False):
         assert len(nrows) == nm * len(gshells), "block (%d,%d): %d native vs %d gennbo" % (
             atom, l, len(nrows), nm * len(gshells))
         nshells = [nrows[a * nm:(a + 1) * nm] for a in range(len(gshells))]
-        M, total = mixing(Cn, Cg, S, nshells, gshells)
+        M, total, w = mixing(Cn, Cg, S, nshells, gshells)
+        same_other_l = (g_atom == atom) & (g_l != l)
+        other_atom = g_atom != atom
         for a in range(M.shape[0]):
             lab = labels[nshells[a][0]]
             g = naos[gshells[a][0]]
@@ -241,9 +254,16 @@ def compare(mol, d, verbose=False):
             #Gap to the runner-up: a pairing that is merely close is worth knowing about, and a
             #systematic off-by-one has a LARGE gap on the wrong column, not a small one.
             gap = float(M[a, order[0]] - M[a, order[1]]) if M.shape[1] > 1 else float("nan")
+            #The three column sets must be disjoint and exhaustive, or the split is bookkeeping
+            #fiction: own (atom,l) block + same atom other l + other atom = everything = total.
+            part = float(M[a].sum() + w[a, same_other_l].sum() + w[a, other_atom].sum())
+            assert abs(part - float(total[a])) < 1e-9, "block (%d,%d) rank %d: partition %.12f vs total %.12f" % (
+                atom, l, a, part, total[a])
             rows.append(dict(mol=mol, atom=atom, l=l, rank=a, cls=CLASS[lab[5]],
                              gcls=g["type"], gshell=g["shell"], occ=lab[6], gocc=g["occupancy"],
                              diag=float(M[a, a]), inblock=float(M[a].sum()),
+                             crossl=float(w[a, same_other_l].sum()),
+                             otheratom=float(w[a, other_atom].sum()),
                              best=worst_b, bestval=float(M[a, worst_b]), gap=gap,
                              total=float(total[a])))
     return dict(mol=mol, n=n, layout=layout, ortho=ortho, occ_err=occ_err, occ_form=occ_form,
@@ -295,13 +315,109 @@ def by_group(all_rows):
     print("\non the charge scale (sum (2l+1)*occ*leak, electrons):")
     for what, val in (("rank-paired", lambda r: 1.0 - r["diag"]),
                       ("ordering-insensitive", lambda r: 1.0 - r["bestval"]),
-                      ("out-of-block", lambda r: 1.0 - r["inblock"])):
+                      ("out-of-block", lambda r: 1.0 - r["inblock"]),
+                      ("  of that, same atom other l", lambda r: r["crossl"]),
+                      ("  of that, another atom", lambda r: r["otheratom"]),
+                      ("in-block, other shell", lambda r: r["inblock"] - r["diag"])):
         groups = {}
         for r in all_rows:
             groups.setdefault(r["cls"], []).append((2 * r["l"] + 1) * r["occ"] * val(r))
-        print("  %-21s %s   total %.5f" % (
+        print("  %-29s %s   total %.5f" % (
             what, "  ".join("%s: %.5f" % (k, sum(v)) for k, v in sorted(groups.items())),
             sum(sum(v) for v in groups.values())))
+
+
+def final_table(mol):
+    """(d(Val), worst |dq| per atom) from the stamped reference pair - the FINAL table this is
+    supposed to explain.  Read here rather than copied from nao_class_leak's printout, so the
+    bridge cannot quietly compare against a number that has since changed."""
+    if load_nbo is None:
+        return None
+    d = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", mol)
+    paths = [os.path.join(d, "%s.%s.nbo.json" % (mol, side)) for side in ("gennbo", "native")]
+    if not all(os.path.exists(p) for p in paths):
+        return None
+    g, n = (load_nbo(p)["nao"] for p in paths)
+    if len(g) != len(n):
+        return None
+
+    def by_atom(table):
+        out = {}
+        for e in table:
+            cls = e["type"] if e["type"] in ("Cor", "Val", "Ryd") else "Ryd"
+            out.setdefault(e["atom"], {"Cor": 0.0, "Val": 0.0, "Ryd": 0.0})[cls] += e["occupancy"]
+        return out
+
+    gc, nc = by_atom(g), by_atom(n)
+    dval = sum(nc[a]["Val"] - gc[a]["Val"] for a in gc)
+    dq = max(abs(sum(nc[a][c] - gc[a][c] for c in gc[a])) for a in gc)
+    return dval, dq
+
+
+def bridge(rows_by_mol, final=None):
+    """Does the intermediate account for the final table, molecule by molecule?
+
+    The final tables say native's valence set is short by d(Val) and its Rydberg set long by the
+    same amount, INTRA-ATOMICALLY - benzene 0.31611 e, ethane 0.12989 e, and pf5/so2/sf6 the other
+    way by ~0.02 e.  The intermediate says native's valence NAOs are the wrong shape.  Those are
+    only the same finding if the mis-shape is large enough to produce the mis-population, so it is
+    put on the same scale and the same molecules:
+
+        intra   sum over VALENCE shells of (2l+1)*occ*(weight on the same atom but a different
+                shell or a different l) - the part that can move population between classes of one
+                atom without moving charge off it
+        inter   the same for weight on ANOTHER atom - which cannot do that, and would show up as a
+                charge error instead
+
+    intra is an ESTIMATE of an upper bound, not an upper bound: the population a mis-shaped shell
+    actually moves is w*(occ_a - occ_b) to leading order, and occ_b >= 0, so w*occ_a is on the high
+    side - but M is m-averaged, so the weight assumes a shell's m components share its occupancy,
+    and both classes' rows contribute to d(Val), which is why the Rydberg rows' intra weight is
+    printed alongside and the ratio is taken on the sum.  A ratio near 1 on a molecule whose d(Val)
+    is tenths of an electron is therefore a real quantitative bridge; a ratio of 0.3-0.8 on one
+    whose d(Val) is 0.001-0.02 e is at the estimate's own resolution and says only that the two
+    numbers are the same size.  Nothing here can check the SIGN: a mixing weight is positive, and
+    pf5/so2/sf6 have native's valence set too LARGE while the other five have it too small.
+    """
+    print("\nbridge to the final table (electrons):")
+    print("  %-10s %10s %10s %10s %7s %10s %10s" % (
+        "molecule", "d(Val)", "intra Val", "intra Ryd", "ratio", "inter Val", "worst dq"))
+    short, inter_tot, dq_tot = [], 0.0, 0.0
+    for mol, rows in sorted(rows_by_mol.items()):
+        wt = lambda r: (2 * r["l"] + 1) * r["occ"]
+        def intra_of(cls):
+            return sum(wt(r) * (r["inblock"] - r["diag"] + r["crossl"])
+                       for r in rows if r["cls"] == cls)
+        iv, ir = intra_of("Val"), intra_of("Ryd")
+        inter = sum(wt(r) * r["otheratom"] for r in rows if r["cls"] == "Val")
+        inter_tot += inter
+        ft = (final or final_table)(mol)
+        if ft is None:
+            print("  %-10s %10s %10.5f %10.5f %7s %10.5f %10s" % (
+                mol, "n/a", iv, ir, "n/a", inter, "n/a"))
+            continue
+        dval, dq = ft
+        dq_tot = max(dq_tot, dq)
+        ratio = (iv + ir) / abs(dval) if dval else float("inf")
+        print("  %-10s %+10.5f %10.5f %10.5f %7.2f %10.5f %10.5f" % (
+            mol, dval, iv, ir, ratio, inter, dq))
+        if ratio < 1.0:
+            short.append((mol, ratio, abs(dval)))
+    if short:
+        print("  -> the intra-atomic mis-shape is SMALLER than the final class error on %s" %
+              ", ".join("%s (%.2f, d(Val) %.5f e)" % kv for kv in short))
+        big = [t for t in short if t[2] > 0.05]
+        print("     %s" % ("all of those have |d(Val)| under 0.05 e, which is the estimate's own "
+                           "resolution - not a refutation on its own" if not big else
+                           "and %s has |d(Val)| over 0.05 e, which the estimate cannot explain away"
+                           % ", ".join(t[0] for t in big)))
+    else:
+        print("  -> every molecule's final class error fits inside its intermediate mis-shape")
+    #The inter-atomic arm has nowhere to go in the class tables, so it must show up as charge - and
+    #it does not, by more than an order of magnitude.  That is the same cancellation that made the
+    #NPA charge agreement meaningless, measured one level further up.
+    print("  inter-atomic valence weight totals %.5f e, worst atomic charge deviation %.5f e "
+          "(%.0fx cancellation)" % (inter_tot, dq_tot, inter_tot / dq_tot if dq_tot else 0.0))
 
 
 def demo():
@@ -327,7 +443,7 @@ def demo():
     # mixing: identical sets give the identity, and a swapped pair shows up off-diagonal
     Cn = np.eye(4)
     Cg = np.eye(4)[:, [1, 0, 2, 3]]
-    M, tot = mixing(Cn, Cg, np.eye(4), [[0], [1], [2], [3]], [[0], [1], [2], [3]])
+    M, tot, _ = mixing(Cn, Cg, np.eye(4), [[0], [1], [2], [3]], [[0], [1], [2], [3]])
     assert abs(M[0, 1] - 1.0) < 1e-12 and abs(M[0, 0]) < 1e-12, M
     assert np.abs(tot - 1.0).max() < 1e-12, tot
     # Two identical p shells stored m-major on the native side and component-major on gennbo's must
@@ -337,15 +453,16 @@ def demo():
     nsh = [[0, 1, 2], [3, 4, 5]]                    # native: shell 1 (x, y, z), then shell 2
     gsh = [[0, 2, 4], [1, 3, 5]]                    # gennbo: x(1, 2), y(1, 2), z(1, 2)
     Cg6 = I6[:, [0, 3, 1, 4, 2, 5]]                 # the same six functions in gennbo's print order
-    M6, tot6 = mixing(I6, Cg6, I6, nsh, gsh)
+    M6, tot6, _ = mixing(I6, Cg6, I6, nsh, gsh)
     assert np.abs(M6 - np.eye(2)).max() < 1e-12, M6
     assert np.abs(tot6 - 1.0).max() < 1e-12, tot6
     os.remove(path)
     # The pairing diagnostic has to call a systematic off-by-one what it is: completeness cannot,
     # because a row sum is the same whichever column carried the weight.
-    def row(rank, best, total=1.0, diag=0.9):
+    def row(rank, best, total=1.0, diag=0.9, crossl=0.0, otheratom=0.0):
         return dict(mol="m", atom=1, l=0, rank=rank, cls="Val", gcls="Val", gshell="2s", occ=1.0,
-                    gocc=1.0, diag=diag, inblock=1.0, best=best, bestval=0.9, gap=0.5, total=total)
+                    gocc=1.0, diag=diag, inblock=1.0, best=best, bestval=0.9, gap=0.5, total=total,
+                    crossl=crossl, otheratom=otheratom)
     out = io.StringIO()
     with contextlib.redirect_stdout(out):
         zero_check({"shifted": [row(a, a + 1) for a in range(4)]})
@@ -359,6 +476,27 @@ def demo():
     with contextlib.redirect_stdout(out):
         zero_check({"short": [row(a, a, total=0.93) for a in range(4)]})
     assert "MISSING WEIGHT" in out.getvalue(), out.getvalue()
+    # The bridge must call a mis-shape too small for the final table a refutation, and it must not
+    # count weight on another atom towards an intra-atomic class error.  One shell, occ 1, l = 0,
+    # diag 0.9 in-block 1.0 -> intra = 0.1 e; a final d(Val) of 0.5 e cannot come out of that.
+    out = io.StringIO()
+    with contextlib.redirect_stdout(out):
+        bridge({"tight": [row(0, 0)]}, final=lambda m: (-0.5, 0.01))
+    got = out.getvalue()
+    assert "SMALLER than the final class error on tight" in got, got
+    assert "cannot explain away" in got, got  # |d(Val)| = 0.5 e, well above the resolution
+    out = io.StringIO()
+    with contextlib.redirect_stdout(out):
+        bridge({"loose": [row(0, 0, crossl=0.4)]}, final=lambda m: (-0.2, 0.01))
+    assert "SMALLER" not in out.getvalue(), out.getvalue()
+    out = io.StringIO()
+    with contextlib.redirect_stdout(out):
+        bridge({"offatom": [row(0, 0, diag=1.0, otheratom=0.4)]}, final=lambda m: (-0.2, 0.01))
+    got = out.getvalue()
+    #Weight on ANOTHER atom must not be credited to an intra-atomic class error, and it must be
+    #visible in the inter-atomic total instead: 0.4 e of it against a 0.01 e charge deviation.
+    assert "SMALLER than the final class error on offatom" in got, got
+    assert "totals 0.40000 e" in got and "40x cancellation" in got, got
     print("demo ok")
 
 
@@ -448,6 +586,8 @@ def zero_check(rows_by_mol):
 def main(argv):
     verbose = "--full" in argv
     root = [a for a in argv[1:] if not a.startswith("--")][0]
+    print("aonao_compare on %s, 1 thread (numpy on matrices of a few hundred), root %s" % (
+        socket.gethostname(), root))
     all_rows, rows_by_mol, void, missing = [], {}, [], []
     for mol in sorted(os.listdir(root)):
         d = os.path.join(root, mol)
@@ -476,6 +616,7 @@ def main(argv):
     if all_rows:
         by_group(all_rows)
         zero_check(rows_by_mol)
+        bridge(rows_by_mol)
     return 0
 
 

@@ -29,7 +29,7 @@
 # (6.2x gennbo), benzene the largest molecule with a bad one (3.7x), pf5/so2/sf6 the only three
 # that are already right, water/ammonia cheap controls, lif small enough to read by eye.
 set -u
-OUT=/work/akkleemiss/florian/aonao_cmp
+OUT=${OUT:-/work/akkleemiss/florian/aonao_cmp}
 SRC=/work/akkleemiss/florian/nbo_ref_v2
 V2=/work/akkleemiss/florian/nos_nboref/tests/nbo_reference_v2
 BIN=/work/akkleemiss/florian/nos_nboref/build/release-linux/bin/NoSpherA2
@@ -56,9 +56,11 @@ for MOL in $MOLS; do
     # before the NAO stage, so the abort has nothing to do with NRT even though NRTSYM=OFF is what
     # suppresses it.  It is kept out of the other seven's keylist deliberately: their numbers were
     # produced with AONAO=W alone, and a keylist change would make them a different run.
-    EXTRA_KEYS=${EXTRA_KEYS:-}
-    [ "$MOL" = sf6 ] && EXTRA_KEYS="NRTSYM=OFF"
-    python3 - "$W/$MOL.47" "$EXTRA_KEYS" <<'PY' || exit 1
+    # KEYS, not EXTRA_KEYS: writing back into the env var would leak sf6's keyword into every
+    # molecule after it in MOLS.
+    KEYS=${EXTRA_KEYS:-}
+    [ "$MOL" = sf6 ] && KEYS="NRTSYM=OFF"
+    python3 - "$W/$MOL.47" "$KEYS" <<'PY' || exit 1
 import sys
 p = sys.argv[1]
 extra = (" " + sys.argv[2].strip()) if len(sys.argv) > 2 and sys.argv[2].strip() else ""
