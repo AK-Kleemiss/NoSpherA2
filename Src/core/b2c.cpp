@@ -1303,27 +1303,20 @@ double core_shell_radius(const int Z)
 	return 1.8;
 }
 
-int unify_core_basins(cubei &basin_cube, std::vector<d4> &maxima, const std::vector<atom> &atoms, ivec *basin_map)
+//Both merges below decide only WHICH maxima belong together, and then do the same three things with
+//the answer: keep the highest of each group, renumber the cube, and report where each old basin went.
+//keeper[b] is the group's representative - its lowest member - or -1 for a maximum that stands alone.
+static int collapse_maxima_groups(cubei &basin_cube, std::vector<d4> &maxima, const ivec &keeper, ivec *basin_map)
 {
 	const int nb = static_cast<int>(maxima.size());
-	ivec owner(nb, -1);
-	for (int b = 0; b < nb; b++)
-		for (size_t a = 0; a < atoms.size(); a++) {
-			const d3 ap = atoms[a].get_pos();
-			const double r = core_shell_radius(atoms[a].get_charge());
-			if (std::pow(maxima[b][0] - ap[0], 2) + std::pow(maxima[b][1] - ap[1], 2) + std::pow(maxima[b][2] - ap[2], 2) < r * r) { owner[b] = static_cast<int>(a); break; }
-		}
-	//The atom's core keeps the highest of its maxima; the merged ones are dropped
 	ivec target(nb + 1);
 	for (int b = 0; b <= nb; b++) target[b] = b;
 	for (int b = 0; b < nb; b++) {
-		if (owner[b] < 0) continue;
-		for (int c = 0; c < b; c++)
-			if (owner[c] == owner[b]) { target[b + 1] = target[c + 1]; break; }
-		if (target[b + 1] == b + 1) continue;
+		if (keeper[b] < 0 || keeper[b] == b) continue;
+		target[b + 1] = target[keeper[b] + 1];
 		const int keep = target[b + 1] - 1;
 		//Symmetry-equivalent maxima tie up to rounding; the tie goes to the lexicographically
-		//larger position so the surviving core maximum is the same on every platform
+		//larger position so the surviving maximum is the same on every platform
 		const bool tie = std::abs(maxima[b][3] - maxima[keep][3]) < 1e-8 * std::abs(maxima[keep][3]);
 		if (tie ? maxima[b] > maxima[keep] : maxima[b][3] > maxima[keep][3]) std::swap(maxima[b], maxima[keep]);
 	}
@@ -1337,8 +1330,8 @@ int unify_core_basins(cubei &basin_cube, std::vector<d4> &maxima, const std::vec
 				const int b = basin_cube.get_value(x, y, z);
 				if (b > 0) basin_cube.set_value(x, y, z, renumber[target[b]]);
 			}
-	//The swap above only ever exchanges two maxima of the same atom's core, and every member of
-	//that group shares one target, so renumber[target[b]] is the same number before and after it
+	//The swap above only ever exchanges two maxima of one group, and every member of that group
+	//shares one target, so renumber[target[b]] is the same number before and after it
 	if (basin_map) {
 		basin_map->assign(nb + 1, 0);
 		for (int b = 1; b <= nb; b++) (*basin_map)[b] = renumber[target[b]];
@@ -1346,6 +1339,67 @@ int unify_core_basins(cubei &basin_cube, std::vector<d4> &maxima, const std::vec
 	const int merged = nb - static_cast<int>(kept.size());
 	maxima.swap(kept);
 	return merged;
+}
+
+int unify_core_basins(cubei &basin_cube, std::vector<d4> &maxima, const std::vector<atom> &atoms, ivec *basin_map)
+{
+	const int nb = static_cast<int>(maxima.size());
+	ivec owner(nb, -1);
+	for (int b = 0; b < nb; b++)
+		for (size_t a = 0; a < atoms.size(); a++) {
+			const d3 ap = atoms[a].get_pos();
+			const double r = core_shell_radius(atoms[a].get_charge());
+			if (std::pow(maxima[b][0] - ap[0], 2) + std::pow(maxima[b][1] - ap[1], 2) + std::pow(maxima[b][2] - ap[2], 2) < r * r) { owner[b] = static_cast<int>(a); break; }
+		}
+	//The atom's core keeps the highest of its maxima; the merged ones are dropped
+	ivec keeper(nb, -1);
+	for (int b = 0; b < nb; b++) {
+		if (owner[b] < 0) continue;
+		for (int c = 0; c < b; c++)
+			if (owner[c] == owner[b]) { keeper[b] = (keeper[c] < 0 ? c : keeper[c]); break; }
+	}
+	return collapse_maxima_groups(basin_cube, maxima, keeper, basin_map);
+}
+
+//A spherically symmetric ELI-D shell sampled on a cubic grid is handed out one basin per voxel on the
+//sphere. Co2, a two-atom molecule, kept 845 basins that way: 824 under 0.01 e holding 0.6461 e in
+//27237 bohr^3, and the survivors in exactly degenerate families at one radius from one atom. It is the
+//same shape of defect unify_core_basins removes for the spheres of maxima an ECP leaves behind, but
+//that one only looks inside core_shell_radius(Z) and this shell sits at 5.35 bohr. It gets WORSE on
+//refinement, not better: NH3Li goes 10 / 11 / 25 basins at 0.1 / 0.05 / 0.025 A.
+//
+//The persistence merge cannot separate the shell from real chemistry. Measured over 5e-3 .. 2e-1 (job
+//592171): the smallest threshold that dents Co2 at all - 3e-2, 845 -> 687 - already costs OH one of
+//its two REAL oxygen lone pairs, and 2e-1, the first that collapses Co2 to 4 basins, leaves OH with
+//two basins and no lone pairs at all. Relative height above a grid saddle cannot do it, because the
+//saddles inside a flat shell are as deep as the one between two genuine lone pairs.
+//
+//A length can. Co2's neighbouring shell maxima are 0.38 bohr apart; ZP2's duplicated F1 lone pair,
+//two basins holding 1.4276 and 1.2907 e where one lone pair holds ~2.7, is 0.84 bohr; OH's two real
+//lone pairs are 1.89 bohr apart and every pair of distinct chemical maxima in ZP2 is over 2.2. So
+//group by single linkage over pairs that are both close and near-degenerate in value, and nothing
+//else - no persistence, no atom lookup, no field evaluation.
+//O(n^2) over the maxima: 885 of them is 391k distance tests, once, against a basin integration.
+int unify_shell_basins(cubei &basin_cube, std::vector<d4> &maxima, ivec *basin_map, double max_dist, double rel_tol)
+{
+	const int nb = static_cast<int>(maxima.size());
+	if (nb < 2 || max_dist <= 0.0) return 0;
+	const double d2 = max_dist * max_dist;
+	ivec root(nb);
+	for (int b = 0; b < nb; b++) root[b] = b;
+	auto find = [&root](int b) { while (root[b] != b) b = root[b] = root[root[b]]; return b; };
+	for (int b = 1; b < nb; b++)
+		for (int c = 0; c < b; c++) {
+			if (std::pow(maxima[b][0] - maxima[c][0], 2) + std::pow(maxima[b][1] - maxima[c][1], 2) + std::pow(maxima[b][2] - maxima[c][2], 2) > d2) continue;
+			const double hi = std::max(std::abs(maxima[b][3]), std::abs(maxima[c][3]));
+			if (hi > 0.0 && std::abs(maxima[b][3] - maxima[c][3]) > rel_tol * hi) continue;
+			const int rb = find(b), rc = find(c);
+			//union by lower index, so a group's root is always its lowest member
+			if (rb != rc) root[std::max(rb, rc)] = std::min(rb, rc);
+		}
+	ivec keeper(nb);
+	for (int b = 0; b < nb; b++) { const int r = find(b); keeper[b] = (r == b ? -1 : r); }
+	return collapse_maxima_groups(basin_cube, maxima, keeper, basin_map);
 }
 
 //Newton-Raphson onto the nearest critical point of the field, then the negative-definite test.

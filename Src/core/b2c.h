@@ -85,6 +85,11 @@ double core_shell_radius(const int Z);
 //the walk has to be able to reach every core shell's own maximum, while the report wants the
 //one merged core basin per atom.
 int unify_core_basins(cubei& basin_cube, std::vector<d4>& maxima, const std::vector<atom>& atoms, ivec* basin_map = nullptr);
+
+//Fold a shattered shell - maxima that are close together AND near-degenerate in value - into one basin
+//each. max_dist is a physical length in bohr, deliberately not a voxel count: the defect gets worse as
+//the grid is refined, so a grid-derived cutoff would chase it. See the comment on the definition.
+int unify_shell_basins(cubei& basin_cube, std::vector<d4>& maxima, ivec* basin_map = nullptr, double max_dist = 1.2, double rel_tol = 0.05);
 //Atomic overlap matrices S^b_ij = int_b phi_i phi_j, taken on the same quadrature points and
 //with the same basin assignment as the populations, so a basin's trace is its population by
 //construction. One packed lower triangle per basin over the occupied MOs

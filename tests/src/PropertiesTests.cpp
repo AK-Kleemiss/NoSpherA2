@@ -1277,6 +1277,83 @@ TEST(PropertiesBasinTests, UnifyCoreBasinsMergesMaximaInsideTheCoreRadius)
 	EXPECT_EQ(two.get_value(1, 0, 0), 2);
 }
 
+// Outside the cores the same sphere of maxima appears with nothing to fold it: a spherically symmetric
+// ELI-D shell sampled on a cubic grid is handed out one basin per voxel, and Co2 - two atoms - kept 845
+// basins that way, 824 of them under 0.01 e. The persistence merge cannot fix it: swept from 5e-3 to
+// 2e-1, the first threshold that dented Co2 at all (3e-2, 845 -> 687) already took one of OH's two REAL
+// oxygen lone pairs, because both a shell's grid saddles and the saddle between two genuine lone pairs
+// are shallow. Only a length separates them, and these are the measured geometries.
+TEST(PropertiesBasinTests, UnifyShellBasinsFoldsAShatteredShellAndKeepsTwoRealLonePairs)
+{
+	std::vector<d4> maxima;
+	// Co2's shell: one sphere at 5.35 bohr with neighbours 0.378 bohr apart (two voxels at 0.1 A) and
+	// values alternating 2.2671 / 2.3067 as measured - 1.7 % apart, so no value test keeps them together
+	const int n_shell = 89;  // 2 pi 5.35 / 0.378
+	for (int i = 0; i < n_shell; i++) {
+		const double a = constants::TWO_PI * i / n_shell;
+		maxima.push_back(d4{ 5.35 * std::cos(a), 5.35 * std::sin(a), 0.0, i % 2 ? 2.3067 : 2.2671 });
+	}
+	// OH's two REAL oxygen lone pairs: 1.890 bohr apart, degenerate to 0.2 %
+	maxima.push_back(d4{ 2.268, -0.945, -0.378, 1.6704 });
+	maxima.push_back(d4{ 2.268, 0.945, -0.378, 1.6671 });
+	// ZP2's duplicated F1 lone pair: 0.84 bohr apart, degenerate to 0.2 %, holding 1.4276 and 1.2907 e
+	// where one lone pair holds about 2.7. The prediction in the other direction - these MUST merge.
+	maxima.push_back(d4{ 0.0, 0.0, 12.0, 1.6460 });
+	maxima.push_back(d4{ 0.0, 0.84, 12.0, 1.6427 });
+
+	const std::vector<d4> before = maxima;
+	const int nb = static_cast<int>(maxima.size());
+	cubei basins({ nb, 1, 1 }, 0, true);
+	for (int b = 0; b < nb; b++)
+		basins.set_value(b, 0, 0, b + 1);
+	ivec map;
+	const int merged = unify_shell_basins(basins, maxima, &map);
+	EXPECT_EQ(merged, n_shell);  // 88 of the shell, plus one of ZP2's pair
+	ASSERT_EQ(maxima.size(), 4u);
+
+	// the shell keeps its highest maximum, and it is still on the sphere
+	EXPECT_NEAR(maxima[0][3], 2.3067, 0.0);
+	EXPECT_NEAR(std::sqrt(maxima[0][0] * maxima[0][0] + maxima[0][1] * maxima[0][1]), 5.35, 1e-9);
+	// both oxygen lone pairs survive, separately
+	EXPECT_NEAR(maxima[1][3], 1.6704, 0.0);
+	EXPECT_NEAR(maxima[2][3], 1.6671, 0.0);
+	EXPECT_NEAR(maxima[1][1], -0.945, 0.0);
+	EXPECT_NEAR(maxima[2][1], 0.945, 0.0);
+	// ZP2's duplicate is one basin now, keeping the higher maximum
+	EXPECT_NEAR(maxima[3][3], 1.6460, 0.0);
+
+	// the cube and the basin map agree: the whole shell is basin 1, the lone pairs are 2 and 3
+	ASSERT_EQ(map.size(), static_cast<size_t>(nb) + 1);
+	for (int b = 0; b < n_shell; b++) {
+		EXPECT_EQ(basins.get_value(b, 0, 0), 1) << "shell voxel " << b;
+		EXPECT_EQ(map[b + 1], 1) << "shell maximum " << b;
+	}
+	EXPECT_EQ(map[n_shell + 1], 2);
+	EXPECT_EQ(map[n_shell + 2], 3);
+	EXPECT_EQ(map[n_shell + 3], 4);
+	EXPECT_EQ(map[n_shell + 4], 4);
+	EXPECT_EQ(basins.get_value(n_shell + 3, 0, 0), 4);
+	EXPECT_EQ(basins.max_value(), 4);
+
+	// a distance of zero is the off switch and must change nothing at all
+	std::vector<d4> untouched = before;
+	cubei same({ nb, 1, 1 }, 0, true);
+	for (int b = 0; b < nb; b++)
+		same.set_value(b, 0, 0, b + 1);
+	EXPECT_EQ(unify_shell_basins(same, untouched, nullptr, 0.0, 0.05), 0);
+	EXPECT_EQ(untouched.size(), before.size());
+	EXPECT_EQ(same.max_value(), nb);
+
+	// and the margin: the default 1.2 bohr sits between ZP2's 0.84 and OH's 1.890, so a cutoff past
+	// 1.890 eats a real lone pair. That is the failure this test exists to catch.
+	std::vector<d4> too_far = before;
+	cubei wide({ nb, 1, 1 }, 0, true);
+	for (int b = 0; b < nb; b++)
+		wide.set_value(b, 0, 0, b + 1);
+	EXPECT_EQ(unify_shell_basins(wide, too_far, nullptr, 2.0, 0.05), n_shell + 1);
+	ASSERT_EQ(too_far.size(), 3u);
+}
+
 // the legacy interactive b2c() with its selection read from a redirected cin writes the log and
 // the selected-basins cube next to the input cube
 TEST(PropertiesBasinTests, LegacyB2cWritesLogAndSelectedBasinCube)

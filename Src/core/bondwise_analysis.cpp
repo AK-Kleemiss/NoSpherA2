@@ -3074,6 +3074,19 @@ void ELI_analysis(const WFN &wavy, options &opt) {
 	//basin per atom is what a bonding analysis wants, and what DGrid's ELIDcore gives
 	const int core_merged = unify_core_basins(eli_results.first, eli_results.second, atoms, stream_eli ? &eli_core_map : nullptr);
 	if (core_merged) std::cout << "Unified " << core_merged << " core-shell basins into their atoms' cores, " << eli_results.second.size() << " ELI-D basins remain." << std::endl;
+	//And outside the cores, the same sphere of maxima with nothing to fold it: see unify_shell_basins.
+	//NOS_ELI_SHELL_DIST / _TOL exist to choose the two numbers by measurement; 0 for the distance
+	//turns the merge off, which is the old behaviour.
+	double shell_dist = 1.2, shell_tol = 0.05;
+	if (const char *e = std::getenv("NOS_ELI_SHELL_DIST")) { const double v = std::atof(e); if (v >= 0.0 && v < 10.0) shell_dist = v; }
+	if (const char *e = std::getenv("NOS_ELI_SHELL_TOL")) { const double v = std::atof(e); if (v >= 0.0 && v < 1.0) shell_tol = v; }
+	ivec eli_shell_map;
+	const int shell_merged = unify_shell_basins(eli_results.first, eli_results.second, stream_eli ? &eli_shell_map : nullptr, shell_dist, shell_tol);
+	if (shell_merged) std::cout << "Unified " << shell_merged << " shattered shell basins, " << eli_results.second.size() << " ELI-D basins remain." << std::endl;
+	//The integrator walks to one of eli_maxima_all and then reads eli_core_map, so the second merge
+	//has to be composed into that map rather than replacing it
+	if (!eli_shell_map.empty())
+		for (size_t b = 1; b < eli_core_map.size(); b++) eli_core_map[b] = eli_shell_map[eli_core_map[b]];
 	svec eli_labels = assign_labels_to_basins(eli_results.second, atoms, opt.debug, 1);
 	report("QTAIM Analysis", qtaim_results, labels, false, stream_qtaim);
 	report("ELI-D Analysis", eli_results, eli_labels, true, stream_eli);
