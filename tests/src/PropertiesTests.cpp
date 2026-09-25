@@ -1151,7 +1151,7 @@ TEST(PropertiesBasinTests, GradientTrajectoriesWithoutSeedsCreateMaximaAtNuclei)
 
 // an assignment radius keeps only voxels near an atom (basin 0 elsewhere) and a value floor
 // removes the faint tail; a one-voxel bump in the tail is a basin of its own with the merge
-// switched off and folds into the nuclear basin under the default persistence
+// switched off and folds into the nuclear basin at a persistence of 5e-3
 TEST(PropertiesBasinTests, AssignmentRadiusFloorAndPersistenceMerge)
 {
 	const H2Model m(1.0, 1.0);
@@ -1203,6 +1203,16 @@ TEST(PropertiesBasinTests, AssignmentRadiusFloorAndPersistenceMerge)
 	EXPECT_EQ(merged.second.size(), 2u);
 	EXPECT_EQ(merged.first.max_value(), 2);
 	EXPECT_EQ(merged.first.get_value(16, 8, 8), merged.first.get_value(12, 8, 8));
+	//This bump's persistence is (1.001 - 1) / 1.001 = 9.99e-4 of its height, which is the scale a
+	//shard of a flat valence shell sits at - and 5e-3 is wide enough to eat it. Inside a shell every
+	//saddle is about as deep as the one down to the core, so single linkage then chains the shards
+	//INTO the core basin and the core reports whole electrons too many (Cl2's chlorine 14.8951 e
+	//against the 10 its closed shells hold). The ELI-D call site therefore passes 3e-4 now, and the
+	//length-based unify_shell_basins folds the shell instead; this asserts the boundary the constant
+	//has to stay on the right side of, because nothing else in the suite would notice it moving back.
+	std::pair<cubei, std::vector<d4>> shipped = topological_cube_analysis(&bumped, atoms, false, false, 0.0, 0.0, -1.0, 3e-4);
+	EXPECT_EQ(shipped.second.size(), 3u) << "at 3e-4 a bump 9.99e-4 above its saddle survives";
+	EXPECT_NE(shipped.first.get_value(16, 8, 8), shipped.first.get_value(12, 8, 8));
 }
 
 // ELI labels: the proton's basin by its nucleus, a maximum inside the core shell of a heavier
@@ -1238,7 +1248,12 @@ TEST(PropertiesBasinTests, UnifyCoreBasinsMergesMaximaInsideTheCoreRadius)
 	EXPECT_EQ(core_shell_radius(2), 0.0);
 	EXPECT_EQ(core_shell_radius(6), 0.25);
 	EXPECT_EQ(core_shell_radius(10), 0.25);
-	EXPECT_EQ(core_shell_radius(17), 0.55);
+	//Na-Ar shares the 1.0 bohr band with K-Kr: 0.55 was measured to sit INSIDE the L shell at the
+	//electropositive end of the row (Na's L-shell ELI-D maximum is 0.740 bohr out, Al's 0.582), so
+	//about 7 e of a 10 e core stayed unfolded. The gap between the furthest maximum that must fold
+	//in (0.740) and the nearest that must not (1.472) is 0.732 bohr wide.
+	EXPECT_EQ(core_shell_radius(11), 1.0);
+	EXPECT_EQ(core_shell_radius(17), 1.0);
 	EXPECT_EQ(core_shell_radius(26), 1.0);
 	EXPECT_EQ(core_shell_radius(53), 1.4);
 	EXPECT_EQ(core_shell_radius(82), 1.8);

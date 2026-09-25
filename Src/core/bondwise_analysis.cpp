@@ -2734,6 +2734,18 @@ void ELI_analysis(const WFN &wavy, options &opt) {
 	properties_options prop_opt = opt.properties;
 	WFN l_w = wavy;
 	l_w.delete_unoccupied_MOs();
+	//ELI-D needs g = rho tau - |grad rho|^2 / 4 > 0 to exist, and g vanishes identically when a
+	//single orbital carries the whole density. The field is then 0/0 and every voxel is a maximum in
+	//round-off: H2 comes out with 11214 basins holding 0.5777 of its 2 electrons, maxima from 1.6e5
+	//to 4.3e6 against H2O's 1.77 to 7.08, and 1.4222 e outside every basin - the worst residual in
+	//the 211-molecule set, and not a defect of the integrator. DGrid shatters the same field the same
+	//way (403 basins, maxima to 5.4e5), so this is the definition and not an implementation. Say so
+	//rather than letting a chemist read a table of ten thousand basins as a result.
+	if (l_w.get_nmo() < 2)
+		std::cout << "WARNING: this wavefunction has a single occupied orbital, so ELI-D's pair"
+			" density g = rho*tau - |grad rho|^2/4 is identically zero and the field is undefined."
+			" The basins below are round-off structure, not chemistry - expect thousands of them and"
+			" do not quote their populations. The QTAIM basins are unaffected." << std::endl;
 	readxyzMinMax_fromWFN(wavy, prop_opt);
 
 	cube rho(prop_opt.NbSteps, l_w.get_ncen(), true);
@@ -3053,7 +3065,25 @@ void ELI_analysis(const WFN &wavy, options &opt) {
 			<< " A grid. Coarser than 0.05 A this basin set is not reliable: core basins have been"
 			" seen to shift by whole electrons and to be retyped as lone pairs. The QTAIM basins"
 			" are unaffected." << std::endl;
-	std::pair<cubei, std::vector<d4>> eli_results = topological_cube_analysis(&eli_cube, atoms, opt.debug, false, 0.0, 1e-10, radius);
+	//The persistence merge absorbs a low-persistence basin into its highest neighbour across their
+	//highest shared saddle. Inside a flat valence shell every saddle is about as deep as the one
+	//down to the core, so at the 5e-3 default the single-linkage chain walks the shell shards INTO
+	//the core basin and the core reads several electrons too many: Cl2's chlorine core 14.8951 e
+	//against the 10 its closed shells hold and DGrid's 10.0438, ClF's fluorine 6.8359 against 2,
+	//F2 6.6864, CF4 6.5741, HCl 14.6529, S2 13.4436, and CO2's oxygens 4.8859 - 178 of the corpus's
+	//1006 scoreable cores, every one of them an atom with a compact near-degenerate lone-pair shell.
+	//3e-4 leaves the merge to genuine grid noise and hands the shattered shell to the LENGTH-based
+	//unify_shell_basins, which is what that was built for and which cannot chain into a core because
+	//it only merges maxima within 1.2 bohr of each other. Measured over the four values (job 594631,
+	//one binary, one grid, res 0.05): the eight cores above land on their integers (10.0567, 2.2917,
+	//2.2891, 2.3025, 10.0579, 10.0815, 10.0753, 2.1307), the final basin COUNT is unchanged on every
+	//control (H2O 5, CO2 51, OH 5 at all four values - the noise merge's work is simply done by the
+	//shell merge instead: CO2 goes 44 noise / 0 shattered to 22 / 22), and OH keeps both oxygen lone
+	//pairs. Below 3e-4 nothing further is gained. NaCl, HOCl and AlCl3 stay wrong, for a different
+	//reason: their Na and Al cores come out too SMALL (2.92 and 3.04 against 10), so an electropositive
+	//atom's own outer core shell is not being folded in - core_shell_radius(11)=0.55 bohr does not
+	//reach Na's 2p shell. That is a separate defect and it is not fixed here.
+	std::pair<cubei, std::vector<d4>> eli_results = topological_cube_analysis(&eli_cube, atoms, opt.debug, false, 0.0, 1e-10, radius, 3e-4);
 	T.lap("ELI-D cube topology");
 	//The cube keeps the topology: there is no critical-point search for this field to take
 	//attractors from, and no analytic Hessian to test a maximum with - computeELIGrad is all there

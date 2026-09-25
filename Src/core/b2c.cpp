@@ -1297,7 +1297,16 @@ double core_shell_radius(const int Z)
 {
 	if (Z <= 2) return 0.0;
 	if (Z <= 10) return 0.25;
-	if (Z <= 18) return 0.55;
+	//Na-Ar was 0.55, which is inside the L shell at the electropositive end of the row: sodium's
+	//L-shell ELI-D maximum sits 0.740 bohr from the nucleus and aluminium's 0.582, so 7.1018 and
+	//6.9564 electrons stayed outside a core the shell structure says holds 10, and Na2, NaCl, AlCl3
+	//and AlF3 reported cores of 2.91 to 3.20 e - the worst core deviations in the corpus, and too
+	//SMALL where every other offender is too large. Both ends of the gap were measured over the 1006
+	//scoreable cores of the 211-molecule set (shellgap.py), not on the cases that motivated it: the
+	//furthest maximum that MUST fold in is that 0.740, the nearest that must NOT is 1.472 (ClF3's
+	//chlorine, 0.25 e), so the gap is 0.732 bohr wide and 1.0 sits inside it with 0.26 below and 0.47
+	//above. Li-Ne needs no change: no period-2 atom in the corpus has an unfolded shell at all and
+	//its nearest non-core maximum is 0.918 bohr out.
 	if (Z <= 36) return 1.0;
 	if (Z <= 54) return 1.4;
 	return 1.8;
