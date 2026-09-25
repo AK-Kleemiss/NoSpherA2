@@ -1361,6 +1361,22 @@ void readxyzMinMax_fromWFN(
     opts.NbSteps[0] = (int)ceil(constants::bohr2ang(opts.MinMax[3] - opts.MinMax[0]) / opts.resolution);
     opts.NbSteps[1] = (int)ceil(constants::bohr2ang(opts.MinMax[4] - opts.MinMax[1]) / opts.resolution);
     opts.NbSteps[2] = (int)ceil(constants::bohr2ang(opts.MinMax[5] - opts.MinMax[2]) / opts.resolution);
+
+    //An EVEN number of points, because an odd one cannot sample the molecule's own symmetry planes.
+    //Every caller lays the NbSteps points out from MinMax[i] with a step of (MinMax[3+i]-MinMax[i])/NbSteps[i],
+    //so the centre of the box - which for a box built from min/max plus one radius is the molecule's own
+    //symmetry centre - falls at index NbSteps/2: on a grid plane when NbSteps is even, exactly halfway
+    //between two planes when it is odd. In the odd case no grid plane contains a mirror plane or a rotation
+    //axis of the molecule, the four voxels around an axis are degenerate, and no single-voxel answer can be
+    //symmetric. Measured on octahedral UH6 (radius 2.5 A), whose six ELI-D hydrogen attractors must map onto
+    //themselves under all 48 operations of its point group: at 0.15 A the count came out 61 and 1 of 48
+    //operations held, the miss being 0.997 of a voxel; at 0.10 A, 91 points, likewise 1 of 48; at 0.20 A (46)
+    //and 0.12 A (76) all 48 held exactly. The parity was not the caller's choice either - 9.0/0.15 evaluates
+    //to 60.000000000000014, so ceil() hands back 61 rather than 60. One extra plane per axis costs a few per
+    //cent of the points and buys a grid that carries the point group at whatever resolution is asked for.
+    for (int i = 0; i < 3; i++)
+        if (opts.NbSteps[i] % 2 != 0)
+            opts.NbSteps[i]++;
 }
 
 void readxyzMinMax_fromCIF(

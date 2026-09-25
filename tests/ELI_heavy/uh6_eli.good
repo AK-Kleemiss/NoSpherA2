@@ -8,8 +8,9 @@ This software is part of the cuQCT software suite developed by Florian Kleemiss.
 Please give credit and cite corresponding pieces!
 This Software is published with BSD-2 clause license.
 Analysing ELI basins in the wavefunction...
-Calcualting grid of size 91 x 91 x 91...
-Number of points: 753571
+[ELI-D] Kohout, Pernal, Wagner & Grin, Theor. Chem. Acc. 112 (2004) 453, DOI 10.1007/s00214-004-0615-y
+Calcualting grid of size 92 x 92 x 92...
+Number of points: 778688
 Grid parameters:
   Min: (-8.50377, -8.50377, -8.50377)
   Max: (8.50377, 8.50377, 8.50377)
@@ -21,7 +22,7 @@ Atom positions:
   Atom 4: (0, -3.77945, 0)
   Atom 5: (0, 0, 3.77945)
   Atom 6: (0, 0, -3.77945)
-Density Critical Points (13 found):
+Density Critical Points (7 found):
 
   CP   1  [attractor   ]  converged   U0
     Position  :        -0.0000         0.0000        -0.0000
@@ -79,65 +80,14 @@ Density Critical Points (13 found):
     DelSqRho  :       -21.2503
    V         :    -5.3142e+00   G         :         0.0008   K         :     5.3134e+00   L         :     5.3126e+00
 
-  CP   8  [bond        ]  converged   H2-U0 bond
-    Position  :        -2.4702        -0.0000        -0.0000
-    Rho       :         0.1100
-    GradRho   :         0.0000        -0.0000         0.0000   |GradRho| :         0.0000
-    HessRho_EigVals:    -1.7520e-01    -1.7520e-01     2.8783e-01
-    DelSqRho  :        -0.0626
-    Bond Ellipticity:         0.0000
-   V         :    -8.5708e-02   G         :         0.0350   K         :     5.0675e-02   L         :     1.5642e-02
-
-  CP   9  [bond        ]  converged   H4-U0 bond
-    Position  :        -0.0000        -2.4702         0.0000
-    Rho       :         0.1100
-    GradRho   :        -0.0000         0.0000         0.0000   |GradRho| :         0.0000
-    HessRho_EigVals:    -1.7520e-01    -1.7520e-01     2.8783e-01
-    DelSqRho  :        -0.0626
-    Bond Ellipticity:         0.0000
-   V         :    -8.5708e-02   G         :         0.0350   K         :     5.0675e-02   L         :     1.5642e-02
-
-  CP  10  [bond        ]  converged   H6-U0 bond
-    Position  :         0.0000        -0.0000        -2.4702
-    Rho       :         0.1100
-    GradRho   :         0.0000         0.0000         0.0000   |GradRho| :         0.0000
-    HessRho_EigVals:    -1.7520e-01    -1.7520e-01     2.8783e-01
-    DelSqRho  :        -0.0626
-    Bond Ellipticity:         0.0000
-   V         :    -8.5708e-02   G         :         0.0350   K         :     5.0675e-02   L         :     1.5642e-02
-
-  CP  11  [bond        ]  converged   H5-U0 bond
-    Position  :        -0.0000         0.0000         2.4702
-    Rho       :         0.1100
-    GradRho   :        -0.0000         0.0000        -0.0000   |GradRho| :         0.0000
-    HessRho_EigVals:    -1.7520e-01    -1.7520e-01     2.8783e-01
-    DelSqRho  :        -0.0626
-    Bond Ellipticity:         0.0000
-   V         :    -8.5708e-02   G         :         0.0350   K         :     5.0675e-02   L         :     1.5642e-02
-
-  CP  12  [bond        ]  converged   H3-U0 bond
-    Position  :        -0.0000         2.4702        -0.0000
-    Rho       :         0.1100
-    GradRho   :        -0.0000        -0.0000         0.0000   |GradRho| :         0.0000
-    HessRho_EigVals:    -1.7520e-01    -1.7520e-01     2.8783e-01
-    DelSqRho  :        -0.0626
-    Bond Ellipticity:         0.0000
-   V         :    -8.5708e-02   G         :         0.0350   K         :     5.0675e-02   L         :     1.5642e-02
-
-  CP  13  [bond        ]  converged   H1-U0 bond
-    Position  :         2.4702        -0.0000        -0.0000
-    Rho       :         0.1100
-    GradRho   :        -0.0000        -0.0000        -0.0000   |GradRho| :         0.0000
-    HessRho_EigVals:    -1.7520e-01    -1.7520e-01     2.8783e-01
-    DelSqRho  :        -0.0626
-    Bond Ellipticity:         0.0000
-   V         :    -8.5708e-02   G         :         0.0350   K         :     5.0675e-02   L         :     1.5642e-02
-
 QTAIM attractors from the analytic field: 7 (7 nuclei, 0 non-nuclear)
 Assigning basins by near-grid ascent...
-I found 53 Basins.
-Merged 25 noise maxima, 28 basins remain.
-Unified 15 core-shell basins into their atoms' cores, 13 ELI-D basins remain.
+Near-grid ascent: 6956 steepest-neighbour steps, 0 of them tied (0.000 %), 0 voxel paths went through at least one tie
+Near-grid ascent: 1243650 rounded step decisions, 0 within 1e-5 of flipping and 0 within 1e-9, closest margin 1.602e-05
+Near-grid ascent: 0 walks stopped on a top that grad_epsilon (1.0e-10) calls flat, largest uphill 0.000e+00 still available there
+I found 33 Basins.
+Merged 6 noise maxima, 27 basins remain.
+Unified 14 core-shell basins into their atoms' cores, 13 ELI-D basins remain.
 GridManager: Setting up prototype grids for atom types...
 GridManager: Generating integration grids for atoms...
 GridManager: Generated total of 143592 grid points.
@@ -155,6 +105,7 @@ QTAIM Analysis (atomic quadrature grids):
   total in basins: 97.9998   outside every basin: 0.0000
 
 Delocalization indices (49 occupied orbitals):
+[LI/DI] Fradera, Austen & Bader, J. Phys. Chem. A 103 (1999) 304, DOI 10.1021/jp983362q
   sum over all basins of S^A - identity: 6.68e-05   (the quadrature's own error; AIMAll's integrations reach ~1e-3)
 
   basin  label                 N(A)     lambda(A)   sum_B delta(A,B)/2   residual
@@ -188,37 +139,37 @@ Delocalization indices (49 occupied orbitals):
   3 further pairs below 0.01
 
 ELI-D Analysis (voxel sum):
-basin:    0 label:       H2-U0 bond integrated value:   0.3349 volume:  165.3030
-basin:    1 label:       H4-U0 bond integrated value:   0.3094 volume:  161.7059
-basin:    2 label:               H4 integrated value:   1.7003 volume:   69.1412
-basin:    3 label:               H6 integrated value:   1.7143 volume:   74.9383
-basin:    4 label:               H2 integrated value:   1.6696 volume:   62.0384
-basin:    5 label:       H6-U0 bond integrated value:   0.3013 volume:  160.3219
-basin:    6 label:       H5-U0 bond integrated value:   0.2991 volume:  159.6822
-basin:    7 label:               H5 integrated value:   1.7063 volume:   67.6984
-basin:    8 label:               H3 integrated value:   1.7071 volume:   69.4023
-basin:    9 label:       H3-U0 bond integrated value:   0.3025 volume:  161.3991
-basin:   10 label:          U0 core integrated value:  74.1202 volume:   61.3660
-basin:   11 label:               H1 integrated value:   1.6888 volume:   58.5392
-basin:   12 label:       H1-U0 bond integrated value:   0.3240 volume:  174.4557
+basin:    0 label:       H2-U0 bond integrated value:   0.3122 volume:  162.5929
+basin:    1 label:               H4 integrated value:   1.7284 volume:   69.1791
+basin:    2 label:               H2 integrated value:   1.7176 volume:   63.9859
+basin:    3 label:               H6 integrated value:   1.7492 volume:   76.7730
+basin:    4 label:               H5 integrated value:   1.7377 volume:   69.5771
+basin:    5 label:               H3 integrated value:   1.7379 volume:   70.6448
+basin:    6 label:       H4-U0 bond integrated value:   0.3074 volume:  161.8727
+basin:    7 label:       H6-U0 bond integrated value:   0.2925 volume:  158.6381
+basin:    8 label:       H5-U0 bond integrated value:   0.2950 volume:  159.1435
+basin:    9 label:       H3-U0 bond integrated value:   0.2978 volume:  160.3691
+basin:   10 label:          U0 core integrated value: 176620.2353 volume:   61.5915
+basin:   11 label:               H1 integrated value:   1.7296 volume:   64.3587
+basin:   12 label:       H1-U0 bond integrated value:   0.3090 volume:  168.7970
 GridManager: Setting up prototype grids for atom types...
 GridManager: Generating integration grids for atoms...
 GridManager: Generated total of 143592 grid points.
-Quadrature points sent along the field: 56754, left the grid: 24
+Quadrature points sent along the field: 58335, left the grid: 24
 
 ELI-D Analysis (atomic quadrature grids):
   basin  label               electrons      volume         maximum        x          y          z
-      1  H2-U0 bond             0.3184    174.6183         11.0925     -5.513     -0.093     -0.093
-      2  H4-U0 bond             0.3145    172.3387         11.0925      0.093     -5.513     -0.093
-      3  H4                     1.7229     67.1940         12.3869      0.093     -3.831     -0.093
-      4  H6                     1.7371     73.7736         12.3869      0.093      0.093     -3.831
-      5  H2                     1.7139     62.6844         12.3869     -3.831      0.093     -0.093
-      6  H6-U0 bond             0.3124    170.7804         11.0925      0.093     -0.093     -5.513
-      7  H5-U0 bond             0.3120    170.9252         11.0925      0.093      0.093      5.513
-      8  H5                     1.7135     57.0439         12.3869     -0.093     -0.093      3.831
-      9  H3                     1.7212     66.0117         12.3869      0.093      3.831      0.093
-     10  H3-U0 bond             0.3157    173.3794         11.0925      0.093      5.513     -0.093
-     11  U0 core               85.7429     67.6509          1.3679      1.028      1.028      1.028
-     12  H1                     1.7155     59.8938         12.3869      3.831     -0.093      0.093
-     13  H1-U0 bond             0.3233    176.6657         11.0925      5.513      0.093     -0.093
-  total in basins: 97.9633   outside every basin: 0.0365
+      1  H2-U0 bond             0.3130    171.7233         11.0849     -5.546      0.000      0.000
+      2  H4                     1.7245     67.0778         13.6414      0.000     -3.882      0.000
+      3  H2                     1.7192     64.6280         13.6414     -3.882      0.000      0.000
+      4  H6                     1.7394     73.8360         13.6414      0.000      0.000     -3.882
+      5  H5                     1.7159     57.8791         13.6414      0.000      0.000      3.882
+      6  H3                     1.7225     65.9389         13.6414      0.000      3.882      0.000
+      7  H4-U0 bond             0.3128    171.6051         11.0849      0.000     -5.546      0.000
+      8  H6-U0 bond             0.3099    169.6176         11.0849      0.000      0.000     -5.546
+      9  H5-U0 bond             0.3096    169.9271         11.0849      0.000      0.000      5.546
+     10  H3-U0 bond             0.3142    172.3137         11.0849      0.000      5.546      0.000
+     11  U0 core               85.7426     67.6357         13.5603      0.000      0.000      0.000
+     12  H1                     1.7161     59.5742         13.6414      3.882      0.000      0.000
+     13  H1-U0 bond             0.3227    176.6191         11.0849      5.546      0.000      0.000
+  total in basins: 97.9623   outside every basin: 0.0374

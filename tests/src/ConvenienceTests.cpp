@@ -7,6 +7,7 @@
 
 #include <complex>
 #include <cstdio>
+#include <cmath>
 #include <cstring>
 #include <numeric>
 
@@ -628,13 +629,69 @@ TEST(ConvenienceMathTests, ReadxyzMinMaxFromWFNPadsAndSteps)
 	EXPECT_NEAR(opts.MinMax[4], 3.0 + pad, 1e-12);
 	EXPECT_NEAR(opts.MinMax[2], -0.5 - pad, 1e-12);
 	EXPECT_NEAR(opts.MinMax[5], 0.5 + pad, 1e-12);
-	EXPECT_EQ(opts.NbSteps[0], (int)ceil(constants::bohr2ang(3.0 + 2.0 * pad) / 0.1));
-	EXPECT_EQ(opts.NbSteps[1], (int)ceil(constants::bohr2ang(3.0 + 2.0 * pad) / 0.1));
-	EXPECT_EQ(opts.NbSteps[2], (int)ceil(constants::bohr2ang(1.0 + 2.0 * pad) / 0.1));
+	//the count is the ceil of length over resolution, rounded up once more to an even number
+	const int raw[3] = { (int)ceil(constants::bohr2ang(3.0 + 2.0 * pad) / 0.1),
+						 (int)ceil(constants::bohr2ang(3.0 + 2.0 * pad) / 0.1),
+						 (int)ceil(constants::bohr2ang(1.0 + 2.0 * pad) / 0.1) };
+	for (int i = 0; i < 3; i++)
+	{
+		EXPECT_EQ(opts.NbSteps[i], raw[i] + (raw[i] % 2));
+		//and the point of the parity: the callers step from MinMax[i] by (length)/NbSteps[i], so the centre
+		//of the box has to land ON a grid plane. Half a voxel off and the molecule's own mirror planes are
+		//not sampled, which is what broke UH6's six ELI-D attractors into six inequivalent positions.
+		const double h = (opts.MinMax[3 + i] - opts.MinMax[i]) / opts.NbSteps[i];
+		const double centre_index = 0.5 * (opts.MinMax[3 + i] + opts.MinMax[i] - 2.0 * opts.MinMax[i]) / h;
+		EXPECT_NEAR(centre_index, std::round(centre_index), 1e-9) << "axis " << i;
+		//and the step is no coarser than the caller asked for
+		EXPECT_LE(constants::bohr2ang(h), 0.1 + 1e-12) << "axis " << i;
+	}
 	EXPECT_EQ(opts.n_grid_points(), size_t(opts.NbSteps[0]) * opts.NbSteps[1] * opts.NbSteps[2]);
 	EXPECT_FALSE(opts.calc());
 	opts.rho = true;
 	EXPECT_TRUE(opts.calc());
+}
+
+// A grid that cannot sample the molecule's mirror planes cannot give a symmetric answer, at any resolution.
+// This is octahedral UH6 as tests/ELI_heavy/uh6.gbw has it - uranium at the origin, six hydrogens on the
+// axes at 2 Angstrom - measured with the radius its test uses. The six ELI-D hydrogen attractors of that
+// molecule have to map onto themselves under all 48 operations of its point group, and before the parity
+// step in readxyzMinMax_fromWFN they did so under 1 of 48 at 0.15 and 0.10 Angstrom and under all 48 at
+// 0.20 and 0.12: what decided it was whether ceil(length/resolution) happened to come out even, since with
+// an odd count the box centre falls exactly halfway between two grid planes and the four voxels around each
+// axis are degenerate. 9.0/0.15 evaluates to 60.000000000000014, so the caller asking for 0.15 got 61.
+// The attractor positions themselves are checked by tests/ELI_heavy/uh6_eli.good; this is the precondition,
+// and it is the cheap place to notice it breaking again.
+TEST(ConvenienceMathTests, GridCentreLandsOnAPlaneAtEveryResolution)
+{
+	WFN w(e_origin::NOT_YET_DEFINED);
+	w.push_back_atom("U", 0.0, 0.0, 0.0, 92);
+	const double d = constants::ang2bohr(2.0);
+	for (int ax = 0; ax < 3; ax++)
+		for (int sign = -1; sign <= 1; sign += 2)
+		{
+			double p[3] = { 0.0, 0.0, 0.0 };
+			p[ax] = sign * d;
+			w.push_back_atom("H", p[0], p[1], p[2], 1);
+		}
+	ASSERT_EQ(w.get_ncen(), 7);
+	for (double res : { 0.20, 0.15, 0.12, 0.10, 0.08, 0.05 })
+	{
+		properties_options opts;
+		opts.radius = 2.5;
+		opts.resolution = res;
+		readxyzMinMax_fromWFN(w, opts);
+		for (int i = 0; i < 3; i++)
+		{
+			EXPECT_EQ(opts.NbSteps[i] % 2, 0) << "resolution " << res << " axis " << i;
+			const double h = (opts.MinMax[3 + i] - opts.MinMax[i]) / opts.NbSteps[i];
+			//the box centre sits at index NbSteps/2 because the points start at MinMax[i]
+			EXPECT_EQ(opts.NbSteps[i] / 2 * 2, opts.NbSteps[i]) << "resolution " << res;
+			EXPECT_LE(constants::bohr2ang(h), res + 1e-12) << "resolution " << res << " axis " << i;
+		}
+		//and the molecule's octahedral axes are all equivalent, so the three counts must agree
+		EXPECT_EQ(opts.NbSteps[0], opts.NbSteps[1]) << "resolution " << res;
+		EXPECT_EQ(opts.NbSteps[1], opts.NbSteps[2]) << "resolution " << res;
+	}
 }
 
 // a shortest interatomic distance below 2 reads as Angstrom, above as bohr
