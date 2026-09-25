@@ -800,3 +800,78 @@ TEST(BondwiseCoverageEliTests, AFreeAtomIsAnalysedAndItsBasinsCloseOnItsOwnElect
 	const std::string own = wavy.get_atom_label(0) + "0";
 	EXPECT_NE(out.find(own), std::string::npos) << "every basin belongs to atom " << own << "\n" << out;
 }
+
+namespace
+{
+	//"  basin  label  <first number>  ..." rows of the table that follows `after`, up to the
+	//"total in basins" line that closes it. The first number is the population in every one of
+	//the four tables, whatever the remaining columns are.
+	std::map<std::string, double> parse_basin_rows(const std::string& out, const std::string& after)
+	{
+		std::map<std::string, double> rows;
+		const size_t start = out.find(after);
+		if (start == std::string::npos)
+			return rows;
+		const size_t stop = out.find("total in basins", start);
+		std::istringstream in(out.substr(start, stop == std::string::npos ? std::string::npos : stop - start));
+		std::string line;
+		while (std::getline(in, line))
+		{
+			std::istringstream row(line);
+			int index = 0;
+			std::string label;
+			double value = 0;
+			if (row >> index >> label >> value)
+				rows[label] = value;   //a two-word label ("H2-Li4 bond") keeps its first word, which is enough
+		}
+		return rows;
+	}
+}  // namespace
+
+//An invariant that needs no reference calculation: nh3li.gbw is NH3 with a lithium on the
+//three-fold axis, so H1, H2 and H3 are related by symmetry and must carry the same population.
+//Anything else is the code's own error, and it is measurable without AIMAll or DGrid.
+//
+//The QTAIM arm holds the orbit to 7e-4 electrons and is asserted here. The ELI-D arm on the very
+//same runs does not, and the resolution scan says why it is not asserted: the spread over the three
+//equivalent hydrogens is 0.2077 e at resolution 0.4, 0.7420 e at 0.3 (one hydrogen at 2.6756
+//against two at 1.93), 0.1546 e at 0.2 and 0.0661 e at 0.15, while the conserved total stays at
+//12.67-12.68 throughout and the basin count grows 6, 6, 8, 9 with spurious 0.001-electron "bond"
+//basins. A defect the conserved total cannot see, in the voxel watershed that decides the
+//boundaries rather than in the field or the quadrature - the same quadrature integrates the QTAIM
+//basins of this molecule to 7e-4. Left as measured, not asserted, because no resolution the suite
+//can afford makes the ELI numbers symmetric.
+TEST(BondwiseCoverageEliTests, QtaimHoldsTheThreefoldOrbitOfNH3Li)
+{
+	const std::filesystem::path p = nos_test_repo_root() / "tests" / "RGBI_groups" / "nh3li.gbw";
+	if (!std::filesystem::exists(p))
+		GTEST_SKIP() << "tests/RGBI_groups/nh3li.gbw not found";
+	Scratch s("QtaimHoldsTheThreefoldOrbitOfNH3Li");
+	std::filesystem::current_path(s.dir);
+
+	WFN wavy(p);
+	ASSERT_EQ(wavy.get_ncen(), 5);
+	options opt;
+	opt.properties.radius = 2.5;
+	opt.properties.resolution = 0.4;   //the QTAIM basins follow the analytic gradient, so this only sizes the ELI arm
+	std::string out;
+	{
+		CoutCapture cap;
+		ELI_analysis(wavy, opt);
+		out = cap.str();
+	}
+
+	const auto rows = parse_basin_rows(out, "QTAIM Analysis");
+	ASSERT_EQ(rows.count("H1") + rows.count("H2") + rows.count("H3"), 3u)
+		<< "expected one QTAIM basin per hydrogen\n" << out;
+	const double h1 = rows.at("H1"), h2 = rows.at("H2"), h3 = rows.at("H3");
+	EXPECT_NEAR(h1, h2, 2e-3) << "H1 and H2 are related by the three-fold axis\n" << out;
+	EXPECT_NEAR(h1, h3, 2e-3) << "H1 and H3 are related by the three-fold axis\n" << out;
+	EXPECT_NEAR(h2, h3, 2e-3) << "H2 and H3 are related by the three-fold axis\n" << out;
+
+	//and the whole table closes on the molecule's own electron count, 13 for NH3Li
+	const auto totals = parse_basin_totals(out);
+	ASSERT_GE(totals.size(), 1u) << out;
+	const double electrons = wavy.count_nr_electrons();
+	EXPECT_NEAR(totals[0].first + totals[0].second, electrons, 1e-2 * electrons) << out;
+}
