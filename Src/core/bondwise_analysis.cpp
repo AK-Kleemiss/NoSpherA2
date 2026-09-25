@@ -11,6 +11,7 @@
 #include "spherical_density.h"
 #include "citations.h"
 #include "nao.h"
+#include <mutex>
 #include <occ/core/parallel.h>
 #include <occ/qm/hf.h>
 #include <occ/qm/guess_kind.h>
@@ -309,14 +310,30 @@ namespace {
 	//to one thread for the rest of the process - every later occ user in the same binary, the whole
 	//test suite included, silently serial. If there was no control on the way in, there must be none
 	//on the way out.
+	//NOS_RGBI_NO_PIN exists to measure what the pin costs, not to be set in anger. The pin was put in
+	//to make a published bond index reproducible; measuring whether that is worth its time needs the
+	//same binary to run both ways, because a second binary differs in more than the pin. Read once:
+	//flipping it mid-process would leave the constructor and destructor disagreeing about what they did.
+	inline bool occ_pinning_disabled() {
+		static const bool disabled = std::getenv("NOS_RGBI_NO_PIN") != nullptr;
+		return disabled;
+	}
+
 	class ScopedOccSingleThread {
 	public:
 		ScopedOccSingleThread()
 			: had_control(occ::parallel::get_tbb_control() != nullptr),
-			previous(occ::parallel::get_num_threads()) {
-			occ::parallel::set_num_threads(1);
+			previous(occ_pinning_disabled() ? 1 : occ::parallel::get_num_threads()) {
+			if (previous != 1)
+				occ::parallel::set_num_threads(1);
 		}
 		~ScopedOccSingleThread() {
+			//Already pinned when we arrived: the constructor changed nothing, so neither does this. The
+			//pair is symmetric either way, and it matters when several of these are alive at once inside
+			//the warm pass below - a destructor that called shutdown_tbb() while a sibling thread was
+			//still inside TBB would be shutting down a pool in use.
+			if (previous == 1)
+				return;
 			if (had_control)
 				occ::parallel::set_num_threads(previous);
 			else {
@@ -330,8 +347,82 @@ namespace {
 		int previous = 1;
 	};
 
+	//What a free atom's density depends on, and nothing else: the basis it is expanded in, the number
+	//of electrons that basis has to hold, and the two conventions below. Its position never enters -
+	//the basis is centred on the atom, so the matrix is the same wherever the atom sits - and the
+	//multiplicity and the guess kind follow from the effective Z. So every atom of an element carrying
+	//the same basis has the same free-atom SCF, and tests/Fe_gbw/Fe.gbw runs 21 of them for 4 answers:
+	//one Fe, four Cl, four O and twelve H.
+	//
+	//What those 17 repeats are NOT is most of the run, and this comment said they were until job 578479
+	//measured it. Removing them leaves Fe.gbw at 1735.4 s and 1739.6 s, against 405.6 s for the binary
+	//that runs all 21 unpinned - so the cost is one expensive free-atom SCF held to a single thread, not
+	//the repetition of the cheap ones. The cache is still worth having: Au2Br2 answers 53 centres with 5
+	//SCFs and malbac 52 with 7, every printed table byte-identical. It is simply not the fix for Fe.gbw,
+	//and NOS_RGBI_NO_PIN above is how that is being measured rather than guessed at a second time.
+	//
+	//Keying on the atom's own basis rather than on its element is the part that matters. A mixed-basis
+	//calculation may describe two atoms of the same element differently, and handing one of them the
+	//other's density would be a wrong answer arriving faster.
+	//
+	//basis_set_entry::operator== is not the comparison to use for that, which is the trap here: it
+	//forwards to primitive::operator==, and a primitive carries the index of the atom it sits on. Two
+	//chemically identical atoms therefore compare unequal on every entry, so a key built on it would
+	//never match and this whole cache would be a silent no-op that still looked right in review. What
+	//defines the free atom is the contraction - angular momentum, shell number, exponent, coefficient -
+	//and the centre is exactly the field that must not enter.
+	struct FreeAtomKey {
+		std::vector<basis_set_entry> basis;
+		int charge;
+		int ecp_electrons;
+		e_origin origin;
+		bool cartesian;
+		bool operator==(const FreeAtomKey &other) const {
+			if (charge != other.charge || ecp_electrons != other.ecp_electrons ||
+				origin != other.origin || cartesian != other.cartesian ||
+				basis.size() != other.basis.size())
+				return false;
+			for (size_t i = 0; i < basis.size(); i++)
+				if (basis[i].get_type() != other.basis[i].get_type() ||
+					basis[i].get_shell() != other.basis[i].get_shell() ||
+					basis[i].get_exponent() != other.basis[i].get_exponent() ||
+					basis[i].get_coefficient() != other.basis[i].get_coefficient())
+					return false;
+			return true;
+		}
+	};
+
 	dMatrix2 compute_tonto_style_atomic_density(
 		const atom &atm, const e_origin origin, const bool cartesian) {
+		//A linear scan, because the number of distinct elements in a molecule is small and a map would
+		//need a hash over the whole basis to answer the same question. The mutex is here because the
+		//cost of being wrong if this loop is ever parallelised is a corrupted density, not a slow run.
+		const FreeAtomKey key{ atm.get_basis_set(), atm.get_charge(), atm.get_ECP_electrons(),
+							   origin, cartesian };
+		static std::vector<std::pair<FreeAtomKey, dMatrix2>> free_atom_cache;
+		static std::mutex free_atom_cache_mutex;
+		//An off switch, because the only evidence a cache offers on its own is that it ran faster, and
+		//"faster" is not a check that can go red. With NOS_RGBI_NO_FREEATOM_CACHE set, this same binary
+		//recomputes every centre: that is what gives the cached numbers a reference to be identical to,
+		//and it lets one test process watch the cache both fire and not fire without editing the source.
+		//It is also the escape hatch if the key is ever found to be missing a field that matters.
+		//Read on every call rather than once into a static: a getenv is free beside a free-atom SCF that
+		//costs 430 s on a g-shell Fe, and a process-lifetime static could not be flipped between two
+		//runs inside one test - which is the only place the cached and uncached answers can be compared
+		//without a second build.  A disabled call neither reads nor writes the cache, so a warm cache
+		//from an earlier run in the same process cannot make the uncached arm look cached.
+		const bool cache_disabled = std::getenv("NOS_RGBI_NO_FREEATOM_CACHE") != nullptr;
+		if (!cache_disabled) {
+			const std::lock_guard<std::mutex> hold(free_atom_cache_mutex);
+			for (const auto &cached : free_atom_cache)
+				if (cached.first == key) {
+					if (std::getenv("NOS_RGBI_DEBUG") != nullptr)
+						std::cout << "\nFREEATOM-CACHED " << atm.get_label() << " Z="
+							<< atm.get_charge() - atm.get_ECP_electrons() << std::endl;
+					return cached.second;
+				}
+		}
+
 		ScopedOccLogLevel quiet_occ_logs(spdlog::level::err);
 		const ScopedOccSingleThread deterministic_reduction;
 		const occ::gto::AOBasis basis = build_occ_atomic_basis_from_wfn_atom(atm, origin, cartesian);
@@ -395,12 +486,73 @@ namespace {
 				<< std::setprecision(14) << " E=" << scf_energy
 				<< " sumD=" << mo.D.sum() << " normD=" << mo.D.norm() << "\n";
 
-		if (spin_kind == occ::qm::SpinorbitalKind::Restricted)
-			return eigen_matrix_to_dmatrix2(2.0 * mo.D);
+		dMatrix2 result = (spin_kind == occ::qm::SpinorbitalKind::Restricted)
+			? eigen_matrix_to_dmatrix2(2.0 * mo.D)
+			: eigen_matrix_to_dmatrix2(occ::Mat(occ::qm::block::a(mo.D) + occ::qm::block::b(mo.D)));
+		//Only a converged SCF is cached: the throw above and any occ failure leave the cache untouched,
+		//so a fallback stays a fallback and is not remembered as an answer.
+		if (!cache_disabled) {
+			const std::lock_guard<std::mutex> hold(free_atom_cache_mutex);
+			free_atom_cache.push_back({ key, result });
+		}
+		return result;
+	}
 
-		const occ::Mat spin_summed =
-			occ::qm::block::a(mo.D) + occ::qm::block::b(mo.D);
-		return eigen_matrix_to_dmatrix2(spin_summed);
+	//The cache turns 21 free-atom SCFs into 4 on tests/Fe_gbw/Fe.gbw, and those 4 still cost about half
+	//an hour because they run one behind the other inside a loop that cannot be parallelised: it mutates
+	//the overlap matrix, accumulates a basis-function index and appends to NAOs in order. The SCFs
+	//themselves are independent of each other, so they can be run up front and concurrently, after which
+	//the serial loop finds every centre already answered and the whole wall time collapses towards one
+	//SCF.
+	//
+	//Off unless NOS_RGBI_PARALLEL_FREEATOM is set, because occ's SCF has not been shown to be re-entrant
+	//and a free-atom density is precisely the thing this must not quietly get wrong. What makes the flag
+	//testable rather than hopeful is that the serial cached answer already exists as a digest: the
+	//parallel run has to reproduce it bit for bit or it is refuted.
+	//
+	//Every failure here is swallowed on purpose. This pass only fills a cache, so an atom it could not
+	//answer is simply not cached, and the serial loop reaches it and handles the failure the way it
+	//always did - with its own message and its molecular-orbital fallback. An exception crossing an
+	//OpenMP region boundary would terminate the process instead.
+	void warm_free_atom_cache(const std::vector<atom> &ats, const e_origin origin,
+		const bool cartesian) {
+		if (std::getenv("NOS_RGBI_PARALLEL_FREEATOM") == nullptr ||
+			std::getenv("NOS_RGBI_NO_FREEATOM_CACHE") != nullptr)
+			return;
+
+		//One representative per distinct free atom, picked without running anything: the same key the
+		//cache uses, so the set this warms is exactly the set the serial loop would have computed.
+		std::vector<const atom *> distinct;
+		std::vector<FreeAtomKey> keys;
+		for (const auto &a : ats) {
+			const FreeAtomKey key{ a.get_basis_set(), a.get_charge(), a.get_ECP_electrons(),
+								   origin, cartesian };
+			bool seen = false;
+			for (const auto &k : keys)
+				if (k == key) { seen = true; break; }
+			if (!seen) {
+				keys.push_back(key);
+				distinct.push_back(&a);
+			}
+		}
+		if (distinct.size() < 2)
+			return;
+		if (std::getenv("NOS_RGBI_DEBUG") != nullptr)
+			std::cout << "\nFREEATOM-WARM " << distinct.size() << " distinct of " << ats.size()
+				<< " centres" << std::endl;
+
+		//Pinned once, out here: the guard each SCF takes then finds occ already at one thread and does
+		//nothing, so no two of these threads race over occ's global thread count and none of them can
+		//shut a pool down while the others are still in it.
+		const ScopedOccSingleThread deterministic_reduction;
+#pragma omp parallel for schedule(dynamic)
+		for (int i = 0; i < static_cast<int>(distinct.size()); i++) {
+			try {
+				compute_tonto_style_atomic_density(*distinct[i], origin, cartesian);
+			}
+			catch (...) {
+			}
+		}
 	}
 
 	const std::vector<OhOperation> &oh_operations() {
@@ -1624,6 +1776,9 @@ void Roby_information::computeAllAtomicNAOs(WFN &wavy, const bool symmetrize, co
 	//0.95 across 0.025 A of bond length. Unless legacy_occupancy_cutoff asks for that behaviour,
 	//the subspace is fixed by the element instead - see free_atom_orbital_count.
 	const double occupancy_cutoff = use_ano_basis ? 1.0 / 14.0 : 1.0 / 6.0;
+
+	if (use_ano_basis)
+		warm_free_atom_cache(ats, wavy.get_origin(), wavy.get_d_f_switch());
 
 	int last_index = 0;
 	ivec2 indices(wavy.get_ncen());

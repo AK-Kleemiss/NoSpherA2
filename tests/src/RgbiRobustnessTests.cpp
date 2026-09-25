@@ -5,6 +5,7 @@
 #include <occ/core/parallel.h>
 
 #include <cmath>
+#include <set>
 #include <sstream>
 #include <string>
 
@@ -279,4 +280,192 @@ TEST(RgbiRobustnessTests, SymmetryEquivalentGoldCentresAgreeToEveryDigit_full)
 		for (size_t i = 0; i < 9; i++)
 			EXPECT_DOUBLE_EQ(first[i], second[i]) << "column " << i << " of " << orbit[0] << " vs " << orbit[1];
 	}
+}
+
+//A free atom's density depends on its basis and its electron count, not on which atom it is: two
+//hydrogens of the same molecule have the same free-atom SCF to the last bit. The ANO route computed
+//one per centre anyway, so tests/Fe_gbw/Fe.gbw ran 21 one-atom SCFs for 4 distinct answers - and with
+//the reductions pinned to one thread for reproducibility, that repetition was most of the run: the
+//analysis did not finish inside 900 s where the unpinned build took 405 s.
+//
+//The invariant is stated so that it holds whether or not an earlier test in the same binary has
+//already warmed the cache: every centre must be accounted for, and the number of SCFs actually run
+//must be smaller than the number of centres. tests/TFVC/water.gbw is O, two H and a non-bonded He -
+//4 centres, 3 distinct free atoms - so a cold run is 3 SCFs and 1 hit, a warm one 0 and 4, and 4
+//SCFs is the defect.
+//
+//Made red on purpose by returning before the cache lookup: the count goes to 4 SCFs and 0 hits.
+TEST(RgbiRobustnessTests, IdenticalCentresShareOneFreeAtomScf)
+{
+	const auto p = water_he_fixture();
+	if (p.empty())
+		GTEST_SKIP() << "tests/TFVC/water.gbw not found";
+
+	struct ScopedEnv {
+		ScopedEnv() {
+#ifdef _WIN32
+			_putenv_s("NOS_RGBI_DEBUG", "1");
+#else
+			setenv("NOS_RGBI_DEBUG", "1", 1);
+#endif
+		}
+		~ScopedEnv() {
+#ifdef _WIN32
+			_putenv_s("NOS_RGBI_DEBUG", "");
+#else
+			unsetenv("NOS_RGBI_DEBUG");
+#endif
+		}
+	} debug_on;
+
+	const std::string out = rgbi_ano_output(false);
+	ASSERT_FALSE(out.empty()) << "the analysis produced no output at all";
+
+	const auto count = [&out](const std::string &token) {
+		size_t n = 0;
+		for (size_t at = out.find(token); at != std::string::npos; at = out.find(token, at + 1))
+			n++;
+		return n;
+		};
+	//FREEATOM-CACHED is a prefix of nothing, but FREEATOM-START and FREEATOM both match a
+	//FREEATOM-START line, so count the completed-SCF lines by their own distinct opening.
+	const size_t scfs = count("FREEATOM-START");
+	const size_t hits = count("FREEATOM-CACHED");
+
+	EXPECT_EQ(scfs + hits, 4u) << "water.gbw has 4 centres and each must be answered once:\n" << out;
+	EXPECT_LT(scfs, 4u) << "two hydrogens of one molecule ran two separate free-atom SCFs";
+	EXPECT_LE(scfs, 3u) << "more SCFs than the molecule has distinct free atoms";
+
+	//The half that makes this a check and not a stopwatch. NOS_RGBI_NO_FREEATOM_CACHE recomputes every
+	//centre in this same process, so the cached bond table has something to be identical to. Without it
+	//the only evidence for the cache is that it ran faster, and on the one fixture the cache exists for
+	//- tests/Fe_gbw/Fe.gbw - the uncached run is a ~2.5 h job that has never produced a table at all, so
+	//the cached numbers there rest on the identity holding where it can be afforded.
+#ifdef _WIN32
+	_putenv_s("NOS_RGBI_NO_FREEATOM_CACHE", "1");
+#else
+	setenv("NOS_RGBI_NO_FREEATOM_CACHE", "1", 1);
+#endif
+	const std::string uncached = rgbi_ano_output(false);
+#ifdef _WIN32
+	_putenv_s("NOS_RGBI_NO_FREEATOM_CACHE", "");
+#else
+	unsetenv("NOS_RGBI_NO_FREEATOM_CACHE");
+#endif
+	ASSERT_FALSE(uncached.empty()) << "the uncached arm produced no output at all";
+
+	const auto count_in = [](const std::string &hay, const std::string &token) {
+		size_t n = 0;
+		for (size_t at = hay.find(token); at != std::string::npos; at = hay.find(token, at + 1))
+			n++;
+		return n;
+		};
+	EXPECT_EQ(count_in(uncached, "FREEATOM-START"), 4u)
+		<< "the off switch is not off: fewer than 4 SCFs with the cache disabled";
+	EXPECT_EQ(count_in(uncached, "FREEATOM-CACHED"), 0u)
+		<< "a disabled cache still reported a hit";
+
+	//Compare the tables, not the whole stream: the debug lines differ by construction.
+	const auto table = [](const std::string &s) {
+		const size_t from = s.find("Atom Nr");
+		return from == std::string::npos ? std::string() : s.substr(from);
+		};
+	ASSERT_FALSE(table(out).empty()) << "no bond table in the cached run";
+	EXPECT_EQ(table(out), table(uncached))
+		<< "the cache changed the answer, which is the only way it can be wrong\ncached:\n"
+		<< table(out) << "\nuncached:\n" << table(uncached);
+}
+
+//The cache removes the repeats; it does not make the remaining SCFs any faster. On tests/Fe_gbw/Fe.gbw
+//4 distinct free atoms still cost about half an hour one behind the other, and they do not depend on
+//each other, so NOS_RGBI_PARALLEL_FREEATOM runs them up front and concurrently. The risk that buys is
+//the only one worth testing for: occ's SCF is not documented re-entrant, and a free-atom density that
+//comes out subtly different under concurrency would be invisible in a timing table.
+//
+//So the assertion is not that it is faster - on 3 light atoms it cannot be - but that the answer did
+//not move. Two things about how it is written are the whole difficulty, and both were found by making
+//the check red on purpose rather than by reading it:
+//
+//The serial arm runs with the cache OFF. Written the obvious way round - serial first with the cache on,
+//then the parallel arm - the serial arm fills the cache, the warm pass finds every centre already
+//answered, no SCF ever runs concurrently, and the check compares a concurrent run against itself. It
+//passed a deliberately perturbed free-atom density that way, because the perturbation lived on the SCF
+//path and no SCF ran.
+//
+//And the comparison is over the 14-digit debug lines, not only the printed bond table. A bond table
+//prints three decimals, so perturbing one element of the atomic density by a part in 1e7 changes no
+//printed digit and the table - and any md5 taken over it - is identical. That sensitivity floor applies
+//to every md5-identical claim in this harness: they say "agrees to the digits it prints", which is not
+//"agrees bit for bit". sumD, normD and the SCF energy are printed at setprecision(14) under
+//NOS_RGBI_DEBUG, so the check compares those and can see what the table cannot.
+TEST(RgbiRobustnessTests, WarmingTheFreeAtomCacheInParallelDoesNotChangeTheAnswer)
+{
+	const auto p = water_he_fixture();
+	if (p.empty())
+		GTEST_SKIP() << "tests/TFVC/water.gbw not found";
+
+	const auto set_env = [](const char *name, const char *value) {
+#ifdef _WIN32
+		_putenv_s(name, value);
+#else
+		if (*value)
+			setenv(name, value, 1);
+		else
+			unsetenv(name);
+#endif
+		};
+	const auto table = [](const std::string &s) {
+		const size_t from = s.find("Atom Nr");
+		return from == std::string::npos ? std::string() : s.substr(from);
+		};
+	//Every completed free-atom SCF, by its numbers and not by which atom it sat on: the label is dropped
+	//so that the two H of water collapse to one entry, which is the whole claim of the cache, and so that
+	//the warm pass's representative compares equal to whichever H the serial loop reached first.
+	const auto scf_numbers = [](const std::string &s) {
+		std::set<std::string> found;
+		for (size_t at = s.find("FREEATOM "); at != std::string::npos; at = s.find("FREEATOM ", at + 1)) {
+			const size_t eol = s.find('\n', at);
+			const std::string line = s.substr(at, eol == std::string::npos ? eol : eol - at);
+			if (line.find(" E=") == std::string::npos)
+				continue;                         //a -START or -WARM line, not a completed SCF
+			const size_t z = line.find(" Z=");    //drop "FREEATOM <label>"
+			if (z != std::string::npos)
+				found.insert(line.substr(z));
+		}
+		return found;
+		};
+
+	//The cache off, so these are four SCFs actually run, in sequence, and nothing is left behind for the
+	//parallel arm to find.
+	set_env("NOS_RGBI_DEBUG", "1");
+	set_env("NOS_RGBI_NO_FREEATOM_CACHE", "1");
+	const std::string serial = rgbi_ano_output(false);
+	set_env("NOS_RGBI_NO_FREEATOM_CACHE", "");
+	ASSERT_FALSE(table(serial).empty()) << "no bond table from the serial run";
+
+	set_env("NOS_RGBI_PARALLEL_FREEATOM", "1");
+	const std::string parallel = rgbi_ano_output(false);
+	set_env("NOS_RGBI_PARALLEL_FREEATOM", "");
+	set_env("NOS_RGBI_DEBUG", "");
+	ASSERT_FALSE(table(parallel).empty()) << "no bond table from the parallel run";
+
+	//Proof the flag did something, so that an equal answer is not equal because nothing ran differently.
+	EXPECT_NE(parallel.find("FREEATOM-WARM 3 distinct of 4 centres"), std::string::npos)
+		<< "the parallel warm pass did not run, so this check compared two identical code paths";
+	EXPECT_EQ(serial.find("FREEATOM-WARM"), std::string::npos)
+		<< "the serial run warmed the cache in parallel without being asked to";
+
+	const auto serial_scfs = scf_numbers(serial);
+	const auto parallel_scfs = scf_numbers(parallel);
+	ASSERT_EQ(serial_scfs.size(), 3u)
+		<< "4 centres of 3 distinct free atoms did not produce 3 distinct SCF results in the serial arm";
+	ASSERT_EQ(parallel_scfs.size(), 3u)
+		<< "the parallel arm did not run 3 SCFs, so concurrency was never exercised here";
+	EXPECT_EQ(serial_scfs, parallel_scfs)
+		<< "a free-atom SCF gave a different answer when run concurrently - the density, its norm or its "
+		   "energy differs in the 14 printed digits";
+
+	EXPECT_EQ(table(serial), table(parallel))
+		<< "running the free-atom SCFs concurrently changed the answer\nserial:\n"
+		<< table(serial) << "\nparallel:\n" << table(parallel);
 }
