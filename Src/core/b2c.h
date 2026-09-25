@@ -128,6 +128,11 @@ bool beta_spheres_enabled();
 //ways and compares basin by basin, which is what puts a number on that cost.
 void basin_adaptive_step_set_enabled(const bool on);
 bool basin_adaptive_step_enabled();
+//The four knobs the grown step is made of, as the run will actually use them. Enabling the growth
+//re-reads NOS_ADP_CAP, NOS_ADP_GROW, NOS_ADP_KEEP and NOS_ADP_REACH, because the defaults were
+//measured against the pre-fix walk and re-tuning them has to be possible without a rebuild;
+//-basin_timing prints whatever came out, since a step count without its knobs measures nothing.
+void basin_adaptive_step_knobs(double &cap, double &grow, double &keep, double &reach);
 //What the grown step spent, since the last reset: steps taken, longer steps proposed, proposals
 //turned back by the angle test, proposals dropped again because the field stopped rising. Only a
 //run with the growth enabled moves them. A fallback is by definition the fate of a proposal, so

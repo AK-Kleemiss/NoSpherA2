@@ -6,9 +6,11 @@
 #include "core/cube.h"
 #include "core/properties.h"
 
+#include <cstdlib>
 #include <cmath>
 #include <filesystem>
 #include <sstream>
+#include <string>
 
 //A beta sphere is the radius around an attractor inside which no ascent trajectory can get out:
 //grad f . rhat < 0 at every point of the sphere, so a path leaving it would have to cross
@@ -197,6 +199,79 @@ TEST(AdaptiveStep, NeverFallsBackMoreOftenThanItProposesOnELID)
 		<< fell << " steps were reverted as grown against " << proposed
 		<< " grown proposals, so the fallback is blaming steps that ran at the floor";
 	EXPECT_LE(turned + fell, proposed) << "more proposals were rejected than were ever made";
+}
+
+//The knobs the grown step is made of were measured against a walk that reverted a third of its
+//floor steps, so the optimum moved when that was fixed and re-finding it is a sweep of eight cluster
+//jobs. Those eight came back byte-identical, counters and all: nothing in the binary read the
+//variables they set. So the override exists, and this is the check that it is wired up - the thing
+//that failed was not the tuning but the belief that a knob was a knob.
+TEST(AdaptiveStep, KnobsComeFromTheEnvironment)
+{
+	//Declared first, destroyed last: by then the env_guards below have cleared the variables, so
+	//re-reading them puts the validated defaults back for the rest of the suite
+	struct knob_restore {
+		bool was = basin_adaptive_step_enabled();
+		~knob_restore() { basin_adaptive_step_set_enabled(true); basin_adaptive_step_set_enabled(was); }
+	} restore;
+	struct env_guard {
+		std::string name;
+		std::string old;
+		bool had = false;
+		env_guard(const char *n, const char *v) : name(n)
+		{
+			if (const char *e = std::getenv(n)) { old = e; had = true; }
+			set(v);
+		}
+		~env_guard() { if (had) set(old.c_str()); else clear(); }
+		void set(const char *v) const
+		{
+#ifdef _WIN32
+			_putenv_s(name.c_str(), v);
+#else
+			setenv(name.c_str(), v, 1);
+#endif
+		}
+		void clear() const
+		{
+#ifdef _WIN32
+			_putenv_s(name.c_str(), "");
+#else
+			unsetenv(name.c_str());
+#endif
+		}
+	};
+
+	double cap = 0.0, grow = 0.0, keep = 0.0, reach = 0.0;
+	basin_adaptive_step_set_enabled(true);
+	basin_adaptive_step_knobs(cap, grow, keep, reach);
+	const double shipped_grow = grow, shipped_cap = cap;
+	EXPECT_GT(shipped_grow, 0.9) << "the shipped cosine gate is a tight one; this test assumes it";
+
+	{
+		env_guard g("NOS_ADP_GROW", "0.99");
+		basin_adaptive_step_set_enabled(true);
+		basin_adaptive_step_knobs(cap, grow, keep, reach);
+		EXPECT_DOUBLE_EQ(grow, 0.99) << "NOS_ADP_GROW was set and the walk would still use " << grow;
+		EXPECT_DOUBLE_EQ(cap, shipped_cap) << "setting one knob moved another";
+	}
+	basin_adaptive_step_set_enabled(true);
+	basin_adaptive_step_knobs(cap, grow, keep, reach);
+	EXPECT_DOUBLE_EQ(grow, shipped_grow) << "clearing the variable did not restore the validated default";
+
+	//Junk must not be parsed into a zero: a cosine gate of 0 would grow every step in the suite
+	{
+		env_guard g("NOS_ADP_GROW", "not-a-number");
+		basin_adaptive_step_set_enabled(true);
+		basin_adaptive_step_knobs(cap, grow, keep, reach);
+		EXPECT_DOUBLE_EQ(grow, shipped_grow) << "unparseable knob was not ignored";
+	}
+	{
+		env_guard g("NOS_ADP_CAP", "-4");
+		basin_adaptive_step_set_enabled(true);
+		basin_adaptive_step_knobs(cap, grow, keep, reach);
+		EXPECT_DOUBLE_EQ(cap, shipped_cap) << "a negative cap was accepted";
+	}
 }
 
 TEST(AdaptiveStep, AgreesWithTheFloorStepOnNH3Li)

@@ -1474,10 +1474,45 @@ bool beta_spheres_enabled() { return g_beta_spheres; }
 //decides it - the turn test sees curvature, and a separatrix crossed sideways through a straight
 //stretch of field is not curvature, so only the distance to the nearest attractor can bound it -
 //but the cosine has to be tight as well, because curvature is the other way to lose the sheet.
-static const double g_adp_cap = 8.0;    //at most this many times the validated floor step
-static const double g_adp_grow = 0.99999;   //midpoint cosine that earns a doubling
-static const double g_adp_keep = 0.999;   //below this the step is thrown away and retaken at the floor
-static const double g_adp_reach = 0.25;  //fraction of the distance to the nearest maximum
+static constexpr double adp_cap_default = 8.0;    //at most this many times the validated floor step
+static constexpr double adp_grow_default = 0.99999;   //midpoint cosine that earns a doubling
+static constexpr double adp_keep_default = 0.999;   //below this the step is thrown away and retaken at the floor
+static constexpr double adp_reach_default = 0.25;  //fraction of the distance to the nearest maximum
+static double g_adp_cap = adp_cap_default;
+static double g_adp_grow = adp_grow_default;
+static double g_adp_keep = adp_keep_default;
+static double g_adp_reach = adp_reach_default;
+//Those four were measured against a walk that was throwing a third of its floor steps away (see the
+//blame fix in climb below), so re-finding the optimum is a sweep rather than a diff - which is only
+//possible if the numbers can be moved from outside the binary, and only honest if every run says
+//which ones it used. Eight jobs of exactly that sweep once came back byte-identical, counters and
+//all, because nothing in the binary was reading the variables they set. Overriding is for the sweep,
+//not for production: the defaults are the values the equivalence test validates.
+static void adp_knobs_from_env()
+{
+	//From the defaults every time, so clearing the variables puts the validated numbers back
+	g_adp_cap = adp_cap_default; g_adp_grow = adp_grow_default;
+	g_adp_keep = adp_keep_default; g_adp_reach = adp_reach_default;
+	struct entry { const char *name; double *slot; };
+	const entry k[] = { { "NOS_ADP_CAP", &g_adp_cap }, { "NOS_ADP_GROW", &g_adp_grow },
+		{ "NOS_ADP_KEEP", &g_adp_keep }, { "NOS_ADP_REACH", &g_adp_reach } };
+	for (const entry &e : k) {
+		const char *v = std::getenv(e.name); // Flawfinder: ignore - parsed as one positive double
+		if (v == nullptr || *v == '\0') continue;
+		try {
+			const double d = std::stod(v);
+			if (d > 0.0 && std::isfinite(d)) *e.slot = d;
+			else std::cout << "Ignoring " << e.name << "=" << v << ": not a positive finite number" << std::endl;
+		}
+		catch (const std::exception &) {
+			std::cout << "Ignoring " << e.name << "=" << v << ": not a number" << std::endl;
+		}
+	}
+}
+void basin_adaptive_step_knobs(double &cap, double &grow, double &keep, double &reach)
+{
+	cap = g_adp_cap; grow = g_adp_grow; keep = g_adp_keep; reach = g_adp_reach;
+}
 //Off by default, and the reason is a measurement rather than caution: at the settings above the
 //grown step costs at most 8e-4 electrons per basin against the floor-step integration, and on NH3Li
 //it puts 8e-4 electrons outside every basin that the floor step accounts for. That is inside the
@@ -1502,7 +1537,7 @@ void basin_adaptive_step_counters_reset()
 {
 	g_adp_steps = 0; g_adp_tries = 0; g_adp_turn = 0; g_adp_fall = 0;
 }
-void basin_adaptive_step_set_enabled(const bool on) { g_adaptive_step = on; }
+void basin_adaptive_step_set_enabled(const bool on) { g_adaptive_step = on; if (on) adp_knobs_from_env(); }
 bool basin_adaptive_step_enabled() { return g_adaptive_step; }
 static double g_basin_step_scale = 1.0;
 void basin_step_scale_set(const double f) { g_basin_step_scale = f > 0.0 ? f : 1.0; }
@@ -2134,6 +2169,10 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 			<< std::fixed << std::setprecision(1)
 			<< (tr ? 100.0 * static_cast<double>(tu + fa) / static_cast<double>(tr) : 0.0)
 			<< " % of proposals wasted" << std::endl;
+		//A step count without the knobs it was taken at is not a measurement of anything
+		std::cout << "  [timing] " << fieldname << "grown step knobs: cap " << std::setprecision(4) << g_adp_cap
+			<< ", grow " << std::setprecision(8) << g_adp_grow << ", keep " << g_adp_keep
+			<< ", reach " << std::setprecision(4) << g_adp_reach << std::endl;
 	}
 	std::cout << "Quadrature points sent along the field: " << boundary_points << ", left the grid: " << lost << std::endl;
 	return pop;
