@@ -507,19 +507,19 @@ TEST(Topology, ReportNamesTheAssumedFormAndTheDeficit)
 	EXPECT_NE(text.find("Accepted when"), std::string::npos);
 }
 
-//An invariant of the molecule, not of this code: tests/grown/water.wfx is exactly centrosymmetric
-//about its manganese at (0, 15.2402633248481, 0) bohr - 45 of its 48 nuclei map onto each other to
-//1.3E-13 bohr; the three that do not are the unpaired fifth water, which the pairing test below
-//excludes by itself.  A density built
-//from a centrosymmetric geometry with a centrosymmetric basis is invariant under that inversion,
-//so its critical point set must be too: a nucleus with a maximum of its own has an image with one.
+//An invariant of the molecule, not of this code: the geometry of tests/grown/water.wfx is
+//centrosymmetric about its manganese at (0, 15.2402633248481, 0) bohr - 45 of its 48 nuclei map onto
+//each other to 1.3E-13 bohr; the three that do not are the unpaired fifth water, which the pairing
+//test below excludes by itself.  Every nucleus of an all-electron density carries a cusp maximum of
+//rho, so a nucleus with a maximum of its own must have an image with one.  That part is exact and
+//holds however asymmetric the density is - which this one is, by a few milli-a.u.; see the second
+//half of the test, where it is measured and then used as the yardstick for the rest.
 //
-//It did not.  47 attractors for 48 nuclei, the proton H38 without a maximum while its image H39
-//had one - and the cause was neither the density (rho and |grad rho| at the 48 nuclei agree with
-//their images to 7E-16 relative) nor the search (starting at H38, Newton converged in 6 iterations
-//to a (3,-3) point 0.183 bohr away with |grad rho| = 1.4E-10, just as it did at H39).  It was the
-//de-duplication: two accepted points closer than options::merge_distance were called one point
-//whatever their Hessian signature said, and the smaller gradient norm won.  At H38 a bond seed
+//The count did not hold.  47 attractors for 48 nuclei, the proton H38 without a maximum while its
+//image H39 had one - and the cause was not the search either (starting at H38, Newton converged in 6
+//iterations to a (3,-3) point 0.183 bohr away with |grad rho| = 1.4E-10, just as it did at H39).  It
+//was the de-duplication: two accepted points closer than options::merge_distance were called one
+//point whatever their Hessian signature said, and the smaller gradient norm won.  At H38 a bond seed
 //landed 0.045 bohr from the maximum and replaced it; at H39 the same pair sits 0.0536 bohr apart,
 //outside the threshold, and both survived.  The tie-break was a fact about two searches, not about
 //the density, and the printed row still said the point came from a nuclear seed.
@@ -545,7 +545,8 @@ TEST(Topology, ACentrosymmetricDensityHasACentrosymmetricCriticalPointSet)
 	ASSERT_EQ(paired, 45u) << "the inversion centre or the fixture changed: 45 of the 48 nuclei pair "
 		"under it, the three that do not being the unpaired fifth water";
 
-	const topology::result r = topology::analyze_topology(wavy, nuc, topology::options{});
+	const topology::options opt{};
+	const topology::result r = topology::analyze_topology(wavy, nuc, opt);
 	SCOPED_TRACE(r.diagnosis);
 	std::vector<int> attractors_of(nuc.size(), 0);
 	std::vector<double> rho_of(nuc.size(), 0.0), doff_of(nuc.size(), 0.0);
@@ -578,16 +579,47 @@ TEST(Topology, ACentrosymmetricDensityHasACentrosymmetricCriticalPointSet)
 			}
 		}
 	}
-	//The pairs that exist must also carry the same density.  1E-2 is not the tolerance the symmetry
-	//deserves - it is what this search currently delivers, and the gap is recorded rather than hidden:
-	//the worst pair measured here is 4.4E-03, two protons whose maxima the search leaves 0.03 bohr
-	//apart in their own local frames.  Newton stops at |grad rho| <= 1E-7, which pins a position to
-	//~3E-08 bohr, so 0.03 bohr is path dependence in the seeding and not a convergence tolerance.  It
-	//is not the de-duplication either: the number is identical with the old merge rule.
-	EXPECT_LT(worst_rho_rel, 1E-2) << "rho at a nuclear maximum differs from its image's, worst pair Z="
-		<< worst_pair;
 	std::cout << "worst inversion pair, relative drho " << std::scientific << worst_rho_rel
 		<< "   Z=" << worst_pair << "\n";
+
+	//How asymmetric is the density itself?  rho at each paired nucleus against rho at its partner: the
+	//geometry maps those two onto each other to 1.3E-13 bohr and no search is anywhere near this, so
+	//whatever comes out belongs to the wavefunction.  It is not zero.  The breach sorts by element and
+	//not by distance from the water that has no image - H 2.9E-04 to 4.8E-03, C and O around 1E-05, a
+	//pair 12.6 bohr from that water worse than a pair 3.7 bohr from it - and multiplied by rho at each
+	//nucleus it is one number: 1.8E-03 at a proton, 2.4E-03 at a carbon, 5E-03 at an oxygen, absolute.
+	//A uniform valence-scale asymmetry of a few milli-a.u. is what an SCF on an asymmetric molecule looks
+	//like, and this cluster is asymmetric: only its geometry is centrosymmetric, and only for 45 of its
+	//48 nuclei.  A reader mangling a grown image would not respect core hardness that cleanly.
+	double worst_nucleus_rel = 0.0;
+	std::string worst_nucleus_pair;
+	for (size_t a = 0; a < nuc.size(); a++) {
+		const int b = partner[a];
+		if (b < 0 || (size_t)b <= a) continue;
+		const double rho_a = topology::describe_cp(wavy, nuc[a].pos, nuc, opt).density;
+		const double rho_b = topology::describe_cp(wavy, nuc[(size_t)b].pos, nuc, opt).density;
+		const double rel = std::abs(rho_a - rho_b) / rho_a;
+		if (rel > worst_nucleus_rel) {
+			worst_nucleus_rel = rel;
+			std::ostringstream o;
+			o << a + 1 << "/" << b + 1 << " Z=" << nuc[a].Z << " rho " << rho_a << " vs " << rho_b;
+			worst_nucleus_pair = o.str();
+		}
+	}
+	std::cout << "rho at a nucleus against rho at its image, 22 pairs, no search: worst relative drho "
+		<< worst_nucleus_rel << "   " << worst_nucleus_pair << "\n";
+	ASSERT_GT(worst_nucleus_rel, 0.0) << "no pair was compared, so the bound below is vacuous";
+
+	//That number, and not a written-out tolerance, is what the maxima are held to: the search may not add
+	//asymmetry of its own beyond the asymmetry the density already has.  Measured, the maxima come out
+	//4.378652E-03 against 4.750379E-03 at the same two nuclei - a ratio of 0.92, so the two maxima differ
+	//in rho because rho differs there, and the factor of 3 below is headroom rather than a finding.  An
+	//earlier reading of this pair as path dependence in the seeding, on the grounds that Newton's 1E-7
+	//acceptance pins a position to 3E-08 bohr, was wrong for exactly that reason.  It is not the
+	//de-duplication either: the number is identical with the old merge rule.
+	EXPECT_LT(worst_rho_rel, 3.0 * worst_nucleus_rel) << "rho at a nuclear maximum differs from its "
+		"image's by more than the density does at those nuclei, worst maximum pair Z=" << worst_pair
+		<< ", worst nucleus pair " << worst_nucleus_pair;
 	//and every one of the 45 paired nuclei owns exactly one, which is the cusp argument again
 	for (size_t a = 0; a < nuc.size(); a++)
 		if (partner[a] >= 0)
