@@ -3042,6 +3042,17 @@ void ELI_analysis(const WFN &wavy, options &opt) {
 			for (int z = 0; z < eli_cube.get_size(2); z++)
 				if (rho.get_value(x, y, z) < 1e-4) eli_cube.set_value(x, y, z, 0.0);
 	T.lap("ELI-D tail crop");
+	//These are the only attractors this routine discovers on the grid - the QTAIM set is seeded from
+	//the nuclei above and comes out bit-identical at any spacing - so the resolution is an accuracy
+	//parameter for ELI-D and not a performance knob. Measured against their own 0.05 A runs: at
+	//0.1 A one of sucrose's core basins moves 5.6e-2 electrons and ZP2 grows a lone pair that is not
+	//there; at 0.2 A five of sucrose's core basins are retyped as lone pairs. A user who coarsens
+	//the grid to save the cube's seconds has no other way to find that out.
+	if (grid_spacing > 0.05)
+		std::cout << "WARNING: the ELI-D attractors are searched on the " << grid_spacing
+			<< " A grid. Coarser than 0.05 A this basin set is not reliable: core basins have been"
+			" seen to shift by whole electrons and to be retyped as lone pairs. The QTAIM basins"
+			" are unaffected." << std::endl;
 	std::pair<cubei, std::vector<d4>> eli_results = topological_cube_analysis(&eli_cube, atoms, opt.debug, false, 0.0, 1e-10, radius);
 	T.lap("ELI-D cube topology");
 	//The cube keeps the topology: there is no critical-point search for this field to take
