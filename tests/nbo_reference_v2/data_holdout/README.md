@@ -375,7 +375,94 @@ that the two arms actually disagree on one molecule before running the other fif
   and `threads=1` for the three added later, and that difference is now measured to be
   nothing. `holdout_stage.sh`'s header claim holds.
 - The four open shells have no column 3 at all, as above: the sine comparator refuses them.
-- **Still open:** the sine instrument cannot measure an open shell, so `cf3` - the one member
-  that *fails* H2 above the floor by a wide margin - has only the population instruments. A
-  counter-molecule with no subspace measurement is a counter-molecule whose cause is unlocated.
+- **CLOSED, 25 Sep:** `cf3`'s regression is localised to **one spin**, and no new reference
+  was needed to do it - see the next section. The sine instrument still refuses open shells;
+  what was missing was not a reference but the right key in the file we already had.
 
+
+
+## `cf3` is localised to the alpha spin, and `cl2` is not a robust counter-molecule
+
+Two things were wrong in how the two counter-molecules were first reported, and both are
+fixed by instruments that need no cluster and no new reference. Run them with
+`py -3.12 spinsplit.py data_holdout` and `py -3.12 twofloors.py data_holdout <mols>`;
+`spinsplit.py --selfcheck data_holdout` is the assert-only version.
+
+### The per-spin reference was already in git
+
+The open-shell gap was scoped as a missing reference. It is not: gennbo's own **per-spin**
+NAO tables are already parsed into **`nao_alpha` and `nao_beta`** in every
+`<mol>.gennbo.nbo.json`, and `-nbo_native` emits the same two keys, matched row for row
+(`cf3` 124/124/124, `ch2` and `hs` 43, `c2h5` 92). The composite `nao` key is the spin-summed
+table, which is why a comparison against *it* is meaningless for one spin - `alpha + beta`
+reproduces the composite occupancy column to within **2.0 floors** on all four molecules.
+Nothing had to be rebuilt or re-run; the comparator was reading the wrong key.
+
+And a hypothesis about that gap is **refuted**: gennbo and native agree on the Cor/Val/Ryd
+class of **every basis function** of all four open shells, in both arms - `misclass = 0`,
+124/124 and 43/43 and 92/92. Whatever the per-`(atom, l)` row-count difference is, it is not
+spin-dependent classification on this set.
+
+### `cf3`: alpha is 1.9x worse, beta is 8.0x better, and the baseline's total was cancellation
+
+Per-spin Rydberg population, native - gennbo, each side classed by itself. Floor here is
+`n_Ryd x 0.5e-5` = 5.2e-04 for `cf3`, because this sum adds 104 printed values, not 4.
+
+| molecule | spin | baseline | renat5 | factor | floors (base / ren5) |
+|---|---|---|---|---|---|
+| cf3 | alpha | -0.00285 | **-0.00541** | **0.53 worse** | 5.5 / 10.4 |
+| cf3 | beta | +0.00580 | -0.00073 | 7.96 better | 11.1 / 1.4 |
+| cf3 | total | +0.00302 | -0.00607 | **0.50 worse** | 5.8 / 11.7 |
+| c2h5 | alpha | +0.05318 | +0.00029 | 186.4 | 138.1 / 0.7 |
+| c2h5 | beta | +0.05571 | -0.00033 | 170.9 | 144.7 / 0.8 |
+| ch2 | alpha | +0.00340 | -0.00042 | 8.1 | 18.9 / 2.3 |
+| ch2 | beta | +0.01431 | -0.00089 | 16.0 | 79.5 / 5.0 |
+| hs | alpha | +0.00194 | +0.00035 | 5.6 | 11.7 / 2.1 |
+| hs | beta | +0.00203 | +0.00010 | 20.4 | 12.3 / 0.6 |
+
+`cf3` is the only one of the four that gets worse, and only in **alpha**. The mechanism is
+visible in the signs: the baseline's two spins carried errors of **opposite** sign
+(-0.00285 and +0.00580) which partly cancelled in the total (+0.00302). `renat5` drives both
+**negative** (-0.00541, -0.00073), so they add instead of cancelling (-0.00607). So part of
+"2.08x worse on cf3" is the loss of a cancellation the baseline was benefiting from, not 2x
+more error everywhere - but **alpha genuinely worsens 1.9x at 10.4 floors**, so this explains
+the size of the regression without excusing it. `c2h5` is the control: same open-shell
+structure, both spins improve by >170x, so the alpha channel is not generically harmed.
+
+### `cl2` flips verdict between two legitimate summations
+
+The same `d(Ryd)` can be summed over the per-atom NPA Rydberg column (k = N_atoms) or over the
+per-NAO `Ryd` rows (k = n_Ryd). Both are the same physical quantity - they agree in value to
+well within the looser floor on all 16, which `twofloors.py` asserts - but the floor is
+`k x 0.5e-5`, so the per-NAO sum is the **looser** instrument.
+
+| molecule | convention | k | floor | baseline | renat5 | verdict |
+|---|---|---|---|---|---|---|
+| cl2 | per-atom | 2 | 1.0e-05 | -0.00010 | -0.00024 | worse (10 -> 24 floors) |
+| cl2 | per-NAO | 56 | 2.8e-04 | -0.00012 | -0.00026 | **both below floor: no signal** |
+| cf3 | per-atom | 4 | 2.0e-05 | +0.00295 | -0.00614 | worse (148 -> 307) |
+| cf3 | per-NAO | 104 | 5.2e-04 | +0.00302 | -0.00607 | worse (5.8 -> 11.7) |
+
+`cl2` is the **only** molecule of the 16 whose verdict depends on the summation. So the honest
+headline is **one robust counter-molecule, not two**: `cf3` fails on both instruments and by a
+wide margin, while `cl2`'s regression exists on the tighter convention and vanishes on the
+looser one, at a magnitude of 1.4e-04 e. Quote the convention with the number or do not quote
+the number.
+
+### Trap: `nao[i].energy` on an open shell is the ALPHA energy
+
+The open-shell composite NAO table prints `Occupancy` and `Spin` - it has **no Energy column**.
+The `energy` on a composite record in the reference JSON is therefore taken from elsewhere, and
+it is measurably gennbo's **alpha** energy: equal on **124/124** rows of `cf3`, 43/43, 43/43,
+92/92, and to the beta energy on **0** rows of any of them. `spinsplit.py --selfcheck` asserts
+this so it cannot drift silently. It is the same defect family as the `[:packed]` slice in
+`read_47` (`53f11d7f`) and the label beside the binary - an alpha quantity wearing a total
+label - and `nboref_sidebyside.py` prints that field in a column headed `E g`, so read that
+column as alpha on any open-shell molecule. No measured number in this README depends on it:
+every column here is built from occupancies and charges.
+
+### Trap: a blank line inside gennbo's NAO table separates atoms
+
+It does not end the table. A reader that stops at the first blank line after the header returns
+**the first atom only** - 31 of `ch3`'s 49 rows, which looks like a plausible table and is not
+one. Break on a blank line only when the next non-blank line is not itself a row.

@@ -166,3 +166,32 @@ Held-out verdicts, both arms from one binary and one environment variable (job 5
   improvement is not an agreement.
 - The **fit-rather-than-improvement** reading required a median below 2x. It is 18.0, so that
   reading is not available - a result of the set, not a concession to it.
+
+
+## Addendum 3, 25 Sep 2026 - H2's two counter-molecules are one, and cf3's cause is found
+
+Append-only, as above: Addendum 2 stands as written and this refines it. Neither number below
+is new data - both come out of the JSONs Addendum 2 already committed, read with the right key
+and with the floor that belongs to each summation.
+
+**H2 still FAILS, but on one molecule rather than two.** `cf3` gets worse under `renat5` on both
+of the two legitimate `d(Ryd)` summations (per-atom 148 -> 307 floors; per-NAO 5.8 -> 11.7), so
+it is a real counter-molecule. `cl2` gets worse only on the tighter per-atom convention
+(10 -> 24 floors) and has **no signal at all** on the per-NAO one (0.4 -> 0.9 floors, both below
+the 2.8e-04 floor). It is the only one of the 16 that flips verdict between conventions, and its
+magnitude is 1.4e-04 e. Reporting it as a counter-molecule beside `cf3` overstated it; the
+convention has to be quoted with the number. `twofloors.py` asserts the two conventions agree in
+value, so the flip is a floor effect and not a reading error.
+
+**`cf3`'s cause is localised to the alpha spin** - the open hole Addendum 2 left. alpha worsens
+1.9x (-0.00285 -> -0.00541, 5.5 -> 10.4 floors) while beta *improves* 8.0x
+(+0.00580 -> -0.00073). The baseline's two spins had errors of opposite sign that partly
+cancelled in the total; `renat5` makes both negative so they add. `c2h5` is the control and both
+its spins improve by >170x, so nothing generic harms the alpha channel.
+
+**One pre-registration assumption was wrong and is withdrawn:** that the open shells could not
+be measured per spin without building a new reference. gennbo's per-spin NAO tables were already
+parsed into `nao_alpha` / `nao_beta` in the committed reference JSONs, and native emits the same
+keys. The comparator was reading the composite key. Nothing was rebuilt and nothing was re-run.
+
+The gate is unchanged and is not softened by any of this: **0 PASS / 16 FAIL in both arms.**
