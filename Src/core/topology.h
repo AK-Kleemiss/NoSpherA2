@@ -263,8 +263,17 @@ namespace topology
 				point.from = seed_of[s];
 				point.iterations = it;
 				bool duplicate = false;
+				//Same kind, and only then close enough: an attractor and a saddle 0.045 bohr apart are two
+				//points of the density, not one point found twice. Measured on tests/grown/water.wfx, where
+				//distance alone cost the proton H38 its maximum: the nuclear seed reached the attractor at
+				//|grad rho| = 1.4E-10 and a bond seed then reached a (3,-1) point beside it at 1.7E-11, the
+				//smaller gradient replaced the larger, and the analysis reported a bond critical point at a
+				//nucleus - 47 attractors for 48 nuclei. Which of the two converges harder is a fact about the
+				//two searches and not about the density. The inversion image H39, whose pair sits 0.0536 bohr
+				//apart, kept both all along, so the old rule was not even consistent between two nuclei that
+				//the molecule's own symmetry makes equivalent.
 				for (cp& existing : r.points)
-					if (array_length(existing.position, point.position) <= opt.merge_distance) {
+					if (existing.kind == point.kind && array_length(existing.position, point.position) <= opt.merge_distance) {
 						duplicate = true;
 						if (point.gradient_norm < existing.gradient_norm) {
 							const seed_class keep = existing.from; //the class that found it first

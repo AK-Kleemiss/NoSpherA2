@@ -506,3 +506,90 @@ TEST(Topology, ReportNamesTheAssumedFormAndTheDeficit)
 	//the thresholds that did the rejecting are printed too
 	EXPECT_NE(text.find("Accepted when"), std::string::npos);
 }
+
+//An invariant of the molecule, not of this code: tests/grown/water.wfx is exactly centrosymmetric
+//about its manganese at (0, 15.2402633248481, 0) bohr - 45 of its 48 nuclei map onto each other to
+//1.3E-13 bohr; the three that do not are the unpaired fifth water, which the pairing test below
+//excludes by itself.  A density built
+//from a centrosymmetric geometry with a centrosymmetric basis is invariant under that inversion,
+//so its critical point set must be too: a nucleus with a maximum of its own has an image with one.
+//
+//It did not.  47 attractors for 48 nuclei, the proton H38 without a maximum while its image H39
+//had one - and the cause was neither the density (rho and |grad rho| at the 48 nuclei agree with
+//their images to 7E-16 relative) nor the search (starting at H38, Newton converged in 6 iterations
+//to a (3,-3) point 0.183 bohr away with |grad rho| = 1.4E-10, just as it did at H39).  It was the
+//de-duplication: two accepted points closer than options::merge_distance were called one point
+//whatever their Hessian signature said, and the smaller gradient norm won.  At H38 a bond seed
+//landed 0.045 bohr from the maximum and replaced it; at H39 the same pair sits 0.0536 bohr apart,
+//outside the threshold, and both survived.  The tie-break was a fact about two searches, not about
+//the density, and the printed row still said the point came from a nuclear seed.
+TEST(Topology, ACentrosymmetricDensityHasACentrosymmetricCriticalPointSet)
+{
+	const std::filesystem::path f = nos_test_repo_root() / "tests" / "grown" / "water.wfx";
+	if (!std::filesystem::exists(f)) GTEST_SKIP() << "missing fixture " << f.string();
+	WFN wavy(f);
+	const std::vector<topology::nucleus> nuc = topology::nuclei_of(wavy);
+	ASSERT_EQ(nuc.size(), 48u) << "expected the grown manganese complex with five waters";
+	//The centre is the manganese itself, taken from the fixture's own coordinates rather than written
+	//out here: a literal truncated to seven decimals leaves a 1.5E-05 bohr residual and pairs nothing
+	//at the tolerance below.  About Mn1 the 45 paired nuclei map onto each other to 1.3E-13 bohr.
+	ASSERT_EQ(nuc[0].Z, 25) << "nucleus 1 is the inversion centre of this fixture";
+	const d3 centre = nuc[0].pos;
+	std::vector<int> partner(nuc.size(), -1);
+	for (size_t a = 0; a < nuc.size(); a++) {
+		const d3 im{ 2 * centre[0] - nuc[a].pos[0], 2 * centre[1] - nuc[a].pos[1], 2 * centre[2] - nuc[a].pos[2] };
+		for (size_t b = 0; b < nuc.size(); b++)
+			if (nuc[b].Z == nuc[a].Z && array_length(im, nuc[b].pos) < 1E-8) { partner[a] = (int)b; break; }
+	}
+	const size_t paired = (size_t)std::count_if(partner.begin(), partner.end(), [](const int p) { return p >= 0; });
+	ASSERT_EQ(paired, 45u) << "the inversion centre or the fixture changed: 45 of the 48 nuclei pair "
+		"under it, the three that do not being the unpaired fifth water";
+
+	const topology::result r = topology::analyze_topology(wavy, nuc, topology::options{});
+	SCOPED_TRACE(r.diagnosis);
+	std::vector<int> attractors_of(nuc.size(), 0);
+	std::vector<double> rho_of(nuc.size(), 0.0), doff_of(nuc.size(), 0.0);
+	for (const topology::cp& p : r.points)
+		if (p.kind == topology::cp_kind::attractor && !p.is_nna && p.nearest_nucleus >= 0) {
+			attractors_of[p.nearest_nucleus]++;
+			//the one nearest the nucleus, so a second attractor in the same basin cannot decide this
+			if (rho_of[p.nearest_nucleus] == 0.0 || p.nearest_nucleus_distance < doff_of[p.nearest_nucleus]) {
+				rho_of[p.nearest_nucleus] = p.density;
+				doff_of[p.nearest_nucleus] = p.nearest_nucleus_distance;
+			}
+		}
+	double worst_rho_rel = 0.0;
+	std::string worst_pair = "none";
+	for (size_t a = 0; a < nuc.size(); a++) {
+		const int b = partner[a];
+		if (b < 0) continue;
+		EXPECT_EQ(attractors_of[a], attractors_of[(size_t)b])
+			<< "nucleus " << a + 1 << " and its inversion image " << b + 1 << " (both Z=" << nuc[a].Z
+			<< ") disagree on whether they own a maximum";
+		if (attractors_of[a] > 0 && attractors_of[(size_t)b] > 0 && rho_of[a] > 0.0) {
+			const double rel = std::abs(rho_of[a] - rho_of[(size_t)b]) / rho_of[a];
+			if (rel > worst_rho_rel) {
+				worst_rho_rel = rel;
+				std::ostringstream o;
+				o << nuc[a].Z << ": " << a + 1 << " rho " << rho_of[a] << " at " << doff_of[a]
+					<< " bohr off its nucleus, image " << b + 1 << " rho " << rho_of[(size_t)b] << " at "
+					<< doff_of[(size_t)b] << " bohr";
+				worst_pair = o.str();
+			}
+		}
+	}
+	//The pairs that exist must also carry the same density.  1E-2 is not the tolerance the symmetry
+	//deserves - it is what this search currently delivers, and the gap is recorded rather than hidden:
+	//the worst pair measured here is 4.4E-03, two protons whose maxima the search leaves 0.03 bohr
+	//apart in their own local frames.  Newton stops at |grad rho| <= 1E-7, which pins a position to
+	//~3E-08 bohr, so 0.03 bohr is path dependence in the seeding and not a convergence tolerance.  It
+	//is not the de-duplication either: the number is identical with the old merge rule.
+	EXPECT_LT(worst_rho_rel, 1E-2) << "rho at a nuclear maximum differs from its image's, worst pair Z="
+		<< worst_pair;
+	std::cout << "worst inversion pair, relative drho " << std::scientific << worst_rho_rel
+		<< "   Z=" << worst_pair << "\n";
+	//and every one of the 45 paired nuclei owns exactly one, which is the cusp argument again
+	for (size_t a = 0; a < nuc.size(); a++)
+		if (partner[a] >= 0)
+			EXPECT_EQ(attractors_of[a], 1) << "nucleus " << a + 1 << " (Z=" << nuc[a].Z << ")";
+}
