@@ -3060,11 +3060,20 @@ void ELI_analysis(const WFN &wavy, options &opt) {
 	//0.1 A one of sucrose's core basins moves 5.6e-2 electrons and ZP2 grows a lone pair that is not
 	//there; at 0.2 A five of sucrose's core basins are retyped as lone pairs. A user who coarsens
 	//the grid to save the cube's seconds has no other way to find that out.
+	//The message used to say "shift by whole electrons", which came from Cl2 reading a correct core at
+	//0.1 A and a core 4.9 e too large at 0.05 A. That was the persistence defect fixed above, not a
+	//resolution effect, and it is retracted: re-measured with the fixed merge at 0.05/0.1/0.2 A, Cl2's
+	//chlorine core is 10.0573/10.0555/10.0544, HCl's 10.0579/10.0579/10.0568 and CO2's oxygens
+	//2.1307/2.1307/2.1299 - a drift of 0.003 e, not whole electrons. What remains is real but smaller
+	//and lands at the coarse end: F2's fluorine core goes 2.2891/2.2984/2.5984, so 0.31 e at 0.2 A,
+	//and its core volume jumps 0.96 -> 7.72 bohr^3 with an eleventh basin appearing. The gate is left
+	//at 0.05 A because the sucrose and ZP2 numbers above were taken with the old merge and have not
+	//been re-measured - weakening a gate on unmeasured ground is how the retracted claim got in.
 	if (grid_spacing > 0.05)
 		std::cout << "WARNING: the ELI-D attractors are searched on the " << grid_spacing
-			<< " A grid. Coarser than 0.05 A this basin set is not reliable: core basins have been"
-			" seen to shift by whole electrons and to be retyped as lone pairs. The QTAIM basins"
-			" are unaffected." << std::endl;
+			<< " A grid. Coarser than 0.05 A this basin set is less reliable: core populations have"
+			" been seen to drift by 0.3 electrons and basins to appear or be retyped as lone pairs by"
+			" 0.2 A. The QTAIM basins are unaffected." << std::endl;
 	//The persistence merge absorbs a low-persistence basin into its highest neighbour across their
 	//highest shared saddle. Inside a flat valence shell every saddle is about as deep as the one
 	//down to the core, so at the 5e-3 default the single-linkage chain walks the shell shards INTO
