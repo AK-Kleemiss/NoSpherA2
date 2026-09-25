@@ -300,10 +300,18 @@ TEST(RgbiRobustnessTests, TheAnalysisLeavesOccsThreadCountAsItFoundIt)
 //and a free atom's open shell is degenerate enough for the last bit to pick a different member of the
 //manifold. Symmetry-equivalent centres now agree to every digit, which is the only way a published
 //bond index can be compared to anything.
-TEST(RgbiRobustnessTests, SymmetryEquivalentGoldCentresAgreeToEveryDigit_full)
+//
+//The test was gated behind RUN_FULL_TEST when it was written and in that state it never ran once - and
+//it could not have passed: bond_row matched the literal string "0 - 2" against a line printed as
+//"   0 -   2   Au - Br  ...", where each index is right-aligned in its own field, so it found no row and
+//asserted on its own parser before it compared a single number. The indices are read as numbers now, and
+//the gate is gone: fe628ab9's free-atom cache brought the whole analysis to 4 s at the command line and
+//5.6 s in the test binary, which is not a gate's worth of time. Ungating it also puts the ECP heavy-atom
+//RGBI path into the default suite, which is where 09a9c925 belongs - both deployed share binaries abort
+//inside "Calculating ANOs for all atoms..." on this exact file, 4 runs out of 4, with malloc() and
+//SIGSEGV heap diagnostics, while this branch finishes it twice with bit-identical output.
+TEST(RgbiRobustnessTests, SymmetryEquivalentGoldCentresAgreeToEveryDigit)
 {
-	if (const char *env = std::getenv("RUN_FULL_TEST"); !env || std::string(env) == "0" || std::string(env) == "false")
-		GTEST_SKIP() << "Set RUN_FULL_TEST=1 for the 53-atom Au2Br2 Roby-Gould analysis";
 	const auto p = nos_test_repo_root() / "tests" / "ECP_SF" / "Au2Br2.gbw";
 	if (!std::filesystem::exists(p))
 		GTEST_SKIP() << "tests/ECP_SF/Au2Br2.gbw not found";
@@ -315,27 +323,46 @@ TEST(RgbiRobustnessTests, SymmetryEquivalentGoldCentresAgreeToEveryDigit_full)
 		out = cap.str();
 	}
 
-	//the two gold atoms
-	const double au0 = value_after(out, "Population of atom 0: ");
-	const double au1 = value_after(out, "Population of atom 1: ");
-	ASSERT_TRUE(std::isfinite(au0) && std::isfinite(au1)) << "no populations in the output";
-	EXPECT_DOUBLE_EQ(au0, au1);
+	//the three orbits of the inversion centre: 0<->1 (Au), 2<->3 (Br), 4<->5 (P)
+	for (const int a : { 0, 2, 4 }) {
+		const double first = value_after(out, "Population of atom " + std::to_string(a) + ": ");
+		const double second = value_after(out, "Population of atom " + std::to_string(a + 1) + ": ");
+		ASSERT_TRUE(std::isfinite(first) && std::isfinite(second)) << "no population for atoms " << a << " and " << a + 1;
+		EXPECT_DOUBLE_EQ(first, second) << "populations of the symmetry-equivalent atoms " << a << " and " << a + 1;
+	}
 
-	//and the two bond orbits. The inversion centre maps 0<->1 (Au), 2<->3 (Br), 4<->5 (P), so the
-	//rows "0 - 2" and "1 - 3" are one bond, as are "0 - 4" and "1 - 5".
-	auto bond_row = [&out](const std::string &pair) {
+	//The one quantity on this path that does NOT come out bit-identical between two centres of the same
+	//orbit: the population left outside the ANO cutoff, 8.8788628 against 8.8788629 for the two gold
+	//atoms and 3.16409 against 3.1640901 for the two phosphorus atoms, the same on both sides at 1 and
+	//8 threads and in two repeats of each (AKL007, 25 Sep). That is a reduction-order residual in the
+	//last printed digit of a number that is itself a difference of two large ones, so it is pinned at
+	//1e-6 instead of being asserted equal - and pinned rather than ignored, because the populations and
+	//all nine bond columns below ARE bit-identical, and a drift here would be the first sign of the
+	//old defect coming back.
+	for (const int a : { 0, 2, 4 }) {
+		const std::string key = "Atomic projector population outside selected ANO cutoff of atom ";
+		const double first = value_after(out, key + std::to_string(a) + ": ");
+		const double second = value_after(out, key + std::to_string(a + 1) + ": ");
+		ASSERT_TRUE(std::isfinite(first) && std::isfinite(second)) << "no outside-cutoff population for atoms " << a << " and " << a + 1;
+		EXPECT_NEAR(first, second, 1e-6) << "outside-cutoff population of atoms " << a << " and " << a + 1;
+	}
+
+	//and the two bond orbits: the rows "0 - 2" and "1 - 3" are one bond, as are "0 - 4" and "1 - 5".
+	auto bond_row = [&out](const int a, const int b) {
 		vec numbers;
 		std::istringstream in(out);
 		std::string line;
 		while (std::getline(in, line)) {
-			//the pair has to be the first thing on the line, or "0 - 2" also matches "10 - 2"
-			const size_t start = line.find_first_not_of(" \t");
-			if (start == std::string::npos || line.compare(start, pair.size(), pair) != 0)
+			//the indices are right-aligned in their own fields ("   0 -   2   Au - Br  ..."), so they are
+			//read as numbers: a literal "0 - 2" matches no line at all, and "0 -" would also match "10 -"
+			std::istringstream cells(line);
+			int i = 0, j = 0;
+			char dash = 0;
+			if (!(cells >> i >> dash >> j) || dash != '-' || i != a || j != b)
 				continue;
-			const size_t at = start;
-			std::istringstream cells(line.substr(line.find_first_of("ABCDEFGHIJKLMNOPQRSTUVWXYZ", at)));
-			std::string element_a, dash, element_b;
-			cells >> element_a >> dash >> element_b;
+			std::string element_a, element_dash, element_b;
+			if (!(cells >> element_a >> element_dash >> element_b) || element_dash != "-")
+				continue;
 			double v = 0.0;
 			while (cells >> v)
 				numbers.push_back(v);
@@ -343,13 +370,14 @@ TEST(RgbiRobustnessTests, SymmetryEquivalentGoldCentresAgreeToEveryDigit_full)
 		}
 		return numbers;
 	};
-	const char *orbits[][2] = { { "0 - 2", "1 - 3" }, { "0 - 4", "1 - 5" } };
+	const int orbits[][4] = { { 0, 2, 1, 3 }, { 0, 4, 1, 5 } };
 	for (const auto &orbit : orbits) {
-		const vec first = bond_row(orbit[0]), second = bond_row(orbit[1]);
-		ASSERT_EQ(first.size(), 9u) << "no bond row " << orbit[0];
-		ASSERT_EQ(second.size(), 9u) << "no bond row " << orbit[1];
+		const vec first = bond_row(orbit[0], orbit[1]), second = bond_row(orbit[2], orbit[3]);
+		ASSERT_EQ(first.size(), 9u) << "no bond row " << orbit[0] << " - " << orbit[1];
+		ASSERT_EQ(second.size(), 9u) << "no bond row " << orbit[2] << " - " << orbit[3];
 		for (size_t i = 0; i < 9; i++)
-			EXPECT_DOUBLE_EQ(first[i], second[i]) << "column " << i << " of " << orbit[0] << " vs " << orbit[1];
+			EXPECT_DOUBLE_EQ(first[i], second[i]) << "column " << i << " of " << orbit[0] << " - " << orbit[1]
+				<< " vs " << orbit[2] << " - " << orbit[3];
 	}
 }
 
