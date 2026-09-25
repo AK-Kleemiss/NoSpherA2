@@ -1678,17 +1678,39 @@ Roby_information::NAOResult Roby_information::calculateAtomicNAO(const dMatrix2 
 	for (int i = skip_orbitals; i < n; i++)
 		if (result.eigenvalues[idx[i]] > null_occupation)
 			occupied_eigenvectors++;
-	const int keep = std::min(std::clamp(keep_orbitals, 0, std::max(0, n - skip_orbitals)),
+	int keep = std::min(std::clamp(keep_orbitals, 0, std::max(0, n - skip_orbitals)),
 		keep_orbitals >= 0 ? occupied_eigenvectors : n);
-	//A rank boundary inside a degenerate set is ambiguous for the same reason, but there the omitted
-	//partner is occupied, so no cap can help: say so instead of reporting an arbitrary number.
+	//A rank boundary inside a degenerate set is ambiguous in the same way, and worse than an arbitrary
+	//padding direction: a degenerate set spans one subspace and which vectors inside it the diagonalizer
+	//returns is arbitrary, so keeping two members of a threefold set and dropping the third makes the
+	//atomic projector itself depend on that arbitrary choice. It then no longer commutes with the
+	//molecule's symmetry, and bonds that symmetry makes identical come out different. TeF6/def2-TZVP is
+	//the clean case: Te's fixed rank of 13 falls inside the triple at 0.45375369 (the sets are 3, 3, 3, 2
+	//and 3 members, so the boundaries are 11 and 14), and the six Te-F bonds of an exactly octahedral
+	//molecule printed as three pairs - s_AB 0.192, 0.194, 0.192 and Cov. 0.459, 0.449, 0.455 - where six
+	//identical rows are the only correct answer. A degenerate set is therefore all-or-nothing: the rank is
+	//extended to the end of the set it would have cut, which keeps every occupied direction and restores
+	//the symmetry. Each candidate is compared with the last kept value, not with its neighbour, so a long
+	//chain of slowly drifting occupations is not mistaken for one degenerate set.
 	if (keep_orbitals >= 0 && keep > 0 && skip_orbitals + keep < n) {
 		const double last = result.eigenvalues[idx[skip_orbitals + keep - 1]];
-		const double first_out = result.eigenvalues[idx[skip_orbitals + keep]];
-		if (first_out > null_occupation && std::abs(last - first_out) < 1E-6)
-			std::cout << "\n  WARNING: the atomic subspace of rank " << keep << " cuts through a degenerate "
-			<< "occupation (" << std::setprecision(8) << last << " = " << first_out << "); which partner is "
-			<< "kept is arbitrary and this atom's population is not well defined.\n";
+		const int rank_asked = keep;
+		//relative, because these occupations run from 1E-8 to above 12 in the same list
+		constexpr double degenerate_window = 1E-6;
+		while (skip_orbitals + keep < n) {
+			const double next = result.eigenvalues[idx[skip_orbitals + keep]];
+			if (next <= null_occupation)
+				break;
+			if (std::abs(last - next) > degenerate_window * std::max(1.0, std::abs(last)))
+				break;
+			keep++;
+		}
+		if (keep != rank_asked)
+			std::cout << "\n  NOTE: the atomic subspace of rank " << rank_asked << " would have cut through a "
+			<< "degenerate occupation (" << std::setprecision(8) << last << "), which would have made this "
+			<< "atom's projector depend on an arbitrary choice of directions inside that set and its bonds "
+			<< "to symmetry-equivalent partners come out different. Rank extended to " << keep
+			<< " so the set is kept whole.\n";
 	}
 	for (int i = 0; i < n; i++) {
 		int original_idx = idx[i];
@@ -1884,7 +1906,12 @@ double Roby_information::projection_matrix_and_expectation(const ivec &indices, 
 	print_dmatrix2(X, "new Basis");
 #endif
 
-	auto Y = LAPACKE_invert(X);
+	PinvRank rank{};
+	auto Y = LAPACKE_invert(X, pinv_cutoff, &rank);
+	last_pinv_n = rank.n;
+	last_pinv_kept = rank.kept;
+	last_pinv_smallest_kept = rank.smallest_kept;
+	last_pinv_largest_dropped = rank.largest_dropped;
 #ifdef NSA2DEBUG
 	print_dmatrix2(Y, "Pseudo inverse of Y");
 #endif
@@ -2734,6 +2761,22 @@ Roby_information::Roby_information(WFN &wavy, const ivec3 &group_sets, const boo
 	//a second RGBI analysis in the same process printed a population as 1.295 where the first
 	//printed 1.29453, and every later line of the run lost digits the same way.
 	const ostream_format_guard restore_cout_format(std::cout);
+	//The pseudo-inverses below decide the rank of a near-singular metric at a hard cutoff. Moving it is the
+	//only way to tell a number that the physics fixed from a number the threshold fixed, so it is settable -
+	//and announced, because a run at a non-default cutoff must not be mistaken for a default one.
+	if (const char *env = std::getenv("NOS_RGBI_PINV_CUTOFF")) {
+		try {
+			const double v = std::stod(env);
+			err_checkf(v > 0.0, "NOS_RGBI_PINV_CUTOFF must be positive, got '" + std::string(env) + "'.", std::cout);
+			pinv_cutoff = v;
+			std::cout << "NOS_RGBI_PINV_CUTOFF is set: RGBI pseudo-inverses cut singular values below "
+				<< std::scientific << std::setprecision(3) << pinv_cutoff << " instead of the default 1.000e-05\n"
+				<< std::defaultfloat;
+		}
+		catch (const std::invalid_argument &) {
+			err_checkf(false, "NOS_RGBI_PINV_CUTOFF is not a number: '" + std::string(env) + "'.", std::cout);
+		}
+	}
 	auto bonds = get_bonded_atom_pairs(wavy);
 	//Both routes need a per-atom basis set, and a plain .wfn has none: it lists primitives by
 	//centre without shell structure, so every atom's basis comes back empty.  Unguarded, the ANO
@@ -2936,6 +2979,19 @@ Roby_information::Roby_information(WFN &wavy, const ivec3 &group_sets, const boo
 
 		//calcualte population using data from both atoms
 		const double bond_population = projection_matrix_and_expectation(bond_indices, bond_eigenvals, bond_eigenvecs);
+		//This population is the n_AB column, and s_AB = n_A + n_B - n_AB is a difference of two numbers of
+		//the size of n_AB, so a relative error of 1e-4 in it comes out as a percent-level error in s_AB and
+		//in everything derived from the theta decomposition. If the rank of the pair metric was decided by
+		//the cutoff rather than by a gap in the spectrum, say which bond it was.
+		if ((last_pinv_kept > 0 && last_pinv_smallest_kept < 10.0 * pinv_cutoff)
+			|| last_pinv_largest_dropped > 0.1 * pinv_cutoff) {
+			std::ostringstream w;
+			w << "  " << wavy.get_atoms()[bond.first].get_label() << " - " << wavy.get_atoms()[bond.second].get_label()
+				<< ": kept " << last_pinv_kept << " of " << last_pinv_n
+				<< " singular values, smallest kept " << std::scientific << std::setprecision(3) << last_pinv_smallest_kept
+				<< ", largest dropped " << last_pinv_largest_dropped;
+			pinv_warnings.push_back(w.str());
+		}
 		//atom_pair_populations(bond.first, bond.second) = bond_population;
 		//atom_pair_populations(bond.second, bond.first) = bond_population;
 		std::cout << "Bond population between atom " << bond.first + 1 << " and atom " << bond.second + 1 << ": " << bond_population << "\n";
@@ -3191,6 +3247,20 @@ Roby_information::Roby_information(WFN &wavy, const ivec3 &group_sets, const boo
 			<< std::fixed << std::setprecision(3) << std::setw(8) << res.percent_covalent_Arakai << "\n";
 	}
 	std::cout << "--------------------------------------------------------------------------------------------\n";
+
+	//A rank decided by the threshold instead of by a gap in the spectrum is how two bonds that symmetry
+	//makes identical come out different, so it is said out loud rather than left in the numbers. UH6 is the
+	//case that made this necessary: its six U-H bonds are one orbit and come out as 89.363/89.330.
+	if (!pinv_warnings.empty()) {
+		std::cout << "\nWARNING: " << pinv_warnings.size() << " of " << bonds.size()
+			<< " pair subspaces had their rank fixed by the " << std::scientific << std::setprecision(1) << pinv_cutoff
+			<< " singular-value cutoff rather than by a gap in the spectrum, so a bond that symmetry makes "
+			"identical to another can land on the other side of it and the numbers above then differ for no "
+			"physical reason. NOS_RGBI_PINV_CUTOFF moves the cutoff to test that.\n";
+		for (const auto &w : pinv_warnings)
+			std::cout << w << "\n";
+		std::cout << std::defaultfloat;
+	}
 
 	if (!group_sets.empty()) {
 		const int N_atoms = wavy.get_ncen();

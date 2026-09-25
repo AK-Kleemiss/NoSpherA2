@@ -732,3 +732,100 @@ TEST(RgbiRobustnessTests, TheRefusalNeverSuggestsTheFormatItIsRefusing)
 		EXPECT_FALSE(phrase.empty()) << "a refusal with no alternative at all, for " << ext;
 	}
 }
+
+//An exactly octahedral molecule has ONE bond orbit: all six Te-F bonds are the same bond, so the six
+//rows of the table must agree in every printed digit. On this branch before the fix they did not - they
+//came out as three pairs, s_AB 0.192 / 0.194 / 0.192 and Cov. 0.459 / 0.449 / 0.455 - and the log said
+//why: "the atomic subspace of rank 13 cuts through a degenerate occupation (0.45375369)". Te's ANO
+//occupations group as 3, 3, 3, 2, 3, so the boundaries are at 11 and 14 and the fixed rank of 13 kept
+//two members of a threefold set. A degenerate set spans one subspace and which vectors inside it the
+//diagonalizer hands back is arbitrary, so a rank that cuts one makes the atomic projector itself
+//arbitrary; it then no longer commutes with the molecule's symmetry and bonds the symmetry makes
+//identical come out different. calculateAtomicNAO now extends the rank to the end of the set it would
+//have cut.
+//
+//WHAT WOULD MAKE THIS TEST WRONG rather than red: TeF6/def2-TZVP is octahedral to the last digit of the
+//input geometry (1.815 A along each axis, ORCA NoUseSym), so any spread at all is the code's. The three
+//cheaper members of the same bisection - SF6/def2-SVP (l <= 2), SF6/def2-TZVP (l <= 3) and
+//SF6/def2-QZVP (l = 4) - all came out exactly Oh on this binary without the fix, which is what makes
+//the ECP/degenerate-rank path and not the spherical transforms the thing under test here.
+//
+//The binary without the extension IS the red run: on it this fixture prints s_AB 0.192 / 0.194 / 0.192
+//and Cov. 0.459 / 0.449 / 0.455, so the five exact columns below fail 2 + 2 + 2 (measured on AKL007,
+//binary b34902b06d12, 25 Sep). With the extension the same binary prints six identical rows in those
+//five columns (8c137772530d, same node, same fixture).
+TEST(RgbiRobustnessTests, OctahedralTeF6HasOneBondOrbitNotThree)
+{
+	const auto p = nos_test_repo_root() / "tests" / "RGBI_groups" / "tef6_tzvp.gbw";
+	if (!std::filesystem::exists(p))
+		GTEST_SKIP() << "tests/RGBI_groups/tef6_tzvp.gbw not found";
+	std::string out;
+	{
+		CoutCapture cap;
+		WFN wavy(p);
+		Roby_information roby(wavy, {}, true, true, false, false);
+		out = cap.str();
+	}
+
+	//The six fluorines are one orbit, so one population. They come out at 9.8018244 for the four
+	//equatorial ones and 9.8018242 for the two along z: a 2e-7 residual in the last printed digit of a
+	//number that is a difference of two much larger ones, the same floor the Au2Br2 test pins for its
+	//outside-cutoff population. It is pinned at 1e-6 rather than asserted equal - and pinned rather than
+	//ignored, because it is the D4h pattern again and it is where a regression would show first. What
+	//makes this a floor and the ionic split below a defect is four orders of magnitude: 2e-7 here against
+	//1e-3 in Ion.
+	const double f0 = value_after(out, "Population of atom 1: ");
+	ASSERT_TRUE(std::isfinite(f0)) << "no population for atom 1";
+	for (int a = 2; a <= 6; a++) {
+		const double f = value_after(out, "Population of atom " + std::to_string(a) + ": ");
+		ASSERT_TRUE(std::isfinite(f)) << "no population for atom " << a;
+		EXPECT_NEAR(f0, f, 1e-6) << "population of fluorine " << a << " against fluorine 1";
+	}
+
+	//and the six Te-F rows are one bond. Same reader as the Au2Br2 test: the indices are right-aligned
+	//in their own fields, so they are read as numbers rather than matched as text.
+	auto bond_row = [&out](const int a, const int b) {
+		vec numbers;
+		std::istringstream in(out);
+		std::string line;
+		while (std::getline(in, line)) {
+			std::istringstream cells(line);
+			int i = 0, j = 0;
+			char dash = 0;
+			if (!(cells >> i >> dash >> j) || dash != '-' || i != a || j != b)
+				continue;
+			std::string element_a, element_dash, element_b;
+			if (!(cells >> element_a >> element_dash >> element_b) || element_dash != "-")
+				continue;
+			double v = 0.0;
+			while (cells >> v)
+				numbers.push_back(v);
+			break;
+		}
+		return numbers;
+	};
+	//Five of the nine columns - n_A, n_B, n_AB, s_AB and Cov. - now agree in every printed digit, where
+	//before the fix all nine split. The four that still do not are the ionic ones: Ion. reads -0.432 for
+	//the four equatorial bonds and -0.431 for the two along z, and Tot., Pyth. and Arak. are computed
+	//from it. That is a SECOND, smaller defect, pinned rather than asserted equal so that the part which
+	//is fixed is protected today and the part which is not is recorded as a number instead of a promise:
+	//the theta tables put the two pi subspaces of ONE bond at 85.109 and 85.113 degrees, and the site
+	//symmetry of a Te-F axis in an octahedron is C4v, which makes those two exactly degenerate - so a
+	//4e-3 deg split is the pair path's own asymmetry, upstream of the ionic sum. Four equatorial plus two
+	//axial is D4h again, and a reduction-order residual would not pick out the z axis run after run.
+	const size_t exact_columns = 5;
+	const double pinned_tolerance[4] = { 2e-3, 2e-3, 3e-2, 2e-2 };  //Ion., Tot., Pyth., Arak., as printed
+	const vec first = bond_row(0, 1);
+	ASSERT_EQ(first.size(), 9u) << "no bond row 0 - 1";
+	for (int b = 2; b <= 6; b++) {
+		const vec row = bond_row(0, b);
+		ASSERT_EQ(row.size(), 9u) << "no bond row 0 - " << b;
+		for (size_t i = 0; i < exact_columns; i++)
+			EXPECT_DOUBLE_EQ(first[i], row[i]) << "column " << i << " of Te-F bond 0 - " << b
+				<< " against 0 - 1: an octahedral molecule has one bond orbit";
+		for (size_t i = exact_columns; i < 9; i++)
+			EXPECT_NEAR(first[i], row[i], pinned_tolerance[i - exact_columns]) << "ionic column " << i
+				<< " of Te-F bond 0 - " << b << " against 0 - 1: the known residual is 1e-3 in Ion. and "
+				"0.019 in Pyth., so a failure here is the second defect growing, not the first returning";
+	}
+}

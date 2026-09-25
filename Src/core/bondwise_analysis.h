@@ -92,6 +92,16 @@ private:
 	std::vector<bond_index_result> RGBI;
 	std::vector<group_bond_index_result> RGBI_groups;
 	ivec ano_fallback_atoms;
+	//RGBI inverts a near-singular metric for every atom and every pair, and the rank of that inverse is
+	//decided by a hard singular-value cutoff. On UH6 that split six symmetry-equivalent U-H bonds into two
+	//groups (pair populations 89.363 and 89.330, which the s_AB column turns into 0.330 against 0.362
+	//because it is a difference of two numbers near 90), so the rank of the last inverse is kept and any
+	//bond whose rank was decided AT the cutoff rather than by a gap in the spectrum says so after the
+	//table. Plain members rather than the PinvRank struct, so this header needs no new include.
+	double pinv_cutoff = 1E-5;  //NOS_RGBI_PINV_CUTOFF overrides it, which is how the sensitivity is tested
+	int last_pinv_n = 0, last_pinv_kept = 0;
+	double last_pinv_smallest_kept = 0.0, last_pinv_largest_dropped = 0.0;
+	std::vector<std::string> pinv_warnings;
 	//Roby-Gould atomic natural orbitals: one atom at a time, plain Loewdin S^-1/2, no
 	//orthogonalisation between atoms - what the RGBI projections want, and a different quantity
 	//from the NAOs of nao.h, whose occupancies sum to the exact electron count.

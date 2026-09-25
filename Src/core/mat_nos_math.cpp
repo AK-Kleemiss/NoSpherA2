@@ -640,7 +640,7 @@ template void get_submatrices(const dMatrix2& D_full, const dMatrix2& S_full, ve
 //template void get_submatrices(const cMatrix2& D_full, const cMatrix2& S_full, cvec& D_sub, cvec& S_sub, const ivec& indices);
 
 //calculates the Moore-Penrose pseudo-inverse of a matrix A using SVD
-dMatrix2 LAPACKE_invert(const dMatrix2& A, const double cutoff) {
+dMatrix2 LAPACKE_invert(const dMatrix2& A, const double cutoff, PinvRank* rank_out) {
 	const int m = static_cast<int>(A.extent(0)); // rows
 	const int n = static_cast<int>(A.extent(1)); // cols
 	const int k = std::min(m, n);
@@ -715,6 +715,21 @@ dMatrix2 LAPACKE_invert(const dMatrix2& A, const double cutoff) {
 #endif
 
 	// 3. Invert Singular Values (Sigma^+)
+	//Report how the rank came out BEFORE the values are overwritten. dgesvd returns them in descending
+	//order, but scanning instead of indexing the ends costs nothing and does not depend on that.
+	if (rank_out != nullptr) {
+		*rank_out = PinvRank{};
+		rank_out->n = k;
+		for (int i = 0; i < k; ++i) {
+			rank_out->largest = std::max(rank_out->largest, S[i]);
+			if (S[i] < cutoff)
+				rank_out->largest_dropped = std::max(rank_out->largest_dropped, S[i]);
+			else {
+				rank_out->kept++;
+				rank_out->smallest_kept = rank_out->kept == 1 ? S[i] : std::min(rank_out->smallest_kept, S[i]);
+			}
+		}
+	}
 	// Filter out small singular values
 	for (int i = 0; i < k; ++i)
 		S[i] = S[i] < cutoff ? 0.0 : 1.0 / S[i];

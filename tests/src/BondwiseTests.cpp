@@ -368,6 +368,71 @@ TEST(BondwiseSymmetrizeTests, SphericalMultiShellOffsets)
 	EXPECT_NEAR(trace(m), 45.0, 1e-10);
 }
 
+//The spherical transforms were tested up to d, and RGBI accepts shells up to h. Everything above d is
+//built by a pseudo-inverse solve against libcint's real-spherical convention
+//(spherical_transform_matrix: solve T_cart C = C T_sph), so f, g and h are the three l values where a
+//wrong or non-orthogonal representation would go unnoticed - and a wrong representation on one l shows
+//up as a molecule whose symmetry-equivalent bonds differ, which is the defect class this whole file is
+//about. UH6, the one octahedral fixture that still splits 4 + 2 after the atomic-rank fix, carries the
+//highest angular momenta of any RGBI fixture in the tree.
+//
+//Two invariants, and they need no reference and no eigensolver:
+//  * O_h-averaging the identity must return the identity. sum_g D(g) I D(g)^T / 48 = I holds if and only
+//    if every D(g) is orthogonal, which is what an orthogonal change of real-spherical basis has to be.
+//    A pseudo-inverse solve that loses a row, or picks up a normalisation factor, fails here.
+//  * The averaging is idempotent, symmetric and trace-preserving on an arbitrary matrix. Idempotence is
+//    the group-closure test: sum_g D(g) is a projector only if {D(g)} is closed under composition, so a
+//    transform matrix that is orthogonal but does not represent the operation it was built for fails
+//    here even though it passes the first test.
+//
+//WHAT THIS DOES NOT CHECK: that each D(g) is the representation of the RIGHT group element - a
+//relabelling of the 48 operations among themselves passes both invariants. That would need the
+//composition table, which is not exposed.
+//
+//Made red on purpose by transposing one of the two transform factors in the spherical branch of
+//symmetrize_atomic_matrix_oh (transforms[shell_a](a, transformed_a) instead of (transformed_a, a)):
+//the identity check then fails on every l from 1 to 5 (3, 5, 6, 11 and 11 entries of the 3, 5, 7, 9 and
+//11-function shells), the trace moves on all four shell combinations, and idempotence fails in 418
+//places. The three pre-existing spherical tests go red with it, which is the point of keeping them: this
+//test is the one that covers l = 3, 4 and 5, where a transform can be wrong without any of them noticing.
+TEST(BondwiseSymmetrizeTests, SphericalFGHTransformsAreOrthogonalAndClosed)
+{
+	for (const int l : { 0, 1, 2, 3, 4, 5 }) {
+		const int n = 2 * l + 1;
+		vec ones(n, 1.0);
+		dMatrix2 identity = diagonal_matrix(ones);
+		symmetrize_atomic_matrix_oh(identity, { l }, true);
+		for (int i = 0; i < n; i++)
+			for (int j = 0; j < n; j++)
+				EXPECT_NEAR(identity(i, j), i == j ? 1.0 : 0.0, 1e-10)
+					<< "O_h-averaging the identity of the spherical l = " << l << " shell changed it at ("
+					<< i << ", " << j << "), so that shell's 48 transforms are not all orthogonal";
+	}
+
+	//one shell per l, and then the three high ones together, which also exercises the shell offsets
+	for (const ivec &shells : { ivec{ 3 }, ivec{ 4 }, ivec{ 5 }, ivec{ 3, 4, 5 } }) {
+		int n = 0;
+		for (const int l : shells)
+			n += 2 * l + 1;
+		dMatrix2 m(n, n);
+		for (int i = 0; i < n; i++)
+			for (int j = 0; j < n; j++)
+				m(i, j) = std::cos(0.37 * i + 0.11 * j) + std::cos(0.37 * j + 0.11 * i);
+		const double before = trace(m);
+		symmetrize_atomic_matrix_oh(m, shells, true);
+		dMatrix2 twice = m;
+		symmetrize_atomic_matrix_oh(twice, shells, true);
+		EXPECT_NEAR(trace(m), before, 1e-10) << "the trace of a " << n << "-function spherical block is not "
+			"preserved, which an orthogonal representation cannot do";
+		for (int i = 0; i < n; i++)
+			for (int j = 0; j < n; j++) {
+				EXPECT_NEAR(m(i, j), m(j, i), 1e-10) << "asymmetric result at (" << i << ", " << j << ") for n = " << n;
+				EXPECT_NEAR(twice(i, j), m(i, j), 1e-10) << "averaging twice differs from averaging once at ("
+					<< i << ", " << j << ") for n = " << n << ": the transforms do not close into a group";
+			}
+	}
+}
+
 //two s shells are invariant under every operation: the full 2x2 matrix, off-diagonal included, is untouched
 TEST(BondwiseSymmetrizeTests, SOnlyMatrixIsUnchanged)
 {
