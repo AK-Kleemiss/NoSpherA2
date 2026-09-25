@@ -332,9 +332,18 @@ NAOResult build_naos(const dMatrix2 &P_in, const dMatrix2 &S_in, const std::vect
     //of everything above it - so a core keeps its shape exactly, which is what makes its
     //occupancy come out at 1.99995 rather than 1.9991 - and then occupancy-weighted
     //symmetrically orthogonalised among its own members.
-    //Core and valence stay separate classes: orthogonalising the whole natural minimal basis in
-    //one OWSO, the way the 1985 paper reads, moves epoxide and nh3bh3 further from NBO 7 (worst
-    //|dq| 0.020 -> 0.022 and 0.019 -> 0.022) and benzene from 0.004 to 0.006.
+    //Core and valence stay separate classes.  The argument that used to stand here was an NPA one -
+    //pooling them moved epoxide and nh3bh3's worst |dq| 0.020 -> 0.022 and benzene's 0.004 -> 0.006 -
+    //and that instrument is now known to be blind to exactly this: the class-split arm moved 0.695 e
+    //of benzene's Rydberg set while all 111 charges agreed to 1e-10.  The three classes survive on the
+    //gauge-free measurement instead: over the 144-member cascade grid (fit144.py) no grouping of the
+    //classes closes a molecule and none beats three, and the two-class form is what separates `spec`
+    //from `renat5` below - `renat5` IS spec minus two_class, and it is the better of the two.
+    //
+    //Rydberg orbitals additionally get spec step 5 before their OWSO; see the block in the loop.
+    //NAO_LEGACY_CASCADE=1 restores the pre-step-5 cascade exactly (no naturalization, pre-NAO
+    //occupancies as the Rydberg weights) so a before/after can be taken with one binary.
+    const bool legacy_cascade = nao_env("NAO_LEGACY_CASCADE");
     ivec cols_by_class[3];
     for (int i = 0; i < nao; i++)
         cols_by_class[static_cast<int>(orbitals[i].type)].push_back(i);
@@ -343,9 +352,13 @@ NAOResult build_naos(const dMatrix2 &P_in, const dMatrix2 &S_in, const std::vect
     for (int i = 0; i < nao; i++)
         l_blocks[{ orbitals[i].atom, orbitals[i].l }].push_back(i);
 
-    //The weights stay the pre-NAO occupancies.  Re-running steps 3 and 4 with the weights taken
-    //from the orbitals they produce does converge, but to the wrong answer - epoxide's hydrogens
-    //end at +0.66 - so the pre-NAO occupancy is the weight, not a first guess at one.
+    //Core and valence weights stay the pre-NAO occupancies.  Re-running steps 3 and 4 with the
+    //weights taken from the orbitals they produce does converge, but to the wrong answer - epoxide's
+    //hydrogens end at +0.66 - so for those two classes the pre-NAO occupancy is the weight, not a
+    //first guess at one.  The RYDBERG weights are the exception and they are not an iteration: spec
+    //step 5 hands this loop a fresh generalised eigenproblem's eigenvalues for the very vectors it is
+    //about to orthogonalise (arm `renat5`).  The refuted iteration is arm `weights`, which takes the
+    //current m-averaged diagonals instead and is reachable as neither - it is not implemented here.
     MatrixXd done(nao, 0);  //everything orthonormalised so far, in S
     for (int cls = 0; cls < 3; cls++) {
         const ivec &cols = cols_by_class[cls];
@@ -360,6 +373,50 @@ NAOResult build_naos(const dMatrix2 &P_in, const dMatrix2 &S_in, const std::vect
             B -= done * (done.transpose() * S * B);
             for (int j = 0; j < B.cols(); j++)
                 B.col(j) /= std::sqrt(std::max(B.col(j).dot(S * B.col(j)), 1e-300));
+        }
+        //---------------------------------------------- 5. intracenter naturalization of the NRBs
+        //The published cascade has seven steps where this one had four, and this is one of the two
+        //that were missing: after the Schmidt projection the Rydberg vectors are no longer natural on
+        //their own atom, so per (atom, l) solve the m-averaged GENERALISED problem (S P S) c = w S c
+        //again - the same eigenproblem as step 1, on different input vectors - and use ITS eigenvalues
+        //as the weights of the OWSO that follows.  S enters as the metric because these columns are
+        //S-normalised but not yet mutually S-orthogonal.
+        //
+        //This is arm `renat5` of tests/nbo_reference_v2/spec_steps.py and it is an IMPROVEMENT, not an
+        //agreement: it cuts the worst Rydberg population error against gennbo 7's own AO->NAO matrix
+        //from 0.3161 to 0.0050 e and is closer on 8 of 8 closed-loop molecules, and the acceptance
+        //gate still FAILS - native disagrees with NBO 7 on all 22 wavefunctions before and after.
+        //Nothing here closes that; it removes one measured defect out of the way of finding what does.
+        if (cls == 2 && !legacy_cascade) {
+            const MatrixXd Sloc = B.transpose() * S * B, Ploc = B.transpose() * SPS * B;
+            std::map<std::pair<int, int>, ivec> ryd_blocks;  //(atom, l) -> LOCAL columns of B
+            for (size_t j = 0; j < cols.size(); j++)
+                ryd_blocks[{ orbitals[cols[j]].atom, orbitals[cols[j]].l }].push_back(static_cast<int>(j));
+            const MatrixXd Bold = B;  //the combination reads the old vectors while B is overwritten
+            for (const auto &kv : ryd_blocks) {
+                const int nm_r = 2 * kv.first.second + 1;
+                const ivec &grp = kv.second;  //shell-major, m contiguous, descending pre-NAO occupancy
+                const int ns_r = static_cast<int>(grp.size()) / nm_r;
+                MatrixXd Sb = MatrixXd::Zero(ns_r, ns_r), Pb = MatrixXd::Zero(ns_r, ns_r);
+                for (int s1 = 0; s1 < ns_r; s1++)
+                    for (int s2 = 0; s2 < ns_r; s2++)
+                        for (int m = 0; m < nm_r; m++) {
+                            Sb(s1, s2) += Sloc(grp[s1 * nm_r + m], grp[s2 * nm_r + m]) / nm_r;
+                            Pb(s1, s2) += Ploc(grp[s1 * nm_r + m], grp[s2 * nm_r + m]) / nm_r;
+                        }
+                const MatrixXd X = sym_power(Sb, -0.5);
+                Eigen::SelfAdjointEigenSolver<MatrixXd> es(X * Pb * X);
+                for (int sh = 0; sh < ns_r; sh++) {
+                    const int k = ns_r - 1 - sh;  //descending occupancy, as step 1
+                    const VectorXd c = X * es.eigenvectors().col(k);
+                    for (int m = 0; m < nm_r; m++) {
+                        VectorXd v = VectorXd::Zero(nao);
+                        for (int s = 0; s < ns_r; s++) v += c(s) * Bold.col(grp[s * nm_r + m]);
+                        B.col(grp[sh * nm_r + m]) = v;
+                        w(grp[sh * nm_r + m]) = std::max(es.eigenvalues()(k), 0.0);
+                    }
+                }
+            }
         }
         //NAO_OWSO_OFF=1 drops the occupancy weighting and leaves the plain Loewdin below as the
         //whole of the within-class orthogonalisation.  That is not a candidate - it throws away the
