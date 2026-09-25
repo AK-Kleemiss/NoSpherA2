@@ -160,6 +160,27 @@ CONTROLS, all three mandatory, reported with their numbers whatever they say:
 
 NOT MEASURED HERE, on purpose: timings, NPA charges (measured blind to this defect), NRT, and
 anything about the 22-molecule external gate, which this file does not touch.
+
+AMENDMENTS AFTER THE PRE-REGISTRATION COMMIT (1409901).  Everything above is the frozen text; these
+are the changes made to the code afterwards, each one forced by a CONTROL FAILURE and not by any
+real-data result, and NONE of them touches the acceptance rule, the floor recipe or the backbones:
+
+  a. resid() sign-canonicalises each column of M by the sign of its own diagonal element, and drops
+     the diagonal residual for members of a degenerate cluster.  Forced by control 1: the recovery
+     fit returned 1.2e+00 on lif and moved zero steps, because the raw residual JUMPED by 0.75 for a
+     1e-10 step along a direction the cascade is exactly invariant under (eigh's column sign).  Gauge
+     2 of the pre-registration already declared the sign to be a gauge; taking |M_jj| quotients it on
+     the diagonal only, and the off-diagonal needed the same treatment.
+  b. x0 for both fits is log(max(w0, 1e-6)) rather than log(w0): a pre-NAO occupancy of exactly zero
+     gave -inf, i.e. outside the box of gauge 4.
+  c. Two reporting-layer bugs: a KeyError in the per-row print line and a json writer that could not
+     serialise an array.
+  d. The solver's finite-difference step is DIFF_STEP = 1e-4, not scipy's default, and the real fit
+     runs from STARTS = 3 starting points.  Also forced by control 1 and tuned ONLY on the recovery
+     target, whose answer is known by construction: the default step left the optimiser differentiating
+     eigen-decomposition noise (lif 2.076e-04 against a 1.26e-07 floor, terminating after 13 steps),
+     and 16 (jac, diff_step, x_scale) combinations were measured there before one was fixed.  Both
+     changes can only lower the achieved residual, i.e. only ever make a MISS harder to claim.
 """
 
 import json
@@ -183,6 +204,8 @@ DRAWS = 4
 SPREAD = 3.0
 FIT_K, MISS_K = 1.0, 10.0     # acceptance multiples of the measured floor
 SEED = 20260925
+DIFF_STEP = 1e-04            # measured on the recovery target, not scipy's default
+STARTS = 3                   # multistart for the real fit only
 
 
 def norm_w(w, cls):
@@ -219,10 +242,36 @@ def mask_of(g):
     return keep
 
 
+def maskd_of(g):
+    """Diagonal entries that carry information: those outside every degenerate cluster.
+
+    >>> maskd_of(dict(n=3, cl=[[0], [1, 2]])).tolist()
+    [True, False, False]
+    """
+    keepd = np.ones(g["n"], dtype=bool)
+    for grp in g["cl"]:
+        if len(grp) > 1:
+            keepd[list(grp)] = False
+    return keepd
+
+
 def resid(theta, g, renat, keep, Cref):
-    """[off-diagonal M ; 1 - |diag M|] with M = Cref^t S C(w), w = exp(theta)."""
+    """[off-diagonal M ; 1 - diag M] with M = Cref^t S C(w) sign-canonicalised, w = exp(theta).
+
+    The column sign of C(w) is eigh's arbitrary gauge, not an answer: flipping it flips a whole column
+    of M, and the raw off-diagonal residual therefore JUMPED by 0.75 for a 1e-10 step along a direction
+    the cascade is exactly invariant under, which left least_squares differentiating noise (it moved
+    zero steps, and the recovery control failed at 1.2e+00 on lif).  Each column is canonicalised
+    against the reference by the sign of its own diagonal element - near any candidate solution that
+    element is +-1, nowhere near the kink at zero.  Members of a degenerate occupancy cluster carry no
+    diagonal residual at all: their intra-cluster rotation is undetermined, and with the cluster's
+    off-diagonal block already masked out, M's orthogonality makes that block redundant rather than
+    informative.  Neither change touches the acceptance rule; both are gauge quotients.
+    """
     M = Cref.T @ g["S"] @ compose(np.exp(theta), g, renat)
-    return np.concatenate([M[keep], 1.0 - np.abs(np.diag(M))])
+    d = np.diag(M).copy()
+    M = M * np.sign(np.where(d == 0.0, 1.0, d))[None, :]
+    return np.concatenate([M[keep], 1.0 - np.diag(M)[g["keepd"]]])
 
 
 def verdict(C, Cref, g):
@@ -273,23 +322,46 @@ def prepare(mol, d):
     g["perm"] = perm
     g["w0"] = norm_w(np.maximum(g["pre_occ"], 0.0), g["cls"])
     g["keep"] = mask_of(g)
+    g["keepd"] = maskd_of(g)
     g["ndeg"] = sum(len(x) for x in g["cl"] if len(x) > 1)
     return g
 
 
-def fit_one(g, renat, Cref, x0, xtol=1e-10, max_nfev=None):
-    """least_squares on theta, boxed to owso()'s own representable range."""
+def fit_one(g, renat, Cref, x0, starts=1, max_nfev=200):
+    """least_squares on theta, boxed to owso()'s own representable range; best of `starts` starts.
+
+    DIFF_STEP is not scipy's default.  On the recovery target - which is exactly reachable, so every
+    failure there is the solver's - the default 2-point step left lif at 2.076e-04 while diff_step=1e-4
+    reached 5.960e-08, the sine floor, because the cascade's eigen-decompositions are not smooth at the
+    1.5e-08 scale the default probes.  Sixteen (jac, diff_step, x_scale) combinations were measured on
+    that target before this one was fixed, and it is then used unchanged for every molecule and arm.
+
+    `starts` > 1 adds the flat vectors and a log-uniform draw as extra starting points and keeps the
+    lowest residual.  That is multistart for a plateaued optimiser, not best-of-N acceptance: it can
+    only ever make a MISS harder to claim, and the acceptance rule still runs on 8 of 8 molecules.
+    """
     from scipy.optimize import least_squares
     lo, hi = np.log(WLO), np.log(WHI)
-    x0 = np.clip(x0, lo + 1e-09, hi - 1e-09)
-    t0 = time.time()
-    r = least_squares(resid, x0, bounds=(lo, hi), args=(g, renat, g["keep"], Cref),
-                      method="trf", xtol=xtol, ftol=1e-12, gtol=1e-12, max_nfev=max_nfev)
-    w = norm_w(np.exp(r.x), g["cls"])
-    pinned = int((r.x <= lo + 1e-06).sum())
-    return dict(w=w, cost=float(r.cost), nfev=int(r.nfev), secs=time.time() - t0,
-                pinned=pinned, status=int(r.status),
-                res=float(np.linalg.norm(r.fun)), neq=int(r.fun.size))
+    rng = np.random.default_rng(SEED + 2)
+    xs = [np.clip(x0, lo + 1e-09, hi - 1e-09)]
+    for k in range(1, starts):
+        xs.append(np.clip(np.log(np.full(g["n"], 0.1)) if k == 1
+                          else np.log(norm_w(10.0 ** rng.uniform(-4, 0, g["n"]), g["cls"])),
+                          lo + 1e-09, hi - 1e-09))
+    t0, best = time.time(), None
+    nfev = 0
+    for x in xs:
+        r = least_squares(resid, x, bounds=(lo, hi), args=(g, renat, g["keep"], Cref), method="trf",
+                          jac="2-point", diff_step=DIFF_STEP, x_scale=1.0,
+                          xtol=1e-14, ftol=1e-14, gtol=1e-14, max_nfev=max_nfev)
+        nfev += int(r.nfev)
+        if best is None or r.cost < best.cost:
+            best = r
+    w = norm_w(np.exp(best.x), g["cls"])
+    pinned = int((best.x <= lo + 1e-06).sum())
+    return dict(w=w, cost=float(best.cost), nfev=nfev, starts=len(xs), secs=time.time() - t0,
+                pinned=pinned, status=int(best.status),
+                res=float(np.linalg.norm(best.fun)), neq=int(best.fun.size))
 
 
 def forms(w, g):
@@ -350,6 +422,7 @@ def demo():
     g = dict(n=n, S=S, SPS=SPS, lbl=lbl, cls=cls, C32=C32, pre_occ=np.array([t[6] for t in lbl]))
     g["cl"] = clusters(lbl)
     g["keep"] = mask_of(g)
+    g["keepd"] = maskd_of(g)
     g["w0"] = norm_w(g["pre_occ"], cls)
     out = {"n": n, "sp_off": float(np.abs(C32.T @ S @ C32 - np.eye(n)).max())}
     C0 = compose(g["w0"], g, False)
@@ -381,7 +454,7 @@ def main(argv):
     for mol in mols:
         sub = os.path.join(d, "ops_" + mol)
         g = prepare(mol, sub)
-        row = dict(mol=mol, n=g["n"], ndeg=g["ndeg"], neq_mask=int(g["keep"].sum()),
+        row = dict(mol=mol, n=g["n"], ndeg=g["ndeg"], neq=int(g["keep"].sum() + g["keepd"].sum()),
                    sp_off=float(np.abs(g["Sp"] - np.eye(g["n"])).max()), arms={})
         rng = np.random.default_rng(SEED)
         C33 = g["C33"]
@@ -395,7 +468,8 @@ def main(argv):
             # (3b) on real data: the composition moves when w moves.
             moves = verdict(compose(norm_w(g["w0"] * rng.uniform(0.5, 2.0, g["n"]), g["cls"]), g, renat),
                             C0, g)["worst"]
-            f = fit_one(g, renat, C33, np.log(g["w0"]))
+            x0 = np.log(np.maximum(g["w0"], WLO))
+            f = fit_one(g, renat, C33, x0, starts=STARTS)
             vf = verdict(compose(f["w"], g, renat), C33, g)
             # (1) recovery, on this molecule's real S/SPS/labels.
             wp = norm_w(10.0 ** rng.uniform(-4, 0, g["n"]), g["cls"])
@@ -403,21 +477,21 @@ def main(argv):
             # (2) negative, an independent random orthogonal on top of a plain Loewdin.
             Q = np.linalg.qr(np.random.default_rng(SEED + 1).normal(size=(g["n"], g["n"])))[0]
             Cneg = g["C32"] @ sym_power(g["Sp"], -0.5) @ Q
-            rn = fit_one(g, renat, Cneg, np.log(g["w0"]), max_nfev=60 * g["n"])
+            rn = fit_one(g, renat, Cneg, x0, starts=STARTS)
+            neg = dict(res=rn["res"], worst=verdict(compose(rn["w"], g, renat), Cneg, g)["worst"])
             call = ("FIT" if vf["worst"] <= FIT_K * fl else
                     ("MISS" if vf["worst"] >= MISS_K * fl else "INCONCLUSIVE"))
             row["arms"][name] = dict(
                 floor=fl, draws=draws, base=base, fit=f, vfit=vf, call=call, moves=moves,
                 recover=dict(res=rc["res"], dlog=float(np.abs(np.log10(rc["w"] / wp)).max()),
                              worst=verdict(compose(rc["w"], g, renat), compose(wp, g, renat), g)["worst"]),
-                negative=dict(res=rn["res"],
-                              worst=verdict(compose(rn["w"], g, renat), Cneg, g)["worst"]),
+                negative=neg,
                 forms=forms(f["w"], g))
             print("%-9s %-6s n=%-4d eq=%-6d unk=%-4d floor=%.2e base=%.4e fit=%.4e %-12s "
                   "pin=%-3d rec=%.1e neg=%.4e" % (
-                      mol, name, g["n"], row["neq_mask"] + g["n"], g["n"] - len(set(g["cls"])),
+                      mol, name, g["n"], row["neq"], g["n"] - len(set(g["cls"])),
                       fl, base["worst"], vf["worst"], call, f["pinned"],
-                      rc["res"], rn["worst"]))
+                      rc["res"], neg["worst"]))
             sys.stdout.flush()
         rows.append(row)
     calls = {}
@@ -428,8 +502,9 @@ def main(argv):
     for a, cs in calls.items():
         print("%-6s FIT %d/%d  MISS %d/%d  INCONCLUSIVE %d/%d" % (
             a, cs.count("FIT"), len(cs), cs.count("MISS"), len(cs), cs.count("INCONCLUSIVE"), len(cs)))
-    out = os.path.join(d, "fitw_result.json")
-    json.dump(rows, open(out, "w"), indent=1, default=float)
+    tag = "" if list(mols) == list(MOLS) else "_" + "-".join(mols)
+    out = os.path.join(d, "fitw_result%s.json" % tag)
+    json.dump(rows, open(out, "w"), indent=1, default=lambda o: o.tolist() if hasattr(o, "tolist") else float(o))
     print("wrote", out)
     return 0
 
