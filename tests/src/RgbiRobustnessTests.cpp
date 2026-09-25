@@ -129,6 +129,13 @@ TEST(RgbiRobustnessTests, CeriumFreeAtomRunsAndIsNotFallenBackOn)
 	const auto p = nos_test_repo_root() / "tests" / "molden_file" / "Ce_full.molden";
 	if (!std::filesystem::exists(p))
 		GTEST_SKIP() << "tests/molden_file/Ce_full.molden not found";
+	//Ce's free-atom SCF is the most expensive thing in this suite by four orders of magnitude: 2414355 ms
+	//of a 96-core node in the 25 Sep 04:38 run, against 165 ms for the next slowest RGBI test. A gate
+	//nobody waits for is a gate nobody runs, and this is the only test covering the f-element free-atom
+	//path, so it stays - behind a switch, and named in the skip message rather than quietly dropped.
+	if (!std::getenv("NOS_RGBI_SLOW_TESTS"))
+		GTEST_SKIP() << "Ce's free-atom SCF took 2414 s on AKL007 (96 cores, 25 Sep 04:38); "
+		                "set NOS_RGBI_SLOW_TESTS=1 to run it";
 	std::string out;
 	{
 		CoutCapture cap;
@@ -318,6 +325,9 @@ TEST(RgbiRobustnessTests, IdenticalCentresShareOneFreeAtomScf)
 		}
 	} debug_on;
 
+	//Cold, or this counts the test order rather than the run: with the cache left warm by a neighbour this
+	//arm reports 0 SCFs and 4 hits, which satisfies every bound below while proving nothing.
+	clear_rgbi_free_atom_cache();
 	const std::string out = rgbi_ano_output(false);
 	ASSERT_FALSE(out.empty()) << "the analysis produced no output at all";
 
@@ -333,14 +343,17 @@ TEST(RgbiRobustnessTests, IdenticalCentresShareOneFreeAtomScf)
 	const size_t hits = count("FREEATOM-CACHED");
 
 	EXPECT_EQ(scfs + hits, 4u) << "water.gbw has 4 centres and each must be answered once:\n" << out;
-	EXPECT_LT(scfs, 4u) << "two hydrogens of one molecule ran two separate free-atom SCFs";
-	EXPECT_LE(scfs, 3u) << "more SCFs than the molecule has distinct free atoms";
+	//Exact, now that the cache is cleared above: O, H and He are three distinct free atoms and the second
+	//hydrogen is the one repeat. A bound like "fewer than 4" was satisfied by a warm cache doing none.
+	EXPECT_EQ(scfs, 3u) << "water plus helium has 3 distinct free atoms, so 3 SCFs and no more:\n" << out;
+	EXPECT_EQ(hits, 1u) << "the second hydrogen is the only repeat and it must come from the cache:\n" << out;
 
 	//The half that makes this a check and not a stopwatch. NOS_RGBI_NO_FREEATOM_CACHE recomputes every
 	//centre in this same process, so the cached bond table has something to be identical to. Without it
-	//the only evidence for the cache is that it ran faster, and on the one fixture the cache exists for
-	//- tests/Fe_gbw/Fe.gbw - the uncached run is a ~2.5 h job that has never produced a table at all, so
-	//the cached numbers there rest on the identity holding where it can be afforded.
+	//the cache offers no evidence at all: it is not faster. On the one fixture it exists for,
+	//tests/Fe_gbw/Fe.gbw, the uncached run has now produced its table - 21 SCFs in 411.3 s against the
+	//cached 4 in 1727.1 s, md5 1672c4eae0c8 both ways - so the eighth fixture is verified and the cache's
+	//justification is entirely this identity.
 #ifdef _WIN32
 	_putenv_s("NOS_RGBI_NO_FREEATOM_CACHE", "1");
 #else
@@ -376,9 +389,10 @@ TEST(RgbiRobustnessTests, IdenticalCentresShareOneFreeAtomScf)
 		<< table(out) << "\nuncached:\n" << table(uncached);
 }
 
-//The cache removes the repeats; it does not make the remaining SCFs any faster. On tests/Fe_gbw/Fe.gbw
-//4 distinct free atoms still cost about half an hour one behind the other, and they do not depend on
-//each other, so NOS_RGBI_PARALLEL_FREEATOM runs them up front and concurrently. The risk that buys is
+//The cache removes the repeats; it does not make the remaining SCFs any faster, and on
+//tests/Fe_gbw/Fe.gbw it makes the run about 1300 s slower than recomputing all 21. The distinct SCFs run
+//one behind the other and do not depend on each other, so NOS_RGBI_PARALLEL_FREEATOM runs them up front
+//and concurrently. How much that saves is being measured and is not claimed here. The risk it buys is
 //the only one worth testing for: occ's SCF is not documented re-entrant, and a free-atom density that
 //comes out subtly different under concurrency would be invisible in a timing table.
 //
@@ -443,6 +457,12 @@ TEST(RgbiRobustnessTests, WarmingTheFreeAtomCacheInParallelDoesNotChangeTheAnswe
 	set_env("NOS_RGBI_NO_FREEATOM_CACHE", "");
 	ASSERT_FALSE(table(serial).empty()) << "no bond table from the serial run";
 
+	//Cold on purpose. The cache lives for the process, so without this the warm pass finds every atom of
+	//this fixture already answered by an earlier test in this same binary, runs no SCF at all, and the
+	//fourteen-digit comparison below has nothing to compare. That is how this check failed once it
+	//acquired neighbours, having passed while it ran alone: 0 SCFs in the parallel arm, and the product
+	//behaving correctly the whole time.
+	clear_rgbi_free_atom_cache();
 	set_env("NOS_RGBI_PARALLEL_FREEATOM", "1");
 	const std::string parallel = rgbi_ano_output(false);
 	set_env("NOS_RGBI_PARALLEL_FREEATOM", "");
@@ -468,4 +488,73 @@ TEST(RgbiRobustnessTests, WarmingTheFreeAtomCacheInParallelDoesNotChangeTheAnswe
 	EXPECT_EQ(table(serial), table(parallel))
 		<< "running the free-atom SCFs concurrently changed the answer\nserial:\n"
 		<< table(serial) << "\nparallel:\n" << table(parallel);
+}
+
+//The determinism guard's own effect, asserted directly instead of through the digits it protects.
+//
+//TheAnalysisLeavesOccsThreadCountAsItFoundIt above checks that the guard cleans up. Nothing checked
+//that it ever engaged, and it stopped: occ declares `inline int nthreads = 1` and installs no
+//tbb::global_control until set_num_threads is called, so a guard that skipped the call when
+//get_num_threads() already read 1 installed nothing, and every free-atom SCF ran its reductions across
+//every core. The damage was 1.3e-13 in norm(D) - two chemically identical hydrogens of this same fixture
+//disagreed in 7 of 50 processes - which no bond table printed at three decimals can see, and none of the
+//eight md5 fixtures of this harness did.
+//
+//So the observable is the pin, not the digits: a check on the digits would have gone red about one time
+//in seven, and a gate that fails one run in seven gets muted. This one is exact. NOS_RGBI_NO_PIN turns
+//the pin off in this same binary and makes it red immediately, which is how it was confirmed to be able
+//to fail at all.
+TEST(RgbiRobustnessTests, EveryFreeAtomScfRunsWithOccPinnedForReal)
+{
+	const auto p = water_he_fixture();
+	if (p.empty())
+		GTEST_SKIP() << "tests/TFVC/water.gbw not found";
+
+	struct ScopedEnv {
+		ScopedEnv() {
+#ifdef _WIN32
+			_putenv_s("NOS_RGBI_DEBUG", "1");
+			_putenv_s("NOS_RGBI_NO_FREEATOM_CACHE", "1");
+#else
+			setenv("NOS_RGBI_DEBUG", "1", 1);
+			setenv("NOS_RGBI_NO_FREEATOM_CACHE", "1", 1);
+#endif
+		}
+		~ScopedEnv() {
+#ifdef _WIN32
+			_putenv_s("NOS_RGBI_DEBUG", "");
+			_putenv_s("NOS_RGBI_NO_FREEATOM_CACHE", "");
+#else
+			unsetenv("NOS_RGBI_DEBUG");
+			unsetenv("NOS_RGBI_NO_FREEATOM_CACHE");
+#endif
+		}
+	} debug_uncached;
+
+	//Uncached on purpose: a cache hit runs no SCF, so the cached run would only report on the
+	//centres that happened to miss. Every centre has to be seen pinned, including the repeats.
+	const std::string out = rgbi_ano_output(false);
+	ASSERT_FALSE(out.empty()) << "the analysis produced no output at all";
+
+	size_t starts = 0, pinned = 0;
+	for (size_t at = out.find("FREEATOM-START"); at != std::string::npos;
+		at = out.find("FREEATOM-START", at + 1)) {
+		const size_t eol = out.find('\n', at);
+		const std::string line = out.substr(at, eol == std::string::npos ? eol : eol - at);
+		starts++;
+		if (line.find("pinned=1") != std::string::npos)
+			pinned++;
+	}
+	ASSERT_EQ(starts, 4u)
+		<< "4 centres with the cache disabled must run 4 free-atom SCFs, so this test is looking at "
+		"nothing if it does not see 4 of them:\n" << out;
+	EXPECT_EQ(pinned, starts)
+		<< pinned << " of " << starts << " free-atom SCFs began with a tbb::global_control admitting "
+		"one thread. The rest ran their reductions concurrently, and the free-atom density they return "
+		"is then reproducible only to the digits a bond table prints:\n" << out;
+
+	//And the guard still has to put occ back: an assertion that it engaged is worth nothing if the
+	//way it engaged leaves the rest of the binary pinned to one thread.
+	EXPECT_EQ(occ::parallel::get_tbb_control(), nullptr)
+		<< "the analysis left a TBB control behind, so every later occ user in this process is serial";
 }

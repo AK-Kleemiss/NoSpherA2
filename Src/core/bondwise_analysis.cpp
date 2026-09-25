@@ -11,6 +11,7 @@
 #include "spherical_density.h"
 #include "citations.h"
 #include "nao.h"
+#include <chrono>
 #include <mutex>
 #include <occ/core/parallel.h>
 #include <occ/qm/hf.h>
@@ -319,33 +320,80 @@ namespace {
 		return disabled;
 	}
 
+	//"Already at one thread" is not "already pinned", and reading it as such unpins occ altogether. occ
+	//declares `inline int nthreads = 1` and creates no tbb::global_control until somebody calls
+	//set_num_threads, so at process start get_num_threads() answers 1 while TBB is still free to use
+	//every core. A version of this guard that skipped the call when previous == 1 therefore installed no
+	//control at all, and the SCF it exists to make deterministic ran its reductions concurrently: two
+	//chemically identical hydrogens of tests/TFVC/water.gbw, each given its own free-atom SCF in one
+	//process at OMP_NUM_THREADS=1, came back with different norm(D) in 7 of 50 processes - 1.3e-13
+	//relative, invisible to a bond table printed at three decimals, which is why no digest caught it.
+	//The state that matters is whether the control exists, never the integer beside it.
+	//
+	//The reason that version existed is real, so it is handled here rather than by not pinning: inside
+	//the parallel warm pass below several of these are alive at once, and a destructor calling
+	//shutdown_tbb() while a sibling thread is still inside TBB would tear down a pool in use. A depth
+	//count settles it - the outermost frame owns the pin and the restore, every inner frame is a no-op -
+	//and it is deliberately one global count rather than one per thread, because the frame that encloses
+	//the warm pass is on the main thread while the frames it has to suppress are on the workers.
 	class ScopedOccSingleThread {
 	public:
-		ScopedOccSingleThread()
-			: had_control(occ::parallel::get_tbb_control() != nullptr),
-			previous(occ_pinning_disabled() ? 1 : occ::parallel::get_num_threads()) {
-			if (previous != 1)
-				occ::parallel::set_num_threads(1);
+		ScopedOccSingleThread() {
+			if (occ_pinning_disabled())
+				return;
+			const std::lock_guard<std::mutex> hold(state().mutex);
+			engaged = true;
+			if (state().depth++ > 0)
+				return;                 //an enclosing frame has already pinned occ
+			state().had_control = occ::parallel::get_tbb_control() != nullptr;
+			state().previous = occ::parallel::get_num_threads();
+			occ::parallel::set_num_threads(1);
 		}
 		~ScopedOccSingleThread() {
-			//Already pinned when we arrived: the constructor changed nothing, so neither does this. The
-			//pair is symmetric either way, and it matters when several of these are alive at once inside
-			//the warm pass below - a destructor that called shutdown_tbb() while a sibling thread was
-			//still inside TBB would be shutting down a pool in use.
-			if (previous == 1)
+			if (!engaged)
 				return;
-			if (had_control)
-				occ::parallel::set_num_threads(previous);
+			const std::lock_guard<std::mutex> hold(state().mutex);
+			if (--state().depth > 0)
+				return;
+			if (state().had_control)
+				occ::parallel::set_num_threads(state().previous);
 			else {
 				occ::parallel::shutdown_tbb();
-				occ::parallel::nthreads = previous; //keep get_num_threads() honest
+				occ::parallel::nthreads = state().previous; //keep get_num_threads() honest
 			}
 		}
 
 	private:
-		bool had_control = false;
-		int previous = 1;
+		bool engaged = false;
+		struct State {
+			std::mutex mutex;
+			int depth = 0;
+			bool had_control = false;
+			int previous = 1;
+		};
+		static State &state() {
+			static State s;
+			return s;
+		}
 	};
+
+	//Every diagnostic line below is built in its own stream and written under one lock, because the warm
+	//pass at the end of this block runs these SCFs from several OpenMP threads at once. Unsynchronised,
+	//three concurrent std::cout chains on tests/TFVC/water.gbw produced 14 FREEATOM lines of which 0 still
+	//carried their " E=" field, in a file grep then called binary - so the digest the parallel arm has to
+	//reproduce could not be read out of it at all, and the check on it failed for a reason that had nothing
+	//to do with the densities. The std::setprecision(14) that used to sit mid-chain is the worse half: it
+	//is never restored, so on the shared stream every number the process printed afterwards inherited it,
+	//and from a worker thread it applied to whichever line happened to be mid-flight. A local
+	//ostringstream has its own format state and leaks nothing.
+	//
+	//getenv is read at each call rather than cached in a static on purpose: the tests flip NOS_RGBI_DEBUG
+	//between arms inside one process, and a cached answer would freeze whatever the first arm saw.
+	void rgbi_debug_line(const std::string &line) {
+		static std::mutex print_mutex;
+		const std::lock_guard<std::mutex> hold(print_mutex);
+		std::cout << "\n" << line << std::endl;
+	}
 
 	//What a free atom's density depends on, and nothing else: the basis it is expanded in, the number
 	//of electrons that basis has to hold, and the two conventions below. Its position never enters -
@@ -392,15 +440,18 @@ namespace {
 		}
 	};
 
+	//At file scope rather than inside the function only so that clear_rgbi_free_atom_cache() below can
+	//reach them. A linear scan, because the number of distinct elements in a molecule is small and a map
+	//would need a hash over the whole basis to answer the same question. The mutex is here because the
+	//cost of being wrong if this is ever called concurrently - and the warm pass does call it
+	//concurrently - is a corrupted density, not a slow run.
+	std::vector<std::pair<FreeAtomKey, dMatrix2>> free_atom_cache;
+	std::mutex free_atom_cache_mutex;
+
 	dMatrix2 compute_tonto_style_atomic_density(
 		const atom &atm, const e_origin origin, const bool cartesian) {
-		//A linear scan, because the number of distinct elements in a molecule is small and a map would
-		//need a hash over the whole basis to answer the same question. The mutex is here because the
-		//cost of being wrong if this loop is ever parallelised is a corrupted density, not a slow run.
 		const FreeAtomKey key{ atm.get_basis_set(), atm.get_charge(), atm.get_ECP_electrons(),
 							   origin, cartesian };
-		static std::vector<std::pair<FreeAtomKey, dMatrix2>> free_atom_cache;
-		static std::mutex free_atom_cache_mutex;
 		//An off switch, because the only evidence a cache offers on its own is that it ran faster, and
 		//"faster" is not a check that can go red. With NOS_RGBI_NO_FREEATOM_CACHE set, this same binary
 		//recomputes every centre: that is what gives the cached numbers a reference to be identical to,
@@ -416,9 +467,12 @@ namespace {
 			const std::lock_guard<std::mutex> hold(free_atom_cache_mutex);
 			for (const auto &cached : free_atom_cache)
 				if (cached.first == key) {
-					if (std::getenv("NOS_RGBI_DEBUG") != nullptr)
-						std::cout << "\nFREEATOM-CACHED " << atm.get_label() << " Z="
-							<< atm.get_charge() - atm.get_ECP_electrons() << std::endl;
+					if (std::getenv("NOS_RGBI_DEBUG") != nullptr) {
+						std::ostringstream line;
+						line << "FREEATOM-CACHED " << atm.get_label() << " Z="
+							<< atm.get_charge() - atm.get_ECP_electrons();
+						rgbi_debug_line(line.str());
+					}
 					return cached.second;
 				}
 		}
@@ -450,11 +504,29 @@ namespace {
 
 		//Named before the SCF, not after it: when occ dies inside it there is otherwise nothing at all
 		//to say which atom was being computed.
-		if (std::getenv("NOS_RGBI_DEBUG") != nullptr)
-			std::cout << "\nFREEATOM-START " << atm.get_label() << " Z=" << effective_atomic_number
+		//
+		//pinned= is the observable the determinism guard was missing. The guard's effect was previously
+		//only visible in the digits it protects, and those move about one process in seven - a check that
+		//goes red one time in seven is not a gate. This says outright whether a tbb::global_control exists
+		//and admits one thread at the moment the SCF begins, which is what being pinned means; it reads
+		//false immediately and every time under NOS_RGBI_NO_PIN, so the check on it can be made red on
+		//purpose without patching anything.
+		if (std::getenv("NOS_RGBI_DEBUG") != nullptr) {
+			std::ostringstream line;
+			line << "FREEATOM-START " << atm.get_label() << " Z=" << effective_atomic_number
 				<< " mult=" << multiplicity << (restricted ? " restricted" : " unrestricted")
 				<< " nbf=" << basis.nbf() << " nsh=" << basis.size() << " n_alpha=" << n_alpha
-				<< std::endl;
+				<< " pinned=" << ((occ::parallel::get_tbb_control() != nullptr &&
+					occ::parallel::get_num_threads() == 1) ? 1 : 0);
+			rgbi_debug_line(line.str());
+		}
+
+		//Timed, because every per-SCF cost quoted about this function so far has been a total divided by
+		//a count, and that is not a measurement of an SCF - it is a measurement of the whole run with the
+		//SCF's name on it. It produced "430 s per free-atom SCF" from one fixture's total, and job 580121
+		//then reported the same binary doing 21 of these SCFs in 411.3 s and 4 of them in 1727.1 s, which
+		//no division can reconcile because the 21 include the 4. One of those totals is not spent here.
+		const auto scf_t0 = std::chrono::steady_clock::now();
 
 		occ::qm::HartreeFock hf(basis);
 		occ::qm::SCF<occ::qm::HartreeFock> scf(hf, spin_kind);
@@ -479,12 +551,28 @@ namespace {
 		occ::qm::MolecularOrbitals mo = scf.wavefunction().mo;
 		mo.update_occupied_orbitals();
 		mo.update_density_matrix();
-		if (std::getenv("NOS_RGBI_DEBUG") != nullptr)
-			std::cout << "\nFREEATOM " << atm.get_label() << " Z=" << effective_atomic_number
+		if (std::getenv("NOS_RGBI_DEBUG") != nullptr) {
+			std::ostringstream line;
+			line << "FREEATOM " << atm.get_label() << " Z=" << effective_atomic_number
 				<< " mult=" << multiplicity << (restricted ? " restricted" : " unrestricted")
 				<< " nbf=" << basis.nbf() << " na=" << mo.n_alpha << " nb=" << mo.n_beta
 				<< std::setprecision(14) << " E=" << scf_energy
-				<< " sumD=" << mo.D.sum() << " normD=" << mo.D.norm() << "\n";
+				<< " sumD=" << mo.D.sum() << " normD=" << mo.D.norm();
+			rgbi_debug_line(line.str());
+		}
+		//A line of its own, and not a field on the one above, because that line is the harness's only
+		//observable with real resolution: RgbiRobustnessTests compares the text of it from " Z=" to the
+		//end of the line to decide whether two runs of the same free atom agree. A wall clock in there
+		//makes every such line unique, so the comparison would pass unconditionally from then on - the
+		//check would still be green and would no longer be checking anything. It carries no " E=", which
+		//is what that test filters on.
+		if (std::getenv("NOS_RGBI_DEBUG") != nullptr) {
+			std::ostringstream line;
+			line << "FREEATOM-TIME " << atm.get_label() << " Z=" << effective_atomic_number
+				<< " nbf=" << basis.nbf() << " secs="
+				<< std::chrono::duration<double>(std::chrono::steady_clock::now() - scf_t0).count();
+			rgbi_debug_line(line.str());
+		}
 
 		dMatrix2 result = (spin_kind == occ::qm::SpinorbitalKind::Restricted)
 			? eigen_matrix_to_dmatrix2(2.0 * mo.D)
@@ -498,12 +586,20 @@ namespace {
 		return result;
 	}
 
-	//The cache turns 21 free-atom SCFs into 4 on tests/Fe_gbw/Fe.gbw, and those 4 still cost about half
-	//an hour because they run one behind the other inside a loop that cannot be parallelised: it mutates
-	//the overlap matrix, accumulates a basis-function index and appends to NAOs in order. The SCFs
-	//themselves are independent of each other, so they can be run up front and concurrently, after which
-	//the serial loop finds every centre already answered and the whole wall time collapses towards one
-	//SCF.
+	//The cache turns 21 free-atom SCFs into 4 on tests/Fe_gbw/Fe.gbw. What those 4 cost is not known: an
+	//earlier version of this comment divided the run's half hour by them and got about 430 s each, which
+	//was arithmetic on the wrong quantity. Measured from one binary on one node with only
+	//NOS_RGBI_NO_FREEATOM_CACHE between the arms, 21 SCFs take 411.3 s and 4 take 1727.1 s, and the 21
+	//contain the 4 - so most of at least one total is not spent in the free-atom SCFs at all, and on this
+	//fixture the cache buys byte-identical output for about 1300 s of net loss. The cache is an accuracy
+	//and determinism device and not a speed one. FREEATOM-TIME under NOS_RGBI_DEBUG times each SCF from
+	//inside, which is the only way to get a per-SCF number here.
+	//
+	//The SCFs are independent of each other and the loop that consumes them is not: it mutates the
+	//overlap matrix, accumulates a basis-function index and appends to NAOs in order. So they can be run
+	//up front and concurrently, after which the serial loop finds every centre already answered. Whether
+	//that is worth a concurrency path is a measurement and not yet an answer, and its floor is the largest
+	//single SCF, which stays serial either way.
 	//
 	//Off unless NOS_RGBI_PARALLEL_FREEATOM is set, because occ's SCF has not been shown to be re-entrant
 	//and a free-atom density is precisely the thing this must not quietly get wrong. What makes the flag
@@ -537,14 +633,20 @@ namespace {
 		}
 		if (distinct.size() < 2)
 			return;
-		if (std::getenv("NOS_RGBI_DEBUG") != nullptr)
-			std::cout << "\nFREEATOM-WARM " << distinct.size() << " distinct of " << ats.size()
-				<< " centres" << std::endl;
+		if (std::getenv("NOS_RGBI_DEBUG") != nullptr) {
+			std::ostringstream line;
+			line << "FREEATOM-WARM " << distinct.size() << " distinct of " << ats.size() << " centres";
+			rgbi_debug_line(line.str());
+		}
 
 		//Pinned once, out here: the guard each SCF takes then finds occ already at one thread and does
 		//nothing, so no two of these threads race over occ's global thread count and none of them can
 		//shut a pool down while the others are still in it.
 		const ScopedOccSingleThread deterministic_reduction;
+		//And quiet once, out here as well. Each SCF sets this for itself, but spdlog's level is global and
+		//three threads restoring it in turn let whole convergence tables through between them - the test
+		//log for this path was several hundred lines of occ energy components with the result buried in it.
+		const ScopedOccLogLevel quiet_occ_logs(spdlog::level::err);
 #pragma omp parallel for schedule(dynamic)
 		for (int i = 0; i < static_cast<int>(distinct.size()); i++) {
 			try {
@@ -676,6 +778,18 @@ namespace {
 		return result;
 	}
 } // namespace
+
+//Exists for the harness, and says so rather than pretending to be a feature: the free-atom cache lives
+//for the process, so a check that the parallel warm pass really runs free-atom SCFs sees none of them if
+//an earlier check in the same process already answered those atoms. That is not hypothetical - the
+//concurrency check passed alone and failed behind its three neighbours, reporting 0 SCFs in its parallel
+//arm, and the two ways to make it green without this were both worse: assert less, or let the
+//fourteen-digit comparison quietly stop happening. It also releases the matrices, which a long-lived
+//Olex2 process may care about.
+void clear_rgbi_free_atom_cache() {
+	const std::lock_guard<std::mutex> hold(free_atom_cache_mutex);
+	free_atom_cache.clear();
+}
 
 void symmetrize_atomic_matrix_oh(dMatrix2 &matrix, const ivec &shell_angular_momenta,
 	const bool spherical) {

@@ -11,6 +11,11 @@ class WFN;
 void symmetrize_atomic_matrix_oh(dMatrix2& matrix, const ivec& shell_angular_momenta,
 	bool spherical = false);
 
+// Drop every cached free-atom density. The RGBI/ANO route runs one free-atom SCF per distinct
+// element+basis and keeps it for the life of the process; the harness clears it so that "this run did N
+// free-atom SCFs" stays a statement about the run rather than about which test happened to go first.
+void clear_rgbi_free_atom_cache();
+
 struct bond {
 	std::string label_1;
 	std::string label_2;
