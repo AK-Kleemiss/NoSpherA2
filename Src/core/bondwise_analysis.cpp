@@ -2077,6 +2077,16 @@ void Roby_information::computeAllAtomicNAOs(WFN &wavy, const bool symmetrize, co
 			"orientation of the molecule in the file.\n";
 	}
 
+	//A flag that changes nothing has to say so, or it is the same defect as a flag nobody reads: on the
+	//ANO route over a spherical basis the reference is a free atom's own density and is averaged whatever
+	//this switch says, because not averaging it put the file's axes into the numbers. The switch still
+	//does what it says on the molecular route, which is where the ANO route falls back when an element's
+	//atomic SCF does not converge, so it is not ignored - just not decisive here.
+	if (!symmetrize && use_ano_basis && !wavy.get_d_f_switch())
+		std::cout << "Note: -rgbi_no_sym does not change the atomic reference on the ANO route, because "
+			"that reference is a free atom and a free atom is spherically symmetric. It still applies to "
+			"any atom whose ANO reference falls back to the molecular density.\n";
+
 	if (wavy.get_d_f_switch()) {
 		Int_Params basis(wavy);
 		vec S_full;
@@ -2204,9 +2214,25 @@ void Roby_information::computeAllAtomicNAOs(WFN &wavy, const bool symmetrize, co
 				//the ANO route thresholds free atom occupations, which are element constants, so
 				//its rank never depended on the geometry - passing the same count keeps the
 				//subspace it already picked and makes the two routes say the same thing.
+				//And the matrix handed over here is not the molecule's: it is a FREE ATOM's own
+				//density, from occ's atomic SCF. A free atom is spherically symmetric, so this average
+				//is a property of that reference and not an approximation imposed on the molecule -
+				//which is what -rgbi_no_sym switches off. A single-determinant SCF on an open-shell
+				//atom breaks that symmetry artificially by putting its electrons in particular m
+				//components, and the broken reference then carries the axes of the FILE into every bond
+				//that touches the atom: on TeF6/def2-TZVP the six bonds an octahedron makes identical
+				//came out 2 + 2 + 2, worst 2.893 in the Pythagorean index, on exactly this corner and
+				//on no other of the four. So the exact rotational average runs here whatever symmetrize
+				//says, and the flag keeps its documented meaning on the molecular path above, where the
+				//matrix really is the molecule's.
+				//Conditional on a spherical basis for one reason: a Cartesian shell mixes angular
+				//momenta, so the exact average does not apply and the fallback would be the O_h
+				//average, which has an l <= 5 ceiling and an orientation dependence of its own -
+				//forcing it on would turn a working Cartesian no_sym run into a refusal. That corner is
+				//left as it was, and the warning at the top of this function is what tells the user.
 				auto ano = calculateAtomicNAO(atomic_density, atomic_overlap,
 					local_indices,
-					symmetrize ? shell_angular_momenta : ivec{},
+					(symmetrize || spherical) ? shell_angular_momenta : ivec{},
 					spherical,
 					occupancy_cutoff,
 					0,

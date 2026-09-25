@@ -816,11 +816,18 @@ TEST(RgbiRobustnessTests, OctahedralTeF6HasOneBondOrbitNotThree)
 	//  no_sym + NAO     0 in all nine, both molecules            0 in all nine, unchanged
 	//  sym    + NAO     4 + 2, SF6 Pyth. 33.926 / 34.260         0 in all nine, both molecules
 	//  sym    + ANO     SF6 0, TeF6 1e-3 in Ion. (this test)     0 in all nine, both molecules
-	//  no_sym + ANO     2 + 2 + 2, SF6 s_AB 0.659/0.632/0.661    unchanged, TeF6 worst 2.893 in Pyth.
-	//The last row is the one defect that remains, and it is expected to: -rgbi_no_sym asks for no average,
-	//so the free-atom reference compute_tonto_style_atomic_density builds there keeps its orientation and
-	//nothing is entitled to fix it. It is not on the default path. The three rows that ARE reachable
-	//without asking for it are now exact, so this assertion is EXPECT_DOUBLE_EQ on all nine columns.
+	//  no_sym + ANO     2 + 2 + 2, SF6 s_AB 0.659/0.632/0.661    0 in all nine, both molecules
+	//All four corners are exact now, and the last row took a second change and an argument that had been
+	//got wrong here. This comment used to say that row was "expected to" split because -rgbi_no_sym asks
+	//for no average and "nothing is entitled to fix it". That reads the flag as applying to something it
+	//does not: on the ANO route the matrix being averaged is not the molecule's, it is a free atom's own
+	//density from occ's atomic SCF, and a free atom is spherically symmetric. The average there is a
+	//property of the reference, not an approximation imposed on the molecule, and skipping it let the
+	//SCF's arbitrary choice of m components put the axes of the FILE into every bond. So the exact
+	//rotational average now runs on the ANO route whatever the flag says, the flag still governs the
+	//molecular route it was named for, and a run that asks for it on the ANO route is told in one printed
+	//line that it changed nothing there. OctahedralTeF6IsExactlyOhOnTheAnoPathWithoutSymmetrization is
+	//that row's own test. The assertion below is EXPECT_DOUBLE_EQ on all nine columns.
 	//
 	//WHAT WOULD MAKE THIS FAIL: any change that lets the atom's orientation back into its own reference -
 	//an average applied per bond rather than per atom, the O_h route reinstated for a spherical basis, a
@@ -891,5 +898,75 @@ TEST(RgbiRobustnessTests, OctahedralTeF6IsExactlyOhWithoutTheAtomicReference)
 		for (size_t i = 0; i < 9; i++)
 			EXPECT_DOUBLE_EQ(first[i], row[i]) << "column " << i << " of Te-F bond 0 - " << b << " against "
 				"0 - 1: this path reproduces the octahedron exactly, so any difference at all is new";
+	}
+}
+
+//The fourth corner of {sym, no_sym} x {ANO, NAO}, and the last one that was not exact: -rgbi_no_sym with
+//the ANO basis. It split TeF6's six bonds 2 + 2 + 2 - worst 2.893 in the Pythagorean index, 0.659 against
+//0.632 in s_AB on SF6 - and the reason is not the molecule. On this route the matrix that gets averaged
+//is a FREE ATOM's own density from occ's atomic SCF, not the molecular density, and a free atom is
+//spherically symmetric: a single-determinant SCF on an open-shell atom only appears anisotropic because
+//it has to put its electrons in particular m components. Leaving that unaveraged carried the axes of the
+//INPUT FILE into every bond touching the atom, which is why the split follows x, y and z. So the exact
+//rotational average now runs on the ANO route whatever symmetrize says, and -rgbi_no_sym keeps its
+//meaning on the molecular route it was named for.
+//
+//WHAT WOULD MAKE THIS FAIL: putting the flag back in front of the free-atom average, or any change that
+//lets an atomic reference depend on the orientation of the file - the O_h average reinstated for a
+//spherical basis, an average applied per bond instead of per atom, a degenerate ANO set cut mid-shell.
+//WHAT WOULD MAKE IT WRONG rather than red: nothing about the fixture. TeF6/def2-TZVP is octahedral to the
+//last digit of the input geometry, so a spread in symmetry-equivalent bonds is the code's by construction.
+//It asserts no reference numbers and needs no second program.
+//
+//Made red on purpose, this exact call on the binary before the change (AKL007, 0ab63b56dc00, 8 threads,
+//4 s): the six rows come out as three pairs and the pairs are the Cartesian axes.
+//     bonds 1,2   17.493  9.792  27.092  0.193  0.453  -0.430  0.624  52.525  51.608
+//     bonds 3,4   17.493  9.798  27.100  0.191  0.448  -0.451  0.636  49.632  49.766
+//     bonds 5,6   17.493  9.793  27.093  0.193  0.452  -0.431  0.624  52.443  51.556
+//Eight of the nine columns split - worst 2.893 in Pyth. (52.525 against 49.632), 0.021 in Ion. - and the
+//populations split 6.1e-03 (9.7922512 / 9.798316 / 9.7930333), which is what the EXPECT_NEAR above
+//catches at 1e-7. Only column 0, the total Te population, survived. Running THIS test against a binary
+//with the one condition put back fails 32 assertions: 28 of the 45 column equalities and 4 of the 5
+//population checks, the Note check passing because the printed line is a separate change. SF6/def2-SVP
+//through def2-QZVP split the same way on the same corner (s_AB 0.659 / 0.632 / 0.661), so it is not the
+//ECP and not the f functions.
+//And the fixed numbers are not merely self-consistent: this corner now prints the same nine numbers as
+//the DEFAULT corner of the same file to every digit (17.476 9.802 27.083 0.194 0.449 -0.428 0.621 52.359
+//51.502), which is the statement the printed Note makes - on the ANO route the flag decides nothing.
+TEST(RgbiRobustnessTests, OctahedralTeF6IsExactlyOhOnTheAnoPathWithoutSymmetrization)
+{
+	const auto p = nos_test_repo_root() / "tests" / "RGBI_groups" / "tef6_tzvp.gbw";
+	if (!std::filesystem::exists(p))
+		GTEST_SKIP() << "tests/RGBI_groups/tef6_tzvp.gbw not found";
+	std::string out;
+	{
+		CoutCapture cap;
+		WFN wavy(p);
+		//no group sets, NO symmetrization, ANO basis, no eigenvalues, no theta table
+		Roby_information roby(wavy, {}, false, true, false, false);
+		out = cap.str();
+	}
+
+	//A switch that decides nothing has to say so out loud, or it is the same defect as a switch nobody
+	//reads: this run asked for -rgbi_no_sym and the ANO reference is averaged anyway.
+	EXPECT_NE(out.find("-rgbi_no_sym does not change the atomic reference on the ANO route"), std::string::npos)
+		<< "a run that asks for no symmetrization on the ANO route must be told that the free-atom "
+		   "reference is spherical regardless";
+
+	const double f0 = value_after(out, "Population of atom 1: ");
+	ASSERT_TRUE(std::isfinite(f0)) << "no population for atom 1";
+	for (int a = 2; a <= 6; a++)
+		EXPECT_NEAR(f0, value_after(out, "Population of atom " + std::to_string(a) + ": "), 1e-7)
+			<< "population of fluorine " << a << " against fluorine 1 on the ANO path without symmetrization";
+
+	const vec first = bond_row(out, 0, 1);
+	ASSERT_EQ(first.size(), 9u) << "no bond row 0 - 1";
+	for (int b = 2; b <= 6; b++) {
+		const vec row = bond_row(out, 0, b);
+		ASSERT_EQ(row.size(), 9u) << "no bond row 0 - " << b;
+		for (size_t i = 0; i < 9; i++)
+			EXPECT_DOUBLE_EQ(first[i], row[i]) << "column " << i << " of Te-F bond 0 - " << b << " against "
+				"0 - 1: the free-atom ANO reference is spherically averaged whether or not -rgbi_no_sym "
+				"was given, so this corner reproduces the octahedron like the other three";
 	}
 }
