@@ -501,7 +501,9 @@ TEST(BondwiseSymmetrizeTests, SphericalAverageLeavesOneNumberPerShellPair)
 		for (int j = 0; j < 5; j++)
 			EXPECT_NEAR(d(i, j), i == j ? 3.0 : 0.0, 1e-12) << "d shell entry (" << i << ", " << j << "): the "
 				"rotational average of a d block is (trace/5) x identity, one number, where the O_h average of "
-				"this same block is 7/3 on three components and 4 on the other two";
+				"this same block is 7/3 on three components and 4 on the other two - "
+				"SphericalDShellSplitsIntoT2gAndEg above asserts that second answer on the very same "
+				"diag(1..5), so the suite holds both and the two averages cannot quietly become one";
 	EXPECT_NEAR(trace(d), 15.0, 1e-12) << "an average of orthogonal transforms preserves the trace";
 
 	//s + p + p + d: the two p shells must keep their coupling, every different-l block must go

@@ -4157,6 +4157,59 @@ const char *owning_analysis(const std::string &flag)
     return nullptr;
 }
 
+namespace {
+    //run_app_impl tries the analyses below in a chain that each end in "return 0", and the
+    //RGBI/NPA block sits after that chain: a command line that names one of these AND -rgbi/-npa
+    //runs the first, drops the second, and exits 0 as if both had been done. Mirrors that chain -
+    //an analysis added there wants a line here, or its combinations go silent again.
+    const char *quit_early_analysis(const options &o)
+    {
+        if (o.qct) return "-qct";
+        if (o.fukui_analysis_run) return "-fukui_analysis";
+        if (o.eli_analysis_run) return "-eli_analysis";
+        if (o.fract) return "-fractal";
+        if (o.promol_nci) return "-promol_nci";
+        if (!o.interaction_energies_job.empty()) return "-interaction_energy";
+        if (!o.hirshfeld_surface.empty()) return "-hirshfeld_surface";
+        if (!o.wfn2.empty()) return "-wfn2";
+        if (!o.pol_wfns.empty()) return "-polarizabilities";
+        if (o.combined_tsc_calc || o.cif_based_combined_tsc_calc) return "-merge";
+        if (o.iam_switch) return "-IAM";
+        if (!o.cube_density.empty()) return "-cube_density";
+        return nullptr;
+    }
+}
+
+void options::refuse_unread_bonding_options()
+{
+    const char *early = quit_early_analysis(*this);
+    const char *bonding = rgbi ? "-rgbi" : (npa ? "-npa" : nullptr);
+    if (early != nullptr && bonding != nullptr)
+        err_checkf(false, std::string("Cannot do both ") + early + " and " + bonding + " in one run: " +
+                              early + " ends the run before " + bonding + " would be reached, so " +
+                              bonding + " would be dropped without a word. Run them one at a time",
+                   log_file);
+    //An -nbo_*/-nrt_* option is read by the -nbo/-nbo_parse/-nbo_native/-convert_to_47 handlers
+    //themselves, and those finish the command line where they run. Reaching here with one still in
+    //hand means no NBO analysis was asked for, so whatever analysis does run reads it from nobody.
+    const char *running = early != nullptr ? early : bonding;
+    if (running == nullptr)
+        return; //no analysis at all: run_app reports that on its own, with the help text
+    for (const std::string &raw : arguments)
+    {
+        std::string o = raw;
+        if (o.size() > 1 && o[0] == '-' && isalpha(static_cast<unsigned char>(o[1])))
+            std::replace(o.begin() + 1, o.end(), '-', '_');
+        if (nbo_family_suboptions().count(o) == 0)
+            continue;
+        err_checkf(false, "Option " + o + " is an NBO/NRT option and this run is " + running +
+                              ", which does not read it: no NBO analysis was asked for, so the "
+                              "option would be ignored and the run would still exit 0. Add "
+                              "-nbo_native <wavefunction>, or drop " + o,
+                   log_file);
+    }
+}
+
 void options::digest_options()
 {
     using namespace std;
@@ -4243,6 +4296,8 @@ void options::digest_options()
     //-multipole_moments without -ri_fit: auto_aux, whichever order the two came in
     if (multipole_lmax >= 0 && aux_basis.empty())
         aux_basis.push_back(std::make_shared<BasisSet>());
+    //last, so it sees every flag whichever order they were written in
+    refuse_unread_bonding_options();
 };
 
 std::string options::unrunnable_analysis() const

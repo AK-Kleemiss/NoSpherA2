@@ -1063,6 +1063,11 @@ struct options
 	 *  wavefunction branch, so without -wfn/-occ it is skipped in silence - which is how
 	 *  `-rgbi water.gbw` (RGBI has no positional form) came to exit 0 having done nothing. */
 	std::string unrunnable_analysis() const;
+	/** @brief Refuses a command line whose bonding options nothing will read: -rgbi/-npa together
+	 *  with an analysis that ends the run before them, and an -nbo_/-nrt_ option on a line that
+	 *  runs no NBO analysis. Both used to exit 0 having quietly done something else. Called at the
+	 *  end of digest_options(), so option order does not matter. */
+	void refuse_unread_bonding_options();
 
 	options() : log_file(std::cout)
 	{

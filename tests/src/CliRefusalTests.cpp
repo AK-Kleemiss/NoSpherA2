@@ -210,6 +210,27 @@ TEST(CliRefusal, AnalysisFlagsAreEitherDigestedOrListed)
 		<< [&] { std::string s; for (const auto& o : orphans) s += o + " "; return s; }();
 }
 
+//A correctly spelled option that the analysis actually running does not read is the same defect as
+//a misspelled one, and harder to see: `-rgbi -nrt` computed Roby indices and no resonance theory,
+//`-eli_analysis f 0.3 2.0 -rgbi_basis nao` did the basins and no RGBI, and both exited 0. The cause
+//is structural - the -nbo_* options are read by the -nbo_native handler, which never ran, and
+//run_app_impl's early-exit analyses return before the RGBI/NPA block - so neither could be caught
+//by the unknown-option check.
+TEST(CliRefusal, RealOptionNoAnalysisReadsIsFatal)
+{
+	//-nrt and -nbo_threads are read by the NBO handlers, and this line runs RGBI
+	EXPECT_EXIT(parse({"-rgbi", "-nrt"}), ::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), ".*");
+	EXPECT_EXIT(parse({"-rgbi", "-nbo_threads", "2"}), ::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), ".*");
+	//an analysis that ends the run, plus one that sits after it in the chain
+	const auto wfn = fixture("ptb_H_file/H.gbw");
+	if (!std::filesystem::exists(wfn))
+		GTEST_SKIP() << wfn.string() << " not found";
+	EXPECT_EXIT(parse({"-eli_analysis", wfn.string(), "0.3", "2.0", "-rgbi_basis", "nao"}),
+				::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), ".*");
+	EXPECT_EXIT(parse({"-eli_analysis", wfn.string(), "0.3", "2.0", "-npa"}),
+				::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), ".*");
+}
+
 //The other half of the check: an option that is real must still parse. -nrt and -nbo_json are
 //consumed by the -nbo_native handler, so at the top level no digester claims them - they must not
 //be mistaken for typos whichever order they were written in.
