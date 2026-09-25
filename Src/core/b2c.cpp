@@ -1516,12 +1516,19 @@ static void adp_knobs_from_env()
 	g_adp_reach = env_double("NOS_ADP_REACH", adp_reach_default);
 }
 //The fraction of the smallest radius the 302 directions found that the beta sphere is actually kept
-//at. 0.7 is the number BetaSpheres.* validates, and it is not obviously the largest safe one: a
-//sphere ends a trajectory the moment it enters, and it is the reason a third of the quadrature
-//points never take a step at all, so this one number prices accuracy against the dominant stage.
-//Read from the environment for the sweep that asks how far it can go, and printed by -basin_timing
-//so that no run's populations can be read without the margin they were produced at.
-static constexpr double beta_margin_default = 0.7;
+//at. A sphere ends a trajectory the moment it enters, which is why a third of the quadrature points
+//never take a step at all, so this one number prices accuracy against the dominant stage - and
+//inside the sphere it is not an approximation: the point is assigned to the maximum the walk would
+//have reached anyway, so a sphere that lies within its basin is exact.
+//
+//It was 0.7. Swept over five molecules (sucrose 45 atoms, ZP2, UH6, NH3Li with its non-nuclear ELI-D
+//maxima, HgH2 with an ECP), every basin comes back identical to the printed 1e-4 e at 0.8, 0.85, 0.9
+//and 0.95, while the QTAIM walk gets 10-17 % shorter. At 1.0 - the sphere drawn at exactly the radius
+//the march measured - it breaks: UH6's U0 moves 1.6e-3 e with 6 of 7 basins over the 3e-4 e noise
+//floor, and ZP2's N5 by 2.0e-4. So the margin is the hedge against the angular sampling, not against
+//the radial march, and 0.9 is the largest value shown to hold. Read from the environment for the
+//sweep, and printed by -basin_timing so no run's populations can be read without it.
+static constexpr double beta_margin_default = 0.9;
 double basin_beta_margin() { return env_double("NOS_BETA_MARGIN", beta_margin_default, 1.0); }
 void basin_adaptive_step_knobs(double &cap, double &grow, double &keep, double &reach)
 {
@@ -2195,7 +2202,8 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 		//A step count without the knobs it was taken at is not a measurement of anything
 		std::cout << "  [timing] " << fieldname << "grown step knobs: cap " << std::setprecision(4) << g_adp_cap
 			<< ", grow " << std::setprecision(8) << g_adp_grow << ", keep " << g_adp_keep
-			<< ", reach " << std::setprecision(4) << g_adp_reach << std::endl;
+			<< ", reach " << std::setprecision(4) << g_adp_reach
+			<< ", exp cutoff " << constants::exp_cutoff << std::endl;
 	}
 	std::cout << "Quadrature points sent along the field: " << boundary_points << ", left the grid: " << lost << std::endl;
 	return pop;
