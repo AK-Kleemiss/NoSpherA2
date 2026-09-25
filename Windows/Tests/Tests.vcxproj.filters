@@ -42,6 +42,9 @@
     <ClCompile Include="..\..\tests\src\Nbo47Tests.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\tests\src\NboNativeTests.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\tests\src\TscStreamTests.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

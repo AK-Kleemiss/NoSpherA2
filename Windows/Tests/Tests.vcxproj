@@ -29,6 +29,7 @@
     <ClCompile Include="..\..\tests\src\RgbiRobustnessTests.cpp" />
     <ClCompile Include="..\..\tests\src\BondingGuardsTests.cpp" />
     <ClCompile Include="..\..\tests\src\Nbo47Tests.cpp" />
+    <ClCompile Include="..\..\tests\src\NboNativeTests.cpp" />
     <ClCompile Include="..\..\tests\src\NrtTests.cpp" />
     <ClCompile Include="..\..\tests\src\pch.cpp">
       <PrecompiledHeader>Create</PrecompiledHeader>

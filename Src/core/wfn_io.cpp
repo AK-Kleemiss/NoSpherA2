@@ -2435,6 +2435,29 @@ bool WFN::write_nbo(const std::filesystem::path &fileName, const bool &debug, st
 					  << " (" << progress_elapsed_seconds() << " s)" << std::endl;
 		progress_log->flush();
 	}
+	//The two diagnostics above were computed and then thrown away unless a progress log had been
+	//passed, which -nbo_native does only under -debug. On tests/alanine_occ/alanine.owf.fchk the
+	//writer knew twice over that its archive was wrong - all 228 AOs unnormalised, Tr(P*S)=7.579
+	//against 48 electrons - and the analysis went on to print an NPA table whose charges sum to
+	//+40.42 on a neutral molecule and whose largest NAO occupancy is 2.16 electrons. Nobody reading
+	//that output could tell. Tr(P*S) is the one number that decides whether the archive describes
+	//the wavefunction at all, so it is checked on every path and it is fatal: every quantity
+	//downstream - NAO populations, NBO occupancies, E2, NRT weights - is a functional of this
+	//density, and there is no partial answer to give.
+	if (expected_electrons > 0.0 &&
+		std::abs(density_electrons - expected_electrons) > 1.0E-4 * std::max(1.0, expected_electrons)) {
+		std::ostringstream why;
+		why << std::fixed << std::setprecision(6)
+			<< "The FILE47 archive does not describe this wavefunction: Tr(P*S)=" << density_electrons
+			<< " electrons where the occupied orbitals hold " << expected_electrons << ".";
+		if (unnormalised > 0)
+			why << " " << unnormalised << " of " << nbo_nao << " AOs are not normalised in the"
+				<< " overlap either, so the contracted basis this source was read into carries the"
+				<< " wrong normalisation convention (see Int_Params).";
+		why << " Every NBO quantity is a functional of this density, so no analysis is written."
+			<< " Use the .gbw or .molden of the same calculation.";
+		err_checkf(false, why.str(), std::cout);
+	}
 	auto build_fock = [&](const vec2& C, const vec& energies, const std::string& label) {
 		vec2 result;
 		if (static_cast<int>(C.size()) != nbo_nao || static_cast<int>(energies.size()) < nbo_nao) {
