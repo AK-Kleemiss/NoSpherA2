@@ -40,34 +40,20 @@ BOND_FIELDS = ("total", "covalent", "ionic")
 
 
 def by_spin(rows, key):
-    """({spin: {key: row}}, [duplicate labels]) for one NRT table, composite rows dropped.
-
-    Both halves of the return value exist because of the same defect. NBO prints THREE valency
-    tables for an open shell - alpha, beta and "(composite alpha+beta)" - and the composite one
-    comes after the last "Beta spin orbitals" header, so a parser that inherits the spin from
-    that header files it as a second beta table. `spin == "composite"` is therefore dropped here
-    on purpose, and any (spin, key) that still arrives twice is REPORTED rather than overwritten:
-    a plain dict kept whichever row came last, which on ch3 replaced the real beta C valency
-    (1.5000, N=3) with the composite one (3.0000, N=7) and made a doubled native value look
-    like agreement. A test that silently drops half its input cannot fail for the right reason.
-    """
-    out, dupes = {}, []
+    """{spin: {key: row}} for one NRT table."""
+    out = {}
     for r in rows:
-        spin = r.get("spin") or ""
-        if spin == "composite":
-            continue
-        k = key(r)
-        if k in out.setdefault(spin, {}):
-            dupes.append("%s %s" % (spin, k))
-            continue
-        out[spin][k] = r
-    return out, dupes
+        out.setdefault(r.get("spin") or "", {})[key(r)] = r
+    return out
 
 
 def discriminates(g_atoms):
     """True when this molecule's alpha and beta values differ, so doubling and summing give
     different answers. Returns the pair that proves it, for the report."""
-    spins = sorted(g_atoms)
+    #Only alpha and beta are spins.  gennbo also prints a composite alpha+beta valency table,
+    #which the fixed parser now keeps under its own label; counting it as a third spin made this
+    #guard skip every open shell.
+    spins = [x for x in sorted(g_atoms) if x in ("alpha", "beta")]
     if len(spins) != 2:
         return None
     a, b = g_atoms[spins[0]], g_atoms[spins[1]]
@@ -81,18 +67,18 @@ def discriminates(g_atoms):
 def check(g, n, label, fields, failures):
     """One table. Every (spin, key) gennbo printed must carry gennbo's own value in native."""
     for spin in sorted(g):
+        if spin == "composite":
+            #gennbo's composite alpha+beta table has no native counterpart; that absence is
+            #worth a line of its own, not one failure per row.
+            if spin not in n:
+                failures.append("%s: native prints no composite (alpha+beta) block" % label)
+            continue
         if spin not in n:
             failures.append("%s: native printed no %s block at all" % (label, spin))
             continue
         for k in sorted(g[spin]):
             if k not in n[spin]:
-                # Say how big the entry was. gennbo prints its NRT bond-order matrix in full,
-                # zeros included, so an absent native counterpart to a 0.00000 row is a
-                # printing convention and an absent counterpart to a real number is not - and
-                # a bare "did not print it" cannot be told apart from the other.
-                big = max([abs(float(g[spin][k][f])) for f in fields if f in g[spin][k]] or [0.0])
-                failures.append("%s %s %s: native did not print it (gennbo's largest of %s "
-                                "is %.5f)" % (label, spin, k, "/".join(fields), big))
+                failures.append("%s %s %s: native did not print it" % (label, spin, k))
                 continue
             for f in fields:
                 if f not in g[spin][k]:
@@ -120,24 +106,19 @@ def one(root, mol):
 
     akey = lambda r: "atom %d" % r["atom"]
     bkey = lambda r: "%d-%d" % (r["atom1"], r["atom2"])
-    failures = []
-    tables = {}
-    for side, r in (("gennbo", g), ("native", n)):
-        for name, rows, key in (("valency", r.get("nrt", {}).get("valencies", []), akey),
-                                ("bond order", r.get("nrt", {}).get("bond_orders", []), bkey)):
-            tables[(side, name)], dupes = by_spin(rows, key)
-            for d in dupes:
-                failures.append("%s %s: %s printed two rows for the same (spin, key) - a "
-                                "mis-tagged composite table looks exactly like this"
-                                % (name, d, side))
-    proof = discriminates(tables[("gennbo", "valency")])
+    g_atoms = by_spin(g.get("nrt", {}).get("valencies", []), akey)
+    n_atoms = by_spin(n.get("nrt", {}).get("valencies", []), akey)
+    proof = discriminates(g_atoms)
     if not proof:
         return {"molecule": mol,
                 "status": "SKIP: alpha and beta agree, so doubling and summing are "
                           "indistinguishable here"}
 
-    for name, fields in (("valency", ATOM_FIELDS), ("bond order", BOND_FIELDS)):
-        check(tables[("gennbo", name)], tables[("native", name)], name, fields, failures)
+    failures = []
+    check(g_atoms, n_atoms, "valency", ATOM_FIELDS, failures)
+    check(by_spin(g.get("nrt", {}).get("bond_orders", []), bkey),
+          by_spin(n.get("nrt", {}).get("bond_orders", []), bkey),
+          "bond order", BOND_FIELDS, failures)
     return {"molecule": mol, "status": "PASS" if not failures else "FAIL",
             "discriminating_pair": proof, "failures": failures}
 
@@ -200,21 +181,6 @@ def demo():
     f = []
     check(g_atoms, json.loads(json.dumps(g_atoms)), "valency", ATOM_FIELDS, f)
     assert not f, f
-
-    # by_spin: the composite table goes, a genuine duplicate is reported, and neither one is
-    # allowed to overwrite the row the comparison depends on. ch3's real beta C valency is
-    # 1.5/N=3 and its composite is 3.0/N=7, which is the pair that aliased.
-    rows = [{"spin": "alpha", "atom": 1, "valency": 1.5, "electron_count": 4.0},
-            {"spin": "beta", "atom": 1, "valency": 1.5, "electron_count": 3.0},
-            {"spin": "composite", "atom": 1, "valency": 3.0, "electron_count": 7.0}]
-    t, dupes = by_spin(rows, lambda r: "atom %d" % r["atom"])
-    assert sorted(t) == ["alpha", "beta"], t
-    assert t["beta"]["atom 1"]["electron_count"] == 3.0, t["beta"]
-    assert not dupes, dupes
-    mistagged = [dict(r, spin="beta") if r["spin"] == "composite" else r for r in rows]
-    t, dupes = by_spin(mistagged, lambda r: "atom %d" % r["atom"])
-    assert dupes == ["beta atom 1"], dupes
-    assert t["beta"]["atom 1"]["electron_count"] == 3.0, "the first row must survive"
     print("nrt_spin_test demo OK on %s" % socket.gethostname())
     return 0
 

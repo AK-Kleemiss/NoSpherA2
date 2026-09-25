@@ -1,0 +1,27 @@
+ryd_excess_by_l on AKL007, 1 thread, root /work/akkleemiss/florian/nao_split_exp/baseline
+molecule        with valence     no valence   worst single block
+acetylene           +0.00211       +0.06092   +0.01703 atom 1 f
+ammonia             -0.00293       +0.03252   +0.01905 atom 1 d
+benzene             +0.06470       +0.25135   +0.03193 atom 1 d
+ch3                 -0.00425       +0.03845   +0.01818 atom 1 d
+ethane              +0.02155       +0.10830   +0.03977 atom 1 d
+ethene              -0.00022       +0.09444   +0.03155 atom 1 d
+formaldehyde        -0.00282       +0.04301   +0.02226 atom 1 d
+formate             -0.01082       +0.03988   +0.01820 atom 1 d
+hcn                 -0.01041       +0.04253   +0.02000 atom 2 d
+lif                 -0.00028       +0.00147   +0.00229 atom 1 p
+n2                  -0.02117       +0.04512   +0.01654 atom 1 d
+ni_co_4             +0.02836       +0.05262   +0.02386 atom 1 d (has valence)
+nitromethane        +0.01843       +0.07829   +0.02408 atom 2 d
+no                  -0.01041       +0.02157   +0.01180 atom 1 d
+o2                  -0.00556       +0.00914   +0.00378 atom 2 d
+ozone               +0.00111       +0.01296   +0.00915 atom 1 d
+pf5                 -0.00243       -0.01703   -0.00968 atom 1 p (has valence)
+pyridine            +0.04572       +0.23393   +0.03415 atom 2 d
+sf6                 +0.00913       -0.01802   +0.01478 atom 1 f
+so2                 -0.01372       -0.00322   -0.01975 atom 1 s (has valence)
+ticl4               -0.00270       +0.01152   +0.01473 atom 1 p
+water               -0.00090       +0.01360   +0.00773 atom 1 d
+
+totals over the set: +0.10250 e in valence-bearing l blocks, +1.15335 e in blocks with no
+valence shell.  The second number cannot be an intra-block leak.

@@ -55,6 +55,16 @@ namespace
     //It reduces to S^-1/2 for equal weights and to the identity for S = 1, and it is what makes
     //the strongly occupied orbitals keep their shape while the diffuse ones absorb the
     //orthogonalisation tails.
+    //Diagnostic knobs for the NAO construction, off unless the environment sets them.  They
+    //exist to run the two arms of one experiment - see the comments at steps 3 and 4 - and are
+    //deliberately not command-line options: build_naos takes no options struct and this is a
+    //measurement, not a feature.
+    bool nao_env(const char *name)
+    {
+        const char *v = std::getenv(name);
+        return v && *v && *v != '0';
+    }
+
     MatrixXd owso(const MatrixXd &S, const VectorXd &weights)
     {
         VectorXd w = weights;
@@ -318,13 +328,58 @@ NAOResult build_naos(const dMatrix2 &P_in, const dMatrix2 &S_in, const std::vect
     //---------------------------------------------------------------- 4. natural character
     //The set is orthonormal now but the orthogonalisation mixed the shells of one l, so
     //re-diagonalise inside every (atom, l) block - m-averaged again, which is what keeps the
-    //components of a shell degenerate.  Valence and Rydberg go in one block: separating them
-    //leaves the valence-Rydberg coupling in place and inflates the Rydberg occupancies tenfold.
-    //The mixing is intra-atomic and unitary, so it moves no charge between atoms.
+    //components of a shell degenerate.  Valence and Rydberg go in one block, and NAO_CLASS_SPLIT=1
+    //runs the alternative so the claim can be checked instead of believed.  Measured over the same
+    //22 wavefunctions against gennbo 7's own NAO tables: splitting the classes raises the mean
+    //intra-atomic valence->Rydberg leak from 0.0123 to 0.0690 e over 111 atoms (benzene's Rydberg
+    //set 0.432 -> 1.127 e), and it does so in all 22 - including pf5, so2 and sf6, the only three
+    //whose leak has the opposite sign in the one-block form.  One block is the better of the two,
+    //so whatever is left of the leak is upstream of here: step 3, or which n,l count as valence.
+    //The mixing is intra-atomic and unitary, so it moves no charge between atoms - and that is not
+    //a reassurance, it is a warning.  The two arms differ by 0.695 e in benzene's Rydberg
+    //population and by 1e-10 in every one of 111 NPA charges, so an NPA comparison cannot see this
+    //error at all and agreement there says nothing about the class partition.
     const MatrixXd Porb = C.transpose() * SPS * C;
+    //NAO_DUMP_STEP3: the occupancies step 4 inherits.  If the valence deficit against NBO 7 is
+    //already visible here, step 4 is not the place to look for it.
+    if (nao_env("NAO_DUMP_STEP3")) {
+        std::cout << "STEP3 atom l shell class occ_per_component" << std::endl;
+        for (const auto &kv : l_blocks) {
+            const int nm = 2 * kv.first.second + 1;
+            const ivec &cols = kv.second;
+            for (size_t sh = 0; sh * nm < cols.size(); sh++) {
+                double occ = 0.0;
+                for (int m = 0; m < nm; m++) occ += Porb(cols[sh * nm + m], cols[sh * nm + m]) / nm;
+                std::cout << "STEP3 " << kv.first.first << " " << kv.first.second << " " << sh
+                          << " " << static_cast<int>(orbitals[cols[sh * nm]].type)
+                          << " " << std::setprecision(8) << std::fixed << occ << std::endl;
+            }
+        }
+    }
+    //NAO_CLASS_SPLIT runs the rejected variant: the shells of one (atom, l) are re-diagonalised
+    //within their own class instead of all together.  Note what the one-block form is: the top
+    //eigenvalue of the m-averaged block is an upper bound on any single shell's own diagonal, so
+    //the valence shell can only come out with MORE population from one block than from a split
+    //one.  Splitting therefore cannot reduce a Rydberg excess - it has to increase it - which is
+    //what makes this arm a real test rather than a search for a better number.
+    const bool class_split = nao_env("NAO_CLASS_SPLIT");
+    std::vector<ivec> blocks;
     for (auto &kv : l_blocks) {
-        const ivec &cols = kv.second;
-        const int l = kv.first.second, nm = 2 * l + 1;
+        const int l_of_block = kv.first.second, nm_of_block = 2 * l_of_block + 1;
+        if (!class_split) { blocks.push_back(kv.second); continue; }
+        ivec per_class[3];
+        const ivec &all = kv.second;
+        for (size_t j = 0; j * nm_of_block < all.size(); j++) {
+            const int cls = static_cast<int>(orbitals[all[j * nm_of_block]].type);
+            for (int m = 0; m < nm_of_block; m++)
+                per_class[cls].push_back(all[j * nm_of_block + m]);
+        }
+        for (int cls = 0; cls < 3; cls++)
+            if (!per_class[cls].empty()) blocks.push_back(per_class[cls]);
+    }
+    for (const ivec &block_cols : blocks) {
+        const ivec &cols = block_cols;
+        const int l = orbitals[cols[0]].l, nm = 2 * l + 1;
         const int ns = static_cast<int>(cols.size()) / nm;
         if (ns <= 1) continue;
         //cols is shell-major with the m components contiguous

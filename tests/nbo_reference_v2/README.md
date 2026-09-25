@@ -224,6 +224,108 @@ was a 4-thread job landing on a 96-core node.
   right: the valency and bond-order ionic shares then agree at 13.60/13.61 %, where before they
   differed by 2.8 points.
 
+## The NAO class partition, and why NPA cannot referee it
+
+`nao_class_leak.py <root>` decomposes each side's NAO table into Core/Valence/Rydberg per atom
+and pairs the rows **by rank within an (atom, l) block**, never by the printed shell label: NBO 7
+numbers ethane's C 1s block `1s 2s 3s 5s 4s` where native numbers it `1s 2s 3s 4s 5s`, and pairing
+on that label reported 11 of 22 molecules "not comparable" until the rank pairing replaced it. The
+printed principal quantum number is each side's private bookkeeping. **Rank, never label** - the
+same trap costs the E2 table matches through its `BD ( 2)` ordinal, and `label_pairing_audit.py`
+measures how many.
+
+What it found, over the 22: the core is exact everywhere (|d| <= 3e-5 e), and `d(Val) = -d(Ryd)`
+to five decimals in every single molecule. The error is an intra-atomic valence -> Rydberg leak,
+and it is 47x larger than the NPA charge comparison lets you see - benzene's valence set is
+0.31611 e short and its Rydberg set 0.31605 e long while its worst NPA charge deviation is
+0.00673 e. It is not a per-Rydberg-function normalisation error: `ryd_per_function.py` shows d per
+function spanning -0.000694 to +0.001939 e *including sign changes*, with the top 3 of 26 functions
+carrying 38-88 % of the magnitude where flat would be 11.5 %. It is not spin-resolved either -
+ch3's leak (0.03418 e) is smaller than closed-shell ethane's (0.12989 e).
+
+### The two-arm experiment (`nao_split_arms.sh`, `NAO_CLASS_SPLIT`)
+
+`nao.cpp` step 4 re-diagonalises the m-averaged density inside each (atom, l) block with valence
+and Rydberg **together**, and its comment claimed that separating them "inflates the Rydberg
+occupancies tenfold". That was an assertion, so `NAO_CLASS_SPLIT=1` now runs the separated variant
+and `nao_split_arms.sh` runs both arms over the same 22 wavefunctions and the same gennbo JSONs.
+
+Pre-registered before the run, and written into the script: split will be **worse**, because the
+top eigenvalue of the m-averaged block is an upper bound on any single shell's own diagonal, so the
+valence shell can only come out with more population from one block than from a split one.
+
+Measured: mean |intra-atomic leak| 0.01229 e one-block vs **0.06897 e** split, over 111 atoms.
+Benzene's Rydberg set 0.43157 -> 1.12682 e. Split also loses the one structural feature the
+baseline has: pf5, so2 and sf6 are the only three molecules whose leak has the *opposite* sign in
+the one-block form, and splitting drives all 22 the same way. One block is the better of the two,
+the comment is accurate, and step 4 is exonerated - what is left of the leak is upstream, in step
+3's class orthogonalisation or in which (n, l) count as valence per element.
+
+### And it is not step 4 at all: 92 % of the excess is inter-l
+
+`ryd_excess_by_l.py <root>` splits the Rydberg deviation by (atom, l) block and asks whether the
+block holds a valence shell. Over the 22, **+0.10250 e lands in valence-bearing l blocks and
++1.15335 e in blocks with no valence shell** - the d and f polarisation shells of first-row atoms,
+where the worst single block is ethane's C d at +0.03977 e. Step 4 is unitary *within* a block and
+those blocks contain no valence population to take, so it cannot be the source: the leak crosses l,
+and inside this construction only step 3's Schmidt projection of one class out of another can move
+population between l values. That is where to look next, and the valence-shell definition is
+exonerated too - `nao_class_leak.py` reports zero rows classified differently by the two sides once
+they are paired by rank.
+
+The hypervalent three behave the other way round in this decomposition as well: pf5 -0.01703 e,
+sf6 -0.01802 e and so2 -0.00322 e in the no-valence blocks, against +0.25135 e for benzene and
++0.10830 e for ethane. Their baseline Rydberg totals are 0.93-0.98x gennbo's, i.e. essentially
+right, while benzene's is 3.74x and ethane's 6.22x. Any candidate fix has to keep them right -
+that is what makes them the acceptance test rather than three more data points.
+
+For the record on the rejected arm: split takes benzene's Rydberg population to 9.75x gennbo's
+0.11552 e and ethane's to 17.38x. The old comment's "tenfold" was not a figure of speech.
+
+**And the metric that cannot see any of it.** The two arms differ by 0.695 e in benzene's Rydberg
+population and by **1e-10 in every one of 111 NPA charges**. Step 4's mixing is intra-atomic and
+unitary, so it moves no charge between atoms - which means NPA agreement is not evidence about the
+class partition, in either direction. Any future claim about the NAO construction has to be made
+on the NAO table, not on charges.
+
+## Three open shells that were never in the lost run
+
+`make_radicals.py` adds allyl, hco and no2 - doublets with an alpha/beta asymmetry large enough to
+tell "doubles each spin's own value" apart from "sums the two spins". They have no
+`thresholds_reported_by_nbo` record because they were never in the original run, so `config.py`
+gives them the same thresholds as the open shells that do (`NO_RECORD`, written out rather than
+defaulted silently) and `accept.py` takes `<S**2>` near 0.75 plus a converged optimisation in place
+of a stored basis-function count. Accepted: allyl 123 basis functions, `<S**2>` 0.778384,
+E -117.227034018565; hco 68, 0.753460, -113.848612257692; no2 93, 0.753692, -205.080839945861.
+
+### They refute "just divide by two"
+
+`nrt_ratio_stats.py` and `nrt_halving_test.py` apply `ratio_probe.py`'s resolution-aware residual
+test (`|native/2 - gennbo| <= 0.0005 + 0.01|gennbo|`, gennbo's NRT tables carry three decimals) to
+**every** spin-resolved NRT number rather than the subset one probe matched:
+
+| molecule | numbers | halving repairs | halving fails | worst residual |
+|---|---|---|---|---|
+| o2 | 34 | 34 | 0 | - |
+| no | 34 | 22 | 12 | 0.0365 |
+| ch3 | 74 | 46 | 28 | 0.1268 |
+| hco | 54 | 29 | 25 | 0.0565 |
+| no2 | 60 | 20 | 40 | 0.1211 |
+| allyl | 154 | 55 | 99 | 0.1838 |
+
+o2 is the only molecule where the error *is* a factor of two. On ch3 the two worst failures are
+the C's covalency (+0.1268) and its electrovalency (-0.1268) - equal and opposite, so halving fixes
+the total valency and leaves the covalent/ionic partition wrong. no2 additionally breaks a symmetry
+gennbo keeps: its two symmetry-equivalent oxygens come out at 1.5152 and 1.7753 alpha valency
+against gennbo's 0.8355 for both.
+
+`nrt_spin_test.py` had been skipping all of this. Its `discriminates()` guard bailed when a molecule
+did not have exactly two spin labels, and the fixed parser now correctly stores gennbo's composite
+alpha+beta valency table under a third label, `composite` - so a guard meant to stop a
+non-discriminating molecule passing a wrong fix was instead stopping every open shell from being
+tested at all. A spin is alpha or beta; the composite block's absence on the native side is now one
+reported line instead of one failure per row.
+
 ## Layout
 
 ```

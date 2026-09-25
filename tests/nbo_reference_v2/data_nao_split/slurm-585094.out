@@ -1,0 +1,53 @@
+==========================================
+SLURM_JOB_ID = 585094
+SLURM_JOB_NODELIST = AKL039
+==========================================
+=== nao_split_arms on AKL039, node has 96 cores, this job has 8 threads
+=== binary /work/akkleemiss/florian/nos_nboref/build/release-linux/bin/NoSpherA2
+/var/spool/slurmd/job585094/slurm_script: line 37: git: command not found
+===  plus the uncommitted nao.cpp diagnostic knobs
+baseline acetylene    rc=0    0s
+baseline ammonia      rc=0    0s
+baseline benzene      rc=0    2s
+baseline ch3          rc=0    0s
+baseline ethane       rc=0    1s
+baseline ethene       rc=0    0s
+baseline formaldehyde rc=0    0s
+baseline formate      rc=0    1s
+baseline hcn          rc=0    0s
+baseline lif          rc=0    0s
+baseline n2           rc=0    0s
+baseline ni_co_4      rc=0   10s
+baseline nitromethane rc=0    1s
+baseline no           rc=0    0s
+baseline o2           rc=0    1s
+baseline ozone        rc=0    0s
+baseline pf5          rc=0    1s
+baseline pyridine     rc=0    3s
+baseline sf6          rc=0    1s
+baseline so2          rc=0    1s
+baseline ticl4        rc=0    1s
+baseline water        rc=0    0s
+split    acetylene    rc=0    0s
+split    ammonia      rc=0    0s
+split    benzene      rc=0    2s
+split    ch3          rc=0    0s
+split    ethane       rc=0    1s
+split    ethene       rc=0    0s
+split    formaldehyde rc=0    0s
+split    formate      rc=0    1s
+split    hcn          rc=0    0s
+split    lif          rc=0    0s
+split    n2           rc=0    0s
+split    ni_co_4      rc=0    9s
+split    nitromethane rc=0    2s
+split    no           rc=0    0s
+split    o2           rc=0    0s
+split    ozone        rc=0    1s
+split    pf5          rc=0    0s
+split    pyridine     rc=0    3s
+split    sf6          rc=0    2s
+split    so2          rc=0    0s
+split    ticl4        rc=0    1s
+split    water        rc=0    0s
+=== done 2026-09-25T04:13:59Z on AKL039, 8 threads

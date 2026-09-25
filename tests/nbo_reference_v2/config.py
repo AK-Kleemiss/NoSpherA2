@@ -86,10 +86,25 @@ NRTSTR_SO2 = """ $NRTSTR
 """
 
 
+# allyl, hco and no2 were never in the lost original run, so index.json has no record of what
+# NBO reported for them and there is nothing to read the thresholds off.  They are given the
+# SAME thresholds as the three open shells that do have a record (ch3, no, o2): E2 printing at
+# 0.25 kcal/mol, NRT delocalisation at 1 kcal/mol.  Written out here rather than defaulted
+# silently, because a molecule whose thresholds come from a guess must be visible as one.
+NO_RECORD = {
+    "allyl": ({"e2_kcal": 0.25, "nrt_deloc_kcal": 1.0}, 2),
+    "hco": ({"e2_kcal": 0.25, "nrt_deloc_kcal": 1.0}, 2),
+    "no2": ({"e2_kcal": 0.25, "nrt_deloc_kcal": 1.0}, 2),
+}
+
+
 def thresholds():
     idx = json.load(open(INDEX))
-    return {m["name"]: (m["thresholds_reported_by_nbo"], m["orca"]["multiplicity"])
-            for m in idx["molecules"]}
+    out = {m["name"]: (m["thresholds_reported_by_nbo"], m["orca"]["multiplicity"])
+           for m in idx["molecules"]}
+    assert not set(out) & set(NO_RECORD), "a NO_RECORD molecule turned up in index.json"
+    out.update(NO_RECORD)
+    return out
 
 
 def nbo_keywords(mol):

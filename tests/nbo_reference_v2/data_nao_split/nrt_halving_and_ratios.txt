@@ -1,0 +1,23 @@
+nrt_halving_test on AKL007, 1 thread, residual |native/2 - gennbo| <= 0.0005 + 0.01|gennbo|
+molecule         n repair   fail   worst three residuals
+ch3             74     46     28   valencies beta 1 electrovalency g=0.2041 n=0.1545 r=-0.1268; valencies beta 1 covalency g=1.2959 n=2.8455 r=+0.1268; valencies alpha 1 electrovalency g=0.2880 n=0.7437 r=+0.0838
+ch3_original    74     46     28   valencies beta 1 electrovalency g=0.1970 n=0.1330 r=-0.1305; valencies beta 1 covalency g=1.3030 n=2.8670 r=+0.1305; valencies alpha 1 covalency g=1.1984 n=2.2211 r=-0.0879
+no              34     22     12   valencies beta 2 covalency g=1.0556 n=2.0383 r=-0.0365; valencies beta 1 covalency g=1.0556 n=2.0383 r=-0.0365; bond_orders beta (1, 2) covalent g=1.0556 n=2.0383 r=-0.0365
+o2              34     34      0   
+allyl          154     55     99   valencies beta 2 electron_count g=3.5712 n=6.7748 r=-0.1838; valencies beta 2 valency g=1.7752 n=3.2506 r=-0.1499; valencies beta 2 covalency g=1.4825 n=2.6900 r=-0.1375
+hco             54     29     25   valencies beta 1 electrovalency g=0.7300 n=1.5730 r=+0.0565; valencies beta 1 covalency g=1.2627 n=2.4211 r=-0.0522; valencies beta 2 electrovalency g=0.5996 n=1.3004 r=+0.0506
+no2             60     20     40   valencies beta 1 covalency g=1.4525 n=3.1473 r=+0.1211; bond_orders beta (2, 3) covalent g=0.2194 n=0.2187 r=-0.1100; valencies beta 1 valency g=1.7674 n=3.7412 r=+0.1032
+
+Every failing row is a number that halving leaves wrong: a second error under the two.
+
+nrt_ratio_stats on AKL007, 1 thread
+molecule         n      min   median      max   spread at 2.000
+ch3             51   0.7554   2.0000   2.5825   1.8271   23/51  
+ch3_original    51   0.6729   2.0000   2.5839   1.9110   23/51  
+no              26   1.8633   2.0000   2.1641   0.3009   14/26  
+o2              20   2.0000   2.0000   2.0000   0.0000   20/20  
+allyl          120   1.0342   1.9755  15.9677  14.9335    1/120 
+hco             41   1.6270   1.9971   2.1897   0.5627    0/41  
+no2             48   0.0002   2.0000   3.0374   3.0371    6/48  
+
+A spike at 2.0000 with no spread is a factor of two.  A spread is a second error.
