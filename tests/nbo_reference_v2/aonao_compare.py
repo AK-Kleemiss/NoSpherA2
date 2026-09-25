@@ -769,16 +769,10 @@ def cascade_sides(mol, d):
     gcls = [e["type"] for e in naos]
     assert [e["type"] for e in pre_naos] == gcls, (
         "the AONAO and AOPNAO runs disagree about the NAO classes")
-    #A class block is only the SAME block on both sides if both sides put the same orbitals into it, so
-    #the verdict below is about the transforms rather than about the labels only once this holds.
-    #Counted per (atom, l) because that is invariant under both sides' differing column orders, so no
-    #pairing is needed.  Measured IDENTICAL on all eight, which is what the core-block verdict rests on.
-    cnt_n = collections.Counter((l[1], l[2], CLASS[l[5]]) for l in lnao)
-    cnt_g = collections.Counter((e["atom"] - 1, LANG_L[e["lang"][0].lower()], e["type"])
-                                for e in naos)
-    assert cnt_n == cnt_g, ("native and gennbo classify differently per (atom, l): %s - a block "
-                            "called Val>Cor on one side is then not the same block on the other"
-                            % ((cnt_n - cnt_g) + (cnt_g - cnt_n)))
+    #A class block is only the SAME block on both sides if both sides put the same orbitals into it,
+    #so the verdict below is about the transforms rather than about the labels only once this holds.
+    #Measured IDENTICAL on all eight, which is what the core-block verdict rests on.
+    assert_same_classes(lnao, naos)
     sides = {}
     for side, Cpre, Cnao, cls, al in (
             ("native", Cn_pre, Cn_nao, [CLASS[l[5]] for l in lnao], [(l[1], l[2]) for l in lnao]),
@@ -1008,6 +1002,299 @@ def main_cascade(root):
         print("  incomplete: %s" % " ".join(missing))
     if results:
         cascade_verdict(results)
+    return 0
+
+
+#------------------------------------------------------------------------------------------------
+#--space: the cascade as ONE orthogonal matrix per side, compared where a comparison is possible.
+#
+#--cascade ended with T = G^-1/2 O, so the whole orthogonalisation cascade is one orthogonal matrix
+#per side and every difference between the sides lives in O.  This arm compares the two O's.
+#
+#WHAT WAS PROPOSED FOR THE FIRST GATE, AND WHY IT CANNOT BE ONE.  The singular values of O_n^T O_g P,
+#"all 1.000000 iff they differ by nothing", are all 1.000000 FULL STOP: O_n, O_g and P are each
+#orthogonal, a product of orthogonal matrices is orthogonal, and an orthogonal matrix has every
+#singular value equal to 1 identically.  The principal angles between the two FULL spaces vanish for
+#the same reason - both sides span the whole AO space, so completeness fixes them.  This is the
+#||T||^2 = tr(G^-1) trap one level up, and it is DEMONSTRATED rather than argued: the very matrix
+#whose singular values come out 1.000000 is the matrix whose class blocks disagree, the value does
+#not move when the permutation is replaced by a deliberately wrong one, and demo() rotates valence
+#into Rydberg by 30 degrees and still gets 1.000000 out of it.  So it is computed, printed as VOID,
+#and never quoted.
+#
+#WHAT IS MEASURABLE.  A subspace has no column order and no column signs:
+#
+#    U = Cnao_n^T S Cnao_g           both sides' NAOs in the shared AO basis, S from the shared .47
+#    mass[C, C'] = ||U[C, C']||_F^2  dimensions of native's class-C space lying in gennbo's C' space
+#
+#plus the principal angles between span(Cnao_n[:, C]) and span(Cnao_g[:, C]) per class, and per
+#(atom, class) for the "where".  None of this needs the permutation between native's
+#(atom, l, shell, m) order and gennbo's component-major order, and none of it needs a sign rule: the
+#permutation is not resolved here, it is ELIMINATED.  That is strictly better than pinning it,
+#because a quantity that never enters the arithmetic cannot be fitted to make the answer nicer.  The
+#class membership per (atom, l) is asserted identical first, or "native's Val space" and "gennbo's
+#Val space" are not the same question.
+#
+#WHAT IS FIXED BY CONSTRUCTION IN THE MASS TABLE, stated before it is read so nobody quotes it as a
+#finding: U is orthogonal, so every row block AND every column block of mass sums to that class's
+#dimension.  With the cores in near-agreement that FORCES mass[Val, Ryd] ~ mass[Ryd, Val] - the two
+#directions of the valence/Rydberg disagreement are near-equal by the sum rule, not by measurement.
+#One number carries the content: d_VR = mass[Val, Ryd], the dimensions of valence space the two sides
+#disagree about.  It is a subspace mass and NOT electrons; converting it needs occupancies.
+#
+#THE FLOOR IS MEASURED, AND IT IS THE SQUARE ROOT OF THE COEFFICIENT FLOOR.  A principal sine is
+#sqrt(1 - sigma**2) ~ sqrt(2 * (1 - sigma)), so a deficit of delta in a cosine shows up as sqrt(2
+#delta) in the angle: the sqrt AMPLIFIES roundoff, and a decade of printed precision buys only half a
+#decade of resolvable angle.  This is not theory - the self-comparison in demo() came out at 4e-08 on
+#coefficients good to 1e-15 and failed a 1e-12 assertion, which is how the factor was found.  So the
+#floor is sqrt(2 * max|C^T S C - 1|) over both sides and a class counts as different only above
+#SPACE_SEP times it.  Anyone reading gennbo's nine decimals as a 1e-09 floor here would be a factor
+#of ~10000 too optimistic and would call noise a leak.
+#A self-comparison is NOT the way to measure the floor (the sines of a space against itself are zero
+#by construction); it is a check on this code, and it is labelled as one in demo().
+#
+#PRE-REGISTERED, before any number was read:
+#  G  all class subspaces agree to the floor.  Then the cascade produces the same core, valence and
+#     Rydberg SPACES, the leak is not a subspace difference at all, and the working hypothesis that
+#     the orthogonalisation cascade is at fault is REFUTED - it would have to be the occupancy and
+#     m-averaging step downstream of it.
+#  H  the valence and/or Rydberg subspaces differ measurably while the cores agree.  The cascade's
+#     valence/Rydberg split is then located as a subspace difference and d_VR quantifies it; pf5,
+#     so2 and sf6 must then be checked for flatness, since those three are what the acceptance test
+#     discriminates on.
+#  I  the core subspaces differ too.  Corroborates the core defect --cascade already located and adds
+#     nothing to it - reported as corroboration, never as a second finding.
+#  J  the gate fails: the instrument moves under something it must ignore, or fails to move under an
+#     injected leak.  NO OUTCOME, quote nothing, exactly as --cascade's valence/Rydberg half did.
+SPACE_SEP = 10.0
+
+
+def cascade_orthogonal(Cpre, Cnao, S):
+    """O = G^1/2 T, the whole cascade as one orthogonal matrix, with max|O^T O - 1| beside it.
+
+    >>> rng = np.random.default_rng(3)
+    >>> A = rng.normal(size=(6, 6)); S = A @ A.T + 6 * np.eye(6)
+    >>> Cp = np.linalg.inv(np.linalg.cholesky(S)).T        # any S-orthonormal set, so G = 1
+    >>> Q, _ = np.linalg.qr(rng.normal(size=(6, 6)))
+    >>> O, res = cascade_orthogonal(Cp, Cp @ Q, S)
+    >>> bool(res < 1e-12), bool(np.abs(O - Q).max() < 1e-10)
+    (True, True)
+    """
+    w, V = np.linalg.eigh(Cpre.T @ S @ Cpre)
+    T, _, _, _ = np.linalg.lstsq(Cpre, Cnao, rcond=None)
+    O = (V * np.sqrt(w)) @ V.T @ T
+    return O, float(np.abs(O.T @ O - np.eye(O.shape[1])).max())
+
+
+def principal_sines(A, B, S):
+    """sin of the principal angles between span(A) and span(B), both S-orthonormal, descending.
+
+    Zero iff the two spans coincide.  Neither a column order nor a column sign enters, which is the
+    whole reason this comparison needs no permutation between the sides and no sign convention.
+
+    >>> S6 = np.eye(6)
+    >>> A = np.eye(6)[:, :2]
+    >>> float(principal_sines(A, A[:, ::-1], S6).max())     # a reordering is the SAME space
+    0.0
+    >>> B = np.column_stack([A[:, 0] * np.cos(0.3) + np.eye(6)[:, 3] * np.sin(0.3), A[:, 1]])
+    >>> bool(abs(principal_sines(A, B, S6).max() - np.sin(0.3)) < 1e-12)
+    True
+    """
+    sv = np.linalg.svd(A.T @ S @ B, compute_uv=False)
+    return np.sqrt(np.clip(1.0 - sv ** 2, 0.0, None))[::-1]
+
+
+def class_mass(Cn, Cg, S, ncls, gcls, order=ORDER):
+    """mass[(C, C')] = dimensions of native's class-C NAO space lying in gennbo's class-C' space.
+
+    Row AND column blocks sum to the class dimension because U is orthogonal, so a row sum is not a
+    measurement, and the near-equality of mass[Val, Ryd] with mass[Ryd, Val] is forced rather than
+    found - the second doctest is one Val/Ryd Givens rotation and both come out 0.64.
+
+    >>> S4, C = np.eye(4), np.eye(4)
+    >>> cls = ["Val", "Val", "Ryd", "Ryd"]
+    >>> m = class_mass(C, C, S4, cls, cls)
+    >>> round(m[("Val", "Val")], 12), m[("Val", "Ryd")]
+    (2.0, 0.0)
+    >>> g = np.array([[0.6, 0, -0.8, 0], [0, 1, 0, 0], [0.8, 0, 0.6, 0], [0, 0, 0, 1.0]])
+    >>> m = class_mass(C, g, S4, cls, cls)
+    >>> round(m[("Val", "Ryd")], 6), round(m[("Ryd", "Val")], 6)
+    (0.64, 0.64)
+    """
+    U = Cn.T @ S @ Cg
+    idx_n = {c: [i for i, k in enumerate(ncls) if k == c] for c in order}
+    idx_g = {c: [i for i, k in enumerate(gcls) if k == c] for c in order}
+    return {(a, b): float(np.linalg.norm(U[np.ix_(idx_n[a], idx_g[b])]) ** 2)
+            if idx_n[a] and idx_g[b] else 0.0 for a in order for b in order}
+
+
+def assert_same_classes(lnao, naos):
+    """Both sides must put the same number of orbitals of each (atom, l) into each class.
+
+    Counted per (atom, l) because that is invariant under the two sides' differing column orders, so
+    no pairing is needed.  Without it, a block or a space called Val on one side is not the same
+    question as the one called Val on the other and every number below would be about the labels.
+    """
+    cnt_n = collections.Counter((l[1], l[2], CLASS[l[5]]) for l in lnao)
+    cnt_g = collections.Counter((e["atom"] - 1, LANG_L[e["lang"][0].lower()], e["type"])
+                                for e in naos)
+    assert cnt_n == cnt_g, ("native and gennbo classify differently per (atom, l): %s - a space "
+                            "called Val on one side is then not the same space on the other"
+                            % ((cnt_n - cnt_g) + (cnt_g - cnt_n)))
+
+
+def space_sides(mol, d):
+    """Both sides' class subspaces compared in the shared AO basis, plus the VOID metric."""
+    n, S, P = read_47(os.path.join(d, mol + ".47"))
+    Cg, lay33, e33 = read_lfn33(os.path.join(d, mol + ".33"), n, S)
+    lnao, Cn = read_naoc(os.path.join(d, mol + ".naoc.txt"))
+    p = os.path.join(d, mol + ".aonao.nbo.json")
+    naos = sorted((load_nbo(p) if load_nbo is not None else json.load(open(p)))["nao"],
+                  key=lambda e: e["index"])
+    assert_same_classes(lnao, naos)
+    ncls = [CLASS[l[5]] for l in lnao]
+    gcls = [e["type"] for e in naos]
+    natom = [l[1] for l in lnao]
+    gatom = [e["atom"] - 1 for e in naos]
+    e_n = float(np.abs(Cn.T @ S @ Cn - np.eye(n)).max())
+    #sqrt, not the residual itself: a principal sine is sqrt(1 - sigma**2), so a cosine deficit of
+    #delta surfaces as sqrt(2 delta) in the angle.  See the header - the factor was found by a failed
+    #assertion, not assumed.
+    floor = float(np.sqrt(2.0 * max(e_n, e33)))
+    cls_sines, worst_atom = {}, {}
+    for c in ORDER:
+        a = Cn[:, [i for i, k in enumerate(ncls) if k == c]]
+        b = Cg[:, [i for i, k in enumerate(gcls) if k == c]]
+        cls_sines[c] = float(principal_sines(a, b, S).max()) if a.shape[1] else 0.0
+        #"where", resolved by atom and still pairing-free: one atom's class space per side.
+        per = []
+        for at in sorted(set(natom)):
+            ia = [i for i, k in enumerate(ncls) if k == c and natom[i] == at]
+            ib = [i for i, k in enumerate(gcls) if k == c and gatom[i] == at]
+            if ia and len(ia) == len(ib):
+                per.append((float(principal_sines(Cn[:, ia], Cg[:, ib], S).max()), at))
+        worst_atom[c] = max(per) if per else (0.0, -1)
+    mass = class_mass(Cn, Cg, S, ncls, gcls)
+    dims = {c: sum(1 for k in ncls if k == c) for c in ORDER}
+    #The VOID metric, computed so it can be shown to be void rather than asserted to be.  A
+    #deliberately WRONG permutation is used for the second number: if the singular values do not move
+    #when the pairing is scrambled, the pairing was never being tested.
+    Cn_pre = read_naoc(os.path.join(d, mol + ".naocpre.txt"), tag="NAOCPRE")[1]
+    Cg_pre = read_lfn32(os.path.join(d, mol + ".32"), n, S)[0]
+    On, res_n = cascade_orthogonal(Cn_pre, Cn, S)
+    Og, res_g = cascade_orthogonal(Cg_pre, Cg, S)
+    wrong = np.random.default_rng(0).permutation(n)
+    sv_id = np.linalg.svd(On.T @ Og, compute_uv=False)
+    sv_wrong = np.linalg.svd(On.T @ Og[:, wrong], compute_uv=False)
+    return dict(mol=mol, n=n, floor=floor, e_n=e_n, e_g=e33, dims=dims, sines=cls_sines,
+                worst_atom=worst_atom, mass=mass, res_n=res_n, res_g=res_g,
+                void_sv=(float(sv_id.min()), float(sv_id.max())),
+                void_sv_wrong=(float(sv_wrong.min()), float(sv_wrong.max())))
+
+
+def space_verdict(rows):
+    print("\n%s" % ("=" * 96))
+    print("the VOID metric first, so it cannot be mistaken for the result.  sigma(O_n^T O_g) is")
+    print("bounded below and above by:")
+    lo = min(r["void_sv"][0] for r in rows)
+    hi = max(r["void_sv"][1] for r in rows)
+    wlo = min(r["void_sv_wrong"][0] for r in rows)
+    whi = max(r["void_sv_wrong"][1] for r in rows)
+    print("  correct pairing  %.12f .. %.12f" % (lo, hi))
+    print("  WRONG pairing    %.12f .. %.12f   <- scrambling the pairing changes nothing," % (
+        wlo, whi))
+    print("     which is the proof that the pairing was never being tested.  A product of orthogonal")
+    print("     matrices is orthogonal and every singular value of an orthogonal matrix is 1, so this")
+    print("     metric cannot fail and is quoted nowhere.  demo() rotates valence into Rydberg by 30")
+    print("     degrees and still gets 1.000000 from it.")
+    print("\nthe measurable part.  floor = each side's own max|C^T S C - 1|; a class counts as")
+    print("different only above %.0f x floor." % SPACE_SEP)
+    print("\n%-9s %9s %9s %9s %9s %7s %7s %7s" % (
+        "mol", "floor", "sin Cor", "sin Val", "sin Ryd", "dVR", "dim Val", "dVR/dim"))
+    for r in rows:
+        print("%-9s %9.1e %9.2e %9.2e %9.2e %7.3f %7d %7.3f" % (
+            r["mol"], r["floor"], r["sines"]["Cor"], r["sines"]["Val"], r["sines"]["Ryd"],
+            r["mass"][("Val", "Ryd")], r["dims"]["Val"],
+            r["mass"][("Val", "Ryd")] / max(r["dims"]["Val"], 1)))
+    #A THIRD quantity fixed by construction, and the one most likely to be mis-read off the table
+    #above: sin Val and sin Ryd are EQUAL, and have to be.  The complementarity theorem says the
+    #nonzero principal angles between two equal-dimensional subspaces equal those between their
+    #orthogonal complements; inside the Val+Ryd space, Ryd IS Val's complement on each side, and
+    #the class assertion already guarantees both sides give Val the same dimension.  So the two
+    #columns are ONE measurement, not two agreeing ones, and "Val 8/8 Ryd 8/8" below is one fact
+    #reported twice.  Printed as a measured difference rather than asserted, because the cores are
+    #only NEARLY common - the residual is what the core defect leaks into it.
+    print("\nforced by complementarity and therefore ONE measurement, not two: sin Val vs sin Ryd")
+    print("  " + "  ".join("%s %.1e" % (r["mol"], abs(r["sines"]["Val"] - r["sines"]["Ryd"]))
+                           for r in rows))
+    print("  (Ryd is Val's complement inside Val+Ryd, so these are equal by theorem.  The residual")
+    print("   is bounded by the core disagreement, which is why it is not exactly zero.)")
+    print("\nforced by the sum rule and therefore not a finding: mass[Val, Ryd] vs mass[Ryd, Val]")
+    for r in rows:
+        print("  %-9s %.6f vs %.6f   (difference %.2e)" % (
+            r["mol"], r["mass"][("Val", "Ryd")], r["mass"][("Ryd", "Val")],
+            abs(r["mass"][("Val", "Ryd")] - r["mass"][("Ryd", "Val")])))
+    print("\nwhere, resolved by atom - the worst atom of each class subspace, pairing-free:")
+    for r in rows:
+        print("  %-9s %s" % (r["mol"], "  ".join(
+            "%s worst atom %d at %.2e" % (c, r["worst_atom"][c][1], r["worst_atom"][c][0])
+            for c in ORDER)))
+    #The pre-registered read, applied in the order it was written.
+    diff = {c: [r for r in rows if r["sines"][c] > SPACE_SEP * r["floor"]] for c in ORDER}
+    print("\nclasses called different at %.0f x floor: %s" % (
+        SPACE_SEP, "  ".join("%s %d/%d" % (c, len(diff[c]), len(rows)) for c in ORDER)))
+    if not any(diff[c] for c in ORDER):
+        print("OUTCOME G: every class subspace agrees to the floor on every molecule.  The cascade")
+        print("produces the SAME core, valence and Rydberg spaces, so the leak is not a subspace")
+        print("difference and the hypothesis that the orthogonalisation cascade is at fault is")
+        print("REFUTED - it has to be the occupancy/m-averaging step downstream of it.")
+    else:
+        which = "H" if not diff["Cor"] else "H and I"
+        print("OUTCOME %s: the class subspaces themselves differ, so the two cascades do not even"
+              % which)
+        print("agree about WHICH space is valence and which is Rydberg.")
+        print("d_VR = the dimensions of valence space the two sides disagree about: %.3f to %.3f" % (
+            min(r["mass"][("Val", "Ryd")] for r in rows),
+            max(r["mass"][("Val", "Ryd")] for r in rows)))
+        flat = [(r["mol"], r["mass"][("Val", "Ryd")] / max(r["dims"]["Val"], 1)) for r in rows]
+        flat.sort(key=lambda t: -t[1])
+        print("d_VR per valence dimension, the form that can be compared across molecules:")
+        print("  " + "  ".join("%s %.4f" % t for t in flat))
+        print("the acceptance test discriminates on pf5/so2/sf6 staying flat, so those three are")
+        print("what a candidate fix has to leave alone; they are %s here." % ", ".join(
+            "%s %.4f" % t for t in flat if t[0] in ("pf5", "so2", "sf6")))
+        if diff["Cor"]:
+            print("the core half is OUTCOME I - corroboration of the core defect --cascade already")
+            print("located, and NOT a second finding.")
+        print("(outcome letter: %s)" % which)
+
+
+def main_space(root):
+    print("aonao_compare --space on %s, 1 thread, root %s" % (socket.gethostname(), root))
+    rows, void, missing = [], [], []
+    for mol in sorted(os.listdir(root)):
+        d = os.path.join(root, mol)
+        if not os.path.isdir(d):
+            continue
+        if not all(os.path.isfile(os.path.join(d, mol + s))
+                   for s in (".33", ".naoc.txt", ".32", ".naocpre.txt")):
+            missing.append(mol)
+            continue
+        try:
+            r = space_sides(mol, d)
+        except AssertionError as e:
+            void.append((mol, str(e)))
+            print("%-10s VOID: %s" % (mol, e))
+            continue
+        print("%-10s n=%-4d floor %.1e (native %.1e / gennbo %.1e)  O^T O - 1: %.1e / %.1e" % (
+            mol, r["n"], r["floor"], r["e_n"], r["e_g"], r["res_n"], r["res_g"]))
+        rows.append(r)
+    print("\ndenominator: %d molecules measured, %d VOID, %d incomplete" % (
+        len(rows), len(void), len(missing)))
+    if missing:
+        print("  incomplete: %s" % " ".join(missing))
+    if rows:
+        space_verdict(rows)
     return 0
 
 
@@ -1677,7 +1964,8 @@ def demo():
     # points a runner at them.  These four are not.
     import doctest
     runner, finder = doctest.DocTestRunner(verbose=False), doctest.DocTestFinder()
-    for f in (cascade_transform, sym_shape, sign_frustration, tri_shape):
+    for f in (cascade_transform, sym_shape, sign_frustration, tri_shape,
+              cascade_orthogonal, principal_sines, class_mass):
         for t in finder.find(f, f.__name__, globs=globals()):
             runner.run(t)
     assert runner.failures == 0, "%d doctest failure(s) in the cascade arm" % runner.failures
@@ -1696,6 +1984,49 @@ def demo():
     assert min(bo[("Ryd", "Cor")], bo[("Val", "Cor")]) > 0.05, bo   # OWSO fills both triangles
     assert max(bs[("Ryd", "Cor")], bs[("Val", "Cor")]) == 0.0, bs   # Schmidt empties one
     assert sym_shape(schmidt, pairs)["n"] == 0                      # and its pairs never both clear
+    # --space: the instrument is gated on its ability to DISCRIMINATE before any leak number is read.
+    # Built on a non-trivial S, because an instrument that only works at S = 1 would not be one.
+    rng = np.random.default_rng(11)
+    A = rng.normal(size=(8, 8))
+    S8 = A @ A.T + 8.0 * np.eye(8)
+    X = np.linalg.inv(np.linalg.cholesky(S8)).T
+    Q, _ = np.linalg.qr(rng.normal(size=(8, 8)))
+    Cn = X @ Q                                                # an S-orthonormal "native" NAO set
+    cls = ["Cor"] * 2 + ["Val"] * 3 + ["Ryd"] * 3
+    iv, ir = [2, 3, 4], [5, 6, 7]
+    # (a) CODE check, not a gate: a space compared with itself gives zero identically, so passing it
+    #     says the svd and the clip are right and says nothing whatever about the instrument.  The
+    #     tolerance is 1e-07 and not 1e-12 BECAUSE a sine is sqrt(1 - sigma**2): at 1e-15 in the
+    #     cosine this comes out near 4e-08, which is where the sqrt floor in the header was found.
+    assert principal_sines(Cn[:, iv], Cn[:, iv], S8).max() < 1e-7
+    # (b) MUST NOT MOVE under the two gauges that are each side's own free choice - a per-column sign
+    #     and the order of columns within a class.  This is what makes the permutation between the
+    #     sides irrelevant rather than merely unresolved.
+    gauge = Cn.copy() * np.where(rng.random(8) < 0.5, -1.0, 1.0)
+    gauge[:, iv] = gauge[:, [4, 2, 3]]
+    for c, idx in (("Val", iv), ("Ryd", ir)):
+        assert principal_sines(Cn[:, idx], gauge[:, idx], S8).max() < 1e-7, c
+    assert abs(class_mass(Cn, gauge, S8, cls, cls)[("Val", "Ryd")]) < 1e-12   # mass is linear, so tight
+    # (c) MUST MOVE, by a known amount, under an injected valence -> Rydberg leak: one Givens
+    #     rotation of eps between a Val and a Ryd column puts sin(eps) into the largest principal
+    #     sine of BOTH classes and exactly sin(eps)**2 dimensions into mass[Val, Ryd].  An exact
+    #     analytic expectation, so this calibrates the instrument instead of merely exercising it.
+    for eps in (1e-6, 1e-3, 0.1, np.pi / 6):
+        leak = Cn.copy()
+        leak[:, 4] = np.cos(eps) * Cn[:, 4] + np.sin(eps) * Cn[:, 5]
+        leak[:, 5] = -np.sin(eps) * Cn[:, 4] + np.cos(eps) * Cn[:, 5]
+        for idx in (iv, ir):
+            got = principal_sines(Cn[:, idx], leak[:, idx], S8).max()
+            assert abs(got - np.sin(eps)) < 1e-7, (eps, got)   # sqrt floor, see (a)
+        m = class_mass(Cn, leak, S8, cls, cls)
+        assert abs(m[("Val", "Ryd")] - np.sin(eps) ** 2) < 1e-9, (eps, m[("Val", "Ryd")])
+        assert abs(m[("Cor", "Cor")] - 2.0) < 1e-9                # an untouched class stays put
+        # (d) and the metric that was proposed as the FIRST gate cannot see any of it: U is
+        #     orthogonal, so its singular values are 1 whatever was done to the classes.  At eps =
+        #     30 degrees a quarter of a dimension has moved and it still reads 1.000000.
+        sv = np.linalg.svd(Cn.T @ S8 @ leak, compute_uv=False)
+        assert np.abs(sv - 1.0).max() < 1e-12, sv
+    assert abs(np.sin(np.pi / 6) ** 2 - 0.25) < 1e-12             # the "quarter of a dimension"
     print("demo ok")
 
 
@@ -1789,6 +2120,8 @@ def main(argv):
         return main_pre(root, verbose)
     if "--cascade" in argv:
         return main_cascade(root)
+    if "--space" in argv:
+        return main_space(root)
     print("aonao_compare on %s, 1 thread (numpy on matrices of a few hundred), root %s" % (
         socket.gethostname(), root))
     all_rows, rows_by_mol, void, missing = [], {}, [], []
