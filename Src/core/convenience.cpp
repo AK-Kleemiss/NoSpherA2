@@ -5153,6 +5153,13 @@ void ProgressBar::write_progress()
     // Check if os is a file stream
     if (dynamic_cast<std::filebuf *>(stream_.rdbuf()))
     {
+        // A file stream is rewound so the bar is redrawn in place - and that OVERWRITES whatever the loop
+        // itself printed in the meantime. Every diagnostic raised inside a progress-bar loop was silently
+        // deleted from NoSpherA2.log this way, including RGBI's per-bond populations, which have been
+        // printed and lost since they were written. If the put position has moved since the bar was last
+        // drawn, someone else wrote there: keep that text and re-anchor the bar behind it.
+        if (stream_.tellp() != barend_)
+            linestart = stream_.tellp();
         stream_.seekp(linestart); // Is a file stream
     }
     else
@@ -5173,6 +5180,7 @@ void ProgressBar::write_progress()
     if (((progress_ < 100.0f) ? progress_ : 100.0f) == 100)
     {
         stream_ << "] 100% " << std::flush;
+        barend_ = stream_.tellp();
 #ifdef _WIN32
         if (taskbarList_)
         {
@@ -5184,6 +5192,7 @@ void ProgressBar::write_progress()
     }
 
     stream_ << std::flush;
+    barend_ = stream_.tellp();
 
 #ifdef _WIN32
     // Update taskbar progress

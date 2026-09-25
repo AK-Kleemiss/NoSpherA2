@@ -471,6 +471,7 @@ public:
 		int bw = bar_width_ + 2;
 		print_centered_text(status_text_, bw, stream_);
 		linestart = stream_.tellp();
+		barend_ = linestart;
 #ifdef _WIN32
 			initialize_taskbar_progress();
 #endif
@@ -519,6 +520,9 @@ private:
 	std::atomic<unsigned long long> bar_writes_{0};
 	float progress_;
 	std::streampos linestart;
+	//where the bar's own last write ended; a put position anywhere else means the loop printed something
+	//that must not be overwritten. See write_progress().
+	std::streampos barend_{};
 	bool finished_ = false;
 #ifdef _WIN32
 	//Assigned only inside initialize_taskbar_progress()'s SUCCEEDED checks; without the initialiser the destructor calls through stack garbage when COM refuses

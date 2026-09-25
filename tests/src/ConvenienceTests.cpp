@@ -468,6 +468,36 @@ TEST(ConvenienceTests, ProgressBarBatchedUpdateWritesOnce)
 	EXPECT_NE(out.str().find("100%"), std::string::npos);
 }
 
+//A file-backed bar is redrawn by seeking back to the start of its line, and that overwrites whatever the
+//loop printed in between. Both bar tests above use an ostringstream, which takes the "\r" branch, so the
+//file branch - the one every NoSpherA2.log goes through - was never covered. This is not a cosmetic
+//question: RGBI prints a population line per bond inside its bar loop and not one of them has ever reached
+//the log, and the same holds for every warning any other bar loop raises. A diagnostic that is printed and
+//then erased is worse than one that was never written, because the code looks like it reports.
+//WHAT MAKES THIS FAIL: a write_progress that seeks back unconditionally. Measured red by reverting the
+//guard: found came out 0 of 4, and the file held the bar followed by the truncated tail of the last line
+//("tion between atom 1 and atom 5: 27.09"), which is what silent corruption of a log looks like.
+TEST(ConvenienceTests, FileBarKeepsWhatTheLoopPrinted)
+{
+	const TempFile tmp("progressbar", ".log");
+	{
+		std::ofstream f(tmp.path);
+		ProgressBar bar(4, 10, "-", " ", "pairs", f);
+		for (int i = 0; i < 4; i++) {
+			f << "Bond population between atom 1 and atom " << i + 2 << ": 27.09\n";
+			bar.update();
+		}
+	}
+	std::ifstream in(tmp.path);
+	const std::string text{ std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>() };
+	int found = 0;
+	for (size_t at = text.find("Bond population"); at != std::string::npos;
+		at = text.find("Bond population", at + 1))
+		found++;
+	EXPECT_EQ(found, 4) << "the bar overwrote the loop's own output in the log file:\n" << text;
+	EXPECT_NE(text.find("100%"), std::string::npos) << "and the bar itself must still finish";
+}
+
 // the contributor block is the part -no_date suppresses; the banner stays
 TEST(ConvenienceTests, MessageOmitsContributorsWithNoDate)
 {
