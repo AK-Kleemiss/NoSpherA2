@@ -315,12 +315,31 @@ namespace
 		{
 			if (line.rfind("  total in basins:", 0) == 0)
 				break;
+			//the label column holds spaces - "NNA near H0", "O0 LP", "H2-Hg0 bond" - so it cannot be read
+			//with a single >>: that reads "NNA", then fails on "near" as a double and drops the row without
+			//saying so, which is how an NNA row would disappear from a table a test is asserting on.
 			std::istringstream row(line);
-			int idx;
-			std::string label;
-			double electrons, charge;
-			if (row >> idx >> label >> electrons >> charge)
-				rows[label] = { electrons, charge };
+			std::vector<std::string> tok;
+			for (std::string t; row >> t; )
+				tok.push_back(t);
+			if (tok.size() < 4)
+				continue;
+			//the label runs from token 1 to the first token that is a number: electrons and charge are the
+			//first two numeric columns and four more follow them, so counting from the end would depend on
+			//how many columns the table happens to print
+			size_t first_num = 1;
+			auto is_number = [](const std::string& t) {
+				try { size_t used = 0; (void)std::stod(t, &used); return used == t.size(); }
+				catch (const std::exception&) { return false; }
+			};
+			while (first_num < tok.size() && !is_number(tok[first_num]))
+				first_num++;
+			if (first_num < 2 || first_num + 1 >= tok.size() || !is_number(tok[0]))
+				continue; //not a data row
+			std::string label = tok[1];
+			for (size_t t = 2; t < first_num; t++)
+				label += " " + tok[t];
+			rows[label] = { std::stod(tok[first_num]), std::stod(tok[first_num + 1]) };
 		}
 		return rows;
 	}
@@ -683,12 +702,48 @@ TEST(BondwiseCoverageEliTests, DebugListsTheCriticalPointsOfTwoGaussians)
 	EXPECT_EQ(attractors, 2);
 	EXPECT_EQ(bonds, 1);
 	const auto rows = parse_qtaim_table(out);
+	//H2 has two basins, so the table has two rows. A parser that dropped a row whose label carries a space
+	//("NNA near H0", "H0-H1 bond") would still satisfy the two lookups below while hiding a third basin.
+	ASSERT_EQ(rows.size(), 2u) << out;
 	ASSERT_TRUE(rows.count("H0") && rows.count("H1")) << out;
 	const double e0 = rows.at("H0").first, e1 = rows.at("H1").first;
 	EXPECT_GT(e0, 0.0);
 	EXPECT_NEAR(e0, e1, 5e-3 * (e0 + e1));
 	EXPECT_NEAR(rows.at("H0").second, 1.0 - e0, 2e-4);
 	EXPECT_NEAR(rows.at("H1").second, 1.0 - e1, 2e-4);
+}
+
+//The H2 table above has two single-word labels, so the row-count assertion in it cannot by itself show
+//that the parser stopped dropping rows. This does, on a table written out here: two of its three rows
+//carry a label with a space, which is what the real tables print for NNA, lone-pair and bond basins.
+TEST(BondwiseCoverageEliTests, QtaimTableParserKeepsLabelsThatCarrySpaces)
+{
+	const std::string out =
+		"QTAIM Analysis (atomic quadrature grids):\n"
+		"  basin  label               electrons     charge      volume         maximum        x          y          z\n"
+		"      1  Hg0                   79.4496     0.5504  12885.2903     367149.1320      0.000      0.000      0.000\n"
+		"      2  NNA near H0            0.1234    -0.1234     42.0000          1.2300      0.500      0.000      0.000\n"
+		"      3  H2-Hg0 bond            0.9000     0.1000     99.0000          0.4500     -0.500      0.000      0.000\n"
+		"  total in basins:     80.4730   outside every basin:     0.0100\n";
+	const auto rows = parse_qtaim_table(out);
+	ASSERT_EQ(rows.size(), 3u);
+	EXPECT_NEAR(rows.at("Hg0").first, 79.4496, 1e-9);
+	EXPECT_NEAR(rows.at("NNA near H0").first, 0.1234, 1e-9);
+	EXPECT_NEAR(rows.at("NNA near H0").second, -0.1234, 1e-9);
+	EXPECT_NEAR(rows.at("H2-Hg0 bond").first, 0.9000, 1e-9);
+	EXPECT_NEAR(rows.at("H2-Hg0 bond").second, 0.1000, 1e-9);
+	//and the same table read the way it used to be read, kept here so this test cannot quietly become a
+	//tautology: a single >> for the label keeps one row of the three and says nothing about the two it lost
+	size_t naive = 0;
+	std::istringstream in(out);
+	for (std::string line; std::getline(in, line); )
+	{
+		std::istringstream row(line);
+		int idx = 0; std::string label; double electrons = 0.0, charge = 0.0;
+		if (row >> idx >> label >> electrons >> charge)
+			naive++;
+	}
+	EXPECT_EQ(naive, 1u) << "the old parser kept only the row whose label is a single word";
 }
 
 namespace {
