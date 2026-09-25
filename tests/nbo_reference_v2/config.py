@@ -114,6 +114,12 @@ NO_RECORD = {
     "hs": ({"e2_kcal": 0.25, "nrt_deloc_kcal": 1.0}, 2),
     "cf3": ({"e2_kcal": 0.25, "nrt_deloc_kcal": 1.0}, 2),
     "ch2": ({"e2_kcal": 0.25, "nrt_deloc_kcal": 1.0}, 3),
+    # The supplement.  benzene and pyridine, the two aromatics with a record, both took
+    # e2_kcal 0.5 / nrt_deloc_kcal 1.0, so thiophene gets what its own homologue got and no
+    # allowance beyond it; c2h5 gets ch3's and allyl's open-shell 0.25.
+    "si2h6": ({"e2_kcal": 0.5, "nrt_deloc_kcal": 1.0}, 1),
+    "thiophene": ({"e2_kcal": 0.5, "nrt_deloc_kcal": 1.0}, 1),
+    "c2h5": ({"e2_kcal": 0.25, "nrt_deloc_kcal": 1.0}, 2),
 }
 
 

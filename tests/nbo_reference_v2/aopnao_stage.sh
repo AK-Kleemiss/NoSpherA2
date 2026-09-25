@@ -72,9 +72,13 @@
 # that list.  Guessing a unit is how a 0-byte file with rc=0 gets mistaken for an answer.
 set -u
 OUT=${OUT:-/work/akkleemiss/florian/aopnao_cmp}
-SRC=/work/akkleemiss/florian/nbo_ref_v2
-V2=/work/akkleemiss/florian/nos_nboref/tests/nbo_reference_v2
-BIN=/work/akkleemiss/florian/nos_nboref/build/release-linux/bin/NoSpherA2
+# SRC / V2 / BIN are overridable so that the same probe can be pointed at the HELD-OUT root and
+# at a NAMED binary.  Unset, they are what the eight were measured with, so nothing changes for
+# the existing runs.  Which binary produced a dump is the whole question here, and the run echoes
+# $BIN with its mtime below - a probe that cannot name its own binary is not a measurement.
+SRC=${SRC:-/work/akkleemiss/florian/nbo_ref_v2}
+V2=${V2:-/work/akkleemiss/florian/nos_nboref/tests/nbo_reference_v2}
+BIN=${BIN:-/work/akkleemiss/florian/nos_nboref/build/release-linux/bin/NoSpherA2}
 MOLS=${MOLS:-"lif water ammonia ethane benzene pf5 so2 sf6"}
 THREADS=${SLURM_CPUS_PER_TASK:-1}
 export OMP_NUM_THREADS=$THREADS
