@@ -1752,8 +1752,9 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 	//1.5 bohr of a nucleus, so every trajectory otherwise walks the whole cusp in tens of steps of
 	//two gradient calls each - and there are three to nine trajectories per quadrature point.
 	//The radius is the smallest over a spiral of directions marched outwards until the radial
-	//derivative stops being negative, kept at 70 % of it. Capped at 0.45 of the distance to the
-	//nearest other maximum so two spheres can never meet and only one attractor is ever inside -
+	//derivative stops being negative, kept at beta_margin_default of it - 0.9, swept over five
+	//molecules at its definition. Capped at 0.45 of the distance to the nearest other maximum so
+	//two spheres can never meet and only one attractor is ever inside -
 	//a saddle between two maxima stops the march by itself, the radial derivative past it
 	//pointing at the other one.
 	//The direction count and the margin are not free parameters to be picked small. The first
