@@ -6,6 +6,7 @@
 #include "nos_math.h"
 #include "citations.h"
 #include "GridManager.h"
+#include <limits>
 #include <map>
 #include <mutex>
 
@@ -1411,8 +1412,11 @@ bool converge_to_maximum(const scalar_field &field, d3 &p, const double step_lim
 //Nuclei are attractors of the density by the cusp and need no test. Everything else has to
 //earn it: the critical-point search must have converged there and called it an attractor, and
 //the point must still be a maximum when it is re-converged on the analytic field from a
-//perturbed start, so that a candidate resting on a shoulder falls out. The perturbation is a
-//tenth of a bohr, wider than the Newton step tolerance and narrower than any real basin.
+//perturbed start, so that a candidate resting on a shoulder falls out. The perturbation is a third
+//of the distance to the nearest other critical point, capped at a tenth of a bohr, because that
+//distance is where the basin ends and a shallow attractor's is narrower than any fixed length.
+//Candidates come from the seed cube AND from a scan of rho along each bonded internuclear line, so
+//that discovery does not inherit the cube's resolution the way the integration no longer does.
 std::vector<d4> streaming_density_attractors(const WFN &wavy, const std::vector<critical_point> &critical_points, const std::function<double(const d3&)> *core_density, const std::function<void(const d3&, d3&)> *core_gradient, const bool debug)
 {
 	auto rho = [&](const d3 &p) { return wavy.compute_dens(p) + (core_density ? (*core_density)(p) : 0.0); };
@@ -1433,46 +1437,126 @@ std::vector<d4> streaming_density_attractors(const WFN &wavy, const std::vector<
 	const size_t nuclei = maxima.size();
 	constexpr double nuclear_radius = 0.5;   //a critical point this close to a nucleus is that nucleus
 	constexpr double duplicate_radius2 = 0.01;
-	for (const critical_point &cp : critical_points) {
-		if (!cp.converged || cp.type != "attractor") continue;
-		bool nuclear = false;
-		for (size_t a = 0; a < nuclei && !nuclear; a++)
-			nuclear = array_length(cp.position, d3{ maxima[a][0], maxima[a][1], maxima[a][2] }) < nuclear_radius;
-		if (nuclear) continue;
-		bool survives = true;
-		d3 converged = cp.position;
+
+	//How far a candidate may be displaced and still be inside its own basin of attraction: less than
+	//the distance to the nearest other critical point of the field, because that is where the basin
+	//ends. It used to be a flat tenth of a bohr, and AIMAll's CCH is what that cost. Its non-nuclear
+	//attractor NNA4 carries 0.39257 e and is flanked by two saddles 0.0687 and 0.1225 bohr away - the
+	//density along the C-C axis rises from 0.425864 to 0.425895 and falls again, a barrier of
+	//3.1e-5 e/bohr^3 with an axial curvature of -0.0249 against -0.633 across. A 0.1 bohr displacement
+	//along that axis therefore lands past the saddle in the next basin, the Newton iteration from
+	//there reaches no maximum, and the candidate was rejected - at every cube resolution, because the
+	//displacement never depended on the resolution. A third of the distance to the nearest
+	//neighbouring critical point leaves the Newton step room to overshoot and still cannot leave.
+	auto perturbation_for = [&](const d3 &at, const double cap) {
+		double nearest2 = std::numeric_limits<double>::max();
+		auto note = [&](const d3 &q) {
+			const double d2 = std::pow(at[0] - q[0], 2) + std::pow(at[1] - q[1], 2) + std::pow(at[2] - q[2], 2);
+			//1e-4 bohr^2 is 0.01 bohr, the floor below - anything nearer is the candidate itself or a
+			//second seed that converged onto it, and neither bounds anything.
+			if (d2 > 1e-4) nearest2 = std::min(nearest2, d2);
+		};
+		for (const critical_point &o : critical_points)
+			if (o.converged) note(o.position);
+		for (const d4 &m : maxima) note(d3{ m[0], m[1], m[2] });
+		//The cap defaults to the old displacement, so nothing with room around it changes; the floor
+		//keeps a crowded neighbourhood from asking for a displacement the Newton tolerance cannot
+		//resolve. A caller that knows a tighter bound - the bond line does, from its own profile -
+		//passes it, because otherwise the bound comes from whatever critical points the cube found
+		//nearby, which is the resolution dependence being removed one level further in.
+		return std::min(cap, std::max(0.01, std::sqrt(nearest2) / 3.0));
+	};
+
+	//A candidate is an attractor if the analytic field has a maximum there: the point itself must
+	//converge, and three starts displaced along the axes must all come back to the same place.
+	auto accept = [&](const d3 &candidate, d3 &converged, const double cap = 0.1) {
+		for (size_t a = 0; a < nuclei; a++)
+			if (array_length(candidate, d3{ maxima[a][0], maxima[a][1], maxima[a][2] }) < nuclear_radius) return false;
+		const double delta = perturbation_for(candidate, cap);
+		const double back = 0.5 * delta;
+		converged = candidate;
 		int fail_t = -1; double fail_dist = 0.0; const char *why = "";
-		for (int t = 0; t < 4 && survives; t++) {
-			//t == 0 is the point itself; the three after it start a tenth of a bohr off along
-			//each axis and have to come back to the same place
-			d3 start = cp.position;
-			if (t > 0) start[t - 1] += 0.1;
-			d3 q = start;
-			survives = converge_to_maximum(field, q);
-			if (!survives) { fail_t = t; why = "the Newton iteration did not reach a maximum"; break; }
-			if (t == 0) converged = q;
+		for (int t = 0; t < 4; t++) {
+			//t == 0 is the point itself; the three after it start delta off along each axis and
+			//have to come back to the same place
+			d3 q = candidate;
+			if (t > 0) q[t - 1] += delta;
+			if (!converge_to_maximum(field, q)) { fail_t = t; why = "the Newton iteration did not reach a maximum"; }
+			else if (t == 0) { converged = q; continue; }
 			else {
 				fail_dist = array_length(q, converged);
-				if (fail_dist >= 0.05) { survives = false; fail_t = t; why = "it came back somewhere else"; }
+				if (fail_dist < back) continue;
+				fail_t = t; why = "it came back somewhere else";
 			}
-		}
-		if (!survives) {
 			//Which start failed and how far it went, because the two failures mean opposite things: the
 			//point itself failing says there is no maximum there, while a perturbed start running away
-			//says only that 0.1 bohr is further than this maximum's basin of attraction reaches along
-			//that axis - which a shallow one, an NNA inside a triple bond, genuinely is.
+			//says only that the displacement is further than this maximum's basin of attraction reaches
+			//along that axis - which a shallow one, an NNA inside a triple bond, genuinely is.
 			if (debug) std::cout << "Dropped a non-nuclear attractor candidate that is not a maximum of the analytic field at "
-				<< cp.position[0] << " " << cp.position[1] << " " << cp.position[2]
+				<< candidate[0] << " " << candidate[1] << " " << candidate[2]
 				<< " (start " << fail_t << ": " << why << ", " << fail_dist
-				<< " bohr away)" << std::endl;
-			continue;
+				<< " bohr away, displaced by " << delta << ")" << std::endl;
+			return false;
 		}
-		bool duplicate = false;
 		for (const d4 &m : maxima)
-			if (std::pow(converged[0] - m[0], 2) + std::pow(converged[1] - m[1], 2) + std::pow(converged[2] - m[2], 2) < duplicate_radius2) duplicate = true;
-		if (duplicate) continue;
+			if (std::pow(converged[0] - m[0], 2) + std::pow(converged[1] - m[1], 2) + std::pow(converged[2] - m[2], 2) < duplicate_radius2) return false;
+		return true;
+	};
+
+	auto keep = [&](const d3 &converged, const char *from) {
 		maxima.push_back(d4{ converged[0], converged[1], converged[2], rho(converged) });
-		if (debug) std::cout << "Kept a non-nuclear attractor at " << converged[0] << " " << converged[1] << " " << converged[2] << " with rho " << rho(converged) << std::endl;
+		if (debug) std::cout << "Kept a non-nuclear attractor at " << converged[0] << " " << converged[1] << " "
+			<< converged[2] << " with rho " << rho(converged) << " (from " << from << ")" << std::endl;
+	};
+
+	d3 converged;
+	for (const critical_point &cp : critical_points) {
+		if (!cp.converged || cp.type != "attractor") continue;
+		if (accept(cp.position, converged)) keep(converged, "the seed cube");
+	}
+
+	//Candidates of the search's own, because everything above came from the seed cube and a streaming
+	//integration that still discovers its attractors at the cube's resolution is only half free of it.
+	//CCH is the case: its NNA is nominated from a 0.025 A cube and never from a 0.05 A one, so the
+	//0.39 e it carries was missing at the resolution the gate actually runs. A non-nuclear attractor
+	//on a bond sits on the bond path, so walk the internuclear line and take every interior local
+	//maximum of rho. A normal bond has none - rho falls from one nucleus to the bond critical point
+	//and rises to the other - so this nominates nothing at all except where there is something to
+	//find, and accept() above is what decides whether it is real.
+	const double line_step = 0.02;   //bohr. CCH's bump is 3.1e-5 e/bohr^3 over 0.19 bohr with an axial
+	//curvature of -0.0249, so a step this size falls 5e-6 across it - six times finer than the bump it
+	//has to resolve. It is an absolute length on purpose: a fraction of the bond would make the
+	//nomination depend on the bond, which is the mistake being fixed here. Cost is one density per
+	//point, about 5400 for all of sucrose's bonds against millions in the integration itself.
+	for (int a = 0; a < wavy.get_ncen(); a++) {
+		const d3 pa = wavy.get_atom_pos(a);
+		const int za = wavy.get_atom_charge(a);
+		const double ra = (za > 0 && za < 114) ? constants::covalent_radii[za] : 1.5;
+		for (int b = a + 1; b < wavy.get_ncen(); b++) {
+			const d3 pb = wavy.get_atom_pos(b);
+			const int zb = wavy.get_atom_charge(b);
+			const double rb = (zb > 0 && zb < 114) ? constants::covalent_radii[zb] : 1.5;
+			const double dist = array_length(pa, pb);
+			//The same 1.3 x sum of CSD covalent radii the cube's own bond seeds use
+			if (dist > constants::ang2bohr(1.3 * (ra + rb)) || dist < 2.0 * line_step) continue;
+			const int n = (int)(dist / line_step);
+			const d3 u{ (pb[0] - pa[0]) / dist, (pb[1] - pa[1]) / dist, (pb[2] - pa[2]) / dist };
+			auto at = [&](const int i) { return d3{ pa[0] + i * line_step * u[0], pa[1] + i * line_step * u[1], pa[2] + i * line_step * u[2] }; };
+			std::vector<double> prof((size_t)n + 1);
+			for (int i = 0; i <= n; i++) prof[(size_t)i] = rho(at(i));
+			for (int i = 1; i < n; i++) {
+				if (prof[i] <= prof[i - 1] || prof[i] <= prof[i + 1]) continue;
+				//How far this maximum's basin reaches along the line, from the profile and nothing else:
+				//the nearest turning point on either side. The cube's critical points would otherwise be
+				//what bounds the displacement, and a candidate the bond line found precisely because the
+				//cube was too coarse must not then be judged against what the cube found.
+				int lo = i, hi = i;
+				while (lo > 0 && prof[lo - 1] < prof[lo]) lo--;
+				while (hi < n && prof[hi + 1] < prof[hi]) hi++;
+				const double reach = line_step * std::min(i - lo, hi - i);
+				if (accept(at(i), converged, std::min(0.1, std::max(0.01, reach / 3.0)))) keep(converged, "a bond line");
+			}
+		}
 	}
 	return maxima;
 }
