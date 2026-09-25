@@ -794,14 +794,31 @@ void make_Eigenvalues(vec& A, vec& W) {
 	err_checkf(try_make_Eigenvalues(A, W), "The algorithm failed to compute eigenvalues.", std::cout);
 }
 
-vec mat_sqrt(vec& A, vec& W, const double cutoff) {
+vec mat_sqrt(vec& A, vec& W, const double cutoff, PinvRank* rank_out) {
 	const int n = static_cast<int>(W.size());
 	vec Temp(static_cast<size_t>(n) * n, 0.0);
 
 	make_Eigenvalues(A, W);
 
-	for (int i = 0; i < n; ++i)
-		W[i] = abs(W[i]) < cutoff ? 0.0 : std::sqrt(abs(W[i]));
+	if (rank_out) {
+		*rank_out = PinvRank{};
+		rank_out->n = n;
+		for (int i = 0; i < n; ++i)
+			rank_out->largest = std::max(rank_out->largest, abs(W[i]));
+	}
+	for (int i = 0; i < n; ++i) {
+		const double magnitude = abs(W[i]);
+		if (rank_out) {
+			if (magnitude < cutoff)
+				rank_out->largest_dropped = std::max(rank_out->largest_dropped, magnitude);
+			else {
+				rank_out->kept++;
+				rank_out->smallest_kept = rank_out->smallest_kept == 0.0
+					? magnitude : std::min(rank_out->smallest_kept, magnitude);
+			}
+		}
+		W[i] = magnitude < cutoff ? 0.0 : std::sqrt(magnitude);
+	}
 
 	double* T;
 	int in, jn;

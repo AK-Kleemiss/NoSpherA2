@@ -3023,15 +3023,34 @@ Roby_information::Roby_information(WFN &wavy, const ivec3 &group_sets, const boo
 
 		vec V = S_Sub;
 		vec W(n);
+		//Both of these were taking the default 1E-5 cutoff, which is a rank decision on the pair overlap
+		//and on its square root - the same class of decision that, on the ATOMIC subspace, made an
+		//octahedral molecule print three different Te-F bonds. They are routed through pinv_cutoff so the
+		//sweep can ask whether they are also deciding anything, and both report what they decided.
+		PinvRank sqrt_rank{}, inverse_rank{};
 		// make V = Sqrt(S)
-		const vec Temp = mat_sqrt(V, W);
+		const vec Temp = mat_sqrt(V, W, pinv_cutoff, &sqrt_rank);
 
 		dMatrix2 A = reshape<dMatrix2>(Temp, Shape2D(n, n));
 #ifdef NSA2DEBUG
 		print_dmatrix2(A, "Overlap Sqrt SH");
 #endif
 
-		dMatrix2 SI = LAPACKE_invert(A);
+		dMatrix2 SI = LAPACKE_invert(A, pinv_cutoff, &inverse_rank);
+		//Reported through the same collector the atomic subspaces use, so a marginal pair metric lands in
+		//the one warning block at the end of the table rather than in a line per bond: measured on TeF6,
+		//every bond keeps 81 of 81 with the smallest kept at 4.29e-03, so an unconditional line would be
+		//six lines of "nothing happened" in every run.
+		if (sqrt_rank.marginal(pinv_cutoff) || inverse_rank.marginal(pinv_cutoff)) {
+			std::ostringstream w;
+			w << "  " << wavy.get_atoms()[bond.first].get_label() << " - " << wavy.get_atoms()[bond.second].get_label()
+				<< ": pair overlap kept " << sqrt_rank.kept << " of " << sqrt_rank.n << " eigenvalues (smallest kept "
+				<< std::scientific << std::setprecision(3) << sqrt_rank.smallest_kept << ", largest dropped "
+				<< sqrt_rank.largest_dropped << "), its square root kept " << inverse_rank.kept << " of "
+				<< inverse_rank.n << " (smallest kept " << inverse_rank.smallest_kept << ", largest dropped "
+				<< inverse_rank.largest_dropped << ")";
+			pinv_warnings.push_back(w.str());
+		}
 
 #ifdef NSA2DEBUG
 		print_dmatrix2(SI, "Overlap Pseudo Inverse");

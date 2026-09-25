@@ -179,7 +179,10 @@ dMatrix2 LAPACKE_invert(const dMatrix2& A, const double cutoff = 1E-5, PinvRank*
 bool try_make_Eigenvalues(vec& A, vec& W);
 // Same as try_make_Eigenvalues but aborts via err_checkf on failure.
 void make_Eigenvalues(vec& A, vec& W);
-vec mat_sqrt(vec& A, vec& W, const double cutoff = 1E-5);
+//The symmetric square root zeroes every eigenvalue below the cutoff, which is a rank decision on the
+//same footing as the pseudo-inverse's - and in RGBI it is taken on a pair overlap matrix whose spectrum
+//runs down to 1e-8, so it reports what it decided for the same reason LAPACKE_invert does.
+vec mat_sqrt(vec& A, vec& W, const double cutoff = 1E-5, PinvRank* rank_out = nullptr);
 
 template <typename T>
 void swap_rows_cols_symm(T& mat, const int i, const int j);

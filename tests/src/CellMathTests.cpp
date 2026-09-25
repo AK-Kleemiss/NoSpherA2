@@ -1024,5 +1024,30 @@ namespace NoSpherA2UnitTests
 		// sqrt(3) times the projector onto (1,1)/sqrt(2): every entry sqrt(3)/2
 		for (int i = 0; i < 4; i++)
 			EXPECT_NEAR(Sc[i], r3 / 2.0, 1e-12) << i;
+
+		// and the optional rank report, which exists because zeroing an eigenvalue here is the same class
+		// of silent rank decision as the pseudo-inverse's: RGBI routes a pair overlap through this, and a
+		// rank that differs between two bonds symmetry makes identical is the answer to why they differ.
+		// smallest_kept starts at 0.0 and is minimised from the first kept value, so a report that never
+		// saw a kept eigenvalue and one whose smallest kept is genuinely 0 look alike - kept tells them
+		// apart, which is why both are asserted.
+		vec C = { 2, 1, 1, 2 };
+		vec Wr(2);
+		PinvRank all{}, cut{};
+		mat_sqrt(C, Wr, 1E-5, &all);
+		EXPECT_EQ(all.n, 2);
+		EXPECT_EQ(all.kept, 2);
+		EXPECT_NEAR(all.largest, 3.0, 1e-12);
+		EXPECT_NEAR(all.smallest_kept, 1.0, 1e-12);
+		EXPECT_DOUBLE_EQ(all.largest_dropped, 0.0);
+		EXPECT_FALSE(all.marginal(1E-5)) << "a spectrum from 1 to 3 against a 1e-5 cutoff is not marginal";
+		vec D = { 2, 1, 1, 2 };
+		vec Wd(2);
+		mat_sqrt(D, Wd, 1.5, &cut);
+		EXPECT_EQ(cut.kept, 1);
+		EXPECT_NEAR(cut.smallest_kept, 3.0, 1e-12);
+		EXPECT_NEAR(cut.largest_dropped, 1.0, 1e-12) << "the dropped eigenvalue must be reported, not just counted";
+		EXPECT_TRUE(cut.marginal(1.5)) << "dropping an eigenvalue at 0.67 times the cutoff is exactly the case "
+			"the warning exists for";
 	}
 }
