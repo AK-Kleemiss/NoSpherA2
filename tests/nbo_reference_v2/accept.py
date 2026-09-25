@@ -28,15 +28,18 @@ stiff bonds in this set (k of order 0.5 Eh/a0^2) that is under 1e-7 Eh, and the 
 spread is dominated instead by the DFT integration grid moving with the nuclei.  The default
 here is therefore 2.0e-5 Eh, which is four times ORCA's own per-step energy criterion.
 
-Two groups get a looser number, declared here rather than widened after seeing the result:
+2.0e-5 Eh applies to all 22 with no per-molecule exceptions.  Three of them used to get
+1.0e-4 Eh, declared up front rather than widened afterwards - ni_co_4 and ticl4 for soft M-L
+bending modes, nitromethane for its almost free methyl rotor.  All three then came in at
+2.94e-08, 2.89e-06 and 1.83e-06 Eh, inside the default, so the loosening was never exercised
+and its justification never tested.  An unexercised tolerance cannot be told apart from an
+unnecessary one and will silently absorb a real regression later; if one of these genuinely
+needs the room it will fail and say why, which is better information than a tolerance nobody
+has ever seen used.
 
-  * ni_co_4 and ticl4 (1.0e-4 Eh): a transition metal with soft M-L bending modes; the
-    gradient tolerance buys much less energy resolution on a flat surface.
-  * nitromethane (1.0e-4 Eh): an almost free methyl rotor, so the optimiser can stop at a
-    different rotamer of an essentially flat torsion.
-
-The deviation actually observed is printed for every molecule whether it passes or not, so
-a tolerance that turns out to be too generous is visible instead of hidden.
+The deviation actually observed is printed for every molecule whether it passes or not, so a
+tolerance that turns out to be too generous is visible instead of hidden.  The worst over the
+22 is ammonia at 9.03e-06 Eh, so this gate is generous by a factor 2.2 and no more.
 """
 import argparse
 import json
@@ -48,11 +51,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 REF_DIR = os.path.join(HERE, os.pardir, "nbo_reference")
 
 DEFAULT_TOL_HA = 2.0e-5
-TOL_HA = {
-    "ni_co_4": 1.0e-4,
-    "ticl4": 1.0e-4,
-    "nitromethane": 1.0e-4,
-}
+TOL_HA = {}  # deliberately empty; see TOLERANCE above
 
 # the same regexes collect_reference.py uses, so both sides read the same fields
 FIELDS = {

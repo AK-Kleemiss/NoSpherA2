@@ -5,9 +5,19 @@
     python config.py --nrtstr <mol>           # the $NRTSTR keylist, empty unless so2
     python config.py --list
 
-The uniform keylist is the one the surviving ch3 archive carries:
+The uniform keylist is the one the surviving ch3 archive carries, except that E2PERT is given
+its value explicitly:
 
-    $NBO NRT E2PERT NRTLST=0.1 NRTDTL $END
+    $NBO NRT E2PERT=<e2_kcal> NRTLST=0.1 NRTDTL $END
+
+E2PERT WITHOUT A VALUE IS ACCEPTED AND SILENTLY IGNORED.  The archive's bare `E2PERT` left the
+threshold at NBO's default and the output still said "Threshold for printing: 0.25 kcal/mol";
+no warning, no error, exit code 0.  That default happens to equal the value index.json recorded
+(0.5 closed shell, 0.25 open shell) because the recorded value IS what NBO printed under the
+ignored keyword, so the first full run compared two sides at the same threshold by luck rather
+than by construction.  Spelling it out removes the luck and makes a mismatch visible in the
+keylist line each stage logs.  The next person lowering the threshold needs to know this: only
+`E2PERT=<value>` does anything, and `E2PERT <value>` does not.
 
 Four molecules deviate, all of them for reasons collect_reference.py's NOTES dict recorded
 against the original run, not for reasons discovered here:
@@ -42,7 +52,7 @@ import json
 import os
 import sys
 
-BASE_KEYWORDS = "NRT E2PERT NRTLST=0.1 NRTDTL"
+BASE_KEYWORDS = "NRT E2PERT=%g NRTLST=0.1 NRTDTL"  # %g takes the molecule's own e2_kcal
 
 EXTRA_KEYWORDS = {
     "sf6": "NRTSYM=off",
@@ -83,7 +93,8 @@ def thresholds():
 
 
 def nbo_keywords(mol):
-    kw = BASE_KEYWORDS
+    th, _ = thresholds()[mol]
+    kw = BASE_KEYWORDS % th["e2_kcal"]
     if mol in EXTRA_KEYWORDS:
         kw += " " + EXTRA_KEYWORDS[mol]
     return kw
