@@ -1369,11 +1369,25 @@ def compare(mol, d, verbose=False):
              for sh in gshells])
         same_other_l = (g_atom == atom) & (g_l != l)
         other_atom = g_atom != atom
+        #Per-shell populations on each side, m-averaged, so a degenerate PAIR inside this block can
+        #be recognised.  Both sides' own reported numbers, read from the fields each side printed -
+        #no new matrix and nothing inferred from an offset.
+        nocc_sh = [sum(labels[i][6] for i in sh) / nm for sh in nshells]
+        gocc_sh = [float(printed[gs].sum()) / nm for gs in gshells]
         for a in range(M.shape[0]):
             lab = labels[nshells[a][0]]
             g = naos[gshells[a][0]]
             order = np.argsort(M[a])[::-1]
             worst_b = int(order[0])
+            #Same rule as compare_pre above, applied one level later: a shared m-averaged block
+            #eigenvalue fixes an EIGENSPACE and nothing inside it, so for two shells of equal
+            #population `M[a][a]` charges one eigensolver's arbitrary choice as an error.  The
+            #invariant is the projector onto that eigenspace.  BOTH sides must be degenerate - if
+            #only one is, the two are not describing the same indeterminacy and the disagreement is
+            #real.  Where a shell is alone, degsum IS diag, which is why both are carried.
+            deg = [b for b in range(M.shape[1])
+                   if abs(nocc_sh[b] - nocc_sh[a]) < DEG_TOL
+                   and abs(gocc_sh[b] - gocc_sh[a]) < DEG_TOL]
             #Gap to the runner-up: a pairing that is merely close is worth knowing about, and a
             #systematic off-by-one has a LARGE gap on the wrong column, not a small one.
             gap = float(M[a, order[0]] - M[a, order[1]]) if M.shape[1] > 1 else float("nan")
@@ -1398,6 +1412,7 @@ def compare(mol, d, verbose=False):
                              mol=mol, atom=atom, l=l, rank=a, cls=CLASS[lab[5]],
                              gcls=g["type"], gshell=g["shell"], occ=lab[6], gocc=g["occupancy"],
                              diag=float(M[a, a]), inblock=float(M[a].sum()),
+                             degsum=float(M[a, deg].sum()), ndeg=len(deg),
                              crossl=float(w[a, same_other_l].sum()),
                              otheratom=float(w[a, other_atom].sum()),
                              best=worst_b, bestval=float(M[a, worst_b]), gap=gap,
@@ -1432,7 +1447,16 @@ def by_group(all_rows):
     2p Rydberg pair: 0.00007 on the rank partner, 0.98861 one rank over - the shape is right); where
     both are large the shape itself is wrong and no relabelling recovers it.
     """
+    #A FOURTH view, and the one the step-4 degeneracy by-product forces.  `1 - M[a][a]` is not a
+    #measurement on a shell whose population is shared with another shell of the same block: the
+    #eigenvalue they share fixes their eigenspace and nothing inside it, so which one native calls
+    #rank a is its eigensolver's choice.  `1 - degsum` projects onto that eigenspace instead.  It is
+    #the rule compare_pre already uses on the pre-NAOs, at the same DEG_TOL, not a new one - and it
+    #is NOT a looser version of the rank-paired arm: on a shell that is alone the two are the same
+    #number, and the count of shells where they can differ is printed below so the correction's
+    #reach is visible rather than asserted.
     for what, val in (("mean 1-M[a][a], rank-paired", lambda r: 1.0 - r["diag"]),
+                      ("mean 1-degsum, degeneracy-projected", lambda r: 1.0 - r["degsum"]),
                       ("mean 1-max_b M[a][b], ordering-insensitive", lambda r: 1.0 - r["bestval"]),
                       ("mean weight outside the shell's own (atom,l) block",
                        lambda r: 1.0 - r["inblock"])):
@@ -1443,6 +1467,14 @@ def by_group(all_rows):
                 groups.setdefault(key(r), []).append(val(r))
             print("  by %-5s %s" % (name, "  ".join("%s: %.5f (%d)" % (k, sum(v) / len(v), len(v))
                                                     for k, v in sorted(groups.items(), key=str))))
+    ind = [r for r in all_rows if r["ndeg"] > 1]
+    cls_all = sorted(set(r["cls"] for r in all_rows))
+    print("\nshells whose rank pairing is a GAUGE (degenerate on both sides, so 1-M[a][a] is not a"
+          " measurement there): %d of %d   %s" % (
+              len(ind), len(all_rows),
+              "  ".join("%s %d/%d" % (k, sum(1 for r in ind if r["cls"] == k),
+                                      sum(1 for r in all_rows if r["cls"] == k)) for k in cls_all)))
+
     #The metric above normalises every shell to 1 whatever its occupancy, so an empty Rydberg shell
     #with a badly wrong shape counts the same as a doubly-occupied valence shell that is nearly right.
     #Populations do not work that way, and the failure being chased is a population failure, so the
@@ -1450,6 +1482,7 @@ def by_group(all_rows):
     #m-averaged, so this assumes the m components of a shell share its occupancy.
     print("\non the charge scale (sum (2l+1)*occ*leak, electrons):")
     for what, val in (("rank-paired", lambda r: 1.0 - r["diag"]),
+                      ("degeneracy-projected", lambda r: 1.0 - r["degsum"]),
                       ("ordering-insensitive", lambda r: 1.0 - r["bestval"]),
                       ("out-of-block", lambda r: 1.0 - r["inblock"]),
                       ("  of that, same atom other l", lambda r: r["crossl"]),
@@ -1843,12 +1876,41 @@ def demo():
     # The pairing diagnostic has to call a systematic off-by-one what it is: completeness cannot,
     # because a row sum is the same whichever column carried the weight.
     def row(rank, best, total=1.0, diag=0.9, crossl=0.0, otheratom=0.0, occshell=1.0,
-            goccshell=1.0, pred=1.0, predfull=None, cls="Val", l=0, spectra=None):
+            goccshell=1.0, pred=1.0, predfull=None, cls="Val", l=0, spectra=None,
+            degsum=None, ndeg=1):
         return dict(mol="m", atom=1, l=l, rank=rank, cls=cls, gcls=cls, gshell="2s", occ=1.0,
                     gocc=1.0, diag=diag, inblock=1.0, best=best, bestval=0.9, gap=0.5, total=total,
+                    degsum=diag if degsum is None else degsum, ndeg=ndeg,
                     crossl=crossl, otheratom=otheratom, occshell=occshell, goccshell=goccshell,
                     pred=pred, predfull=occshell if predfull is None else predfull,
                     spectra=spectra or {n: (0.0, 0.0, 0.0, 0) for n, _, _ in LEVELS})
+    # The degeneracy-projected view has to DIFFER from the rank-paired one on a rotation inside a
+    # degenerate pair - 1.00000 of rank-paired leak, 0.00000 once projected - and it has to be the
+    # SAME number on a shell that is alone, or it is a blanket loosening rather than a gauge fix.
+    out = io.StringIO()
+    with contextlib.redirect_stdout(out):
+        by_group([row(0, 1, diag=0.0, degsum=1.0, ndeg=2), row(1, 0, diag=0.0, degsum=1.0, ndeg=2)])
+    seg, cur = {}, None
+    for line in out.getvalue().splitlines():
+        if line.startswith("where the shape error sits ("):
+            cur = line.split("(", 1)[1].split(",")[0]
+        elif cur and line.startswith("  by class"):
+            seg[cur] = line
+    assert "Val: 1.00000 (2)" in seg["mean 1-M[a][a]"], seg
+    assert "Val: 0.00000 (2)" in seg["mean 1-degsum"], seg
+    assert "GAUGE" in out.getvalue() and "2 of 2" in out.getvalue(), out.getvalue()
+    out = io.StringIO()
+    with contextlib.redirect_stdout(out):
+        by_group([row(0, 0, diag=0.4), row(1, 1, diag=0.4)])
+    seg, cur = {}, None
+    for line in out.getvalue().splitlines():
+        if line.startswith("where the shape error sits ("):
+            cur = line.split("(", 1)[1].split(",")[0]
+        elif cur and line.startswith("  by class"):
+            seg[cur] = line
+    assert seg["mean 1-M[a][a]"] == seg["mean 1-degsum"], seg
+    assert "0 of 2" in out.getvalue(), out.getvalue()
+
     out = io.StringIO()
     with contextlib.redirect_stdout(out):
         zero_check({"shifted": [row(a, a + 1) for a in range(4)]})
