@@ -1,0 +1,28 @@
+#!/bin/bash
+# gennbo 7 without the two traps in the shipped tcsh wrapper: no rm -i on a stale output
+# (which blocks a batch job on a prompt), and NBOMEM from the environment instead of a
+# hardcoded 100gb that a job with less memory than that cannot honour.
+#
+#   gennbo7 <jobname>        # reads <jobname>.47, writes <jobname>.nbo
+#
+# NBOBIN defaults to the cluster install; NBOMEM to 4gb.
+set -u
+JOB=${1:?usage: gennbo7 <jobname, no .47 extension>}
+export NBOBIN=${NBOBIN:-/work/software/bin/NBO/bin}
+export NBOMEM=${NBOMEM:-4gb}
+export INT=${INT:-i8}
+export GENEXE=$NBOBIN/gennbo.$INT.exe
+export NBOEXE=$NBOBIN/nbo7.$INT.exe
+export JOB NBOFIL=$JOB
+export NBODTL=${2:-}
+
+for exe in "$GENEXE" "$NBOEXE"; do
+    [ -x "$exe" ] || { echo "gennbo7: missing $exe" >&2; exit 2; }
+done
+[ -f "$JOB.47" ] || { echo "gennbo7: no $JOB.47" >&2; exit 2; }
+
+rm -f "$JOB.nbo"
+"$GENEXE" "$JOB.47" > "$JOB.nbo" 2> "$JOB.gennbo.err"
+rc=$?
+echo "gennbo7 $JOB rc=$rc  NBOMEM=$NBOMEM  host=$(hostname)  NBOBIN=$NBOBIN"
+exit $rc
