@@ -1488,27 +1488,41 @@ static double g_adp_reach = adp_reach_default;
 //which ones it used. Eight jobs of exactly that sweep once came back byte-identical, counters and
 //all, because nothing in the binary was reading the variables they set. Overriding is for the sweep,
 //not for production: the defaults are the values the equivalence test validates.
+//One positive finite double from the environment, or the default. upper, when positive, is the
+//largest value that still means anything: a beta-sphere margin above 1 is not a looser setting, it
+//is a sphere wider than the radius that was measured to hold.
+static double env_double(const char *name, const double fallback, const double upper = 0.0)
+{
+	const char *v = std::getenv(name); // Flawfinder: ignore - parsed as one positive double
+	if (v == nullptr || *v == '\0') return fallback;
+	try {
+		const double d = std::stod(v);
+		if (d > 0.0 && std::isfinite(d) && (upper <= 0.0 || d <= upper)) return d;
+		std::cout << "Ignoring " << name << "=" << v << ": not a positive finite number";
+		if (upper > 0.0) std::cout << " of at most " << upper;
+		std::cout << std::endl;
+	}
+	catch (const std::exception &) {
+		std::cout << "Ignoring " << name << "=" << v << ": not a number" << std::endl;
+	}
+	return fallback;
+}
 static void adp_knobs_from_env()
 {
 	//From the defaults every time, so clearing the variables puts the validated numbers back
-	g_adp_cap = adp_cap_default; g_adp_grow = adp_grow_default;
-	g_adp_keep = adp_keep_default; g_adp_reach = adp_reach_default;
-	struct entry { const char *name; double *slot; };
-	const entry k[] = { { "NOS_ADP_CAP", &g_adp_cap }, { "NOS_ADP_GROW", &g_adp_grow },
-		{ "NOS_ADP_KEEP", &g_adp_keep }, { "NOS_ADP_REACH", &g_adp_reach } };
-	for (const entry &e : k) {
-		const char *v = std::getenv(e.name); // Flawfinder: ignore - parsed as one positive double
-		if (v == nullptr || *v == '\0') continue;
-		try {
-			const double d = std::stod(v);
-			if (d > 0.0 && std::isfinite(d)) *e.slot = d;
-			else std::cout << "Ignoring " << e.name << "=" << v << ": not a positive finite number" << std::endl;
-		}
-		catch (const std::exception &) {
-			std::cout << "Ignoring " << e.name << "=" << v << ": not a number" << std::endl;
-		}
-	}
+	g_adp_cap = env_double("NOS_ADP_CAP", adp_cap_default);
+	g_adp_grow = env_double("NOS_ADP_GROW", adp_grow_default);
+	g_adp_keep = env_double("NOS_ADP_KEEP", adp_keep_default);
+	g_adp_reach = env_double("NOS_ADP_REACH", adp_reach_default);
 }
+//The fraction of the smallest radius the 302 directions found that the beta sphere is actually kept
+//at. 0.7 is the number BetaSpheres.* validates, and it is not obviously the largest safe one: a
+//sphere ends a trajectory the moment it enters, and it is the reason a third of the quadrature
+//points never take a step at all, so this one number prices accuracy against the dominant stage.
+//Read from the environment for the sweep that asks how far it can go, and printed by -basin_timing
+//so that no run's populations can be read without the margin they were produced at.
+static constexpr double beta_margin_default = 0.7;
+double basin_beta_margin() { return env_double("NOS_BETA_MARGIN", beta_margin_default, 1.0); }
 void basin_adaptive_step_knobs(double &cap, double &grow, double &keep, double &reach)
 {
 	cap = g_adp_cap; grow = g_adp_grow; keep = g_adp_keep; reach = g_adp_reach;
@@ -1750,6 +1764,7 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 	//is the check that it stays so.
 	basin_stage_timer T;
 	const std::string fieldname = eli_field ? "ELI-D " : "QTAIM ";
+	double margin = 0.0;
 	if (streaming && beta_spheres_enabled() && !maxima.empty()) {
 		constexpr int ndir = 302;
 		static const std::vector<d3> dirs = [] {
@@ -1764,6 +1779,8 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 		}();
 		const double march = 0.05;   //bohr; the radius is only ever needed to within a step
 		const int nm = static_cast<int>(maxima.size());
+		//Once, outside the parallel loop: every sphere has to be drawn at the same margin
+		margin = basin_beta_margin();
 #pragma omp parallel for schedule(dynamic)
 		for (int m = 0; m < nm; m++) {
 			//Ascend onto the attractor first. A cube maximum is a voxel centre, so half a voxel
@@ -1810,10 +1827,16 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 			}
 			if (r <= 2.0 * march) continue;
 			bcen[m] = c;
-			beta2[m] = std::pow(0.7 * r, 2);
+			beta2[m] = std::pow(margin * r, 2);
 		}
 	}
 	T.lap(fieldname + "beta spheres");
+	if (basin_timing_enabled() && margin > 0.0) {
+		size_t with = 0;
+		for (const double b : beta2) if (b > 0.0) with++;
+		std::cout << "  [timing] " << fieldname << "beta spheres: margin " << margin << ", "
+			<< with << " of " << beta2.size() << " maxima carry one" << std::endl;
+	}
 	//Level 3 at least: a basin boundary cuts through the atomic shells and the population
 	//follows the angular resolution, 0.01 e at level 2, 0.005 at 3 and 0.002 at 4, which
 	//costs five times level 3

@@ -121,6 +121,12 @@ void report_delocalization(const WFN& wavy, const basin_overlaps& ovl, const sve
 //time goes; -no_beta_spheres turns them off and is what the equivalence test compares against.
 void beta_spheres_set_enabled(const bool on);
 bool beta_spheres_enabled();
+//The fraction of the smallest safe radius the 302 sampled directions found that a sphere is
+//actually drawn at, 0.7 by default and at most 1. NOS_BETA_MARGIN overrides it, because the sphere
+//is the reason a third of the quadrature points never take a step and the margin is therefore the
+//one number that prices the dominant stage against the populations; -basin_timing prints it beside
+//how many maxima ended up with a sphere at all.
+double basin_beta_margin();
 //Angle-adaptive RK2 step: the step step_at hands out is the one the populations were validated
 //at, so it is a floor, and a longer one has to be earned from the midpoint gradient the step
 //already computed. Off by default because it is not free: 1.2x on sucrose and 2x on UH6, at up to

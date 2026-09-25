@@ -201,6 +201,37 @@ TEST(AdaptiveStep, NeverFallsBackMoreOftenThanItProposesOnELID)
 	EXPECT_LE(turned + fell, proposed) << "more proposals were rejected than were ever made";
 }
 
+//One environment variable, set for the life of the scope and put back exactly as it was - set to
+//something else, or not set at all. A knob test that leaks its variable silently changes what every
+//later test in the binary measures.
+struct env_guard {
+	std::string name;
+	std::string old;
+	bool had = false;
+	env_guard(const char *n, const char *v) : name(n)
+	{
+		if (const char *e = std::getenv(n)) { old = e; had = true; }
+		set(v);
+	}
+	~env_guard() { if (had) set(old.c_str()); else clear(); }
+	void set(const char *v) const
+	{
+#ifdef _WIN32
+		_putenv_s(name.c_str(), v);
+#else
+		setenv(name.c_str(), v, 1);
+#endif
+	}
+	void clear() const
+	{
+#ifdef _WIN32
+		_putenv_s(name.c_str(), "");
+#else
+		unsetenv(name.c_str());
+#endif
+	}
+};
+
 //The knobs the grown step is made of were measured against a walk that reverted a third of its
 //floor steps, so the optimum moved when that was fixed and re-finding it is a sweep of eight cluster
 //jobs. Those eight came back byte-identical, counters and all: nothing in the binary read the
@@ -214,33 +245,6 @@ TEST(AdaptiveStep, KnobsComeFromTheEnvironment)
 		bool was = basin_adaptive_step_enabled();
 		~knob_restore() { basin_adaptive_step_set_enabled(true); basin_adaptive_step_set_enabled(was); }
 	} restore;
-	struct env_guard {
-		std::string name;
-		std::string old;
-		bool had = false;
-		env_guard(const char *n, const char *v) : name(n)
-		{
-			if (const char *e = std::getenv(n)) { old = e; had = true; }
-			set(v);
-		}
-		~env_guard() { if (had) set(old.c_str()); else clear(); }
-		void set(const char *v) const
-		{
-#ifdef _WIN32
-			_putenv_s(name.c_str(), v);
-#else
-			setenv(name.c_str(), v, 1);
-#endif
-		}
-		void clear() const
-		{
-#ifdef _WIN32
-			_putenv_s(name.c_str(), "");
-#else
-			unsetenv(name.c_str());
-#endif
-		}
-	};
 
 	double cap = 0.0, grow = 0.0, keep = 0.0, reach = 0.0;
 	basin_adaptive_step_set_enabled(true);
@@ -336,7 +340,7 @@ TEST(BetaSpheres, NoAscentPathLeavesTheSphereItChose)
 			r = std::min(r, rr - 0.05);
 		}
 		if (r <= 0.1) continue;   //no sphere claimed here, nothing to check
-		r *= 0.7;
+		r *= basin_beta_margin();   //whatever margin the integration is drawing them at
 		//Off-lattice directions: a spiral of 200 points, a different count so not one of them is
 		//one of the 302 the radius was built from
 		for (int i = 0; i < 200; i++) {
@@ -350,6 +354,32 @@ TEST(BetaSpheres, NoAscentPathLeavesTheSphereItChose)
 			EXPECT_LT(radial, 0.0) << "the density rises outwards at r = " << r << " in a direction the "
 				"26-direction sample never looked at, so a trajectory could leave this sphere";
 		}
+	}
+}
+
+//The margin is the sphere's only free number and it is the one that prices the dominant stage: the
+//spheres are why roughly a third of sucrose's 1.4 million quadrature points never take a step, and
+//they end every trajectory that enters one. So it has to be sweepable from outside the binary - the
+//adaptive step's four knobs were constants for weeks and a sweep of eight cluster jobs came back
+//byte-identical before anybody noticed. Two things are checked here: the variable reaches the code,
+//and a value that is not a margin cannot get in. Above 1 is not a looser setting, it is a sphere
+//wider than the radius the 302 directions measured to be safe, i.e. a wrong population.
+TEST(BetaSpheres, MarginComesFromTheEnvironmentAndStaysAMargin)
+{
+	const double shipped = basin_beta_margin();
+	EXPECT_GT(shipped, 0.0);
+	EXPECT_LE(shipped, 1.0) << "the shipped margin is already outside the range this test enforces";
+
+	{
+		env_guard g("NOS_BETA_MARGIN", "0.85");
+		EXPECT_DOUBLE_EQ(basin_beta_margin(), 0.85) << "NOS_BETA_MARGIN was set and the spheres would "
+			"still be drawn at " << basin_beta_margin();
+	}
+	EXPECT_DOUBLE_EQ(basin_beta_margin(), shipped) << "clearing the variable did not restore the default";
+
+	for (const char *bad : { "1.4", "0", "-0.8", "not-a-number", "" }) {
+		env_guard g("NOS_BETA_MARGIN", bad);
+		EXPECT_DOUBLE_EQ(basin_beta_margin(), shipped) << "NOS_BETA_MARGIN=" << bad << " was accepted";
 	}
 }
 
