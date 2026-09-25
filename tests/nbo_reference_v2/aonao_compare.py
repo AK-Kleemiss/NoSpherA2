@@ -109,7 +109,17 @@ def read_47(path):
     centers = [int(v) for v in numbers(basis[:label_at])]
     packed = n * (n + 1) // 2
     S = unpack_upper(numbers(section(text, "$OVERLAP")), n)
-    P = unpack_upper(numbers(section(text, "$DENSITY"))[:packed], n)
+    dens = numbers(section(text, "$DENSITY"))
+    # An OPEN archive puts alpha THEN beta in $DENSITY - measured, ratio exactly 2.0000 on
+    # ch3 (1225 -> 2450) and o2 (1953 -> 3906), 1.0000 on water and benzene.  This used to
+    # read [:packed], which on those two silently returned the ALPHA density wearing a
+    # total-density label.  Refuse instead: every caller here compares spin-summed NAO
+    # tables, so there is no correct spin for this reader to pick on its own.
+    assert len(dens) == packed, (
+        "%s: $DENSITY holds %d values, not the %d of one packed triangle (ratio %.4f). An "
+        "open-shell archive carries alpha then beta here and this reader is spin-blind - the "
+        "caller must read the spin it wants, by name." % (path, len(dens), packed, len(dens) / packed))
+    P = unpack_upper(dens, n)
     assert len(centers) == n, (len(centers), n)
     return n, S, P
 
