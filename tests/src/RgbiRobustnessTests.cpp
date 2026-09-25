@@ -772,28 +772,33 @@ TEST(RgbiRobustnessTests, OctahedralTeF6HasOneBondOrbitNotThree)
 		out = cap.str();
 	}
 
-	//The six fluorines are one orbit, so one population. They come out at 9.8018244 for the four
-	//equatorial ones and 9.8018242 for the two along z: a 2e-7 residual in the last printed digit of a
-	//number that is a difference of two much larger ones, the same floor the Au2Br2 test pins for its
-	//outside-cutoff population. It is pinned at 1e-6 rather than asserted equal - and pinned rather than
-	//ignored, because it is the D4h pattern again and it is where a regression would show first. What
-	//makes this a floor and the ionic split below a defect is four orders of magnitude: 2e-7 here against
-	//1e-3 in Ion.
+	//The six fluorines are one orbit, so one population, and they now print one number: 9.8018244 six
+	//times. Before the atomic reference was averaged over all rotations instead of over O_h they read
+	//9.8018244 for the four equatorial ones and 9.8018242 for the two along z - the D4h pattern, at the
+	//last printed digit. The pin stays a tolerance of 1e-7 rather than becoming EXPECT_DOUBLE_EQ only
+	//because these are PARSED PRINTED digits: two numbers that differ below the seventh decimal can still
+	//straddle a rounding boundary and print apart, which would be a flake and not a defect. 1e-7 is that
+	//printing width, and the residual it allows is one order of magnitude below the one that was there.
 	const double f0 = value_after(out, "Population of atom 1: ");
 	ASSERT_TRUE(std::isfinite(f0)) << "no population for atom 1";
 	for (int a = 2; a <= 6; a++) {
 		const double f = value_after(out, "Population of atom " + std::to_string(a) + ": ");
 		ASSERT_TRUE(std::isfinite(f)) << "no population for atom " << a;
-		EXPECT_NEAR(f0, f, 1e-6) << "population of fluorine " << a << " against fluorine 1";
+		EXPECT_NEAR(f0, f, 1e-7) << "population of fluorine " << a << " against fluorine 1";
 	}
 
-	//Five of the nine columns - n_A, n_B, n_AB, s_AB and Cov. - now agree in every printed digit, where
-	//before the fix all nine split. The four that still do not are the ionic ones: Ion. reads -0.432 for
-	//the four equatorial bonds and -0.431 for the two along z, and Tot., Pyth. and Arak. are computed
-	//from it. That is a SECOND, smaller defect, pinned rather than asserted equal so that the part which
-	//is fixed is protected today and the part which is not is recorded as a number instead of a promise.
-	//Four equatorial plus two axial is D4h, and a reduction-order residual would not pick out the z axis
-	//run after run.
+	//ALL NINE columns now agree in every printed digit, and the assertion below is the equality it used to
+	//be unable to make. Two earlier states of this same line are worth keeping, because each was a real
+	//measurement: all nine split before the degenerate-rank extension, and five of nine agreed after it
+	//while the four ionic columns kept a 1e-3 residual with the D4h pattern (Ion. -0.432 on the four
+	//equatorial bonds against -0.431 on the two along z). That residual was the atomic reference being
+	//averaged over the 48 operations of O_h instead of over all rotations: an O_h average of a shell with
+	//l >= 2 still leaves more than one invariant - e_g and t_2g stay separate - so what survives is the
+	//part of the atom's own anisotropy that happens to line up with the Cartesian axes of the input file,
+	//and the two fluorines on z do not lie in the frame the way the four on x and y do. Averaging over
+	//SO(3) instead leaves exactly one number per pair of shells of equal l, by Schur's lemma, and the
+	//pattern is gone: measured max |O_h average - exact average| in a fluorine block is 6.519e-05 on the
+	//four equatorial and 2.833e-04 on the two axial ones, which is where the 1e-3 in Ion. came from.
 	//
 	//WHERE IT IS NOT: two things this comment used to claim, both since measured and dropped.
 	//  * Not the pair metric's rank. Every one of the six bonds keeps 81 of 81 eigenvalues on both
@@ -805,36 +810,44 @@ TEST(RgbiRobustnessTests, OctahedralTeF6HasOneBondOrbitNotThree)
 	//    80.138 against 80.144, while agreeing in all nine columns of all six bonds. A split that is
 	//    present where the result is exact is not the cause of a result that is not, and 1/cos(85 deg) is
 	//    11.5, so 6e-3 deg is ~1e-5 in the underlying ratio.
-	//It is in the atomic reference. {sym, no_sym} x {ANO, NAO} on both molecules: no_sym+NAO reproduces
-	//all nine columns of all six bonds EXACTLY in both (the test below pins that), sym+NAO splits 4 + 2
-	//(SF6 Pyth. 33.926 against 34.260), no_sym+ANO splits 2 + 2 + 2 (SF6 s_AB 0.659/0.632/0.661), and the
-	//default sym+ANO is those two breaks cancelling - exactly in SF6, to 1e-3 in TeF6. So the pair
-	//decomposition is Oh-covariant on its own and both breaks exist with no ECP anywhere.
-	const size_t exact_columns = 5;
-	const double pinned_tolerance[4] = { 2e-3, 2e-3, 3e-2, 2e-2 };  //Ion., Tot., Pyth., Arak., as printed
+	//Where it was, and the state of the four-corner option matrix now. {sym, no_sym} x {ANO, NAO} on both
+	//molecules, measured on AKL007 25 Sep, printed spread over the six bonds per column:
+	//                   before (O_h average)                     after (exact rotational average)
+	//  no_sym + NAO     0 in all nine, both molecules            0 in all nine, unchanged
+	//  sym    + NAO     4 + 2, SF6 Pyth. 33.926 / 34.260         0 in all nine, both molecules
+	//  sym    + ANO     SF6 0, TeF6 1e-3 in Ion. (this test)     0 in all nine, both molecules
+	//  no_sym + ANO     2 + 2 + 2, SF6 s_AB 0.659/0.632/0.661    unchanged, TeF6 worst 2.893 in Pyth.
+	//The last row is the one defect that remains, and it is expected to: -rgbi_no_sym asks for no average,
+	//so the free-atom reference compute_tonto_style_atomic_density builds there keeps its orientation and
+	//nothing is entitled to fix it. It is not on the default path. The three rows that ARE reachable
+	//without asking for it are now exact, so this assertion is EXPECT_DOUBLE_EQ on all nine columns.
+	//
+	//WHAT WOULD MAKE THIS FAIL: any change that lets the atom's orientation back into its own reference -
+	//an average applied per bond rather than per atom, the O_h route reinstated for a spherical basis, a
+	//degenerate ANO set truncated mid-shell. It uses no external program and no reference numbers: it only
+	//asserts that a symmetry the molecule has survives into the output.
 	const vec first = bond_row(out, 0, 1);
 	ASSERT_EQ(first.size(), 9u) << "no bond row 0 - 1";
 	for (int b = 2; b <= 6; b++) {
 		const vec row = bond_row(out, 0, b);
 		ASSERT_EQ(row.size(), 9u) << "no bond row 0 - " << b;
-		for (size_t i = 0; i < exact_columns; i++)
+		for (size_t i = 0; i < 9; i++)
 			EXPECT_DOUBLE_EQ(first[i], row[i]) << "column " << i << " of Te-F bond 0 - " << b
-				<< " against 0 - 1: an octahedral molecule has one bond orbit";
-		for (size_t i = exact_columns; i < 9; i++)
-			EXPECT_NEAR(first[i], row[i], pinned_tolerance[i - exact_columns]) << "ionic column " << i
-				<< " of Te-F bond 0 - " << b << " against 0 - 1: the known residual is 1e-3 in Ion. and "
-				"0.019 in Pyth., so a failure here is the second defect growing, not the first returning";
+				<< " against 0 - 1: an octahedral molecule has one bond orbit, and on the DEFAULT option "
+				"combination all nine columns reproduce it since the atomic reference is averaged over all "
+				"rotations instead of over O_h";
 	}
 }
 
-//The invariant that localises the residual the test above pins, and the sharpest one RGBI has: with the
-//NAO orbital basis and the Oh symmetrization of the free-atom matrix BOTH OFF, an octahedral molecule's
-//six bonds come out identical in every one of the nine columns, to the last bit - EXPECT_DOUBLE_EQ, not a
-//tolerance. That is not a weaker check than the default path's, it is a stronger one on a different
-//switch setting, and it says where the defect is not: the pair decomposition, the projector construction,
-//the reductions and the printing are all exactly Oh-covariant. What is left is the two atomic reference
-//constructions, each of which breaks the symmetry on its own (sym+NAO into 4 + 2, no_sym+ANO into
-//2 + 2 + 2) and which cancel to 1e-3 in the default combination.
+//The invariant that LOCALISED the residual the test above used to pin, and the one that keeps it honest
+//now that it is gone: with the NAO orbital basis and the symmetrization of the free-atom matrix BOTH OFF,
+//an octahedral molecule's six bonds come out identical in every one of the nine columns, to the last bit -
+//EXPECT_DOUBLE_EQ, not a tolerance. It is the arm that carried the diagnosis, because it said where the
+//defect was NOT: the pair decomposition, the projector construction, the reductions and the printing are
+//all exactly Oh-covariant on their own, so what was left could only be the atomic reference. It was: the
+//reference was averaged over O_h instead of over all rotations. Keeping this test after the fix is not
+//redundant with the one above - it is the only arm that exercises the whole pair machinery with NO atomic
+//reference construction in the way at all, so a future break in one of the two is attributable.
 //
 //WHAT WOULD MAKE THIS FAIL, and it is worth saying because a passing symmetry test is easy to trust too
 //much: any change that makes the NAO path's per-bond work depend on the bond's orientation - a reduction

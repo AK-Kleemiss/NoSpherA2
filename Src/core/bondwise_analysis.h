@@ -9,8 +9,15 @@ class WFN;
 // Average an atom-centred AO matrix over the 48 operations of O_h.
 // Shells must be contiguous. Cartesian matrices use constants::type_vector;
 // spherical matrices use the libcint real-spherical ordering and phases.
+// Only the Cartesian route still uses this: a spherically averaged atomic reference is the one
+// below, and O_h is an approximation to it that remembers which way the molecule was oriented.
 void symmetrize_atomic_matrix_oh(dMatrix2& matrix, const ivec& shell_angular_momenta,
 	bool spherical = false);
+
+// Average an atom-centred AO matrix over ALL rotations - what a spherically averaged atomic
+// reference means, and what O_h only approximates. Real-spherical basis only. It needs each shell's
+// 2l+1 components contiguous but nothing about their order, phase convention or l.
+void spherically_average_atomic_matrix(dMatrix2& matrix, const ivec& shell_angular_momenta);
 
 // The highest angular momentum any shell of this wavefunction's basis carries, or -1 for a basis
 // with no shells at all. symmetrize_atomic_matrix_oh() refuses anything beyond h, and asking the

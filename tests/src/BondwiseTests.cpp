@@ -483,6 +483,85 @@ TEST(BondwiseSymmetrizeTests, SphericalFShellDecouplesTheA2uComponent)
 	EXPECT_NEAR(rest, trace_before - a2u_before, 1e-10) << "with a2u fixed, t1u + t2u must carry the remainder";
 }
 
+//The exact rotational average of an atom-centred matrix: what the atomic reference is supposed to be and
+//what O_h only approximates. Schur's lemma fixes the answer completely - between two copies of the same
+//irreducible D^l the only rotation-invariant map is a multiple of the identity, and between different l
+//there is none - so one number survives per pair of shells of equal l and nothing else. O_h leaves TWO
+//numbers in a d shell (e_g and t_2g) and more above it, and that leftover freedom is what let the six
+//fluorines of an octahedral molecule keep references pointing in different directions.
+//
+//WHAT WOULD MAKE THIS FAIL: a shell whose 2l+1 components are not contiguous, an offset walked with the
+//Cartesian shell size, or a same-l cross-shell block dropped along with the different-l ones - that last
+//one would silently decouple 2p from 3p on every atom of every molecule.
+TEST(BondwiseSymmetrizeTests, SphericalAverageLeavesOneNumberPerShellPair)
+{
+	dMatrix2 d = diagonal_matrix({ 1.0, 2.0, 3.0, 4.0, 5.0 });
+	spherically_average_atomic_matrix(d, { 2 });
+	for (int i = 0; i < 5; i++)
+		for (int j = 0; j < 5; j++)
+			EXPECT_NEAR(d(i, j), i == j ? 3.0 : 0.0, 1e-12) << "d shell entry (" << i << ", " << j << "): the "
+				"rotational average of a d block is (trace/5) x identity, one number, where the O_h average of "
+				"this same block is 7/3 on three components and 4 on the other two";
+	EXPECT_NEAR(trace(d), 15.0, 1e-12) << "an average of orthogonal transforms preserves the trace";
+
+	//s + p + p + d: the two p shells must keep their coupling, every different-l block must go
+	dMatrix2 m(12, 12);
+	for (int i = 0; i < 12; i++)
+		for (int j = i; j < 12; j++)
+			m(i, j) = m(j, i) = 0.5 + 0.11 * i - 0.07 * j + 0.03 * i * j;
+	const double p1p2_diagonal = m(1, 4) + m(2, 5) + m(3, 6);
+	const double s_before = m(0, 0);
+	const double trace_before = trace(m);
+	spherically_average_atomic_matrix(m, { 0, 1, 1, 2 });
+
+	EXPECT_NEAR(m(0, 0), s_before, 1e-12) << "an s shell is already invariant, so it must come out untouched";
+	for (int i = 0; i < 3; i++)
+		EXPECT_NEAR(m(1 + i, 4 + i), p1p2_diagonal / 3.0, 1e-12) << "the 2p-3p coupling must survive as (its "
+			"own trace)/3 on component " << i << ": two radial shells of equal l are not independent atoms";
+	for (int i = 0; i < 3; i++)
+		for (int j = 0; j < 3; j++)
+			if (i != j)
+				EXPECT_NEAR(m(1 + i, 4 + j), 0.0, 1e-12) << "the same block off its diagonal, (" << i << ", "
+					<< j << "): a multiple of the identity has nothing there";
+	for (int i = 1; i < 12; i++)
+		EXPECT_NEAR(m(0, i), 0.0, 1e-12) << "s couples to no other l, entry (0, " << i << ")";
+	for (int i = 1; i < 7; i++)
+		for (int j = 7; j < 12; j++)
+			EXPECT_NEAR(m(i, j), 0.0, 1e-12) << "p to d, entry (" << i << ", " << j << ")";
+	EXPECT_NEAR(trace(m), trace_before, 1e-12) << "still an average of orthogonal transforms";
+}
+
+//Why this average runs on every spherical basis and O_h does not: it cannot be fooled by an m ordering.
+//It reads only the diagonal of a shell-pair block and writes a multiple of the identity, so permuting the
+//components inside each shell permutes the result and changes nothing else. The O_h route needs libcint's
+//exact order and phases - SphericalFShellDecouplesTheA2uComponent above is red at two plausible orderings
+//on purpose - so a reader that hands it another convention gets a silently wrong reference, not an error.
+//WHAT WOULD MAKE THIS FAIL: any use of a component's index as more than a position inside its own shell.
+TEST(BondwiseSymmetrizeTests, SphericalAverageDoesNotDependOnTheMOrder)
+{
+	const ivec shells = { 0, 1, 2, 2 };
+	const int n = 14;
+	ivec permutation(n);
+	std::iota(permutation.begin(), permutation.end(), 0);
+	std::reverse(permutation.begin() + 1, permutation.begin() + 4);   //p
+	std::reverse(permutation.begin() + 4, permutation.begin() + 9);   //first d
+	std::reverse(permutation.begin() + 9, permutation.begin() + 14);  //second d
+
+	dMatrix2 straight(n, n), permuted(n, n);
+	for (int i = 0; i < n; i++)
+		for (int j = i; j < n; j++) {
+			const double v = 1.0 + 0.23 * i - 0.17 * j + 0.05 * i * j;
+			straight(i, j) = straight(j, i) = v;
+			permuted(permutation[i], permutation[j]) = permuted(permutation[j], permutation[i]) = v;
+		}
+	spherically_average_atomic_matrix(straight, shells);
+	spherically_average_atomic_matrix(permuted, shells);
+	for (int i = 0; i < n; i++)
+		for (int j = 0; j < n; j++)
+			EXPECT_NEAR(permuted(permutation[i], permutation[j]), straight(i, j), 1e-12)
+				<< "entry (" << i << ", " << j << ") moved when the m order inside the shells was reversed";
+}
+
 //two s shells are invariant under every operation: the full 2x2 matrix, off-diagonal included, is untouched
 TEST(BondwiseSymmetrizeTests, SOnlyMatrixIsUnchanged)
 {

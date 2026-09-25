@@ -969,6 +969,68 @@ void symmetrize_atomic_matrix_oh(dMatrix2 &matrix, const ivec &shell_angular_mom
 	matrix = std::move(symmetrized);
 }
 
+//The atomic reference is supposed to be spherically averaged - Tonto's own switch is called "Use
+//spherical averaging?" - and an average over the 48 operations of O_h is not that average. O_h leaves
+//TWO invariants in a d shell instead of one, e_g and t_2g, and more of them above d, so the averaged
+//block keeps whatever part of the atom's anisotropy happens to line up with the Cartesian axes of the
+//input file. Averaging over the full rotation group instead leaves exactly one invariant per pair of
+//shells of equal l, the identity on the 2l+1 components: by Schur's lemma the only rotation-invariant
+//map between two copies of the same irreducible D^l is a multiple of the identity, and no invariant
+//exists at all between different l. So the block below cannot remember a direction, which is the whole
+//point of a spherical reference, and the result no longer depends on how the molecule is oriented.
+//
+//Measured on TeF6/def2-TZVP, whose six Te-F bonds must print one row six times: the O_h average of a
+//fluorine block differs from this one by 6.5E-05 elementwise on the four fluorines on x and y and by
+//2.8E-04 on the two on z, and that 4 + 2 split in the reference is the 4 + 2 split the bond table
+//showed. With this average the six fluorines' occupations agree to 4.2E-09, which is below the 6.6E-09
+//the untouched blocks already disagree by, i.e. all that is left is the SCF's own asymmetry.
+//
+//It is also indifferent to the m ordering and to sign conventions, because it only ever reads a
+//diagonal of a shell-pair block and writes a multiple of the identity, where the O_h route needs
+//libcint's exact real-spherical order and phases to be right. And it has no l limit: the s..h ceiling
+//is the O_h transforms', not this one's.
+void spherically_average_atomic_matrix(dMatrix2 &matrix, const ivec &shell_angular_momenta) {
+	const bool square = matrix.extent(0) == matrix.extent(1);
+	err_checkf(square, "Cannot spherically average a non-square atomic matrix.", std::cout);
+	if (!square)
+		return;
+
+	ivec shell_offsets(shell_angular_momenta.size() + 1, 0);
+	for (int shell = 0; shell < static_cast<int>(shell_angular_momenta.size()); ++shell) {
+		const int l = shell_angular_momenta[shell];
+		err_checkf(l >= 0, "Cannot spherically average a shell of negative angular momentum.", std::cout);
+		if (l < 0)
+			return;
+		shell_offsets[shell + 1] = shell_offsets[shell] + 2 * l + 1;
+	}
+
+	const bool correct_size = shell_offsets.back() == static_cast<int>(matrix.extent(0));
+	err_checkf(correct_size,
+		"Atomic matrix size does not match its spherical shell description.", std::cout);
+	if (!correct_size)
+		return;
+
+	dMatrix2 averaged(matrix.extent(0), matrix.extent(1));
+	std::fill(averaged.container().begin(), averaged.container().end(), 0.0);
+	for (int shell_a = 0; shell_a < static_cast<int>(shell_angular_momenta.size()); ++shell_a) {
+		const int l = shell_angular_momenta[shell_a];
+		const int size = 2 * l + 1;
+		for (int shell_b = 0; shell_b < static_cast<int>(shell_angular_momenta.size()); ++shell_b) {
+			//two shells of different l have no invariant to keep, so their block is dropped; two shells
+			//of the same l keep their coupling, which is what holds 2p-3p together in an atom
+			if (shell_angular_momenta[shell_b] != l)
+				continue;
+			double sum = 0.0;
+			for (int m = 0; m < size; ++m)
+				sum += matrix(shell_offsets[shell_a] + m, shell_offsets[shell_b] + m);
+			const double mean = sum / static_cast<double>(size);
+			for (int m = 0; m < size; ++m)
+				averaged(shell_offsets[shell_a] + m, shell_offsets[shell_b] + m) = mean;
+		}
+	}
+	matrix = std::move(averaged);
+}
+
 void print_dmatrix2(const dMatrix2 &EVC2, const std::string name) {
 	std::cout << std::endl << name << ":\n";
 	for (int i = 0; i < EVC2.extent(0); i++) {
@@ -1558,12 +1620,19 @@ Roby_information::NAOResult Roby_information::calculateAtomicNAO(const dMatrix2 
 	vec S_sub(static_cast<size_t>(n) * n, 0.0); // called S in tonto
 	get_submatrices(D_full, S_full, D_sub, S_sub, atom_indices);
 
-	// Tonto's atomic spherical averaging applies the local point group to the
-	// atom-centred density before the ANOs are constructed.  O_h is used here
-	// because it averages all Cartesian directions without mixing radial shells.
+	// Tonto's atomic spherical averaging averages the atom-centred density over all rotations before
+	// the ANOs are constructed, and in a real-spherical basis that average is exact and cheap. The
+	// O_h average is only a stand-in for it: it keeps the anisotropy that happens to line up with the
+	// Cartesian axes, which on TeF6 made four of the six Te-F bonds differ from the other two. So it
+	// is used only where the exact average does not apply, on a Cartesian basis whose shells mix l.
+	// ponytail: a Cartesian shell of order l spans l, l-2, ..., so its exact rotational average needs
+	// that decomposition first; O_h stays there and computeAllAtomicNAOs() says so out loud.
 	if (!shell_angular_momenta.empty()) {
 		dMatrix2 atomic_density = reshape<dMatrix2>(D_sub, Shape2D(n, n));
-		symmetrize_atomic_matrix_oh(atomic_density, shell_angular_momenta, spherical);
+		if (spherical)
+			spherically_average_atomic_matrix(atomic_density, shell_angular_momenta);
+		else
+			symmetrize_atomic_matrix_oh(atomic_density, shell_angular_momenta, spherical);
 		D_sub = atomic_density.container();
 	}
 	vec Rho(static_cast<size_t>(n) * n);        // To store target density
@@ -1983,15 +2052,29 @@ void Roby_information::computeAllAtomicNAOs(WFN &wavy, const bool symmetrize, co
 	//467.3 s and then exited on a message that needs nothing but the shell types to print. A refusal
 	//that arrives after the work is a robustness defect of its own, so ask here. The check inside
 	//symmetrize_atomic_matrix_oh() stays as the backstop for its other callers.
-	if (symmetrize) {
+	//Only the Cartesian route has that ceiling: it is the 48 O_h transforms' limit, and a real-spherical
+	//basis now goes through the exact rotational average, which is written for any l. So an i-shell gbw,
+	//which used to be refused here, is analysed.
+	if (symmetrize && wavy.get_d_f_switch()) {
 		const int highest = highest_shell_angular_momentum(wavy);
 		err_checkf(highest <= 5,
-			"RGBI's atomic O_h symmetrization supports shells from s through h, and the basis of " +
+			"RGBI's atomic O_h symmetrization supports shells from s through h, and the Cartesian basis of " +
 			wavy.get_path().filename().string() + " carries l = " + std::to_string(highest) +
-			" (" + std::string(1, "spdfghiklm"[std::min(highest, 9)]) + " shells). -rgbi_no_sym analyses "
-			"it without the symmetrization, but expect it to be slow: on the 670-function i-shell file "
-			"in the test set it produced no output in 1800 s.",
+			" (" + std::string(1, "spdfghiklm"[std::min(highest, 9)]) + " shells). A spherical basis has no "
+			"such limit, because it is averaged over all rotations instead. -rgbi_no_sym analyses this file "
+			"without the averaging, but expect it to be slow: on the 670-function i-shell file in the test "
+			"set it produced no output in 1800 s.",
 			std::cout);
+	//A Cartesian shell mixes angular momenta, so the exact rotational average does not apply to it and
+	//the atomic reference falls back to the O_h average. That average keeps the part of each atom's
+	//anisotropy that lines up with x, y and z, so the numbers below depend on how the molecule is
+	//oriented in this file - on TeF6/def2-TZVP, in a spherical basis, that dependence made four of six
+	//symmetry-equivalent bonds differ from the other two by 1 % in the Pythagorean index. Saying it is
+	//the point: a user reading Cartesian numbers has to know they carry that, and -rgbi_no_sym or a
+	//spherical wavefunction of the same calculation are the two ways out.
+		std::cout << "Warning: " << wavy.get_path().filename().string() << " uses a Cartesian basis, so the "
+			"atomic reference is averaged over O_h instead of over all rotations and depends on the "
+			"orientation of the molecule in the file.\n";
 	}
 
 	if (wavy.get_d_f_switch()) {
