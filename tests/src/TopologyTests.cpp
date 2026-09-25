@@ -352,6 +352,48 @@ TEST(Topology, PoincareHopfHoldsOnACyclicMolecule)
 	}
 }
 
+//Every nucleus of an all-electron density is a (3,-3) attractor.  That is a property of rho - it has
+//a cusp maximum at every nucleus - and not of this search, so it is an invariant the output has to
+//reproduce on any all-electron file, whatever Poincare-Hopf adds up to.  tests/Fe_gbw/Fe.gbw is where
+//it failed: rho at the iron is ~8E3 and at the four sulfurs ~2.6E3, the Hessian there is 1E8-1E9, and
+//an unscaled absolute tolerance of 1E-7 a.u. sits below the floating-point floor of the analytic
+//gradient, so the Newton search stalled and Fe1, S2, S4 and S5 produced no critical point at all
+//while S3 was accepted at 8.3E-8 - 17 attractors for 21 nuclei, and a Poincare-Hopf sum of -3.
+//All-electron is the premise and is therefore asserted: the theorem does not hold for a
+//pseudopotential density, which is the case NotEveryWavefunctionHasNuclearMaxima below covers.
+TEST(Topology, EveryNucleusOfAnAllElectronDensityIsAnAttractor)
+{
+	const std::filesystem::path f = nos_test_repo_root() / "tests" / "Fe_gbw" / "Fe.gbw";
+	if (!std::filesystem::exists(f)) GTEST_SKIP() << "missing fixture " << f.string();
+	WFN wavy(f);
+	const std::vector<topology::nucleus> nuc = topology::nuclei_of(wavy);
+	ASSERT_EQ(nuc.size(), 21u) << "expected the iron thiolate, Fe(SCH3)4";
+	double charge = 0.0;
+	for (const topology::nucleus& n : nuc) charge += n.Z;
+	//an ion would be fine here, a missing core would not: the smallest def2 ECP core is 10 electrons
+	ASSERT_LT(charge - wavy.count_nr_electrons(), 5.0)
+		<< "this fixture has to be all-electron for the cusp argument to apply";
+
+	const topology::result r = topology::analyze_topology(wavy, nuc, topology::options{});
+	SCOPED_TRACE(r.diagnosis);
+	std::vector<int> attractors_of(nuc.size(), 0);
+	for (const topology::cp& p : r.points)
+		if (p.kind == topology::cp_kind::attractor && !p.is_nna && p.nearest_nucleus >= 0)
+			attractors_of[p.nearest_nucleus]++;
+	for (size_t a = 0; a < nuc.size(); a++)
+		EXPECT_EQ(attractors_of[a], 1) << "nucleus " << a + 1 << " (Z=" << nuc[a].Z
+			<< ") has no maximum of its own";
+	//and the heavy centres are the ones it broke on: their rho is three orders above a carbon's
+	int heavy = 0;
+	for (const topology::cp& p : r.points)
+		if (p.kind == topology::cp_kind::attractor && p.nearest_nucleus >= 0 && nuc[p.nearest_nucleus].Z > 15) {
+			heavy++;
+			EXPECT_GT(p.density, 1E3) << "Z=" << nuc[p.nearest_nucleus].Z;
+			EXPECT_LT(p.nearest_nucleus_distance, 1E-3) << "a heavy maximum sits on its nucleus";
+		}
+	EXPECT_EQ(heavy, 5) << "one iron and four sulfurs";
+}
+
 //Not every file that reads as a wavefunction has a nuclear maximum, and the search must not pretend
 //it does.  tests/molden_file/epoxide.molden carries 9 occupied orbitals holding 18 electrons for
 //C2H4O, which has 24 - the heavy atoms wear pseudopotentials (largest oxygen s exponent 69, against

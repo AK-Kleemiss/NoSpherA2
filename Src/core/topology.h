@@ -84,7 +84,9 @@ namespace topology
 
 	struct options
 	{
-		double gradient_tolerance = 1E-7; //|grad rho| at an accepted point, atomic units
+		//|grad rho| at an accepted point, atomic units, scaled by rho where rho > 1: see the note in
+		//newton_to_critical_point, where 1E-7 unscaled cost four nuclei of Fe.gbw their attractor
+		double gradient_tolerance = 1E-7;
 		//An absolute gradient tolerance alone is not a convergence test.  Far out in the density
 		//tail |grad rho| is itself of the order of rho, so |grad rho| <= 1E-7 holds at every point
 		//out there and a seed placed in the tail reports a critical point without taking a step -
@@ -178,8 +180,19 @@ namespace topology
 	template <class S>
 	bool newton_to_critical_point(const S& source, d3& p, const options& opt, int& iterations)
 	{
+		//The absolute bound floats with rho, because 1E-7 a.u. is not reachable at a heavy nucleus.
+		//There rho is 1E3-1E4 and the Hessian 1E8-1E9, and the analytic gradient is a sum of primitive
+		//terms of that size whose cancellation leaves a floating-point floor far above 1E-7, so no step
+		//reduces the gradient any further and the search returns nothing at all.  Measured on
+		//tests/Fe_gbw/Fe.gbw: S3 squeaked through at |grad rho| = 8.3E-8 and Fe1, S2, S4 and S5 did
+		//not, four nuclei of an all-electron density silently absent from the critical point set - which
+		//no nucleus of an all-electron density can be, rho having a cusp maximum at every one.  Scaled,
+		//the tight test is the logarithmic derivative |grad rho| / rho <= gradient_tolerance wherever
+		//rho exceeds 1, which still pins a nuclear attractor to ~1E-13 bohr; below 1 it is the old test
+		//unchanged, and the relative tolerance that guards the density tail is untouched either way.
 		auto converged = [&opt](const double gnorm, const double rho) {
-			return rho > opt.density_floor && gnorm <= opt.gradient_tolerance && gnorm <= opt.relative_gradient_tolerance * rho;
+			return rho > opt.density_floor && gnorm <= opt.gradient_tolerance * (rho > 1.0 ? rho : 1.0)
+				&& gnorm <= opt.relative_gradient_tolerance * rho;
 		};
 		d3 grad{ 0.0, 0.0, 0.0 };
 		double H[9]{};

@@ -312,7 +312,7 @@ namespace topology
 		log << "Newton-Raphson on grad rho = 0 with the analytic Hessian. Positions in bohr.\n"
 			//A rejected point is as much a result as an accepted one, so the thresholds that did the
 			//rejecting are printed: a critical point below the density floor would not appear above
-			<< "Accepted when |grad rho| <= " << opt.gradient_tolerance << " and <= "
+			<< "Accepted when |grad rho| <= " << opt.gradient_tolerance << " * max(1, rho) and <= "
 			<< opt.relative_gradient_tolerance << " * rho, with rho > " << opt.density_floor
 			<< "; points merged below " << opt.merge_distance << " bohr; an eigenvalue below "
 			<< opt.eigen_tolerance << " * max|lambda| counts as zero.\n\n"
