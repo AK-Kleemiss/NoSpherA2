@@ -14,7 +14,20 @@
 
 namespace {
 
-    constexpr unsigned NBO_ERROR_EXIT_CODE = 255u;
+    //err_checkf ends the process with exit(-1).  POSIX reports that as wait status 255, Windows
+    //hands gtest the raw -1, so pinning one number passes on one platform and fails on the other -
+    //which is exactly what CI's Windows Release and Windows GPU Release jobs were failing on while
+    //Linux and macOS were green.  Accept either code, but still only a CLEAN exit: this test exists
+    //to show the search refuses instead of crashing, so an access violation or a signal must not
+    //satisfy it.  ExitedWithCode does that platform check for us, so delegate to it twice rather
+    //than reimplementing WIFEXITED here.
+    struct ExitedWithErrCheckfCode
+    {
+        bool operator()(int status) const
+        {
+            return ::testing::ExitedWithCode(255)(status) || ::testing::ExitedWithCode(-1)(status);
+        }
+    };
 
     //Several s NAOs per atom, so an atom block is wider than the orbital taken out of it and a pair
     //block is wider still - with one NAO per atom every block is 1 or 2 wide and any way of
@@ -166,5 +179,5 @@ TEST(NboSearchTests, ADensityWithNoLewisStructureSaysSoInsteadOfCrashing)
             NboOptions opt;
             nbo_search(h_chain_shells(2, 2), density_of(v, 0.3), chain_bondable(2), 1, 2.0, opt);
         },
-        ::testing::ExitedWithCode(NBO_ERROR_EXIT_CODE), ".*");
+        ExitedWithErrCheckfCode(), ".*");
 }
