@@ -612,3 +612,161 @@ TEST(ExpCutoff, ScreeningAccuracyIsSettableAndRangeChecked)
 	wavy.set_exp_cutoff();
 	EXPECT_DOUBLE_EQ(constants::exp_cutoff, shipped);
 }
+
+//Where the basin boundary's own error actually lives. AIMAll integrated the benchmark set's
+//wavefunctions independently, and on the two most ionic molecules in it the streaming walk
+//disagreed: SiF4's silicon by 0.1495 e and CF4's carbon by 0.1008 e, with each fluorine picking up
+//exactly a quarter of it so that the signed differences summed to 2-7e-4. A conserved total cannot
+//see that, and neither can the delocalization residual - sum_A S^A is the identity for ANY
+//partition of space, whatever the surfaces do. Beta spheres, the margin and the adaptive step were
+//all cleared by arms that reproduced the disagreement to the printed digit; -acc 4 halved it on
+//both molecules (0.1495 -> 0.0769, 0.1008 -> 0.0471), and doubling the radial and angular scale on
+//top of that bought 0.0053 more for 2.3x the time. So it is the angular order of the atomic grid
+//and nothing else, the walk converges on AIMAll's answer rather than disagreeing with it, and the
+//0.005 e quoted for level 3 is a covalent figure - an ionic centre is thirty times worse.
+//
+//The check that outlives the comparison: refining has to keep moving a basin the boundary cuts
+//through toward its limit, |N(3) - N(5)| > |N(4) - N(5)|, with no external number needed.
+//
+//It was written as levels 2, 3 and 4 on NH3Li's lithium and failed on its first run, printing
+//"level 2 2.81535, level 3 2.81535". config.accuracy is std::max(accuracy, 3), so level 2 does not
+//exist through this entry point and the first arm was comparing level 3 with itself. Two things came
+//out of that. A test whose arms cannot differ passes for the wrong reason, and this one only escaped
+//because EXPECT_GT is strict where EXPECT_GE would have been green. And NH3Li's lithium was the wrong
+//subject regardless: it sits 17 bohr from the ammonia at a charge of 0.18 e, so it is an isolated
+//atom rather than the ionic centre the paragraph above is about. SiF4 and CF4 are not in this
+//repository; hydroxide is, its oxygen basin is cut by a separatrix that comes within 0.4 bohr of the
+//hydrogen, and three real levels on two atoms cost seconds where NH3Li cost 90.
+TEST(QuadratureAccuracy, RefiningTheGridKeepsConverging)
+{
+	const std::filesystem::path wfn = nos_test_repo_root() / "tests" / "cytidine_tonto" / "OH.wfn";
+	if (!std::filesystem::exists(wfn)) GTEST_SKIP() << "fixture missing: " << wfn.string();
+	const WFN wavy(wfn);
+	const cube rho = seed_cube(wavy, 0.25, 3.0);
+	const std::vector<critical_point> cps = analyze_cube_critical_points(&rho, wavy, false, std::max(1e-8, rho.max_value() * 1e-6));
+	const std::vector<d4> maxima = streaming_density_attractors(wavy, cps, nullptr, nullptr, false);
+	ASSERT_EQ(maxima.size(), 2u);
+
+	//The oxygen's basin, found by its nucleus rather than by an index the reader would have to trust
+	size_t ox = maxima.size();
+	for (int a = 0; a < wavy.get_ncen(); a++) {
+		if (wavy.get_atom_charge(a) != 8) continue;
+		for (size_t b = 0; b < maxima.size(); b++)
+			if (std::pow(maxima[b][0] - wavy.get_atom_coordinate(a, 0), 2) +
+				std::pow(maxima[b][1] - wavy.get_atom_coordinate(a, 1), 2) +
+				std::pow(maxima[b][2] - wavy.get_atom_coordinate(a, 2), 2) < 0.01) ox = b;
+	}
+	ASSERT_LT(ox, maxima.size()) << "no basin sits on the oxygen";
+
+	vec n[3], v[3];
+	double out[3] = { 0.0, 0.0, 0.0 };
+	for (int lvl = 3; lvl <= 5; lvl++)
+		n[lvl - 3] = integrate_basins_on_atomic_grids(nullptr, nullptr, maxima, wavy, lvl, false, v[lvl - 3], out[lvl - 3]);
+
+	const double e3 = std::abs(n[0][ox] - n[2][ox]);
+	const double e4 = std::abs(n[1][ox] - n[2][ox]);
+	std::cout << "  oxygen basin: level 3 " << n[0][ox] << ", level 4 " << n[1][ox]
+		<< ", level 5 " << n[2][ox] << "  (|3-5| " << e3 << ", |4-5| " << e4 << ")" << std::endl;
+	//Strictly greater on purpose: two levels that agree exactly mean one of them was not the level
+	//it was asked for, which is the failure this test was born from
+	EXPECT_GT(e3, e4) << "refining the grid stopped converging on the oxygen basin";
+
+	//and every level still has to account for all the electrons, or the sequence above converges on
+	//the wrong thing entirely. The count has to come from the occupations and not from the nuclear
+	//charges: OH.wfn is the hydroxide anion, so get_nr_electrons() says 9 where the wavefunction
+	//holds 10, and the first version of this clause failed by exactly that one electron.
+	//
+	//What is left after that is 0.0155 e, and it is the same 0.0155 e at all three levels - 9.984528,
+	//9.984522, 9.984522. So it is not the quadrature's error, which is what the levels refine: a
+	//higher accuracy adds points inside the radial range the atomic grids already cover and none
+	//beyond it, and an anion's diffuse tail reaches past that range. Neutral molecules do not show it
+	//(Si2H6 integrates to 34.0000, epoxide to 24.0000, CCH to 13.0000), so the window is 0.02 e here
+	//and would be 5e-3 anywhere else. A level that loses more than the tail still fails.
+	double total[3] = { 0.0, 0.0, 0.0 };
+	for (int lvl = 0; lvl < 3; lvl++) {
+		total[lvl] = out[lvl];
+		for (const double b : n[lvl]) total[lvl] += b;
+		EXPECT_NEAR(total[lvl], wavy.count_nr_electrons(), 0.02) << "level " << lvl + 3;
+	}
+	//The tail is a property of the grid's extent, so refining must not change the total either way.
+	//This is the half that would see a level quietly dropping electrons.
+	EXPECT_NEAR(total[0], total[2], 1e-3) << "the integrated total moved with the accuracy level";
+	EXPECT_NEAR(total[1], total[2], 1e-3) << "the integrated total moved with the accuracy level";
+}
+
+//A trajectory that stops rising has to be given to somebody. It used to be given to the nearest
+//attractor only if one was within a bohr, and that reach threw away every stall further out - which
+//is exactly where a bond critical point between two like atoms sits. The external gate found it:
+//Si2H6 reported 0.6487 e outside every basin and its two silicons each came out 0.32 e short of
+//AIMAll's, over 117 molecules exactly ten lost anything at all, and all ten have a homopolar
+//heavy-heavy bond. C-H and Si-F BCPs are inside a bohr of a nucleus, which is why every heteropolar
+//molecule looked clean.
+//
+//No molecule in this repository loses a printable amount, so asserting outside == 0 on a fixture
+//would be a check that cannot come out red. Co2.molden can, because it has a real non-nuclear
+//attractor at the bond midpoint, 1.417 bohr from both cobalts and 4.15 e in it. Hand the integration
+//only the two nuclei and that charge has nowhere to climb to: every trajectory heading for the NNA
+//arrives, stops rising, and stalls 1.4 bohr from either attractor - one synthetic partition that
+//reproduces the mechanism on a fixture already in git.
+//
+//Both halves of the fix are asserted, because they fail differently. Dropping the reach is what
+//keeps the total: without it the second integration is four electrons short. Deciding the stall by
+//where the trajectory STARTED rather than where it stopped is what keeps the molecule symmetric: at
+//a saddle between two equivalent atoms the nearest attractor to the stall point is a floating-point
+//coin flip that hands the whole 4 e to one cobalt, while the start point is on one definite side of
+//the separatrix.
+TEST(BasinStalls, AStalledTrajectoryIsStillAssigned)
+{
+	const std::filesystem::path wfn = nos_test_repo_root() / "tests" / "molden_file" / "Co2.molden";
+	if (!std::filesystem::exists(wfn)) GTEST_SKIP() << "fixture missing: " << wfn.string();
+	const WFN wavy(wfn);
+	const cube rho = seed_cube(wavy, 0.1, 3.0);
+	const std::vector<critical_point> cps = analyze_cube_critical_points(&rho, wavy, false, std::max(1e-8, rho.max_value() * 1e-6));
+	const std::vector<d4> all = streaming_density_attractors(wavy, cps, nullptr, nullptr, false);
+
+	//The nuclear attractors, by nucleus rather than by an index the reader would have to trust; what
+	//is left over is non-nuclear and is what gets taken away below. The count is deliberately not
+	//asserted: a 0.1 A seed cube finds four attractors here where the 0.05 A production run found
+	//three, so pinning the number would make this test a statement about the seeding resolution
+	//instead of about stalls. One non-nuclear attractor to remove is all it needs.
+	std::vector<d4> nuclei;
+	for (const d4 &m : all) {
+		for (int a = 0; a < wavy.get_ncen(); a++)
+			if (std::pow(m[0] - wavy.get_atom_coordinate(a, 0), 2) +
+				std::pow(m[1] - wavy.get_atom_coordinate(a, 1), 2) +
+				std::pow(m[2] - wavy.get_atom_coordinate(a, 2), 2) < 0.01) { nuclei.push_back(m); break; }
+	}
+	for (const d4 &m : all)
+		std::cout << "  attractor at " << m[0] << " " << m[1] << " " << m[2] << " rho " << m[3] << std::endl;
+	ASSERT_EQ(nuclei.size(), static_cast<size_t>(wavy.get_ncen())) << "an attractor is missing from a nucleus";
+	ASSERT_GT(all.size(), nuclei.size()) << "Co2 no longer resolves any non-nuclear attractor";
+
+	vec n_all, n_nuc, v_all, v_nuc;
+	double out_all = 0.0, out_nuc = 0.0;
+	n_all = integrate_basins_on_atomic_grids(nullptr, nullptr, all, wavy, 3, false, v_all, out_all);
+	n_nuc = integrate_basins_on_atomic_grids(nullptr, nullptr, nuclei, wavy, 3, false, v_nuc, out_nuc);
+	ASSERT_EQ(n_all.size(), all.size());
+	ASSERT_EQ(n_nuc.size(), nuclei.size());
+
+	double total_all = out_all, total_nuc = out_nuc, non_nuclear = 0.0;
+	for (const double b : n_all) total_all += b;
+	for (const double b : n_nuc) total_nuc += b;
+	for (size_t b = nuclei.size(); b < n_all.size(); b++) non_nuclear += n_all[b];
+	std::cout << "  with them:  " << n_all[0] << " + " << n_all[1] << ", non-nuclear " << non_nuclear
+		<< ", outside " << out_all << "\n  without:    " << n_nuc[0] << " + " << n_nuc[1]
+		<< ", outside " << out_nuc << ", total " << total_nuc << " vs " << total_all << std::endl;
+	//The attractors the nuclear list drops have to be carrying something, or removing them proves
+	//nothing at all
+	ASSERT_GT(non_nuclear, 1.0) << "the non-nuclear attractors hold nothing to redistribute";
+
+	//The electrons the NNA held are still in the molecule, wherever the partition puts them. A reach
+	//that drops a stall beyond a bohr loses all of them, which is the several-electron failure.
+	EXPECT_NEAR(total_nuc, total_all, 5e-3) << "the NNA's electrons went missing when it was not an attractor";
+	EXPECT_LT(out_nuc, 5e-3) << "a stalled trajectory was reported outside every basin";
+	//and they landed in the cobalts rather than nowhere: roughly half of 4.15 e each
+	EXPECT_GT(n_nuc[0], n_all[0] + 0.5) << "the first cobalt did not gain the non-nuclear charge";
+	EXPECT_GT(n_nuc[1], n_all[1] + 0.5) << "the second cobalt did not gain the non-nuclear charge";
+	//A homonuclear diatomic cannot prefer one end. This is the assertion the stall's tie-break exists
+	//for, and it is the one a stall-point tie-break fails.
+	EXPECT_NEAR(n_nuc[0], n_nuc[1], 1e-3) << "the two cobalts split the stalled charge unevenly";
+}

@@ -1441,6 +1441,7 @@ std::vector<d4> streaming_density_attractors(const WFN &wavy, const std::vector<
 		if (nuclear) continue;
 		bool survives = true;
 		d3 converged = cp.position;
+		int fail_t = -1; double fail_dist = 0.0; const char *why = "";
 		for (int t = 0; t < 4 && survives; t++) {
 			//t == 0 is the point itself; the three after it start a tenth of a bohr off along
 			//each axis and have to come back to the same place
@@ -1448,11 +1449,22 @@ std::vector<d4> streaming_density_attractors(const WFN &wavy, const std::vector<
 			if (t > 0) start[t - 1] += 0.1;
 			d3 q = start;
 			survives = converge_to_maximum(field, q);
-			if (survives && t == 0) converged = q;
-			if (survives && t > 0) survives = array_length(q, converged) < 0.05;
+			if (!survives) { fail_t = t; why = "the Newton iteration did not reach a maximum"; break; }
+			if (t == 0) converged = q;
+			else {
+				fail_dist = array_length(q, converged);
+				if (fail_dist >= 0.05) { survives = false; fail_t = t; why = "it came back somewhere else"; }
+			}
 		}
 		if (!survives) {
-			if (debug) std::cout << "Dropped a non-nuclear attractor candidate that is not a maximum of the analytic field at " << cp.position[0] << " " << cp.position[1] << " " << cp.position[2] << std::endl;
+			//Which start failed and how far it went, because the two failures mean opposite things: the
+			//point itself failing says there is no maximum there, while a perturbed start running away
+			//says only that 0.1 bohr is further than this maximum's basin of attraction reaches along
+			//that axis - which a shallow one, an NNA inside a triple bond, genuinely is.
+			if (debug) std::cout << "Dropped a non-nuclear attractor candidate that is not a maximum of the analytic field at "
+				<< cp.position[0] << " " << cp.position[1] << " " << cp.position[2]
+				<< " (start " << fail_t << ": " << why << ", " << fail_dist
+				<< " bohr away)" << std::endl;
 			continue;
 		}
 		bool duplicate = false;
@@ -1546,6 +1558,38 @@ static bool g_adaptive_step = false;
 //loses 15 %. Counted only under -adaptive_step and printed under -basin_timing; relaxed because
 //the ratio is the answer, not the last digit.
 static std::atomic<long long> g_adp_steps{ 0 }, g_adp_tries{ 0 }, g_adp_turn{ 0 }, g_adp_fall{ 0 };
+//Where trajectories give up, which for the density field is the only thing that can put electrons
+//outside every basin - and 0.65 e of Si2H6 sat outside for a year for want of this number. Counted
+//always: a stall costs a density evaluation, so three relaxed adds are free, and the one figure that
+//matters is the largest density at a stall further from every attractor than a bohr. Below the
+//floor that is the vacuum tail and means nothing; two orders above it, it is a bond critical point.
+static std::atomic<long long> g_stall_vacuum{ 0 }, g_stall_field{ 0 }, g_stall_far{ 0 };
+static std::atomic<double> g_stall_far_rho{ 0.0 };
+//dist < 0 means the stall was below the density floor. Called once per stall.
+//Where trajectories gave up, since the last reset. vacuum: below the density floor, where there is
+//nothing to belong to. in_field: on a critical point of the field, which is a real place and has to
+//be given to somebody. beyond_a_bohr: of those, the ones no attractor is within a bohr of - exactly
+//the set a one-bohr reach used to drop, which is how the 117-molecule AIMAll gate came to find Si2H6
+//0.65 e short. worst_rho is the densest of them and says which kind of stall it was: 1e-6 e/bohr^3 is
+//a vacuum tail, 1e-1 a bond critical point. File-local on purpose - the only consumer is the line
+//-basin_timing prints, and a reader of that line wants the reasoning here rather than in the header.
+static void basin_stall_seen(const double dist, const double rho)
+{
+	if (dist < 0.0) { g_stall_vacuum.fetch_add(1, std::memory_order_relaxed); return; }
+	g_stall_field.fetch_add(1, std::memory_order_relaxed);
+	if (dist <= 1.0) return;
+	g_stall_far.fetch_add(1, std::memory_order_relaxed);
+	double cur = g_stall_far_rho.load(std::memory_order_relaxed);
+	while (rho > cur && !g_stall_far_rho.compare_exchange_weak(cur, rho, std::memory_order_relaxed)) {}
+}
+static void basin_stall_counters(long long &vacuum, long long &in_field, long long &beyond_a_bohr, double &worst_rho)
+{
+	vacuum = g_stall_vacuum.load();
+	in_field = g_stall_field.load();
+	beyond_a_bohr = g_stall_far.load();
+	worst_rho = g_stall_far_rho.load();
+}
+static void basin_stall_counters_reset() { g_stall_vacuum = 0; g_stall_field = 0; g_stall_far = 0; g_stall_far_rho = 0.0; }
 static inline void adp_count(std::atomic<long long> &c) { c.fetch_add(1, std::memory_order_relaxed); }
 void basin_adaptive_step_counters(long long &steps, long long &proposed, long long &turned_back, long long &fell_back)
 {
@@ -1847,7 +1891,15 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 	}
 	//Level 3 at least: a basin boundary cuts through the atomic shells and the population
 	//follows the angular resolution, 0.01 e at level 2, 0.005 at 3 and 0.002 at 4, which
-	//costs five times level 3
+	//costs five times level 3. Those figures are covalent ones. AIMAll integrated the benchmark
+	//set independently and on its two most ionic molecules level 3 is thirty times worse: SiF4's
+	//silicon 0.1495 e out and CF4's carbon 0.1008 e, each ligand taking up a quarter of it so the
+	//total still conserves to 3e-4. Level 4 halves both (0.0769, 0.0471) and the sequence
+	//extrapolates onto AIMAll's value, so this is the grid converging and not a boundary defect -
+	//the beta spheres, the sphere margin and the adaptive step were each cleared by an arm that
+	//reproduced the gap to the printed digit, and -basin_grid 2 on top of level 4 bought 0.005 e
+	//for 2.3x the time. A strongly ionic centre wanted at 0.01 e needs level 4.
+	//QuadratureAccuracy.RefiningTheGridKeepsConverging is what keeps the sequence converging.
 	GridConfiguration config;
 	config.accuracy = std::max(accuracy, 3);
 	config.alpha_max_scale = static_cast<double>(grid_boost) * grid_boost;
@@ -1885,13 +1937,38 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 	//HgH2's bond basin came out at 52433 bohr^3 against the cube's 286, and asymmetric on a
 	//symmetric molecule, while 0.0002 e of grid debris in NH3Li grew to 0.025 e. Where there is no
 	//density there is no basin to be in, and the point belongs outside where it is reported.
-	const double stall_reach = eli_field ? 1e30 : 1.0;
+	//"No excuse for one" was wrong, and the AIMAll gate is what found it. rho does have a gradient
+	//everywhere, but it vanishes at rho's own critical points, and a bond critical point between two
+	//like atoms is more than a bohr from both of them - so every trajectory that climbed a
+	//homonuclear separatrix into its BCP fell outside the one-bohr reach and was thrown away. Over
+	//117 benchmark molecules exactly ten lost anything at all and all ten have a homopolar
+	//heavy-heavy bond: Si2H6 0.6487 e (0.32 per silicon, the two still equal to 4 decimals), CCH
+	//0.1731, acetylene 0.0488, thiirane 0.0191, and the other 107 lost 0.0000. Four arms say it is
+	//structural and not the quadrature: the floor step reproduces it (0.6496), -no_beta_spheres to
+	//the digit, ELI-D - which already had no reach - loses nothing on either molecule, and -acc 4
+	//makes it *worse* (0.6881), a refined grid putting more points into the doomed region.
+	//So the reach is gone. Above the density floor a stall is at an interior critical point, where
+	//there is something to partition and the volume a basin can claim is bounded; below it there is
+	//nothing there, which is the vacuum case the floor was written for.
+	const double stall_reach = 1e30;
 	//e/bohr^3. Two orders below the cube's own 1e-4 crop, so this keeps what the crop threw away
-	//and still cannot hand a printable population to the vacuum
+	//and still cannot hand a printable population to the vacuum. It now guards the density too:
+	//that is what keeps the unbounded reach from carving up the tail, the way it once did for ELI-D.
 	const double stall_floor = 1e-6;
-	auto stalled = [&](const d3 &r) {
-		if (eli_field && valence(r) < stall_floor) return 0;
-		return nearest_maximum(r, stall_reach);
+	//start is where the trajectory began, r where it gave up. They differ for the case this exists
+	//for: at a saddle between two equivalent atoms the nearest attractor to r is a coin flip - it
+	//would hand Si2H6's whole 0.65 e to whichever silicon the floating-point comparison happened to
+	//favour and break a symmetric molecule - while start is on one definite side of the separatrix
+	//the walk was climbing. ELI-D keeps deciding on r, where its stalls are in a vacuum tail that
+	//has no side to be on and the populations it moves are zero either way.
+	auto stalled = [&](const d3 &start, const d3 &r) {
+		const double rho = valence(r);
+		if (rho < stall_floor) { basin_stall_seen(-1.0, 0.0); return 0; }
+		double d2 = std::numeric_limits<double>::max();
+		for (size_t m = 0; m < maxima.size(); m++)
+			d2 = std::min(d2, std::pow(r[0] - maxima[m][0], 2) + std::pow(r[1] - maxima[m][1], 2) + std::pow(r[2] - maxima[m][2], 2));
+		basin_stall_seen(std::sqrt(d2), rho);
+		return nearest_maximum(eli_field ? r : start, stall_reach);
 	};
 	auto climb = [&](const d3 &p, long long &lb, long long &ll) {
 		bool settled;
@@ -1943,7 +2020,7 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 					//is the floor path's own stall, moved one step back and charged a gradient.
 					if (grown_last) { adp_count(g_adp_fall); r = r_prev; last_value = value_prev; mult = 1.0; grown_last = false; continue; }
 					mult = 1.0;
-					const int n = stalled(r);
+					const int n = stalled(p, r);
 					if (n) return n;
 					break;
 				}
@@ -1998,7 +2075,7 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 		}
 		//A streaming ELI-D trajectory that died, ran its 2000 steps out or lost its gradient has
 		//nowhere to report to; the gridded one still has the cube's answer in b
-		if (eli_field && streaming) return stalled(r);
+		if (eli_field && streaming) return stalled(p, r);
 		return b;
 	};
 	//Local refinement. A quadrature cell is a shell segment, and the error the basin boundary
@@ -2192,6 +2269,26 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 			else outside += ncore;
 		}
 	T.lap(fieldname + "point loop");
+	{
+		//Read and reset unconditionally so the counts never carry from one field or one molecule
+		//into the next, but print only under -basin_timing: the golden files are line-by-line
+		//captures of this console log, so an extra line here shifts every basin row below it.
+		long long sv, sf, sfar; double srho;
+		basin_stall_counters(sv, sf, sfar, srho);
+		basin_stall_counters_reset();
+		//Built in its own stream on purpose. Scientific notation is the only readable form for a
+		//density that spans 1e-6 to 1e-1, and setting it on std::cout leaves the precision behind
+		//for whatever prints next - the basin table is three lines below and the golden files are
+		//captures of it.
+		if (g_basin_timing && sf + sv > 0) {
+			std::ostringstream line;
+			line << std::scientific << std::setprecision(3);
+			line << "  " << fieldname << "trajectories that stalled: " << sf << " in the field, "
+				<< sv << " below " << stall_floor << " e/bohr^3; " << sfar
+				<< " further than a bohr from every attractor, the densest at " << srho << " e/bohr^3";
+			std::cout << line.str() << std::endl;
+		}
+	}
 	if (g_basin_timing && g_adaptive_step) {
 		const long long st = g_adp_steps.exchange(0), tr = g_adp_tries.exchange(0);
 		const long long tu = g_adp_turn.exchange(0), fa = g_adp_fall.exchange(0);
