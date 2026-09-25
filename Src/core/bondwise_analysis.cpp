@@ -664,6 +664,14 @@ namespace {
 	//OpenMP region boundary would terminate the process instead.
 	void warm_free_atom_cache(const std::vector<atom> &ats, const e_origin origin,
 		const bool cartesian) {
+		//Cache off disables this on purpose: warming a cache nothing reads is pure cost. That also means
+		//NOS_RGBI_NO_FREEATOM_CACHE cannot be used to manufacture a heavy workload for this flag. Job
+		//582589 spent 1 h 56 min doing exactly that on four arms of Fe.gbw, and every one of them, both
+		//W arms included, took the serial path with FREEATOM-WARM absent from the log; the 3 s by which
+		//W came out slower was the single Fe SCF drifting, not a cost of the flag. Bench this with the
+		//cache ON and on a molecule with many distinct heavy centres. fe_g has four distinct free atoms
+		//and one of them is 99.7 % of the run, so it cannot answer the question in either configuration:
+		//cache off refuses the flag, cache on leaves 0.356 s of 404.0 s for it to win.
 		if (std::getenv("NOS_RGBI_PARALLEL_FREEATOM") == nullptr ||
 			std::getenv("NOS_RGBI_NO_FREEATOM_CACHE") != nullptr)
 			return;
