@@ -528,9 +528,13 @@ private:
 #endif
 };
 
+//even_steps rounds the point count up to even, which puts the centre of the box ON a grid plane. Pass false
+//only from a caller that sets its step to the requested resolution instead of to (Max-Min)/NbSteps: there an
+//extra point enlarges the box and does not move the centre. See the comment at the definition.
 void readxyzMinMax_fromWFN(
 	const WFN& wavy,
-	properties_options& opts);
+	properties_options& opts,
+	const bool even_steps = true);
 
 void readxyzMinMax_fromCIF(
 	std::filesystem::path cif,

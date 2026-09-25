@@ -660,7 +660,9 @@ TEST(ConvenienceMathTests, ReadxyzMinMaxFromWFNPadsAndSteps)
 // an odd count the box centre falls exactly halfway between two grid planes and the four voxels around each
 // axis are degenerate. 9.0/0.15 evaluates to 60.000000000000014, so the caller asking for 0.15 got 61.
 // The attractor positions themselves are checked by tests/ELI_heavy/uh6_eli.good; this is the precondition,
-// and it is the cheap place to notice it breaking again.
+// and it is the cheap place to notice it breaking again. The second half of the test pins the opposite case:
+// with even_steps = false the count must stay exactly what ceil returned, which at 0.15 and 0.10 is odd - so
+// this test goes red if the parameter is ignored in either direction.
 TEST(ConvenienceMathTests, GridCentreLandsOnAPlaneAtEveryResolution)
 {
 	WFN w(e_origin::NOT_YET_DEFINED);
@@ -680,8 +682,17 @@ TEST(ConvenienceMathTests, GridCentreLandsOnAPlaneAtEveryResolution)
 		opts.radius = 2.5;
 		opts.resolution = res;
 		readxyzMinMax_fromWFN(w, opts);
+		//the property-cube path keeps its step at the resolution rather than at the span over the count, so an
+		//extra point there only widens the box: it asks for even_steps = false and must get ceil's own parity.
+		properties_options raw_opts;
+		raw_opts.radius = 2.5;
+		raw_opts.resolution = res;
+		readxyzMinMax_fromWFN(w, raw_opts, false);
 		for (int i = 0; i < 3; i++)
 		{
+			const int raw = (int)ceil(constants::bohr2ang(raw_opts.MinMax[3 + i] - raw_opts.MinMax[i]) / res);
+			EXPECT_EQ(raw_opts.NbSteps[i], raw) << "resolution " << res << " axis " << i;
+			EXPECT_EQ(opts.NbSteps[i], raw + (raw % 2)) << "resolution " << res << " axis " << i;
 			EXPECT_EQ(opts.NbSteps[i] % 2, 0) << "resolution " << res << " axis " << i;
 			const double h = (opts.MinMax[3 + i] - opts.MinMax[i]) / opts.NbSteps[i];
 			//the box centre sits at index NbSteps/2 because the points start at MinMax[i]

@@ -1330,7 +1330,8 @@ bool unsaved_files(std::vector<WFN> &wavy)
 
 void readxyzMinMax_fromWFN(
     const WFN &wavy,
-    properties_options &opts)
+    properties_options &opts,
+    const bool even_steps)
 {
     vec2 PosAtoms;
     PosAtoms.resize(3);
@@ -1363,7 +1364,7 @@ void readxyzMinMax_fromWFN(
     opts.NbSteps[2] = (int)ceil(constants::bohr2ang(opts.MinMax[5] - opts.MinMax[2]) / opts.resolution);
 
     //An EVEN number of points, because an odd one cannot sample the molecule's own symmetry planes.
-    //Every caller lays the NbSteps points out from MinMax[i] with a step of (MinMax[3+i]-MinMax[i])/NbSteps[i],
+    //Ten of the eleven callers lay the NbSteps points out from MinMax[i] with a step of (MinMax[3+i]-MinMax[i])/NbSteps[i],
     //so the centre of the box - which for a box built from min/max plus one radius is the molecule's own
     //symmetry centre - falls at index NbSteps/2: on a grid plane when NbSteps is even, exactly halfway
     //between two planes when it is odd. In the odd case no grid plane contains a mirror plane or a rotation
@@ -1374,9 +1375,16 @@ void readxyzMinMax_fromWFN(
     //and 0.12 A (76) all 48 held exactly. The parity was not the caller's choice either - 9.0/0.15 evaluates
     //to 60.000000000000014, so ceil() hands back 61 rather than 60. One extra plane per axis costs a few per
     //cent of the points and buys a grid that carries the point group at whatever resolution is asked for.
-    for (int i = 0; i < 3; i++)
-        if (opts.NbSteps[i] % 2 != 0)
-            opts.NbSteps[i]++;
+    //The eleventh caller is the property-cube path (properties.cpp, the -cube/-esp/-elf/-MO run), which sets
+    //its step to ang2bohr(resolution) and not to the span over the count. There the parity of the count says
+    //nothing about where the centre falls - the centre sits at span/(2*resolution) whatever the count is - so
+    //an extra point only pushes the far face of the box half an Angstrom further out. Measured: the epoxide
+    //cube went 13 13 12 -> 14 14 12 with the step unchanged at 0.944863, i.e. ~16 % more points for no
+    //symmetry gained. That caller passes even_steps = false, which is why this is a parameter and not a rule.
+    if (even_steps)
+        for (int i = 0; i < 3; i++)
+            if (opts.NbSteps[i] % 2 != 0)
+                opts.NbSteps[i]++;
 }
 
 void readxyzMinMax_fromCIF(
