@@ -231,6 +231,13 @@ def sines(A, B, S, lbl, cl):
     """
     out = {c: 0.0 for c in ("Cor", "Val", "Ryd")}
     ndeg = 0
+    worst = {}
+    # Rydberg columns are near-empty, and a direction is determined only to the extent that its
+    # occupancy is separated from its neighbours'.  DEG_TOL catches exact degeneracy; it does NOT
+    # make a 1e-09-vs-1e-10 pair meaningful.  So the Rydberg worst sine is also reported split by
+    # the occupancy decade of the column it came from, which says whether the number is a defect or
+    # a gauge.  This is a decomposition of the pre-registered metric, not a second threshold.
+    dec = {}
     for grp in cl:
         name = CLASS[lbl[grp[0]][5]]
         if len(grp) == 1:
@@ -240,10 +247,19 @@ def sines(A, B, S, lbl, cl):
         else:
             ndeg += len(grp)
             s = float(principal_sines(A[:, grp], B[:, grp], S).max())
+        occ = max(lbl[k][6] for k in grp)
+        if s > out[name]:
+            worst[name] = dict(occ=occ, size=len(grp), atom=lbl[grp[0]][1], l=lbl[grp[0]][2],
+                               rank=lbl[grp[0]][4], sine=s)
         out[name] = max(out[name], s)
         for k in grp[1:]:
             out[CLASS[lbl[k][5]]] = max(out[CLASS[lbl[k][5]]], s)
+        if name == "Ryd":
+            d = "occ>1e-3" if occ > 1e-03 else ("1e-6<occ<1e-3" if occ > 1e-06 else "occ<1e-6")
+            dec[d] = max(dec.get(d, 0.0), s)
     out["ndeg"] = ndeg
+    out["worst"] = worst
+    out["ryd_by_occ"] = dec
     return out
 
 
@@ -269,6 +285,36 @@ def already_step4(C, Dp_ao, S, lbl):
     return worst
 
 
+def structure(X, lbl):
+    """Where the mass of gennbo's OWN cascade lives, as Frobenius mass fractions of X_true.
+
+    This characterises the arbiter, not a candidate, and it is the one question the 144-member grid
+    could not ask: every member of that grid was a native definition, so the grid could only say
+    which of OUR shapes fits, never what shape the arbiter's transformation HAS.  A max element says
+    nothing about how much of a transformation is off-block, so these are squared-mass fractions.
+
+    >>> lbl = [(0, 0, 0, 0, 0, 0, 2.0), (1, 1, 0, 0, 0, 1, 1.0)]
+    >>> r = structure(np.eye(2), lbl)
+    >>> round(r["off_al"], 12), round(r["off_atom"], 12), round(r["off_class"], 12)
+    (0.0, 0.0, 0.0)
+    >>> r2 = structure(np.array([[0.0, 1.0], [1.0, 0.0]]), lbl)
+    >>> round(r2["off_atom"], 12)
+    1.0
+    """
+    al = np.array([t[1] * 100 + t[2] for t in lbl])
+    at = np.array([t[1] for t in lbl])
+    cl = np.array([t[5] for t in lbl])
+    tot = float((X ** 2).sum())
+    out = dict(tot=tot,
+               off_al=float((X[al[:, None] != al[None, :]] ** 2).sum()) / tot,
+               off_atom=float((X[at[:, None] != at[None, :]] ** 2).sum()) / tot,
+               off_class=float((X[cl[:, None] != cl[None, :]] ** 2).sum()) / tot)
+    for a, b in ((0, 1), (0, 2), (1, 2)):
+        m = (cl[:, None] == a) & (cl[None, :] == b)
+        out["%s-%s" % (CLASS[a], CLASS[b])] = float((X[m] ** 2).sum() + (X[m.T] ** 2).sum()) / tot
+    return out
+
+
 def load(mol, d):
     """Everything the test needs, with GATE N0 measured on the way in."""
     n, S, P = read_47(os.path.join(d, mol + ".47"))
@@ -286,8 +332,26 @@ def load(mol, d):
              cls=[t[5] for t in lbl], pre_occ=np.diag(Dp)[perm].copy(), reranked=reranked,
              Sp=Sp[np.ix_(perm, perm)], cl=None)
     g["cl"] = clusters(lbl)
+    # X_true is built by INVERTING a matrix that is printed to nine decimals, so the two checks that
+    # go THROUGH that inverse (X**T Sp X = 1 and unit 53) inherit the print quantisation and cannot
+    # be gated at a flat tolerance.  A guessed bound is a fitted bound, so the floor is MEASURED
+    # instead: every printed matrix is re-quantised by +-0.5e-09, which is exactly what nine decimals
+    # throw away, and the same two quantities are recomputed.  The spread over the draws IS the
+    # instrument's floor, it is computed from the input alone, and it never looks at an arm.  The two
+    # identifications that do not go through the inverse (unit 51, unit 52) keep their flat 1e-07.
+    rng = np.random.default_rng(20260925)
+    q = 0.5e-09
+    noise = 0.0
+    for _ in range(4):
+        def j(M):
+            return M + rng.uniform(-q, q, M.shape)
+        C32q, C33q, Spq, Dpq, Dnq = j(C32), j(C33), j(Sp), j(Dp), j(Dn)
+        Xq = np.linalg.solve(C32q, C33q)
+        noise = max(noise, float(np.abs(Xq.T @ Spq @ Xq - np.eye(n)).max()),
+                    float(np.abs(Dnq - Xq.T @ Dpq @ Xq).max()))
+    cond = float(np.linalg.cond(C32))
     g["n0"] = dict(
-        o33=e33, o32=e32,
+        o33=e33, o32=e32, cond=cond, noise=noise, prop=3.0 * noise,
         sp=float(np.abs(Sp - C32.T @ S @ C32).max()),
         dp=float(np.abs(Dp - C32.T @ SPS @ C32).max()),
         sp_rowmajor=float(np.abs(Sp_bad - C32.T @ S @ C32).max()),
@@ -295,7 +359,7 @@ def load(mol, d):
         xorth=float(np.abs(X.T @ Sp @ X - np.eye(n)).max()),
         dn=float(np.abs(Dn - X.T @ Dp @ X).max()),
         reranked=reranked,
-        r_step4=already_step4(C32, SPS, S, lbl))
+        r_step4=already_step4(g["C32"], SPS, S, lbl))
     return g
 
 
@@ -323,6 +387,7 @@ def molecule(mol, d):
     res = dict(mol=mol, n=g["n"], n0=g["n0"], arms={})
     ryd = [k for k, t in enumerate(g["lbl"]) if t[5] == 2]
     res["gpop"] = float(np.einsum("ij,ij->j", g["C33"][:, ryd], g["SPS"] @ g["C33"][:, ryd]).sum())
+    res["struct"] = structure(np.linalg.solve(g["C32"], g["C33"]), g["lbl"])
     for name, C in candidates(g).items():
         r = sines(C, g["C33"], g["S"], g["lbl"], g["cl"])
         r["pop"] = float(np.einsum("ij,ij->j", C[:, ryd], g["SPS"] @ C[:, ryd]).sum())
@@ -357,17 +422,17 @@ def report(rows, n1, out):
     p = out.write
     p("FLOOR = %.3e (nine printed decimals, sine floors at the square root)\n\n" % FLOOR)
     p("GATE N0, the instrument.  All under 1e-07 except recon (1e-10) and the refused packing.\n")
-    p("%-9s %7s %9s %9s %9s %9s %9s %9s %9s %7s %9s\n" % (
+    p("%-9s %7s %9s %9s %9s %9s %9s %9s %9s %7s %8s %9s %9s\n" % (
         "mol", "n", "|C33'SC33|", "diagC32", "unit52", "unit51", "recon", "X'SpX", "unit53",
-        "rerank", "R:step4"))
+        "rerank", "cond32", "prop.bnd", "R:step4"))
     ok = True
     for r in rows:
         z = r["n0"]
-        p("%-9s %7d %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %7d %9.2e\n" % (
+        p("%-9s %7d %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %9.2e %7d %8.1f %9.2e %9.2e\n" % (
             r["mol"], r["n"], z["o33"], z["o32"], z["sp"], z["dp"], z["recon"], z["xorth"],
-            z["dn"], z["reranked"], z["r_step4"]))
+            z["dn"], z["reranked"], z["cond"], z["prop"], z["r_step4"]))
         for k, tol in (("o33", 1e-07), ("o32", 1e-07), ("sp", 1e-07), ("dp", 1e-07),
-                       ("recon", 1e-10), ("xorth", 1e-07), ("dn", 1e-07)):
+                       ("recon", 1e-10), ("xorth", z["prop"]), ("dn", z["prop"])):
             if not z[k] < tol:
                 ok = False
                 p("  N0 FAIL %s %s = %.3e, want < %.1e\n" % (r["mol"], k, z[k], tol))
@@ -402,6 +467,35 @@ def report(rows, n1, out):
         verdict[nm] = (mx, dpop)
         p("%-18s %11.3e %11.3e %11.3e %11.1f %9.4f\n" % (
             nm, w["Cor"], w["Val"], w["Ryd"], mx / FLOOR, dpop))
+
+    p("\nWHAT SHAPE GENNBO'S OWN CASCADE HAS: Frobenius mass fractions of X_true off each block\n"
+      "structure.  This describes the arbiter, not a candidate; the 144-grid could never ask it.\n")
+    p("%-9s %10s %10s %10s %10s %10s %10s\n" % (
+        "mol", "off(at,l)", "off atom", "off class", "Cor-Val", "Cor-Ryd", "Val-Ryd"))
+    for r in rows:
+        z = r["struct"]
+        p("%-9s %10.3e %10.3e %10.3e %10.3e %10.3e %10.3e\n" % (
+            r["mol"], z["off_al"], z["off_atom"], z["off_class"], z["Cor-Val"], z["Cor-Ryd"],
+            z["Val-Ryd"]))
+
+    p("\nWHERE THE RYDBERG MISS LIVES: worst sine split by the occupancy of the column it came from,\n"
+      "plus the worst Rydberg contributor itself.  A near-empty shell's direction is a gauge.\n")
+    p("%-18s %11s %15s %11s %s\n" % ("arm", "occ>1e-3", "1e-6<occ<1e-3", "occ<1e-6", "worst Ryd contributor"))
+    for nm in names:
+        d = {}
+        wc = None
+        for r in rows:
+            for k, v in r["arms"][nm]["ryd_by_occ"].items():
+                d[k] = max(d.get(k, 0.0), v)
+            w = r["arms"][nm].get("worst", {}).get("Ryd")
+            if w and (wc is None or w["sine"] > wc[1]["sine"]):
+                wc = (r["mol"], w)
+        tag = "-" if wc is None else "%s atom %d l=%d rank %d occ %.2e size %d" % (
+            wc[0], wc[1]["atom"], wc[1]["l"], wc[1]["rank"], wc[1]["occ"], wc[1]["size"])
+        p("%-18s %11.3e %15.3e %11.3e %s\n" % (
+            nm, d.get("occ>1e-3", 0.0), d.get("1e-6<occ<1e-3", 0.0), d.get("occ<1e-6", 0.0), tag))
+    p("  degenerate columns compared as subspaces: %s\n"
+      % " ".join("%s %d/%d" % (r["mol"], r["arms"][names[0]]["ndeg"], r["n"]) for r in rows))
 
     p("\nGATE N2, discrimination (both wrong candidates must exceed 100x FLOOR = %.1e):\n" % (100 * FLOOR))
     for nm in ("WRONG_identity", "WRONG_lowdin"):
