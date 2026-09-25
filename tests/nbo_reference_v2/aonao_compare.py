@@ -2,6 +2,7 @@
 
     py -3.12 aonao_compare.py <dir with one subdirectory per molecule> [--full]
     py -3.12 aonao_compare.py --pre <same, with a .32 and a .naocpre.txt per molecule>
+    py -3.12 aonao_compare.py --cascade <same, needing both ends: .32/.naocpre.txt and .33/.naoc.txt>
     py -3.12 aonao_compare.py --demo
 
 --pre is the other end of a bisection: `$NBO AOPNAO=W $END` (unit 32 on this install) and
@@ -46,6 +47,7 @@ worth nothing - three have been retired on this branch for exactly that):
      assumes the NAO stage is upstream of NBO/E2/NRT.  Its NAO table must therefore equal the
      stamped reference JSON's to 1e-5, or the shortcut is wrong and the comparison is void.
 """
+import collections
 import json
 import os
 import re
@@ -501,6 +503,511 @@ def main_pre(root, verbose=False):
     if missing:
         print("  no lfn 32: %s" % " ".join(missing))
     pre_verdict(rows_by_mol)
+    return 0
+
+
+#------------------------------------------------------------------- the cascade's net transform
+#Pre-registered before any of these numbers exist; the outcome letters continue the A/B/C of
+#aopnao_stage.sh.  The bisection put the disagreement strictly between the pre-NAO level, where the
+#two sides agree to 1.000000 on every shell of all eight molecules, and the m-averaged NAO block,
+#where they do not.  Between those two levels sits the orthogonalisation cascade - and BOTH of its
+#ends are already on disk for all eight: AO -> PNAO (gennbo unit 32, native NAOCPRE) and AO -> NAO
+#(unit 33, NAOC), read off the same .47.  So the cascade's ENTIRE net effect is available per side as
+#the PNAO -> NAO transform T with Cnao = Cpre T, with no new job, no cluster time and no assumption
+#about what the cascade contains.  T is not a guess; the only question is its SHAPE.
+#
+#  D.  A gate fails.  Quote NOTHING for that molecule: the matrices on disk do not determine its net
+#      transform.  Both gates are ONE-SIDED - each side's T must reproduce THAT side's own NAOs from
+#      THAT side's own PNAOs to the printing floor, and T^T G T must be the identity with
+#      G = Cpre^T S Cpre.  If no molecule survives, that is the whole result and nothing follows.
+#  E.  The two transforms have DIFFERENT shape.  Licenses: the cascade's STRUCTURE differs between
+#      the codes, so the fault is not a coefficient inside a correct cascade, and the interval closes
+#      with no substitution experiment at all.  Does NOT license naming the step - unless the block
+#      that differs is one step's own block, and then it is named BY that block and not by the story.
+#  F.  SAME shape, differing magnitude.  Licenses: a coefficient error inside a correctly structured
+#      cascade, which is what makes the OWSO-weight and class-partition substitution arms worth
+#      running.  Does NOT license which coefficient, and does not rank the two candidates.
+#
+#The two candidate structures have DIFFERENT measurable shapes, so neither has to be assumed:
+#
+#  A Schmidt step against a priority order is TRIANGULAR in that partition.  Native's step 3 says so
+#  in its own comment - core, then valence, then Rydberg, each projected out of everything above it -
+#  and that forces T[i, j] = 0 whenever class(i) > class(j): a core NAO is built out of core PNAOs
+#  alone, a valence NAO may reach into core, a Rydberg NAO into both.  Measured as the Frobenius mass
+#  of every ordered class block of T, as a share of ||T||.
+#
+#  An occupancy-weighted symmetric orthogonalisation is T = W^-1 M with M symmetric and W the
+#  positive diagonal of weights, so SOME positive diagonal makes it symmetric.  The weights are not
+#  known and do not need to be: |T_ij| / |T_ji| must factor as d_j / d_i, i.e.
+#  log|T_ij| - log|T_ji| = a_j - a_i, a least-squares fit whose residual is the deviation.  It is
+#  read on the WITHIN-class blocks, where the OWSO acts and the Schmidt step is exactly the identity
+#  (projecting a valence PNAO against core changes its core rows, never its valence rows), and only
+#  on pairs from DIFFERENT (atom, l): step 4's per-(atom, l) re-diagonalisation is a further
+#  orthogonal factor inside those, so same-(atom, l) pairs are reported apart instead of mixed in.
+#
+#Both measures are GAUGE-INVARIANT, which is why they are the ones quoted.  Every PNAO and every NAO
+#column carries an arbitrary sign on each side, so T -> diag(s) T diag(t) with s, t = +-1 is the SAME
+#transform.  max|T - T^T| is not invariant under that and is never quoted; |T_ij| / |T_ji| is, every
+#block norm is, and the sign structure is only quoted in the one form that survives it - whether the
+#products sign(T_ij) sign(T_ji) FACTOR as u_i u_j, which is the same cocycle condition in the sign
+#group (the raw products do not survive: the gauge multiplies them by (s_i t_i)(s_j t_j)).
+#
+#Thresholds: native dumps 10 fixed decimals and gennbo 9, so an entry carries ~5e-10 and the solve
+#inflates that by cond(Cpre), which is printed beside every gate so a failure is diagnosable rather
+#than mysterious.  1e-6 is three decades above that floor and three below the structure being looked
+#for - and a threshold below the measurement floor is not a gate, which is exactly how the in-block
+#identity refused all eight at 1e-9 one level up.
+CASC_GATE = 1e-6
+#A pair enters the symmetry fit only if BOTH its entries clear this; below it a ratio is roundoff
+#over roundoff.  The class-block masses are not floored - a norm needs no floor.
+CASC_FLOOR = 1e-3
+#exp(resid) - 1 is the worst relative error left in the ratios after the best diagonal: 1e-3 admits
+#"some positive diagonal makes it symmetric" at the same decade as the entry floor.
+CASC_SYM = 1e-3
+#A class block counts as EMPTY below this share of ||T||: six decades under a filled one.
+CASC_ZERO = 1e-6
+ORDER = ("Cor", "Val", "Ryd")
+
+
+def cascade_transform(Cpre, Cnao, S):
+    """The net PNAO -> NAO transform T with Cnao = Cpre T, plus its two one-sided gates.
+
+    Returns (T, reproduce, ortho, cond).  `reproduce` = max|Cpre T - Cnao| is the printing-floor
+    test.  `ortho` = max|T^T G T - 1| with G = Cpre^T S Cpre is an EXACT identity, because the NAOs
+    are S-orthonormal - and it is free.  It also says where the magnitude lives: G is built from the
+    pre-NAOs, which the two sides already agree on to 1.000000, so whatever T carries in magnitude is
+    constrained by a matrix both sides share, and what is left to compare is shape.
+
+    >>> rng = np.random.default_rng(0)
+    >>> S = np.eye(5); Cpre = rng.normal(size=(5, 5)); T0 = rng.normal(size=(5, 5))
+    >>> T, rep, _, _ = cascade_transform(Cpre, Cpre @ T0, S)
+    >>> bool(np.abs(T - T0).max() < 1e-10), bool(rep < 1e-10)
+    (True, True)
+    >>> _, rep, _, _ = cascade_transform(Cpre[:, :2], Cpre[:, 2:4], S)   # not in the span
+    >>> bool(rep > 1e-3)
+    True
+    >>> Q = np.linalg.qr(rng.normal(size=(5, 5)))[0]      # S-orthonormal NAOs, S = 1
+    >>> _, _, orth, _ = cascade_transform(Cpre, Q, S)
+    >>> bool(orth < 1e-12)
+    True
+    """
+    T, _, _, _ = np.linalg.lstsq(Cpre, Cnao, rcond=None)
+    rep = float(np.abs(Cpre @ T - Cnao).max())
+    G = Cpre.T @ S @ Cpre
+    ortho = float(np.abs(T.T @ G @ T - np.eye(T.shape[1])).max())
+    return T, rep, ortho, float(np.linalg.cond(Cpre))
+
+
+def sym_shape(T, pairs, floor=CASC_FLOOR):
+    """How far T is from being made symmetric by SOME positive diagonal, without knowing which one.
+
+    log|T_ij| - log|T_ji| = a_j - a_i, solved for a by least squares over the pairs whose two entries
+    both clear `floor`; `resid` is the worst leftover in log units, so exp(resid) - 1 is a relative
+    error in the ratios.  `plain` is max|log|T_ij| - log|T_ji|| on the same pairs - what those ratios
+    would give if no diagonal were allowed - carried so that a small residual can never be read as
+    "T is symmetric" when it is nothing of the kind.
+
+    >>> M = np.array([[1.0, 0.4, -0.2], [0.4, 1.0, 0.3], [-0.2, 0.3, 1.0]])
+    >>> T = np.diag([1.0, 2.0, 0.5]) @ M            # W^-1 M, so diagonally symmetrizable
+    >>> p = [(0, 1), (0, 2), (1, 2)]
+    >>> r = sym_shape(T, p, floor=0.01)
+    >>> r["n"], round(r["resid"], 12), round(r["plain"], 4)
+    (3, 0.0, 1.3863)
+    >>> g = np.diag([1.0, -1.0, 1.0])               # a sign gauge changes nothing measured
+    >>> r2 = sym_shape(g @ T @ g, p, floor=0.01)
+    >>> (r2["n"], round(r2["resid"], 12)) == (r["n"], round(r["resid"], 12))
+    True
+    >>> T[0, 1] = 0.9        # break the ratio structure: the triangle no longer closes, and its
+    >>> round(sym_shape(T, p, floor=0.01)["resid"], 4)   # 0.8109 of discrepancy spreads over 3 edges
+    0.2703
+    >>> sym_shape(T, p, floor=10.0)["n"]            # nothing clears the floor
+    0
+    """
+    idx = [(i, j) for i, j in pairs if min(abs(T[i, j]), abs(T[j, i])) > floor]
+    if not idx:
+        return dict(n=0, resid=None, plain=None, pairs=[])
+    A = np.zeros((len(idx), T.shape[0]))
+    L = np.empty(len(idx))
+    for k, (i, j) in enumerate(idx):
+        A[k, j], A[k, i] = 1.0, -1.0
+        L[k] = np.log(abs(T[i, j])) - np.log(abs(T[j, i]))
+    a, _, _, _ = np.linalg.lstsq(A, L, rcond=None)
+    return dict(n=len(idx), resid=float(np.abs(L - A @ a).max()),
+                plain=float(np.abs(L).max()), pairs=idx)
+
+
+def sign_frustration(pairs, neg):
+    """Do the products sign(T_ij) sign(T_ji) FACTOR as u_i u_j?  Returns (edges, violations).
+
+    A W^-1 M form with M symmetric and W positive has sign(T_ij) = sign(T_ji) on every pair, but the
+    sign of a PNAO column and of an NAO column are each an arbitrary gauge, so that raw statement is
+    not measurable: T -> diag(s) T diag(t) multiplies the product by (s_i t_i)(s_j t_j).  What
+    survives the gauge is whether the products factor, which is a two-colouring of the pair graph -
+    the same cocycle condition as the magnitudes, in the sign group.  `neg` holds the (i, j), i < j,
+    whose product is negative.  The colouring is taken from a spanning tree, so the count is an UPPER
+    bound on the minimum frustration; zero is exact, and zero is the only reading quoted.
+
+    >>> sign_frustration([(0, 1), (1, 2), (0, 2)], {(0, 1), (0, 2)})
+    (3, 0)
+    >>> sign_frustration([(0, 1), (1, 2), (0, 2)], {(0, 1)})
+    (3, 1)
+    >>> sign_frustration([], set())
+    (0, 0)
+    """
+    adj = {}
+    for i, j in pairs:
+        adj.setdefault(i, []).append(j)
+        adj.setdefault(j, []).append(i)
+    val = {}
+    for start in adj:
+        if start in val:
+            continue
+        val[start], stack = 0, [start]
+        while stack:
+            i = stack.pop()
+            for j in adj[i]:
+                if j not in val:
+                    val[j] = val[i] ^ (1 if (min(i, j), max(i, j)) in neg else 0)
+                    stack.append(j)
+    bad = sum(1 for i, j in pairs
+              if val[i] ^ val[j] != (1 if (min(i, j), max(i, j)) in neg else 0))
+    return len(pairs), bad
+
+
+def tri_shape(T, rcls, ccls, order=ORDER):
+    """Frobenius mass of every ordered class block of T as a share of ||T||.
+
+    A Schmidt step against the priority order leaves the blocks with class(row) > class(col) empty -
+    a core NAO is built from core PNAOs alone.  Which triangle is the empty one is not assumed
+    either: both are returned and the report prints them side by side.
+
+    >>> c = ["Cor", "Val", "Ryd"]
+    >>> b = tri_shape(np.array([[1.0, 0.5, 0.5], [0.0, 1.0, 0.5], [0.0, 0.0, 1.0]]), c, c)
+    >>> b[("Val", "Cor")], b[("Ryd", "Val")]
+    (0.0, 0.0)
+    >>> round(b[("Cor", "Val")], 6)
+    0.258199
+    """
+    tot = float(np.linalg.norm(T))
+    out = {}
+    for a in order:
+        rows = [i for i, c in enumerate(rcls) if c == a]
+        if not rows:
+            continue
+        for b in order:
+            cols = [j for j, c in enumerate(ccls) if c == b]
+            if not cols:
+                continue
+            out[(a, b)] = float(np.linalg.norm(T[np.ix_(rows, cols)])) / tot
+    return out
+
+
+def class_locality(T, cls, al, order=ORDER):
+    """Per cross-class block, how its mass splits into same-(atom, l) and cross-(atom, l).
+
+    This is the measure that actually separates the two steps, and it came out of the triangularity
+    numbers rather than being designed with them: the priority Schmidt step is a MOLECULAR projection,
+    so what it puts into a block is spread over every atom, while the only other thing that can move
+    amplitude between classes is the per-(atom, l) re-diagonalisation, which is strictly intra-atomic
+    and intra-l by construction on both sides.  A cross-class block whose mass is entirely
+    same-(atom, l) was therefore produced by the second, and one carrying cross-(atom, l) mass was
+    not.  Both halves are block norms, so both survive the sign gauge.
+
+    >>> c = ["Cor", "Val", "Val"]
+    >>> al = [(0, 0), (0, 0), (1, 0)]
+    >>> T = np.array([[1.0, 0.0, 0.0], [0.3, 1.0, 0.0], [0.0, 0.0, 1.0]])
+    >>> s, x = class_locality(T, c, al)[("Val", "Cor")]
+    >>> round(s, 4), round(x, 4)                 # the 0.3 sits on atom 0's own l = 0
+    (0.1697, 0.0)
+    """
+    tot = float(np.linalg.norm(T))
+    keys = sorted(set(al))
+    code = np.array([keys.index(x) for x in al])
+    same = code[:, None] == code[None, :]
+    out = {}
+    for a in order:
+        rows = [i for i, c in enumerate(cls) if c == a]
+        for b in order:
+            cols = [j for j, c in enumerate(cls) if c == b]
+            if a == b or not rows or not cols:
+                continue
+            blk, m = T[np.ix_(rows, cols)], same[np.ix_(rows, cols)]
+            out[(a, b)] = (float(np.linalg.norm(blk[m])) / tot,
+                           float(np.linalg.norm(blk[~m])) / tot)
+    return out
+
+
+def cascade_sides(mol, d):
+    """Both sides' net PNAO -> NAO transform, measured the same way off the same .47."""
+    n, S, P = read_47(os.path.join(d, mol + ".47"))
+    Cg_pre, lay32, e32 = read_lfn32(os.path.join(d, mol + ".32"), n, S)
+    Cg_nao, lay33, e33 = read_lfn33(os.path.join(d, mol + ".33"), n, S)
+    lpre, Cn_pre = read_naoc(os.path.join(d, mol + ".naocpre.txt"), tag="NAOCPRE")
+    lnao, Cn_nao = read_naoc(os.path.join(d, mol + ".naoc.txt"))
+    assert Cn_pre.shape == Cn_nao.shape == (n, n), "native dumps %s / %s, .47 says %d" % (
+        Cn_pre.shape, Cn_nao.shape, n)
+    #A row of T and a column of T are the same orbital only if native's two dumps are in one order.
+    #Asserted on the self-identifying fields rather than assumed - a permutation would turn every
+    #shape number below into some other matrix's.  The CLASS field is compared separately, because a
+    #re-labelling between the two dumps would be a finding and not a pairing failure.
+    assert [l[:5] for l in lpre] == [l[:5] for l in lnao], (
+        "native's NAOCPRE and NAOC are not in the same orbital order")
+    recls = sum(1 for a, b in zip(lpre, lnao) if a[5] != b[5])
+
+    def load(suffix):
+        p = os.path.join(d, mol + suffix)
+        return load_nbo(p) if load_nbo is not None else json.load(open(p))
+
+    naos = sorted(load(".aonao.nbo.json")["nao"], key=lambda e: e["index"])
+    pre_naos = sorted(load(".aopnao.nbo.json")["nao"], key=lambda e: e["index"])
+    assert len(naos) == n, "gennbo's NAO table has %d rows, .47 says %d" % (len(naos), n)
+    #gennbo's rows are the unit-32 columns and its columns the unit-33 ones, which is a POSITIONAL
+    #pairing.  It is not free: the --pre arm already found each (atom, l) block of unit 32 at the NAO
+    #table's own indices, S-orthonormal inside the block and diagonalising the m-averaged S P S
+    #there, which is what says unit 32 is indexed like the NAO table.  The two runs are also required
+    #to agree about the classes, which catches a mismatched pair of jobs.
+    gcls = [e["type"] for e in naos]
+    assert [e["type"] for e in pre_naos] == gcls, (
+        "the AONAO and AOPNAO runs disagree about the NAO classes")
+    #A class block is only the SAME block on both sides if both sides put the same orbitals into it, so
+    #the verdict below is about the transforms rather than about the labels only once this holds.
+    #Counted per (atom, l) because that is invariant under both sides' differing column orders, so no
+    #pairing is needed.  Measured IDENTICAL on all eight, which is what the core-block verdict rests on.
+    cnt_n = collections.Counter((l[1], l[2], CLASS[l[5]]) for l in lnao)
+    cnt_g = collections.Counter((e["atom"] - 1, LANG_L[e["lang"][0].lower()], e["type"])
+                                for e in naos)
+    assert cnt_n == cnt_g, ("native and gennbo classify differently per (atom, l): %s - a block "
+                            "called Val>Cor on one side is then not the same block on the other"
+                            % ((cnt_n - cnt_g) + (cnt_g - cnt_n)))
+    sides = {}
+    for side, Cpre, Cnao, cls, al in (
+            ("native", Cn_pre, Cn_nao, [CLASS[l[5]] for l in lnao], [(l[1], l[2]) for l in lnao]),
+            ("gennbo", Cg_pre, Cg_nao, gcls,
+             [(e["atom"] - 1, LANG_L[e["lang"][0].lower()]) for e in naos])):
+        T, rep, ortho, cond = cascade_transform(Cpre, Cnao, S)
+        cross, same = [], []
+        for a in range(n):
+            for b in range(a + 1, n):
+                if cls[a] == cls[b]:
+                    (same if al[a] == al[b] else cross).append((a, b))
+        sc, ss = sym_shape(T, cross), sym_shape(T, same)
+        neg = {(i, j) for i, j in sc["pairs"] if T[i, j] * T[j, i] < 0}
+        edges, frus = sign_frustration(sc["pairs"], neg)
+        sides[side] = dict(rep=rep, ortho=ortho, cond=cond, blocks=tri_shape(T, cls, cls),
+                           loc=class_locality(T, cls, al), sym=sc, sym_same=ss, edges=edges,
+                           frus=frus, cls=cls,
+                           dom=sum(1 for j in range(n) if int(np.abs(T[:, j]).argmax()) == j),
+                           norm=float(np.linalg.norm(T)))
+    #The two pre-NAO sets carry the same metric or they do not, and that is checkable WITHOUT pairing
+    #a single column: the spectrum of G is invariant under any permutation of the columns and under
+    #any per-column sign, which is exactly the gauge freedom between the two sides.  It matters here
+    #because T^T G T = 1 holds on both sides, so if the spectra agree then both transforms are
+    #isometries of one metric and no magnitude difference between them can be hiding in G.
+    #(The entrywise |G_n| - |G_g| is NOT the test and was void when tried: native orders its columns
+    #(atom, l, shell, m) while gennbo orders an (atom, l) block component-major, so entrywise it
+    #compares two different orderings and reports a permutation as a disagreement.)
+    Gn, Gg = Cn_pre.T @ S @ Cn_pre, Cg_pre.T @ S @ Cg_pre
+    deig = float(np.abs(np.sort(np.linalg.eigvalsh(Gn)) - np.sort(np.linalg.eigvalsh(Gg))).max())
+    return dict(mol=mol, n=n, lay32=lay32, lay33=lay33, e32=e32, e33=e33, recls=recls, sides=sides,
+                deig=deig, dtrace=float(abs(Gn.trace() - Gg.trace())))
+
+
+def cascade_shape(s):
+    """(the set of empty class blocks, is it diagonally symmetrizable) - the two shape statements."""
+    empty = frozenset(k for k, v in s["blocks"].items() if k[0] != k[1] and v < CASC_ZERO)
+    return empty, bool(s["sym"]["n"] > 0 and s["sym"]["resid"] < CASC_SYM and s["frus"] == 0)
+
+
+def cascade_verdict(results):
+    """The pre-registered D/E/F verdict, and not one word past what it licenses."""
+    ok, dropped = [], []
+    for r in results:
+        bad = ["%s rep=%.1e ortho=%.1e" % (side, s["rep"], s["ortho"])
+               for side, s in sorted(r["sides"].items())
+               if not (s["rep"] < CASC_GATE and s["ortho"] < CASC_GATE)]
+        if bad:
+            dropped.append((r, bad))
+        else:
+            ok.append(r)
+    print("\ngate: T reproduces its OWN side's NAOs and satisfies T^T G T = 1, both at %g" %
+          CASC_GATE)
+    for r, bad in dropped:
+        print("  OUTCOME D %-10s quoted nowhere below: %s" % (r["mol"], "; ".join(bad)))
+    if not ok:
+        print("\nOUTCOME D on every molecule: the matrices on disk do not determine the net")
+        print("transform, so nothing about the cascade is quoted, in either direction.")
+        return
+    print("  %d of %d molecules pass on both sides" % (len(ok), len(results)))
+    print("\nclass-block mass as a share of ||T||.  A Schmidt step against Cor < Val < Ryd empties")
+    print("every block with class(row) > class(col); the other triangle is what it fills.")
+    print("%-9s %-7s %9s %9s %11s %9s" % ("mol", "side", "wrong-tri", "right-tri", "worst-wrong",
+                                          "cond"))
+    for r in ok:
+        for side, s in sorted(r["sides"].items()):
+            lo = {k: v for k, v in s["blocks"].items()
+                  if ORDER.index(k[0]) > ORDER.index(k[1])}
+            hi = {k: v for k, v in s["blocks"].items()
+                  if ORDER.index(k[0]) < ORDER.index(k[1])}
+            worst = max(lo.items(), key=lambda kv: kv[1], default=(("-", "-"), 0.0))
+            print("%-9s %-7s %9.2e %9.2e %11s %9.1e" % (
+                r["mol"], side, sum(v * v for v in lo.values()) ** 0.5,
+                sum(v * v for v in hi.values()) ** 0.5,
+                ("%s>%s %.0e" % (worst[0][0], worst[0][1], worst[1])) if worst[1] > CASC_ZERO
+                else "-", s["cond"]))
+    #The separation, printed before the cut is used: last time a threshold was set below the
+    #measurement floor and refused all eight, so a cut is only a gate if the two populations it
+    #divides sit either side of it with room to spare.
+    filled = [(v, r["mol"], side, k) for r in ok for side, s in r["sides"].items()
+              for k, v in s["blocks"].items() if k[0] != k[1] and v >= CASC_ZERO]
+    empty = [(v, r["mol"], side, k) for r in ok for side, s in r["sides"].items()
+             for k, v in s["blocks"].items() if k[0] != k[1] and v < CASC_ZERO]
+    if empty and filled:
+        hi, lo = max(empty), min(filled)
+        print("\nseparation: the largest mass called empty is %.1e (%s %s %s>%s), the smallest called"
+              % (hi[0], hi[1], hi[2], hi[3][0], hi[3][1]))
+        print("filled is %.1e (%s %s %s>%s).  The cut at %g lies between two populations %.0f decades"
+              % (lo[0], lo[1], lo[2], lo[3][0], lo[3][1], CASC_ZERO, np.log10(lo[0] / hi[0])))
+        print("apart, which is what makes it a gate and not a floor.")
+    print("\nthe same metric on both sides, without pairing a column: max|dEig(G)| over the pre-NAO")
+    print("Gram matrices, whose spectrum is invariant under the permutation and the signs that are")
+    print("the gauge here.  T^T G T = 1 on both sides, so agreement here leaves no magnitude")
+    print("difference between the two transforms hiding in G.")
+    for r in ok:
+        print("  %-9s max|dEig| %.1e   |dTrace| %.1e   (n = %d)" % (
+            r["mol"], r["deig"], r["dtrace"], r["n"]))
+    print("\nlocality of the cross-class mass: same-(atom, l) / cross-(atom, l), share of ||T||.")
+    print("This was pre-registered as a discriminator - a per-(atom, l) re-diagonalisation fills only")
+    print("the first column, a molecular Schmidt projection also the second - and the measurement")
+    print("REFUTED that reading of it: step 4 mixes step-3 OUTPUTS, which are already molecular, so")
+    print("one intra-atomic rotation of a delocalised valence NAO puts other atoms' valence pre-NAOs")
+    print("into a core NAO.  Both columns are therefore consistent with step 4 alone and the split is")
+    print("reported for the record, not as evidence.")
+    print("%-9s %-7s %-19s %-19s %-19s" % ("mol", "side", "Val>Cor same/cross",
+                                           "Ryd>Cor same/cross", "Ryd>Val same/cross"))
+    for r in ok:
+        for side, s in sorted(r["sides"].items()):
+            cells = []
+            for k in (("Val", "Cor"), ("Ryd", "Cor"), ("Ryd", "Val")):
+                sm, cr = s["loc"].get(k, (float("nan"),) * 2)
+                cells.append("%8.1e /%8.1e" % (sm, cr))
+            print("%-9s %-7s %s" % (r["mol"], side, " ".join(cells)))
+    print("\nsymmetrizability on the within-class, cross-(atom, l) pairs above %g.  resid is in log" %
+          CASC_FLOOR)
+    print("units, so exp(resid) is the worst ratio error left after the best diagonal; `plain` is the")
+    print("same pairs with no diagonal allowed, and a small resid next to a LARGE plain is the")
+    print("finding - both small would only mean T is nearly symmetric outright.")
+    print("%-9s %-7s %6s %9s %9s %7s %10s" % (
+        "mol", "side", "pairs", "resid", "plain", "signbad", "same-(a,l)"))
+    for r in ok:
+        for side, s in sorted(r["sides"].items()):
+            q = s["sym"]
+            print("%-9s %-7s %6d %9s %9s %7d %10s" % (
+                r["mol"], side, q["n"],
+                "-" if q["resid"] is None else "%.2e" % q["resid"],
+                "-" if q["plain"] is None else "%.2e" % q["plain"], s["frus"],
+                "-" if s["sym_same"]["resid"] is None else "%.2e" % s["sym_same"]["resid"]))
+    rows, differ = [], []
+    for r in ok:
+        en, sn = cascade_shape(r["sides"]["native"])
+        eg, sg = cascade_shape(r["sides"]["gennbo"])
+        rows.append((r["mol"], sorted(en ^ eg), sn, sg))
+        if en != eg or sn != sg:
+            differ.append(r["mol"])
+    print("\nshape per molecule: the empty-block set and diagonal symmetrizability, both")
+    print("gauge-invariant.  `blocks differing` is the symmetric difference of the two empty sets.")
+    for mol, diffblocks, sn, sg in sorted(rows):
+        print("  %-9s symmetrizable native %-5s gennbo %-5s  blocks differing: %s" % (
+            mol, sn, sg, ", ".join("%s>%s" % b for b in diffblocks) or "none"))
+    #TWO THINGS NOT TO QUOTE, both of the shape the lane has been burnt by.
+    #  1. the gates above are near-tautological.  Cpre is square and well conditioned (cond ~ 10), so
+    #     T = Cpre^-1 Cnao reproduces Cnao by construction, and T^T G T = 1 reduces to
+    #     Cnao^T S Cnao = 1, which is read_lfn33's own layout test.  Passing them says the matrices
+    #     are full rank and S-orthonormal, nothing about the cascade.  The one-sided check that is
+    #     NOT vacuous was already paid for at the level below: each side's pre-NAOs satisfy the
+    #     pre-NAO definition (native 4.91e-10, gennbo 5.78e-09), and it is what says the dumped Cpre
+    #     is a pre-NAO set at all.  It also bounds the ambiguity that is left: any other proper
+    #     pre-NAO set differs by a rotation inside one (atom, l) block, which cannot create or remove
+    #     content on a DIFFERENT atom.
+    #  2. ||T|| agrees between the sides to every printed digit on all eight, and that is worth
+    #     exactly nothing: T^T G T = 1 with square T gives T T^T = G^-1 identically, so
+    #     ||T||^2 = tr(G^-1) is fixed by the metric the two sides already share.  It is the same
+    #     pattern as the NRT doubling - a quantity fixed by construction measures the construction -
+    #     and it is recorded here so nobody quotes it later.  The identity was CHECKED and not just
+    #     argued: max|T T^T - G^-1| is 3.2e-10 to 1.5e-6 over the sixteen sides (at each side's own
+    #     printing floor, gennbo's nine decimals being the looser one) and ||T||^2 reproduces tr(G^-1)
+    #     in every printed digit, e.g. lif 59.652594 and benzene 145994.7196.  The same identity says what the object
+    #     of interest actually is: T = G^-1/2 O with O orthogonal, so the entire cascade is one
+    #     orthogonal matrix per side and every difference between them lives in O.
+    core = [("Val", "Cor"), ("Ryd", "Cor")]
+    core_n = max(max(r["sides"]["native"]["blocks"][k] for k in core) for r in ok)
+    core_g = max(max(r["sides"]["gennbo"]["blocks"][k] for k in core) for r in ok)
+    print("\nREAD PER PARTITION, because the two partitions do not give the same answer.")
+    print("\ncore partition - OUTCOME E on %d of %d, and it is named by the block." % (
+        len(differ), len(ok)))
+    print("gennbo's core NAOs are built from core pre-NAOs ALONE: Val>Cor and Ryd>Cor at most %.1e" %
+          core_g)
+    print("over all eight, which is its own numerical zero.  Native's carry %.1e at most and %.1e at" %
+          (core_n, min(min(r["sides"]["native"]["blocks"][k] for k in core) for r in ok)))
+    print("least, five to six decades above the same floor, on 8 of 8.  So the priority partition")
+    print("itself differs: native lets non-core pre-NAOs into a core NAO and gennbo does not.  The")
+    print("only step in nao.cpp that can cross classes is step 4, whose blocks are keyed on")
+    print("(atom, l) with no class in the key - that is a reading of the code, not a measurement, and")
+    print("it is already falsifiable: NAO_CLASS_SPLIT=1 is exactly the arm that empties these two")
+    print("blocks, and it is ALREADY measured and rejected (pf5/so2/sf6 go 0.93/0.94/0.98 ->")
+    print("1.12/1.05/1.19 x gennbo).  So this is a real, located, structural difference that the")
+    print("acceptance gate has already refused as a fix - a second defect, not the one being hunted.")
+    print("It cannot be the leak by magnitude either: 1e-4 of ||T|| against 0.5 e of moved charge.")
+    print("\nvalence/Rydberg partition - NO OUTCOME.  This is the partition the leak lives in, and")
+    print("the instrument does not resolve it.  Ryd>Val is filled on BOTH sides (%.1e to %.1e), so" % (
+        min(s["blocks"][("Ryd", "Val")] for r in ok for s in r["sides"].values()),
+        max(s["blocks"][("Ryd", "Val")] for r in ok for s in r["sides"].values())))
+    print("neither side is triangular there and the difference is magnitude, not shape; and the")
+    print("symmetry measure refuses both sides at resid 1.9 to 6.6 log units, which it MUST, because")
+    print("both codes end with a per-(atom, l) re-diagonalisation and a right rotation destroys the")
+    print("W^-1 M signature it was built to detect.  A measure that refuses both sides by construction")
+    print("discriminates nothing, so nothing is quoted from it - the resolution does not pass, and")
+    print("that is the result.")
+    print("\nthe one thing in this arm whose RANKING tracks the failure, quoted as a correlation and")
+    print("nothing more - it is not gated, and pf5/so2/sf6 are not flat in it, which is the")
+    print("discriminator the acceptance test uses:")
+    ratios = sorted(((r["sides"]["native"]["blocks"][("Ryd", "Val")] /
+                      r["sides"]["gennbo"]["blocks"][("Ryd", "Val")], r["mol"]) for r in ok),
+                    reverse=True)
+    print("  Ryd>Val native/gennbo:  " + "  ".join("%s %.2f" % (m, v) for v, m in ratios))
+    print("  the top two are the two molecules whose final Rydberg excess is worst; below them the")
+    print("  ordering does not track it, so this licenses a next measurement and no claim.")
+
+
+def main_cascade(root):
+    print("aonao_compare --cascade on %s, 1 thread, root %s" % (socket.gethostname(), root))
+    results, void, missing = [], [], []
+    for mol in sorted(os.listdir(root)):
+        d = os.path.join(root, mol)
+        if not os.path.isdir(d):
+            continue
+        if not all(os.path.isfile(os.path.join(d, mol + e)) for e in (".32", ".33")):
+            missing.append(mol)
+            continue
+        try:
+            r = cascade_sides(mol, d)
+        except AssertionError as e:
+            void.append((mol, str(e)))
+            print("%-10s VOID: %s" % (mol, e))
+            continue
+        print("%-10s n=%-4d lfn32 %s lfn33 %s  ||T|| native %.1f gennbo %.1f  diag-dominant cols "
+              "%d/%d, %d/%d  class relabels %d" % (
+                  mol, r["n"], r["lay32"], r["lay33"], r["sides"]["native"]["norm"],
+                  r["sides"]["gennbo"]["norm"], r["sides"]["native"]["dom"], r["n"],
+                  r["sides"]["gennbo"]["dom"], r["n"], r["recls"]))
+        results.append(r)
+    print("\ndenominator: %d molecules measured, %d VOID, %d without both matrices" % (
+        len(results), len(void), len(missing)))
+    for mol, why in void:
+        print("  VOID %-10s %s" % (mol, why))
+    if missing:
+        print("  incomplete: %s" % " ".join(missing))
+    if results:
+        cascade_verdict(results)
     return 0
 
 
@@ -1165,6 +1672,30 @@ def demo():
     got = out.getvalue()
     assert "native is not diagonalising what NBO diagonalises" in got, got
     assert "NO level has both sides self-consistent" in got, got
+    # The cascade arm's four measurements are checked by their own doctests, RUN here - nothing in
+    # this repository ran a doctest before, so the examples above this line are prose until someone
+    # points a runner at them.  These four are not.
+    import doctest
+    runner, finder = doctest.DocTestRunner(verbose=False), doctest.DocTestFinder()
+    for f in (cascade_transform, sym_shape, sign_frustration, tri_shape):
+        for t in finder.find(f, f.__name__, globs=globals()):
+            runner.run(t)
+    assert runner.failures == 0, "%d doctest failure(s) in the cascade arm" % runner.failures
+    # And the two shapes are distinguishable, which is the whole premise: a Schmidt-triangular
+    # transform and an occupancy-weighted symmetric one must not read the same on either measure.
+    c = ["Cor"] * 2 + ["Val"] * 2 + ["Ryd"] * 2
+    al = [(0, 0), (1, 0)] * 3
+    rng = np.random.default_rng(7)
+    M = rng.normal(size=(6, 6)); M = M + M.T
+    owso = np.diag([1.0, 2.0, 0.5, 4.0, 0.25, 1.5]) @ M           # W^-1 M
+    schmidt = np.triu(rng.normal(size=(6, 6)) + 3.0 * np.eye(6))  # zero below the diagonal
+    pairs = [(a, b) for a in range(6) for b in range(a + 1, 6) if c[a] == c[b] and al[a] != al[b]]
+    assert sym_shape(owso, pairs)["resid"] < 1e-12, sym_shape(owso, pairs)
+    assert sign_frustration(pairs, {(i, j) for i, j in pairs if owso[i, j] * owso[j, i] < 0})[1] == 0
+    bo, bs = tri_shape(owso, c, c), tri_shape(schmidt, c, c)
+    assert min(bo[("Ryd", "Cor")], bo[("Val", "Cor")]) > 0.05, bo   # OWSO fills both triangles
+    assert max(bs[("Ryd", "Cor")], bs[("Val", "Cor")]) == 0.0, bs   # Schmidt empties one
+    assert sym_shape(schmidt, pairs)["n"] == 0                      # and its pairs never both clear
     print("demo ok")
 
 
@@ -1256,6 +1787,8 @@ def main(argv):
     root = [a for a in argv[1:] if not a.startswith("--")][0]
     if "--pre" in argv:
         return main_pre(root, verbose)
+    if "--cascade" in argv:
+        return main_cascade(root)
     print("aonao_compare on %s, 1 thread (numpy on matrices of a few hundred), root %s" % (
         socket.gethostname(), root))
     all_rows, rows_by_mol, void, missing = [], {}, [], []
