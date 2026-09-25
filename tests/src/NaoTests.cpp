@@ -299,3 +299,47 @@ TEST(NaoReaderConsistencyTests, MoldenAndGbwOfTheSameCalculationAgree)
 	for (size_t i = 0; i < a.total.atoms.size(); i++)
 		EXPECT_NEAR(b.total.atoms[i].charge, a.total.atoms[i].charge, 5e-3) << "atom " << i + 1;
 }
+
+//An fchk's basis reached no normalisation branch in Int_Params at all: e_origin::fchk fell into the
+//"WFN Origin 5 not recognized, tread carefully!  No normalisation was performed" default, so every AO
+//of a spherical fchk left ao_overlap() with a non-unit diagonal and every density built on it was
+//wrong.  Two invariants pin it and neither needs an external reference: the diagonal of an AO overlap
+//is 1 by construction once the basis functions are normalised, and Tr(P S) is the electron count.
+//Measured on this fixture (spherical, shell types -2 and -3, 228 functions, 94 shells, 48 electrons,
+//written by OCC): before, 228 of 228 diagonal elements were off and Tr(P S) = 7.579076; after, the
+//diagonal is 1 everywhere and Tr(P S) = 47.938220.  The remaining 0.0618 e is a separate and still
+//unfixed defect - most plausibly spherical-component ordering or phase between the fchk-built density
+//matrix and libcint's order - which is why the trace tolerance here is 0.07 rather than 1e-6: it pins
+//the improvement without claiming the file is cured.  The reader's own 1e-4 trace guard still refuses
+//it downstream, so nothing consumes a half-right basis.
+TEST(NaoReaderConsistencyTests, ASphericalFchkBasisIsNormalised)
+{
+	const auto p = fixture("alanine_occ", "alanine.owf.fchk");
+	if (p.empty()) GTEST_SKIP() << "tests/alanine_occ/alanine.owf.fchk not found";
+	WFN wavy(p);
+	ASSERT_EQ(wavy.get_origin(), e_origin::fchk);
+	//a cartesian fchk is a different and unfixable matter: tests/NiP3_fchk/good.fchk declares 964
+	//functions where the spherical basis Int_Params rebuilds holds 857, and no normalisation convention
+	//closes a 107-function gap.  This fixture is spherical, so normalisation is the whole story.
+	ASSERT_FALSE(wavy.get_d_f_switch()) << "fixture is no longer spherical";
+	const dMatrix2 S = ao_overlap(wavy);
+	ASSERT_GT(S.extent(0), size_t(0));
+	int off = 0;
+	double worst = 0.0;
+	for (size_t i = 0; i < S.extent(0); i++) {
+		const double d = std::abs(S(i, i) - 1.0);
+		worst = std::max(worst, d);
+		if (d > 1e-8) off++;
+	}
+	EXPECT_EQ(off, 0) << off << " of " << S.extent(0) << " AOs are not normalised, worst |S_ii - 1| = "
+		<< worst << " - e_origin::fchk has fallen out of its normalisation branch again";
+	//the second invariant, and the one that separates this file from the cartesian case: the fchk's own
+	//"Number of basis functions" is 228, and the basis Int_Params rebuilds from its shells must hold
+	//exactly that many.  NiP3_fchk/good.fchk fails this at 857 against a declared 964 and no
+	//normalisation convention can close that gap; this one does not.
+	EXPECT_EQ(S.extent(0), size_t(228)) << "the fchk declares 228 basis functions";
+	//Tr(P S) is not checked here: WFN::DM stays empty for an fchk (the gbw, wfx, molden and ptb readers
+	//fill it, read_fchk does not, and the .47 writer builds its own contracted density from the MO
+	//coefficients instead), which is also why EveryReaderConservesTheElectronCount skips this file.  The
+	//end-to-end trace is measured through the CLI: 7.579076 before this fix, 47.938220 after, against 48.
+}

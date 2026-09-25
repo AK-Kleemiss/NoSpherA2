@@ -139,7 +139,15 @@ void Int_Params::collect_basis_data()
 		//and not a second normalisation.  Without this branch a molden fell through to the
 		//"tread carefully" default, the overlap had no unit diagonal, and every analysis that pairs
 		//Int_Params with the density matrix (NPA/NBO, RGBI, Mulliken, the density fit) inherited it.
-		if (wfn_origin == e_origin::gbw || wfn_origin == e_origin::wfx || wfn_origin == e_origin::molden)
+		//An fchk belongs in the same branch, and reached none at all until now: read_fchk divides the
+		//file's contraction coefficients by the contraction norm and multiplies in the primitive norm
+		//of x^l, so what lands on the atoms multiplies bare x^l exp(-a r^2) exactly as a gbw's do.
+		//Measured on tests/alanine_occ/alanine.owf.fchk (spherical, 228 functions, 48 electrons):
+		//without this branch all 228 AOs had a non-unit overlap diagonal and Tr(P*S) came out at
+		//7.579076 electrons; with it the diagonal is 1 everywhere and Tr(P*S) is 47.938220. The
+		//alternative - normalize_gto(), as for ptb - gives 42.091936 and is not the convention.
+		if (wfn_origin == e_origin::gbw || wfn_origin == e_origin::wfx || wfn_origin == e_origin::molden
+			|| wfn_origin == e_origin::fchk)
 		{
 			for (int i = 0; i < coefficients.size(); i++)
 			{
