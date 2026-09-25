@@ -154,3 +154,38 @@ TEST(NboNativeTests, AnArchiveThatDoesNotDescribeTheWavefunctionIsRefusedByName)
 	std::error_code ec;
 	std::filesystem::remove(out, ec);
 }
+
+//The .47 writer's refusal on tests/alanine_occ/alanine.owf.fchk blames "the wrong normalisation
+//convention", and for that file it is right: its shells are spherical, 228 declared and 228 built,
+//and the gbw conversion factor brings Tr(P*S) from 7.579 to 47.938 of 48. For
+//tests/NiP3_fchk/good.fchk the message is misleading. That file declares 964 basis functions because
+//its 44 d and 21 f shells are cartesian; the libcint basis Int_Params builds counts 2l+1 per shell
+//and holds 857. No constant can map one space onto the other - five candidate conventions were
+//measured against Tr(P*S) before the counts were compared, and the best of them still left 367 AOs
+//with a non-unit overlap diagonal, which is 220 spherical d plus 147 spherical f exactly.
+//
+//So the reader says it, and this pins both directions: the cartesian file must name its two counts,
+//and the spherical file must stay silent, because a warning that fires on every fchk is a warning
+//nobody reads. Made red on purpose by asserting 857 on the spherical file: it fails with the
+//reader's silence printed beside it.
+TEST(NboNativeTests, ACartesianFchkNamesTheTwoCountsAndASphericalOneStaysQuiet)
+{
+	const auto cartesian = nos_test_repo_root() / "tests" / "NiP3_fchk" / "good.fchk";
+	const auto spherical = fchk_fixture();
+	if (!std::filesystem::exists(cartesian) || spherical.empty())
+		GTEST_SKIP() << "tests/NiP3_fchk/good.fchk or tests/alanine_occ/alanine.owf.fchk not found";
+
+	std::ostringstream loud;
+	WFN cart;
+	ASSERT_TRUE(cart.read_fchk(cartesian, loud, false));
+	const std::string said = loud.str();
+	EXPECT_NE(said.find("964 basis functions"), std::string::npos) << said;
+	EXPECT_NE(said.find("857 spherical functions"), std::string::npos) << said;
+	EXPECT_NE(said.find("cartesian"), std::string::npos) << said;
+
+	std::ostringstream quiet;
+	WFN sph;
+	ASSERT_TRUE(sph.read_fchk(spherical, quiet, false));
+	EXPECT_EQ(quiet.str().find("WARNING"), std::string::npos)
+		<< "a spherical fchk needs no warning, and got: " << quiet.str();
+}

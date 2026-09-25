@@ -2883,6 +2883,33 @@ bool WFN::read_fchk(const std::filesystem::path &filename, std::ostream &log, co
 	}
 	if (debug)
 		log << "I read the basis of " << ncen << " atoms successfully" << std::endl;
+	//An fchk may declare its d/f/g shells cartesian - a positive shell-type code - and the loop above
+	//reads them as such, so everything driven by the primitives (cubes, the density fit, .tsc) is in
+	//the AO space the file used. Int_Params is not: it rebuilds a libcint basis from the contracted
+	//shells pushed onto the atoms, which carry only l, and counts 2l+1 functions per shell
+	//unconditionally. For a cartesian fchk every analysis that pairs Int_Params with the density
+	//matrix - NPA/NBO, RGBI, Mulliken - then works in an AO space the file never used, and no
+	//normalisation constant can repair that: the space itself is the wrong one.
+	//tests/NiP3_fchk/good.fchk declares 964 functions where that spherical basis holds 857, and the
+	//107 missing ones are its 44 cartesian d and 21 cartesian f shells - which is why the .47 writer
+	//reports 367 of 857 AOs with a non-unit overlap diagonal: 220 d plus 147 f, exactly. Five
+	//normalisation conventions were measured against Tr(P*S) on this file before the two counts were
+	//compared, and none of them could have worked. Say it at read time, where both numbers are known.
+	int spherical_nbf = 0, cartesian_shells = 0;
+	for (size_t a = 0; a < shell_types.size(); a++)
+	{
+		const int l = abs(shell_types[a]);
+		spherical_nbf += constants::n_spher(l);
+		if (shell_types[a] > 0 && l > 1)
+			cartesian_shells++;
+	}
+	if (spherical_nbf != nbas)
+		log << "WARNING: this fchk declares " << nbas << " basis functions and " << cartesian_shells
+			<< " of its shells are cartesian, so the basis kept for integrals - " << spherical_nbf
+			<< " spherical functions - is not the space the file's MO coefficients are written in."
+			<< " Cubes, the density fit and .tsc read the primitives and are unaffected; NPA/NBO, RGBI"
+			<< " and Mulliken would not be, so use the .gbw or .molden of the same calculation for those."
+			<< std::endl;
 	nex = 0;
 	for (int i = 0; i < 2; i++) {
 		if (MOocc[i].size() == 0)
