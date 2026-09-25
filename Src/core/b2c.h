@@ -128,6 +128,13 @@ bool beta_spheres_enabled();
 //ways and compares basin by basin, which is what puts a number on that cost.
 void basin_adaptive_step_set_enabled(const bool on);
 bool basin_adaptive_step_enabled();
+//What the grown step spent, since the last reset: steps taken, longer steps proposed, proposals
+//turned back by the angle test, proposals dropped again because the field stopped rising. Only a
+//run with the growth enabled moves them. A fallback is by definition the fate of a proposal, so
+//fell <= proposed is an invariant of the code and not of the physics - it is the one that broke,
+//and it broke without moving a single population, which is why it is asserted rather than trusted.
+void basin_adaptive_step_counters(long long &steps, long long &proposed, long long &turned_back, long long &fell_back);
+void basin_adaptive_step_counters_reset();
 //-basin_timing: the wall clock of every stage of the analysis, which is the only way to say
 //where the time of a 45-atom molecule actually sits. Off by default, and it has to be: the
 //golden files are captures of this console log and no timing line ever reproduces.

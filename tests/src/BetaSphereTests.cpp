@@ -149,6 +149,56 @@ TEST(AdaptiveStep, AgreesWithTheFloorStepOnHydroxide)
 }
 
 //The fixture with three separatrices meeting at an angle, which is where a long step would cross
+//A performance bug that moves no number. The first version of the fallback tested `mult > 1.0`,
+//but mult is raised at the END of a step, so one iteration later it says "the next step may be
+//grown" and was read as "the last one was". UH6's ELI-D then threw away 2 147 188 perfectly good
+//floor steps against 222 797 grown proposals - 36 % of all its steps, each costing the gradient it
+//was tested with - and every basin population came out identical to four decimals. Nothing in the
+//suite could see it, and nothing did. What sees it is the counter, because a fallback is the fate
+//of a proposal and cannot outnumber proposals.
+//
+//It has to be the ELI-D field, and that is not incidental: QTAIM fell back 0 times out of 306 857
+//proposals on UH6, so a density version of this test asserts an inequality nothing stresses. ELI-D
+//is where it breaks because its maxima are broad and flat - stall_reach is 1e30 for ELI-D against
+//1.0 for QTAIM - so a trajectory routinely stops rising while still far from an attractor, which is
+//the branch the blame lived on.
+TEST(AdaptiveStep, NeverFallsBackMoreOftenThanItProposesOnELID)
+{
+	const std::filesystem::path wfn = nos_test_repo_root() / "tests" / "ELI_heavy" / "uh6.gbw";
+	if (!std::filesystem::exists(wfn)) GTEST_SKIP() << "fixture missing: " << wfn.string();
+	const WFN wavy(wfn);
+	const cube rho = seed_cube(wavy, 0.3, 2.5);
+
+	//ELI-D on the same grid, and its own maxima: the walk below climbs ELI-D, so its attractors
+	//have to be ELI-D's. Taking the density's would put the targets in the wrong places and the
+	//counters would then be measuring a configuration the code is never asked for.
+	cube eli(rho.get_sizes(), 0, true);
+	eli.set_origin(0, rho.get_origin(0)); eli.set_origin(1, rho.get_origin(1)); eli.set_origin(2, rho.get_origin(2));
+	for (int k = 0; k < 3; k++) eli.set_vector(k, k, rho.get_vector(k, k));
+	eli.calc_dv();
+	std::ostringstream log;
+	Calc_Eli(eli, wavy, 3.0, log, false);
+	const std::vector<d4> maxima = topological_cube_analysis(&eli, wavy.get_atoms(), false, false, 0.0, 1e-12, -1.0, 5e-3, nullptr, &wavy).second;
+	ASSERT_GT(maxima.size(), 3u) << "no ELI-D attractors, so nothing is climbed";
+
+	adaptive_guard guard;
+	basin_adaptive_step_set_enabled(true);
+	basin_adaptive_step_counters_reset();
+	vec volumes;
+	double outside = 0.0;
+	integrate_basins_on_atomic_grids(nullptr, nullptr, maxima, wavy, 3, true, volumes, outside);
+
+	long long steps = 0, proposed = 0, turned = 0, fell = 0;
+	basin_adaptive_step_counters(steps, proposed, turned, fell);
+	basin_adaptive_step_counters_reset();
+	ASSERT_GT(steps, 0) << "the growth was enabled and no step was counted, so this asserts nothing";
+	ASSERT_GT(proposed, 0) << "no longer step was ever proposed, so the counters cannot be compared";
+	EXPECT_LE(fell, proposed)
+		<< fell << " steps were reverted as grown against " << proposed
+		<< " grown proposals, so the fallback is blaming steps that ran at the floor";
+	EXPECT_LE(turned + fell, proposed) << "more proposals were rejected than were ever made";
+}
+
 TEST(AdaptiveStep, AgreesWithTheFloorStepOnNH3Li)
 {
 	const std::filesystem::path wfn = nos_test_repo_root() / "tests" / "RGBI_groups" / "nh3li.gbw";

@@ -1483,6 +1483,25 @@ static const double g_adp_reach = 0.25;  //fraction of the distance to the neare
 //it puts 8e-4 electrons outside every basin that the floor step accounts for. That is inside the
 //tolerance the equivalence test asserts and it is still a changed number, so it is -adaptive_step.
 static bool g_adaptive_step = false;
+//What the grown step actually spends. A proposal that fails - the field turned too far, or the
+//value stopped rising - costs the midpoint gradient it was tested with and then retakes the step
+//at the floor, so a walk whose proposals mostly fail pays for the whole machinery and keeps none
+//of it. That is the suspected reason ELI-D gains 5-7 % where QTAIM gains 29-47 %, and UH6's ELI-D
+//loses 15 %. Counted only under -adaptive_step and printed under -basin_timing; relaxed because
+//the ratio is the answer, not the last digit.
+static std::atomic<long long> g_adp_steps{ 0 }, g_adp_tries{ 0 }, g_adp_turn{ 0 }, g_adp_fall{ 0 };
+static inline void adp_count(std::atomic<long long> &c) { c.fetch_add(1, std::memory_order_relaxed); }
+void basin_adaptive_step_counters(long long &steps, long long &proposed, long long &turned_back, long long &fell_back)
+{
+	steps = g_adp_steps.load();
+	proposed = g_adp_tries.load();
+	turned_back = g_adp_turn.load();
+	fell_back = g_adp_fall.load();
+}
+void basin_adaptive_step_counters_reset()
+{
+	g_adp_steps = 0; g_adp_tries = 0; g_adp_turn = 0; g_adp_fall = 0;
+}
 void basin_adaptive_step_set_enabled(const bool on) { g_adaptive_step = on; }
 bool basin_adaptive_step_enabled() { return g_adaptive_step; }
 static double g_basin_step_scale = 1.0;
@@ -1644,6 +1663,10 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 	//With a value pointer the density rides along on the gradient's own orbital pass, which is
 	//what the climb wants: rho and grad at the same point used to be two passes over every
 	//primitive, and the analytic field is where the streaming basins spend their time.
+	//Do not reach for an occupied-MO bound here: properties.cpp calls delete_unoccupied_MOs()
+	//before any of this runs, so wavy holds occupied orbitals only and the loop length is already
+	//minimal. Measured, not assumed - a bound was built and its own diagnostic reported 53 of 53,
+	//91 of 91 and 49 of 49 MOs occupied on ZP2, sucrose and UH6.
 	auto gradient = [&](const d3 &p, d3 &g, double *val = nullptr) {
 		if (!eli_field) {
 			if (field) { field->grad(p, g); if (val) *val = field->rho(p); }
@@ -1829,10 +1852,15 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 		//field curves this is the old walk, evaluation for evaluation; the saving is the long
 		//straight run in from the tail and through the outer valence, which is where the steps are.
 		double mult = 1.0;
+		//Was the step that reached r actually longer than the floor? mult is raised at the end of a
+		//step, so mult > 1 at the top of the next iteration says "the next step may be grown", not
+		//"the last one was" - and only the latter is grounds for throwing a point away.
+		bool grown_last = false;
 		d3 r_prev = p;
 		const bool grow = basin_adaptive_step_enabled();
 		double value_prev = -1.0;
 		for (int s = 0; s < 2000; s++) {
+			if (grow) adp_count(g_adp_steps);
 			const int m = at_maximum(r);
 			if (m) return m;
 			const double floor_step = step_at(r);
@@ -1843,8 +1871,12 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 				here = value_and_gradient(r, g);
 				if (here <= last_value) {
 					//A grown step can cross a ridge the floor step would have followed round, so
-					//the step is blamed before the path is: at the floor there is nothing to blame
-					if (mult > 1.0) { r = r_prev; last_value = value_prev; mult = 1.0; continue; }
+					//the step is blamed before the path is: at the floor there is nothing to blame.
+					//grown_last, not mult: a trajectory that stops rising one step after mult was
+					//raised got there on a floor step, and reverting that step is not a retry - it
+					//is the floor path's own stall, moved one step back and charged a gradient.
+					if (grown_last) { adp_count(g_adp_fall); r = r_prev; last_value = value_prev; mult = 1.0; grown_last = false; continue; }
+					mult = 1.0;
 					const int n = stalled(r);
 					if (n) return n;
 					break;
@@ -1874,19 +1906,21 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 			bool stepped = false;
 			for (int attempt = 0; attempt < 2 && !stepped; attempt++) {
 				sl = mult > 1.0 ? std::min(floor_step * mult, std::max(floor_step, reach_limit(r))) : floor_step;
+				if (mult > 1.0) adp_count(g_adp_tries);
 				d3 mid;
 				for (int k = 0; k < 3; k++) mid[k] = r[k] + 0.5 * sl * g0[k] / gn0;
 				gradient(mid, g);
 				gn = std::sqrt(g[0] * g[0] + g[1] * g[1] + g[2] * g[2]);
 				if (gn < 1e-12) break;
 				cosine = (g[0] * dir[0] + g[1] * dir[1] + g[2] * dir[2]) / gn;
-				if (mult > 1.0 && cosine < g_adp_keep) { mult = 1.0; continue; }
+				if (mult > 1.0 && cosine < g_adp_keep) { adp_count(g_adp_turn); mult = 1.0; continue; }
 				stepped = true;
 			}
 			if (!stepped) break;
 			r_prev = r;
 			value_prev = last_value;
 			last_value = here;
+			grown_last = sl > floor_step;
 			for (int k = 0; k < 3; k++) r[k] += sl * g[k] / gn;
 			if (cosine > g_adp_grow && mult < g_adp_cap && grow) mult *= 2.0;
 			if (!streaming) {
@@ -2092,6 +2126,15 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 			else outside += ncore;
 		}
 	T.lap(fieldname + "point loop");
+	if (g_basin_timing && g_adaptive_step) {
+		const long long st = g_adp_steps.exchange(0), tr = g_adp_tries.exchange(0);
+		const long long tu = g_adp_turn.exchange(0), fa = g_adp_fall.exchange(0);
+		std::cout << "  [timing] " << fieldname << "grown step: " << st << " steps, " << tr
+			<< " proposals, " << tu << " turned back, " << fa << " fell back, "
+			<< std::fixed << std::setprecision(1)
+			<< (tr ? 100.0 * static_cast<double>(tu + fa) / static_cast<double>(tr) : 0.0)
+			<< " % of proposals wasted" << std::endl;
+	}
 	std::cout << "Quadrature points sent along the field: " << boundary_points << ", left the grid: " << lost << std::endl;
 	return pop;
 }
