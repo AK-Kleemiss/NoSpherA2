@@ -12,6 +12,7 @@
 #include "constants.h"
 #include "wfn_class.h"
 #include "basis_set.h"
+#include "citations.h"
 #include <filesystem>
 #include <future>
 
@@ -33,10 +34,24 @@ SALTEDPredictor::SALTEDPredictor(WFN wavy_in, options& opt_in)
 		return;
 	}
 
-	config.salted_filename = find_first_salted_file(opt_in.salted_model_dir);
-	if (config.salted_filename.empty()) {
-		std::cout << "No SALTED binary file found in directory: " << opt_in.salted_model_dir << std::endl;
-		exit(1);
+	if (opt_in.salted_model_dirs.size() > 1) {
+		build_merged(wavy_in, opt_in);
+		return;
+	}
+
+	// A model may be named by its own file: two models often live in the same
+	// folder, and then the directory alone cannot say which one is meant.
+	if (std::filesystem::is_regular_file(_path)) {
+		SALTED_DIR = _path.parent_path();
+		config.salted_filename = _path.filename();
+		_path = SALTED_DIR;
+	}
+	else {
+		config.salted_filename = find_first_salted_file(opt_in.salted_model_dir);
+		if (config.salted_filename.empty()) {
+			std::cout << "No SALTED binary file found in directory: " << opt_in.salted_model_dir << std::endl;
+			exit(1);
+		}
 	}
 
 	wavy = wavy_in;
@@ -48,6 +63,30 @@ SALTEDPredictor::SALTEDPredictor(WFN wavy_in, options& opt_in)
 	const std::vector<char> use_thakkar = SALTED_Utils::filter_input(wavy, opt_in, config);
 	if (!use_thakkar.empty()) {
 		spherical_fill_used = true;
+		estimate_fill_charges(wavy_in, use_thakkar, opt_in);
+	}
+
+	//wavy.write_xyz("temp_rascaline.xyz"); //Also this
+	//config.predict_filename = "temp_rascaline.xyz";
+
+	natoms = wavy.get_ncen();
+
+	if (wavy.get_nmo() != 0)
+		wavy.clear_MOs(); // Delete unneccesarry MOs, since we are predicting anyway.
+
+	wavy.delete_basis_set();
+	if (file.basis_set_defined()) {
+		model_basis = file.read_basis_set();
+		// SALTED predicts one coefficient per DECONTRACTED auxiliary function, so the
+		// basis has to be loaded that way whatever the default of the day is.
+		load_basis_into_WFN(wavy, model_basis, true);
+		bbasis_set_loaded = true;
+	}
+}
+
+void SALTEDPredictor::estimate_fill_charges(const WFN& wavy_in, const std::vector<char>& use_thakkar, options& opt_in)
+{
+	{
 		// The filled atoms get a NEUTRAL Thakkar density, which fixes how many
 		// electrons they carry. Estimate what they should really carry, so the
 		// size of that assumption can be reported rather than hidden. EEQ gives
@@ -104,25 +143,193 @@ SALTEDPredictor::SALTEDPredictor(WFN wavy_in, options& opt_in)
 			filled_eeq_charge = std::numeric_limits<double>::quiet_NaN();
 		}
 	}
-
-	//wavy.write_xyz("temp_rascaline.xyz"); //Also this
-	//config.predict_filename = "temp_rascaline.xyz";
-
-	natoms = wavy.get_ncen();
-
-	if (wavy.get_nmo() != 0)
-		wavy.clear_MOs(); // Delete unneccesarry MOs, since we are predicting anyway.
-
-	wavy.delete_basis_set();
-	if (file.basis_set_defined()) {
-		load_basis_into_WFN(wavy, file.read_basis_set());
-		bbasis_set_loaded = true;
-	}
 }
 
 const std::string SALTEDPredictor::get_dfbasis_name() const
 {
 	return config.dfbasis;
+}
+
+std::shared_ptr<BasisSet> SALTEDPredictor::get_model_basis() const
+{
+	return model_basis ? model_basis : BasisSetLibrary::get_basis_set(config.dfbasis);
+}
+
+// Match a predictor's (possibly filtered) structure back onto the full one. The
+// filter only erases atoms and leaves the rest in order and untouched, so one
+// forward walk with an exact comparison is enough.
+static ivec map_atoms(const WFN& full, const WFN& part)
+{
+	ivec idx(full.get_ncen(), -1);
+	int p = 0;
+	for (int a = 0; a < full.get_ncen() && p < part.get_ncen(); a++)
+	{
+		if (full.get_atom_charge(a) != part.get_atom_charge(p)) continue;
+		bool same = true;
+		for (int ax = 0; ax < 3 && same; ax++)
+			same = (full.get_atom_coordinate(a, ax) == part.get_atom_coordinate(p, ax));
+		if (same) idx[a] = p++;
+	}
+	return idx;
+}
+
+// Where each atom's coefficients start in a wavefunction's auxiliary basis - the
+// same table the density evaluation indexes with. One entry past the end.
+static ivec coef_offsets(const WFN& w)
+{
+	const aux_density_table t(*w.get_atoms_ptr());
+	ivec off(w.get_ncen() + 1, t.n_coef);
+	for (int a = 0; a < w.get_ncen(); a++) off[a] = t.coef_off[t.sh_start[a]];
+	return off;
+}
+
+void SALTEDPredictor::build_merged(const WFN& wavy_in, options& opt_in)
+{
+	// One prediction per model, each of them seeing the whole structure: an atom
+	// another model owns is still a neighbour of the ones this model predicts.
+	// The blocks are per atom and each carries its own model's auxiliary basis,
+	// so putting them side by side is a concatenation, not a mixture.
+	std::cout << "Combining " << opt_in.salted_model_dirs.size()
+			  << " SALTED models. Each of them first reports what IT alone cannot predict;"
+			  << " the assignment that counts is printed below." << std::endl;
+	for (const auto& model : opt_in.salted_model_dirs)
+	{
+		options sub_opt = opt_in;               // its own spherical-fill bookkeeping
+		sub_opt.salted_model_dirs.clear();
+		sub_opt.salted_model_dir = model;
+		sub_opt.needs_Thakkar_fill = false;
+		sub_opt.spherical_fill_charges.clear();
+		auto sub = std::make_unique<SALTEDPredictor>(wavy_in, sub_opt);
+		sub->skip_charge_constraint = true;     // the stitched density is scaled once, at the end
+		if (!sub->basis_set_loaded())
+			load_basis_into_WFN(sub->wavy, sub->get_model_basis(), true);
+		sub_models.push_back(std::move(sub));
+	}
+
+	// An element goes to the first model that predicts it, and all its atoms with
+	// it: the auxiliary basis lives per element, so two models cannot share one.
+	std::vector<ivec> sub_index;
+	for (const auto& sub : sub_models) sub_index.push_back(map_atoms(wavy_in, sub->wavy));
+	ivec element_model(118, -1);
+	for (int a = 0; a < wavy_in.get_ncen(); a++)
+	{
+		const int Z = wavy_in.get_atom_charge(a) - 1;
+		if (element_model[Z] >= 0) continue;
+		for (int m = 0; m < (int)sub_models.size(); m++)
+			if (sub_index[m][a] >= 0) { element_model[Z] = m; break; }
+	}
+
+	wavy = wavy_in;
+	atom_model.assign(wavy_in.get_ncen(), -1);
+	atom_in_model.assign(wavy_in.get_ncen(), -1);
+	for (int a = 0; a < wavy_in.get_ncen(); a++)
+	{
+		const int m = element_model[wavy_in.get_atom_charge(a) - 1];
+		// A model that dropped this atom for having no environment cannot predict
+		// it either, however well it knows the element.
+		if (m < 0 || sub_index[m][a] < 0) continue;
+		atom_model[a] = m;
+		atom_in_model[a] = sub_index[m][a];
+	}
+
+	for (int m = 0; m < (int)sub_models.size(); m++)
+	{
+		svec elements;
+		int n = 0;
+		for (int Z = 0; Z < 118; Z++)
+			if (element_model[Z] == m) elements.push_back(constants::atnr2letter(Z + 1));
+		for (int a = 0; a < wavy_in.get_ncen(); a++) if (atom_model[a] == m) n++;
+		std::cout << "Model " << sub_models[m]->get_salted_filename() << " predicts " << n << " atom(s): ";
+		for (const auto& e : elements) std::cout << e << " ";
+		std::cout << std::endl;
+	}
+
+	// Only an atom that no model handles goes to the spherical fill.
+	std::vector<char> use_thakkar(wavy_in.get_ncen(), 0);
+	int n_uncovered = 0;
+	for (int a = 0; a < wavy_in.get_ncen(); a++)
+		if (atom_model[a] < 0) { use_thakkar[a] = 1; ++n_uncovered; }
+	if (n_uncovered > 0)
+	{
+		std::cout << "No model predicts " << n_uncovered
+			<< " atom(s); they are filled with spherical Thakkar densities." << std::endl;
+		spherical_fill_used = true;
+		opt_in.needs_Thakkar_fill = true;
+		opt_in.spherical_fill_charges.clear();
+		estimate_fill_charges(wavy_in, use_thakkar, opt_in);
+		for (int a = wavy_in.get_ncen() - 1; a >= 0; a--)
+			if (use_thakkar[a])
+			{
+				wavy.erase_atom(a);
+				atom_model.erase(atom_model.begin() + a);
+				atom_in_model.erase(atom_in_model.begin() + a);
+			}
+	}
+
+	natoms = wavy.get_ncen();
+	if (wavy.get_nmo() != 0) wavy.clear_MOs();
+	wavy.delete_basis_set();
+
+	// Each element keeps the basis of the model that predicts it; anything else
+	// would read that model's coefficients with the wrong radial functions.
+	auto merged = std::make_shared<BasisSet>();
+	std::string name;
+	for (int Z = 0; Z < 118; Z++)
+	{
+		const int m = element_model[Z];
+		if (m < 0) continue;
+		const std::span<const SimplePrimitive> prims = (*sub_models[m]->get_model_basis())[Z];
+		if (prims.empty()) continue;
+		merged->set_count_for_element(Z, (int)prims.size());
+		for (const auto& p : prims) merged->add_owned_primitive(p);
+	}
+	for (const auto& sub : sub_models)
+		name += (name.empty() ? "" : "_plus_") + sub->get_dfbasis_name();
+	merged->set_name(name);
+	load_basis_into_WFN(wavy, merged, true);
+	model_basis = merged;
+	bbasis_set_loaded = true;
+	config.dfbasis = name;
+	for (const auto& sub : sub_models)
+		config.salted_filename += (config.salted_filename.empty() ? "" : "+")
+			+ sub->get_salted_filename().string();
+}
+
+vec SALTEDPredictor::merge_predictions()
+{
+	std::vector<vec> parts;
+	std::vector<ivec> offsets;
+	for (auto& sub : sub_models)
+	{
+		parts.push_back(sub->gen_SALTED_densities());
+		offsets.push_back(coef_offsets(sub->wavy));
+		err_checkf(parts.back().size() == (size_t)offsets.back().back(),
+			"Model " + sub_models[parts.size() - 1]->get_salted_filename().string() + " predicted "
+			+ std::to_string(parts.back().size()) + " coefficients for a basis of "
+			+ std::to_string(offsets.back().back()) + " - model and basis do not belong together", std::cout);
+	}
+
+	vec coefs;
+	for (int a = 0; a < wavy.get_ncen(); a++)
+	{
+		const int m = atom_model[a], p = atom_in_model[a];
+		err_checkf(offsets[m][p + 1] <= (int)parts[m].size(),
+			"Predicted coefficients are shorter than the basis of " + sub_models[m]->get_salted_filename().string(), std::cout);
+		coefs.insert(coefs.end(), parts[m].begin() + offsets[m][p], parts[m].begin() + offsets[m][p + 1]);
+	}
+	const ivec merged_offsets = coef_offsets(wavy);
+	err_checkf(coefs.size() == (size_t)merged_offsets.back(),
+		"Stitched coefficients do not fit the combined basis", std::cout);
+
+	// Each model only constrained its own share, which is meaningless on its own;
+	// the electron count belongs to the whole density.
+	bool wanted = force_charge_constraint;
+	for (const auto& sub : sub_models) wanted = wanted || sub->wants_charge_constraint();
+	if (wanted)
+		apply_charge_constraint(wavy.get_atoms(), coefs, wavy.get_charge(),
+								spherical_fill_used, n_filled,
+								filled_eeq_charge, applied_fill_charge, std::cout);
+	return coefs;
 }
 
 void calculateConjugate(SALTEDDescriptors& v2)
@@ -542,6 +749,47 @@ vec SALTEDPredictor::predict()
 		}
 	}
 
+	// A model carrying a BASIS block that does not describe what it predicts is
+	// broken; name the species that disagrees instead of failing later on a
+	// total count that says nothing about where it went wrong.
+	if (bbasis_set_loaded)
+	{
+		const aux_density_table t(*wavy.get_atoms_ptr());
+		if (Tsize != t.n_coef)
+		{
+			std::cout << "The model predicts " << Tsize << " coefficients, the basis in the model file holds "
+					  << t.n_coef << ":" << std::endl;
+			std::unordered_set<std::string> reported;
+			for (int iat = 0; iat < natoms; iat++)
+			{
+				const std::string& spe = atomic_symbols[iat];
+				if (!reported.insert(spe).second) continue;
+				int model_size = 0;
+				for (int l = 0; l < lmax[spe] + 1; l++)
+					model_size += nmax[spe + to_string(l)] * (2 * l + 1);
+				const int basis_size = (iat + 1 < natoms ? t.coef_off[t.sh_start[iat + 1]] : t.n_coef)
+									 - t.coef_off[t.sh_start[iat]];
+				std::cout << "   " << spe << ": predicted " << model_size << ", basis " << basis_size
+						  << (model_size == basis_size ? "" : "   <-- mismatch") << std::endl;
+				if (model_size == basis_size) continue;
+				// Say which angular momentum is short, which is what has to be fixed
+				// in the model file - a total count alone does not point anywhere.
+				ivec basis_l;
+				const int sh1 = (iat + 1 < natoms ? t.sh_start[iat + 1] : t.n_sh);
+				for (int s = t.sh_start[iat]; s < sh1; s++)
+				{
+					if ((int)basis_l.size() <= t.sh_l[s]) basis_l.resize(t.sh_l[s] + 1, 0);
+					basis_l[t.sh_l[s]]++;
+				}
+				for (int l = 0; l <= std::max(lmax[spe], (int)basis_l.size() - 1); l++)
+					std::cout << "      l = " << l << ": model "
+							  << (l <= lmax[spe] ? nmax[spe + to_string(l)] : 0) << " shells, basis "
+							  << (l < (int)basis_l.size() ? basis_l[l] : 0) << " shells" << std::endl;
+			}
+			err_checkf(false, "SALTED model and the basis set in its file do not belong together", std::cout);
+		}
+	}
+
 	vec Av_coeffs(Tsize, 0.0);
 
 	// fill vector of predictions
@@ -599,9 +847,28 @@ vec SALTEDPredictor::predict()
 	return pred_coefs;
 }
 
+bool SALTEDPredictor::wants_charge_constraint() const
+{
+	if (force_charge_constraint) return true;
+	if (!model_file || !model_file->charge_constraint_defined()) return false;
+	const auto entries = model_file->read_charge_constraint();
+	const auto mode_it = entries.find("MODE");
+	const int mode = (mode_it != entries.end() && !mode_it->second.empty())
+						 ? static_cast<int>(std::lround(mode_it->second[0]))
+						 : 0;
+	if (mode == 1) return true;
+	if (mode != 0)
+		std::cout << "Unknown charge-constraint mode " << mode
+				  << " in the model file; leaving the density alone." << std::endl;
+	return false;
+}
+
 vec SALTEDPredictor::gen_SALTED_densities()
 {
 	using namespace std;
+	citations::cite(citations::Method::SALTED, std::cout);
+	if (!sub_models.empty())
+		return merge_predictions();
 	if (coef_file != "")
 	{
 		vec coefs{};
@@ -631,26 +898,13 @@ vec SALTEDPredictor::gen_SALTED_densities()
 	// File VERSION 3 models carry an optional NORMC block asking for the
 	// electron count to be constrained. Applied here rather than at each call
 	// site so the tsc, the charge table and the cubes all see the same density.
-	// V2 models have no such block, so they are untouched.
-	if (force_charge_constraint)
+	// V2 models have no such block, so they are untouched. A sub model of a
+	// merged prediction only holds a share of the electrons, so it is skipped
+	// and the stitched density is constrained once instead.
+	if (!skip_charge_constraint && wants_charge_constraint())
 		apply_charge_constraint(wavy.get_atoms(), coefs, wavy.get_charge(),
 								spherical_fill_used, n_filled,
 								filled_eeq_charge, applied_fill_charge, std::cout);
-	else if (model_file && model_file->charge_constraint_defined())
-	{
-		const auto entries = model_file->read_charge_constraint();
-		const auto mode_it = entries.find("MODE");
-		const int mode = (mode_it != entries.end() && !mode_it->second.empty())
-							 ? static_cast<int>(std::lround(mode_it->second[0]))
-							 : 0;
-		if (mode == 1)
-			apply_charge_constraint(wavy.get_atoms(), coefs, wavy.get_charge(),
-									spherical_fill_used, n_filled,
-									filled_eeq_charge, applied_fill_charge, std::cout);
-		else if (mode != 0)
-			std::cout << "Unknown charge-constraint mode " << mode
-					  << " in the model file; leaving the density alone." << std::endl;
-	}
 
 	shrink_intermediate_vectors();
 	return coefs;

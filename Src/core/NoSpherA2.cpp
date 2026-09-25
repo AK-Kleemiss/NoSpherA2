@@ -13,6 +13,8 @@
 #include "XCW.h"
 #include "geometry_aid.h"
 #include "crystal_energies.h"
+#include "nao.h"
+#include "citations.h"
 #ifdef NOSPHERA2_USE_GPU
 #include "grid_gpu.h"
 #include "aux_density_gpu.h"
@@ -244,26 +246,22 @@ static int run_app_impl(int argc, char **argv)
 		vec shape_index, curvedness;
 		surface_curvature(triangles_i, weight, shape_index, curvedness);
 		tp.push_back(get_time()); tp_desc.push_back("d_i, d_e, d_norm, curvature");
-		vec esp;
-		if (wavy[0].get_nmo() > 0)
-			esp = surface_ESP(triangles_i, wavy[0]);
-		else if (opt.SALTED)
-		{
-			const Gaussian_Molecule ml(wavy[0], opt);
-			esp = surface_ESP(triangles_i, [&](const d3& p) { return ml.esp(p); });
-		}
-		tp.push_back(get_time()); tp_desc.push_back("surface ESP");
 		// one row per face in obj order (d_i, d_e in Angstrom, curvature in 1/Angstrom, esp in a.u.): Olex2 colours the surface from these, columns 1-2 are the fingerprint plot
-		ofstream dat("Hirshfeld_surface.dat");
-		dat << "# d_i d_e d_norm shape_index curvedness" << (esp.empty() ? "" : " esp") << "\n";
-		for (int i = 0; i < nt; i++)
+		auto write_dat = [&](const vec& esp)
 		{
-			dat << constants::bohr2ang(d_i[i]) << "\t" << constants::bohr2ang(d_e[i]) << "\t" << d_norm[i] << "\t" << shape_index[i] << "\t" << curvedness[i];
-			if (!esp.empty())
-				dat << "\t" << esp[i];
-			dat << "\n";
-		}
-		dat.close();
+			ofstream dat("Hirshfeld_surface.dat");
+			dat << "# d_i d_e d_norm shape_index curvedness" << (esp.empty() ? "" : " esp") << "\n";
+			for (int i = 0; i < nt; i++)
+			{
+				dat << constants::bohr2ang(d_i[i]) << "\t" << constants::bohr2ang(d_e[i]) << "\t" << d_norm[i] << "\t" << shape_index[i] << "\t" << curvedness[i];
+				if (!esp.empty())
+					dat << "\t" << esp[i];
+				dat << "\n";
+			}
+		};
+		// the shape is finished here and the per-face ESP below is the long pole, so the geometry and every column that
+		// does not need it go out first: Olex2 watches for the stage1 flag and puts the mesh on screen while it runs
+		write_dat({});
 		// plain values, not structured bindings: clang's OpenMP cannot capture those (macOS CI)
 		const double lo_i = *std::min_element(d_i.begin(), d_i.end()), hi_i = *std::max_element(d_i.begin(), d_i.end());
 		const double lo_e = *std::min_element(d_e.begin(), d_e.end()), hi_e = *std::max_element(d_e.begin(), d_e.end());
@@ -283,12 +281,25 @@ static int run_app_impl(int argc, char **argv)
 		writeColourObj("Hirshfeld_surface_i.obj", triangles_i);
 		writeColourObj("Hirshfeld_surface_e.obj", triangles_e);
 		writeColourObj("Hirshfeld_surface_norm.obj", triangles_n);
+		{ ofstream stage1("Hirshfeld_surface_i.obj.stage1"); stage1 << nt << "\n"; }  // the mesh is complete and readable
+		tp.push_back(get_time()); tp_desc.push_back("shape dat + obj files");
+
+		vec esp;
+		if (wavy[0].get_nmo() > 0)
+			esp = surface_ESP(triangles_i, wavy[0]);
+		else if (opt.SALTED)
+		{
+			const Gaussian_Molecule ml(wavy[0], opt);
+			esp = surface_ESP(triangles_i, [&](const d3& p) { return ml.esp(p); });
+		}
+		tp.push_back(get_time()); tp_desc.push_back("surface ESP");
 		if (!esp.empty())
 		{
+			write_dat(esp);
 			colour_by_ESP(triangles_i, esp, std::cout);
 			writeColourObj("Hirshfeld_surface_esp.obj", triangles_i);
+			tp.push_back(get_time()); tp_desc.push_back("esp dat + obj file");
 		}
-		tp.push_back(get_time()); tp_desc.push_back("dat + obj files");
 		write_timing_to_file(std::cout, tp, tp_desc);
 		std::cout.rdbuf(_coutbuf); // reset to standard output again
 		std::cout << "Finished!" << endl;
@@ -427,6 +438,7 @@ static int run_app_impl(int argc, char **argv)
 				}
 			}
 			log_file << " done!\nNumber of atoms in Wavefunction file: " << wavy[i].get_ncen() << " Number of MOs: " << wavy[i].get_nmo() << endl;
+			citations::flush(log_file); //whatever the reader queued while this line was open
 		}
 
 		svec known_scatterer;
@@ -653,10 +665,22 @@ static int run_app_impl(int argc, char **argv)
 			wavy[0].set_has_ECPs(true, true, opt.ECP_mode);
 		}
 		log_file << " done!\nNumber of atoms in Wavefunction file: " << wavy[0].get_ncen() << " Number of MOs: " << wavy[0].get_nmo() << endl;
+		citations::flush(log_file); //whatever the reader queued while this line was open
 
 		if (opt.rgbi) {
 			Roby_information Roby(wavy[0], opt.rgbi_group_sets, !opt.rgbi_no_sym,
-				opt.rgbi_orbital_basis == RGBIOrbitalBasis::ANO, opt.rgbi_EVs, opt.rgbi_theta);
+				opt.rgbi_orbital_basis == RGBIOrbitalBasis::ANO, opt.rgbi_EVs, opt.rgbi_theta,
+				opt.rgbi_legacy_cutoff);
+		}
+
+		if (opt.npa) {
+			NPAResult npa = natural_population_analysis(wavy[0]);
+			if (!opt.npa_orbitals) {
+				npa.total.orbitals.clear();
+				npa.alpha.orbitals.clear();
+				npa.beta.orbitals.clear();
+			}
+			print_npa(npa, log_file);
 		}
 
 		// this one is for generation of an fchk file
@@ -717,7 +741,6 @@ static int run_app_impl(int argc, char **argv)
 				string df_basis_name = temp_pred->get_dfbasis_name();
 				filesystem::path salted_model_path = temp_pred->get_salted_filename();
 				log_file << "Using " << salted_model_path << " for the prediction" << endl;
-				std::shared_ptr<BasisSet> aux_basis = BasisSetLibrary::get_basis_set(df_basis_name);
 				if (!temp_pred->basis_set_loaded()) { //If the basis set was supplied by the SALTED model file, do not overwrite it
 					std::shared_ptr<BasisSet> aux_basis = BasisSetLibrary::get_basis_set(df_basis_name);
 					load_basis_into_WFN(temp_pred->wavy, aux_basis);

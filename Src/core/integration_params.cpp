@@ -180,9 +180,10 @@ void Int_Params::collect_basis_data()
 				"overlap computed from this basis will not have a unit diagonal.\n";
 		}
 
-		//OCC and NOT_YET_DEFINED store l in get_type(), every file reader (gbw, wfx, tonto, ptb, xtb,
-		//molden, fchk, XCW_fit) stores l + 1
-		const int type_offset = (wfn_origin == e_origin::NOT_YET_DEFINED || wfn_origin == e_origin::OCC) ? 0 : 1;
+		//NOT_YET_DEFINED, the aux bases, stores l in get_type(); every wavefunction basis stores
+		//l + 1, the file readers (gbw, wfx, tonto, ptb, xtb, molden, fchk, XCW_fit) and the
+		//in-process OCC constructor alike
+		const int type_offset = (wfn_origin == e_origin::NOT_YET_DEFINED) ? 0 : 1;
 		int max_l = 1;
 		for (int func = 0; func < basis.size(); func++)
 		{

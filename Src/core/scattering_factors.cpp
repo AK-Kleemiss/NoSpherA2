@@ -16,6 +16,7 @@
 #include "npy.h"
 #include "integrator.h"
 #include "basis_set.h"
+#include "citations.h"
 #ifdef NOSPHERA2_USE_GPU
 #include "SALTED_equicomb.h"
 #include "grid_gpu.h"
@@ -2519,6 +2520,19 @@ int make_atomic_grids_wrapper(
 	std::vector<_time_point>& time_points, svec& time_descriptions, vec2& d1, vec2& d2, vec2& d3, vec2& dens,
 	const options& opt, std::ostream& file = std::cout) {
 
+	//The grid itself is Becke's; which partitioning runs on it is the user's choice.
+	citations::cite(citations::Method::BeckeGrid, file);
+	if (opt.partition_type == PartitionType::Hirshfeld)
+		citations::cite(citations::Method::Hirshfeld, file);
+	else if (opt.partition_type == PartitionType::TFVC)
+		citations::cite(citations::Method::TFVC, file);
+	else if (opt.partition_type == PartitionType::MBIS || opt.partition_type == PartitionType::EMBIS) {
+		citations::cite(citations::Method::MBIS, file);
+		//EMBIS is MBIS with an ellipsoidal sigma, so it rests on both papers.
+		if (opt.partition_type == PartitionType::EMBIS)
+			citations::cite(citations::Method::EMBIS, file);
+	}
+
 	const int atoms_with_grids = vec_sum(needs_grid);
 	err_checkf(atoms_with_grids > 0, "No atoms with grids to generate!", file);
 	err_checkf(atoms_with_grids <= wave.get_ncen(), "More atoms with grids than in the wavefunction! Aborting!", file);
@@ -2769,10 +2783,18 @@ tsc_block_type calculate_scattering_factors(
 			}
 		}
 		err_checkf(opt.groups[nr].size() >= 1, "Not enough groups specified to work with!", file);
+		//What these form factors are, before any of them is computed.
+		citations::cite(citations::Method::NoSpherA2, file);
+		if (opt.iam_switch)
+			citations::cite(citations::Method::IAM, file);
+		else
+			citations::cite(citations::Method::HAR, file);
 		file << "Number of protons: " << wavy->get_nr_electrons() << endl
 			<< "Number of electrons: " << fixed << wavy->count_nr_electrons() << endl;
-		if (wavy->get_has_ECPs())
+		if (wavy->get_has_ECPs()) {
 			file << "Number of ECP electrons: " << wavy->get_nr_ECP_electrons() << endl;
+			citations::cite(citations::Method::ECP, file);
+		}
 		// err_checkf(exists(asym_cif), "Asym/Wfn CIF does not exists!", file);
 		if (opt.debug)
 			file << "Working with: " << wavy->get_path() << endl;

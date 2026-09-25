@@ -10,6 +10,7 @@
 #include "libCintMain.h"
 #include "integrator.h"
 #include "cell.h"
+#include "citations.h"
 
 
 const std::string WFN::hdr(const bool &occupied) const
@@ -455,6 +456,9 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
 		<< GetCurrentDir << endl;
 	origin = e_origin::molden;
 	isBohr = true;
+	//The format this reader follows, and the only written specification of it.  Queued, not
+	//printed: the caller is in the middle of its "Reading: <file> ... done!" line.
+	citations::queue(citations::Method::Molden);
 	ifstream rf(filename.c_str());
 	if (rf.good())
 		path = filename;
@@ -487,6 +491,24 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
 	err_checkf(ncen > 0, "No atoms in molden file", file);
 	err_checkf(line.find("[GTO]") != string::npos, "Expected [GTO] after the atoms but found: '" + line + "'", file);
 	//----------------------------- Basis: per atom "index 0", shells "type nprim 1.0", primitives, blank line ------------------------------
+	//The contraction coefficients are taken as multiplying bare x^l exp(-a r^2), with the
+	//contracted shell already normalised - what ORCA and orca_2mkl write. The format's own
+	//documentation describes the other convention (coefficients multiply individually normalised
+	//primitives, the contracted shell renormalised afterwards) and nothing in a molden file says
+	//which one it is in: no file we have carries a "program=" keyword, and the [Title] line is
+	//not evidence either - F2.molden has an empty title and is ORCA-convention.
+	//
+	//Do not add a norm-based detector without reading this first: the contracted self-overlap is
+	//not an l-independent discriminator. Co2.molden's contracted d shell has bare self-overlap
+	//1.000 for the xx component while Ce_full.molden's uncontracted d shells have 3.000 - both
+	//ORCA files, differing only in which cartesian component the writer normalised. What does
+	//discriminate is per-MO: the file's own MO vectors are orthonormal in whatever convention it
+	//was written in. tests/src/MoldenConventionTests.cpp records those numbers for F2.molden
+	//(1.00000 per MO and 14.000000 electrons under this reading, 0.889..1.344 and 13.727 under
+	//the other) and pins the density against an evaluator independent of this code. Applying that
+	//test inside the reader means building the contracted AO overlap, and not one file in the
+	//corpus or the test set is in the other convention, so it is not built. Symptom if one ever
+	//turns up: a density wrong by a factor of thousands, not by a little.
 	int atoms_with_basis = 0;
 	while (atoms_with_basis < ncen && (read_line_or_fail(rf, line, "the basis set", file), line.find("[") == string::npos))
 	{
@@ -559,7 +581,7 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
 	//----------------------------- MOs: "Key= value" header lines, then "index coefficient" lines ------------------------------
 	//One row per MO of either spin: the density matrix is sum_i occ_i c_i c_i^T whatever the spin
 	vec2 coefficients;
-	vec occ;
+	vec occ, occ_beta;
 	int nmo = 0;
 	while (getline_universal(rf, line) && line.find("[") == string::npos)
 	{
@@ -585,6 +607,7 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
 			is_unrestricted = true;
 		push_back_MO(nmo + 1, occup, ene, spin);
 		occ.push_back(occup);
+		occ_beta.push_back(spin ? occup : 0.0);
 		coefficients.push_back(vec());
 		int run = 0, basis_run = 0;
 		vec2 shell;
@@ -619,6 +642,10 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
 	dMatrix2 m_coefs = reshape<dMatrix2>(_coefficients, Shape2D(nmo, expected_coefs));
 	dMatrix2 temp_co = diag_dot(m_coefs, occ, true);
 	DM = dot(temp_co, m_coefs);
+	if (is_unrestricted) {
+		dMatrix2 temp_b = diag_dot(m_coefs, occ_beta, true);
+		DM_beta = dot(temp_b, m_coefs);
+	}
 	set_exp_cutoff();
 	return true;
 };
@@ -1429,6 +1456,7 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
 			std::transform(DM_s1.container().begin(), DM_s1.container().end(), DM_s2.data(), DM_s1.data(), std::plus<double>());
 
 			DM = DM_s1;
+			DM_beta = DM_s2;
 		}
 
 		if (debug)
@@ -1843,11 +1871,19 @@ bool WFN::write_wfx(const std::filesystem::path &fileName, const bool occupied) 
 	return rf.good();
 };
 
-bool WFN::write_nbo(const std::filesystem::path &fileName, const bool &debug, std::ostream* progress_log)
+bool WFN::write_nbo(const std::filesystem::path &fileName, const bool &debug, std::ostream* progress_log, const std::string& nbo_keywords)
 {
 	using namespace std;
 
-	err_checkf(get_nr_basis_set_loaded() == ncen, "Can only write .47 file if basis set is present!", std::cout);
+	//A FILE47 needs the contracted shell structure ($BASIS/$CONTRACT) and an AO overlap
+	//computed over it. A .wfn/.wfx carries primitives only - the shells, their contraction
+	//coefficients and the primitive-to-shell ordering are all gone - so no archive can be
+	//built from one without guessing, and a guessed archive produces plausible-looking but
+	//wrong NBO output. Convert through .molden/.fchk/.gbw instead.
+	err_checkf(get_nr_basis_set_loaded() == ncen,
+		"Can only write a .47 file when a contracted basis set is present. A primitive-only source"
+		" (.wfn/.wfx) does not carry one - use the .gbw, .fchk or .molden of the same calculation.",
+		std::cout);
 	const auto nbo_start_time = std::chrono::high_resolution_clock::now();
 	auto progress_elapsed_seconds = [&]() {
 		return std::chrono::duration_cast<std::chrono::seconds>(std::chrono::high_resolution_clock::now() - nbo_start_time).count();
@@ -1926,7 +1962,13 @@ bool WFN::write_nbo(const std::filesystem::path &fileName, const bool &debug, st
 			const int type = get_shell_type(a, s);
 			const int cart_count = constants::n_cart(type - 1);
 			const int nbo_count = constants::n_spher(type - 1);
-			err_checkf(type <= 5, "Unsupported basis shell in .47 writer", std::cout);
+			//FILE47 itself goes further than g: it has label codes for h (Cartesian 501-521,
+			//spherical 551-563) and i (601-628 / 651-665) and $CONTRACT arrays CH and CI. The
+			//ceiling here is NoSpherA2's, not the archive's - constants::n_cart / n_spher and
+			//constants::sph2cart stop at g, and no basis used with NoSpherA2 (def2, cc-pVnZ up
+			//to quadruple zeta, jorge, x2c) carries an h shell. Add CH/CI here if one ever does.
+			err_checkf(type <= 5, "Unsupported basis shell in .47 writer: shells beyond g need"
+				" constants::sph2cart extended first (FILE47 itself supports h and i)", std::cout);
 			NboShell shell;
 			shell.atom = a;
 			shell.shell = s;
@@ -2171,7 +2213,18 @@ bool WFN::write_nbo(const std::filesystem::path &fileName, const bool &debug, st
 			//the components may be permuted as well (gbw stores p as z, x, y): the type says which row
 			for (int c = 0; c < shell.cart_components; c++) {
 				const int prim = primitive_start + c * stride + rep_offset;
-				cart_values[get_type(prim) - constants::first_type[shell.type - 1]] = get_MO_coef(m, prim) / contraction;
+				//A foreign wavefunction decides this index: the primitive picked is this shell's
+				//component c only if its primitive order really is the one detected above. An index
+				//off either end used to walk over cart_values' heap buffer and abort in free()
+				//afterwards, with nothing said about which shell was misread.
+				const int component = get_type(prim) - constants::first_type[shell.type - 1];
+				err_checkf(component >= 0 && component < shell.cart_components,
+					"Primitive order not understood in the .47 writer: atom " + std::to_string(shell.atom + 1)
+					+ ", shell " + std::to_string(shell.shell) + " of type " + std::to_string(shell.type)
+					+ ", component " + std::to_string(c) + " -> primitive " + std::to_string(prim)
+					+ " of type " + std::to_string(get_type(prim)) + " (component index " + std::to_string(component)
+					+ " of " + std::to_string(shell.cart_components) + ")", std::cout);
+				cart_values[component] = get_MO_coef(m, prim) / contraction;
 			}
 			const vec nbo_values = project_to_nbo(shell.type, cart_values);
 			for (int c = 0; c < shell.nbo_components; c++)
@@ -2182,36 +2235,57 @@ bool WFN::write_nbo(const std::filesystem::path &fileName, const bool &debug, st
 	progress("Building density matrix");
 	int naotr = nbo_nao * (nbo_nao + 1) / 2;
 	vec CDM(naotr, 0.0);
-	auto build_mo_density = [&]() {
+	//Occupations and energies per spin, in the row order of CMO / CMO_beta. An open-shell
+	//FILE47 carries $DENSITY, $FOCK and $LCAOMO twice - alpha block then beta block - while
+	//$OVERLAP stays single; a closed-shell one carries the spin sum once.
+	vec occ_spin[2], energy_spin[2];
+	for (int m = 0; m < get_nmo(); m++) {
+		const int op = MOs[m].get_op();
+		if (op != 0 && op != 1)
+			continue;
+		occ_spin[op].push_back(get_MO_occ(m));
+		energy_spin[op].push_back(get_MO_energy(m));
+	}
+	const bool open_shell = get_is_unrestricted() && beta_mos > 0;
+	auto build_mo_density = [&](const int op) {
+		const vec2& C = op == 0 ? CMO : CMO_beta;
+		const vec& occs = occ_spin[op];
+		const int nmo_spin = std::min(static_cast<int>(C.size()), static_cast<int>(occs.size()));
 		vec density(naotr, 0.0);
 		int density_progress_next = 10;
 #pragma omp parallel for schedule(dynamic)
 		for (int iu = 0; iu < nbo_nao; iu++) {
 			for (int iv = 0; iv <= iu; iv++) {
 				const int iuv = (iu * (iu + 1) / 2) + iv;
-				int alpha_index = 0;
-				int beta_index = 0;
-				for (int m = 0; m < get_nmo(); m++) {
-					const double occ = get_MO_occ(m);
-					if (MOs[m].get_op() == 0) {
-						if (occ != 0.0)
-							density[iuv] += occ * CMO[alpha_index][iu] * CMO[alpha_index][iv];
-						alpha_index++;
-					}
-					else if (MOs[m].get_op() == 1) {
-						if (occ != 0.0)
-							density[iuv] += occ * CMO_beta[beta_index][iu] * CMO_beta[beta_index][iv];
-						beta_index++;
-					}
-				}
+				for (int m = 0; m < nmo_spin; m++)
+					if (occs[m] != 0.0)
+						density[iuv] += occs[m] * C[m][iu] * C[m][iv];
 			}
 #pragma omp critical(nbo_progress)
 			progress_percent("Density build", iu + 1, nbo_nao, density_progress_next);
 		}
 		return density;
 	};
+	auto build_total_density = [&]() {
+		vec density = build_mo_density(0);
+		if (beta_mos > 0) {
+			const vec beta_density = build_mo_density(1);
+			for (int i = 0; i < naotr; i++)
+				density[i] += beta_density[i];
+		}
+		return density;
+	};
+	vec CDM_alpha, CDM_beta;
 	bool density_from_cached_dm = false;
-	if (static_cast<int>(DM.extent(0)) == nbo_nao && static_cast<int>(DM.extent(1)) == nbo_nao) {
+	if (open_shell) {
+		progress("Building spin-resolved density matrices for the open-shell FILE47");
+		CDM_alpha = build_mo_density(0);
+		CDM_beta = build_mo_density(1);
+		for (int i = 0; i < naotr; i++)
+			CDM[i] = CDM_alpha[i] + CDM_beta[i];
+	}
+	//A cached DM is the spin sum, so it can only serve the closed-shell layout.
+	else if (static_cast<int>(DM.extent(0)) == nbo_nao && static_cast<int>(DM.extent(1)) == nbo_nao) {
 		density_from_cached_dm = true;
 		for (int iu = 0; iu < nbo_nao; iu++) {
 			for (int iv = 0; iv <= iu; iv++) {
@@ -2221,7 +2295,7 @@ bool WFN::write_nbo(const std::filesystem::path &fileName, const bool &debug, st
 		}
 	}
 	else {
-		CDM = build_mo_density();
+		CDM = build_total_density();
 	}
 
 	vec OVLP_matrix = {};
@@ -2271,7 +2345,7 @@ bool WFN::write_nbo(const std::filesystem::path &fileName, const bool &debug, st
 		progress("Cached GBW density is inconsistent with FILE47 overlap: Tr(P*S)=" +
 			std::to_string(density_electrons) + ", expected=" + std::to_string(expected_electrons) +
 			". Rebuilding density from NBO-ordered MO coefficients");
-		CDM = build_mo_density();
+		CDM = build_total_density();
 		density_from_cached_dm = false;
 		density_electrons = packed_trace_product(CDM);
 	}
@@ -2283,23 +2357,27 @@ bool WFN::write_nbo(const std::filesystem::path &fileName, const bool &debug, st
 					  << " (" << progress_elapsed_seconds() << " s)" << std::endl;
 		progress_log->flush();
 	}
-	vec2 FOCK_nbo;
-	if (alpha_mos == nbo_nao) {
-		progress("Building Fock matrix from MO energies with BLAS");
-		FOCK_nbo = vec2(nbo_nao, vec(nbo_nao, 0.0));
+	auto build_fock = [&](const vec2& C, const vec& energies, const std::string& label) {
+		vec2 result;
+		if (static_cast<int>(C.size()) != nbo_nao || static_cast<int>(energies.size()) < nbo_nao) {
+			progress("Skipping " + label + " Fock matrix: MO count does not match NBO basis size");
+			return result;
+		}
+		progress("Building " + label + " Fock matrix from MO energies with BLAS");
+		result = vec2(nbo_nao, vec(nbo_nao, 0.0));
 		dMatrix2 overlap(nbo_nao, nbo_nao);
 		dMatrix2 cmo(nbo_nao, nbo_nao);
 		for (int i = 0; i < nbo_nao; i++) {
 			for (int j = 0; j < nbo_nao; j++)
 				overlap(i, j) = OVLP_nbo[i][j];
 			for (int m = 0; m < nbo_nao; m++)
-				cmo(m, i) = CMO[m][i];
+				cmo(m, i) = C[m][i];
 		}
 		dMatrix2 eps_cmo(nbo_nao, nbo_nao);
 #pragma omp parallel for schedule(dynamic)
 		for (int m = 0; m < nbo_nao; m++)
 			for (int i = 0; i < nbo_nao; i++)
-				eps_cmo(m, i) = get_MO_energy(m) * cmo(m, i);
+				eps_cmo(m, i) = energies[m] * cmo(m, i);
 		progress("Fock build: C^T * eps * C");
 		dMatrix2 ctc = dot<dMatrix2>(cmo, eps_cmo, true, false);
 		progress("Fock build: S * (C^T * eps * C)");
@@ -2309,10 +2387,20 @@ bool WFN::write_nbo(const std::filesystem::path &fileName, const bool &debug, st
 #pragma omp parallel for schedule(dynamic)
 		for (int i = 0; i < nbo_nao; i++)
 			for (int j = 0; j < nbo_nao; j++)
-				FOCK_nbo[i][j] = fock(i, j);
-	}
-	else {
-		progress("Skipping Fock matrix: alpha MO count does not match NBO basis size");
+				result[i][j] = fock(i, j);
+		return result;
+	};
+	vec2 FOCK_nbo = build_fock(CMO, energy_spin[0], open_shell ? "alpha" : "total");
+	vec2 FOCK_beta;
+	if (open_shell) {
+		FOCK_beta = build_fock(CMO_beta, energy_spin[1], "beta");
+		//An open-shell $FOCK is read as two blocks; one alone would be parsed as the alpha
+		//block and leave NBO reading the next section as beta, so it is both or neither.
+		if (FOCK_nbo.empty() || FOCK_beta.empty()) {
+			FOCK_nbo.clear();
+			FOCK_beta.clear();
+			progress("Skipping $FOCK entirely: an open-shell FILE47 needs both spin blocks");
+		}
 	}
 
 	ofstream rf(fileName, ios::out);
@@ -2370,8 +2458,8 @@ bool WFN::write_nbo(const std::filesystem::path &fileName, const bool &debug, st
 		rf << endl;
 	};
 
-	rf << " $GENNBO NATOMS=" << ncen << " NBAS=" << nbo_nao << " UPPER BODM FORMAT=PRECISE $END" << endl;
-	rf << " $NBO $END" << endl;
+	rf << " $GENNBO NATOMS=" << ncen << " NBAS=" << nbo_nao << (open_shell ? " OPEN" : "") << " UPPER BODM FORMAT=PRECISE $END" << endl;
+	rf << " $NBO" << (nbo_keywords.empty() ? "" : " " + nbo_keywords) << " $END" << endl;
 	rf << " $COORD" << endl;
 	rf << " .47 file generated by NoSpherA2 based on " << path << endl;
 	for (int i = 0; i < ncen; i++)
@@ -2435,43 +2523,62 @@ bool WFN::write_nbo(const std::filesystem::path &fileName, const bool &debug, st
 		if (count % 4 == 0)
 			rf << "\n";
 	};
+	//NBO reads each spin block with its own Fortran READ, so the beta block has to start on a
+	//fresh record. Streaming both blocks as one run of values makes TINP report
+	//"error reading $LCAOMO" whenever a block length is not a multiple of four.
+	auto end_block = [&](int& count) {
+		if (count % 4 != 0)
+			rf << "\n";
+		count = 0;
+	};
 
 	rf << " $OVERLAP" << endl;
 	int runner = 0;
 	for (int i = 0; i < nbo_nao; i++)
 		for (int j = 0; j <= i; j++)
 			write_precise_value(OVLP_nbo[i][j], runner);
-	if (runner % 4 != 0)
-		rf << "\n";
+	end_block(runner);
 	rf << " $END" << endl;
 	rf << " $DENSITY" << endl;
-	runner = 0;
 	for (int i = 0; i < naotr; i++)
-		write_precise_value(CDM[i], runner);
-	if (runner % 4 != 0)
-		rf << "\n";
+		write_precise_value(open_shell ? CDM_alpha[i] : CDM[i], runner);
+	end_block(runner);
+	if (open_shell) {
+		for (int i = 0; i < naotr; i++)
+			write_precise_value(CDM_beta[i], runner);
+		end_block(runner);
+	}
 	rf << " $END" << endl;
 	if (!FOCK_nbo.empty()) {
+		auto write_fock_block = [&](const vec2& fock) {
+			for (int i = 0; i < nbo_nao; i++)
+				for (int j = 0; j <= i; j++)
+					write_precise_value(fock[i][j], runner);
+			end_block(runner);
+		};
 		rf << " $FOCK" << endl;
-		runner = 0;
-		for (int i = 0; i < nbo_nao; i++)
-			for (int j = 0; j <= i; j++)
-				write_precise_value(FOCK_nbo[i][j], runner);
-		if (runner % 4 != 0)
-			rf << "\n";
+		write_fock_block(FOCK_nbo);
+		if (open_shell)
+			write_fock_block(FOCK_beta);
 		rf << " $END" << endl;
 	}
+	//$LCAOMO is nbas x nbas per spin block whatever the MO count, so a wavefunction that
+	//carries fewer MOs than basis functions is zero-padded - a short block would otherwise
+	//shift every value after it (and, open shell, the whole beta block).
+	auto write_lcaomo_block = [&](const vec2& C) {
+		for (int mo_counter = 0; mo_counter < nbo_nao; mo_counter++)
+		{
+			if (debug)
+				std::cout << "Writing MO #" << mo_counter + 1 << "...\n";
+			for (int i = 0; i < nbo_nao; i++)
+				write_precise_value(mo_counter < static_cast<int>(C.size()) ? C[mo_counter][i] : 0.0, runner);
+		}
+		end_block(runner);
+	};
 	rf << " $LCAOMO" << endl;
-	runner = 0;
-	for (int mo_counter = 0; mo_counter < std::min(alpha_mos, nbo_nao); mo_counter++)
-	{
-		if (debug)
-			std::cout << "Writing MO #" << mo_counter + 1 << "...\n";
-		for (int i = 0; i < nbo_nao; i++)
-			write_precise_value(CMO[mo_counter][i], runner);
-	}
-	if (runner % 4 != 0)
-		rf << "\n";
+	write_lcaomo_block(CMO);
+	if (open_shell)
+		write_lcaomo_block(CMO_beta);
 	rf << " $END" << endl;
 	rf.close();
 	progress("Finished .47 conversion");
@@ -2711,6 +2818,7 @@ bool WFN::read_ptb(const std::filesystem::path &filename, std::ostream &file, co
 	origin = e_origin::ptb;
 	isBohr = true;
 	path = filename;
+	citations::queue(citations::Method::PTB); //see read_molden: the caller's line is still open
 	if (debug)
 		file << "Reading pTB file: " << filename << std::endl;
 	std::ifstream inFile(filename, std::ios::binary | std::ios::in);

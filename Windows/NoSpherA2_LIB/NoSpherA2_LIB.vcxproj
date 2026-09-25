@@ -92,6 +92,7 @@
     <ClInclude Include="..\..\Src\core\atoms.h" />
     <ClInclude Include="..\..\Src\core\aux_density.h" />
     <ClInclude Include="..\..\Src\core\aux_density_gpu.h" />
+    <ClInclude Include="..\..\Src\core\esp_gpu.h" />
     <ClInclude Include="..\..\Src\core\b2c.h" />
     <ClInclude Include="..\..\Src\core\basis_set.h" />
     <ClInclude Include="..\..\Src\core\blas_gpu.h" />
@@ -108,6 +109,7 @@
     <ClInclude Include="..\..\Src\core\CUDA_utilities.h" />
     <ClInclude Include="..\..\Src\core\early_exit.h" />
     <ClInclude Include="..\..\Src\core\ECPs_corrections.h" />
+    <ClInclude Include="..\..\Src\core\extinction.h" />
     <ClInclude Include="..\..\Src\core\fchk.h" />
     <ClInclude Include="..\..\Src\core\geometry_aid.h" />
     <ClInclude Include="..\..\Src\core\gemm_gpu.cuh" />
@@ -146,6 +148,7 @@
     <ClInclude Include="..\..\Src\core\test_functions.h" />
     <ClInclude Include="..\..\Src\core\Thakkar_coefs.h" />
     <ClInclude Include="..\..\Src\core\throughput.h" />
+    <ClInclude Include="..\..\Src\core\topology.h" />
     <ClInclude Include="..\..\Src\core\tsc_block.h" />
     <ClInclude Include="..\..\Src\core\tsc_label_converter.h" />
     <ClInclude Include="..\..\Src\core\tsc_stream.h" />
@@ -171,10 +174,12 @@
     <ClCompile Include="..\..\Src\core\bondwise_analysis.cpp" />
     <ClCompile Include="..\..\Src\core\cell.cpp" />
     <ClCompile Include="..\..\Src\core\cif.cpp" />
+    <ClCompile Include="..\..\Src\core\citations.cpp" />
     <ClCompile Include="..\..\Src\core\constants.cpp" />
     <ClCompile Include="..\..\Src\core\convenience.cpp" />
     <ClCompile Include="..\..\Src\core\cube.cpp" />
     <ClCompile Include="..\..\Src\core\ECPs_corrections.cpp" />
+    <ClCompile Include="..\..\Src\core\eli_family.cpp" />
     <ClCompile Include="..\..\Src\core\fchk.cpp" />
     <ClCompile Include="..\..\Src\core\GridManager.cpp" />
     <ClCompile Include="..\..\Src\core\integration_params.cpp" />
@@ -183,8 +188,12 @@
     <ClCompile Include="..\..\Src\core\libCintKernels.cpp" />
     <ClCompile Include="..\..\Src\core\libCintMain.cpp" />
     <ClCompile Include="..\..\Src\core\molecule.cpp" />
+    <ClCompile Include="..\..\Src\core\nao.cpp" />
+    <ClCompile Include="..\..\Src\core\nbo.cpp" />
+    <ClCompile Include="..\..\Src\core\nbo_run.cpp" />
     <ClCompile Include="..\..\Src\core\NoSpherA2.cpp" />
     <ClCompile Include="..\..\Src\core\nos_math.cpp" />
+    <ClCompile Include="..\..\Src\core\nrt.cpp" />
     <ClCompile Include="..\..\Src\core\properties.cpp" />
     <ClCompile Include="..\..\Src\core\qct.cpp" />
     <ClCompile Include="..\..\Src\core\SALTED_equicomb.cpp" />
@@ -193,19 +202,23 @@
     <ClCompile Include="..\..\Src\core\SALTED_utilities.cpp" />
     <ClCompile Include="..\..\Src\core\scattering_factors.cpp" />
     <ClCompile Include="..\..\Src\core\throughput.cpp" />
+    <ClCompile Include="..\..\Src\core\topology.cpp" />
     <ClCompile Include="..\..\Src\core\tsc_label_converter.cpp" />
     <ClCompile Include="..\..\Src\core\sphere_lebedev_rule.cpp" />
     <ClCompile Include="..\..\Src\core\spherical_density.cpp" />
     <ClCompile Include="..\..\Src\core\wfn_class.cpp" />
     <ClCompile Include="..\..\Src\core\wfn_density.cpp" />
     <ClCompile Include="..\..\Src\core\wfn_io.cpp" />
-    <ClCompile Include="..\..\Src\core\XCW.cpp" />
+    <ClCompile Include="..\..\Src\core\XCW.cpp">
+      <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
     <ClCompile Include="..\..\Src\core\stored_eri.cpp" />
     <ClCompile Include="..\..\Src\core\xcw_halting.cpp" />
   </ItemGroup>
   <ItemGroup Condition="'$(NosUseCuda)' == 'true'">
     <CudaCompile Include="..\..\Src\core\aux_density_gpu.cu" />
     <CudaCompile Include="..\..\Src\core\blas_gpu.cu" />
+    <CudaCompile Include="..\..\Src\core\esp_gpu.cu" />
     <CudaCompile Include="..\..\Src\core\grid_gpu.cu" />
     <CudaCompile Include="..\..\Src\core\itensor_gpu.cu" />
     <CudaCompile Include="..\..\Src\core\salted_gpu.cu" />
@@ -225,6 +238,7 @@
     </ClCompile>
     <CustomBuild Include="..\..\Src\core\aux_density_gpu.cu" />
     <CustomBuild Include="..\..\Src\core\blas_gpu.cu" />
+    <CustomBuild Include="..\..\Src\core\esp_gpu.cu" />
     <CustomBuild Include="..\..\Src\core\grid_gpu.cu" />
     <CustomBuild Include="..\..\Src\core\itensor_gpu.cu" />
     <CustomBuild Include="..\..\Src\core\salted_gpu.cu" />

@@ -1,5 +1,5 @@
 # Unit Test Status
-**Last updated: 2026-09-16** (fchk reading goes through the shared `push_back_spherical_shell`/`push_back_cartesian_shell` path with the tonto and molden readers: contractions are normalised on read (NoSpherA2's own fchk writer leaves them unnormalised), pure |m| = 3, 4, 7, 8 functions carry the Gaussian/libcint phase and are flipped to the ORCA convention of the sph2cart tables, Cartesian d/f primitives divided by sqrt((2l-1)!!); the fchk writer picks f coefficients by WFN type, so tonto-ordered wfn files (17 before 16) round-trip, `NiP3_fchk/good.fchk` regenerated. `FormatConsistencyTests.OccFchkMatchesBridge` checks the occ FchkWriter output against the bridge for l = 1..4 to 1e-6, `ElectronCountOnLargestGrid_full` integrates every input format (gbw, molden, fchk Cartesian and pure, wfn, wfx, tonto stdout, xtb) on the accuracy-5 Becke grid to 1e-4 electrons per electron; the accuracy-5 Lebedev table index was out of range (32 -> 31). The corrected occ-fchk reading moved `alanine_occ.good` (Becke count 47.935 -> 47.998). 322/322 with `RUN_FULL_TEST=1` on `release-windows`.) Earlier the same day: (`OccHighAngularTests`: H2 with one primitive per l built through the occ bridge, `HartreeFockMOsAreOrthonormalToH` (l=5 HF, analytic primitive overlap 1e-8), `LoewdinMOsAreOrthonormalToL10` (l=10 Loewdin MOs, libcint's Rys quadrature on MSVC has no roots beyond 11 so no HF above h), `IntegratesElectronCountToL10` (Becke count 2.0 to 1e-4 at l=5 and 10). The bridge now takes p in occ's x,y,z order and divides by ORCA's per-l norm `constants::sph2cart_norm2`; the primitive cutoff is l-aware (`WFN::set_exp_cutoff`), which changed the ELI basin partition slightly, so `nh3li_eli.good` and `hgh2_ecp_eli.good` were regenerated; GridManager maps types to l = 10. `FormatConsistencyTests.SameDensityFromEveryFormat` checks the Gaussian NA2 fchk/wfn pair and the write_wfn round trip of gbw (incl. i functions) and molden inputs to 1e-6; molden and gbw share `WFN::push_back_spherical_shell`. The cutoff is the per-primitive minimum of the bound, 1.5 % over the 42 integration tests. 321/321 with `RUN_FULL_TEST=1` on `release-windows`. Earlier the same day: `Sph2CartTests.MatchesLibcintWithOrcaPhase` pins every `constants::sph2cart` table d-l=10 to libcint's real solid harmonics with ORCA's phase and angular norm (Lukas Seifert's derivation); this caught two swapped g rows and the h/i scale: ORCA's angular norm drops sqrt((2l-1)(2l-3)) from h on, so those tables were regenerated. `GbwHighAngularTests.OccupiedMOsAreNormalised_full` checks every ORCA contraction to 1e-12 and every occupied CuF2 MO to 1e-8 under the analytic primitive overlap, `IntegratesElectronCount_full` the Becke-grid electron count to 1e-3; `ReadsIFunctionFixtures` reads the three CuF2 `i`-function GBWs, verifies Cartesian types through 84 and finite positive grid densities. The twelve P1 XCW goldens regenerated on the corrected atom grids and the CDIIS SCF, gtests for the three `-xcw_incremental` cases, `RGBI_Groups_NH3BH3_sym` pinned to `-rgbi_basis nao`, `NH3BH3_sym_ano.good` regenerated after the ANO population fix; 312/312 with `RUN_FULL_TEST=1` on `release-windows`. 2026-09-14: one GPU binary per OS: the CUDA and HIP kernels compiled side by side into
+**Last updated: 2026-09-24** (the in-house NBO analysis: `NaoTests.OverlapCarriesTheDensitysPhaseConvention` (nh3bh3, 17.98171 of 18 electrons before the |m| >= 3 phase fix), `Nbo47Tests` on the FILE47 archive, and `NrtTests`' three analytic NRT cases. The NBO/NRT corpus comparison is not a gtest: `py -3.12 tests/nbo_reference/compare_nbo.py --all .` measures the native result against the 22 stored NBO 7.0.9 references and reports 22 PASS, exit 0. `NoSpherA2_Tests` links again: `tests/src/CellMathTests.cpp` calls `cell` members that no longer exist (`grown_subgroup`, `coset_representatives`, `set_subgroup_factors`) and was excluded from the target, so `cmake --build --preset release-windows --target NoSpherA2_Tests` needs no hand-linking. Run the binary from `build/release-windows/bin`, which is what its relative fixture paths assume: 1111 passed, 0 failed, 8 skipped, 2 disabled.) 2026-09-16: (fchk reading goes through the shared `push_back_spherical_shell`/`push_back_cartesian_shell` path with the tonto and molden readers: contractions are normalised on read (NoSpherA2's own fchk writer leaves them unnormalised), pure |m| = 3, 4, 7, 8 functions carry the Gaussian/libcint phase and are flipped to the ORCA convention of the sph2cart tables, Cartesian d/f primitives divided by sqrt((2l-1)!!); the fchk writer picks f coefficients by WFN type, so tonto-ordered wfn files (17 before 16) round-trip, `NiP3_fchk/good.fchk` regenerated. `FormatConsistencyTests.OccFchkMatchesBridge` checks the occ FchkWriter output against the bridge for l = 1..4 to 1e-6, `ElectronCountOnLargestGrid_full` integrates every input format (gbw, molden, fchk Cartesian and pure, wfn, wfx, tonto stdout, xtb) on the accuracy-5 Becke grid to 1e-4 electrons per electron; the accuracy-5 Lebedev table index was out of range (32 -> 31). The corrected occ-fchk reading moved `alanine_occ.good` (Becke count 47.935 -> 47.998). 322/322 with `RUN_FULL_TEST=1` on `release-windows`.) Earlier the same day: (`OccHighAngularTests`: H2 with one primitive per l built through the occ bridge, `HartreeFockMOsAreOrthonormalToH` (l=5 HF, analytic primitive overlap 1e-8), `LoewdinMOsAreOrthonormalToL10` (l=10 Loewdin MOs, libcint's Rys quadrature on MSVC has no roots beyond 11 so no HF above h), `IntegratesElectronCountToL10` (Becke count 2.0 to 1e-4 at l=5 and 10). The bridge now takes p in occ's x,y,z order and divides by ORCA's per-l norm `constants::sph2cart_norm2`; the primitive cutoff is l-aware (`WFN::set_exp_cutoff`), which changed the ELI basin partition slightly, so `nh3li_eli.good` and `hgh2_ecp_eli.good` were regenerated; GridManager maps types to l = 10. `FormatConsistencyTests.SameDensityFromEveryFormat` checks the Gaussian NA2 fchk/wfn pair and the write_wfn round trip of gbw (incl. i functions) and molden inputs to 1e-6; molden and gbw share `WFN::push_back_spherical_shell`. The cutoff is the per-primitive minimum of the bound, 1.5 % over the 42 integration tests. 321/321 with `RUN_FULL_TEST=1` on `release-windows`. Earlier the same day: `Sph2CartTests.MatchesLibcintWithOrcaPhase` pins every `constants::sph2cart` table d-l=10 to libcint's real solid harmonics with ORCA's phase and angular norm (Lukas Seifert's derivation); this caught two swapped g rows and the h/i scale: ORCA's angular norm drops sqrt((2l-1)(2l-3)) from h on, so those tables were regenerated. `GbwHighAngularTests.OccupiedMOsAreNormalised_full` checks every ORCA contraction to 1e-12 and every occupied CuF2 MO to 1e-8 under the analytic primitive overlap, `IntegratesElectronCount_full` the Becke-grid electron count to 1e-3; `ReadsIFunctionFixtures` reads the three CuF2 `i`-function GBWs, verifies Cartesian types through 84 and finite positive grid densities. The twelve P1 XCW goldens regenerated on the corrected atom grids and the CDIIS SCF, gtests for the three `-xcw_incremental` cases, `RGBI_Groups_NH3BH3_sym` pinned to `-rgbi_basis nao`, `NH3BH3_sym_ano.good` regenerated after the ANO population fix; 312/312 with `RUN_FULL_TEST=1` on `release-windows`. 2026-09-14: one GPU binary per OS: the CUDA and HIP kernels compiled side by side into
 their own namespaces, dispatched at run time, neither runtime linked; `Linux GPU Release` and `Windows GPU
 Release` replace the four single-backend CI jobs. Earlier the same day: GPU CI: CUDA and HIP builds for
 Linux and Windows on GPU-less runners, occ `9bde072f7` compiles `ccsd.cpp` at `/O2` again;
@@ -19,6 +19,56 @@ partner's field, D4 dispersion and the density overlap S; `-salted_charge_constr
 with the golden case `SALTED_charge_constraint`, the `-interaction_energy` input modes and the
 `WFN::isBohr` reader fix, the interaction energy itself, the `Int_Params` fix, multipole-restrained
 RI fit, `computeRho` screening fix.)
+
+## 2026-09-24 — Either separator names the same flag
+
+`ConvenienceOptionsTests.EitherSeparatorNamesTheSameFlag` (`tests/src/ConvenienceTests.cpp`) pins the
+one normalisation in `options::digest_options()`: a token that starts with `-` followed by a letter has
+its remaining `-` turned into `_` before any digester sees it, so `-rgbi-groups` and `-rgbi_groups` are
+one option and the underscore is the canonical spelling. The five hand-written dual comparisons
+(`-no-date`, `-no_date_but_gpu`, `-density-difference`, `-rgbi-groups`, `-multipole-moments`) were
+collapsed to their underscore form.
+
+The test's last line is the reason for the `isalpha` guard: `-charge` does not advance `i`, so its value
+token is read again in flag position on the next round. Rewriting `-1` to `_1` would have broken every
+negative-valued option, and no other test would have noticed.
+
+## 2026-09-24 — The in-house NBO analysis: what is checked by a gtest and what by the reference corpus
+
+`NrtTests` (`tests/src/NrtTests.cpp`) drives the public `native_nrt()` on synthetic input, because
+everything inside `Src/core/nrt.cpp` is in an anonymous namespace on purpose. Three cases, all with
+analytic expectations and no golden file:
+
+- `ParentThatSpansTheDensityTakesAllTheWeight` — two one-NAO hydrogens, `Gamma = 2 v v^T` with
+  `v = (1,1)/sqrt(2)`, parent = one bond. The parent's own orbital set is then exactly the density,
+  so the answer is known: one structure at 100 %, `D(w) = 0` to 1e-8, `rho_NL = 0`, bond order 1,
+  valency 1, electron count 2.
+- `IonicBondOrderIsLinearInThePolarity` — the same system with `v = (sqrt(0.8), sqrt(0.2))`, so the
+  bond orbital's polarity is `i = c_A^2 - c_B^2 = 0.6` exactly. The ionic share of a bond order is
+  `|i| b`, not `i^2 b`: the test demands 0.6/0.4 and fails at 0.36 if that is ever "corrected".
+  Acetylene's printed NBO table is the external evidence for the same thing (`i = 0.2334`,
+  `ionic/total = 0.2262/0.9693 = 0.23336`).
+- `DerivedQuantitiesAreConsistentOverAMultiStructureFit` — three atoms, one electron pair,
+  `-nrt_exhaustive`, so several candidates compete and the answer is no longer known by hand. What
+  is checked are the identities: the weights are a probability vector, `D(w) <= D(0)`, every atom's
+  valency is its bond-order row sum, `valency = covalency + electrovalency`, the electron count is
+  `2 (lone pairs + valency)`, and the total bond order plus lone pairs is the one pair there is.
+
+The 22-molecule comparison against NBO 7.0.9 is **not** a gtest and is not meant to become one: the
+references are stored as JSON under `tests/nbo_reference/` and
+`py -3.12 tests/nbo_reference/compare_nbo.py --all .` reports 22 PASS, exit 0. NRT weights there must
+be compared **by rank, never by label**. gennbo itself reproduces TiCl4's `D(w)`, all 20 valencies and
+all 45 bond orders to every printed decimal at `NRTE2 = 10` and at `20` while individual weights move
+7.1 percentage points, because near-collinear candidates make the residual minimum unique and the
+argmin not. The label-free invariants are the bond orders, the valencies and `D(w)`.
+
+`compare_nbo_results()` in `Src/core/nbo_run.cpp` matches NRT weights by label and so cannot be used
+for this; it is fine for NAO, NPA and E2.
+
+Building a suite at all still needs the hand-link: `tests/src/CellMathTests.cpp` does not compile
+(`cell::grown_subgroup`, `cell::coset_representatives`, `cell::set_subgroup_factors` are gone), which
+stops ninja before it links `NoSpherA2_Tests`. The workaround is to link the executable by hand from
+the objects ninja did produce, leaving `CellMathTests.cpp.obj` out.
 
 ## 2026-09-16 — P1 XCW goldens regenerated, `-xcw_incremental` gtests, NAO pinned for `RGBI_Groups_NH3BH3_sym`
 
@@ -533,7 +583,7 @@ failed identically with the pTB changes stashed, so they were pre-existing.
 
 `XCW.cpp` and `scattering_factors.cpp` already gated their notes on `no_date`;
 `AtomGrid.cpp` and `SALTED_equicomb.cpp` had no access to the flag and were missed. They
-now consult `constants::hide_gpu_notes`, set by `-no-date` and following the
+now consult `constants::hide_gpu_notes`, set by `-no_date` and following the
 `constants::exp_cutoff` precedent for a runtime-settable global.
 
 That alone breaks `sucrose_SF_gpu_grid`, whose reference deliberately contains the note:

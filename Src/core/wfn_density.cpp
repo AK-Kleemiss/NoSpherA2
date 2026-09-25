@@ -10,6 +10,10 @@
 #include "libCintMain.h"
 #include "integrator.h"
 #include "cell.h"
+#ifdef NOSPHERA2_USE_GPU
+#include "aux_density_gpu.h"
+#include "esp_gpu.h"
+#endif
 
 
 const double WFN::compute_dens(
@@ -3020,39 +3024,56 @@ const double WFN::computeMO(
 
 // Boys function F_m(T) by a 6-term Taylor expansion around a tabulated grid (step 0.1 up to
 // T = 30, error < 1E-10), asymptotic beyond (1E-14); expn = exp(-T), which the caller has anyway
+// build_ESP_pairs refuses anything past g, so MaxFn = |l_i| + |l_j| <= 8 and the Taylor reads
+// m .. m + 5: a row of 15 doubles instead of 31 halves the table to 36 KB, which is the difference
+// between a row spanning four cache lines and two
+static constexpr int boys_mmax = 8 + 6, boys_nT = 301;
+static constexpr double boys_step = 0.1;
+// dT^k / k! by one multiply per term: a division by the loop counter was 5 of them per Boys call,
+// and on a device a double division is a software sequence
+static constexpr double boys_inv_k[6] = { 0.0, 1.0, 0.5, 1.0 / 3.0, 0.25, 0.2 };
+// 1 / (2n - 1) for the downward F_n recursion, n = 1 .. MaxFn, same reason
+static constexpr double boys_inv_odd[9] = { 0.0, 1.0, 1.0 / 3.0, 0.2, 1.0 / 7.0, 1.0 / 9.0, 1.0 / 11.0, 1.0 / 13.0, 1.0 / 15.0 };
+// file scope rather than a function-local static, so the hot loop carries no guard check and
+// the GPU kernel can be handed the same table through esp_boys_table()
+static const vec boys_tab = []()
+{
+	vec F((size_t)boys_nT * (boys_mmax + 1));
+	for (int i = 0; i < boys_nT; i++)
+	{
+		const double T0 = i * boys_step, e = exp(-T0);
+		// F_mmax by its series e^-T sum_k (2T)^k / ((2m+1)...(2m+2k+1)), then downward
+		double term = 1.0 / (2 * boys_mmax + 1), sum = term;
+		for (int k = 1; term > 1E-17 * sum; k++)
+			term *= 2 * T0 / (2 * boys_mmax + 2 * k + 1), sum += term;
+		double *row = F.data() + (size_t)i * (boys_mmax + 1);
+		row[boys_mmax] = e * sum;
+		for (int n = boys_mmax - 1; n >= 0; n--)
+			row[n] = (2 * T0 * row[n + 1] + e) / (2 * n + 1);
+	}
+	return F;
+}();
+
+const double *esp_boys_table(int &nT, int &stride, double &step)
+{
+	nT = boys_nT, stride = boys_mmax + 1, step = boys_step;
+	return boys_tab.data();
+}
+
 static double boys(const int m, const double T, const double expn)
 {
-	constexpr int mmax = 24 + 6, nT = 301;
-	constexpr double step = 0.1;
-	static const vec table = []()
-	{
-		vec F((size_t)nT * (mmax + 1));
-		for (int i = 0; i < nT; i++)
-		{
-			const double T0 = i * step, e = exp(-T0);
-			// F_mmax by its series e^-T sum_k (2T)^k / ((2m+1)...(2m+2k+1)), then downward
-			double term = 1.0 / (2 * mmax + 1), sum = term;
-			for (int k = 1; term > 1E-17 * sum; k++)
-				term *= 2 * T0 / (2 * mmax + 2 * k + 1), sum += term;
-			double *row = F.data() + (size_t)i * (mmax + 1);
-			row[mmax] = e * sum;
-			for (int n = mmax - 1; n >= 0; n--)
-				row[n] = (2 * T0 * row[n + 1] + e) / (2 * n + 1);
-		}
-		return F;
-	}();
-	if (T >= (nT - 1) * step)
+	if (T >= (boys_nT - 1) * boys_step)
 	{
 		double f = 0.5 * sqrt(constants::PI / T); // F_0, then upward, stable at this T
 		for (int n = 1; n <= m; n++)
 			f = ((2 * n - 1) * f - expn) / (2 * T);
 		return f;
 	}
-	const int i = (int)(T / step + 0.5);
-	const double dT = i * step - T, *row = table.data() + (size_t)i * (mmax + 1) + m;
-	double f = 0, pw = 1;
-	for (int k = 0; k <= 5; k++, pw *= dT / k)
-		f += row[k] * pw;
+	const int i = (int)(T * (1.0 / boys_step) + 0.5);
+	const double dT = i * boys_step - T, *row = boys_tab.data() + (size_t)i * (boys_mmax + 1) + m;
+	double f = row[0], pw = 1;
+	for (int k = 1; k <= 5; k++)
+		pw *= dT * boys_inv_k[k], f += row[k] * pw;
 	return f;
 }
 const double WFN::fj(int &j, int &l, int &m, double &aa, double &bb) const
@@ -3087,14 +3108,13 @@ const double WFN::Afac(int &l, int &r, int &i, double &PC, double &gamma, double
 		return temp;
 }
 
-// number of (l, r, s) terms of one axis with l_i + l_j = L
+// number of (l, r, s) terms of one axis with l_i + l_j = L: sum over l <= L, r <= l / 2 of
+// (l - 2 r) / 2 + 1. Tabulated because computeESP asks for it three times per pair, and L is
+// bounded by 8 - the g x g ceiling build_ESP_pairs refuses to go past.
 static int esp_axis_terms(const int L)
 {
-	int n = 0;
-	for (int l = 0; l <= L; l++)
-		for (int r = 0; r <= l / 2; r++)
-			n += (l - 2 * r) / 2 + 1;
-	return n;
+	static constexpr int n[9] = { 1, 2, 5, 8, 14, 20, 30, 40, 55 };
+	return n[L];
 }
 
 WFN::ESP_pairs WFN::build_ESP_pairs() const
@@ -3105,6 +3125,15 @@ WFN::ESP_pairs WFN::build_ESP_pairs() const
 	const double *coef = get_coef_primitive_major(); // [prim][mo]
 	int l_i[3], l_j[3];
 	double Pi[3], Pj[3];
+	// The (l,r,s) tables here and in computeESP are sized for a g x g pair: Afac_pre is [9][5][9],
+	// so an axis takes l_i + l_j <= 8, pcp is [3][9] and Fn is [25]. An h primitive indexes straight
+	// past all three, silently, and the OCC WFN constructor accepts shells up to l = 10 - so say so.
+	for (int iprim = 0; iprim < nprim; iprim++)
+	{
+		constants::type2vector(get_type(iprim), l_i);
+		if (l_i[0] < 0 || l_i[0] + l_i[1] + l_i[2] > 4)
+			err_not_impl_f("ESP of a primitive beyond g functions (type " + std::to_string(get_type(iprim)) + ")", std::cout);
+	}
 	t.off.push_back(0);
 	for (int iprim = 0; iprim < nprim; iprim++)
 	{
@@ -3159,58 +3188,182 @@ WFN::ESP_pairs WFN::build_ESP_pairs() const
 	return t;
 }
 
-const double WFN::computeESP(const d3 &PosGrid, const ESP_pairs &t) const
+// One copy of the pair loop for VL points at a time. Every index in it - L, the (l,r,s) count, the
+// F index, the PC power, the offset into coef - is a property of the pair and not of the point, so
+// the lane dimension carries nothing but arithmetic and -O3 can put it in a vector register. Each
+// lane replays exactly the operations the scalar version did, in the same order, so any VL gives
+// bitwise the same ESP - which is what EspTests.BatchMatchesThePerPointLoop pins at 0.
+template <int VL>
+static void esp_lanes(const WFN &wfn, const WFN::ESP_pairs &t,
+					  const double *px, const double *py, const double *pz, double *out)
 {
-	double ESP = 0;
-	for (int iat = 0; iat < get_ncen(); iat++)
+	double ESP[VL];
+	for (int v = 0; v < VL; v++)
+		ESP[v] = 0.0;
+	for (int iat = 0; iat < wfn.get_ncen(); iat++)
 	{
-		double r2 = 0;
-		for (int k = 0; k < 3; k++)
-			r2 += pow(PosGrid[k] - atoms[iat].get_coordinate(k), 2);
-		ESP += (get_atom_charge(iat) - atoms[iat].get_ECP_electrons()) / sqrt(r2); // ECP/xTB/pTB: only the valence electrons are in the MOs, so the core must not count as nuclear charge
+		const double cx = wfn.get_atom_coordinate(iat, 0), cy = wfn.get_atom_coordinate(iat, 1), cz = wfn.get_atom_coordinate(iat, 2);
+		// ECP/xTB/pTB: only the valence electrons are in the MOs, so the core must not count as nuclear charge
+		const double Z = wfn.get_atom_charge(iat) - wfn.get_atom_ECP_electrons(iat);
+		for (int v = 0; v < VL; v++)
+		{
+			const double dx = px[v] - cx, dy = py[v] - cy, dz = pz[v] - cz;
+			ESP[v] += Z / sqrt((dx * dx + dy * dy) + dz * dz);
+		}
 	}
 
-	double Fn[25], pcp[3][9], Al[506], Am[506], An[506]; // l_i, l_j <= 4 per axis (pre tables)
-	int mapl[506], mapm[506], mapn[506];
+	// B[axis][k] holds one axis pre-reduced by the F index its (l, r, s) term feeds, which is what
+	// lets the product loop below index Fn with its own counters. pw is reused per axis, so the
+	// per-pair state is 45 doubles per lane instead of the three 506-entry arrays it replaces.
+	double Fn[9][VL], B[3][9][VL], pw[9][VL], PC[3][VL], T[VL], expc[VL], term[VL]; // MaxFn <= 8, L[k] <= 8 for g x g
 	const int npairs = (int)t.weight.size();
 	for (int p = 0; p < npairs; p++)
 	{
 		const double ex_sum = t.ex_sum[p];
 		const std::array<int, 3> &L = t.L[p];
-		double sqpc = 0;
+		const int MaxFn = L[0] + L[1] + L[2];
+		const double Px = t.P[p][0], Py = t.P[p][1], Pz = t.P[p][2], w = t.weight[p];
+		for (int v = 0; v < VL; v++)
+		{
+			PC[0][v] = Px - px[v], PC[1][v] = Py - py[v], PC[2][v] = Pz - pz[v];
+			T[v] = ex_sum * ((PC[0][v] * PC[0][v] + PC[1][v] * PC[1][v]) + PC[2][v] * PC[2][v]);
+		}
+		int c = t.off[p];
+		// s-s pairs (the bulk of the table) have one (l,r,s) term per axis, every PC power 0, and
+		// F_0 never touches exp(-T) on either branch: bitwise the general path below, without the exp
+		if (MaxFn == 0)
+		{
+			const double cc = (t.coef[c] * t.coef[c + 1]) * t.coef[c + 2];
+			for (int v = 0; v < VL; v++)
+				ESP[v] -= w * (cc * boys(0, T[v], 0.0));
+			continue;
+		}
+		// exp(-T) is the only transcendental in here, and for a distant pair it is pointless: at T = 60
+		// it is 8.8E-27 against an F_0 of 0.114, so dropping it changes no bit of a double. The pair
+		// table of a 45-atom molecule is mostly distant pairs at any one point, and this branch is
+		// predictable, so the libm call survives only where it can still matter.
+		for (int v = 0; v < VL; v++)
+		{
+			expc[v] = T[v] < 60.0 ? exp(-T[v]) : 0.0;
+			Fn[MaxFn][v] = boys(MaxFn, T[v], expc[v]);
+		}
+		for (int nu = MaxFn - 1; nu >= 0; nu--)
+			for (int v = 0; v < VL; v++)
+				Fn[nu][v] = (expc[v] + 2 * T[v] * Fn[nu + 1][v]) * boys_inv_odd[nu + 1];
+
+		// Every (l, r, s) term of an axis multiplies exactly one F index, so summing the axis into
+		// B[k] first turns nl * nm * nn products with a gathered Fn index into (L0+1)(L1+1)(L2+1)
+		// products whose index is kx + ky + kz - 5.5 instead of 10.5 per pair over sucrose's table,
+		// and the innermost walk over Fn is contiguous. Exact factorisation, not an approximation.
 		for (int k = 0; k < 3; k++)
 		{
-			const double PC = t.P[p][k] - PosGrid[k];
-			sqpc += PC * PC;
-			pcp[k][0] = 1.0;
+			for (int v = 0; v < VL; v++)
+				pw[0][v] = 1.0;
 			for (int n = 1; n <= L[k]; n++)
-				pcp[k][n] = pcp[k][n - 1] * PC;
-		}
-		double expc = exp(-ex_sum * sqpc);
-		int MaxFn = L[0] + L[1] + L[2];
-		Fn[MaxFn] = boys(MaxFn, ex_sum * sqpc, expc);
-		const double twoexpc = 2 * ex_sum * sqpc;
-		for (int nu = MaxFn - 1; nu >= 0; nu--)
-			Fn[nu] = (expc + twoexpc * Fn[nu + 1]) / (2 * (nu + 1) - 1);
-
-		int c = t.off[p];
-		const int nl = esp_axis_terms(L[0]), nm = esp_axis_terms(L[1]), nn = esp_axis_terms(L[2]);
-		for (int l = 0; l < nl; l++, c++)
-			Al[l] = t.coef[c] * pcp[0][t.pc_pow[c]], mapl[l] = t.fn_idx[c];
-		for (int m = 0; m < nm; m++, c++)
-			Am[m] = t.coef[c] * pcp[1][t.pc_pow[c]], mapm[m] = t.fn_idx[c];
-		for (int n = 0; n < nn; n++, c++)
-			An[n] = t.coef[c] * pcp[2][t.pc_pow[c]], mapn[n] = t.fn_idx[c];
-
-		double term = 0.0;
-		for (int l = 0; l < nl; l++)
-			for (int m = 0; m < nm; m++)
+				for (int v = 0; v < VL; v++)
+					pw[n][v] = pw[n - 1][v] * PC[k][v];
+			for (int i = 0; i <= L[k]; i++)
+				for (int v = 0; v < VL; v++)
+					B[k][i][v] = 0.0;
+			for (int i = esp_axis_terms(L[k]); i--; c++)
 			{
-				const double lm = Al[l] * Am[m];
-				for (int n = 0; n < nn; n++)
-					term += lm * An[n] * Fn[mapl[l] + mapm[m] + mapn[n]];
+				const double cf = t.coef[c];
+				const double *const p_pw = pw[t.pc_pow[c]];
+				double *const p_B = B[k][t.fn_idx[c]];
+				for (int v = 0; v < VL; v++)
+					p_B[v] += cf * p_pw[v];
 			}
-		ESP -= t.weight[p] * term;
+		}
+
+		for (int v = 0; v < VL; v++)
+			term[v] = 0.0;
+		for (int kx = 0; kx <= L[0]; kx++)
+			for (int ky = 0; ky <= L[1]; ky++)
+				for (int kz = 0; kz <= L[2]; kz++)
+				{
+					const double *const f = Fn[kx + ky + kz];
+					for (int v = 0; v < VL; v++)
+						term[v] += (B[0][kx][v] * B[1][ky][v]) * B[2][kz][v] * f[v];
+				}
+		for (int v = 0; v < VL; v++)
+			ESP[v] -= w * term[v];
 	}
+	for (int v = 0; v < VL; v++)
+		out[v] = ESP[v];
+}
+
+const double WFN::computeESP(const d3 &PosGrid, const ESP_pairs &t) const
+{
+	double ESP = 0;
+	esp_lanes<1>(*this, t, &PosGrid[0], &PosGrid[1], &PosGrid[2], &ESP);
 	return ESP;
 };
+
+// The host fallback of computeESP_batch: VL points share one pass over the pair table, the leftovers
+// go through the scalar path. Measured on sucrose, 32 threads, ESP cube: 68.0 s at one point per pass,
+// 24.1 at four, 16.3 at thirty-two, 15.6 at sixty-four, 15.4 at 128. What the loop is short of is not
+// arithmetic but the table - coef, pc_pow, fn_idx and the six per-pair arrays - so the fewer times per
+// point it is fetched the better, until the lane state (51 doubles per lane) stops fitting in L1.
+template <int VL>
+static void esp_host_pass(const WFN &wfn, const WFN::ESP_pairs &t, const std::vector<d3> &points, double *out)
+{
+	const int np = (int)points.size(), nblk = np / VL;
+#pragma omp parallel for schedule(static)
+	for (int b = 0; b < nblk; b++)
+	{
+		double px[VL], py[VL], pz[VL];
+		for (int v = 0; v < VL; v++)
+			px[v] = points[b * VL + v][0], py[v] = points[b * VL + v][1], pz[v] = points[b * VL + v][2];
+		esp_lanes<VL>(wfn, t, px, py, pz, out + (size_t)b * VL);
+	}
+	for (int i = nblk * VL; i < np; i++)
+		out[i] = wfn.computeESP(points[i], t);
+}
+
+// One call per point set instead of one per point: the pair table is O(nprim^2) and every point
+// walks all of it, so a whole grid is worth shipping to a device at once. Falls back to the
+// OpenMP loop over computeESP when there is no device (or the set is too small to pay the copies).
+void WFN::computeESP_batch(const std::vector<d3> &points, const ESP_pairs &t, double *out) const
+{
+	const int np = (int)points.size();
+	if (np == 0)
+		return;
+#ifdef NOSPHERA2_USE_GPU
+	const int ncen = get_ncen(), npairs = (int)t.weight.size();
+	// the pair table stays resident on the device between calls, so a slice only pays its own point
+	// upload and result download; 4M pair-point evaluations already beat the OpenMP loop comfortably
+	if (npairs > 0 && (long long)np * npairs >= (1LL << 22) && aux_density_gpu_enabled())
+	{
+		vec ax(ncen), ay(ncen), az(ncen), q(ncen);
+		for (int a = 0; a < ncen; a++)
+		{
+			ax[a] = atoms[a].get_coordinate(0), ay[a] = atoms[a].get_coordinate(1), az[a] = atoms[a].get_coordinate(2);
+			q[a] = get_atom_charge(a) - atoms[a].get_ECP_electrons();
+		}
+		int nT = 0, stride = 0;
+		double step = 0;
+		const double *tab = esp_boys_table(nT, stride, step);
+		// The whole set in one launch, deliberately: the kernel is latency bound, not bandwidth bound,
+		// so it needs every SM occupied to hide its local-memory loads. Feeding it in quarters to
+		// overlap the idle cores (measured 24 Sep) cost more than the cores were worth - 87312 faces
+		// took 38750 ms in shrinking blocks against 19902 ms in one, because the tail launches run at
+		// a fraction of the occupancy. A split would have to be one cut with both sides launched once.
+		if (esp_gpu_eval(ncen, ax.data(), ay.data(), az.data(), q.data(),
+						 npairs, t.ex_sum.data(), t.weight.data(), t.P[0].data(), t.L[0].data(),
+						 t.off.data(), t.coef.data(), t.pc_pow.data(), t.fn_idx.data(),
+						 nT, stride, step, tab, np, points[0].data(), out))
+			return;
+	}
+#endif
+	// One block is VL points of work, so a small set must not be cut into fewer blocks than there are
+	// threads - below that the wide pass wins less than the idle cores lose. Every width gives bitwise
+	// the same answer (each lane replays the scalar operations in the scalar order), which is what
+	// EspTests.BatchMatchesThePerPointLoop pins at max |batch - per point| 0.
+	const int nthr = omp_get_max_threads();
+	if (np >= 64 * nthr)
+		esp_host_pass<64>(*this, t, points, out);
+	else if (np >= 8 * nthr)
+		esp_host_pass<8>(*this, t, points, out);
+	else
+		esp_host_pass<1>(*this, t, points, out);
+}

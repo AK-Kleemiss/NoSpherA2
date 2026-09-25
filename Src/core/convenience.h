@@ -801,6 +801,8 @@ struct options
     ivec cmo2;
     ivec ignore;
     std::filesystem::path salted_model_dir;
+    //Every model given to -SALTED, in that order; salted_model_dir is the first of them
+    pathvec salted_model_dirs;
     std::vector<std::shared_ptr<BasisSet>> aux_basis;
     std::filesystem::path wfn;
     std::filesystem::path wfn2;
@@ -895,9 +897,19 @@ struct options
 	double xcw_strong_cutoff = 3.0;
     bool calc_F_calc = false;
     bool rgbi = false;
+    //-npa: natural atomic orbitals and natural population analysis (NAO/NPA), run in-process
+    bool npa = false;
+    //-npa_naos: also print the per-NAO occupancy table, as NBO's NATURAL POPULATIONS block
+    bool npa_orbitals = true;
     bool rgbi_no_sym = false;
     bool rgbi_EVs = false;
     bool rgbi_theta = false;
+    //-rgbi_legacy_cutoff: pick the atomic subspace by thresholding the occupation numbers (1/6 for
+    //NAOs, 1/14 for ANOs) as releases before this one did, instead of by the element's free-atom
+    //orbital count. The threshold makes the rank of the atomic projector, and therefore every bond
+    //index, jump when an occupation crosses it - LiH moves from 0.06 to 0.95 over 0.025 A - so this
+    //is only for reproducing older numbers.
+    bool rgbi_legacy_cutoff = false;
     RGBIOrbitalBasis rgbi_orbital_basis = RGBIOrbitalBasis::ANO;
     ivec3 rgbi_group_sets;
     bool fract = false;
@@ -972,6 +984,9 @@ struct options
     //-basin_grid <n>: the quadrature of the basin analysis pulled into the core, tightest
     //exponent sharpened n^2-fold, radial step divided by n, Lebedev order up n - 1 entries
     int basin_grid = 1;
+    //-basin_cube: go back to finding the QTAIM basins on the cube. The default takes their
+    //attractors from the analytic critical-point search instead, which no voxel can add to
+    bool basin_cube = false;
     int threads = -1;
     int pbc = 0;
     int charge = 0;

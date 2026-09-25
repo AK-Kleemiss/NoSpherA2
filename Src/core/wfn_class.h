@@ -122,6 +122,9 @@ private:
 	vec UT_SpinDensityMatrix;
 	// Density Matrix in mdarray
 	dMatrix2 DM;
+	// Beta-spin part of DM, same order and size. Only filled by readers that separate the spins
+	// (gbw, molden); empty for a restricted case and for readers that only sum the two.
+	dMatrix2 DM_beta;
 	// Spherical MO coefficients as OCC converged them, rows = AO in OCC's m = -l..l order
 	// (beta block below alpha when unrestricted), columns = MO. Filled by the OCC constructor.
 	dMatrix2 MO_sph;
@@ -313,8 +316,8 @@ public:
 	bool write_wfn(const std::filesystem::path& fileName, const bool& debug, const bool occupied) const;
 	/** Write an AIM .wfx file; occupied drops the virtual MOs. */
 	bool write_wfx(const std::filesystem::path& fileName, const bool occupied) const;
-	/** Write current wavefunction to .47 file (optionally only occupied). */
-	bool write_nbo(const std::filesystem::path& fileName, const bool& debug, std::ostream* progress_log = nullptr);
+	/** Write current wavefunction to .47 file; nbo_keywords go into the $NBO keylist (e.g. "NRT NRTE2=5"). */
+	bool write_nbo(const std::filesystem::path& fileName, const bool& debug, std::ostream* progress_log = nullptr, const std::string& nbo_keywords = "");
 	/** Write atomic geometry to .xyz file. */
 	bool write_xyz(const std::filesystem::path& fileName);
 	/** Set internal path field. */
@@ -603,6 +606,8 @@ public:
 	ESP_pairs build_ESP_pairs() const;
 	/** Electrostatic potential including nuclear cores. */
 	const double computeESP(const d3& PosGrid, const ESP_pairs& pairs) const;
+	/** computeESP for a whole point set, out holds points.size() values; GPU when one is there, OpenMP otherwise. */
+	void computeESP_batch(const std::vector<d3>& points, const ESP_pairs& pairs, double* out) const;
 	//----------DM Handling--------------------------------
 	/** Build density (and optionally spin density) matrix; loads basis if required. */
 	bool build_DM(std::string basis_set_path, bool debug = false);
@@ -620,6 +625,10 @@ public:
 	dMatrix2 get_dm() const { return DM; };
 	/** Set density matrix*/
 	void set_dm(const dMatrix2& in) { DM = in; };
+	/** Beta-spin density matrix if the reader kept one, empty otherwise. */
+	dMatrix2 get_dm_beta() const { return DM_beta; };
+	/** Set beta-spin density matrix*/
+	void set_dm_beta(const dMatrix2& in) { DM_beta = in; };
 	//----------S_DM Handling--------------------------------
 	/** Append spin density matrix element. */
 	void push_back_SDM(const double& value = 0.0);

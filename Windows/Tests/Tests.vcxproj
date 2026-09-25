@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -26,6 +26,8 @@
     <ClCompile Include="..\..\tests\src\DeltaSeriesTests.cpp" />
     <ClCompile Include="..\..\tests\src\DensitySourceTests.cpp" />
     <ClCompile Include="..\..\tests\src\Nbo47Tests.cpp" />
+    <ClCompile Include="..\..\tests\src\NrtTests.cpp" />
+    <ClCompile Include="..\..\tests\src\NboSearchTests.cpp" />
     <ClCompile Include="..\..\tests\src\pch.cpp">
       <PrecompiledHeader>Create</PrecompiledHeader>
     </ClCompile>
@@ -36,19 +38,28 @@
     <ClCompile Include="..\..\tests\src\BasisConstantsTests.cpp" />
     <ClCompile Include="..\..\tests\src\BondwiseTests.cpp" />
     <ClCompile Include="..\..\tests\src\CellMathTests.cpp" />
+    <ClCompile Include="..\..\tests\src\CitationTests.cpp" />
     <ClCompile Include="..\..\tests\src\ConvenienceTests.cpp" />
     <ClCompile Include="..\..\tests\src\CubeTests.cpp" />
+    <ClCompile Include="..\..\tests\src\DelocalizationTests.cpp" />
+    <ClCompile Include="..\..\tests\src\EliFamilyTests.cpp" />
+    <ClCompile Include="..\..\tests\src\ExtinctionTests.cpp" />
     <ClCompile Include="..\..\tests\src\FieldSurfaceTests.cpp" />
     <ClCompile Include="..\..\tests\src\GridTests.cpp" />
     <ClCompile Include="..\..\tests\src\HighAngularTests.cpp" />
     <ClCompile Include="..\..\tests\src\LibcintDispatchTests.cpp" />
     <ClCompile Include="..\..\tests\src\MathFunctionTests.cpp" />
+    <ClCompile Include="..\..\tests\src\MoldenConventionTests.cpp" />
+    <ClCompile Include="..\..\tests\src\NaoTests.cpp" />
+    <ClCompile Include="..\..\tests\src\OccSecondOrderScfTests.cpp" />
     <ClCompile Include="..\..\tests\src\PropertiesTests.cpp" />
     <ClCompile Include="..\..\tests\src\RiEnergyTests.cpp" />
     <ClCompile Include="..\..\tests\src\SaltedFchkTests.cpp" />
     <ClCompile Include="..\..\tests\src\ScatteringFactorTests.cpp" />
     <ClCompile Include="..\..\tests\src\StoredEriTests.cpp" />
+    <ClCompile Include="..\..\tests\src\StreamingBasinTests.cpp" />
     <ClCompile Include="..\..\tests\src\StringUtilTests.cpp" />
+    <ClCompile Include="..\..\tests\src\TopologyTests.cpp" />
     <ClCompile Include="..\..\tests\src\TscIoTests.cpp" />
     <ClCompile Include="..\..\tests\src\WfnOpsTests.cpp" />
     <ClCompile Include="..\..\tests\src\WfnReadTests.cpp" />

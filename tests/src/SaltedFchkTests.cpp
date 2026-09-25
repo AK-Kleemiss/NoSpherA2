@@ -156,7 +156,7 @@ namespace
 		if (with_basis)
 		{
 			salted_writer w;
-			w.block_head(2);
+			w.block_head(3);
 			w.raw(static_cast<int32_t>(1));
 			w.dataset(std::vector<int32_t>{ 1 }, { 1 });
 			w.dataset(std::vector<int32_t>{ 0 }, { 1 });
@@ -167,6 +167,12 @@ namespace
 			w.dataset(std::vector<int32_t>{ 0, 1 }, { 2 });
 			w.dataset(vec{ 2.0, 0.7 }, { 2 });
 			w.dataset(vec{ 1.0, 1.0 }, { 2 });
+			// carbon carries one CONTRACTED shell: two primitives sharing one angular momentum
+			w.raw(static_cast<int32_t>(6));
+			w.dataset(std::vector<int32_t>{ 2 }, { 1 });
+			w.dataset(std::vector<int32_t>{ 1 }, { 1 });
+			w.dataset(vec{ 3.0, 0.9 }, { 2 });
+			w.dataset(vec{ 0.6, 0.4 }, { 2 });
 			blocks.emplace_back("BASIS", w.buf);
 		}
 		salted_writer h;
@@ -482,11 +488,12 @@ TEST(SaltedFchkIoTests, SyntheticModelBasisSet)
 	}
 	std::filesystem::remove(p);
 	ASSERT_TRUE(b);
-	EXPECT_EQ(b->get_owned_primitive_count(), 3u);
-	EXPECT_EQ(b->get_primitive_count(), 3u);
+	EXPECT_EQ(b->get_owned_primitive_count(), 5u);
+	EXPECT_EQ(b->get_primitive_count(), 5u);
 	EXPECT_TRUE(b->has_element(1));
 	EXPECT_TRUE(b->has_element(8));
-	EXPECT_FALSE(b->has_element(6));
+	EXPECT_TRUE(b->has_element(6));
+	EXPECT_FALSE(b->has_element(7));
 	const auto h = (*b)[0];
 	ASSERT_EQ(h.size(), 1u);
 	EXPECT_NEAR(h[0].exp, 1.5, 1e-15);
@@ -497,6 +504,15 @@ TEST(SaltedFchkIoTests, SyntheticModelBasisSet)
 	EXPECT_EQ(o[1].type, 1);
 	EXPECT_EQ(o[1].shell, 1);
 	EXPECT_EQ(o[0].shell, 0);
+	// both primitives of the contracted shell keep the shell's angular momentum
+	const auto c = (*b)[5];
+	ASSERT_EQ(c.size(), 2u);
+	EXPECT_EQ(c[0].type, 1);
+	EXPECT_EQ(c[1].type, 1);
+	EXPECT_EQ(c[0].shell, 0);
+	EXPECT_EQ(c[1].shell, 0);
+	EXPECT_NEAR(c[1].exp, 0.9, 1e-15);
+	EXPECT_NEAR(c[1].coefficient, 0.4, 1e-15);
 }
 
 // wanted species are loaded, the rest contribute only their shape; features load everything and keep row-major order
@@ -603,6 +619,18 @@ TEST(SaltedFchkIoTests, CorruptHeaderExits)
 	std::filesystem::remove(bad_magic);
 	std::filesystem::remove(neg);
 	std::filesystem::remove(trunc);
+}
+
+// a model that stopped copying part-way keeps a valid header listing blocks that are
+// no longer in the file; it has to say so instead of failing inside the first block read
+TEST(SaltedFchkIoTests, TruncatedFileExits)
+{
+	const auto p = tmp_path("truncated.salted");
+	write_synthetic_model(p, 3, true, true);
+	const auto full = std::filesystem::file_size(p);
+	std::filesystem::resize_file(p, full / 2);
+	EXPECT_EXIT(SALTED_BINARY_FILE f(p), ::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), "is incomplete");
+	std::filesystem::remove(p);
 }
 
 // asking for a block the table of contents does not list is fatal

@@ -14,6 +14,11 @@
 #include "geometry_aid.h"
 #include "crystal_energies.h"
 #include "SALTED_equicomb.h"
+#include "nbo_run.h"
+#include "nbo.h"
+#include "eli_family.h"
+#include "topology.h"
+#include "citations.h"
 
 #ifdef _WIN32
 #include <windows.h>
@@ -173,7 +178,9 @@ std::string help_message =
  "============================================================================\n"
  "Syntax: NoSpherA2 [options]\n"
  "Values in [brackets] are optional.  Repeatable options may be supplied more\n"
- "than once.  Input files and options may be given in any order unless noted.\n\n"
+ "than once.  Input files and options may be given in any order unless noted.\n"
+ "Every option accepts either separator: -rgbi_groups and -rgbi-groups are the\n"
+ "same flag, and the spelling below is the canonical one.\n\n"
  "GETTING STARTED\n"
  "  HAR/TSC:  -cif model.cif -hkl data.hkl -wfn wavefunction.wfx -acc 2\n"
  "  IAM TSC:  -cif model.cif -hkl data.hkl -xyz model.xyz -IAM -acc 2\n\n"
@@ -396,26 +403,148 @@ std::string help_message =
  "                                    wavefunction and writes\n"
  "                                    NA2_<lambda>_RGBI.txt; the .wfn and\n"
  "                                    .fchk written there cannot carry it.\n"
+ "  -npa                               Natural atomic orbitals and natural\n"
+ "                                    population analysis (NAO/NPA). Needs a\n"
+ "                                    contracted spherical basis, so a .gbw,\n"
+ "                                    .molden or .fchk, not a .wfn/.wfx.\n"
+ "  -npa_summary                       -npa without the per-orbital NAO table.\n"
  "  -rgbi_no_sym                       RGBI without atomic O_h symmetrization.\n"
  "  -rgbi_basis <nao|ano>              RGBI basis: occupied NAO or ANO [ano].\n"
- "  -rgbi-groups <range ...>           RGBI groups, e.g. 0-5,7; repeat option\n"
+ "  -rgbi_groups <range ...>           RGBI groups, e.g. 0-5,7; repeat option\n"
  "                                    for multiple group sets.\n"
  "  -promol_nci <a.xyz> <b.xyz> [c.xyz ...] [rcut1 rcut2 rho_max rdg_max colour_max]\n"
  "                                    Promolecular NCI/RDG outputs. Defaults:\n"
  "                                    rcut1=0.95 and rcut2=0.75.\n"
- "  -promol_nci_single_thread          Disable NCI parallel processing.\n"
+ "  -promol_nci_single_thread          Disable NCI parallel processing.\n\n"
+ "BONDING ANALYSIS\n"
+ "  -topology <wfn>                    All critical points of rho (nuclear,\n"
+ "                                    bond, ring, cage) by Newton-Raphson on\n"
+ "                                    the analytic Hessian, with the\n"
+ "                                    Poincare-Hopf completeness check and any\n"
+ "                                    non-nuclear attractors.\n"
+ "  -laplacian_bonds <wfn>             Plot density Laplacian along bonds.\n"
+ "  -eli_analysis <wfn> <resolution> <radius>\n"
+ "                                    QTAIM and ELI-D basins of the density and\n"
+ "                                    ELI-D cubes (resolution and radius in\n"
+ "                                    Angstrom), each basin's electrons by a\n"
+ "                                    voxel sum and on the atomic quadrature\n"
+ "                                    grids, the boundary followed along the\n"
+ "                                    field; -acc 4 before it tightens the\n"
+ "                                    latter from 0.005 to 0.002 e. With -ECP\n"
+ "                                    the core an ECP removed is filled from\n"
+ "                                    Thakkar densities for the QTAIM basins.\n"
+ "                                    A real analysis needs 0.05 A or finer;\n"
+ "                                    -ri_fit <aux basis> before it (or\n"
+ "                                    -SALTED <model> with an xyz as <wfn>)\n"
+ "                                    takes rho and its gradient from the\n"
+ "                                    fitted density, one pass over the\n"
+ "                                    auxiliary functions instead of the\n"
+ "                                    orbital sum, so the QTAIM basins are\n"
+ "                                    those of the fitted density. ELI-D\n"
+ "                                    stays on the orbitals (a density-only\n"
+ "                                    ELI-D is flat over bonds and lone\n"
+ "                                    pairs) and is skipped without them.\n"
+ "                                    The atomic overlap matrices fall out of\n"
+ "                                    the same point loop, so the QTAIM set\n"
+ "                                    also reports localisation and\n"
+ "                                    delocalization indices; they are left\n"
+ "                                    out, with a note saying so, when the\n"
+ "                                    matrices would need over 512 MB.\n"
+ "  -basin_grid <n>                    Pull the basin quadrature into the core:\n"
+ "                                    tightest exponent sharpened n^2-fold, the\n"
+ "                                    radial step divided by n, the angular\n"
+ "                                    order up n-1 steps. For heavy atoms.\n"
+ "  -basin_cube                        Find the QTAIM basins on the cube, as\n"
+ "                                    before. The default takes their attractors\n"
+ "                                    from the analytic critical-point search, so\n"
+ "                                    the grid can no longer invent one; use this\n"
+ "                                    to compare against the older behaviour.\n"
+ "  -eli_family <wfn> [points_file]\n"
+ "                                    The rest of Kohout's ELI family as point\n"
+ "                                    values: ELI-D for alpha-alpha, beta-beta and\n"
+ "                                    triplet-coupled pairs and ELI-q, in DGrid 5.2\n"
+ "                                    conventions. Without a points file only the\n"
+ "                                    status of each member is printed; with one\n"
+ "                                    ('x y z' per line, bohr) every field at every\n"
+ "                                    point. ELIA needs a correlated 2-matrix and is\n"
+ "                                    not available - the report says why.\n"
  "  -qtaim_eli <rho.cube> <eli.cube> <atoms> [background]\n"
  "  -qtaim_eli <wfn> <atoms> [resolution radius background]\n"
  "                                    Keep ELI only in QTAIM basins of 0-based,\n"
  "                                    comma-separated atom indices. Runs at\n"
  "                                    once, so -ri_fit or -SALTED must come\n"
  "                                    before it (see -eli_analysis).\n"
- "  -laplacian_bonds <wfn>             Plot density Laplacian along bonds.\n\n"
+ "  -convert_to_47 <wfn>               Write an NBO File47 (.47). Add\n"
+"                                    -nbo_keywords \"NRT NRTE2=5\" to fill the\n"
+"                                    $NBO keylist.\n"
+"  -nbo <wfn>                         Write the .47, run the external NBO on it\n"
+"                                    and parse the output into <stem>.nbo.json:\n"
+"                                    NPA, NAO, NBOs with hybridisations, the E2\n"
+"                                    donor-acceptor table and NRT weights and\n"
+"                                    bond orders. Options: -nbo_keywords,\n"
+"                                    -nbo_exe <gennbo>, -nbo_json <file>,\n"
+"                                    -nbo_dir <dir>. Without -nbo_exe it calls\n"
+"                                    ~/nbo7/gennbo through WSL on Windows and\n"
+"                                    gennbo from PATH elsewhere.\n"
+"  -nbo_parse <out.nbo>               Parse an NBO output that already exists into\n"
+"                                    <stem>.nbo.json. Options: -nbo_json <file>.\n"
+ "  -nbo_native <wfn>                  The same analysis without the external\n"
+ "                                    program: NAOs and NPA, the NBO search with\n"
+ "                                    hybridisations, E2, and with -nrt natural\n"
+ "                                    resonance theory. Writes\n"
+ "                                    <stem>.native.nbo.json in the format -nbo\n"
+ "                                    writes, so tests/nbo_reference/compare_nbo.py\n"
+ "                                    measures the two against each other.\n"
+ "                                    Options: -nbo_json <file>, -nbo_e2min <kcal>\n"
+ "                                    (default 0.5, what enters the E2 table),\n"
+ "                                    -nbo_threads <n> (0: the OpenMP default),\n"
+ "                                    -nbo_47 <file> to read an existing FILE47\n"
+ "                                    instead of building one from the\n"
+ "                                    wavefunction, -nbo_keep47 to keep the one it\n"
+ "                                    builds.\n"
+ "  -nrt                               Natural resonance theory after the search\n"
+ "                                    (with -nbo_native): the candidate resonance\n"
+ "                                    structures, the convex quadratic program\n"
+ "                                    that weights them, and the bond orders,\n"
+ "                                    valencies and topology matrices those\n"
+ "                                    weights imply, covalent and ionic apart.\n"
+ "  -nrt_e2 <kcal>                     Donor-acceptor gate on what enters the\n"
+ "                                    resonance search, NBO's NRTE2; default 2.0,\n"
+ "                                    which is between ethane's 2.80 kcal\n"
+ "                                    hyperconjugation and water's strongest\n"
+ "                                    1.01 kcal, so both get the structure count\n"
+ "                                    NBO gives them.\n"
+ "  -nrt_arrows <n>                    Depth of the arrow-driven candidate\n"
+ "                                    generation, default 2.\n"
+ "  -nrt_exhaustive                    Enumerate every feasible topology instead\n"
+ "                                    of following arrows. For small systems, and\n"
+ "                                    for checking the arrow search missed none.\n"
+ "  -nrt_bond_scale <f>                Longest bond a candidate may place,\n"
+ "                                    f * (r_cov,A + r_cov,B); default 1.75,\n"
+ "                                    looser than the search's own 1.3 because a\n"
+ "                                    resonance structure may bond atoms the\n"
+ "                                    parent does not - ozone's ring structure at\n"
+ "                                    23.6 % spans 2.24 A against 1.32 A.\n"
+ "  -nrt_max <n>                       Candidate limit, default 4000 capped by a size guard on big molecules.\n"
+ "  -nrt_atoms <a,b,...>               Subspace NRT: only these 1-based atoms may\n"
+ "                                    change, the rest keep the parent structure's\n"
+ "                                    bonding. NBO's 'NRT <atoms>'.\n"
+ "  -nrt_no_symmetry                   Keep candidates related by an automorphism\n"
+ "                                    of the molecule instead of collapsing them\n"
+ "                                    onto one weight.\n"
+ "  -nrt_no_components                 Weight the molecule as one problem instead\n"
+ "                                    of splitting it into connected components of\n"
+ "                                    the delocalisation graph.\n"
+ "  -nrt_no_ion                        Forbid candidates that move a bond onto a\n"
+ "                                    lone pair (NBO's NRTION off).\n\n"
  "CONVERSION, ML, AND SPECIALISED TOOLS\n"
  "  -gbw2wfn -wfn <file.gbw>            Convert GBW input to .wfn.\n"
- "  -convert_to_47 <wfn>               Write an NBO File47 (.47).\n"
- "  -fchk <output.fchk>                Write FCHK output (requires -b and -d).\n"
- "  -SALTED <model-dir>                Predict density with a SALTED model.\n"
+ "  -fchk <output.fchk>              Write FCHK output (requires -b and -d).\n"
+ "  -SALTED <model> [<model> ...]      Predict density with a SALTED model.\n"
+ "                                    A model is a directory or a .salted file.\n"
+ "                                    With several, each element is predicted by\n"
+ "                                    the first model trained on it and the\n"
+ "                                    per-atom blocks are stitched together.\n"
  "                                    With -xyz instead of -wfn the prediction\n"
  "                                    is the structure's density for -rho,\n"
  "                                    -esp, -lap, -eli, -esp_isosurface and the Hirshfeld\n"
@@ -453,39 +582,14 @@ std::string help_message =
  "  -v | -v2 | -debug                  Verbose diagnostic output.\n"
  "  -profiling [tests-root]            Run the internal profiling suite\n"
  "                                    [./tests]. Alias: -profile.\n"
- "  -no-date                           Suppress date information and the GPU notes, so\n"
+ "  -no_date                           Suppress date information and the GPU notes, so\n"
  "                                    output does not depend on the machine it ran on.\n"
- "  -no_date_but_gpu                   As -no-date, but keeps the GPU notes. For the\n"
+ "  -no_date_but_gpu                   As -no_date, but keeps the GPU notes. For the\n"
  "                                    tests whose reference has to show that the device\n"
  "                                    did the work, a silent fallback being otherwise\n"
  "                                    indistinguishable from the CPU result.\n"
  "  -draw_orbits l,m[,resolution,radius]\n"
  "                                    Draw a spherical-harmonic orbital.\n"
- "  -eli_analysis <wfn> <resolution> <radius>\n"
- "                                    QTAIM and ELI-D basins of the density and\n"
- "                                    ELI-D cubes (resolution and radius in\n"
- "                                    Angstrom), each basin's electrons by a\n"
- "                                    voxel sum and on the atomic quadrature\n"
- "                                    grids, the boundary followed along the\n"
- "                                    field; -acc 4 before it tightens the\n"
- "                                    latter from 0.005 to 0.002 e. With -ECP\n"
- "                                    the core an ECP removed is filled from\n"
- "                                    Thakkar densities for the QTAIM basins.\n"
- "                                    A real analysis needs 0.05 A or finer;\n"
- "                                    -ri_fit <aux basis> before it (or\n"
- "                                    -SALTED <model> with an xyz as <wfn>)\n"
- "                                    takes rho and its gradient from the\n"
- "                                    fitted density, one pass over the\n"
- "                                    auxiliary functions instead of the\n"
- "                                    orbital sum, so the QTAIM basins are\n"
- "                                    those of the fitted density. ELI-D\n"
- "                                    stays on the orbitals (a density-only\n"
- "                                    ELI-D is flat over bonds and lone\n"
- "                                    pairs) and is skipped without them.\n"
- "  -basin_grid <n>                    Pull the basin quadrature into the core:\n"
- "                                    tightest exponent sharpened n^2-fold, the\n"
- "                                    radial step divided by n, the angular\n"
- "                                    order up n-1 steps. For heavy atoms.\n"
  "  -ewal_sum <cube> [kmax] [accuracy] Ewald sum of a cube.\n"
  "  -atom_dens <wfn> [alpha-MOs beta-MOs]\n"
  "  -atom_dens_diff <gbw1> <gbw2>      Difference density from two GBW files.\n"
@@ -525,6 +629,7 @@ std::string help_message =
  "  -refine [accuracy]                  Set refinement integral accuracy [0.1].\n"
  "  -rgbi_EVs                           Include RGBI eigenvectors.\n"
  "  -rgbi_theta                         Include per-bond Roby-Gould theta-subspace populations and indices.\n"
+ "  -rgbi_legacy_cutoff                 RGBI atomic subspaces from occupation-number thresholds (pre-fix, jumps with geometry).\n"
  "  -sfac_diffuse x y z cif wfn dmin    Calculate diffuse scattering factors.\n\n"
  "EXPERIMENTAL AND DEVELOPER COMMANDS\n"
  "  -coef <file>                        Use externally supplied SALTED\n"
@@ -661,7 +766,8 @@ std::string NoSpherA2_message(bool no_date)
         t.append("Aux basis /RI partitioning  : Seifert et al. Z. Krist. - Cryst. Mat. 2026, 241, 283 - 295.\n");
         t.append("Embedding for HAR at        : Landeros-Rivera & Kleemiss, J. Appl. Cryst. 2026, 59, 10.1107/S160057672600717X.\n");
         t.append("TFVC partitioning at        : Gimferrer et al. TBA.\n");
-        t.append("MBIS/EMBIS partitioning at  : Nielsen et al. TBA.\n");
+        t.append("MBIS partitioning at        : Verstraelen et al. J. Chem. Theory Comput. 2016, 12, 3894 - 3912.\n");
+        t.append("EMBIS partitioning at       : Nielsen & Jensen, J. Chem. Theory Comput. 2025, 21, 8753 - 8761.\n");
     }
     return t;
 }
@@ -2476,10 +2582,112 @@ bool options::digest_io_options(const std::string &temp, int &i)
     else if (temp == "-convert_to_47") {
         err_checkf(argc >= i + 2, "Not enough arguments for -convert_to_47\nPlease provide at least stdout name!", std::cout);
         std::filesystem::path _wfn = arguments[i + 1];
+        std::string keys;
+        for (int j = i + 2; j + 1 < argc; j++)
+            if (arguments[j] == "-nbo_keywords") keys = arguments[j + 1];
         WFN wavy(e_origin::NOT_YET_DEFINED);
         wavy.read_known_wavefunction_format(_wfn, std::cout, debug);
-        wavy.write_nbo(_wfn.replace_extension(".47"), debug, &std::cout);
+        citations::cite(citations::Method::NBOProgram, std::cout);
+        wavy.write_nbo(_wfn.replace_extension(".47"), debug, &std::cout, keys);
         finished = true; return true;
+    }
+    else if (temp == "-nbo") {
+        err_checkf(argc >= i + 2, "Not enough arguments for -nbo\nPlease provide a wavefunction!", std::cout);
+        NboRunOptions opt;
+        opt.wavefunction = arguments[i + 1];
+        opt.debug = debug;
+        for (int j = i + 2; j + 1 < argc; j++) {
+            if (arguments[j] == "-nbo_keywords") opt.keywords = arguments[j + 1];
+            else if (arguments[j] == "-nbo_exe") opt.executable = arguments[j + 1];
+            else if (arguments[j] == "-nbo_json") opt.json_out = arguments[j + 1];
+            else if (arguments[j] == "-nbo_dir") opt.work_dir = arguments[j + 1];
+        }
+        finished = true;
+        citations::cite(citations::Method::NBOProgram, std::cout);
+        return run_nbo(opt, std::cout) == 0;
+    }
+    else if (temp == "-nbo_parse") {
+        //Same parser as -nbo, on an output that already exists: the spread study re-runs gennbo
+        //itself on one archive with different keylists and only needs the reading back.
+        err_checkf(argc >= i + 2, "Not enough arguments for -nbo_parse\nPlease provide an NBO output file!", std::cout);
+        std::filesystem::path out = arguments[i + 1];
+        err_checkf(std::filesystem::exists(out), "NBO output doesn't exist: " + out.string(), std::cout);
+        std::filesystem::path json = out.parent_path() / (out.stem().string() + ".nbo.json");
+        for (int j = i + 2; j + 1 < argc; j++)
+            if (arguments[j] == "-nbo_json") json = arguments[j + 1];
+        NboResults r = parse_nbo_output(out);
+        write_nbo_json(r, json);
+        std::cout << "wrote " << json.string() << std::endl;
+        finished = true;
+        return true;
+    }
+    else if (temp == "-nbo_native") {
+        //The in-house analysis, writing the same JSON -nbo writes, so the two are comparable by
+        //tests/nbo_reference/compare_nbo.py without a second format.
+        err_checkf(argc >= i + 2, "Not enough arguments for -nbo_native\nPlease provide a wavefunction!", std::cout);
+        std::filesystem::path _wfn = arguments[i + 1];
+        err_checkf(std::filesystem::exists(_wfn), "wavefunction doesn't exist: " + _wfn.string(), std::cout);
+        NboOptions opt;
+        opt.debug = debug;
+        std::filesystem::path json = _wfn.parent_path() / (_wfn.stem().string() + ".native.nbo.json");
+        for (int j = i + 2; j + 1 < argc; j++) {
+            if (arguments[j] == "-nbo_json") json = arguments[j + 1];
+            else if (arguments[j] == "-nbo_47") opt.file47 = arguments[j + 1];
+            else if (arguments[j] == "-nbo_e2min") opt.e2_threshold_kcal = std::stod(arguments[j + 1]);
+            else if (arguments[j] == "-nbo_threads") opt.threads = std::stoi(arguments[j + 1]);
+            //This branch runs the analysis inline and returns, so a -cpus written after
+            //-nbo_native never reached the main digester and was silently dropped.
+            else if (arguments[j] == "-cpus") {
+                threads = std::stoi(arguments[j + 1]);
+                MKL_Set_Num_Threads(threads);
+#ifdef _OPENMP
+                omp_set_num_threads(threads);
+                omp_set_dynamic(0);
+#endif
+            }
+            else if (arguments[j] == "-nrt") opt.nrt = true;
+            else if (arguments[j] == "-nrt_e2") opt.nrt_e2_kcal = std::stod(arguments[j + 1]);
+            else if (arguments[j] == "-nrt_arrows") opt.nrt_max_arrows = std::stoi(arguments[j + 1]);
+            else if (arguments[j] == "-nrt_bond_scale")
+                opt.nrt_bond_scale = std::stod(arguments[j + 1]);
+            else if (arguments[j] == "-nrt_max") {
+                opt.nrt_max_candidates = std::stoi(arguments[j + 1]);
+                opt.nrt_max_set = true;
+            }
+            else if (arguments[j] == "-nrt_atoms") {
+                //a comma separated 1-based atom list, NBO's "NRT <atoms>" subspace
+                std::string s = arguments[j + 1];
+                for (char& c : s) if (c == ',') c = ' ';
+                std::istringstream is(s);
+                int a = 0;
+                while (is >> a) opt.nrt_subspace.push_back(a);
+            }
+        }
+        for (int j = i + 2; j < argc; j++)
+            if (arguments[j] == "-nrt") opt.nrt = true;
+            else if (arguments[j] == "-nrt_exhaustive") opt.nrt_exhaustive = true;
+            else if (arguments[j] == "-nrt_no_symmetry") opt.nrt_symmetry = false;
+            else if (arguments[j] == "-nrt_no_components") opt.nrt_components = false;
+            else if (arguments[j] == "-nrt_no_ion") opt.nrt_ion = false;
+            else if (arguments[j] == "-nbo_keep47") opt.keep_file47 = true;
+        //-nbo_threads wins, then -cpus, then the OpenMP default; NRT read only the first of the three.
+        if (opt.threads <= 0 && threads > 0) opt.threads = threads;
+        WFN wavy(e_origin::NOT_YET_DEFINED);
+        wavy.read_known_wavefunction_format(_wfn, std::cout, debug);
+        //Cited from here rather than from nbo.cpp/nrt.cpp, so the search and the resonance
+        //weights each name their paper without a second session's optimisation work colliding.
+        citations::cite(citations::Method::NAONPA, std::cout);
+        citations::cite(citations::Method::NBO, std::cout);
+        citations::cite(citations::Method::E2, std::cout);
+        if (opt.nrt)
+            citations::cite(citations::Method::NRT, std::cout);
+        NboResults r = native_nbo(wavy, opt, std::cout);
+        r.name = _wfn.stem().string();
+        print_nbo(r, std::cout);
+        write_nbo_json(r, json);
+        std::cout << "wrote " << json.string() << std::endl;
+        finished = true;
+        return true;
     }
     else if (temp == "-d")
         basis_set_path = arguments[i + 1];
@@ -2519,6 +2727,8 @@ bool options::digest_run_options(const std::string &temp, int &i)
         accuracy = stoi(arguments[i + 1]);
     else if (temp == "-basin_grid")
         basin_grid = std::max(1, stoi(arguments[i + 1]));
+    else if (temp == "-basin_cube")
+        basin_cube = true;
     else if (temp == "-Anion")
     {
         int n = 1;
@@ -2633,9 +2843,9 @@ bool options::digest_run_options(const std::string &temp, int &i)
         method = arguments[i + 1];
     else if (temp == "-mult")
         mult = stoi(arguments[i + 1]);
-    else if (temp == "-no-date" || temp == "-no_date")
+    else if (temp == "-no_date")
         no_date = constants::hide_gpu_notes = constants::hide_timings = true;
-    else if (temp == "-no_date_but_gpu" || temp == "-no-date-but-gpu")
+    else if (temp == "-no_date_but_gpu")
     {
         no_date = constants::hide_timings = true;
         constants::hide_gpu_notes = false;
@@ -2776,7 +2986,8 @@ bool options::digest_partition_options(const std::string &temp, int &i)
     {
         partition_type = PartitionType::EMBIS;
     }
-    else if (temp == "-HDEF")
+    //Both spellings: the help text mentions the flag as -hdef in one place and -HDEF in the other.
+    else if (temp == "-HDEF" || temp == "-hdef")
         properties.hdef = true;
     else if (temp == "-hirsh")
         properties.hirsh = true, properties.hirsh_number = stoi(arguments[i + 1]);
@@ -2875,7 +3086,13 @@ bool options::digest_partition_options(const std::string &temp, int &i)
     else if (temp == "-SALTED" || temp == "-salted")
     {
         SALTED = true;
-        salted_model_dir = arguments[i + 1];
+        // Several models may follow, like -ri_fit takes several basis sets. The
+        // first one keeps salted_model_dir so every single-model path is unchanged.
+        int next = i + 1;
+        while (next < argc && arguments[next].find("-") != 0)
+            salted_model_dirs.push_back(arguments[next++]);
+        err_chkf(!salted_model_dirs.empty(), "No SALTED model given after -SALTED.", std::cout);
+        salted_model_dir = salted_model_dirs[0];
     }
     else if (temp == "-SALTED_COEFS" || temp == "-salted_coefs")
     {
@@ -3050,7 +3267,7 @@ bool options::digest_property_options(const std::string &temp, int &i)
             j++;
         }
     }
-    else if (temp == "-density_difference" || temp == "-density-difference")
+    else if (temp == "-density_difference")
     {
         wfn2 = arguments[i + 1];
     }
@@ -3090,6 +3307,21 @@ bool options::digest_property_options(const std::string &temp, int &i)
         properties.radius = stod(arguments[i + 3]);
         eli_analysis_run = true;
         i += 3;
+    }
+    //The rest of Kohout's ELI family (ELI-D alpha/beta/triplet, ELI-q) as point values; runs here
+    //rather than setting a flag, it has no cube or basin output to schedule
+    else if (temp == "-eli_family") {
+        err_checkf(argc >= i + 2, "Not enough arguments for -eli_family\nPlease provide at least a wfn!", std::cout);
+        const bool has_points = argc >= i + 3 && arguments[i + 2].size() > 0 && arguments[i + 2][0] != '-';
+        eli_family::report(arguments[i + 1], has_points ? std::filesystem::path(arguments[i + 2]) : std::filesystem::path());
+        finished = true; return true;
+    }
+    //Every critical point of rho - nuclear, bond, ring and cage - from the analytic Hessian, with
+    //Poincare-Hopf as the check that none is missing. No cube: the seeding comes from the topology
+    else if (temp == "-topology") {
+        err_checkf(argc >= i + 2, "Not enough arguments for -topology\nPlease provide a wfn!", std::cout);
+        topology::report(arguments[i + 1], std::cout);
+        finished = true; return true;
     }
     else if (temp == "-qtaim_eli") {
         // Cube-files mode:  -qtaim_eli <rho.cube> <eli.cube> <atoms_csv> [<bg_value>]
@@ -3531,6 +3763,12 @@ bool options::digest_ri_options(const std::string &temp, int &i)
         err_checkf(i + 1 < argc, "-calc_featomic_descriptors needs the list file", std::cout);
         featomic_structures = geometry_aid::read_structure_list(arguments[++i]);
     }
+    else if (temp == "-npa")
+        npa = true;
+    else if (temp == "-npa_summary") {
+        npa = true;
+        npa_orbitals = false;
+    }
     else if (temp == "-rgbi")
         rgbi = true;
     else if (temp == "-rgbi_no_sym") {
@@ -3543,6 +3781,10 @@ bool options::digest_ri_options(const std::string &temp, int &i)
     else if (temp == "-rgbi_theta") {
         rgbi = true;
         rgbi_theta = true;
+    }
+    else if (temp == "-rgbi_legacy_cutoff") {
+        rgbi = true;
+        rgbi_legacy_cutoff = true;
     }
     else if (temp == "-rgbi_basis") {
         err_checkf(i + 1 < argc, "Not enough arguments for -rgbi_basis. Use 'nao' or 'ano'.", std::cout);
@@ -3557,7 +3799,7 @@ bool options::digest_ri_options(const std::string &temp, int &i)
         else
             err_checkf(false, "Invalid -rgbi_basis value '" + basis + "'. Use 'nao' or 'ano'.", std::cout);
     }
-    else if (temp == "-rgbi-groups") {
+    else if (temp == "-rgbi_groups") {
         int n = 1;
         ivec2 group_set;
         while (i + n < argc && string(arguments[i + n]).find("-") > 0) {
@@ -3577,7 +3819,7 @@ bool options::digest_ri_options(const std::string &temp, int &i)
         partition_type = PartitionType::RI;
         aux_basis = get_aux_basis(argc, arguments, i);
     }
-    else if (temp == "-multipole_moments" || temp == "-multipole-moments") {
+    else if (temp == "-multipole_moments") {
         err_checkf(i + 2 < argc, "-multipole_moments needs a partitioning scheme and the highest order, e.g. -multipole_moments Hirshfeld 2", std::cout);
         std::string scheme = arguments[++i];
         std::transform(scheme.begin(), scheme.end(), scheme.begin(),
@@ -3824,6 +4066,11 @@ void options::digest_options()
             continue;
         if (finished)
             return;
+        //Either separator names the same flag, so -rgbi-groups and -rgbi_groups are one option.
+        //The digesters compare against the underscore spelling; a negative number keeps its
+        //dashes because the character after the first one is not a letter
+        if (temp.size() > 1 && isalpha(static_cast<unsigned char>(temp[1])))
+            replace(temp.begin() + 1, temp.end(), '-', '_');
         //The digesters index arguments[i + n] and call stoi/stod directly; a flag that is
         //last on the line or followed by a non-number used to die as a bare "invalid stod
         //argument" with no hint which option it was

@@ -23,7 +23,14 @@ static std::vector<std::string> read_lines_stripped(const std::filesystem::path&
 		if (!line.empty() && line.back() == '\r') {
 			line.pop_back();
 		}
-		if (!line.empty()) {
+		// Citation lines are provenance, not results: "[QTAIM] Bader, ... , DOI 10.1021/...".
+		// They are compared line by line like everything else, so adding a reference to a
+		// method would otherwise shift every golden below it and fail tests that have
+		// nothing to do with the change. Dropped from both sides; citations::table() is
+		// specified by CitationTests instead.
+		const bool is_citation = line.size() > 1 && line.front() == '[' &&
+								 line.find(", DOI 10.") != std::string::npos;
+		if (!line.empty() && !is_citation) {
 			lines.push_back(line);
 		}
 	}

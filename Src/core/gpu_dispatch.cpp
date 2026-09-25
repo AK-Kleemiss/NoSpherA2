@@ -11,6 +11,7 @@
 #include "salted_gpu.h"
 #include "aux_density_gpu.h"
 #include "spherical_density_gpu.h"
+#include "esp_gpu.h"
 #include "blas_gpu.h"
 
 #include <cctype>
@@ -59,6 +60,7 @@
 	F(bool, aux_density_gpu_enabled, (), ()) \
 	F(bool, aux_density_gpu_eval, (int n_at, const double* cx, const double* cy, const double* cz, const double* r2_max, int n_sh, const int* sh_start, const int* sh_l, const int* pr_start, const int* coef_off, int n_pr, const double* pr_exp, const double* pr_norm, int n_coef, const double* coefs, int np, const double* x, const double* y, const double* z, double* rho, double* gx, double* gy, double* gz, double* lap, double* hess), (n_at, cx, cy, cz, r2_max, n_sh, sh_start, sh_l, pr_start, coef_off, n_pr, pr_exp, pr_norm, n_coef, coefs, np, x, y, z, rho, gx, gy, gz, lap, hess)) \
 	F(bool, spherical_density_gpu_eval, (int nx, int ny, int nz, const double* origin, const double* vectors, int n_at, const double* ax, const double* ay, const double* az, const int* at_tab, int n_tab, const int* tab_off, const double* r_tab, const double* rho_tab, double lincr, double start, double radius_bohr, double* out), (nx, ny, nz, origin, vectors, n_at, ax, ay, az, at_tab, n_tab, tab_off, r_tab, rho_tab, lincr, start, radius_bohr, out)) \
+	F(bool, esp_gpu_eval, (int n_at, const double* ax, const double* ay, const double* az, const double* q, int npairs, const double* ex_sum, const double* weight, const double* P, const int* L, const int* off, const double* coef, const unsigned char* pc_pow, const unsigned char* fn_idx, int nT, int stride, double step, const double* boys_tab, int np, const double* points, double* out), (n_at, ax, ay, az, q, npairs, ex_sum, weight, P, L, off, coef, pc_pow, fn_idx, nT, stride, step, boys_tab, np, points, out)) \
 	F(bool, blas_gpu_available, (), ()) \
 	F(void, blas_gpu_set_enabled, (bool on), (on)) \
 	F(bool, blas_gpu_enabled, (), ()) \

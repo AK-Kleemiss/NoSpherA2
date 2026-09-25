@@ -5,6 +5,12 @@
 #include "core/atoms.h"
 #include "core/constants.h"
 #include "core/bondwise_analysis.h"
+#include "core/basis_set.h"
+
+#include <occ/core/molecule.h>
+#include <occ/io/xyz.h>
+#include <occ/qm/hf.h>
+#include <occ/qm/scf.h>
 
 #include <algorithm>
 #include <array>
@@ -950,4 +956,222 @@ TEST(BondwiseRobyTests, AnoBasisMatchesGoldenWithoutFallback)
 	ASSERT_EQ(h.size(), 9u);
 	EXPECT_NEAR(h[4], 0.885, 5e-3);
 	EXPECT_NEAR(h[5], 0.295, 5e-3);
+}
+
+namespace
+{
+	//A Roby analysis at a geometry of our choosing: Hartree-Fock/def2-SVP in process, then the
+	//index on the resulting wavefunction. The .gbw fixtures are single points, and the question
+	//the RGBI has to answer - does the number move smoothly when the molecule does - cannot be
+	//asked without a wavefunction per geometry.
+	//the analysis exits the process on an internal inconsistency, and a swallowed stdout would
+	//take the message with it, so this copy keeps the stream visible while recording it
+	struct CoutTee : std::streambuf
+	{
+		std::ostringstream buffer;
+		std::streambuf* old;
+		CoutTee() : old(std::cout.rdbuf(this)) {}
+		~CoutTee() { std::cout.rdbuf(old); }
+		int overflow(int c) override
+		{
+			if (c != EOF) { buffer.put(static_cast<char>(c)); old->sputc(static_cast<char>(c)); }
+			return c;
+		}
+		std::string str() const { return buffer.str(); }
+	};
+
+	std::string roby_geometry_output(const std::string& xyz, bool ano, bool theta,
+		const std::string& basis_name = "def2-svp", bool evs = false, bool legacy = false)
+	{
+		occ::core::Molecule mol = occ::io::molecule_from_xyz_string(xyz);
+		mol.set_charge(0);
+		mol.set_multiplicity(1);
+		std::shared_ptr<BasisSet> bs = BasisSetLibrary::get_basis_set(basis_name);
+		occ::qm::AOBasis basis = bs->to_AOBasis(mol.atoms());
+		basis.set_pure(true);
+		occ::qm::HartreeFock hf(basis);
+		occ::qm::SCF<occ::qm::HartreeFock> scf(hf, occ::qm::SpinorbitalKind::Restricted);
+		scf.set_charge_multiplicity(0, 1);
+		CoutTee cap;
+		scf.compute_scf_energy();
+		WFN wavy(scf.wavefunction());
+		Roby_information roby(wavy, {}, true, ano, evs, theta, legacy);
+		return cap.str();
+	}
+
+	//the Tot. column of the first row of a bond, or -1 when the analysis printed no such row
+	double bond_total(const std::string& out, const std::string& bond)
+	{
+		const vec row = row_numbers_after(out, bond);
+		return row.size() == 9u ? row[6] : -1.0;
+	}
+
+	//H2O2 with the dihedral as the only variable: a conformer coordinate of a four-atom molecule,
+	//so the O-O bond has to be a smooth function of it.
+	std::string h2o2_xyz(double dihedral_deg)
+	{
+		const double roo = 1.452, roh = 0.965, ang = 100.0 * constants::PI_180;
+		const double h = std::sin(ang), d = std::cos(ang);
+		std::ostringstream o;
+		o << std::setprecision(10) << std::fixed;
+		o << "4\n\n";
+		o << "O 0.0 0.0 0.0\n";
+		o << "O " << roo << " 0.0 0.0\n";
+		o << "H " << (-roh * d) << " " << (roh * h) << " 0.0\n";
+		const double phi = dihedral_deg * constants::PI_180;
+		o << "H " << (roo + roh * d) << " " << (roh * h * std::cos(phi)) << " " << (roh * h * std::sin(phi)) << "\n";
+		return o.str();
+	}
+}
+
+namespace
+{
+	std::string diatomic_xyz(const std::string& a, const std::string& b, double d)
+	{
+		std::ostringstream o;
+		o << "2\n\n" << a << " 0.0 0.0 0.0\n" << b << " 0.0 0.0 "
+			<< std::setprecision(10) << std::fixed << d << "\n";
+		return o.str();
+	}
+}
+
+//LiH is where the legacy subspace rule breaks: Li's second atomic natural orbital walks through the
+//1/6 occupancy cutoff between 1.575 and 1.600 A, so the rank of its projector - and every index
+//built on it - used to step there. With the subspace fixed by the element the four points have to
+//lie on one smooth curve. 0.02 per 0.025 A step is ten times the observed drift and a fortieth of
+//the jump it replaces.
+TEST(BondwiseRobyTests, LiHBondIndexIsContinuousThroughTheOldCutoff)
+{
+	vec tot;
+	for (double d = 1.550; d < 1.6301; d += 0.025)
+		tot.emplace_back(bond_total(roby_geometry_output(diatomic_xyz("Li", "H", d), false, false), "Li -  H"));
+	ASSERT_EQ(tot.size(), 4u);
+	for (size_t i = 0; i < tot.size(); i++)
+		ASSERT_GT(tot[i], 0.0) << "no Li - H row at point " << i;
+	for (size_t i = 1; i < tot.size(); i++)
+		EXPECT_NEAR(tot[i], tot[i - 1], 0.02) << "step between points " << (i - 1) << " and " << i;
+	//and the free-atom ANO route, whose cutoff has always been applied to element constants rather
+	//than to the molecular occupations, has to agree with it - two independent subspace rules, one
+	//bond index
+	const double ano = bond_total(roby_geometry_output(diatomic_xyz("Li", "H", 1.600), true, false), "Li -  H");
+	EXPECT_NEAR(ano, tot[2], 0.03);
+}
+
+//the mirror of the test above: -rgbi_legacy_cutoff reproduces the old numbers, jump included. If
+//this one ever stops failing to be continuous the legacy path has silently changed too.
+TEST(BondwiseRobyTests, LegacyCutoffStillStepsAtTheOldThreshold)
+{
+	const double before = bond_total(roby_geometry_output(diatomic_xyz("Li", "H", 1.575), false, false, "def2-svp", false, true), "Li -  H");
+	const double after = bond_total(roby_geometry_output(diatomic_xyz("Li", "H", 1.600), false, false, "def2-svp", false, true), "Li -  H");
+	ASSERT_GT(before, 0.0);
+	ASSERT_GT(after, 0.0);
+	EXPECT_GT(after - before, 0.5) << "legacy " << before << " -> " << after;
+}
+
+namespace
+{
+	//the same molecule in a different frame: every bond index is a function of the density and the
+	//atomic projectors, so a rigid rotation may not move it. What a rotation does change is the AO
+	//representation, and with it the basis the diagonaliser happens to return inside a degenerate
+	//eigenspace - which is exactly what the index must not depend on.
+	std::string rotate_xyz(const std::string& xyz, double a, double b, double c, double tx)
+	{
+		std::istringstream in(xyz);
+		std::string line;
+		std::getline(in, line); std::getline(in, line);
+		const double ca = std::cos(a), sa = std::sin(a), cb = std::cos(b), sb = std::sin(b),
+			cc = std::cos(c), sc = std::sin(c);
+		const double R[3][3] = {
+			{ cb * cc, -cb * sc, sb },
+			{ sa * sb * cc + ca * sc, -sa * sb * sc + ca * cc, -sa * cb },
+			{ -ca * sb * cc + sa * sc, ca * sb * sc + sa * cc, ca * cb } };
+		std::ostringstream o;
+		o << std::setprecision(12) << std::fixed;
+		std::vector<std::string> atoms;
+		std::vector<std::array<double, 3>> pos;
+		while (std::getline(in, line)) {
+			std::istringstream l(line);
+			std::string el; double x, y, z;
+			if (!(l >> el >> x >> y >> z)) continue;
+			atoms.push_back(el);
+			pos.push_back({ x, y, z });
+		}
+		o << atoms.size() << "\n\n";
+		for (size_t i = 0; i < atoms.size(); i++) {
+			const auto& p = pos[i];
+			o << atoms[i];
+			for (int r = 0; r < 3; r++)
+				o << " " << (R[r][0] * p[0] + R[r][1] * p[1] + R[r][2] * p[2] + (r == 0 ? tx : 0.0));
+			o << "\n";
+		}
+		return o.str();
+	}
+}
+
+//the index is a function of the density and the atomic projectors, both of which a rigid motion only
+//conjugates, so every column has to come back unchanged. The table prints three decimals, hence the
+//2e-3 window: it is rounding, not tolerance.
+TEST(BondwiseRobyTests, RigidMotionLeavesEveryBondIndexUnchanged)
+{
+	const std::string plain = roby_geometry_output(h2o2_xyz(120.0), false, false);
+	const std::string moved = roby_geometry_output(rotate_xyz(h2o2_xyz(120.0), 0.37, 0.81, 1.23, 2.5), false, false);
+	for (const char* bond : { "O -  O", "O -  H" }) {
+		const vec a = row_numbers_after(plain, bond);
+		const vec b = row_numbers_after(moved, bond);
+		ASSERT_EQ(a.size(), 9u) << bond;
+		ASSERT_EQ(b.size(), 9u) << bond;
+		for (size_t i = 0; i < 9; i++)
+			EXPECT_NEAR(a[i], b[i], 2e-3) << bond << " column " << i;
+	}
+}
+
+namespace
+{
+	//NH3 (C3v, r = 1.012 A, HNH = 106.7 deg) and staggered NH3BH3 (N-B 1.658, N-H 1.014 at 111 deg
+	//to N-B, B-H 1.210 at 104.5 deg to B-N): two molecules whose N-H bonds are the same bond.
+	std::string nh3_xyz()
+	{
+		const double r = 1.012, sb = 2.0 * std::sin(53.35 * constants::PI_180) / std::sqrt(3.0);
+		const double cb = std::sqrt(1.0 - sb * sb);
+		std::ostringstream o;
+		o << std::setprecision(10) << std::fixed << "4\n\nN 0.0 0.0 0.0\n";
+		for (int i = 0; i < 3; i++) {
+			const double p = i * 120.0 * constants::PI_180;
+			o << "H " << (r * sb * std::cos(p)) << " " << (r * sb * std::sin(p)) << " " << (r * cb) << "\n";
+		}
+		return o.str();
+	}
+
+	std::string nh3bh3_xyz()
+	{
+		const double rnb = 1.658, rnh = 1.014, rbh = 1.210;
+		const double an = 111.0 * constants::PI_180, ab = (180.0 - 104.5) * constants::PI_180;
+		std::ostringstream o;
+		o << std::setprecision(10) << std::fixed << "8\n\nN 0.0 0.0 0.0\nB 0.0 0.0 " << rnb << "\n";
+		for (int i = 0; i < 3; i++) {
+			const double p = i * 120.0 * constants::PI_180;
+			o << "H " << (rnh * std::sin(an) * std::cos(p)) << " " << (rnh * std::sin(an) * std::sin(p))
+				<< " " << (rnh * std::cos(an)) << "\n";
+		}
+		for (int i = 0; i < 3; i++) {
+			const double p = (60.0 + i * 120.0) * constants::PI_180;
+			o << "H " << (rbh * std::sin(ab) * std::cos(p)) << " " << (rbh * std::sin(ab) * std::sin(p))
+				<< " " << (rnb + rbh * std::cos(ab)) << "\n";
+		}
+		return o.str();
+	}
+}
+
+//cross-molecule comparability, which is the point of fixing the subspace by the element: the same
+//N-H bond in two different molecules - one of them next to a dative bond to BH3 - has to come out
+//as the same number. It does, 0.966 against 0.968, and the fixtures agree: 0.952 in
+//tests/RGBI/nh3li_nao.good and 0.966 in tests/RGBI_groups/NH3BH3_sym.good. The window is ten times
+//the observed difference.
+TEST(BondwiseRobyTests, NHBondIndexComparesBetweenMolecules)
+{
+	const double nh3 = bond_total(roby_geometry_output(nh3_xyz(), false, false), "N -  H");
+	const double borazane = bond_total(roby_geometry_output(nh3bh3_xyz(), false, false), "N -  H");
+	ASSERT_GT(nh3, 0.0);
+	ASSERT_GT(borazane, 0.0);
+	EXPECT_NEAR(nh3, borazane, 0.02) << "NH3 " << nh3 << " vs NH3BH3 " << borazane;
 }

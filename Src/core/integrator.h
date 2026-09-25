@@ -65,7 +65,9 @@ namespace DensityFitting
 	// density (density_batch of a Gaussian_Molecule) or else from wavy's orbitals
 	vec2 partition_multipole_rows(const WFN& wavy, const aux_density_table& table, const CHARGE_SCHEME scheme, const int lmax, DensityBatch density = {});
 
-	void analyze_density_fit_quality(const vec& coefficients, const WFN& wavy_aux, const aux_density_table& aux_density, const vec& expected_charges = vec());
+	// partitioned: the expected populations come from the grid partition, which constrains the moments of the total
+	// fitted density and not the per-centre coefficient sums the table reports
+	void analyze_density_fit_quality(const vec& coefficients, const WFN& wavy_aux, const aux_density_table& aux_density, const vec& expected_charges = vec(), const bool partitioned = false);
 	// Per-atom row weight of the restraints
 	vec restraint_weights(const WFN& wavy_aux, const size_t n_aux, double base_restraint_coef = 0.00005, bool adaptive_weighting = true);
 	// Interaction energy of two fitted densities and their nuclei in Hartree, from the coefficients and the aux basis

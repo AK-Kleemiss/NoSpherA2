@@ -64,6 +64,7 @@ void WFN::reset()
 	UT_DensityMatrix.clear();
 	UT_SpinDensityMatrix.clear();
 	DM = dMatrix2();
+	DM_beta = dMatrix2();
 	MO_sph = dMatrix2();
 	basis_set = NULL;
 	cub.clear();
@@ -206,6 +207,10 @@ WFN::WFN(const occ::qm::Wavefunction &occ_WF, bool from_file) : WFN()
 		}
 		// insert_into_centers(std::views::repeat(atom+1, n_cart*nprim));
 		for (int j = 0; j < shell.exponents.size(); j++) {
+			//l + 1, the convention of every wavefunction basis in this program: WFN's own
+			//get_shell_type() hands this very field out and the primitive counters switch over it
+			//as 1 = s, 2 = p, ..., so an s shell stored as 0 matches no case and they count
+			//nothing. Only the aux bases, which carry origin NOT_YET_DEFINED, store l itself.
 			push_back_atom_basis_set(atom, shell.exponents(j), shell.contraction_coefficients(j), shell.l + 1, k);
 		}
 		k++;
@@ -1047,42 +1052,22 @@ const int WFN::get_shell_start_in_primitives(const unsigned int &nr_atom, const 
 {
 	if (static_cast<int>(nr_atom) < ncen && nr_shell < atoms[nr_atom].get_shellcount_size())
 	{
+		//The cartesian components of a shell are the gap between consecutive WFN type blocks:
+		//1, 3, 6, 10, 15, ... A switch over s/p/d/f used to stand here and added nothing at all for
+		//g and above, so every primitive index behind the first g shell of a wavefunction was short
+		//by 15 per g shell - which is how Fe.gbw's atom 2 asked for its s shell and was handed a g
+		//primitive 540 places later, then wrote past the end of a 1-component buffer.
+		const auto cart_components = [](const int shell_type) {
+			return (shell_type >= 1 && shell_type < static_cast<int>(std::size(constants::first_type)))
+				? constants::first_type[shell_type] - constants::first_type[shell_type - 1]
+				: 0;
+		};
 		int primitive_counter = 0;
 		for (unsigned int a = 0; a < nr_atom; a++)
 			for (unsigned int s = 0; s < atoms[a].get_shellcount_size(); s++)
-				switch (get_shell_type(a, s))
-				{
-				case 1:
-					primitive_counter += atoms[a].get_shellcount(s);
-					break;
-				case 2:
-					primitive_counter += (3 * atoms[a].get_shellcount(s));
-					break;
-				case 3:
-					primitive_counter += (6 * atoms[a].get_shellcount(s));
-					break;
-				case 4:
-					primitive_counter += (10 * atoms[a].get_shellcount(s));
-					break;
-				}
+				primitive_counter += cart_components(get_shell_type(a, s)) * atoms[a].get_shellcount(s);
 		for (unsigned int s = 0; s < nr_shell; s++)
-		{
-			switch (get_shell_type(nr_atom, s))
-			{
-			case 1:
-				primitive_counter += atoms[nr_atom].get_shellcount(s);
-				break;
-			case 2:
-				primitive_counter += (3 * atoms[nr_atom].get_shellcount(s));
-				break;
-			case 3:
-				primitive_counter += (6 * atoms[nr_atom].get_shellcount(s));
-				break;
-			case 4:
-				primitive_counter += (10 * atoms[nr_atom].get_shellcount(s));
-				break;
-			}
-		}
+			primitive_counter += cart_components(get_shell_type(nr_atom, s)) * atoms[nr_atom].get_shellcount(s);
 		return primitive_counter;
 	}
 	else
@@ -2452,6 +2437,7 @@ WFN &WFN::operator=(const WFN &right)
 	UT_DensityMatrix = right.UT_DensityMatrix;
 	UT_SpinDensityMatrix = right.UT_SpinDensityMatrix;
 	DM = right.DM;
+	DM_beta = right.DM_beta;
 	MO_sph = right.MO_sph;
 	basis_set = right.basis_set;
 	cub = right.cub;

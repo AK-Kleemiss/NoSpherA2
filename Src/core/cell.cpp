@@ -31,7 +31,7 @@ namespace {
 			catch (const std::exception&) {
 				return false;
 			}
-		};
+			};
 		const size_t slash = number.find('/');
 		if (slash == std::string::npos)
 			return to_double(number, value);
@@ -172,7 +172,7 @@ void cell::eval_symm(std::vector<asym_atom>& asym_atoms, const int& asymmetric_a
 	const int total_atoms = asym_atoms.size();
 	auto frac_pos = [&](int i) -> vec {
 		return { asym_atoms[i].frac_pos[0], asym_atoms[i].frac_pos[1], asym_atoms[i].frac_pos[2] };
-	};
+		};
 	linking_list.resize(asymmetric_atoms);
 	const int num_sym_ops = sym[0][0].size();
 	int idx1 = 0;
@@ -209,124 +209,127 @@ ivec cell::apply_grown(ivec3& linking_list) {
 	// closing function
 }
 
+// This is an old but working implementation for grown structures.
+// It is not used currently but kept for reference purposes in case something goes wrong with the new implementation.
+
 // Number of explicit atoms in asym_atoms that are symmetry images of the same
 // asymmetric atom as atom_links belongs to, itself included. Using the full,
 // undeleted symmetry operation set to rebuild each atom's orbit always visits
 // each of its physical sites exactly self_links.size() times,
 // uniformly, whether or not another explicit atom already covers part
 // of that orbit; dividing by orbit_copies as well corrects for that overlap.
-int cell::orbit_copies(const ivec2& atom_links) {
-	int count = 0;
-	for (const ivec& link : atom_links) {
-		if (!link.empty()) count++;
-	}
-	return count;
-}
-
-void cell::set_symmetry_factors(std::vector<asym_atom>& asym_atoms, const ivec3& linking_list) {
-	int idx1 = 0;
-	for (asym_atom& a : asym_atoms) {
-		if (!a.grown) {
-			a.asym_fact = 1.0 / (linking_list[idx1][idx1].size() * orbit_copies(linking_list[idx1]));
-			idx1++;
-			continue;
-		}
-		for (int idx2 = 0; idx2 < linking_list.size(); idx2++) {
-			if (linking_list[idx2][idx1].size() != 0) {
-				a.asym_fact = 1.0 / (linking_list[idx2][idx2].size() * orbit_copies(linking_list[idx2]));
-				a.sym_op = linking_list[idx2][idx1][0];
-			}
-		}
-		idx1++;
-	}
-}
-
-int cell::compose_ops(const int op_a, const int op_b) {
-	// sym[y][x][op] holds R[x][y]; (a after b)(x) = R_a (R_b x + t_b) + t_a
-	int rot[3][3];
-	double t[3];
-	for (int i = 0; i < 3; i++) {
-		rot[i][0] = rot[i][1] = rot[i][2] = 0;
-		t[i] = trans[i][op_a];
-		for (int k = 0; k < 3; k++) {
-			t[i] += sym[k][i][op_a] * trans[k][op_b];
-			for (int j = 0; j < 3; j++)
-				rot[i][j] += sym[k][i][op_a] * sym[j][k][op_b];
-		}
-	}
-	const int num_sym_ops = static_cast<int>(sym[0][0].size());
-	for (int c = 0; c < num_sym_ops; c++) {
-		bool same = true;
-		for (int i = 0; i < 3 && same; i++) {
-			const double dt = trans[i][c] - t[i];
-			same = std::abs(dt - std::round(dt)) < 1e-6;
-			for (int j = 0; j < 3 && same; j++)
-				same = sym[j][i][c] == rot[i][j];
-		}
-		if (same) return c;
-	}
-	return -1;
-}
-
-ivec cell::grown_subgroup(const ivec3& linking_list) {
-	const int num_sym_ops = static_cast<int>(sym[0][0].size());
-	const int asymmetric_atoms = static_cast<int>(linking_list.size());
-	// per asymmetric atom: the operations that land on an explicit atom, and one operation per explicit image
-	std::vector<bvec> lands(asymmetric_atoms, bvec(num_sym_ops, false));
-	ivec2 image_ops(asymmetric_atoms);
-	for (int idx1 = 0; idx1 < asymmetric_atoms; idx1++)
-		for (const ivec& link : linking_list[idx1]) {
-			if (link.empty()) continue;
-			image_ops[idx1].push_back(link[0]);
-			for (const int s : link) lands[idx1][s] = true;
-		}
-	// H = operations that map every explicit atom (parents and images alike) onto an explicit atom:
-	// the setwise stabiliser of the cluster, a group, never smaller than {identity}
-	ivec subgroup;
-	for (int sym_op = 0; sym_op < num_sym_ops; sym_op++) {
-		bool keeps = true;
-		for (int idx1 = 0; idx1 < asymmetric_atoms && keeps; idx1++)
-			for (const int h : image_ops[idx1]) {
-				const int gh = compose_ops(sym_op, h);
-				if (gh < 0 || !lands[idx1][gh]) { keeps = false; break; }
-			}
-		if (keeps) subgroup.push_back(sym_op);
-	}
-	return subgroup;
-}
-
-ivec cell::coset_representatives(const ivec& subgroup) {
-	const int num_sym_ops = static_cast<int>(sym[0][0].size());
-	ivec reps;
-	bvec covered(num_sym_ops, false);
-	auto take = [&](const int g) {
-		if (covered[g]) return;
-		reps.push_back(g);
-		for (const int h : subgroup) {
-			const int gh = compose_ops(g, h);
-			if (gh >= 0) covered[gh] = true;
-		}
-	};
-	// the identity coset first: eval_translation_phase reads the unrotated reflection from slot 0
-	for (int g = 0; g < num_sym_ops; g++)
-		if (check_identity(g)) take(g);
-	for (int g = 0; g < num_sym_ops; g++) take(g);
-	return reps;
-}
-
-void cell::set_subgroup_factors(std::vector<asym_atom>& asym_atoms, const ivec3& linking_list, const ivec& subgroup) {
-	vec weight(linking_list.size());
-	for (int idx1 = 0; idx1 < linking_list.size(); idx1++) {
-		int stab = 0;
-		for (const int s : linking_list[idx1][idx1])
-			if (std::find(subgroup.begin(), subgroup.end(), s) != subgroup.end()) stab++;
-		// the coset sum visits every site of the orbit copies * |stab_G| / |H| times
-		weight[idx1] = static_cast<double>(subgroup.size()) / (linking_list[idx1][idx1].size() * orbit_copies(linking_list[idx1]));
-	}
-	for (int at = 0; at < asym_atoms.size(); at++)
-		for (int idx1 = 0; idx1 < linking_list.size(); idx1++)
-			if (!linking_list[idx1][at].empty()) { asym_atoms[at].asym_fact = weight[idx1]; break; }
-}
+//int cell::orbit_copies(const ivec2& atom_links) {
+//	int count = 0;
+//	for (const ivec& link : atom_links) {
+//		if (!link.empty()) count++;
+//	}
+//	return count;
+//}
+//
+//void cell::set_symmetry_factors(std::vector<asym_atom>& asym_atoms, const ivec3& linking_list) {
+//	int idx1 = 0;
+//	for (asym_atom& a : asym_atoms) {
+//		if (!a.grown) {
+//			a.asym_fact = 1.0 / (linking_list[idx1][idx1].size() * orbit_copies(linking_list[idx1]));
+//			idx1++;
+//			continue;
+//		}
+//		for (int idx2 = 0; idx2 < linking_list.size(); idx2++) {
+//			if (linking_list[idx2][idx1].size() != 0) {
+//				a.asym_fact = 1.0 / (linking_list[idx2][idx2].size() * orbit_copies(linking_list[idx2]));
+//				a.sym_op = linking_list[idx2][idx1][0];
+//			}
+//		}
+//		idx1++;
+//	}
+//}
+//
+//int cell::compose_ops(const int op_a, const int op_b) {
+//	// sym[y][x][op] holds R[x][y]; (a after b)(x) = R_a (R_b x + t_b) + t_a
+//	int rot[3][3];
+//	double t[3];
+//	for (int i = 0; i < 3; i++) {
+//		rot[i][0] = rot[i][1] = rot[i][2] = 0;
+//		t[i] = trans[i][op_a];
+//		for (int k = 0; k < 3; k++) {
+//			t[i] += sym[k][i][op_a] * trans[k][op_b];
+//			for (int j = 0; j < 3; j++)
+//				rot[i][j] += sym[k][i][op_a] * sym[j][k][op_b];
+//		}
+//	}
+//	const int num_sym_ops = static_cast<int>(sym[0][0].size());
+//	for (int c = 0; c < num_sym_ops; c++) {
+//		bool same = true;
+//		for (int i = 0; i < 3 && same; i++) {
+//			const double dt = trans[i][c] - t[i];
+//			same = std::abs(dt - std::round(dt)) < 1e-6;
+//			for (int j = 0; j < 3 && same; j++)
+//				same = sym[j][i][c] == rot[i][j];
+//		}
+//		if (same) return c;
+//	}
+//	return -1;
+//}
+//
+//ivec cell::grown_subgroup(const ivec3& linking_list) {
+//	const int num_sym_ops = static_cast<int>(sym[0][0].size());
+//	const int asymmetric_atoms = static_cast<int>(linking_list.size());
+//	// per asymmetric atom: the operations that land on an explicit atom, and one operation per explicit image
+//	std::vector<bvec> lands(asymmetric_atoms, bvec(num_sym_ops, false));
+//	ivec2 image_ops(asymmetric_atoms);
+//	for (int idx1 = 0; idx1 < asymmetric_atoms; idx1++)
+//		for (const ivec& link : linking_list[idx1]) {
+//			if (link.empty()) continue;
+//			image_ops[idx1].push_back(link[0]);
+//			for (const int s : link) lands[idx1][s] = true;
+//		}
+//	// H = operations that map every explicit atom (parents and images alike) onto an explicit atom:
+//	// the setwise stabiliser of the cluster, a group, never smaller than {identity}
+//	ivec subgroup;
+//	for (int sym_op = 0; sym_op < num_sym_ops; sym_op++) {
+//		bool keeps = true;
+//		for (int idx1 = 0; idx1 < asymmetric_atoms && keeps; idx1++)
+//			for (const int h : image_ops[idx1]) {
+//				const int gh = compose_ops(sym_op, h);
+//				if (gh < 0 || !lands[idx1][gh]) { keeps = false; break; }
+//			}
+//		if (keeps) subgroup.push_back(sym_op);
+//	}
+//	return subgroup;
+//}
+//
+//ivec cell::coset_representatives(const ivec& subgroup) {
+//	const int num_sym_ops = static_cast<int>(sym[0][0].size());
+//	ivec reps;
+//	bvec covered(num_sym_ops, false);
+//	auto take = [&](const int g) {
+//		if (covered[g]) return;
+//		reps.push_back(g);
+//		for (const int h : subgroup) {
+//			const int gh = compose_ops(g, h);
+//			if (gh >= 0) covered[gh] = true;
+//		}
+//		};
+//	// the identity coset first: eval_translation_phase reads the unrotated reflection from slot 0
+//	for (int g = 0; g < num_sym_ops; g++)
+//		if (check_identity(g)) take(g);
+//	for (int g = 0; g < num_sym_ops; g++) take(g);
+//	return reps;
+//}
+//
+//void cell::set_subgroup_factors(std::vector<asym_atom>& asym_atoms, const ivec3& linking_list, const ivec& subgroup) {
+//	vec weight(linking_list.size());
+//	for (int idx1 = 0; idx1 < linking_list.size(); idx1++) {
+//		int stab = 0;
+//		for (const int s : linking_list[idx1][idx1])
+//			if (std::find(subgroup.begin(), subgroup.end(), s) != subgroup.end()) stab++;
+//		// the coset sum visits every site of the orbit copies * |stab_G| / |H| times
+//		weight[idx1] = static_cast<double>(subgroup.size()) / (linking_list[idx1][idx1].size() * orbit_copies(linking_list[idx1]));
+//	}
+//	for (int at = 0; at < asym_atoms.size(); at++)
+//		for (int idx1 = 0; idx1 < linking_list.size(); idx1++)
+//			if (!linking_list[idx1][at].empty()) { asym_atoms[at].asym_fact = weight[idx1]; break; }
+//}
 
 bool cell::check_identity(const int& sym_op) {
 	bool is_identity = false;
@@ -380,3 +383,126 @@ ivec cell::confirm_applied_symmetry(ivec3& linking_list) {
 	return applied_symmetry;
 }
 
+void cell::set_symmetry_factors(std::vector<asym_atom>& asym_atoms, const ivec3& linking_list, const ivec& applied_symmetry) {
+	int idx1 = 0;
+	for (asym_atom& a : asym_atoms) {
+		if (!a.grown) {
+			a.asym_fact = 1.0 / linking_list[idx1][idx1].size();
+			idx1++;
+			continue;
+		}
+		for (int idx2 = 0; idx2 < linking_list.size(); idx2++) {
+			if (linking_list[idx2][idx1].size() != 0) {
+				a.asym_fact = 1.0 / linking_list[idx2][idx2].size();
+				a.sym_op = linking_list[idx2][idx1][0];
+			}
+		}
+		idx1++;
+	}
+}
+
+void cell::project_into_subgroup(ivec& applied_symmetry, hkl_list& hkl_enlarged, const hkl_list& hkl, ivec3& linking_list) {
+	ivec additional_symmetries;
+	for (int sym_op1 : applied_symmetry) {
+		for (int sym_op2 = 0; sym_op2 < sym[0][0].size(); sym_op2++) {
+			if (check_identity(sym_op2)) {
+				continue;
+			}
+			if (std::find(applied_symmetry.begin(), applied_symmetry.end(), sym_op2) != applied_symmetry.end()) {
+				continue;
+			}
+			const int equal_to = equal_to_concatenation(sym_op1, sym_op2);
+			if (equal_to == -1) {
+				continue;
+			}
+			if (std::find(additional_symmetries.begin(), additional_symmetries.end(), equal_to) != additional_symmetries.end()) {
+				continue;
+			}
+			if (check_identity(equal_to)) {
+				additional_symmetries.push_back(sym_op2);
+				continue;
+			}
+			additional_symmetries.push_back(sym_op2);
+		}
+	}
+	for (int i = 0; i < additional_symmetries.size(); i++) {
+		applied_symmetry.push_back(additional_symmetries[i]);
+	}
+	std::sort(applied_symmetry.begin(), applied_symmetry.end());
+
+	for (int sym_op : std::views::reverse(applied_symmetry)) {
+		for (ivec2& middle : sym) {
+			for (ivec& inner : middle) {
+				inner.erase(inner.begin() + sym_op);
+			}
+		}
+		for (vec& inner : trans) {
+			inner.erase(inner.begin() + sym_op);
+		}
+	}
+
+	for (int applied_sym : applied_symmetry) {
+		for (int idx1 = 0; idx1 < linking_list.size(); idx1++) {
+			for (int idx2 = 0; idx2 < linking_list[idx1].size(); idx2++) {
+				for (int sym_op = 0; sym_op < linking_list[idx1][idx2].size(); sym_op++) {
+					if (linking_list[idx1][idx2][sym_op] == applied_sym && linking_list[idx1][idx2].size() > 1) {
+						linking_list[idx1][idx2].erase(linking_list[idx1][idx2].begin() + sym_op);
+						sym_op--;
+					}
+				}
+			}
+		}
+	}
+
+	const int nr = hkl.size();
+	std::vector<i3> hkl_vec(hkl.begin(), hkl.end());
+	hkl_list new_enlarged;
+	for (int r = 0; r < nr; r++) {
+		vec hkl_temp = { (double)hkl_vec[r][0], (double)hkl_vec[r][1], (double)hkl_vec[r][2] };
+		for (int sym_op = 0; sym_op < sym[0][0].size(); sym_op++) {
+			const vec2 rot_temp = { { (double)sym[0][0][sym_op], (double)sym[0][1][sym_op], (double)sym[0][2][sym_op] },
+									{ (double)sym[1][0][sym_op], (double)sym[1][1][sym_op], (double)sym[1][2][sym_op] },
+									{ (double)sym[2][0][sym_op], (double)sym[2][1][sym_op], (double)sym[2][2][sym_op] } };
+			vec new_hkl = self_dot(rot_temp, hkl_temp, false);
+			i3 new_hkl_int = { (int)std::round(new_hkl[0]), (int)std::round(new_hkl[1]), (int)std::round(new_hkl[2]) };
+			new_enlarged.insert(new_hkl_int);
+		}
+	}
+	hkl_enlarged = new_enlarged;
+
+	//closing function
+}
+
+ivec cell::apply_grown(const hkl_list& hkl, hkl_list& hkl_enlarged, std::vector<asym_atom>& asym_atoms, ivec3& linking_list, ivec3& original_rotations) {
+	original_rotations = sym;
+	ivec applied_symmetry = confirm_applied_symmetry(linking_list);
+	project_into_subgroup(applied_symmetry, hkl_enlarged, hkl, linking_list);
+	return applied_symmetry;
+	// closing function
+}
+
+int cell::equal_to_concatenation(const int op_a, const int op_b) {
+	int rot[3][3];
+	double t[3];
+	for (int i = 0; i < 3; i++) {
+		rot[i][0] = rot[i][1] = rot[i][2] = 0;
+		t[i] = trans[i][op_a];
+		for (int k = 0; k < 3; k++) {
+			t[i] += sym[k][i][op_a] * trans[k][op_b];
+			for (int j = 0; j < 3; j++)
+				rot[i][j] += sym[k][i][op_a] * sym[j][k][op_b];
+		}
+	}
+	const int num_sym_ops = static_cast<int>(sym[0][0].size());
+	for (int c = 0; c < num_sym_ops; c++) {
+		bool same = true;
+		for (int i = 0; i < 3 && same; i++) {
+			const double dt = trans[i][c] - t[i];
+			same = std::abs(dt - std::round(dt)) < 1e-6;
+			for (int j = 0; j < 3 && same; j++)
+				same = sym[j][i][c] == rot[i][j];
+		}
+		if (same) return c;
+	}
+	return -1;
+}

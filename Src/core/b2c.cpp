@@ -4,6 +4,7 @@
 #include "constants.h"
 #include "b2c.h"
 #include "nos_math.h"
+#include "citations.h"
 #include "GridManager.h"
 #include <map>
 #include <mutex>
@@ -171,7 +172,10 @@ critical_point evaluate_critical_point(
 		const double g = 0.5 * tau;
 		const double l = -0.25 * laplacian;
 		const double k = g + l;
-		const double v = k - g;
+		//Local virial theorem, (1/4) DelSqRho = 2 G + V, with L = -(1/4) DelSqRho and K = G + L,
+		//so V = -L - 2G = -(K + G). It used to read k - g, which is L again: every printed V
+		//carried L's value, right magnitude at a bond critical point and the wrong sign
+		const double v = -(k + g);
 		result.kinetic_lagrangian = g;
 		result.kinetic_hamiltonian = k;
 		result.lagrangian_density = l;
@@ -1337,12 +1341,130 @@ int unify_core_basins(cubei &basin_cube, std::vector<d4> &maxima, const std::vec
 	return merged;
 }
 
+//Newton-Raphson onto the nearest critical point of the field, then the negative-definite test.
+//Newton converges to whatever critical point is nearest, of any type, which is the point: a
+//candidate sitting next to a saddle comes back rejected rather than dragged uphill to some
+//maximum elsewhere. The step is damped until it lowers the gradient norm, so a bad quadratic
+//model costs iterations and not a runaway.
+bool converge_to_maximum(const scalar_field &field, d3 &p, const double step_limit, const int max_iterations, const double gradient_tolerance)
+{
+	//Central differences of the analytic gradient: the cancellation at 1e-3 bohr leaves about
+	//1e-13 of noise on a curvature of order one, far below what the definiteness test asks
+	constexpr double fd = 1e-3;
+	d3 g;
+	if (!std::isfinite(field(p, g))) return false;
+	for (int it = 0; it < max_iterations; it++) {
+		double H[9];
+		for (int k = 0; k < 3; k++) {
+			d3 a = p, b = p, ga, gb;
+			a[k] += fd;
+			b[k] -= fd;
+			field(a, ga);
+			field(b, gb);
+			for (int j = 0; j < 3; j++) H[3 * j + k] = (ga[j] - gb[j]) / (2.0 * fd);
+		}
+		for (int i = 0; i < 3; i++)
+			for (int j = i + 1; j < 3; j++) {
+				const double m = 0.5 * (H[3 * i + j] + H[3 * j + i]);
+				H[3 * i + j] = H[3 * j + i] = m;
+			}
+		const double g0 = array_length(g);
+		if (!std::isfinite(g0)) return false;
+		if (g0 <= gradient_tolerance) {
+			vec A(H, H + 9), W(3);
+			if (!try_make_Eigenvalues(A, W)) return false;
+			const double max_abs = std::max({ std::abs(W[0]), std::abs(W[1]), std::abs(W[2]) });
+			const double tol = std::max(1e-10, max_abs * 1e-8);
+			return W[0] < -tol && W[1] < -tol && W[2] < -tol;
+		}
+		double inv[9];
+		if (!invert_3x3(H, inv)) return false;
+		d3 s = mat3_vec_mul(inv, g);
+		for (int k = 0; k < 3; k++) s[k] = -s[k];
+		const double n = array_length(s);
+		if (!std::isfinite(n) || n == 0.0) return false;
+		if (n > step_limit)
+			for (int k = 0; k < 3; k++) s[k] *= step_limit / n;
+		bool accepted = false;
+		for (int att = 0; att < 10 && !accepted; att++) {
+			const double d = std::pow(0.5, att);
+			const d3 q{ p[0] + d * s[0], p[1] + d * s[1], p[2] + d * s[2] };
+			d3 gq;
+			if (!std::isfinite(field(q, gq))) continue;
+			if (array_length(gq) < g0) {
+				p = q;
+				g = gq;
+				accepted = true;
+			}
+		}
+		if (!accepted) return false;
+	}
+	return false;
+}
+
+//Nuclei are attractors of the density by the cusp and need no test. Everything else has to
+//earn it: the critical-point search must have converged there and called it an attractor, and
+//the point must still be a maximum when it is re-converged on the analytic field from a
+//perturbed start, so that a candidate resting on a shoulder falls out. The perturbation is a
+//tenth of a bohr, wider than the Newton step tolerance and narrower than any real basin.
+std::vector<d4> streaming_density_attractors(const WFN &wavy, const std::vector<critical_point> &critical_points, const std::function<double(const d3&)> *core_density, const std::function<void(const d3&, d3&)> *core_gradient, const bool debug)
+{
+	auto rho = [&](const d3 &p) { return wavy.compute_dens(p) + (core_density ? (*core_density)(p) : 0.0); };
+	scalar_field field = [&](const d3 &p, d3 &g) {
+		wavy.computeGrad(p, g);
+		if (core_gradient) {
+			d3 c;
+			(*core_gradient)(p, c);
+			for (int k = 0; k < 3; k++) g[k] += c[k];
+		}
+		return rho(p);
+	};
+	std::vector<d4> maxima;
+	for (int a = 0; a < wavy.get_ncen(); a++) {
+		const d3 p = wavy.get_atom_pos(a);
+		maxima.push_back(d4{ p[0], p[1], p[2], rho(p) });
+	}
+	const size_t nuclei = maxima.size();
+	constexpr double nuclear_radius = 0.5;   //a critical point this close to a nucleus is that nucleus
+	constexpr double duplicate_radius2 = 0.01;
+	for (const critical_point &cp : critical_points) {
+		if (!cp.converged || cp.type != "attractor") continue;
+		bool nuclear = false;
+		for (size_t a = 0; a < nuclei && !nuclear; a++)
+			nuclear = array_length(cp.position, d3{ maxima[a][0], maxima[a][1], maxima[a][2] }) < nuclear_radius;
+		if (nuclear) continue;
+		bool survives = true;
+		d3 converged = cp.position;
+		for (int t = 0; t < 4 && survives; t++) {
+			//t == 0 is the point itself; the three after it start a tenth of a bohr off along
+			//each axis and have to come back to the same place
+			d3 start = cp.position;
+			if (t > 0) start[t - 1] += 0.1;
+			d3 q = start;
+			survives = converge_to_maximum(field, q);
+			if (survives && t == 0) converged = q;
+			if (survives && t > 0) survives = array_length(q, converged) < 0.05;
+		}
+		if (!survives) {
+			if (debug) std::cout << "Dropped a non-nuclear attractor candidate that is not a maximum of the analytic field at " << cp.position[0] << " " << cp.position[1] << " " << cp.position[2] << std::endl;
+			continue;
+		}
+		bool duplicate = false;
+		for (const d4 &m : maxima)
+			if (std::pow(converged[0] - m[0], 2) + std::pow(converged[1] - m[1], 2) + std::pow(converged[2] - m[2], 2) < duplicate_radius2) duplicate = true;
+		if (duplicate) continue;
+		maxima.push_back(d4{ converged[0], converged[1], converged[2], rho(converged) });
+		if (debug) std::cout << "Kept a non-nuclear attractor at " << converged[0] << " " << converged[1] << " " << converged[2] << " with rho " << rho(converged) << std::endl;
+	}
+	return maxima;
+}
+
 //Populations of the basins integrated on the molecule's atom-centred quadrature grids, which
 //carry the cusps a uniform cube cannot. A quadrature point takes the basin of its cube cell
 //when every voxel within three of it agrees; otherwise it is sent up the analytic field
 //until it comes within two voxels of a maximum, so the boundary is the field's and not the
 //grid's.
-vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, const std::vector<d4> &maxima, const WFN &wavy, const int accuracy, const bool eli_field, vec &volumes, double &outside, const std::function<double(const d3&)> *core_density, const std::function<void(const d3&, d3&)> *core_gradient, const int grid_boost, const density_field *field)
+vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, const std::vector<d4> &maxima, const WFN &wavy, const int accuracy, const bool eli_field, vec &volumes, double &outside, const std::function<double(const d3&)> *core_density, const std::function<void(const d3&, d3&)> *core_gradient, const int grid_boost, const density_field *field, basin_overlaps *ovl)
 {
 	//The filled core steers the trajectories only. An ECP atom's grid is built for its
 	//valence basis and cannot integrate a 1s at Z = 80, so the core electrons are added to
@@ -1350,29 +1472,59 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 	//lies whole inside its atom's basin
 	auto valence = [&](const d3 &p) { return field ? field->rho(p) : wavy.compute_dens(p); };
 	auto density = [&](const d3 &p) { return valence(p) + (core_density ? (*core_density)(p) : 0.0); };
-	const int nb = basin_cube->max_value();
+	//Streaming: no cube and no basin cube, the maxima are the whole topology and every point
+	//finds its basin by walking the field
+	const bool streaming = cub == nullptr || basin_cube == nullptr;
+	const int nb = streaming ? static_cast<int>(maxima.size()) : basin_cube->max_value();
+	//The overlap matrices ride along on the same points and the same weights as the populations:
+	//the density a point contributes is sum_i occ_i phi_i^2, so the diagonal of what is
+	//accumulated here sums to exactly the population below and the two can never disagree
+	if (ovl && field) ovl = nullptr;
+	if (ovl) {
+		ovl->mo_index.clear();
+		for (int m = 0; m < wavy.get_nmo(); m++)
+			if (std::abs(wavy.get_MO_occ(m)) > 1e-8) ovl->mo_index.push_back(m);
+		ovl->nmo = static_cast<int>(ovl->mo_index.size());
+		ovl->S.assign(nb, vec(ovl->triangle(), 0.0));
+	}
 	vec pop(nb, 0.0);
 	volumes.assign(nb, 0.0);
 	outside = 0.0;
-	const int nx = cub->get_size(0), ny = cub->get_size(1), nz = cub->get_size(2);
-	d3 h;
-	for (int i = 0; i < 3; i++)
-		h[i] = std::sqrt(cub->get_vector(0, i) * cub->get_vector(0, i) + cub->get_vector(1, i) * cub->get_vector(1, i) + cub->get_vector(2, i) * cub->get_vector(2, i));
+	const int nx = streaming ? 0 : cub->get_size(0), ny = streaming ? 0 : cub->get_size(1), nz = streaming ? 0 : cub->get_size(2);
+	//Without a cube there is nothing to read a spacing off, so the trajectory keeps the step of
+	//a 0.1 A grid: the integrator is then the one the gridded path has been validated against
+	//and only the basin bookkeeping changes
+	d3 h{ constants::ang2bohr(0.1), constants::ang2bohr(0.1), constants::ang2bohr(0.1) };
+	if (!streaming)
+		for (int i = 0; i < 3; i++)
+			h[i] = std::sqrt(cub->get_vector(0, i) * cub->get_vector(0, i) + cub->get_vector(1, i) * cub->get_vector(1, i) + cub->get_vector(2, i) * cub->get_vector(2, i));
 	//A third of a voxel with a midpoint step near a nucleus: the Euler step at half a voxel
 	//put the N-H boundary of NH3BH3 0.03 e off AIMAll, this is within 0.006. Beyond 1.5 bohr
 	//of every nucleus the field is smooth enough for a whole voxel.
 	const double voxel = std::min({ h[0], h[1], h[2] });
 	const std::vector<atom> atoms = wavy.get_atoms();
 	auto step_at = [&](const d3 &p) {
+		double d2 = std::numeric_limits<double>::max();
 		for (const atom &at : atoms) {
 			const d3 ap = at.get_pos();
-			if (std::pow(p[0] - ap[0], 2) + std::pow(p[1] - ap[1], 2) + std::pow(p[2] - ap[2], 2) < 2.25) return 0.3 * voxel;
+			d2 = std::min(d2, std::pow(p[0] - ap[0], 2) + std::pow(p[1] - ap[1], 2) + std::pow(p[2] - ap[2], 2));
 		}
+		if (d2 < 2.25) return 0.3 * voxel;
+		//Beyond six bohr of every nucleus the density is a smooth decaying tail with no basin
+		//boundary a step could miss, and the streaming path has to walk points out there all the
+		//way back in - the cube used to stop at its own edge and hand them to "outside". The step
+		//grows with the distance so that walk costs a handful of evaluations instead of a
+		//hundred, and shrinks again to the voxel before it reaches anything with structure.
+		//Streaming only: with a cube the long step jumps over its edge, and a point that leaves
+		//is lost to "outside" rather than slow - it cost NH3Li's ELI-D 0.02 e when it applied
+		//to both paths.
+		if (streaming && d2 > 36.0) return std::min(0.25 * std::sqrt(d2), 4.0);
 		return voxel;
 	};
 	const double step = 0.3 * voxel;
 	//Cube cell of a position and the position within it; false outside the cube
 	auto cell = [&](const d3 &p, int *c, d3 &f) {
+		if (streaming) return false;
 		const int sz[3] = { nx, ny, nz };
 		for (int d = 0; d < 3; d++) {
 			const double t = (p[d] - cub->get_origin(d)) / cub->get_vector(d, d);
@@ -1445,7 +1597,8 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 		int b = lookup(p, settled);
 		if (eli_field && (settled || b == 0)) return b;
 		int c[3]; d3 f;
-		if (!cell(p, c, f)) return 0;
+		//Off the cube there is nothing to integrate; streaming has no cube to be off
+		if (!streaming && !cell(p, c, f)) return 0;
 		lb++;
 		d3 r = p, g;
 		double last_rho = -1.0;
@@ -1480,12 +1633,15 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 		}
 		return b;
 	};
-	//Radial shells of an atom's grid, so a boundary point near a heavy nucleus can be split
-	//along its radius: a core boundary sits where the density is several e/bohr^3 and the
-	//shell spacing alone misplaces 0.05 e, the split brings that below 0.005. Out to half a
-	//bohr beyond the outermost core shell; further out the quadrature's own spacing serves,
-	//and the split costs twelve trajectories a point
-	constexpr int radial_split = 12;
+	//Local refinement. A quadrature cell is a shell segment, and the error the basin boundary
+	//costs is the part of the cell that lies on the wrong side of it. Rather than deciding that
+	//from the cell's centre alone, both radial edges are climbed as well: a cell whose two ends
+	//agree belongs whole to one basin and is done in three trajectories, and only a cell the
+	//boundary actually crosses pays for more. That one is bisected until the crossing radius is
+	//known to a sixty-fourth of the cell, which places the surface far better than sampling the
+	//cell at a fixed number of radii ever did and costs half as many trajectories where it used
+	//to fire - and it now fires wherever a boundary is, not only near a heavy core.
+	constexpr int bisections = 6;
 	long long boundary_points = 0, lost = 0;
 	for (size_t a = 0; a < gd.atomic_grids.size(); a++) {
 		const vec &X = gd.atomic_grids[a][GridData::X], &Y = gd.atomic_grids[a][GridData::Y], &Z = gd.atomic_grids[a][GridData::Z], &W = gd.atomic_grids[a][GridData::BECKE_WEIGHT];
@@ -1501,6 +1657,29 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 			vec lp(nb, 0.0), lv(nb, 0.0);
 			double lo = 0.0;
 			long long lb = 0, ll = 0;
+			//ponytail: one triangle per basin per thread, nb * nmo^2 / 2 doubles each; the caller
+			//sizes the job, a molecule big enough to hurt here has other limits first
+			vec2 ls;
+			vec phi;
+			vec2 dbuf;
+			if (ovl) {
+				ls.assign(nb, vec(ovl->triangle(), 0.0));
+				phi.resize(wavy.get_nmo(), 0.0);
+				dbuf.assign(wavy.get_ncen(), vec(16, 0.0));
+			}
+			//Rank-1 update of one basin's triangle: the point's share of the quadrature weight
+			//times the outer product of the orbitals it sees
+			auto accumulate = [&](const int b, const double wq) {
+				if (!ovl || b <= 0 || wq == 0.0) return;
+				double *Sb = ls[b - 1].data();
+				const int *idx = ovl->mo_index.data();
+				for (int a2 = 0; a2 < ovl->nmo; a2++) {
+					const double pa = wq * phi[idx[a2]];
+					if (pa == 0.0) continue;
+					double *row = Sb + (size_t)a2 * (a2 + 1) / 2;
+					for (int b2 = 0; b2 <= a2; b2++) row[b2] += pa * phi[idx[b2]];
+				}
+			};
 #pragma omp for schedule(dynamic, 16)
 			for (int i = 0; i < np; i++) {
 				const double w = W[i];
@@ -1508,46 +1687,63 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 				const d3 p{ X[i], Y[i], Z[i] };
 				bool settled;
 				int b = lookup(p, settled);
-				bool heavy = false;
-				if (!eli_field || (b != 0 && !settled))
-					for (const atom &at : atoms) {
-						if (at.get_charge() <= 2) continue;
-						const d3 ap = at.get_pos();
-						const double rc = core_shell_radius(at.get_charge()) + 0.5;
-						if (std::pow(p[0] - ap[0], 2) + std::pow(p[1] - ap[1], 2) + std::pow(p[2] - ap[2], 2) < rc * rc) { heavy = true; break; }
-					}
-				const double rho = valence(p);
-				if (heavy) {
-					//The cell's weight stays with the quadrature rule; only its share per basin
-					//is decided by the sub-points, each counted with the density it sees
-					const size_t k = std::lower_bound(shells.begin(), shells.end(), radius[i] - 1e-8) - shells.begin();
-					const double lower = k > 0 ? 0.5 * (shells[k - 1] + shells[k]) : 0.0;
-					const double upper = k + 1 < shells.size() ? 0.5 * (shells[k] + shells[k + 1]) : shells[k];
-					vec share(nb + 1, 0.0), count(nb + 1, 0.0);
-					double sum = 0.0;
-					for (int q = 0; q < radial_split; q++) {
-						const double rq = lower + (upper - lower) * (q + 0.5) / radial_split;
-						const double f = rq / radius[i];
-						const d3 pq{ centre[0] + (p[0] - centre[0]) * f, centre[1] + (p[1] - centre[1]) * f, centre[2] + (p[2] - centre[2]) * f };
-						const double sq = valence(pq) * f * f;
-						const int bq = climb(pq, lb, ll);
-						share[bq] += sq;
-						count[bq] += 1.0;
-						sum += sq;
-					}
-					if (sum > 0.0) {
-						lo += w * rho * share[0] / sum;
-						for (int bq = 1; bq <= nb; bq++) { lp[bq - 1] += w * rho * share[bq] / sum; lv[bq - 1] += w * count[bq] / radial_split; }
-					}
-					continue;
+				//The same density, taken from the orbital pass that also hands out phi
+				const double rho = ovl ? wavy.compute_dens(p, dbuf, phi) : valence(p);
+				//A basin's share of the cell's quadrature weight; the weight itself stays with
+				//the rule, only who gets it is decided here
+				auto give = [&](const int bb, const double fr) {
+					if (fr <= 0.0) return;
+					if (bb == 0) { lo += w * rho * fr; return; }
+					lp[bb - 1] += w * rho * fr;
+					lv[bb - 1] += w * fr;
+					accumulate(bb, w * fr);
+				};
+				//For ELI-D a cell whose neighbourhood agrees is taken from the grid, as before
+				if (eli_field && (b == 0 || settled)) { give(b, 1.0); continue; }
+				b = climb(p, lb, ll);
+				const size_t k = std::lower_bound(shells.begin(), shells.end(), radius[i] - 1e-8) - shells.begin();
+				const double inner = k > 0 ? 0.5 * (shells[k - 1] + shells[k]) : 0.0;
+				const double outer = k + 1 < shells.size() ? 0.5 * (shells[k] + shells[k + 1]) : shells[k];
+				if (radius[i] <= 1e-8 || outer <= inner + 1e-8) { give(b, 1.0); continue; }
+				auto along = [&](const double r) {
+					const double f = r / radius[i];
+					return d3{ centre[0] + (p[0] - centre[0]) * f, centre[1] + (p[1] - centre[1]) * f, centre[2] + (p[2] - centre[2]) * f };
+				};
+				//A probe is not a sample. The centre of this cell has already climbed to a basin;
+				//the edges are asked only to find out whether a boundary lies between them, and an
+				//edge that climbs off the cube answers nothing. Handing the cell's weight to
+				//"outside" on that basis throws away density the centre had already placed - it is
+				//how UH6's ELI-D lost 0.009 e when this refinement landed, the edge probes of the
+				//cells near the crop being further out than the centres they stand in for. A probe
+				//that fails defers to the point it was probing for
+				int bi = climb(along(inner), lb, ll), bo = climb(along(outer), lb, ll);
+				if (bi == 0) bi = b;
+				if (bo == 0) bo = b;
+				if (bi == bo) { give(bi, 1.0); continue; }
+				//ponytail: one crossing per cell. Three basins meeting inside a single quadrature
+				//cell is a smaller thing than the rule's own error; bisect for more if it is not
+				double lo_r = inner, hi_r = outer;
+				for (int it = 0; it < bisections; it++) {
+					const double mid = 0.5 * (lo_r + hi_r);
+					int bm = climb(along(mid), lb, ll);
+					if (bm == 0) bm = b;
+					if (bm == bi) lo_r = mid; else hi_r = mid;
 				}
-				if (!eli_field || (b != 0 && !settled)) b = climb(p, lb, ll);
-				if (b == 0) lo += w * rho;
-				else { lp[b - 1] += w * rho; lv[b - 1] += w; }
+				const double rc = 0.5 * (lo_r + hi_r);
+				//Each side gets the density it carries over its own part of the shell segment,
+				//whose volume goes as r^3
+				const double wi = valence(along(0.5 * (inner + rc))) * (rc * rc * rc - inner * inner * inner);
+				const double wo = valence(along(0.5 * (rc + outer))) * (outer * outer * outer - rc * rc * rc);
+				const double sum = wi + wo;
+				if (sum > 0.0) { give(bi, wi / sum); give(bo, wo / sum); }
+				else give(b, 1.0);
 			}
 #pragma omp critical
 			{
 				for (int b = 0; b < nb; b++) { pop[b] += lp[b]; volumes[b] += lv[b]; }
+				if (ovl)
+					for (int b = 0; b < nb; b++)
+						for (size_t t = 0; t < ovl->S[b].size(); t++) ovl->S[b][t] += ls[b][t];
 				outside += lo;
 				boundary_points += lb;
 				lost += ll;
@@ -1559,12 +1755,122 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 			const int ncore = wavy.get_atom_ECP_electrons(a);
 			if (ncore <= 0) continue;
 			bool settled;
-			const int b = lookup(wavy.get_atom_pos(a), settled);
+			//Streaming has no basin cube to read the nucleus out of; it is one of the maxima by
+			//construction, so the maximum it sits on is its basin
+			const int b = streaming ? at_maximum(wavy.get_atom_pos(a)) : lookup(wavy.get_atom_pos(a), settled);
 			if (b > 0) pop[b - 1] += ncore;
 			else outside += ncore;
 		}
 	std::cout << "Quadrature points sent along the field: " << boundary_points << ", left the grid: " << lost << std::endl;
 	return pop;
+}
+
+//The pair-density of a single determinant, partitioned twice: delta(A,B) counts the electron
+//pairs shared between two basins and lambda(A) those kept inside one. Both come out of the
+//overlap matrices alone, so they cost nothing beyond the integration that already ran. A
+//restricted wavefunction lists one set of MOs for both spins, hence m = 2 and the occupations
+//halved to the spin-orbital ones; alpha and beta listed separately give m = 1
+delocalization_result delocalization_indices(const WFN &wavy, const basin_overlaps &ovl)
+{
+	delocalization_result r;
+	const int nb = static_cast<int>(ovl.S.size());
+	const int n = ovl.nmo;
+	r.lambda.assign(nb, 0.0);
+	r.population.assign(nb, 0.0);
+	if (nb == 0 || n == 0) return r;
+	//What decides m is the occupation, not the operator flag: a spin orbital cannot hold more
+	//than one electron, so an MO occupied twice is a spatial one standing for both spins. The
+	//flag is a guess in every reader that has to infer the spin blocks - the .wfn reader starts
+	//a beta block wherever the orbital energies stop rising, so a degenerate pair in a closed
+	//shell (the two pi lone pairs of OH-) is enough to label the second of them beta. Believing
+	//that gave m = 1 with occ = 2 and every lambda and delta exactly twice too large, while the
+	//population m * occ * S_ii stayed right and hid it
+	double max_occ = 0.0;
+	for (int i = 0; i < n; i++) max_occ = std::max(max_occ, std::abs(wavy.get_MO_occ(ovl.mo_index[i])));
+	const bool restricted = max_occ > 1.0 + 1e-6;
+	const double m = restricted ? 2.0 : 1.0;
+	vec occ(n);
+	ivec spin(n);
+	for (int i = 0; i < n; i++) {
+		occ[i] = wavy.get_MO_occ(ovl.mo_index[i]) / m;
+		//Spatial orbitals stand for both spins and all of them exchange with one another; only
+		//a genuinely spin-resolved set has an alpha and a beta block that must not mix
+		spin[i] = restricted ? 0 : wavy.get_MO_op(ovl.mo_index[i]);
+	}
+	for (int b = 0; b < nb; b++)
+		for (int i = 0; i < n; i++)
+			r.population[b] += m * occ[i] * ovl.at(b, i, i);
+	//The overlap matrices of all basins add up to the identity, whatever the basins are; what
+	//they miss is what the quadrature missed, and it is the only error estimate here that does
+	//not need a reference
+	for (int i = 0; i < n; i++)
+		for (int j = 0; j <= i; j++) {
+			if (spin[i] != spin[j]) continue;
+			double s = 0.0;
+			for (int b = 0; b < nb; b++) s += ovl.at(b, i, j);
+			r.identity_error = std::max(r.identity_error, std::abs(s - (i == j ? 1.0 : 0.0)));
+		}
+	//The pair sum is symmetric in i and j, so the triangle is taken once and doubled off the
+	//diagonal
+	auto pair_sum = [&](const int a, const int b) {
+		double s = 0.0;
+		for (int i = 0; i < n; i++)
+			for (int j = 0; j <= i; j++) {
+				if (spin[i] != spin[j]) continue;
+				const double t = occ[i] * occ[j] * ovl.at(a, i, j) * ovl.at(b, i, j);
+				s += i == j ? t : 2.0 * t;
+			}
+		return s;
+	};
+	for (int b = 0; b < nb; b++) r.lambda[b] = m * pair_sum(b, b);
+	for (int a = 0; a < nb; a++)
+		for (int b = a + 1; b < nb; b++) {
+			r.pairs.push_back({ a, b });
+			r.di.push_back(2.0 * m * pair_sum(a, b));
+		}
+	return r;
+}
+
+void report_delocalization(const WFN &wavy, const basin_overlaps &ovl, const svec &labels, std::ostream &log, const double threshold)
+{
+	const delocalization_result r = delocalization_indices(wavy, ovl);
+	const int nb = static_cast<int>(r.lambda.size());
+	if (nb == 0 || ovl.nmo == 0) return;
+	auto name = [&](const int b) { return b < static_cast<int>(labels.size()) ? labels[b] : std::to_string(b + 1); };
+	log << "\nDelocalization indices (" << ovl.nmo << " occupied orbitals):\n";
+	citations::cite(citations::Method::LIDI, log);
+	log << "  sum over all basins of S^A - identity: " << std::scientific << std::setprecision(2) << r.identity_error
+		<< std::fixed << "   (the quadrature's own error; AIMAll's integrations reach ~1e-3)\n";
+	//delta(A,B) summed over B is the count an atom shares with everything else; with lambda(A)
+	//it has to give the population back, and the residual says which basin the grid missed
+	log << "\n  basin  label                 N(A)     lambda(A)   sum_B delta(A,B)/2   residual\n";
+	for (int b = 0; b < nb; b++) {
+		double half = 0.0;
+		for (size_t p = 0; p < r.pairs.size(); p++)
+			if (r.pairs[p][0] == b || r.pairs[p][1] == b) half += 0.5 * r.di[p];
+		log << std::setw(7) << b + 1 << "  " << std::left << std::setw(18) << name(b) << std::right << std::fixed << std::setprecision(4)
+			<< std::setw(11) << r.population[b] << std::setw(12) << r.lambda[b] << std::setw(18) << half
+			<< std::setw(12) << r.lambda[b] + half - r.population[b] << "\n";
+	}
+	ivec order(r.di.size());
+	std::iota(order.begin(), order.end(), 0);
+	std::sort(order.begin(), order.end(), [&](const int a, const int b) { return r.di[a] > r.di[b]; });
+	log << "\n  basin pair                                delta(A,B)\n";
+	int shown = 0;
+	for (const int p : order) {
+		if (r.di[p] < threshold) break;
+		log << "  " << std::left << std::setw(18) << name(r.pairs[p][0]) << std::setw(18) << name(r.pairs[p][1])
+			<< std::right << std::fixed << std::setprecision(4) << std::setw(12) << r.di[p] << "\n";
+		shown++;
+	}
+	if (!shown) log << "  none above " << threshold << "\n";
+	else log << "  " << static_cast<int>(r.di.size()) - shown << " further pairs below " << std::setprecision(2) << threshold << "\n";
+	for (int a = 0; a < wavy.get_ncen(); a++)
+		if (wavy.get_atom_ECP_electrons(a) > 0) {
+			log << "  An ECP took core electrons out of the orbitals: N(A) here is the valence count\n"
+				<< "  and is short of the basin population above by the core the Thakkar fill added.\n";
+			break;
+		}
 }
 
 vec integrate_values_in_basins(const cube *cub, const cubei *basin_cube, svec& basin_label, bool debug)

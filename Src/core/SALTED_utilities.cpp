@@ -1008,6 +1008,18 @@ void create_SALTED_training_data(const WFN& orbital, const WFN& aux, const optio
 	std::cout << "Calculating density fitting coefficients..." << std::endl;
 	DensityFitting::CONFIG config = DensityFitting::config_from_options(opts);
 	config.analyze_quality = true;
+
+	// SALTED learns one coefficient block per atom, so the fit has to keep each
+	// atom's density on its own centre. Grid-partitioned restraints pin the
+	// moments of the total density and leave the per-centre sums free, which
+	// trains the model on blocks that integrate to nothing physical.
+	if (config.partition_restraints) {
+		std::cout
+			<< "SALTED training: restraining the atom-centred populations instead of the grid-partitioned ones."
+			<< std::endl;
+		config.partition_restraints = false;
+		config.constrain_total_electrons = config.restrain_charges;
+	}
 	//config.restrain_type = DensityFitting::RESTRAINT_TYPE::SIMPLE_AND_TIK;
 	//config.charge_scheme = DensityFitting::CHARGE_SCHEME::HIRSHFELD;
 	//if (wavy->get_origin() == e_origin::ptb)

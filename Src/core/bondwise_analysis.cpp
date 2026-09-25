@@ -9,6 +9,7 @@
 #include "b2c.h"
 #include "crystal_energies.h"
 #include "spherical_density.h"
+#include "citations.h"
 #include <occ/qm/hf.h>
 
 namespace {
@@ -25,6 +26,63 @@ namespace {
 	int cartesian_shell_size(const int l) {
 		return (l + 1) * (l + 2) / 2;
 	}
+
+	//The dimension of the free atom's occupied orbital space, filled in Aufbau order and counted
+	//with full m degeneracy, so Li -> 2 (1s, 2s), B through Ne -> 5 (1s, 2s, 2p), Fe -> 15.
+	//This is the atomic subspace Roby's definition asks for, and unlike a threshold on the
+	//occupation numbers it is a property of the element alone: the rank of the atomic projector
+	//cannot change when a bond stretches or a torsion turns, which is what makes the resulting
+	//index a continuous function of the geometry and comparable between two molecules. A partly
+	//filled shell counts in full, because the atomic subspace has to be spherically complete.
+	constexpr int free_atom_orbital_count(const int atomic_number) {
+		//l of each shell in Aufbau filling order - 1s 2s 2p 3s 3p 4s 3d 4p 5s 4d 5p 6s 4f 5d 6p
+		//7s 5f 6d 7p - which covers every element up to Z = 118. Only l is needed; n never enters
+		//the count, so the table is one-dimensional. MSVC 14.44 rejects a range-for over a local
+		//constexpr int[][2] inside a constexpr function ("a non-constant (sub-)expression was
+		//encountered"), which an index loop over a flat array sidesteps.
+		constexpr int shell_l[] = { 0, 0, 1, 0, 1, 0, 2, 1, 0, 2, 1, 0, 3, 2, 1, 0, 3, 2, 1 };
+		int electrons = atomic_number;
+		int dimension = 0;
+		for (int i = 0; i < static_cast<int>(sizeof(shell_l) / sizeof(shell_l[0])); i++) {
+			if (electrons <= 0) break;
+			const int size = 2 * shell_l[i] + 1;
+			dimension += size;
+			electrons -= 2 * size;
+		}
+		return dimension;
+	}
+
+	//An ECP removed the innermost shells from the basis altogether, so free_atom_orbital_count would
+	//ask for orbitals that are not there and the rank would clamp to the whole atomic block - every
+	//diffuse and polarisation NAO included, which is not Roby's atomic subspace. The replaced core is
+	//always a set of complete shells filled in (n, then l) order, so counting orbitals until the
+	//ECP's electron count is used up gives the rank the core would have had: a 60-electron ECP on Au
+	//covers 1s through 4d plus 4f, 30 of the free atom's 40 orbitals, leaving the 10 that 5s, 5p, 5d
+	//and 6s span.
+	constexpr int ecp_core_orbital_count(const int ecp_electrons) {
+		int electrons = ecp_electrons;
+		int dimension = 0;
+		for (int n = 1; electrons > 0 && n <= 7; n++)
+			for (int l = 0; l < n && electrons > 0; l++) {
+				const int size = 2 * l + 1;
+				dimension += size;
+				electrons -= 2 * size;
+			}
+		return dimension;
+	}
+
+	//The subspace rank is the whole point of the fix, so it is checked where it is defined rather
+	//than in a test that needs a wavefunction to run.
+	static_assert(free_atom_orbital_count(3) == 2, "Li spans 1s and 2s");
+	static_assert(free_atom_orbital_count(7) == 5, "N spans 1s, 2s and 2p - a half-filled shell in full");
+	static_assert(free_atom_orbital_count(26) == 15, "Fe spans 1s..4s and 3d");
+	static_assert(free_atom_orbital_count(118) == 59, "the Aufbau list reaches the last element");
+	static_assert(ecp_core_orbital_count(0) == 0, "no ECP removes nothing");
+	static_assert(ecp_core_orbital_count(28) == 14, "a 28-electron ECP covers 1s..3d");
+	static_assert(free_atom_orbital_count(53) - ecp_core_orbital_count(28) == 13,
+		"iodine with a 28-electron ECP keeps 4s, 4p, 4d, 5s and 5p");
+	static_assert(free_atom_orbital_count(79) - ecp_core_orbital_count(60) == 10,
+		"gold with a 60-electron ECP keeps 5s, 5p, 5d and 6s");
 
 	int atomic_shell_size(const int l, const bool cartesian) {
 		return cartesian ? cartesian_shell_size(l) : 2 * l + 1;
@@ -154,9 +212,7 @@ namespace {
 
 		while (primitive_idx < static_cast<int>(basis_set.size())) {
 			const int shell_id = static_cast<int>(basis_set[primitive_idx].get_shell());
-			const int l = origin == e_origin::OCC
-				? static_cast<int>(basis_set[primitive_idx].get_type())
-				: static_cast<int>(basis_set[primitive_idx].get_type()) - 1;
+			const int l = static_cast<int>(basis_set[primitive_idx].get_type()) - 1;
 			err_checkf(l >= 0,
 				"Encountered an invalid shell angular momentum while building an OCC atomic basis.",
 				std::cout);
@@ -1027,7 +1083,8 @@ Roby_information::NAOResult Roby_information::calculateAtomicNAO(const dMatrix2 
 	const bool spherical,
 	const double occupancy_cutoff,
 	const int leading_orbitals_to_skip,
-	const bool EVs) {
+	const bool EVs,
+	const int keep_orbitals) {
 
 	err_checkf(D_full.extent(0) == D_full.extent(1), "Density matrix D must be square.", std::cout);
 	err_checkf(S_full.extent(0) == S_full.extent(1), "Overlap matrix S must be square.", std::cout);
@@ -1147,10 +1204,16 @@ Roby_information::NAOResult Roby_information::calculateAtomicNAO(const dMatrix2 
 	}
 
 	const int skip_orbitals = std::clamp(leading_orbitals_to_skip, 0, n);
+	//A non-negative keep_orbitals fixes the rank of the atomic subspace and ignores the occupancy
+	//threshold; the eigenvalues are already sorted, so this keeps the most occupied ones. The
+	//threshold branch is the legacy behaviour and steps whenever an occupation crosses it.
+	const int keep = std::clamp(keep_orbitals, 0, std::max(0, n - skip_orbitals));
 	for (int i = 0; i < n; i++) {
 		int original_idx = idx[i];
 		const bool omit_orbital = i < skip_orbitals ||
-			(occupancy_cutoff >= 0.0 && result.eigenvalues[original_idx] < occupancy_cutoff);
+			(keep_orbitals >= 0
+				? i >= skip_orbitals + keep
+				: (occupancy_cutoff >= 0.0 && result.eigenvalues[original_idx] < occupancy_cutoff));
 		vec &target_evals = omit_orbital ? omitted_evals : sorted_evals;
 		vec &target_evecs = omit_orbital ? omitted_evecs : sorted_evecs;
 
@@ -1377,7 +1440,7 @@ double Roby_information::Roby_population_analysis(const ivec atoms) {
 	return P;
 }
 
-void Roby_information::computeAllAtomicNAOs(WFN &wavy, const bool symmetrize, const bool use_ano_basis, const bool EVs) {
+void Roby_information::computeAllAtomicNAOs(WFN &wavy, const bool symmetrize, const bool use_ano_basis, const bool EVs, const bool legacy_occupancy_cutoff) {
 	const int N_atoms = wavy.get_ncen();
 	const std::vector<atom> ats = wavy.get_atoms();
 	NAOs.reserve(N_atoms);
@@ -1400,6 +1463,12 @@ void Roby_information::computeAllAtomicNAOs(WFN &wavy, const bool symmetrize, co
 
 	//err_checkf()
 
+	//The legacy subspace rule: keep every natural orbital whose occupation exceeds a fixed number.
+	//Those occupations move continuously with the geometry, so the rank of the atomic projector -
+	//and with it every index built on it - steps whenever one of them crosses. Li in LiH is the
+	//clean example: its second NAO passes 1/6 at 1.5875 A and the bond index jumps from 0.06 to
+	//0.95 across 0.025 A of bond length. Unless legacy_occupancy_cutoff asks for that behaviour,
+	//the subspace is fixed by the element instead - see free_atom_orbital_count.
 	const double occupancy_cutoff = use_ano_basis ? 1.0 / 14.0 : 1.0 / 6.0;
 
 	int last_index = 0;
@@ -1413,9 +1482,7 @@ void Roby_information::computeAllAtomicNAOs(WFN &wavy, const bool symmetrize, co
 		for (auto &bf : basis_set) {
 			if (bf.get_shell() != current_shell) {
 				current_shell++;
-				const int l = wavy.get_origin() == e_origin::OCC
-					? static_cast<int>(bf.get_type())
-					: static_cast<int>(bf.get_type()) - 1;
+				const int l = static_cast<int>(bf.get_type()) - 1;
 				err_checkf(l >= 0,
 					"Encountered an invalid shell angular momentum while building RGBI atomic NAOs.",
 					std::cout);
@@ -1454,6 +1521,9 @@ void Roby_information::computeAllAtomicNAOs(WFN &wavy, const bool symmetrize, co
 			std::stable_sort(shell_angular_momenta.begin(), shell_angular_momenta.end());
 
 		const bool spherical = !wavy.get_d_f_switch();
+		const int keep_orbitals = legacy_occupancy_cutoff
+			? -1
+			: free_atom_orbital_count(a.get_charge()) - ecp_core_orbital_count(a.get_ECP_electrons());
 
 		auto make_molecular_fallback = [&]() {
 			auto fallback = calculateAtomicNAO(density_matrix, overlap_matrix,
@@ -1462,7 +1532,8 @@ void Roby_information::computeAllAtomicNAOs(WFN &wavy, const bool symmetrize, co
 				spherical,
 				occupancy_cutoff,
 				0,
-				EVs);
+				EVs,
+				keep_orbitals);
 			fallback.atom_index = a.get_nr() - 1;
 			return fallback;
 		};
@@ -1481,13 +1552,17 @@ void Roby_information::computeAllAtomicNAOs(WFN &wavy, const bool symmetrize, co
 				vec S_sub(static_cast<size_t>(n_local) * n_local, 0.0);
 				get_submatrix(overlap_matrix, S_sub, indices[a.get_nr() - 1]);
 				const dMatrix2 atomic_overlap = reshape<dMatrix2>(S_sub, Shape2D(n_local, n_local));
+				//the ANO route thresholds free atom occupations, which are element constants, so
+				//its rank never depended on the geometry - passing the same count keeps the
+				//subspace it already picked and makes the two routes say the same thing.
 				auto ano = calculateAtomicNAO(atomic_density, atomic_overlap,
 					local_indices,
 					symmetrize ? shell_angular_momenta : ivec{},
 					spherical,
 					occupancy_cutoff,
 					0,
-					EVs);
+					EVs,
+					keep_orbitals);
 				ano.sub_OM = S_sub;
 				ano.sub_DM = atomic_density.container();
 				ano.matrix_elements = indices[a.get_nr() - 1];
@@ -1612,16 +1687,18 @@ void Roby_information::transform_Ionic_eigenvectors_to_Ionic_orbitals(
 		fa = 0.5 * ((fm + fp) + c * (fm - fp));
 		fb = 0.5 * (c * (fm + fp) + (fm - fp));
 
-		if (abs(fa - 1.0) > 1E-8) {
-			A = dot_BLAS<dMatrix1, dMatrix2>(PAS, EVC_column, false);
+		//A and B live outside the loop, so skipping the projection would leave the previous pair's
+		//vector in place. The second test also read fa where it meant fb. Projecting
+		//unconditionally and only dividing is both correct and shorter; the division is a no-op
+		//when the factor is 1.
+		A = dot_BLAS<dMatrix1, dMatrix2>(PAS, EVC_column, false);
+		if (abs(fa - 1.0) > 1E-8)
 			for (int a = 0; a < n_a; a++)
 				A(a) /= fa;
-		}
-		if (abs(fa - 1.0) > 1E-8) {
-			B = dot_BLAS<dMatrix1, dMatrix2>(PBS, EVC_column, false);
+		B = dot_BLAS<dMatrix1, dMatrix2>(PBS, EVC_column, false);
+		if (abs(fb - 1.0) > 1E-8)
 			for (int b = 0; b < n_b; b++)
 				B(b) /= fb;
-		}
 
 #ifdef NSA2DEBUG
 		std::cout << "fa: " << fa << std::endl << "fb: " << fb << std::endl;
@@ -1804,16 +1881,16 @@ void Roby_information::transform_group_Ionic_orbitals(
 		double fa = 0.5 * ((fm + fp) + c * (fm - fp));
 		double fb = 0.5 * (c * (fm + fp) + (fm - fp));
 
-		if (abs(fa - 1.0) > 1E-8) {
-			A = dot_BLAS<dMatrix1, dMatrix2>(PAS, EVC_column, false);
+		//see transform_Ionic_eigenvectors_to_Ionic_orbitals: A and B outlive the loop body, so the
+		//projection has to happen on every pair even when the scaling factor is 1.
+		A = dot_BLAS<dMatrix1, dMatrix2>(PAS, EVC_column, false);
+		if (abs(fa - 1.0) > 1E-8)
 			for (int a = 0; a < n_a; a++)
 				A(a) /= fa;
-		}
-		if (abs(fb - 1.0) > 1E-8) {
-			B = dot_BLAS<dMatrix1, dMatrix2>(PBS, EVC_column, false);
+		B = dot_BLAS<dMatrix1, dMatrix2>(PBS, EVC_column, false);
+		if (abs(fb - 1.0) > 1E-8)
 			for (int b = 0; b < n_b; b++)
 				B(b) /= fb;
-		}
 
 		// Build antibonding partner in column pairs[i]
 		fa = 0.5 * (fm - fp);
@@ -2040,10 +2117,15 @@ void Roby_information::computeGroupAnalysis(const ivec2 &group_defs, const vec &
 			// Lone-pair orbitals localized almost entirely within one group have
 			// eigvals near ±1.  In the group basis the inter-group contamination
 			// can push these to ~0.996 rather than exactly 1, so they evade the
-			// angle cutoff (84.6° < 89.99°) and corrupt the ionic index with large
-			// contributions of the wrong sign.  Exclude any pair whose positive
-			// eigval exceeds this threshold.
-			constexpr double lone_pair_eigval_threshold = 0.99;
+			// angle cutoff (84.6° is well inside the 0.573° window this cutoff
+			// actually draws, not the 89.99° the old comment claimed) and corrupt
+			// the ionic index with large contributions of the wrong sign.
+			// Exclude any pair whose positive eigval exceeds this threshold.
+			// NOTE: the atom-pair loop has no equivalent guard, so the two paths
+			// currently answer differently for the same lone pair - on the H2O2 O-O
+			// bond, 0.800 here against 0.645 there.  Which of the two is the
+			// intended Roby-Gould definition is a method question, not a bug fix.
+			const double lone_pair_eigval_threshold = 0.99;
 			for (int i = 0; i < n0; i++) {
 				if (covalent_info['A'](i, 0) < zero_angle_cutoff || covalent_info['A'](i, 0) > 90.0 - zero_angle_cutoff)
 					continue;
@@ -2099,11 +2181,26 @@ void Roby_information::computeGroupAnalysis(const ivec2 &group_defs, const vec &
 	std::cout << sep << "\n";
 }
 
-Roby_information::Roby_information(WFN &wavy, const ivec3 &group_sets, const bool symmetrize, const bool use_ano_basis, const bool EVs, const bool theta_info) {
+Roby_information::Roby_information(WFN &wavy, const ivec3 &group_sets, const bool symmetrize, const bool use_ano_basis, const bool EVs, const bool theta_info, const bool legacy_occupancy_cutoff) {
 	auto bonds = get_bonded_atom_pairs(wavy);
+	//Both routes need a per-atom basis set, and a plain .wfn has none: it lists primitives by
+	//centre without shell structure, so every atom's basis comes back empty.  Unguarded, the ANO
+	//route hands OCC a shell-less AOBasis and dies in gensqrtinv - a segfault no try/catch around
+	//the call can intercept - while the NAO route reports an empty index list from three frames
+	//deeper.  One check for both, before either can start.
+	for (int a = 0; a < wavy.get_ncen(); a++)
+		err_checkf(!wavy.get_atom(a).get_basis_set().empty(),
+			"RGBI needs the basis set of every atom, and " + wavy.get_path().filename().string() +
+			" carries none for atom " + std::to_string(a + 1) + " (" +
+			constants::atnr2letter(wavy.get_atom(a).get_charge()) + "). A plain .wfn stores "
+			"primitives without their shell structure; run RGBI on a .wfx, .fchk, .molden, .gbw or "
+			"a Tonto archive instead.", std::cout);
+	citations::cite(citations::Method::RGBI, std::cout);
 	const char *orbital_label = use_ano_basis ? "ANOs" : "NAOs";
 	std::cout << "Calculating " << orbital_label << " for all atoms...                 " << std::flush;
-	computeAllAtomicNAOs(wavy, symmetrize, use_ano_basis, EVs);
+	if (legacy_occupancy_cutoff)
+		std::cout << "\n  (legacy occupancy cutoff: atomic subspace ranks follow the occupation numbers)\n";
+	computeAllAtomicNAOs(wavy, symmetrize, use_ano_basis, EVs, legacy_occupancy_cutoff);
 	std::cout << " ...done!" << std::endl;
 	if (theta_info)
 		std::cout << "RGBI theta-subspace reports enabled." << std::endl;
@@ -2624,9 +2721,13 @@ static std::unique_ptr<Gaussian_Molecule> fitted_source(const WFN &wavy, options
 void ELI_analysis(const WFN &wavy, options &opt) {
 	err_checkf(wavy.get_ncen() != 0, "No Atoms in the wavefunction, this will not work!! ABORTING!!", std::cout);
 	std::cout << "Analysing ELI basins in the wavefunction..." << std::endl;
+	citations::cite(citations::Method::ELID, std::cout);
 	density_field field;
 	const std::unique_ptr<Gaussian_Molecule> fit = fitted_source(wavy, opt, field, std::cout);
 	const density_field *fld = fit ? &field : nullptr;
+	//A fitted source has no orbitals, so ELI comes from the density alone.
+	if (fld)
+		citations::cite(citations::Method::ELIOrbitalFree, std::cout);
 
 	const double radius = opt.properties.radius;
 	const double grid_spacing = opt.properties.resolution;
@@ -2854,21 +2955,48 @@ void ELI_analysis(const WFN &wavy, options &opt) {
 	//longer trusted; its ~1e-3 error at a bond critical point also leaves a bump there that
 	//5e-3 persistence keeps, hence the looser merge
 	const double floor = fld ? 1e-4 : 0.0, persistence = fld ? 2e-2 : 5e-3;
-	std::pair<cubei, std::vector<d4>> qtaim_results = topological_cube_analysis(&rho, atoms, opt.debug, true, floor, 1e-10, radius, persistence, &nuclei, &l_w, fill_cores ? &core_density : nullptr, fill_cores ? &core_gradient : nullptr, fld);
+	//The density's attractors come from the analytic critical-point search that has already run,
+	//and the quadrature then walks the field from every point with no cube in the loop. A fitted
+	//density keeps the cube: those critical points are the orbitals' and not the fit's, so they
+	//are not that field's attractors. Without orbitals there is no search to take them from.
+	const bool stream_qtaim = !opt.basin_cube && !fld && l_w.get_nmo() > 0;
+	std::pair<cubei, std::vector<d4>> qtaim_results;
+	if (stream_qtaim) {
+		qtaim_results.second = streaming_density_attractors(l_w, density_critical_points, fill_cores ? &core_density : nullptr, fill_cores ? &core_gradient : nullptr, opt.debug);
+		std::cout << "QTAIM attractors from the analytic field: " << qtaim_results.second.size() << " (" << l_w.get_ncen() << " nuclei, " << qtaim_results.second.size() - l_w.get_ncen() << " non-nuclear)" << std::endl;
+	}
+	else
+		qtaim_results = topological_cube_analysis(&rho, atoms, opt.debug, true, floor, 1e-10, radius, persistence, &nuclei, &l_w, fill_cores ? &core_density : nullptr, fill_cores ? &core_gradient : nullptr, fld);
 	svec labels = assign_labels_to_basins(qtaim_results.second, atoms, opt.debug);
 
 	//Two integrations of the density over each basin set: the voxel sum, which is what the cube
 	//resolution buys, and the atom-centred quadrature grids with the boundary decided by the
 	//field itself, which is the number to compare with AIMAll and DGrid. The ELI-D basins follow
 	//the orbitals' ELI-D and integrate the orbital density; only the QTAIM set uses the fit
-	auto report = [&](const char *title, const std::pair<cubei, std::vector<d4>> &res, svec &lab, const bool eli) {
-		std::cout << "\n" << title << " (voxel sum):\n";
-		integrate_values_in_basins(&rho, &(res.first), lab, opt.debug);
+	auto report = [&](const char *title, const std::pair<cubei, std::vector<d4>> &res, svec &lab, const bool eli, const bool stream) {
+		//The voxel sum is a property of the basin cube; streaming has none, and the number it
+		//gave was the worse of the two anyway
+		if (!stream) {
+			std::cout << "\n" << title << " (voxel sum):\n";
+			integrate_values_in_basins(&rho, &(res.first), lab, opt.debug);
+		}
 		vec vol;
 		double outside = 0.0;
-		const vec pop = integrate_basins_on_atomic_grids(&rho, &(res.first), res.second, l_w, opt.accuracy, eli, vol, outside, fill_cores && !eli ? &core_density : nullptr, fill_cores && !eli ? &core_gradient : nullptr, opt.basin_grid, eli ? nullptr : fld);
+		//The overlap matrices come out of the same point loop as the populations, at one triangle
+		//per basin per thread; past a couple of hundred megabytes that is no longer a free ride
+		//and the delocalization indices are left out rather than the run
+		basin_overlaps ovl;
+		const bool orbitals = !eli && !fld && l_w.get_nmo() > 0;
+		const size_t aom_bytes = orbitals ? (size_t)l_w.get_nmo() * (l_w.get_nmo() + 1) / 2 * res.second.size() * omp_get_max_threads() * sizeof(double) : 0;
+		const bool want_aom = orbitals && aom_bytes < (size_t)512 * 1024 * 1024;
+		if (orbitals && !want_aom)
+			std::cout << "  Delocalization indices skipped: " << l_w.get_nmo() << " orbitals over " << res.second.size()
+				<< " basins on " << omp_get_max_threads() << " threads would need " << aom_bytes / (1024 * 1024) << " MB of overlap matrices.\n";
+		const vec pop = integrate_basins_on_atomic_grids(stream ? nullptr : &rho, stream ? nullptr : &(res.first), res.second, l_w, opt.accuracy, eli, vol, outside, fill_cores && !eli ? &core_density : nullptr, fill_cores && !eli ? &core_gradient : nullptr, opt.basin_grid, eli ? nullptr : fld, want_aom ? &ovl : nullptr);
 		std::cout << "\n" << title << " (atomic quadrature grids):\n";
-		std::cout << "  basin  label               electrons" << (eli ? "" : "     charge") << "      volume     maximum        x          y          z\n";
+		//The maximum column is 16 wide, not 12: it carries rho at the attractor, and at a uranium
+		//nucleus that is 3.3e8 - it used to run into the volume beside it
+		std::cout << "  basin  label               electrons" << (eli ? "" : "     charge") << "      volume         maximum        x          y          z\n";
 		double total = 0.0;
 		for (size_t b = 0; b < pop.size(); b++) {
 			total += pop[b];
@@ -2882,13 +3010,14 @@ void ELI_analysis(const WFN &wavy, options &opt) {
 				if (Z < 0) std::cout << std::setw(11) << "-";
 				else std::cout << std::setw(11) << Z - pop[b];
 			}
-			std::cout << std::setw(12) << vol[b] << std::setw(12) << res.second[b][3]
+			std::cout << std::setw(12) << vol[b] << std::setw(16) << res.second[b][3]
 				<< std::setprecision(3) << std::setw(11) << res.second[b][0] << std::setw(11) << res.second[b][1] << std::setw(11) << res.second[b][2] << "\n";
 		}
 		std::cout << "  total in basins: " << std::setprecision(4) << total << "   outside every basin: " << outside << "\n";
+		if (want_aom) report_delocalization(l_w, ovl, lab, std::cout);
 	};
 	if (l_w.get_nmo() == 0) {
-		report("QTAIM Analysis", qtaim_results, labels, false);
+		report("QTAIM Analysis", qtaim_results, labels, false, stream_qtaim);
 		std::cout << "\nNo orbitals: the ELI-D basins are skipped." << std::endl;
 		return;
 	}
@@ -2905,9 +3034,14 @@ void ELI_analysis(const WFN &wavy, options &opt) {
 	//basin per atom is what a bonding analysis wants, and what DGrid's ELIDcore gives
 	const int core_merged = unify_core_basins(eli_results.first, eli_results.second, atoms);
 	if (core_merged) std::cout << "Unified " << core_merged << " core-shell basins into their atoms' cores, " << eli_results.second.size() << " ELI-D basins remain." << std::endl;
+	//ELI-D keeps the cube: it is the cube that carries its topology, there is no critical-point
+	//search for this field to take attractors from, and no analytic Hessian to test a maximum
+	//with - computeELIGrad is all there is. Testing the grid's ELI-D maxima against the analytic
+	//gradient was tried and removed: a hydrogen valence basin converges to a non-maximum of the
+	//gradient and the test ate six real H basins in UH6 and one in NH3Li
 	svec eli_labels = assign_labels_to_basins(eli_results.second, atoms, opt.debug, 1);
-	report("QTAIM Analysis", qtaim_results, labels, false);
-	report("ELI-D Analysis", eli_results, eli_labels, true);
+	report("QTAIM Analysis", qtaim_results, labels, false, stream_qtaim);
+	report("ELI-D Analysis", eli_results, eli_labels, true, false);
 }
 
 // ---------------------------------------------------------------------------

@@ -1,6 +1,7 @@
 #include "pch.h"
 
 #include "core/wfn_class.h"
+#include "core/nbo_run.h"
 
 #include <stdexcept>
 
@@ -274,6 +275,9 @@ TEST(Nbo47, OpenShellNh3LiGbwWritesValidFile47)
 	ASSERT_NE(text.find("$DENSITY"), std::string::npos);
 	ASSERT_NE(text.find("$FOCK"), std::string::npos);
 	ASSERT_NE(text.find("$LCAOMO"), std::string::npos);
+	//Without OPEN, NBO reads the archive as restricted and silently halves the electron
+	//count it finds; the doubled blocks below are only meaningful together with it.
+	ASSERT_NE(text.find(" OPEN "), std::string::npos);
 
 	EXPECT_EQ(parse_key_int(text, "NATOMS").value_or(-1), 5);
 	EXPECT_EQ(parse_key_int(text, "NBAS").value_or(-1), 63);
@@ -285,11 +289,19 @@ TEST(Nbo47, OpenShellNh3LiGbwWritesValidFile47)
 	const auto fock = extract_section_numbers(text, "$FOCK");
 	const auto lcaomo = extract_section_numbers(text, "$LCAOMO");
 	const int nbasis = 63;
-	EXPECT_EQ(overlap.size(), static_cast<size_t>(nbasis * (nbasis + 1) / 2));
-	EXPECT_EQ(density.size(), static_cast<size_t>(nbasis * (nbasis + 1) / 2));
-	EXPECT_EQ(fock.size(), static_cast<size_t>(nbasis * (nbasis + 1) / 2));
-	EXPECT_EQ(lcaomo.size(), static_cast<size_t>(nbasis * nbasis));
-	EXPECT_NEAR(packed_trace_product(density, overlap, nbasis), 13.0, 1.0e-5);
+	const size_t ntri = static_cast<size_t>(nbasis) * (nbasis + 1) / 2;
+	//$OVERLAP stays single; $DENSITY, $FOCK and $LCAOMO carry an alpha block then a beta one.
+	EXPECT_EQ(overlap.size(), ntri);
+	ASSERT_EQ(density.size(), 2 * ntri);
+	EXPECT_EQ(fock.size(), 2 * ntri);
+	EXPECT_EQ(lcaomo.size(), 2 * static_cast<size_t>(nbasis) * nbasis);
+
+	const vec alpha_density(density.begin(), density.begin() + ntri);
+	const vec beta_density(density.begin() + ntri, density.end());
+	//13 electrons in a doublet: 7 alpha, 6 beta. A spin-summed archive would give 13 here
+	//twice, and a swapped one 6 then 7.
+	EXPECT_NEAR(packed_trace_product(alpha_density, overlap, nbasis), 7.0, 1.0e-5);
+	EXPECT_NEAR(packed_trace_product(beta_density, overlap, nbasis), 6.0, 1.0e-5);
 }
 
 TEST(Nbo47, OpenShellNh3LiGennboProducesEnergyAnalysisWhenAvailable)
@@ -325,4 +337,253 @@ TEST(Nbo47, OpenShellNh3LiGennboProducesEnergyAnalysisWhenAvailable)
 	const auto actual_electrons = parse_total_electrons(generated_nbo);
 	ASSERT_TRUE(actual_electrons.has_value());
 	EXPECT_NEAR(*actual_electrons, 13.0, 1.0e-5);
+}
+
+TEST(NboRun, ParsesReferenceOutputOfTheEpoxideFixture)
+{
+	const auto reference_nbo = repo_root() / "tests" / "epoxide_gbw" / "NBO" / "reference.nbo";
+	if (!std::filesystem::exists(reference_nbo)) {
+		GTEST_SKIP() << "NBO reference fixture is not available";
+	}
+
+	const NboResults r = parse_nbo_output(reference_nbo);
+	EXPECT_FALSE(r.open_shell);
+	ASSERT_EQ(r.npa.size(), 7u);
+	EXPECT_EQ(r.npa[0].element, "O");
+	EXPECT_NEAR(r.npa[0].charge, -0.56088, 1.0e-5);
+	EXPECT_NEAR(r.npa[0].total, 8.56088, 1.0e-5);
+	double charge_sum = 0.0;
+	for (const auto& a : r.npa) charge_sum += a.charge;
+	EXPECT_NEAR(charge_sum, 0.0, 1.0e-4);
+
+	ASSERT_FALSE(r.nao.empty());
+	EXPECT_EQ(r.nao.front().type, "Cor");
+	EXPECT_NEAR(r.nao.front().occupancy, 1.99997, 1.0e-5);
+
+	//An NBO with a bond has two hybrids that add up to the whole orbital, and each hybrid's
+	//s/p/d percentages add up to 100 - the two things a wrong parse gets wrong first.
+	ASSERT_FALSE(r.orbitals.empty());
+	const NboOrbital* bond = nullptr;
+	for (const auto& o : r.orbitals) if (o.type == "BD" && o.centers.size() == 2) { bond = &o; break; }
+	ASSERT_NE(bond, nullptr);
+	ASSERT_EQ(bond->hybrids.size(), 2u);
+	EXPECT_NEAR(bond->hybrids[0].weight_percent + bond->hybrids[1].weight_percent, 100.0, 0.05);
+	for (const auto& h : bond->hybrids) EXPECT_NEAR(h.s + h.p + h.d + h.f, 100.0, 0.05);
+	EXPECT_LT(bond->energy, 0.0);
+
+	ASSERT_FALSE(r.e2.empty());
+	EXPECT_NE(r.e2.front().donor.find("LP"), std::string::npos);
+	for (const auto& e : r.e2) {
+		EXPECT_GT(e.energy_kcal, 0.0);
+		EXPECT_NE(e.donor_index, e.acceptor_index);
+	}
+}
+
+TEST(NboRun, ComparisonPassesAgainstItselfAndCatchesAShiftedCharge)
+{
+	const auto reference_nbo = repo_root() / "tests" / "epoxide_gbw" / "NBO" / "reference.nbo";
+	if (!std::filesystem::exists(reference_nbo)) {
+		GTEST_SKIP() << "NBO reference fixture is not available";
+	}
+
+	const NboResults reference = parse_nbo_output(reference_nbo);
+	const NboComparison same = compare_nbo_results(reference, reference);
+	EXPECT_TRUE(same.ok) << same.report();
+	for (const auto& q : same.quantities) EXPECT_EQ(q.missing, 0) << q.quantity;
+
+	NboResults shifted = reference;
+	shifted.npa.front().charge += 0.01;
+	shifted.e2.front().energy_kcal += 1.0;
+	const NboComparison differs = compare_nbo_results(reference, shifted);
+	EXPECT_FALSE(differs.ok);
+
+	NboResults truncated = reference;
+	truncated.orbitals.pop_back();
+	const NboComparison missing = compare_nbo_results(reference, truncated);
+	EXPECT_FALSE(missing.ok);
+}
+
+TEST(NboRun, OpenShellNh3LiSpinResolvedNpaMatchesOrcaSpinPopulations)
+{
+	if (!wsl_gennbo_available()) {
+		GTEST_SKIP() << "WSL ~/nbo7/gennbo is not available";
+	}
+
+	const auto input_gbw = repo_root() / "tests" / "RGBI_groups" / "nh3li.gbw";
+	ASSERT_TRUE(std::filesystem::exists(input_gbw));
+
+	const auto temp_dir = make_temp_dir();
+	const auto generated_47 = temp_dir / "nh3li.47";
+	const auto generated_nbo = temp_dir / "nh3li.nbo";
+
+	WFN wave(input_gbw, false);
+	ASSERT_TRUE(wave.write_nbo(generated_47, false));
+	const std::string command = "wsl bash -lc \"cd '" + windows_path_to_wsl(temp_dir) + "' && ~/nbo7/gennbo nh3li\"";
+	ASSERT_EQ(std::system(command.c_str()), 0);
+	ASSERT_TRUE(std::filesystem::exists(generated_nbo));
+
+	const NboResults r = parse_nbo_output(generated_nbo);
+	EXPECT_TRUE(r.open_shell);
+	ASSERT_EQ(r.npa.size(), 5u);
+
+	double spin_sum = 0.0, charge_sum = 0.0;
+	for (const auto& a : r.npa) { spin_sum += a.spin_density; charge_sum += a.charge; ASSERT_TRUE(a.has_spin_density); }
+	EXPECT_NEAR(spin_sum, 1.0, 1.0e-4);
+	EXPECT_NEAR(charge_sum, 0.0, 1.0e-4);
+
+	//Independent reference: ORCA 6.1.1 on the same wavefunction puts 0.99 (Mulliken) / 0.90
+	//(Loewdin) of the unpaired electron on Li and leaves N slightly negative. NPA is a third
+	//partitioning, so only the pattern is compared - but a spin-summed or spin-swapped
+	//archive gets the pattern wrong, which is what this pins down.
+	const NboAtomPopulation* li = nullptr;
+	const NboAtomPopulation* n = nullptr;
+	for (const auto& a : r.npa) { if (a.element == "Li") li = &a; if (a.element == "N") n = &a; }
+	ASSERT_NE(li, nullptr);
+	ASSERT_NE(n, nullptr);
+	EXPECT_GT(li->spin_density, 0.80);
+	EXPECT_LT(std::abs(n->spin_density), 0.15);
+	EXPECT_LT(n->charge, 0.0);
+
+	//The unrestricted analysis has to reach the spin-resolved NBO sections as well.
+	bool alpha = false, beta = false;
+	for (const auto& o : r.orbitals) { alpha |= o.spin == "alpha"; beta |= o.spin == "beta"; }
+	EXPECT_TRUE(alpha);
+	EXPECT_TRUE(beta);
+	bool spin_e2 = false;
+	for (const auto& e : r.e2) spin_e2 |= !e.spin.empty();
+	EXPECT_TRUE(spin_e2);
+}
+
+/*
+ * The NRT capture, against the acetylene output of the reference set (NRT E2PERT NRTLST=0.1
+ * NRTDTL). Everything asserted here is a number NBO 7.0.9 printed, so a parser that starts
+ * dropping rows - the zero-weight tail, the diagonal of the bond-order matrix, a resonance
+ * structure whose Added(Removed) column wrapped onto a second line - fails here rather than
+ * silently shipping a short reference.
+ */
+TEST(NboRun, CapturesTheFullNrtSectionOfTheAcetyleneReference)
+{
+	const auto nbo = repo_root() / "tests" / "nbo_reference" / "acetylene_nrtdtl.nbo";
+	if (!std::filesystem::exists(nbo)) GTEST_SKIP() << "NRT reference fixture is not available";
+
+	const NboResults r = parse_nbo_output(nbo);
+	//The keylist as NBO echoed it back. Re-deriving a stored reference after a parser change goes
+	//through -nbo_parse, and then this is the only record of what the run was asked for:
+	//r.keywords stays empty because nothing passed a keylist in.
+	EXPECT_EQ(r.keywords_reported, "NRT NRTLST NRTDTL E2PERT");
+	ASSERT_TRUE(r.nrt.present);
+	EXPECT_EQ(r.nrt.structures_used, 7);
+	EXPECT_EQ(r.nrt.structures_found, 15);
+	EXPECT_NEAR(r.nrt.d_w, 0.01830453, 1.0e-8);
+	EXPECT_NEAR(r.nrt.d_0, 0.01884235, 1.0e-8);
+	EXPECT_EQ(r.nrt.max_search_cycles, 3);
+	EXPECT_EQ(r.nrt.initial_topo, 1);
+	EXPECT_NE(r.nrt.symmetry.find("symmetry operator"), std::string::npos);
+	EXPECT_GT(r.nbo_cpu_seconds, 0.0);
+
+	//The search table: two cycles, the second one generating nothing new.
+	ASSERT_EQ(r.nrt.cycles.size(), 2u);
+	EXPECT_EQ(r.nrt.cycles[0].structures_found, 1);
+	EXPECT_EQ(r.nrt.cycles[1].structures_used, 7);
+	EXPECT_EQ(r.nrt.cycles[1].structures_found, 15);
+	EXPECT_EQ(r.nrt.cycles[1].e2, 0);
+
+	//All 15 candidates, not only the 7 with weight: the ratio is what a screening scheme has
+	//to beat, so the zero-weight tail has to survive the parse.
+	ASSERT_EQ(r.nrt.weights.size(), 15u);
+	EXPECT_NEAR(r.nrt.weights[0].weight_percent, 95.70, 1.0e-6);
+	EXPECT_NEAR(r.nrt.weights[0].weight_fraction, 0.95696, 1.0e-6);
+	EXPECT_NE(r.nrt.weights[1].changes.find("C 1- C 2"), std::string::npos);
+	int zero_weight = 0;
+	for (const auto& w : r.nrt.weights) if (w.weight_fraction == 0.0) zero_weight++;
+	EXPECT_EQ(zero_weight, 8);
+	ASSERT_EQ(r.nrt.candidates.size(), 15u);
+	EXPECT_NEAR(r.nrt.candidates[0].rho_nl, 0.02527, 1.0e-6);
+	ASSERT_EQ(r.nrt.candidates[0].topo.size(), 4u);
+	EXPECT_EQ(r.nrt.candidates[0].topo[0][1], 3);   //the C-C triple bond of the leading structure
+
+	//The QP path, so a candidate implementation can be compared step by step and not only at
+	//the converged answer.
+	ASSERT_GE(r.nrt.qp_iterations.size(), 8u);
+	EXPECT_NEAR(r.nrt.qp_iterations.back().d_w, 0.01830453, 1.0e-8);
+	//Two "Perform ARROWS on structures of weight > X%" lines (the parent threshold as NBO applied
+	//it, once per cycle) and the one line naming the parent structure and the E2 depth used.
+	ASSERT_EQ(r.nrt.arrows.size(), 3u);
+	EXPECT_NE(r.nrt.arrows[1].find("generates 6 new structures from structure 1"), std::string::npos);
+	EXPECT_NE(r.nrt.arrows[1].find("E(2)=1.0 kcal/mol"), std::string::npos);
+
+	//The bond-order matrix as printed: upper triangle plus diagonal of a 4-atom system.
+	ASSERT_EQ(r.nrt.bond_orders.size(), 10u);
+	const NboBondOrder* cc = nullptr;
+	const NboBondOrder* diag = nullptr;
+	for (const auto& b : r.nrt.bond_orders) {
+		if (b.atom1 == 1 && b.atom2 == 2) cc = &b;
+		if (b.atom1 == 1 && b.atom2 == 1) diag = &b;
+	}
+	ASSERT_NE(cc, nullptr);
+	ASSERT_NE(diag, nullptr);
+	EXPECT_NEAR(cc->total, 2.9938, 1.0e-6);
+	EXPECT_NEAR(cc->covalent, 2.9938, 1.0e-6);
+	EXPECT_NEAR(cc->ionic, 0.0, 1.0e-6);
+	EXPECT_TRUE(diag->diagonal);
+	EXPECT_NEAR(diag->total, 0.0198, 1.0e-6);
+
+	//Valencies, the atom-by-atom sum of those bond orders.
+	ASSERT_EQ(r.nrt.valencies.size(), 4u);
+	EXPECT_EQ(r.nrt.valencies[0].element, "C");
+	EXPECT_NEAR(r.nrt.valencies[0].valency, 3.9631, 1.0e-6);
+	EXPECT_NEAR(r.nrt.valencies[0].covalency, 3.7369, 1.0e-6);
+	EXPECT_NEAR(r.nrt.valencies[0].electron_count, 7.9657, 1.0e-6);
+
+	ASSERT_EQ(r.nrt.leading_topo.size(), 1u);
+	EXPECT_EQ(r.nrt.leading_topo[0].matrix[1][0], 3);
+	EXPECT_NE(r.nrt.nrtstr_keylist.find("STR"), std::string::npos);
+}
+
+TEST(Nbo47, GShellWavefunctionWritesFile47WithCorrectElectronCount)
+{
+	//A basis with g functions is what broke get_shell_start_in_primitives: its switch covered
+	//s, p, d and f and added nothing for g, so every primitive index behind the first g shell
+	//was short by 15 per g shell.  Fe.gbw's atom 2 then asked for its s shell and was handed a
+	//g primitive, wrote past the end of a one-component buffer and aborted in the heap later.
+	//Tr(P S) is what says the coefficients that came back are the right ones, not merely that
+	//nothing crashed.
+	const auto root = repo_root();
+	const auto input_gbw = root / "tests" / "Fe_gbw" / "Fe.gbw";
+	ASSERT_TRUE(std::filesystem::exists(input_gbw));
+
+	const auto temp_dir = make_temp_dir();
+	const auto generated_47 = temp_dir / "fe.47";
+
+	WFN wave(input_gbw, false);
+	int highest_shell = 0;
+	for (int a = 0; a < wave.get_ncen(); a++)
+		for (int s = 0; s < wave.get_atom_shell_count(a); s++)
+			highest_shell = std::max(highest_shell, wave.get_shell_type(a, s));
+	ASSERT_GE(highest_shell, 5) << "fixture no longer carries g functions";
+
+	ASSERT_TRUE(wave.write_nbo(generated_47, false));
+	ASSERT_TRUE(std::filesystem::exists(generated_47));
+
+	const std::string text = read_file(generated_47);
+	const int nbasis = parse_key_int(text, "NBAS").value_or(-1);
+	ASSERT_GT(nbasis, 0);
+	const size_t ntri = static_cast<size_t>(nbasis) * (nbasis + 1) / 2;
+	const auto overlap = extract_section_numbers(text, "$OVERLAP");
+	const auto density = extract_section_numbers(text, "$DENSITY");
+	ASSERT_EQ(overlap.size(), ntri);
+	const bool open_shell = density.size() == 2 * ntri;
+	ASSERT_TRUE(open_shell || density.size() == ntri);
+
+	double electrons = 0.0;
+	for (size_t block = 0; block < density.size() / ntri; block++)
+		electrons += packed_trace_product(
+			vec(density.begin() + block * ntri, density.begin() + (block + 1) * ntri), overlap, nbasis);
+	//Against the wavefunction's own occupations, not against the nuclear charges: this fixture
+	//integrates to 128 while Z - charge gives 126, which is a question about the gbw charge field
+	//and not about whether the archive reproduces the wavefunction it was written from.
+	double occupied = 0.0;
+	for (int m = 0; m < wave.get_nmo(); m++)
+		occupied += wave.get_MO_occ(m);
+	EXPECT_NEAR(electrons, occupied, 1.0e-3);
 }

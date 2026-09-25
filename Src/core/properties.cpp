@@ -15,6 +15,7 @@
 #include "crystal_energies.h"
 #include "b2c.h"
 #include "density_source.h"
+#include "citations.h"
 
 std::vector<Thakkar> make_thakkar_interpolators()
 {
@@ -63,6 +64,40 @@ double sanitize_finite(double value)
 	if (std::isnan(value) || std::isinf(value))
 		return 0.0;
 	return value;
+}
+
+// The in-radius points of the grid in one batch instead of one call each: the ESP walks the whole
+// primitive-pair table per point, so the whole set is worth handing to a device at once. Points
+// outside stay zero as in evaluate_cube_in_radius, and wrap sums the periodic images per cell.
+template <typename BatchFn>
+void evaluate_cube_in_radius_batched(
+	cube &target,
+	bool wrap,
+	const std::vector<atom> &atoms,
+	double radius_bohr,
+	BatchFn &&batch)
+{
+	std::vector<d3> points;
+	std::vector<i3> cells;
+	target.evaluate_on_grid(
+		[&](const d3 &pos, const i3 &, const i3 &mapped) {
+			if (!is_within_radius(pos, atoms, radius_bohr))
+				return 0.0;
+#pragma omp critical(cube_gather)
+			{
+				points.push_back(pos);
+				cells.push_back(mapped);
+			}
+			return 0.0;
+		},
+		wrap);
+	vec values(points.size());
+	batch(points, values.data());
+	for (size_t i = 0; i < points.size(); i++)
+	{
+		const i3 &c = cells[i];
+		target.set_value(c[0], c[1], c[2], target.get_value(c[0], c[1], c[2]) + values[i]);
+	}
 }
 
 template <typename EvalFn>
@@ -629,13 +664,13 @@ void Calc_ESP(
 	const double radius_bohr = constants::ang2bohr(radius);
 	const vector<atom> atoms = wavy.get_atoms();
 
-	evaluate_cube_in_radius(
+	evaluate_cube_in_radius_batched(
 		CubeESP,
 		wrap,
 		atoms,
 		radius_bohr,
-		[&](const d3 &pos) {
-			return wavy.computeESP(pos, pairs);
+		[&](const std::vector<d3> &points, double *out) {
+			wavy.computeESP_batch(points, pairs, out);
 		});
 
 	if (!no_date)
@@ -980,6 +1015,7 @@ void fukui_analysis(options &opt, std::ostream &log2)
 	err_checkf(opt.wfn != "", "Error, no wfn file specified! Use -fukui_analysis <wfn> or -wfn <wfn>.", log2);
 	WFN wavy(opt.wfn);
 	log2 << "\nConceptual-DFT reactivity analysis of " << opt.wfn.string() << endl;
+	citations::cite(citations::Method::Fukui, log2);
 	log2 << "Read " << wavy.get_ncen() << " atoms and " << wavy.get_nmo()
 		 << " molecular orbitals (" << wavy.get_nmo(true) << " occupied)." << endl;
 
@@ -1422,6 +1458,7 @@ void promolecular_nci_analysis(
 	const _time_point t_start = get_time();
 
 	err_checkf(xyz_files.size() >= 2, "Promolecular NCI needs at least two XYZ fragments.", log);
+	citations::cite(citations::Method::NCI, log);
 
 	// Output names join every fragment stem: a_b_c_values.dat etc.
 	std::string joined_stems = xyz_files.front().stem().string();
@@ -1802,6 +1839,20 @@ void properties_calculation(options &opt)
 		log2 << "Fukui functions and dual descriptor, ";
 	log2 << endl;
 
+	//Which paper each of those grids implements.  Same guards as the list above.
+	if (opt.properties.hdef || opt.properties.def || opt.properties.hirsh)
+		citations::cite(citations::Method::Hirshfeld, log2);
+	if (opt.properties.eli)
+		citations::cite(citations::Method::ELID, log2);
+	if (opt.properties.elf)
+		citations::cite(citations::Method::ELF, log2);
+	if (opt.properties.rdg)
+		citations::cite(citations::Method::NCI, log2);
+	if (opt.properties.esp)
+		citations::cite(citations::Method::ESP, log2);
+	if (opt.properties.fukui)
+		citations::cite(citations::Method::Fukui, log2);
+
 	log2 << "Calculating for " << fixed << setprecision(0) << opt.properties.NbSteps[0] * opt.properties.NbSteps[1] * opt.properties.NbSteps[2] << " Gridpoints." << endl;
 
 	if (ml) Calc_Rho(cubes[cube_type::Rho], *ml, opt.properties.radius, log2, opt.cif != "");
@@ -2049,11 +2100,14 @@ void properties_calculation(options &opt)
 		WFN temp = wavy;
 		temp.delete_unoccupied_MOs();
 		temp.delete_Qs();
+		_time_point e0 = get_time();
 		if (ml) Calc_ESP(cubes[cube_type::ESP], *ml, opt.properties.radius, opt.no_date, log2, opt.cif != "");
 		else Calc_ESP(cubes[cube_type::ESP], temp, opt.properties.radius, opt.no_date, log2, opt.cif != "");
+		_time_point e1 = get_time();
 		log2 << "Writing cube to Disk..." << flush;
 		cubes[cube_type::ESP].write_file(true);
-		log2 << "  done!" << endl;
+		_time_point e2 = get_time();
+		log2 << "  done! ESP " << get_msec(e0, e1) << " ms, cube written in " << get_msec(e1, e2) << " ms" << endl;
 	}
 	if (opt.properties.esp_isosurface > 0)
 	{
@@ -2066,11 +2120,25 @@ void properties_calculation(options &opt)
 			if (ml) Calc_Rho(box, *ml, box_opts.radius, log2, false);
 			else Calc_Rho(box, wavy, box_opts.radius, log2, false);
 		}
+		// the phases here cost wildly different amounts on different molecules, so each one says how long it took
+		_time_point t0 = get_time();
 		std::vector<Triangle> triangles = marchingCubes(opt.cif != "" ? box : cubes[cube_type::Rho], opt.properties.esp_isosurface);
-		log2 << "Found " << triangles.size() << " triangles" << endl;
+		_time_point t1 = get_time();
+		log2 << "Found " << triangles.size() << " triangles in " << get_msec(t0, t1) << " ms" << endl;
+		// same staging as the Hirshfeld run: the isosurface is done, the per-face ESP below is the long pole, so the
+		// bare shape goes out first for Olex2 to show while it runs - in its own file, the coloured one must only ever
+		// appear complete
+		const std::string esp_stem = (wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_rho_esp";
+		writeColourObj(esp_stem + "_shape.obj", triangles);
+		{ ofstream stage1(esp_stem + "_shape.obj.stage1"); stage1 << triangles.size() << "\n"; }
+		_time_point t2 = get_time();
 		if (ml) colour_by_ESP(triangles, surface_ESP(triangles, ml_esp), log2);
 		else colour_by_ESP(triangles, wavy, log2);
-		writeColourObj((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_rho_esp.obj", triangles);
+		_time_point t3 = get_time();
+		writeColourObj(esp_stem + ".obj", triangles);
+		_time_point t4 = get_time();
+		log2 << "shape mesh " << get_msec(t1, t2) << " ms, ESP on the faces " << get_msec(t2, t3)
+			 << " ms, coloured mesh " << get_msec(t3, t4) << " ms" << endl;
 	}
 	// return output tostd::cout
 	std::cout.rdbuf(_coutbuf);
