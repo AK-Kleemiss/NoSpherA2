@@ -1,11 +1,12 @@
 {
   "name": "water",
+  "parser_version": 2,
   "source": "water.gbw",
   "nbo_version": "NoSpherA2 native NBO",
   "keywords": "",
   "keywords_reported": "",
   "open_shell": false,
-  "timings": {"file47_seconds": 0.001642838, "nbo_seconds": 0, "nbo_reported_cpu_seconds": 0, "nbo_reported_wall_seconds": 0, "nao_seconds": 0.000456509, "search_seconds": 0.023830342, "e2_seconds": 3.7711e-05},
+  "timings": {"file47_seconds": 0.001628022, "nbo_seconds": 0, "nbo_reported_cpu_seconds": 0, "nbo_reported_wall_seconds": 0, "nao_seconds": 0.000508791, "search_seconds": 0.014456263, "e2_seconds": 2.8688e-05},
   "thresholds": {"e2_kcal": 0.5, "e2_intermolecular_kcal": 0, "nrt_parent_percent": 0, "nrt_deloc_kcal": 1},
   "npa": [
     {"atom": 1, "element": "O", "charge": -0.9174088507, "core": 1.999997759, "valence": 6.890268707, "rydberg": 0.02714238505, "total": 8.917408851},
@@ -112,12 +113,12 @@
     {"donor_index": 4, "donor": "BD ( 1) O 1- H 2", "acceptor_index": 40, "acceptor": "RY ( 2) H 3", "spin": "", "energy_kcal": 0.7450763061, "e_diff": 2.330038939, "fij": 0.03720640712},
     {"donor_index": 5, "donor": "BD ( 1) O 1- H 3", "acceptor_index": 35, "acceptor": "RY ( 2) H 2", "spin": "", "energy_kcal": 0.7450765713, "e_diff": 2.330039018, "fij": -0.03720641438}
   ],
-  "nrt": {"present": true, "structures_used": 4, "structures_found": 5, "d_0": 0.2243782005, "d_w": 0.2240450563, "max_search_cycles": 2, "symmetry": "1 graph-invariant orbit(s) covering 2 structure(s), 4 orbit weights solved for, D(w) rise 0.000038", "initial_structures": {"total": 5, "nls": 0, "nbi": 0, "sym": 0}, "nrtstr_keylist": "", "seconds": {"search": 3.0302e-05, "gram": 0.006471615, "minimize": 0.000159181, "other": 5.3525e-05},
+  "nrt": {"present": true, "structures_used": 4, "structures_found": 5, "d_0": 0.2243782005, "d_w": 0.2240450563, "max_search_cycles": 2, "symmetry": "1 graph-invariant orbit(s) covering 2 structure(s), 4 orbit weights solved for, D(w) rise 0.000038", "initial_structures": {"total": 5, "nls": 0, "nbi": 0, "sym": 0}, "nrtstr_keylist": "", "seconds": {"search": 2.76e-05, "gram": 0.007910759, "minimize": 0.000242069, "other": 4.8611e-05},
     "weights": [
       {"structure": 1, "rank": 0, "weight_percent": 99.50839497, "weight_fraction": 0.9950839497, "idxres": 1, "changes": "parent", "spin": ""},
-      {"structure": 2, "rank": 0, "weight_percent": 0.1977725893, "weight_fraction": 0.001977725893, "idxres": 3, "changes": "LP O1, LP H3(O1-H2, O1-H3)", "spin": ""},
-      {"structure": 3, "rank": 0, "weight_percent": 0.1977725893, "weight_fraction": 0.001977725893, "idxres": 4, "changes": "LP O1, LP H2(O1-H2, O1-H3)", "spin": ""},
-      {"structure": 4, "rank": 0, "weight_percent": 0.09605985119, "weight_fraction": 0.0009605985119, "idxres": 5, "changes": "LP H2, LP H3(O1-H2, O1-H3)", "spin": ""}
+      {"structure": 2, "rank": 0, "weight_percent": 0.1977725894, "weight_fraction": 0.001977725894, "idxres": 3, "changes": "LP O1, LP H3(O1-H2, O1-H3)", "spin": ""},
+      {"structure": 3, "rank": 0, "weight_percent": 0.1977725894, "weight_fraction": 0.001977725894, "idxres": 4, "changes": "LP O1, LP H2(O1-H2, O1-H3)", "spin": ""},
+      {"structure": 4, "rank": 0, "weight_percent": 0.09605985106, "weight_fraction": 0.0009605985106, "idxres": 5, "changes": "LP H2, LP H3(O1-H2, O1-H3)", "spin": ""}
     ],
     "bond_orders": [
       {"atom1": 1, "atom2": 2, "total": 0.9950839497, "covalent": 0.5291371277, "ionic": 0.465946822, "diagonal": false, "spin": ""},
@@ -156,8 +157,8 @@
       {"iteration": 9, "structures": 4, "d_w": 0.2240549492, "kkt": "", "rho_nl": 0.02008552907, "added": 0, "spin": ""},
       {"iteration": 10, "structures": 4, "d_w": 0.2240389788, "kkt": "", "rho_nl": 0.02086556542, "added": 0, "spin": ""},
       {"iteration": 50, "structures": 4, "d_w": 0.2240072276, "kkt": "", "rho_nl": 0.02323705737, "added": 0, "spin": ""},
-      {"iteration": 100, "structures": 4, "d_w": 0.2240072271, "kkt": "", "rho_nl": 0.02324009675, "added": 0, "spin": ""},
-      {"iteration": 150, "structures": 4, "d_w": 0.2240072271, "kkt": "", "rho_nl": 0.02324010793, "added": 0, "spin": ""},
+      {"iteration": 100, "structures": 4, "d_w": 0.2240072271, "kkt": "", "rho_nl": 0.02324010412, "added": 0, "spin": ""},
+      {"iteration": 150, "structures": 4, "d_w": 0.2240072271, "kkt": "", "rho_nl": 0.02324010806, "added": 0, "spin": ""},
       {"iteration": 200, "structures": 4, "d_w": 0.2240072271, "kkt": "", "rho_nl": 0.02324010841, "added": 0, "spin": ""}
     ],
     "arrows": ["ARROWS depth 1 generates 4 new structures from 1", "ARROWS depth 2 generates 4 new structures from 4", "half-arrow intermediates dropped: 4 of 9"],

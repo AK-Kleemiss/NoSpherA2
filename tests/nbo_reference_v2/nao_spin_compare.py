@@ -11,6 +11,7 @@ import json
 import os
 import socket
 import sys
+from config import load_nbo  # refuses a reference an older parser wrote
 
 
 def label(n):
@@ -55,7 +56,7 @@ if __name__ == "__main__":
         gp, np_ = os.path.join(d, "%s.gennbo.nbo.json" % mol), os.path.join(d, "%s.native.nbo.json" % mol)
         if not (os.path.isfile(gp) and os.path.isfile(np_)):
             continue
-        g, n = json.load(open(gp)), json.load(open(np_))
+        g, n = load_nbo(gp), load_nbo(np_)
         if not (g.get("nao_alpha") or n.get("nao_alpha")):
             continue
         print("\n%s" % mol)

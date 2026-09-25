@@ -209,6 +209,19 @@ NAOResult build_naos(const dMatrix2 &P_in, const dMatrix2 &S_in, const std::vect
     //rather than the gross atomic population - moves half an electron per carbon in epoxide, and
     //keeping these orbitals but weighting the orthogonalisation below by the net population
     //c^T P^A c is worse again (0.4 e on epoxide's oxygen).  Gross it is, for both.
+    //Both of those numbers are NPA charges, and the class-split arm proved an NPA comparison blind
+    //to the class partition: 0.695 e of benzene's Rydberg set moved while all 111 charges agreed to
+    //1e-10.  NAO_PRENAO_NET=1 re-runs the net variant so the Rydberg metric can judge it instead.
+    //It is worth re-running because of what fixes the class totals after step 3: the Rydberg set is
+    //then the S-orthogonal complement of the span of the natural minimal pre-NAOs, so its total
+    //population depends only on that span - on these eigenvectors and on which shells step 2 calls
+    //minimal - and on nothing inside step 3.  NAO_OWSO_OFF=1 below is the check of that claim.
+    //Measured (job 586936, all 25 wavefunctions): the net variant is not a near miss, it is a
+    //different answer.  The Rydberg total after step 3 goes from 10.40557 to 194.78163 e over the
+    //22 closed shells and the final one from 4.00571 to 56.45473 against gennbo's 2.74986, every
+    //single molecule between 8x and 72x, and the pre-NAO occupancies then sum to 0.8 N instead of
+    //1.6 N.  Gross is confirmed by the Rydberg metric and no longer rests on the charge argument.
+    const bool prenao_net = nao_env("NAO_PRENAO_NET");
     MatrixXd C = MatrixXd::Zero(nao, nao);
     VectorXd pre_occ = VectorXd::Zero(nao);
     std::vector<NAO> orbitals(nao);
@@ -223,7 +236,8 @@ NAOResult build_naos(const dMatrix2 &P_in, const dMatrix2 &S_in, const std::vect
             for (int s2 = 0; s2 < ns; s2++)
                 for (int m = 0; m < nm; m++) {
                     Sb(s1, s2) += S(g.idx[s1][m], g.idx[s2][m]) / nm;
-                    Pb(s1, s2) += SPS(g.idx[s1][m], g.idx[s2][m]) / nm;
+                    Pb(s1, s2) += (prenao_net ? P(g.idx[s1][m], g.idx[s2][m])
+                                              : SPS(g.idx[s1][m], g.idx[s2][m])) / nm;
                 }
         //(S P S)^A c = w S^A c becomes the ordinary eigenproblem X (S P S)^A X y = w y with
         //X = (S^A)^-1/2 and c = X y, which keeps c^T S c = 1
@@ -314,7 +328,26 @@ NAOResult build_naos(const dMatrix2 &P_in, const dMatrix2 &S_in, const std::vect
             for (int j = 0; j < B.cols(); j++)
                 B.col(j) /= std::sqrt(std::max(B.col(j).dot(S * B.col(j)), 1e-300));
         }
-        B = B * owso(MatrixXd(B.transpose() * S * B), w);
+        //NAO_OWSO_OFF=1 drops the occupancy weighting and leaves the plain Loewdin below as the
+        //whole of the within-class orthogonalisation.  That is not a candidate - it throws away the
+        //point of the OWSO - it is the test of the invariance claimed above: the weighting picks
+        //different vectors inside the class but cannot change the class's span, so every class
+        //TOTAL after step 3 must come out unchanged while the final ones move.  If a step-3 total
+        //does move, the span argument is wrong and the search cannot be narrowed by it.
+        //Measured (job 586936): confirmed.  Every molecule's Rydberg total after step 3 is
+        //unchanged to all five printed decimals (ethane 0.43210, benzene 1.12682, sf6 0.71526)
+        //while the final ones move everywhere.  So no choice inside this loop can change a class
+        //TOTAL at step 3 - but the distribution over (atom, l) blocks is NOT invariant, and that is
+        //what the final answer sees: the no-valence-block excess went 1.39828 -> 1.14700 e and the
+        //final excess 1.25585 -> 1.12478 e.  The weighting is therefore a lever on the final
+        //numbers, just not on the step-3 totals, and "only step 3 crosses l" was the wrong
+        //localisation.  It is still not a candidate, because the pre-registered gate in
+        //tests/nbo_reference_v2/step3_stages.py fired on exactly this arm: the mean improves while
+        //pf5 goes 0.93 -> 1.12, so2 0.94 -> 1.05 and sf6 0.98 -> 1.19 x gennbo, sf6 worse by
+        //0.077 e on its own.  Flattening the three molecules that were right to improve the average
+        //is the fudge-factor signature the gate was written to catch.
+        if (!nao_env("NAO_OWSO_OFF"))
+            B = B * owso(MatrixXd(B.transpose() * S * B), w);
         //the weighted inverse square root leaves the near-zero-weight directions orthonormal only
         //to about 1e-5; one unweighted Loewdin on a matrix that is already I + O(1e-5) cleans that
         //up without moving the occupied orbitals
@@ -335,6 +368,12 @@ NAOResult build_naos(const dMatrix2 &P_in, const dMatrix2 &S_in, const std::vect
     //set 0.432 -> 1.127 e), and it does so in all 22 - including pf5, so2 and sf6, the only three
     //whose leak has the opposite sign in the one-block form.  One block is the better of the two,
     //so whatever is left of the leak is upstream of here: step 3, or which n,l count as valence.
+    //That last sentence was too strong and job 586936 corrected it.  The class totals step 4
+    //inherits are fixed by the span of the natural minimal pre-NAOs alone (NAO_OWSO_OFF leaves them
+    //identical to five decimals), and the only other input to that span, the net-density pre-NAO
+    //variant, is catastrophic.  So there is nothing upstream left to change: the final numbers move
+    //only through which vectors step 3 hands to each (atom, l) block and what this step then does
+    //with them, and NBO 7 prints no intermediate table, so neither side of that can be arbitrated.
     //The mixing is intra-atomic and unitary, so it moves no charge between atoms - and that is not
     //a reassurance, it is a warning.  The two arms differ by 0.695 e in benzene's Rydberg
     //population and by 1e-10 in every one of 111 NPA charges, so an NPA comparison cannot see this
@@ -343,16 +382,20 @@ NAOResult build_naos(const dMatrix2 &P_in, const dMatrix2 &S_in, const std::vect
     //NAO_DUMP_STEP3: the occupancies step 4 inherits.  If the valence deficit against NBO 7 is
     //already visible here, step 4 is not the place to look for it.
     if (nao_env("NAO_DUMP_STEP3")) {
-        std::cout << "STEP3 atom l shell class occ_per_component" << std::endl;
+        std::cout << "STEP3 atom l shell class occ_per_component pre_occ_per_component" << std::endl;
         for (const auto &kv : l_blocks) {
             const int nm = 2 * kv.first.second + 1;
             const ivec &cols = kv.second;
             for (size_t sh = 0; sh * nm < cols.size(); sh++) {
-                double occ = 0.0;
-                for (int m = 0; m < nm; m++) occ += Porb(cols[sh * nm + m], cols[sh * nm + m]) / nm;
+                double occ = 0.0, pre = 0.0;
+                for (int m = 0; m < nm; m++) {
+                    occ += Porb(cols[sh * nm + m], cols[sh * nm + m]) / nm;
+                    pre += pre_occ(cols[sh * nm + m]) / nm;
+                }
                 std::cout << "STEP3 " << kv.first.first << " " << kv.first.second << " " << sh
                           << " " << static_cast<int>(orbitals[cols[sh * nm]].type)
-                          << " " << std::setprecision(8) << std::fixed << occ << std::endl;
+                          << " " << std::setprecision(8) << std::fixed << occ
+                          << " " << pre << std::endl;
             }
         }
     }

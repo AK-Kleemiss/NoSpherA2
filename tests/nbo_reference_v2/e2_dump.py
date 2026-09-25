@@ -3,10 +3,11 @@ import json
 import os
 import socket
 import sys
+from config import load_nbo  # refuses a reference an older parser wrote
 
 d, mol = sys.argv[1], sys.argv[2]
-g = json.load(open(os.path.join(d, mol + ".gennbo.nbo.json")))
-n = json.load(open(os.path.join(d, mol + ".native.nbo.json")))
+g = load_nbo(os.path.join(d, mol + ".gennbo.nbo.json"))
+n = load_nbo(os.path.join(d, mol + ".native.nbo.json"))
 print("e2_dump on %s, %s" % (socket.gethostname(), mol))
 for side, r in (("gennbo", g), ("native", n)):
     e2 = r.get("e2", [])

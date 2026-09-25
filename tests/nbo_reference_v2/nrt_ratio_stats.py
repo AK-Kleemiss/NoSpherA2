@@ -15,6 +15,7 @@ import json
 import os
 import socket
 import sys
+from config import load_nbo  # refuses a reference an older parser wrote
 
 ATOM_FIELDS = ("valency", "covalency", "electrovalency", "electron_count")
 BOND_FIELDS = ("total", "covalent", "ionic")
@@ -23,8 +24,8 @@ SPINS = ("alpha", "beta")
 
 def pairs(mol_dir, mol):
     """Yield (label, gennbo, native) for every spin-resolved NRT number both sides printed."""
-    g = json.load(open(os.path.join(mol_dir, "%s.gennbo.nbo.json" % mol))).get("nrt") or {}
-    n = json.load(open(os.path.join(mol_dir, "%s.native.nbo.json" % mol))).get("nrt") or {}
+    g = load_nbo(os.path.join(mol_dir, "%s.gennbo.nbo.json" % mol)).get("nrt") or {}
+    n = load_nbo(os.path.join(mol_dir, "%s.native.nbo.json" % mol)).get("nrt") or {}
     for table, fields, key in (("valencies", ATOM_FIELDS, lambda r: r["atom"]),
                                ("bond_orders", BOND_FIELDS,
                                 lambda r: (r.get("atom1"), r.get("atom2")))):

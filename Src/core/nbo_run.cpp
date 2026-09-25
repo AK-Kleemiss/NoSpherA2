@@ -597,6 +597,8 @@ void write_nbo_json(const NboResults& r, const std::filesystem::path& json_file)
 	err_checkf(f.good(), "Could not write " + json_file.string(), std::cout);
 	f << "{\n";
 	f << "  \"name\": " << jstr(r.name) << ",\n";
+	f << "  \"parser_version\": " << NBO_JSON_PARSER_VERSION << ",\n";	//refuse, do not reinterpret
+
 	f << "  \"source\": " << jstr(r.source) << ",\n";
 	f << "  \"nbo_version\": " << jstr(r.version) << ",\n";
 	f << "  \"keywords\": " << jstr(r.keywords) << ",\n";

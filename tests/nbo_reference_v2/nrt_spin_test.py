@@ -32,6 +32,7 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, os.pardir, "nbo_reference"))
 import compare_nbo  # noqa: E402  for TOL only
+from config import load_nbo  # refuses a reference an older parser wrote
 
 TOL = compare_nbo.TOL["bond_order"]
 
@@ -95,10 +96,8 @@ def check(g, n, label, fields, failures):
 def one(root, mol):
     d = os.path.join(root, mol)
     try:
-        with open(os.path.join(d, mol + ".gennbo.nbo.json")) as f:
-            g = json.load(f)
-        with open(os.path.join(d, mol + ".native.nbo.json")) as f:
-            n = json.load(f)
+        g = load_nbo(os.path.join(d, mol + ".gennbo.nbo.json"))
+        n = load_nbo(os.path.join(d, mol + ".native.nbo.json"))
     except IOError as e:
         return {"molecule": mol, "status": "no data: %s" % e}
     if not (g.get("open_shell") and n.get("open_shell")):

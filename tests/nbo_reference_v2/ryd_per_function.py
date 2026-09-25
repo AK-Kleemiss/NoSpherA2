@@ -17,12 +17,13 @@ import json
 import os
 import socket
 import sys
+from config import load_nbo  # refuses a reference an older parser wrote
 
 CLASSES = ("Cor", "Val", "Ryd")
 
 
 def rows(path):
-    return json.load(open(path))["nao"]
+    return load_nbo(path)["nao"]
 
 
 def demo():

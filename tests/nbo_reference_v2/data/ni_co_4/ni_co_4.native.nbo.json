@@ -1,11 +1,12 @@
 {
   "name": "ni_co_4",
+  "parser_version": 2,
   "source": "ni_co_4.gbw",
   "nbo_version": "NoSpherA2 native NBO",
   "keywords": "",
   "keywords_reported": "",
   "open_shell": false,
-  "timings": {"file47_seconds": 0.083674479, "nbo_seconds": 0, "nbo_reported_cpu_seconds": 0, "nbo_reported_wall_seconds": 0, "nao_seconds": 0.081040409, "search_seconds": 1.489387964, "e2_seconds": 0.009522467},
+  "timings": {"file47_seconds": 0.078826439, "nbo_seconds": 0, "nbo_reported_cpu_seconds": 0, "nbo_reported_wall_seconds": 0, "nao_seconds": 0.076804013, "search_seconds": 2.428156809, "e2_seconds": 0.006740432},
   "thresholds": {"e2_kcal": 0.5, "e2_intermolecular_kcal": 0, "nrt_parent_percent": 0, "nrt_deloc_kcal": 5},
   "npa": [
     {"atom": 1, "element": "Ni", "charge": 0.2231819182, "core": 17.99977275, "valence": 9.718043099, "rydberg": 0.05900222932, "total": 27.77681808},
@@ -868,7 +869,7 @@
     {"donor_index": 42, "donor": "BD ( 2)Ni 1- C 3", "acceptor_index": 162, "acceptor": "RY (24) C 4", "spin": "", "energy_kcal": 0.6130148621, "e_diff": 15.37247634, "fij": 0.08850893172},
     {"donor_index": 42, "donor": "BD ( 2)Ni 1- C 3", "acceptor_index": 216, "acceptor": "RY ( 1) O 7", "spin": "", "energy_kcal": 2.008580273, "e_diff": 3.490716838, "fij": 0.07634517367}
   ],
-  "nrt": {"present": true, "structures_used": 27, "structures_found": 234, "d_0": 2.086016661, "d_w": 1.899219333, "max_search_cycles": 2, "symmetry": "0 graph-invariant orbit(s) covering 0 structure(s), weights averaged inside each", "initial_structures": {"total": 234, "nls": 0, "nbi": 0, "sym": 0}, "nrtstr_keylist": "", "seconds": {"search": 0.000669278, "gram": 7.485245935, "minimize": 0.048363713, "other": 0.000219735},
+  "nrt": {"present": true, "structures_used": 27, "structures_found": 234, "d_0": 2.086016661, "d_w": 1.899219333, "max_search_cycles": 2, "symmetry": "0 graph-invariant orbit(s) covering 0 structure(s), weights averaged inside each", "initial_structures": {"total": 234, "nls": 0, "nbi": 0, "sym": 0}, "nrtstr_keylist": "", "seconds": {"search": 0.000484025, "gram": 7.421827633, "minimize": 0.134779592, "other": 0.000198986},
     "weights": [
       {"structure": 1, "rank": 0, "weight_percent": 12.96226115, "weight_fraction": 0.1296226115, "idxres": 162, "changes": "Ni1-C4, LP O8(LP Ni1, C4-O8)", "spin": ""},
       {"structure": 2, "rank": 0, "weight_percent": 11.7224666, "weight_fraction": 0.117224666, "idxres": 231, "changes": "Ni1-O8, LP C4(LP Ni1, C4-O8)", "spin": ""},

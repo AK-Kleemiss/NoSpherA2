@@ -1,11 +1,12 @@
 {
   "name": "no2",
+  "parser_version": 2,
   "source": "no2.gbw",
   "nbo_version": "NoSpherA2 native NBO",
   "keywords": "",
   "keywords_reported": "",
   "open_shell": true,
-  "timings": {"file47_seconds": 0.011127399, "nbo_seconds": 0, "nbo_reported_cpu_seconds": 0, "nbo_reported_wall_seconds": 0, "nao_seconds": 0.006946575, "search_seconds": 0.311924919, "e2_seconds": 0.000436196},
+  "timings": {"file47_seconds": 0.011731184, "nbo_seconds": 0, "nbo_reported_cpu_seconds": 0, "nbo_reported_wall_seconds": 0, "nao_seconds": 0.006787393, "search_seconds": 0.367426173, "e2_seconds": 0.000512052},
   "thresholds": {"e2_kcal": 0.25, "e2_intermolecular_kcal": 0, "nrt_parent_percent": 0, "nrt_deloc_kcal": 1},
   "npa": [
     {"atom": 1, "element": "N", "charge": 0.4968297646, "core": 1.999993313, "valence": 4.418730986, "rydberg": 0.08444593615, "total": 6.503170235, "spin_density": 0.4631826078},
@@ -570,7 +571,7 @@
     {"donor_index": 100, "donor": "LP ( 2) O 3", "acceptor_index": 134, "acceptor": "RY (26) N 1", "spin": "beta", "energy_kcal": 0.2771671923, "e_diff": 5.388029161, "fij": -0.05645238093},
     {"donor_index": 100, "donor": "LP ( 2) O 3", "acceptor_index": 161, "acceptor": "RY ( 1) O 3", "spin": "beta", "energy_kcal": 0.5684780356, "e_diff": 1.608580205, "fij": -0.04417479961}
   ],
-  "nrt": {"present": true, "structures_used": 8, "structures_found": 33, "d_0": 1.033508277, "d_w": 0.6596468075, "max_search_cycles": 4, "symmetry": "1 graph-invariant orbit(s) covering 2 structure(s), 17 orbit weights solved for, D(w) rise -0.000000", "initial_structures": {"total": 18, "nls": 0, "nbi": 0, "sym": 0}, "nrtstr_keylist": "", "seconds": {"search": 0.000109444, "gram": 0.195368629, "minimize": 0.002215922, "other": 0.000101173},
+  "nrt": {"present": true, "structures_used": 8, "structures_found": 33, "d_0": 1.033508277, "d_w": 0.6596468075, "max_search_cycles": 4, "symmetry": "1 graph-invariant orbit(s) covering 2 structure(s), 17 orbit weights solved for, D(w) rise -0.000000", "initial_structures": {"total": 18, "nls": 0, "nbi": 0, "sym": 0}, "nrtstr_keylist": "", "seconds": {"search": 8.0318e-05, "gram": 0.242469168, "minimize": 0.002575505, "other": 0.000100245},
     "weights": [
       {"structure": 1, "rank": 0, "weight_percent": 32.20937345, "weight_fraction": 0.3220937345, "idxres": 14, "changes": "N1-O2, LP O3(N1-O3, LP O2)", "spin": "alpha"},
       {"structure": 2, "rank": 0, "weight_percent": 29.04896056, "weight_fraction": 0.2904896056, "idxres": 8, "changes": "LP N1, O2-O3(N1-O3, LP O2)", "spin": "alpha"},

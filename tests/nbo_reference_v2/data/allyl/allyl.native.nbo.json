@@ -1,11 +1,12 @@
 {
   "name": "allyl",
+  "parser_version": 2,
   "source": "allyl.gbw",
   "nbo_version": "NoSpherA2 native NBO",
   "keywords": "",
   "keywords_reported": "",
   "open_shell": true,
-  "timings": {"file47_seconds": 0.01932987, "nbo_seconds": 0, "nbo_reported_cpu_seconds": 0, "nbo_reported_wall_seconds": 0, "nao_seconds": 0.013172686, "search_seconds": 0.093080141, "e2_seconds": 0.001211312},
+  "timings": {"file47_seconds": 0.021535716, "nbo_seconds": 0, "nbo_reported_cpu_seconds": 0, "nbo_reported_wall_seconds": 0, "nao_seconds": 0.014315225, "search_seconds": 0.104805362, "e2_seconds": 0.001269248},
   "thresholds": {"e2_kcal": 0.25, "e2_intermolecular_kcal": 0, "nrt_parent_percent": 0, "nrt_deloc_kcal": 1},
   "npa": [
     {"atom": 1, "element": "C", "charge": -0.2988459288, "core": 1.999989818, "valence": 4.22517073, "rydberg": 0.0736853806, "total": 6.298845929, "spin_density": -0.3476218359},
@@ -783,7 +784,7 @@
     {"donor_index": 134, "donor": "BD ( 2) C 1- C 3", "acceptor_index": 183, "acceptor": "RY (14) C 2", "spin": "beta", "energy_kcal": 0.2848894019, "e_diff": 3.136918913, "fij": -0.04222804519},
     {"donor_index": 134, "donor": "BD ( 2) C 1- C 3", "acceptor_index": 195, "acceptor": "RY (26) C 2", "spin": "beta", "energy_kcal": 1.389286634, "e_diff": 1.27331471, "fij": -0.05941211205}
   ],
-  "nrt": {"present": true, "structures_used": 33, "structures_found": 231, "d_0": 0.7338910022, "d_w": 0.5651433261, "max_search_cycles": 4, "symmetry": "10 graph-invariant orbit(s) covering 20 structure(s), 113 orbit weights solved for, D(w) rise 0.000166", "initial_structures": {"total": 123, "nls": 0, "nbi": 0, "sym": 0}, "nrtstr_keylist": "", "seconds": {"search": 0.000694917, "gram": 0.456693712, "minimize": 0.069899115, "other": 0.000221599},
+  "nrt": {"present": true, "structures_used": 33, "structures_found": 231, "d_0": 0.7338910022, "d_w": 0.5651433261, "max_search_cycles": 4, "symmetry": "10 graph-invariant orbit(s) covering 20 structure(s), 113 orbit weights solved for, D(w) rise 0.000166", "initial_structures": {"total": 123, "nls": 0, "nbi": 0, "sym": 0}, "nrtstr_keylist": "", "seconds": {"search": 0.000735103, "gram": 0.512140331, "minimize": 0.076309975, "other": 0.000252435},
     "weights": [
       {"structure": 1, "rank": 0, "weight_percent": 37.44476422, "weight_fraction": 0.3744476422, "idxres": 1, "changes": "parent", "spin": "alpha"},
       {"structure": 2, "rank": 0, "weight_percent": 37.44476422, "weight_fraction": 0.3744476422, "idxres": 8, "changes": "C1-C3, LP C2(C1-C2, LP C3)", "spin": "alpha"},

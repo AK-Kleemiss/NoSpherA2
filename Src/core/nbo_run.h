@@ -217,6 +217,14 @@ struct NboResults {
 	NboNrt nrt;
 };
 
+/** Bumped when a parse or JSON change alters what a stored reference MEANS, so a reader can
+    refuse a file an older parser wrote instead of quietly comparing against it.  2 = gennbo's
+    NRT "RS" column read as a rank rather than a structure number, its composite alpha+beta
+    valency table kept under its own label instead of overwriting beta, and the open-shell NAO
+    table's Spin column no longer read as Energy.  Version 1 files are wrong in all three ways
+    and a whole measurement was already lost to a directory that still held them. */
+constexpr int NBO_JSON_PARSER_VERSION = 2;
+
 /** Parse a .nbo output file produced by NBO 6/7 into structured results. */
 NboResults parse_nbo_output(const std::filesystem::path& nbo_file);
 

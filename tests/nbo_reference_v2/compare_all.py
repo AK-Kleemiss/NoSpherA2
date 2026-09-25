@@ -44,6 +44,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 # make in one of two copies and trust.
 sys.path.insert(0, os.path.join(HERE, os.pardir, "nbo_reference"))
 import compare_nbo  # noqa: E402  the shared engine
+from config import load_nbo  # refuses a reference an older parser wrote
 
 EMPTY = 1.0e-5  # the engine's own threshold for "this orbital holds nothing"
 
@@ -93,10 +94,8 @@ def one(root, mol):
         if not os.path.exists(p):
             out["status"] = "missing file: " + os.path.basename(p)
             return out
-    with open(ref) as f:
-        reference = json.load(f)
-    with open(cand) as f:
-        candidate = json.load(f)
+    reference = load_nbo(ref)
+    candidate = load_nbo(cand)
 
     prov = os.path.join(d, "provenance_nbo.json")
     if os.path.exists(prov):

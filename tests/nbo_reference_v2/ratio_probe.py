@@ -25,6 +25,7 @@ import json
 import os
 import socket
 import sys
+from config import load_nbo  # refuses a reference an older parser wrote
 
 NEAR_ZERO = 1.0e-6
 
@@ -166,8 +167,8 @@ def main(argv):
     ap.add_argument("--json")
     a = ap.parse_args(argv[1:])
 
-    g = json.load(open(os.path.join(a.dir, a.mol + ".gennbo.nbo.json")))
-    n = json.load(open(os.path.join(a.dir, a.mol + ".native.nbo.json")))
+    g = load_nbo(os.path.join(a.dir, a.mol + ".gennbo.nbo.json"))
+    n = load_nbo(os.path.join(a.dir, a.mol + ".native.nbo.json"))
     print("ratio_probe on %s, %s, open_shell gennbo=%r native=%r"
           % (socket.gethostname(), a.mol, g.get("open_shell"), n.get("open_shell")))
     print("thresholds gennbo=%r native=%r" % (g.get("thresholds"), n.get("thresholds")))

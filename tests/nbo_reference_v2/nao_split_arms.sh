@@ -59,9 +59,12 @@ for ARM in baseline split; do
         fi
         RC=$?
         T1=$(date +%s)
-        # the gennbo side comes in by symlink so nao_class_leak.py runs on this tree unchanged
-        ln -sf /work/akkleemiss/florian/nbo_ref_v2_fixed/$MOL/$MOL.gennbo.nbo.json \
-            "$W/$MOL.gennbo.nbo.json"
+        # the gennbo side comes in by symlink so nao_class_leak.py runs on this tree unchanged.
+        # It used to point into nbo_ref_v2_fixed, which was the correct parse while $ROOT held the
+        # old one.  $ROOT is the single stamped truth now and the mirror is retired unstamped, so a
+        # rerun would have stopped in config.load_nbo - the guard doing its job, but the link may as
+        # well be right.
+        ln -sf "$D/$MOL.gennbo.nbo.json" "$W/$MOL.gennbo.nbo.json"
         printf '%-8s %-12s rc=%d %4ds\n' "$ARM" "$MOL" "$RC" "$((T1 - T0))"
     done
 done

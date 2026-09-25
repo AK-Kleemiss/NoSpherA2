@@ -107,6 +107,27 @@ def thresholds():
     return out
 
 
+# The version stamp NoSpherA2's JSON writer puts in every file (NBO_JSON_PARSER_VERSION in
+# Src/core/nbo_run.h).  Version 1 files read gennbo's NRT "RS" column as a structure number,
+# stored the composite alpha+beta valency table under "beta", and read the open-shell NAO table's
+# Spin column as Energy.  A measurement was already lost to a directory still holding them, so
+# they must not be silently readable: every reader of a stored reference goes through load_nbo.
+PARSER_VERSION = 2
+
+
+def load_nbo(path):
+    """Load a stored NBO JSON, refusing one an older parser wrote."""
+    with open(path) as fh:
+        d = json.load(fh)
+    v = d.get("parser_version")
+    if v != PARSER_VERSION:
+        raise SystemExit(
+            "%s carries parser_version %r, this tree expects %d.  Re-parse it from the kept .nbo "
+            "text (NoSpherA2 -nbo_parse <mol>.nbo -nbo_json <file>) rather than reading it: an "
+            "older parse means different numbers, not just an older file." % (path, v, PARSER_VERSION))
+    return d
+
+
 def nbo_keywords(mol):
     th, _ = thresholds()[mol]
     kw = BASE_KEYWORDS % th["e2_kcal"]

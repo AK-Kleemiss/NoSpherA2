@@ -1,11 +1,12 @@
 {
   "name": "acetylene",
+  "parser_version": 2,
   "source": "acetylene.gbw",
   "nbo_version": "NoSpherA2 native NBO",
   "keywords": "",
   "keywords_reported": "",
   "open_shell": false,
-  "timings": {"file47_seconds": 0.005633682, "nbo_seconds": 0, "nbo_reported_cpu_seconds": 0, "nbo_reported_wall_seconds": 0, "nao_seconds": 0.002524397, "search_seconds": 0.021935187, "e2_seconds": 0.000144401},
+  "timings": {"file47_seconds": 0.005615584, "nbo_seconds": 0, "nbo_reported_cpu_seconds": 0, "nbo_reported_wall_seconds": 0, "nao_seconds": 0.002907053, "search_seconds": 0.026211649, "e2_seconds": 0.000160311},
   "thresholds": {"e2_kcal": 0.5, "e2_intermolecular_kcal": 0, "nrt_parent_percent": 0, "nrt_deloc_kcal": 1},
   "npa": [
     {"atom": 1, "element": "C", "charge": -0.2474233296, "core": 1.999990913, "valence": 4.207679913, "rydberg": 0.03975250429, "total": 6.24742333},
@@ -201,30 +202,30 @@
     {"donor_index": 7, "donor": "BD ( 1) C 2- H 4", "acceptor_index": 69, "acceptor": "RY ( 5) H 3", "spin": "", "energy_kcal": 2.786487463, "e_diff": 2.900219746, "fij": 0.08040915838},
     {"donor_index": 7, "donor": "BD ( 1) C 2- H 4", "acceptor_index": 74, "acceptor": "RY ( 5) H 4", "spin": "", "energy_kcal": 1.094389701, "e_diff": 2.900220957, "fij": 0.05039216985}
   ],
-  "nrt": {"present": true, "structures_used": 7, "structures_found": 18, "d_0": 0.3218179119, "d_w": 0.3097291604, "max_search_cycles": 2, "symmetry": "7 graph-invariant orbit(s) covering 14 structure(s), 11 orbit weights solved for, D(w) rise 0.000000", "initial_structures": {"total": 18, "nls": 0, "nbi": 0, "sym": 0}, "nrtstr_keylist": "", "seconds": {"search": 5.4922e-05, "gram": 0.033039606, "minimize": 0.000957809, "other": 0.00034446},
+  "nrt": {"present": true, "structures_used": 7, "structures_found": 18, "d_0": 0.3218179119, "d_w": 0.3097291604, "max_search_cycles": 2, "symmetry": "7 graph-invariant orbit(s) covering 14 structure(s), 11 orbit weights solved for, D(w) rise 0.000000", "initial_structures": {"total": 18, "nls": 0, "nbi": 0, "sym": 0}, "nrtstr_keylist": "", "seconds": {"search": 0.000105077, "gram": 0.037957534, "minimize": 0.001330618, "other": 0.000570167},
     "weights": [
       {"structure": 1, "rank": 0, "weight_percent": 95.49754997, "weight_fraction": 0.9549754997, "idxres": 1, "changes": "parent", "spin": ""},
       {"structure": 2, "rank": 0, "weight_percent": 1.424747074, "weight_fraction": 0.01424747074, "idxres": 9, "changes": "C1-C2, LP H3(C1-H3, C2-H4)", "spin": ""},
       {"structure": 3, "rank": 0, "weight_percent": 1.424747074, "weight_fraction": 0.01424747074, "idxres": 18, "changes": "C1-C2, LP H4(C1-H3, C2-H4)", "spin": ""},
-      {"structure": 4, "rank": 0, "weight_percent": 0.7791275716, "weight_fraction": 0.007791275716, "idxres": 6, "changes": "LP C1, LP C2(C1-C2, C1-H3)", "spin": ""},
-      {"structure": 5, "rank": 0, "weight_percent": 0.7791275716, "weight_fraction": 0.007791275716, "idxres": 10, "changes": "LP C1, LP C2(C1-C2, C2-H4)", "spin": ""},
-      {"structure": 6, "rank": 0, "weight_percent": 0.04735036946, "weight_fraction": 0.0004735036946, "idxres": 5, "changes": "LP C1, LP H3(C1-C2, C1-H3)", "spin": ""},
-      {"structure": 7, "rank": 0, "weight_percent": 0.04735036946, "weight_fraction": 0.0004735036946, "idxres": 15, "changes": "LP C2, LP H4(C1-C2, C2-H4)", "spin": ""}
+      {"structure": 4, "rank": 0, "weight_percent": 0.7791275758, "weight_fraction": 0.007791275758, "idxres": 6, "changes": "LP C1, LP C2(C1-C2, C1-H3)", "spin": ""},
+      {"structure": 5, "rank": 0, "weight_percent": 0.7791275758, "weight_fraction": 0.007791275758, "idxres": 10, "changes": "LP C1, LP C2(C1-C2, C2-H4)", "spin": ""},
+      {"structure": 6, "rank": 0, "weight_percent": 0.0473503674, "weight_fraction": 0.000473503674, "idxres": 5, "changes": "LP C1, LP H3(C1-C2, C1-H3)", "spin": ""},
+      {"structure": 7, "rank": 0, "weight_percent": 0.0473503674, "weight_fraction": 0.000473503674, "idxres": 15, "changes": "LP C2, LP H4(C1-C2, C2-H4)", "spin": ""}
     ],
     "bond_orders": [
       {"atom1": 1, "atom2": 2, "total": 3.011965383, "covalent": 3.011961809, "ionic": 3.57400437e-06, "diagonal": false, "spin": ""},
       {"atom1": 1, "atom2": 3, "total": 0.9632402791, "covalent": 0.7217361834, "ionic": 0.2415040957, "diagonal": false, "spin": ""},
-      {"atom1": 2, "atom2": 4, "total": 0.9632402791, "covalent": 0.7217355755, "ionic": 0.2415047037, "diagonal": false, "spin": ""},
-      {"atom1": 1, "atom2": 1, "total": 0.01605605513, "covalent": 0, "ionic": 0, "diagonal": true, "spin": ""},
-      {"atom1": 2, "atom2": 2, "total": 0.01605605513, "covalent": 0, "ionic": 0, "diagonal": true, "spin": ""},
-      {"atom1": 3, "atom2": 3, "total": 0.01472097443, "covalent": 0, "ionic": 0, "diagonal": true, "spin": ""},
-      {"atom1": 4, "atom2": 4, "total": 0.01472097443, "covalent": 0, "ionic": 0, "diagonal": true, "spin": ""}
+      {"atom1": 2, "atom2": 4, "total": 0.9632402791, "covalent": 0.7217355754, "ionic": 0.2415047037, "diagonal": false, "spin": ""},
+      {"atom1": 1, "atom2": 1, "total": 0.01605605519, "covalent": 0, "ionic": 0, "diagonal": true, "spin": ""},
+      {"atom1": 2, "atom2": 2, "total": 0.01605605519, "covalent": 0, "ionic": 0, "diagonal": true, "spin": ""},
+      {"atom1": 3, "atom2": 3, "total": 0.01472097441, "covalent": 0, "ionic": 0, "diagonal": true, "spin": ""},
+      {"atom1": 4, "atom2": 4, "total": 0.01472097441, "covalent": 0, "ionic": 0, "diagonal": true, "spin": ""}
     ],
     "valencies": [
       {"atom": 1, "element": "C", "valency": 3.975205662, "covalency": 3.733697992, "electrovalency": 0.2415076697, "electron_count": 7.982523434, "spin": ""},
       {"atom": 2, "element": "C", "valency": 3.975205662, "covalency": 3.733697384, "electrovalency": 0.2415082777, "electron_count": 7.982523434, "spin": ""},
       {"atom": 3, "element": "H", "valency": 0.9632402791, "covalency": 0.7217361834, "electrovalency": 0.2415040957, "electron_count": 1.955922507, "spin": ""},
-      {"atom": 4, "element": "H", "valency": 0.9632402791, "covalency": 0.7217355755, "electrovalency": 0.2415047037, "electron_count": 1.955922507, "spin": ""}
+      {"atom": 4, "element": "H", "valency": 0.9632402791, "covalency": 0.7217355754, "electrovalency": 0.2415047037, "electron_count": 1.955922507, "spin": ""}
     ],
     "cycles": [
       {"cycle": 1, "structures_used": 7, "structures_found": 18, "d_w": 0.3097291604, "kmax": 0, "choose": 0, "ion": 0, "e2": 0, "sym": 0, "dbmax": 0, "dbrms": 0, "spin": ""},
@@ -257,22 +258,22 @@
       {"iteration": 100, "structures": 7, "d_w": 0.3097292749, "kkt": "", "rho_nl": 0.1088427728, "added": 0, "spin": ""},
       {"iteration": 150, "structures": 7, "d_w": 0.3097291609, "kkt": "", "rho_nl": 0.1087378212, "added": 0, "spin": ""},
       {"iteration": 200, "structures": 7, "d_w": 0.3097291604, "kkt": "", "rho_nl": 0.108732384, "added": 0, "spin": ""},
-      {"iteration": 250, "structures": 7, "d_w": 0.3097291604, "kkt": "", "rho_nl": 0.1087328626, "added": 0, "spin": ""},
-      {"iteration": 300, "structures": 7, "d_w": 0.3097291604, "kkt": "", "rho_nl": 0.1087329072, "added": 0, "spin": ""},
-      {"iteration": 350, "structures": 7, "d_w": 0.3097291604, "kkt": "", "rho_nl": 0.1087329399, "added": 0, "spin": ""},
-      {"iteration": 400, "structures": 7, "d_w": 0.3097291604, "kkt": "", "rho_nl": 0.1087329654, "added": 0, "spin": ""},
-      {"iteration": 450, "structures": 7, "d_w": 0.3097291604, "kkt": "", "rho_nl": 0.1087329823, "added": 0, "spin": ""},
-      {"iteration": 500, "structures": 7, "d_w": 0.3097291604, "kkt": "", "rho_nl": 0.1087329958, "added": 0, "spin": ""},
-      {"iteration": 550, "structures": 7, "d_w": 0.3097291604, "kkt": "", "rho_nl": 0.108733005, "added": 0, "spin": ""},
-      {"iteration": 600, "structures": 7, "d_w": 0.3097291604, "kkt": "", "rho_nl": 0.1087330119, "added": 0, "spin": ""},
-      {"iteration": 650, "structures": 7, "d_w": 0.3097291604, "kkt": "", "rho_nl": 0.108733016, "added": 0, "spin": ""},
-      {"iteration": 700, "structures": 7, "d_w": 0.3097291604, "kkt": "", "rho_nl": 0.108733019, "added": 0, "spin": ""},
-      {"iteration": 750, "structures": 7, "d_w": 0.3097291604, "kkt": "", "rho_nl": 0.1087330211, "added": 0, "spin": ""},
-      {"iteration": 800, "structures": 7, "d_w": 0.3097291604, "kkt": "", "rho_nl": 0.1087330229, "added": 0, "spin": ""},
-      {"iteration": 850, "structures": 7, "d_w": 0.3097291604, "kkt": "", "rho_nl": 0.1087330241, "added": 0, "spin": ""},
-      {"iteration": 900, "structures": 7, "d_w": 0.3097291604, "kkt": "", "rho_nl": 0.108733025, "added": 0, "spin": ""},
-      {"iteration": 950, "structures": 7, "d_w": 0.3097291604, "kkt": "", "rho_nl": 0.1087330256, "added": 0, "spin": ""},
-      {"iteration": 1000, "structures": 7, "d_w": 0.3097291604, "kkt": "", "rho_nl": 0.108733026, "added": 0, "spin": ""}
+      {"iteration": 250, "structures": 7, "d_w": 0.3097291604, "kkt": "", "rho_nl": 0.1087329209, "added": 0, "spin": ""},
+      {"iteration": 300, "structures": 7, "d_w": 0.3097291604, "kkt": "", "rho_nl": 0.1087329513, "added": 0, "spin": ""},
+      {"iteration": 350, "structures": 7, "d_w": 0.3097291604, "kkt": "", "rho_nl": 0.1087329716, "added": 0, "spin": ""},
+      {"iteration": 400, "structures": 7, "d_w": 0.3097291604, "kkt": "", "rho_nl": 0.1087329861, "added": 0, "spin": ""},
+      {"iteration": 450, "structures": 7, "d_w": 0.3097291604, "kkt": "", "rho_nl": 0.1087329976, "added": 0, "spin": ""},
+      {"iteration": 500, "structures": 7, "d_w": 0.3097291604, "kkt": "", "rho_nl": 0.1087330054, "added": 0, "spin": ""},
+      {"iteration": 550, "structures": 7, "d_w": 0.3097291604, "kkt": "", "rho_nl": 0.108733011, "added": 0, "spin": ""},
+      {"iteration": 600, "structures": 7, "d_w": 0.3097291604, "kkt": "", "rho_nl": 0.1087330154, "added": 0, "spin": ""},
+      {"iteration": 650, "structures": 7, "d_w": 0.3097291604, "kkt": "", "rho_nl": 0.1087330186, "added": 0, "spin": ""},
+      {"iteration": 700, "structures": 7, "d_w": 0.3097291604, "kkt": "", "rho_nl": 0.108733021, "added": 0, "spin": ""},
+      {"iteration": 750, "structures": 7, "d_w": 0.3097291604, "kkt": "", "rho_nl": 0.1087330226, "added": 0, "spin": ""},
+      {"iteration": 800, "structures": 7, "d_w": 0.3097291604, "kkt": "", "rho_nl": 0.1087330239, "added": 0, "spin": ""},
+      {"iteration": 850, "structures": 7, "d_w": 0.3097291604, "kkt": "", "rho_nl": 0.1087330248, "added": 0, "spin": ""},
+      {"iteration": 900, "structures": 7, "d_w": 0.3097291604, "kkt": "", "rho_nl": 0.1087330255, "added": 0, "spin": ""},
+      {"iteration": 950, "structures": 7, "d_w": 0.3097291604, "kkt": "", "rho_nl": 0.108733026, "added": 0, "spin": ""},
+      {"iteration": 1000, "structures": 7, "d_w": 0.3097291604, "kkt": "", "rho_nl": 0.1087330263, "added": 0, "spin": ""}
     ],
     "arrows": ["ARROWS depth 1 generates 6 new structures from 1", "ARROWS depth 2 generates 17 new structures from 6", "half-arrow intermediates dropped: 6 of 24"],
     "symmetry_forms": []

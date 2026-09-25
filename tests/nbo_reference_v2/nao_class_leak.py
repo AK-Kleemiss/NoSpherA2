@@ -19,6 +19,7 @@ import json
 import os
 import socket
 import sys
+from config import load_nbo  # refuses a reference an older parser wrote
 
 CLASSES = ("Cor", "Val", "Ryd")
 
@@ -84,7 +85,7 @@ if __name__ == "__main__":
         np_ = os.path.join(root, mol, "%s.native.nbo.json" % mol)
         if not (os.path.isfile(gp) and os.path.isfile(np_)):
             continue
-        g, n = json.load(open(gp)), json.load(open(np_))
+        g, n = load_nbo(gp), load_nbo(np_)
         pair = paired(g.get("nao") or [], n.get("nao") or [])
         if pair is None:
             print("%-12s NAO tables not comparable - skipped" % mol)

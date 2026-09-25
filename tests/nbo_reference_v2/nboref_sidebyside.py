@@ -9,10 +9,11 @@ whole-quantity disagreement from a Rydberg tail.
 import json
 import os
 import sys
+from config import load_nbo  # refuses a reference an older parser wrote
 
 d, mol = sys.argv[1], sys.argv[2]
-g = json.load(open(os.path.join(d, mol + ".gennbo.nbo.json")))
-n = json.load(open(os.path.join(d, mol + ".native.nbo.json")))
+g = load_nbo(os.path.join(d, mol + ".gennbo.nbo.json"))
+n = load_nbo(os.path.join(d, mol + ".native.nbo.json"))
 
 print("== top-level keys")
 print("gennbo:", sorted(g))

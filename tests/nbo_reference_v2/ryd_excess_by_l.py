@@ -19,6 +19,7 @@ import os
 import socket
 import sys
 from collections import defaultdict
+from config import load_nbo  # refuses a reference an older parser wrote
 
 LANG = "spdfghi"
 
@@ -57,7 +58,7 @@ if __name__ == "__main__":
         fn = os.path.join(d, "%s.native.nbo.json" % mol)
         if not (os.path.isfile(fg) and os.path.isfile(fn)):
             continue
-        g, n = by_block(json.load(open(fg))["nao"]), by_block(json.load(open(fn))["nao"])
+        g, n = by_block(load_nbo(fg)["nao"]), by_block(load_nbo(fn)["nao"])
         withv = nov = 0.0
         worst = (0.0, "")
         for k in sorted(set(g) & set(n)):

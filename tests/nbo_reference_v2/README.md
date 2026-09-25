@@ -326,6 +326,106 @@ non-discriminating molecule passing a wrong fix was instead stopping every open 
 tested at all. A spin is alpha or beta; the composite block's absence on the native side is now one
 reported line instead of one failure per row.
 
+## One truth per molecule: `parser_version`
+
+Three parser defects were fixed in this lane (gennbo's NRT `RS` column is a rank, not a structure
+number; its composite alpha+beta valency table is its own table and must not overwrite `beta`; an
+open-shell NAO table prints `Spin` where the old code read `Energy`).  That made every stored JSON
+written before the fix *wrong*, not merely old — and for a while there were two copies of the
+reference on the cluster, `nbo_ref_v2/` with the old parse and `nbo_ref_v2_fixed/` with the new one.
+A whole halving measurement was made against the old copy and had to be thrown away.
+
+A warning in a README does not stop that happening again, so:
+
+* `NBO_JSON_PARSER_VERSION` in `Src/core/nbo_run.h` is stamped into every JSON the writer produces
+  as `"parser_version"`.  Bump it whenever a change alters what a stored reference *means*.
+* `config.load_nbo(path)` is the only way the scripts here read a stored reference, and it raises
+  `SystemExit` on a file whose stamp is not the current one.  Eleven readers were converted;
+  `index.json` and `provenance_nbo.json` are not parser output and are left alone.
+* Every `.nbo` kept in `data/<mol>/` and on the cluster was re-parsed **in place** by
+  `regen_refs.sh`, and the native side was re-run in place with the same per-molecule flags, so
+  both files in a directory carry version 2 and nothing in the tree predates the fix.
+  `verify_one_truth.py` then compared the re-parse with the retired `nbo_ref_v2_fixed/` copy field
+  by field: 23 of 23 molecules identical outside `parser_version`, `source` and `timings`.
+* The retired copy keeps its files **unstamped on purpose**, with a `README-SUPERSEDED.txt`.  A
+  second copy of a reference is how the wrong one gets measured, so it now fails loudly instead of
+  answering.
+
+Re-parsing does not weaken the arbitration: `-nbo_parse` re-reads gennbo 7's own output text, which
+is kept and unchanged.  The reference is still NBO 7's numbers; only our reading of them is new.
+
+One file did not survive that sweep and could not: `ch3_original/ch3_original.native.nbo.json` was
+computed from `ch3.gbw` — a *different molecule* that happens to share the name, which is exactly
+the pairing that made the old dataset unusable.  The archive's own wavefunction is gone, so it is
+renamed `ch3_original.native-from-ch3-gbw.NOT-A-PAIR.json` and cannot be picked up as a pair again.
+
+## Step 3 was not where the leak has to be
+
+`nao_class_leak.py` and the `NAO_CLASS_SPLIT` arm between them exonerate step 4: the split variant
+is 5.6x worse, and `ryd_excess_by_l.py` puts +1.15335 e of the +1.256 e Rydberg excess in `(atom, l)`
+blocks that hold no valence shell at all — blocks a unitary intra-block rotation cannot feed.  Step
+1 is per-`(atom, l)` as well.  Only step 3's Schmidt projection crosses `l`.
+
+`NAO_DUMP_STEP3=1` now prints, for every shell, both the occupancy step 4 inherits and the pre-NAO
+occupancy it started from (the dump goes to `NoSpherA2.log`, not stdout).  `step3_stages.py` reads
+those logs and puts four stages side by side — pre-NAO, after step 3, final, gennbo — and
+`step3_stages.sh` produces them for all 25 molecules in place.  The measurement on ethane and
+benzene that motivated it:
+
+| molecule | after step 3 | final | gennbo | step 4 recovered |
+|----------|-------------|-------|--------|------------------|
+| ethane   | 0.43210 | 0.15471 | 0.02486 | 68 % of the excess |
+| benzene  | 1.12682 | 0.43157 | 0.11552 | 69 % |
+| sf6      | 0.71526 | 0.34846 | 0.35735 | 102 % |
+| pf5      | 0.50271 | 0.24899 | 0.26845 | 108 % |
+
+So step 4 is not a cosmetic step: it repairs most of what step 3 leaves, and it repairs the
+hypervalent cases *completely*.  What it cannot repair is population parked in a block with no
+valence shell — which is precisely the residual.
+
+The pre-registration and the acceptance gate for any later change to step 3 are in
+`step3_stages.py`'s docstring, fixed before the run so they cannot be relaxed afterwards: pf5, so2
+and sf6 must keep a final Rydberg total within 0.90–1.05 of gennbo's, no molecule may get worse by
+more than 0.01 e, and the no-valence-block excess must fall.  A change that improves the mean while
+flattening those three has found a fudge factor, not a fix.
+
+### What the arms then measured (job 586936, `nao_step1_arms.sh`, all 25 molecules)
+
+The localisation above is wrong, and the gate caught the first candidate that would have
+exploited it.
+
+`NAO_OWSO_OFF=1` drops the occupancy weighting inside each class and lets the plain Löwdin do the
+whole within-class orthogonalisation.  It is not a candidate — it throws the OWSO away — it is the
+test of one claim: after step 3 the Rydberg set is the S-orthogonal complement of the span of the
+natural minimal pre-NAOs, so a class **total** at that stage cannot depend on anything inside step 3.
+Confirmed: every molecule's `s3_Ryd` is unchanged to all five printed decimals while every `fin_Ryd`
+moves.
+
+But the *distribution* over `(atom, l)` blocks is not invariant, and that is what the final answer
+sees — the no-valence-block excess went 1.39828 → 1.14700 e and the final excess 1.25585 → 1.12478 e.
+So "only step 3's Schmidt projection crosses `l`" was the wrong localisation: the weighting inside
+step 3 moves the final numbers too.
+
+And it is still not a candidate, because it is what the gate was written to catch.  The mean improves
+while pf5 goes 0.93 → 1.12, so2 0.94 → 1.05 and sf6 0.98 → 1.19 × gennbo, sf6 worse by 0.077 e on its
+own.  That is the fudge factor: flattening the three molecules that were already right in order to
+improve the average.
+
+`NAO_PRENAO_NET=1` builds the pre-NAOs from the atom's own block of `P` with `S^A` as the metric —
+the net atomic population, the way the 1985 paper reads — instead of from `(S P S)^A`.  It was
+rejected years ago on epoxide's NPA charges, which the class-split arm proved blind to exactly this
+kind of error, so it needed re-running against the Rydberg metric.  It is not a near miss: the
+Rydberg total after step 3 goes 10.40557 → 194.78163 e and the final one 4.00571 → 56.45473 against
+gennbo's 2.74986, every molecule between 8× and 72× worse.  Gross is confirmed, and no longer on a
+charge argument.
+
+Together those two prune the search rather than narrow it.  The class totals step 4 inherits are
+fixed by the span of the natural minimal pre-NAOs alone, and both inputs to that span are already at
+their better setting — so there is nothing upstream of step 4 left to change.  What is left is which
+vectors step 3 hands to each block and what step 4 does with them, and NBO 7 prints no intermediate
+table, so neither can be arbitrated: only the final table can.
+
+
 ## Layout
 
 ```

@@ -1,0 +1,35 @@
+==========================================
+SLURM_JOB_ID = 586172
+SLURM_JOB_NODELIST = AKL038
+==========================================
+=== nboref-regen on AKL038, node has 96 cores, this job has 8 threads
+=== binary /work/akkleemiss/florian/nos_nboref/build/release-linux/bin/NoSpherA2
+/var/spool/slurmd/job586172/slurm_script: line 29: git: command not found
+=== 
+acetylene parse_exit=0 native_exit=0 gennbo_parser_version=2 native_parser_version=2 flags='-nrt -nbo_e2min 0.5 -nrt_e2 1'
+ammonia parse_exit=0 native_exit=0 gennbo_parser_version=2 native_parser_version=2 flags='-nrt -nbo_e2min 0.5 -nrt_e2 1'
+benzene parse_exit=0 native_exit=0 gennbo_parser_version=2 native_parser_version=2 flags='-nrt -nbo_e2min 0.5 -nrt_e2 1'
+ch3 parse_exit=0 native_exit=0 gennbo_parser_version=2 native_parser_version=2 flags='-nrt -nbo_e2min 0.25 -nrt_e2 1'
+SKIP ch3_original: config.py has no flags for it
+ethane parse_exit=0 native_exit=0 gennbo_parser_version=2 native_parser_version=2 flags='-nrt -nbo_e2min 0.5 -nrt_e2 1'
+ethene parse_exit=0 native_exit=0 gennbo_parser_version=2 native_parser_version=2 flags='-nrt -nbo_e2min 0.5 -nrt_e2 1'
+formaldehyde parse_exit=0 native_exit=0 gennbo_parser_version=2 native_parser_version=2 flags='-nrt -nbo_e2min 0.5 -nrt_e2 1'
+formate parse_exit=0 native_exit=0 gennbo_parser_version=2 native_parser_version=2 flags='-nrt -nbo_e2min 0.5 -nrt_e2 1'
+hcn parse_exit=0 native_exit=0 gennbo_parser_version=2 native_parser_version=2 flags='-nrt -nbo_e2min 0.5 -nrt_e2 1'
+lif parse_exit=0 native_exit=0 gennbo_parser_version=2 native_parser_version=2 flags='-nrt -nbo_e2min 0.5 -nrt_e2 1'
+n2 parse_exit=0 native_exit=0 gennbo_parser_version=2 native_parser_version=2 flags='-nrt -nbo_e2min 0.5 -nrt_e2 1'
+ni_co_4 parse_exit=0 native_exit=0 gennbo_parser_version=2 native_parser_version=2 flags='-nrt -nbo_e2min 0.5 -nrt_e2 5'
+nitromethane parse_exit=0 native_exit=0 gennbo_parser_version=2 native_parser_version=2 flags='-nrt -nbo_e2min 0.5 -nrt_e2 1'
+no parse_exit=0 native_exit=0 gennbo_parser_version=2 native_parser_version=2 flags='-nrt -nbo_e2min 0.25 -nrt_e2 1'
+o2 parse_exit=0 native_exit=0 gennbo_parser_version=2 native_parser_version=2 flags='-nrt -nbo_e2min 0.25 -nrt_e2 1'
+ozone parse_exit=0 native_exit=0 gennbo_parser_version=2 native_parser_version=2 flags='-nrt -nbo_e2min 0.5 -nrt_e2 1'
+pf5 parse_exit=0 native_exit=0 gennbo_parser_version=2 native_parser_version=2 flags='-nrt -nbo_e2min 0.5 -nrt_e2 1'
+pyridine parse_exit=0 native_exit=0 gennbo_parser_version=2 native_parser_version=2 flags='-nrt -nbo_e2min 0.5 -nrt_e2 1'
+sf6 parse_exit=0 native_exit=0 gennbo_parser_version=2 native_parser_version=2 flags='-nrt -nbo_e2min 0.5 -nrt_e2 1 -nrt_no_symmetry'
+so2 parse_exit=0 native_exit=0 gennbo_parser_version=2 native_parser_version=2 flags='-nrt -nbo_e2min 0.5 -nrt_e2 1'
+ticl4 parse_exit=0 native_exit=0 gennbo_parser_version=2 native_parser_version=2 flags='-nrt -nbo_e2min 0.5 -nrt_e2 20'
+water parse_exit=0 native_exit=0 gennbo_parser_version=2 native_parser_version=2 flags='-nrt -nbo_e2min 0.5 -nrt_e2 1'
+allyl parse_exit=0 native_exit=0 gennbo_parser_version=2 native_parser_version=2 flags='-nrt -nbo_e2min 0.25 -nrt_e2 1'
+hco parse_exit=0 native_exit=0 gennbo_parser_version=2 native_parser_version=2 flags='-nrt -nbo_e2min 0.25 -nrt_e2 1'
+no2 parse_exit=0 native_exit=0 gennbo_parser_version=2 native_parser_version=2 flags='-nrt -nbo_e2min 0.25 -nrt_e2 1'
+=== stamped both files: 25 molecules, incomplete: 1

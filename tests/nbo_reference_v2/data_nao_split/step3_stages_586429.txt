@@ -1,0 +1,73 @@
+==========================================
+SLURM_JOB_ID = 586429
+SLURM_JOB_NODELIST = AKL063
+==========================================
+=== step3_stages on AKL063, node has 96 cores, this job has 8 threads
+=== binary /work/akkleemiss/florian/nos_nboref/build/release-linux/bin/NoSpherA2
+/var/spool/slurmd/job586429/slurm_script: line 28: git: command not found
+===  plus the uncommitted pre_occ dump column
+acetylene exit=0 step3_lines=31
+ammonia exit=0 step3_lines=24
+benzene exit=0 step3_lines=91
+ch3 exit=0 step3_lines=48
+ethane exit=0 step3_lines=47
+ethene exit=0 step3_lines=39
+formaldehyde exit=0 step3_lines=31
+formate exit=0 step3_lines=38
+hcn exit=0 step3_lines=27
+lif exit=0 step3_lines=20
+n2 exit=0 step3_lines=23
+ni_co_4 exit=0 step3_lines=104
+nitromethane exit=0 step3_lines=57
+no exit=0 step3_lines=46
+o2 exit=0 step3_lines=46
+ozone exit=0 step3_lines=34
+pf5 exit=0 step3_lines=69
+pyridine exit=0 step3_lines=87
+sf6 exit=0 step3_lines=80
+so2 exit=0 step3_lines=36
+ticl4 exit=0 step3_lines=68
+water exit=0 step3_lines=20
+allyl exit=0 step3_lines=108
+hco exit=0 step3_lines=54
+no2 exit=0 step3_lines=68
+=== analysis, 22 + 3 molecules in one table
+step3_stages on AKL063, 1 thread, root /work/akkleemiss/florian/nbo_ref_v2
+molecule        pre_Ryd    s3_Ryd   fin_Ryd   gen_Ryd  fin/gen   noVal_d
+acetylene       4.76233   0.32404   0.08921   0.02618     3.41  +0.06661
+ammonia         2.96711   0.17290   0.05975   0.03016     1.98  +0.03917
+benzene        31.77321   1.12682   0.43157   0.11552     3.74  +0.24915
+ch3             2.43229   0.17280   0.05028   0.01607     3.13  +0.03878
+ethane          9.83587   0.43210   0.15471   0.02486     6.22  +0.11329
+ethene          7.63845   0.39510   0.13623   0.04200     3.24  +0.09505
+formaldehyde    5.86839   0.29861   0.10690   0.06672     1.60  +0.05980
+formate         9.35260   0.40633   0.15063   0.12157     1.24  +0.05179
+hcn             4.32361   0.31734   0.09377   0.06164     1.52  +0.06002
+lif             1.46804   0.05820   0.05241   0.05122     1.02  +0.05182
+n2              4.02009   0.31562   0.12373   0.09978     1.24  +0.06316
+ni_co_4        32.08727   1.27081   0.55820   0.47723     1.17  +0.08515
+nitromethane   15.03837   0.63626   0.19696   0.10023     1.97  +0.08654
+no              3.92859   0.24725   0.10527   0.09412     1.12  +0.04409
+o2              3.43660   0.21730   0.07445   0.07088     1.05  +0.01996
+ozone           7.04722   0.32060   0.11240   0.09833     1.14  +0.02055
+pf5            17.48315   0.50271   0.24899   0.26845     0.93  -0.00408
+pyridine       30.59747   1.11037   0.42106   0.14141     2.98  +0.22523
+sf6            21.22747   0.71526   0.34846   0.35735     0.98  -0.00660
+so2             8.49120   0.47354   0.27909   0.29603     0.94  +0.03233
+ticl4           9.55938   0.78165   0.17245   0.16363     1.05  -0.01954
+water           2.20271   0.10996   0.03918   0.02648     1.48  +0.02602
+
+22 molecules.  Rydberg totals summed: pre-NAO 235.54142, after step 3 10.40557, final 4.00571, gennbo 2.74986
+Excess over gennbo: pre-NAO +232.79156, after step 3 +7.65571, final +1.25585
+Rydberg population in l blocks with no valence shell, ours minus gennbo's, after step 3: +1.39828 e
+The pre-NAO column is the one that decides this: it is the stage the two codes share.
+step3_stages on AKL063, 1 thread, root /work/akkleemiss/florian/nbo_ref_radicals
+molecule        pre_Ryd    s3_Ryd   fin_Ryd   gen_Ryd  fin/gen   noVal_d
+allyl          13.01021   0.57266   0.20268   0.06150     3.30  +0.12175
+hco             4.78487   0.27655   0.10812   0.09042     1.20  +0.04857
+no2             7.60435   0.41319   0.14696   0.12586     1.17  +0.04968
+
+3 molecules.  Rydberg totals summed: pre-NAO 25.39943, after step 3 1.26241, final 0.45777, gennbo 0.27778
+Excess over gennbo: pre-NAO +25.12165, after step 3 +0.98463, final +0.17999
+Rydberg population in l blocks with no valence shell, ours minus gennbo's, after step 3: +0.22000 e
+The pre-NAO column is the one that decides this: it is the stage the two codes share.
