@@ -119,6 +119,14 @@ NboResults parse_nbo_output(const std::filesystem::path& nbo_file) {
 	enum class Section { none, npa, nao, hybrids, summary, e2, weights, cycles, topo, valencies, qp, symforms, nrtstr };
 	Section section = Section::none;
 	std::string spin;             //"", "alpha", "beta"
+	//The valency table takes its spin from its OWN title, not from the enclosing NBO section.
+	//Open shell prints three of them - "(alpha spin)", "(beta spin)" and "(composite alpha+beta)"
+	//- and the composite one comes after the last "Beta spin orbitals" header, so inheriting
+	//`spin` filed it as a second beta table: on ch3 that stored C as valency 3.0000 / covalency
+	//2.5079 / 7 electrons next to the real beta 1.5000 / 1.2959 / 3, and any consumer keying by
+	//(spin, atom) silently kept whichever came last. parse_bond_orders already reads the spin off
+	//its own title for exactly this reason - same three-table layout, same fix.
+	std::string valency_spin;
 	bool nao_column_is_spin = false;  //set from each NAO table's own header, see Section::nao
 	std::map<std::pair<std::string, int>, size_t> orbital_index;  //(spin, NBO number) -> position
 	//The TOPO matrices of the leading structure and, under NRTDTL, of every candidate are the
@@ -156,7 +164,14 @@ NboResults parse_nbo_output(const std::filesystem::path& nbo_file) {
 			section = Section::topo;
 			continue;
 		}
-		if (line.find("Natural Atomic Valencies") != std::string::npos) { section = Section::valencies; valencies_at_section_start = r.nrt.valencies.size(); continue; }
+		if (line.find("Natural Atomic Valencies") != std::string::npos) {
+			section = Section::valencies;
+			valencies_at_section_start = r.nrt.valencies.size();
+			valency_spin = line.find("composite") != std::string::npos ? "composite"
+				: line.find("alpha") != std::string::npos ? "alpha"
+				: line.find("beta") != std::string::npos ? "beta" : "";
+			continue;
+		}
 		if (line.find("cycle  structures") != std::string::npos) { section = Section::cycles; continue; }
 		if (line.find("iter  nres") != std::string::npos) { section = Section::qp; continue; }
 		if (line.find("Symmetry equivalent resonance forms") != std::string::npos) { section = Section::symforms; continue; }
@@ -413,7 +428,7 @@ NboResults parse_nbo_output(const std::filesystem::path& nbo_file) {
 			v.covalency = to_d(m[4].str());
 			v.electrovalency = to_d(m[5].str());
 			v.electron_count = to_d(m[6].str());
-			v.spin = spin;
+			v.spin = valency_spin;
 			r.nrt.valencies.push_back(v);
 			break;
 		}
