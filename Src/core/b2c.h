@@ -159,6 +159,12 @@ void basin_adaptive_step_counters_reset();
 //that says how much of it the basins actually need. 1.0 leaves the binary as it was.
 void basin_step_scale_set(const double f);
 double basin_step_scale();
+//Density trajectories from the last integration that stopped rising while a gradient of 1e-2 e/bohr^4
+//or more was still on them. The invariant is zero: such a point is not a critical point, it is a step
+//too long for the local curvature, and the step controller shrinks below its floor rather than giving
+//up and handing the point to whichever attractor happens to be nearest. ZP2_part1 had 10850 of them
+//and CCH 3716, 91 % of which went to one non-nuclear attractor that then held twice its charge.
+long long basin_stalls_on_a_slope();
 void basin_timing_set_enabled(const bool on);
 bool basin_timing_enabled();
 struct basin_stage_timer {

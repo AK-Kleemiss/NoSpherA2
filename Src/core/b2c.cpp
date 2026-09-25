@@ -1695,7 +1695,29 @@ static bool g_adaptive_step = false;
 //of it. That is the suspected reason ELI-D gains 5-7 % where QTAIM gains 29-47 %, and UH6's ELI-D
 //loses 15 %. Counted only under -adaptive_step and printed under -basin_timing; relaxed because
 //the ratio is the answer, not the last digit.
-static std::atomic<long long> g_adp_steps{ 0 }, g_adp_tries{ 0 }, g_adp_turn{ 0 }, g_adp_fall{ 0 };
+static std::atomic<long long> g_adp_steps{ 0 }, g_adp_tries{ 0 }, g_adp_turn{ 0 }, g_adp_fall{ 0 }, g_adp_shrink{ 0 };
+//Trajectories that ran their step budget out. Counted separately from the stalls because they are
+//the opposite failure - a walk that never gave up rather than one that gave up too early - and
+//because a streaming walk that reaches the cap has no cube to fall back on.
+static std::atomic<long long> g_adp_exhaust{ 0 };
+//Steps a single trajectory may take before it is given up on. 2000 was chosen for a walk whose step
+//had a hard floor; the shrink took that floor away, so whether it is still enough is a measurement,
+//and NOS_BASIN_STEP_CAP is how that measurement gets taken without a rebuild per value.
+static int g_step_cap = 2000;
+//How fast a shrunken step is allowed back toward its floor. The halving is exactly /2, so a halve-then-
+//grow round trip multiplies the step by relax/2 and only contracts below 2.0: at 2.0 it is the identity
+//and a ridge becomes a limit cycle - halve, rise, double, overshoot, halve - and above 2.0 the min(1.0,)
+//clamp makes it the identity again, which is why 2.0, 2.5, 3.0 and 4.0 all cost the same 24-27 s on the
+//Co2 fixture where 1.2 to 1.75 cost 1-2 s. Not 1.0 either: a step that never recovers bottoms out at
+//1/16 of the floor and the first failure there has nowhere left to go, so 1.0 leaves 4224 trajectories
+//stalled on a slope and 1.1 leaves 48. 1.5 contracts by 0.75 with margin from the cliff at 1.9, and on
+//CCH at 0.05 A it takes the non-nuclear attractor from 0.5605 to 0.4430 e against AIMAll's 0.39257 while
+//the point loop drops from 4.54 to 1.20 s. NOS_BASIN_STEP_RELAX reproduces any of it without a rebuild.
+static double g_step_relax = 1.5;
+//Whether a floor step that fails to rise may halve and try again. On by default - it is the fix, and
+//3716 of CCH's 3716 stalls were this - and NOS_BASIN_SHRINK=0 turns it off, which is how the test that
+//asserts the stall count is zero gets to show the count it is asserting against.
+static bool g_step_shrink = true;
 //Where trajectories give up, which for the density field is the only thing that can put electrons
 //outside every basin - and 0.65 e of Si2H6 sat outside for a year for want of this number. Counted
 //always: a stall costs a density evaluation, so three relaxed adds are free, and the one figure that
@@ -1703,6 +1725,18 @@ static std::atomic<long long> g_adp_steps{ 0 }, g_adp_tries{ 0 }, g_adp_turn{ 0 
 //floor that is the vacuum tail and means nothing; two orders above it, it is a bond critical point.
 static std::atomic<long long> g_stall_vacuum{ 0 }, g_stall_field{ 0 }, g_stall_far{ 0 };
 static std::atomic<double> g_stall_far_rho{ 0.0 };
+//Buckets rather than a mean, because the question is not how big the gradient is on average but
+//whether a stall is at a critical point at all: 1e-6 is one, 1e-2 is a walk that gave up on a slope.
+//And the basin each stall was handed to, which is what says whether the tie-break is the thing that
+//over-claims. Eight slots and a bin for the rest - a molecule with more basins than that has no
+//single culprit to find this way.
+static constexpr int g_stall_basins = 8;
+static std::atomic<long long> g_stall_gn[4] = {};
+//The >=1e-2 bucket again, but cleared when an integration starts instead of when it prints, so it
+//still holds the last field's count after the call returns. That is what basin_stalls_on_a_slope
+//hands to the test; the rest of these are read once by the log line and reset in the same breath.
+static std::atomic<long long> g_stall_slope{ 0 };
+static std::atomic<long long> g_stall_to[g_stall_basins + 1] = {};
 //dist < 0 means the stall was below the density floor. Called once per stall.
 //Where trajectories gave up, since the last reset. vacuum: below the density floor, where there is
 //nothing to belong to. in_field: on a critical point of the field, which is a real place and has to
@@ -1711,14 +1745,29 @@ static std::atomic<double> g_stall_far_rho{ 0.0 };
 //0.65 e short. worst_rho is the densest of them and says which kind of stall it was: 1e-6 e/bohr^3 is
 //a vacuum tail, 1e-1 a bond critical point. File-local on purpose - the only consumer is the line
 //-basin_timing prints, and a reader of that line wants the reasoning here rather than in the header.
-static void basin_stall_seen(const double dist, const double rho)
+//gn < 0 means the caller had no gradient to hand over; basin is filled in afterwards by
+//basin_stall_gave_to, since the recorder runs before the tie-break has answered.
+static void basin_stall_seen(const double dist, const double rho, const double gn = -1.0)
 {
 	if (dist < 0.0) { g_stall_vacuum.fetch_add(1, std::memory_order_relaxed); return; }
 	g_stall_field.fetch_add(1, std::memory_order_relaxed);
+	if (gn >= 0.0) {
+		const int b = gn < 1e-6 ? 0 : gn < 1e-4 ? 1 : gn < 1e-2 ? 2 : 3;
+		g_stall_gn[b].fetch_add(1, std::memory_order_relaxed);
+		if (b == 3) g_stall_slope.fetch_add(1, std::memory_order_relaxed);
+	}
 	if (dist <= 1.0) return;
 	g_stall_far.fetch_add(1, std::memory_order_relaxed);
 	double cur = g_stall_far_rho.load(std::memory_order_relaxed);
 	while (rho > cur && !g_stall_far_rho.compare_exchange_weak(cur, rho, std::memory_order_relaxed)) {}
+}
+long long basin_stalls_on_a_slope()
+{
+	return g_stall_slope.load();
+}
+static void basin_stall_gave_to(const int basin)
+{
+	g_stall_to[basin >= 0 && basin < g_stall_basins ? basin : g_stall_basins].fetch_add(1, std::memory_order_relaxed);
 }
 static void basin_stall_counters(long long &vacuum, long long &in_field, long long &beyond_a_bohr, double &worst_rho)
 {
@@ -1727,7 +1776,12 @@ static void basin_stall_counters(long long &vacuum, long long &in_field, long lo
 	beyond_a_bohr = g_stall_far.load();
 	worst_rho = g_stall_far_rho.load();
 }
-static void basin_stall_counters_reset() { g_stall_vacuum = 0; g_stall_field = 0; g_stall_far = 0; g_stall_far_rho = 0.0; }
+static void basin_stall_counters_reset()
+{
+	g_stall_vacuum = 0; g_stall_field = 0; g_stall_far = 0; g_stall_far_rho = 0.0;
+	for (auto &c : g_stall_gn) c = 0;
+	for (auto &c : g_stall_to) c = 0;
+}
 static inline void adp_count(std::atomic<long long> &c) { c.fetch_add(1, std::memory_order_relaxed); }
 void basin_adaptive_step_counters(long long &steps, long long &proposed, long long &turned_back, long long &fell_back)
 {
@@ -1738,7 +1792,7 @@ void basin_adaptive_step_counters(long long &steps, long long &proposed, long lo
 }
 void basin_adaptive_step_counters_reset()
 {
-	g_adp_steps = 0; g_adp_tries = 0; g_adp_turn = 0; g_adp_fall = 0;
+	g_adp_steps = 0; g_adp_tries = 0; g_adp_turn = 0; g_adp_fall = 0; g_adp_shrink = 0; g_adp_exhaust = 0;
 }
 void basin_adaptive_step_set_enabled(const bool on) { g_adaptive_step = on; if (on) adp_knobs_from_env(); }
 bool basin_adaptive_step_enabled() { return g_adaptive_step; }
@@ -1770,6 +1824,21 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 	//Streaming: no cube and no basin cube, the maxima are the whole topology and every point
 	//finds its basin by walking the field
 	const bool streaming = cub == nullptr || basin_cube == nullptr;
+	//Cleared here and not at the print, so the count belongs to this call and survives it
+	g_stall_slope = 0;
+	if (const char *e = std::getenv("NOS_BASIN_STEP_CAP")) {
+		const int v = std::atoi(e);
+		//A cap below a few hundred steps would make every trajectory unfinished and the measurement
+		//meaningless, so a typo reads as "leave it alone" rather than as a setting.
+		if (v >= 100) g_step_cap = v;
+	}
+	if (const char *e = std::getenv("NOS_BASIN_STEP_RELAX")) {
+		const double v = std::atof(e);
+		//Below 1.0 the step would shrink on a *successful* step too, which is a different algorithm
+		//and not one anybody asked for; above 4.0 it is a cycle with a longer period.
+		if (v >= 1.0 && v <= 4.0) g_step_relax = v;
+	}
+	if (const char *e = std::getenv("NOS_BASIN_SHRINK")) g_step_shrink = std::string(e) != "0";
 	//The basin a maximum belongs to, 1-based; without a map that is the maximum's own index
 	auto basin_of = [&](const size_t m) { return maximum_basin ? (*maximum_basin)[m + 1] : static_cast<int>(m) + 1; };
 	int nb = 0;
@@ -2099,14 +2168,16 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 	//favour and break a symmetric molecule - while start is on one definite side of the separatrix
 	//the walk was climbing. ELI-D keeps deciding on r, where its stalls are in a vacuum tail that
 	//has no side to be on and the populations it moves are zero either way.
-	auto stalled = [&](const d3 &start, const d3 &r) {
+	auto stalled = [&](const d3 &start, const d3 &r, const double gn = -1.0) {
 		const double rho = valence(r);
 		if (rho < stall_floor) { basin_stall_seen(-1.0, 0.0); return 0; }
 		double d2 = std::numeric_limits<double>::max();
 		for (size_t m = 0; m < maxima.size(); m++)
 			d2 = std::min(d2, std::pow(r[0] - maxima[m][0], 2) + std::pow(r[1] - maxima[m][1], 2) + std::pow(r[2] - maxima[m][2], 2));
-		basin_stall_seen(std::sqrt(d2), rho);
-		return nearest_maximum(eli_field ? r : start, stall_reach);
+		basin_stall_seen(std::sqrt(d2), rho, gn);
+		const int b = nearest_maximum(eli_field ? r : start, stall_reach);
+		basin_stall_gave_to(b);
+		return b;
 	};
 	auto climb = [&](const d3 &p, long long &lb, long long &ll) {
 		bool settled;
@@ -2133,6 +2204,13 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 		//field curves this is the old walk, evaluation for evaluation; the saving is the long
 		//straight run in from the tail and through the outer valence, which is where the steps are.
 		double mult = 1.0;
+		//Below the floor rather than above it. The floor is the step the populations were validated
+		//at, so it is where the walk wants to be; but a floor step that lands lower than it started
+		//is simply too long for the curvature here, and giving up on it throws away a point whose
+		//uphill direction is perfectly well defined. A sixteenth of the floor is the limit: by then
+		//the displacement is under the Newton tolerance the maxima themselves were found to, and a
+		//walk that cannot rise over it has genuinely run out of field.
+		double shrink = 1.0;
 		//Was the step that reached r actually longer than the floor? mult is raised at the end of a
 		//step, so mult > 1 at the top of the next iteration says "the next step may be grown", not
 		//"the last one was" - and only the latter is grounds for throwing a point away.
@@ -2140,7 +2218,7 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 		d3 r_prev = p;
 		const bool grow = basin_adaptive_step_enabled();
 		double value_prev = -1.0;
-		for (int s = 0; s < 2000; s++) {
+		for (int s = 0; s < g_step_cap; s++) {
 			if (grow) adp_count(g_adp_steps);
 			const int m = at_maximum(r);
 			if (m) return m;
@@ -2158,14 +2236,29 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 					//is the floor path's own stall, moved one step back and charged a gradient.
 					if (grown_last) { adp_count(g_adp_fall); r = r_prev; last_value = value_prev; mult = 1.0; grown_last = false; continue; }
 					mult = 1.0;
-					const int n = stalled(p, r);
+					if (!eli_field && g_step_shrink && shrink > 0.0625) {
+						adp_count(g_adp_shrink);
+						shrink *= 0.5;
+						r = r_prev;
+						last_value = value_prev;
+						grown_last = false;
+						continue;
+					}
+					const int n = stalled(p, r, std::sqrt(g[0] * g[0] + g[1] * g[1] + g[2] * g[2]));
 					if (n) return n;
 					break;
 				}
 			}
 			else gradient(r, g);
 			double gn = std::sqrt(g[0] * g[0] + g[1] * g[1] + g[2] * g[2]);
-			if (gn < 1e-12) break;
+			if (gn < 1e-12) {
+				//A critical point, and now the only way to reach the stall path: 3716 of CCH's 3716
+				//old stalls carried a gradient of 1e-2 or more, so none of them was ever this. A
+				//streaming density walk has no cube behind it, so breaking here reports the point
+				//outside every basin - 0.0102 e of CCH - where the tie-break has a definite answer.
+				if (!eli_field) { const int n = stalled(p, r, gn); if (n) return n; }
+				break;
+			}
 			//The gradient at r, kept because the midpoint below has to be computed from it in the
 			//same expression order it always was: 0.5 * sl * g[k] / gn divides last, and the
 			//pre-divided direction does not. A midpoint one ulp away is not a rounding detail
@@ -2182,11 +2275,12 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 			//from the same point. It has to be retaken right here, not by restarting the iteration -
 			//that would meet the monotonicity test at a point whose value is already recorded in
 			//last_value, read "stopped rising", and end the trajectory in mid flight.
-			double sl = floor_step;
+			const double base = floor_step * shrink;
+			double sl = base;
 			double cosine = 0.0;
 			bool stepped = false;
 			for (int attempt = 0; attempt < 2 && !stepped; attempt++) {
-				sl = mult > 1.0 ? std::min(floor_step * mult, std::max(floor_step, reach_limit(r))) : floor_step;
+				sl = mult > 1.0 ? std::min(base * mult, std::max(base, reach_limit(r))) : base;
 				if (mult > 1.0) adp_count(g_adp_tries);
 				d3 mid;
 				for (int k = 0; k < 3; k++) mid[k] = r[k] + 0.5 * sl * g0[k] / gn0;
@@ -2197,13 +2291,19 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 				if (mult > 1.0 && cosine < g_adp_keep) { adp_count(g_adp_turn); mult = 1.0; continue; }
 				stepped = true;
 			}
-			if (!stepped) break;
+			//Same case one level in: the attempt loop gives up only when the midpoint gradient
+			//vanished too.
+			if (!stepped) {
+				if (!eli_field) { const int n = stalled(p, r, gn); if (n) return n; }
+				break;
+			}
 			r_prev = r;
 			value_prev = last_value;
 			last_value = here;
-			grown_last = sl > floor_step;
+			grown_last = sl > base;
 			for (int k = 0; k < 3; k++) r[k] += sl * g[k] / gn;
-			if (cosine > g_adp_grow && mult < g_adp_cap && grow) mult *= 2.0;
+			if (shrink < 1.0) shrink = std::min(1.0, shrink * g_step_relax);
+			else if (cosine > g_adp_grow && mult < g_adp_cap && grow) mult *= 2.0;
 			if (!streaming) {
 				const int b2 = lookup(r, settled);
 				if (b2 == 0 && eli_field) { ll++; break; }
@@ -2211,9 +2311,14 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 				if (settled && eli_field) break;
 			}
 		}
-		//A streaming ELI-D trajectory that died, ran its 2000 steps out or lost its gradient has
-		//nowhere to report to; the gridded one still has the cube's answer in b
-		if (eli_field && streaming) return stalled(p, r);
+		//A streaming trajectory that died, ran its 2000 steps out or lost its gradient has nowhere
+		//to report to: lookup's cell test begins with "if (streaming) return false", so b is 0 for
+		//every point once there is no cube, and returning it puts the point outside every basin
+		//rather than in a basin. ELI-D has always taken the tie-break here; the density fell through
+		//and was discarded, which is where ZP2's 0.0011 e and CCH's 0.0102 e of missing charge went
+		//once the shrink stopped those same trajectories from giving up early. The gridded density
+		//still has the cube's own answer in b, so it keeps it.
+		if (streaming) { adp_count(g_adp_exhaust); return stalled(p, r); }
 		return b;
 	};
 	//Local refinement. A quadrature cell is a shell segment, and the error the basin boundary
@@ -2413,25 +2518,36 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 		//captures of this console log, so an extra line here shifts every basin row below it.
 		long long sv, sf, sfar; double srho;
 		basin_stall_counters(sv, sf, sfar, srho);
+		long long sgn[4], sto[g_stall_basins + 1];
+		for (int i = 0; i < 4; i++) sgn[i] = g_stall_gn[i].load();
+		for (int i = 0; i <= g_stall_basins; i++) sto[i] = g_stall_to[i].load();
+		const long long sx = g_adp_exhaust.exchange(0);
 		basin_stall_counters_reset();
 		//Built in its own stream on purpose. Scientific notation is the only readable form for a
 		//density that spans 1e-6 to 1e-1, and setting it on std::cout leaves the precision behind
 		//for whatever prints next - the basin table is three lines below and the golden files are
 		//captures of it.
-		if (g_basin_timing && sf + sv > 0) {
+		if (g_basin_timing && sf + sv + sx > 0) {
 			std::ostringstream line;
 			line << std::scientific << std::setprecision(3);
 			line << "  " << fieldname << "trajectories that stalled: " << sf << " in the field, "
 				<< sv << " below " << stall_floor << " e/bohr^3; " << sfar
 				<< " further than a bohr from every attractor, the densest at " << srho << " e/bohr^3";
+			line << std::defaultfloat << "\n  " << fieldname << "stall gradients: ";
+			const char *edge[4] = { "<1e-6", "<1e-4", "<1e-2", ">=1e-2" };
+			for (int i = 0; i < 4; i++) line << (i ? ", " : "") << sgn[i] << " " << edge[i];
+			line << "; " << sx << " ran the step budget out; handed to basin";
+			for (int i = 0; i <= g_stall_basins; i++)
+				if (sto[i]) line << " " << (i == g_stall_basins ? std::string("other") : std::to_string(i)) << ":" << sto[i];
 			std::cout << line.str() << std::endl;
 		}
 	}
 	if (g_basin_timing && g_adaptive_step) {
 		const long long st = g_adp_steps.exchange(0), tr = g_adp_tries.exchange(0);
 		const long long tu = g_adp_turn.exchange(0), fa = g_adp_fall.exchange(0);
+		const long long sh = g_adp_shrink.exchange(0);
 		std::cout << "  [timing] " << fieldname << "grown step: " << st << " steps, " << tr
-			<< " proposals, " << tu << " turned back, " << fa << " fell back, "
+			<< " proposals, " << tu << " turned back, " << fa << " fell back, " << sh << " shrunk below the floor, "
 			<< std::fixed << std::setprecision(1)
 			<< (tr ? 100.0 * static_cast<double>(tu + fa) / static_cast<double>(tr) : 0.0)
 			<< " % of proposals wasted" << std::endl;

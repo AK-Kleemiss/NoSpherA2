@@ -748,6 +748,22 @@ TEST(BasinStalls, AStalledTrajectoryIsStillAssigned)
 	ASSERT_EQ(n_all.size(), all.size());
 	ASSERT_EQ(n_nuc.size(), nuclei.size());
 
+	//And the stall this test is named for is no longer a stall. Every one of these trajectories used
+	//to stop rising with a full gradient still on it - 3716 of them on CCH, 10850 on ZP2_part1, not one
+	//below 1e-2 e/bohr^4 - because the step controller could grow but never shrink, so a floor step too
+	//long for the local curvature had nothing left to try. They were then handed to whichever attractor
+	//was nearest, which for an attractor sitting between two nuclei is a wide perpendicular slab of
+	//points that belongs to its neighbour: CCH gave 91 % of them to its NNA, which held 0.7778 e against
+	//AIMAll's 0.39257.
+	//
+	//The count is the assertion rather than the populations, because the populations move by about a
+	//millielectron and every tolerance in this file is looser than that - a population check would pass
+	//on the broken code. This one cannot: the same integration on the same fixture counted these in the
+	//thousands before the step was allowed to halve below its floor.
+	EXPECT_EQ(basin_stalls_on_a_slope(), 0)
+		<< "a density trajectory stopped rising with a gradient still on it: that is a step too long for "
+		   "the local curvature, not a critical point, and the step must halve rather than give up";
+
 	double total_all = out_all, total_nuc = out_nuc, non_nuclear = 0.0;
 	for (const double b : n_all) total_all += b;
 	for (const double b : n_nuc) total_nuc += b;
