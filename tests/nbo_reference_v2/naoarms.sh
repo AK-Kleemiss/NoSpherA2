@@ -1,5 +1,10 @@
 #!/bin/bash
-# Four arms of the SAME baseline binary on benzene, with a POSITIVE CONTROL, because the first
+# CAVEAT 2026-09-25: the file this ran, bin/NoSpherA2_baseline, is byte-identical to the renat5
+# TREATMENT build (md5 1e45bc35f8d5e9617ee42dc62ca7d180) - the name and the DEPLOYED_COMMIT.txt
+# beside it were wrong.  No arm below sets NAO_LEGACY_CASCADE=1, so none of them is a baseline and
+# the job cannot bracket the pre-change number.  What it DOES still prove is that environment
+# variables reach the binary (the class_split control moves benzene) - nothing more.
+# Four arms of ONE binary on benzene, with a POSITIVE CONTROL, because the first
 # attempt at this (job 594818) set NAO_CORE_POOLED=1 and never proved the variable reached the
 # binary - a silent knob reads exactly like a knob with no effect.  NAO_CLASS_SPLIT=1 is the
 # control: it is known to move the number (the class-split arm was measured 5.6x worse), so if it

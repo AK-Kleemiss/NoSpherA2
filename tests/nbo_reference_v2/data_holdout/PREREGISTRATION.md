@@ -137,3 +137,32 @@ Consequences, and only these:
 
 See `README.md`, section "The 0.3161 e baseline figure does not belong to this branch", for the
 excluded candidates and the positive control that makes the exclusions readable.
+
+## Addendum 2, 25 Sep 2026 - the first addendum was wrong, and the claims are now decided
+
+Addendum 1 above said the 0.3161 e calibration figure belonged to the share build `c8130055`
+and not to this branch. **That is withdrawn.** The binary it rested on is byte-identical to the
+renat5 treatment build (md5 `1e45bc35f8d5e9617ee42dc62ca7d180`, checked by `md5sum` against the
+preserved pre-change binary `99a8aa34...`, which is 176 bytes smaller), so benzene 0.12055 was
+the *treatment* value all along and agreed with the sibling's renat5 arm rather than
+contradicting the 0.3161 e before-value. Both addenda stay in place: an addendum that is itself
+corrected is part of the record.
+
+The 0.3161 e figure therefore stands, and so does the scale the predictions were written on.
+Held-out verdicts, both arms from one binary and one environment variable (job 595959):
+
+- **H1 HOLDS.** Worst `d(Ryd)` 0.19334 e baseline -> 0.00614 e renat5, factor **31.5** against
+  the 5x claimed. Median per-molecule factor 18.0.
+- **H2 FAILS on two members**: `cf3` (2.08x worse, both values far above its 2.0e-05 floor) and
+  `cl2` (2.4x worse, 10 floors against 24). "Closer on 8 of 8, no counter-molecule" does not
+  survive held-out data.
+- **The nominated counter-molecule was the wrong one.** `zn_cl2` was predicted to get worse and
+  improves 9.1x. `bh3` was pre-registered as the control - "if bh3's dpop moves a lot, the
+  instrument is not measuring what this file claims" - and it moved 44x. The reading taken is
+  the narrower one: `bh3` does have Rydberg population to move (0.03707 e baseline), so the
+  control was mis-specified rather than the instrument being wrong. That is a weakened control
+  and it is recorded as such, not repaired after the fact.
+- **H3 HOLDS**: 0 PASS / 16 FAIL in both arms. Nothing here agrees with NBO 7, and a 31.5x
+  improvement is not an agreement.
+- The **fit-rather-than-improvement** reading required a median below 2x. It is 18.0, so that
+  reading is not available - a result of the set, not a concession to it.

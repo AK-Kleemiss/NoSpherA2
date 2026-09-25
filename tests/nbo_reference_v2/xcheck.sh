@@ -1,5 +1,8 @@
 #!/bin/bash
-# Re-run ONLY the native side of the already-stamped 22 with the NAMED baseline binary, so that
+# CAVEAT 2026-09-25: BIN defaults to bin/NoSpherA2_baseline, which is the renat5 TREATMENT build
+# (md5 1e45bc35...).  Pass BIN and set NAO_LEGACY_CASCADE=1 yourself for a baseline, and md5sum the
+# file rather than trusting its name.
+# Re-run ONLY the native side of the already-stamped 22 with a NAMED binary, so that
 # "the shipped native's worst Rydberg error is 0.3161 e" can be checked against the binary the
 # held-out set was measured with instead of against the share binary that produced the published
 # number.  gennbo's side is not touched: its stored JSON is copied in and reused, so the only
