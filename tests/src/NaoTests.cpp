@@ -343,3 +343,36 @@ TEST(NaoReaderConsistencyTests, ASphericalFchkBasisIsNormalised)
 	//coefficients instead), which is also why EveryReaderConservesTheElectronCount skips this file.  The
 	//end-to-end trace is measured through the CLI: 7.579076 before this fix, 47.938220 after, against 48.
 }
+
+//An occupancy is a number of electrons, so a printed "-0.00000" is wrong twice over: it reads as a
+//negative population, and it is not even a property of the molecule.  This was found by translating a
+//molecule rigidly and diffing the output - the one transformation a wavefunction file admits without
+//recomputing it, since the basis functions ride on the atom centres - and tests/molden_file/test.molden
+//printed "Ryd( 6s)   -0.00000" in one position and "0.00000" for the same molecule moved 4.35 bohr.
+//This test does NOT assert that no occupancy is negative: one that is genuinely negative would be a real
+//defect and must stay visible.  It asserts that nothing is printed as a signed zero, which is the one
+//case where the sign carries no information at all.
+//The fixture is Sc_full and not the test.molden the defect was found on, because the first version of
+//this test used test.molden and PASSED against a binary with the clamp taken back out: test.molden prints
+//the signed zero only in the MOVED frame, so on the fixture as committed there was nothing to catch.
+//Sc_full is scandium in a large basis, so it carries a long tail of nearly empty Rydberg NAOs and prints
+//eleven of them signed in its own frame - the same defect where it is reproducible rather than where it
+//happened to be noticed.
+TEST(NaoPrintTests, NoOccupancyIsPrintedAsANegativeZero)
+{
+	const auto p = fixture("molden_file", "Sc_full.molden");
+	if (p.empty()) GTEST_SKIP() << "tests/molden_file/Sc_full.molden not found";
+	WFN wavy(p);
+	ASSERT_FALSE(wavy.get_d_f_switch()) << "NPA needs a spherical basis; fixture is no longer spherical";
+	const NPAResult r = natural_population_analysis(wavy);
+	std::ostringstream os;
+	print_npa(r, os);
+	const std::string out = os.str();
+	ASSERT_NE(out.find("NATURAL POPULATIONS"), std::string::npos) << "no occupancy table was printed";
+	EXPECT_EQ(out.find("-0.00000"), std::string::npos)
+		<< "an occupancy printed as a negative zero: the sign is roundoff from the diagonalisation and it "
+		   "flips when the molecule is translated, so it says nothing and reads as a negative population";
+	//and the fix must not have hidden the row: the tiny occupancy is still printed, as a plain zero
+	EXPECT_NE(out.find("0.00000"), std::string::npos)
+		<< "the nearly empty NAO rows have gone missing entirely, which is not what the clamp does";
+}

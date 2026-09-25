@@ -476,6 +476,16 @@ namespace
 {
     //with_charge = false for one spin on its own, where Z_eff minus that spin's population is not
     //a charge and printing it invites the reader to add the two tables up
+    //An occupancy is a number of electrons and cannot be negative. A diagonalisation leaves a nearly empty
+    //Rydberg NAO at a tiny value of either sign, and at 5 decimals that printed "Ryd( 6s)   -0.00000" -
+    //which reads as a negative occupancy and is not even stable: the same molecule translated by 4.35 bohr
+    //printed +0.00000 for it. The threshold is far below any occupancy worth reading, so an occupancy that
+    //is genuinely negative - which WOULD be a defect - is still printed with its sign.
+    double printable_occupation(const double occ)
+    {
+        return std::abs(occ) < 1e-9 ? 0.0 : occ;
+    }
+
     void print_one(const NAOResult &r, const std::string &title, std::ostream &out,
                    const bool with_charge = true)
     {
@@ -493,7 +503,7 @@ namespace
                     << "  " << left << setw(7) << shell_label(o.l, o.m) << right
                     << class_label(o.type) << "(" << setw(2) << o.n
                     << string(1, "spdfghik"[std::min(o.l, 7)]) << ")" << setw(12) << fixed
-                    << setprecision(5) << o.occupation << "\n";
+                    << setprecision(5) << printable_occupation(o.occupation) << "\n";
             }
         }
         out << "\n Summary of Natural Population Analysis:\n\n"

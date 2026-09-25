@@ -3316,9 +3316,17 @@ Roby_information::Roby_information(WFN &wavy, const ivec3 &group_sets, const boo
 	//measuring the analysis against it reported 21 % accounted for on HgH2 where 78 % is the truth.
 	const double number_of_electrons =
 		wavy.get_nr_electrons() - static_cast<double>(wavy.get_nr_ECP_electrons());
-	const double omitted_population = use_ano_basis
+	//This is the difference of two sums each of order the electron count, so when nothing was cut off it
+	//comes out zero only in exact arithmetic: on Co2 it printed -3.20e-14 for one position of the molecule
+	//and +2.84e-14 for the same molecule translated by 4.35 bohr. A negative count of omitted electrons is
+	//nonsense on its face, and the translation arm is what showed that its sign was arbitrary. Below the
+	//cancellation floor the honest print is zero. A real cutoff is orders of magnitude above this
+	//threshold, so a genuinely negative value - which WOULD be a defect - still reaches the user.
+	double omitted_population = use_ano_basis
 		? all_atom_population_with_omitted - all_atom_population
 		: 0.0;
+	if (std::abs(omitted_population) < 1e-9 * std::max(1.0, all_atom_population))
+		omitted_population = 0.0;
 
 	std::cout << "\nRoby-Gould Bond Indices (RGBI) Analysis\n----------------------------------------------\n";
 	std::cout << "Number of electrons in system:         " << number_of_electrons;

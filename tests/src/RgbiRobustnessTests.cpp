@@ -970,3 +970,42 @@ TEST(RgbiRobustnessTests, OctahedralTeF6IsExactlyOhOnTheAnoPathWithoutSymmetriza
 				"was given, so this corner reproduces the octahedron like the other three";
 	}
 }
+
+//"Number of cutoff electrons" is the difference of two sums each of order the electron count, so when
+//nothing is cut off it came out as the cancellation residual with an arbitrary sign: Co2 printed
+//-3.19744e-14 for one position of the molecule and +2.84217e-14 for the same molecule translated by 4.35
+//bohr, which is how it was found - a rigid translation is the one transformation a wavefunction file
+//admits without recomputing it, and no printed number may move under it.
+//The fixture matters here and the first version of this check had it wrong: it rode along on the TeF6
+//capture above, where the cutoff is a genuine 2.05785 electrons, so the assertion could never have gone
+//red and would have tested nothing. Co2 is the fixture where the quantity IS the residual.
+//This does NOT assert the value is zero - if the ANO cutoff ever omits something real on Co2 that is a
+//legitimate positive number. It asserts the sign, which is the part that cannot be right.
+TEST(RgbiRobustnessTests, NoRgbiRunReportsANegativeNumberOfCutoffElectrons)
+{
+	const auto p = nos_test_repo_root() / "tests" / "molden_file" / "Co2.molden";
+	if (!std::filesystem::exists(p))
+		GTEST_SKIP() << "tests/molden_file/Co2.molden not found";
+	std::string out;
+	{
+		CoutCapture cap;
+		WFN wavy(p);
+		Roby_information roby(wavy, {}, true, true, false, false);
+		out = cap.str();
+	}
+	const std::string key = "Number of cutoff electrons:";
+	const double cut = value_after(out, key);
+	ASSERT_TRUE(std::isfinite(cut)) << "no cutoff line was printed - an ANO run is the only one that "
+		"prints it, so either the default basis changed or the run did not get that far";
+	EXPECT_GE(cut, 0.0) << "a negative count of cutoff electrons: nothing can be omitted a negative number "
+		"of times, so this is either the cancellation residual leaking its arbitrary sign or a real defect "
+		"in the cutoff projection";
+	//And the printed token, because IEEE has -0.0 >= 0.0, so the check above passes on a printed "-0" -
+	//the other half of what the clamp exists to prevent. The token and not the whole line, because a
+	//legitimate small value prints as 3.55271e-15 and that minus belongs to the exponent.
+	std::istringstream rest(out.substr(out.find(key) + key.size()));
+	std::string token;
+	ASSERT_TRUE(static_cast<bool>(rest >> token)) << "the cutoff line carries no value";
+	EXPECT_NE(token.front(), '-') << "the number of cutoff electrons is printed with a leading minus: "
+		<< token;
+}
