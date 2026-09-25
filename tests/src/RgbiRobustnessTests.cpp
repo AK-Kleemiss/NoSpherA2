@@ -63,6 +63,33 @@ namespace {
 		in >> value;
 		return value;
 	}
+
+	//The nine numbers of one bond row of the RGBI table, or an empty vector if there is no such row.
+	//The indices are right-aligned in their own fields ("   0 -   2   Au - Br  ..."), so they are read as
+	//numbers: matching the literal "0 - 2" finds no row at all - a copy of this reader did exactly that
+	//behind RUN_FULL_TEST and asserted on its own parser before comparing a single number - and "0 -"
+	//would also match "10 -".
+	vec bond_row(const std::string &text, const int a, const int b)
+	{
+		vec numbers;
+		std::istringstream in(text);
+		std::string line;
+		while (std::getline(in, line)) {
+			std::istringstream cells(line);
+			int i = 0, j = 0;
+			char dash = 0;
+			if (!(cells >> i >> dash >> j) || dash != '-' || i != a || j != b)
+				continue;
+			std::string element_a, element_dash, element_b;
+			if (!(cells >> element_a >> element_dash >> element_b) || element_dash != "-")
+				continue;
+			double v = 0.0;
+			while (cells >> v)
+				numbers.push_back(v);
+			break;
+		}
+		return numbers;
+	}
 }
 
 //A non-bonded closed-shell atom has to get its own electrons back.  Helium's free atom was built
@@ -348,31 +375,9 @@ TEST(RgbiRobustnessTests, SymmetryEquivalentGoldCentresAgreeToEveryDigit)
 	}
 
 	//and the two bond orbits: the rows "0 - 2" and "1 - 3" are one bond, as are "0 - 4" and "1 - 5".
-	auto bond_row = [&out](const int a, const int b) {
-		vec numbers;
-		std::istringstream in(out);
-		std::string line;
-		while (std::getline(in, line)) {
-			//the indices are right-aligned in their own fields ("   0 -   2   Au - Br  ..."), so they are
-			//read as numbers: a literal "0 - 2" matches no line at all, and "0 -" would also match "10 -"
-			std::istringstream cells(line);
-			int i = 0, j = 0;
-			char dash = 0;
-			if (!(cells >> i >> dash >> j) || dash != '-' || i != a || j != b)
-				continue;
-			std::string element_a, element_dash, element_b;
-			if (!(cells >> element_a >> element_dash >> element_b) || element_dash != "-")
-				continue;
-			double v = 0.0;
-			while (cells >> v)
-				numbers.push_back(v);
-			break;
-		}
-		return numbers;
-	};
 	const int orbits[][4] = { { 0, 2, 1, 3 }, { 0, 4, 1, 5 } };
 	for (const auto &orbit : orbits) {
-		const vec first = bond_row(orbit[0], orbit[1]), second = bond_row(orbit[2], orbit[3]);
+		const vec first = bond_row(out, orbit[0], orbit[1]), second = bond_row(out, orbit[2], orbit[3]);
 		ASSERT_EQ(first.size(), 9u) << "no bond row " << orbit[0] << " - " << orbit[1];
 		ASSERT_EQ(second.size(), 9u) << "no bond row " << orbit[2] << " - " << orbit[3];
 		for (size_t i = 0; i < 9; i++)
@@ -782,43 +787,35 @@ TEST(RgbiRobustnessTests, OctahedralTeF6HasOneBondOrbitNotThree)
 		EXPECT_NEAR(f0, f, 1e-6) << "population of fluorine " << a << " against fluorine 1";
 	}
 
-	//and the six Te-F rows are one bond. Same reader as the Au2Br2 test: the indices are right-aligned
-	//in their own fields, so they are read as numbers rather than matched as text.
-	auto bond_row = [&out](const int a, const int b) {
-		vec numbers;
-		std::istringstream in(out);
-		std::string line;
-		while (std::getline(in, line)) {
-			std::istringstream cells(line);
-			int i = 0, j = 0;
-			char dash = 0;
-			if (!(cells >> i >> dash >> j) || dash != '-' || i != a || j != b)
-				continue;
-			std::string element_a, element_dash, element_b;
-			if (!(cells >> element_a >> element_dash >> element_b) || element_dash != "-")
-				continue;
-			double v = 0.0;
-			while (cells >> v)
-				numbers.push_back(v);
-			break;
-		}
-		return numbers;
-	};
 	//Five of the nine columns - n_A, n_B, n_AB, s_AB and Cov. - now agree in every printed digit, where
 	//before the fix all nine split. The four that still do not are the ionic ones: Ion. reads -0.432 for
 	//the four equatorial bonds and -0.431 for the two along z, and Tot., Pyth. and Arak. are computed
 	//from it. That is a SECOND, smaller defect, pinned rather than asserted equal so that the part which
-	//is fixed is protected today and the part which is not is recorded as a number instead of a promise:
-	//the theta tables put the two pi subspaces of ONE bond at 85.109 and 85.113 degrees, and the site
-	//symmetry of a Te-F axis in an octahedron is C4v, which makes those two exactly degenerate - so a
-	//4e-3 deg split is the pair path's own asymmetry, upstream of the ionic sum. Four equatorial plus two
-	//axial is D4h again, and a reduction-order residual would not pick out the z axis run after run.
+	//is fixed is protected today and the part which is not is recorded as a number instead of a promise.
+	//Four equatorial plus two axial is D4h, and a reduction-order residual would not pick out the z axis
+	//run after run.
+	//
+	//WHERE IT IS NOT: two things this comment used to claim, both since measured and dropped.
+	//  * Not the pair metric's rank. Every one of the six bonds keeps 81 of 81 eigenvalues on both
+	//    metrics, the smallest kept is 4.29e-03 - two and a half decades above the floor - and the table
+	//    is byte-identical with NOS_RGBI_PINV_CUTOFF swept from 1E-4 to 1E-8.
+	//  * Not the theta split either. The two pi subspaces of ONE bond come out at 85.109 and 85.113 deg
+	//    where C4v site symmetry makes them exactly degenerate, and this comment called that "the pair
+	//    path's own asymmetry". SF6/def2-QZVP - the same geometry with no ECP - splits the same way, at
+	//    80.138 against 80.144, while agreeing in all nine columns of all six bonds. A split that is
+	//    present where the result is exact is not the cause of a result that is not, and 1/cos(85 deg) is
+	//    11.5, so 6e-3 deg is ~1e-5 in the underlying ratio.
+	//It is in the atomic reference. {sym, no_sym} x {ANO, NAO} on both molecules: no_sym+NAO reproduces
+	//all nine columns of all six bonds EXACTLY in both (the test below pins that), sym+NAO splits 4 + 2
+	//(SF6 Pyth. 33.926 against 34.260), no_sym+ANO splits 2 + 2 + 2 (SF6 s_AB 0.659/0.632/0.661), and the
+	//default sym+ANO is those two breaks cancelling - exactly in SF6, to 1e-3 in TeF6. So the pair
+	//decomposition is Oh-covariant on its own and both breaks exist with no ECP anywhere.
 	const size_t exact_columns = 5;
 	const double pinned_tolerance[4] = { 2e-3, 2e-3, 3e-2, 2e-2 };  //Ion., Tot., Pyth., Arak., as printed
-	const vec first = bond_row(0, 1);
+	const vec first = bond_row(out, 0, 1);
 	ASSERT_EQ(first.size(), 9u) << "no bond row 0 - 1";
 	for (int b = 2; b <= 6; b++) {
-		const vec row = bond_row(0, b);
+		const vec row = bond_row(out, 0, b);
 		ASSERT_EQ(row.size(), 9u) << "no bond row 0 - " << b;
 		for (size_t i = 0; i < exact_columns; i++)
 			EXPECT_DOUBLE_EQ(first[i], row[i]) << "column " << i << " of Te-F bond 0 - " << b
@@ -827,5 +824,59 @@ TEST(RgbiRobustnessTests, OctahedralTeF6HasOneBondOrbitNotThree)
 			EXPECT_NEAR(first[i], row[i], pinned_tolerance[i - exact_columns]) << "ionic column " << i
 				<< " of Te-F bond 0 - " << b << " against 0 - 1: the known residual is 1e-3 in Ion. and "
 				"0.019 in Pyth., so a failure here is the second defect growing, not the first returning";
+	}
+}
+
+//The invariant that localises the residual the test above pins, and the sharpest one RGBI has: with the
+//NAO orbital basis and the Oh symmetrization of the free-atom matrix BOTH OFF, an octahedral molecule's
+//six bonds come out identical in every one of the nine columns, to the last bit - EXPECT_DOUBLE_EQ, not a
+//tolerance. That is not a weaker check than the default path's, it is a stronger one on a different
+//switch setting, and it says where the defect is not: the pair decomposition, the projector construction,
+//the reductions and the printing are all exactly Oh-covariant. What is left is the two atomic reference
+//constructions, each of which breaks the symmetry on its own (sym+NAO into 4 + 2, no_sym+ANO into
+//2 + 2 + 2) and which cancel to 1e-3 in the default combination.
+//
+//WHAT WOULD MAKE THIS FAIL, and it is worth saying because a passing symmetry test is easy to trust too
+//much: any change that makes the NAO path's per-bond work depend on the bond's orientation - a reduction
+//order tied to atom index, a cutoff applied per bond rather than per orbit, an eigenvector phase leaking
+//into a population. It does NOT test the numbers themselves against anything external; it tests that the
+//molecule's own symmetry survives, which needs no second program and no reference at all. TeF6 also
+//carries an ECP and f functions, so the invariant covers the two input kinds that break things most.
+//
+//This is also not an obscure corner of the option space: it is the same setting
+//TontoWaterRobyGouldNumbersAreReproduced runs, because it is what Tonto itself uses ("Use spherical
+//averaging? F", "Use NAOs? T"). The one combination that reproduces the published reference numbers is
+//the one that is exactly Oh here.
+//
+//Made red on purpose by flipping the symmetrization on: 16 assertions fail, the six rows splitting in
+//s_AB (0.577 against 0.585) and in all four ionic columns.
+TEST(RgbiRobustnessTests, OctahedralTeF6IsExactlyOhWithoutTheAtomicReference)
+{
+	const auto p = nos_test_repo_root() / "tests" / "RGBI_groups" / "tef6_tzvp.gbw";
+	if (!std::filesystem::exists(p))
+		GTEST_SKIP() << "tests/RGBI_groups/tef6_tzvp.gbw not found";
+	std::string out;
+	{
+		CoutCapture cap;
+		WFN wavy(p);
+		//no group sets, NO symmetrization, NO ANO basis, no eigenvalues, no theta table
+		Roby_information roby(wavy, {}, false, false, false, false);
+		out = cap.str();
+	}
+
+	const double f0 = value_after(out, "Population of atom 1: ");
+	ASSERT_TRUE(std::isfinite(f0)) << "no population for atom 1";
+	for (int a = 2; a <= 6; a++)
+		EXPECT_DOUBLE_EQ(f0, value_after(out, "Population of atom " + std::to_string(a) + ": "))
+			<< "population of fluorine " << a << " against fluorine 1 on the NAO path without symmetrization";
+
+	const vec first = bond_row(out, 0, 1);
+	ASSERT_EQ(first.size(), 9u) << "no bond row 0 - 1";
+	for (int b = 2; b <= 6; b++) {
+		const vec row = bond_row(out, 0, b);
+		ASSERT_EQ(row.size(), 9u) << "no bond row 0 - " << b;
+		for (size_t i = 0; i < 9; i++)
+			EXPECT_DOUBLE_EQ(first[i], row[i]) << "column " << i << " of Te-F bond 0 - " << b << " against "
+				"0 - 1: this path reproduces the octahedron exactly, so any difference at all is new";
 	}
 }

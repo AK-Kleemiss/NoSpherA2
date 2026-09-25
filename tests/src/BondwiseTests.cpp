@@ -433,6 +433,56 @@ TEST(BondwiseSymmetrizeTests, SphericalFGHTransformsAreOrthogonalAndClosed)
 	}
 }
 
+//Orthogonality and closure both survive a RELABELLING of the real-spherical components among themselves,
+//which the test above says in its own comment, and l = 3 is where that gap actually bites: f is the lowest
+//l where the Oh irreps mix m components, so the diagonal-pattern argument that pins d down
+//(SphericalDShellSplitsIntoT2gAndEg already asserts t_2g at 0, 1, 3 and e_g at 2, 4 in libcint's
+//m = -l .. +l order, and it is green - the d ordering is NOT the cause of the 4 + 2 RGBI shows on
+//octahedral fixtures) gives nothing above d. It does give ONE thing, and it is enough to fix the ordering:
+//
+//  f splits into a2u + t1u + t2u, and a2u is the single function xyz. xyz is not a mixture - it IS the
+//  m = -2 real solid harmonic, so in libcint's order (m = -3, -2, -1, 0, +1, +2, +3) it is component 1
+//  alone. A one-dimensional irrep that appears once makes the Oh average P_a2u M P_a2u + (t1u part) +
+//  (t2u part): row and column 1 must come out zero off the diagonal and entry (1, 1) must come out
+//  EXACTLY the value it went in with, while the other six mix. Permute the seven components and the
+//  decoupled one moves, so this asserts the ordering itself.
+//
+//The six t1u/t2u rows are deliberately not pinned further: each irrep spans combinations of m, so that
+//block is only block-diagonal in a basis this test does not have. Its trace is checked instead.
+//l = 4's a1g mixes m = 0 with m = +-4, so f is the only l above d where this argument exists at all.
+//
+//Made red on purpose at the two orderings it is meant to rule out, by moving the constant: at component 0
+//(m = -3 first) entry (1, 1) comes out 4.1016 instead of 2 and four assertions fail, and at component 5
+//(the reversed m = +3 .. -3 ordering) it comes out 6.0102 instead of 6.0500. Green at 1 and red at both,
+//which is what makes it an ordering check rather than a restatement of trace preservation.
+TEST(BondwiseSymmetrizeTests, SphericalFShellDecouplesTheA2uComponent)
+{
+	const int xyz = 1; //m = -2 of l = 3 in libcint's ordering
+	dMatrix2 f(7, 7);
+	for (int i = 0; i < 7; i++)
+		for (int j = i; j < 7; j++)
+			f(i, j) = f(j, i) = 2.0 + 0.37 * i - 0.21 * j + 0.13 * i * j;
+	const double a2u_before = f(xyz, xyz);
+	const double trace_before = trace(f);
+	symmetrize_atomic_matrix_oh(f, { 3 }, true);
+
+	EXPECT_NEAR(f(xyz, xyz), a2u_before, 1e-10) << "a2u is one-dimensional and spanned by xyz alone, so the "
+		"Oh average cannot change it; it moved from " << a2u_before << " to " << f(xyz, xyz) << ", which means "
+		"component " << xyz << " of the f shell is not the one the symmetrizer treats as xyz";
+	for (int j = 0; j < 7; j++)
+		if (j != xyz) {
+			EXPECT_NEAR(f(xyz, j), 0.0, 1e-10) << "a2u cannot couple to t1u or t2u: entry (" << xyz << ", "
+				<< j << ") survived the average";
+			EXPECT_NEAR(f(j, xyz), 0.0, 1e-10) << "and the same off the other side, at (" << j << ", " << xyz << ")";
+		}
+	EXPECT_NEAR(trace(f), trace_before, 1e-10) << "the average is orthogonal, so the trace is fixed";
+	double rest = 0.0;
+	for (int i = 0; i < 7; i++)
+		if (i != xyz)
+			rest += f(i, i);
+	EXPECT_NEAR(rest, trace_before - a2u_before, 1e-10) << "with a2u fixed, t1u + t2u must carry the remainder";
+}
+
 //two s shells are invariant under every operation: the full 2x2 matrix, off-diagonal included, is untouched
 TEST(BondwiseSymmetrizeTests, SOnlyMatrixIsUnchanged)
 {
