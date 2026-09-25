@@ -14,7 +14,11 @@
 
 export SPACK_LMOD=/work/software/spack/share/spack/lmod/linux-rocky9-x86_64/Core
 export NBOBIN=/work/software/bin/NBO/bin
-export NOSPHERA2=/work/akkleemiss/share/NoSpherA2_RGBI_NBO/NoSpherA2
+# Overridable, because the held-out set is measured against a NAMED baseline binary rather
+# than the share: `export NOSPHERA2=...` before sourcing this file picks that one instead, and
+# the path lands in every provenance_nbo.json, so which binary produced a number is never a
+# question.  Unset, it is the share binary the 22 were built with.
+export NOSPHERA2=${NOSPHERA2:-/work/akkleemiss/share/NoSpherA2_RGBI_NBO/NoSpherA2}
 export ROOT=${ROOT:-/work/akkleemiss/florian/nbo_ref_v2}
 export ORCA_MODULE=orca/avx2-6.1.1-xqm3jnz
 

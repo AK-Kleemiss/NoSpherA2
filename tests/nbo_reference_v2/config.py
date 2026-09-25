@@ -95,6 +95,25 @@ NO_RECORD = {
     "allyl": ({"e2_kcal": 0.25, "nrt_deloc_kcal": 1.0}, 2),
     "hco": ({"e2_kcal": 0.25, "nrt_deloc_kcal": 1.0}, 2),
     "no2": ({"e2_kcal": 0.25, "nrt_deloc_kcal": 1.0}, 2),
+    # The held-out set of make_holdout.py is in the same situation: no index.json record, so the
+    # thresholds are the ones the recorded molecules of the same kind got - 0.5 kcal E2 for a
+    # closed shell, 0.25 for an open shell, 1 kcal NRT delocalisation for main group.  zn_cl2 is
+    # deliberately NOT given ni_co_4's and ticl4's raised NRTE2 on the first attempt: those two
+    # were raised because the search demonstrably did not finish, and inheriting that for a d10
+    # metal with three atoms would be assuming the failure instead of measuring it.
+    "sih4": ({"e2_kcal": 0.5, "nrt_deloc_kcal": 1.0}, 1),
+    "cl2": ({"e2_kcal": 0.5, "nrt_deloc_kcal": 1.0}, 1),
+    "clf3": ({"e2_kcal": 0.5, "nrt_deloc_kcal": 1.0}, 1),
+    "bh3": ({"e2_kcal": 0.5, "nrt_deloc_kcal": 1.0}, 1),
+    "nh4_plus": ({"e2_kcal": 0.5, "nrt_deloc_kcal": 1.0}, 1),
+    "bf4_minus": ({"e2_kcal": 0.5, "nrt_deloc_kcal": 1.0}, 1),
+    "nacl": ({"e2_kcal": 0.5, "nrt_deloc_kcal": 1.0}, 1),
+    "mg_h2": ({"e2_kcal": 0.5, "nrt_deloc_kcal": 1.0}, 1),
+    "zn_cl2": ({"e2_kcal": 0.5, "nrt_deloc_kcal": 1.0}, 1),
+    "hi": ({"e2_kcal": 0.5, "nrt_deloc_kcal": 1.0}, 1),
+    "hs": ({"e2_kcal": 0.25, "nrt_deloc_kcal": 1.0}, 2),
+    "cf3": ({"e2_kcal": 0.25, "nrt_deloc_kcal": 1.0}, 2),
+    "ch2": ({"e2_kcal": 0.25, "nrt_deloc_kcal": 1.0}, 3),
 }
 
 
