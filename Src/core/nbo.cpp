@@ -749,7 +749,9 @@ namespace
 
     //The NAO table in NBO's own order: per atom, per l, components in NBO's printing order, and
     //inside one component the shells by descending occupancy.
-    void fill_nao_table(NboResults& res, const NAOResult& nao, const vec& occupancy,
+    //out is res.nao for the spin-summed table and res.nao_alpha / res.nao_beta for the per-spin
+    //ones, which an open shell has to print as well: the sum hides a per-spin error that cancels.
+    void fill_nao_table(std::vector<NboNao>& out, const NAOResult& nao, const vec& occupancy,
                         const dMatrix2& fock_nao)
     {
         ivec order(nao.orbitals.size());
@@ -776,7 +778,7 @@ namespace
             n.shell = std::to_string(o.n) + std::string(1, "spdfghik"[std::min(o.l, 7)]);
             n.occupancy = occupancy[i];
             if (fock_nao.extent(0)) n.energy = fock_nao(i, i);
-            res.nao.push_back(n);
+            out.push_back(n);
         }
     }
 }
@@ -826,7 +828,7 @@ NboResults native_nbo(WFN& wavy, const NboOptions& options, std::ostream& log)
                      in.fock.empty() ? dMatrix2() : in.fock[0], n_pairs, 2.0, "", options, lewis);
         vec occ(nao.orbitals.size(), 0.0);
         for (size_t i = 0; i < occ.size(); i++) occ[i] = nao.orbitals[i].occupation;
-        fill_nao_table(res, nao, occ, in.fock.empty() ? dMatrix2() : nao_operator(in.fock[0], nao.C));
+        fill_nao_table(res.nao, nao, occ, in.fock.empty() ? dMatrix2() : nao_operator(in.fock[0], nao.C));
         for (const NAOAtom& a : nao.atoms) {
             NboAtomPopulation p;
             p.element = constants::atnr2letter(a.Z);
@@ -860,8 +862,19 @@ NboResults native_nbo(WFN& wavy, const NboOptions& options, std::ostream& log)
         vec occ(a_nao.orbitals.size(), 0.0);
         for (size_t i = 0; i < occ.size(); i++)
             occ[i] = a_nao.orbitals[i].occupation + b_nao.orbitals[i].occupation;
-        fill_nao_table(res, a_nao, occ,
+        fill_nao_table(res.nao, a_nao, occ,
                        in.fock.empty() ? dMatrix2() : nao_operator(in.fock[0], a_nao.C));
+        //and each spin's own table, which is the only thing NBO's per-spin tables can be compared
+        //against: on ch3's carbon the two errors are +0.0839 e and -0.1279 e, and they cancel to
+        //0.044 e in the sum above while adding to the 0.212 e spin density.
+        for (int s = 0; s < 2; s++) {
+            const NAOResult& nao = s ? b_nao : a_nao;
+            vec spin_occ(nao.orbitals.size(), 0.0);
+            for (size_t i = 0; i < spin_occ.size(); i++) spin_occ[i] = nao.orbitals[i].occupation;
+            fill_nao_table(s ? res.nao_beta : res.nao_alpha, nao, spin_occ,
+                           static_cast<int>(in.fock.size()) > s ? nao_operator(in.fock[s], nao.C)
+                                                                : dMatrix2());
+        }
         for (size_t a = 0; a < a_nao.atoms.size(); a++) {
             const NAOAtom& x = a_nao.atoms[a];
             const NAOAtom& y = b_nao.atoms[a];

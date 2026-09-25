@@ -278,17 +278,6 @@ NboResults parse_nbo_output(const std::filesystem::path& nbo_file) {
 				if (!r.nao.empty() && line.find("---") == std::string::npos && line.find_first_not_of(" \t") != std::string::npos) section = Section::none;
 				break;
 			}
-			if (!spin.empty()) {
-				//The per-spin tables are the only place an open-shell run prints NAO energies, and
-				//alpha is the set the spin-summed table is labelled from, so its energies belong on
-				//those rows.
-				if (spin == "alpha" && !nao_column_is_spin) {
-					const size_t at = static_cast<size_t>(std::stoi(m[1].str())) - 1;
-					if (at < r.nao.size() && r.nao[at].element == m[2].str() && r.nao[at].lang == m[4].str())
-						r.nao[at].energy = to_d(m[8].str());
-				}
-				break;
-			}
 			NboNao n;
 			n.index = std::stoi(m[1].str());
 			n.element = m[2].str();
@@ -299,7 +288,24 @@ NboResults parse_nbo_output(const std::filesystem::path& nbo_file) {
 			n.occupancy = to_d(m[7].str());
 			if (nao_column_is_spin) { n.spin_density = to_d(m[8].str()); n.has_spin_density = true; }
 			else n.energy = to_d(m[8].str());
-			r.nao.push_back(n);
+			if (spin.empty()) {
+				r.nao.push_back(n);
+				break;
+			}
+			//An open-shell run prints a second and third NAO table, one per spin.  Those are the
+			//only per-spin NAO occupancies NBO gives, and they are the ones worth comparing: the
+			//spin-summed table hides a per-spin error that cancels between the spins.  They were
+			//dropped on the floor until now, which is why ch3's 0.212 e spin-density error could
+			//not be localised to individual orbitals.
+			if (spin == "alpha") r.nao_alpha.push_back(n);
+			else if (spin == "beta") r.nao_beta.push_back(n);
+			//alpha is also the set the spin-summed table is labelled from, and the per-spin tables
+			//are the only place an open-shell run prints an NAO energy, so its energies go there too.
+			if (spin == "alpha" && !nao_column_is_spin) {
+				const size_t at = static_cast<size_t>(n.index) - 1;
+				if (at < r.nao.size() && r.nao[at].element == n.element && r.nao[at].lang == n.lang)
+					r.nao[at].energy = n.energy;
+			}
 			break;
 		}
 		case Section::hybrids: {
@@ -621,16 +627,23 @@ void write_nbo_json(const NboResults& r, const std::filesystem::path& json_file)
 	}
 	f << "  ],\n";
 
-	f << "  \"nao\": [\n";
-	for (size_t i = 0; i < r.nao.size(); i++) {
-		const auto& n = r.nao[i];
-		f << "    {\"index\": " << n.index << ", \"element\": " << jstr(n.element) << ", \"atom\": " << n.center
-			<< ", \"lang\": " << jstr(n.lang) << ", \"type\": " << jstr(n.type) << ", \"shell\": " << jstr(n.shell)
-			<< ", \"occupancy\": " << jnum(n.occupancy) << ", \"energy\": " << jnum(n.energy);
-		if (n.has_spin_density) f << ", \"spin_density\": " << jnum(n.spin_density);
-		f << "}" << (i + 1 < r.nao.size() ? "," : "") << "\n";
-	}
-	f << "  ],\n";
+	//The spin-summed table, and for an open shell each spin's own: a per-spin error that
+	//cancels in the sum is invisible in the first array and plain in the other two.
+	const auto nao_array = [&](const char* key, const std::vector<NboNao>& t) {
+		f << "  \"" << key << "\": [\n";
+		for (size_t i = 0; i < t.size(); i++) {
+			const auto& n = t[i];
+			f << "    {\"index\": " << n.index << ", \"element\": " << jstr(n.element) << ", \"atom\": " << n.center
+				<< ", \"lang\": " << jstr(n.lang) << ", \"type\": " << jstr(n.type) << ", \"shell\": " << jstr(n.shell)
+				<< ", \"occupancy\": " << jnum(n.occupancy) << ", \"energy\": " << jnum(n.energy);
+			if (n.has_spin_density) f << ", \"spin_density\": " << jnum(n.spin_density);
+			f << "}" << (i + 1 < t.size() ? "," : "") << "\n";
+		}
+		f << "  ],\n";
+	};
+	nao_array("nao", r.nao);
+	if (!r.nao_alpha.empty()) nao_array("nao_alpha", r.nao_alpha);
+	if (!r.nao_beta.empty()) nao_array("nao_beta", r.nao_beta);
 
 	f << "  \"nbos\": [\n";
 	for (size_t i = 0; i < r.orbitals.size(); i++) {

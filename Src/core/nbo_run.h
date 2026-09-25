@@ -205,6 +205,13 @@ struct NboResults {
 	double e2_intermolecular_threshold_kcal = 0.0;
 	std::vector<NboAtomPopulation> npa;   //spin-summed table
 	std::vector<NboNao> nao;              //spin-summed table
+	//An open shell has two NAO sets, one per spin density, and the spin-summed table above can
+	//only be read as a sum: it hides per-spin errors that cancel.  ch3's carbon comes out 0.0839 e
+	//too high in alpha and 0.1279 e too low in beta against NBO 7, which sum to its 0.044 e charge
+	//error and differ by its 0.212 e spin-density error - the charge agreement is what made the
+	//per-spin error look small.  Empty for a closed shell, where both spins are the same set.
+	std::vector<NboNao> nao_alpha;
+	std::vector<NboNao> nao_beta;
 	std::vector<NboOrbital> orbitals;
 	std::vector<NboE2Entry> e2;
 	NboNrt nrt;
