@@ -149,9 +149,33 @@ bool WFN::read_wfn(const std::filesystem::path &fileName, const bool &debug, std
 	{
 		read_line_or_fail(rf, line, "atom " + to_string(i + 1) + " of " + to_string(e_nuc), file);
 		err_checkf(line.size() >= 73, "wfn atom line " + to_string(i + 1) + " is too short: '" + line + "'", file);
-		string label = line.substr(0, 4);
-		const int charge = static_cast<int>(field(70, 3));
-		err_checkf(push_back_atom(shrink_string_to_atom(label, charge), field(24, 12), field(36, 12), field(48, 12), charge), "Error while making atoms!!\n", file);
+		//The columns of this line are fixed only relative to the label, whose width is not.  Gaussian writes
+		//it right-justified in four ("  C    1"), tests/molden_file/temp_wavefunction.wfn writes "Co1     1"
+		//and tests/RI_Test_2/temp_wavefunction.wfn one narrower again, so the absolute columns this used to
+		//read - field(24, 12) onwards for the coordinates, field(70, 3) for the charge - are off by one in
+		//either direction.  On the Co1 dialect the charge field returned "= 2" and the stod threw, which is
+		//why no analysis could open that file at all ("Option -eli_family: stod").
+		//Whitespace is no answer either: the three coordinates are 12-character fields that TOUCH whenever
+		//one is negative ("2.80503294-12.05929207 -5.85443715" in cytidine_tonto/cyt.wfn), so they must
+		//still be cut by width.  What is stable is where the block sits relative to the "(CENTRE n)" the
+		//writer aligns on, so the fields are anchored two characters past its ')'.  The charge is whatever
+		//follows the last '=', and the label is the first word.  Measured over the 16 wfn atom lines in the
+		//test tree: the anchored split reads all 16 and agrees to 1e-12 with the old absolute columns on the
+		//15 those could read at all.
+		const size_t centre_end = line.find(')');
+		err_checkf(centre_end != string::npos && centre_end + 2 + 36 <= line.size(), "wfn atom line " + to_string(i + 1) + " carries no '(CENTRE n)' with 3 coordinates after it: '" + line + "'", file);
+		const size_t chg = line.find("CHARGE");
+		err_checkf(chg != string::npos && chg >= centre_end + 2 + 36, "wfn atom line " + to_string(i + 1) + " carries no CHARGE field after its coordinates: '" + line + "'", file);
+		const size_t eq = line.find('=', chg);
+		err_checkf(eq != string::npos && eq + 1 < line.size(), "wfn atom line " + to_string(i + 1) + " carries no '= <charge>': '" + line + "'", file);
+		const int charge = static_cast<int>(stod(line.substr(eq + 1)));
+		string label;
+		{
+			std::istringstream first(line);
+			first >> label;
+		}
+		err_checkf(!label.empty(), "wfn atom line " + to_string(i + 1) + " carries no label: '" + line + "'", file);
+		err_checkf(push_back_atom(shrink_string_to_atom(label, charge), field(centre_end + 2, 12), field(centre_end + 14, 12), field(centre_end + 26, 12), charge), "Error while making atoms!!\n", file);
 	}
 	//------------------------------ Read basis: centres, types, exponents ------------------------------
 	ivec centre, type;
@@ -166,8 +190,21 @@ bool WFN::read_wfn(const std::filesystem::path &fileName, const bool &debug, std
 	}
 	isBohr = true;
 	//-------------------------------- Read MOs --------------------------------------
+	//A .wfn carries no spin labels, so a second spin set can only be spotted by its energies starting
+	//over.  Two traps in that, which together made tests/polarizabilities/zero.wfn - closed-shell
+	//acetylene, seven doubly occupied MOs - come back as "unrestricted, N_alpha = 12, N_beta = 2":
+	//  * the energy was read as a fixed 12-character field starting AT the '=' of "ORB. ENERGY =", so
+	//    -0.301831 and -0.301830 both truncated to -0.30183 and then compared EQUAL;
+	//  * "not greater than the last one" counts equality as a restart, and degenerate orbitals - this
+	//    molecule's pi pair, any t2g set - print equal energies in files that are perfectly fine.
+	//The energy is now taken from after the last '=' on the line, so no digit is lost to a field width,
+	//and only a strict decrease starts a new spin set.  An occupation above 1 settles it outright: a
+	//spin-averaged orbital cannot belong to a spin channel, so a file that lists any occupation near 2
+	//has no beta set to find, whatever its energies do.  Measured over the 31 .wfn/.wfx fixtures
+	//against what each file says about itself: 5 closed-shell .wfn files were being split, 0 now.
 	int oper = 0;
 	double last_ener = -DBL_MAX;
+	bool spin_orbitals = true;
 	vec coef;
 	for (int monum = 0; monum < e_nmo; monum++)
 	{
@@ -175,18 +212,18 @@ bool WFN::read_wfn(const std::filesystem::path &fileName, const bool &debug, std
 		err_checkf(line.compare(0, 2, "MO") == 0, "Expected MO " + to_string(monum + 1) + " but found: '" + line + "'", file);
 		const int nr = static_cast<int>(field(2, 6));
 		const double occ = field(36, 12);
-		// some writers glue the '=' to the energy
-		if (line.size() > 61 && line[61] == '=') line[61] = ' ';
-		const double ener = field(61, 12);
-		//the energies restart from the bottom for the second spin
-		if (ener > last_ener)
-			last_ener = ener;
-		else
+		if (occ > 1.0 + 1e-6)
+			spin_orbitals = false;
+		//whatever follows the last '=', which also covers the writers that glue it to the number
+		const size_t eq = line.rfind('=');
+		err_checkf(eq != string::npos && eq + 1 < line.size(), "MO " + to_string(monum + 1) + " carries no '= <energy>': '" + line + "'", file);
+		const double ener = stod(line.substr(eq + 1));
+		if (spin_orbitals && ener < last_ener)
 		{
-			last_ener = -DBL_MAX;
 			oper++;
 			is_unrestricted = true;
 		}
+		last_ener = ener;
 		push_back_MO(nr, occ, ener, oper);
 		read_block("", 0, 16, e_nex, coef);
 		for (const double c : coef)
@@ -362,19 +399,56 @@ bool WFN::read_wfx(const std::filesystem::path &fileName, const bool &debug, std
 	read_block("Molecular Orbital Occupation Numbers", occ);
 	read_block("Molecular Orbital Energies", ener);
 	err_checkf(occ.size() == temp_nmo && ener.size() == temp_nmo, "Found " + to_string(occ.size()) + " occupations and " + to_string(ener.size()) + " energies for " + to_string(temp_nmo) + " MOs", file);
+	//A wfx LABELS every orbital's spin, so there is nothing to guess here - the energy heuristic below
+	//is only for the older files that carry no such block, and it has the same failure mode the .wfn
+	//reader had: degenerate orbitals print equal energies and equality was read as a new spin set.
+	std::vector<std::string> spins;
+	{
+		rf.clear();
+		rf.seekg(0);
+		string l;
+		bool inside = false;
+		while (getline(rf, l))
+		{
+			if (!inside)
+			{
+				inside = l.find("<Molecular Orbital Spin Types>") != string::npos;
+				continue;
+			}
+			if (l.find("</Molecular Orbital Spin Types>") != string::npos)
+				break;
+			const size_t a = l.find_first_not_of(" \t\r\n");
+			if (a == string::npos)
+				continue;
+			spins.push_back(l.substr(a, l.find_last_not_of(" \t\r\n") - a + 1));
+		}
+	}
+	const bool labelled = spins.size() == static_cast<size_t>(temp_nmo);
+	err_checkf(spins.empty() || labelled, "<Molecular Orbital Spin Types> lists " + to_string(spins.size()) + " labels for " + to_string(temp_nmo) + " orbitals", file);
 	double last_ener = -DBL_MAX;
 	int oper = 0;
+	bool spin_orbitals = true;
 	for (int i = 0; i < temp_nmo; i++)
 	{
-		if (ener[i] > last_ener)
+		if (labelled)
 		{
-			last_ener = ener[i];
+			//"Alpha and Beta" is one spin-averaged orbital, not two, and belongs to the first operator
+			err_checkf(spins[i] == "Alpha" || spins[i] == "Beta" || spins[i] == "Alpha and Beta",
+					   "Orbital " + to_string(i + 1) + " carries the spin label '" + spins[i] + "', which is none of Alpha, Beta or 'Alpha and Beta'", file);
+			oper = spins[i] == "Beta" ? 1 : 0;
+			if (oper == 1)
+				is_unrestricted = true;
 		}
 		else
 		{
-			last_ener = -DBL_MAX;
-			oper++;
-			is_unrestricted = true;
+			if (occ[i] > 1.0 + 1e-6)
+				spin_orbitals = false;
+			if (spin_orbitals && ener[i] < last_ener)
+			{
+				oper++;
+				is_unrestricted = true;
+			}
+			last_ener = ener[i];
 		}
 		err_checkf(push_back_MO(i + 1, occ[i], ener[i], oper), "Error poshing back MO! MO: " + to_string(i), file);
 	}
@@ -1901,13 +1975,21 @@ bool WFN::write_wfx(const std::filesystem::path &fileName, const bool occupied) 
 	auto sci = [&](const double x) { snprintf(buf, sizeof(buf), "%16.8E", x); rf << buf; };
 	ivec sel;
 	double nel = 0, nalpha = 0;
+	//The spin structure of the file has to follow the orbitals that go into it, not only the is_unrestricted
+	//flag: a wavefunction assembled MO by MO can hold beta orbitals without the flag ever being set, and it
+	//then wrote a wfx labelling every orbital "Alpha and Beta" - a file that states it is closed-shell while
+	//carrying a beta set, which a reader that believes the labels has no way to recover from.
+	bool unrestricted = is_unrestricted;
+	for (int m = 0; m < nmo; m++)
+		if (!(occupied && MOs[m].get_occ() == 0) && MOs[m].get_op() != 0)
+			unrestricted = true;
 	for (int m = 0; m < nmo; m++)
 	{
 		if (occupied && MOs[m].get_occ() == 0)
 			continue;
 		sel.push_back(m);
 		nel += MOs[m].get_occ();
-		nalpha += is_unrestricted ? (MOs[m].get_op() == 0 ? MOs[m].get_occ() : 0) : MOs[m].get_occ() / 2;
+		nalpha += unrestricted ? (MOs[m].get_op() == 0 ? MOs[m].get_occ() : 0) : MOs[m].get_occ() / 2;
 	}
 	const int n = static_cast<int>(sel.size()), i_nel = static_cast<int>(round(nel)), i_nalpha = static_cast<int>(round(nalpha));
 	block("Title", [&]() { rf << comment << '\n'; });
@@ -1930,7 +2012,7 @@ bool WFN::write_wfx(const std::filesystem::path &fileName, const bool occupied) 
 	numbers("Primitive Exponents", nex, 5, [&](const int i) { sci(exponents[i]); });
 	numbers("Molecular Orbital Occupation Numbers", n, 1, [&](const int i) { sci(MOs[sel[i]].get_occ()); });
 	numbers("Molecular Orbital Energies", n, 1, [&](const int i) { sci(MOs[sel[i]].get_energy()); });
-	numbers("Molecular Orbital Spin Types", n, 1, [&](const int i) { rf << (!is_unrestricted ? "Alpha and Beta" : MOs[sel[i]].get_op() == 0 ? "Alpha" : "Beta"); });
+	numbers("Molecular Orbital Spin Types", n, 1, [&](const int i) { rf << (!unrestricted ? "Alpha and Beta" : MOs[sel[i]].get_op() == 0 ? "Alpha" : "Beta"); });
 	block("Molecular Orbital Primitive Coefficients", [&]()
 	{
 		for (int i = 0; i < n; i++)
