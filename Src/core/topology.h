@@ -102,6 +102,12 @@ namespace topology
 		//Below this rho is vacuum.  Four orders of magnitude under the rho of a real cage point
 		//(~1E-3 a.u.), so it cannot hide one; the relative gradient above is the actual guard
 		double density_floor = 1E-7;
+		//rho at a nucleus below this, for Z >= 5, means the wavefunction carries no core density there
+		//because a pseudopotential replaced it.  An all-electron boron already has rho ~ 40 at its
+		//nucleus and the cusp grows as Z^3, while tests/ELI_heavy/hgh2_ecp.gbw gives 7.1E-4 at its Hg:
+		//the two cases are five orders of magnitude apart, so none of that margin is being spent on
+		//the choice of 1
+		double core_rho_floor = 1.0;
 		double bond_scale = 1.3;       //pair is bonded if d <= bond_scale * (r_cov,a + r_cov,b)
 		double eigen_tolerance = 1E-6; //relative to max|lambda|: below it an eigenvalue is zero
 		bool escalate_on_mismatch = true; //add a coarse grid of seeds when the sum does not close
@@ -137,6 +143,17 @@ namespace topology
 		//moving both sides of sum == C together.
 		int covalent_fragments = 1;
 		bool escalated = false; //a coarse grid of seeds was added
+		//Nuclei of Z >= 5 where rho is below options::core_rho_floor, i.e. where the wavefunction has
+		//no core density because an ECP replaced it.  Both ECP failure modes in the test tree come
+		//from this one fact and the diagnosis used to blame the search for both: tests/ECP_SF/Au2Br2.gbw
+		//finds 51 attractors for 53 nuclei and the two without one are exactly its two Au ("nuclear
+		//seeding is the likely gap"), while tests/ELI_heavy/hgh2_ecp.gbw does find an attractor at its
+		//Hg - at rho 7.1E-4 - and then puts two spurious ring points 0.77 bohr out in the core hole
+		//("cage seeding is the likely gap").  Neither is a seeding gap: a pseudo-density has no cusp at
+		//the nucleus and no readable shell structure around it, so those points are a property of the
+		//wavefunction.  Empty for an all-electron wavefunction, which is what keeps the note honest -
+		//tests/Fe_gbw/Fe.gbw and tests/TFVC/water.gbw are both COMPLETE and both leave it empty.
+		std::vector<int> coreless_nuclei;
 		std::string diagnosis;  //empty when complete, otherwise what is missing and where
 	};
 
@@ -188,6 +205,24 @@ namespace topology
 		}
 		c.is_nna = c.kind == cp_kind::attractor && c.nearest_nucleus_distance > opt.nna_distance;
 		return c;
+	}
+
+	//Which nuclei the wavefunction carries no core density at, measured rather than taken from a flag:
+	//an ECP is not always recorded in the file the analysis was handed, but rho at the nucleus states
+	//it outright.  One density evaluation per heavy nucleus, which is nothing next to the search, and
+	//it is what turns "nuclear seeding is the likely gap" into a statement about the wavefunction.
+	template <class S>
+	void note_coreless_nuclei(result& r, const S& source, const std::vector<nucleus>& nuclei, const options& opt)
+	{
+		r.coreless_nuclei.clear();
+		for (size_t a = 0; a < nuclei.size(); a++) {
+			if (nuclei[a].Z < 5)
+				continue;
+			d3 grad{ 0.0, 0.0, 0.0 };
+			double H[9]{};
+			if (calculate_hessian(source, nuclei[a].pos, grad, H) < opt.core_rho_floor)
+				r.coreless_nuclei.push_back((int)a);
+		}
 	}
 
 	//----- the templated search.  S is any density_source.h source: a WFN, a fitted density, a
@@ -370,6 +405,7 @@ namespace topology
 
 		//What the sum is compared against, before anything is compared: C separated molecules give C
 		r.covalent_fragments = covalent_fragment_count(nuclei, opt);
+		note_coreless_nuclei(r, source, nuclei, opt);
 		tally(r, opt);
 
 		//5. the sum did not close.  A coarse grid over the nuclear bounding box is the only seeding

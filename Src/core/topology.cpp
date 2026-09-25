@@ -366,6 +366,26 @@ namespace topology
 					  << "bridge raises the sum and splits a component at the same time. ";
 			}
 		}
+		//Every sentence above blames a seeding class, and on an ECP wavefunction all of them are
+		//blaming the search for something it cannot find.  Measured over the five topology cells:
+		//ECP_SF/Au2Br2.gbw, ECP_SF/malbac.gbw and ELI_heavy/hgh2_ecp.gbw are INCOMPLETE and all three
+		//carry coreless nuclei; Fe_gbw/Fe.gbw and TFVC/water.gbw are COMPLETE and carry none.  On
+		//Au2Br2 the two nuclei with no attractor are exactly its two Au.
+		//d is non-empty only when something above has already failed, which is the condition for
+		//saying any of this: on a complete set there is no verdict to explain
+		if (!r.coreless_nuclei.empty() && d.tellp() > 0) {
+			d << r.coreless_nuclei.size() << " nucleus/nuclei carry no core density (rho below "
+			  << opt.core_rho_floor << " at a nucleus of Z >= 5), atom number";
+			for (size_t i = 0; i < r.coreless_nuclei.size() && i < 8; i++)
+				d << (i ? "," : " ") << r.coreless_nuclei[i] + 1;
+			if (r.coreless_nuclei.size() > 8)
+				d << " and " << r.coreless_nuclei.size() - 8 << " more";
+			d << ": a pseudopotential replaced the core there, so the density has no cusp at those "
+			  << "nuclei and no readable shell structure around them. A missing nuclear attractor on "
+			  << "one of them, or a spurious ring or cage point within about a bohr of one, is a "
+			  << "property of this wavefunction and not a gap in the seeding - QTAIM is not defined on "
+			  << "a pseudo-density inside the core radius. ";
+		}
 		r.complete = r.balanced && r.n_degenerate == 0 && r.graph_consistent;
 		r.diagnosis = d.str();
 	}

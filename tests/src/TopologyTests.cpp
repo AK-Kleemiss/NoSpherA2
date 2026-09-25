@@ -705,6 +705,42 @@ TEST(Topology, ANucleusWithoutAnAttractorIsNotComplete)
 	EXPECT_NE(r.diagnosis.find("nuclear seeding"), std::string::npos) << r.diagnosis;
 }
 
+//"nuclear seeding is the likely gap" is the wrong thing to tell a colleague about an ECP wavefunction:
+//there is nothing at that nucleus to seed towards.  Measured over the five topology cells with
+//OMP_NUM_THREADS=8 on AKL007, binary f3f34c922882: ECP_SF/Au2Br2.gbw (51 attractors for 53 nuclei, the
+//two without one being exactly Au1 and Au2), ECP_SF/malbac.gbw and ELI_heavy/hgh2_ecp.gbw (which does
+//find an attractor at its Hg, at rho 7.1E-4, and then puts two spurious ring points 0.77 bohr out in
+//the core hole) are all three INCOMPLETE; Fe_gbw/Fe.gbw and TFVC/water.gbw, both all-electron, are
+//COMPLETE.  The note is measured from rho at the nucleus rather than read off an ECP flag, because the
+//file handed to an analysis does not always record that an ECP was used - and rho states it outright,
+//with five orders of magnitude between the two cases.
+TEST(Topology, AnEcpCoreIsNamedInsteadOfBlamedOnTheSeeding)
+{
+	//Au2Br2's shape scaled down: 4 nuclei, 3 attractors, one nucleus with no maximum
+	topology::result r = graph_case(3, 2, 0, 4, 3, 1);
+	ASSERT_FALSE(r.complete) << "the arm is vacuous unless the set is refused";
+	ASSERT_NE(r.diagnosis.find("nuclear seeding"), std::string::npos) << r.diagnosis;
+	EXPECT_EQ(r.diagnosis.find("pseudopotential"), std::string::npos)
+		<< "an all-electron shortfall must NOT be excused as an ECP: " << r.diagnosis;
+
+	//the same counts, plus the measurement that the heavy nucleus carries no core density
+	topology::result ecp = r;
+	ecp.coreless_nuclei = { 0 };
+	topology::tally(ecp);
+	EXPECT_FALSE(ecp.complete) << "naming the cause must not turn the refusal into a pass";
+	EXPECT_NE(ecp.diagnosis.find("pseudopotential"), std::string::npos) << ecp.diagnosis;
+	EXPECT_NE(ecp.diagnosis.find("atom number 1"), std::string::npos)
+		<< "the note has to say WHICH nucleus, 1-based as the table prints them: " << ecp.diagnosis;
+
+	//and a complete set stays silent about its cores, so the note cannot become noise on every ECP
+	//run: epoxide's shape with two coreless heavy atoms
+	topology::result fine = graph_case(7, 7, 1, 7, 7, 1);
+	fine.coreless_nuclei = { 0, 3 };
+	topology::tally(fine);
+	ASSERT_TRUE(fine.complete) << fine.diagnosis;
+	EXPECT_TRUE(fine.diagnosis.empty()) << fine.diagnosis;
+}
+
 TEST(Topology, AGenuineRingStaysComplete)
 {
 	//The other direction, which is what keeps the new term from being a blanket refusal: epoxide as
