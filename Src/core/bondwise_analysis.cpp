@@ -11,6 +11,8 @@
 #include "spherical_density.h"
 #include "citations.h"
 #include "nao.h"
+#include <algorithm>
+#include <cctype>
 #include <chrono>
 #include <mutex>
 #include <occ/core/parallel.h>
@@ -849,6 +851,22 @@ namespace {
 void clear_rgbi_free_atom_cache() {
 	const std::lock_guard<std::mutex> hold(free_atom_cache_mutex);
 	free_atom_cache.clear();
+}
+
+std::string rgbi_supported_input_phrase(const std::string &refused_extension) {
+	std::string ext = refused_extension;
+	std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return (char)std::tolower(c); });
+	if (!ext.empty() && ext.front() != '.')
+		ext.insert(ext.begin(), '.');
+	std::vector<std::string> works;
+	for (const char *w : { ".gbw", ".molden" })
+		if (ext != w)
+			works.push_back(w);
+	std::string phrase;
+	for (size_t i = 0; i < works.size(); i++)
+		phrase += (i == 0 ? "a " : (i + 1 == works.size() ? " or a " : ", a ")) + works[i];
+	//both formats cannot be the refused one at once, so the list is never empty
+	return phrase;
 }
 
 int highest_shell_angular_momentum(const WFN &wavy) {
@@ -1927,8 +1945,8 @@ void Roby_information::computeAllAtomicNAOs(WFN &wavy, const bool symmetrize, co
 	//basis is there and the file is not at fault, so say what is missing rather than what is wrong.
 	err_checkf(density_matrix.extent(0) > 0 && density_matrix.extent(1) == density_matrix.extent(0),
 		"RGBI needs the density matrix over the contracted basis, and " + wavy.get_path().filename().string() +
-		" carries none: its reader stores the density in triangular form only. Use the .gbw or the "
-		".molden of the same calculation.",
+		" carries none: its reader stores the density in triangular form only. Use " +
+		rgbi_supported_input_phrase(wavy.get_path().extension().string()) + " of the same calculation.",
 		std::cout);
 
 	//Whether the O_h symmetrization can handle this basis is a property of the basis, and nothing
@@ -2726,9 +2744,10 @@ Roby_information::Roby_information(WFN &wavy, const ivec3 &group_sets, const boo
 		err_checkf(!wavy.get_atom(a).get_basis_set().empty(),
 			"RGBI needs the basis set of every atom, and " + wavy.get_path().filename().string() +
 			" carries none for atom " + std::to_string(a + 1) + " (" +
-			constants::atnr2letter(wavy.get_atom(a).get_charge()) + "). A plain .wfn stores "
-			"primitives without their shell structure; run RGBI on a .wfx, .fchk, .molden, .gbw or "
-			"a Tonto archive instead.", std::cout);
+			constants::atnr2letter(wavy.get_atom(a).get_charge()) + "). A file that lists primitives "
+			"by centre without their shell structure - .wfn, .ffn and .wfx all do - leaves every atom's "
+			"basis empty; run RGBI on " + rgbi_supported_input_phrase(wavy.get_path().extension().string()) +
+			" instead.", std::cout);
 	citations::cite(citations::Method::RGBI, std::cout);
 	const char *orbital_label = use_ano_basis ? "ANOs" : "NAOs";
 	std::cout << "Calculating " << orbital_label << " for all atoms...                 " << std::flush;

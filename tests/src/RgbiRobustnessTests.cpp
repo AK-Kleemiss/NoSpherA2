@@ -4,6 +4,8 @@
 
 #include <occ/core/parallel.h>
 
+#include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <set>
 #include <sstream>
@@ -670,4 +672,35 @@ TEST(RgbiRobustnessTests, TheUnsupportedShellQuestionIsAskedOfEveryAtomsBasis)
 	//A basis with no shells at all has no highest l. The Roby_information constructor refuses that
 	//case separately (a plain .wfn), and this must not turn into a 0 that looks supported.
 	EXPECT_EQ(highest_shell_angular_momentum(wfn_of({ atom("H", {}, 1, 0.0, 0.0, 0.0, 1) })), -1);
+}
+
+//A refusal that sends the reader back to the file it just refused is worse than no advice at all, and
+//that is what this one did: -rgbi on tests/molden_file/f_ref.wfx printed "f_ref.wfx carries none ... run
+//RGBI on a .wfx, .fchk, .molden, .gbw or a Tonto archive instead". Measured on this binary, 6 reader
+//cells: .gbw and .molden complete, .wfx and .wfn are refused for an empty basis, .fchk is refused for a
+//missing contracted density matrix, and the Tonto fixture in tests/cytidine_tonto cannot be read at all
+//because its companion stdout file is not in the tree. So two of the four formats the message named
+//cannot run this analysis and one of them was the input.
+TEST(RgbiRobustnessTests, TheRefusalNeverSuggestsTheFormatItIsRefusing)
+{
+	//the whole list, for the case where the refused file is neither of them
+	EXPECT_EQ(rgbi_supported_input_phrase(".wfn"), "a .gbw or a .molden");
+	//and each of the two working formats drops itself, because a .gbw whose basis did not survive the
+	//reader must not be answered with "use a .gbw"
+	EXPECT_EQ(rgbi_supported_input_phrase(".gbw"), "a .molden");
+	EXPECT_EQ(rgbi_supported_input_phrase(".molden"), "a .gbw");
+
+	//The property, over every extension the matrix covers, written so that adding a format to the list
+	//cannot reintroduce the defect: whatever the phrase says, it does not say the input.
+	for (const char *ext : { ".wfn", ".wfx", ".ffn", ".fchk", ".molden", ".gbw", "GBW", "wfx" }) {
+		const std::string phrase = rgbi_supported_input_phrase(ext);
+		std::string lower = ext;
+		std::transform(lower.begin(), lower.end(), lower.begin(),
+			[](unsigned char c) { return (char)std::tolower(c); });
+		if (!lower.empty() && lower.front() != '.')
+			lower.insert(lower.begin(), '.');
+		EXPECT_EQ(phrase.find(lower), std::string::npos)
+			<< "the refusal of a " << ext << " offers a " << lower << ": " << phrase;
+		EXPECT_FALSE(phrase.empty()) << "a refusal with no alternative at all, for " << ext;
+	}
 }

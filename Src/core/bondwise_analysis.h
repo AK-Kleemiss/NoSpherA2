@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string.h>
+#include <string>
 #include <vector>
 
 class WFN;
@@ -21,6 +22,13 @@ int highest_shell_angular_momentum(const WFN& wavy);
 // element+basis and keeps it for the life of the process; the harness clears it so that "this run did N
 // free-atom SCFs" stays a statement about the run rather than about which test happened to go first.
 void clear_rgbi_free_atom_cache();
+
+// The inputs RGBI has been measured to run on, as a phrase for a refusal message, with the refused
+// file's own extension left out of it. Measured on this binary: .gbw and .molden complete, a .wfn and a
+// .wfx carry no shell structure so every atom's basis comes back empty, and a .fchk carries no
+// contracted density matrix - so the old message, which told a .wfx user to "run RGBI on a .wfx, .fchk,
+// .molden, .gbw", named two formats that cannot work and one of them was the file being refused.
+std::string rgbi_supported_input_phrase(const std::string& refused_extension);
 
 struct bond {
 	std::string label_1;
