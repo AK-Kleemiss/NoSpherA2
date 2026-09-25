@@ -346,7 +346,10 @@ namespace NoSpherA2UnitTests
 			const double d = std::hypot(c[0] - O[0], c[1] - O[1], c[2] - O[2]);
 			if (d < d_min) d_min = d, at_oxygen = t.get_colour();
 		}
-		EXPECT_EQ(at_oxygen[0], 255);
+		//the red channel is saturated here, but which of the two neighbouring grid planes the nearest triangle
+		//sits on decides whether mix_colour rounds the top of the ramp to 255 or 254, so the check is on
+		//saturation and not on the last count: it fails if the colour stops being red, not if the grid moves
+		EXPECT_GE(at_oxygen[0], 250);
 		EXPECT_LT(at_oxygen[2], 128) << "the surface above the oxygen must be red";
 		EXPECT_NE(log.str().find("ESP on the surface from -0.06"), std::string::npos) << log.str();
 	}

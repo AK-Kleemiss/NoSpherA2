@@ -558,12 +558,14 @@ TEST(BondwiseCoverageRobyTests, EpoxideCarbonCarbonRowKeepsTheIdentities)
 }
 
 //wavefunction mode: the two-shell H2 model is written as a .wfn, read back and gridded with radius 1.1 A and 0.5 A steps,
-//which is 7 x 5 x 5 points from (-1 - r, -r, -r) with r = ang2bohr(1.1) = 2.0787 bohr and steps (2 + 2r) / 7 and
-//2r / 5. Only points strictly inside r of a nucleus are evaluated, so the y = z = -r planes and the x = -1 - r
-//plane stay empty and the basin of H0 (the half space x < 0) covers the x columns 1..3 and the y, z rows 1..4:
-//a 3 x 4 x 4 cube from (-1 - r + (2 + 2r) / 7, -0.6 r, -0.6 r). Of its 48 voxels the four corners at x index 0,
-//|y| = |z| = 0.6 r lie 2.13 bohr from H0 and carry the background; the other 44 hold the finite, positive ELI-D
-//(the x = -2.20 column lies more than 3.15 bohr from H1, which is why the model needs its second shell)
+//which is 8 x 6 x 6 points from (-1 - r, -r, -r) with r = ang2bohr(1.1) = 2.0787 bohr and steps (2 + 2r) / 8 and
+//2r / 6 - the counts are even because readxyzMinMax_fromWFN forces them to be, which is what puts x index 4 exactly
+//on the H-H midplane, the mirror plane of this molecule. Only points strictly inside r of a nucleus are evaluated, so
+//the y = z = -r planes and the x = -1 - r plane stay empty and the basin of H0 covers the x columns 1..4 (the last of
+//them being that midplane, which the ascent hands to H0) and the y, z rows 1..5: a 4 x 5 x 5 cube from
+//(-1 - r + (2 + 2r) / 8, -2r/3, -2r/3). Of its 100 voxels eight carry the background: the four corners at x = -2.3090
+//lie 2.3568 bohr from H0, and the four at x = 0 lie 2.2002 bohr from both nuclei, all outside r; the other 92 hold
+//the finite, positive ELI-D (the x = -2.31 column lies 3.85 bohr from H1, which is why the model needs its second shell)
 TEST(BondwiseCoverageMaskTests, WfnModeMasksTheFirstHydrogenBasin)
 {
 	Scratch s("WfnModeMasksTheFirstHydrogenBasin");
@@ -581,17 +583,19 @@ TEST(BondwiseCoverageMaskTests, WfnModeMasksTheFirstHydrogenBasin)
 		run_QTAIM_ELI_mask(wfn_path, {}, { 0 }, -1.0, opt, log);
 	}
 	EXPECT_NE(log.str().find("Loading wavefunction: "), std::string::npos) << log.str();
-	EXPECT_NE(log.str().find("Calculating density and ELI grid (7 x 5 x 5)"), std::string::npos) << log.str();
+	EXPECT_NE(log.str().find("Calculating density and ELI grid (8 x 6 x 6)"), std::string::npos) << log.str();
 	const auto masked = s.dir / "eli_qtaim_masked.cube";
 	ASSERT_TRUE(std::filesystem::exists(masked));
 	const cube c = read_cube(masked);
 	EXPECT_NE(c.get_comment1().find("QTAIM-masked ELI"), std::string::npos);
 	EXPECT_NE(c.get_comment2().find("Selected atoms: 0"), std::string::npos);
 	const double r = constants::ang2bohr(1.1);
-	const double step_x = (2.0 + 2.0 * r) / 7.0, step_yz = 2.0 * r / 5.0;
-	ASSERT_EQ(c.get_size(0), 3);
-	ASSERT_EQ(c.get_size(1), 4);
-	ASSERT_EQ(c.get_size(2), 4);
+	const double step_x = (2.0 + 2.0 * r) / 8.0, step_yz = 2.0 * r / 6.0;
+	ASSERT_EQ(c.get_size(0), 4);
+	ASSERT_EQ(c.get_size(1), 5);
+	ASSERT_EQ(c.get_size(2), 5);
+	//1e-6 and not 0 because the cube header carries the origin and the step in six decimals (the residual is 5.3e-08)
+	EXPECT_NEAR(c.get_origin(0) + 3.0 * step_x, 0.0, 1e-6) << "the last x column is the mirror plane itself";
 	EXPECT_NEAR(c.get_origin(0), -1.0 - r + step_x, 1e-5);
 	EXPECT_NEAR(c.get_origin(1), -r + step_yz, 1e-5);
 	EXPECT_NEAR(c.get_origin(2), -r + step_yz, 1e-5);
@@ -599,12 +603,12 @@ TEST(BondwiseCoverageMaskTests, WfnModeMasksTheFirstHydrogenBasin)
 	EXPECT_NEAR(c.get_vector(1, 1), step_yz, 1e-5);
 	EXPECT_NEAR(c.get_vector(2, 2), step_yz, 1e-5);
 	int kept = 0, background = 0;
-	for (int i = 0; i < 3; i++)
-		for (int j = 0; j < 4; j++)
-			for (int k = 0; k < 4; k++)
+	for (int i = 0; i < 4; i++)
+		for (int j = 0; j < 5; j++)
+			for (int k = 0; k < 5; k++)
 			{
 				const double v = c.get_value(i, j, k);
-				const bool corner = i == 0 && (j == 0 || j == 3) && (k == 0 || k == 3);
+				const bool corner = (i == 0 || i == 3) && (j == 0 || j == 4) && (k == 0 || k == 4);
 				if (v == -1.0)
 				{
 					EXPECT_TRUE(corner) << "background at " << i << " " << j << " " << k;
@@ -616,8 +620,8 @@ TEST(BondwiseCoverageMaskTests, WfnModeMasksTheFirstHydrogenBasin)
 				EXPECT_GT(v, 0.0);
 				kept++;
 			}
-	EXPECT_EQ(kept, 44);
-	EXPECT_EQ(background, 4);
+	EXPECT_EQ(kept, 92);
+	EXPECT_EQ(background, 8);
 }
 
 //debug run of ELI_analysis on the two-Gaussian H2 model: rho = 4 (exp(-2 r_a^2) + exp(-2 r_b^2)) has the two nuclear
@@ -643,7 +647,7 @@ TEST(BondwiseCoverageEliTests, DebugListsTheCriticalPointsOfTwoGaussians)
 	}
 	EXPECT_TRUE(std::filesystem::exists(s.dir / "rho.cube"));
 	EXPECT_TRUE(std::filesystem::exists(s.dir / "eli.cube"));
-	EXPECT_NE(out.find("Calcualting grid of size 18 x 13 x 13"), std::string::npos);
+	EXPECT_NE(out.find("Calcualting grid of size 18 x 14 x 14"), std::string::npos) << out;
 	EXPECT_NE(out.find("Density Critical Points (3 found):"), std::string::npos);
 	const std::vector<CriticalPoint> cps = parse_critical_points(out);
 	ASSERT_EQ(cps.size(), 3u) << out;
