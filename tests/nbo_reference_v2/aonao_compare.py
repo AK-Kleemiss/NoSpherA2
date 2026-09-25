@@ -179,20 +179,90 @@ def mixing(Cn, Cg, S, rows, cols):
     `rows` and `cols` are lists of shells, each a list of the (2l+1) indices of its components, so
     neither side's component order has to match the other's - the m sum is over all pairs.
 
-    Returns (M, total, w), with w[a][j] the m-averaged weight of native shell a on gennbo NAO j, so
-    any other grouping of the columns - same atom other l, other atom - is a sum over w and needs no
-    second pass over the matrices.
+    Returns (M, total, w, O3), with w[a][j] the m-averaged weight of native shell a on gennbo NAO j,
+    so any other grouping of the columns - same atom other l, other atom - is a sum over w and needs
+    no second pass over the matrices, and O3[a][m][j] the SIGNED overlap itself.  w discards the sign
+    and the coherence between two gennbo NAOs; O3 keeps both, which is what the signed, occupancy-
+    weighted prediction needs - and what makes that prediction checkable exactly rather than to
+    leading order.
     """
     flat = [i for sh in rows for i in sh]
     nm = len(rows[0])
     O = Cn[:, flat].T @ S @ Cg  # native block rows against ALL gennbo NAOs
-    w = (O ** 2).reshape(len(rows), nm, -1).sum(axis=1) / nm
+    O3 = O.reshape(len(rows), nm, -1)
+    w = (O3 ** 2).sum(axis=1) / nm
     M = np.zeros((len(rows), len(cols)))
     for a in range(len(rows)):
         for b, cb in enumerate(cols):
             M[a, b] = w[a, cb].sum()
     total = w.sum(axis=1)  # 1.0 by completeness
-    return M, total, w
+    return M, total, w, O3
+
+
+LEVELS = [("per NAO, full block", False, False), ("per NAO, class sub-block", False, True),
+          ("m-averaged, full block", True, False), ("m-averaged, class sub-block", True, True)]
+
+
+def block_spectra(Dn, Dg, nshells, gshells, ncls, gcls):
+    """Per (atom, l) block: |d eigen| and each side's self-consistency, at four candidate levels.
+
+    "Spectrum or vectors" can only be asked at the level each side actually diagonalises, and that
+    level is not obvious - assuming one and reading the answer is how three metrics were retired on
+    this branch.  So all four candidates are computed and the one that is quoted is the one where
+    BOTH sides reproduce their own reported occupancies as eigenvalues (`self` ~ 0):
+
+      per NAO vs m-averaged   the NAO recipe diagonalises the density averaged over the (2l+1)
+                              components of a shell, so that one radial function serves all m.  The
+                              m-averaged matrix is nsh x nsh with element sum_m D[(a,m)][(b,m)], its
+                              diagonal is the shell population, and a side that m-averages does NOT
+                              reproduce its occupancies as eigenvalues of the per-NAO block.
+      full block vs class     the recipe's last diagonalisation runs inside the natural minimal and
+                              Rydberg parts separately, which is what leaves a valence/Rydberg
+                              partition to be wrong about in the first place.
+
+    Returns {level name: (|d eigen|, self native, self gennbo, n class-size mismatches)}.
+
+    >>> D = np.diag([2.0, 2.0, 2.0, 0.1, 0.1, 0.1])            # two p shells, one atom
+    >>> D[0, 3] = D[3, 0] = 0.3                                # cancels in the m sum ...
+    >>> D[1, 4] = D[4, 1] = -0.3                               # ... so the m-averaged block is
+    >>> sh = [[0, 1, 2], [3, 4, 5]]                            #     diagonal and the per-NAO is not
+    >>> r = block_spectra(D, D, sh, sh, ["Val", "Ryd"], ["Val", "Ryd"])
+    >>> round(r["m-averaged, full block"][1], 12), round(r["per NAO, full block"][1], 3)
+    (0.0, 0.185)
+    """
+    def arm(D, shells, avg):
+        if avg:
+            A = np.array([[sum(D[sa[i], sb[i]] for i in range(len(sa))) for sb in shells]
+                          for sa in shells])
+        else:
+            ix = [i for sh in shells for i in sh]
+            A = D[np.ix_(ix, ix)]
+        e = np.sort(np.linalg.eigvalsh(A))[::-1]
+        return e, float(np.abs(e - np.sort(np.diag(A))[::-1]).sum())
+
+    out = {}
+    for name, avg, per_class in LEVELS:
+        if per_class:
+            keys = sorted(set(ncls) | set(gcls))
+            groups = [([s for s, c in zip(nshells, ncls) if c == k],
+                       [s for s, c in zip(gshells, gcls) if c == k]) for k in keys]
+        else:
+            groups = [(nshells, gshells)]
+        deig = sn = sg = 0.0
+        mism = 0
+        for ns, gs in groups:
+            if not ns and not gs:
+                continue
+            if len(ns) != len(gs):
+                mism += 1
+                continue
+            en, s1 = arm(Dn, ns, avg)
+            eg, s2 = arm(Dg, gs, avg)
+            deig += float(np.abs(en - eg).sum())
+            sn += s1
+            sg += s2
+        out[name] = (deig, sn, sg, mism)
+    return out
 
 
 def compare(mol, d, verbose=False):
@@ -215,7 +285,10 @@ def compare(mol, d, verbose=False):
     #reproduces the printed table is reported: if the wrong one had been used the validation would
     #have failed loudly instead of passing on a coincidence.
     printed = np.array([e["occupancy"] for e in naos])
-    forms = {"C^T S P S C": np.diag(Cg.T @ S @ P @ S @ Cg), "C^T P C": np.diag(Cg.T @ P @ Cg)}
+    #The full matrix, not just its diagonal: the off-diagonal elements are the coherence between two
+    #gennbo NAOs, and they are exactly what separates the signed prediction below from an estimate.
+    Dg = Cg.T @ S @ P @ S @ Cg
+    forms = {"C^T S P S C": np.diag(Dg), "C^T P C": np.diag(Cg.T @ P @ Cg)}
     occ_form = min(forms, key=lambda k: np.abs(forms[k] - printed).max())
     occ_err = float(np.abs(forms[occ_form] - printed).max())
 
@@ -228,6 +301,9 @@ def compare(mol, d, verbose=False):
             ro = np.array([e["occupancy"] for e in ref["nao"]])
             ref_err = float(np.abs(ro - printed).max()) if ro.shape == printed.shape else float("inf")
 
+    #The native side's NAO-basis density, by the same identity: needed whole because the block
+    #spectra are taken from sub-blocks of it at several groupings.
+    Dn = Cn.T @ S @ P @ S @ Cn
     gb = gennbo_blocks(naos)
     #Which atom and which l each GENNBO column belongs to, so the out-of-block weight can be split
     #into the two things it can be.  Same atom, different l is an intra-atomic cross-l mix, which is
@@ -243,7 +319,21 @@ def compare(mol, d, verbose=False):
         assert len(nrows) == nm * len(gshells), "block (%d,%d): %d native vs %d gennbo" % (
             atom, l, len(nrows), nm * len(gshells))
         nshells = [nrows[a * nm:(a + 1) * nm] for a in range(len(gshells))]
-        M, total, w = mixing(Cn, Cg, S, nshells, gshells)
+        M, total, w, O3 = mixing(Cn, Cg, S, nshells, gshells)
+        #"Spectrum" has to mean eigenvalues, not each side's reported diagonal.  The density
+        #restricted to a block's own subspace is C_block^T S P S C_block, and its eigenvalues are
+        #the populations a perfect diagonalisation of THAT subspace would report - so:
+        #  blockeig  the two sides' eigenvalue sets, order-free.  Differing means the two subspaces
+        #            do not hold the same density, and no choice of vectors inside the block can
+        #            repair it.
+        #  self_n    each side's reported diagonal against its OWN eigenvalues.  Non-zero means that
+        #            side did not diagonalise its block, which is a different defect and is
+        #            localised without reference to the other side.
+        spectra = block_spectra(
+            Dn, Dg, nshells, gshells,
+            [CLASS[labels[sh[0]][5]] for sh in nshells],
+            [naos[sh[0]]["type"] if naos[sh[0]]["type"] in CLASS.values() else "Ryd"
+             for sh in gshells])
         same_other_l = (g_atom == atom) & (g_l != l)
         other_atom = g_atom != atom
         for a in range(M.shape[0]):
@@ -259,7 +349,20 @@ def compare(mol, d, verbose=False):
             part = float(M[a].sum() + w[a, same_other_l].sum() + w[a, other_atom].sum())
             assert abs(part - float(total[a])) < 1e-9, "block (%d,%d) rank %d: partition %.12f vs total %.12f" % (
                 atom, l, a, part, total[a])
-            rows.append(dict(mol=mol, atom=atom, l=l, rank=a, cls=CLASS[lab[5]],
+            #The signed arm.  A native shell's population is exactly
+            #    sum_m sum_{b,b'} O[m][b] O[m][b'] Dg[b][b']
+            #because C_g^-1 = C_g^T S, so `predfull` must reproduce the native run's own printed
+            #occupancy - a gate on the two matrices and the density together, not an estimate.
+            #`pred` keeps only the b = b' terms, which is the same information the unsigned metric
+            #has (w times an occupancy) but with the direction left in: it is what native's
+            #occupancy WOULD be if it were a weighted average of gennbo's, and its deviation from
+            #gennbo's own shell population therefore has a sign.
+            pred = nm * float(w[a] @ printed)
+            predfull = float(np.einsum("mb,mc,bc->", O3[a], O3[a], Dg))
+            rows.append(dict(spectra=spectra, pred=pred, predfull=predfull,
+                             occshell=float(sum(labels[i][6] for i in nshells[a])),
+                             goccshell=float(printed[gshells[a]].sum()),
+                             mol=mol, atom=atom, l=l, rank=a, cls=CLASS[lab[5]],
                              gcls=g["type"], gshell=g["shell"], occ=lab[6], gocc=g["occupancy"],
                              diag=float(M[a, a]), inblock=float(M[a].sum()),
                              crossl=float(w[a, same_other_l].sum()),
@@ -420,6 +523,210 @@ def bridge(rows_by_mol, final=None):
           "(%.0fx cancellation)" % (inter_tot, dq_tot, inter_tot / dq_tot if dq_tot else 0.0))
 
 
+def signed(rows_by_mol, final=None):
+    """The same leak with its sign left in - a prediction of d(Val), not a bound on |d(Val)|.
+
+    The unsigned arms answer "is the mis-shape big enough".  They cannot answer "does it push the
+    right way", because a mixing weight is positive while the final tables split in two directions:
+    native's valence set comes out too SMALL on five molecules and too LARGE on pf5/so2/sf6, and
+    that split is the discriminator the whole acceptance gate rests on.  Putting gennbo's own
+    occupancies through the mixing gives a signed number:
+
+        pred(a)   = (2l+1) * sum_b w[a][b] * occ_gennbo(b)   what native's shell a would hold if it
+                                                             were a weighted average of gennbo's
+        d_pred    = sum over native VALENCE shells of pred(a) - gennbo's own valence total
+        d_actual  = native's own valence total - gennbo's
+
+    Total electrons are conserved exactly in d_pred (the columns of (2l+1)*w sum to 1 by
+    completeness of the native set), so the class sums of d_pred add to zero just as the real ones
+    do, and a sign is a statement about direction rather than about normalisation.
+
+    Two gates before the sign is read:
+
+      exact   sum over the class of predfull(a) - gennbo's total must EQUAL d_actual, because
+              predfull keeps the off-diagonal coherence and is then an identity, not a model.  If
+              this fails the matrices or the density are misread and nothing else here counts.
+      resid   d_pred - d_actual is exactly the coherence term dropped by w.  It is reported, not
+              hidden: it is the part of the class error that the m-averaged, sign-blind metric
+              cannot see, and if it dominates then the unsigned bridge was measuring a proxy.
+    """
+    print("\nsigned prediction (electrons, native - gennbo; + = native's set is LARGER):")
+    print("  %-10s %11s %11s %11s %10s %9s %6s" % (
+        "molecule", "d(Val) act", "d(Val) pred", "d(Ryd) pred", "coherence", "|exact|", "sign"))
+    agree, total, bad_gate = 0, 0, []
+    verdict = {}
+    for mol, rows in sorted(rows_by_mol.items()):
+        def tot(field, key):
+            out = {}
+            for r in rows:
+                out[r[key]] = out.get(r[key], 0.0) + r[field]
+            return out
+        g = tot("goccshell", "gcls")
+        n = tot("occshell", "cls")
+        p = tot("pred", "cls")
+        pf = tot("predfull", "cls")
+        get = lambda d, k: d.get(k, 0.0)
+        act = get(n, "Val") - get(g, "Val")
+        pred = get(p, "Val") - get(g, "Val")
+        pred_ryd = get(p, "Ryd") - get(g, "Ryd")
+        exact = abs((get(pf, "Val") - get(g, "Val")) - act)
+        if exact > 1e-6:
+            bad_gate.append((mol, exact))
+        ok = (act > 0) == (pred > 0)
+        agree += int(ok)
+        total += 1
+        verdict[mol] = (act, pred)
+        print("  %-10s %+11.5f %+11.5f %+11.5f %+10.5f %9.1e %6s" % (
+            mol, act, pred, pred_ryd, pred - act, exact, "ok" if ok else "WRONG"))
+    if bad_gate:
+        print("  -> EXACTNESS GATE FAILED on %s: predfull does not reproduce the native class total, "
+              "so the signed numbers above are not readable" % ", ".join(
+                  "%s (%.1e)" % kv for kv in bad_gate))
+        return
+    print("  exactness gate passes: predfull reproduces every native valence total to < 1e-6 e")
+    print("  -> sign reproduced on %d of %d molecules" % (agree, total))
+    #The split is the point, not the count: three molecules go the other way in the final tables and
+    #they are the acceptance test.  A metric that gets the majority right by getting the majority
+    #sign right has said nothing.
+    right = [m for m in ALREADY_RIGHT if m in verdict]
+    other = [m for m in verdict if m not in ALREADY_RIGHT]
+    if right and other:
+        a_r = [verdict[m][0] for m in right]
+        p_r = [verdict[m][1] for m in right]
+        a_o = [verdict[m][0] for m in other]
+        p_o = [verdict[m][1] for m in other]
+        split_act = all(x > 0 for x in a_r) and all(x < 0 for x in a_o)
+        split_pred = all(x > 0 for x in p_r) and all(x < 0 for x in p_o)
+        print("     the split that matters: actual %s on %s / %s on the other %d;  predicted %s / %s"
+              % ("+" if all(x > 0 for x in a_r) else "mixed", "/".join(right),
+                 "-" if all(x < 0 for x in a_o) else "mixed", len(other),
+                 "+" if all(x > 0 for x in p_r) else "mixed",
+                 "-" if all(x < 0 for x in p_o) else "mixed"))
+        if split_act and split_pred:
+            print("     -> the bridge is a PREDICTION: the mixing matrix alone reproduces which "
+                  "molecules go which way, so a candidate fix can be screened on it without a run")
+        elif split_act:
+            print("     -> the signed form does NOT reproduce the split, so the m-averaging is "
+                  "throwing away something the final table sees: the sign lives in the coherence "
+                  "or in the m resolution, and the unsigned weight stays the only usable screen")
+        else:
+            print("     -> the actual tables do not split that way in this subset; no split to "
+                  "reproduce")
+
+
+def spectrum(rows_by_mol):
+    """Is the same-l channel a wrong SPECTRUM or wrong VECTORS?
+
+    0.42780 e of the intra-atomic valence weight goes into another shell of the SAME (atom, l) -
+    the one place where the two sides choose among the same candidate functions, so it is decidable
+    without a new gennbo job.  Three things are put side by side:
+
+      |d eigen|    the EIGENVALUES of the density restricted to each side's own block, order-free.
+                   This is the spectrum proper.  Agreeing says the two sides hold the same density
+                   in that block and only what is done inside it can be wrong - a fix belongs in
+                   the diagonalisation.  Disagreeing says the block itself holds different density
+                   and a fix belongs UPSTREAM of it.
+      self         each side's reported occupancies against its OWN eigenvalues.  This decides at
+                   which grouping the question may be asked at all, and it is measured rather than
+                   assumed: `block_spectra` computes four candidate levels and only a level where
+                   BOTH sides come out self-consistent is quoted.  gennbo is NBO 7 itself, so a
+                   level where gennbo fails is a wrong guess about the recipe, not a finding.
+      |d sorted| / |d rank|   the two sides' REPORTED shell populations, order-free and rank-paired.
+                   `sorted` agreeing while `rank` does not would mean the same populations in a
+                   different order - a labelling difference rather than a shape error.
+    """
+    print("\nspectrum or vectors (per (atom,l) block, electrons):")
+    print("  %-10s %7s %11s %11s %11s %9s" % (
+        "molecule", "blocks", "|d sorted|", "|d rank|", "same-l off", "vs d(Val)"))
+    tag, levels, worst_blocks = {}, {}, []
+    for mol, rows in sorted(rows_by_mol.items()):
+        blocks = {}
+        for r in rows:
+            blocks.setdefault((r["atom"], r["l"]), []).append(r)
+        dspec = drank = offd = 0.0
+        for key, rs in blocks.items():
+            nat = sorted((r["occshell"] for r in rs), reverse=True)
+            gen = sorted((r["goccshell"] for r in rs), reverse=True)
+            s = sum(abs(a - b) for a, b in zip(nat, gen))
+            d = sum(abs(r["occshell"] - r["goccshell"]) for r in rs)
+            o = sum((2 * r["l"] + 1) * r["occ"] * (r["inblock"] - r["diag"]) for r in rs)
+            dspec += s
+            drank += d
+            offd += o
+            for name, vals in rs[0]["spectra"].items():
+                cur = levels.setdefault(name, [0.0, 0.0, 0.0, 0])
+                for i in range(4):
+                    cur[i] += vals[i]
+            worst_blocks.append((o, mol, key, s, d, len(rs)))
+        ft = final_table(mol)
+        dval = abs(ft[0]) if ft else None
+        print("  %-10s %7d %11.5f %11.5f %11.5f %9s" % (
+            mol, len(blocks), dspec, drank, offd,
+            "n/a" if not dval else "%.2f" % (dspec / dval)))
+        tag[mol] = (dspec, drank, offd, dval)
+    print("  blocks with the most same-l mixing:")
+    for o, mol, key, s, d, nsh in sorted(worst_blocks, reverse=True)[:6]:
+        print("     %-10s atom %2d l=%d  off-diag %.5f  |d sorted| %.5f  |d rank| %.5f  %d shells"
+              % (mol, key[0], key[1], o, s, d, nsh))
+    spec = sum(t[0] for t in tag.values())
+    rank = sum(t[1] for t in tag.values())
+    off = sum(t[2] for t in tag.values())
+    print("  reported tables: |d sorted| %.5f   |d rank| %.5f   same-l off-diagonal weight %.5f" % (
+        spec, rank, off))
+    #Which grouping each side diagonalises, measured.  A level where GENNBO is not self-consistent
+    #is a wrong guess about the NAO recipe; a level where only native fails would be a finding in
+    #its own right, and it is printed either way rather than being hidden by the choice.
+    print("  which level each side reproduces as its own eigenvalues (self ~ 0 = readable):")
+    for name, _, _ in LEVELS:
+        deig, sn, sg, mism = levels[name]
+        print("     %-28s |d eigen| %9.5f   self nat %9.5f   self gen %9.5f%s" % (
+            name, deig, sn, sg, "" if not mism else "   (%d class-size mismatches)" % mism))
+    readable = [n for n, _, _ in LEVELS if max(levels[n][1], levels[n][2]) < 0.01]
+    one_sided = [n for n, _, _ in LEVELS if levels[n][2] < 0.01 <= levels[n][1]]
+    if one_sided:
+        print("  -> gennbo is self-consistent at %s and native is NOT (self nat %.5f e): native is "
+              "not diagonalising what NBO diagonalises, which is a finding about nao.cpp and not "
+              "about the metric" % (one_sided[0], levels[one_sided[0]][1]))
+    if not readable:
+        print("  -> NO level has both sides self-consistent, so no spectrum comparison is readable "
+              "here: the grouping each side diagonalises is none of the four, and finding it is the "
+              "next step rather than quoting a number")
+        return
+    name = readable[0]
+    eig = levels[name][0]
+    print("  -> read at %s (both sides self-consistent to %.1e/%.1e e)" % (
+        name, levels[name][1], levels[name][2]))
+    #Say the tautology out loud.  At a level where both `self` vanish, each side's eigenvalues ARE
+    #its reported diagonal, so |d eigen| is |d sorted| again and must not be quoted as a second,
+    #independent measurement.  What IS new is that both sides demonstrably diagonalise this level -
+    #and that is what licenses the reading below, because two sides that both diagonalise and hold
+    #the same operator cannot report different occupancy multisets.
+    if abs(eig - spec) < 0.01 * max(eig, spec, 1e-12):
+        print("     (|d eigen| %.5f is |d sorted| %.5f again - self ~ 0 means the eigenvalues ARE "
+              "the reported diagonal, so this is one number, not two; what the level table adds is "
+              "that both sides DO diagonalise here)" % (eig, spec))
+    if off <= 0:
+        print("  -> no same-l mixing to explain")
+    elif eig > 0.1 * off:
+        print("  -> the block EIGENVALUES DIFFER by %.5f e (%.0f%% of the same-l mixing): the two "
+              "blocks do not hold the same density, so no choice of vectors inside the block can "
+              "repair it and a fix belongs UPSTREAM of the diagonalisation" % (eig, 100 * eig / off))
+    #Order before assignment: a swapped pair has agreeing eigenvalues, an agreeing sorted table and
+    #an off-diagonal mixing all at once, and reading that as a wrong shape is the mistake this arm
+    #exists to avoid.
+    elif rank > 2 * spec and rank > 0.01:
+        print("  -> the same populations in a DIFFERENT ORDER (rank %.5f vs sorted %.5f): a "
+              "labelling and class-assignment difference, not a shape error" % (rank, spec))
+    elif spec > 0.1 * off:
+        print("  -> the block eigenvalues AGREE (%.5f e) while the reported tables differ by "
+              "%.5f e: the block is right and what is done INSIDE it is not, so a fix belongs in "
+              "the diagonalisation" % (eig, spec))
+    else:
+        print("  -> eigenvalues and reported tables both agree while the mixing is not a "
+              "permutation (%.5f e): the vectors differ without moving population - a rotation "
+              "inside a near-degenerate set, harmless for the class tables" % off)
+
+
 def demo():
     m = unpack_upper([1.0, 0.5, 2.0], 2)
     assert m[0, 1] == m[1, 0] == 0.5 and m[1, 1] == 2.0
@@ -443,7 +750,7 @@ def demo():
     # mixing: identical sets give the identity, and a swapped pair shows up off-diagonal
     Cn = np.eye(4)
     Cg = np.eye(4)[:, [1, 0, 2, 3]]
-    M, tot, _ = mixing(Cn, Cg, np.eye(4), [[0], [1], [2], [3]], [[0], [1], [2], [3]])
+    M, tot, _, _ = mixing(Cn, Cg, np.eye(4), [[0], [1], [2], [3]], [[0], [1], [2], [3]])
     assert abs(M[0, 1] - 1.0) < 1e-12 and abs(M[0, 0]) < 1e-12, M
     assert np.abs(tot - 1.0).max() < 1e-12, tot
     # Two identical p shells stored m-major on the native side and component-major on gennbo's must
@@ -453,16 +760,19 @@ def demo():
     nsh = [[0, 1, 2], [3, 4, 5]]                    # native: shell 1 (x, y, z), then shell 2
     gsh = [[0, 2, 4], [1, 3, 5]]                    # gennbo: x(1, 2), y(1, 2), z(1, 2)
     Cg6 = I6[:, [0, 3, 1, 4, 2, 5]]                 # the same six functions in gennbo's print order
-    M6, tot6, _ = mixing(I6, Cg6, I6, nsh, gsh)
+    M6, tot6, _, _ = mixing(I6, Cg6, I6, nsh, gsh)
     assert np.abs(M6 - np.eye(2)).max() < 1e-12, M6
     assert np.abs(tot6 - 1.0).max() < 1e-12, tot6
     os.remove(path)
     # The pairing diagnostic has to call a systematic off-by-one what it is: completeness cannot,
     # because a row sum is the same whichever column carried the weight.
-    def row(rank, best, total=1.0, diag=0.9, crossl=0.0, otheratom=0.0):
-        return dict(mol="m", atom=1, l=0, rank=rank, cls="Val", gcls="Val", gshell="2s", occ=1.0,
+    def row(rank, best, total=1.0, diag=0.9, crossl=0.0, otheratom=0.0, occshell=1.0,
+            goccshell=1.0, pred=1.0, predfull=None, cls="Val", l=0, spectra=None):
+        return dict(mol="m", atom=1, l=l, rank=rank, cls=cls, gcls=cls, gshell="2s", occ=1.0,
                     gocc=1.0, diag=diag, inblock=1.0, best=best, bestval=0.9, gap=0.5, total=total,
-                    crossl=crossl, otheratom=otheratom)
+                    crossl=crossl, otheratom=otheratom, occshell=occshell, goccshell=goccshell,
+                    pred=pred, predfull=occshell if predfull is None else predfull,
+                    spectra=spectra or {n: (0.0, 0.0, 0.0, 0) for n, _, _ in LEVELS})
     out = io.StringIO()
     with contextlib.redirect_stdout(out):
         zero_check({"shifted": [row(a, a + 1) for a in range(4)]})
@@ -497,6 +807,82 @@ def demo():
     #visible in the inter-atomic total instead: 0.4 e of it against a 0.01 e charge deviation.
     assert "SMALLER than the final class error on offatom" in got, got
     assert "totals 0.40000 e" in got and "40x cancellation" in got, got
+    # The signed arm: predfull is an identity, so a row whose predfull does not reproduce its own
+    # occupancy must void the report rather than print a sign.
+    out = io.StringIO()
+    with contextlib.redirect_stdout(out):
+        signed({"broken": [row(0, 0, occshell=1.2, predfull=1.0)]})
+    assert "EXACTNESS GATE FAILED" in out.getvalue(), out.getvalue()
+    # ... and with the gate passing, a native valence total BELOW gennbo's must come out negative,
+    # with the coherence residual named.  occshell 0.8 vs goccshell 1.0 -> d(Val) = -0.2; pred 0.85
+    # -> -0.15, same sign, residual +0.05.
+    out = io.StringIO()
+    with contextlib.redirect_stdout(out):
+        signed({"low": [row(0, 0, occshell=0.8, goccshell=1.0, pred=0.85)]})
+    got = out.getvalue()
+    assert "-0.20000" in got and "-0.15000" in got and "+0.05000" in got, got
+    assert "sign reproduced on 1 of 1" in got, got
+    # A wrong sign has to say so: native total ABOVE gennbo's while the prediction is below.
+    out = io.StringIO()
+    with contextlib.redirect_stdout(out):
+        signed({"flip": [row(0, 0, occshell=1.2, goccshell=1.0, predfull=1.2, pred=0.9)]})
+    assert "WRONG" in out.getvalue() and "sign reproduced on 0 of 1" in out.getvalue()
+    # spectrum: two shells of one block holding the same two occupancies in the opposite order is
+    # the same spectrum, not a shape error - and that must not be read as vectors-are-wrong.
+    out = io.StringIO()
+    with contextlib.redirect_stdout(out):
+        spectrum({"swap": [row(0, 0, occshell=1.9, goccshell=0.1, diag=0.5),
+                           row(1, 1, occshell=0.1, goccshell=1.9, diag=0.5)]})
+    got = out.getvalue()
+    assert "DIFFERENT ORDER" in got, got
+    # Eigenvalues AND reported tables agreeing while the mixing is not a permutation is not a
+    # finding about the vectors being wrong - it is a rotation that moves no population, and
+    # calling it an error is the over-read this branch is full of.
+    lvl = lambda **kw: {n: kw.get(n.split(",")[0].replace(" ", "_"), (0.0, 0.0, 0.0, 0))
+                        for n, _, _ in LEVELS}
+    ok = lvl()
+    out = io.StringIO()
+    with contextlib.redirect_stdout(out):
+        spectrum({"vec": [row(0, 0, occshell=1.9, goccshell=1.9, diag=0.5, spectra=ok),
+                          row(1, 1, occshell=0.1, goccshell=0.1, diag=0.5, spectra=ok)]})
+    assert "without moving population" in out.getvalue(), out.getvalue()
+    # The same two occupancies in the opposite order is a labelling difference, not a shape error.
+    out = io.StringIO()
+    with contextlib.redirect_stdout(out):
+        spectrum({"swap2": [row(0, 0, occshell=1.9, goccshell=0.1, diag=0.5, spectra=ok),
+                            row(1, 1, occshell=0.1, goccshell=1.9, diag=0.5, spectra=ok)]})
+    assert "DIFFERENT ORDER" in out.getvalue(), out.getvalue()
+    # Eigenvalues that genuinely differ at the readable level point upstream.
+    ups = lvl(per_NAO=(0.5, 0.0, 0.0, 0))
+    out = io.StringIO()
+    with contextlib.redirect_stdout(out):
+        spectrum({"ups": [row(0, 0, diag=0.9, spectra=ups), row(1, 1, diag=0.9, spectra=ups)]})
+    assert "EIGENVALUES DIFFER" in out.getvalue(), out.getvalue()
+    # A level where the FIRST candidate is not self-consistent must be skipped, not quoted: here
+    # only the m-averaged level is readable, and its 0.0 must drive the verdict, not the 0.9.
+    skip = {n: ((0.9, 0.3, 0.3, 0) if not avg else (0.0, 0.0, 0.0, 0)) for n, avg, _ in LEVELS}
+    out = io.StringIO()
+    with contextlib.redirect_stdout(out):
+        spectrum({"skip": [row(0, 0, diag=0.5, spectra=skip), row(1, 1, diag=0.5, spectra=skip)]})
+    got = out.getvalue()
+    assert "read at m-averaged, full block" in got, got
+    assert "EIGENVALUES DIFFER" not in got, got
+    # And when the readable level's eigenvalues are just the reported table again, say so: quoting
+    # it as a second measurement is exactly the double-counting three retired metrics died of.
+    tau = {n: ((0.8, 0.0, 0.0, 0) if avg else (0.9, 0.3, 0.3, 0)) for n, avg, _ in LEVELS}
+    out = io.StringIO()
+    with contextlib.redirect_stdout(out):
+        spectrum({"tau": [row(0, 0, occshell=1.5, goccshell=1.9, diag=0.9, spectra=tau),
+                          row(1, 1, occshell=0.5, goccshell=0.1, diag=0.9, spectra=tau)]})
+    assert "is one number, not two" in out.getvalue(), out.getvalue()
+    # Native alone failing a level gennbo passes is a statement about nao.cpp, and must be said.
+    lop = {n: (0.0, 0.3, 0.0, 0) for n, _, _ in LEVELS}
+    out = io.StringIO()
+    with contextlib.redirect_stdout(out):
+        spectrum({"lop": [row(0, 0, spectra=lop), row(1, 1, spectra=lop)]})
+    got = out.getvalue()
+    assert "native is not diagonalising what NBO diagonalises" in got, got
+    assert "NO level has both sides self-consistent" in got, got
     print("demo ok")
 
 
@@ -617,6 +1003,8 @@ def main(argv):
         by_group(all_rows)
         zero_check(rows_by_mol)
         bridge(rows_by_mol)
+        signed(rows_by_mol)
+        spectrum(rows_by_mol)
     return 0
 
 
