@@ -441,20 +441,68 @@ NAOResult build_naos(const dMatrix2 &P_in, const dMatrix2 &S_in, const std::vect
     //the valence shell can only come out with MORE population from one block than from a split
     //one.  Splitting therefore cannot reduce a Rydberg excess - it has to increase it - which is
     //what makes this arm a real test rather than a search for a better number.
+    //(The paragraph above still describes NAO_CLASS_SPLIT's arm and its upper-bound argument, and
+    //the 'one-block form' it compares against is now reachable only as NAO_CORE_POOLED=1.)
+    //
+    //The CORE gets its own block; valence and Rydberg stay pooled.  This is a fix, not an arm, and
+    //NAO_CORE_POOLED=1 restores the old fully pooled form so the two can still be compared.
+    //
+    //Why: step 3 above walks the three classes in decreasing priority and Schmidt-projects each out
+    //of everything above it, so the core keeps its shape EXACTLY at that point.  Keying this step's
+    //blocks on (atom, l) alone then handed the core 1s and the valence 2s of the same atom to one
+    //re-diagonalisation and mixed the core back into the valence it had just been protected from.
+    //The restriction was already being applied before this step and this step was undoing it.
+    //
+    //Measured in numpy against gennbo 7's own AO->NAO matrix, without a rebuild, by
+    //tests/nbo_reference_v2/step4_core_block.py - which replicates steps 3 and 4 from the dumped
+    //pre-NAOs and reproduces native's shipped NAO matrix to an angle of 1.0e-05 .. 1.5e-05 per
+    //column before any arm is read.  The core class subspace's principal sine against gennbo's own
+    //core subspace, over 8 molecules:
+    //
+    //    pooled (old):  7.9e-04  9.0e-04  9.9e-04  1.1e-03  1.2e-03  1.2e-03  1.3e-03  6.3e-03
+    //    core alone:    1.1e-05  2.8e-05  2.8e-05  4.8e-05  4.6e-05  5.6e-05  5.7e-05  6.3e-05
+    //
+    //i.e. onto the instrument's own floor (5.7e-05 .. 7.5e-05) on 8/8, lif by a factor of 138.  That
+    //is gennbo's territory: gennbo's cores are exact to 1.3e-10 where native's were right only to
+    //about 1e-05 in coefficients - which is why the earlier AONAO comparison printed a mean core
+    //mixing defect of 0.00000 at five decimals and called the cores exactly right.  A principal sine
+    //is sqrt(1 - sigma^2), so 6.3e-03 of sine is 2e-05 of coefficient; the three measurements that
+    //looked inconsistent were one statement all along.
+    //
+    //What it does NOT do, and this is why it is safe: the valence and Rydberg subspaces do not move.
+    //Their principal sines against gennbo are unchanged in every printed digit on all 8, and d_VR -
+    //the dimensions of valence space the two sides disagree about - moves by at most 2e-06, on lif.
+    //pf5, so2 and sf6, the three the acceptance test discriminates on, are flat to 1e-07.  Cauchy
+    //interlacing says the valence shell can only GAIN from this partition (it takes the top
+    //eigenvalue of the submatrix instead of the second of the full block, and lambda_1(B') >=
+    //lambda_2(B)), which is the correcting direction for the known leak - but the gain measures as
+    //nil, because the core/valence gap in the m-averaged block is enormous (water's oxygen s block
+    //runs 1.99999776, 1.74913697, 0.00044236) and the remix it allowed was correspondingly tiny.
+    //So this fixes a real defect of about 1e-05 in the core NAOs and is NOT a candidate for the
+    //0.5 e leak.  The 22-molecule acceptance gate has NOT been run on this - it needs a build - and
+    //shipping waits on it.
+    //
+    //NAO_CLASS_SPLIT=1 still runs the refuted variant, which splits all three classes: that one also
+    //separates valence from Rydberg, and it is the destructive half - mean intra-atomic
+    //valence->Rydberg leak 0.0123 -> 0.0690 e, and pf5/so2/sf6 flattened, which is the fudge-factor
+    //signature.  The core-only partition is the part of it that was never tried.
     const bool class_split = nao_env("NAO_CLASS_SPLIT");
+    const bool core_pooled = nao_env("NAO_CORE_POOLED");
     std::vector<ivec> blocks;
     for (auto &kv : l_blocks) {
-        const int l_of_block = kv.first.second, nm_of_block = 2 * l_of_block + 1;
-        if (!class_split) { blocks.push_back(kv.second); continue; }
-        ivec per_class[3];
+        const int nm_of_block = 2 * kv.first.second + 1;
         const ivec &all = kv.second;
+        if (!class_split && core_pooled) { blocks.push_back(all); continue; }
+        ivec per_class[3];
         for (size_t j = 0; j * nm_of_block < all.size(); j++) {
             const int cls = static_cast<int>(orbitals[all[j * nm_of_block]].type);
+            //bucket 0 is the core either way; without the full split, valence and Rydberg share 1
+            const int bucket = class_split ? cls : (cls == 0 ? 0 : 1);
             for (int m = 0; m < nm_of_block; m++)
-                per_class[cls].push_back(all[j * nm_of_block + m]);
+                per_class[bucket].push_back(all[j * nm_of_block + m]);
         }
-        for (int cls = 0; cls < 3; cls++)
-            if (!per_class[cls].empty()) blocks.push_back(per_class[cls]);
+        for (int b = 0; b < 3; b++)
+            if (!per_class[b].empty()) blocks.push_back(per_class[b]);
     }
     for (const ivec &block_cols : blocks) {
         const ivec &cols = block_cols;
