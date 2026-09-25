@@ -1,7 +1,14 @@
 """Compare NoSpherA2's AO -> NAO transformation with gennbo 7's own, orbital by orbital.
 
     py -3.12 aonao_compare.py <dir with one subdirectory per molecule> [--full]
+    py -3.12 aonao_compare.py --pre <same, with a .32 and a .naocpre.txt per molecule>
     py -3.12 aonao_compare.py --demo
+
+--pre is the other end of a bisection: `$NBO AOPNAO=W $END` (unit 32 on this install) and
+NAO_DUMP_CPRE=1 give the AO -> PRE-NAO matrices, which are upstream of every orthogonalisation, so
+the two modes bracket the whole cascade.  It needs its own admissibility gate because neither side
+prints a pre-NAO occupancy table - see pre_check - and its verdict is pre-registered in
+aopnao_stage.sh rather than chosen once the numbers are on screen.
 
 Every comparison before this one was of a FINAL table - NPA charges, NAO occupancies, class
 totals.  A final table can say that an (atom, l) block came out with the wrong population; it
@@ -105,30 +112,60 @@ def read_47(path):
     return n, S, P
 
 
-def read_lfn33(path, n, S):
-    """gennbo's AO -> NAO matrix, with the layout decided by C^T S C = 1 rather than assumed."""
+NAO_HEADER = "NAOs in the AO basis:"
+PRE_HEADER = "PNAOs in the AO basis:"
+
+
+def read_lfn(path, n, block, layout_test, what):
+    """One of NBO 7's written transformation matrices, with the layout decided rather than assumed.
+
+    `block` is matched at the start of a line, because "NAOs in the AO basis:" is a substring of
+    "PNAOs in the AO basis:" - a plain `in` test would read a PNAO matrix as an NAO one and nothing
+    downstream would notice.  `layout_test` returns the deviation from a property the correct layout
+    has and the transpose does not; the loser is asserted to FAIL, because a test both layouts pass
+    has not decided anything.
+    """
     body = open(path).read()
-    #A VOID, not a traceback: sf6's lfn 33 came back 0 bytes from the staging job.
-    assert "NAOs in the AO basis:" in body, "no 'NAOs in the AO basis:' block in %s (%d bytes)" % (
-        os.path.basename(path), len(body))
-    start = body.index("NAOs in the AO basis:")
-    vals = numbers(body[start:])[:n * n]
-    assert len(vals) == n * n, "lfn 33 holds %d numbers, need %d" % (len(vals), n * n)
+    #A VOID, not a traceback: sf6's lfn 33 came back 0 bytes with rc = 0 from an earlier job.
+    m = re.search(r"^[ \t]*" + re.escape(block), body, re.M)
+    assert m, "no %r block in %s (%d bytes)" % (block, os.path.basename(path), len(body))
+    vals = numbers(body[m.start():])[:n * n]
+    assert len(vals) == n * n, "%s holds %d numbers, need %d" % (
+        os.path.basename(path), len(vals), n * n)
     a = np.array(vals)
     cands = {"column-major": a.reshape(n, n).T, "row-major": a.reshape(n, n)}
-    errs = {k: float(np.abs(C.T @ S @ C - np.eye(n)).max()) for k, C in cands.items()}
+    errs = {k: layout_test(C) for k, C in cands.items()}
     best = min(errs, key=errs.get)
-    assert errs[best] < 1e-6, "neither layout of lfn 33 is S-orthonormal: %s" % errs
+    assert errs[best] < 1e-6, "neither layout of %s is %s: %s" % (
+        os.path.basename(path), what, errs)
     other = [k for k in errs if k != best][0]
     assert errs[other] > 1e-6, "both layouts pass, the test cannot decide: %s" % errs
     return cands[best], best, errs[best]
 
 
-def read_naoc(path):
+def read_lfn33(path, n, S):
+    """gennbo's AO -> NAO matrix, with the layout decided by C^T S C = 1 rather than assumed."""
+    return read_lfn(path, n, NAO_HEADER,
+                    lambda C: float(np.abs(C.T @ S @ C - np.eye(n)).max()), "S-orthonormal")
+
+
+def read_lfn32(path, n, S):
+    """gennbo's AO -> pre-NAO matrix (`$NBO AOPNAO=W $END`, unit 32 on this install).
+
+    The layout CANNOT be decided by C^T S C = 1 here: pre-NAOs on different atoms are not
+    orthogonal, which is the whole point of them, so the NAO test would fail on both candidates.
+    What is still true of every pre-NAO is that it is normalised, so diag(C^T S C) = 1 decides it -
+    a weaker property, and the assertion that the transpose fails it is what keeps that honest.
+    """
+    return read_lfn(path, n, PRE_HEADER,
+                    lambda C: float(np.abs(np.diag(C.T @ S @ C) - 1.0).max()), "column-normalised")
+
+
+def read_naoc(path, tag="NAOC"):
     """The native dump: (labels, C) with labels[i] = (atom, l, m, shell, class, occ)."""
     labels, cols = [], []
     for line in open(path):
-        if not line.startswith("NAOC "):
+        if not line.startswith(tag + " "):
             continue
         t = line.split()
         if t[1] == "index":
@@ -263,6 +300,208 @@ def block_spectra(Dn, Dg, nshells, gshells, ncls, gcls):
             sg += s2
         out[name] = (deig, sn, sg, mism)
     return out
+
+
+def pre_check(C, shells, S, D):
+    """A pre-NAO set's own defining property, on ONE side, inside one m-averaged (atom, l) block.
+
+    Neither side prints a pre-NAO occupancy table, so the admissibility gate that made the AO -> NAO
+    comparison readable - both sides reproducing their own reported numbers - has no counterpart
+    here and something else has to carry it.  What both sides have is the DEFINITION of a pre-NAO:
+    inside one (atom, l) block its columns are S-orthonormal, and m-averaged they diagonalise
+    S P S.  Native by construction, gennbo by NBO's own definition.  Either failing is outcome C.
+
+    The m-averaged test also checks the component grouping, which is otherwise an assumption: a
+    wrong grouping mixes components into one "shell" and the off-diagonal does not vanish.
+
+    Returns (|G - 1| max, |off-diagonal| max, eigenvalues descending).
+
+    >>> S = np.eye(4)
+    >>> D = np.diag([2.0, 2.0, 0.1, 0.1])
+    >>> D[0, 2] = D[2, 0] = 0.3          # cancels in the m sum ...
+    >>> D[1, 3] = D[3, 1] = -0.3         # ... so the m-averaged block is diagonal
+    >>> o, off, e = pre_check(np.eye(4), [[0, 1], [2, 3]], S, D)
+    >>> round(o, 12), round(off, 12), e.round(6).tolist()
+    (0.0, 0.0, [4.0, 0.2])
+    """
+    flat = [i for sh in shells for i in sh]
+    G = C[:, flat].T @ S @ C[:, flat]
+    ortho = float(np.abs(G - np.eye(len(flat))).max())
+    A = np.array([[sum(D[sa[i], sb[i]] for i in range(len(sa))) for sb in shells] for sa in shells])
+    off = float(np.abs(A - np.diag(np.diag(A))).max())
+    return ortho, off, np.sort(np.diag(A))[::-1]
+
+
+def compare_pre(mol, d):
+    """The AO -> pre-NAO matrices from both sides, on the same .47.
+
+    Two things are different from the NAO comparison and both make this arm SHARPER, not weaker:
+
+      - there is no out-of-block question.  A pre-NAO is strictly intra-atomic, so both sides' block
+        spans the same subspace (that atom's AOs of that l) and the in-block m-averaged mixing sums
+        to exactly 1.  That is an identity, so it is a gate: if it misses, one side's pre-NAOs are
+        not confined to the block and the comparison is void rather than small.
+      - `mixing`'s completeness total is NOT 1 here, because pre-NAOs on different atoms overlap.
+        The in-block row sum is what is 1, and it is the one that is checked.
+
+    The occ column of the NAOCPRE dump is native's `pre_occ`, which is the accumulator that sums to
+    1041.75 e against N = 664 - a retired metric.  It is deliberately NOT used: every occupancy here
+    is an eigenvalue of C^T S P S C built from the matrices and the .47 density.
+    """
+    n, S, P = read_47(os.path.join(d, mol + ".47"))
+    Cg, layout, lerr = read_lfn32(os.path.join(d, mol + ".32"), n, S)
+    labels, Cn = read_naoc(os.path.join(d, mol + ".naocpre.txt"), tag="NAOCPRE")
+    assert Cn.shape == (n, n), "native dump is %s, .47 says %d" % (Cn.shape, n)
+    run_path = os.path.join(d, mol + ".aopnao.nbo.json")
+    run = load_nbo(run_path) if load_nbo is not None else json.load(open(run_path))
+    naos = run["nao"]
+    Dg = Cg.T @ S @ P @ S @ Cg
+    Dn = Cn.T @ S @ P @ S @ Cn
+    rows = []
+    for (atom, l), gshells in sorted(gennbo_blocks(naos).items()):
+        nm = 2 * l + 1
+        nrows = [i for i, lab in enumerate(labels) if lab[1] == atom and lab[2] == l]
+        nrows.sort(key=lambda i: (labels[i][4], labels[i][3]))  # shell rank, then m
+        assert len(nrows) == nm * len(gshells), "block (%d,%d): %d native vs %d gennbo" % (
+            atom, l, len(nrows), nm * len(gshells))
+        nshells = [nrows[a * nm:(a + 1) * nm] for a in range(len(gshells))]
+        on, offn, en = pre_check(Cn, nshells, S, Dn)
+        og, offg, eg = pre_check(Cg, gshells, S, Dg)
+        M, _, _, _ = mixing(Cn, Cg, S, nshells, gshells)
+        inblock = M.sum(axis=1)
+        for a in range(M.shape[0]):
+            order = np.argsort(M[a])[::-1]
+            #A degenerate eigenvalue fixes its EIGENSPACE, not its eigenvectors: two shells with the
+            #same pre-occupancy can be any orthogonal mix of each other on either side, and M[a][a]
+            #would then read < 1 with nothing wrong.  So the invariant is the projector - M summed
+            #over the columns degenerate with a - and the rank-paired diagonal is reported next to
+            #it.  Where a shell is non-degenerate the two are the SAME number, which is why both are
+            #carried instead of the looser one replacing the tighter.
+            deg = [b for b in range(len(gshells)) if abs(en[b] - en[a]) < DEG_TOL]
+            rows.append(dict(mol=mol, atom=atom, l=l, rank=a, nsh=len(gshells),
+                             cls=CLASS[labels[nshells[a][0]][5]], gcls=naos[gshells[a][0]]["type"],
+                             diag=float(M[a, a]), best=int(order[0]),
+                             bestval=float(M[a, order[0]]), inblock=float(inblock[a]),
+                             degsum=float(M[a, deg].sum()), ndeg=len(deg),
+                             bestdeg=int(order[0]) in deg,
+                             ortho_n=on, off_n=offn, ortho_g=og, off_g=offg,
+                             deig=float(np.abs(en - eg).sum()),
+                             occ_n=float(en[a]), occ_g=float(eg[a])))
+    return dict(mol=mol, n=n, layout=layout, lerr=lerr, rows=rows)
+
+
+#The gate thresholds, argued rather than tuned.  gennbo writes nine decimals, so a coefficient
+#carries up to 5e-10 and an n-term dot product of them ~1e-8; a 222-column block accumulates a
+#little more.  1e-5 is three decades above that floor and three below the NAO-level leaks this is
+#bisecting.
+PRE_GATE = 1e-5
+#The in-block sum is an exact identity in exact arithmetic, so it is tempting to gate it at 1e-9 -
+#and that is a threshold set BELOW the measurement floor: the first run refused all eight molecules
+#at 5e-10 to 2.2e-09, which is the nine-decimal roundoff and not a missing dimension.  A span that
+#really differs loses O(0.1) of the sum, so 1e-7 separates the two by six decades either way.
+PRE_SPAN = 1e-7
+PRE_FLOOR = 1e-4
+#Two pre-occupancies this close are degenerate for the purpose of fixing eigenvectors: gennbo's own
+#tables print five decimals, and the matrices here carry ~1e-8.
+DEG_TOL = 1e-6
+
+
+def pre_verdict(rows_by_mol):
+    """The pre-registered A/B/C verdict of the bisection, and nothing beyond what it licenses."""
+    rows = [r for rs in rows_by_mol.values() for r in rs]
+    if not rows:
+        print("\nno PNAO rows: nothing to say")
+        return
+    print("\n=== PNAO bisection: the AO -> pre-NAO matrices, both sides, same .47")
+    bad_self, bad_span = [], []
+    for mol, rs in sorted(rows_by_mol.items()):
+        sn = max(max(r["ortho_n"], r["off_n"]) for r in rs)
+        sg = max(max(r["ortho_g"], r["off_g"]) for r in rs)
+        span = max(abs(r["inblock"] - 1.0) for r in rs)
+        leak = [1.0 - r["diag"] for r in rs]
+        dleak = [1.0 - r["degsum"] for r in rs]
+        mism = [r for r in rs if r["best"] != r["rank"] and not r["bestdeg"]]
+        print("  %-9s shells %3d  self-check native %.2e gennbo %.2e  in-block sum-1 %.2e"
+              "  leak max %.5f mean %.5f  degeneracy-invariant max %.5f (%d degenerate shells)"
+              "  rank mismatches %d  |d eigen| max %.2e" % (
+                  mol, len(rs), sn, sg, span, max(leak), sum(leak) / len(leak), max(dleak),
+                  sum(1 for r in rs if r["ndeg"] > 1), len(mism), max(r["deig"] for r in rs)))
+        if sn > PRE_GATE or sg > PRE_GATE:
+            bad_self.append((mol, sn, sg))
+        if span > PRE_SPAN:
+            bad_span.append((mol, span))
+    #C first, because a failed self-check makes the rest unquotable however it came out.
+    if bad_self or bad_span:
+        print("\n  OUTCOME C: the PNAO matrices on disk cannot arbitrate.")
+        for mol, sn, sg in bad_self:
+            side = "native" if sn > sg else "gennbo"
+            print("    %-9s self-check fails on %s (native %.2e, gennbo %.2e) - a pre-NAO set that"
+                  " is not S-orthonormal and SPS-diagonal inside its own block is not a pre-NAO"
+                  " set, and nothing is quoted against it" % (mol, side, sn, sg))
+        for mol, span in bad_span:
+            print("    %-9s in-block mixing sums to 1 + %.2e: the two sides' blocks do not span the"
+                  " same subspace, so the rotation is not the only difference" % (mol, span))
+        return
+    worst = min(r["diag"] for r in rows)
+    #The verdict runs on the degeneracy invariant, because that is the quantity the two sides are
+    #both entitled to; the rank-paired diagonal is printed beside it and they coincide wherever a
+    #shell is alone in its eigenvalue.
+    wdeg = min(r["degsum"] for r in rows)
+    #A "wrong" best partner inside one eigenspace is not an ordering error either: which member of a
+    #degenerate pair a side prints first is arbitrary on both sides.
+    mism = [r for r in rows if r["best"] != r["rank"] and not r["bestdeg"]]
+    print("\n  gate passed on both sides everywhere (< %.0e), and the in-block sums are 1 to %.0e:"
+          " the comparison is readable and it is a pure rotation question." % (PRE_GATE, PRE_SPAN))
+    if 1.0 - wdeg <= PRE_FLOOR and not mism:
+        print("  OUTCOME B: pre-NAOs AGREE (worst eigenspace-projected %.6f, worst rank-paired"
+              " M[a][a] %.6f, no rank mismatches)." % (wdeg, worst))
+        print("    Licensed: the disagreement is created strictly between the pre-NAO and the"
+              " m-averaged NAO block - the orthogonalisation cascade and the class input it takes,"
+              " steps 2 to 4, and nothing earlier.")
+        print("    NOT licensed: which of Schmidt and OWSO. Two arms over a bracketed interval now,"
+              " not a guess.")
+    else:
+        print("  OUTCOME A: pre-NAOs DISAGREE (worst eigenspace-projected %.6f, worst rank-paired"
+              " M[a][a] %.6f, %d rank mismatches of %d)." % (wdeg, worst, len(mism), len(rows)))
+        print("    Licensed: the two sides differ already at step 1's atomic (atom, l) eigenproblem,"
+              " upstream of every orthogonalisation; no downstream arbitration is interpretable"
+              " until that is fixed.")
+        print("    NOT licensed: WHICH ingredient of step 1 (m-averaging, gross vs net density, the"
+              " S^-1/2 metric, the shell grouping). That is a further bisection with its own arms.")
+    #By the invariant first, then by the rank-paired diagonal: with the invariant at 1.0 everywhere
+    #the second key is what puts the interesting rows on screen instead of eight arbitrary ones.
+    for r in sorted(rows, key=lambda r: (round(r["degsum"], 6), r["diag"]))[:8]:
+        print("    %-9s atom %2d l=%d rank %d/%d %s/%-4s  M[a][a]=%.6f  eigenspace(%d)=%.6f"
+              "  best rank %d (%.6f)  occ %.5f/%.5f" % (
+                  r["mol"], r["atom"], r["l"], r["rank"], r["nsh"], r["cls"], r["gcls"], r["diag"],
+                  r["ndeg"], r["degsum"], r["best"], r["bestval"], r["occ_n"], r["occ_g"]))
+
+
+def main_pre(root, verbose=False):
+    print("aonao_compare --pre on %s, 1 thread, root %s" % (socket.gethostname(), root))
+    rows_by_mol, void, missing = {}, [], []
+    for mol in sorted(os.listdir(root)):
+        d = os.path.join(root, mol)
+        if not os.path.isdir(d):
+            continue
+        if not os.path.isfile(os.path.join(d, mol + ".32")):
+            missing.append(mol)
+            continue
+        try:
+            res = compare_pre(mol, d)
+        except AssertionError as e:
+            void.append((mol, str(e)))
+            print("%-10s VOID: %s" % (mol, e))
+            continue
+        print("%-10s n=%-4d lfn32 %s  |diag(C^T S C)-1|=%.1e  blocks/shells %d" % (
+            res["mol"], res["n"], res["layout"], res["lerr"], len(res["rows"])))
+        rows_by_mol[mol] = res["rows"]
+    print("\ndenominator: %d molecules compared, %d VOID, %d without an lfn 32" % (
+        len(rows_by_mol), len(void), len(missing)))
+    if missing:
+        print("  no lfn 32: %s" % " ".join(missing))
+    pre_verdict(rows_by_mol)
+    return 0
 
 
 def compare(mol, d, verbose=False):
@@ -747,6 +986,49 @@ def demo():
     C, layout, err = read_lfn33(path, n, S)
     assert layout == "column-major" and err < 1e-9, (layout, err)
     assert np.abs(C - C_true).max() < 1e-9
+    # The same file read as a PNAO matrix must be REFUSED: "NAOs in the AO basis:" is a substring of
+    # "PNAOs in the AO basis:", so a plain `in` test would have read one matrix as the other.
+    try:
+        read_lfn32(path, n, S)
+        raise AssertionError("a PNAO read of an NAO file must be refused")
+    except AssertionError as e:
+        assert "PNAOs in the AO basis:" in str(e), e
+    # The PNAO reader's own layout test, on a set that is normalised but NOT orthonormal - which is
+    # what a pre-NAO set is, and where read_lfn33's test would fail on both candidates.
+    Cp = C_true @ np.array([[1.0, 0.4, 0.0], [0.0, 1.0, 0.3], [0.2, 0.0, 1.0]])
+    Cp = Cp / np.sqrt(np.diag(Cp.T @ S @ Cp))          # columns normalised, not orthogonal
+    ppath = os.path.join(os.environ.get("TEMP", "."), "demo_lfn32.txt")
+    with open(ppath, "w") as f:
+        f.write(" PNAOs in the AO basis:\n" + "\n".join("%.9f" % v for v in Cp.T.reshape(-1)))
+    Cr, playout, perr = read_lfn32(ppath, n, S)
+    assert playout == "column-major" and perr < 1e-8, (playout, perr)  # 9 decimals on disk
+    assert np.abs(Cr - Cp).max() < 1e-9
+    assert np.abs(Cr.T @ S @ Cr - np.eye(n)).max() > 0.1  # the NAO test would have had nothing here
+    # pre_check refuses a set that is not orthonormal inside the block ...
+    o, off, _ = pre_check(Cp, [[0], [1], [2]], S, Cp.T @ S @ np.eye(n) @ S @ Cp)
+    assert o > 0.1, o
+    # ... and the A/B/C verdict says C when it does, whatever the mixing looks like.
+    def prow(rank, **kw):
+        r = dict(mol="m", atom=0, l=0, rank=rank, nsh=2, cls="Val", gcls="Val", diag=1.0,
+                 best=rank, bestval=1.0, inblock=1.0, ortho_n=0.0, off_n=0.0, ortho_g=0.0,
+                 off_g=0.0, deig=0.0, occ_n=1.0, occ_g=1.0, degsum=1.0, ndeg=1, bestdeg=False)
+        r.update(kw)
+        return r
+    # A degenerate pair mixed into each other is NOT a disagreement: the eigenspace is reproduced,
+    # only its arbitrary basis differs, and the rank "mismatch" inside it is arbitrary on both sides.
+    out = io.StringIO()
+    with contextlib.redirect_stdout(out):
+        pre_verdict({"m": [prow(0, diag=0.4, best=1, bestdeg=True, ndeg=2, degsum=1.0),
+                           prow(1, diag=0.4, best=0, bestdeg=True, ndeg=2, degsum=1.0)]})
+    assert "OUTCOME B" in out.getvalue(), out.getvalue()
+    # A failed self-check outranks a perfect mixing: C is checked before A and B, because a metric
+    # that fails its own side's gate is not made admissible by coming out flattering.
+    for kw, want in ((dict(off_n=0.3), "OUTCOME C"), (dict(inblock=1.5), "OUTCOME C"),
+                     (dict(), "OUTCOME B"), (dict(diag=0.4, best=1), "OUTCOME A")):
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            pre_verdict({"m": [prow(0, **kw), prow(1, **kw)]})
+        assert want in out.getvalue(), (want, out.getvalue())
     # mixing: identical sets give the identity, and a swapped pair shows up off-diagonal
     Cn = np.eye(4)
     Cg = np.eye(4)[:, [1, 0, 2, 3]]
@@ -972,6 +1254,8 @@ def zero_check(rows_by_mol):
 def main(argv):
     verbose = "--full" in argv
     root = [a for a in argv[1:] if not a.startswith("--")][0]
+    if "--pre" in argv:
+        return main_pre(root, verbose)
     print("aonao_compare on %s, 1 thread (numpy on matrices of a few hundred), root %s" % (
         socket.gethostname(), root))
     all_rows, rows_by_mol, void, missing = [], {}, [], []

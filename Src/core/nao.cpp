@@ -129,6 +129,25 @@ namespace
         return std::string(1, letter) + "(" + (mv >= 0 ? "+" : "") + std::to_string(mv) + ")";
     }
 
+    //One writer for both dumps, because the two matrices have to arrive in the SAME format: the
+    //comparison script parses one line shape, and a second hand-rolled loop is where a column/row
+    //or a precision difference would enter without anything failing.
+    void dump_c_matrix(const char *tag, const MatrixXd &C, const std::vector<NAO> &orbitals,
+                       const VectorXd &occ)
+    {
+        const int nao = static_cast<int>(C.rows());
+        std::cout << tag << " index atom l m shell class occ coefficients[" << nao << "]"
+                  << std::endl;
+        for (int i = 0; i < nao; i++) {
+            const NAO &o = orbitals[i];
+            std::cout << tag << " " << i << " " << o.atom << " " << o.l << " " << o.m << " "
+                      << o.shell << " " << static_cast<int>(o.type) << " " << std::setprecision(10)
+                      << std::fixed << occ(i);
+            for (int k = 0; k < nao; k++) std::cout << " " << C(k, i);
+            std::cout << std::endl;
+        }
+    }
+
     const char *class_label(const NAOClass c)
     {
         switch (c) {
@@ -293,6 +312,20 @@ NAOResult build_naos(const dMatrix2 &P_in, const dMatrix2 &S_in, const std::vect
             }
         }
     }
+
+    //NAO_DUMP_CPRE: the AO -> pre-NAO matrix, in the same format as NAO_DUMP_C, dumped here
+    //because step 2 only labels the columns and leaves the vectors alone - so these are step 1's
+    //eigenvectors with their class already attached.
+    //
+    //Why it exists: the AO -> NAO comparison located the failure at "the operator handed to the
+    //final m-averaged within-block diagonalisation already carries the wrong occupancy multiset",
+    //which is a location and not a step.  NBO 7 writes `$NBO AOPNAO=W $END` on the same terms as
+    //AONAO, and a pre-NAO is before every inter-atomic orthogonalisation, so the two matrices
+    //bracket the whole cascade: disagreeing here puts the fault in step 1's atomic eigenproblem
+    //and makes everything downstream unarbitrable until it is fixed; agreeing here confines it to
+    //steps 2-4 and nothing earlier.  That is a bisection, not a hypothesis - which is the point,
+    //because naming step 3 from evidence that only bracketed it is a mistake already made once.
+    if (nao_env("NAO_DUMP_CPRE")) dump_c_matrix("NAOCPRE", C, orbitals, pre_occ);
 
     //---------------------------------------------------------------- 3. orthogonalisation
     //Three sets in decreasing priority: core, valence, Rydberg.  Each is Schmidt-projected out
@@ -482,17 +515,7 @@ NAOResult build_naos(const dMatrix2 &P_in, const dMatrix2 &S_in, const std::vect
     //partners and cancels - which is why the NPA charges agreed while this was wrong.  A candidate fix
     //has to move the intra-atomic valence weight, with pf5/so2/sf6 held flat.
     //Tables in tests/nbo_reference_v2/README.md.
-    if (nao_env("NAO_DUMP_C")) {
-        std::cout << "NAOC index atom l m shell class occ coefficients[" << nao << "]" << std::endl;
-        for (int i = 0; i < nao; i++) {
-            const NAO &o = orbitals[i];
-            std::cout << "NAOC " << i << " " << o.atom << " " << o.l << " " << o.m << " " << o.shell
-                      << " " << static_cast<int>(o.type) << " " << std::setprecision(10)
-                      << std::fixed << o.occupation;
-            for (int k = 0; k < nao; k++) std::cout << " " << C(k, i);
-            std::cout << std::endl;
-        }
-    }
+    if (nao_env("NAO_DUMP_C")) dump_c_matrix("NAOC", C, orbitals, Pfin.diagonal());
 
     res.C = to_dmatrix(C);
     res.orbitals = orbitals;
