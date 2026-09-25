@@ -11,6 +11,12 @@ class WFN;
 void symmetrize_atomic_matrix_oh(dMatrix2& matrix, const ivec& shell_angular_momenta,
 	bool spherical = false);
 
+// The highest angular momentum any shell of this wavefunction's basis carries, or -1 for a basis
+// with no shells at all. symmetrize_atomic_matrix_oh() refuses anything beyond h, and asking the
+// basis directly lets RGBI refuse before it has built an overlap matrix or run a free-atom SCF for
+// an analysis it is going to abandon.
+int highest_shell_angular_momentum(const WFN& wavy);
+
 // Drop every cached free-atom density. The RGBI/ANO route runs one free-atom SCF per distinct
 // element+basis and keeps it for the life of the process; the harness clears it so that "this run did N
 // free-atom SCFs" stays a statement about the run rather than about which test happened to go first.

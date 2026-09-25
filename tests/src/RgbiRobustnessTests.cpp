@@ -413,10 +413,11 @@ TEST(RgbiRobustnessTests, IdenticalCentresShareOneFreeAtomScf)
 	//The half that makes this a check and not a stopwatch. NOS_RGBI_NO_FREEATOM_CACHE recomputes every
 	//centre in this same process, so the cached bond table has something to be identical to. Without it
 	//the cache offers no evidence at all: it is barely faster. On the one fixture it exists for,
-	//tests/Fe_gbw/Fe.gbw, all four arms of job 582380 print md5 1672c4eae0c8 and 20 rows - cached 4 SCFs
-	//in 404.0 s against uncached 21 in 410.5 s unpinned, 1729.1 s against 1731.8 s pinned - and the 17
-	//repeats it removes are worth 1.0 s of that unpinned run, the non-Fe SCFs summing to 0.3 s against
-	//1.3 s. So the eighth fixture is verified and the cache's justification is entirely this identity.
+	//tests/Fe_gbw/Fe.gbw, all eight arms of job 582380 - four configurations, two repeats - print md5
+	//1672c4eae0c8 and 20 rows, and the 17 repeats the cache removes are worth 0.93 s unpinned and 3.37 s
+	//pinned, the non-Fe SCFs summing to 0.356 s against 1.290 s. Do not quote the whole-run seconds for
+	//this: over those two repeats the cached arm was 6.5 s faster and then 3.0 s slower. So the eighth
+	//fixture is verified and the cache's justification is entirely this identity.
 #ifdef _WIN32
 	_putenv_s("NOS_RGBI_NO_FREEATOM_CACHE", "1");
 #else
@@ -453,11 +454,11 @@ TEST(RgbiRobustnessTests, IdenticalCentresShareOneFreeAtomScf)
 }
 
 //The cache removes the repeats; it does not make the remaining SCFs any faster, and on
-//tests/Fe_gbw/Fe.gbw the repeats it removes are worth 1.0 s of a 404.0 s run - the earlier claim that it
-//cost about 1300 s was the pin measured across two jobs, not this cache. The distinct SCFs run
-//one behind the other and do not depend on each other, so NOS_RGBI_PARALLEL_FREEATOM runs them up front
-//and concurrently. On this fixture that can reach only the 1.0 s, because 402.653 s of the run is one Fe;
-//the fixture where it could pay is one with many distinct heavy centres. The risk it buys is
+//tests/Fe_gbw/Fe.gbw the repeats it removes are worth 0.93 s of a 404.0 s run, reproduced to 0.6 % over two
+//repeats - the earlier claim that it cost about 1300 s was the pin measured across two jobs, not this cache.
+//The distinct SCFs run one behind the other and do not depend on each other, so NOS_RGBI_PARALLEL_FREEATOM
+//runs them up front and concurrently. On this fixture that can reach only the 0.93 s, because 402.653 s of
+//the run is one Fe; the fixture where it could pay is one with many distinct heavy centres. The risk it buys is
 //the only one worth testing for: occ's SCF is not documented re-entrant, and a free-atom density that
 //comes out subtly different under concurrency would be invisible in a timing table.
 //
@@ -622,4 +623,51 @@ TEST(RgbiRobustnessTests, EveryFreeAtomScfRunsWithOccPinnedForReal)
 	//way it engaged leaves the rest of the binary pinned to one thread.
 	EXPECT_EQ(occ::parallel::get_tbb_control(), nullptr)
 		<< "the analysis left a TBB control behind, so every later occ user in this process is serial";
+}
+
+//RGBI refuses a basis whose shells go beyond h, because its O_h symmetrization has no transform for
+//them. It used to refuse from inside symmetrize_atomic_matrix_oh(), which is reached only after the
+//overlap matrix is built and, on the ANO route, after a free-atom SCF per element: -rgbi on
+//tests/CuF2_i_func/71/calc.gbw ran for 467.3 s before printing it. The decision needs the shell
+//types and nothing else, so it is now taken from the basis before any of that work. err_checkf()
+//exits the process, so what is tested here is the question the guard asks - highest_shell_angular_
+//momentum() over the whole molecule - rather than the exit; a test that reproduces the refusal
+//end to end would have to carry a 670-MO fixture and wait for it.
+namespace {
+	//type is the NoSpherA2 basis_set_entry convention, l + 1: an s shell is 1, an i shell is 7.
+	atom shell_atom(const std::string &label, const int Z, const double z, const ivec &l_values)
+	{
+		atom a(label, {}, 1, 0.0, 0.0, z, Z);
+		for (int s = 0; s < static_cast<int>(l_values.size()); s++)
+			a.push_back_basis_set(1.0 + 0.1 * s, 1.0, l_values[s] + 1, s);
+		return a;
+	}
+
+	WFN wfn_of(const std::vector<atom> &atoms)
+	{
+		WFN w(e_origin::NOT_YET_DEFINED);
+		for (const atom &a : atoms) w.push_back_atom(a);
+		return w;
+	}
+}
+
+TEST(RgbiRobustnessTests, TheUnsupportedShellQuestionIsAskedOfEveryAtomsBasis)
+{
+	//s through h is what the symmetrization supports, and the whole point of asking early is that the
+	//answer must not depend on how far the analysis got.
+	EXPECT_EQ(highest_shell_angular_momentum(wfn_of({ shell_atom("H", 1, 0.0, {0}) })), 0);
+	EXPECT_EQ(highest_shell_angular_momentum(wfn_of({ shell_atom("Cu", 29, 0.0, {0, 1, 2, 3, 4, 5}) })), 5);
+
+	//The defect shape this guards against: a check that inspects the first atom only. Copper carries
+	//the i shells in CuF2_i_func and fluorine does not, so an i shell on any centre but the first has
+	//to be seen.
+	const WFN i_on_the_second = wfn_of({ shell_atom("F", 9, 0.0, {0, 1, 2}),
+										 shell_atom("Cu", 29, 3.5, {0, 1, 2, 3, 4, 5, 6}) });
+	EXPECT_EQ(highest_shell_angular_momentum(i_on_the_second), 6)
+		<< "an i shell on the second atom was not seen, so RGBI would run the whole overlap and only "
+		"then refuse - which is the defect this replaced";
+
+	//A basis with no shells at all has no highest l. The Roby_information constructor refuses that
+	//case separately (a plain .wfn), and this must not turn into a 0 that looks supported.
+	EXPECT_EQ(highest_shell_angular_momentum(wfn_of({ atom("H", {}, 1, 0.0, 0.0, 0.0, 1) })), -1);
 }

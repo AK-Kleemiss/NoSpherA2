@@ -635,11 +635,14 @@ namespace {
 	//1727.1 s across two jobs whose pin state differed and charged the gap to the cache. Job 582380 ran
 	//all four arms from one binary on one node at OMP_NUM_THREADS=4 with only the two switches between
 	//them, and FREEATOM-TIME priced the SCFs from inside: unpinned, Fe 402.653 s, S 0.324232 s,
-	//C 0.0296981 s, H 0.0023573 s. One atom is the run. Removing the 17 repeats is worth 1.0 s unpinned
-	//- the non-Fe SCFs sum to 0.3 s cached against 1.3 s uncached - and 3.3 s pinned, on runs of 404.0 s
-	//and 1729.1 s. Do not read the whole-run difference instead: the Fe SCF, computed exactly once in
-	//every arm, moved 402.7 -> 408.2 s between the two unpinned arms, so 5.5 s of the 6.5 s gap between
-	//them is that variance and not this cache. The ~1300 s once charged here is the pin below, 1729.1 s
+	//C 0.0296981 s, H 0.0023573 s. One atom is the run. Removing the 17 repeats is worth 0.93 s unpinned
+	//- the non-Fe SCFs sum to 0.356 s cached against 1.290 s uncached - and 3.37 s pinned, on runs of
+	//404.0 s and 1729.1 s. Both repeats of all four arms agree on that: 0.9333 and 0.9280 s unpinned,
+	//3.3671 and 3.3675 s pinned. Do not read the whole-run difference instead, because over the same two
+	//repeats it swings 9.5 s and changes sign - cached was 6.5 s faster, then 3.0 s slower - while the Fe
+	//SCF, computed exactly once in every arm, ran 402.653 / 402.681 / 408.245 / 398.641 s unpinned, a
+	//9.6 s spread that is ten times what the cache is worth. Reading a 1 s effect off a 404 s total was
+	//never going to work in either direction. The ~1300 s once charged here is the pin below, 1729.1 s
 	//against 404.0 s with nothing else changed. The cache is an accuracy and determinism device and not
 	//a speed one, and Au2Br2 answering 53 centres with 5 SCFs is what it is for. FREEATOM-TIME under
 	//NOS_RGBI_DEBUG times each SCF from inside, which is the only way to get a per-SCF number here.
@@ -838,6 +841,14 @@ namespace {
 void clear_rgbi_free_atom_cache() {
 	const std::lock_guard<std::mutex> hold(free_atom_cache_mutex);
 	free_atom_cache.clear();
+}
+
+int highest_shell_angular_momentum(const WFN &wavy) {
+	int highest = -1;
+	for (const atom &a : wavy.get_atoms())
+		for (const basis_set_entry &bf : a.get_basis_set())
+			highest = std::max(highest, static_cast<int>(bf.get_type()) - 1);
+	return highest;
 }
 
 void symmetrize_atomic_matrix_oh(dMatrix2 &matrix, const ivec &shell_angular_momenta,
@@ -1911,6 +1922,23 @@ void Roby_information::computeAllAtomicNAOs(WFN &wavy, const bool symmetrize, co
 		" carries none: its reader stores the density in triangular form only. Use the .gbw or the "
 		".molden of the same calculation.",
 		std::cout);
+
+	//Whether the O_h symmetrization can handle this basis is a property of the basis, and nothing
+	//below changes it - but the check used to live inside symmetrize_atomic_matrix_oh(), three calls
+	//down and after the overlap matrix and (on the ANO route) a free-atom SCF per element had been
+	//paid for. -rgbi on tests/CuF2_i_func/71/calc.gbw, 670 MOs with i shells, therefore worked for
+	//467.3 s and then exited on a message that needs nothing but the shell types to print. A refusal
+	//that arrives after the work is a robustness defect of its own, so ask here. The check inside
+	//symmetrize_atomic_matrix_oh() stays as the backstop for its other callers.
+	if (symmetrize) {
+		const int highest = highest_shell_angular_momentum(wavy);
+		err_checkf(highest <= 5,
+			"RGBI's atomic O_h symmetrization supports shells from s through h, and the basis of " +
+			wavy.get_path().filename().string() + " carries l = " + std::to_string(highest) +
+			" (" + std::string(1, "spdfghiklm"[std::min(highest, 9)]) + " shells). Run -rgbi_no_sym "
+			"to analyse it without the symmetrization.",
+			std::cout);
+	}
 
 	if (wavy.get_d_f_switch()) {
 		Int_Params basis(wavy);
