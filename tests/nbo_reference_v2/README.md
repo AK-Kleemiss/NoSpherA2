@@ -236,9 +236,12 @@ measures how many.
 
 What it found, over the 22: the core is exact everywhere (|d| <= 3e-5 e), and `d(Val) = -d(Ryd)`
 to five decimals in every single molecule. The error is an intra-atomic valence -> Rydberg leak,
-and it is 47x larger than the NPA charge comparison lets you see - benzene's valence set is
-0.31611 e short and its Rydberg set 0.31605 e long while its worst NPA charge deviation is
-0.00673 e. It is not a per-Rydberg-function normalisation error: `ryd_per_function.py` shows d per
+and the NPA charge comparison is **blind** to it rather than merely 47x coarser: benzene's valence
+set is 0.31611 e short and its Rydberg set 0.31605 e long while its worst NPA charge deviation is
+0.00673 e, and the two class arms below move 0.695 e of benzene's Rydberg population while all 111
+NPA charges agree to 1e-10.  A charge is a sum over classes, so a leak between two classes cancels
+in it exactly.  The distinction decides what to do next: a coarse metric would be worth tightening,
+a blind one has to be replaced - which is what the per-orbital AO -> NAO comparison does. It is not a per-Rydberg-function normalisation error: `ryd_per_function.py` shows d per
 function spanning -0.000694 to +0.001939 e *including sign changes*, with the top 3 of 26 functions
 carrying 38-88 % of the magnitude where flat would be 11.5 %. It is not spin-resolved either -
 ch3's leak (0.03418 e) is smaller than closed-shell ethane's (0.12989 e).
@@ -422,9 +425,145 @@ charge argument.
 Together those two prune the search rather than narrow it.  The class totals step 4 inherits are
 fixed by the span of the natural minimal pre-NAOs alone, and both inputs to that span are already at
 their better setting — so there is nothing upstream of step 4 left to change.  What is left is which
-vectors step 3 hands to each block and what step 4 does with them, and NBO 7 prints no intermediate
-table, so neither can be arbitrated: only the final table can.
+vectors step 3 hands to each block and what step 4 does with them.  NBO 7 prints no intermediate
+*occupancy* table - but it does emit the transformation itself, so the vectors are arbitrable even
+where the intermediate occupancies are not.
 
+
+## The arbitrated intermediate (`aonao_probe.sh`, `aonao_stage.sh`, `aonao_compare.py`)
+
+`$NBO AONAO=W $END` makes NBO 7.0.9 write **its own AO -> NAO transformation matrix** to logical
+file 33 at nine decimals, and `AONAO` alone prints the same matrix into the `.nbo`.  Probe job
+588007 established that on this install, against the binary's own `$NBO HELP $END` text rather than
+a remembered manual - and it also killed the guessed unit number: `AONAO=W48` is refused, because
+lfn 48 is reserved.  The whole matrix-output family exists on the same terms (AOPAO, AOPNAO, AONHO,
+AONBO, AONLMO, AORNBO, AOMO, PAOPNAO, NAONHO, NAONBO), so AO -> NBO is available later without a
+second capability question.  The native side needed no new code beyond a dump: `NAOResult::C`
+already holds our AO -> NAO matrix, and `NAO_DUMP_C=1` prints one `NAOC` line per NAO with its
+(atom, l, m, shell, class, occupancy) and its AO coefficients.
+
+What makes this a fair comparison rather than a convention argument: **both sides read the same
+`<mol>_native.47`**.  The reader in `nbo.cpp` builds its AO map from that file's own CENTER/LABEL
+arrays and takes S and P from `$OVERLAP`/`$DENSITY`, so the AO order and both matrices are literally
+the same arrays on both sides and nothing is converted.
+
+The metric is an m-averaged mixing matrix between the two sides' shells inside each (atom, l) block,
+`M[a][b] = (1/(2l+1)) sum_{m,m'} (c_native(a,m)^T S c_gennbo(b,m'))^2`, paired **by rank** within the
+block.  Squaring makes it sign-blind and the m sum makes it blind to component order, so neither
+convention can masquerade as an error.  It is reported as two separate numbers: the **in-block leak**
+`1 - M[a][a]`, which an intra-atomic step could produce, and the **out-of-block remainder**, which it
+could not.
+
+Three gates run before any number is quoted, because three metrics have already been retired on this
+branch for being incommensurable:
+
+1. the lfn 33 layout is decided by which reshape satisfies `C^T S C = 1`, and the check asserts the
+   loser **fails** - with `S = 1` a matrix and its transpose would both pass, so the demo uses a
+   non-trivial metric;
+2. the occupancies printed in the same run must come back out of the matrix as
+   `diag(C_g^T S P S C_g)` (that is the NAO-basis density because `C^-1 = C^T S`; the wrong form
+   `C_g^T P C_g` is computed too and the report names which one matched);
+3. the AONAO runs use a reduced keylist (`AONAO=W` alone, since the NAO stage is upstream of NBO, E2
+   and NRT), so that run's own NAO table must equal the stamped reference JSON's to 1e-5 - otherwise
+   the molecule is declared **VOID** instead of compared.
+
+The number of VOID molecules is printed next to the number compared, so a shrinking denominator
+cannot flatter a mean - the failure that has just cost another lane a corpus headline.
+
+Three more gates test the **metric** rather than `nao.cpp`.  The exact one is completeness: each native
+shell's m-averaged mixing summed over *all* gennbo NAOs must be 1, because both sides are
+S-orthonormal sets spanning the same AO space, so any deviation is an error in the matrix read, the
+pairing or the block bookkeeping and nothing may be quoted until it passes.  The soft one is the
+contrast: mean in-block leak on pf5/so2/sf6, whose final table is already right, against ethane and
+benzene, which are worst - if the metric does not separate those, it is measuring something other
+than the leak it exists to explain.  The third closes completeness's blind spot: a row sum is
+invariant under any relabelling of gennbo's shells, so it cannot see a pairing error - the defect
+that once discarded 11 of 22 molecules - and the pairing diagnostic therefore prints, per molecule,
+how many shells have their argmax on the rank partner and the distribution of (argmax - rank)
+offsets.  It is deliberately diagnostic rather than pass/fail, because a genuine leak *will* move an
+argmax off the diagonal and that is the finding; a systematic off-by-one instead appears as most
+shells sharing one non-zero offset, and the report says so in those words.  When completeness does
+fire, the report distinguishes a **shortfall** - missing weight, so lfn 33 is not the full n x n set
+and the fault is on the read side - from an excess, which would have to be block bookkeeping: 0.93
+instead of 1 reads like a small error and means a missing column.
+
+A third gate was proposed and **does not survive the algebra**, so it is not implemented: that the
+out-of-block remainder should be exactly 0 on LiF or N2 because the pipeline is intra-atomic.  NAOs
+are orthonormal over the whole molecule on each side, not per atom, so a native NAO on one atom
+generically has amplitude on another atom's and on other l when expanded in gennbo's basis - and that
+is the inter-l leak this metric exists to measure (92 % of the final-table excess crosses l), not an
+artefact of it.  A diatomic does not change it: two atoms' NAO sets are mutually orthogonal within
+one side, never between sides.
+
+### What it says (jobs 589060 + 589634, AKL012, 2 threads, 8 molecules, 0 VOID)
+
+The staging job ran in seconds once it was shaped like the probe, and every gate passed: lfn 33 is
+column-major on all eight molecules with `|C^T S C - 1| <= 2.8e-09`, the printed occupancies come back
+out of it as `diag(C^T S P S C)` to `5.0e-06` while the wrong form does not, all eight agree with the
+stamped reference JSON at `0.0e+00`, completeness holds to `2.74e-09`, and the contrast gate separates
+the molecules whose final table is already right (mean in-block leak 0.17423 over 182 shells) from the
+two worst (0.43950 over 136).
+
+sf6 was **VOID on the first pass** with a 0-byte lfn 33 and `rc=0`, and the cause is worth keeping: NBO
+stopped at `SYMOPS: generated 48 symmetry operator(s) for Th but expected 24` after 0.02 CPU seconds,
+which is *before* the NAO stage, so it produced a valid-looking `.nbo` of 1190 bytes and no matrix at
+all.  `NRTSYM=OFF` suppresses it and job 589634 recovered the full 1.15 MB matrix; the keyword is
+applied to sf6 alone on purpose, because the other seven's numbers were produced with `AONAO=W` by
+itself.  A job that exits 0 and writes an empty file is exactly what the VOID denominator exists for.
+
+Three arms, because a rank pairing is not physics and a unit-normalised shell is not a population:
+
+| by class | mean `1-M[a][a]` (rank-paired) | mean `1-max_b M[a][b]` | mean weight outside the (atom,l) block | shells |
+|---|---|---|---|---|
+| Core    | 0.00000 | 0.00000 | 0.00000 | 34 |
+| Valence | 0.00783 | 0.00783 | 0.00367 | 72 |
+| Rydberg | 0.37253 | 0.27308 | 0.17676 | 273 |
+
+Read per shell, the Rydberg set is the whole problem - 48x the valence error - and the cores are
+*exactly* right, which exonerates the AO read, S, P and the core partition in one number.  Of the
+Rydberg 0.373, 0.099 is only an ordering difference (LiF's 2p Rydberg pair scores 0.00007 on its rank
+partner and 0.98861 one rank over: right shape, different order), 0.096 is genuine rotation inside the
+(atom,l) block, and 0.177 leaves the block altogether.  The `+-1` offsets in the pairing diagnostic are
+symmetric (benzene `-1:24 +0:42 +1:24`), so they are mutual swaps, not the shared non-zero offset that
+would mean a systematic pairing error; sf6's are one-sided (`+1:7` of 79) but too few to be that either.
+
+Weighted by occupancy the ranking **inverts**, and that is the finding:
+
+| electrons, sum `(2l+1)*occ*leak` | rank-paired | ordering-insensitive | out-of-block |
+|---|---|---|---|
+| Core    | 0.00026 | 0.00026 | 0.00001 |
+| Valence | 0.94266 | 0.94266 | 0.51486 |
+| Rydberg | 0.39467 | 0.31255 | 0.19472 |
+| total   | 1.33759 | 1.25547 | 0.70960 |
+
+**70 % of the mis-shaped density is in the valence shells**, and 0.51486 e of it lands outside its own
+(atom,l) block - against 0.19472 e for the whole Rydberg set, whose per-shell error is 48x larger.
+None of the valence number is an ordering artefact: the two arms agree to five decimals, because
+valence shells are not near-degenerate enough to swap.  So the per-shell picture ("the Rydberg
+construction is wrong") and the charge picture ("the valence shells carry the error that moves
+populations") are both true, and only the second is commensurable with the NPA failure this exists to
+explain.  It is also what `d(Val) = -d(Ryd)` looks like one level down: the valence shells themselves
+are built with a small shape error that carries a lot of charge, and it surfaces as Rydberg population.
+
+This is the fourth metric on this branch to rank the wrong thing until it was weighted the way the
+failure is, so the charge-scale arm is printed next to the mean and neither is quoted alone.
+
+Two read defects were caught by the gates on the way, both of the family this branch keeps meeting:
+
+- `unpack_upper` filled the `.47`'s packed triangle row by row, but UPPER is packed **column by
+  column**, so S and P were scrambled and the layout gate refused all five molecules.  It was right
+  and the fault was mine one function earlier.  Its doctest had used `n = 2`, where the two orders
+  coincide - a test that could not fail; it uses `n = 3` now.
+- gennbo prints an (atom, l) block **component-major** (water's oxygen p set is `2px 3px 4px 5px`,
+  then `2py ...`), so slicing it in groups of `2l+1` grouped four shells of one component together.
+  Every p shell then scored `M[a][a] ~ 1/3` - one of three m pairs matching - and the run passed all
+  three gates while producing nonsense.  The grouping now reads the self-identifying `lang` field, and
+  the demo carries the case that scores 1/3 under the old slicing and 1 under the new.
+
+The kept inputs are in `data_nao_split/aonao/<mol>/`: gennbo's own lfn 33 (`<mol>.33`, the external
+reference in its original form, so a reader fix is a local re-parse), the native `NAOC` dump, the
+AONAO run's parsed JSON, both jobs' stdout and the full comparison table.  The `.47` is not duplicated
+here - it is the same `<mol>_native.47` listed under "Deliberately not committed" in `data/README.md`.
 
 ## Layout
 

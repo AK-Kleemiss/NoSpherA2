@@ -373,7 +373,10 @@ NAOResult build_naos(const dMatrix2 &P_in, const dMatrix2 &S_in, const std::vect
     //identical to five decimals), and the only other input to that span, the net-density pre-NAO
     //variant, is catastrophic.  So there is nothing upstream left to change: the final numbers move
     //only through which vectors step 3 hands to each (atom, l) block and what this step then does
-    //with them, and NBO 7 prints no intermediate table, so neither side of that can be arbitrated.
+    //with them.  That last clause read "and NBO 7 prints no intermediate table, so neither side of
+    //that can be arbitrated", which over-generalised from occupancies to everything: NBO 7 prints no
+    //intermediate OCCUPANCY table, but `$NBO AONAO=W $END` writes its AO -> NAO matrix to lfn 33
+    //(verified on this install, job 588007).  The vectors themselves are arbitrable; see NAO_DUMP_C.
     //The mixing is intra-atomic and unitary, so it moves no charge between atoms - and that is not
     //a reassurance, it is a warning.  The two arms differ by 0.695 e in benzene's Rydberg
     //population and by 1e-10 in every one of 111 NPA charges, so an NPA comparison cannot see this
@@ -448,6 +451,38 @@ NAOResult build_naos(const dMatrix2 &P_in, const dMatrix2 &S_in, const std::vect
     NAOResult res;
     const MatrixXd Pfin = C.transpose() * SPS * C;
     for (int i = 0; i < nao; i++) orbitals[i].occupation = Pfin(i, i);
+
+    //NAO_DUMP_C: the AO -> NAO transformation itself, one line per NAO.  This is the only
+    //arbitrated INTERMEDIATE that exists.  NBO 7 prints no pre-NAO and no step-3 occupancy table,
+    //but `$NBO AONAO=W $END` writes its own AO -> NAO matrix to lfn 33 at nine decimals - verified
+    //on this install, job 588007, where AONAO=W48 is refused because 48 is reserved - and both
+    //sides read the SAME .47, so the AO order, S and P are literally the same arrays.  A final
+    //occupancy table can only say that a block came out with the wrong population; the overlap
+    //c_native^T S c_nbo says which orbital has the wrong shape, which is what a fix needs.
+    //
+    //What it said (jobs 589060 + 589634, 8 molecules, 0 VOID; every gate passed, completeness to
+    //2.74e-09).  Mean m-averaged mixing defect per shell, rank-paired inside each (atom, l) block:
+    //Core 0.00000 (34 shells), Valence 0.00783 (72), Rydberg 0.37253 (273).  The cores being EXACTLY
+    //right exonerates the AO read, S, P and the core partition in one number.  Weighted by occupancy
+    //the ranking INVERTS, and that is the finding: of 1.33759 e of mis-shaped density, the valence
+    //shells carry 0.94266 e - 0.51486 e of it outside their own (atom, l) block - against the whole
+    //Rydberg set's 0.39467 e (0.19472 e outside), whose per-shell error is 48x larger.  None of the
+    //valence figure is an ordering artefact: the ordering-insensitive arm agrees to five decimals.  So the per-shell error lives in the Rydberg
+    //construction while the charge that moves is valence, which is what d(Val) = -d(Ryd) looks like
+    //one level down - and only the electron-weighted number is commensurable with the NPA failure.
+    //Do not quote the per-shell mean alone: it ranks a badly-shaped empty Rydberg shell above a
+    //nearly-right doubly-occupied valence one.  Tables in tests/nbo_reference_v2/README.md.
+    if (nao_env("NAO_DUMP_C")) {
+        std::cout << "NAOC index atom l m shell class occ coefficients[" << nao << "]" << std::endl;
+        for (int i = 0; i < nao; i++) {
+            const NAO &o = orbitals[i];
+            std::cout << "NAOC " << i << " " << o.atom << " " << o.l << " " << o.m << " " << o.shell
+                      << " " << static_cast<int>(o.type) << " " << std::setprecision(10)
+                      << std::fixed << o.occupation;
+            for (int k = 0; k < nao; k++) std::cout << " " << C(k, i);
+            std::cout << std::endl;
+        }
+    }
 
     res.C = to_dmatrix(C);
     res.orbitals = orbitals;

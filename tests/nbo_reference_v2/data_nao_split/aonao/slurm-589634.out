@@ -1,0 +1,10 @@
+==========================================
+SLURM_JOB_ID = 589634
+SLURM_JOB_NODELIST = AKL012
+==========================================
+host=AKL012  threads=2  node_cores=96  job=589634  partition=Active
+binary /work/akkleemiss/florian/nos_nboref/build/release-linux/bin/NoSpherA2
+keylist now: $NBO AONAO=W NRTSYM=OFF $END
+gennbo7 sf6 rc=0  NBOMEM=4gb  host=AKL012  NBOBIN=/work/software/bin/NBO/bin
+sf6       gennbo  10s parse rc=0 native   1s rc=0  lfn33=1153696 bytes  NAOC lines=224
+=== done 2026-09-25T06:04:29Z on AKL012, 2 threads

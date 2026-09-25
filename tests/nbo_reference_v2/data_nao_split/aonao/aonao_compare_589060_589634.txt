@@ -1,0 +1,96 @@
+ammonia    n=49   lfn33 column-major  |C^T S C-1|=2.8e-09  occ (C^T S P S C) vs printed 5.0e-06  vs stamped ref 0.0e+00
+   shells 23   in-block leak max 0.41936 mean 0.15812   out-of-block max 0.41048   rank mismatches 0
+     atom  0 l=0 rank 2 Ryd/Ryd 3s   occ  0.00038/ 0.00010  M[a][a]=0.58064  best rank 2 (0.58064)  in-block 0.58952
+     atom  0 l=1 rank 1 Ryd/Ryd 3p   occ  0.00342/ 0.00184  M[a][a]=0.62412  best rank 1 (0.62412)  in-block 0.65887
+     atom  0 l=2 rank 0 Ryd/Ryd 3d   occ  0.00256/ 0.00113  M[a][a]=0.66070  best rank 0 (0.66070)  in-block 0.73806
+     atom  2 l=0 rank 1 Ryd/Ryd 2s   occ  0.00117/ 0.00033  M[a][a]=0.69056  best rank 1 (0.69056)  in-block 0.69769
+     atom  3 l=0 rank 1 Ryd/Ryd 2s   occ  0.00117/ 0.00033  M[a][a]=0.69056  best rank 1 (0.69056)  in-block 0.69769
+benzene    n=222  lfn33 column-major  |C^T S C-1|=2.3e-09  occ (C^T S P S C) vs printed 4.9e-06  vs stamped ref 0.0e+00
+   shells 90   in-block leak max 0.98829 mean 0.48108   out-of-block max 0.53218   rank mismatches 48
+     atom  5 l=0 rank 2 Ryd/Ryd 3s   occ  0.00235/ 0.00089  M[a][a]=0.01171  best rank 3 (0.45001)  in-block 0.46927
+     atom  1 l=0 rank 2 Ryd/Ryd 3s   occ  0.00235/ 0.00089  M[a][a]=0.01171  best rank 3 (0.45001)  in-block 0.46927
+     atom  2 l=0 rank 2 Ryd/Ryd 3s   occ  0.00235/ 0.00089  M[a][a]=0.01171  best rank 3 (0.45001)  in-block 0.46927
+     atom  4 l=0 rank 2 Ryd/Ryd 3s   occ  0.00235/ 0.00089  M[a][a]=0.01171  best rank 3 (0.45001)  in-block 0.46927
+     atom  3 l=0 rank 2 Ryd/Ryd 3s   occ  0.00231/ 0.00089  M[a][a]=0.01177  best rank 3 (0.44846)  in-block 0.46782
+ethane     n=98   lfn33 column-major  |C^T S C-1|=2.6e-09  occ (C^T S P S C) vs printed 5.0e-06  vs stamped ref 0.0e+00
+   shells 46   in-block leak max 0.99457 mean 0.35817   out-of-block max 0.45378   rank mismatches 6
+     atom  0 l=0 rank 2 Ryd/Ryd 3s   occ  0.00077/ 0.00127  M[a][a]=0.00543  best rank 3 (0.29978)  in-block 0.60250
+     atom  1 l=0 rank 2 Ryd/Ryd 3s   occ  0.00077/ 0.00127  M[a][a]=0.00543  best rank 3 (0.29979)  in-block 0.60250
+     atom  0 l=1 rank 2 Ryd/Ryd 4p   occ  0.00063/ 0.00001  M[a][a]=0.23669  best rank 1 (0.30949)  in-block 0.54622
+     atom  1 l=1 rank 2 Ryd/Ryd 4p   occ  0.00063/ 0.00001  M[a][a]=0.23669  best rank 1 (0.30949)  in-block 0.54622
+     atom  0 l=1 rank 1 Ryd/Ryd 3p   occ  0.00128/ 0.00058  M[a][a]=0.25740  best rank 2 (0.54997)  in-block 0.80945
+lif        n=45   lfn33 column-major  |C^T S C-1|=1.6e-09  occ (C^T S P S C) vs printed 4.7e-06  vs stamped ref 0.0e+00
+   shells 19   in-block leak max 0.99993 mean 0.22212   out-of-block max 0.07047   rank mismatches 4
+     atom  1 l=1 rank 2 Ryd/Ryd 3p   occ  0.00002/ 0.00000  M[a][a]=0.00007  best rank 1 (0.98861)  in-block 0.98868
+     atom  1 l=1 rank 1 Ryd/Ryd 4p   occ  0.00010/ 0.00000  M[a][a]=0.00008  best rank 2 (0.95255)  in-block 0.95263
+     atom  0 l=0 rank 3 Ryd/Ryd 5s   occ  0.00000/ 0.00000  M[a][a]=0.42076  best rank 4 (0.55439)  in-block 0.98089
+     atom  0 l=0 rank 4 Ryd/Ryd 3s   occ  0.00000/ 0.00000  M[a][a]=0.42820  best rank 3 (0.53442)  in-block 0.98759
+     atom  1 l=0 rank 2 Ryd/Ryd 3s   occ  0.00019/ 0.00050  M[a][a]=0.57293  best rank 2 (0.57293)  in-block 0.97015
+pf5        n=192  lfn33 column-major  |C^T S C-1|=1.9e-09  occ (C^T S P S C) vs printed 4.9e-06  vs stamped ref 0.0e+00
+   shells 68   in-block leak max 0.90611 mean 0.19436   out-of-block max 0.66037   rank mismatches 10
+     atom  3 l=0 rank 2 Ryd/Ryd 3s   occ  0.00164/ 0.00067  M[a][a]=0.09389  best rank 3 (0.65984)  in-block 0.75549
+     atom  5 l=0 rank 2 Ryd/Ryd 3s   occ  0.00170/ 0.00067  M[a][a]=0.09478  best rank 3 (0.65614)  in-block 0.75268
+     atom  4 l=0 rank 2 Ryd/Ryd 3s   occ  0.00170/ 0.00067  M[a][a]=0.09479  best rank 3 (0.65613)  in-block 0.75268
+     atom  1 l=0 rank 2 Ryd/Ryd 3s   occ  0.00176/ 0.00063  M[a][a]=0.16803  best rank 3 (0.63015)  in-block 0.81591
+     atom  2 l=0 rank 2 Ryd/Ryd 3s   occ  0.00176/ 0.00063  M[a][a]=0.16803  best rank 3 (0.63015)  in-block 0.81591
+sf6        n=223  lfn33 column-major  |C^T S C-1|=2.5e-09  occ (C^T S P S C) vs printed 4.9e-06  vs stamped ref 0.0e+00
+   shells 79   in-block leak max 0.93296 mean 0.16099   out-of-block max 0.92342   rank mismatches 7
+     atom  0 l=0 rank 4 Ryd/Ryd 5s   occ  0.00000/ 0.00000  M[a][a]=0.06704  best rank 4 (0.06704)  in-block 0.07658
+     atom  0 l=1 rank 3 Ryd/Ryd 4p   occ  0.00005/ 0.00015  M[a][a]=0.15848  best rank 4 (0.36221)  in-block 0.53201
+     atom  5 l=0 rank 2 Ryd/Ryd 3s   occ  0.00234/ 0.00063  M[a][a]=0.27863  best rank 3 (0.46922)  in-block 0.75679
+     atom  6 l=0 rank 2 Ryd/Ryd 3s   occ  0.00234/ 0.00063  M[a][a]=0.27864  best rank 3 (0.46922)  in-block 0.75679
+     atom  1 l=0 rank 2 Ryd/Ryd 3s   occ  0.00232/ 0.00063  M[a][a]=0.27874  best rank 3 (0.46774)  in-block 0.75542
+so2        n=99   lfn33 column-major  |C^T S C-1|=2.0e-09  occ (C^T S P S C) vs printed 5.0e-06  vs stamped ref 0.0e+00
+   shells 35   in-block leak max 0.91730 mean 0.16503   out-of-block max 0.36361   rank mismatches 4
+     atom  1 l=0 rank 2 Ryd/Ryd 3s   occ  0.00328/ 0.00090  M[a][a]=0.08270  best rank 3 (0.78643)  in-block 0.87503
+     atom  2 l=0 rank 2 Ryd/Ryd 3s   occ  0.00328/ 0.00090  M[a][a]=0.08270  best rank 3 (0.78643)  in-block 0.87503
+     atom  1 l=0 rank 3 Ryd/Ryd 4s   occ  0.00026/ 0.00016  M[a][a]=0.12308  best rank 2 (0.50722)  in-block 0.63639
+     atom  2 l=0 rank 3 Ryd/Ryd 4s   occ  0.00026/ 0.00016  M[a][a]=0.12308  best rank 2 (0.50721)  in-block 0.63639
+     atom  0 l=2 rank 1 Ryd/Ryd 4d   occ  0.00047/ 0.00002  M[a][a]=0.62874  best rank 1 (0.62874)  in-block 0.64131
+water      n=43   lfn33 column-major  |C^T S C-1|=2.5e-09  occ (C^T S P S C) vs printed 5.0e-06  vs stamped ref 0.0e+00
+   shells 19   in-block leak max 0.57398 mean 0.15385   out-of-block max 0.40977   rank mismatches 0
+     atom  0 l=0 rank 2 Ryd/Ryd 3s   occ  0.00044/ 0.00028  M[a][a]=0.42602  best rank 2 (0.42602)  in-block 0.59023
+     atom  1 l=0 rank 1 Ryd/Ryd 2s   occ  0.00191/ 0.00119  M[a][a]=0.71156  best rank 1 (0.71156)  in-block 0.78255
+     atom  2 l=0 rank 1 Ryd/Ryd 2s   occ  0.00191/ 0.00119  M[a][a]=0.71156  best rank 1 (0.71156)  in-block 0.78255
+     atom  0 l=1 rank 1 Ryd/Ryd 3p   occ  0.00057/ 0.00283  M[a][a]=0.72783  best rank 1 (0.72783)  in-block 0.78710
+     atom  0 l=0 rank 3 Ryd/Ryd 4s   occ -0.00000/ 0.00000  M[a][a]=0.76151  best rank 3 (0.76151)  in-block 0.98539
+
+denominator: 8 molecules compared, 0 VOID, 0 without an lfn 33
+
+where the shape error sits (mean 1-M[a][a], rank-paired, n shells):
+  by l     0: 0.31841 (191)  1: 0.24304 (107)  2: 0.26599 (54)  3: 0.03994 (27)
+  by class Cor: 0.00000 (34)  Ryd: 0.37253 (273)  Val: 0.00783 (72)
+
+where the shape error sits (mean 1-max_b M[a][b], ordering-insensitive, n shells):
+  by l     0: 0.22976 (191)  1: 0.18015 (107)  2: 0.20142 (54)  3: 0.03994 (27)
+  by class Cor: 0.00000 (34)  Ryd: 0.27308 (273)  Val: 0.00783 (72)
+
+where the shape error sits (mean weight outside the shell's own (atom,l) block, n shells):
+  by l     0: 0.14429 (191)  1: 0.12883 (107)  2: 0.11294 (54)  3: 0.03994 (27)
+  by class Cor: 0.00000 (34)  Ryd: 0.17676 (273)  Val: 0.00367 (72)
+
+on the charge scale (sum (2l+1)*occ*leak, electrons):
+  rank-paired           Cor: 0.00026  Ryd: 0.39467  Val: 0.94266   total 1.33759
+  ordering-insensitive  Cor: 0.00026  Ryd: 0.31255  Val: 0.94266   total 1.25547
+  out-of-block          Cor: 0.00001  Ryd: 0.19472  Val: 0.51486   total 0.70960
+
+completeness gate (sum_b M[a][b] over ALL gennbo NAOs must be 1, exactly):
+  ammonia    max |sum - 1| = 2.74e-09 over 23 shells
+  benzene    max |sum - 1| = 1.47e-09 over 90 shells
+  ethane     max |sum - 1| = 1.92e-09 over 46 shells
+  lif        max |sum - 1| = 1.53e-09 over 19 shells
+  pf5        max |sum - 1| = 1.73e-09 over 68 shells
+  sf6        max |sum - 1| = 1.53e-09 over 79 shells
+  so2        max |sum - 1| = 1.93e-09 over 35 shells
+  water      max |sum - 1| = 2.58e-09 over 19 shells
+  -> passes (worst 2.74e-09)
+pairing diagnostic (argmax within the (atom, l) block vs the rank partner):
+  ammonia    on partner 23/23   offsets +0:23
+  benzene    on partner 42/90   offsets -1:24 +0:42 +1:24   worst off-partner gap 0.44563
+  ethane     on partner 40/46   offsets -1:2 +0:40 +1:4   worst off-partner gap 0.29258
+  lif        on partner 15/19   offsets -1:2 +0:15 +1:2   worst off-partner gap 0.98854
+  pf5        on partner 58/68   offsets -1:5 +0:58 +1:5   worst off-partner gap 0.56595
+  sf6        on partner 72/79   offsets +0:72 +1:7   worst off-partner gap 0.20373
+  so2        on partner 31/35   offsets -1:2 +0:31 +1:2   worst off-partner gap 0.70374
+  water      on partner 19/19   offsets +0:19
+contrast gate: mean in-block leak 0.17423 on the already-right pf5/so2/sf6 (182 shells) vs 0.43950 on ethane/benzene (136 shells) -> tracks the final-table error
