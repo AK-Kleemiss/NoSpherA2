@@ -109,3 +109,31 @@ optimisation, converged last SCF, charge / multiplicity / basis / keyword line a
 `<S**2>` within 4 % of S(S+1)) and **records** the basis-function count so the next
 regeneration of this set does have the exact test. It can prove the wavefunction is the one
 this tree asked for. It cannot prove it reproduces somebody else's earlier wavefunction.
+
+## Addendum, 25 Sep 2026 - written AFTER the baseline was measured, and marked as such
+
+Nothing above is edited: the predictions stand as registered. What this addendum records is
+that one number the predictions were *calibrated against* turned out to belong to a different
+binary, which changes the scale H1 and H2 are read on and nothing else.
+
+"The shipped native's worst `dpop` is 0.3161 e (benzene 0.4316 against gennbo's 0.1155)" is a
+property of the share build `/work/akkleemiss/share/NoSpherA2_RGBI_NBO/NoSpherA2`,
+`c8130055 built 2026-09-25 02:20 on AKL007, branch density_source`, which is what produced the
+stored native column in `../data/`. Re-running only the native side of the same 22 with the
+baseline binary 60055d4b - same stored `.gbw`, same `_native.47`, same flags, same thread count,
+so the only variable is which NoSpherA2 ran - gives benzene 0.12055 against gennbo's 0.11544,
+a `dpop` of **0.00503 e**, and a mean over the 22 of 0.00030 e rather than 0.01229 e.
+
+Consequences, and only these:
+
+- The factor 63 is a ratio against that share build, not against the head of this branch.
+- H1's "5x improvement" and H2's "1.5x worse" are ratios, so they survive unchanged - but they
+  must be taken on one binary with an environment switch, never on two builds, and the
+  before-number must come from 60055d4b.
+- The held-out set's own baseline sits at 0.00002 to 0.00607 e, which is one to two orders
+  below the 0.3161 e the set was sized against. The "fit rather than improvement" reading above
+  is therefore harder to reach than intended on this set: a 5x improvement on 0.006 e is close
+  to the 1e-5 print floor. That is a weakness of the set, recorded rather than repaired.
+
+See `README.md`, section "The 0.3161 e baseline figure does not belong to this branch", for the
+excluded candidates and the positive control that makes the exclusions readable.
