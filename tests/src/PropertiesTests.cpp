@@ -1250,6 +1250,50 @@ TEST(PropertiesBasinTests, EliLabelsCoreLonePairBondAndProton)
 	EXPECT_EQ(labels[4], "O1 core");
 }
 
+// Two nearest nuclei are not a bond unless the maximum lies between them. The bond branch used to be
+// the unconditional else of the ELI chain, so a basin that reached it was labelled "A-B bond" whatever
+// the geometry: -eli_analysis on water with a helium atom 13 bohr away reported nine "He3-H1 bond"
+// basins. Hydrogen is where it shows, because for a nearest atom of charge <= 2 neither the core nor
+// the lone-pair branch can fire. The first half of this test is the positive control - a maximum on the
+// O-H line must still be a bond - so a gate that rejected everything would fail here.
+TEST(PropertiesBasinTests, EliBondLabelNeedsTheMaximumBetweenTheTwoNuclei)
+{
+	std::vector<atom> atoms;
+	atoms.emplace_back("O", atomID(), 1, 0.0, 0.0, 0.0, 8);
+	atoms.emplace_back("H", atomID(), 2, 1.8, 0.0, 0.0, 1);
+	atoms.emplace_back("He", atomID(), 3, 13.2, 0.0, 0.0, 2);
+	const std::vector<d4> on_the_line{ d4{ 0.9, 0.0, 0.0, 2.0 } };   // the O-H midpoint: d1 + d2 = d(O,H)
+	const svec bond = assign_labels_to_basins(on_the_line, atoms, false, 1);
+	ASSERT_EQ(bond.size(), 1u);
+	EXPECT_EQ(bond[0], "O0-H1 bond");
+
+	// In the vacuum between the hydrogen and the helium: nearest H at 5.2 bohr, second He at 6.2, and
+	// the two sum to d(H,He) exactly, so it IS between them - betweenness alone would still call this a
+	// bond. What rules it out is that H and He are not a bonded pair: 11.4 bohr against 1.3 * (0.23 +
+	// 1.50) Angstrom = 4.25 bohr, so the seeding loop of b2c.cpp would never have looked for a BCP
+	// there either. Before the gate this came out "H1-He2 bond".
+	const std::vector<d4> in_the_gap{ d4{ 7.0, 0.0, 0.0, 0.01 } };
+	const svec unbonded = assign_labels_to_basins(in_the_gap, atoms, false, 1);
+	ASSERT_EQ(unbonded.size(), 1u);
+	EXPECT_EQ(unbonded[0], "H1 LP");
+	EXPECT_EQ(unbonded[0].find("bond"), std::string::npos) << "a maximum between two unbonded atoms was called a bond";
+
+	// 1.0 bohr past the hydrogen, away from the oxygen: nearest H (1.0), second O (2.8), sum 3.8 against
+	// d(O,H) = 1.8 - a bonded pair, but the maximum is outside it. That is the other half of the gate.
+	const std::vector<d4> past_the_h{ d4{ 2.8, 0.0, 0.0, 0.9 } };
+	const svec outside = assign_labels_to_basins(past_the_h, atoms, false, 1);
+	ASSERT_EQ(outside.size(), 1u);
+	EXPECT_EQ(outside[0], "H1 LP");
+
+	// off the internuclear axis by 0.6 bohr at the midpoint of a 1.8 bohr bond: still a bond, because a
+	// pi-type basin does not sit on the line. This pins the tolerance from the other side - a gate
+	// tighter than d1 + d2 <= 1.25 d(A,B) would lose it.
+	const std::vector<d4> off_axis{ d4{ 0.9, 0.6, 0.0, 1.4 } };
+	const svec pi = assign_labels_to_basins(off_axis, atoms, false, 1);
+	ASSERT_EQ(pi.size(), 1u);
+	EXPECT_EQ(pi[0], "O0-H1 bond");
+}
+
 // A free atom has no second atom to bond to, and it is the system ELI-D is calibrated against.
 // The labeller used to abort on it - err_checkf(atom_index2 >= 0, "Only one atom found for basin
 // ...") - which made -eli_analysis impossible on every monoatomic input: six of the twenty-two

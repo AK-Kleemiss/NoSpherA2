@@ -87,8 +87,8 @@ Delocalization indices (11 occupied orbitals):
 ELI-D Analysis (voxel sum):
 basin:    0 label:               H2 integrated value:   1.3926 volume:   33.6932
 basin:    1 label:               H1 integrated value:   1.4304 volume:   39.4592
-basin:    2 label:      H2-Hg0 bond integrated value:   0.4969 volume:  279.2072
-basin:    3 label:      H1-Hg0 bond integrated value:   0.4591 volume:  273.5088
+basin:    2 label:            H2 LP integrated value:   0.4969 volume:  279.2072
+basin:    3 label:            H1 LP integrated value:   0.4591 volume:  273.5088
 basin:    4 label:         Hg0 core integrated value: 377.0942 volume:  232.8545
 GridManager: Setting up prototype grids for atom types...
 GridManager: Generating integration grids for atoms...
@@ -99,7 +99,7 @@ ELI-D Analysis (atomic quadrature grids):
   basin  label               electrons      volume         maximum        x          y          z
       1  H2                     1.4273     35.4697          7.2442      0.000      0.000     -3.178
       2  H1                     1.4406     37.4762          7.2442      0.000      0.000      3.178
-      3  H2-Hg0 bond            0.4764    288.4732          5.0747      0.000      0.000     -4.955
-      4  H1-Hg0 bond            0.4631    286.4706          5.0747      0.000      0.000      4.955
+      3  H2 LP                  0.4764    288.4732          5.0747      0.000      0.000     -4.955
+      4  H1 LP                  0.4631    286.4706          5.0747      0.000      0.000      4.955
       5  Hg0 core              18.1633    215.1703          1.4329      0.378     -0.472     -0.654
   total in basins: 21.9708   outside every basin: 0.0292

@@ -2100,6 +2100,29 @@ svec assign_labels_to_basins(const std::vector<d4> &Maxima, const std::vector<at
 				//Ce_full.molden, sc.molden) for no reason other than holding one atom.
 				const bool lone_atom = atom_index2 < 0;
 				const double ratio = lone_atom ? 0.0 : std::max(1e-5, min_dist1) / std::max(1e-5, min_dist2);
+				//Two nearest nuclei do not make a bond. Two things have to hold, and neither was tested: the
+				//pair has to be bonded at all, and the maximum has to lie BETWEEN the two. The bond criterion
+				//is the same one the seeding loop of this file already uses for its BCP seeds - d(A,B) within
+				//1.3 times the sum of the CSD covalent radii - so a basin is never called a bond of a pair the
+				//seeder would not have looked for a BCP along. Betweenness is d1 + d2 against d(A,B): equal on
+				//the internuclear line, larger off it or outside the pair, and 1.25 admits a maximum up to
+				//0.75 * d(A,B)/2 off the axis, which is where a pi basin sits.
+				//Without these two the else below was unconditional, so any basin reaching it was labelled
+				//"A-B bond" whatever the geometry: -eli_analysis on water with a helium atom 13 bohr away
+				//reported nine "He3-H1 bond" basins. Hydrogen is where it shows, because for a nearest atom
+				//of charge <= 2 neither the core nor the lone-pair branch above can fire at all.
+				bool between = false;
+				if (!lone_atom) {
+					const d3 p1 = atoms[atom_index1].get_pos();
+					const d3 p2 = atoms[atom_index2].get_pos();
+					const int z1 = atoms[atom_index1].get_charge();
+					const int z2 = atoms[atom_index2].get_charge();
+					const double r1 = (z1 > 0 && z1 < 114) ? constants::covalent_radii[z1] : 1.5;
+					const double r2 = (z2 > 0 && z2 < 114) ? constants::covalent_radii[z2] : 1.5;
+					const double dAB = std::sqrt((p1[0] - p2[0]) * (p1[0] - p2[0]) + (p1[1] - p2[1]) * (p1[1] - p2[1]) + (p1[2] - p2[2]) * (p1[2] - p2[2]));
+					between = dAB <= constants::ang2bohr(1.3 * (r1 + r2)) &&
+						(std::sqrt(min_dist1) + std::sqrt(min_dist2)) <= 1.25 * std::max(1e-5, dAB);
+				}
 				if (atoms[atom_index1].get_charge() == 1 && min_dist1 < 0.36) // The basin holding a proton: its maximum sits within 0.6 bohr of the nucleus
 					result[i] = atoms[atom_index1].get_label() + to_string(atom_index1);
 				else if (lone_atom) // one atom in the molecule: inside its core radius a core shell, outside it the valence shell
@@ -2108,8 +2131,10 @@ svec assign_labels_to_basins(const std::vector<d4> &Maxima, const std::vector<at
 					result[i] = atoms[atom_index1].get_label() + to_string(atom_index1) + " core";
 				else if ((ratio < 0.333 || ratio > 3) && atoms[atom_index1].get_charge() > 2) // If the maximum is significantly closer to one atom than to the other, we assume it's a valence basin and label it with the closest atom
 					result[i] = atoms[atom_index1].get_label() + to_string(atom_index1) + " LP";
-				else // Otherwise, we assume it's a bond basin and label it with both atoms
+				else if (between) // between its two nearest nuclei: a bond basin, labelled with both atoms
 					result[i] = atoms[atom_index1].get_label() + to_string(atom_index1) + "-" + atoms[atom_index2].get_label() + to_string(atom_index2) + " bond";
+				else // not between them: it belongs to the nearest atom alone, core inside the core radius
+					result[i] = atoms[atom_index1].get_label() + to_string(atom_index1) + (min_dist1 < core_dist && atoms[atom_index1].get_charge() > 2 ? " core" : " LP");
 			}
 			break;
 		default:
