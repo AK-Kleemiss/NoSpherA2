@@ -1182,27 +1182,48 @@ TEST(PropertiesBasinTests, AssignmentRadiusFloorAndPersistenceMerge)
 	EXPECT_EQ(floored.first.get_value(0, 0, 0), 0);
 	EXPECT_NE(floored.first.get_value(4, 8, 8), 0);
 
-	// bump at (2.0, 0, 0) beyond the right nucleus, a tenth of a percent over its highest neighbour
+	// bump at (1.75, 0, 0) beyond the right nucleus, a tenth of a percent over its highest neighbour.
+	// One voxel in from the face on purpose: the bump used to sit at index 16, x = 2.0, which is the
+	// last plane of the grid, and a maximum whose outward neighbour is outside the analysed region is
+	// now dropped rather than reported - see the face arm below. Grid noise in the tail, which is what
+	// this arm is about, does not need to be on the face to be noise
 	cube bumped = rho;
 	double best = 0.0;
 	for (int dx = -1; dx <= 1; dx++)
 		for (int dy = -1; dy <= 1; dy++)
 			for (int dz = -1; dz <= 1; dz++)
 				if (dx || dy || dz)
-					best = std::max(best, rho.get_value(16 + dx < N ? 16 + dx : 16, 8 + dy, 8 + dz));
-	bumped.set_value(16, 8, 8, best * 1.001);
+					best = std::max(best, rho.get_value(15 + dx, 8 + dy, 8 + dz));
+	bumped.set_value(15, 8, 8, best * 1.001);
 	std::pair<cubei, std::vector<d4>> kept = topological_cube_analysis(&bumped, atoms, false, false, 0.0, 0.0, -1.0, 0.0);
 	ASSERT_EQ(kept.second.size(), 3u);
 	bool bump_found = false;
 	for (const d4 &mx : kept.second)
-		if (std::abs(mx[0] - 2.0) < 1e-12 && std::abs(mx[1]) < 1e-12)
+		if (std::abs(mx[0] - 1.75) < 1e-12 && std::abs(mx[1]) < 1e-12)
 			bump_found = true;
 	EXPECT_TRUE(bump_found);
 	EXPECT_EQ(kept.first.max_value(), 3);
 	std::pair<cubei, std::vector<d4>> merged = topological_cube_analysis(&bumped, atoms, false, false, 0.0, 0.0, -1.0, 5e-3);
 	EXPECT_EQ(merged.second.size(), 2u);
 	EXPECT_EQ(merged.first.max_value(), 2);
-	EXPECT_EQ(merged.first.get_value(16, 8, 8), merged.first.get_value(12, 8, 8));
+	EXPECT_EQ(merged.first.get_value(15, 8, 8), merged.first.get_value(12, 8, 8));
+
+	// the same bump on the last plane of the grid, where the one-sided difference has nothing outward
+	// to compare against, with the persistence merge switched off so nothing else can remove it: not
+	// a basin, because the field beyond the analysed region is not known to be lower. This is the ELI-D
+	// rim artefact in its smallest form - there the crop at rho < 1e-4 plays the part of the face, and
+	// it produced 62, 53 and 23 basins for one molecule at three box paddings
+	cube on_face = rho;
+	double best_face = 0.0;
+	for (int dx = -1; dx <= 0; dx++)
+		for (int dy = -1; dy <= 1; dy++)
+			for (int dz = -1; dz <= 1; dz++)
+				if (dx || dy || dz)
+					best_face = std::max(best_face, rho.get_value(16 + dx, 8 + dy, 8 + dz));
+	on_face.set_value(16, 8, 8, best_face * 1.001);
+	std::pair<cubei, std::vector<d4>> faced = topological_cube_analysis(&on_face, atoms, false, false, 0.0, 0.0, -1.0, 0.0);
+	EXPECT_EQ(faced.second.size(), 2u) << "a maximum on the last plane of the grid was reported as a basin";
+	EXPECT_EQ(faced.first.get_value(16, 8, 8), 0) << "its voxels were handed to a neighbouring basin instead of being left unresolved";
 }
 
 // ELI labels: the proton's basin by its nucleus, a maximum inside the core shell of a heavier

@@ -992,7 +992,6 @@ std::pair<cubei, std::vector<d4>> topological_cube_analysis(const cube *cub, con
 	};
 	ivec basin(n, 0);
 	std::vector<d4> Maxima;
-	std::vector<bool> on_rim;
 	std::vector<unsigned char> seeded(n, 0);
 	ivec stamp(n, 0);
 	int path_id = 0;
@@ -1006,7 +1005,6 @@ std::pair<cubei, std::vector<d4>> topological_cube_analysis(const cube *cub, con
 			}
 			if (!inside || !valid[lin(c[0], c[1], c[2])] || basin[lin(c[0], c[1], c[2])]) continue;
 			Maxima.push_back(d4{ p[0], p[1], p[2], v[lin(c[0], c[1], c[2])] });
-			on_rim.push_back(false);
 			basin[lin(c[0], c[1], c[2])] = static_cast<int>(Maxima.size());
 			seeded[lin(c[0], c[1], c[2])] = 1;
 		}
@@ -1189,7 +1187,6 @@ std::pair<cubei, std::vector<d4>> topological_cube_analysis(const cube *cub, con
 					if (std::pow(pos[0] - Maxima[m][0], 2) + std::pow(pos[1] - Maxima[m][1], 2) + std::pow(pos[2] - Maxima[m][2], 2) < catch2) id = static_cast<int>(m) + 1;
 				if (id == 0) {
 					Maxima.push_back(d4{ pos[0], pos[1], pos[2], v[top] });
-					on_rim.push_back(false);
 					id = static_cast<int>(Maxima.size());
 				}
 				result[i] = id;
@@ -1231,10 +1228,38 @@ std::pair<cubei, std::vector<d4>> topological_cube_analysis(const cube *cub, con
 	}
 	int nb = static_cast<int>(Maxima.size());
 	std::cout << "I found " << nb << " Basins." << std::endl;
+	//A maximum on the rim of the analysed region is not a maximum of the field. The crop - rho < 1e-4
+	//for ELI-D, the assignment radius for a cube density - marks the outward neighbours invalid, so
+	//the one-sided difference at the last valid voxel has nowhere higher to go and ascend() registers
+	//it as an attractor. How many of those there are is set by the crop surface measured in voxels
+	//rather than by the molecule: NH3Li reported 62, 53 and 23 ELI-D basins for box paddings of 2.00,
+	//2.05 and 2.10 A at one spacing, and 62, 105 and 208 as the spacing went 0.1 -> 0.05 A, nearly all
+	//of them slivers of Li's diffuse valence rim; water beside a helium 13 bohr away reported 219, all
+	//but four of them on the helium's rim with ELI-D values near 19000. The persistence merge cannot
+	//reach them - their outward saddle is the crop, so their persistence is ~1, the opposite of noise -
+	//so they are marked here and dropped after that merge - see there for what becomes of their
+	//density and for the two treatments measured and rejected first. A real ELI-D attractor sits where
+	//the density is that of a bond or a lone pair and is nowhere near the 1e-4 crop, which is what
+	//keeps this from eating the H valence basins of UH6 and NH3Li.
+	std::vector<char> rim(nb + 1, 0);
+	int n_rim = 0;
+	for (int b = 1; b <= nb; b++) {
+		if (b <= n_seeded) continue;
+		int c[3];
+		bool inside = true;
+		for (int d = 0; d < 3 && inside; d++) {
+			c[d] = static_cast<int>(std::lround((Maxima[b - 1][d] - cub->get_origin(d)) / cub->get_vector(d, d)));
+			inside = c[d] >= 0 && c[d] < (d == 0 ? nx : d == 1 ? ny : nz);
+		}
+		if (!inside) continue;
+		for (int k = 0; k < 6 && !rim[b]; k++)
+			if (!ok(c[0] + dx6[k], c[1] + dy6[k], c[2] + dz6[k])) rim[b] = 1;
+		n_rim += rim[b];
+	}
 	//Persistence merge: the saddle between two basins is the highest of the lower values over
 	//their shared faces; a maximum less than merge_persistence of its height above its highest
 	//saddle is grid noise and joins the basin behind that saddle
-	if (merge_persistence > 0.0 && nb > 1) {
+	if ((merge_persistence > 0.0 || n_rim > 0) && nb > 1) {
 		std::map<std::pair<int, int>, double> pass;
 		for (int x = 0; x < nx; x++)
 			for (int y = 0; y < ny; y++)
@@ -1277,6 +1302,21 @@ std::pair<cubei, std::vector<d4>> topological_cube_analysis(const cube *cub, con
 			if (debug) std::cout << "Merging basin " << worst << " into " << into << " (persistence " << worst_rel << ")\n";
 			target[worst] = into;
 		}
+		//The rim last, and reported as unresolved rather than handed to a neighbour. Both of the
+		//other treatments were measured on NH3Li and water first: giving each sliver to the basin
+		//across its highest saddle moved up to 0.4 e of diffuse tail into whichever hydrogen won the
+		//saddle (2.0414/2.0696/1.9939 e for three hydrogens that differ by 5e-6 in their geometry,
+		//against 1.9329/1.9249/1.9215 with the slivers left alone, and 2.3749 e in 331 bohr^3 for one
+		//of them at another padding), and doing that before the persistence merge lifted the saddles
+		//enough to collapse the molecule into two basins. The slivers are the part of the field the
+		//crop did not resolve - here the diffuse Li valence shell, and for a helium 13 bohr from the
+		//water the whole of its outer region - so they go where unresolved density already goes, into
+		//"outside every basin", and the resolved basins keep the numbers they had
+		int rim_dropped = 0;
+		for (int b = 1; b <= nb; b++)
+			if (rim[b] && root(b) == b) { target[b] = 0; rim_dropped++; }
+		if (rim_dropped)
+			std::cout << "Left " << rim_dropped << " maxima on the rim of the analysed region unresolved; their density is reported outside every basin." << std::endl;
 		ivec renumber(nb + 1, 0);
 		std::vector<d4> kept;
 		for (int b = 1; b <= nb; b++)
