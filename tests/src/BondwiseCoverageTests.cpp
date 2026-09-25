@@ -7,6 +7,7 @@
 
 #include <array>
 #include <cmath>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -684,4 +685,73 @@ TEST(BondwiseCoverageEliTests, DebugListsTheCriticalPointsOfTwoGaussians)
 	EXPECT_NEAR(e0, e1, 5e-3 * (e0 + e1));
 	EXPECT_NEAR(rows.at("H0").second, 1.0 - e0, 2e-4);
 	EXPECT_NEAR(rows.at("H1").second, 1.0 - e1, 2e-4);
+}
+
+namespace {
+
+	//every "total in basins: X   outside every basin: Y" line, in the order printed
+	std::vector<std::pair<double, double>> parse_basin_totals(const std::string& out)
+	{
+		std::vector<std::pair<double, double>> totals;
+		const std::string key = "  total in basins:", mid = "outside every basin:";
+		for (size_t at = out.find(key); at != std::string::npos; at = out.find(key, at + 1))
+		{
+			const size_t m = out.find(mid, at);
+			if (m == std::string::npos)
+				break;
+			totals.emplace_back(std::strtod(out.c_str() + at + key.size(), nullptr),
+								std::strtod(out.c_str() + m + mid.size(), nullptr));
+		}
+		return totals;
+	}
+
+}  // namespace
+
+//The two basin tables of an ECP wavefunction close on two different electron counts, and both are
+//right: HgH2 with the def2 ECP on Hg has 22 electrons in its orbitals, and the QTAIM arm fills the
+//60-electron core with a Thakkar density before integrating, so its table closes on 82 while the
+//ELI-D arm - which only ever sees the orbitals - closes on 22. Comparing the wrong pair is how a
+//correct ECP run gets reported as a 60-electron error, and it is the question a colleague asks first.
+//
+//Conservation is what is asserted rather than any particular population, because the cube resolution
+//only decides where the boundaries fall: every quadrature point is charged either to a basin or to
+//"outside every basin", so the two must add to the electron count however coarse the grid is. That
+//is what makes this checkable at a resolution the suite can afford.
+TEST(BondwiseCoverageEliTests, TheEcpBasinTablesCloseOnTheirOwnElectronCounts)
+{
+	const std::filesystem::path p = nos_test_repo_root() / "tests" / "ELI_heavy" / "hgh2_ecp.gbw";
+	if (!std::filesystem::exists(p))
+		GTEST_SKIP() << "tests/ELI_heavy/hgh2_ecp.gbw not found";
+	Scratch s("TheEcpBasinTablesCloseOnTheirOwnElectronCounts");
+	std::filesystem::current_path(s.dir);
+
+	WFN wavy(p);
+	ASSERT_TRUE(wavy.get_has_ECPs());
+	const double explicit_electrons = wavy.count_nr_electrons();
+	const double cores = static_cast<double>(wavy.get_nr_ECP_electrons());
+	ASSERT_NEAR(explicit_electrons, 22.0, 1e-9);
+	ASSERT_NEAR(cores, 60.0, 1e-9);
+
+	options opt;
+	opt.properties.radius = 2.0;
+	opt.properties.resolution = 0.4;
+	std::string out;
+	{
+		CoutCapture cap;
+		ELI_analysis(wavy, opt);
+		out = cap.str();
+	}
+
+	const auto totals = parse_basin_totals(out);
+	ASSERT_EQ(totals.size(), 2u) << "expected a QTAIM table and an ELI-D table\n" << out;
+	const double qtaim = totals[0].first + totals[0].second;
+	const double eli = totals[1].first + totals[1].second;
+	EXPECT_NEAR(qtaim, explicit_electrons + cores, 1e-2 * (explicit_electrons + cores))
+		<< "the QTAIM arm integrates the Thakkar cores too, so it must close on "
+		<< explicit_electrons + cores << " electrons\n" << out;
+	EXPECT_NEAR(eli, explicit_electrons, 1e-2 * explicit_electrons)
+		<< "the ELI-D arm sees only the orbitals, so it must close on " << explicit_electrons
+		<< " electrons\n" << out;
+	EXPECT_NEAR(qtaim - eli, cores, 2e-2 * cores)
+		<< "the difference between the two arms is the ECP core the one fills and the other cannot see";
 }
