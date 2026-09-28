@@ -473,6 +473,16 @@ void cell::project_into_subgroup(ivec& applied_symmetry, hkl_list& hkl_enlarged,
 	//closing function
 }
 
+void cell::grow_U_iso(std::vector<asym_atom>& asym_atoms, const ivec3& symmetry_linking_list) {
+	for (int i = 0; i < symmetry_linking_list.size(); i++) {
+		for (int j = 0; j < symmetry_linking_list[i].size(); j++) {
+			if (symmetry_linking_list[i][j].size() != 0) {
+				asym_atoms[j].U_iso = asym_atoms[i].U_iso;
+			}
+		}
+	}
+};
+
 ivec cell::apply_grown(const hkl_list& hkl, hkl_list& hkl_enlarged, std::vector<asym_atom>& asym_atoms, ivec3& linking_list, ivec3& original_rotations) {
 	original_rotations = sym;
 	ivec applied_symmetry = confirm_applied_symmetry(linking_list);

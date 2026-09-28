@@ -784,7 +784,9 @@ static int run_app_impl(int argc, char **argv)
 	if (!opt.properties.calc() && opt.do_XCW)
 	{
 		opt.groups[0].push_back(0);
-		XCW xcw(opt);
+		structure_factors SF(opt);
+		XCW xcw(SF);
+		//XCW xcw2(opt);
 		if(!opt.calc_F_calc)
 		{
 			xcw.run_XCW_fitting();

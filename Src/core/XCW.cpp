@@ -13,6 +13,59 @@
 #include <limits>
 #include <random>
 
+void XCW::construct_from_sf(const structure_factors& sf) {
+	opt = sf.opt;
+	unit_cell = sf.unit_cell;
+	hkl = sf.scatter_data.hkl;
+	hkl_enlarged = sf.scatter_data.hkl_enlarged;
+	std::ofstream log3("log3.txt", std::ios::out);
+	cryst.ncen = sf.model_data.ncen;
+	dummy_wave = sf.dummy_wave;
+	cryst.nr = sf.model_data.nr_enlarged;
+	cryst.nr_small = sf.model_data.nr;
+	k_pt = sf.k_pt;
+	asym_atoms = sf.asym_atoms;
+	for (int i = 0; i < asym_atoms.size(); i++) {
+		cryst.U_iso.push_back(asym_atoms[i].U_iso);
+	}
+	asym_atom_list = sf.asym_atom_list;
+	obs.resize(cryst.nr_small);
+	for (int i = 0; i < cryst.nr_small; i++) {
+		obs[i].F_obs = sf.scatter_data.F_obs[i];
+		obs[i].F_obs2 = sf.scatter_data.F_obs2[i];
+		obs[i].sigma_obs = sf.scatter_data.sigma_obs[i];
+		obs[i].sigma_obs2 = sf.scatter_data.sigma_obs2[i];
+		obs[i].abs_F_obs = sf.scatter_data.abs_F_obs[i];
+	}
+
+	// Prepare output files
+	XCW_log.open("XCW.log");
+	std::cout << "XCW orbital basis set: " << sf.basis_set_name << std::endl;
+	XCW_log << "XCW orbital basis set: " << sf.basis_set_name << std::endl;
+
+	// The fit set, see i_sigma_cutoff. F_obs2 is |I|, the sign lives in F_obs
+	cryst.n_fit = sf.nr_fit;
+	fit_mask_ = sf.scatter_data.hkl_mask;
+
+	ext_p_ = sf.ext_p_;
+	ext_c_ = sf.ext_c_;
+	ext_cos2t_ = sf.ext_cos2t_;
+	ext_y_ = sf.ext_y_;
+	ext_sqrt_y_ = sf.ext_sqrt_y_;
+	ext_g_ = sf.ext_g_;
+	ext_m_ = sf.ext_m_;
+	ext_dyc_ = sf.ext_dyc_;
+
+	err_checkf(cryst.n_fit > n_params(), "Fewer reflections above the I/sigma cutoff than parameters", std::cout);
+	std::cout << "XCW: I/sigma(I) >= " << settings.i_sigma_cutoff << " (F/sigma(F) >= " << 2 * settings.i_sigma_cutoff << "): " << cryst.n_fit << " of " << cryst.nr_small << " reflections in the fit; R1 and Criterion are over these, R1(all) and Crit(all) over all" << std::endl;
+	XCW_log << "XCW: I/sigma(I) >= " << settings.i_sigma_cutoff << ": " << cryst.n_fit << " of " << cryst.nr_small << " reflections in the fit" << std::endl;
+	cryst.inv_scale = sf.inv_scale;
+	F_calc.resize(2);
+	F_calc[0].resize(cryst.nr_small, 0);
+	F_calc[1].resize(cryst.nr_small, 0);
+	
+}
+
 void XCW::construct(const options& opt_in) {
 	opt = &opt_in;
 
@@ -4123,71 +4176,6 @@ occ::qm::HartreeFock XCW::setup_XCW_procedure(bool read_tensor) {
 	return hf;
 	// closing function
 }
-
-// Needs rework
-//void XCW::calc_F_calc_fast() {
-//	eval_phase();
-//	//eval_DW();
-//	eval_translation_phase();
-//	eval_anom_disp();
-//
-//	cvec2 atomic_scattering_factors(ncen, cvec(nr, 0));
-//	F_calc.resize(nr_small, 0);
-//
-//	// Calculate atomic scattering factors for each atom and symmetry generated reflexes
-//	GridConfiguration config;
-//	config.accuracy = opt->accuracy;
-//	config.partition_type = opt->partition_type;
-//	config.pbc = opt->pbc;
-//	config.no_density_eval = false;
-//	config.debug = opt->debug;
-//	config.all_charges = opt->all_charges;
-//	GridManager grid_manager(config);
-//	WFN temp = wave;
-//	vec2 d1, d2, d3, dens;
-//	std::vector<_time_point> time_points({ get_time() });
-//	_time_point end;
-//	temp.delete_unoccupied_MOs();
-//	grid_manager.setup3DGridsForMolecule(temp, asym_atom_list, needs_grid, unit_cell);
-//	grid_manager.calculateNonSphericalDensities(temp, unit_cell);
-//	svec time_descriptions;
-//	grid_manager.addTimingInfoToVecs(time_points, time_descriptions);
-//	PartitionResults results = grid_manager.calculatePartitionedCharges(temp, unit_cell);
-//	grid_manager.printChargeTable(labels, temp, asym_atom_list, std::cout, results);
-//	time_points.push_back(get_time());
-//	time_descriptions.push_back("calculate charges");
-//	grid_manager.getDensityVectors(temp, asym_atom_list, d1, d2, d3, dens);
-//	const int points = grid_manager.getTotalGridPoints();
-//	calc_SF(points, k_pt, d1, d2, d3, dens, atomic_scattering_factors, std::cout, time_points.front(), end, opt->debug, true, true);
-//	// Calculate F_calc
-//#pragma omp parallel for
-//	for (int r = 0; r < nr_small; r++) {
-//		const ivec& lookup = generate_asym_lookup(r);
-//		for (int at = 0; at < ncen; at++) {
-//			for (int r_asym = 0; r_asym < lookup.size(); r_asym++) {
-//				F_calc[r] += atomic_scattering_factors[at][lookup[r_asym]] * DW_fact[at][lookup[r_asym]] * phase_fact[at][lookup[r_asym]] * translation_phase[r][r_asym] * asym_atoms[at].asym_fact;
-//			}
-//		}
-//		// Add anomalous dispersion correction
-//		F_calc[r] += anom_corr[r];
-//		//std::cout << std::fixed << std::setprecision(5) << std::pow(std::abs(F_calc[r]), 2) << std::endl;
-//	}
-//	//dump F_calc values as binary file called F_calc
-//
-//	std::ofstream fout("F_calc.bin", std::ios::out | std::ios::binary);
-//	//First byte is the number of bytes per double, the next one is the size of a compelx double, to understand how to read the data.
-//	//After that an int64 (8 byte) of the number of F.calc values to be expected after that.
-//	//Finally, the dump of all F_calc values as cdouble (A,B)
-//	char size = sizeof(double);
-//	fout.write(reinterpret_cast<const char*>(&size), sizeof(size));
-//	size = sizeof(cdouble);
-//	fout.write(reinterpret_cast<const char*>(&size), sizeof(size));
-//	size_t vec_size = F_calc.size();
-//	fout.write(reinterpret_cast<const char*>(&vec_size), sizeof(size_t));
-//	fout.write(reinterpret_cast<const char*>(F_calc.data()), vec_size * sizeof(cdouble));
-//	fout.close();
-//
-//}
 
 void XCW::run_XCW_fitting() {
 	//OCC parallelises through TBB, which does not read OMP_NUM_THREADS. Not a speedup - it

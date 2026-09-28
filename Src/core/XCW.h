@@ -13,6 +13,7 @@
 #include "stored_eri.h"
 #include <thread>
 #include <deque>
+#include "structure_factors.h"
 
 // Applies M to the U/C/D tensors of one atom in their Voigt storage: T'_{ij..} = sum_pq.. M_pi M_qj .. T_pq..
 void transform_ADPs(vec2& ADPs, const vec2& M);
@@ -25,6 +26,12 @@ public:
 		: settings(loadSettings(opt_in.xcw_settings_path))
 	{
 		construct(opt_in);
+	};
+
+	XCW(const structure_factors& sf)
+		: settings(loadSettings(sf.opt->xcw_settings_path))
+	{
+		construct_from_sf(sf);
 	};
 
 
@@ -213,6 +220,7 @@ private:
 
 	// Constructor of the XCW class
 	void construct(const options& opt_in);
+	void construct_from_sf(const structure_factors& sf);
 
 	// Loads the convergence settings
 	SCF_settings loadSettings(const std::filesystem::path& settings_path);
@@ -531,7 +539,7 @@ private:
 	// dy/dP_p = ext_dyc_[r] * a_{r,p}.
 	vec ext_y_, ext_sqrt_y_, ext_g_, ext_m_, ext_dyc_;
 	// Reflection r is in the fit set (I/sigma(I) >= i_sigma_cutoff), see construct
-	bvec fit_mask_;
+	ivec fit_mask_;
 	// The criterion the SCF descends (XWR_type x refine_against), over the fit set or over all
 	double criterion(bool all) const;
 	// Per-lambda Gaussian halting diagnostics, see evaluate_gaussian_halting.

@@ -15,6 +15,7 @@ struct asym_atom {
 	bool grown = false;
 	// symmetry operation that generates a grown atom from its asymmetric parent, -1 for the parent itself
 	int sym_op = -1;
+	double U_iso = 0.0;
 };
 
 /**
@@ -53,6 +54,8 @@ public:
 	// Subgroup projection for grown structures
 	void set_symmetry_factors(std::vector<asym_atom>& asym_atoms, const ivec3& linking_list, const ivec& applied_symmetry);
 	ivec apply_grown(const hkl_list& hkl, hkl_list& hkl_enlarged, std::vector<asym_atom>& asym_atoms, ivec3& linking_list, ivec3& original_rotations);
+	void grow_U_iso(std::vector<asym_atom>& asym_atoms, const ivec3& symmetry_linking_list);
+
 
 
 	/**

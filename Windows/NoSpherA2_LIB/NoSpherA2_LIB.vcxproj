@@ -145,6 +145,7 @@
     <ClInclude Include="..\..\Src\core\sphere_lebedev_rule.h" />
     <ClInclude Include="..\..\Src\core\spherical_density.h" />
     <ClInclude Include="..\..\Src\core\spherical_harmonic.h" />
+    <ClInclude Include="..\..\Src\core\structure_factors.h" />
     <ClInclude Include="..\..\Src\core\test_functions.h" />
     <ClInclude Include="..\..\Src\core\Thakkar_coefs.h" />
     <ClInclude Include="..\..\Src\core\throughput.h" />
@@ -171,7 +172,9 @@
     <ClCompile Include="..\..\Src\core\atoms.cpp" />
     <ClCompile Include="..\..\Src\core\b2c.cpp" />
     <ClCompile Include="..\..\Src\core\basis_set.cpp" />
-    <ClCompile Include="..\..\Src\core\bondwise_analysis.cpp" />
+    <ClCompile Include="..\..\Src\core\bondwise_analysis.cpp">
+      <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
     <ClCompile Include="..\..\Src\core\cell.cpp" />
     <ClCompile Include="..\..\Src\core\cif.cpp" />
     <ClCompile Include="..\..\Src\core\citations.cpp" />
@@ -201,6 +204,7 @@
     <ClCompile Include="..\..\Src\core\SALTED_predictor.cpp" />
     <ClCompile Include="..\..\Src\core\SALTED_utilities.cpp" />
     <ClCompile Include="..\..\Src\core\scattering_factors.cpp" />
+    <ClCompile Include="..\..\Src\core\structure_factors.cpp" />
     <ClCompile Include="..\..\Src\core\throughput.cpp" />
     <ClCompile Include="..\..\Src\core\topology.cpp" />
     <ClCompile Include="..\..\Src\core\tsc_label_converter.cpp" />

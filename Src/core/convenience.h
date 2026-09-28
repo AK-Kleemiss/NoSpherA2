@@ -22,6 +22,7 @@ void not_implemented(const std::source_location loc, const std::string& error_me
 #define err_chekf(condition, error_message, file) error_check(condition, std::source_location::current(), error_message, file)
 #define err_not_impl_f(error_message, file) not_implemented(std::source_location::current(), error_message, file)
 
+
 typedef std::complex<double> cdouble;
 typedef std::vector<double> vec;
 typedef std::vector<vec> vec2;
