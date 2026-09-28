@@ -955,8 +955,6 @@ struct options
     bool gpu_itensor_tensor = false;
     //SALTED descriptor combination uses the device when one is available; -no_gpu_salted keeps it on the CPU.
     bool gpu_salted = true;
-    //-salted_charge_constraint rescales the l=0 coefficients of every SALTED prediction to the electron count, whether or not the model asks for it
-    bool salted_charge_constraint = false;
     //-no_gpu_grid keeps the Becke/TFVC integration weights on the CPU
     bool gpu_grid = true;
     //Owned by the caller; the scattering-factor grid is built in it instead of a local, so

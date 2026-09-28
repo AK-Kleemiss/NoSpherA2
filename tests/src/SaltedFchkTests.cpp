@@ -405,7 +405,6 @@ TEST(SaltedFchkIoTests, SyntheticModelConfig)
 		SALTED_BINARY_FILE f(p);
 		f.populate_config(c);
 		EXPECT_FALSE(f.basis_set_defined());
-		EXPECT_FALSE(f.charge_constraint_defined());
 	}
 	std::filesystem::remove(p);
 	EXPECT_TRUE(c.average);
@@ -454,23 +453,6 @@ TEST(SaltedFchkIoTests, SyntheticModelSimpleBlocks)
 		const vec w = f.read_weights();
 		ASSERT_EQ(w.size(), 4u);
 		EXPECT_NEAR(w[3], 0.4, 1e-15);
-	}
-	std::filesystem::remove(p);
-}
-
-// the VERSION 3 NORMC block: presence flag and the three keyed entries
-TEST(SaltedFchkIoTests, SyntheticModelChargeConstraint)
-{
-	const auto p = tmp_path("normc.salted");
-	write_synthetic_model(p, 3, false, true);
-	{
-		SALTED_BINARY_FILE f(p);
-		ASSERT_TRUE(f.charge_constraint_defined());
-		const auto e = f.read_charge_constraint();
-		ASSERT_EQ(e.size(), 3u);
-		EXPECT_EQ(std::lround(e.at("MODE")[0]), 1);
-		EXPECT_NEAR(e.at("DEFCT")[0], -0.00235, 1e-15);
-		EXPECT_NEAR(e.at("NCAL")[0], 600.0, 1e-15);
 	}
 	std::filesystem::remove(p);
 }
@@ -580,7 +562,6 @@ TEST(SaltedFchkIoTests, NewerVersionStillReads)
 	write_synthetic_model(p, 4, false, true);
 	{
 		SALTED_BINARY_FILE f(p);
-		EXPECT_TRUE(f.charge_constraint_defined());
 		EXPECT_EQ(f.read_weights().size(), 4u);
 	}
 	std::filesystem::remove(p);
@@ -638,7 +619,6 @@ TEST(SaltedFchkIoTests, MissingBlockExits)
 {
 	const auto p = tmp_path("nonormc.salted");
 	write_synthetic_model(p, 3, false, false);
-	EXPECT_EXIT({ SALTED_BINARY_FILE f(p); f.read_charge_constraint(); }, ::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), ".*");
 	EXPECT_EXIT({ SALTED_BINARY_FILE f(p); f.read_basis_set(); }, ::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), ".*");
 	std::filesystem::remove(p);
 }
@@ -659,7 +639,6 @@ TEST(SaltedFchkIoTests, ShippedModelHeader)
 	EXPECT_EQ(c.nang1, 7);
 	EXPECT_NEAR(c.rcut1, 4.0, 1e-12);
 	EXPECT_FALSE(f.basis_set_defined());
-	EXPECT_FALSE(f.charge_constraint_defined());
 	EXPECT_EQ(f.read_weights().size(), 10176u);
 	EXPECT_EQ(f.read_fps().at(0).size(), 500u);
 	EXPECT_EQ(f.read_averages().at("S").size(), 13u);
@@ -756,104 +735,6 @@ TEST(SaltedFchkUtilTests, FilterInputRemovesIsolatedAtom)
 	EXPECT_EQ(removed[0] + removed[1], 0);
 	EXPECT_EQ(w.get_ncen(), 2);
 	EXPECT_TRUE(opt.needs_Thakkar_fill);
-}
-
-// a 2 % surplus is scaled out of the s coefficient only, the p coefficients stay, and the electron count becomes exact
-TEST(SaltedFchkUtilTests, ChargeConstraintScalesOnlyS)
-{
-	const atom A = aux_atom("H", 1, 0.0, 0.0, 0.0, { { 1.0, 0 }, { 0.8, 1 } });
-	const double per_unit = electrons_per_unit(1.0);
-	vec coefs{ 1.02 / per_unit, 0.3, 0.4, 0.5 };
-	std::ostringstream log;
-	const double f = apply_charge_constraint({ A }, coefs, 0, false, 0, 0.0, 0.0, log);
-	EXPECT_NEAR(f, 1.0 / 1.02, 1e-12);
-	EXPECT_NEAR(calc_atomic_density({ A }, coefs)[0], 1.0, 1e-10);
-	EXPECT_NEAR(coefs[1], 0.3, 1e-15);
-	EXPECT_NEAR(coefs[3], 0.5, 1e-15);
-	EXPECT_NE(log.str().find("Charge constraint applied"), std::string::npos);
-	EXPECT_NE(log.str().find("NOTE: correction"), std::string::npos);
-	// 0.2 % is inside the training scatter: applied, but without the caution note
-	vec tiny_surplus{ 1.002 / per_unit };
-	std::ostringstream quiet;
-	const atom S = aux_atom("H", 1, 0.0, 0.0, 0.0, { { 1.0, 0 } });
-	EXPECT_NEAR(apply_charge_constraint({ S }, tiny_surplus, 0, false, 0, 0.0, 0.0, quiet), 1.0 / 1.002, 1e-12);
-	EXPECT_EQ(quiet.str().find("NOTE: correction"), std::string::npos);
-}
-
-// more than 5 % off means something else is wrong: refused, coefficients untouched
-TEST(SaltedFchkUtilTests, ChargeConstraintRefusesLargeFactor)
-{
-	const atom A = aux_atom("H", 1, 0.0, 0.0, 0.0, { { 1.0, 0 } });
-	const double per_unit = electrons_per_unit(1.0);
-	vec coefs{ 1.10 / per_unit };
-	const vec before = coefs;
-	std::ostringstream log;
-	EXPECT_NEAR(apply_charge_constraint({ A }, coefs, 0, false, 0, 0.0, 0.0, log), 1.0, 1e-15);
-	EXPECT_NEAR(coefs[0], before[0], 1e-15);
-	EXPECT_NE(log.str().find("SKIPPED: factor"), std::string::npos);
-}
-
-// a net charge moves the target: an anion of two Z = 1 atoms holds 3 electrons
-TEST(SaltedFchkUtilTests, ChargeConstraintHonoursNetCharge)
-{
-	const atom A = aux_atom("H", 1, 0.0, 0.0, 0.0, { { 1.0, 0 } });
-	const atom B = aux_atom("H", 1, 0.0, 0.0, 1.5, { { 1.0, 0 } });
-	const double per_unit = electrons_per_unit(1.0);
-	vec coefs{ 1.48 / per_unit, 1.48 / per_unit };
-	std::ostringstream log;
-	const double f = apply_charge_constraint({ A, B }, coefs, -1, false, 0, 0.0, 0.0, log);
-	EXPECT_NEAR(f, 3.0 / 2.96, 1e-12);
-	const vec e = calc_atomic_density({ A, B }, coefs);
-	EXPECT_NEAR(e[0] + e[1], 3.0, 1e-10);
-	EXPECT_NE(log.str().find("net charge -1 taken into account"), std::string::npos);
-	// with a spherical fill the split of that charge is undefined: refused
-	vec again{ 1.48 / per_unit, 1.48 / per_unit };
-	std::ostringstream log2;
-	EXPECT_NEAR(apply_charge_constraint({ A, B }, again, -1, true, 1, 0.0, 0.0, log2), 1.0, 1e-15);
-	EXPECT_NEAR(again[0], 1.48 / per_unit, 1e-15);
-	EXPECT_NE(log2.str().find("SKIPPED: net charge"), std::string::npos);
-}
-
-// the fill notes: charge moved onto filled ions shifts the target, an unknown eeq charge is said so, an unappliable one too
-TEST(SaltedFchkUtilTests, ChargeConstraintFillNotes)
-{
-	const atom A = aux_atom("H", 1, 0.0, 0.0, 0.0, { { 1.0, 0 } });
-	const double per_unit = electrons_per_unit(1.0);
-	{
-		// +0.02 e went onto a filled cation, so the predicted region must hold 1.02
-		vec coefs{ 1.0 / per_unit };
-		std::ostringstream log;
-		const double f = apply_charge_constraint({ A }, coefs, 0, true, 1, 0.02, 0.02, log);
-		EXPECT_NEAR(f, 1.02, 1e-12);
-		EXPECT_NEAR(calc_atomic_density({ A }, coefs)[0], 1.02, 1e-10);
-		EXPECT_NE(log.str().find("moved to the spherically filled"), std::string::npos);
-		EXPECT_NE(log.str().find("EEQ puts"), std::string::npos);
-		EXPECT_EQ(log.str().find("could not be applied"), std::string::npos);
-		EXPECT_NE(log.str().find("ML-predicted"), std::string::npos);
-	}
-	{
-		vec coefs{ 1.0 / per_unit };
-		std::ostringstream log;
-		apply_charge_constraint({ A }, coefs, 0, true, 2, std::numeric_limits<double>::quiet_NaN(), 0.0, log);
-		EXPECT_NE(log.str().find("could not be estimated"), std::string::npos);
-	}
-	{
-		vec coefs{ 1.0 / per_unit };
-		std::ostringstream log;
-		apply_charge_constraint({ A }, coefs, 0, true, 1, 0.3, 0.0, log);
-		EXPECT_NE(log.str().find("could not be applied"), std::string::npos);
-	}
-}
-
-// a negative coefficient gives a non-positive electron count: skipped, factor one
-TEST(SaltedFchkUtilTests, ChargeConstraintSkipsNonPositive)
-{
-	const atom A = aux_atom("H", 1, 0.0, 0.0, 0.0, { { 1.0, 0 } });
-	vec coefs{ -0.5 };
-	std::ostringstream log;
-	EXPECT_NEAR(apply_charge_constraint({ A }, coefs, 0, false, 0, 0.0, 0.0, log), 1.0, 1e-15);
-	EXPECT_NEAR(coefs[0], -0.5, 1e-15);
-	EXPECT_NE(log.str().find("non-positive"), std::string::npos);
 }
 
 // the cube overload evaluates the table on the grid; atom_nr slices out that atom's coefficients

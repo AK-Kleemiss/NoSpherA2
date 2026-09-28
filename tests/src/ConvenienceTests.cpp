@@ -973,7 +973,7 @@ TEST(ConvenienceOptionsTests, IsosurfaceAndAnalysisOptionsReadOptionalValues)
 TEST(ConvenienceOptionsTests, GpuAndXcwTogglesFlipTheirFields)
 {
 	const options opt = parse({ "-no_gpu", "-gpu_fp64", "-gpu_fp32", "-no_gpu_itensor", "-gpu_itensor_tensor", "-no_gpu_cublas",
-		"-no_gpu_salted", "-salted_charge_constraint", "-no_gpu_grid", "-no_gpu_density", "-gpu_blas", "-no_cpu_itensor_fp32",
+		"-no_gpu_salted", "-no_gpu_grid", "-no_gpu_density", "-gpu_blas", "-no_cpu_itensor_fp32",
 		"-itensor_hybrid", "-no_xcw_extrapolate", "-xcw_incremental", "-xcw_int_precision", "1e-12",
 		"-do_XCW", "-calc_F", "-xcw_gaussian_halt", "-xcw_strong_cutoff", "2.5", "-XCW_settings", "settings.toml" });
 	EXPECT_FALSE(opt.use_gpu);
@@ -983,7 +983,6 @@ TEST(ConvenienceOptionsTests, GpuAndXcwTogglesFlipTheirFields)
 	EXPECT_TRUE(opt.gpu_itensor_tensor);
 	EXPECT_FALSE(opt.gpu_cublas);
 	EXPECT_FALSE(opt.gpu_salted);
-	EXPECT_TRUE(opt.salted_charge_constraint);
 	EXPECT_FALSE(opt.gpu_grid);
 	EXPECT_FALSE(opt.gpu_density);
 	EXPECT_TRUE(opt.gpu_blas);

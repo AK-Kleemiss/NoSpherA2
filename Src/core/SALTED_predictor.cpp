@@ -22,7 +22,6 @@ SALTEDPredictor::SALTEDPredictor(WFN wavy_in, options& opt_in)
 	std::filesystem::path _path = opt_in.salted_model_dir;
 	SALTED_DIR = opt_in.salted_model_dir;
 	debug = opt_in.debug;
-	force_charge_constraint = opt_in.salted_charge_constraint;
 
 	if (opt_in.salted_model_dir.empty() && opt_in.coef_file != "") {
 		std::cout << "Using density coefficients found in: " << opt_in.coef_file << std::endl;
@@ -77,9 +76,7 @@ SALTEDPredictor::SALTEDPredictor(WFN wavy_in, options& opt_in)
 	wavy.delete_basis_set();
 	if (file.basis_set_defined()) {
 		model_basis = file.read_basis_set();
-		// SALTED predicts one coefficient per DECONTRACTED auxiliary function, so the
-		// basis has to be loaded that way whatever the default of the day is.
-		load_basis_into_WFN(wavy, model_basis, true);
+		load_basis_into_WFN(wavy, model_basis);
 		bbasis_set_loaded = true;
 	}
 }
@@ -200,9 +197,8 @@ void SALTEDPredictor::build_merged(const WFN& wavy_in, options& opt_in)
 		sub_opt.needs_Thakkar_fill = false;
 		sub_opt.spherical_fill_charges.clear();
 		auto sub = std::make_unique<SALTEDPredictor>(wavy_in, sub_opt);
-		sub->skip_charge_constraint = true;     // the stitched density is scaled once, at the end
 		if (!sub->basis_set_loaded())
-			load_basis_into_WFN(sub->wavy, sub->get_model_basis(), true);
+			load_basis_into_WFN(sub->wavy, sub->get_model_basis());
 		sub_models.push_back(std::move(sub));
 	}
 
@@ -286,7 +282,7 @@ void SALTEDPredictor::build_merged(const WFN& wavy_in, options& opt_in)
 	for (const auto& sub : sub_models)
 		name += (name.empty() ? "" : "_plus_") + sub->get_dfbasis_name();
 	merged->set_name(name);
-	load_basis_into_WFN(wavy, merged, true);
+	load_basis_into_WFN(wavy, merged);
 	model_basis = merged;
 	bbasis_set_loaded = true;
 	config.dfbasis = name;
@@ -321,14 +317,6 @@ vec SALTEDPredictor::merge_predictions()
 	err_checkf(coefs.size() == (size_t)merged_offsets.back(),
 		"Stitched coefficients do not fit the combined basis", std::cout);
 
-	// Each model only constrained its own share, which is meaningless on its own;
-	// the electron count belongs to the whole density.
-	bool wanted = force_charge_constraint;
-	for (const auto& sub : sub_models) wanted = wanted || sub->wants_charge_constraint();
-	if (wanted)
-		apply_charge_constraint(wavy.get_atoms(), coefs, wavy.get_charge(),
-								spherical_fill_used, n_filled,
-								filled_eeq_charge, applied_fill_charge, std::cout);
 	return coefs;
 }
 
@@ -343,8 +331,7 @@ void calculateConjugate(SALTEDDescriptors& v2)
 
 void SALTEDPredictor::setup_atomic_environment()
 {
-	const std::shared_ptr<std::array<std::vector<primitive>, 118>> bs = wavy.get_basis_set_ptr();
-	SALTED_Utils::set_lmax_nmax(lmax, nmax, *bs, config.species);
+	SALTED_Utils::set_lmax_nmax(lmax, nmax, *get_model_basis(), config.species);
 
 	atomic_symbols.reserve(wavy.get_ncen());
 	for (int i = 0; i < wavy.get_ncen(); i++)
@@ -847,22 +834,6 @@ vec SALTEDPredictor::predict()
 	return pred_coefs;
 }
 
-bool SALTEDPredictor::wants_charge_constraint() const
-{
-	if (force_charge_constraint) return true;
-	if (!model_file || !model_file->charge_constraint_defined()) return false;
-	const auto entries = model_file->read_charge_constraint();
-	const auto mode_it = entries.find("MODE");
-	const int mode = (mode_it != entries.end() && !mode_it->second.empty())
-						 ? static_cast<int>(std::lround(mode_it->second[0]))
-						 : 0;
-	if (mode == 1) return true;
-	if (mode != 0)
-		std::cout << "Unknown charge-constraint mode " << mode
-				  << " in the model file; leaving the density alone." << std::endl;
-	return false;
-}
-
 vec SALTEDPredictor::gen_SALTED_densities()
 {
 	using namespace std;
@@ -894,17 +865,6 @@ vec SALTEDPredictor::gen_SALTED_densities()
 
 
 	vec coefs = predict();
-
-	// File VERSION 3 models carry an optional NORMC block asking for the
-	// electron count to be constrained. Applied here rather than at each call
-	// site so the tsc, the charge table and the cubes all see the same density.
-	// V2 models have no such block, so they are untouched. A sub model of a
-	// merged prediction only holds a share of the electrons, so it is skipped
-	// and the stitched density is constrained once instead.
-	if (!skip_charge_constraint && wants_charge_constraint())
-		apply_charge_constraint(wavy.get_atoms(), coefs, wavy.get_charge(),
-								spherical_fill_used, n_filled,
-								filled_eeq_charge, applied_fill_charge, std::cout);
 
 	shrink_intermediate_vectors();
 	return coefs;

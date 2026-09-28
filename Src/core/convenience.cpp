@@ -548,13 +548,8 @@ std::string help_message =
  "                                    With -xyz instead of -wfn the prediction\n"
  "                                    is the structure's density for -rho,\n"
  "                                    -esp, -lap, -eli, -esp_isosurface and the Hirshfeld\n"
- "                                    surface ESP; add\n"
- "                                    -salted_charge_constraint there, a\n"
- "                                    fraction of an electron missing shifts\n"
- "                                    the whole ESP by q/r.\n"
+ "                                    surface ESP. \n"
  "  -SALTED_COEFS <model-dir>          Write SALTED_COEFS.npy (requires -wfn).\n"
- "  -salted_charge_constraint          Rescale the l=0 coefficients of every\n"
- "                                    SALTED prediction to the electron count.\n"
  "  -RI_CUBE <coefficients.npy>        Write an RI density cube; use -wfn and\n"
  "                                    -ri_fit first.\n"
  "  -write_ri_coefs                    Write RI_COEFS.npy; use -wfn, -ri_fit\n"
@@ -3116,6 +3111,16 @@ bool options::digest_partition_options(const std::string &temp, int &i)
             load_basis_into_WFN(SP.wavy, _aux_basis);
         }
         vec coefs = SP.gen_SALTED_densities();
+
+        const aux_density_table t(SP.wavy.get_atoms());
+
+        DensityFitting::analyze_density_fit_quality(
+            coefs,
+            SP.wavy,
+            t,
+            vec(),
+            false);
+
         npy::npy_data<double> np_coeffs;
         np_coeffs.data = coefs;
         np_coeffs.fortran_order = false;
@@ -3437,8 +3442,6 @@ bool options::digest_property_options(const std::string &temp, int &i)
         gpu_salted = true;
     else if (temp == "-no_gpu_salted")
         gpu_salted = false;
-    else if (temp == "-salted_charge_constraint")
-        salted_charge_constraint = true;
     else if (temp == "-gpu_grid")
         gpu_grid = true;
     else if (temp == "-no_gpu_grid")

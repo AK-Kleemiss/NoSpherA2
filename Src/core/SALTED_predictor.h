@@ -37,16 +37,11 @@ private:
 	std::vector<std::unique_ptr<SALTEDPredictor>> sub_models{};
 	// Per atom of the merged structure: which sub model predicts it, and its index there
 	ivec atom_model{}, atom_in_model{};
-	// A sub model must not rescale its share to the whole system's electron count;
-	// the stitched density is constrained once, at the end
-	bool skip_charge_constraint = false;
 	void build_merged(const WFN& wavy_in, options& opt_in);
 	vec merge_predictions();
 	// Estimate what the spherically filled atoms should carry, so the size of the
 	// neutral-fill assumption is reported rather than hidden
 	void estimate_fill_charges(const WFN& wavy_in, const std::vector<char>& use_thakkar, options& opt_in);
-	// Does this model ask for the electron count to be imposed on its prediction?
-	bool wants_charge_constraint() const;
 	// Set when atoms were moved to the spherical Thakkar fill. The charge
 	// constraint needs it: with a mixed ML/Thakkar system the split of a net
 	// charge between the two regions is undefined.
@@ -59,8 +54,6 @@ private:
 	// this, so predicted + filled still sums to the right number of electrons.
 	double applied_fill_charge = 0.0;
 	int n_filled = 0;
-	//-salted_charge_constraint: apply the constraint even when the model file does not ask for it
-	bool force_charge_constraint = false;
 	SALTEDConfig config;
 	int natoms;
 	std::filesystem::path SALTED_DIR;

@@ -147,9 +147,5 @@ public:
 
 	const bool basis_set_defined() { return table_of_contents.find("BASIS") != table_of_contents.end(); }
 
-	// Optional NORMC block (file VERSION 3): electron-count constraint.
-	// Absent in every V2 model, so this returns 0 and nothing changes for them.
-	const bool charge_constraint_defined() { return table_of_contents.find("NORMC") != table_of_contents.end(); }
-	std::unordered_map<std::string, vec> read_charge_constraint();
 	std::shared_ptr<BasisSet> read_basis_set();
 };

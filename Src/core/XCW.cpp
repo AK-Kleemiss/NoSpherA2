@@ -105,7 +105,7 @@ void XCW::construct(const options& opt_in) {
 
 	// Load basis set & generate basis for each atom
 	std::shared_ptr<BasisSet> basis = BasisSetLibrary::get_basis_set(settings.basis_set_name);
-	load_basis_into_WFN(dummy_wave, basis, false, true);
+	load_basis_into_WFN(dummy_wave, basis, false, false);
 
 	// Read isotropic displacement parameters
 	cryst.U_iso = read_U_iso_from_CIF(cif, dummy_wave, unit_cell, log3, opt->debug);

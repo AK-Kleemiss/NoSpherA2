@@ -561,7 +561,7 @@ TEST(BasisConstantsLibraryTests, LoadBasisDecontractedVersusContracted)
 	WFN dec(e_origin::NOT_YET_DEFINED);
 	dec.push_back_atom("H", 0.0, 0.0, 0.0, 1);
 	dec.push_back_atom("C", 0.0, 0.0, 1.5, 6);
-	EXPECT_EQ(load_basis_into_WFN(dec, b), 3 + 6 + 9);
+	EXPECT_EQ(load_basis_into_WFN(dec, b, true), 3 + 6 + 9);
 	EXPECT_EQ(dec.get_atom_basis_set_size(0), 3);
 	EXPECT_EQ(dec.get_atom_basis_set_size(1), 9);
 	EXPECT_EQ(dec.get_atom(1).get_shellcount_size(), 9u);
@@ -735,7 +735,7 @@ TEST(BasisConstantsLibraryTests, GenerateAuxWfnCombinesSeveralSets)
 	orb.push_back_atom("H", 0.0, 0.0, 0.0, 1);
 	orb.push_back_atom("He", 0.0, 0.0, 2.0, 2);
 	std::vector<std::shared_ptr<BasisSet>> sets{ a, b };
-	const WFN aux = generate_aux_wfn(orb, sets);
+	const WFN aux = generate_aux_wfn(orb, sets, true);
 	EXPECT_EQ(a->get_name(), "a_plus_b");
 	ASSERT_EQ(aux.get_atom_basis_set_size(0), 2);
 	ASSERT_EQ(aux.get_atom_basis_set_size(1), 1);
