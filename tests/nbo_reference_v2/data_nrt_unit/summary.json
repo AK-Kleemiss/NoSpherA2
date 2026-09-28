@@ -1,0 +1,8300 @@
+{
+ "host": "Flowoffice",
+ "rows": [
+  {
+   "molecule": "acetylene",
+   "gennbo_json": "C:\\Users\\florian\\AppData\\Local\\Temp\\nrt_renat5_20260928\\acetylene\\acetylene.gennbo.nbo.json",
+   "native_json": "C:\\Users\\florian\\AppData\\Local\\Temp\\nrt_renat5_20260928\\acetylene\\acetylene.native.nbo.json",
+   "ungated": {
+    "status": "FAIL",
+    "quantities": [
+     {
+      "name": "npa charge",
+      "tol": 0.002,
+      "compared": 16,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 8,
+      "max_dev": 0.0029209479000000815,
+      "worst": "atom 3 H val"
+     },
+     {
+      "name": "nao occupancy",
+      "tol": 0.002,
+      "compared": 48,
+      "missing": 4,
+      "surplus": 4,
+      "failed": 6,
+      "max_dev": 0.005764891000000105,
+      "worst": "nao 43 occ"
+     },
+     {
+      "name": "nao energy",
+      "tol": 0.002,
+      "compared": 48,
+      "missing": 4,
+      "surplus": 4,
+      "failed": 40,
+      "max_dev": 2.6958378739999995,
+      "worst": "nao 35 E"
+     },
+     {
+      "name": "nbo occupancy",
+      "tol": 0.002,
+      "compared": 74,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 3,
+      "max_dev": 0.0023394150000000113,
+      "worst": "BD (3) C 1- C 2 occ"
+     },
+     {
+      "name": "nbo energy",
+      "tol": 0.002,
+      "compared": 74,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 64,
+      "max_dev": 11.053894697,
+      "worst": "RY (4) C 1 s E"
+     },
+     {
+      "name": "hybrid %s/%p",
+      "tol": 0.5,
+      "compared": 420,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 187,
+      "max_dev": 100.0,
+      "worst": "RY (13) C 2 s h0 %f"
+     },
+     {
+      "name": "E2",
+      "tol": 0.1,
+      "compared": 12,
+      "missing": 4,
+      "surplus": 9,
+      "failed": 12,
+      "max_dev": 0.969695094,
+      "worst": "BD ( 1) C 1- H 3 -> BD*( 3) C 1- C 2 E(2)"
+     },
+     {
+      "name": "NRT weight",
+      "tol": 0.005,
+      "compared": 0,
+      "missing": 15,
+      "surplus": 5,
+      "failed": 0,
+      "max_dev": 0.0,
+      "worst": ""
+     },
+     {
+      "name": "NRT weight by rank",
+      "tol": 0.005,
+      "compared": 5,
+      "missing": 10,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.00418086288,
+      "worst": "rank 2 w"
+     },
+     {
+      "name": "NRT valency",
+      "tol": 0.005,
+      "compared": 16,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 10,
+      "max_dev": 0.021581173000000398,
+      "worst": "atom 1 N"
+     },
+     {
+      "name": "NRT bond order",
+      "tol": 0.005,
+      "compared": 21,
+      "missing": 3,
+      "surplus": 0,
+      "failed": 6,
+      "max_dev": 0.02032319100000013,
+      "worst": "1-2 tot"
+     }
+    ],
+    "n_points": 734,
+    "n_failed": 336,
+    "n_missing": 40,
+    "n_surplus": 22
+   },
+   "gated": {
+    "status": "FAIL",
+    "quantities": [
+     {
+      "name": "npa charge",
+      "tol": 0.002,
+      "compared": 16,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 8,
+      "max_dev": 0.0029209479000000815,
+      "worst": "atom 3 H val"
+     },
+     {
+      "name": "nao occupancy",
+      "tol": 0.002,
+      "compared": 48,
+      "missing": 4,
+      "surplus": 4,
+      "failed": 6,
+      "max_dev": 0.005764891000000105,
+      "worst": "nao 43 occ"
+     },
+     {
+      "name": "nao energy",
+      "tol": 0.002,
+      "compared": 48,
+      "missing": 4,
+      "surplus": 4,
+      "failed": 40,
+      "max_dev": 2.6958378739999995,
+      "worst": "nao 35 E"
+     },
+     {
+      "name": "nbo occupancy",
+      "tol": 0.002,
+      "compared": 22,
+      "missing": 2,
+      "surplus": 0,
+      "failed": 3,
+      "max_dev": 0.0023394150000000113,
+      "worst": "BD (3) C 1- C 2 occ"
+     },
+     {
+      "name": "nbo energy",
+      "tol": 0.002,
+      "compared": 22,
+      "missing": 2,
+      "surplus": 0,
+      "failed": 12,
+      "max_dev": 0.655845896,
+      "worst": "RY (2) H 3 s E"
+     },
+     {
+      "name": "hybrid %s/%p",
+      "tol": 0.5,
+      "compared": 160,
+      "missing": 2,
+      "surplus": 0,
+      "failed": 28,
+      "max_dev": 9.76407841,
+      "worst": "RY (2) H 3 s h0 %p"
+     },
+     {
+      "name": "E2",
+      "tol": 0.1,
+      "compared": 6,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 6,
+      "max_dev": 0.969695094,
+      "worst": "BD ( 1) C 1- H 3 -> BD*( 3) C 1- C 2 E(2)"
+     },
+     {
+      "name": "NRT weight",
+      "tol": 0.005,
+      "compared": 0,
+      "missing": 15,
+      "surplus": 5,
+      "failed": 0,
+      "max_dev": 0.0,
+      "worst": ""
+     },
+     {
+      "name": "NRT weight by rank",
+      "tol": 0.005,
+      "compared": 5,
+      "missing": 10,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.00418086288,
+      "worst": "rank 2 w"
+     },
+     {
+      "name": "NRT valency",
+      "tol": 0.005,
+      "compared": 16,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 10,
+      "max_dev": 0.021581173000000398,
+      "worst": "atom 1 N"
+     },
+     {
+      "name": "NRT bond order",
+      "tol": 0.005,
+      "compared": 21,
+      "missing": 3,
+      "surplus": 0,
+      "failed": 6,
+      "max_dev": 0.02032319100000013,
+      "worst": "1-2 tot"
+     }
+    ],
+    "n_points": 364,
+    "n_failed": 119,
+    "n_missing": 42,
+    "n_surplus": 13
+   },
+   "surplus": {
+    "total": 22,
+    "by_quantity": {
+     "nao occupancy": 4,
+     "nao energy": 4,
+     "E2": 9,
+     "NRT weight": 5
+    }
+   },
+   "dropped": {
+    "nbos_gennbo": 50,
+    "nbos_native": 52,
+    "e2_gennbo": 10,
+    "e2_native": 15,
+    "points": 370
+   },
+   "status": "FAIL",
+   "quantities": [
+    {
+     "name": "npa charge",
+     "tol": 0.002,
+     "compared": 16,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 8,
+     "max_dev": 0.0029209479000000815,
+     "worst": "atom 3 H val"
+    },
+    {
+     "name": "nao occupancy",
+     "tol": 0.002,
+     "compared": 48,
+     "missing": 4,
+     "surplus": 4,
+     "failed": 6,
+     "max_dev": 0.005764891000000105,
+     "worst": "nao 43 occ"
+    },
+    {
+     "name": "nao energy",
+     "tol": 0.002,
+     "compared": 48,
+     "missing": 4,
+     "surplus": 4,
+     "failed": 40,
+     "max_dev": 2.6958378739999995,
+     "worst": "nao 35 E"
+    },
+    {
+     "name": "nbo occupancy",
+     "tol": 0.002,
+     "compared": 74,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 3,
+     "max_dev": 0.0023394150000000113,
+     "worst": "BD (3) C 1- C 2 occ"
+    },
+    {
+     "name": "nbo energy",
+     "tol": 0.002,
+     "compared": 74,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 64,
+     "max_dev": 11.053894697,
+     "worst": "RY (4) C 1 s E"
+    },
+    {
+     "name": "hybrid %s/%p",
+     "tol": 0.5,
+     "compared": 420,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 187,
+     "max_dev": 100.0,
+     "worst": "RY (13) C 2 s h0 %f"
+    },
+    {
+     "name": "E2",
+     "tol": 0.1,
+     "compared": 12,
+     "missing": 4,
+     "surplus": 9,
+     "failed": 12,
+     "max_dev": 0.969695094,
+     "worst": "BD ( 1) C 1- H 3 -> BD*( 3) C 1- C 2 E(2)"
+    },
+    {
+     "name": "NRT weight",
+     "tol": 0.005,
+     "compared": 0,
+     "missing": 15,
+     "surplus": 5,
+     "failed": 0,
+     "max_dev": 0.0,
+     "worst": ""
+    },
+    {
+     "name": "NRT weight by rank",
+     "tol": 0.005,
+     "compared": 5,
+     "missing": 10,
+     "surplus": 0,
+     "failed": 0,
+     "max_dev": 0.00418086288,
+     "worst": "rank 2 w"
+    },
+    {
+     "name": "NRT valency",
+     "tol": 0.005,
+     "compared": 16,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 10,
+     "max_dev": 0.021581173000000398,
+     "worst": "atom 1 N"
+    },
+    {
+     "name": "NRT bond order",
+     "tol": 0.005,
+     "compared": 21,
+     "missing": 3,
+     "surplus": 0,
+     "failed": 6,
+     "max_dev": 0.02032319100000013,
+     "worst": "1-2 tot"
+    }
+   ],
+   "n_points": 734,
+   "n_failed": 336,
+   "n_missing": 40,
+   "n_surplus": 22,
+   "notes": [
+    "thresholds differs: gennbo {'e2_kcal': 0.5, 'e2_intermolecular_kcal': 0, 'nrt_parent_percent': 50, 'nrt_deloc_kcal': 1}, native {'e2_kcal': 0.5, 'e2_intermolecular_kcal': 0, 'nrt_parent_percent': 0, 'nrt_deloc_kcal': 1}"
+   ]
+  },
+  {
+   "molecule": "ammonia",
+   "gennbo_json": "C:\\Users\\florian\\AppData\\Local\\Temp\\nrt_renat5_20260928\\ammonia\\ammonia.gennbo.nbo.json",
+   "native_json": "C:\\Users\\florian\\AppData\\Local\\Temp\\nrt_renat5_20260928\\ammonia\\ammonia.native.nbo.json",
+   "ungated": {
+    "status": "FAIL",
+    "quantities": [
+     {
+      "name": "npa charge",
+      "tol": 0.002,
+      "compared": 16,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 2,
+      "max_dev": 0.0029958050000000735,
+      "worst": "atom 1 N charge"
+     },
+     {
+      "name": "nao occupancy",
+      "tol": 0.002,
+      "compared": 42,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.0010606829999999512,
+      "worst": "nao 2 occ"
+     },
+     {
+      "name": "nao energy",
+      "tol": 0.002,
+      "compared": 42,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 28,
+      "max_dev": 0.10424538099999969,
+      "worst": "nao 35 E"
+     },
+     {
+      "name": "nbo occupancy",
+      "tol": 0.002,
+      "compared": 49,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 7.072900000015814e-05,
+      "worst": "LP (1) N 1 s occ"
+     },
+     {
+      "name": "nbo energy",
+      "tol": 0.002,
+      "compared": 49,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 41,
+      "max_dev": 9.832363860000001,
+      "worst": "RY (5) N 1 s E"
+     },
+     {
+      "name": "hybrid %s/%p",
+      "tol": 0.5,
+      "compared": 275,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 117,
+      "max_dev": 91.8831206,
+      "worst": "RY (26) N 1 s h0 %p"
+     },
+     {
+      "name": "E2",
+      "tol": 0.1,
+      "compared": 3,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.05071386170000003,
+      "worst": "LP ( 1) N 1 -> RY ( 1) H 2 E(2)"
+     },
+     {
+      "name": "NRT weight",
+      "tol": 0.005,
+      "compared": 0,
+      "missing": 1,
+      "surplus": 1,
+      "failed": 0,
+      "max_dev": 0.0,
+      "worst": ""
+     },
+     {
+      "name": "NRT weight by rank",
+      "tol": 0.005,
+      "compared": 1,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.0,
+      "worst": ""
+     },
+     {
+      "name": "NRT valency",
+      "tol": 0.005,
+      "compared": 16,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.0029245230000001232,
+      "worst": "atom 1 cov"
+     },
+     {
+      "name": "NRT bond order",
+      "tol": 0.005,
+      "compared": 21,
+      "missing": 3,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.001021337000000011,
+      "worst": "1-2 ion"
+     }
+    ],
+    "n_points": 514,
+    "n_failed": 188,
+    "n_missing": 4,
+    "n_surplus": 1
+   },
+   "gated": {
+    "status": "FAIL",
+    "quantities": [
+     {
+      "name": "npa charge",
+      "tol": 0.002,
+      "compared": 16,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 2,
+      "max_dev": 0.0029958050000000735,
+      "worst": "atom 1 N charge"
+     },
+     {
+      "name": "nao occupancy",
+      "tol": 0.002,
+      "compared": 42,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.0010606829999999512,
+      "worst": "nao 2 occ"
+     },
+     {
+      "name": "nao energy",
+      "tol": 0.002,
+      "compared": 42,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 28,
+      "max_dev": 0.10424538099999969,
+      "worst": "nao 35 E"
+     },
+     {
+      "name": "nbo occupancy",
+      "tol": 0.002,
+      "compared": 17,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 7.072900000015814e-05,
+      "worst": "LP (1) N 1 s occ"
+     },
+     {
+      "name": "nbo energy",
+      "tol": 0.002,
+      "compared": 17,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 9,
+      "max_dev": 0.05230427500000001,
+      "worst": "RY (1) H 2 s E"
+     },
+     {
+      "name": "hybrid %s/%p",
+      "tol": 0.5,
+      "compared": 115,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 12,
+      "max_dev": 2.683685320000002,
+      "worst": "RY (1) H 2 s h0 %s"
+     },
+     {
+      "name": "NRT weight",
+      "tol": 0.005,
+      "compared": 0,
+      "missing": 1,
+      "surplus": 1,
+      "failed": 0,
+      "max_dev": 0.0,
+      "worst": ""
+     },
+     {
+      "name": "NRT weight by rank",
+      "tol": 0.005,
+      "compared": 1,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.0,
+      "worst": ""
+     },
+     {
+      "name": "NRT valency",
+      "tol": 0.005,
+      "compared": 16,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.0029245230000001232,
+      "worst": "atom 1 cov"
+     },
+     {
+      "name": "NRT bond order",
+      "tol": 0.005,
+      "compared": 21,
+      "missing": 3,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.001021337000000011,
+      "worst": "1-2 ion"
+     }
+    ],
+    "n_points": 287,
+    "n_failed": 51,
+    "n_missing": 4,
+    "n_surplus": 1
+   },
+   "surplus": {
+    "total": 1,
+    "by_quantity": {
+     "NRT weight": 1
+    }
+   },
+   "dropped": {
+    "nbos_gennbo": 32,
+    "nbos_native": 32,
+    "e2_gennbo": 3,
+    "e2_native": 3,
+    "points": 227
+   },
+   "status": "FAIL",
+   "quantities": [
+    {
+     "name": "npa charge",
+     "tol": 0.002,
+     "compared": 16,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 2,
+     "max_dev": 0.0029958050000000735,
+     "worst": "atom 1 N charge"
+    },
+    {
+     "name": "nao occupancy",
+     "tol": 0.002,
+     "compared": 42,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 0,
+     "max_dev": 0.0010606829999999512,
+     "worst": "nao 2 occ"
+    },
+    {
+     "name": "nao energy",
+     "tol": 0.002,
+     "compared": 42,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 28,
+     "max_dev": 0.10424538099999969,
+     "worst": "nao 35 E"
+    },
+    {
+     "name": "nbo occupancy",
+     "tol": 0.002,
+     "compared": 49,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 0,
+     "max_dev": 7.072900000015814e-05,
+     "worst": "LP (1) N 1 s occ"
+    },
+    {
+     "name": "nbo energy",
+     "tol": 0.002,
+     "compared": 49,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 41,
+     "max_dev": 9.832363860000001,
+     "worst": "RY (5) N 1 s E"
+    },
+    {
+     "name": "hybrid %s/%p",
+     "tol": 0.5,
+     "compared": 275,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 117,
+     "max_dev": 91.8831206,
+     "worst": "RY (26) N 1 s h0 %p"
+    },
+    {
+     "name": "E2",
+     "tol": 0.1,
+     "compared": 3,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 0,
+     "max_dev": 0.05071386170000003,
+     "worst": "LP ( 1) N 1 -> RY ( 1) H 2 E(2)"
+    },
+    {
+     "name": "NRT weight",
+     "tol": 0.005,
+     "compared": 0,
+     "missing": 1,
+     "surplus": 1,
+     "failed": 0,
+     "max_dev": 0.0,
+     "worst": ""
+    },
+    {
+     "name": "NRT weight by rank",
+     "tol": 0.005,
+     "compared": 1,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 0,
+     "max_dev": 0.0,
+     "worst": ""
+    },
+    {
+     "name": "NRT valency",
+     "tol": 0.005,
+     "compared": 16,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 0,
+     "max_dev": 0.0029245230000001232,
+     "worst": "atom 1 cov"
+    },
+    {
+     "name": "NRT bond order",
+     "tol": 0.005,
+     "compared": 21,
+     "missing": 3,
+     "surplus": 0,
+     "failed": 0,
+     "max_dev": 0.001021337000000011,
+     "worst": "1-2 ion"
+    }
+   ],
+   "n_points": 514,
+   "n_failed": 188,
+   "n_missing": 4,
+   "n_surplus": 1,
+   "notes": [
+    "thresholds differs: gennbo {'e2_kcal': 0.5, 'e2_intermolecular_kcal': 0, 'nrt_parent_percent': 50, 'nrt_deloc_kcal': 1}, native {'e2_kcal': 0.5, 'e2_intermolecular_kcal': 0, 'nrt_parent_percent': 0, 'nrt_deloc_kcal': 1}"
+   ]
+  },
+  {
+   "molecule": "benzene",
+   "gennbo_json": "C:\\Users\\florian\\AppData\\Local\\Temp\\nrt_renat5_20260928\\benzene\\benzene.gennbo.nbo.json",
+   "native_json": "C:\\Users\\florian\\AppData\\Local\\Temp\\nrt_renat5_20260928\\benzene\\benzene.native.nbo.json",
+   "ungated": {
+    "status": "FAIL",
+    "quantities": [
+     {
+      "name": "npa charge",
+      "tol": 0.002,
+      "compared": 48,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.0016067392000000125,
+      "worst": "atom 4 C charge"
+     },
+     {
+      "name": "nao occupancy",
+      "tol": 0.002,
+      "compared": 210,
+      "missing": 4,
+      "surplus": 0,
+      "failed": 6,
+      "max_dev": 0.0024490056000000537,
+      "worst": "nao 157 occ"
+     },
+     {
+      "name": "nao energy",
+      "tol": 0.002,
+      "compared": 210,
+      "missing": 4,
+      "surplus": 0,
+      "failed": 170,
+      "max_dev": 0.543795553,
+      "worst": "nao 15 E"
+     },
+     {
+      "name": "nbo occupancy",
+      "tol": 0.002,
+      "compared": 216,
+      "missing": 6,
+      "surplus": 6,
+      "failed": 2,
+      "max_dev": 0.32132742000000003,
+      "worst": "BD (1) C 5- C 6 occ"
+     },
+     {
+      "name": "nbo energy",
+      "tol": 0.002,
+      "compared": 216,
+      "missing": 6,
+      "surplus": 6,
+      "failed": 194,
+      "max_dev": 9.551155563999998,
+      "worst": "RY (18) C 4 s E"
+     },
+     {
+      "name": "hybrid %s/%p",
+      "tol": 0.5,
+      "compared": 1200,
+      "missing": 10,
+      "surplus": 10,
+      "failed": 597,
+      "max_dev": 96.74344663,
+      "worst": "RY (22) C 2 s h0 %f"
+     },
+     {
+      "name": "E2",
+      "tol": 0.1,
+      "compared": 62,
+      "missing": 65,
+      "surplus": 41,
+      "failed": 22,
+      "max_dev": 0.570495867,
+      "worst": "BD ( 1) C 2- C 3 -> RY ( 1) C 4 E(2)"
+     },
+     {
+      "name": "NRT weight",
+      "tol": 0.005,
+      "compared": 0,
+      "missing": 32,
+      "surplus": 6,
+      "failed": 0,
+      "max_dev": 0.0,
+      "worst": ""
+     },
+     {
+      "name": "NRT weight by rank",
+      "tol": 0.005,
+      "compared": 6,
+      "missing": 26,
+      "surplus": 0,
+      "failed": 4,
+      "max_dev": 0.1087151918,
+      "worst": "rank 1 w"
+     },
+     {
+      "name": "NRT valency",
+      "tol": 0.005,
+      "compared": 48,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 48,
+      "max_dev": 0.09049011100000026,
+      "worst": "atom 1 cov"
+     },
+     {
+      "name": "NRT bond order",
+      "tol": 0.005,
+      "compared": 72,
+      "missing": 54,
+      "surplus": 0,
+      "failed": 43,
+      "max_dev": 0.04059999999999997,
+      "worst": "1-7 tot"
+     }
+    ],
+    "n_points": 2288,
+    "n_failed": 1086,
+    "n_missing": 207,
+    "n_surplus": 69
+   },
+   "gated": {
+    "status": "FAIL",
+    "quantities": [
+     {
+      "name": "npa charge",
+      "tol": 0.002,
+      "compared": 48,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.0016067392000000125,
+      "worst": "atom 4 C charge"
+     },
+     {
+      "name": "nao occupancy",
+      "tol": 0.002,
+      "compared": 210,
+      "missing": 4,
+      "surplus": 0,
+      "failed": 6,
+      "max_dev": 0.0024490056000000537,
+      "worst": "nao 157 occ"
+     },
+     {
+      "name": "nao energy",
+      "tol": 0.002,
+      "compared": 210,
+      "missing": 4,
+      "surplus": 0,
+      "failed": 170,
+      "max_dev": 0.543795553,
+      "worst": "nao 15 E"
+     },
+     {
+      "name": "nbo occupancy",
+      "tol": 0.002,
+      "compared": 108,
+      "missing": 18,
+      "surplus": 6,
+      "failed": 2,
+      "max_dev": 0.32132742000000003,
+      "worst": "BD (1) C 5- C 6 occ"
+     },
+     {
+      "name": "nbo energy",
+      "tol": 0.002,
+      "compared": 108,
+      "missing": 18,
+      "surplus": 6,
+      "failed": 86,
+      "max_dev": 1.0027435750000002,
+      "worst": "RY (9) C 5 s E"
+     },
+     {
+      "name": "hybrid %s/%p",
+      "tol": 0.5,
+      "compared": 660,
+      "missing": 22,
+      "surplus": 10,
+      "failed": 240,
+      "max_dev": 35.307335089999995,
+      "worst": "RY (9) C 4 s h0 %d"
+     },
+     {
+      "name": "E2",
+      "tol": 0.1,
+      "compared": 40,
+      "missing": 19,
+      "surplus": 12,
+      "failed": 0,
+      "max_dev": 0.04899733099999981,
+      "worst": "BD ( 1) C 1- H 7 -> BD*( 1) C 2- C 3 E(2)"
+     },
+     {
+      "name": "NRT weight",
+      "tol": 0.005,
+      "compared": 0,
+      "missing": 32,
+      "surplus": 6,
+      "failed": 0,
+      "max_dev": 0.0,
+      "worst": ""
+     },
+     {
+      "name": "NRT weight by rank",
+      "tol": 0.005,
+      "compared": 6,
+      "missing": 26,
+      "surplus": 0,
+      "failed": 4,
+      "max_dev": 0.1087151918,
+      "worst": "rank 1 w"
+     },
+     {
+      "name": "NRT valency",
+      "tol": 0.005,
+      "compared": 48,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 48,
+      "max_dev": 0.09049011100000026,
+      "worst": "atom 1 cov"
+     },
+     {
+      "name": "NRT bond order",
+      "tol": 0.005,
+      "compared": 72,
+      "missing": 54,
+      "surplus": 0,
+      "failed": 43,
+      "max_dev": 0.04059999999999997,
+      "worst": "1-7 tot"
+     }
+    ],
+    "n_points": 1510,
+    "n_failed": 599,
+    "n_missing": 197,
+    "n_surplus": 40
+   },
+   "surplus": {
+    "total": 69,
+    "by_quantity": {
+     "nbo occupancy": 6,
+     "nbo energy": 6,
+     "hybrid %s/%p": 10,
+     "E2": 41,
+     "NRT weight": 6
+    }
+   },
+   "dropped": {
+    "nbos_gennbo": 96,
+    "nbos_native": 108,
+    "e2_gennbo": 68,
+    "e2_native": 51,
+    "points": 778
+   },
+   "status": "FAIL",
+   "quantities": [
+    {
+     "name": "npa charge",
+     "tol": 0.002,
+     "compared": 48,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 0,
+     "max_dev": 0.0016067392000000125,
+     "worst": "atom 4 C charge"
+    },
+    {
+     "name": "nao occupancy",
+     "tol": 0.002,
+     "compared": 210,
+     "missing": 4,
+     "surplus": 0,
+     "failed": 6,
+     "max_dev": 0.0024490056000000537,
+     "worst": "nao 157 occ"
+    },
+    {
+     "name": "nao energy",
+     "tol": 0.002,
+     "compared": 210,
+     "missing": 4,
+     "surplus": 0,
+     "failed": 170,
+     "max_dev": 0.543795553,
+     "worst": "nao 15 E"
+    },
+    {
+     "name": "nbo occupancy",
+     "tol": 0.002,
+     "compared": 216,
+     "missing": 6,
+     "surplus": 6,
+     "failed": 2,
+     "max_dev": 0.32132742000000003,
+     "worst": "BD (1) C 5- C 6 occ"
+    },
+    {
+     "name": "nbo energy",
+     "tol": 0.002,
+     "compared": 216,
+     "missing": 6,
+     "surplus": 6,
+     "failed": 194,
+     "max_dev": 9.551155563999998,
+     "worst": "RY (18) C 4 s E"
+    },
+    {
+     "name": "hybrid %s/%p",
+     "tol": 0.5,
+     "compared": 1200,
+     "missing": 10,
+     "surplus": 10,
+     "failed": 597,
+     "max_dev": 96.74344663,
+     "worst": "RY (22) C 2 s h0 %f"
+    },
+    {
+     "name": "E2",
+     "tol": 0.1,
+     "compared": 62,
+     "missing": 65,
+     "surplus": 41,
+     "failed": 22,
+     "max_dev": 0.570495867,
+     "worst": "BD ( 1) C 2- C 3 -> RY ( 1) C 4 E(2)"
+    },
+    {
+     "name": "NRT weight",
+     "tol": 0.005,
+     "compared": 0,
+     "missing": 32,
+     "surplus": 6,
+     "failed": 0,
+     "max_dev": 0.0,
+     "worst": ""
+    },
+    {
+     "name": "NRT weight by rank",
+     "tol": 0.005,
+     "compared": 6,
+     "missing": 26,
+     "surplus": 0,
+     "failed": 4,
+     "max_dev": 0.1087151918,
+     "worst": "rank 1 w"
+    },
+    {
+     "name": "NRT valency",
+     "tol": 0.005,
+     "compared": 48,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 48,
+     "max_dev": 0.09049011100000026,
+     "worst": "atom 1 cov"
+    },
+    {
+     "name": "NRT bond order",
+     "tol": 0.005,
+     "compared": 72,
+     "missing": 54,
+     "surplus": 0,
+     "failed": 43,
+     "max_dev": 0.04059999999999997,
+     "worst": "1-7 tot"
+    }
+   ],
+   "n_points": 2288,
+   "n_failed": 1086,
+   "n_missing": 207,
+   "n_surplus": 69,
+   "notes": [
+    "thresholds differs: gennbo {'e2_kcal': 0.5, 'e2_intermolecular_kcal': 0, 'nrt_parent_percent': 50, 'nrt_deloc_kcal': 1}, native {'e2_kcal': 0.5, 'e2_intermolecular_kcal': 0, 'nrt_parent_percent': 0, 'nrt_deloc_kcal': 1}"
+   ]
+  },
+  {
+   "molecule": "ch3",
+   "gennbo_json": "C:\\Users\\florian\\AppData\\Local\\Temp\\nrt_renat5_20260928\\ch3\\ch3.gennbo.nbo.json",
+   "native_json": "C:\\Users\\florian\\AppData\\Local\\Temp\\nrt_renat5_20260928\\ch3\\ch3.native.nbo.json",
+   "ungated": {
+    "status": "FAIL",
+    "quantities": [
+     {
+      "name": "npa charge",
+      "tol": 0.002,
+      "compared": 20,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 12,
+      "max_dev": 0.21059684900000009,
+      "worst": "atom 1 C spin"
+     },
+     {
+      "name": "nao occupancy",
+      "tol": 0.002,
+      "compared": 30,
+      "missing": 4,
+      "surplus": 0,
+      "failed": 8,
+      "max_dev": 0.01460608699999999,
+      "worst": "nao 6 occ"
+     },
+     {
+      "name": "nao energy",
+      "tol": 0.002,
+      "compared": 30,
+      "missing": 4,
+      "surplus": 0,
+      "failed": 26,
+      "max_dev": 0.4341084259999999,
+      "worst": "nao 15 E"
+     },
+     {
+      "name": "nbo occupancy",
+      "tol": 0.002,
+      "compared": 98,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.001684625129,
+      "worst": "BD* (1) C 1- H 4 beta occ"
+     },
+     {
+      "name": "nbo energy",
+      "tol": 0.002,
+      "compared": 98,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 87,
+      "max_dev": 16.377646679999998,
+      "worst": "RY (26) C 1 s beta E"
+     },
+     {
+      "name": "hybrid %s/%p",
+      "tol": 0.5,
+      "compared": 550,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 266,
+      "max_dev": 99.98888871,
+      "worst": "RY (26) C 1 s alpha h0 %p"
+     },
+     {
+      "name": "E2",
+      "tol": 0.1,
+      "compared": 0,
+      "missing": 0,
+      "surplus": 6,
+      "failed": 0,
+      "max_dev": 0.0,
+      "worst": ""
+     },
+     {
+      "name": "NRT weight",
+      "tol": 0.005,
+      "compared": 0,
+      "missing": 2,
+      "surplus": 2,
+      "failed": 0,
+      "max_dev": 0.0,
+      "worst": ""
+     },
+     {
+      "name": "NRT weight by rank",
+      "tol": 0.005,
+      "compared": 2,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.0,
+      "worst": ""
+     },
+     {
+      "name": "NRT valency",
+      "tol": 0.005,
+      "compared": 32,
+      "missing": 4,
+      "surplus": 0,
+      "failed": 16,
+      "max_dev": 0.119701485,
+      "worst": "atom 1 beta cov"
+     },
+     {
+      "name": "NRT bond order",
+      "tol": 0.005,
+      "compared": 42,
+      "missing": 6,
+      "surplus": 0,
+      "failed": 12,
+      "max_dev": 0.039900930140000006,
+      "worst": "1-2 beta ion"
+     }
+    ],
+    "n_points": 902,
+    "n_failed": 427,
+    "n_missing": 20,
+    "n_surplus": 8
+   },
+   "gated": {
+    "status": "FAIL",
+    "quantities": [
+     {
+      "name": "npa charge",
+      "tol": 0.002,
+      "compared": 20,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 12,
+      "max_dev": 0.21059684900000009,
+      "worst": "atom 1 C spin"
+     },
+     {
+      "name": "nao occupancy",
+      "tol": 0.002,
+      "compared": 30,
+      "missing": 4,
+      "surplus": 0,
+      "failed": 8,
+      "max_dev": 0.01460608699999999,
+      "worst": "nao 6 occ"
+     },
+     {
+      "name": "nao energy",
+      "tol": 0.002,
+      "compared": 30,
+      "missing": 4,
+      "surplus": 0,
+      "failed": 26,
+      "max_dev": 0.4341084259999999,
+      "worst": "nao 15 E"
+     },
+     {
+      "name": "nbo occupancy",
+      "tol": 0.002,
+      "compared": 29,
+      "missing": 2,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.001684625129,
+      "worst": "BD* (1) C 1- H 4 beta occ"
+     },
+     {
+      "name": "nbo energy",
+      "tol": 0.002,
+      "compared": 29,
+      "missing": 2,
+      "surplus": 0,
+      "failed": 20,
+      "max_dev": 0.8303244289999998,
+      "worst": "RY (1) H 3 s beta E"
+     },
+     {
+      "name": "hybrid %s/%p",
+      "tol": 0.5,
+      "compared": 205,
+      "missing": 2,
+      "surplus": 0,
+      "failed": 54,
+      "max_dev": 72.67963301,
+      "worst": "RY (2) H 3 s beta h0 %p"
+     },
+     {
+      "name": "E2",
+      "tol": 0.1,
+      "compared": 0,
+      "missing": 0,
+      "surplus": 6,
+      "failed": 0,
+      "max_dev": 0.0,
+      "worst": ""
+     },
+     {
+      "name": "NRT weight",
+      "tol": 0.005,
+      "compared": 0,
+      "missing": 2,
+      "surplus": 2,
+      "failed": 0,
+      "max_dev": 0.0,
+      "worst": ""
+     },
+     {
+      "name": "NRT weight by rank",
+      "tol": 0.005,
+      "compared": 2,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.0,
+      "worst": ""
+     },
+     {
+      "name": "NRT valency",
+      "tol": 0.005,
+      "compared": 32,
+      "missing": 4,
+      "surplus": 0,
+      "failed": 16,
+      "max_dev": 0.119701485,
+      "worst": "atom 1 beta cov"
+     },
+     {
+      "name": "NRT bond order",
+      "tol": 0.005,
+      "compared": 42,
+      "missing": 6,
+      "surplus": 0,
+      "failed": 12,
+      "max_dev": 0.039900930140000006,
+      "worst": "1-2 beta ion"
+     }
+    ],
+    "n_points": 419,
+    "n_failed": 148,
+    "n_missing": 26,
+    "n_surplus": 8
+   },
+   "surplus": {
+    "total": 8,
+    "by_quantity": {
+     "E2": 6,
+     "NRT weight": 2
+    }
+   },
+   "dropped": {
+    "nbos_gennbo": 67,
+    "nbos_native": 69,
+    "e2_gennbo": 0,
+    "e2_native": 0,
+    "points": 483
+   },
+   "status": "FAIL",
+   "quantities": [
+    {
+     "name": "npa charge",
+     "tol": 0.002,
+     "compared": 20,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 12,
+     "max_dev": 0.21059684900000009,
+     "worst": "atom 1 C spin"
+    },
+    {
+     "name": "nao occupancy",
+     "tol": 0.002,
+     "compared": 30,
+     "missing": 4,
+     "surplus": 0,
+     "failed": 8,
+     "max_dev": 0.01460608699999999,
+     "worst": "nao 6 occ"
+    },
+    {
+     "name": "nao energy",
+     "tol": 0.002,
+     "compared": 30,
+     "missing": 4,
+     "surplus": 0,
+     "failed": 26,
+     "max_dev": 0.4341084259999999,
+     "worst": "nao 15 E"
+    },
+    {
+     "name": "nbo occupancy",
+     "tol": 0.002,
+     "compared": 98,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 0,
+     "max_dev": 0.001684625129,
+     "worst": "BD* (1) C 1- H 4 beta occ"
+    },
+    {
+     "name": "nbo energy",
+     "tol": 0.002,
+     "compared": 98,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 87,
+     "max_dev": 16.377646679999998,
+     "worst": "RY (26) C 1 s beta E"
+    },
+    {
+     "name": "hybrid %s/%p",
+     "tol": 0.5,
+     "compared": 550,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 266,
+     "max_dev": 99.98888871,
+     "worst": "RY (26) C 1 s alpha h0 %p"
+    },
+    {
+     "name": "E2",
+     "tol": 0.1,
+     "compared": 0,
+     "missing": 0,
+     "surplus": 6,
+     "failed": 0,
+     "max_dev": 0.0,
+     "worst": ""
+    },
+    {
+     "name": "NRT weight",
+     "tol": 0.005,
+     "compared": 0,
+     "missing": 2,
+     "surplus": 2,
+     "failed": 0,
+     "max_dev": 0.0,
+     "worst": ""
+    },
+    {
+     "name": "NRT weight by rank",
+     "tol": 0.005,
+     "compared": 2,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 0,
+     "max_dev": 0.0,
+     "worst": ""
+    },
+    {
+     "name": "NRT valency",
+     "tol": 0.005,
+     "compared": 32,
+     "missing": 4,
+     "surplus": 0,
+     "failed": 16,
+     "max_dev": 0.119701485,
+     "worst": "atom 1 beta cov"
+    },
+    {
+     "name": "NRT bond order",
+     "tol": 0.005,
+     "compared": 42,
+     "missing": 6,
+     "surplus": 0,
+     "failed": 12,
+     "max_dev": 0.039900930140000006,
+     "worst": "1-2 beta ion"
+    }
+   ],
+   "n_points": 902,
+   "n_failed": 427,
+   "n_missing": 20,
+   "n_surplus": 8,
+   "notes": [
+    "thresholds differs: gennbo {'e2_kcal': 0.25, 'e2_intermolecular_kcal': 0, 'nrt_parent_percent': 50, 'nrt_deloc_kcal': 1}, native {'e2_kcal': 0.25, 'e2_intermolecular_kcal': 0, 'nrt_parent_percent': 0, 'nrt_deloc_kcal': 1}"
+   ]
+  },
+  {
+   "molecule": "ethane",
+   "gennbo_json": "C:\\Users\\florian\\AppData\\Local\\Temp\\nrt_renat5_20260928\\ethane\\ethane.gennbo.nbo.json",
+   "native_json": "C:\\Users\\florian\\AppData\\Local\\Temp\\nrt_renat5_20260928\\ethane\\ethane.native.nbo.json",
+   "ungated": {
+    "status": "FAIL",
+    "quantities": [
+     {
+      "name": "npa charge",
+      "tol": 0.002,
+      "compared": 32,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 4,
+      "max_dev": 0.004108516099999959,
+      "worst": "atom 2 C charge"
+     },
+     {
+      "name": "nao occupancy",
+      "tol": 0.002,
+      "compared": 88,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.0015665970000000584,
+      "worst": "nao 9 occ"
+     },
+     {
+      "name": "nao energy",
+      "tol": 0.002,
+      "compared": 88,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 62,
+      "max_dev": 0.2115417159999997,
+      "worst": "nao 23 E"
+     },
+     {
+      "name": "nbo occupancy",
+      "tol": 0.002,
+      "compared": 98,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 8.034826999999998e-05,
+      "worst": "BD* (1) C 1- C 2 occ"
+     },
+     {
+      "name": "nbo energy",
+      "tol": 0.002,
+      "compared": 98,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 82,
+      "max_dev": 7.994730314,
+      "worst": "RY (6) C 2 s E"
+     },
+     {
+      "name": "hybrid %s/%p",
+      "tol": 0.5,
+      "compared": 560,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 210,
+      "max_dev": 85.03178762,
+      "worst": "RY (17) C 2 s h0 %f"
+     },
+     {
+      "name": "E2",
+      "tol": 0.1,
+      "compared": 6,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.006683357000000001,
+      "worst": "BD ( 1) C 2- H 7 -> BD*( 1) C 1- H 3 E(2)"
+     },
+     {
+      "name": "NRT weight",
+      "tol": 0.005,
+      "compared": 0,
+      "missing": 7,
+      "surplus": 7,
+      "failed": 0,
+      "max_dev": 0.0,
+      "worst": ""
+     },
+     {
+      "name": "NRT weight by rank",
+      "tol": 0.005,
+      "compared": 7,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.004678356500000036,
+      "worst": "rank 1 w"
+     },
+     {
+      "name": "NRT valency",
+      "tol": 0.005,
+      "compared": 32,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 4,
+      "max_dev": 0.0050348832000000066,
+      "worst": "atom 2 ion"
+     },
+     {
+      "name": "NRT bond order",
+      "tol": 0.005,
+      "compared": 45,
+      "missing": 21,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.004678357000000188,
+      "worst": "1-2 tot"
+     }
+    ],
+    "n_points": 1054,
+    "n_failed": 362,
+    "n_missing": 28,
+    "n_surplus": 7
+   },
+   "gated": {
+    "status": "FAIL",
+    "quantities": [
+     {
+      "name": "npa charge",
+      "tol": 0.002,
+      "compared": 32,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 4,
+      "max_dev": 0.004108516099999959,
+      "worst": "atom 2 C charge"
+     },
+     {
+      "name": "nao occupancy",
+      "tol": 0.002,
+      "compared": 88,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.0015665970000000584,
+      "worst": "nao 9 occ"
+     },
+     {
+      "name": "nao energy",
+      "tol": 0.002,
+      "compared": 88,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 62,
+      "max_dev": 0.2115417159999997,
+      "worst": "nao 23 E"
+     },
+     {
+      "name": "nbo occupancy",
+      "tol": 0.002,
+      "compared": 40,
+      "missing": 6,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 8.034826999999998e-05,
+      "worst": "BD* (1) C 1- C 2 occ"
+     },
+     {
+      "name": "nbo energy",
+      "tol": 0.002,
+      "compared": 40,
+      "missing": 6,
+      "surplus": 0,
+      "failed": 24,
+      "max_dev": 0.119682552,
+      "worst": "RY (3) C 1 s E"
+     },
+     {
+      "name": "hybrid %s/%p",
+      "tol": 0.5,
+      "compared": 270,
+      "missing": 6,
+      "surplus": 0,
+      "failed": 22,
+      "max_dev": 3.696905004,
+      "worst": "RY (3) C 2 s h0 %f"
+     },
+     {
+      "name": "E2",
+      "tol": 0.1,
+      "compared": 6,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.006683357000000001,
+      "worst": "BD ( 1) C 2- H 7 -> BD*( 1) C 1- H 3 E(2)"
+     },
+     {
+      "name": "NRT weight",
+      "tol": 0.005,
+      "compared": 0,
+      "missing": 7,
+      "surplus": 7,
+      "failed": 0,
+      "max_dev": 0.0,
+      "worst": ""
+     },
+     {
+      "name": "NRT weight by rank",
+      "tol": 0.005,
+      "compared": 7,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.004678356500000036,
+      "worst": "rank 1 w"
+     },
+     {
+      "name": "NRT valency",
+      "tol": 0.005,
+      "compared": 32,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 4,
+      "max_dev": 0.0050348832000000066,
+      "worst": "atom 2 ion"
+     },
+     {
+      "name": "NRT bond order",
+      "tol": 0.005,
+      "compared": 45,
+      "missing": 21,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.004678357000000188,
+      "worst": "1-2 tot"
+     }
+    ],
+    "n_points": 648,
+    "n_failed": 116,
+    "n_missing": 46,
+    "n_surplus": 7
+   },
+   "surplus": {
+    "total": 7,
+    "by_quantity": {
+     "NRT weight": 7
+    }
+   },
+   "dropped": {
+    "nbos_gennbo": 52,
+    "nbos_native": 58,
+    "e2_gennbo": 0,
+    "e2_native": 0,
+    "points": 406
+   },
+   "status": "FAIL",
+   "quantities": [
+    {
+     "name": "npa charge",
+     "tol": 0.002,
+     "compared": 32,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 4,
+     "max_dev": 0.004108516099999959,
+     "worst": "atom 2 C charge"
+    },
+    {
+     "name": "nao occupancy",
+     "tol": 0.002,
+     "compared": 88,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 0,
+     "max_dev": 0.0015665970000000584,
+     "worst": "nao 9 occ"
+    },
+    {
+     "name": "nao energy",
+     "tol": 0.002,
+     "compared": 88,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 62,
+     "max_dev": 0.2115417159999997,
+     "worst": "nao 23 E"
+    },
+    {
+     "name": "nbo occupancy",
+     "tol": 0.002,
+     "compared": 98,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 0,
+     "max_dev": 8.034826999999998e-05,
+     "worst": "BD* (1) C 1- C 2 occ"
+    },
+    {
+     "name": "nbo energy",
+     "tol": 0.002,
+     "compared": 98,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 82,
+     "max_dev": 7.994730314,
+     "worst": "RY (6) C 2 s E"
+    },
+    {
+     "name": "hybrid %s/%p",
+     "tol": 0.5,
+     "compared": 560,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 210,
+     "max_dev": 85.03178762,
+     "worst": "RY (17) C 2 s h0 %f"
+    },
+    {
+     "name": "E2",
+     "tol": 0.1,
+     "compared": 6,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 0,
+     "max_dev": 0.006683357000000001,
+     "worst": "BD ( 1) C 2- H 7 -> BD*( 1) C 1- H 3 E(2)"
+    },
+    {
+     "name": "NRT weight",
+     "tol": 0.005,
+     "compared": 0,
+     "missing": 7,
+     "surplus": 7,
+     "failed": 0,
+     "max_dev": 0.0,
+     "worst": ""
+    },
+    {
+     "name": "NRT weight by rank",
+     "tol": 0.005,
+     "compared": 7,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 0,
+     "max_dev": 0.004678356500000036,
+     "worst": "rank 1 w"
+    },
+    {
+     "name": "NRT valency",
+     "tol": 0.005,
+     "compared": 32,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 4,
+     "max_dev": 0.0050348832000000066,
+     "worst": "atom 2 ion"
+    },
+    {
+     "name": "NRT bond order",
+     "tol": 0.005,
+     "compared": 45,
+     "missing": 21,
+     "surplus": 0,
+     "failed": 0,
+     "max_dev": 0.004678357000000188,
+     "worst": "1-2 tot"
+    }
+   ],
+   "n_points": 1054,
+   "n_failed": 362,
+   "n_missing": 28,
+   "n_surplus": 7,
+   "notes": [
+    "thresholds differs: gennbo {'e2_kcal': 0.5, 'e2_intermolecular_kcal': 0, 'nrt_parent_percent': 50, 'nrt_deloc_kcal': 1}, native {'e2_kcal': 0.5, 'e2_intermolecular_kcal': 0, 'nrt_parent_percent': 0, 'nrt_deloc_kcal': 1}"
+   ]
+  },
+  {
+   "molecule": "ethene",
+   "gennbo_json": "C:\\Users\\florian\\AppData\\Local\\Temp\\nrt_renat5_20260928\\ethene\\ethene.gennbo.nbo.json",
+   "native_json": "C:\\Users\\florian\\AppData\\Local\\Temp\\nrt_renat5_20260928\\ethene\\ethene.native.nbo.json",
+   "ungated": {
+    "status": "FAIL",
+    "quantities": [
+     {
+      "name": "npa charge",
+      "tol": 0.002,
+      "compared": 24,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.001535064999999669,
+      "worst": "atom 2 C val"
+     },
+     {
+      "name": "nao occupancy",
+      "tol": 0.002,
+      "compared": 76,
+      "missing": 2,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.00199229600000006,
+      "worst": "nao 12 occ"
+     },
+     {
+      "name": "nao energy",
+      "tol": 0.002,
+      "compared": 76,
+      "missing": 2,
+      "surplus": 0,
+      "failed": 58,
+      "max_dev": 0.801325066,
+      "worst": "nao 49 E"
+     },
+     {
+      "name": "nbo occupancy",
+      "tol": 0.002,
+      "compared": 86,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.000698308999999897,
+      "worst": "BD (2) C 1- C 2 occ"
+     },
+     {
+      "name": "nbo energy",
+      "tol": 0.002,
+      "compared": 86,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 72,
+      "max_dev": 16.85342789,
+      "worst": "RY (26) C 1 s E"
+     },
+     {
+      "name": "hybrid %s/%p",
+      "tol": 0.5,
+      "compared": 490,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 213,
+      "max_dev": 98.85070565999999,
+      "worst": "RY (24) C 2 s h0 %p"
+     },
+     {
+      "name": "E2",
+      "tol": 0.1,
+      "compared": 16,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 4,
+      "max_dev": 0.31703406200000006,
+      "worst": "BD ( 1) C 1- H 4 -> RY ( 1) C 2 E(2)"
+     },
+     {
+      "name": "NRT weight",
+      "tol": 0.005,
+      "compared": 0,
+      "missing": 5,
+      "surplus": 7,
+      "failed": 0,
+      "max_dev": 0.0,
+      "worst": ""
+     },
+     {
+      "name": "NRT weight by rank",
+      "tol": 0.005,
+      "compared": 5,
+      "missing": 0,
+      "surplus": 2,
+      "failed": 1,
+      "max_dev": 0.005500172400000003,
+      "worst": "rank 1 w"
+     },
+     {
+      "name": "NRT valency",
+      "tol": 0.005,
+      "compared": 24,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.003081837999999948,
+      "worst": "atom 1 val"
+     },
+     {
+      "name": "NRT bond order",
+      "tol": 0.005,
+      "compared": 33,
+      "missing": 10,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.0019796265999999507,
+      "worst": "1-3 tot"
+     }
+    ],
+    "n_points": 916,
+    "n_failed": 348,
+    "n_missing": 19,
+    "n_surplus": 9
+   },
+   "gated": {
+    "status": "FAIL",
+    "quantities": [
+     {
+      "name": "npa charge",
+      "tol": 0.002,
+      "compared": 24,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.001535064999999669,
+      "worst": "atom 2 C val"
+     },
+     {
+      "name": "nao occupancy",
+      "tol": 0.002,
+      "compared": 76,
+      "missing": 2,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.00199229600000006,
+      "worst": "nao 12 occ"
+     },
+     {
+      "name": "nao energy",
+      "tol": 0.002,
+      "compared": 76,
+      "missing": 2,
+      "surplus": 0,
+      "failed": 58,
+      "max_dev": 0.801325066,
+      "worst": "nao 49 E"
+     },
+     {
+      "name": "nbo occupancy",
+      "tol": 0.002,
+      "compared": 34,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.000698308999999897,
+      "worst": "BD (2) C 1- C 2 occ"
+     },
+     {
+      "name": "nbo energy",
+      "tol": 0.002,
+      "compared": 34,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 20,
+      "max_dev": 0.20187829100000032,
+      "worst": "RY (4) H 4 s E"
+     },
+     {
+      "name": "hybrid %s/%p",
+      "tol": 0.5,
+      "compared": 230,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 30,
+      "max_dev": 13.151178909999999,
+      "worst": "RY (1) C 1 s h0 %p"
+     },
+     {
+      "name": "E2",
+      "tol": 0.1,
+      "compared": 8,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.04020167780000006,
+      "worst": "BD ( 1) C 1- H 4 -> BD*( 1) C 2- H 6 E(2)"
+     },
+     {
+      "name": "NRT weight",
+      "tol": 0.005,
+      "compared": 0,
+      "missing": 5,
+      "surplus": 7,
+      "failed": 0,
+      "max_dev": 0.0,
+      "worst": ""
+     },
+     {
+      "name": "NRT weight by rank",
+      "tol": 0.005,
+      "compared": 5,
+      "missing": 0,
+      "surplus": 2,
+      "failed": 1,
+      "max_dev": 0.005500172400000003,
+      "worst": "rank 1 w"
+     },
+     {
+      "name": "NRT valency",
+      "tol": 0.005,
+      "compared": 24,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.003081837999999948,
+      "worst": "atom 1 val"
+     },
+     {
+      "name": "NRT bond order",
+      "tol": 0.005,
+      "compared": 33,
+      "missing": 10,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.0019796265999999507,
+      "worst": "1-3 tot"
+     }
+    ],
+    "n_points": 544,
+    "n_failed": 109,
+    "n_missing": 19,
+    "n_surplus": 9
+   },
+   "surplus": {
+    "total": 9,
+    "by_quantity": {
+     "NRT weight": 7,
+     "NRT weight by rank": 2
+    }
+   },
+   "dropped": {
+    "nbos_gennbo": 52,
+    "nbos_native": 52,
+    "e2_gennbo": 8,
+    "e2_native": 8,
+    "points": 372
+   },
+   "status": "FAIL",
+   "quantities": [
+    {
+     "name": "npa charge",
+     "tol": 0.002,
+     "compared": 24,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 0,
+     "max_dev": 0.001535064999999669,
+     "worst": "atom 2 C val"
+    },
+    {
+     "name": "nao occupancy",
+     "tol": 0.002,
+     "compared": 76,
+     "missing": 2,
+     "surplus": 0,
+     "failed": 0,
+     "max_dev": 0.00199229600000006,
+     "worst": "nao 12 occ"
+    },
+    {
+     "name": "nao energy",
+     "tol": 0.002,
+     "compared": 76,
+     "missing": 2,
+     "surplus": 0,
+     "failed": 58,
+     "max_dev": 0.801325066,
+     "worst": "nao 49 E"
+    },
+    {
+     "name": "nbo occupancy",
+     "tol": 0.002,
+     "compared": 86,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 0,
+     "max_dev": 0.000698308999999897,
+     "worst": "BD (2) C 1- C 2 occ"
+    },
+    {
+     "name": "nbo energy",
+     "tol": 0.002,
+     "compared": 86,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 72,
+     "max_dev": 16.85342789,
+     "worst": "RY (26) C 1 s E"
+    },
+    {
+     "name": "hybrid %s/%p",
+     "tol": 0.5,
+     "compared": 490,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 213,
+     "max_dev": 98.85070565999999,
+     "worst": "RY (24) C 2 s h0 %p"
+    },
+    {
+     "name": "E2",
+     "tol": 0.1,
+     "compared": 16,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 4,
+     "max_dev": 0.31703406200000006,
+     "worst": "BD ( 1) C 1- H 4 -> RY ( 1) C 2 E(2)"
+    },
+    {
+     "name": "NRT weight",
+     "tol": 0.005,
+     "compared": 0,
+     "missing": 5,
+     "surplus": 7,
+     "failed": 0,
+     "max_dev": 0.0,
+     "worst": ""
+    },
+    {
+     "name": "NRT weight by rank",
+     "tol": 0.005,
+     "compared": 5,
+     "missing": 0,
+     "surplus": 2,
+     "failed": 1,
+     "max_dev": 0.005500172400000003,
+     "worst": "rank 1 w"
+    },
+    {
+     "name": "NRT valency",
+     "tol": 0.005,
+     "compared": 24,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 0,
+     "max_dev": 0.003081837999999948,
+     "worst": "atom 1 val"
+    },
+    {
+     "name": "NRT bond order",
+     "tol": 0.005,
+     "compared": 33,
+     "missing": 10,
+     "surplus": 0,
+     "failed": 0,
+     "max_dev": 0.0019796265999999507,
+     "worst": "1-3 tot"
+    }
+   ],
+   "n_points": 916,
+   "n_failed": 348,
+   "n_missing": 19,
+   "n_surplus": 9,
+   "notes": [
+    "thresholds differs: gennbo {'e2_kcal': 0.5, 'e2_intermolecular_kcal': 0, 'nrt_parent_percent': 50, 'nrt_deloc_kcal': 1}, native {'e2_kcal': 0.5, 'e2_intermolecular_kcal': 0, 'nrt_parent_percent': 0, 'nrt_deloc_kcal': 1}"
+   ]
+  },
+  {
+   "molecule": "formaldehyde",
+   "gennbo_json": "C:\\Users\\florian\\AppData\\Local\\Temp\\nrt_renat5_20260928\\formaldehyde\\formaldehyde.gennbo.nbo.json",
+   "native_json": "C:\\Users\\florian\\AppData\\Local\\Temp\\nrt_renat5_20260928\\formaldehyde\\formaldehyde.native.nbo.json",
+   "ungated": {
+    "status": "FAIL",
+    "quantities": [
+     {
+      "name": "npa charge",
+      "tol": 0.002,
+      "compared": 16,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.0012821330000000186,
+      "worst": "atom 2 O charge"
+     },
+     {
+      "name": "nao occupancy",
+      "tol": 0.002,
+      "compared": 57,
+      "missing": 4,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.0011798880000000178,
+      "worst": "nao 2 occ"
+     },
+     {
+      "name": "nao energy",
+      "tol": 0.002,
+      "compared": 57,
+      "missing": 4,
+      "surplus": 0,
+      "failed": 45,
+      "max_dev": 0.2937572909999999,
+      "worst": "nao 16 E"
+     },
+     {
+      "name": "nbo occupancy",
+      "tol": 0.002,
+      "compared": 70,
+      "missing": 4,
+      "surplus": 4,
+      "failed": 2,
+      "max_dev": 0.002081653999999933,
+      "worst": "BD (1) C 1- H 3 occ"
+     },
+     {
+      "name": "nbo energy",
+      "tol": 0.002,
+      "compared": 70,
+      "missing": 4,
+      "surplus": 4,
+      "failed": 64,
+      "max_dev": 34.948128911000005,
+      "worst": "RY (5) O 2 s E"
+     },
+     {
+      "name": "hybrid %s/%p",
+      "tol": 0.5,
+      "compared": 370,
+      "missing": 4,
+      "surplus": 8,
+      "failed": 189,
+      "max_dev": 99.93008211,
+      "worst": "RY (14) O 2 s h0 %f"
+     },
+     {
+      "name": "E2",
+      "tol": 0.1,
+      "compared": 9,
+      "missing": 60,
+      "surplus": 0,
+      "failed": 6,
+      "max_dev": 1.682204989999999,
+      "worst": "LP ( 2) O 2 -> BD*( 1) C 1- H 4 E(2)"
+     },
+     {
+      "name": "NRT weight",
+      "tol": 0.005,
+      "compared": 0,
+      "missing": 4,
+      "surplus": 8,
+      "failed": 0,
+      "max_dev": 0.0,
+      "worst": ""
+     },
+     {
+      "name": "NRT weight by rank",
+      "tol": 0.005,
+      "compared": 4,
+      "missing": 0,
+      "surplus": 4,
+      "failed": 4,
+      "max_dev": 0.06147466260000001,
+      "worst": "rank 1 w"
+     },
+     {
+      "name": "NRT valency",
+      "tol": 0.005,
+      "compared": 16,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 13,
+      "max_dev": 0.11563294499999976,
+      "worst": "atom 2 val"
+     },
+     {
+      "name": "NRT bond order",
+      "tol": 0.005,
+      "compared": 21,
+      "missing": 3,
+      "surplus": 0,
+      "failed": 11,
+      "max_dev": 0.11563294499999976,
+      "worst": "1-2 tot"
+     }
+    ],
+    "n_points": 690,
+    "n_failed": 334,
+    "n_missing": 87,
+    "n_surplus": 28
+   },
+   "gated": {
+    "status": "FAIL",
+    "quantities": [
+     {
+      "name": "npa charge",
+      "tol": 0.002,
+      "compared": 16,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.0012821330000000186,
+      "worst": "atom 2 O charge"
+     },
+     {
+      "name": "nao occupancy",
+      "tol": 0.002,
+      "compared": 57,
+      "missing": 4,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.0011798880000000178,
+      "worst": "nao 2 occ"
+     },
+     {
+      "name": "nao energy",
+      "tol": 0.002,
+      "compared": 57,
+      "missing": 4,
+      "surplus": 0,
+      "failed": 45,
+      "max_dev": 0.2937572909999999,
+      "worst": "nao 16 E"
+     },
+     {
+      "name": "nbo occupancy",
+      "tol": 0.002,
+      "compared": 22,
+      "missing": 5,
+      "surplus": 4,
+      "failed": 2,
+      "max_dev": 0.002081653999999933,
+      "worst": "BD (1) C 1- H 3 occ"
+     },
+     {
+      "name": "nbo energy",
+      "tol": 0.002,
+      "compared": 22,
+      "missing": 5,
+      "surplus": 4,
+      "failed": 16,
+      "max_dev": 0.10813594300000018,
+      "worst": "RY (2) H 3 s E"
+     },
+     {
+      "name": "hybrid %s/%p",
+      "tol": 0.5,
+      "compared": 130,
+      "missing": 5,
+      "surplus": 8,
+      "failed": 25,
+      "max_dev": 4.41596195,
+      "worst": "RY (5) H 4 s h0 %s"
+     },
+     {
+      "name": "E2",
+      "tol": 0.1,
+      "compared": 4,
+      "missing": 9,
+      "surplus": 0,
+      "failed": 2,
+      "max_dev": 1.682204989999999,
+      "worst": "LP ( 2) O 2 -> BD*( 1) C 1- H 4 E(2)"
+     },
+     {
+      "name": "NRT weight",
+      "tol": 0.005,
+      "compared": 0,
+      "missing": 4,
+      "surplus": 8,
+      "failed": 0,
+      "max_dev": 0.0,
+      "worst": ""
+     },
+     {
+      "name": "NRT weight by rank",
+      "tol": 0.005,
+      "compared": 4,
+      "missing": 0,
+      "surplus": 4,
+      "failed": 4,
+      "max_dev": 0.06147466260000001,
+      "worst": "rank 1 w"
+     },
+     {
+      "name": "NRT valency",
+      "tol": 0.005,
+      "compared": 16,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 13,
+      "max_dev": 0.11563294499999976,
+      "worst": "atom 2 val"
+     },
+     {
+      "name": "NRT bond order",
+      "tol": 0.005,
+      "compared": 21,
+      "missing": 3,
+      "surplus": 0,
+      "failed": 11,
+      "max_dev": 0.11563294499999976,
+      "worst": "1-2 tot"
+     }
+    ],
+    "n_points": 349,
+    "n_failed": 118,
+    "n_missing": 39,
+    "n_surplus": 28
+   },
+   "surplus": {
+    "total": 28,
+    "by_quantity": {
+     "nbo occupancy": 4,
+     "nbo energy": 4,
+     "hybrid %s/%p": 8,
+     "NRT weight": 8,
+     "NRT weight by rank": 4
+    }
+   },
+   "dropped": {
+    "nbos_gennbo": 47,
+    "nbos_native": 48,
+    "e2_gennbo": 56,
+    "e2_native": 5,
+    "points": 341
+   },
+   "status": "FAIL",
+   "quantities": [
+    {
+     "name": "npa charge",
+     "tol": 0.002,
+     "compared": 16,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 0,
+     "max_dev": 0.0012821330000000186,
+     "worst": "atom 2 O charge"
+    },
+    {
+     "name": "nao occupancy",
+     "tol": 0.002,
+     "compared": 57,
+     "missing": 4,
+     "surplus": 0,
+     "failed": 0,
+     "max_dev": 0.0011798880000000178,
+     "worst": "nao 2 occ"
+    },
+    {
+     "name": "nao energy",
+     "tol": 0.002,
+     "compared": 57,
+     "missing": 4,
+     "surplus": 0,
+     "failed": 45,
+     "max_dev": 0.2937572909999999,
+     "worst": "nao 16 E"
+    },
+    {
+     "name": "nbo occupancy",
+     "tol": 0.002,
+     "compared": 70,
+     "missing": 4,
+     "surplus": 4,
+     "failed": 2,
+     "max_dev": 0.002081653999999933,
+     "worst": "BD (1) C 1- H 3 occ"
+    },
+    {
+     "name": "nbo energy",
+     "tol": 0.002,
+     "compared": 70,
+     "missing": 4,
+     "surplus": 4,
+     "failed": 64,
+     "max_dev": 34.948128911000005,
+     "worst": "RY (5) O 2 s E"
+    },
+    {
+     "name": "hybrid %s/%p",
+     "tol": 0.5,
+     "compared": 370,
+     "missing": 4,
+     "surplus": 8,
+     "failed": 189,
+     "max_dev": 99.93008211,
+     "worst": "RY (14) O 2 s h0 %f"
+    },
+    {
+     "name": "E2",
+     "tol": 0.1,
+     "compared": 9,
+     "missing": 60,
+     "surplus": 0,
+     "failed": 6,
+     "max_dev": 1.682204989999999,
+     "worst": "LP ( 2) O 2 -> BD*( 1) C 1- H 4 E(2)"
+    },
+    {
+     "name": "NRT weight",
+     "tol": 0.005,
+     "compared": 0,
+     "missing": 4,
+     "surplus": 8,
+     "failed": 0,
+     "max_dev": 0.0,
+     "worst": ""
+    },
+    {
+     "name": "NRT weight by rank",
+     "tol": 0.005,
+     "compared": 4,
+     "missing": 0,
+     "surplus": 4,
+     "failed": 4,
+     "max_dev": 0.06147466260000001,
+     "worst": "rank 1 w"
+    },
+    {
+     "name": "NRT valency",
+     "tol": 0.005,
+     "compared": 16,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 13,
+     "max_dev": 0.11563294499999976,
+     "worst": "atom 2 val"
+    },
+    {
+     "name": "NRT bond order",
+     "tol": 0.005,
+     "compared": 21,
+     "missing": 3,
+     "surplus": 0,
+     "failed": 11,
+     "max_dev": 0.11563294499999976,
+     "worst": "1-2 tot"
+    }
+   ],
+   "n_points": 690,
+   "n_failed": 334,
+   "n_missing": 87,
+   "n_surplus": 28,
+   "notes": [
+    "thresholds differs: gennbo {'e2_kcal': 0.5, 'e2_intermolecular_kcal': 0.05, 'nrt_parent_percent': 50, 'nrt_deloc_kcal': 1}, native {'e2_kcal': 0.5, 'e2_intermolecular_kcal': 0, 'nrt_parent_percent': 0, 'nrt_deloc_kcal': 1}"
+   ]
+  },
+  {
+   "molecule": "formate",
+   "gennbo_json": "C:\\Users\\florian\\AppData\\Local\\Temp\\nrt_renat5_20260928\\formate\\formate.gennbo.nbo.json",
+   "native_json": "C:\\Users\\florian\\AppData\\Local\\Temp\\nrt_renat5_20260928\\formate\\formate.native.nbo.json",
+   "ungated": {
+    "status": "FAIL",
+    "quantities": [
+     {
+      "name": "npa charge",
+      "tol": 0.002,
+      "compared": 16,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 2,
+      "max_dev": 0.003232187000000053,
+      "worst": "atom 1 C val"
+     },
+     {
+      "name": "nao occupancy",
+      "tol": 0.002,
+      "compared": 90,
+      "missing": 4,
+      "surplus": 0,
+      "failed": 1,
+      "max_dev": 0.002729849700000009,
+      "worst": "nao 6 occ"
+     },
+     {
+      "name": "nao energy",
+      "tol": 0.002,
+      "compared": 90,
+      "missing": 4,
+      "surplus": 0,
+      "failed": 63,
+      "max_dev": 0.41286162699999984,
+      "worst": "nao 34 E"
+     },
+     {
+      "name": "nbo occupancy",
+      "tol": 0.002,
+      "compared": 99,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 1,
+      "max_dev": 0.002525831000000034,
+      "worst": "BD (1) C 1- H 4 occ"
+     },
+     {
+      "name": "nbo energy",
+      "tol": 0.002,
+      "compared": 99,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 83,
+      "max_dev": 35.584002761,
+      "worst": "RY (10) O 2 s E"
+     },
+     {
+      "name": "hybrid %s/%p",
+      "tol": 0.5,
+      "compared": 535,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 262,
+      "max_dev": 97.45717319,
+      "worst": "RY (18) O 3 s h0 %f"
+     },
+     {
+      "name": "E2",
+      "tol": 0.1,
+      "compared": 32,
+      "missing": 4,
+      "surplus": 1,
+      "failed": 16,
+      "max_dev": 22.75978569,
+      "worst": "LP ( 3) O 3 -> BD*( 1) C 1- O 2 E(2)"
+     },
+     {
+      "name": "NRT weight",
+      "tol": 0.005,
+      "compared": 0,
+      "missing": 6,
+      "surplus": 7,
+      "failed": 0,
+      "max_dev": 0.0,
+      "worst": ""
+     },
+     {
+      "name": "NRT weight by rank",
+      "tol": 0.005,
+      "compared": 6,
+      "missing": 0,
+      "surplus": 1,
+      "failed": 5,
+      "max_dev": 0.0597384123,
+      "worst": "rank 3 w"
+     },
+     {
+      "name": "NRT valency",
+      "tol": 0.005,
+      "compared": 16,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 10,
+      "max_dev": 0.28345640299999997,
+      "worst": "atom 2 val"
+     },
+     {
+      "name": "NRT bond order",
+      "tol": 0.005,
+      "compared": 24,
+      "missing": 2,
+      "surplus": 0,
+      "failed": 12,
+      "max_dev": 0.30861893400000007,
+      "worst": "2-2 tot"
+     }
+    ],
+    "n_points": 1007,
+    "n_failed": 455,
+    "n_missing": 20,
+    "n_surplus": 9
+   },
+   "gated": {
+    "status": "FAIL",
+    "quantities": [
+     {
+      "name": "npa charge",
+      "tol": 0.002,
+      "compared": 16,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 2,
+      "max_dev": 0.003232187000000053,
+      "worst": "atom 1 C val"
+     },
+     {
+      "name": "nao occupancy",
+      "tol": 0.002,
+      "compared": 90,
+      "missing": 4,
+      "surplus": 0,
+      "failed": 1,
+      "max_dev": 0.002729849700000009,
+      "worst": "nao 6 occ"
+     },
+     {
+      "name": "nao energy",
+      "tol": 0.002,
+      "compared": 90,
+      "missing": 4,
+      "surplus": 0,
+      "failed": 63,
+      "max_dev": 0.41286162699999984,
+      "worst": "nao 34 E"
+     },
+     {
+      "name": "nbo occupancy",
+      "tol": 0.002,
+      "compared": 35,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 1,
+      "max_dev": 0.002525831000000034,
+      "worst": "BD (1) C 1- H 4 occ"
+     },
+     {
+      "name": "nbo energy",
+      "tol": 0.002,
+      "compared": 35,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 19,
+      "max_dev": 0.17026171800000034,
+      "worst": "RY (4) C 1 s E"
+     },
+     {
+      "name": "hybrid %s/%p",
+      "tol": 0.5,
+      "compared": 215,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 37,
+      "max_dev": 5.52688156,
+      "worst": "RY (4) O 2 s h0 %d"
+     },
+     {
+      "name": "E2",
+      "tol": 0.1,
+      "compared": 11,
+      "missing": 2,
+      "surplus": 0,
+      "failed": 6,
+      "max_dev": 22.75978569,
+      "worst": "LP ( 3) O 3 -> BD*( 1) C 1- O 2 E(2)"
+     },
+     {
+      "name": "NRT weight",
+      "tol": 0.005,
+      "compared": 0,
+      "missing": 6,
+      "surplus": 7,
+      "failed": 0,
+      "max_dev": 0.0,
+      "worst": ""
+     },
+     {
+      "name": "NRT weight by rank",
+      "tol": 0.005,
+      "compared": 6,
+      "missing": 0,
+      "surplus": 1,
+      "failed": 5,
+      "max_dev": 0.0597384123,
+      "worst": "rank 3 w"
+     },
+     {
+      "name": "NRT valency",
+      "tol": 0.005,
+      "compared": 16,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 10,
+      "max_dev": 0.28345640299999997,
+      "worst": "atom 2 val"
+     },
+     {
+      "name": "NRT bond order",
+      "tol": 0.005,
+      "compared": 24,
+      "missing": 2,
+      "surplus": 0,
+      "failed": 12,
+      "max_dev": 0.30861893400000007,
+      "worst": "2-2 tot"
+     }
+    ],
+    "n_points": 538,
+    "n_failed": 156,
+    "n_missing": 18,
+    "n_surplus": 8
+   },
+   "surplus": {
+    "total": 9,
+    "by_quantity": {
+     "E2": 1,
+     "NRT weight": 7,
+     "NRT weight by rank": 1
+    }
+   },
+   "dropped": {
+    "nbos_gennbo": 64,
+    "nbos_native": 64,
+    "e2_gennbo": 23,
+    "e2_native": 22,
+    "points": 469
+   },
+   "status": "FAIL",
+   "quantities": [
+    {
+     "name": "npa charge",
+     "tol": 0.002,
+     "compared": 16,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 2,
+     "max_dev": 0.003232187000000053,
+     "worst": "atom 1 C val"
+    },
+    {
+     "name": "nao occupancy",
+     "tol": 0.002,
+     "compared": 90,
+     "missing": 4,
+     "surplus": 0,
+     "failed": 1,
+     "max_dev": 0.002729849700000009,
+     "worst": "nao 6 occ"
+    },
+    {
+     "name": "nao energy",
+     "tol": 0.002,
+     "compared": 90,
+     "missing": 4,
+     "surplus": 0,
+     "failed": 63,
+     "max_dev": 0.41286162699999984,
+     "worst": "nao 34 E"
+    },
+    {
+     "name": "nbo occupancy",
+     "tol": 0.002,
+     "compared": 99,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 1,
+     "max_dev": 0.002525831000000034,
+     "worst": "BD (1) C 1- H 4 occ"
+    },
+    {
+     "name": "nbo energy",
+     "tol": 0.002,
+     "compared": 99,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 83,
+     "max_dev": 35.584002761,
+     "worst": "RY (10) O 2 s E"
+    },
+    {
+     "name": "hybrid %s/%p",
+     "tol": 0.5,
+     "compared": 535,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 262,
+     "max_dev": 97.45717319,
+     "worst": "RY (18) O 3 s h0 %f"
+    },
+    {
+     "name": "E2",
+     "tol": 0.1,
+     "compared": 32,
+     "missing": 4,
+     "surplus": 1,
+     "failed": 16,
+     "max_dev": 22.75978569,
+     "worst": "LP ( 3) O 3 -> BD*( 1) C 1- O 2 E(2)"
+    },
+    {
+     "name": "NRT weight",
+     "tol": 0.005,
+     "compared": 0,
+     "missing": 6,
+     "surplus": 7,
+     "failed": 0,
+     "max_dev": 0.0,
+     "worst": ""
+    },
+    {
+     "name": "NRT weight by rank",
+     "tol": 0.005,
+     "compared": 6,
+     "missing": 0,
+     "surplus": 1,
+     "failed": 5,
+     "max_dev": 0.0597384123,
+     "worst": "rank 3 w"
+    },
+    {
+     "name": "NRT valency",
+     "tol": 0.005,
+     "compared": 16,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 10,
+     "max_dev": 0.28345640299999997,
+     "worst": "atom 2 val"
+    },
+    {
+     "name": "NRT bond order",
+     "tol": 0.005,
+     "compared": 24,
+     "missing": 2,
+     "surplus": 0,
+     "failed": 12,
+     "max_dev": 0.30861893400000007,
+     "worst": "2-2 tot"
+    }
+   ],
+   "n_points": 1007,
+   "n_failed": 455,
+   "n_missing": 20,
+   "n_surplus": 9,
+   "notes": [
+    "thresholds differs: gennbo {'e2_kcal': 0.5, 'e2_intermolecular_kcal': 0, 'nrt_parent_percent': 50, 'nrt_deloc_kcal': 1}, native {'e2_kcal': 0.5, 'e2_intermolecular_kcal': 0, 'nrt_parent_percent': 0, 'nrt_deloc_kcal': 1}"
+   ]
+  },
+  {
+   "molecule": "hcn",
+   "gennbo_json": "C:\\Users\\florian\\AppData\\Local\\Temp\\nrt_renat5_20260928\\hcn\\hcn.gennbo.nbo.json",
+   "native_json": "C:\\Users\\florian\\AppData\\Local\\Temp\\nrt_renat5_20260928\\hcn\\hcn.native.nbo.json",
+   "ungated": {
+    "status": "FAIL",
+    "quantities": [
+     {
+      "name": "npa charge",
+      "tol": 0.002,
+      "compared": 12,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 2,
+      "max_dev": 0.0027293818700000055,
+      "worst": "atom 1 C charge"
+     },
+     {
+      "name": "nao occupancy",
+      "tol": 0.002,
+      "compared": 45,
+      "missing": 3,
+      "surplus": 0,
+      "failed": 2,
+      "max_dev": 0.004602166000000185,
+      "worst": "nao 12 occ"
+     },
+     {
+      "name": "nao energy",
+      "tol": 0.002,
+      "compared": 45,
+      "missing": 3,
+      "surplus": 0,
+      "failed": 34,
+      "max_dev": 0.3332072610000001,
+      "worst": "nao 65 E"
+     },
+     {
+      "name": "nbo occupancy",
+      "tol": 0.002,
+      "compared": 68,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.0018337179999998732,
+      "worst": "BD (1) C 1- H 3 occ"
+     },
+     {
+      "name": "nbo energy",
+      "tol": 0.002,
+      "compared": 68,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 58,
+      "max_dev": 24.5385285272,
+      "worst": "RY (5) N 2 s E"
+     },
+     {
+      "name": "hybrid %s/%p",
+      "tol": 0.5,
+      "compared": 380,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 167,
+      "max_dev": 100.0,
+      "worst": "RY (14) C 1 s h0 %f"
+     },
+     {
+      "name": "E2",
+      "tol": 0.1,
+      "compared": 7,
+      "missing": 2,
+      "surplus": 1,
+      "failed": 6,
+      "max_dev": 0.63781789,
+      "worst": "BD ( 3) C 1- N 2 -> BD*( 1) C 1- H 3 E(2)"
+     },
+     {
+      "name": "NRT weight",
+      "tol": 0.005,
+      "compared": 0,
+      "missing": 4,
+      "surplus": 4,
+      "failed": 0,
+      "max_dev": 0.0,
+      "worst": ""
+     },
+     {
+      "name": "NRT weight by rank",
+      "tol": 0.005,
+      "compared": 4,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 3,
+      "max_dev": 0.01971505150000008,
+      "worst": "rank 1 w"
+     },
+     {
+      "name": "NRT valency",
+      "tol": 0.005,
+      "compared": 12,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 7,
+      "max_dev": 0.024005527999999998,
+      "worst": "atom 2 val"
+     },
+     {
+      "name": "NRT bond order",
+      "tol": 0.005,
+      "compared": 15,
+      "missing": 1,
+      "surplus": 0,
+      "failed": 6,
+      "max_dev": 0.024005527999999998,
+      "worst": "1-2 tot"
+     }
+    ],
+    "n_points": 656,
+    "n_failed": 285,
+    "n_missing": 13,
+    "n_surplus": 5
+   },
+   "gated": {
+    "status": "FAIL",
+    "quantities": [
+     {
+      "name": "npa charge",
+      "tol": 0.002,
+      "compared": 12,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 2,
+      "max_dev": 0.0027293818700000055,
+      "worst": "atom 1 C charge"
+     },
+     {
+      "name": "nao occupancy",
+      "tol": 0.002,
+      "compared": 45,
+      "missing": 3,
+      "surplus": 0,
+      "failed": 2,
+      "max_dev": 0.004602166000000185,
+      "worst": "nao 12 occ"
+     },
+     {
+      "name": "nao energy",
+      "tol": 0.002,
+      "compared": 45,
+      "missing": 3,
+      "surplus": 0,
+      "failed": 34,
+      "max_dev": 0.3332072610000001,
+      "worst": "nao 65 E"
+     },
+     {
+      "name": "nbo occupancy",
+      "tol": 0.002,
+      "compared": 17,
+      "missing": 1,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.0018337179999998732,
+      "worst": "BD (1) C 1- H 3 occ"
+     },
+     {
+      "name": "nbo energy",
+      "tol": 0.002,
+      "compared": 17,
+      "missing": 1,
+      "surplus": 0,
+      "failed": 8,
+      "max_dev": 0.3100675720000001,
+      "worst": "RY (2) H 3 s E"
+     },
+     {
+      "name": "hybrid %s/%p",
+      "tol": 0.5,
+      "compared": 125,
+      "missing": 1,
+      "surplus": 0,
+      "failed": 12,
+      "max_dev": 8.866213720000005,
+      "worst": "RY (2) H 3 s h0 %s"
+     },
+     {
+      "name": "E2",
+      "tol": 0.1,
+      "compared": 3,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 3,
+      "max_dev": 0.63781789,
+      "worst": "BD ( 3) C 1- N 2 -> BD*( 1) C 1- H 3 E(2)"
+     },
+     {
+      "name": "NRT weight",
+      "tol": 0.005,
+      "compared": 0,
+      "missing": 4,
+      "surplus": 4,
+      "failed": 0,
+      "max_dev": 0.0,
+      "worst": ""
+     },
+     {
+      "name": "NRT weight by rank",
+      "tol": 0.005,
+      "compared": 4,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 3,
+      "max_dev": 0.01971505150000008,
+      "worst": "rank 1 w"
+     },
+     {
+      "name": "NRT valency",
+      "tol": 0.005,
+      "compared": 12,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 7,
+      "max_dev": 0.024005527999999998,
+      "worst": "atom 2 val"
+     },
+     {
+      "name": "NRT bond order",
+      "tol": 0.005,
+      "compared": 15,
+      "missing": 1,
+      "surplus": 0,
+      "failed": 6,
+      "max_dev": 0.024005527999999998,
+      "worst": "1-2 tot"
+     }
+    ],
+    "n_points": 295,
+    "n_failed": 77,
+    "n_missing": 14,
+    "n_surplus": 4
+   },
+   "surplus": {
+    "total": 5,
+    "by_quantity": {
+     "E2": 1,
+     "NRT weight": 4
+    }
+   },
+   "dropped": {
+    "nbos_gennbo": 50,
+    "nbos_native": 51,
+    "e2_gennbo": 6,
+    "e2_native": 5,
+    "points": 361
+   },
+   "status": "FAIL",
+   "quantities": [
+    {
+     "name": "npa charge",
+     "tol": 0.002,
+     "compared": 12,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 2,
+     "max_dev": 0.0027293818700000055,
+     "worst": "atom 1 C charge"
+    },
+    {
+     "name": "nao occupancy",
+     "tol": 0.002,
+     "compared": 45,
+     "missing": 3,
+     "surplus": 0,
+     "failed": 2,
+     "max_dev": 0.004602166000000185,
+     "worst": "nao 12 occ"
+    },
+    {
+     "name": "nao energy",
+     "tol": 0.002,
+     "compared": 45,
+     "missing": 3,
+     "surplus": 0,
+     "failed": 34,
+     "max_dev": 0.3332072610000001,
+     "worst": "nao 65 E"
+    },
+    {
+     "name": "nbo occupancy",
+     "tol": 0.002,
+     "compared": 68,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 0,
+     "max_dev": 0.0018337179999998732,
+     "worst": "BD (1) C 1- H 3 occ"
+    },
+    {
+     "name": "nbo energy",
+     "tol": 0.002,
+     "compared": 68,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 58,
+     "max_dev": 24.5385285272,
+     "worst": "RY (5) N 2 s E"
+    },
+    {
+     "name": "hybrid %s/%p",
+     "tol": 0.5,
+     "compared": 380,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 167,
+     "max_dev": 100.0,
+     "worst": "RY (14) C 1 s h0 %f"
+    },
+    {
+     "name": "E2",
+     "tol": 0.1,
+     "compared": 7,
+     "missing": 2,
+     "surplus": 1,
+     "failed": 6,
+     "max_dev": 0.63781789,
+     "worst": "BD ( 3) C 1- N 2 -> BD*( 1) C 1- H 3 E(2)"
+    },
+    {
+     "name": "NRT weight",
+     "tol": 0.005,
+     "compared": 0,
+     "missing": 4,
+     "surplus": 4,
+     "failed": 0,
+     "max_dev": 0.0,
+     "worst": ""
+    },
+    {
+     "name": "NRT weight by rank",
+     "tol": 0.005,
+     "compared": 4,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 3,
+     "max_dev": 0.01971505150000008,
+     "worst": "rank 1 w"
+    },
+    {
+     "name": "NRT valency",
+     "tol": 0.005,
+     "compared": 12,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 7,
+     "max_dev": 0.024005527999999998,
+     "worst": "atom 2 val"
+    },
+    {
+     "name": "NRT bond order",
+     "tol": 0.005,
+     "compared": 15,
+     "missing": 1,
+     "surplus": 0,
+     "failed": 6,
+     "max_dev": 0.024005527999999998,
+     "worst": "1-2 tot"
+    }
+   ],
+   "n_points": 656,
+   "n_failed": 285,
+   "n_missing": 13,
+   "n_surplus": 5,
+   "notes": [
+    "thresholds differs: gennbo {'e2_kcal': 0.5, 'e2_intermolecular_kcal': 0, 'nrt_parent_percent': 50, 'nrt_deloc_kcal': 1}, native {'e2_kcal': 0.5, 'e2_intermolecular_kcal': 0, 'nrt_parent_percent': 0, 'nrt_deloc_kcal': 1}"
+   ]
+  },
+  {
+   "molecule": "lif",
+   "gennbo_json": "C:\\Users\\florian\\AppData\\Local\\Temp\\nrt_renat5_20260928\\lif\\lif.gennbo.nbo.json",
+   "native_json": "C:\\Users\\florian\\AppData\\Local\\Temp\\nrt_renat5_20260928\\lif\\lif.native.nbo.json",
+   "ungated": {
+    "status": "FAIL",
+    "quantities": [
+     {
+      "name": "npa charge",
+      "tol": 0.002,
+      "compared": 8,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.0001063305579999999,
+      "worst": "atom 2 F ryd"
+     },
+     {
+      "name": "nao occupancy",
+      "tol": 0.002,
+      "compared": 19,
+      "missing": 2,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.00013615799999988631,
+      "worst": "nao 26 occ"
+     },
+     {
+      "name": "nao energy",
+      "tol": 0.002,
+      "compared": 19,
+      "missing": 2,
+      "surplus": 0,
+      "failed": 9,
+      "max_dev": 0.045419349499999984,
+      "worst": "nao 7 E"
+     },
+     {
+      "name": "nbo occupancy",
+      "tol": 0.002,
+      "compared": 45,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 3.3401049999999544e-05,
+      "worst": "RY (1) Li 1 s occ"
+     },
+     {
+      "name": "nbo energy",
+      "tol": 0.002,
+      "compared": 45,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 35,
+      "max_dev": 46.886944230000005,
+      "worst": "RY (6) F 2 s E"
+     },
+     {
+      "name": "hybrid %s/%p",
+      "tol": 0.5,
+      "compared": 225,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 72,
+      "max_dev": 99.99772389,
+      "worst": "RY (19) F 2 s h0 %f"
+     },
+     {
+      "name": "E2",
+      "tol": 0.1,
+      "compared": 4,
+      "missing": 9,
+      "surplus": 2,
+      "failed": 0,
+      "max_dev": 0.07307731999999945,
+      "worst": "LP ( 2) F 2 -> RY ( 3)Li 1 E(2)"
+     },
+     {
+      "name": "NRT weight",
+      "tol": 0.005,
+      "compared": 0,
+      "missing": 1,
+      "surplus": 1,
+      "failed": 0,
+      "max_dev": 0.0,
+      "worst": ""
+     },
+     {
+      "name": "NRT weight by rank",
+      "tol": 0.005,
+      "compared": 1,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.0,
+      "worst": ""
+     },
+     {
+      "name": "NRT valency",
+      "tol": 0.005,
+      "compared": 8,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.0,
+      "worst": ""
+     },
+     {
+      "name": "NRT bond order",
+      "tol": 0.005,
+      "compared": 6,
+      "missing": 1,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.0,
+      "worst": ""
+     }
+    ],
+    "n_points": 380,
+    "n_failed": 116,
+    "n_missing": 15,
+    "n_surplus": 3
+   },
+   "gated": {
+    "status": "FAIL",
+    "quantities": [
+     {
+      "name": "npa charge",
+      "tol": 0.002,
+      "compared": 8,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.0001063305579999999,
+      "worst": "atom 2 F ryd"
+     },
+     {
+      "name": "nao occupancy",
+      "tol": 0.002,
+      "compared": 19,
+      "missing": 2,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.00013615799999988631,
+      "worst": "nao 26 occ"
+     },
+     {
+      "name": "nao energy",
+      "tol": 0.002,
+      "compared": 19,
+      "missing": 2,
+      "surplus": 0,
+      "failed": 9,
+      "max_dev": 0.045419349499999984,
+      "worst": "nao 7 E"
+     },
+     {
+      "name": "nbo occupancy",
+      "tol": 0.002,
+      "compared": 12,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 3.3401049999999544e-05,
+      "worst": "RY (1) Li 1 s occ"
+     },
+     {
+      "name": "nbo energy",
+      "tol": 0.002,
+      "compared": 12,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 3,
+      "max_dev": 0.012297771999999707,
+      "worst": "RY (1) F 2 s E"
+     },
+     {
+      "name": "hybrid %s/%p",
+      "tol": 0.5,
+      "compared": 60,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 5,
+      "max_dev": 5.115522661,
+      "worst": "RY (1) F 2 s h0 %f"
+     },
+     {
+      "name": "E2",
+      "tol": 0.1,
+      "compared": 1,
+      "missing": 1,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.008330882499999914,
+      "worst": "LP ( 1) F 2 -> LV ( 1)Li 1 E(2)"
+     },
+     {
+      "name": "NRT weight",
+      "tol": 0.005,
+      "compared": 0,
+      "missing": 1,
+      "surplus": 1,
+      "failed": 0,
+      "max_dev": 0.0,
+      "worst": ""
+     },
+     {
+      "name": "NRT weight by rank",
+      "tol": 0.005,
+      "compared": 1,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.0,
+      "worst": ""
+     },
+     {
+      "name": "NRT valency",
+      "tol": 0.005,
+      "compared": 8,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.0,
+      "worst": ""
+     },
+     {
+      "name": "NRT bond order",
+      "tol": 0.005,
+      "compared": 6,
+      "missing": 1,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.0,
+      "worst": ""
+     }
+    ],
+    "n_points": 146,
+    "n_failed": 17,
+    "n_missing": 7,
+    "n_surplus": 1
+   },
+   "surplus": {
+    "total": 3,
+    "by_quantity": {
+     "E2": 2,
+     "NRT weight": 1
+    }
+   },
+   "dropped": {
+    "nbos_gennbo": 33,
+    "nbos_native": 33,
+    "e2_gennbo": 11,
+    "e2_native": 5,
+    "points": 234
+   },
+   "status": "FAIL",
+   "quantities": [
+    {
+     "name": "npa charge",
+     "tol": 0.002,
+     "compared": 8,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 0,
+     "max_dev": 0.0001063305579999999,
+     "worst": "atom 2 F ryd"
+    },
+    {
+     "name": "nao occupancy",
+     "tol": 0.002,
+     "compared": 19,
+     "missing": 2,
+     "surplus": 0,
+     "failed": 0,
+     "max_dev": 0.00013615799999988631,
+     "worst": "nao 26 occ"
+    },
+    {
+     "name": "nao energy",
+     "tol": 0.002,
+     "compared": 19,
+     "missing": 2,
+     "surplus": 0,
+     "failed": 9,
+     "max_dev": 0.045419349499999984,
+     "worst": "nao 7 E"
+    },
+    {
+     "name": "nbo occupancy",
+     "tol": 0.002,
+     "compared": 45,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 0,
+     "max_dev": 3.3401049999999544e-05,
+     "worst": "RY (1) Li 1 s occ"
+    },
+    {
+     "name": "nbo energy",
+     "tol": 0.002,
+     "compared": 45,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 35,
+     "max_dev": 46.886944230000005,
+     "worst": "RY (6) F 2 s E"
+    },
+    {
+     "name": "hybrid %s/%p",
+     "tol": 0.5,
+     "compared": 225,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 72,
+     "max_dev": 99.99772389,
+     "worst": "RY (19) F 2 s h0 %f"
+    },
+    {
+     "name": "E2",
+     "tol": 0.1,
+     "compared": 4,
+     "missing": 9,
+     "surplus": 2,
+     "failed": 0,
+     "max_dev": 0.07307731999999945,
+     "worst": "LP ( 2) F 2 -> RY ( 3)Li 1 E(2)"
+    },
+    {
+     "name": "NRT weight",
+     "tol": 0.005,
+     "compared": 0,
+     "missing": 1,
+     "surplus": 1,
+     "failed": 0,
+     "max_dev": 0.0,
+     "worst": ""
+    },
+    {
+     "name": "NRT weight by rank",
+     "tol": 0.005,
+     "compared": 1,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 0,
+     "max_dev": 0.0,
+     "worst": ""
+    },
+    {
+     "name": "NRT valency",
+     "tol": 0.005,
+     "compared": 8,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 0,
+     "max_dev": 0.0,
+     "worst": ""
+    },
+    {
+     "name": "NRT bond order",
+     "tol": 0.005,
+     "compared": 6,
+     "missing": 1,
+     "surplus": 0,
+     "failed": 0,
+     "max_dev": 0.0,
+     "worst": ""
+    }
+   ],
+   "n_points": 380,
+   "n_failed": 116,
+   "n_missing": 15,
+   "n_surplus": 3,
+   "notes": [
+    "thresholds differs: gennbo {'e2_kcal': 0.5, 'e2_intermolecular_kcal': 0.05, 'nrt_parent_percent': 50, 'nrt_deloc_kcal': 1}, native {'e2_kcal': 0.5, 'e2_intermolecular_kcal': 0, 'nrt_parent_percent': 0, 'nrt_deloc_kcal': 1}"
+   ]
+  },
+  {
+   "molecule": "n2",
+   "gennbo_json": "C:\\Users\\florian\\AppData\\Local\\Temp\\nrt_renat5_20260928\\n2\\n2.gennbo.nbo.json",
+   "native_json": "C:\\Users\\florian\\AppData\\Local\\Temp\\nrt_renat5_20260928\\n2\\n2.native.nbo.json",
+   "ungated": {
+    "status": "FAIL",
+    "quantities": [
+     {
+      "name": "npa charge",
+      "tol": 0.002,
+      "compared": 8,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.0013943840000001373,
+      "worst": "atom 1 N val"
+     },
+     {
+      "name": "nao occupancy",
+      "tol": 0.002,
+      "compared": 32,
+      "missing": 2,
+      "surplus": 0,
+      "failed": 2,
+      "max_dev": 0.002127889939999999,
+      "worst": "nao 23 occ"
+     },
+     {
+      "name": "nao energy",
+      "tol": 0.002,
+      "compared": 32,
+      "missing": 2,
+      "surplus": 0,
+      "failed": 22,
+      "max_dev": 0.8680298940000002,
+      "worst": "nao 45 E"
+     },
+     {
+      "name": "nbo occupancy",
+      "tol": 0.002,
+      "compared": 62,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 4.6632067999999305e-05,
+      "worst": "RY (1) N 1 s occ"
+     },
+     {
+      "name": "nbo energy",
+      "tol": 0.002,
+      "compared": 62,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 56,
+      "max_dev": 11.73911366,
+      "worst": "RY (23) N 2 s E"
+     },
+     {
+      "name": "hybrid %s/%p",
+      "tol": 0.5,
+      "compared": 340,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 169,
+      "max_dev": 100.0,
+      "worst": "RY (19) N 2 s h0 %d"
+     },
+     {
+      "name": "E2",
+      "tol": 0.1,
+      "compared": 10,
+      "missing": 12,
+      "surplus": 9,
+      "failed": 7,
+      "max_dev": 0.7823632740000002,
+      "worst": "LP ( 1) N 2 -> RY ( 7) N 1 E(2)"
+     },
+     {
+      "name": "NRT weight",
+      "tol": 0.005,
+      "compared": 0,
+      "missing": 1,
+      "surplus": 1,
+      "failed": 0,
+      "max_dev": 0.0,
+      "worst": ""
+     },
+     {
+      "name": "NRT weight by rank",
+      "tol": 0.005,
+      "compared": 1,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.0,
+      "worst": ""
+     },
+     {
+      "name": "NRT valency",
+      "tol": 0.005,
+      "compared": 8,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 2.000000165480742e-09,
+      "worst": "atom 1 cov"
+     },
+     {
+      "name": "NRT bond order",
+      "tol": 0.005,
+      "compared": 9,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 2.000000165480742e-09,
+      "worst": "1-2 cov"
+     }
+    ],
+    "n_points": 564,
+    "n_failed": 256,
+    "n_missing": 17,
+    "n_surplus": 10
+   },
+   "gated": {
+    "status": "FAIL",
+    "quantities": [
+     {
+      "name": "npa charge",
+      "tol": 0.002,
+      "compared": 8,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.0013943840000001373,
+      "worst": "atom 1 N val"
+     },
+     {
+      "name": "nao occupancy",
+      "tol": 0.002,
+      "compared": 32,
+      "missing": 2,
+      "surplus": 0,
+      "failed": 2,
+      "max_dev": 0.002127889939999999,
+      "worst": "nao 23 occ"
+     },
+     {
+      "name": "nao energy",
+      "tol": 0.002,
+      "compared": 32,
+      "missing": 2,
+      "surplus": 0,
+      "failed": 22,
+      "max_dev": 0.8680298940000002,
+      "worst": "nao 45 E"
+     },
+     {
+      "name": "nbo occupancy",
+      "tol": 0.002,
+      "compared": 12,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 4.6632067999999305e-05,
+      "worst": "RY (1) N 1 s occ"
+     },
+     {
+      "name": "nbo energy",
+      "tol": 0.002,
+      "compared": 12,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 6,
+      "max_dev": 0.9718903922,
+      "worst": "BD* (2) N 1- N 2 E"
+     },
+     {
+      "name": "hybrid %s/%p",
+      "tol": 0.5,
+      "compared": 90,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 20,
+      "max_dev": 39.116854319999995,
+      "worst": "BD (2) N 1- N 2 h1 %p"
+     },
+     {
+      "name": "E2",
+      "tol": 0.1,
+      "compared": 0,
+      "missing": 2,
+      "surplus": 2,
+      "failed": 0,
+      "max_dev": 0.0,
+      "worst": ""
+     },
+     {
+      "name": "NRT weight",
+      "tol": 0.005,
+      "compared": 0,
+      "missing": 1,
+      "surplus": 1,
+      "failed": 0,
+      "max_dev": 0.0,
+      "worst": ""
+     },
+     {
+      "name": "NRT weight by rank",
+      "tol": 0.005,
+      "compared": 1,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.0,
+      "worst": ""
+     },
+     {
+      "name": "NRT valency",
+      "tol": 0.005,
+      "compared": 8,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 2.000000165480742e-09,
+      "worst": "atom 1 cov"
+     },
+     {
+      "name": "NRT bond order",
+      "tol": 0.005,
+      "compared": 9,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 2.000000165480742e-09,
+      "worst": "1-2 cov"
+     }
+    ],
+    "n_points": 204,
+    "n_failed": 50,
+    "n_missing": 7,
+    "n_surplus": 3
+   },
+   "surplus": {
+    "total": 10,
+    "by_quantity": {
+     "E2": 9,
+     "NRT weight": 1
+    }
+   },
+   "dropped": {
+    "nbos_gennbo": 50,
+    "nbos_native": 50,
+    "e2_gennbo": 20,
+    "e2_native": 17,
+    "points": 360
+   },
+   "status": "FAIL",
+   "quantities": [
+    {
+     "name": "npa charge",
+     "tol": 0.002,
+     "compared": 8,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 0,
+     "max_dev": 0.0013943840000001373,
+     "worst": "atom 1 N val"
+    },
+    {
+     "name": "nao occupancy",
+     "tol": 0.002,
+     "compared": 32,
+     "missing": 2,
+     "surplus": 0,
+     "failed": 2,
+     "max_dev": 0.002127889939999999,
+     "worst": "nao 23 occ"
+    },
+    {
+     "name": "nao energy",
+     "tol": 0.002,
+     "compared": 32,
+     "missing": 2,
+     "surplus": 0,
+     "failed": 22,
+     "max_dev": 0.8680298940000002,
+     "worst": "nao 45 E"
+    },
+    {
+     "name": "nbo occupancy",
+     "tol": 0.002,
+     "compared": 62,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 0,
+     "max_dev": 4.6632067999999305e-05,
+     "worst": "RY (1) N 1 s occ"
+    },
+    {
+     "name": "nbo energy",
+     "tol": 0.002,
+     "compared": 62,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 56,
+     "max_dev": 11.73911366,
+     "worst": "RY (23) N 2 s E"
+    },
+    {
+     "name": "hybrid %s/%p",
+     "tol": 0.5,
+     "compared": 340,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 169,
+     "max_dev": 100.0,
+     "worst": "RY (19) N 2 s h0 %d"
+    },
+    {
+     "name": "E2",
+     "tol": 0.1,
+     "compared": 10,
+     "missing": 12,
+     "surplus": 9,
+     "failed": 7,
+     "max_dev": 0.7823632740000002,
+     "worst": "LP ( 1) N 2 -> RY ( 7) N 1 E(2)"
+    },
+    {
+     "name": "NRT weight",
+     "tol": 0.005,
+     "compared": 0,
+     "missing": 1,
+     "surplus": 1,
+     "failed": 0,
+     "max_dev": 0.0,
+     "worst": ""
+    },
+    {
+     "name": "NRT weight by rank",
+     "tol": 0.005,
+     "compared": 1,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 0,
+     "max_dev": 0.0,
+     "worst": ""
+    },
+    {
+     "name": "NRT valency",
+     "tol": 0.005,
+     "compared": 8,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 0,
+     "max_dev": 2.000000165480742e-09,
+     "worst": "atom 1 cov"
+    },
+    {
+     "name": "NRT bond order",
+     "tol": 0.005,
+     "compared": 9,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 0,
+     "max_dev": 2.000000165480742e-09,
+     "worst": "1-2 cov"
+    }
+   ],
+   "n_points": 564,
+   "n_failed": 256,
+   "n_missing": 17,
+   "n_surplus": 10,
+   "notes": [
+    "thresholds differs: gennbo {'e2_kcal': 0.5, 'e2_intermolecular_kcal': 0, 'nrt_parent_percent': 50, 'nrt_deloc_kcal': 1}, native {'e2_kcal': 0.5, 'e2_intermolecular_kcal': 0, 'nrt_parent_percent': 0, 'nrt_deloc_kcal': 1}"
+   ]
+  },
+  {
+   "molecule": "ni_co_4",
+   "gennbo_json": "C:\\Users\\florian\\AppData\\Local\\Temp\\nrt_renat5_20260928\\ni_co_4\\ni_co_4.gennbo.nbo.json",
+   "native_json": "C:\\Users\\florian\\AppData\\Local\\Temp\\nrt_renat5_20260928\\ni_co_4\\ni_co_4.native.nbo.json",
+   "ungated": {
+    "status": "FAIL",
+    "quantities": [
+     {
+      "name": "npa charge",
+      "tol": 0.002,
+      "compared": 36,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 18,
+      "max_dev": 0.004990346599999973,
+      "worst": "atom 2 C charge"
+     },
+     {
+      "name": "nao occupancy",
+      "tol": 0.002,
+      "compared": 253,
+      "missing": 17,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.0016081119999999949,
+      "worst": "nao 171 occ"
+     },
+     {
+      "name": "nao energy",
+      "tol": 0.002,
+      "compared": 253,
+      "missing": 17,
+      "surplus": 0,
+      "failed": 55,
+      "max_dev": 0.04245710800000002,
+      "worst": "nao 21 E"
+     },
+     {
+      "name": "nbo occupancy",
+      "tol": 0.002,
+      "compared": 281,
+      "missing": 12,
+      "surplus": 12,
+      "failed": 14,
+      "max_dev": 1.208786338,
+      "worst": "BD* (1) Ni 1- C 3 occ"
+     },
+     {
+      "name": "nbo energy",
+      "tol": 0.002,
+      "compared": 281,
+      "missing": 12,
+      "surplus": 12,
+      "failed": 212,
+      "max_dev": 27.065745300000003,
+      "worst": "CR (5) Ni 1 s E"
+     },
+     {
+      "name": "hybrid %s/%p",
+      "tol": 0.5,
+      "compared": 1535,
+      "missing": 12,
+      "surplus": 24,
+      "failed": 567,
+      "max_dev": 99.99991671,
+      "worst": "RY (15) Ni 1 s h0 %f"
+     },
+     {
+      "name": "E2",
+      "tol": 0.1,
+      "compared": 49,
+      "missing": 325,
+      "surplus": 134,
+      "failed": 27,
+      "max_dev": 5.7827052533,
+      "worst": "LP ( 2)Ni 1 -> BD*( 1) C 3- O 7 E(2)"
+     },
+     {
+      "name": "NRT weight",
+      "tol": 0.005,
+      "compared": 0,
+      "missing": 138,
+      "surplus": 29,
+      "failed": 0,
+      "max_dev": 0.0,
+      "worst": ""
+     },
+     {
+      "name": "NRT weight by rank",
+      "tol": 0.005,
+      "compared": 29,
+      "missing": 109,
+      "surplus": 0,
+      "failed": 21,
+      "max_dev": 0.08027491556,
+      "worst": "rank 4 w"
+     },
+     {
+      "name": "NRT valency",
+      "tol": 0.005,
+      "compared": 36,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 35,
+      "max_dev": 5.916931959999999,
+      "worst": "atom 1 val"
+     },
+     {
+      "name": "NRT bond order",
+      "tol": 0.005,
+      "compared": 60,
+      "missing": 25,
+      "surplus": 0,
+      "failed": 42,
+      "max_dev": 3.2440615359999994,
+      "worst": "1-1 tot"
+     }
+    ],
+    "n_points": 2813,
+    "n_failed": 991,
+    "n_missing": 667,
+    "n_surplus": 211
+   },
+   "gated": {
+    "status": "FAIL",
+    "quantities": [
+     {
+      "name": "npa charge",
+      "tol": 0.002,
+      "compared": 36,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 18,
+      "max_dev": 0.004990346599999973,
+      "worst": "atom 2 C charge"
+     },
+     {
+      "name": "nao occupancy",
+      "tol": 0.002,
+      "compared": 253,
+      "missing": 17,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.0016081119999999949,
+      "worst": "nao 171 occ"
+     },
+     {
+      "name": "nao energy",
+      "tol": 0.002,
+      "compared": 253,
+      "missing": 17,
+      "surplus": 0,
+      "failed": 55,
+      "max_dev": 0.04245710800000002,
+      "worst": "nao 21 E"
+     },
+     {
+      "name": "nbo occupancy",
+      "tol": 0.002,
+      "compared": 122,
+      "missing": 24,
+      "surplus": 12,
+      "failed": 14,
+      "max_dev": 1.208786338,
+      "worst": "BD* (1) Ni 1- C 3 occ"
+     },
+     {
+      "name": "nbo energy",
+      "tol": 0.002,
+      "compared": 122,
+      "missing": 24,
+      "surplus": 12,
+      "failed": 59,
+      "max_dev": 27.065745300000003,
+      "worst": "CR (5) Ni 1 s E"
+     },
+     {
+      "name": "hybrid %s/%p",
+      "tol": 0.5,
+      "compared": 740,
+      "missing": 24,
+      "surplus": 24,
+      "failed": 186,
+      "max_dev": 99.99177242,
+      "worst": "RY (6) Ni 1 s h0 %s"
+     },
+     {
+      "name": "E2",
+      "tol": 0.1,
+      "compared": 21,
+      "missing": 69,
+      "surplus": 111,
+      "failed": 18,
+      "max_dev": 5.7827052533,
+      "worst": "LP ( 2)Ni 1 -> BD*( 1) C 3- O 7 E(2)"
+     },
+     {
+      "name": "NRT weight",
+      "tol": 0.005,
+      "compared": 0,
+      "missing": 138,
+      "surplus": 29,
+      "failed": 0,
+      "max_dev": 0.0,
+      "worst": ""
+     },
+     {
+      "name": "NRT weight by rank",
+      "tol": 0.005,
+      "compared": 29,
+      "missing": 109,
+      "surplus": 0,
+      "failed": 21,
+      "max_dev": 0.08027491556,
+      "worst": "rank 4 w"
+     },
+     {
+      "name": "NRT valency",
+      "tol": 0.005,
+      "compared": 36,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 35,
+      "max_dev": 5.916931959999999,
+      "worst": "atom 1 val"
+     },
+     {
+      "name": "NRT bond order",
+      "tol": 0.005,
+      "compared": 60,
+      "missing": 25,
+      "surplus": 0,
+      "failed": 42,
+      "max_dev": 3.2440615359999994,
+      "worst": "1-1 tot"
+     }
+    ],
+    "n_points": 1672,
+    "n_failed": 448,
+    "n_missing": 447,
+    "n_surplus": 188
+   },
+   "surplus": {
+    "total": 211,
+    "by_quantity": {
+     "nbo occupancy": 12,
+     "nbo energy": 12,
+     "hybrid %s/%p": 24,
+     "E2": 134,
+     "NRT weight": 29
+    }
+   },
+   "dropped": {
+    "nbos_gennbo": 147,
+    "nbos_native": 159,
+    "e2_gennbo": 284,
+    "e2_native": 51,
+    "points": 1141
+   },
+   "status": "FAIL",
+   "quantities": [
+    {
+     "name": "npa charge",
+     "tol": 0.002,
+     "compared": 36,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 18,
+     "max_dev": 0.004990346599999973,
+     "worst": "atom 2 C charge"
+    },
+    {
+     "name": "nao occupancy",
+     "tol": 0.002,
+     "compared": 253,
+     "missing": 17,
+     "surplus": 0,
+     "failed": 0,
+     "max_dev": 0.0016081119999999949,
+     "worst": "nao 171 occ"
+    },
+    {
+     "name": "nao energy",
+     "tol": 0.002,
+     "compared": 253,
+     "missing": 17,
+     "surplus": 0,
+     "failed": 55,
+     "max_dev": 0.04245710800000002,
+     "worst": "nao 21 E"
+    },
+    {
+     "name": "nbo occupancy",
+     "tol": 0.002,
+     "compared": 281,
+     "missing": 12,
+     "surplus": 12,
+     "failed": 14,
+     "max_dev": 1.208786338,
+     "worst": "BD* (1) Ni 1- C 3 occ"
+    },
+    {
+     "name": "nbo energy",
+     "tol": 0.002,
+     "compared": 281,
+     "missing": 12,
+     "surplus": 12,
+     "failed": 212,
+     "max_dev": 27.065745300000003,
+     "worst": "CR (5) Ni 1 s E"
+    },
+    {
+     "name": "hybrid %s/%p",
+     "tol": 0.5,
+     "compared": 1535,
+     "missing": 12,
+     "surplus": 24,
+     "failed": 567,
+     "max_dev": 99.99991671,
+     "worst": "RY (15) Ni 1 s h0 %f"
+    },
+    {
+     "name": "E2",
+     "tol": 0.1,
+     "compared": 49,
+     "missing": 325,
+     "surplus": 134,
+     "failed": 27,
+     "max_dev": 5.7827052533,
+     "worst": "LP ( 2)Ni 1 -> BD*( 1) C 3- O 7 E(2)"
+    },
+    {
+     "name": "NRT weight",
+     "tol": 0.005,
+     "compared": 0,
+     "missing": 138,
+     "surplus": 29,
+     "failed": 0,
+     "max_dev": 0.0,
+     "worst": ""
+    },
+    {
+     "name": "NRT weight by rank",
+     "tol": 0.005,
+     "compared": 29,
+     "missing": 109,
+     "surplus": 0,
+     "failed": 21,
+     "max_dev": 0.08027491556,
+     "worst": "rank 4 w"
+    },
+    {
+     "name": "NRT valency",
+     "tol": 0.005,
+     "compared": 36,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 35,
+     "max_dev": 5.916931959999999,
+     "worst": "atom 1 val"
+    },
+    {
+     "name": "NRT bond order",
+     "tol": 0.005,
+     "compared": 60,
+     "missing": 25,
+     "surplus": 0,
+     "failed": 42,
+     "max_dev": 3.2440615359999994,
+     "worst": "1-1 tot"
+    }
+   ],
+   "n_points": 2813,
+   "n_failed": 991,
+   "n_missing": 667,
+   "n_surplus": 211,
+   "notes": [
+    "thresholds differs: gennbo {'e2_kcal': 0.5, 'e2_intermolecular_kcal': 0.05, 'nrt_parent_percent': 50, 'nrt_deloc_kcal': 5}, native {'e2_kcal': 0.5, 'e2_intermolecular_kcal': 0, 'nrt_parent_percent': 0, 'nrt_deloc_kcal': 5}"
+   ]
+  },
+  {
+   "molecule": "nitromethane",
+   "gennbo_json": "C:\\Users\\florian\\AppData\\Local\\Temp\\nrt_renat5_20260928\\nitromethane\\nitromethane.gennbo.nbo.json",
+   "native_json": "C:\\Users\\florian\\AppData\\Local\\Temp\\nrt_renat5_20260928\\nitromethane\\nitromethane.native.nbo.json",
+   "ungated": {
+    "status": "FAIL",
+    "quantities": [
+     {
+      "name": "npa charge",
+      "tol": 0.002,
+      "compared": 28,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 4,
+      "max_dev": 0.006272008899999959,
+      "worst": "atom 1 C charge"
+     },
+     {
+      "name": "nao occupancy",
+      "tol": 0.002,
+      "compared": 126,
+      "missing": 8,
+      "surplus": 0,
+      "failed": 2,
+      "max_dev": 0.0032956610000001163,
+      "worst": "nao 43 occ"
+     },
+     {
+      "name": "nao energy",
+      "tol": 0.002,
+      "compared": 126,
+      "missing": 8,
+      "surplus": 0,
+      "failed": 87,
+      "max_dev": 0.7900917589999996,
+      "worst": "nao 96 E"
+     },
+     {
+      "name": "nbo occupancy",
+      "tol": 0.002,
+      "compared": 140,
+      "missing": 2,
+      "surplus": 2,
+      "failed": 3,
+      "max_dev": 0.52841009851,
+      "worst": "BD* (1) N 2- O 4 occ"
+     },
+     {
+      "name": "nbo energy",
+      "tol": 0.002,
+      "compared": 140,
+      "missing": 2,
+      "surplus": 2,
+      "failed": 119,
+      "max_dev": 32.268203869999994,
+      "worst": "RY (25) O 3 s E"
+     },
+     {
+      "name": "hybrid %s/%p",
+      "tol": 0.5,
+      "compared": 760,
+      "missing": 2,
+      "surplus": 4,
+      "failed": 360,
+      "max_dev": 99.25229341,
+      "worst": "RY (18) O 3 s h0 %f"
+     },
+     {
+      "name": "E2",
+      "tol": 0.1,
+      "compared": 23,
+      "missing": 36,
+      "surplus": 13,
+      "failed": 8,
+      "max_dev": 1.2294665680000003,
+      "worst": "LP ( 3) O 3 -> RY ( 3) N 2 E(2)"
+     },
+     {
+      "name": "NRT weight",
+      "tol": 0.005,
+      "compared": 0,
+      "missing": 50,
+      "surplus": 15,
+      "failed": 0,
+      "max_dev": 0.0,
+      "worst": ""
+     },
+     {
+      "name": "NRT weight by rank",
+      "tol": 0.005,
+      "compared": 15,
+      "missing": 35,
+      "surplus": 0,
+      "failed": 15,
+      "max_dev": 0.10801415039999998,
+      "worst": "rank 1 w"
+     },
+     {
+      "name": "NRT valency",
+      "tol": 0.005,
+      "compared": 28,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 19,
+      "max_dev": 0.13028933399999998,
+      "worst": "atom 1 cov"
+     },
+     {
+      "name": "NRT bond order",
+      "tol": 0.005,
+      "compared": 48,
+      "missing": 12,
+      "surplus": 0,
+      "failed": 25,
+      "max_dev": 0.16246133959999998,
+      "worst": "1-2 tot"
+     }
+    ],
+    "n_points": 1434,
+    "n_failed": 642,
+    "n_missing": 155,
+    "n_surplus": 36
+   },
+   "gated": {
+    "status": "FAIL",
+    "quantities": [
+     {
+      "name": "npa charge",
+      "tol": 0.002,
+      "compared": 28,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 4,
+      "max_dev": 0.006272008899999959,
+      "worst": "atom 1 C charge"
+     },
+     {
+      "name": "nao occupancy",
+      "tol": 0.002,
+      "compared": 126,
+      "missing": 8,
+      "surplus": 0,
+      "failed": 2,
+      "max_dev": 0.0032956610000001163,
+      "worst": "nao 43 occ"
+     },
+     {
+      "name": "nao energy",
+      "tol": 0.002,
+      "compared": 126,
+      "missing": 8,
+      "surplus": 0,
+      "failed": 87,
+      "max_dev": 0.7900917589999996,
+      "worst": "nao 96 E"
+     },
+     {
+      "name": "nbo occupancy",
+      "tol": 0.002,
+      "compared": 63,
+      "missing": 2,
+      "surplus": 2,
+      "failed": 3,
+      "max_dev": 0.52841009851,
+      "worst": "BD* (1) N 2- O 4 occ"
+     },
+     {
+      "name": "nbo energy",
+      "tol": 0.002,
+      "compared": 63,
+      "missing": 2,
+      "surplus": 2,
+      "failed": 42,
+      "max_dev": 0.545201332,
+      "worst": "BD* (1) N 2- O 4 E"
+     },
+     {
+      "name": "hybrid %s/%p",
+      "tol": 0.5,
+      "compared": 375,
+      "missing": 2,
+      "surplus": 4,
+      "failed": 100,
+      "max_dev": 33.51677693,
+      "worst": "BD (1) N 2- O 4 h0 %s"
+     },
+     {
+      "name": "E2",
+      "tol": 0.1,
+      "compared": 9,
+      "missing": 14,
+      "surplus": 9,
+      "failed": 3,
+      "max_dev": 0.9481426099999997,
+      "worst": "LP ( 2) O 4 -> BD*( 1) C 1- N 2 E(2)"
+     },
+     {
+      "name": "NRT weight",
+      "tol": 0.005,
+      "compared": 0,
+      "missing": 50,
+      "surplus": 15,
+      "failed": 0,
+      "max_dev": 0.0,
+      "worst": ""
+     },
+     {
+      "name": "NRT weight by rank",
+      "tol": 0.005,
+      "compared": 15,
+      "missing": 35,
+      "surplus": 0,
+      "failed": 15,
+      "max_dev": 0.10801415039999998,
+      "worst": "rank 1 w"
+     },
+     {
+      "name": "NRT valency",
+      "tol": 0.005,
+      "compared": 28,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 19,
+      "max_dev": 0.13028933399999998,
+      "worst": "atom 1 cov"
+     },
+     {
+      "name": "NRT bond order",
+      "tol": 0.005,
+      "compared": 48,
+      "missing": 12,
+      "surplus": 0,
+      "failed": 25,
+      "max_dev": 0.16246133959999998,
+      "worst": "1-2 tot"
+     }
+    ],
+    "n_points": 881,
+    "n_failed": 300,
+    "n_missing": 133,
+    "n_surplus": 32
+   },
+   "surplus": {
+    "total": 36,
+    "by_quantity": {
+     "nbo occupancy": 2,
+     "nbo energy": 2,
+     "hybrid %s/%p": 4,
+     "E2": 13,
+     "NRT weight": 15
+    }
+   },
+   "dropped": {
+    "nbos_gennbo": 77,
+    "nbos_native": 77,
+    "e2_gennbo": 36,
+    "e2_native": 18,
+    "points": 553
+   },
+   "status": "FAIL",
+   "quantities": [
+    {
+     "name": "npa charge",
+     "tol": 0.002,
+     "compared": 28,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 4,
+     "max_dev": 0.006272008899999959,
+     "worst": "atom 1 C charge"
+    },
+    {
+     "name": "nao occupancy",
+     "tol": 0.002,
+     "compared": 126,
+     "missing": 8,
+     "surplus": 0,
+     "failed": 2,
+     "max_dev": 0.0032956610000001163,
+     "worst": "nao 43 occ"
+    },
+    {
+     "name": "nao energy",
+     "tol": 0.002,
+     "compared": 126,
+     "missing": 8,
+     "surplus": 0,
+     "failed": 87,
+     "max_dev": 0.7900917589999996,
+     "worst": "nao 96 E"
+    },
+    {
+     "name": "nbo occupancy",
+     "tol": 0.002,
+     "compared": 140,
+     "missing": 2,
+     "surplus": 2,
+     "failed": 3,
+     "max_dev": 0.52841009851,
+     "worst": "BD* (1) N 2- O 4 occ"
+    },
+    {
+     "name": "nbo energy",
+     "tol": 0.002,
+     "compared": 140,
+     "missing": 2,
+     "surplus": 2,
+     "failed": 119,
+     "max_dev": 32.268203869999994,
+     "worst": "RY (25) O 3 s E"
+    },
+    {
+     "name": "hybrid %s/%p",
+     "tol": 0.5,
+     "compared": 760,
+     "missing": 2,
+     "surplus": 4,
+     "failed": 360,
+     "max_dev": 99.25229341,
+     "worst": "RY (18) O 3 s h0 %f"
+    },
+    {
+     "name": "E2",
+     "tol": 0.1,
+     "compared": 23,
+     "missing": 36,
+     "surplus": 13,
+     "failed": 8,
+     "max_dev": 1.2294665680000003,
+     "worst": "LP ( 3) O 3 -> RY ( 3) N 2 E(2)"
+    },
+    {
+     "name": "NRT weight",
+     "tol": 0.005,
+     "compared": 0,
+     "missing": 50,
+     "surplus": 15,
+     "failed": 0,
+     "max_dev": 0.0,
+     "worst": ""
+    },
+    {
+     "name": "NRT weight by rank",
+     "tol": 0.005,
+     "compared": 15,
+     "missing": 35,
+     "surplus": 0,
+     "failed": 15,
+     "max_dev": 0.10801415039999998,
+     "worst": "rank 1 w"
+    },
+    {
+     "name": "NRT valency",
+     "tol": 0.005,
+     "compared": 28,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 19,
+     "max_dev": 0.13028933399999998,
+     "worst": "atom 1 cov"
+    },
+    {
+     "name": "NRT bond order",
+     "tol": 0.005,
+     "compared": 48,
+     "missing": 12,
+     "surplus": 0,
+     "failed": 25,
+     "max_dev": 0.16246133959999998,
+     "worst": "1-2 tot"
+    }
+   ],
+   "n_points": 1434,
+   "n_failed": 642,
+   "n_missing": 155,
+   "n_surplus": 36,
+   "notes": [
+    "thresholds differs: gennbo {'e2_kcal': 0.5, 'e2_intermolecular_kcal': 0, 'nrt_parent_percent': 50, 'nrt_deloc_kcal': 1}, native {'e2_kcal': 0.5, 'e2_intermolecular_kcal': 0, 'nrt_parent_percent': 0, 'nrt_deloc_kcal': 1}"
+   ]
+  },
+  {
+   "molecule": "no",
+   "gennbo_json": "C:\\Users\\florian\\AppData\\Local\\Temp\\nrt_renat5_20260928\\no\\no.gennbo.nbo.json",
+   "native_json": "C:\\Users\\florian\\AppData\\Local\\Temp\\nrt_renat5_20260928\\no\\no.native.nbo.json",
+   "ungated": {
+    "status": "FAIL",
+    "quantities": [
+     {
+      "name": "npa charge",
+      "tol": 0.002,
+      "compared": 10,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 6,
+      "max_dev": 0.05086911979999997,
+      "worst": "atom 1 N spin"
+     },
+     {
+      "name": "nao occupancy",
+      "tol": 0.002,
+      "compared": 47,
+      "missing": 6,
+      "surplus": 0,
+      "failed": 5,
+      "max_dev": 0.006322748999999961,
+      "worst": "nao 37 occ"
+     },
+     {
+      "name": "nao energy",
+      "tol": 0.002,
+      "compared": 47,
+      "missing": 6,
+      "surplus": 0,
+      "failed": 43,
+      "max_dev": 1.0221759199999996,
+      "worst": "nao 45 E"
+     },
+     {
+      "name": "nbo occupancy",
+      "tol": 0.002,
+      "compared": 122,
+      "missing": 2,
+      "surplus": 2,
+      "failed": 3,
+      "max_dev": 0.004051793556,
+      "worst": "BD* (1) N 1- O 2 beta occ"
+     },
+     {
+      "name": "nbo energy",
+      "tol": 0.002,
+      "compared": 122,
+      "missing": 2,
+      "surplus": 2,
+      "failed": 112,
+      "max_dev": 34.256536415,
+      "worst": "RY (8) O 2 s alpha E"
+     },
+     {
+      "name": "hybrid %s/%p",
+      "tol": 0.5,
+      "compared": 650,
+      "missing": 2,
+      "surplus": 4,
+      "failed": 380,
+      "max_dev": 99.87049186,
+      "worst": "RY (11) N 1 s alpha h0 %f"
+     },
+     {
+      "name": "E2",
+      "tol": 0.1,
+      "compared": 7,
+      "missing": 27,
+      "surplus": 10,
+      "failed": 4,
+      "max_dev": 0.9055407840000003,
+      "worst": "LP ( 1) O 2 -> RY ( 1) N 1 beta E(2)"
+     },
+     {
+      "name": "NRT weight",
+      "tol": 0.005,
+      "compared": 0,
+      "missing": 2,
+      "surplus": 2,
+      "failed": 0,
+      "max_dev": 0.0,
+      "worst": ""
+     },
+     {
+      "name": "NRT weight by rank",
+      "tol": 0.005,
+      "compared": 2,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.0,
+      "worst": ""
+     },
+     {
+      "name": "NRT valency",
+      "tol": 0.005,
+      "compared": 16,
+      "missing": 2,
+      "surplus": 0,
+      "failed": 8,
+      "max_dev": 0.03181798800000002,
+      "worst": "atom 1 beta cov"
+     },
+     {
+      "name": "NRT bond order",
+      "tol": 0.005,
+      "compared": 18,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 4,
+      "max_dev": 0.03181798800000002,
+      "worst": "1-2 beta cov"
+     }
+    ],
+    "n_points": 1041,
+    "n_failed": 565,
+    "n_missing": 49,
+    "n_surplus": 20
+   },
+   "gated": {
+    "status": "FAIL",
+    "quantities": [
+     {
+      "name": "npa charge",
+      "tol": 0.002,
+      "compared": 10,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 6,
+      "max_dev": 0.05086911979999997,
+      "worst": "atom 1 N spin"
+     },
+     {
+      "name": "nao occupancy",
+      "tol": 0.002,
+      "compared": 47,
+      "missing": 6,
+      "surplus": 0,
+      "failed": 5,
+      "max_dev": 0.006322748999999961,
+      "worst": "nao 37 occ"
+     },
+     {
+      "name": "nao energy",
+      "tol": 0.002,
+      "compared": 47,
+      "missing": 6,
+      "surplus": 0,
+      "failed": 43,
+      "max_dev": 1.0221759199999996,
+      "worst": "nao 45 E"
+     },
+     {
+      "name": "nbo occupancy",
+      "tol": 0.002,
+      "compared": 24,
+      "missing": 2,
+      "surplus": 2,
+      "failed": 3,
+      "max_dev": 0.004051793556,
+      "worst": "BD* (1) N 1- O 2 beta occ"
+     },
+     {
+      "name": "nbo energy",
+      "tol": 0.002,
+      "compared": 24,
+      "missing": 2,
+      "surplus": 2,
+      "failed": 14,
+      "max_dev": 0.3210114922,
+      "worst": "BD* (1) N 1- O 2 beta E"
+     },
+     {
+      "name": "hybrid %s/%p",
+      "tol": 0.5,
+      "compared": 160,
+      "missing": 2,
+      "surplus": 4,
+      "failed": 68,
+      "max_dev": 16.638839360000006,
+      "worst": "BD (2) N 1- O 2 beta h1 %p"
+     },
+     {
+      "name": "E2",
+      "tol": 0.1,
+      "compared": 0,
+      "missing": 9,
+      "surplus": 4,
+      "failed": 0,
+      "max_dev": 0.0,
+      "worst": ""
+     },
+     {
+      "name": "NRT weight",
+      "tol": 0.005,
+      "compared": 0,
+      "missing": 2,
+      "surplus": 2,
+      "failed": 0,
+      "max_dev": 0.0,
+      "worst": ""
+     },
+     {
+      "name": "NRT weight by rank",
+      "tol": 0.005,
+      "compared": 2,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.0,
+      "worst": ""
+     },
+     {
+      "name": "NRT valency",
+      "tol": 0.005,
+      "compared": 16,
+      "missing": 2,
+      "surplus": 0,
+      "failed": 8,
+      "max_dev": 0.03181798800000002,
+      "worst": "atom 1 beta cov"
+     },
+     {
+      "name": "NRT bond order",
+      "tol": 0.005,
+      "compared": 18,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 4,
+      "max_dev": 0.03181798800000002,
+      "worst": "1-2 beta cov"
+     }
+    ],
+    "n_points": 348,
+    "n_failed": 151,
+    "n_missing": 31,
+    "n_surplus": 14
+   },
+   "surplus": {
+    "total": 20,
+    "by_quantity": {
+     "nbo occupancy": 2,
+     "nbo energy": 2,
+     "hybrid %s/%p": 4,
+     "E2": 10,
+     "NRT weight": 2
+    }
+   },
+   "dropped": {
+    "nbos_gennbo": 98,
+    "nbos_native": 98,
+    "e2_gennbo": 25,
+    "e2_native": 13,
+    "points": 693
+   },
+   "status": "FAIL",
+   "quantities": [
+    {
+     "name": "npa charge",
+     "tol": 0.002,
+     "compared": 10,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 6,
+     "max_dev": 0.05086911979999997,
+     "worst": "atom 1 N spin"
+    },
+    {
+     "name": "nao occupancy",
+     "tol": 0.002,
+     "compared": 47,
+     "missing": 6,
+     "surplus": 0,
+     "failed": 5,
+     "max_dev": 0.006322748999999961,
+     "worst": "nao 37 occ"
+    },
+    {
+     "name": "nao energy",
+     "tol": 0.002,
+     "compared": 47,
+     "missing": 6,
+     "surplus": 0,
+     "failed": 43,
+     "max_dev": 1.0221759199999996,
+     "worst": "nao 45 E"
+    },
+    {
+     "name": "nbo occupancy",
+     "tol": 0.002,
+     "compared": 122,
+     "missing": 2,
+     "surplus": 2,
+     "failed": 3,
+     "max_dev": 0.004051793556,
+     "worst": "BD* (1) N 1- O 2 beta occ"
+    },
+    {
+     "name": "nbo energy",
+     "tol": 0.002,
+     "compared": 122,
+     "missing": 2,
+     "surplus": 2,
+     "failed": 112,
+     "max_dev": 34.256536415,
+     "worst": "RY (8) O 2 s alpha E"
+    },
+    {
+     "name": "hybrid %s/%p",
+     "tol": 0.5,
+     "compared": 650,
+     "missing": 2,
+     "surplus": 4,
+     "failed": 380,
+     "max_dev": 99.87049186,
+     "worst": "RY (11) N 1 s alpha h0 %f"
+    },
+    {
+     "name": "E2",
+     "tol": 0.1,
+     "compared": 7,
+     "missing": 27,
+     "surplus": 10,
+     "failed": 4,
+     "max_dev": 0.9055407840000003,
+     "worst": "LP ( 1) O 2 -> RY ( 1) N 1 beta E(2)"
+    },
+    {
+     "name": "NRT weight",
+     "tol": 0.005,
+     "compared": 0,
+     "missing": 2,
+     "surplus": 2,
+     "failed": 0,
+     "max_dev": 0.0,
+     "worst": ""
+    },
+    {
+     "name": "NRT weight by rank",
+     "tol": 0.005,
+     "compared": 2,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 0,
+     "max_dev": 0.0,
+     "worst": ""
+    },
+    {
+     "name": "NRT valency",
+     "tol": 0.005,
+     "compared": 16,
+     "missing": 2,
+     "surplus": 0,
+     "failed": 8,
+     "max_dev": 0.03181798800000002,
+     "worst": "atom 1 beta cov"
+    },
+    {
+     "name": "NRT bond order",
+     "tol": 0.005,
+     "compared": 18,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 4,
+     "max_dev": 0.03181798800000002,
+     "worst": "1-2 beta cov"
+    }
+   ],
+   "n_points": 1041,
+   "n_failed": 565,
+   "n_missing": 49,
+   "n_surplus": 20,
+   "notes": [
+    "thresholds differs: gennbo {'e2_kcal': 0.25, 'e2_intermolecular_kcal': 0, 'nrt_parent_percent': 50, 'nrt_deloc_kcal': 1}, native {'e2_kcal': 0.25, 'e2_intermolecular_kcal': 0, 'nrt_parent_percent': 0, 'nrt_deloc_kcal': 1}"
+   ]
+  },
+  {
+   "molecule": "o2",
+   "gennbo_json": "C:\\Users\\florian\\AppData\\Local\\Temp\\nrt_renat5_20260928\\o2\\o2.gennbo.nbo.json",
+   "native_json": "C:\\Users\\florian\\AppData\\Local\\Temp\\nrt_renat5_20260928\\o2\\o2.native.nbo.json",
+   "ungated": {
+    "status": "FAIL",
+    "quantities": [
+     {
+      "name": "npa charge",
+      "tol": 0.002,
+      "compared": 10,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.0011759969999998177,
+      "worst": "atom 1 O val"
+     },
+     {
+      "name": "nao occupancy",
+      "tol": 0.002,
+      "compared": 40,
+      "missing": 4,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.0011149720000001029,
+      "worst": "nao 12 occ"
+     },
+     {
+      "name": "nao energy",
+      "tol": 0.002,
+      "compared": 40,
+      "missing": 4,
+      "surplus": 0,
+      "failed": 30,
+      "max_dev": 0.8200603959999997,
+      "worst": "nao 35 E"
+     },
+     {
+      "name": "nbo occupancy",
+      "tol": 0.002,
+      "compared": 124,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.000387522503,
+      "worst": "RY (1) O 1 s beta occ"
+     },
+     {
+      "name": "nbo energy",
+      "tol": 0.002,
+      "compared": 124,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 109,
+      "max_dev": 34.443508806,
+      "worst": "RY (7) O 1 s alpha E"
+     },
+     {
+      "name": "hybrid %s/%p",
+      "tol": 0.5,
+      "compared": 660,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 329,
+      "max_dev": 99.99999958,
+      "worst": "RY (13) O 2 s beta h0 %f"
+     },
+     {
+      "name": "E2",
+      "tol": 0.1,
+      "compared": 6,
+      "missing": 3,
+      "surplus": 3,
+      "failed": 4,
+      "max_dev": 0.7277269250000001,
+      "worst": "LP ( 1) O 1 -> RY ( 1) O 2 beta E(2)"
+     },
+     {
+      "name": "NRT weight",
+      "tol": 0.005,
+      "compared": 0,
+      "missing": 2,
+      "surplus": 2,
+      "failed": 0,
+      "max_dev": 0.0,
+      "worst": ""
+     },
+     {
+      "name": "NRT weight by rank",
+      "tol": 0.005,
+      "compared": 2,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.0,
+      "worst": ""
+     },
+     {
+      "name": "NRT valency",
+      "tol": 0.005,
+      "compared": 16,
+      "missing": 2,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 1.487121907e-06,
+      "worst": "atom 1 beta ion"
+     },
+     {
+      "name": "NRT bond order",
+      "tol": 0.005,
+      "compared": 18,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 1.487121907e-06,
+      "worst": "1-2 beta ion"
+     }
+    ],
+    "n_points": 1040,
+    "n_failed": 472,
+    "n_missing": 15,
+    "n_surplus": 5
+   },
+   "gated": {
+    "status": "FAIL",
+    "quantities": [
+     {
+      "name": "npa charge",
+      "tol": 0.002,
+      "compared": 10,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.0011759969999998177,
+      "worst": "atom 1 O val"
+     },
+     {
+      "name": "nao occupancy",
+      "tol": 0.002,
+      "compared": 40,
+      "missing": 4,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.0011149720000001029,
+      "worst": "nao 12 occ"
+     },
+     {
+      "name": "nao energy",
+      "tol": 0.002,
+      "compared": 40,
+      "missing": 4,
+      "surplus": 0,
+      "failed": 30,
+      "max_dev": 0.8200603959999997,
+      "worst": "nao 35 E"
+     },
+     {
+      "name": "nbo occupancy",
+      "tol": 0.002,
+      "compared": 28,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.000387522503,
+      "worst": "RY (1) O 1 s beta occ"
+     },
+     {
+      "name": "nbo energy",
+      "tol": 0.002,
+      "compared": 28,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 14,
+      "max_dev": 0.410010926,
+      "worst": "RY (1) O 2 s beta E"
+     },
+     {
+      "name": "hybrid %s/%p",
+      "tol": 0.5,
+      "compared": 180,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 40,
+      "max_dev": 27.0374255,
+      "worst": "RY (1) O 2 s beta h0 %p"
+     },
+     {
+      "name": "NRT weight",
+      "tol": 0.005,
+      "compared": 0,
+      "missing": 2,
+      "surplus": 2,
+      "failed": 0,
+      "max_dev": 0.0,
+      "worst": ""
+     },
+     {
+      "name": "NRT weight by rank",
+      "tol": 0.005,
+      "compared": 2,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.0,
+      "worst": ""
+     },
+     {
+      "name": "NRT valency",
+      "tol": 0.005,
+      "compared": 16,
+      "missing": 2,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 1.487121907e-06,
+      "worst": "atom 1 beta ion"
+     },
+     {
+      "name": "NRT bond order",
+      "tol": 0.005,
+      "compared": 18,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 1.487121907e-06,
+      "worst": "1-2 beta ion"
+     }
+    ],
+    "n_points": 362,
+    "n_failed": 84,
+    "n_missing": 12,
+    "n_surplus": 2
+   },
+   "surplus": {
+    "total": 5,
+    "by_quantity": {
+     "E2": 3,
+     "NRT weight": 2
+    }
+   },
+   "dropped": {
+    "nbos_gennbo": 96,
+    "nbos_native": 96,
+    "e2_gennbo": 9,
+    "e2_native": 9,
+    "points": 678
+   },
+   "status": "FAIL",
+   "quantities": [
+    {
+     "name": "npa charge",
+     "tol": 0.002,
+     "compared": 10,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 0,
+     "max_dev": 0.0011759969999998177,
+     "worst": "atom 1 O val"
+    },
+    {
+     "name": "nao occupancy",
+     "tol": 0.002,
+     "compared": 40,
+     "missing": 4,
+     "surplus": 0,
+     "failed": 0,
+     "max_dev": 0.0011149720000001029,
+     "worst": "nao 12 occ"
+    },
+    {
+     "name": "nao energy",
+     "tol": 0.002,
+     "compared": 40,
+     "missing": 4,
+     "surplus": 0,
+     "failed": 30,
+     "max_dev": 0.8200603959999997,
+     "worst": "nao 35 E"
+    },
+    {
+     "name": "nbo occupancy",
+     "tol": 0.002,
+     "compared": 124,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 0,
+     "max_dev": 0.000387522503,
+     "worst": "RY (1) O 1 s beta occ"
+    },
+    {
+     "name": "nbo energy",
+     "tol": 0.002,
+     "compared": 124,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 109,
+     "max_dev": 34.443508806,
+     "worst": "RY (7) O 1 s alpha E"
+    },
+    {
+     "name": "hybrid %s/%p",
+     "tol": 0.5,
+     "compared": 660,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 329,
+     "max_dev": 99.99999958,
+     "worst": "RY (13) O 2 s beta h0 %f"
+    },
+    {
+     "name": "E2",
+     "tol": 0.1,
+     "compared": 6,
+     "missing": 3,
+     "surplus": 3,
+     "failed": 4,
+     "max_dev": 0.7277269250000001,
+     "worst": "LP ( 1) O 1 -> RY ( 1) O 2 beta E(2)"
+    },
+    {
+     "name": "NRT weight",
+     "tol": 0.005,
+     "compared": 0,
+     "missing": 2,
+     "surplus": 2,
+     "failed": 0,
+     "max_dev": 0.0,
+     "worst": ""
+    },
+    {
+     "name": "NRT weight by rank",
+     "tol": 0.005,
+     "compared": 2,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 0,
+     "max_dev": 0.0,
+     "worst": ""
+    },
+    {
+     "name": "NRT valency",
+     "tol": 0.005,
+     "compared": 16,
+     "missing": 2,
+     "surplus": 0,
+     "failed": 0,
+     "max_dev": 1.487121907e-06,
+     "worst": "atom 1 beta ion"
+    },
+    {
+     "name": "NRT bond order",
+     "tol": 0.005,
+     "compared": 18,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 0,
+     "max_dev": 1.487121907e-06,
+     "worst": "1-2 beta ion"
+    }
+   ],
+   "n_points": 1040,
+   "n_failed": 472,
+   "n_missing": 15,
+   "n_surplus": 5,
+   "notes": [
+    "thresholds differs: gennbo {'e2_kcal': 0.25, 'e2_intermolecular_kcal': 0, 'nrt_parent_percent': 50, 'nrt_deloc_kcal': 1}, native {'e2_kcal': 0.25, 'e2_intermolecular_kcal': 0, 'nrt_parent_percent': 0, 'nrt_deloc_kcal': 1}"
+   ]
+  },
+  {
+   "molecule": "ozone",
+   "gennbo_json": "C:\\Users\\florian\\AppData\\Local\\Temp\\nrt_renat5_20260928\\ozone\\ozone.gennbo.nbo.json",
+   "native_json": "C:\\Users\\florian\\AppData\\Local\\Temp\\nrt_renat5_20260928\\ozone\\ozone.native.nbo.json",
+   "ungated": {
+    "status": "FAIL",
+    "quantities": [
+     {
+      "name": "npa charge",
+      "tol": 0.002,
+      "compared": 12,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.0017394681999999828,
+      "worst": "atom 1 O charge"
+     },
+     {
+      "name": "nao occupancy",
+      "tol": 0.002,
+      "compared": 82,
+      "missing": 8,
+      "surplus": 0,
+      "failed": 1,
+      "max_dev": 0.0020637880000000663,
+      "worst": "nao 6 occ"
+     },
+     {
+      "name": "nao energy",
+      "tol": 0.002,
+      "compared": 82,
+      "missing": 8,
+      "surplus": 0,
+      "failed": 57,
+      "max_dev": 0.10214300599999948,
+      "worst": "nao 16 E"
+     },
+     {
+      "name": "nbo occupancy",
+      "tol": 0.002,
+      "compared": 93,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.0012367610000001417,
+      "worst": "BD (1) O 1- O 2 occ"
+     },
+     {
+      "name": "nbo energy",
+      "tol": 0.002,
+      "compared": 93,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 75,
+      "max_dev": 35.18278968600001,
+      "worst": "RY (11) O 3 s E"
+     },
+     {
+      "name": "hybrid %s/%p",
+      "tol": 0.5,
+      "compared": 495,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 259,
+      "max_dev": 98.87894012,
+      "worst": "RY (18) O 3 s h0 %f"
+     },
+     {
+      "name": "E2",
+      "tol": 0.1,
+      "compared": 19,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 9,
+      "max_dev": 63.35044889999999,
+      "worst": "LP ( 3) O 2 -> BD*( 1) O 1- O 3 E(2)"
+     },
+     {
+      "name": "NRT weight",
+      "tol": 0.005,
+      "compared": 0,
+      "missing": 11,
+      "surplus": 4,
+      "failed": 0,
+      "max_dev": 0.0,
+      "worst": ""
+     },
+     {
+      "name": "NRT weight by rank",
+      "tol": 0.005,
+      "compared": 4,
+      "missing": 7,
+      "surplus": 0,
+      "failed": 4,
+      "max_dev": 0.08933354760000001,
+      "worst": "rank 1 w"
+     },
+     {
+      "name": "NRT valency",
+      "tol": 0.005,
+      "compared": 12,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 9,
+      "max_dev": 0.26212002000000023,
+      "worst": "atom 1 cov"
+     },
+     {
+      "name": "NRT bond order",
+      "tol": 0.005,
+      "compared": 18,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 12,
+      "max_dev": 0.2074465539999999,
+      "worst": "1-3 cov"
+     }
+    ],
+    "n_points": 910,
+    "n_failed": 426,
+    "n_missing": 34,
+    "n_surplus": 4
+   },
+   "gated": {
+    "status": "FAIL",
+    "quantities": [
+     {
+      "name": "npa charge",
+      "tol": 0.002,
+      "compared": 12,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.0017394681999999828,
+      "worst": "atom 1 O charge"
+     },
+     {
+      "name": "nao occupancy",
+      "tol": 0.002,
+      "compared": 82,
+      "missing": 8,
+      "surplus": 0,
+      "failed": 1,
+      "max_dev": 0.0020637880000000663,
+      "worst": "nao 6 occ"
+     },
+     {
+      "name": "nao energy",
+      "tol": 0.002,
+      "compared": 82,
+      "missing": 8,
+      "surplus": 0,
+      "failed": 57,
+      "max_dev": 0.10214300599999948,
+      "worst": "nao 16 E"
+     },
+     {
+      "name": "nbo occupancy",
+      "tol": 0.002,
+      "compared": 30,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.0012367610000001417,
+      "worst": "BD (1) O 1- O 2 occ"
+     },
+     {
+      "name": "nbo energy",
+      "tol": 0.002,
+      "compared": 30,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 12,
+      "max_dev": 0.3621675740000001,
+      "worst": "RY (4) O 3 s E"
+     },
+     {
+      "name": "hybrid %s/%p",
+      "tol": 0.5,
+      "compared": 180,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 40,
+      "max_dev": 14.14944625,
+      "worst": "RY (4) O 3 s h0 %s"
+     },
+     {
+      "name": "E2",
+      "tol": 0.1,
+      "compared": 6,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 3,
+      "max_dev": 63.35044889999999,
+      "worst": "LP ( 3) O 2 -> BD*( 1) O 1- O 3 E(2)"
+     },
+     {
+      "name": "NRT weight",
+      "tol": 0.005,
+      "compared": 0,
+      "missing": 11,
+      "surplus": 4,
+      "failed": 0,
+      "max_dev": 0.0,
+      "worst": ""
+     },
+     {
+      "name": "NRT weight by rank",
+      "tol": 0.005,
+      "compared": 4,
+      "missing": 7,
+      "surplus": 0,
+      "failed": 4,
+      "max_dev": 0.08933354760000001,
+      "worst": "rank 1 w"
+     },
+     {
+      "name": "NRT valency",
+      "tol": 0.005,
+      "compared": 12,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 9,
+      "max_dev": 0.26212002000000023,
+      "worst": "atom 1 cov"
+     },
+     {
+      "name": "NRT bond order",
+      "tol": 0.005,
+      "compared": 18,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 12,
+      "max_dev": 0.2074465539999999,
+      "worst": "1-3 cov"
+     }
+    ],
+    "n_points": 456,
+    "n_failed": 138,
+    "n_missing": 34,
+    "n_surplus": 4
+   },
+   "surplus": {
+    "total": 4,
+    "by_quantity": {
+     "NRT weight": 4
+    }
+   },
+   "dropped": {
+    "nbos_gennbo": 63,
+    "nbos_native": 63,
+    "e2_gennbo": 13,
+    "e2_native": 13,
+    "points": 454
+   },
+   "status": "FAIL",
+   "quantities": [
+    {
+     "name": "npa charge",
+     "tol": 0.002,
+     "compared": 12,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 0,
+     "max_dev": 0.0017394681999999828,
+     "worst": "atom 1 O charge"
+    },
+    {
+     "name": "nao occupancy",
+     "tol": 0.002,
+     "compared": 82,
+     "missing": 8,
+     "surplus": 0,
+     "failed": 1,
+     "max_dev": 0.0020637880000000663,
+     "worst": "nao 6 occ"
+    },
+    {
+     "name": "nao energy",
+     "tol": 0.002,
+     "compared": 82,
+     "missing": 8,
+     "surplus": 0,
+     "failed": 57,
+     "max_dev": 0.10214300599999948,
+     "worst": "nao 16 E"
+    },
+    {
+     "name": "nbo occupancy",
+     "tol": 0.002,
+     "compared": 93,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 0,
+     "max_dev": 0.0012367610000001417,
+     "worst": "BD (1) O 1- O 2 occ"
+    },
+    {
+     "name": "nbo energy",
+     "tol": 0.002,
+     "compared": 93,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 75,
+     "max_dev": 35.18278968600001,
+     "worst": "RY (11) O 3 s E"
+    },
+    {
+     "name": "hybrid %s/%p",
+     "tol": 0.5,
+     "compared": 495,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 259,
+     "max_dev": 98.87894012,
+     "worst": "RY (18) O 3 s h0 %f"
+    },
+    {
+     "name": "E2",
+     "tol": 0.1,
+     "compared": 19,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 9,
+     "max_dev": 63.35044889999999,
+     "worst": "LP ( 3) O 2 -> BD*( 1) O 1- O 3 E(2)"
+    },
+    {
+     "name": "NRT weight",
+     "tol": 0.005,
+     "compared": 0,
+     "missing": 11,
+     "surplus": 4,
+     "failed": 0,
+     "max_dev": 0.0,
+     "worst": ""
+    },
+    {
+     "name": "NRT weight by rank",
+     "tol": 0.005,
+     "compared": 4,
+     "missing": 7,
+     "surplus": 0,
+     "failed": 4,
+     "max_dev": 0.08933354760000001,
+     "worst": "rank 1 w"
+    },
+    {
+     "name": "NRT valency",
+     "tol": 0.005,
+     "compared": 12,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 9,
+     "max_dev": 0.26212002000000023,
+     "worst": "atom 1 cov"
+    },
+    {
+     "name": "NRT bond order",
+     "tol": 0.005,
+     "compared": 18,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 12,
+     "max_dev": 0.2074465539999999,
+     "worst": "1-3 cov"
+    }
+   ],
+   "n_points": 910,
+   "n_failed": 426,
+   "n_missing": 34,
+   "n_surplus": 4,
+   "notes": [
+    "thresholds differs: gennbo {'e2_kcal': 0.5, 'e2_intermolecular_kcal': 0, 'nrt_parent_percent': 50, 'nrt_deloc_kcal': 1}, native {'e2_kcal': 0.5, 'e2_intermolecular_kcal': 0, 'nrt_parent_percent': 0, 'nrt_deloc_kcal': 1}"
+   ]
+  },
+  {
+   "molecule": "pf5",
+   "gennbo_json": "C:\\Users\\florian\\AppData\\Local\\Temp\\nrt_renat5_20260928\\pf5\\pf5.gennbo.nbo.json",
+   "native_json": "C:\\Users\\florian\\AppData\\Local\\Temp\\nrt_renat5_20260928\\pf5\\pf5.native.nbo.json",
+   "ungated": {
+    "status": "FAIL",
+    "quantities": [
+     {
+      "name": "npa charge",
+      "tol": 0.002,
+      "compared": 24,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.0004477839999998956,
+      "worst": "atom 1 P charge"
+     },
+     {
+      "name": "nao occupancy",
+      "tol": 0.002,
+      "compared": 141,
+      "missing": 10,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.0007038578000000406,
+      "worst": "nao 3 occ"
+     },
+     {
+      "name": "nao energy",
+      "tol": 0.002,
+      "compared": 141,
+      "missing": 10,
+      "surplus": 0,
+      "failed": 70,
+      "max_dev": 0.16946654299999997,
+      "worst": "nao 31 E"
+     },
+     {
+      "name": "nbo occupancy",
+      "tol": 0.002,
+      "compared": 189,
+      "missing": 3,
+      "surplus": 3,
+      "failed": 7,
+      "max_dev": 0.01055111700000011,
+      "worst": "BD (1) P 1- F 4 occ"
+     },
+     {
+      "name": "nbo energy",
+      "tol": 0.002,
+      "compared": 189,
+      "missing": 3,
+      "surplus": 3,
+      "failed": 162,
+      "max_dev": 43.879234032,
+      "worst": "RY (17) F 4 s E"
+     },
+     {
+      "name": "hybrid %s/%p",
+      "tol": 0.5,
+      "compared": 975,
+      "missing": 5,
+      "surplus": 5,
+      "failed": 460,
+      "max_dev": 99.9657903,
+      "worst": "RY (9) P 1 s h0 %f"
+     },
+     {
+      "name": "E2",
+      "tol": 0.1,
+      "compared": 72,
+      "missing": 92,
+      "surplus": 47,
+      "failed": 34,
+      "max_dev": 3.886738009,
+      "worst": "LP ( 3) F 6 -> RY ( 3) P 1 E(2)"
+     },
+     {
+      "name": "NRT weight",
+      "tol": 0.005,
+      "compared": 0,
+      "missing": 70,
+      "surplus": 13,
+      "failed": 0,
+      "max_dev": 0.0,
+      "worst": ""
+     },
+     {
+      "name": "NRT weight by rank",
+      "tol": 0.005,
+      "compared": 13,
+      "missing": 57,
+      "surplus": 0,
+      "failed": 13,
+      "max_dev": 0.1174948895,
+      "worst": "rank 2 w"
+     },
+     {
+      "name": "NRT valency",
+      "tol": 0.005,
+      "compared": 24,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 17,
+      "max_dev": 0.16791906,
+      "worst": "atom 1 val"
+     },
+     {
+      "name": "NRT bond order",
+      "tol": 0.005,
+      "compared": 51,
+      "missing": 4,
+      "surplus": 0,
+      "failed": 33,
+      "max_dev": 0.1679190596,
+      "worst": "1-1 tot"
+     }
+    ],
+    "n_points": 1819,
+    "n_failed": 796,
+    "n_missing": 254,
+    "n_surplus": 71
+   },
+   "gated": {
+    "status": "FAIL",
+    "quantities": [
+     {
+      "name": "npa charge",
+      "tol": 0.002,
+      "compared": 24,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.0004477839999998956,
+      "worst": "atom 1 P charge"
+     },
+     {
+      "name": "nao occupancy",
+      "tol": 0.002,
+      "compared": 141,
+      "missing": 10,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.0007038578000000406,
+      "worst": "nao 3 occ"
+     },
+     {
+      "name": "nao energy",
+      "tol": 0.002,
+      "compared": 141,
+      "missing": 10,
+      "surplus": 0,
+      "failed": 70,
+      "max_dev": 0.16946654299999997,
+      "worst": "nao 31 E"
+     },
+     {
+      "name": "nbo occupancy",
+      "tol": 0.002,
+      "compared": 90,
+      "missing": 9,
+      "surplus": 3,
+      "failed": 7,
+      "max_dev": 0.01055111700000011,
+      "worst": "BD (1) P 1- F 4 occ"
+     },
+     {
+      "name": "nbo energy",
+      "tol": 0.002,
+      "compared": 90,
+      "missing": 9,
+      "surplus": 3,
+      "failed": 66,
+      "max_dev": 0.258739759,
+      "worst": "RY (2) F 4 s E"
+     },
+     {
+      "name": "hybrid %s/%p",
+      "tol": 0.5,
+      "compared": 480,
+      "missing": 11,
+      "surplus": 5,
+      "failed": 165,
+      "max_dev": 99.9657903,
+      "worst": "RY (9) P 1 s h0 %f"
+     },
+     {
+      "name": "E2",
+      "tol": 0.1,
+      "compared": 25,
+      "missing": 17,
+      "surplus": 27,
+      "failed": 21,
+      "max_dev": 0.6609172980000001,
+      "worst": "BD ( 1) P 1- F 5 -> BD*( 1) P 1- F 5 E(2)"
+     },
+     {
+      "name": "NRT weight",
+      "tol": 0.005,
+      "compared": 0,
+      "missing": 70,
+      "surplus": 13,
+      "failed": 0,
+      "max_dev": 0.0,
+      "worst": ""
+     },
+     {
+      "name": "NRT weight by rank",
+      "tol": 0.005,
+      "compared": 13,
+      "missing": 57,
+      "surplus": 0,
+      "failed": 13,
+      "max_dev": 0.1174948895,
+      "worst": "rank 2 w"
+     },
+     {
+      "name": "NRT valency",
+      "tol": 0.005,
+      "compared": 24,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 17,
+      "max_dev": 0.16791906,
+      "worst": "atom 1 val"
+     },
+     {
+      "name": "NRT bond order",
+      "tol": 0.005,
+      "compared": 51,
+      "missing": 4,
+      "surplus": 0,
+      "failed": 33,
+      "max_dev": 0.1679190596,
+      "worst": "1-1 tot"
+     }
+    ],
+    "n_points": 1079,
+    "n_failed": 392,
+    "n_missing": 197,
+    "n_surplus": 51
+   },
+   "surplus": {
+    "total": 71,
+    "by_quantity": {
+     "nbo occupancy": 3,
+     "nbo energy": 3,
+     "hybrid %s/%p": 5,
+     "E2": 47,
+     "NRT weight": 13
+    }
+   },
+   "dropped": {
+    "nbos_gennbo": 93,
+    "nbos_native": 99,
+    "e2_gennbo": 122,
+    "e2_native": 67,
+    "points": 740
+   },
+   "status": "FAIL",
+   "quantities": [
+    {
+     "name": "npa charge",
+     "tol": 0.002,
+     "compared": 24,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 0,
+     "max_dev": 0.0004477839999998956,
+     "worst": "atom 1 P charge"
+    },
+    {
+     "name": "nao occupancy",
+     "tol": 0.002,
+     "compared": 141,
+     "missing": 10,
+     "surplus": 0,
+     "failed": 0,
+     "max_dev": 0.0007038578000000406,
+     "worst": "nao 3 occ"
+    },
+    {
+     "name": "nao energy",
+     "tol": 0.002,
+     "compared": 141,
+     "missing": 10,
+     "surplus": 0,
+     "failed": 70,
+     "max_dev": 0.16946654299999997,
+     "worst": "nao 31 E"
+    },
+    {
+     "name": "nbo occupancy",
+     "tol": 0.002,
+     "compared": 189,
+     "missing": 3,
+     "surplus": 3,
+     "failed": 7,
+     "max_dev": 0.01055111700000011,
+     "worst": "BD (1) P 1- F 4 occ"
+    },
+    {
+     "name": "nbo energy",
+     "tol": 0.002,
+     "compared": 189,
+     "missing": 3,
+     "surplus": 3,
+     "failed": 162,
+     "max_dev": 43.879234032,
+     "worst": "RY (17) F 4 s E"
+    },
+    {
+     "name": "hybrid %s/%p",
+     "tol": 0.5,
+     "compared": 975,
+     "missing": 5,
+     "surplus": 5,
+     "failed": 460,
+     "max_dev": 99.9657903,
+     "worst": "RY (9) P 1 s h0 %f"
+    },
+    {
+     "name": "E2",
+     "tol": 0.1,
+     "compared": 72,
+     "missing": 92,
+     "surplus": 47,
+     "failed": 34,
+     "max_dev": 3.886738009,
+     "worst": "LP ( 3) F 6 -> RY ( 3) P 1 E(2)"
+    },
+    {
+     "name": "NRT weight",
+     "tol": 0.005,
+     "compared": 0,
+     "missing": 70,
+     "surplus": 13,
+     "failed": 0,
+     "max_dev": 0.0,
+     "worst": ""
+    },
+    {
+     "name": "NRT weight by rank",
+     "tol": 0.005,
+     "compared": 13,
+     "missing": 57,
+     "surplus": 0,
+     "failed": 13,
+     "max_dev": 0.1174948895,
+     "worst": "rank 2 w"
+    },
+    {
+     "name": "NRT valency",
+     "tol": 0.005,
+     "compared": 24,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 17,
+     "max_dev": 0.16791906,
+     "worst": "atom 1 val"
+    },
+    {
+     "name": "NRT bond order",
+     "tol": 0.005,
+     "compared": 51,
+     "missing": 4,
+     "surplus": 0,
+     "failed": 33,
+     "max_dev": 0.1679190596,
+     "worst": "1-1 tot"
+    }
+   ],
+   "n_points": 1819,
+   "n_failed": 796,
+   "n_missing": 254,
+   "n_surplus": 71,
+   "notes": [
+    "thresholds differs: gennbo {'e2_kcal': 0.5, 'e2_intermolecular_kcal': 0.05, 'nrt_parent_percent': 50, 'nrt_deloc_kcal': 1}, native {'e2_kcal': 0.5, 'e2_intermolecular_kcal': 0, 'nrt_parent_percent': 0, 'nrt_deloc_kcal': 1}"
+   ]
+  },
+  {
+   "molecule": "pyridine",
+   "gennbo_json": "C:\\Users\\florian\\AppData\\Local\\Temp\\nrt_renat5_20260928\\pyridine\\pyridine.gennbo.nbo.json",
+   "native_json": "C:\\Users\\florian\\AppData\\Local\\Temp\\nrt_renat5_20260928\\pyridine\\pyridine.native.nbo.json",
+   "ungated": {
+    "status": "FAIL",
+    "quantities": [
+     {
+      "name": "npa charge",
+      "tol": 0.002,
+      "compared": 44,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 2,
+      "max_dev": 0.0023725367999999913,
+      "worst": "atom 1 N charge"
+     },
+     {
+      "name": "nao occupancy",
+      "tol": 0.002,
+      "compared": 201,
+      "missing": 6,
+      "surplus": 0,
+      "failed": 6,
+      "max_dev": 0.0033260669999999326,
+      "worst": "nao 6 occ"
+     },
+     {
+      "name": "nao energy",
+      "tol": 0.002,
+      "compared": 201,
+      "missing": 6,
+      "surplus": 0,
+      "failed": 161,
+      "max_dev": 0.8444260269999999,
+      "worst": "nao 170 E"
+     },
+     {
+      "name": "nbo occupancy",
+      "tol": 0.002,
+      "compared": 216,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.0012224120000000008,
+      "worst": "BD* (1) C 4- C 5 occ"
+     },
+     {
+      "name": "nbo energy",
+      "tol": 0.002,
+      "compared": 216,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 187,
+      "max_dev": 18.303106951,
+      "worst": "RY (19) N 1 s E"
+     },
+     {
+      "name": "hybrid %s/%p",
+      "tol": 0.5,
+      "compared": 1220,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 602,
+      "max_dev": 95.0853794,
+      "worst": "RY (25) C 2 s h0 %f"
+     },
+     {
+      "name": "E2",
+      "tol": 0.1,
+      "compared": 75,
+      "missing": 3,
+      "surplus": 8,
+      "failed": 30,
+      "max_dev": 4.81163398,
+      "worst": "BD ( 2) C 3- C 4 -> BD*( 2) N 1- C 2 E(2)"
+     },
+     {
+      "name": "NRT weight",
+      "tol": 0.005,
+      "compared": 0,
+      "missing": 30,
+      "surplus": 19,
+      "failed": 0,
+      "max_dev": 0.0,
+      "worst": ""
+     },
+     {
+      "name": "NRT weight by rank",
+      "tol": 0.005,
+      "compared": 19,
+      "missing": 11,
+      "surplus": 0,
+      "failed": 15,
+      "max_dev": 0.18681601469999998,
+      "worst": "rank 2 w"
+     },
+     {
+      "name": "NRT valency",
+      "tol": 0.005,
+      "compared": 44,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 38,
+      "max_dev": 0.37584916199999974,
+      "worst": "atom 1 cov"
+     },
+     {
+      "name": "NRT bond order",
+      "tol": 0.005,
+      "compared": 66,
+      "missing": 44,
+      "surplus": 0,
+      "failed": 36,
+      "max_dev": 0.33878994800000006,
+      "worst": "1-6 tot"
+     }
+    ],
+    "n_points": 2302,
+    "n_failed": 1077,
+    "n_missing": 100,
+    "n_surplus": 27
+   },
+   "gated": {
+    "status": "FAIL",
+    "quantities": [
+     {
+      "name": "npa charge",
+      "tol": 0.002,
+      "compared": 44,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 2,
+      "max_dev": 0.0023725367999999913,
+      "worst": "atom 1 N charge"
+     },
+     {
+      "name": "nao occupancy",
+      "tol": 0.002,
+      "compared": 201,
+      "missing": 6,
+      "surplus": 0,
+      "failed": 6,
+      "max_dev": 0.0033260669999999326,
+      "worst": "nao 6 occ"
+     },
+     {
+      "name": "nao energy",
+      "tol": 0.002,
+      "compared": 201,
+      "missing": 6,
+      "surplus": 0,
+      "failed": 161,
+      "max_dev": 0.8444260269999999,
+      "worst": "nao 170 E"
+     },
+     {
+      "name": "nbo occupancy",
+      "tol": 0.002,
+      "compared": 113,
+      "missing": 11,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.0012224120000000008,
+      "worst": "BD* (1) C 4- C 5 occ"
+     },
+     {
+      "name": "nbo energy",
+      "tol": 0.002,
+      "compared": 113,
+      "missing": 11,
+      "surplus": 0,
+      "failed": 84,
+      "max_dev": 2.013983656,
+      "worst": "RY (9) C 2 s E"
+     },
+     {
+      "name": "hybrid %s/%p",
+      "tol": 0.5,
+      "compared": 705,
+      "missing": 11,
+      "surplus": 0,
+      "failed": 247,
+      "max_dev": 68.50939801,
+      "worst": "RY (9) C 4 s h0 %p"
+     },
+     {
+      "name": "E2",
+      "tol": 0.1,
+      "compared": 46,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 8,
+      "max_dev": 4.81163398,
+      "worst": "BD ( 2) C 3- C 4 -> BD*( 2) N 1- C 2 E(2)"
+     },
+     {
+      "name": "NRT weight",
+      "tol": 0.005,
+      "compared": 0,
+      "missing": 30,
+      "surplus": 19,
+      "failed": 0,
+      "max_dev": 0.0,
+      "worst": ""
+     },
+     {
+      "name": "NRT weight by rank",
+      "tol": 0.005,
+      "compared": 19,
+      "missing": 11,
+      "surplus": 0,
+      "failed": 15,
+      "max_dev": 0.18681601469999998,
+      "worst": "rank 2 w"
+     },
+     {
+      "name": "NRT valency",
+      "tol": 0.005,
+      "compared": 44,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 38,
+      "max_dev": 0.37584916199999974,
+      "worst": "atom 1 cov"
+     },
+     {
+      "name": "NRT bond order",
+      "tol": 0.005,
+      "compared": 66,
+      "missing": 44,
+      "surplus": 0,
+      "failed": 36,
+      "max_dev": 0.33878994800000006,
+      "worst": "1-6 tot"
+     }
+    ],
+    "n_points": 1552,
+    "n_failed": 597,
+    "n_missing": 130,
+    "n_surplus": 19
+   },
+   "surplus": {
+    "total": 27,
+    "by_quantity": {
+     "E2": 8,
+     "NRT weight": 19
+    }
+   },
+   "dropped": {
+    "nbos_gennbo": 92,
+    "nbos_native": 103,
+    "e2_gennbo": 32,
+    "e2_native": 37,
+    "points": 750
+   },
+   "status": "FAIL",
+   "quantities": [
+    {
+     "name": "npa charge",
+     "tol": 0.002,
+     "compared": 44,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 2,
+     "max_dev": 0.0023725367999999913,
+     "worst": "atom 1 N charge"
+    },
+    {
+     "name": "nao occupancy",
+     "tol": 0.002,
+     "compared": 201,
+     "missing": 6,
+     "surplus": 0,
+     "failed": 6,
+     "max_dev": 0.0033260669999999326,
+     "worst": "nao 6 occ"
+    },
+    {
+     "name": "nao energy",
+     "tol": 0.002,
+     "compared": 201,
+     "missing": 6,
+     "surplus": 0,
+     "failed": 161,
+     "max_dev": 0.8444260269999999,
+     "worst": "nao 170 E"
+    },
+    {
+     "name": "nbo occupancy",
+     "tol": 0.002,
+     "compared": 216,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 0,
+     "max_dev": 0.0012224120000000008,
+     "worst": "BD* (1) C 4- C 5 occ"
+    },
+    {
+     "name": "nbo energy",
+     "tol": 0.002,
+     "compared": 216,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 187,
+     "max_dev": 18.303106951,
+     "worst": "RY (19) N 1 s E"
+    },
+    {
+     "name": "hybrid %s/%p",
+     "tol": 0.5,
+     "compared": 1220,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 602,
+     "max_dev": 95.0853794,
+     "worst": "RY (25) C 2 s h0 %f"
+    },
+    {
+     "name": "E2",
+     "tol": 0.1,
+     "compared": 75,
+     "missing": 3,
+     "surplus": 8,
+     "failed": 30,
+     "max_dev": 4.81163398,
+     "worst": "BD ( 2) C 3- C 4 -> BD*( 2) N 1- C 2 E(2)"
+    },
+    {
+     "name": "NRT weight",
+     "tol": 0.005,
+     "compared": 0,
+     "missing": 30,
+     "surplus": 19,
+     "failed": 0,
+     "max_dev": 0.0,
+     "worst": ""
+    },
+    {
+     "name": "NRT weight by rank",
+     "tol": 0.005,
+     "compared": 19,
+     "missing": 11,
+     "surplus": 0,
+     "failed": 15,
+     "max_dev": 0.18681601469999998,
+     "worst": "rank 2 w"
+    },
+    {
+     "name": "NRT valency",
+     "tol": 0.005,
+     "compared": 44,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 38,
+     "max_dev": 0.37584916199999974,
+     "worst": "atom 1 cov"
+    },
+    {
+     "name": "NRT bond order",
+     "tol": 0.005,
+     "compared": 66,
+     "missing": 44,
+     "surplus": 0,
+     "failed": 36,
+     "max_dev": 0.33878994800000006,
+     "worst": "1-6 tot"
+    }
+   ],
+   "n_points": 2302,
+   "n_failed": 1077,
+   "n_missing": 100,
+   "n_surplus": 27,
+   "notes": [
+    "thresholds differs: gennbo {'e2_kcal': 0.5, 'e2_intermolecular_kcal': 0, 'nrt_parent_percent': 50, 'nrt_deloc_kcal': 1}, native {'e2_kcal': 0.5, 'e2_intermolecular_kcal': 0, 'nrt_parent_percent': 0, 'nrt_deloc_kcal': 1}"
+   ]
+  },
+  {
+   "molecule": "sf6",
+   "gennbo_json": "C:\\Users\\florian\\AppData\\Local\\Temp\\nrt_renat5_20260928\\sf6\\sf6.gennbo.nbo.json",
+   "native_json": "C:\\Users\\florian\\AppData\\Local\\Temp\\nrt_renat5_20260928\\sf6\\sf6.native.nbo.json",
+   "ungated": {
+    "status": "FAIL",
+    "quantities": [
+     {
+      "name": "npa charge",
+      "tol": 0.002,
+      "compared": 28,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.0016047324999999835,
+      "worst": "atom 1 S ryd"
+     },
+     {
+      "name": "nao occupancy",
+      "tol": 0.002,
+      "compared": 166,
+      "missing": 18,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.0008670417700000002,
+      "worst": "nao 29 occ"
+     },
+     {
+      "name": "nao energy",
+      "tol": 0.002,
+      "compared": 166,
+      "missing": 18,
+      "surplus": 0,
+      "failed": 103,
+      "max_dev": 0.32142341399999985,
+      "worst": "nao 24 E"
+     },
+     {
+      "name": "nbo occupancy",
+      "tol": 0.002,
+      "compared": 220,
+      "missing": 3,
+      "surplus": 3,
+      "failed": 8,
+      "max_dev": 0.05188774960000003,
+      "worst": "BD* (1) S 1- F 3 occ"
+     },
+     {
+      "name": "nbo energy",
+      "tol": 0.002,
+      "compared": 220,
+      "missing": 3,
+      "surplus": 3,
+      "failed": 186,
+      "max_dev": 41.734128594,
+      "worst": "RY (22) F 7 s E"
+     },
+     {
+      "name": "hybrid %s/%p",
+      "tol": 0.5,
+      "compared": 1130,
+      "missing": 5,
+      "surplus": 5,
+      "failed": 524,
+      "max_dev": 99.99999868899914,
+      "worst": "RY (17) S 1 s h0 %d"
+     },
+     {
+      "name": "E2",
+      "tol": 0.1,
+      "compared": 87,
+      "missing": 205,
+      "surplus": 87,
+      "failed": 73,
+      "max_dev": 35.31022532,
+      "worst": "LP ( 4) F 6 -> BD*( 1) S 1- F 4 E(2)"
+     },
+     {
+      "name": "NRT weight",
+      "tol": 0.005,
+      "compared": 0,
+      "missing": 110,
+      "surplus": 12,
+      "failed": 0,
+      "max_dev": 0.0,
+      "worst": ""
+     },
+     {
+      "name": "NRT weight by rank",
+      "tol": 0.005,
+      "compared": 12,
+      "missing": 98,
+      "surplus": 0,
+      "failed": 12,
+      "max_dev": 0.1379812762,
+      "worst": "rank 1 w"
+     },
+     {
+      "name": "NRT valency",
+      "tol": 0.005,
+      "compared": 28,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 21,
+      "max_dev": 0.16677693699999996,
+      "worst": "atom 6 val"
+     },
+     {
+      "name": "NRT bond order",
+      "tol": 0.005,
+      "compared": 57,
+      "missing": 9,
+      "surplus": 0,
+      "failed": 37,
+      "max_dev": 0.23266944729999994,
+      "worst": "1-5 tot"
+     }
+    ],
+    "n_points": 2114,
+    "n_failed": 964,
+    "n_missing": 469,
+    "n_surplus": 110
+   },
+   "gated": {
+    "status": "FAIL",
+    "quantities": [
+     {
+      "name": "npa charge",
+      "tol": 0.002,
+      "compared": 28,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.0016047324999999835,
+      "worst": "atom 1 S ryd"
+     },
+     {
+      "name": "nao occupancy",
+      "tol": 0.002,
+      "compared": 166,
+      "missing": 18,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.0008670417700000002,
+      "worst": "nao 29 occ"
+     },
+     {
+      "name": "nao energy",
+      "tol": 0.002,
+      "compared": 166,
+      "missing": 18,
+      "surplus": 0,
+      "failed": 103,
+      "max_dev": 0.32142341399999985,
+      "worst": "nao 24 E"
+     },
+     {
+      "name": "nbo occupancy",
+      "tol": 0.002,
+      "compared": 105,
+      "missing": 9,
+      "surplus": 3,
+      "failed": 8,
+      "max_dev": 0.05188774960000003,
+      "worst": "BD* (1) S 1- F 3 occ"
+     },
+     {
+      "name": "nbo energy",
+      "tol": 0.002,
+      "compared": 105,
+      "missing": 9,
+      "surplus": 3,
+      "failed": 73,
+      "max_dev": 1.772131904,
+      "worst": "RY (3) F 2 s E"
+     },
+     {
+      "name": "hybrid %s/%p",
+      "tol": 0.5,
+      "compared": 555,
+      "missing": 11,
+      "surplus": 5,
+      "failed": 215,
+      "max_dev": 99.99638129,
+      "worst": "RY (15) S 1 s h0 %f"
+     },
+     {
+      "name": "E2",
+      "tol": 0.1,
+      "compared": 33,
+      "missing": 33,
+      "surplus": 26,
+      "failed": 33,
+      "max_dev": 35.31022532,
+      "worst": "LP ( 4) F 6 -> BD*( 1) S 1- F 4 E(2)"
+     },
+     {
+      "name": "NRT weight",
+      "tol": 0.005,
+      "compared": 0,
+      "missing": 110,
+      "surplus": 12,
+      "failed": 0,
+      "max_dev": 0.0,
+      "worst": ""
+     },
+     {
+      "name": "NRT weight by rank",
+      "tol": 0.005,
+      "compared": 12,
+      "missing": 98,
+      "surplus": 0,
+      "failed": 12,
+      "max_dev": 0.1379812762,
+      "worst": "rank 1 w"
+     },
+     {
+      "name": "NRT valency",
+      "tol": 0.005,
+      "compared": 28,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 21,
+      "max_dev": 0.16677693699999996,
+      "worst": "atom 6 val"
+     },
+     {
+      "name": "NRT bond order",
+      "tol": 0.005,
+      "compared": 57,
+      "missing": 9,
+      "surplus": 0,
+      "failed": 37,
+      "max_dev": 0.23266944729999994,
+      "worst": "1-5 tot"
+     }
+    ],
+    "n_points": 1255,
+    "n_failed": 502,
+    "n_missing": 315,
+    "n_surplus": 49
+   },
+   "surplus": {
+    "total": 110,
+    "by_quantity": {
+     "nbo occupancy": 3,
+     "nbo energy": 3,
+     "hybrid %s/%p": 5,
+     "E2": 87,
+     "NRT weight": 12
+    }
+   },
+   "dropped": {
+    "nbos_gennbo": 109,
+    "nbos_native": 115,
+    "e2_gennbo": 226,
+    "e2_native": 115,
+    "points": 859
+   },
+   "status": "FAIL",
+   "quantities": [
+    {
+     "name": "npa charge",
+     "tol": 0.002,
+     "compared": 28,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 0,
+     "max_dev": 0.0016047324999999835,
+     "worst": "atom 1 S ryd"
+    },
+    {
+     "name": "nao occupancy",
+     "tol": 0.002,
+     "compared": 166,
+     "missing": 18,
+     "surplus": 0,
+     "failed": 0,
+     "max_dev": 0.0008670417700000002,
+     "worst": "nao 29 occ"
+    },
+    {
+     "name": "nao energy",
+     "tol": 0.002,
+     "compared": 166,
+     "missing": 18,
+     "surplus": 0,
+     "failed": 103,
+     "max_dev": 0.32142341399999985,
+     "worst": "nao 24 E"
+    },
+    {
+     "name": "nbo occupancy",
+     "tol": 0.002,
+     "compared": 220,
+     "missing": 3,
+     "surplus": 3,
+     "failed": 8,
+     "max_dev": 0.05188774960000003,
+     "worst": "BD* (1) S 1- F 3 occ"
+    },
+    {
+     "name": "nbo energy",
+     "tol": 0.002,
+     "compared": 220,
+     "missing": 3,
+     "surplus": 3,
+     "failed": 186,
+     "max_dev": 41.734128594,
+     "worst": "RY (22) F 7 s E"
+    },
+    {
+     "name": "hybrid %s/%p",
+     "tol": 0.5,
+     "compared": 1130,
+     "missing": 5,
+     "surplus": 5,
+     "failed": 524,
+     "max_dev": 99.99999868899914,
+     "worst": "RY (17) S 1 s h0 %d"
+    },
+    {
+     "name": "E2",
+     "tol": 0.1,
+     "compared": 87,
+     "missing": 205,
+     "surplus": 87,
+     "failed": 73,
+     "max_dev": 35.31022532,
+     "worst": "LP ( 4) F 6 -> BD*( 1) S 1- F 4 E(2)"
+    },
+    {
+     "name": "NRT weight",
+     "tol": 0.005,
+     "compared": 0,
+     "missing": 110,
+     "surplus": 12,
+     "failed": 0,
+     "max_dev": 0.0,
+     "worst": ""
+    },
+    {
+     "name": "NRT weight by rank",
+     "tol": 0.005,
+     "compared": 12,
+     "missing": 98,
+     "surplus": 0,
+     "failed": 12,
+     "max_dev": 0.1379812762,
+     "worst": "rank 1 w"
+    },
+    {
+     "name": "NRT valency",
+     "tol": 0.005,
+     "compared": 28,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 21,
+     "max_dev": 0.16677693699999996,
+     "worst": "atom 6 val"
+    },
+    {
+     "name": "NRT bond order",
+     "tol": 0.005,
+     "compared": 57,
+     "missing": 9,
+     "surplus": 0,
+     "failed": 37,
+     "max_dev": 0.23266944729999994,
+     "worst": "1-5 tot"
+    }
+   ],
+   "n_points": 2114,
+   "n_failed": 964,
+   "n_missing": 469,
+   "n_surplus": 110,
+   "notes": [
+    "thresholds differs: gennbo {'e2_kcal': 0.5, 'e2_intermolecular_kcal': 0.05, 'nrt_parent_percent': 50, 'nrt_deloc_kcal': 1}, native {'e2_kcal': 0.5, 'e2_intermolecular_kcal': 0, 'nrt_parent_percent': 0, 'nrt_deloc_kcal': 1}"
+   ]
+  },
+  {
+   "molecule": "so2",
+   "gennbo_json": "C:\\Users\\florian\\AppData\\Local\\Temp\\nrt_renat5_20260928\\so2\\so2.gennbo.nbo.json",
+   "native_json": "C:\\Users\\florian\\AppData\\Local\\Temp\\nrt_renat5_20260928\\so2\\so2.native.nbo.json",
+   "ungated": {
+    "status": "FAIL",
+    "quantities": [
+     {
+      "name": "npa charge",
+      "tol": 0.002,
+      "compared": 12,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 1,
+      "max_dev": 0.002017214999999961,
+      "worst": "atom 1 S charge"
+     },
+     {
+      "name": "nao occupancy",
+      "tol": 0.002,
+      "compared": 89,
+      "missing": 3,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.0014669720000000108,
+      "worst": "nao 43 occ"
+     },
+     {
+      "name": "nao energy",
+      "tol": 0.002,
+      "compared": 89,
+      "missing": 3,
+      "surplus": 0,
+      "failed": 54,
+      "max_dev": 0.16235706800000038,
+      "worst": "nao 41 E"
+     },
+     {
+      "name": "nbo occupancy",
+      "tol": 0.002,
+      "compared": 97,
+      "missing": 2,
+      "surplus": 2,
+      "failed": 9,
+      "max_dev": 0.109186813,
+      "worst": "BD (1) S 1- O 2 occ"
+     },
+     {
+      "name": "nbo energy",
+      "tol": 0.002,
+      "compared": 97,
+      "missing": 2,
+      "surplus": 2,
+      "failed": 86,
+      "max_dev": 11.557436029,
+      "worst": "RY (9) O 3 s E"
+     },
+     {
+      "name": "hybrid %s/%p",
+      "tol": 0.5,
+      "compared": 515,
+      "missing": 4,
+      "surplus": 2,
+      "failed": 293,
+      "max_dev": 95.67611927,
+      "worst": "RY (19) O 2 s h0 %f"
+     },
+     {
+      "name": "E2",
+      "tol": 0.1,
+      "compared": 7,
+      "missing": 34,
+      "surplus": 23,
+      "failed": 4,
+      "max_dev": 16.88434153,
+      "worst": "LP ( 3) O 2 -> BD*( 1) S 1- O 3 E(2)"
+     },
+     {
+      "name": "NRT weight",
+      "tol": 0.005,
+      "compared": 0,
+      "missing": 10,
+      "surplus": 4,
+      "failed": 0,
+      "max_dev": 0.0,
+      "worst": ""
+     },
+     {
+      "name": "NRT weight by rank",
+      "tol": 0.005,
+      "compared": 4,
+      "missing": 6,
+      "surplus": 0,
+      "failed": 4,
+      "max_dev": 0.15988353137,
+      "worst": "rank 4 w"
+     },
+     {
+      "name": "NRT valency",
+      "tol": 0.005,
+      "compared": 12,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 11,
+      "max_dev": 0.49528125599999995,
+      "worst": "atom 2 val"
+     },
+     {
+      "name": "NRT bond order",
+      "tol": 0.005,
+      "compared": 15,
+      "missing": 1,
+      "surplus": 0,
+      "failed": 9,
+      "max_dev": 0.49528125599999995,
+      "worst": "1-2 tot"
+     }
+    ],
+    "n_points": 937,
+    "n_failed": 471,
+    "n_missing": 65,
+    "n_surplus": 33
+   },
+   "gated": {
+    "status": "FAIL",
+    "quantities": [
+     {
+      "name": "npa charge",
+      "tol": 0.002,
+      "compared": 12,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 1,
+      "max_dev": 0.002017214999999961,
+      "worst": "atom 1 S charge"
+     },
+     {
+      "name": "nao occupancy",
+      "tol": 0.002,
+      "compared": 89,
+      "missing": 3,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.0014669720000000108,
+      "worst": "nao 43 occ"
+     },
+     {
+      "name": "nao energy",
+      "tol": 0.002,
+      "compared": 89,
+      "missing": 3,
+      "surplus": 0,
+      "failed": 54,
+      "max_dev": 0.16235706800000038,
+      "worst": "nao 41 E"
+     },
+     {
+      "name": "nbo occupancy",
+      "tol": 0.002,
+      "compared": 33,
+      "missing": 3,
+      "surplus": 1,
+      "failed": 9,
+      "max_dev": 0.109186813,
+      "worst": "BD (1) S 1- O 2 occ"
+     },
+     {
+      "name": "nbo energy",
+      "tol": 0.002,
+      "compared": 33,
+      "missing": 3,
+      "surplus": 1,
+      "failed": 22,
+      "max_dev": 2.897430432,
+      "worst": "RY (5) S 1 s E"
+     },
+     {
+      "name": "hybrid %s/%p",
+      "tol": 0.5,
+      "compared": 195,
+      "missing": 5,
+      "surplus": 1,
+      "failed": 72,
+      "max_dev": 58.20996321,
+      "worst": "RY (4) S 1 s h0 %p"
+     },
+     {
+      "name": "E2",
+      "tol": 0.1,
+      "compared": 3,
+      "missing": 10,
+      "surplus": 3,
+      "failed": 2,
+      "max_dev": 16.88434153,
+      "worst": "LP ( 3) O 2 -> BD*( 1) S 1- O 3 E(2)"
+     },
+     {
+      "name": "NRT weight",
+      "tol": 0.005,
+      "compared": 0,
+      "missing": 10,
+      "surplus": 4,
+      "failed": 0,
+      "max_dev": 0.0,
+      "worst": ""
+     },
+     {
+      "name": "NRT weight by rank",
+      "tol": 0.005,
+      "compared": 4,
+      "missing": 6,
+      "surplus": 0,
+      "failed": 4,
+      "max_dev": 0.15988353137,
+      "worst": "rank 4 w"
+     },
+     {
+      "name": "NRT valency",
+      "tol": 0.005,
+      "compared": 12,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 11,
+      "max_dev": 0.49528125599999995,
+      "worst": "atom 2 val"
+     },
+     {
+      "name": "NRT bond order",
+      "tol": 0.005,
+      "compared": 15,
+      "missing": 1,
+      "surplus": 0,
+      "failed": 9,
+      "max_dev": 0.49528125599999995,
+      "worst": "1-2 tot"
+     }
+    ],
+    "n_points": 485,
+    "n_failed": 184,
+    "n_missing": 44,
+    "n_surplus": 10
+   },
+   "surplus": {
+    "total": 33,
+    "by_quantity": {
+     "nbo occupancy": 2,
+     "nbo energy": 2,
+     "hybrid %s/%p": 2,
+     "E2": 23,
+     "NRT weight": 4
+    }
+   },
+   "dropped": {
+    "nbos_gennbo": 63,
+    "nbos_native": 65,
+    "e2_gennbo": 28,
+    "e2_native": 24,
+    "points": 452
+   },
+   "status": "FAIL",
+   "quantities": [
+    {
+     "name": "npa charge",
+     "tol": 0.002,
+     "compared": 12,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 1,
+     "max_dev": 0.002017214999999961,
+     "worst": "atom 1 S charge"
+    },
+    {
+     "name": "nao occupancy",
+     "tol": 0.002,
+     "compared": 89,
+     "missing": 3,
+     "surplus": 0,
+     "failed": 0,
+     "max_dev": 0.0014669720000000108,
+     "worst": "nao 43 occ"
+    },
+    {
+     "name": "nao energy",
+     "tol": 0.002,
+     "compared": 89,
+     "missing": 3,
+     "surplus": 0,
+     "failed": 54,
+     "max_dev": 0.16235706800000038,
+     "worst": "nao 41 E"
+    },
+    {
+     "name": "nbo occupancy",
+     "tol": 0.002,
+     "compared": 97,
+     "missing": 2,
+     "surplus": 2,
+     "failed": 9,
+     "max_dev": 0.109186813,
+     "worst": "BD (1) S 1- O 2 occ"
+    },
+    {
+     "name": "nbo energy",
+     "tol": 0.002,
+     "compared": 97,
+     "missing": 2,
+     "surplus": 2,
+     "failed": 86,
+     "max_dev": 11.557436029,
+     "worst": "RY (9) O 3 s E"
+    },
+    {
+     "name": "hybrid %s/%p",
+     "tol": 0.5,
+     "compared": 515,
+     "missing": 4,
+     "surplus": 2,
+     "failed": 293,
+     "max_dev": 95.67611927,
+     "worst": "RY (19) O 2 s h0 %f"
+    },
+    {
+     "name": "E2",
+     "tol": 0.1,
+     "compared": 7,
+     "missing": 34,
+     "surplus": 23,
+     "failed": 4,
+     "max_dev": 16.88434153,
+     "worst": "LP ( 3) O 2 -> BD*( 1) S 1- O 3 E(2)"
+    },
+    {
+     "name": "NRT weight",
+     "tol": 0.005,
+     "compared": 0,
+     "missing": 10,
+     "surplus": 4,
+     "failed": 0,
+     "max_dev": 0.0,
+     "worst": ""
+    },
+    {
+     "name": "NRT weight by rank",
+     "tol": 0.005,
+     "compared": 4,
+     "missing": 6,
+     "surplus": 0,
+     "failed": 4,
+     "max_dev": 0.15988353137,
+     "worst": "rank 4 w"
+    },
+    {
+     "name": "NRT valency",
+     "tol": 0.005,
+     "compared": 12,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 11,
+     "max_dev": 0.49528125599999995,
+     "worst": "atom 2 val"
+    },
+    {
+     "name": "NRT bond order",
+     "tol": 0.005,
+     "compared": 15,
+     "missing": 1,
+     "surplus": 0,
+     "failed": 9,
+     "max_dev": 0.49528125599999995,
+     "worst": "1-2 tot"
+    }
+   ],
+   "n_points": 937,
+   "n_failed": 471,
+   "n_missing": 65,
+   "n_surplus": 33,
+   "notes": [
+    "thresholds differs: gennbo {'e2_kcal': 0.5, 'e2_intermolecular_kcal': 0, 'nrt_parent_percent': 50, 'nrt_deloc_kcal': 1}, native {'e2_kcal': 0.5, 'e2_intermolecular_kcal': 0, 'nrt_parent_percent': 0, 'nrt_deloc_kcal': 1}"
+   ]
+  },
+  {
+   "molecule": "ticl4",
+   "gennbo_json": "C:\\Users\\florian\\AppData\\Local\\Temp\\nrt_renat5_20260928\\ticl4\\ticl4.gennbo.nbo.json",
+   "native_json": "C:\\Users\\florian\\AppData\\Local\\Temp\\nrt_renat5_20260928\\ticl4\\ticl4.native.nbo.json",
+   "ungated": {
+    "status": "FAIL",
+    "quantities": [
+     {
+      "name": "npa charge",
+      "tol": 0.002,
+      "compared": 20,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 2,
+      "max_dev": 0.0032344784999999154,
+      "worst": "atom 1 Ti charge"
+     },
+     {
+      "name": "nao occupancy",
+      "tol": 0.002,
+      "compared": 174,
+      "missing": 3,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.0015586389000000755,
+      "worst": "nao 23 occ"
+     },
+     {
+      "name": "nao energy",
+      "tol": 0.002,
+      "compared": 174,
+      "missing": 3,
+      "surplus": 0,
+      "failed": 50,
+      "max_dev": 0.6863654403000001,
+      "worst": "nao 30 E"
+     },
+     {
+      "name": "nbo occupancy",
+      "tol": 0.002,
+      "compared": 193,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 8,
+      "max_dev": 0.009205418699999995,
+      "worst": "BD* (1) Ti 1-Cl 5 occ"
+     },
+     {
+      "name": "nbo energy",
+      "tol": 0.002,
+      "compared": 193,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 133,
+      "max_dev": 14.978040849999998,
+      "worst": "CR (5) Ti 1 s E"
+     },
+     {
+      "name": "hybrid %s/%p",
+      "tol": 0.5,
+      "compared": 1005,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 380,
+      "max_dev": 100.0,
+      "worst": "RY (9) Ti 1 s h0 %f"
+     },
+     {
+      "name": "E2",
+      "tol": 0.1,
+      "compared": 58,
+      "missing": 24,
+      "surplus": 23,
+      "failed": 54,
+      "max_dev": 19.148413123,
+      "worst": "LP ( 3)Cl 2 -> LV ( 2)Ti 1 E(2)"
+     },
+     {
+      "name": "NRT weight",
+      "tol": 0.005,
+      "compared": 0,
+      "missing": 42,
+      "surplus": 5,
+      "failed": 0,
+      "max_dev": 0.0,
+      "worst": ""
+     },
+     {
+      "name": "NRT weight by rank",
+      "tol": 0.005,
+      "compared": 5,
+      "missing": 37,
+      "surplus": 0,
+      "failed": 5,
+      "max_dev": 0.5208248977,
+      "worst": "rank 1 w"
+     },
+     {
+      "name": "NRT valency",
+      "tol": 0.005,
+      "compared": 20,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 18,
+      "max_dev": 0.512522017,
+      "worst": "atom 2 val"
+     },
+     {
+      "name": "NRT bond order",
+      "tol": 0.005,
+      "compared": 27,
+      "missing": 6,
+      "surplus": 0,
+      "failed": 17,
+      "max_dev": 0.557051774,
+      "worst": "2-2 tot"
+     }
+    ],
+    "n_points": 1869,
+    "n_failed": 667,
+    "n_missing": 115,
+    "n_surplus": 28
+   },
+   "gated": {
+    "status": "FAIL",
+    "quantities": [
+     {
+      "name": "npa charge",
+      "tol": 0.002,
+      "compared": 20,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 2,
+      "max_dev": 0.0032344784999999154,
+      "worst": "atom 1 Ti charge"
+     },
+     {
+      "name": "nao occupancy",
+      "tol": 0.002,
+      "compared": 174,
+      "missing": 3,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.0015586389000000755,
+      "worst": "nao 23 occ"
+     },
+     {
+      "name": "nao energy",
+      "tol": 0.002,
+      "compared": 174,
+      "missing": 3,
+      "surplus": 0,
+      "failed": 50,
+      "max_dev": 0.6863654403000001,
+      "worst": "nao 30 E"
+     },
+     {
+      "name": "nbo occupancy",
+      "tol": 0.002,
+      "compared": 97,
+      "missing": 4,
+      "surplus": 0,
+      "failed": 8,
+      "max_dev": 0.009205418699999995,
+      "worst": "BD* (1) Ti 1-Cl 5 occ"
+     },
+     {
+      "name": "nbo energy",
+      "tol": 0.002,
+      "compared": 97,
+      "missing": 4,
+      "surplus": 0,
+      "failed": 46,
+      "max_dev": 14.978040849999998,
+      "worst": "CR (5) Ti 1 s E"
+     },
+     {
+      "name": "hybrid %s/%p",
+      "tol": 0.5,
+      "compared": 525,
+      "missing": 4,
+      "surplus": 0,
+      "failed": 112,
+      "max_dev": 100.0,
+      "worst": "RY (9) Ti 1 s h0 %f"
+     },
+     {
+      "name": "E2",
+      "tol": 0.1,
+      "compared": 32,
+      "missing": 4,
+      "surplus": 4,
+      "failed": 32,
+      "max_dev": 19.148413123,
+      "worst": "LP ( 3)Cl 2 -> LV ( 2)Ti 1 E(2)"
+     },
+     {
+      "name": "NRT weight",
+      "tol": 0.005,
+      "compared": 0,
+      "missing": 42,
+      "surplus": 5,
+      "failed": 0,
+      "max_dev": 0.0,
+      "worst": ""
+     },
+     {
+      "name": "NRT weight by rank",
+      "tol": 0.005,
+      "compared": 5,
+      "missing": 37,
+      "surplus": 0,
+      "failed": 5,
+      "max_dev": 0.5208248977,
+      "worst": "rank 1 w"
+     },
+     {
+      "name": "NRT valency",
+      "tol": 0.005,
+      "compared": 20,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 18,
+      "max_dev": 0.512522017,
+      "worst": "atom 2 val"
+     },
+     {
+      "name": "NRT bond order",
+      "tol": 0.005,
+      "compared": 27,
+      "missing": 6,
+      "surplus": 0,
+      "failed": 17,
+      "max_dev": 0.557051774,
+      "worst": "2-2 tot"
+     }
+    ],
+    "n_points": 1171,
+    "n_failed": 290,
+    "n_missing": 107,
+    "n_surplus": 9
+   },
+   "surplus": {
+    "total": 28,
+    "by_quantity": {
+     "E2": 23,
+     "NRT weight": 5
+    }
+   },
+   "dropped": {
+    "nbos_gennbo": 92,
+    "nbos_native": 96,
+    "e2_gennbo": 46,
+    "e2_native": 45,
+    "points": 698
+   },
+   "status": "FAIL",
+   "quantities": [
+    {
+     "name": "npa charge",
+     "tol": 0.002,
+     "compared": 20,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 2,
+     "max_dev": 0.0032344784999999154,
+     "worst": "atom 1 Ti charge"
+    },
+    {
+     "name": "nao occupancy",
+     "tol": 0.002,
+     "compared": 174,
+     "missing": 3,
+     "surplus": 0,
+     "failed": 0,
+     "max_dev": 0.0015586389000000755,
+     "worst": "nao 23 occ"
+    },
+    {
+     "name": "nao energy",
+     "tol": 0.002,
+     "compared": 174,
+     "missing": 3,
+     "surplus": 0,
+     "failed": 50,
+     "max_dev": 0.6863654403000001,
+     "worst": "nao 30 E"
+    },
+    {
+     "name": "nbo occupancy",
+     "tol": 0.002,
+     "compared": 193,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 8,
+     "max_dev": 0.009205418699999995,
+     "worst": "BD* (1) Ti 1-Cl 5 occ"
+    },
+    {
+     "name": "nbo energy",
+     "tol": 0.002,
+     "compared": 193,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 133,
+     "max_dev": 14.978040849999998,
+     "worst": "CR (5) Ti 1 s E"
+    },
+    {
+     "name": "hybrid %s/%p",
+     "tol": 0.5,
+     "compared": 1005,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 380,
+     "max_dev": 100.0,
+     "worst": "RY (9) Ti 1 s h0 %f"
+    },
+    {
+     "name": "E2",
+     "tol": 0.1,
+     "compared": 58,
+     "missing": 24,
+     "surplus": 23,
+     "failed": 54,
+     "max_dev": 19.148413123,
+     "worst": "LP ( 3)Cl 2 -> LV ( 2)Ti 1 E(2)"
+    },
+    {
+     "name": "NRT weight",
+     "tol": 0.005,
+     "compared": 0,
+     "missing": 42,
+     "surplus": 5,
+     "failed": 0,
+     "max_dev": 0.0,
+     "worst": ""
+    },
+    {
+     "name": "NRT weight by rank",
+     "tol": 0.005,
+     "compared": 5,
+     "missing": 37,
+     "surplus": 0,
+     "failed": 5,
+     "max_dev": 0.5208248977,
+     "worst": "rank 1 w"
+    },
+    {
+     "name": "NRT valency",
+     "tol": 0.005,
+     "compared": 20,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 18,
+     "max_dev": 0.512522017,
+     "worst": "atom 2 val"
+    },
+    {
+     "name": "NRT bond order",
+     "tol": 0.005,
+     "compared": 27,
+     "missing": 6,
+     "surplus": 0,
+     "failed": 17,
+     "max_dev": 0.557051774,
+     "worst": "2-2 tot"
+    }
+   ],
+   "n_points": 1869,
+   "n_failed": 667,
+   "n_missing": 115,
+   "n_surplus": 28,
+   "notes": [
+    "thresholds differs: gennbo {'e2_kcal': 0.5, 'e2_intermolecular_kcal': 0, 'nrt_parent_percent': 50, 'nrt_deloc_kcal': 20}, native {'e2_kcal': 0.5, 'e2_intermolecular_kcal': 0, 'nrt_parent_percent': 0, 'nrt_deloc_kcal': 20}"
+   ]
+  },
+  {
+   "molecule": "water",
+   "gennbo_json": "C:\\Users\\florian\\AppData\\Local\\Temp\\nrt_renat5_20260928\\water\\water.gennbo.nbo.json",
+   "native_json": "C:\\Users\\florian\\AppData\\Local\\Temp\\nrt_renat5_20260928\\water\\water.native.nbo.json",
+   "ungated": {
+    "status": "FAIL",
+    "quantities": [
+     {
+      "name": "npa charge",
+      "tol": 0.002,
+      "compared": 12,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.0016335480000000402,
+      "worst": "atom 1 O val"
+     },
+     {
+      "name": "nao occupancy",
+      "tol": 0.002,
+      "compared": 33,
+      "missing": 3,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.0007574770000000619,
+      "worst": "nao 6 occ"
+     },
+     {
+      "name": "nao energy",
+      "tol": 0.002,
+      "compared": 33,
+      "missing": 3,
+      "surplus": 0,
+      "failed": 24,
+      "max_dev": 0.05628791899999985,
+      "worst": "nao 15 E"
+     },
+     {
+      "name": "nbo occupancy",
+      "tol": 0.002,
+      "compared": 43,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 7.59719999998687e-05,
+      "worst": "LP (1) O 1 s occ"
+     },
+     {
+      "name": "nbo energy",
+      "tol": 0.002,
+      "compared": 43,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 36,
+      "max_dev": 25.2941936818,
+      "worst": "RY (2) O 1 s E"
+     },
+     {
+      "name": "hybrid %s/%p",
+      "tol": 0.5,
+      "compared": 235,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 96,
+      "max_dev": 99.61985023,
+      "worst": "RY (26) O 1 s h0 %p"
+     },
+     {
+      "name": "E2",
+      "tol": 0.1,
+      "compared": 6,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.061416154,
+      "worst": "LP ( 1) O 1 -> RY ( 2) H 3 E(2)"
+     },
+     {
+      "name": "NRT weight",
+      "tol": 0.005,
+      "compared": 0,
+      "missing": 1,
+      "surplus": 1,
+      "failed": 0,
+      "max_dev": 0.0,
+      "worst": ""
+     },
+     {
+      "name": "NRT weight by rank",
+      "tol": 0.005,
+      "compared": 1,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.0,
+      "worst": ""
+     },
+     {
+      "name": "NRT valency",
+      "tol": 0.005,
+      "compared": 12,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.000620375999999867,
+      "worst": "atom 1 cov"
+     },
+     {
+      "name": "NRT bond order",
+      "tol": 0.005,
+      "compared": 15,
+      "missing": 1,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.0003101918000000259,
+      "worst": "1-2 cov"
+     }
+    ],
+    "n_points": 433,
+    "n_failed": 156,
+    "n_missing": 8,
+    "n_surplus": 1
+   },
+   "gated": {
+    "status": "FAIL",
+    "quantities": [
+     {
+      "name": "npa charge",
+      "tol": 0.002,
+      "compared": 12,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.0016335480000000402,
+      "worst": "atom 1 O val"
+     },
+     {
+      "name": "nao occupancy",
+      "tol": 0.002,
+      "compared": 33,
+      "missing": 3,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.0007574770000000619,
+      "worst": "nao 6 occ"
+     },
+     {
+      "name": "nao energy",
+      "tol": 0.002,
+      "compared": 33,
+      "missing": 3,
+      "surplus": 0,
+      "failed": 24,
+      "max_dev": 0.05628791899999985,
+      "worst": "nao 15 E"
+     },
+     {
+      "name": "nbo occupancy",
+      "tol": 0.002,
+      "compared": 13,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 7.59719999998687e-05,
+      "worst": "LP (1) O 1 s occ"
+     },
+     {
+      "name": "nbo energy",
+      "tol": 0.002,
+      "compared": 13,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 6,
+      "max_dev": 0.052834205999999995,
+      "worst": "RY (3) H 2 s E"
+     },
+     {
+      "name": "hybrid %s/%p",
+      "tol": 0.5,
+      "compared": 85,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 4,
+      "max_dev": 2.9174142199999977,
+      "worst": "RY (3) H 2 s h0 %s"
+     },
+     {
+      "name": "NRT weight",
+      "tol": 0.005,
+      "compared": 0,
+      "missing": 1,
+      "surplus": 1,
+      "failed": 0,
+      "max_dev": 0.0,
+      "worst": ""
+     },
+     {
+      "name": "NRT weight by rank",
+      "tol": 0.005,
+      "compared": 1,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.0,
+      "worst": ""
+     },
+     {
+      "name": "NRT valency",
+      "tol": 0.005,
+      "compared": 12,
+      "missing": 0,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.000620375999999867,
+      "worst": "atom 1 cov"
+     },
+     {
+      "name": "NRT bond order",
+      "tol": 0.005,
+      "compared": 15,
+      "missing": 1,
+      "surplus": 0,
+      "failed": 0,
+      "max_dev": 0.0003101918000000259,
+      "worst": "1-2 cov"
+     }
+    ],
+    "n_points": 217,
+    "n_failed": 34,
+    "n_missing": 8,
+    "n_surplus": 1
+   },
+   "surplus": {
+    "total": 1,
+    "by_quantity": {
+     "NRT weight": 1
+    }
+   },
+   "dropped": {
+    "nbos_gennbo": 30,
+    "nbos_native": 30,
+    "e2_gennbo": 6,
+    "e2_native": 6,
+    "points": 216
+   },
+   "status": "FAIL",
+   "quantities": [
+    {
+     "name": "npa charge",
+     "tol": 0.002,
+     "compared": 12,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 0,
+     "max_dev": 0.0016335480000000402,
+     "worst": "atom 1 O val"
+    },
+    {
+     "name": "nao occupancy",
+     "tol": 0.002,
+     "compared": 33,
+     "missing": 3,
+     "surplus": 0,
+     "failed": 0,
+     "max_dev": 0.0007574770000000619,
+     "worst": "nao 6 occ"
+    },
+    {
+     "name": "nao energy",
+     "tol": 0.002,
+     "compared": 33,
+     "missing": 3,
+     "surplus": 0,
+     "failed": 24,
+     "max_dev": 0.05628791899999985,
+     "worst": "nao 15 E"
+    },
+    {
+     "name": "nbo occupancy",
+     "tol": 0.002,
+     "compared": 43,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 0,
+     "max_dev": 7.59719999998687e-05,
+     "worst": "LP (1) O 1 s occ"
+    },
+    {
+     "name": "nbo energy",
+     "tol": 0.002,
+     "compared": 43,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 36,
+     "max_dev": 25.2941936818,
+     "worst": "RY (2) O 1 s E"
+    },
+    {
+     "name": "hybrid %s/%p",
+     "tol": 0.5,
+     "compared": 235,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 96,
+     "max_dev": 99.61985023,
+     "worst": "RY (26) O 1 s h0 %p"
+    },
+    {
+     "name": "E2",
+     "tol": 0.1,
+     "compared": 6,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 0,
+     "max_dev": 0.061416154,
+     "worst": "LP ( 1) O 1 -> RY ( 2) H 3 E(2)"
+    },
+    {
+     "name": "NRT weight",
+     "tol": 0.005,
+     "compared": 0,
+     "missing": 1,
+     "surplus": 1,
+     "failed": 0,
+     "max_dev": 0.0,
+     "worst": ""
+    },
+    {
+     "name": "NRT weight by rank",
+     "tol": 0.005,
+     "compared": 1,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 0,
+     "max_dev": 0.0,
+     "worst": ""
+    },
+    {
+     "name": "NRT valency",
+     "tol": 0.005,
+     "compared": 12,
+     "missing": 0,
+     "surplus": 0,
+     "failed": 0,
+     "max_dev": 0.000620375999999867,
+     "worst": "atom 1 cov"
+    },
+    {
+     "name": "NRT bond order",
+     "tol": 0.005,
+     "compared": 15,
+     "missing": 1,
+     "surplus": 0,
+     "failed": 0,
+     "max_dev": 0.0003101918000000259,
+     "worst": "1-2 cov"
+    }
+   ],
+   "n_points": 433,
+   "n_failed": 156,
+   "n_missing": 8,
+   "n_surplus": 1,
+   "notes": [
+    "thresholds differs: gennbo {'e2_kcal': 0.5, 'e2_intermolecular_kcal': 0, 'nrt_parent_percent': 50, 'nrt_deloc_kcal': 1}, native {'e2_kcal': 0.5, 'e2_intermolecular_kcal': 0, 'nrt_parent_percent': 0, 'nrt_deloc_kcal': 1}"
+   ]
+  }
+ ],
+ "n_pass": 0,
+ "n_fail": 22,
+ "n_points": 26417,
+ "gated": {
+  "n_pass": 0,
+  "n_points": 14782,
+  "n_dropped": 11635
+ }
+}
