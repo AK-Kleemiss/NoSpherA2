@@ -140,6 +140,17 @@ def owso(S, weights):
     return w[:, None] * sym_power((w[:, None] * S) * w[None, :], -0.5, 1e-10 * s * s)
 
 
+def pre_occupations(Cpre, SPS, labels):
+    diag = np.diag(Cpre.T @ SPS @ Cpre)
+    out = diag.copy()
+    blocks = {}
+    for i, t in enumerate(labels):
+        blocks.setdefault((t[1], t[2], t[4]), []).append(i)
+    for cols in blocks.values():
+        out[cols] = np.mean(diag[cols])
+    return out
+
+
 def step3(Cpre, pre_occ, cls, S):
     """The three-class Schmidt + OWSO cascade, as nao.cpp:337-393."""
     C = Cpre.copy()
@@ -214,7 +225,7 @@ def replica(mol, d, core_own_block):
     lnao, Cnat = read_naoc(os.path.join(d, mol + ".naoc.txt"))
     Cg, _, e33 = read_lfn33(os.path.join(d, mol + ".33"), n, S)
     assert [t[1:6] for t in lpre] == [t[1:6] for t in lnao], mol
-    pre_occ = np.array([t[6] for t in lpre])
+    pre_occ = pre_occupations(Cpre, S @ P @ S, lpre)
     cls = [t[5] for t in lnao]
     C = step4(step3(Cpre, pre_occ, cls, S), S @ P @ S, lnao, core_own_block)
     e_n = float(np.abs(Cnat.T @ S @ Cnat - np.eye(Cnat.shape[1])).max())

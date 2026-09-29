@@ -137,6 +137,22 @@ TEST(NaoBasisMapTests, OverlapCarriesTheDensitysPhaseConvention)
 	EXPECT_NEAR(charge_sum, 0.0, 1e-9);
 }
 
+TEST(NaoBasisMapTests, PrintedComponentsFollowLibcintAOOrder)
+{
+	const auto p = fixture("RGBI_groups", "nh3bh3.gbw");
+	if (p.empty()) GTEST_SKIP() << "tests/RGBI_groups/nh3bh3.gbw not found";
+	WFN wavy(p);
+	const auto ao = spherical_ao_map(wavy);
+	int shells = 0;
+	for (int i = 0; i + 2 < ao.size(); i++) {
+		if (ao[i].l != 1 || ao[i].m != 2) continue;
+		EXPECT_EQ(ao[i + 1].m, 0);
+		EXPECT_EQ(ao[i + 2].m, 1);
+		shells++;
+	}
+	EXPECT_GT(shells, 0);
+}
+
 TEST(NaoEpoxideTests, OccupanciesSumToTheElectronCountAndTheTransformIsOrthogonal)
 {
 	const auto p = fixture("epoxide_gbw", "epoxide.gbw");
@@ -184,9 +200,7 @@ TEST(NaoEpoxideTests, NaturalChargesMatchNbo7)
 	EXPECT_NEAR(npa.total.rydberg, nbo_rydberg, 1.5e-2);
 }
 
-//An open-shell case with chemistry in it: the NH3...Li doublet.  NBO 7.0.9 on the .47 of the same
-//gbw gives the charges below and puts 0.947 of the unpaired electron on lithium; we agree on the
-//charges to 5e-3 and put 0.976 there, so the tolerances differ by column.
+//The NH3...Li doublet tests charges and spin populations against NBO 7.0.9.
 TEST(NaoOpenShellTests, Nh3LiChargesAndSpinFollowNbo7)
 {
 	const auto p = fixture("RGBI_groups", "nh3li.gbw");
@@ -199,8 +213,8 @@ TEST(NaoOpenShellTests, Nh3LiChargesAndSpinFollowNbo7)
 	const double nbo_spin[5] = { 0.03529, 0.00575, 0.00575, 0.00575, 0.94747 };
 	double spin_sum = 0.0;
 	for (size_t a = 0; a < 5; a++) {
-		EXPECT_NEAR(npa.total.atoms[a].charge, nbo_charge[a], 6e-3) << "atom " << a + 1;
-		EXPECT_NEAR(npa.spin_population[a], nbo_spin[a], 3e-2) << "spin, atom " << a + 1;
+		EXPECT_NEAR(npa.total.atoms[a].charge, nbo_charge[a], 3e-3) << "atom " << a + 1;
+		EXPECT_NEAR(npa.spin_population[a], nbo_spin[a], 1e-3) << "spin, atom " << a + 1;
 		spin_sum += npa.spin_population[a];
 	}
 	//the spin populations sum to Tr((P_alpha - P_beta) S) exactly, whatever the partition does
@@ -208,6 +222,10 @@ TEST(NaoOpenShellTests, Nh3LiChargesAndSpinFollowNbo7)
 	EXPECT_NEAR(spin_sum, trace_spin(wavy), 1e-9);
 	EXPECT_NEAR(npa.total.population, trace_PS(wavy), 1e-9);
 	EXPECT_NEAR(npa.total.population, npa.alpha.population + npa.beta.population, 1e-9);
+	for (size_t i = 0; i < npa.total.orbitals.size(); i++)
+		EXPECT_NEAR(npa.total.orbitals[i].occupation,
+		            npa.alpha.orbitals[i].occupation + npa.beta.orbitals[i].occupation, 1e-9);
+	EXPECT_LT(orthonormality_error(npa.total.C, ao_overlap(wavy)), 1e-9);
 	EXPECT_LT(orthonormality_error(npa.alpha.C, ao_overlap(wavy)), 1e-9);
 	EXPECT_LT(orthonormality_error(npa.beta.C, ao_overlap(wavy)), 1e-9);
 }

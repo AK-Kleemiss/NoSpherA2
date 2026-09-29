@@ -667,7 +667,8 @@ void write_nbo_json(const NboResults& r, const std::filesystem::path& json_file)
 			const auto& y = o.hybrids[h];
 			f << (h ? ", " : "") << "{\"atom\": " << y.center << ", \"element\": " << jstr(y.element)
 				<< ", \"weight_percent\": " << jnum(y.weight_percent) << ", \"coefficient\": " << jnum(y.coefficient)
-				<< ", \"s\": " << jnum(y.s) << ", \"p\": " << jnum(y.p) << ", \"d\": " << jnum(y.d) << ", \"f\": " << jnum(y.f) << "}";
+				<< ", \"s\": " << jnum(y.s) << ", \"p\": " << jnum(y.p) << ", \"d\": " << jnum(y.d) << ", \"f\": " << jnum(y.f)
+				<< ", \"sp_exponent\": " << (y.sp_exponent() > 0.0 ? jnum(y.sp_exponent()) : "null") << "}";
 		}
 		f << "]}" << (i + 1 < r.orbitals.size() ? "," : "") << "\n";
 	}

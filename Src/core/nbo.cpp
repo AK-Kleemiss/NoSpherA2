@@ -1063,8 +1063,11 @@ NboResults native_nbo(WFN& wavy, const NboOptions& options, std::ostream& log)
         }
     }
     else {
-        //NBO analyses the two spin densities independently and prints a spin-summed NAO table
+        //NPA tables share total-density NAOs; NBO searches use separate spin densities.
         const auto t_nao = clock();
+        const dMatrix2 total_density = to_dmatrix(MatrixXd(to_eigen(in.density[0]) + to_eigen(in.density[1])));
+        const dMatrix2 spin_density = to_dmatrix(MatrixXd(to_eigen(in.density[0]) - to_eigen(in.density[1])));
+        const NAOResult total_nao = build_naos(total_density, in.overlap, in.ao, atoms, ecp);
         const NAOResult a_nao = build_naos(in.density[0], in.overlap, in.ao, atoms, ecp);
         const NAOResult b_nao = build_naos(in.density[1], in.overlap, in.ao, atoms, ecp);
         res.nao_seconds = std::chrono::duration<double>(clock() - t_nao).count();
@@ -1077,37 +1080,31 @@ NboResults native_nbo(WFN& wavy, const NboOptions& options, std::ostream& log)
                          static_cast<int>(std::llround(electrons)), 1.0, s ? "beta" : "alpha",
                          options, lewis);
         }
-        //the spin-summed NAO table needs one set of NAOs; the alpha set carries the labels and the
-        //occupancies are the two spin occupancies of the same NAO index, which is an approximation
-        //to what NBO prints (it re-derives a spin-averaged set)
-        vec occ(a_nao.orbitals.size(), 0.0);
+        vec occ(total_nao.orbitals.size(), 0.0);
         for (size_t i = 0; i < occ.size(); i++)
-            occ[i] = a_nao.orbitals[i].occupation + b_nao.orbitals[i].occupation;
-        fill_nao_table(res.nao, a_nao, occ,
-                       in.fock.empty() ? dMatrix2() : nao_operator(in.fock[0], a_nao.C));
-        //and each spin's own table, which is the only thing NBO's per-spin tables can be compared
-        //against: on ch3's carbon the two errors are +0.0839 e and -0.1279 e, and they cancel to
-        //0.044 e in the sum above while adding to the 0.212 e spin density.
+            occ[i] = total_nao.orbitals[i].occupation;
+        fill_nao_table(res.nao, total_nao, occ,
+                       in.fock.empty() ? dMatrix2() : nao_operator(in.fock[0], total_nao.C));
         for (int s = 0; s < 2; s++) {
-            const NAOResult& nao = s ? b_nao : a_nao;
-            vec spin_occ(nao.orbitals.size(), 0.0);
-            for (size_t i = 0; i < spin_occ.size(); i++) spin_occ[i] = nao.orbitals[i].occupation;
-            fill_nao_table(s ? res.nao_beta : res.nao_alpha, nao, spin_occ,
-                           static_cast<int>(in.fock.size()) > s ? nao_operator(in.fock[s], nao.C)
+            const dMatrix2 spin_nao = nao_density(in.density[s], in.overlap, total_nao.C);
+            vec spin_occ(total_nao.orbitals.size(), 0.0);
+            for (size_t i = 0; i < spin_occ.size(); i++) spin_occ[i] = spin_nao(i, i);
+            fill_nao_table(s ? res.nao_beta : res.nao_alpha, total_nao, spin_occ,
+                           static_cast<int>(in.fock.size()) > s ? nao_operator(in.fock[s], total_nao.C)
                                                                 : dMatrix2());
         }
-        for (size_t a = 0; a < a_nao.atoms.size(); a++) {
-            const NAOAtom& x = a_nao.atoms[a];
-            const NAOAtom& y = b_nao.atoms[a];
+        const dMatrix2 spin_nao = nao_density(spin_density, in.overlap, total_nao.C);
+        for (const NAOAtom& x : total_nao.atoms) {
             NboAtomPopulation p;
             p.element = constants::atnr2letter(x.Z);
             p.index = x.index + 1;
-            p.core = x.core + y.core;
-            p.valence = x.valence + y.valence;
-            p.rydberg = x.rydberg + y.rydberg;
-            p.total = x.population + y.population;
-            p.charge = x.Z_eff - p.total;
-            p.spin_density = x.population - y.population;
+            p.core = x.core;
+            p.valence = x.valence;
+            p.rydberg = x.rydberg;
+            p.total = x.population;
+            p.charge = x.charge;
+            for (size_t i = 0; i < total_nao.orbitals.size(); i++)
+                if (total_nao.orbitals[i].atom == x.index) p.spin_density += spin_nao(i, i);
             p.has_spin_density = true;
             res.npa.push_back(p);
         }
@@ -1135,11 +1132,14 @@ void print_nbo(const NboResults& r, std::ostream& out)
             << fixed << setprecision(5) << setw(12) << o.occupancy << setw(12) << o.energy;
         if (!o.spin.empty()) out << "  " << o.spin;
         out << "\n";
-        for (const NboHybrid& h : o.hybrids)
+        for (const NboHybrid& h : o.hybrids) {
             out << "              " << fixed << setprecision(2) << setw(7) << h.weight_percent
                 << "% " << setw(2) << h.element << setw(3) << h.center << "  s(" << setw(6) << h.s
                 << "%)p" << setw(7) << h.p << "%  d" << setw(7) << h.d << "%  f" << setw(6) << h.f
-                << "%\n";
+                << "%";
+            if (h.sp_exponent() > 0.0) out << "  sp^" << setprecision(2) << h.sp_exponent();
+            out << "\n";
+        }
     }
     if (r.e2.empty()) return;
     out << "\n SECOND ORDER PERTURBATION THEORY ANALYSIS OF FOCK MATRIX IN NBO BASIS\n\n"

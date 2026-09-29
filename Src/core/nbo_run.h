@@ -51,6 +51,7 @@ struct NboHybrid {
 	double p = 0.0;
 	double d = 0.0;
 	double f = 0.0;
+	double sp_exponent() const { return s >= 1.0 && p >= 1.0 && s + p >= 95.0 ? p / s : 0.0; }
 };
 
 struct NboOrbital {

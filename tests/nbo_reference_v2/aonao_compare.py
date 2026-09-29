@@ -356,9 +356,8 @@ def compare_pre(mol, d):
       - `mixing`'s completeness total is NOT 1 here, because pre-NAOs on different atoms overlap.
         The in-block row sum is what is 1, and it is the one that is checked.
 
-    The occ column of the NAOCPRE dump is native's `pre_occ`, which is the accumulator that sums to
-    1041.75 e against N = 664 - a retired metric.  It is deliberately NOT used: every occupancy here
-    is an eigenvalue of C^T S P S C built from the matrices and the .47 density.
+    The saved NAOCPRE occupation column duplicates the final NAOC occupation column on all eight
+    cases and is not a pre-NAO measurement.  It is not used: occupations here come from C^T S P S C.
     """
     n, S, P = read_47(os.path.join(d, mol + ".47"))
     Cg, layout, lerr = read_lfn32(os.path.join(d, mol + ".32"), n, S)

@@ -11,50 +11,14 @@
 using Eigen::MatrixXd;
 using Eigen::VectorXd;
 
-//Natural resonance theory, after Glendening and Weinhold, J. Comput. Chem. 19 (1998) 593, as what it
-//mathematically is: a convex quadratic program on the probability simplex,
-//
-//    minimise  D(w) = || Gamma - sum_a w_a Gamma_a ||_F   subject to  w >= 0, sum w = 1,
-//
-//over a set of candidate resonance structures.  Gamma is the density in the NAO basis and Gamma_a is
-//the idealised density of candidate a, s V_a V_a^T over the orthonormal orbital set V_a that its
-//integer topology prescribes (s = 2 closed shell, 1 per spin of an open one).
-//
-//Nothing here ever materialises a Gamma_a.  Expanding the norm gives
-//
-//    D(w)^2 = Tr(Gamma^2) - 2 g.w + w^T G w,   g_a = s Tr(V_a^T Gamma V_a),
-//                                              G_ab = s^2 || V_a^T V_b ||_F^2,
-//
-//so one n x k matrix per candidate and one k x k product per pair is the whole cost, and the pair
-//loop is embarrassingly parallel.  NBO 7 is serial - its binaries carry no OpenMP or pthread symbols
-//- so this is where the speed comes from, not from a cleverer minimiser.
-//
-//Two honest deviations from NBO, both measured and both reported:
-//
-//  * the value of D.  NBO's printed D is scaled by something this code does not reproduce (acetylene
-//    prints D(0) = 0.01884235 where the Frobenius norm of the same difference is 0.10108, a ratio of
-//    5.37 that is not the electron count, the orbital count or any power of either).  D here is the
-//    plain Frobenius norm defined above.  It is a residual, so its absolute value carries no physics;
-//    what is compared against the reference is the weights by rank, the bond orders, the valencies
-//    and the retained-structure count, all of which are D-normalisation independent.
-//  * the argmin.  The candidate Gramians are strongly near-collinear - two resonance structures that
-//    differ by one arrow overlap in almost every orbital - so the residual minimum is unique but the
-//    weight vector attaining it need not be.  This is not an implementation artefact: gennbo itself
-//    reproduces D(w), every bond order and every valency of TiCl4 to all eight printed decimals at
-//    NRTE2 = 10 and at 20 while individual weights move by 7.1 percentage points.  Weights are
-//    therefore compared by rank and never by label.
+//NRT minimizes ||Gamma - sum_a w_a Gamma_a||_F over the probability simplex.
+//With Gamma_a = s V_a V_a^T, D(w)^2 = Tr(Gamma^2) - 2 g.w + w^T G w,
+//g_a = s Tr(V_a^T Gamma V_a), G_ab = s^2 ||V_a^T V_b||_F^2.
+//Compare weights by rank and bond properties; NBO 7 scales its printed D differently.
 
 namespace
 {
-    //Candidates to generate per octet slot of a delocalising atom - the default budget's only free
-    //number, and the block that uses it explains the budget.  Calibrated by sweeping it over the 22
-    //reference molecules against their uncapped runs and asking not for D(w) to the last digit but
-    //for the bond orders and valencies a chemist reads: 4 is enough for water and N2, 8 for SO2,
-    //16 for the main-group multiple bonds (ethene, ozone, formate, nitromethane), 32 for benzene,
-    //SF6, PF5, TiCl4 and even ethane, and 64 for Ni(CO)4 and pyridine, which are the last to come in.
-    //64 is nearly free where it is not needed, because the generator saturates: ethane produces the
-    //same 103 candidates at 32 and at 64, TiCl4 the same 71, and no reference run reached 5 s.  On a
-    //molecule big enough for the number to bite, the machine guard below binds long before it does.
+    //Per-slot candidate budget, calibrated against the 22 NBO 7 references.
     constexpr int NRT_PER_SLOT = 64;
 
     MatrixXd to_eigen(const dMatrix2& m)
@@ -67,22 +31,8 @@ namespace
         return out;
     }
 
-    //Leading eigenpair of the block of R (less minus, if given) over idx, embedded back into the full
-    //space.  A copy of nbo.cpp's helper; ten lines duplicated is cheaper than a header two files under
-    //parallel development both have to include.  minus exists because the self-consistency sweep below
-    //wants the block of G0 - sum and nothing else of it: materialising the n x n difference to read a
-    //57 x 57 corner of it cost 11 s of Ni(CO)4's 145.
-    //
-    //warm, when given, is this block's own eigenvector from the previous sweep (full space, zero
-    //outside idx).  A full solve does 57^3 work to hand back one of 57 eigenpairs, and the blocks the
-    //sweep asks about are residual densities - one occupancy near 2, a wide relative gap - so power
-    //iteration from the last iterate converges in 9 steps: 41 us against 1328, on the 87 % of
-    //single-thread NRT that is this function.  The guard is exact rather than heuristic and costs
-    //nothing: power iteration converges to the largest eigenvalue BY MAGNITUDE, so a converged
-    //positive lambda IS the algebraic maximum.  Non-positive, or not converged inside the cap (a
-    //near-degenerate leading pair), falls through to the full solve.  Shifting by the Gershgorin bound
-    //to force definiteness instead would take 46 to 50 iterations - it drives the eigenvalue ratio
-    //that sets the convergence rate towards 1.
+    //Leading eigenpair on idx, warm-started from the prior sweep when available.
+    //A negative dominant eigenvalue triggers the full symmetric solve.
     double leading_block(const MatrixXd& R, const ivec& idx, VectorXd& v,
                          const MatrixXd* minus = nullptr, const VectorXd* warm = nullptr)
     {
@@ -127,10 +77,7 @@ namespace
         return es.eigenvalues()(k - 1);
     }
 
-    //x^T A x over idx x idx only.  Every orbital the sweep produces is exactly zero outside its own
-    //block, so the rows and columns outside contribute exactly 0.0 and this is the same number the
-    //full product returns - for sucrose's 998 NAOs and a 60-wide block, 1/270 of the work, and it is
-    //called once per orbital per sweep.
+    //x^T A x restricted to the nonzero block idx.
     double block_quad(const MatrixXd& A, const ivec& idx, const VectorXd& x)
     {
         const int k = static_cast<int>(idx.size());
@@ -143,10 +90,7 @@ namespace
         return s;
     }
 
-    //A += s x x^T over idx x idx only.  Every orbital leading_block returns is exactly zero outside
-    //its own block, so the rest of the outer product adds exactly 0.0 and skipping it is not an
-    //approximation: for Ni(CO)4's 293 NAOs and a 57-wide block it is 3.8 % of the writes, and the two
-    //updates per sweep step were 36 s of the 145.
+    //A += s x x^T restricted to the nonzero block idx.
     void rank1_block(MatrixXd& A, const ivec& idx, const double s, const VectorXd& x)
     {
         const int k = static_cast<int>(idx.size());
@@ -265,16 +209,7 @@ namespace
     // a-priori screens
     //--------------------------------------------------------------------------------------
 
-    //Which atom pairs the resonance search may move electrons between: exactly the pairs a
-    //second-order interaction above nrt_e2_kcal connects.  This is screen (b) of the brief - E2 as the
-    //pricing score - used as a hard gate rather than as a ranking, and it is the screen that decides
-    //how many candidates exist at all.  Seeding it with the pairs the parent already bonds, which
-    //looks harmless, is what made water generate nine ionic structures where NBO 7 generates one
-    //structure and finds one: NBO's candidate count for a molecule with no delocalisation above the
-    //threshold is one, and that is a consequence of this gate, not of a weight floor.
-    //It also carries the price: the strongest E2 interaction covering the pair, in kcal/mol, which is
-    //what licensed the pair in the first place.  A move across a 30 kcal pair is a structure a chemist
-    //would draw; a move across a 2.1 kcal pair is the last permille.  Zero means closed.
+    //Allow pair moves only where an E2 interaction exceeds nrt_e2_kcal.
     vec2 delocalisation_graph(const NboLewis& lewis, const std::vector<NboE2Entry>& e2,
                               const double kcal, const int na, const bvec2& bondable)
     {
@@ -339,15 +274,6 @@ namespace
         bvec free_atom;      //may a move touch this atom at all (subspace screen)
         bvec2 bondable;      //geometry screen
         vec2 deloc;          //E2 screen, and the kcal/mol price of each open pair
-        //Components confine a candidate's arrows to one connected delocalisation, so a budget that
-        //spends per component rather than per price was the obvious second remedy for the three
-        //molecules above 600 NAOs that still miss their converged bond orders.  It cannot help them:
-        //reconstructing which atoms each retained structure moves (its topology minus the leading
-        //one's, merged into connected regions) puts sucrose, malbac and Au2Br2 in ONE region in both
-        //the capped and the uncapped run - 74 retained structures over 1 region uncapped, 62 over the
-        //same 1 region at the default - and no region of any uncapped run is left untouched by its
-        //capped one.  These molecules are one delocalisation, not many local ones; the cap thins it
-        //evenly, and nothing can be rebalanced between components that all live in the same component.
         ivec comp;           //component of each atom
         int max_charge = 2;  //how far a candidate may move an atom's Lewis electron count
         ivec parent_electrons;
@@ -557,17 +483,7 @@ namespace
         }
 
         //3. self consistency: every orbital against the density with all the others removed
-        //ponytail: this loop is 87 % of single-thread NRT and all of it is leading_block - 298 371
-        //dense 57x57 blocks for Ni(CO)4.  Measured, not guessed: the change < 1e-9 exit never fires
-        //(all 234 candidates run all 50 sweeps) and only 265 of 292 500 orbital updates leave the
-        //orbital standing, so neither a lower sweep cap nor memoising an unchanged block would help -
-        //which leaves the eigenpair itself, and each step already holds the answer to the previous one.
-        //Handing it back as a warm start replaces the full solve with 9 power iterations: 32x on that
-        //57x57 block, and on Ni(PH3)3 at -nbo_threads 1 the phase that contains this loop goes 21.38 s
-        //-> 6.79 s (3.2x) and the whole run 28.7 s -> 14.1 s, the rest being the weight QP.  Measured
-        //both ways: D(w) = 1.508640309 either way, 25 of 412 structures either way, weights within
-        //4.6e-5 percentage points and all 28 bond orders within 4.8e-7 - against the gate's 0.5 and
-        //5e-3.  There was no bit-identity to keep; nothing in the repo stores NRT tighter than 1e-8.
+        //Reuse each slot eigenvector as the next sweep's warm start.
         for (int s = 0; s < max_sweeps; s++) {
             double change = 0.0;
             for (int j = first_valence; j < k; j++) {
@@ -708,12 +624,7 @@ namespace
         const double L = std::max(2.0 * lam, 1e-12);
         VectorXd y = w, wp = w;
         double t = 1.0, f = objective(G, g, trg2, w);
-        //The per-iteration test below wants df < 1e-14 f AND a step under 1e-12 at the same moment,
-        //which a Hessian this badly conditioned never delivers, so every call ran its full maxit: the
-        //symmetry-orbit solve at maxit 200000 spent 292 of polyene C12H14's 296 s in the minimiser,
-        //polishing the 11th digit of D.  A window is the honest test - a restart makes one iteration
-        //look stalled when it is not - but 500 iterations that together buy less than 1e-11 of an
-        //objective of order 1 are a plateau, and the weights they feed are reported to 1e-4.
+        //A convergence window avoids stopping on a single FISTA restart.
         double f_window = f;
         //One matvec an iteration, not two.  The old loop formed G y for the gradient step and G wn
         //for the objective; wn is the only new point, and y is an affine combination of wn and the
@@ -814,46 +725,8 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
     }
 
     //--- how many candidates this molecule is worth, and how many it can afford --------------------
-    //Two different numbers, and the default is the smaller of them.
-    //
-    //(1) What the chemistry can produce.  A flat 4000 is the wrong shape: it is far more than ethene
-    //needs and far less than an alkane generates.  An atom only takes part in resonance if something
-    //above the E2 threshold reaches it, and then it can hand its pair on, or take one into a slot its
-    //octet leaves free - cap minus what the parent already put there, where cap is the atom's own
-    //valence NAO count, so H stops at one pair, first-row atoms at four, and a metal or a
-    //hypervalent centre gets the slots it actually has.  Summing 1 + free over the delocalising
-    //atoms scales with the molecule the way the answer does: the structures above the reporting floor
-    //grow linearly with size (C2 to C12 alkanes: 7, 19, 31, 43, 55, 66) while the candidates
-    //generated grow as the square (103 to 2863), so the flat cap throws almost all its work away.
-    //NRT_PER_SLOT is that linear count with room over it, calibrated below.
-    //
-    //(2) What the machine can afford.  The Gram matrix is nc^2/2 products of two n x k orbital sets,
-    //so it grows as nc^2 k^2 n, and the weight QP on top of it is nc^2 per iteration.  Measured on
-    //sucrose (45 atoms, 998 NAOs) with the plateau break in place: 93 candidates cost 0.9 s of Gram
-    //and 0.03 s of QP, 400 cost 7.4 s and 0.5 s, 804 cost 25 s and 2.2 s, and 2062 cost 147 s and
-    //69 s to move D(w) by 1.5 %.  It is the backstop for a molecule whose octet estimate is generous,
-    //not the main rule.
-    //
-    //The constant was first set from that curve alone, at 5.0e11, and an aromatic then showed that
-    //Gram seconds are the wrong thing to calibrate a chemistry default against: at 5.0e11 tetracene
-    //could afford 667 of the 2308 structures its two arrows reach, and reported the C9-C10 bond order
-    //0.49 away from the converged answer (which -nrt_max 8000 and 16000 agree on to every digit).
-    //Ranking better inside the smaller budget does not substitute for raising it; see the note at the
-    //shortlist below, where that was tried and measured worse, and the one at Limits::comp, where
-    //spending the budget per delocalisation rather than per price was tried and cannot apply.
-    //
-    //1.0e14 is where it stands, and it was chosen by chemistry too.  Gram seconds are exactly
-    //proportional to this constant (sucrose: 1.2 s at 5.0e11, predicted 5.6 and measured 5.59 at
-    //4.0e12), and afford as its square root, so every trial value is one run at
-    //-nrt_max = min(chem, m * afford) with the two numbers the default already prints - no rebuild.
-    //Measured that way against each molecule's own converged run: 4.0e12 leaves sucrose 0.07 and
-    //malbac 0.32 in bond order and 0.90 in valency away from it; 1.6e13 changes nothing (malbac
-    //0.38); 1.0e14 makes sucrose and rubredoxin residue 2 exact and leaves malbac and Au2Br2
-    //differing by 0.13, on a hydrogen.  It is free where it does not bind - tetracene's octet number
-    //is 1920 against an afford of 1887, so it runs the same 8 s it did - and it is paid only above
-    //~600 NAOs, where it buys sucrose 53 s -> 158 s and malbac 79 s -> 176 s.
-    //
-    //-nrt_max puts the user's number back, both of them out of the way.
+    //Limit candidates by valence slots and by the Gram matrix work estimate.
+    //-nrt_max overrides both limits.
     int budget = options.nrt_max_candidates;
     if (!options.nrt_max_set) {
         int slots = 0, active = 0;
@@ -902,21 +775,8 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
                              " feasible topologies");
     }
     else {
-        //A budget has to buy the best structures, not the first ones.  Truncating in generation order
-        //is what made sucrose at -nrt_max 20 and at 60 return its parent alone - no resonance at all -
-        //because the depth-one half-moves dropped below were spending the whole of it.  So the
-        //intermediates get a generous cap of their own instead of the budget (they are not free: each
-        //one is expanded again), and each level is ranked by the summed E2 price of the arrows that
-        //made it before any cap bites.  stable_sort, not nth_element, so equal prices keep generation
-        //order and two runs of the same molecule agree.
+        //Rank intermediates by summed E2 price before applying the budget.
         const auto richer = [](const Candidate& a, const Candidate& b) { return a.score > b.score; };
-        //A diversity-aware cut was tried here and measured worse, which is worth writing down because
-        //the reasoning for it is seductive: tetracene's 66 first arrows are all pi -> pi*, so their
-        //prices are near-degenerate and a price sort looks arbitrary.  Keeping the best structure of
-        //every starting bond in turn instead raised D(w) on anthracene from 2.79613 (uncapped) to
-        //2.96935 and moved a bond order by 0.22, because a round robin buys the best of a bad root at
-        //the price of the second best of a good one.  The price order is the right order; the acene
-        //was short of budget, not badly ranked, and the machine guard above is where that was fixed.
         const auto shortlist = [&richer](std::vector<Candidate>& v, const size_t keep) {
             std::stable_sort(v.begin(), v.end(), richer);
             if (v.size() > keep) v.resize(keep);
@@ -949,13 +809,7 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
             level_begin = level_end;
             if (!added || paid >= static_cast<size_t>(budget)) break;
         }
-        //A single pair-move is never a resonance structure of its own, only half of one.  Count the
-        //entries in the "changes" column of all 588 structures the 22 references list: 78 carry none
-        //(they are the reference structures themselves), 239 carry four, 52 six, 193 eight, 23 ten,
-        //and not one carries two.  Four entries is one add and one removal per move for two moves, so
-        //NBO's elementary step is a coupled pair - a bond shifts while a lone pair takes its place -
-        //and the intermediate is not a candidate.  Keeping the depth-one half-moves is what made LiF
-        //bond its ionic parent back together with 99.65 % weight and water invent ionic structures.
+        //A resonance arrow couples two pair moves; depth-one states are intermediates.
         const size_t before = cands.size();
         cands.erase(std::remove_if(cands.begin() + 1, cands.end(),
                                    [](const Candidate& c) { return c.depth == 1; }),
@@ -1197,26 +1051,10 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
         nrt.cycles.push_back(cy);
     }
 
-    //Screen (d), applied after the fact: average the weights over classes of structures that are the
-    //same Lewis structure on differently numbered atoms.  The argmin set of a convex function is
-    //convex, so averaging over members that are all optimal stays optimal - and if the class is not a
-    //real symmetry of the density the average is worse, which is checked and rejected.
+    //Screen symmetry-equivalent topologies before the orbit-weight solve.
     int orbits = 0, in_orbits = 0;
     if (options.nrt_symmetry) {
-        //Every candidate enters an orbit, not only the ones above the weight floor, and the orbit
-        //weight is not averaged after the fact but solved for: substituting w_i = u_p / |p| into the
-        //objective gives the same quadratic program over the orbits, with G and g block-averaged, and
-        //its solution is the symmetric optimum - the other structures readjust, which a post-hoc
-        //average does not let them do.  Averaging instead kept formate's two equivalent structures at
-        //47.98 and 21.62 where the reference has 33.29 and 33.29, and the rise it cost (0.029 in D)
-        //then looked like evidence against the symmetry rather than against the method.
-        //The canonical form is a graph invariant, and a graph invariant is not a symmetry of the
-        //molecule: ozone's ring structure, O 1- O 3 across 2.24 A, is isomorphic to the open one with
-        //its 1.28 A bond, and forcing the two to equal weight is simply wrong.  Splitting each
-        //canonical class by Tr(V^T Gamma V) - equal to 1e-5, single-link - is the numerical
-        //"close enough" that tells a real symmetry from an accidental isomorphism, and it needs no
-        //coordinates: two structures that fit this density equally well and have the same graph are
-        //the same structure on renumbered atoms.
+        //Solve orbit weights directly and separate graph-isomorphic structures by density fit.
         std::map<std::string, ivec> classes;
         for (int i = 0; i < nc; i++)
             if (cands[i].feasible) classes[canonical_form(cands[i].topo, Z)].push_back(i);

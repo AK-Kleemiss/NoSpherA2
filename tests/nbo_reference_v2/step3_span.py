@@ -138,7 +138,7 @@ import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from aonao_compare import (CLASS, LANG_L, ORDER, assert_same_classes, principal_sines, read_47,
                            read_lfn32, read_lfn33, read_naoc)
-from step4_core_block import step3, step4, sym_power
+from step4_core_block import pre_occupations, step3, step4, sym_power
 
 try:
     from config import load_nbo
@@ -218,8 +218,8 @@ def load_sides(mol, d, core_own_block=True):
     gcls = [NUM[e["type"]] for e in naos]
     nkey = [(t[1], t[2], t[5]) for t in lnao]
     gkey = [(e["atom"] - 1, LANG_L[e["lang"][0].lower()], NUM[e["type"]]) for e in naos]
-    pre_occ = np.array([t[6] for t in lpre])
     SPS = S @ P @ S
+    pre_occ = pre_occupations(Cnpre, SPS, lpre)
     C3 = step3(Cnpre, pre_occ, ncls, S)
     C4 = step4(C3, SPS, lnao, core_own_block)
     e_n = float(np.abs(Cnat.T @ S @ Cnat - np.eye(n)).max())
