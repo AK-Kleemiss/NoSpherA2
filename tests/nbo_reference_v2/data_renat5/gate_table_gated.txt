@@ -1,0 +1,23 @@
+A = C:/Users/florian/AppData/Local/Temp/claude/E--Dropbox-Obsidian-LLM-Infos/61956d9d-87f0-40dc-840f-98dbefbee2d4/scratchpad/out/legacy.summary.json
+B = C:/Users/florian/AppData/Local/Temp/claude/E--Dropbox-Obsidian-LLM-Infos/61956d9d-87f0-40dc-840f-98dbefbee2d4/scratchpad/out/renat5.summary.json
+view = gated
+quantity          A failed/compared  B failed/compared   mols better/worse/equal (A vs B)
+npa charge              278/    452         63/    452   0/21/1
+nao occupancy           452/   2134         39/   2089   0/21/1
+nao energy             1883/   2134       1291/   2089   0/21/1
+nbo occupancy           182/   1103         60/   1066   1/11/10
+nbo energy              880/   1103        661/   1066   1/19/2
+hybrid %s/%p           2617/   6625       1734/   6440   1/20/1
+E2                      188/    243        137/    254   6/8/5
+NRT weight                0/      0          0/      0   0/0/22
+NRT weight by rank        112/    151        106/    148   2/6/14
+NRT valency             370/    476        320/    476   1/10/11
+NRT bond order          355/    702        326/    702   1/10/11
+TOTAL                  7317/  15123       4737/  14782   net failed +2580
+
+per molecule, total failed points A-B:
+  better   0: none
+  worse   22: acetylene +54  ammonia +45  benzene +297  ch3 +44  ethane +205  ethene +123  formaldehyde +58  formate +131  hcn +49  lif +15  n2 +26  ni_co_4 +451  nitromethane +178  no +9  o2 +8  ozone +61  pf5 +127  pyridine +311  sf6 +118  so2 +43  ticl4 +189  water +38
+  equal    0
+A: 0 PASS 22 FAIL, 26451 points, gated 15123 points (11328 dropped), host Flowoffice
+B: 0 PASS 22 FAIL, 26417 points, gated 14782 points (11635 dropped), host Flowoffice

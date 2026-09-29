@@ -1,0 +1,17 @@
+molecule  floor     | legacy C++ vs numpy base        | renat5 C++ vs numpy renat5      | renat5 C++ vs numpy base        | legacy C++ vs renat5 C++
+----------------------------------------------------------------------------------------------------------------------------------------------------
+ammonia   7.50e-05 | col 1.37e-05 sub 4.68e-06  2/23  | col 8.79e-06 sub 7.91e-06  2/23  | col 6.83e-01 sub 3.69e-01  2/23  | col 6.83e-01 sub 3.69e-01  2/23 
+benzene   6.74e-05 | col 1.65e-05 sub 0.00e+00  0/90  | col 1.07e-05 sub 0.00e+00  0/90  | col 9.92e-01 sub 0.00e+00  0/90  | col 9.92e-01 sub 0.00e+00  0/90 
+ethane    7.26e-05 | col 1.26e-05 sub 0.00e+00  0/46  | col 4.33e-05 sub 0.00e+00  0/46  | col 9.98e-01 sub 0.00e+00  0/46  | col 9.98e-01 sub 0.00e+00  0/46 
+lif       5.68e-05 | col 1.03e-05 sub 0.00e+00  0/19  | col 1.46e-05 sub 0.00e+00  0/19  | col 9.93e-01 sub 0.00e+00  0/19  | col 9.93e-01 sub 0.00e+00  0/19 
+pf5       6.19e-05 | col 1.55e-05 sub 0.00e+00  0/68  | col 1.59e-05 sub 0.00e+00  0/68  | col 9.60e-01 sub 0.00e+00  0/68  | col 9.60e-01 sub 0.00e+00  0/68 
+sf6       7.06e-05 | col 1.26e-05 sub 0.00e+00  0/79  | col 1.26e-05 sub 0.00e+00  0/79  | col 9.66e-01 sub 0.00e+00  0/79  | col 9.66e-01 sub 0.00e+00  0/79 
+so2       6.29e-05 | col 1.50e-05 sub 0.00e+00  0/35  | col 1.25e-05 sub 0.00e+00  0/35  | col 9.39e-01 sub 0.00e+00  0/35  | col 9.39e-01 sub 0.00e+00  0/35 
+water     7.02e-05 | col 9.65e-06 sub 3.37e-06  2/19  | col 1.07e-05 sub 8.08e-06  2/19  | col 7.57e-01 sub 4.40e-01  2/19  | col 7.57e-01 sub 4.40e-01  2/19 
+----------------------------------------------------------------------------------------------------------------------------------------------------
+sub cell = worst subspace angle, then degenerate columns / shells in the block set.
+0.00e+00 over 0 degenerate columns is an EMPTY maximum, not an agreement.
+legacy C++ vs numpy base    worst over the 8: column 1.654e-05   subspace 4.681e-06
+renat5 C++ vs numpy renat5  worst over the 8: column 4.326e-05   subspace 8.079e-06
+renat5 C++ vs numpy base    worst over the 8: column 9.975e-01   subspace 4.397e-01
+legacy C++ vs renat5 C++    worst over the 8: column 9.975e-01   subspace 4.397e-01

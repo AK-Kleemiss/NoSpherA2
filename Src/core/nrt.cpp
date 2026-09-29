@@ -1281,14 +1281,16 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
     const auto t_other0 = clock();
     vec2 bo(na, vec(na, 0.0));        //bond orders, diagonal = lone pairs
     vec2 pol(na, vec(na, 0.0));       //weight-summed c_A^2 - c_B^2 of the bonds on the pair
+    //Topology units are electron pairs closed shell and single electrons per spin open shell.
+    const double unit = scale / 2.0;
     for (int i = 0; i < nc; i++) {
         if (w(i) <= 0.0) continue;
         for (int a = 0; a < na; a++)
             for (int b = a; b < na; b++)
-                bo[a][b] += w(i) * cands[i].topo.at(a, b);
+                bo[a][b] += unit * w(i) * cands[i].topo.at(a, b);
         for (const std::array<double, 3>& p : cands[i].polarity) {
             const int a = static_cast<int>(p[0]), b = static_cast<int>(p[1]);
-            pol[std::min(a, b)][std::max(a, b)] += w(i) * ((a < b) ? p[2] : -p[2]);
+            pol[std::min(a, b)][std::max(a, b)] += unit * w(i) * ((a < b) ? p[2] : -p[2]);
         }
     }
 

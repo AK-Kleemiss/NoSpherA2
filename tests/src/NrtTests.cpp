@@ -200,6 +200,164 @@ TEST(NrtTests, IonicBondOrderIsLinearInThePolarity)
     EXPECT_NEAR(valency_of(nrt, 1).covalency, 0.4, 1e-6);
 }
 
+//An open-shell NRT runs once per spin, and nrt.cpp's own opening comment says what one unit of the
+//integer topology is on each route: an electron PAIR closed shell, a SINGLE ELECTRON per spin open
+//shell.  A bond order is counted in pairs either way, so one alpha electron shared between two
+//hydrogens is HALF a bond and the alpha channel holds ONE electron.  Summing units straight into the
+//bond order gave 1.0 and an electron count of 2.0 - two electrons in a channel that has one, which
+//takes no external reference to refute.  It is also what a comparison against NBO 7 measured on ch3,
+//no and o2: every total came out at exactly twice gennbo's.
+//The closed-shell twin of this test is ParentThatSpansTheDensityTakesAllTheWeight above, whose
+//numbers are exactly twice these, and `scale` is the only difference between the two calls.
+TEST(NrtTests, AnOpenShellSpinChannelCountsItsBondOrdersInPairsNotElectrons)
+{
+    const NAOResult nao = h_chain(2);
+    const double r = 1.0 / std::sqrt(2.0);
+    //Gamma = 1 v v^T, not 2 v v^T: one electron in this spin channel and not a pair, which is what
+    //rank_one() would build. The Lewis bond's occupancy has to say the same.
+    dMatrix2 gamma(2, 2);
+    for (size_t i = 0; i < 2; i++)
+        for (size_t j = 0; j < 2; j++)
+            gamma(i, j) = r * r;
+    NboLewis lewis = one_bond(gamma, 2);
+    lewis.orbitals[0].occupancy = 1.0;
+    NboOptions opt;
+    opt.nrt = true;
+    NboNrt nrt;
+    std::ostringstream log;
+    native_nrt(nrt, nao, lewis, {}, chain_bondable(2), opt, "alpha", 1.0, log);
+
+    ASSERT_TRUE(nrt.present);
+    EXPECT_NEAR(bond_total(nrt, 1, 2), 0.5, 1e-8)
+        << "one electron shared between two centres is half a bond; 1.0 would be counting the spin's "
+           "single electron as a pair";
+    const NboValency& v = valency_of(nrt, 1);
+    EXPECT_NEAR(v.valency, 0.5, 1e-8);
+    EXPECT_NEAR(v.electron_count, 1.0, 1e-8)
+        << "the alpha channel of this system holds exactly one electron, so no bookkeeping derived "
+           "from it may report two";
+    //and the conserved sum: every bond order and lone pair of a spin channel adds up to half that
+    //channel's electron count, because the weights are a probability vector over topologies that each
+    //place the same number of units.
+    double pairs = 0.0;
+    for (const NboBondOrder& o : nrt.bond_orders) pairs += o.total;
+    EXPECT_NEAR(pairs, 0.5, 1e-8)
+        << "the bond orders and lone pairs of a one-electron spin channel must sum to 0.5 pairs";
+}
+
+//The unpolarised limit, which is where the open-shell route can be held to the closed-shell one with
+//no reference at all: a closed-shell density split into two IDENTICAL spin channels must reproduce the
+//closed-shell answer when the channels are added back up.  The same density is run twice - once as
+//gamma with occupancy 2 and scale 2, once as gamma/2 with occupancy 1 and scale 1, twice - and the
+//only differences in the two calls are those three numbers.
+//Two things are asserted and they are not the same thing.  The TOTALS must add up: that is the unit
+//conversion, and it is what goes red if scale/2 is taken back out of native_nrt.  The ionic FRACTION
+//must be the same in each channel as in the closed-shell run: that is the split, and it must not
+//depend on how many electrons occupy an orbital, because the polarity of an orbital does not.
+//THE FIXTURE HAS TWO BONDS ON PURPOSE.  The first version of this test used one, and with a single
+//orbital the OWSO step is the identity - c.V = M w (w S w)^-1/2 = M for k = 1 whatever the weight is -
+//so the fraction assertions could not have gone red at all.  Confirmed the hard way: with the OWSO
+//weight mutated to occ + 0.5, which destroys exactly the scale invariance this test is about, the
+//one-bond version passed every fraction check.  Two bonds sharing atom 2 overlap by about a fifth, the
+//weighting decides how that overlap is shared, and the mutation then moves the fractions.
+//The two fraction tolerances are 1e-12 and not the 1e-6 they started at, because that is how exactly
+//the invariant holds with the fix in place - the mutation moves them by 3.04e-06, so the margin between
+//passing and failing is a factor of about three million rather than three.
+//Both invariants hold, which is the BOUNDARY of the split defect this branch reports and does not fix:
+//on ch3 and no, where the two channels are genuinely different, native's ionic share disagrees with
+//gennbo's in opposite directions per spin - but the machinery is exactly self-consistent where the two
+//channels are the same, and o2, homonuclear and so of zero polarity by symmetry, agrees with gennbo on
+//all 34 of its numbers.  So whatever is wrong there is specific to spin POLARISATION, and it is not in
+//the per-spin algebra or in the unit conversion.
+TEST(NrtTests, TwoIdenticalSpinChannelsAddUpToTheClosedShellAnswer)
+{
+    const NAOResult nao = h_chain(3);
+    //Two polar bond orbitals, 1-2 and 2-3, not orthogonal to each other: they share atom 2, which is
+    //what gives the OWSO step something to do.
+    const vec u1 = normalised({ std::sqrt(0.8), std::sqrt(0.2), 0.0 });
+    const vec u2 = normalised({ 0.0, std::sqrt(0.3), std::sqrt(0.7) });
+    const dMatrix2 gamma = rank_two(u1, u2);   //2 (u1 u1^T + u2 u2^T)
+
+    //The parent: one bond on each bondable pair of the chain.
+    auto two_bond_lewis = [](const dMatrix2& g, const double occ) {
+        NboLewis L;
+        L.gamma = g;
+        for (const std::vector<int>& c : { std::vector<int>{ 0, 1 }, std::vector<int>{ 1, 2 } }) {
+            NboFunction f;
+            f.centers = c;
+            f.type = "BD";
+            f.multiplicity = 1;
+            f.occupancy = occ;
+            L.orbitals.push_back(f);
+        }
+        L.n_lewis = 2;
+        L.topo.assign(3, ivec(3, 0));
+        L.topo[0][1] = L.topo[1][0] = 1;
+        L.topo[1][2] = L.topo[2][1] = 1;
+        return L;
+    };
+
+    auto bond_of = [](const NboNrt& n, const int a, const int b) {
+        for (const NboBondOrder& o : n.bond_orders)
+            if (!o.diagonal && o.atom1 == a && o.atom2 == b) return o;
+        throw std::runtime_error("no bond order for the pair");
+    };
+
+    NboOptions opt;
+    opt.nrt = true;
+    opt.nrt_exhaustive = true;   //so both routes see the same candidate set by construction
+    std::ostringstream log;
+
+    NboNrt closed;
+    NboLewis lc = two_bond_lewis(gamma, 2.0);
+    native_nrt(closed, nao, lc, {}, chain_bondable(3), opt, "", 2.0, log);
+    ASSERT_TRUE(closed.present);
+
+    dMatrix2 half(3, 3);
+    for (size_t i = 0; i < 3; i++)
+        for (size_t j = 0; j < 3; j++)
+            half(i, j) = 0.5 * gamma(i, j);
+
+    double spin_total[2] = { 0.0, 0.0 }, spin_ionic[2] = { 0.0, 0.0 }, spin_electrons = 0.0;
+    const int pair_a[2] = { 1, 2 }, pair_b[2] = { 2, 3 };
+    for (const char* spin : { "alpha", "beta" }) {
+        NboNrt s;
+        NboLewis ls = two_bond_lewis(half, 1.0);
+        native_nrt(s, nao, ls, {}, chain_bondable(3), opt, spin, 1.0, log);
+        ASSERT_TRUE(s.present) << spin;
+        for (int k = 0; k < 2; k++) {
+            const NboBondOrder o = bond_of(s, pair_a[k], pair_b[k]);
+            const NboBondOrder c = bond_of(closed, pair_a[k], pair_b[k]);
+            ASSERT_GT(o.total, 0.0) << spin;
+            EXPECT_NEAR(o.total, 0.5 * c.total, 1e-8)
+                << spin << " bond " << pair_a[k] << "-" << pair_b[k]
+                << ": one electron of this spin where the closed-shell run has a pair is half the "
+                   "bond order, not the same bond order";
+            EXPECT_NEAR(o.ionic / o.total, c.ionic / c.total, 1e-12)
+                << spin << " bond " << pair_a[k] << "-" << pair_b[k]
+                << ": the ionic FRACTION is a property of the orbital's polarity and cannot depend on "
+                   "whether one electron or two occupy it";
+            spin_total[k] += o.total;
+            spin_ionic[k] += o.ionic;
+        }
+        spin_electrons += valency_of(s, 2).electron_count;
+    }
+
+    for (int k = 0; k < 2; k++) {
+        const NboBondOrder c = bond_of(closed, pair_a[k], pair_b[k]);
+        EXPECT_NEAR(spin_total[k], c.total, 1e-8)
+            << "the two spin channels of an unpolarised density must add up to the closed-shell bond "
+               "order on " << pair_a[k] << "-" << pair_b[k] << ": " << spin_total[k] << " against "
+            << c.total;
+        EXPECT_NEAR(spin_ionic[k], c.ionic, 1e-12)
+            << "and to its ionic part on " << pair_a[k] << "-" << pair_b[k] << ": " << spin_ionic[k]
+            << " against " << c.ionic;
+    }
+    EXPECT_NEAR(spin_electrons, valency_of(closed, 2).electron_count, 1e-8)
+        << "each channel's electron count is the closed-shell one halved, so the two add back to it "
+           "and not to twice it";
+}
+
 //With more than one candidate the answer is no longer known by hand, but the identities are: the
 //weights are a probability vector, the minimiser cannot do worse than the parent alone, every
 //atom's valency is its bond-order row sum and its electron count is 2 (lone pairs + valency).
