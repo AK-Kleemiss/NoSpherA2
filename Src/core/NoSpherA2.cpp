@@ -786,7 +786,6 @@ static int run_app_impl(int argc, char **argv)
 		opt.groups[0].push_back(0);
 		structure_factors SF(opt);
 		XCW xcw(SF);
-		//XCW xcw2(opt);
 		if(!opt.calc_F_calc)
 		{
 			xcw.run_XCW_fitting();

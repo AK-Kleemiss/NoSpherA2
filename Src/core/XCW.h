@@ -22,12 +22,6 @@ class XCW {
 public:
 
 	// Constructor
-	XCW(const options& opt_in)
-		: settings(loadSettings(opt_in.xcw_settings_path))
-	{
-		construct(opt_in);
-	};
-
 	XCW(const structure_factors& sf)
 		: settings(loadSettings(sf.opt->xcw_settings_path))
 	{
@@ -400,6 +394,8 @@ private:
 	int rescues_ = 0;
 	static constexpr double rescue_rise_ = 1.0;
 	bool rescue_scf(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double quant, double& alpha);
+	double wavelength;
+	vec3 ADPs;
 
 	// The way out of a plateau the Roothaan/DIIS map does not leave (Fe(phen)2(SCN)2 UHF
 	// singlet at lambda 0.04: E and chi^2 flat for 130 iterations, orbital gradient stuck at
@@ -545,7 +541,6 @@ private:
 	// Per-lambda Gaussian halting diagnostics, see evaluate_gaussian_halting.
 	std::vector<GaussianHaltEntry> gaussian_halt_history_;
 	const options* opt;
-	WFN dummy_wave;
 	cell unit_cell;
 	std::ofstream XCW_log;
 	SCF_settings settings;

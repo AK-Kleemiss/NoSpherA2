@@ -41,6 +41,22 @@ struct scattering_data {
 	double sigma_obs2;
 };
 
+// Store scattering data for each reflection
+struct scatter_data {
+	vec F_obs;
+	vec F_obs2;
+	vec sigma_obs;
+	vec sigma_obs2;
+	vec abs_F_obs;
+	cvec F_calc;
+	vec F_calc2;
+	double scale;
+	ivec hkl_mask;
+	hkl_list hkl;
+	hkl_list hkl_enlarged;
+	cvec anom_correction;
+};
+
 enum GridIndex
 {
 	x_coord = 0,
@@ -333,4 +349,4 @@ struct hkl_sym {
 };
 
 void read_hkl(const std::filesystem::path& hkl_filename, hkl_list& hkl, const vec2& twin_law, cell& unit_cell, std::ostream& file, bool debug = false);
-hkl_list read_hkl_full(const std::filesystem::path& hkl_filename, hkl_list& hkl, const vec2& twin_law, cell& unit_cell, std::ostream& file, std::vector<scattering_data>& obs, bool debug = false);
+hkl_list read_hkl_full(const std::filesystem::path& hkl_filename, hkl_list& hkl, const vec2& twin_law, cell& unit_cell, std::ostream& file, scatter_data& obs, bool debug = false);

@@ -14,29 +14,21 @@ structure_factors::structure_factors(const options& opt_in) {
 	std::filesystem::path cif = opt->cif;
 	std::ifstream cif_input(cif.c_str(), std::ios::in);
 	std::vector<asym_atom> xyz_atoms;
-	if (!opt_in.xyz_file.empty()) {
-		const std::filesystem::path xyz_path = opt_in.xyz_file;
-		WFN dummy_wave(xyz_path, opt_in.debug);
-		dummy_wave.read_xyz(xyz_path, std::cout, opt_in.debug);
+	if (!opt->xyz_file.empty()) {
+		const std::filesystem::path xyz_path = opt->xyz_file;
+		WFN dummy_wave(xyz_path, opt->debug);
+		dummy_wave.read_xyz(xyz_path, std::cout, opt->debug);
 		xyz_atoms = dummy_wave.extract_xyz("bohr");
 	}
 	unit_cell = cell(cif, std::cout, opt->debug, opt->do_XCW);
-	std::vector<scattering_data> obs;
-	scatter_data.hkl_enlarged = read_hkl_full(hkl_filename, scatter_data.hkl, opt_in.twin_law, unit_cell, std::cout, obs, opt_in.debug);
+	scatter_data.hkl_enlarged = read_hkl_full(hkl_filename, scatter_data.hkl, opt->twin_law, unit_cell, std::cout, scatter_data, opt->debug);
 	std::ofstream log3("log3.txt", std::ios::out);
-	for (int i = 0; i < obs.size(); i++) {
-		scatter_data.F_obs.push_back(obs[i].F_obs);
-		scatter_data.F_obs2.push_back(obs[i].F_obs2);
-		scatter_data.sigma_obs.push_back(obs[i].sigma_obs);
-		scatter_data.sigma_obs2.push_back(obs[i].sigma_obs2);
-		scatter_data.abs_F_obs.push_back(obs[i].abs_F_obs);
-	}
-	bvec needs_grid;
-	read_atoms_from_CIF(cif_input, unit_cell, model_data.ncen, needs_grid, asym_atoms, opt_in.debug);
+	
+	wavelength = read_CIF(cif_input, unit_cell, model_data.ncen, asym_atoms, ADPs, opt->debug);
 	err_checkf(model_data.ncen > 0, "No atoms were read from " + cif.string() + "! Is there an _atom_site loop with labels, type symbols and fractional coordinates?", std::cout);
 
 	// Adds symmetry generated atoms
-	if (!opt_in.xyz_file.empty()) {
+	if (!opt->xyz_file.empty()) {
 		unit_cell.grow_asym_atoms(asym_atoms, xyz_atoms);
 	}
 
@@ -47,16 +39,13 @@ structure_factors::structure_factors(const options& opt_in) {
 	unit_cell.eval_symm(asym_atoms, model_data.ncen, symmetry_linking_list);
 	model_data.ncen = asym_atoms.size();
 
-	// Warn if a grown structure's explicit atoms don't consistently cover the same
-	// symmetry operations for every asymmetric atom
+	// Handle symmetry for grown structures, projects into subgroup and deletes redundant symmetry operations
 	ivec applied_symmetry;
-	if (!opt_in.xyz_file.empty()) {
-		// Below is working
-		//unit_cell.apply_grown(symmetry_linking_list);
+	if (!opt->xyz_file.empty()) {
 		applied_symmetry = unit_cell.apply_grown(scatter_data.hkl, scatter_data.hkl_enlarged, asym_atoms, symmetry_linking_list, original_rotations);
 	}
 
-	//unit_cell.set_symmetry_factors(asym_atoms, symmetry_linking_list);
+	// Set the symmetry factors for each atom
 	unit_cell.set_symmetry_factors(asym_atoms, symmetry_linking_list, applied_symmetry);
 
 	if (std::getenv("NOSPHERA2_DEBUG_ASYMFACT")) { // Flawfinder: ignore
@@ -69,6 +58,7 @@ structure_factors::structure_factors(const options& opt_in) {
 		std::cerr << "hkl_enlarged size: " << scatter_data.hkl_enlarged.size() << std::endl;
 	}
 
+	WFN dummy_wave;
 	// Generate WFN object from asym_atoms
 	for (int at = 0; at < model_data.ncen; at++) {
 		asym_atom_list.push_back(at);
@@ -80,34 +70,20 @@ structure_factors::structure_factors(const options& opt_in) {
 		dummy_wave.push_back_atom(temp_atom);
 	}
 
-	// Load basis set & generate basis for each atom
-	std::shared_ptr<BasisSet> basis = BasisSetLibrary::get_basis_set(basis_set_name);
-	load_basis_into_WFN(dummy_wave, basis, false, true);
-
-	// Read isotropic displacement parameters
-	vec U_iso = read_U_iso_from_CIF(cif, dummy_wave, unit_cell, log3, opt_in.debug);
-	for (int i = 0; i < asym_atoms.size(); i++) {
-		asym_atoms[i].U_iso = U_iso[i];
-	}
-
-
-	if (!opt_in.xyz_file.empty()) {
+	// Extend U_iso to symmetry generated atoms
+	if (!opt->xyz_file.empty()) {
 		unit_cell.grow_U_iso(asym_atoms, symmetry_linking_list);
 	}
 
 	// Generate k_pts and set the number of reflections
+	make_k_pts(model_data.nr_enlarged != 0 && scatter_data.hkl.size() == 0, opt->save_k_pts, unit_cell, scatter_data.hkl_enlarged, k_pt, std::cout, opt->debug);
 	model_data.nr_enlarged = scatter_data.hkl_enlarged.size();
 	model_data.nr = scatter_data.hkl.size();
-	make_k_pts(model_data.nr_enlarged != 0 && scatter_data.hkl.size() == 0, opt_in.save_k_pts, unit_cell, scatter_data.hkl_enlarged, k_pt, std::cout, opt_in.debug);
-
-	// Read ADPs
-	bool grown = !opt_in.xyz_file.empty();
-	read_fracs_ADPs_from_CIF(cif, dummy_wave, log3, opt_in.debug, grown, symmetry_linking_list);
 
 	// Prepare output files
 	XCW_log.open("XCW.log");
-	std::cout << "XCW orbital basis set: " << basis->get_name() << std::endl;
-	XCW_log << "XCW orbital basis set: " << basis->get_name() << std::endl;
+	std::cout << "XCW orbital basis set: " << basis_set_name << std::endl;
+	XCW_log << "XCW orbital basis set: " << basis_set_name << std::endl;
 
 	// The fit set, see i_sigma_cutoff. F_obs2 is |I|, the sign lives in F_obs
 	scatter_data.hkl_mask.resize(model_data.nr, 0);
@@ -132,7 +108,8 @@ structure_factors::structure_factors(const options& opt_in) {
 
 void structure_factors::setup_extinction(const std::filesystem::path& cif) {
 	if (ext_model == extinction::model::none) return;
-	const double lambda = wavelength > 0.0 ? wavelength : read_cif_wavelength(cif);
+	//const double lambda = wavelength > 0.0 ? wavelength : read_cif_wavelength(cif);
+	const double lambda = wavelength;
 	err_checkf(lambda > 0.0, "Extinction needs a wavelength: put `wavelength <lambda>` in the XCW "
 		"settings file, or _diffrn_radiation_wavelength in " + cif.string(), std::cout);
 	ensure_hkl_ordered();

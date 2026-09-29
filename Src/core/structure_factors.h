@@ -22,22 +22,6 @@ public:
 		double R1;
 	};
 
-	// Store scattering data for each reflection
-	struct scatter_data {
-		vec F_obs;
-		vec F_obs2;
-		vec sigma_obs;
-		vec sigma_obs2;
-		vec abs_F_obs;
-		cvec F_calc;
-		vec F_calc2;
-		double scale;
-		ivec hkl_mask;
-		hkl_list hkl;
-		hkl_list hkl_enlarged;
-		cvec anom_correction;
-	};
-
 	// Store information about the model (e.g. number of atoms, reflections)
 	struct model_data {
 		int ncen;
@@ -46,7 +30,8 @@ public:
 		int n_params = 177;
 	};
 
-
+	// Stores the ADP tensors
+	vec3 ADPs;
 	// Stores the Debye-Waller factors
 	cvec2 DW_facts;
 	// Stores the rotational phase factors
@@ -67,8 +52,6 @@ public:
 	std::vector<asym_atom> asym_atoms;
 	// Store the full rotational symmetry in case of a grown structure, for rotating ADPs
 	ivec3 original_rotations;
-	// Dummy wavefunction used for reading in atoms and basis sets
-	WFN dummy_wave;
 	// List used for grid generation
 	ivec asym_atom_list;
 	// Store the basis set name
