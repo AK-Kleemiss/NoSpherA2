@@ -114,15 +114,7 @@ TEST(NaoBasisMapTests, EpoxideAoMapMatchesTheOverlap)
 		}
 }
 
-//The overlap has to carry the same convention as the coefficients the reader kept.  ORCA writes the
-//|m| >= 3 components of an f or g shell - f(+-3), g(+-3), g(+-4) - with the sign opposite to
-//libcint's, and the gbw reader keeps ORCA's convention in the density, so an uncorrected overlap
-//makes Tr(P S) miss the electron count: 0.018 e here, 0.009 e on Zn(NH3), 0.31 of SF6's 70.  It
-//hides in every linear molecule, because the sign cancels between two flipped functions and the
-//surviving cross terms vanish by axial symmetry - which is why the diatomic references never showed
-//it.  ao_overlap() applies the same correction the FILE47 writer does; what is checked here is the
-//exact statement, that the natural populations sum to the nuclear charge whatever the partition
-//does with them.  The epoxide and ethane fixtures cannot see this and pass either way.
+//The AO overlap must use the same spherical-harmonic phases as the density.
 TEST(NaoBasisMapTests, OverlapCarriesTheDensitysPhaseConvention)
 {
 	const auto p = fixture("RGBI_groups", "nh3bh3.gbw");
@@ -169,20 +161,7 @@ TEST(NaoEpoxideTests, OccupanciesSumToTheElectronCountAndTheTransformIsOrthogona
 	EXPECT_LT(orthonormality_error(npa.total.C, ao_overlap(wavy)), 1e-9);
 }
 
-//NBO 7.0.9, tests/epoxide_gbw/NBO/reference.nbo, "Summary of Natural Population Analysis".
-//Tolerance: oxygen and the cores come out to 2e-3 and 4e-5, but a residual C -> H transfer of
-//about 0.009 e per hydrogen is left, so the carbons sit 0.02 e too positive.  Ruled out as the
-//cause: the OWSO formula (re-derived), equal-weight Loewdin instead of OWSO (much worse), the
-//core definition (exact), the step-4 class merge (intra-atomic and unitary), self-consistent
-//weights (converges to hydrogens at +0.66) and one OWSO over the whole natural minimal basis
-//instead of core before valence (worse here and on nh3bh3 and benzene).  Also ruled out: NBO's
-//symmetry averaging, which the 22-molecule reference spine now makes testable and which does not
-//explain it - the reference prints distinct charges for symmetry-equivalent atoms wherever the
-//geometry allows, and where it does not our spread is zero too.  The overlap phase convention was
-//a real cause and is fixed (see OverlapCarriesTheDensitysPhaseConvention): it carried the whole
-//error on the hypervalent and heavy-atom references, PF5 0.099 -> 0.013 e and SF6 0.080 -> 0.016,
-//but none of this one, which has no |m| >= 3 cross terms.  The bound below is the measured
-//agreement; if a later change makes it pass at a tighter one, tighten it.
+//Compare epoxide charges with the stored NBO 7.0.9 population table.
 TEST(NaoEpoxideTests, NaturalChargesMatchNbo7)
 {
 	const auto p = fixture("epoxide_gbw", "epoxide.gbw");
@@ -249,16 +228,7 @@ TEST(NaoOpenShellTests, HydrogenAtomCarriesOneUnpairedElectron)
 	EXPECT_NEAR(npa.beta.population, 0.0, 1e-9);
 }
 
-//Tr(P S) is the electron count by construction, whatever reader built P and whatever basis it is in,
-//so it is the one number that catches a density matrix and an overlap that are not in the same basis.
-//It caught three such defects on the molden route, all fixed: Int_Params had no normalisation branch
-//for a molden origin (the log said "tread carefully" and nothing else), the molden reader left the
-//coefficients in the file's own AO order while Int_Params sorts an atom's shells by l and orders a
-//shell's components in libcint's convention, and the ORCA |m| >= 3 sign convention was gated on the
-//gbw origin alone although orca_2mkl writes the gbw's own coefficients.  F_open came out at 1.512 of
-//its 9 electrons, Ce_full at 47.11 of 56, CuF2's i-shell molden at 17.57 of 47.  The reference each
-//file is checked against is its own sum of MO occupations, so this test needs no external number and
-//cannot be satisfied by making the reader and the integrals agree on something wrong.
+//Tr(P S) checks that a reader and its overlap use the same AO basis.
 TEST(NaoReaderConsistencyTests, EveryReaderConservesTheElectronCount)
 {
 	struct Case { const char* dir; const char* file; double tol; };
@@ -270,10 +240,7 @@ TEST(NaoReaderConsistencyTests, EveryReaderConservesTheElectronCount)
 		{ "molden_file", "F_full.molden",   1e-7 },
 		{ "molden_file", "Sc_full.molden",  1e-7 },
 		{ "molden_file", "Ce_full.molden",  1e-7 },
-		//g, h and i shells, where the |m| >= 3 phase convention is worth 0.042 e.  The 1e-3 is not
-		//this code's error bar: the same 7.1e-4 is there for the gbw of the same calculation (see
-		//MoldenAndGbwOfTheSameCalculationAgree), a pre-existing high-l matter that is not a phase
-		//convention - flipping every |m| >= 3 is the best of the three candidate rules, measured.
+		//High-l ORCA phase conventions are checked against the matching GBW.
 		{ "CuF2_i_func/71", "calc_occupied.molden", 1e-3 },
 		{ "CuF2_i_func/71", "calc.gbw",             1e-3 },
 		//gbw controls: ECP, an open shell, one electron, and the epoxide reference
@@ -299,10 +266,7 @@ TEST(NaoReaderConsistencyTests, EveryReaderConservesTheElectronCount)
 	}
 }
 
-//The same ORCA calculation read two ways has to give the same density in the same basis.  Before the
-//molden fixes these two differed by 29.4 electrons of 47 and nothing said so; the gbw was right and
-//the molden was not, which is why the reference here is the gbw.  Both now sit at 46.99929, and the
-//7.1e-4 they share is what remains to explain about h and i shells.
+//The same ORCA calculation must give the same density from GBW and Molden.
 TEST(NaoReaderConsistencyTests, MoldenAndGbwOfTheSameCalculationAgree)
 {
 	const auto g = fixture("CuF2_i_func/71", "calc.gbw");
@@ -318,18 +282,7 @@ TEST(NaoReaderConsistencyTests, MoldenAndGbwOfTheSameCalculationAgree)
 		EXPECT_NEAR(b.total.atoms[i].charge, a.total.atoms[i].charge, 5e-3) << "atom " << i + 1;
 }
 
-//An fchk's basis reached no normalisation branch in Int_Params at all: e_origin::fchk fell into the
-//"WFN Origin 5 not recognized, tread carefully!  No normalisation was performed" default, so every AO
-//of a spherical fchk left ao_overlap() with a non-unit diagonal and every density built on it was
-//wrong.  Two invariants pin it and neither needs an external reference: the diagonal of an AO overlap
-//is 1 by construction once the basis functions are normalised, and Tr(P S) is the electron count.
-//Measured on this fixture (spherical, shell types -2 and -3, 228 functions, 94 shells, 48 electrons,
-//written by OCC): before, 228 of 228 diagonal elements were off and Tr(P S) = 7.579076; after, the
-//diagonal is 1 everywhere and Tr(P S) = 47.938220.  The remaining 0.0618 e is a separate and still
-//unfixed defect - most plausibly spherical-component ordering or phase between the fchk-built density
-//matrix and libcint's order - which is why the trace tolerance here is 0.07 rather than 1e-6: it pins
-//the improvement without claiming the file is cured.  The reader's own 1e-4 trace guard still refuses
-//it downstream, so nothing consumes a half-right basis.
+//A spherical FCHK overlap has unit-normalized AO diagonals.
 TEST(NaoReaderConsistencyTests, ASphericalFchkBasisIsNormalised)
 {
 	const auto p = fixture("alanine_occ", "alanine.owf.fchk");
@@ -362,20 +315,7 @@ TEST(NaoReaderConsistencyTests, ASphericalFchkBasisIsNormalised)
 	//end-to-end trace is measured through the CLI: 7.579076 before this fix, 47.938220 after, against 48.
 }
 
-//An occupancy is a number of electrons, so a printed "-0.00000" is wrong twice over: it reads as a
-//negative population, and it is not even a property of the molecule.  This was found by translating a
-//molecule rigidly and diffing the output - the one transformation a wavefunction file admits without
-//recomputing it, since the basis functions ride on the atom centres - and tests/molden_file/test.molden
-//printed "Ryd( 6s)   -0.00000" in one position and "0.00000" for the same molecule moved 4.35 bohr.
-//This test does NOT assert that no occupancy is negative: one that is genuinely negative would be a real
-//defect and must stay visible.  It asserts that nothing is printed as a signed zero, which is the one
-//case where the sign carries no information at all.
-//The fixture is Sc_full and not the test.molden the defect was found on, because the first version of
-//this test used test.molden and PASSED against a binary with the clamp taken back out: test.molden prints
-//the signed zero only in the MOVED frame, so on the fixture as committed there was nothing to catch.
-//Sc_full is scandium in a large basis, so it carries a long tail of nearly empty Rydberg NAOs and prints
-//eleven of them signed in its own frame - the same defect where it is reproducible rather than where it
-//happened to be noticed.
+//Printed NAO occupations must not show negative zero.
 TEST(NaoPrintTests, NoOccupancyIsPrintedAsANegativeZero)
 {
 	const auto p = fixture("molden_file", "Sc_full.molden");

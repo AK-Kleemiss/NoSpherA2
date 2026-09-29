@@ -11,10 +11,7 @@
 using Eigen::MatrixXd;
 using Eigen::VectorXd;
 
-//NRT minimizes ||Gamma - sum_a w_a Gamma_a||_F over the probability simplex.
-//With Gamma_a = s V_a V_a^T, D(w)^2 = Tr(Gamma^2) - 2 g.w + w^T G w,
-//g_a = s Tr(V_a^T Gamma V_a), G_ab = s^2 ||V_a^T V_b||_F^2.
-//Compare weights by rank and bond properties; NBO 7 scales its printed D differently.
+//NRT minimizes ||Gamma - sum_a w_a Gamma_a||_F over simplex weights w.
 
 namespace
 {
@@ -447,12 +444,7 @@ namespace
         int k = static_cast<int>(B.core.size());
         for (const Slot& sl : slots) k += sl.mult;
         if (k > n) return;
-        //A spin channel can ask for no orbitals at all: a hydrogen atom's beta channel holds no
-        //electrons, so there is no core and every slot multiplicity is zero.  k = 0 then reached the
-        //OWSO overlap check below as a 0x0 SelfAdjointEigenSolver, and Eigen's first step there is
-        //maxCoeff() over an empty matrix - a segfault, not an exception, and -nbo_native H.gbw -nrt
-        //died in it with nothing printed after the citation block.  A candidate with no orbitals
-        //cannot be built, which is what infeasible means everywhere else in this function.
+        //An empty spin channel contributes no NRT candidates.
         if (k == 0) return;
         std::vector<VectorXd> v(k);
         std::vector<const ivec*> blk(k, nullptr);
@@ -506,10 +498,7 @@ namespace
             if (change < 1e-9) break;
         }
 
-        //4. OWSO.  Two bonds at the same atom overlap by about a fifth; weighting by occupancy lets
-        //the occupied orbitals keep their shape at the expense of the empty ones and keeps two
-        //equivalent bonds equivalent.  A topology whose orbitals are linearly dependent - two lone
-        //pairs asked of an atom whose block the bonds have already used up - drops out here.
+        //Occupancy-weighted orthogonalization resolves overlapping bond orbitals.
         MatrixXd M(n, k);
         for (int j = 0; j < k; j++) M.col(j) = v[j];
         VectorXd wt(k);
@@ -555,12 +544,7 @@ namespace
         return trg2 - 2.0 * g.dot(w) + w.dot(G * w);
     }
 
-    //G v, with the exactly-zero entries of v left out.  project_simplex zeroes all but the support,
-    //and the support is tens of structures out of thousands, so this reads those columns of G and not
-    //all of them: sucrose's 1480x1480 G is 17.5 MB, a 66-column gather is 0.8 MB and stays in L2,
-    //and the minimiser was bandwidth bound on streaming the whole matrix twice per iteration.  It is
-    //not an approximation and not a screen: the terms dropped are multiplications by exactly 0.0,
-    //whose products are exactly 0.0 and whose sums leave the accumulator unchanged.
+    //Multiply the Gram matrix on the active simplex support.
     void gather_mv(const MatrixXd& G, const VectorXd& v, VectorXd& out)
     {
         const int n = static_cast<int>(v.size());
@@ -572,12 +556,7 @@ namespace
         }
     }
 
-    //On a fixed support the only remaining constraint is the one equality sum(w)=1, so the KKT
-    //system is (m+1)x(m+1) and one factorisation replaces the iteration entirely.  A negative
-    //component means the support was too wide, so the most negative one is dropped and the system
-    //re-solved - textbook active set, and the support is tens of structures, not thousands.
-    //completeOrthogonalDecomposition because G is near-singular by construction (candidates that
-    //differ by one arrow are near-collinear) and the minimum-norm solution is the one we want.
+    //On a fixed support, the optimum satisfies the simplex KKT equation.
     double solve_qp_support(const MatrixXd& G, const VectorXd& g, const double trg2, VectorXd& w)
     {
         const int n = static_cast<int>(G.rows());
@@ -610,9 +589,7 @@ namespace
         return std::numeric_limits<double>::infinity();
     }
 
-    //Accelerated projected gradient (FISTA with adaptive restart).  The Hessian 2G is badly
-    //conditioned by construction - candidates that differ by one arrow are near-collinear - so this
-    //runs to identify the support and the support problem is then solved again on its own.
+    //Use accelerated projected gradient with adaptive restart.
     double solve_qp(const MatrixXd& G, const VectorXd& g, const double trg2, VectorXd& w,
                     const int maxit, const vec* rho, const std::string& spin,
                     std::vector<NboQpIteration>* trace)
@@ -633,11 +610,7 @@ namespace
         double t = 1.0, f = objective(G, g, trg2, w);
         //A convergence window avoids stopping on a single FISTA restart.
         double f_window = f;
-        //One matvec an iteration, not two.  The old loop formed G y for the gradient step and G wn
-        //for the objective; wn is the only new point, and y is an affine combination of wn and the
-        //previous wn, so G y is the same combination of two products already in hand.  Exact in
-        //exact arithmetic and the rounding does not accumulate - both operands are products of the
-        //current and the previous iterate, never of a derived quantity.
+        //Reuse the gradient product when checking convergence.
         VectorXd Gy(n), Gwn(n), Gwp(n);
         gather_mv(G, y, Gy);
         Gwp = Gy;                                     //wp == y == w on entry
@@ -896,31 +869,7 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
     const double orbital_seconds = secs(t_gram0, clock());
     const auto t_pairs0 = clock();
 
-    //G is a Gram matrix, so it is one product and not nc^2/2 of them - the work is finding the
-    //vectors it is a Gram matrix of.  Cyclic invariance of the trace turns the pair entry into an
-    //inner product of two objects that depend on one candidate each:
-    //
-    //    || V_a^T V_b ||_F^2 = Tr(V_b^T V_a V_a^T V_b) = Tr(P_a P_b) = <vec P_a, vec P_b>,
-    //                                                    P_a = V_a V_a^T  (nn x nn, symmetric),
-    //
-    //so G = s^2 Z^T Z with column a of Z the flattened P_a.  Z is nn^2 x nc, which is 11.8 TB for
-    //sucrose, but the identity holds one block of the (p, q) index at a time: P_a[R, C] is
-    //V_a[R, :] (V_a[C, :])^T, and summing Z_blk^T Z_blk over the blocks is the same sum over (p, q).
-    //
-    //Only the blocks with R <= C are formed.  P_a is symmetric, so P_a[C, R] = P_a[R, C]^T, and a
-    //Frobenius inner product does not see a transpose applied to both of its arguments: the (C, R)
-    //block contributes exactly what the (R, C) block does.  Doubling the off-diagonal blocks and
-    //counting the diagonal ones once is therefore the whole sum over (p, q) at half the work.  The
-    //two are accumulated apart so that the factor two is an exact scaling of a finished sum, rather
-    //than a sqrt(2) folded into every element of Z.
-    //
-    //In multiplies: the pair loop is nc^2/2 * k^2 * nn, this is nc^2/4 * nn^2 + nc/2 * nn^2 * k, so
-    //it wins when k^2 > nn/2 - and it replaces a million 91x998x91 products, each allocating its own
-    //temporary, with a few thousand big GEMMs.  Sucrose has k = 91 and nn = 998: a factor 16 in
-    //flops on top of the shape.  The inequality goes the other way on small molecules, so the cost
-    //model below chooses.  No screen and no threshold is involved either way - both routes compute
-    //the same G, and the probe check at the end of the branch is the proof that they do, on every
-    //run rather than on the inputs a test happens to cover.
+    //The Gram matrix is the product of packed candidate densities.
     int kmax = 0;
     for (const Candidate& c : cands) kmax = std::max(kmax, static_cast<int>(c.V.cols()));
     const double dnc = static_cast<double>(nc), dnn = static_cast<double>(nn);
@@ -974,11 +923,7 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
                 G(j, i) = G(i, j);
             }
 
-        //The identity is proved above; the blocking and the tiling are not, and an off-by-one in
-        //either produces an O(1) error in some entries and none in the rest, which no aggregate
-        //check sees.  So a stride of pairs is recomputed the direct way, on every run: at 96 pairs
-        //this is 96/nc^2 of the pair loop - 0.02 s of sucrose - and it is the reason the route can be
-        //trusted on an input no test covers.
+        //Check the tiled Gram product against the direct scalar formula.
         const int probes = 96;
         const int stride = std::max(1, nc * nc / probes);
         double worst = 0.0, scale_ref = 1e-300;
@@ -1208,10 +1153,7 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
         c.topo = cands[i].topo.matrix();
         nrt.candidates.push_back(c);
     }
-    //Every structure that ties the leading weight, not just the first of them: ozone's two Lewis
-    //structures both come out at 32.96 % and which one is printed first is arbitrary - in NBO too,
-    //whose own leading pair is 25.03 % twice.  A single printed matrix invites a comparison that
-    //mistakes the tie-break for a disagreement.
+    //Retain every structure tied for leading weight.
     for (size_t r = 0; r < order.size(); r++) {
         if (w(order[r]) < w(order[0]) - 5.0e-4) break;
         NboTopo t;

@@ -11,11 +11,7 @@
 #include <filesystem>
 #include <sstream>
 
-//The basin analysis used to take its attractors from a cube: wherever a trajectory started on a
-//voxel ended nowhere, a maximum was declared there. That invents non-nuclear attractors out of
-//the sampling - epoxide at 0.05 A grew one of 0.027 e that no critical point of the analytic
-//density lies under - and it is the reason a finer grid used to produce more debris rather than
-//less. The streaming path asks the field instead, and these tests pin the question it asks.
+//Streaming attractors are maxima of the analytic field.
 namespace
 {
 	//Two spherical bumps a fixed distance apart: maxima at the centres, one saddle exactly
@@ -108,10 +104,7 @@ TEST(StreamingBasins, HydroxideHasExactlyTwoAttractors)
 	}
 }
 
-//The local virial theorem is pointwise: it holds at every point of every density however that
-//density is evaluated, so it costs nothing and catches what nothing else looks at. V used to be
-//computed as K - G, which is L - the right magnitude at a bond critical point and the wrong
-//sign - and it was printed that way in every critical-point block of every job.
+//The local virial identity fixes the sign of potential energy density.
 TEST(StreamingBasins, CriticalPointEnergyDensitiesObeyTheLocalVirialTheorem)
 {
 	const std::filesystem::path wfn = nos_test_repo_root() / "tests" / "cytidine_tonto" / "OH.wfn";
@@ -137,10 +130,7 @@ TEST(StreamingBasins, CriticalPointEnergyDensitiesObeyTheLocalVirialTheorem)
 	EXPECT_GT(checked, 0) << "no critical point carried energy densities, so nothing was checked";
 }
 
-//The debris case, asked directly. At 0.05 A the cube path grew a non-nuclear attractor at this
-//position on epoxide, 0.027 e over 2.0 bohr^3, while the critical-point search at the same
-//resolution found seven attractors and all seven were nuclei. Handed the same position as a
-//candidate, the criterion has to throw it out and keep every nucleus.
+//Reject the spurious epoxide maximum from the coarse cube.
 TEST(StreamingBasins, EpoxideGridDebrisIsNotAnAttractor)
 {
 	const std::filesystem::path gbw = nos_test_repo_root() / "tests" / "epoxide_gbw" / "epoxide.gbw";
@@ -202,14 +192,7 @@ TEST(StreamingBasins, HydroxideStreamsToTheRightElectronCount)
 	}
 }
 
-//The partition has to be exact even where the rule is not. Whatever the quadrature's own error
-//on the total, the basins only decide who gets each cell's weight, so sum(populations) + outside
-//is the plain weighted sum over the grid and cannot depend on how many basins there are. Putting
-//a spurious attractor at the bond midpoint is the hardest version of that: it carves a third
-//basin out of the middle of the molecule, so most cells near the bond become straddling cells and
-//go through the bisection. If a split cell ever handed out more than its own weight - both sides
-//rounded up, a boundary counted by the climb and again by the split - this total would rise with
-//the extra basin. It must not move at all.
+//Basin populations plus outside density equal the unpartitioned quadrature sum.
 TEST(StreamingBasins, BasinPartitionConservesTheQuadratureWeight)
 {
 	const std::filesystem::path wfn = nos_test_repo_root() / "tests" / "cytidine_tonto" / "OH.wfn";
@@ -239,16 +222,7 @@ TEST(StreamingBasins, BasinPartitionConservesTheQuadratureWeight)
 		<< "adding a basin changed the integrated total by " << three - two << " electrons, so a cell's weight is not being conserved across the split";
 }
 
-//A maximum on the rim of the analysed region is a property of the crop, not of the field. The ELI-D
-//pass crops at rho < 1e-4 and then looks for maxima of ELI-D, which RISES outward through a diffuse
-//tail, so the last voxel the crop leaves valid has no higher valid neighbour and used to be
-//registered as an attractor. NH3Li reported 62, 53 and 23 ELI-D basins for box paddings of 2.00,
-//2.05 and 2.10 A, and 62, 105 and 208 as the spacing went 0.1 -> 0.05 A; a count that moves with the
-//grid is not a property of the molecule, and the persistence merge cannot remove these because their
-//outward saddle is the crop, so their persistence is ~1. The field below is that shape in closed
-//form - one real maximum of 10 at the origin and a ramp rising outward to a crop surface that lies
-//inside the box, so the rim here is the crop and not the box face. The ASSERT_GT counts the trap on
-//the fixture itself, so the test cannot go vacuous if the field ever stops being rim-prone.
+//The density-crop rim is not an ELI-D attractor.
 TEST(StreamingBasins, MaximaOnTheCropSurfaceAreNotBasins)
 {
 	const int n = 41;

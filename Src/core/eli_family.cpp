@@ -3,10 +3,7 @@
 #include "constants.h"
 #include "citations.h"
 
-//The spin-resolved evaluator.  Structurally WFN::computeELIELF (wfn_density.cpp), i.e. the same
-//4-component primitive loop (value + three Cartesian derivatives), but the MO accumulation is split
-//into the alpha and beta channels instead of being spin-summed.  Free function on the public WFN
-//accessors, so nothing in wfn_class.h / wfn_density.cpp has to change.
+//Evaluate spin-resolved ELI fields from the same density ingredients as WFN::computeELIELF.
 namespace eli_family
 {
 	void spin_fields(const WFN& wave, const d3& p, SpinFields& f)
@@ -151,18 +148,7 @@ namespace eli_family
 		}
 		const bool spin_polarised = has_beta_set && std::abs(Na - Nb) > 1e-8;
 
-		//A spin channel that holds no electrons is not a member of anything. tests/ptb_H_file/H.gbw is
-		//one electron in the alpha channel: it has a beta MO set and |Na - Nb| = 1, so it is
-		//spin-polarised by any test, and the list used to advertise ELI-D(bb) and ELI-q(bb) over an
-		//empty channel plus ELI-D(triplet) with rho^(t) = 0 and the singlet ELI-q with zeta = 1. All
-		//four are identically zero at every point in space - eli_d() and eli_q() return 0 for rho = 0,
-		//triplet_density_factor() returns 0 for N <= 1, and 1 - zeta^2 is 0 for a fully polarised
-		//density - so -eli_family printed six members and would dump four columns of zeros under their
-		//headers. A caller reading that list cannot tell an empty channel from a computed field.
-		//
-		//The triplet member needs a same-spin pair and therefore two electrons, which is the bound
-		//triplet_density_factor() already applies to its own prefactor: a member whose prefactor is
-		//exactly zero is not computable, it is absent.
+		//An empty spin channel has no ELI-D basins.
 		const bool has_alpha_electrons = Na > 1e-8;
 		const bool has_beta_electrons = Nb > 1e-8;
 		const bool has_a_pair = Na + Nb > 1.0 + 1e-8;

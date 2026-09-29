@@ -931,16 +931,7 @@ std::vector<critical_point> analyze_cube_critical_points(
 	return points;
 }
 
-//Basins of a gridded field by near-grid steepest ascent (Tang, Sanville, Henkelman, J. Phys.:
-//Condens. Matter 21, 084204 (2009)): every step goes to the neighbour nearest the true
-//gradient direction and the rounding error is carried along, so a trajectory follows the field
-//instead of the lattice. Edge points are reassigned in a second pass. Maxima the grid creates
-//out of noise are then merged into the basin behind their highest saddle when their
-//persistence, the height above that saddle, is below merge_persistence of the maximum.
-//Seeds are maxima known beforehand - the nuclei of a density - which own their voxel from
-//the start and are never merged: a hydroxyl hydrogen's basin is two voxels across at 0.1 A
-//and has no grid maximum of its own. With field_wfn the ascent takes the analytic density
-//gradient instead of grid differences, which is what lets it climb into such a basin.
+//Assign gridded basins by near-grid steepest ascent.
 std::pair<cubei, std::vector<d4>> topological_cube_analysis(const cube *cub, const std::vector<atom> &atoms, bool debug, bool bcp, double value_floor, double grad_epsilon, double assignment_radius, double merge_persistence, const std::vector<d3> *seeds, const WFN *field_wfn, const std::function<double(const d3&)> *core_density, const std::function<void(const d3&, d3&)> *core_gradient, const density_field *field)
 {
 	auto field_dens = [&](const d3 &p) { return (field ? field->rho(p) : field_wfn->compute_dens(p)) + (core_density ? (*core_density)(p) : 0.0); };
@@ -976,29 +967,10 @@ std::pair<cubei, std::vector<d4>> topological_cube_analysis(const cube *cub, con
 				valid[i] = in ? 1 : 0;
 			}
 	auto ok = [&](int x, int y, int z) { return x >= 0 && y >= 0 && z >= 0 && x < nx && y < ny && z < nz && valid[lin(x, y, z)]; };
-	//How much of the near-grid partition below was decided by the loop order rather than by the field?
-	//steepest() takes the steepest of the 26 neighbours with a strict >, so when two are exactly equally
-	//steep the one the (ix,iy,iz) loops reach first wins - always the smaller index, i.e. -x before +x.
-	//That order is a property of the array, not of the molecule, so symmetry-equivalent basins are not
-	//treated equivalently: octahedral UH6 with its six hydrogens on the cartesian axes and the grid
-	//centred on the uranium - so the grid itself carries the symmetry - comes out with six ELI-D
-	//hydrogen basins whose voxel volumes differ by 37 % and whose electron counts differ by 3 %, while
-	//the QTAIM basins of the same run, which take the analytic-gradient path instead, hold the same
-	//orbit to every printed digit. The spread does not fall when the spacing goes 0.20 -> 0.08 A
-	//(1.37 -> 1.34 % in electrons), so it is not discretisation error that a finer grid would remove.
-	//A tied step is genuinely ambiguous - no single winner can be symmetric - so the count is printed
-	//rather than hidden: it is the honest error bar on every near-grid basin this routine reports.
+	//Measure sensitivity to the order of voxel updates.
 	long long steep_calls = 0, steep_tied = 0, tied_paths = 0;
 	bool path_tied = false;
-	//The other way a step can be arbitrary, and the one that turns out to matter here. The stepper below
-	//rounds each gradient component's share f = s[d]/max|s| to a whole voxel step with lround(), so a
-	//component sitting at f = 0.5 is one rounding away from stepping and one from not. The field on the
-	//grid is symmetric only as far as its own arithmetic is: values at mirror-image points agree to
-	//within the last bit, not exactly, because a grid coordinate is origin + i*h and the mirror of that
-	//is not the same sum. A decision within that distance of 0.5 therefore resolves one way on one side
-	//of the molecule and the other way on the other, which is how a 1e-16 asymmetry becomes a 37 %
-	//difference in basin volume. min_margin says how close the closest call was; a run whose margin
-	//never drops near the field's own noise would REFUTE this explanation.
+	//Measure sensitivity to the ascent step.
 	long long marginal_1e9 = 0, marginal_1e5 = 0, step_decisions = 0;
 	double min_margin = 1.0;
 	//And the one that decides where the attractors land: grad_epsilon is ABSOLUTE, so on a field whose
@@ -1024,14 +996,7 @@ std::pair<cubei, std::vector<d4>> topological_cube_analysis(const cube *cub, con
 				}
 		steep_calls++;
 		if (n_best > 1) { steep_tied++; path_tied = true; }
-		//A third way for a step to be arbitrary, and on UH6 the one that decides where the attractors
-		//land. grad_epsilon is an absolute number (1e-10) on a field whose values here are around 11, so
-		//the top of a hydrogen's ELI-D basin - a shell where ELI-D varies in the eleventh digit - counts
-		//as flat and the walk stops at whichever voxel of it the path entered. Which voxel that is
-		//depends on where the path came from, so the six symmetry-equivalent hydrogens get attractors at
-		//six DIFFERENT transverse offsets: H3 at (+0.139, +4.043, +0.139) against H4 at (+0.139, -4.043,
-		//-0.139), which is not the mirror image the group requires. The nearest-attractor quadrature then
-		//inherits that, which is why its volumes spread 32 % while its maxima all read 11.2258.
+		//Measure sensitivity to the grid spacing.
 		if (best > 0.0 && best <= grad_epsilon) {
 			flat_stops++;
 			if (best > max_flat_best) max_flat_best = best;
@@ -1253,14 +1218,7 @@ std::pair<cubei, std::vector<d4>> topological_cube_analysis(const cube *cub, con
 	}
 	else {
 		std::cout << "Assigning basins by near-grid ascent..." << std::endl;
-		//A path stops at the first already-assigned voxel and adopts its basin, which is only exact if
-		//the answer at that voxel is the answer this path would have reached. It is not: the stepper
-		//above carries a rounding residual dr from the voxels it has already crossed, so where a path
-		//goes on from a voxel depends on how it arrived there. The partition is therefore decided partly
-		//by which path reaches a voxel FIRST, i.e. by the order of the three loops below - and that order
-		//is not one of the molecule's symmetry operations. Reversing it changes nothing if this
-		//explanation is wrong, which is what the environment variable is for; it is a diagnostic, never a
-		//mode anyone should run, and the default is the historical order.
+		//An assigned voxel terminates ascent only after its basin is settled.
 		const bool reverse_scan = std::getenv("NOS_BASIN_SCAN_REVERSE") != nullptr;
 		if (reverse_scan) std::cout << "NOS_BASIN_SCAN_REVERSE is set: scanning seed voxels in the opposite order (diagnostic)" << std::endl;
 		for (int xr = 0; xr < nx; xr++)
@@ -1310,19 +1268,7 @@ std::pair<cubei, std::vector<d4>> topological_cube_analysis(const cube *cub, con
 	}
 	int nb = static_cast<int>(Maxima.size());
 	std::cout << "I found " << nb << " Basins." << std::endl;
-	//A maximum on the rim of the analysed region is not a maximum of the field. The crop - rho < 1e-4
-	//for ELI-D, the assignment radius for a cube density - marks the outward neighbours invalid, so
-	//the one-sided difference at the last valid voxel has nowhere higher to go and ascend() registers
-	//it as an attractor. How many of those there are is set by the crop surface measured in voxels
-	//rather than by the molecule: NH3Li reported 62, 53 and 23 ELI-D basins for box paddings of 2.00,
-	//2.05 and 2.10 A at one spacing, and 62, 105 and 208 as the spacing went 0.1 -> 0.05 A, nearly all
-	//of them slivers of Li's diffuse valence rim; water beside a helium 13 bohr away reported 219, all
-	//but four of them on the helium's rim with ELI-D values near 19000. The persistence merge cannot
-	//reach them - their outward saddle is the crop, so their persistence is ~1, the opposite of noise -
-	//so they are marked here and dropped after that merge - see there for what becomes of their
-	//density and for the two treatments measured and rejected first. A real ELI-D attractor sits where
-	//the density is that of a bond or a lone pair and is nowhere near the 1e-4 crop, which is what
-	//keeps this from eating the H valence basins of UH6 and NH3Li.
+	//Exclude maxima on the density-crop rim.
 	std::vector<char> rim(nb + 1, 0);
 	int n_rim = 0;
 	for (int b = 1; b <= nb; b++) {
@@ -1384,16 +1330,7 @@ std::pair<cubei, std::vector<d4>> topological_cube_analysis(const cube *cub, con
 			if (debug) std::cout << "Merging basin " << worst << " into " << into << " (persistence " << worst_rel << ")\n";
 			target[worst] = into;
 		}
-		//The rim last, and reported as unresolved rather than handed to a neighbour. Both of the
-		//other treatments were measured on NH3Li and water first: giving each sliver to the basin
-		//across its highest saddle moved up to 0.4 e of diffuse tail into whichever hydrogen won the
-		//saddle (2.0414/2.0696/1.9939 e for three hydrogens that differ by 5e-6 in their geometry,
-		//against 1.9329/1.9249/1.9215 with the slivers left alone, and 2.3749 e in 331 bohr^3 for one
-		//of them at another padding), and doing that before the persistence merge lifted the saddles
-		//enough to collapse the molecule into two basins. The slivers are the part of the field the
-		//crop did not resolve - here the diffuse Li valence shell, and for a helium 13 bohr from the
-		//water the whole of its outer region - so they go where unresolved density already goes, into
-		//"outside every basin", and the resolved basins keep the numbers they had
+		//Report unresolved rim voxels outside the basins.
 		int rim_dropped = 0;
 		for (int b = 1; b <= nb; b++)
 			if (rim[b] && root(b) == b) { target[b] = 0; rim_dropped++; }
@@ -1418,16 +1355,7 @@ double core_shell_radius(const int Z)
 {
 	if (Z <= 2) return 0.0;
 	if (Z <= 10) return 0.25;
-	//Na-Ar was 0.55, which is inside the L shell at the electropositive end of the row: sodium's
-	//L-shell ELI-D maximum sits 0.740 bohr from the nucleus and aluminium's 0.582, so 7.1018 and
-	//6.9564 electrons stayed outside a core the shell structure says holds 10, and Na2, NaCl, AlCl3
-	//and AlF3 reported cores of 2.91 to 3.20 e - the worst core deviations in the corpus, and too
-	//SMALL where every other offender is too large. Both ends of the gap were measured over the 1006
-	//scoreable cores of the 211-molecule set (shellgap.py), not on the cases that motivated it: the
-	//furthest maximum that MUST fold in is that 0.740, the nearest that must NOT is 1.472 (ClF3's
-	//chlorine, 0.25 e), so the gap is 0.732 bohr wide and 1.0 sits inside it with 0.26 below and 0.47
-	//above. Li-Ne needs no change: no period-2 atom in the corpus has an unfolded shell at all and
-	//its nearest non-core maximum is 0.918 bohr out.
+	//Use element-dependent core radii for basin grouping.
 	if (Z <= 36) return 1.0;
 	if (Z <= 54) return 1.4;
 	return 1.8;
@@ -1491,25 +1419,7 @@ int unify_core_basins(cubei &basin_cube, std::vector<d4> &maxima, const std::vec
 	return collapse_maxima_groups(basin_cube, maxima, keeper, basin_map);
 }
 
-//A spherically symmetric ELI-D shell sampled on a cubic grid is handed out one basin per voxel on the
-//sphere. Co2, a two-atom molecule, kept 845 basins that way: 824 under 0.01 e holding 0.6461 e in
-//27237 bohr^3, and the survivors in exactly degenerate families at one radius from one atom. It is the
-//same shape of defect unify_core_basins removes for the spheres of maxima an ECP leaves behind, but
-//that one only looks inside core_shell_radius(Z) and this shell sits at 5.35 bohr. It gets WORSE on
-//refinement, not better: NH3Li goes 10 / 11 / 25 basins at 0.1 / 0.05 / 0.025 A.
-//
-//The persistence merge cannot separate the shell from real chemistry. Measured over 5e-3 .. 2e-1 (job
-//592171): the smallest threshold that dents Co2 at all - 3e-2, 845 -> 687 - already costs OH one of
-//its two REAL oxygen lone pairs, and 2e-1, the first that collapses Co2 to 4 basins, leaves OH with
-//two basins and no lone pairs at all. Relative height above a grid saddle cannot do it, because the
-//saddles inside a flat shell are as deep as the one between two genuine lone pairs.
-//
-//A length can. Co2's neighbouring shell maxima are 0.38 bohr apart; ZP2's duplicated F1 lone pair,
-//two basins holding 1.4276 and 1.2907 e where one lone pair holds ~2.7, is 0.84 bohr; OH's two real
-//lone pairs are 1.89 bohr apart and every pair of distinct chemical maxima in ZP2 is over 2.2. So
-//group by single linkage over pairs that are both close and near-degenerate in value, and nothing
-//else - no persistence, no atom lookup, no field evaluation.
-//O(n^2) over the maxima: 885 of them is 391k distance tests, once, against a basin integration.
+//Merge grid-fragmented ELI-D shells by persistence.
 int unify_shell_basins(cubei &basin_cube, std::vector<d4> &maxima, ivec *basin_map, double max_dist, double rel_tol)
 {
 	const int nb = static_cast<int>(maxima.size());
@@ -1593,14 +1503,7 @@ bool converge_to_maximum(const scalar_field &field, d3 &p, const double step_lim
 	return false;
 }
 
-//Nuclei are attractors of the density by the cusp and need no test. Everything else has to
-//earn it: the critical-point search must have converged there and called it an attractor, and
-//the point must still be a maximum when it is re-converged on the analytic field from a
-//perturbed start, so that a candidate resting on a shoulder falls out. The perturbation is a third
-//of the distance to the nearest other critical point, capped at a tenth of a bohr, because that
-//distance is where the basin ends and a shallow attractor's is narrower than any fixed length.
-//Candidates come from the seed cube AND from a scan of rho along each bonded internuclear line, so
-//that discovery does not inherit the cube's resolution the way the integration no longer does.
+//Accept non-nuclear attractors only when the analytic field confirms a maximum.
 std::vector<d4> streaming_density_attractors(const WFN &wavy, const std::vector<critical_point> &critical_points, const std::function<double(const d3&)> *core_density, const std::function<void(const d3&, d3&)> *core_gradient, const bool debug)
 {
 	auto rho = [&](const d3 &p) { return wavy.compute_dens(p) + (core_density ? (*core_density)(p) : 0.0); };
@@ -1622,16 +1525,7 @@ std::vector<d4> streaming_density_attractors(const WFN &wavy, const std::vector<
 	constexpr double nuclear_radius = 0.5;   //a critical point this close to a nucleus is that nucleus
 	constexpr double duplicate_radius2 = 0.01;
 
-	//How far a candidate may be displaced and still be inside its own basin of attraction: less than
-	//the distance to the nearest other critical point of the field, because that is where the basin
-	//ends. It used to be a flat tenth of a bohr, and AIMAll's CCH is what that cost. Its non-nuclear
-	//attractor NNA4 carries 0.39257 e and is flanked by two saddles 0.0687 and 0.1225 bohr away - the
-	//density along the C-C axis rises from 0.425864 to 0.425895 and falls again, a barrier of
-	//3.1e-5 e/bohr^3 with an axial curvature of -0.0249 against -0.633 across. A 0.1 bohr displacement
-	//along that axis therefore lands past the saddle in the next basin, the Newton iteration from
-	//there reaches no maximum, and the candidate was rejected - at every cube resolution, because the
-	//displacement never depended on the resolution. A third of the distance to the nearest
-	//neighbouring critical point leaves the Newton step room to overshoot and still cannot leave.
+	//Keep perturbations inside the candidate attractor basin.
 	auto perturbation_for = [&](const d3 &at, const double cap) {
 		double nearest2 = std::numeric_limits<double>::max();
 		auto note = [&](const d3 &q) {
@@ -1643,11 +1537,7 @@ std::vector<d4> streaming_density_attractors(const WFN &wavy, const std::vector<
 		for (const critical_point &o : critical_points)
 			if (o.converged) note(o.position);
 		for (const d4 &m : maxima) note(d3{ m[0], m[1], m[2] });
-		//The cap defaults to the old displacement, so nothing with room around it changes; the floor
-		//keeps a crowded neighbourhood from asking for a displacement the Newton tolerance cannot
-		//resolve. A caller that knows a tighter bound - the bond line does, from its own profile -
-		//passes it, because otherwise the bound comes from whatever critical points the cube found
-		//nearby, which is the resolution dependence being removed one level further in.
+		//Limit the displacement used to test a candidate maximum.
 		return std::min(cap, std::max(0.01, std::sqrt(nearest2) / 3.0));
 	};
 
@@ -1672,10 +1562,7 @@ std::vector<d4> streaming_density_attractors(const WFN &wavy, const std::vector<
 				if (fail_dist < back) continue;
 				fail_t = t; why = "it came back somewhere else";
 			}
-			//Which start failed and how far it went, because the two failures mean opposite things: the
-			//point itself failing says there is no maximum there, while a perturbed start running away
-			//says only that the displacement is further than this maximum's basin of attraction reaches
-			//along that axis - which a shallow one, an NNA inside a triple bond, genuinely is.
+			//Record whether a candidate failed to converge or reached another maximum.
 			if (debug) std::cout << "Dropped a non-nuclear attractor candidate that is not a maximum of the analytic field at "
 				<< candidate[0] << " " << candidate[1] << " " << candidate[2]
 				<< " (start " << fail_t << ": " << why << ", " << fail_dist
@@ -1699,14 +1586,7 @@ std::vector<d4> streaming_density_attractors(const WFN &wavy, const std::vector<
 		if (accept(cp.position, converged)) keep(converged, "the seed cube");
 	}
 
-	//Candidates of the search's own, because everything above came from the seed cube and a streaming
-	//integration that still discovers its attractors at the cube's resolution is only half free of it.
-	//CCH is the case: its NNA is nominated from a 0.025 A cube and never from a 0.05 A one, so the
-	//0.39 e it carries was missing at the resolution the gate actually runs. A non-nuclear attractor
-	//on a bond sits on the bond path, so walk the internuclear line and take every interior local
-	//maximum of rho. A normal bond has none - rho falls from one nucleus to the bond critical point
-	//and rises to the other - so this nominates nothing at all except where there is something to
-	//find, and accept() above is what decides whether it is real.
+	//Sample bond lines for maxima absent from the seed cube.
 	const double line_step = 0.02;   //bohr. CCH's bump is 3.1e-5 e/bohr^3 over 0.19 bohr with an axial
 	//curvature of -0.0249, so a step this size falls 5e-6 across it - six times finer than the bump it
 	//has to resolve. It is an absolute length on purpose: a fraction of the bond would make the
@@ -1748,12 +1628,7 @@ std::vector<d4> streaming_density_attractors(const WFN &wavy, const std::vector<
 static bool g_beta_spheres = true;
 void beta_spheres_set_enabled(const bool on) { g_beta_spheres = on; }
 bool beta_spheres_enabled() { return g_beta_spheres; }
-//The four numbers the angle-adaptive step is made of, all four measured rather than chosen: a knob
-//matrix run against AdaptiveStep.* (which integrates both ways and compares basin by basin) put
-//every looser combination outside 1e-3 electrons on NH3Li. The reach fraction is the one that
-//decides it - the turn test sees curvature, and a separatrix crossed sideways through a straight
-//stretch of field is not curvature, so only the distance to the nearest attractor can bound it -
-//but the cosine has to be tight as well, because curvature is the other way to lose the sheet.
+//The adaptive step uses field turning to grow on straight trajectories.
 static constexpr double adp_cap_default = 8.0;    //at most this many times the validated floor step
 static constexpr double adp_grow_default = 0.99999;   //midpoint cosine that earns a doubling
 static constexpr double adp_keep_default = 0.999;   //below this the step is thrown away and retaken at the floor
@@ -1762,15 +1637,7 @@ static double g_adp_cap = adp_cap_default;
 static double g_adp_grow = adp_grow_default;
 static double g_adp_keep = adp_keep_default;
 static double g_adp_reach = adp_reach_default;
-//Those four were measured against a walk that was throwing a third of its floor steps away (see the
-//blame fix in climb below), so re-finding the optimum is a sweep rather than a diff - which is only
-//possible if the numbers can be moved from outside the binary, and only honest if every run says
-//which ones it used. Eight jobs of exactly that sweep once came back byte-identical, counters and
-//all, because nothing in the binary was reading the variables they set. Overriding is for the sweep,
-//not for production: the defaults are the values the equivalence test validates.
-//One positive finite double from the environment, or the default. upper, when positive, is the
-//largest value that still means anything: a beta-sphere margin above 1 is not a looser setting, it
-//is a sphere wider than the radius that was measured to hold.
+//Measure adaptive-step settings against basin populations.
 static double env_double(const char *name, const double fallback, const double upper = 0.0)
 {
 	const char *v = std::getenv(name); // Flawfinder: ignore - parsed as one positive double
@@ -1795,36 +1662,16 @@ static void adp_knobs_from_env()
 	g_adp_keep = env_double("NOS_ADP_KEEP", adp_keep_default);
 	g_adp_reach = env_double("NOS_ADP_REACH", adp_reach_default);
 }
-//The fraction of the smallest radius the 302 directions found that the beta sphere is actually kept
-//at. A sphere ends a trajectory the moment it enters, which is why a third of the quadrature points
-//never take a step at all, so this one number prices accuracy against the dominant stage - and
-//inside the sphere it is not an approximation: the point is assigned to the maximum the walk would
-//have reached anyway, so a sphere that lies within its basin is exact.
-//
-//It was 0.7. Swept over five molecules (sucrose 45 atoms, ZP2, UH6, NH3Li with its non-nuclear ELI-D
-//maxima, HgH2 with an ECP), every basin comes back identical to the printed 1e-4 e at 0.8, 0.85, 0.9
-//and 0.95, while the QTAIM walk gets 10-17 % shorter. At 1.0 - the sphere drawn at exactly the radius
-//the march measured - it breaks: UH6's U0 moves 1.6e-3 e with 6 of 7 basins over the 3e-4 e noise
-//floor, and ZP2's N5 by 2.0e-4. So the margin is the hedge against the angular sampling, not against
-//the radial march, and 0.9 is the largest value shown to hold. Read from the environment for the
-//sweep, and printed by -basin_timing so no run's populations can be read without it.
+//Keep beta spheres within the smallest sampled safe radius.
 static constexpr double beta_margin_default = 0.9;
 double basin_beta_margin() { return env_double("NOS_BETA_MARGIN", beta_margin_default, 1.0); }
 void basin_adaptive_step_knobs(double &cap, double &grow, double &keep, double &reach)
 {
 	cap = g_adp_cap; grow = g_adp_grow; keep = g_adp_keep; reach = g_adp_reach;
 }
-//Off by default, and the reason is a measurement rather than caution: at the settings above the
-//grown step costs at most 8e-4 electrons per basin against the floor-step integration, and on NH3Li
-//it puts 8e-4 electrons outside every basin that the floor step accounts for. That is inside the
-//tolerance the equivalence test asserts and it is still a changed number, so it is -adaptive_step.
+//Keep adaptive step growth optional.
 static bool g_adaptive_step = false;
-//What the grown step actually spends. A proposal that fails - the field turned too far, or the
-//value stopped rising - costs the midpoint gradient it was tested with and then retakes the step
-//at the floor, so a walk whose proposals mostly fail pays for the whole machinery and keeps none
-//of it. That is the suspected reason ELI-D gains 5-7 % where QTAIM gains 29-47 %, and UH6's ELI-D
-//loses 15 %. Counted only under -adaptive_step and printed under -basin_timing; relaxed because
-//the ratio is the answer, not the last digit.
+//Count rejected adaptive-step proposals separately.
 static std::atomic<long long> g_adp_steps{ 0 }, g_adp_tries{ 0 }, g_adp_turn{ 0 }, g_adp_fall{ 0 }, g_adp_shrink{ 0 };
 //Trajectories that ran their step budget out. Counted separately from the stalls because they are
 //the opposite failure - a walk that never gave up rather than one that gave up too early - and
@@ -1834,32 +1681,16 @@ static std::atomic<long long> g_adp_exhaust{ 0 };
 //had a hard floor; the shrink took that floor away, so whether it is still enough is a measurement,
 //and NOS_BASIN_STEP_CAP is how that measurement gets taken without a rebuild per value.
 static int g_step_cap = 2000;
-//How fast a shrunken step is allowed back toward its floor. The halving is exactly /2, so a halve-then-
-//grow round trip multiplies the step by relax/2 and only contracts below 2.0: at 2.0 it is the identity
-//and a ridge becomes a limit cycle - halve, rise, double, overshoot, halve - and above 2.0 the min(1.0,)
-//clamp makes it the identity again, which is why 2.0, 2.5, 3.0 and 4.0 all cost the same 24-27 s on the
-//Co2 fixture where 1.2 to 1.75 cost 1-2 s. Not 1.0 either: a step that never recovers bottoms out at
-//1/16 of the floor and the first failure there has nowhere left to go, so 1.0 leaves 4224 trajectories
-//stalled on a slope and 1.1 leaves 48. 1.5 contracts by 0.75 with margin from the cliff at 1.9, and on
-//CCH at 0.05 A it takes the non-nuclear attractor from 0.5605 to 0.4430 e against AIMAll's 0.39257 while
-//the point loop drops from 4.54 to 1.20 s. NOS_BASIN_STEP_RELAX reproduces any of it without a rebuild.
+//Recover from a shortened step by doubling toward the base step.
 static double g_step_relax = 1.5;
 //Whether a floor step that fails to rise may halve and try again. On by default - it is the fix, and
 //3716 of CCH's 3716 stalls were this - and NOS_BASIN_SHRINK=0 turns it off, which is how the test that
 //asserts the stall count is zero gets to show the count it is asserting against.
 static bool g_step_shrink = true;
-//Where trajectories give up, which for the density field is the only thing that can put electrons
-//outside every basin - and 0.65 e of Si2H6 sat outside for a year for want of this number. Counted
-//always: a stall costs a density evaluation, so three relaxed adds are free, and the one figure that
-//matters is the largest density at a stall further from every attractor than a bohr. Below the
-//floor that is the vacuum tail and means nothing; two orders above it, it is a bond critical point.
+//Account separately for density that never reaches a basin.
 static std::atomic<long long> g_stall_vacuum{ 0 }, g_stall_field{ 0 }, g_stall_far{ 0 };
 static std::atomic<double> g_stall_far_rho{ 0.0 };
-//Buckets rather than a mean, because the question is not how big the gradient is on average but
-//whether a stall is at a critical point at all: 1e-6 is one, 1e-2 is a walk that gave up on a slope.
-//And the basin each stall was handed to, which is what says whether the tie-break is the thing that
-//over-claims. Eight slots and a bin for the rest - a molecule with more basins than that has no
-//single culprit to find this way.
+//Bucket stalled gradients to distinguish tail and interior failures.
 static constexpr int g_stall_basins = 8;
 static std::atomic<long long> g_stall_gn[4] = {};
 //The >=1e-2 bucket again, but cleared when an integration starts instead of when it prints, so it
@@ -1867,16 +1698,7 @@ static std::atomic<long long> g_stall_gn[4] = {};
 //hands to the test; the rest of these are read once by the log line and reset in the same breath.
 static std::atomic<long long> g_stall_slope{ 0 };
 static std::atomic<long long> g_stall_to[g_stall_basins + 1] = {};
-//dist < 0 means the stall was below the density floor. Called once per stall.
-//Where trajectories gave up, since the last reset. vacuum: below the density floor, where there is
-//nothing to belong to. in_field: on a critical point of the field, which is a real place and has to
-//be given to somebody. beyond_a_bohr: of those, the ones no attractor is within a bohr of - exactly
-//the set a one-bohr reach used to drop, which is how the 117-molecule AIMAll gate came to find Si2H6
-//0.65 e short. worst_rho is the densest of them and says which kind of stall it was: 1e-6 e/bohr^3 is
-//a vacuum tail, 1e-1 a bond critical point. File-local on purpose - the only consumer is the line
-//-basin_timing prints, and a reader of that line wants the reasoning here rather than in the header.
-//gn < 0 means the caller had no gradient to hand over; basin is filled in afterwards by
-//basin_stall_gave_to, since the recorder runs before the tie-break has answered.
+//A negative distance marks a stall below the density cutoff.
 static void basin_stall_seen(const double dist, const double rho, const double gn = -1.0)
 {
 	if (dist < 0.0) { g_stall_vacuum.fetch_add(1, std::memory_order_relaxed); return; }
@@ -1939,11 +1761,7 @@ void basin_stage_timer::lap(const std::string &what) {
 	if (g_basin_timing) std::cout << "  [timing] " << what << ": " << std::fixed << std::setprecision(2) << s << " s" << std::endl;
 }
 
-//Populations of the basins integrated on the molecule's atom-centred quadrature grids, which
-//carry the cusps a uniform cube cannot. A quadrature point takes the basin of its cube cell
-//when every voxel within three of it agrees; otherwise it is sent up the analytic field
-//until it comes within two voxels of a maximum, so the boundary is the field's and not the
-//grid's.
+//Integrate basin populations on atom-centred quadrature grids.
 vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, const std::vector<d4> &maxima, const WFN &wavy, const int accuracy, const bool eli_field, vec &volumes, double &outside, const std::function<double(const d3&)> *core_density, const std::function<void(const d3&, d3&)> *core_gradient, const int grid_boost, const density_field *field, basin_overlaps *ovl, const ivec *maximum_basin)
 {
 	//The filled core steers the trajectories only. An ECP atom's grid is built for its
@@ -2012,14 +1830,7 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 			d2 = std::min(d2, std::pow(p[0] - ap[0], 2) + std::pow(p[1] - ap[1], 2) + std::pow(p[2] - ap[2], 2));
 		}
 		if (d2 < 2.25) return sscale * 0.3 * voxel;
-		//Beyond six bohr of every nucleus the density is a smooth decaying tail with no basin
-		//boundary a step could miss, and the streaming path has to walk points out there all the
-		//way back in - the cube used to stop at its own edge and hand them to "outside". The step
-		//grows with the distance so that walk costs a handful of evaluations instead of a
-		//hundred, and shrinks again to the voxel before it reaches anything with structure.
-		//Streaming only: with a cube the long step jumps over its edge, and a point that leaves
-		//is lost to "outside" rather than slow - it cost NH3Li's ELI-D 0.02 e when it applied
-		//to both paths.
+		//The density cutoff bounds the tail outside the basins.
 		if (streaming && d2 > 36.0) return sscale * std::min(0.25 * std::sqrt(d2), 4.0);
 		return sscale * voxel;
 	};
@@ -2059,13 +1870,7 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 	//ELI-D maximum, which is broad; a nucleus gets a tenth of a bohr, since a hydroxyl
 	//hydrogen's basin is 0.4 bohr thick and a wider net catches the oxygen's electrons
 	const double catch2 = eli_field ? std::pow(2.0 * std::max({ h[0], h[1], h[2] }), 2) : 0.01;
-	//The beta sphere of each maximum, squared, and the centre it is drawn around; both filled
-	//below once the gradient is available and left at zero / the maximum itself wherever there is
-	//no sphere, which is exactly the old catch2 behaviour.
-	//The centre is separate because the maxima come out of the cube and sit at voxel centres, up
-	//to half a voxel from the attractor they stand for. The sphere is an acceleration structure,
-	//so it is drawn around the attractor the short ascent below actually finds; nothing that gets
-	//reported moves.
+	//Store each attractor centre and squared beta-sphere radius.
 	vec beta2(maxima.size(), 0.0);
 	std::vector<d3> bcen(maxima.size());
 	for (size_t m = 0; m < maxima.size(); m++) bcen[m] = d3{ maxima[m][0], maxima[m][1], maxima[m][2] };
@@ -2099,13 +1904,7 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 			d2 = std::min(d2, std::pow(p[0] - maxima[m][0], 2) + std::pow(p[1] - maxima[m][1], 2) + std::pow(p[2] - maxima[m][2], 2));
 		return g_adp_reach * std::sqrt(d2);
 	};
-	//With a value pointer the density rides along on the gradient's own orbital pass, which is
-	//what the climb wants: rho and grad at the same point used to be two passes over every
-	//primitive, and the analytic field is where the streaming basins spend their time.
-	//Do not reach for an occupied-MO bound here: properties.cpp calls delete_unoccupied_MOs()
-	//before any of this runs, so wavy holds occupied orbitals only and the loop length is already
-	//minimal. Measured, not assumed - a bound was built and its own diagnostic reported 53 of 53,
-	//91 of 91 and 49 of 49 MOs occupied on ZP2, sucrose and UH6.
+	//Evaluate density and gradient in the same orbital pass.
 	auto gradient = [&](const d3 &p, d3 &g, double *val = nullptr) {
 		if (!eli_field) {
 			if (field) { field->grad(p, g); if (val) *val = field->rho(p); }
@@ -2126,33 +1925,7 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 		gradient(p, g, &v);
 		return v;
 	};
-	//Beta spheres. Around an attractor there is a radius inside which no ascent trajectory can
-	//get out: if grad f . rhat < 0 at every point of the sphere then a path leaving it would have
-	//to cross outwards while the gradient it is following points inwards, which it cannot. Every
-	//point inside therefore belongs to the one maximum inside without being climbed at all, and a
-	//trajectory that enters is finished on the spot. That second part is where the time is:
-	//catch2 is a tenth of a bohr for the density and step_at shrinks the step to 0.3 voxel within
-	//1.5 bohr of a nucleus, so every trajectory otherwise walks the whole cusp in tens of steps of
-	//two gradient calls each - and there are three to nine trajectories per quadrature point.
-	//The radius is the smallest over a spiral of directions marched outwards until the radial
-	//derivative stops being negative, kept at beta_margin_default of it - 0.9, swept over five
-	//molecules at its definition. Capped at 0.45 of the distance to the nearest other maximum so
-	//two spheres can never meet and only one attractor is ever inside -
-	//a saddle between two maxima stops the march by itself, the radial derivative past it
-	//pointing at the other one.
-	//The direction count and the margin are not free parameters to be picked small. The first
-	//version sampled 26 directions and kept 90 %: on NH3Li the three chemically equivalent
-	//hydrogens came out 0.6358 / 0.6384 / 0.6542 e against 0.6358 / 0.6351 / 0.6355 with the
-	//spheres off, i.e. one sphere in three had poked through the N-H separatrix between two
-	//samples and eaten 0.019 e of nitrogen. 45 degrees between samples is far too coarse for a
-	//surface that comes within 0.4 bohr of a hydrogen, and 10 % of margin does not cover the
-	//difference between the smallest sampled radius and the smallest radius there is. 302
-	//directions put the samples ~7 degrees apart and cost 302 * cap / march gradient calls per
-	//maximum - some hundred thousand for a 45-atom molecule, against the 10^9 the quadrature
-	//itself spends, so there is no reason to be stingy.
-	//ponytail: still a sample, so still only exact at the sampled directions. -no_beta_spheres is
-	//the A/B that says whether it is tight enough, and BetaSpheres.AgreeWithTheFullClimbOnHydroxide
-	//is the check that it stays so.
+	//A beta sphere terminates trajectories that cannot leave its attractor basin.
 	basin_stage_timer T;
 	const std::string fieldname = eli_field ? "ELI-D " : "QTAIM ";
 	double margin = 0.0;
@@ -2228,17 +2001,7 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 		std::cout << "  [timing] " << fieldname << "beta spheres: margin " << margin << ", "
 			<< with << " of " << beta2.size() << " maxima carry one" << std::endl;
 	}
-	//Level 3 at least: a basin boundary cuts through the atomic shells and the population
-	//follows the angular resolution, 0.01 e at level 2, 0.005 at 3 and 0.002 at 4, which
-	//costs five times level 3. Those figures are covalent ones. AIMAll integrated the benchmark
-	//set independently and on its two most ionic molecules level 3 is thirty times worse: SiF4's
-	//silicon 0.1495 e out and CF4's carbon 0.1008 e, each ligand taking up a quarter of it so the
-	//total still conserves to 3e-4. Level 4 halves both (0.0769, 0.0471) and the sequence
-	//extrapolates onto AIMAll's value, so this is the grid converging and not a boundary defect -
-	//the beta spheres, the sphere margin and the adaptive step were each cleared by an arm that
-	//reproduced the gap to the printed digit, and -basin_grid 2 on top of level 4 bought 0.005 e
-	//for 2.3x the time. A strongly ionic centre wanted at 0.01 e needs level 4.
-	//QuadratureAccuracy.RefiningTheGridKeepsConverging is what keeps the sequence converging.
+	//Use at least level 3; strongly ionic centres can require level 4 for 0.01 e agreement.
 	GridConfiguration config;
 	config.accuracy = std::max(accuracy, 3);
 	config.alpha_max_scale = static_cast<double>(grid_boost) * grid_boost;
@@ -2252,46 +2015,11 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 	grids.setup3DGridsForMolecule(wavy, every_atom);
 	const GridData &gd = grids.getGridData();
 	T.lap(fieldname + "atomic quadrature grids");
-	//The density isosurface bounds both grid and streaming basins.
-	//Stopped climbing: for the density that is the sphere of maxima an ECP leaves around its
-	//nucleus, a bohr wide, and a trajectory that dies anywhere else is left outside where it can
-	//be seen - rho has a gradient everywhere, so there is no excuse for one. ELI-D does run out
-	//of slope, wherever g = rho tau - |grad rho|^2 / 4 goes to zero: one orbital carrying the
-	//density, which is the far tail of any molecule and all of a two-electron system. Out there
-	//the field does not exist to be followed and the nearest attractor, however far, is the only
-	//thing left to say who the point belongs to.
-	//ponytail: Euclidean nearest, not the separatrix it should be. It only ever decides points the
-	//field has gone flat on, whose weight is in the last digit of a basin; trace the separatrix if
-	//that ever stops being true
-	//"However far" needs the second half of that sentence: only where there is something to
-	//partition. ELI-D's g goes to zero throughout the vacuum tail, so every outermost quadrature
-	//point stalls, and a nearest-maximum with no reach turned the tail into a Voronoi carve-up of
-	//all space. The populations did not show it - rho is zero out there - but volume goes as r^3:
-	//HgH2's bond basin came out at 52433 bohr^3 against the cube's 286, and asymmetric on a
-	//symmetric molecule, while 0.0002 e of grid debris in NH3Li grew to 0.025 e. Where there is no
-	//density there is no basin to be in, and the point belongs outside where it is reported.
-	//"No excuse for one" was wrong, and the AIMAll gate is what found it. rho does have a gradient
-	//everywhere, but it vanishes at rho's own critical points, and a bond critical point between two
-	//like atoms is more than a bohr from both of them - so every trajectory that climbed a
-	//homonuclear separatrix into its BCP fell outside the one-bohr reach and was thrown away. Over
-	//117 benchmark molecules exactly ten lost anything at all and all ten have a homopolar
-	//heavy-heavy bond: Si2H6 0.6487 e (0.32 per silicon, the two still equal to 4 decimals), CCH
-	//0.1731, acetylene 0.0488, thiirane 0.0191, and the other 107 lost 0.0000. Four arms say it is
-	//structural and not the quadrature: the floor step reproduces it (0.6496), -no_beta_spheres to
-	//the digit, ELI-D - which already had no reach - loses nothing on either molecule, and -acc 4
-	//makes it *worse* (0.6881), a refined grid putting more points into the doomed region.
-	//So the reach is gone. Above the density floor a stall is at an interior critical point, where
-	//there is something to partition and the volume a basin can claim is bounded; below it there is
-	//nothing there, which is the vacuum case the floor was written for.
+	//The rho = 1e-4 isosurface bounds gridded and streaming basins.
 	const double stall_reach = 1e30;
 	//The trajectory and quadrature share the density isosurface.
 	const double stall_floor = basin_density_cutoff;
-	//start is where the trajectory began, r where it gave up. They differ for the case this exists
-	//for: at a saddle between two equivalent atoms the nearest attractor to r is a coin flip - it
-	//would hand Si2H6's whole 0.65 e to whichever silicon the floating-point comparison happened to
-	//favour and break a symmetric molecule - while start is on one definite side of the separatrix
-	//the walk was climbing. ELI-D keeps deciding on r, where its stalls are in a vacuum tail that
-	//has no side to be on and the populations it moves are zero either way.
+	//Resolve a stalled density trajectory from its starting side of the separatrix.
 	auto stalled = [&](const d3 &start, const d3 &r, const double gn = -1.0) {
 		const double rho = valence(r);
 		if (rho < stall_floor) { basin_stall_seen(-1.0, 0.0); return 0; }
@@ -2319,22 +2047,9 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 		lb++;
 		d3 r = p, g;
 		double last_value = -1.0;
-		//The step step_at hands out is the one the populations were validated at, and scaling it up
-		//everywhere is not free: at 1.5x ZP2's ELI-D moves 0.039 e and NH3Li puts 0.0219 e outside
-		//every basin. So it is a floor here, never a target, and a multiplier above it has to be
-		//earned step by step: the midpoint gradient the RK2 step already computed says how far the
-		//field turned over the step just taken, and only a field that turned less than a degree
-		//doubles the next one. Any doubt - a turn over two and a half degrees, or a value that
-		//stopped rising - drops straight back to the floor and redoes that step there. Where the
-		//field curves this is the old walk, evaluation for evaluation; the saving is the long
-		//straight run in from the tail and through the outer valence, which is where the steps are.
+		//Grow only steps whose field direction stays nearly straight.
 		double mult = 1.0;
-		//Below the floor rather than above it. The floor is the step the populations were validated
-		//at, so it is where the walk wants to be; but a floor step that lands lower than it started
-		//is simply too long for the curvature here, and giving up on it throws away a point whose
-		//uphill direction is perfectly well defined. A sixteenth of the floor is the limit: by then
-		//the displacement is under the Newton tolerance the maxima themselves were found to, and a
-		//walk that cannot rise over it has genuinely run out of field.
+		//Shorten a base step if it would decrease the field.
 		double shrink = 1.0;
 		//Was the step that reached r actually longer than the floor? mult is raised at the end of a
 		//step, so mult > 1 at the top of the next iteration says "the next step may be grown", not
@@ -2355,11 +2070,7 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 			if (!eli_field || streaming) {
 				here = value_and_gradient(r, g);
 				if (here <= last_value) {
-					//A grown step can cross a ridge the floor step would have followed round, so
-					//the step is blamed before the path is: at the floor there is nothing to blame.
-					//grown_last, not mult: a trajectory that stops rising one step after mult was
-					//raised got there on a floor step, and reverting that step is not a retry - it
-					//is the floor path's own stall, moved one step back and charged a gradient.
+					//Retry a grown step at the base length after excessive turning.
 					if (grown_last) { adp_count(g_adp_fall); r = r_prev; last_value = value_prev; mult = 1.0; grown_last = false; continue; }
 					mult = 1.0;
 					if (!eli_field && g_step_shrink && shrink > 0.0625) {
@@ -2385,22 +2096,11 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 				if (!eli_field) { const int n = stalled(p, r, gn); if (n) return n; }
 				break;
 			}
-			//The gradient at r, kept because the midpoint below has to be computed from it in the
-			//same expression order it always was: 0.5 * sl * g[k] / gn divides last, and the
-			//pre-divided direction does not. A midpoint one ulp away is not a rounding detail
-			//here - on NH3Li it moves 150 ELI-D trajectories to the other side of a separatrix
-			//and 3e-4 electrons with them, which is the noise floor of a basin population and
-			//nearly half of what the grown step itself costs. Doing it this way costs nothing:
-			//11.5 s of zp2's QTAIM point loop was measured for the pre-divided form and 23.4 s
-			//for this one, and then 23.4 s for the pre-divided form again once both were built
-			//the same way.
+			//Preserve the midpoint expression order used for validated basin populations.
 			const d3 g0{ g[0], g[1], g[2] };
 			const double gn0 = gn;
 			const d3 dir{ g0[0] / gn0, g0[1] / gn0, g0[2] / gn0 };
-			//Too much turning for the step that was taken: throw it away and retake it at the floor
-			//from the same point. It has to be retaken right here, not by restarting the iteration -
-			//that would meet the monotonicity test at a point whose value is already recorded in
-			//last_value, read "stopped rising", and end the trajectory in mid flight.
+			//Retry a step at the base length when its field direction turns too far.
 			const double base = floor_step * shrink;
 			double sl = base;
 			double cosine = 0.0;
@@ -2437,24 +2137,11 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 				if (settled && eli_field) break;
 			}
 		}
-		//A streaming trajectory that died, ran its 2000 steps out or lost its gradient has nowhere
-		//to report to: lookup's cell test begins with "if (streaming) return false", so b is 0 for
-		//every point once there is no cube, and returning it puts the point outside every basin
-		//rather than in a basin. ELI-D has always taken the tie-break here; the density fell through
-		//and was discarded, which is where ZP2's 0.0011 e and CCH's 0.0102 e of missing charge went
-		//once the shrink stopped those same trajectories from giving up early. The gridded density
-		//still has the cube's own answer in b, so it keeps it.
+		//Assign a stalled streaming trajectory by its starting point.
 		if (streaming) { adp_count(g_adp_exhaust); return stalled(p, r); }
 		return b;
 	};
-	//Local refinement. A quadrature cell is a shell segment, and the error the basin boundary
-	//costs is the part of the cell that lies on the wrong side of it. Rather than deciding that
-	//from the cell's centre alone, both radial edges are climbed as well: a cell whose two ends
-	//agree belongs whole to one basin and is done in three trajectories, and only a cell the
-	//boundary actually crosses pays for more. That one is bisected until the crossing radius is
-	//known to a sixty-fourth of the cell, which places the surface far better than sampling the
-	//cell at a fixed number of radii ever did and costs half as many trajectories where it used
-	//to fire - and it now fires wherever a boundary is, not only near a heavy core.
+	//Bisect a radial cell only when its edge trajectories reach different basins.
 	constexpr int bisections = 6;
 	long long boundary_points = 0, lost = 0;
 	for (size_t a = 0; a < gd.atomic_grids.size(); a++) {
@@ -2479,10 +2166,7 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 			const double f = r / radius[i];
 			return d3{ centre[0] + (X[i] - centre[0]) * f, centre[1] + (Y[i] - centre[1]) * f, centre[2] + (Z[i] - centre[2]) * f };
 		};
-		//Who owns the same probe one shell further in. The grid is emitted shell by shell, each
-		//shell one Lebedev set, so two adjacent shells of equal size hold the same directions in
-		//the same order - but "equal size" is a guess about the generator, and the direction is
-		//not, so every candidate pair is confirmed by its own dot product before it is used.
+		//Reuse probes only for adjacent shells with matching directions.
 		ivec partner(np, -1);
 		{
 			ivec start;
@@ -2578,26 +2262,13 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 				//For a gridded ELI-D a cell whose neighbourhood agrees is taken from the grid, as
 				//before; streaming has no grid to take it from and every cell is refined
 				if (eli_field && !streaming && (b == 0 || settled)) { give(b, 1.0); continue; }
-				//The cell centre's own trajectory, climbed on demand. It decides nothing by itself:
-				//where both radial probes answer and agree the cell is interior and the weight goes
-				//to their answer, not to this one. What is left for it is a probe that climbed off
-				//the grid and a cell with no radial extent - rare enough that climbing it up front
-				//was a third of every trajectory the quadrature fires, thrown away.
+				//Climb the cell centre only when the edge probes do not decide its basin.
 				int bc = -1;
 				auto centre_basin = [&]() { if (bc < 0) bc = climb(p, lb, ll); return bc; };
 				double inner, outer;
 				if (!cell_edges(i, inner, outer)) { give(centre_basin(), 1.0); continue; }
 				auto along = [&](const double r) { return along_i(i, r); };
-				//A probe is not a sample. The edges are asked only whether a boundary lies between
-				//them, and an edge that climbs off the cube answers nothing. Handing the cell's weight to
-				//"outside" on that basis throws away density the centre had already placed - it is
-				//how UH6's ELI-D lost 0.009 e when this refinement landed, the edge probes of the
-				//cells near the crop being further out than the centres they stand in for. A probe
-				//that fails defers to the point it was probing for
-				//Both edges come from the pass above wherever it ran: this cell's own entry for the
-				//outer edge, and the cell one shell in for the inner one. A -1 is a probe nobody
-				//computed - the innermost shell, a shell the pruning changed the angular order at, or
-				//the gridded ELI-D path that skips the pass - and is climbed here as before.
+				//A failed edge probe defers to the cell centre.
 				const int pin = partner[i];
 				int bi = pin >= 0 && outer_probe[pin] >= 0 ? outer_probe[pin] : climb(along(inner), lb, ll);
 				int bo = outer_probe[i] >= 0 ? outer_probe[i] : climb(along(outer), lb, ll);
@@ -2700,11 +2371,7 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 	return pop;
 }
 
-//The pair-density of a single determinant, partitioned twice: delta(A,B) counts the electron
-//pairs shared between two basins and lambda(A) those kept inside one. Both come out of the
-//overlap matrices alone, so they cost nothing beyond the integration that already ran. A
-//restricted wavefunction lists one set of MOs for both spins, hence m = 2 and the occupations
-//halved to the spin-orbital ones; alpha and beta listed separately give m = 1
+//Partition the determinant pair density over basin overlap matrices.
 delocalization_result delocalization_indices(const WFN &wavy, const basin_overlaps &ovl)
 {
 	delocalization_result r;
@@ -2714,13 +2381,7 @@ delocalization_result delocalization_indices(const WFN &wavy, const basin_overla
 	r.population.assign(nb, 0.0);
 	r.outside_half.assign(nb, 0.0);
 	if (nb == 0 || n == 0) return r;
-	//What decides m is the occupation, not the operator flag: a spin orbital cannot hold more
-	//than one electron, so an MO occupied twice is a spatial one standing for both spins. The
-	//flag is a guess in every reader that has to infer the spin blocks - the .wfn reader starts
-	//a beta block wherever the orbital energies stop rising, so a degenerate pair in a closed
-	//shell (the two pi lone pairs of OH-) is enough to label the second of them beta. Believing
-	//that gave m = 1 with occ = 2 and every lambda and delta exactly twice too large, while the
-	//population m * occ * S_ii stayed right and hid it
+	//Infer spin resolution from orbital occupations.
 	double max_occ = 0.0;
 	for (int i = 0; i < n; i++) max_occ = std::max(max_occ, std::abs(wavy.get_MO_occ(ovl.mo_index[i])));
 	const bool restricted = max_occ > 1.0 + 1e-6;
@@ -2912,25 +2573,10 @@ svec assign_labels_to_basins(const std::vector<d4> &Maxima, const std::vector<at
 				//the charge is read after the index is known to be one: atoms[-1] was being indexed to
 				//compute core_dist one line above the check that atom_index1 exists at all
 				const double core_dist = std::pow(core_shell_radius(atoms[atom_index1].get_charge()), 2);
-				//A monoatomic wavefunction has no second atom, and every ELI basin of a free atom belongs
-				//to its one nucleus - core shells and a valence shell, never a bond. This used to be
-				//err_checkf(atom_index2 >= 0, "Only one atom found..."), which aborted the whole analysis
-				//on exactly the systems ELI-D is calibrated against: it refused six of the twenty-two
-				//reader inputs in the robustness matrix (H.gbw, f_ref.wfx, f_ref.wfn, F_open.molden,
-				//Ce_full.molden, sc.molden) for no reason other than holding one atom.
+				//Assign every basin of a monoatomic system to its nucleus.
 				const bool lone_atom = atom_index2 < 0;
 				const double ratio = lone_atom ? 0.0 : std::max(1e-5, min_dist1) / std::max(1e-5, min_dist2);
-				//Two nearest nuclei do not make a bond. Two things have to hold, and neither was tested: the
-				//pair has to be bonded at all, and the maximum has to lie BETWEEN the two. The bond criterion
-				//is the same one the seeding loop of this file already uses for its BCP seeds - d(A,B) within
-				//1.3 times the sum of the CSD covalent radii - so a basin is never called a bond of a pair the
-				//seeder would not have looked for a BCP along. Betweenness is d1 + d2 against d(A,B): equal on
-				//the internuclear line, larger off it or outside the pair, and 1.25 admits a maximum up to
-				//0.75 * d(A,B)/2 off the axis, which is where a pi basin sits.
-				//Without these two the else below was unconditional, so any basin reaching it was labelled
-				//"A-B bond" whatever the geometry: -eli_analysis on water with a helium atom 13 bohr away
-				//reported nine "He3-H1 bond" basins. Hydrogen is where it shows, because for a nearest atom
-				//of charge <= 2 neither the core nor the lone-pair branch above can fire at all.
+				//Label a bond basin only for a bonded pair that brackets its maximum.
 				bool between = false;
 				err_checkf(atom_index2 >= 0 || atoms.size() == 1, "Only one atom found for basin " + toString<size_t>(i) + " at position (" + toString<double>(pos[0]) + ", " + toString<double>(pos[1]) + ", " + toString<double>(pos[2]) + ")!", std::cout);
 				if (!lone_atom) {

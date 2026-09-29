@@ -39,11 +39,7 @@ namespace
 
     MatrixXd sym_power(const MatrixXd& M, const double p, const double rel_floor = 1e-10)
     {
-        //A spin with nothing in it is a legitimate input: the beta spin of a hydrogen atom has no
-        //occupied NAO, so the Lewis set is empty and this is called on a 0 x 0 matrix.  Eigen's
-        //maxCoeff() on an empty expression is undefined - in a release build it reads past the end
-        //and segfaults, which is how -nbo_native on a one-electron wavefunction died.  The power of
-        //an empty matrix is that matrix, and every product below is already well defined for it.
+        //An empty spin channel has no Lewis structure.
         if (M.rows() == 0 || M.cols() == 0)
             return M;
         Eigen::SelfAdjointEigenSolver<MatrixXd> es(M);
@@ -237,10 +233,7 @@ namespace
         return es.eigenvalues()(k - 1);
     }
 
-    //Smallest share of a two-centre candidate that may sit on its minor centre.  Tuned on the 22
-    //reference molecules: 0.05 lets formate and ozone buy an electron pair with a "bond" that is
-    //really a lone pair, 0.15 reproduces NBO's Lewis topology on both without moving any molecule
-    //that already agreed.  Override with NBO_BOND_FLOOR if a system ever needs it retuned.
+    //Reject two-centre candidates below the minority population threshold.
     double bond_minority_floor()
     {
         static const double v = [] {
@@ -257,21 +250,7 @@ namespace
         return w;
     }
 
-    //--------------------------------------------------------------------------------------
-    // corner arithmetic
-    //--------------------------------------------------------------------------------------
-    //Every vector the search works with is zero outside the NAOs of its own one or two centres -
-    //leading_block() writes it that way, and nothing in the ladder or the sweep below breaks that.
-    //So the density bookkeeping of the self-consistency sweep only ever needs the (centres x
-    //centres) corner of an n x n matrix: for sucrose that is 44 x 44 out of 998 x 998, a five
-    //hundredth of it.  Building the whole matrix for that corner cost 45 of sucrose's 47 search
-    //seconds - 97 % of the stage - because it is 8 MB of allocation, two reads and a write per
-    //orbital per sweep, 18200 times.
-    //
-    //The three helpers below gather a corner, write one back, and gather a sub-vector.  Every entry
-    //they skip is one the whole-matrix form computed as x - 0.0 or x + 0.0, so the arithmetic on
-    //everything that is not identically zero is unchanged, operand for operand and in the same
-    //order.  That is what lets this be a pure speed-up rather than a new approximation.
+    //NBO construction follows the Lewis, antibond, and Rydberg cascade.
 
     MatrixXd corner(const MatrixXd& M, const ivec& idx)
     {
@@ -414,10 +393,7 @@ NboLewis nbo_search(const NAOResult& nao, const dMatrix2& gamma, const bvec2& bo
     const MatrixXd G0 = to_eigen(gamma);
     MatrixXd G = G0;
     const std::vector<AtomIndices> idx = atom_indices(nao);
-    //Same rule as NRT's: -nbo_threads if it was given, otherwise whatever OpenMP offers.  Only loops
-    //whose iterations are independent Eigen reductions of their own are threaded, so the thread count
-    //cannot move a number: Core is built with EIGEN_DONT_PARALLELIZE and Eigen is not backed by a
-    //BLAS here, so each of those reductions is reproducible on its own.
+    //Use the requested NBO thread count or the OpenMP default.
 #ifdef _OPENMP
     const int nthreads = options.threads > 0 ? options.threads : omp_get_max_threads();
 #else
@@ -454,18 +430,7 @@ NboLewis nbo_search(const NAOResult& nao, const dMatrix2& gamma, const bvec2& bo
             res.topo[a][a]++;
         }
 
-    //2. the threshold ladder.  At each threshold every one-centre block is searched before any
-    //two-centre one - that preference is what makes a lone pair a lone pair rather than half of a
-    //bond - and the accepted orbital is always the most occupied candidate found.
-    //
-    //An atom may not carry more valence orbitals - lone pairs plus bonds, each bond of a multiple
-    //bond counted once - than it has valence NAOs: four for a main-group atom, nine for a transition
-    //metal.  That cap is what makes NBO's Lewis structure for SF6 four bonds and two fluoride lone
-    //pairs rather than six bonds: the sixth S-F candidate has occupancy 1.99 and wins on occupancy,
-    //it just does not fit in sulphur's octet.  Without it nine of the 22 reference molecules came out
-    //with a different topology - always one bond too many on the central atom - and with it two.
-    //If the cap cannot be satisfied at all the ladder is run again without it, so a genuinely
-    //hypervalent density still gets a complete Lewis set rather than a truncated one.
+    //Search one-centre and two-centre blocks at each occupancy threshold.
     static const vec ladder = { 1.90, 1.80, 1.70, 1.60, 1.50, 1.40, 1.30, 1.20, 1.10,
                                 1.00, 0.90, 0.80, 0.70, 0.60, 0.50 };
     ivec used(natoms, 0);
@@ -478,12 +443,7 @@ NboLewis nbo_search(const NAOResult& nao, const dMatrix2& gamma, const bvec2& bo
         bool progress = true;
         while (progress && static_cast<int>(res.orbitals.size()) < n_pairs) {
             progress = false;
-            //The candidates of one accept step are independent small eigensolves of the same
-            //density - one per atom here, one per bondable pair below - and only the choice between
-            //them is sequential.  Evaluating them in parallel and choosing serially in index order
-            //makes exactly the choice the serial scan made, ties included: leading_block() is a
-            //single-threaded Eigen eigensolve of its own block, so its result does not depend on how
-            //many threads are running, and the comparison chain is untouched.
+            //Candidate eigensolves at one threshold are independent.
             vec lam1(natoms, 0.0);
             ivec have1(natoms, 0);
             std::vector<VectorXd> cand1(natoms);
@@ -540,12 +500,7 @@ NboLewis nbo_search(const NAOResult& nao, const dMatrix2& gamma, const bvec2& bo
                 if (lam2[c] <= bestp) continue;
                 const double wa = weight_on(cand2[c], idx[plist[c][0]].all);
                 const double wb = weight_on(cand2[c], idx[plist[c][1]].all);
-                //A candidate that sits almost entirely on one centre is a lone pair, not a
-                //bond, and accepting it as a bond costs a whole electron pair of the Lewis
-                //structure: formate took a 93 %-on-oxygen "third C-O bond" at occupancy 1.977
-                //in place of the reference's third lone pair on O, because the ladder always
-                //accepts the most occupied candidate and that one wins at the top rung.  The
-                //floor is the polarity at which NBO stops calling something a bond.
+                //Classify a two-centre candidate by its minority-centre weight.
                 if (std::min(wa, wb) < bond_minority_floor() * (wa + wb)) continue;
                 bestp = lam2[c];
                 bvp = cand2[c];
@@ -566,11 +521,7 @@ NboLewis nbo_search(const NAOResult& nao, const dMatrix2& gamma, const bvec2& bo
       }
     }
     res.n_lewis = static_cast<int>(res.orbitals.size());
-    //A density with nothing in it - tests/molden_file/F2.molden carries 2.7 of its 14 electrons
-    //after the reader, epoxide.molden the same way - leaves the ladder with not one orbital to
-    //accept, and then OWSO below asked Eigen for the eigenvalues of a 0 x 0 matrix.  That crashes
-    //inside maxCoeff() rather than saying anything: both of those files segfaulted the native route.
-    //There is no Lewis structure to report for such an input, so say which input it was.
+    //Reject a nonempty spin density with no Lewis orbital.
     {
         double tr = 0.0;
         for (int i = 0; i < n; i++) tr += G0(i, i);
@@ -583,26 +534,16 @@ NboLewis nbo_search(const NAOResult& nao, const dMatrix2& gamma, const bvec2& bo
     }
     p_ladder = prof.lap();
 
-    //3. self consistency.  The ladder decides one orbital at a time out of a density that still
-    //holds every orbital found after it, so each accepted orbital carries the bias of the ones it
-    //did not know about.  Sweeping every orbital against the density with all the *other* accepted
-    //ones removed, to convergence, takes that bias out; on water's O-H bond it moves the occupancy
-    //from 1.9857 to within 1e-4 of NBO's 1.99963, which is the difference between failing and
-    //passing the 2e-3 tolerance.
+    //Refine the Lewis orbitals self-consistently after the threshold search.
     {
-        //The index set and the G0 corner of an orbital do not change from sweep to sweep, so they are
-        //built once rather than 200 times - the index set used to be rebuilt with two vector inserts
-        //per orbital per sweep.
+        //The orbital centres and their density corners are fixed during the sweep.
         std::vector<ivec> sub(res.n_lewis);
         std::vector<MatrixXd> G0_corner(res.n_lewis);
         for (int j = 0; j < res.n_lewis; j++) {
             for (const int a : res.orbitals[j].centers)
                 sub[j].insert(sub[j].end(), idx[a].all.begin(), idx[a].all.end());
             G0_corner[j] = corner(G0, sub[j]);
-            //The corner arithmetic below is only equivalent to the whole-matrix form while the
-            //vectors really are confined to their own centres.  That is an invariant of how they are
-            //built, not an assumption about the density, so it is checked once here instead of being
-            //trusted: a future search that lets an orbital reach further has to say so.
+            //Corner updates require vectors supported only on their assigned centres.
             bvec on(n, false);
             for (const int i : sub[j]) on[i] = true;
             for (int i = 0; i < n; i++)
@@ -618,14 +559,7 @@ NboLewis nbo_search(const NAOResult& nao, const dMatrix2& gamma, const bvec2& bo
             block += occ[j] * vs * vs.transpose();
             scatter_corner(sum, block, sub[j]);
         }
-        //Two orbitals whose centres do not meet touch disjoint corners of sum: neither one's
-        //eigensolve reads anything the other's rank-one update writes.  So the sweep's order has to be
-        //kept only between orbitals that *do* share a centre.  level[j] is one past the last
-        //conflicting predecessor's level, which is exactly the sequential dependence and nothing
-        //more, so the orbitals of one level are independent by construction and can run at the same
-        //time without moving a bit.  Sucrose spends 200 sweeps here and 70 % of them inside the
-        //whole-space gemv below, which is memory bound - more cores is the only thing that makes a
-        //memory-bound loop faster.
+        //Disjoint orbital centres update disjoint density corners.
         ivec level(res.n_lewis, 0);
         int n_levels = 0;
         for (int j = 0; j < res.n_lewis; j++) {
@@ -670,12 +604,7 @@ NboLewis nbo_search(const NAOResult& nao, const dMatrix2& gamma, const bvec2& bo
                     moved_at[j] = (v - vectors[j]).norm();
                     vectors[j] = v;
                     vs = gather(v, s);
-                    //The occupancy is the one number here that the corner cannot produce: over the whole
-                    //space Eigen's gemv sums n terms in its own grouping and over the corner only m, and
-                    //adding the skipped zeros back does not put the surviving terms in the same groups.
-                    //It cost the 22 references their last bits and moved the E2 table at 1e-15, so the
-                    //gemv stays as it was, and it is the price of the numbers not moving: 70 % of the
-                    //sweep.  Memoising it was tried and refuted - see the note in the report.
+                    //Evaluate the occupancy against the full density.
                     occ[j] = v.dot(G0 * v);
                     block += occ[j] * vs * vs.transpose();
                     scatter_corner(sum, block, s);
@@ -688,10 +617,7 @@ NboLewis nbo_search(const NAOResult& nao, const dMatrix2& gamma, const bvec2& bo
             if (change < 1e-10) break;
         }
         p_scf = prof.lap();
-        //4. the refined set is still not orthogonal - two bonds at the same atom overlap by a fifth.
-        //An occupancy-weighted symmetric orthogonalisation (OWSO) spreads that symmetrically, which
-        //is what keeps two equivalent bonds equivalent while letting the occupied ones keep their
-        //shape at the expense of the empty ones.
+        //Occupancy-weighted orthogonalization removes overlap among Lewis orbitals.
         MatrixXd VL(n, res.n_lewis);
         for (int j = 0; j < res.n_lewis; j++) VL.col(j) = vectors[j];
         VectorXd w(res.n_lewis);
@@ -728,13 +654,7 @@ NboLewis nbo_search(const NAOResult& nao, const dMatrix2& gamma, const bvec2& bo
     }
     p_anti = prof.lap();
 
-    //6. everything the Lewis set and the antibonds do not span.  Their hybrids reach a little way
-    //into the extra-valence NAOs - the reference's own LP(1) on water's oxygen carries 0.17% d
-    //character, and confining the search to the natural minimal basis costs 0.014 e of bond
-    //occupancy - so the complement is taken over the whole NAO space.  It has to be taken with a
-    //projector rather than by Schmidt: the antibonds are not orthogonal to the Lewis set, and
-    //projecting against a non-orthonormal set silently produces vectors of the wrong length (it put
-    //a 202%-weight "LV" of occupancy 1.03 into water).
+    //Project the Rydberg space out of the Lewis and antibond subspaces.
     {
         const int k = res.n_lewis + static_cast<int>(non_lewis.size());
         MatrixXd M(n, k);
@@ -743,21 +663,14 @@ NboLewis nbo_search(const NAOResult& nao, const dMatrix2& gamma, const bvec2& bo
             M.col(res.n_lewis + static_cast<int>(j)) = non_lewis[j];
         const MatrixXd Q = MatrixXd::Identity(n, n) -
             M * sym_power(MatrixXd(M.transpose() * M), -1.0) * M.transpose();
-        //Q's own eigenvectors would do as a basis of the complement, but they come out of a
-        //degenerate eigenspace and are therefore arbitrary - nothing ties one of them to an atom.
-        //Projecting the NAO unit vectors instead and taking them in order of the largest surviving
-        //norm (a pivoted Gram-Schmidt) picks a basis each of whose members belongs to one NAO, and
-        //so to one atom; that is what makes the printed RY orbitals one-centre.
+        //Use local basis vectors for deterministic Rydberg labels.
         p_comp = prof.lap();  //the projector Q alone until the pivot and the diagonalisation are in
         std::vector<VectorXd> extra;
         ivec owner;
         std::vector<VectorXd> residual(n);
         for (int i = 0; i < n; i++) residual[i] = Q.col(i);
         bvec used(n, false);
-        //n steps over n residuals of length n is n^3 - 0.40 s of sucrose's search, the second
-        //largest item after the sweep.  Each norm and each residual update is one independent Eigen
-        //reduction, so threading the loops regroups no sum; the pivot is still chosen by a serial
-        //scan in index order, so a tie still goes to the lowest NAO index.
+        //Orthogonalize the residuals without repeated full projections.
         vec nrm(n, 0.0);
         for (int step = 0; step < n - k; step++) {
             int pivot = -1;
@@ -818,10 +731,7 @@ NboLewis nbo_search(const NAOResult& nao, const dMatrix2& gamma, const bvec2& bo
         vectors.push_back(non_lewis[j]);
     }
 
-    //8. coefficients, polarisation and l character.  The occupancies are taken here, from the final
-    //vectors: the Lewis ones were refined and then orthogonalised after they were accepted.
-    //One n x n gemv per orbital, and there are as many orbitals as NAOs: n^3, 0.59 s of sucrose's
-    //search.  Independent per orbital, and each writes only into its own res.orbitals entry.
+    //Compute occupations and polarization from the final NBO vectors.
     const int n_orb = static_cast<int>(res.orbitals.size());
 #pragma omp parallel for schedule(static) num_threads(nthreads)
     for (int j = 0; j < n_orb; j++) {
@@ -856,9 +766,7 @@ NboLewis nbo_search(const NAOResult& nao, const dMatrix2& gamma, const bvec2& bo
                   << " antibonds " << p_anti << " complement " << p_comp << " (pivot "
                   << p_pivot << " rydberg " << p_ryd << ") coefficients " << p_final
                   << std::endl;
-        //The sweep stops at 200 iterations, not at its tolerance, on anything the size of
-        //sucrose, so the trace is worth seeing: it is the evidence for how far from converged
-        //the published occupancies are.
+        //Report a sweep that reaches the iteration cap.
         std::cout << "NBO search: sweep change";
         for (size_t i = 0; i < ch_trace.size(); i++)
             if (i < 3 || i + 3 >= ch_trace.size())
@@ -976,10 +884,7 @@ namespace
         out_lewis.push_back(lewis);
     }
 
-    //The NAO table in NBO's own order: per atom, per l, components in NBO's printing order, and
-    //inside one component the shells by descending occupancy.
-    //out is res.nao for the spin-summed table and res.nao_alpha / res.nao_beta for the per-spin
-    //ones, which an open shell has to print as well: the sum hides a per-spin error that cancels.
+    //Print NAOs by atom, angular momentum, and NBO component order.
     void fill_nao_table(std::vector<NboNao>& out, const NAOResult& nao, const vec& occupancy,
                         const dMatrix2& fock_nao)
     {
@@ -1128,11 +1033,7 @@ NboResults native_nbo(WFN& wavy, const NboOptions& options, std::ostream& log)
     return res;
 }
 
-//-nrt spends most of a run's time and used to report nowhere a reader looks: the resonance weights,
-//the bond orders and the valencies went into <stem>.native.nbo.json and NoSpherA2.log carried only
-//the two NRT citations, so a 6.6 s search on a 14-atom complex was indistinguishable from an
-//ignored flag.  The layout follows gennbo's own headings on purpose, so the two routes can be read
-//side by side; every number printed here is the one written to the JSON, unrounded there.
+//Print the NRT results beside the NBO results.
 void print_nrt(const NboResults& r, std::ostream& out)
 {
     using namespace std;
@@ -1198,10 +1099,7 @@ void print_nbo(const NboResults& r, std::ostream& out)
     //fixed/setprecision below stay on the stream after this table, so everything printed through it
     //afterwards would carry two decimals
     const ostream_format_guard restore_format(out);
-    //The populations were JSON-only for the same reason the resonance tables were: nobody wrote the
-    //branch.  NPA charges are the most-read line of an NBO run, and on -nbo_native they appeared
-    //nowhere in NoSpherA2.log.  The per-NAO table stays in <stem>.native.nbo.json - it is 189 rows
-    //on a 14-atom complex and the populations are its summary.
+    //Print the atomic populations beside the orbital tables.
     if (!r.npa.empty()) {
         const bool spin = r.npa.front().has_spin_density;
         out << "\n NATURAL POPULATION ANALYSIS (in house):\n\n"
