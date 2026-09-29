@@ -33,8 +33,29 @@ struct CoutFormatReset : ::testing::EmptyTestEventListener
 	}
 };
 
+//Report an exit that interrupts a running test.
+static void report_exit_during_test()
+{
+	const ::testing::TestInfo* info = ::testing::UnitTest::GetInstance()->current_test_info();
+	if (info == nullptr)
+		return;
+	std::cout.flush();
+	std::cerr << "\nNoSpherA2_Tests: the process exited while " << info->test_suite_name() << "."
+			  << info->name() << " was still running. Production code called exit() (error_check "
+			  << "does) outside a death test, so no verdict was printed and the tests after it "
+			  << "never ran.\n";
+	std::cerr.flush();
+}
+
 int main(int argc, char** argv)
 {
+	//A death-test child is expected to exit.
+	const bool death_test_child = std::any_of(argv, argv + argc, [](const char* a) {
+		return std::string(a).rfind("--gtest_internal_run_death_test", 0) == 0;
+	});
+	if (!death_test_child)
+		std::atexit(report_exit_during_test);
+
 	//The default "fast" death test style forks and runs the statement in the child. The child then
 	//owns copies of every thread object this process holds but none of the threads themselves, so
 	//its exit path can throw ("pthread_detach has failed: No such process") and abort with signal 6
