@@ -49,9 +49,6 @@ Density Critical Points (3 found):
 
 QTAIM attractors from the analytic field: 3 (3 nuclei, 0 non-nuclear)
 Assigning basins by near-grid ascent...
-Near-grid ascent: 70522 steepest-neighbour steps, 3480 of them tied (4.935 %), 3480 voxel paths went through at least one tie
-Near-grid ascent: 6937146 rounded step decisions, 228 within 1e-5 of flipping and 0 within 1e-9, closest margin 3.285e-07
-Near-grid ascent: 0 walks stopped on a top that grad_epsilon (1.0e-10) calls flat, largest uphill 0.000e+00 still available there
 I found 28 Basins.
 ELI-D basin boundaries from the analytic field (the default).
 Unified 23 core-shell basins into their atoms' cores, 5 ELI-D basins remain.

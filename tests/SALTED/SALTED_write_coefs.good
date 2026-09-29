@@ -12,6 +12,23 @@ Descriptor sets identical: sharing one copy
 [#############################################################] 100% 
 [              Calculating descriptors for l = 5              ]
 [#############################################################] 100% 
+=== Density Fitting Quality Analysis ===
+Population: the auxiliary functions on that centre only.
+Atom 1 (Z=16): Population = 16.552, Charge = -0.552
+Atom 2 (Z=8): Population = 8.692, Charge = -0.692
+Atom 3 (Z=8): Population = 8.655, Charge = -0.655
+Atom 4 (Z=7): Population = 7.302, Charge = -0.302
+Atom 5 (Z=6): Population = 5.745, Charge = 0.255
+Atom 6 (Z=6): Population = 5.538, Charge = 0.462
+Atom 7 (Z=6): Population = 5.697, Charge = 0.303
+Atom 8 (Z=1): Population = 1.003, Charge = -0.003
+Atom 9 (Z=1): Population = 0.969, Charge = 0.031
+Atom 10 (Z=1): Population = 0.982, Charge = 0.018
+Atom 11 (Z=1): Population = 0.809, Charge = 0.191
+Atom 12 (Z=1): Population = 0.684, Charge = 0.316
+Atom 13 (Z=1): Population = 0.685, Charge = 0.315
+Atom 14 (Z=1): Population = 0.678, Charge = 0.322
+Expected / Real total electrons: 64.000 / 63.990
     _   __     _____       __              ___   ___
    / | / /___ / ___/____  / /_  ___  _____/   | |__ \
   /  |/ / __ \\__ \/ __ \/ __ \/ _ \/ ___/ /| | __/ /

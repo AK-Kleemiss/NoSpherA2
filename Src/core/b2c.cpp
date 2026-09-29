@@ -1253,18 +1253,18 @@ std::pair<cubei, std::vector<d4>> topological_cube_analysis(const cube *cub, con
 			refined[i] = ascend(x, y, z, &interior, false);
 		}
 		basin.swap(refined);
-		//Both near-grid passes counted together; see steepest() above for what a tie means and for the
-		//UH6 measurement that says the asymmetry it causes does not go away with a finer grid
-		std::cout << "Near-grid ascent: " << steep_calls << " steepest-neighbour steps, " << steep_tied
-			<< " of them tied (" << std::fixed << std::setprecision(3)
-			<< (steep_calls ? 100.0 * static_cast<double>(steep_tied) / static_cast<double>(steep_calls) : 0.0)
-			<< " %), " << tied_paths << " voxel paths went through at least one tie" << std::endl;
-		std::cout << "Near-grid ascent: " << step_decisions << " rounded step decisions, " << marginal_1e5
-			<< " within 1e-5 of flipping and " << marginal_1e9 << " within 1e-9, closest margin "
-			<< std::scientific << std::setprecision(3) << min_margin << std::defaultfloat << std::endl;
-		std::cout << "Near-grid ascent: " << flat_stops << " walks stopped on a top that grad_epsilon ("
-			<< std::scientific << std::setprecision(1) << grad_epsilon << ") calls flat, largest uphill "
-			<< std::setprecision(3) << max_flat_best << " still available there" << std::defaultfloat << std::endl;
+		if (basin_timing_enabled()) {
+			std::cout << "Near-grid ascent: " << steep_calls << " steepest-neighbour steps, " << steep_tied
+				<< " of them tied (" << std::fixed << std::setprecision(3)
+				<< (steep_calls ? 100.0 * static_cast<double>(steep_tied) / static_cast<double>(steep_calls) : 0.0)
+				<< " %), " << tied_paths << " voxel paths went through at least one tie" << std::endl;
+			std::cout << "Near-grid ascent: " << step_decisions << " rounded step decisions, " << marginal_1e5
+				<< " within 1e-5 of flipping and " << marginal_1e9 << " within 1e-9, closest margin "
+				<< std::scientific << std::setprecision(3) << min_margin << std::defaultfloat << std::endl;
+			std::cout << "Near-grid ascent: " << flat_stops << " walks stopped on a top that grad_epsilon ("
+				<< std::scientific << std::setprecision(1) << grad_epsilon << ") calls flat, largest uphill "
+				<< std::setprecision(3) << max_flat_best << " still available there" << std::defaultfloat << std::endl;
+		}
 	}
 	int nb = static_cast<int>(Maxima.size());
 	std::cout << "I found " << nb << " Basins." << std::endl;

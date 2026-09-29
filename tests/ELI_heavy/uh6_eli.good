@@ -83,9 +83,6 @@ Density Critical Points (7 found):
 QTAIM attractors from the analytic field: 7 (7 nuclei, 0 non-nuclear)
 WARNING: the ELI-D attractors are searched on the 0.1000 A grid. Coarser than 0.05 A this basin set is less reliable: core populations have been seen to drift by 0.3 electrons and basins to appear or be retyped as lone pairs by 0.2 A. The QTAIM basins are unaffected.
 Assigning basins by near-grid ascent...
-Near-grid ascent: 6956 steepest-neighbour steps, 0 of them tied (0.000 %), 0 voxel paths went through at least one tie
-Near-grid ascent: 1243650 rounded step decisions, 0 within 1e-5 of flipping and 0 within 1e-9, closest margin 1.602e-05
-Near-grid ascent: 0 walks stopped on a top that grad_epsilon (1.0e-10) calls flat, largest uphill 0.000e+00 still available there
 I found 33 Basins.
 Left 6 maxima on the rim of the analysed region unresolved; their density is reported outside every basin.
 Merged 6 noise maxima, 27 basins remain.
