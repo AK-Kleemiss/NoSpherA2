@@ -240,6 +240,34 @@ TEST(EliFamily, VariantSelectionFollowsTheOrbitals)
 	EXPECT_STREQ(eli_family::member_column(eli_family::Member::eli_d_triplet), "ELI-D_t");
 }
 
+//One electron. It has a beta orbital set and |N_alpha - N_beta| = 1, so every test of spin
+//polarisation says yes, and the member list said so too: ELI-D(bb) and ELI-q(bb) over a channel with
+//no electrons in it, the triplet member whose prefactor rho^(t) is exactly zero below two electrons,
+//and the singlet ELI-q, which is 1 - zeta^2 = 0 for a fully polarised density. Four identically-zero
+//fields advertised as computable members, which a caller reading that list cannot tell from real
+//ones. This is the few-electron row of the input matrix, where a fallback has to be taken AND right
+//rather than merely silent.
+TEST(EliFamily, AnEmptySpinChannelIsNotAMember)
+{
+	const std::filesystem::path f = nos_test_repo_root() / "tests" / "ptb_H_file" / "H.gbw";
+	if (!std::filesystem::exists(f)) GTEST_SKIP() << "missing fixture " << f.string();
+	WFN wave(f);
+	ASSERT_NEAR(wave.count_nr_electrons(), 1.0, 1e-9) << "this fixture is the one-electron case";
+	std::string warn;
+	const std::vector<eli_family::Member> v = eli_family::eli_variants_for(wave, &warn);
+	EXPECT_EQ(v, (std::vector<eli_family::Member>{ eli_family::Member::eli_d_aa,
+		eli_family::Member::eli_q_aa }));
+	EXPECT_NE(warn.find("holds no electrons"), std::string::npos) << warn;
+	//and the prefactor that makes three of those four zero, stated rather than assumed
+	EXPECT_DOUBLE_EQ(eli_family::triplet_density_factor(wave), 0.0);
+	//the bound is two electrons and not "unrestricted": the doublet F atom keeps all six members
+	const std::filesystem::path open = nos_test_repo_root() / "tests" / "molden_file" / "F_open.molden";
+	if (!std::filesystem::exists(open)) GTEST_SKIP() << "missing fixture " << open.string();
+	WFN doublet(open);
+	EXPECT_EQ(eli_family::eli_variants_for(doublet, &warn).size(), 6u);
+	EXPECT_GT(eli_family::triplet_density_factor(doublet), 0.0);
+}
+
 //A multiplicity label that disagrees with the occupations must not change the member list, only
 //raise a warning.  F_full is restricted, so its ELI family is the closed-shell one whatever the
 //label claims; inventing a spin split from a label is how a spin heuristic doubles every index

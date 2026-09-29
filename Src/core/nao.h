@@ -58,7 +58,7 @@ struct NAOResult {
 };
 
 struct NPAResult {
-    //from the total density; for an unrestricted case this is the sum of the two spin analyses
+    //The total and spin populations share one NAO basis for an unrestricted case.
     NAOResult total;
     bool spin_resolved = false;
     NAOResult alpha;

@@ -85,6 +85,13 @@ namespace constants
 									   590, 770, 974, 1202, 1454, 1730, 2030, 2354,
 									   2702, 3074, 3470, 3890, 4334, 4802, 5294, 5810 };
 	constexpr long long int double_ft[25]{ 1, 1, 2, 3, 8, 15, 48, 105, 384, 945, 3840, 10395, 46080, 135135, 645120, 2027025, 10321920, 34459425, 185794560, 654729075, 3715891200, 13749310575, 81749606400, 316234143225, 1961990553600 };
+	//The norm of the axial cartesian primitive x^l exp(-a r^2): (2a/PI)^(3/4) (4a)^(l/2) /
+	//sqrt((2l-1)!!). Written once, for every l, because the same four numbers had been spelled out
+	//as an s/p/d/f switch in two places and a g shell fell through both of them.
+	inline double axial_prim_norm(const int l, const double a)
+	{
+		return pow(pow(2, 3 + 4 * l) * pow(a, 2 * l + 3) / PI3 / pow(double_ft[std::max(2 * l - 1, 0)], 2), 0.25);
+	}
 	constexpr double alpha_coef = 0.1616204596739954813316614;
 	constexpr double c_13 = 1.0 / 3.0;
 	constexpr double c_43 = 4.0 / 3.0;
@@ -412,6 +419,26 @@ namespace constants
 									 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 28, 28, 28, 28, 28, 28,
 									 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 46, 46, 46, 46, 46, 46,
 									 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 60, 60, 60, 60, 60, 60, 60, 60, 60, 78, 78, 78, 78, 78, 78 };
+
+	//All three tables stop at Rn, Z = 86, because that is where the def2, xTB and pTB core
+	//definitions they transcribe stop. Indexing them directly by atomic number is therefore only
+	//safe up to Rn, and an actinide walked off the end: `-rgbi uh6.gbw -ECP 1` read whatever
+	//followed the table and declared uranium to hold Z = -543649293 core electrons before
+	//segfaulting. A centre heavier than the table has no core defined for it, which is zero - the
+	//all-electron reading of the file, which is what the file is - so say that instead of guessing.
+	template <std::size_t N>
+	constexpr int ECP_core_electrons(const int(&table)[N], const int Z) noexcept
+	{
+		return (Z >= 0 && static_cast<std::size_t>(Z) < N) ? table[Z] : 0;
+	}
+
+	//The heaviest element any of the tables above describes. One place to ask, so a caller that
+	//wants to warn rather than silently take the zero does not hardcode 86 of its own.
+	constexpr int heaviest_ECP_element = static_cast<int>(sizeof(ECP_electrons) / sizeof(int)) - 1;
+	static_assert(sizeof(ECP_electrons_xTB) == sizeof(ECP_electrons) &&
+		sizeof(ECP_electrons_pTB) == sizeof(ECP_electrons),
+		"the three ECP core tables are indexed by the same atomic number and reported by the same "
+		"heaviest_ECP_element, so they have to end at the same element");
 
 	constexpr std::complex<double> i_pows[] = {
 		std::complex<double>(1.0, 0.0),

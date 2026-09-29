@@ -182,7 +182,8 @@ TEST(StreamingBasins, HydroxideStreamsToTheRightElectronCount)
 	double total = outside;
 	for (const double p : pop) total += p;
 	EXPECT_NEAR(total, 10.0, 0.05) << "the streaming quadrature lost electrons";
-	EXPECT_LT(outside, 0.01) << "electrons ended up in no basin at all";
+	EXPECT_GT(outside, 0.0) << "the density isosurface left no outside region";
+	EXPECT_LT(outside, 0.02) << "too much density lies outside the isosurface";
 	//The hydrogen of a hydroxide keeps well under an electron and the oxygen carries the rest;
 	//a boundary put in the wrong place shows up here long before the total does
 	EXPECT_NEAR(pop[0], 0.61, 0.05);
@@ -196,6 +197,7 @@ TEST(StreamingBasins, HydroxideStreamsToTheRightElectronCount)
 		double half = 0.0;
 		for (size_t p = 0; p < r.pairs.size(); p++)
 			if (r.pairs[p][0] == static_cast<int>(b) || r.pairs[p][1] == static_cast<int>(b)) half += 0.5 * r.di[p];
+		half += r.outside_half[b];
 		EXPECT_NEAR(r.lambda[b] + half - r.population[b], 0.0, 0.02) << "basin " << b + 1 << " breaks the sum rule";
 	}
 }
@@ -235,4 +237,58 @@ TEST(StreamingBasins, BasinPartitionConservesTheQuadratureWeight)
 	//Relative, because the absolute size of the total is the rule's business and not this test's
 	EXPECT_NEAR(three, two, 1e-9 * std::max(1.0, std::abs(two)))
 		<< "adding a basin changed the integrated total by " << three - two << " electrons, so a cell's weight is not being conserved across the split";
+}
+
+//A maximum on the rim of the analysed region is a property of the crop, not of the field. The ELI-D
+//pass crops at rho < 1e-4 and then looks for maxima of ELI-D, which RISES outward through a diffuse
+//tail, so the last voxel the crop leaves valid has no higher valid neighbour and used to be
+//registered as an attractor. NH3Li reported 62, 53 and 23 ELI-D basins for box paddings of 2.00,
+//2.05 and 2.10 A, and 62, 105 and 208 as the spacing went 0.1 -> 0.05 A; a count that moves with the
+//grid is not a property of the molecule, and the persistence merge cannot remove these because their
+//outward saddle is the crop, so their persistence is ~1. The field below is that shape in closed
+//form - one real maximum of 10 at the origin and a ramp rising outward to a crop surface that lies
+//inside the box, so the rim here is the crop and not the box face. The ASSERT_GT counts the trap on
+//the fixture itself, so the test cannot go vacuous if the field ever stops being rim-prone.
+TEST(StreamingBasins, MaximaOnTheCropSurfaceAreNotBasins)
+{
+	const int n = 41;
+	const double h = 0.2, R = 3.4, lo = -0.5 * (n - 1) * h;
+	cube f(std::array<int, 3>{ n, n, n }, 0, true);
+	for (int k = 0; k < 3; k++) { f.set_origin(k, lo); f.set_vector(k, k, h); }
+	f.calc_dv();
+	for (int x = 0; x < n; x++)
+		for (int y = 0; y < n; y++)
+			for (int z = 0; z < n; z++) {
+				const double px = lo + x * h, py = lo + y * h, pz = lo + z * h;
+				const double r = std::sqrt(px * px + py * py + pz * pz);
+				f.set_value(x, y, z, r >= R ? 0.0 : 1.0 + r / R + 9.0 * std::exp(-4.0 * r * r));
+			}
+
+	//The trap, counted on the fixture: voxels the crop leaves valid whose valid neighbours are all
+	//lower. Every one of these was reported as a basin before the rim rule
+	const int d6[6][3] = { {1,0,0},{-1,0,0},{0,1,0},{0,-1,0},{0,0,1},{0,0,-1} };
+	int rim_maxima = 0;
+	for (int x = 1; x + 1 < n; x++)
+		for (int y = 1; y + 1 < n; y++)
+			for (int z = 1; z + 1 < n; z++) {
+				const double v = f.get_value(x, y, z);
+				if (v <= 0.0) continue;
+				bool on_crop = false, highest = true;
+				for (const auto &s : d6) {
+					const double u = f.get_value(x + s[0], y + s[1], z + s[2]);
+					if (u <= 0.0) on_crop = true;
+					else if (u > v) highest = false;
+				}
+				if (on_crop && highest) rim_maxima++;
+			}
+	ASSERT_GT(rim_maxima, 20) << "the fixture no longer has maxima on the crop surface, so this test proves nothing";
+
+	WFN w(e_origin::NOT_YET_DEFINED);
+	w.push_back_atom("He", 0.0, 0.0, 0.0, 2);
+	const std::pair<cubei, std::vector<d4>> basins = topological_cube_analysis(&f, w.get_atoms(), false, false, 0.0, 1e-10, -1.0);
+	ASSERT_EQ(basins.second.size(), 1u)
+		<< "the crop surface contributed " << basins.second.size() - 1 << " attractors on top of the one real maximum ("
+		<< rim_maxima << " of its voxels are local maxima of this field)";
+	EXPECT_NEAR(basins.second[0][3], 10.0, 1e-9) << "the surviving basin is not the real maximum";
+	for (int k = 0; k < 3; k++) EXPECT_NEAR(basins.second[0][k], 0.0, 0.5 * h);
 }

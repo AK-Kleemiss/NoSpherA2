@@ -51,6 +51,7 @@ struct NboHybrid {
 	double p = 0.0;
 	double d = 0.0;
 	double f = 0.0;
+	double sp_exponent() const { return s >= 1.0 && p >= 1.0 && s + p >= 95.0 ? p / s : 0.0; }
 };
 
 struct NboOrbital {
@@ -174,6 +175,11 @@ struct NboNrt {
 	std::vector<NboNrtCandidate> candidates;
 	std::vector<NboQpIteration> qp_iterations;
 	std::vector<std::string> arrows;          //"ARROWS generates N new structures from ..." lines
+	//Everything else the search has to say about how it got there: the candidate budget it settled
+	//on, an exhaustive count, the half-arrow intermediates it dropped.  These were pushed into
+	//`arrows` too, so a consumer reading the JSON's "arrows" array could not tell an arrow
+	//generation from a budget decision.
+	std::vector<std::string> notes;
 	std::vector<std::string> symmetry_forms;  //"Symmetry equivalent resonance forms" block
 	std::string nrtstr_keylist;               //the $NRTSTR block NBO writes back, verbatim
 };
@@ -205,10 +211,25 @@ struct NboResults {
 	double e2_intermolecular_threshold_kcal = 0.0;
 	std::vector<NboAtomPopulation> npa;   //spin-summed table
 	std::vector<NboNao> nao;              //spin-summed table
+	//An open shell has two NAO sets, one per spin density, and the spin-summed table above can
+	//only be read as a sum: it hides per-spin errors that cancel.  ch3's carbon comes out 0.0839 e
+	//too high in alpha and 0.1279 e too low in beta against NBO 7, which sum to its 0.044 e charge
+	//error and differ by its 0.212 e spin-density error - the charge agreement is what made the
+	//per-spin error look small.  Empty for a closed shell, where both spins are the same set.
+	std::vector<NboNao> nao_alpha;
+	std::vector<NboNao> nao_beta;
 	std::vector<NboOrbital> orbitals;
 	std::vector<NboE2Entry> e2;
 	NboNrt nrt;
 };
+
+/** Bumped when a parse or JSON change alters what a stored reference MEANS, so a reader can
+    refuse a file an older parser wrote instead of quietly comparing against it.  2 = gennbo's
+    NRT "RS" column read as a rank rather than a structure number, its composite alpha+beta
+    valency table kept under its own label instead of overwriting beta, and the open-shell NAO
+    table's Spin column no longer read as Energy.  Version 1 files are wrong in all three ways
+    and a whole measurement was already lost to a directory that still held them. */
+constexpr int NBO_JSON_PARSER_VERSION = 2;
 
 /** Parse a .nbo output file produced by NBO 6/7 into structured results. */
 NboResults parse_nbo_output(const std::filesystem::path& nbo_file);

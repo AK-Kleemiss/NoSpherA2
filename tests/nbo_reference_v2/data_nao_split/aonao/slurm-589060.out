@@ -1,0 +1,31 @@
+==========================================
+SLURM_JOB_ID = 589060
+SLURM_JOB_NODELIST = AKL012
+==========================================
+host=AKL012  threads=2  node_cores=96  job=589060  partition=Active
+binary /work/akkleemiss/florian/nos_nboref/build/release-linux/bin/NoSpherA2
+keylist now: $NBO AONAO=W $END
+gennbo7 lif rc=0  NBOMEM=4gb  host=AKL012  NBOBIN=/work/software/bin/NBO/bin
+lif       gennbo   0s parse rc=0 native   0s rc=0  lfn33=47993 bytes  NAOC lines=46
+keylist now: $NBO AONAO=W $END
+gennbo7 water rc=0  NBOMEM=4gb  host=AKL012  NBOBIN=/work/software/bin/NBO/bin
+water     gennbo   0s parse rc=0 native   0s rc=0  lfn33=43928 bytes  NAOC lines=44
+keylist now: $NBO AONAO=W $END
+gennbo7 ammonia rc=0  NBOMEM=4gb  host=AKL012  NBOBIN=/work/software/bin/NBO/bin
+ammonia   gennbo   0s parse rc=0 native   0s rc=0  lfn33=56785 bytes  NAOC lines=50
+keylist now: $NBO AONAO=W $END
+gennbo7 ethane rc=0  NBOMEM=4gb  host=AKL012  NBOBIN=/work/software/bin/NBO/bin
+ethane    gennbo   0s parse rc=0 native   0s rc=0  lfn33=224210 bytes  NAOC lines=99
+keylist now: $NBO AONAO=W $END
+gennbo7 benzene rc=0  NBOMEM=4gb  host=AKL012  NBOBIN=/work/software/bin/NBO/bin
+benzene   gennbo   1s parse rc=0 native   0s rc=0  lfn33=1143492 bytes  NAOC lines=223
+keylist now: $NBO AONAO=W $END
+gennbo7 pf5 rc=0  NBOMEM=4gb  host=AKL012  NBOBIN=/work/software/bin/NBO/bin
+pf5       gennbo   1s parse rc=0 native   1s rc=0  lfn33=855943 bytes  NAOC lines=193
+keylist now: $NBO AONAO=W $END
+gennbo7 so2 rc=0  NBOMEM=4gb  host=AKL012  NBOBIN=/work/software/bin/NBO/bin
+so2       gennbo   0s parse rc=0 native   1s rc=0  lfn33=228734 bytes  NAOC lines=100
+keylist now: $NBO AONAO=W $END
+gennbo7 sf6 rc=0  NBOMEM=4gb  host=AKL012  NBOBIN=/work/software/bin/NBO/bin
+sf6       gennbo   0s parse rc=0 native   1s rc=0  lfn33=0 bytes  NAOC lines=224
+=== done 2026-09-25T05:49:22Z on AKL012, 2 threads

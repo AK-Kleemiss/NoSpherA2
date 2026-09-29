@@ -2233,13 +2233,16 @@ void WFN::computeELIGrad(
 			f1[0] * f[1] * f[2] * ex, f[0] * f1[1] * f[2] * ex, f[0] * f[1] * f1[2] * ex,
 			f2[0] * f[1] * f[2] * ex, f[0] * f2[1] * f[2] * ex, f[0] * f[1] * f2[2] * ex,
 			f1[0] * f1[1] * f[2] * ex, f1[0] * f[1] * f1[2] * ex, f[0] * f1[1] * f1[2] * ex };
+		//Component-major, as in computeGrad: ten unit-stride accumulations instead of one
+		//stride-ten scatter per MO. Same products, same order over primitives.
 		const double *c_row = coefs + (size_t)j * _nmo;
-		double *phi_ptr = phi.data();
-		for (int mo = 0; mo < _nmo; ++mo, phi_ptr += 10)
+		double *const phi0 = phi.data();
+		for (int k = 0; k < 10; k++)
 		{
-			const double c = c_row[mo];
-			for (int k = 0; k < 10; k++)
-				phi_ptr[k] += c * chi[k];
+			double *const pk = phi0 + (size_t)k * _nmo;
+			const double ck = chi[k];
+			for (int mo = 0; mo < _nmo; mo++)
+				pk[mo] += ck * c_row[mo];
 		}
 	}
 	static constexpr int hidx[3][3] = { {4, 7, 8}, {7, 5, 9}, {8, 9, 6} };
@@ -2248,7 +2251,9 @@ void WFN::computeELIGrad(
 	{
 		const double occ = get_MO_occ(mo);
 		if (occ == 0) continue;
-		const double *p = &phi[mo * 10], docc = 2 * occ;
+		double p[10];
+		for (int k = 0; k < 10; k++) p[k] = phi[(size_t)k * _nmo + mo];
+		const double docc = 2 * occ;
 		rho += occ * p[0] * p[0];
 		for (int i = 0; i < 3; i++)
 		{
@@ -2280,7 +2285,8 @@ void WFN::computeELIGrad(
 
 void WFN::computeGrad(
 	const d3 &PosGrid, // [3] vector with current position on te grid
-	d3& gradient
+	d3& gradient,
+	double *rho
 ) const
 {
 	const int _nmo = get_nmo(false);
@@ -2289,7 +2295,6 @@ void WFN::computeGrad(
 	thread_local vec phi, d;
 	phi.assign(4 * _nmo, 0.0);
 	if (d.size() < 16 * (size_t)ncen) d.resize(16 * (size_t)ncen);
-	double *phi_temp;
 	double chi[4]{ 0, 0, 0, 0 };
 	int k, j;
 	double ex = 0;
@@ -2406,17 +2411,22 @@ void WFN::computeGrad(
 		chi[2] = (y1 - ex2 * ynext) * x0 * z0 * ex;
 		chi[3] = (z1 - ex2 * znext) * x0 * y0 * ex;
 
+		//Component-major: phi[k * nmo + mo]. The same products summed over primitives in the
+		//same order - so the numbers are bit-identical - but each component's accumulation now
+		//walks memory with unit stride against one broadcast scalar, which is what the vector
+		//units want. The interleaved layout wrote four doubles per MO at a stride of four.
 		const double *c_row = coefs + (size_t)j * _nmo;
-		double *phi_ptr = phi.data();
-		for (int mo = 0; mo < _nmo; ++mo, phi_ptr += 4)
+		double *const phi0 = phi.data();
+		for (k = 0; k < 4; k++)
 		{
-			const double c = c_row[mo];
-			for (k = 0; k < 4; k++)
-				phi_ptr[k] += c * chi[k];
+			double *const pk = phi0 + (size_t)k * _nmo;
+			const double ck = chi[k];
+			for (int mo = 0; mo < _nmo; mo++)
+				pk[mo] += ck * c_row[mo];
 		}
 	}
 
-	double Grad[3]{ 0, 0, 0 };
+	double Grad[3]{ 0, 0, 0 }, Rho = 0.0;
 
 	for (int mo = 0; mo < _nmo; mo++)
 	{
@@ -2424,15 +2434,18 @@ void WFN::computeGrad(
 		const double docc = 2 * occ;
 		if (occ != 0)
 		{
-			phi_temp = &phi[mo * 4];
-			Grad[0] += docc * *phi_temp * phi_temp[1];
-			Grad[1] += docc * *phi_temp * phi_temp[2];
-			Grad[2] += docc * *phi_temp * phi_temp[3];
+			const double v = phi[mo], gx = phi[(size_t)_nmo + mo],
+				gy = phi[(size_t)2 * _nmo + mo], gz = phi[(size_t)3 * _nmo + mo];
+			Grad[0] += docc * v * gx;
+			Grad[1] += docc * v * gy;
+			Grad[2] += docc * v * gz;
+			if (rho) Rho += occ * v * v;
 		}
 	}
 	gradient[0] = Grad[0];
 	gradient[1] = Grad[1];
 	gradient[2] = Grad[2];
+	if (rho) *rho = Rho;
 
 };
 

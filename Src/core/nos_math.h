@@ -150,8 +150,26 @@ void get_submatrix(const T2& full, T& sub, const ivec& val_indices, const ivec& 
 template <typename T, typename T2>
 void get_submatrices(const T2& D_full, const T2& S_full, T& D_sub, T& S_sub, const ivec& indices);
 
+//How the pseudo-inverse decided the rank. The cutoff is a HARD threshold on the singular values, so a
+//singular value sitting near it decides the result on its own, and two matrices that differ only by a
+//rotation can land on opposite sides of it - which is one way six symmetry-equivalent bonds come out as
+//two groups. A caller with a symmetry to preserve cannot see that unless the inverse reports it, so this
+//reports it. Filling it changes nothing about the inverse itself.
+struct PinvRank {
+	int n = 0;                     //min(rows, cols), i.e. how many singular values there were
+	int kept = 0;                  //how many were above the cutoff and inverted
+	double largest = 0.0;          //the largest singular value, for a relative view of the cutoff
+	double smallest_kept = 0.0;    //the smallest one that was inverted (0.0 if none was)
+	double largest_dropped = 0.0;  //the largest one that was zeroed (0.0 if none was)
+	//True when the rank rests on a value within a decade of the cutoff on either side, i.e. when it was
+	//the threshold and not a gap in the spectrum that fixed the rank.
+	bool marginal(const double cutoff) const {
+		return (kept > 0 && smallest_kept < 10.0 * cutoff) || largest_dropped > 0.1 * cutoff;
+	}
+};
+
 //calculates the Moore-Penrose pseudo-inverse of a matrix A using SVD
-dMatrix2 LAPACKE_invert(const dMatrix2& A, const double cutoff = 1E-5);
+dMatrix2 LAPACKE_invert(const dMatrix2& A, const double cutoff = 1E-5, PinvRank* rank_out = nullptr);
 
 // Symmetric eigendecomposition of A (n x n, row-major). On return, W holds the
 // ascending eigenvalues and A holds the eigenvectors as columns, row-major
@@ -161,7 +179,10 @@ dMatrix2 LAPACKE_invert(const dMatrix2& A, const double cutoff = 1E-5);
 bool try_make_Eigenvalues(vec& A, vec& W);
 // Same as try_make_Eigenvalues but aborts via err_checkf on failure.
 void make_Eigenvalues(vec& A, vec& W);
-vec mat_sqrt(vec& A, vec& W, const double cutoff = 1E-5);
+//The symmetric square root zeroes every eigenvalue below the cutoff, which is a rank decision on the
+//same footing as the pseudo-inverse's - and in RGBI it is taken on a pair overlap matrix whose spectrum
+//runs down to 1e-8, so it reports what it decided for the same reason LAPACKE_invert does.
+vec mat_sqrt(vec& A, vec& W, const double cutoff = 1E-5, PinvRank* rank_out = nullptr);
 
 template <typename T>
 void swap_rows_cols_symm(T& mat, const int i, const int j);

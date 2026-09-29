@@ -55,6 +55,16 @@ namespace
     //It reduces to S^-1/2 for equal weights and to the identity for S = 1, and it is what makes
     //the strongly occupied orbitals keep their shape while the diffuse ones absorb the
     //orthogonalisation tails.
+    //Diagnostic knobs for the NAO construction, off unless the environment sets them.  They
+    //exist to run the two arms of one experiment - see the comments at steps 3 and 4 - and are
+    //deliberately not command-line options: build_naos takes no options struct and this is a
+    //measurement, not a feature.
+    bool nao_env(const char *name)
+    {
+        const char *v = std::getenv(name);
+        return v && *v && *v != '0';
+    }
+
     MatrixXd owso(const MatrixXd &S, const VectorXd &weights)
     {
         VectorXd w = weights;
@@ -100,8 +110,7 @@ namespace
         return 1;
     }
 
-    //The internal spherical basis runs m = 0, +1, -1, +2, -2 (the ORCA/Gaussian order the
-    //sph2cart tables and the .47 writer both assume), not libcint's -l .. +l.
+    //NAO labels use ORCA's m = 0, +1, -1, +2, -2 order.
     std::string shell_label(const int l, const int m)
     {
         static const char *lc = "spdfghik";
@@ -117,6 +126,25 @@ namespace
         }
         const int mv = (m == 0) ? 0 : ((m + 1) / 2) * ((m % 2) ? 1 : -1);
         return std::string(1, letter) + "(" + (mv >= 0 ? "+" : "") + std::to_string(mv) + ")";
+    }
+
+    //One writer for both dumps, because the two matrices have to arrive in the SAME format: the
+    //comparison script parses one line shape, and a second hand-rolled loop is where a column/row
+    //or a precision difference would enter without anything failing.
+    void dump_c_matrix(const char *tag, const MatrixXd &C, const std::vector<NAO> &orbitals,
+                       const VectorXd &occ)
+    {
+        const int nao = static_cast<int>(C.rows());
+        std::cout << tag << " index atom l m shell class occ coefficients[" << nao << "]"
+                  << std::endl;
+        for (int i = 0; i < nao; i++) {
+            const NAO &o = orbitals[i];
+            std::cout << tag << " " << i << " " << o.atom << " " << o.l << " " << o.m << " "
+                      << o.shell << " " << static_cast<int>(o.type) << " " << std::setprecision(10)
+                      << std::fixed << occ(i);
+            for (int k = 0; k < nao; k++) std::cout << " " << C(k, i);
+            std::cout << std::endl;
+        }
     }
 
     const char *class_label(const NAOClass c)
@@ -159,8 +187,11 @@ std::vector<NAOBasisFunction> spherical_ao_map(const WFN &wavy)
     for (size_t s = 0; s < nbas; s++) {
         const int a = bas[8 * s + 0], l = bas[8 * s + 1];
         const int idx = shell_counter[{ a, l }]++;
+        ivec component(2 * l + 1);
         for (int m = 0; m <= 2 * l; m++)
-            map.push_back(NAOBasisFunction{ a, l, idx, m });
+            component[constants::orca_2_pySCF(l, m).value()] = m;
+        for (int m = 0; m <= 2 * l; m++)
+            map.push_back(NAOBasisFunction{ a, l, idx, component[m] });
     }
     return map;
 }
@@ -192,13 +223,9 @@ NAOResult build_naos(const dMatrix2 &P_in, const dMatrix2 &S_in, const std::vect
     }
 
     //---------------------------------------------------------------- 1. pre-NAOs
-    //Inside one atom, shells of different l are orthogonal by symmetry and so are different m,
-    //so the only non-trivial block is (atom, l) averaged over m.  Solving
-    //(S P S) c = w S c there gives orbitals with c^T S c = 1 whose occupancy is exactly w.
-    //Using the atom's own block of P with its own block of S as the metric instead - the net
-    //rather than the gross atomic population - moves half an electron per carbon in epoxide, and
-    //keeping these orbitals but weighting the orthogonalisation below by the net population
-    //c^T P^A c is worse again (0.4 e on epoxide's oxygen).  Gross it is, for both.
+    //Within each (atom, l), solve the m-averaged (S P S)c = w S c.
+    //NAO_PRENAO_NET selects the net-density diagnostic.
+    const bool prenao_net = nao_env("NAO_PRENAO_NET");
     MatrixXd C = MatrixXd::Zero(nao, nao);
     VectorXd pre_occ = VectorXd::Zero(nao);
     std::vector<NAO> orbitals(nao);
@@ -213,7 +240,8 @@ NAOResult build_naos(const dMatrix2 &P_in, const dMatrix2 &S_in, const std::vect
             for (int s2 = 0; s2 < ns; s2++)
                 for (int m = 0; m < nm; m++) {
                     Sb(s1, s2) += S(g.idx[s1][m], g.idx[s2][m]) / nm;
-                    Pb(s1, s2) += SPS(g.idx[s1][m], g.idx[s2][m]) / nm;
+                    Pb(s1, s2) += (prenao_net ? P(g.idx[s1][m], g.idx[s2][m])
+                                              : SPS(g.idx[s1][m], g.idx[s2][m])) / nm;
                 }
         //(S P S)^A c = w S^A c becomes the ordinary eigenproblem X (S P S)^A X y = w y with
         //X = (S^A)^-1/2 and c = X y, which keeps c^T S c = 1
@@ -230,7 +258,7 @@ NAOResult build_naos(const dMatrix2 &P_in, const dMatrix2 &S_in, const std::vect
                 pre_occ(col) = w;
                 orbitals[col].atom = g.atom;
                 orbitals[col].l = g.l;
-                orbitals[col].m = m;
+                orbitals[col].m = ao[g.idx[0][m]].m;
                 orbitals[col].shell = shell;
                 orbitals[col].n = g.l + 1 + shell;
                 group_columns[{ g.atom, g.l }].push_back(col);
@@ -270,14 +298,13 @@ NAOResult build_naos(const dMatrix2 &P_in, const dMatrix2 &S_in, const std::vect
         }
     }
 
+    //Dump the AO -> pre-NAO transform for comparison with NBO 7 unit 32.
+    if (nao_env("NAO_DUMP_CPRE")) dump_c_matrix("NAOCPRE", C, orbitals, pre_occ);
+
     //---------------------------------------------------------------- 3. orthogonalisation
-    //Three sets in decreasing priority: core, valence, Rydberg.  Each is Schmidt-projected out
-    //of everything above it - so a core keeps its shape exactly, which is what makes its
-    //occupancy come out at 1.99995 rather than 1.9991 - and then occupancy-weighted
-    //symmetrically orthogonalised among its own members.
-    //Core and valence stay separate classes: orthogonalising the whole natural minimal basis in
-    //one OWSO, the way the 1985 paper reads, moves epoxide and nh3bh3 further from NBO 7 (worst
-    //|dq| 0.020 -> 0.022 and 0.019 -> 0.022) and benzene from 0.004 to 0.006.
+    //Schmidt-project core, valence, then Rydberg and OWSO within each class.
+    //NAO_LEGACY_CASCADE omits Rydberg re-naturalization for comparison.
+    const bool legacy_cascade = nao_env("NAO_LEGACY_CASCADE");
     ivec cols_by_class[3];
     for (int i = 0; i < nao; i++)
         cols_by_class[static_cast<int>(orbitals[i].type)].push_back(i);
@@ -286,9 +313,7 @@ NAOResult build_naos(const dMatrix2 &P_in, const dMatrix2 &S_in, const std::vect
     for (int i = 0; i < nao; i++)
         l_blocks[{ orbitals[i].atom, orbitals[i].l }].push_back(i);
 
-    //The weights stay the pre-NAO occupancies.  Re-running steps 3 and 4 with the weights taken
-    //from the orbitals they produce does converge, but to the wrong answer - epoxide's hydrogens
-    //end at +0.66 - so the pre-NAO occupancy is the weight, not a first guess at one.
+    //Use pre-NAO occupancies for core and valence OWSO; Rydberg weights come from step 5.
     MatrixXd done(nao, 0);  //everything orthonormalised so far, in S
     for (int cls = 0; cls < 3; cls++) {
         const ivec &cols = cols_by_class[cls];
@@ -304,7 +329,41 @@ NAOResult build_naos(const dMatrix2 &P_in, const dMatrix2 &S_in, const std::vect
             for (int j = 0; j < B.cols(); j++)
                 B.col(j) /= std::sqrt(std::max(B.col(j).dot(S * B.col(j)), 1e-300));
         }
-        B = B * owso(MatrixXd(B.transpose() * S * B), w);
+        //---------------------------------------------- 5. intracenter naturalization of the NRBs
+        //Re-naturalize the Schmidt-projected Rydberg block before its OWSO.
+        if (cls == 2 && !legacy_cascade) {
+            const MatrixXd Sloc = B.transpose() * S * B, Ploc = B.transpose() * SPS * B;
+            std::map<std::pair<int, int>, ivec> ryd_blocks;  //(atom, l) -> LOCAL columns of B
+            for (size_t j = 0; j < cols.size(); j++)
+                ryd_blocks[{ orbitals[cols[j]].atom, orbitals[cols[j]].l }].push_back(static_cast<int>(j));
+            const MatrixXd Bold = B;  //the combination reads the old vectors while B is overwritten
+            for (const auto &kv : ryd_blocks) {
+                const int nm_r = 2 * kv.first.second + 1;
+                const ivec &grp = kv.second;  //shell-major, m contiguous, descending pre-NAO occupancy
+                const int ns_r = static_cast<int>(grp.size()) / nm_r;
+                MatrixXd Sb = MatrixXd::Zero(ns_r, ns_r), Pb = MatrixXd::Zero(ns_r, ns_r);
+                for (int s1 = 0; s1 < ns_r; s1++)
+                    for (int s2 = 0; s2 < ns_r; s2++)
+                        for (int m = 0; m < nm_r; m++) {
+                            Sb(s1, s2) += Sloc(grp[s1 * nm_r + m], grp[s2 * nm_r + m]) / nm_r;
+                            Pb(s1, s2) += Ploc(grp[s1 * nm_r + m], grp[s2 * nm_r + m]) / nm_r;
+                        }
+                const MatrixXd X = sym_power(Sb, -0.5);
+                Eigen::SelfAdjointEigenSolver<MatrixXd> es(X * Pb * X);
+                for (int sh = 0; sh < ns_r; sh++) {
+                    const int k = ns_r - 1 - sh;  //descending occupancy, as step 1
+                    const VectorXd c = X * es.eigenvectors().col(k);
+                    for (int m = 0; m < nm_r; m++) {
+                        VectorXd v = VectorXd::Zero(nao);
+                        for (int s = 0; s < ns_r; s++) v += c(s) * Bold.col(grp[s * nm_r + m]);
+                        B.col(grp[sh * nm_r + m]) = v;
+                        w(grp[sh * nm_r + m]) = std::max(es.eigenvalues()(k), 0.0);
+                    }
+                }
+            }
+        }
+        if (!nao_env("NAO_OWSO_OFF"))
+            B = B * owso(MatrixXd(B.transpose() * S * B), w);
         //the weighted inverse square root leaves the near-zero-weight directions orthonormal only
         //to about 1e-5; one unweighted Loewdin on a matrix that is already I + O(1e-5) cleans that
         //up without moving the occupied orbitals
@@ -316,15 +375,51 @@ NAOResult build_naos(const dMatrix2 &P_in, const dMatrix2 &S_in, const std::vect
     }
 
     //---------------------------------------------------------------- 4. natural character
-    //The set is orthonormal now but the orthogonalisation mixed the shells of one l, so
-    //re-diagonalise inside every (atom, l) block - m-averaged again, which is what keeps the
-    //components of a shell degenerate.  Valence and Rydberg go in one block: separating them
-    //leaves the valence-Rydberg coupling in place and inflates the Rydberg occupancies tenfold.
-    //The mixing is intra-atomic and unitary, so it moves no charge between atoms.
+    //Re-diagonalize the m-averaged density within each (atom, l) block.
+    //Intraatomic rotations preserve atomic charges but can change Val/Ryd populations.
     const MatrixXd Porb = C.transpose() * SPS * C;
+    //NAO_DUMP_STEP3: the occupancies step 4 inherits.  If the valence deficit against NBO 7 is
+    //already visible here, step 4 is not the place to look for it.
+    if (nao_env("NAO_DUMP_STEP3")) {
+        std::cout << "STEP3 atom l shell class occ_per_component pre_occ_per_component" << std::endl;
+        for (const auto &kv : l_blocks) {
+            const int nm = 2 * kv.first.second + 1;
+            const ivec &cols = kv.second;
+            for (size_t sh = 0; sh * nm < cols.size(); sh++) {
+                double occ = 0.0, pre = 0.0;
+                for (int m = 0; m < nm; m++) {
+                    occ += Porb(cols[sh * nm + m], cols[sh * nm + m]) / nm;
+                    pre += pre_occ(cols[sh * nm + m]) / nm;
+                }
+                std::cout << "STEP3 " << kv.first.first << " " << kv.first.second << " " << sh
+                          << " " << static_cast<int>(orbitals[cols[sh * nm]].type)
+                          << " " << std::setprecision(8) << std::fixed << occ
+                          << " " << pre << std::endl;
+            }
+        }
+    }
+    //Core remains separate; valence and Rydberg share a block unless NAO_CLASS_SPLIT is set.
+    const bool class_split = nao_env("NAO_CLASS_SPLIT");
+    const bool core_pooled = nao_env("NAO_CORE_POOLED");
+    std::vector<ivec> blocks;
     for (auto &kv : l_blocks) {
-        const ivec &cols = kv.second;
-        const int l = kv.first.second, nm = 2 * l + 1;
+        const int nm_of_block = 2 * kv.first.second + 1;
+        const ivec &all = kv.second;
+        if (!class_split && core_pooled) { blocks.push_back(all); continue; }
+        ivec per_class[3];
+        for (size_t j = 0; j * nm_of_block < all.size(); j++) {
+            const int cls = static_cast<int>(orbitals[all[j * nm_of_block]].type);
+            //bucket 0 is the core either way; without the full split, valence and Rydberg share 1
+            const int bucket = class_split ? cls : (cls == 0 ? 0 : 1);
+            for (int m = 0; m < nm_of_block; m++)
+                per_class[bucket].push_back(all[j * nm_of_block + m]);
+        }
+        for (int b = 0; b < 3; b++)
+            if (!per_class[b].empty()) blocks.push_back(per_class[b]);
+    }
+    for (const ivec &block_cols : blocks) {
+        const ivec &cols = block_cols;
+        const int l = orbitals[cols[0]].l, nm = 2 * l + 1;
         const int ns = static_cast<int>(cols.size()) / nm;
         if (ns <= 1) continue;
         //cols is shell-major with the m components contiguous
@@ -350,6 +445,9 @@ NAOResult build_naos(const dMatrix2 &P_in, const dMatrix2 &S_in, const std::vect
     NAOResult res;
     const MatrixXd Pfin = C.transpose() * SPS * C;
     for (int i = 0; i < nao; i++) orbitals[i].occupation = Pfin(i, i);
+
+    //Dump the AO -> NAO transform for comparison with NBO 7 unit 33.
+    if (nao_env("NAO_DUMP_C")) dump_c_matrix("NAOC", C, orbitals, Pfin.diagonal());
 
     res.C = to_dmatrix(C);
     res.orbitals = orbitals;
@@ -389,6 +487,33 @@ namespace
                 ecp[a] = wavy.get_atom_ECP_electrons(static_cast<int>(a));
         return build_naos(P, S, ao, ats, ecp);
     }
+
+    NAOResult project_spin(const NAOResult &total, const dMatrix2 &P, const dMatrix2 &S)
+    {
+        NAOResult res = total;
+        const MatrixXd C = to_eigen(total.C), Sm = to_eigen(S);
+        const MatrixXd D = C.transpose() * Sm * to_eigen(P) * Sm * C;
+        res.population = res.core = res.valence = res.rydberg = 0.0;
+        for (NAOAtom &a : res.atoms)
+            a.population = a.core = a.valence = a.rydberg = 0.0;
+        for (size_t i = 0; i < res.orbitals.size(); i++) {
+            NAO &o = res.orbitals[i];
+            o.occupation = D(i, i);
+            NAOAtom &a = res.atoms[o.atom];
+            a.population += o.occupation;
+            if (o.type == NAOClass::Core) a.core += o.occupation;
+            else if (o.type == NAOClass::Valence) a.valence += o.occupation;
+            else a.rydberg += o.occupation;
+        }
+        for (NAOAtom &a : res.atoms) {
+            a.charge = a.Z_eff - a.population;
+            res.population += a.population;
+            res.core += a.core;
+            res.valence += a.valence;
+            res.rydberg += a.rydberg;
+        }
+        return res;
+    }
 }
 
 dMatrix2 ao_overlap(const WFN &wavy)
@@ -398,11 +523,14 @@ dMatrix2 ao_overlap(const WFN &wavy)
     compute2C<Overlap2C_SPH>(params, S_flat);
     const size_t n = static_cast<size_t>(std::llround(std::sqrt(static_cast<double>(S_flat.size()))));
     dMatrix2 S = reshape<dMatrix2>(S_flat, Shape2D(n, n));
-    //ORCA stores the |m| >= 3 components - f(+-3), g(+-3), g(+-4) - with the sign opposite to
-    //libcint's, and the gbw reader keeps its convention in the density, so the overlap next to that
-    //density has to take ORCA's sign as well.  This is the same correction the FILE47 writer
-    //applies; without it Tr(P S) misses up to 0.3 e (SF6) and every NAO population inherits it.
-    if (wavy.get_origin() == e_origin::gbw) {
+    //An ORCA-convention density (gbw, and a molden written from one) carries the opposite sign on the
+    //|m| >= 3 components, so the overlap next to it has to take that sign as well - see
+    //origin_has_orca_pure_phases.  This is the same correction the FILE47 writer applies; without it
+    //Tr(P S) misses up to 0.3 e (SF6) and every NAO population inherits it.  Scanned against the
+    //electron count on CuF2_i_func/71/calc.gbw (shells up to i): flipping every |m| >= 3 gives
+    //46.99929 of 47, stopping at |m| <= 3 gives 46.99845, flipping nothing 46.95769 - so "all |m| >= 3"
+    //it is, and the 7e-4 that remains is a separate high-l matter, identical for the gbw and the molden.
+    if (origin_has_orca_pure_phases(wavy.get_origin())) {
         const ivec bas = params.get_bas();
         bvec flip(n, false);
         size_t k = 0;
@@ -431,33 +559,17 @@ NPAResult natural_population_analysis(const WFN &wavy)
     NPAResult res;
     const dMatrix2 Pb = wavy.get_dm_beta();
     if (wavy.get_is_unrestricted() && Pb.extent(0) == ao.size()) {
-        //different NAOs for different spins, as NBO does by default: the two spin densities are
-        //analysed independently and the charges come from the sum of the two populations
         dMatrix2 Pa(ao.size(), ao.size());
         for (size_t i = 0; i < ao.size(); i++)
             for (size_t j = 0; j < ao.size(); j++)
                 Pa(i, j) = P(i, j) - Pb(i, j);
-        res.alpha = analyse(Pa, S, ao, wavy);
-        res.beta = analyse(Pb, S, ao, wavy);
+        res.total = analyse(P, S, ao, wavy);
+        res.alpha = project_spin(res.total, Pa, S);
+        res.beta = project_spin(res.total, Pb, S);
         res.spin_resolved = true;
-        res.total = res.alpha;
-        for (size_t a = 0; a < res.total.atoms.size(); a++) {
-            NAOAtom &t = res.total.atoms[a];
-            const NAOAtom &b = res.beta.atoms[a];
-            t.population += b.population;
-            t.core += b.core;
-            t.valence += b.valence;
-            t.rydberg += b.rydberg;
-            t.charge = t.Z_eff - t.population;
-            res.spin_population.push_back(res.alpha.atoms[a].population - b.population);
-        }
-        res.total.population = res.alpha.population + res.beta.population;
-        res.total.core = res.alpha.core + res.beta.core;
-        res.total.valence = res.alpha.valence + res.beta.valence;
-        res.total.rydberg = res.alpha.rydberg + res.beta.rydberg;
-        //the orbital table of a spin-resolved run belongs to the two spin sets
-        res.total.orbitals.clear();
-        res.total.C = dMatrix2();
+        res.spin_population.resize(res.total.atoms.size(), 0.0);
+        for (size_t a = 0; a < res.total.atoms.size(); a++)
+            res.spin_population[a] = res.alpha.atoms[a].population - res.beta.atoms[a].population;
     }
     else {
         err_checkf(!wavy.get_is_unrestricted(),
@@ -473,6 +585,16 @@ namespace
 {
     //with_charge = false for one spin on its own, where Z_eff minus that spin's population is not
     //a charge and printing it invites the reader to add the two tables up
+    //An occupancy is a number of electrons and cannot be negative. A diagonalisation leaves a nearly empty
+    //Rydberg NAO at a tiny value of either sign, and at 5 decimals that printed "Ryd( 6s)   -0.00000" -
+    //which reads as a negative occupancy and is not even stable: the same molecule translated by 4.35 bohr
+    //printed +0.00000 for it. The threshold is far below any occupancy worth reading, so an occupancy that
+    //is genuinely negative - which WOULD be a defect - is still printed with its sign.
+    double printable_occupation(const double occ)
+    {
+        return std::abs(occ) < 1e-9 ? 0.0 : occ;
+    }
+
     void print_one(const NAOResult &r, const std::string &title, std::ostream &out,
                    const bool with_charge = true)
     {
@@ -490,7 +612,7 @@ namespace
                     << "  " << left << setw(7) << shell_label(o.l, o.m) << right
                     << class_label(o.type) << "(" << setw(2) << o.n
                     << string(1, "spdfghik"[std::min(o.l, 7)]) << ")" << setw(12) << fixed
-                    << setprecision(5) << o.occupation << "\n";
+                    << setprecision(5) << printable_occupation(o.occupation) << "\n";
             }
         }
         out << "\n Summary of Natural Population Analysis:\n\n"
@@ -543,9 +665,9 @@ void print_npa(const NPAResult &result, std::ostream &out)
 {
     citations::cite(citations::Method::NAONPA, out);
     if (result.spin_resolved) {
+        print_one(result.total, "Natural atomic orbital occupancies", out);
         print_one(result.alpha, "alpha spin natural atomic orbital occupancies", out, false);
         print_one(result.beta, "beta spin natural atomic orbital occupancies", out, false);
-        print_one(result.total, "both spins", out);
         out << "\n\n  Atom No     Natural Charge      Spin Population (alpha - beta)\n"
             << " ---------------------------------------------------------------\n";
         for (size_t a = 0; a < result.total.atoms.size(); a++)

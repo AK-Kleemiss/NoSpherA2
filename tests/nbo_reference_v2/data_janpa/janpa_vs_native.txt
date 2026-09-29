@@ -1,0 +1,46 @@
+--- the three sides share one wavefunction and one gauge (checked, not assumed) ---
+mol          n max|dS|,|dP|  max|DSjD-S| janpa CtSC-I gennbo CtSC-I
+ammonia     49    0.000e+00    6.000e-10    2.690e-09    2.810e-09
+benzene    222    0.000e+00    1.000e-09    9.927e-09    2.271e-09
+ethane      98    0.000e+00    1.000e-09    2.545e-09    2.633e-09
+lif         45    0.000e+00    1.000e-09    6.801e-10    1.613e-09
+pf5        192    0.000e+00    8.000e-10    1.988e-09    1.915e-09
+sf6        223    0.000e+00    1.000e-09    4.249e-09    2.491e-09
+so2         99    0.000e+00    1.000e-09    9.675e-10    1.975e-09
+water       43    0.000e+00    4.000e-10    6.784e-10    2.463e-09
+
+--- the arm labels, verified by measurement: Rydberg population error vs gennbo's printed table (published: legacy 0.3161 e, renat5 0.0050 e worst) ---
+mol       gennbo Ryd e   legacy err   renat5 err    legacy sine  renat5 sine
+ammonia         0.0302       0.0296      -0.0003         0.1025       0.0036
+benzene         0.1155       0.3161       0.0050         0.2445       0.0301
+ethane          0.0249       0.1299       0.0004         0.1746       0.0115
+lif             0.0512       0.0012       0.0000         0.0859       0.0101
+pf5             0.2685      -0.0194      -0.0001         0.0913       0.0026
+sf6             0.3574      -0.0089       0.0004         0.0960       0.0062
+so2             0.2960      -0.0169      -0.0021         0.0906       0.0062
+water           0.0265       0.0127       0.0011         0.0898       0.0049
+  worst |pop err|: legacy 0.3161 e  renat5 0.0050 e  (over 8 molecules)
+
+--- worst m-averaged, tie-run block metric, every pair of sides, same metric ---
+mol        shells  JANPA:gennbo legacy:gennbo renat5:gennbo    legacy:JANPA  renat5:JANPA
+ammonia        23     2.608e-02     4.207e-01     3.693e-03       4.227e-01     3.049e-02
+benzene        90     1.603e-02     9.883e-01     1.651e-01       9.821e-01     1.651e-01
+ethane         46     1.432e-02     9.945e-01     5.656e-03       9.947e-01     1.432e-02
+lif            19     1.010e-02     4.264e-01     1.965e-03       4.087e-01     1.010e-02
+pf5            68     3.561e-02     9.060e-01     3.295e-03       9.059e-01     3.560e-02
+sf6            79     3.516e-02     9.330e-01     2.717e-02       9.437e-01     3.516e-02
+so2            35     3.924e-02     9.172e-01     8.413e-03       9.174e-01     3.924e-02
+water          19     1.164e-02     5.726e-01     3.789e-03       5.713e-01     1.164e-02
+
+--- NPA charges in ELECTRONS, max |dq| per molecule.  Native's charges are computed from its own dump (Z_A - occ on A), gennbo's and JANPA's are each code's printed table; gennbo prints 4 decimals, so its own floor is 5e-05 ---
+mol       JANPA:gennbo legacy:gennbo renat5:gennbo   legacy:JANPA renat5:JANPA
+ammonia      4.762e-03    9.963e-03    2.996e-03      5.202e-03    1.766e-03
+benzene      1.588e-03    6.708e-03    1.607e-03      8.291e-03    3.190e-03
+ethane       5.297e-03    9.012e-03    4.109e-03      3.716e-03    1.188e-03
+lif          3.199e-04    1.964e-03    3.995e-05      2.284e-03    3.598e-04
+pf5          2.017e-03    1.306e-02    4.478e-04      1.105e-02    2.464e-03
+sf6          4.256e-03    1.630e-02    1.501e-03      1.204e-02    2.755e-03
+so2          3.918e-03    2.803e-02    2.017e-03      2.411e-02    1.901e-03
+water        2.423e-03    1.651e-03    4.926e-04      7.723e-04    1.931e-03
+  worst over 8 molecules: JANPA:gennbo 5.297e-03 | legacy:gennbo 2.803e-02 renat5:gennbo 4.109e-03
+  median over 8 molecules: JANPA:gennbo 2.106e-02 | legacy:gennbo 9.116e-01 renat5:gennbo 4.723e-03 | legacy:JANPA 9.117e-01 renat5:JANPA 3.283e-02

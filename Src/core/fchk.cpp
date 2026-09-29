@@ -758,11 +758,10 @@ double read_fchk_double(std::ifstream& in, const char* search, bool rewind)
 		return read_fchk_double(temp);
 };
 
-//(2a/constants::PI)^(3/4) (4a)^(l/2) / sqrt((2l-1)!!): the norm of x^l exp(-a r^2), the primitive normalisation fchk contraction coefficients leave out
-static double axial_prim_norm(const int l, const double a)
-{
-		return pow(pow(2, 3 + 4 * l) * pow(a, 2 * l + 3) / constants::PI3 / pow(constants::double_ft[std::max(2 * l - 1, 0)], 2), 0.25);
-}
+//the primitive normalisation fchk contraction coefficients leave out. The formula now lives beside
+//the (2l-1)!! table it is built from, in constants.h, because WFN::build_DM spelled the same four
+//numbers out as an s/p/d/f switch and had nothing for g.
+using constants::axial_prim_norm;
 
 bool free_fchk(std::ostream &file, const std::filesystem::path &fchk_name, const std::filesystem::path &basis_set_path, WFN &wave, const bool &debug, const bool force_overwrite)
 {
@@ -1203,16 +1202,13 @@ bool free_fchk(std::ostream &file, const std::filesystem::path &fchk_name, const
 																nao += 6;
 														break;
 												case 4:
-														// this hardcoded piece is due to the order of f-type functions in the fchk
-														for (int i = 0; i < 3; i++)
-																CMO_beta.push_back(changed_coefs[m][wave.get_shell_start_in_primitives(a, s) + i]);
-														CMO_beta.push_back(changed_coefs[m][wave.get_shell_start_in_primitives(a, s) + 6]);
-														for (int i = 0; i < 2; i++)
-																CMO_beta.push_back(changed_coefs[m][wave.get_shell_start_in_primitives(a, s) + i + 3]);
-														for (int i = 0; i < 2; i++)
-																CMO_beta.push_back(changed_coefs[m][wave.get_shell_start_in_primitives(a, s) + i + 7]);
-														CMO_beta.push_back(changed_coefs[m][wave.get_shell_start_in_primitives(a, s) + 5]);
-														CMO_beta.push_back(changed_coefs[m][wave.get_shell_start_in_primitives(a, s) + 9]);
+														// The fchk orders f functions differently from the wfn types, and the alpha branch above
+														// resolves that by asking which primitive carries each type.  This branch spelled the same
+														// permutation out as fixed offsets 0,1,2,6,3,4,7,8,5,9, which is only that permutation while
+														// the shell's primitives happen to be stored in ascending type order - the assumption
+														// prim_of_type exists to avoid.  A scrambled beta CMO block is invisible downstream.
+														for (int i = 0; i < 10; i++)
+																CMO_beta.push_back(changed_coefs[m][prim_of_type(wave, wave.get_shell_start_in_primitives(a, s), fchk_f_types[i])]);
 														if (debug && wave.get_atom_shell_primitives(a, s) != 1)
 																file << "Pushing back 10 coefficient for F shell, this shell has " << wave.get_atom_shell_primitives(a, s) << " primitives!\n";
 														if (m == 0)

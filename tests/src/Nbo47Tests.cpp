@@ -1,6 +1,7 @@
 #include "pch.h"
 
 #include "core/wfn_class.h"
+#include "core/nbo.h"
 #include "core/nbo_run.h"
 
 #include <stdexcept>
@@ -377,6 +378,46 @@ TEST(NboRun, ParsesReferenceOutputOfTheEpoxideFixture)
 		EXPECT_GT(e.energy_kcal, 0.0);
 		EXPECT_NE(e.donor_index, e.acceptor_index);
 	}
+}
+
+//-nbo_native printed the NBO table and the E2 table into NoSpherA2.log and nothing else: the natural
+//population analysis, the line every reader of an NBO run looks at first, went only into
+//<stem>.native.nbo.json.  print_nbo prints it, and this is the check that it prints the numbers it
+//was given rather than a second set - the epoxide reference is a real parsed result, so the seven
+//charges and totals are known and the two sums are the identities a reader checks on the spot.
+TEST(NboRun, ThePrintedPopulationTableCarriesEveryAtomAndItsOwnSums)
+{
+	const auto reference_nbo = repo_root() / "tests" / "epoxide_gbw" / "NBO" / "reference.nbo";
+	if (!std::filesystem::exists(reference_nbo))
+		GTEST_SKIP() << "NBO reference fixture is not available";
+	NboResults r = parse_nbo_output(reference_nbo);
+	ASSERT_EQ(r.npa.size(), 7u);
+
+	std::ostringstream out;
+	print_nbo(r, out);
+	const std::string text = out.str();
+	const auto fixed_str = [](const double v) {
+		std::ostringstream s;
+		s << std::fixed << std::setprecision(5) << v;
+		return s.str();
+	};
+	EXPECT_NE(text.find("NATURAL POPULATION ANALYSIS"), std::string::npos) << text;
+	double charge_sum = 0.0, total_sum = 0.0;
+	for (const NboAtomPopulation& p : r.npa) {
+		EXPECT_NE(text.find(fixed_str(p.charge)), std::string::npos)
+			<< "charge of " << p.element << p.index << " missing";
+		EXPECT_NE(text.find(fixed_str(p.total)), std::string::npos)
+			<< "population of " << p.element << p.index << " missing";
+		charge_sum += p.charge;
+		total_sum += p.total;
+	}
+	EXPECT_NE(text.find(fixed_str(charge_sum)), std::string::npos) << "the charge sum is not printed";
+	EXPECT_NE(text.find(fixed_str(total_sum)), std::string::npos) << "the electron sum is not printed";
+	//a closed-shell result must not grow a spin-density column
+	EXPECT_FALSE(r.npa.front().has_spin_density);
+	EXPECT_EQ(text.find("Spin dens."), std::string::npos) << text;
+	//and the check has to be able to fail: a charge nobody printed is not found
+	EXPECT_EQ(text.find(fixed_str(r.npa.front().charge + 0.01234)), std::string::npos);
 }
 
 TEST(NboRun, ComparisonPassesAgainstItselfAndCatchesAShiftedCharge)

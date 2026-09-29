@@ -390,6 +390,33 @@ void append_numbers(const std::string& line, std::vector<T>& out, const std::str
 	err_checkf(is.eof(), "Not a number in " + what + ": '" + line + "'", log);
 }
 
+/** @brief Restores a stream's sticky format state - flags, precision, width - when it goes out of
+ *  scope, on every path including an unwinding exception.
+ *
+ *  std::fixed and std::setprecision stay set on the stream after the statement that wrote them, and
+ *  the analyses here print tables at three or four decimals. Everything printed afterwards through
+ *  the same stream then carries that precision: the second of two RGBI analyses in one process
+ *  printed a population as 1.295 where the first printed 1.29453, the same number in fewer digits.
+ *  An analysis that prints has no business changing how the rest of the program prints, so every
+ *  entry point that formats its output holds one of these. */
+struct ostream_format_guard
+{
+	std::ostream& stream;
+	const std::ios_base::fmtflags flags;
+	const std::streamsize precision;
+	const std::streamsize width;
+	explicit ostream_format_guard(std::ostream& s)
+		: stream(s), flags(s.flags()), precision(s.precision()), width(s.width()) {}
+	ostream_format_guard(const ostream_format_guard&) = delete;
+	ostream_format_guard& operator=(const ostream_format_guard&) = delete;
+	~ostream_format_guard()
+	{
+		stream.flags(flags);
+		stream.precision(precision);
+		stream.width(width);
+	}
+};
+
 inline void print_centered_text(const std::string& text, int& bar_width, std::ostream& file = std::cout)
 {
 	const int text_length = static_cast<int>(text.length());
@@ -444,6 +471,7 @@ public:
 		int bw = bar_width_ + 2;
 		print_centered_text(status_text_, bw, stream_);
 		linestart = stream_.tellp();
+		barend_ = linestart;
 #ifdef _WIN32
 			initialize_taskbar_progress();
 #endif
@@ -492,6 +520,9 @@ private:
 	std::atomic<unsigned long long> bar_writes_{0};
 	float progress_;
 	std::streampos linestart;
+	//where the bar's own last write ended; a put position anywhere else means the loop printed something
+	//that must not be overwritten. See write_progress().
+	std::streampos barend_{};
 	bool finished_ = false;
 #ifdef _WIN32
 	//Assigned only inside initialize_taskbar_progress()'s SUCCEEDED checks; without the initialiser the destructor calls through stack garbage when COM refuses
@@ -501,9 +532,13 @@ private:
 #endif
 };
 
+//even_steps rounds the point count up to even, which puts the centre of the box ON a grid plane. Pass false
+//only from a caller that sets its step to the requested resolution instead of to (Max-Min)/NbSteps: there an
+//extra point enlarges the box and does not move the centre. See the comment at the definition.
 void readxyzMinMax_fromWFN(
 	const WFN& wavy,
-	properties_options& opts);
+	properties_options& opts,
+	const bool even_steps = true);
 
 void readxyzMinMax_fromCIF(
 	std::filesystem::path cif,
@@ -982,9 +1017,13 @@ struct options
     //-basin_grid <n>: the quadrature of the basin analysis pulled into the core, tightest
     //exponent sharpened n^2-fold, radial step divided by n, Lebedev order up n - 1 entries
     int basin_grid = 1;
-    //-basin_cube: go back to finding the QTAIM basins on the cube. The default takes their
-    //attractors from the analytic critical-point search instead, which no voxel can add to
+    //-basin_cube: go back to finding the QTAIM and ELI-D basins on the cube. The default takes
+    //the density's attractors from the analytic critical-point search instead, which no voxel can
+    //add to, and sends every quadrature point up the analytic field for its basin
     bool basin_cube = false;
+    //-basin_analytic: the analytic ELI-D boundaries even below the 10 electrons they need to be
+    //defined everywhere, where the automatic choice would fall back to the cube
+    bool basin_analytic = false;
     int threads = -1;
     int pbc = 0;
     int charge = 0;
@@ -1021,6 +1060,16 @@ struct options
 	//development and test-only switches
 	bool digest_dev_options(const std::string &temp, int &i);
 	void digest_options();
+	/** @brief The error for an analysis that was asked for and has nothing to run on, "" when the
+	 *  command line is runnable. Everything it reports only runs inside run_app_impl's
+	 *  wavefunction branch, so without -wfn/-occ it is skipped in silence - which is how
+	 *  `-rgbi water.gbw` (RGBI has no positional form) came to exit 0 having done nothing. */
+	std::string unrunnable_analysis() const;
+	/** @brief Refuses a command line whose bonding options nothing will read: -rgbi/-npa together
+	 *  with an analysis that ends the run before them, and an -nbo_/-nrt_ option on a line that
+	 *  runs no NBO analysis. Both used to exit 0 having quietly done something else. Called at the
+	 *  end of digest_options(), so option order does not matter. */
+	void refuse_unread_bonding_options();
 
 	options() : log_file(std::cout)
 	{
@@ -1032,6 +1081,19 @@ struct options
 		look_for_debug(argc, argv);
 	};
 };
+
+/** @brief The analysis whose options begin with this flag's prefix, nullptr for a flag that names
+ *  none. digest_options refuses an unclaimed flag inside one of those families instead of dropping
+ *  it, so a misspelling cannot hand back the analysis' default. */
+const char *owning_analysis(const std::string &flag);
+
+/** @brief The -nbo_ and -nrt_ options the -nbo/-nbo_parse/-nbo_native/-convert_to_47 handlers read
+ *  from the tokens after their own wavefunction rather than through a digester. This is the only
+ *  list of flags the parser keeps: every other option is known by the digester that claims it, and
+ *  a flag a digester claims never reaches the unknown-option refusal. Adding an option to a
+ *  digester is therefore enough; adding one to a handler's own scan loop needs an entry here, which
+ *  is what CliRefusalTests' AnalysisFlagsAreEitherDigestedOrListed asserts. */
+const std::set<std::string> &nbo_family_suboptions();
 
 void convert_tonto_XCW_lambda_steps(const std::string& str, const std::string& lambda_step, bool debug, options& opt);
 

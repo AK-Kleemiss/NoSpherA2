@@ -1714,7 +1714,9 @@ void properties_calculation(options &opt)
 		readxyzMinMax_fromCIF(opt.cif, opt.properties, cell_matrix);
 	else
 	{
-		readxyzMinMax_fromWFN(wavy, opt.properties);
+		//no even-point rounding here: the step below is the requested resolution and not the span over the
+		//point count, so one more point would enlarge the box instead of putting its centre on a grid plane
+		readxyzMinMax_fromWFN(wavy, opt.properties, false);
 		for (int i = 0; i < 3; i++)
 			cell_matrix[i][i] = constants::ang2bohr(opt.properties.resolution);
 	}

@@ -2,6 +2,7 @@
 #include "nbo.h"
 #include "wfn_class.h"
 #include "constants.h"
+#include "convenience.h"
 
 #include <Eigen/Dense>
 #include <fstream>
@@ -38,6 +39,13 @@ namespace
 
     MatrixXd sym_power(const MatrixXd& M, const double p, const double rel_floor = 1e-10)
     {
+        //A spin with nothing in it is a legitimate input: the beta spin of a hydrogen atom has no
+        //occupied NAO, so the Lewis set is empty and this is called on a 0 x 0 matrix.  Eigen's
+        //maxCoeff() on an empty expression is undefined - in a release build it reads past the end
+        //and segfaults, which is how -nbo_native on a one-electron wavefunction died.  The power of
+        //an empty matrix is that matrix, and every product below is already well defined for it.
+        if (M.rows() == 0 || M.cols() == 0)
+            return M;
         Eigen::SelfAdjointEigenSolver<MatrixXd> es(M);
         VectorXd w = es.eigenvalues();
         const double cut = rel_floor * std::max(w.maxCoeff(), 1e-300);
@@ -970,7 +978,9 @@ namespace
 
     //The NAO table in NBO's own order: per atom, per l, components in NBO's printing order, and
     //inside one component the shells by descending occupancy.
-    void fill_nao_table(NboResults& res, const NAOResult& nao, const vec& occupancy,
+    //out is res.nao for the spin-summed table and res.nao_alpha / res.nao_beta for the per-spin
+    //ones, which an open shell has to print as well: the sum hides a per-spin error that cancels.
+    void fill_nao_table(std::vector<NboNao>& out, const NAOResult& nao, const vec& occupancy,
                         const dMatrix2& fock_nao)
     {
         ivec order(nao.orbitals.size());
@@ -997,7 +1007,7 @@ namespace
             n.shell = std::to_string(o.n) + std::string(1, "spdfghik"[std::min(o.l, 7)]);
             n.occupancy = occupancy[i];
             if (fock_nao.extent(0)) n.energy = fock_nao(i, i);
-            res.nao.push_back(n);
+            out.push_back(n);
         }
     }
 }
@@ -1047,7 +1057,7 @@ NboResults native_nbo(WFN& wavy, const NboOptions& options, std::ostream& log)
                      in.fock.empty() ? dMatrix2() : in.fock[0], n_pairs, 2.0, "", options, lewis);
         vec occ(nao.orbitals.size(), 0.0);
         for (size_t i = 0; i < occ.size(); i++) occ[i] = nao.orbitals[i].occupation;
-        fill_nao_table(res, nao, occ, in.fock.empty() ? dMatrix2() : nao_operator(in.fock[0], nao.C));
+        fill_nao_table(res.nao, nao, occ, in.fock.empty() ? dMatrix2() : nao_operator(in.fock[0], nao.C));
         for (const NAOAtom& a : nao.atoms) {
             NboAtomPopulation p;
             p.element = constants::atnr2letter(a.Z);
@@ -1061,8 +1071,11 @@ NboResults native_nbo(WFN& wavy, const NboOptions& options, std::ostream& log)
         }
     }
     else {
-        //NBO analyses the two spin densities independently and prints a spin-summed NAO table
+        //NPA tables share total-density NAOs; NBO searches use separate spin densities.
         const auto t_nao = clock();
+        const dMatrix2 total_density = to_dmatrix(MatrixXd(to_eigen(in.density[0]) + to_eigen(in.density[1])));
+        const dMatrix2 spin_density = to_dmatrix(MatrixXd(to_eigen(in.density[0]) - to_eigen(in.density[1])));
+        const NAOResult total_nao = build_naos(total_density, in.overlap, in.ao, atoms, ecp);
         const NAOResult a_nao = build_naos(in.density[0], in.overlap, in.ao, atoms, ecp);
         const NAOResult b_nao = build_naos(in.density[1], in.overlap, in.ao, atoms, ecp);
         res.nao_seconds = std::chrono::duration<double>(clock() - t_nao).count();
@@ -1075,26 +1088,31 @@ NboResults native_nbo(WFN& wavy, const NboOptions& options, std::ostream& log)
                          static_cast<int>(std::llround(electrons)), 1.0, s ? "beta" : "alpha",
                          options, lewis);
         }
-        //the spin-summed NAO table needs one set of NAOs; the alpha set carries the labels and the
-        //occupancies are the two spin occupancies of the same NAO index, which is an approximation
-        //to what NBO prints (it re-derives a spin-averaged set)
-        vec occ(a_nao.orbitals.size(), 0.0);
+        vec occ(total_nao.orbitals.size(), 0.0);
         for (size_t i = 0; i < occ.size(); i++)
-            occ[i] = a_nao.orbitals[i].occupation + b_nao.orbitals[i].occupation;
-        fill_nao_table(res, a_nao, occ,
-                       in.fock.empty() ? dMatrix2() : nao_operator(in.fock[0], a_nao.C));
-        for (size_t a = 0; a < a_nao.atoms.size(); a++) {
-            const NAOAtom& x = a_nao.atoms[a];
-            const NAOAtom& y = b_nao.atoms[a];
+            occ[i] = total_nao.orbitals[i].occupation;
+        fill_nao_table(res.nao, total_nao, occ,
+                       in.fock.empty() ? dMatrix2() : nao_operator(in.fock[0], total_nao.C));
+        for (int s = 0; s < 2; s++) {
+            const dMatrix2 spin_nao = nao_density(in.density[s], in.overlap, total_nao.C);
+            vec spin_occ(total_nao.orbitals.size(), 0.0);
+            for (size_t i = 0; i < spin_occ.size(); i++) spin_occ[i] = spin_nao(i, i);
+            fill_nao_table(s ? res.nao_beta : res.nao_alpha, total_nao, spin_occ,
+                           static_cast<int>(in.fock.size()) > s ? nao_operator(in.fock[s], total_nao.C)
+                                                                : dMatrix2());
+        }
+        const dMatrix2 spin_nao = nao_density(spin_density, in.overlap, total_nao.C);
+        for (const NAOAtom& x : total_nao.atoms) {
             NboAtomPopulation p;
             p.element = constants::atnr2letter(x.Z);
             p.index = x.index + 1;
-            p.core = x.core + y.core;
-            p.valence = x.valence + y.valence;
-            p.rydberg = x.rydberg + y.rydberg;
-            p.total = x.population + y.population;
-            p.charge = x.Z_eff - p.total;
-            p.spin_density = x.population - y.population;
+            p.core = x.core;
+            p.valence = x.valence;
+            p.rydberg = x.rydberg;
+            p.total = x.population;
+            p.charge = x.charge;
+            for (size_t i = 0; i < total_nao.orbitals.size(); i++)
+                if (total_nao.orbitals[i].atom == x.index) p.spin_density += spin_nao(i, i);
             p.has_spin_density = true;
             res.npa.push_back(p);
         }
@@ -1110,9 +1128,101 @@ NboResults native_nbo(WFN& wavy, const NboOptions& options, std::ostream& log)
     return res;
 }
 
+//-nrt spends most of a run's time and used to report nowhere a reader looks: the resonance weights,
+//the bond orders and the valencies went into <stem>.native.nbo.json and NoSpherA2.log carried only
+//the two NRT citations, so a 6.6 s search on a 14-atom complex was indistinguishable from an
+//ignored flag.  The layout follows gennbo's own headings on purpose, so the two routes can be read
+//side by side; every number printed here is the one written to the JSON, unrounded there.
+void print_nrt(const NboResults& r, std::ostream& out)
+{
+    using namespace std;
+    const NboNrt& n = r.nrt;
+    if (!n.present) return;
+    const ostream_format_guard restore_format(out);
+    //bond orders carry atom indices only; the populations table is where the elements are
+    std::map<int, std::string> element;
+    for (const NboAtomPopulation& p : r.npa) element[p.index] = p.element;
+    for (const NboValency& v : n.valencies) element[v.atom] = v.element;
+    const auto label = [&element](const int a) {
+        const auto it = element.find(a);
+        return (it == element.end() ? std::string("?") : it->second) + std::to_string(a);
+    };
+
+    out << "\n NATURAL RESONANCE THEORY ANALYSIS (in house):\n\n"
+        << " " << n.structures_used << " of " << n.structures_found
+        << " resonance structures carry the fit, D(0) = " << fixed << setprecision(5) << n.d_0
+        << ", D(w) = " << n.d_w << "\n";
+    for (const std::string& s : n.notes) out << "   " << s << "\n";
+
+    if (!n.weights.empty()) {
+        out << "\n  RS   Weight(%)   Added(Removed)\n"
+            << " ---------------------------------------------------------------------------------\n";
+        for (const NboResonanceWeight& w : n.weights)
+            out << setw(4) << w.structure << setprecision(2) << setw(11) << w.weight_percent << "   "
+                << (w.spin.empty() ? "" : w.spin + ": ") << w.changes << "\n";
+    }
+    if (!n.bond_orders.empty()) {
+        out << "\n Natural Bond Order\n"
+            << "   Atom  Atom      Total   Covalent      Ionic\n"
+            << " ---------------------------------------------------------------------------------\n";
+        for (const NboBondOrder& b : n.bond_orders) {
+            out << "  " << left << setw(6) << label(b.atom1) << setw(6)
+                << (b.diagonal ? std::string() : label(b.atom2)) << right << fixed << setprecision(4)
+                << setw(11) << b.total;
+            if (b.diagonal)
+                out << "        ---        ---";
+            else
+                out << setw(11) << b.covalent << setw(11) << b.ionic;
+            if (!b.spin.empty()) out << "  " << b.spin;
+            out << "\n";
+        }
+    }
+    if (!n.valencies.empty()) {
+        out << "\n Natural Atomic Valencies\n"
+            << "   Atom    Valency  Covalency  Electroval.   Electrons\n"
+            << " ---------------------------------------------------------------------------------\n";
+        for (const NboValency& v : n.valencies) {
+            out << "  " << left << setw(6) << (v.element + std::to_string(v.atom)) << right << fixed
+                << setprecision(4) << setw(11) << v.valency << setw(11) << v.covalency << setw(11)
+                << v.electrovalency << setw(12) << v.electron_count;
+            if (!v.spin.empty()) out << "  " << v.spin;
+            out << "\n";
+        }
+    }
+    for (const std::string& s : n.symmetry_forms) out << " " << s << "\n";
+}
+
 void print_nbo(const NboResults& r, std::ostream& out)
 {
     using namespace std;
+    //fixed/setprecision below stay on the stream after this table, so everything printed through it
+    //afterwards would carry two decimals
+    const ostream_format_guard restore_format(out);
+    //The populations were JSON-only for the same reason the resonance tables were: nobody wrote the
+    //branch.  NPA charges are the most-read line of an NBO run, and on -nbo_native they appeared
+    //nowhere in NoSpherA2.log.  The per-NAO table stays in <stem>.native.nbo.json - it is 189 rows
+    //on a 14-atom complex and the populations are its summary.
+    if (!r.npa.empty()) {
+        const bool spin = r.npa.front().has_spin_density;
+        out << "\n NATURAL POPULATION ANALYSIS (in house):\n\n"
+            << "   Atom      Charge       Core    Valence    Rydberg      Total"
+            << (spin ? "   Spin dens.\n" : "\n")
+            << " ---------------------------------------------------------------------------------\n";
+        double charge_sum = 0.0, total_sum = 0.0;
+        for (const NboAtomPopulation& p : r.npa) {
+            out << "  " << left << setw(4) << (p.element + std::to_string(p.index)) << right << fixed
+                << setprecision(5) << setw(12) << p.charge << setw(11) << p.core << setw(11)
+                << p.valence << setw(11) << p.rydberg << setw(11) << p.total;
+            if (p.has_spin_density) out << setw(13) << p.spin_density;
+            out << "\n";
+            charge_sum += p.charge;
+            total_sum += p.total;
+        }
+        //the two sums are the check a reader can make on the spot: the charges add to the molecular
+        //charge and the populations to the number of electrons the wavefunction carries
+        out << "  " << left << setw(4) << "sum" << right << setw(12) << charge_sum << setw(44)
+            << total_sum << "\n";
+    }
     out << "\n NATURAL BOND ORBITAL ANALYSIS (in house):\n\n"
         << "                                                      Principal Delocalizations\n"
         << "  NBO                         Occupancy    Energy\n"
@@ -1122,18 +1232,23 @@ void print_nbo(const NboResults& r, std::ostream& out)
             << fixed << setprecision(5) << setw(12) << o.occupancy << setw(12) << o.energy;
         if (!o.spin.empty()) out << "  " << o.spin;
         out << "\n";
-        for (const NboHybrid& h : o.hybrids)
+        for (const NboHybrid& h : o.hybrids) {
             out << "              " << fixed << setprecision(2) << setw(7) << h.weight_percent
                 << "% " << setw(2) << h.element << setw(3) << h.center << "  s(" << setw(6) << h.s
                 << "%)p" << setw(7) << h.p << "%  d" << setw(7) << h.d << "%  f" << setw(6) << h.f
-                << "%\n";
+                << "%";
+            if (h.sp_exponent() > 0.0) out << "  sp^" << setprecision(2) << h.sp_exponent();
+            out << "\n";
+        }
     }
-    if (r.e2.empty()) return;
-    out << "\n SECOND ORDER PERTURBATION THEORY ANALYSIS OF FOCK MATRIX IN NBO BASIS\n\n"
-        << "     Donor NBO              Acceptor NBO            E(2)   E(NL)-E(L)  F(L,NL)\n"
-        << " ---------------------------------------------------------------------------------\n";
-    for (const NboE2Entry& e : r.e2)
-        out << " " << left << setw(22) << e.donor << setw(22) << e.acceptor << right << fixed
-            << setprecision(2) << setw(8) << e.energy_kcal << setprecision(3) << setw(11)
-            << e.e_diff << setw(10) << e.fij << (e.spin.empty() ? "" : "  " + e.spin) << "\n";
+    if (!r.e2.empty()) {
+        out << "\n SECOND ORDER PERTURBATION THEORY ANALYSIS OF FOCK MATRIX IN NBO BASIS\n\n"
+            << "     Donor NBO              Acceptor NBO            E(2)   E(NL)-E(L)  F(L,NL)\n"
+            << " ---------------------------------------------------------------------------------\n";
+        for (const NboE2Entry& e : r.e2)
+            out << " " << left << setw(22) << e.donor << setw(22) << e.acceptor << right << fixed
+                << setprecision(2) << setw(8) << e.energy_kcal << setprecision(3) << setw(11)
+                << e.e_diff << setw(10) << e.fij << (e.spin.empty() ? "" : "  " + e.spin) << "\n";
+    }
+    print_nrt(r, out);
 }
