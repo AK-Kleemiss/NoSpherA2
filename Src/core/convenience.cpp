@@ -431,6 +431,7 @@ std::string help_message =
  "                                    Angstrom), each basin's electrons by a\n"
  "                                    voxel sum and on the atomic quadrature\n"
  "                                    grids, the boundary followed along the\n"
+ "                                    field to rho = 0.0001 e/bohr^3.\n"
  "                                    field; -acc 4 before it tightens the\n"
  "                                    latter from 0.005 to 0.002 e. With -ECP\n"
  "                                    the core an ECP removed is filled from\n"

@@ -1985,10 +1985,12 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 			if (std::abs(wavy.get_MO_occ(m)) > 1e-8) ovl->mo_index.push_back(m);
 		ovl->nmo = static_cast<int>(ovl->mo_index.size());
 		ovl->S.assign(nb, vec(ovl->triangle(), 0.0));
+		ovl->outside.assign(ovl->triangle(), 0.0);
 	}
 	vec pop(nb, 0.0);
 	volumes.assign(nb, 0.0);
 	outside = 0.0;
+	double cutoff_outside = 0.0, unresolved_outside = 0.0;
 	const int nx = streaming ? 0 : cub->get_size(0), ny = streaming ? 0 : cub->get_size(1), nz = streaming ? 0 : cub->get_size(2);
 	//Without a cube there is nothing to read a spacing off, so the trajectory keeps the step of
 	//a 0.1 A grid: the integrator is then the one the gridded path has been validated against
@@ -2250,13 +2252,7 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 	grids.setup3DGridsForMolecule(wavy, every_atom);
 	const GridData &gd = grids.getGridData();
 	T.lap(fieldname + "atomic quadrature grids");
-	//For a gridded ELI-D a point's cell decides when its neighbourhood agrees and only a
-	//straddling cell sends a trajectory; a point below the cube's crop is left outside, as DGrid
-	//does. For the density every point rides its own trajectory to a nucleus: the cube cannot
-	//place a cusp basin two voxels across, and AIMAll's surfaces are what this has to reproduce.
-	//A point below the crop climbs in all the same - the density's tail belongs to somebody.
-	//Streaming ELI-D does the same for the same reason: the outermost valence basin's separatrix
-	//runs to infinity, so the crop was never physics, only the cube's reach.
+	//The density isosurface bounds both grid and streaming basins.
 	//Stopped climbing: for the density that is the sphere of maxima an ECP leaves around its
 	//nucleus, a bohr wide, and a trajectory that dies anywhere else is left outside where it can
 	//be seen - rho has a gradient everywhere, so there is no excuse for one. ELI-D does run out
@@ -2288,10 +2284,8 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 	//there is something to partition and the volume a basin can claim is bounded; below it there is
 	//nothing there, which is the vacuum case the floor was written for.
 	const double stall_reach = 1e30;
-	//e/bohr^3. Two orders below the cube's own 1e-4 crop, so this keeps what the crop threw away
-	//and still cannot hand a printable population to the vacuum. It now guards the density too:
-	//that is what keeps the unbounded reach from carving up the tail, the way it once did for ELI-D.
-	const double stall_floor = 1e-6;
+	//The trajectory and quadrature share the density isosurface.
+	const double stall_floor = basin_density_cutoff;
 	//start is where the trajectory began, r where it gave up. They differ for the case this exists
 	//for: at a saddle between two equivalent atoms the nearest attractor to r is a coin flip - it
 	//would hand Si2H6's whole 0.65 e to whichever silicon the floating-point comparison happened to
@@ -2310,6 +2304,7 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 		return b;
 	};
 	auto climb = [&](const d3 &p, long long &lb, long long &ll) {
+		if (valence(p) < basin_density_cutoff) return 0;
 		bool settled;
 		int b = lookup(p, settled);
 		//A gridded ELI-D takes a settled cell straight from the cube and leaves the crop outside;
@@ -2349,6 +2344,7 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 		const bool grow = basin_adaptive_step_enabled();
 		double value_prev = -1.0;
 		for (int s = 0; s < g_step_cap; s++) {
+			if (eli_field && valence(r) < basin_density_cutoff) return 0;
 			if (grow) adp_count(g_adp_steps);
 			const int m = at_maximum(r);
 			if (m) return m;
@@ -2528,23 +2524,25 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 #pragma omp parallel
 		{
 			vec lp(nb, 0.0), lv(nb, 0.0);
-			double lo = 0.0;
+			double lo = 0.0, lc = 0.0, lu = 0.0;
 			long long lb = 0, ll = 0;
 			//ponytail: one triangle per basin per thread, nb * nmo^2 / 2 doubles each; the caller
 			//sizes the job, a molecule big enough to hurt here has other limits first
 			vec2 ls;
+			vec ls_out;
 			vec phi;
 			vec2 dbuf;
 			if (ovl) {
 				ls.assign(nb, vec(ovl->triangle(), 0.0));
+				ls_out.assign(ovl->triangle(), 0.0);
 				phi.resize(wavy.get_nmo(), 0.0);
 				dbuf.assign(wavy.get_ncen(), vec(16, 0.0));
 			}
 			//Rank-1 update of one basin's triangle: the point's share of the quadrature weight
 			//times the outer product of the orbitals it sees
 			auto accumulate = [&](const int b, const double wq) {
-				if (!ovl || b <= 0 || wq == 0.0) return;
-				double *Sb = ls[b - 1].data();
+				if (!ovl || wq == 0.0) return;
+				double *Sb = b > 0 ? ls[b - 1].data() : ls_out.data();
 				const int *idx = ovl->mo_index.data();
 				for (int a2 = 0; a2 < ovl->nmo; a2++) {
 					const double pa = wq * phi[idx[a2]];
@@ -2566,11 +2564,17 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 				//the rule, only who gets it is decided here
 				auto give = [&](const int bb, const double fr) {
 					if (fr <= 0.0) return;
-					if (bb == 0) { lo += w * rho * fr; return; }
+					if (bb == 0) {
+						lo += w * rho * fr;
+						if (rho < basin_density_cutoff) lc += w * rho * fr; else lu += w * rho * fr;
+						accumulate(0, w * fr);
+						return;
+					}
 					lp[bb - 1] += w * rho * fr;
 					lv[bb - 1] += w * fr;
 					accumulate(bb, w * fr);
 				};
+				if (rho < basin_density_cutoff) { give(0, 1.0); continue; }
 				//For a gridded ELI-D a cell whose neighbourhood agrees is taken from the grid, as
 				//before; streaming has no grid to take it from and every cell is refined
 				if (eli_field && !streaming && (b == 0 || settled)) { give(b, 1.0); continue; }
@@ -2621,10 +2625,14 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 #pragma omp critical
 			{
 				for (int b = 0; b < nb; b++) { pop[b] += lp[b]; volumes[b] += lv[b]; }
-				if (ovl)
+				if (ovl) {
 					for (int b = 0; b < nb; b++)
 						for (size_t t = 0; t < ovl->S[b].size(); t++) ovl->S[b][t] += ls[b][t];
+					for (size_t t = 0; t < ovl->outside.size(); t++) ovl->outside[t] += ls_out[t];
+				}
 				outside += lo;
+				cutoff_outside += lc;
+				unresolved_outside += lu;
 				boundary_points += lb;
 				lost += ll;
 			}
@@ -2672,6 +2680,7 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 			std::cout << line.str() << std::endl;
 		}
 	}
+	if (g_basin_timing) std::cout << "  [timing] " << fieldname << "outside the density isosurface: " << cutoff_outside << " e, unresolved inside: " << unresolved_outside << " e" << std::endl;
 	if (g_basin_timing && g_adaptive_step) {
 		const long long st = g_adp_steps.exchange(0), tr = g_adp_tries.exchange(0);
 		const long long tu = g_adp_turn.exchange(0), fa = g_adp_fall.exchange(0);
@@ -2703,6 +2712,7 @@ delocalization_result delocalization_indices(const WFN &wavy, const basin_overla
 	const int n = ovl.nmo;
 	r.lambda.assign(nb, 0.0);
 	r.population.assign(nb, 0.0);
+	r.outside_half.assign(nb, 0.0);
 	if (nb == 0 || n == 0) return r;
 	//What decides m is the occupation, not the operator flag: a spin orbital cannot hold more
 	//than one electron, so an MO occupied twice is a spatial one standing for both spins. The
@@ -2726,33 +2736,36 @@ delocalization_result delocalization_indices(const WFN &wavy, const basin_overla
 	for (int b = 0; b < nb; b++)
 		for (int i = 0; i < n; i++)
 			r.population[b] += m * occ[i] * ovl.at(b, i, i);
-	//The overlap matrices of all basins add up to the identity, whatever the basins are; what
-	//they miss is what the quadrature missed, and it is the only error estimate here that does
-	//not need a reference
+	//The basins and outside region together resolve the orbital metric.
 	for (int i = 0; i < n; i++)
 		for (int j = 0; j <= i; j++) {
 			if (spin[i] != spin[j]) continue;
 			double s = 0.0;
 			for (int b = 0; b < nb; b++) s += ovl.at(b, i, j);
+			if (!ovl.outside.empty()) s += ovl.outside[basin_overlaps::packed(i, j)];
 			r.identity_error = std::max(r.identity_error, std::abs(s - (i == j ? 1.0 : 0.0)));
 		}
 	//The pair sum is symmetric in i and j, so the triangle is taken once and doubled off the
 	//diagonal
-	auto pair_sum = [&](const int a, const int b) {
+	auto pair_sum = [&](const vec &a, const vec &b) {
 		double s = 0.0;
 		for (int i = 0; i < n; i++)
 			for (int j = 0; j <= i; j++) {
 				if (spin[i] != spin[j]) continue;
-				const double t = occ[i] * occ[j] * ovl.at(a, i, j) * ovl.at(b, i, j);
+				const size_t k = basin_overlaps::packed(i, j);
+				const double t = occ[i] * occ[j] * a[k] * b[k];
 				s += i == j ? t : 2.0 * t;
 			}
 		return s;
 	};
-	for (int b = 0; b < nb; b++) r.lambda[b] = m * pair_sum(b, b);
+	for (int b = 0; b < nb; b++) {
+		r.lambda[b] = m * pair_sum(ovl.S[b], ovl.S[b]);
+		if (!ovl.outside.empty()) r.outside_half[b] = m * pair_sum(ovl.S[b], ovl.outside);
+	}
 	for (int a = 0; a < nb; a++)
 		for (int b = a + 1; b < nb; b++) {
 			r.pairs.push_back({ a, b });
-			r.di.push_back(2.0 * m * pair_sum(a, b));
+			r.di.push_back(2.0 * m * pair_sum(ovl.S[a], ovl.S[b]));
 		}
 	return r;
 }
@@ -2765,15 +2778,17 @@ void report_delocalization(const WFN &wavy, const basin_overlaps &ovl, const sve
 	auto name = [&](const int b) { return b < static_cast<int>(labels.size()) ? labels[b] : std::to_string(b + 1); };
 	log << "\nDelocalization indices (" << ovl.nmo << " occupied orbitals):\n";
 	citations::cite(citations::Method::LIDI, log);
-	log << "  sum over all basins of S^A - identity: " << std::scientific << std::setprecision(2) << r.identity_error
+	log << "  sum over basins and outside of S^A - identity: " << std::scientific << std::setprecision(2) << r.identity_error
 		<< std::fixed << "   (the quadrature's own error; AIMAll's integrations reach ~1e-3)\n";
 	//delta(A,B) summed over B is the count an atom shares with everything else; with lambda(A)
 	//it has to give the population back, and the residual says which basin the grid missed
 	log << "\n  basin  label                 N(A)     lambda(A)   sum_B delta(A,B)/2   residual\n";
+	log << "  B includes the region beyond rho = " << basin_density_cutoff << " e/bohr^3.\n";
 	for (int b = 0; b < nb; b++) {
 		double half = 0.0;
 		for (size_t p = 0; p < r.pairs.size(); p++)
 			if (r.pairs[p][0] == b || r.pairs[p][1] == b) half += 0.5 * r.di[p];
+		half += r.outside_half[b];
 		log << std::setw(7) << b + 1 << "  " << std::left << std::setw(18) << name(b) << std::right << std::fixed << std::setprecision(4)
 			<< std::setw(11) << r.population[b] << std::setw(12) << r.lambda[b] << std::setw(18) << half
 			<< std::setw(12) << r.lambda[b] + half - r.population[b] << "\n";

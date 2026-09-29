@@ -49,57 +49,51 @@ Density Critical Points (3 found):
 
 QTAIM attractors from the analytic field: 3 (3 nuclei, 0 non-nuclear)
 Assigning basins by near-grid ascent...
-Near-grid ascent: 71325 steepest-neighbour steps, 3227 of them tied (4.524 %), 3227 voxel paths went through at least one tie
-Near-grid ascent: 6959004 rounded step decisions, 228 within 1e-5 of flipping and 0 within 1e-9, closest margin 3.285e-07
+Near-grid ascent: 70522 steepest-neighbour steps, 3480 of them tied (4.935 %), 3480 voxel paths went through at least one tie
+Near-grid ascent: 6937146 rounded step decisions, 228 within 1e-5 of flipping and 0 within 1e-9, closest margin 3.285e-07
 Near-grid ascent: 0 walks stopped on a top that grad_epsilon (1.0e-10) calls flat, largest uphill 0.000e+00 still available there
 I found 28 Basins.
-Merged 22 noise maxima, 6 basins remain.
-Unified 1 core-shell basins into their atoms' cores, 5 ELI-D basins remain.
+ELI-D basin boundaries from the analytic field (the default).
+Unified 23 core-shell basins into their atoms' cores, 5 ELI-D basins remain.
 GridManager: Setting up prototype grids for atom types...
 GridManager: Generating integration grids for atoms...
 GridManager: Generated total of 65266 grid points.
-Quadrature points sent along the field: 197988, left the grid: 0
+Quadrature points sent along the field: 19668, left the grid: 0
 
 QTAIM Analysis (atomic quadrature grids):
   basin  label               electrons     charge      volume         maximum        x          y          z
-      1  Hg0                   79.4496     0.5504  12885.2903     367149.1320      0.000      0.000      0.000
-      2  H1                     1.2752    -0.2752   9014.8677          0.3478      0.000      0.000      3.118
-      3  H2                     1.2752    -0.2752   9014.6699          0.3478      0.000      0.000     -3.118
-  total in basins: 82.0000   outside every basin: 0.0000
+      1  Hg0                   79.4353     0.5647    450.7671     367149.1320      0.000      0.000      0.000
+      2  H1                     1.2675    -0.2675    204.0560          0.3478      0.000      0.000      3.118
+      3  H2                     1.2675    -0.2675    204.0560          0.3478      0.000      0.000     -3.118
+  total in basins: 81.9704   outside every basin: 0.0296
 
 Delocalization indices (11 occupied orbitals):
 [LI/DI] Fradera, Austen & Bader, J. Phys. Chem. A 103 (1999) 304, DOI 10.1021/jp983362q
   sum over all basins of S^A - identity: 1.57e-06   (the quadrature's own error; AIMAll's integrations reach ~1e-3)
 
   basin  label                 N(A)     lambda(A)   sum_B delta(A,B)/2   residual
-      1  Hg0                   19.4496     18.4677            0.9818     -0.0000
-      2  H1                     1.2752      0.7409            0.5343     -0.0000
-      3  H2                     1.2752      0.7409            0.5343     -0.0000
+  B includes the region beyond rho = 0.00 e/bohr^3.
+      1  Hg0                   19.4353     18.4485            0.9868     -0.0000
+      2  H1                     1.2675      0.7326            0.5350     -0.0000
+      3  H2                     1.2675      0.7326            0.5350     -0.0000
 
   basin pair                                delta(A,B)
-  Hg0               H2                      0.9818
-  Hg0               H1                      0.9818
-  H1                H2                      0.0868
+  Hg0               H2                      0.9713
+  Hg0               H1                      0.9713
+  H1                H2                      0.0847
   0 further pairs below 0.01
   An ECP took core electrons out of the orbitals: N(A) here is the valence count
   and is short of the basin population above by the core the Thakkar fill added.
-
-ELI-D Analysis (voxel sum):
-basin:    0 label:               H2 integrated value:   1.3926 volume:   33.6932
-basin:    1 label:               H1 integrated value:   1.4304 volume:   39.4592
-basin:    2 label:            H2 LP integrated value:   0.4969 volume:  279.2072
-basin:    3 label:            H1 LP integrated value:   0.4591 volume:  273.5088
-basin:    4 label:         Hg0 core integrated value: 377.0942 volume:  232.8545
 GridManager: Setting up prototype grids for atom types...
 GridManager: Generating integration grids for atoms...
 GridManager: Generated total of 65266 grid points.
-Quadrature points sent along the field: 14127, left the grid: 0
+Quadrature points sent along the field: 47164, left the grid: 0
 
 ELI-D Analysis (atomic quadrature grids):
   basin  label               electrons      volume         maximum        x          y          z
-      1  H2                     1.4273     35.4697          7.2442      0.000      0.000     -3.178
-      2  H1                     1.4406     37.4762          7.2442      0.000      0.000      3.178
-      3  H2 LP                  0.4764    288.4732          5.0747      0.000      0.000     -4.955
-      4  H1 LP                  0.4631    286.4706          5.0747      0.000      0.000      4.955
-      5  Hg0 core              18.1633    215.1703          1.4329      0.378     -0.472     -0.654
-  total in basins: 21.9708   outside every basin: 0.0292
+      1  Hg0 core              18.1621    210.6314          1.4329      0.472      0.378      0.654
+      2  H2                     1.4364     36.5894          7.2442      0.000      0.000     -3.178
+      3  H1                     1.4364     36.5894          7.2442      0.000      0.000      3.178
+      4  H2 LP                  0.4677    287.5343          5.0747      0.000      0.000     -4.955
+      5  H1 LP                  0.4677    287.5343          5.0747      0.000      0.000      4.955
+  total in basins: 21.9704   outside every basin: 0.0296

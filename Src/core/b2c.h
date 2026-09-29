@@ -10,6 +10,8 @@
 class WFN;
 class cube;
 
+constexpr double basin_density_cutoff = 1e-4;
+
 struct cubepoint {
 	int x;
 	int y;
@@ -97,6 +99,7 @@ struct basin_overlaps {
 	int nmo = 0;   //MOs in the triangles
 	ivec mo_index; //their indices in the WFN, size nmo
 	vec2 S;        //S[basin][packed(i,j)], basins in the order of the maxima
+	vec outside;   //overlap beyond the density isosurface
 	static size_t packed(const int i, const int j) { return i >= j ? (size_t)i * (i + 1) / 2 + j : (size_t)j * (j + 1) / 2 + i; }
 	size_t triangle() const { return (size_t)nmo * (nmo + 1) / 2; }
 	double at(const int b, const int i, const int j) const { return S[b][packed(i, j)]; }
@@ -109,7 +112,8 @@ struct delocalization_result {
 	vec population;                        //m sum_i n_i S^A_ii, the trace population
 	std::vector<std::array<int, 2>> pairs; //basin pairs, first < second
 	vec di;                                //delta for each pair, same order
-	double identity_error = 0.0;           //max |sum_A S^A_ij - delta_ij|: the integration's own error
+	vec outside_half;                      //delta(A,outside)/2
+	double identity_error = 0.0;           //max |sum_A S^A_ij + S^outside_ij - delta_ij|
 };
 delocalization_result delocalization_indices(const WFN& wavy, const basin_overlaps& ovl);
 void report_delocalization(const WFN& wavy, const basin_overlaps& ovl, const svec& labels, std::ostream& log, const double threshold = 0.01);

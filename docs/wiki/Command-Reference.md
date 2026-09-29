@@ -218,6 +218,8 @@ delocalisation indices (LI/DI).
 
 Basins walk the analytic gradient by default; `-basin_cube` restores the older
 cube-based path. ELI-D and the fitted densities still use a cube on purpose.
+Both paths stop at the electron-density isosurface of 0.0001 e/bohr³; density
+outside it is reported separately from the finite basin populations and volumes.
 
 ## 7. Bonding analysis
 

@@ -497,7 +497,9 @@ TEST(BasinReaders, TheSameFluorineThroughThreeReaders)
 		double outside = 0.0, electrons = 0.0;
 		const double pop = lone_atom_population(f, outside, electrons);
 		EXPECT_NEAR(pop, electrons, 0.01) << name << " did not integrate to its own electron count";
-		EXPECT_NEAR(outside, 0.0, 1e-3) << name << " left density outside the one basin there is";
+		EXPECT_GT(outside, 0.0) << name << " has no density beyond the isosurface";
+		EXPECT_LT(outside, 0.01) << name << " lost density inside the isosurface";
+		EXPECT_NEAR(pop + outside, electrons, 0.01) << name << " did not conserve the quadrature";
 		if (!first_name) { first = pop; first_name = name; }
 		else EXPECT_NEAR(pop, first, 1e-3) << name << " disagrees with " << first_name;
 	}
@@ -521,7 +523,9 @@ TEST(BasinReaders, TheOpenShellFluorineAtThreeSpinStates)
 		EXPECT_GT(electrons, 0.0) << name << " reported no electrons at all";
 		EXPECT_NEAR(pop, electrons, 0.01) << name << " integrated to " << pop << " and not to its own "
 			<< electrons << " electrons";
-		EXPECT_NEAR(outside, 0.0, 1e-3) << name << " left density outside the one basin there is";
+		EXPECT_GT(outside, 0.0) << name << " has no density beyond the isosurface";
+		EXPECT_LT(outside, 0.01) << name << " lost density inside the isosurface";
+		EXPECT_NEAR(pop + outside, electrons, 0.01) << name << " did not conserve the quadrature";
 		seen++;
 	}
 	if (!seen) GTEST_SKIP() << "no open-shell fluorine fixture under " << dir.string();
@@ -778,7 +782,7 @@ TEST(BasinStalls, AStalledTrajectoryIsStillAssigned)
 	//The electrons the NNA held are still in the molecule, wherever the partition puts them. A reach
 	//that drops a stall beyond a bohr loses all of them, which is the several-electron failure.
 	EXPECT_NEAR(total_nuc, total_all, 5e-3) << "the NNA's electrons went missing when it was not an attractor";
-	EXPECT_LT(out_nuc, 5e-3) << "a stalled trajectory was reported outside every basin";
+	EXPECT_NEAR(out_nuc, out_all, 5e-3) << "removing a non-nuclear attractor lost density inside the isosurface";
 	//and they landed in the cobalts rather than nowhere: roughly half of 4.15 e each
 	EXPECT_GT(n_nuc[0], n_all[0] + 0.5) << "the first cobalt did not gain the non-nuclear charge";
 	EXPECT_GT(n_nuc[1], n_all[1] + 0.5) << "the second cobalt did not gain the non-nuclear charge";

@@ -182,7 +182,8 @@ TEST(StreamingBasins, HydroxideStreamsToTheRightElectronCount)
 	double total = outside;
 	for (const double p : pop) total += p;
 	EXPECT_NEAR(total, 10.0, 0.05) << "the streaming quadrature lost electrons";
-	EXPECT_LT(outside, 0.01) << "electrons ended up in no basin at all";
+	EXPECT_GT(outside, 0.0) << "the density isosurface left no outside region";
+	EXPECT_LT(outside, 0.02) << "too much density lies outside the isosurface";
 	//The hydrogen of a hydroxide keeps well under an electron and the oxygen carries the rest;
 	//a boundary put in the wrong place shows up here long before the total does
 	EXPECT_NEAR(pop[0], 0.61, 0.05);
@@ -196,6 +197,7 @@ TEST(StreamingBasins, HydroxideStreamsToTheRightElectronCount)
 		double half = 0.0;
 		for (size_t p = 0; p < r.pairs.size(); p++)
 			if (r.pairs[p][0] == static_cast<int>(b) || r.pairs[p][1] == static_cast<int>(b)) half += 0.5 * r.di[p];
+		half += r.outside_half[b];
 		EXPECT_NEAR(r.lambda[b] + half - r.population[b], 0.0, 0.02) << "basin " << b + 1 << " breaks the sum rule";
 	}
 }

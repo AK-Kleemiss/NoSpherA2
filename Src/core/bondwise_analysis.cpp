@@ -3735,7 +3735,7 @@ void ELI_analysis(const WFN &wavy, options &opt) {
 	//persistence merge is quadratic in their number), so the search stops where the fit is no
 	//longer trusted; its ~1e-3 error at a bond critical point also leaves a bump there that
 	//5e-3 persistence keeps, hence the looser merge
-	const double floor = fld ? 1e-4 : 0.0, persistence = fld ? 2e-2 : 5e-3;
+	const double floor = basin_density_cutoff, persistence = fld ? 2e-2 : 5e-3;
 	//The density's attractors come from the analytic critical-point search that has already run,
 	//and the quadrature then walks the field from every point with no cube in the loop. A fitted
 	//density keeps the cube: those critical points are the orbitals' and not the fit's, so they
@@ -3811,14 +3811,11 @@ void ELI_analysis(const WFN &wavy, options &opt) {
 		return;
 	}
 
-	//ELI-D is a ratio of quantities that both vanish in the density's tail and turns to noise
-	//there, so its maxima are searched only where the density exceeds 1e-4, the crop DGrid is
-	//run with here; on the cube what lies beyond is reported as outside, while a streaming walk
-	//starts out there too and climbs back in
+	//ELI-D is undefined in the density tail, so the cube ends at the density isosurface.
 	for (int x = 0; x < eli_cube.get_size(0); x++)
 		for (int y = 0; y < eli_cube.get_size(1); y++)
 			for (int z = 0; z < eli_cube.get_size(2); z++)
-				if (rho.get_value(x, y, z) < 1e-4) eli_cube.set_value(x, y, z, 0.0);
+				if (rho.get_value(x, y, z) < basin_density_cutoff) eli_cube.set_value(x, y, z, 0.0);
 	T.lap("ELI-D tail crop");
 	//These are the only attractors this routine discovers on the grid - the QTAIM set is seeded from
 	//the nuclei above and comes out bit-identical at any spacing - so the resolution is an accuracy

@@ -99,69 +99,65 @@ Density Critical Points (9 found):
    V         :    -4.0482e-02   G         :         0.0479   K         :    -7.4285e-03   L         :    -5.5339e-02
 
 QTAIM attractors from the analytic field: 5 (5 nuclei, 0 non-nuclear)
+WARNING: the ELI-D attractors are searched on the 0.1000 A grid. Coarser than 0.05 A this basin set is less reliable: core populations have been seen to drift by 0.3 electrons and basins to appear or be retyped as lone pairs by 0.2 A. The QTAIM basins are unaffected.
 Assigning basins by near-grid ascent...
 Near-grid ascent: 11912 steepest-neighbour steps, 0 of them tied (0.000 %), 0 voxel paths went through at least one tie
 Near-grid ascent: 685452 rounded step decisions, 22 within 1e-5 of flipping and 0 within 1e-9, closest margin 1.127e-06
 Near-grid ascent: 0 walks stopped on a top that grad_epsilon (1.0e-10) calls flat, largest uphill 0.000e+00 still available there
 I found 12 Basins.
 Left 5 maxima on the rim of the analysed region unresolved; their density is reported outside every basin.
-Merged 6 noise maxima, 6 basins remain.
+Merged 5 noise maxima, 7 basins remain.
+ELI-D basin boundaries from the analytic field (the default).
 GridManager: Setting up prototype grids for atom types...
 GridManager: Generating integration grids for atoms...
 GridManager: Generated total of 111906 grid points.
-Quadrature points sent along the field: 323619, left the grid: 0
+Quadrature points sent along the field: 49747, left the grid: 0
 
 QTAIM Analysis (atomic quadrature grids):
   basin  label               electrons     charge      volume         maximum        x          y          z
-      1  N0                     8.2860    -1.2860  10438.8259        198.5481    -10.483     10.089      2.209
-      2  H1                     0.6358     0.3642   5229.5157          0.4000     -9.421      9.375      3.711
-      3  H2                     0.6351     0.3649   5056.1666          0.4000    -12.306      9.343      2.332
-      4  H3                     0.6355     0.3645   5191.0919          0.4000     -9.671      9.459      0.524
-      5  Li4                    2.8153     0.1847  29697.3395         13.6761    -10.574     13.775      2.315
-  total in basins: 13.0077   outside every basin: 0.0000
+      1  N0                     8.2758    -1.2758    371.9613        198.5481    -10.483     10.089      2.209
+      2  H1                     0.6298     0.3702    102.9946          0.4000     -9.421      9.375      3.711
+      3  H2                     0.6292     0.3708    101.2113          0.4000    -12.306      9.343      2.332
+      4  H3                     0.6294     0.3706    103.0771          0.4000     -9.671      9.459      0.524
+      5  Li4                    2.7558     0.2442    917.8524         13.6761    -10.574     13.775      2.315
+  total in basins: 12.9201   outside every basin: 0.0875
 
 Delocalization indices (13 occupied orbitals):
 [LI/DI] Fradera, Austen & Bader, J. Phys. Chem. A 103 (1999) 304, DOI 10.1021/jp983362q
   sum over all basins of S^A - identity: 7.80e-03   (the quadrature's own error; AIMAll's integrations reach ~1e-3)
 
   basin  label                 N(A)     lambda(A)   sum_B delta(A,B)/2   residual
-      1  N0                     8.2860      6.8220            1.4651      0.0011
-      2  H1                     0.6358      0.1693            0.4667      0.0002
-      3  H2                     0.6351      0.1691            0.4662      0.0002
-      4  H3                     0.6355      0.1692            0.4666      0.0002
-      5  Li4                    2.8153      2.5758            0.2455      0.0060
+  B includes the region beyond rho = 0.00 e/bohr^3.
+      1  N0                     8.2758      6.8190            1.4579      0.0010
+      2  H1                     0.6298      0.1683            0.4617      0.0002
+      3  H2                     0.6292      0.1682            0.4612      0.0002
+      4  H3                     0.6294      0.1682            0.4615      0.0002
+      5  Li4                    2.7558      2.4879            0.2735      0.0055
 
   basin pair                                delta(A,B)
-  N0                H1                      0.8569
-  N0                H3                      0.8568
-  N0                H2                      0.8565
-  N0                Li4                     0.3600
-  H1                Li4                     0.0440
-  H3                Li4                     0.0438
-  H2                Li4                     0.0433
-  H1                H3                      0.0163
-  H1                H2                      0.0163
-  H2                H3                      0.0163
+  N0                H1                      0.8533
+  N0                H3                      0.8531
+  N0                H2                      0.8530
+  N0                Li4                     0.3266
+  H1                Li4                     0.0340
+  H3                Li4                     0.0338
+  H2                Li4                     0.0335
+  H1                H3                      0.0158
+  H1                H2                      0.0158
+  H2                H3                      0.0158
   0 further pairs below 0.01
-
-ELI-D Analysis (voxel sum):
-basin:    0 label:               H2 integrated value:   1.9094 volume:  119.3788
-basin:    1 label:            N0 LP integrated value:   2.1729 volume:   56.4276
-basin:    2 label:               H3 integrated value:   1.9495 volume:  121.4006
-basin:    3 label:               H1 integrated value:   1.8923 volume:  117.6317
-basin:    4 label:         Li4 core integrated value:   2.0217 volume:   16.6587
-basin:    5 label:          N0 core integrated value:   2.1218 volume:    0.4711
 GridManager: Setting up prototype grids for atom types...
 GridManager: Generating integration grids for atoms...
 GridManager: Generated total of 111906 grid points.
-Quadrature points sent along the field: 102405, left the grid: 154
+Quadrature points sent along the field: 56010, left the grid: 0
 
 ELI-D Analysis (atomic quadrature grids):
   basin  label               electrons      volume         maximum        x          y          z
-      1  H2                     1.9336    116.6922          4.6129    -12.361      9.306      2.304
-      2  N0 LP                  2.1620     56.3336          1.9582    -10.489     11.371      2.304
-      3  H3                     1.9264    118.0930          4.2478     -9.741      9.494      0.442
-      4  H1                     1.9221    117.5108          4.4779     -9.366      9.306      3.794
-      5  Li4 core               2.0207     16.5914         29.6693    -10.489     13.812      2.304
-      6  N0 core                2.1094      0.4465          5.6213    -10.489     10.057      2.118
-  total in basins: 12.0742   outside every basin: 0.9334
+      1  H2                     1.9310    119.4661          4.6129    -12.361      9.306      2.304
+      2  N0 LP                  2.1609     56.3307          1.9582    -10.489     11.371      2.304
+      3  H3                     1.9266    120.0895          4.2478     -9.741      9.494      0.442
+      4  H1                     1.9230    118.8830          4.4779     -9.366      9.306      3.794
+      5  Li4 core               2.0401     54.7920         29.6693    -10.489     13.812      2.304
+      6  Li4 LP                 0.7580    804.1082         12.6859    -10.676     17.942      2.490
+      7  N0 core                2.1129      0.4634          5.6213    -10.489     10.057      2.118
+  total in basins: 12.8525   outside every basin: 0.1552
