@@ -1207,7 +1207,7 @@ bool WFN::build_DM(std::string basis_set_path, bool debug) {
 	for (int i = 0; i < ncen; i++)
 	{
 		elcount += get_atom_charge(i);
-		elcount -= constants::ECP_electrons_pTB[get_atom_charge(i)];
+		elcount -= constants::ECP_core_electrons(constants::ECP_electrons_pTB, get_atom_charge(i));
 	}
 	if (debug)
 		std::cout << "elcount after: " << elcount << std::endl;
@@ -1287,32 +1287,41 @@ bool WFN::build_DM(std::string basis_set_path, bool debug) {
 		}
 
 		//-------------------normalize the basis set shell wise into a copy vector---------
+		//The shell loop below spells out the cartesian component norms of s, p, d and f by hand and
+		//has nothing for g: a g shell used to leave `factor` at the previous shell's value, push no
+		//constants at all, and every later shell then read norm_const one shell off. Say so instead.
+		//Generalising it needs the component order this file's g types are written in, which is a
+		//convention no reader here agrees on yet - and build_DM has no caller outside the tests.
+		for (int a = 0; a < get_ncen(); a++)
+			for (int s = 0; s < get_atom_shell_count(a); s++)
+			{
+				const int type = get_shell_type(a, s);
+				err_checkf(type >= 1, "The type of shell " + std::to_string(s) + " of atom " +
+					std::to_string(a) + " was never read", std::cout);
+				if (type > 4)
+				{
+					std::cout << "build_DM normalises s, p, d and f shells only; shell " << s
+						<< " of atom " << a << " is of type " << type
+						<< " (l = " << type - 1 << "). Refusing rather than building a density "
+						"matrix from normalisation constants that are one shell out of step.\n";
+					return false;
+				}
+			}
 		vec2 basis_coefficients(get_ncen());
 #pragma omp parallel for
 		for (int a = 0; a < get_ncen(); a++)
 		{
 			for (int p = 0; p < get_atom_primitive_count(a); p++)
 			{
-				double temp_c = get_atom_basis_set_exponent(a, p);
-				switch (get_atom_primitive_type(a, p))
-				{
-				case 1:
-					temp_c = 8 * pow(temp_c, 3) / constants::PI3;
-					break;
-				case 2:
-					temp_c = 128 * pow(temp_c, 5) / constants::PI3;
-					break;
-				case 3:
-					temp_c = 2048 * pow(temp_c, 7) / (9 * constants::PI3);
-					break;
-				case 4:
-					temp_c = 32768 * pow(temp_c, 9) / (225 * constants::PI3);
-					break;
-				case -1:
-					std::cout << "Sorry, the type reading went wrong somwhere, look where it may have gone crazy...\n";
-					break;
-				}
-				temp_c = pow(temp_c, 0.25) * get_atom_basis_set_coefficient(a, p);
+				//This was the same s/p/d/f switch that lost a g shell in
+				//get_shell_start_in_primitives: a type of 5 matched no case, so the primitive kept
+				//its raw exponent as a normalisation constant. constants::axial_prim_norm is the
+				//general-l form of exactly these four numbers. The types are validated above,
+				//serially - err_checkf exits, and exiting from inside an OpenMP region does not.
+				const double temp_c =
+					constants::axial_prim_norm(get_atom_primitive_type(a, p) - 1,
+						get_atom_basis_set_exponent(a, p)) *
+					get_atom_basis_set_coefficient(a, p);
 				if (debug)
 					std::cout << "temp_c:" << temp_c << "\n";
 				basis_coefficients[a].push_back(temp_c);
@@ -2350,39 +2359,44 @@ void WFN::set_has_ECPs(const bool &in, const bool &apply_to_atoms, const int &EC
 {
 	has_ECPs = in;
 	ECP_m = ECP_mode;
-	if (apply_to_atoms && ECP_mode == 1) // This is the def2 ECPs
-	{
-#pragma omp parallel for
-		for (int i = 0; i < ncen; i++)
+	if (!apply_to_atoms)
+		return;
+	//1 = def2, 2 = xTB, 3 = pTB. One loop over the atoms for all three, because the only difference
+	//between them was which table a table lookup read - and the bound-checked accessor is what keeps
+	//an atom heavier than the tables describe from reading past the end of one. A table lookup per
+	//atom does not need a thread each, so the three omp loops this replaces are no loss.
+	auto core_of = [ECP_mode](const int Z)
 		{
-			if (constants::ECP_electrons[get_atom_charge(i)] != 0)
+			switch (ECP_mode)
 			{
-				atoms[i].set_ECP_electrons(constants::ECP_electrons[get_atom_charge(i)]);
+			case 1: return constants::ECP_core_electrons(constants::ECP_electrons, Z);
+			case 2: return constants::ECP_core_electrons(constants::ECP_electrons_xTB, Z);
+			case 3: return constants::ECP_core_electrons(constants::ECP_electrons_pTB, Z);
+			default: return 0;
 			}
-		}
-	}
-	if (apply_to_atoms && ECP_mode == 2) // xTB ECPs
+		};
+	if (ECP_mode < 1 || ECP_mode > 3)
+		return;
+	//An atom past the end of the tables gets zero from the accessor, which is the right answer - no
+	//core is defined for it - but a silent zero on a run that asked for ECP cores would quietly
+	//count its cores as valence. Name the heaviest one instead; the number is in the tables, not here.
+	int heaviest_beyond_tables = 0;
+	for (int i = 0; i < ncen; i++)
 	{
-#pragma omp parallel for
-		for (int i = 0; i < ncen; i++)
-		{
-			if (constants::ECP_electrons_xTB[get_atom_charge(i)] != 0)
-			{
-				atoms[i].set_ECP_electrons(constants::ECP_electrons_xTB[get_atom_charge(i)]);
-			}
-		}
+		const int Z = get_atom_charge(i);
+		if (Z > constants::heaviest_ECP_element)
+			heaviest_beyond_tables = std::max(heaviest_beyond_tables, Z);
+		//Zero means the table declares no core for this element, and that is not the same as a
+		//declaration of zero: a count read from the file itself stays, as it did before.
+		const int core = core_of(Z);
+		if (core != 0)
+			atoms[i].set_ECP_electrons(core);
 	}
-	if (apply_to_atoms && ECP_mode == 3) // pTB ECPs
-	{
-#pragma omp parallel for
-		for (int i = 0; i < ncen; i++)
-		{
-			if (constants::ECP_electrons_pTB[get_atom_charge(i)] != 0)
-			{
-				atoms[i].set_ECP_electrons(constants::ECP_electrons_pTB[get_atom_charge(i)]);
-			}
-		}
-	}
+	if (heaviest_beyond_tables != 0)
+		std::cout << "\nECP cores were asked for, but the tables stop at Z = "
+		<< constants::heaviest_ECP_element << " and this structure contains Z = "
+		<< heaviest_beyond_tables << ": those atoms are treated as all-electron, which is what "
+		"their basis set has to be for the electron count to add up.\n";
 };
 
 void WFN::set_ECPs(ivec &nr, ivec &elcount)

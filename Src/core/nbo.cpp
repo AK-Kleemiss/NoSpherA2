@@ -2,6 +2,7 @@
 #include "nbo.h"
 #include "wfn_class.h"
 #include "constants.h"
+#include "convenience.h"
 
 #include <Eigen/Dense>
 #include <fstream>
@@ -38,6 +39,13 @@ namespace
 
     MatrixXd sym_power(const MatrixXd& M, const double p, const double rel_floor = 1e-10)
     {
+        //A spin with nothing in it is a legitimate input: the beta spin of a hydrogen atom has no
+        //occupied NAO, so the Lewis set is empty and this is called on a 0 x 0 matrix.  Eigen's
+        //maxCoeff() on an empty expression is undefined - in a release build it reads past the end
+        //and segfaults, which is how -nbo_native on a one-electron wavefunction died.  The power of
+        //an empty matrix is that matrix, and every product below is already well defined for it.
+        if (M.rows() == 0 || M.cols() == 0)
+            return M;
         Eigen::SelfAdjointEigenSolver<MatrixXd> es(M);
         VectorXd w = es.eigenvalues();
         const double cut = rel_floor * std::max(w.maxCoeff(), 1e-300);
@@ -1120,9 +1128,101 @@ NboResults native_nbo(WFN& wavy, const NboOptions& options, std::ostream& log)
     return res;
 }
 
+//-nrt spends most of a run's time and used to report nowhere a reader looks: the resonance weights,
+//the bond orders and the valencies went into <stem>.native.nbo.json and NoSpherA2.log carried only
+//the two NRT citations, so a 6.6 s search on a 14-atom complex was indistinguishable from an
+//ignored flag.  The layout follows gennbo's own headings on purpose, so the two routes can be read
+//side by side; every number printed here is the one written to the JSON, unrounded there.
+void print_nrt(const NboResults& r, std::ostream& out)
+{
+    using namespace std;
+    const NboNrt& n = r.nrt;
+    if (!n.present) return;
+    const ostream_format_guard restore_format(out);
+    //bond orders carry atom indices only; the populations table is where the elements are
+    std::map<int, std::string> element;
+    for (const NboAtomPopulation& p : r.npa) element[p.index] = p.element;
+    for (const NboValency& v : n.valencies) element[v.atom] = v.element;
+    const auto label = [&element](const int a) {
+        const auto it = element.find(a);
+        return (it == element.end() ? std::string("?") : it->second) + std::to_string(a);
+    };
+
+    out << "\n NATURAL RESONANCE THEORY ANALYSIS (in house):\n\n"
+        << " " << n.structures_used << " of " << n.structures_found
+        << " resonance structures carry the fit, D(0) = " << fixed << setprecision(5) << n.d_0
+        << ", D(w) = " << n.d_w << "\n";
+    for (const std::string& s : n.notes) out << "   " << s << "\n";
+
+    if (!n.weights.empty()) {
+        out << "\n  RS   Weight(%)   Added(Removed)\n"
+            << " ---------------------------------------------------------------------------------\n";
+        for (const NboResonanceWeight& w : n.weights)
+            out << setw(4) << w.structure << setprecision(2) << setw(11) << w.weight_percent << "   "
+                << (w.spin.empty() ? "" : w.spin + ": ") << w.changes << "\n";
+    }
+    if (!n.bond_orders.empty()) {
+        out << "\n Natural Bond Order\n"
+            << "   Atom  Atom      Total   Covalent      Ionic\n"
+            << " ---------------------------------------------------------------------------------\n";
+        for (const NboBondOrder& b : n.bond_orders) {
+            out << "  " << left << setw(6) << label(b.atom1) << setw(6)
+                << (b.diagonal ? std::string() : label(b.atom2)) << right << fixed << setprecision(4)
+                << setw(11) << b.total;
+            if (b.diagonal)
+                out << "        ---        ---";
+            else
+                out << setw(11) << b.covalent << setw(11) << b.ionic;
+            if (!b.spin.empty()) out << "  " << b.spin;
+            out << "\n";
+        }
+    }
+    if (!n.valencies.empty()) {
+        out << "\n Natural Atomic Valencies\n"
+            << "   Atom    Valency  Covalency  Electroval.   Electrons\n"
+            << " ---------------------------------------------------------------------------------\n";
+        for (const NboValency& v : n.valencies) {
+            out << "  " << left << setw(6) << (v.element + std::to_string(v.atom)) << right << fixed
+                << setprecision(4) << setw(11) << v.valency << setw(11) << v.covalency << setw(11)
+                << v.electrovalency << setw(12) << v.electron_count;
+            if (!v.spin.empty()) out << "  " << v.spin;
+            out << "\n";
+        }
+    }
+    for (const std::string& s : n.symmetry_forms) out << " " << s << "\n";
+}
+
 void print_nbo(const NboResults& r, std::ostream& out)
 {
     using namespace std;
+    //fixed/setprecision below stay on the stream after this table, so everything printed through it
+    //afterwards would carry two decimals
+    const ostream_format_guard restore_format(out);
+    //The populations were JSON-only for the same reason the resonance tables were: nobody wrote the
+    //branch.  NPA charges are the most-read line of an NBO run, and on -nbo_native they appeared
+    //nowhere in NoSpherA2.log.  The per-NAO table stays in <stem>.native.nbo.json - it is 189 rows
+    //on a 14-atom complex and the populations are its summary.
+    if (!r.npa.empty()) {
+        const bool spin = r.npa.front().has_spin_density;
+        out << "\n NATURAL POPULATION ANALYSIS (in house):\n\n"
+            << "   Atom      Charge       Core    Valence    Rydberg      Total"
+            << (spin ? "   Spin dens.\n" : "\n")
+            << " ---------------------------------------------------------------------------------\n";
+        double charge_sum = 0.0, total_sum = 0.0;
+        for (const NboAtomPopulation& p : r.npa) {
+            out << "  " << left << setw(4) << (p.element + std::to_string(p.index)) << right << fixed
+                << setprecision(5) << setw(12) << p.charge << setw(11) << p.core << setw(11)
+                << p.valence << setw(11) << p.rydberg << setw(11) << p.total;
+            if (p.has_spin_density) out << setw(13) << p.spin_density;
+            out << "\n";
+            charge_sum += p.charge;
+            total_sum += p.total;
+        }
+        //the two sums are the check a reader can make on the spot: the charges add to the molecular
+        //charge and the populations to the number of electrons the wavefunction carries
+        out << "  " << left << setw(4) << "sum" << right << setw(12) << charge_sum << setw(44)
+            << total_sum << "\n";
+    }
     out << "\n NATURAL BOND ORBITAL ANALYSIS (in house):\n\n"
         << "                                                      Principal Delocalizations\n"
         << "  NBO                         Occupancy    Energy\n"
@@ -1141,12 +1241,14 @@ void print_nbo(const NboResults& r, std::ostream& out)
             out << "\n";
         }
     }
-    if (r.e2.empty()) return;
-    out << "\n SECOND ORDER PERTURBATION THEORY ANALYSIS OF FOCK MATRIX IN NBO BASIS\n\n"
-        << "     Donor NBO              Acceptor NBO            E(2)   E(NL)-E(L)  F(L,NL)\n"
-        << " ---------------------------------------------------------------------------------\n";
-    for (const NboE2Entry& e : r.e2)
-        out << " " << left << setw(22) << e.donor << setw(22) << e.acceptor << right << fixed
-            << setprecision(2) << setw(8) << e.energy_kcal << setprecision(3) << setw(11)
-            << e.e_diff << setw(10) << e.fij << (e.spin.empty() ? "" : "  " + e.spin) << "\n";
+    if (!r.e2.empty()) {
+        out << "\n SECOND ORDER PERTURBATION THEORY ANALYSIS OF FOCK MATRIX IN NBO BASIS\n\n"
+            << "     Donor NBO              Acceptor NBO            E(2)   E(NL)-E(L)  F(L,NL)\n"
+            << " ---------------------------------------------------------------------------------\n";
+        for (const NboE2Entry& e : r.e2)
+            out << " " << left << setw(22) << e.donor << setw(22) << e.acceptor << right << fixed
+                << setprecision(2) << setw(8) << e.energy_kcal << setprecision(3) << setw(11)
+                << e.e_diff << setw(10) << e.fij << (e.spin.empty() ? "" : "  " + e.spin) << "\n";
+    }
+    print_nrt(r, out);
 }

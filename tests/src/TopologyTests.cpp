@@ -352,6 +352,48 @@ TEST(Topology, PoincareHopfHoldsOnACyclicMolecule)
 	}
 }
 
+//Every nucleus of an all-electron density is a (3,-3) attractor.  That is a property of rho - it has
+//a cusp maximum at every nucleus - and not of this search, so it is an invariant the output has to
+//reproduce on any all-electron file, whatever Poincare-Hopf adds up to.  tests/Fe_gbw/Fe.gbw is where
+//it failed: rho at the iron is ~8E3 and at the four sulfurs ~2.6E3, the Hessian there is 1E8-1E9, and
+//an unscaled absolute tolerance of 1E-7 a.u. sits below the floating-point floor of the analytic
+//gradient, so the Newton search stalled and Fe1, S2, S4 and S5 produced no critical point at all
+//while S3 was accepted at 8.3E-8 - 17 attractors for 21 nuclei, and a Poincare-Hopf sum of -3.
+//All-electron is the premise and is therefore asserted: the theorem does not hold for a
+//pseudopotential density, which is the case NotEveryWavefunctionHasNuclearMaxima below covers.
+TEST(Topology, EveryNucleusOfAnAllElectronDensityIsAnAttractor)
+{
+	const std::filesystem::path f = nos_test_repo_root() / "tests" / "Fe_gbw" / "Fe.gbw";
+	if (!std::filesystem::exists(f)) GTEST_SKIP() << "missing fixture " << f.string();
+	WFN wavy(f);
+	const std::vector<topology::nucleus> nuc = topology::nuclei_of(wavy);
+	ASSERT_EQ(nuc.size(), 21u) << "expected the iron thiolate, Fe(SCH3)4";
+	double charge = 0.0;
+	for (const topology::nucleus& n : nuc) charge += n.Z;
+	//an ion would be fine here, a missing core would not: the smallest def2 ECP core is 10 electrons
+	ASSERT_LT(charge - wavy.count_nr_electrons(), 5.0)
+		<< "this fixture has to be all-electron for the cusp argument to apply";
+
+	const topology::result r = topology::analyze_topology(wavy, nuc, topology::options{});
+	SCOPED_TRACE(r.diagnosis);
+	std::vector<int> attractors_of(nuc.size(), 0);
+	for (const topology::cp& p : r.points)
+		if (p.kind == topology::cp_kind::attractor && !p.is_nna && p.nearest_nucleus >= 0)
+			attractors_of[p.nearest_nucleus]++;
+	for (size_t a = 0; a < nuc.size(); a++)
+		EXPECT_EQ(attractors_of[a], 1) << "nucleus " << a + 1 << " (Z=" << nuc[a].Z
+			<< ") has no maximum of its own";
+	//and the heavy centres are the ones it broke on: their rho is three orders above a carbon's
+	int heavy = 0;
+	for (const topology::cp& p : r.points)
+		if (p.kind == topology::cp_kind::attractor && p.nearest_nucleus >= 0 && nuc[p.nearest_nucleus].Z > 15) {
+			heavy++;
+			EXPECT_GT(p.density, 1E3) << "Z=" << nuc[p.nearest_nucleus].Z;
+			EXPECT_LT(p.nearest_nucleus_distance, 1E-3) << "a heavy maximum sits on its nucleus";
+		}
+	EXPECT_EQ(heavy, 5) << "one iron and four sulfurs";
+}
+
 //Not every file that reads as a wavefunction has a nuclear maximum, and the search must not pretend
 //it does.  tests/molden_file/epoxide.molden carries 9 occupied orbitals holding 18 electrons for
 //C2H4O, which has 24 - the heavy atoms wear pseudopotentials (largest oxygen s exponent 69, against
@@ -439,28 +481,361 @@ TEST(Topology, NonNuclearAttractorIsReportedWithItsDistance)
 
 //The report must print the sum, the counts and, when it does not close, the diagnosis - the point
 //of the exercise is that a user sees the gap rather than a plausible-looking number.
+//This test used to build two hydrogen atoms 10 bohr apart, each with one maximum and no bond point,
+//and assert that a sum of 2 was a deficit against 1.  That was the bug, written down as an
+//expectation: two separated atoms have index sum 2, and the case is COMPLETE - see
+//SeparatedFragmentsSumToTheirNumber below.  The wording it checks is worth keeping, so it now runs on
+//a case that really is short a point: one bonded pair (one covalent fragment), one attractor found
+//where there should be two, sum 0 against 1.
 TEST(Topology, ReportNamesTheAssumedFormAndTheDeficit)
 {
 	topology::result r;
-	topology::cp attractor;
-	attractor.kind = topology::cp_kind::attractor;
-	r.points.assign(2, attractor);
+	topology::cp p;
+	p.kind = topology::cp_kind::attractor;
+	r.points.push_back(p);
+	p.kind = topology::cp_kind::bond;
+	r.points.push_back(p);
 	r.graph_vertices = 2;
-	r.graph_edges = 0;
-	r.graph_components = 2;
+	r.graph_edges = 1;
+	r.graph_components = 1;
+	r.covalent_fragments = 1;
 	topology::tally(r);
-	EXPECT_EQ(r.sum, 2);
+	EXPECT_EQ(r.sum, 0);
+	EXPECT_EQ(r.target, 1);
 	EXPECT_FALSE(r.balanced);
 
 	std::ostringstream out;
-	topology::report_topology(r, { { { 0.0, 0.0, 0.0 }, 1 }, { { 10.0, 0.0, 0.0 }, 1 } }, out);
+	topology::report_topology(r, { { { 0.0, 0.0, 0.0 }, 1 }, { { 1.4, 0.0, 0.0 }, 1 } }, out);
 	const std::string text = out.str();
 	//which Poincare-Hopf form is being assumed, stated in the output
 	EXPECT_NE(text.find("molecular form"), std::string::npos);
 	EXPECT_NE(text.find("INCOMPLETE"), std::string::npos);
-	EXPECT_NE(text.find("deficit"), std::string::npos);
-	//two covalent fragments is a named possibility, not silently folded into a wrong sum
-	EXPECT_NE(text.find("fragment"), std::string::npos) << text;
+	EXPECT_NE(text.find("deficit"), std::string::npos) << text;
+	//and which class is short, rather than only that something is
+	EXPECT_NE(text.find("attractor or ring point"), std::string::npos) << text;
 	//the thresholds that did the rejecting are printed too
 	EXPECT_NE(text.find("Accepted when"), std::string::npos);
+}
+
+//An invariant of the molecule, not of this code: the geometry of tests/grown/water.wfx is
+//centrosymmetric about its manganese at (0, 15.2402633248481, 0) bohr - 45 of its 48 nuclei map onto
+//each other to 1.3E-13 bohr; the three that do not are the unpaired fifth water, which the pairing
+//test below excludes by itself.  Every nucleus of an all-electron density carries a cusp maximum of
+//rho, so a nucleus with a maximum of its own must have an image with one.  That part is exact and
+//holds however asymmetric the density is - which this one is, by a few milli-a.u.; see the second
+//half of the test, where it is measured and then used as the yardstick for the rest.
+//
+//The count did not hold.  47 attractors for 48 nuclei, the proton H38 without a maximum while its
+//image H39 had one - and the cause was not the search either (starting at H38, Newton converged in 6
+//iterations to a (3,-3) point 0.183 bohr away with |grad rho| = 1.4E-10, just as it did at H39).  It
+//was the de-duplication: two accepted points closer than options::merge_distance were called one
+//point whatever their Hessian signature said, and the smaller gradient norm won.  At H38 a bond seed
+//landed 0.045 bohr from the maximum and replaced it; at H39 the same pair sits 0.0536 bohr apart,
+//outside the threshold, and both survived.  The tie-break was a fact about two searches, not about
+//the density, and the printed row still said the point came from a nuclear seed.
+TEST(Topology, ACentrosymmetricDensityHasACentrosymmetricCriticalPointSet)
+{
+	const std::filesystem::path f = nos_test_repo_root() / "tests" / "grown" / "water.wfx";
+	if (!std::filesystem::exists(f)) GTEST_SKIP() << "missing fixture " << f.string();
+	WFN wavy(f);
+	const std::vector<topology::nucleus> nuc = topology::nuclei_of(wavy);
+	ASSERT_EQ(nuc.size(), 48u) << "expected the grown manganese complex with five waters";
+	//The centre is the manganese itself, taken from the fixture's own coordinates rather than written
+	//out here: a literal truncated to seven decimals leaves a 1.5E-05 bohr residual and pairs nothing
+	//at the tolerance below.  About Mn1 the 45 paired nuclei map onto each other to 1.3E-13 bohr.
+	ASSERT_EQ(nuc[0].Z, 25) << "nucleus 1 is the inversion centre of this fixture";
+	const d3 centre = nuc[0].pos;
+	std::vector<int> partner(nuc.size(), -1);
+	for (size_t a = 0; a < nuc.size(); a++) {
+		const d3 im{ 2 * centre[0] - nuc[a].pos[0], 2 * centre[1] - nuc[a].pos[1], 2 * centre[2] - nuc[a].pos[2] };
+		for (size_t b = 0; b < nuc.size(); b++)
+			if (nuc[b].Z == nuc[a].Z && array_length(im, nuc[b].pos) < 1E-8) { partner[a] = (int)b; break; }
+	}
+	const size_t paired = (size_t)std::count_if(partner.begin(), partner.end(), [](const int p) { return p >= 0; });
+	ASSERT_EQ(paired, 45u) << "the inversion centre or the fixture changed: 45 of the 48 nuclei pair "
+		"under it, the three that do not being the unpaired fifth water";
+
+	const topology::options opt{};
+	const topology::result r = topology::analyze_topology(wavy, nuc, opt);
+	SCOPED_TRACE(r.diagnosis);
+	std::vector<int> attractors_of(nuc.size(), 0);
+	std::vector<double> rho_of(nuc.size(), 0.0), doff_of(nuc.size(), 0.0);
+	for (const topology::cp& p : r.points)
+		if (p.kind == topology::cp_kind::attractor && !p.is_nna && p.nearest_nucleus >= 0) {
+			attractors_of[p.nearest_nucleus]++;
+			//the one nearest the nucleus, so a second attractor in the same basin cannot decide this
+			if (rho_of[p.nearest_nucleus] == 0.0 || p.nearest_nucleus_distance < doff_of[p.nearest_nucleus]) {
+				rho_of[p.nearest_nucleus] = p.density;
+				doff_of[p.nearest_nucleus] = p.nearest_nucleus_distance;
+			}
+		}
+	double worst_rho_rel = 0.0;
+	std::string worst_pair = "none";
+	for (size_t a = 0; a < nuc.size(); a++) {
+		const int b = partner[a];
+		if (b < 0) continue;
+		EXPECT_EQ(attractors_of[a], attractors_of[(size_t)b])
+			<< "nucleus " << a + 1 << " and its inversion image " << b + 1 << " (both Z=" << nuc[a].Z
+			<< ") disagree on whether they own a maximum";
+		if (attractors_of[a] > 0 && attractors_of[(size_t)b] > 0 && rho_of[a] > 0.0) {
+			const double rel = std::abs(rho_of[a] - rho_of[(size_t)b]) / rho_of[a];
+			if (rel > worst_rho_rel) {
+				worst_rho_rel = rel;
+				std::ostringstream o;
+				o << nuc[a].Z << ": " << a + 1 << " rho " << rho_of[a] << " at " << doff_of[a]
+					<< " bohr off its nucleus, image " << b + 1 << " rho " << rho_of[(size_t)b] << " at "
+					<< doff_of[(size_t)b] << " bohr";
+				worst_pair = o.str();
+			}
+		}
+	}
+	std::cout << "worst inversion pair, relative drho " << std::scientific << worst_rho_rel
+		<< "   Z=" << worst_pair << "\n";
+
+	//How asymmetric is the density itself?  rho at each paired nucleus against rho at its partner: the
+	//geometry maps those two onto each other to 1.3E-13 bohr and no search is anywhere near this, so
+	//whatever comes out belongs to the wavefunction.  It is not zero.  The breach sorts by element and
+	//not by distance from the water that has no image - H 2.9E-04 to 4.8E-03, C and O around 1E-05, a
+	//pair 12.6 bohr from that water worse than a pair 3.7 bohr from it - and multiplied by rho at each
+	//nucleus it is one number: 1.8E-03 at a proton, 2.4E-03 at a carbon, 5E-03 at an oxygen, absolute.
+	//A uniform valence-scale asymmetry of a few milli-a.u. is what an SCF on an asymmetric molecule looks
+	//like, and this cluster is asymmetric: only its geometry is centrosymmetric, and only for 45 of its
+	//48 nuclei.  A reader mangling a grown image would not respect core hardness that cleanly.
+	double worst_nucleus_rel = 0.0;
+	std::string worst_nucleus_pair;
+	for (size_t a = 0; a < nuc.size(); a++) {
+		const int b = partner[a];
+		if (b < 0 || (size_t)b <= a) continue;
+		const double rho_a = topology::describe_cp(wavy, nuc[a].pos, nuc, opt).density;
+		const double rho_b = topology::describe_cp(wavy, nuc[(size_t)b].pos, nuc, opt).density;
+		const double rel = std::abs(rho_a - rho_b) / rho_a;
+		if (rel > worst_nucleus_rel) {
+			worst_nucleus_rel = rel;
+			std::ostringstream o;
+			o << a + 1 << "/" << b + 1 << " Z=" << nuc[a].Z << " rho " << rho_a << " vs " << rho_b;
+			worst_nucleus_pair = o.str();
+		}
+	}
+	std::cout << "rho at a nucleus against rho at its image, 22 pairs, no search: worst relative drho "
+		<< worst_nucleus_rel << "   " << worst_nucleus_pair << "\n";
+	ASSERT_GT(worst_nucleus_rel, 0.0) << "no pair was compared, so the bound below is vacuous";
+
+	//That number, and not a written-out tolerance, is what the maxima are held to: the search may not add
+	//asymmetry of its own beyond the asymmetry the density already has.  Measured, the maxima come out
+	//4.378652E-03 against 4.750379E-03 at the same two nuclei - a ratio of 0.92, so the two maxima differ
+	//in rho because rho differs there, and the factor of 3 below is headroom rather than a finding.  An
+	//earlier reading of this pair as path dependence in the seeding, on the grounds that Newton's 1E-7
+	//acceptance pins a position to 3E-08 bohr, was wrong for exactly that reason.  It is not the
+	//de-duplication either: the number is identical with the old merge rule.
+	EXPECT_LT(worst_rho_rel, 3.0 * worst_nucleus_rel) << "rho at a nuclear maximum differs from its "
+		"image's by more than the density does at those nuclei, worst maximum pair Z=" << worst_pair
+		<< ", worst nucleus pair " << worst_nucleus_pair;
+	//and every one of the 45 paired nuclei owns exactly one, which is the cusp argument again
+	for (size_t a = 0; a < nuc.size(); a++)
+		if (partner[a] >= 0)
+			EXPECT_EQ(attractors_of[a], 1) << "nucleus " << a + 1 << " (Z=" << nuc[a].Z << ")";
+}
+
+//Poincare-Hopf is a necessary condition and not a sufficient one, and the code used to treat it as
+//sufficient: a spurious bond point and a spurious ring point cancel in n_NCP - n_BCP + n_RCP - n_CCP.
+//tests/ELI_heavy/hgh2_ecp.gbw is the case that exposed it - a linear H-Hg-H, three nuclei, two bonds
+//and no ring anywhere - and -topology printed
+//    Counts: 3 attractor, 4 bond, 2 ring, 0 cage      3 - 4 + 2 - 0 = 1 (expected 1)
+//    The set of critical points is COMPLETE
+//and exited 0.  Two of those bond points and both ring points cannot exist: a molecule whose bond
+//graph is a path has cycle rank 0, so n_ring - n_cage must be 0.  That rank was already being
+//computed; it just sat inside "if (!r.balanced)" and so was only ever consulted after the sum had
+//already failed.  The counts below are that fixture's, entered by hand - tally() is public so the
+//verdict can be checked without a search, and none of these three arms needs a wavefunction.
+namespace
+{
+	//fragments defaults to C: one covalent fragment per component of the found bond graph, which is
+	//the ordinary case.  Pass it explicitly to separate the two - a closed-shell contact gives
+	//fragments > C, a missing bridging bond point gives fragments < C
+	topology::result graph_case(int n_attractor, int n_bond, int n_ring, int V, int E, int C, int fragments = -1)
+	{
+		topology::result r;
+		topology::cp p;
+		for (int k = 0; k < n_attractor; k++) { p.kind = topology::cp_kind::attractor; r.points.push_back(p); }
+		for (int k = 0; k < n_bond; k++) { p.kind = topology::cp_kind::bond; r.points.push_back(p); }
+		for (int k = 0; k < n_ring; k++) { p.kind = topology::cp_kind::ring; r.points.push_back(p); }
+		r.graph_vertices = V;
+		r.graph_edges = E;
+		r.graph_components = C;
+		r.covalent_fragments = fragments >= 0 ? fragments : std::max(C, 1);
+		//what bond_graph_cycles() computes, reproduced here because that function needs the points'
+		//positions and these have none
+		r.required_ring_minus_cage = E - V + C;
+		topology::tally(r);
+		return r;
+	}
+}
+
+TEST(Topology, ABalancedSumThatContradictsTheBondGraphIsNotComplete)
+{
+	//HgH2: three nuclei, two bonds, one component -> cycle rank 0, and two ring points found
+	topology::result r = graph_case(3, 4, 2, 3, 2, 1);
+	ASSERT_EQ(r.sum, 1);
+	ASSERT_TRUE(r.balanced) << "the arm is vacuous unless the alternating sum still closes";
+	ASSERT_EQ(r.required_ring_minus_cage, 0);
+	ASSERT_EQ(r.found_ring_minus_cage, 2);
+	EXPECT_FALSE(r.graph_consistent);
+	EXPECT_FALSE(r.complete) << "a path graph has no ring, so 2 ring points with a balanced sum is "
+		"two spurious bond points and two spurious ring points cancelling: " << r.diagnosis;
+	EXPECT_NE(r.diagnosis.find("cycle rank"), std::string::npos) << r.diagnosis;
+
+	//and the printed verdict has to agree with the flag, because -topology's exit code is now the flag
+	std::ostringstream out;
+	topology::report_topology(r, { { { 0.0, 0.0, 0.0 }, 80 }, { { 3.1, 0.0, 0.0 }, 1 }, { { -3.1, 0.0, 0.0 }, 1 } }, out);
+	EXPECT_NE(out.str().find("INCOMPLETE"), std::string::npos) << out.str();
+}
+
+TEST(Topology, ANucleusWithoutAnAttractorIsNotComplete)
+{
+	//tests/ECP_SF/Au2Br2.gbw's shape: the sum closes (51 - 57 + 9 - 2 = 1) while two of its 53 nuclei
+	//carry no maximum at all.  Every nucleus of a density with core electrons there has a cusp, so
+	//n_attractor must be n_nuclei + n_NNA; scaled down to 4 nuclei, 3 bonds, 3 attractors found
+	topology::result r = graph_case(3, 2, 0, 4, 3, 1);
+	ASSERT_EQ(r.sum, 1);
+	ASSERT_TRUE(r.balanced);
+	ASSERT_EQ(r.required_ring_minus_cage, 0);
+	ASSERT_EQ(r.found_ring_minus_cage, 0) << "the ring arm must not be what fails here";
+	EXPECT_FALSE(r.graph_consistent);
+	EXPECT_FALSE(r.complete) << r.diagnosis;
+	EXPECT_NE(r.diagnosis.find("nuclear seeding"), std::string::npos) << r.diagnosis;
+}
+
+//"nuclear seeding is the likely gap" is the wrong thing to tell a colleague about an ECP wavefunction:
+//there is nothing at that nucleus to seed towards.  Measured over the five topology cells with
+//OMP_NUM_THREADS=8 on AKL007, binary f3f34c922882: ECP_SF/Au2Br2.gbw (51 attractors for 53 nuclei, the
+//two without one being exactly Au1 and Au2), ECP_SF/malbac.gbw and ELI_heavy/hgh2_ecp.gbw (which does
+//find an attractor at its Hg, at rho 7.1E-4, and then puts two spurious ring points 0.77 bohr out in
+//the core hole) are all three INCOMPLETE; Fe_gbw/Fe.gbw and TFVC/water.gbw, both all-electron, are
+//COMPLETE.  The note is measured from rho at the nucleus rather than read off an ECP flag, because the
+//file handed to an analysis does not always record that an ECP was used - and rho states it outright,
+//with five orders of magnitude between the two cases.
+TEST(Topology, AnEcpCoreIsNamedInsteadOfBlamedOnTheSeeding)
+{
+	//Au2Br2's shape scaled down: 4 nuclei, 3 attractors, one nucleus with no maximum
+	topology::result r = graph_case(3, 2, 0, 4, 3, 1);
+	ASSERT_FALSE(r.complete) << "the arm is vacuous unless the set is refused";
+	ASSERT_NE(r.diagnosis.find("nuclear seeding"), std::string::npos) << r.diagnosis;
+	EXPECT_EQ(r.diagnosis.find("pseudopotential"), std::string::npos)
+		<< "an all-electron shortfall must NOT be excused as an ECP: " << r.diagnosis;
+
+	//the same counts, plus the measurement that the heavy nucleus carries no core density
+	topology::result ecp = r;
+	ecp.coreless_nuclei = { 0 };
+	topology::tally(ecp);
+	EXPECT_FALSE(ecp.complete) << "naming the cause must not turn the refusal into a pass";
+	EXPECT_NE(ecp.diagnosis.find("pseudopotential"), std::string::npos) << ecp.diagnosis;
+	EXPECT_NE(ecp.diagnosis.find("atom number 1"), std::string::npos)
+		<< "the note has to say WHICH nucleus, 1-based as the table prints them: " << ecp.diagnosis;
+
+	//and a complete set stays silent about its cores, so the note cannot become noise on every ECP
+	//run: epoxide's shape with two coreless heavy atoms
+	topology::result fine = graph_case(7, 7, 1, 7, 7, 1);
+	fine.coreless_nuclei = { 0, 3 };
+	topology::tally(fine);
+	ASSERT_TRUE(fine.complete) << fine.diagnosis;
+	EXPECT_TRUE(fine.diagnosis.empty()) << fine.diagnosis;
+}
+
+TEST(Topology, AGenuineRingStaysComplete)
+{
+	//The other direction, which is what keeps the new term from being a blanket refusal: epoxide as
+	//-topology finds it, 7 nuclei and 7 bonds in one component, cycle rank 1, one ring point.  14 of
+	//the 22 fixtures swept stay COMPLETE, so this arm is the majority case and not the exception.
+	topology::result r = graph_case(7, 7, 1, 7, 7, 1);
+	ASSERT_EQ(r.sum, 1);
+	ASSERT_EQ(r.required_ring_minus_cage, 1);
+	EXPECT_TRUE(r.graph_consistent);
+	EXPECT_TRUE(r.complete) << r.diagnosis;
+
+	//no bond graph at all - a single atom, or a source with no nuclei - must not be refused either
+	topology::result lone = graph_case(1, 0, 0, 0, 0, 0);
+	EXPECT_TRUE(lone.graph_consistent);
+	EXPECT_TRUE(lone.complete) << lone.diagnosis;
+}
+
+//The index sum of ONE isolated molecule is 1; C of them, with rho -> 0 between them, sum to C.
+//tests/TFVC/water.gbw is a water with a helium atom 13.2 bohr away: 4 attractors, 2 bond points, no
+//ring, no cage, a sum of 2 - and it was reported INCOMPLETE with "deficit -1" while its own
+//diagnosis already read "the bond graph falls into 2 covalent fragments".  Harmless while -topology
+//exited 0 regardless; a hard failure on a perfectly good input once it does not.
+TEST(Topology, SeparatedFragmentsSumToTheirNumber)
+{
+	//water + He: 4 nuclei, 2 bond points, the bond graph in 2 components, 2 covalent fragments
+	topology::result r = graph_case(4, 2, 0, 4, 2, 2);
+	EXPECT_EQ(r.target, 2) << "two separated fragments have index sum 2";
+	EXPECT_EQ(r.sum, 2);
+	EXPECT_TRUE(r.balanced);
+	EXPECT_TRUE(r.graph_consistent);
+	EXPECT_TRUE(r.complete) << r.diagnosis;
+
+	//and the same molecule as one fragment still expects 1, so the default is not simply relaxed
+	topology::result one = graph_case(4, 3, 0, 4, 3, 1);
+	EXPECT_EQ(one.target, 1);
+	EXPECT_TRUE(one.complete) << one.diagnosis;
+
+	//An explicit target is the caller's choice and must survive: the periodic Morse form is 0 however
+	//many fragments the cell contains
+	topology::result r2;
+	topology::cp p;
+	for (int k = 0; k < 4; k++) { p.kind = topology::cp_kind::attractor; r2.points.push_back(p); }
+	for (int k = 0; k < 2; k++) { p.kind = topology::cp_kind::bond; r2.points.push_back(p); }
+	r2.graph_vertices = 4; r2.graph_edges = 2; r2.graph_components = 2; r2.covalent_fragments = 2;
+	topology::options morse;
+	morse.poincare_hopf_target = 0;
+	topology::tally(r2, morse);
+	EXPECT_EQ(r2.target, 0) << "an explicit Poincare-Hopf target must not be overwritten";
+}
+
+//What taking the target from the FOUND bond paths costs, and the check that pays for it.  The count
+//has to come from the found paths: a hydrogen-bonded dimer is covalently two fragments and its
+//density has a bridging bond point, so its sum is 1 and a geometric count would refuse it.  The
+//price is that dropping a bridging bond point raises the sum by 1 and splits a component at the
+//same time, so sum == C cannot see it.  The covalent geometry can: bond paths may be LESS
+//disconnected than the covalent graph (that is what a closed-shell contact is) and never more.
+TEST(Topology, FoundBondPathsMayNotBeMoreDisconnectedThanTheGeometry)
+{
+	//one covalent molecule of 4 nuclei, but only 2 bond points found, so the paths fall in 2 pieces
+	topology::result missing = graph_case(4, 2, 0, 4, 2, 2, 1);
+	EXPECT_EQ(missing.target, 2);
+	EXPECT_TRUE(missing.balanced) << "the arm is vacuous unless the sum still closes against 2";
+	EXPECT_FALSE(missing.graph_consistent);
+	EXPECT_FALSE(missing.complete) << missing.diagnosis;
+	EXPECT_NE(missing.diagnosis.find("bridging bond point"), std::string::npos) << missing.diagnosis;
+
+	//the other direction is legitimate and must pass: a dimer held by one closed-shell contact has 2
+	//covalent fragments, 1 connected set of bond paths, and a sum of 1
+	topology::result hbond = graph_case(6, 5, 0, 6, 5, 1, 2);
+	EXPECT_EQ(hbond.target, 1);
+	EXPECT_TRUE(hbond.graph_consistent);
+	EXPECT_TRUE(hbond.complete) << hbond.diagnosis;
+}
+
+//The fragment count itself, off the geometry alone - no density, no search.  The helium sits 11.9
+//bohr (6.3 A) from the nearest hydrogen, and bond_scale 1.3 could only reach that with a covalent
+//radius near 2.2 A, which no element in the table has - so the separation does not depend on which
+//radius helium is given.
+TEST(Topology, CovalentFragmentCountIsGeometryOnly)
+{
+	const std::vector<topology::nucleus> water_and_he{
+		{ { 0.0, 0.0, 0.2318 }, 8 }, { { 0.0, 1.39815, -0.89997 }, 1 }, { { 0.0, -1.39815, -0.89997 }, 1 },
+		{ { 0.0, 13.22808, 0.0 }, 2 } };   //tests/TFVC/water.gbw's geometry, in bohr
+	topology::options opt;
+	EXPECT_EQ(topology::covalent_fragment_count(water_and_he, opt), 2);
+
+	//the water alone is one fragment, and each atom on its own is its own
+	const std::vector<topology::nucleus> water(water_and_he.begin(), water_and_he.begin() + 3);
+	EXPECT_EQ(topology::covalent_fragment_count(water, opt), 1);
+	EXPECT_EQ(topology::covalent_fragment_count({}, opt), 1) << "an empty system is not a deficit";
+	EXPECT_EQ(topology::covalent_fragment_count({ water_and_he[0] }, opt), 1);
+	EXPECT_EQ(topology::covalent_fragment_count({ water_and_he[1], water_and_he[3] }, opt), 2);
+
+	//and a large enough bond_scale joins everything, which is the knob doing the work rather than a
+	//hard-coded distance
+	opt.bond_scale = 10.0;
+	EXPECT_EQ(topology::covalent_fragment_count(water_and_he, opt), 1);
 }

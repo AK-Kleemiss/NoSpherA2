@@ -7,6 +7,7 @@
 
 #include <complex>
 #include <cstdio>
+#include <cmath>
 #include <cstring>
 #include <numeric>
 
@@ -467,6 +468,36 @@ TEST(ConvenienceTests, ProgressBarBatchedUpdateWritesOnce)
 	EXPECT_NE(out.str().find("100%"), std::string::npos);
 }
 
+//A file-backed bar is redrawn by seeking back to the start of its line, and that overwrites whatever the
+//loop printed in between. Both bar tests above use an ostringstream, which takes the "\r" branch, so the
+//file branch - the one every NoSpherA2.log goes through - was never covered. This is not a cosmetic
+//question: RGBI prints a population line per bond inside its bar loop and not one of them has ever reached
+//the log, and the same holds for every warning any other bar loop raises. A diagnostic that is printed and
+//then erased is worse than one that was never written, because the code looks like it reports.
+//WHAT MAKES THIS FAIL: a write_progress that seeks back unconditionally. Measured red by reverting the
+//guard: found came out 0 of 4, and the file held the bar followed by the truncated tail of the last line
+//("tion between atom 1 and atom 5: 27.09"), which is what silent corruption of a log looks like.
+TEST(ConvenienceTests, FileBarKeepsWhatTheLoopPrinted)
+{
+	const TempFile tmp("progressbar", ".log");
+	{
+		std::ofstream f(tmp.path);
+		ProgressBar bar(4, 10, "-", " ", "pairs", f);
+		for (int i = 0; i < 4; i++) {
+			f << "Bond population between atom 1 and atom " << i + 2 << ": 27.09\n";
+			bar.update();
+		}
+	}
+	std::ifstream in(tmp.path);
+	const std::string text{ std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>() };
+	int found = 0;
+	for (size_t at = text.find("Bond population"); at != std::string::npos;
+		at = text.find("Bond population", at + 1))
+		found++;
+	EXPECT_EQ(found, 4) << "the bar overwrote the loop's own output in the log file:\n" << text;
+	EXPECT_NE(text.find("100%"), std::string::npos) << "and the bar itself must still finish";
+}
+
 // the contributor block is the part -no_date suppresses; the banner stays
 TEST(ConvenienceTests, MessageOmitsContributorsWithNoDate)
 {
@@ -628,13 +659,80 @@ TEST(ConvenienceMathTests, ReadxyzMinMaxFromWFNPadsAndSteps)
 	EXPECT_NEAR(opts.MinMax[4], 3.0 + pad, 1e-12);
 	EXPECT_NEAR(opts.MinMax[2], -0.5 - pad, 1e-12);
 	EXPECT_NEAR(opts.MinMax[5], 0.5 + pad, 1e-12);
-	EXPECT_EQ(opts.NbSteps[0], (int)ceil(constants::bohr2ang(3.0 + 2.0 * pad) / 0.1));
-	EXPECT_EQ(opts.NbSteps[1], (int)ceil(constants::bohr2ang(3.0 + 2.0 * pad) / 0.1));
-	EXPECT_EQ(opts.NbSteps[2], (int)ceil(constants::bohr2ang(1.0 + 2.0 * pad) / 0.1));
+	//the count is the ceil of length over resolution, rounded up once more to an even number
+	const int raw[3] = { (int)ceil(constants::bohr2ang(3.0 + 2.0 * pad) / 0.1),
+						 (int)ceil(constants::bohr2ang(3.0 + 2.0 * pad) / 0.1),
+						 (int)ceil(constants::bohr2ang(1.0 + 2.0 * pad) / 0.1) };
+	for (int i = 0; i < 3; i++)
+	{
+		EXPECT_EQ(opts.NbSteps[i], raw[i] + (raw[i] % 2));
+		//and the point of the parity: the callers step from MinMax[i] by (length)/NbSteps[i], so the centre
+		//of the box has to land ON a grid plane. Half a voxel off and the molecule's own mirror planes are
+		//not sampled, which is what broke UH6's six ELI-D attractors into six inequivalent positions.
+		const double h = (opts.MinMax[3 + i] - opts.MinMax[i]) / opts.NbSteps[i];
+		const double centre_index = 0.5 * (opts.MinMax[3 + i] + opts.MinMax[i] - 2.0 * opts.MinMax[i]) / h;
+		EXPECT_NEAR(centre_index, std::round(centre_index), 1e-9) << "axis " << i;
+		//and the step is no coarser than the caller asked for
+		EXPECT_LE(constants::bohr2ang(h), 0.1 + 1e-12) << "axis " << i;
+	}
 	EXPECT_EQ(opts.n_grid_points(), size_t(opts.NbSteps[0]) * opts.NbSteps[1] * opts.NbSteps[2]);
 	EXPECT_FALSE(opts.calc());
 	opts.rho = true;
 	EXPECT_TRUE(opts.calc());
+}
+
+// A grid that cannot sample the molecule's mirror planes cannot give a symmetric answer, at any resolution.
+// This is octahedral UH6 as tests/ELI_heavy/uh6.gbw has it - uranium at the origin, six hydrogens on the
+// axes at 2 Angstrom - measured with the radius its test uses. The six ELI-D hydrogen attractors of that
+// molecule have to map onto themselves under all 48 operations of its point group, and before the parity
+// step in readxyzMinMax_fromWFN they did so under 1 of 48 at 0.15 and 0.10 Angstrom and under all 48 at
+// 0.20 and 0.12: what decided it was whether ceil(length/resolution) happened to come out even, since with
+// an odd count the box centre falls exactly halfway between two grid planes and the four voxels around each
+// axis are degenerate. 9.0/0.15 evaluates to 60.000000000000014, so the caller asking for 0.15 got 61.
+// The attractor positions themselves are checked by tests/ELI_heavy/uh6_eli.good; this is the precondition,
+// and it is the cheap place to notice it breaking again. The second half of the test pins the opposite case:
+// with even_steps = false the count must stay exactly what ceil returned, which at 0.15 and 0.10 is odd - so
+// this test goes red if the parameter is ignored in either direction.
+TEST(ConvenienceMathTests, GridCentreLandsOnAPlaneAtEveryResolution)
+{
+	WFN w(e_origin::NOT_YET_DEFINED);
+	w.push_back_atom("U", 0.0, 0.0, 0.0, 92);
+	const double d = constants::ang2bohr(2.0);
+	for (int ax = 0; ax < 3; ax++)
+		for (int sign = -1; sign <= 1; sign += 2)
+		{
+			double p[3] = { 0.0, 0.0, 0.0 };
+			p[ax] = sign * d;
+			w.push_back_atom("H", p[0], p[1], p[2], 1);
+		}
+	ASSERT_EQ(w.get_ncen(), 7);
+	for (double res : { 0.20, 0.15, 0.12, 0.10, 0.08, 0.05 })
+	{
+		properties_options opts;
+		opts.radius = 2.5;
+		opts.resolution = res;
+		readxyzMinMax_fromWFN(w, opts);
+		//the property-cube path keeps its step at the resolution rather than at the span over the count, so an
+		//extra point there only widens the box: it asks for even_steps = false and must get ceil's own parity.
+		properties_options raw_opts;
+		raw_opts.radius = 2.5;
+		raw_opts.resolution = res;
+		readxyzMinMax_fromWFN(w, raw_opts, false);
+		for (int i = 0; i < 3; i++)
+		{
+			const int raw = (int)ceil(constants::bohr2ang(raw_opts.MinMax[3 + i] - raw_opts.MinMax[i]) / res);
+			EXPECT_EQ(raw_opts.NbSteps[i], raw) << "resolution " << res << " axis " << i;
+			EXPECT_EQ(opts.NbSteps[i], raw + (raw % 2)) << "resolution " << res << " axis " << i;
+			EXPECT_EQ(opts.NbSteps[i] % 2, 0) << "resolution " << res << " axis " << i;
+			const double h = (opts.MinMax[3 + i] - opts.MinMax[i]) / opts.NbSteps[i];
+			//the box centre sits at index NbSteps/2 because the points start at MinMax[i]
+			EXPECT_EQ(opts.NbSteps[i] / 2 * 2, opts.NbSteps[i]) << "resolution " << res;
+			EXPECT_LE(constants::bohr2ang(h), res + 1e-12) << "resolution " << res << " axis " << i;
+		}
+		//and the molecule's octahedral axes are all equivalent, so the three counts must agree
+		EXPECT_EQ(opts.NbSteps[0], opts.NbSteps[1]) << "resolution " << res;
+		EXPECT_EQ(opts.NbSteps[1], opts.NbSteps[2]) << "resolution " << res;
+	}
 }
 
 // a shortest interatomic distance below 2 reads as Angstrom, above as bohr
@@ -951,9 +1049,13 @@ TEST(ConvenienceOptionsTests, IsosurfaceAndAnalysisOptionsReadOptionalValues)
 	EXPECT_TRUE(def.properties.rho);
 	const options val = parse({ "-esp_isosurface", "0.01" });
 	EXPECT_NEAR(val.properties.esp_isosurface, 0.01, 1e-15);
-	const options eli = parse({ "-eli_analysis", "mol.wfn", "0.05", "3.5", "-acc", "4" });
+	//a real file, because -eli_analysis refuses a positional wavefunction that is not there: the
+	//name used to be taken on trust and the run died minutes later, or not at all
+	const TempFile mol("eli_analysis", ".wfn");
+	mol.write_text("");
+	const options eli = parse({ "-eli_analysis", mol.path.string(), "0.05", "3.5", "-acc", "4" });
 	EXPECT_TRUE(eli.eli_analysis_run);
-	EXPECT_EQ(eli.wfn, std::filesystem::path("mol.wfn"));
+	EXPECT_EQ(eli.wfn, mol.path);
 	EXPECT_NEAR(eli.properties.resolution, 0.05, 1e-15);
 	EXPECT_NEAR(eli.properties.radius, 3.5, 1e-15);
 	EXPECT_EQ(eli.accuracy, 4);

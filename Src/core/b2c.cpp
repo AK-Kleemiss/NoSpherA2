@@ -975,9 +975,41 @@ std::pair<cubei, std::vector<d4>> topological_cube_analysis(const cube *cub, con
 				valid[i] = in ? 1 : 0;
 			}
 	auto ok = [&](int x, int y, int z) { return x >= 0 && y >= 0 && z >= 0 && x < nx && y < ny && z < nz && valid[lin(x, y, z)]; };
+	//How much of the near-grid partition below was decided by the loop order rather than by the field?
+	//steepest() takes the steepest of the 26 neighbours with a strict >, so when two are exactly equally
+	//steep the one the (ix,iy,iz) loops reach first wins - always the smaller index, i.e. -x before +x.
+	//That order is a property of the array, not of the molecule, so symmetry-equivalent basins are not
+	//treated equivalently: octahedral UH6 with its six hydrogens on the cartesian axes and the grid
+	//centred on the uranium - so the grid itself carries the symmetry - comes out with six ELI-D
+	//hydrogen basins whose voxel volumes differ by 37 % and whose electron counts differ by 3 %, while
+	//the QTAIM basins of the same run, which take the analytic-gradient path instead, hold the same
+	//orbit to every printed digit. The spread does not fall when the spacing goes 0.20 -> 0.08 A
+	//(1.37 -> 1.34 % in electrons), so it is not discretisation error that a finer grid would remove.
+	//A tied step is genuinely ambiguous - no single winner can be symmetric - so the count is printed
+	//rather than hidden: it is the honest error bar on every near-grid basin this routine reports.
+	long long steep_calls = 0, steep_tied = 0, tied_paths = 0;
+	bool path_tied = false;
+	//The other way a step can be arbitrary, and the one that turns out to matter here. The stepper below
+	//rounds each gradient component's share f = s[d]/max|s| to a whole voxel step with lround(), so a
+	//component sitting at f = 0.5 is one rounding away from stepping and one from not. The field on the
+	//grid is symmetric only as far as its own arithmetic is: values at mirror-image points agree to
+	//within the last bit, not exactly, because a grid coordinate is origin + i*h and the mirror of that
+	//is not the same sum. A decision within that distance of 0.5 therefore resolves one way on one side
+	//of the molecule and the other way on the other, which is how a 1e-16 asymmetry becomes a 37 %
+	//difference in basin volume. min_margin says how close the closest call was; a run whose margin
+	//never drops near the field's own noise would REFUTE this explanation.
+	long long marginal_1e9 = 0, marginal_1e5 = 0, step_decisions = 0;
+	double min_margin = 1.0;
+	//And the one that decides where the attractors land: grad_epsilon is ABSOLUTE, so on a field whose
+	//values are around 11 a top that varies in the eleventh digit counts as flat and the walk stops at
+	//whichever voxel of it the path entered. flat_stops counts those stops and max_flat_best says how
+	//much uphill was still there when the walk gave up; a count of zero would refute this too.
+	long long flat_stops = 0;
+	double max_flat_best = 0.0;
 	//Highest 26-neighbour; false when none is higher
 	auto steepest = [&](int x, int y, int z, int &bx, int &by, int &bz) {
 		double best = 0.0;
+		int n_best = 0;
 		bx = x; by = y; bz = z;
 		const double c = v[lin(x, y, z)];
 		for (int ix = x - 1; ix <= x + 1; ix++)
@@ -986,13 +1018,27 @@ std::pair<cubei, std::vector<d4>> topological_cube_analysis(const cube *cub, con
 					if ((ix == x && iy == y && iz == z) || !ok(ix, iy, iz)) continue;
 					const double d = std::sqrt(std::pow((ix - x) * h[0], 2) + std::pow((iy - y) * h[1], 2) + std::pow((iz - z) * h[2], 2));
 					const double g = (v[lin(ix, iy, iz)] - c) / d;
-					if (g > best) { best = g; bx = ix; by = iy; bz = iz; }
+					if (g > best) { best = g; bx = ix; by = iy; bz = iz; n_best = 1; }
+					else if (n_best && g == best) n_best++;   //just as steep, reached later: the winner was picked by loop order alone
 				}
+		steep_calls++;
+		if (n_best > 1) { steep_tied++; path_tied = true; }
+		//A third way for a step to be arbitrary, and on UH6 the one that decides where the attractors
+		//land. grad_epsilon is an absolute number (1e-10) on a field whose values here are around 11, so
+		//the top of a hydrogen's ELI-D basin - a shell where ELI-D varies in the eleventh digit - counts
+		//as flat and the walk stops at whichever voxel of it the path entered. Which voxel that is
+		//depends on where the path came from, so the six symmetry-equivalent hydrogens get attractors at
+		//six DIFFERENT transverse offsets: H3 at (+0.139, +4.043, +0.139) against H4 at (+0.139, -4.043,
+		//-0.139), which is not the mirror image the group requires. The nearest-attractor quadrature then
+		//inherits that, which is why its volumes spread 32 % while its maxima all read 11.2258.
+		if (best > 0.0 && best <= grad_epsilon) {
+			flat_stops++;
+			if (best > max_flat_best) max_flat_best = best;
+		}
 		return best > grad_epsilon;
 	};
 	ivec basin(n, 0);
 	std::vector<d4> Maxima;
-	std::vector<bool> on_rim;
 	std::vector<unsigned char> seeded(n, 0);
 	ivec stamp(n, 0);
 	int path_id = 0;
@@ -1006,7 +1052,6 @@ std::pair<cubei, std::vector<d4>> topological_cube_analysis(const cube *cub, con
 			}
 			if (!inside || !valid[lin(c[0], c[1], c[2])] || basin[lin(c[0], c[1], c[2])]) continue;
 			Maxima.push_back(d4{ p[0], p[1], p[2], v[lin(c[0], c[1], c[2])] });
-			on_rim.push_back(false);
 			basin[lin(c[0], c[1], c[2])] = static_cast<int>(Maxima.size());
 			seeded[lin(c[0], c[1], c[2])] = 1;
 		}
@@ -1017,6 +1062,7 @@ std::pair<cubei, std::vector<d4>> topological_cube_analysis(const cube *cub, con
 	auto ascend = [&](int x, int y, int z, const std::vector<unsigned char> *interior, const bool assign) {
 		path.clear();
 		path_id++;
+		path_tied = false;
 		d3 dr{ 0.0, 0.0, 0.0 };
 		int cx = x, cy = y, cz = z;
 		for (size_t guard = 0; guard < n; guard++) {
@@ -1048,6 +1094,12 @@ std::pair<cubei, std::vector<d4>> topological_cube_analysis(const cube *cub, con
 				int step[3];
 				for (int d = 0; d < 3; d++) {
 					const double f = s[d] / m;
+					//how far is this component from the nearest lround() boundary at a half-integer?
+					const double margin = std::abs(std::abs(f) - std::floor(std::abs(f)) - 0.5);
+					step_decisions++;
+					if (margin < min_margin) min_margin = margin;
+					if (margin < 1e-9) marginal_1e9++;
+					if (margin < 1e-5) marginal_1e5++;
 					step[d] = static_cast<int>(std::lround(f));
 					dr[d] += f - step[d];
 					if (dr[d] > 0.5) { step[d]++; dr[d] -= 1.0; }
@@ -1079,6 +1131,7 @@ std::pair<cubei, std::vector<d4>> topological_cube_analysis(const cube *cub, con
 						id = static_cast<int>(Maxima.size());
 					}
 					if (assign) for (const int q : path) basin[q] = id;
+					if (path_tied) tied_paths++;
 					return id;
 				}
 			}
@@ -1086,6 +1139,7 @@ std::pair<cubei, std::vector<d4>> topological_cube_analysis(const cube *cub, con
 		}
 		const int id = basin[lin(cx, cy, cz)];
 		if (assign) for (const int q : path) basin[q] = id;
+		if (path_tied) tied_paths++;
 		return id;
 	};
 	if (field_wfn) {
@@ -1189,7 +1243,6 @@ std::pair<cubei, std::vector<d4>> topological_cube_analysis(const cube *cub, con
 					if (std::pow(pos[0] - Maxima[m][0], 2) + std::pow(pos[1] - Maxima[m][1], 2) + std::pow(pos[2] - Maxima[m][2], 2) < catch2) id = static_cast<int>(m) + 1;
 				if (id == 0) {
 					Maxima.push_back(d4{ pos[0], pos[1], pos[2], v[top] });
-					on_rim.push_back(false);
 					id = static_cast<int>(Maxima.size());
 				}
 				result[i] = id;
@@ -1199,9 +1252,22 @@ std::pair<cubei, std::vector<d4>> topological_cube_analysis(const cube *cub, con
 	}
 	else {
 		std::cout << "Assigning basins by near-grid ascent..." << std::endl;
-		for (int x = 0; x < nx; x++)
-			for (int y = 0; y < ny; y++)
-				for (int z = 0; z < nz; z++) {
+		//A path stops at the first already-assigned voxel and adopts its basin, which is only exact if
+		//the answer at that voxel is the answer this path would have reached. It is not: the stepper
+		//above carries a rounding residual dr from the voxels it has already crossed, so where a path
+		//goes on from a voxel depends on how it arrived there. The partition is therefore decided partly
+		//by which path reaches a voxel FIRST, i.e. by the order of the three loops below - and that order
+		//is not one of the molecule's symmetry operations. Reversing it changes nothing if this
+		//explanation is wrong, which is what the environment variable is for; it is a diagnostic, never a
+		//mode anyone should run, and the default is the historical order.
+		const bool reverse_scan = std::getenv("NOS_BASIN_SCAN_REVERSE") != nullptr;
+		if (reverse_scan) std::cout << "NOS_BASIN_SCAN_REVERSE is set: scanning seed voxels in the opposite order (diagnostic)" << std::endl;
+		for (int xr = 0; xr < nx; xr++)
+			for (int yr = 0; yr < ny; yr++)
+				for (int zr = 0; zr < nz; zr++) {
+					const int x = reverse_scan ? nx - 1 - xr : xr;
+					const int y = reverse_scan ? ny - 1 - yr : yr;
+					const int z = reverse_scan ? nz - 1 - zr : zr;
 					const size_t i = lin(x, y, z);
 					if (basin[i] == 0 && valid[i]) ascend(x, y, z, nullptr, true);
 				}
@@ -1228,13 +1294,53 @@ std::pair<cubei, std::vector<d4>> topological_cube_analysis(const cube *cub, con
 			refined[i] = ascend(x, y, z, &interior, false);
 		}
 		basin.swap(refined);
+		//Both near-grid passes counted together; see steepest() above for what a tie means and for the
+		//UH6 measurement that says the asymmetry it causes does not go away with a finer grid
+		std::cout << "Near-grid ascent: " << steep_calls << " steepest-neighbour steps, " << steep_tied
+			<< " of them tied (" << std::fixed << std::setprecision(3)
+			<< (steep_calls ? 100.0 * static_cast<double>(steep_tied) / static_cast<double>(steep_calls) : 0.0)
+			<< " %), " << tied_paths << " voxel paths went through at least one tie" << std::endl;
+		std::cout << "Near-grid ascent: " << step_decisions << " rounded step decisions, " << marginal_1e5
+			<< " within 1e-5 of flipping and " << marginal_1e9 << " within 1e-9, closest margin "
+			<< std::scientific << std::setprecision(3) << min_margin << std::defaultfloat << std::endl;
+		std::cout << "Near-grid ascent: " << flat_stops << " walks stopped on a top that grad_epsilon ("
+			<< std::scientific << std::setprecision(1) << grad_epsilon << ") calls flat, largest uphill "
+			<< std::setprecision(3) << max_flat_best << " still available there" << std::defaultfloat << std::endl;
 	}
 	int nb = static_cast<int>(Maxima.size());
 	std::cout << "I found " << nb << " Basins." << std::endl;
+	//A maximum on the rim of the analysed region is not a maximum of the field. The crop - rho < 1e-4
+	//for ELI-D, the assignment radius for a cube density - marks the outward neighbours invalid, so
+	//the one-sided difference at the last valid voxel has nowhere higher to go and ascend() registers
+	//it as an attractor. How many of those there are is set by the crop surface measured in voxels
+	//rather than by the molecule: NH3Li reported 62, 53 and 23 ELI-D basins for box paddings of 2.00,
+	//2.05 and 2.10 A at one spacing, and 62, 105 and 208 as the spacing went 0.1 -> 0.05 A, nearly all
+	//of them slivers of Li's diffuse valence rim; water beside a helium 13 bohr away reported 219, all
+	//but four of them on the helium's rim with ELI-D values near 19000. The persistence merge cannot
+	//reach them - their outward saddle is the crop, so their persistence is ~1, the opposite of noise -
+	//so they are marked here and dropped after that merge - see there for what becomes of their
+	//density and for the two treatments measured and rejected first. A real ELI-D attractor sits where
+	//the density is that of a bond or a lone pair and is nowhere near the 1e-4 crop, which is what
+	//keeps this from eating the H valence basins of UH6 and NH3Li.
+	std::vector<char> rim(nb + 1, 0);
+	int n_rim = 0;
+	for (int b = 1; b <= nb; b++) {
+		if (b <= n_seeded) continue;
+		int c[3];
+		bool inside = true;
+		for (int d = 0; d < 3 && inside; d++) {
+			c[d] = static_cast<int>(std::lround((Maxima[b - 1][d] - cub->get_origin(d)) / cub->get_vector(d, d)));
+			inside = c[d] >= 0 && c[d] < (d == 0 ? nx : d == 1 ? ny : nz);
+		}
+		if (!inside) continue;
+		for (int k = 0; k < 6 && !rim[b]; k++)
+			if (!ok(c[0] + dx6[k], c[1] + dy6[k], c[2] + dz6[k])) rim[b] = 1;
+		n_rim += rim[b];
+	}
 	//Persistence merge: the saddle between two basins is the highest of the lower values over
 	//their shared faces; a maximum less than merge_persistence of its height above its highest
 	//saddle is grid noise and joins the basin behind that saddle
-	if (merge_persistence > 0.0 && nb > 1) {
+	if ((merge_persistence > 0.0 || n_rim > 0) && nb > 1) {
 		std::map<std::pair<int, int>, double> pass;
 		for (int x = 0; x < nx; x++)
 			for (int y = 0; y < ny; y++)
@@ -1277,6 +1383,21 @@ std::pair<cubei, std::vector<d4>> topological_cube_analysis(const cube *cub, con
 			if (debug) std::cout << "Merging basin " << worst << " into " << into << " (persistence " << worst_rel << ")\n";
 			target[worst] = into;
 		}
+		//The rim last, and reported as unresolved rather than handed to a neighbour. Both of the
+		//other treatments were measured on NH3Li and water first: giving each sliver to the basin
+		//across its highest saddle moved up to 0.4 e of diffuse tail into whichever hydrogen won the
+		//saddle (2.0414/2.0696/1.9939 e for three hydrogens that differ by 5e-6 in their geometry,
+		//against 1.9329/1.9249/1.9215 with the slivers left alone, and 2.3749 e in 331 bohr^3 for one
+		//of them at another padding), and doing that before the persistence merge lifted the saddles
+		//enough to collapse the molecule into two basins. The slivers are the part of the field the
+		//crop did not resolve - here the diffuse Li valence shell, and for a helium 13 bohr from the
+		//water the whole of its outer region - so they go where unresolved density already goes, into
+		//"outside every basin", and the resolved basins keep the numbers they had
+		int rim_dropped = 0;
+		for (int b = 1; b <= nb; b++)
+			if (rim[b] && root(b) == b) { target[b] = 0; rim_dropped++; }
+		if (rim_dropped)
+			std::cout << "Left " << rim_dropped << " maxima on the rim of the analysed region unresolved; their density is reported outside every basin." << std::endl;
 		ivec renumber(nb + 1, 0);
 		std::vector<d4> kept;
 		for (int b = 1; b <= nb; b++)
@@ -1967,18 +2088,53 @@ svec assign_labels_to_basins(const std::vector<d4> &Maxima, const std::vector<at
 						atom_index2 = j;
 					}
 				}
-				const double core_dist = std::pow(core_shell_radius(atoms[atom_index1].get_charge()), 2);
 				err_checkf(atom_index1 >= 0, "No atom found for basin " + toString<size_t>(i) + " at position (" + toString<double>(pos[0]) + ", " + toString<double>(pos[1]) + ", " + toString<double>(pos[2]) + ")!", std::cout);
-				err_checkf(atom_index2 >= 0, "Only one atom found for basin " + toString<size_t>(i) + " at position (" + toString<double>(pos[0]) + ", " + toString<double>(pos[1]) + ", " + toString<double>(pos[2]) + ")!", std::cout);
-				double ratio = std::max(1e-5, min_dist1) / std::max(1e-5, min_dist2);
+				//the charge is read after the index is known to be one: atoms[-1] was being indexed to
+				//compute core_dist one line above the check that atom_index1 exists at all
+				const double core_dist = std::pow(core_shell_radius(atoms[atom_index1].get_charge()), 2);
+				//A monoatomic wavefunction has no second atom, and every ELI basin of a free atom belongs
+				//to its one nucleus - core shells and a valence shell, never a bond. This used to be
+				//err_checkf(atom_index2 >= 0, "Only one atom found..."), which aborted the whole analysis
+				//on exactly the systems ELI-D is calibrated against: it refused six of the twenty-two
+				//reader inputs in the robustness matrix (H.gbw, f_ref.wfx, f_ref.wfn, F_open.molden,
+				//Ce_full.molden, sc.molden) for no reason other than holding one atom.
+				const bool lone_atom = atom_index2 < 0;
+				const double ratio = lone_atom ? 0.0 : std::max(1e-5, min_dist1) / std::max(1e-5, min_dist2);
+				//Two nearest nuclei do not make a bond. Two things have to hold, and neither was tested: the
+				//pair has to be bonded at all, and the maximum has to lie BETWEEN the two. The bond criterion
+				//is the same one the seeding loop of this file already uses for its BCP seeds - d(A,B) within
+				//1.3 times the sum of the CSD covalent radii - so a basin is never called a bond of a pair the
+				//seeder would not have looked for a BCP along. Betweenness is d1 + d2 against d(A,B): equal on
+				//the internuclear line, larger off it or outside the pair, and 1.25 admits a maximum up to
+				//0.75 * d(A,B)/2 off the axis, which is where a pi basin sits.
+				//Without these two the else below was unconditional, so any basin reaching it was labelled
+				//"A-B bond" whatever the geometry: -eli_analysis on water with a helium atom 13 bohr away
+				//reported nine "He3-H1 bond" basins. Hydrogen is where it shows, because for a nearest atom
+				//of charge <= 2 neither the core nor the lone-pair branch above can fire at all.
+				bool between = false;
+				if (!lone_atom) {
+					const d3 p1 = atoms[atom_index1].get_pos();
+					const d3 p2 = atoms[atom_index2].get_pos();
+					const int z1 = atoms[atom_index1].get_charge();
+					const int z2 = atoms[atom_index2].get_charge();
+					const double r1 = (z1 > 0 && z1 < 114) ? constants::covalent_radii[z1] : 1.5;
+					const double r2 = (z2 > 0 && z2 < 114) ? constants::covalent_radii[z2] : 1.5;
+					const double dAB = std::sqrt((p1[0] - p2[0]) * (p1[0] - p2[0]) + (p1[1] - p2[1]) * (p1[1] - p2[1]) + (p1[2] - p2[2]) * (p1[2] - p2[2]));
+					between = dAB <= constants::ang2bohr(1.3 * (r1 + r2)) &&
+						(std::sqrt(min_dist1) + std::sqrt(min_dist2)) <= 1.25 * std::max(1e-5, dAB);
+				}
 				if (atoms[atom_index1].get_charge() == 1 && min_dist1 < 0.36) // The basin holding a proton: its maximum sits within 0.6 bohr of the nucleus
 					result[i] = atoms[atom_index1].get_label() + to_string(atom_index1);
+				else if (lone_atom) // one atom in the molecule: inside its core radius a core shell, outside it the valence shell
+					result[i] = atoms[atom_index1].get_label() + to_string(atom_index1) + (min_dist1 < core_dist ? " core" : " LP");
 				else if (min_dist1 < core_dist && atoms[atom_index1].get_charge() > 2) // If the maximum is very close to an atom, we assume it's a core basin and label it with that atom
 					result[i] = atoms[atom_index1].get_label() + to_string(atom_index1) + " core";
 				else if ((ratio < 0.333 || ratio > 3) && atoms[atom_index1].get_charge() > 2) // If the maximum is significantly closer to one atom than to the other, we assume it's a valence basin and label it with the closest atom
 					result[i] = atoms[atom_index1].get_label() + to_string(atom_index1) + " LP";
-				else // Otherwise, we assume it's a bond basin and label it with both atoms
+				else if (between) // between its two nearest nuclei: a bond basin, labelled with both atoms
 					result[i] = atoms[atom_index1].get_label() + to_string(atom_index1) + "-" + atoms[atom_index2].get_label() + to_string(atom_index2) + " bond";
+				else // not between them: it belongs to the nearest atom alone, core inside the core radius
+					result[i] = atoms[atom_index1].get_label() + to_string(atom_index1) + (min_dist1 < core_dist && atoms[atom_index1].get_charge() > 2 ? " core" : " LP");
 			}
 			break;
 		default:

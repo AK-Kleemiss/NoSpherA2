@@ -447,6 +447,13 @@ namespace
         int k = static_cast<int>(B.core.size());
         for (const Slot& sl : slots) k += sl.mult;
         if (k > n) return;
+        //A spin channel can ask for no orbitals at all: a hydrogen atom's beta channel holds no
+        //electrons, so there is no core and every slot multiplicity is zero.  k = 0 then reached the
+        //OWSO overlap check below as a 0x0 SelfAdjointEigenSolver, and Eigen's first step there is
+        //maxCoeff() over an empty matrix - a segfault, not an exception, and -nbo_native H.gbw -nrt
+        //died in it with nothing printed after the citation block.  A candidate with no orbitals
+        //cannot be built, which is what infeasible means everywhere else in this function.
+        if (k == 0) return;
         std::vector<VectorXd> v(k);
         std::vector<const ivec*> blk(k, nullptr);
         std::vector<std::pair<int, int>> owner(k, { -1, -1 });
@@ -745,13 +752,17 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
         const int want = std::min(chem, std::max(64, afford));
         if (want < budget) {
             budget = want;
-            //The budget changes the answer, so say so on every run, not only under -debug.  It used to
-            //be pushed into nrt.arrows, which is the ARROWS data of the NRT report - a diagnostic in a
-            //data array is a fake arrow to anything parsing the JSON.
+            //The budget changes the answer, so report it in the log and JSON notes.
             log << "NRT" << (spin.empty() ? "" : " " + spin) << ": candidate budget " << budget
                 << " of " << options.nrt_max_candidates << ": " << active << " delocalising atom(s), "
                 << slots << " octet slot(s) -> " << chem << ", machine guard " << afford << " at "
                 << nn << " NAOs (-nrt_max overrides both)\n";
+            nrt.notes.push_back("candidate budget " + std::to_string(budget) + " of " +
+                                 std::to_string(options.nrt_max_candidates) + ": " +
+                                 std::to_string(active) + " delocalising atom(s), " +
+                                 std::to_string(slots) + " octet slot(s) -> " + std::to_string(chem) +
+                                 ", machine guard " + std::to_string(afford) + " at " +
+                                 std::to_string(nn) + " NAOs (-nrt_max overrides both)");
         }
     }
 
@@ -771,7 +782,7 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
         for (Candidate& c : all)
             if (seen.emplace(c.topo.key(), static_cast<int>(cands.size())).second)
                 cands.push_back(std::move(c));
-        nrt.arrows.push_back("exhaustive enumeration yields " + std::to_string(cands.size()) +
+        nrt.notes.push_back("exhaustive enumeration yields " + std::to_string(cands.size()) +
                              " feasible topologies");
     }
     else {
@@ -814,7 +825,7 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
         cands.erase(std::remove_if(cands.begin() + 1, cands.end(),
                                    [](const Candidate& c) { return c.depth == 1; }),
                     cands.end());
-        nrt.arrows.push_back("half-arrow intermediates dropped: " +
+        nrt.notes.push_back("half-arrow intermediates dropped: " +
                              std::to_string(before - cands.size()) + " of " +
                              std::to_string(before));
     }

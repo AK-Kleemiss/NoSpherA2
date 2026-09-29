@@ -523,11 +523,14 @@ dMatrix2 ao_overlap(const WFN &wavy)
     compute2C<Overlap2C_SPH>(params, S_flat);
     const size_t n = static_cast<size_t>(std::llround(std::sqrt(static_cast<double>(S_flat.size()))));
     dMatrix2 S = reshape<dMatrix2>(S_flat, Shape2D(n, n));
-    //ORCA stores the |m| >= 3 components - f(+-3), g(+-3), g(+-4) - with the sign opposite to
-    //libcint's, and the gbw reader keeps its convention in the density, so the overlap next to that
-    //density has to take ORCA's sign as well.  This is the same correction the FILE47 writer
-    //applies; without it Tr(P S) misses up to 0.3 e (SF6) and every NAO population inherits it.
-    if (wavy.get_origin() == e_origin::gbw) {
+    //An ORCA-convention density (gbw, and a molden written from one) carries the opposite sign on the
+    //|m| >= 3 components, so the overlap next to it has to take that sign as well - see
+    //origin_has_orca_pure_phases.  This is the same correction the FILE47 writer applies; without it
+    //Tr(P S) misses up to 0.3 e (SF6) and every NAO population inherits it.  Scanned against the
+    //electron count on CuF2_i_func/71/calc.gbw (shells up to i): flipping every |m| >= 3 gives
+    //46.99929 of 47, stopping at |m| <= 3 gives 46.99845, flipping nothing 46.95769 - so "all |m| >= 3"
+    //it is, and the 7e-4 that remains is a separate high-l matter, identical for the gbw and the molden.
+    if (origin_has_orca_pure_phases(wavy.get_origin())) {
         const ivec bas = params.get_bas();
         bvec flip(n, false);
         size_t k = 0;
@@ -582,6 +585,16 @@ namespace
 {
     //with_charge = false for one spin on its own, where Z_eff minus that spin's population is not
     //a charge and printing it invites the reader to add the two tables up
+    //An occupancy is a number of electrons and cannot be negative. A diagonalisation leaves a nearly empty
+    //Rydberg NAO at a tiny value of either sign, and at 5 decimals that printed "Ryd( 6s)   -0.00000" -
+    //which reads as a negative occupancy and is not even stable: the same molecule translated by 4.35 bohr
+    //printed +0.00000 for it. The threshold is far below any occupancy worth reading, so an occupancy that
+    //is genuinely negative - which WOULD be a defect - is still printed with its sign.
+    double printable_occupation(const double occ)
+    {
+        return std::abs(occ) < 1e-9 ? 0.0 : occ;
+    }
+
     void print_one(const NAOResult &r, const std::string &title, std::ostream &out,
                    const bool with_charge = true)
     {
@@ -599,7 +612,7 @@ namespace
                     << "  " << left << setw(7) << shell_label(o.l, o.m) << right
                     << class_label(o.type) << "(" << setw(2) << o.n
                     << string(1, "spdfghik"[std::min(o.l, 7)]) << ")" << setw(12) << fixed
-                    << setprecision(5) << o.occupation << "\n";
+                    << setprecision(5) << printable_occupation(o.occupation) << "\n";
             }
         }
         out << "\n Summary of Natural Population Analysis:\n\n"

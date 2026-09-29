@@ -1182,27 +1182,48 @@ TEST(PropertiesBasinTests, AssignmentRadiusFloorAndPersistenceMerge)
 	EXPECT_EQ(floored.first.get_value(0, 0, 0), 0);
 	EXPECT_NE(floored.first.get_value(4, 8, 8), 0);
 
-	// bump at (2.0, 0, 0) beyond the right nucleus, a tenth of a percent over its highest neighbour
+	// bump at (1.75, 0, 0) beyond the right nucleus, a tenth of a percent over its highest neighbour.
+	// One voxel in from the face on purpose: the bump used to sit at index 16, x = 2.0, which is the
+	// last plane of the grid, and a maximum whose outward neighbour is outside the analysed region is
+	// now dropped rather than reported - see the face arm below. Grid noise in the tail, which is what
+	// this arm is about, does not need to be on the face to be noise
 	cube bumped = rho;
 	double best = 0.0;
 	for (int dx = -1; dx <= 1; dx++)
 		for (int dy = -1; dy <= 1; dy++)
 			for (int dz = -1; dz <= 1; dz++)
 				if (dx || dy || dz)
-					best = std::max(best, rho.get_value(16 + dx < N ? 16 + dx : 16, 8 + dy, 8 + dz));
-	bumped.set_value(16, 8, 8, best * 1.001);
+					best = std::max(best, rho.get_value(15 + dx, 8 + dy, 8 + dz));
+	bumped.set_value(15, 8, 8, best * 1.001);
 	std::pair<cubei, std::vector<d4>> kept = topological_cube_analysis(&bumped, atoms, false, false, 0.0, 0.0, -1.0, 0.0);
 	ASSERT_EQ(kept.second.size(), 3u);
 	bool bump_found = false;
 	for (const d4 &mx : kept.second)
-		if (std::abs(mx[0] - 2.0) < 1e-12 && std::abs(mx[1]) < 1e-12)
+		if (std::abs(mx[0] - 1.75) < 1e-12 && std::abs(mx[1]) < 1e-12)
 			bump_found = true;
 	EXPECT_TRUE(bump_found);
 	EXPECT_EQ(kept.first.max_value(), 3);
 	std::pair<cubei, std::vector<d4>> merged = topological_cube_analysis(&bumped, atoms, false, false, 0.0, 0.0, -1.0, 5e-3);
 	EXPECT_EQ(merged.second.size(), 2u);
 	EXPECT_EQ(merged.first.max_value(), 2);
-	EXPECT_EQ(merged.first.get_value(16, 8, 8), merged.first.get_value(12, 8, 8));
+	EXPECT_EQ(merged.first.get_value(15, 8, 8), merged.first.get_value(12, 8, 8));
+
+	// the same bump on the last plane of the grid, where the one-sided difference has nothing outward
+	// to compare against, with the persistence merge switched off so nothing else can remove it: not
+	// a basin, because the field beyond the analysed region is not known to be lower. This is the ELI-D
+	// rim artefact in its smallest form - there the crop at rho < 1e-4 plays the part of the face, and
+	// it produced 62, 53 and 23 basins for one molecule at three box paddings
+	cube on_face = rho;
+	double best_face = 0.0;
+	for (int dx = -1; dx <= 0; dx++)
+		for (int dy = -1; dy <= 1; dy++)
+			for (int dz = -1; dz <= 1; dz++)
+				if (dx || dy || dz)
+					best_face = std::max(best_face, rho.get_value(16 + dx, 8 + dy, 8 + dz));
+	on_face.set_value(16, 8, 8, best_face * 1.001);
+	std::pair<cubei, std::vector<d4>> faced = topological_cube_analysis(&on_face, atoms, false, false, 0.0, 0.0, -1.0, 0.0);
+	EXPECT_EQ(faced.second.size(), 2u) << "a maximum on the last plane of the grid was reported as a basin";
+	EXPECT_EQ(faced.first.get_value(16, 8, 8), 0) << "its voxels were handed to a neighbouring basin instead of being left unresolved";
 }
 
 // ELI labels: the proton's basin by its nucleus, a maximum inside the core shell of a heavier
@@ -1227,6 +1248,86 @@ TEST(PropertiesBasinTests, EliLabelsCoreLonePairBondAndProton)
 	EXPECT_EQ(labels[2], "O1 LP");
 	EXPECT_EQ(labels[3], "H2");
 	EXPECT_EQ(labels[4], "O1 core");
+}
+
+// Two nearest nuclei are not a bond unless the maximum lies between them. The bond branch used to be
+// the unconditional else of the ELI chain, so a basin that reached it was labelled "A-B bond" whatever
+// the geometry: -eli_analysis on water with a helium atom 13 bohr away reported nine "He3-H1 bond"
+// basins. Hydrogen is where it shows, because for a nearest atom of charge <= 2 neither the core nor
+// the lone-pair branch can fire. The first half of this test is the positive control - a maximum on the
+// O-H line must still be a bond - so a gate that rejected everything would fail here.
+TEST(PropertiesBasinTests, EliBondLabelNeedsTheMaximumBetweenTheTwoNuclei)
+{
+	std::vector<atom> atoms;
+	atoms.emplace_back("O", atomID(), 1, 0.0, 0.0, 0.0, 8);
+	atoms.emplace_back("H", atomID(), 2, 1.8, 0.0, 0.0, 1);
+	atoms.emplace_back("He", atomID(), 3, 13.2, 0.0, 0.0, 2);
+	const std::vector<d4> on_the_line{ d4{ 0.9, 0.0, 0.0, 2.0 } };   // the O-H midpoint: d1 + d2 = d(O,H)
+	const svec bond = assign_labels_to_basins(on_the_line, atoms, false, 1);
+	ASSERT_EQ(bond.size(), 1u);
+	EXPECT_EQ(bond[0], "O0-H1 bond");
+
+	// In the vacuum between the hydrogen and the helium: nearest H at 5.2 bohr, second He at 6.2, and
+	// the two sum to d(H,He) exactly, so it IS between them - betweenness alone would still call this a
+	// bond. What rules it out is that H and He are not a bonded pair: 11.4 bohr against 1.3 * (0.23 +
+	// 1.50) Angstrom = 4.25 bohr, so the seeding loop of b2c.cpp would never have looked for a BCP
+	// there either. Before the gate this came out "H1-He2 bond".
+	const std::vector<d4> in_the_gap{ d4{ 7.0, 0.0, 0.0, 0.01 } };
+	const svec unbonded = assign_labels_to_basins(in_the_gap, atoms, false, 1);
+	ASSERT_EQ(unbonded.size(), 1u);
+	EXPECT_EQ(unbonded[0], "H1 LP");
+	EXPECT_EQ(unbonded[0].find("bond"), std::string::npos) << "a maximum between two unbonded atoms was called a bond";
+
+	// 1.0 bohr past the hydrogen, away from the oxygen: nearest H (1.0), second O (2.8), sum 3.8 against
+	// d(O,H) = 1.8 - a bonded pair, but the maximum is outside it. That is the other half of the gate.
+	const std::vector<d4> past_the_h{ d4{ 2.8, 0.0, 0.0, 0.9 } };
+	const svec outside = assign_labels_to_basins(past_the_h, atoms, false, 1);
+	ASSERT_EQ(outside.size(), 1u);
+	EXPECT_EQ(outside[0], "H1 LP");
+
+	// off the internuclear axis by 0.6 bohr at the midpoint of a 1.8 bohr bond: still a bond, because a
+	// pi-type basin does not sit on the line. This pins the tolerance from the other side - a gate
+	// tighter than d1 + d2 <= 1.25 d(A,B) would lose it.
+	const std::vector<d4> off_axis{ d4{ 0.9, 0.6, 0.0, 1.4 } };
+	const svec pi = assign_labels_to_basins(off_axis, atoms, false, 1);
+	ASSERT_EQ(pi.size(), 1u);
+	EXPECT_EQ(pi[0], "O0-H1 bond");
+}
+
+// A free atom has no second atom to bond to, and it is the system ELI-D is calibrated against.
+// The labeller used to abort on it - err_checkf(atom_index2 >= 0, "Only one atom found for basin
+// ...") - which made -eli_analysis impossible on every monoatomic input: six of the twenty-two
+// reader inputs in the robustness matrix failed here and nowhere else (H.gbw, f_ref.wfx,
+// f_ref.wfn, F_open.molden, Ce_full.molden, sc.molden). Every basin of a lone atom belongs to
+// that atom: inside its core radius a core shell, outside it the valence shell.
+TEST(PropertiesBasinTests, EliLabelsAFreeAtomInsteadOfAborting)
+{
+	std::vector<atom> atoms;
+	atoms.emplace_back("Ce", atomID(), 1, 0.0, 0.0, 0.0, 58);
+	const std::vector<d4> maxima{
+		d4{ 0.05, 0.0, 0.0, 900.0 },  // inside Ce's core radius
+		d4{ 2.60, 0.0, 0.0, 3.0 },    // outside it: the valence shell
+	};
+	const svec labels = assign_labels_to_basins(maxima, atoms, false, 1);
+	ASSERT_EQ(labels.size(), 2u);
+	EXPECT_EQ(labels[0], "Ce0 core");
+	EXPECT_EQ(labels[1], "Ce0 LP");
+
+	// the two elements whose core radius is zero must not fall through into the bond branch and
+	// label themselves as bonded to themselves
+	std::vector<atom> one_h;
+	one_h.emplace_back("H", atomID(), 1, 0.0, 0.0, 0.0, 1);
+	const std::vector<d4> h_maxima{ d4{ 0.2, 0.0, 0.0, 1.0 }, d4{ 1.4, 0.0, 0.0, 0.3 } };
+	const svec h_labels = assign_labels_to_basins(h_maxima, one_h, false, 1);
+	ASSERT_EQ(h_labels.size(), 2u);
+	EXPECT_EQ(h_labels[0], "H0");      // within 0.6 bohr of the proton
+	EXPECT_EQ(h_labels[1], "H0 LP");   // further out, and still H's own
+	std::vector<atom> one_he;
+	one_he.emplace_back("He", atomID(), 1, 0.0, 0.0, 0.0, 2);
+	const std::vector<d4> he_maxima{ d4{ 0.1, 0.0, 0.0, 30.0 } };
+	const svec he_labels = assign_labels_to_basins(he_maxima, one_he, false, 1);
+	ASSERT_EQ(he_labels.size(), 1u);
+	EXPECT_EQ(he_labels[0], "He0 LP");
 }
 
 // core_shell_radius steps by period; unify_core_basins folds every maximum inside an atom's

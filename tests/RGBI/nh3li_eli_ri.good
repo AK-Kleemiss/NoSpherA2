@@ -8,8 +8,10 @@ This software is part of the cuQCT software suite developed by Florian Kleemiss.
 Please give credit and cite corresponding pieces!
 This Software is published with BSD-2 clause license.
 Analysing ELI basins in the wavefunction...
+[ELI-D] Kohout, Pernal, Wagner & Grin, Theor. Chem. Acc. 112 (2004) 453, DOI 10.1007/s00214-004-0615-y
 
 === Density Fitting ===
+[RI fit] Seifert et al., Z. Kristallogr. Cryst. Mater. 241 (2026) 283, DOI 10.1515/zkri-2026-0013
 Normal basis functions: 63
 Auxiliary basis functions: 222
 Metric: Coulomb
@@ -24,8 +26,9 @@ Density source: RI fit of 126 orbitals, 222 auxiliary functions.
   N_basis x N_MO, so grids of 0.05 A and finer are affordable. The QTAIM basins and populations below
   are those of the fitted density: it matches the orbital density to ~1e-3 e/bohr^3 at bond critical
   points, and its tail (rho < 0.01) is not reliable. ELI-D is taken from the orbitals.
-Calcualting grid of size 76 x 84 x 77...
-Number of points: 491568
+[ELI (PC07)] Perdew & Constantin, Phys. Rev. B 75 (2007) 155109, DOI 10.1103/PhysRevB.75.155109
+Calcualting grid of size 76 x 84 x 78...
+Number of points: 497952
 Grid parameters:
   Min: (-17.9751, 3.67361, -5.14485)
   Max: (-3.75186, 19.4441, 9.38043)
@@ -98,7 +101,7 @@ Density Critical Points (9 found):
   CP   8  [bond        ]  converged   H3-N0 bond
     Position  :        -9.8856         9.6206         0.9703
     Rho       :         0.3090
-    GradRho   :        -0.0000         0.0000        -0.0000   |GradRho| :         0.0000
+    GradRho   :        -0.0000        -0.0000         0.0000   |GradRho| :         0.0000
     HessRho_EigVals:    -1.1220e+00    -1.0857e+00     8.3089e-01
     DelSqRho  :        -1.3769
     Bond Ellipticity:         0.0334
@@ -116,51 +119,51 @@ Density Critical Points (9 found):
 Assigning basins along the density gradient...
 I found 5 Basins.
 Assigning basins by near-grid ascent...
-I found 9 Basins.
-Merged 1 noise maxima, 8 basins remain.
+Near-grid ascent: 11739 steepest-neighbour steps, 0 of them tied (0.000 %), 0 voxel paths went through at least one tie
+Near-grid ascent: 684306 rounded step decisions, 20 within 1e-5 of flipping and 0 within 1e-9, closest margin 1.127e-06
+Near-grid ascent: 0 walks stopped on a top that grad_epsilon (1.0e-10) calls flat, largest uphill 0.000e+00 still available there
+I found 10 Basins.
+Left 3 maxima on the rim of the analysed region unresolved; their density is reported outside every basin.
+Merged 4 noise maxima, 6 basins remain.
 
 QTAIM Analysis (voxel sum):
-basin:    0 label:               N0 integrated value:   8.5507 volume:  375.6458
-basin:    1 label:               H1 integrated value:   0.6341 volume:  106.5661
-basin:    2 label:               H2 integrated value:   0.6769 volume:  123.3086
-basin:    3 label:               H3 integrated value:   0.6419 volume:  109.6813
-basin:    4 label:              Li4 integrated value:   2.6546 volume:  458.0394
+basin:    0 label:               N0 integrated value:   8.2107 volume:  376.8495
+basin:    1 label:               H1 integrated value:   0.6424 volume:  108.4060
+basin:    2 label:               H2 integrated value:   0.6591 volume:  120.5827
+basin:    3 label:               H3 integrated value:   0.6446 volume:  110.4147
+basin:    4 label:              Li4 integrated value:   2.6574 volume:  456.8127
 GridManager: Setting up prototype grids for atom types...
 GridManager: Generating integration grids for atoms...
 GridManager: Generated total of 111906 grid points.
-Quadrature points sent along the field: 303862, left the grid: 0
+Quadrature points sent along the field: 303872, left the grid: 0
 
 QTAIM Analysis (atomic quadrature grids):
   basin  label               electrons     charge      volume         maximum        x          y          z
-      1  N0                     8.2229    -1.2229    641.9395        130.3622    -10.483     10.089      2.209
-      2  H1                     0.6516     0.3484    376.1380          0.3315     -9.421      9.375      3.711
-      3  H2                     0.6516     0.3484    517.7741          0.3273    -12.306      9.343      2.332
-      4  H3                     0.6514     0.3486    402.0340          0.3529     -9.671      9.459      0.524
-      5  Li4                    2.7824     0.2176   1689.0582          6.5636    -10.574     13.775      2.315
+      1  N0                     8.2229    -1.2229    642.0901         53.0889    -10.483     10.089      2.209
+      2  H1                     0.6516     0.3484    376.1629          0.3105     -9.421      9.375      3.711
+      3  H2                     0.6516     0.3484    517.9086          0.3355    -12.306      9.343      2.332
+      4  H3                     0.6514     0.3486    401.9738          0.3281     -9.671      9.459      0.524
+      5  Li4                    2.7824     0.2176   1689.5536          8.0474    -10.574     13.775      2.315
   total in basins: 12.9599   outside every basin: 0.0421
 
 ELI-D Analysis (voxel sum):
-basin:    0 label:      Li4-N0 bond integrated value:   0.7493 volume:  725.8598
-basin:    1 label:      H2-Li4 bond integrated value:   0.0012 volume:    6.8203
-basin:    2 label:               H2 integrated value:   1.9267 volume:  122.3409
-basin:    3 label:            N0 LP integrated value:   2.1416 volume:   56.4380
-basin:    4 label:               H3 integrated value:   1.9213 volume:  123.1893
-basin:    5 label:               H1 integrated value:   1.9372 volume:  121.3467
-basin:    6 label:         Li4 core integrated value:   2.0184 volume:   16.7823
-basin:    7 label:          N0 core integrated value:   2.4625 volume:    0.4640
+basin:    0 label:               H2 integrated value:   1.9052 volume:  122.2250
+basin:    1 label:            N0 LP integrated value:   2.1761 volume:   56.4276
+basin:    2 label:               H3 integrated value:   1.9499 volume:  124.1160
+basin:    3 label:               H1 integrated value:   1.8923 volume:  120.3340
+basin:    4 label:         Li4 core integrated value:   2.0217 volume:   16.6587
+basin:    5 label:          N0 core integrated value:   2.1176 volume:    0.4711
 GridManager: Setting up prototype grids for atom types...
 GridManager: Generating integration grids for atoms...
 GridManager: Generated total of 111906 grid points.
-Quadrature points sent along the field: 113488, left the grid: 1685
+Quadrature points sent along the field: 102254, left the grid: 152
 
 ELI-D Analysis (atomic quadrature grids):
   basin  label               electrons      volume         maximum        x          y          z
-      1  Li4-N0 bond            0.7558    765.2255         14.5518    -10.676     19.256      2.401
-      2  H2-Li4 bond            0.0010      7.0246          2.0067    -15.917     12.873     -0.240
-      3  H2                     1.9339    117.3126          4.4973    -12.361      9.306      2.401
-      4  N0 LP                  2.1609     56.2477          1.9588    -10.489     11.371      2.212
-      5  H3                     1.9259    119.5662          4.2793     -9.741      9.494      0.514
-      6  H1                     1.9225    117.8379          4.5130     -9.366      9.306      3.721
-      7  Li4 core               2.0219     16.7421         26.2968    -10.489     13.812      2.401
-      8  N0 core                2.1094      0.4465          9.4356    -10.489     10.057      2.212
-  total in basins: 12.8313   outside every basin: 0.1764
+      1  H2                     1.9338    118.6146          4.6129    -12.361      9.306      2.304
+      2  N0 LP                  2.1620     56.3336          1.9582    -10.489     11.371      2.304
+      3  H3                     1.9264    119.7274          4.2478     -9.741      9.494      0.442
+      4  H1                     1.9222    119.0168          4.4779     -9.366      9.306      3.794
+      5  Li4 core               2.0207     16.5914         29.6693    -10.489     13.812      2.304
+      6  N0 core                2.1094      0.4465          5.6213    -10.489     10.057      2.118
+  total in basins: 12.0745   outside every basin: 0.9331

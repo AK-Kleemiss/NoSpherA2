@@ -248,3 +248,149 @@ TEST(NaoOpenShellTests, HydrogenAtomCarriesOneUnpairedElectron)
 	EXPECT_NEAR(npa.alpha.population, 1.0, 1e-9);
 	EXPECT_NEAR(npa.beta.population, 0.0, 1e-9);
 }
+
+//Tr(P S) is the electron count by construction, whatever reader built P and whatever basis it is in,
+//so it is the one number that catches a density matrix and an overlap that are not in the same basis.
+//It caught three such defects on the molden route, all fixed: Int_Params had no normalisation branch
+//for a molden origin (the log said "tread carefully" and nothing else), the molden reader left the
+//coefficients in the file's own AO order while Int_Params sorts an atom's shells by l and orders a
+//shell's components in libcint's convention, and the ORCA |m| >= 3 sign convention was gated on the
+//gbw origin alone although orca_2mkl writes the gbw's own coefficients.  F_open came out at 1.512 of
+//its 9 electrons, Ce_full at 47.11 of 56, CuF2's i-shell molden at 17.57 of 47.  The reference each
+//file is checked against is its own sum of MO occupations, so this test needs no external number and
+//cannot be satisfied by making the reader and the integrals agree on something wrong.
+TEST(NaoReaderConsistencyTests, EveryReaderConservesTheElectronCount)
+{
+	struct Case { const char* dir; const char* file; double tol; };
+	const Case cases[] = {
+		//the moldens - a closed shell, an open shell, a 3d and a 4f element.  A molden prints its MO
+		//coefficients to about ten digits, so the density it carries is only that precise: Ce_full
+		//misses its 56 electrons by 1.5e-9 and the other three are exact to 1e-9.
+		{ "molden_file", "F_open.molden",   1e-7 },
+		{ "molden_file", "F_full.molden",   1e-7 },
+		{ "molden_file", "Sc_full.molden",  1e-7 },
+		{ "molden_file", "Ce_full.molden",  1e-7 },
+		//g, h and i shells, where the |m| >= 3 phase convention is worth 0.042 e.  The 1e-3 is not
+		//this code's error bar: the same 7.1e-4 is there for the gbw of the same calculation (see
+		//MoldenAndGbwOfTheSameCalculationAgree), a pre-existing high-l matter that is not a phase
+		//convention - flipping every |m| >= 3 is the best of the three candidate rules, measured.
+		{ "CuF2_i_func/71", "calc_occupied.molden", 1e-3 },
+		{ "CuF2_i_func/71", "calc.gbw",             1e-3 },
+		//gbw controls: ECP, an open shell, one electron, and the epoxide reference
+		{ "ECP_SF", "Au2Br2.gbw",       1e-9 },
+		{ "RGBI_groups", "nh3li.gbw",   1e-9 },
+		{ "ptb_H_file", "H.gbw",        1e-9 },
+		{ "epoxide_gbw", "epoxide.gbw", 1e-9 },
+	};
+	for (const Case& c : cases) {
+		const auto p = fixture(c.dir, c.file);
+		if (p.empty()) { GTEST_LOG_(INFO) << "skipping absent " << c.dir << "/" << c.file; continue; }
+		WFN wavy(p);
+		//a reader that fills no contracted density, or a cartesian basis, is a refusal and not this
+		//test's business - NaoRefusalTests and the CLI cover those
+		if (wavy.get_dm().extent(0) == 0 || wavy.get_d_f_switch()) {
+			GTEST_LOG_(INFO) << "no spherical contracted density in " << c.file;
+			continue;
+		}
+		double occ = 0.0;
+		for (int i = 0; i < wavy.get_nmo(); i++)
+			occ += wavy.get_MO_occ(i);
+		EXPECT_NEAR(trace_PS(wavy), occ, c.tol) << c.dir << "/" << c.file;
+	}
+}
+
+//The same ORCA calculation read two ways has to give the same density in the same basis.  Before the
+//molden fixes these two differed by 29.4 electrons of 47 and nothing said so; the gbw was right and
+//the molden was not, which is why the reference here is the gbw.  Both now sit at 46.99929, and the
+//7.1e-4 they share is what remains to explain about h and i shells.
+TEST(NaoReaderConsistencyTests, MoldenAndGbwOfTheSameCalculationAgree)
+{
+	const auto g = fixture("CuF2_i_func/71", "calc.gbw");
+	const auto m = fixture("CuF2_i_func/71", "calc_occupied.molden");
+	if (g.empty() || m.empty()) GTEST_SKIP() << "tests/CuF2_i_func/71 fixtures not found";
+	WFN gbw(g), mol(m);
+	ASSERT_EQ(gbw.get_origin(), e_origin::gbw);
+	ASSERT_EQ(mol.get_origin(), e_origin::molden);
+	EXPECT_NEAR(trace_PS(mol), trace_PS(gbw), 1e-4);
+	const NPAResult a = natural_population_analysis(gbw), b = natural_population_analysis(mol);
+	ASSERT_EQ(a.total.atoms.size(), b.total.atoms.size());
+	for (size_t i = 0; i < a.total.atoms.size(); i++)
+		EXPECT_NEAR(b.total.atoms[i].charge, a.total.atoms[i].charge, 5e-3) << "atom " << i + 1;
+}
+
+//An fchk's basis reached no normalisation branch in Int_Params at all: e_origin::fchk fell into the
+//"WFN Origin 5 not recognized, tread carefully!  No normalisation was performed" default, so every AO
+//of a spherical fchk left ao_overlap() with a non-unit diagonal and every density built on it was
+//wrong.  Two invariants pin it and neither needs an external reference: the diagonal of an AO overlap
+//is 1 by construction once the basis functions are normalised, and Tr(P S) is the electron count.
+//Measured on this fixture (spherical, shell types -2 and -3, 228 functions, 94 shells, 48 electrons,
+//written by OCC): before, 228 of 228 diagonal elements were off and Tr(P S) = 7.579076; after, the
+//diagonal is 1 everywhere and Tr(P S) = 47.938220.  The remaining 0.0618 e is a separate and still
+//unfixed defect - most plausibly spherical-component ordering or phase between the fchk-built density
+//matrix and libcint's order - which is why the trace tolerance here is 0.07 rather than 1e-6: it pins
+//the improvement without claiming the file is cured.  The reader's own 1e-4 trace guard still refuses
+//it downstream, so nothing consumes a half-right basis.
+TEST(NaoReaderConsistencyTests, ASphericalFchkBasisIsNormalised)
+{
+	const auto p = fixture("alanine_occ", "alanine.owf.fchk");
+	if (p.empty()) GTEST_SKIP() << "tests/alanine_occ/alanine.owf.fchk not found";
+	WFN wavy(p);
+	ASSERT_EQ(wavy.get_origin(), e_origin::fchk);
+	//a cartesian fchk is a different and unfixable matter: tests/NiP3_fchk/good.fchk declares 964
+	//functions where the spherical basis Int_Params rebuilds holds 857, and no normalisation convention
+	//closes a 107-function gap.  This fixture is spherical, so normalisation is the whole story.
+	ASSERT_FALSE(wavy.get_d_f_switch()) << "fixture is no longer spherical";
+	const dMatrix2 S = ao_overlap(wavy);
+	ASSERT_GT(S.extent(0), size_t(0));
+	int off = 0;
+	double worst = 0.0;
+	for (size_t i = 0; i < S.extent(0); i++) {
+		const double d = std::abs(S(i, i) - 1.0);
+		worst = std::max(worst, d);
+		if (d > 1e-8) off++;
+	}
+	EXPECT_EQ(off, 0) << off << " of " << S.extent(0) << " AOs are not normalised, worst |S_ii - 1| = "
+		<< worst << " - e_origin::fchk has fallen out of its normalisation branch again";
+	//the second invariant, and the one that separates this file from the cartesian case: the fchk's own
+	//"Number of basis functions" is 228, and the basis Int_Params rebuilds from its shells must hold
+	//exactly that many.  NiP3_fchk/good.fchk fails this at 857 against a declared 964 and no
+	//normalisation convention can close that gap; this one does not.
+	EXPECT_EQ(S.extent(0), size_t(228)) << "the fchk declares 228 basis functions";
+	//Tr(P S) is not checked here: WFN::DM stays empty for an fchk (the gbw, wfx, molden and ptb readers
+	//fill it, read_fchk does not, and the .47 writer builds its own contracted density from the MO
+	//coefficients instead), which is also why EveryReaderConservesTheElectronCount skips this file.  The
+	//end-to-end trace is measured through the CLI: 7.579076 before this fix, 47.938220 after, against 48.
+}
+
+//An occupancy is a number of electrons, so a printed "-0.00000" is wrong twice over: it reads as a
+//negative population, and it is not even a property of the molecule.  This was found by translating a
+//molecule rigidly and diffing the output - the one transformation a wavefunction file admits without
+//recomputing it, since the basis functions ride on the atom centres - and tests/molden_file/test.molden
+//printed "Ryd( 6s)   -0.00000" in one position and "0.00000" for the same molecule moved 4.35 bohr.
+//This test does NOT assert that no occupancy is negative: one that is genuinely negative would be a real
+//defect and must stay visible.  It asserts that nothing is printed as a signed zero, which is the one
+//case where the sign carries no information at all.
+//The fixture is Sc_full and not the test.molden the defect was found on, because the first version of
+//this test used test.molden and PASSED against a binary with the clamp taken back out: test.molden prints
+//the signed zero only in the MOVED frame, so on the fixture as committed there was nothing to catch.
+//Sc_full is scandium in a large basis, so it carries a long tail of nearly empty Rydberg NAOs and prints
+//eleven of them signed in its own frame - the same defect where it is reproducible rather than where it
+//happened to be noticed.
+TEST(NaoPrintTests, NoOccupancyIsPrintedAsANegativeZero)
+{
+	const auto p = fixture("molden_file", "Sc_full.molden");
+	if (p.empty()) GTEST_SKIP() << "tests/molden_file/Sc_full.molden not found";
+	WFN wavy(p);
+	ASSERT_FALSE(wavy.get_d_f_switch()) << "NPA needs a spherical basis; fixture is no longer spherical";
+	const NPAResult r = natural_population_analysis(wavy);
+	std::ostringstream os;
+	print_npa(r, os);
+	const std::string out = os.str();
+	ASSERT_NE(out.find("NATURAL POPULATIONS"), std::string::npos) << "no occupancy table was printed";
+	EXPECT_EQ(out.find("-0.00000"), std::string::npos)
+		<< "an occupancy printed as a negative zero: the sign is roundoff from the diagonalisation and it "
+		   "flips when the molecule is translated, so it says nothing and reads as a negative population";
+	//and the fix must not have hidden the row: the tiny occupancy is still printed, as a plain zero
+	EXPECT_NE(out.find("0.00000"), std::string::npos)
+		<< "the nearly empty NAO rows have gone missing entirely, which is not what the clamp does";
+}

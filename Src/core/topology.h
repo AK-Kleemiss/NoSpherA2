@@ -84,7 +84,9 @@ namespace topology
 
 	struct options
 	{
-		double gradient_tolerance = 1E-7; //|grad rho| at an accepted point, atomic units
+		//|grad rho| at an accepted point, atomic units, scaled by rho where rho > 1: see the note in
+		//newton_to_critical_point, where 1E-7 unscaled cost four nuclei of Fe.gbw their attractor
+		double gradient_tolerance = 1E-7;
 		//An absolute gradient tolerance alone is not a convergence test.  Far out in the density
 		//tail |grad rho| is itself of the order of rho, so |grad rho| <= 1E-7 holds at every point
 		//out there and a seed placed in the tail reports a critical point without taking a step -
@@ -100,6 +102,12 @@ namespace topology
 		//Below this rho is vacuum.  Four orders of magnitude under the rho of a real cage point
 		//(~1E-3 a.u.), so it cannot hide one; the relative gradient above is the actual guard
 		double density_floor = 1E-7;
+		//rho at a nucleus below this, for Z >= 5, means the wavefunction carries no core density there
+		//because a pseudopotential replaced it.  An all-electron boron already has rho ~ 40 at its
+		//nucleus and the cusp grows as Z^3, while tests/ELI_heavy/hgh2_ecp.gbw gives 7.1E-4 at its Hg:
+		//the two cases are five orders of magnitude apart, so none of that margin is being spent on
+		//the choice of 1
+		double core_rho_floor = 1.0;
 		double bond_scale = 1.3;       //pair is bonded if d <= bond_scale * (r_cov,a + r_cov,b)
 		double eigen_tolerance = 1E-6; //relative to max|lambda|: below it an eigenvalue is zero
 		bool escalate_on_mismatch = true; //add a coarse grid of seeds when the sum does not close
@@ -120,9 +128,41 @@ namespace topology
 		int graph_components = 0;
 		int required_ring_minus_cage = 0; //E - V + C: what Poincare-Hopf needs of the two classes
 		int found_ring_minus_cage = 0;
+		//n_ring - n_cage matches the bond graph's cycle rank, and the attractors match nuclei plus
+		//NNAs.  Poincare-Hopf is necessary and not sufficient - a spurious bond point and a spurious
+		//ring point cancel in the alternating sum - so this is the check that a balanced sum was
+		//balanced for the right reason.  True when there is no bond graph to compare against.
+		bool graph_consistent = true;
+		//Connected components of the COVALENT graph, from the nuclear geometry alone - not of the
+		//graph the bond critical points build.  The index sum for C separated molecules is C and not
+		//1, so this is what target is taken from; tests/TFVC/water.gbw is a water with a helium atom
+		//13.2 bohr away, its sum is 2, and it was reported INCOMPLETE with a deficit of -1 while its
+		//own diagnosis said "the bond graph falls into 2 covalent fragments".  Geometry rather than
+		//found points on purpose: taking C from the found bond points would make the relation blind
+		//to a missing one, because dropping a bond point raises the sum by 1 and splits a fragment,
+		//moving both sides of sum == C together.
+		int covalent_fragments = 1;
 		bool escalated = false; //a coarse grid of seeds was added
+		//Nuclei of Z >= 5 where rho is below options::core_rho_floor, i.e. where the wavefunction has
+		//no core density because an ECP replaced it.  Both ECP failure modes in the test tree come
+		//from this one fact and the diagnosis used to blame the search for both: tests/ECP_SF/Au2Br2.gbw
+		//finds 51 attractors for 53 nuclei and the two without one are exactly its two Au ("nuclear
+		//seeding is the likely gap"), while tests/ELI_heavy/hgh2_ecp.gbw does find an attractor at its
+		//Hg - at rho 7.1E-4 - and then puts two spurious ring points 0.77 bohr out in the core hole
+		//("cage seeding is the likely gap").  Neither is a seeding gap: a pseudo-density has no cusp at
+		//the nucleus and no readable shell structure around it, so those points are a property of the
+		//wavefunction.  Empty for an all-electron wavefunction, which is what keeps the note honest -
+		//tests/Fe_gbw/Fe.gbw and tests/TFVC/water.gbw are both COMPLETE and both leave it empty.
+		std::vector<int> coreless_nuclei;
 		std::string diagnosis;  //empty when complete, otherwise what is missing and where
 	};
+
+	//Two nuclei are covalently bonded when they are closer than bond_scale * (r_cov + r_cov).  One
+	//function rather than the criterion written out twice: the bond seeding and the fragment count
+	//have to agree, or the search seeds bonds the accounting does not expect.
+	bool covalently_bonded(const nucleus& a, const nucleus& b, const options& opt);
+	//Connected components of that graph.  An empty system gives 1, so it is not read as a deficit.
+	int covalent_fragment_count(const std::vector<nucleus>& nuclei, const options& opt);
 
 	//Classification of a stationary point from its Hessian alone (row-major 3x3).  Split out so
 	//the signature logic can be checked against a matrix whose eigenvalues are known exactly,
@@ -167,6 +207,24 @@ namespace topology
 		return c;
 	}
 
+	//Which nuclei the wavefunction carries no core density at, measured rather than taken from a flag:
+	//an ECP is not always recorded in the file the analysis was handed, but rho at the nucleus states
+	//it outright.  One density evaluation per heavy nucleus, which is nothing next to the search, and
+	//it is what turns "nuclear seeding is the likely gap" into a statement about the wavefunction.
+	template <class S>
+	void note_coreless_nuclei(result& r, const S& source, const std::vector<nucleus>& nuclei, const options& opt)
+	{
+		r.coreless_nuclei.clear();
+		for (size_t a = 0; a < nuclei.size(); a++) {
+			if (nuclei[a].Z < 5)
+				continue;
+			d3 grad{ 0.0, 0.0, 0.0 };
+			double H[9]{};
+			if (calculate_hessian(source, nuclei[a].pos, grad, H) < opt.core_rho_floor)
+				r.coreless_nuclei.push_back((int)a);
+		}
+	}
+
 	//----- the templated search.  S is any density_source.h source: a WFN, a fitted density, a
 	//Centred<> atom model, or a test source that implements hessian(p, grad, H) -----
 
@@ -178,8 +236,19 @@ namespace topology
 	template <class S>
 	bool newton_to_critical_point(const S& source, d3& p, const options& opt, int& iterations)
 	{
+		//The absolute bound floats with rho, because 1E-7 a.u. is not reachable at a heavy nucleus.
+		//There rho is 1E3-1E4 and the Hessian 1E8-1E9, and the analytic gradient is a sum of primitive
+		//terms of that size whose cancellation leaves a floating-point floor far above 1E-7, so no step
+		//reduces the gradient any further and the search returns nothing at all.  Measured on
+		//tests/Fe_gbw/Fe.gbw: S3 squeaked through at |grad rho| = 8.3E-8 and Fe1, S2, S4 and S5 did
+		//not, four nuclei of an all-electron density silently absent from the critical point set - which
+		//no nucleus of an all-electron density can be, rho having a cusp maximum at every one.  Scaled,
+		//the tight test is the logarithmic derivative |grad rho| / rho <= gradient_tolerance wherever
+		//rho exceeds 1, which still pins a nuclear attractor to ~1E-13 bohr; below 1 it is the old test
+		//unchanged, and the relative tolerance that guards the density tail is untouched either way.
 		auto converged = [&opt](const double gnorm, const double rho) {
-			return rho > opt.density_floor && gnorm <= opt.gradient_tolerance && gnorm <= opt.relative_gradient_tolerance * rho;
+			return rho > opt.density_floor && gnorm <= opt.gradient_tolerance * (rho > 1.0 ? rho : 1.0)
+				&& gnorm <= opt.relative_gradient_tolerance * rho;
 		};
 		d3 grad{ 0.0, 0.0, 0.0 };
 		double H[9]{};
@@ -250,8 +319,17 @@ namespace topology
 				point.from = seed_of[s];
 				point.iterations = it;
 				bool duplicate = false;
+				//Same kind, and only then close enough: an attractor and a saddle 0.045 bohr apart are two
+				//points of the density, not one point found twice. Measured on tests/grown/water.wfx, where
+				//distance alone cost the proton H38 its maximum: the nuclear seed reached the attractor at
+				//|grad rho| = 1.4E-10 and a bond seed then reached a (3,-1) point beside it at 1.7E-11, the
+				//smaller gradient replaced the larger, and the analysis reported a bond critical point at a
+				//nucleus - 47 attractors for 48 nuclei. Which of the two converges harder is a fact about the
+				//two searches and not about the density. The inversion image H39, whose pair sits 0.0536 bohr
+				//apart, kept both all along, so the old rule was not even consistent between two nuclei that
+				//the molecule's own symmetry makes equivalent.
 				for (cp& existing : r.points)
-					if (array_length(existing.position, point.position) <= opt.merge_distance) {
+					if (existing.kind == point.kind && array_length(existing.position, point.position) <= opt.merge_distance) {
 						duplicate = true;
 						if (point.gradient_norm < existing.gradient_norm) {
 							const seed_class keep = existing.from; //the class that found it first
@@ -275,9 +353,7 @@ namespace topology
 			const size_t first = seeds.size();
 			for (size_t a = 0; a < nuclei.size(); a++)
 				for (size_t b = a + 1; b < nuclei.size(); b++) {
-					const double ra = nuclei[a].Z > 0 && nuclei[a].Z < 114 ? constants::covalent_radii[nuclei[a].Z] : 1.5;
-					const double rb = nuclei[b].Z > 0 && nuclei[b].Z < 114 ? constants::covalent_radii[nuclei[b].Z] : 1.5;
-					if (array_length(nuclei[a].pos, nuclei[b].pos) > constants::ang2bohr(opt.bond_scale * (ra + rb)))
+					if (!covalently_bonded(nuclei[a], nuclei[b], opt))
 						continue;
 					for (int i = 1; i < 10; i++) {
 						const double t = 0.1 * i;
@@ -327,6 +403,9 @@ namespace topology
 			run(first);
 		}
 
+		//What the sum is compared against, before anything is compared: C separated molecules give C
+		r.covalent_fragments = covalent_fragment_count(nuclei, opt);
+		note_coreless_nuclei(r, source, nuclei, opt);
 		tally(r, opt);
 
 		//5. the sum did not close.  A coarse grid over the nuclear bounding box is the only seeding
@@ -347,6 +426,10 @@ namespace topology
 							seed_class::grid);
 			run(first);
 			r.escalated = true;
+			//The grid can add bond points, and the verdict now depends on the bond graph they build -
+			//so it is rebuilt before the second tally rather than left as step 3 found it.  The
+			//returned cycles are discarded: the ring seeding has already happened
+			bond_graph_cycles(r, nuclei);
 			tally(r, opt);
 		}
 		return r;
@@ -354,6 +437,9 @@ namespace topology
 
 	//Every critical point of a wavefunction's density with the Poincare-Hopf verdict, printed
 	void report_topology(const result& r, const std::vector<nucleus>& nuclei, std::ostream& log, const options& opt = {});
-	//-topology <wfn>: load, analyze, report
-	void report(const std::filesystem::path& wfn_path, std::ostream& log);
+	//-topology <wfn>: load, analyze, report.  Returns the Poincare-Hopf verdict - true when the set of
+	//critical points is complete - so the caller can exit non-zero on a set that is provably missing
+	//points.  It used to be void, and -topology exited 0 on an INCOMPLETE set: a script could not tell
+	//the two apart, and four of the matrix's own cells are INCOMPLETE.
+	bool report(const std::filesystem::path& wfn_path, std::ostream& log);
 }

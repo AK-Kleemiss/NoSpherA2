@@ -821,6 +821,24 @@ static int run_app_impl(int argc, char **argv)
 			write_wfn_CIF(wavy[0], opt.wfn.replace_extension(".cif"));
 		return 0;
 	}
+	//Nothing above claimed the task, and that is two different situations of which only one is a
+	//defect. A command line that named an analysis and could not run it - `-rgbi water.gbw`, RGBI
+	//having no positional form and wanting -wfn - used to write the help into NoSpherA2.log and
+	//return 0, which from the outside reads as an analysis that ran and printed no table: it now
+	//says what was missing, on the console where it can be seen, and fails. A command line that
+	//named no analysis at all asked nothing, so it keeps the old behaviour exactly - the help in
+	//the log it requested, exit 0 - which is what a wrapper probing the executable expects.
+	const std::string missing = opt.unrunnable_analysis();
+	if (!missing.empty())
+	{
+		std::cout.rdbuf(_coutbuf);
+		std::cout << NoSpherA2_message(opt.no_date);
+		if (!opt.no_date)
+			std::cout << build_date;
+		std::cout << "ERROR: " << missing << endl;
+		log_file.flush();
+		return 1;
+	}
 	std::cout << NoSpherA2_message(opt.no_date);
 	if (!opt.no_date)
 		std::cout << build_date;

@@ -7,6 +7,7 @@
 #include "basis_set.h"
 #include "SALTED_utilities.h"
 #include "aux_density.h"
+#include "nao.h"
 #include "citations.h"
 #include <occ/disp/d4.h>
 #include <occ/interaction/polarization.h>
@@ -1524,10 +1525,11 @@ vec DensityFitting::calculate_expected_populations(const WFN& wavy, const WFN& w
 	}
 	else if (scheme == CHARGE_SCHEME::MULLIKEN) {
 		dMatrix2 dm = wavy.get_dm();
-		vec eri2c;
-		Int_Params normal_basis(wavy);
-		compute2C<Overlap2C_SPH>(normal_basis, eri2c);
-		dMatrixRef2 eri2c_ref(eri2c.data(), normal_basis.get_nao(), normal_basis.get_nao());
+		//Mulliken's sum of diag(P S) is the electron count, so P and S have to be the same basis:
+		//ao_overlap is the spherical overlap in the density's own phase convention (an ORCA-convention
+		//density has the opposite sign on |m| >= 3, so a plain Overlap2C_SPH loses charge on every
+		//molecule with f or higher shells).
+		const dMatrix2 S_ao = ao_overlap(wavy);
 		const size_t nao = dm.extent(1);
 
 		// optional: symmetric Mulliken operator M = 1/2 (P S + S P)
@@ -1550,7 +1552,7 @@ vec DensityFitting::calculate_expected_populations(const WFN& wavy, const WFN& w
 			for (size_t m = mu_begin; m < mu_end; m++) {
 				double diag_PS = 0.0;
 				for (size_t n = 0; n < nao; n++)
-					diag_PS += dm(m, n) * eri2c_ref(n, m);
+					diag_PS += dm(m, n) * S_ao(n, m);
 				GA += diag_PS;
 			}
 			expected_populations[iat] = GA;//A.get_charge() - GA;        // Mulliken charge
