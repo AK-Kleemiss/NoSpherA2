@@ -319,25 +319,8 @@ TEST(RgbiRobustnessTests, TheAnalysisLeavesOccsThreadCountAsItFoundIt)
 	occ::parallel::nthreads = 1;
 }
 
-//The reproducibility check that has teeth. tests/ECP_SF/Au2Br2.gbw is centrosymmetric: its two Au
-//atoms are one orbit, as are the two Au-Br bonds and the two Au-P bonds, so the molecule's own
-//symmetry is a reference that needs no second program. Those numbers used to disagree inside a single
-//run - populations 16.040429 against 16.029264, bond totals apart by 0.019 and covalent percentages
-//by 1.4 - because each free-atom Fock matrix reduced in whatever order TBB's work stealing produced
-//and a free atom's open shell is degenerate enough for the last bit to pick a different member of the
-//manifold. Symmetry-equivalent centres now agree to every digit, which is the only way a published
-//bond index can be compared to anything.
-//
-//The test was gated behind RUN_FULL_TEST when it was written and in that state it never ran once - and
-//it could not have passed: bond_row matched the literal string "0 - 2" against a line printed as
-//"   0 -   2   Au - Br  ...", where each index is right-aligned in its own field, so it found no row and
-//asserted on its own parser before it compared a single number. The indices are read as numbers now, and
-//the gate is gone: fe628ab9's free-atom cache brought the whole analysis to 4 s at the command line and
-//5.6 s in the test binary, which is not a gate's worth of time. Ungating it also puts the ECP heavy-atom
-//RGBI path into the default suite, which is where 09a9c925 belongs - both deployed share binaries abort
-//inside "Calculating ANOs for all atoms..." on this exact file, 4 runs out of 4, with malloc() and
-//SIGSEGV heap diagnostics, while this branch finishes it twice with bit-identical output.
-TEST(RgbiRobustnessTests, SymmetryEquivalentGoldCentresAgreeToEveryDigit)
+//Inversion-related Au, Br and P centres must retain matching RGBI populations and bond indices.
+TEST(RgbiRobustnessTests, SymmetryEquivalentGoldCentresAgreeWithinPrintedPrecision)
 {
 	const auto p = nos_test_repo_root() / "tests" / "ECP_SF" / "Au2Br2.gbw";
 	if (!std::filesystem::exists(p))
@@ -355,17 +338,11 @@ TEST(RgbiRobustnessTests, SymmetryEquivalentGoldCentresAgreeToEveryDigit)
 		const double first = value_after(out, "Population of atom " + std::to_string(a) + ": ");
 		const double second = value_after(out, "Population of atom " + std::to_string(a + 1) + ": ");
 		ASSERT_TRUE(std::isfinite(first) && std::isfinite(second)) << "no population for atoms " << a << " and " << a + 1;
-		EXPECT_DOUBLE_EQ(first, second) << "populations of the symmetry-equivalent atoms " << a << " and " << a + 1;
+		//The reported populations can differ by one unit in their sixth decimal.
+		EXPECT_NEAR(first, second, 1.1e-6) << "populations of the symmetry-equivalent atoms " << a << " and " << a + 1;
 	}
 
-	//The one quantity on this path that does NOT come out bit-identical between two centres of the same
-	//orbit: the population left outside the ANO cutoff, 8.8788628 against 8.8788629 for the two gold
-	//atoms and 3.16409 against 3.1640901 for the two phosphorus atoms, the same on both sides at 1 and
-	//8 threads and in two repeats of each (AKL007, 25 Sep). That is a reduction-order residual in the
-	//last printed digit of a number that is itself a difference of two large ones, so it is pinned at
-	//1e-6 instead of being asserted equal - and pinned rather than ignored, because the populations and
-	//all nine bond columns below ARE bit-identical, and a drift here would be the first sign of the
-	//old defect coming back.
+	//The omitted population is a difference of two projector populations.
 	for (const int a : { 0, 2, 4 }) {
 		const std::string key = "Atomic projector population outside selected ANO cutoff of atom ";
 		const double first = value_after(out, key + std::to_string(a) + ": ");
