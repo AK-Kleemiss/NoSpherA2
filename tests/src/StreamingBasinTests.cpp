@@ -292,3 +292,26 @@ TEST(StreamingBasins, MaximaOnTheCropSurfaceAreNotBasins)
 	EXPECT_NEAR(basins.second[0][3], 10.0, 1e-9) << "the surviving basin is not the real maximum";
 	for (int k = 0; k < 3; k++) EXPECT_NEAR(basins.second[0][k], 0.0, 0.5 * h);
 }
+
+TEST(StreamingBasins, EliStreamsWithSharedMaximumBasinsInsideTheIsosurface)
+{
+	const std::filesystem::path wfn = nos_test_repo_root() / "tests" / "cytidine_tonto" / "OH.wfn";
+	if (!std::filesystem::exists(wfn)) GTEST_SKIP() << "fixture missing: " << wfn.string();
+	const WFN wavy = load(wfn);
+	const d3 h = wavy.get_atom_pos(0), o = wavy.get_atom_pos(1);
+	std::vector<d4> maxima{ d4{ h[0], h[1], h[2], 1.0 }, d4{ o[0], o[1], o[2], 1.0 } };
+	vec volumes;
+	double outside = 0.0;
+	const vec pop = integrate_basins_on_atomic_grids(nullptr, nullptr, maxima, wavy, 3, true, volumes, outside);
+	ASSERT_EQ(pop.size(), 2u);
+	const double total = pop[0] + pop[1] + outside;
+	EXPECT_NEAR(total, 10.0, 0.05);
+	EXPECT_GT(outside, 0.0);
+	maxima.push_back(d4{ o[0] + 0.3, o[1], o[2], 1.0 });
+	const ivec basin_of_maximum{ 0, 1, 2, 2 };
+	vec merged_volumes;
+	double merged_outside = 0.0;
+	const vec merged = integrate_basins_on_atomic_grids(nullptr, nullptr, maxima, wavy, 3, true, merged_volumes, merged_outside, nullptr, nullptr, 1, nullptr, nullptr, &basin_of_maximum);
+	ASSERT_EQ(merged.size(), 2u);
+	EXPECT_NEAR(merged[0] + merged[1] + merged_outside, total, 1e-9 * total);
+}
