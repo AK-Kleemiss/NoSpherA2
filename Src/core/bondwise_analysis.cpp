@@ -3500,6 +3500,18 @@ void ELI_analysis(const WFN &wavy, options &opt) {
 	properties_options prop_opt = opt.properties;
 	WFN l_w = wavy;
 	l_w.delete_unoccupied_MOs();
+	//ELI-D needs g = rho tau - |grad rho|^2 / 4 > 0 to exist, and g vanishes identically when a
+	//single orbital carries the whole density. The field is then 0/0 and every voxel is a maximum in
+	//round-off: H2 comes out with 11214 basins holding 0.5777 of its 2 electrons, maxima from 1.6e5
+	//to 4.3e6 against H2O's 1.77 to 7.08, and 1.4222 e outside every basin - the worst residual in
+	//the 211-molecule set, and not a defect of the integrator. DGrid shatters the same field the same
+	//way (403 basins, maxima to 5.4e5), so this is the definition and not an implementation. Say so
+	//rather than letting a chemist read a table of ten thousand basins as a result.
+	if (l_w.get_nmo() < 2)
+		std::cout << "WARNING: this wavefunction has a single occupied orbital, so ELI-D's pair"
+			" density g = rho*tau - |grad rho|^2/4 is identically zero and the field is undefined."
+			" The basins below are round-off structure, not chemistry - expect thousands of them and"
+			" do not quote their populations. The QTAIM basins are unaffected." << std::endl;
 	readxyzMinMax_fromWFN(wavy, prop_opt);
 
 	cube rho(prop_opt.NbSteps, l_w.get_ncen(), true);
@@ -3538,7 +3550,9 @@ void ELI_analysis(const WFN &wavy, options &opt) {
 	rho.calc_dv();
 	eli_cube.calc_dv();
 
+	basin_stage_timer T;
 	Calc_RhoEli(rho, eli_cube, l_w, radius, fld);
+	T.lap("rho and ELI-D cube");
 	//An ECP took the core electrons out of the density. The QTAIM basins get them back from
 	//Thakkar's spherical core densities, the fill the Hirshfeld grids and the scattering
 	//factors apply: the nucleus is a cusp again and its basin holds the atom's full count.
@@ -3588,6 +3602,7 @@ void ELI_analysis(const WFN &wavy, options &opt) {
 	std::vector<critical_point> density_critical_points;
 	if (l_w.get_nmo() > 0) density_critical_points = analyze_cube_critical_points(&rho, l_w, opt.debug, density_floor);
 	else std::cout << "No orbitals: critical points (Hessian, V, G, K) need a wavefunction and are skipped." << std::endl;
+	T.lap("density critical points");
 	//Core shells make critical points of their own and an ECP atom a whole sphere of them,
 	//none of which says anything about bonding and none of which any two machines find at
 	//the same spots; only the nuclear attractor survives inside an atom's core radius. Sorted
@@ -3733,18 +3748,25 @@ void ELI_analysis(const WFN &wavy, options &opt) {
 	}
 	else
 		qtaim_results = topological_cube_analysis(&rho, atoms, opt.debug, true, floor, 1e-10, radius, persistence, &nuclei, &l_w, fill_cores ? &core_density : nullptr, fill_cores ? &core_gradient : nullptr, fld);
+	T.lap("QTAIM attractors");
 	svec labels = assign_labels_to_basins(qtaim_results.second, atoms, opt.debug);
 
 	//Two integrations of the density over each basin set: the voxel sum, which is what the cube
 	//resolution buys, and the atom-centred quadrature grids with the boundary decided by the
 	//field itself, which is the number to compare with AIMAll and DGrid. The ELI-D basins follow
 	//the orbitals' ELI-D and integrate the orbital density; only the QTAIM set uses the fit
+	//A streaming ELI-D has to be able to walk to every core shell's own maximum while the report
+	//keeps the one merged core basin per atom, so the integrator gets the unmerged list of maxima
+	//and the map from it to the basins alongside it
+	std::vector<d4> eli_maxima_all;
+	ivec eli_core_map;
 	auto report = [&](const char *title, const std::pair<cubei, std::vector<d4>> &res, svec &lab, const bool eli, const bool stream) {
 		//The voxel sum is a property of the basin cube; streaming has none, and the number it
 		//gave was the worse of the two anyway
 		if (!stream) {
 			std::cout << "\n" << title << " (voxel sum):\n";
 			integrate_values_in_basins(&rho, &(res.first), lab, opt.debug);
+			T.lap(std::string(title) + " voxel sum");
 		}
 		vec vol;
 		double outside = 0.0;
@@ -3758,7 +3780,8 @@ void ELI_analysis(const WFN &wavy, options &opt) {
 		if (orbitals && !want_aom)
 			std::cout << "  Delocalization indices skipped: " << l_w.get_nmo() << " orbitals over " << res.second.size()
 				<< " basins on " << omp_get_max_threads() << " threads would need " << aom_bytes / (1024 * 1024) << " MB of overlap matrices.\n";
-		const vec pop = integrate_basins_on_atomic_grids(stream ? nullptr : &rho, stream ? nullptr : &(res.first), res.second, l_w, opt.accuracy, eli, vol, outside, fill_cores && !eli ? &core_density : nullptr, fill_cores && !eli ? &core_gradient : nullptr, opt.basin_grid, eli ? nullptr : fld, want_aom ? &ovl : nullptr);
+		const bool mapped = eli && stream && !eli_core_map.empty();
+		const vec pop = integrate_basins_on_atomic_grids(stream ? nullptr : &rho, stream ? nullptr : &(res.first), mapped ? eli_maxima_all : res.second, l_w, opt.accuracy, eli, vol, outside, fill_cores && !eli ? &core_density : nullptr, fill_cores && !eli ? &core_gradient : nullptr, opt.basin_grid, eli ? nullptr : fld, want_aom ? &ovl : nullptr, mapped ? &eli_core_map : nullptr);
 		std::cout << "\n" << title << " (atomic quadrature grids):\n";
 		//The maximum column is 16 wide, not 12: it carries rho at the attractor, and at a uranium
 		//nucleus that is 3.3e8 - it used to run into the volume beside it
@@ -3789,25 +3812,89 @@ void ELI_analysis(const WFN &wavy, options &opt) {
 	}
 
 	//ELI-D is a ratio of quantities that both vanish in the density's tail and turns to noise
-	//there, so its basins are searched only where the density exceeds 1e-4, the crop DGrid is
-	//run with here; what lies beyond is reported as outside
+	//there, so its maxima are searched only where the density exceeds 1e-4, the crop DGrid is
+	//run with here; on the cube what lies beyond is reported as outside, while a streaming walk
+	//starts out there too and climbs back in
 	for (int x = 0; x < eli_cube.get_size(0); x++)
 		for (int y = 0; y < eli_cube.get_size(1); y++)
 			for (int z = 0; z < eli_cube.get_size(2); z++)
 				if (rho.get_value(x, y, z) < 1e-4) eli_cube.set_value(x, y, z, 0.0);
-	std::pair<cubei, std::vector<d4>> eli_results = topological_cube_analysis(&eli_cube, atoms, opt.debug, false, 0.0, 1e-10, radius);
+	T.lap("ELI-D tail crop");
+	//These are the only attractors this routine discovers on the grid - the QTAIM set is seeded from
+	//the nuclei above and comes out bit-identical at any spacing - so the resolution is an accuracy
+	//parameter for ELI-D and not a performance knob. Measured against their own 0.05 A runs: at
+	//0.1 A one of sucrose's core basins moves 5.6e-2 electrons and ZP2 grows a lone pair that is not
+	//there; at 0.2 A five of sucrose's core basins are retyped as lone pairs. A user who coarsens
+	//the grid to save the cube's seconds has no other way to find that out.
+	//The message used to say "shift by whole electrons", which came from Cl2 reading a correct core at
+	//0.1 A and a core 4.9 e too large at 0.05 A. That was the persistence defect fixed above, not a
+	//resolution effect, and it is retracted: re-measured with the fixed merge at 0.05/0.1/0.2 A, Cl2's
+	//chlorine core is 10.0573/10.0555/10.0544, HCl's 10.0579/10.0579/10.0568 and CO2's oxygens
+	//2.1307/2.1307/2.1299 - a drift of 0.003 e, not whole electrons. What remains is real but smaller
+	//and lands at the coarse end: F2's fluorine core goes 2.2891/2.2984/2.5984, so 0.31 e at 0.2 A,
+	//and its core volume jumps 0.96 -> 7.72 bohr^3 with an eleventh basin appearing. The gate is left
+	//at 0.05 A because the sucrose and ZP2 numbers above were taken with the old merge and have not
+	//been re-measured - weakening a gate on unmeasured ground is how the retracted claim got in.
+	if (grid_spacing > 0.05)
+		std::cout << "WARNING: the ELI-D attractors are searched on the " << grid_spacing
+			<< " A grid. Coarser than 0.05 A this basin set is less reliable: core populations have"
+			" been seen to drift by 0.3 electrons and basins to appear or be retyped as lone pairs by"
+			" 0.2 A. The QTAIM basins are unaffected." << std::endl;
+	//The persistence merge absorbs a low-persistence basin into its highest neighbour across their
+	//highest shared saddle. Inside a flat valence shell every saddle is about as deep as the one
+	//down to the core, so at the 5e-3 default the single-linkage chain walks the shell shards INTO
+	//the core basin and the core reads several electrons too many: Cl2's chlorine core 14.8951 e
+	//against the 10 its closed shells hold and DGrid's 10.0438, ClF's fluorine 6.8359 against 2,
+	//F2 6.6864, CF4 6.5741, HCl 14.6529, S2 13.4436, and CO2's oxygens 4.8859 - 178 of the corpus's
+	//1006 scoreable cores, every one of them an atom with a compact near-degenerate lone-pair shell.
+	//3e-4 leaves the merge to genuine grid noise and hands the shattered shell to the LENGTH-based
+	//unify_shell_basins, which is what that was built for and which cannot chain into a core because
+	//it only merges maxima within 1.2 bohr of each other. Measured over the four values (job 594631,
+	//one binary, one grid, res 0.05): the eight cores above land on their integers (10.0567, 2.2917,
+	//2.2891, 2.3025, 10.0579, 10.0815, 10.0753, 2.1307), the final basin COUNT is unchanged on every
+	//control (H2O 5, CO2 51, OH 5 at all four values - the noise merge's work is simply done by the
+	//shell merge instead: CO2 goes 44 noise / 0 shattered to 22 / 22), and OH keeps both oxygen lone
+	//pairs. Below 3e-4 nothing further is gained. NaCl, HOCl and AlCl3 stay wrong, for a different
+	//reason: their Na and Al cores come out too SMALL (2.92 and 3.04 against 10), so an electropositive
+	//atom's own outer core shell is not being folded in - core_shell_radius(11)=0.55 bohr does not
+	//reach Na's 2p shell. That is a separate defect and it is not fixed here.
+	std::pair<cubei, std::vector<d4>> eli_results = topological_cube_analysis(&eli_cube, atoms, opt.debug, false, 0.0, 1e-10, radius, 3e-4);
+	T.lap("ELI-D cube topology");
+	//The cube keeps the topology: there is no critical-point search for this field to take
+	//attractors from, and no analytic Hessian to test a maximum with - computeELIGrad is all there
+	//is. Testing the grid's ELI-D maxima against the analytic gradient was tried and removed: a
+	//hydrogen valence basin converges to a non-maximum of the gradient and the test ate six real H
+	//basins in UH6 and one in NH3Li. Only the boundaries become the field's, by sending every
+	//quadrature point up computeELIGrad to one of those maxima instead of reading a voxel's basin
+	//number, which is what leaves the crop above outside every basin.
+	//ELI-D needs g = rho tau - |grad rho|^2 / 4 > 0 to exist at all, and g vanishes wherever a
+	//single orbital carries the density - everywhere in a two-electron system - so there the walk
+	//has no slope to follow and the grid stays in charge.
+	const double electrons = l_w.count_nr_electrons();
+	const bool stream_eli = !opt.basin_cube && (opt.basin_analytic || electrons >= 10.0);
+	std::cout << "ELI-D basin boundaries from " << (stream_eli ? "the analytic field" : "the cube") << " ("
+		<< (opt.basin_cube ? "-basin_cube" : opt.basin_analytic ? "-basin_analytic" : stream_eli ? "the default" : "fewer than 10 electrons in the orbitals, " + std::to_string((int)std::lround(electrons))) << ")." << std::endl;
+	if (stream_eli) eli_maxima_all = eli_results.second;
 	//The shells of a heavy atom's core structure ELI-D into several basins each; one core
 	//basin per atom is what a bonding analysis wants, and what DGrid's ELIDcore gives
-	const int core_merged = unify_core_basins(eli_results.first, eli_results.second, atoms);
+	const int core_merged = unify_core_basins(eli_results.first, eli_results.second, atoms, stream_eli ? &eli_core_map : nullptr);
 	if (core_merged) std::cout << "Unified " << core_merged << " core-shell basins into their atoms' cores, " << eli_results.second.size() << " ELI-D basins remain." << std::endl;
-	//ELI-D keeps the cube: it is the cube that carries its topology, there is no critical-point
-	//search for this field to take attractors from, and no analytic Hessian to test a maximum
-	//with - computeELIGrad is all there is. Testing the grid's ELI-D maxima against the analytic
-	//gradient was tried and removed: a hydrogen valence basin converges to a non-maximum of the
-	//gradient and the test ate six real H basins in UH6 and one in NH3Li
+	//And outside the cores, the same sphere of maxima with nothing to fold it: see unify_shell_basins.
+	//NOS_ELI_SHELL_DIST / _TOL exist to choose the two numbers by measurement; 0 for the distance
+	//turns the merge off, which is the old behaviour.
+	double shell_dist = 1.2, shell_tol = 0.05;
+	if (const char *e = std::getenv("NOS_ELI_SHELL_DIST")) { const double v = std::atof(e); if (v >= 0.0 && v < 10.0) shell_dist = v; }
+	if (const char *e = std::getenv("NOS_ELI_SHELL_TOL")) { const double v = std::atof(e); if (v >= 0.0 && v < 1.0) shell_tol = v; }
+	ivec eli_shell_map;
+	const int shell_merged = unify_shell_basins(eli_results.first, eli_results.second, stream_eli ? &eli_shell_map : nullptr, shell_dist, shell_tol);
+	if (shell_merged) std::cout << "Unified " << shell_merged << " shattered shell basins, " << eli_results.second.size() << " ELI-D basins remain." << std::endl;
+	//The integrator walks to one of eli_maxima_all and then reads eli_core_map, so the second merge
+	//has to be composed into that map rather than replacing it
+	if (!eli_shell_map.empty())
+		for (size_t b = 1; b < eli_core_map.size(); b++) eli_core_map[b] = eli_shell_map[eli_core_map[b]];
 	svec eli_labels = assign_labels_to_basins(eli_results.second, atoms, opt.debug, 1);
 	report("QTAIM Analysis", qtaim_results, labels, false, stream_qtaim);
-	report("ELI-D Analysis", eli_results, eli_labels, true, false);
+	report("ELI-D Analysis", eli_results, eli_labels, true, stream_eli);
 }
 
 // ---------------------------------------------------------------------------

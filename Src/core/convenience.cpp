@@ -19,6 +19,7 @@
 #include "eli_family.h"
 #include "topology.h"
 #include "citations.h"
+#include "b2c.h"
 
 #ifdef _WIN32
 #include <windows.h>
@@ -455,11 +456,35 @@ std::string help_message =
  "                                    tightest exponent sharpened n^2-fold, the\n"
  "                                    radial step divided by n, the angular\n"
  "                                    order up n-1 steps. For heavy atoms.\n"
- "  -basin_cube                        Find the QTAIM basins on the cube, as\n"
- "                                    before. The default takes their attractors\n"
- "                                    from the analytic critical-point search, so\n"
- "                                    the grid can no longer invent one; use this\n"
- "                                    to compare against the older behaviour.\n"
+ "  -basin_cube                        Find the QTAIM and ELI-D basins on the\n"
+ "                                    cube, as before. The default takes the\n"
+ "                                    density's attractors from the analytic\n"
+ "                                    critical-point search, so the grid can no\n"
+ "                                    longer invent one, and walks the analytic\n"
+ "                                    field from every quadrature point for its\n"
+ "                                    basin; use this for the older behaviour.\n"
+ "  -basin_analytic                    Keep the analytic ELI-D boundaries below\n"
+ "                                    the 10 electrons they need to be defined\n"
+ "                                    everywhere; the cube takes over by default.\n"
+ "  -basin_step <f>                    Scale the trajectory step of the streaming\n"
+ "                                    basin quadrature by f. The step is a fraction\n"
+ "                                    of the cube's voxel; f says how much of it the\n"
+ "                                    basins need. Same basins, f times fewer steps.\n"
+ "  -basin_timing                      Print the wall clock of every stage of the\n"
+ "                                    basin analysis: the cube, the critical\n"
+ "                                    points, the beta spheres, the quadrature.\n"
+ "  -adaptive_step                     Let a straight run of field earn a longer\n"
+ "                                    ascent step than the validated one: sucrose\n"
+ "                                    363 -> 296 s, UH6 26 -> 13 s, at up to 8e-4\n"
+ "                                    electrons per basin. Off by default.\n"
+ "  -no_adaptive_step                  Every ascent step at the validated step\n"
+ "                                    length. The default, and the reference the\n"
+ "                                    equivalence check compares against.\n"
+ "  -no_beta_spheres                   Climb every quadrature point the whole way\n"
+ "                                    instead of stopping it at the radius around\n"
+ "                                    an attractor that no ascent path can leave.\n"
+ "                                    Same basins, many times the time; it is\n"
+ "                                    there to check that they are the same.\n"
  "  -eli_family <wfn> [points_file]\n"
  "                                    The rest of Kohout's ELI family as point\n"
  "                                    values: ELI-D for alpha-alpha, beta-beta and\n"
@@ -2796,6 +2821,20 @@ bool options::digest_run_options(const std::string &temp, int &i)
         basin_grid = std::max(1, stoi(arguments[i + 1]));
     else if (temp == "-basin_cube")
         basin_cube = true;
+    else if (temp == "-basin_analytic")
+        basin_analytic = true;
+    else if (temp == "-basin_step")
+        basin_step_scale_set(stod(arguments[i + 1]));
+    else if (temp == "-basin_timing")
+        basin_timing_set_enabled(true);
+    else if (temp == "-no_beta_spheres")
+        beta_spheres_set_enabled(false);
+    else if (temp == "-no_adaptive_step")
+        basin_adaptive_step_set_enabled(false);
+    else if (temp == "-adaptive_step")
+        basin_adaptive_step_set_enabled(true);
+    else if (temp == "-beta_spheres")
+        beta_spheres_set_enabled(true);
     else if (temp == "-Anion")
     {
         int n = 1;

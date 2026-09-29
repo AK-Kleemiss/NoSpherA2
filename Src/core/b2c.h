@@ -2,6 +2,7 @@
 #include "atoms.h"
 #include "cube.h"
 #include <array>
+#include <chrono>
 #include <functional>
 #include <string>
 #include <vector>
@@ -78,8 +79,17 @@ std::vector<d4> streaming_density_attractors(const WFN& wavy, const std::vector<
 //element keeps beneath its valence peaks at about 0.7 bohr for the first transition row
 double core_shell_radius(const int Z);
 //Every basin whose maximum lies within an atom's core radius becomes that atom's one core
-//basin, as DGrid's ELIDcore does; returns the number of basins merged away
-int unify_core_basins(cubei& basin_cube, std::vector<d4>& maxima, const std::vector<atom>& atoms);
+//basin, as DGrid's ELIDcore does; returns the number of basins merged away.
+//basin_map, when given, comes back sized maxima.size() + 1 and holds the 1-based basin each of
+//the maxima the call was handed ends up in. A streaming integration needs both halves of that:
+//the walk has to be able to reach every core shell's own maximum, while the report wants the
+//one merged core basin per atom.
+int unify_core_basins(cubei& basin_cube, std::vector<d4>& maxima, const std::vector<atom>& atoms, ivec* basin_map = nullptr);
+
+//Fold a shattered shell - maxima that are close together AND near-degenerate in value - into one basin
+//each. max_dist is a physical length in bohr, deliberately not a voxel count: the defect gets worse as
+//the grid is refined, so a grid-derived cutoff would chase it. See the comment on the definition.
+int unify_shell_basins(cubei& basin_cube, std::vector<d4>& maxima, ivec* basin_map = nullptr, double max_dist = 1.2, double rel_tol = 0.05);
 //Atomic overlap matrices S^b_ij = int_b phi_i phi_j, taken on the same quadrature points and
 //with the same basin assignment as the populations, so a basin's trace is its population by
 //construction. One packed lower triangle per basin over the occupied MOs
@@ -105,9 +115,64 @@ delocalization_result delocalization_indices(const WFN& wavy, const basin_overla
 void report_delocalization(const WFN& wavy, const basin_overlaps& ovl, const svec& labels, std::ostream& log, const double threshold = 0.01);
 //ovl, when given, is filled with the basin overlap matrices. Only meaningful for the orbital
 //density (field == nullptr): it is the orbitals that are being partitioned.
-//cub and basin_cube may both be null: the quadrature then runs streaming, every point sent up
-//the analytic field to one of the given maxima with no grid in the loop and no cube in memory
-vec integrate_basins_on_atomic_grids(const cube* cub, const cubei* basin_cube, const std::vector<d4>& maxima, const WFN& wavy, const int accuracy, const bool eli_field, vec& volumes, double& outside, const std::function<double(const d3&)>* core_density = nullptr, const std::function<void(const d3&, d3&)>* core_gradient = nullptr, const int grid_boost = 1, const density_field* field = nullptr, basin_overlaps* ovl = nullptr);
+//cub or basin_cube null: the quadrature then runs streaming, every point sent up the analytic
+//field to one of the given maxima with no grid deciding any boundary. A 0.1 A grid's spacing is
+//then assumed for the trajectory's step and the radius that counts as arrival.
+//maximum_basin, when given, is the 1-based basin of each maximum, as unify_core_basins reports
+//it: several maxima then share one basin and the returned vector is one entry per basin.
+//Beta spheres: around an attractor there is a radius inside which no ascent trajectory can get
+//out, so every point inside belongs to it without being climbed and a trajectory that enters is
+//finished on the spot. On by default, and only for the streaming quadrature, which is where the
+//time goes; -no_beta_spheres turns them off and is what the equivalence test compares against.
+void beta_spheres_set_enabled(const bool on);
+bool beta_spheres_enabled();
+//The fraction of the smallest safe radius the 302 sampled directions found that a sphere is
+//actually drawn at, 0.7 by default and at most 1. NOS_BETA_MARGIN overrides it, because the sphere
+//is the reason a third of the quadrature points never take a step and the margin is therefore the
+//one number that prices the dominant stage against the populations; -basin_timing prints it beside
+//how many maxima ended up with a sphere at all.
+double basin_beta_margin();
+//Angle-adaptive RK2 step: the step step_at hands out is the one the populations were validated
+//at, so it is a floor, and a longer one has to be earned from the midpoint gradient the step
+//already computed. Off by default because it is not free: 1.2x on sucrose and 2x on UH6, at up to
+//8e-4 electrons per basin. -adaptive_step turns it on, and the equivalence test integrates both
+//ways and compares basin by basin, which is what puts a number on that cost.
+void basin_adaptive_step_set_enabled(const bool on);
+bool basin_adaptive_step_enabled();
+//The four knobs the grown step is made of, as the run will actually use them. Enabling the growth
+//re-reads NOS_ADP_CAP, NOS_ADP_GROW, NOS_ADP_KEEP and NOS_ADP_REACH, because the defaults were
+//measured against the pre-fix walk and re-tuning them has to be possible without a rebuild;
+//-basin_timing prints whatever came out, since a step count without its knobs measures nothing.
+void basin_adaptive_step_knobs(double &cap, double &grow, double &keep, double &reach);
+//What the grown step spent, since the last reset: steps taken, longer steps proposed, proposals
+//turned back by the angle test, proposals dropped again because the field stopped rising. Only a
+//run with the growth enabled moves them. A fallback is by definition the fate of a proposal, so
+//fell <= proposed is an invariant of the code and not of the physics - it is the one that broke,
+//and it broke without moving a single population, which is why it is asserted rather than trusted.
+void basin_adaptive_step_counters(long long &steps, long long &proposed, long long &turned_back, long long &fell_back);
+void basin_adaptive_step_counters_reset();
+//-basin_timing: the wall clock of every stage of the analysis, which is the only way to say
+//where the time of a 45-atom molecule actually sits. Off by default, and it has to be: the
+//golden files are captures of this console log and no timing line ever reproduces.
+//-basin_step <f>: the trajectory step of the streaming quadrature, times f. The step is a
+//fraction of the cube's voxel, which is a resolution and not an accuracy: this is the knob
+//that says how much of it the basins actually need. 1.0 leaves the binary as it was.
+void basin_step_scale_set(const double f);
+double basin_step_scale();
+//Density trajectories from the last integration that stopped rising while a gradient of 1e-2 e/bohr^4
+//or more was still on them. The invariant is zero: such a point is not a critical point, it is a step
+//too long for the local curvature, and the step controller shrinks below its floor rather than giving
+//up and handing the point to whichever attractor happens to be nearest. ZP2_part1 had 10850 of them
+//and CCH 3716, 91 % of which went to one non-nuclear attractor that then held twice its charge.
+long long basin_stalls_on_a_slope();
+void basin_timing_set_enabled(const bool on);
+bool basin_timing_enabled();
+struct basin_stage_timer {
+	std::chrono::steady_clock::time_point t = std::chrono::steady_clock::now();
+	//Seconds since the last lap (or since construction), printed only under -basin_timing.
+	void lap(const std::string &what);
+};
+vec integrate_basins_on_atomic_grids(const cube* cub, const cubei* basin_cube, const std::vector<d4>& maxima, const WFN& wavy, const int accuracy, const bool eli_field, vec& volumes, double& outside, const std::function<double(const d3&)>* core_density = nullptr, const std::function<void(const d3&, d3&)>* core_gradient = nullptr, const int grid_boost = 1, const density_field* field = nullptr, basin_overlaps* ovl = nullptr, const ivec* maximum_basin = nullptr);
 std::vector<critical_point_seed> find_cube_critical_point_seeds(const cube* cub, bool debug, double value_floor = -1.0, double gradient_epsilon = -1.0);
 std::vector<critical_point> refine_cube_critical_points(const cube* cub, const WFN& wavy, const std::vector<critical_point_seed>& seeds, bool debug, double value_floor = -1.0, double gradient_tolerance = 1e-8, double step_tolerance = 1e-6, int max_iterations = 32);
 std::vector<critical_point> analyze_cube_critical_points(const cube* cub, const WFN& wavy, bool debug, double value_floor = -1.0, double gradient_epsilon = -1.0, double gradient_tolerance = 1e-8, double step_tolerance = 1e-6, int max_iterations = 32);

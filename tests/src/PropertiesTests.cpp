@@ -1151,7 +1151,7 @@ TEST(PropertiesBasinTests, GradientTrajectoriesWithoutSeedsCreateMaximaAtNuclei)
 
 // an assignment radius keeps only voxels near an atom (basin 0 elsewhere) and a value floor
 // removes the faint tail; a one-voxel bump in the tail is a basin of its own with the merge
-// switched off and folds into the nuclear basin under the default persistence
+// switched off and folds into the nuclear basin at a persistence of 5e-3
 TEST(PropertiesBasinTests, AssignmentRadiusFloorAndPersistenceMerge)
 {
 	const H2Model m(1.0, 1.0);
@@ -1224,6 +1224,16 @@ TEST(PropertiesBasinTests, AssignmentRadiusFloorAndPersistenceMerge)
 	std::pair<cubei, std::vector<d4>> faced = topological_cube_analysis(&on_face, atoms, false, false, 0.0, 0.0, -1.0, 0.0);
 	EXPECT_EQ(faced.second.size(), 2u) << "a maximum on the last plane of the grid was reported as a basin";
 	EXPECT_EQ(faced.first.get_value(16, 8, 8), 0) << "its voxels were handed to a neighbouring basin instead of being left unresolved";
+	//This bump's persistence is (1.001 - 1) / 1.001 = 9.99e-4 of its height, which is the scale a
+	//shard of a flat valence shell sits at - and 5e-3 is wide enough to eat it. Inside a shell every
+	//saddle is about as deep as the one down to the core, so single linkage then chains the shards
+	//INTO the core basin and the core reports whole electrons too many (Cl2's chlorine 14.8951 e
+	//against the 10 its closed shells hold). The ELI-D call site therefore passes 3e-4 now, and the
+	//length-based unify_shell_basins folds the shell instead; this asserts the boundary the constant
+	//has to stay on the right side of, because nothing else in the suite would notice it moving back.
+	std::pair<cubei, std::vector<d4>> shipped = topological_cube_analysis(&bumped, atoms, false, false, 0.0, 0.0, -1.0, 3e-4);
+	EXPECT_EQ(shipped.second.size(), 3u) << "at 3e-4 a bump 9.99e-4 above its saddle survives";
+	EXPECT_NE(shipped.first.get_value(16, 8, 8), shipped.first.get_value(12, 8, 8));
 }
 
 // ELI labels: the proton's basin by its nucleus, a maximum inside the core shell of a heavier
@@ -1339,7 +1349,12 @@ TEST(PropertiesBasinTests, UnifyCoreBasinsMergesMaximaInsideTheCoreRadius)
 	EXPECT_EQ(core_shell_radius(2), 0.0);
 	EXPECT_EQ(core_shell_radius(6), 0.25);
 	EXPECT_EQ(core_shell_radius(10), 0.25);
-	EXPECT_EQ(core_shell_radius(17), 0.55);
+	//Na-Ar shares the 1.0 bohr band with K-Kr: 0.55 was measured to sit INSIDE the L shell at the
+	//electropositive end of the row (Na's L-shell ELI-D maximum is 0.740 bohr out, Al's 0.582), so
+	//about 7 e of a 10 e core stayed unfolded. The gap between the furthest maximum that must fold
+	//in (0.740) and the nearest that must not (1.472) is 0.732 bohr wide.
+	EXPECT_EQ(core_shell_radius(11), 1.0);
+	EXPECT_EQ(core_shell_radius(17), 1.0);
 	EXPECT_EQ(core_shell_radius(26), 1.0);
 	EXPECT_EQ(core_shell_radius(53), 1.4);
 	EXPECT_EQ(core_shell_radius(82), 1.8);
@@ -1376,6 +1391,83 @@ TEST(PropertiesBasinTests, UnifyCoreBasinsMergesMaximaInsideTheCoreRadius)
 	EXPECT_EQ(unify_core_basins(two, apart, atoms), 0);
 	EXPECT_EQ(apart.size(), 2u);
 	EXPECT_EQ(two.get_value(1, 0, 0), 2);
+}
+
+// Outside the cores the same sphere of maxima appears with nothing to fold it: a spherically symmetric
+// ELI-D shell sampled on a cubic grid is handed out one basin per voxel, and Co2 - two atoms - kept 845
+// basins that way, 824 of them under 0.01 e. The persistence merge cannot fix it: swept from 5e-3 to
+// 2e-1, the first threshold that dented Co2 at all (3e-2, 845 -> 687) already took one of OH's two REAL
+// oxygen lone pairs, because both a shell's grid saddles and the saddle between two genuine lone pairs
+// are shallow. Only a length separates them, and these are the measured geometries.
+TEST(PropertiesBasinTests, UnifyShellBasinsFoldsAShatteredShellAndKeepsTwoRealLonePairs)
+{
+	std::vector<d4> maxima;
+	// Co2's shell: one sphere at 5.35 bohr with neighbours 0.378 bohr apart (two voxels at 0.1 A) and
+	// values alternating 2.2671 / 2.3067 as measured - 1.7 % apart, so no value test keeps them together
+	const int n_shell = 89;  // 2 pi 5.35 / 0.378
+	for (int i = 0; i < n_shell; i++) {
+		const double a = constants::TWO_PI * i / n_shell;
+		maxima.push_back(d4{ 5.35 * std::cos(a), 5.35 * std::sin(a), 0.0, i % 2 ? 2.3067 : 2.2671 });
+	}
+	// OH's two REAL oxygen lone pairs: 1.890 bohr apart, degenerate to 0.2 %
+	maxima.push_back(d4{ 2.268, -0.945, -0.378, 1.6704 });
+	maxima.push_back(d4{ 2.268, 0.945, -0.378, 1.6671 });
+	// ZP2's duplicated F1 lone pair: 0.84 bohr apart, degenerate to 0.2 %, holding 1.4276 and 1.2907 e
+	// where one lone pair holds about 2.7. The prediction in the other direction - these MUST merge.
+	maxima.push_back(d4{ 0.0, 0.0, 12.0, 1.6460 });
+	maxima.push_back(d4{ 0.0, 0.84, 12.0, 1.6427 });
+
+	const std::vector<d4> before = maxima;
+	const int nb = static_cast<int>(maxima.size());
+	cubei basins({ nb, 1, 1 }, 0, true);
+	for (int b = 0; b < nb; b++)
+		basins.set_value(b, 0, 0, b + 1);
+	ivec map;
+	const int merged = unify_shell_basins(basins, maxima, &map);
+	EXPECT_EQ(merged, n_shell);  // 88 of the shell, plus one of ZP2's pair
+	ASSERT_EQ(maxima.size(), 4u);
+
+	// the shell keeps its highest maximum, and it is still on the sphere
+	EXPECT_NEAR(maxima[0][3], 2.3067, 0.0);
+	EXPECT_NEAR(std::sqrt(maxima[0][0] * maxima[0][0] + maxima[0][1] * maxima[0][1]), 5.35, 1e-9);
+	// both oxygen lone pairs survive, separately
+	EXPECT_NEAR(maxima[1][3], 1.6704, 0.0);
+	EXPECT_NEAR(maxima[2][3], 1.6671, 0.0);
+	EXPECT_NEAR(maxima[1][1], -0.945, 0.0);
+	EXPECT_NEAR(maxima[2][1], 0.945, 0.0);
+	// ZP2's duplicate is one basin now, keeping the higher maximum
+	EXPECT_NEAR(maxima[3][3], 1.6460, 0.0);
+
+	// the cube and the basin map agree: the whole shell is basin 1, the lone pairs are 2 and 3
+	ASSERT_EQ(map.size(), static_cast<size_t>(nb) + 1);
+	for (int b = 0; b < n_shell; b++) {
+		EXPECT_EQ(basins.get_value(b, 0, 0), 1) << "shell voxel " << b;
+		EXPECT_EQ(map[b + 1], 1) << "shell maximum " << b;
+	}
+	EXPECT_EQ(map[n_shell + 1], 2);
+	EXPECT_EQ(map[n_shell + 2], 3);
+	EXPECT_EQ(map[n_shell + 3], 4);
+	EXPECT_EQ(map[n_shell + 4], 4);
+	EXPECT_EQ(basins.get_value(n_shell + 3, 0, 0), 4);
+	EXPECT_EQ(basins.max_value(), 4);
+
+	// a distance of zero is the off switch and must change nothing at all
+	std::vector<d4> untouched = before;
+	cubei same({ nb, 1, 1 }, 0, true);
+	for (int b = 0; b < nb; b++)
+		same.set_value(b, 0, 0, b + 1);
+	EXPECT_EQ(unify_shell_basins(same, untouched, nullptr, 0.0, 0.05), 0);
+	EXPECT_EQ(untouched.size(), before.size());
+	EXPECT_EQ(same.max_value(), nb);
+
+	// and the margin: the default 1.2 bohr sits between ZP2's 0.84 and OH's 1.890, so a cutoff past
+	// 1.890 eats a real lone pair. That is the failure this test exists to catch.
+	std::vector<d4> too_far = before;
+	cubei wide({ nb, 1, 1 }, 0, true);
+	for (int b = 0; b < nb; b++)
+		wide.set_value(b, 0, 0, b + 1);
+	EXPECT_EQ(unify_shell_basins(wide, too_far, nullptr, 2.0, 0.05), n_shell + 1);
+	ASSERT_EQ(too_far.size(), 3u);
 }
 
 // the legacy interactive b2c() with its selection read from a redirected cin writes the log and
