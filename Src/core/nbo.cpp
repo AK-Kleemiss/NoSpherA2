@@ -606,8 +606,9 @@ NboLewis nbo_search(const NAOResult& nao, const dMatrix2& gamma, const bvec2& bo
                     moved_at[j] = (v - vectors[j]).norm();
                     vectors[j] = v;
                     vs = gather(v, s);
-                    //Evaluate the occupancy against the full density.
-                    occ[j] = v.dot(G0 * v);
+                    //v vanishes outside s, so its occupancy against the full density is the corner's:
+                    //the full G0 * v was an n^2 matvec per orbital per sweep, most of the search
+                    occ[j] = vs.dot(G0_corner[j] * vs);
                     block += occ[j] * vs * vs.transpose();
                     scatter_corner(sum, block, s);
                 }

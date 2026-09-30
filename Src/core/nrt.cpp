@@ -264,6 +264,9 @@ namespace
         double rho_nl = 0.0;      //electrons the structure leaves outside its own orbital set
         MatrixXd V;
         std::vector<std::array<double, 3>> polarity;  //{a, b, c_a^2 - c_b^2} per two-centre orbital
+        int sweeps = 0;           //self-consistency sweeps the construction took, for -debug
+        double change = 0.0;      //the last sweep's largest vector change
+        bool converged = false;   //the valence span stopped moving before the sweep cap
     };
 
     struct Limits {
@@ -483,7 +486,37 @@ namespace
 
         //3. self consistency: every orbital against the density with all the others removed
         //Reuse each slot eigenvector as the next sweep's warm start.
-        for (int s = 0; s < max_sweeps; s++) {
+        //Converged means the SPAN of the valence orbitals stopped moving: G, g and rho_nl depend on
+        //nothing else, and the vectors themselves keep wobbling inside it at ~1e-9 (rub2: the span
+        //settles to 1e-15 while the largest vector change plateaus at 4.5e-9, so a vector criterion
+        //never fires). The Gauss-Seidel sweep contracts linearly (~0.78 per sweep on rub2's parent);
+        //Anderson mixing over the last 5 sweeps halves the sweep count, but only once the iterate is
+        //close - started from sweep 1 it lands on a different fixed point (rub2: D(w) 2.32 vs 2.16).
+        const int nv = k - first_valence;
+        const auto orth = [&]() {
+            MatrixXd Mv(n, nv);
+            for (int j = first_valence; j < k; j++) Mv.col(j - first_valence) = v[j];
+            Eigen::HouseholderQR<MatrixXd> qr(Mv);
+            return MatrixXd(qr.householderQ() * MatrixXd::Identity(n, nv));
+        };
+        ivec off(nv + 1, 0);
+        for (int j = 0; j < nv; j++) off[j + 1] = off[j] + static_cast<int>(blk[first_valence + j]->size());
+        const auto pack = [&]() {
+            VectorXd x(off[nv]);
+            for (int j = 0; j < nv; j++) {
+                const ivec& idx = *blk[first_valence + j];
+                for (size_t t = 0; t < idx.size(); t++) x(off[j] + t) = v[first_valence + j](idx[t]);
+            }
+            return x;
+        };
+        constexpr int anderson_depth = 5;
+        constexpr double anderson_start = 1e-3, span_start = 1e-6, span_tol = 1e-10;
+        MatrixXd Q;  //span the sweep started from; a QR costs about a sweep, so only kept near the end
+        std::deque<VectorXd> dX, dF;
+        VectorXd x_prev, f_prev;
+        c.converged = nv == 0;
+        for (int s = 0; s < max_sweeps && !c.converged; s++) {
+            const VectorXd x0 = pack();
             double change = 0.0;
             for (int j = first_valence; j < k; j++) {
                 rank1_block(sum, *blk[j], -occ[j], v[j]);
@@ -495,7 +528,44 @@ namespace
                 occ[j] = block_quad(G0, *blk[j], x);
                 rank1_block(sum, *blk[j], occ[j], x);
             }
-            if (change < 1e-9) break;
+            c.sweeps = s + 1;
+            c.change = change;
+            if (change < span_start) {
+                const MatrixXd Qn = orth();
+                if (Q.size() && (Qn - Q * (Q.transpose() * Qn)).norm() < span_tol) {
+                    c.converged = true;
+                    break;
+                }
+                Q = Qn;
+            }
+            else Q.resize(0, 0);
+            if (x_prev.size() == 0 && change > anderson_start) continue;
+            //Anderson (type II) on the stacked block vectors
+            const VectorXd F = pack(), f = F - x0;
+            if (x_prev.size()) {
+                dX.push_back(x0 - x_prev);
+                dF.push_back(f - f_prev);
+                if (static_cast<int>(dX.size()) > anderson_depth) { dX.pop_front(); dF.pop_front(); }
+            }
+            x_prev = x0;
+            f_prev = f;
+            if (dX.empty()) continue;
+            const int h = static_cast<int>(dX.size());
+            MatrixXd DX(F.size(), h), DF(F.size(), h);
+            for (int i = 0; i < h; i++) { DX.col(i) = dX[i]; DF.col(i) = dF[i]; }
+            const VectorXd xn = F - (DX + DF) * DF.colPivHouseholderQr().solve(f);
+            sum.setZero();
+            for (int j = 0; j < first_valence; j++) sum(B.core[j], B.core[j]) += occ[j];
+            for (int j = 0; j < nv; j++) {
+                const int o = first_valence + j;
+                const ivec& idx = *blk[o];
+                v[o].setZero();
+                for (size_t t = 0; t < idx.size(); t++) v[o](idx[t]) = xn(off[j] + t);
+                v[o].normalize();
+                occ[o] = block_quad(G0, idx, v[o]);
+                rank1_block(sum, idx, occ[o], v[o]);
+            }
+            if (Q.size()) Q = orth();  //the next sweep starts from the mixed iterate
         }
 
         //Occupancy-weighted orthogonalization resolves overlapping bond orbitals.
@@ -844,7 +914,7 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
     const int nc0 = static_cast<int>(cands.size());
 #pragma omp parallel for schedule(dynamic) num_threads(nthreads)
     for (int i = 0; i < nc0; i++) {
-        build_orbitals(cands[i], gamma, B, 50);
+        build_orbitals(cands[i], gamma, B, 200);
         if (!cands[i].feasible) continue;
         const MatrixXd GV = gamma * cands[i].V;
         double tr = 0.0;
@@ -853,6 +923,28 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
         cands[i].rho_nl = electrons - tr;
     }
 
+    if (options.debug) {
+        int capped = 0, feas = 0;
+        long total = 0;
+        double worst = 0.0;
+        for (const Candidate& c : cands) {
+            if (!c.feasible) continue;
+            feas++;
+            total += c.sweeps;
+            if (!c.converged) { capped++; worst = std::max(worst, c.change); }
+        }
+        log << "NRT" << (spin.empty() ? "" : " " + spin) << ": orbital sweeps " << total << " over "
+            << feas << " candidates, " << capped << " stopped at the cap (worst change " << worst
+            << ", parent " << cands[0].change << " after " << cands[0].sweeps << "); last change by decade:";
+        //decades 1e-1 .. 1e-12, the count of feasible candidates whose last change falls in each
+        ivec dec(13, 0);
+        for (const Candidate& c : cands)
+            if (c.feasible)
+                dec[std::min(12, std::max(0, static_cast<int>(-std::floor(std::log10(std::max(c.change, 1e-300))))))]++;
+        for (int d = 0; d < 13; d++)
+            if (dec[d]) log << " 1e-" << d << ":" << dec[d];
+        log << "\n";
+    }
     //drop the infeasible ones, keeping the parent first
     std::vector<Candidate> keep;
     for (Candidate& c : cands)
