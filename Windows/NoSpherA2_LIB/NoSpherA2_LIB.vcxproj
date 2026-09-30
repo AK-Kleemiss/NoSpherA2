@@ -139,6 +139,7 @@
     <ClInclude Include="..\..\Src\core\SALTED_utilities.h" />
     <ClInclude Include="..\..\Src\core\scatterer_id.h" />
     <ClInclude Include="..\..\Src\core\scattering_factors.h" />
+    <ClInclude Include="..\..\Src\core\SCF_wrapper.h" />
     <ClInclude Include="..\..\Src\core\sf_gpu.h" />
     <ClInclude Include="..\..\Src\core\Slater_delta_coefs.h" />
     <ClInclude Include="..\..\Src\core\Slater_ion_coefs.h" />
@@ -154,9 +155,9 @@
     <ClInclude Include="..\..\Src\core\tsc_label_converter.h" />
     <ClInclude Include="..\..\Src\core\tsc_stream.h" />
     <ClInclude Include="..\..\Src\core\wfn_class.h" />
-    <ClInclude Include="..\..\Src\core\XCW.h" />
     <ClInclude Include="..\..\Src\core\stored_eri.h" />
     <ClInclude Include="..\..\Src\core\xcw_halting.h" />
+    <ClInclude Include="..\..\Src\core\XCW_solver.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\Src\core\crystal_energies.cpp" />
@@ -204,7 +205,10 @@
     <ClCompile Include="..\..\Src\core\SALTED_predictor.cpp" />
     <ClCompile Include="..\..\Src\core\SALTED_utilities.cpp" />
     <ClCompile Include="..\..\Src\core\scattering_factors.cpp" />
-    <ClCompile Include="..\..\Src\core\structure_factors.cpp" />
+    <ClCompile Include="..\..\Src\core\SCF_wrapper.cpp" />
+    <ClCompile Include="..\..\Src\core\structure_factors.cpp">
+      <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
     <ClCompile Include="..\..\Src\core\throughput.cpp" />
     <ClCompile Include="..\..\Src\core\topology.cpp" />
     <ClCompile Include="..\..\Src\core\tsc_label_converter.cpp" />
@@ -213,11 +217,9 @@
     <ClCompile Include="..\..\Src\core\wfn_class.cpp" />
     <ClCompile Include="..\..\Src\core\wfn_density.cpp" />
     <ClCompile Include="..\..\Src\core\wfn_io.cpp" />
-    <ClCompile Include="..\..\Src\core\XCW.cpp">
-      <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/bigobj %(AdditionalOptions)</AdditionalOptions>
-    </ClCompile>
     <ClCompile Include="..\..\Src\core\stored_eri.cpp" />
     <ClCompile Include="..\..\Src\core\xcw_halting.cpp" />
+    <ClCompile Include="..\..\Src\core\XCW_solver.cpp" />
   </ItemGroup>
   <ItemGroup Condition="'$(NosUseCuda)' == 'true'">
     <CudaCompile Include="..\..\Src\core\aux_density_gpu.cu" />

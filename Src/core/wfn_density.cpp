@@ -484,8 +484,9 @@ const double WFN::eval_ao(
 	const primitive* const p_end = p + prims.size();
 
 	for (; p != p_end; p++) {
-		radial += p->eval_gaussian_unnormalized(rl, d[3]);
+		radial += p->eval_gaussian_unnormalized(d[3]);
 	}
+	radial *= rl;
 
 	return radial * constants::spherical_harmonic(type, m, d.data());
 	// err_checkf(coef_counter == exp_coefs, "WRONG NUMBER OF COEFFICIENTS! " + std::to_string(coef_counter) + " vs. " + std::to_string(exp_coefs), std::cout);

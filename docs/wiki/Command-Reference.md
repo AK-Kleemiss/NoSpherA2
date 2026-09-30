@@ -323,13 +323,10 @@ mostly about where that tensor lives.
 | Flag | Arguments | Default | Meaning |
 | --- | --- | --- | --- |
 | `-do_XCW` | 0 | off | Run the XCW lambda scan. |
-| `-XCW_settings <file>` | 1 | | Settings file. Keywords include `stream`, `i_tensor_mb`, `save`, `read`, `df_basis`, `i_double`, `i_float`. |
-| `-calc_F` | 0 | off | Compute structure factors from the fitted wavefunction. |
+| `-XCW_settings <file>` | 1 | | Settings file. Keywords include `stream`, `i_tensor_mb`, `save`, `read`, `df_basis`, `i_double`, `i_float`, `gaussian_halt` (halt the scan on the Gaussian-statistics criterion) and `strong_cutoff <x>` (cut-off separating strong from weak reflections, default `3.0`). |
 | `-xcw_int_precision <eps>` | 1 | `1e-10` | Integral screening threshold. |
 | `-xcw_extrapolate` / `-no_xcw_extrapolate` | 0 | on | Extrapolate between lambda steps. |
 | `-xcw_incremental` / `-no_xcw_incremental` | 0 | off | Build the Fock matrix incrementally. |
-| `-xcw_strong_cutoff <x>` | 1 | `3.0` | Cut-off separating strong from weak reflections. |
-| `-xcw_gaussian_halt` | 0 | off | Halt the scan on the Gaussian-statistics criterion. |
 | `-convert_XCW <stdout> <step>` | 2 | | Import lambda steps from a Tonto XCW log. One-shot. |
 
 ## 10. Performance and hardware

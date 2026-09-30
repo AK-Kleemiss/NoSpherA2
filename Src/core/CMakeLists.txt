@@ -139,7 +139,7 @@ add_library(
 nosphera2_enable_optimizations(NoSpherA2Core)
 
 if(MSVC)
-    set_source_files_properties("${CMAKE_CURRENT_SOURCE_DIR}/XCW.cpp" PROPERTIES COMPILE_OPTIONS "/bigobj")
+    set_source_files_properties("${CMAKE_CURRENT_SOURCE_DIR}/structure_factors.cpp" PROPERTIES COMPILE_OPTIONS "/bigobj")
 endif()
 
 add_library(

@@ -10,7 +10,7 @@
 #include "isosurface.h"
 #include "cif.h"
 #include "bondwise_analysis.h"
-#include "XCW.h"
+#include "XCW_solver.h"
 #include "geometry_aid.h"
 #include "crystal_energies.h"
 #include "nao.h"
@@ -784,16 +784,10 @@ static int run_app_impl(int argc, char **argv)
 	if (!opt.properties.calc() && opt.do_XCW)
 	{
 		opt.groups[0].push_back(0);
+		opt.loadXCWsettings();
 		structure_factors SF(opt);
-		XCW xcw(SF);
-		if(!opt.calc_F_calc)
-		{
-			xcw.run_XCW_fitting();
-		}
-		if (opt.calc_F_calc) {
-			std::cout << "Currently not implemented..." << std::endl;
-			//xcw.calc_F_calc_fast();
-		}
+		XCW_solver xcw_solver(SF);
+		xcw_solver.run();
 		log_file.flush();
 		std::cout.rdbuf(_coutbuf);
 		return 0;

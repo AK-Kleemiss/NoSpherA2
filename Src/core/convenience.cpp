@@ -635,7 +635,7 @@ std::string help_message =
  "  -coef <file>                        Use externally supplied SALTED\n"
  "                                    coefficients.\n"
  "  -convert_XCW <stdout> <lambda-step> Convert Tonto XCW lambda-step output.\n"
- "  -do_XCW  -calc_F  -anom_disp <file> XCW/Fcalc/anomalous-dispersion modes.\n"
+ "  -do_XCW  -anom_disp <file>          XCW/anomalous-dispersion modes.\n"
  "  -no_xcw_extrapolate                Seed each lambda step from the last one\n"
  "                                    alone instead of the density extrapolated\n"
  "                                    through the two previous steps.\n"
@@ -3738,28 +3738,9 @@ bool options::digest_xcw_options(const std::string &temp, int &i)
     }
     else if (temp == "-do_XCW") {
         do_XCW = true;
-        // Optional trailing "stepsize max_value" to limit the lambda scan
-        // range, e.g. for quick tests: -do_XCW 0.01 0.01
-        // CURRENTLY NOT IN USE SINCE THIS IS HANDLED IN THE INPUT FILE
-        //if (i + 2 < argc &&
-        //    string(arguments[i + 1]).find("-") != 0 &&
-        //    string(arguments[i + 2]).find("-") != 0)
-        //{
-        //    xcw_lambda_step = stod(arguments[i + 1]);
-        //    xcw_lambda_max = stod(arguments[i + 2]);
-        //}
-    }
-    else if (temp == "-calc_F") {
-        calc_F_calc = true;
-    }
-    else if (temp == "-xcw_gaussian_halt") {
-        xcw_gaussian_halt = true;
-    }
-    else if (temp == "-xcw_strong_cutoff") {
-        xcw_strong_cutoff = stod(arguments[i + 1]);
     }
     else if (temp == "-XCW_settings") {
-			xcw_settings_path = arguments[i + 1];
+		xcw_settings_path = arguments[i + 1];
     }
     else
         return false;
@@ -3884,6 +3865,423 @@ void options::digest_options()
     if (multipole_lmax >= 0 && aux_basis.empty())
         aux_basis.push_back(std::make_shared<BasisSet>());
 };
+
+void options::loadXCWsettings() {
+    auto lowercase = [](std::string s) {
+        std::transform(s.begin(), s.end(), s.begin(),
+            [](unsigned char c) { return std::tolower(c); });
+        return s;
+        };
+
+    std::string conv_preset = "normal";
+    bool soscf = false, check_hessian = false;
+    std::string speed_preset = "normal_conv";
+
+    /* 1: Classical Jayatilaka XWR
+       2: Ewald sum XWR */
+    xcw_settings.XWR_type = 1;
+    double quant_diff = 32768, diis_stop_damping = 32768, diis_stop_shift = 32768, max_diis_error = 32768, gradient = 32768, MaxP_diff = 32768, RMSP_diff = 32768, alpha = 32768, level_shift = 32768, start = 32768, end = 32768, step_size = 32768, xcw_strong_cutoff = 3.0;
+    int max_scf_iterations = 32768, charge = 32768, multiplicity = 32768, n_params = 32768, refine_against = 32768;
+    std::string basis_set_name = "Undefined";
+    std::string df_basis_name, guess_basis_name;
+    bool grown = false, read_tensor = false, read_first_guess = false, nbo_output = false, xcw_gaussian_halt = false;
+    extinction::model extinction_model = extinction::model::none;
+    bool extinction_aniso = false, extinction_refine = true;
+    double extinction_start = 1e-4, wavelength = 0.0;
+    bool i_tensor_single = false, i_tensor_double = false;
+    std::filesystem::path i_tensor_file_path;
+    std::filesystem::path i_tensor_save_path;
+    // 0 = hold the whole tensor, which is what every run did before this existed.
+    size_t i_tensor_max_mb = 0;
+    occ::qm::SpinorbitalKind hf_type = occ::qm::SpinorbitalKind::Restricted;
+    if (!std::filesystem::exists(xcw_settings_path)) {
+        throw std::runtime_error("Settings file not found! Aborting run!");
+    }
+    else {
+
+        std::ifstream input(xcw_settings_path);
+        using Handler = std::function<void(std::istream&)>;
+        std::unordered_map<std::string, Handler> handlers;
+        handlers["conv"] = [&](std::istream& is) {
+            if (!(is >> quant_diff))
+                throw std::runtime_error("Expected value after 'conv'");
+            };
+
+        handlers["extinction"] = [&](std::istream& is) {
+            //`extinction <model> [iso|aniso] [fixed] [start value]`, the rest of the line in
+            //any order: a word names the model or a flag, a number is the start value
+            std::string rest, token;
+            std::getline(is, rest);
+            std::istringstream words(rest);
+            while (words >> token) {
+                const std::string low = lowercase(token);
+                if (low == "aniso" || low == "anisotropic") extinction_aniso = true;
+                else if (low == "iso" || low == "isotropic") extinction_aniso = false;
+                else if (low == "fixed" || low == "fix") extinction_refine = false;
+                else if (extinction::from_string(low) != extinction::model::none) extinction_model = extinction::from_string(low);
+                else {
+                    try { extinction_start = std::stod(token); }
+                    catch (const std::exception&) { throw std::runtime_error("Could not read '" + token + "' after 'extinction'"); }
+                }
+            }
+            if (extinction_model == extinction::model::none)
+                throw std::runtime_error("Expected a model (shelx, bc_gaussian or bc_lorentzian) after 'extinction'");
+            };
+
+        handlers["wavelength"] = [&](std::istream& is) {
+            if (!(is >> wavelength))
+                throw std::runtime_error("Expected value after 'wavelength'");
+            };
+
+        handlers["diis_damping"] = [&](std::istream& is) {
+            if (!(is >> diis_stop_damping))
+                throw std::runtime_error("Expected value after 'diis_damping'");
+            };
+
+        handlers["diis_shift"] = [&](std::istream& is) {
+            if (!(is >> diis_stop_shift))
+                throw std::runtime_error("Expected value after 'diis_shift'");
+            };
+
+        handlers["conv_diis"] = [&](std::istream& is) {
+            if (!(is >> max_diis_error))
+                throw std::runtime_error("Expected value after 'conv_diis'");
+            };
+
+        handlers["gradient"] = [&](std::istream& is) {
+            if (!(is >> gradient))
+                throw std::runtime_error("Expected value after 'gradient'");
+            };
+
+        handlers["maxp_diff"] = [&](std::istream& is) {
+            if (!(is >> MaxP_diff))
+                throw std::runtime_error("Expected value after 'MaxP_diff'");
+            };
+
+        handlers["rmsp_diff"] = [&](std::istream& is) {
+            if (!(is >> RMSP_diff))
+                throw std::runtime_error("Expected value after 'RMSP_diff'");
+            };
+
+        handlers["params"] = [&](std::istream& is) {
+            if (!(is >> n_params))
+                throw std::runtime_error("Expected value after 'params'");
+            };
+
+        handlers["damp"] = [&](std::istream& is) {
+            if (!(is >> alpha))
+                throw std::runtime_error("Expected value after 'damp'");
+            };
+
+        handlers["shift"] = [&](std::istream& is) {
+            if (!(is >> level_shift))
+                throw std::runtime_error("Expected value after 'shift'");
+            };
+
+        handlers["max_iter"] = [&](std::istream& is) {
+            if (!(is >> max_scf_iterations))
+                throw std::runtime_error("Expected value after 'max_iter'");
+            };
+
+        handlers["charge"] = [&](std::istream& is) {
+            if (!(is >> charge))
+                throw std::runtime_error("Expected value after 'charge'");
+            };
+
+        handlers["mult"] = [&](std::istream& is) {
+            if (!(is >> multiplicity))
+                throw std::runtime_error("Expected value after 'mult'");
+            };
+
+        handlers["f"] = [&](std::istream&) {
+            refine_against = 1;
+            };
+
+        handlers["f2"] = [&](std::istream&) {
+            refine_against = 2;
+            };
+
+        handlers["i_sigma"] = [&](std::istream& is) {
+            if (!(is >> xcw_settings.i_sigma_cutoff))
+                throw std::runtime_error("Expected value after 'i_sigma'");
+            };
+
+        handlers["weighted"] = [&](std::istream&) {
+            xcw_settings.XWR_type = 2;
+            };
+
+        handlers["basis_set"] = [&](std::istream& is) {
+            if (!(is >> basis_set_name))
+                throw std::runtime_error("Expected basis set name");
+            };
+        handlers["df_basis"] = [&](std::istream& is) {
+            if (!(is >> df_basis_name))
+                throw std::runtime_error("Expected a fitting basis name after 'df_basis'");
+            };
+        handlers["guess_basis"] = [&](std::istream& is) {
+            if (!(is >> guess_basis_name))
+                throw std::runtime_error("Expected a basis name after 'guess_basis'");
+            };
+
+        handlers["start"] = [&](std::istream& is) {
+            if (!(is >> start))
+                throw std::runtime_error("Expected value after 'start'");
+            };
+
+        handlers["end"] = [&](std::istream& is) {
+            if (!(is >> end))
+                throw std::runtime_error("Expected value after 'end'");
+            };
+
+        handlers["step_size"] = [&](std::istream& is) {
+            if (!(is >> step_size))
+                throw std::runtime_error("Expected value after 'step_size'");
+            };
+
+        handlers["grown"] = [&](std::istream&) {
+            grown = true;
+            };
+
+        handlers["rhf"] = [&](std::istream&) {
+            hf_type = occ::qm::SpinorbitalKind::Restricted;
+            };
+
+        handlers["uhf"] = [&](std::istream&) {
+            hf_type = occ::qm::SpinorbitalKind::Unrestricted;
+            };
+
+        handlers["sloppy"] = [&](std::istream&) {
+            conv_preset = "sloppy";
+            };
+
+        handlers["normal"] = [&](std::istream&) {
+            conv_preset = "normal";
+            };
+
+        handlers["tight"] = [&](std::istream&) {
+            conv_preset = "tight";
+            };
+
+        handlers["very_tight"] = [&](std::istream&) {
+            conv_preset = "very_tight";
+            };
+
+        handlers["slow_conv"] = [&](std::istream&) {
+            speed_preset = "slow_conv";
+            };
+
+        handlers["normal_conv"] = [&](std::istream&) {
+            speed_preset = "normal_conv";
+            };
+
+        handlers["soscf"] = [&](std::istream&) {
+            soscf = true;
+            };
+
+        handlers["check_hessian"] = [&](std::istream&) {
+            check_hessian = true;
+            };
+
+        handlers["fast_conv"] = [&](std::istream&) {
+            speed_preset = "fast_conv";
+            };
+
+        //`safe` is `save` to the default path, which is where `read` without a path looks.
+        handlers["safe"] = [&](std::istream&) {
+            i_tensor_save_path = "I_tensor_stream.bin";
+            };
+
+        //`read <path>` reuses the streamed tensor at that path, which is the expensive thing
+        //a run produces and which depends only on the geometry, the basis and the
+        //reflections, not on any refinement setting. So trying another lambda range or
+        //convergence preset need not rebuild it. It is held in memory when it fits.
+        //
+        //The path is optional, and the settings file is one whitespace-separated stream of
+        //tokens, so a bare `read` followed by another keyword must not swallow it: take the
+        //next token, put it back if it is a keyword.
+        handlers["read"] = [&](std::istream& is) {
+            read_tensor = true;
+            i_tensor_file_path = "I_tensor_stream.bin";
+            const std::streampos before = is.tellg();
+            std::string token;
+            if (!(is >> token)) { is.clear(); return; }
+            std::string lowered = token;
+            std::transform(lowered.begin(), lowered.end(), lowered.begin(),
+                [](unsigned char c) { return std::tolower(c); });
+            if (handlers.find(lowered) != handlers.end()) {
+                is.clear();
+                is.seekg(before);
+                return;
+            }
+            i_tensor_file_path = token;
+            };
+        handlers["load_wfn"] = [&](std::istream&) {
+            read_first_guess = true;
+            };
+        handlers["nbo"] = [&](std::istream&) {
+            nbo_output = true;
+            };
+        // The tensor is nr_small blocks of nmo(nmo+1)/2 complex doubles and grows
+        // quadratically with the basis, so on anything past a minimal basis it is
+        // the largest thing in the process. `stream` puts it on disk with a
+        // default budget; `i_tensor_mb <n>` names the budget.
+        handlers["stream"] = [&](std::istream&) {
+            if (i_tensor_max_mb == 0) i_tensor_max_mb = 2048;
+            };
+
+        //The tensor comes off the device in single precision and was stored in double, so
+        //half of every byte the SCF loop reads back was padding. Holding it as computed is
+        //half the memory and, measured on the full twisted ethylene, 1.63x on the two walks
+        //each SCF iteration makes over it. Opt-in because it is a change of stored
+        //precision: the lambda scan agrees to 5e-13 and iteration for iteration, but that
+        //is a measurement on one system rather than a proof.
+        //Writing the tensor is worth ~40 minutes to a later run and costs this one nothing:
+        //the refinement only reads the tensor, so a thread can push it to disk while the SCF
+        //gets on with it. The path is what `read <path>` will want afterwards.
+        handlers["save"] = [&](std::istream& is) {
+            std::string path;
+            if (!(is >> path))
+                throw std::runtime_error("Expected a path after 'save'");
+            i_tensor_save_path = path;
+            };
+
+        handlers["i_float"] = [&](std::istream&) {
+            i_tensor_single = true;
+            };
+
+        handlers["i_double"] = [&](std::istream&) {
+            i_tensor_double = true;
+            };
+
+        handlers["i_tensor_mb"] = [&](std::istream& in2) {
+            long long mb = 0;
+            in2 >> mb;
+            i_tensor_max_mb = (mb > 0) ? static_cast<size_t>(mb) : 0;
+            };
+
+        handlers["gaussian_halt"] = [&](std::istream&) {
+            xcw_gaussian_halt = true;
+            };
+
+        handlers["strong_cutoff"] = [&](std::istream& is) {
+            if (!(is >> xcw_strong_cutoff))
+                throw std::runtime_error("Expected value after 'strong_cutoff'");
+            };
+
+        std::string keyword;
+
+        while (input >> keyword)
+        {
+            keyword = lowercase(keyword);
+
+            auto it = handlers.find(keyword);
+            if (it == handlers.end()) {
+                throw std::runtime_error("Unknown keyword '" + keyword + "'");
+            }
+
+            it->second(input);
+        }
+    }
+
+    if (conv_preset == "sloppy") {
+        xcw_settings.quant_diff = 3e-5;
+        xcw_settings.max_diis_error = 1e-4;
+        xcw_settings.gradient = 5e-4;
+        xcw_settings.MaxP_diff = 1e-4;
+        xcw_settings.RMSP_diff = 1e-5;
+        xcw_settings.max_scf_iterations = 100;
+    }
+    else if (conv_preset == "normal") {
+        xcw_settings.quant_diff = 1e-6;
+        xcw_settings.max_diis_error = 1e-5;
+        xcw_settings.gradient = 7e-5;
+        xcw_settings.MaxP_diff = 1e-5;
+        xcw_settings.RMSP_diff = 1e-6;
+        xcw_settings.max_scf_iterations = 100;
+    }
+    else if (conv_preset == "tight") {
+        xcw_settings.quant_diff = 5e-7;
+        xcw_settings.max_diis_error = 5e-6;
+        xcw_settings.gradient = 3e-5;
+        xcw_settings.MaxP_diff = 1e-6;
+        xcw_settings.RMSP_diff = 1e-7;
+        xcw_settings.max_scf_iterations = 100;
+    }
+    else if (conv_preset == "very_tight") {
+        xcw_settings.quant_diff = 1e-7;
+        xcw_settings.max_diis_error = 1e-6;
+        xcw_settings.gradient = 1e-5;
+        xcw_settings.MaxP_diff = 1e-7;
+        xcw_settings.RMSP_diff = 1e-8;
+        xcw_settings.max_scf_iterations = 100;
+    }
+
+    if (speed_preset == "slow_conv") {
+        xcw_settings.slow_conv = true;
+        xcw_settings.alpha = 0.8;
+        xcw_settings.level_shift = 1;
+        xcw_settings.diis_stop_damping = 1e-5;
+        xcw_settings.diis_stop_shift = 1e-5;
+    }
+    else if (speed_preset == "normal_conv") {
+        xcw_settings.alpha = 0.5;
+        xcw_settings.level_shift = 0.5;
+        xcw_settings.diis_stop_damping = 1e-3;
+        xcw_settings.diis_stop_shift = 1e-2;
+    }
+    else if (speed_preset == "fast_conv") {
+        xcw_settings.method_apply_damping = false;
+        xcw_settings.method_apply_shift = false;
+    }
+
+    if (basis_set_name == "Undefined") {
+        throw std::runtime_error("Basis set name not specified in settings file! Aborting run!");
+    }
+    xcw_settings.basis_set_name = basis_set_name;
+    if (quant_diff != 32768) xcw_settings.quant_diff = quant_diff;
+    if (diis_stop_damping != 32768) xcw_settings.diis_stop_damping = diis_stop_damping;
+    if (diis_stop_shift != 32768) xcw_settings.diis_stop_shift = diis_stop_shift;
+    if (max_diis_error != 32768) xcw_settings.max_diis_error = max_diis_error;
+    if (gradient != 32768) xcw_settings.gradient = gradient;
+    if (MaxP_diff != 32768) xcw_settings.MaxP_diff = MaxP_diff;
+    if (RMSP_diff != 32768) xcw_settings.RMSP_diff = RMSP_diff;
+    if (alpha != 32768) xcw_settings.alpha = alpha;
+    if (level_shift != 32768) xcw_settings.level_shift = level_shift;
+    if (max_scf_iterations != 32768) xcw_settings.max_scf_iterations = max_scf_iterations;
+    xcw_settings.charge = (charge != 32768) ? charge : xcw_settings.charge;
+    xcw_settings.multiplicity = (multiplicity != 32768) ? multiplicity : xcw_settings.multiplicity;
+    if (n_params != 32768) xcw_settings.n_params = n_params;
+    xcw_settings.extinction_model = extinction_model;
+    xcw_settings.extinction_aniso = extinction_aniso;
+    xcw_settings.extinction_refine = extinction_refine;
+    xcw_settings.extinction_start = extinction_start;
+    xcw_settings.wavelength = wavelength;
+    if (refine_against != 32768) xcw_settings.refine_against = refine_against;
+    xcw_settings.xcw_start_value = (start != 32768) ? start : 0;
+    xcw_settings.xcw_step_size = (step_size != 32768) ? step_size : 0.01;
+    if (end != 32768) {
+        xcw_settings.num_xcw_steps = static_cast<int>(std::round((end - xcw_settings.xcw_start_value) / xcw_settings.xcw_step_size)) + 1;
+    }
+    else {
+        xcw_settings.num_xcw_steps = static_cast<int>(std::round((1 - xcw_settings.xcw_start_value) / xcw_settings.xcw_step_size)) + 1;
+    }
+    xcw_settings.grown = grown;
+    xcw_settings.hf_type = hf_type;
+    xcw_settings.read_tensor = read_tensor;
+    xcw_settings.read_first_guess = read_first_guess;
+    xcw_settings.i_tensor_max_mb = i_tensor_max_mb;
+    xcw_settings.i_tensor_single = i_tensor_single;
+    xcw_settings.i_tensor_double = i_tensor_double;
+    xcw_settings.i_tensor_file_path = i_tensor_file_path;
+    xcw_settings.i_tensor_save_path = i_tensor_save_path;
+    xcw_settings.nbo_output = nbo_output;
+    xcw_settings.df_basis_name = df_basis_name;
+    xcw_settings.guess_basis_name = guess_basis_name;
+    xcw_settings.soscf = soscf;
+    xcw_settings.check_hessian = check_hessian;
+    xcw_settings.xcw_gaussian_halt = xcw_gaussian_halt;
+    xcw_settings.xcw_strong_cutoff = xcw_strong_cutoff;
+}
 
 namespace {
     // Captured during static initialisation, so it still refers to the console after
