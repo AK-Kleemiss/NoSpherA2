@@ -326,7 +326,7 @@ TEST(NaoPrintTests, NoOccupancyIsPrintedAsANegativeZero)
 	std::ostringstream os;
 	print_npa(r, os);
 	const std::string out = os.str();
-	ASSERT_NE(out.find("NATURAL POPULATIONS"), std::string::npos) << "no occupancy table was printed";
+	ASSERT_NE(out.find("Natural atomic orbital occupancies"), std::string::npos) << "no occupancy table was printed";
 	EXPECT_EQ(out.find("-0.00000"), std::string::npos)
 		<< "an occupancy printed as a negative zero: the sign is roundoff from the diagonalisation and it "
 		   "flips when the molecule is translated, so it says nothing and reads as a negative population";

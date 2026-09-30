@@ -401,7 +401,7 @@ TEST(NboRun, ThePrintedPopulationTableCarriesEveryAtomAndItsOwnSums)
 		s << std::fixed << std::setprecision(5) << v;
 		return s.str();
 	};
-	EXPECT_NE(text.find("NATURAL POPULATION ANALYSIS"), std::string::npos) << text;
+	EXPECT_NE(text.find("Natural population analysis"), std::string::npos) << text;
 	double charge_sum = 0.0, total_sum = 0.0;
 	for (const NboAtomPopulation& p : r.npa) {
 		EXPECT_NE(text.find(fixed_str(p.charge)), std::string::npos)
@@ -415,7 +415,7 @@ TEST(NboRun, ThePrintedPopulationTableCarriesEveryAtomAndItsOwnSums)
 	EXPECT_NE(text.find(fixed_str(total_sum)), std::string::npos) << "the electron sum is not printed";
 	//a closed-shell result must not grow a spin-density column
 	EXPECT_FALSE(r.npa.front().has_spin_density);
-	EXPECT_EQ(text.find("Spin dens."), std::string::npos) << text;
+	EXPECT_EQ(text.find("spin density"), std::string::npos) << text;
 	//and the check has to be able to fail: a charge nobody printed is not found
 	EXPECT_EQ(text.find(fixed_str(r.npa.front().charge + 0.01234)), std::string::npos);
 }

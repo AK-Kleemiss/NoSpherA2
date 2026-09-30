@@ -583,7 +583,7 @@ TEST(NrtTests, EveryResonanceRowTheResultCarriesIsAlsoPrinted)
         return text.find(needle) != std::string::npos;
     };
 
-    EXPECT_TRUE(printed("NATURAL RESONANCE THEORY")) << text;
+    EXPECT_TRUE(printed("Natural resonance theory")) << text;
     EXPECT_TRUE(printed(fixed_str(res.nrt.d_w, 5))) << text;
     for (const NboResonanceWeight& w : res.nrt.weights)
         EXPECT_TRUE(printed(fixed_str(w.weight_percent, 2)))

@@ -6,6 +6,7 @@
 #include "constants.h"
 #include "nos_math.h"
 #include "citations.h"
+#include "convenience.h"
 
 #include <Eigen/Dense>
 
@@ -150,9 +151,9 @@ namespace
     const char *class_label(const NAOClass c)
     {
         switch (c) {
-        case NAOClass::Core: return "Cor";
-        case NAOClass::Valence: return "Val";
-        default: return "Ryd";
+        case NAOClass::Core: return "core";
+        case NAOClass::Valence: return "valence";
+        default: return "Rydberg";
         }
     }
 }
@@ -595,52 +596,52 @@ namespace
         return std::abs(occ) < 1e-9 ? 0.0 : occ;
     }
 
-    void print_one(const NAOResult &r, const std::string &title, std::ostream &out,
+    //"O1", the label every other NoSpherA2 table uses for an atom
+    std::string atom_name(const NAOResult &r, const int a)
+    {
+        return r.atoms[a].label + std::to_string(a + 1);
+    }
+
+    void print_one(const NAOResult &r, const std::string &what, std::ostream &out,
                    const bool with_charge = true)
     {
         using namespace std;
         if (!r.orbitals.empty()) {
-            out << "\n NATURAL POPULATIONS:  " << title << "\n\n"
-                << "  NAO Atom No lang   Type(AO)    Occupancy\n"
-                << " -------------------------------------------------\n";
+            out << "\nNatural atomic orbital occupancies (" << what << "):\n"
+                << "    nao  atom  function  class    shell   occupancy\n";
             int last_atom = -1;
             for (size_t i = 0; i < r.orbitals.size(); i++) {
                 const NAO &o = r.orbitals[i];
                 if (o.atom != last_atom && last_atom >= 0) out << "\n";
                 last_atom = o.atom;
-                out << setw(4) << i + 1 << setw(5) << r.atoms[o.atom].label << setw(3) << o.atom + 1
-                    << "  " << left << setw(7) << shell_label(o.l, o.m) << right
-                    << class_label(o.type) << "(" << setw(2) << o.n
-                    << string(1, "spdfghik"[std::min(o.l, 7)]) << ")" << setw(12) << fixed
+                out << setw(7) << i + 1 << "  " << left << setw(6) << atom_name(r, o.atom) << setw(10)
+                    << shell_label(o.l, o.m) << setw(9) << class_label(o.type) << o.n
+                    << setw(4) << string(1, "spdfghik"[std::min(o.l, 7)]) << right << setw(12) << fixed
                     << setprecision(5) << printable_occupation(o.occupation) << "\n";
             }
         }
-        out << "\n Summary of Natural Population Analysis:\n\n"
-            << "                                     Natural Population\n"
-            << "             Natural    ---------------------------------------------\n"
-            << "  Atom No    Charge        Core      Valence    Rydberg      Total\n"
-            << " --------------------------------------------------------------------\n";
+        //one spin on its own has no charge, so that column is left out rather than filled with dashes
+        out << "\nNatural population analysis (" << what << "):\n"
+            << "  atom   " << (with_charge ? "    charge" : "") << "      core   valence   Rydberg     total\n";
+        out << fixed << setprecision(5);
         for (const NAOAtom &a : r.atoms) {
-            out << setw(5) << r.atoms[a.index].label << setw(3) << a.index + 1 << fixed
-                << setprecision(5);
-            if (with_charge) out << setw(11) << a.charge;
-            else out << setw(11) << "-";
-            out << setw(13) << a.core << setw(12) << a.valence << setw(11) << a.rydberg << setw(12)
+            out << "  " << left << setw(7) << atom_name(r, a.index) << right;
+            if (with_charge) out << setw(10) << a.charge;
+            out << setw(10) << a.core << setw(10) << a.valence << setw(10) << a.rydberg << setw(10)
                 << a.population << "\n";
         }
-        out << " ====================================================================\n"
-            << " * Total * " << fixed << setprecision(5);
-        if (with_charge)
-            out << setw(9) << std::accumulate(r.atoms.begin(), r.atoms.end(), 0.0,
-                                              [](double s, const NAOAtom &a) { return s + a.charge; });
-        else
-            out << setw(9) << "-";
-        out << setw(13) << r.core << setw(12) << r.valence << setw(11) << r.rydberg << setw(12)
+        out << "  " << left << setw(7) << "total" << right;
+        if (with_charge) {
+            //the molecular charge: rounding noise below the last digit would print as "-0.00000"
+            const double charge = std::accumulate(r.atoms.begin(), r.atoms.end(), 0.0,
+                                                  [](double s, const NAOAtom &a) { return s + a.charge; });
+            out << setw(10) << (std::abs(charge) < 5e-6 ? 0.0 : charge);
+        }
+        out << setw(10) << r.core << setw(10) << r.valence << setw(10) << r.rydberg << setw(10)
             << r.population << "\n";
 
         if (r.orbitals.empty()) return;
-        out << "\n    Atom No         Natural Electron Configuration\n"
-            << " ----------------------------------------------------------------------------\n";
+        out << "\nNatural electron configurations (" << what << ", shells above 0.005 e):\n";
         for (const NAOAtom &a : r.atoms) {
             std::map<std::pair<int, int>, double> shells;  //(n, l) -> occupancy
             bool has_core = false;
@@ -649,12 +650,13 @@ namespace
                 if (o.type == NAOClass::Core) { has_core = true; continue; }
                 shells[{ o.n, o.l }] += o.occupation;
             }
-            out << setw(7) << r.atoms[a.index].label << setw(3) << a.index + 1 << "      "
-                << (has_core ? "[core]" : "      ");
+            out << "  " << left << setw(7) << atom_name(r, a.index) << right << (has_core ? "[core] " : "");
+            bool first = true;
             for (const auto &kv : shells) {
                 if (kv.second < 0.005) continue;
-                out << kv.first.first << "spdfghik"[std::min(kv.first.second, 7)] << "("
-                    << fixed << setprecision(2) << setw(5) << kv.second << ")";
+                out << (first ? "" : "  ") << kv.first.first << "spdfghik"[std::min(kv.first.second, 7)] << " "
+                    << setprecision(2) << kv.second;
+                first = false;
             }
             out << "\n";
         }
@@ -663,20 +665,19 @@ namespace
 
 void print_npa(const NPAResult &result, std::ostream &out)
 {
+    const ostream_format_guard restore_format(out);
     citations::cite(citations::Method::NAONPA, out);
+    print_one(result.total, "total density", out);
     if (result.spin_resolved) {
-        print_one(result.total, "Natural atomic orbital occupancies", out);
-        print_one(result.alpha, "alpha spin natural atomic orbital occupancies", out, false);
-        print_one(result.beta, "beta spin natural atomic orbital occupancies", out, false);
-        out << "\n\n  Atom No     Natural Charge      Spin Population (alpha - beta)\n"
-            << " ---------------------------------------------------------------\n";
+        print_one(result.alpha, "alpha spin", out, false);
+        print_one(result.beta, "beta spin", out, false);
+        out << "\nNatural charges and spin populations:\n"
+            << "  atom       charge  spin (alpha - beta)\n"
+            << std::fixed << std::setprecision(5);
         for (size_t a = 0; a < result.total.atoms.size(); a++)
-            out << std::setw(7) << result.total.atoms[a].label << std::setw(3) << a + 1 << std::fixed
-                << std::setprecision(5) << std::setw(16) << result.total.atoms[a].charge
-                << std::setw(22) << result.spin_population[a] << "\n";
-    }
-    else {
-        print_one(result.total, "Natural atomic orbital occupancies", out);
+            out << "  " << std::left << std::setw(7) << atom_name(result.total, static_cast<int>(a))
+                << std::right << std::setw(10) << result.total.atoms[a].charge << std::setw(12)
+                << result.spin_population[a] << "\n";
     }
     out << std::endl;
 }

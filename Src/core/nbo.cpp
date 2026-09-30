@@ -1033,6 +1033,45 @@ NboResults native_nbo(WFN& wavy, const NboOptions& options, std::ostream& log)
     return res;
 }
 
+namespace {
+    //"BD O1-H2": the type and its centres, from the hybrids, which a parsed gennbo result carries too.
+    //The description string is gennbo's own layout ("BD ( 1) O 1- H 2") and stays in the JSON for
+    //the comparison; it is only the fallback here.
+    std::string nbo_label(const NboOrbital& o)
+    {
+        if (o.hybrids.empty()) return o.description;
+        std::string s = o.type + " ";
+        for (size_t k = 0; k < o.hybrids.size(); k++)
+            s += (k ? "-" : "") + o.hybrids[k].element + std::to_string(o.hybrids[k].center);
+        return s;
+    }
+
+    //The spins a table carries, in the order they first appear; one empty entry for a closed shell.
+    template <class Row>
+    svec spins_of(const std::vector<Row>& rows)
+    {
+        svec spins;
+        for (const Row& x : rows)
+            if (std::find(spins.begin(), spins.end(), x.spin) == spins.end()) spins.push_back(x.spin);
+        return spins;
+    }
+
+    //"Resonance weights (alpha spin):" - the spin goes into the title, not into a column of every row
+    std::string title(const std::string& what, const std::string& spin, std::string note = "")
+    {
+        if (!spin.empty())
+            note += (note.empty() ? "" : ", ") + spin + (spin == "alpha" || spin == "beta" ? " spin" : "");
+        return "\n" + what + (note.empty() ? "" : " (" + note + ")") + ":\n";
+    }
+
+    //Anything that rounds to zero at five decimals is printed as zero: a nearly empty orbital comes
+    //out of the diagonalisation at either sign, and "-0.00000" reads as a negative occupancy.
+    double printable(const double x)
+    {
+        return std::abs(x) < 5e-6 ? 0.0 : x;
+    }
+}
+
 //Print the NRT results beside the NBO results.
 void print_nrt(const NboResults& r, std::ostream& out)
 {
@@ -1049,48 +1088,52 @@ void print_nrt(const NboResults& r, std::ostream& out)
         return (it == element.end() ? std::string("?") : it->second) + std::to_string(a);
     };
 
-    out << "\n NATURAL RESONANCE THEORY ANALYSIS (in house):\n\n"
-        << " " << n.structures_used << " of " << n.structures_found
+    out << "\nNatural resonance theory (in house):\n"
+        << "  " << n.structures_used << " of " << n.structures_found
         << " resonance structures carry the fit, D(0) = " << fixed << setprecision(5) << n.d_0
         << ", D(w) = " << n.d_w << "\n";
-    for (const std::string& s : n.notes) out << "   " << s << "\n";
+    //an open shell runs the search once per spin, and both runs push the same budget line
+    svec seen;
+    for (const std::string& s : n.notes)
+        if (std::find(seen.begin(), seen.end(), s) == seen.end()) {
+            seen.push_back(s);
+            out << "  " << s << "\n";
+        }
 
-    if (!n.weights.empty()) {
-        out << "\n  RS   Weight(%)   Added(Removed)\n"
-            << " ---------------------------------------------------------------------------------\n";
+    for (const std::string& spin : spins_of(n.weights)) {
+        out << title("Resonance weights", spin) << "  structure   weight %   change from the parent\n";
         for (const NboResonanceWeight& w : n.weights)
-            out << setw(4) << w.structure << setprecision(2) << setw(11) << w.weight_percent << "   "
-                << (w.spin.empty() ? "" : w.spin + ": ") << w.changes << "\n";
+            if (w.spin == spin)
+                out << setw(11) << w.structure << setprecision(2) << setw(11) << w.weight_percent << "   "
+                    << w.changes << "\n";
     }
-    if (!n.bond_orders.empty()) {
-        out << "\n Natural Bond Order\n"
-            << "   Atom  Atom      Total   Covalent      Ionic\n"
-            << " ---------------------------------------------------------------------------------\n";
-        for (const NboBondOrder& b : n.bond_orders) {
-            out << "  " << left << setw(6) << label(b.atom1) << setw(6)
-                << (b.diagonal ? std::string() : label(b.atom2)) << right << fixed << setprecision(4)
-                << setw(11) << b.total;
-            if (b.diagonal)
-                out << "        ---        ---";
-            else
-                out << setw(11) << b.covalent << setw(11) << b.ionic;
-            if (!b.spin.empty()) out << "  " << b.spin;
-            out << "\n";
-        }
+    //The diagonal of NRT's bond-order matrix is the atom's lone-pair count, which is a property of
+    //one atom, so it goes into the valency table rather than into a bond table with two empty columns.
+    std::map<std::pair<std::string, int>, double> lone_pairs;
+    for (const NboBondOrder& b : n.bond_orders)
+        if (b.diagonal) lone_pairs[{ b.spin, b.atom1 }] = b.total;
+    for (const std::string& spin : spins_of(n.bond_orders)) {
+        out << title("Natural bond orders", spin) << "  atom   atom        total  covalent     ionic\n"
+            << setprecision(4);
+        for (const NboBondOrder& b : n.bond_orders)
+            if (b.spin == spin && !b.diagonal)
+                out << "  " << left << setw(7) << label(b.atom1) << setw(7) << label(b.atom2) << right
+                    << setw(10) << b.total << setw(10) << b.covalent << setw(10) << b.ionic << "\n";
     }
-    if (!n.valencies.empty()) {
-        out << "\n Natural Atomic Valencies\n"
-            << "   Atom    Valency  Covalency  Electroval.   Electrons\n"
-            << " ---------------------------------------------------------------------------------\n";
+    for (const std::string& spin : spins_of(n.valencies)) {
+        out << title("Natural atomic valencies", spin)
+            << "  atom      valency  covalency  electrovalency  electrons  lone pairs\n" << setprecision(4);
         for (const NboValency& v : n.valencies) {
-            out << "  " << left << setw(6) << (v.element + std::to_string(v.atom)) << right << fixed
-                << setprecision(4) << setw(11) << v.valency << setw(11) << v.covalency << setw(11)
-                << v.electrovalency << setw(12) << v.electron_count;
-            if (!v.spin.empty()) out << "  " << v.spin;
+            if (v.spin != spin) continue;
+            out << "  " << left << setw(7) << (v.element + std::to_string(v.atom)) << right << setw(10)
+                << v.valency << setw(11) << v.covalency << setw(16) << v.electrovalency << setw(11)
+                << v.electron_count;
+            const auto lp = lone_pairs.find({ v.spin, v.atom });
+            if (lp != lone_pairs.end()) out << setw(12) << lp->second;
             out << "\n";
         }
     }
-    for (const std::string& s : n.symmetry_forms) out << " " << s << "\n";
+    for (const std::string& s : n.symmetry_forms) out << "  " << s << "\n";
 }
 
 void print_nbo(const NboResults& r, std::ostream& out)
@@ -1102,51 +1145,82 @@ void print_nbo(const NboResults& r, std::ostream& out)
     //Print the atomic populations beside the orbital tables.
     if (!r.npa.empty()) {
         const bool spin = r.npa.front().has_spin_density;
-        out << "\n NATURAL POPULATION ANALYSIS (in house):\n\n"
-            << "   Atom      Charge       Core    Valence    Rydberg      Total"
-            << (spin ? "   Spin dens.\n" : "\n")
-            << " ---------------------------------------------------------------------------------\n";
+        out << "\nNatural population analysis (in house):\n"
+            << "  atom       charge      core   valence   Rydberg     total" << (spin ? "  spin density\n" : "\n")
+            << fixed << setprecision(5);
         double charge_sum = 0.0, total_sum = 0.0;
         for (const NboAtomPopulation& p : r.npa) {
-            out << "  " << left << setw(4) << (p.element + std::to_string(p.index)) << right << fixed
-                << setprecision(5) << setw(12) << p.charge << setw(11) << p.core << setw(11)
-                << p.valence << setw(11) << p.rydberg << setw(11) << p.total;
-            if (p.has_spin_density) out << setw(13) << p.spin_density;
+            out << "  " << left << setw(7) << (p.element + std::to_string(p.index)) << right << setw(10)
+                << p.charge << setw(10) << p.core << setw(10) << p.valence << setw(10) << p.rydberg
+                << setw(10) << p.total;
+            if (p.has_spin_density) out << setw(14) << p.spin_density;
             out << "\n";
             charge_sum += p.charge;
             total_sum += p.total;
         }
         //the two sums are the check a reader can make on the spot: the charges add to the molecular
         //charge and the populations to the number of electrons the wavefunction carries
-        out << "  " << left << setw(4) << "sum" << right << setw(12) << charge_sum << setw(44)
-            << total_sum << "\n";
+        out << "  " << left << setw(7) << "total" << right << setw(10) << printable(charge_sum) << setw(40) << total_sum
+            << "\n";
     }
-    out << "\n NATURAL BOND ORBITAL ANALYSIS (in house):\n\n"
-        << "                                                      Principal Delocalizations\n"
-        << "  NBO                         Occupancy    Energy\n"
-        << " ---------------------------------------------------------------------------------\n";
-    for (const NboOrbital& o : r.orbitals) {
-        out << setw(4) << o.index << ". " << left << setw(22) << o.description << right
-            << fixed << setprecision(5) << setw(12) << o.occupancy << setw(12) << o.energy;
-        if (!o.spin.empty()) out << "  " << o.spin;
+
+
+    //A basis with diffuse or polarisation functions leaves dozens of Rydberg NBOs per atom at
+    //essentially nothing; they are counted and summed instead of listed.  The JSON keeps every one.
+    constexpr double rydberg_floor = 1e-4;
+    const auto hybrid = [&out](const NboHybrid& h) {
+        out << "   " << left << setw(6) << (h.element + std::to_string(h.center)) << right << setprecision(2)
+            << setw(9) << h.weight_percent << setw(8) << h.s << setw(8) << h.p << setw(8) << h.d << setw(8)
+            << h.f;
+        if (h.sp_exponent() > 0.0) out << setw(8) << h.sp_exponent();
         out << "\n";
-        for (const NboHybrid& h : o.hybrids) {
-            out << "              " << fixed << setprecision(2) << setw(7) << h.weight_percent
-                << "% " << setw(2) << h.element << setw(3) << h.center << "  s(" << setw(6) << h.s
-                << "%)p" << setw(7) << h.p << "%  d" << setw(7) << h.d << "%  f" << setw(6) << h.f
-                << "%";
-            if (h.sp_exponent() > 0.0) out << "  sp^" << setprecision(2) << h.sp_exponent();
-            out << "\n";
+    };
+    for (const std::string& spin : spins_of(r.orbitals)) {
+        out << title("Natural bond orbitals", spin, "in house")
+            << "    nbo  type  centres       occupancy     energy   hybrid weight %     s %     p %     d %     f %    sp^x\n";
+        int hidden = 0;
+        double hidden_occupancy = 0.0;
+        for (const NboOrbital& o : r.orbitals) {
+            if (o.spin != spin) continue;
+            if (o.type.rfind("RY", 0) == 0 && o.occupancy < rydberg_floor) {
+                hidden++;
+                hidden_occupancy += o.occupancy;
+                continue;
+            }
+            const std::string centres = nbo_label(o).substr(o.hybrids.empty() ? 0 : o.type.size() + 1);
+            out << setw(7) << o.index << "  " << left << setw(6) << o.type << setw(12) << centres << right
+                << fixed << setprecision(5) << setw(11) << printable(o.occupancy) << setw(11) << o.energy;
+            if (o.hybrids.empty()) out << "\n";
+            for (size_t k = 0; k < o.hybrids.size(); k++) {
+                if (k) out << string(49, ' ');
+                hybrid(o.hybrids[k]);
+            }
         }
+        if (hidden)
+            out << "  " << hidden << " further Rydberg NBOs below " << scientific << setprecision(0)
+                << rydberg_floor << " e, together " << fixed << setprecision(5) << printable(hidden_occupancy)
+                << " e\n";
     }
+
     if (!r.e2.empty()) {
-        out << "\n SECOND ORDER PERTURBATION THEORY ANALYSIS OF FOCK MATRIX IN NBO BASIS\n\n"
-            << "     Donor NBO              Acceptor NBO            E(2)   E(NL)-E(L)  F(L,NL)\n"
-            << " ---------------------------------------------------------------------------------\n";
-        for (const NboE2Entry& e : r.e2)
-            out << " " << left << setw(22) << e.donor << setw(22) << e.acceptor << right << fixed
-                << setprecision(2) << setw(8) << e.energy_kcal << setprecision(3) << setw(11)
-                << e.e_diff << setw(10) << e.fij << (e.spin.empty() ? "" : "  " + e.spin) << "\n";
+        //"4 BD O1-H2": the number finds the orbital in the table above, the label says what it is
+        std::map<std::pair<std::string, int>, const NboOrbital*> by_index;
+        for (const NboOrbital& o : r.orbitals) by_index[{ o.spin, o.index }] = &o;
+        const auto name = [&by_index](const std::string& spin, const int index, const std::string& fallback) {
+            const auto it = by_index.find({ spin, index });
+            return it == by_index.end() ? fallback : std::to_string(index) + " " + nbo_label(*it->second);
+        };
+        for (const std::string& spin : spins_of(r.e2)) {
+            out << title("Second-order donor-acceptor energies in the NBO basis", spin, "in house") << "  "
+                << left << setw(21) << "donor" << setw(21) << "acceptor" << right << setw(14) << "E(2) kcal/mol"
+                << setw(15) << "E(j)-E(i) Eh" << setw(12) << "F(i,j) Eh" << "\n";
+            for (const NboE2Entry& e : r.e2)
+                if (e.spin == spin)
+                    out << "  " << left << setw(21) << name(spin, e.donor_index, e.donor) << setw(21)
+                        << name(spin, e.acceptor_index, e.acceptor) << right << fixed << setprecision(2)
+                        << setw(14) << e.energy_kcal << setprecision(3) << setw(15) << e.e_diff << setw(12)
+                        << e.fij << "\n";
+        }
     }
     print_nrt(r, out);
 }
