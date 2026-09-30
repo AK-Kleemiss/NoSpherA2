@@ -425,26 +425,28 @@ std::string help_message =
  "                                    Poincare-Hopf completeness check and any\n"
  "                                    non-nuclear attractors.\n"
  "  -laplacian_bonds <wfn>             Plot density Laplacian along bonds.\n"
- "  -fba <wfn> [resolution radius]     Full bonding analysis in one run: RGBI,\n"
+ "  -fba <wfn>                         Full bonding analysis in one run: RGBI,\n"
  "                                    the Laplacian along every bond\n"
  "                                    (-laplacian_bonds), the QTAIM and ELI-D\n"
  "                                    basins of -eli_analysis, and beside them\n"
  "                                    on a thread of its own native NBO with\n"
  "                                    NPA, E2 and NRT (JSON as -nbo_native\n"
- "                                    writes it, log block printed last). The\n"
- "                                    grid defaults to 0.05 A and a 3 A radius.\n"
- "  -eli_analysis <wfn> <resolution> <radius>\n"
- "                                    QTAIM and ELI-D basins of the density and\n"
- "                                    ELI-D cubes (resolution and radius in\n"
- "                                    Angstrom), each basin's electrons by a\n"
- "                                    voxel sum and on the atomic quadrature\n"
- "                                    grids, the boundary followed along the\n"
- "                                    field to rho = 0.0001 e/bohr^3; -acc 4\n"
- "                                    before it tightens the grid sum from\n"
- "                                    0.005 to 0.002 e. With -ECP\n"
+ "                                    writes it, log block printed last).\n"
+ "  -eli_analysis <wfn> [resolution radius]\n"
+ "                                    QTAIM and ELI-D basins: critical points\n"
+ "                                    as -topology finds them, ELI-D maxima by\n"
+ "                                    gradient ascent, each basin's electrons\n"
+ "                                    on the atomic quadrature grids, the\n"
+ "                                    boundary followed along the analytic\n"
+ "                                    field to rho = 0.0001 e/bohr^3; no cube.\n"
+ "                                    -acc 4 before it tightens the grid sum\n"
+ "                                    from 0.005 to 0.002 e. With -ECP\n"
  "                                    the core an ECP removed is filled from\n"
  "                                    Thakkar densities for the QTAIM basins.\n"
- "                                    A real analysis needs 0.05 A or finer;\n"
+ "                                    Resolution and radius (Angstrom, default\n"
+ "                                    0.05 and 3) set the cube that\n"
+ "                                    -basin_cube and a fitted density still\n"
+ "                                    use, 0.05 A or finer for a real run;\n"
  "                                    -ri_fit <aux basis> before it (or\n"
  "                                    -SALTED <model> with an xyz as <wfn>)\n"
  "                                    takes rho and its gradient from the\n"
@@ -3423,23 +3425,14 @@ bool options::digest_property_options(const std::string &temp, int &i)
     }
     else if (temp == "-eli")
         properties.eli = true;
+    //Both analyses run on the analytic field; the cube, and so its resolution and radius, is only
+    //built for -basin_cube and a fitted density. -eli_analysis still takes the two for those
     else if (temp == "-eli_analysis") {
-        err_checkf(argc >= i + 4, "Not enough arguments for -eli_analysis\nPlease provide at least wfn, resolution and radius!", std::cout);
+        err_checkf(argc >= i + 2, "Not enough arguments for -eli_analysis\nPlease provide a wfn!", std::cout);
         wfn = arguments[i + 1];
         //-wfn refuses a file that is not there; the positional forms took the name on trust and
         //failed later, or not at all
         err_checkf(std::filesystem::exists(wfn), "-eli_analysis: wavefunction does not exist: " + wfn.string(), std::cout);
-        properties.resolution = stod(arguments[i + 2]);
-        properties.radius = stod(arguments[i + 3]);
-        eli_analysis_run = true;
-        i += 3;
-    }
-    //RGBI, native NBO/NPA with NRT, then the QTAIM and ELI-D basins of -eli_analysis, on one
-    //wavefunction; the grid defaults to the 0.05 A / 3 A the chem_bond_DB benchmark is scored at
-    else if (temp == "-fba") {
-        err_checkf(argc >= i + 2, "Not enough arguments for -fba\nPlease provide a wfn!", std::cout);
-        wfn = arguments[i + 1];
-        err_checkf(std::filesystem::exists(wfn), "-fba: wavefunction does not exist: " + wfn.string(), std::cout);
         properties.resolution = 0.05;
         properties.radius = 3.0;
         i += 1;
@@ -3448,6 +3441,17 @@ bool options::digest_property_options(const std::string &temp, int &i)
             properties.radius = stod(arguments[i + 2]);
             i += 2;
         }
+        eli_analysis_run = true;
+    }
+    //RGBI, native NBO/NPA with NRT, then the QTAIM and ELI-D basins of -eli_analysis, on one
+    //wavefunction
+    else if (temp == "-fba") {
+        err_checkf(argc >= i + 2, "Not enough arguments for -fba\nPlease provide a wfn!", std::cout);
+        wfn = arguments[i + 1];
+        err_checkf(std::filesystem::exists(wfn), "-fba: wavefunction does not exist: " + wfn.string(), std::cout);
+        properties.resolution = 0.05;
+        properties.radius = 3.0;
+        i += 1;
         fba = true;
     }
     //The rest of Kohout's ELI family (ELI-D alpha/beta/triplet, ELI-q) as point values; runs here

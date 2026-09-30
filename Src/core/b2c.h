@@ -53,6 +53,8 @@ struct critical_point {
 };
 
 bool b2c(const cube* cub, const std::vector<atom> &atoms, bool debug, bool bcp);
+//rho, its Hessian eigen-decomposition, the type and V/G/K/L at a point already refined
+critical_point evaluate_critical_point(const critical_point_seed& seed, const d3& position, const WFN& wavy, int iterations, bool converged);
 //The density the basin code follows off the grid. The wavefunction's orbitals unless one of
 //these is given, which -ri_fit and -SALTED do with the fitted density: one loop over the
 //auxiliary functions for rho and its gradient instead of a sum over orbitals
@@ -77,6 +79,10 @@ bool converge_to_maximum(const scalar_field& field, d3& p, double step_limit = 0
 //critical point the search already found and classified as an attractor that survives
 //converge_to_maximum. No voxel can add to this list, so there is no grid debris in it
 std::vector<d4> streaming_density_attractors(const WFN& wavy, const std::vector<critical_point>& critical_points, const std::function<double(const d3&)>* core_density = nullptr, const std::function<void(const d3&, d3&)>* core_gradient = nullptr, bool debug = false);
+//ELI-D's maxima without a cube: gradient ascent on computeELIGrad from atom-centred shells of
+//seeds inside rho >= basin_density_cutoff, ends within 0.1 bohr merged. Sorted by value, highest
+//first. Core-shell and shattered-shell fragments are left for unify_core_basins/unify_shell_basins
+std::vector<d4> analytic_eli_maxima(const WFN& wavy, bool debug = false);
 //Radius holding the ELI-D maxima of an atom's core shells, by period; the outermost shell the
 //element keeps beneath its valence peaks at about 0.7 bohr for the first transition row
 double core_shell_radius(const int Z);

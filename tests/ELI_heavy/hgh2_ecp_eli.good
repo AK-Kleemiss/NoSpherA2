@@ -11,17 +11,13 @@ This Software is published with BSD-2 clause license.
 The orbitals hold 22 electrons, 60 fewer than the nuclei carry, and that is exactly the def2 ECP core of these atoms: treating them as ECP atoms, as -ECP would.
 Analysing ELI basins in the wavefunction...
 [ELI-D] Kohout, Pernal, Wagner & Grin, Theor. Chem. Acc. 112 (2004) 453, DOI 10.1007/s00214-004-0615-y
-Calcualting grid of size 120 x 120 x 188...
-Number of points: 2707200
-Grid parameters:
-  Min: (-5.66918, -5.66918, -8.78723)
-  Max: (5.66918, 5.66918, 8.78723)
 Atom positions:
   Atom 0: (0, 0, 0)
   Atom 1: (0, 0, 3.11805)
   Atom 2: (0, 0, -3.11805)
 ECP cores of 1 atoms filled with Thakkar densities: 60.0 electrons added for the QTAIM basins
-Density Critical Points (3 found):
+Density critical points from the analytic field: NCP 3, BCP 4, RCP 2, CCP 0; Poincare-Hopf sum 1 against 1 (INCOMPLETE: The bond graph has 3 nuclei, 2 bonds and 1 component(s), cycle rank 0; found n_ring - n_cage = 2. More ring than cage points than the bond graph allows: either a spurious ring point, or 2 cage point(s) were not found - cage seeding is the likely gap. 1 nucleus/nuclei carry no core density (rho below 1 at a nucleus of Z >= 5), atom number 1: a pseudopotential replaced the core there, so the density has no cusp at those nuclei and no readable shell structure around them. A missing nuclear attractor on one of them, or a spurious ring or cage point within about a bohr of one, is a property of this wavefunction and not a gap in the seeding - QTAIM is not defined on a pseudo-density inside the core radius. )
+Density Critical Points (5 found):
 
   CP   1  [attractor   ]  converged   H2
     Position  :         0.0000         0.0000        -3.1029
@@ -34,7 +30,7 @@ Density Critical Points (3 found):
   CP   2  [attractor   ]  converged   H1
     Position  :         0.0000         0.0000         3.1029
     Rho       :         0.3485
-    GradRho   :         0.0000         0.0000         0.0000   |GradRho| :         0.0000
+    GradRho   :         0.0000         0.0000        -0.0000   |GradRho| :         0.0000
     HessRho_EigVals:    -6.9607e+00    -6.9607e+00    -6.8000e+00
     DelSqRho  :       -20.7215
    V         :    -5.1878e+00   G         :         0.0037   K         :     5.1841e+00   L         :     5.1804e+00
@@ -47,11 +43,28 @@ Density Critical Points (3 found):
     DelSqRho  :        -0.2177
    V         :    -8.5216e-02   G         :         0.0154   K         :     6.9816e-02   L         :     5.4415e-02
 
+  CP   4  [bond        ]  converged   H2-Hg0 bond
+    Position  :         0.0000         0.0000        -2.1083
+    Rho       :         0.1396
+    GradRho   :         0.0000         0.0000         0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -2.2404e-01    -2.2404e-01     4.6573e-01
+    DelSqRho  :         0.0176
+    Bond Ellipticity:         0.0000
+   V         :    -1.7929e-01   G         :         0.0918   K         :     8.7438e-02   L         :    -4.4108e-03
+
+  CP   5  [bond        ]  converged   H1-Hg0 bond
+    Position  :         0.0000         0.0000         2.1083
+    Rho       :         0.1396
+    GradRho   :         0.0000         0.0000        -0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -2.2404e-01    -2.2404e-01     4.6573e-01
+    DelSqRho  :         0.0176
+    Bond Ellipticity:         0.0000
+   V         :    -1.7929e-01   G         :         0.0918   K         :     8.7438e-02   L         :    -4.4108e-03
+
 QTAIM attractors from the analytic field: 3 (3 nuclei, 0 non-nuclear)
-Assigning basins by near-grid ascent...
-I found 28 Basins.
+ELI-D maxima from the analytic field: 51
 ELI-D basin boundaries from the analytic field (the default).
-Unified 23 core-shell basins into their atoms' cores, 5 ELI-D basins remain.
+Unified 46 core-shell basins into their atoms' cores, 5 ELI-D basins remain.
 GridManager: Setting up prototype grids for atom types...
 GridManager: Generating integration grids for atoms...
 GridManager: Generated total of 65266 grid points.
@@ -84,13 +97,13 @@ Delocalization indices (11 occupied orbitals):
 GridManager: Setting up prototype grids for atom types...
 GridManager: Generating integration grids for atoms...
 GridManager: Generated total of 65266 grid points.
-Quadrature points sent along the field: 47164, left the grid: 0
+Quadrature points sent along the field: 30245, left the grid: 0
 
 ELI-D Analysis (atomic quadrature grids):
   basin  label               electrons      volume         maximum        x          y          z
-      1  Hg0 core              18.1621    210.6314          1.4329      0.472      0.378      0.654
-      2  H2                     1.4364     36.5894          7.2442      0.000      0.000     -3.178
-      3  H1                     1.4364     36.5894          7.2442      0.000      0.000      3.178
-      4  H2 LP                  0.4677    287.5343          5.0747      0.000      0.000     -4.955
-      5  H1 LP                  0.4677    287.5343          5.0747      0.000      0.000      4.955
+      1  H2                     1.4364     36.5894          7.2480     -0.000      0.000     -3.170
+      2  H1                     1.4364     36.5894          7.2480     -0.000      0.000      3.170
+      3  H1 LP                  0.4677    287.5343          5.0790     -0.000      0.000      4.989
+      4  H2 LP                  0.4677    287.5343          5.0790      0.000      0.000     -4.989
+      5  Hg0 core              18.1621    210.6314          1.4332      0.579      0.030     -0.682
   total in basins: 21.9704   outside every basin: 0.0296

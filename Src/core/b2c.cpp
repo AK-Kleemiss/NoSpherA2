@@ -128,6 +128,8 @@ std::string classify_density_critical_point(int negative_count, int positive_cou
 	return "unknown";
 }
 
+} // namespace
+
 critical_point evaluate_critical_point(
 	const critical_point_seed &seed,
 	const d3 &position,
@@ -223,6 +225,8 @@ critical_point evaluate_critical_point(
 
 	return result;
 }
+
+namespace {
 
 bool try_merge_critical_point(std::vector<critical_point> &points, const critical_point &candidate, double distance_tolerance)
 {
@@ -1622,6 +1626,84 @@ std::vector<d4> streaming_density_attractors(const WFN &wavy, const std::vector<
 			}
 		}
 	}
+	return maxima;
+}
+
+std::vector<d4> analytic_eli_maxima(const WFN &wavy, const bool debug)
+{
+	auto sphere = [](const int n) {
+		std::vector<d3> d(n);
+		for (int i = 0; i < n; i++) {
+			const double z = 1.0 - 2.0 * (i + 0.5) / n;
+			const double s = std::sqrt(std::max(0.0, 1.0 - z * z));
+			const double phi = 2.39996322972865332 * i;
+			d[i] = d3{ s * std::cos(phi), s * std::sin(phi), z };
+		}
+		return d;
+	};
+	const std::vector<d3> inner = sphere(26), outer = sphere(110);
+	//bohr; the core shells of a fourth-row atom sit inside 0.1, a lone pair or bond maximum 0.6-2.5 out
+	const double radii[] = { 0.03, 0.06, 0.1, 0.15, 0.22, 0.3, 0.4, 0.55, 0.75, 1.0, 1.3, 1.7, 2.2, 2.8, 3.5 };
+	const int ncen = wavy.get_ncen();
+	std::vector<d3> seeds;
+	for (int a = 0; a < ncen; a++) {
+		const d3 pa = wavy.get_atom_pos(a);
+		seeds.push_back(pa);
+		for (const double r : radii)
+			for (const d3 &u : (r < 0.5 ? inner : outer)) {
+				const d3 p{ pa[0] + r * u[0], pa[1] + r * u[1], pa[2] + r * u[2] };
+				//Every seed belongs to the atom nearest to it, so no region is seeded twice
+				bool own = true;
+				for (int b = 0; b < ncen && own; b++)
+					if (b != a && array_length(p, wavy.get_atom_pos(b)) < r) own = false;
+				if (own) seeds.push_back(p);
+			}
+	}
+	//Monotone ascent along the normalised gradient: a step is taken only if ELI-D rises, grows
+	//after a success and halves after a failure. There is deliberately no Hessian test at the end
+	//- a hydrogen's valence maximum sits on the cusp of the nucleus, and the Newton test ate six
+	//real H basins in UH6 (see converge_to_maximum)
+	const int ns = static_cast<int>(seeds.size());
+	std::vector<d4> ends(ns, d4{ 0.0, 0.0, 0.0, -1.0 });
+#pragma omp parallel for schedule(dynamic, 16)
+	for (int s = 0; s < ns; s++) {
+		d3 p = seeds[s], g;
+		if (wavy.compute_dens(p) < basin_density_cutoff) continue;
+		double f;
+		wavy.computeELIGrad(p, f, g);
+		if (!std::isfinite(f)) continue;
+		bool inside = true;
+		double step = 0.05;
+		for (int it = 0; it < 500 && step > 1e-5; it++) {
+			const double gn = array_length(g);
+			if (!std::isfinite(gn) || gn < 1e-12) break;
+			const d3 t{ p[0] + step * g[0] / gn, p[1] + step * g[1] / gn, p[2] + step * g[2] / gn };
+			double ft;
+			d3 gt;
+			wavy.computeELIGrad(t, ft, gt);
+			if (std::isfinite(ft) && ft > f) {
+				p = t; f = ft; g = gt;
+				step = std::min(1.5 * step, 0.3);
+				//ELI-D is undefined in the tail and the basins end at the same isosurface
+				if (wavy.compute_dens(p) < basin_density_cutoff) { inside = false; break; }
+			}
+			else step *= 0.5;
+		}
+		if (inside) ends[s] = d4{ p[0], p[1], p[2], f };
+	}
+	//Highest first; an end within 0.1 bohr of a kept one is that maximum reached again
+	std::vector<int> order;
+	for (int s = 0; s < ns; s++) if (ends[s][3] >= 0.0) order.push_back(s);
+	std::stable_sort(order.begin(), order.end(), [&](const int x, const int y) { return ends[x][3] > ends[y][3]; });
+	std::vector<d4> maxima;
+	for (const int s : order) {
+		bool seen = false;
+		for (const d4 &m : maxima)
+			if (std::pow(m[0] - ends[s][0], 2) + std::pow(m[1] - ends[s][1], 2) + std::pow(m[2] - ends[s][2], 2) < 0.01) { seen = true; break; }
+		if (!seen) maxima.push_back(ends[s]);
+	}
+	if (debug)
+		std::cout << "ELI-D maxima from " << ns << " seeds by analytic ascent: " << order.size() << " climbs finished, " << maxima.size() << " distinct maxima" << std::endl;
 	return maxima;
 }
 

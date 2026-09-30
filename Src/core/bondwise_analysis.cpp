@@ -7,6 +7,7 @@
 #include "nos_math.h"
 #include "integration_params.h"
 #include "b2c.h"
+#include "topology.h"
 #include "crystal_energies.h"
 #include "spherical_density.h"
 #include "citations.h"
@@ -3512,22 +3513,42 @@ void ELI_analysis(const WFN &wavy, options &opt) {
 			" density g = rho*tau - |grad rho|^2/4 is identically zero and the field is undefined."
 			" The basins below are round-off structure, not chemistry - expect thousands of them and"
 			" do not quote their populations. The QTAIM basins are unaffected." << std::endl;
-	readxyzMinMax_fromWFN(wavy, prop_opt);
-
-	cube rho(prop_opt.NbSteps, l_w.get_ncen(), true);
-	cube eli_cube(prop_opt.NbSteps, l_w.get_ncen(), true);
-	rho.give_parent_wfn(l_w);
-	eli_cube.give_parent_wfn(l_w);
-
-	std::cout << "Calcualting grid of size " << prop_opt.NbSteps[0] << " x " << prop_opt.NbSteps[1] << " x " << prop_opt.NbSteps[2] << "..." << std::endl;
-	std::cout << "Number of points: " << prop_opt.NbSteps[0] * prop_opt.NbSteps[1] * prop_opt.NbSteps[2] << std::endl;
-
-	//Print a summary of the grid parameters
-	std::cout << "Grid parameters:\n";
-	std::cout << "  Min: (" << prop_opt.MinMax[0] << ", " << prop_opt.MinMax[1] << ", " << prop_opt.MinMax[2] << ")\n";
-	std::cout << "  Max: (" << prop_opt.MinMax[3] << ", " << prop_opt.MinMax[4] << ", " << prop_opt.MinMax[5] << ")\n";
-
+	//Both basin sets are found and integrated on the analytic field by default: the density's
+	//attractors from the critical-point search, ELI-D's from analytic_eli_maxima, the boundaries by
+	//walking each quadrature point up the field. The cube is only built for what still needs one:
+	//-basin_cube, and a fitted density (its attractors are not the orbitals' critical points).
+	//Without orbitals there is no search, and the QTAIM set comes from the cube as well.
+	const bool stream_qtaim = !opt.basin_cube && !fld && l_w.get_nmo() > 0;
+	const bool stream_eli = !opt.basin_cube;
+	const bool need_cube = !stream_qtaim || !stream_eli;
 	const std::vector<atom> atoms = wavy.get_atoms();
+	cube rho, eli_cube;
+	basin_stage_timer T;
+	if (need_cube) {
+		readxyzMinMax_fromWFN(wavy, prop_opt);
+		rho = cube(prop_opt.NbSteps, l_w.get_ncen(), true);
+		eli_cube = cube(prop_opt.NbSteps, l_w.get_ncen(), true);
+		rho.give_parent_wfn(l_w);
+		eli_cube.give_parent_wfn(l_w);
+		std::cout << "Calcualting grid of size " << prop_opt.NbSteps[0] << " x " << prop_opt.NbSteps[1] << " x " << prop_opt.NbSteps[2] << "..." << std::endl;
+		std::cout << "Number of points: " << prop_opt.NbSteps[0] * prop_opt.NbSteps[1] * prop_opt.NbSteps[2] << std::endl;
+		std::cout << "Grid parameters:\n";
+		std::cout << "  Min: (" << prop_opt.MinMax[0] << ", " << prop_opt.MinMax[1] << ", " << prop_opt.MinMax[2] << ")\n";
+		std::cout << "  Max: (" << prop_opt.MinMax[3] << ", " << prop_opt.MinMax[4] << ", " << prop_opt.MinMax[5] << ")\n";
+		vec stepsizes{ (prop_opt.MinMax[3] - prop_opt.MinMax[0]) / prop_opt.NbSteps[0],
+					  (prop_opt.MinMax[4] - prop_opt.MinMax[1]) / prop_opt.NbSteps[1],
+					  (prop_opt.MinMax[5] - prop_opt.MinMax[2]) / prop_opt.NbSteps[2] };
+		for (int i = 0; i < 3; i++) {
+			rho.set_origin(i, prop_opt.MinMax[i]);
+			rho.set_vector(i, i, stepsizes[i]);
+			eli_cube.set_origin(i, prop_opt.MinMax[i]);
+			eli_cube.set_vector(i, i, stepsizes[i]);
+		}
+		rho.calc_dv();
+		eli_cube.calc_dv();
+		Calc_RhoEli(rho, eli_cube, l_w, radius, fld);
+		T.lap("rho and ELI-D cube");
+	}
 
 	// print table of atom positions
 	std::cout << "Atom positions:\n";
@@ -3535,24 +3556,6 @@ void ELI_analysis(const WFN &wavy, options &opt) {
 		std::cout << "  Atom " << a << ": (" << atoms[a].get_coordinate(0) << ", " << atoms[a].get_coordinate(1) << ", " << atoms[a].get_coordinate(2) << ")\n";
 	}
 
-	vec stepsizes{ (prop_opt.MinMax[3] - prop_opt.MinMax[0]) / prop_opt.NbSteps[0],
-				  (prop_opt.MinMax[4] - prop_opt.MinMax[1]) / prop_opt.NbSteps[1],
-				  (prop_opt.MinMax[5] - prop_opt.MinMax[2]) / prop_opt.NbSteps[2] };
-
-	for (int i = 0; i < 3; i++)
-	{
-		rho.set_origin(i, prop_opt.MinMax[i]);
-		rho.set_vector(i, i, stepsizes[i]);
-		eli_cube.set_origin(i, prop_opt.MinMax[i]);
-		eli_cube.set_vector(i, i, stepsizes[i]);
-	}
-
-	rho.calc_dv();
-	eli_cube.calc_dv();
-
-	basin_stage_timer T;
-	Calc_RhoEli(rho, eli_cube, l_w, radius, fld);
-	T.lap("rho and ELI-D cube");
 	//An ECP took the core electrons out of the density. The QTAIM basins get them back from
 	//Thakkar's spherical core densities, the fill the Hirshfeld grids and the scattering
 	//factors apply: the nucleus is a cusp again and its basin holds the atom's full count.
@@ -3592,15 +3595,39 @@ void ELI_analysis(const WFN &wavy, options &opt) {
 				for (int z = 0; z < rho.get_size(2); z++)
 					if (rho.get_value(x, y, z) > 0.0) rho.set_value(x, y, z, rho.get_value(x, y, z) + core_density(rho.get_pos(x, y, z)));
 	}
-	rho.set_path("rho.cube");
-	eli_cube.set_path("eli.cube");
-	if (opt.debug) { rho.write_file(true); eli_cube.write_file(true); }
+	if (need_cube && opt.debug) {
+		rho.set_path("rho.cube");
+		eli_cube.set_path("eli.cube");
+		rho.write_file(true);
+		eli_cube.write_file(true);
+	}
 
-	const double density_floor = std::max(1e-8, rho.max_value() * 1e-6);
 	//The critical points are refined on the orbitals (V, G and K need them) even when the
-	//basins follow the fitted density; a SALTED prediction has none, so they are skipped
+	//basins follow the fitted density; a SALTED prediction has none, so they are skipped. The
+	//search is -topology's: Newton on the analytic Hessian from nuclear, bond, ring and cage seeds,
+	//checked against Poincare-Hopf, so no grid resolution decides which points exist
 	std::vector<critical_point> density_critical_points;
-	if (l_w.get_nmo() > 0) density_critical_points = analyze_cube_critical_points(&rho, l_w, opt.debug, density_floor);
+	if (l_w.get_nmo() > 0) {
+		//-topology seeds bond points only between pairs within 1.3 x (r_cov + r_cov) and takes its
+		//Poincare-Hopf target from those fragments, so a hydrogen bond or a long contact went missing
+		//while the sum still closed.  The cube search found them; 2.5 reaches O-H...O and C-H...O and
+		//keeps the target consistent, because seeding and fragment count share the criterion
+		topology::options topo_opt;
+		topo_opt.bond_scale = 2.5;
+		const topology::result top = topology::analyze_topology(l_w, topology::nuclei_of(l_w), topo_opt);
+		for (const topology::cp &p : top.points) {
+			if (p.kind != topology::cp_kind::attractor && p.density < basin_density_cutoff) continue;
+			//a saddle within a bohr of a nucleus whose core an ECP replaced sits in the pseudo-density's
+			//core hole (hgh2_ecp.gbw: two "Hg-H bonds" 0.06 bohr from Hg at rho 6E-4) and is no bond
+			if (p.kind != topology::cp_kind::attractor && p.nearest_nucleus_distance < 1.0
+				&& std::find(top.coreless_nuclei.begin(), top.coreless_nuclei.end(), p.nearest_nucleus) != top.coreless_nuclei.end()) continue;
+			const critical_point_seed seed{ i3{ 0, 0, 0 }, p.position, p.density, p.gradient_norm, p.kind == topology::cp_kind::attractor && !p.is_nna, p.nearest_nucleus };
+			density_critical_points.push_back(evaluate_critical_point(seed, p.position, l_w, p.iterations, true));
+		}
+		std::cout << "Density critical points from the analytic field: NCP " << top.n_attractor << ", BCP " << top.n_bond << ", RCP "
+			<< top.n_ring << ", CCP " << top.n_cage << "; Poincare-Hopf sum " << top.sum << " against " << top.target
+			<< (top.complete ? " (COMPLETE)" : " (INCOMPLETE: " + top.diagnosis + ")") << std::endl;
+	}
 	else std::cout << "No orbitals: critical points (Hessian, V, G, K) need a wavefunction and are skipped." << std::endl;
 	T.lap("density critical points");
 	//Core shells make critical points of their own and an ECP atom a whole sphere of them,
@@ -3633,7 +3660,7 @@ void ELI_analysis(const WFN &wavy, options &opt) {
 		std::cout << " (" << density_critical_points.size() << " found)";
 	std::cout << ":\n";
 	if (density_critical_points.empty()) {
-		std::cout << "  No critical points refined from the current cube grid.\n";
+		std::cout << "  No critical points found.\n";
 	}
 	else {
 		constexpr int nw = 15; // numeric field width — wide enough for large core densities
@@ -3740,7 +3767,6 @@ void ELI_analysis(const WFN &wavy, options &opt) {
 	//and the quadrature then walks the field from every point with no cube in the loop. A fitted
 	//density keeps the cube: those critical points are the orbitals' and not the fit's, so they
 	//are not that field's attractors. Without orbitals there is no search to take them from.
-	const bool stream_qtaim = !opt.basin_cube && !fld && l_w.get_nmo() > 0;
 	std::pair<cubei, std::vector<d4>> qtaim_results;
 	if (stream_qtaim) {
 		qtaim_results.second = streaming_density_attractors(l_w, density_critical_points, fill_cores ? &core_density : nullptr, fill_cores ? &core_gradient : nullptr, opt.debug);
@@ -3811,6 +3837,17 @@ void ELI_analysis(const WFN &wavy, options &opt) {
 		return;
 	}
 
+	std::pair<cubei, std::vector<d4>> eli_results;
+	if (stream_eli) {
+		//Gradient ascent on computeELIGrad from shells of seeds around every atom. The cube search it
+		//replaces needed 0.05 A to find the right maxima (see below); this has no grid to be coarse.
+		//The Hessian stays out of it for the reason given at the cube branch
+		eli_results.second = analytic_eli_maxima(l_w, opt.debug);
+		eli_maxima_all = eli_results.second;
+		T.lap("ELI-D maxima");
+		std::cout << "ELI-D maxima from the analytic field: " << eli_results.second.size() << std::endl;
+	}
+	else {
 	//ELI-D is undefined in the density tail, so the cube ends at the density isosurface.
 	for (int x = 0; x < eli_cube.get_size(0); x++)
 		for (int y = 0; y < eli_cube.get_size(1); y++)
@@ -3855,23 +3892,20 @@ void ELI_analysis(const WFN &wavy, options &opt) {
 	//reason: their Na and Al cores come out too SMALL (2.92 and 3.04 against 10), so an electropositive
 	//atom's own outer core shell is not being folded in - core_shell_radius(11)=0.55 bohr does not
 	//reach Na's 2p shell. That is a separate defect and it is not fixed here.
-	std::pair<cubei, std::vector<d4>> eli_results = topological_cube_analysis(&eli_cube, atoms, opt.debug, false, 0.0, 1e-10, radius, 3e-4);
+	eli_results = topological_cube_analysis(&eli_cube, atoms, opt.debug, false, 0.0, 1e-10, radius, 3e-4);
 	T.lap("ELI-D cube topology");
-	//The cube keeps the topology: there is no critical-point search for this field to take
-	//attractors from, and no analytic Hessian to test a maximum with - computeELIGrad is all there
-	//is. Testing the grid's ELI-D maxima against the analytic gradient was tried and removed: a
-	//hydrogen valence basin converges to a non-maximum of the gradient and the test ate six real H
-	//basins in UH6 and one in NH3Li. Only the boundaries become the field's, by sending every
-	//quadrature point up computeELIGrad to one of those maxima instead of reading a voxel's basin
-	//number, which is what leaves the crop above outside every basin.
+	}
+	//There is no analytic Hessian to test an ELI-D maximum with - computeELIGrad is all there is.
+	//Testing the grid's ELI-D maxima against the analytic gradient with Newton was tried and removed:
+	//a hydrogen valence basin converges to a non-maximum of the gradient and the test ate six real H
+	//basins in UH6 and one in NH3Li. The boundaries are the field's, by sending every quadrature
+	//point up computeELIGrad to one of the maxima instead of reading a voxel's basin number.
 	//The walk is the default at every electron count. A ten-electron gate once kept the cube below
 	//10 e, on the argument that g = rho tau - |grad rho|^2 / 4 vanishes where one orbital carries
 	//the density. Measured against DGRID on the eleven molecules below 10 e of the benchmark (30 Sep
 	//2026) the two came out even: eli_population MAE 0.3337 cube / 0.3349 walk, the same basin
 	//counts, H2O identical - and H2's three cube basins held 0.000 e each where the walk gave 1.99 e.
-	const bool stream_eli = !opt.basin_cube;
 	std::cout << "ELI-D basin boundaries from " << (stream_eli ? "the analytic field (the default)" : "the cube (-basin_cube)") << "." << std::endl;
-	if (stream_eli) eli_maxima_all = eli_results.second;
 	//The shells of a heavy atom's core structure ELI-D into several basins each; one core
 	//basin per atom is what a bonding analysis wants, and what DGrid's ELIDcore gives
 	const int core_merged = unify_core_basins(eli_results.first, eli_results.second, atoms, stream_eli ? &eli_core_map : nullptr);

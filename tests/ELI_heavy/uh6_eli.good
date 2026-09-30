@@ -9,11 +9,6 @@ Please give credit and cite corresponding pieces!
 This Software is published with BSD-2 clause license.
 Analysing ELI basins in the wavefunction...
 [ELI-D] Kohout, Pernal, Wagner & Grin, Theor. Chem. Acc. 112 (2004) 453, DOI 10.1007/s00214-004-0615-y
-Calcualting grid of size 92 x 92 x 92...
-Number of points: 778688
-Grid parameters:
-  Min: (-8.50377, -8.50377, -8.50377)
-  Max: (8.50377, 8.50377, 8.50377)
 Atom positions:
   Atom 0: (0, 0, 0)
   Atom 1: (3.77945, 0, 0)
@@ -22,12 +17,13 @@ Atom positions:
   Atom 4: (0, -3.77945, 0)
   Atom 5: (0, 0, 3.77945)
   Atom 6: (0, 0, -3.77945)
-Density Critical Points (7 found):
+Density critical points from the analytic field: NCP 7, BCP 6, RCP 0, CCP 0; Poincare-Hopf sum 1 against 1 (COMPLETE)
+Density Critical Points (13 found):
 
   CP   1  [attractor   ]  converged   U0
-    Position  :        -0.0000         0.0000        -0.0000
+    Position  :         0.0000         0.0000         0.0000
     Rho       :  27946116.9797
-    GradRho   :         0.0000        -0.0000        -0.0000   |GradRho| :         0.0000
+    GradRho   :        -0.0002         0.0055        -0.0025   |GradRho| :         0.0060
     HessRho_EigVals:    -2.5634e+15    -2.5634e+15    -2.5634e+15
     DelSqRho  :-7690297652384896.0000
    V         :    -1.9226e+15   G         :9302899556.1495   K         :     1.9226e+15   L         :     1.9226e+15
@@ -35,7 +31,7 @@ Density Critical Points (7 found):
   CP   2  [attractor   ]  converged   H2
     Position  :        -3.7649        -0.0000        -0.0000
     Rho       :         0.3608
-    GradRho   :         0.0000         0.0000        -0.0000   |GradRho| :         0.0000
+    GradRho   :         0.0000        -0.0000        -0.0000   |GradRho| :         0.0000
     HessRho_EigVals:    -7.1319e+00    -7.1319e+00    -6.9865e+00
     DelSqRho  :       -21.2503
    V         :    -5.3142e+00   G         :         0.0008   K         :     5.3134e+00   L         :     5.3126e+00
@@ -51,7 +47,7 @@ Density Critical Points (7 found):
   CP   4  [attractor   ]  converged   H6
     Position  :         0.0000        -0.0000        -3.7649
     Rho       :         0.3608
-    GradRho   :         0.0000        -0.0000        -0.0000   |GradRho| :         0.0000
+    GradRho   :         0.0000        -0.0000         0.0000   |GradRho| :         0.0000
     HessRho_EigVals:    -7.1319e+00    -7.1319e+00    -6.9865e+00
     DelSqRho  :       -21.2503
    V         :    -5.3142e+00   G         :         0.0008   K         :     5.3134e+00   L         :     5.3126e+00
@@ -59,7 +55,7 @@ Density Critical Points (7 found):
   CP   5  [attractor   ]  converged   H5
     Position  :        -0.0000         0.0000         3.7649
     Rho       :         0.3608
-    GradRho   :        -0.0000        -0.0000         0.0000   |GradRho| :         0.0000
+    GradRho   :        -0.0000         0.0000        -0.0000   |GradRho| :         0.0000
     HessRho_EigVals:    -7.1319e+00    -7.1319e+00    -6.9865e+00
     DelSqRho  :       -21.2503
    V         :    -5.3142e+00   G         :         0.0008   K         :     5.3134e+00   L         :     5.3126e+00
@@ -67,7 +63,7 @@ Density Critical Points (7 found):
   CP   6  [attractor   ]  converged   H3
     Position  :        -0.0000         3.7649        -0.0000
     Rho       :         0.3608
-    GradRho   :         0.0000        -0.0000         0.0000   |GradRho| :         0.0000
+    GradRho   :        -0.0000        -0.0000        -0.0000   |GradRho| :         0.0000
     HessRho_EigVals:    -7.1319e+00    -7.1319e+00    -6.9865e+00
     DelSqRho  :       -21.2503
    V         :    -5.3142e+00   G         :         0.0008   K         :     5.3134e+00   L         :     5.3126e+00
@@ -75,19 +71,69 @@ Density Critical Points (7 found):
   CP   7  [attractor   ]  converged   H1
     Position  :         3.7649        -0.0000         0.0000
     Rho       :         0.3608
-    GradRho   :        -0.0000         0.0000        -0.0000   |GradRho| :         0.0000
+    GradRho   :        -0.0000        -0.0000         0.0000   |GradRho| :         0.0000
     HessRho_EigVals:    -7.1319e+00    -7.1319e+00    -6.9865e+00
     DelSqRho  :       -21.2503
    V         :    -5.3142e+00   G         :         0.0008   K         :     5.3134e+00   L         :     5.3126e+00
 
+  CP   8  [bond        ]  converged   H2-U0 bond
+    Position  :        -2.4702        -0.0000        -0.0000
+    Rho       :         0.1100
+    GradRho   :         0.0000        -0.0000         0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -1.7520e-01    -1.7520e-01     2.8783e-01
+    DelSqRho  :        -0.0626
+    Bond Ellipticity:         0.0000
+   V         :    -8.5708e-02   G         :         0.0350   K         :     5.0675e-02   L         :     1.5642e-02
+
+  CP   9  [bond        ]  converged   H4-U0 bond
+    Position  :        -0.0000        -2.4702         0.0000
+    Rho       :         0.1100
+    GradRho   :         0.0000         0.0000         0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -1.7520e-01    -1.7520e-01     2.8783e-01
+    DelSqRho  :        -0.0626
+    Bond Ellipticity:         0.0000
+   V         :    -8.5708e-02   G         :         0.0350   K         :     5.0675e-02   L         :     1.5642e-02
+
+  CP  10  [bond        ]  converged   H6-U0 bond
+    Position  :         0.0000        -0.0000        -2.4702
+    Rho       :         0.1100
+    GradRho   :         0.0000         0.0000         0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -1.7520e-01    -1.7520e-01     2.8783e-01
+    DelSqRho  :        -0.0626
+    Bond Ellipticity:         0.0000
+   V         :    -8.5708e-02   G         :         0.0350   K         :     5.0675e-02   L         :     1.5642e-02
+
+  CP  11  [bond        ]  converged   H5-U0 bond
+    Position  :        -0.0000         0.0000         2.4702
+    Rho       :         0.1100
+    GradRho   :        -0.0000         0.0000        -0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -1.7520e-01    -1.7520e-01     2.8783e-01
+    DelSqRho  :        -0.0626
+    Bond Ellipticity:         0.0000
+   V         :    -8.5708e-02   G         :         0.0350   K         :     5.0675e-02   L         :     1.5642e-02
+
+  CP  12  [bond        ]  converged   H3-U0 bond
+    Position  :        -0.0000         2.4702        -0.0000
+    Rho       :         0.1100
+    GradRho   :        -0.0000        -0.0000        -0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -1.7520e-01    -1.7520e-01     2.8783e-01
+    DelSqRho  :        -0.0626
+    Bond Ellipticity:         0.0000
+   V         :    -8.5708e-02   G         :         0.0350   K         :     5.0675e-02   L         :     1.5642e-02
+
+  CP  13  [bond        ]  converged   H1-U0 bond
+    Position  :         2.4702        -0.0000        -0.0000
+    Rho       :         0.1100
+    GradRho   :        -0.0000         0.0000        -0.0000   |GradRho| :         0.0000
+    HessRho_EigVals:    -1.7520e-01    -1.7520e-01     2.8783e-01
+    DelSqRho  :        -0.0626
+    Bond Ellipticity:         0.0000
+   V         :    -8.5708e-02   G         :         0.0350   K         :     5.0675e-02   L         :     1.5642e-02
+
 QTAIM attractors from the analytic field: 7 (7 nuclei, 0 non-nuclear)
-WARNING: the ELI-D attractors are searched on the 0.1000 A grid. Coarser than 0.05 A this basin set is less reliable: core populations have been seen to drift by 0.3 electrons and basins to appear or be retyped as lone pairs by 0.2 A. The QTAIM basins are unaffected.
-Assigning basins by near-grid ascent...
-I found 33 Basins.
-Left 6 maxima on the rim of the analysed region unresolved; their density is reported outside every basin.
-Merged 6 noise maxima, 27 basins remain.
+ELI-D maxima from the analytic field: 49
 ELI-D basin boundaries from the analytic field (the default).
-Unified 14 core-shell basins into their atoms' cores, 13 ELI-D basins remain.
+Unified 36 core-shell basins into their atoms' cores, 13 ELI-D basins remain.
 GridManager: Setting up prototype grids for atom types...
 GridManager: Generating integration grids for atoms...
 GridManager: Generated total of 143592 grid points.
@@ -141,21 +187,21 @@ Delocalization indices (49 occupied orbitals):
 GridManager: Setting up prototype grids for atom types...
 GridManager: Generating integration grids for atoms...
 GridManager: Generated total of 143592 grid points.
-Quadrature points sent along the field: 63425, left the grid: 0
+Quadrature points sent along the field: 62791, left the grid: 0
 
 ELI-D Analysis (atomic quadrature grids):
   basin  label               electrons      volume         maximum        x          y          z
-      1  H2 LP                  0.3232    176.1943         11.0849     -5.546      0.000      0.000
-      2  H4                     1.6450     61.6676         13.6414      0.000     -3.882      0.000
-      3  H2                     1.6404     59.3136         13.6414     -3.882      0.000      0.000
-      4  H6                     1.6583     67.8023         13.6414      0.000      0.000     -3.882
-      5  H5                     1.6346     50.2401         13.6414      0.000      0.000      3.882
-      6  H3                     1.6450     61.0535         13.6414      0.000      3.882      0.000
-      7  H4 LP                  0.3232    176.1943         11.0849      0.000     -5.546      0.000
-      8  H6 LP                  0.3232    176.1943         11.0849      0.000      0.000     -5.546
-      9  H5 LP                  0.3232    176.1943         11.0849      0.000      0.000      5.546
-     10  H3 LP                  0.3232    176.1943         11.0849      0.000      5.546      0.000
-     11  U0 core               86.1530     78.7456         13.5603      0.000      0.000      0.000
-     12  H1                     1.6483     60.6030         13.6414      3.882      0.000      0.000
-     13  H1 LP                  0.3232    176.1943         11.0849      5.546      0.000      0.000
+      1  H6                     1.6583     67.8023         13.7822      0.000      0.000     -3.850
+      2  H5                     1.6346     50.2401         13.7822     -0.000     -0.000      3.850
+      3  H1                     1.6483     60.6030         13.7822      3.850     -0.000      0.000
+      4  H3                     1.6450     61.0535         13.7822      0.000      3.850      0.000
+      5  H2                     1.6404     59.3136         13.7822     -3.850      0.000     -0.000
+      6  H4                     1.6450     61.6676         13.7822      0.000     -3.850     -0.000
+      7  U0 core               86.1530     78.7456         13.5603      0.000      0.000      0.000
+      8  H2 LP                  0.3232    176.1943         11.2194     -5.465     -0.000     -0.000
+      9  H5 LP                  0.3232    176.1943         11.2194      0.000      0.000      5.465
+     10  H1 LP                  0.3232    176.1943         11.2194      5.465      0.000     -0.000
+     11  H6 LP                  0.3232    176.1943         11.2194     -0.000      0.000     -5.465
+     12  H3 LP                  0.3232    176.1943         11.2194     -0.000      5.465     -0.000
+     13  H4 LP                  0.3232    176.1943         11.2194     -0.000     -5.465      0.000
   total in basins: 97.9636   outside every basin: 0.0361

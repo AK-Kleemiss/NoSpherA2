@@ -647,7 +647,8 @@ TEST(BondwiseCoverageMaskTests, WfnModeMasksTheFirstHydrogenBasin)
 //maxima (at x = +-0.99933, the tail of the other Gaussian pulls them in by 2 exp(-8)) and one saddle at the origin
 //with Hessian eigenvalues (-4, -4, 12) rho, Laplacian 4 rho and ellipticity 0; the debug listing adds the eigenvectors
 //and the x axis carries the positive curvature. The QTAIM basins split at the midplane, so both hydrogens hold the
-//same electron count and charge = Z - electrons; -debug also drops rho.cube and eli.cube into the working directory
+//same electron count and charge = Z - electrons. The default path is analytic end to end, so -debug no longer has a
+//rho.cube or eli.cube to drop, and the bond point at 2 bohr (beyond 1.3 x the covalent radii) must still be found
 TEST(BondwiseCoverageEliTests, DebugListsTheCriticalPointsOfTwoGaussians)
 {
 	Scratch s("DebugListsTheCriticalPointsOfTwoGaussians");
@@ -664,9 +665,10 @@ TEST(BondwiseCoverageEliTests, DebugListsTheCriticalPointsOfTwoGaussians)
 		ELI_analysis(wavy, opt);
 		out = cap.str();
 	}
-	EXPECT_TRUE(std::filesystem::exists(s.dir / "rho.cube"));
-	EXPECT_TRUE(std::filesystem::exists(s.dir / "eli.cube"));
-	EXPECT_NE(out.find("Calcualting grid of size 18 x 14 x 14"), std::string::npos) << out;
+	EXPECT_FALSE(std::filesystem::exists(s.dir / "rho.cube"));
+	EXPECT_FALSE(std::filesystem::exists(s.dir / "eli.cube"));
+	EXPECT_EQ(out.find("Calcualting grid of size"), std::string::npos) << out;
+	EXPECT_NE(out.find("NCP 2, BCP 1, RCP 0, CCP 0; Poincare-Hopf sum 1 against 1 (COMPLETE)"), std::string::npos) << out;
 	EXPECT_NE(out.find("Density Critical Points (3 found):"), std::string::npos);
 	const std::vector<CriticalPoint> cps = parse_critical_points(out);
 	ASSERT_EQ(cps.size(), 3u) << out;
@@ -711,6 +713,35 @@ TEST(BondwiseCoverageEliTests, DebugListsTheCriticalPointsOfTwoGaussians)
 	EXPECT_NEAR(e0, e1, 5e-3 * (e0 + e1));
 	EXPECT_NEAR(rows.at("H0").second, 1.0 - e0, 2e-4);
 	EXPECT_NEAR(rows.at("H1").second, 1.0 - e1, 2e-4);
+}
+
+//-basin_cube is the fallback that still builds the grid: the same H2 model, now with the cube files -debug drops and
+//the grid line, and the same two equal hydrogen basins
+TEST(BondwiseCoverageEliTests, BasinCubeFallbackStillBuildsTheGrid)
+{
+	Scratch s("BasinCubeFallbackStillBuildsTheGrid");
+	std::filesystem::current_path(s.dir);
+	WFN wavy = h2_wfn();
+	wavy.set_path(s.dir / "h2.wfn");
+	options opt;
+	opt.debug = true;
+	opt.basin_cube = true;
+	opt.properties.radius = 1.6;
+	opt.properties.resolution = 0.25;
+	std::string out;
+	{
+		CoutCapture cap;
+		ELI_analysis(wavy, opt);
+		out = cap.str();
+	}
+	EXPECT_TRUE(std::filesystem::exists(s.dir / "rho.cube"));
+	EXPECT_TRUE(std::filesystem::exists(s.dir / "eli.cube"));
+	EXPECT_NE(out.find("Calcualting grid of size 18 x 14 x 14"), std::string::npos) << out;
+	EXPECT_NE(out.find("Density Critical Points (3 found):"), std::string::npos) << out;
+	const auto rows = parse_qtaim_table(out);
+	ASSERT_EQ(rows.size(), 2u) << out;
+	ASSERT_TRUE(rows.count("H0") && rows.count("H1")) << out;
+	EXPECT_NEAR(rows.at("H0").first, rows.at("H1").first, 5e-3 * (rows.at("H0").first + rows.at("H1").first));
 }
 
 //The H2 table above has two single-word labels, so the row-count assertion in it cannot by itself show
