@@ -934,7 +934,7 @@ struct options
     bool rgbi = false;
     //-npa: natural atomic orbitals and natural population analysis (NAO/NPA), run in-process
     bool npa = false;
-    //-npa_naos: also print the per-NAO occupancy table, as NBO's NATURAL POPULATIONS block
+    //the per-NAO "Natural atomic orbital occupancies" table beside the NPA; -npa_summary turns it off
     bool npa_orbitals = true;
     bool rgbi_no_sym = false;
     bool rgbi_EVs = false;
@@ -1021,9 +1021,6 @@ struct options
     //the density's attractors from the analytic critical-point search instead, which no voxel can
     //add to, and sends every quadrature point up the analytic field for its basin
     bool basin_cube = false;
-    //-basin_analytic: the analytic ELI-D boundaries even below the 10 electrons they need to be
-    //defined everywhere, where the automatic choice would fall back to the cube
-    bool basin_analytic = false;
     int threads = -1;
     int pbc = 0;
     int charge = 0;

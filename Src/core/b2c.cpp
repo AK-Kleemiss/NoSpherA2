@@ -2444,7 +2444,7 @@ void report_delocalization(const WFN &wavy, const basin_overlaps &ovl, const sve
 	//delta(A,B) summed over B is the count an atom shares with everything else; with lambda(A)
 	//it has to give the population back, and the residual says which basin the grid missed
 	log << "\n  basin  label                 N(A)     lambda(A)   sum_B delta(A,B)/2   residual\n";
-	log << "  B includes the region beyond rho = " << basin_density_cutoff << " e/bohr^3.\n";
+	log << "  B includes the region beyond rho = " << std::scientific << std::setprecision(0) << basin_density_cutoff << std::fixed << std::setprecision(2) << " e/bohr^3.\n";
 	for (int b = 0; b < nb; b++) {
 		double half = 0.0;
 		for (size_t p = 0; p < r.pairs.size(); p++)

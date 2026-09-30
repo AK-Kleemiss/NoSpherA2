@@ -431,9 +431,9 @@ std::string help_message =
  "                                    Angstrom), each basin's electrons by a\n"
  "                                    voxel sum and on the atomic quadrature\n"
  "                                    grids, the boundary followed along the\n"
- "                                    field to rho = 0.0001 e/bohr^3.\n"
- "                                    field; -acc 4 before it tightens the\n"
- "                                    latter from 0.005 to 0.002 e. With -ECP\n"
+ "                                    field to rho = 0.0001 e/bohr^3; -acc 4\n"
+ "                                    before it tightens the grid sum from\n"
+ "                                    0.005 to 0.002 e. With -ECP\n"
  "                                    the core an ECP removed is filled from\n"
  "                                    Thakkar densities for the QTAIM basins.\n"
  "                                    A real analysis needs 0.05 A or finer;\n"
@@ -464,9 +464,9 @@ std::string help_message =
  "                                    longer invent one, and walks the analytic\n"
  "                                    field from every quadrature point for its\n"
  "                                    basin; use this for the older behaviour.\n"
- "  -basin_analytic                    Keep the analytic ELI-D boundaries below\n"
- "                                    the 10 electrons they need to be defined\n"
- "                                    everywhere; the cube takes over by default.\n"
+ "  -basin_analytic                    Accepted and ignored: the analytic ELI-D\n"
+ "                                    boundaries are the default at every\n"
+ "                                    electron count now.\n"
  "  -basin_step <f>                    Scale the trajectory step of the streaming\n"
  "                                    basin quadrature by f. The step is a fraction\n"
  "                                    of the cube's voxel; f says how much of it the\n"
@@ -2823,7 +2823,7 @@ bool options::digest_run_options(const std::string &temp, int &i)
     else if (temp == "-basin_cube")
         basin_cube = true;
     else if (temp == "-basin_analytic")
-        basin_analytic = true;
+        ; //the default since 30 Sep 2026; still accepted so older job scripts run
     else if (temp == "-basin_step")
         basin_step_scale_set(stod(arguments[i + 1]));
     else if (temp == "-basin_timing")

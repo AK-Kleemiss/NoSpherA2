@@ -3864,13 +3864,13 @@ void ELI_analysis(const WFN &wavy, options &opt) {
 	//basins in UH6 and one in NH3Li. Only the boundaries become the field's, by sending every
 	//quadrature point up computeELIGrad to one of those maxima instead of reading a voxel's basin
 	//number, which is what leaves the crop above outside every basin.
-	//ELI-D needs g = rho tau - |grad rho|^2 / 4 > 0 to exist at all, and g vanishes wherever a
-	//single orbital carries the density - everywhere in a two-electron system - so there the walk
-	//has no slope to follow and the grid stays in charge.
-	const double electrons = l_w.count_nr_electrons();
-	const bool stream_eli = !opt.basin_cube && (opt.basin_analytic || electrons >= 10.0);
-	std::cout << "ELI-D basin boundaries from " << (stream_eli ? "the analytic field" : "the cube") << " ("
-		<< (opt.basin_cube ? "-basin_cube" : opt.basin_analytic ? "-basin_analytic" : stream_eli ? "the default" : "fewer than 10 electrons in the orbitals, " + std::to_string((int)std::lround(electrons))) << ")." << std::endl;
+	//The walk is the default at every electron count. A ten-electron gate once kept the cube below
+	//10 e, on the argument that g = rho tau - |grad rho|^2 / 4 vanishes where one orbital carries
+	//the density. Measured against DGRID on the eleven molecules below 10 e of the benchmark (30 Sep
+	//2026) the two came out even: eli_population MAE 0.3337 cube / 0.3349 walk, the same basin
+	//counts, H2O identical - and H2's three cube basins held 0.000 e each where the walk gave 1.99 e.
+	const bool stream_eli = !opt.basin_cube;
+	std::cout << "ELI-D basin boundaries from " << (stream_eli ? "the analytic field (the default)" : "the cube (-basin_cube)") << "." << std::endl;
 	if (stream_eli) eli_maxima_all = eli_results.second;
 	//The shells of a heavy atom's core structure ELI-D into several basins each; one core
 	//basin per atom is what a bonding analysis wants, and what DGrid's ELIDcore gives

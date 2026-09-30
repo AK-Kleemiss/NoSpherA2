@@ -124,7 +124,7 @@ Delocalization indices (13 occupied orbitals):
   sum over basins and outside of S^A - identity: 7.80e-03   (the quadrature's own error; AIMAll's integrations reach ~1e-3)
 
   basin  label                 N(A)     lambda(A)   sum_B delta(A,B)/2   residual
-  B includes the region beyond rho = 0.00 e/bohr^3.
+  B includes the region beyond rho = 1e-04 e/bohr^3.
       1  N0                     8.2758      6.8190            1.4579      0.0010
       2  H1                     0.6298      0.1683            0.4617      0.0002
       3  H2                     0.6292      0.1682            0.4612      0.0002
