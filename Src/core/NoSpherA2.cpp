@@ -17,6 +17,7 @@
 #include "nbo.h"
 #include "nbo_run.h"
 #include "citations.h"
+#include <future>
 #ifdef NOSPHERA2_USE_GPU
 #include "grid_gpu.h"
 #include "aux_density_gpu.h"
@@ -201,31 +202,40 @@ static int run_app_impl(int argc, char **argv)
 			if (opt.ECP) w.set_has_ECPs(true, true, opt.ECP_mode);
 			return w;
 		};
-		log_file << "\nFull bonding analysis of " << opt.wfn.string() << ": RGBI, NBO/NPA with NRT, QTAIM and ELI-D\n" << endl;
+		log_file << "\nFull bonding analysis of " << opt.wfn.string() << ": RGBI, bondwise Laplacian, QTAIM and ELI-D, then NBO/NPA with NRT\n" << endl;
+		//NBO/NRT runs on its own thread next to the rest. RGBI and the basins print straight to
+		//std::cout, whose format flags every thread shares, so the NBO side gets a stream of its
+		//own and its block goes into the log after ELI-D. RGBI is serial and the NBO search stops
+		//scaling past a few threads, so the overlap is where the cores the basins leave go.
+		std::ostringstream nbo_log;
+		citations::cite(citations::Method::NAONPA, nbo_log);
+		citations::cite(citations::Method::NBO, nbo_log);
+		citations::cite(citations::Method::E2, nbo_log);
+		citations::cite(citations::Method::NRT, nbo_log);
+		const filesystem::path json = opt.wfn.parent_path() / (opt.wfn.stem().string() + ".native.nbo.json");
+		auto nbo_done = std::async(std::launch::async, [&nbo_log, &opt, &json](WFN w) {
+			NboOptions nbo;
+			nbo.debug = opt.debug;
+			nbo.nrt = true;
+			if (opt.threads > 0) nbo.threads = opt.threads;
+			NboResults r = native_nbo(w, nbo, nbo_log);
+			r.name = opt.wfn.stem().string();
+			print_nbo(r, nbo_log);
+			write_nbo_json(r, json);
+			nbo_log << "wrote " << json.string() << std::endl;
+		}, read_wfn());
 		{
 			WFN w = read_wfn();
 			Roby_information Roby(w, opt.rgbi_group_sets, !opt.rgbi_no_sym,
 				opt.rgbi_orbital_basis == RGBIOrbitalBasis::ANO, opt.rgbi_EVs, opt.rgbi_theta,
 				opt.rgbi_legacy_cutoff);
 		}
-		{
-			WFN w = read_wfn();
-			NboOptions nbo;
-			nbo.debug = opt.debug;
-			nbo.nrt = true;
-			if (opt.threads > 0) nbo.threads = opt.threads;
-			citations::cite(citations::Method::NAONPA, std::cout);
-			citations::cite(citations::Method::NBO, std::cout);
-			citations::cite(citations::Method::E2, std::cout);
-			citations::cite(citations::Method::NRT, std::cout);
-			NboResults r = native_nbo(w, nbo, std::cout);
-			r.name = opt.wfn.stem().string();
-			print_nbo(r, std::cout);
-			const filesystem::path json = opt.wfn.parent_path() / (opt.wfn.stem().string() + ".native.nbo.json");
-			write_nbo_json(r, json);
-			std::cout << "wrote " << json.string() << std::endl;
-		}
+		//The .dat files go where -laplacian_bonds puts them.
+		bondwise_laplacian_plots(opt.wfn);
 		ELI_analysis(read_wfn(), opt);
+		//Rethrows whatever stopped the NBO side
+		nbo_done.get();
+		std::cout << "\n" << nbo_log.str() << "\nFull bonding analysis finished." << std::endl;
 		return 0;
 	}
 	//Basin analysis and quit; the tables stay in the log, which is what the golden test reads
