@@ -425,6 +425,11 @@ std::string help_message =
  "                                    Poincare-Hopf completeness check and any\n"
  "                                    non-nuclear attractors.\n"
  "  -laplacian_bonds <wfn>             Plot density Laplacian along bonds.\n"
+ "  -fba <wfn> [resolution radius]     Full bonding analysis in one run: RGBI,\n"
+ "                                    native NBO with NPA, E2 and NRT (JSON as\n"
+ "                                    -nbo_native writes it), then the QTAIM and\n"
+ "                                    ELI-D basins of -eli_analysis. The grid\n"
+ "                                    defaults to 0.05 A and a 3 A radius.\n"
  "  -eli_analysis <wfn> <resolution> <radius>\n"
  "                                    QTAIM and ELI-D basins of the density and\n"
  "                                    ELI-D cubes (resolution and radius in\n"
@@ -3004,7 +3009,6 @@ bool options::digest_partition_options(const std::string &temp, int &i)
     const int argc = (int)arguments.size();
     if (temp == "-atom_sfac")
     {
-        std::cout << NoSpherA2_message() << endl;
         wfn = arguments[i + 1];
         wfn2 = arguments[i + 2];
         err_checkf(std::filesystem::exists(wfn), "WFN doesn't exist", std::cout);
@@ -3338,7 +3342,6 @@ bool options::digest_property_options(const std::string &temp, int &i)
     }
     else if (temp == "-atom_dens")
     {
-        std::cout << NoSpherA2_message() << endl;
         wfn = arguments[i + 1];
         err_checkf(std::filesystem::exists(wfn), "WFN doesn't exist", std::cout);
         ivec val_MOs;
@@ -3427,6 +3430,22 @@ bool options::digest_property_options(const std::string &temp, int &i)
         properties.radius = stod(arguments[i + 3]);
         eli_analysis_run = true;
         i += 3;
+    }
+    //RGBI, native NBO/NPA with NRT, then the QTAIM and ELI-D basins of -eli_analysis, on one
+    //wavefunction; the grid defaults to the 0.05 A / 3 A the chem_bond_DB benchmark is scored at
+    else if (temp == "-fba") {
+        err_checkf(argc >= i + 2, "Not enough arguments for -fba\nPlease provide a wfn!", std::cout);
+        wfn = arguments[i + 1];
+        err_checkf(std::filesystem::exists(wfn), "-fba: wavefunction does not exist: " + wfn.string(), std::cout);
+        properties.resolution = 0.05;
+        properties.radius = 3.0;
+        i += 1;
+        if (argc >= i + 3 && arguments[i + 1][0] != '-' && arguments[i + 2][0] != '-') {
+            properties.resolution = stod(arguments[i + 1]);
+            properties.radius = stod(arguments[i + 2]);
+            i += 2;
+        }
+        fba = true;
     }
     //The rest of Kohout's ELI family (ELI-D alpha/beta/triplet, ELI-q) as point values; runs here
     //rather than setting a flag, it has no cube or basin output to schedule
@@ -4210,6 +4229,7 @@ namespace {
     {
         if (o.qct) return "-qct";
         if (o.fukui_analysis_run) return "-fukui_analysis";
+        if (o.fba) return "-fba";
         if (o.eli_analysis_run) return "-eli_analysis";
         if (o.fract) return "-fractal";
         if (o.promol_nci) return "-promol_nci";
@@ -4247,9 +4267,12 @@ void options::refuse_unread_bonding_options()
         if (nbo_family_suboptions().count(o) == 0)
             continue;
         err_checkf(false, "Option " + o + " is an NBO/NRT option and this run is " + running +
-                              ", which does not read it: no NBO analysis was asked for, so the "
-                              "option would be ignored and the run would still exit 0. Add "
-                              "-nbo_native <wavefunction>, or drop " + o,
+                              (fba ? ", which runs NBO and NRT at their defaults and does not read it: the "
+                                     "option would be ignored and the run would still exit 0. Use "
+                                     "-nbo_native <wavefunction> -nrt for NRT options, or drop " + o
+                                   : ", which does not read it: no NBO analysis was asked for, so the "
+                                     "option would be ignored and the run would still exit 0. Add "
+                                     "-nbo_native <wavefunction>, or drop " + o),
                    log_file);
     }
 }

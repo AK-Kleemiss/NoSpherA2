@@ -2386,9 +2386,7 @@ vec calc_dipole_for_atom(WFN &wavy, const int &i, cube &Hirshfeld_atom, vec &cha
 void dipole_moments(options &opt, std::ostream &log2)
 {
 	using namespace std;
-	log2 << NoSpherA2_message(opt.no_date);
-	if (!opt.no_date)
-		log2 << build_date;
+	//no header here: run_app_impl has written it to the log before the options were read
 	err_checkf(opt.wfn != "", "Error, no wfn file specified!", log2);
 	WFN wavy(opt.wfn);
 	if (opt.debug)

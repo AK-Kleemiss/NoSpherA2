@@ -14,6 +14,8 @@
 #include "geometry_aid.h"
 #include "crystal_energies.h"
 #include "nao.h"
+#include "nbo.h"
+#include "nbo_run.h"
 #include "citations.h"
 #ifdef NOSPHERA2_USE_GPU
 #include "grid_gpu.h"
@@ -65,10 +67,13 @@ static int run_app_impl(int argc, char **argv)
 	using namespace std;
 	const std::filesystem::path cwd = std::filesystem::current_path();
 	string output_file = "NoSpherA2.log";
+	bool no_date = false;
 	{
 		for (int i = 0; i < argc; i++) {
 			string temp = argv[i];
-			if (temp == "-out") {
+			if (temp == "-no_date" || temp == "-no_date_but_gpu")
+				no_date = true;
+			else if (temp == "-out") {
 				err_checkf(i + 1 < argc && argv[i + 1][0] != '-',
 					"Missing argument for -out option",
 					std::cout);
@@ -106,6 +111,14 @@ static int run_app_impl(int argc, char **argv)
 		std::ostream& out;
 		~throughput_reporter() { throughput::report(out); }
 	} report_throughput{log_file};
+
+	//Header first, before the options are read: the NBO/NRT, topology, ELI family and other
+	//bonding jobs run inside digest_options() and return below without reaching the job code,
+	//and a job that fails while reading its input would otherwise leave an empty log
+	log_file << NoSpherA2_message(no_date);
+	if (!no_date)
+		log_file << build_date;
+	log_file.flush();
 
 	options opt(argc, argv, log_file);
 	opt.digest_options();
@@ -148,14 +161,6 @@ static int run_app_impl(int argc, char **argv)
 #endif
 	vector<WFN> wavy;
 
-	//Header first, before any job: a job that fails while reading its input otherwise leaves an empty log
-	log_file << NoSpherA2_message(opt.no_date);
-	if (!opt.no_date)
-	{
-		log_file << build_date;
-	}
-	log_file.flush();
-
 	if (opt.promol_nci)
 	{
 		promolecular_nci_analysis(
@@ -185,6 +190,42 @@ static int run_app_impl(int argc, char **argv)
 		log_file.flush();
 		std::cout.rdbuf(_coutbuf); // reset to standard output again
 		fukui_analysis(opt, std::cout);
+		return 0;
+	}
+	//Full bonding analysis and quit. Each stage reads the wavefunction afresh: RGBI and the NBO
+	//search take it by non-const reference, and the basins must not see what either left behind
+	if (opt.fba)
+	{
+		const auto read_wfn = [&opt]() {
+			WFN w(opt.wfn);
+			if (opt.ECP) w.set_has_ECPs(true, true, opt.ECP_mode);
+			return w;
+		};
+		log_file << "\nFull bonding analysis of " << opt.wfn.string() << ": RGBI, NBO/NPA with NRT, QTAIM and ELI-D\n" << endl;
+		{
+			WFN w = read_wfn();
+			Roby_information Roby(w, opt.rgbi_group_sets, !opt.rgbi_no_sym,
+				opt.rgbi_orbital_basis == RGBIOrbitalBasis::ANO, opt.rgbi_EVs, opt.rgbi_theta,
+				opt.rgbi_legacy_cutoff);
+		}
+		{
+			WFN w = read_wfn();
+			NboOptions nbo;
+			nbo.debug = opt.debug;
+			nbo.nrt = true;
+			if (opt.threads > 0) nbo.threads = opt.threads;
+			citations::cite(citations::Method::NAONPA, std::cout);
+			citations::cite(citations::Method::NBO, std::cout);
+			citations::cite(citations::Method::E2, std::cout);
+			citations::cite(citations::Method::NRT, std::cout);
+			NboResults r = native_nbo(w, nbo, std::cout);
+			r.name = opt.wfn.stem().string();
+			print_nbo(r, std::cout);
+			const filesystem::path json = opt.wfn.parent_path() / (opt.wfn.stem().string() + ".native.nbo.json");
+			write_nbo_json(r, json);
+			std::cout << "wrote " << json.string() << std::endl;
+		}
+		ELI_analysis(read_wfn(), opt);
 		return 0;
 	}
 	//Basin analysis and quit; the tables stay in the log, which is what the golden test reads

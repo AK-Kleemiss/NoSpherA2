@@ -1010,6 +1010,8 @@ struct options
     bool fukui_analysis_run = false;
     //Basin analysis (-eli_analysis), run from run_app_impl for the same reason
     bool eli_analysis_run = false;
+    //Full bonding analysis (-fba): RGBI, native NBO/NPA with NRT, QTAIM and ELI-D on one wavefunction
+    bool fba = false;
     bool profiling = false;
     bool promol_nci = false;
     bool get_g = false;
