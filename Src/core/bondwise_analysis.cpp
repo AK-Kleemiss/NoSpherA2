@@ -3923,8 +3923,7 @@ void QTAIM_ELI_mask(
 	}
 
 	log << "Running QTAIM topological analysis on density grid..." << std::endl;
-	const double density_floor = std::max(1e-8, rho.max_value() * 1e-6);
-	auto [basin_cube, maxima] = topological_cube_analysis(&rho, atoms, debug, false, density_floor);
+	auto [basin_cube, maxima] = topological_cube_analysis(&rho, atoms, debug, false, basin_density_cutoff);
 	svec labels = assign_labels_to_basins(maxima, atoms, debug, 0);
 
 	// Map selected atom indices → set of 1-based basin IDs
