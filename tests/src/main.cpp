@@ -65,6 +65,14 @@ int main(int argc, char** argv)
 	//of forking, so no death test inherits a thread it cannot join. Set before InitGoogleTest so
 	//--gtest_death_test_style on the command line still wins.
 	GTEST_FLAG_SET(death_test_style, "threadsafe");
+	//The RGBI tests count free-atom SCFs and compare their digits run against run; a density read back
+	//from a previous run's on-disk cache would answer them without running anything. A test that wants
+	//the disk cache sets NOS_FREEATOM_CACHE_DIR itself.
+#ifdef _WIN32
+	_putenv_s("NOS_FREEATOM_CACHE_DIR", "off");
+#else
+	setenv("NOS_FREEATOM_CACHE_DIR", "off", 1);
+#endif
 	::testing::InitGoogleTest(&argc, argv);
 	::testing::UnitTest::GetInstance()->listeners().Append(new CoutFormatReset);
 	warn_about_working_directory();

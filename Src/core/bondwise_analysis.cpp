@@ -20,6 +20,11 @@
 #include <occ/qm/hf.h>
 #include <occ/qm/guess_kind.h>
 #include <occ/qm/initial_guess.h>
+#include <occ/qm/cint_interface.h>
+#include <cstring>
+#include <filesystem>
+#include <fstream>
+#include <thread>
 
 namespace {
 	struct OhOperation {
@@ -451,6 +456,298 @@ namespace {
 	std::vector<std::pair<FreeAtomKey, dMatrix2>> free_atom_cache;
 	std::mutex free_atom_cache_mutex;
 
+	//Spin-free exact two-component one-electron correction (sf-X2C-1e), returned as the change it makes
+	//to T + V in the atom's own contracted basis so that occ's SCF can take it as an external potential.
+	//A non-relativistic free atom is the wrong reference for anything heavy: the 1s of U contracts by
+	//~25 %, the whole core with it, and the valence expands in response. A relativistic molecular
+	//wavefunction divided by that reference is where the "9 electrons outside the ANO cutoff" on U came
+	//from. The algorithm is PySCF's sfx2c1e: solve the modified Dirac equation in the decontracted basis,
+	//take the X matrix of its electronic solutions, renormalise with R and contract back. occ has no
+	//relativistic Hamiltonian of its own, so the p.Vp integrals come straight from libcint.
+	//
+	//The decontracted basis is built from raw primitives with coefficient 1, which is exactly what occ
+	//hands libcint for the contracted shells as well, so the contraction matrix is the coefficient table
+	//and no normalisation convention has to be guessed. That claim is checked rather than trusted: the
+	//contracted S, T and V rebuilt from the primitives have to reproduce occ's own to 1e-8, and if they do
+	//not this throws instead of adding a correction in a mismatched basis.
+	occ::Mat sfx2c1e_core_correction(const occ::gto::AOBasis &basis, const occ::Mat &S_ref,
+		const occ::Mat &T_ref, const occ::Mat &V_ref) {
+		using occ::gto::Shell;
+		constexpr double c = 137.03599967994;
+		const bool cart = basis.is_cartesian();
+
+		//Unique (l, exponent) primitives. A generally contracted basis repeats its exponents across
+		//shells, and duplicated primitives would make the metric singular.
+		std::vector<Shell> prims;
+		std::vector<std::vector<int>> prim_of(basis.size());
+		for (size_t k = 0; k < basis.size(); k++) {
+			const Shell &sh = basis[k];
+			err_checkf(sh.num_contractions() == 1, "sf-X2C: shell with more than one contraction", std::cout);
+			for (size_t p = 0; p < sh.num_primitives(); p++) {
+				const double a = sh.exponents(p);
+				int found = -1;
+				for (int u = 0; u < static_cast<int>(prims.size()); u++)
+					if (prims[u].l == sh.l && std::abs(prims[u].exponents(0) - a) <= 1e-12 * a) {
+						found = u;
+						break;
+					}
+				if (found < 0) {
+					found = static_cast<int>(prims.size());
+					Shell d(static_cast<int>(sh.l), { a }, { { 1.0 } }, { 0.0, 0.0, 0.0 });
+					d.kind = sh.kind;
+					prims.push_back(d);
+				}
+				prim_of[k].push_back(found);
+			}
+		}
+
+		occ::qm::cint::IntegralEnvironment env(basis.atoms(), prims);
+		std::vector<int> off(prims.size() + 1, 0);
+		for (size_t i = 0; i < prims.size(); i++)
+			off[i + 1] = off[i] + static_cast<int>(prims[i].size());
+		const int n = off.back();
+		auto one_e = [&](libcint::CINTIntegralFunction *fn) {
+			occ::Mat M = occ::Mat::Zero(n, n);
+			std::vector<double> buf(64 * 64);
+			for (int i = 0; i < static_cast<int>(prims.size()); i++)
+				for (int j = 0; j < static_cast<int>(prims.size()); j++) {
+					int shls[2] = { i, j };
+					fn(buf.data(), nullptr, shls, env.atom_data_ptr(), env.num_atoms(), env.basis_data_ptr(),
+						env.num_basis(), env.env_data_ptr(), nullptr, nullptr);
+					const int di = off[i + 1] - off[i], dj = off[j + 1] - off[j];
+					for (int b = 0; b < dj; b++)
+						for (int a = 0; a < di; a++)
+							M(off[i] + a, off[j] + b) = buf[a + di * b];
+				}
+			return M;
+		};
+		occ::Mat s = one_e(cart ? &libcint::int1e_ovlp_cart : &libcint::int1e_ovlp_sph);
+		occ::Mat t = one_e(cart ? &libcint::int1e_kin_cart : &libcint::int1e_kin_sph);
+		occ::Mat v = one_e(cart ? &libcint::int1e_nuc_cart : &libcint::int1e_nuc_sph);
+		occ::Mat w = one_e(cart ? &libcint::int1e_pnucp_cart : &libcint::int1e_pnucp_sph);
+
+		//Normalise the primitives, for the conditioning of the eigenproblem below; K absorbs the scale.
+		const occ::Vec norm = s.diagonal().cwiseSqrt();
+		const occ::Vec inv = norm.cwiseInverse();
+		s = inv.asDiagonal() * s * inv.asDiagonal();
+		t = inv.asDiagonal() * t * inv.asDiagonal();
+		v = inv.asDiagonal() * v * inv.asDiagonal();
+		w = inv.asDiagonal() * w * inv.asDiagonal();
+		occ::Mat K = occ::Mat::Zero(n, static_cast<Eigen::Index>(basis.nbf()));
+		for (size_t k = 0; k < basis.size(); k++) {
+			const int first = static_cast<int>(basis.first_bf()[k]);
+			const int width = static_cast<int>(basis[k].size());
+			for (size_t p = 0; p < basis[k].num_primitives(); p++) {
+				const int u = prim_of[k][p];
+				for (int m = 0; m < width; m++)
+					K(off[u] + m, first + m) += basis[k].contraction_coefficients(p, 0) * norm(off[u] + m);
+			}
+		}
+		auto rel_dev = [](const occ::Mat &a, const occ::Mat &b) {
+			return (a - b).cwiseAbs().maxCoeff() / std::max(1.0, b.cwiseAbs().maxCoeff());
+		};
+		const double dev = std::max({ rel_dev(K.transpose() * s * K, S_ref),
+			rel_dev(K.transpose() * t * K, T_ref), rel_dev(K.transpose() * v * K, V_ref) });
+		if (!(dev < 1e-8))
+			throw std::runtime_error("sf-X2C: the decontracted basis does not reproduce occ's contracted "
+				"integrals (max relative deviation " + std::to_string(dev) + ")");
+
+		const int n2 = 2 * n;
+		occ::Mat h4 = occ::Mat::Zero(n2, n2), m4 = occ::Mat::Zero(n2, n2);
+		h4.topLeftCorner(n, n) = v;
+		h4.topRightCorner(n, n) = t;
+		h4.bottomLeftCorner(n, n) = t;
+		h4.bottomRightCorner(n, n) = w * (0.25 / (c * c)) - t;
+		m4.topLeftCorner(n, n) = s;
+		m4.bottomRightCorner(n, n) = t * (0.5 / (c * c));
+		Eigen::GeneralizedSelfAdjointEigenSolver<occ::Mat> dirac(h4, m4);
+		if (dirac.info() != Eigen::Success)
+			throw std::runtime_error("sf-X2C: the modified Dirac equation could not be solved");
+		//Eigenvalues ascend, so the upper n are the electronic solutions.
+		const occ::Mat cl = dirac.eigenvectors().block(0, n, n, n);
+		const occ::Mat cs = dirac.eigenvectors().block(n, n, n, n);
+		const occ::Mat X = cl.transpose().partialPivLu().solve(cs.transpose()).transpose();
+
+		const occ::Mat s1 = s + X.transpose() * t * X * (0.5 / (c * c));
+		const occ::Mat tx = t * X;
+		const occ::Mat h1 = v + tx + tx.transpose() - X.transpose() * tx
+			+ X.transpose() * w * X * (0.25 / (c * c));
+		//R = S^-1/2 (S^-1/2 s1 S^-1/2)^-1/2 S^1/2, in the eigenbasis of S.
+		Eigen::SelfAdjointEigenSolver<occ::Mat> es(s);
+		std::vector<int> keep;
+		for (int i = 0; i < n; i++)
+			if (es.eigenvalues()(i) > 1e-14)
+				keep.push_back(i);
+		occ::Mat U(n, keep.size());
+		occ::Vec ws(keep.size());
+		for (size_t i = 0; i < keep.size(); i++) {
+			U.col(i) = es.eigenvectors().col(keep[i]);
+			ws(i) = std::sqrt(es.eigenvalues()(keep[i]));
+		}
+		const occ::Mat mid = ws.cwiseInverse().asDiagonal() * (U.transpose() * s1 * U) * ws.cwiseInverse().asDiagonal();
+		Eigen::SelfAdjointEigenSolver<occ::Mat> em(mid);
+		occ::Mat mid_isqrt = occ::Mat::Zero(mid.rows(), mid.cols());
+		for (int i = 0; i < mid.rows(); i++)
+			if (em.eigenvalues()(i) > 1e-14)
+				mid_isqrt += em.eigenvectors().col(i) * em.eigenvectors().col(i).transpose() / std::sqrt(em.eigenvalues()(i));
+		const occ::Mat R = U * (ws.cwiseInverse().asDiagonal() * mid_isqrt * ws.asDiagonal()) * U.transpose();
+		const occ::Mat h_x2c = R.transpose() * h1 * R;
+		occ::Mat delta = K.transpose() * (h_x2c - t - v) * K;
+		return 0.5 * (delta + delta.transpose());
+	}
+
+	//Free-atom densities on disk. An all-electron U costs ten minutes of single-threaded SCF and is the
+	//same answer every time, so it is solved once per basis and binary and read back afterwards.
+	//
+	//The key is everything the in-memory key holds plus what else can change the digits: the Hamiltonian,
+	//the binary (build_date - a rebuilt binary recomputes rather than trusting a density produced by other
+	//code), the thread pin and the iteration cap. The full key is stored in the file and compared on load,
+	//so a hash collision is a miss, not a wrong density. Anything unreadable is a miss as well.
+	struct FreeAtomDiskEntry {
+		dMatrix2 density;
+		bool converged = true;
+		int iter = 0;
+		double ediff_rel = 0.0, diis_error = 0.0;
+	};
+
+	std::filesystem::path free_atom_cache_dir() {
+		//"off" disables the disk cache alone; NOS_RGBI_NO_FREEATOM_CACHE disables both caches.
+		if (const char *d = std::getenv("NOS_FREEATOM_CACHE_DIR"))
+			return (std::string(d).empty() || std::string(d) == "off") ? std::filesystem::path() : std::filesystem::path(d);
+		if (const char *d = std::getenv("LOCALAPPDATA"))
+			return std::filesystem::path(d) / "NoSpherA2" / "free_atom_cache";
+		if (const char *d = std::getenv("XDG_CACHE_HOME"))
+			return std::filesystem::path(d) / "NoSpherA2" / "free_atom_cache";
+		if (const char *d = std::getenv("HOME"))
+			return std::filesystem::path(d) / ".cache" / "NoSpherA2" / "free_atom_cache";
+		return {};
+	}
+
+	std::string free_atom_disk_key(const FreeAtomKey &key, const bool relativistic) {
+		std::string k = relativistic ? "sfx2c1e|" : "nonrel|";
+		k += build_date + "|pin=" + (occ_pinning_disabled() ? "0" : "1") + "|maxiter=";
+		if (const char *cap = std::getenv("NOS_RGBI_FREE_ATOM_MAXITER"))
+			k += cap;
+		auto put = [&k](const auto value) { k.append(reinterpret_cast<const char *>(&value), sizeof(value)); };
+		put(key.charge); put(key.ecp_electrons); put(static_cast<int>(key.origin)); put(key.cartesian);
+		for (const auto &b : key.basis) {
+			put(static_cast<int>(b.get_type())); put(static_cast<int>(b.get_shell()));
+			put(b.get_exponent()); put(b.get_coefficient());
+		}
+		return k;
+	}
+
+	std::filesystem::path free_atom_disk_path(const std::string &disk_key, const int Z) {
+		const auto dir = free_atom_cache_dir();
+		if (dir.empty())
+			return {};
+		uint64_t h = 1469598103934665603ULL;
+		for (const unsigned char ch : disk_key)
+			h = (h ^ ch) * 1099511628211ULL;
+		std::ostringstream name;
+		name << "Z" << Z << "_" << std::hex << h << ".fad";
+		return dir / name.str();
+	}
+
+	constexpr char free_atom_disk_magic[8] = { 'N', 'O', 'S', 'F', 'A', 'D', '0', '1' };
+
+	bool load_free_atom_from_disk(const std::filesystem::path &path, const std::string &disk_key,
+		FreeAtomDiskEntry &entry) {
+		if (path.empty())
+			return false;
+		std::ifstream in(path, std::ios::binary);
+		if (!in)
+			return false;
+		char magic[8];
+		uint64_t key_size = 0;
+		in.read(magic, 8);
+		in.read(reinterpret_cast<char *>(&key_size), sizeof(key_size));
+		if (!in || std::memcmp(magic, free_atom_disk_magic, 8) != 0 || key_size != disk_key.size())
+			return false;
+		std::string stored(key_size, '\0');
+		in.read(stored.data(), key_size);
+		if (!in || stored != disk_key)
+			return false;
+		int32_t conv = 0, iter = 0;
+		int64_t rows = 0, cols = 0;
+		in.read(reinterpret_cast<char *>(&conv), sizeof(conv));
+		in.read(reinterpret_cast<char *>(&iter), sizeof(iter));
+		in.read(reinterpret_cast<char *>(&entry.ediff_rel), sizeof(double));
+		in.read(reinterpret_cast<char *>(&entry.diis_error), sizeof(double));
+		in.read(reinterpret_cast<char *>(&rows), sizeof(rows));
+		in.read(reinterpret_cast<char *>(&cols), sizeof(cols));
+		if (!in || rows <= 0 || cols <= 0 || rows > 100000 || cols > 100000)
+			return false;
+		std::vector<double> values(static_cast<size_t>(rows * cols));
+		in.read(reinterpret_cast<char *>(values.data()), values.size() * sizeof(double));
+		if (!in)
+			return false;
+		entry.density = dMatrix2(rows, cols);
+		for (int64_t r = 0; r < rows; r++)
+			for (int64_t col = 0; col < cols; col++)
+				entry.density(r, col) = values[r * cols + col];
+		entry.converged = conv != 0;
+		entry.iter = iter;
+		return true;
+	}
+
+	//Written to a temporary name and renamed into place, so a reader never sees half a file and two
+	//processes racing on the same atom both end with a complete one. Any failure only costs the next run
+	//its shortcut, so it is ignored.
+	void store_free_atom_to_disk(const std::filesystem::path &path, const std::string &disk_key,
+		const FreeAtomDiskEntry &entry) {
+		if (path.empty())
+			return;
+		std::error_code ec;
+		std::filesystem::create_directories(path.parent_path(), ec);
+		std::ostringstream tmp_name;
+		tmp_name << path.filename().string() << ".tmp."
+			<< std::hash<std::thread::id>{}(std::this_thread::get_id()) << "."
+			<< std::chrono::steady_clock::now().time_since_epoch().count();
+		const auto tmp = path.parent_path() / tmp_name.str();
+		{
+			std::ofstream out(tmp, std::ios::binary);
+			if (!out)
+				return;
+			const uint64_t key_size = disk_key.size();
+			const int32_t conv = entry.converged ? 1 : 0, iter = entry.iter;
+			const int64_t rows = entry.density.extent(0), cols = entry.density.extent(1);
+			out.write(free_atom_disk_magic, 8);
+			out.write(reinterpret_cast<const char *>(&key_size), sizeof(key_size));
+			out.write(disk_key.data(), key_size);
+			out.write(reinterpret_cast<const char *>(&conv), sizeof(conv));
+			out.write(reinterpret_cast<const char *>(&iter), sizeof(iter));
+			out.write(reinterpret_cast<const char *>(&entry.ediff_rel), sizeof(double));
+			out.write(reinterpret_cast<const char *>(&entry.diis_error), sizeof(double));
+			out.write(reinterpret_cast<const char *>(&rows), sizeof(rows));
+			out.write(reinterpret_cast<const char *>(&cols), sizeof(cols));
+			for (int64_t r = 0; r < rows; r++)
+				for (int64_t col = 0; col < cols; col++) {
+					const double x = entry.density(r, col);
+					out.write(reinterpret_cast<const char *>(&x), sizeof(double));
+				}
+			if (!out) {
+				out.close();
+				std::filesystem::remove(tmp, ec);
+				return;
+			}
+		}
+		std::filesystem::rename(tmp, path, ec);
+		if (ec)
+			std::filesystem::remove(tmp, ec);
+	}
+
+	void warn_unconverged_free_atom(const std::string &label, const int Z, const size_t nbf, const int iter,
+		const double ediff_rel, const double diis_error) {
+		std::ostringstream line;
+		line << "  WARNING: the free-atom SCF of " << label << " (Z=" << Z << ", " << nbf
+			<< " functions) did not converge in " << iter << " iterations: |dE|/E=" << std::scientific
+			<< std::setprecision(3) << ediff_rel << ", max|FDS-SDF|=" << diis_error
+			<< ". Its density is used as the free-atom reference for every atom of this element, so"
+			<< " the bond indices below inherit that residual.";
+		rgbi_debug_line(line.str());
+	}
+
 	dMatrix2 compute_tonto_style_atomic_density(
 		const atom &atm, const e_origin origin, const bool cartesian) {
 		const FreeAtomKey key{ atm.get_basis_set(), atm.get_charge(), atm.get_ECP_electrons(),
@@ -480,10 +777,30 @@ namespace {
 				}
 		}
 
+		//All-electron atoms get the scalar-relativistic Hamiltonian; an ECP already carries relativity in
+		//its potential and its valence basis was fitted without any further correction.
+		//NOS_RGBI_NONREL_FREEATOM restores the non-relativistic free atom, for comparison only.
+		const bool relativistic = atm.get_ECP_electrons() == 0 &&
+			std::getenv("NOS_RGBI_NONREL_FREEATOM") == nullptr;
+		const int effective_atomic_number = atm.get_charge() - atm.get_ECP_electrons();
+		const std::string disk_key = cache_disabled ? std::string() : free_atom_disk_key(key, relativistic);
+		const std::filesystem::path disk_path =
+			cache_disabled ? std::filesystem::path() : free_atom_disk_path(disk_key, effective_atomic_number);
+		if (FreeAtomDiskEntry hit; !cache_disabled && load_free_atom_from_disk(disk_path, disk_key, hit)) {
+			if (std::getenv("NOS_RGBI_DEBUG") != nullptr)
+				rgbi_debug_line("FREEATOM-DISK " + atm.get_label() + " Z=" + std::to_string(effective_atomic_number) +
+					" " + disk_path.string());
+			if (!hit.converged)
+				warn_unconverged_free_atom(atm.get_label(), effective_atomic_number, hit.density.extent(0),
+					hit.iter, hit.ediff_rel, hit.diis_error);
+			const std::lock_guard<std::mutex> hold(free_atom_cache_mutex);
+			free_atom_cache.push_back({ key, hit.density });
+			return hit.density;
+		}
+
 		ScopedOccLogLevel quiet_occ_logs(spdlog::level::err);
 		const ScopedOccSingleThread deterministic_reduction;
 		const occ::gto::AOBasis basis = build_occ_atomic_basis_from_wfn_atom(atm, origin, cartesian);
-		const int effective_atomic_number = atm.get_charge() - atm.get_ECP_electrons();
 		const int multiplicity = std::max(1, tonto_ground_state_multiplicity(effective_atomic_number));
 		const bool restricted = multiplicity == 1 && (effective_atomic_number % 2 == 0);
 		const auto spin_kind = restricted
@@ -519,6 +836,7 @@ namespace {
 			line << "FREEATOM-START " << atm.get_label() << " Z=" << effective_atomic_number
 				<< " mult=" << multiplicity << (restricted ? " restricted" : " unrestricted")
 				<< " nbf=" << basis.nbf() << " nsh=" << basis.size() << " n_alpha=" << n_alpha
+				<< (relativistic ? " sfx2c1e" : " nonrel")
 				<< " pinned=" << ((occ::parallel::get_tbb_control() != nullptr &&
 					occ::parallel::get_num_threads() == 1) ? 1 : 0);
 			rgbi_debug_line(line.str());
@@ -560,6 +878,9 @@ namespace {
 			if (capped_iterations > 0)
 				scf.maxiter = capped_iterations;
 		}
+		if (relativistic)
+			scf.set_external_potential(sfx2c1e_core_correction(basis, hf.compute_overlap_matrix(),
+				hf.compute_kinetic_matrix(), hf.compute_nuclear_attraction_matrix()), 0.0, "sfx2c1e");
 		const double scf_energy = scf.compute_scf_energy();
 
 		//occ does not throw when an SCF runs out of iterations: scf_impl.h logs one line at error
@@ -579,16 +900,9 @@ namespace {
 		//free-atom reference is unconverged and by how much, which they could not see before: the occ
 		//line goes through spdlog, and the RGBI path holds spdlog at error level from two places, so on
 		//a quiet terminal it was there and on the test log it was buried in several hundred lines.
-		if (!scf.ctx.converged) {
-			std::ostringstream line;
-			line << "  WARNING: the free-atom SCF of " << atm.get_label() << " (Z="
-				<< effective_atomic_number << ", " << basis.nbf() << " functions) did not converge in "
-				<< scf.iter << " iterations: |dE|/E=" << std::scientific << std::setprecision(3)
-				<< scf.ediff_rel << ", max|FDS-SDF|=" << scf.diis_error
-				<< ". Its density is used as the free-atom reference for every atom of this element, so"
-				<< " the bond indices below inherit that residual.";
-			rgbi_debug_line(line.str());
-		}
+		if (!scf.ctx.converged)
+			warn_unconverged_free_atom(atm.get_label(), effective_atomic_number, basis.nbf(), scf.iter,
+				scf.ediff_rel, scf.diis_error);
 
 		occ::qm::MolecularOrbitals mo = scf.wavefunction().mo;
 		mo.update_occupied_orbitals();
@@ -626,6 +940,8 @@ namespace {
 		//how that case is declared instead. This comment used to say "only a converged SCF is cached",
 		//which was the one case it did not cover.
 		if (!cache_disabled) {
+			store_free_atom_to_disk(disk_path, disk_key,
+				{ result, static_cast<bool>(scf.ctx.converged), static_cast<int>(scf.iter), scf.ediff_rel, scf.diis_error });
 			const std::lock_guard<std::mutex> hold(free_atom_cache_mutex);
 			free_atom_cache.push_back({ key, result });
 		}
