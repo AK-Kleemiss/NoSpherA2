@@ -395,7 +395,9 @@ NboLewis nbo_search(const NAOResult& nao, const dMatrix2& gamma, const bvec2& bo
     const std::vector<AtomIndices> idx = atom_indices(nao);
     //Use the requested NBO thread count or the OpenMP default.
 #ifdef _OPENMP
-    const int nthreads = options.threads > 0 ? options.threads : omp_get_max_threads();
+    const int nthreads = options.search_threads > 0 ? options.search_threads
+                       : options.threads > 0        ? options.threads
+                                                    : omp_get_max_threads();
 #else
     const int nthreads = 1;
 #endif

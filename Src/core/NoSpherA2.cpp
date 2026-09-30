@@ -220,6 +220,10 @@ static int run_app_impl(int argc, char **argv)
 			nbo.debug = opt.debug;
 			nbo.nrt = true;
 			if (opt.threads > 0) nbo.threads = opt.threads;
+			//The search's ~3000 small OpenMP regions each wait at a barrier for threads the basin
+			//loops have taken: rub2 at -cpus 48 spent 59 s there against 2.2 s serial. NRT's
+			//per-candidate loop is coarse and keeps the full count.
+			nbo.search_threads = 1;
 			NboResults r = native_nbo(w, nbo, nbo_log);
 			r.name = opt.wfn.stem().string();
 			print_nbo(r, nbo_log);

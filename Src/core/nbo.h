@@ -81,6 +81,8 @@ struct NboOptions {
     bool nrt_components = true;        //split into connected components of the delocalisation graph
     ivec nrt_subspace;                 //1-based atoms the search may alter, empty = all of them
     int threads = 0;                   //0: OpenMP default
+    int search_threads = 0;            //Lewis search only, 0: threads.  Its regions are too fine to
+                                       //share a loaded machine: -fba runs it serial
     std::filesystem::path file47;      //read this instead of writing a fresh one
     bool keep_file47 = false;
     bool debug = false;
