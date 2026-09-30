@@ -17,6 +17,7 @@
 #include "nbo.h"
 #include "nbo_run.h"
 #include "citations.h"
+#include "b2c.h"
 #include <future>
 #ifdef NOSPHERA2_USE_GPU
 #include "grid_gpu.h"
@@ -214,6 +215,7 @@ static int run_app_impl(int argc, char **argv)
 		citations::cite(citations::Method::NRT, nbo_log);
 		const filesystem::path json = opt.wfn.parent_path() / (opt.wfn.stem().string() + ".native.nbo.json");
 		auto nbo_done = std::async(std::launch::async, [&nbo_log, &opt, &json](WFN w) {
+			const auto t0 = std::chrono::steady_clock::now();
 			NboOptions nbo;
 			nbo.debug = opt.debug;
 			nbo.nrt = true;
@@ -223,18 +225,28 @@ static int run_app_impl(int argc, char **argv)
 			print_nbo(r, nbo_log);
 			write_nbo_json(r, json);
 			nbo_log << "wrote " << json.string() << std::endl;
+			//NAO, search and E2 are in the json's timings; NRT is what this leaves over
+			if (basin_timing_enabled())
+				nbo_log << "  [timing] fba NBO/NPA/NRT thread: " << std::fixed << std::setprecision(2)
+				        << std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count() << " s" << std::endl;
 		}, read_wfn());
+		//-basin_timing: one lap per stage of the main thread, which runs while NBO/NRT does
+		basin_stage_timer fba_timer;
 		{
 			WFN w = read_wfn();
 			Roby_information Roby(w, opt.rgbi_group_sets, !opt.rgbi_no_sym,
 				opt.rgbi_orbital_basis == RGBIOrbitalBasis::ANO, opt.rgbi_EVs, opt.rgbi_theta,
 				opt.rgbi_legacy_cutoff);
 		}
+		fba_timer.lap("fba RGBI");
 		//The .dat files go where -laplacian_bonds puts them.
 		bondwise_laplacian_plots(opt.wfn);
+		fba_timer.lap("fba bondwise Laplacian");
 		ELI_analysis(read_wfn(), opt);
+		fba_timer.lap("fba QTAIM and ELI-D");
 		//Rethrows whatever stopped the NBO side
 		nbo_done.get();
+		fba_timer.lap("fba waiting for NBO/NRT");
 		std::cout << "\n" << nbo_log.str() << "\nFull bonding analysis finished." << std::endl;
 		return 0;
 	}
