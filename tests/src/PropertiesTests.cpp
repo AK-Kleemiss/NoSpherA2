@@ -1504,7 +1504,11 @@ TEST(PropertiesDriverTests, StaticDeformationAloneSubtractsTheSphericalAtoms)
 	opt.properties.def = true;
 	opt.properties.resolution = 0.5;
 	opt.properties.radius = 1.5;
+	//properties_calculation writes NoSpherA2_cube.log into the cwd
+	const std::filesystem::path old_cwd = std::filesystem::current_path();
+	std::filesystem::current_path(dir);
 	properties_calculation(opt);
+	std::filesystem::current_path(old_cwd);
 	std::ostringstream log;
 	WFN wave(dir / "epoxide.gbw", false);
 	const cube rho(dir / "epoxide_rho.cube", true, wave, log);
