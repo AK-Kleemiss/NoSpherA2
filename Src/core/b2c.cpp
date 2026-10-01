@@ -2141,7 +2141,16 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 		const bool grow = basin_adaptive_step_enabled();
 		double value_prev = -1.0;
 		for (int s = 0; s < g_step_cap; s++) {
-			if (eli_field && valence(r) < basin_density_cutoff) return 0;
+			//A streaming ELI-D step evaluates the field at r anyway; that orbital pass carries the
+			//density too, so the isosurface test costs no separate density evaluation
+			bool have_vg = false;
+			double vg = 0.0;
+			if (eli_field) {
+				double rho_r;
+				if (streaming && !field) { wavy.computeELIGrad(r, vg, g, &rho_r); have_vg = true; }
+				else rho_r = valence(r);
+				if (rho_r < basin_density_cutoff) return 0;
+			}
 			if (grow) adp_count(g_adp_steps);
 			const int m = at_maximum(r);
 			if (m) return m;
@@ -2150,7 +2159,7 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 			//still rising; every streaming walk is, since nothing else can stop it
 			double here = last_value;
 			if (!eli_field || streaming) {
-				here = value_and_gradient(r, g);
+				here = have_vg ? vg : value_and_gradient(r, g);
 				if (here <= last_value) {
 					//Retry a grown step at the base length after excessive turning.
 					if (grown_last) { adp_count(g_adp_fall); r = r_prev; last_value = value_prev; mult = 1.0; grown_last = false; continue; }

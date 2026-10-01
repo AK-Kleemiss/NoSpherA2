@@ -15,6 +15,51 @@
 #include "esp_gpu.h"
 #endif
 
+namespace
+{
+	//Per-point, per-thread scratch for the contraction: K components per function, summed over
+	//its primitives, then multiplied into the MOs once. Only the functions a point touched
+	//(the exponent cutoff drops the rest) are visited and reset.
+	template <int K>
+	struct ao_scratch {
+		vec v;
+		std::vector<char> hit;
+		ivec touched;
+		void begin(const size_t nao)
+		{
+			if (hit.size() < nao) {
+				hit.resize(nao, 0);
+				v.resize(K * nao);
+			}
+			touched.clear();
+		}
+		void add(const int a, const double s, const double* chi)
+		{
+			double* t = v.data() + (size_t)K * a;
+			if (!hit[a]) {
+				hit[a] = 1;
+				touched.push_back(a);
+				for (int k = 0; k < K; k++) t[k] = s * chi[k];
+			}
+			else
+				for (int k = 0; k < K; k++) t[k] += s * chi[k];
+		}
+		//phi[k * nmo + mo] += sum_A v[A][k] C[A][mo]
+		void to_mo(const double* coef_ao, const int nmo, double* phi)
+		{
+			for (const int a : touched) {
+				hit[a] = 0;
+				const double* c = coef_ao + (size_t)a * nmo;
+				const double* t = v.data() + (size_t)K * a;
+				for (int k = 0; k < K; k++) {
+					double* const pk = phi + (size_t)k * nmo;
+					const double ck = t[k];
+					for (int mo = 0; mo < nmo; mo++) pk[mo] += ck * c[mo];
+				}
+			}
+		}
+	};
+}
 
 const double WFN::compute_dens(
 	const d3 &Pos,
@@ -131,18 +176,19 @@ const double WFN::compute_dens_cartesian(
 	const double *exponents_data = exponents.data();
 	const MO *MOs_data = MOs.data();
 	double *phi_data = phi.data();
-	//Primitive-major: every MO for one primitive is contiguous, where MOs keeps them nex
-	//apart. Same arithmetic in the same order, and no per-point allocation.
-	const double *const coefs = get_coef_primitive_major();
+	//Builds the exponent groups and the contraction the loop below reads
+	if (!get_coef_primitive_major()) return 0.0;
 	thread_local vec exps;
 	if (exps.size() < group_exponent.size()) exps.resize(group_exponent.size());
 	exp_table([&d](const int c) { return d[c][3]; }, exps.data());
 	const int *group = prim_exp_group.data();
+	thread_local ao_scratch<1> ao;
+	ao.begin(coef_ao_major.size() / nmo);
 
 	for (j = 0; j < nex; j++)
 	{
 		ex = exps[group[j]];
-		if (ex == 0.0)
+		if (ex == 0.0 || prim_ao[j] < 0)
 		{ // corresponds to cutoff of maximum density contribution of 1E-5
 			continue;
 		}
@@ -439,15 +485,9 @@ const double WFN::compute_dens_cartesian(
 		default: break;
 		}
 
-		// use pointer arithmetic and cache coefficient pointer
-		// This avoids repeated virtual function calls to get_coefficient_f
-		const double *c_row = coefs + (size_t)j * nmo;
-		double *phi_ptr = phi_data;
-		for (int mo = 0; mo < nmo; ++mo, ++phi_ptr)
-		{
-			*phi_ptr += c_row[mo] * ex;
-		}
+		ao.add(prim_ao[j], prim_ao_scale[j], &ex);
 	}
+	ao.to_mo(coef_ao_major.data(), nmo, phi_data);
 
 	// use pointer arithmetic and minimize overhead
 	const double *phi_ptr = phi_data;
@@ -1570,9 +1610,50 @@ const double* WFN::get_coef_primitive_major() const
 			coef_primitive_major[(size_t)j * _nmo + mo] = src[j];
 	}
 	build_exp_groups();
+	build_ao_contraction();
 	valid.store(true, std::memory_order_release);
 	return coef_primitive_major.data();
 }
+
+void WFN::build_ao_contraction() const
+{
+	const int _nmo = get_nmo(false);
+	const double* const cp = coef_primitive_major.data();
+	prim_ao.assign(nex, -1);
+	prim_ao_scale.assign(nex, 0.0);
+	ivec rep;  //the first primitive of every function; its row is the function's row
+	std::map<std::pair<int, int>, ivec> by_shape;  //(centre, type) -> functions
+	for (int j = 0; j < nex; j++) {
+		const double* r = cp + (size_t)j * _nmo;
+		int m = 0;
+		for (int mo = 1; mo < _nmo; mo++)
+			if (std::abs(r[mo]) > std::abs(r[m])) m = mo;
+		if (r[m] == 0.0) continue;
+		ivec& fs = by_shape[{ centers[j], types[j] }];
+		for (const int a : fs) {
+			const double* q = cp + (size_t)rep[a] * _nmo;
+			if (q[m] == 0.0) continue;
+			const double s = r[m] / q[m];
+			bool same = true;
+			for (int mo = 0; mo < _nmo && same; mo++) same = std::abs(r[mo] - s * q[mo]) <= 1e-12 * std::abs(r[m]);
+			if (same) {
+				prim_ao[j] = a;
+				prim_ao_scale[j] = s;
+				break;
+			}
+		}
+		if (prim_ao[j] < 0) {
+			prim_ao[j] = (int)rep.size();
+			prim_ao_scale[j] = 1.0;
+			fs.push_back(prim_ao[j]);
+			rep.push_back(j);
+		}
+	}
+	coef_ao_major.resize(rep.size() * (size_t)_nmo);
+	for (size_t a = 0; a < rep.size(); a++)
+		std::copy_n(cp + (size_t)rep[a] * _nmo, _nmo, coef_ao_major.data() + a * _nmo);
+}
+
 
 void WFN::build_exp_groups() const
 {
@@ -2183,7 +2264,8 @@ void WFN::computeRhoELI(
 void WFN::computeELIGrad(
 	const d3 &PosGrid,
 	double& out_Eli,
-	d3& out_grad
+	d3& out_grad,
+	double *out_rho
 ) const
 {
 	//ELI-D Y = rho/2 (48/g)^(3/8) with g = rho tau - |grad rho|^2 / 4, so
@@ -2201,15 +2283,23 @@ void WFN::computeELIGrad(
 		for (int k = 0; k < 3; k++) d_[k] = PosGrid[k] - atoms[j].get_coordinate(k);
 		d_[3] = d_[0] * d_[0] + d_[1] * d_[1] + d_[2] * d_[2];
 	}
-	const double *const coefs = get_coef_primitive_major();
+	if (!get_coef_primitive_major())
+	{
+		out_Eli = 0;
+		out_grad = { 0, 0, 0 };
+		if (out_rho) *out_rho = 0.0;
+		return;
+	}
 	thread_local vec exps;
 	if (exps.size() < group_exponent.size()) exps.resize(group_exponent.size());
 	exp_table([r2 = d.data()](const int c) { return r2[4 * (size_t)c + 3]; }, exps.data());
 	const int *group = prim_exp_group.data();
+	thread_local ao_scratch<10> ao;
+	ao.begin(coef_ao_major.size() / _nmo);
 	for (int j = 0; j < nex; j++)
 	{
 		const double ex = exps[group[j]];
-		if (ex == 0.0)
+		if (ex == 0.0 || prim_ao[j] < 0)
 			continue;
 		const double *d_ = d.data() + 4 * (centers[j] - 1);
 		const double ex2 = 2 * exponents[j];
@@ -2233,18 +2323,10 @@ void WFN::computeELIGrad(
 			f1[0] * f[1] * f[2] * ex, f[0] * f1[1] * f[2] * ex, f[0] * f[1] * f1[2] * ex,
 			f2[0] * f[1] * f[2] * ex, f[0] * f2[1] * f[2] * ex, f[0] * f[1] * f2[2] * ex,
 			f1[0] * f1[1] * f[2] * ex, f1[0] * f[1] * f1[2] * ex, f[0] * f1[1] * f1[2] * ex };
-		//Component-major, as in computeGrad: ten unit-stride accumulations instead of one
-		//stride-ten scatter per MO. Same products, same order over primitives.
-		const double *c_row = coefs + (size_t)j * _nmo;
-		double *const phi0 = phi.data();
-		for (int k = 0; k < 10; k++)
-		{
-			double *const pk = phi0 + (size_t)k * _nmo;
-			const double ck = chi[k];
-			for (int mo = 0; mo < _nmo; mo++)
-				pk[mo] += ck * c_row[mo];
-		}
+		ao.add(prim_ao[j], prim_ao_scale[j], chi);
 	}
+	//Component-major, as in computeGrad: ten unit-stride accumulations per function
+	ao.to_mo(coef_ao_major.data(), _nmo, phi.data());
 	static constexpr int hidx[3][3] = { {4, 7, 8}, {7, 5, 9}, {8, 9, 6} };
 	double rho = 0, tau = 0, G[3]{ 0, 0, 0 }, T[3]{ 0, 0, 0 }, H[3][3]{ {0, 0, 0}, {0, 0, 0}, {0, 0, 0} };
 	for (int mo = 0; mo < _nmo; mo++)
@@ -2266,6 +2348,7 @@ void WFN::computeELIGrad(
 			}
 		}
 	}
+	if (out_rho) *out_rho = rho;
 	const double g = rho * tau - 0.25 * (G[0] * G[0] + G[1] * G[1] + G[2] * G[2]);
 	if (!(g > 0))
 	{
@@ -2325,20 +2408,23 @@ void WFN::computeGrad(
 	const int *types_data = types.data();
 	const double *exponents_data = exponents.data();
 
-	const MO *MOs_data = MOs.data();
-	//Primitive-major coefficients: every MO for one primitive is contiguous here, where
-	//MOs keeps them nex apart. Identical arithmetic in identical order - one sequential
-	//read per primitive instead of nmo scattered ones, and no per-point heap allocation.
-	const double *const coefs = get_coef_primitive_major();
+	if (!get_coef_primitive_major())
+	{
+		gradient = { 0, 0, 0 };
+		if (rho) *rho = 0.0;
+		return;
+	}
 	thread_local vec exps;
 	if (exps.size() < group_exponent.size()) exps.resize(group_exponent.size());
 	exp_table([r2 = d.data()](const int c) { return r2[16 * (size_t)c + 3]; }, exps.data());
 	const int *group = prim_exp_group.data();
+	thread_local ao_scratch<4> ao;
+	ao.begin(coef_ao_major.size() / _nmo);
 
 	for (j = 0; j < nex; j++)
 	{
 		ex = exps[group[j]];
-		if (ex == 0.0)
+		if (ex == 0.0 || prim_ao[j] < 0)
 			continue;
 		const double *d_ = d.data() + 16 * (centers_data[j] - 1);
 		const int type = types_data[j];
@@ -2411,20 +2497,10 @@ void WFN::computeGrad(
 		chi[2] = (y1 - ex2 * ynext) * x0 * z0 * ex;
 		chi[3] = (z1 - ex2 * znext) * x0 * y0 * ex;
 
-		//Component-major: phi[k * nmo + mo]. The same products summed over primitives in the
-		//same order - so the numbers are bit-identical - but each component's accumulation now
-		//walks memory with unit stride against one broadcast scalar, which is what the vector
-		//units want. The interleaved layout wrote four doubles per MO at a stride of four.
-		const double *c_row = coefs + (size_t)j * _nmo;
-		double *const phi0 = phi.data();
-		for (k = 0; k < 4; k++)
-		{
-			double *const pk = phi0 + (size_t)k * _nmo;
-			const double ck = chi[k];
-			for (int mo = 0; mo < _nmo; mo++)
-				pk[mo] += ck * c_row[mo];
-		}
+		ao.add(prim_ao[j], prim_ao_scale[j], chi);
 	}
+	//Component-major: phi[k * nmo + mo], unit stride against one broadcast scalar per function
+	ao.to_mo(coef_ao_major.data(), _nmo, phi.data());
 
 	double Grad[3]{ 0, 0, 0 }, Rho = 0.0;
 

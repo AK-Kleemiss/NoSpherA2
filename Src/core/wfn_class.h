@@ -111,6 +111,14 @@ private:
 	mutable ivec center_group_start; // [ncen + 1]: the groups of centre c are [start[c], start[c + 1])
 	mutable vec center_min_exponent; // [ncen]: the most diffuse primitive on the centre
 	void build_exp_groups() const;
+	// Primitives whose coefficient rows are proportional over every MO act as one contracted
+	// function: phi_mo = sum_A C[A][mo] sum_{j in A} s_j chi_j, exactly. The evaluators add the
+	// primitives up first and multiply nao rows into the MOs instead of nex. Read off the
+	// coefficients, so a .wfn works as well as a basis-set reader. Built with coef_primitive_major.
+	mutable ivec prim_ao;           // [nex] -> function, -1 for a row that is zero in every MO
+	mutable vec prim_ao_scale;      // [nex]: row j = scale * the function's row
+	mutable vec coef_ao_major;      // [nao * nmo]
+	void build_ao_contraction() const;
 	// Vector of centeres that primitives are base on
 	ivec centers;
 	// Vector of types of primitives
@@ -596,8 +604,9 @@ public:
 	const double computeLap(const d3& PosGrid) const;
 	/** Compute Rho and ELI together. */
 	void computeRhoELI(const d3 &PosGrid, double& Rho, double& Eli) const;
-	//ELI-D and its analytic gradient from the orbital values, gradients and Hessians
-	void computeELIGrad(const d3 &PosGrid, double& Eli, d3& gradient) const;
+	//ELI-D and its analytic gradient from the orbital values, gradients and Hessians;
+	//rho, when asked for, is the density of the same orbital pass
+	void computeELIGrad(const d3 &PosGrid, double& Eli, d3& gradient, double *rho = nullptr) const;
 	/** Compute gradient. */
 	//rho comes out of the same orbital pass when a pointer is given: the reduction already
 	//has phi, so the density is one multiply-add per MO instead of a second pass over every

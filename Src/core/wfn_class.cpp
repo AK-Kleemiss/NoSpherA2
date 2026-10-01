@@ -58,6 +58,9 @@ void WFN::reset()
 	group_exponent.clear();
 	center_group_start.clear();
 	center_min_exponent.clear();
+	prim_ao.clear();
+	prim_ao_scale.clear();
+	coef_ao_major.clear();
 	centers.clear();
 	types.clear();
 	exponents.clear();
