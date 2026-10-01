@@ -140,16 +140,16 @@ Delocalization indices (13 occupied orbitals):
 GridManager: Setting up prototype grids for atom types...
 GridManager: Generating integration grids for atoms...
 GridManager: Generated total of 111906 grid points.
-Quadrature points sent along the field: 50706, left the grid: 0
+Quadrature points sent along the field: 48893, left the grid: 0
 
 ELI-D Analysis (atomic quadrature grids):
   basin  label               electrons      volume         maximum        x          y          z
-      1  Li4 core               2.0429     61.0252         43.7858    -10.574     13.777      2.315
-      2  Li4 LP                 0.6609    759.6629         14.5564    -10.708     19.268      2.471
-      3  N0 core                2.1129      0.4634         12.9571    -10.483     10.089      2.209
-      4  Li4 LP                 0.0940     37.6616         12.6891    -10.676     17.954      2.434
-      5  H1                     1.9230    118.8837          4.6691     -9.399      9.356      3.743
-      6  H2                     1.9310    119.4668          4.6691    -12.344      9.323      2.334
-      7  H3                     1.9266    120.0901          4.6690     -9.653      9.442      0.489
-      8  N0-Li4 bond            2.1609     56.3322          1.9677    -10.517     11.461      2.248
-  total in basins: 12.8523   outside every basin: 0.1554
+      1  Li4 core               2.0219     16.7443         43.7858    -10.574     13.777      2.315
+      2  Li4 LP                 0.6838    808.9687         14.5564    -10.708     19.268      2.471
+      3  N0 core                2.1094      0.4465         12.9571    -10.483     10.089      2.209
+      4  Li4 LP                 0.0910     30.6951         12.6891    -10.676     17.954      2.434
+      5  H1                     1.9230    118.8975          4.6691     -9.399      9.356      3.743
+      6  H2                     1.9345    119.4834          4.6691    -12.344      9.323      2.334
+      7  H3                     1.9266    120.0911          4.6690     -9.653      9.442      0.489
+      8  N0-Li4 bond            2.1610     56.3319          1.9677    -10.517     11.461      2.248
+  total in basins: 12.8511   outside every basin: 0.1566

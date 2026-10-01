@@ -1991,9 +1991,14 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 	for (size_t m = 0; m < maxima.size(); m++) bcen[m] = d3{ maxima[m][0], maxima[m][1], maxima[m][2] };
 	auto at_maximum = [&](const d3 &p) {
 		for (size_t m = 0; m < maxima.size(); m++) {
-			if (std::pow(p[0] - maxima[m][0], 2) + std::pow(p[1] - maxima[m][1], 2) + std::pow(p[2] - maxima[m][2], 2) < catch2)
-				return basin_of(m);
-			if (beta2[m] > 0.0 && std::pow(p[0] - bcen[m][0], 2) + std::pow(p[1] - bcen[m][1], 2) + std::pow(p[2] - bcen[m][2], 2) < beta2[m])
+			//A beta sphere was measured and replaces the catch radius, which is not: two streaming
+			//voxels are 0.378 bohr, past F's core minimum at 0.32-0.38, and gave F2's core 2.29 e
+			//where the minimum holds 2.14 (DGrid 2.13)
+			if (beta2[m] > 0.0) {
+				if (std::pow(p[0] - bcen[m][0], 2) + std::pow(p[1] - bcen[m][1], 2) + std::pow(p[2] - bcen[m][2], 2) < beta2[m])
+					return basin_of(m);
+			}
+			else if (std::pow(p[0] - maxima[m][0], 2) + std::pow(p[1] - maxima[m][1], 2) + std::pow(p[2] - maxima[m][2], 2) < catch2)
 				return basin_of(m);
 		}
 		return 0;
@@ -2134,15 +2139,33 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 	const double stall_reach = 1e30;
 	//The trajectory and quadrature share the density isosurface.
 	const double stall_floor = basin_density_cutoff;
+	//An ELI-D walk stalls on a ridge too flat to climb, a lone-pair torus above all, and the
+	//maximum nearest such a point is the atom's core behind the shell minimum: H2CF2 gave each
+	//F core 0.3 e of its lone pairs that way. Take the maximum, among those up to twice the
+	//nearest distance away, whose straight path from p stays highest. d2 is the nearest squared.
+	auto highest_path = [&](const d3 &p, const double d2) {
+		int best = 0;
+		double best_low = -1.0, best_q = 0.0;
+		for (size_t m = 0; m < maxima.size(); m++) {
+			const d3 v{ maxima[m][0] - p[0], maxima[m][1] - p[1], maxima[m][2] - p[2] };
+			const double q = v[0] * v[0] + v[1] * v[1] + v[2] * v[2];
+			if (q > 4.0 * d2) continue;
+			double low = std::numeric_limits<double>::max();
+			for (int k = 1; k < 8; k++)
+				low = std::min(low, wavy.computeELI(d3{ p[0] + k / 8.0 * v[0], p[1] + k / 8.0 * v[1], p[2] + k / 8.0 * v[2] }));
+			if (low > best_low || (low == best_low && q < best_q)) { best = basin_of(m); best_low = low; best_q = q; }
+		}
+		return best;
+	};
 	//Resolve a stalled density trajectory from its starting side of the separatrix.
-	auto stalled = [&](const d3 &start, const d3 &r, const double gn = -1.0) {
+	auto stalled =[&](const d3 &start, const d3 &r, const double gn = -1.0) {
 		const double rho = valence(r);
 		if (rho < stall_floor) { basin_stall_seen(-1.0, 0.0); return 0; }
 		double d2 = std::numeric_limits<double>::max();
 		for (size_t m = 0; m < maxima.size(); m++)
 			d2 = std::min(d2, std::pow(r[0] - maxima[m][0], 2) + std::pow(r[1] - maxima[m][1], 2) + std::pow(r[2] - maxima[m][2], 2));
 		basin_stall_seen(std::sqrt(d2), rho, gn);
-		const int b = nearest_maximum(eli_field ? r : start, stall_reach);
+		const int b = eli_field ? highest_path(r, d2) : nearest_maximum(start, stall_reach);
 		basin_stall_gave_to(b);
 		return b;
 	};
@@ -2197,7 +2220,7 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 					//Retry a grown step at the base length after excessive turning.
 					if (grown_last) { adp_count(g_adp_fall); r = r_prev; last_value = value_prev; mult = 1.0; grown_last = false; continue; }
 					mult = 1.0;
-					if (!eli_field && g_step_shrink && shrink > 0.0625) {
+					if (g_step_shrink && shrink > 0.0625) {
 						adp_count(g_adp_shrink);
 						shrink *= 0.5;
 						r = r_prev;
