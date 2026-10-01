@@ -1365,6 +1365,33 @@ double core_shell_radius(const int Z)
 	return 1.8;
 }
 
+//A d-block metal's outer core shell - (n-1)s,p with the d electrons - stands apart from its inner core in
+//ELI-D, and DGrid's ELIDcore keeps it so: over the 312-molecule reference set the core attractor sits within
+//0.29 bohr (Ti, Fe, Ni), 0.37 (Pd) and 0.43 (Pt) and the shell's six or so basins of 2-3 e from 0.70, 0.84
+//and 1.16 bohr; Ca's 3s3p shell at 1.19 likewise. core_shell_radius reaches past that shell and folded
+//14-17 e of it into the core. These radii sit in the gap. Zn, Cd and Hg are left alone: DGrid shows
+//no separate shell on a closed d10 core (Zn 27.8 e, Cd 44.8 e).
+double eli_core_radius(const int Z)
+{
+	if (Z >= 19 && Z <= 29) return 0.5;  // K-Cu
+	if (Z >= 39 && Z <= 47) return 0.6;  // Y-Ag
+	if (Z == 57 || (Z >= 72 && Z <= 79)) return 0.8;  // La, Hf-Au
+	return core_shell_radius(Z);
+}
+
+static bool in_outer_core_shell(const d4 &m, const std::vector<atom> &atoms)
+{
+	for (const atom &a : atoms) {
+		const int Z = a.get_charge();
+		const double inner = eli_core_radius(Z), outer = core_shell_radius(Z);
+		if (inner >= outer) continue;
+		const d3 p = a.get_pos();
+		const double d2 = std::pow(m[0] - p[0], 2) + std::pow(m[1] - p[1], 2) + std::pow(m[2] - p[2], 2);
+		if (d2 >= inner * inner && d2 < outer * outer) return true;
+	}
+	return false;
+}
+
 //Both merges below decide only WHICH maxima belong together, and then do the same three things with
 //the answer: keep the highest of each group, renumber the cube, and report where each old basin went.
 //keeper[b] is the group's representative - its lowest member - or -1 for a maximum that stands alone.
@@ -1410,7 +1437,7 @@ int unify_core_basins(cubei &basin_cube, std::vector<d4> &maxima, const std::vec
 	for (int b = 0; b < nb; b++)
 		for (size_t a = 0; a < atoms.size(); a++) {
 			const d3 ap = atoms[a].get_pos();
-			const double r = core_shell_radius(atoms[a].get_charge());
+			const double r = eli_core_radius(atoms[a].get_charge());
 			if (std::pow(maxima[b][0] - ap[0], 2) + std::pow(maxima[b][1] - ap[1], 2) + std::pow(maxima[b][2] - ap[2], 2) < r * r) { owner[b] = static_cast<int>(a); break; }
 		}
 	//The atom's core keeps the highest of its maxima; the merged ones are dropped
@@ -1424,17 +1451,23 @@ int unify_core_basins(cubei &basin_cube, std::vector<d4> &maxima, const std::vec
 }
 
 //Merge grid-fragmented ELI-D shells by persistence.
-int unify_shell_basins(cubei &basin_cube, std::vector<d4> &maxima, ivec *basin_map, double max_dist, double rel_tol)
+int unify_shell_basins(cubei &basin_cube, std::vector<d4> &maxima, ivec *basin_map, double max_dist, double rel_tol, const std::vector<atom> *atoms)
 {
 	const int nb = static_cast<int>(maxima.size());
 	if (nb < 2 || max_dist <= 0.0) return 0;
 	const double d2 = max_dist * max_dist;
+	//A metal's outer core shell is a few near-degenerate maxima 0.99 bohr apart at the closest (Ni's six
+	//at 0.70 bohr), real ones, so there only a grid duplicate - half the length - is folded
+	const double d2_shell = d2 / 4.0;
+	std::vector<char> shell(nb, 0);
+	if (atoms)
+		for (int b = 0; b < nb; b++) shell[b] = in_outer_core_shell(maxima[b], *atoms);
 	ivec root(nb);
 	for (int b = 0; b < nb; b++) root[b] = b;
 	auto find = [&root](int b) { while (root[b] != b) b = root[b] = root[root[b]]; return b; };
 	for (int b = 1; b < nb; b++)
 		for (int c = 0; c < b; c++) {
-			if (std::pow(maxima[b][0] - maxima[c][0], 2) + std::pow(maxima[b][1] - maxima[c][1], 2) + std::pow(maxima[b][2] - maxima[c][2], 2) > d2) continue;
+			if (std::pow(maxima[b][0] - maxima[c][0], 2) + std::pow(maxima[b][1] - maxima[c][1], 2) + std::pow(maxima[b][2] - maxima[c][2], 2) > (shell[b] || shell[c] ? d2_shell : d2)) continue;
 			const double hi = std::max(std::abs(maxima[b][3]), std::abs(maxima[c][3]));
 			if (hi > 0.0 && std::abs(maxima[b][3] - maxima[c][3]) > rel_tol * hi) continue;
 			const int rb = find(b), rc = find(c);
@@ -2735,7 +2768,7 @@ svec assign_labels_to_basins(const std::vector<d4> &Maxima, const std::vector<at
 				else if (lone_atom) // one atom in the molecule: inside its core radius a core shell, outside it the valence shell
 					result[i] = atoms[atom_index1].get_label() + to_string(atom_index1) + (min_dist1 < core_dist ? " core" : " LP");
 				else if (min_dist1 < core_dist && atoms[atom_index1].get_charge() > 2) // If the maximum is very close to an atom, we assume it's a core basin and label it with that atom
-					result[i] = atoms[atom_index1].get_label() + to_string(atom_index1) + " core";
+					result[i] = atoms[atom_index1].get_label() + to_string(atom_index1) + (min_dist1 < std::pow(eli_core_radius(atoms[atom_index1].get_charge()), 2) ? " core" : " shell");
 				else if ((ratio < 0.333 || ratio > 3) && atoms[atom_index1].get_charge() > 2) // If the maximum is significantly closer to one atom than to the other, we assume it's a valence basin and label it with the closest atom
 					result[i] = atoms[atom_index1].get_label() + to_string(atom_index1) + " LP";
 				else if (between) // between its two nearest nuclei: a bond basin, labelled with both atoms

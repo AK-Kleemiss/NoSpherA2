@@ -86,7 +86,10 @@ std::vector<d4> analytic_eli_maxima(const WFN& wavy, bool debug = false);
 //Radius holding the ELI-D maxima of an atom's core shells, by period; the outermost shell the
 //element keeps beneath its valence peaks at about 0.7 bohr for the first transition row
 double core_shell_radius(const int Z);
-//Every basin whose maximum lies within an atom's core radius becomes that atom's one core
+//The ELI-D core: core_shell_radius, except for a d-block metal (and K, Ca) whose outer core shell
+//it stops short of, so that shell keeps its own basins, labelled "shell"
+double eli_core_radius(const int Z);
+//Every basin whose maximum lies within an atom's ELI-D core radius becomes that atom's one core
 //basin, as DGrid's ELIDcore does; returns the number of basins merged away.
 //basin_map, when given, comes back sized maxima.size() + 1 and holds the 1-based basin each of
 //the maxima the call was handed ends up in. A streaming integration needs both halves of that:
@@ -97,7 +100,8 @@ int unify_core_basins(cubei& basin_cube, std::vector<d4>& maxima, const std::vec
 //Fold a shattered shell - maxima that are close together AND near-degenerate in value - into one basin
 //each. max_dist is a physical length in bohr, deliberately not a voxel count: the defect gets worse as
 //the grid is refined, so a grid-derived cutoff would chase it. See the comment on the definition.
-int unify_shell_basins(cubei& basin_cube, std::vector<d4>& maxima, ivec* basin_map = nullptr, double max_dist = 1.2, double rel_tol = 0.05);
+//With atoms, maxima in a metal's outer core shell (see eli_core_radius) merge only within max_dist / 2.
+int unify_shell_basins(cubei& basin_cube, std::vector<d4>& maxima, ivec* basin_map = nullptr, double max_dist = 1.2, double rel_tol = 0.05, const std::vector<atom>* atoms = nullptr);
 //Atomic overlap matrices S^b_ij = int_b phi_i phi_j, taken on the same quadrature points and
 //with the same basin assignment as the populations, so a basin's trace is its population by
 //construction. One packed lower triangle per basin over the occupied MOs

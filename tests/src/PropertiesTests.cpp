@@ -1404,6 +1404,40 @@ TEST(PropertiesBasinTests, UnifyCoreBasinsMergesMaximaInsideTheCoreRadius)
 	EXPECT_EQ(two.get_value(1, 0, 0), 2);
 }
 
+// A d-block metal keeps its outer core shell apart from the core, as DGrid's ELIDcore does: NiLiL0PhPMe3's
+// Ni core attractor within 0.19 bohr and six shell basins of 1.8-3.4 e at 0.70-0.74 bohr, which the 1.0 bohr
+// core radius used to fold in (core 25.9 e against DGrid's 9.7). Neither merge may take the six.
+TEST(PropertiesBasinTests, MetalOuterCoreShellKeepsItsOwnBasins)
+{
+	EXPECT_EQ(eli_core_radius(28), 0.5);
+	EXPECT_EQ(eli_core_radius(46), 0.6);
+	EXPECT_EQ(eli_core_radius(78), 0.8);
+	EXPECT_EQ(eli_core_radius(30), core_shell_radius(30));  // Zn: closed d10, no separate shell
+	EXPECT_EQ(eli_core_radius(17), core_shell_radius(17));
+
+	std::vector<atom> atoms;
+	atoms.emplace_back("Ni", atomID(), 1, 0.0, 0.0, 0.0, 28);
+	std::vector<d4> maxima{ d4{ 0.1, 0.0, 0.0, 6.5 }, d4{ -0.1, 0.0, 0.0, 6.4 } };  // two core pieces
+	const double r = 0.72;
+	const double six[6][3] = { { r, 0, 0 }, { -r, 0, 0 }, { 0, r, 0 }, { 0, -r, 0 }, { 0, 0, r }, { 0, 0, -r } };
+	for (int k = 0; k < 6; k++) maxima.push_back(d4{ six[k][0], six[k][1], six[k][2], 1.414 + 0.0005 * k });
+	maxima.push_back(d4{ r + 0.25, 0.0, 0.0, 1.4130 });  // a grid duplicate 0.25 bohr off the first, folded
+	const int nb = static_cast<int>(maxima.size());
+	cubei basins({ nb, 1, 1 }, 0, true);
+	for (int b = 0; b < nb; b++) basins.set_value(b, 0, 0, b + 1);
+	EXPECT_EQ(unify_core_basins(basins, maxima, atoms), 1);
+	EXPECT_EQ(unify_shell_basins(basins, maxima, nullptr, 1.2, 0.05, &atoms), 1);
+	ASSERT_EQ(maxima.size(), 7u);
+	const svec labels = assign_labels_to_basins(maxima, std::vector<atom>{ atoms[0], atom("P", atomID(), 2, 4.2, 0.0, 0.0, 15) }, false, 1);
+	EXPECT_EQ(labels[0], "Ni0 core");
+	for (int k = 1; k < 7; k++) EXPECT_EQ(labels[k], "Ni0 shell") << k;
+	// without the atoms the shell merge chains the six into one, which is what this guards against
+	std::vector<d4> blind = maxima;
+	cubei b2({ 7, 1, 1 }, 0, true);
+	for (int b = 0; b < 7; b++) b2.set_value(b, 0, 0, b + 1);
+	EXPECT_EQ(unify_shell_basins(b2, blind, nullptr, 1.2, 0.05), 5);
+}
+
 // Outside the cores the same sphere of maxima appears with nothing to fold it: a spherically symmetric
 // ELI-D shell sampled on a cubic grid is handed out one basin per voxel, and Co2 - two atoms - kept 845
 // basins that way, 824 of them under 0.01 e. The persistence merge cannot fix it: swept from 5e-3 to
