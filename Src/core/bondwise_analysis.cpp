@@ -508,7 +508,7 @@ namespace {
 		const int n = off.back();
 		auto one_e = [&](libcint::CINTIntegralFunction *fn) {
 			occ::Mat M = occ::Mat::Zero(n, n);
-			std::vector<double> buf(64 * 64);
+			vec buf(64 * 64);
 			for (int i = 0; i < static_cast<int>(prims.size()); i++)
 				for (int j = 0; j < static_cast<int>(prims.size()); j++) {
 					int shls[2] = { i, j };
@@ -678,7 +678,7 @@ namespace {
 		in.read(reinterpret_cast<char *>(&cols), sizeof(cols));
 		if (!in || rows <= 0 || cols <= 0 || rows > 100000 || cols > 100000)
 			return false;
-		std::vector<double> values(static_cast<size_t>(rows * cols));
+		vec values(static_cast<size_t>(rows * cols));
 		in.read(reinterpret_cast<char *>(values.data()), values.size() * sizeof(double));
 		if (!in)
 			return false;

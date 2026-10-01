@@ -119,7 +119,6 @@ void save_k_points(vec2& k_pt, hkl_list& hkl)
 		}
 		hkl_ = next(hkl_);
 	}
-	k_points_file.flush();
 	k_points_file.close();
 }
 
