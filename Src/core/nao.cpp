@@ -229,7 +229,7 @@ NAOResult build_naos(const dMatrix2 &P_in, const dMatrix2 &S_in, const std::vect
     const bool prenao_net = nao_env("NAO_PRENAO_NET");
     MatrixXd C = MatrixXd::Zero(nao, nao);
     VectorXd pre_occ = VectorXd::Zero(nao);
-    std::vector<NAO> orbitals(nao);
+    std::vector<NAO> orbitals(static_cast<size_t>(nao));
     int col = 0;
     std::map<std::pair<int, int>, ivec> group_columns;  //(atom, l) -> column indices, shell-major
     for (auto &kv : groups) {
@@ -237,13 +237,23 @@ NAOResult build_naos(const dMatrix2 &P_in, const dMatrix2 &S_in, const std::vect
         g.nshell = static_cast<int>(g.idx.size());
         const int nm = 2 * g.l + 1, ns = g.nshell;
         MatrixXd Sb = MatrixXd::Zero(ns, ns), Pb = MatrixXd::Zero(ns, ns);
-        for (int s1 = 0; s1 < ns; s1++)
-            for (int s2 = 0; s2 < ns; s2++)
-                for (int m = 0; m < nm; m++) {
-                    Sb(s1, s2) += S(g.idx[s1][m], g.idx[s2][m]) / nm;
-                    Pb(s1, s2) += (prenao_net ? P(g.idx[s1][m], g.idx[s2][m])
-                                              : SPS(g.idx[s1][m], g.idx[s2][m])) / nm;
+
+        for (int s1 = 0; s1 < ns; ++s1)
+        {
+            auto& shell1 = g.idx.at(static_cast<size_t>(s1));
+            for (int s2 = 0; s2 < ns; ++s2)
+            {
+                auto& shell2 = g.idx.at(static_cast<size_t>(s2));
+                for (int m = 0; m < nm; ++m)
+                {
+                    const int i = shell1.at(static_cast<size_t>(m));
+                    const int j = shell2.at(static_cast<size_t>(m));
+
+                    Sb(s1, s2) += S(i, j) / static_cast<double>(nm);
+                    Pb(s1, s2) += (prenao_net ? P(i, j) : SPS(i, j)) / static_cast<double>(nm);
                 }
+            }
+        }
         //(S P S)^A c = w S^A c becomes the ordinary eigenproblem X (S P S)^A X y = w y with
         //X = (S^A)^-1/2 and c = X y, which keeps c^T S c = 1
         const MatrixXd X = sym_power(Sb, -0.5);
@@ -257,13 +267,15 @@ NAOResult build_naos(const dMatrix2 &P_in, const dMatrix2 &S_in, const std::vect
                 for (int s = 0; s < ns; s++)
                     C(g.idx[s][m], col) = c(s);
                 pre_occ(col) = w;
-                orbitals[col].atom = g.atom;
-                orbitals[col].l = g.l;
-                orbitals[col].m = ao[g.idx[0][m]].m;
-                orbitals[col].shell = shell;
-                orbitals[col].n = g.l + 1 + shell;
-                group_columns[{ g.atom, g.l }].push_back(col);
-                col++;
+
+                NAO& orbital = orbitals.at(static_cast<size_t>(col));
+                orbital.atom = g.atom;
+                orbital.l = g.l;
+                orbital.m = m;
+                orbital.shell = shell;
+                orbital.n = g.l + 1 + shell;
+                group_columns[{g.atom, g.l}].push_back(col);
+                ++col;
             }
         }
     }
@@ -283,18 +295,24 @@ NAOResult build_naos(const dMatrix2 &P_in, const dMatrix2 &S_in, const std::vect
             n_core = std::max(0, n_core - (n_nmb - g.nshell));
             n_nmb = g.nshell;
         }
-        for (int c : group_columns[{ g.atom, g.l }]) {
-            const int sh = orbitals[c].shell;
-            orbitals[c].type = (sh < n_core) ? NAOClass::Core
-                             : (sh < n_nmb)  ? NAOClass::Valence
-                                             : NAOClass::Rydberg;
-            //an ECP core shell is gone from the basis, so the remaining ones are labelled from
-            //the first shell the basis actually carries
-            if (ecp_electrons[g.atom] > 0 && (g.l < 4)) {
+
+        const auto gc_it = group_columns.find({ g.atom, g.l });
+
+        for (const int c : gc_it->second) {
+            NAO& orbital = orbitals.at(static_cast<size_t>(c));
+
+            const int sh = orbital.shell;
+
+            orbital.type =
+                (sh < n_core) ? NAOClass::Core :
+                (sh < n_nmb) ?  NAOClass::Valence :
+                                NAOClass::Rydberg;
+
+            if (ecp_electrons.at(static_cast<size_t>(g.atom)) > 0 && g.l < 4) {
                 int full_shells[4] = { 0, 0, 0, 0 }, full_cores[4] = { 0, 0, 0, 0 };
                 natural_minimal_shells(Z, full_shells, full_cores);
                 const int missing = std::max(0, full_shells[g.l] - g.nshell);
-                orbitals[c].n += missing;
+                orbital.n += missing;
             }
         }
     }
@@ -311,24 +329,38 @@ NAOResult build_naos(const dMatrix2 &P_in, const dMatrix2 &S_in, const std::vect
         cols_by_class[static_cast<int>(orbitals[i].type)].push_back(i);
     //(atom, l) -> columns, shell-major, for the m-averaging in step 4 and in the weight update
     std::map<std::pair<int, int>, ivec> l_blocks;
-    for (int i = 0; i < nao; i++)
-        l_blocks[{ orbitals[i].atom, orbitals[i].l }].push_back(i);
-
+    
+    for (int i = 0; i < nao; ++i)
+    {
+        const NAO& o = orbitals.at(static_cast<size_t>(i));
+        l_blocks[{o.atom, o.l}].push_back(i);
+    }
+    
     //Use pre-NAO occupancies for core and valence OWSO; Rydberg weights come from step 5.
     MatrixXd done(nao, 0);  //everything orthonormalised so far, in S
     for (int cls = 0; cls < 3; cls++) {
         const ivec &cols = cols_by_class[cls];
         if (cols.empty()) continue;
-        MatrixXd B(nao, static_cast<int>(cols.size()));
-        VectorXd w(static_cast<int>(cols.size()));
-        for (size_t j = 0; j < cols.size(); j++) {
-            B.col(static_cast<int>(j)) = C.col(cols[j]);
-            w(static_cast<int>(j)) = std::max(pre_occ(cols[j]), 0.0);
+    
+        const int ncols = static_cast<int>(cols.size());
+        MatrixXd B(nao, ncols);
+        VectorXd w(ncols);
+    
+        for (int j = 0; j < ncols; j++) {
+            const int c = cols.at(static_cast<size_t>(j));
+    
+            B.col(j) = C.col(c);
+            w(j) = std::max(pre_occ(c), 0.0);
         }
         if (done.cols() > 0) {
             B -= done * (done.transpose() * S * B);
-            for (int j = 0; j < B.cols(); j++)
-                B.col(j) /= std::sqrt(std::max(B.col(j).dot(S * B.col(j)), 1e-300));
+    
+            for (int j = 0; j < B.cols(); ++j)
+            {
+                const double norm2 = B.col(j).dot(S * B.col(j));
+    
+                B.col(j) /= std::sqrt(std::max(norm2, 1e-300));
+            }
         }
         //---------------------------------------------- 5. intracenter naturalization of the NRBs
         //Re-naturalize the Schmidt-projected Rydberg block before its OWSO.
@@ -369,10 +401,22 @@ NAOResult build_naos(const dMatrix2 &P_in, const dMatrix2 &S_in, const std::vect
         //to about 1e-5; one unweighted Loewdin on a matrix that is already I + O(1e-5) cleans that
         //up without moving the occupied orbitals
         B = B * sym_power(MatrixXd(B.transpose() * S * B), -0.5);
-        for (size_t j = 0; j < cols.size(); j++) C.col(cols[j]) = B.col(static_cast<int>(j));
-        const int old = static_cast<int>(done.cols());
-        done.conservativeResize(nao, old + B.cols());
-        done.rightCols(B.cols()) = B;
+
+
+        for (int j = 0; j < ncols; ++j)
+            C.col(cols.at(static_cast<size_t>(j))) = B.col(j);
+
+        // The old thing lead to a memory error. So i fixed it
+        const int old_cols = static_cast<int>(done.cols());
+
+        MatrixXd new_done(nao, old_cols + ncols);
+
+        if (old_cols > 0)
+            new_done.leftCols(old_cols) = done;
+
+        new_done.rightCols(ncols) = B;
+
+        done.swap(new_done);
     }
 
     //---------------------------------------------------------------- 4. natural character
@@ -443,13 +487,13 @@ NAOResult build_naos(const dMatrix2 &P_in, const dMatrix2 &S_in, const std::vect
     }
 
     //---------------------------------------------------------------- results
-    NAOResult res;
     const MatrixXd Pfin = C.transpose() * SPS * C;
     for (int i = 0; i < nao; i++) orbitals[i].occupation = Pfin(i, i);
 
     //Dump the AO -> NAO transform for comparison with NBO 7 unit 33.
     if (nao_env("NAO_DUMP_C")) dump_c_matrix("NAOC", C, orbitals, Pfin.diagonal());
-
+    NAOResult res;
+    
     res.C = to_dmatrix(C);
     res.orbitals = orbitals;
     res.atoms.resize(atoms.size());

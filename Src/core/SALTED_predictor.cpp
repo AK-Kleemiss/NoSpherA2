@@ -59,6 +59,15 @@ SALTEDPredictor::SALTEDPredictor(WFN wavy_in, options& opt_in)
 	SALTED_BINARY_FILE file = SALTED_BINARY_FILE(_path);
 	file.populate_config(config);
 
+	featomic_system = SALTED_Utils::gen_featomic_system(wavy);
+
+	natoms = 0;
+	for (auto a : wavy.get_atoms()) {
+		const std::string atom_symbol = a.get_label();
+		if (std::find(config.species.begin(), config.species.end(), atom_symbol) != config.species.end())
+			natoms++;
+	}//natoms is the number of atoms, that featomic creates a descriptor as a central atom for.
+
 	const std::vector<char> use_thakkar = SALTED_Utils::filter_input(wavy, opt_in, config);
 	if (!use_thakkar.empty()) {
 		spherical_fill_used = true;
@@ -68,7 +77,6 @@ SALTEDPredictor::SALTEDPredictor(WFN wavy_in, options& opt_in)
 	//wavy.write_xyz("temp_rascaline.xyz"); //Also this
 	//config.predict_filename = "temp_rascaline.xyz";
 
-	natoms = wavy.get_ncen();
 
 	if (wavy.get_nmo() != 0)
 		wavy.clear_MOs(); // Delete unneccesarry MOs, since we are predicting anyway.
@@ -333,10 +341,11 @@ void SALTEDPredictor::setup_atomic_environment()
 {
 	SALTED_Utils::set_lmax_nmax(lmax, nmax, *get_model_basis(), config.species);
 
-	atomic_symbols.reserve(wavy.get_ncen());
-	for (int i = 0; i < wavy.get_ncen(); i++)
+	atomic_symbols.reserve(natoms);
+	for (int i = 0; i < featomic_system.size(); i++)
 	{
-		std::string label = wavy.get_atom_label(i);
+		std::string label = constants::Labels[featomic_system.types()[i]];
+		if (std::find(config.species.begin(), config.species.end(), label) == config.species.end()) continue;
 		// Deuterium is hydrogen for the electron density; without this a joint
 		// X-ray/neutron structure is refused with "Excluded species: D"
 		if (label == "D" || label == "d")
@@ -357,8 +366,7 @@ void SALTEDPredictor::setup_atomic_environment()
 		std::cout << std::endl;
 	}
 
-	natoms = static_cast<int>(atomic_symbols.size());
-	for (int i = 0; i < atomic_symbols.size(); i++)
+	for (int i = 0; i < natoms; i++)
 	{
 		atom_idx[atomic_symbols[i]].push_back(i);
 		natom_dict[atomic_symbols[i]] += 1;
@@ -383,7 +391,6 @@ void SALTEDPredictor::setup_atomic_environment()
 		}
 	};
 
-	featomic::SimpleSystem featomic_system = SALTED_Utils::gen_featomic_system(wavy);
 	// RASCALINE (Generate descriptors)
 	const auto _t_desc = std::chrono::steady_clock::now();
 	v1 = SALTED_Utils::calculate_SALTED_descriptors(featomic_system, hp);
