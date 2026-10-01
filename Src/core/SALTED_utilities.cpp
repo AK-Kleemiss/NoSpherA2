@@ -103,11 +103,17 @@ std::vector<char> SALTED_Utils::filter_input(WFN& wavy, options& opt, const SALT
 	// neighbours whose species is outside neighspe. An atom with neighbours but no
 	// ALLOWED ones therefore still reaches equicomb - the zero guard there catches
 	// it, leaves it spherical rather than NaN, and says so in the log.
+
+	auto is_species_of_atom_defined_in_model = [&config](const std::string& atom_symbol) {
+		return std::find(config.species.begin(), config.species.end(), atom_symbol) == config.species.end(); };
+
 	const int ncen_in = wavy.get_ncen();
 	std::vector<char> use_thakkar(ncen_in, 0);
 	for (int a = 0; a < ncen_in; a++)
-		if (std::find(config.species.begin(), config.species.end(), std::string(constants::atnr2letter(wavy.get_atom_charge(a)))) == config.species.end())
+	{
+		if (is_species_of_atom_defined_in_model(constants::atnr2letter(wavy.get_atom_charge(a))))
 			use_thakkar[a] = 1;
+	}
 	const int n_unknown = static_cast<int>(std::count(use_thakkar.begin(), use_thakkar.end(), (char)1));
 
 	const double rcut = std::min(config.rcut1, config.rcut2);
@@ -145,7 +151,7 @@ std::vector<char> SALTED_Utils::filter_input(WFN& wavy, options& opt, const SALT
 			std::cout << "WARNING: Not all species in the structure are known to the model. The following species are not known: ";
 			for (int a = 0; a < ncen_in; a++)
 			{
-				if (std::find(config.species.begin(), config.species.end(), std::string(constants::atnr2letter(wavy.get_atom_charge(a)))) == config.species.end())
+				if (is_species_of_atom_defined_in_model(constants::atnr2letter(wavy.get_atom_charge(a))))
 				{
 					std::cout << constants::atnr2letter(wavy.get_atom_charge(a)) << " ";
 				}
@@ -213,7 +219,7 @@ static metatensor::TensorMap get_feats_projs(featomic::SimpleSystem featomic_sys
 			{
 				int32_t neigh_z = constants::get_Z_from_label(neigh_spe.c_str()) + 1;
 				// Directly emplace back initializer_lists into keys_array
-				keys_array.push_back({ l, 1, center_z, neigh_z});
+				keys_array.push_back({ l, 1, center_z, neigh_z });
 			}
 		}
 	}
@@ -267,10 +273,10 @@ static metatensor::TensorMap get_feats_projs(featomic::SimpleSystem featomic_sys
 // Reads the descriptor buffer and fills the expansion coefficients vector
 static SALTEDDescriptors get_expansion_coeffs(std::vector<uint8_t> descriptor_buffer, const featomic::SimpleSystem& featomic_system, const SALTED_Utils::FeatomicHyperParameters& parameters)
 {
-	int n_atoms = (int)featomic_system.size();
-	int nspe = (int)parameters.species.size();
 	metatensor::TensorMap descriptor = metatensor::TensorMap::load_buffer(descriptor_buffer);
-	const int nchannels = nspe * parameters.max_radial;
+	std::vector<size_t> sizes = descriptor.block_by_id(0).values_shape(); //This has the size of the descriptor, meaning alle atoms that actually have a environment based on the neighborhood and species list
+	const int n_atoms = sizes[0];
+	const int nchannels = sizes[2]; //(int)parameters.neighspe.size() * parameters.max_radial;
 	SALTEDDescriptors omega(n_atoms, nchannels, parameters.max_angular);
 	for (int l = 0; l < parameters.max_angular + 1; ++l)
 	{

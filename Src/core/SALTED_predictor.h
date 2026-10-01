@@ -84,6 +84,8 @@ private:
 	std::unordered_map<std::string, dMatrix2> power_env_sparse{};
 	std::unordered_map<std::string, vec> av_coefs{};
 	std::unordered_map<int, int> featsize{};
+
+	featomic::SimpleSystem featomic_system;
 	void read_model_data();
 	// Fetch / drop the model matrices of one lambda; read_model_data() only indexes
 	void load_model_lambda(const int lam);
