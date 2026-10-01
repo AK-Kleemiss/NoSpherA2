@@ -271,7 +271,7 @@ NAOResult build_naos(const dMatrix2 &P_in, const dMatrix2 &S_in, const std::vect
                 NAO& orbital = orbitals.at(static_cast<size_t>(col));
                 orbital.atom = g.atom;
                 orbital.l = g.l;
-                orbital.m = m;
+                orbital.m = ao.at(g.idx[0][m]).m; //ORCA-order component, which shell_label and lang_label read
                 orbital.shell = shell;
                 orbital.n = g.l + 1 + shell;
                 group_columns[{g.atom, g.l}].push_back(col);

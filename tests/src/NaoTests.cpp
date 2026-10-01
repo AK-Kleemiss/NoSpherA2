@@ -145,6 +145,31 @@ TEST(NaoBasisMapTests, PrintedComponentsFollowLibcintAOOrder)
 	EXPECT_GT(shells, 0);
 }
 
+//A NAO's m must be its AOs' m, which is what shell_label and lang_label print: the largest AO
+//coefficient of a core or valence NAO sits on its own atom, l and m.  8f2ded20 set the loop index
+//instead and permuted every p and d label.
+TEST(NaoBasisMapTests, NaoComponentIsTheComponentOfItsAOs)
+{
+	const auto p = fixture("RGBI_groups", "nh3bh3.gbw");
+	if (p.empty()) GTEST_SKIP() << "tests/RGBI_groups/nh3bh3.gbw not found";
+	WFN wavy(p);
+	const auto ao = spherical_ao_map(wavy);
+	const NPAResult npa = natural_population_analysis(wavy);
+	int checked = 0;
+	for (size_t k = 0; k < npa.total.orbitals.size(); k++) {
+		const NAO& o = npa.total.orbitals[k];
+		if (o.l == 0 || o.type == NAOClass::Rydberg) continue;
+		size_t best = 0;
+		for (size_t i = 1; i < ao.size(); i++)
+			if (std::abs(npa.total.C(i, k)) > std::abs(npa.total.C(best, k))) best = i;
+		EXPECT_EQ(ao[best].atom, o.atom) << "NAO " << k;
+		EXPECT_EQ(ao[best].l, o.l) << "NAO " << k;
+		EXPECT_EQ(ao[best].m, o.m) << "NAO " << k;
+		checked++;
+	}
+	EXPECT_GE(checked, 6) << "the N and B 2p NAOs";
+}
+
 TEST(NaoEpoxideTests, OccupanciesSumToTheElectronCountAndTheTransformIsOrthogonal)
 {
 	const auto p = fixture("epoxide_gbw", "epoxide.gbw");
