@@ -689,7 +689,7 @@ void Calc_MO(
 	bool wrap)
 {
 	using namespace std;
-	err_checkf(mo <= wavy.get_nmo(), to_string(mo) + " bigger MO selected than " + to_string(wavy.get_nmo()) + " contained in the wavefunctions!", file);
+	err_checkf(mo >= 0 && mo < wavy.get_nmo(), "MO index " + to_string(mo) + " out of range, the wavefunction has " + to_string(wavy.get_nmo()) + " MOs (0 to " + to_string(wavy.get_nmo() - 1) + ")!", file);
 	_time_point start = get_time();
 	const double radius_bohr = constants::ang2bohr(radius);
 	const vector<atom> atoms = wavy.get_atoms();

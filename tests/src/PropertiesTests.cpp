@@ -523,6 +523,17 @@ TEST(PropertiesGridTests, CalcMoMatchesAnalyticAntibondingOrbital)
 	EXPECT_EQ(mo.get_value(0, 0, 0), 0.0);
 }
 
+// MO indices are 0-based, so H2's two MOs are 0 and 1; index 2 (once let through by mo <= nmo)
+// and -1 must stop in the range check instead of reading past the MO list
+TEST(PropertiesGridDeathTest, CalcMoRefusesAnIndexOutsideTheMOs)
+{
+	const H2Model m(1.0, 1.0);
+	cube mo = make_grid(N, H);
+	std::ostringstream log;
+	EXPECT_EXIT({ Calc_MO(mo, 2, m.wavy, RADIUS, log, false); }, ::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), ".*");
+	EXPECT_EXIT({ Calc_MO(mo, -1, m.wavy, RADIUS, log, false); }, ::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), ".*");
+}
+
 // the four Fukui cubes are |psi_lumo|^2, |psi_homo|^2, their mean and their difference; a
 // cube set without the Fukui_plus storage makes Calc_Fukui return without touching anything
 TEST(PropertiesFukuiTests, CalcFukuiCubesAreFrontierOrbitalDensities)
