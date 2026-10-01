@@ -8,7 +8,7 @@ This software is part of the cuQCT software suite developed by Florian Kleemiss.
 Please give credit and cite corresponding pieces!
 This Software is published with BSD-2 clause license.
 
-The orbitals hold 22 electrons, 60 fewer than the nuclei carry, and that is exactly the def2 ECP core of these atoms: treating them as ECP atoms, as -ECP would.
+The gbw file's ECP block removes 60 core electrons from the orbitals: treating them as ECP atoms, as -ECP would.
 Analysing ELI basins in the wavefunction...
 [ELI-D] Kohout, Pernal, Wagner & Grin, Theor. Chem. Acc. 112 (2004) 453, DOI 10.1007/s00214-004-0615-y
 Atom positions:
