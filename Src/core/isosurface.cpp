@@ -394,19 +394,15 @@ double calc_d_i(const d3& p_t, const WFN& wavy) {
 }
 
 double calc_d_norm_term(const d3& p_t, const WFN& wavy) {
-	// (d - r_vdW) / r_vdW of the nearest atom; d_norm is this term for the molecule plus the one for the environment
-	double d_i = 1E100;
-	int nearest = 0;
+	// min over atoms of (d - r_vdW) / r_vdW; d_norm is this term for the molecule plus the one for the environment.
+	// Taking the radius of the nearest atom instead jumps by up to 0.8 where the nearest atom switches (H 1.09 vs C 1.70 A).
+	double t = 1E100;
 	for (int i = 0; i < wavy.get_ncen(); i++) {
 		const d3 p_a = { p_t[0] - wavy.get_atom_coordinate(i,0), p_t[1] - wavy.get_atom_coordinate(i,1), p_t[2] - wavy.get_atom_coordinate(i,2) };
-		const double d = array_length(p_a);
-		if (d < d_i) {
-			d_i = d;
-			nearest = i;
-		}
+		const double r = constants::ang2bohr(constants::vdW_radii[wavy.get_atom_charge(i)]);
+		t = std::min(t, (array_length(p_a) - r) / r);
 	}
-	const double r = constants::ang2bohr(constants::vdW_radii[wavy.get_atom_charge(nearest)]);
-	return (d_i - r) / r;
+	return t;
 }
 
 RGB mix_colour(double val, const std::array<std::array<int, 3>, 3>& Colourcode, double low_lim, double high_lim) {
@@ -503,22 +499,35 @@ void surface_curvature(const std::vector<Triangle>& triangles, const cube& field
 	for (int k = 0; k < 3; k++) h[k] = constants::bohr2ang(field.get_vector(k, k));
 #pragma omp parallel for
 	for (int t = 0; t < nt; t++) {
+		// the finite differences at the 8 nodes around the face centre, blended trilinearly: the nearest node alone
+		// makes the curvature a step function of the voxel, which the shape index shows as speckle on every grid
 		const d3 c = triangles[t].calc_center();
-		int idx[3];
-		for (int k = 0; k < 3; k++)
-			idx[k] = std::clamp((int)std::lround((c[k] - field.get_origin(k)) / field.get_vector(k, k)), 1, field.get_size(k) - 2);
-		auto w = [&](const int di, const int dj, const int dk) { return field.get_value(idx[0] + di, idx[1] + dj, idx[2] + dk); };
-		const double w0 = w(0, 0, 0);
-		double g[3], H[3][3];
-		g[0] = (w(1, 0, 0) - w(-1, 0, 0)) / (2 * h[0]);
-		g[1] = (w(0, 1, 0) - w(0, -1, 0)) / (2 * h[1]);
-		g[2] = (w(0, 0, 1) - w(0, 0, -1)) / (2 * h[2]);
-		H[0][0] = (w(1, 0, 0) - 2 * w0 + w(-1, 0, 0)) / (h[0] * h[0]);
-		H[1][1] = (w(0, 1, 0) - 2 * w0 + w(0, -1, 0)) / (h[1] * h[1]);
-		H[2][2] = (w(0, 0, 1) - 2 * w0 + w(0, 0, -1)) / (h[2] * h[2]);
-		H[0][1] = H[1][0] = (w(1, 1, 0) - w(1, -1, 0) - w(-1, 1, 0) + w(-1, -1, 0)) / (4 * h[0] * h[1]);
-		H[0][2] = H[2][0] = (w(1, 0, 1) - w(1, 0, -1) - w(-1, 0, 1) + w(-1, 0, -1)) / (4 * h[0] * h[2]);
-		H[1][2] = H[2][1] = (w(0, 1, 1) - w(0, 1, -1) - w(0, -1, 1) + w(0, -1, -1)) / (4 * h[1] * h[2]);
+		int base[3];
+		double f[3];
+		for (int k = 0; k < 3; k++) {
+			const double u = (c[k] - field.get_origin(k)) / field.get_vector(k, k);
+			base[k] = std::clamp((int)std::floor(u), 1, field.get_size(k) - 3);
+			f[k] = std::clamp(u - base[k], 0.0, 1.0);
+		}
+		double g[3] = { 0, 0, 0 }, H[3][3] = { {0, 0, 0}, {0, 0, 0}, {0, 0, 0} };
+		for (int corner = 0; corner < 8; corner++) {
+			const int o[3] = { corner & 1, (corner >> 1) & 1, (corner >> 2) & 1 };
+			const double s = (o[0] ? f[0] : 1 - f[0]) * (o[1] ? f[1] : 1 - f[1]) * (o[2] ? f[2] : 1 - f[2]);
+			auto w = [&](const int di, const int dj, const int dk) { return field.get_value(base[0] + o[0] + di, base[1] + o[1] + dj, base[2] + o[2] + dk); };
+			const double w0 = w(0, 0, 0);
+			g[0] += s * (w(1, 0, 0) - w(-1, 0, 0)) / (2 * h[0]);
+			g[1] += s * (w(0, 1, 0) - w(0, -1, 0)) / (2 * h[1]);
+			g[2] += s * (w(0, 0, 1) - w(0, 0, -1)) / (2 * h[2]);
+			H[0][0] += s * (w(1, 0, 0) - 2 * w0 + w(-1, 0, 0)) / (h[0] * h[0]);
+			H[1][1] += s * (w(0, 1, 0) - 2 * w0 + w(0, -1, 0)) / (h[1] * h[1]);
+			H[2][2] += s * (w(0, 0, 1) - 2 * w0 + w(0, 0, -1)) / (h[2] * h[2]);
+			H[0][1] += s * (w(1, 1, 0) - w(1, -1, 0) - w(-1, 1, 0) + w(-1, -1, 0)) / (4 * h[0] * h[1]);
+			H[0][2] += s * (w(1, 0, 1) - w(1, 0, -1) - w(-1, 0, 1) + w(-1, 0, -1)) / (4 * h[0] * h[2]);
+			H[1][2] += s * (w(0, 1, 1) - w(0, 1, -1) - w(0, -1, 1) + w(0, -1, -1)) / (4 * h[1] * h[2]);
+		}
+		H[1][0] = H[0][1];
+		H[2][0] = H[0][2];
+		H[2][1] = H[1][2];
 		const double gn = std::sqrt(g[0] * g[0] + g[1] * g[1] + g[2] * g[2]);
 		if (gn < 1E-12) continue;
 		double n[3], M[3][3], Hn[3];
