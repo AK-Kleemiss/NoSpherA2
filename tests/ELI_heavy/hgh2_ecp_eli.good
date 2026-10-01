@@ -68,7 +68,7 @@ Unified 46 core-shell basins into their atoms' cores, 5 ELI-D basins remain.
 GridManager: Setting up prototype grids for atom types...
 GridManager: Generating integration grids for atoms...
 GridManager: Generated total of 65266 grid points.
-Quadrature points sent along the field: 19668, left the grid: 0
+Quadrature points sent along the field: 18812, left the grid: 0
 
 QTAIM Analysis (atomic quadrature grids):
   basin  label               electrons     charge      volume         maximum        x          y          z
@@ -97,7 +97,7 @@ Delocalization indices (11 occupied orbitals):
 GridManager: Setting up prototype grids for atom types...
 GridManager: Generating integration grids for atoms...
 GridManager: Generated total of 65266 grid points.
-Quadrature points sent along the field: 30245, left the grid: 0
+Quadrature points sent along the field: 28659, left the grid: 0
 
 ELI-D Analysis (atomic quadrature grids):
   basin  label               electrons      volume         maximum        x          y          z
@@ -105,5 +105,5 @@ ELI-D Analysis (atomic quadrature grids):
       2  H1                     1.4364     36.5894          7.2480     -0.000      0.000      3.170
       3  H1 LP                  0.4677    287.5343          5.0790     -0.000      0.000      4.989
       4  H2 LP                  0.4677    287.5343          5.0790      0.000      0.000     -4.989
-      5  Hg0 core              18.1621    210.6314          1.4332      0.579      0.030     -0.682
+      5  Hg0 core              18.1621    210.6315          1.4332      0.579      0.030     -0.682
   total in basins: 21.9704   outside every basin: 0.0296

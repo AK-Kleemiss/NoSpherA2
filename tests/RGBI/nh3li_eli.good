@@ -100,15 +100,15 @@ ELI-D basin boundaries from the analytic field (the default).
 GridManager: Setting up prototype grids for atom types...
 GridManager: Generating integration grids for atoms...
 GridManager: Generated total of 111906 grid points.
-Quadrature points sent along the field: 49747, left the grid: 0
+Quadrature points sent along the field: 44058, left the grid: 0
 
 QTAIM Analysis (atomic quadrature grids):
   basin  label               electrons     charge      volume         maximum        x          y          z
-      1  N0                     8.2758    -1.2758    371.9613        198.5481    -10.483     10.089      2.209
-      2  H1                     0.6298     0.3702    102.9946          0.4000     -9.421      9.375      3.711
-      3  H2                     0.6292     0.3708    101.2113          0.4000    -12.306      9.343      2.332
-      4  H3                     0.6294     0.3706    103.0771          0.4000     -9.671      9.459      0.524
-      5  Li4                    2.7558     0.2442    917.8524         13.6761    -10.574     13.775      2.315
+      1  N0                     8.2758    -1.2758    371.9604        198.5481    -10.483     10.089      2.209
+      2  H1                     0.6298     0.3702    102.9949          0.4000     -9.421      9.375      3.711
+      3  H2                     0.6292     0.3708    101.2116          0.4000    -12.306      9.343      2.332
+      4  H3                     0.6294     0.3706    103.0774          0.4000     -9.671      9.459      0.524
+      5  Li4                    2.7558     0.2442    917.8523         13.6761    -10.574     13.775      2.315
   total in basins: 12.9201   outside every basin: 0.0875
 
 Delocalization indices (13 occupied orbitals):
@@ -138,16 +138,16 @@ Delocalization indices (13 occupied orbitals):
 GridManager: Setting up prototype grids for atom types...
 GridManager: Generating integration grids for atoms...
 GridManager: Generated total of 111906 grid points.
-Quadrature points sent along the field: 57099, left the grid: 0
+Quadrature points sent along the field: 50706, left the grid: 0
 
 ELI-D Analysis (atomic quadrature grids):
   basin  label               electrons      volume         maximum        x          y          z
-      1  Li4 core               2.0429     61.0230         43.7858    -10.574     13.777      2.315
-      2  Li4 LP                 0.6609    759.6647         14.5564    -10.708     19.268      2.471
+      1  Li4 core               2.0429     61.0252         43.7858    -10.574     13.777      2.315
+      2  Li4 LP                 0.6609    759.6629         14.5564    -10.708     19.268      2.471
       3  N0 core                2.1129      0.4634         12.9571    -10.483     10.089      2.209
-      4  Li4 LP                 0.0940     37.6614         12.6891    -10.676     17.954      2.434
-      5  H1                     1.9230    118.8831          4.6691     -9.399      9.356      3.743
-      6  H2                     1.9310    119.4661          4.6691    -12.344      9.323      2.334
-      7  H3                     1.9266    120.0895          4.6690     -9.653      9.442      0.489
+      4  Li4 LP                 0.0940     37.6616         12.6891    -10.676     17.954      2.434
+      5  H1                     1.9230    118.8837          4.6691     -9.399      9.356      3.743
+      6  H2                     1.9310    119.4668          4.6691    -12.344      9.323      2.334
+      7  H3                     1.9266    120.0901          4.6690     -9.653      9.442      0.489
       8  N0-Li4 bond            2.1609     56.3322          1.9677    -10.517     11.461      2.248
   total in basins: 12.8523   outside every basin: 0.1554

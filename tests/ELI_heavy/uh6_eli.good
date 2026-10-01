@@ -23,7 +23,7 @@ Density Critical Points (13 found):
   CP   1  [attractor   ]  converged   U0
     Position  :         0.0000         0.0000         0.0000
     Rho       :  27946116.9797
-    GradRho   :        -0.0002         0.0055        -0.0025   |GradRho| :         0.0060
+    GradRho   :        -0.0002         0.0054        -0.0026   |GradRho| :         0.0060
     HessRho_EigVals:    -2.5634e+15    -2.5634e+15    -2.5634e+15
     DelSqRho  :-7690297652384896.0000
    V         :    -1.9226e+15   G         :9302899556.1495   K         :     1.9226e+15   L         :     1.9226e+15
@@ -124,7 +124,7 @@ Density Critical Points (13 found):
   CP  13  [bond        ]  converged   H1-U0 bond
     Position  :         2.4702        -0.0000        -0.0000
     Rho       :         0.1100
-    GradRho   :        -0.0000         0.0000        -0.0000   |GradRho| :         0.0000
+    GradRho   :        -0.0000        -0.0000        -0.0000   |GradRho| :         0.0000
     HessRho_EigVals:    -1.7520e-01    -1.7520e-01     2.8783e-01
     DelSqRho  :        -0.0626
     Bond Ellipticity:         0.0000
@@ -137,15 +137,15 @@ Unified 36 core-shell basins into their atoms' cores, 13 ELI-D basins remain.
 GridManager: Setting up prototype grids for atom types...
 GridManager: Generating integration grids for atoms...
 GridManager: Generated total of 143592 grid points.
-Quadrature points sent along the field: 42021, left the grid: 0
+Quadrature points sent along the field: 38445, left the grid: 0
 
 QTAIM Analysis (atomic quadrature grids):
   basin  label               electrons     charge      volume         maximum        x          y          z
-      1  U0                    89.0527     2.9473    199.9109   27946116.9797      0.000      0.000      0.000
-      2  H1                     1.4854    -0.4854    218.0076          0.3601      3.779      0.000      0.000
-      3  H2                     1.4854    -0.4854    218.0076          0.3601     -3.779      0.000      0.000
-      4  H3                     1.4854    -0.4854    218.0076          0.3601      0.000      3.779      0.000
-      5  H4                     1.4854    -0.4854    218.0076          0.3601      0.000     -3.779      0.000
+      1  U0                    89.0527     2.9473    199.9104   27946116.9797      0.000      0.000      0.000
+      2  H1                     1.4854    -0.4854    218.0078          0.3601      3.779      0.000      0.000
+      3  H2                     1.4854    -0.4854    218.0078          0.3601     -3.779      0.000      0.000
+      4  H3                     1.4854    -0.4854    218.0077          0.3601      0.000      3.779      0.000
+      5  H4                     1.4854    -0.4854    218.0077          0.3601      0.000     -3.779      0.000
       6  H5                     1.4854    -0.4854    218.0076          0.3601      0.000      0.000      3.779
       7  H6                     1.4854    -0.4854    218.0076          0.3601      0.000      0.000     -3.779
   total in basins: 97.9649   outside every basin: 0.0349
@@ -165,39 +165,39 @@ Delocalization indices (49 occupied orbitals):
       7  H6                     1.4854      1.0361            0.4492     -0.0000
 
   basin pair                                delta(A,B)
-  U0                H6                      0.8260
-  U0                H5                      0.8260
   U0                H1                      0.8260
+  U0                H2                      0.8260
   U0                H3                      0.8260
   U0                H4                      0.8260
-  U0                H2                      0.8260
+  U0                H6                      0.8260
+  U0                H5                      0.8260
   H2                H3                      0.0140
   H2                H4                      0.0140
   H2                H6                      0.0140
-  H4                H6                      0.0140
   H2                H5                      0.0140
-  H3                H6                      0.0140
+  H4                H6                      0.0140
   H1                H6                      0.0140
+  H3                H6                      0.0140
   H4                H5                      0.0140
   H3                H5                      0.0140
   H1                H4                      0.0140
-  H1                H5                      0.0140
   H1                H3                      0.0140
+  H1                H5                      0.0140
   3 further pairs below 0.01
 GridManager: Setting up prototype grids for atom types...
 GridManager: Generating integration grids for atoms...
 GridManager: Generated total of 143592 grid points.
-Quadrature points sent along the field: 62791, left the grid: 0
+Quadrature points sent along the field: 57416, left the grid: 0
 
 ELI-D Analysis (atomic quadrature grids):
   basin  label               electrons      volume         maximum        x          y          z
       1  H6                     1.6583     67.8023         13.7822      0.000      0.000     -3.850
-      2  H5                     1.6346     50.2401         13.7822     -0.000     -0.000      3.850
+      2  H5                     1.6346     50.2403         13.7822     -0.000     -0.000      3.850
       3  H1                     1.6483     60.6030         13.7822      3.850     -0.000      0.000
-      4  H3                     1.6450     61.0535         13.7822      0.000      3.850      0.000
+      4  H3                     1.6450     61.0535         13.7822     -0.000      3.850     -0.000
       5  H2                     1.6404     59.3136         13.7822     -3.850      0.000     -0.000
       6  H4                     1.6450     61.6676         13.7822      0.000     -3.850     -0.000
-      7  U0 core               86.1530     78.7456         13.5603      0.000      0.000      0.000
+      7  U0 core               86.1530     78.7457         13.5603      0.000      0.000      0.000
       8  H2 LP                  0.3232    176.1943         11.2194     -5.465     -0.000     -0.000
       9  H5 LP                  0.3232    176.1943         11.2194      0.000      0.000      5.465
      10  H1 LP                  0.3232    176.1943         11.2194      5.465      0.000     -0.000

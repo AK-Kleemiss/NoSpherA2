@@ -2235,6 +2235,13 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 	//Bisect a radial cell only when its edge trajectories reach different basins.
 	constexpr int bisections = 6;
 	long long boundary_points = 0, lost = 0;
+	//NOS_BASIN_SKIP: electrons per molecule the lightest points may move instead of being
+	//climbed; 0 climbs every point. The default, half the last printed digit of a basin
+	//population, cannot move any basin by a printed unit (volumes are allowed to move)
+	const char *skip_env = std::getenv("NOS_BASIN_SKIP"); // Flawfinder: ignore - compared, then parsed by env_double
+	const double skip_budget = (skip_env != nullptr && std::string(skip_env) == "0") ? 0.0 : env_double("NOS_BASIN_SKIP", 5e-5);
+	long long skipped_points = 0;
+	double skipped_mass = 0.0;
 	for (size_t a = 0; a < gd.atomic_grids.size(); a++) {
 		const vec &X = gd.atomic_grids[a][GridData::X], &Y = gd.atomic_grids[a][GridData::Y], &Z = gd.atomic_grids[a][GridData::Z], &W = gd.atomic_grids[a][GridData::BECKE_WEIGHT];
 		const int np = static_cast<int>(X.size());
@@ -2279,6 +2286,42 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 				}
 			}
 		}
+		//The points that carry the least w * rho are not climbed: summed from the smallest up
+		//until they would pass this grid's share of the budget, they go to the nearest maximum
+		//instead. Whatever basin that is, it moves at most the budget in electrons and budget /
+		//cutoff in volume, and it is the Becke weight's long tail that pays - a point deep in
+		//another atom's cell has the density of that atom and a weight of 1e-10. Ordered and summed
+		//by |w| * rho: the rule has negative weights, which would otherwise sort first and pull
+		//the running sum down, so any number of them would pass under the budget.
+		vec rho_at;
+		std::vector<char> skip;
+		if (skip_budget > 0.0) {
+			rho_at.assign(np, 0.0);
+#pragma omp parallel for schedule(dynamic, 64)
+			for (int i = 0; i < np; i++)
+				if (W[i] != 0.0) rho_at[i] = valence(d3{ X[i], Y[i], Z[i] });
+			ivec order;
+			for (int i = 0; i < np; i++)
+				if (W[i] != 0.0 && rho_at[i] >= basin_density_cutoff) order.push_back(i);
+			std::sort(order.begin(), order.end(), [&](const int x, const int y) { return std::abs(W[x]) * rho_at[x] < std::abs(W[y]) * rho_at[y]; });
+			skip.assign(np, 0);
+			double sum = 0.0;
+			const double share = skip_budget / static_cast<double>(gd.atomic_grids.size());
+			for (const int i : order) {
+				if (sum + std::abs(W[i]) * rho_at[i] > share) break;
+				sum += std::abs(W[i]) * rho_at[i];
+				skip[i] = 1;
+				skipped_points++;
+			}
+			skipped_mass += sum;
+		}
+		//A skipped cell's outer probe is still wanted when a climbed cell reads it as its inner edge
+		std::vector<char> probe_wanted(np, 1);
+		if (!skip.empty()) {
+			for (int i = 0; i < np; i++) probe_wanted[i] = !skip[i];
+			for (int i = 0; i < np; i++)
+				if (partner[i] >= 0 && !skip[i]) probe_wanted[partner[i]] = 1;
+		}
 		//Every cell's outer probe, climbed once. A gridded ELI-D takes most cells from the cube
 		//without probing at all, so it keeps the old on-demand path and this pass is skipped.
 		ivec outer_probe(np, -1);
@@ -2289,7 +2332,7 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 #pragma omp for schedule(dynamic, 16)
 				for (int i = 0; i < np; i++) {
 					double in, out;
-					if (W[i] == 0.0 || !cell_edges(i, in, out)) continue;
+					if (W[i] == 0.0 || !probe_wanted[i] || !cell_edges(i, in, out)) continue;
 					outer_probe[i] = climb(along_i(i, out), lb, ll);
 				}
 #pragma omp critical
@@ -2334,7 +2377,7 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 				bool settled;
 				int b = lookup(p, settled);
 				//The same density, taken from the orbital pass that also hands out phi
-				const double rho = ovl ? wavy.compute_dens(p, dbuf, phi) : valence(p);
+				const double rho = ovl ? wavy.compute_dens(p, dbuf, phi) : (rho_at.empty() ? valence(p) : rho_at[i]);
 				//A basin's share of the cell's quadrature weight; the weight itself stays with
 				//the rule, only who gets it is decided here
 				auto give = [&](const int bb, const double fr) {
@@ -2350,6 +2393,7 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 					accumulate(bb, w * fr);
 				};
 				if (rho < basin_density_cutoff) { give(0, 1.0); continue; }
+				if (!skip.empty() && skip[i]) { give(nearest_maximum(p, stall_reach), 1.0); continue; }
 				//For a gridded ELI-D a cell whose neighbourhood agrees is taken from the grid, as
 				//before; streaming has no grid to take it from and every cell is refined
 				if (eli_field && !streaming && (b == 0 || settled)) { give(b, 1.0); continue; }
@@ -2441,6 +2485,11 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 				if (sto[i]) line << " " << (i == g_stall_basins ? std::string("other") : std::to_string(i)) << ":" << sto[i];
 			std::cout << line.str() << std::endl;
 		}
+	}
+	if (g_basin_timing && skip_budget > 0.0) {
+		const auto flags = std::cout.flags();
+		std::cout << "  [timing] " << fieldname << "not climbed: " << skipped_points << " points carrying " << std::scientific << skipped_mass << " e, to their nearest maximum" << std::endl;
+		std::cout.flags(flags);
 	}
 	if (g_basin_timing) std::cout << "  [timing] " << fieldname << "outside the density isosurface: " << cutoff_outside << " e, unresolved inside: " << unresolved_outside << " e" << std::endl;
 	if (g_basin_timing && g_adaptive_step) {
