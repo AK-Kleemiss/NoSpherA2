@@ -15,16 +15,35 @@
 structure_factors::structure_factors(options& opt_in) {
 	opt = &opt_in;
 
+	// Load the settings from the options object
+	model_data.n_params = opt_in.xcw_settings.n_params;
+	extinction_settings.extinction_model = opt_in.xcw_settings.extinction_model;
+	I_tens.read_tensor = opt_in.xcw_settings.read_tensor;
+	I_tens.i_tensor_file_path = opt_in.xcw_settings.i_tensor_file_path;
+	I_tens.i_tensor_save_path = opt_in.xcw_settings.i_tensor_save_path;
+	I_tens.tensor_single = opt_in.xcw_settings.i_tensor_single;
+	I_tens.tensor_double = opt_in.xcw_settings.i_tensor_double;
+	I_tens.basis_set_name = opt_in.xcw_settings.basis_set_name;
+	extinction_settings.aniso = opt_in.xcw_settings.extinction_aniso;
+	extinction_settings.refine = opt_in.xcw_settings.extinction_refine;
+	extinction_settings.start = opt_in.xcw_settings.extinction_start;
+	quality_criteria.refine_against = opt_in.xcw_settings.refine_against;
+	quality_criteria.goof_type = opt_in.xcw_settings.XWR_type;
+	I_tens.i_tensor_max_mb = opt_in.xcw_settings.i_tensor_max_mb;
+
+
 	// Setup file paths
-	std::filesystem::path hkl_filename = opt->hkl;
-	std::filesystem::path cif = opt->cif;
+	std::filesystem::path hkl_filename = opt_in.hkl;
+	std::filesystem::path cif = opt_in.cif;
 	std::ifstream cif_input(cif.c_str(), std::ios::in);
 
 	// Read the hkl and cif file and generate the unit cell
-	unit_cell = cell(cif, std::cout, opt->debug, opt->do_XCW);
-	scatter_data.hkl_enlarged = read_hkl_full(hkl_filename, scatter_data.hkl, opt->twin_law, unit_cell, std::cout, scatter_data, opt->debug);
-	wavelength = read_CIF(cif_input, unit_cell, model_data.ncen, asym_atoms, ADPs, opt->debug);
-	if (opt->xcw_settings.wavelength > 0.0) wavelength = opt->xcw_settings.wavelength;
+	unit_cell = cell(cif, std::cout, opt_in.debug, opt_in.do_XCW);
+	scatter_data.hkl_enlarged = read_hkl_full(hkl_filename, scatter_data.hkl, opt_in.twin_law, unit_cell, std::cout, scatter_data, opt_in.debug);
+	double wavelength_ = read_CIF(cif_input, unit_cell, model_data.ncen, asym_atoms, ADPs, opt_in.debug);
+	// Directly convert into reciprocal space so rotation for grown structures can be done directly
+	U_cif2U_star();
+	model_data.wavelength = opt_in.xcw_settings.wavelength > 0.0 ? opt_in.xcw_settings.wavelength : wavelength_;
 	err_checkf(model_data.ncen > 0, "No atoms were read from " + cif.string() + "! Is there an _atom_site loop with labels, type symbols and fractional coordinates?", std::cout);
 
 	{
@@ -32,12 +51,12 @@ structure_factors::structure_factors(options& opt_in) {
 		ivec applied_symmetry;
 		// Handle grown structures
 		std::vector<asym_atom> xyz_atoms;
-		if (opt->xcw_settings.grown) {
-			err_checkf(!opt->xyz_file.empty(), "Grown structures require an xyz file with the grown structure. Please provide one with the `-xyz` option.", std::cout);
+		if (opt_in.xcw_settings.grown) {
+			err_checkf(!opt_in.xyz_file.empty(), "Grown structures require an xyz file with the grown structure. Please provide one with the `-xyz` option.", std::cout);
 			// Read xyz file and grow the asymmetric unit
-			const std::filesystem::path xyz_path = opt->xyz_file;
-			WFN dummy_wave(xyz_path, opt->debug);
-			dummy_wave.read_xyz(xyz_path, std::cout, opt->debug);
+			const std::filesystem::path xyz_path = opt_in.xyz_file;
+			WFN dummy_wave(xyz_path, opt_in.debug);
+			dummy_wave.read_xyz(xyz_path, std::cout, opt_in.debug);
 			xyz_atoms = dummy_wave.extract_xyz("bohr");
 			unit_cell.grow_asym_atoms(asym_atoms, xyz_atoms);
 		}
@@ -46,11 +65,11 @@ structure_factors::structure_factors(options& opt_in) {
 		"diagonal elements" have to have size equivalent to multiplicity, otherwise something broke */
 		unit_cell.eval_symm(asym_atoms, model_data.ncen, symmetry_linking_list);
 		model_data.ncen = asym_atoms.size();
-		if (opt->xcw_settings.grown) {
-			// Set the U_iso values for grown atoms
-			unit_cell.grow_U_iso(asym_atoms, symmetry_linking_list);
+		if (opt_in.xcw_settings.grown) {
+			// Copy U_iso, the dispersion and the ADPs of each grown atom's parent, the ADPs rotated onto the image
+			unit_cell.grow_ADPs(asym_atoms, symmetry_linking_list, ADPs);
 			// Project grown structure into its symmetry subgroup and update everything accordingly
-			applied_symmetry = unit_cell.apply_grown(scatter_data.hkl, scatter_data.hkl_enlarged, asym_atoms, symmetry_linking_list, original_rotations);
+			applied_symmetry = unit_cell.apply_grown(scatter_data.hkl, scatter_data.hkl_enlarged, asym_atoms, symmetry_linking_list);
 		}
 		// Set the symmetry factors for each atom
 		unit_cell.set_symmetry_factors(asym_atoms, symmetry_linking_list, applied_symmetry);
@@ -65,61 +84,57 @@ structure_factors::structure_factors(options& opt_in) {
 		}
 	}
 
-	for (int at = 0; at < model_data.ncen; at++) {
-		asym_atom_list.push_back(at);
-	}
+	// Convert the ADPs from reciprocal space to Cartesian coordinates
+	U_star2U_cart();
 
 	// Generate k_pts and set the number of reflections
-	make_k_pts(model_data.nr_enlarged != 0 && scatter_data.hkl.size() == 0, opt->save_k_pts, unit_cell, scatter_data.hkl_enlarged, k_pt, std::cout, opt->debug);
+	make_k_pts(model_data.nr_enlarged != 0 && scatter_data.hkl.size() == 0, opt_in.save_k_pts, unit_cell, scatter_data.hkl_enlarged, k_pt, std::cout, opt_in.debug);
 	model_data.nr_enlarged = scatter_data.hkl_enlarged.size();
 	model_data.nr = scatter_data.hkl.size();
 
-	// Prepare output files
-	XCW_log.open("XCW.log");
-	const std::string basis_set_name = BasisSetLibrary::get_basis_set(opt->xcw_settings.basis_set_name)->get_name();
-	std::cout << "XCW orbital basis set: " << basis_set_name << std::endl;
-	XCW_log << "XCW orbital basis set: " << opt->xcw_settings.basis_set_name << std::endl;
-
-	// The fit set, see i_sigma_cutoff. F_obs2 is |I|, the sign lives in F_obs
-	const double i_sigma_cutoff = opt->xcw_settings.i_sigma_cutoff;
+	// Find all reflections that are above the I/sigma cutoff
+	const double i_sigma_cutoff = opt_in.xcw_settings.i_sigma_cutoff;
 	scatter_data.hkl_mask.resize(model_data.nr, 0);
-	nr_fit = 0;
+	model_data.nr_fit = 0;
 	for (int r = 0; r < model_data.nr; r++) {
 		const double I_over_sigma = (scatter_data.F_obs[r] < 0 ? -scatter_data.F_obs2[r] : scatter_data.F_obs2[r]) / scatter_data.sigma_obs2[r];
 		scatter_data.hkl_mask[r] = scatter_data.sigma_obs2[r] > 0 && I_over_sigma >= i_sigma_cutoff;
-		nr_fit += scatter_data.hkl_mask[r];
+		model_data.nr_fit += scatter_data.hkl_mask[r];
 	}
-	setup_extinction(cif);
-	err_checkf(nr_fit > n_params(), "Fewer reflections above the I/sigma cutoff than parameters", std::cout);
-	std::cout << "XCW: I/sigma(I) >= " << i_sigma_cutoff << " (F/sigma(F) >= " << 2 * i_sigma_cutoff << "): " << nr_fit << " of " << model_data.nr << " reflections in the fit; R1 and Criterion are over these, R1(all) and Crit(all) over all" << std::endl;
-	XCW_log << "XCW: I/sigma(I) >= " << i_sigma_cutoff << ": " << nr_fit << " of " << model_data.nr << " reflections in the fit" << std::endl;
 
-	// Precompute GooF scaling factor
-	inv_scale = 1.0 / (nr_fit - n_params());
+	// Extinction correction
+	setup_extinction(cif);
+	err_checkf(model_data.nr_fit > n_params(), "Fewer reflections above the I/sigma cutoff than parameters", std::cout);
+	std::cout << "XCW: I/sigma(I) >= " << i_sigma_cutoff << " (F/sigma(F) >= " << 2 * i_sigma_cutoff << "): " << model_data.nr_fit << " of " << model_data.nr << " reflections in the fit; R1 and Criterion are over these, R1(all) and Crit(all) over all" << std::endl;
 
 	// Set F_calc sizes
 	scatter_data.F_calc.resize(model_data.nr, 0);
 	scatter_data.anom_correction.resize(model_data.nr, 0);
+
+	// Initialize DW factors and phase factors, so that F_calc can be calculated without DW factors or phase factors if they are not requested
+	DW_facts.resize(model_data.ncen, cvec(model_data.nr_enlarged, 1));
+	phase_facts.resize(model_data.ncen, cvec(model_data.nr_enlarged, 1));
+
 }
 
 void structure_factors::setup_extinction(const std::filesystem::path& cif) {
-	if (opt->xcw_settings.extinction_model == extinction::model::none) return;
-	const double lambda = wavelength;
+	if (extinction_settings.extinction_model == extinction::model::none) return;
+	const double lambda = model_data.wavelength;
 	err_checkf(lambda > 0.0, "Extinction needs a wavelength: put `wavelength <lambda>` in the XCW "
 		"settings file, or _diffrn_radiation_wavelength in " + cif.string(), std::cout);
 	ensure_hkl_ordered();
-	const size_t np = opt->xcw_settings.extinction_aniso ? 6 : 1;
+	const size_t np = extinction_settings.aniso ? 6 : 1;
 	//the anisotropic tensor starts isotropic, where x(h) is the start value for every h
 	ext_p_.assign(np, 0.0);
-	for (size_t p = 0; p < (opt->xcw_settings.extinction_aniso ? 3u : 1u); p++) ext_p_[p] = opt->xcw_settings.extinction_start;
+	for (size_t p = 0; p < (extinction_settings.aniso ? 3u : 1u); p++) ext_p_[p] = extinction_settings.start;
 	ext_c_.resize(model_data.nr);
 	ext_cos2t_.resize(model_data.nr);
-	if (opt->xcw_settings.extinction_aniso) ext_a_.resize(static_cast<size_t>(model_data.nr) * np);
+	if (extinction_settings.aniso) ext_a_.resize(static_cast<size_t>(model_data.nr) * np);
 	for (int r = 0; r < model_data.nr; r++) {
 		const double stl = unit_cell.get_stl_of_hkl(hkl_ordered_[r]);
 		ext_c_[r] = extinction::geometry_constant(lambda, stl);
 		ext_cos2t_[r] = extinction::cos_2theta(lambda, stl);
-		if (!opt->xcw_settings.extinction_aniso) continue;
+		if (!extinction_settings.aniso) continue;
 		//the scattering vector in Cartesian, |h| = 1/d: rcm's rows are the Cartesian
 		//components, its columns the reciprocal basis vectors
 		std::array<double, 3> h_unit{ 0.0, 0.0, 0.0 };
@@ -137,12 +152,11 @@ void structure_factors::setup_extinction(const std::filesystem::path& cif) {
 	ext_m_.assign(model_data.nr, 1.0);
 	ext_dyc_.assign(model_data.nr, 0.0);
 	std::ostringstream banner;
-	banner << "XCW extinction: " << extinction::name(opt->xcw_settings.extinction_model)
-		<< (opt->xcw_settings.extinction_aniso ? ", anisotropic (azimuth-averaged, 6 parameters)" : ", isotropic (1 parameter)")
-		<< (opt->xcw_settings.extinction_refine ? ", refined with the scale" : ", held fixed")
-		<< ", lambda = " << lambda << " A, start value " << opt->xcw_settings.extinction_start;
+	banner << "XCW extinction: " << extinction::name(extinction_settings.extinction_model)
+		<< (extinction_settings.aniso ? ", anisotropic (azimuth-averaged, 6 parameters)" : ", isotropic (1 parameter)")
+		<< (extinction_settings.refine ? ", refined with the scale" : ", held fixed")
+		<< ", lambda = " << lambda << " A, start value " << extinction_settings.start;
 	std::cout << banner.str() << std::endl;
-	XCW_log << banner.str() << std::endl;
 }
 
 void structure_factors::ensure_hkl_ordered() {
@@ -181,112 +195,12 @@ void structure_factors::U_cif2U_star() {
 
 	for (int a = 0; a < model_data.ncen; a++) {
 		vec2 ADPs_ = ADPs[a];
-		if (ADPs_[0].size() > 0) {
+		if (ADPs_.size() > 0 && ADPs_[0].size() > 0) {
 			for (int i = 0; i < 6; i++) {
 				ADPs_[0][i] *= transform[i];
 			}
 			ADPs[a] = ADPs_;
 		}
-	}
-}
-
-// Position of a sorted index triple/quadruple in the Voigt storage of C (10) and D (15)
-static void get_voigt_index(const ivec& indices, int& ADP_idx) {
-	ivec2 map3, map4;
-	ivec mult3, mult4;
-	map3 = { { 0, 0, 0 }, { 0, 0, 1 }, { 0, 0, 2 }, { 0, 1, 1 }, {0, 1, 2}, {0, 2, 2}, {1, 1, 1}, { 1, 1, 2 }, { 1, 2, 2 }, { 2, 2, 2 } };
-	map4 = { { 0, 0, 0, 0 }, { 0, 0, 0, 1 }, { 0, 0, 0, 2 }, { 0, 0, 1, 1 }, { 0, 0, 1, 2 }, { 0, 0, 2, 2 }, { 0, 1, 1, 1 }, { 0, 1, 1, 2 }, { 0, 1, 2, 2 }, { 0, 2, 2, 2 }, { 1, 1, 1, 1 }, { 1, 1, 1, 2 }, { 1, 1, 2, 2 }, { 1, 2, 2, 2 }, { 2, 2, 2, 2 } };
-	if (indices.size() == 3) {
-		int idx = 0;
-		while (indices != map3[idx]) {
-			idx++;
-		}
-		ADP_idx = idx;
-	}
-	if (indices.size() == 4) {
-		int idx = 0;
-		while (indices != map4[idx]) {
-			idx++;
-		}
-		ADP_idx = idx;
-	}
-}
-
-// T'_{ij..} = sum M_pi M_qj .. T_pq.. for the U (rank 2), C (rank 3) and D (rank 4) tensors in their
-// Voigt storage: U_star2U_cart hands in the cell matrix, the grown-atom rotation the transposed symmetry operation
-void transform_ADPs(vec2& ADPs, const vec2& M) {
-	if (ADPs.size() > 0 && ADPs[0].size() > 0) {
-		vec2 U(3, vec(3));
-		U[0][0] = ADPs[0][0];
-		U[0][1] = ADPs[0][3];
-		U[0][2] = ADPs[0][4];
-		U[1][0] = ADPs[0][3];
-		U[1][1] = ADPs[0][1];
-		U[1][2] = ADPs[0][5];
-		U[2][0] = ADPs[0][4];
-		U[2][1] = ADPs[0][5];
-		U[2][2] = ADPs[0][2];
-		U = self_dot(self_dot(M, U, true, false), M, false, false);
-		ADPs[0][0] = U[0][0];
-		ADPs[0][1] = U[1][1];
-		ADPs[0][2] = U[2][2];
-		ADPs[0][3] = U[0][1];
-		ADPs[0][4] = U[0][2];
-		ADPs[0][5] = U[1][2];
-	}
-	if (ADPs.size() > 1 && ADPs[1].size() > 0) {
-		int running_idx = 0;
-		vec C_out(10);
-		for (int i = 0; i < 3; i++) {
-			for (int j = i; j < 3; j++) {
-				for (int k = j; k < 3; k++) {
-					double sum = 0;
-					for (int p = 0; p < 3; p++) {
-						for (int q = 0; q < 3; q++) {
-							for (int r = 0; r < 3; r++) {
-								ivec sorted_idx = { p, q, r };
-								std::sort(sorted_idx.begin(), sorted_idx.end());
-								int ADP_idx;
-								get_voigt_index(sorted_idx, ADP_idx);
-								sum += M[p][i] * M[q][j] * M[r][k] * ADPs[1][ADP_idx];
-							}
-						}
-					}
-					C_out[running_idx] = sum;
-					running_idx++;
-				}
-			}
-		}
-		ADPs[1] = C_out;
-	}
-	if (ADPs.size() > 2 && ADPs[2].size() > 0) {
-		int running_idx = 0;
-		vec D_out(15);
-		for (int i = 0; i < 3; i++) {
-			for (int j = i; j < 3; j++) {
-				for (int k = j; k < 3; k++) {
-					for (int l = k; l < 3; l++) {
-						double sum = 0;
-						for (int p = 0; p < 3; p++) {
-							for (int q = 0; q < 3; q++) {
-								for (int r = 0; r < 3; r++) {
-									for (int s = 0; s < 3; s++) {
-										ivec sorted_idx = { p, q, r, s };
-										std::sort(sorted_idx.begin(), sorted_idx.end());
-										int ADP_idx;
-										get_voigt_index(sorted_idx, ADP_idx);
-										sum += M[p][i] * M[q][j] * M[r][k] * M[s][l] * ADPs[2][ADP_idx];
-									}
-								}
-							}
-						}
-						D_out[running_idx] = sum;
-						running_idx++;
-					}
-				}
-			}
-		}
-		ADPs[2] = D_out;
 	}
 }
 
@@ -300,27 +214,7 @@ void structure_factors::U_star2U_cart() {
 	}
 	for (int a = 0; a < model_data.ncen; a++) {
 		vec2 ADPs_ = ADPs[a];
-		transform_ADPs(ADPs_, cart_matrix);
-		ADPs[a] = ADPs_;
-	}
-}
-
-// A grown atom carries a copy of its parent's ADPs (read_fracs_ADPs_from_CIF); U*, C and D are
-// contravariant tensors in the fractional basis, so the image's are T' = R T R^T with R the rotation
-// of the linking operation (x' = R x + t). cell stores R transposed, which is what transform_ADPs takes.
-void structure_factors::rotate_grown_ADPs() {
-	for (int a = 0; a < model_data.ncen; a++) {
-		const int op = asym_atoms[a].sym_op;
-		if (op < 0) continue;
-		vec2 M(3, vec(3));
-		for (int i = 0; i < 3; i++) {
-			for (int j = 0; j < 3; j++) {
-				M[i][j] = original_rotations[i][j][op];
-				//M[i][j] = unit_cell.get_sym(i, j, op);
-			}
-		}
-		vec2 ADPs_ = ADPs[a];
-		transform_ADPs(ADPs_, M);
+		cell::transform_ADPs(ADPs_, cart_matrix);
 		ADPs[a] = ADPs_;
 	}
 }
@@ -352,10 +246,6 @@ void structure_factors::eval_DW() {
 			level.emplace_back(0);
 		}
 	}
-	// Convert ADPs from cif format to Cartesian coordinates
-	U_cif2U_star();
-	rotate_grown_ADPs();
-	U_star2U_cart();
 	vec2 q(model_data.nr_enlarged, vec(3));
 	for (int h = 0; h < model_data.nr_enlarged; h++) {
 		q[h][0] = k_pt[0][h];
@@ -467,39 +357,8 @@ void structure_factors::eval_translation_phase() {
 	// closing function
 }
 
-void structure_factors::parse_anom_atoms(std::vector<anom_atom>& anom_atoms) {
-	std::ifstream file(opt->anom_disp_path);
-	if (!file) {
-		std::cout << "Could not open anomalous dispersion file. Continuing without anomalous dispersions." << std::endl;
-	}
-	std::string line;
-	while (getline_universal(file, line)) {
-		if (line.empty())
-			continue;
-		std::istringstream iss(line);
-		std::string symbol;
-		double real_part, imag_part;
-		if (iss >> symbol >> real_part >> imag_part) {
-			if (!symbol.empty() && symbol[0] != '_' && symbol != "loop_") {
-				anom_atoms.push_back({ symbol, cdouble(real_part, imag_part) });
-			}
-		}
-	}
-}
-
 void structure_factors::eval_anom_disp() {
-	std::vector<anom_atom> anom_atoms;
-	parse_anom_atoms(anom_atoms);
 	int r, at, r_asym;
-	for (int at = 0; at < model_data.ncen; at++) {
-		const char* symbol = constants::atnr2letter(asym_atoms[at].type);
-		for (const anom_atom& anom_atom : anom_atoms) {
-			if (symbol == anom_atom.identifier) {
-				asym_atoms[at].anom = anom_atom.dispersion;
-				break;
-			}
-		}
-	}
 	ivec2 asym_lookup(model_data.nr);
 	for (r = 0; r < model_data.nr; r++) {
 		asym_lookup[r] = generate_asym_lookup(r);
@@ -519,7 +378,7 @@ void structure_factors::eval_anom_disp() {
 //y_r and the chain factors, from the current F_calc and the current coefficients
 void structure_factors::update_extinction() {
 	if (ext_p_.empty()) return;
-	const extinction::model m = opt->xcw_settings.extinction_model;
+	const extinction::model m = extinction_settings.extinction_model;
 #pragma omp parallel for
 	for (int r = 0; r < model_data.nr; r++) {
 		const double u = std::norm(scatter_data.F_calc[r]);
@@ -540,7 +399,7 @@ void structure_factors::update_extinction() {
 //leaves x_r >= 0 everywhere, since a negative coefficient is not extinction.
 bool structure_factors::refine_extinction_step() {
 	const Eigen::Index np = static_cast<Eigen::Index>(ext_p_.size());
-	const bool against_F2 = opt->xcw_settings.refine_against == 2, weighted = opt->xcw_settings.XWR_type == 2;
+	const bool against_F2 = quality_criteria.refine_against == 2, weighted = quality_criteria.goof_type == 2;
 	const double k = scatter_data.scale, s = k * k;
 	auto residual_sum = [&]() {
 		update_extinction();
@@ -597,8 +456,8 @@ bool structure_factors::refine_extinction_step() {
 std::string structure_factors::extinction_report() const {
 	if (ext_p_.empty()) return "";
 	std::ostringstream out;
-	out << "extinction(" << extinction::name(opt->xcw_settings.extinction_model)
-		<< (opt->xcw_settings.extinction_aniso ? ", aniso)" : ")") << std::scientific << std::setprecision(4);
+	out << "extinction(" << extinction::name(extinction_settings.extinction_model)
+		<< (extinction_settings.aniso ? ", aniso)" : ")") << std::scientific << std::setprecision(4);
 	for (const double p : ext_p_) out << " " << p;
 	return out.str();
 }
@@ -614,7 +473,7 @@ void structure_factors::eval_scale() {
 	ensure_inv_H2_weights();
 	update_extinction();
 	solve_scale();
-	if (ext_p_.empty() || !opt->xcw_settings.extinction_refine) return;
+	if (ext_p_.empty() || !extinction_settings.refine) return;
 	//the scale and the extinction coefficients are coupled through the same residual, so
 	//alternate: a Gauss-Newton step on the coefficients, then the closed-form scale again
 	for (int it = 0; it < 5; it++) {
@@ -625,7 +484,7 @@ void structure_factors::eval_scale() {
 }
 
 void structure_factors::solve_scale() {
-	const bool against_F2 = opt->xcw_settings.refine_against == 2, weighted = opt->xcw_settings.XWR_type == 2;
+	const bool against_F2 = quality_criteria.refine_against == 2, weighted = quality_criteria.goof_type == 2;
 	const int chunk = 128, nchunk = (model_data.nr + chunk - 1) / chunk;
 	vec numerators(nchunk), denominators(nchunk);
 #pragma omp parallel for schedule(static)
@@ -659,7 +518,7 @@ void structure_factors::solve_scale() {
 void structure_factors::calc_criteria() {
 	ensure_inv_H2_weights();
 	//index 0: the fit set, 1: all reflections
-	const double prefactor[2] = { 1.0 / static_cast<double>(nr_fit - n_params()), 1.0 / static_cast<double>(model_data.nr - n_params()) };
+	const double prefactor[2] = { 1.0 / static_cast<double>(model_data.nr_fit - n_params()), 1.0 / static_cast<double>(model_data.nr - n_params()) };
 	const int chunk = 128, nchunk = (model_data.nr + chunk - 1) / chunk;
 	vec2 goof1(2, vec(nchunk)), goof2(2, vec(nchunk)), wgoof1(2, vec(nchunk)), wgoof2(2, vec(nchunk)), r1_num(2, vec(nchunk)), r1_den(2, vec(nchunk));
 	const double scale = scatter_data.scale;
@@ -675,7 +534,7 @@ void structure_factors::calc_criteria() {
 			const double weighted_diff2 = diff2 / scatter_data.sigma_obs2[i];
 			const double weighted_diff1_sq = weighted_diff1 * weighted_diff1;
 			const double weighted_diff2_sq = weighted_diff2 * weighted_diff2;
-			const double w = opt->xcw_settings.XWR_type == 2 ? inv_H2_[i] : 0.0;
+			const double w = quality_criteria.goof_type == 2 ? inv_H2_[i] : 0.0;
 			for (int set = scatter_data.hkl_mask[i] ? 0 : 1; set < 2; set++) {
 				goof1[set][c] += weighted_diff1_sq;
 				goof2[set][c] += weighted_diff2_sq;
@@ -710,7 +569,7 @@ void structure_factors::calc_criteria() {
 }
 
 double structure_factors::criterion(const bool all) const {
-	const bool weighted = opt->xcw_settings.XWR_type == 2, against_F2 = opt->xcw_settings.refine_against == 2;
+	const bool weighted = quality_criteria.goof_type == 2, against_F2 = quality_criteria.refine_against == 2;
 	if (all) return weighted ? (against_F2 ? quality_criteria.weighted_GooF2_all : quality_criteria.weighted_GooF1_all) : (against_F2 ? quality_criteria.GooF2_all : quality_criteria.GooF1_all);
 	return weighted ? (against_F2 ? quality_criteria.weighted_GooF2 : quality_criteria.weighted_GooF1) : (against_F2 ? quality_criteria.GooF2 : quality_criteria.GooF1);
 }
@@ -719,7 +578,7 @@ double structure_factors::criterion(const bool all) const {
 //U_res ~ Sum_h |dF_h|^2/|H_h|^2, with |H| = 1/d = 2*sin(theta)/lambda.
 //(0,0,0) is already excluded from hkl at read time; depends only on geometry.
 void structure_factors::ensure_inv_H2_weights() {
-	if (opt->xcw_settings.XWR_type == 1 || !inv_H2_.empty()) {
+	if (quality_criteria.goof_type == 1 || !inv_H2_.empty()) {
 		return;
 	}
 	ensure_hkl_ordered();
@@ -789,7 +648,7 @@ structure_factors::I_tensor& structure_factors::eval_I_anom_disp(std::vector<ao_
 	eval_translation_phase();
 	size_t kept_on_disk = 0;
 	bool single_on_disk = false;
-	if (opt->xcw_settings.read_tensor && !opt->xcw_settings.i_tensor_file_path.empty()
+	if (I_tens.read_tensor && !I_tens.i_tensor_file_path.empty()
 		&& i_tensor_file::matches(i_tensor_path(), model_data.nr, model_data.nmo, kept_on_disk, single_on_disk)) {
 		//A streamed tensor already there and big enough for this problem. It depends on the
 		//geometry, the basis and the reflections and on none of the refinement settings, so
@@ -809,14 +668,14 @@ structure_factors::I_tensor& structure_factors::eval_I_anom_disp(std::vector<ao_
 		//The file's element type is kept as it is: a single-precision tensor cannot regain
 		//anything by widening, and a double one is narrowed only on request
 		const char* f = std::getenv("NOSPHERA2_XCW_I_FLOAT"); // Flawfinder: ignore
-		I_tens.i_float_ = single_on_disk || (!I_tens.i_streamed_ && (opt->xcw_settings.i_tensor_single || (f && std::atoi(f) != 0)));
+		I_tens.i_float_ = single_on_disk || (!I_tens.i_streamed_ && (I_tens.tensor_single || (f && std::atoi(f) != 0)));
 		std::cout << "I tensor read from " << i_tensor_path().string()
 			<< " (" << (i_tensor_file::total_bytes(model_data.nr, I_tens.i_compact_, single_on_disk) / 1048576.0)
 			<< " MB" << (single_on_disk ? ", single precision" : "") << "), not recomputed"
 			<< (I_tens.i_streamed_ ? ", read a window at a time" : ", held in memory") << std::endl;
 		if (I_tens.i_float_ && !single_on_disk)
 			std::cout << "NOTE: the tensor on disk is double precision; it is narrowed to single as i_float asks" << std::endl;
-		if (single_on_disk && opt->xcw_settings.i_tensor_double)
+		if (single_on_disk && I_tens.tensor_double)
 			std::cout << "NOTE: the tensor on disk is single precision; i_double cannot widen it, it is used as stored" << std::endl;
 		if (!I_tens.i_streamed_) {
 			if (I_tens.i_float_)
@@ -863,10 +722,10 @@ structure_factors::I_tensor& structure_factors::eval_I_anom_disp(std::vector<ao_
 //the disk bandwidth, which it is not competing for while it works out of memory.
 void structure_factors::start_i_save()
 {
-	if (opt->xcw_settings.i_tensor_save_path.empty() || I_tens.i_streamed_) return;
+	if (I_tens.i_tensor_save_path.empty() || I_tens.i_streamed_) return;
 	const size_t packed = I_tens.i_compact_;
 	const int nr = model_data.nr;
-	const std::filesystem::path path = opt->xcw_settings.i_tensor_save_path;
+	const std::filesystem::path path = I_tens.i_tensor_save_path;
 	const bool from_float = I_tens.i_float_;
 	std::cout << "Writing the I tensor to " << path.string()
 		<< " in the background; a later run can `read " << path.string()
@@ -894,14 +753,14 @@ void structure_factors::finish_i_save()
 	i_writer_.join();
 	if (!i_writer_error_.empty())
 		std::cout << "Could not write the I tensor to "
-			<< opt->xcw_settings.i_tensor_save_path.string() << ": " << i_writer_error_
+			<< I_tens.i_tensor_save_path.string() << ": " << i_writer_error_
 			<< " (the refinement itself is unaffected)" << std::endl;
 	else
-		std::cout << "I tensor written to " << opt->xcw_settings.i_tensor_save_path.string() << std::endl;
+		std::cout << "I tensor written to " << I_tens.i_tensor_save_path.string() << std::endl;
 }
 
 size_t structure_factors::i_budget(const char*& source, bool& automatic) const {
-	size_t budget = opt->xcw_settings.i_tensor_max_mb * 1024ULL * 1024ULL;
+	size_t budget = I_tens.i_tensor_max_mb * 1024ULL * 1024ULL;
 	source = "i_tensor_mb";
 	automatic = false;
 	if (budget == 0 && opt->mem_given && opt->mem > 0.0) {
@@ -966,9 +825,9 @@ void structure_factors::decide_i_storage() {
 }
 
 std::filesystem::path structure_factors::i_tensor_path() const {
-	return opt->xcw_settings.i_tensor_file_path.empty()
+	return I_tens.i_tensor_file_path.empty()
 		? std::filesystem::path(i_tensor_default)
-		: opt->xcw_settings.i_tensor_file_path;
+		: I_tens.i_tensor_file_path;
 }
 
 void structure_factors::open_i_stream_for_reading() {
@@ -1012,10 +871,14 @@ void structure_factors::eval_I(std::vector<ao_data>& ao_data_shells, double& tim
 		temp_atom.set_charge(asym_atoms[at].type);
 		dummy_wave.push_back_atom(temp_atom);
 	}
-	std::shared_ptr<BasisSet> basis = BasisSetLibrary::get_basis_set(opt->xcw_settings.basis_set_name);
+	std::shared_ptr<BasisSet> basis = BasisSetLibrary::get_basis_set(I_tens.basis_set_name);
 	load_basis_into_WFN(dummy_wave, basis, false, true);
 	dummy_wave.delete_unoccupied_MOs();
 	bvec needs_grid(model_data.ncen, true);
+	ivec asym_atom_list(model_data.ncen);
+	for (int at = 0; at < model_data.ncen; at++) {
+		asym_atom_list[at] = at;
+	}
 	grid_manager.setup3DGridsForMolecule(dummy_wave, asym_atom_list, needs_grid, unit_cell);
 
 	bool equal = false;
@@ -1238,19 +1101,21 @@ void structure_factors::eval_I(std::vector<ao_data>& ao_data_shells, double& tim
 			const int prefix_end = g < n_atom_grids ? ao_prefix_end[mu][g] : points[g];
 			for (int p = 0; p < prefix_end; p++) {
 				d4 d_mu{ x_ptr[p] - mp0, y_ptr[p] - mp1 , z_ptr[p] - mp2 , 0 };
-				d_mu[3] = std::hypot(d_mu[0], d_mu[1], d_mu[2]);
-				if (d_mu[3] * d_mu[3] > ao_grid_cutoff_squared[mu]) {
+				d_mu[3] = d_mu[0] * d_mu[0] + d_mu[1] * d_mu[1] + d_mu[2] * d_mu[2];
+				const double root_d3 = std::sqrt(d_mu[3]);
+				if (d_mu[3] > ao_grid_cutoff_squared[mu]) {
 					local_mu_vals_ptr[p] = 0.0;
 				}
 				else {
-					local_mu_vals_ptr[p] = dummy_wave.eval_ao(d_mu, mu_primitives, mu_prims.m);
+					local_mu_vals_ptr[p] = dummy_wave.eval_ao(d_mu, mu_primitives, mu_prims.m, root_d3);
 				}
 			}
 		}
 	}
 	std::chrono::high_resolution_clock::time_point end_AOs = std::chrono::high_resolution_clock::now();
 	std::cout << "AO values calculated for all grids." << std::endl;
-	std::cout << "Time taken for AO values computation: " << std::chrono::duration_cast<std::chrono::milliseconds>(end_AOs - start_AOs).count() << " milliseconds." << std::endl;
+	if (!(opt->no_date))
+		std::cout << "Time taken for AO values computation: " << std::chrono::duration_cast<std::chrono::milliseconds>(end_AOs - start_AOs).count() << " milliseconds." << std::endl;
 	//Morton-order every atom grid's points, so that a run of consecutive points is a
 	//compact ball rather than a spherical shell. This is what OCC does
 	//(occ/qm/spatial_grid_hierarchy.h) and what grid-based codes do generally, and the
@@ -1800,7 +1665,7 @@ void structure_factors::eval_I(std::vector<ao_data>& ao_data_shells, double& tim
 		const char* f = std::getenv("NOSPHERA2_XCW_I_FLOAT"); // Flawfinder: ignore
 		const bool single_build = (itensor_on_gpu && !opt->gpu_fp64)
 			|| ((!itensor_on_gpu || opt->itensor_hybrid) && opt->cpu_itensor_fp32);
-		I_tens.i_float_ = opt->xcw_settings.i_tensor_single || (f && std::atoi(f) != 0) || (single_build && !opt->xcw_settings.i_tensor_double);
+		I_tens.i_float_ = I_tens.tensor_single || (f && std::atoi(f) != 0) || (single_build && !I_tens.tensor_double);
 		if (single_build && !I_tens.i_float_)
 			std::cout << "NOTE: the I tensor is built in single precision and held in double as i_double asks" << std::endl;
 		if (!single_build && I_tens.i_float_)
@@ -2092,9 +1957,6 @@ void structure_factors::eval_I(std::vector<ao_data>& ao_data_shells, double& tim
 	time_taken = std::chrono::duration<double>(duration).count();
 	throughput::record("XCW I tensor", itensor_on_gpu, itensor_flops,
 		1.0e3 * std::chrono::duration<double>(duration).count());
-	if (!(opt->no_date) && pb) {
-		XCW_log << "Time taken for XCW integrals: " << std::fixed << std::setprecision(2) << std::chrono::duration<double>(duration).count() << " seconds." << std::endl;
-	}
 }
 
 //F_r = Sum_at asym_fact Sum_s f_at(h R_s) exp(i h R_s x_at) T_at(h R_s) exp(2 pi i h t_s) plus the

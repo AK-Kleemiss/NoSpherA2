@@ -292,8 +292,7 @@ namespace NoSpherA2IntegrationTests
         {
             RunTest({
                 "P1_XWR", "P1_test", "", "",
-                {"-acc","2", "-cif", "P1_test_NA2.cif", "-hkl", "P1_test.hkl", "-anom_disp",
-                 "anom_disp.txt", "-do_XCW"}
+                {"-acc","2", "-cif", "P1_test.cif", "-hkl", "P1_test.hkl", "-do_XCW"}
                 });
         }
 

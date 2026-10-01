@@ -205,7 +205,9 @@
     <ClCompile Include="..\..\Src\core\SALTED_predictor.cpp" />
     <ClCompile Include="..\..\Src\core\SALTED_utilities.cpp" />
     <ClCompile Include="..\..\Src\core\scattering_factors.cpp" />
-    <ClCompile Include="..\..\Src\core\SCF_wrapper.cpp" />
+    <ClCompile Include="..\..\Src\core\SCF_wrapper.cpp">
+      <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
     <ClCompile Include="..\..\Src\core\structure_factors.cpp">
       <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/bigobj %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>

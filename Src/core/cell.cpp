@@ -152,19 +152,21 @@ void cell::grow_asym_atoms(std::vector<asym_atom>& asym_atoms, std::vector<asym_
 	for (asym_atom& xyz_atom : xyz_atoms) {
 		bool found = false;
 		const vec pos1 = { xyz_atom.frac_pos[0], xyz_atom.frac_pos[1], xyz_atom.frac_pos[2] };
+		int idx = 0;
 		for (const asym_atom& asym_atom : asym_atoms) {
 			const vec pos2 = { asym_atom.frac_pos[0], asym_atom.frac_pos[1], asym_atom.frac_pos[2] };
 			// This is not a real solution, only a quick fix. Should use the same procedure as in the cif reader (scattering_factors.cpp)
-
 			if (check_special(pos1, pos2, 1e-2)) {
 				found = true;
 				break;
 			}
+			idx++;
 		}
 		if (!found) {
 			xyz_atom.grown = true;
 			asym_atoms.push_back(xyz_atom);
 		}
+		idx++;
 	}
 }
 
@@ -203,12 +205,6 @@ bool cell::check_special(const vec& pos1, const vec& pos2, const double& toleran
 	//closing function
 }
 
-// Handles the processing of grown structures
-ivec cell::apply_grown(ivec3& linking_list) {
-	return confirm_applied_symmetry(linking_list);
-	// closing function
-}
-
 bool cell::check_identity(const int& sym_op) {
 	bool is_identity = false;
 	vec trans_identity = { 0 ,0, 0 };
@@ -223,39 +219,31 @@ bool cell::check_identity(const int& sym_op) {
 	return is_identity;
 }
 
-ivec cell::confirm_applied_symmetry(ivec3& linking_list) {
-	ivec applied_symmetry;
+ivec cell::confirm_applied_symmetry(const ivec3& linking_list) {
 	const int asymmetric_atoms = linking_list.size();
 	const int num_sym_ops = sym[0][0].size();
+
+	// Count how often a symmetry operation is applied (check if it is applied to all asymmetric atoms)
+	ivec counts(num_sym_ops, 0);
+	for (const ivec2& asym_atom_link : linking_list) {
+		for (const ivec& generated_atom_link : asym_atom_link) {
+			for (const int sym_op : generated_atom_link) {
+				counts[sym_op]++;
+			}
+		}
+	}
+
+	ivec applied_symmetry;
+
 	for (int sym_op = 0; sym_op < num_sym_ops; sym_op++) {
 		if (check_identity(sym_op)) {
 			continue;
 		}
-		int counter = 0;
-		for (int idx1 = 0; idx1 < linking_list.size(); idx1++) {
-			for (int idx2 = 0; idx2 < linking_list[idx1].size(); idx2++) {
-				for (int idx3 = 0; idx3 < linking_list[idx1][idx2].size(); idx3++) {
-					if (linking_list[idx1][idx2][idx3] == sym_op) {
-						counter++;
-					}
-				}
-			}
-		}
-		if (counter == asymmetric_atoms) {
+		if (counts[sym_op] == asymmetric_atoms) {
 			applied_symmetry.push_back(sym_op);
 		}
-		else if (counter != 0) {
-			int counter2 = 0;
-			for (int idx1 = 0; idx1 < linking_list.size(); idx1++) {
-				for (int idx2 = 0; idx2 < linking_list[idx1][idx1].size(); idx2++) {
-					if (linking_list[idx1][idx1][idx2] == sym_op) {
-						counter2++;
-					}
-				}
-			}
-			if (counter != counter2) {
-				std::cerr << "Warning: Symmetry operation not fully matched. Structure seems to be grown improperly!\n";
-			}
+		else if (counts[sym_op] != 0) {
+			std::cerr << "Warning: Symmetry operation not fully matched. Structure seems to be grown improperly!\n";
 		}
 	}
 	return applied_symmetry;
@@ -296,19 +284,17 @@ void cell::project_into_subgroup(ivec& applied_symmetry, hkl_list& hkl_enlarged,
 			if (std::find(additional_symmetries.begin(), additional_symmetries.end(), equal_to) != additional_symmetries.end()) {
 				continue;
 			}
-			if (check_identity(equal_to)) {
-				additional_symmetries.push_back(sym_op2);
-				continue;
-			}
 			additional_symmetries.push_back(sym_op2);
 		}
 	}
-	for (int i = 0; i < additional_symmetries.size(); i++) {
-		applied_symmetry.push_back(additional_symmetries[i]);
-	}
+	applied_symmetry.insert(
+		applied_symmetry.end(),
+		additional_symmetries.begin(),
+		additional_symmetries.end()
+	);
 	std::sort(applied_symmetry.begin(), applied_symmetry.end());
 
-	for (int sym_op : std::views::reverse(applied_symmetry)) {
+	for (const int sym_op : std::views::reverse(applied_symmetry)) {
 		for (ivec2& middle : sym) {
 			for (ivec& inner : middle) {
 				inner.erase(inner.begin() + sym_op);
@@ -320,49 +306,217 @@ void cell::project_into_subgroup(ivec& applied_symmetry, hkl_list& hkl_enlarged,
 	}
 
 	for (int applied_sym : applied_symmetry) {
-		for (int idx1 = 0; idx1 < linking_list.size(); idx1++) {
-			for (int idx2 = 0; idx2 < linking_list[idx1].size(); idx2++) {
-				for (int sym_op = 0; sym_op < linking_list[idx1][idx2].size(); sym_op++) {
-					if (linking_list[idx1][idx2][sym_op] == applied_sym && linking_list[idx1][idx2].size() > 1) {
-						linking_list[idx1][idx2].erase(linking_list[idx1][idx2].begin() + sym_op);
-						sym_op--;
-					}
+		for (ivec2& middle : linking_list) {
+			for (ivec& links : middle) {
+				if (links.size() > 1) {
+					links.erase(std::remove(links.begin(), links.end(), applied_sym), links.end());
 				}
 			}
 		}
 	}
 
+	vec3 rotations;
+	for (int sym_op = 0; sym_op < sym[0][0].size(); ++sym_op) {
+		rotations.push_back({{
+				static_cast<double>(sym[0][0][sym_op]),
+				static_cast<double>(sym[0][1][sym_op]),
+				static_cast<double>(sym[0][2][sym_op])},{
+				static_cast<double>(sym[1][0][sym_op]),
+				static_cast<double>(sym[1][1][sym_op]),
+				static_cast<double>(sym[1][2][sym_op])},{
+				static_cast<double>(sym[2][0][sym_op]),
+				static_cast<double>(sym[2][1][sym_op]),
+				static_cast<double>(sym[2][2][sym_op])}});
+	}
+
 	const int nr = hkl.size();
 	std::vector<i3> hkl_vec(hkl.begin(), hkl.end());
 	hkl_list new_enlarged;
-	for (int r = 0; r < nr; r++) {
-		vec hkl_temp = { (double)hkl_vec[r][0], (double)hkl_vec[r][1], (double)hkl_vec[r][2] };
-		for (int sym_op = 0; sym_op < sym[0][0].size(); sym_op++) {
-			const vec2 rot_temp = { { (double)sym[0][0][sym_op], (double)sym[0][1][sym_op], (double)sym[0][2][sym_op] },
-									{ (double)sym[1][0][sym_op], (double)sym[1][1][sym_op], (double)sym[1][2][sym_op] },
-									{ (double)sym[2][0][sym_op], (double)sym[2][1][sym_op], (double)sym[2][2][sym_op] } };
-			vec new_hkl = self_dot(rot_temp, hkl_temp, false);
+	for (const auto& h : hkl) {
+		vec hkl_temp = {static_cast<double>(h[0]), static_cast<double>(h[1]), static_cast<double>(h[2])};
+		for (const vec2& rot : rotations) {
+			vec new_hkl = self_dot(rot, hkl_temp, false);
 			i3 new_hkl_int = { (int)std::round(new_hkl[0]), (int)std::round(new_hkl[1]), (int)std::round(new_hkl[2]) };
-			new_enlarged.insert(new_hkl_int);
+			new_enlarged.insert(new_hkl_int);			
 		}
 	}
 	hkl_enlarged = new_enlarged;
-
 	//closing function
 }
 
-void cell::grow_U_iso(std::vector<asym_atom>& asym_atoms, const ivec3& symmetry_linking_list) {
-	for (int i = 0; i < symmetry_linking_list.size(); i++) {
-		for (int j = 0; j < symmetry_linking_list[i].size(); j++) {
+void cell::grow_ADPs(std::vector<asym_atom>& asym_atoms, const ivec3& symmetry_linking_list, vec3& ADPs) {
+	vec3 new_ADPs(asym_atoms.size());
+	for (int i = 0; i < ADPs.size(); i++) {
+		new_ADPs[i] = ADPs[i];
+	}
+	// The grown atoms follow the asymmetric ones; each takes its parent's values, the ADPs rotated by the linking operation
+	const int n_asym = symmetry_linking_list.size();
+	for (int i = 0; i < n_asym; i++) {
+		for (int j = n_asym; j < symmetry_linking_list[i].size(); j++) {
 			if (symmetry_linking_list[i][j].size() != 0) {
 				asym_atoms[j].U_iso = asym_atoms[i].U_iso;
+				asym_atoms[j].anom = asym_atoms[i].anom;
+				new_ADPs[j] = ADPs[i];
+				rotate_grown_ADPs(new_ADPs[j], symmetry_linking_list[i][j][0]);
 			}
 		}
 	}
+	ADPs = new_ADPs;
 };
 
-ivec cell::apply_grown(const hkl_list& hkl, hkl_list& hkl_enlarged, std::vector<asym_atom>& asym_atoms, ivec3& linking_list, ivec3& original_rotations) {
-	original_rotations = sym;
+// U*, C and D are contravariant tensors in the fractional basis, so an image's are T' = R T R^T with R
+// the rotation of sym_op (x' = R x + t); sym holds R transposed, which is what transform_ADPs takes.
+// U comes as the CIF gives it, U*_ij / (a*_i a*_j), so it is rotated as U* and scaled back.
+void cell::rotate_grown_ADPs(vec2& ADPs, const int sym_op) const {
+	vec2 M(3, vec(3));
+	for (int i = 0; i < 3; i++)
+		for (int j = 0; j < 3; j++)
+			M[i][j] = sym[i][j][sym_op];
+	transform_ADPs(ADPs, M);
+}
+
+// Position of a sorted index triple/quadruple in the Voigt storage of C (10) and D (15)
+static int get_voigt_index(const ivec& indices) {
+	static const ivec2 map3{ { 0, 0, 0 }, { 0, 0, 1 }, { 0, 0, 2 }, { 0, 1, 1 }, {0, 1, 2}, {0, 2, 2}, {1, 1, 1}, { 1, 1, 2 }, { 1, 2, 2 }, { 2, 2, 2 } };
+	static const ivec2 map4{ { 0, 0, 0, 0 }, { 0, 0, 0, 1 }, { 0, 0, 0, 2 }, { 0, 0, 1, 1 }, { 0, 0, 1, 2 }, { 0, 0, 2, 2 }, { 0, 1, 1, 1 }, { 0, 1, 1, 2 }, { 0, 1, 2, 2 }, { 0, 2, 2, 2 }, { 1, 1, 1, 1 }, { 1, 1, 1, 2 }, { 1, 1, 2, 2 }, { 1, 2, 2, 2 }, { 2, 2, 2, 2 } };
+	const auto& map = indices.size() == 3 ? map3 : map4;
+	return std::find(map.begin(), map.end(), indices) - map.begin();
+}
+
+//Maybe an alternative to transform_ADPs but I don't like it yet since it has many auxiliary functions and is really hard to read.
+//template <std::size_t N>
+//int flat_index(const std::array<int, N>& t) {
+//	int f = 0;
+//	for (int i : t) f = 3 * f + i;
+//	return f;
+//}
+//
+//template <std::size_t N, std::size_t K>
+//vec transform_symmetric(const vec& packed, const vec2& M, const std::array<std::array<int, N>, K>& order) {
+//	assert(packed.size() == K);
+//	constexpr int full = ipow3(N);
+//
+//	// Unpack into the full tensor: every permutation of a stored tuple gets its value.
+//	std::array<double, full> T{};
+//	for (std::size_t c = 0; c < K; ++c) {
+//		auto t = order[c];  // tuples are stored sorted, so next_permutation hits all of them
+//		do T[flat_index(t)] = packed[c];
+//		while (std::next_permutation(t.begin(), t.end()));
+//	}
+//
+//	// Contract M into one axis at a time: N * 3^(N+1) flops instead of 3^(2N).
+//	for (std::size_t axis = 0; axis < N; ++axis) {
+//		const int stride = ipow3(N - 1 - axis);
+//		std::array<double, full> R{};
+//		for (int f = 0; f < full; ++f) {
+//			const int i = (f / stride) % 3;
+//			const int base = f - i * stride;
+//			for (int p = 0; p < 3; ++p)
+//				R[f] += M[p][i] * T[base + p * stride];
+//		}
+//		T = R;
+//	}
+//
+//	// Pack back into the independent components.
+//	vec out(K);
+//	for (std::size_t c = 0; c < K; ++c)
+//		out[c] = T[flat_index(order[c])];
+//	return out;
+//}
+//
+//
+//constexpr int ipow3(std::size_t n) { return n == 0 ? 1 : 3 * ipow3(n - 1); }
+//void cell::transform_ADPs(vec2& ADPs, const vec2& M) {
+//	constexpr std::array<std::array<int, 2>, 6> voigt2{ { {0,0}, {1,1}, {2,2}, {0,1}, {0,2}, {1,2} } };
+//	constexpr std::array<std::array<int, 3>, 10> voigt3{ {
+//		{0,0,0}, {0,0,1}, {0,0,2}, {0,1,1}, {0,1,2}, {0,2,2}, {1,1,1}, {1,1,2}, {1,2,2}, {2,2,2} } };
+//	constexpr std::array<std::array<int, 4>, 15> voigt4{ {{0,0,0,0}, {0,0,0,1}, {0,0,0,2}, {0,0,1,1}, {0,0,1,2}, {0,0,2,2}, {0,1,1,1}, {0,1,1,2},
+//		{0,1,2,2}, {0,2,2,2}, {1,1,1,1}, {1,1,1,2}, {1,1,2,2}, {1,2,2,2}, {2,2,2,2} } };
+//	if (ADPs.size() > 0 && !ADPs[0].empty()) ADPs[0] = transform_symmetric(ADPs[0], M, voigt2);
+//	if (ADPs.size() > 1 && !ADPs[1].empty()) ADPs[1] = transform_symmetric(ADPs[1], M, voigt3);
+//	if (ADPs.size() > 2 && !ADPs[2].empty()) ADPs[2] = transform_symmetric(ADPs[2], M, voigt4);
+//}
+
+
+
+// T'_{ij..} = sum M_pi M_qj .. T_pq.. for the U (rank 2), C (rank 3) and D (rank 4) tensors in their
+// Voigt storage: structure_factors::U_star2U_cart hands in the cell matrix, rotate_grown_ADPs the transposed symmetry operation
+void cell::transform_ADPs(vec2& ADPs, const vec2& M) {
+	if (ADPs.size() > 0 && ADPs[0].size() > 0) {
+		vec2 U(3, vec(3));
+		U[0][0] = ADPs[0][0];
+		U[0][1] = ADPs[0][3];
+		U[0][2] = ADPs[0][4];
+		U[1][0] = ADPs[0][3];
+		U[1][1] = ADPs[0][1];
+		U[1][2] = ADPs[0][5];
+		U[2][0] = ADPs[0][4];
+		U[2][1] = ADPs[0][5];
+		U[2][2] = ADPs[0][2];
+		U = self_dot(self_dot(M, U, true, false), M, false, false);
+		ADPs[0][0] = U[0][0];
+		ADPs[0][1] = U[1][1];
+		ADPs[0][2] = U[2][2];
+		ADPs[0][3] = U[0][1];
+		ADPs[0][4] = U[0][2];
+		ADPs[0][5] = U[1][2];
+	}
+	if (ADPs.size() > 1 && ADPs[1].size() > 0) {
+		int running_idx = 0;
+		vec C_out(10);
+		for (int i = 0, idx = 0; i < 3; i++) {
+			for (int j = i; j < 3; j++) {
+				for (int k = j; k < 3; k++) {
+					double sum = 0;
+					for (int p = 0; p < 3; p++) {
+						for (int q = 0; q < 3; q++) {
+							for (int r = 0; r < 3; r++) {
+								ivec sorted_idx = { p, q, r };
+								std::sort(sorted_idx.begin(), sorted_idx.end());
+								int ADP_idx;
+								ADP_idx = get_voigt_index(sorted_idx);
+								sum += M[p][i] * M[q][j] * M[r][k] * ADPs[1][ADP_idx];
+							}
+						}
+					}
+					C_out[idx++] = sum;
+				}
+			}
+		}
+		ADPs[1] = C_out;
+	}
+	if (ADPs.size() > 2 && ADPs[2].size() > 0) {
+		int running_idx = 0;
+		vec D_out(15);
+		for (int i = 0; i < 3; i++) {
+			for (int j = i; j < 3; j++) {
+				for (int k = j; k < 3; k++) {
+					for (int l = k; l < 3; l++) {
+						double sum = 0;
+						for (int p = 0; p < 3; p++) {
+							for (int q = 0; q < 3; q++) {
+								for (int r = 0; r < 3; r++) {
+									for (int s = 0; s < 3; s++) {
+										ivec sorted_idx = { p, q, r, s };
+										std::sort(sorted_idx.begin(), sorted_idx.end());
+										int ADP_idx;
+										ADP_idx = get_voigt_index(sorted_idx);
+										sum += M[p][i] * M[q][j] * M[r][k] * M[s][l] * ADPs[2][ADP_idx];
+									}
+								}
+							}
+						}
+						D_out[running_idx] = sum;
+						running_idx++;
+					}
+				}
+			}
+		}
+		ADPs[2] = D_out;
+	}
+}
+
+ivec cell::apply_grown(const hkl_list& hkl, hkl_list& hkl_enlarged, std::vector<asym_atom>& asym_atoms, ivec3& linking_list) {
 	ivec applied_symmetry = confirm_applied_symmetry(linking_list);
 	project_into_subgroup(applied_symmetry, hkl_enlarged, hkl, linking_list);
 	return applied_symmetry;

@@ -975,7 +975,7 @@ TEST(ConvenienceOptionsTests, GpuAndXcwTogglesFlipTheirFields)
 	const options opt = parse({ "-no_gpu", "-gpu_fp64", "-gpu_fp32", "-no_gpu_itensor", "-gpu_itensor_tensor", "-no_gpu_cublas",
 		"-no_gpu_salted", "-salted_charge_constraint", "-no_gpu_grid", "-no_gpu_density", "-gpu_blas", "-no_cpu_itensor_fp32",
 		"-itensor_hybrid", "-no_xcw_extrapolate", "-xcw_incremental", "-xcw_int_precision", "1e-12",
-		"-do_XCW", "-calc_F", "-xcw_gaussian_halt", "-xcw_strong_cutoff", "2.5", "-XCW_settings", "settings.toml" });
+		"-do_XCW", "-XCW_settings", "settings.toml" });
 	EXPECT_FALSE(opt.use_gpu);
 	EXPECT_TRUE(opt.gpu_fp64);
 	EXPECT_TRUE(opt.gpu_fp32);
@@ -993,9 +993,6 @@ TEST(ConvenienceOptionsTests, GpuAndXcwTogglesFlipTheirFields)
 	EXPECT_TRUE(opt.xcw_incremental);
 	EXPECT_NEAR(opt.xcw_int_precision, 1e-12, 1e-25);
 	EXPECT_TRUE(opt.do_XCW);
-	EXPECT_TRUE(opt.calc_F_calc);
-	EXPECT_TRUE(opt.xcw_gaussian_halt);
-	EXPECT_NEAR(opt.xcw_strong_cutoff, 2.5, 1e-15);
 	EXPECT_EQ(opt.xcw_settings_path, std::filesystem::path("settings.toml"));
 	const options back = parse({ "-no_gpu_itensor", "-gpu_itensor", "-no_itensor_hybrid", "-xcw_extrapolate", "-no_xcw_incremental", "-gpu_cublas", "-gpu_grid", "-gpu_density", "-gpu_salted", "-cpu_itensor_fp32" });
 	EXPECT_TRUE(back.gpu_itensor);

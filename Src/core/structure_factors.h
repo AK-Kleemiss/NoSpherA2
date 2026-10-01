@@ -8,14 +8,13 @@
 #include <occ/qm/hf.h>
 #include <thread>
 
-// Applies M to the U/C/D tensors of one atom in their Voigt storage: T'_{ij..} = sum_pq.. M_pi M_qj .. T_pq..
-void transform_ADPs(vec2& ADPs, const vec2& M);
-
 class structure_factors {
 
 public:
 	structure_factors() = default;
 	structure_factors(options& opt_in);
+
+	options* opt;
 
 //private:
 
@@ -33,6 +32,8 @@ public:
 		double GooF2_all;
 		double weighted_GooF1_all;
 		double weighted_GooF2_all;
+		int refine_against; // 1 for F and 2 for F^2
+		int goof_type; // 1 for traditional GooF and 2 for Coulomb weighted GooF
 	};
 
 	// Store information about the model (e.g. number of atoms, reflections)
@@ -40,7 +41,17 @@ public:
 		int ncen;
 		int nr;
 		int nr_enlarged;
+		int nr_fit;
 		int nmo;
+		int n_params;
+		double wavelength;
+	};
+
+	struct extinction_settings {
+		extinction::model extinction_model;
+		bool aniso;
+		bool refine;
+		double start;
 	};
 
 	// Data for contracted basis function
@@ -48,12 +59,6 @@ public:
 		std::vector<primitive> prims;
 		d3 pos;
 		int m;
-	};
-
-	// Data for anomalous dispersion correction
-	struct anom_atom {
-		std::string identifier;
-		cdouble dispersion;
 	};
 
 	// The I tensor: held resident, or written to disk and read back a window
@@ -86,6 +91,13 @@ public:
 		{
 			return i_streamed_ ? i_file_.block32(r) : I32.data() + static_cast<size_t>(r) * i_compact_;
 		}
+		bool read_tensor;
+		std::filesystem::path i_tensor_file_path;
+		std::filesystem::path i_tensor_save_path;
+		bool tensor_single;
+		bool tensor_double;
+		size_t i_tensor_max_mb;
+		std::string basis_set_name;
 	};
 
 	// Stores the ADP tensors
@@ -96,8 +108,6 @@ public:
 	cvec2 phase_facts;
 	// Stores the translational phase factors
 	cvec2 translation_phase_facts;
-	// Used for conveying options to the structure_factors class
-	options* opt;
 	// Store information about the model
 	model_data model_data;
 	// Store scattering data for each reflection
@@ -108,20 +118,8 @@ public:
 	cell unit_cell;
 	// Store the atoms of the asymmetric unit (or the grown unit)
 	std::vector<asym_atom> asym_atoms;
-	// Store the full rotational symmetry in case of a grown structure, for rotating ADPs
-	ivec3 original_rotations;
-	// List used for grid generation
-	ivec asym_atom_list;
 	// Store the k points
 	vec2 k_pt;
-	// The XCW log file
-	std::ofstream XCW_log;
-	// Store the number of reflections in the fit set
-	int nr_fit;
-	// Store the inverse scale factor for GooF calculations
-	double inv_scale;
-	// Store the wavelength
-	double wavelength;
 	// The refined extinction coefficient, or the six Voigt components X11 X22 X33 X12 X13 X23
 	// of the anisotropic tensor. Empty when no model is active, which is what every extinction
 	// branch tests on.
@@ -149,7 +147,7 @@ public:
 	// The parameters the criteria divide by: the settings file's `params` plus the extinction
 	// coefficients, but only while those are actually being refined
 	int n_params() const {
-		return opt->xcw_settings.n_params + static_cast<int>(opt->xcw_settings.extinction_refine ? ext_p_.size() : 0);
+		return model_data.n_params + static_cast<int>(extinction_settings.refine ? ext_p_.size() : 0);
 	}
 	// Reads the wavelength (settings file, else _diffrn_radiation_wavelength in the CIF),
 	// sizes the coefficient vector and builds the per-reflection extinction geometry. No-op
@@ -187,12 +185,10 @@ public:
 	// perturbation when h2 weighting is set. No-op otherwise.
 	void ensure_inv_H2_weights();
 
-	// Converts the ADP matrix (just U) from cif format into reciprocal space
+	//// Converts the ADP matrix (just U) from cif format into reciprocal space
 	void U_cif2U_star();
 	// Converts all ADP tensors from reciprocal space into real space
 	void U_star2U_cart();
-	// Rotates the ADP tensors copied onto grown atoms by their linking symmetry operation
-	void rotate_grown_ADPs();
 
 	// Generates a list that links the symmetry operations to symmetry-generated reflexes for given reflex r
 	ivec generate_asym_lookup(const int r);
@@ -204,8 +200,6 @@ public:
 	// Evaluates the translational contribution to the phase factors
 	void eval_translation_phase();
 
-	// Parses the anomalous dispersion information from a CIF style .txt file
-	void parse_anom_atoms(std::vector<anom_atom>& anom_atoms);
 	// Calculates direct corrections of the anomalous dispersion onto F_calc
 	void eval_anom_disp();
 
@@ -241,6 +235,8 @@ public:
 	void calc_criteria();
 	// The criterion the SCF descends (XWR_type x refine_against), over the fit set or over all
 	double criterion(bool all) const;
+
+	extinction_settings extinction_settings;
 
 
 	// closing class

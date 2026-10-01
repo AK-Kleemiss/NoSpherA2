@@ -372,7 +372,7 @@ namespace NoSpherA2UnitTests
 		EXPECT_EQ(links[0][0][0], 0);
 		EXPECT_EQ(links[0][1][0], 1);
 
-		const ivec applied = cl.apply_grown(links);
+		const ivec applied = cl.confirm_applied_symmetry(links);
 		ASSERT_EQ(applied.size(), 1u);
 		EXPECT_EQ(applied[0], 1);
 		// The weights and sym_op used to be checked here through the two-argument
@@ -401,7 +401,7 @@ namespace NoSpherA2UnitTests
 		EXPECT_EQ(links[0][2].size(), 1u);
 		EXPECT_TRUE(links[1][2].empty());
 		testing::internal::CaptureStderr();
-		const ivec applied = cl.apply_grown(links);
+		const ivec applied = cl.confirm_applied_symmetry(links);
 		const std::string err = testing::internal::GetCapturedStderr();
 		EXPECT_TRUE(applied.empty());
 		EXPECT_NE(err.find("Symmetry operation not fully matched"), std::string::npos);

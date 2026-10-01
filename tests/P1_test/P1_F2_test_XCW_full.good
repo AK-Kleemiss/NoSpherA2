@@ -7,61 +7,62 @@
 This software is part of the cuQCT software suite developed by Florian Kleemiss.
 Please give credit and cite corresponding pieces!
 This Software is published with BSD-2 clause license.
-Reading:                            "P1_test_NA2.cif" done!
+Reading:                                "P1_test.cif" done!
 Reading:                                "P1_test.hkl" done!
 Nr of reflections read from file: 3215
 Number of symmetry operations: 1
 Nr of reflections to be used: 3215
 Generating k-points...                            ... done!
 Number of k-points to evaluate: 3215
-XCW orbital basis set: sto-3g-basis
+XCW: I/sigma(I) >= 2 (F/sigma(F) >= 4): 3146 of 3215 reflections in the fit; R1 and Criterion are over these, R1(all) and Crit(all) over all
+XCW orbital basis set: sto-3g
 XCW: I/sigma(I) >= 2 (F/sigma(F) >= 4): 3146 of 3215 reflections in the fit; R1 and Criterion are over these, R1(all) and Crit(all) over all
 GridManager: Setting up prototype grids for atom types...
 GridManager: Generating integration grids for atoms...
 GridManager: Generated total of 93098 grid points.
 Total number of grid points after pruning: 93092
 AO values calculated for all grids.
-Screened out 1798 unique pairs of mu, nu (33.57%) 
-Skipped evaluation of 64013865 grids (16.16%) 
-More detailed output in XCW.log file...
+Screened out 1802 unique pairs of mu, nu (33.64%) 
+Skipped evaluation of 64843335 grids (16.37%) 
+More detailed output in SCF.log file...
 ____________________________________________________________________________________
  Lambda		Criterion	GooF(F2)	R1(gt)		Total Energy		Perturbation	Target quantity		Crit(all)	R1(all)		A^2 (halt)
 								(Eh)			(a. u.)		(a. u.)
 ____________________________________________________________________________________
-0.00000		4.7318		4.7318		0.02512		-1961.923538820		0.000		-1961.923538820		4.6796		0.02566		196.1899
-0.01000		4.2560		4.2560		0.02437		-1961.905127729		0.043		-1961.862568206		4.2093		0.02491		166.3354
-0.02000		3.9935		3.9935		0.02391		-1961.873617035		0.080		-1961.793746502		3.9500		0.02445		150.7921
-0.03000		3.8190		3.8190		0.02358		-1961.839983078		0.115		-1961.725411924		3.7776		0.02411		141.4242
-0.04000		3.6912		3.6912		0.02331		-1961.806635875		0.148		-1961.658986478		3.6513		0.02384		135.3298
+0.00000		4.8713		4.8713		0.02545		-1961.925585145		0.000		-1961.925585145		4.8173		0.02599		194.5594
+0.01000		4.3698		4.3698		0.02461		-1961.905512489		0.044		-1961.861814615		4.3218		0.02515		164.6817
+0.02000		4.0858		4.0858		0.02409		-1961.870528268		0.082		-1961.788812596		4.0411		0.02463		147.8333
+0.03000		3.8937		3.8937		0.02370		-1961.832706658		0.117		-1961.715894211		3.8513		0.02424		136.7082
+0.04000		3.7511		3.7511		0.02339		-1961.794817868		0.150		-1961.644772701		3.7104		0.02392		128.8789
 ____________________________________________________________________________
 Gaussian halting criterion: progress update after 5 lambda steps
-Recommended halting lambda* = 0.04000 (A^2=135.3298) -- WARNING: binned <z^2> trend test flagged at this lambda; residuals may be spatially correlated, inspect before trusting lambda*.
-  candidate fit: degree=2 RSS=12.5743 R^2=0.9947 AIC=12.6111 [chosen]
+Recommended halting lambda* = 0.04000 (A^2=128.8789) -- WARNING: binned <z^2> trend test flagged at this lambda; residuals may be spatially correlated, inspect before trusting lambda*.
+  candidate fit: degree=2 RSS=9.8138 R^2=0.9964 AIC=11.3717 [chosen]
   candidate fit: degree=4 -- not enough points yet (need >= degree+3 evaluated lambda steps)
-WARNING: A^2 is still falling at the last evaluated lambda (0.04000); this is a scan-boundary value, not a confirmed interior minimum. Extend the scan (larger max_value in -do_XCW stepsize max_value) to find the true optimum. The degree-2 fit places its minimum at lambda ~= 0.03914, inside the range already scanned, which contradicts A^2 still falling at the last step; the trend is too flat here to extrapolate from, only further steps can decide it.
-0.05000		3.5918		3.5918		0.02308		-1961.774186882		0.180		-1961.594599007		3.5530		0.02361		131.1359
+WARNING: A^2 is still falling at the last evaluated lambda (0.04000); this is a scan-boundary value, not a confirmed interior minimum. Extend the scan (larger max_value in -do_XCW stepsize max_value) to find the true optimum. Degree-2 polynomial extrapolation (best fit by AIC, R^2=0.9964) of the A^2(lambda) trend so far estimates the minimum near lambda ~= 0.04238 (extrapolated, not yet observed -- treat as a rough guide to where to extend the scan, not a final answer).
+0.05000		3.6387		3.6387		0.02313		-1961.757605984		0.182		-1961.575670068		3.5993		0.02366		123.1494
 XCW: A^2 is still falling at lambda 0.05000, so the minimum is outside the requested range - extending the scan to lambda 0.06000 (extra step 1 of at most 6)
-0.06000		3.5110		3.5110		0.02288		-1961.742758674		0.211		-1961.532096006		3.4732		0.02341		128.0199
-XCW: A^2 is still falling at lambda 0.06000, so the minimum is outside the requested range - extending the scan to lambda 0.07000 (extra step 2 of at most 6), extrapolated minimum near lambda ~= 0.06258
-0.07000		3.4436		3.4436		0.02270		-1961.712325066		0.241		-1961.471275884		3.4065		0.02323		125.5711
-XCW: A^2 is still falling at lambda 0.07000, so the minimum is outside the requested range - extending the scan to lambda 0.08000 (extra step 3 of at most 6), extrapolated minimum near lambda ~= 0.07102
-0.08000		3.3859		3.3859		0.02254		-1961.682833670		0.271		-1961.411963474		3.3495		0.02307		123.5783
-XCW: A^2 is still falling at lambda 0.08000, so the minimum is outside the requested range - extending the scan to lambda 0.09000 (extra step 4 of at most 6)
-0.09000		3.3357		3.3357		0.02240		-1961.654223265		0.300		-1961.354007695		3.3000		0.02293		121.9187
-XCW: A^2 is still falling at lambda 0.09000, so the minimum is outside the requested range - extending the scan to lambda 0.10000 (extra step 5 of at most 6)
+0.06000		3.5465		3.5465		0.02290		-1961.721261381		0.213		-1961.508473763		3.5082		0.02343		118.8301
+XCW: A^2 is still falling at lambda 0.06000, so the minimum is outside the requested range - extending the scan to lambda 0.07000 (extra step 2 of at most 6), extrapolated minimum near lambda ~= 0.06447
+0.07000		3.4685		3.4685		0.02269		-1961.685810636		0.243		-1961.443013286		3.4312		0.02322		115.4179
+XCW: A^2 is still falling at lambda 0.07000, so the minimum is outside the requested range - extending the scan to lambda 0.08000 (extra step 3 of at most 6), extrapolated minimum near lambda ~= 0.07322
+0.08000		3.4013		3.4013		0.02250		-1961.651243572		0.272		-1961.379137549		3.3648		0.02303		112.5888
+XCW: A^2 is still falling at lambda 0.08000, so the minimum is outside the requested range - extending the scan to lambda 0.09000 (extra step 4 of at most 6), extrapolated minimum near lambda ~= 0.08200
+0.09000		3.3425		3.3425		0.02233		-1961.617547760		0.301		-1961.316726445		3.3066		0.02286		110.1660
+XCW: A^2 is still falling at lambda 0.09000, so the minimum is outside the requested range - extending the scan to lambda 0.10000 (extra step 5 of at most 6), extrapolated minimum near lambda ~= 0.09077
 ____________________________________________________________________________
 Gaussian halting criterion: progress update after 10 lambda steps
-Recommended halting lambda* = 0.09000 (A^2=121.9187) -- WARNING: binned <z^2> trend test flagged at this lambda; residuals may be spatially correlated, inspect before trusting lambda*.
-  candidate fit: degree=2 RSS=185.6752 R^2=0.9627 AIC=37.2141
-  candidate fit: degree=4 RSS=2.9029 R^2=0.9994 AIC=-0.3689 [chosen]
-WARNING: A^2 is still falling at the last evaluated lambda (0.09000); this is a scan-boundary value, not a confirmed interior minimum. Extend the scan (larger max_value in -do_XCW stepsize max_value) to find the true optimum. The degree-4 fit places its minimum at lambda ~= 0.08779, inside the range already scanned, which contradicts A^2 still falling at the last step; the trend is too flat here to extrapolate from, only further steps can decide it.
-0.10000		3.2916		3.2916		0.02227		-1961.626445406		0.329		-1961.297289814		3.2563		0.02280		120.5162
+Recommended halting lambda* = 0.09000 (A^2=110.1660) -- WARNING: binned <z^2> trend test flagged at this lambda; residuals may be spatially correlated, inspect before trusting lambda*.
+  candidate fit: degree=2 RSS=148.6637 R^2=0.9773 AIC=34.9910
+  candidate fit: degree=4 RSS=2.4161 R^2=0.9996 AIC=-2.2045 [chosen]
+WARNING: A^2 is still falling at the last evaluated lambda (0.09000); this is a scan-boundary value, not a confirmed interior minimum. Extend the scan (larger max_value in -do_XCW stepsize max_value) to find the true optimum. Degree-4 polynomial extrapolation (best fit by AIC, R^2=0.9996) of the A^2(lambda) trend so far estimates the minimum near lambda ~= 0.09077 (extrapolated, not yet observed -- treat as a rough guide to where to extend the scan, not a final answer).
+0.10000		3.2903		3.2903		0.02218		-1961.584716900		0.329		-1961.255687351		3.2551		0.02270		108.0432
 XCW: A^2 is still falling at lambda 0.10000, so the minimum is outside the requested range - extending the scan to lambda 0.11000 (extra step 6 of at most 6)
-0.11000		3.2522		3.2522		0.02215		-1961.599454698		0.358		-1961.241708842		3.2175		0.02268		119.3105
+0.11000		3.2437		3.2437		0.02203		-1961.552750992		0.357		-1961.195948719		3.2090		0.02256		106.1571
 XCW: A^2 is still falling at lambda 0.11000, so the minimum is outside the requested range - stopping anyway, the scan has already been extended by its limit of 6 steps; raise max_value in -do_XCW to continue
 ____________________________________________________________________________
-Recommended halting lambda* = 0.11000 (A^2=119.3105) -- WARNING: binned <z^2> trend test flagged at this lambda; residuals may be spatially correlated, inspect before trusting lambda*.
-  candidate fit: degree=2 RSS=306.5428 R^2=0.9471 AIC=46.8854
-  candidate fit: degree=4 RSS=7.8187 R^2=0.9987 AIC=6.8594 [chosen]
-WARNING: A^2 is still falling at the last evaluated lambda (0.11000); this is a scan-boundary value, not a confirmed interior minimum. Extend the scan (larger max_value in -do_XCW stepsize max_value) to find the true optimum. The degree-4 fit places its minimum at lambda ~= 0.10450, inside the range already scanned, which contradicts A^2 still falling at the last step; the trend is too flat here to extrapolate from, only further steps can decide it.
+Recommended halting lambda* = 0.11000 (A^2=106.1571) -- WARNING: binned <z^2> trend test flagged at this lambda; residuals may be spatially correlated, inspect before trusting lambda*.
+  candidate fit: degree=2 RSS=259.8464 R^2=0.9670 AIC=44.9022
+  candidate fit: degree=4 RSS=5.7788 R^2=0.9993 AIC=3.2315 [chosen]
+WARNING: A^2 is still falling at the last evaluated lambda (0.11000); this is a scan-boundary value, not a confirmed interior minimum. Extend the scan (larger max_value in -do_XCW stepsize max_value) to find the true optimum. The degree-4 fit places its minimum at lambda ~= 0.10829, inside the range already scanned, which contradicts A^2 still falling at the last step; the trend is too flat here to extrapolate from, only further steps can decide it.
 Finished XCW fitting procedure.

@@ -7,33 +7,34 @@
 This software is part of the cuQCT software suite developed by Florian Kleemiss.
 Please give credit and cite corresponding pieces!
 This Software is published with BSD-2 clause license.
-Reading:                            "P1_test_NA2.cif" done!
+Reading:                                "P1_test.cif" done!
 Reading:                                "P1_test.hkl" done!
 Nr of reflections read from file: 3215
 Number of symmetry operations: 1
 Nr of reflections to be used: 3215
 Generating k-points...                            ... done!
 Number of k-points to evaluate: 3215
-XCW orbital basis set: sto-3g-basis
+XCW: I/sigma(I) >= 2 (F/sigma(F) >= 4): 3146 of 3215 reflections in the fit; R1 and Criterion are over these, R1(all) and Crit(all) over all
+XCW orbital basis set: sto-3g
 XCW: I/sigma(I) >= 2 (F/sigma(F) >= 4): 3146 of 3215 reflections in the fit; R1 and Criterion are over these, R1(all) and Crit(all) over all
 GridManager: Setting up prototype grids for atom types...
 GridManager: Generating integration grids for atoms...
 GridManager: Generated total of 93098 grid points.
 Total number of grid points after pruning: 93092
 AO values calculated for all grids.
-Screened out 1798 unique pairs of mu, nu (33.57%) 
-Skipped evaluation of 64013865 grids (16.16%) 
-More detailed output in XCW.log file...
+Screened out 1802 unique pairs of mu, nu (33.64%) 
+Skipped evaluation of 64843335 grids (16.37%) 
+More detailed output in SCF.log file...
 XCW: fitting against the 1/|H|^2-weighted residual self-energy criterion Criterion below is this weighted quantity, not the classical GoF.
 ____________________________________________________________________________________
  Lambda		Criterion	GooF(F2)	R1(gt)		Total Energy		Perturbation	Target quantity		Crit(all)	R1(all)		A^2 (halt)
 								(Eh)			(a. u.)		(a. u.)
 ____________________________________________________________________________________
-0.00000		9.7541		4.8274		0.02461		-1961.923538820		0.000		-1961.923538820		9.6437		0.02515		189.4354
-0.01000		6.1852		3.7047		0.02368		-1961.776389235		0.062		-1961.714537435		6.1162		0.02422		138.9066
-0.02000		5.5880		3.5119		0.02352		-1961.677162407		0.112		-1961.565401475		5.5260		0.02405		150.4979
+0.00000		10.0922		5.0172		0.02505		-1961.925585145		0.000		-1961.925585145		9.9781		0.02560		198.4329
+0.01000		6.1761		3.7734		0.02375		-1961.760148779		0.062		-1961.698387641		6.1075		0.02429		121.8687
+0.02000		5.5003		3.5442		0.02343		-1961.648761947		0.110		-1961.538755324		5.4397		0.02397		122.3900
 ____________________________________________________________________________
-Recommended halting lambda* = 0.01000 (A^2=138.9066) -- WARNING: binned <z^2> trend test flagged at this lambda; residuals may be spatially correlated, inspect before trusting lambda*.
+Recommended halting lambda* = 0.01000 (A^2=121.8687) -- WARNING: binned <z^2> trend test flagged at this lambda; residuals may be spatially correlated, inspect before trusting lambda*.
   candidate fit: degree=2 -- not enough points yet (need >= degree+3 evaluated lambda steps)
   candidate fit: degree=4 -- not enough points yet (need >= degree+3 evaluated lambda steps)
 Finished XCW fitting procedure.

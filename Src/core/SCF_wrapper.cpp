@@ -13,6 +13,7 @@ SCF_wrapper::SCF_wrapper(XCW_solver& xcw_in, structure_factors& sf_in) {
 	xcw = &xcw_in;
 	sf = &sf_in;
 	opt = sf->opt;
+	SCF_log.open("SCF.log");
 }
 
 //C = op(A) op(B) for column-major occ matrices through MKL, Src/core's Eigen being serial
@@ -60,7 +61,7 @@ void SCF_wrapper::small_basis_guess(occ::qm::SCF<occ::qm::HartreeFock>& scf) {
 	scf_small.set_charge_multiplicity(opt->xcw_settings.charge, opt->xcw_settings.multiplicity);
 	scf_small.maxiter = opt->xcw_settings.max_scf_iterations;
 	const double e_small = scf_small.compute_scf_energy();
-	sf->XCW_log << "XCW: initial guess from a " << opt->xcw_settings.guess_basis_name << " Hartree-Fock (" << small_bs.nbf()
+	SCF_log << "XCW: initial guess from a " << opt->xcw_settings.guess_basis_name << " Hartree-Fock (" << small_bs.nbf()
 		<< " functions), E = " << std::fixed << std::setprecision(8) << e_small << " Eh" << std::endl;
 
 	occ::qm::MolecularOrbitals guess;
@@ -92,14 +93,14 @@ double SCF_wrapper::dynamic_damping(const occ::qm::SCF<occ::qm::HartreeFock>& sc
 		new_alpha *= 0.75;
 		quant_diff_mem = quant_diff;
 		if (quant_diff < 10 * scf.convergence_settings.energy_threshold) {
-			print_centered_message("***Turned off damping***", 84, sf->XCW_log);
+			print_centered_message("***Turned off damping***", 84, SCF_log);
 			new_alpha = 0;
 			opt->xcw_settings.apply_damping = false;
 		}
 		else {
 			std::stringstream print_;
 			print_ << "***Decreased damping to " << std::fixed << std::setprecision(3) << new_alpha << "***";
-			print_centered_message(print_.str(), 84, sf->XCW_log);
+			print_centered_message(print_.str(), 84, SCF_log);
 		}
 	}
 	return new_alpha;
@@ -157,11 +158,11 @@ bool SCF_wrapper::do_SCF(const double& lambda, double& alpha, occ::qm::SCF<occ::
 	rescues_ = 0;
 	soscf_reset();
 
-	sf->XCW_log << "Starting XCW SCF solver with lambda = " << std::fixed << std::setprecision(5) << lambda << "\n";
-	sf->XCW_log << "____________________________________________________________________________________\n";
-	sf->XCW_log << " Iteration\t\tCriterion\tGooF(F^2)\tR1(gt)\t\tTotal Energy\t\tPerturbation\tTarget quantity\n";
-	sf->XCW_log << "\t\t\t\t\t\t\t\t\t(Eh)\t\t\t(a. u.)\t\t(a. u.)\n";
-	sf->XCW_log << "____________________________________________________________________________________\n";
+	SCF_log << "Starting XCW SCF solver with lambda = " << std::fixed << std::setprecision(5) << lambda << "\n";
+	SCF_log << "____________________________________________________________________________________\n";
+	SCF_log << " Iteration\t\tCriterion\tGooF(F^2)\tR1(gt)\t\tTotal Energy\t\tPerturbation\tTarget quantity\n";
+	SCF_log << "\t\t\t\t\t\t\t\t\t(Eh)\t\t\t(a. u.)\t\t(a. u.)\n";
+	SCF_log << "____________________________________________________________________________________\n";
 
 	// Compute first guess and update the energy according to this guess
 	const _time_point guess_t0 = get_time();
@@ -196,10 +197,10 @@ bool SCF_wrapper::do_SCF(const double& lambda, double& alpha, occ::qm::SCF<occ::
 	} while (!converged && scf.iter < scf.maxiter);
 
 	if (converged) {
-		sf->XCW_log << "____________________________________________________________________________________\n";
+		SCF_log << "____________________________________________________________________________________\n";
 		std::stringstream print_;
 		print_ << "***SCF converged in " << scf.iter << " iterations***";
-		print_centered_message(print_.str(), 84, sf->XCW_log);
+		print_centered_message(print_.str(), 84, SCF_log);
 
 		//Before the summary line below so its A^2 can be appended as an extra column
 		if (opt->xcw_settings.xcw_gaussian_halt) {
@@ -222,8 +223,8 @@ bool SCF_wrapper::do_SCF(const double& lambda, double& alpha, occ::qm::SCF<occ::
 		}
 	}
 	else {
-		sf->XCW_log << "____________________________________________________________________________________\n";
-		print_centered_message("***SCF did not converge***", 84, sf->XCW_log);
+		SCF_log << "____________________________________________________________________________________\n";
+		print_centered_message("***SCF did not converge***", 84, SCF_log);
 		std::ostringstream perturbed_energy;
 		perturbed_energy << " for perturbed energy: " << std::scientific << opt->xcw_settings.quant_diff << " (current: " << opt->xcw_settings.current_quant_diff << ") \n";
 		std::ostringstream diis_error;
@@ -235,40 +236,40 @@ bool SCF_wrapper::do_SCF(const double& lambda, double& alpha, occ::qm::SCF<occ::
 		std::ostringstream rmsd_density;
 		rmsd_density << " for RMSD of density matrix: " << std::scientific << opt->xcw_settings.RMSP_diff << " (current: " << opt->xcw_settings.current_RMSP_diff << ") \n";
 		if (opt->xcw_settings.conv_quant_diff) {
-			sf->XCW_log << "CONVERGED";
+			SCF_log << "CONVERGED";
 		}
 		else {
-			sf->XCW_log << "NOT CONVERGED";
+			SCF_log << "NOT CONVERGED";
 		}
-		sf->XCW_log << perturbed_energy.str();
+		SCF_log << perturbed_energy.str();
 		if (opt->xcw_settings.conv_max_diis_error) {
-			sf->XCW_log << "CONVERGED";
+			SCF_log << "CONVERGED";
 		}
 		else {
-			sf->XCW_log << "NOT CONVERGED";
+			SCF_log << "NOT CONVERGED";
 		}
-		sf->XCW_log << diis_error.str();
+		SCF_log << diis_error.str();
 		if (opt->xcw_settings.conv_gradient) {
-			sf->XCW_log << "CONVERGED";
+			SCF_log << "CONVERGED";
 		}
 		else {
-			sf->XCW_log << "NOT CONVERGED";
+			SCF_log << "NOT CONVERGED";
 		}
-		sf->XCW_log << orbital_gradient.str();
+		SCF_log << orbital_gradient.str();
 		if (opt->xcw_settings.conv_MaxP_diff) {
-			sf->XCW_log << "CONVERGED";
+			SCF_log << "CONVERGED";
 		}
 		else {
-			sf->XCW_log << "NOT CONVERGED";
+			SCF_log << "NOT CONVERGED";
 		}
-		sf->XCW_log << max_density_diff.str();
+		SCF_log << max_density_diff.str();
 		if (opt->xcw_settings.conv_RMSP_diff) {
-			sf->XCW_log << "CONVERGED";
+			SCF_log << "CONVERGED";
 		}
 		else {
-			sf->XCW_log << "NOT CONVERGED";
+			SCF_log << "NOT CONVERGED";
 		}
-		sf->XCW_log << rmsd_density.str();
+		SCF_log << rmsd_density.str();
 	}
 	return converged;
 }
@@ -469,7 +470,7 @@ bool SCF_wrapper::SCF_iteration(occ::qm::SCF<occ::qm::HartreeFock>& scf, const d
 	scf.ctx.F += perturbation * lambda;
 
 	// Prints output line for iteration
-	sf->XCW_log << "\t" << scf.iter << "\t\t" << std::fixed << std::setprecision(4) << current_criterion << "\t\t" << sf->quality_criteria.GooF2 << "\t\t" << std::setprecision(5) << sf->quality_criteria.R1 << "\t\t" << std::fixed << std::setprecision(9) << scf.ctx.energy["total"] << "\t\t" << std::fixed << std::setprecision(3) << temp_penalty << "\t\t" << std::fixed << std::setprecision(9) << quant << std::endl;
+	SCF_log << "\t" << scf.iter << "\t\t" << std::fixed << std::setprecision(4) << current_criterion << "\t\t" << sf->quality_criteria.GooF2 << "\t\t" << std::setprecision(5) << sf->quality_criteria.R1 << "\t\t" << std::fixed << std::setprecision(9) << scf.ctx.energy["total"] << "\t\t" << std::fixed << std::setprecision(3) << temp_penalty << "\t\t" << std::fixed << std::setprecision(9) << quant << std::endl;
 
 	//calc_perturb is the gradient of lambda * criterion^2 (the chi^2 of Jayatilaka's functional),
 	//so that, not the printed lambda * criterion, is what the SCF descends and what the rescue ranks by
@@ -479,7 +480,7 @@ bool SCF_wrapper::SCF_iteration(occ::qm::SCF<occ::qm::HartreeFock>& scf, const d
 	// DIIS extrapolation
 	occ::Mat F_diis = diis_update(scf);
 	opt->xcw_settings.current_max_diis_error = scf.diis_error;
-	opt->xcw_settings.update(sf->XCW_log, alpha);
+	opt->xcw_settings.update(SCF_log, alpha);
 
 	// Convergence check
 	opt->xcw_settings.current_gradient = compute_orbital_gradient(scf);
@@ -503,8 +504,8 @@ bool SCF_wrapper::SCF_iteration(occ::qm::SCF<occ::qm::HartreeFock>& scf, const d
 			std::ostringstream what;
 			what << "***" << (stuck ? "Orbital gradient not halved in " + std::to_string(patience) + " iterations" : "DIIS error below 1e-2")
 				<< ": second-order steps on the orbital rotations from here***";
-			print_centered_message(what.str(), 84, sf->XCW_log);
-			citations::cite(citations::Method::TRAH, sf->XCW_log);
+			print_centered_message(what.str(), 84, SCF_log);
+			citations::cite(citations::Method::TRAH, SCF_log);
 		}
 	}
 	if (soscf_) {
@@ -632,7 +633,7 @@ void SCF_wrapper::soscf_step(occ::qm::SCF<occ::qm::HartreeFock>& scf, const doub
 	const bool stepped = soscf_kappa_.size() > 0;
 	if (stepped) {
 		const double actual = phi - soscf_phi_;
-		sf->XCW_log << "\t\tTRAH: predicted " << std::scientific << std::setprecision(3) << soscf_pred_
+		SCF_log << "\t\tTRAH: predicted " << std::scientific << std::setprecision(3) << soscf_pred_
 			<< ", actual " << actual << " Eh, rho " << std::fixed << std::setprecision(2)
 			<< (soscf_pred_ < 0 ? actual / soscf_pred_ : 0.0) << ", model error "
 			<< std::scientific << std::setprecision(1) << std::abs(actual - soscf_pred_) << std::endl;
@@ -647,7 +648,7 @@ void SCF_wrapper::soscf_step(occ::qm::SCF<occ::qm::HartreeFock>& scf, const doub
 		if (soscf_floored_ >= 2) {
 			std::ostringstream give_up;
 			give_up << "***E + lambda chi^2 still rising at the smallest trust radius: back to DIIS***";
-			print_centered_message(give_up.str(), 84, sf->XCW_log);
+			print_centered_message(give_up.str(), 84, SCF_log);
 			//hand DIIS the orbitals the last accepted step left, not the rejected ones
 			rotate_orbitals(scf, soscf_C_, occ::Vec::Zero(soscf_kappa_.size()));
 			soscf_ = false;
@@ -657,7 +658,7 @@ void SCF_wrapper::soscf_step(occ::qm::SCF<occ::qm::HartreeFock>& scf, const doub
 		std::ostringstream what;
 		what << "***E + lambda chi^2 " << std::scientific << std::setprecision(1) << phi - soscf_phi_
 			<< " Eh above the orbitals the step left: trust radius " << std::scientific << std::setprecision(2) << soscf_trust_ << ", step re-solved***";
-		print_centered_message(what.str(), 84, sf->XCW_log);
+		print_centered_message(what.str(), 84, SCF_log);
 		trah_solve(scf, lambda, false);
 		rotate_orbitals(scf, soscf_C_, soscf_kappa_);
 		return;
@@ -780,7 +781,7 @@ void SCF_wrapper::trah_solve(occ::qm::SCF<occ::qm::HartreeFock>& scf, const doub
 	trah_micro_total_ += micro;
 	soscf_kappa_ = kappa;
 	soscf_pred_ = g.dot(kappa) + 0.5 * kappa.dot(Hkappa);
-	sf->XCW_log << "\t\tTRAH: " << micro << " micro-iterations (" << trah_micro_total_ << " in this lambda step), |g| " << std::scientific << std::setprecision(1) << gnorm
+	SCF_log << "\t\tTRAH: " << micro << " micro-iterations (" << trah_micro_total_ << " in this lambda step), |g| " << std::scientific << std::setprecision(1) << gnorm
 		<< ", residual " << rnorm << ", |kappa| " << knorm << (soscf_boundary_ ? " on" : " within") << " the trust radius " << std::fixed << std::setprecision(3) << soscf_trust_
 		<< ", shift " << std::scientific << std::setprecision(1) << theta << ", predicted " << soscf_pred_ << " Eh" << std::endl;
 }
@@ -884,7 +885,7 @@ occ::Vec SCF_wrapper::hessian_vector(occ::qm::SCF<occ::qm::HartreeFock>& scf, co
 		}
 		occ::Mat dP;
 		xcw->contract_I(dP, dq);
-		dP *= (against_F2 ? 4.0 : 2.0) / (sf->nr_fit - sf->n_params()) * lambda;
+		dP *= (against_F2 ? 4.0 : 2.0) / (sf->model_data.nr_fit - sf->n_params()) * lambda;
 		for (int b = 0; b < nb; b++) dF.middleRows(static_cast<Eigen::Index>(b) * n, n) += dP;
 	}
 	occ::Vec Hv(v.size());
@@ -956,7 +957,7 @@ void SCF_wrapper::check_hessian(occ::qm::SCF<occ::qm::HartreeFock>& scf, const d
 	const double eps = 1e-4;
 	const occ::Mat C0 = scf.ctx.mo.C;
 	const occ::Vec fd = (gradient_at(scf, lambda, C0, eps * v) - gradient_at(scf, lambda, C0, -eps * v)) / (2.0 * eps);
-	sf->XCW_log << "\t\tHessian check: |Hv - FD| / |FD| = " << std::scientific << std::setprecision(2) << (Hv - fd).norm() / fd.norm()
+	SCF_log << "\t\tHessian check: |Hv - FD| / |FD| = " << std::scientific << std::setprecision(2) << (Hv - fd).norm() / fd.norm()
 		<< " (|Hv| " << Hv.norm() << ", |FD| " << fd.norm() << ", v.Hv " << v.dot(Hv) << ", v.FD " << v.dot(fd) << ")" << std::endl;
 }
 
@@ -979,7 +980,7 @@ bool SCF_wrapper::rescue_scf(occ::qm::SCF<occ::qm::HartreeFock>& scf, const doub
 		<< " Eh above its best: back to the best orbitals, level shift and damping on until DIIS error "
 		<< std::scientific << std::setprecision(0) << opt->xcw_settings.diis_stop_shift << " / " << opt->xcw_settings.diis_stop_damping
 		<< " (rescue " << rescues_ << "/3)***";
-	print_centered_message(what.str(), 84, sf->XCW_log);
+	print_centered_message(what.str(), 84, SCF_log);
 	scf.ctx.mo = best_mo_;
 	G_last_.resize(0, 0);
 	diis_F_.clear();

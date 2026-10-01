@@ -12,7 +12,7 @@ XCW_solver::XCW_solver(structure_factors& sf_in) : scf_solver(*this, sf_in) {
 	sf = &sf_in;
 	opt = sf->opt;
 	std::cout << "XCW orbital basis set: " << opt->xcw_settings.basis_set_name << std::endl;
-	std::cout << "XCW: I/sigma(I) >= " << opt->xcw_settings.i_sigma_cutoff << " (F/sigma(F) >= " << 2 * opt->xcw_settings.i_sigma_cutoff << "): " << sf->nr_fit << " of " << sf->model_data.nr << " reflections in the fit; R1 and Criterion are over these, R1(all) and Crit(all) over all" << std::endl;
+	std::cout << "XCW: I/sigma(I) >= " << opt->xcw_settings.i_sigma_cutoff << " (F/sigma(F) >= " << 2 * opt->xcw_settings.i_sigma_cutoff << "): " << sf->model_data.nr_fit << " of " << sf->model_data.nr << " reflections in the fit; R1 and Criterion are over these, R1(all) and Crit(all) over all" << std::endl;
 }
 
 //z_h = (|F_obs,h| - |F_calc,h|) / sigma_h for the converged F_calc/F_scale over
@@ -52,7 +52,7 @@ void XCW_solver::evaluate_gaussian_halting(const double lambda) {
 	entry.n_used = static_cast<int>(z_raw.size());
 
 	if (entry.n_used < 8) {
-		sf->XCW_log << "Gaussian halting criterion: only " << entry.n_used
+		scf_solver.SCF_log << "Gaussian halting criterion: only " << entry.n_used
 			<< " strong reflections (|F|/sigma >= " << opt->xcw_settings.xcw_strong_cutoff
 			<< ") at lambda=" << lambda << ", skipping (need >= 8)." << std::endl;
 		gaussian_halt_history_.push_back(entry);
@@ -95,7 +95,7 @@ void XCW_solver::evaluate_gaussian_halting(const double lambda) {
 	entry.intensity_trend_r = int_trend.spearman_r;
 	entry.intensity_trend_flagged = int_trend.flagged;
 
-	sf->XCW_log << "Gaussian halting criterion at lambda=" << std::fixed << std::setprecision(5) << lambda << ":\n"
+	scf_solver.SCF_log << "Gaussian halting criterion at lambda=" << std::fixed << std::setprecision(5) << lambda << ":\n"
 		<< "  n_used=" << entry.n_used << "/" << entry.n_total << " (|F|/sigma >= " << opt->xcw_settings.xcw_strong_cutoff
 		<< "), sigma_scale=" << entry.sigma_scale << "\n"
 		<< "  A^2=" << entry.A2 << (entry.ad_reject_5pct ? " (rejects N(0,1) at 5%)" : " (consistent with N(0,1) at 5%)") << "\n"
@@ -116,11 +116,11 @@ void XCW_solver::report_gaussian_halting_summary() {
 		return;
 	}
 
-	sf->XCW_log << "\n____________________________________________________________________________\n"
+	scf_solver.SCF_log << "\n____________________________________________________________________________\n"
 		<< "Gaussian halting criterion summary (tests/P1_test/XCW_plan.md)\n"
 		<< " Lambda\t\tA^2\treject5%\tpp_slope\tpp_intercept\tskew\tkurt\tres_trend_r\tint_trend_r\tn_used\n";
 	for (const GaussianHaltEntry& e : gaussian_halt_history_) {
-		sf->XCW_log << "\t" << std::fixed << std::setprecision(5) << e.lambda
+		scf_solver.SCF_log << "\t" << std::fixed << std::setprecision(5) << e.lambda
 			<< "\t" << std::setprecision(4) << e.A2
 			<< "\t" << (e.ad_reject_5pct ? "yes" : "no")
 			<< "\t\t" << e.pp_slope << "\t\t" << e.pp_intercept
@@ -164,7 +164,7 @@ void XCW_solver::report_halting_progress_estimate(bool is_final) {
 	std::vector<PolynomialFit> candidates;
 	const PolynomialFit fit = choose_best_polynomial_fit(fit_lambda, fit_A2, { 2, 4 }, &candidates);
 
-	std::ostream* streams[2] = { &sf->XCW_log, &std::cout };
+	std::ostream* streams[2] = { &scf_solver.SCF_log, &std::cout };
 	for (std::ostream* s : streams) {
 		*s << "____________________________________________________________________________\n";
 		if (!is_final) {
@@ -229,11 +229,11 @@ void XCW_solver::calc_perturb(occ::Mat& perturb, const occ::qm::SCF<occ::qm::Har
 	const bool against_F2 = (ref == 2);
 	const bool weighted = (xwr == 2);
 	const bool valid = (xwr == 1 || xwr == 2) && (ref == 1 || ref == 2);
-	if (!valid) sf->XCW_log << "Invalid refinement option" << std::endl;
+	if (!valid) scf_solver.SCF_log << "Invalid refinement option" << std::endl;
 	const double scale_sq = sf->scatter_data.scale * sf->scatter_data.scale;
 	const double prefactor = against_F2
-		? 4.0 * scale_sq / (sf->nr_fit - sf->n_params())
-		: 2.0 * sf->scatter_data.scale / (sf->nr_fit - sf->n_params());
+		? 4.0 * scale_sq / (sf->model_data.nr_fit - sf->n_params())
+		: 2.0 * sf->scatter_data.scale / (sf->model_data.nr_fit - sf->n_params());
 
 	cvec pre(sf->model_data.nr);
 #pragma omp parallel for
@@ -360,7 +360,7 @@ void XCW_solver::flip_high_m_phases(occ::qm::Wavefunction& w) {
 }
 
 void XCW_solver::create_tscb(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& lambda) {
-	sf->XCW_log << "Creating .tscb file from converged SCF calculation..." << std::endl;
+	scf_solver.SCF_log << "Creating .tscb file from converged SCF calculation..." << std::endl;
 	std::vector<WFN> sf_wave_vec(1, { scf.wavefunction(), false });
 	//The constructor marks anything taken from OCC as OCC-origin. What this refinement holds
 	//is an OCC result over a basis this program loaded, so say that: Int_Params then reads the
@@ -374,11 +374,11 @@ void XCW_solver::create_tscb(occ::qm::SCF<occ::qm::HartreeFock>& scf, const doub
 	result.append(calculate_scattering_factors<itsc_block, std::vector<WFN>&>(
 		*opt,
 		sf_wave_vec,
-		sf->XCW_log,
+		scf_solver.SCF_log,
 		known_atoms_,
 		0,
 		&sf->k_pt),
-		sf->XCW_log);
+		scf_solver.SCF_log);
 	std::string value = std::to_string(lambda);
 	value.erase(std::remove(value.begin(), value.end(), '.'), value.end());
 	while (value.length() < 7) {
@@ -397,7 +397,7 @@ void XCW_solver::create_tscb(occ::qm::SCF<occ::qm::HartreeFock>& scf, const doub
 		std::ofstream fc("NA2_" + value + "_Fcalc.txt");
 		if (!sf->ext_p_.empty()) {
 			std::cout << "XCW lambda " << lambda << ": " << sf->extinction_report() << std::endl;
-			sf->XCW_log << "XCW lambda " << lambda << ": " << sf->extinction_report() << std::endl;
+			scf_solver.SCF_log << "XCW lambda " << lambda << ": " << sf->extinction_report() << std::endl;
 		}
 		fc << "#    h    k    l          F_obs        sig(F)   scale*|F_calc|     phase(deg)   R1(gt) = " << std::setprecision(5) << sf->quality_criteria.R1 << " R1(all) = " << sf->quality_criteria.R1_all << " scale = " << std::setprecision(10) << sf->scatter_data.scale << "\n";
 		for (int r = 0; r < sf->model_data.nr; r++) {
@@ -420,7 +420,7 @@ void XCW_solver::create_tscb(occ::qm::SCF<occ::qm::HartreeFock>& scf, const doub
 	if (opt->xcw_settings.nbo_output) {
 		std::ostringstream oss4;
 		oss4 << "NA2_" << value << ".47";
-		sf_wave_vec[0].write_nbo(oss4.str(), opt->debug, &sf->XCW_log);
+		sf_wave_vec[0].write_nbo(oss4.str(), opt->debug, &scf_solver.SCF_log);
 	}
 	//Neither file written above can carry this analysis - a .wfn has bare primitives and
 	//the fchk reader keeps no shells - so -rgbi runs it here, on the refined wavefunction,
@@ -434,7 +434,7 @@ void XCW_solver::create_tscb(occ::qm::SCF<occ::qm::HartreeFock>& scf, const doub
 			opt->rgbi_orbital_basis == RGBIOrbitalBasis::ANO, opt->rgbi_EVs, opt->rgbi_theta,
 			opt->rgbi_legacy_cutoff);
 		std::cout.rdbuf(cout_buf);
-		sf->XCW_log << "RGBI analysis written to " << oss5.str() << std::endl;
+		scf_solver.SCF_log << "RGBI analysis written to " << oss5.str() << std::endl;
 	}
 }
 
@@ -503,7 +503,7 @@ void XCW_solver::run() {
 	if (opt->xcw_settings.hf_type != occ::qm::SpinorbitalKind::General) {
 		const _time_point eri_t0 = get_time();
 		const size_t avail = available_memory_bytes();
-		if (scf_solver.eri_.build(hf, avail ? avail / 5 * 4 : 0, sf->XCW_log))
+		if (scf_solver.eri_.build(hf, avail ? avail / 5 * 4 : 0, scf_solver.SCF_log))
 			throughput::record_time("XCW two-electron integrals", false, get_msec(eri_t0, get_time()));
 	}
 #if defined(NOSPHERA2_USE_GPU) || defined(NOSPHERA2_USE_METAL)
@@ -537,11 +537,11 @@ void XCW_solver::run() {
 		has_guess = true;
 	}
 
-	std::cout << "More detailed output in XCW.log file..." << std::endl;
+	std::cout << "More detailed output in SCF.log file..." << std::endl;
 	if (opt->xcw_settings.XWR_type == 2) {
 		std::cout << "XCW: fitting against the 1/|H|^2-weighted residual self-energy criterion "
 			<< "Criterion below is this weighted quantity, not the classical GoF." << std::endl;
-		sf->XCW_log << "XCW: fitting against the 1/|H|^2-weighted residual self-energy criterion "
+		scf_solver.SCF_log << "XCW: fitting against the 1/|H|^2-weighted residual self-energy criterion "
 			<< "Criterion below are this weighted quantity, not the classical GoF." << std::endl;
 	}
 	std::cout << "____________________________________________________________________________________\n";
@@ -577,7 +577,7 @@ void XCW_solver::run() {
 	if (slow_start) {
 		opt->xcw_settings.alpha = 0.5; opt->xcw_settings.level_shift = 0.5; opt->xcw_settings.diis_stop_damping = 1e-3; opt->xcw_settings.diis_stop_shift = 1e-2;
 		std::cout << "XCW: slow_conv - the unperturbed first step runs the normal schedule, slow damping from the second step on" << std::endl;
-		sf->XCW_log << "XCW: slow_conv - the unperturbed first step runs the normal schedule, slow damping from the second step on" << std::endl;
+		scf_solver.SCF_log << "XCW: slow_conv - the unperturbed first step runs the normal schedule, slow damping from the second step on" << std::endl;
 	}
 	//The scan used to stop at max_value even when A^2 was still falling there, i.e. on the
 	//scan boundary instead of on lambda*, and only printed "extend the scan" afterwards.
@@ -612,7 +612,7 @@ void XCW_solver::run() {
 			while (!result.first && lambda_step > min_lambda_step) {
 				lambda_step *= 0.5;
 				const double trial_lambda = std::min(lambda, last_lambda + lambda_step);
-				sf->XCW_log << "XCW: retrying lambda " << std::fixed << std::setprecision(8) << trial_lambda
+				scf_solver.SCF_log << "XCW: retrying lambda " << std::fixed << std::setprecision(8) << trial_lambda
 					<< " from converged lambda " << last_lambda << " with step " << lambda_step << std::endl;
 				std::cout << "XCW: retrying lambda " << std::fixed << std::setprecision(8) << trial_lambda
 					<< " with step " << lambda_step << std::endl;
@@ -637,7 +637,7 @@ void XCW_solver::run() {
 				why << " in " << opt->xcw_settings.max_scf_iterations << " SCF iterations (raise max_iter or loosen the criteria); stopping scan.";
 			else
 				why << " with a continuation step above " << min_lambda_step << "; stopping scan.";
-			sf->XCW_log << why.str() << std::endl;
+			scf_solver.SCF_log << why.str() << std::endl;
 			std::cout << why.str() << std::endl;
 			break;
 		}
@@ -666,7 +666,7 @@ void XCW_solver::run() {
 					msg << "stopping anyway, the scan has already been extended by its limit of "
 						<< max_extra_steps << " steps; raise max_value in -do_XCW to continue";
 				}
-				sf->XCW_log << msg.str() << std::endl;
+				scf_solver.SCF_log << msg.str() << std::endl;
 				std::cout << msg.str() << std::endl;
 			}
 		}

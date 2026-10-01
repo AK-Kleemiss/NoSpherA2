@@ -29,6 +29,8 @@ public:
 	stored_eri eri_;
 	bool eri_on_device_ = false;
 
+	std::ofstream SCF_log;
+
 private:
 
 	void small_basis_guess(occ::qm::SCF<occ::qm::HartreeFock>& scf);

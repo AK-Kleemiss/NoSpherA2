@@ -394,9 +394,8 @@ good = "P1_test_XCW.good"
 [P1_test_XCW.args]
 do_XCW = ""
 no_gpu = ""
-cif = "P1_test_NA2.cif"
+cif = "P1_test.cif"
 hkl = "P1_subset.hkl"
-anom_disp = "anom_disp.txt"
 XCW_settings = "test_settings.txt"
 no_date = ""
 
@@ -412,11 +411,9 @@ full = true
 [P1_test_XCW_full.args]
 do_XCW = ""
 no_gpu = ""
-xcw_gaussian_halt = ""
-cif = "P1_test_NA2.cif"
+cif = "P1_test.cif"
 hkl = "P1_test.hkl"
-anom_disp = "anom_disp.txt"
-XCW_settings = "test_settings.txt"
+XCW_settings = "test_settings_halt.txt"
 no_date = ""
 
 # h2_weighting variant of P1_test_XCW: fits against the 1/|H|^2-weighted
@@ -429,9 +426,8 @@ good = "P1_test_XCW_h2.good"
 [P1_test_XCW_h2.args]
 do_XCW = ""
 no_gpu = ""
-cif = "P1_test_NA2.cif"
+cif = "P1_test.cif"
 hkl = "P1_subset.hkl"
-anom_disp = "anom_disp.txt"
 XCW_settings = "h2_test_settings.txt"
 no_date = ""
 
@@ -451,11 +447,9 @@ full = true
 [P1_test_XCW_h2_full.args]
 do_XCW = ""
 no_gpu = ""
-xcw_gaussian_halt = ""
-cif = "P1_test_NA2.cif"
+cif = "P1_test.cif"
 hkl = "P1_test.hkl"
-anom_disp = "anom_disp.txt"
-XCW_settings = "h2_test_settings.txt"
+XCW_settings = "h2_test_settings_halt.txt"
 no_date = ""
 
 # The same three fits with -xcw_incremental: the two-electron Fock part comes from the
@@ -473,9 +467,8 @@ do_XCW = ""
 no_gpu = ""
 xcw_incremental = ""
 xcw_int_precision = "1e-12"
-cif = "P1_test_NA2.cif"
+cif = "P1_test.cif"
 hkl = "P1_subset.hkl"
-anom_disp = "anom_disp.txt"
 XCW_settings = "test_settings.txt"
 no_date = ""
 
@@ -488,9 +481,8 @@ do_XCW = ""
 no_gpu = ""
 xcw_incremental = ""
 xcw_int_precision = "1e-12"
-cif = "P1_test_NA2.cif"
+cif = "P1_test.cif"
 hkl = "P1_subset.hkl"
-anom_disp = "anom_disp.txt"
 XCW_settings = "h2_test_settings.txt"
 no_date = ""
 
@@ -503,9 +495,8 @@ do_XCW = ""
 no_gpu = ""
 xcw_incremental = ""
 xcw_int_precision = "1e-12"
-cif = "P1_test_NA2.cif"
+cif = "P1_test.cif"
 hkl = "P1_subset.hkl"
-anom_disp = "anom_disp.txt"
 XCW_settings = "test_settings_f2.txt"
 no_date = ""
 
@@ -518,9 +509,8 @@ good = "P1_F2_test_XCW.good"
 [P1_F2_test_XCW.args]
 do_XCW = ""
 no_gpu = ""
-cif = "P1_test_NA2.cif"
+cif = "P1_test.cif"
 hkl = "P1_subset.hkl"
-anom_disp = "anom_disp.txt"
 XCW_settings = "test_settings_f2.txt"
 no_date = ""
 
@@ -532,11 +522,9 @@ full = true
 [P1_F2_test_XCW_full.args]
 do_XCW = ""
 no_gpu = ""
-xcw_gaussian_halt = ""
-cif = "P1_test_NA2.cif"
+cif = "P1_test.cif"
 hkl = "P1_test.hkl"
-anom_disp = "anom_disp.txt"
-XCW_settings = "test_settings_f2.txt"
+XCW_settings = "test_settings_f2_halt.txt"
 no_date = ""
 
 # h2_weighting variant of P1_F2_test_XCW: 
@@ -549,9 +537,8 @@ good = "P1_F2_test_XCW_h2.good"
 
 do_XCW = ""
 no_gpu = ""
-cif = "P1_test_NA2.cif"
+cif = "P1_test.cif"
 hkl = "P1_subset.hkl"
-anom_disp = "anom_disp.txt"
 XCW_settings = "h2_test_settings_f2.txt"
 no_date = ""
 
@@ -563,11 +550,9 @@ full = true
 [P1_F2_test_XCW_h2_full.args]
 do_XCW = ""
 no_gpu = ""
-xcw_gaussian_halt = ""
-cif = "P1_test_NA2.cif"
+cif = "P1_test.cif"
 hkl = "P1_test.hkl"
-anom_disp = "anom_disp.txt"
-XCW_settings = "h2_test_settings_f2.txt"
+XCW_settings = "h2_test_settings_f2_halt.txt"
 no_date = ""
 
 # GPU variants. These run only when a device is present; the test skips otherwise, so
@@ -605,9 +590,8 @@ good = "P1_test_XCW_gpu_itensor.good"
 
 [P1_test_XCW_gpu_itensor.args]
 do_XCW = ""
-cif = "P1_test_NA2.cif"
+cif = "P1_test.cif"
 hkl = "P1_test.hkl"
-anom_disp = "anom_disp.txt"
 XCW_settings = "test_settings.txt"
 no_date = ""
 gpu_itensor = ""

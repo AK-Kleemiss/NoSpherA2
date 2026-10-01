@@ -66,4 +66,5 @@ private:
 	structure_factors* sf;
 	SCF_wrapper scf_solver;
 	GridManager tsc_grids;
+
 };

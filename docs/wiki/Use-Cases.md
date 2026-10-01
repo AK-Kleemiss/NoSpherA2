@@ -315,7 +315,7 @@ because the device I tensor differs from the host one in the tenth significant
 figure.
 
 ```powershell
-.\NoSpherA2.exe -wfn mol.gbw -cif mol.cif -hkl mol.hkl -acc 2 -mult 1 -charge 0 -do_XCW -XCW_settings xcw.txt -anom_disp mol.disp -no_gpu
+.\NoSpherA2.exe -wfn mol.gbw -cif mol.cif -hkl mol.hkl -acc 2 -mult 1 -charge 0 -do_XCW -XCW_settings xcw.txt -no_gpu
 ```
 
 ```powershell

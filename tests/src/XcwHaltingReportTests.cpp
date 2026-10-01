@@ -1,7 +1,7 @@
 //XCW: the Gaussian halting reports (evaluate_gaussian_halting, the progress estimate and
 //the summary), the disk-backed I tensor (decide_i_storage / i_budget / start_i_save /
-//finish_i_save / open_i_stream_for_reading) and the grown branch of construct(), all
-//driven through run_XCW_fitting() on a 402-reflection subset of the P1 fixture that each
+//finish_i_save / open_i_stream_for_reading) and the grown branch of the structure_factors
+//constructor, all driven through XCW_solver::run() on a 402-reflection subset of the P1 fixture that each
 //test writes into its own scratch directory. XcwTests.cpp owns the halting maths and the
 //settings parser; nothing here repeats those.
 #include "pch.h"
@@ -19,7 +19,7 @@
 #include "core/cell.h"
 #include "core/scattering_factors.h"
 #include "core/i_tensor_stream.h"
-#include "core/XCW.h"
+#include "core/XCW_solver.h"
 
 namespace {
 
@@ -50,7 +50,7 @@ namespace {
 
 	bool fixture_present()
 	{
-		return std::filesystem::exists(fixture_dir() / "P1_test_NA2.cif") && std::filesystem::exists(fixture_dir() / "P1_test.hkl");
+		return std::filesystem::exists(fixture_dir() / "P1_test.cif") && std::filesystem::exists(fixture_dir() / "P1_test.hkl");
 	}
 
 	std::filesystem::path scratch_dir()
@@ -127,22 +127,15 @@ namespace {
 		}
 	}
 
-	//A short anomalous dispersion table with blank lines, which parse_anom_atoms skips
-	void write_anom(const std::filesystem::path& p)
-	{
-		std::ofstream(p) << "\nC 0.00313 0.00162\n\nCl 0.14908 0.15974\nH 0.0 0.0\nN 0.00611 0.00317\nO 0.01110 0.00600\nS 0.12463 0.12335\n\n";
-	}
-
 	//The options the NoSpherA2 driver would build for -XCW on the fixture cif, the subset hkl
-	//and the settings text, CPU only. opt must outlive the XCW, which keeps a pointer to it.
+	//and the settings text, CPU only. opt must outlive the solver, which keeps a pointer to it.
 	options make_options(const std::filesystem::path& dir, const std::string& settings_text)
 	{
 		std::ofstream(dir / "settings.txt") << settings_text;
 		options opt;
 		opt.xcw_settings_path = dir / "settings.txt";
-		opt.cif = std::filesystem::absolute(fixture_dir() / "P1_test_NA2.cif");
+		opt.cif = std::filesystem::absolute(fixture_dir() / "P1_test.cif");
 		opt.hkl = dir / "subset.hkl";
-		opt.anom_disp_path = dir / "anom.txt";
 		opt.do_XCW = true;
 		opt.use_gpu = false;
 		opt.no_date = true;
@@ -151,14 +144,16 @@ namespace {
 	}
 
 	//Construct and run in dir; returns what went to std::cout
-	std::string run_xcw(const std::filesystem::path& dir, const options& opt)
+	std::string run_xcw(const std::filesystem::path& dir, options& opt)
 	{
 		CwdGuard cwd;
 		std::filesystem::current_path(dir);
 		CoutCapture out;
+		opt.loadXCWsettings();
 		{
-			XCW x(opt);
-			x.run_XCW_fitting();
+			structure_factors SF(opt);
+			XCW_solver x(SF);
+			x.run();
 		}
 		return out.str();
 	}
@@ -228,13 +223,11 @@ TEST(XcwHaltingReportTests, HaltingReportsAcrossTheExtendedLambdaScan)
 	write_subset_hkl(dir / "subset.hkl", n_written, n_strong, 3.0);
 	ASSERT_EQ(n_written, 402);
 	ASSERT_GE(n_strong, 8);
-	write_anom(dir / "anom.txt");
 
-	options opt = make_options(dir, RUN_BASE + "end 0.05 i_tensor_mb 4096 save itensor.bin");
-	opt.xcw_gaussian_halt = true;
+	options opt = make_options(dir, RUN_BASE + "end 0.05 i_tensor_mb 4096 save itensor.bin gaussian_halt");
 	opt.cpu_itensor_fp32 = false;
 	const std::string out = run_xcw(dir, opt);
-	const std::string log = read_file(dir / "XCW.log");
+	const std::string log = read_file(dir / "SCF.log");
 
 	//halting_minimum_beyond_scan: A^2 falls to the end of the requested range on this
 	//fixture, so the scan adds its six permitted steps and then says why it stops anyway
@@ -311,8 +304,7 @@ TEST(XcwHaltingReportTests, HaltingReportsAcrossTheExtendedLambdaScan)
 		HEADER_FIXED_BYTES + 8 * static_cast<std::uintmax_t>(kept) + static_cast<std::uintmax_t>(n_written) * kept * 16);
 
 	//eval_I_anom_disp read branch: the saved tensor is loaded, not rebuilt, and gives the same rows
-	options opt2 = make_options(dir, RUN_BASE + "end 0.01 i_tensor_mb 4096 read itensor.bin");
-	opt2.xcw_gaussian_halt = true;
+	options opt2 = make_options(dir, RUN_BASE + "end 0.01 i_tensor_mb 4096 read itensor.bin gaussian_halt");
 	opt2.cpu_itensor_fp32 = false;
 	const std::string out2 = run_xcw(dir, opt2);
 	EXPECT_NE(out2.find("I tensor read from itensor.bin ("), std::string::npos) << out2;
@@ -352,16 +344,13 @@ TEST(XcwHaltingReportTests, StreamedTensorRoundTrip)
 	write_subset_hkl(dir / "subset.hkl", n_written, n_strong, 1e9);
 	ASSERT_EQ(n_written, 402);
 	ASSERT_EQ(n_strong, 0);
-	write_anom(dir / "anom.txt");
 
-	options opt = make_options(dir, RUN_BASE + "end 0");
+	options opt = make_options(dir, RUN_BASE + "end 0 gaussian_halt strong_cutoff 1e9");
 	opt.mem_given = true;
 	opt.mem = 0.001;
 	opt.no_date = false;
-	opt.xcw_gaussian_halt = true;
-	opt.xcw_strong_cutoff = 1e9;
 	const std::string out = run_xcw(dir, opt);
-	const std::string log = read_file(dir / "XCW.log");
+	const std::string log = read_file(dir / "SCF.log");
 
 	//the skip branch of evaluate_gaussian_halting, then a summary row with n_used 0 and no lambda*
 	EXPECT_NE(log.find("Gaussian halting criterion: only 0 strong reflections (|F|/sigma >= "), std::string::npos) << log;
@@ -423,24 +412,24 @@ TEST(XcwHaltingReportTests, StreamedTensorRoundTrip)
 }
 
 //`grown` with an xyz that holds exactly the asymmetric unit: the xyz is read, nothing is
-//added, symmetry linking and the grown U_iso / ADP paths run on the 23 atoms and construct
-//finishes as it does without the keyword.
+//added, symmetry linking and the grown U_iso / ADP paths run on the 23 atoms and the
+//constructors finish as they do without the keyword.
 TEST(XcwHaltingReportTests, GrownConstructUsesTheXyzAtoms)
 {
 	if (!fixture_present()) {
 		GTEST_SKIP() << "P1 fixture missing under " << fixture_dir();
 	}
 	const auto dir = scratch_dir();
-	const auto cif = std::filesystem::absolute(fixture_dir() / "P1_test_NA2.cif");
+	const auto cif = std::filesystem::absolute(fixture_dir() / "P1_test.cif");
 
-	//the asymmetric unit in Angstrom, from the same reader construct uses
+	//the asymmetric unit in Angstrom, from the same reader structure_factors uses
 	std::vector<asym_atom> atoms;
 	{
 		cell unit_cell(cif, std::cout, false, true);
 		std::ifstream cif_in(cif);
 		int ncen = 0;
-		bvec needs_grid;
-		read_atoms_from_CIF(cif_in, unit_cell, ncen, needs_grid, atoms, false);
+		vec3 ADPs;
+		read_CIF(cif_in, unit_cell, ncen, atoms, ADPs, false);
 		ASSERT_EQ(ncen, 23);
 		ASSERT_EQ(atoms.size(), 23u);
 	}
@@ -462,24 +451,26 @@ TEST(XcwHaltingReportTests, GrownConstructUsesTheXyzAtoms)
 		CwdGuard cwd;
 		std::filesystem::current_path(dir);
 		CoutCapture capture;
+		opt.loadXCWsettings();
 		{
-			XCW x(opt);
+			structure_factors SF(opt);
+			EXPECT_TRUE(opt.xcw_settings.grown);
+			EXPECT_EQ(SF.model_data.ncen, 23);
+			XCW_solver x(SF);
 		}
 		out = capture.str();
 	}
-	EXPECT_EQ(out.find("I need an xyz file"), std::string::npos) << out;
+	EXPECT_EQ(out.find("Grown structures require an xyz file"), std::string::npos) << out;
 	EXPECT_NE(out.find("Nr of reflections read from file: 402"), std::string::npos) << out;
 	EXPECT_NE(out.find("XCW orbital basis set: sto-3g"), std::string::npos) << out;
-	EXPECT_TRUE(std::filesystem::exists(dir / "log3.txt"));
-	EXPECT_NE(read_file(dir / "XCW.log").find("XCW orbital basis set: sto-3g"), std::string::npos);
 
 	if (!::testing::Test::HasFailure()) {
 		std::filesystem::remove_all(dir);
 	}
 }
 
-//`grown` without -xyz: construct says so on stderr, then read_xyz's err_checkf on the empty
-//path ends the process with the error_check exit code
+//`grown` without -xyz: the structure_factors constructor's err_checkf ends the process with
+//the error_check exit code (the message goes to std::cout, so no stderr pattern)
 TEST(XcwHaltingReportTests, GrownWithoutXyzFileDies)
 {
 	if (!fixture_present()) {
@@ -490,9 +481,10 @@ TEST(XcwHaltingReportTests, GrownWithoutXyzFileDies)
 	write_subset_hkl(dir / "subset.hkl", n_written, n_strong, 3.0);
 	options opt = make_options(dir, "normal params 177 basis_set sto-3g charge 0 mult 1 rhf start 0 step_size 0.01 end 0 grown");
 	ASSERT_TRUE(opt.xyz_file.empty());
+	opt.loadXCWsettings();
 	EXPECT_EXIT({
-		XCW x(opt);
-		}, ::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), "I need an xyz file to grow the crystal, but none was provided");
+		structure_factors SF(opt);
+		}, ::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), "");
 
 	if (!::testing::Test::HasFailure()) {
 		std::filesystem::remove_all(dir);

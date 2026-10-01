@@ -466,18 +466,18 @@ const double WFN::compute_dens_cartesian(
 const double WFN::eval_ao(
 	std::array<double, 4>& d,
 	const std::vector<primitive>& prims,
-	const int &m
+	const int &m,
+	const double& root_d3
 ) const
 {
 
 	// normalize distances for spherical harmonic
 	const int type = prims[0].get_type();
-	const double scale = 1 / d[3];
+	const double scale = 1 / root_d3;
 	d[0] *= scale;
 	d[1] *= scale;
 	d[2] *= scale;
-	const double rl = std::pow(d[3], type);
-	d[3] *= d[3];
+	const double rl = std::pow(root_d3, type);
 
 	double radial = 0;
 	const primitive* p = prims.data();

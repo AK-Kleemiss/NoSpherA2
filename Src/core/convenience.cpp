@@ -635,7 +635,7 @@ std::string help_message =
  "  -coef <file>                        Use externally supplied SALTED\n"
  "                                    coefficients.\n"
  "  -convert_XCW <stdout> <lambda-step> Convert Tonto XCW lambda-step output.\n"
- "  -do_XCW  -anom_disp <file>          XCW/anomalous-dispersion modes.\n"
+ "  -do_XCW                             XCW mode; anomalous dispersion is read from the CIF.\n"
  "  -no_xcw_extrapolate                Seed each lambda step from the last one\n"
  "                                    alone instead of the density extrapolated\n"
  "                                    through the two previous steps.\n"
@@ -2959,10 +2959,6 @@ bool options::digest_partition_options(const std::string &temp, int &i)
         }
 
         label_tsc_output = true;
-    }
-    else if (temp == "-anom_disp")
-    {
-        anom_disp_path = arguments[i + 1];
     }
     else if (temp == "-occ")
     {

@@ -735,10 +735,6 @@ public:
 	{
 		return pow(r, type) * std::exp(-exp * r * r) * normalized_coefficient;
 	};
-	double eval_gaussian_unnormalized(const double& r) const
-	{
-		return pow(r, type) * std::exp(-exp * r * r) * coefficient;
-	};
 	inline double eval_gaussian_unnormalized(const double& r2) const
 	{
 		return std::exp(-exp * r2) * coefficient;
@@ -820,7 +816,6 @@ struct options
     std::filesystem::path gaussian_path;
     std::filesystem::path turbomole_path;
     std::filesystem::path basis_set_path;
-    std::filesystem::path anom_disp_path;
     std::string occ;
     std::filesystem::path occ_toml_path;
     std::filesystem::path cwd;

@@ -45,7 +45,6 @@ private:
 
 	// Subgroup projection for grown structures
 	void project_into_subgroup(ivec& applied_symmetry, hkl_list& hkl_enlarged, const hkl_list& hkl, ivec3& linking_list);
-	ivec confirm_applied_symmetry(ivec3& linking_list);
 	int equal_to_concatenation(const int op_a, const int op_b);
 	
 
@@ -53,8 +52,13 @@ public:
 
 	// Subgroup projection for grown structures
 	void set_symmetry_factors(std::vector<asym_atom>& asym_atoms, const ivec3& linking_list, const ivec& applied_symmetry);
-	ivec apply_grown(const hkl_list& hkl, hkl_list& hkl_enlarged, std::vector<asym_atom>& asym_atoms, ivec3& linking_list, ivec3& original_rotations);
-	void grow_U_iso(std::vector<asym_atom>& asym_atoms, const ivec3& symmetry_linking_list);
+	ivec apply_grown(const hkl_list& hkl, hkl_list& hkl_enlarged, std::vector<asym_atom>& asym_atoms, ivec3& linking_list);
+	// U_iso, dispersion and ADPs of the grown atoms from their parents, the ADPs rotated onto the image
+	void grow_ADPs(std::vector<asym_atom>& asym_atoms, const ivec3& symmetry_linking_list, vec3& ADPs);
+	// Rotates one atom's U (as read from the CIF), C and D by the rotation of sym_op
+	void rotate_grown_ADPs(vec2& ADPs, const int sym_op) const;
+	// Applies M to the U/C/D tensors of one atom in their Voigt storage: T'_{ij..} = sum_pq.. M_pi M_qj .. T_pq..
+	static void transform_ADPs(vec2& ADPs, const vec2& M);
 
 
 
@@ -80,7 +84,7 @@ public:
 	//void get_asym_atoms(std::vector<asym_atom>& asym_atoms, svec& labels, ivec& atom_type_list, ivec& asym_atom_to_type_list, ivec& asym_atom_list);
 	void grow_asym_atoms(std::vector<asym_atom>& asym_atoms, std::vector<asym_atom>& xyz_atoms);
 	void eval_symm(std::vector<asym_atom>& asym_atoms, const int& asymmetric_atoms, ivec3& linking_list);
-	ivec apply_grown(ivec3& linking_list);
+	ivec confirm_applied_symmetry(const ivec3& linking_list);
 
 	// Retired together with orbit_copies below. A declaration whose definition is commented out
 	// does not fail where it is called, it fails at link time in whichever target calls it - which

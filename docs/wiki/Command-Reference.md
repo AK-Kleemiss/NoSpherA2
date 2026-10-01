@@ -88,7 +88,6 @@ you are memory-constrained.
 | `-tscb <file>` | 1 | | Convert between `.tsc` and `.tscb` (the direction follows the input extension). Rejects any other extension with "Wrong file ending!". One-shot. |
 | `-IAM` | 0 | off | Write spherical (independent-atom-model) form factors — the reference case. |
 | `-ED` | 0 | off | Electron-diffraction scattering factors. Changes `-dmin` to `dmin/2 - 0.001` and ignores the index box. |
-| `-anom_disp <file>` | 1 | | Add anomalous dispersion corrections from a file. |
 | `-twin <9 numbers>` | 9 | | A twin law as a 3x3 matrix, row-major. Repeat the flag for several laws. |
 | `-pbc <n>` | 1 | `0` | Number of periodic images included in the density. |
 | `-group <n> [n ...]` | 1+ | | Atom group for the current fragment; `+n` marks a negated index. Olex2 emits this. |

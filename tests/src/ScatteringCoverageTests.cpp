@@ -257,21 +257,21 @@ TEST(ScatteringCoverageHklTests, ReadHklFullDerivesFAndSigma)
 	}
 	cell c(kA, kA, kA, 90.0, 90.0, 90.0);
 	hkl_list hkl;
-	std::vector<scattering_data> obs;
+	scatter_data obs;
 	std::ostringstream log;
 	const hkl_list enlarged = read_hkl_full(path, hkl, {}, c, log, obs, false);
 	fs::remove(path);
 	EXPECT_EQ(hkl, (hkl_list{ i3{ 0, 0, 1 }, i3{ 1, 0, 0 } }));
 	EXPECT_EQ(enlarged, hkl);
 	//obs follows the (h,k,l) order of the set, not the file: (0,0,1) comes first
-	ASSERT_EQ(obs.size(), 2u);
-	EXPECT_DOUBLE_EQ(obs[1].F_obs2, 100.0);
-	EXPECT_DOUBLE_EQ(obs[1].F_obs, 10.0);
-	EXPECT_DOUBLE_EQ(obs[1].abs_F_obs, 10.0);
-	EXPECT_DOUBLE_EQ(obs[1].sigma_obs2, 10.0);
-	EXPECT_DOUBLE_EQ(obs[1].sigma_obs, 0.5);
-	EXPECT_DOUBLE_EQ(obs[0].F_obs, 20.0);
-	EXPECT_DOUBLE_EQ(obs[0].sigma_obs, 0.5);
+	ASSERT_EQ(obs.F_obs.size(), 2u);
+	EXPECT_DOUBLE_EQ(obs.F_obs2[1], 100.0);
+	EXPECT_DOUBLE_EQ(obs.F_obs[1], 10.0);
+	EXPECT_DOUBLE_EQ(obs.abs_F_obs[1], 10.0);
+	EXPECT_DOUBLE_EQ(obs.sigma_obs2[1], 10.0);
+	EXPECT_DOUBLE_EQ(obs.sigma_obs[1], 0.5);
+	EXPECT_DOUBLE_EQ(obs.F_obs[0], 20.0);
+	EXPECT_DOUBLE_EQ(obs.sigma_obs[0], 0.5);
 	EXPECT_EQ(parse_after(log.str(), "Nr of reflections read from file: "), 2);
 	EXPECT_EQ(parse_after(log.str(), "Number of symmetry operations: "), 1);
 	EXPECT_EQ(parse_after(log.str(), "Nr of reflections to be used: "), 2);
@@ -290,7 +290,7 @@ TEST(ScatteringCoverageHklTests, ReadHklFullRejectsBrokenRows)
 	}
 	cell c(kA, kA, kA, 90.0, 90.0, 90.0);
 	hkl_list hkl;
-	std::vector<scattering_data> obs;
+	scatter_data obs;
 	std::ostringstream log;
 	EXPECT_EXIT({ read_hkl_full(short_row, hkl, {}, c, log, obs, false); }, ::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), ".*");
 	EXPECT_EXIT({ read_hkl_full(no_dot, hkl, {}, c, log, obs, false); }, ::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), ".*");
