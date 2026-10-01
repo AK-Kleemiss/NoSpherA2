@@ -43,7 +43,9 @@ TEST(Citations, FormatsOneLinePerReference)
 	// cite() is what the call sites use; it must emit every reference of that method and nothing else.
 	std::ostringstream os;
 	citations::cite(citations::Method::QTAIM, os);
-	EXPECT_EQ(os.str(), citations::format(bader) + "\n") << "QTAIM rests on one paper";
+	const citations::Reference book{citations::Method::QTAIM, "QTAIM",
+									 "Bader, Atoms in Molecules: A Quantum Theory, Oxford University Press (1990)", "10.1093/oso/9780198551683.001.0001"};
+	EXPECT_EQ(os.str(), citations::format(book) + "\n" + citations::format(bader) + "\n") << "QTAIM rests on the book and the review";
 
 	std::ostringstream two;
 	citations::cite(citations::Method::HAR, two);

@@ -24,6 +24,7 @@ namespace citations
             {Method::ECP, "ECP", "Kleemiss et al., J. Appl. Cryst. 58 (2025) 374", "10.1107/S1600576725000901"},
             {Method::RIFit, "RI fit", "Seifert et al., Z. Kristallogr. Cryst. Mater. 241 (2026) 283", "10.1515/zkri-2026-0013"},
             {Method::Embedding, "Embedding", "Landeros-Rivera & Kleemiss, J. Appl. Cryst. 59 (2026)", "10.1107/S160057672600717X"},
+            {Method::QTAIM, "QTAIM", "Bader, Atoms in Molecules: A Quantum Theory, Oxford University Press (1990)", "10.1093/oso/9780198551683.001.0001"},
             {Method::QTAIM, "QTAIM", "Bader, Chem. Rev. 91 (1991) 893", "10.1021/cr00005a013"},
             {Method::LIDI, "LI/DI", "Fradera, Austen & Bader, J. Phys. Chem. A 103 (1999) 304", "10.1021/jp983362q"},
             {Method::ELF, "ELF", "Becke & Edgecombe, J. Chem. Phys. 92 (1990) 5397", "10.1063/1.458517"},

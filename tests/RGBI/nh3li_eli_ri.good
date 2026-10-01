@@ -134,6 +134,8 @@ GridManager: Generated total of 111906 grid points.
 Quadrature points sent along the field: 66773, left the grid: 0
 
 QTAIM Analysis (atomic quadrature grids):
+[QTAIM] Bader, Atoms in Molecules: A Quantum Theory, Oxford University Press (1990), DOI 10.1093/oso/9780198551683.001.0001
+[QTAIM] Bader, Chem. Rev. 91 (1991) 893, DOI 10.1021/cr00005a013
   basin  label               electrons     charge      volume         maximum        x          y          z
       1  N0                     8.2071    -1.2071    347.8187         53.1756    -10.483     10.089      2.209
       2  H1                     0.6525     0.3475    116.9576          0.3121     -9.421      9.375      3.711

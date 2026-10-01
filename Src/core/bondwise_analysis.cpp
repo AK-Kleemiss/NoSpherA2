@@ -4125,6 +4125,7 @@ void ELI_analysis(const WFN &wavy, options &opt) {
 		const bool mapped = eli && stream && !eli_core_map.empty();
 		const vec pop = integrate_basins_on_atomic_grids(stream ? nullptr : &rho, stream ? nullptr : &(res.first), mapped ? eli_maxima_all : res.second, l_w, opt.accuracy, eli, vol, outside, fill_cores && !eli ? &core_density : nullptr, fill_cores && !eli ? &core_gradient : nullptr, opt.basin_grid, eli ? nullptr : fld, want_aom ? &ovl : nullptr, mapped ? &eli_core_map : nullptr);
 		std::cout << "\n" << title << " (atomic quadrature grids):\n";
+		if (!eli) citations::cite(citations::Method::QTAIM, std::cout);
 		//The maximum column is 16 wide, not 12: it carries rho at the attractor, and at a uranium
 		//nucleus that is 3.3e8 - it used to run into the volume beside it
 		std::cout << "  basin  label               electrons" << (eli ? "" : "     charge") << "      volume         maximum        x          y          z\n";
