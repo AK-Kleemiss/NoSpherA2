@@ -106,6 +106,7 @@ struct properties_options
 	double promol_nci_rho_abs_max = 0.5;
 	double promol_nci_rdg_max = 1.0;
 	double promol_nci_colour_max = 0.015; // VMD/Olex2 colour range on sign(l2)rho in a.u., symmetric
+	double promol_nci_iso = 0.5; // RDG of the _nci.obj surface
 	//The _values.dat writer schedules grid points dynamically, so row order (not the values) varies between runs; forces single-threaded for golden files
 	bool promol_nci_single_threaded = false;
 	std::array<int, 3> NbSteps = { 0, 0, 0 };
