@@ -84,6 +84,8 @@ private:
 	std::vector<std::tuple<std::string, _time_point>> timing_points_;
 	bool non_spherical_densities_calculated_ = false;
 	bool needs_helper_grids_ = false;
+	//The wfn atom each grid is centred on; not the grid index once a structure is grown
+	ivec grid_atom_;
 	vec grid_key_;
 	//What calculateNonSphericalDensities evaluates; the wave's orbitals when empty
 	DensityBatch density_;
