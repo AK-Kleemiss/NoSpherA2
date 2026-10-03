@@ -41,6 +41,17 @@ if(LINUX)
     endif()
 endif()
 
+#NOS_AVX2=ON goes one step further: -mavx2 -mfma, i.e. 256-bit packed fp64 with a fused
+#multiply-add. It has to be a LINK option as well as a compile option, and that is not a detail:
+#the build is -flto=auto, so the machine code is generated at link time and per-file compile flags
+#produced a byte-identical binary when this was tried per translation unit. Off by default - an AVX2
+#instruction on a pre-Haswell host is SIGILL, not a slow path - and NOT wired into the AUTO
+#detection above until the win is measured on a real case.
+if(NOS_AVX2 AND LINUX)
+    add_compile_options(-mavx2 -mfma)
+    add_link_options(-mavx2 -mfma)
+endif()
+
 if(WIN32 AND NOS_USE_AVX)
     add_compile_options($<$<COMPILE_LANGUAGE:CXX>:/arch:AVX>)
 endif()

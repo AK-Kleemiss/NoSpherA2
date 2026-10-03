@@ -274,7 +274,7 @@ namespace NoSpherA2IntegrationTests
         {
             RunTest({
                 "RGBI_Groups_NH3BH3", "RGBI_groups", "NH3BH3.good", "",
-                {"-wfn","nh3bh3.gbw", "-rgbi_no_sym", "-rgbi-groups", "0,4,5,7", "1,2,3,6",
+                {"-wfn","nh3bh3.gbw", "-rgbi_no_sym", "-rgbi_groups", "0,4,5,7", "1,2,3,6",
                  "-all_charges", "-no_date"}
             });
         }
@@ -283,7 +283,7 @@ namespace NoSpherA2IntegrationTests
         {
             RunTest({
                 "RGBI_Groups_NH3Li", "RGBI_groups", "NH3Li.good", "",
-                {"-wfn","nh3li.gbw", "-rgbi_no_sym", "-rgbi-groups", "0,1,2,3", "4",
+                {"-wfn","nh3li.gbw", "-rgbi_no_sym", "-rgbi_groups", "0,1,2,3", "4",
                  "-all_charges", "-no_date"}
                     });
         }

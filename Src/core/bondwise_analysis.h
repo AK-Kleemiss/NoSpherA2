@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string.h>
+#include <string>
 #include <vector>
 
 class WFN;
@@ -8,8 +9,33 @@ class WFN;
 // Average an atom-centred AO matrix over the 48 operations of O_h.
 // Shells must be contiguous. Cartesian matrices use constants::type_vector;
 // spherical matrices use the libcint real-spherical ordering and phases.
+// Only the Cartesian route still uses this: a spherically averaged atomic reference is the one
+// below, and O_h is an approximation to it that remembers which way the molecule was oriented.
 void symmetrize_atomic_matrix_oh(dMatrix2& matrix, const ivec& shell_angular_momenta,
 	bool spherical = false);
+
+// Average an atom-centred AO matrix over ALL rotations - what a spherically averaged atomic
+// reference means, and what O_h only approximates. Real-spherical basis only. It needs each shell's
+// 2l+1 components contiguous but nothing about their order, phase convention or l.
+void spherically_average_atomic_matrix(dMatrix2& matrix, const ivec& shell_angular_momenta);
+
+// The highest angular momentum any shell of this wavefunction's basis carries, or -1 for a basis
+// with no shells at all. symmetrize_atomic_matrix_oh() refuses anything beyond h, and asking the
+// basis directly lets RGBI refuse before it has built an overlap matrix or run a free-atom SCF for
+// an analysis it is going to abandon.
+int highest_shell_angular_momentum(const WFN& wavy);
+
+// Drop every cached free-atom density. The RGBI/ANO route runs one free-atom SCF per distinct
+// element+basis and keeps it for the life of the process; the harness clears it so that "this run did N
+// free-atom SCFs" stays a statement about the run rather than about which test happened to go first.
+void clear_rgbi_free_atom_cache();
+
+// The inputs RGBI has been measured to run on, as a phrase for a refusal message, with the refused
+// file's own extension left out of it. Measured on this binary: .gbw and .molden complete, a .wfn and a
+// .wfx carry no shell structure so every atom's basis comes back empty, and a .fchk carries no
+// contracted density matrix - so the old message, which told a .wfx user to "run RGBI on a .wfx, .fchk,
+// .molden, .gbw", named two formats that cannot work and one of them was the file being refused.
+std::string rgbi_supported_input_phrase(const std::string& refused_extension);
 
 struct bond {
 	std::string label_1;
@@ -73,12 +99,29 @@ private:
 	std::vector<bond_index_result> RGBI;
 	std::vector<group_bond_index_result> RGBI_groups;
 	ivec ano_fallback_atoms;
+	//RGBI inverts a near-singular metric for every atom and every pair, and the rank of that inverse is
+	//decided by a hard singular-value cutoff. On UH6 that split six symmetry-equivalent U-H bonds into two
+	//groups (pair populations 89.363 and 89.330, which the s_AB column turns into 0.330 against 0.362
+	//because it is a difference of two numbers near 90), so the rank of the last inverse is kept and any
+	//bond whose rank was decided AT the cutoff rather than by a gap in the spectrum says so after the
+	//table. Plain members rather than the PinvRank struct, so this header needs no new include.
+	double pinv_cutoff = 1E-5;  //NOS_RGBI_PINV_CUTOFF overrides it, which is how the sensitivity is tested
+	int last_pinv_n = 0, last_pinv_kept = 0;
+	double last_pinv_smallest_kept = 0.0, last_pinv_largest_dropped = 0.0;
+	std::vector<std::string> pinv_warnings;
+	//Roby-Gould atomic natural orbitals: one atom at a time, plain Loewdin S^-1/2, no
+	//orthogonalisation between atoms - what the RGBI projections want, and a different quantity
+	//from the NAOs of nao.h, whose occupancies sum to the exact electron count.
+	//keep_orbitals >= 0 fixes the rank of the atomic subspace and ignores occupancy_cutoff: the
+	//projector then depends on the element rather than on where an occupation number happens to sit
+	//relative to a threshold, which is what keeps the indices continuous in the geometry.
 	NAOResult calculateAtomicNAO(const dMatrix2& D_full, const dMatrix2& S_full,
 		const ivec& atom_indices, const ivec& shell_angular_momenta = {},
 		bool spherical = false, double occupancy_cutoff = 1.0 / 6.0,
-		int leading_orbitals_to_skip = 0, bool EVs = false);
+		int leading_orbitals_to_skip = 0, bool EVs = false, int keep_orbitals = -1);
 	double projection_matrix_and_expectation(const ivec& indices, const ivec& eigvals = {}, const ivec& eigvecs = {}, dMatrix2* given_NAO = nullptr, dMatrix2* proj_out = nullptr);
-	void computeAllAtomicNAOs(WFN& wavy, bool symmetrize, bool use_ano_basis, bool EVs= false);
+	void computeAllAtomicNAOs(WFN& wavy, bool symmetrize, bool use_ano_basis, bool EVs= false,
+		bool legacy_occupancy_cutoff = false);
 	ivec find_eigenvalue_pairs(const vec& eigvals, const double tolerance = 1E-4);
 	void transform_Ionic_eigenvectors_to_Ionic_orbitals(dMatrix2& EVC,
 		const vec& eigvals,
@@ -104,7 +147,7 @@ public:
 	Roby_information() = default;
 	~Roby_information() = default;
 	Roby_information(const Roby_information&) = default;
-	Roby_information(WFN& wavy, const ivec3& group_sets = {}, bool symmetrize = true, bool use_ano_basis = false, bool EVs = false, bool theta_info = false);
+	Roby_information(WFN& wavy, const ivec3& group_sets = {}, bool symmetrize = true, bool use_ano_basis = false, bool EVs = false, bool theta_info = false, bool legacy_occupancy_cutoff = false);
 
 };
 

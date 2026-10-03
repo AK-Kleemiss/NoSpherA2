@@ -229,14 +229,14 @@ AtomGrid::AtomGrid(const double radial_precision,
 		const int start = (int)atom_grid_x_bohr_.size();
 		angular_off -= start;
 		const int size = start + num_angular;
-		int p = 0;
 		atom_grid_x_bohr_.resize(size);
 		atom_grid_y_bohr_.resize(size);
 		atom_grid_z_bohr_.resize(size);
 		atom_grid_w_.resize(size);
-#pragma omp parallel for private(p)
+		//serial: at most a few thousand multiplies per shell, and a parallel region per shell
+		//waited at its barrier for busy threads (uh6 under load: grids 5-49 s -> 0.6-1.7 s)
 		for (int iang = start; iang < size; iang++) {
-			p = angular_off + iang;
+			const int p = angular_off + iang;
 			atom_grid_x_bohr_[iang] = angular_x[p] * radial_r;
 			atom_grid_y_bohr_[iang] = angular_y[p] * radial_r;
 			atom_grid_z_bohr_[iang] = angular_z[p] * radial_r;

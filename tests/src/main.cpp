@@ -33,8 +33,46 @@ struct CoutFormatReset : ::testing::EmptyTestEventListener
 	}
 };
 
+//Report an exit that interrupts a running test.
+static void report_exit_during_test()
+{
+	const ::testing::TestInfo* info = ::testing::UnitTest::GetInstance()->current_test_info();
+	if (info == nullptr)
+		return;
+	std::cout.flush();
+	std::cerr << "\nNoSpherA2_Tests: the process exited while " << info->test_suite_name() << "."
+			  << info->name() << " was still running. Production code called exit() (error_check "
+			  << "does) outside a death test, so no verdict was printed and the tests after it "
+			  << "never ran.\n";
+	std::cerr.flush();
+}
+
 int main(int argc, char** argv)
 {
+	//A death-test child is expected to exit.
+	const bool death_test_child = std::any_of(argv, argv + argc, [](const char* a) {
+		return std::string(a).rfind("--gtest_internal_run_death_test", 0) == 0;
+	});
+	if (!death_test_child)
+		std::atexit(report_exit_during_test);
+
+	//The default "fast" death test style forks and runs the statement in the child. The child then
+	//owns copies of every thread object this process holds but none of the threads themselves, so
+	//its exit path can throw ("pthread_detach has failed: No such process") and abort with signal 6
+	//instead of the exit code the test expects - which is how
+	//FittingIoCoverageFchkTests.FreeFchkExitsWhenMissingBasisCannotBeRead failed on macOS arm64
+	//while passing everywhere else. "threadsafe" re-executes the binary for that one test instead
+	//of forking, so no death test inherits a thread it cannot join. Set before InitGoogleTest so
+	//--gtest_death_test_style on the command line still wins.
+	GTEST_FLAG_SET(death_test_style, "threadsafe");
+	//The RGBI tests count free-atom SCFs and compare their digits run against run; a density read back
+	//from a previous run's on-disk cache would answer them without running anything. A test that wants
+	//the disk cache sets NOS_FREEATOM_CACHE_DIR itself.
+#ifdef _WIN32
+	_putenv_s("NOS_FREEATOM_CACHE_DIR", "off");
+#else
+	setenv("NOS_FREEATOM_CACHE_DIR", "off", 1);
+#endif
 	::testing::InitGoogleTest(&argc, argv);
 	::testing::UnitTest::GetInstance()->listeners().Append(new CoutFormatReset);
 	warn_about_working_directory();

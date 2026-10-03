@@ -66,7 +66,7 @@ namespace SALTED_Utils
 	cvec3 complex_to_real_transformation(ivec sizes);
 	//Removes the atoms the model cannot predict from wavy; returns which of the input atoms were removed
 	std::vector<char> filter_input(WFN& wavy, options& opt, const SALTEDConfig& config);
-	void set_lmax_nmax(std::unordered_map<std::string, int> &lmax, std::unordered_map<std::string, int> &nmax, const std::array<std::vector<primitive>, 118> &basis_set, std::vector<std::string> species);
+	void set_lmax_nmax(std::unordered_map<std::string, int> &lmax, std::unordered_map<std::string, int> &nmax, const BasisSet& basis_set, std::vector<std::string> species);
 	int get_lmax_max(std::unordered_map<std::string, int> &lmax);
 
 	inline featomic::SimpleSystem gen_featomic_system(const WFN& wfn)
@@ -168,13 +168,6 @@ struct aux_density_table
 void calc_aux_density(const aux_density_table& t, const vec& coefficients, const int np, const double* x, const double* y, const double* z, double* rho, double* gx = nullptr, double* gy = nullptr, double* gz = nullptr, double* lap = nullptr, double* hess = nullptr);
 
 vec calc_atomic_density(const std::vector<atom> &atoms, const vec &coefs);
-
-// Scale the l=0 coefficients so the predicted density integrates to the exact
-// electron count. Returns the applied factor (1.0 if nothing was done).
-double apply_charge_constraint(const std::vector<atom> &atoms, vec &coefs,
-							   int net_charge, bool spherical_fill_used,
-							   int n_filled, double filled_eeq_charge,
-							   double applied_fill_charge, std::ostream &file);
 
 cube calc_cube_ML(const vec& data, WFN &dummy, const int& atom_nr = -1);
 void calc_cube_ML(const vec& data, WFN& dummy, cube& cube_data, const int& atom_nr = -1);

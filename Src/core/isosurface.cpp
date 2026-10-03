@@ -3,6 +3,10 @@
 #include "isosurface.h"
 #include <set>
 #include "properties.h"
+#include "citations.h"
+#ifdef NOSPHERA2_USE_GPU
+#include "aux_density_gpu.h"
+#endif
 
 // --------------------------------------------------------------------------
 // 1) Minimal Edge Table
@@ -390,19 +394,15 @@ double calc_d_i(const d3& p_t, const WFN& wavy) {
 }
 
 double calc_d_norm_term(const d3& p_t, const WFN& wavy) {
-	// (d - r_vdW) / r_vdW of the nearest atom; d_norm is this term for the molecule plus the one for the environment
-	double d_i = 1E100;
-	int nearest = 0;
+	// min over atoms of (d - r_vdW) / r_vdW; d_norm is this term for the molecule plus the one for the environment.
+	// Taking the radius of the nearest atom instead jumps by up to 0.8 where the nearest atom switches (H 1.09 vs C 1.70 A).
+	double t = 1E100;
 	for (int i = 0; i < wavy.get_ncen(); i++) {
 		const d3 p_a = { p_t[0] - wavy.get_atom_coordinate(i,0), p_t[1] - wavy.get_atom_coordinate(i,1), p_t[2] - wavy.get_atom_coordinate(i,2) };
-		const double d = array_length(p_a);
-		if (d < d_i) {
-			d_i = d;
-			nearest = i;
-		}
+		const double r = constants::ang2bohr(constants::vdW_radii[wavy.get_atom_charge(i)]);
+		t = std::min(t, (array_length(p_a) - r) / r);
 	}
-	const double r = constants::ang2bohr(constants::vdW_radii[wavy.get_atom_charge(nearest)]);
-	return (d_i - r) / r;
+	return t;
 }
 
 RGB mix_colour(double val, const std::array<std::array<int, 3>, 3>& Colourcode, double low_lim, double high_lim) {
@@ -416,17 +416,21 @@ RGB mix_colour(double val, const std::array<std::array<int, 3>, 3>& Colourcode, 
 	}
 	else {
 		//Mix colours
+		// a + f * (b - a), not (1 - f) * a + f * b: the second form returns 254.99999999999997 for a
+		// channel that is 255 at both ends, and int() truncates that to 254. The red of a red-white
+		// ramp then depends on the last bits of val, which is how a 1E-16 change in the ESP moved the
+		// colour of a face (IsosurfaceTests.EspColourOfRhoIsosurface). With this form f * 0 == 0 exactly.
 		if (val < mid_point) {
 			double factor = (val - low_lim) / (mid_point - low_lim);
-			colour = { int((1 - factor) * Colourcode[0][0] + factor * Colourcode[1][0]),
-					   int((1 - factor) * Colourcode[0][1] + factor * Colourcode[1][1]),
-					   int((1 - factor) * Colourcode[0][2] + factor * Colourcode[1][2]) };
+			colour = { int(Colourcode[0][0] + factor * (Colourcode[1][0] - Colourcode[0][0])),
+					   int(Colourcode[0][1] + factor * (Colourcode[1][1] - Colourcode[0][1])),
+					   int(Colourcode[0][2] + factor * (Colourcode[1][2] - Colourcode[0][2])) };
 		}
 		else if (val > mid_point) {
 			double factor = (val - mid_point) / (high_lim - mid_point);
-			colour = { int((1 - factor) * Colourcode[1][0] + factor * Colourcode[2][0]),
-					   int((1 - factor) * Colourcode[1][1] + factor * Colourcode[2][1]),
-					   int((1 - factor) * Colourcode[1][2] + factor * Colourcode[2][2]) };
+			colour = { int(Colourcode[1][0] + factor * (Colourcode[2][0] - Colourcode[1][0])),
+					   int(Colourcode[1][1] + factor * (Colourcode[2][1] - Colourcode[1][1])),
+					   int(Colourcode[1][2] + factor * (Colourcode[2][2] - Colourcode[1][2])) };
 		}
 		else
 			colour = Colourcode[1];
@@ -457,6 +461,7 @@ cube box_cube(WFN& wfn, properties_options& opts)
 
 std::vector<Triangle> Hirshfeld_surface(WFN& mol, WFN& env, properties_options& opts, std::ostream& log, cube* weight_out)
 {
+	citations::cite(citations::Method::HirshfeldSurface, log);
 	if (opts.radius < 2.5) {
 		log << "Resetting Radius to at least 2.5!" << std::endl;
 		opts.radius = 2.5;
@@ -494,22 +499,35 @@ void surface_curvature(const std::vector<Triangle>& triangles, const cube& field
 	for (int k = 0; k < 3; k++) h[k] = constants::bohr2ang(field.get_vector(k, k));
 #pragma omp parallel for
 	for (int t = 0; t < nt; t++) {
+		// the finite differences at the 8 nodes around the face centre, blended trilinearly: the nearest node alone
+		// makes the curvature a step function of the voxel, which the shape index shows as speckle on every grid
 		const d3 c = triangles[t].calc_center();
-		int idx[3];
-		for (int k = 0; k < 3; k++)
-			idx[k] = std::clamp((int)std::lround((c[k] - field.get_origin(k)) / field.get_vector(k, k)), 1, field.get_size(k) - 2);
-		auto w = [&](const int di, const int dj, const int dk) { return field.get_value(idx[0] + di, idx[1] + dj, idx[2] + dk); };
-		const double w0 = w(0, 0, 0);
-		double g[3], H[3][3];
-		g[0] = (w(1, 0, 0) - w(-1, 0, 0)) / (2 * h[0]);
-		g[1] = (w(0, 1, 0) - w(0, -1, 0)) / (2 * h[1]);
-		g[2] = (w(0, 0, 1) - w(0, 0, -1)) / (2 * h[2]);
-		H[0][0] = (w(1, 0, 0) - 2 * w0 + w(-1, 0, 0)) / (h[0] * h[0]);
-		H[1][1] = (w(0, 1, 0) - 2 * w0 + w(0, -1, 0)) / (h[1] * h[1]);
-		H[2][2] = (w(0, 0, 1) - 2 * w0 + w(0, 0, -1)) / (h[2] * h[2]);
-		H[0][1] = H[1][0] = (w(1, 1, 0) - w(1, -1, 0) - w(-1, 1, 0) + w(-1, -1, 0)) / (4 * h[0] * h[1]);
-		H[0][2] = H[2][0] = (w(1, 0, 1) - w(1, 0, -1) - w(-1, 0, 1) + w(-1, 0, -1)) / (4 * h[0] * h[2]);
-		H[1][2] = H[2][1] = (w(0, 1, 1) - w(0, 1, -1) - w(0, -1, 1) + w(0, -1, -1)) / (4 * h[1] * h[2]);
+		int base[3];
+		double f[3];
+		for (int k = 0; k < 3; k++) {
+			const double u = (c[k] - field.get_origin(k)) / field.get_vector(k, k);
+			base[k] = std::clamp((int)std::floor(u), 1, field.get_size(k) - 3);
+			f[k] = std::clamp(u - base[k], 0.0, 1.0);
+		}
+		double g[3] = { 0, 0, 0 }, H[3][3] = { {0, 0, 0}, {0, 0, 0}, {0, 0, 0} };
+		for (int corner = 0; corner < 8; corner++) {
+			const int o[3] = { corner & 1, (corner >> 1) & 1, (corner >> 2) & 1 };
+			const double s = (o[0] ? f[0] : 1 - f[0]) * (o[1] ? f[1] : 1 - f[1]) * (o[2] ? f[2] : 1 - f[2]);
+			auto w = [&](const int di, const int dj, const int dk) { return field.get_value(base[0] + o[0] + di, base[1] + o[1] + dj, base[2] + o[2] + dk); };
+			const double w0 = w(0, 0, 0);
+			g[0] += s * (w(1, 0, 0) - w(-1, 0, 0)) / (2 * h[0]);
+			g[1] += s * (w(0, 1, 0) - w(0, -1, 0)) / (2 * h[1]);
+			g[2] += s * (w(0, 0, 1) - w(0, 0, -1)) / (2 * h[2]);
+			H[0][0] += s * (w(1, 0, 0) - 2 * w0 + w(-1, 0, 0)) / (h[0] * h[0]);
+			H[1][1] += s * (w(0, 1, 0) - 2 * w0 + w(0, -1, 0)) / (h[1] * h[1]);
+			H[2][2] += s * (w(0, 0, 1) - 2 * w0 + w(0, 0, -1)) / (h[2] * h[2]);
+			H[0][1] += s * (w(1, 1, 0) - w(1, -1, 0) - w(-1, 1, 0) + w(-1, -1, 0)) / (4 * h[0] * h[1]);
+			H[0][2] += s * (w(1, 0, 1) - w(1, 0, -1) - w(-1, 0, 1) + w(-1, 0, -1)) / (4 * h[0] * h[2]);
+			H[1][2] += s * (w(0, 1, 1) - w(0, 1, -1) - w(0, -1, 1) + w(0, -1, -1)) / (4 * h[1] * h[2]);
+		}
+		H[1][0] = H[0][1];
+		H[2][0] = H[0][2];
+		H[2][1] = H[1][2];
 		const double gn = std::sqrt(g[0] * g[0] + g[1] * g[1] + g[2] * g[2]);
 		if (gn < 1E-12) continue;
 		double n[3], M[3][3], Hn[3];
@@ -533,7 +551,34 @@ vec surface_ESP(const std::vector<Triangle>& triangles, const WFN& wavy)
 	temp.delete_unoccupied_MOs();
 	temp.delete_Qs();
 	const WFN::ESP_pairs pairs = temp.build_ESP_pairs();
-	return surface_ESP(triangles, [&](const d3& p) { return temp.computeESP(p, pairs); });
+	// the face centres in batches, so a device sees many at once (the generic overload below stays
+	// for callers that hand in their own per-point function); the bar still ticks per batch, since
+	// Olex2 tails it while the window stays alive
+	const int n = (int)triangles.size();
+	vec esp(n);
+	// A device needs the whole set in one launch to fill itself - sucrose's 87312 faces in 4096-point
+	// slices is 32 blocks of 128 on 80 SMs, and they took 18056 ms against 6171 ms for a cube of 3x as
+	// many points handed over in one call. Without a device the slices are independent OpenMP loops that
+	// cost nothing (measured: the same 159 us per point either way), so there the bar stays fine grained.
+#ifdef NOSPHERA2_USE_GPU
+	const bool one_call = aux_density_gpu_enabled() && aux_density_gpu_available();
+#else
+	const bool one_call = false;
+#endif
+	const int slice = one_call ? n : std::max(4096, n / 50);
+	ProgressBar pb((n + slice - 1) / slice, 50, "=", " ", "Surface ESP");
+	std::vector<d3> centres;
+	for (int first = 0; first < n; first += slice)
+	{
+		const int m = std::min(slice, n - first);
+		centres.resize(m);
+#pragma omp parallel for
+		for (int i = 0; i < m; i++)
+			centres[i] = triangles[first + i].calc_center();
+		temp.computeESP_batch(centres, pairs, esp.data() + first);
+		pb.update();
+	}
+	return esp;
 }
 
 vec surface_ESP(const std::vector<Triangle>& triangles, const std::function<double(const d3&)>& esp_at)

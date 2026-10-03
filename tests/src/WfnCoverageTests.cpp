@@ -489,4 +489,22 @@ namespace
 		EXPECT_EQ(w.get_atom_ECP_electrons(2), 0);
 		EXPECT_EQ(w.get_nr_ECP_electrons(), 120u);
 	}
+
+	//Without -ECP the cores still come from the file's ECP block: the electron-count fallback misses
+	//every charged molecule (a PdLiL0Ph cation's Pd was read as all-electron). An all-electron file
+	//stores a 0 pointer and stays all-electron instead of exiting.
+	TEST(WfnCoverageIoTests, GbwEcpBlockReadWithoutFlag)
+	{
+		std::ostringstream log;
+		WFN w(e_origin::NOT_YET_DEFINED);
+		ASSERT_TRUE(w.read_gbw(nos_test_repo_root() / "tests" / "ELI_heavy" / "hgh2_ecp.gbw", log));
+		EXPECT_TRUE(w.get_has_ECPs());
+		EXPECT_EQ(w.get_ECP_mode(), 1);
+		EXPECT_EQ(w.get_atom_ECP_electrons(0), 60);
+		EXPECT_EQ(w.get_nr_ECP_electrons(), 60u);
+		WFN v(e_origin::NOT_YET_DEFINED);
+		ASSERT_TRUE(v.read_gbw(nos_test_repo_root() / "tests" / "epoxide_gbw" / "epoxide.gbw", log));
+		EXPECT_FALSE(v.get_has_ECPs());
+		EXPECT_EQ(v.get_nr_ECP_electrons(), 0u);
+	}
 }

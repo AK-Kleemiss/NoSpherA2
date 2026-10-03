@@ -1,0 +1,22 @@
+==========================================
+SLURM_JOB_ID = 589969
+SLURM_JOB_NODELIST = AKL012
+==========================================
+host=AKL012  threads=2  node_cores=96  job=589969  partition=Active
+binary /work/akkleemiss/florian/nos_nboref/build/release-linux/bin/NoSpherA2
+keylist now: $NBO AONAO=W NRTSYM=OFF $END
+gennbo7 lif rc=0  NBOMEM=4gb  host=AKL012  NBOBIN=/work/software/bin/NBO/bin
+lif       gennbo   0s parse rc=0 native   0s rc=0  lfn33=47993 bytes  NAOC lines=46
+keylist now: $NBO AONAO=W NRTSYM=OFF $END
+gennbo7 water rc=0  NBOMEM=4gb  host=AKL012  NBOBIN=/work/software/bin/NBO/bin
+water     gennbo   0s parse rc=0 native   0s rc=0  lfn33=43928 bytes  NAOC lines=44
+=== done 2026-09-25T06:12:47Z on AKL012, 2 threads
+
+--- cmp against the committed run (jobs 589060/589634, same node AKL012):
+lif lfn 33 byte-identical, md5 4b7206f8320667ca78fd15f93073766e (47993 bytes)
+water lfn 33 byte-identical, md5 a2d5f3e126bb160271ff8d047d9808e9 (43928 bytes)
+--- the only difference in the input:
+2c2
+<  $NBO AONAO=W $END
+---
+>  $NBO AONAO=W NRTSYM=OFF $END

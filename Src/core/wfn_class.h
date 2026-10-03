@@ -40,6 +40,18 @@ enum e_origin {
 	XCW_fit = 14
 };
 
+//ORCA stores the pure components with |m| >= 3 - f(+-3), g(+-3), g(+-4) and the same for h and i -
+//with the sign opposite to libcint's, and a reader that keeps ORCA's coefficients keeps that
+//convention in its density matrix.  Two readers do: the gbw reader, and the molden reader, because
+//orca_2mkl writes the gbw's own coefficients.  An overlap paired with such a density has to take
+//ORCA's sign there as well; in the ORCA component order (m = 0, +1, -1, +2, -2, ...) that is every
+//component index from 5 on.  Measured on tests/CuF2_i_func/71/calc_occupied.molden, which carries
+//shells up to i: without it Tr(P S) is 46.958 of the file's 47 electrons.
+inline bool origin_has_orca_pure_phases(const e_origin o)
+{
+	return o == e_origin::gbw || o == e_origin::molden;
+}
+
 /**
  * @class WFN
  * @brief Container for a quantum-mechanical wavefunction including atoms, basis primitives, molecular orbitals and derived properties.
@@ -99,6 +111,14 @@ private:
 	mutable ivec center_group_start; // [ncen + 1]: the groups of centre c are [start[c], start[c + 1])
 	mutable vec center_min_exponent; // [ncen]: the most diffuse primitive on the centre
 	void build_exp_groups() const;
+	// Primitives whose coefficient rows are proportional over every MO act as one contracted
+	// function: phi_mo = sum_A C[A][mo] sum_{j in A} s_j chi_j, exactly. The evaluators add the
+	// primitives up first and multiply nao rows into the MOs instead of nex. Read off the
+	// coefficients, so a .wfn works as well as a basis-set reader. Built with coef_primitive_major.
+	mutable ivec prim_ao;           // [nex] -> function, -1 for a row that is zero in every MO
+	mutable vec prim_ao_scale;      // [nex]: row j = scale * the function's row
+	mutable vec coef_ao_major;      // [nao * nmo]
+	void build_ao_contraction() const;
 	// Vector of centeres that primitives are base on
 	ivec centers;
 	// Vector of types of primitives
@@ -122,6 +142,9 @@ private:
 	vec UT_SpinDensityMatrix;
 	// Density Matrix in mdarray
 	dMatrix2 DM;
+	// Beta-spin part of DM, same order and size. Only filled by readers that separate the spins
+	// (gbw, molden); empty for a restricted case and for readers that only sum the two.
+	dMatrix2 DM_beta;
 	// Spherical MO coefficients as OCC converged them, rows = AO in OCC's m = -l..l order
 	// (beta block below alpha when unrestricted), columns = MO. Filled by the OCC constructor.
 	dMatrix2 MO_sph;
@@ -181,6 +204,9 @@ private:
 	const double compute_dens_spherical(const d3& Pos, vec2& d, vec& phi) const;
 	// Empties every container and puts every scalar back to its default; ctors and operator= start here
 	void reset();
+	//Orbital values, gradients and Hessians at p, component-major phi[k * nmo + mo] (k: 0 value,
+	//1-3 x y z, 4-6 xx yy zz, 7 xy, 8 xz, 9 yz); false when there are no coefficients
+	bool eli_orbital_pass(const d3& p, vec& phi) const;
 
 public:
 	/** Primitive-major MO coefficients, [primitive * nmo + mo], built on first use.
@@ -291,6 +317,11 @@ public:
 	bool add_exp(const int& cent, const int& type, const double& e);
 	/** Auto-detect file type and read wavefunction. */
 	void read_known_wavefunction_format(const std::filesystem::path& fileName, std::ostream& file, const bool debug = false);
+	/** @brief Declare def2 ECP cores when the orbitals hold exactly that many electrons fewer than
+	 *  the nuclei carry. No file format states an ECP unless -ECP is passed, and an analysis that
+	 *  fills orbitals from Z then works with electrons the basis does not describe. Only an exact
+	 *  match against constants::ECP_electrons acts; anything else is left alone. */
+	void declare_ECPs_if_core_electrons_are_missing(std::ostream& file);
 	/** Read legacy .wfn /.ffn file. */
 	bool read_wfn(const std::filesystem::path& fileName, const bool& debug, std::ostream& file);
 	/** Read .wfx file. */
@@ -313,8 +344,8 @@ public:
 	bool write_wfn(const std::filesystem::path& fileName, const bool& debug, const bool occupied) const;
 	/** Write an AIM .wfx file; occupied drops the virtual MOs. */
 	bool write_wfx(const std::filesystem::path& fileName, const bool occupied) const;
-	/** Write current wavefunction to .47 file (optionally only occupied). */
-	bool write_nbo(const std::filesystem::path& fileName, const bool& debug, std::ostream* progress_log = nullptr);
+	/** Write current wavefunction to .47 file; nbo_keywords go into the $NBO keylist (e.g. "NRT NRTE2=5"). */
+	bool write_nbo(const std::filesystem::path& fileName, const bool& debug, std::ostream* progress_log = nullptr, const std::string& nbo_keywords = "");
 	/** Write atomic geometry to .xyz file. */
 	bool write_xyz(const std::filesystem::path& fileName);
 	/** Set internal path field. */
@@ -576,10 +607,19 @@ public:
 	const double computeLap(const d3& PosGrid) const;
 	/** Compute Rho and ELI together. */
 	void computeRhoELI(const d3 &PosGrid, double& Rho, double& Eli) const;
-	//ELI-D and its analytic gradient from the orbital values, gradients and Hessians
-	void computeELIGrad(const d3 &PosGrid, double& Eli, d3& gradient) const;
+	//ELI-D and its analytic gradient from the orbital values, gradients and Hessians;
+	//rho, when asked for, is the density of the same orbital pass
+	void computeELIGrad(const d3 &PosGrid, double& Eli, d3& gradient, double *rho = nullptr) const;
+	//Kohout's spin-resolved ELI-D and its analytic gradient (eli_family.h has the definitions):
+	//field 0 alpha-alpha, 1 beta-beta, 2 the triplet-coupled pair with rho^(t) = triplet_factor * rho.
+	//aux, when given, receives rho, rho_alpha, rho_beta and rho_s * ELI-q_s (0 for the triplet) of
+	//the same orbital pass. A restricted wavefunction splits every occupation evenly, as spin_fields does
+	void computeELISpinGrad(const d3 &PosGrid, const int field, const double triplet_factor, double& Eli, d3& gradient, double *aux = nullptr) const;
 	/** Compute gradient. */
-	void computeGrad(const d3 &PosGrid, d3& gradient) const;
+	//rho comes out of the same orbital pass when a pointer is given: the reduction already
+	//has phi, so the density is one multiply-add per MO instead of a second pass over every
+	//primitive.  The QTAIM climb needs both at every step.
+	void computeGrad(const d3 &PosGrid, d3& gradient, double *rho = nullptr) const;
 	/** Compute ELI alone. */
 	const double computeELI(const d3& PosGrid) const;
 	/** Compute ELF alone. */
@@ -603,6 +643,8 @@ public:
 	ESP_pairs build_ESP_pairs() const;
 	/** Electrostatic potential including nuclear cores. */
 	const double computeESP(const d3& PosGrid, const ESP_pairs& pairs) const;
+	/** computeESP for a whole point set, out holds points.size() values; GPU when one is there, OpenMP otherwise. */
+	void computeESP_batch(const std::vector<d3>& points, const ESP_pairs& pairs, double* out) const;
 	//----------DM Handling--------------------------------
 	/** Build density (and optionally spin density) matrix; loads basis if required. */
 	bool build_DM(std::string basis_set_path, bool debug = false);
@@ -620,6 +662,10 @@ public:
 	dMatrix2 get_dm() const { return DM; };
 	/** Set density matrix*/
 	void set_dm(const dMatrix2& in) { DM = in; };
+	/** Beta-spin density matrix if the reader kept one, empty otherwise. */
+	dMatrix2 get_dm_beta() const { return DM_beta; };
+	/** Set beta-spin density matrix*/
+	void set_dm_beta(const dMatrix2& in) { DM_beta = in; };
 	//----------S_DM Handling--------------------------------
 	/** Append spin density matrix element. */
 	void push_back_SDM(const double& value = 0.0);

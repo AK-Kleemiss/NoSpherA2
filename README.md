@@ -72,7 +72,7 @@ cmake --preset release-windows -DNOSPHERA2_BUILD_TESTS=ON
 
 The Visual Studio solution under `Windows/` makes the same choices from the installed toolkits; see [GPU builds with the solution](#gpu-builds-with-the-solution).
 
-The CUDA runtime is linked statically and cuBLAS is loaded only when `-gpu_cublas` is requested and a matching library is installed. A CUDA-enabled executable therefore has no required CUDA DLL import and starts normally on a machine without an NVIDIA GPU; GPU requests fall back to the CPU when no usable device is present. HIP builds do not link the HIP runtime either: `libamdhip64.so` / `amdhip64_<major>.dll` is opened by name on the first GPU call and treated as "no device" when it is absent, so the same executable starts on a machine without ROCm. No CUDA, HIP, or cuBLAS runtime is copied into the executable directory. The CI artifacts `NoSpherA2-linux-x86_64-gpu` and `NoSpherA2-windows-x64-gpu` are such combined CUDA+HIP builds for every supported architecture.
+The CUDA runtime is linked statically and cuBLAS is opened by name on its first use rather than linked: it is on by default (`-no_gpu_cublas` pins the I-tensor GEMM to CUTLASS or the built-in kernel, which is what the reference tests do) and treated as absent when no matching library is installed. A CUDA-enabled executable therefore has no required CUDA DLL import and starts normally on a machine without an NVIDIA GPU; GPU requests fall back to the CPU when no usable device is present. HIP builds do not link the HIP runtime either: `libamdhip64.so` / `amdhip64_<major>.dll` is opened by name on the first GPU call and treated as "no device" when it is absent, so the same executable starts on a machine without ROCm. No CUDA, HIP, or cuBLAS runtime is copied into the executable directory. The CI artifacts `NoSpherA2-linux-x86_64-gpu` and `NoSpherA2-windows-x64-gpu` are such combined CUDA+HIP builds for every supported architecture.
 
 At runtime, supported GPU paths are enabled by default: Fourier transforms, XCW I-tensor contractions, SALTED descriptor combinations, and Becke/TFVC atomic-grid weights. Each automatically falls back to the CPU if the device, memory budget, or input layout is unsuitable. Use `-no_gpu` to disable every GPU path, or `-no_gpu_grid`, `-no_gpu_itensor`, and `-no_gpu_salted` to pin an individual calculation to the CPU. `-gpu_blas` remains opt-in because its transfers only pay off for sufficiently large dense matrix products.
 
@@ -186,7 +186,7 @@ cmake --preset release-macos-universal
    cif = "sucrose.cif"
    hkl = "olex2/Wfn_job/sucrose.hkl"
    wfn = "olex2/Wfn_job/sucrose.wfx"
-   acc = 0
+   acc = 1
    ```
 4. If the reference output is not named after the test, add the `good` parameter:
 
@@ -198,7 +198,7 @@ cmake --preset release-macos-universal
    [disorder_THPP.args]
    cif = "thpp.cif"
    hkl = "thpp.hkl"
-   acc = 0
+   acc = 1
    ```
 5. Command line arguments are always passed in the block `<testname>.args`.
 6. **Run `pytest` (or `ctest`)** to ensure your test runs.

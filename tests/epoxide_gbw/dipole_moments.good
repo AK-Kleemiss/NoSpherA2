@@ -7,7 +7,7 @@
 This software is part of the cuQCT software suite developed by Florian Kleemiss.
 Please give credit and cite corresponding pieces!
 This Software is published with BSD-2 clause license.
-Calculating for 241920 Gridpoints.
+Calculating for 245760 Gridpoints.
 Calcualting Rho... ...done!
 Calcualting spherical Rho... ...done!
 Calcualting Hirshfeld density for atom: 0
@@ -26,13 +26,13 @@ Calcualting Hirshfeld density for atom: 6
 ..done!
  atom   |  dipole moment x,        y,         z
 ======================================
-  0 (O) |   9.756811e-02,  -7.898943e-02,  -1.356836e-01
-  1 (C) |  -5.744411e-02,  -3.430091e-02,  -2.834304e-02
-  2 (H) |  -4.004882e-02,   4.431668e-02,  -9.622381e-02
-  3 (H) |  -9.690530e-03,  -1.116446e-01,   2.270412e-02
-  4 (C) |   7.116202e-02,   3.041677e-02,   2.320570e-02
-  5 (H) |   7.773190e-02,  -5.402318e-02,   6.742123e-02
-  6 (H) |   4.753573e-02,   8.736511e-02,  -5.666592e-02
+  0 (O) |   9.095873e-02,  -6.979635e-02,  -1.453471e-01
+  1 (C) |  -6.159322e-02,  -3.387218e-02,  -2.541642e-02
+  2 (H) |  -4.004871e-02,   4.431509e-02,  -9.622021e-02
+  3 (H) |  -9.681307e-03,  -1.116454e-01,   2.270533e-02
+  4 (C) |   7.207160e-02,   3.284960e-02,   2.064122e-02
+  5 (H) |   7.773114e-02,  -5.402090e-02,   6.743080e-02
+  6 (H) |   4.753570e-02,   8.736405e-02,  -5.666302e-02
 
 
 Properties calculation done!

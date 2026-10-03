@@ -700,6 +700,7 @@ TEST(FittingIoCoverageIntegratorTests, QmRiDifferenceCubeWritesThreeCubes)
 			hi = std::max(hi, wave.get_atom_coordinate(a, i));
 		}
 		steps[i] = (int)std::ceil(constants::bohr2ang(hi - lo + 2.0 * constants::ang2bohr(3.0)) / 0.1);
+		steps[i] += steps[i] % 2;   // readxyzMinMax_fromWFN rounds the count up to even so the box centre lands on a grid plane
 	}
 
 	StreamCapture out(std::cout);

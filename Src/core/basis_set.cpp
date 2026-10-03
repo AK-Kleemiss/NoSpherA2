@@ -668,6 +668,23 @@ WFN generate_aux_wfn(const WFN& orbital_wfn, std::vector<std::shared_ptr<BasisSe
 	WFN wavy_aux(e_origin::NOT_YET_DEFINED);
 	wavy_aux.set_atoms(orbital_wfn.get_atoms());
 	wavy_aux.set_ncen(orbital_wfn.get_ncen());
+	// The fitted density carries the charge of the density it fits; without this
+	// the aux wavefunction looks neutral to everything downstream. A wavefunction
+	// read from a file usually leaves the charge unset, so ask the occupations -
+	// they hold exactly the electrons the fit will see, ECP cores excluded.
+	if (orbital_wfn.get_nmo() > 0) {
+		double occupied = 0.0;
+		for (int mo = 0; mo < orbital_wfn.get_nmo(); ++mo)
+			occupied += orbital_wfn.get_MO_occ(mo);
+		int nuclear = 0;
+		for (int a = 0; a < orbital_wfn.get_ncen(); ++a)
+			nuclear += orbital_wfn.get_atom_charge(a)
+				- orbital_wfn.get_atom_ECP_electrons(a);
+		wavy_aux.set_charge(nuclear - static_cast<int>(std::lround(occupied)));
+	}
+	else
+		wavy_aux.set_charge(orbital_wfn.get_charge());
+	wavy_aux.set_multi(orbital_wfn.get_multi());
 	wavy_aux.delete_basis_set();
 	load_basis_into_WFN(wavy_aux, combined_aux_basis, decontract);
 

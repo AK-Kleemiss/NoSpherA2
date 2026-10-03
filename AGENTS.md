@@ -300,6 +300,17 @@ alternative is one flag away in each case.
 
 ## Current Validation Notes
 
+As of 2026-09-24, the in-house NBO analysis (`-nbo_native`, `Src/core/nbo.cpp` and
+`Src/core/nrt.cpp`) is checked in two places: `NrtTests`, `Nbo47Tests` and
+`NaoTests.OverlapCarriesTheDensitysPhaseConvention` as gtests, and
+`py -3.12 tests/nbo_reference/compare_nbo.py --all .` against the 22 stored NBO 7.0.9 references,
+which reports **22 PASS, exit 0**. NRT weights are compared by rank and never by label - gennbo
+reproduces TiCl4's `D(w)`, valencies and bond orders exactly while individual weights move 7.1
+points. `cmake --build --preset release-windows --target NoSpherA2_Tests` links again since
+`tests/src/CellMathTests.cpp` (which calls `cell` members that no longer exist) was excluded, and the
+binary reports **1111 passed, 0 failed, 8 skipped** from `build/release-windows/bin` - the relative
+fixture paths in the tests are what makes that the working directory. See `UNIT_TESTS_STATUS.md`.
+
 As of 2026-09-08, `ctest --preset release-linux` reports **267/267 passing** outside the XCW
 cases (`-E XCW`), including the new `TomlIntegrationTests.ELI_NH3Li` golden case for the
 rewritten `-eli_analysis` basin analysis; the nine XCW cases pass on a V100 node, a CPU node

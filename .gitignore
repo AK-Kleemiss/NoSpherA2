@@ -53,6 +53,8 @@ intel-onemkl*.sh
 
 #Folders created by build
 build*
+#build* is meant for build DIRECTORIES; this driver is a script and has to stay in git
+!tests/nbo_reference_v2/build_nboref.sh
 deps-install-*
 #Escape build directory for Windows
 /Windows/NoSpherA2**/Debug*

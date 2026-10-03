@@ -13,6 +13,12 @@
 #include "XCW.h"
 #include "geometry_aid.h"
 #include "crystal_energies.h"
+#include "nao.h"
+#include "nbo.h"
+#include "nbo_run.h"
+#include "citations.h"
+#include "b2c.h"
+#include <future>
 #ifdef NOSPHERA2_USE_GPU
 #include "grid_gpu.h"
 #include "aux_density_gpu.h"
@@ -63,10 +69,13 @@ static int run_app_impl(int argc, char **argv)
 	using namespace std;
 	const std::filesystem::path cwd = std::filesystem::current_path();
 	string output_file = "NoSpherA2.log";
+	bool no_date = false;
 	{
 		for (int i = 0; i < argc; i++) {
 			string temp = argv[i];
-			if (temp == "-out") {
+			if (temp == "-no_date" || temp == "-no_date_but_gpu")
+				no_date = true;
+			else if (temp == "-out") {
 				err_checkf(i + 1 < argc && argv[i + 1][0] != '-',
 					"Missing argument for -out option",
 					std::cout);
@@ -104,6 +113,14 @@ static int run_app_impl(int argc, char **argv)
 		std::ostream& out;
 		~throughput_reporter() { throughput::report(out); }
 	} report_throughput{log_file};
+
+	//Header first, before the options are read: the NBO/NRT, topology, ELI family and other
+	//bonding jobs run inside digest_options() and return below without reaching the job code,
+	//and a job that fails while reading its input would otherwise leave an empty log
+	log_file << NoSpherA2_message(no_date);
+	if (!no_date)
+		log_file << build_date;
+	log_file.flush();
 
 	options opt(argc, argv, log_file);
 	opt.digest_options();
@@ -146,14 +163,6 @@ static int run_app_impl(int argc, char **argv)
 #endif
 	vector<WFN> wavy;
 
-	//Header first, before any job: a job that fails while reading its input otherwise leaves an empty log
-	log_file << NoSpherA2_message(opt.no_date);
-	if (!opt.no_date)
-	{
-		log_file << build_date;
-	}
-	log_file.flush();
-
 	if (opt.promol_nci)
 	{
 		promolecular_nci_analysis(
@@ -183,6 +192,66 @@ static int run_app_impl(int argc, char **argv)
 		log_file.flush();
 		std::cout.rdbuf(_coutbuf); // reset to standard output again
 		fukui_analysis(opt, std::cout);
+		return 0;
+	}
+	//Full bonding analysis and quit. Each stage reads the wavefunction afresh: RGBI and the NBO
+	//search take it by non-const reference, and the basins must not see what either left behind
+	if (opt.fba)
+	{
+		const auto read_wfn = [&opt]() {
+			WFN w(opt.wfn);
+			if (opt.ECP) w.set_has_ECPs(true, true, opt.ECP_mode);
+			return w;
+		};
+		log_file << "\nFull bonding analysis of " << opt.wfn.string() << ": RGBI, bondwise Laplacian, QTAIM and ELI-D, then NBO/NPA with NRT\n" << endl;
+		//NBO/NRT runs on its own thread next to the rest. RGBI and the basins print straight to
+		//std::cout, whose format flags every thread shares, so the NBO side gets a stream of its
+		//own and its block goes into the log after ELI-D. RGBI is serial and the NBO search stops
+		//scaling past a few threads, so the overlap is where the cores the basins leave go.
+		std::ostringstream nbo_log;
+		citations::cite(citations::Method::NAONPA, nbo_log);
+		citations::cite(citations::Method::NBO, nbo_log);
+		citations::cite(citations::Method::E2, nbo_log);
+		citations::cite(citations::Method::NRT, nbo_log);
+		const filesystem::path json = opt.wfn.parent_path() / (opt.wfn.stem().string() + ".native.nbo.json");
+		auto nbo_done = std::async(std::launch::async, [&nbo_log, &opt, &json](WFN w) {
+			const auto t0 = std::chrono::steady_clock::now();
+			NboOptions nbo;
+			nbo.debug = opt.debug;
+			nbo.nrt = true;
+			if (opt.threads > 0) nbo.threads = opt.threads;
+			//The search's ~3000 small OpenMP regions each wait at a barrier for threads the basin
+			//loops have taken: rub2 at -cpus 48 spent 59 s there against 2.2 s serial. NRT's
+			//per-candidate loop is coarse and keeps the full count.
+			nbo.search_threads = 1;
+			NboResults r = native_nbo(w, nbo, nbo_log);
+			r.name = opt.wfn.stem().string();
+			print_nbo(r, nbo_log);
+			write_nbo_json(r, json);
+			nbo_log << "wrote " << json.string() << std::endl;
+			//NAO, search and E2 are in the json's timings; NRT is what this leaves over
+			if (basin_timing_enabled())
+				nbo_log << "  [timing] fba NBO/NPA/NRT thread: " << std::fixed << std::setprecision(2)
+				        << std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count() << " s" << std::endl;
+		}, read_wfn());
+		//-basin_timing: one lap per stage of the main thread, which runs while NBO/NRT does
+		basin_stage_timer fba_timer;
+		{
+			WFN w = read_wfn();
+			Roby_information Roby(w, opt.rgbi_group_sets, !opt.rgbi_no_sym,
+				opt.rgbi_orbital_basis == RGBIOrbitalBasis::ANO, opt.rgbi_EVs, opt.rgbi_theta,
+				opt.rgbi_legacy_cutoff);
+		}
+		fba_timer.lap("fba RGBI");
+		//The .dat files go where -laplacian_bonds puts them.
+		bondwise_laplacian_plots(opt.wfn);
+		fba_timer.lap("fba bondwise Laplacian");
+		ELI_analysis(read_wfn(), opt);
+		fba_timer.lap("fba QTAIM and ELI-D");
+		//Rethrows whatever stopped the NBO side
+		nbo_done.get();
+		fba_timer.lap("fba waiting for NBO/NRT");
+		std::cout << "\n" << nbo_log.str() << "\nFull bonding analysis finished." << std::endl;
 		return 0;
 	}
 	//Basin analysis and quit; the tables stay in the log, which is what the golden test reads
@@ -244,26 +313,22 @@ static int run_app_impl(int argc, char **argv)
 		vec shape_index, curvedness;
 		surface_curvature(triangles_i, weight, shape_index, curvedness);
 		tp.push_back(get_time()); tp_desc.push_back("d_i, d_e, d_norm, curvature");
-		vec esp;
-		if (wavy[0].get_nmo() > 0)
-			esp = surface_ESP(triangles_i, wavy[0]);
-		else if (opt.SALTED)
-		{
-			const Gaussian_Molecule ml(wavy[0], opt);
-			esp = surface_ESP(triangles_i, [&](const d3& p) { return ml.esp(p); });
-		}
-		tp.push_back(get_time()); tp_desc.push_back("surface ESP");
 		// one row per face in obj order (d_i, d_e in Angstrom, curvature in 1/Angstrom, esp in a.u.): Olex2 colours the surface from these, columns 1-2 are the fingerprint plot
-		ofstream dat("Hirshfeld_surface.dat");
-		dat << "# d_i d_e d_norm shape_index curvedness" << (esp.empty() ? "" : " esp") << "\n";
-		for (int i = 0; i < nt; i++)
+		auto write_dat = [&](const vec& esp)
 		{
-			dat << constants::bohr2ang(d_i[i]) << "\t" << constants::bohr2ang(d_e[i]) << "\t" << d_norm[i] << "\t" << shape_index[i] << "\t" << curvedness[i];
-			if (!esp.empty())
-				dat << "\t" << esp[i];
-			dat << "\n";
-		}
-		dat.close();
+			ofstream dat("Hirshfeld_surface.dat");
+			dat << "# d_i d_e d_norm shape_index curvedness" << (esp.empty() ? "" : " esp") << "\n";
+			for (int i = 0; i < nt; i++)
+			{
+				dat << constants::bohr2ang(d_i[i]) << "\t" << constants::bohr2ang(d_e[i]) << "\t" << d_norm[i] << "\t" << shape_index[i] << "\t" << curvedness[i];
+				if (!esp.empty())
+					dat << "\t" << esp[i];
+				dat << "\n";
+			}
+		};
+		// the shape is finished here and the per-face ESP below is the long pole, so the geometry and every column that
+		// does not need it go out first: Olex2 watches for the stage1 flag and puts the mesh on screen while it runs
+		write_dat({});
 		// plain values, not structured bindings: clang's OpenMP cannot capture those (macOS CI)
 		const double lo_i = *std::min_element(d_i.begin(), d_i.end()), hi_i = *std::max_element(d_i.begin(), d_i.end());
 		const double lo_e = *std::min_element(d_e.begin(), d_e.end()), hi_e = *std::max_element(d_e.begin(), d_e.end());
@@ -283,12 +348,25 @@ static int run_app_impl(int argc, char **argv)
 		writeColourObj("Hirshfeld_surface_i.obj", triangles_i);
 		writeColourObj("Hirshfeld_surface_e.obj", triangles_e);
 		writeColourObj("Hirshfeld_surface_norm.obj", triangles_n);
+		{ ofstream stage1("Hirshfeld_surface_i.obj.stage1"); stage1 << nt << "\n"; }  // the mesh is complete and readable
+		tp.push_back(get_time()); tp_desc.push_back("shape dat + obj files");
+
+		vec esp;
+		if (wavy[0].get_nmo() > 0)
+			esp = surface_ESP(triangles_i, wavy[0]);
+		else if (opt.SALTED)
+		{
+			const Gaussian_Molecule ml(wavy[0], opt);
+			esp = surface_ESP(triangles_i, [&](const d3& p) { return ml.esp(p); });
+		}
+		tp.push_back(get_time()); tp_desc.push_back("surface ESP");
 		if (!esp.empty())
 		{
+			write_dat(esp);
 			colour_by_ESP(triangles_i, esp, std::cout);
 			writeColourObj("Hirshfeld_surface_esp.obj", triangles_i);
+			tp.push_back(get_time()); tp_desc.push_back("esp dat + obj file");
 		}
-		tp.push_back(get_time()); tp_desc.push_back("dat + obj files");
 		write_timing_to_file(std::cout, tp, tp_desc);
 		std::cout.rdbuf(_coutbuf); // reset to standard output again
 		std::cout << "Finished!" << endl;
@@ -427,6 +505,7 @@ static int run_app_impl(int argc, char **argv)
 				}
 			}
 			log_file << " done!\nNumber of atoms in Wavefunction file: " << wavy[i].get_ncen() << " Number of MOs: " << wavy[i].get_nmo() << endl;
+			citations::flush(log_file); //whatever the reader queued while this line was open
 		}
 
 		svec known_scatterer;
@@ -653,10 +732,22 @@ static int run_app_impl(int argc, char **argv)
 			wavy[0].set_has_ECPs(true, true, opt.ECP_mode);
 		}
 		log_file << " done!\nNumber of atoms in Wavefunction file: " << wavy[0].get_ncen() << " Number of MOs: " << wavy[0].get_nmo() << endl;
+		citations::flush(log_file); //whatever the reader queued while this line was open
 
 		if (opt.rgbi) {
 			Roby_information Roby(wavy[0], opt.rgbi_group_sets, !opt.rgbi_no_sym,
-				opt.rgbi_orbital_basis == RGBIOrbitalBasis::ANO, opt.rgbi_EVs, opt.rgbi_theta);
+				opt.rgbi_orbital_basis == RGBIOrbitalBasis::ANO, opt.rgbi_EVs, opt.rgbi_theta,
+				opt.rgbi_legacy_cutoff);
+		}
+
+		if (opt.npa) {
+			NPAResult npa = natural_population_analysis(wavy[0]);
+			if (!opt.npa_orbitals) {
+				npa.total.orbitals.clear();
+				npa.alpha.orbitals.clear();
+				npa.beta.orbitals.clear();
+			}
+			print_npa(npa, log_file);
 		}
 
 		// this one is for generation of an fchk file
@@ -717,7 +808,6 @@ static int run_app_impl(int argc, char **argv)
 				string df_basis_name = temp_pred->get_dfbasis_name();
 				filesystem::path salted_model_path = temp_pred->get_salted_filename();
 				log_file << "Using " << salted_model_path << " for the prediction" << endl;
-				std::shared_ptr<BasisSet> aux_basis = BasisSetLibrary::get_basis_set(df_basis_name);
 				if (!temp_pred->basis_set_loaded()) { //If the basis set was supplied by the SALTED model file, do not overwrite it
 					std::shared_ptr<BasisSet> aux_basis = BasisSetLibrary::get_basis_set(df_basis_name);
 					load_basis_into_WFN(temp_pred->wavy, aux_basis);
@@ -797,6 +887,24 @@ static int run_app_impl(int argc, char **argv)
 		if (opt.write_CIF)
 			write_wfn_CIF(wavy[0], opt.wfn.replace_extension(".cif"));
 		return 0;
+	}
+	//Nothing above claimed the task, and that is two different situations of which only one is a
+	//defect. A command line that named an analysis and could not run it - `-rgbi water.gbw`, RGBI
+	//having no positional form and wanting -wfn - used to write the help into NoSpherA2.log and
+	//return 0, which from the outside reads as an analysis that ran and printed no table: it now
+	//says what was missing, on the console where it can be seen, and fails. A command line that
+	//named no analysis at all asked nothing, so it keeps the old behaviour exactly - the help in
+	//the log it requested, exit 0 - which is what a wrapper probing the executable expects.
+	const std::string missing = opt.unrunnable_analysis();
+	if (!missing.empty())
+	{
+		std::cout.rdbuf(_coutbuf);
+		std::cout << NoSpherA2_message(opt.no_date);
+		if (!opt.no_date)
+			std::cout << build_date;
+		std::cout << "ERROR: " << missing << endl;
+		log_file.flush();
+		return 1;
 	}
 	std::cout << NoSpherA2_message(opt.no_date);
 	if (!opt.no_date)

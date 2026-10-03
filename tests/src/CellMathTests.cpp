@@ -375,13 +375,10 @@ namespace NoSpherA2UnitTests
 		const ivec applied = cl.apply_grown(links);
 		ASSERT_EQ(applied.size(), 1u);
 		EXPECT_EQ(applied[0], 1);
-
-		cl.set_symmetry_factors(asym, links);
-		EXPECT_NEAR(asym[0].asym_fact, 0.5, 1e-12);
-		EXPECT_NEAR(asym[1].asym_fact, 0.5, 1e-12);
-		// the image remembers the operation that made it, the parent has none
-		EXPECT_EQ(asym[0].sym_op, -1);
-		EXPECT_EQ(asym[1].sym_op, 1);
+		// The weights and sym_op used to be checked here through the two-argument
+		// set_symmetry_factors, which is retired with orbit_copies (see below). The live
+		// three-argument overload divides by |linking_list[i][i]| alone, so it does not
+		// reproduce the 0.5 these two tests asserted - that factor was orbit_copies.
 	}
 
 	// when only one of two asymmetric atoms has its inversion image present the
@@ -408,11 +405,9 @@ namespace NoSpherA2UnitTests
 		const std::string err = testing::internal::GetCapturedStderr();
 		EXPECT_TRUE(applied.empty());
 		EXPECT_NE(err.find("Symmetry operation not fully matched"), std::string::npos);
-		cl.set_symmetry_factors(asym, links);
-		EXPECT_NEAR(asym[0].asym_fact, 0.5, 1e-12);
-		EXPECT_NEAR(asym[1].asym_fact, 1.0, 1e-12);
-		EXPECT_NEAR(asym[2].asym_fact, 0.5, 1e-12);
-		EXPECT_EQ(asym[2].sym_op, 1);
+		// Same as above: the asym_fact/sym_op half of this test specified the retired
+		// two-argument set_symmetry_factors. What is live here is that a partially grown
+		// structure applies no operation and says so on stderr.
 	}
 
 	namespace
@@ -446,6 +441,15 @@ namespace NoSpherA2UnitTests
 		}
 	}
 
+	// The six tests below specify cell::compose_ops, grown_subgroup,
+	// coset_representatives and set_subgroup_factors - the old grown-structure
+	// implementation, which is commented out in cell.h, in cell.cpp and at its
+	// XCW.cpp call site as "an old but working implementation ... kept for reference
+	// purposes in case something goes wrong with the new implementation". These
+	// tests were the only live callers left, so every platform's build stopped on
+	// them. They are disabled the same way the code they specify is, and belong in
+	// whichever commit brings that implementation back.
+#if 0
 	// composition is matched modulo lattice translations: the screw squared is
 	// (x, y+1, z), i.e. the identity, and screw after inversion is the glide
 	TEST(CellMathIoTests, ComposeOpsMatchesModuloLattice)
@@ -610,6 +614,7 @@ namespace NoSpherA2UnitTests
 		EXPECT_NEAR(asym[2].asym_fact, 0.5, 1e-12);
 		EXPECT_NEAR(asym[3].asym_fact, 1.0, 1e-12);
 	}
+#endif
 
 	// xyz atoms that coincide with an asymmetric atom, also when shifted by a
 	// lattice translation, must not be appended a second time
@@ -1019,5 +1024,30 @@ namespace NoSpherA2UnitTests
 		// sqrt(3) times the projector onto (1,1)/sqrt(2): every entry sqrt(3)/2
 		for (int i = 0; i < 4; i++)
 			EXPECT_NEAR(Sc[i], r3 / 2.0, 1e-12) << i;
+
+		// and the optional rank report, which exists because zeroing an eigenvalue here is the same class
+		// of silent rank decision as the pseudo-inverse's: RGBI routes a pair overlap through this, and a
+		// rank that differs between two bonds symmetry makes identical is the answer to why they differ.
+		// smallest_kept starts at 0.0 and is minimised from the first kept value, so a report that never
+		// saw a kept eigenvalue and one whose smallest kept is genuinely 0 look alike - kept tells them
+		// apart, which is why both are asserted.
+		vec C = { 2, 1, 1, 2 };
+		vec Wr(2);
+		PinvRank all{}, cut{};
+		mat_sqrt(C, Wr, 1E-5, &all);
+		EXPECT_EQ(all.n, 2);
+		EXPECT_EQ(all.kept, 2);
+		EXPECT_NEAR(all.largest, 3.0, 1e-12);
+		EXPECT_NEAR(all.smallest_kept, 1.0, 1e-12);
+		EXPECT_DOUBLE_EQ(all.largest_dropped, 0.0);
+		EXPECT_FALSE(all.marginal(1E-5)) << "a spectrum from 1 to 3 against a 1e-5 cutoff is not marginal";
+		vec D = { 2, 1, 1, 2 };
+		vec Wd(2);
+		mat_sqrt(D, Wd, 1.5, &cut);
+		EXPECT_EQ(cut.kept, 1);
+		EXPECT_NEAR(cut.smallest_kept, 3.0, 1e-12);
+		EXPECT_NEAR(cut.largest_dropped, 1.0, 1e-12) << "the dropped eigenvalue must be reported, not just counted";
+		EXPECT_TRUE(cut.marginal(1.5)) << "dropping an eigenvalue at 0.67 times the cutoff is exactly the case "
+			"the warning exists for";
 	}
 }

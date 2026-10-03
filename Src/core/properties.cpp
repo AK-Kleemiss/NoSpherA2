@@ -15,6 +15,7 @@
 #include "crystal_energies.h"
 #include "b2c.h"
 #include "density_source.h"
+#include "citations.h"
 
 std::vector<Thakkar> make_thakkar_interpolators()
 {
@@ -63,6 +64,40 @@ double sanitize_finite(double value)
 	if (std::isnan(value) || std::isinf(value))
 		return 0.0;
 	return value;
+}
+
+// The in-radius points of the grid in one batch instead of one call each: the ESP walks the whole
+// primitive-pair table per point, so the whole set is worth handing to a device at once. Points
+// outside stay zero as in evaluate_cube_in_radius, and wrap sums the periodic images per cell.
+template <typename BatchFn>
+void evaluate_cube_in_radius_batched(
+	cube &target,
+	bool wrap,
+	const std::vector<atom> &atoms,
+	double radius_bohr,
+	BatchFn &&batch)
+{
+	std::vector<d3> points;
+	std::vector<i3> cells;
+	target.evaluate_on_grid(
+		[&](const d3 &pos, const i3 &, const i3 &mapped) {
+			if (!is_within_radius(pos, atoms, radius_bohr))
+				return 0.0;
+#pragma omp critical(cube_gather)
+			{
+				points.push_back(pos);
+				cells.push_back(mapped);
+			}
+			return 0.0;
+		},
+		wrap);
+	vec values(points.size());
+	batch(points, values.data());
+	for (size_t i = 0; i < points.size(); i++)
+	{
+		const i3 &c = cells[i];
+		target.set_value(c[0], c[1], c[2], target.get_value(c[0], c[1], c[2]) + values[i]);
+	}
 }
 
 template <typename EvalFn>
@@ -629,13 +664,13 @@ void Calc_ESP(
 	const double radius_bohr = constants::ang2bohr(radius);
 	const vector<atom> atoms = wavy.get_atoms();
 
-	evaluate_cube_in_radius(
+	evaluate_cube_in_radius_batched(
 		CubeESP,
 		wrap,
 		atoms,
 		radius_bohr,
-		[&](const d3 &pos) {
-			return wavy.computeESP(pos, pairs);
+		[&](const std::vector<d3> &points, double *out) {
+			wavy.computeESP_batch(points, pairs, out);
 		});
 
 	if (!no_date)
@@ -654,7 +689,7 @@ void Calc_MO(
 	bool wrap)
 {
 	using namespace std;
-	err_checkf(mo <= wavy.get_nmo(), to_string(mo) + " bigger MO selected than " + to_string(wavy.get_nmo()) + " contained in the wavefunctions!", file);
+	err_checkf(mo >= 0 && mo < wavy.get_nmo(), "MO index " + to_string(mo) + " out of range, the wavefunction has " + to_string(wavy.get_nmo()) + " MOs (0 to " + to_string(wavy.get_nmo() - 1) + ")!", file);
 	_time_point start = get_time();
 	const double radius_bohr = constants::ang2bohr(radius);
 	const vector<atom> atoms = wavy.get_atoms();
@@ -980,6 +1015,7 @@ void fukui_analysis(options &opt, std::ostream &log2)
 	err_checkf(opt.wfn != "", "Error, no wfn file specified! Use -fukui_analysis <wfn> or -wfn <wfn>.", log2);
 	WFN wavy(opt.wfn);
 	log2 << "\nConceptual-DFT reactivity analysis of " << opt.wfn.string() << endl;
+	citations::cite(citations::Method::Fukui, log2);
 	log2 << "Read " << wavy.get_ncen() << " atoms and " << wavy.get_nmo()
 		 << " molecular orbitals (" << wavy.get_nmo(true) << " occupied)." << endl;
 
@@ -1422,6 +1458,7 @@ void promolecular_nci_analysis(
 	const _time_point t_start = get_time();
 
 	err_checkf(xyz_files.size() >= 2, "Promolecular NCI needs at least two XYZ fragments.", log);
+	citations::cite(citations::Method::NCI, log);
 
 	// Output names join every fragment stem: a_b_c_values.dat etc.
 	std::string joined_stems = xyz_files.front().stem().string();
@@ -1435,11 +1472,15 @@ void promolecular_nci_analysis(
 	WFN combined(e_origin::xyz);
 	combined.set_path(xyz_files.front().parent_path() / (joined_stems + ".xyz"));
 	vector<PromolecularAtom> atoms;
+	vector<std::array<double, 6>> fragment_boxes; // each fragment's atoms + radius, bohr
 	for (size_t f = 0; f < xyz_files.size(); f++)
 	{
 		err_checkf(std::filesystem::exists(xyz_files[f]), "XYZ file does not exist: " + xyz_files[f].string(), log);
 		WFN fragment(e_origin::xyz);
 		fragment.read_xyz(xyz_files[f], log, false);
+		properties_options fragment_opts = opts;
+		readxyzMinMax_fromWFN(fragment, fragment_opts);
+		fragment_boxes.push_back(fragment_opts.MinMax);
 		add_atoms_to_combined_wfn(fragment, combined);
 		add_promolecular_atoms(fragment, static_cast<int>(f) + 1, atoms);
 	}
@@ -1450,6 +1491,35 @@ void promolecular_nci_analysis(
 	if (cif.empty())
 	{
 		readxyzMinMax_fromWFN(combined, local_opts);
+		// an intermolecular point lies within radius of two fragments, so only the pairwise overlaps of the fragment
+		// boxes can hold one; Olex2's crystal shell is ~30x the molecule's box, and the mask pass walked all of it
+		std::array<double, 6> overlaps = { 1E300, 1E300, 1E300, -1E300, -1E300, -1E300 };
+		for (size_t f = 0; f < fragment_boxes.size(); f++)
+			for (size_t g = f + 1; g < fragment_boxes.size(); g++)
+			{
+				std::array<double, 6> o;
+				bool empty = false;
+				for (int i = 0; i < 3; i++)
+				{
+					o[i] = std::max(fragment_boxes[f][i], fragment_boxes[g][i]);
+					o[i + 3] = std::min(fragment_boxes[f][i + 3], fragment_boxes[g][i + 3]);
+					empty |= o[i] >= o[i + 3];
+				}
+				if (!empty)
+					for (int i = 0; i < 3; i++)
+					{
+						overlaps[i] = std::min(overlaps[i], o[i]);
+						overlaps[i + 3] = std::max(overlaps[i + 3], o[i + 3]);
+					}
+			}
+		err_checkf(overlaps[0] < overlaps[3], "The fragments are more than two -radius apart; no intermolecular region.", log);
+		for (int i = 0; i < 3; i++)
+		{
+			local_opts.MinMax[i] = std::max(local_opts.MinMax[i], overlaps[i]);
+			local_opts.MinMax[i + 3] = std::min(local_opts.MinMax[i + 3], overlaps[i + 3]);
+			local_opts.NbSteps[i] = (int)ceil(constants::bohr2ang(local_opts.MinMax[i + 3] - local_opts.MinMax[i]) / local_opts.resolution);
+			local_opts.NbSteps[i] += local_opts.NbSteps[i] % 2; // even, as readxyzMinMax_fromWFN
+		}
 		for (int i = 0; i < 3; i++)
 			cell_matrix[i][i] = (local_opts.MinMax[i + 3] - local_opts.MinMax[i]) / local_opts.NbSteps[i];
 	}
@@ -1550,6 +1620,24 @@ void promolecular_nci_analysis(
 	const int nci_write_threads = 1;
 #endif
 	std::vector<std::ostringstream> values_by_thread(nci_write_threads);
+	// the masked points next to a kept one get their RDG too: the mesh below is cut from that unmasked rim, so a sheet
+	// ends in a face whose centre fails the mask test (dropped) instead of in a wall along the mask's voxel staircase.
+	// Every other masked point stays at 101, above any iso, and the cubes are masked again after the mesh
+	const int nx = rho_cube.get_size(0), ny = rho_cube.get_size(1), nz = rho_cube.get_size(2);
+	const auto at = [&](int x, int y, int z) { return (static_cast<size_t>(x) * ny + y) * nz + z; };
+	std::vector<char> masked(static_cast<size_t>(nx) * ny * nz), rim(masked.size(), 0);
+	for (int x = 0; x < nx; x++)
+		for (int y = 0; y < ny; y++)
+			for (int z = 0; z < nz; z++)
+				masked[at(x, y, z)] = std::abs(rdg_cube.get_value(x, y, z) - 101.0) <= 1E-12;
+	for (int x = 0; x < nx; x++)
+		for (int y = 0; y < ny; y++)
+			for (int z = 0; z < nz; z++)
+				if (!masked[at(x, y, z)])
+					for (int i = std::max(x - 1, 0); i <= std::min(x + 1, nx - 1); i++)
+						for (int j = std::max(y - 1, 0); j <= std::min(y + 1, ny - 1); j++)
+							for (int k = std::max(z - 1, 0); k <= std::min(z + 1, nz - 1); k++)
+								rim[at(i, j, k)] = masked[at(i, j, k)];
 	ProgressBar rdg_progress(rho_cube.get_size(0), 50, "=", " ", "Calculating promolecular RDG");
 #pragma omp parallel reduction(+ : kept_points) num_threads(nci_write_threads)
 	{
@@ -1565,10 +1653,10 @@ void promolecular_nci_analysis(
 		{
 			for (int z = 0; z < rho_cube.get_size(2); z++)
 			{
-				if (std::abs(rdg_cube.get_value(x, y, z) - 101.0) <= 1E-12)
+				const bool is_masked = masked[at(x, y, z)];
+				if (is_masked && !rim[at(x, y, z)])
 				{
-					signed_rho_cube.set_value(x, y, z, 0.0);
-					rdg_cube.set_value(x, y, z, 101.0);
+					signed_rho_cube.set_value(x, y, z, 0.0); // rdg is still the mask's 101
 					continue;
 				}
 
@@ -1581,6 +1669,8 @@ void promolecular_nci_analysis(
 
 				signed_rho_cube.set_value(x, y, z, signed_rho);
 				rdg_cube.set_value(x, y, z, rdg);
+				if (is_masked)
+					continue;
 
 				if (opts.promol_nci_rho_abs_max >= 0.0 && std::abs(signed_rho) > opts.promol_nci_rho_abs_max)
 					continue;
@@ -1596,6 +1686,57 @@ void promolecular_nci_analysis(
 	}
 	for (const std::ostringstream &local_values : values_by_thread)
 		values_file << local_values.str();
+	const _time_point t_mesh = get_time();
+
+	// the surface Olex2 draws: marching cubes on the unmasked RDG, so a sheet ends where the intermolecular region
+	// ends instead of closing into walls along the mask's voxel staircase. A face stays when its centre is
+	// intermolecular; its colour and the .dat value are sign(lambda2) rho there (VMD's BGR, +-colour_max)
+	const std::vector<Triangle> triangles = marchingCubes(rdg_cube, opts.promol_nci_iso);
+	std::vector<char> keep(triangles.size(), 0);
+	vec centre_signed_rho(triangles.size());
+#pragma omp parallel for schedule(dynamic, 256)
+	for (long long i = 0; i < static_cast<long long>(triangles.size()); i++)
+	{
+		const d3 c = triangles[i].calc_center();
+		const PromolecularFragmentDensities densities = promolecular_fragment_densities_at(c, atoms, atom_models);
+		if (!is_promolecular_nci_point(densities, densities.total(), opts.promol_nci_rcut1, opts.promol_nci_rcut2))
+			continue;
+		d3 grad;
+		double hessian[9];
+		const double rho = promolecular_derivatives_at(c, atoms, atom_models, grad, hessian);
+		centre_signed_rho[i] = get_lambda_1(hessian) < 0.0 ? -rho : rho;
+		keep[i] = 1;
+	}
+	std::vector<Triangle> faces;
+	vec face_signed_rho;
+	for (size_t i = 0; i < triangles.size(); i++)
+	{
+		if (!keep[i])
+			continue;
+		const Triangle &t = triangles[i];
+		face_signed_rho.push_back(centre_signed_rho[i]);
+		faces.emplace_back(t.get_v(1), t.get_v(3), t.get_v(2), // low RDG is inside: wind as the density surfaces
+			mix_colour(centre_signed_rho[i], { { { 0, 0, 255 }, { 0, 255, 0 }, { 255, 0, 0 } } },
+				-opts.promol_nci_colour_max, opts.promol_nci_colour_max));
+	}
+	writeColourObj(output_base.string() + "_nci.obj", faces);
+	{
+		ofstream face_file(output_base.string() + "_nci.dat");
+		face_file << "# signed_rho\n" << scientific << setprecision(6);
+		for (const double s : face_signed_rho)
+			face_file << s << "\n";
+	}
+	log << "Intermolecular NCI surface: " << faces.size() << " of " << triangles.size() << " RDG = "
+		<< opts.promol_nci_iso << " faces, " << output_base.string() << "_nci.obj" << endl;
+
+	for (int x = 0; x < nx; x++)
+		for (int y = 0; y < ny; y++)
+			for (int z = 0; z < nz; z++)
+				if (rim[at(x, y, z)])
+				{
+					signed_rho_cube.set_value(x, y, z, 0.0);
+					rdg_cube.set_value(x, y, z, 101.0);
+				}
 	const _time_point t_write = get_time();
 
 	signed_rho_cube.set_path(output_base.string() + "_signed_rho.cube");
@@ -1606,7 +1747,7 @@ void promolecular_nci_analysis(
 	write_promolecular_nci_plot_script(output_base, opts, log);
 	if (!constants::hide_timings)
 		log << "Promolecular NCI setup: " << get_msec(t_start, t_mask) << " ms, mask pass: " << get_msec(t_mask, t_rdg)
-			<< " ms, RDG pass: " << get_msec(t_rdg, t_write) << " ms, cube writing: " << get_msec(t_write, get_time()) << " ms" << endl;
+			<< " ms, RDG pass: " << get_msec(t_rdg, t_mesh) << " ms, surface: " << get_msec(t_mesh, t_write) << " ms, cube writing: " << get_msec(t_write, get_time()) << " ms" << endl;
 
 	log << "Wrote " << signed_rho_cube.get_path() << endl;
 	log << "Wrote " << rdg_cube.get_path() << endl;
@@ -1677,7 +1818,9 @@ void properties_calculation(options &opt)
 		readxyzMinMax_fromCIF(opt.cif, opt.properties, cell_matrix);
 	else
 	{
-		readxyzMinMax_fromWFN(wavy, opt.properties);
+		//no even-point rounding here: the step below is the requested resolution and not the span over the
+		//point count, so one more point would enlarge the box instead of putting its centre on a grid plane
+		readxyzMinMax_fromWFN(wavy, opt.properties, false);
 		for (int i = 0; i < 3; i++)
 			cell_matrix[i][i] = constants::ang2bohr(opt.properties.resolution);
 	}
@@ -1801,6 +1944,20 @@ void properties_calculation(options &opt)
 	if (opt.properties.fukui)
 		log2 << "Fukui functions and dual descriptor, ";
 	log2 << endl;
+
+	//Which paper each of those grids implements.  Same guards as the list above.
+	if (opt.properties.hdef || opt.properties.def || opt.properties.hirsh)
+		citations::cite(citations::Method::Hirshfeld, log2);
+	if (opt.properties.eli)
+		citations::cite(citations::Method::ELID, log2);
+	if (opt.properties.elf)
+		citations::cite(citations::Method::ELF, log2);
+	if (opt.properties.rdg)
+		citations::cite(citations::Method::NCI, log2);
+	if (opt.properties.esp)
+		citations::cite(citations::Method::ESP, log2);
+	if (opt.properties.fukui)
+		citations::cite(citations::Method::Fukui, log2);
 
 	log2 << "Calculating for " << fixed << setprecision(0) << opt.properties.NbSteps[0] * opt.properties.NbSteps[1] * opt.properties.NbSteps[2] << " Gridpoints." << endl;
 
@@ -2049,11 +2206,14 @@ void properties_calculation(options &opt)
 		WFN temp = wavy;
 		temp.delete_unoccupied_MOs();
 		temp.delete_Qs();
+		_time_point e0 = get_time();
 		if (ml) Calc_ESP(cubes[cube_type::ESP], *ml, opt.properties.radius, opt.no_date, log2, opt.cif != "");
 		else Calc_ESP(cubes[cube_type::ESP], temp, opt.properties.radius, opt.no_date, log2, opt.cif != "");
+		_time_point e1 = get_time();
 		log2 << "Writing cube to Disk..." << flush;
 		cubes[cube_type::ESP].write_file(true);
-		log2 << "  done!" << endl;
+		_time_point e2 = get_time();
+		log2 << "  done! ESP " << get_msec(e0, e1) << " ms, cube written in " << get_msec(e1, e2) << " ms" << endl;
 	}
 	if (opt.properties.esp_isosurface > 0)
 	{
@@ -2066,11 +2226,25 @@ void properties_calculation(options &opt)
 			if (ml) Calc_Rho(box, *ml, box_opts.radius, log2, false);
 			else Calc_Rho(box, wavy, box_opts.radius, log2, false);
 		}
+		// the phases here cost wildly different amounts on different molecules, so each one says how long it took
+		_time_point t0 = get_time();
 		std::vector<Triangle> triangles = marchingCubes(opt.cif != "" ? box : cubes[cube_type::Rho], opt.properties.esp_isosurface);
-		log2 << "Found " << triangles.size() << " triangles" << endl;
+		_time_point t1 = get_time();
+		log2 << "Found " << triangles.size() << " triangles in " << get_msec(t0, t1) << " ms" << endl;
+		// same staging as the Hirshfeld run: the isosurface is done, the per-face ESP below is the long pole, so the
+		// bare shape goes out first for Olex2 to show while it runs - in its own file, the coloured one must only ever
+		// appear complete
+		const std::string esp_stem = (wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_rho_esp";
+		writeColourObj(esp_stem + "_shape.obj", triangles);
+		{ ofstream stage1(esp_stem + "_shape.obj.stage1"); stage1 << triangles.size() << "\n"; }
+		_time_point t2 = get_time();
 		if (ml) colour_by_ESP(triangles, surface_ESP(triangles, ml_esp), log2);
 		else colour_by_ESP(triangles, wavy, log2);
-		writeColourObj((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_rho_esp.obj", triangles);
+		_time_point t3 = get_time();
+		writeColourObj(esp_stem + ".obj", triangles);
+		_time_point t4 = get_time();
+		log2 << "shape mesh " << get_msec(t1, t2) << " ms, ESP on the faces " << get_msec(t2, t3)
+			 << " ms, coloured mesh " << get_msec(t3, t4) << " ms" << endl;
 	}
 	// return output tostd::cout
 	std::cout.rdbuf(_coutbuf);
@@ -2316,9 +2490,7 @@ vec calc_dipole_for_atom(WFN &wavy, const int &i, cube &Hirshfeld_atom, vec &cha
 void dipole_moments(options &opt, std::ostream &log2)
 {
 	using namespace std;
-	log2 << NoSpherA2_message(opt.no_date);
-	if (!opt.no_date)
-		log2 << build_date;
+	//no header here: run_app_impl has written it to the log before the options were read
 	err_checkf(opt.wfn != "", "Error, no wfn file specified!", log2);
 	WFN wavy(opt.wfn);
 	if (opt.debug)
