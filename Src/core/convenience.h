@@ -18,8 +18,6 @@ void error_check(const bool condition, const std::source_location loc, const std
 void not_implemented(const std::source_location loc, const std::string& error_mesasge, std::ostream& log_file);
 #define err_checkf(condition, error_message, file) error_check(condition, std::source_location::current(), error_message, file)
 #define err(error_message, file) error_check(false, std::source_location::current(), error_message, file)
-#define err_chkf(condition, error_message, file) error_check(condition, std::source_location::current(), error_message, file)
-#define err_chekf(condition, error_message, file) error_check(condition, std::source_location::current(), error_message, file)
 #define err_not_impl_f(error_message, file) not_implemented(std::source_location::current(), error_message, file)
 
 typedef std::complex<double> cdouble;
@@ -41,16 +39,16 @@ typedef std::vector<bvec2> bvec3;
 //truncated file used to be undefined behaviour instead of an error
 struct svec : std::vector<std::string>
 {
-    using std::vector<std::string>::vector;
-    svec(const std::vector<std::string> &v) : std::vector<std::string>(v) {}
-    svec(std::vector<std::string> &&v) : std::vector<std::string>(std::move(v)) {}
-    const std::string &operator[](size_t i) const
-    {
-        if (i >= size())
-            throw std::out_of_range("field " + std::to_string(i + 1) + " missing, the line has only " + std::to_string(size()));
-        return std::vector<std::string>::operator[](i);
-    }
-    std::string &operator[](size_t i) { return const_cast<std::string &>(std::as_const(*this)[i]); }
+	using std::vector<std::string>::vector;
+	svec(const std::vector<std::string> &v) : std::vector<std::string>(v) {}
+	svec(std::vector<std::string> &&v) : std::vector<std::string>(std::move(v)) {}
+	const std::string &operator[](size_t i) const
+	{
+		if (i >= size())
+			throw std::out_of_range("field " + std::to_string(i + 1) + " missing, the line has only " + std::to_string(size()));
+		return std::vector<std::string>::operator[](i);
+	}
+	std::string &operator[](size_t i) { return const_cast<std::string &>(std::as_const(*this)[i]); }
 };
 typedef std::vector<std::filesystem::path> pathvec;
 typedef std::chrono::high_resolution_clock::time_point _time_point;
@@ -450,13 +448,13 @@ inline void print_centered_message(const std::string& text, int bar_width, std::
 //The fits-test is a division rather than n_items * item_bytes because that product is exactly what overflows on the structures this serves
 inline size_t items_within_budget(const size_t n_items, const size_t item_bytes, const size_t budget_bytes)
 {
-    if (budget_bytes == 0 || n_items == 0 || item_bytes == 0)
-        return 0;
-    const size_t n = budget_bytes / item_bytes;
-    if (n_items <= n)
-        return 0;
-    //a single item larger than the whole budget still has to be processed, one at a time
-    return n ? n : 1;
+	if (budget_bytes == 0 || n_items == 0 || item_bytes == 0)
+		return 0;
+	const size_t n = budget_bytes / item_bytes;
+	if (n_items <= n)
+		return 0;
+	//a single item larger than the whole budget still has to be processed, one at a time
+	return n ? n : 1;
 }
 
 //-------------------------Progress_bar--------------------------------------------------
@@ -793,254 +791,257 @@ struct ECP_primitive : primitive
 struct options
 	/** @brief All command line options and settings controlling a run. */
 {
-    std::ostream &log_file;
-    double d_sfac_scan = 0.0;
-    d3 sfac_diffuse = { 0.0, 0.0, 0.0 };
-    double dmin = 99.0;
-    double mem = 1000.0; // In MB
-    //Set only when -mem was passed; only then is mem a budget the tsc block size and XCW I tensor window are fitted to
-    bool mem_given = false;
-    double efield = 0.005;
-    ivec2 groups;
-    ivec2 hkl_min_max{ {-100, 100}, {-100, 100}, {-100, 100} };
-    vec2 twin_law;
-    ivec2 combined_tsc_groups;
-    pathvec combined_tsc_calc_files;
-    pathvec combined_tsc_calc_cifs;
-    std::vector<unsigned int> combined_tsc_calc_mult;
-    ivec combined_tsc_calc_charge;
-    ivec combined_tsc_calc_ECP;
-    //Bounds-checked: the digesters read arguments[i + n] freely, so a flag that is last on the
-    //line throws missing_argument (caught in digest_options with the flag's name) instead of
-    //reading past the end
-    struct missing_argument : std::out_of_range
-    {
-        using std::out_of_range::out_of_range;
-    };
-    struct checked_svec : svec
-    {
-        using svec::svec;
-        std::string &operator[](size_t i) { return const_cast<std::string &>(std::as_const(*this)[i]); }
-        const std::string &operator[](size_t i) const
-        {
-            if (i >= size())
-                throw missing_argument("argument " + std::to_string(i));
-            return svec::operator[](i);
-        }
-    };
-    checked_svec arguments;
-    pathvec combine_mo;
-    svec Cations;
-    svec Anions;
-    pathvec pol_wfns;
-    ivec cmo1;
-    ivec cmo2;
-    ivec ignore;
-    std::filesystem::path salted_model_dir;
-    //Every model given to -SALTED, in that order; salted_model_dir is the first of them
-    pathvec salted_model_dirs;
-    std::vector<std::shared_ptr<BasisSet>> aux_basis;
-    std::filesystem::path wfn;
-    std::filesystem::path wfn2;
-    std::filesystem::path cube_density;
-    std::filesystem::path fchk;
-    std::string basis_set;
-    std::filesystem::path hkl;
-    std::filesystem::path cif;
-    std::string method;
-    std::filesystem::path xyz_file;
-    std::filesystem::path coef_file;
-    std::filesystem::path hirshfeld_surface;
-    std::filesystem::path hirshfeld_surface2;
-    std::filesystem::path fract_name;
-    std::filesystem::path wavename;
-    std::filesystem::path gaussian_path;
-    std::filesystem::path turbomole_path;
-    std::filesystem::path basis_set_path;
-    std::filesystem::path anom_disp_path;
-    std::string occ;
-    std::filesystem::path occ_toml_path;
-    std::filesystem::path cwd;
-    std::filesystem::path profiling_tests_root = "tests";
-    pathvec promol_nci_xyz; //Two or more fragments; a grid point is intermolecular when no single fragment dominates
-    //Geometry-aid jobs (-calc_featomic_descriptor(s), -classify_atoms(_list)): the flags queue, run_app_impl runs geometry_aid::run and quits
-    bool calc_featomic_descriptor = false;
-    std::filesystem::path classify_atoms_out;
-    std::filesystem::path geometry_aid_model;
-    pathvec featomic_structures;
-    pathvec classify_structures;
-    double geometry_aid_cutoff = 3.5;
-    bool geometry_aid_metals = false;
-    double geometry_aid_center_weight = 1.0;
-    std::filesystem::path interaction_energies_job;
+	std::ostream &log_file;
+	double d_sfac_scan = 0.0;
+	d3 sfac_diffuse = { 0.0, 0.0, 0.0 };
+	double dmin = 99.0;
+	double mem = 1000.0; // In MB
+	//Set only when -mem was passed; only then is mem a budget the tsc block size and XCW I tensor window are fitted to
+	bool mem_given = false;
+	double efield = 0.005;
+	ivec2 groups;
+	ivec2 hkl_min_max{ {-100, 100}, {-100, 100}, {-100, 100} };
+	vec2 twin_law;
+	ivec2 combined_tsc_groups;
+	pathvec combined_tsc_calc_files;
+	pathvec combined_tsc_calc_cifs;
+	std::vector<unsigned int> combined_tsc_calc_mult;
+	ivec combined_tsc_calc_charge;
+	ivec combined_tsc_calc_ECP;
+	//Bounds-checked: the digesters read arguments[i + n] freely, so a flag that is last on the
+	//line throws missing_argument (caught in digest_options with the flag's name) instead of
+	//reading past the end
+	struct missing_argument : std::out_of_range
+	{
+		using std::out_of_range::out_of_range;
+	};
+	struct checked_svec : svec
+	{
+		using svec::svec;
+		std::string &operator[](size_t i) { return const_cast<std::string &>(std::as_const(*this)[i]); }
+		const std::string &operator[](size_t i) const
+		{
+			if (i >= size())
+				throw missing_argument("argument " + std::to_string(i));
+			return svec::operator[](i);
+		}
+	};
+	checked_svec arguments;
+	pathvec combine_mo;
+	svec Cations;
+	svec Anions;
+	pathvec pol_wfns;
+	ivec cmo1;
+	ivec cmo2;
+	ivec ignore;
+	std::filesystem::path salted_model_dir;
+	//Every model given to -SALTED, in that order; salted_model_dir is the first of them
+	pathvec salted_model_dirs;
+	std::vector<std::shared_ptr<BasisSet>> aux_basis;
+	std::filesystem::path wfn;
+	std::filesystem::path wfn2;
+	std::filesystem::path cube_density;
+	std::filesystem::path fchk;
+	std::string basis_set;
+	std::filesystem::path hkl;
+	std::filesystem::path cif;
+	std::string method;
+	std::filesystem::path xyz_file;
+	std::filesystem::path coef_file;
+	std::filesystem::path hirshfeld_surface;
+	std::filesystem::path hirshfeld_surface2;
+	std::filesystem::path fract_name;
+	std::filesystem::path wavename;
+	std::filesystem::path gaussian_path;
+	std::filesystem::path turbomole_path;
+	std::filesystem::path basis_set_path;
+	std::filesystem::path anom_disp_path;
+	std::string occ;
+	std::filesystem::path occ_toml_path;
+	std::filesystem::path cwd;
+	std::filesystem::path profiling_tests_root = "tests";
+	pathvec promol_nci_xyz; //Two or more fragments; a grid point is intermolecular when no single fragment dominates
+	//Geometry-aid jobs (-calc_featomic_descriptor(s), -classify_atoms(_list)): the flags queue, run_app_impl runs geometry_aid::run and quits
+	bool calc_featomic_descriptor = false;
+	std::filesystem::path classify_atoms_out;
+	std::filesystem::path geometry_aid_model;
+	pathvec featomic_structures;
+	pathvec classify_structures;
+	double geometry_aid_cutoff = 3.5;
+	bool geometry_aid_metals = false;
+	double geometry_aid_center_weight = 1.0;
+	std::filesystem::path interaction_energies_job;
 	std::filesystem::path xcw_settings_path;
-    properties_options properties;
-    bool debug = false;
-    //Set by the one-shot options (-merge, -dipole_moments, -convert_to_47, ...) that used to
-    //exit(0) inside the parser: that killed the host when run_app is a library call (Olex2, the
-    //in-process tests), and no option after them was read. run_app_impl returns 0 instead.
-    bool finished = false;
-    bool all_charges = false;
-    bool SALTED = false;
-    bool Olex2_1_3_switch = false;
-    bool iam_switch = false;
-    bool read_k_pts = false;
-    bool save_k_pts = false;
-    bool combined_tsc_calc = false;
-    bool binary_tsc = true;
-    bool cif_based_combined_tsc_calc = false;
-    bool no_date = false;
-    bool gbw2wfn = false;
-    bool old_tsc = false;
-    bool label_tsc_output = false;
-    bool write_CIF = false;
-    bool test = false;
-    bool electron_diffraction = false;
-    bool ECP = false;
-    bool RI_FIT = false;
-    bool needs_Thakkar_fill = false;
-    //Set around a spherical fill, where a disorder part already covered by an earlier one legitimately yields no atoms and must not read as a broken CIF
-    bool allow_empty_asym = false;
-    //Set while a spherical fill runs for somebody else: it must RETURN a block, not stream experimental.tscb out from under the table being built
-    bool spherical_fill = false;
-    // Per-atom EEQ charges for atoms handed to the spherical fill, as
-    // {x, y, z, q} in the wavefunction's own coordinate units. Keyed by
-    // POSITION rather than index because the fill rebuilds its wavefunction
-    // from the original file, and that is how CIF and WFN atoms are matched
-    // everywhere else here. Empty means "no charges known" -> neutral fill,
-    // which is the previous behaviour.
-    std::vector<std::array<double, 4>> spherical_fill_charges{};
-    //Reflections per block when streaming the tsc; 0 restores the single allocation of the whole scatterers x reflections x 16 byte table
-    //The exact block size is not performance-critical
-    size_t tsc_block_size = 1000;
-    //Set only when -tsc_block was passed, so an explicit block size wins over one derived from -mem
-    bool tsc_block_given = false;
-    //Reflections to hold at once for n_scat scatterers, 0 for the whole table; -tsc_block wins, then -mem, then the default
-    //A block costs about three copies of n_scat * block * 16 bytes - producer, queue and writer - which is what the budget is spent against
-    size_t tsc_block_for(const size_t n_refl, const size_t n_scat) const
-    {
-        if (tsc_block_given || !mem_given || mem <= 0.0)
-            return tsc_block_size;
-        const size_t item = 3 * (n_scat ? n_scat : 1) * sizeof(std::complex<double>);
-        return items_within_budget(n_refl, item, static_cast<size_t>(mem * 1024.0 * 1024.0));
-    }
+	properties_options properties;
+	bool debug = false;
+	//Set by the one-shot options (-merge, -dipole_moments, -convert_to_47, ...) that used to
+	//exit(0) inside the parser: that killed the host when run_app is a library call (Olex2, the
+	//in-process tests), and no option after them was read. run_app_impl returns 0 instead.
+	bool finished = false;
+	bool all_charges = false;
+	bool SALTED = false;
+	bool Olex2_1_3_switch = false;
+	bool iam_switch = false;
+	bool read_k_pts = false;
+	bool save_k_pts = false;
+	bool combined_tsc_calc = false;
+	bool binary_tsc = true;
+	bool cif_based_combined_tsc_calc = false;
+	bool no_date = false;
+	bool gbw2wfn = false;
+	bool old_tsc = false;
+	bool label_tsc_output = false;
+	bool write_CIF = false;
+	bool test = false;
+	bool electron_diffraction = false;
+	bool ECP = false;
+	bool RI_FIT = false;
+	bool needs_Thakkar_fill = false;
+	//Set around a spherical fill, where a disorder part already covered by an earlier one legitimately yields no atoms and must not read as a broken CIF
+	bool allow_empty_asym = false;
+	//Set while a spherical fill runs for somebody else: it must RETURN a block, not stream experimental.tscb out from under the table being built
+	bool spherical_fill = false;
+	// Per-atom EEQ charges for atoms handed to the spherical fill, as
+	// {x, y, z, q} in the wavefunction's own coordinate units. Keyed by
+	// POSITION rather than index because the fill rebuilds its wavefunction
+	// from the original file, and that is how CIF and WFN atoms are matched
+	// everywhere else here. Empty means "no charges known" -> neutral fill,
+	// which is the previous behaviour.
+	std::vector<std::array<double, 4>> spherical_fill_charges{};
+	//Reflections per block when streaming the tsc; 0 restores the single allocation of the whole scatterers x reflections x 16 byte table
+	//The exact block size is not performance-critical
+	size_t tsc_block_size = 1000;
+	//Set only when -tsc_block was passed, so an explicit block size wins over one derived from -mem
+	bool tsc_block_given = false;
+	//Reflections to hold at once for n_scat scatterers, 0 for the whole table; -tsc_block wins, then -mem, then the default
+	//A block costs about three copies of n_scat * block * 16 bytes - producer, queue and writer - which is what the budget is spent against
+	size_t tsc_block_for(const size_t n_refl, const size_t n_scat) const
+	{
+		if (tsc_block_given || !mem_given || mem <= 0.0)
+			return tsc_block_size;
+		const size_t item = 3 * (n_scat ? n_scat : 1) * sizeof(std::complex<double>);
+		return items_within_budget(n_refl, item, static_cast<size_t>(mem * 1024.0 * 1024.0));
+	}
 
-    //set once a streamed run wrote the file itself, so the caller does not overwrite it with an empty one-shot block
-    bool tsc_written_by_stream = false;
-    bool qct = false;
-    bool do_XCW = false;
+	//set once a streamed run wrote the file itself, so the caller does not overwrite it with an empty one-shot block
+	bool tsc_written_by_stream = false;
+	bool qct = false;
+	bool do_XCW = false;
 	bool xcw_gaussian_halt = false;
 	double xcw_strong_cutoff = 3.0;
-    bool calc_F_calc = false;
-    bool rgbi = false;
-    //-npa: natural atomic orbitals and natural population analysis (NAO/NPA), run in-process
-    bool npa = false;
-    //the per-NAO "Natural atomic orbital occupancies" table beside the NPA; -npa_summary turns it off
-    bool npa_orbitals = true;
-    bool rgbi_no_sym = false;
-    bool rgbi_EVs = false;
-    bool rgbi_theta = false;
-    //-rgbi_legacy_cutoff: pick the atomic subspace by thresholding the occupation numbers (1/6 for
-    //NAOs, 1/14 for ANOs) as releases before this one did, instead of by the element's free-atom
-    //orbital count. The threshold makes the rank of the atomic projector, and therefore every bond
-    //index, jump when an occupation crosses it - LiH moves from 0.06 to 0.95 over 0.025 A - so this
-    //is only for reproducing older numbers.
-    bool rgbi_legacy_cutoff = false;
-    RGBIOrbitalBasis rgbi_orbital_basis = RGBIOrbitalBasis::ANO;
-    ivec3 rgbi_group_sets;
-    bool fract = false;
-    //GPU scattering factors when a device is present; -no_gpu forces the CPU loop
-    bool use_gpu = true;
-    //-gpu_fp64 keeps the double sincos on a card that would otherwise pick the fp32 one
-    bool gpu_fp64 = false;
-    //Single-precision tiles for the CPU I tensor, as the device path runs; sgemm is twice
-    //dgemm's rate. -no_cpu_itensor_fp32 keeps double.
-    bool cpu_itensor_fp32 = true;
-    //-itensor_hybrid lets the CPU threads take reflections alongside the device. Off by
-    //default: the two sides differ in the last bits and a shared counter decides which rows
-    //each takes, so the result changes from run to run. For a card slow in double only.
-    bool itensor_hybrid = false;
-    //Seed each lambda step from the density extrapolated through the two previous steps
-    //rather than the last one alone; the step is small and the trajectory smooth.
-    bool xcw_extrapolate = true;
-    //Build the two-electron Fock matrix from the change of the density between iterations,
-    //rather than from the whole density every time: the stored integrals skip the segments
-    //the difference cannot reach (stored_eri::JK), the direct kernel skips shell quartets.
-    //The direct build only with xcw_int_precision 1e-12: at 1e-10 the increments' screening
-    //error accumulates to a gradient floor of 3e-5 and the SCF never meets its 1e-5, and the
-    //full build at 1e-10 is the faster of the two anyway.
-    bool xcw_incremental = false;
-    //Integral screening threshold of the XCW Fock build; OCC's own default is 1e-12.
-    double xcw_int_precision = 1e-10;
-    //-gflops reports achieved GFLOP/s per stage for the CPU and GPU paths at the end of a
-    //run. The thresholds deciding what goes to the device were calibrated on one machine;
-    //this is how they get re-derived on another.
-    bool track_gflops = false;
-    //-gpu_fp32 forces the reduced-argument single-precision sincos on a card that would
-    //otherwise keep the double one. It exists for the test suite: without it the precision
-    //a run uses depends on the card, so neither path can be pinned. -gpu_fp64 wins if both
-    //are given, the accurate path being the safer thing to fall back to.
-    bool gpu_fp32 = false;
-    //-no_gpu_itensor keeps the XCW I tensor GEMMs on the CPU. On by default: it is much the
-    //largest of the device paths, and it moves the total energy only in the tenth
-    //significant figure. Read together with use_gpu, so -no_gpu turns it off as well.
-    bool gpu_itensor = true;
-    //FP16 Tensor Core operands with FP32 accumulation for the I tensor. Off by default: the
-    //half-precision operands move the XCW energies in the fourth decimal, plain FP32 GEMM
-    //sits within 1e-8 Eh of double.
-    bool gpu_itensor_tensor = false;
-    //SALTED descriptor combination uses the device when one is available; -no_gpu_salted keeps it on the CPU.
-    bool gpu_salted = true;
-    //-no_gpu_grid keeps the Becke/TFVC integration weights on the CPU
-    bool gpu_grid = true;
-    //Owned by the caller; the scattering-factor grid is built in it instead of a local, so
-    //a second table for the same geometry reuses the points and weights
-    GridManager* grid_cache = nullptr;
-    //-no_gpu_density keeps the fitted density of the Gordon-Kim repulsion grid and the spherical-atom grids on the CPU
-    bool gpu_density = true;
-    //-gpu_blas offers large dense GEMMs in nos_math to the device
-    bool gpu_blas = false;
-    //The I tensor GEMM goes through cuBLAS when the machine has it, and through the
-    //built-in CUTLASS path otherwise. cuBLAS is 1.65x faster on a V100 and level with
-    //CUTLASS within measurement noise on consumer cards, so preferring it costs nothing
-    //where it does not help. -no_gpu_cublas pins CUTLASS, which is what the reference tests
-    //do: the two differ in the last digits, so a test left to pick would pass or fail on
-    //whether a CUDA toolkit happened to be installed.
-    bool gpu_cublas = true;
-    //Standalone conceptual-DFT reactivity analysis (-fukui_analysis), run from run_app_impl rather than at parse time so its output survives
-    bool fukui_analysis_run = false;
-    //Basin analysis (-eli_analysis), run from run_app_impl for the same reason
-    bool eli_analysis_run = false;
-    //Full bonding analysis (-fba): RGBI, native NBO/NPA with NRT, bondwise Laplacian, QTAIM and ELI-D on one wavefunction
-    bool fba = false;
-    bool profiling = false;
-    bool promol_nci = false;
-    bool get_g = false;
-    int accuracy = 2;
-    //-basin_grid <n>: the quadrature of the basin analysis pulled into the core, tightest
-    //exponent sharpened n^2-fold, radial step divided by n, Lebedev order up n - 1 entries
-    int basin_grid = 1;
-    //-basin_cube: go back to finding the QTAIM and ELI-D basins on the cube. The default takes
-    //the density's attractors from the analytic critical-point search instead, which no voxel can
-    //add to, and sends every quadrature point up the analytic field for its basin
-    bool basin_cube = false;
-    int threads = -1;
-    int pbc = 0;
-    int charge = 0;
-    int ECP_mode = 0;
-    PartitionType partition_type = PartitionType::Hirshfeld;
-    //-multipole_moments: the RI fit is restrained to this scheme's atomic moments up to this order, -1 = unrestrained
-    int multipole_lmax = -1;
-    PartitionType multipole_scheme = PartitionType::Hirshfeld;
-    double multipole_strength = 1.0;
-    //-multipole_centre switches the restraint rows from partition-weighted grid moments of every aux function to centre moments
-    bool multipole_partition = true;
-    //-repulsion_overlap: exchange-repulsion of -interaction_energy as K * Int rhoA rhoB, 0 = not included
-    double repulsion_overlap = 0.0;
-    //-repulsion_exchange: exchange functional of the Gordon-Kim repulsion, 0 Dirac, 1 PBE, 2 B88, 3 r2SCAN-L
-    int repulsion_exchange = 0;
-    unsigned int mult = 0;
-    hkl_list m_hkl_list;
+	bool calc_F_calc = false;
+	bool rgbi = false;
+	//-npa: natural atomic orbitals and natural population analysis (NAO/NPA), run in-process
+	bool npa = false;
+	//the per-NAO "Natural atomic orbital occupancies" table beside the NPA; -npa_summary turns it off
+	bool npa_orbitals = true;
+	bool rgbi_no_sym = false;
+	bool rgbi_EVs = false;
+	bool rgbi_theta = false;
+	//-rgbi_legacy_cutoff: pick the atomic subspace by thresholding the occupation numbers (1/6 for
+	//NAOs, 1/14 for ANOs) as releases before this one did, instead of by the element's free-atom
+	//orbital count. The threshold makes the rank of the atomic projector, and therefore every bond
+	//index, jump when an occupation crosses it - LiH moves from 0.06 to 0.95 over 0.025 A - so this
+	//is only for reproducing older numbers.
+	bool rgbi_legacy_cutoff = false;
+	RGBIOrbitalBasis rgbi_orbital_basis = RGBIOrbitalBasis::ANO;
+	ivec3 rgbi_group_sets;
+	bool fract = false;
+	//GPU scattering factors when a device is present; -no_gpu forces the CPU loop
+	bool use_gpu = true;
+	//-gpu_fp64 keeps the double sincos on a card that would otherwise pick the fp32 one
+	bool gpu_fp64 = false;
+	//Single-precision tiles for the CPU I tensor, as the device path runs; sgemm is twice
+	//dgemm's rate. -no_cpu_itensor_fp32 keeps double.
+	bool cpu_itensor_fp32 = true;
+	//-itensor_hybrid lets the CPU threads take reflections alongside the device. Off by
+	//default: the two sides differ in the last bits and a shared counter decides which rows
+	//each takes, so the result changes from run to run. For a card slow in double only.
+	bool itensor_hybrid = false;
+	//Seed each lambda step from the density extrapolated through the two previous steps
+	//rather than the last one alone; the step is small and the trajectory smooth.
+	bool xcw_extrapolate = true;
+	//Build the two-electron Fock matrix from the change of the density between iterations,
+	//rather than from the whole density every time: the stored integrals skip the segments
+	//the difference cannot reach (stored_eri::JK), the direct kernel skips shell quartets.
+	//The direct build only with xcw_int_precision 1e-12: at 1e-10 the increments' screening
+	//error accumulates to a gradient floor of 3e-5 and the SCF never meets its 1e-5, and the
+	//full build at 1e-10 is the faster of the two anyway.
+	bool xcw_incremental = false;
+	//Integral screening threshold of the XCW Fock build; OCC's own default is 1e-12.
+	double xcw_int_precision = 1e-10;
+	//-gflops reports achieved GFLOP/s per stage for the CPU and GPU paths at the end of a
+	//run. The thresholds deciding what goes to the device were calibrated on one machine;
+	//this is how they get re-derived on another.
+	bool track_gflops = false;
+	//-gpu_fp32 forces the reduced-argument single-precision sincos on a card that would
+	//otherwise keep the double one. It exists for the test suite: without it the precision
+	//a run uses depends on the card, so neither path can be pinned. -gpu_fp64 wins if both
+	//are given, the accurate path being the safer thing to fall back to.
+	bool gpu_fp32 = false;
+	//-no_gpu_itensor keeps the XCW I tensor GEMMs on the CPU. On by default: it is much the
+	//largest of the device paths, and it moves the total energy only in the tenth
+	//significant figure. Read together with use_gpu, so -no_gpu turns it off as well.
+	bool gpu_itensor = true;
+	//FP16 Tensor Core operands with FP32 accumulation for the I tensor. Off by default: the
+	//half-precision operands move the XCW energies in the fourth decimal, plain FP32 GEMM
+	//sits within 1e-8 Eh of double.
+	bool gpu_itensor_tensor = false;
+	//SALTED descriptor combination uses the device when one is available; -no_gpu_salted keeps it on the CPU.
+	bool gpu_salted = true;
+	//-no_gpu_grid keeps the Becke/TFVC integration weights on the CPU
+	bool gpu_grid = true;
+	//Owned by the caller; the scattering-factor grid is built in it instead of a local, so
+	//a second table for the same geometry reuses the points and weights
+	GridManager* grid_cache = nullptr;
+	//-no_gpu_density keeps the fitted density of the Gordon-Kim repulsion grid and the spherical-atom grids on the CPU
+	bool gpu_density = true;
+	//-gpu_blas offers large dense GEMMs in nos_math to the device
+	bool gpu_blas = false;
+	//The I tensor GEMM goes through cuBLAS when the machine has it, and through the
+	//built-in CUTLASS path otherwise. cuBLAS is 1.65x faster on a V100 and level with
+	//CUTLASS within measurement noise on consumer cards, so preferring it costs nothing
+	//where it does not help. -no_gpu_cublas pins CUTLASS, which is what the reference tests
+	//do: the two differ in the last digits, so a test left to pick would pass or fail on
+	//whether a CUDA toolkit happened to be installed.
+	bool gpu_cublas = true;
+	//Standalone conceptual-DFT reactivity analysis (-fukui_analysis), run from run_app_impl rather than at parse time so its output survives
+	bool fukui_analysis_run = false;
+	//Basin analysis (-eli_analysis), run from run_app_impl for the same reason
+	bool eli_analysis_run = false;
+	//Full bonding analysis (-fba): RGBI, native NBO/NPA with NRT, bondwise Laplacian, QTAIM and ELI-D on one wavefunction
+	bool fba = false;
+	bool profiling = false;
+	bool promol_nci = false;
+	bool get_g = false;
+	int accuracy = 2;
+	//-basin_grid <n>: the quadrature of the basin analysis pulled into the core, tightest
+	//exponent sharpened n^2-fold, radial step divided by n, Lebedev order up n - 1 entries
+	int basin_grid = 1;
+	//-basin_cube: go back to finding the QTAIM and ELI-D basins on the cube. The default takes
+	//the density's attractors from the analytic critical-point search instead, which no voxel can
+	//add to, and sends every quadrature point up the analytic field for its basin
+	bool basin_cube = false;
+	//-no_spin_eli: leave out the ELI-D alpha-alpha / beta-beta / triplet basins that -fba and
+	//-eli_analysis add after the spin-summed ELI-D for a spin-polarised wavefunction
+	bool spin_eli = true;
+	int threads = -1;
+	int pbc = 0;
+	int charge = 0;
+	int ECP_mode = 0;
+	PartitionType partition_type = PartitionType::Hirshfeld;
+	//-multipole_moments: the RI fit is restrained to this scheme's atomic moments up to this order, -1 = unrestrained
+	int multipole_lmax = -1;
+	PartitionType multipole_scheme = PartitionType::Hirshfeld;
+	double multipole_strength = 1.0;
+	//-multipole_centre switches the restraint rows from partition-weighted grid moments of every aux function to centre moments
+	bool multipole_partition = true;
+	//-repulsion_overlap: exchange-repulsion of -interaction_energy as K * Int rhoA rhoB, 0 = not included
+	double repulsion_overlap = 0.0;
+	//-repulsion_exchange: exchange functional of the Gordon-Kim repulsion, 0 Dirac, 1 PBE, 2 B88, 3 r2SCAN-L
+	int repulsion_exchange = 0;
+	unsigned int mult = 0;
+	hkl_list m_hkl_list;
 
 	/** @brief Finds the debug flag, removes it from argc/argv and stores the rest internally. */
 	void look_for_debug(int& argc, char** argv);

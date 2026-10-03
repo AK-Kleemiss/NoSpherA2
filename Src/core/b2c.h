@@ -2,7 +2,9 @@
 #include "atoms.h"
 #include "cube.h"
 #include <array>
+#include <atomic>
 #include <chrono>
+#include <cstdint>
 #include <functional>
 #include <string>
 #include <vector>
@@ -82,11 +84,20 @@ std::vector<d4> streaming_density_attractors(const WFN& wavy, const std::vector<
 //ELI-D's maxima without a cube: gradient ascent on computeELIGrad from atom-centred shells of
 //seeds inside rho >= basin_density_cutoff, ends within 0.1 bohr merged. Sorted by value, highest
 //first. Core-shell and shattered-shell fragments are left for unify_core_basins/unify_shell_basins
-std::vector<d4> analytic_eli_maxima(const WFN& wavy, bool debug = false);
+//A spin member of the ELI family in place of the spin-summed ELI-D: value and gradient at p and,
+//when aux is given, rho, rho_alpha, rho_beta and rho_s * ELI-q_s there (WFN::computeELISpinGrad)
+using eli_spin_field = std::function<void(const d3&, double&, d3&, double*)>;
+std::vector<d4> analytic_eli_maxima(const WFN& wavy, bool debug = false, const eli_spin_field* eli = nullptr);
 //Radius holding the ELI-D maxima of an atom's core shells, by period; the outermost shell the
 //element keeps beneath its valence peaks at about 0.7 bohr for the first transition row
 double core_shell_radius(const int Z);
-//Every basin whose maximum lies within an atom's core radius becomes that atom's one core
+//The ELI-D core: core_shell_radius, except for a d-block metal (and K, Ca) whose outer core shell
+//it stops short of, so that shell keeps its own basins, labelled "shell"
+double eli_core_radius(const int Z);
+//Electrons the eli_core_radius core should hold: the closed shells beneath the valence s,p shell, or
+//beneath the outer core shell of a metal that keeps one
+int eli_core_electrons(const int Z);
+//Every basin whose maximum lies within an atom's ELI-D core radius becomes that atom's one core
 //basin, as DGrid's ELIDcore does; returns the number of basins merged away.
 //basin_map, when given, comes back sized maxima.size() + 1 and holds the 1-based basin each of
 //the maxima the call was handed ends up in. A streaming integration needs both halves of that:
@@ -97,7 +108,8 @@ int unify_core_basins(cubei& basin_cube, std::vector<d4>& maxima, const std::vec
 //Fold a shattered shell - maxima that are close together AND near-degenerate in value - into one basin
 //each. max_dist is a physical length in bohr, deliberately not a voxel count: the defect gets worse as
 //the grid is refined, so a grid-derived cutoff would chase it. See the comment on the definition.
-int unify_shell_basins(cubei& basin_cube, std::vector<d4>& maxima, ivec* basin_map = nullptr, double max_dist = 1.2, double rel_tol = 0.05);
+//With atoms, maxima in a metal's outer core shell (see eli_core_radius) merge only within max_dist / 2.
+int unify_shell_basins(cubei& basin_cube, std::vector<d4>& maxima, ivec* basin_map = nullptr, double max_dist = 1.2, double rel_tol = 0.05, const std::vector<atom>* atoms = nullptr);
 //Atomic overlap matrices S^b_ij = int_b phi_i phi_j, taken on the same quadrature points and
 //with the same basin assignment as the populations, so a basin's trace is its population by
 //construction. One packed lower triangle per basin over the occupied MOs
@@ -130,6 +142,9 @@ void report_delocalization(const WFN& wavy, const basin_overlaps& ovl, const sve
 //then assumed for the trajectory's step and the radius that counts as arrival.
 //maximum_basin, when given, is the 1-based basin of each maximum, as unify_core_basins reports
 //it: several maxima then share one basin and the returned vector is one entry per basin.
+//eli (with eli_field): the ELI member the boundaries follow instead of the spin-summed ELI-D.
+//spin_pop (with eli): per basin {N_alpha, N_beta, integral of rho_s * ELI-q_s}, from the same points
+//and weights as the populations.
 //Beta spheres: around an attractor there is a radius inside which no ascent trajectory can get
 //out, so every point inside belongs to it without being climbed and a trajectory that enters is
 //finished on the spot. On by default, and only for the streaming quadrature, which is where the
@@ -182,7 +197,36 @@ struct basin_stage_timer {
 	//Seconds since the last lap (or since construction), printed only under -basin_timing.
 	void lap(const std::string &what);
 };
-vec integrate_basins_on_atomic_grids(const cube* cub, const cubei* basin_cube, const std::vector<d4>& maxima, const WFN& wavy, const int accuracy, const bool eli_field, vec& volumes, double& outside, const std::function<double(const d3&)>* core_density = nullptr, const std::function<void(const d3&, d3&)>* core_gradient = nullptr, const int grid_boost = 1, const density_field* field = nullptr, basin_overlaps* ovl = nullptr, const ivec* maximum_basin = nullptr);
+//Which basin the streaming climbs that crossed a voxel ended in, so a later climb that walks into
+//a block every earlier one agreed on can stop there. Fixed capacity, open addressing, no deletion,
+//lock-free: one word per voxel packs the key (3 x 14-bit indices), the 1-based basin (13 bits), a
+//visit count saturating at 255 and a conflict bit that, once two basins met in the voxel, stays.
+//The answer depends on which climbs ran first, so it is only as good as the repeat-run check says;
+//NOS_BASIN_MEMO=0 turns it off and NOS_BASIN_MEMO_MB caps the table (256 MB by default).
+struct basin_memo {
+	basin_memo(const d3 &lo, const d3 &hi, double voxel, size_t megabytes);
+	//The voxel of p, 0 outside the 16382-voxel box centred on lo..hi
+	uint64_t key(const d3 &p) const;
+	//One clean climb's voxels, consecutive repeats already dropped, all ending in basin label
+	void write(const std::vector<uint64_t> &path, int label);
+	//The basin of p's voxel when it is settled: visited at least twice, and all 27 voxels of its
+	//3x3x3 block populated, conflict-free and of one basin. 0 otherwise
+	int settled(const d3 &p) const;
+	size_t entries() const { return used.load(std::memory_order_relaxed); }
+	size_t capacity() const { return table.size(); }
+private:
+	static constexpr int bits = 14;
+	static constexpr uint64_t key_mask = (1ull << 3 * bits) - 1, label_mask = (1ull << 13) - 1;
+	static constexpr uint64_t one = 1ull << 55, conflict = 1ull << 63;
+	d3 origin;
+	double inv;
+	std::vector<std::atomic<uint64_t>> table;
+	size_t mask, limit;
+	std::atomic<size_t> used{ 0 };
+	uint64_t find(uint64_t k) const;
+	void add(uint64_t k, uint64_t label);
+};
+vec integrate_basins_on_atomic_grids(const cube* cub, const cubei* basin_cube, const std::vector<d4>& maxima, const WFN& wavy, const int accuracy, const bool eli_field, vec& volumes, double& outside, const std::function<double(const d3&)>* core_density = nullptr, const std::function<void(const d3&, d3&)>* core_gradient = nullptr, const int grid_boost = 1, const density_field* field = nullptr, basin_overlaps* ovl = nullptr, const ivec* maximum_basin = nullptr, const eli_spin_field* eli = nullptr, vec2* spin_pop = nullptr);
 std::vector<critical_point_seed> find_cube_critical_point_seeds(const cube* cub, bool debug, double value_floor = -1.0, double gradient_epsilon = -1.0);
 std::vector<critical_point> refine_cube_critical_points(const cube* cub, const WFN& wavy, const std::vector<critical_point_seed>& seeds, bool debug, double value_floor = -1.0, double gradient_tolerance = 1e-8, double step_tolerance = 1e-6, int max_iterations = 32);
 std::vector<critical_point> analyze_cube_critical_points(const cube* cub, const WFN& wavy, bool debug, double value_floor = -1.0, double gradient_epsilon = -1.0, double gradient_tolerance = 1e-8, double step_tolerance = 1e-6, int max_iterations = 32);

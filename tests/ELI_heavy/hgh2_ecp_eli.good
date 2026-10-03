@@ -99,7 +99,7 @@ Delocalization indices (11 occupied orbitals):
 GridManager: Setting up prototype grids for atom types...
 GridManager: Generating integration grids for atoms...
 GridManager: Generated total of 65266 grid points.
-Quadrature points sent along the field: 28659, left the grid: 0
+Quadrature points sent along the field: 24606, left the grid: 0
 
 ELI-D Analysis (atomic quadrature grids):
   basin  label               electrons      volume         maximum        x          y          z
@@ -109,3 +109,5 @@ ELI-D Analysis (atomic quadrature grids):
       4  H2 LP                  0.4677    287.5343          5.0790      0.000      0.000     -4.989
       5  Hg0 core              18.1621    210.6315          1.4332      0.579      0.030     -0.682
   total in basins: 21.9704   outside every basin: 0.0296
+
+Spin-resolved ELI-D: skipped, restricted wavefunction - ELI-D(alpha-alpha) = ELI-D(beta-beta) is the ELI-D above and the triplet member a constant multiple of it.

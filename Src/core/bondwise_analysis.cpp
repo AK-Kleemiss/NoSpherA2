@@ -7,6 +7,7 @@
 #include "nos_math.h"
 #include "integration_params.h"
 #include "b2c.h"
+#include "eli_family.h"
 #include "topology.h"
 #include "crystal_energies.h"
 #include "spherical_density.h"
@@ -508,7 +509,7 @@ namespace {
 		const int n = off.back();
 		auto one_e = [&](libcint::CINTIntegralFunction *fn) {
 			occ::Mat M = occ::Mat::Zero(n, n);
-			std::vector<double> buf(64 * 64);
+			vec buf(64 * 64);
 			for (int i = 0; i < static_cast<int>(prims.size()); i++)
 				for (int j = 0; j < static_cast<int>(prims.size()); j++) {
 					int shls[2] = { i, j };
@@ -678,7 +679,7 @@ namespace {
 		in.read(reinterpret_cast<char *>(&cols), sizeof(cols));
 		if (!in || rows <= 0 || cols <= 0 || rows > 100000 || cols > 100000)
 			return false;
-		std::vector<double> values(static_cast<size_t>(rows * cols));
+		vec values(static_cast<size_t>(rows * cols));
 		in.read(reinterpret_cast<char *>(values.data()), values.size() * sizeof(double));
 		if (!in)
 			return false;
@@ -3801,6 +3802,134 @@ static std::unique_ptr<Gaussian_Molecule> fitted_source(const WFN &wavy, options
 	return fit;
 }
 
+//Kohout's spin-resolved ELI-D (eli_family.h) for a spin-polarised wavefunction. The ELI-D above is the
+//spin-summed field, which for an open shell is not the pair function of either spin; the alpha-alpha,
+//beta-beta and triplet-pair members are, and each gets its own maxima and basins on the analytic field,
+//with the alpha and beta electrons of every basin and the ELI-q average over it from the same points.
+//The member list comes off the orbitals (eli_variants_for), never off the stated multiplicity.
+static void spin_eli_analysis(const WFN &l_w, const options &opt, const std::vector<atom> &atoms, const double shell_dist, const double shell_tol)
+{
+	using eli_family::Member;
+	std::string warn;
+	const std::vector<Member> members = eli_family::eli_variants_for(l_w, &warn);
+	auto has = [&](const Member m) { return std::find(members.begin(), members.end(), m) != members.end(); };
+	if (!opt.spin_eli) { std::cout << "\nSpin-resolved ELI-D: off (-no_spin_eli)." << std::endl; return; }
+	const bool unrestricted = l_w.get_MO_op_count(1) > 0;
+	double N[2]{ 0.0, 0.0 };
+	int norb[2]{ 0, 0 };
+	bool open_restricted = false;
+	for (int mo = 0; mo < l_w.get_nmo(); mo++) {
+		const double occ = l_w.get_MO_occ(mo);
+		if (occ == 0.0) continue;
+		const int s = unrestricted ? l_w.get_MO_op(mo) : 0;
+		N[s] += occ;
+		norb[s]++;
+		if (!unrestricted && std::abs(occ - 2.0) > 1e-6) open_restricted = true;
+	}
+	if (!has(Member::eli_d_bb)) {
+		std::cout << "\nSpin-resolved ELI-D: skipped, "
+			<< (open_restricted ? "restricted open-shell or fractional occupations (ROHF/ROKS, natural orbitals) - one MO set without spin labels, so alpha and beta densities are not resolved"
+				: !unrestricted ? "restricted wavefunction - ELI-D(alpha-alpha) = ELI-D(beta-beta) is the ELI-D above and the triplet member a constant multiple of it"
+				: N[1] < 1e-8 ? "the beta orbital set holds no electrons"
+				: "N_alpha = N_beta - not spin-polarised")
+			<< "." << std::endl;
+		return;
+	}
+	if (opt.basin_cube) { std::cout << "\nSpin-resolved ELI-D: skipped, it runs on the analytic field only and -basin_cube was given." << std::endl; return; }
+	citations::cite(citations::Method::ELIFamily, std::cout);
+	const double tf = eli_family::triplet_density_factor(l_w);
+	std::cout << "\nSpin-resolved ELI-D (Kohout): N_alpha = " << std::fixed << std::setprecision(4) << N[0] << ", N_beta = " << N[1]
+		<< ". The ELI-D above is the spin-summed field, not a pair function of either spin." << std::endl;
+	struct member_basins { std::vector<d4> maxima; svec labels; vec pop, vol; vec2 spin; double outside = 0.0; bool done = false; };
+	const char *names[3] = { "alpha-alpha", "beta-beta", "triplet" };
+	member_basins res[3];
+	const int nf = has(Member::eli_d_triplet) ? 3 : 2;
+	for (int f = 0; f < nf; f++) {
+		//A channel carried by one orbital has g_s = 0 everywhere: no field, only round-off basins
+		if (f < 2 && norb[f] < 2) {
+			std::cout << "\nELI-D " << names[f] << ": skipped, the " << (f ? "beta" : "alpha") << " electrons sit in a single orbital, so g_s = 0 and the field is undefined." << std::endl;
+			continue;
+		}
+		basin_stage_timer clock;
+		const eli_spin_field eval = [&l_w, f, tf](const d3 &p, double &y, d3 &g, double *aux) { l_w.computeELISpinGrad(p, f, tf, y, g, aux); };
+		member_basins &r = res[f];
+		const std::vector<d4> all = analytic_eli_maxima(l_w, opt.debug, &eval);
+		r.maxima = all;
+		cubei none;
+		ivec core_map, shell_map;
+		unify_core_basins(none, r.maxima, atoms, &core_map);
+		unify_shell_basins(none, r.maxima, &shell_map, shell_dist, shell_tol, &atoms);
+		if (!shell_map.empty())
+			for (size_t b = 1; b < core_map.size(); b++) core_map[b] = shell_map[core_map[b]];
+		r.labels = assign_labels_to_basins(r.maxima, atoms, opt.debug, 1);
+		clock.lap(std::string("ELI-D ") + names[f] + " maxima");
+		r.pop = integrate_basins_on_atomic_grids(nullptr, nullptr, all, l_w, opt.accuracy, true, r.vol, r.outside, nullptr, nullptr, opt.basin_grid, nullptr, nullptr, &core_map, &eval, &r.spin);
+		r.done = true;
+		clock.lap(std::string("ELI-D ") + names[f] + " basins");
+		std::cout << "\nELI-D " << names[f] << " Analysis (atomic quadrature grids), " << all.size() << " maxima, " << r.maxima.size() << " basins:\n"
+			<< "  basin  label               electrons    N_alpha     N_beta       spin  <ELI-q>      volume         maximum        x          y          z\n";
+		double tot = 0.0, ts[2]{ 0.0, 0.0 };
+		for (size_t b = 0; b < r.pop.size(); b++) {
+			tot += r.pop[b];
+			ts[0] += r.spin[b][0];
+			ts[1] += r.spin[b][1];
+			std::cout << std::setw(7) << b + 1 << "  " << std::left << std::setw(18) << r.labels[b] << std::right << std::fixed << std::setprecision(4)
+				<< std::setw(11) << r.pop[b] << std::setw(11) << r.spin[b][0] << std::setw(11) << r.spin[b][1] << std::setw(11) << r.spin[b][0] - r.spin[b][1];
+			//<ELI-q_s> = integral of rho_s Y_q over the basin / N_s; the triplet has no ELI-q partner
+			//below 1e-3 e of the channel the average is a tail ratio of two vanishing integrals
+			if (f < 2 && r.spin[b][f] > 1e-3) std::cout << std::setw(9) << r.spin[b][2] / r.spin[b][f];
+			else std::cout << std::setw(9) << "-";
+			std::cout << std::setw(12) << r.vol[b] << std::setw(16) << r.maxima[b][3]
+				<< std::setprecision(3) << std::setw(11) << r.maxima[b][0] << std::setw(11) << r.maxima[b][1] << std::setw(11) << r.maxima[b][2] << "\n";
+		}
+		std::cout << std::setprecision(4) << "  total in basins: " << tot << "   N_alpha " << ts[0] << " of " << N[0] << ", N_beta " << ts[1] << " of " << N[1]
+			<< "   outside every basin: " << r.outside << std::endl;
+	}
+	//alpha-alpha against beta-beta: only basins with the same label pair. A label each table holds once
+	//pairs outright: a unified core or shell basin is represented by one arbitrary maximum on its shell,
+	//so its aa and bb maxima can sit far apart (HgH: 1.7 bohr). A repeated label pairs by mutual nearest
+	//maxima within a bohr. An alpha basin left without a partner is where the unpaired alpha electrons sit
+	if (res[0].done && res[1].done) {
+		const svec &LA = res[0].labels, &LB = res[1].labels;
+		auto nearest = [](const d4 &m, const std::vector<d4> &in, const svec &lin, const std::string &l, double &d) {
+			int best = -1;
+			d = 1e30;
+			for (size_t k = 0; k < in.size(); k++) {
+				if (lin[k] != l) continue;
+				const double q = std::sqrt(std::pow(m[0] - in[k][0], 2) + std::pow(m[1] - in[k][1], 2) + std::pow(m[2] - in[k][2], 2));
+				if (q < d) { d = q; best = static_cast<int>(k); }
+			}
+			return best;
+		};
+		const std::vector<d4> &A = res[0].maxima, &B = res[1].maxima;
+		std::vector<char> b_used(B.size(), 0);
+		std::cout << "\nELI-D alpha-alpha <-> beta-beta basins (same label; a repeated label by mutual nearest maxima within 1 bohr):\n"
+			<< "  aa basin                bb basin              distance  N_alpha(aa)  N_beta(bb)   N_a - N_b\n";
+		for (size_t a = 0; a < A.size(); a++) {
+			double d, back;
+			const int b = nearest(A[a], B, LB, LA[a], d);
+			const bool unique = std::count(LA.begin(), LA.end(), LA[a]) == 1 && std::count(LB.begin(), LB.end(), LA[a]) == 1;
+			const bool pair = b >= 0 && (unique || (d < 1.0 && nearest(B[b], A, LA, LA[a], back) == static_cast<int>(a)));
+			std::cout << std::setw(4) << a + 1 << " " << std::left << std::setw(18) << res[0].labels[a] << std::right;
+			if (pair) {
+				b_used[b] = 1;
+				std::cout << std::setw(5) << b + 1 << " " << std::left << std::setw(18) << res[1].labels[b] << std::right << std::fixed << std::setprecision(3) << std::setw(8) << d
+					<< std::setprecision(4) << std::setw(13) << res[0].spin[a][0] << std::setw(12) << res[1].spin[b][1] << std::setw(12) << res[0].spin[a][0] - res[1].spin[b][1] << "\n";
+			}
+			else
+				std::cout << std::setw(5) << "-" << " " << std::left << std::setw(18) << "(no partner)" << std::right << std::setw(8) << "-"
+					<< std::fixed << std::setprecision(4) << std::setw(13) << res[0].spin[a][0] << std::setw(12) << "-" << std::setw(12) << res[0].spin[a][0] << "\n";
+		}
+		for (size_t b = 0; b < B.size(); b++)
+			if (!b_used[b])
+				std::cout << std::setw(4) << "-" << " " << std::left << std::setw(18) << "(no partner)" << std::right << std::setw(5) << b + 1 << " " << std::left << std::setw(18) << res[1].labels[b] << std::right
+					<< std::setw(8) << "-" << std::setw(13) << "-" << std::fixed << std::setprecision(4) << std::setw(12) << res[1].spin[b][1] << std::setw(12) << -res[1].spin[b][1] << "\n";
+	}
+	std::cout << "\nELIA (antiparallel pairs): not computed. For a single determinant the on-top pair density is exactly"
+		" rho_alpha * rho_beta, so ELIA carries no pair information; it needs a correlated 2-matrix (-eli_family prints the details)." << std::endl;
+	if (!warn.empty()) std::cout << "  WARNING: " << warn << std::endl;
+}
+
 void ELI_analysis(const WFN &wavy, options &opt) {
 	err_checkf(wavy.get_ncen() != 0, "No Atoms in the wavefunction, this will not work!! ABORTING!!", std::cout);
 	std::cout << "Analysing ELI basins in the wavefunction..." << std::endl;
@@ -4146,6 +4275,24 @@ void ELI_analysis(const WFN &wavy, options &opt) {
 				<< std::setprecision(3) << std::setw(11) << res.second[b][0] << std::setw(11) << res.second[b][1] << std::setw(11) << res.second[b][2] << "\n";
 		}
 		std::cout << "  total in basins: " << std::setprecision(4) << total << "   outside every basin: " << outside << "\n";
+		//A metal's core and its outer core shell (eli_core_radius), each summed; a core far from its
+		//closed-shell count (eli_core_electrons, less what an ECP took) is flagged
+		if (eli)
+			for (int a = 0; a < l_w.get_ncen(); a++) {
+				const std::string name = l_w.get_atom_label(a) + std::to_string(a);
+				double core = 0.0, shell = 0.0;
+				int n_core = 0, n_shell = 0;
+				for (size_t b = 0; b < pop.size(); b++) {
+					if (lab[b] == name + " core") { core += pop[b]; n_core++; }
+					else if (lab[b] == name + " shell") { shell += pop[b]; n_shell++; }
+				}
+				const int expected = std::max(0, eli_core_electrons(static_cast<int>(l_w.get_atom_charge(a))) - static_cast<int>(l_w.get_atom_ECP_electrons(a)));
+				if (n_shell) std::cout << "  " << name << ": core " << std::setprecision(4) << core << " e (closed shells " << expected << "), outer core shell " << shell << " e in "
+					<< n_shell << " basins, together " << core + shell << " e\n";
+				if (n_core && std::abs(core - expected) > std::max(1.0, 0.15 * expected))
+					std::cout << "  WARNING: " << name << " core holds " << std::setprecision(2) << core << " e, its closed shells " << expected
+					<< ": the core boundary sits in the wrong shell minimum\n";
+			}
 		if (want_aom) report_delocalization(l_w, ovl, lab, std::cout);
 	};
 	if (l_w.get_nmo() == 0) {
@@ -4234,7 +4381,7 @@ void ELI_analysis(const WFN &wavy, options &opt) {
 	if (const char *e = std::getenv("NOS_ELI_SHELL_DIST")) { const double v = std::atof(e); if (v >= 0.0 && v < 10.0) shell_dist = v; }
 	if (const char *e = std::getenv("NOS_ELI_SHELL_TOL")) { const double v = std::atof(e); if (v >= 0.0 && v < 1.0) shell_tol = v; }
 	ivec eli_shell_map;
-	const int shell_merged = unify_shell_basins(eli_results.first, eli_results.second, stream_eli ? &eli_shell_map : nullptr, shell_dist, shell_tol);
+	const int shell_merged = unify_shell_basins(eli_results.first, eli_results.second, stream_eli ? &eli_shell_map : nullptr, shell_dist, shell_tol, &atoms);
 	if (shell_merged) std::cout << "Unified " << shell_merged << " shattered shell basins, " << eli_results.second.size() << " ELI-D basins remain." << std::endl;
 	//The integrator walks to one of eli_maxima_all and then reads eli_core_map, so the second merge
 	//has to be composed into that map rather than replacing it
@@ -4243,6 +4390,7 @@ void ELI_analysis(const WFN &wavy, options &opt) {
 	svec eli_labels = assign_labels_to_basins(eli_results.second, atoms, opt.debug, 1);
 	report("QTAIM Analysis", qtaim_results, labels, false, stream_qtaim);
 	report("ELI-D Analysis", eli_results, eli_labels, true, stream_eli);
+	spin_eli_analysis(l_w, opt, atoms, shell_dist, shell_tol);
 }
 
 // ---------------------------------------------------------------------------

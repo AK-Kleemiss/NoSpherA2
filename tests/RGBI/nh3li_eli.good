@@ -140,16 +140,81 @@ Delocalization indices (13 occupied orbitals):
 GridManager: Setting up prototype grids for atom types...
 GridManager: Generating integration grids for atoms...
 GridManager: Generated total of 111906 grid points.
-Quadrature points sent along the field: 50706, left the grid: 0
+Quadrature points sent along the field: 48893, left the grid: 0
 
 ELI-D Analysis (atomic quadrature grids):
   basin  label               electrons      volume         maximum        x          y          z
-      1  Li4 core               2.0429     61.0252         43.7858    -10.574     13.777      2.315
-      2  Li4 LP                 0.6609    759.6629         14.5564    -10.708     19.268      2.471
-      3  N0 core                2.1129      0.4634         12.9571    -10.483     10.089      2.209
-      4  Li4 LP                 0.0940     37.6616         12.6891    -10.676     17.954      2.434
-      5  H1                     1.9230    118.8837          4.6691     -9.399      9.356      3.743
-      6  H2                     1.9310    119.4668          4.6691    -12.344      9.323      2.334
-      7  H3                     1.9266    120.0901          4.6690     -9.653      9.442      0.489
-      8  N0-Li4 bond            2.1609     56.3322          1.9677    -10.517     11.461      2.248
-  total in basins: 12.8523   outside every basin: 0.1554
+      1  Li4 core               2.0219     16.7443         43.7858    -10.574     13.777      2.315
+      2  Li4 LP                 0.6838    808.9687         14.5564    -10.708     19.268      2.471
+      3  N0 core                2.1094      0.4465         12.9571    -10.483     10.089      2.209
+      4  Li4 LP                 0.0910     30.6951         12.6891    -10.676     17.954      2.434
+      5  H1                     1.9230    118.8975          4.6691     -9.399      9.356      3.743
+      6  H2                     1.9345    119.4834          4.6691    -12.344      9.323      2.334
+      7  H3                     1.9266    120.0911          4.6690     -9.653      9.442      0.489
+      8  N0-Li4 bond            2.1610     56.3319          1.9677    -10.517     11.461      2.248
+  total in basins: 12.8511   outside every basin: 0.1566
+[ELI family] Kohout, Wagner & Grin, Theor. Chem. Acc. 119 (2008) 413, DOI 10.1007/s00214-007-0396-1
+[ELI family] Kohout, Faraday Discuss. 135 (2007) 43, DOI 10.1039/b605951c
+
+Spin-resolved ELI-D (Kohout): N_alpha = 7.0000, N_beta = 6.0000. The ELI-D above is the spin-summed field, not a pair function of either spin.
+GridManager: Setting up prototype grids for atom types...
+GridManager: Generating integration grids for atoms...
+GridManager: Generated total of 111906 grid points.
+Quadrature points sent along the field: 49528, left the grid: 0
+
+ELI-D alpha-alpha Analysis (atomic quadrature grids), 8 maxima, 8 basins:
+  basin  label               electrons    N_alpha     N_beta       spin  <ELI-q>      volume         maximum        x          y          z
+      1  Li4 core               2.0012     1.0114     0.9898     0.0217   0.3835     13.7968         41.2479    -10.574     13.773      2.314
+      2  Li4 LP                 0.6941     0.6497     0.0444     0.6053   0.6361    832.2104         19.7951    -10.709     19.305      2.472
+      3  Li4 LP                 0.1495     0.1438     0.0057     0.1380   0.4643     49.0844         17.2887    -10.673     17.816      2.430
+      4  N0 core                2.1074     1.0543     1.0531     0.0011   0.4452      0.4444         12.9690    -10.483     10.089      2.209
+      5  H1                     1.9145     0.9696     0.9449     0.0247   0.6151    107.2718          4.5645     -9.401      9.357      3.739
+      6  H2                     1.9251     0.9747     0.9504     0.0243   0.6130    106.4311          4.5644    -12.340      9.324      2.334
+      7  H3                     1.9174     0.9711     0.9463     0.0248   0.6145    107.2645          4.5643     -9.655      9.443      0.493
+      8  N0-Li4 bond            2.1370     1.0790     1.0580     0.0210   0.7559     42.9205          1.9743    -10.517     11.448      2.248
+  total in basins: 12.8462   N_alpha 6.8536 of 7.0000, N_beta 5.9927 of 6.0000   outside every basin: 0.1615
+GridManager: Setting up prototype grids for atom types...
+GridManager: Generating integration grids for atoms...
+GridManager: Generated total of 111906 grid points.
+Quadrature points sent along the field: 44894, left the grid: 0
+
+ELI-D beta-beta Analysis (atomic quadrature grids), 7 maxima, 7 basins:
+  basin  label               electrons    N_alpha     N_beta       spin  <ELI-q>      volume         maximum        x          y          z
+      1  Li4 core               2.2141     1.2086     1.0055     0.2031   0.2936    122.3496         54.6660    -10.574     13.785      2.315
+      2  N0 core                2.1114     1.0563     1.0551     0.0011   0.4447      0.4487         12.9452    -10.483     10.089      2.209
+      3  H2                     1.9488     0.9931     0.9556     0.0375   0.5493    167.2570          4.7871    -12.350      9.322      2.335
+      4  H1                     1.9394     0.9886     0.9508     0.0379   0.5502    170.1544          4.7871     -9.395      9.354      3.747
+      5  H3                     1.9412     0.9895     0.9517     0.0378   0.5490    170.6633          4.7870     -9.651      9.441      0.484
+      6  N0-Li4 bond            2.7247     1.6451     1.0796     0.5655   0.8379    846.2044          1.9616    -10.517     11.475      2.249
+      7  Li4 LP                 0.0188     0.0188     0.0000     0.0188        -     10.2911          0.6950    -10.638     16.370      2.388
+  total in basins: 12.8984   N_alpha 6.9001 of 7.0000, N_beta 5.9984 of 6.0000   outside every basin: 0.1093
+GridManager: Setting up prototype grids for atom types...
+GridManager: Generating integration grids for atoms...
+GridManager: Generated total of 111906 grid points.
+Quadrature points sent along the field: 48971, left the grid: 0
+
+ELI-D triplet Analysis (atomic quadrature grids), 8 maxima, 8 basins:
+  basin  label               electrons    N_alpha     N_beta       spin  <ELI-q>      volume         maximum        x          y          z
+      1  Li4 core               2.0218     1.0257     0.9962     0.0295        -     16.7390         43.5027    -10.574     13.777      2.315
+      2  Li4 LP                 0.6707     0.6436     0.0272     0.6164        -    810.3166         13.7989    -10.708     19.283      2.471
+      3  N0 core                2.1094     1.0553     1.0541     0.0011        -      0.4465         12.8729    -10.483     10.089      2.209
+      4  Li4 LP                 0.1065     0.1040     0.0025     0.1015        -     36.3678         12.0121    -10.675     17.901      2.432
+      5  H1                     1.9230     0.9751     0.9480     0.0271        -    118.9218          4.6389     -9.399      9.356      3.743
+      6  H2                     1.9344     0.9809     0.9535     0.0274        -    119.4794          4.6389    -12.344      9.323      2.334
+      7  H3                     1.9265     0.9772     0.9494     0.0278        -    120.1763          4.6387     -9.653      9.442      0.489
+      8  N0-Li4 bond            2.1609     1.0966     1.0643     0.0323        -     56.2768          1.9550    -10.517     11.461      2.248
+  total in basins: 12.8533   N_alpha 6.8582 of 7.0000, N_beta 5.9951 of 6.0000   outside every basin: 0.1544
+
+ELI-D alpha-alpha <-> beta-beta basins (same label; a repeated label by mutual nearest maxima within 1 bohr):
+  aa basin                bb basin              distance  N_alpha(aa)  N_beta(bb)   N_a - N_b
+   1 Li4 core              1 Li4 core             0.012       1.0114      1.0055      0.0059
+   2 Li4 LP                - (no partner)             -       0.6497           -      0.6497
+   3 Li4 LP                - (no partner)             -       0.1438           -      0.1438
+   4 N0 core               2 N0 core              0.000       1.0543      1.0551     -0.0009
+   5 H1                    4 H1                   0.010       0.9696      0.9508      0.0188
+   6 H2                    3 H2                   0.010       0.9747      0.9556      0.0190
+   7 H3                    5 H3                   0.010       0.9711      0.9517      0.0194
+   8 N0-Li4 bond           6 N0-Li4 bond          0.028       1.0790      1.0796     -0.0006
+   - (no partner)          7 Li4 LP                   -            -      0.0000     -0.0000
+
+ELIA (antiparallel pairs): not computed. For a single determinant the on-top pair density is exactly rho_alpha * rho_beta, so ELIA carries no pair information; it needs a correlated 2-matrix (-eli_family prints the details).

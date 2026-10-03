@@ -1351,6 +1351,53 @@ TEST(PropertiesBasinTests, EliLabelsAFreeAtomInsteadOfAborting)
 	EXPECT_EQ(he_labels[0], "He0 LP");
 }
 
+// eli_core_electrons: the closed shells under the valence, or under a metal's outer core shell
+TEST(PropertiesBasinTests, EliCoreElectronsCountsTheClosedShells)
+{
+	const std::pair<int, int> expected[] = { {1, 0}, {2, 0}, {3, 2}, {10, 2}, {11, 10}, {15, 10}, {20, 10}, {26, 10},
+		{28, 10}, {30, 28}, {35, 28}, {46, 28}, {48, 46}, {50, 46}, {78, 60}, {80, 78}, {92, 86} };
+	for (const auto &[Z, n] : expected) EXPECT_EQ(eli_core_electrons(Z), n) << "Z " << Z;
+}
+
+// basin_memo answers a voxel only once two walks agreed on it and its 26 neighbours all carry the
+// same basin; one walk, a disagreeing neighbour or a hole leaves it unanswered
+TEST(PropertiesBasinTests, BasinMemoSettlesOnlyAnAgreedPopulatedBlock)
+{
+	const double v = 0.1;
+	const d3 c{ 0.05, 0.05, 0.05 };
+	auto at = [&](int dx, int dy, int dz) { return d3{ c[0] + dx * v, c[1] + dy * v, c[2] + dz * v }; };
+	auto block = [&](const basin_memo &m) {
+		std::vector<uint64_t> path;
+		for (int dz = -1; dz <= 1; dz++)
+			for (int dy = -1; dy <= 1; dy++)
+				for (int dx = -1; dx <= 1; dx++) path.push_back(m.key(at(dx, dy, dz)));
+		return path;
+	};
+	{
+		basin_memo m(d3{ 0, 0, 0 }, d3{ 0, 0, 0 }, v, 1);
+		EXPECT_EQ(m.key(d3{ 1e4, 0, 0 }), 0u);
+		const auto path = block(m);
+		m.write(path, 3);
+		EXPECT_EQ(m.settled(c), 0) << "one walk is not enough";
+		m.write(path, 3);
+		EXPECT_EQ(m.settled(c), 3);
+		EXPECT_EQ(m.settled(at(1, 0, 0)), 0) << "an edge voxel has unvisited neighbours";
+		EXPECT_EQ(m.entries(), 27u);
+		m.write({ m.key(at(1, 1, 1)) }, 4);
+		EXPECT_EQ(m.settled(c), 0) << "a neighbour two basins claimed";
+		m.write(path, 0);
+		EXPECT_EQ(m.entries(), 27u) << "label 0 is not a basin";
+	}
+	{
+		basin_memo m(d3{ 0, 0, 0 }, d3{ 0, 0, 0 }, v, 1);
+		auto path = block(m);
+		path.erase(path.begin());
+		m.write(path, 1);
+		m.write(path, 1);
+		EXPECT_EQ(m.settled(c), 0) << "a missing neighbour";
+	}
+}
+
 // core_shell_radius steps by period; unify_core_basins folds every maximum inside an atom's
 // core radius into one basin per atom keeping the highest, renumbers the cube and reports the
 // number merged
@@ -1402,6 +1449,40 @@ TEST(PropertiesBasinTests, UnifyCoreBasinsMergesMaximaInsideTheCoreRadius)
 	EXPECT_EQ(unify_core_basins(two, apart, atoms), 0);
 	EXPECT_EQ(apart.size(), 2u);
 	EXPECT_EQ(two.get_value(1, 0, 0), 2);
+}
+
+// A d-block metal keeps its outer core shell apart from the core, as DGrid's ELIDcore does: NiLiL0PhPMe3's
+// Ni core attractor within 0.19 bohr and six shell basins of 1.8-3.4 e at 0.70-0.74 bohr, which the 1.0 bohr
+// core radius used to fold in (core 25.9 e against DGrid's 9.7). Neither merge may take the six.
+TEST(PropertiesBasinTests, MetalOuterCoreShellKeepsItsOwnBasins)
+{
+	EXPECT_EQ(eli_core_radius(28), 0.5);
+	EXPECT_EQ(eli_core_radius(46), 0.6);
+	EXPECT_EQ(eli_core_radius(78), 0.8);
+	EXPECT_EQ(eli_core_radius(30), core_shell_radius(30));  // Zn: closed d10, no separate shell
+	EXPECT_EQ(eli_core_radius(17), core_shell_radius(17));
+
+	std::vector<atom> atoms;
+	atoms.emplace_back("Ni", atomID(), 1, 0.0, 0.0, 0.0, 28);
+	std::vector<d4> maxima{ d4{ 0.1, 0.0, 0.0, 6.5 }, d4{ -0.1, 0.0, 0.0, 6.4 } };  // two core pieces
+	const double r = 0.72;
+	const double six[6][3] = { { r, 0, 0 }, { -r, 0, 0 }, { 0, r, 0 }, { 0, -r, 0 }, { 0, 0, r }, { 0, 0, -r } };
+	for (int k = 0; k < 6; k++) maxima.push_back(d4{ six[k][0], six[k][1], six[k][2], 1.414 + 0.0005 * k });
+	maxima.push_back(d4{ r + 0.25, 0.0, 0.0, 1.4130 });  // a grid duplicate 0.25 bohr off the first, folded
+	const int nb = static_cast<int>(maxima.size());
+	cubei basins({ nb, 1, 1 }, 0, true);
+	for (int b = 0; b < nb; b++) basins.set_value(b, 0, 0, b + 1);
+	EXPECT_EQ(unify_core_basins(basins, maxima, atoms), 1);
+	EXPECT_EQ(unify_shell_basins(basins, maxima, nullptr, 1.2, 0.05, &atoms), 1);
+	ASSERT_EQ(maxima.size(), 7u);
+	const svec labels = assign_labels_to_basins(maxima, std::vector<atom>{ atoms[0], atom("P", atomID(), 2, 4.2, 0.0, 0.0, 15) }, false, 1);
+	EXPECT_EQ(labels[0], "Ni0 core");
+	for (int k = 1; k < 7; k++) EXPECT_EQ(labels[k], "Ni0 shell") << k;
+	// without the atoms the shell merge chains the six into one, which is what this guards against
+	std::vector<d4> blind = maxima;
+	cubei b2({ 7, 1, 1 }, 0, true);
+	for (int b = 0; b < 7; b++) b2.set_value(b, 0, 0, b + 1);
+	EXPECT_EQ(unify_shell_basins(b2, blind, nullptr, 1.2, 0.05), 5);
 }
 
 // Outside the cores the same sphere of maxima appears with nothing to fold it: a spherically symmetric

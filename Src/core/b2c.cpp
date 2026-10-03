@@ -605,7 +605,6 @@ bool b2c(const cube *cub, const std::vector<atom> &atoms, bool debug, bool bcp)
 					<< pos[1] << " "
 					<< pos[2] << endl;
 			}
-	logfile.flush();
 	logfile.close();
 	return true;
 };
@@ -1365,6 +1364,48 @@ double core_shell_radius(const int Z)
 	return 1.8;
 }
 
+//A d-block metal's outer core shell - (n-1)s,p with the d electrons - stands apart from its inner core in
+//ELI-D, and DGrid's ELIDcore keeps it so: over the 312-molecule reference set the core attractor sits within
+//0.29 bohr (Ti, Fe, Ni), 0.37 (Pd) and 0.43 (Pt) and the shell's six or so basins of 2-3 e from 0.70, 0.84
+//and 1.16 bohr; Ca's 3s3p shell at 1.19 likewise. core_shell_radius reaches past that shell and folded
+//14-17 e of it into the core. These radii sit in the gap. Zn, Cd and Hg are left alone: DGrid shows
+//no separate shell on a closed d10 core (Zn 27.8 e, Cd 44.8 e).
+double eli_core_radius(const int Z)
+{
+	if (Z >= 19 && Z <= 29) return 0.5;  // K-Cu
+	if (Z >= 39 && Z <= 47) return 0.6;  // Y-Ag
+	if (Z == 57 || (Z >= 72 && Z <= 79)) return 0.8;  // La, Hf-Au
+	return core_shell_radius(Z);
+}
+
+//DGrid's ELIDcore over the reference set: Na, Al, P, S, Cl 10.05; Ti, Fe, Ni 9.2-10.3; Zn, Br 27.8;
+//Pd 26.7; Cd 44.8; Sn 46.6; Pt 51.7. The 5d core runs short of its 60, hence a relative tolerance
+int eli_core_electrons(const int Z)
+{
+	if (Z >= 19 && Z <= 29) return 10;
+	if (Z >= 39 && Z <= 47) return 28;
+	if (Z == 57) return 46;
+	if (Z >= 72 && Z <= 79) return 60;
+	//the largest closed core below Z: a noble gas, or one with a filled (n-1)d and 4f beneath it
+	int core = 0;
+	for (const int c : {2, 10, 18, 28, 36, 46, 54, 78, 86})
+		if (c < Z) core = c;
+	return core;
+}
+
+static bool in_outer_core_shell(const d4 &m, const std::vector<atom> &atoms)
+{
+	for (const atom &a : atoms) {
+		const int Z = a.get_charge();
+		const double inner = eli_core_radius(Z), outer = core_shell_radius(Z);
+		if (inner >= outer) continue;
+		const d3 p = a.get_pos();
+		const double d2 = std::pow(m[0] - p[0], 2) + std::pow(m[1] - p[1], 2) + std::pow(m[2] - p[2], 2);
+		if (d2 >= inner * inner && d2 < outer * outer) return true;
+	}
+	return false;
+}
+
 //Both merges below decide only WHICH maxima belong together, and then do the same three things with
 //the answer: keep the highest of each group, renumber the cube, and report where each old basin went.
 //keeper[b] is the group's representative - its lowest member - or -1 for a maximum that stands alone.
@@ -1410,7 +1451,7 @@ int unify_core_basins(cubei &basin_cube, std::vector<d4> &maxima, const std::vec
 	for (int b = 0; b < nb; b++)
 		for (size_t a = 0; a < atoms.size(); a++) {
 			const d3 ap = atoms[a].get_pos();
-			const double r = core_shell_radius(atoms[a].get_charge());
+			const double r = eli_core_radius(atoms[a].get_charge());
 			if (std::pow(maxima[b][0] - ap[0], 2) + std::pow(maxima[b][1] - ap[1], 2) + std::pow(maxima[b][2] - ap[2], 2) < r * r) { owner[b] = static_cast<int>(a); break; }
 		}
 	//The atom's core keeps the highest of its maxima; the merged ones are dropped
@@ -1424,17 +1465,23 @@ int unify_core_basins(cubei &basin_cube, std::vector<d4> &maxima, const std::vec
 }
 
 //Merge grid-fragmented ELI-D shells by persistence.
-int unify_shell_basins(cubei &basin_cube, std::vector<d4> &maxima, ivec *basin_map, double max_dist, double rel_tol)
+int unify_shell_basins(cubei &basin_cube, std::vector<d4> &maxima, ivec *basin_map, double max_dist, double rel_tol, const std::vector<atom> *atoms)
 {
 	const int nb = static_cast<int>(maxima.size());
 	if (nb < 2 || max_dist <= 0.0) return 0;
 	const double d2 = max_dist * max_dist;
+	//A metal's outer core shell is a few near-degenerate maxima 0.99 bohr apart at the closest (Ni's six
+	//at 0.70 bohr), real ones, so there only a grid duplicate - half the length - is folded
+	const double d2_shell = d2 / 4.0;
+	std::vector<char> shell(nb, 0);
+	if (atoms)
+		for (int b = 0; b < nb; b++) shell[b] = in_outer_core_shell(maxima[b], *atoms);
 	ivec root(nb);
 	for (int b = 0; b < nb; b++) root[b] = b;
 	auto find = [&root](int b) { while (root[b] != b) b = root[b] = root[root[b]]; return b; };
 	for (int b = 1; b < nb; b++)
 		for (int c = 0; c < b; c++) {
-			if (std::pow(maxima[b][0] - maxima[c][0], 2) + std::pow(maxima[b][1] - maxima[c][1], 2) + std::pow(maxima[b][2] - maxima[c][2], 2) > d2) continue;
+			if (std::pow(maxima[b][0] - maxima[c][0], 2) + std::pow(maxima[b][1] - maxima[c][1], 2) + std::pow(maxima[b][2] - maxima[c][2], 2) > (shell[b] || shell[c] ? d2_shell : d2)) continue;
 			const double hi = std::max(std::abs(maxima[b][3]), std::abs(maxima[c][3]));
 			if (hi > 0.0 && std::abs(maxima[b][3] - maxima[c][3]) > rel_tol * hi) continue;
 			const int rb = find(b), rc = find(c);
@@ -1528,14 +1575,12 @@ std::vector<d4> streaming_density_attractors(const WFN &wavy, const std::vector<
 	const size_t nuclei = maxima.size();
 	constexpr double nuclear_radius = 0.5;   //a critical point this close to a nucleus is that nucleus
 	constexpr double duplicate_radius2 = 0.01;
-
 	//Keep perturbations inside the candidate attractor basin.
 	auto perturbation_for = [&](const d3 &at, const double cap) {
 		double nearest2 = std::numeric_limits<double>::max();
 		auto note = [&](const d3 &q) {
 			const double d2 = std::pow(at[0] - q[0], 2) + std::pow(at[1] - q[1], 2) + std::pow(at[2] - q[2], 2);
-			//1e-4 bohr^2 is 0.01 bohr, the floor below - anything nearer is the candidate itself or a
-			//second seed that converged onto it, and neither bounds anything.
+			//nearer than 0.01 bohr is the candidate itself
 			if (d2 > 1e-4) nearest2 = std::min(nearest2, d2);
 		};
 		for (const critical_point &o : critical_points)
@@ -1544,7 +1589,6 @@ std::vector<d4> streaming_density_attractors(const WFN &wavy, const std::vector<
 		//Limit the displacement used to test a candidate maximum.
 		return std::min(cap, std::max(0.01, std::sqrt(nearest2) / 3.0));
 	};
-
 	//A candidate is an attractor if the analytic field has a maximum there: the point itself must
 	//converge, and three starts displaced along the axes must all come back to the same place.
 	auto accept = [&](const d3 &candidate, d3 &converged, const double cap = 0.1) {
@@ -1570,32 +1614,25 @@ std::vector<d4> streaming_density_attractors(const WFN &wavy, const std::vector<
 			if (debug) std::cout << "Dropped a non-nuclear attractor candidate that is not a maximum of the analytic field at "
 				<< candidate[0] << " " << candidate[1] << " " << candidate[2]
 				<< " (start " << fail_t << ": " << why << ", " << fail_dist
-				<< " bohr away, displaced by " << delta << ")" << std::endl;
+				<< " bohr away, displaced by " << delta << ")\n";
 			return false;
 		}
 		for (const d4 &m : maxima)
 			if (std::pow(converged[0] - m[0], 2) + std::pow(converged[1] - m[1], 2) + std::pow(converged[2] - m[2], 2) < duplicate_radius2) return false;
 		return true;
 	};
-
 	auto keep = [&](const d3 &converged, const char *from) {
 		maxima.push_back(d4{ converged[0], converged[1], converged[2], rho(converged) });
 		if (debug) std::cout << "Kept a non-nuclear attractor at " << converged[0] << " " << converged[1] << " "
-			<< converged[2] << " with rho " << rho(converged) << " (from " << from << ")" << std::endl;
+			<< converged[2] << " with rho " << rho(converged) << " (from " << from << ")\n";
 	};
-
 	d3 converged;
 	for (const critical_point &cp : critical_points) {
 		if (!cp.converged || cp.type != "attractor") continue;
 		if (accept(cp.position, converged)) keep(converged, "the seed cube");
 	}
-
 	//Sample bond lines for maxima absent from the seed cube.
-	const double line_step = 0.02;   //bohr. CCH's bump is 3.1e-5 e/bohr^3 over 0.19 bohr with an axial
-	//curvature of -0.0249, so a step this size falls 5e-6 across it - six times finer than the bump it
-	//has to resolve. It is an absolute length on purpose: a fraction of the bond would make the
-	//nomination depend on the bond, which is the mistake being fixed here. Cost is one density per
-	//point, about 5400 for all of sucrose's bonds against millions in the integration itself.
+	const double line_step = 0.02;   //bohr, independent of the bond length
 	for (int a = 0; a < wavy.get_ncen(); a++) {
 		const d3 pa = wavy.get_atom_pos(a);
 		const int za = wavy.get_atom_charge(a);
@@ -1610,14 +1647,11 @@ std::vector<d4> streaming_density_attractors(const WFN &wavy, const std::vector<
 			const int n = (int)(dist / line_step);
 			const d3 u{ (pb[0] - pa[0]) / dist, (pb[1] - pa[1]) / dist, (pb[2] - pa[2]) / dist };
 			auto at = [&](const int i) { return d3{ pa[0] + i * line_step * u[0], pa[1] + i * line_step * u[1], pa[2] + i * line_step * u[2] }; };
-			std::vector<double> prof((size_t)n + 1);
+			vec prof((size_t)n + 1);
 			for (int i = 0; i <= n; i++) prof[(size_t)i] = rho(at(i));
 			for (int i = 1; i < n; i++) {
 				if (prof[i] <= prof[i - 1] || prof[i] <= prof[i + 1]) continue;
-				//How far this maximum's basin reaches along the line, from the profile and nothing else:
-				//the nearest turning point on either side. The cube's critical points would otherwise be
-				//what bounds the displacement, and a candidate the bond line found precisely because the
-				//cube was too coarse must not then be judged against what the cube found.
+				//the basin's reach along the line: the nearest turning point on either side
 				int lo = i, hi = i;
 				while (lo > 0 && prof[lo - 1] < prof[lo]) lo--;
 				while (hi < n && prof[hi + 1] < prof[hi]) hi++;
@@ -1629,8 +1663,9 @@ std::vector<d4> streaming_density_attractors(const WFN &wavy, const std::vector<
 	return maxima;
 }
 
-std::vector<d4> analytic_eli_maxima(const WFN &wavy, const bool debug)
+std::vector<d4> analytic_eli_maxima(const WFN &wavy, const bool debug, const eli_spin_field *eli)
 {
+	auto eli_grad = [&](const d3 &p, double &f, d3 &g) { if (eli) (*eli)(p, f, g, nullptr); else wavy.computeELIGrad(p, f, g); };
 	auto sphere = [](const int n) {
 		std::vector<d3> d(n);
 		for (int i = 0; i < n; i++) {
@@ -1660,9 +1695,8 @@ std::vector<d4> analytic_eli_maxima(const WFN &wavy, const bool debug)
 			}
 	}
 	//Monotone ascent along the normalised gradient: a step is taken only if ELI-D rises, grows
-	//after a success and halves after a failure. There is deliberately no Hessian test at the end
-	//- a hydrogen's valence maximum sits on the cusp of the nucleus, and the Newton test ate six
-	//real H basins in UH6 (see converge_to_maximum)
+	//after a success and halves after a failure. No Hessian test: a hydrogen's valence maximum sits
+	//on the cusp of the nucleus
 	const int ns = static_cast<int>(seeds.size());
 	std::vector<d4> ends(ns, d4{ 0.0, 0.0, 0.0, -1.0 });
 #pragma omp parallel for schedule(dynamic, 16)
@@ -1670,7 +1704,7 @@ std::vector<d4> analytic_eli_maxima(const WFN &wavy, const bool debug)
 		d3 p = seeds[s], g;
 		if (wavy.compute_dens(p) < basin_density_cutoff) continue;
 		double f;
-		wavy.computeELIGrad(p, f, g);
+		eli_grad(p, f, g);
 		if (!std::isfinite(f)) continue;
 		bool inside = true;
 		double step = 0.05;
@@ -1680,7 +1714,7 @@ std::vector<d4> analytic_eli_maxima(const WFN &wavy, const bool debug)
 			const d3 t{ p[0] + step * g[0] / gn, p[1] + step * g[1] / gn, p[2] + step * g[2] / gn };
 			double ft;
 			d3 gt;
-			wavy.computeELIGrad(t, ft, gt);
+			eli_grad(t, ft, gt);
 			if (std::isfinite(ft) && ft > f) {
 				p = t; f = ft; g = gt;
 				step = std::min(1.5 * step, 0.3);
@@ -1755,19 +1789,13 @@ void basin_adaptive_step_knobs(double &cap, double &grow, double &keep, double &
 static bool g_adaptive_step = false;
 //Count rejected adaptive-step proposals separately.
 static std::atomic<long long> g_adp_steps{ 0 }, g_adp_tries{ 0 }, g_adp_turn{ 0 }, g_adp_fall{ 0 }, g_adp_shrink{ 0 };
-//Trajectories that ran their step budget out. Counted separately from the stalls because they are
-//the opposite failure - a walk that never gave up rather than one that gave up too early - and
-//because a streaming walk that reaches the cap has no cube to fall back on.
+//Trajectories that ran their step budget out
 static std::atomic<long long> g_adp_exhaust{ 0 };
-//Steps a single trajectory may take before it is given up on. 2000 was chosen for a walk whose step
-//had a hard floor; the shrink took that floor away, so whether it is still enough is a measurement,
-//and NOS_BASIN_STEP_CAP is how that measurement gets taken without a rebuild per value.
+//Steps a single trajectory may take before it is given up on (NOS_BASIN_STEP_CAP)
 static int g_step_cap = 2000;
 //Recover from a shortened step by doubling toward the base step.
 static double g_step_relax = 1.5;
-//Whether a floor step that fails to rise may halve and try again. On by default - it is the fix, and
-//3716 of CCH's 3716 stalls were this - and NOS_BASIN_SHRINK=0 turns it off, which is how the test that
-//asserts the stall count is zero gets to show the count it is asserting against.
+//Whether a floor step that fails to rise may halve and try again (NOS_BASIN_SHRINK=0 turns it off)
 static bool g_step_shrink = true;
 //Account separately for density that never reaches a basin.
 static std::atomic<long long> g_stall_vacuum{ 0 }, g_stall_field{ 0 }, g_stall_far{ 0 };
@@ -1775,9 +1803,7 @@ static std::atomic<double> g_stall_far_rho{ 0.0 };
 //Bucket stalled gradients to distinguish tail and interior failures.
 static constexpr int g_stall_basins = 8;
 static std::atomic<long long> g_stall_gn[4] = {};
-//The >=1e-2 bucket again, but cleared when an integration starts instead of when it prints, so it
-//still holds the last field's count after the call returns. That is what basin_stalls_on_a_slope
-//hands to the test; the rest of these are read once by the log line and reset in the same breath.
+//The >=1e-2 bucket again, cleared when an integration starts so basin_stalls_on_a_slope can read it after
 static std::atomic<long long> g_stall_slope{ 0 };
 static std::atomic<long long> g_stall_to[g_stall_basins + 1] = {};
 //A negative distance marks a stall below the density cutoff.
@@ -1843,9 +1869,106 @@ void basin_stage_timer::lap(const std::string &what) {
 	if (g_basin_timing) std::cout << "  [timing] " << what << ": " << std::fixed << std::setprecision(2) << s << " s" << std::endl;
 }
 
-//Integrate basin populations on atom-centred quadrature grids.
-vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, const std::vector<d4> &maxima, const WFN &wavy, const int accuracy, const bool eli_field, vec &volumes, double &outside, const std::function<double(const d3&)> *core_density, const std::function<void(const d3&, d3&)> *core_gradient, const int grid_boost, const density_field *field, basin_overlaps *ovl, const ivec *maximum_basin)
+//Sized for the atoms' box plus 4 bohr each side at half load, so a molecule smaller than the cap
+//does not pay for the cap
+basin_memo::basin_memo(const d3 &lo, const d3 &hi, const double voxel, const size_t megabytes) : inv(1.0 / voxel)
 {
+	double n = 2.0;
+	for (int d = 0; d < 3; d++) {
+		origin[d] = 0.5 * (lo[d] + hi[d]) - (1 << (bits - 1)) * voxel;
+		n *= (hi[d] - lo[d] + 8.0) / voxel;
+	}
+	const size_t cap = std::max<size_t>(megabytes << 20, 1 << 19) / sizeof(uint64_t);
+	size_t size = 1 << 16;
+	while (size * 2 <= cap && static_cast<double>(size) < n) size <<= 1;
+	table = std::vector<std::atomic<uint64_t>>(size);
+	mask = size - 1;
+	//Linear probing degrades past three quarters full; inserts stop there and reads go on
+	//ponytail: a full table just stops learning; grow-and-rehash if a large system hits the cap
+	limit = size / 4 * 3;
+}
+
+uint64_t basin_memo::key(const d3 &p) const
+{
+	uint64_t k = 0;
+	for (int d = 0; d < 3; d++) {
+		const double t = std::floor((p[d] - origin[d]) * inv);
+		//one voxel of margin both sides, so every neighbour of a key is a key
+		if (!(t >= 1.0 && t <= static_cast<double>((1 << bits) - 2))) return 0;
+		k |= static_cast<uint64_t>(t) << (d * bits);
+	}
+	return k;
+}
+
+static inline uint64_t memo_hash(uint64_t k)
+{
+	k ^= k >> 33; k *= 0xff51afd7ed558ccdull; k ^= k >> 33; k *= 0xc4ceb9fe1a85ec53ull; k ^= k >> 33;
+	return k;
+}
+
+uint64_t basin_memo::find(const uint64_t k) const
+{
+	for (size_t i = memo_hash(k) & mask, n = 0; n <= mask; n++, i = (i + 1) & mask) {
+		const uint64_t e = table[i].load(std::memory_order_relaxed);
+		if (e == 0) return 0;
+		if ((e & key_mask) == k) return e;
+	}
+	return 0;
+}
+
+void basin_memo::add(const uint64_t k, const uint64_t label)
+{
+	for (size_t i = memo_hash(k) & mask, n = 0; n <= mask; n++, i = (i + 1) & mask) {
+		uint64_t e = table[i].load(std::memory_order_relaxed);
+		if (e == 0) {
+			if (used.load(std::memory_order_relaxed) >= limit) return;
+			if (table[i].compare_exchange_strong(e, k | label << 42 | one, std::memory_order_relaxed)) {
+				used.fetch_add(1, std::memory_order_relaxed);
+				return;
+			}
+			//e is now whoever won the slot, which may be this very voxel
+		}
+		if ((e & key_mask) != k) continue;
+		for (;;) {
+			if (e & conflict) return;
+			uint64_t next = e;
+			if (((e >> 42) & label_mask) != label) next |= conflict;
+			else if ((e & ~conflict) >> 55 < 255) next += one;
+			else return;
+			if (table[i].compare_exchange_weak(e, next, std::memory_order_relaxed)) return;
+		}
+	}
+}
+
+void basin_memo::write(const std::vector<uint64_t> &path, const int label)
+{
+	if (label <= 0 || static_cast<uint64_t>(label) > label_mask) return;
+	for (const uint64_t k : path) add(k, static_cast<uint64_t>(label));
+}
+
+int basin_memo::settled(const d3 &p) const
+{
+	const uint64_t k = key(p);
+	if (k == 0) return 0;
+	const uint64_t c = find(k);
+	if (c == 0 || (c & conflict) || (c >> 55) < 2) return 0;
+	const uint64_t label = (c >> 42) & label_mask;
+	for (int dz = -1; dz <= 1; dz++)
+		for (int dy = -1; dy <= 1; dy++)
+			for (int dx = -1; dx <= 1; dx++) {
+				if (dx == 0 && dy == 0 && dz == 0) continue;
+				//every index stays inside its 14 bits, so the offsets add field by field
+				const uint64_t e = find(k + static_cast<uint64_t>(dx + dy * (int64_t(1) << bits) + dz * (int64_t(1) << 2 * bits)));
+				if (e == 0 || (e & conflict) || ((e >> 42) & label_mask) != label) return 0;
+			}
+	return static_cast<int>(label);
+}
+
+//Integrate basin populations on atom-centred quadrature grids.
+vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, const std::vector<d4> &maxima, const WFN &wavy, const int accuracy, const bool eli_field, vec &volumes, double &outside, const std::function<double(const d3&)> *core_density, const std::function<void(const d3&, d3&)> *core_gradient, const int grid_boost, const density_field *field, basin_overlaps *ovl, const ivec *maximum_basin, const eli_spin_field *eli, vec2 *spin_pop)
+{
+	if (!eli_field) eli = nullptr;
+	if (!eli) spin_pop = nullptr;
 	//The filled core steers the trajectories only. An ECP atom's grid is built for its
 	//valence basis and cannot integrate a 1s at Z = 80, so the core electrons are added to
 	//the nucleus's basin by count once the valence density is integrated; a Thakkar core
@@ -1858,14 +1981,10 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 	g_stall_slope = 0;
 	if (const char *e = std::getenv("NOS_BASIN_STEP_CAP")) {
 		const int v = std::atoi(e);
-		//A cap below a few hundred steps would make every trajectory unfinished and the measurement
-		//meaningless, so a typo reads as "leave it alone" rather than as a setting.
 		if (v >= 100) g_step_cap = v;
 	}
 	if (const char *e = std::getenv("NOS_BASIN_STEP_RELAX")) {
 		const double v = std::atof(e);
-		//Below 1.0 the step would shrink on a *successful* step too, which is a different algorithm
-		//and not one anybody asked for; above 4.0 it is a cycle with a longer period.
 		if (v >= 1.0 && v <= 4.0) g_step_relax = v;
 	}
 	if (const char *e = std::getenv("NOS_BASIN_SHRINK")) g_step_shrink = std::string(e) != "0";
@@ -1889,19 +2008,16 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 	}
 	vec pop(nb, 0.0);
 	volumes.assign(nb, 0.0);
+	if (spin_pop) spin_pop->assign(nb, vec(3, 0.0));
 	outside = 0.0;
 	double cutoff_outside = 0.0, unresolved_outside = 0.0;
 	const int nx = streaming ? 0 : cub->get_size(0), ny = streaming ? 0 : cub->get_size(1), nz = streaming ? 0 : cub->get_size(2);
-	//Without a cube there is nothing to read a spacing off, so the trajectory keeps the step of
-	//a 0.1 A grid: the integrator is then the one the gridded path has been validated against
-	//and only the basin bookkeeping changes
+	//Without a cube the trajectory keeps the step of a 0.1 A grid
 	d3 h{ constants::ang2bohr(0.1), constants::ang2bohr(0.1), constants::ang2bohr(0.1) };
 	if (cub)
 		for (int i = 0; i < 3; i++)
 			h[i] = std::sqrt(cub->get_vector(0, i) * cub->get_vector(0, i) + cub->get_vector(1, i) * cub->get_vector(1, i) + cub->get_vector(2, i) * cub->get_vector(2, i));
-	//A third of a voxel with a midpoint step near a nucleus: the Euler step at half a voxel
-	//put the N-H boundary of NH3BH3 0.03 e off AIMAll, this is within 0.006. Beyond 1.5 bohr
-	//of every nucleus the field is smooth enough for a whole voxel.
+	//A third of a voxel within 1.5 bohr of a nucleus, a whole voxel beyond
 	const double voxel = std::min({ h[0], h[1], h[2] });
 	const std::vector<atom> atoms = wavy.get_atoms();
 	const double sscale = basin_step_scale();
@@ -1917,6 +2033,24 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 		return sscale * voxel;
 	};
 	const double step = 0.3 * voxel;
+	//Streaming only: a gridded run's basin cube already answers what the memo would. Half a
+	//step voxel, so a 0.19 bohr step crosses about two memo voxels and the midpoint fills the gap
+	//ponytail: 13-bit labels, so more than 8191 basins runs without the memo; widen the label
+	//field (and narrow the count) if that ever happens
+	std::unique_ptr<basin_memo> memo;
+	{
+		const char *e = std::getenv("NOS_BASIN_MEMO"); // Flawfinder: ignore - compared only
+		if (streaming && !atoms.empty() && nb < (1 << 13) && !(e != nullptr && std::string(e) == "0")) {
+			d3 lo = atoms[0].get_pos(), hi = lo;
+			for (const atom &at : atoms)
+				for (int d = 0; d < 3; d++) { lo[d] = std::min(lo[d], at.get_pos()[d]); hi[d] = std::max(hi[d], at.get_pos()[d]); }
+			memo = std::make_unique<basin_memo>(lo, hi, 0.5 * voxel, static_cast<size_t>(env_double("NOS_BASIN_MEMO_MB", 256.0)));
+		}
+	}
+	//Trajectories by who asked for them (outer probe, inner probe, cell centre, bisection), the
+	//step iterations they took and how many a settled memo block ended
+	enum { climb_outer, climb_inner, climb_centre, climb_bisect };
+	std::atomic<long long> climbs[4]{}, climb_steps[4]{}, memo_hits{ 0 };
 	//Cube cell of a position and the position within it; false outside the cube
 	auto cell = [&](const d3 &p, int *c, d3 &f) {
 		if (streaming) return false;
@@ -1929,9 +2063,7 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 		}
 		return true;
 	};
-	//Basin of the nearest grid point, and whether every voxel within band of the cell agrees.
-	//Three voxels: the grid's own boundary can be off by one or two, and a point that close
-	//to it is cheap to send up the field
+	//Basin of the nearest grid point, and whether every voxel within band of the cell agrees
 	const int band = 1;
 	auto lookup = [&](const d3 &p, bool &settled) {
 		int c[3]; d3 f;
@@ -1952,15 +2084,19 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 	//ELI-D maximum, which is broad; a nucleus gets a tenth of a bohr, since a hydroxyl
 	//hydrogen's basin is 0.4 bohr thick and a wider net catches the oxygen's electrons
 	const double catch2 = eli_field ? std::pow(2.0 * std::max({ h[0], h[1], h[2] }), 2) : 0.01;
-	//Store each attractor centre and squared beta-sphere radius.
+	//Store each attractor centre and squared beta-sphere radius; -1 marks a core maximum that
+	//answers through its nucleus's sphere and has no catch radius of its own.
 	vec beta2(maxima.size(), 0.0);
 	std::vector<d3> bcen(maxima.size());
 	for (size_t m = 0; m < maxima.size(); m++) bcen[m] = d3{ maxima[m][0], maxima[m][1], maxima[m][2] };
 	auto at_maximum = [&](const d3 &p) {
 		for (size_t m = 0; m < maxima.size(); m++) {
-			if (std::pow(p[0] - maxima[m][0], 2) + std::pow(p[1] - maxima[m][1], 2) + std::pow(p[2] - maxima[m][2], 2) < catch2)
-				return basin_of(m);
-			if (beta2[m] > 0.0 && std::pow(p[0] - bcen[m][0], 2) + std::pow(p[1] - bcen[m][1], 2) + std::pow(p[2] - bcen[m][2], 2) < beta2[m])
+			//a measured beta sphere replaces the catch radius, which can reach past a core shell minimum
+			if (beta2[m] > 0.0) {
+				if (std::pow(p[0] - bcen[m][0], 2) + std::pow(p[1] - bcen[m][1], 2) + std::pow(p[2] - bcen[m][2], 2) < beta2[m])
+					return basin_of(m);
+			}
+			else if (beta2[m] == 0.0 && std::pow(p[0] - maxima[m][0], 2) + std::pow(p[1] - maxima[m][1], 2) + std::pow(p[2] - maxima[m][2], 2) < catch2)
 				return basin_of(m);
 		}
 		return 0;
@@ -1996,7 +2132,8 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 			return;
 		}
 		double e;
-		wavy.computeELIGrad(p, e, g);
+		if (eli) (*eli)(p, e, g, nullptr);
+		else wavy.computeELIGrad(p, e, g);
 		if (val) *val = e;
 	};
 	//The field's value at p and its gradient in one call, which is what the climb needs to see
@@ -2029,11 +2166,8 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 		margin = basin_beta_margin();
 #pragma omp parallel for schedule(dynamic)
 		for (int m = 0; m < nm; m++) {
-			//Ascend onto the attractor first. A cube maximum is a voxel centre, so half a voxel
-			//out on the far side of the true top the radial derivative already points back in:
-			//the march stops at its very first sample and the sphere collapses to nothing. That
-			//is the whole reason the density gained (its maxima are nuclei, exact to the last
-			//digit) and ELI-D gained not one trajectory.
+			//Ascend onto the attractor first: a cube maximum is a voxel centre, and past the true top
+			//the radial derivative already points back in
 			d3 c{ maxima[m][0], maxima[m][1], maxima[m][2] };
 			{
 				d3 g;
@@ -2059,21 +2193,42 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 				const double d = std::sqrt(std::pow(c[0] - maxima[n][0], 2) + std::pow(c[1] - maxima[n][1], 2) + std::pow(c[2] - maxima[n][2], 2));
 				cap = std::min(cap, 0.45 * d);
 			}
+			//A maximum on a nucleus heads the atom's unified core: the shells out to its furthest core
+			//maximum are its own basin, so a ray crosses their minima and stops at the first beyond
+			double inner = 0.0;
+			for (const atom &a : atoms) {
+				const d3 ap = a.get_pos();
+				if (std::pow(c[0] - ap[0], 2) + std::pow(c[1] - ap[1], 2) + std::pow(c[2] - ap[2], 2) > march * march) continue;
+				for (int n = 0; n < nm; n++)
+					if (n != m && basin_of(n) == basin_of(m))
+						inner = std::max(inner, std::sqrt(std::pow(c[0] - maxima[n][0], 2) + std::pow(c[1] - maxima[n][1], 2) + std::pow(c[2] - maxima[n][2], 2)));
+			}
 			double r = cap;
 			for (const d3 &u : dirs) {
-				double rr = march;
+				double rr = inner + march;
+				bool fell = inner == 0.0;
 				for (; rr <= cap + 1e-12; rr += march) {
 					const d3 q{ c[0] + rr * u[0], c[1] + rr * u[1], c[2] + rr * u[2] };
 					d3 g;
 					gradient(q, g);
-					if (g[0] * u[0] + g[1] * u[1] + g[2] * u[2] >= 0.0) break;
+					if (g[0] * u[0] + g[1] * u[1] + g[2] * u[2] < 0.0) fell = true;
+					else if (fell) break;
 				}
+				//never past the outer core shell's top within the cap: nothing measured
+				if (!fell) { r = 0.0; break; }
 				r = std::min(r, rr - march);
 				if (r <= march) break;
 			}
 			if (r <= 2.0 * march) continue;
 			bcen[m] = c;
 			beta2[m] = std::pow(margin * r, 2);
+		}
+		//A core maximum inside its nucleus's sphere answers through that sphere; its own catch radius
+		//reaches past the shell minimum the sphere stops at
+		for (int m = 0; m < nm; m++) {
+			if (beta2[m] > 0.0) continue;
+			for (int n = 0; n < nm; n++)
+				if (beta2[n] > 0.0 && basin_of(n) == basin_of(m) && std::pow(maxima[m][0] - bcen[n][0], 2) + std::pow(maxima[m][1] - bcen[n][1], 2) + std::pow(maxima[m][2] - bcen[n][2], 2) < beta2[n]) { beta2[m] = -1.0; break; }
 		}
 	}
 	T.lap(fieldname + "beta spheres");
@@ -2101,19 +2256,46 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 	const double stall_reach = 1e30;
 	//The trajectory and quadrature share the density isosurface.
 	const double stall_floor = basin_density_cutoff;
+	//An ELI-D walk stalls on a flat ridge such as a lone-pair torus, where the nearest maximum can be
+	//the core behind the shell minimum. Take the maximum, among those up to twice the nearest
+	//distance away, whose straight path from p stays highest. d2 is the nearest squared.
+	auto highest_path = [&](const d3 &p, const double d2) {
+		int best = 0;
+		double best_low = -1.0, best_q = 0.0;
+		for (size_t m = 0; m < maxima.size(); m++) {
+			const d3 v{ maxima[m][0] - p[0], maxima[m][1] - p[1], maxima[m][2] - p[2] };
+			const double q = v[0] * v[0] + v[1] * v[1] + v[2] * v[2];
+			if (q > 4.0 * d2) continue;
+			double low = std::numeric_limits<double>::max();
+			for (int k = 1; k < 8; k++)
+			{
+				const d3 x{ p[0] + k / 8.0 * v[0], p[1] + k / 8.0 * v[1], p[2] + k / 8.0 * v[2] };
+				double e;
+				d3 g;
+				if (eli) (*eli)(x, e, g, nullptr);
+				else e = wavy.computeELI(x);
+				low = std::min(low, e);
+			}
+			if (low > best_low || (low == best_low && q < best_q)) { best = basin_of(m); best_low = low; best_q = q; }
+		}
+		return best;
+	};
 	//Resolve a stalled density trajectory from its starting side of the separatrix.
-	auto stalled = [&](const d3 &start, const d3 &r, const double gn = -1.0) {
+	auto stalled =[&](const d3 &start, const d3 &r, const double gn = -1.0) {
 		const double rho = valence(r);
 		if (rho < stall_floor) { basin_stall_seen(-1.0, 0.0); return 0; }
 		double d2 = std::numeric_limits<double>::max();
 		for (size_t m = 0; m < maxima.size(); m++)
 			d2 = std::min(d2, std::pow(r[0] - maxima[m][0], 2) + std::pow(r[1] - maxima[m][1], 2) + std::pow(r[2] - maxima[m][2], 2));
 		basin_stall_seen(std::sqrt(d2), rho, gn);
-		const int b = nearest_maximum(eli_field ? r : start, stall_reach);
+		const int b = eli_field ? highest_path(r, d2) : nearest_maximum(start, stall_reach);
 		basin_stall_gave_to(b);
 		return b;
 	};
-	auto climb = [&](const d3 &p, long long &lb, long long &ll) {
+	//kind says who asked (climb_outer...). Every clean ending is written to the memo, but only
+	//the edge probes read it: a cell centre or a bisection probe is climbed because it sits within
+	//a cell of the separatrix, which is exactly where a 3x3x3 block can be wrong
+	auto climb = [&](const d3 &p, long long &lb, long long &ll, const int kind) {
 		if (valence(p) < basin_density_cutoff) return 0;
 		bool settled;
 		int b = lookup(p, settled);
@@ -2127,6 +2309,18 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 		//not counted as one either
 		if (const int m0 = at_maximum(p)) return m0;
 		lb++;
+		climbs[kind].fetch_add(1, std::memory_order_relaxed);
+		struct tally { std::atomic<long long> &to; long long n = 0; ~tally() { to.fetch_add(n, std::memory_order_relaxed); } } steps{ climb_steps[kind] };
+		const bool read_memo = memo && (kind == climb_outer || kind == climb_inner);
+		//The voxels this walk has held, and the midpoint of the step in flight, which joins them
+		//only once the point it led to has been accepted
+		std::vector<uint64_t> path;
+		uint64_t pending = 0;
+		auto note = [&](const uint64_t k) { if (k != 0 && (path.empty() || path.back() != k)) path.push_back(k); };
+		//Field at r_prev, kept so a step that is taken back does not evaluate it a second time
+		d3 g_prev{};
+		double here_prev = 0.0;
+		bool have_prev = false, reuse = false;
 		d3 r = p, g;
 		double last_value = -1.0;
 		//Grow only steps whose field direction stays nearly straight.
@@ -2141,19 +2335,32 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 		const bool grow = basin_adaptive_step_enabled();
 		double value_prev = -1.0;
 		for (int s = 0; s < g_step_cap; s++) {
+			steps.n++;
+			//Two steps of its own first, so a probe that starts on a boundary does not read the
+			//block it starts in
+			if (read_memo && s >= 2)
+				if (const int mb = memo->settled(r)) { memo->write(path, mb); memo_hits.fetch_add(1, std::memory_order_relaxed); return mb; }
 			//A streaming ELI-D step evaluates the field at r anyway; that orbital pass carries the
 			//density too, so the isosurface test costs no separate density evaluation
 			bool have_vg = false;
 			double vg = 0.0;
-			if (eli_field) {
+			if (reuse) {
+				//r is r_prev again, whose field (and density test) the accepted step already has
+				g = g_prev; vg = here_prev; have_vg = true; reuse = false;
+			}
+			else if (eli_field) {
 				double rho_r;
-				if (streaming && !field) { wavy.computeELIGrad(r, vg, g, &rho_r); have_vg = true; }
+				if (streaming && eli) { double aux[4]; (*eli)(r, vg, g, aux); rho_r = aux[0]; have_vg = true; }
+				else if (streaming && !field) { wavy.computeELIGrad(r, vg, g, &rho_r); have_vg = true; }
 				else rho_r = valence(r);
 				if (rho_r < basin_density_cutoff) return 0;
 			}
 			if (grow) adp_count(g_adp_steps);
 			const int m = at_maximum(r);
-			if (m) return m;
+			if (m) {
+				if (memo) { note(pending); note(memo->key(r)); memo->write(path, m); }
+				return m;
+			}
 			const double floor_step = step_at(r);
 			//The gridded ELI-D climb is steered by the cube below and never asked whether it is
 			//still rising; every streaming walk is, since nothing else can stop it
@@ -2162,14 +2369,16 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 				here = have_vg ? vg : value_and_gradient(r, g);
 				if (here <= last_value) {
 					//Retry a grown step at the base length after excessive turning.
-					if (grown_last) { adp_count(g_adp_fall); r = r_prev; last_value = value_prev; mult = 1.0; grown_last = false; continue; }
+					if (grown_last) { adp_count(g_adp_fall); r = r_prev; last_value = value_prev; mult = 1.0; grown_last = false; reuse = have_prev; pending = 0; continue; }
 					mult = 1.0;
-					if (!eli_field && g_step_shrink && shrink > 0.0625) {
+					if (g_step_shrink && shrink > 0.0625) {
 						adp_count(g_adp_shrink);
 						shrink *= 0.5;
 						r = r_prev;
 						last_value = value_prev;
 						grown_last = false;
+						reuse = have_prev;
+						pending = 0;
 						continue;
 					}
 					const int n = stalled(p, r, std::sqrt(g[0] * g[0] + g[1] * g[1] + g[2] * g[2]));
@@ -2178,12 +2387,11 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 				}
 			}
 			else gradient(r, g);
+			if (memo) { note(pending); pending = 0; note(memo->key(r)); }
 			double gn = std::sqrt(g[0] * g[0] + g[1] * g[1] + g[2] * g[2]);
 			if (gn < 1e-12) {
-				//A critical point, and now the only way to reach the stall path: 3716 of CCH's 3716
-				//old stalls carried a gradient of 1e-2 or more, so none of them was ever this. A
-				//streaming density walk has no cube behind it, so breaking here reports the point
-				//outside every basin - 0.0102 e of CCH - where the tie-break has a definite answer.
+				//A critical point: a streaming density walk has no cube behind it, so it goes to the
+				//stall tie-break instead of outside every basin
 				if (!eli_field) { const int n = stalled(p, r, gn); if (n) return n; }
 				break;
 			}
@@ -2196,10 +2404,10 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 			double sl = base;
 			double cosine = 0.0;
 			bool stepped = false;
+			d3 mid;
 			for (int attempt = 0; attempt < 2 && !stepped; attempt++) {
 				sl = mult > 1.0 ? std::min(base * mult, std::max(base, reach_limit(r))) : base;
 				if (mult > 1.0) adp_count(g_adp_tries);
-				d3 mid;
 				for (int k = 0; k < 3; k++) mid[k] = r[k] + 0.5 * sl * g0[k] / gn0;
 				gradient(mid, g);
 				gn = std::sqrt(g[0] * g[0] + g[1] * g[1] + g[2] * g[2]);
@@ -2215,6 +2423,10 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 				break;
 			}
 			r_prev = r;
+			g_prev = g0;
+			here_prev = here;
+			have_prev = true;
+			if (memo) pending = memo->key(mid);
 			value_prev = last_value;
 			last_value = here;
 			grown_last = sl > base;
@@ -2333,7 +2545,7 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 				for (int i = 0; i < np; i++) {
 					double in, out;
 					if (W[i] == 0.0 || !probe_wanted[i] || !cell_edges(i, in, out)) continue;
-					outer_probe[i] = climb(along_i(i, out), lb, ll);
+					outer_probe[i] = climb(along_i(i, out), lb, ll, climb_outer);
 				}
 #pragma omp critical
 				{ boundary_points += lb; lost += ll; }
@@ -2341,7 +2553,7 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 		}
 #pragma omp parallel
 		{
-			vec lp(nb, 0.0), lv(nb, 0.0);
+			vec lp(nb, 0.0), lv(nb, 0.0), lspin(spin_pop ? 3 * (size_t)nb : 0, 0.0);
 			double lo = 0.0, lc = 0.0, lu = 0.0;
 			long long lb = 0, ll = 0;
 			//ponytail: one triangle per basin per thread, nb * nmo^2 / 2 doubles each; the caller
@@ -2378,6 +2590,9 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 				int b = lookup(p, settled);
 				//The same density, taken from the orbital pass that also hands out phi
 				const double rho = ovl ? wavy.compute_dens(p, dbuf, phi) : (rho_at.empty() ? valence(p) : rho_at[i]);
+				//rho, rho_alpha, rho_beta, rho_s Y_q at the point; only basins carry them, so not below the cutoff
+				double aux[4]{ 0.0, 0.0, 0.0, 0.0 };
+				if (spin_pop && rho >= basin_density_cutoff) { double e; d3 g; (*eli)(p, e, g, aux); }
 				//A basin's share of the cell's quadrature weight; the weight itself stays with
 				//the rule, only who gets it is decided here
 				auto give = [&](const int bb, const double fr) {
@@ -2390,6 +2605,7 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 					}
 					lp[bb - 1] += w * rho * fr;
 					lv[bb - 1] += w * fr;
+					if (spin_pop) for (int k = 0; k < 3; k++) lspin[3 * (size_t)(bb - 1) + k] += w * fr * aux[1 + k];
 					accumulate(bb, w * fr);
 				};
 				if (rho < basin_density_cutoff) { give(0, 1.0); continue; }
@@ -2399,14 +2615,14 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 				if (eli_field && !streaming && (b == 0 || settled)) { give(b, 1.0); continue; }
 				//Climb the cell centre only when the edge probes do not decide its basin.
 				int bc = -1;
-				auto centre_basin = [&]() { if (bc < 0) bc = climb(p, lb, ll); return bc; };
+				auto centre_basin = [&]() { if (bc < 0) bc = climb(p, lb, ll, climb_centre); return bc; };
 				double inner, outer;
 				if (!cell_edges(i, inner, outer)) { give(centre_basin(), 1.0); continue; }
 				auto along = [&](const double r) { return along_i(i, r); };
 				//A failed edge probe defers to the cell centre.
 				const int pin = partner[i];
-				int bi = pin >= 0 && outer_probe[pin] >= 0 ? outer_probe[pin] : climb(along(inner), lb, ll);
-				int bo = outer_probe[i] >= 0 ? outer_probe[i] : climb(along(outer), lb, ll);
+				int bi = pin >= 0 && outer_probe[pin] >= 0 ? outer_probe[pin] : climb(along(inner), lb, ll, climb_inner);
+				int bo = outer_probe[i] >= 0 ? outer_probe[i] : climb(along(outer), lb, ll, climb_outer);
 				if (bi == 0) bi = centre_basin();
 				if (bo == 0) bo = centre_basin();
 				if (bi == bo) { give(bi, 1.0); continue; }
@@ -2415,7 +2631,7 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 				double lo_r = inner, hi_r = outer;
 				for (int it = 0; it < bisections; it++) {
 					const double mid = 0.5 * (lo_r + hi_r);
-					int bm = climb(along(mid), lb, ll);
+					int bm = climb(along(mid), lb, ll, climb_bisect);
 					if (bm == 0) bm = centre_basin();
 					if (bm == bi) lo_r = mid; else hi_r = mid;
 				}
@@ -2431,6 +2647,7 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 #pragma omp critical
 			{
 				for (int b = 0; b < nb; b++) { pop[b] += lp[b]; volumes[b] += lv[b]; }
+				if (spin_pop) for (int b = 0; b < nb; b++) for (int k = 0; k < 3; k++) (*spin_pop)[b][k] += lspin[3 * (size_t)b + k];
 				if (ovl) {
 					for (int b = 0; b < nb; b++)
 						for (size_t t = 0; t < ovl->S[b].size(); t++) ovl->S[b][t] += ls[b][t];
@@ -2457,9 +2674,7 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 		}
 	T.lap(fieldname + "point loop");
 	{
-		//Read and reset unconditionally so the counts never carry from one field or one molecule
-		//into the next, but print only under -basin_timing: the golden files are line-by-line
-		//captures of this console log, so an extra line here shifts every basin row below it.
+		//Read and reset unconditionally so the counts never carry into the next field or molecule
 		long long sv, sf, sfar; double srho;
 		basin_stall_counters(sv, sf, sfar, srho);
 		long long sgn[4], sto[g_stall_basins + 1];
@@ -2467,10 +2682,7 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 		for (int i = 0; i <= g_stall_basins; i++) sto[i] = g_stall_to[i].load();
 		const long long sx = g_adp_exhaust.exchange(0);
 		basin_stall_counters_reset();
-		//Built in its own stream on purpose. Scientific notation is the only readable form for a
-		//density that spans 1e-6 to 1e-1, and setting it on std::cout leaves the precision behind
-		//for whatever prints next - the basin table is three lines below and the golden files are
-		//captures of it.
+		//Own stream, so the scientific format does not stay on std::cout
 		if (g_basin_timing && sf + sv + sx > 0) {
 			std::ostringstream line;
 			line << std::scientific << std::setprecision(3);
@@ -2492,6 +2704,17 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 		std::cout.flags(flags);
 	}
 	if (g_basin_timing) std::cout << "  [timing] " << fieldname << "outside the density isosurface: " << cutoff_outside << " e, unresolved inside: " << unresolved_outside << " e" << std::endl;
+	if (g_basin_timing) {
+		const char *who[4] = { "outer", "inner", "centre", "bisection" };
+		long long all = 0;
+		std::cout << "  [timing] " << fieldname << "climbs (step iterations):";
+		for (int k = 0; k < 4; k++) { std::cout << (k ? ", " : " ") << climbs[k] << " " << who[k] << " (" << climb_steps[k] << ")"; all += climb_steps[k]; }
+		std::cout << "; " << all << " step iterations";
+		if (memo) std::cout << "; memo: " << memo_hits << " ended in a settled block, " << memo->entries() << " voxels in "
+			<< memo->capacity() << " slots";
+		else std::cout << "; memo off";
+		std::cout << std::endl;
+	}
 	if (g_basin_timing && g_adaptive_step) {
 		const long long st = g_adp_steps.exchange(0), tr = g_adp_tries.exchange(0);
 		const long long tu = g_adp_turn.exchange(0), fa = g_adp_fall.exchange(0);
@@ -2735,7 +2958,7 @@ svec assign_labels_to_basins(const std::vector<d4> &Maxima, const std::vector<at
 				else if (lone_atom) // one atom in the molecule: inside its core radius a core shell, outside it the valence shell
 					result[i] = atoms[atom_index1].get_label() + to_string(atom_index1) + (min_dist1 < core_dist ? " core" : " LP");
 				else if (min_dist1 < core_dist && atoms[atom_index1].get_charge() > 2) // If the maximum is very close to an atom, we assume it's a core basin and label it with that atom
-					result[i] = atoms[atom_index1].get_label() + to_string(atom_index1) + " core";
+					result[i] = atoms[atom_index1].get_label() + to_string(atom_index1) + (min_dist1 < std::pow(eli_core_radius(atoms[atom_index1].get_charge()), 2) ? " core" : " shell");
 				else if ((ratio < 0.333 || ratio > 3) && atoms[atom_index1].get_charge() > 2) // If the maximum is significantly closer to one atom than to the other, we assume it's a valence basin and label it with the closest atom
 					result[i] = atoms[atom_index1].get_label() + to_string(atom_index1) + " LP";
 				else if (between) // between its two nearest nuclei: a bond basin, labelled with both atoms

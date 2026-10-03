@@ -76,7 +76,7 @@ bool cube::write_binary(const std::filesystem::path& given_path, bool absolute) 
 		for (int j = 0; j < 3; j++) put<double>(of, parent_wavefunction->get_atom_coordinate(i, j));
 	}
 	const uint32_t header_bytes = (uint32_t)of.tellp();
-	std::vector<double> row(size[2]);
+	vec row(size[2]);
 	for (int x = 0; x < size[0]; x++)
 		for (int y = 0; y < size[1]; y++)
 		{

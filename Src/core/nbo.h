@@ -26,66 +26,66 @@ class WFN;
 //One FILE47, unpacked.  density and fock carry one block for a closed shell and two - alpha then
 //beta - for an open one.
 struct NboInput {
-    int n = 0;
-    bool open_shell = false;
-    std::vector<NAOBasisFunction> ao;  //atom, l, shell inside (atom, l), component 0..2l
-    dMatrix2 overlap;
-    std::vector<dMatrix2> density;
-    std::vector<dMatrix2> fock;
+	int n = 0;
+	bool open_shell = false;
+	std::vector<NAOBasisFunction> ao;  //atom, l, shell inside (atom, l), component 0..2l
+	dMatrix2 overlap;
+	std::vector<dMatrix2> density;
+	std::vector<dMatrix2> fock;
 };
 
 //One accepted Lewis or non-Lewis orbital in the NAO basis.
 struct NboFunction {
-    ivec centers;                      //0-based atom indices, one or two
-    std::string type;                  //CR, LP, BD, BD*, LV, RY
-    int multiplicity = 1;              //sigma = 1, the second and third bond of a multiple bond
-    double occupancy = 0.0;
-    double energy = 0.0;
-    vec coefficients;                  //length n_nao, the orbital in the NAO basis
-    //per centre polarisation, parallel to centers: |c_A|^2 and the l-resolved share inside it
-    vec center_weight;
-    vec2 center_lchar;                 //[centre][l], summing to 1 per centre
+	ivec centers;                      //0-based atom indices, one or two
+	std::string type;                  //CR, LP, BD, BD*, LV, RY
+	int multiplicity = 1;              //sigma = 1, the second and third bond of a multiple bond
+	double occupancy = 0.0;
+	double energy = 0.0;
+	vec coefficients;                  //length n_nao, the orbital in the NAO basis
+	//per centre polarisation, parallel to centers: |c_A|^2 and the l-resolved share inside it
+	vec center_weight;
+	vec2 center_lchar;                 //[centre][l], summing to 1 per centre
 };
 
 struct NboLewis {
-    dMatrix2 gamma;                    //density in the NAO basis, trace = electron count
-    std::vector<NboFunction> orbitals; //Lewis set first, then the non-Lewis set
-    int n_lewis = 0;                   //how many of them are Lewis (CR, LP, BD)
-    double rho_nl = 0.0;               //electrons outside the Lewis set
-    double threshold = 0.0;            //occupancy threshold the ladder stopped at
-    //bond multiplicities of the leading Lewis structure: topo(a,b) for a != b, lone pairs
-    //(cores included) on the diagonal.  This is the starting point of the resonance search.
-    ivec2 topo;
+	dMatrix2 gamma;                    //density in the NAO basis, trace = electron count
+	std::vector<NboFunction> orbitals; //Lewis set first, then the non-Lewis set
+	int n_lewis = 0;                   //how many of them are Lewis (CR, LP, BD)
+	double rho_nl = 0.0;               //electrons outside the Lewis set
+	double threshold = 0.0;            //occupancy threshold the ladder stopped at
+	//bond multiplicities of the leading Lewis structure: topo(a,b) for a != b, lone pairs
+	//(cores included) on the diagonal.  This is the starting point of the resonance search.
+	ivec2 topo;
 };
 
 struct NboOptions {
-    double occupancy_threshold = 1.90; //start of the ladder, NBO's default
-    double e2_threshold_kcal = 0.5;    //what enters the printed E2 table
-    //What enters the resonance search, NBO's NRTE2.  Calibrated, not inherited: ethane's strongest
-    //interaction is 3.52 kcal (sigma(C-H) -> RY C) and its hyperconjugative sigma -> sigma* is
-    //2.80 kcal, yet NBO finds ethane's six resonance structures, while water's strongest is 1.01 kcal
-    //and NBO finds water one structure.  The gate has to sit between the two.
-    double nrt_e2_kcal = 2.0;
-    int nrt_max_arrows = 2;            //depth of the arrow-driven candidate generation
-    //Bond-length screen for resonance candidates, looser than the search's 1.3: a resonance structure
-    //may put a bond where the parent has none at all.  Ozone's third-largest reference structure at
-    //23.63 % is the ring, O 1- O 3 at 2.24 A against a covalent-radius sum of 1.32 A.
-    double nrt_bond_scale = 1.75;
-    int nrt_max_candidates = 4000;
-    bool nrt_max_set = false;          //-nrt_max given: obey the number, skip the size guard
-    double nrt_weight_floor = 5.0e-5;  //weights below this are dropped from the reported set
-    bool nrt = false;
-    bool nrt_exhaustive = false;       //enumerate every feasible topology instead of arrows
-    bool nrt_ion = true;               //allow candidates that move a bond to a lone pair (NRTION)
-    bool nrt_symmetry = true;          //collapse candidates related by an automorphism
-    bool nrt_components = true;        //split into connected components of the delocalisation graph
-    ivec nrt_subspace;                 //1-based atoms the search may alter, empty = all of them
-    int threads = 0;                   //0: OpenMP default
-    int search_threads = 0;            //Lewis search only, 0: threads.  Its regions are too fine to
-                                       //share a loaded machine: -fba runs it serial
-    std::filesystem::path file47;      //read this instead of writing a fresh one
-    bool keep_file47 = false;
-    bool debug = false;
+	double occupancy_threshold = 1.90; //start of the ladder, NBO's default
+	double e2_threshold_kcal = 0.5;    //what enters the printed E2 table
+	//What enters the resonance search, NBO's NRTE2.  Calibrated, not inherited: ethane's strongest
+	//interaction is 3.52 kcal (sigma(C-H) -> RY C) and its hyperconjugative sigma -> sigma* is
+	//2.80 kcal, yet NBO finds ethane's six resonance structures, while water's strongest is 1.01 kcal
+	//and NBO finds water one structure.  The gate has to sit between the two.
+	double nrt_e2_kcal = 2.0;
+	int nrt_max_arrows = 2;            //depth of the arrow-driven candidate generation
+	//Bond-length screen for resonance candidates, looser than the search's 1.3: a resonance structure
+	//may put a bond where the parent has none at all.  Ozone's third-largest reference structure at
+	//23.63 % is the ring, O 1- O 3 at 2.24 A against a covalent-radius sum of 1.32 A.
+	double nrt_bond_scale = 1.75;
+	int nrt_max_candidates = 4000;
+	bool nrt_max_set = false;          //-nrt_max given: obey the number, skip the size guard
+	double nrt_weight_floor = 5.0e-5;  //weights below this are dropped from the reported set
+	bool nrt = false;
+	bool nrt_exhaustive = false;       //enumerate every feasible topology instead of arrows
+	bool nrt_ion = true;               //allow candidates that move a bond to a lone pair (NRTION)
+	bool nrt_symmetry = true;          //collapse candidates related by an automorphism
+	bool nrt_components = true;        //split into connected components of the delocalisation graph
+	ivec nrt_subspace;                 //1-based atoms the search may alter, empty = all of them
+	int threads = 0;                   //0: OpenMP default
+	int search_threads = 0;            //Lewis search only, 0: threads.  Its regions are too fine to
+									   //share a loaded machine: -fba runs it serial
+	std::filesystem::path file47;      //read this instead of writing a fresh one
+	bool keep_file47 = false;
+	bool debug = false;
 };
 
 /** Read overlap, density, Fock matrix and the AO map out of a FILE47. */
@@ -112,7 +112,7 @@ bvec2 bondable_pairs(const std::vector<atom>& atoms, double scale = 1.3);
  * and scale is the occupancy a full orbital carries, 2 or 1.
  */
 NboLewis nbo_search(const NAOResult& nao, const dMatrix2& gamma, const bvec2& bondable, int n_pairs,
-                    double scale, const NboOptions& options);
+					double scale, const NboOptions& options);
 
 /**
  * Second-order perturbative donor-acceptor energies over the accepted orbitals.  lewis is not
@@ -134,9 +134,9 @@ std::vector<NboE2Entry> nbo_e2(NboLewis& lewis, const dMatrix2& fock_nao, double
  * the weights by rank, the bond orders, the valencies and the retained-structure count.
  */
 void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
-                const std::vector<NboE2Entry>& e2, const bvec2& bondable,
-                const NboOptions& options, const std::string& spin, double scale,
-                std::ostream& log);
+				const std::vector<NboE2Entry>& e2, const bvec2& bondable,
+				const NboOptions& options, const std::string& spin, double scale,
+				std::ostream& log);
 
 //The whole in-house analysis, in the shape the NBO 7 reference is stored in.  wavy is not const
 //because writing the FILE47 is not: WFN::write_nbo() renormalises the stored basis on the way.
