@@ -4146,18 +4146,23 @@ void ELI_analysis(const WFN &wavy, options &opt) {
 				<< std::setprecision(3) << std::setw(11) << res.second[b][0] << std::setw(11) << res.second[b][1] << std::setw(11) << res.second[b][2] << "\n";
 		}
 		std::cout << "  total in basins: " << std::setprecision(4) << total << "   outside every basin: " << outside << "\n";
-		//A metal's core and its outer core shell (eli_core_radius), each summed
+		//A metal's core and its outer core shell (eli_core_radius), each summed; a core far from its
+		//closed-shell count (eli_core_electrons, less what an ECP took) is flagged
 		if (eli)
 			for (int a = 0; a < l_w.get_ncen(); a++) {
 				const std::string name = l_w.get_atom_label(a) + std::to_string(a);
 				double core = 0.0, shell = 0.0;
-				int n_shell = 0;
+				int n_core = 0, n_shell = 0;
 				for (size_t b = 0; b < pop.size(); b++) {
-					if (lab[b] == name + " core") core += pop[b];
+					if (lab[b] == name + " core") { core += pop[b]; n_core++; }
 					else if (lab[b] == name + " shell") { shell += pop[b]; n_shell++; }
 				}
-				if (n_shell) std::cout << "  " << name << ": core " << std::setprecision(4) << core << " e, outer core shell " << shell << " e in "
+				const int expected = std::max(0, eli_core_electrons(static_cast<int>(l_w.get_atom_charge(a))) - static_cast<int>(l_w.get_atom_ECP_electrons(a)));
+				if (n_shell) std::cout << "  " << name << ": core " << std::setprecision(4) << core << " e (closed shells " << expected << "), outer core shell " << shell << " e in "
 					<< n_shell << " basins, together " << core + shell << " e\n";
+				if (n_core && std::abs(core - expected) > std::max(1.0, 0.15 * expected))
+					std::cout << "  WARNING: " << name << " core holds " << std::setprecision(2) << core << " e, its closed shells " << expected
+					<< ": the core boundary sits in the wrong shell minimum\n";
 			}
 		if (want_aom) report_delocalization(l_w, ovl, lab, std::cout);
 	};

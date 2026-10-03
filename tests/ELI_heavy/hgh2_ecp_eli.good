@@ -99,7 +99,7 @@ Delocalization indices (11 occupied orbitals):
 GridManager: Setting up prototype grids for atom types...
 GridManager: Generating integration grids for atoms...
 GridManager: Generated total of 65266 grid points.
-Quadrature points sent along the field: 29175, left the grid: 0
+Quadrature points sent along the field: 24606, left the grid: 0
 
 ELI-D Analysis (atomic quadrature grids):
   basin  label               electrons      volume         maximum        x          y          z

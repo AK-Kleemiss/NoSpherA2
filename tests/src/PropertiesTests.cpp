@@ -1351,6 +1351,14 @@ TEST(PropertiesBasinTests, EliLabelsAFreeAtomInsteadOfAborting)
 	EXPECT_EQ(he_labels[0], "He0 LP");
 }
 
+// eli_core_electrons: the closed shells under the valence, or under a metal's outer core shell
+TEST(PropertiesBasinTests, EliCoreElectronsCountsTheClosedShells)
+{
+	const std::pair<int, int> expected[] = { {1, 0}, {2, 0}, {3, 2}, {10, 2}, {11, 10}, {15, 10}, {20, 10}, {26, 10},
+		{28, 10}, {30, 28}, {35, 28}, {46, 28}, {48, 46}, {50, 46}, {78, 60}, {80, 78}, {92, 86} };
+	for (const auto &[Z, n] : expected) EXPECT_EQ(eli_core_electrons(Z), n) << "Z " << Z;
+}
+
 // core_shell_radius steps by period; unify_core_basins folds every maximum inside an atom's
 // core radius into one basin per atom keeping the highest, renumbers the cube and reports the
 // number merged

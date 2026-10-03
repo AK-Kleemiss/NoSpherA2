@@ -89,6 +89,9 @@ double core_shell_radius(const int Z);
 //The ELI-D core: core_shell_radius, except for a d-block metal (and K, Ca) whose outer core shell
 //it stops short of, so that shell keeps its own basins, labelled "shell"
 double eli_core_radius(const int Z);
+//Electrons the eli_core_radius core should hold: the closed shells beneath the valence s,p shell, or
+//beneath the outer core shell of a metal that keeps one
+int eli_core_electrons(const int Z);
 //Every basin whose maximum lies within an atom's ELI-D core radius becomes that atom's one core
 //basin, as DGrid's ELIDcore does; returns the number of basins merged away.
 //basin_map, when given, comes back sized maxima.size() + 1 and holds the 1-based basin each of

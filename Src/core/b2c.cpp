@@ -1378,6 +1378,21 @@ double eli_core_radius(const int Z)
 	return core_shell_radius(Z);
 }
 
+//DGrid's ELIDcore over the reference set: Na, Al, P, S, Cl 10.05; Ti, Fe, Ni 9.2-10.3; Zn, Br 27.8;
+//Pd 26.7; Cd 44.8; Sn 46.6; Pt 51.7. The 5d core runs short of its 60, hence a relative tolerance
+int eli_core_electrons(const int Z)
+{
+	if (Z >= 19 && Z <= 29) return 10;
+	if (Z >= 39 && Z <= 47) return 28;
+	if (Z == 57) return 46;
+	if (Z >= 72 && Z <= 79) return 60;
+	//the largest closed core below Z: a noble gas, or one with a filled (n-1)d and 4f beneath it
+	int core = 0;
+	for (const int c : {2, 10, 18, 28, 36, 46, 54, 78, 86})
+		if (c < Z) core = c;
+	return core;
+}
+
 static bool in_outer_core_shell(const d4 &m, const std::vector<atom> &atoms)
 {
 	for (const atom &a : atoms) {
@@ -1952,7 +1967,8 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 	//ELI-D maximum, which is broad; a nucleus gets a tenth of a bohr, since a hydroxyl
 	//hydrogen's basin is 0.4 bohr thick and a wider net catches the oxygen's electrons
 	const double catch2 = eli_field ? std::pow(2.0 * std::max({ h[0], h[1], h[2] }), 2) : 0.01;
-	//Store each attractor centre and squared beta-sphere radius.
+	//Store each attractor centre and squared beta-sphere radius; -1 marks a core maximum that
+	//answers through its nucleus's sphere and has no catch radius of its own.
 	vec beta2(maxima.size(), 0.0);
 	std::vector<d3> bcen(maxima.size());
 	for (size_t m = 0; m < maxima.size(); m++) bcen[m] = d3{ maxima[m][0], maxima[m][1], maxima[m][2] };
@@ -1963,7 +1979,7 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 				if (std::pow(p[0] - bcen[m][0], 2) + std::pow(p[1] - bcen[m][1], 2) + std::pow(p[2] - bcen[m][2], 2) < beta2[m])
 					return basin_of(m);
 			}
-			else if (std::pow(p[0] - maxima[m][0], 2) + std::pow(p[1] - maxima[m][1], 2) + std::pow(p[2] - maxima[m][2], 2) < catch2)
+			else if (beta2[m] == 0.0 && std::pow(p[0] - maxima[m][0], 2) + std::pow(p[1] - maxima[m][1], 2) + std::pow(p[2] - maxima[m][2], 2) < catch2)
 				return basin_of(m);
 		}
 		return 0;
@@ -2059,21 +2075,42 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 				const double d = std::sqrt(std::pow(c[0] - maxima[n][0], 2) + std::pow(c[1] - maxima[n][1], 2) + std::pow(c[2] - maxima[n][2], 2));
 				cap = std::min(cap, 0.45 * d);
 			}
+			//A maximum on a nucleus heads the atom's unified core: the shells out to its furthest core
+			//maximum are its own basin, so a ray crosses their minima and stops at the first beyond
+			double inner = 0.0;
+			for (const atom &a : atoms) {
+				const d3 ap = a.get_pos();
+				if (std::pow(c[0] - ap[0], 2) + std::pow(c[1] - ap[1], 2) + std::pow(c[2] - ap[2], 2) > march * march) continue;
+				for (int n = 0; n < nm; n++)
+					if (n != m && basin_of(n) == basin_of(m))
+						inner = std::max(inner, std::sqrt(std::pow(c[0] - maxima[n][0], 2) + std::pow(c[1] - maxima[n][1], 2) + std::pow(c[2] - maxima[n][2], 2)));
+			}
 			double r = cap;
 			for (const d3 &u : dirs) {
-				double rr = march;
+				double rr = inner + march;
+				bool fell = inner == 0.0;
 				for (; rr <= cap + 1e-12; rr += march) {
 					const d3 q{ c[0] + rr * u[0], c[1] + rr * u[1], c[2] + rr * u[2] };
 					d3 g;
 					gradient(q, g);
-					if (g[0] * u[0] + g[1] * u[1] + g[2] * u[2] >= 0.0) break;
+					if (g[0] * u[0] + g[1] * u[1] + g[2] * u[2] < 0.0) fell = true;
+					else if (fell) break;
 				}
+				//never past the outer core shell's top within the cap: nothing measured
+				if (!fell) { r = 0.0; break; }
 				r = std::min(r, rr - march);
 				if (r <= march) break;
 			}
 			if (r <= 2.0 * march) continue;
 			bcen[m] = c;
 			beta2[m] = std::pow(margin * r, 2);
+		}
+		//A core maximum inside its nucleus's sphere answers through that sphere; its own catch radius
+		//reaches past the shell minimum the sphere stops at
+		for (int m = 0; m < nm; m++) {
+			if (beta2[m] > 0.0) continue;
+			for (int n = 0; n < nm; n++)
+				if (beta2[n] > 0.0 && basin_of(n) == basin_of(m) && std::pow(maxima[m][0] - bcen[n][0], 2) + std::pow(maxima[m][1] - bcen[n][1], 2) + std::pow(maxima[m][2] - bcen[n][2], 2) < beta2[n]) { beta2[m] = -1.0; break; }
 		}
 	}
 	T.lap(fieldname + "beta spheres");
