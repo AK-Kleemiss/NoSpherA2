@@ -2,7 +2,9 @@
 #include "atoms.h"
 #include "cube.h"
 #include <array>
+#include <atomic>
 #include <chrono>
+#include <cstdint>
 #include <functional>
 #include <string>
 #include <vector>
@@ -188,6 +190,35 @@ struct basin_stage_timer {
 	std::chrono::steady_clock::time_point t = std::chrono::steady_clock::now();
 	//Seconds since the last lap (or since construction), printed only under -basin_timing.
 	void lap(const std::string &what);
+};
+//Which basin the streaming climbs that crossed a voxel ended in, so a later climb that walks into
+//a block every earlier one agreed on can stop there. Fixed capacity, open addressing, no deletion,
+//lock-free: one word per voxel packs the key (3 x 14-bit indices), the 1-based basin (13 bits), a
+//visit count saturating at 255 and a conflict bit that, once two basins met in the voxel, stays.
+//The answer depends on which climbs ran first, so it is only as good as the repeat-run check says;
+//NOS_BASIN_MEMO=0 turns it off and NOS_BASIN_MEMO_MB caps the table (256 MB by default).
+struct basin_memo {
+	basin_memo(const d3 &lo, const d3 &hi, double voxel, size_t megabytes);
+	//The voxel of p, 0 outside the 16382-voxel box centred on lo..hi
+	uint64_t key(const d3 &p) const;
+	//One clean climb's voxels, consecutive repeats already dropped, all ending in basin label
+	void write(const std::vector<uint64_t> &path, int label);
+	//The basin of p's voxel when it is settled: visited at least twice, and all 27 voxels of its
+	//3x3x3 block populated, conflict-free and of one basin. 0 otherwise
+	int settled(const d3 &p) const;
+	size_t entries() const { return used.load(std::memory_order_relaxed); }
+	size_t capacity() const { return table.size(); }
+private:
+	static constexpr int bits = 14;
+	static constexpr uint64_t key_mask = (1ull << 3 * bits) - 1, label_mask = (1ull << 13) - 1;
+	static constexpr uint64_t one = 1ull << 55, conflict = 1ull << 63;
+	d3 origin;
+	double inv;
+	std::vector<std::atomic<uint64_t>> table;
+	size_t mask, limit;
+	std::atomic<size_t> used{ 0 };
+	uint64_t find(uint64_t k) const;
+	void add(uint64_t k, uint64_t label);
 };
 vec integrate_basins_on_atomic_grids(const cube* cub, const cubei* basin_cube, const std::vector<d4>& maxima, const WFN& wavy, const int accuracy, const bool eli_field, vec& volumes, double& outside, const std::function<double(const d3&)>* core_density = nullptr, const std::function<void(const d3&, d3&)>* core_gradient = nullptr, const int grid_boost = 1, const density_field* field = nullptr, basin_overlaps* ovl = nullptr, const ivec* maximum_basin = nullptr);
 std::vector<critical_point_seed> find_cube_critical_point_seeds(const cube* cub, bool debug, double value_floor = -1.0, double gradient_epsilon = -1.0);

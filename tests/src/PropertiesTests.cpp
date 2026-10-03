@@ -1359,6 +1359,45 @@ TEST(PropertiesBasinTests, EliCoreElectronsCountsTheClosedShells)
 	for (const auto &[Z, n] : expected) EXPECT_EQ(eli_core_electrons(Z), n) << "Z " << Z;
 }
 
+// basin_memo answers a voxel only once two walks agreed on it and its 26 neighbours all carry the
+// same basin; one walk, a disagreeing neighbour or a hole leaves it unanswered
+TEST(PropertiesBasinTests, BasinMemoSettlesOnlyAnAgreedPopulatedBlock)
+{
+	const double v = 0.1;
+	const d3 c{ 0.05, 0.05, 0.05 };
+	auto at = [&](int dx, int dy, int dz) { return d3{ c[0] + dx * v, c[1] + dy * v, c[2] + dz * v }; };
+	auto block = [&](const basin_memo &m) {
+		std::vector<uint64_t> path;
+		for (int dz = -1; dz <= 1; dz++)
+			for (int dy = -1; dy <= 1; dy++)
+				for (int dx = -1; dx <= 1; dx++) path.push_back(m.key(at(dx, dy, dz)));
+		return path;
+	};
+	{
+		basin_memo m(d3{ 0, 0, 0 }, d3{ 0, 0, 0 }, v, 1);
+		EXPECT_EQ(m.key(d3{ 1e4, 0, 0 }), 0u);
+		const auto path = block(m);
+		m.write(path, 3);
+		EXPECT_EQ(m.settled(c), 0) << "one walk is not enough";
+		m.write(path, 3);
+		EXPECT_EQ(m.settled(c), 3);
+		EXPECT_EQ(m.settled(at(1, 0, 0)), 0) << "an edge voxel has unvisited neighbours";
+		EXPECT_EQ(m.entries(), 27u);
+		m.write({ m.key(at(1, 1, 1)) }, 4);
+		EXPECT_EQ(m.settled(c), 0) << "a neighbour two basins claimed";
+		m.write(path, 0);
+		EXPECT_EQ(m.entries(), 27u) << "label 0 is not a basin";
+	}
+	{
+		basin_memo m(d3{ 0, 0, 0 }, d3{ 0, 0, 0 }, v, 1);
+		auto path = block(m);
+		path.erase(path.begin());
+		m.write(path, 1);
+		m.write(path, 1);
+		EXPECT_EQ(m.settled(c), 0) << "a missing neighbour";
+	}
+}
+
 // core_shell_radius steps by period; unify_core_basins folds every maximum inside an atom's
 // core radius into one basin per atom keeping the highest, renumbers the cube and reports the
 // number merged
