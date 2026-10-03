@@ -496,6 +496,10 @@ std::string help_message =
  "                                    an attractor that no ascent path can leave.\n"
  "                                    Same basins, many times the time; it is\n"
  "                                    there to check that they are the same.\n"
+ "  -no_spin_eli                       Skip the spin-resolved ELI-D basins\n"
+ "                                    (alpha-alpha, beta-beta, triplet) that\n"
+ "                                    -fba and -eli_analysis add for an\n"
+ "                                    unrestricted, spin-polarised wavefunction.\n"
  "  -eli_family <wfn> [points_file]\n"
  "                                    The rest of Kohout's ELI family as point\n"
  "                                    values: ELI-D for alpha-alpha, beta-beta and\n"
@@ -2832,6 +2836,8 @@ bool options::digest_run_options(const std::string &temp, int &i)
 		basin_grid = std::max(1, stoi(arguments[i + 1]));
 	else if (temp == "-basin_cube")
 		basin_cube = true;
+	else if (temp == "-no_spin_eli")
+		spin_eli = false;
 	else if (temp == "-basin_analytic")
 		; //the default since 30 Sep 2026; still accepted so older job scripts run
 	else if (temp == "-basin_step")

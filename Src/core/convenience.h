@@ -1022,6 +1022,9 @@ struct options
 	//the density's attractors from the analytic critical-point search instead, which no voxel can
 	//add to, and sends every quadrature point up the analytic field for its basin
 	bool basin_cube = false;
+	//-no_spin_eli: leave out the ELI-D alpha-alpha / beta-beta / triplet basins that -fba and
+	//-eli_analysis add after the spin-summed ELI-D for a spin-polarised wavefunction
+	bool spin_eli = true;
 	int threads = -1;
 	int pbc = 0;
 	int charge = 0;

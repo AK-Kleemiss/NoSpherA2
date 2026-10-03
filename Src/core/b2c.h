@@ -84,7 +84,10 @@ std::vector<d4> streaming_density_attractors(const WFN& wavy, const std::vector<
 //ELI-D's maxima without a cube: gradient ascent on computeELIGrad from atom-centred shells of
 //seeds inside rho >= basin_density_cutoff, ends within 0.1 bohr merged. Sorted by value, highest
 //first. Core-shell and shattered-shell fragments are left for unify_core_basins/unify_shell_basins
-std::vector<d4> analytic_eli_maxima(const WFN& wavy, bool debug = false);
+//A spin member of the ELI family in place of the spin-summed ELI-D: value and gradient at p and,
+//when aux is given, rho, rho_alpha, rho_beta and rho_s * ELI-q_s there (WFN::computeELISpinGrad)
+using eli_spin_field = std::function<void(const d3&, double&, d3&, double*)>;
+std::vector<d4> analytic_eli_maxima(const WFN& wavy, bool debug = false, const eli_spin_field* eli = nullptr);
 //Radius holding the ELI-D maxima of an atom's core shells, by period; the outermost shell the
 //element keeps beneath its valence peaks at about 0.7 bohr for the first transition row
 double core_shell_radius(const int Z);
@@ -139,6 +142,9 @@ void report_delocalization(const WFN& wavy, const basin_overlaps& ovl, const sve
 //then assumed for the trajectory's step and the radius that counts as arrival.
 //maximum_basin, when given, is the 1-based basin of each maximum, as unify_core_basins reports
 //it: several maxima then share one basin and the returned vector is one entry per basin.
+//eli (with eli_field): the ELI member the boundaries follow instead of the spin-summed ELI-D.
+//spin_pop (with eli): per basin {N_alpha, N_beta, integral of rho_s * ELI-q_s}, from the same points
+//and weights as the populations.
 //Beta spheres: around an attractor there is a radius inside which no ascent trajectory can get
 //out, so every point inside belongs to it without being climbed and a trajectory that enters is
 //finished on the spot. On by default, and only for the streaming quadrature, which is where the
@@ -220,7 +226,7 @@ private:
 	uint64_t find(uint64_t k) const;
 	void add(uint64_t k, uint64_t label);
 };
-vec integrate_basins_on_atomic_grids(const cube* cub, const cubei* basin_cube, const std::vector<d4>& maxima, const WFN& wavy, const int accuracy, const bool eli_field, vec& volumes, double& outside, const std::function<double(const d3&)>* core_density = nullptr, const std::function<void(const d3&, d3&)>* core_gradient = nullptr, const int grid_boost = 1, const density_field* field = nullptr, basin_overlaps* ovl = nullptr, const ivec* maximum_basin = nullptr);
+vec integrate_basins_on_atomic_grids(const cube* cub, const cubei* basin_cube, const std::vector<d4>& maxima, const WFN& wavy, const int accuracy, const bool eli_field, vec& volumes, double& outside, const std::function<double(const d3&)>* core_density = nullptr, const std::function<void(const d3&, d3&)>* core_gradient = nullptr, const int grid_boost = 1, const density_field* field = nullptr, basin_overlaps* ovl = nullptr, const ivec* maximum_basin = nullptr, const eli_spin_field* eli = nullptr, vec2* spin_pop = nullptr);
 std::vector<critical_point_seed> find_cube_critical_point_seeds(const cube* cub, bool debug, double value_floor = -1.0, double gradient_epsilon = -1.0);
 std::vector<critical_point> refine_cube_critical_points(const cube* cub, const WFN& wavy, const std::vector<critical_point_seed>& seeds, bool debug, double value_floor = -1.0, double gradient_tolerance = 1e-8, double step_tolerance = 1e-6, int max_iterations = 32);
 std::vector<critical_point> analyze_cube_critical_points(const cube* cub, const WFN& wavy, bool debug, double value_floor = -1.0, double gradient_epsilon = -1.0, double gradient_tolerance = 1e-8, double step_tolerance = 1e-6, int max_iterations = 32);

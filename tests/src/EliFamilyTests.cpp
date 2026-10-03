@@ -1,6 +1,7 @@
 #include "pch.h"
 
 #include "core/eli_family.h"
+#include "core/b2c.h"
 
 //eli_family.h: Kohout's ELI-D for alpha-alpha, beta-beta and triplet-coupled pairs, and ELI-q.
 //Two kinds of check: the analytic uniform-electron-gas limit, which fixes the normalisation
@@ -306,5 +307,157 @@ TEST(EliFamily, SingletEliQIsOneMinusZetaSquared)
 		eli_family::SpinFields s;
 		eli_family::spin_fields(closed, d3{ 0.3, -0.2, z }, s);
 		EXPECT_NEAR(eli_family::elia_singlet_eli_q(s), 1.0, 1E-12);
+	}
+}
+
+//WFN::computeELISpinGrad: the field the spin-resolved basins climb. Its value has to be the
+//eli_family member on the same point (the DGrid-checked reference above), its gradient the central
+//difference of that value, and ELI-q has to come out of aux as rho_s * Y_q.
+namespace
+{
+	const d3 spin_points[] = { { 0.3, -0.2, 0.5 }, { 1.1, 0.4, -0.7 }, { 0.05, 0.1, 0.15 }, { 2.0, 0.5, 1.0 }, { -0.6, 0.9, 0.2 } };
+}
+
+TEST(EliSpin, PointValuesMatchTheFamilyMembers)
+{
+	const std::filesystem::path f = nos_test_repo_root() / "tests" / "molden_file" / "F_open.molden";
+	if (!std::filesystem::exists(f)) GTEST_SKIP() << "missing fixture " << f.string();
+	WFN wave(f);
+	const double tf = eli_family::triplet_density_factor(wave);
+	for (const d3 &p : spin_points) {
+		eli_family::SpinFields s;
+		eli_family::spin_fields(wave, p, s);
+		const double ref[3] = { eli_family::eli_d(s.rho[0], eli_family::g_same_spin(s, 0)), eli_family::eli_d(s.rho[1], eli_family::g_same_spin(s, 1)),
+			eli_family::eli_d(tf * (s.rho[0] + s.rho[1]), eli_family::g_triplet(s)) };
+		for (int field = 0; field < 3; field++) {
+			double y, aux[4];
+			d3 g;
+			wave.computeELISpinGrad(p, field, tf, y, g, aux);
+			SCOPED_TRACE("field " + std::to_string(field) + " at " + std::to_string(p[0]) + " " + std::to_string(p[1]) + " " + std::to_string(p[2]));
+			EXPECT_NEAR(y, ref[field], 1E-9 * std::max(1.0, ref[field]));
+			EXPECT_NEAR(aux[1], s.rho[0], 1E-10 * std::max(1.0, s.rho[0]));
+			EXPECT_NEAR(aux[2], s.rho[1], 1E-10 * std::max(1.0, s.rho[1]));
+			EXPECT_NEAR(aux[0], s.rho[0] + s.rho[1], 1E-10 * std::max(1.0, aux[0]));
+			if (field < 2) {
+				const double q = eli_family::eli_q(s.rho[field], eli_family::g_same_spin(s, field));
+				EXPECT_NEAR(aux[3] / s.rho[field], q, 1E-9 * std::max(1.0, q));
+			}
+			else
+				EXPECT_EQ(aux[3], 0.0);
+		}
+	}
+}
+
+TEST(EliSpin, AnalyticGradientMatchesFiniteDifference)
+{
+	const std::filesystem::path f = nos_test_repo_root() / "tests" / "molden_file" / "F_open.molden";
+	if (!std::filesystem::exists(f)) GTEST_SKIP() << "missing fixture " << f.string();
+	WFN wave(f);
+	const double tf = eli_family::triplet_density_factor(wave), h = 1E-4;
+	for (const d3 &p : spin_points)
+		for (int field = 0; field < 3; field++) {
+			double y;
+			d3 g;
+			wave.computeELISpinGrad(p, field, tf, y, g);
+			for (int k = 0; k < 3; k++) {
+				d3 a = p, b = p, ga, gb;
+				a[k] += h;
+				b[k] -= h;
+				double ya, yb;
+				wave.computeELISpinGrad(a, field, tf, ya, ga);
+				wave.computeELISpinGrad(b, field, tf, yb, gb);
+				const double fd = (ya - yb) / (2 * h);
+				EXPECT_NEAR(g[k], fd, 1E-6 * std::max(1.0, std::abs(fd))) << "field " << field << " axis " << k << " at " << p[0] << " " << p[1] << " " << p[2];
+			}
+		}
+}
+
+//Restricted: both channels carry occ/2, so ELI-D(alpha-alpha) = ELI-D(beta-beta) = computeELI
+TEST(EliSpin, RestrictedChannelsAreTheExistingEliD)
+{
+	const std::filesystem::path f = nos_test_repo_root() / "tests" / "molden_file" / "F_full.molden";
+	if (!std::filesystem::exists(f)) GTEST_SKIP() << "missing fixture " << f.string();
+	WFN wave(f);
+	const double tf = eli_family::triplet_density_factor(wave);
+	for (const d3 &p : spin_points) {
+		const double ref = wave.computeELI(p);
+		for (int field = 0; field < 2; field++) {
+			double y;
+			d3 g;
+			wave.computeELISpinGrad(p, field, tf, y, g);
+			EXPECT_NEAR(y, ref, 1E-8 * std::max(1.0, ref)) << "field " << field;
+		}
+	}
+}
+
+//The spin populations of the alpha-alpha basins of the F doublet: every alpha and every beta
+//electron is in some basin up to what the quadrature leaves outside them (3.5e-3 e at accuracy 2)
+TEST(EliSpin, BasinSpinPopulationsAddUpToTheElectronCounts)
+{
+	const std::filesystem::path f = nos_test_repo_root() / "tests" / "molden_file" / "F_open.molden";
+	if (!std::filesystem::exists(f)) GTEST_SKIP() << "missing fixture " << f.string();
+	WFN wave(f);
+	const double tf = eli_family::triplet_density_factor(wave);
+	for (int field = 0; field < 3; field++) {
+		const eli_spin_field eval = [&wave, field, tf](const d3 &p, double &y, d3 &g, double *aux) { wave.computeELISpinGrad(p, field, tf, y, g, aux); };
+		const std::vector<d4> maxima = analytic_eli_maxima(wave, false, &eval);
+		ASSERT_FALSE(maxima.empty());
+		vec volumes;
+		vec2 spin;
+		double outside = 0.0;
+		const vec pop = integrate_basins_on_atomic_grids(nullptr, nullptr, maxima, wave, 2, true, volumes, outside, nullptr, nullptr, 1, nullptr, nullptr, nullptr, &eval, &spin);
+		ASSERT_EQ(spin.size(), pop.size());
+		double na = 0.0, nb = 0.0, n = 0.0;
+		for (size_t b = 0; b < pop.size(); b++) {
+			na += spin[b][0];
+			nb += spin[b][1];
+			n += pop[b];
+			EXPECT_NEAR(spin[b][0] + spin[b][1], pop[b], 1E-9 * std::max(1.0, pop[b])) << "field " << field << " basin " << b;
+		}
+		EXPECT_NEAR(na, 5.0, 5E-3) << "field " << field;
+		EXPECT_NEAR(nb, 4.0, 5E-3) << "field " << field;
+		EXPECT_NEAR(n + outside, 9.0, 2E-3) << "field " << field;
+	}
+}
+
+//The same value and gradient checks on a polyatomic doublet (NH3Li, UKS gbw): points next to each
+//nucleus, off-axis around it and on the bonds to the first atom, where several centres contribute
+TEST(EliSpin, MoleculeValuesAndGradientsOnNH3Li)
+{
+	const std::filesystem::path f = nos_test_repo_root() / "tests" / "RGBI_groups" / "nh3li.gbw";
+	if (!std::filesystem::exists(f)) GTEST_SKIP() << "missing fixture " << f.string();
+	WFN wave(f);
+	ASSERT_GT(wave.get_MO_op_count(1), 0);
+	const double tf = eli_family::triplet_density_factor(wave), h = 1E-5;
+	std::vector<d3> pts;
+	const d3 p0 = wave.get_atom_pos(0);
+	for (int a = 0; a < wave.get_ncen(); a++) {
+		const d3 pa = wave.get_atom_pos(a);
+		pts.push_back({ pa[0] + 0.05, pa[1] + 0.03, pa[2] - 0.04 });
+		pts.push_back({ pa[0] + 0.4, pa[1] - 0.3, pa[2] + 0.5 });
+		if (a) pts.push_back({ 0.5 * (pa[0] + p0[0]) + 0.02, 0.5 * (pa[1] + p0[1]), 0.5 * (pa[2] + p0[2]) - 0.03 });
+	}
+	for (const d3 &p : pts) {
+		eli_family::SpinFields s;
+		eli_family::spin_fields(wave, p, s);
+		const double ref[3] = { eli_family::eli_d(s.rho[0], eli_family::g_same_spin(s, 0)), eli_family::eli_d(s.rho[1], eli_family::g_same_spin(s, 1)),
+			eli_family::eli_d(tf * (s.rho[0] + s.rho[1]), eli_family::g_triplet(s)) };
+		for (int field = 0; field < 3; field++) {
+			SCOPED_TRACE("field " + std::to_string(field) + " at " + std::to_string(p[0]) + " " + std::to_string(p[1]) + " " + std::to_string(p[2]));
+			double y;
+			d3 g;
+			wave.computeELISpinGrad(p, field, tf, y, g);
+			EXPECT_NEAR(y, ref[field], 1E-9 * std::max(1.0, ref[field]));
+			for (int k = 0; k < 3; k++) {
+				d3 a = p, b = p, ga, gb;
+				a[k] += h;
+				b[k] -= h;
+				double ya, yb;
+				wave.computeELISpinGrad(a, field, tf, ya, ga);
+				wave.computeELISpinGrad(b, field, tf, yb, gb);
+				const double fd = (ya - yb) / (2 * h);
+				EXPECT_NEAR(g[k], fd, 1E-5 * std::max(1.0, std::abs(fd))) << "axis " << k;
+			}
+		}
 	}
 }

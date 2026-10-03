@@ -2261,20 +2261,10 @@ void WFN::computeRhoELI(
 	out_Rho = Rho;
 };
 
-void WFN::computeELIGrad(
-	const d3 &PosGrid,
-	double& out_Eli,
-	d3& out_grad,
-	double *out_rho
-) const
+bool WFN::eli_orbital_pass(const d3 &PosGrid, vec &phi) const
 {
-	//ELI-D Y = rho/2 (48/g)^(3/8) with g = rho tau - |grad rho|^2 / 4, so
-	//grad Y = (48/g)^(3/8) / 2 (grad rho - 3/8 rho grad g / g) with
-	//grad g = tau grad rho + rho grad tau - H grad rho / 2, H the density Hessian.
-	//One pass with orbital values, gradients and Hessians replaces the six ELI
-	//evaluations of the central difference the basin climb used before
 	const int _nmo = get_nmo(false);
-	thread_local vec phi, d;
+	thread_local vec d;
 	phi.assign(10 * _nmo, 0.0);
 	if (d.size() < 4 * (size_t)ncen) d.resize(4 * (size_t)ncen);
 	for (int j = 0; j < ncen; j++)
@@ -2284,12 +2274,7 @@ void WFN::computeELIGrad(
 		d_[3] = d_[0] * d_[0] + d_[1] * d_[1] + d_[2] * d_[2];
 	}
 	if (!get_coef_primitive_major())
-	{
-		out_Eli = 0;
-		out_grad = { 0, 0, 0 };
-		if (out_rho) *out_rho = 0.0;
-		return;
-	}
+		return false;
 	thread_local vec exps;
 	if (exps.size() < group_exponent.size()) exps.resize(group_exponent.size());
 	exp_table([r2 = d.data()](const int c) { return r2[4 * (size_t)c + 3]; }, exps.data());
@@ -2327,6 +2312,30 @@ void WFN::computeELIGrad(
 	}
 	//Component-major, as in computeGrad: ten unit-stride accumulations per function
 	ao.to_mo(coef_ao_major.data(), _nmo, phi.data());
+	return true;
+}
+
+void WFN::computeELIGrad(
+	const d3 &PosGrid,
+	double& out_Eli,
+	d3& out_grad,
+	double *out_rho
+) const
+{
+	//ELI-D Y = rho/2 (48/g)^(3/8) with g = rho tau - |grad rho|^2 / 4, so
+	//grad Y = (48/g)^(3/8) / 2 (grad rho - 3/8 rho grad g / g) with
+	//grad g = tau grad rho + rho grad tau - H grad rho / 2, H the density Hessian.
+	//One pass with orbital values, gradients and Hessians replaces the six ELI
+	//evaluations of the central difference the basin climb used before
+	const int _nmo = get_nmo(false);
+	thread_local vec phi;
+	if (!eli_orbital_pass(PosGrid, phi))
+	{
+		out_Eli = 0;
+		out_grad = { 0, 0, 0 };
+		if (out_rho) *out_rho = 0.0;
+		return;
+	}
 	static constexpr int hidx[3][3] = { {4, 7, 8}, {7, 5, 9}, {8, 9, 6} };
 	double rho = 0, tau = 0, G[3]{ 0, 0, 0 }, T[3]{ 0, 0, 0 }, H[3][3]{ {0, 0, 0}, {0, 0, 0}, {0, 0, 0} };
 	for (int mo = 0; mo < _nmo; mo++)
@@ -2365,6 +2374,99 @@ void WFN::computeELIGrad(
 		out_grad[k] = 0.5 * f * (G[k] - 0.375 * rho * dg / g);
 	}
 };
+
+void WFN::computeELISpinGrad(
+	const d3 &PosGrid,
+	const int field,
+	const double triplet_factor,
+	double& out_Eli,
+	d3& out_grad,
+	double *aux
+) const
+{
+	//Per spin channel s the same ingredients as computeELIGrad: rho_s, T_s = sum n |grad phi|^2,
+	//G_s = grad rho_s, dT_s = grad T_s and H_s the Hessian of rho_s. Then, eli_family.h,
+	//  same spin  g = rho_s T_s - |G_s|^2/4,            grad g = G_s T_s + rho_s dT_s - H_s G_s / 2
+	//  triplet    g = g_a + g_b + (rho_a T_b + rho_b T_a)/2 - G_a.G_b/4, differentiated term by term
+	//and Y = r (12/g)^(3/8) with r = rho_s or triplet_factor * rho, grad Y = (12/g)^(3/8) (grad r - 3/8 r grad g / g)
+	const int _nmo = get_nmo(false);
+	thread_local vec phi;
+	out_Eli = 0;
+	out_grad = { 0, 0, 0 };
+	if (aux) for (int k = 0; k < 4; k++) aux[k] = 0.0;
+	if (!eli_orbital_pass(PosGrid, phi)) return;
+	static constexpr int hidx[3][3] = { {4, 7, 8}, {7, 5, 9}, {8, 9, 6} };
+	//serial scan: get_MO_op_count opens an OpenMP region, and this runs once per point of the climb
+	bool unrestricted = false;
+	for (int mo = 0; mo < _nmo && !unrestricted; mo++) unrestricted = get_MO_op(mo) == 1;
+	double rho[2]{ 0, 0 }, tau[2]{ 0, 0 }, G[2][3]{}, T[2][3]{}, H[2][3][3]{};
+	for (int mo = 0; mo < _nmo; mo++)
+	{
+		const double occ = get_MO_occ(mo);
+		if (occ == 0) continue;
+		double p[10];
+		for (int k = 0; k < 10; k++) p[k] = phi[(size_t)k * _nmo + mo];
+		//restricted: half of every occupation in each channel, accumulated once into alpha and copied
+		const int s = unrestricted ? get_MO_op(mo) : 0;
+		const double n = unrestricted ? occ : 0.5 * occ, dn = 2 * n;
+		rho[s] += n * p[0] * p[0];
+		for (int i = 0; i < 3; i++)
+		{
+			tau[s] += n * p[1 + i] * p[1 + i];
+			G[s][i] += dn * p[0] * p[1 + i];
+			for (int k = 0; k < 3; k++)
+			{
+				H[s][i][k] += dn * (p[0] * p[hidx[i][k]] + p[1 + i] * p[1 + k]);
+				T[s][k] += dn * p[1 + i] * p[hidx[i][k]];
+			}
+		}
+	}
+	if (!unrestricted)
+	{
+		rho[1] = rho[0]; tau[1] = tau[0];
+		for (int i = 0; i < 3; i++) { G[1][i] = G[0][i]; T[1][i] = T[0][i]; for (int k = 0; k < 3; k++) H[1][i][k] = H[0][i][k]; }
+	}
+	//g_s and grad g_s of one channel
+	auto same = [&](const int s, double &g, double *dg) {
+		g = rho[s] * tau[s] - 0.25 * (G[s][0] * G[s][0] + G[s][1] * G[s][1] + G[s][2] * G[s][2]);
+		for (int k = 0; k < 3; k++)
+			dg[k] = G[s][k] * tau[s] + rho[s] * T[s][k] - 0.5 * (G[s][0] * H[s][0][k] + G[s][1] * H[s][1][k] + G[s][2] * H[s][2][k]);
+	};
+	double g, dg[3], r, dr[3];
+	if (field == 2)
+	{
+		double ga, gb, dga[3], dgb[3];
+		same(0, ga, dga);
+		same(1, gb, dgb);
+		g = ga + gb + 0.5 * (rho[0] * tau[1] + rho[1] * tau[0]) - 0.25 * (G[0][0] * G[1][0] + G[0][1] * G[1][1] + G[0][2] * G[1][2]);
+		for (int k = 0; k < 3; k++)
+		{
+			dg[k] = dga[k] + dgb[k] + 0.5 * (G[0][k] * tau[1] + rho[0] * T[1][k] + G[1][k] * tau[0] + rho[1] * T[0][k])
+				- 0.25 * (H[0][k][0] * G[1][0] + H[0][k][1] * G[1][1] + H[0][k][2] * G[1][2] + H[1][k][0] * G[0][0] + H[1][k][1] * G[0][1] + H[1][k][2] * G[0][2]);
+			dr[k] = triplet_factor * (G[0][k] + G[1][k]);
+		}
+		r = triplet_factor * (rho[0] + rho[1]);
+	}
+	else
+	{
+		same(field, g, dg);
+		r = rho[field];
+		for (int k = 0; k < 3; k++) dr[k] = G[field][k];
+	}
+	if (aux)
+	{
+		aux[0] = rho[0] + rho[1];
+		aux[1] = rho[0];
+		aux[2] = rho[1];
+		//rho_s Y_q = g_s / (12 rho_s^(5/3)), so the basin average of ELI-q is this integral over N_s
+		aux[3] = field != 2 && r > 0.0 && g > 0.0 ? g / (12.0 * std::pow(r, 5.0 / 3.0)) : 0.0;
+	}
+	//an empty channel, or a single orbital carrying it: no pair, no finite ELI-D
+	if (!(g > 0) || !(r > 0)) return;
+	const double f = pow(12 / g, constants::c_38);
+	out_Eli = r * f;
+	for (int k = 0; k < 3; k++) out_grad[k] = f * (dr[k] - 0.375 * r * dg[k] / g);
+}
 
 void WFN::computeGrad(
 	const d3 &PosGrid, // [3] vector with current position on te grid

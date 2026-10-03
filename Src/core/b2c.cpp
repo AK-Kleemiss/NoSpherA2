@@ -1663,8 +1663,9 @@ std::vector<d4> streaming_density_attractors(const WFN &wavy, const std::vector<
 	return maxima;
 }
 
-std::vector<d4> analytic_eli_maxima(const WFN &wavy, const bool debug)
+std::vector<d4> analytic_eli_maxima(const WFN &wavy, const bool debug, const eli_spin_field *eli)
 {
+	auto eli_grad = [&](const d3 &p, double &f, d3 &g) { if (eli) (*eli)(p, f, g, nullptr); else wavy.computeELIGrad(p, f, g); };
 	auto sphere = [](const int n) {
 		std::vector<d3> d(n);
 		for (int i = 0; i < n; i++) {
@@ -1703,7 +1704,7 @@ std::vector<d4> analytic_eli_maxima(const WFN &wavy, const bool debug)
 		d3 p = seeds[s], g;
 		if (wavy.compute_dens(p) < basin_density_cutoff) continue;
 		double f;
-		wavy.computeELIGrad(p, f, g);
+		eli_grad(p, f, g);
 		if (!std::isfinite(f)) continue;
 		bool inside = true;
 		double step = 0.05;
@@ -1713,7 +1714,7 @@ std::vector<d4> analytic_eli_maxima(const WFN &wavy, const bool debug)
 			const d3 t{ p[0] + step * g[0] / gn, p[1] + step * g[1] / gn, p[2] + step * g[2] / gn };
 			double ft;
 			d3 gt;
-			wavy.computeELIGrad(t, ft, gt);
+			eli_grad(t, ft, gt);
 			if (std::isfinite(ft) && ft > f) {
 				p = t; f = ft; g = gt;
 				step = std::min(1.5 * step, 0.3);
@@ -1964,8 +1965,10 @@ int basin_memo::settled(const d3 &p) const
 }
 
 //Integrate basin populations on atom-centred quadrature grids.
-vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, const std::vector<d4> &maxima, const WFN &wavy, const int accuracy, const bool eli_field, vec &volumes, double &outside, const std::function<double(const d3&)> *core_density, const std::function<void(const d3&, d3&)> *core_gradient, const int grid_boost, const density_field *field, basin_overlaps *ovl, const ivec *maximum_basin)
+vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, const std::vector<d4> &maxima, const WFN &wavy, const int accuracy, const bool eli_field, vec &volumes, double &outside, const std::function<double(const d3&)> *core_density, const std::function<void(const d3&, d3&)> *core_gradient, const int grid_boost, const density_field *field, basin_overlaps *ovl, const ivec *maximum_basin, const eli_spin_field *eli, vec2 *spin_pop)
 {
+	if (!eli_field) eli = nullptr;
+	if (!eli) spin_pop = nullptr;
 	//The filled core steers the trajectories only. An ECP atom's grid is built for its
 	//valence basis and cannot integrate a 1s at Z = 80, so the core electrons are added to
 	//the nucleus's basin by count once the valence density is integrated; a Thakkar core
@@ -2005,6 +2008,7 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 	}
 	vec pop(nb, 0.0);
 	volumes.assign(nb, 0.0);
+	if (spin_pop) spin_pop->assign(nb, vec(3, 0.0));
 	outside = 0.0;
 	double cutoff_outside = 0.0, unresolved_outside = 0.0;
 	const int nx = streaming ? 0 : cub->get_size(0), ny = streaming ? 0 : cub->get_size(1), nz = streaming ? 0 : cub->get_size(2);
@@ -2128,7 +2132,8 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 			return;
 		}
 		double e;
-		wavy.computeELIGrad(p, e, g);
+		if (eli) (*eli)(p, e, g, nullptr);
+		else wavy.computeELIGrad(p, e, g);
 		if (val) *val = e;
 	};
 	//The field's value at p and its gradient in one call, which is what the climb needs to see
@@ -2263,7 +2268,14 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 			if (q > 4.0 * d2) continue;
 			double low = std::numeric_limits<double>::max();
 			for (int k = 1; k < 8; k++)
-				low = std::min(low, wavy.computeELI(d3{ p[0] + k / 8.0 * v[0], p[1] + k / 8.0 * v[1], p[2] + k / 8.0 * v[2] }));
+			{
+				const d3 x{ p[0] + k / 8.0 * v[0], p[1] + k / 8.0 * v[1], p[2] + k / 8.0 * v[2] };
+				double e;
+				d3 g;
+				if (eli) (*eli)(x, e, g, nullptr);
+				else e = wavy.computeELI(x);
+				low = std::min(low, e);
+			}
 			if (low > best_low || (low == best_low && q < best_q)) { best = basin_of(m); best_low = low; best_q = q; }
 		}
 		return best;
@@ -2338,7 +2350,8 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 			}
 			else if (eli_field) {
 				double rho_r;
-				if (streaming && !field) { wavy.computeELIGrad(r, vg, g, &rho_r); have_vg = true; }
+				if (streaming && eli) { double aux[4]; (*eli)(r, vg, g, aux); rho_r = aux[0]; have_vg = true; }
+				else if (streaming && !field) { wavy.computeELIGrad(r, vg, g, &rho_r); have_vg = true; }
 				else rho_r = valence(r);
 				if (rho_r < basin_density_cutoff) return 0;
 			}
@@ -2540,7 +2553,7 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 		}
 #pragma omp parallel
 		{
-			vec lp(nb, 0.0), lv(nb, 0.0);
+			vec lp(nb, 0.0), lv(nb, 0.0), lspin(spin_pop ? 3 * (size_t)nb : 0, 0.0);
 			double lo = 0.0, lc = 0.0, lu = 0.0;
 			long long lb = 0, ll = 0;
 			//ponytail: one triangle per basin per thread, nb * nmo^2 / 2 doubles each; the caller
@@ -2577,6 +2590,9 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 				int b = lookup(p, settled);
 				//The same density, taken from the orbital pass that also hands out phi
 				const double rho = ovl ? wavy.compute_dens(p, dbuf, phi) : (rho_at.empty() ? valence(p) : rho_at[i]);
+				//rho, rho_alpha, rho_beta, rho_s Y_q at the point; only basins carry them, so not below the cutoff
+				double aux[4]{ 0.0, 0.0, 0.0, 0.0 };
+				if (spin_pop && rho >= basin_density_cutoff) { double e; d3 g; (*eli)(p, e, g, aux); }
 				//A basin's share of the cell's quadrature weight; the weight itself stays with
 				//the rule, only who gets it is decided here
 				auto give = [&](const int bb, const double fr) {
@@ -2589,6 +2605,7 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 					}
 					lp[bb - 1] += w * rho * fr;
 					lv[bb - 1] += w * fr;
+					if (spin_pop) for (int k = 0; k < 3; k++) lspin[3 * (size_t)(bb - 1) + k] += w * fr * aux[1 + k];
 					accumulate(bb, w * fr);
 				};
 				if (rho < basin_density_cutoff) { give(0, 1.0); continue; }
@@ -2630,6 +2647,7 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 #pragma omp critical
 			{
 				for (int b = 0; b < nb; b++) { pop[b] += lp[b]; volumes[b] += lv[b]; }
+				if (spin_pop) for (int b = 0; b < nb; b++) for (int k = 0; k < 3; k++) (*spin_pop)[b][k] += lspin[3 * (size_t)b + k];
 				if (ovl) {
 					for (int b = 0; b < nb; b++)
 						for (size_t t = 0; t < ovl->S[b].size(); t++) ovl->S[b][t] += ls[b][t];

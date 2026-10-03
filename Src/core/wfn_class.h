@@ -204,6 +204,9 @@ private:
 	const double compute_dens_spherical(const d3& Pos, vec2& d, vec& phi) const;
 	// Empties every container and puts every scalar back to its default; ctors and operator= start here
 	void reset();
+	//Orbital values, gradients and Hessians at p, component-major phi[k * nmo + mo] (k: 0 value,
+	//1-3 x y z, 4-6 xx yy zz, 7 xy, 8 xz, 9 yz); false when there are no coefficients
+	bool eli_orbital_pass(const d3& p, vec& phi) const;
 
 public:
 	/** Primitive-major MO coefficients, [primitive * nmo + mo], built on first use.
@@ -607,6 +610,11 @@ public:
 	//ELI-D and its analytic gradient from the orbital values, gradients and Hessians;
 	//rho, when asked for, is the density of the same orbital pass
 	void computeELIGrad(const d3 &PosGrid, double& Eli, d3& gradient, double *rho = nullptr) const;
+	//Kohout's spin-resolved ELI-D and its analytic gradient (eli_family.h has the definitions):
+	//field 0 alpha-alpha, 1 beta-beta, 2 the triplet-coupled pair with rho^(t) = triplet_factor * rho.
+	//aux, when given, receives rho, rho_alpha, rho_beta and rho_s * ELI-q_s (0 for the triplet) of
+	//the same orbital pass. A restricted wavefunction splits every occupation evenly, as spin_fields does
+	void computeELISpinGrad(const d3 &PosGrid, const int field, const double triplet_factor, double& Eli, d3& gradient, double *aux = nullptr) const;
 	/** Compute gradient. */
 	//rho comes out of the same orbital pass when a pointer is given: the reduction already
 	//has phi, so the density is one multiply-add per MO instead of a second pass over every

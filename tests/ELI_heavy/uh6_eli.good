@@ -207,3 +207,5 @@ ELI-D Analysis (atomic quadrature grids):
      12  H3 LP                  0.3247    178.0269         11.2194     -0.000      5.465     -0.000
      13  H4 LP                  0.3251    178.0142         11.2194     -0.000     -5.465      0.000
   total in basins: 97.9634   outside every basin: 0.0364
+
+Spin-resolved ELI-D: skipped, restricted wavefunction - ELI-D(alpha-alpha) = ELI-D(beta-beta) is the ELI-D above and the triplet member a constant multiple of it.
