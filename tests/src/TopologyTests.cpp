@@ -352,6 +352,29 @@ TEST(Topology, PoincareHopfHoldsOnACyclicMolecule)
 	}
 }
 
+//The seeds' Newton searches run in parallel and are merged serially in seed order, so the thread
+//count may not change a single bit of the result: same points, same order, same positions
+TEST(Topology, ThreadCountDoesNotChangeThePointSet)
+{
+	const std::filesystem::path f = nos_test_repo_root() / "tests" / "cytidine_tonto" / "cyt.wfn";
+	if (!std::filesystem::exists(f)) GTEST_SKIP() << "missing fixture " << f.string();
+	WFN wavy(f);
+	const std::vector<topology::nucleus> nuc = topology::nuclei_of(wavy);
+	const int threads = omp_get_max_threads();
+	omp_set_num_threads(1);
+	const topology::result serial = topology::analyze_topology(wavy, nuc, topology::options{});
+	omp_set_num_threads(std::max(threads, 4));
+	const topology::result parallel = topology::analyze_topology(wavy, nuc, topology::options{});
+	omp_set_num_threads(threads);
+	ASSERT_EQ(serial.points.size(), parallel.points.size());
+	for (size_t i = 0; i < serial.points.size(); i++) {
+		EXPECT_EQ(serial.points[i].kind, parallel.points[i].kind) << "point " << i;
+		EXPECT_EQ(serial.points[i].from, parallel.points[i].from) << "point " << i;
+		for (int k = 0; k < 3; k++) EXPECT_EQ(serial.points[i].position[k], parallel.points[i].position[k]) << "point " << i;
+	}
+	EXPECT_EQ(serial.sum, parallel.sum);
+}
+
 //Every nucleus of an all-electron density is a (3,-3) attractor.  That is a property of rho - it has
 //a cusp maximum at every nucleus - and not of this search, so it is an invariant the output has to
 //reproduce on any all-electron file, whatever Poincare-Hopf adds up to.  tests/Fe_gbw/Fe.gbw is where

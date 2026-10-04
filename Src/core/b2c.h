@@ -88,6 +88,16 @@ std::vector<d4> streaming_density_attractors(const WFN& wavy, const std::vector<
 //when aux is given, rho, rho_alpha, rho_beta and rho_s * ELI-q_s there (WFN::computeELISpinGrad)
 using eli_spin_field = std::function<void(const d3&, double&, d3&, double*)>;
 std::vector<d4> analytic_eli_maxima(const WFN& wavy, bool debug = false, const eli_spin_field* eli = nullptr);
+//A spin field can rise all the way to the rho = basin_density_cutoff isosurface where one orbital
+//carries the spin density; its attractor is then the field's maximum on that surface. The ascent
+//slides along the surface to it; analytic_eli_maxima keeps such attractors for a spin field and the
+//basin integration finishes trajectories that leave the domain with it.
+bool bounded_eli_ascent(const WFN& wavy, const eli_spin_field& eli, d3& p, double& f);
+//Those surface attractors come as a ring or sphere of equal maxima around an axial or spherical open
+//shell, and so does a spin field's degenerate shell just inside it (Rb ROKS alpha-alpha: over a
+//hundred, 2.6 bohr apart, beyond unify_shell_basins' 1.2; linked only over a flat arc). One basin each
+//such set; same basin_map as below.
+int unify_boundary_basins(std::vector<d4>& maxima, const WFN& wavy, const eli_spin_field& eli, ivec* basin_map = nullptr);
 //Radius holding the ELI-D maxima of an atom's core shells, by period; the outermost shell the
 //element keeps beneath its valence peaks at about 0.7 bohr for the first transition row
 double core_shell_radius(const int Z);

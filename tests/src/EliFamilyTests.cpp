@@ -461,3 +461,130 @@ TEST(EliSpin, MoleculeValuesAndGradientsOnNH3Li)
 		}
 	}
 }
+
+//ROKS (one MO set, occupations 2 and 1, no spin labels): a singly occupied MO is alpha, a doubly occupied
+//one carries one electron of each spin. Rb doublet, 5s singly occupied: N_alpha 19, N_beta 18, all six
+//members, and the alpha excess of the field's own densities is the 5s density, positive out at 4.5 bohr
+TEST(EliSpin, RestrictedOpenShellIsSplitByOccupation)
+{
+	double n[2];
+	eli_family::mo_spin_occupations(2.0, 0, eli_family::SpinSplit::restricted_open, n);
+	EXPECT_EQ(n[0], 1.0); EXPECT_EQ(n[1], 1.0);
+	eli_family::mo_spin_occupations(1.0, 0, eli_family::SpinSplit::restricted_open, n);
+	EXPECT_EQ(n[0], 1.0); EXPECT_EQ(n[1], 0.0);
+	eli_family::mo_spin_occupations(1.0, 0, eli_family::SpinSplit::halves, n);
+	EXPECT_EQ(n[0], 0.5); EXPECT_EQ(n[1], 0.5);
+	eli_family::mo_spin_occupations(1.0, 1, eli_family::SpinSplit::unrestricted, n);
+	EXPECT_EQ(n[0], 0.0); EXPECT_EQ(n[1], 1.0);
+
+	const std::filesystem::path f = nos_test_repo_root() / "tests" / "ECP_SF" / "Rb.gbw";
+	if (!std::filesystem::exists(f)) GTEST_SKIP() << "missing fixture " << f.string();
+	WFN wave(f);
+	ASSERT_EQ(eli_family::spin_split(wave), eli_family::SpinSplit::restricted_open);
+	std::string warn;
+	EXPECT_EQ(eli_family::eli_variants_for(wave, &warn).size(), 6u) << warn;
+	EXPECT_NEAR(eli_family::triplet_density_factor(wave), 1.0 - 18.0 / (2.0 * 36.0), 1E-12);
+	const double tf = eli_family::triplet_density_factor(wave);
+	for (const d3 &p : { d3{ 0.0, 0.0, 4.5 }, d3{ 1.0, -2.0, 3.0 }, d3{ 0.2, 0.1, -0.3 } }) {
+		eli_family::SpinFields s;
+		eli_family::spin_fields(wave, p, s);
+		double y, aux[4];
+		d3 g;
+		wave.computeELISpinGrad(p, 0, tf, y, g, aux);
+		EXPECT_NEAR(aux[1], s.rho[0], 1E-10 * std::max(1.0, s.rho[0]));
+		EXPECT_NEAR(aux[2], s.rho[1], 1E-10 * std::max(1.0, s.rho[1]));
+		EXPECT_NEAR(aux[1] + aux[2], wave.compute_dens(p), 1E-9 * std::max(1.0, aux[0]));
+		EXPECT_GT(aux[1], aux[2]);
+		EXPECT_NEAR(y, eli_family::eli_d(s.rho[0], eli_family::g_same_spin(s, 0)), 1E-9 * std::max(1.0, y));
+	}
+}
+
+//The Rb alpha-alpha field is one degenerate sphere of maxima just inside the rho = 1e-4 isosurface (over
+//a hundred of them at equal value, 2.6 bohr apart) around the core and the n = 4 shell. One basin each
+//after the merges, every point inside the isosurface reaches one, and N_alpha + N_beta = population
+static int rb_alpha_alpha_basins(const WFN &wave, vec &pop, vec2 &spin, double &outside)
+{
+	const double tf = eli_family::triplet_density_factor(wave);
+	const eli_spin_field eval = [&wave, tf](const d3 &p, double &y, d3 &g, double *aux) { wave.computeELISpinGrad(p, 0, tf, y, g, aux); };
+	const std::vector<d4> all = analytic_eli_maxima(wave, false, &eval);
+	std::vector<d4> maxima = all;
+	cubei none;
+	ivec core_map, shell_map, edge_map;
+	unify_core_basins(none, maxima, *wave.get_atoms_ptr(), &core_map);
+	unify_shell_basins(none, maxima, &shell_map, 1.2, 0.05, wave.get_atoms_ptr());
+	for (size_t b = 1; b < core_map.size(); b++) core_map[b] = shell_map[core_map[b]];
+	if (unify_boundary_basins(maxima, wave, eval, &edge_map) > 0)
+		for (size_t b = 1; b < core_map.size(); b++) core_map[b] = edge_map[core_map[b]];
+	vec volumes;
+	pop = integrate_basins_on_atomic_grids(nullptr, nullptr, all, wave, 2, true, volumes, outside, nullptr, nullptr, 1, nullptr, nullptr, &core_map, &eval, &spin);
+	return static_cast<int>(maxima.size());
+}
+
+TEST(EliSpin, RestrictedOpenShellSphereIsOneBasin)
+{
+	const std::filesystem::path f = nos_test_repo_root() / "tests" / "ECP_SF" / "Rb.gbw";
+	if (!std::filesystem::exists(f)) GTEST_SKIP() << "missing fixture " << f.string();
+	WFN wave(f);
+	vec pop;
+	vec2 spin;
+	double outside = 0.0;
+	EXPECT_EQ(rb_alpha_alpha_basins(wave, pop, spin, outside), 3);
+	ASSERT_EQ(spin.size(), pop.size());
+	double n = 0.0;
+	for (size_t b = 0; b < pop.size(); b++) {
+		n += pop[b];
+		EXPECT_NEAR(spin[b][0] + spin[b][1], pop[b], 1E-9 * std::max(1.0, pop[b])) << "basin " << b;
+	}
+	EXPECT_NEAR(n + outside, wave.count_nr_electrons(), 5E-3);
+	//what is left outside is the tail beyond the isosurface (0.107 e measured at the default accuracy)
+	EXPECT_LT(outside, 0.15);
+}
+
+//Broken symmetry: N_alpha = N_beta, so only the orbitals tell a spin-polarised determinant from a
+//restricted one written out twice. F_full rewritten as UKS with beta = alpha is not spin-polarised (its
+//alpha-alpha field is the restricted ELI-D); bending one beta coefficient makes it so
+TEST(EliFamily, BrokenSymmetryIsDecidedByTheOrbitals)
+{
+	const std::filesystem::path f = nos_test_repo_root() / "tests" / "molden_file" / "F_full.molden";
+	if (!std::filesystem::exists(f)) GTEST_SKIP() << "missing fixture " << f.string();
+	WFN wave(f);
+	const d3 p{ 0.3, -0.2, 0.5 };
+	const double ref = wave.computeELI(p);
+	const int n0 = wave.get_nmo();
+	for (int i = 0; i < n0; i++) {
+		MO a = wave.get_MO(i);
+		a.set_occ(0.5 * wave.get_MO_occ(i));
+		a.set_op(0);
+		wave.push_back_MO(a);
+	}
+	for (int i = 0; i < n0; i++) {
+		MO b = wave.get_MO(n0 + i);
+		b.set_op(1);
+		wave.push_back_MO(b);
+	}
+	for (int i = 0; i < n0; i++) wave.delete_MO(0);
+	ASSERT_EQ(wave.get_nmo(), 2 * n0);
+	ASSERT_EQ(eli_family::spin_split(wave), eli_family::SpinSplit::unrestricted);
+	EXPECT_FALSE(eli_family::alpha_beta_orbitals_differ(wave));
+	std::string warn;
+	EXPECT_EQ(eli_family::eli_variants_for(wave, &warn).size(), 2u) << warn;
+	double y;
+	d3 g;
+	wave.computeELISpinGrad(p, 0, eli_family::triplet_density_factor(wave), y, g);
+	EXPECT_NEAR(y, ref, 1E-8 * std::max(1.0, ref));
+
+	//the beta HOMO's largest coefficient, 2 % off: same electron counts, different orbitals
+	int homo = -1, big = 0;
+	for (int m = 0; m < wave.get_nmo(); m++)
+		if (wave.get_MO_op(m) == 1 && wave.get_MO_occ(m) > 0.0) homo = m;
+	ASSERT_GE(homo, 0);
+	for (int j = 1; j < wave.get_nex(); j++)
+		if (std::abs(wave.get_MO_coef(homo, j)) > std::abs(wave.get_MO_coef(homo, big))) big = j;
+	wave.set_MO_coef(homo, big, 1.02 * wave.get_MO_coef(homo, big));
+	EXPECT_TRUE(eli_family::alpha_beta_orbitals_differ(wave));
+	EXPECT_EQ(eli_family::eli_variants_for(wave, &warn).size(), 6u) << warn;
+	//a sign flip of a whole orbital is the same orbital
+	wave.set_MO_coef(homo, big, wave.get_MO_coef(homo, big) / 1.02);
+	for (int j = 0; j < wave.get_nex(); j++) wave.set_MO_coef(homo, j, -wave.get_MO_coef(homo, j));
+	EXPECT_FALSE(eli_family::alpha_beta_orbitals_differ(wave));
+}
