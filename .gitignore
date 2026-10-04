@@ -1,5 +1,9 @@
 #Filetypes to ignore
 *.log
+*.rgbi_log
+*.qtaim_log
+*.eli_log
+*.nbo_log
 *.tscb
 !tests/epoxide_gbw/fixture.tscb
 *.densities

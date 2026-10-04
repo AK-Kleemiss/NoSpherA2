@@ -20,6 +20,7 @@
 #include "topology.h"
 #include "citations.h"
 #include "b2c.h"
+#include "section_log.h"
 
 #ifdef _WIN32
 #include <windows.h>
@@ -2790,7 +2791,13 @@ bool options::digest_io_options(const std::string &temp, int &i)
 			citations::cite(citations::Method::NRT, std::cout);
 		NboResults r = native_nbo(wavy, opt, std::cout);
 		r.name = _wfn.stem().string();
-		print_nbo(r, std::cout);
+		{
+			using citations::Method;
+			const section_log::section nbo_file(_wfn, "nbo", std::string("Natural bond orbitals: NPA, NBO, second-order E(2)") + (opt.nrt ? " and NRT" : ""),
+				opt.nrt ? std::vector<Method>{ Method::NAONPA, Method::NBO, Method::E2, Method::NRT } : std::vector<Method>{ Method::NAONPA, Method::NBO, Method::E2 }, no_date);
+			const section_log::tee nbo_tee("nbo");
+			print_nbo(r, std::cout);
+		}
 		write_nbo_json(r, json);
 		std::cout << "wrote " << json.string() << std::endl;
 		finished = true;

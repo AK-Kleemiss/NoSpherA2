@@ -13,6 +13,7 @@
 #include "spherical_density.h"
 #include "citations.h"
 #include "nao.h"
+#include "section_log.h"
 #include <algorithm>
 #include <cctype>
 #include <chrono>
@@ -3646,6 +3647,7 @@ Roby_information::Roby_information(WFN &wavy, const ivec3 &group_sets, const boo
 	if (std::abs(omitted_population) < 1e-9 * std::max(1.0, all_atom_population))
 		omitted_population = 0.0;
 
+	const section_log::tee rgbi_tee("rgbi", "Bond populations, covalent and ionic indices");
 	std::cout << "\nRoby-Gould Bond Indices (RGBI) Analysis\n----------------------------------------------\n";
 	std::cout << "Number of electrons in system:         " << number_of_electrons;
 	if (wavy.get_nr_ECP_electrons() > 0)
@@ -4088,6 +4090,7 @@ void ELI_analysis(const WFN &wavy, options &opt) {
 			const critical_point_seed seed{ i3{ 0, 0, 0 }, p.position, p.density, p.gradient_norm, p.kind == topology::cp_kind::attractor && !p.is_nna, p.nearest_nucleus };
 			density_critical_points.push_back(evaluate_critical_point(seed, p.position, l_w, p.iterations, true));
 		}
+		const section_log::tee cp_tee("qtaim", "Critical points of the electron density");
 		std::cout << "Density critical points from the analytic field: NCP " << top.n_attractor << ", BCP " << top.n_bond << ", RCP "
 			<< top.n_ring << ", CCP " << top.n_cage << "; Poincare-Hopf sum " << top.sum << " against " << top.target
 			<< (top.complete ? " (COMPLETE)" : " (INCOMPLETE: " + top.diagnosis + ")") << std::endl;
@@ -4119,6 +4122,8 @@ void ELI_analysis(const WFN &wavy, options &opt) {
 		});
 		density_critical_points.swap(kept);
 	}
+	{
+	const section_log::tee cp_tee("qtaim");
 	std::cout << "Density Critical Points";
 	if (!density_critical_points.empty())
 		std::cout << " (" << density_critical_points.size() << " found)";
@@ -4217,6 +4222,7 @@ void ELI_analysis(const WFN &wavy, options &opt) {
 		}
 		std::cout << "\n";
 	}
+	}
 
 	//Every nucleus is a maximum of the density, whatever the grid says
 	std::vector<d3> nuclei;
@@ -4272,6 +4278,8 @@ void ELI_analysis(const WFN &wavy, options &opt) {
 				<< " basins on " << omp_get_max_threads() << " threads would need " << aom_bytes / (1024 * 1024) << " MB of overlap matrices.\n";
 		const bool mapped = eli && stream && !eli_core_map.empty();
 		const vec pop = integrate_basins_on_atomic_grids(stream ? nullptr : &rho, stream ? nullptr : &(res.first), mapped ? eli_maxima_all : res.second, l_w, opt.accuracy, eli, vol, outside, fill_cores && !eli ? &core_density : nullptr, fill_cores && !eli ? &core_gradient : nullptr, opt.basin_grid, eli ? nullptr : fld, want_aom ? &ovl : nullptr, mapped ? &eli_core_map : nullptr);
+		const section_log::tee basin_tee(eli ? "eli" : "qtaim", eli ? "ELI-D basins: populations, volumes and maxima"
+			: "QTAIM basins: populations, charges, volumes and maxima");
 		std::cout << "\n" << title << " (atomic quadrature grids):\n";
 		if (!eli) citations::cite(citations::Method::QTAIM, std::cout);
 		//The maximum column is 16 wide, not 12: it carries rho at the attractor, and at a uranium
@@ -4312,7 +4320,11 @@ void ELI_analysis(const WFN &wavy, options &opt) {
 					std::cout << "  WARNING: " << name << " core holds " << std::setprecision(2) << core << " e, its closed shells " << expected
 					<< ": the core boundary sits in the wrong shell minimum\n";
 			}
-		if (want_aom) report_delocalization(l_w, ovl, lab, std::cout);
+		if (want_aom) {
+			std::cout.flush();
+			section_log::heading("qtaim", "Localization and delocalization indices");
+			report_delocalization(l_w, ovl, lab, std::cout);
+		}
 	};
 	if (l_w.get_nmo() == 0) {
 		report("QTAIM Analysis", qtaim_results, labels, false, stream_qtaim);
@@ -4409,6 +4421,7 @@ void ELI_analysis(const WFN &wavy, options &opt) {
 	svec eli_labels = assign_labels_to_basins(eli_results.second, atoms, opt.debug, 1);
 	report("QTAIM Analysis", qtaim_results, labels, false, stream_qtaim);
 	report("ELI-D Analysis", eli_results, eli_labels, true, stream_eli);
+	const section_log::tee spin_tee("eli", "Spin-resolved ELI-D");
 	spin_eli_analysis(l_w, opt, atoms, shell_dist, shell_tol);
 }
 
