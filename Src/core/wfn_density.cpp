@@ -8,6 +8,7 @@
 #include "basis_set.h"
 #include "nos_math.h"
 #include "libCintMain.h"
+#include "eli_family.h"
 #include "integrator.h"
 #include "cell.h"
 #ifdef NOSPHERA2_USE_GPU
@@ -2396,9 +2397,9 @@ void WFN::computeELISpinGrad(
 	if (aux) for (int k = 0; k < 4; k++) aux[k] = 0.0;
 	if (!eli_orbital_pass(PosGrid, phi)) return;
 	static constexpr int hidx[3][3] = { {4, 7, 8}, {7, 5, 9}, {8, 9, 6} };
-	//serial scan: get_MO_op_count opens an OpenMP region, and this runs once per point of the climb
-	bool unrestricted = false;
-	for (int mo = 0; mo < _nmo && !unrestricted; mo++) unrestricted = get_MO_op(mo) == 1;
+	//serial scan inside spin_split: get_MO_op_count opens an OpenMP region, and this runs once per point of the climb
+	const eli_family::SpinSplit how = eli_family::spin_split(*this);
+	const bool halves = how == eli_family::SpinSplit::halves;
 	double rho[2]{ 0, 0 }, tau[2]{ 0, 0 }, G[2][3]{}, T[2][3]{}, H[2][3][3]{};
 	for (int mo = 0; mo < _nmo; mo++)
 	{
@@ -2406,22 +2407,27 @@ void WFN::computeELISpinGrad(
 		if (occ == 0) continue;
 		double p[10];
 		for (int k = 0; k < 10; k++) p[k] = phi[(size_t)k * _nmo + mo];
-		//restricted: half of every occupation in each channel, accumulated once into alpha and copied
-		const int s = unrestricted ? get_MO_op(mo) : 0;
-		const double n = unrestricted ? occ : 0.5 * occ, dn = 2 * n;
-		rho[s] += n * p[0] * p[0];
-		for (int i = 0; i < 3; i++)
+		//halves: half of every occupation in each channel, accumulated once into alpha and copied
+		double nc[2];
+		eli_family::mo_spin_occupations(occ, get_MO_op(mo), how, nc);
+		for (int s = 0; s < (halves ? 1 : 2); s++)
 		{
-			tau[s] += n * p[1 + i] * p[1 + i];
-			G[s][i] += dn * p[0] * p[1 + i];
-			for (int k = 0; k < 3; k++)
+			const double n = nc[s], dn = 2 * n;
+			if (n == 0.0) continue;
+			rho[s] += n * p[0] * p[0];
+			for (int i = 0; i < 3; i++)
 			{
-				H[s][i][k] += dn * (p[0] * p[hidx[i][k]] + p[1 + i] * p[1 + k]);
-				T[s][k] += dn * p[1 + i] * p[hidx[i][k]];
+				tau[s] += n * p[1 + i] * p[1 + i];
+				G[s][i] += dn * p[0] * p[1 + i];
+				for (int k = 0; k < 3; k++)
+				{
+					H[s][i][k] += dn * (p[0] * p[hidx[i][k]] + p[1 + i] * p[1 + k]);
+					T[s][k] += dn * p[1 + i] * p[hidx[i][k]];
+				}
 			}
 		}
 	}
-	if (!unrestricted)
+	if (halves)
 	{
 		rho[1] = rho[0]; tau[1] = tau[0];
 		for (int i = 0; i < 3; i++) { G[1][i] = G[0][i]; T[1][i] = T[0][i]; for (int k = 0; k < 3; k++) H[1][i][k] = H[0][i][k]; }

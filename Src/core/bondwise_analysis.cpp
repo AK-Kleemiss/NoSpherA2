@@ -3814,24 +3814,25 @@ static void spin_eli_analysis(const WFN &l_w, const options &opt, const std::vec
 	const std::vector<Member> members = eli_family::eli_variants_for(l_w, &warn);
 	auto has = [&](const Member m) { return std::find(members.begin(), members.end(), m) != members.end(); };
 	if (!opt.spin_eli) { std::cout << "\nSpin-resolved ELI-D: off (-no_spin_eli)." << std::endl; return; }
-	const bool unrestricted = l_w.get_MO_op_count(1) > 0;
+	const eli_family::SpinSplit how = eli_family::spin_split(l_w);
+	const bool unrestricted = how == eli_family::SpinSplit::unrestricted;
 	double N[2]{ 0.0, 0.0 };
 	int norb[2]{ 0, 0 };
 	bool open_restricted = false;
 	for (int mo = 0; mo < l_w.get_nmo(); mo++) {
 		const double occ = l_w.get_MO_occ(mo);
 		if (occ == 0.0) continue;
-		const int s = unrestricted ? l_w.get_MO_op(mo) : 0;
-		N[s] += occ;
-		norb[s]++;
-		if (!unrestricted && std::abs(occ - 2.0) > 1e-6) open_restricted = true;
+		double n[2];
+		eli_family::mo_spin_occupations(occ, l_w.get_MO_op(mo), how, n);
+		for (int s = 0; s < 2; s++) if (n[s] != 0.0) { N[s] += n[s]; norb[s]++; }
+		if (how == eli_family::SpinSplit::halves && std::abs(occ - 2.0) > 1e-6) open_restricted = true;
 	}
 	if (!has(Member::eli_d_bb)) {
 		std::cout << "\nSpin-resolved ELI-D: skipped, "
-			<< (open_restricted ? "restricted open-shell or fractional occupations (ROHF/ROKS, natural orbitals) - one MO set without spin labels, so alpha and beta densities are not resolved"
+			<< (open_restricted ? "fractional occupations in one MO set without spin labels (natural orbitals) - alpha and beta densities are not resolved"
 				: !unrestricted ? "restricted wavefunction - ELI-D(alpha-alpha) = ELI-D(beta-beta) is the ELI-D above and the triplet member a constant multiple of it"
 				: N[1] < 1e-8 ? "the beta orbital set holds no electrons"
-				: "N_alpha = N_beta - not spin-polarised")
+				: "N_alpha = N_beta and the beta orbitals are the alpha ones - not spin-polarised")
 			<< "." << std::endl;
 		return;
 	}
@@ -3839,6 +3840,8 @@ static void spin_eli_analysis(const WFN &l_w, const options &opt, const std::vec
 	citations::cite(citations::Method::ELIFamily, std::cout);
 	const double tf = eli_family::triplet_density_factor(l_w);
 	std::cout << "\nSpin-resolved ELI-D (Kohout): N_alpha = " << std::fixed << std::setprecision(4) << N[0] << ", N_beta = " << N[1]
+		<< (how == eli_family::SpinSplit::restricted_open ? " (restricted open shell: singly occupied MOs alpha, doubly occupied one of each)"
+			: std::abs(N[0] - N[1]) < 1e-8 ? " (broken symmetry: N_alpha = N_beta, alpha and beta orbitals differ)" : "")
 		<< ". The ELI-D above is the spin-summed field, not a pair function of either spin." << std::endl;
 	struct member_basins { std::vector<d4> maxima; svec labels; vec pop, vol; vec2 spin; double outside = 0.0; bool done = false; };
 	const char *names[3] = { "alpha-alpha", "beta-beta", "triplet" };
@@ -3861,18 +3864,34 @@ static void spin_eli_analysis(const WFN &l_w, const options &opt, const std::vec
 		unify_shell_basins(none, r.maxima, &shell_map, shell_dist, shell_tol, &atoms);
 		if (!shell_map.empty())
 			for (size_t b = 1; b < core_map.size(); b++) core_map[b] = shell_map[core_map[b]];
+		ivec edge_map;
+		if (unify_boundary_basins(r.maxima, l_w, eval, &edge_map) > 0)
+			for (size_t b = 1; b < core_map.size(); b++) core_map[b] = edge_map[core_map[b]];
 		r.labels = assign_labels_to_basins(r.maxima, atoms, opt.debug, 1);
 		clock.lap(std::string("ELI-D ") + names[f] + " maxima");
 		r.pop = integrate_basins_on_atomic_grids(nullptr, nullptr, all, l_w, opt.accuracy, true, r.vol, r.outside, nullptr, nullptr, opt.basin_grid, nullptr, nullptr, &core_map, &eval, &r.spin);
 		r.done = true;
 		clock.lap(std::string("ELI-D ") + names[f] + " basins");
-		std::cout << "\nELI-D " << names[f] << " Analysis (atomic quadrature grids), " << all.size() << " maxima, " << r.maxima.size() << " basins:\n"
-			<< "  basin  label               electrons    N_alpha     N_beta       spin  <ELI-q>      volume         maximum        x          y          z\n";
 		double tot = 0.0, ts[2]{ 0.0, 0.0 };
 		for (size_t b = 0; b < r.pop.size(); b++) {
 			tot += r.pop[b];
 			ts[0] += r.spin[b][0];
 			ts[1] += r.spin[b][1];
+		}
+		//ponytail: the rim seeds find surface attractors of the bounded field that hold nothing on a light
+		//radical (C2H5 alpha-alpha: 7 of 17 basins at 0.0000 e); they count in the totals but leave both tables
+		int empty = 0;
+		for (size_t b = r.pop.size(); b-- > 0;)
+			if (r.pop[b] < 5e-5) {
+				r.pop.erase(r.pop.begin() + b); r.vol.erase(r.vol.begin() + b); r.spin.erase(r.spin.begin() + b);
+				r.maxima.erase(r.maxima.begin() + b); r.labels.erase(r.labels.begin() + b);
+				empty++;
+			}
+		std::cout << "\nELI-D " << names[f] << " Analysis (atomic quadrature grids), " << all.size() << " maxima, " << r.maxima.size() << " basins";
+		if (empty) std::cout << " (" << empty << " more below 5e-5 e not listed)";
+		std::cout << ":\n"
+			<< "  basin  label               electrons    N_alpha     N_beta       spin  <ELI-q>      volume         maximum        x          y          z\n";
+		for (size_t b = 0; b < r.pop.size(); b++) {
 			std::cout << std::setw(7) << b + 1 << "  " << std::left << std::setw(18) << r.labels[b] << std::right << std::fixed << std::setprecision(4)
 				<< std::setw(11) << r.pop[b] << std::setw(11) << r.spin[b][0] << std::setw(11) << r.spin[b][1] << std::setw(11) << r.spin[b][0] - r.spin[b][1];
 			//<ELI-q_s> = integral of rho_s Y_q over the basin / N_s; the triplet has no ELI-q partner

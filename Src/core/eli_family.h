@@ -38,6 +38,26 @@ namespace eli_family
 	};
 	enum Spin { alpha = 0, beta = 1 };
 
+	//How the occupations split over the two spins, read off the orbitals.
+	//  unrestricted     a beta MO set exists: every MO is in the channel of its own label.
+	//  restricted_open  one MO set, every occupation 0, 1 or 2, at least one 1 and, if the file states a
+	//                   multiplicity, it is the number of singles + 1 (ROHF/ROKS): a single is alpha, a
+	//                   double is one of each.
+	//  halves           any other single set (closed shell, fractional natural orbitals): occ/2 each.
+	//Serial loops only: computeELISpinGrad asks once per point of a climb.
+	enum class SpinSplit { unrestricted, restricted_open, halves };
+	SpinSplit spin_split(const WFN& wave);
+	inline void mo_spin_occupations(const double occ, const int op, const SpinSplit how, double n[2])
+	{
+		if (how == SpinSplit::unrestricted) { n[0] = op == 1 ? 0.0 : occ; n[1] = op == 1 ? occ : 0.0; }
+		else if (how == SpinSplit::restricted_open) { n[0] = std::min(occ, 1.0); n[1] = occ - n[0]; }
+		else n[0] = n[1] = 0.5 * occ;
+	}
+	//A beta set with N_alpha = N_beta is still spin-polarised when its orbitals differ from the alpha ones
+	//(a broken-symmetry singlet): occupied alpha and beta MOs compared in order, coefficients to 1e-4 of
+	//the largest, an overall sign allowed.
+	bool alpha_beta_orbitals_differ(const WFN& wave);
+
 	//One pass over the primitives, alpha and beta accumulated separately.  A restricted wavefunction
 	//(no MO carries op 1) splits every occupation evenly between the two channels, which reproduces
 	//rho_alpha = rho_beta = rho/2 exactly.

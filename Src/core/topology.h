@@ -310,14 +310,27 @@ namespace topology
 		auto add_seed = [&](const d3& p, const seed_class c) { seeds.push_back(p); seed_of.push_back(c); };
 
 		auto run = [&](const size_t first) {
-			for (size_t s = first; s < seeds.size(); s++) {
-				d3 p = seeds[s];
+			//Each seed's Newton search is independent and was the whole serial cost: 114 s of the
+			//complex_Pt_Zn_PMe3 FBA run on one core. The searches run in parallel and the merge below
+			//stays serial in seed order, so the point set is the one the serial loop found, bit for bit
+			const int n = static_cast<int>(seeds.size() - first);
+			std::vector<cp> found(n);
+			std::vector<char> ok(n, 0);
+#pragma omp parallel for schedule(dynamic, 1)
+			for (int i = 0; i < n; i++) {
+				d3 p = seeds[first + i];
 				int it = 0;
 				if (!newton_to_critical_point(source, p, opt, it))
 					continue;
-				cp point = describe_cp(source, p, nuclei, opt);
-				point.from = seed_of[s];
-				point.iterations = it;
+				found[i] = describe_cp(source, p, nuclei, opt);
+				found[i].from = seed_of[first + i];
+				found[i].iterations = it;
+				ok[i] = 1;
+			}
+			for (int i = 0; i < n; i++) {
+				if (!ok[i])
+					continue;
+				const cp &point = found[i];
 				bool duplicate = false;
 				//Same kind, and only then close enough: an attractor and a saddle 0.045 bohr apart are two
 				//points of the density, not one point found twice. Measured on tests/grown/water.wfx, where

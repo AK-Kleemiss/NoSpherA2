@@ -1379,7 +1379,8 @@ double eli_core_radius(const int Z)
 }
 
 //DGrid's ELIDcore over the reference set: Na, Al, P, S, Cl 10.05; Ti, Fe, Ni 9.2-10.3; Zn, Br 27.8;
-//Pd 26.7; Cd 44.8; Sn 46.6; Pt 51.7. The 5d core runs short of its 60, hence a relative tolerance
+//Pd 26.7; Cd 44.8; Sn 46.6; Pt 51.7 (under-resolved at 0.1 bohr). The ELI-D N/O minimum of a free ZORA Pt
+//atom holds 58.13 e, not 60: 2.26 e of the 4f tail lie beyond it. Hence a relative tolerance
 int eli_core_electrons(const int Z)
 {
 	if (Z >= 19 && Z <= 29) return 10;
@@ -1491,6 +1492,58 @@ int unify_shell_basins(cubei &basin_cube, std::vector<d4> &maxima, ivec *basin_m
 	ivec keeper(nb);
 	for (int b = 0; b < nb; b++) { const int r = find(b); keeper[b] = (r == b ? -1 : r); }
 	return collapse_maxima_groups(basin_cube, maxima, keeper, basin_map);
+}
+
+int unify_boundary_basins(std::vector<d4> &maxima, const WFN &wavy, const eli_spin_field &eli, ivec *basin_map)
+{
+	const int nb = static_cast<int>(maxima.size());
+	std::vector<char> edge(nb, 0);
+	for (int b = 0; b < nb; b++) edge[b] = wavy.compute_dens(d3{ maxima[b][0], maxima[b][1], maxima[b][2] }) < 1.05 * basin_density_cutoff;
+	//No barrier on the arc from b to c about the atom nearest b, at their radii: the field stays within
+	//the 1e-3 of the two maxima at four points between. A degenerate sphere (Rb 5s alpha-alpha just inside
+	//the isosurface) is flat there; two equivalent lone pairs or bonds dip between them
+	auto flat = [&](const d4 &b, const d4 &c) {
+		const d3 pb{ b[0], b[1], b[2] }, pc{ c[0], c[1], c[2] };
+		int na = 0;
+		for (int a = 1; a < wavy.get_ncen(); a++)
+			if (array_length(pb, wavy.get_atom_pos(a)) < array_length(pb, wavy.get_atom_pos(na))) na = a;
+		const d3 o = wavy.get_atom_pos(na);
+		const d3 u{ pb[0] - o[0], pb[1] - o[1], pb[2] - o[2] }, v{ pc[0] - o[0], pc[1] - o[1], pc[2] - o[2] };
+		const double ru = array_length(u), rv = array_length(v);
+		if (!(ru > 1e-6) || !(rv > 1e-6)) return false;
+		const double lo = (1.0 - 1e-3) * std::min(b[3], c[3]);
+		for (int k = 1; k <= 4; k++) {
+			const double t = k / 5.0, r = (1.0 - t) * ru + t * rv;
+			//normalised linear interpolation of the two directions: the arc is short, 3 bohr at most
+			d3 w{ (1.0 - t) * u[0] / ru + t * v[0] / rv, (1.0 - t) * u[1] / ru + t * v[1] / rv, (1.0 - t) * u[2] / ru + t * v[2] / rv };
+			const double wl = array_length(w);
+			if (!(wl > 1e-6)) return false;
+			const d3 p{ o[0] + r * w[0] / wl, o[1] + r * w[1] / wl, o[2] + r * w[2] / wl };
+			double f;
+			d3 g;
+			eli(p, f, g, nullptr);
+			if (!(f >= lo)) return false;
+		}
+		return true;
+	};
+	ivec root(nb);
+	std::iota(root.begin(), root.end(), 0);
+	auto find = [&root](int b) { while (root[b] != b) b = root[b] = root[root[b]]; return b; };
+	//ponytail: equal value to 1e-3 and 3 bohr single linkage; surface maxima link without the arc test
+	//(two symmetry-equivalent open-shell sites on the isosurface closer than 3 bohr would merge - give
+	//them the arc test too if one ever does), interior ones only over a flat arc
+	for (int b = 1; b < nb; b++)
+		for (int c = 0; c < b; c++) {
+			if (std::pow(maxima[b][0] - maxima[c][0], 2) + std::pow(maxima[b][1] - maxima[c][1], 2) + std::pow(maxima[b][2] - maxima[c][2], 2) > 9.0) continue;
+			if (std::abs(maxima[b][3] - maxima[c][3]) > 1e-3 * std::max(maxima[b][3], maxima[c][3])) continue;
+			const int rb = find(b), rc = find(c);
+			if (rb == rc) continue;
+			if ((edge[b] && edge[c]) || flat(maxima[b], maxima[c])) root[std::max(rb, rc)] = std::min(rb, rc);
+		}
+	ivec keeper(nb);
+	for (int b = 0; b < nb; b++) { const int r = find(b); keeper[b] = (r == b ? -1 : r); }
+	cubei none;
+	return collapse_maxima_groups(none, maxima, keeper, basin_map);
 }
 
 //Newton-Raphson onto the nearest critical point of the field, then the negative-definite test.
@@ -1663,9 +1716,61 @@ std::vector<d4> streaming_density_attractors(const WFN &wavy, const std::vector<
 	return maxima;
 }
 
+//Monotone ascent of a spin-resolved ELI-D on the domain rho >= basin_density_cutoff. Where one orbital
+//carries a spin's density (HgH alpha-alpha behind the Hg: g_aa -> 0) the same-spin field rises all the
+//way out to the isosurface, so that basin's attractor is the field's maximum on it. A step that would
+//leave the domain is pulled back onto the surface along grad rho, and the walk slides along it to that
+//constrained maximum; inside the domain it is the plain ascent. False if p cannot be put on the domain.
+bool bounded_eli_ascent(const WFN &wavy, const eli_spin_field &eli, d3 &p, double &f)
+{
+	//just inside, so the integration's own isosurface test accepts the attractor it lands on
+	const double target = 1.001 * basin_density_cutoff;
+	//Newton on ln rho, which the exponential tail makes nearly linear; a plain Newton on rho overshoots
+	//inward and leaves the walk off the surface it is meant to slide along
+	auto onto = [&](d3 &q) {
+		for (int k = 0; k < 12; k++) {
+			d3 n;
+			double rho = 0.0;
+			wavy.computeGrad(q, n, &rho);
+			if (rho >= basin_density_cutoff) return true;
+			const double n2 = n[0] * n[0] + n[1] * n[1] + n[2] * n[2];
+			if (!(n2 > 1e-30) || !(rho > 0.0)) return false;
+			const double s = std::log(target / rho) * rho / n2;
+			for (int i = 0; i < 3; i++) q[i] += s * n[i];
+		}
+		return false;
+	};
+	if (!onto(p)) return false;
+	d3 g;
+	eli(p, f, g, nullptr);
+	if (!std::isfinite(f)) return false;
+	double step = 0.05;
+	for (int it = 0; it < 500 && step > 1e-5; it++) {
+		//On the surface with the field pointing out, only its tangential part moves the walk: the full
+		//gradient, projected back, crept 0.4 bohr short of HgH's alpha-alpha attractor (2.435 of 2.452)
+		d3 d = g, n;
+		double rho = 0.0;
+		wavy.computeGrad(p, n, &rho);
+		const double gdn = g[0] * n[0] + g[1] * n[1] + g[2] * n[2], n2 = n[0] * n[0] + n[1] * n[1] + n[2] * n[2];
+		if (rho < 1.05 * basin_density_cutoff && gdn > 0.0 && n2 > 1e-30)
+			for (int i = 0; i < 3; i++) d[i] -= gdn / n2 * n[i];
+		const double gn = array_length(d);
+		if (!std::isfinite(gn) || gn < 1e-12 || gn < 1e-9 * array_length(g)) break;
+		d3 t{ p[0] + step * d[0] / gn, p[1] + step * d[1] / gn, p[2] + step * d[2] / gn };
+		if (!onto(t)) { step *= 0.5; continue; }
+		double ft;
+		d3 gt;
+		eli(t, ft, gt, nullptr);
+		if (std::isfinite(ft) && ft > f) { p = t; f = ft; g = gt; step = std::min(1.5 * step, 0.3); }
+		else step *= 0.5;
+	}
+	return true;
+}
+
 std::vector<d4> analytic_eli_maxima(const WFN &wavy, const bool debug, const eli_spin_field *eli)
 {
-	auto eli_grad = [&](const d3 &p, double &f, d3 &g) { if (eli) (*eli)(p, f, g, nullptr); else wavy.computeELIGrad(p, f, g); };
+	//rho comes out of computeELIGrad's own orbital pass; the spin field leaves it unset (nullptr)
+	auto eli_grad = [&](const d3 &p, double &f, d3 &g, double *rho = nullptr) { if (eli) (*eli)(p, f, g, nullptr); else wavy.computeELIGrad(p, f, g, rho); };
 	auto sphere = [](const int n) {
 		std::vector<d3> d(n);
 		for (int i = 0; i < n; i++) {
@@ -1694,6 +1799,25 @@ std::vector<d4> analytic_eli_maxima(const WFN &wavy, const bool debug, const eli
 				if (own) seeds.push_back(p);
 			}
 	}
+	//A spin field's surface attractor can sit behind an interior maximum and a minimum (HgH triplet: the
+	//Hg lone pair at z = -4.05, the surface attractor at -6.35) where no seed above reaches; every exit
+	//there then had no basin. So a spin field also starts one bounded ascent per outer direction on
+	//the isosurface itself (first point out from 3.5 bohr in 0.5 bohr steps with rho below the cutoff)
+	const size_t n_interior = seeds.size();
+	if (eli)
+		for (int a = 0; a < ncen; a++) {
+			const d3 pa = wavy.get_atom_pos(a);
+			for (const d3 &u : outer)
+				for (double r = 3.5; r < 25.0; r += 0.5) {
+					const d3 p{ pa[0] + r * u[0], pa[1] + r * u[1], pa[2] + r * u[2] };
+					if (wavy.compute_dens(p) >= basin_density_cutoff) continue;
+					bool own = true;
+					for (int b = 0; b < ncen && own; b++)
+						if (b != a && array_length(p, wavy.get_atom_pos(b)) < r) own = false;
+					if (own) seeds.push_back(p);
+					break;
+				}
+		}
 	//Monotone ascent along the normalised gradient: a step is taken only if ELI-D rises, grows
 	//after a success and halves after a failure. No Hessian test: a hydrogen's valence maximum sits
 	//on the cusp of the nucleus
@@ -1702,8 +1826,12 @@ std::vector<d4> analytic_eli_maxima(const WFN &wavy, const bool debug, const eli
 #pragma omp parallel for schedule(dynamic, 16)
 	for (int s = 0; s < ns; s++) {
 		d3 p = seeds[s], g;
-		if (wavy.compute_dens(p) < basin_density_cutoff) continue;
 		double f;
+		if (static_cast<size_t>(s) >= n_interior) {
+			if (bounded_eli_ascent(wavy, *eli, p, f)) ends[s] = d4{ p[0], p[1], p[2], f };
+			continue;
+		}
+		if (wavy.compute_dens(p) < basin_density_cutoff) continue;
 		eli_grad(p, f, g);
 		if (!std::isfinite(f)) continue;
 		bool inside = true;
@@ -1712,14 +1840,21 @@ std::vector<d4> analytic_eli_maxima(const WFN &wavy, const bool debug, const eli
 			const double gn = array_length(g);
 			if (!std::isfinite(gn) || gn < 1e-12) break;
 			const d3 t{ p[0] + step * g[0] / gn, p[1] + step * g[1] / gn, p[2] + step * g[2] / gn };
-			double ft;
+			double ft, rt = 0.0;
 			d3 gt;
-			eli_grad(t, ft, gt);
+			eli_grad(t, ft, gt, eli ? nullptr : &rt);
 			if (std::isfinite(ft) && ft > f) {
 				p = t; f = ft; g = gt;
 				step = std::min(1.5 * step, 0.3);
-				//ELI-D is undefined in the tail and the basins end at the same isosurface
-				if (wavy.compute_dens(p) < basin_density_cutoff) { inside = false; break; }
+				//ELI-D is undefined in the tail and the basins end at the same isosurface. The closed-shell
+				//field's rho is the one computeELIGrad just summed, which saves a density evaluation per
+				//accepted step
+				if ((eli ? wavy.compute_dens(p) : rt) < basin_density_cutoff) {
+					//A spin field that climbs out has its attractor on the isosurface; the spin-summed
+					//field keeps dropping such climbs, its output is unchanged
+					inside = eli != nullptr && bounded_eli_ascent(wavy, *eli, p, f);
+					break;
+				}
 			}
 			else step *= 0.5;
 		}
@@ -1797,6 +1932,10 @@ static int g_step_cap = 2000;
 static double g_step_relax = 1.5;
 //Whether a floor step that fails to rise may halve and try again (NOS_BASIN_SHRINK=0 turns it off)
 static bool g_step_shrink = true;
+//Fraction of the base step below which a failing step stops halving (NOS_BASIN_SHRINK_FLOOR).
+//ponytail: 1/64 clears every >=1e-2 stall (NaCl 38, 1-bromopropane 2) and moves no core, but splits
+//one H2CF2 F lone-pair pair 0.040 -> 0.116 e apart, so the default stays 1/16 (4 Oct 2026)
+static double g_shrink_floor = 0.0625;
 //Account separately for density that never reaches a basin.
 static std::atomic<long long> g_stall_vacuum{ 0 }, g_stall_field{ 0 }, g_stall_far{ 0 };
 static std::atomic<double> g_stall_far_rho{ 0.0 };
@@ -1988,6 +2127,10 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 		if (v >= 1.0 && v <= 4.0) g_step_relax = v;
 	}
 	if (const char *e = std::getenv("NOS_BASIN_SHRINK")) g_step_shrink = std::string(e) != "0";
+	if (const char *e = std::getenv("NOS_BASIN_SHRINK_FLOOR")) {
+		const double v = std::atof(e);
+		if (v > 0.0 && v <= 1.0) g_shrink_floor = v;
+	}
 	//The basin a maximum belongs to, 1-based; without a map that is the maximum's own index
 	auto basin_of = [&](const size_t m) { return maximum_basin ? (*maximum_basin)[m + 1] : static_cast<int>(m) + 1; };
 	int nb = 0;
@@ -2233,10 +2376,14 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 	}
 	T.lap(fieldname + "beta spheres");
 	if (basin_timing_enabled() && margin > 0.0) {
-		size_t with = 0;
-		for (const double b : beta2) if (b > 0.0) with++;
+		//A maximum inside a same-basin sphere (-1) is covered by it, and on a heavy atom that is most of
+		//them: complex_Pt_Zn_PMe3 read "235 of 342 carry one" while 94 of the other 107 were core-shell
+		//and shattered-shell maxima inside their core's or neighbour's sphere, so only 13 had none
+		size_t with = 0, via = 0;
+		for (const double b : beta2) { if (b > 0.0) with++; else if (b < 0.0) via++; }
 		std::cout << "  [timing] " << fieldname << "beta spheres: margin " << margin << ", "
-			<< with << " of " << beta2.size() << " maxima carry one" << std::endl;
+			<< with << " of " << beta2.size() << " maxima carry one, " << via << " more answer through a same-basin sphere, "
+			<< beta2.size() - with - via << " have only the catch radius" << std::endl;
 	}
 	//Use at least level 3; strongly ionic centres can require level 4 for 0.01 e agreement.
 	GridConfiguration config;
@@ -2353,7 +2500,29 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 				if (streaming && eli) { double aux[4]; (*eli)(r, vg, g, aux); rho_r = aux[0]; have_vg = true; }
 				else if (streaming && !field) { wavy.computeELIGrad(r, vg, g, &rho_r); have_vg = true; }
 				else rho_r = valence(r);
-				if (rho_r < basin_density_cutoff) return 0;
+				if (rho_r < basin_density_cutoff) {
+					//A spin field's walk that leaves the domain goes on along the isosurface to the attractor
+					//analytic_eli_maxima found there (bounded_eli_ascent); before, it was outside every basin
+					if (!(streaming && eli)) return 0;
+					d3 q = r;
+					double fq;
+					if (!bounded_eli_ascent(wavy, *eli, q, fq)) return 0;
+					if (const int mb = at_maximum(q)) return mb;
+					//A near-degenerate surface (Rb 5s: one shell of equal-value maxima) stops the ascent anywhere on
+					//it; the nearest maximum of the same value within unify_boundary_basins' 3 bohr linkage is its
+					//basin, and that pass then merges the shell
+					int best = 0;
+					double d2 = 9.0;
+					for (size_t m = 0; m < maxima.size(); m++) {
+						if (std::abs(maxima[m][3] - fq) > 1e-3 * std::max(maxima[m][3], fq)) continue;
+						const double dq = std::pow(q[0] - maxima[m][0], 2) + std::pow(q[1] - maxima[m][1], 2) + std::pow(q[2] - maxima[m][2], 2);
+						if (dq < d2) { d2 = dq; best = basin_of(m); }
+					}
+					//ponytail: a few HgH exits (22 alpha-alpha, 48 triplet points, < 1e-4 e together) stall 0.4 bohr and
+					//0.6 % short of the axial surface attractor and still end here with 0; a constrained Newton step if
+					//that ever carries weight
+					return best ? best : nearest_maximum(q, 0.1);
+				}
 			}
 			if (grow) adp_count(g_adp_steps);
 			const int m = at_maximum(r);
@@ -2371,7 +2540,7 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 					//Retry a grown step at the base length after excessive turning.
 					if (grown_last) { adp_count(g_adp_fall); r = r_prev; last_value = value_prev; mult = 1.0; grown_last = false; reuse = have_prev; pending = 0; continue; }
 					mult = 1.0;
-					if (g_step_shrink && shrink > 0.0625) {
+					if (g_step_shrink && shrink > g_shrink_floor) {
 						adp_count(g_adp_shrink);
 						shrink *= 0.5;
 						r = r_prev;
