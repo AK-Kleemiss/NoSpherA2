@@ -18,6 +18,7 @@
 #include "nbo_run.h"
 #include "citations.h"
 #include "b2c.h"
+#include "section_log.h"
 #include <future>
 #ifdef NOSPHERA2_USE_GPU
 #include "grid_gpu.h"
@@ -86,6 +87,7 @@ static int run_app_impl(int argc, char **argv)
 	}
 
 	current_log_path = output_file;
+	section_log::main_log() = output_file;
 	ofstream log_file(output_file, ios::out);
 	std::streambuf *_coutbuf = std::cout.rdbuf(log_file.rdbuf()); // save and redirect
 
@@ -226,7 +228,13 @@ static int run_app_impl(int argc, char **argv)
 			nbo.search_threads = 1;
 			NboResults r = native_nbo(w, nbo, nbo_log);
 			r.name = opt.wfn.stem().string();
-			print_nbo(r, nbo_log);
+			//Not registered: cout belongs to RGBI and the basins on the main thread
+			section_log::section nbo_file(opt.wfn, "nbo", "Natural bond orbitals: NPA, NBO, second-order E(2) and NRT",
+				{ citations::Method::NAONPA, citations::Method::NBO, citations::Method::E2, citations::Method::NRT }, opt.no_date, false);
+			std::ostringstream tables;
+			print_nbo(r, tables);
+			nbo_log << tables.str();
+			nbo_file.stream() << tables.str() << "\n  Machine-readable copy: " << json.filename().string() << "\n";
 			write_nbo_json(r, json);
 			nbo_log << "wrote " << json.string() << std::endl;
 			//NAO, search and E2 are in the json's timings; NRT is what this leaves over
@@ -236,6 +244,10 @@ static int run_app_impl(int argc, char **argv)
 		}, read_wfn());
 		//-basin_timing: one lap per stage of the main thread, which runs while NBO/NRT does
 		basin_stage_timer fba_timer;
+		const section_log::section rgbi_file(opt.wfn, "rgbi", "Roby-Gould Bond Indices (RGBI)", { citations::Method::RGBI }, opt.no_date),
+			qtaim_file(opt.wfn, "qtaim", "QTAIM: critical points, atomic basins and delocalization indices",
+				{ citations::Method::QTAIM, citations::Method::LIDI }, opt.no_date),
+			eli_file(opt.wfn, "eli", "ELI-D: electron localizability basins", { citations::Method::ELID }, opt.no_date);
 		{
 			WFN w = read_wfn();
 			Roby_information Roby(w, opt.rgbi_group_sets, !opt.rgbi_no_sym,
@@ -259,6 +271,9 @@ static int run_app_impl(int argc, char **argv)
 	{
 		WFN basins(opt.wfn);
 		if (opt.ECP) basins.set_has_ECPs(true, true, opt.ECP_mode);
+		const section_log::section qtaim_file(opt.wfn, "qtaim", "QTAIM: critical points, atomic basins and delocalization indices",
+			{ citations::Method::QTAIM, citations::Method::LIDI }, opt.no_date),
+			eli_file(opt.wfn, "eli", "ELI-D: electron localizability basins", { citations::Method::ELID }, opt.no_date);
 		ELI_analysis(basins, opt);
 		return 0;
 	}
@@ -735,6 +750,7 @@ static int run_app_impl(int argc, char **argv)
 		citations::flush(log_file); //whatever the reader queued while this line was open
 
 		if (opt.rgbi) {
+			const section_log::section rgbi_file(opt.wfn, "rgbi", "Roby-Gould Bond Indices (RGBI)", { citations::Method::RGBI }, opt.no_date);
 			Roby_information Roby(wavy[0], opt.rgbi_group_sets, !opt.rgbi_no_sym,
 				opt.rgbi_orbital_basis == RGBIOrbitalBasis::ANO, opt.rgbi_EVs, opt.rgbi_theta,
 				opt.rgbi_legacy_cutoff);

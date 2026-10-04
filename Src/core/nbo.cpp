@@ -819,7 +819,7 @@ namespace
 					  const bvec2& bondable, const bvec2& nrt_bondable, const dMatrix2& density,
 					  const dMatrix2& fock,
 					  const int n_pairs, const double scale, const std::string& spin,
-					  const NboOptions& options, std::vector<NboLewis>& out_lewis)
+					  const NboOptions& options, std::vector<NboLewis>& out_lewis, std::ostream& log)
 	{
 		const dMatrix2 gamma = nao_density(density, in.overlap, nao.C);
 		const dMatrix2 fock_nao = fock.extent(0) ? nao_operator(fock, nao.C) : dMatrix2();
@@ -834,7 +834,8 @@ namespace
 		res.e2_seconds += std::chrono::duration<double>(clock() - t).count();
 		//before the renumbering below, while e2's indices still point into lewis.orbitals
 		if (options.nrt)
-			native_nrt(res.nrt, nao, lewis, e2, nrt_bondable, options, spin, scale, std::cout);
+			//log, not std::cout: under -fba this runs on the NBO thread and cout is RGBI's
+			native_nrt(res.nrt, nao, lewis, e2, nrt_bondable, options, spin, scale, log);
 
 		//NBO numbers its NBOs by type group: the Lewis set in the order it was found, then the
 		//non-Lewis set as LV, BD*, RY
@@ -962,7 +963,7 @@ NboResults native_nbo(WFN& wavy, const NboOptions& options, std::ostream& log)
 		for (const NAOAtom& a : nao.atoms) electrons += a.population;
 		const int n_pairs = static_cast<int>(std::llround(electrons / 2.0));
 		analyse_spin(res, in, nao, bondable, nrt_bondable, in.density[0],
-					 in.fock.empty() ? dMatrix2() : in.fock[0], n_pairs, 2.0, "", options, lewis);
+					 in.fock.empty() ? dMatrix2() : in.fock[0], n_pairs, 2.0, "", options, lewis, log);
 		vec occ(nao.orbitals.size(), 0.0);
 		for (size_t i = 0; i < occ.size(); i++) occ[i] = nao.orbitals[i].occupation;
 		fill_nao_table(res.nao, nao, occ, in.fock.empty() ? dMatrix2() : nao_operator(in.fock[0], nao.C));
@@ -994,7 +995,7 @@ NboResults native_nbo(WFN& wavy, const NboOptions& options, std::ostream& log)
 			analyse_spin(res, in, nao, bondable, nrt_bondable, in.density[s],
 						 static_cast<int>(in.fock.size()) > s ? in.fock[s] : dMatrix2(),
 						 static_cast<int>(std::llround(electrons)), 1.0, s ? "beta" : "alpha",
-						 options, lewis);
+						 options, lewis, log);
 		}
 		vec occ(total_nao.orbitals.size(), 0.0);
 		for (size_t i = 0; i < occ.size(); i++)
