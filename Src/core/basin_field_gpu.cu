@@ -175,6 +175,8 @@ bool basin_field_gpu_eval(
 	//the GEMM indexes in int: keep K * nb * nao below 2^31
 	const long long cap = ((1LL << 31) - 1) / ((long long)K * (nao > nocc ? nao : nocc));
 	if (nb > cap) nb = cap;
+	//gemm_gpu's reduce pass puts the K * nb rows on grid y in blocks of 16, which stops at 65535
+	if (nb > 65535LL * 16 / K) nb = 65535LL * 16 / K;
 	if (nb < 1) return false;
 	const int chunk = (int)nb;
 
@@ -195,6 +197,7 @@ bool basin_field_gpu_eval(
 		&& gpuMalloc(&d_grad, sizeof(double) * 3 * (size_t)chunk) == gpuSuccess
 		&& gpuMalloc(&d_rho, sizeof(double) * (size_t)chunk) == gpuSuccess;
 
+	gpuError_t err = gpuSuccess;
 	for (int first = 0; first < np && ok; first += chunk)
 	{
 		const int n = np - first < chunk ? np - first : chunk;
@@ -213,13 +216,15 @@ bool basin_field_gpu_eval(
 			bf_reduce_kernel<4><<<rb, BF_BLOCK>>>(n, nocc, d_occ, d_phi, d_val, d_grad, d_rho);
 		else
 			bf_reduce_kernel<10><<<rb, BF_BLOCK>>>(n, nocc, d_occ, d_phi, d_val, d_grad, d_rho);
-		ok = gpuGetLastError() == gpuSuccess && gpuDeviceSynchronize() == gpuSuccess
+		err = gpuGetLastError();
+		if (err == gpuSuccess) err = gpuDeviceSynchronize();
+		ok = err == gpuSuccess
 			&& gpuMemcpy(grad + 3 * (size_t)first, d_grad, sizeof(double) * 3 * (size_t)n, gpuMemcpyDeviceToHost) == gpuSuccess
 			&& (!val || K == 4 || gpuMemcpy(val + first, d_val, sizeof(double) * (size_t)n, gpuMemcpyDeviceToHost) == gpuSuccess)
 			&& (!rho || gpuMemcpy(rho + first, d_rho, sizeof(double) * (size_t)n, gpuMemcpyDeviceToHost) == gpuSuccess);
 	}
 	if (!ok)
-		std::fprintf(stderr, "NoSpherA2 basin field GPU: %s, falling back to the host\n", gpuGetErrorString(gpuGetLastError()));
+		std::fprintf(stderr, "NoSpherA2 basin field GPU: %s, falling back to the host\n", gpuGetErrorString(err != gpuSuccess ? err : gpuGetLastError()));
 	gpuFree(d_c); gpuFree(d_cmin); gpuFree(d_pe); gpuFree(d_ps); gpuFree(d_coef); gpuFree(d_occ);
 	gpuFree(d_start); gpuFree(d_pc); gpuFree(d_pl);
 	gpuFree(d_pts); gpuFree(d_chi); gpuFree(d_phi); gpuFree(d_P); gpuFree(d_val); gpuFree(d_grad); gpuFree(d_rho);
