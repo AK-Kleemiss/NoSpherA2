@@ -3,14 +3,11 @@
 #include "core/eli_family.h"
 #include "core/b2c.h"
 
-//eli_family.h: Kohout's ELI-D for alpha-alpha, beta-beta and triplet-coupled pairs, and ELI-q.
-//Two kinds of check: the analytic uniform-electron-gas limit, which fixes the normalisation
-//constants without any reference program, and per-member regression rows taken off DGrid 5.2's
-//own grids (the reference implementation) for a closed-shell and an open-shell wavefunction.
-//The DGrid conventions these rows encode are written out in eli_family.h.
+//Kohout's ELI family: the UEG limit fixes the normalisation constants analytically, regression rows
+//come from DGrid 5.2 grids (the conventions they encode are in eli_family.h).
 namespace
 {
-	//One voxel of a DGrid FIELD-DATA grid: position in bohr and DGrid's value for each member.
+	//One DGrid FIELD-DATA voxel: position in bohr and DGrid's value per member.
 	struct dg_row
 	{
 		d3 p;
@@ -38,14 +35,13 @@ namespace
 	}
 }
 
-//The uniform electron gas: grad rho = 0 and T_s = (3/5)(6 pi^2)^(2/3) rho_s^(5/3), so
-//g^s = (3/5)(6 pi^2)^(2/3) rho_s^(8/3) and ELI-D is the density-independent constant
-//[12/((3/5)(6 pi^2)^(2/3))]^(3/8).  This pins every normalisation constant in the family.
+//UEG: grad rho = 0, T_s = (3/5)(6 pi^2)^(2/3) rho_s^(5/3), so g^s = (3/5)(6 pi^2)^(2/3) rho_s^(8/3)
+//and ELI-D = [12/((3/5)(6 pi^2)^(2/3))]^(3/8), density independent.
 TEST(EliFamily, UniformElectronGasLimit)
 {
 	const double c = eli_family::ueg_g_coefficient();
 	EXPECT_NEAR(c, 0.6 * std::pow(6.0 * constants::PI2, 2.0 / 3.0), 1E-12);
-	//[12/((3/5)(6 pi^2)^(2/3))]^(3/8) = 1.108596490563... - worked out independently of the header.
+	//[12/((3/5)(6 pi^2)^(2/3))]^(3/8) = 1.108596490563..., worked out independently of the header
 	EXPECT_NEAR(eli_family::ueg_eli_d(), 1.10859649056, 1E-10);
 	for (const double rho_s : { 0.01, 0.1, 1.0, 12.5 }) {
 		eli_family::SpinFields f;
@@ -62,9 +58,7 @@ TEST(EliFamily, UniformElectronGasLimit)
 	}
 }
 
-//ELI-q is an exact monotone rescaling of ELI-D for a single determinant, Y_q = Y_D^(-8/3);
-//there is no extra information in it, only a different restriction scheme.  Checked on the
-//real field rather than on the UEG, where every point has the same value.
+//Y_q = Y_D^(-8/3) for a single determinant; checked on a real field, the UEG value is constant.
 TEST(EliFamily, EliQIsEliDToTheMinusEightThirds)
 {
 	const std::filesystem::path f = nos_test_repo_root() / "tests" / "molden_file" / "F_full.molden";
@@ -80,8 +74,7 @@ TEST(EliFamily, EliQIsEliDToTheMinusEightThirds)
 	}
 }
 
-//A restricted wavefunction has to come out spin-symmetric, and its ELI-D(alpha-alpha) has to be
-//what WFN::computeELI already returns - the existing ELI-D is Kohout's Y_D^alpha.
+//WFN::computeELI is Kohout's Y_D^alpha.
 TEST(EliFamily, RestrictedMatchesExistingEliD)
 {
 	const std::filesystem::path f = nos_test_repo_root() / "tests" / "molden_file" / "F2.molden";
@@ -98,8 +91,7 @@ TEST(EliFamily, RestrictedMatchesExistingEliD)
 	}
 }
 
-//rho^(t)/rho = 1 - N_beta/(2(N-1)), DGrid 5.2's convention (Kohout's Eq. 5 gives a different
-//normalisation; the header says so).  F2 has N = 14, N_beta = 7 -> 19/26.
+//rho^(t)/rho = 1 - N_beta/(2(N-1)), DGrid 5.2's convention, not Kohout's Eq. 5. F2: N = 14, N_beta = 7.
 TEST(EliFamily, TripletDensityFactor)
 {
 	const std::filesystem::path f = nos_test_repo_root() / "tests" / "molden_file" / "F2.molden";
@@ -113,8 +105,6 @@ TEST(EliFamily, TripletDensityFactor)
 	EXPECT_NEAR(eli_family::triplet_density_factor(open), 0.75, 1E-12);
 }
 
-//ELIA has no field function; the status string has to say why, so a user does not think it is
-//merely unimplemented.
 TEST(EliFamily, EliaReportsWhyItIsNotComputable)
 {
 	const std::string s = eli_family::elia_status();
@@ -122,42 +112,14 @@ TEST(EliFamily, EliaReportsWhyItIsNotComputable)
 	EXPECT_NE(s.find("on-top"), std::string::npos);
 }
 
-//----------------------------------------------------------------------------------------------
-//Regression rows straight off DGrid 5.2's own grids.  How to regrow them:
-//  1. DGrid converts the molden first, and it GUESSES the coefficient convention from the [Title]
-//     line - an ORCA-looking title -> <name>.molden.orca, coefficients already carry the primitive
-//     normalisation ("bare"); anything else -> <name>.molden.md, coefficients multiply normalised
-//     primitives and the contracted shell is renormalised ("normprim").  NoSpherA2 always reads
-//     bare.  A file does not say which it is, but its MOs do: an SCF's MO vectors are orthonormal
-//     in the convention the file was written in, so read it both ways and keep the one that gives
-//     unit MO norms - see tests/src/MoldenConventionTests.cpp.  By that test F2.molden is bare
-//     DESPITE an empty [Title] (norms 1.00000, 14.000000 electrons; normprim gives 0.889..1.344
-//     and 13.727), so the 695x difference at its nucleus is DGRID applying normprim to a bare
-//     file, not a reader bug here.  Use that test, never the title, to decide whether a DGrid
-//     number on a new fixture is even a valid reference.
-//     ALL FOUR fixtures below are orca_2mkl output with the ORCA title, so both codes read them
-//     bare and agree on the convention; that is why the rows are comparable at all.
-//  2. compute / using wfn_1 / <property> / save field_1 / mesh=0.3 rho=0.0001, once per property:
-//     "rho alpha", "ELI-D alpha-alpha", "ELI-D beta-beta", "ELI-q alpha-alpha", "ELI-D triplet-pair".
-//  3. The FIELD-DATA header's origin and I/J/K columns are FULL SPANS, so step = vec/(n-1), and
-//     the value list runs with I fastest, then J, then K.  (Confirmed by landing the global maxima
-//     on the nuclei to the voxel.)  The points below are those voxel centres, in bohr.
-//
-//Measured over 400 voxels with rho > 1e-3, NoSpherA2 against DGrid, relative, max over the set:
-//                    rho(median)  ELI-D aa   ELI-D bb   ELI-q aa   ELI-D triplet
-//  F_open              6.2e-8      4.3e-5     5.9e-5     1.1e-4       4.7e-5
-//  F_s1                7.5e-8      4.0e-5     2.2e-4     1.1e-4       5.0e-5
-//  F_s32               8.9e-8      3.6e-5     2.1e-3     9.7e-5       4.2e-5
-//  F_full              6.7e-8      4.3e-5    (skipped)   1.1e-4       4.3e-5
-//The median ~6e-8 is DGrid's 9-significant-digit ASCII output; the tail is NoSpherA2's exp_cutoff
-//primitive skipping, worst in the depleted beta channel of the S = 3/2 case.  The tolerances below
-//are those worst cases with headroom - a regression fence, not a precision claim.
+//Rows off DGrid 5.2 FIELD-DATA grids: compute / using wfn_1 / <property> / save field_1 / mesh=0.3 rho=0.0001.
+//DGrid guesses the molden coefficient convention from [Title]; these fixtures are orca_2mkl output with the
+//ORCA title, so both codes read them bare (MoldenConventionTests decides it for a new fixture). FIELD-DATA
+//spans are full, step = vec/(n-1), I fastest. The tolerances fence exp_cutoff primitive skipping.
 namespace
 {
-	//F_full: DGrid 5.2 on F_full.molden.orca, mesh 0.3, grid [25, 25, 25]; rho agrees to 1.7e-05 here.
-	//Restricted, so DGrid builds no beta orbital set and its elid_r_b_bb is an artefact (its beta tau
-	//is 0, making its g_beta = -1/4|grad rho_b|^2 negative).  The beta column below is DGrid's alpha
-	//field, which is what beta must equal for a closed shell - that is the statement being pinned.
+	//F_full.molden.orca, grid [25, 25, 25]. Restricted, so DGrid's own bb field is an artefact (beta tau 0);
+	//the bb column is its alpha field, which beta must equal for a closed shell.
 	const std::vector<dg_row> f_full_rows = {
 		//{x, y, z}, rho_alpha, ELI-D(aa), ELI-D(bb), ELI-q(aa), ELI-D(triplet)
 		{ {1.21000000, 0.91000000, 1.51000000}, 1.00107620e-02, 1.13291071e+00, 1.13291071e+00, 7.16932351e-01, 1.08386715e+00 },
@@ -167,7 +129,7 @@ namespace
 		{ {0.01000000, 0.01000000, 0.01000000}, 1.63065130e+02, 9.12533809e+00, 9.12533809e+00, 2.75002155e-03, 8.73030339e+00 },
 	};
 
-	//F_open: DGrid 5.2 on F_open.molden.orca, mesh 0.3, grid [25, 25, 24]; rho agrees to 3.3e-05 here.
+	//F_open.molden.orca, grid [25, 25, 24]
 	const std::vector<dg_row> f_open_rows = {
 		//{x, y, z}, rho_alpha, ELI-D(aa), ELI-D(bb), ELI-q(aa), ELI-D(triplet)
 		{ {1.81000000, 0.01000000, 1.05000000}, 1.12642273e-02, 1.15018569e+00, 1.23496210e+00, 6.88576362e-01, 1.15597674e+00 },
@@ -177,7 +139,7 @@ namespace
 		{ {0.01000000, 0.01000000, -0.15000000}, 1.58359749e+01, 2.17522564e+00, 2.81194455e+00, 1.25889207e-01, 2.39074421e+00 },
 	};
 
-	//F_s1: DGrid 5.2 on F_s1.molden.orca, mesh 0.3, grid [24, 25, 24]; rho agrees to 1.0e-05 here.
+	//F_s1.molden.orca, grid [24, 25, 24]
 	const std::vector<dg_row> f_s1_rows = {
 		//{x, y, z}, rho_alpha, ELI-D(aa), ELI-D(bb), ELI-q(aa), ELI-D(triplet)
 		{ {1.35000000, 0.31000000, 1.35000000}, 1.69621244e-02, 1.21274567e+00, 6.15420583e-01, 5.97880031e-01, 9.97031252e-01 },
@@ -187,7 +149,7 @@ namespace
 		{ {-0.15000000, 0.01000000, 0.15000000}, 5.94428704e+00, 1.32990696e+00, 1.84285316e+00, 4.67530534e-01, 1.53370550e+00 },
 	};
 
-	//F_s32: DGrid 5.2 on F_s32.molden.orca, mesh 0.3, grid [24, 24, 24]; rho agrees to 1.4e-05 here.
+	//F_s32.molden.orca, grid [24, 24, 24]
 	const std::vector<dg_row> f_s32_rows = {
 		//{x, y, z}, rho_alpha, ELI-D(aa), ELI-D(bb), ELI-q(aa), ELI-D(triplet)
 		{ {-1.35000000, -0.15000000, -1.35000000}, 1.78317647e-02, 1.22073774e+00, 8.27634687e+00, 5.87498831e-01, 1.15110125e+00 },
@@ -201,19 +163,17 @@ namespace
 //Closed shell, N = 10.
 TEST(EliFamilyDGrid, RestrictedFminus) { check_against_dgrid("F_full.molden", f_full_rows, 1E-3); }
 
-//Doublet, N = 9.  aa, bb and the triplet are three genuinely different fields here.
+//Doublet, N = 9: aa, bb and triplet are three different fields.
 TEST(EliFamilyDGrid, DoubletF) { check_against_dgrid("F_open.molden", f_open_rows, 1E-3); }
 
 //Triplet cation, N = 8, S = 1.
 TEST(EliFamilyDGrid, TripletFplus) { check_against_dgrid("F_s1.molden", f_s1_rows, 1E-3); }
 
-//Quartet dication, N = 7, S = 3/2.  Its beta channel is depleted enough that NoSpherA2's exp_cutoff
-//primitive skipping shows at the 2e-3 level, hence the looser fence.
+//Quartet dication, N = 7, S = 3/2: exp_cutoff skipping shows in the depleted beta channel.
 TEST(EliFamilyDGrid, QuartetFpp) { check_against_dgrid("F_s32.molden", f_s32_rows, 5E-3); }
 
-//The member list is read off the orbitals, never off a stated multiplicity.  A restricted file gets
-//ELI-D(aa) and ELI-q(aa) and nothing else - ELI-D(bb) is the same field and ELI-D(triplet) a constant
-//multiple of it - while an unrestricted one gets all six.
+//Members follow the orbitals: restricted gets ELI-D(aa) and ELI-q(aa) only (bb is the same field, the
+//triplet a constant multiple), unrestricted all six.
 TEST(EliFamily, VariantSelectionFollowsTheOrbitals)
 {
 	const std::filesystem::path root = nos_test_repo_root() / "tests" / "molden_file";
@@ -230,9 +190,7 @@ TEST(EliFamily, VariantSelectionFollowsTheOrbitals)
 	EXPECT_NE(std::find(v.begin(), v.end(), eli_family::Member::eli_d_triplet), v.end());
 	EXPECT_NE(std::find(v.begin(), v.end(), eli_family::Member::elia_singlet), v.end());
 
-	//Only ELI-D has maxima of its own.  ELI-q is ELI-D^(-8/3), so an ascent on it runs into ELI-D's
-	//minima and shatters into tail basins - DGrid's own ELID_core ascent returns ~60 (H2O) / ~100
-	//(F doublet) of them, holding 0.0000-0.0005 e each.
+	//ELI-q = ELI-D^(-8/3) has no maxima of its own: an ascent on it shatters into tail basins.
 	EXPECT_TRUE(eli_family::basins_independent(eli_family::Member::eli_d_aa));
 	EXPECT_TRUE(eli_family::basins_independent(eli_family::Member::eli_d_triplet));
 	EXPECT_FALSE(eli_family::basins_independent(eli_family::Member::eli_q_aa));
@@ -241,13 +199,8 @@ TEST(EliFamily, VariantSelectionFollowsTheOrbitals)
 	EXPECT_STREQ(eli_family::member_column(eli_family::Member::eli_d_triplet), "ELI-D_t");
 }
 
-//One electron. It has a beta orbital set and |N_alpha - N_beta| = 1, so every test of spin
-//polarisation says yes, and the member list said so too: ELI-D(bb) and ELI-q(bb) over a channel with
-//no electrons in it, the triplet member whose prefactor rho^(t) is exactly zero below two electrons,
-//and the singlet ELI-q, which is 1 - zeta^2 = 0 for a fully polarised density. Four identically-zero
-//fields advertised as computable members, which a caller reading that list cannot tell from real
-//ones. This is the few-electron row of the input matrix, where a fallback has to be taken AND right
-//rather than merely silent.
+//One electron: the bb members, the triplet (rho^(t) = 0 below two electrons) and the singlet ELI-q
+//(1 - zeta^2 = 0) are identically zero and must not be listed as members.
 TEST(EliFamily, AnEmptySpinChannelIsNotAMember)
 {
 	const std::filesystem::path f = nos_test_repo_root() / "tests" / "ptb_H_file" / "H.gbw";
@@ -259,9 +212,9 @@ TEST(EliFamily, AnEmptySpinChannelIsNotAMember)
 	EXPECT_EQ(v, (std::vector<eli_family::Member>{ eli_family::Member::eli_d_aa,
 		eli_family::Member::eli_q_aa }));
 	EXPECT_NE(warn.find("holds no electrons"), std::string::npos) << warn;
-	//and the prefactor that makes three of those four zero, stated rather than assumed
+	//rho^(t) = 0 below two electrons
 	EXPECT_DOUBLE_EQ(eli_family::triplet_density_factor(wave), 0.0);
-	//the bound is two electrons and not "unrestricted": the doublet F atom keeps all six members
+	//the bound is two electrons, not "unrestricted": the F doublet keeps all six
 	const std::filesystem::path open = nos_test_repo_root() / "tests" / "molden_file" / "F_open.molden";
 	if (!std::filesystem::exists(open)) GTEST_SKIP() << "missing fixture " << open.string();
 	WFN doublet(open);
@@ -269,16 +222,14 @@ TEST(EliFamily, AnEmptySpinChannelIsNotAMember)
 	EXPECT_GT(eli_family::triplet_density_factor(doublet), 0.0);
 }
 
-//A multiplicity label that disagrees with the occupations must not change the member list, only
-//raise a warning.  F_full is restricted, so its ELI family is the closed-shell one whatever the
-//label claims; inventing a spin split from a label is how a spin heuristic doubles every index
-//while the populations still look right.
+//A multiplicity label that disagrees with the occupations only warns; a spin split taken from a label
+//doubles every index while the populations still look right.
 TEST(EliFamily, MultiplicityLabelIsOnlyACrossCheck)
 {
 	const std::filesystem::path f = nos_test_repo_root() / "tests" / "molden_file" / "F_full.molden";
 	if (!std::filesystem::exists(f)) GTEST_SKIP() << "missing fixture " << f.string();
 	WFN wave(f);
-	wave.set_multi(3);   //lie about it
+	wave.set_multi(3);
 	std::string warn;
 	const std::vector<eli_family::Member> v = eli_family::eli_variants_for(wave, &warn);
 	EXPECT_EQ(v, (std::vector<eli_family::Member>{ eli_family::Member::eli_d_aa, eli_family::Member::eli_q_aa }));
@@ -286,9 +237,7 @@ TEST(EliFamily, MultiplicityLabelIsOnlyACrossCheck)
 	EXPECT_NE(warn.find("restricted"), std::string::npos);
 }
 
-//ELIA / the singlet ELI-q of [III] Eq. 53 collapses to 1 - zeta^2 for any single determinant, so it
-//is identically 1 for a closed shell and carries no pair information at all.  Pinned so nobody
-//mistakes it for a second opinion on the electron pair structure.
+//The singlet ELI-q of [III] Eq. 53 is 1 - zeta^2 for any single determinant: 1 for a closed shell.
 TEST(EliFamily, SingletEliQIsOneMinusZetaSquared)
 {
 	eli_family::SpinFields f{};
@@ -298,7 +247,7 @@ TEST(EliFamily, SingletEliQIsOneMinusZetaSquared)
 	const double rho = f.rho[0] + f.rho[1], zeta = (f.rho[0] - f.rho[1]) / rho;
 	EXPECT_NEAR(eli_family::elia_singlet_eli_q(f), 1.0 - zeta * zeta, 1E-14);
 	f.rho[0] = f.rho[1] = 0.0;
-	EXPECT_EQ(eli_family::elia_singlet_eli_q(f), 0.0);   //no density, no value
+	EXPECT_EQ(eli_family::elia_singlet_eli_q(f), 0.0);
 
 	const std::filesystem::path g = nos_test_repo_root() / "tests" / "molden_file" / "F_full.molden";
 	if (!std::filesystem::exists(g)) GTEST_SKIP() << "missing fixture " << g.string();
@@ -310,9 +259,7 @@ TEST(EliFamily, SingletEliQIsOneMinusZetaSquared)
 	}
 }
 
-//WFN::computeELISpinGrad: the field the spin-resolved basins climb. Its value has to be the
-//eli_family member on the same point (the DGrid-checked reference above), its gradient the central
-//difference of that value, and ELI-q has to come out of aux as rho_s * Y_q.
+//computeELISpinGrad: value = the eli_family member, gradient = its central difference, aux[3] = rho_s * Y_q.
 namespace
 {
 	const d3 spin_points[] = { { 0.3, -0.2, 0.5 }, { 1.1, 0.4, -0.7 }, { 0.05, 0.1, 0.15 }, { 2.0, 0.5, 1.0 }, { -0.6, 0.9, 0.2 } };
@@ -390,8 +337,7 @@ TEST(EliSpin, RestrictedChannelsAreTheExistingEliD)
 	}
 }
 
-//The spin populations of the alpha-alpha basins of the F doublet: every alpha and every beta
-//electron is in some basin up to what the quadrature leaves outside them (3.5e-3 e at accuracy 2)
+//The F doublet's basins hold every alpha and beta electron up to what the quadrature leaves outside.
 TEST(EliSpin, BasinSpinPopulationsAddUpToTheElectronCounts)
 {
 	const std::filesystem::path f = nos_test_repo_root() / "tests" / "molden_file" / "F_open.molden";
@@ -420,8 +366,7 @@ TEST(EliSpin, BasinSpinPopulationsAddUpToTheElectronCounts)
 	}
 }
 
-//The same value and gradient checks on a polyatomic doublet (NH3Li, UKS gbw): points next to each
-//nucleus, off-axis around it and on the bonds to the first atom, where several centres contribute
+//NH3Li, UKS: points near each nucleus, off-axis and on bonds, where several centres contribute.
 TEST(EliSpin, MoleculeValuesAndGradientsOnNH3Li)
 {
 	const std::filesystem::path f = nos_test_repo_root() / "tests" / "RGBI_groups" / "nh3li.gbw";
@@ -462,9 +407,8 @@ TEST(EliSpin, MoleculeValuesAndGradientsOnNH3Li)
 	}
 }
 
-//ROKS (one MO set, occupations 2 and 1, no spin labels): a singly occupied MO is alpha, a doubly occupied
-//one carries one electron of each spin. Rb doublet, 5s singly occupied: N_alpha 19, N_beta 18, all six
-//members, and the alpha excess of the field's own densities is the 5s density, positive out at 4.5 bohr
+//ROKS: a singly occupied MO is alpha, a doubly occupied one carries one electron of each spin. Rb doublet:
+//N_alpha 19, N_beta 18, and the alpha excess is the 5s density.
 TEST(EliSpin, RestrictedOpenShellIsSplitByOccupation)
 {
 	double n[2];
@@ -499,9 +443,8 @@ TEST(EliSpin, RestrictedOpenShellIsSplitByOccupation)
 	}
 }
 
-//The Rb alpha-alpha field is one degenerate sphere of maxima just inside the rho = 1e-4 isosurface (over
-//a hundred of them at equal value, 2.6 bohr apart) around the core and the n = 4 shell. One basin each
-//after the merges, every point inside the isosurface reaches one, and N_alpha + N_beta = population
+//Rb alpha-alpha: core, n = 4 shell, and a degenerate sphere of maxima just inside the rho = 1e-4
+//isosurface; the merges make each one basin.
 static int rb_alpha_alpha_basins(const WFN &wave, vec &pop, vec2 &spin, double &outside)
 {
 	const double tf = eli_family::triplet_density_factor(wave);
@@ -536,13 +479,12 @@ TEST(EliSpin, RestrictedOpenShellSphereIsOneBasin)
 		EXPECT_NEAR(spin[b][0] + spin[b][1], pop[b], 1E-9 * std::max(1.0, pop[b])) << "basin " << b;
 	}
 	EXPECT_NEAR(n + outside, wave.count_nr_electrons(), 5E-3);
-	//what is left outside is the tail beyond the isosurface (0.107 e measured at the default accuracy)
+	//outside is the tail beyond the isosurface
 	EXPECT_LT(outside, 0.15);
 }
 
-//Broken symmetry: N_alpha = N_beta, so only the orbitals tell a spin-polarised determinant from a
-//restricted one written out twice. F_full rewritten as UKS with beta = alpha is not spin-polarised (its
-//alpha-alpha field is the restricted ELI-D); bending one beta coefficient makes it so
+//Broken symmetry: with N_alpha = N_beta only the orbitals tell a spin-polarised determinant from a
+//restricted one written out twice.
 TEST(EliFamily, BrokenSymmetryIsDecidedByTheOrbitals)
 {
 	const std::filesystem::path f = nos_test_repo_root() / "tests" / "molden_file" / "F_full.molden";

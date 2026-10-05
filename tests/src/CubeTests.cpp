@@ -967,11 +967,10 @@ TEST(CubeIsoTests, MixColourRamp)
 	EXPECT_EQ(mix_colour(3.0, wild, 0.0, 2.0), (RGB{ 255, 0, 255 }));
 	EXPECT_EQ(mix_colour(0.25, wild, 0.0, 2.0), (RGB{ 0, 25, 25 }));
 	EXPECT_EQ(mtl_name({ 1, 22, 255 }), "FaceMaterial_1_22_255");
-	// A channel equal at both ends of a ramp must not wander: (1 - f) * 255 + f * 255 comes out as
-	// 254.99999999999997 for some f and int() truncates it. The ESP colouring uses exactly such a
-	// code (red 255 -> white 255 -> blue 0), so one face's red flipped on a 1E-16 change of the ESP.
+	// A channel equal at both ends of a ramp must stay put: (1 - f) * 255 + f * 255 can give
+	// 254.99999999999997, which int() truncates; the ESP code red 255 -> white 255 -> blue 0 hits it
 	const std::array<std::array<int, 3>, 3> esp_code{ { { 255, 0, 0 }, { 255, 255, 255 }, { 0, 0, 255 } } };
-	const double lim = 0.061768436721054081; //the epoxide surface's own range, the case that failed
+	const double lim = 0.061768436721054081; //an epoxide surface's ESP range
 	for (int i = 0; i <= 2000; i++)
 	{
 		const double v = -lim + i * (2 * lim / 2000);

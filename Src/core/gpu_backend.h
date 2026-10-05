@@ -1,14 +1,12 @@
 #pragma once
 
-//One name for each runtime call the scattering-factor kernel needs, so the same
-//source compiles under nvcc and hipcc. HIP is API-compatible here except for the
-//fp32:fp64 ratio, which has no equivalent and is inferred from the arch name instead.
+//One name per runtime call so the kernels compile under nvcc and hipcc; the fp32:fp64 ratio has no
+//HIP equivalent and is inferred from the arch name
 
 #ifdef NOSPHERA2_USE_HIP
 #include <hip/hip_runtime.h>
-//Nothing here links the HIP runtime: every call lands in hip_runtime_shim.cpp, which opens
-//amdhip64 by name on first use and answers hipErrorNoDevice without it, so a binary carrying
-//AMD kernels starts on a machine without ROCm.
+//Not linked: every call lands in hip_runtime_shim.cpp, which opens amdhip64 at first use and
+//answers hipErrorNoDevice without it
 #define gpuError_t hipError_t
 #define gpuSuccess hipSuccess
 #define gpuGetErrorString hipGetErrorString
@@ -39,9 +37,8 @@
 #define gpuMemcpyAsync hipMemcpyAsync
 #define gpuHostAlloc hipHostMalloc
 #define gpuFreeHost hipHostFree
-//The kernels assume 32-lane warps (lane = threadIdx.x & 31); a gfx9 wavefront is 64 wide, so
-//the shuffles get the width explicitly and act within each half. The streaming load is clang's
-//non-temporal load, the slc bit like __ldcs on NVIDIA.
+//Kernels assume 32-lane warps (lane = threadIdx.x & 31); a gfx9 wavefront is 64, so shuffles pass
+//width 32 and act per half. Streaming load: non-temporal (slc bit), like __ldcs
 #define gpuShflDown32(v, o) __shfl_down((v), (o), 32)
 #define gpuShflXor32(v, m) __shfl_xor((v), (m), 32)
 #define gpuLoadStreaming(p) __builtin_nontemporal_load(p)
@@ -82,6 +79,4 @@
 #define gpuLoadStreaming(p) __ldcs(p)
 #endif
 
-//No BLAS library is mapped here on purpose. The GEMMs are in gemm_gpu.cuh, which removed
-//half a gigabyte of cuBLAS from the package and, on the AMD side, removed a dependency
-//conda-forge does not ship at all.
+//No BLAS on purpose: the GEMMs are in gemm_gpu.cuh, sparing cuBLAS's size and an AMD BLAS conda-forge does not ship

@@ -471,12 +471,7 @@ template iMatrix2 get_rectangle(const iMatrix2& a, const ivec& rows);
 template dMatrix2 get_rectangle(const dMatrix2& a, const ivec& rows);
 template cMatrix2 get_rectangle(const cMatrix2& a, const ivec& rows);
 
-//Every caller of these helpers hands over a list of basis function indices it built itself, from a
-//shell description of the wavefunction. Those lists have been wrong - a shell layout the reader
-//describes differently from the density matrix it delivered - and the loops below index the full
-//matrix with them unchecked, so a list that runs past the matrix read whatever memory followed it:
-//a segfault on a good day, a plausible number on a bad one. Say which index and how big the matrix
-//is instead; whoever built the list can then be found.
+//Caller-built index lists can disagree with the matrix layout; the loops below index unchecked.
 static void check_submatrix_indices(const ivec& indices, const size_t extent, const char* what) {
 	for (const int index : indices)
 		err_checkf(index >= 0 && static_cast<size_t>(index) < extent,
@@ -715,8 +710,7 @@ dMatrix2 LAPACKE_invert(const dMatrix2& A, const double cutoff, PinvRank* rank_o
 #endif
 
 	// 3. Invert Singular Values (Sigma^+)
-	//Report how the rank came out BEFORE the values are overwritten. dgesvd returns them in descending
-	//order, but scanning instead of indexing the ends costs nothing and does not depend on that.
+	//Rank report must precede the inversion below, which overwrites S.
 	if (rank_out != nullptr) {
 		*rank_out = PinvRank{};
 		rank_out->n = k;

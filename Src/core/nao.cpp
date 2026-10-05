@@ -15,10 +15,6 @@ using Eigen::VectorXd;
 
 namespace
 {
-	//--------------------------------------------------------------------------------------
-	// small linear-algebra helpers
-	//--------------------------------------------------------------------------------------
-
 	MatrixXd to_eigen(const dMatrix2 &m)
 	{
 		const int n = static_cast<int>(m.extent(0)), c = static_cast<int>(m.extent(1));
@@ -38,9 +34,8 @@ namespace
 		return out;
 	}
 
-	//M^p for a symmetric positive semi-definite M.  Eigenvalues below rel_floor * max are
-	//dropped for a negative power, which turns an inverse into a pseudo-inverse rather than
-	//letting a near-linear dependence blow the transform up.
+	//M^p for a symmetric PSD M. For p < 0 eigenvalues below rel_floor * max are dropped (pseudo-inverse),
+	//so a near-linear dependence cannot blow the transform up.
 	MatrixXd sym_power(const MatrixXd &M, const double p, const double rel_floor = 1e-10)
 	{
 		Eigen::SelfAdjointEigenSolver<MatrixXd> es(M);
@@ -52,41 +47,29 @@ namespace
 		return es.eigenvectors() * f.asDiagonal() * es.eigenvectors().transpose();
 	}
 
-	//T = W (W S W)^-1/2, the occupancy-weighted symmetric orthogonalisation of Reed/Weinhold.
-	//It reduces to S^-1/2 for equal weights and to the identity for S = 1, and it is what makes
-	//the strongly occupied orbitals keep their shape while the diffuse ones absorb the
-	//orthogonalisation tails.
-	//Diagnostic knobs for the NAO construction, off unless the environment sets them.  They
-	//exist to run the two arms of one experiment - see the comments at steps 3 and 4 - and are
-	//deliberately not command-line options: build_naos takes no options struct and this is a
-	//measurement, not a feature.
+	//Diagnostic switches from the environment, off by default; deliberately not command-line options.
 	bool nao_env(const char *name)
 	{
 		const char *v = std::getenv(name);
 		return v && *v && *v != '0';
 	}
 
+	//T = W (W S W)^-1/2 (Reed/Weinhold): S^-1/2 for equal weights; strongly occupied orbitals keep their
+	//shape while the diffuse ones absorb the orthogonalisation tails.
 	MatrixXd owso(const MatrixXd &S, const VectorXd &weights)
 	{
 		VectorXd w = weights;
-		//ponytail: relative floor on the weights. Rydberg occupancies span many decades and a
-		//weight of 1e-12 next to one of 1e-3 makes W S W numerically singular. Drop the floor
-		//only if a case shows the clamping matters.
+		//ponytail: relative floor on the weights; Rydberg occupancies span decades and make W S W singular.
+		//Drop it only if a case shows the clamping matters.
 		const double wmax = std::max(w.maxCoeff(), 1e-300);
 		for (int i = 0; i < w.size(); i++)
 			w(i) = std::max(w(i), 1e-6 * wmax);
 		const MatrixXd WSW = w.asDiagonal() * S * w.asDiagonal();
-		//W S W carries the weights squared, so its eigenvalues span (wmin/wmax)^2 even for a
-		//perfectly conditioned S, and a fixed relative floor in sym_power would delete exactly
-		//the columns of smallest weight - which is how a full-rank basis lost a Rydberg
-		//direction on nh3li and 3.5e-4 electrons with it.  Scale the floor with the weights.
+		//W S W carries the weights squared, so its spectrum spans (wmin/wmax)^2 even for a well-conditioned S;
+		//a fixed relative floor would delete the smallest-weight columns, so the floor scales with the weights.
 		const double s = w.minCoeff() / wmax;
 		return w.asDiagonal() * sym_power(WSW, -0.5, 1e-10 * s * s);
 	}
-
-	//--------------------------------------------------------------------------------------
-	// periodic table bookkeeping
-	//--------------------------------------------------------------------------------------
 
 	int period_of(const int Z)
 	{
@@ -129,9 +112,7 @@ namespace
 		return std::string(1, letter) + "(" + (mv >= 0 ? "+" : "") + std::to_string(mv) + ")";
 	}
 
-	//One writer for both dumps, because the two matrices have to arrive in the SAME format: the
-	//comparison script parses one line shape, and a second hand-rolled loop is where a column/row
-	//or a precision difference would enter without anything failing.
+	//One writer for both dumps, so the comparison script sees a single line format.
 	void dump_c_matrix(const char *tag, const MatrixXd &C, const std::vector<NAO> &orbitals,
 					   const VectorXd &occ)
 	{
@@ -223,8 +204,7 @@ NAOResult build_naos(const dMatrix2 &P_in, const dMatrix2 &S_in, const std::vect
 		g.idx[ao[i].shell].push_back(i);
 	}
 
-	//---------------------------------------------------------------- 1. pre-NAOs
-	//Within each (atom, l), solve the m-averaged (S P S)c = w S c.
+	//1. pre-NAOs: within each (atom, l), solve the m-averaged (S P S)c = w S c.
 	//NAO_PRENAO_NET selects the net-density diagnostic.
 	const bool prenao_net = nao_env("NAO_PRENAO_NET");
 	MatrixXd C = MatrixXd::Zero(nao, nao);
@@ -281,7 +261,7 @@ NAOResult build_naos(const dMatrix2 &P_in, const dMatrix2 &S_in, const std::vect
 	}
 	err_checkf(col == nao, "NAO: lost basis functions while building pre-NAOs", std::cout);
 
-	//---------------------------------------------------------------- 2. NMB / NRB partition
+	//2. NMB / NRB partition
 	for (auto &kv : groups) {
 		const Group &g = kv.second;
 		int shells[4] = { 0, 0, 0, 0 }, cores[4] = { 0, 0, 0, 0 };
@@ -320,9 +300,8 @@ NAOResult build_naos(const dMatrix2 &P_in, const dMatrix2 &S_in, const std::vect
 	//Dump the AO -> pre-NAO transform for comparison with NBO 7 unit 32.
 	if (nao_env("NAO_DUMP_CPRE")) dump_c_matrix("NAOCPRE", C, orbitals, pre_occ);
 
-	//---------------------------------------------------------------- 3. orthogonalisation
-	//Schmidt-project core, valence, then Rydberg and OWSO within each class.
-	//NAO_LEGACY_CASCADE omits Rydberg re-naturalization for comparison.
+	//3. Schmidt-project core, valence, then Rydberg, and OWSO within each class.
+	//NAO_LEGACY_CASCADE omits the Rydberg re-naturalisation (step 5) for comparison.
 	const bool legacy_cascade = nao_env("NAO_LEGACY_CASCADE");
 	ivec cols_by_class[3];
 	for (int i = 0; i < nao; i++)
@@ -362,8 +341,7 @@ NAOResult build_naos(const dMatrix2 &P_in, const dMatrix2 &S_in, const std::vect
 				B.col(j) /= std::sqrt(std::max(norm2, 1e-300));
 			}
 		}
-		//---------------------------------------------- 5. intracenter naturalization of the NRBs
-		//Re-naturalize the Schmidt-projected Rydberg block before its OWSO.
+		//5. intracenter naturalisation of the NRBs: re-naturalise the Schmidt-projected Rydberg block before its OWSO
 		if (cls == 2 && !legacy_cascade) {
 			const MatrixXd Sloc = B.transpose() * S * B, Ploc = B.transpose() * SPS * B;
 			std::map<std::pair<int, int>, ivec> ryd_blocks;  //(atom, l) -> LOCAL columns of B
@@ -397,16 +375,14 @@ NAOResult build_naos(const dMatrix2 &P_in, const dMatrix2 &S_in, const std::vect
 		}
 		if (!nao_env("NAO_OWSO_OFF"))
 			B = B * owso(MatrixXd(B.transpose() * S * B), w);
-		//the weighted inverse square root leaves the near-zero-weight directions orthonormal only
-		//to about 1e-5; one unweighted Loewdin on a matrix that is already I + O(1e-5) cleans that
-		//up without moving the occupied orbitals
+		//the weighted inverse square root leaves near-zero-weight directions orthonormal only to ~1e-5; one
+		//unweighted Loewdin on I + O(1e-5) cleans that up without moving the occupied orbitals
 		B = B * sym_power(MatrixXd(B.transpose() * S * B), -0.5);
 
 
 		for (int j = 0; j < ncols; ++j)
 			C.col(cols.at(static_cast<size_t>(j))) = B.col(j);
 
-		// The old thing lead to a memory error. So i fixed it
 		const int old_cols = static_cast<int>(done.cols());
 
 		MatrixXd new_done(nao, old_cols + ncols);
@@ -419,12 +395,10 @@ NAOResult build_naos(const dMatrix2 &P_in, const dMatrix2 &S_in, const std::vect
 		done.swap(new_done);
 	}
 
-	//---------------------------------------------------------------- 4. natural character
-	//Re-diagonalize the m-averaged density within each (atom, l) block.
-	//Intraatomic rotations preserve atomic charges but can change Val/Ryd populations.
+	//4. natural character: re-diagonalise the m-averaged density within each (atom, l) block.
+	//Intra-atomic rotations preserve atomic charges but can change Val/Ryd populations.
 	const MatrixXd Porb = C.transpose() * SPS * C;
-	//NAO_DUMP_STEP3: the occupancies step 4 inherits.  If the valence deficit against NBO 7 is
-	//already visible here, step 4 is not the place to look for it.
+	//NAO_DUMP_STEP3: the occupancies step 4 inherits
 	if (nao_env("NAO_DUMP_STEP3")) {
 		std::cout << "STEP3 atom l shell class occ_per_component pre_occ_per_component" << std::endl;
 		for (const auto &kv : l_blocks) {
@@ -486,7 +460,6 @@ NAOResult build_naos(const dMatrix2 &P_in, const dMatrix2 &S_in, const std::vect
 		for (int j = 0; j < ns * nm; j++) C.col(cols[j]) = rot.col(j);
 	}
 
-	//---------------------------------------------------------------- results
 	const MatrixXd Pfin = C.transpose() * SPS * C;
 	for (int i = 0; i < nao; i++) orbitals[i].occupation = Pfin(i, i);
 
@@ -568,13 +541,9 @@ dMatrix2 ao_overlap(const WFN &wavy)
 	compute2C<Overlap2C_SPH>(params, S_flat);
 	const size_t n = static_cast<size_t>(std::llround(std::sqrt(static_cast<double>(S_flat.size()))));
 	dMatrix2 S = reshape<dMatrix2>(S_flat, Shape2D(n, n));
-	//An ORCA-convention density (gbw, and a molden written from one) carries the opposite sign on the
-	//|m| >= 3 components, so the overlap next to it has to take that sign as well - see
-	//origin_has_orca_pure_phases.  This is the same correction the FILE47 writer applies; without it
-	//Tr(P S) misses up to 0.3 e (SF6) and every NAO population inherits it.  Scanned against the
-	//electron count on CuF2_i_func/71/calc.gbw (shells up to i): flipping every |m| >= 3 gives
-	//46.99929 of 47, stopping at |m| <= 3 gives 46.99845, flipping nothing 46.95769 - so "all |m| >= 3"
-	//it is, and the 7e-4 that remains is a separate high-l matter, identical for the gbw and the molden.
+	//An ORCA-convention density (gbw, or a molden written from one) flips the sign of every |m| >= 3
+	//component, so the overlap has to as well (origin_has_orca_pure_phases, as in the FILE47 writer);
+	//otherwise Tr(P S) misses electrons and every NAO population inherits it.
 	if (origin_has_orca_pure_phases(wavy.get_origin())) {
 		const ivec bas = params.get_bas();
 		bvec flip(n, false);
@@ -628,13 +597,8 @@ NPAResult natural_population_analysis(const WFN &wavy)
 
 namespace
 {
-	//with_charge = false for one spin on its own, where Z_eff minus that spin's population is not
-	//a charge and printing it invites the reader to add the two tables up
-	//An occupancy is a number of electrons and cannot be negative. A diagonalisation leaves a nearly empty
-	//Rydberg NAO at a tiny value of either sign, and at 5 decimals that printed "Ryd( 6s)   -0.00000" -
-	//which reads as a negative occupancy and is not even stable: the same molecule translated by 4.35 bohr
-	//printed +0.00000 for it. The threshold is far below any occupancy worth reading, so an occupancy that
-	//is genuinely negative - which WOULD be a defect - is still printed with its sign.
+	//Clamp |occ| < 1e-9 to 0 so a near-empty Rydberg NAO does not print as -0.00000; a genuinely
+	//negative occupancy keeps its sign.
 	double printable_occupation(const double occ)
 	{
 		return std::abs(occ) < 1e-9 ? 0.0 : occ;
@@ -646,6 +610,7 @@ namespace
 		return r.atoms[a].label + std::to_string(a + 1);
 	}
 
+	//with_charge = false for one spin alone: Z_eff minus that spin's population is not a charge
 	void print_one(const NAOResult &r, const std::string &what, std::ostream &out,
 				   const bool with_charge = true)
 	{

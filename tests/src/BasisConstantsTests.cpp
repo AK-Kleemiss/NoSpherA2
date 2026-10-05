@@ -748,8 +748,8 @@ TEST(BasisConstantsLibraryTests, GenerateAuxWfnCombinesSeveralSets)
 	EXPECT_EQ(aux.get_atom_label(1), "He");
 }
 
-//the fitted density carries the charge of the density it fits: a neutral aux wavefunction made an
-//anion's electron count come out short of the fit by exactly the charge
+//the fitted density carries the charge of the density it fits: a neutral aux wavefunction leaves an
+//anion's electron count short of the fit by exactly the charge
 TEST(BasisConstantsLibraryTests, GenerateAuxWfnKeepsChargeAndMultiplicity)
 {
 	std::shared_ptr<BasisSet> set = std::make_shared<BasisSet>();

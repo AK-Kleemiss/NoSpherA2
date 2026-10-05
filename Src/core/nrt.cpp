@@ -15,7 +15,7 @@ using Eigen::VectorXd;
 
 namespace
 {
-	//Per-slot candidate budget, calibrated against the 22 NBO 7 references.
+	//Per-slot candidate budget
 	constexpr int NRT_PER_SLOT = 64;
 
 	MatrixXd to_eigen(const dMatrix2& m)
@@ -28,8 +28,8 @@ namespace
 		return out;
 	}
 
-	//Leading eigenpair on idx, warm-started from the prior sweep when available.
-	//A negative dominant eigenvalue triggers the full symmetric solve.
+	//Leading eigenpair on block idx by warm-started power iteration; a negative dominant eigenvalue
+	//falls back to the full symmetric solve
 	double leading_block(const MatrixXd& R, const ivec& idx, VectorXd& v,
 						 const MatrixXd* minus = nullptr, const VectorXd* warm = nullptr)
 	{
@@ -54,10 +54,9 @@ namespace
 				for (int it = 0; it < 30; it++) {
 					VectorXd y = B * x;
 					const double ny = y.norm();
-					if (ny == 0.0) break;          //the block annihilates the warm start: solve it
+					if (ny == 0.0) break;
 					y /= ny;
-					//up to sign: a dominant negative eigenvalue flips y at every step, and that case
-					//has to reach the fallback rather than spend the whole cap not converging
+					//Up to sign: a dominant negative eigenvalue flips y each step and must reach the fallback
 					const double d = std::min((y - x).norm(), (y + x).norm());
 					x = y;
 					if (d < 1e-12) {
@@ -74,7 +73,7 @@ namespace
 		return es.eigenvalues()(k - 1);
 	}
 
-	//x^T A x restricted to the nonzero block idx.
+	//x^T A x on the nonzero block idx
 	double block_quad(const MatrixXd& A, const ivec& idx, const VectorXd& x)
 	{
 		const int k = static_cast<int>(idx.size());
@@ -87,7 +86,7 @@ namespace
 		return s;
 	}
 
-	//A += s x x^T restricted to the nonzero block idx.
+	//A += s x x^T on the nonzero block idx
 	void rank1_block(MatrixXd& A, const ivec& idx, const double s, const VectorXd& x)
 	{
 		const int k = static_cast<int>(idx.size());
@@ -97,14 +96,8 @@ namespace
 		}
 	}
 
-	//--------------------------------------------------------------------------------------
-	// resonance structures
-	//--------------------------------------------------------------------------------------
-
-	//A resonance structure is an integer symmetric matrix: bond multiplicities off the diagonal,
-	//lone pairs on it.  Cores are not on the diagonal - they are in every structure and so cannot
-	//distinguish two of them.  That convention is the reference's: acetylene's leading_topo prints 0
-	//on both carbons while both carry a 1s core pair.
+	//Resonance structure: bond multiplicities off the diagonal, lone pairs on it.  Cores are excluded,
+	//as in NBO's own output: they are in every structure and distinguish none
 	struct Topology {
 		int n = 0;
 		ivec t;
@@ -115,14 +108,14 @@ namespace
 		int at(const int a, const int b) const { return t[static_cast<size_t>(a) * n + b]; }
 		void set(const int a, const int b, const int v) { at(a, b) = v; at(b, a) = v; }
 
-		//orbitals the atom carries: lone pairs plus one per bond, a double bond counting twice
+		//orbitals on the atom: lone pairs plus bond multiplicities
 		int used(const int a) const
 		{
 			int u = at(a, a);
 			for (int b = 0; b < n; b++) if (b != a) u += at(a, b);
 			return u;
 		}
-		//electrons the Lewis structure assigns to the atom, both electrons of a shared bond counted
+		//Lewis electron count, both electrons of a shared bond counted
 		int electrons(const int a) const
 		{
 			int e = 2 * at(a, a);
@@ -136,7 +129,7 @@ namespace
 				for (int b = a; b < n; b++) p += at(a, b);
 			return p;
 		}
-		//upper triangle including the diagonal: the deduplication key
+		//upper triangle with diagonal: the deduplication key
 		ivec key() const
 		{
 			ivec k;
@@ -154,9 +147,7 @@ namespace
 		}
 	};
 
-	//Invariant under a relabelling of equivalent atoms: the sorted multiset of per-atom signatures
-	//(element, lone pairs, sorted neighbour element/multiplicity list).  Two structures with the same
-	//string are the same Lewis structure drawn on differently numbered atoms.
+	//Relabelling-invariant key: sorted per-atom signatures (element, lone pairs, sorted neighbour/multiplicity)
 	std::string canonical_form(const Topology& s, const ivec& Z)
 	{
 		std::vector<std::string> sig(s.n);
@@ -177,7 +168,7 @@ namespace
 		return out;
 	}
 
-	//What a candidate did to the parent, in the spirit of NBO's "Added(Removed)" column.
+	//NBO's "Added(Removed)" column
 	std::string change_string(const Topology& s, const Topology& p, const ivec& Z)
 	{
 		const auto label = [&](const int a) {
@@ -202,11 +193,7 @@ namespace
 		return out.empty() ? std::string("parent") : out;
 	}
 
-	//--------------------------------------------------------------------------------------
-	// a-priori screens
-	//--------------------------------------------------------------------------------------
-
-	//Allow pair moves only where an E2 interaction exceeds nrt_e2_kcal.
+	//Pair moves allowed only where an E2 interaction exceeds nrt_e2_kcal
 	vec2 delocalisation_graph(const NboLewis& lewis, const std::vector<NboE2Entry>& e2,
 							  const double kcal, const int na, const bvec2& bondable)
 	{
@@ -226,9 +213,7 @@ namespace
 		return g;
 	}
 
-	//Screen (a): connected components of that graph.  Two moves in different components describe
-	//independent resonance, whose joint weight factorises, so the product of the two candidate sets
-	//is combinatorial waste.
+	//Moves in different components are independent resonance whose weights factorise, so they are not combined
 	ivec components(const vec2& g)
 	{
 		const int n = static_cast<int>(g.size());
@@ -249,33 +234,28 @@ namespace
 		return comp;
 	}
 
-	//--------------------------------------------------------------------------------------
-	// candidate generation
-	//--------------------------------------------------------------------------------------
-
 	struct Candidate {
 		Topology topo;
 		int depth = 0;
-		int component = -1;       //which component of the delocalisation graph the moves touched
-		double score = 0.0;       //sum of the E2 prices of the arrows that made it, kcal/mol
-		//filled by the orbital construction
+		int component = -1;       //delocalisation-graph component the moves touched
+		double score = 0.0;       //summed E2 price of its arrows, kcal/mol
 		bool feasible = false;
 		double g = 0.0;           //s Tr(V^T Gamma V)
-		double rho_nl = 0.0;      //electrons the structure leaves outside its own orbital set
+		double rho_nl = 0.0;      //electrons outside the structure's own orbital set
 		MatrixXd V;
 		std::vector<std::array<double, 3>> polarity;  //{a, b, c_a^2 - c_b^2} per two-centre orbital
-		int sweeps = 0;           //self-consistency sweeps the construction took, for -debug
-		double change = 0.0;      //the last sweep's largest vector change
-		bool converged = false;   //the valence span stopped moving before the sweep cap
+		int sweeps = 0;
+		double change = 0.0;      //largest vector change of the last sweep
+		bool converged = false;   //valence span stopped moving before the sweep cap
 	};
 
 	struct Limits {
 		ivec cap;            //orbitals an atom may carry
-		bvec free_atom;      //may a move touch this atom at all (subspace screen)
+		bvec free_atom;      //subspace screen
 		bvec2 bondable;      //geometry screen
-		vec2 deloc;          //E2 screen, and the kcal/mol price of each open pair
-		ivec comp;           //component of each atom
-		int max_charge = 2;  //how far a candidate may move an atom's Lewis electron count
+		vec2 deloc;          //E2 screen and kcal/mol price of each open pair
+		ivec comp;
+		int max_charge = 2;  //max change of an atom's Lewis electron count
 		ivec parent_electrons;
 		bool ion = true;
 		bool use_components = true;
@@ -290,9 +270,8 @@ namespace
 		return true;
 	}
 
-	//One arrow: a single electron pair moves from one slot of the structure to another.  The
-	//charge-neutral NRT arrow - a bond shifts and a lone pair takes its place - is the depth-two
-	//composition of two of these, which is why nrt_max_arrows defaults to 2.
+	//One arrow moves one electron pair between slots; the charge-neutral NRT arrow is two of these,
+	//hence nrt_max_arrows = 2
 	void expand(const Candidate& c, const Limits& L, std::vector<Candidate>& out)
 	{
 		const int n = c.topo.n;
@@ -345,9 +324,8 @@ namespace
 		}
 	}
 
-	//Every topology the constraints admit, not only the ones an arrow walk reaches.  This is the
-	//reference mode the screens are measured against; it is exponential in the number of bondable
-	//pairs and is capped by nrt_max_candidates.
+	//Every admissible topology, not only those an arrow walk reaches; exponential in the bondable
+	//pairs, capped by nrt_max_candidates
 	void enumerate(const Topology& parent, const Limits& L, const int n_pairs, const size_t cap,
 				   std::vector<Candidate>& out)
 	{
@@ -358,7 +336,7 @@ namespace
 			for (int b = a + 1; b < parent.n; b++)
 				if (L.bondable[a][b] && L.free_atom[a] && L.free_atom[b]) slots.push_back({ a, b });
 		}
-		//the slots a move may not touch keep their parent value and do not enter the recursion
+		//immovable slots keep their parent value outside the recursion
 		Topology fixed(parent.n);
 		int fixed_pairs = 0;
 		for (int a = 0; a < parent.n; a++)
@@ -380,7 +358,7 @@ namespace
 				return;
 			}
 			const int a = slots[i].a, b = slots[i].b;
-			//an orbital count above 3 is not a Lewis structure of any element in the reference set
+			//multiplicity above 3 is not a Lewis structure
 			for (int m = 0; m <= std::min(3, left); m++) {
 				s.set(a, b, m);
 				if (s.used(a) <= L.cap[a] && s.used(b) <= L.cap[b]) rec(i + 1, left - m);
@@ -390,10 +368,6 @@ namespace
 		};
 		rec(0, n_pairs - fixed_pairs);
 	}
-
-	//--------------------------------------------------------------------------------------
-	// the orbitals of one candidate
-	//--------------------------------------------------------------------------------------
 
 	MatrixXd sym_power(const MatrixXd& M, const double p, const double rel_floor = 1e-10)
 	{
@@ -408,23 +382,15 @@ namespace
 
 	struct Blocks {
 		std::vector<ivec> atom;     //every NAO index of the atom, cores included
-		ivec core;                  //core NAO indices, one fixed orbital each in every candidate
+		ivec core;                  //core NAOs, one fixed orbital each in every candidate
 		std::map<std::pair<int, int>, ivec> pair;
-		vec score_atom;             //leading eigenvalue of the undepleted block, the slot order
+		vec score_atom;             //leading eigenvalue of the undepleted block: the slot order
 		std::map<std::pair<int, int>, double> score_pair;
 	};
 
-	/**
-	 * A candidate's orthonormal orbital set, built by the same three steps the NBO search uses -
-	 * greedy fill, self-consistency sweep, occupancy-weighted symmetric orthogonalisation - with the
-	 * topology prescribed instead of searched.  The sweep is not optional and it is not a refinement:
-	 * without it every candidate looks like a decent fit, because a greedy pass leaves each orbital
-	 * carrying the bias of the ones accepted after it.  On water the parent came out at rho_NL = 0.73
-	 * instead of the search's 0.02, and the residual was then so insensitive to the topology that
-	 * water's ionic structures took 23 % of the weight against the reference's 0.  With the sweep a
-	 * wrong topology cannot hide: it is the difference between measuring the structures and
-	 * measuring the construction.
-	 */
+	//Orbitals of a prescribed topology by the NBO search's steps: greedy fill, self-consistency sweep,
+	//occupancy-weighted orthogonalisation.  The sweep is required: a greedy pass leaves each orbital
+	//biased by later ones and the residual stops distinguishing topologies
 	void build_orbitals(Candidate& c, const MatrixXd& G0, const Blocks& B, const int max_sweeps)
 	{
 		struct Slot { int a, b, mult; double score; };
@@ -447,14 +413,13 @@ namespace
 		int k = static_cast<int>(B.core.size());
 		for (const Slot& sl : slots) k += sl.mult;
 		if (k > n) return;
-		//An empty spin channel contributes no NRT candidates.
 		if (k == 0) return;
 		std::vector<VectorXd> v(k);
 		std::vector<const ivec*> blk(k, nullptr);
 		std::vector<std::pair<int, int>> owner(k, { -1, -1 });
 		vec occ(k, 0.0);
 
-		//1. the cores: one NAO each, in every candidate, never swept
+		//cores: one NAO each, never swept
 		MatrixXd sum = MatrixXd::Zero(n, n);
 		int col = 0;
 		for (const int i : B.core) {
@@ -466,7 +431,7 @@ namespace
 		}
 		const int first_valence = col;
 
-		//2. greedy fill out of the density the cores and the earlier orbitals have been taken from
+		//greedy fill from the density depleted by cores and earlier orbitals
 		MatrixXd R = G0 - sum;
 		for (const Slot& sl : slots) {
 			const ivec& idx = (sl.a == sl.b) ? B.atom[sl.a] : B.pair.at({ sl.a, sl.b });
@@ -484,14 +449,10 @@ namespace
 			}
 		}
 
-		//3. self consistency: every orbital against the density with all the others removed
-		//Reuse each slot eigenvector as the next sweep's warm start.
-		//Converged means the SPAN of the valence orbitals stopped moving: G, g and rho_nl depend on
-		//nothing else, and the vectors themselves keep wobbling inside it at ~1e-9 (rub2: the span
-		//settles to 1e-15 while the largest vector change plateaus at 4.5e-9, so a vector criterion
-		//never fires). The Gauss-Seidel sweep contracts linearly (~0.78 per sweep on rub2's parent);
-		//Anderson mixing over the last 5 sweeps halves the sweep count, but only once the iterate is
-		//close - started from sweep 1 it lands on a different fixed point (rub2: D(w) 2.32 vs 2.16).
+		//Self consistency: each orbital against the density with all others removed, warm-started.
+		//Converged on the valence span, which is all G, g and rho_nl depend on; the vectors keep wobbling
+		//inside it, so a vector criterion never fires.  Anderson mixing starts only near convergence:
+		//from the first sweep it can land on a different fixed point
 		const int nv = k - first_valence;
 		const auto orth = [&]() {
 			MatrixXd Mv(n, nv);
@@ -568,7 +529,7 @@ namespace
 			if (Q.size()) Q = orth();  //the next sweep starts from the mixed iterate
 		}
 
-		//Occupancy-weighted orthogonalization resolves overlapping bond orbitals.
+		//Occupancy-weighted symmetric orthogonalisation: V = M W (W S W)^(-1/2)
 		MatrixXd M(n, k);
 		for (int j = 0; j < k; j++) M.col(j) = v[j];
 		VectorXd wt(k);
@@ -588,10 +549,6 @@ namespace
 		}
 		c.feasible = true;
 	}
-
-	//--------------------------------------------------------------------------------------
-	// the quadratic program
-	//--------------------------------------------------------------------------------------
 
 	//Euclidean projection onto the probability simplex, Duchi et al., ICML 2008.
 	void project_simplex(VectorXd& w)
@@ -614,7 +571,7 @@ namespace
 		return trg2 - 2.0 * g.dot(w) + w.dot(G * w);
 	}
 
-	//Multiply the Gram matrix on the active simplex support.
+	//G v over the nonzero weights only: simplex iterates are sparse
 	void gather_mv(const MatrixXd& G, const VectorXd& v, VectorXd& out)
 	{
 		const int n = static_cast<int>(v.size());
@@ -626,7 +583,7 @@ namespace
 		}
 	}
 
-	//On a fixed support, the optimum satisfies the simplex KKT equation.
+	//Equality-constrained KKT solve on a support, dropping the most negative weight until none is
 	double solve_qp_support(const MatrixXd& G, const VectorXd& g, const double trg2, VectorXd& w)
 	{
 		const int n = static_cast<int>(G.rows());
@@ -659,7 +616,7 @@ namespace
 		return std::numeric_limits<double>::infinity();
 	}
 
-	//Use accelerated projected gradient with adaptive restart.
+	//FISTA on the simplex with adaptive restart, step 1/L, L = 2 lambda_max(G)
 	double solve_qp(const MatrixXd& G, const VectorXd& g, const double trg2, VectorXd& w,
 					const int maxit, const vec* rho, const std::string& spin,
 					std::vector<NboQpIteration>* trace)
@@ -678,9 +635,9 @@ namespace
 		const double L = std::max(2.0 * lam, 1e-12);
 		VectorXd y = w, wp = w;
 		double t = 1.0, f = objective(G, g, trg2, w);
-		//A convergence window avoids stopping on a single FISTA restart.
+		//Windowed progress test: a single restart step can stall without convergence
 		double f_window = f;
-		//Reuse the gradient product when checking convergence.
+		//G y follows by linearity from G wn and G wp, one product per iteration
 		VectorXd Gy(n), Gwn(n), Gwp(n);
 		gather_mv(G, y, Gy);
 		Gwp = Gy;                                     //wp == y == w on entry
@@ -740,7 +697,6 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 	ivec Z(na, 0);
 	for (int a = 0; a < na; a++) Z[a] = nao.atoms[a].Z;
 
-	//--- the parent structure, from the NBO search -------------------------------------------------
 	ivec ncore(na, 0);
 	for (const NboFunction& f : lewis.orbitals)
 		if (f.type == "CR") ncore[f.centers[0]]++;
@@ -753,7 +709,7 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 	const int n_pairs = parent.pairs();
 
 	Limits L;
-	L.bondable = bondable;  //the resonance screen, nrt_bond_scale, not the search's (see nbo.h)
+	L.bondable = bondable;  //nrt_bond_scale screen, not the search's
 	L.ion = options.nrt_ion;
 	L.use_components = options.nrt_components;
 	L.deloc = delocalisation_graph(lewis, e2, options.nrt_e2_kcal, na, L.bondable);
@@ -768,15 +724,11 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 		ivec nval(na, 0);
 		for (const NAO& o : nao.orbitals)
 			if (o.type == NAOClass::Valence) nval[o.atom]++;
-		//An atom carries at most as many orbitals as it has valence NAOs, but never fewer than the
-		//parent already gives it: the NBO search relaxes that cap for a genuinely hypervalent
-		//density, and a resonance search that could not reproduce its own parent is nonsense.
+		//Cap = valence NAOs, but never below the parent's count: a hypervalent parent must stay reachable
 		for (int a = 0; a < na; a++) L.cap[a] = std::max(nval[a], parent.used(a));
 	}
 
-	//--- how many candidates this molecule is worth, and how many it can afford --------------------
-	//Limit candidates by valence slots and by the Gram matrix work estimate.
-	//-nrt_max overrides both limits.
+	//Budget from octet slots and a Gram-matrix work guard (k^2 n_NAO per pair); -nrt_max overrides both
 	int budget = options.nrt_max_candidates;
 	if (!options.nrt_max_set) {
 		int slots = 0, active = 0;
@@ -795,7 +747,7 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 		const int want = std::min(chem, std::max(64, afford));
 		if (want < budget) {
 			budget = want;
-			//The budget changes the answer, so report it in the log and JSON notes.
+			//The budget changes the answer, so it is reported
 			log << "NRT" << (spin.empty() ? "" : " " + spin) << ": candidate budget " << budget
 				<< " of " << options.nrt_max_candidates << ": " << active << " delocalising atom(s), "
 				<< slots << " octet slot(s) -> " << chem << ", machine guard " << afford << " at "
@@ -809,7 +761,6 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 		}
 	}
 
-	//--- candidates --------------------------------------------------------------------------------
 	std::vector<Candidate> cands;
 	std::map<ivec, int> seen;
 	{
@@ -843,9 +794,7 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 			std::vector<Candidate> made;
 			for (size_t i = level_begin; i < level_end; i++) {
 				expand(cands[i], L, made);
-				//a parent has O(n^2) children, so the pile of a level is O(nc n^2): 45 atoms and a few
-				//thousand parents is millions of Topologies, and the sort would then throw all but a
-				//few hundred away.  Prune when it outgrows the cap by an order of magnitude.
+				//O(n^2) children per parent: prune before the level grows an order of magnitude past its cap
 				if (made.size() > 8 * level_cap + 1024) shortlist(made, level_cap);
 			}
 			shortlist(made, level_cap);
@@ -874,7 +823,6 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 	}
 	const double search_seconds = secs(t_search0, clock());
 
-	//--- the orbital sets and the Gram matrix ------------------------------------------------------
 	const auto t_gram0 = clock();
 	const MatrixXd gamma = to_eigen(lewis.gamma);
 	double electrons = 0.0;
@@ -886,8 +834,8 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 		B.atom[nao.orbitals[i].atom].push_back(i);
 		if (nao.orbitals[i].type == NAOClass::Core) B.core.push_back(i);
 	}
-	//the slot order is candidate independent: the leading eigenvalue of the slot's own block of the
-	//density with the cores taken out, so a core cannot be mistaken for a lone pair
+	//Candidate-independent slot order: leading eigenvalue of the slot block with cores removed, so a
+	//core is never taken for a lone pair
 	MatrixXd g_nocore = gamma;
 	for (const int i : B.core) g_nocore(i, i) -= gamma(i, i);
 	B.score_atom.assign(na, 0.0);
@@ -936,7 +884,6 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 		log << "NRT" << (spin.empty() ? "" : " " + spin) << ": orbital sweeps " << total << " over "
 			<< feas << " candidates, " << capped << " stopped at the cap (worst change " << worst
 			<< ", parent " << cands[0].change << " after " << cands[0].sweeps << "); last change by decade:";
-		//decades 1e-1 .. 1e-12, the count of feasible candidates whose last change falls in each
 		ivec dec(13, 0);
 		for (const Candidate& c : cands)
 			if (c.feasible)
@@ -945,7 +892,7 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 			if (dec[d]) log << " 1e-" << d << ":" << dec[d];
 		log << "\n";
 	}
-	//drop the infeasible ones, keeping the parent first
+	//parent stays at index 0
 	std::vector<Candidate> keep;
 	for (Candidate& c : cands)
 		if (c.feasible) keep.push_back(std::move(c));
@@ -961,7 +908,7 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 	const double orbital_seconds = secs(t_gram0, clock());
 	const auto t_pairs0 = clock();
 
-	//The Gram matrix is the product of packed candidate densities.
+	//G_ij = s^2 ||V_i^T V_j||_F^2 = s^2 <P_i, P_j>: pair loop or projector product, whichever is cheaper
 	int kmax = 0;
 	for (const Candidate& c : cands) kmax = std::max(kmax, static_cast<int>(c.V.cols()));
 	const double dnc = static_cast<double>(nc), dnn = static_cast<double>(nn);
@@ -969,8 +916,7 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 	const double cost_proj = 0.25 * dnc * dnc * dnn * dnn + 0.5 * dnc * dnn * dnn * kmax;
 	const bool projector = cost_proj < cost_pairs;
 	if (projector) {
-		//One (R, C) block of the nn index per pass, the block side chosen so that the whole of Z for
-		//that pass - nc columns of wr*wc rows - stays near 128 MB.
+		//One (R, C) NAO block per pass, sized so Z (nc columns of wr*wc rows) stays near 128 MB
 		int nbs = static_cast<int>(std::sqrt(134217728.0 / (8.0 * std::max(1, nc))));
 		nbs = std::max(16, std::min(nbs, nn));
 		const int nblk = (nn + nbs - 1) / nbs;
@@ -980,9 +926,8 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 		vec Zbuf(static_cast<size_t>(nbs) * nbs * nc);
 		MatrixXd Goff = MatrixXd::Zero(nc, nc);      //blocks with R < C, counted twice below
 		G.setZero();                                 //blocks with R == C, counted once
-		//tiles of the candidate index, upper triangle only.  A diagonal tile computes its own lower
-		//half as well, which at 128 candidates to a tile is a few per cent of the total and buys a
-		//plain GEMM in every tile instead of a triangular kernel Eigen does not parallelise.
+		//Upper-triangle candidate tiles; diagonal tiles also fill their lower half to stay a plain GEMM,
+		//since Eigen does not parallelise the triangular kernel
 		const int tile = 128;
 		std::vector<std::pair<int, int>> tiles;
 		for (int I = 0; I < nc; I += tile)
@@ -1015,7 +960,7 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 				G(j, i) = G(i, j);
 			}
 
-		//Check the tiled Gram product against the direct scalar formula.
+		//Probe the tiled product against the direct formula
 		const int probes = 96;
 		const int stride = std::max(1, nc * nc / probes);
 		double worst = 0.0, scale_ref = 1e-300;
@@ -1048,10 +993,9 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 	const double trg2 = gamma.squaredNorm();
 	const double gram_seconds = secs(t_gram0, clock());
 
-	//--- minimise ---------------------------------------------------------------------------------
 	const auto t_min0 = clock();
 	VectorXd w = VectorXd::Zero(nc);
-	w(0) = 1.0;                       //start at the parent vertex
+	w(0) = 1.0;
 	const double f0 = objective(G, g, trg2, w);
 	double f = solve_qp(G, g, trg2, w, 5000, &rho, spin, &nrt.qp_iterations);
 	{
@@ -1063,9 +1007,8 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 		cy.d_w = std::sqrt(std::max(0.0, f));
 		nrt.cycles.push_back(cy);
 	}
-	//Polish: drop the structures below the reporting floor and solve again on the support alone.  The
-	//dropped weights are not noise-free - the argmin is not unique - but the residual is, and this is
-	//what makes the reported weights a solution of the problem that is actually reported.
+	//Re-solve on the support above the reporting floor, so the reported weights solve the reported
+	//problem; the argmin is not unique, only the residual is
 	ivec support;
 	for (int i = 0; i < nc; i++)
 		if (w(i) > options.nrt_weight_floor) support.push_back(i);
@@ -1099,10 +1042,9 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 		nrt.cycles.push_back(cy);
 	}
 
-	//Screen symmetry-equivalent topologies before the orbit-weight solve.
 	int orbits = 0, in_orbits = 0;
 	if (options.nrt_symmetry) {
-		//Solve orbit weights directly and separate graph-isomorphic structures by density fit.
+		//Orbits: graph-isomorphic structures with equal g; one weight per orbit, shared equally
 		std::map<std::string, ivec> classes;
 		for (int i = 0; i < nc; i++)
 			if (cands[i].feasible) classes[canonical_form(cands[i].topo, Z)].push_back(i);
@@ -1138,8 +1080,7 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 			VectorXd u = VectorXd::Constant(no, 1.0 / static_cast<double>(no));
 			const double fu = solve_qp(Gr, gr, trg2, u, 200000, nullptr, spin, nullptr);
 			const double rise = std::sqrt(std::max(0.0, fu)) - std::sqrt(std::max(0.0, f));
-			//A rise means the orbits are not a symmetry of this density after all; 1 % of D(w) is the
-			//"close enough" the brief asks for, and the number itself is reported either way.
+			//A rise means the orbits are no symmetry of this density; accepted within 1 % of D(w)
 			if (rise <= 0.01 * std::sqrt(std::max(1e-12, f))) {
 				w.setZero();
 				for (int p = 0; p < no; p++)
@@ -1163,11 +1104,10 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 			: "symmetry screen off";
 	const double minimize_seconds = secs(t_min0, clock());
 
-	//--- what the weights imply -------------------------------------------------------------------
 	const auto t_other0 = clock();
 	vec2 bo(na, vec(na, 0.0));        //bond orders, diagonal = lone pairs
 	vec2 pol(na, vec(na, 0.0));       //weight-summed c_A^2 - c_B^2 of the bonds on the pair
-	//Topology units are electron pairs closed shell and single electrons per spin open shell.
+	//Topology units: electron pairs closed shell, single electrons per spin open shell
 	const double unit = scale / 2.0;
 	for (int i = 0; i < nc; i++) {
 		if (w(i) <= 0.0) continue;
@@ -1180,9 +1120,7 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 		}
 	}
 
-	//The ionic share of a bond order is |i| b with i = c_A^2 - c_B^2, linear in |i| and not in i^2.
-	//Acetylene's printed tables settle it: C-H carries i = 0.2334 and the table gives
-	//ionic/total = 0.2262/0.9693 = 0.23336.
+	//Ionic share of a bond order is |i| b, i = c_A^2 - c_B^2: linear in |i|, not i^2 (NBO 7 convention)
 	vec valency(na, 0.0), covalency(na, 0.0), electrovalency(na, 0.0);
 	for (int a = 0; a < na; a++)
 		for (int b = a + 1; b < na; b++) {
@@ -1215,8 +1153,7 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 		v.valency = valency[a];
 		v.covalency = covalency[a];
 		v.electrovalency = electrovalency[a];
-		//the octet count: both electrons of a shared bond counted for each partner, cores excluded.
-		//Acetylene's carbon prints 7.9657 and 2 (0.0198 + 3.9631) = 7.9658.
+		//octet count: both electrons of a shared bond counted for each partner, cores excluded
 		v.electron_count = 2.0 * (bo[a][a] + valency[a]);
 		nrt.valencies.push_back(v);
 	}
@@ -1245,7 +1182,7 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 		c.topo = cands[i].topo.matrix();
 		nrt.candidates.push_back(c);
 	}
-	//Retain every structure tied for leading weight.
+	//every structure tied for the leading weight
 	for (size_t r = 0; r < order.size(); r++) {
 		if (w(order[r]) < w(order[0]) - 5.0e-4) break;
 		NboTopo t;

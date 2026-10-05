@@ -117,9 +117,8 @@ static int run_app_impl(int argc, char **argv)
 		~throughput_reporter() { throughput::report(out); }
 	} report_throughput{log_file};
 
-	//Header first, before the options are read: the NBO/NRT, topology, ELI family and other
-	//bonding jobs run inside digest_options() and return below without reaching the job code,
-	//and a job that fails while reading its input would otherwise leave an empty log
+	//Header before the options are read: the bonding jobs run inside digest_options() and return without reaching
+	//the job code, and a job that fails reading its input would otherwise leave an empty log
 	log_file << NoSpherA2_message(no_date);
 	if (!no_date)
 		log_file << build_date;
@@ -207,8 +206,8 @@ static int run_app_impl(int argc, char **argv)
 		err_checkf(have_data || opt.eqc_basis.empty(), "-eqc_basis needs occ's data directory (set OCC_DATA_PATH)", std::cout);
 		return eqc::run(opt);
 	}
-	//Full bonding analysis and quit. Each stage reads the wavefunction afresh: RGBI and the NBO
-	//search take it by non-const reference, and the basins must not see what either left behind
+	//Full bonding analysis and quit. Each stage rereads the wavefunction: RGBI and the NBO search modify it,
+	//and the basins must not see that
 	if (opt.fba)
 	{
 		const auto read_wfn = [&opt]() {
@@ -217,10 +216,9 @@ static int run_app_impl(int argc, char **argv)
 			return w;
 		};
 		log_file << "\nFull bonding analysis of " << opt.wfn.string() << ": RGBI, bondwise Laplacian, QTAIM and ELI-D, then NBO/NPA with NRT\n" << endl;
-		//NBO/NRT runs on its own thread next to the rest. RGBI and the basins print straight to
-		//std::cout, whose format flags every thread shares, so the NBO side gets a stream of its
-		//own and its block goes into the log after ELI-D. RGBI is serial and the NBO search stops
-		//scaling past a few threads, so the overlap is where the cores the basins leave go.
+		//NBO/NRT on its own thread with its own stream: RGBI and the basins print to std::cout, whose format flags
+		//all threads share. RGBI is serial and the NBO search stops scaling past a few threads, so it takes the
+		//cores the basins leave.
 		std::ostringstream nbo_log;
 		citations::cite(citations::Method::NAONPA, nbo_log);
 		citations::cite(citations::Method::NBO, nbo_log);
@@ -233,9 +231,8 @@ static int run_app_impl(int argc, char **argv)
 			nbo.debug = opt.debug;
 			nbo.nrt = true;
 			if (opt.threads > 0) nbo.threads = opt.threads;
-			//The search's ~3000 small OpenMP regions each wait at a barrier for threads the basin
-			//loops have taken: rub2 at -cpus 48 spent 59 s there against 2.2 s serial. NRT's
-			//per-candidate loop is coarse and keeps the full count.
+			//The search's many small OpenMP regions would wait at barriers for threads the basin loops hold;
+			//NRT's per-candidate loop is coarse and keeps the full count.
 			nbo.search_threads = 1;
 			NboResults r = native_nbo(w, nbo, nbo_log);
 			r.name = opt.wfn.stem().string();
@@ -253,7 +250,7 @@ static int run_app_impl(int argc, char **argv)
 				nbo_log << "  [timing] fba NBO/NPA/NRT thread: " << std::fixed << std::setprecision(2)
 				        << std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count() << " s" << std::endl;
 		}, read_wfn());
-		//-basin_timing: one lap per stage of the main thread, which runs while NBO/NRT does
+		//-basin_timing: laps of the main thread, which runs alongside NBO/NRT
 		basin_stage_timer fba_timer;
 		const section_log::section rgbi_file(opt.wfn, "rgbi", "Roby-Gould Bond Indices (RGBI)", { citations::Method::RGBI }, opt.no_date),
 			qtaim_file(opt.wfn, "qtaim", "QTAIM: critical points, atomic basins and delocalization indices",
@@ -266,7 +263,6 @@ static int run_app_impl(int argc, char **argv)
 				opt.rgbi_legacy_cutoff);
 		}
 		fba_timer.lap("fba RGBI");
-		//The .dat files go where -laplacian_bonds puts them.
 		bondwise_laplacian_plots(opt.wfn);
 		fba_timer.lap("fba bondwise Laplacian");
 		ELI_analysis(read_wfn(), opt);
@@ -352,8 +348,7 @@ static int run_app_impl(int argc, char **argv)
 				dat << "\n";
 			}
 		};
-		// the shape is finished here and the per-face ESP below is the long pole, so the geometry and every column that
-		// does not need it go out first: Olex2 watches for the stage1 flag and puts the mesh on screen while it runs
+		// geometry columns go out before the slow per-face ESP: Olex2 shows the mesh as soon as the stage1 flag appears
 		write_dat({});
 		// plain values, not structured bindings: clang's OpenMP cannot capture those (macOS CI)
 		const double lo_i = *std::min_element(d_i.begin(), d_i.end()), hi_i = *std::max_element(d_i.begin(), d_i.end());
@@ -915,13 +910,9 @@ static int run_app_impl(int argc, char **argv)
 			write_wfn_CIF(wavy[0], opt.wfn.replace_extension(".cif"));
 		return 0;
 	}
-	//Nothing above claimed the task, and that is two different situations of which only one is a
-	//defect. A command line that named an analysis and could not run it - `-rgbi water.gbw`, RGBI
-	//having no positional form and wanting -wfn - used to write the help into NoSpherA2.log and
-	//return 0, which from the outside reads as an analysis that ran and printed no table: it now
-	//says what was missing, on the console where it can be seen, and fails. A command line that
-	//named no analysis at all asked nothing, so it keeps the old behaviour exactly - the help in
-	//the log it requested, exit 0 - which is what a wrapper probing the executable expects.
+	//Nothing above claimed the task. A command line that named an analysis it could not run (`-rgbi water.gbw`:
+	//RGBI wants -wfn) fails with the reason on the console. One that named no analysis gets the help in the log
+	//and exit 0, which a wrapper probing the executable expects.
 	const std::string missing = opt.unrunnable_analysis();
 	if (!missing.empty())
 	{

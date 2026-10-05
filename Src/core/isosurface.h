@@ -59,9 +59,9 @@ void get_colour(Triangle& t, const cube& volumeData, std::array<std::array<int, 
 void get_colour(Triangle& t, double(*func)(const d3&, const WFN&), const WFN& wavy, std::array<std::array<int, 3>, 3> Colourcode, double low_lim, double high_lim);
 double calc_d_i(const d3& p_t, const WFN& wavy);
 double calc_d_norm_term(const d3& p_t, const WFN& wavy);
-//Hirshfeld surface of mol inside env (weight 0.5 of the spherical-atom densities); raises opts.radius to 2.5 A
-// orthogonal empty grid on the box of wfn's atoms + opts.radius, as opts' MinMax/NbSteps
+//Orthogonal empty grid on the box of wfn's atoms + opts.radius, as opts' MinMax/NbSteps
 cube box_cube(WFN& wfn, properties_options& opts);
+//Hirshfeld surface of mol inside env (weight 0.5 of the spherical-atom densities); raises opts.radius to 2.5 A
 //weight_out, when given, receives the weight grid the surface was cut from (for surface_curvature)
 std::vector<Triangle> Hirshfeld_surface(WFN& mol, WFN& env, properties_options& opts, std::ostream& log, cube* weight_out = nullptr);
 //Shape index (-1 concave ... +1 convex) and curvedness (2/pi ln sqrt((k1^2 + k2^2) / 2), k in 1/Angstrom) at every

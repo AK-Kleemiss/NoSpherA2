@@ -168,9 +168,8 @@ AtomGrid::AtomGrid(const double radial_precision,
 			angular_z.data() + angular_off,
 			angular_w.data() + angular_off);
 	}
-	//Lebedev grids are O_h symmetric: a molecular mirror plane on x=0, y=0 or z=0 puts whole grid rings
-	//on a separatrix (H2CF2 F lone pairs split by up to 0.18 e, varying with the floor). A generic rotation,
-	//from a quaternion with no special angles, keeps the quadrature exact and takes the points off it.
+	//Lebedev grids are O_h symmetric: a molecular mirror on x=0, y=0 or z=0 puts whole grid rings on a
+	//separatrix. A generic rotation (quaternion with no special angles) keeps the quadrature exact and moves them off.
 	if (generic_rotation) {
 		const double w = 0.9, x = 0.2, y = 0.3, z = 0.25, n = w * w + x * x + y * y + z * z;
 		const double R[3][3] = {
@@ -250,8 +249,7 @@ AtomGrid::AtomGrid(const double radial_precision,
 		atom_grid_y_bohr_.resize(size);
 		atom_grid_z_bohr_.resize(size);
 		atom_grid_w_.resize(size);
-		//serial: at most a few thousand multiplies per shell, and a parallel region per shell
-		//waited at its barrier for busy threads (uh6 under load: grids 5-49 s -> 0.6-1.7 s)
+		//serial: a few thousand multiplies per shell; a parallel region per shell stalls at its barrier on busy threads
 		for (int iang = start; iang < size; iang++) {
 			const int p = angular_off + iang;
 			atom_grid_x_bohr_[iang] = angular_x[p] * radial_r;
@@ -330,8 +328,7 @@ vec make_chi(const WFN& wfn, int samples, bool refine, bool debug, const Density
 					auto extrema = find_line_density_extrema(wfn, a, b, rho, samples, refine);
 					size_t use_extr = 0;
 					if (wfn.get_atom_ECP_electrons(a) != 0 || wfn.get_atom_ECP_electrons(b) != 0) {
-						//No sign change in the sampled line (minimum inside the last interval of a polar bond):
-						//extrema[use_extr] below read an empty vector and crashed without a message
+						//No sign change on the sampled line (minimum in the last interval of a polar bond) leaves extrema empty
 						if (extrema.empty()) {
 							std::cout << "WARNING: No density extremum found between atoms " << a << " and " << b << ". Setting chi to 1.0.\n";
 							chi[a * ncen + b] = 1.0;

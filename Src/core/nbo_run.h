@@ -4,14 +4,8 @@
 #include <string>
 #include <vector>
 
-/*
- * Driving the external NBO 7 program and reading its output back into structures.
- *
- * This is the reference side of the in-house NBO work: NoSpherA2 writes a FILE47,
- * hands it to the licensed gennbo, and parses everything back. The structures below
- * define what an in-house implementation has to reproduce, and compare_nbo_results()
- * is the check it gets measured with.
- */
+//Drives the external NBO 7 (FILE47 -> gennbo) and parses its output: the reference an in-house
+//NBO implementation has to reproduce, checked with compare_nbo_results().
 
 struct NboAtomPopulation {
 	std::string element;
@@ -33,9 +27,7 @@ struct NboNao {
 	std::string type;       //Cor, Val, Ryd
 	std::string shell;      //"1s", "2p", ...
 	double occupancy = 0.0;
-	//An open-shell run prints Occupancy/Spin in the spin-summed table and Occupancy/Energy per
-	//spin, so an open-shell NAO energy comes from the alpha table - the same operator the native
-	//analysis diagonalises for this column.
+	//An open-shell run prints Occupancy/Spin in the spin-summed table, so the energy comes from the alpha table.
 	double energy = 0.0;
 	double spin_density = 0.0;
 	bool has_spin_density = false;
@@ -92,8 +84,7 @@ struct NboBondOrder {
 	double total = 0.0;
 	double covalent = 0.0;
 	double ionic = 0.0;
-	//The printed table is symmetric, so only its upper triangle and diagonal are kept. On the
-	//diagonal NBO prints a total and "---" for covalent and ionic, which are left at zero here.
+	//Upper triangle and diagonal of the symmetric table only; on the diagonal covalent and ionic print "---" and stay 0.
 	bool diagonal = false;
 	std::string spin;           //"", "alpha", "beta", "composite"
 };
@@ -110,7 +101,6 @@ struct NboValency {
 };
 
 //One line of the NRT search table: how the candidate set and the objective function moved.
-//This is the problem size that drives the cost, so it belongs to the timing baseline.
 struct NboNrtCycle {
 	int cycle = 0;
 	int structures_used = 0;
@@ -127,8 +117,7 @@ struct NboTopo {
 	std::vector<std::vector<int>> matrix;
 };
 
-//A candidate resonance structure of the NRT search, printed only under NRTDTL. The candidate
-//list is what a screening scheme has to reproduce: everything examined, not only what survived.
+//A candidate resonance structure, printed only under NRTDTL: everything examined, not only what survived.
 struct NboNrtCandidate {
 	int structure = 0;
 	int idxres = 0;
@@ -158,9 +147,8 @@ struct NboNrt {
 	double gram_seconds = 0.0;
 	double minimize_seconds = 0.0;
 	double other_seconds = 0.0;
-	//Thresholds NBO echoes back for this run. The delocalisation-list one is what NRTE2 sets and
-	//it decides which E2 interactions enter the resonance search, so a reference is only
-	//reproducible with it recorded.
+	//Thresholds NBO echoes back. The delocalisation-list one (NRTE2) decides which E2 interactions enter
+	//the resonance search, so a reference is only reproducible with it recorded.
 	double parent_threshold_percent = 0.0;
 	double deloc_threshold_kcal = 0.0;
 	int max_search_cycles = 0;
@@ -175,10 +163,7 @@ struct NboNrt {
 	std::vector<NboNrtCandidate> candidates;
 	std::vector<NboQpIteration> qp_iterations;
 	std::vector<std::string> arrows;          //"ARROWS generates N new structures from ..." lines
-	//Everything else the search has to say about how it got there: the candidate budget it settled
-	//on, an exhaustive count, the half-arrow intermediates it dropped.  These were pushed into
-	//`arrows` too, so a consumer reading the JSON's "arrows" array could not tell an arrow
-	//generation from a budget decision.
+	//Other search notes (candidate budget, exhaustive count, dropped half-arrow intermediates), kept out of arrows
 	std::vector<std::string> notes;
 	std::vector<std::string> symmetry_forms;  //"Symmetry equivalent resonance forms" block
 	std::string nrtstr_keylist;               //the $NRTSTR block NBO writes back, verbatim
@@ -189,33 +174,25 @@ struct NboResults {
 	std::string source;         //the wavefunction the archive came from
 	std::string version;        //NBO banner
 	std::string keywords;       //what went into the $NBO keylist
-	//the keywords NBO echoed back, space separated, in the order it printed them. Not the same
-	//thing: it shows what NBO actually recognised and is all there is when only the output is read
+	//keywords NBO echoed back, in printed order: what it actually recognised, and all there is from output alone
 	std::string keywords_reported;
 	bool open_shell = false;
 	double file47_seconds = 0.0;
 	double nbo_seconds = 0.0;      //wall clock around the gennbo process, wrapper-measured
-	//NBO's own closing line, "completed in X CPU seconds (Y wall seconds)". NBO 7.0.9 is serial
-	//(its binaries carry no OpenMP or pthread symbols), so CPU time is one thread's time.
+	//NBO's closing "completed in X CPU seconds (Y wall seconds)"; NBO 7.0.9 is serial, so CPU is one thread's time.
 	double nbo_cpu_seconds = 0.0;
 	double nbo_reported_wall_seconds = 0.0;
-	//The native route runs the same stages in process, so none of the three above describe it: it
-	//spends its time writing and reading the .47, building the NAOs, searching the Lewis structure
-	//and pricing E2, while NRT reports its own phases inside the nrt block.  Summed over both spins.
+	//Native-route stages, summed over both spins; NRT reports its own phases in the nrt block.
 	double nao_seconds = 0.0;
 	double search_seconds = 0.0;
 	double e2_seconds = 0.0;
-	//The two E2 printing thresholds NBO echoes; below them the table is simply not printed, so a
-	//comparison that does not know them cannot tell a missing interaction from a small one.
+	//E2 printing thresholds NBO echoes: below them nothing is printed, so a missing interaction looks like a small one.
 	double e2_threshold_kcal = 0.0;
 	double e2_intermolecular_threshold_kcal = 0.0;
 	std::vector<NboAtomPopulation> npa;   //spin-summed table
 	std::vector<NboNao> nao;              //spin-summed table
-	//An open shell has two NAO sets, one per spin density, and the spin-summed table above can
-	//only be read as a sum: it hides per-spin errors that cancel.  ch3's carbon comes out 0.0839 e
-	//too high in alpha and 0.1279 e too low in beta against NBO 7, which sum to its 0.044 e charge
-	//error and differ by its 0.212 e spin-density error - the charge agreement is what made the
-	//per-spin error look small.  Empty for a closed shell, where both spins are the same set.
+	//Per-spin NAO sets of an open shell; the spin-summed table hides per-spin errors that cancel.
+	//Empty for a closed shell.
 	std::vector<NboNao> nao_alpha;
 	std::vector<NboNao> nao_beta;
 	std::vector<NboOrbital> orbitals;
@@ -223,12 +200,9 @@ struct NboResults {
 	NboNrt nrt;
 };
 
-/** Bumped when a parse or JSON change alters what a stored reference MEANS, so a reader can
-	refuse a file an older parser wrote instead of quietly comparing against it.  2 = gennbo's
-	NRT "RS" column read as a rank rather than a structure number, its composite alpha+beta
-	valency table kept under its own label instead of overwriting beta, and the open-shell NAO
-	table's Spin column no longer read as Energy.  Version 1 files are wrong in all three ways
-	and a whole measurement was already lost to a directory that still held them. */
+/** Bumped when a parse or JSON change alters what a stored reference means, so a reader can refuse
+	an older file. 2: NRT "RS" column read as a rank, composite alpha+beta valency table kept under its
+	own label, open-shell NAO Spin column not read as Energy. */
 constexpr int NBO_JSON_PARSER_VERSION = 2;
 
 /** Parse a .nbo output file produced by NBO 6/7 into structured results. */

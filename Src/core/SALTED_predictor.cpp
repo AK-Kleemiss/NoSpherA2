@@ -38,8 +38,7 @@ SALTEDPredictor::SALTEDPredictor(WFN wavy_in, options& opt_in)
 		return;
 	}
 
-	// A model may be named by its own file: two models often live in the same
-	// folder, and then the directory alone cannot say which one is meant.
+	// A model may be named by its own file: two models in one folder are otherwise indistinguishable.
 	if (std::filesystem::is_regular_file(_path)) {
 		SALTED_DIR = _path.parent_path();
 		config.salted_filename = _path.filename();
@@ -160,9 +159,8 @@ std::shared_ptr<BasisSet> SALTEDPredictor::get_model_basis() const
 	return model_basis ? model_basis : BasisSetLibrary::get_basis_set(config.dfbasis);
 }
 
-// Match a predictor's (possibly filtered) structure back onto the full one. The
-// filter only erases atoms and leaves the rest in order and untouched, so one
-// forward walk with an exact comparison is enough.
+// The predictor's filter only erases atoms and keeps the rest in order and untouched, so one forward
+// walk with an exact comparison maps its structure back onto the full one.
 static ivec map_atoms(const WFN& full, const WFN& part)
 {
 	ivec idx(full.get_ncen(), -1);
@@ -178,8 +176,7 @@ static ivec map_atoms(const WFN& full, const WFN& part)
 	return idx;
 }
 
-// Where each atom's coefficients start in a wavefunction's auxiliary basis - the
-// same table the density evaluation indexes with. One entry past the end.
+// Each atom's first coefficient in the auxiliary basis, as the density evaluation indexes it; one entry past the end.
 static ivec coef_offsets(const WFN& w)
 {
 	const aux_density_table t(*w.get_atoms_ptr());
@@ -190,10 +187,8 @@ static ivec coef_offsets(const WFN& w)
 
 void SALTEDPredictor::build_merged(const WFN& wavy_in, options& opt_in)
 {
-	// One prediction per model, each of them seeing the whole structure: an atom
-	// another model owns is still a neighbour of the ones this model predicts.
-	// The blocks are per atom and each carries its own model's auxiliary basis,
-	// so putting them side by side is a concatenation, not a mixture.
+	// One prediction per model on the whole structure: an atom another model owns is still a neighbour.
+	// Each per-atom block carries its own model's auxiliary basis, so stitching them is a concatenation.
 	std::cout << "Combining " << opt_in.salted_model_dirs.size()
 			  << " SALTED models. Each of them first reports what IT alone cannot predict;"
 			  << " the assignment that counts is printed below." << std::endl;
@@ -229,8 +224,7 @@ void SALTEDPredictor::build_merged(const WFN& wavy_in, options& opt_in)
 	for (int a = 0; a < wavy_in.get_ncen(); a++)
 	{
 		const int m = element_model[wavy_in.get_atom_charge(a) - 1];
-		// A model that dropped this atom for having no environment cannot predict
-		// it either, however well it knows the element.
+		// A model that dropped this atom for having no environment cannot predict it.
 		if (m < 0 || sub_index[m][a] < 0) continue;
 		atom_model[a] = m;
 		atom_in_model[a] = sub_index[m][a];
@@ -496,9 +490,8 @@ void SALTEDPredictor::read_model_data() {
 }
 
 
-// Fetch the model matrices for one lambda, use them, drop them. Each lambda is
-// visited once and nothing above it reads them again: the weight accounting
-// downstream works off psi_nm and the projector shapes, which outlive the matrices
+// Model matrices are loaded per lambda and dropped after use: nothing rereads them, the weight
+// accounting works off psi_nm and the projector shapes
 void SALTEDPredictor::load_model_lambda(const int lam)
 {
 	if (!model_file) return;
@@ -743,9 +736,8 @@ vec SALTEDPredictor::predict()
 		}
 	}
 
-	// A model carrying a BASIS block that does not describe what it predicts is
-	// broken; name the species that disagrees instead of failing later on a
-	// total count that says nothing about where it went wrong.
+	// A BASIS block that does not describe what the model predicts is broken; name the disagreeing species
+	// rather than fail later on a total count.
 	if (bbasis_set_loaded)
 	{
 		const aux_density_table t(*wavy.get_atoms_ptr());
@@ -766,8 +758,7 @@ vec SALTEDPredictor::predict()
 				std::cout << "   " << spe << ": predicted " << model_size << ", basis " << basis_size
 						  << (model_size == basis_size ? "" : "   <-- mismatch") << std::endl;
 				if (model_size == basis_size) continue;
-				// Say which angular momentum is short, which is what has to be fixed
-				// in the model file - a total count alone does not point anywhere.
+				// The short angular momentum is what has to be fixed in the model file.
 				ivec basis_l;
 				const int sh1 = (iat + 1 < natoms ? t.sh_start[iat + 1] : t.n_sh);
 				for (int s = t.sh_start[iat]; s < sh1; s++)

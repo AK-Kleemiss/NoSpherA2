@@ -18,9 +18,8 @@
 
 namespace
 {
-	//Per-point, per-thread scratch for the contraction: K components per function, summed over
-	//its primitives, then multiplied into the MOs once. Only the functions a point touched
-	//(the exponent cutoff drops the rest) are visited and reset.
+	//Per-thread scratch: K components per function summed over its primitives, then one multiply into
+	//the MOs; only functions the exponent cutoff kept are visited and reset
 	template <int K>
 	struct ao_scratch {
 		vec v;
@@ -2325,9 +2324,7 @@ void WFN::computeELIGrad(
 {
 	//ELI-D Y = rho/2 (48/g)^(3/8) with g = rho tau - |grad rho|^2 / 4, so
 	//grad Y = (48/g)^(3/8) / 2 (grad rho - 3/8 rho grad g / g) with
-	//grad g = tau grad rho + rho grad tau - H grad rho / 2, H the density Hessian.
-	//One pass with orbital values, gradients and Hessians replaces the six ELI
-	//evaluations of the central difference the basin climb used before
+	//grad g = tau grad rho + rho grad tau - H grad rho / 2, H the density Hessian
 	const int _nmo = get_nmo(false);
 	thread_local vec phi;
 	if (!eli_orbital_pass(PosGrid, phi))
@@ -2386,10 +2383,10 @@ void WFN::computeELISpinGrad(
 ) const
 {
 	//Per spin channel s the same ingredients as computeELIGrad: rho_s, T_s = sum n |grad phi|^2,
-	//G_s = grad rho_s, dT_s = grad T_s and H_s the Hessian of rho_s. Then, eli_family.h,
-	//  same spin  g = rho_s T_s - |G_s|^2/4,            grad g = G_s T_s + rho_s dT_s - H_s G_s / 2
-	//  triplet    g = g_a + g_b + (rho_a T_b + rho_b T_a)/2 - G_a.G_b/4, differentiated term by term
-	//and Y = r (12/g)^(3/8) with r = rho_s or triplet_factor * rho, grad Y = (12/g)^(3/8) (grad r - 3/8 r grad g / g)
+	//G_s = grad rho_s, dT_s = grad T_s, H_s the Hessian of rho_s.  Same spin (eli_family.h):
+	//g = rho_s T_s - |G_s|^2/4, grad g = G_s T_s + rho_s dT_s - H_s G_s / 2; triplet:
+	//g = g_a + g_b + (rho_a T_b + rho_b T_a)/2 - G_a.G_b/4, differentiated term by term.
+	//Y = r (12/g)^(3/8), r = rho_s or triplet_factor * rho, grad Y = (12/g)^(3/8) (grad r - 3/8 r grad g / g)
 	const int _nmo = get_nmo(false);
 	thread_local vec phi;
 	out_Eli = 0;
@@ -2397,7 +2394,7 @@ void WFN::computeELISpinGrad(
 	if (aux) for (int k = 0; k < 4; k++) aux[k] = 0.0;
 	if (!eli_orbital_pass(PosGrid, phi)) return;
 	static constexpr int hidx[3][3] = { {4, 7, 8}, {7, 5, 9}, {8, 9, 6} };
-	//serial scan inside spin_split: get_MO_op_count opens an OpenMP region, and this runs once per point of the climb
+	//spin_split scans serially: get_MO_op_count opens an OpenMP region and this runs per climb point
 	const eli_family::SpinSplit how = eli_family::spin_split(*this);
 	const bool halves = how == eli_family::SpinSplit::halves;
 	double rho[2]{ 0, 0 }, tau[2]{ 0, 0 }, G[2][3]{}, T[2][3]{}, H[2][3][3]{};
@@ -3221,18 +3218,14 @@ const double WFN::computeMO(
 
 // Boys function F_m(T) by a 6-term Taylor expansion around a tabulated grid (step 0.1 up to
 // T = 30, error < 1E-10), asymptotic beyond (1E-14); expn = exp(-T), which the caller has anyway
-// build_ESP_pairs refuses anything past g, so MaxFn = |l_i| + |l_j| <= 8 and the Taylor reads
-// m .. m + 5: a row of 15 doubles instead of 31 halves the table to 36 KB, which is the difference
-// between a row spanning four cache lines and two
+// Pairs stop at g x g, so MaxFn <= 8 and the Taylor reads m .. m + 5: rows of 15, not 31, keep a row in two cache lines
 static constexpr int boys_mmax = 8 + 6, boys_nT = 301;
 static constexpr double boys_step = 0.1;
-// dT^k / k! by one multiply per term: a division by the loop counter was 5 of them per Boys call,
-// and on a device a double division is a software sequence
+// 1/k! factors as multiplies: a double division is a software sequence on a device
 static constexpr double boys_inv_k[6] = { 0.0, 1.0, 0.5, 1.0 / 3.0, 0.25, 0.2 };
-// 1 / (2n - 1) for the downward F_n recursion, n = 1 .. MaxFn, same reason
+// 1 / (2n - 1) for the downward F_n recursion, n = 1 .. MaxFn
 static constexpr double boys_inv_odd[9] = { 0.0, 1.0, 1.0 / 3.0, 0.2, 1.0 / 7.0, 1.0 / 9.0, 1.0 / 11.0, 1.0 / 13.0, 1.0 / 15.0 };
-// file scope rather than a function-local static, so the hot loop carries no guard check and
-// the GPU kernel can be handed the same table through esp_boys_table()
+// File scope: no static-init guard in the hot loop, and esp_boys_table() hands it to the GPU
 static const vec boys_tab = []()
 {
 	vec F((size_t)boys_nT * (boys_mmax + 1));
@@ -3305,9 +3298,7 @@ const double WFN::Afac(int &l, int &r, int &i, double &PC, double &gamma, double
 		return temp;
 }
 
-// number of (l, r, s) terms of one axis with l_i + l_j = L: sum over l <= L, r <= l / 2 of
-// (l - 2 r) / 2 + 1. Tabulated because computeESP asks for it three times per pair, and L is
-// bounded by 8 - the g x g ceiling build_ESP_pairs refuses to go past.
+// (l, r, s) terms of one axis with l_i + l_j = L: sum over l <= L, r <= l / 2 of (l - 2 r) / 2 + 1; L <= 8 (g x g)
 static int esp_axis_terms(const int L)
 {
 	static constexpr int n[9] = { 1, 2, 5, 8, 14, 20, 30, 40, 55 };
@@ -3322,9 +3313,8 @@ WFN::ESP_pairs WFN::build_ESP_pairs() const
 	const double *coef = get_coef_primitive_major(); // [prim][mo]
 	int l_i[3], l_j[3];
 	double Pi[3], Pj[3];
-	// The (l,r,s) tables here and in computeESP are sized for a g x g pair: Afac_pre is [9][5][9],
-	// so an axis takes l_i + l_j <= 8, pcp is [3][9] and Fn is [25]. An h primitive indexes straight
-	// past all three, silently, and the OCC WFN constructor accepts shells up to l = 10 - so say so.
+	// Tables are sized for g x g (Afac_pre [9][5][9], Fn [9]): an h primitive would index past them
+	// silently, and the OCC reader accepts l up to 10
 	for (int iprim = 0; iprim < nprim; iprim++)
 	{
 		constants::type2vector(get_type(iprim), l_i);
@@ -3385,11 +3375,8 @@ WFN::ESP_pairs WFN::build_ESP_pairs() const
 	return t;
 }
 
-// One copy of the pair loop for VL points at a time. Every index in it - L, the (l,r,s) count, the
-// F index, the PC power, the offset into coef - is a property of the pair and not of the point, so
-// the lane dimension carries nothing but arithmetic and -O3 can put it in a vector register. Each
-// lane replays exactly the operations the scalar version did, in the same order, so any VL gives
-// bitwise the same ESP - which is what EspTests.BatchMatchesThePerPointLoop pins at 0.
+// Pair loop over VL points: every index belongs to the pair, so lanes carry only arithmetic and vectorise.
+// Each lane replays the scalar operations in scalar order, so any VL is bitwise identical (EspTests pins it)
 template <int VL>
 static void esp_lanes(const WFN &wfn, const WFN::ESP_pairs &t,
 					  const double *px, const double *py, const double *pz, double *out)
@@ -3400,7 +3387,7 @@ static void esp_lanes(const WFN &wfn, const WFN::ESP_pairs &t,
 	for (int iat = 0; iat < wfn.get_ncen(); iat++)
 	{
 		const double cx = wfn.get_atom_coordinate(iat, 0), cy = wfn.get_atom_coordinate(iat, 1), cz = wfn.get_atom_coordinate(iat, 2);
-		// ECP/xTB/pTB: only the valence electrons are in the MOs, so the core must not count as nuclear charge
+		// ECP/xTB/pTB: MOs hold only valence electrons, so the core is removed from the nuclear charge
 		const double Z = wfn.get_atom_charge(iat) - wfn.get_atom_ECP_electrons(iat);
 		for (int v = 0; v < VL; v++)
 		{
@@ -3409,9 +3396,7 @@ static void esp_lanes(const WFN &wfn, const WFN::ESP_pairs &t,
 		}
 	}
 
-	// B[axis][k] holds one axis pre-reduced by the F index its (l, r, s) term feeds, which is what
-	// lets the product loop below index Fn with its own counters. pw is reused per axis, so the
-	// per-pair state is 45 doubles per lane instead of the three 506-entry arrays it replaces.
+	// B[axis][k]: one axis summed by the F index its (l, r, s) terms feed, so the product loop indexes Fn directly
 	double Fn[9][VL], B[3][9][VL], pw[9][VL], PC[3][VL], T[VL], expc[VL], term[VL]; // MaxFn <= 8, L[k] <= 8 for g x g
 	const int npairs = (int)t.weight.size();
 	for (int p = 0; p < npairs; p++)
@@ -3426,8 +3411,7 @@ static void esp_lanes(const WFN &wfn, const WFN::ESP_pairs &t,
 			T[v] = ex_sum * ((PC[0][v] * PC[0][v] + PC[1][v] * PC[1][v]) + PC[2][v] * PC[2][v]);
 		}
 		int c = t.off[p];
-		// s-s pairs (the bulk of the table) have one (l,r,s) term per axis, every PC power 0, and
-		// F_0 never touches exp(-T) on either branch: bitwise the general path below, without the exp
+		// s-s: one term per axis, PC power 0, and F_0 never reads exp(-T): bitwise the general path without the exp
 		if (MaxFn == 0)
 		{
 			const double cc = (t.coef[c] * t.coef[c + 1]) * t.coef[c + 2];
@@ -3435,10 +3419,7 @@ static void esp_lanes(const WFN &wfn, const WFN::ESP_pairs &t,
 				ESP[v] -= w * (cc * boys(0, T[v], 0.0));
 			continue;
 		}
-		// exp(-T) is the only transcendental in here, and for a distant pair it is pointless: at T = 60
-		// it is 8.8E-27 against an F_0 of 0.114, so dropping it changes no bit of a double. The pair
-		// table of a 45-atom molecule is mostly distant pairs at any one point, and this branch is
-		// predictable, so the libm call survives only where it can still matter.
+		// Beyond T = 60, exp(-T) is below the last bit of F_0, so the libm call is skipped
 		for (int v = 0; v < VL; v++)
 		{
 			expc[v] = T[v] < 60.0 ? exp(-T[v]) : 0.0;
@@ -3448,10 +3429,8 @@ static void esp_lanes(const WFN &wfn, const WFN::ESP_pairs &t,
 			for (int v = 0; v < VL; v++)
 				Fn[nu][v] = (expc[v] + 2 * T[v] * Fn[nu + 1][v]) * boys_inv_odd[nu + 1];
 
-		// Every (l, r, s) term of an axis multiplies exactly one F index, so summing the axis into
-		// B[k] first turns nl * nm * nn products with a gathered Fn index into (L0+1)(L1+1)(L2+1)
-		// products whose index is kx + ky + kz - 5.5 instead of 10.5 per pair over sucrose's table,
-		// and the innermost walk over Fn is contiguous. Exact factorisation, not an approximation.
+		// Each (l, r, s) term feeds one F index, so summing each axis into B[k] first factorises the
+		// nl * nm * nn triple product exactly into (L0+1)(L1+1)(L2+1) terms with index kx + ky + kz
 		for (int k = 0; k < 3; k++)
 		{
 			for (int v = 0; v < VL; v++)
@@ -3496,11 +3475,8 @@ const double WFN::computeESP(const d3 &PosGrid, const ESP_pairs &t) const
 	return ESP;
 };
 
-// The host fallback of computeESP_batch: VL points share one pass over the pair table, the leftovers
-// go through the scalar path. Measured on sucrose, 32 threads, ESP cube: 68.0 s at one point per pass,
-// 24.1 at four, 16.3 at thirty-two, 15.6 at sixty-four, 15.4 at 128. What the loop is short of is not
-// arithmetic but the table - coef, pc_pow, fn_idx and the six per-pair arrays - so the fewer times per
-// point it is fetched the better, until the lane state (51 doubles per lane) stops fitting in L1.
+// Host path: VL points share one pass over the pair table, leftovers go scalar.  The loop is bound by
+// fetching the table, so wider passes win until the lane state no longer fits in L1
 template <int VL>
 static void esp_host_pass(const WFN &wfn, const WFN::ESP_pairs &t, const std::vector<d3> &points, double *out)
 {
@@ -3517,9 +3493,8 @@ static void esp_host_pass(const WFN &wfn, const WFN::ESP_pairs &t, const std::ve
 		out[i] = wfn.computeESP(points[i], t);
 }
 
-// One call per point set instead of one per point: the pair table is O(nprim^2) and every point
-// walks all of it, so a whole grid is worth shipping to a device at once. Falls back to the
-// OpenMP loop over computeESP when there is no device (or the set is too small to pay the copies).
+// Every point walks the whole O(nprim^2) pair table, so a whole set goes to the device at once; host
+// fallback without a device or when the set is too small to pay the copies
 void WFN::computeESP_batch(const std::vector<d3> &points, const ESP_pairs &t, double *out) const
 {
 	const int np = (int)points.size();
@@ -3527,8 +3502,7 @@ void WFN::computeESP_batch(const std::vector<d3> &points, const ESP_pairs &t, do
 		return;
 #ifdef NOSPHERA2_USE_GPU
 	const int ncen = get_ncen(), npairs = (int)t.weight.size();
-	// the pair table stays resident on the device between calls, so a slice only pays its own point
-	// upload and result download; 4M pair-point evaluations already beat the OpenMP loop comfortably
+	// The pair table stays resident on the device, so a call pays only its point upload and download
 	if (npairs > 0 && (long long)np * npairs >= (1LL << 22) && aux_density_gpu_enabled())
 	{
 		vec ax(ncen), ay(ncen), az(ncen), q(ncen);
@@ -3540,11 +3514,8 @@ void WFN::computeESP_batch(const std::vector<d3> &points, const ESP_pairs &t, do
 		int nT = 0, stride = 0;
 		double step = 0;
 		const double *tab = esp_boys_table(nT, stride, step);
-		// The whole set in one launch, deliberately: the kernel is latency bound, not bandwidth bound,
-		// so it needs every SM occupied to hide its local-memory loads. Feeding it in quarters to
-		// overlap the idle cores (measured 24 Sep) cost more than the cores were worth - 87312 faces
-		// took 38750 ms in shrinking blocks against 19902 ms in one, because the tail launches run at
-		// a fraction of the occupancy. A split would have to be one cut with both sides launched once.
+		// One launch for the whole set: the kernel is latency bound and needs every SM occupied, so
+		// split launches lose more in tail occupancy than overlapping the host cores gains
 		if (esp_gpu_eval(ncen, ax.data(), ay.data(), az.data(), q.data(),
 						 npairs, t.ex_sum.data(), t.weight.data(), t.P[0].data(), t.L[0].data(),
 						 t.off.data(), t.coef.data(), t.pc_pow.data(), t.fn_idx.data(),
@@ -3552,10 +3523,7 @@ void WFN::computeESP_batch(const std::vector<d3> &points, const ESP_pairs &t, do
 			return;
 	}
 #endif
-	// One block is VL points of work, so a small set must not be cut into fewer blocks than there are
-	// threads - below that the wide pass wins less than the idle cores lose. Every width gives bitwise
-	// the same answer (each lane replays the scalar operations in the scalar order), which is what
-	// EspTests.BatchMatchesThePerPointLoop pins at max |batch - per point| 0.
+	// Never fewer VL blocks than threads: idle cores cost more than the wide pass gains.  All widths are bitwise identical
 	const int nthr = omp_get_max_threads();
 	if (np >= 64 * nthr)
 		esp_host_pass<64>(*this, t, points, out);

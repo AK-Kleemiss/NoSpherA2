@@ -3,19 +3,16 @@
 #include <cmath>
 #include <string>
 
-//Extinction corrections on the model F_calc^2, in cctbx's convention (see
-//cctbx/xray/extinction.h): a model returns a multiplier y on Fc^2, so the amplitude that is
-//compared with |F_obs| is sqrt(y)*|Fc|. Every model here multiplies the same geometry
-//constant 0.001*lambda^3/sin(2 theta) SHELX uses, so the refined coefficient stays on
-//SHELX's scale and the physical constants (cell volume, polarisation ratio, mean path
-//length) stay absorbed in it, exactly as SHELXL's EXTI does.
+//Extinction corrections in cctbx's convention (cctbx/xray/extinction.h): a model returns a multiplier y on
+//Fc^2, so sqrt(y)*|Fc| is compared with |F_obs|. Every model multiplies SHELX's geometry constant
+//0.001*lambda^3/sin(2 theta), so the coefficient stays on SHELXL's EXTI scale with the physical constants
+//(cell volume, polarisation ratio, mean path length) absorbed in it.
 namespace extinction {
 
 	enum class model { none = 0, shelx, bc_gaussian, bc_lorentzian };
 
-	//0.001 * lambda^3 / sin(2 theta), with sin(theta) = lambda * stl for stl = sin(theta)/lambda
-	//in Angstrom^-1. Zero where the reflection is not accessible at this wavelength, which is
-	//where the correction does not apply.
+	//0.001 * lambda^3 / sin(2 theta), stl = sin(theta)/lambda in Angstrom^-1; zero where the reflection is not
+	//accessible at this wavelength
 	inline double geometry_constant(const double wavelength, const double stl) {
 		const double sin_t = wavelength * stl;
 		if (sin_t <= 0.0 || sin_t >= 1.0) return 0.0;
@@ -23,21 +20,18 @@ namespace extinction {
 		return 0.001 * wavelength * wavelength * wavelength / sin_2t;
 	}
 
-	//cos(2 theta), which is what the Becker-Coppens mosaic coefficients depend on
+	//cos(2 theta), which the Becker-Coppens mosaic coefficients depend on
 	inline double cos_2theta(const double wavelength, const double stl) {
 		const double sin_t = wavelength * stl;
 		return 1.0 - 2.0 * sin_t * sin_t;
 	}
 
-	//y(t), and dy/dt when dydt is given. t = c * x * |Fc|^2 with c the geometry constant and
-	//x the refined coefficient (for the anisotropic models, the quadratic form of the tensor).
-	//  SHELX/Zachariasen:  y = (1 + t)^(-1/2), the leading term of Becker-Coppens type I.
-	//  Becker-Coppens:     y = (1 + 2t + A t^2/(1 + B t))^(-1/2), with the Gaussian and
-	//                      Lorentzian mosaic coefficients of Becker & Coppens (1974), taken
-	//                      from GSAS-II's GSASIIstrMath.SCExtinction.
-	//A non-physical shape (D <= 0, reachable only for a negative coefficient) is left
-	//uncorrected rather than producing a NaN; refine_extinction keeps x >= 0 so this is a
-	//backstop, not a working branch.
+	//y(t), and dy/dt when dydt is given; t = c * x * |Fc|^2, c the geometry constant, x the coefficient (for
+	//the anisotropic models the quadratic form of the tensor).
+	//SHELX/Zachariasen: y = (1 + t)^(-1/2), the leading term of Becker-Coppens type I.
+	//Becker & Coppens (1974): y = (1 + 2t + A t^2/(1 + B t))^(-1/2), Gaussian and Lorentzian mosaic A and B
+	//as in GSAS-II's GSASIIstrMath.SCExtinction.
+	//D <= 0 (only for a negative coefficient) is left uncorrected rather than NaN; a backstop, as x >= 0 is kept.
 	inline double correction(const model m, const double cos2t, const double t, double* dydt = nullptr) {
 		if (m == model::none) {
 			if (dydt) *dydt = 0.0;
@@ -71,18 +65,12 @@ namespace extinction {
 		return y;
 	}
 
-	//The anisotropic coefficient x(h) = sum_p a_p X_p, with X stored in the Voigt order
-	//X11 X22 X33 X12 X13 X23 and h_unit the normalised scattering vector in Cartesian.
-	//
-	//The rigorous anisotropic models (Coppens & Hamilton 1970, Thornley & Nelmes 1974; XD2006
-	//sec. 4.6.8 writes them as g(D) = (D'ZD)^1/2 with D perpendicular to the diffraction plane
-	//and rho(N) = lambda (N'WN)^-1/2 with N in it) need the direction cosines of the incident
-	//and diffracted beams, which XD demands as six extra entries per observation and which an
-	//hkl file does not carry. Averaging over the azimuth psi around the scattering vector
-	//removes them: <s_i s_j>_psi = (delta_ij - h_i h_j)/2 for any unit vector s perpendicular
-	//to h, so <D'XD>_psi = (tr X - h'Xh)/2. For X = x*I that is exactly x, so the isotropic
-	//model is this one's isotropic limit, and for merged data averaged over several azimuths
-	//it is arguably the quantity the measurement actually saw.
+	//x(h) = sum_p a_p X_p, X in Voigt order X11 X22 X33 X12 X13 X23, h_unit the normalised Cartesian
+	//scattering vector. The rigorous models (Coppens & Hamilton 1970, Thornley & Nelmes 1974; XD2006 sec. 4.6.8,
+	//g(D) = (D'ZD)^1/2 with D perpendicular to the diffraction plane) need the incident and diffracted beam
+	//directions, which an hkl file does not carry. Averaging over the azimuth psi around h removes them:
+	//<s_i s_j>_psi = (delta_ij - h_i h_j)/2 for unit s perpendicular to h, so <D'XD>_psi = (tr X - h'Xh)/2,
+	//which is x for X = x*I (the isotropic limit).
 	inline void aniso_coefficients(const std::array<double, 3>& h_unit, std::array<double, 6>& a) {
 		for (int i = 0; i < 3; i++) a[i] = 0.5 * (1.0 - h_unit[i] * h_unit[i]);
 		a[3] = -h_unit[0] * h_unit[1];

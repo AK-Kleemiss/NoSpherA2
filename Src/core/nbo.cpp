@@ -12,12 +12,7 @@ using Eigen::VectorXd;
 
 namespace
 {
-	//--------------------------------------------------------------------------------------
-	// small linear-algebra helpers
-	//--------------------------------------------------------------------------------------
-	//These are copies of the ones in nao.cpp's anonymous namespace.  Twenty lines duplicated is
-	//cheaper than a third header that two files under active parallel development both include.
-
+	//copies of the helpers in nao.cpp's anonymous namespace
 	MatrixXd to_eigen(const dMatrix2& m)
 	{
 		const int r = static_cast<int>(m.extent(0)), c = static_cast<int>(m.extent(1));
@@ -39,7 +34,7 @@ namespace
 
 	MatrixXd sym_power(const MatrixXd& M, const double p, const double rel_floor = 1e-10)
 	{
-		//An empty spin channel has no Lewis structure.
+		//an empty spin channel
 		if (M.rows() == 0 || M.cols() == 0)
 			return M;
 		Eigen::SelfAdjointEigenSolver<MatrixXd> es(M);
@@ -51,11 +46,7 @@ namespace
 		return es.eigenvectors() * f.asDiagonal() * es.eigenvectors().transpose();
 	}
 
-	//--------------------------------------------------------------------------------------
-	// FILE47 reading
-	//--------------------------------------------------------------------------------------
-
-	//The whole body of a $SECTION, without the keyword and without the $END.
+	//body of a $SECTION between the keyword and $END
 	std::string section_body(const std::string& text, const std::string& name)
 	{
 		const size_t start = text.find(name);
@@ -65,7 +56,7 @@ namespace
 		return text.substr(after, (end == std::string::npos ? text.size() : end) - after);
 	}
 
-	//Every number of a section body, ignoring the "CENTER =" style tags around them.
+	//every number of a section body, skipping the "CENTER =" tags
 	vec numbers_of(const std::string& body)
 	{
 		vec out;
@@ -89,8 +80,7 @@ namespace
 		return out;
 	}
 
-	//FILE47 packs a symmetric matrix as the upper triangle in column-major order, which reads as
-	//the lower triangle in row-major order - the same n(n+1)/2 values either way.
+	//FILE47 packs the upper triangle column-major, i.e. the lower triangle row-major
 	dMatrix2 unpack(const vec& values, const size_t offset, const int n)
 	{
 		dMatrix2 M(n, n);
@@ -103,8 +93,7 @@ namespace
 		return M;
 	}
 
-	//NBO's LABEL codes, in the order write_nbo() emits them: the components of a shell run
-	//m = 0, +1, -1, +2, -2, ... and the code order below is that order, not the numeric one.
+	//NBO LABEL codes in write_nbo() order: a shell's components run m = 0, +1, -1, +2, -2, ...
 	bool decode_label(const int label, int& l, int& component)
 	{
 		static const ivec2 codes = {
@@ -119,12 +108,7 @@ namespace
 		return false;
 	}
 
-	//--------------------------------------------------------------------------------------
-	// labels
-	//--------------------------------------------------------------------------------------
-
-	//The angular label NBO prints for component c of a shell of angular momentum l, in the
-	//m = 0, +1, -1, ... order the FILE47 uses.
+	//NBO's angular label for component c of shell l, in FILE47's m = 0, +1, -1, ... order
 	std::string lang_label(const int l, const int c)
 	{
 		static const char* p[3] = { "pz", "px", "py" };
@@ -138,8 +122,8 @@ namespace
 		return std::string(1, letter) + "(" + (m > 0 ? "c" : "s") + std::to_string(std::abs(m)) + ")";
 	}
 
-	//Where NBO puts that component in its NAO table: s; px, py, pz; dxy, dxz, dyz, dx2y2, dz2;
-	//f(0), f(c1), f(s1), ... - so for p and d it is not the FILE47 order.
+	//NBO's NAO table order: s; px, py, pz; dxy, dxz, dyz, dx2y2, dz2; f(0), f(c1), f(s1), ...
+	//so for p and d not the FILE47 order
 	int lang_rank(const int l, const int c)
 	{
 		static const int p[3] = { 2, 0, 1 };        //pz, px, py -> 3rd, 1st, 2nd
@@ -156,9 +140,8 @@ namespace
 
 	std::string pad(const int v, const size_t w) { return pad(std::to_string(v), w); }
 
-	//The parser in nbo_run.cpp stores whitespace-collapsed descriptions, and compare_nbo_results()
-	//matches orbitals on exactly that string, so the native side has to produce the collapsed form
-	//of NBO's fixed-width layout rather than something merely equivalent.
+	//compare_nbo_results() matches orbitals on nbo_run.cpp's whitespace-collapsed description,
+	//so the native side must produce exactly that string
 	std::string collapse(const std::string& s)
 	{
 		std::string out;
@@ -197,10 +180,6 @@ namespace
 		return collapse(s);
 	}
 
-	//--------------------------------------------------------------------------------------
-	// the search
-	//--------------------------------------------------------------------------------------
-
 	struct AtomIndices {
 		ivec core, valence, rydberg, all;
 	};
@@ -233,7 +212,7 @@ namespace
 		return es.eigenvalues()(k - 1);
 	}
 
-	//Reject two-centre candidates below the minority population threshold.
+	//minority-centre share below which a two-centre candidate is no bond
 	double bond_minority_floor()
 	{
 		static const double v = [] {
@@ -249,8 +228,6 @@ namespace
 		for (const int i : idx) w += v(i) * v(i);
 		return w;
 	}
-
-	//NBO construction follows the Lewis, antibond, and Rydberg cascade.
 
 	MatrixXd corner(const MatrixXd& M, const ivec& idx)
 	{
@@ -366,8 +343,6 @@ bvec2 bondable_pairs(const std::vector<atom>& atoms, const double scale)
 	return out;
 }
 
-//The stage timer of native_nbo() says the search is the expensive half; this one says which
-//part of the search it is, which is the difference between guessing and knowing.
 namespace {
 	struct ProfClock {
 		std::chrono::steady_clock::time_point t0 = std::chrono::steady_clock::now();
@@ -387,13 +362,12 @@ NboLewis nbo_search(const NAOResult& nao, const dMatrix2& gamma, const bvec2& bo
 	double p_ladder = 0, p_scf = 0, p_owso = 0, p_anti = 0, p_comp = 0, p_final = 0;
 	double p_pivot = 0, p_ryd = 0;
 	int n_sweeps = 0, n_eig1 = 0, n_eig2 = 0, n_levels_used = 0;
-	vec ch_trace;  //the sweep's convergence history, reported under -debug
+	vec ch_trace;  //convergence history, printed under -debug
 	const int n = static_cast<int>(gamma.extent(0));
 	const int natoms = static_cast<int>(nao.atoms.size());
 	const MatrixXd G0 = to_eigen(gamma);
 	MatrixXd G = G0;
 	const std::vector<AtomIndices> idx = atom_indices(nao);
-	//Use the requested NBO thread count or the OpenMP default.
 #ifdef _OPENMP
 	const int nthreads = options.search_threads > 0 ? options.search_threads
 					   : options.threads > 0        ? options.threads
@@ -416,14 +390,12 @@ NboLewis nbo_search(const NAOResult& nao, const dMatrix2& gamma, const bvec2& bo
 		f.occupancy = v.dot(G0 * v);
 		res.orbitals.push_back(f);
 		vectors.push_back(v);
-		//depletion: take the orbital's current occupancy out of the working density, so the next
-		//block search sees only what is left
+		//deplete, so the next block search sees only what is left
 		const double occ = v.dot(G * v);
 		G -= occ * v * v.transpose();
 	};
 
-	//1. cores.  A core NAO is already a one-centre orbital of occupancy ~2 and NBO keeps it as it
-	//is; taking the leading eigenvector of the core block instead moves nothing measurable.
+	//A core NAO is already a one-centre orbital of occupancy ~2, kept as it is.
 	for (int a = 0; a < natoms; a++)
 		for (const int i : idx[a].core) {
 			VectorXd v = VectorXd::Zero(n);
@@ -432,7 +404,7 @@ NboLewis nbo_search(const NAOResult& nao, const dMatrix2& gamma, const bvec2& bo
 			res.topo[a][a]++;
 		}
 
-	//Search one-centre and two-centre blocks at each occupancy threshold.
+	//threshold ladder: one-centre, then two-centre blocks at each threshold
 	static const vec ladder = { 1.90, 1.80, 1.70, 1.60, 1.50, 1.40, 1.30, 1.20, 1.10,
 								1.00, 0.90, 0.80, 0.70, 0.60, 0.50 };
 	ivec used(natoms, 0);
@@ -475,8 +447,7 @@ NboLewis nbo_search(const NAOResult& nao, const dMatrix2& gamma, const bvec2& bo
 			double bestp = t;
 			VectorXd bvp;
 			int pa = -1, pb = -1;
-			//every bondable atom pair, O(N^2) small diagonalisations per accepted bond; at
-			//reference scale the whole search is milliseconds
+			//O(N^2) small diagonalisations per accepted bond
 			ivec2 plist;
 			for (int a = 0; a < natoms; a++) {
 				if (idx[a].valence.empty()) continue;
@@ -502,7 +473,6 @@ NboLewis nbo_search(const NAOResult& nao, const dMatrix2& gamma, const bvec2& bo
 				if (lam2[c] <= bestp) continue;
 				const double wa = weight_on(cand2[c], idx[plist[c][0]].all);
 				const double wb = weight_on(cand2[c], idx[plist[c][1]].all);
-				//Classify a two-centre candidate by its minority-centre weight.
 				if (std::min(wa, wb) < bond_minority_floor() * (wa + wb)) continue;
 				bestp = lam2[c];
 				bvp = cand2[c];
@@ -523,7 +493,6 @@ NboLewis nbo_search(const NAOResult& nao, const dMatrix2& gamma, const bvec2& bo
 	  }
 	}
 	res.n_lewis = static_cast<int>(res.orbitals.size());
-	//Reject a nonempty spin density with no Lewis orbital.
 	{
 		double tr = 0.0;
 		for (int i = 0; i < n; i++) tr += G0(i, i);
@@ -561,12 +530,11 @@ NboLewis nbo_search(const NAOResult& nao, const dMatrix2& gamma, const bvec2& bo
 			block += occ[j] * vs * vs.transpose();
 			scatter_corner(sum, block, sub[j]);
 		}
-		//Disjoint orbital centres update disjoint density corners.
+		//orbitals on disjoint centres update disjoint corners, so one level runs in parallel
 		ivec level(res.n_lewis, 0);
 		int n_levels = 0;
 		for (int j = 0; j < res.n_lewis; j++) {
-			//a core orbital is a single NAO and stays one - NBO prints 2.00000 for it either way, so
-			//it never enters a sweep and never blocks anything
+			//a core orbital is a single NAO and stays one, so it never enters a sweep
 			if (res.orbitals[j].type == "CR") continue;
 			for (int i = 0; i < j; i++) {
 				if (res.orbitals[i].type == "CR") continue;
@@ -582,8 +550,7 @@ NboLewis nbo_search(const NAOResult& nao, const dMatrix2& gamma, const bvec2& bo
 		n_levels_used = n_levels;
 		for (int j = 0; j < res.n_lewis; j++)
 			if (res.orbitals[j].type != "CR") by_level[level[j]].push_back(j);
-		//the max over the whole sweep, taken after it: a per-orbital slot avoids an OpenMP max
-		//reduction, which MSVC's OpenMP 2.0 does not have
+		//per-orbital slot, max taken afterwards: MSVC's OpenMP 2.0 has no max reduction
 		vec moved_at(res.n_lewis, 0.0);
 		for (int sweep = 0; sweep < 200; sweep++) {
 			for (int L = 0; L < n_levels; L++) {
@@ -594,8 +561,7 @@ NboLewis nbo_search(const NAOResult& nao, const dMatrix2& gamma, const bvec2& bo
 					const int j = lv[t];
 					const ivec& s = sub[j];
 					const int m = static_cast<int>(s.size());
-					//one gather and one scatter for the pair of rank-one updates and the difference the
-					//eigensolve needs, instead of three passes over the whole matrix
+					//one gather and scatter serve both rank-one updates and the eigensolve's difference
 					MatrixXd block = corner(sum, s);
 					VectorXd vs = gather(vectors[j], s);
 					block -= occ[j] * vs * vs.transpose();
@@ -606,8 +572,7 @@ NboLewis nbo_search(const NAOResult& nao, const dMatrix2& gamma, const bvec2& bo
 					moved_at[j] = (v - vectors[j]).norm();
 					vectors[j] = v;
 					vs = gather(v, s);
-					//v vanishes outside s, so its occupancy against the full density is the corner's:
-					//the full G0 * v was an n^2 matvec per orbital per sweep, most of the search
+					//v vanishes outside s, so its occupancy against G0 is the corner's
 					occ[j] = vs.dot(G0_corner[j] * vs);
 					block += occ[j] * vs * vs.transpose();
 					scatter_corner(sum, block, s);
@@ -632,9 +597,8 @@ NboLewis nbo_search(const NAOResult& nao, const dMatrix2& gamma, const bvec2& bo
 		p_owso = prof.lap();
 	}
 
-	//5. the valence antibonds.  A bond is c_A h_A + c_B h_B over two normalised hybrids, so its
-	//antibond - the other vector of that same two-dimensional space - is c_B h_A - c_A h_B.  It is
-	//constructed, not searched: it has almost no occupancy to find it by.
+	//A bond c_A h_A + c_B h_B has the antibond c_B h_A - c_A h_B; constructed, not searched, as it
+	//has almost no occupancy to find it by.
 	std::vector<VectorXd> non_lewis;
 	std::vector<NboFunction> non_lewis_fn;
 	for (int j = 0; j < res.n_lewis; j++) {
@@ -667,7 +631,7 @@ NboLewis nbo_search(const NAOResult& nao, const dMatrix2& gamma, const bvec2& bo
 		const MatrixXd Q = MatrixXd::Identity(n, n) -
 			M * sym_power(MatrixXd(M.transpose() * M), -1.0) * M.transpose();
 		//Use local basis vectors for deterministic Rydberg labels.
-		p_comp = prof.lap();  //the projector Q alone until the pivot and the diagonalisation are in
+		p_comp = prof.lap();
 		std::vector<VectorXd> extra;
 		ivec owner;
 		std::vector<VectorXd> residual(n);
@@ -708,8 +672,7 @@ NboLewis nbo_search(const NAOResult& nao, const dMatrix2& gamma, const bvec2& bo
 			for (int j = 0; j < kk; j++) {
 				const VectorXd v = B * e2.eigenvectors().col(kk - 1 - j);
 				NboFunction f;
-				//a residual orbital that still lives in the atom's valence shell is a lone
-				//vacancy; one pushed out of it is Rydberg
+				//still in the atom's valence shell: lone vacancy; pushed out of it: Rydberg
 				f.type = (weight_on(v, idx[a].valence) > 0.5) ? "LV" : "RY";
 				f.centers = { a };
 				non_lewis.push_back(v);
@@ -722,9 +685,7 @@ NboLewis nbo_search(const NAOResult& nao, const dMatrix2& gamma, const bvec2& bo
 
 	for (size_t j = 0; j < non_lewis.size(); j++) {
 		NboFunction f = non_lewis_fn[j];
-		//No occupancy here: phase 8 below computes it from vectors[j], which is this same vector,
-		//with the same expression - one n x n gemv per non-Lewis orbital, 0.28 s of sucrose's
-		//search, thrown away twenty lines later.
+		//occupancy is computed below from the same vector
 		if (f.type != "BD*") {
 			f.multiplicity = 1;
 			for (const NboFunction& o : res.orbitals)
@@ -823,8 +784,6 @@ namespace
 	{
 		const dMatrix2 gamma = nao_density(density, in.overlap, nao.C);
 		const dMatrix2 fock_nao = fock.extent(0) ? nao_operator(fock, nao.C) : dMatrix2();
-		//A stage nobody times is a stage nobody can make faster: sucrose spent 50 of its 54 s
-		//somewhere in here while the only phase line in the log was NRT's own 1.4 s.
 		const auto clock = [] { return std::chrono::steady_clock::now(); };
 		auto t = clock();
 		NboLewis lewis = nbo_search(nao, gamma, bondable, n_pairs, scale, options);
@@ -837,8 +796,7 @@ namespace
 			//log, not std::cout: under -fba this runs on the NBO thread and cout is RGBI's
 			native_nrt(res.nrt, nao, lewis, e2, nrt_bondable, options, spin, scale, log);
 
-		//NBO numbers its NBOs by type group: the Lewis set in the order it was found, then the
-		//non-Lewis set as LV, BD*, RY
+		//NBO numbers by type group: the Lewis set in found order, then LV, BD*, RY
 		ivec order;
 		static const char* groups[] = { "CR", "LP", "BD", "LV", "BD*", "RY" };
 		for (const char* g : groups)
@@ -864,8 +822,7 @@ namespace
 				h.center = f.centers[k] + 1;
 				h.element = constants::atnr2letter(nao.atoms[f.centers[k]].Z);
 				h.weight_percent = 100.0 * f.center_weight[k];
-				//NBO's sign convention: the first centre positive, the second one following the
-				//bond/antibond pair, so an antibond carries the minus
+				//NBO's sign: first centre positive, so an antibond's second centre carries the minus
 				const double c = std::sqrt(std::max(f.center_weight[k], 0.0));
 				h.coefficient = (k == 1 && f.type == "BD*") ? -c : c;
 				h.s = 100.0 * f.center_lchar[k][0];
@@ -888,7 +845,7 @@ namespace
 		out_lewis.push_back(lewis);
 	}
 
-	//Print NAOs by atom, angular momentum, and NBO component order.
+	//NAOs ordered by atom, l and NBO's component order
 	void fill_nao_table(std::vector<NboNao>& out, const NAOResult& nao, const vec& occupancy,
 						const dMatrix2& fock_nao)
 	{
@@ -1038,9 +995,7 @@ NboResults native_nbo(WFN& wavy, const NboOptions& options, std::ostream& log)
 }
 
 namespace {
-	//"BD O1-H2": the type and its centres, from the hybrids, which a parsed gennbo result carries too.
-	//The description string is gennbo's own layout ("BD ( 1) O 1- H 2") and stays in the JSON for
-	//the comparison; it is only the fallback here.
+	//"BD O1-H2" from the hybrids, which a parsed gennbo result carries too; the description is the fallback
 	std::string nbo_label(const NboOrbital& o)
 	{
 		if (o.hybrids.empty()) return o.description;
@@ -1068,15 +1023,13 @@ namespace {
 		return "\n" + what + (note.empty() ? "" : " (" + note + ")") + ":\n";
 	}
 
-	//Anything that rounds to zero at five decimals is printed as zero: a nearly empty orbital comes
-	//out of the diagonalisation at either sign, and "-0.00000" reads as a negative occupancy.
+	//a nearly empty orbital comes out at either sign, and "-0.00000" reads as a negative occupancy
 	double printable(const double x)
 	{
 		return std::abs(x) < 5e-6 ? 0.0 : x;
 	}
 }
 
-//Print the NRT results beside the NBO results.
 void print_nrt(const NboResults& r, std::ostream& out)
 {
 	using namespace std;
@@ -1111,8 +1064,7 @@ void print_nrt(const NboResults& r, std::ostream& out)
 				out << setw(11) << w.structure << setprecision(2) << setw(11) << w.weight_percent << "   "
 					<< w.changes << "\n";
 	}
-	//The diagonal of NRT's bond-order matrix is the atom's lone-pair count, which is a property of
-	//one atom, so it goes into the valency table rather than into a bond table with two empty columns.
+	//the bond-order diagonal is the atom's lone-pair count, so it goes into the valency table
 	std::map<std::pair<std::string, int>, double> lone_pairs;
 	for (const NboBondOrder& b : n.bond_orders)
 		if (b.diagonal) lone_pairs[{ b.spin, b.atom1 }] = b.total;
@@ -1143,10 +1095,8 @@ void print_nrt(const NboResults& r, std::ostream& out)
 void print_nbo(const NboResults& r, std::ostream& out)
 {
 	using namespace std;
-	//fixed/setprecision below stay on the stream after this table, so everything printed through it
-	//afterwards would carry two decimals
+	//fixed/setprecision would otherwise outlive this table
 	const ostream_format_guard restore_format(out);
-	//Print the atomic populations beside the orbital tables.
 	if (!r.npa.empty()) {
 		const bool spin = r.npa.front().has_spin_density;
 		out << "\nNatural population analysis (in house):\n"
@@ -1162,15 +1112,14 @@ void print_nbo(const NboResults& r, std::ostream& out)
 			charge_sum += p.charge;
 			total_sum += p.total;
 		}
-		//the two sums are the check a reader can make on the spot: the charges add to the molecular
-		//charge and the populations to the number of electrons the wavefunction carries
+		//charges sum to the molecular charge, populations to the electron count
 		out << "  " << left << setw(7) << "total" << right << setw(10) << printable(charge_sum) << setw(40) << total_sum
 			<< "\n";
 	}
 
 
-	//A basis with diffuse or polarisation functions leaves dozens of Rydberg NBOs per atom at
-	//essentially nothing; they are counted and summed instead of listed.  The JSON keeps every one.
+	//diffuse or polarisation functions leave dozens of near-empty Rydberg NBOs per atom: counted, not
+	//listed; the JSON keeps every one
 	constexpr double rydberg_floor = 1e-4;
 	const auto hybrid = [&out](const NboHybrid& h) {
 		out << "   " << left << setw(6) << (h.element + std::to_string(h.center)) << right << setprecision(2)

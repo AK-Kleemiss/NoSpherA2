@@ -4,17 +4,9 @@
 #include <cstddef>
 #include <cstdint>
 
-//GPU path for the SALTED descriptor combination. equicomb is 73% of predict() on a
-//642-atom protein with the v7 model, and it was measured on 21 Aug to be bound by the
-//multiply count rather than by gathering, which is the property that makes a port pay.
-//
-//The device reproduces the CPU walk exactly: for each atom and each shell triple
-//(n1, n2, il) it contracts the Wigner-weighted v1 block against the v2 block over the
-//surviving m pairs, applies the complex-to-real transform, accumulates the normalisation
-//sum over every feature, and writes only the sparsified ones.
-//
-//Returns false if no device is present or the problem will not fit, and the caller keeps
-//the CPU loop.
+//GPU SALTED equicomb, the CPU walk exactly: per atom and shell triple (n1, n2, il) the Wigner-weighted
+//v1 block is contracted with v2 over the surviving m pairs and made real; the normalisation sums
+//every feature, only the sparsified ones are written.
 
 struct salted_gpu_problem {
 	int natoms = 0;
@@ -61,7 +53,7 @@ NOSPHERA2_GPU_API_BEGIN
 bool salted_gpu_available();
 void salted_gpu_clear_cache();
 
-//Runs the whole lambda block. Returns false if the caller should fall back to the CPU.
+//Whole lambda block; false means fall back to the CPU.
 bool salted_gpu_equicomb(const salted_gpu_problem& prob, int* empty_environments);
 
 NOSPHERA2_GPU_API_END

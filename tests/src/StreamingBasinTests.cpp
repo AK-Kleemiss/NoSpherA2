@@ -14,9 +14,7 @@
 //Streaming attractors are maxima of the analytic field.
 namespace
 {
-	//Two spherical bumps a fixed distance apart: maxima at the centres, one saddle exactly
-	//between them, and nothing else anywhere. Everything the criterion has to separate, with
-	//the answers known in closed form
+	//Two Gaussian bumps: maxima at the centres, one saddle midway, no other critical point
 	scalar_field two_bumps(const d3 &c1, const d3 &c2, const double a)
 	{
 		return [c1, c2, a](const d3 &p, d3 &g) {
@@ -31,8 +29,7 @@ namespace
 
 	WFN load(const std::filesystem::path &p) { return WFN(p); }
 
-	//A coarse cube, only so the critical-point search has seeds to start from. The point of the
-	//streaming path is that this resolution no longer decides the answer
+	//Coarse cube that only seeds the critical-point search; its resolution does not decide the answer
 	cube seed_cube(const WFN &wavy, const double spacing, const double radius)
 	{
 		const std::vector<atom> atoms = wavy.get_atoms();
@@ -59,12 +56,9 @@ namespace
 	}
 }
 
-//The criterion itself, where the answers are known: a bump's centre is a maximum, the saddle
-//between two bumps is not, and a point on a flank belongs to the bump it is on
 TEST(StreamingBasins, MaximumCriterionSeparatesMaximaFromSaddles)
 {
-	//Six bohr apart, so each bump pulls the other's maximum off its centre by ~1e-7 and the
-	//centres are the maxima to the precision asked for below
+	//At 6 bohr each bump shifts the other's maximum by ~1e-7
 	const d3 c1{ 0.0, 0.0, 0.0 }, c2{ 6.0, 0.0, 0.0 };
 	const scalar_field f = two_bumps(c1, c2, 0.5);
 
@@ -72,8 +66,7 @@ TEST(StreamingBasins, MaximumCriterionSeparatesMaximaFromSaddles)
 	ASSERT_TRUE(converge_to_maximum(f, p)) << "a point beside a bump has to find its top";
 	for (int k = 0; k < 3; k++) EXPECT_NEAR(p[k], c1[k], 1e-3);
 
-	//The saddle at the midpoint satisfies grad = 0, which is exactly what a gradient-only test
-	//would accept; the Hessian has one positive eigenvalue along the axis and rejects it
+	//grad = 0 at the saddle; only the Hessian's positive axial eigenvalue rejects it
 	d3 saddle{ 3.0, 0.0, 0.0 };
 	EXPECT_FALSE(converge_to_maximum(f, saddle)) << "a saddle is not an attractor";
 
@@ -83,9 +76,6 @@ TEST(StreamingBasins, MaximumCriterionSeparatesMaximaFromSaddles)
 	for (int k = 0; k < 3; k++) EXPECT_NEAR(flank[k], c2[k], 1e-3);
 }
 
-//Every nucleus is an attractor of the density and nothing else in OH- is. The old path at 0.1 A
-//also found only these two; the difference is that this one cannot find more however the cube
-//is chosen, because there is no cube in the answer
 TEST(StreamingBasins, HydroxideHasExactlyTwoAttractors)
 {
 	const std::filesystem::path wfn = nos_test_repo_root() / "tests" / "cytidine_tonto" / "OH.wfn";
@@ -114,15 +104,13 @@ TEST(StreamingBasins, CriticalPointEnergyDensitiesObeyTheLocalVirialTheorem)
 	const std::vector<critical_point> cps = analyze_cube_critical_points(&rho, wavy, false, std::max(1e-8, rho.max_value() * 1e-6));
 	int checked = 0;
 	for (const critical_point &cp : cps) {
-		//The energy densities need ELF in (0,1) to be defined at all; where it is not, they are
-		//left NaN on purpose and there is nothing to check
+		//Energy densities need ELF in (0,1) and are NaN by design elsewhere
 		if (!std::isfinite(cp.virial_field)) continue;
 		const double scale = std::max(1.0, std::abs(cp.kinetic_hamiltonian) + std::abs(cp.kinetic_lagrangian));
 		EXPECT_NEAR(cp.lagrangian_density, -0.25 * cp.laplacian, 1e-10 * std::max(1.0, std::abs(cp.laplacian)));
 		EXPECT_NEAR(cp.kinetic_hamiltonian - cp.kinetic_lagrangian, cp.lagrangian_density, 1e-10 * scale);
 		EXPECT_NEAR(cp.virial_field, -(cp.kinetic_hamiltonian + cp.kinetic_lagrangian), 1e-10 * scale);
-		//The potential energy density is negative everywhere. This alone fails on the old code
-		//at any bond critical point, where the Laplacian is negative and L is therefore positive
+		//V < 0 everywhere, including at bond critical points where L > 0
 		EXPECT_LT(cp.virial_field, 0.0) << "the virial field came out positive at a " << cp.type;
 		EXPECT_GE(cp.kinetic_lagrangian, 0.0) << "G is positive definite";
 		checked++;
@@ -151,9 +139,7 @@ TEST(StreamingBasins, EpoxideGridDebrisIsNotAnAttractor)
 			<< "an attractor was kept at the debris position";
 }
 
-//End to end, with no cube in the integration at all: the populations of a real wavefunction have
-//to add up to its electrons. Ten electrons in OH-, and a quadrature that loses them makes every
-//charge and every delocalization index below it meaningless
+//No cube enters the integration; OH- has 10 electrons
 TEST(StreamingBasins, HydroxideStreamsToTheRightElectronCount)
 {
 	const std::filesystem::path wfn = nos_test_repo_root() / "tests" / "cytidine_tonto" / "OH.wfn";
@@ -174,13 +160,11 @@ TEST(StreamingBasins, HydroxideStreamsToTheRightElectronCount)
 	EXPECT_NEAR(total, 10.0, 0.05) << "the streaming quadrature lost electrons";
 	EXPECT_GT(outside, 0.0) << "the density isosurface left no outside region";
 	EXPECT_LT(outside, 0.02) << "too much density lies outside the isosurface";
-	//The hydrogen of a hydroxide keeps well under an electron and the oxygen carries the rest;
-	//a boundary put in the wrong place shows up here long before the total does
+	//A misplaced basin boundary shows in the H/O split long before the total
 	EXPECT_NEAR(pop[0], 0.61, 0.05);
 	EXPECT_NEAR(pop[1], 9.37, 0.05);
 
-	//sum_A S^A = I is not something the code chooses: it follows from the basins tiling space,
-	//so it measures the integration and nothing else
+	//sum_A S^A = I follows from the basins tiling space, so it tests only the integration
 	const delocalization_result r = delocalization_indices(wavy, ovl);
 	EXPECT_LT(r.identity_error, 0.02) << "the basins do not add up to the whole of space";
 	for (size_t b = 0; b < r.lambda.size(); b++) {
@@ -217,7 +201,7 @@ TEST(StreamingBasins, BasinPartitionConservesTheQuadratureWeight)
 	maxima.push_back(d4{ 0.5 * (a[0] + b[0]), 0.5 * (a[1] + b[1]), 0.5 * (a[2] + b[2]), 1.0 });
 	const double three = total_of(maxima);
 
-	//Relative, because the absolute size of the total is the rule's business and not this test's
+	//Relative: the size of the total is not under test
 	EXPECT_NEAR(three, two, 1e-9 * std::max(1.0, std::abs(two)))
 		<< "adding a basin changed the integrated total by " << three - two << " electrons, so a cell's weight is not being conserved across the split";
 }
@@ -238,8 +222,7 @@ TEST(StreamingBasins, MaximaOnTheCropSurfaceAreNotBasins)
 				f.set_value(x, y, z, r >= R ? 0.0 : 1.0 + r / R + 9.0 * std::exp(-4.0 * r * r));
 			}
 
-	//The trap, counted on the fixture: voxels the crop leaves valid whose valid neighbours are all
-	//lower. Every one of these was reported as a basin before the rim rule
+	//Count valid voxels on the crop whose valid neighbours are all lower: each is a spurious basin without the rim rule
 	const int d6[6][3] = { {1,0,0},{-1,0,0},{0,1,0},{0,-1,0},{0,0,1},{0,0,-1} };
 	int rim_maxima = 0;
 	for (int x = 1; x + 1 < n; x++)

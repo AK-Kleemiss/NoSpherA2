@@ -2,25 +2,12 @@
 
 #include "core/nbo.h"
 
-//The NBO search, on densities small enough that the accepted orbital set is known by hand.  The
-//search is where the run spends its time, so it is also where it is optimised - corner arithmetic
-//in place of n x n bookkeeping, and the Gauss-Seidel sweep run one dependency level at a time.  Both
-//of those are equivalences, not approximations, and an equivalence needs a check that fails when it
-//stops holding: the sweep has to find the orbitals that are actually in the density, and the number
-//of threads must not move a single bit of what it reports.
-//
-//The corpus comparison against the 22 stored NBO 7 references lives in tests/nbo_reference and is
-//run by compare_nbo.py; this file is the part that fails when the algebra breaks.
+//NBO search on densities whose accepted orbital set is known by hand; corner arithmetic and the
+//level-scheduled Gauss-Seidel sweep are equivalences, so results must be exact and thread-independent.
 
 namespace {
 
-    //err_checkf ends the process with exit(-1).  POSIX reports that as wait status 255, Windows
-    //hands gtest the raw -1, so pinning one number passes on one platform and fails on the other -
-    //which is exactly what CI's Windows Release and Windows GPU Release jobs were failing on while
-    //Linux and macOS were green.  Accept either code, but still only a CLEAN exit: this test exists
-    //to show the search refuses instead of crashing, so an access violation or a signal must not
-    //satisfy it.  ExitedWithCode does that platform check for us, so delegate to it twice rather
-    //than reimplementing WIFEXITED here.
+    //exit(-1) is status 255 on POSIX and -1 on Windows; accept either, but only a clean exit, not a signal.
     struct ExitedWithErrCheckfCode
     {
         bool operator()(int status) const
@@ -29,9 +16,7 @@ namespace {
         }
     };
 
-    //Several s NAOs per atom, so an atom block is wider than the orbital taken out of it and a pair
-    //block is wider still - with one NAO per atom every block is 1 or 2 wide and any way of
-    //computing its leading eigenpair looks correct.
+    //Several s NAOs per atom: with one, every block is 1 or 2 wide and any eigensolve looks correct.
     NAOResult h_chain_shells(const int na, const int per_atom)
     {
         NAOResult nao;
@@ -81,13 +66,9 @@ namespace {
         return g;
     }
 
-    //Two three-atom fragments, two s NAOs per atom, and four bonds: 0-1 and 1-2 on the first
-    //fragment, 3-4 and 4-5 on the second.  The two bonds of a fragment share their middle atom, so
-    //the sweep has to keep their order; bonds on different fragments share nothing, so it may run
-    //them together.  That is exactly the dependency structure the level scheduling exploits, and
-    //here it is two levels of two.  Every vector is half on each of its centres, which keeps it a
-    //bond rather than a polarised near-lone-pair, and the two vectors of a fragment are orthogonal
-    //through the sign on the shared atom's second shell.
+    //Bonds 0-1, 1-2 and 3-4, 4-5: within a fragment they share an atom, across fragments nothing,
+    //giving two dependency levels of two. Each bond is half on each centre; a fragment's two vectors
+    //are orthogonal through the sign on the shared atom's second shell.
     std::vector<vec> two_fragment_bonds()
     {
         const int n = 12;
@@ -112,11 +93,8 @@ namespace {
 
 }  //namespace
 
-//The density is four doubly occupied two-centre orbitals, so the search has to come back with those
-//four and nothing outside them.  This is the check on the corner arithmetic: the rank-one updates,
-//the difference the eigensolve sees and the eigensolve itself all happen on the 4 x 4 corner of a
-//12 x 12 matrix, and getting the index bookkeeping of that corner wrong shows up here as a wrong
-//occupancy rather than as a crash.
+//Checks the corner arithmetic: updates and eigensolve run on the 4 x 4 corner of a 12 x 12 matrix,
+//so wrong index bookkeeping shows as a wrong occupancy.
 TEST(NboSearchTests, SweepRecoversTheBondsThatAreInTheDensity)
 {
     const NboLewis L = search_at(1);
@@ -125,7 +103,6 @@ TEST(NboSearchTests, SweepRecoversTheBondsThatAreInTheDensity)
         EXPECT_EQ(L.orbitals[j].type, "BD");
         EXPECT_EQ(L.orbitals[j].centers.size(), 2u);
         EXPECT_NEAR(L.orbitals[j].occupancy, 2.0, 1e-9);
-        //half on each centre, which is what makes it a bond
         EXPECT_NEAR(L.orbitals[j].center_weight[0], 0.5, 1e-9);
         EXPECT_NEAR(L.orbitals[j].center_weight[1], 0.5, 1e-9);
     }
@@ -136,12 +113,7 @@ TEST(NboSearchTests, SweepRecoversTheBondsThatAreInTheDensity)
     EXPECT_EQ(L.topo[4][5], 1);
 }
 
-//The sweep is Gauss-Seidel: orbital j reads the density with every other accepted orbital already
-//removed, including the ones updated earlier in the same sweep.  It is threaded by level, so
-//orbitals that share a centre still run in order and only independent ones run together.  If that
-//is right the thread count cannot change anything, down to the last bit - not "to 1e-12", bitwise,
-//which is why this compares with EXPECT_EQ on doubles.  A number that moves here is a number the
-//published tables lose.
+//Gauss-Seidel threaded by dependency level is order-preserving, so results must be bitwise equal (EXPECT_EQ on doubles).
 TEST(NboSearchTests, ThreadCountCannotMoveASingleBit)
 {
     const NboLewis a = search_at(1);
@@ -165,11 +137,7 @@ TEST(NboSearchTests, ThreadCountCannotMoveASingleBit)
     EXPECT_EQ(a.topo, b.topo);
 }
 
-//A density with nothing in it: 0.3 electrons spread over a pair, below the bottom rung of the
-//threshold ladder, so not one orbital is accepted.  tests/molden_file/F2.molden and epoxide.molden
-//arrive at the search exactly like this - their FILE47 comes out with a fraction of the electrons
-//the molecule has - and they used to segfault inside a 0 x 0 eigensolve in the OWSO.  There is no
-//Lewis structure in such an input, so the search has to say which input it was rather than crash.
+//0.3 electrons on a pair is below the lowest threshold, so no orbital is accepted and the OWSO would face a 0 x 0 eigensolve.
 TEST(NboSearchTests, ADensityWithNoLewisStructureSaysSoInsteadOfCrashing)
 {
     EXPECT_EXIT(

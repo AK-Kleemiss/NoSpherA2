@@ -4,6 +4,7 @@
 *.qtaim_log
 *.eli_log
 *.nbo_log
+*.eqc_log
 *.tscb
 !tests/epoxide_gbw/fixture.tscb
 *.densities
@@ -110,12 +111,12 @@ tests/RGBI/*.densitiesinfo
 tests/RGBI/*.property.txt
 tests/RGBI/*.tonto
 
-# NBO conversion outputs. The fixtures are reference.47 and reference.nbo;
-# these are what Nbo47Tests regenerates into a temp dir on every run.
+# NBO conversion outputs Nbo47Tests regenerates into a temp dir on every run.
 tests/epoxide_gbw/NBO/epoxide.47
-tests/epoxide_gbw/NBO/epoxide.nbo
 tests/RGBI_groups/nh3li.47
-tests/RGBI_groups/nh3li.nbo
+# gennbo and ORCA output is external program output and is not published.
+*.nbo
+tests/nbo_reference*/**/*.out
 
 # NCI outputs written beside the inputs by Src/core/properties.cpp.
 tests/intermolecular_nci/unit_surrounding_values.dat

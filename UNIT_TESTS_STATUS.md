@@ -810,6 +810,7 @@ Added: 2026-06-14.
 | alanine_occ | alanine_occ | alanine_occ.good | no | ✅ passing |
 | alanine_integrated_occ | alanine_integrated_occ | alanine_integrated_occ.good | no | ✅ passing (regenerated 2026-07-03, see note below) |
 | disorder_THPP | disorder | disorder_THPP.good | no | ✅ passing |
+| eqc_ethane | eqc_ethane | eqc_ethane.good | no | ✅ passing (added 2026-10-05) |
 | fractal | sucrose_fchk_SF | fractal.good | no | ✅ passing |
 | grown_water | grown | grown_water.good | no | ✅ passing |
 | Hybrid_mode | Hybrid | Hybrid_mode.good | no | ✅ passing |

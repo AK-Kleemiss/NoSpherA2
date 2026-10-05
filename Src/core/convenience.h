@@ -34,9 +34,7 @@ typedef std::vector<std::vector<cvec2>> cvec4;
 typedef std::vector<bool> bvec;
 typedef std::vector<bvec> bvec2;
 typedef std::vector<bvec2> bvec3;
-//A std::vector<std::string> whose operator[] fails with the index instead of reading past the
-//end: the file readers split a line into fields and index them, so a short or blank line in a
-//truncated file used to be undefined behaviour instead of an error
+//operator[] fails naming the index instead of reading past the end, so a short line in a truncated file is an error, not UB
 struct svec : std::vector<std::string>
 {
 	using std::vector<std::string>::vector;
@@ -334,30 +332,12 @@ bool unsaved_files(std::vector<WFN>& wavy);
 std::string trim(const std::string& s);
 
 /**
- * @brief Physical memory this process can actually get, in bytes, or 0 when it cannot be told.
- *
- * Not what the machine has: a scheduler or container ceiling counts, and on a cluster it is
- * usually well below the node's total. Windows reads the available physical memory and any
- * job object limit, macOS counts free, inactive and purgeable pages, Linux takes
- * MemAvailable against the cgroup v2 or v1 limit. Zero means no answer was available and
- * the caller should keep whatever it would have done without asking.
+ * @brief Physical memory this process can get in bytes, capped by a scheduler or container limit
+ * (job object, cgroup); 0 when unknown, and the caller keeps its default.
  */
 size_t available_memory_bytes();
 
-/**
- * @brief std::getline that also accepts CRLF line endings.
- *
- * Files here move between Windows and the Linux servers constantly, and a text
- * file written on Windows ends every line with \r\n. std::getline splits on \n
- * and leaves the \r on the string, where it survives every comparison, every
- * substr() at a fixed column and every conversion of the last field on the line.
- * That is not a theoretical problem: it silently cost the XCW CIF reader its
- * whole atom loop. Every reader in NoSpherA2 uses this instead.
- *
- * @param is Stream to read from.
- * @param line Receives the line without its terminator, \r included.
- * @return The stream, so it can be tested as a condition like std::getline.
- */
+/** std::getline that drops a CRLF file's trailing \r, which would otherwise spoil comparisons and the last field; every reader uses it. */
 inline std::istream& getline_universal(std::istream& is, std::string& line)
 {
 	std::getline(is, line);
@@ -389,15 +369,8 @@ void append_numbers(const std::string& line, std::vector<T>& out, const std::str
 	err_checkf(is.eof(), "Not a number in " + what + ": '" + line + "'", log);
 }
 
-/** @brief Restores a stream's sticky format state - flags, precision, width - when it goes out of
- *  scope, on every path including an unwinding exception.
- *
- *  std::fixed and std::setprecision stay set on the stream after the statement that wrote them, and
- *  the analyses here print tables at three or four decimals. Everything printed afterwards through
- *  the same stream then carries that precision: the second of two RGBI analyses in one process
- *  printed a population as 1.295 where the first printed 1.29453, the same number in fewer digits.
- *  An analysis that prints has no business changing how the rest of the program prints, so every
- *  entry point that formats its output holds one of these. */
+//Restores a stream's flags, precision and width on scope exit, including unwinding. std::fixed and
+//setprecision are sticky, so every analysis entry point that formats output holds one of these.
 struct ostream_format_guard
 {
 	std::ostream& stream;
@@ -501,7 +474,7 @@ public:
 	// How often callers asked, and how often that actually needed the lock.
 	unsigned long long update_calls() const { return update_calls_.load(); }
 	unsigned long long bar_writes() const { return bar_writes_.load(); }
-	static bool report_counts;   // set from the -debug flag
+	static bool report_counts;
 
 	void write_progress();
 
@@ -519,8 +492,7 @@ private:
 	std::atomic<unsigned long long> bar_writes_{0};
 	float progress_;
 	std::streampos linestart;
-	//where the bar's own last write ended; a put position anywhere else means the loop printed something
-	//that must not be overwritten. See write_progress().
+	//end of the bar's last write; a put position elsewhere means the loop printed in between
 	std::streampos barend_{};
 	bool finished_ = false;
 #ifdef _WIN32
@@ -531,9 +503,8 @@ private:
 #endif
 };
 
-//even_steps rounds the point count up to even, which puts the centre of the box ON a grid plane. Pass false
-//only from a caller that sets its step to the requested resolution instead of to (Max-Min)/NbSteps: there an
-//extra point enlarges the box and does not move the centre. See the comment at the definition.
+//even_steps rounds the point count up to even so the box centre lies on a grid plane. Pass false only when
+//the step is the resolution, not (Max-Min)/NbSteps: there an extra point only enlarges the box.
 void readxyzMinMax_fromWFN(
 	const WFN& wavy,
 	properties_options& opts,
@@ -931,18 +902,16 @@ struct options
 	double xcw_strong_cutoff = 3.0;
 	bool calc_F_calc = false;
 	bool rgbi = false;
-	//-npa: natural atomic orbitals and natural population analysis (NAO/NPA), run in-process
+	//-npa: NAO/NPA, run in-process
 	bool npa = false;
-	//the per-NAO "Natural atomic orbital occupancies" table beside the NPA; -npa_summary turns it off
+	//per-NAO occupancy table beside the NPA; -npa_summary turns it off
 	bool npa_orbitals = true;
 	bool rgbi_no_sym = false;
 	bool rgbi_EVs = false;
 	bool rgbi_theta = false;
-	//-rgbi_legacy_cutoff: pick the atomic subspace by thresholding the occupation numbers (1/6 for
-	//NAOs, 1/14 for ANOs) as releases before this one did, instead of by the element's free-atom
-	//orbital count. The threshold makes the rank of the atomic projector, and therefore every bond
-	//index, jump when an occupation crosses it - LiH moves from 0.06 to 0.95 over 0.025 A - so this
-	//is only for reproducing older numbers.
+	//-rgbi_legacy_cutoff: atomic subspace by occupation threshold (1/6 NAO, 1/14 ANO) instead of the
+	//free-atom orbital count; the projector rank, and so every bond index, jumps when an occupation
+	//crosses it. Only for reproducing older numbers.
 	bool rgbi_legacy_cutoff = false;
 	RGBIOrbitalBasis rgbi_orbital_basis = RGBIOrbitalBasis::ANO;
 	ivec3 rgbi_group_sets;
@@ -1022,7 +991,7 @@ struct options
 	bool eqc_cold = false;          //also converge everything from occ's own guess, to count what seeding saves
 	//Basin analysis (-eli_analysis), run from run_app_impl for the same reason
 	bool eli_analysis_run = false;
-	//Full bonding analysis (-fba): RGBI, native NBO/NPA with NRT, bondwise Laplacian, QTAIM and ELI-D on one wavefunction
+	//-fba: RGBI, native NBO/NPA with NRT, bondwise Laplacian, QTAIM and ELI-D on one wavefunction
 	bool fba = false;
 	bool profiling = false;
 	bool promol_nci = false;
@@ -1031,12 +1000,9 @@ struct options
 	//-basin_grid <n>: the quadrature of the basin analysis pulled into the core, tightest
 	//exponent sharpened n^2-fold, radial step divided by n, Lebedev order up n - 1 entries
 	int basin_grid = 1;
-	//-basin_cube: go back to finding the QTAIM and ELI-D basins on the cube. The default takes
-	//the density's attractors from the analytic critical-point search instead, which no voxel can
-	//add to, and sends every quadrature point up the analytic field for its basin
+	//-basin_cube: QTAIM and ELI-D basins on the cube instead of from the analytic critical points and field
 	bool basin_cube = false;
-	//-no_spin_eli: leave out the ELI-D alpha-alpha / beta-beta / triplet basins that -fba and
-	//-eli_analysis add after the spin-summed ELI-D for a spin-polarised wavefunction
+	//-no_spin_eli: skip the spin-resolved ELI-D basins of a spin-polarised wavefunction
 	bool spin_eli = true;
 	int threads = -1;
 	int pbc = 0;
@@ -1074,15 +1040,11 @@ struct options
 	//development and test-only switches
 	bool digest_dev_options(const std::string &temp, int &i);
 	void digest_options();
-	/** @brief The error for an analysis that was asked for and has nothing to run on, "" when the
-	 *  command line is runnable. Everything it reports only runs inside run_app_impl's
-	 *  wavefunction branch, so without -wfn/-occ it is skipped in silence - which is how
-	 *  `-rgbi water.gbw` (RGBI has no positional form) came to exit 0 having done nothing. */
+	/** @brief The error for a requested analysis with no wavefunction to run on, "" when runnable;
+	 *  without -wfn/-occ run_app_impl skips its wavefunction branch silently. */
 	std::string unrunnable_analysis() const;
-	/** @brief Refuses a command line whose bonding options nothing will read: -rgbi/-npa together
-	 *  with an analysis that ends the run before them, and an -nbo_/-nrt_ option on a line that
-	 *  runs no NBO analysis. Both used to exit 0 having quietly done something else. Called at the
-	 *  end of digest_options(), so option order does not matter. */
+	/** @brief Refuses -rgbi/-npa with an analysis that ends the run before them, and an -nbo_/-nrt_
+	 *  option on a line with no NBO analysis. Called last in digest_options(), so order does not matter. */
 	void refuse_unread_bonding_options();
 
 	options() : log_file(std::cout)
@@ -1096,17 +1058,12 @@ struct options
 	};
 };
 
-/** @brief The analysis whose options begin with this flag's prefix, nullptr for a flag that names
- *  none. digest_options refuses an unclaimed flag inside one of those families instead of dropping
- *  it, so a misspelling cannot hand back the analysis' default. */
+/** @brief The analysis whose options begin with this flag's prefix, nullptr if none;
+ *  digest_options refuses an unclaimed flag in such a family. */
 const char *owning_analysis(const std::string &flag);
 
-/** @brief The -nbo_ and -nrt_ options the -nbo/-nbo_parse/-nbo_native/-convert_to_47 handlers read
- *  from the tokens after their own wavefunction rather than through a digester. This is the only
- *  list of flags the parser keeps: every other option is known by the digester that claims it, and
- *  a flag a digester claims never reaches the unknown-option refusal. Adding an option to a
- *  digester is therefore enough; adding one to a handler's own scan loop needs an entry here, which
- *  is what CliRefusalTests' AnalysisFlagsAreEitherDigestedOrListed asserts. */
+/** @brief The -nbo_/-nrt_ options the NBO handlers read from their own tokens, not through a digester.
+ *  An option added to a handler's scan loop needs an entry here (CliRefusalTests asserts it). */
 const std::set<std::string> &nbo_family_suboptions();
 
 void convert_tonto_XCW_lambda_steps(const std::string& str, const std::string& lambda_step, bool debug, options& opt);
