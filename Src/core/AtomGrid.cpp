@@ -313,6 +313,14 @@ vec make_chi(const WFN& wfn, int samples, bool refine, bool debug, const Density
 					auto extrema = find_line_density_extrema(wfn, a, b, rho, samples, refine);
 					size_t use_extr = 0;
 					if (wfn.get_atom_ECP_electrons(a) != 0 || wfn.get_atom_ECP_electrons(b) != 0) {
+						//No sign change in the sampled line (minimum inside the last interval of a polar bond):
+						//extrema[use_extr] below read an empty vector and crashed without a message
+						if (extrema.empty()) {
+							std::cout << "WARNING: No density extremum found between atoms " << a << " and " << b << ". Setting chi to 1.0.\n";
+							chi[a * ncen + b] = 1.0;
+							chi[b * ncen + a] = 1.0;
+							continue;
+						}
 						double closeness = 1.0;
 						for (int i = 0; i < extrema.size(); i++) {
 							if (abs(extrema[i].t - 0.5) < closeness && extrema[i].type == DensityExtremum::Type::Minimum) {
