@@ -1,4 +1,5 @@
 #include "pch.h"
+#include "tuning.h"
 #include "nao.h"
 #include "wfn_class.h"
 #include "integration_params.h"
@@ -47,10 +48,10 @@ namespace
 		return es.eigenvectors() * f.asDiagonal() * es.eigenvectors().transpose();
 	}
 
-	//Diagnostic switches from the environment, off by default; deliberately not command-line options.
-	bool nao_env(const char *name)
+	//Diagnostic switches, -tune NAME; off by default and for "0".
+	bool nao_knob(const char *name)
 	{
-		const char *v = std::getenv(name);
+		const char *v = tuning(name);
 		return v && *v && *v != '0';
 	}
 
@@ -154,6 +155,31 @@ void natural_minimal_shells(const int Z, int (&n_shell)[4], int (&n_core)[4])
 	if (b == 3) n_core[3] = std::max(0, n_core[3] - 1);
 }
 
+//Shells per l an ECP removes: complete shells in (n, then l) order until its electrons are used up,
+//passing over one they cannot fill (4f under a 54-electron [Xe] core), as ecp_core_orbital_count in
+//bondwise_analysis.cpp. A lanthanide ECP between 46 and 60 electrons is 4f-in-core: [Kr]4d10 and 4f.
+static constexpr int ecp_removed_shells(const int Z, const int ecp_electrons, const int l)
+{
+	if (Z >= 57 && Z <= 71 && ecp_electrons > 46 && ecp_electrons < 60)
+		return l == 3 ? 1 : ecp_removed_shells(Z, 46, l);
+	int electrons = ecp_electrons, removed = 0;
+	for (int n = 1; n <= 7 && electrons > 0; n++)
+		for (int k = 0; k < n && electrons > 0; k++) {
+			if (electrons < 2 * (2 * k + 1)) continue;
+			electrons -= 2 * (2 * k + 1);
+			if (k == l) removed++;
+		}
+	return removed;
+}
+static_assert(ecp_removed_shells(53, 28, 0) == 3 && ecp_removed_shells(53, 28, 1) == 2 && ecp_removed_shells(53, 28, 2) == 1,
+	"a 28-electron ECP covers 1s..3d");
+static_assert(ecp_removed_shells(79, 60, 0) == 4 && ecp_removed_shells(79, 60, 2) == 2 && ecp_removed_shells(79, 60, 3) == 1,
+	"a 60-electron ECP covers 1s..4f");
+static_assert(ecp_removed_shells(55, 54, 0) == 5 && ecp_removed_shells(55, 54, 1) == 4 && ecp_removed_shells(55, 54, 3) == 0,
+	"a 54-electron ECP on Cs is [Xe]: 1s..5p without 4f");
+static_assert(ecp_removed_shells(65, 54, 0) == 4 && ecp_removed_shells(65, 54, 1) == 3 && ecp_removed_shells(65, 54, 3) == 1,
+	"a 54-electron ECP on Tb is 4f-in-core: [Kr]4d10 and 4f, 5s and 5p kept");
+
 std::vector<NAOBasisFunction> spherical_ao_map(const WFN &wavy)
 {
 	err_checkf(!wavy.get_d_f_switch(),
@@ -206,7 +232,7 @@ NAOResult build_naos(const dMatrix2 &P_in, const dMatrix2 &S_in, const std::vect
 
 	//1. pre-NAOs: within each (atom, l), solve the m-averaged (S P S)c = w S c.
 	//NAO_PRENAO_NET selects the net-density diagnostic.
-	const bool prenao_net = nao_env("NAO_PRENAO_NET");
+	const bool prenao_net = nao_knob("NAO_PRENAO_NET");
 	MatrixXd C = MatrixXd::Zero(nao, nao);
 	VectorXd pre_occ = VectorXd::Zero(nao);
 	std::vector<NAO> orbitals(static_cast<size_t>(nao));
@@ -269,8 +295,11 @@ NAOResult build_naos(const dMatrix2 &P_in, const dMatrix2 &S_in, const std::vect
 		natural_minimal_shells(Z, shells, cores);
 		int n_nmb = (g.l < 4) ? shells[g.l] : 0;
 		int n_core = (g.l < 4) ? cores[g.l] : 0;
-		//an ECP removes the lowest shells of an l from the basis, so cap on what is there and
-		//take the missing ones off the core count
+		//an ECP removes the lowest shells of an l from the basis: the first pre-NAO of this l is the
+		//first shell above the ECP core
+		const int removed = (g.l < 4) ? ecp_removed_shells(Z, ecp_electrons.at(static_cast<size_t>(g.atom)), g.l) : 0;
+		n_nmb = std::max(0, n_nmb - removed);
+		n_core = std::max(0, n_core - removed);
 		if (n_nmb > g.nshell) {
 			n_core = std::max(0, n_core - (n_nmb - g.nshell));
 			n_nmb = g.nshell;
@@ -288,21 +317,16 @@ NAOResult build_naos(const dMatrix2 &P_in, const dMatrix2 &S_in, const std::vect
 				(sh < n_nmb) ?  NAOClass::Valence :
 								NAOClass::Rydberg;
 
-			if (ecp_electrons.at(static_cast<size_t>(g.atom)) > 0 && g.l < 4) {
-				int full_shells[4] = { 0, 0, 0, 0 }, full_cores[4] = { 0, 0, 0, 0 };
-				natural_minimal_shells(Z, full_shells, full_cores);
-				const int missing = std::max(0, full_shells[g.l] - g.nshell);
-				orbital.n += missing;
-			}
+			orbital.n += removed;
 		}
 	}
 
 	//Dump the AO -> pre-NAO transform for comparison with NBO 7 unit 32.
-	if (nao_env("NAO_DUMP_CPRE")) dump_c_matrix("NAOCPRE", C, orbitals, pre_occ);
+	if (nao_knob("NAO_DUMP_CPRE")) dump_c_matrix("NAOCPRE", C, orbitals, pre_occ);
 
 	//3. Schmidt-project core, valence, then Rydberg, and OWSO within each class.
 	//NAO_LEGACY_CASCADE omits the Rydberg re-naturalisation (step 5) for comparison.
-	const bool legacy_cascade = nao_env("NAO_LEGACY_CASCADE");
+	const bool legacy_cascade = nao_knob("NAO_LEGACY_CASCADE");
 	ivec cols_by_class[3];
 	for (int i = 0; i < nao; i++)
 		cols_by_class[static_cast<int>(orbitals[i].type)].push_back(i);
@@ -373,7 +397,7 @@ NAOResult build_naos(const dMatrix2 &P_in, const dMatrix2 &S_in, const std::vect
 				}
 			}
 		}
-		if (!nao_env("NAO_OWSO_OFF"))
+		if (!nao_knob("NAO_OWSO_OFF"))
 			B = B * owso(MatrixXd(B.transpose() * S * B), w);
 		//the weighted inverse square root leaves near-zero-weight directions orthonormal only to ~1e-5; one
 		//unweighted Loewdin on I + O(1e-5) cleans that up without moving the occupied orbitals
@@ -399,7 +423,7 @@ NAOResult build_naos(const dMatrix2 &P_in, const dMatrix2 &S_in, const std::vect
 	//Intra-atomic rotations preserve atomic charges but can change Val/Ryd populations.
 	const MatrixXd Porb = C.transpose() * SPS * C;
 	//NAO_DUMP_STEP3: the occupancies step 4 inherits
-	if (nao_env("NAO_DUMP_STEP3")) {
+	if (nao_knob("NAO_DUMP_STEP3")) {
 		std::cout << "STEP3 atom l shell class occ_per_component pre_occ_per_component" << std::endl;
 		for (const auto &kv : l_blocks) {
 			const int nm = 2 * kv.first.second + 1;
@@ -418,8 +442,8 @@ NAOResult build_naos(const dMatrix2 &P_in, const dMatrix2 &S_in, const std::vect
 		}
 	}
 	//Core remains separate; valence and Rydberg share a block unless NAO_CLASS_SPLIT is set.
-	const bool class_split = nao_env("NAO_CLASS_SPLIT");
-	const bool core_pooled = nao_env("NAO_CORE_POOLED");
+	const bool class_split = nao_knob("NAO_CLASS_SPLIT");
+	const bool core_pooled = nao_knob("NAO_CORE_POOLED");
 	std::vector<ivec> blocks;
 	for (auto &kv : l_blocks) {
 		const int nm_of_block = 2 * kv.first.second + 1;
@@ -464,7 +488,7 @@ NAOResult build_naos(const dMatrix2 &P_in, const dMatrix2 &S_in, const std::vect
 	for (int i = 0; i < nao; i++) orbitals[i].occupation = Pfin(i, i);
 
 	//Dump the AO -> NAO transform for comparison with NBO 7 unit 33.
-	if (nao_env("NAO_DUMP_C")) dump_c_matrix("NAOC", C, orbitals, Pfin.diagonal());
+	if (nao_knob("NAO_DUMP_C")) dump_c_matrix("NAOC", C, orbitals, Pfin.diagonal());
 	NAOResult res;
     
 	res.C = to_dmatrix(C);

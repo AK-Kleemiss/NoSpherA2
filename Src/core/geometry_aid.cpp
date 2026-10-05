@@ -1,4 +1,5 @@
 #include "pch.h"
+#include "tuning.h"
 #include "geometry_aid.h"
 #include "npy.h"
 
@@ -14,7 +15,7 @@ namespace
 	// SOAP_PHASE lines per stage when NOSPHERA2_TIME_SOAP is set
 	struct phase_timer
 	{
-		const bool on = std::getenv("NOSPHERA2_TIME_SOAP") != nullptr; // Flawfinder: ignore
+		const bool on = tuning("NOSPHERA2_TIME_SOAP") != nullptr;
 		std::chrono::steady_clock::time_point mark = std::chrono::steady_clock::now();
 		void reset() { mark = std::chrono::steady_clock::now(); }
 		void lap(const char* what)
@@ -74,17 +75,17 @@ namespace geometry_aid
 		if (metals) species.push_back("Zn");
 		double spline_accuracy = 1E-6;
 		int max_radial = 6, max_angular = 12;
-		if (const char* override_accuracy = std::getenv("NOSPHERA2_SPLINE_ACCURACY")) // Flawfinder: ignore
+		if (const char* override_accuracy = tuning("NOSPHERA2_SPLINE_ACCURACY"))
 		{
 			spline_accuracy = std::atof(override_accuracy);
 			std::cout << "  WARNING spline_accuracy overridden to " << spline_accuracy << " -- this descriptor does NOT match any trained model and must be used for timing only" << std::endl;
 		}
-		if (const char* override_radial = std::getenv("NOSPHERA2_MAX_RADIAL")) // Flawfinder: ignore
+		if (const char* override_radial = tuning("NOSPHERA2_MAX_RADIAL"))
 		{
 			max_radial = std::atoi(override_radial);
 			std::cout << "  WARNING max_radial overridden to " << max_radial << " -- timing only" << std::endl;
 		}
-		if (const char* override_angular = std::getenv("NOSPHERA2_MAX_ANGULAR")) // Flawfinder: ignore
+		if (const char* override_angular = tuning("NOSPHERA2_MAX_ANGULAR"))
 		{
 			max_angular = std::atoi(override_angular);
 			std::cout << "  WARNING max_angular overridden to " << max_angular << " -- timing only" << std::endl;

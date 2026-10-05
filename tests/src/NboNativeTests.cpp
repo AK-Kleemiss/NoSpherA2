@@ -65,9 +65,8 @@ TEST(NboNativeTests, TheNativePopulationsObeyTheirSumRules)
 		<< "the NAO table and the population table disagree about how many electrons there are";
 }
 
-//The orbital occupancies do not sum to the electron count: BD* = c_B h_A - c_A h_B is not orthogonal
-//to the OWSO-orthonormalised Lewis set, and RY is the complement Q = I - M (MtM)^-1 Mt against that
-//non-orthonormal M, so the residual belongs to the construction and is not asserted.
+//Lewis, antibonds and Rydbergs together are an orthonormal basis of the NAO space, so the occupancies
+//sum to Tr(gamma), the electron count.
 TEST(NboNativeTests, EveryAcceptedOrbitalNamesRealCentres)
 {
 	const auto p = ethane_fixture();
@@ -75,11 +74,15 @@ TEST(NboNativeTests, EveryAcceptedOrbitalNamesRealCentres)
 		GTEST_SKIP() << "tests/TFVC/ethane.gbw not found";
 
 	WFN wavy(p);
+	const double electrons = wavy.count_nr_electrons();
 	NboOptions options;
 	std::ostringstream log;
 	const NboResults r = native_nbo(wavy, options, log);
 
 	ASSERT_FALSE(r.orbitals.empty());
+	double occupancy_sum = 0.0;
+	for (const NboOrbital &o : r.orbitals) occupancy_sum += o.occupancy;
+	EXPECT_NEAR(occupancy_sum, electrons, 1.0e-6);
 	//<phi|gamma|phi> for normalised phi is bounded by gamma's largest eigenvalue, orthogonal or not
 	for (const NboOrbital &o : r.orbitals) {
 		EXPECT_GE(o.occupancy, -1.0e-8) << "orbital " << o.index << " " << o.type << " is negative";

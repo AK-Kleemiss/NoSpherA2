@@ -75,6 +75,9 @@ static int run_app_impl(int argc, char **argv)
 	{
 		for (int i = 0; i < argc; i++) {
 			string temp = argv[i];
+			//the same spelling rule as digest_options: -no-date is -no_date
+			if (temp.size() > 1 && temp[0] == '-' && isalpha(static_cast<unsigned char>(temp[1])))
+				replace(temp.begin() + 1, temp.end(), '-', '_');
 			if (temp == "-no_date" || temp == "-no_date_but_gpu")
 				no_date = true;
 			else if (temp == "-out") {
@@ -225,6 +228,9 @@ static int run_app_impl(int argc, char **argv)
 		citations::cite(citations::Method::E2, nbo_log);
 		citations::cite(citations::Method::NRT, nbo_log);
 		const filesystem::path json = opt.wfn.parent_path() / (opt.wfn.stem().string() + ".native.nbo.json");
+		//Refused here, not by write_nbo on the NBO thread, whose exit would tear down RGBI mid-run
+		WFN nbo_wfn = read_wfn();
+		refuse_unsupported_nbo_source(nbo_wfn, std::cout);
 		auto nbo_done = std::async(std::launch::async, [&nbo_log, &opt, &json](WFN w) {
 			const auto t0 = std::chrono::steady_clock::now();
 			NboOptions nbo;
@@ -249,7 +255,7 @@ static int run_app_impl(int argc, char **argv)
 			if (basin_timing_enabled())
 				nbo_log << "  [timing] fba NBO/NPA/NRT thread: " << std::fixed << std::setprecision(2)
 				        << std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count() << " s" << std::endl;
-		}, read_wfn());
+		}, std::move(nbo_wfn));
 		//-basin_timing: laps of the main thread, which runs alongside NBO/NRT
 		basin_stage_timer fba_timer;
 		const section_log::section rgbi_file(opt.wfn, "rgbi", "Roby-Gould Bond Indices (RGBI)", { citations::Method::RGBI }, opt.no_date),

@@ -119,7 +119,7 @@ with `-DNOSPHERA2_USE_CUDA=ON -DNOSPHERA2_USE_HIP=ON` and both `*_PORTABLE` opti
 compiled twice, once per backend, with `NOSPHERA2_GPU_BACKEND_NS` naming a namespace
 (`nosphera2_cuda` / `nosphera2_hip`, `Src/core/gpu_api.h`); `Src/core/gpu_dispatch.cpp` defines the
 global entry points of the six GPU headers by forwarding to the backend that has a device (CUDA probed
-first, `NOSPHERA2_GPU_BACKEND=cuda|hip` overrides). Host code sees `NOSPHERA2_USE_GPU` only; the
+first, `-tune NOSPHERA2_GPU_BACKEND=cuda|hip` overrides). Host code sees `NOSPHERA2_USE_GPU` only; the
 backend macros reach the device compilers alone. On the CMake HIP-language route a source has one
 LANGUAGE, so the HIP compiles of a fat build go through generated `hip/<name>.hip` wrappers that
 `#include` the `.cu`. Neither runtime is a load-time import: cudart stays static, and the HIP runtime
@@ -423,6 +423,8 @@ screening fix above. Not covered by a test case: the handler exits and the predi
 the 782 MB model.
 
 ### `-salted_charge_constraint`, and what it does to the predicted interaction energy
+
+(The option, `apply_charge_constraint` and the golden case were removed on 2026-09-28, 8d8efc48.)
 
 `apply_charge_constraint` (the global rescaling of the l=0 coefficients to the electron count,
 5 % refusal guard) ran only when a VERSION 3 model file carries a NORMC block with MODE 1.

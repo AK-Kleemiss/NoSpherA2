@@ -93,7 +93,7 @@ bvec2 bondable_pairs(const std::vector<atom>& atoms, double scale = 1.3);
  * shell, the spin's electron count open shell); scale: occupancy of a full orbital, 2 or 1.
  */
 NboLewis nbo_search(const NAOResult& nao, const dMatrix2& gamma, const bvec2& bondable, int n_pairs,
-					double scale, const NboOptions& options);
+					double scale, const NboOptions& options, std::ostream& log = std::cout);
 
 /** Second-order donor-acceptor energies.  Fills the orbital energies, the NBO-basis Fock diagonal, into lewis. */
 std::vector<NboE2Entry> nbo_e2(NboLewis& lewis, const dMatrix2& fock_nao, double threshold_kcal);
@@ -108,6 +108,10 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 				const std::vector<NboE2Entry>& e2, const bvec2& bondable,
 				const NboOptions& options, const std::string& spin, double scale,
 				std::ostream& log);
+
+//Exits on a wavefunction WFN::write_nbo() cannot turn into a FILE47: no contracted basis (.wfn/.wfx) or
+//Cartesian d/f shells. -fba calls it before its NBO thread starts, where the exit would tear down RGBI.
+void refuse_unsupported_nbo_source(const WFN& wavy, std::ostream& log);
 
 //wavy is not const: WFN::write_nbo() renormalises the stored basis.
 NboResults native_nbo(WFN& wavy, const NboOptions& options, std::ostream& log);

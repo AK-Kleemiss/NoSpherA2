@@ -1,4 +1,5 @@
 #include "grid_gpu.h"
+#include "tuning.h"
 #include "gpu_backend.h"
 #include <cstdio>
 #include <algorithm>
@@ -286,7 +287,7 @@ bool grid_gpu_becke_weights(const int np, const int nc, const int* pcen,
 	//Two doubles per centre per thread; wide molecules keep pa only for the near centres, so a protein fits
 	int block = (int)(GRID_SHARED_BYTES / (2 * sizeof(double) * (size_t)nc));
 	//Only molecules wider than a few hundred centres reach the local kernel; this lets it be tested
-	const char* force = std::getenv("NOSPHERA2_GRID_LOCAL");
+	const char* force = tuning("NOSPHERA2_GRID_LOCAL");
 	const bool local_mode = (block < GRID_MIN_BLOCK) || (force && force[0] == '1');
 	if (local_mode)
 		block = (int)(GRID_SHARED_BYTES / (2 * sizeof(double) * (size_t)GRID_MAX_NEAR));

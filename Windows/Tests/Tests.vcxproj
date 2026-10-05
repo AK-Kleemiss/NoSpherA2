@@ -124,7 +124,7 @@
   </ImportGroup>
   <ItemDefinitionGroup>
     <ClCompile>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);$(NosMainFolder)Src;$(NosMainFolder)build\release-windows\_deps\nlohmann_json-src\single_include;$(NosMainFolder)build\release-windows\_deps\libxc-build\src;$(NosMainFolder)build\debug-windows\_deps\libxc-build;$(NosMainFolder)build\debug-windows\_deps\libxc-src\src</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);$(NosMainFolder)Src</AdditionalIncludeDirectories>
       <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/bigobj %(AdditionalOptions)</AdditionalOptions>
       <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">/bigobj %(AdditionalOptions)</AdditionalOptions>
       <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/bigobj %(AdditionalOptions)</AdditionalOptions>

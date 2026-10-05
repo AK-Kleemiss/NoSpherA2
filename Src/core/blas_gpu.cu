@@ -1,4 +1,5 @@
 #include "blas_gpu.h"
+#include "tuning.h"
 #include "gpu_backend.h"
 #include "gemm_gpu.cuh"
 #include "sf_gpu.h"
@@ -18,7 +19,7 @@ bool blas_gpu_enabled() { return g_blas_gpu; }
 //Scaled by the fp32:fp64 ratio, the only proxy for the device rate without benchmarking: a lower bar where doubles are cheap
 static double blas_gpu_min_flop()
 {
-	if (const char* env = std::getenv("NOSPHERA2_BLAS_GPU_MIN_FLOP")) {
+	if (const char* env = tuning("NOSPHERA2_BLAS_GPU_MIN_FLOP")) {
 		const double v = std::atof(env);
 		if (v > 0.0) return v;
 	}

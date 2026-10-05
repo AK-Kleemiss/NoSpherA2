@@ -327,7 +327,6 @@ available from it.
 | `-SALTED <model>` | 1 | | Predict the density with a SALTED model — a directory or a `.salted` file. Also `-salted`. |
 | `-SALTED_COEFS` | 0 | | Predict and write the coefficients only. Needs `-wfn` (or `-xyz`) first. One-shot. Also `-salted_coefs`. |
 | `-SALTED_Training` | 0 | | Generate SALTED training data. Needs `-wfn` and `-ri_fit` first. One-shot. |
-| `-salted_charge_constraint` | 0 | off | Constrain the predicted density to the correct electron count. **Use it.** |
 | `-interaction_energy <A> <B>` | 2 | | Electrostatic interaction between two fitted densities. With `-SALTED` both are predicted, otherwise both are RI-fitted. One-shot. |
 | `-interaction_energy <A> <A.npy> <B> <B.npy>` | 4 | | The same from pre-computed coefficient files. One-shot. |
 | `-interaction_energies <job>` | 1 | | Every contacting molecule pair in the crystal, from a job file. |

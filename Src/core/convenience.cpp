@@ -635,6 +635,10 @@ std::string help_message =
  "  -v | -v2 | -debug                  Verbose diagnostic output.\n"
  "  -profiling [tests-root]            Run the internal profiling suite\n"
  "                                    [./tests]. Alias: -profile.\n"
+ "  -tune NAME[=VALUE]                 Set a developer knob, repeatable; a bare NAME\n"
+ "                                    is 1. Diagnostics and cut-offs such as\n"
+ "                                    NOSPHERA2_GPU_BACKEND=hip or NOS_RGBI_DEBUG,\n"
+ "                                    formerly environment variables.\n"
  "  -no_date                           Suppress date information and the GPU notes, so\n"
  "                                    output does not depend on the machine it ran on.\n"
  "  -no_date_but_gpu                   As -no_date, but keeps the GPU notes. For the\n"
@@ -783,6 +787,25 @@ std::string help_message =
  "  Twin law\n"
  "    NoSpherA2 -cif A.cif -hkl A.hkl -wfn A.wfx -acc 1 -cpus 7 \\\n"
  "      -twin -1 0 0 0 -1 0 0 0 -1\n");
+static std::map<std::string, std::string> &tuning_knobs()
+{
+	static std::map<std::string, std::string> knobs;
+	return knobs;
+}
+const char *tuning(const char *name)
+{
+	const auto &knobs = tuning_knobs();
+	const auto it = knobs.find(name);
+	return it == knobs.end() ? nullptr : it->second.c_str();
+}
+void set_tuning(const std::string &name, const char *value)
+{
+	if (value)
+		tuning_knobs()[name] = value;
+	else
+		tuning_knobs().erase(name);
+}
+
 std::string NoSpherA2_message(bool no_date)
 {
 	std::string t = "    _   __     _____       __              ___   ___\n";
@@ -4188,6 +4211,11 @@ bool options::digest_xcw_options(const std::string &temp, int &i)
 bool options::digest_dev_options(const std::string &temp, int &i)
 {
 	using namespace std;
+	if (temp == "-tune") //applied before the main loop; this only checks there is a value
+	{
+		(void)arguments[++i];
+		return true;
+	}
 	if (temp == "-lahvatest")
 	{
 		//_test_lahva();
@@ -4267,6 +4295,10 @@ namespace {
 		if (o.combined_tsc_calc || o.cif_based_combined_tsc_calc) return "-merge";
 		if (o.iam_switch) return "-IAM";
 		if (!o.cube_density.empty()) return "-cube_density";
+		//the conditions that skip the wavefunction block (d_sfac_scan has no option that sets it)
+		if (o.properties.calc()) return "a property cube (-rho, -lap, -esp, ...)";
+		if (o.do_XCW) return "-do_XCW";
+		if (o.gbw2wfn) return "-gbw2wfn";
 		return nullptr;
 	}
 }
@@ -4274,7 +4306,11 @@ namespace {
 void options::refuse_unread_bonding_options()
 {
 	const char *early = quit_early_analysis(*this);
-	const char *bonding = rgbi ? "-rgbi" : (npa ? "-npa" : nullptr);
+	//-fba runs RGBI (reading the -rgbi_* modifiers, each of which sets rgbi) and its own NPA, which
+	//reads neither -npa nor -npa_summary; -do_XCW runs RGBI on each refined wavefunction unless a
+	//property cube takes the run first or -calc_F stops it before the fit
+	const bool rgbi_read_early = fba || (do_XCW && !calc_F_calc && !properties.calc());
+	const char *bonding = (rgbi && !rgbi_read_early) ? "-rgbi" : (npa ? "-npa" : nullptr);
 	if (early != nullptr && bonding != nullptr)
 		err_checkf(false, std::string("Cannot do both ") + early + " and " + bonding + " in one run: " +
 							  early + " ends the run before " + bonding + " would be reached, so " +
@@ -4311,6 +4347,14 @@ void options::digest_options()
 	{
 		std::cout << " Recap of input:\nsize: " << arguments.size() << endl;
 	}
+	//-tune first: some options run their job inside the loop below
+	for (size_t i = 0; i + 1 < arguments.size(); i++)
+		if (arguments[i] == "-tune")
+		{
+			const std::string &knob = arguments[++i];
+			const size_t eq = knob.find('=');
+			set_tuning(knob.substr(0, eq), eq == std::string::npos ? "1" : knob.c_str() + eq + 1);
+		}
 	// This loop figures out command line options
 	for (int i = 0; i < arguments.size(); i++)
 	{
