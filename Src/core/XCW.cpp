@@ -59,8 +59,7 @@ void XCW::construct(const options& opt_in) {
 		applied_symmetry = unit_cell.apply_grown(hkl, hkl_enlarged, asym_atoms, symmetry_linking_list, original_rotations);
 	}
 
-	//unit_cell.set_symmetry_factors(asym_atoms, symmetry_linking_list);
-	unit_cell.set_symmetry_factors(asym_atoms, symmetry_linking_list, applied_symmetry);
+	unit_cell.set_symmetry_factors(asym_atoms, symmetry_linking_list);
 
 	if (tuning("NOSPHERA2_DEBUG_ASYMFACT")) {
 		std::cerr << "applied_symmetry (deleted):";
