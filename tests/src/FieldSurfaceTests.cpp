@@ -635,6 +635,10 @@ namespace NoSpherA2UnitTests
 		const char* nenv = std::getenv("NOS_FIELD_GPU_BENCH_N");
 		const int n = nenv ? std::atoi(nenv) : 200000;
 		const std::vector<d3> pts = field_probe_points(wave, std::max(1, n / wave.get_ncen()));
+		int nocc = 0;
+		for (int mo = 0; mo < wave.get_nmo(false); mo++) nocc += wave.get_MO_occ(mo) != 0.0;
+		std::cout << path << ": " << wave.get_ncen() << " atoms, " << wave.get_nex() << " primitives, " << wave.get_nmo(false)
+				  << " MOs, " << nocc << " occupied" << std::endl;
 		aux_density_gpu_set_enabled(true);
 		const std::vector<d3> warm(pts.begin(), pts.begin() + std::min<size_t>(pts.size(), 64));
 		compare_field_grad(wave, true, warm); // context creation and the coefficient cache, untimed

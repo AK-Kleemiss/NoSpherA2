@@ -3,6 +3,8 @@
 #include "gpu_backend.h"
 #include "gemm_gpu.cuh"
 #include <cstdio>
+#include <cstdlib>
+#include <chrono>
 
 NOSPHERA2_GPU_API_BEGIN
 
@@ -161,8 +163,15 @@ struct bf_ctx
 	double *c = nullptr, *cmin = nullptr, *pe = nullptr, *ps = nullptr, *coef = nullptr, *occ = nullptr;
 	int *start = nullptr, *pc = nullptr, *pl = nullptr;
 	double *pts = nullptr, *chi = nullptr, *phi = nullptr, *P = nullptr, *val = nullptr, *grad = nullptr, *rho = nullptr;
+	//NOS_BASIN_GPU_PROFILE: a sync after every stage and the seconds per stage, printed at close
+	bool prof = false;
+	double st[4]{ 0, 0, 0, 0 };
+	long long prof_points = 0, prof_runs = 0;
 	~bf_ctx()
 	{
+		if (prof)
+			std::printf("  basin field GPU (K=%d, nao %d, nocc %d): %lld points in %lld runs; copy-in %.3f s, AOs %.3f s, GEMM %.3f s, reduce+copy-out %.3f s\n",
+				K, nao, nocc, prof_points, prof_runs, st[0], st[1], st[2], st[3]);
 		gpuFree(c); gpuFree(cmin); gpuFree(pe); gpuFree(ps); gpuFree(coef); gpuFree(occ);
 		gpuFree(start); gpuFree(pc); gpuFree(pl);
 		gpuFree(pts); gpuFree(chi); gpuFree(phi); gpuFree(P); gpuFree(val); gpuFree(grad); gpuFree(rho);
@@ -198,6 +207,7 @@ void* basin_field_gpu_open(
 
 	bf_ctx* x = new bf_ctx;
 	x->K = K; x->nao = nao; x->nocc = nocc; x->chunk = (int)nb; x->cutoff = exp_cutoff;
+	x->prof = std::getenv("NOS_BASIN_GPU_PROFILE") != nullptr;
 	//split_count grows as the row count shrinks, so a short run can need more workspace than a full
 	//chunk: take the largest m * splits over every row-tile count a run can have
 	const long long mfull = (long long)K * x->chunk;
@@ -237,19 +247,32 @@ bool basin_field_gpu_run(void* ctx, const int np, const double* pts, double* val
 	const int K = x->K, nao = x->nao, nocc = x->nocc, chunk = x->chunk;
 	bool ok = true;
 	gpuError_t err = gpuSuccess;
+	auto t = std::chrono::steady_clock::now();
+	auto lap = [&](const int s) {
+		if (!x->prof) return;
+		gpuDeviceSynchronize();
+		const auto now = std::chrono::steady_clock::now();
+		x->st[s] += std::chrono::duration<double>(now - t).count();
+		t = now;
+	};
+	x->prof_points += np;
+	x->prof_runs++;
 	for (int first = 0; first < np && ok; first += chunk)
 	{
 		const int n = np - first < chunk ? np - first : chunk;
 		ok = gpuMemcpy(x->pts, pts + 3 * (size_t)first, sizeof(double) * 3 * (size_t)n, gpuMemcpyHostToDevice) == gpuSuccess;
 		if (!ok) break;
+		lap(0);
 		const long long work = (long long)n * nao;
 		const unsigned blocks = (unsigned)((work + BF_BLOCK - 1) / BF_BLOCK);
 		if (K == 4)
 			bf_ao_kernel<4><<<blocks, BF_BLOCK>>>(n, nao, x->pts, x->c, x->cmin, x->cutoff, x->start, x->pc, x->pl, x->pe, x->ps, x->chi);
 		else
 			bf_ao_kernel<10><<<blocks, BF_BLOCK>>>(n, nao, x->pts, x->c, x->cmin, x->cutoff, x->start, x->pc, x->pl, x->pe, x->ps, x->chi);
+		lap(1);
 		//phi (K n x nocc, column-major) = chi (K n x nao) * coef^T, coef being nocc x nao column-major
 		gemm_gpu::launch<double>(false, true, K * n, nocc, nao, 1.0, x->chi, K * n, x->coef, nocc, 0.0, x->phi, K * n, x->P);
+		lap(2);
 		const unsigned rb = (unsigned)((n + BF_BLOCK - 1) / BF_BLOCK);
 		if (K == 4)
 			bf_reduce_kernel<4><<<rb, BF_BLOCK>>>(n, nocc, x->occ, x->phi, x->val, x->grad, x->rho);
@@ -261,6 +284,7 @@ bool basin_field_gpu_run(void* ctx, const int np, const double* pts, double* val
 			&& gpuMemcpy(grad + 3 * (size_t)first, x->grad, sizeof(double) * 3 * (size_t)n, gpuMemcpyDeviceToHost) == gpuSuccess
 			&& (!val || K == 4 || gpuMemcpy(val + first, x->val, sizeof(double) * (size_t)n, gpuMemcpyDeviceToHost) == gpuSuccess)
 			&& (!rho || gpuMemcpy(rho + first, x->rho, sizeof(double) * (size_t)n, gpuMemcpyDeviceToHost) == gpuSuccess);
+		lap(3);
 	}
 	if (!ok)
 		std::fprintf(stderr, "NoSpherA2 basin field GPU: %s, falling back to the host\n", gpuGetErrorString(err != gpuSuccess ? err : gpuGetLastError()));
