@@ -30,7 +30,12 @@ static std::vector<std::string> read_lines_stripped(const std::filesystem::path&
 		// specified by CitationTests instead.
 		const bool is_citation = line.size() > 1 && line.front() == '[' &&
 								 line.find(", DOI 10.") != std::string::npos;
-		if (!line.empty() && !is_citation) {
+		// "QTAIM basin field on the device: auto, ..." says which machine path ran and why, so it
+		// differs between a machine with a GPU and one without while the results agree. Dropped the
+		// same way.
+		const bool is_placement = line.find(" on the host: ") != std::string::npos ||
+								  line.find(" on the device: ") != std::string::npos;
+		if (!line.empty() && !is_citation && !is_placement) {
 			lines.push_back(line);
 		}
 	}

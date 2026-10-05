@@ -202,10 +202,11 @@ double basin_step_scale();
 long long basin_stalls_on_a_slope();
 void basin_timing_set_enabled(const bool on);
 bool basin_timing_enabled();
-//-basin_gpu: a streaming wavefunction QTAIM / ELI-D integration evaluates its trajectories' field on
-//the device (WFN::field_gpu_open); falls back to the host when there is no device.
-void basin_gpu_set_enabled(const bool on);
-bool basin_gpu_enabled();
+//Where a streaming wavefunction QTAIM / ELI-D integration and the closed-shell ELI-D maxima search
+//evaluate their field: -1 auto (the default: the device when there is one, the host's evaluation
+//costs enough and the device outruns the host threads), 0 the host (-no_basin_gpu), 1 the device
+//whenever there is one (-basin_gpu).
+void basin_gpu_set_mode(const int mode);
 struct basin_stage_timer {
 	std::chrono::steady_clock::time_point t = std::chrono::steady_clock::now();
 	//Seconds since the last lap (or since construction), printed only under -basin_timing.

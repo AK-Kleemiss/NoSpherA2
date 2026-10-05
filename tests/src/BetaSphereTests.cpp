@@ -795,7 +795,7 @@ TEST(BasinStalls, AStalledTrajectoryIsStillAssigned)
 }
 
 //-basin_gpu: the same streaming integration with every trajectory's field taken from the device,
-//one point per host thread per batch. The device field agrees with the host's to 1e-10 or better
+//fed by each host thread's fibers. The device field agrees with the host's to 1e-10 or better
 //(BasinFieldGpuTests), so a probe can only change its basin where it starts on a separatrix, and
 //a bisection then moves a hundred-thousandth of an electron. The window is 1e-4 e per basin.
 static void expect_gpu_matches_host(const std::filesystem::path &wfn, const bool eli_field)
@@ -803,7 +803,7 @@ static void expect_gpu_matches_host(const std::filesystem::path &wfn, const bool
 #ifdef NOSPHERA2_USE_GPU
 	if (!std::filesystem::exists(wfn)) GTEST_SKIP() << "fixture missing: " << wfn.string();
 	if (!aux_density_gpu_available()) GTEST_SKIP() << "no device";
-	struct guard { ~guard() { basin_gpu_set_enabled(false); aux_density_gpu_set_enabled(false); } } restore;
+	struct guard { ~guard() { basin_gpu_set_mode(-1); aux_density_gpu_set_enabled(false); } } restore;
 	aux_density_gpu_set_enabled(true);
 	const WFN wavy(wfn);
 	{
@@ -829,11 +829,18 @@ static void expect_gpu_matches_host(const std::filesystem::path &wfn, const bool
 	ASSERT_FALSE(maxima.empty());
 	vec v_host, v_dev;
 	double o_host = 0.0, o_dev = 0.0;
-	basin_gpu_set_enabled(false);
-	const vec host = integrate_basins_on_atomic_grids(nullptr, nullptr, maxima, wavy, 3, eli_field, v_host, o_host);
-	basin_gpu_set_enabled(true);
-	const vec dev = integrate_basins_on_atomic_grids(nullptr, nullptr, maxima, wavy, 3, eli_field, v_dev, o_dev);
+	//QTAIM also takes the overlap matrices, whose orbitals the fibers share per thread
+	//(not s_host: winsock defines that)
+	basin_overlaps ov_host, ov_dev;
+	basin_gpu_set_mode(0);
+	const vec host = integrate_basins_on_atomic_grids(nullptr, nullptr, maxima, wavy, 3, eli_field, v_host, o_host, nullptr, nullptr, 1, nullptr, eli_field ? nullptr : &ov_host);
+	basin_gpu_set_mode(1);
+	const vec dev = integrate_basins_on_atomic_grids(nullptr, nullptr, maxima, wavy, 3, eli_field, v_dev, o_dev, nullptr, nullptr, 1, nullptr, eli_field ? nullptr : &ov_dev);
 	ASSERT_EQ(host.size(), dev.size());
+	ASSERT_EQ(ov_host.S.size(), ov_dev.S.size());
+	for (size_t b = 0; b < ov_host.S.size(); b++)
+		for (size_t t = 0; t < ov_host.S[b].size(); t++)
+			EXPECT_NEAR(ov_dev.S[b][t], ov_host.S[b][t], 1e-4) << "basin " << b + 1 << " overlap " << t;
 	for (size_t b = 0; b < host.size(); b++) {
 		std::cout << "  basin " << b + 1 << ": host " << host[b] << ", device " << dev[b] << ", diff " << dev[b] - host[b] << std::endl;
 		EXPECT_NEAR(dev[b], host[b], 1e-4) << "basin " << b + 1 << " population";
@@ -854,4 +861,33 @@ TEST(BasinGpu, QTAIMMatchesHostOnNH3Li)
 TEST(BasinGpu, ELIDMatchesHostOnNH3Li)
 {
 	expect_gpu_matches_host(nos_test_repo_root() / "tests" / "RGBI_groups" / "nh3li.gbw", true);
+}
+
+//The ELI-D maxima search with its seed climbs on the device finds the host's maxima
+TEST(BasinGpu, ELIDMaximaMatchHostOnNH3Li)
+{
+#ifdef NOSPHERA2_USE_GPU
+	const std::filesystem::path wfn = nos_test_repo_root() / "tests" / "RGBI_groups" / "nh3li.gbw";
+	if (!std::filesystem::exists(wfn)) GTEST_SKIP() << "fixture missing: " << wfn.string();
+	if (!aux_density_gpu_available()) GTEST_SKIP() << "no device";
+	struct guard { ~guard() { basin_gpu_set_mode(-1); aux_density_gpu_set_enabled(false); } } restore;
+	aux_density_gpu_set_enabled(true);
+	const WFN wavy(wfn);
+	basin_gpu_set_mode(0);
+	const std::vector<d4> host = analytic_eli_maxima(wavy);
+	basin_gpu_set_mode(1);
+	const std::vector<d4> dev = analytic_eli_maxima(wavy);
+	ASSERT_EQ(dev.size(), host.size());
+	for (const d4 &h : host) {
+		double best = 1e30, f = 0.0;
+		for (const d4 &d : dev) {
+			const double r2 = std::pow(d[0] - h[0], 2) + std::pow(d[1] - h[1], 2) + std::pow(d[2] - h[2], 2);
+			if (r2 < best) { best = r2; f = d[3]; }
+		}
+		EXPECT_LT(std::sqrt(best), 1e-3) << "host maximum " << h[0] << " " << h[1] << " " << h[2];
+		EXPECT_NEAR(f, h[3], 1e-6);
+	}
+#else
+	GTEST_SKIP() << "built without a GPU backend";
+#endif
 }

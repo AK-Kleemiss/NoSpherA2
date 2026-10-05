@@ -485,10 +485,13 @@ std::string help_message =
  "  -basin_timing                      Print the wall clock of every stage of the\n"
  "                                    basin analysis: the cube, the critical\n"
  "                                    points, the beta spheres, the quadrature.\n"
- "  -basin_gpu                         Evaluate the streaming QTAIM / ELI-D basin\n"
- "                                    trajectories' field on the GPU, in batches\n"
- "                                    gathered from NOS_BASIN_GPU_FIBERS (256)\n"
- "                                    fibers per host thread. Off: the host path.\n"
+ "  -basin_gpu / -no_basin_gpu         Always / never evaluate the streaming QTAIM\n"
+ "                                    and ELI-D trajectories' field and the ELI-D\n"
+ "                                    maxima climbs on the GPU. Default: the GPU\n"
+ "                                    when one is found, a host evaluation costs\n"
+ "                                    at least NOS_BASIN_GPU_MIN_US (3) us and the\n"
+ "                                    device outruns all host threads; the log\n"
+ "                                    says which ran and why.\n"
  "  -adaptive_step                     Let a straight run of field earn a longer\n"
  "                                    ascent step than the validated one: sucrose\n"
  "                                    363 -> 296 s, UH6 26 -> 13 s, at up to 8e-4\n"
@@ -2856,7 +2859,9 @@ bool options::digest_run_options(const std::string &temp, int &i)
 	else if (temp == "-basin_timing")
 		basin_timing_set_enabled(true);
 	else if (temp == "-basin_gpu")
-		basin_gpu_set_enabled(true);
+		basin_gpu_set_mode(1);
+	else if (temp == "-no_basin_gpu")
+		basin_gpu_set_mode(0);
 	else if (temp == "-no_beta_spheres")
 		beta_spheres_set_enabled(false);
 	else if (temp == "-no_adaptive_step")
