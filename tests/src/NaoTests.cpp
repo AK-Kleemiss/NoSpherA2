@@ -3,8 +3,7 @@
 #include "core/nao.h"
 #include "core/wfn_class.h"
 
-//NAO/NPA checks.  The numbers come from NBO 7.0.9 run on the same wavefunction; the epoxide
-//reference is committed as tests/epoxide_gbw/NBO/reference.nbo.
+//NAO/NPA checks.  The numbers come from NBO 7.0.9 run on the same wavefunction.
 
 namespace {
 

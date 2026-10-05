@@ -20,12 +20,9 @@ exactly where they are.
 |---|---|---|
 | `<mol>.inp` | 1 | the ORCA input that was actually run (byte-identical to `../inputs/<mol>/`, verified) |
 | `<mol>_start.xyz` | 1 | the idealised geometry the optimisation started from |
-| `<mol>.out` | 1 | ORCA's output, including the basis-function count and final energy acceptance reads |
-| `<mol>.xyz`, `<mol>_trj.xyz` | 1 | the optimised geometry and the optimisation trajectory |
+| `<mol>.xyz` | 1 | the optimised geometry |
 | `provenance_orca.json` | 1 | hostname, threads, node core count, slurm job id, ORCA path and module |
-| `<mol>.nbo` | 2 | **gennbo 7's own output** - the external reference in its original text form |
-| `<mol>.gennbo.nbo.json` | 2 | that output parsed by `-nbo_parse` |
-| `<mol>.native.nbo.json` | 2 | NoSpherA2's own `-nbo_native` answer on the same wavefunction |
+| `<mol>.gennbo.nbo.json` | 2 | gennbo 7's output parsed by `-nbo_parse` |
 | `provenance_nbo.json` | 2 | hostname, threads, NoSpherA2 commit, gennbo path, the exact keylist and flags, per-step seconds |
 
 `accepted.json` is the acceptance record for all 22 at once.
@@ -39,9 +36,9 @@ Two binary artefacts are left on the cluster at
 - `<mol>.47` and `<mol>_native.47` - 42 MB over the 22. The NBO archive.
 
 Both are *derived*, and the derivation is one command each (below), so what they
-would add to the repository is 69 MB of things a reader can rebuild. What is kept
-is everything that is **not** rebuildable without them: the input, the output,
-gennbo's text, and both JSONs. That split is the judgement call in this
+would add to the repository is 69 MB of things a reader can rebuild. ORCA's `.out`
+and gennbo's `.nbo` stay there too: external program output is not published.
+What is kept is the input, the geometries and the gennbo JSON. That split is the judgement call in this
 directory; if a future reader would rather have the `.47` in git than trust this
 paragraph, it is 42 MB and the inputs are all here.
 
@@ -60,7 +57,7 @@ points at is broken on this cluster, and the ORCA module is not on the default
 python make_inputs.py <out_dir>        # 22 x <mol>/<mol>.inp + <mol>_start.xyz
 sbatch orca_opt.sh <mol>              # stage 1 -> <mol>.out, <mol>.gbw, provenance_orca.json
 python accept.py <root>                # -> accepted.json; refuses a molecule that drifted
-sbatch nbo_stage.sh <mol>             # stage 2 -> .47, .nbo, both JSONs, provenance_nbo.json
+sbatch nbo_stage.sh <mol>             # stage 2 -> .47, .nbo, both JSONs, provenance_nbo.json (only the gennbo JSON is committed)
 python compare_all.py <root>          # native vs gennbo, all 22
 ```
 
@@ -164,11 +161,10 @@ matching `-nbo_e2min` - `E2PERT` **must** carry its value, because `E2PERT` alon
 is accepted and silently ignored, exit 0, no warning, which is how the surviving
 keylist came to set nothing at all.
 
-The 22 `.nbo` files in here were parsed by commit c8130055, which does **not**
+The 22 `.nbo` files on the cluster were parsed by commit c8130055, which does **not**
 contain the valency-spin fix on this branch (`bf73d301`: NBO prints three NRT
 valency tables for an open shell and the composite one was stored as a second
 beta table). The `.nbo` text is gennbo's own and is unaffected; only the
 `.gennbo.nbo.json` files of `ch3`, `no` and `o2` carry the duplicate. Re-running
 `-nbo_parse` on the stored `.nbo` files with a rebuilt binary fixes those three
-JSONs without touching the cluster or ORCA - which is the point of having kept
-the `.nbo` text.
+JSONs without re-running ORCA or gennbo.
