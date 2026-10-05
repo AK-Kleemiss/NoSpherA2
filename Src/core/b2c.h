@@ -119,7 +119,7 @@ int unify_core_basins(cubei& basin_cube, std::vector<d4>& maxima, const std::vec
 //each. max_dist is a physical length in bohr, deliberately not a voxel count: the defect gets worse as
 //the grid is refined, so a grid-derived cutoff would chase it. See the comment on the definition.
 //With atoms, maxima in a metal's outer core shell (see eli_core_radius) merge only within max_dist / 2.
-int unify_shell_basins(cubei& basin_cube, std::vector<d4>& maxima, ivec* basin_map = nullptr, double max_dist = 1.2, double rel_tol = 0.05, const std::vector<atom>* atoms = nullptr);
+int unify_shell_basins(cubei& basin_cube, std::vector<d4>& maxima, ivec* basin_map = nullptr, double max_dist = 1.2, double rel_tol = 0.05, const std::vector<atom>* atoms = nullptr, const WFN* wavy = nullptr, const eli_spin_field* eli = nullptr);
 //Atomic overlap matrices S^b_ij = int_b phi_i phi_j, taken on the same quadrature points and
 //with the same basin assignment as the populations, so a basin's trace is its population by
 //construction. One packed lower triangle per basin over the occupied MOs

@@ -3863,7 +3863,7 @@ static void spin_eli_analysis(const WFN &l_w, const options &opt, const std::vec
 		cubei none;
 		ivec core_map, shell_map;
 		unify_core_basins(none, r.maxima, atoms, &core_map);
-		unify_shell_basins(none, r.maxima, &shell_map, shell_dist, shell_tol, &atoms);
+		unify_shell_basins(none, r.maxima, &shell_map, shell_dist, shell_tol, &atoms, &l_w, &eval);
 		if (!shell_map.empty())
 			for (size_t b = 1; b < core_map.size(); b++) core_map[b] = shell_map[core_map[b]];
 		ivec edge_map;
@@ -3889,8 +3889,12 @@ static void spin_eli_analysis(const WFN &l_w, const options &opt, const std::vec
 				r.maxima.erase(r.maxima.begin() + b); r.labels.erase(r.labels.begin() + b);
 				empty++;
 			}
-		std::cout << "\nELI-D " << names[f] << " Analysis (atomic quadrature grids), " << all.size() << " maxima, " << r.maxima.size() << " basins";
-		if (empty) std::cout << " (" << empty << " more below 5e-5 e not listed)";
+		//all.size() also counts the maxima unified into cores/shells and the empty rim attractors: say which
+		const size_t merged = all.size() - r.maxima.size() - empty;
+		std::cout << "\nELI-D " << names[f] << " Analysis (atomic quadrature grids), " << all.size() << " maxima";
+		if (merged) std::cout << ", " << merged << " unified into core/shell basins";
+		if (empty) std::cout << ", " << empty << " empty surface attractors (below 5e-5 e, not listed)";
+		std::cout << ", " << r.maxima.size() << " basins";
 		std::cout << ":\n"
 			<< "  basin  label               electrons    N_alpha     N_beta       spin  <ELI-q>      volume         maximum        x          y          z\n";
 		for (size_t b = 0; b < r.pop.size(); b++) {
@@ -4412,7 +4416,7 @@ void ELI_analysis(const WFN &wavy, options &opt) {
 	if (const char *e = std::getenv("NOS_ELI_SHELL_DIST")) { const double v = std::atof(e); if (v >= 0.0 && v < 10.0) shell_dist = v; }
 	if (const char *e = std::getenv("NOS_ELI_SHELL_TOL")) { const double v = std::atof(e); if (v >= 0.0 && v < 1.0) shell_tol = v; }
 	ivec eli_shell_map;
-	const int shell_merged = unify_shell_basins(eli_results.first, eli_results.second, stream_eli ? &eli_shell_map : nullptr, shell_dist, shell_tol, &atoms);
+	const int shell_merged = unify_shell_basins(eli_results.first, eli_results.second, stream_eli ? &eli_shell_map : nullptr, shell_dist, shell_tol, &atoms, &l_w);
 	if (shell_merged) std::cout << "Unified " << shell_merged << " shattered shell basins, " << eli_results.second.size() << " ELI-D basins remain." << std::endl;
 	//The integrator walks to one of eli_maxima_all and then reads eli_core_map, so the second merge
 	//has to be composed into that map rather than replacing it

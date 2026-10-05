@@ -39,6 +39,8 @@ struct GridConfiguration {
 	double alpha_max_scale = 1.0;
 	double radial_step_scale = 1.0;
 	int angular_boost = 0;
+	//turn the Lebedev spheres off the molecular mirror planes (see AtomGrid); basin integration only
+	bool rotate_angular = false;
 	int pbc = 0;
 	PartitionType partition_type = PartitionType::Hirshfeld;
 	bool debug = false;
