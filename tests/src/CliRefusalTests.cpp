@@ -214,6 +214,11 @@ TEST(CliRefusal, RealOptionNoAnalysisReadsIsFatal)
 	//a property cube skips the wavefunction block too
 	EXPECT_EXIT(parse({"-wfn", wfn.string(), "-lap", "-rgbi"}),
 				::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), ".*");
+	//-fba runs its own NPA; -calc_F stops -do_XCW before the fit that runs RGBI
+	EXPECT_EXIT(parse({"-fba", wfn.string(), "-npa_summary"}),
+				::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), ".*");
+	EXPECT_EXIT(parse({"-do_XCW", "-calc_F", "-rgbi"}),
+				::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), ".*");
 	//-fba reads the -rgbi_* modifiers, each of which also sets rgbi
 	parse({"-fba", wfn.string(), "-rgbi_no_sym", "-rgbi_basis", "nao"});
 }

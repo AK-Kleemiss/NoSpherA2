@@ -4254,10 +4254,11 @@ namespace {
 void options::refuse_unread_bonding_options()
 {
 	const char *early = quit_early_analysis(*this);
-	//-fba runs RGBI (reading the -rgbi_* modifiers, each of which sets rgbi) and NPA itself;
-	//-do_XCW runs RGBI on each refined wavefunction unless a property cube takes the run first
-	const bool rgbi_read_early = fba || (do_XCW && !properties.calc());
-	const char *bonding = fba ? nullptr : ((rgbi && !rgbi_read_early) ? "-rgbi" : (npa ? "-npa" : nullptr));
+	//-fba runs RGBI (reading the -rgbi_* modifiers, each of which sets rgbi) and its own NPA, which
+	//reads neither -npa nor -npa_summary; -do_XCW runs RGBI on each refined wavefunction unless a
+	//property cube takes the run first or -calc_F stops it before the fit
+	const bool rgbi_read_early = fba || (do_XCW && !calc_F_calc && !properties.calc());
+	const char *bonding = (rgbi && !rgbi_read_early) ? "-rgbi" : (npa ? "-npa" : nullptr);
 	if (early != nullptr && bonding != nullptr)
 		err_checkf(false, std::string("Cannot do both ") + early + " and " + bonding + " in one run: " +
 							  early + " ends the run before " + bonding + " would be reached, so " +
