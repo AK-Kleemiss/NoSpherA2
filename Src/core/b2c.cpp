@@ -2629,6 +2629,7 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 				}
 		}
 		feeds = open_field_feeds(wavy, eli_field, sample, [&](const d3 &p) { d3 g; double v; gradient(p, g, &v); }, host_threads, why);
+		T.lap(fieldname + "device probe and feeds");
 	}
 	std::cout << "  " << fieldname << "basin field on the " << (feeds.empty() ? "host" : "device") << ": " << why.str() << std::endl;
 	//body(i) for the calling thread's share of [0, np): its fibers on its feed, or the host's dynamic schedule
