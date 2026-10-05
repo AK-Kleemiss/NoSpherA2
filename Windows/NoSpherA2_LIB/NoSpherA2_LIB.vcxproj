@@ -114,6 +114,7 @@
     <ClInclude Include="..\..\Src\core\ECPs_corrections.h" />
     <ClInclude Include="..\..\Src\core\extinction.h" />
     <ClInclude Include="..\..\Src\core\fchk.h" />
+    <ClInclude Include="..\..\Src\core\fiber_loop.h" />
     <ClInclude Include="..\..\Src\core\geometry_aid.h" />
     <ClInclude Include="..\..\Src\core\gemm_gpu.cuh" />
     <ClInclude Include="..\..\Src\core\gpu_api.h" />
@@ -187,6 +188,7 @@
     <ClCompile Include="..\..\Src\core\eqc.cpp" />
     <ClCompile Include="..\..\Src\core\eli_family.cpp" />
     <ClCompile Include="..\..\Src\core\fchk.cpp" />
+    <ClCompile Include="..\..\Src\core\fiber_loop.cpp" />
     <ClCompile Include="..\..\Src\core\GridManager.cpp" />
     <ClCompile Include="..\..\Src\core\integration_params.cpp" />
     <ClCompile Include="..\..\Src\core\integrator.cpp" />
