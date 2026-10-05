@@ -587,4 +587,16 @@ TEST(EliFamily, BrokenSymmetryIsDecidedByTheOrbitals)
 	wave.set_MO_coef(homo, big, wave.get_MO_coef(homo, big) / 1.02);
 	for (int j = 0; j < wave.get_nex(); j++) wave.set_MO_coef(homo, j, -wave.get_MO_coef(homo, j));
 	EXPECT_FALSE(eli_family::alpha_beta_orbitals_differ(wave));
+	//two equally occupied beta orbitals mixed by 45 degrees: every orbital differs, rho_beta does not
+	int lo = -1;
+	for (int m = 0; m < homo; m++)
+		if (wave.get_MO_op(m) == 1 && wave.get_MO_occ(m) == wave.get_MO_occ(homo)) lo = m;
+	ASSERT_GE(lo, 0);
+	for (int j = 0; j < wave.get_nex(); j++) {
+		const double a = wave.get_MO_coef(lo, j), b = wave.get_MO_coef(homo, j);
+		wave.set_MO_coef(lo, j, (a + b) / std::sqrt(2.0));
+		wave.set_MO_coef(homo, j, (a - b) / std::sqrt(2.0));
+	}
+	EXPECT_FALSE(eli_family::alpha_beta_orbitals_differ(wave));
+	EXPECT_EQ(eli_family::eli_variants_for(wave, &warn).size(), 2u) << warn;
 }

@@ -68,26 +68,26 @@ Unified 46 core-shell basins into their atoms' cores, 5 ELI-D basins remain.
 GridManager: Setting up prototype grids for atom types...
 GridManager: Generating integration grids for atoms...
 GridManager: Generated total of 65266 grid points.
-Quadrature points sent along the field: 18812, left the grid: 0
+Quadrature points sent along the field: 18692, left the grid: 0
 
 QTAIM Analysis (atomic quadrature grids):
 [QTAIM] Bader, Atoms in Molecules: A Quantum Theory, Oxford University Press (1990), DOI 10.1093/oso/9780198551683.001.0001
 [QTAIM] Bader, Chem. Rev. 91 (1991) 893, DOI 10.1021/cr00005a013
   basin  label               electrons     charge      volume         maximum        x          y          z
-      1  Hg0                   79.4353     0.5647    450.7671     367149.1320      0.000      0.000      0.000
-      2  H1                     1.2675    -0.2675    204.0560          0.3478      0.000      0.000      3.118
-      3  H2                     1.2675    -0.2675    204.0560          0.3478      0.000      0.000     -3.118
-  total in basins: 81.9704   outside every basin: 0.0296
+      1  Hg0                   79.4352     0.5648    449.2519     367149.1320      0.000      0.000      0.000
+      2  H1                     1.2675    -0.2675    203.9201          0.3478      0.000      0.000      3.118
+      3  H2                     1.2675    -0.2675    203.9201          0.3478      0.000      0.000     -3.118
+  total in basins: 81.9702   outside every basin: 0.0298
 
 Delocalization indices (11 occupied orbitals):
 [LI/DI] Fradera, Austen & Bader, J. Phys. Chem. A 103 (1999) 304, DOI 10.1021/jp983362q
-  sum over basins and outside of S^A - identity: 1.57e-06   (the quadrature's own error; AIMAll's integrations reach ~1e-3)
+  sum over basins and outside of S^A - identity: 1.62e-06   (the quadrature's own error; AIMAll's integrations reach ~1e-3)
 
   basin  label                 N(A)     lambda(A)   sum_B delta(A,B)/2   residual
   B includes the region beyond rho = 1e-04 e/bohr^3.
-      1  Hg0                   19.4353     18.4485            0.9868     -0.0000
-      2  H1                     1.2675      0.7326            0.5350     -0.0000
-      3  H2                     1.2675      0.7326            0.5350     -0.0000
+      1  Hg0                   19.4352     18.4484            0.9868     -0.0000
+      2  H1                     1.2675      0.7325            0.5350     -0.0000
+      3  H2                     1.2675      0.7325            0.5350     -0.0000
 
   basin pair                                delta(A,B)
   Hg0               H2                      0.9713
@@ -99,15 +99,15 @@ Delocalization indices (11 occupied orbitals):
 GridManager: Setting up prototype grids for atom types...
 GridManager: Generating integration grids for atoms...
 GridManager: Generated total of 65266 grid points.
-Quadrature points sent along the field: 24606, left the grid: 0
+Quadrature points sent along the field: 24910, left the grid: 0
 
 ELI-D Analysis (atomic quadrature grids):
   basin  label               electrons      volume         maximum        x          y          z
-      1  H2                     1.4364     36.5894          7.2480     -0.000      0.000     -3.170
-      2  H1                     1.4364     36.5894          7.2480     -0.000      0.000      3.170
-      3  H1 LP                  0.4677    287.5343          5.0790     -0.000      0.000      4.989
-      4  H2 LP                  0.4677    287.5343          5.0790      0.000      0.000     -4.989
-      5  Hg0 core              18.1621    210.6315          1.4332      0.579      0.030     -0.682
-  total in basins: 21.9704   outside every basin: 0.0296
+      1  H2                     1.4363     36.5949          7.2480     -0.000      0.000     -3.170
+      2  H1                     1.4363     36.5949          7.2480     -0.000      0.000      3.170
+      3  H1 LP                  0.4676    286.0155          5.0790     -0.000      0.000      4.989
+      4  H2 LP                  0.4676    286.0155          5.0790      0.000      0.000     -4.989
+      5  Hg0 core              18.1624    211.8713          1.4332      0.579      0.030     -0.682
+  total in basins: 21.9702   outside every basin: 0.0298
 
 Spin-resolved ELI-D: skipped, restricted wavefunction - ELI-D(alpha-alpha) = ELI-D(beta-beta) is the ELI-D above and the triplet member a constant multiple of it.

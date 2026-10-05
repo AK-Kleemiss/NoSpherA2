@@ -28,7 +28,8 @@ namespace eli_family
 			if (wave.get_MO_occ(mo) != 0.0) occ[wave.get_MO_op(mo) == 1 ? 1 : 0].push_back(mo);
 		if (occ[0].size() != occ[1].size()) return true;
 		const int nex = wave.get_nex();
-		for (size_t k = 0; k < occ[0].size(); k++)
+		bool differ = false;
+		for (size_t k = 0; k < occ[0].size() && !differ; k++)
 		{
 			const int a = occ[0][k], b = occ[1][k];
 			if (wave.get_MO_occ(a) != wave.get_MO_occ(b)) return true;
@@ -40,9 +41,28 @@ namespace eli_family
 				same = std::max(same, std::abs(ca - cb));
 				flip = std::max(flip, std::abs(ca + cb));
 			}
-			if (std::min(same, flip) > 1e-4 * big) return true;
+			differ = std::min(same, flip) > 1e-4 * big;
 		}
-		return false;
+		if (!differ) return false;
+		//Orbitals that differ can still span the same space: beta rotated within a degenerate (or any
+		//equally occupied) subspace gives rho_beta = rho_alpha. Only a spin density decides, so sample it
+		//at 0.3/1/2 bohr from each nucleus along two skew directions.
+		//ponytail: 6 points per atom, a spin density that vanishes at all of them is missed
+		const std::vector<atom>& atoms = *wave.get_atoms_ptr();
+		const double dir[2][3] = { { 0.48, 0.64, 0.6 }, { -0.6, 0.48, -0.64 } }, rad[3] = { 0.3, 1.0, 2.0 };
+		bool polarised = false;
+		wave.get_coef_primitive_major(); //build the lazy cache before the threads read it
+#pragma omp parallel for reduction(||:polarised)
+		for (int i = 0; i < (int)atoms.size(); i++)
+			for (int s = 0; s < 6 && !polarised; s++)
+			{
+				d3 p;
+				for (int c = 0; c < 3; c++) p[c] = atoms[i].get_coordinate(c) + rad[s % 3] * dir[s / 3][c];
+				SpinFields f;
+				spin_fields(wave, p, f);
+				polarised = std::abs(f.rho[0] - f.rho[1]) > 1e-10 + 1e-6 * (f.rho[0] + f.rho[1]);
+			}
+		return polarised;
 	}
 
 	void spin_fields(const WFN& wave, const d3& p, SpinFields& f)

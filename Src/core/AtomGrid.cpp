@@ -143,7 +143,8 @@ AtomGrid::AtomGrid(const double radial_precision,
 	const int max_l_quantum_number,
 	const double alpha_min[],
 	std::ostream &file,
-	const double radial_step_scale)
+	const double radial_step_scale,
+	const bool generic_rotation)
 {
 	using namespace std;
 	const int min_num_angular_points_closest =
@@ -166,6 +167,22 @@ AtomGrid::AtomGrid(const double radial_precision,
 			angular_y.data() + angular_off,
 			angular_z.data() + angular_off,
 			angular_w.data() + angular_off);
+	}
+	//Lebedev grids are O_h symmetric: a molecular mirror plane on x=0, y=0 or z=0 puts whole grid rings
+	//on a separatrix (H2CF2 F lone pairs split by up to 0.18 e, varying with the floor). A generic rotation,
+	//from a quaternion with no special angles, keeps the quadrature exact and takes the points off it.
+	if (generic_rotation) {
+		const double w = 0.9, x = 0.2, y = 0.3, z = 0.25, n = w * w + x * x + y * y + z * z;
+		const double R[3][3] = {
+			{ 1 - 2 * (y * y + z * z) / n, 2 * (x * y - w * z) / n, 2 * (x * z + w * y) / n },
+			{ 2 * (x * y + w * z) / n, 1 - 2 * (x * x + z * z) / n, 2 * (y * z - w * x) / n },
+			{ 2 * (x * z - w * y) / n, 2 * (y * z + w * x) / n, 1 - 2 * (x * x + y * y) / n } };
+		for (size_t k = 0; k < angular_x.size(); k++) {
+			const double a = angular_x[k], b = angular_y[k], c = angular_z[k];
+			angular_x[k] = R[0][0] * a + R[0][1] * b + R[0][2] * c;
+			angular_y[k] = R[1][0] * a + R[1][1] * b + R[1][2] * c;
+			angular_z[k] = R[2][0] * a + R[2][1] * b + R[2][2] * c;
+		}
 	}
 
 	// radial parameters

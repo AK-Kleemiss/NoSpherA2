@@ -533,7 +533,8 @@ void GridManager::setupPrototypeGrids(const WFN &wave, const ivec &atom_types, s
 			max_l_temp,
 			alpha_min.data(),
 			std::cout,
-			config_.radial_step_scale
+			config_.radial_step_scale,
+			config_.rotate_angular
 		);
 		if (config_.debug) {
 			file << std::setw(9) << atom_type << " | "
