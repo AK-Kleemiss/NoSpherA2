@@ -2001,6 +2001,92 @@ double basin_step_scale() { return g_basin_step_scale; }
 static bool g_basin_timing = false;
 void basin_timing_set_enabled(const bool on) { g_basin_timing = on; }
 bool basin_timing_enabled() { return g_basin_timing; }
+static bool g_basin_gpu = false;
+void basin_gpu_set_enabled(const bool on) { g_basin_gpu = on; }
+bool basin_gpu_enabled() { return g_basin_gpu; }
+
+//Gathers one field evaluation from every host thread that joined and runs them on the device as
+//one batch: a thread that asks waits until every live thread has asked (or left), and the last one
+//to arrive runs the batch for all of them. A joined thread must leave() before anything that waits
+//on another thread - a barrier or a critical section - or the round never completes.
+// ponytail: one host thread per trajectory in flight, in lock-step rounds; a climb written as a
+// resumable state machine would feed the device from a handful of threads
+struct field_batcher {
+	struct req { d3 p; double v = 0.0, rho = 0.0; d3 g{}; bool ok = false; };
+	const WFN &wavy;
+	const bool eli;
+	void *ctx;
+	std::mutex mu;
+	int live = 0;
+	bool failed = false;
+	std::atomic<int> round{ 0 };
+	std::vector<req *> reqs;
+	vec pts, val, grad, rho;
+	long long batches = 0, points = 0;
+	field_batcher(const WFN &w, const bool e, const int max_points) : wavy(w), eli(e), ctx(w.field_gpu_open(e, max_points)) {}
+	~field_batcher() { WFN::field_gpu_close(ctx); }
+	field_batcher(const field_batcher &) = delete;
+	field_batcher &operator=(const field_batcher &) = delete;
+	//mu held
+	void flush()
+	{
+		const size_t n = reqs.size();
+		pts.resize(3 * n); val.resize(n); grad.resize(3 * n); rho.resize(n);
+		for (size_t i = 0; i < n; i++) std::copy_n(reqs[i]->p.data(), 3, &pts[3 * i]);
+		if (!failed && !WFN::field_gpu_run(ctx, static_cast<int>(n), pts.data(), eli ? val.data() : nullptr, grad.data(), rho.data()))
+			failed = true;
+		if (!failed)
+			for (size_t i = 0; i < n; i++) {
+				req &r = *reqs[i];
+				r.v = val[i]; r.rho = rho[i]; std::copy_n(&grad[3 * i], 3, r.g.data()); r.ok = true;
+			}
+		batches++;
+		points += static_cast<long long>(n);
+		reqs.clear();
+		round.fetch_add(1, std::memory_order_release);
+		round.notify_all();
+	}
+	void join();
+	void leave();
+	//ELI-D value (eli only), gradient and density at p, as computeELIGrad / computeGrad give them
+	void eval(const d3 &p, double &v, d3 &g, double &rho_p)
+	{
+		req r;
+		r.p = p;
+		{
+			std::unique_lock<std::mutex> lk(mu);
+			if (!failed) {
+				const int seen = round.load(std::memory_order_relaxed);
+				reqs.push_back(&r);
+				if (static_cast<int>(reqs.size()) >= live) flush();
+				else {
+					lk.unlock();
+					for (int now = round.load(std::memory_order_acquire); now == seen; now = round.load(std::memory_order_acquire))
+						round.wait(now, std::memory_order_acquire);
+				}
+			}
+		}
+		if (r.ok) { v = r.v; g = r.g; rho_p = r.rho; return; }
+		//the device declined: every thread evaluates its own point from here on
+		if (eli) wavy.computeELIGrad(p, v, g, &rho_p);
+		else wavy.computeGrad(p, g, &rho_p);
+	}
+};
+//The batcher the calling thread has joined; null outside a batched loop
+static thread_local field_batcher *t_batch = nullptr;
+void field_batcher::join()
+{
+	std::lock_guard<std::mutex> lk(mu);
+	live++;
+	t_batch = this;
+}
+void field_batcher::leave()
+{
+	std::lock_guard<std::mutex> lk(mu);
+	live--;
+	t_batch = nullptr;
+	if (!reqs.empty() && static_cast<int>(reqs.size()) >= live) flush();
+}
 void basin_stage_timer::lap(const std::string &what) {
 	const auto now = std::chrono::steady_clock::now();
 	const double s = std::chrono::duration<double>(now - t).count();
@@ -2112,7 +2198,10 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 	//valence basis and cannot integrate a 1s at Z = 80, so the core electrons are added to
 	//the nucleus's basin by count once the valence density is integrated; a Thakkar core
 	//lies whole inside its atom's basin
-	auto valence = [&](const d3 &p) { return field ? field->rho(p) : wavy.compute_dens(p); };
+	auto valence = [&](const d3 &p) -> double {
+		if (t_batch) { double v, r; d3 g; t_batch->eval(p, v, g, r); return r; }
+		return field ? field->rho(p) : wavy.compute_dens(p);
+	};
 	//Streaming: no cube and no basin cube, the maxima are the whole topology and every point
 	//finds its basin by walking the field
 	const bool streaming = cub == nullptr || basin_cube == nullptr;
@@ -2269,6 +2358,7 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 	auto gradient = [&](const d3 &p, d3 &g, double *val = nullptr) {
 		if (!eli_field) {
 			if (field) { field->grad(p, g); if (val) *val = field->rho(p); }
+			else if (t_batch) { double v, r; t_batch->eval(p, v, g, r); if (val) *val = r; }
 			else wavy.computeGrad(p, g, val);
 			if (core_gradient) { d3 c; (*core_gradient)(p, c); for (int k = 0; k < 3; k++) g[k] += c[k]; }
 			if (val && core_density) *val += (*core_density)(p);
@@ -2276,6 +2366,7 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 		}
 		double e;
 		if (eli) (*eli)(p, e, g, nullptr);
+		else if (t_batch) { double r; t_batch->eval(p, e, g, r); }
 		else wavy.computeELIGrad(p, e, g);
 		if (val) *val = e;
 	};
@@ -2399,6 +2490,26 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 	grids.setup3DGridsForMolecule(wavy, every_atom);
 	const GridData &gd = grids.getGridData();
 	T.lap(fieldname + "atomic quadrature grids");
+	//-basin_gpu: the point loops below run on many more host threads than cores, each holding one
+	//trajectory, and their field evaluations go to the device in batches of one per thread. Only
+	//the plain wavefunction fields: a density_source field, the spin ELI-D and the overlap matrices
+	//(a triangle per basin per thread) stay on the host.
+	std::unique_ptr<field_batcher> batch;
+	int gpu_threads = 2048;
+	if (const char *e = std::getenv("NOS_BASIN_GPU_THREADS")) gpu_threads = std::max(1, std::atoi(e));
+	if (g_basin_gpu && streaming && !field && !eli && !ovl) {
+		batch = std::make_unique<field_batcher>(wavy, eli_field, std::max(gpu_threads, 1 << 16));
+		if (!batch->ctx) {
+			std::cout << "  " << fieldname << "basin GPU declined (no device or no room); the host evaluates the field" << std::endl;
+			batch.reset();
+		}
+	}
+	int host_threads = 1;
+#ifdef _OPENMP
+	host_threads = omp_get_max_threads();
+#endif
+	const int loop_threads = batch ? gpu_threads : host_threads;
+	const int loop_chunk = batch ? 1 : 16;
 	//The rho = 1e-4 isosurface bounds gridded and streaming basins.
 	const double stall_reach = 1e30;
 	//The trajectory and quadrature share the density isosurface.
@@ -2498,7 +2609,11 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 			else if (eli_field) {
 				double rho_r;
 				if (streaming && eli) { double aux[4]; (*eli)(r, vg, g, aux); rho_r = aux[0]; have_vg = true; }
-				else if (streaming && !field) { wavy.computeELIGrad(r, vg, g, &rho_r); have_vg = true; }
+				else if (streaming && !field) {
+					if (t_batch) t_batch->eval(r, vg, g, rho_r);
+					else wavy.computeELIGrad(r, vg, g, &rho_r);
+					have_vg = true;
+				}
 				else rho_r = valence(r);
 				if (rho_r < basin_density_cutoff) {
 					//A spin field's walk that leaves the domain goes on along the isosurface to the attractor
@@ -2678,9 +2793,23 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 		std::vector<char> skip;
 		if (skip_budget > 0.0) {
 			rho_at.assign(np, 0.0);
+			bool on_device = false;
+			if (batch) {
+				ivec at;
+				vec q, gq, rq;
+				for (int i = 0; i < np; i++)
+					if (W[i] != 0.0) { at.push_back(i); q.insert(q.end(), { X[i], Y[i], Z[i] }); }
+				gq.resize(3 * at.size());
+				rq.resize(at.size());
+				on_device = at.empty() || WFN::field_gpu_run(batch->ctx, static_cast<int>(at.size()), q.data(), nullptr, gq.data(), rq.data());
+				if (on_device)
+					for (size_t k = 0; k < at.size(); k++) rho_at[at[k]] = rq[k];
+			}
+			if (!on_device) {
 #pragma omp parallel for schedule(dynamic, 64)
-			for (int i = 0; i < np; i++)
-				if (W[i] != 0.0) rho_at[i] = valence(d3{ X[i], Y[i], Z[i] });
+				for (int i = 0; i < np; i++)
+					if (W[i] != 0.0) rho_at[i] = valence(d3{ X[i], Y[i], Z[i] });
+			}
 			ivec order;
 			for (int i = 0; i < np; i++)
 				if (W[i] != 0.0 && rho_at[i] >= basin_density_cutoff) order.push_back(i);
@@ -2707,20 +2836,24 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 		//without probing at all, so it keeps the old on-demand path and this pass is skipped.
 		ivec outer_probe(np, -1);
 		if (!(eli_field && !streaming)) {
-#pragma omp parallel
+#pragma omp parallel num_threads(loop_threads)
 			{
 				long long lb = 0, ll = 0;
-#pragma omp for schedule(dynamic, 16)
+				//joined before anyone asks and left before the critical section (field_batcher)
+				if (batch) batch->join();
+#pragma omp barrier
+#pragma omp for schedule(dynamic, loop_chunk) nowait
 				for (int i = 0; i < np; i++) {
 					double in, out;
 					if (W[i] == 0.0 || !probe_wanted[i] || !cell_edges(i, in, out)) continue;
 					outer_probe[i] = climb(along_i(i, out), lb, ll, climb_outer);
 				}
+				if (batch) batch->leave();
 #pragma omp critical
 				{ boundary_points += lb; lost += ll; }
 			}
 		}
-#pragma omp parallel
+#pragma omp parallel num_threads(loop_threads)
 		{
 			vec lp(nb, 0.0), lv(nb, 0.0), lspin(spin_pop ? 3 * (size_t)nb : 0, 0.0);
 			double lo = 0.0, lc = 0.0, lu = 0.0;
@@ -2750,7 +2883,9 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 					for (int b2 = 0; b2 <= a2; b2++) row[b2] += pa * phi[idx[b2]];
 				}
 			};
-#pragma omp for schedule(dynamic, 16)
+			if (batch) batch->join();
+#pragma omp barrier
+#pragma omp for schedule(dynamic, loop_chunk) nowait
 			for (int i = 0; i < np; i++) {
 				const double w = W[i];
 				if (w == 0.0) continue;
@@ -2813,6 +2948,7 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 				if (sum > 0.0) { give(bi, wi / sum); give(bo, wo / sum); }
 				else give(centre_basin(), 1.0);
 			}
+			if (batch) batch->leave();
 #pragma omp critical
 			{
 				for (int b = 0; b < nb; b++) { pop[b] += lp[b]; volumes[b] += lv[b]; }
@@ -2842,6 +2978,9 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 			else outside += ncore;
 		}
 	T.lap(fieldname + "point loop");
+	if (g_basin_timing && batch)
+		std::cout << "  [timing] " << fieldname << "GPU field: " << batch->points << " points in " << batch->batches << " batches from "
+			<< loop_threads << " host threads" << (batch->failed ? ", device failed part way, the host finished" : "") << std::endl;
 	{
 		//Read and reset unconditionally so the counts never carry into the next field or molecule
 		long long sv, sf, sfar; double srho;

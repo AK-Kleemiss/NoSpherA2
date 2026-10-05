@@ -5,6 +5,9 @@
 #include "core/constants.h"
 #include "core/cube.h"
 #include "core/properties.h"
+#ifdef NOSPHERA2_USE_GPU
+#include "core/aux_density_gpu.h"
+#endif
 
 #include <cstdlib>
 #include <cmath>
@@ -789,4 +792,66 @@ TEST(BasinStalls, AStalledTrajectoryIsStillAssigned)
 	//A homonuclear diatomic cannot prefer one end. This is the assertion the stall's tie-break exists
 	//for, and it is the one a stall-point tie-break fails.
 	EXPECT_NEAR(n_nuc[0], n_nuc[1], 1e-3) << "the two cobalts split the stalled charge unevenly";
+}
+
+//-basin_gpu: the same streaming integration with every trajectory's field taken from the device,
+//one point per host thread per batch. The device field agrees with the host's to 1e-10 or better
+//(BasinFieldGpuTests), so a probe can only change its basin where it starts on a separatrix, and
+//a bisection then moves a hundred-thousandth of an electron. The window is 1e-4 e per basin.
+static void expect_gpu_matches_host(const std::filesystem::path &wfn, const bool eli_field)
+{
+#ifdef NOSPHERA2_USE_GPU
+	if (!std::filesystem::exists(wfn)) GTEST_SKIP() << "fixture missing: " << wfn.string();
+	if (!aux_density_gpu_available()) GTEST_SKIP() << "no device";
+	struct guard { ~guard() { basin_gpu_set_enabled(false); aux_density_gpu_set_enabled(false); } } restore;
+	aux_density_gpu_set_enabled(true);
+	const WFN wavy(wfn);
+	{
+		//the device has to take the field at all, or the second pass is the first one again
+		const double p[3]{ 0.1, 0.2, 0.3 };
+		double g[3];
+		ASSERT_TRUE(wavy.field_grad_gpu(false, 1, p, nullptr, g)) << "the device declined the field";
+	}
+	const cube rho = seed_cube(wavy, 0.25, 3.0);
+	std::vector<d4> maxima;
+	if (!eli_field) {
+		const std::vector<critical_point> cps = analyze_cube_critical_points(&rho, wavy, false, std::max(1e-8, rho.max_value() * 1e-6));
+		maxima = streaming_density_attractors(wavy, cps, nullptr, nullptr, false);
+	}
+	else {
+		cube eli(rho.get_sizes(), 0, true);
+		for (int k = 0; k < 3; k++) { eli.set_origin(k, rho.get_origin(k)); eli.set_vector(k, k, rho.get_vector(k, k)); }
+		eli.calc_dv();
+		std::ostringstream log;
+		Calc_Eli(eli, wavy, 3.0, log, false);
+		maxima = topological_cube_analysis(&eli, wavy.get_atoms(), false, false, 0.0, 1e-12, -1.0, 5e-3, nullptr, &wavy).second;
+	}
+	ASSERT_FALSE(maxima.empty());
+	vec v_host, v_dev;
+	double o_host = 0.0, o_dev = 0.0;
+	basin_gpu_set_enabled(false);
+	const vec host = integrate_basins_on_atomic_grids(nullptr, nullptr, maxima, wavy, 3, eli_field, v_host, o_host);
+	basin_gpu_set_enabled(true);
+	const vec dev = integrate_basins_on_atomic_grids(nullptr, nullptr, maxima, wavy, 3, eli_field, v_dev, o_dev);
+	ASSERT_EQ(host.size(), dev.size());
+	for (size_t b = 0; b < host.size(); b++) {
+		std::cout << "  basin " << b + 1 << ": host " << host[b] << ", device " << dev[b] << ", diff " << dev[b] - host[b] << std::endl;
+		EXPECT_NEAR(dev[b], host[b], 1e-4) << "basin " << b + 1 << " population";
+		EXPECT_NEAR(v_dev[b], v_host[b], 1e-3 * std::max(1.0, v_host[b])) << "basin " << b + 1 << " volume";
+	}
+	EXPECT_NEAR(o_dev, o_host, 1e-4) << "outside every basin";
+#else
+	(void)wfn; (void)eli_field;
+	GTEST_SKIP() << "built without a GPU backend";
+#endif
+}
+
+TEST(BasinGpu, QTAIMMatchesHostOnNH3Li)
+{
+	expect_gpu_matches_host(nos_test_repo_root() / "tests" / "RGBI_groups" / "nh3li.gbw", false);
+}
+
+TEST(BasinGpu, ELIDMatchesHostOnNH3Li)
+{
+	expect_gpu_matches_host(nos_test_repo_root() / "tests" / "RGBI_groups" / "nh3li.gbw", true);
 }

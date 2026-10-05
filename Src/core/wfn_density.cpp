@@ -2636,10 +2636,37 @@ void WFN::computeGrad(
 
 bool WFN::field_grad_gpu(const bool eli, const int np, const double *pts, double *val, double *grad, double *rho) const
 {
+	void* ctx = field_gpu_open(eli, np);
+	const bool ok = field_gpu_run(ctx, np, pts, val, grad, rho);
+	field_gpu_close(ctx);
+	return ok;
+}
+
+bool WFN::field_gpu_run(void* ctx, const int np, const double *pts, double *val, double *grad, double *rho)
+{
+#ifdef NOSPHERA2_USE_GPU
+	return ctx && basin_field_gpu_run(ctx, np, pts, val, grad, rho);
+#else
+	(void)ctx; (void)np; (void)pts; (void)val; (void)grad; (void)rho;
+	return false;
+#endif
+}
+
+void WFN::field_gpu_close(void* ctx)
+{
+#ifdef NOSPHERA2_USE_GPU
+	if (ctx) basin_field_gpu_close(ctx);
+#else
+	(void)ctx;
+#endif
+}
+
+void* WFN::field_gpu_open(const bool eli, const int max_points) const
+{
 #ifdef NOSPHERA2_USE_GPU
 	const int _nmo = get_nmo(false);
-	if (np <= 0 || !get_coef_primitive_major())
-		return false;
+	if (max_points <= 0 || !get_coef_primitive_major())
+		return nullptr;
 	const int nao = (int)(coef_ao_major.size() / _nmo);
 	//The primitives the host evaluators visit (a function, a type up to l = 10), grouped by
 	//function in ascending wfn order, so every function sums its primitives as ao.add does
@@ -2674,12 +2701,12 @@ bool WFN::field_grad_gpu(const bool eli, const int np, const double *pts, double
 		for (int i = 0; i < nocc; i++) coef[(size_t)a * nocc + i] = coef_ao_major[(size_t)a * _nmo + mos[i]];
 	for (int c = 0; c < ncen; c++)
 		for (int k = 0; k < 3; k++) cxyz[3 * (size_t)c + k] = atoms[c].get_coordinate(k);
-	return basin_field_gpu_eval(eli ? 10 : 4, ncen, cxyz.data(), center_min_exponent.data(), constants::exp_cutoff,
-		nao, start.data(), pc.data(), pl.data(), pe.data(), ps.data(), nocc, coef.data(), occ.data(),
-		np, pts, val, grad, rho);
+	if (nocc == 0) return nullptr;
+	return basin_field_gpu_open(eli ? 10 : 4, ncen, cxyz.data(), center_min_exponent.data(), constants::exp_cutoff,
+		nao, start.data(), pc.data(), pl.data(), pe.data(), ps.data(), nocc, coef.data(), occ.data(), max_points);
 #else
-	(void)eli; (void)np; (void)pts; (void)val; (void)grad; (void)rho;
-	return false;
+	(void)eli; (void)max_points;
+	return nullptr;
 #endif
 }
 

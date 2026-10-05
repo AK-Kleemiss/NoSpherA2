@@ -152,83 +152,124 @@ bool upload(T*& d, const T* h, const size_t n)
 
 } //namespace
 
-bool basin_field_gpu_eval(
+namespace {
+
+struct bf_ctx
+{
+	int K = 0, nao = 0, nocc = 0, chunk = 0;
+	double cutoff = 0;
+	double *c = nullptr, *cmin = nullptr, *pe = nullptr, *ps = nullptr, *coef = nullptr, *occ = nullptr;
+	int *start = nullptr, *pc = nullptr, *pl = nullptr;
+	double *pts = nullptr, *chi = nullptr, *phi = nullptr, *P = nullptr, *val = nullptr, *grad = nullptr, *rho = nullptr;
+	~bf_ctx()
+	{
+		gpuFree(c); gpuFree(cmin); gpuFree(pe); gpuFree(ps); gpuFree(coef); gpuFree(occ);
+		gpuFree(start); gpuFree(pc); gpuFree(pl);
+		gpuFree(pts); gpuFree(chi); gpuFree(phi); gpuFree(P); gpuFree(val); gpuFree(grad); gpuFree(rho);
+	}
+};
+
+} //namespace
+
+void* basin_field_gpu_open(
 	const int K, const int ncen, const double* cxyz, const double* cmin_exp, const double exp_cutoff,
 	const int nao, const int* ao_start, const int* prim_center, const int* prim_l, const double* prim_exp, const double* prim_scale,
-	const int nocc, const double* coef, const double* occ,
-	const int np, const double* pts, double* val, double* grad, double* rho)
+	const int nocc, const double* coef, const double* occ, const int max_points)
 {
-	if (np <= 0 || nao <= 0 || nocc <= 0 || (K != 4 && K != 10)) return false;
-	if (!aux_density_gpu_enabled() || !aux_density_gpu_available()) return false;
+	if (max_points <= 0 || nao <= 0 || nocc <= 0 || (K != 4 && K != 10)) return nullptr;
+	if (!aux_density_gpu_enabled() || !aux_density_gpu_available()) return nullptr;
 	size_t freeb = 0, totalb = 0;
-	if (gpuMemGetInfo(&freeb, &totalb) != gpuSuccess) return false;
+	if (gpuMemGetInfo(&freeb, &totalb) != gpuSuccess) return nullptr;
 
 	//Points per chunk: chi (K x nao), phi and the GEMM workspace (K x nocc each) per point, within half
-	//of what is free. The tables are re-sent every call - a few MB against a call's GEMM.
-	// ponytail: tables uploaded per call; hold them like esp_gpu does if calls get small and frequent
+	//of what is free.
 	const int nprim = ao_start[nao];
 	const size_t per_point = sizeof(double) * ((size_t)K * nao + 2 * (size_t)K * nocc + 8);
 	size_t budget = freeb / 2;
 	if (budget > ((size_t)4 << 30)) budget = (size_t)4 << 30;
 	long long nb = (long long)(budget / per_point);
-	if (nb > np) nb = np;
+	if (nb > max_points) nb = max_points;
 	//the GEMM indexes in int: keep K * nb * nao below 2^31
 	const long long cap = ((1LL << 31) - 1) / ((long long)K * (nao > nocc ? nao : nocc));
 	if (nb > cap) nb = cap;
 	//gemm_gpu's reduce pass puts the K * nb rows on grid y in blocks of 16, which stops at 65535
 	if (nb > 65535LL * 16 / K) nb = 65535LL * 16 / K;
-	if (nb < 1) return false;
-	const int chunk = (int)nb;
+	if (nb < 1) return nullptr;
 
-	double *d_c = nullptr, *d_cmin = nullptr, *d_pe = nullptr, *d_ps = nullptr, *d_coef = nullptr, *d_occ = nullptr;
-	int *d_start = nullptr, *d_pc = nullptr, *d_pl = nullptr;
-	double *d_pts = nullptr, *d_chi = nullptr, *d_phi = nullptr, *d_P = nullptr, *d_val = nullptr, *d_grad = nullptr, *d_rho = nullptr;
-	const size_t ws = gemm_gpu::workspace_elems(K * chunk, nocc, gemm_gpu::split_count(K * chunk, nocc, nao));
-	bool ok = upload(d_c, cxyz, 3 * (size_t)ncen) && upload(d_cmin, cmin_exp, (size_t)ncen)
-		&& upload(d_start, ao_start, (size_t)nao + 1) && upload(d_pc, prim_center, (size_t)nprim)
-		&& upload(d_pl, prim_l, 3 * (size_t)nprim) && upload(d_pe, prim_exp, (size_t)nprim)
-		&& upload(d_ps, prim_scale, (size_t)nprim) && upload(d_coef, coef, (size_t)nao * nocc)
-		&& upload(d_occ, occ, (size_t)nocc)
-		&& gpuMalloc(&d_pts, sizeof(double) * 3 * (size_t)chunk) == gpuSuccess
-		&& gpuMalloc(&d_chi, sizeof(double) * (size_t)K * chunk * nao) == gpuSuccess
-		&& gpuMalloc(&d_phi, sizeof(double) * (size_t)K * chunk * nocc) == gpuSuccess
-		&& gpuMalloc(&d_P, sizeof(double) * ws) == gpuSuccess
-		&& gpuMalloc(&d_val, sizeof(double) * (size_t)chunk) == gpuSuccess
-		&& gpuMalloc(&d_grad, sizeof(double) * 3 * (size_t)chunk) == gpuSuccess
-		&& gpuMalloc(&d_rho, sizeof(double) * (size_t)chunk) == gpuSuccess;
+	bf_ctx* x = new bf_ctx;
+	x->K = K; x->nao = nao; x->nocc = nocc; x->chunk = (int)nb; x->cutoff = exp_cutoff;
+	//split_count grows as the row count shrinks, so a short run can need more workspace than a full
+	//chunk: take the largest m * splits over every row-tile count a run can have
+	const long long mfull = (long long)K * x->chunk;
+	size_t ws = 0;
+	for (long long mt = 1; (mt - 1) * 64 < mfull; mt++)
+	{
+		const int m = (int)(mt * 64 < mfull ? mt * 64 : mfull);
+		const size_t w = gemm_gpu::workspace_elems(m, nocc, gemm_gpu::split_count(m, nocc, nao));
+		if (w > ws) ws = w;
+	}
+	const size_t ch = (size_t)x->chunk;
+	const bool ok = upload(x->c, cxyz, 3 * (size_t)ncen) && upload(x->cmin, cmin_exp, (size_t)ncen)
+		&& upload(x->start, ao_start, (size_t)nao + 1) && upload(x->pc, prim_center, (size_t)nprim)
+		&& upload(x->pl, prim_l, 3 * (size_t)nprim) && upload(x->pe, prim_exp, (size_t)nprim)
+		&& upload(x->ps, prim_scale, (size_t)nprim) && upload(x->coef, coef, (size_t)nao * nocc)
+		&& upload(x->occ, occ, (size_t)nocc)
+		&& gpuMalloc(&x->pts, sizeof(double) * 3 * ch) == gpuSuccess
+		&& gpuMalloc(&x->chi, sizeof(double) * (size_t)K * ch * nao) == gpuSuccess
+		&& gpuMalloc(&x->phi, sizeof(double) * (size_t)K * ch * nocc) == gpuSuccess
+		&& gpuMalloc(&x->P, sizeof(double) * ws) == gpuSuccess
+		&& gpuMalloc(&x->val, sizeof(double) * ch) == gpuSuccess
+		&& gpuMalloc(&x->grad, sizeof(double) * 3 * ch) == gpuSuccess
+		&& gpuMalloc(&x->rho, sizeof(double) * ch) == gpuSuccess;
+	if (!ok)
+	{
+		std::fprintf(stderr, "NoSpherA2 basin field GPU: %s while allocating, falling back to the host\n", gpuGetErrorString(gpuGetLastError()));
+		delete x;
+		return nullptr;
+	}
+	return x;
+}
 
+bool basin_field_gpu_run(void* ctx, const int np, const double* pts, double* val, double* grad, double* rho)
+{
+	bf_ctx* x = (bf_ctx*)ctx;
+	if (!x || np <= 0) return false;
+	const int K = x->K, nao = x->nao, nocc = x->nocc, chunk = x->chunk;
+	bool ok = true;
 	gpuError_t err = gpuSuccess;
 	for (int first = 0; first < np && ok; first += chunk)
 	{
 		const int n = np - first < chunk ? np - first : chunk;
-		ok = gpuMemcpy(d_pts, pts + 3 * (size_t)first, sizeof(double) * 3 * (size_t)n, gpuMemcpyHostToDevice) == gpuSuccess;
+		ok = gpuMemcpy(x->pts, pts + 3 * (size_t)first, sizeof(double) * 3 * (size_t)n, gpuMemcpyHostToDevice) == gpuSuccess;
 		if (!ok) break;
 		const long long work = (long long)n * nao;
 		const unsigned blocks = (unsigned)((work + BF_BLOCK - 1) / BF_BLOCK);
 		if (K == 4)
-			bf_ao_kernel<4><<<blocks, BF_BLOCK>>>(n, nao, d_pts, d_c, d_cmin, exp_cutoff, d_start, d_pc, d_pl, d_pe, d_ps, d_chi);
+			bf_ao_kernel<4><<<blocks, BF_BLOCK>>>(n, nao, x->pts, x->c, x->cmin, x->cutoff, x->start, x->pc, x->pl, x->pe, x->ps, x->chi);
 		else
-			bf_ao_kernel<10><<<blocks, BF_BLOCK>>>(n, nao, d_pts, d_c, d_cmin, exp_cutoff, d_start, d_pc, d_pl, d_pe, d_ps, d_chi);
+			bf_ao_kernel<10><<<blocks, BF_BLOCK>>>(n, nao, x->pts, x->c, x->cmin, x->cutoff, x->start, x->pc, x->pl, x->pe, x->ps, x->chi);
 		//phi (K n x nocc, column-major) = chi (K n x nao) * coef^T, coef being nocc x nao column-major
-		gemm_gpu::launch<double>(false, true, K * n, nocc, nao, 1.0, d_chi, K * n, d_coef, nocc, 0.0, d_phi, K * n, d_P);
+		gemm_gpu::launch<double>(false, true, K * n, nocc, nao, 1.0, x->chi, K * n, x->coef, nocc, 0.0, x->phi, K * n, x->P);
 		const unsigned rb = (unsigned)((n + BF_BLOCK - 1) / BF_BLOCK);
 		if (K == 4)
-			bf_reduce_kernel<4><<<rb, BF_BLOCK>>>(n, nocc, d_occ, d_phi, d_val, d_grad, d_rho);
+			bf_reduce_kernel<4><<<rb, BF_BLOCK>>>(n, nocc, x->occ, x->phi, x->val, x->grad, x->rho);
 		else
-			bf_reduce_kernel<10><<<rb, BF_BLOCK>>>(n, nocc, d_occ, d_phi, d_val, d_grad, d_rho);
+			bf_reduce_kernel<10><<<rb, BF_BLOCK>>>(n, nocc, x->occ, x->phi, x->val, x->grad, x->rho);
 		err = gpuGetLastError();
 		if (err == gpuSuccess) err = gpuDeviceSynchronize();
 		ok = err == gpuSuccess
-			&& gpuMemcpy(grad + 3 * (size_t)first, d_grad, sizeof(double) * 3 * (size_t)n, gpuMemcpyDeviceToHost) == gpuSuccess
-			&& (!val || K == 4 || gpuMemcpy(val + first, d_val, sizeof(double) * (size_t)n, gpuMemcpyDeviceToHost) == gpuSuccess)
-			&& (!rho || gpuMemcpy(rho + first, d_rho, sizeof(double) * (size_t)n, gpuMemcpyDeviceToHost) == gpuSuccess);
+			&& gpuMemcpy(grad + 3 * (size_t)first, x->grad, sizeof(double) * 3 * (size_t)n, gpuMemcpyDeviceToHost) == gpuSuccess
+			&& (!val || K == 4 || gpuMemcpy(val + first, x->val, sizeof(double) * (size_t)n, gpuMemcpyDeviceToHost) == gpuSuccess)
+			&& (!rho || gpuMemcpy(rho + first, x->rho, sizeof(double) * (size_t)n, gpuMemcpyDeviceToHost) == gpuSuccess);
 	}
 	if (!ok)
 		std::fprintf(stderr, "NoSpherA2 basin field GPU: %s, falling back to the host\n", gpuGetErrorString(err != gpuSuccess ? err : gpuGetLastError()));
-	gpuFree(d_c); gpuFree(d_cmin); gpuFree(d_pe); gpuFree(d_ps); gpuFree(d_coef); gpuFree(d_occ);
-	gpuFree(d_start); gpuFree(d_pc); gpuFree(d_pl);
-	gpuFree(d_pts); gpuFree(d_chi); gpuFree(d_phi); gpuFree(d_P); gpuFree(d_val); gpuFree(d_grad); gpuFree(d_rho);
 	return ok;
+}
+
+void basin_field_gpu_close(void* ctx)
+{
+	delete (bf_ctx*)ctx;
 }
 
 NOSPHERA2_GPU_API_END

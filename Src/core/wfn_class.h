@@ -624,6 +624,11 @@ public:
 	//(basin_field_gpu.h): grad 3 per point, val (ELI-D only) and rho optional. False, with nothing
 	//written, when the build has no GPU, there is no device or it declined; the caller keeps its loop.
 	bool field_grad_gpu(bool eli, int np, const double *pts, double *val, double *grad, double *rho = nullptr) const;
+	//The same with the tables held on the device across calls: open (null when declined), run any
+	//number of times from one thread at a time, close. run(null, ...) is false.
+	void* field_gpu_open(bool eli, int max_points) const;
+	static bool field_gpu_run(void* ctx, int np, const double *pts, double *val, double *grad, double *rho = nullptr);
+	static void field_gpu_close(void* ctx);
 	/** Compute ELI alone. */
 	const double computeELI(const d3& PosGrid) const;
 	/** Compute ELF alone. */
