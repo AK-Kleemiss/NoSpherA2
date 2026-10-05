@@ -49,7 +49,7 @@ private:
 
 public:
 
-	void set_symmetry_factors(std::vector<asym_atom>& asym_atoms, const ivec3& linking_list, const ivec& applied_symmetry);
+	void set_symmetry_factors(std::vector<asym_atom>& asym_atoms, const ivec3& linking_list);
 	ivec apply_grown(const hkl_list& hkl, hkl_list& hkl_enlarged, std::vector<asym_atom>& asym_atoms, ivec3& linking_list, ivec3& original_rotations);
 
 
@@ -76,9 +76,6 @@ public:
 	void grow_asym_atoms(std::vector<asym_atom>& asym_atoms, std::vector<asym_atom>& xyz_atoms);
 	void eval_symm(std::vector<asym_atom>& asym_atoms, const int& asymmetric_atoms, ivec3& linking_list);
 	ivec apply_grown(ivec3& linking_list);
-
-	// Retired with orbit_copies: a declaration without a definition only fails at link time in a target that calls it
-	//void set_symmetry_factors(std::vector<asym_atom>& asym_atoms, const ivec3& linking_list);
 
 	// Older working implementation for grown structures, unused, kept for reference.
 	// Grown clusters and the subgroup H of the space group that maps the cluster onto itself:

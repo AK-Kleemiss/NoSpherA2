@@ -8,10 +8,14 @@ namespace eli_family
 	SpinSplit spin_split(const WFN& wave)
 	{
 		const int nmo = wave.get_nmo();
+		//An MO holding more than one electron is spatial whatever its flag: the .wfn/.wfx readers flag
+		//beta where orbital energies stop rising, which splits degenerate restricted pairs
+		bool doubles = false;
+		for (int mo = 0; mo < nmo; mo++) doubles = doubles || wave.get_MO_occ(mo) > 1.0 + 1e-6;
 		int singles = 0;
 		for (int mo = 0; mo < nmo; mo++)
 		{
-			if (wave.get_MO_op(mo) == 1) return SpinSplit::unrestricted;
+			if (!doubles && wave.get_MO_op(mo) == 1) return SpinSplit::unrestricted;
 			const double occ = wave.get_MO_occ(mo);
 			if (occ == 1.0) singles++;
 			else if (occ != 0.0 && occ != 2.0) return SpinSplit::halves;
@@ -195,10 +199,12 @@ namespace eli_family
 		double Na = 0.0, Nb = 0.0;
 		const SpinSplit how = spin_split(wave);
 		const bool has_beta_set = how == SpinSplit::unrestricted;
+		bool fractional = false;
 		for (int mo = 0; mo < wave.get_nmo(); mo++)
 		{
 			const double occ = wave.get_MO_occ(mo);
 			if (occ == 0.0) continue;
+			fractional = fractional || (occ != 1.0 && occ != 2.0);
 			if (!has_beta_set) { double n[2]; mo_spin_occupations(occ, 0, how, n); Na += n[0]; Nb += n[1]; }
 			else if (has_beta_set && wave.get_MO_op(mo) == 1) Nb += occ; else Na += occ;
 		}
@@ -228,7 +234,8 @@ namespace eli_family
 				" family to compute from this wavefunction at all. ";
 			const int stated = (int)wave.get_multi();
 			const int actual = (int)std::lround(std::abs(Na - Nb)) + 1;
-			if (stated > 0 && stated != actual)
+			//restricted natural orbitals split every occupation in halves: no spin count to compare against
+			if (stated > 0 && stated != actual && !(how == SpinSplit::halves && fractional))
 				*warning += "multiplicity label says " + std::to_string(stated)
 				+ " but the orbital occupations give " + std::to_string(actual)
 				+ (spin_polarised ? "" : " (no beta orbital set: this file is restricted)")

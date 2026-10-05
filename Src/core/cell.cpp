@@ -382,7 +382,7 @@ ivec cell::confirm_applied_symmetry(ivec3& linking_list) {
 	return applied_symmetry;
 }
 
-void cell::set_symmetry_factors(std::vector<asym_atom>& asym_atoms, const ivec3& linking_list, const ivec& applied_symmetry) {
+void cell::set_symmetry_factors(std::vector<asym_atom>& asym_atoms, const ivec3& linking_list) {
 	int idx1 = 0;
 	for (asym_atom& a : asym_atoms) {
 		if (!a.grown) {
@@ -401,35 +401,32 @@ void cell::set_symmetry_factors(std::vector<asym_atom>& asym_atoms, const ivec3&
 }
 
 void cell::project_into_subgroup(ivec& applied_symmetry, hkl_list& hkl_enlarged, const hkl_list& hkl, ivec3& linking_list) {
-	ivec additional_symmetries;
-	for (int sym_op1 : applied_symmetry) {
-		for (int sym_op2 = 0; sym_op2 < sym[0][0].size(); sym_op2++) {
-			if (check_identity(sym_op2)) {
-				continue;
-			}
-			if (std::find(applied_symmetry.begin(), applied_symmetry.end(), sym_op2) != applied_symmetry.end()) {
-				continue;
-			}
-			const int equal_to = equal_to_concatenation(sym_op1, sym_op2);
-			if (equal_to == -1) {
-				continue;
-			}
-			if (std::find(additional_symmetries.begin(), additional_symmetries.end(), equal_to) != additional_symmetries.end()) {
-				continue;
-			}
-			if (check_identity(equal_to)) {
-				additional_symmetries.push_back(sym_op2);
-				continue;
-			}
-			additional_symmetries.push_back(sym_op2);
+	// The grown cluster is H(asym) for the subgroup H the applied operations generate, so one operation r
+	// per left coset rH is kept and every r*h is removed: the kept r applied to the cluster then visit
+	// each operation of G once. Pairing op2 with op1*op2 instead held only for |H| = 2 in an abelian group.
+	const int num_sym_ops = static_cast<int>(sym[0][0].size());
+	ivec subgroup = applied_symmetry; // H without the identity, closed under composition
+	for (size_t i = 0; i < subgroup.size(); i++)
+		for (size_t j = 0; j <= i; j++)
+			for (const int c : { equal_to_concatenation(subgroup[i], subgroup[j]), equal_to_concatenation(subgroup[j], subgroup[i]) })
+				if (c >= 0 && !check_identity(c) && std::find(subgroup.begin(), subgroup.end(), c) == subgroup.end())
+					subgroup.push_back(c);
+	bvec removed(num_sym_ops, false);
+	auto keep = [&](const int g) {
+		if (removed[g]) return;
+		for (const int h : subgroup) {
+			const int gh = equal_to_concatenation(g, h);
+			if (gh >= 0 && gh != g) removed[gh] = true;
 		}
-	}
-	for (int i = 0; i < additional_symmetries.size(); i++) {
-		applied_symmetry.push_back(additional_symmetries[i]);
-	}
-	std::sort(applied_symmetry.begin(), applied_symmetry.end());
-	//one sym_op2 can be found for several sym_op1; a duplicate would erase a second, unrelated column
-	applied_symmetry.erase(std::unique(applied_symmetry.begin(), applied_symmetry.end()), applied_symmetry.end());
+		};
+	// the identity coset first: eval_translation_phase reads the unrotated reflection from slot 0;
+	// then the highest index first, which removes what the pairing did wherever that was right
+	for (int g = 0; g < num_sym_ops; g++)
+		if (check_identity(g)) keep(g);
+	for (int g = num_sym_ops - 1; g >= 0; g--) keep(g);
+	applied_symmetry.clear();
+	for (int g = 0; g < num_sym_ops; g++)
+		if (removed[g]) applied_symmetry.push_back(g);
 
 	for (int sym_op : std::views::reverse(applied_symmetry)) {
 		for (ivec2& middle : sym) {

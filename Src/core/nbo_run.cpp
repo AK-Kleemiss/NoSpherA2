@@ -830,6 +830,13 @@ NboComparison compare_nbo_results(const NboResults& ref, const NboResults& cand,
 }
 
 namespace {
+	//POSIX single quotes take everything literally except ' itself, which closes, escapes and reopens
+	std::string sh_quote(const std::string& s) {
+		std::string q = "'";
+		for (const char c : s) q += c == '\'' ? std::string("'\\''") : std::string(1, c);
+		return q + "'";
+	}
+
 	//gennbo wants a stem in its own working directory. On Windows the licensed binary lives in
 	//WSL, so the whole call is handed over with the path translated.
 	std::string gennbo_command(const std::filesystem::path& dir, const std::string& stem, const std::string& exe) {
@@ -840,12 +847,13 @@ namespace {
 			if (wsl_dir.size() > 1 && wsl_dir[1] == ':')
 				wsl_dir = "/mnt/" + std::string(1, static_cast<char>(std::tolower(wsl_dir[0]))) + wsl_dir.substr(2);
 			const std::string bin = exe.empty() ? "~/nbo7/gennbo" : exe;
-			return "wsl bash -lc \"cd '" + wsl_dir + "' && " + bin + " " + stem + "\"";
+			return "wsl bash -lc \"cd " + sh_quote(wsl_dir) + " && " + bin + " " + sh_quote(stem) + "\"";
 		}
-		return "\"" + exe + "\" " + (dir / stem).string();
+		//cmd /c drops the first and the last quote of a line with more than two, hence the outer pair
+		return "\"\"" + exe + "\" \"" + (dir / stem).string() + "\"\"";
 #else
 		const std::string bin = exe.empty() ? "gennbo" : exe;
-		return "cd \"" + std::filesystem::absolute(dir).string() + "\" && " + bin + " " + stem;
+		return "cd " + sh_quote(std::filesystem::absolute(dir).string()) + " && " + bin + " " + sh_quote(stem);
 #endif
 	}
 }
@@ -865,6 +873,9 @@ int run_nbo(const NboRunOptions& o, std::ostream& log) {
 	err_checkf(wavy.write_nbo(f47, o.debug, &log, o.keywords), "Could not write " + f47.string(), log);
 	const double file47_seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
 
+	//a .nbo left by an earlier run would be parsed as this run's output
+	std::error_code ec;
+	std::filesystem::remove(out, ec);
 	const std::string command = gennbo_command(dir, stem, o.executable);
 	log << "Running: " << command << std::endl;
 	t0 = std::chrono::steady_clock::now();
@@ -884,5 +895,5 @@ int run_nbo(const NboRunOptions& o, std::ostream& log) {
 	log << "Parsed " << results.npa.size() << " atoms, " << results.nao.size() << " NAOs, "
 		<< results.orbitals.size() << " NBOs, " << results.e2.size() << " E2 entries, "
 		<< results.nrt.bond_orders.size() << " NRT bond orders -> " << json.string() << std::endl;
-	return 0;
+	return rc;
 }

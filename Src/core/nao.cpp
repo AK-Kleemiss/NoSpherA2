@@ -156,22 +156,29 @@ void natural_minimal_shells(const int Z, int (&n_shell)[4], int (&n_core)[4])
 }
 
 //Shells per l an ECP removes: complete shells in (n, then l) order until its electrons are used up,
-//as ecp_core_orbital_count in bondwise_analysis.cpp
-static constexpr int ecp_removed_shells(const int ecp_electrons, const int l)
+//passing over one they cannot fill (4f under a 54-electron [Xe] core), as ecp_core_orbital_count in
+//bondwise_analysis.cpp. A lanthanide ECP between 46 and 60 electrons is 4f-in-core: [Kr]4d10 and 4f.
+static constexpr int ecp_removed_shells(const int Z, const int ecp_electrons, const int l)
 {
+	if (Z >= 57 && Z <= 71 && ecp_electrons > 46 && ecp_electrons < 60)
+		return l == 3 ? 1 : ecp_removed_shells(Z, 46, l);
 	int electrons = ecp_electrons, removed = 0;
-	for (int n = 1; n <= 7; n++)
-		for (int k = 0; k < n; k++) {
-			if (electrons < 2 * (2 * k + 1)) return removed;
+	for (int n = 1; n <= 7 && electrons > 0; n++)
+		for (int k = 0; k < n && electrons > 0; k++) {
+			if (electrons < 2 * (2 * k + 1)) continue;
 			electrons -= 2 * (2 * k + 1);
 			if (k == l) removed++;
 		}
 	return removed;
 }
-static_assert(ecp_removed_shells(28, 0) == 3 && ecp_removed_shells(28, 1) == 2 && ecp_removed_shells(28, 2) == 1,
+static_assert(ecp_removed_shells(53, 28, 0) == 3 && ecp_removed_shells(53, 28, 1) == 2 && ecp_removed_shells(53, 28, 2) == 1,
 	"a 28-electron ECP covers 1s..3d");
-static_assert(ecp_removed_shells(60, 0) == 4 && ecp_removed_shells(60, 2) == 2 && ecp_removed_shells(60, 3) == 1,
+static_assert(ecp_removed_shells(79, 60, 0) == 4 && ecp_removed_shells(79, 60, 2) == 2 && ecp_removed_shells(79, 60, 3) == 1,
 	"a 60-electron ECP covers 1s..4f");
+static_assert(ecp_removed_shells(55, 54, 0) == 5 && ecp_removed_shells(55, 54, 1) == 4 && ecp_removed_shells(55, 54, 3) == 0,
+	"a 54-electron ECP on Cs is [Xe]: 1s..5p without 4f");
+static_assert(ecp_removed_shells(65, 54, 0) == 4 && ecp_removed_shells(65, 54, 1) == 3 && ecp_removed_shells(65, 54, 3) == 1,
+	"a 54-electron ECP on Tb is 4f-in-core: [Kr]4d10 and 4f, 5s and 5p kept");
 
 std::vector<NAOBasisFunction> spherical_ao_map(const WFN &wavy)
 {
@@ -290,7 +297,7 @@ NAOResult build_naos(const dMatrix2 &P_in, const dMatrix2 &S_in, const std::vect
 		int n_core = (g.l < 4) ? cores[g.l] : 0;
 		//an ECP removes the lowest shells of an l from the basis: the first pre-NAO of this l is the
 		//first shell above the ECP core
-		const int removed = (g.l < 4) ? ecp_removed_shells(ecp_electrons.at(static_cast<size_t>(g.atom)), g.l) : 0;
+		const int removed = (g.l < 4) ? ecp_removed_shells(Z, ecp_electrons.at(static_cast<size_t>(g.atom)), g.l) : 0;
 		n_nmb = std::max(0, n_nmb - removed);
 		n_core = std::max(0, n_core - removed);
 		if (n_nmb > g.nshell) {

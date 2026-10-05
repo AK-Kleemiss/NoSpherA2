@@ -358,8 +358,9 @@ namespace
 				return;
 			}
 			const int a = slots[i].a, b = slots[i].b;
-			//multiplicity above 3 is not a Lewis structure
-			for (int m = 0; m <= std::min(3, left); m++) {
+			//bond multiplicity above 3 is not a Lewis structure; lone pairs run to the atom's cap (F-, Ne: 4)
+			const int mmax = (a == b) ? L.cap[a] : 3;
+			for (int m = 0; m <= std::min(mmax, left); m++) {
 				s.set(a, b, m);
 				if (s.used(a) <= L.cap[a] && s.used(b) <= L.cap[b]) rec(i + 1, left - m);
 				if (out.size() >= cap) break;
@@ -962,11 +963,13 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 
 		//Probe the tiled product against the direct formula
 		const int probes = 96;
-		const int stride = std::max(1, nc * nc / probes);
+		//nc * nc passes INT_MAX from about 46000 candidates
+		const size_t ncc = static_cast<size_t>(nc) * nc;
+		const size_t stride = std::max<size_t>(1, ncc / probes);
 		double worst = 0.0, scale_ref = 1e-300;
 		int bad_i = -1, bad_j = -1;
-		for (int p = 0; p < nc * nc; p += stride) {
-			const int i = p / nc, j = p % nc;
+		for (size_t p = 0; p < ncc; p += stride) {
+			const int i = static_cast<int>(p / nc), j = static_cast<int>(p % nc);
 			if (j < i) continue;
 			const double direct = s2 * (cands[i].V.transpose() * cands[j].V).squaredNorm();
 			const double d = std::abs(direct - G(i, j));

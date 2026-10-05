@@ -20,7 +20,8 @@ namespace eli_family
 	};
 	enum Spin { alpha = 0, beta = 1 };
 
-	//Occupation split over the spins, read off the orbitals.  unrestricted: each MO in its own channel.
+	//Occupation split over the spins, read off the orbitals.  unrestricted: each MO in its own channel
+	//(the spin flags count only while no MO holds more than one electron).
 	//restricted_open: one set, occupations 0/1/2 with at least one 1 and multiplicity (if stated) = singles + 1;
 	//a single is alpha, a double one of each.  halves: any other single set, occ/2 each.
 	//Serial loops only: computeELISpinGrad calls it once per point of a climb

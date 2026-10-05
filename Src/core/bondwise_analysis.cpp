@@ -62,13 +62,18 @@ namespace {
 	}
 
 	//Orbitals an ECP core removes: complete shells in (n, then l) order until its electrons are used up
-	//(60 e on Au -> 30 of 40). Without it the rank would clamp to the whole atomic block.
-	constexpr int ecp_core_orbital_count(const int ecp_electrons) {
+	//(60 e on Au -> 30 of 40), passing over one they cannot fill (4f under a 54-electron [Xe] core).
+	//A lanthanide ECP between 46 and 60 electrons is 4f-in-core: [Kr]4d10 and 4f.
+	//Without it the rank would clamp to the whole atomic block.
+	constexpr int ecp_core_orbital_count(const int atomic_number, const int ecp_electrons) {
+		if (atomic_number >= 57 && atomic_number <= 71 && ecp_electrons > 46 && ecp_electrons < 60)
+			return ecp_core_orbital_count(atomic_number, 46) + 7;
 		int electrons = ecp_electrons;
 		int dimension = 0;
 		for (int n = 1; electrons > 0 && n <= 7; n++)
 			for (int l = 0; l < n && electrons > 0; l++) {
 				const int size = 2 * l + 1;
+				if (electrons < 2 * size) continue;
 				dimension += size;
 				electrons -= 2 * size;
 			}
@@ -79,12 +84,16 @@ namespace {
 	static_assert(free_atom_orbital_count(7) == 5, "N spans 1s, 2s and 2p - a half-filled shell in full");
 	static_assert(free_atom_orbital_count(26) == 15, "Fe spans 1s..4s and 3d");
 	static_assert(free_atom_orbital_count(118) == 59, "the Aufbau list reaches the last element");
-	static_assert(ecp_core_orbital_count(0) == 0, "no ECP removes nothing");
-	static_assert(ecp_core_orbital_count(28) == 14, "a 28-electron ECP covers 1s..3d");
-	static_assert(free_atom_orbital_count(53) - ecp_core_orbital_count(28) == 13,
+	static_assert(ecp_core_orbital_count(6, 0) == 0, "no ECP removes nothing");
+	static_assert(ecp_core_orbital_count(53, 28) == 14, "a 28-electron ECP covers 1s..3d");
+	static_assert(free_atom_orbital_count(53) - ecp_core_orbital_count(53, 28) == 13,
 		"iodine with a 28-electron ECP keeps 4s, 4p, 4d, 5s and 5p");
-	static_assert(free_atom_orbital_count(79) - ecp_core_orbital_count(60) == 10,
+	static_assert(free_atom_orbital_count(79) - ecp_core_orbital_count(79, 60) == 10,
 		"gold with a 60-electron ECP keeps 5s, 5p, 5d and 6s");
+	static_assert(free_atom_orbital_count(55) - ecp_core_orbital_count(55, 54) == 1,
+		"caesium with a 54-electron [Xe] ECP keeps 6s");
+	static_assert(free_atom_orbital_count(65) - ecp_core_orbital_count(65, 54) == 5,
+		"terbium with a 4f-in-core 54-electron ECP keeps 5s, 5p and 6s");
 
 	int atomic_shell_size(const int l, const bool cartesian) {
 		return cartesian ? cartesian_shell_size(l) : 2 * l + 1;
@@ -2216,7 +2225,7 @@ void Roby_information::computeAllAtomicNAOs(WFN &wavy, const bool symmetrize, co
 		const bool spherical = !wavy.get_d_f_switch();
 		const int keep_orbitals = legacy_occupancy_cutoff
 			? -1
-			: free_atom_orbital_count(a.get_charge()) - ecp_core_orbital_count(a.get_ECP_electrons());
+			: free_atom_orbital_count(a.get_charge()) - ecp_core_orbital_count(a.get_charge(), a.get_ECP_electrons());
 
 		auto make_molecular_fallback = [&]() {
 			auto fallback = calculateAtomicNAO(density_matrix, overlap_matrix,
