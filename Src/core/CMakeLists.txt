@@ -300,6 +300,11 @@ if(APPLE)
         PRIVATE
             ACCELERATE_NEW_LAPACK
     )
+    #macOS ucontext.h refuses to compile without _XOPEN_SOURCE, and only with it does ucontext_t carry
+    #the storage getcontext writes the registers into. It has to be set before the first system
+    #header, and the PCH (stdlib.h -> sys/signal.h) would define ucontext_t without that storage first.
+    set_source_files_properties("${CMAKE_CURRENT_SOURCE_DIR}/fiber_loop.cpp"
+        PROPERTIES SKIP_PRECOMPILE_HEADERS ON COMPILE_DEFINITIONS "_XOPEN_SOURCE=700;_DARWIN_C_SOURCE")
 else()
     target_link_libraries(
         NoSpherA2Core
