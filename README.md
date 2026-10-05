@@ -18,6 +18,7 @@ This software makes extensive use of the following external packages:
 - [mdspan](https://github.com/kokkos/mdspan/tree/stable)
 - [featomic](https://github.com/metatensor/featomic)
 - [occ](https://github.com/peterspackman/occ)
+  - OCC was extensively used in XCW and is the engine used for calculating WFNs inside NoSpherA2. Please cite it if those functionalities were used.
 
 ## Building NoSpherA2
 To clone this repository with all of its dependencies do:
