@@ -392,6 +392,22 @@ std::string help_message =
  "                                    condensed Fukui functions under Hirshfeld,\n"
  "                                    Becke, TFVC, MBIS and EMBIS. No cubes, so\n"
  "                                    no grid, radius or CIF is needed.\n"
+ "  -eqc <gbw> -eqc_frag <atoms> <charge> <mult> <atoms> <charge> <mult> ...\n"
+ "                                    Rahm-Hoffmann EQC energy decomposition of\n"
+ "                                    the bonds between the fragments: Delta E\n"
+ "                                    into Delta(nX) and Delta(Vnn-Eee), Q and\n"
+ "                                    the covalency index. occ re-converges the\n"
+ "                                    parent from the gbw, then each fragment\n"
+ "                                    from the parent's density. Atoms are\n"
+ "                                    0-based, e.g. 0,2-4.\n"
+ "    -eqc_method <hf|functional>     occ method, default hf (match the gbw).\n"
+ "    -eqc_basis <name>               Basis by name instead of from the gbw;\n"
+ "                                    needed when the gbw uses ECPs.\n"
+ "    -eqc_cold                       Also converge from occ's own guess.\n"
+ "  -eqc_wfn <parent> <frag> <frag> ...\n"
+ "                                    EQC from given wavefunctions, no SCF:\n"
+ "                                    wfx or fchk; wfn, gbw or molden with the\n"
+ "                                    ORCA .out of the same name beside them.\n"
  "  -radius <angstrom>  -resolution <angstrom>\n"
  "                                    Grid settings for property calculations.\n"
  "  -hirsh <atom-index>                Hirshfeld analysis for one atom.\n"
@@ -3644,6 +3660,41 @@ bool options::digest_property_options(const std::string &temp, int &i)
 			i++;
 		}
 	}
+	else if (temp == "-eqc")
+	{
+		// Only records the request; eqc::run is called from run_app_impl.
+		eqc = true;
+		if (i + 1 < argc && arguments[i + 1][0] != '-')
+			wfn = arguments[++i];
+	}
+	else if (temp == "-eqc_frag")
+	{
+		// Triples <atoms> <charge> <multiplicity> for as long as the next token starts with a
+		// digit; a charge may be negative, which is why only the atoms token is tested
+		while (i + 3 < argc && std::isdigit(static_cast<unsigned char>(arguments[i + 1][0])))
+		{
+			eqc_fragment f;
+			f.atoms = parse_rgbi_group_indices(arguments[i + 1]);
+			f.charge = std::stoi(arguments[i + 2]);
+			f.mult = std::stoi(arguments[i + 3]);
+			err_checkf(f.mult >= 1, "-eqc_frag: multiplicity must be 1 or more", std::cout);
+			eqc_frags.push_back(f);
+			i += 3;
+		}
+		err_checkf(!eqc_frags.empty(), "-eqc_frag wants <atoms> <charge> <multiplicity> triples", std::cout);
+	}
+	else if (temp == "-eqc_wfn")
+	{
+		eqc = true;
+		while (i + 1 < argc && arguments[i + 1][0] != '-')
+			eqc_wfns.emplace_back(arguments[++i]);
+	}
+	else if (temp == "-eqc_method")
+		eqc_method = arguments[++i];
+	else if (temp == "-eqc_basis")
+		eqc_basis = arguments[++i];
+	else if (temp == "-eqc_cold")
+		eqc_cold = true;
 	else if (temp == "-ewal_sum")
 	{
 		// bool read, WFN& wave, std::ostream& file,
@@ -4229,7 +4280,7 @@ const char *owning_analysis(const std::string &flag)
 	static const std::pair<const char *, const char *> families[] = {
 		{"-rgbi", "RGBI"}, {"-npa", "NPA"}, {"-nbo", "NBO"}, {"-nrt", "NRT"},
 		{"-nao", "NAO"}, {"-eli", "ELI-D"}, {"-elf", "ELF"}, {"-qtaim", "QTAIM"},
-		{"-basin", "QTAIM basin"}, {"-topology", "topology"}};
+		{"-basin", "QTAIM basin"}, {"-topology", "topology"}, {"-eqc", "EQC"}};
 	for (const auto &f : families)
 		if (flag.rfind(f.first, 0) == 0)
 			return f.second;
@@ -4243,6 +4294,7 @@ namespace {
 	{
 		if (o.qct) return "-qct";
 		if (o.fukui_analysis_run) return "-fukui_analysis";
+		if (o.eqc) return "-eqc";
 		if (o.fba) return "-fba";
 		if (o.eli_analysis_run) return "-eli_analysis";
 		if (o.fract) return "-fractal";

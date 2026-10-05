@@ -1046,6 +1046,15 @@ TEST(ConvenienceOptionsTests, IsosurfaceAndAnalysisOptionsReadOptionalValues)
 	const options fukui_bare = parse({ "-fukui_analysis", "-acc", "1" });
 	EXPECT_TRUE(fukui_bare.fukui_analysis_run);
 	EXPECT_TRUE(fukui_bare.wfn.empty());
+	//-eqc_frag reads triples until a flag; a negative charge must not end the list
+	const options eqc = parse({ "-eqc", "mol.gbw", "-eqc_frag", "0,2-4", "1", "1", "1", "-1", "1", "-eqc_cold" });
+	EXPECT_TRUE(eqc.eqc);
+	EXPECT_TRUE(eqc.eqc_cold);
+	EXPECT_EQ(eqc.wfn, std::filesystem::path("mol.gbw"));
+	ASSERT_EQ(eqc.eqc_frags.size(), 2u);
+	EXPECT_EQ(eqc.eqc_frags[0].atoms, (ivec{ 0, 2, 3, 4 }));
+	EXPECT_EQ(eqc.eqc_frags[1].charge, -1);
+	EXPECT_EQ(eqc.eqc_frags[1].mult, 1);
 	const options pol = parse({ "-polarizabilities", "a", "b", "c", "d", "e", "f", "g" });
 	ASSERT_EQ(pol.pol_wfns.size(), 7u);
 	EXPECT_EQ(pol.pol_wfns[6], std::filesystem::path("g"));

@@ -19,6 +19,7 @@
 #include "citations.h"
 #include "b2c.h"
 #include "section_log.h"
+#include "eqc.h"
 #include <future>
 #ifdef NOSPHERA2_USE_GPU
 #include "grid_gpu.h"
@@ -197,6 +198,16 @@ static int run_app_impl(int argc, char **argv)
 		std::cout.rdbuf(_coutbuf); // reset to standard output again
 		fukui_analysis(opt, std::cout);
 		return 0;
+	}
+	//EQC energy decomposition and quit; its tables go to stdout and <stem>.eqc_log
+	if (opt.eqc)
+	{
+		log_file.flush();
+		std::cout.rdbuf(_coutbuf);
+		//Only a basis loaded by name needs occ's data directory; the gbw carries its own
+		const bool have_data = ensure_occ_data_path((argc > 0) ? argv[0] : nullptr);
+		err_checkf(have_data || opt.eqc_basis.empty(), "-eqc_basis needs occ's data directory (set OCC_DATA_PATH)", std::cout);
+		return eqc::run(opt);
 	}
 	//Full bonding analysis and quit. Each stage rereads the wavefunction: RGBI and the NBO search modify it,
 	//and the basins must not see that

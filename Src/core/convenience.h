@@ -977,6 +977,19 @@ struct options
 	bool gpu_cublas = true;
 	//Standalone conceptual-DFT reactivity analysis (-fukui_analysis), run from run_app_impl rather than at parse time so its output survives
 	bool fukui_analysis_run = false;
+	//EQC decomposition (-eqc), run from run_app_impl like -fukui_analysis; fragments are 0-based atoms, charge, mult
+	bool eqc = false;
+	struct eqc_fragment
+	{
+		ivec atoms;
+		int charge = 0;
+		int mult = 1;
+	};
+	std::vector<eqc_fragment> eqc_frags;
+	std::vector<std::filesystem::path> eqc_wfns;
+	std::string eqc_method = "hf";  //occ's method name: hf or a functional
+	std::string eqc_basis;          //a basis-library name; empty takes the basis out of the gbw
+	bool eqc_cold = false;          //also converge everything from occ's own guess, to count what seeding saves
 	//Basin analysis (-eli_analysis), run from run_app_impl for the same reason
 	bool eli_analysis_run = false;
 	//-fba: RGBI, native NBO/NPA with NRT, bondwise Laplacian, QTAIM and ELI-D on one wavefunction

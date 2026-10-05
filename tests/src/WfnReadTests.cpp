@@ -1068,14 +1068,16 @@ namespace
 	//------------------------------------------------------------ occ bridge ------------------------------------------------------------
 
 	//H2 in a one-primitive s + p basis through OCC's SCF (deliberately compact exponents, so the orbital energies are
-	//positive, but the SCF is well defined)
-	static occ::qm::Wavefunction h2_occ_wavefunction()
+	//positive, but the SCF is well defined); lmax = 4 adds d, f and g and tilts the bond off z so every m mixes in
+	static occ::qm::Wavefunction h2_occ_wavefunction(const int lmax = 1)
 	{
 		spdlog::set_level(spdlog::level::err);
-		const std::vector<occ::core::Atom> atoms{ { 1, 0.0, 0.0, -0.7 }, { 1, 0.0, 0.0, 0.7 } };
+		const std::vector<occ::core::Atom> atoms = lmax == 1
+			? std::vector<occ::core::Atom>{ { 1, 0.0, 0.0, -0.7 }, { 1, 0.0, 0.0, 0.7 } }
+			: std::vector<occ::core::Atom>{ { 1, -0.31, -0.42, -0.5 }, { 1, 0.31, 0.42, 0.5 } };
 		std::vector<occ::gto::Shell> shells;
 		for (const auto& at : atoms)
-			for (int l = 0; l <= 1; l++)
+			for (int l = 0; l <= lmax; l++)
 			{
 				shells.emplace_back(l, vec{ l == 0 ? 1.2 : 0.9 }, vec2{ { 1.0 } }, std::array<double, 3>{ at.x, at.y, at.z });
 				shells.back().kind = occ::gto::Shell::Kind::Spherical;
@@ -1130,6 +1132,27 @@ namespace
 		for (int i = 0; i < wf.mo.D.rows(); i++)
 			for (int j = 0; j < wf.mo.D.cols(); j++)
 				EXPECT_NEAR(back.mo.D(i, j), wf.mo.D(i, j), 1e-6) << i << "," << j;
+	}
+
+	//f(+-3), g(+-3) and g(+-4) change sign between the sph2cart tables and OCC in both directions; a missed flip
+	//on the way back leaves those rows of D with the wrong sign and the second WFN with another density
+	TEST(WfnReadIoTests, OccRoundTripKeepsFAndGPhases)
+	{
+		const occ::qm::Wavefunction wf = h2_occ_wavefunction(4);
+		WFN w(wf, false);
+		occ::qm::Wavefunction back;
+		w.wfn_to_occ_wavefunction(back);
+		ASSERT_EQ(back.mo.D.rows(), wf.mo.D.rows());
+		double flipped = 0.0;
+		for (size_t s = 0; s < wf.basis.size(); s++)
+			for (int m = 3; m <= wf.basis[s].l; m++)
+				flipped = std::max(flipped, wf.mo.D.row(wf.basis.first_bf()[s] + wf.basis[s].l + m).cwiseAbs().maxCoeff());
+		ASSERT_GT(flipped, 1e-4) << "the tilted bond should put weight on the |m| >= 3 rows";
+		for (int i = 0; i < wf.mo.D.rows(); i++)
+			for (int j = 0; j < wf.mo.D.cols(); j++)
+				EXPECT_NEAR(back.mo.D(i, j), wf.mo.D(i, j), 1e-6) << i << "," << j;
+		WFN again(back, false);
+		expect_same_density(w, again, 1e-6);
 	}
 
 	//------------------------------------------------------------ death tests ------------------------------------------------------------
