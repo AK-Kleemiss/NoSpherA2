@@ -641,6 +641,20 @@ TEST(TomlIntegrationTests, EqcWaterFAndGShells)
 	EXPECT_TRUE(result.success) << result.message;
 }
 
+//Mode 1 with a functional and charged fragments: CH3F -> CH3+ + F-, PBE0/def2-SVP
+TEST(TomlIntegrationTests, EqcCh3fHeterolyticPbe0)
+{
+	const UT_Result result = run_inprocess_test(get_repo_root(), "eqc_ch3f_pbe0");
+	EXPECT_TRUE(result.success) << result.message;
+}
+
+//Mode 2 on the same reaction, every term read from ORCA wfx files
+TEST(TomlIntegrationTests, EqcCh3fFromWfx)
+{
+	const UT_Result result = run_inprocess_test(get_repo_root(), "eqc_ch3f_wfx");
+	EXPECT_TRUE(result.success) << result.message;
+}
+
 TEST(TomlIntegrationTests, GrownWater)
 {
 	const UT_Result result = run_inprocess_test(get_repo_root(), "grown_water");

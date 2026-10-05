@@ -53,6 +53,7 @@ namespace citations
 			{Method::GordonKim, "Gordon-Kim", "Gordon & Kim, J. Chem. Phys. 56 (1972) 3122", "10.1063/1.1677649"},
 			{Method::EQC, "EQC", "Rahm & Hoffmann, J. Am. Chem. Soc. 137 (2015) 10282", "10.1021/jacs.5b05600"},
 			{Method::EQC, "EQC", "Rahm & Hoffmann, J. Am. Chem. Soc. 138 (2016) 3731", "10.1021/jacs.5b12434"},
+			{Method::EQC, "EQC", "Rahm, Zeng & Hoffmann, J. Am. Chem. Soc. 141 (2019) 342", "10.1021/jacs.8b10246"},
 		};
 		return refs;
 	}

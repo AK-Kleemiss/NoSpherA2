@@ -161,6 +161,24 @@ actual = "water.eqc_log"
 eqc = "water.gbw"
 eqc_frag = ["0,1", 0, 2, 2, 0, 2]
 
+[eqc_ch3f_pbe0]
+directory = "eqc_ch3f_pbe0"
+good = "eqc_ch3f_pbe0.good"
+actual = "parent.eqc_log"
+
+[eqc_ch3f_pbe0.args]
+eqc = "parent.gbw"
+eqc_frag = ["0,2-4", 1, 1, 1, -1, 1]
+eqc_method = "pbe0"
+
+[eqc_ch3f_wfx]
+directory = "eqc_ch3f_wfx"
+good = "eqc_ch3f_wfx.good"
+actual = "parent.eqc_log"
+
+[eqc_ch3f_wfx.args]
+eqc_wfn = ["parent.wfx", "ch3p.wfx", "fm.wfx"]
+
 [intermolecular_nci]
 directory = "intermolecular_nci"
 good = "good.dat"

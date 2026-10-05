@@ -17,6 +17,7 @@ This Software is published with BSD-2 clause license.
   References for this analysis:
     [EQC] Rahm & Hoffmann, J. Am. Chem. Soc. 137 (2015) 10282, DOI 10.1021/jacs.5b05600
     [EQC] Rahm & Hoffmann, J. Am. Chem. Soc. 138 (2016) 3731, DOI 10.1021/jacs.5b12434
+    [EQC] Rahm, Zeng & Hoffmann, J. Am. Chem. Soc. 141 (2019) 342, DOI 10.1021/jacs.8b10246
 EQC analysis, Mode 1: water.gbw, charge 0, multiplicity 1, 67 basis functions (from the gbw), 2 fragments, method hf
 
 Parent: E(ORCA) n/a (no water.out), E(occ) at the gbw orbitals -76.059090445, E(occ) converged -76.059090445 hartree

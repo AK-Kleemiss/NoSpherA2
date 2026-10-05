@@ -11,39 +11,36 @@ This Software is published with BSD-2 clause license.
 ================================================================================
   EQC energy decomposition analysis
 ================================================================================
-  Wavefunction : ethane.gbw
+  Wavefunction : parent.wfx
   Full run log : NoSpherA2.log (this file repeats the result sections of it)
 
   References for this analysis:
     [EQC] Rahm & Hoffmann, J. Am. Chem. Soc. 137 (2015) 10282, DOI 10.1021/jacs.5b05600
     [EQC] Rahm & Hoffmann, J. Am. Chem. Soc. 138 (2016) 3731, DOI 10.1021/jacs.5b12434
     [EQC] Rahm, Zeng & Hoffmann, J. Am. Chem. Soc. 141 (2019) 342, DOI 10.1021/jacs.8b10246
-EQC analysis, Mode 1: ethane.gbw, charge 0, multiplicity 1, 58 basis functions (from the gbw), 2 fragments, method hf
+EQC analysis, Mode 2: parent and fragments read from files
 
-Parent: E(ORCA) n/a (no ethane.out), E(occ) at the gbw orbitals -79.174969626, E(occ) converged -79.174969626 hartree
-        E(occ, gbw orbitals) - E(occ) -8.527e-14, nX(occ) - nX(ORCA) 1.788e-08
-        gbw max|C^T S C - 1| 3.442e-15, 4 iterations to re-converge
-Mode 1 (seeded): parent from the ORCA gbw re-converged in occ, fragments converged in occ from the parent's density block; SCF iterations parent 4 fragment 1 16 fragment 2 16
+Mode 2 (external wavefunctions): every term read from its file, no SCF run
 
 Terms per wavefunction (eV; Eee = Vnn - (E - nX))
                 n                 E                nX               Vnn               Eee   iter   cold  source
-parent         18      -2154.460585      -1467.137927       1147.516133       1834.838791      4      -  ORCA gbw, re-converged in occ HF
-fragment 1      9      -1075.383066       -732.470244        261.375641        604.288463     16      -  occ HF, seeded from the parent
-fragment 2      9      -1075.383066       -732.470244        261.375641        604.288463     16      -  occ HF, seeded from the parent
+parent         18      -3795.519079      -2128.813069       1016.761674       2683.467684      -      -  parent.wfx
+fragment 1      8      -1070.643189       -725.817275        261.977828        606.803742      -      -  ch3p.wfx
+fragment 2     10      -2710.119451      -1323.482732          0.000000       1386.636719      -      -  fm.wfx
 
 Fragments -> parent, products minus reactants (eV), as X-analysis -m 2 prints it
-  Delta E               -3.694453
-  Delta(nX-bar)         -2.197440
-  Delta(Vnn-Eee)        -1.497013
-  Delta(E/n)            -0.205247
-  Delta(X-bar)          -0.122080
-  Delta(Vnn/n)          34.709158
-  Delta(Eee/n)          34.792326
-  Delta(Vnn-Eee)/n      -0.083167
-  Q                      0.189589
-  Delta|Eee/E| (%)      28.971792
-  Covalency (%)         59.479440
-  Ionicity (%)          40.520560
+  Delta E              -14.756440
+  Delta(nX-bar)        -79.513063
+  Delta(Vnn-Eee)        64.756623
+  Delta(E/n)            -0.819802
+  Delta(X-bar)          -4.417392
+  Delta(Vnn/n)          41.932436
+  Delta(Eee/n)          38.334846
+  Delta(Vnn-Eee)/n       3.597590
+  Q                      9.776727
+  Delta|Eee/E| (%)      17.975058
+  Covalency (%)         55.114186
+  Ionicity (%)          44.885814
 
 ================================================================================
   End of eqc results

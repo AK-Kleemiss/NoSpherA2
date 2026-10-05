@@ -98,6 +98,24 @@ namespace NoSpherA2IntegrationTests
             });
         }
 
+        TEST_METHOD(eqc_ch3f_pbe0)
+        {
+            RunTest({
+                "eqc_ch3f_pbe0", "eqc_ch3f_pbe0", "eqc_ch3f_pbe0.good", "parent.eqc_log",
+                {"-eqc","parent.gbw", "-eqc_frag","0,2-4","1","1","1","-1","1", "-eqc_method","pbe0",
+                 "-all_charges", "-no_date", "-no_gpu_grid"}
+            });
+        }
+
+        TEST_METHOD(eqc_ch3f_wfx)
+        {
+            RunTest({
+                "eqc_ch3f_wfx", "eqc_ch3f_wfx", "eqc_ch3f_wfx.good", "parent.eqc_log",
+                {"-eqc_wfn","parent.wfx","ch3p.wfx","fm.wfx",
+                 "-all_charges", "-no_date", "-no_gpu_grid"}
+            });
+        }
+
         TEST_METHOD(grown_water)
         {
             RunTest({

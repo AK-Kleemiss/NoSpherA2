@@ -1055,6 +1055,14 @@ TEST(ConvenienceOptionsTests, IsosurfaceAndAnalysisOptionsReadOptionalValues)
 	EXPECT_EQ(eqc.eqc_frags[0].atoms, (ivec{ 0, 2, 3, 4 }));
 	EXPECT_EQ(eqc.eqc_frags[1].charge, -1);
 	EXPECT_EQ(eqc.eqc_frags[1].mult, 1);
+	EXPECT_EQ(eqc.eqc_method, "hf");
+	//-eqc_wfn alone switches EQC on and reads files until the next flag
+	const options eqc_wfn = parse({ "-eqc_wfn", "p.wfx", "a.wfx", "b.fchk", "-eqc_method", "pbe0", "-eqc_basis", "def2-svp" });
+	EXPECT_TRUE(eqc_wfn.eqc);
+	ASSERT_EQ(eqc_wfn.eqc_wfns.size(), 3u);
+	EXPECT_EQ(eqc_wfn.eqc_wfns[2], std::filesystem::path("b.fchk"));
+	EXPECT_EQ(eqc_wfn.eqc_method, "pbe0");
+	EXPECT_EQ(eqc_wfn.eqc_basis, "def2-svp");
 	const options pol = parse({ "-polarizabilities", "a", "b", "c", "d", "e", "f", "g" });
 	ASSERT_EQ(pol.pol_wfns.size(), 7u);
 	EXPECT_EQ(pol.pol_wfns[6], std::filesystem::path("g"));

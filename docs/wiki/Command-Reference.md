@@ -301,6 +301,7 @@ ionicity). Two modes:
 
 Example, ethane into two methyl radicals:
 `NoSpherA2 -eqc ethane.gbw -eqc_frag 0,2-4 0 2 1,5-7 0 2`.
+Theory, every output line and the caveats: [EQC energy decomposition](EQC-Energy-Decomposition.md).
 
 ## 8. RI density fitting, SALTED and interaction energies
 
