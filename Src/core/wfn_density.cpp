@@ -46,9 +46,21 @@ namespace
 			else
 				for (int k = 0; k < K; k++) t[k] += s * chi[k];
 		}
-		//phi[k * nmo + mo] += sum_A v[A][k] C[A][mo]
-		void to_mo(const double* coef_ao, const int nmo, double* phi)
+		//phi[k * nmo + mo] += sum_A v[A][k] C[A][mo], over the occupied MOs only: every caller weighs
+		//phi by the occupation, so the virtuals (most of nmo in a big basis) stay at the caller's zero.
+		//The runs of occ != 0 are rescanned per call, O(nmo) against touched * K * nmo, so an
+		//occupation changed behind the coefficient cache can never go stale; the per-MO sum order is
+		//unchanged, so the occupied values are bit-identical to the full loop
+		ivec runs;
+		template <class Occ>
+		void to_mo(const double* coef_ao, const int nmo, double* phi, Occ occ)
 		{
+			runs.clear();
+			for (int mo = 0; mo < nmo; mo++)
+				if (occ(mo) != 0.0) {
+					if (runs.empty() || runs.back() != mo) { runs.push_back(mo); runs.push_back(mo + 1); }
+					else runs.back() = mo + 1;
+				}
 			for (const int a : touched) {
 				hit[a] = 0;
 				const double* c = coef_ao + (size_t)a * nmo;
@@ -56,7 +68,8 @@ namespace
 				for (int k = 0; k < K; k++) {
 					double* const pk = phi + (size_t)k * nmo;
 					const double ck = t[k];
-					for (int mo = 0; mo < nmo; mo++) pk[mo] += ck * c[mo];
+					for (size_t r = 0; r < runs.size(); r += 2)
+						for (int mo = runs[r]; mo < runs[r + 1]; mo++) pk[mo] += ck * c[mo];
 				}
 			}
 		}
@@ -489,7 +502,7 @@ const double WFN::compute_dens_cartesian(
 
 		ao.add(prim_ao[j], prim_ao_scale[j], &ex);
 	}
-	ao.to_mo(coef_ao_major.data(), nmo, phi_data);
+	ao.to_mo(coef_ao_major.data(), nmo, phi_data, [MOs_data](const int mo) { return MOs_data[mo].get_occ(); });
 
 	// use pointer arithmetic and minimize overhead
 	const double *phi_ptr = phi_data;
@@ -2313,7 +2326,7 @@ bool WFN::eli_orbital_pass(const d3 &PosGrid, vec &phi) const
 		ao.add(prim_ao[j], prim_ao_scale[j], chi);
 	}
 	//Component-major, as in computeGrad: ten unit-stride accumulations per function
-	ao.to_mo(coef_ao_major.data(), _nmo, phi.data());
+	ao.to_mo(coef_ao_major.data(), _nmo, phi.data(), [this](const int mo) { return MOs[mo].get_occ(); });
 	return true;
 }
 
@@ -2609,7 +2622,7 @@ void WFN::computeGrad(
 		ao.add(prim_ao[j], prim_ao_scale[j], chi);
 	}
 	//Component-major: phi[k * nmo + mo], unit stride against one broadcast scalar per function
-	ao.to_mo(coef_ao_major.data(), _nmo, phi.data());
+	ao.to_mo(coef_ao_major.data(), _nmo, phi.data(), [this](const int mo) { return MOs[mo].get_occ(); });
 
 	double Grad[3]{ 0, 0, 0 }, Rho = 0.0;
 
