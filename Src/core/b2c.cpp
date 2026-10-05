@@ -1769,9 +1769,10 @@ std::vector<d4> streaming_density_attractors(const WFN &wavy, const std::vector<
 
 static int g_basin_gpu = -1;
 void basin_gpu_set_mode(const int mode) { g_basin_gpu = mode < 0 ? -1 : mode > 0; }
-//Auto keeps the host below this cost per field evaluation, about what a park and batch costs a host thread
-//(-tune NOS_BASIN_GPU_MIN_US overrides)
-static constexpr double basin_gpu_min_us = 3.0;
+//Auto keeps the host below this cost per field evaluation: a device-fed thread pays a fixed host cost per evaluation
+//(park, batch, copies, driver contention) that the probe does not see (-tune NOS_BASIN_GPU_MIN_US overrides).
+//ponytail: one break-even taken at 24 host threads; fewer threads break even lower, a per-thread-count model if it matters
+static constexpr double basin_gpu_min_us = 15.0;
 
 //One per host thread of a device-fed loop. Each fiber (fiber_loop) holds a trajectory and parks its evaluations here;
 //once all have parked or finished the round goes to the device as one batch on this feed's own context and stream.

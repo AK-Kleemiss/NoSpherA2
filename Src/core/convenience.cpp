@@ -505,7 +505,7 @@ std::string help_message =
  "                                    and ELI-D trajectories' field and the ELI-D\n"
  "                                    maxima climbs on the GPU. Default: the GPU\n"
  "                                    when one is found, a host evaluation costs\n"
- "                                    at least 3 us (-tune NOS_BASIN_GPU_MIN_US)\n"
+ "                                    at least 15 us (-tune NOS_BASIN_GPU_MIN_US)\n"
  "                                    and the device outruns all host threads;\n"
  "                                    the log says which ran and why.\n"
  "  -adaptive_step                     Let a straight run of field earn a longer\n"
