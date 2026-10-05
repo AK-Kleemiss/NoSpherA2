@@ -5,6 +5,7 @@
 #include "core/atoms.h"
 #include "core/constants.h"
 #include "core/cube.h"
+#include "core/fiber_loop.h"
 #include "core/properties.h"
 #ifdef NOSPHERA2_USE_GPU
 #include "core/aux_density_gpu.h"
@@ -665,6 +666,25 @@ static void expect_gpu_matches_host(const std::filesystem::path &wfn, const bool
 	(void)wfn; (void)eli_field;
 	GTEST_SKIP() << "built without a GPU backend";
 #endif
+}
+
+//Every body runs once and keeps its own stack across parks; a round ends once all live fibers have parked
+TEST(FiberLoop, BodiesKeepTheirStacksAcrossParks)
+{
+	const int n = 1000, parks = 5;
+	std::atomic<int> next{ 0 };
+	int rounds = 0, wrong = 0;
+	std::vector<int> ran(n, 0);
+	fiber_loop(16, next, n, [&](const int i) {
+		double mine[32];
+		for (int k = 0; k < 32; k++) mine[k] = i * 32.0 + k;
+		for (int y = 0; y < parks; y++) { fiber_yield(); mine[y] += 0.25; }
+		for (int k = 0; k < 32; k++) wrong += mine[k] != i * 32.0 + k + (k < parks ? 0.25 : 0.0);
+		ran[i]++;
+	}, [&]() { rounds++; });
+	EXPECT_EQ(wrong, 0);
+	EXPECT_EQ(std::count(ran.begin(), ran.end(), 1), n);
+	EXPECT_GE(rounds, n / 16 * parks);
 }
 
 TEST(BasinGpu, QTAIMMatchesHostOnNH3Li)
