@@ -843,6 +843,7 @@ std::string NoSpherA2_message(bool no_date)
 		t.append("   https://github.com/lab-cosmo/metatensor\n");
 		t.append("   This software utilizes Intel(c) Math Kernel Library (oneMKL), version 2025.2.0.629, for optimized mathematical computations\n");
 		t.append("OCC can be found at: https://github.com/peterspackman/occ\n");
+		t.append("OCC was published at        : Spackman et al. OCC, Zenodo 2026, doi:10.5281/zenodo.10703204.\n");
 		t.append("NoSpherA2 was published at  : Kleemiss et al. Chem. Sci., 2021, 12, 1675 - 1692.\n");
 		t.append("Slater IAM was published at : Kleemiss et al. J. Appl. Cryst. 2024, 57, 161 - 174.\n");
 		t.append("ECP correction functions at : Kleemiss et al. J. Appl. Cryst. 2025, 58, 374 - 382.\n");

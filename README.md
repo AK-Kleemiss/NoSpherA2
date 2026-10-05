@@ -12,9 +12,15 @@ Olex2 is provided free of charge by OlexSys Ltd. (https://www.olexsys.org)
 
 The software is provided as-is under the BSD-2 licence. Please see [LICENSE](./LICENSE) for further details!
 
-## Building NoSpherA2
+## Acknowledgments
+This software makes extensive use of the following external packages:
+- [libcint](https://github.com/sunqm/libcint)
+- [mdspan](https://github.com/kokkos/mdspan/tree/stable)
+- [featomic](https://github.com/metatensor/featomic)
+- [occ](https://github.com/peterspackman/occ)
 
-NoSpherA2 relies heavily on the submodule [featomic](https://github.com/metatensor/featomic) and the [mdSpan](https://github.com/kokkos/mdspan/tree/d34b447fbfdddfad63d2204923917e889ebe2e20) reference implementation. To clone this repository with all of its dependencies do:
+## Building NoSpherA2
+To clone this repository with all of its dependencies do:
 
 ```sh
 git clone --recursive https://github.com/AK-Kleemiss/NoSpherA2.git
