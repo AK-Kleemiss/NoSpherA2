@@ -103,6 +103,7 @@
     <ClInclude Include="..\..\Src\core\constants.h" />
     <ClInclude Include="..\..\Src\core\convenience.h" />
     <ClInclude Include="..\..\Src\core\crystal_energies.h" />
+    <ClInclude Include="..\..\Src\core\eqc.h" />
     <ClInclude Include="..\..\Src\core\gaussian_atom.h" />
     <ClInclude Include="..\..\Src\core\density_source.h" />
     <ClInclude Include="..\..\Src\core\cube.h" />
@@ -180,6 +181,7 @@
     <ClCompile Include="..\..\Src\core\convenience.cpp" />
     <ClCompile Include="..\..\Src\core\cube.cpp" />
     <ClCompile Include="..\..\Src\core\ECPs_corrections.cpp" />
+    <ClCompile Include="..\..\Src\core\eqc.cpp" />
     <ClCompile Include="..\..\Src\core\eli_family.cpp" />
     <ClCompile Include="..\..\Src\core\fchk.cpp" />
     <ClCompile Include="..\..\Src\core\GridManager.cpp" />

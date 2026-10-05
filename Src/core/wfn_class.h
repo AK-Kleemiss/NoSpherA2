@@ -146,7 +146,8 @@ private:
 	// (gbw, molden); empty for a restricted case and for readers that only sum the two.
 	dMatrix2 DM_beta;
 	// Spherical MO coefficients as OCC converged them, rows = AO in OCC's m = -l..l order
-	// (beta block below alpha when unrestricted), columns = MO. Filled by the OCC constructor.
+	// (beta block below alpha when unrestricted), columns = MO. Filled by the OCC constructor, and
+	// by read_gbw in file shell order with ORCA's phases (-eqc seeds OCC with those).
 	dMatrix2 MO_sph;
 	// basis set definition (118 elements for each element in the periodic table)
 	std::shared_ptr<std::array<std::vector<primitive>, 118>> basis_set;
@@ -471,6 +472,7 @@ public:
 	const vec get_norm_const(std::ostream& file, const bool debug = false) const;
 	/** Total SCF energy (if available). */
 	const double& get_total_energy() const { return total_energy; };
+	const dMatrix2& get_MO_sph() const { return MO_sph; };
 	/** Virial ratio (if available). */
 	const double& get_virial_ratio() const { return virial_ratio; };
 	/** Upper-triangular density matrix (linear storage). */

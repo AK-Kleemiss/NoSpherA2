@@ -276,6 +276,32 @@ All of these need a contracted basis, so `.gbw`, `.fchk` or `.molden` — not
 are read by a loop starting at that flag's position, so anything earlier on the
 line is ignored without a warning.
 
+### EQC energy decomposition
+
+Rahm and Hoffmann's E = nX̄ + (Vnn − Eee) split of a bond-forming reaction,
+fragments → parent, printed as X-analysis `-m 2` prints it (Q, covalency and
+ionicity). Two modes:
+
+* **Mode 1** (`-eqc <gbw> -eqc_frag ...`): the ORCA `.gbw` seeds occ, which
+  re-converges the parent and then each fragment from the parent's density
+  block, so every term comes from one program. `E(ORCA)` is read from the `.out`
+  next to the gbw.
+* **Mode 2** (`-eqc_wfn <parent> <frag> <frag> ...`): every term read from the
+  files, no SCF. `.wfx` and `.fchk` carry their own energy; `.wfn`, `.gbw` and
+  `.molden` need the ORCA `.out` of the same name beside them.
+
+| Flag | Arguments | Default | Meaning |
+| --- | --- | --- | --- |
+| `-eqc [gbw]` | 0-1 | | Mode 1 on this ORCA gbw (or `-wfn`). |
+| `-eqc_frag <atoms> <charge> <mult>` | 3+ | | One fragment per triple, atoms 0-based as `0,2-4`; every atom in exactly one fragment. |
+| `-eqc_method hf\|<functional>` | 1 | `hf` | occ method for Mode 1; must be the gbw's. |
+| `-eqc_basis <name>` | 1 | from the gbw | Load the basis by name (needed with ECPs); checked against the gbw. |
+| `-eqc_cold` | 0 | off | Also converge every SCF from occ's own guess and report its iteration count. |
+| `-eqc_wfn <files>` | 3+ | | Mode 2: parent first, then the fragments. |
+
+Example, ethane into two methyl radicals:
+`NoSpherA2 -eqc ethane.gbw -eqc_frag 0,2-4 0 2 1,5-7 0 2`.
+
 ## 8. RI density fitting, SALTED and interaction energies
 
 Two ways to get a density that is cheap to evaluate: fit the real one in an

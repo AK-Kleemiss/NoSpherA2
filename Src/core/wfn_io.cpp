@@ -1559,6 +1559,15 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
 				index += 2 * type + 1;
 			}
 		}
+		//Kept before the type sort below, for -eqc to seed occ (layout at get_MO_sph)
+		MO_sph = dMatrix2(operators * dimension, dimension);
+		for (int s = 0; s < operators; s++)
+		{
+			const dMatrix2 &src = s == 0 ? reorderd_coefs_s1 : reorderd_coefs_s2;
+			for (int r = 0; r < dimension; r++)
+				for (int c = 0; c < dimension; c++)
+					MO_sph(s * dimension + r, c) = src(r, c);
+		}
 
 		//Map to collect the end index of every type
 		index = 0;
