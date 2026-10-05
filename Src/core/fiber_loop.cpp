@@ -12,6 +12,9 @@
 #include <windows.h>
 #else
 #include <sys/mman.h>
+#ifndef MAP_STACK //Linux only; macOS stacks need no flag
+#define MAP_STACK 0
+#endif
 #if defined(__linux__) && defined(__x86_64__)
 #define NOS_FIBER_ASM 1
 #else
