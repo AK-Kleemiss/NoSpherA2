@@ -211,6 +211,11 @@ TEST(CliRefusal, RealOptionNoAnalysisReadsIsFatal)
 				::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), ".*");
 	EXPECT_EXIT(parse({"-eli_analysis", wfn.string(), "0.3", "2.0", "-npa"}),
 				::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), ".*");
+	//a property cube skips the wavefunction block too
+	EXPECT_EXIT(parse({"-wfn", wfn.string(), "-lap", "-rgbi"}),
+				::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), ".*");
+	//-fba reads the -rgbi_* modifiers, each of which also sets rgbi
+	parse({"-fba", wfn.string(), "-rgbi_no_sym", "-rgbi_basis", "nao"});
 }
 
 //-nrt and -nbo_json belong to the -nbo_native handler, so no top-level digester claims them; they

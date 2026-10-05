@@ -420,6 +420,8 @@ the 782 MB model.
 
 ### `-salted_charge_constraint`, and what it does to the predicted interaction energy
 
+(The option, `apply_charge_constraint` and the golden case were removed on 2026-09-28, 8d8efc48.)
+
 `apply_charge_constraint` (the global rescaling of the l=0 coefficients to the electron count,
 5 % refusal guard) ran only when a VERSION 3 model file carries a NORMC block with MODE 1.
 `-salted_charge_constraint` forces it after every prediction, in `gen_SALTED_densities`, so

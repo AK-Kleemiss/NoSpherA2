@@ -7,6 +7,7 @@
 #include "citations.h"
 #include "GridManager.h"
 #include "fiber_loop.h"
+#include "eli_family.h"
 #include <limits>
 #include <map>
 
@@ -3171,22 +3172,21 @@ delocalization_result delocalization_indices(const WFN &wavy, const basin_overla
 	r.population.assign(nb, 0.0);
 	r.outside_half.assign(nb, 0.0);
 	if (nb == 0 || n == 0) return r;
-	//Infer spin resolution from orbital occupations.
-	double max_occ = 0.0;
-	for (int i = 0; i < n; i++) max_occ = std::max(max_occ, std::abs(wavy.get_MO_occ(ovl.mo_index[i])));
-	const bool restricted = max_occ > 1.0 + 1e-6;
-	const double m = restricted ? 2.0 : 1.0;
-	vec occ(n);
+	//Spin-orbital occupations as the ELI family splits them: an ROHF singly occupied orbital is all alpha
+	const eli_family::SpinSplit how = eli_family::spin_split(wavy);
+	vec na(n), nbeta(n);
 	ivec spin(n);
 	for (int i = 0; i < n; i++) {
-		occ[i] = wavy.get_MO_occ(ovl.mo_index[i]) / m;
+		double ns[2];
+		eli_family::mo_spin_occupations(wavy.get_MO_occ(ovl.mo_index[i]), wavy.get_MO_op(ovl.mo_index[i]), how, ns);
+		na[i] = ns[0], nbeta[i] = ns[1];
 		//Spatial orbitals stand for both spins and all of them exchange with one another; only
 		//a genuinely spin-resolved set has an alpha and a beta block that must not mix
-		spin[i] = restricted ? 0 : wavy.get_MO_op(ovl.mo_index[i]);
+		spin[i] = how == eli_family::SpinSplit::unrestricted ? wavy.get_MO_op(ovl.mo_index[i]) : 0;
 	}
 	for (int b = 0; b < nb; b++)
 		for (int i = 0; i < n; i++)
-			r.population[b] += m * occ[i] * ovl.at(b, i, i);
+			r.population[b] += (na[i] + nbeta[i]) * ovl.at(b, i, i);
 	//The basins and outside region together resolve the orbital metric.
 	for (int i = 0; i < n; i++)
 		for (int j = 0; j <= i; j++) {
@@ -3204,19 +3204,19 @@ delocalization_result delocalization_indices(const WFN &wavy, const basin_overla
 			for (int j = 0; j <= i; j++) {
 				if (spin[i] != spin[j]) continue;
 				const size_t k = basin_overlaps::packed(i, j);
-				const double t = occ[i] * occ[j] * a[k] * b[k];
+				const double t = (na[i] * na[j] + nbeta[i] * nbeta[j]) * a[k] * b[k];
 				s += i == j ? t : 2.0 * t;
 			}
 		return s;
 	};
 	for (int b = 0; b < nb; b++) {
-		r.lambda[b] = m * pair_sum(ovl.S[b], ovl.S[b]);
-		if (!ovl.outside.empty()) r.outside_half[b] = m * pair_sum(ovl.S[b], ovl.outside);
+		r.lambda[b] = pair_sum(ovl.S[b], ovl.S[b]);
+		if (!ovl.outside.empty()) r.outside_half[b] = pair_sum(ovl.S[b], ovl.outside);
 	}
 	for (int a = 0; a < nb; a++)
 		for (int b = a + 1; b < nb; b++) {
 			r.pairs.push_back({ a, b });
-			r.di.push_back(2.0 * m * pair_sum(ovl.S[a], ovl.S[b]));
+			r.di.push_back(2.0 * pair_sum(ovl.S[a], ovl.S[b]));
 		}
 	return r;
 }

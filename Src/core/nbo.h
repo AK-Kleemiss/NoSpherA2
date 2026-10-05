@@ -93,7 +93,7 @@ bvec2 bondable_pairs(const std::vector<atom>& atoms, double scale = 1.3);
  * shell, the spin's electron count open shell); scale: occupancy of a full orbital, 2 or 1.
  */
 NboLewis nbo_search(const NAOResult& nao, const dMatrix2& gamma, const bvec2& bondable, int n_pairs,
-					double scale, const NboOptions& options);
+					double scale, const NboOptions& options, std::ostream& log = std::cout);
 
 /** Second-order donor-acceptor energies.  Fills the orbital energies, the NBO-basis Fock diagonal, into lewis. */
 std::vector<NboE2Entry> nbo_e2(NboLewis& lewis, const dMatrix2& fock_nao, double threshold_kcal);

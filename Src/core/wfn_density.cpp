@@ -3590,7 +3590,7 @@ void WFN::computeESP_batch(const std::vector<d3> &points, const ESP_pairs &t, do
 		return;
 #ifdef NOSPHERA2_USE_GPU
 	const int ncen = get_ncen(), npairs = (int)t.weight.size();
-	// The pair table stays resident on the device, so a call pays only its point upload and download
+	// The device buffers stay allocated between calls; each call uploads the atoms and the pair table, O(npairs) next to O(np * npairs)
 	if (npairs > 0 && (long long)np * npairs >= (1LL << 22) && aux_density_gpu_enabled())
 	{
 		vec ax(ncen), ay(ncen), az(ncen), q(ncen);

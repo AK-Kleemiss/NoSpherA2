@@ -120,8 +120,8 @@ __global__ void esp_kernel(
 	out[g] = ESP;
 }
 
-//one pair table per run, so it stays resident until the table pointer changes
-const double* held_coef = nullptr;
+//buffers stay allocated while the sizes match; the contents are uploaded on every call, since a table
+//at the same address with the same sizes can still be a different molecule or geometry
 int held_npairs = 0, held_ncoef = 0, held_nat = 0;
 double *d_ax = nullptr, *d_ay = nullptr, *d_az = nullptr, *d_q = nullptr;
 double *d_ex = nullptr, *d_w = nullptr, *d_P = nullptr, *d_coef = nullptr, *d_tab = nullptr;
@@ -136,7 +136,6 @@ void esp_gpu_free()
 	d_ax = d_ay = d_az = d_q = d_ex = d_w = d_P = d_coef = d_tab = nullptr;
 	d_L = d_off = nullptr;
 	d_pcp = d_fni = nullptr;
-	held_coef = nullptr;
 	held_npairs = held_ncoef = held_nat = 0;
 }
 }
@@ -157,13 +156,13 @@ bool esp_gpu_eval(
 	const size_t pt_bytes = sizeof(double) * (size_t)(np < ESP_CHUNK ? np : ESP_CHUNK) * 4;
 	size_t freeb = 0, totalb = 0;
 	if (gpuMemGetInfo(&freeb, &totalb) != gpuSuccess) return false;
-	const bool reuse = (held_coef == coef && held_npairs == npairs && held_ncoef == ncoef && held_nat == n_at);
-	if ((reuse ? 0 : pairs_bytes) + pt_bytes + (1u << 26) > freeb) return false;
+	const bool sized = (held_npairs == npairs && held_ncoef == ncoef && held_nat == n_at);
+	if ((sized ? 0 : pairs_bytes) + pt_bytes + (1u << 26) > freeb) return false;
 
-	if (!reuse)
+	const size_t at = sizeof(double) * (size_t)n_at;
+	if (!sized)
 	{
 		esp_gpu_free();
-		const size_t at = sizeof(double) * (size_t)n_at;
 		GPU_TRY(gpuMalloc(&d_ax, at)); GPU_TRY(gpuMalloc(&d_ay, at)); GPU_TRY(gpuMalloc(&d_az, at)); GPU_TRY(gpuMalloc(&d_q, at));
 		GPU_TRY(gpuMalloc(&d_ex, sizeof(double) * (size_t)npairs));
 		GPU_TRY(gpuMalloc(&d_w, sizeof(double) * (size_t)npairs));
@@ -173,21 +172,21 @@ bool esp_gpu_eval(
 		GPU_TRY(gpuMalloc(&d_coef, sizeof(double) * (size_t)ncoef));
 		GPU_TRY(gpuMalloc(&d_pcp, (size_t)ncoef)); GPU_TRY(gpuMalloc(&d_fni, (size_t)ncoef));
 		GPU_TRY(gpuMalloc(&d_tab, sizeof(double) * (size_t)nT * stride));
-		GPU_TRY(gpuMemcpy(d_ax, ax, at, gpuMemcpyHostToDevice));
-		GPU_TRY(gpuMemcpy(d_ay, ay, at, gpuMemcpyHostToDevice));
-		GPU_TRY(gpuMemcpy(d_az, az, at, gpuMemcpyHostToDevice));
-		GPU_TRY(gpuMemcpy(d_q, q, at, gpuMemcpyHostToDevice));
-		GPU_TRY(gpuMemcpy(d_ex, ex_sum, sizeof(double) * (size_t)npairs, gpuMemcpyHostToDevice));
-		GPU_TRY(gpuMemcpy(d_w, weight, sizeof(double) * (size_t)npairs, gpuMemcpyHostToDevice));
-		GPU_TRY(gpuMemcpy(d_P, P, sizeof(double) * (size_t)npairs * 3, gpuMemcpyHostToDevice));
-		GPU_TRY(gpuMemcpy(d_L, L, sizeof(int) * (size_t)npairs * 3, gpuMemcpyHostToDevice));
-		GPU_TRY(gpuMemcpy(d_off, off, sizeof(int) * (size_t)(npairs + 1), gpuMemcpyHostToDevice));
-		GPU_TRY(gpuMemcpy(d_coef, coef, sizeof(double) * (size_t)ncoef, gpuMemcpyHostToDevice));
-		GPU_TRY(gpuMemcpy(d_pcp, pc_pow, (size_t)ncoef, gpuMemcpyHostToDevice));
-		GPU_TRY(gpuMemcpy(d_fni, fn_idx, (size_t)ncoef, gpuMemcpyHostToDevice));
-		GPU_TRY(gpuMemcpy(d_tab, boys_tab, sizeof(double) * (size_t)nT * stride, gpuMemcpyHostToDevice));
-		held_coef = coef, held_npairs = npairs, held_ncoef = ncoef, held_nat = n_at;
+		held_npairs = npairs, held_ncoef = ncoef, held_nat = n_at;
 	}
+	GPU_TRY(gpuMemcpy(d_ax, ax, at, gpuMemcpyHostToDevice));
+	GPU_TRY(gpuMemcpy(d_ay, ay, at, gpuMemcpyHostToDevice));
+	GPU_TRY(gpuMemcpy(d_az, az, at, gpuMemcpyHostToDevice));
+	GPU_TRY(gpuMemcpy(d_q, q, at, gpuMemcpyHostToDevice));
+	GPU_TRY(gpuMemcpy(d_ex, ex_sum, sizeof(double) * (size_t)npairs, gpuMemcpyHostToDevice));
+	GPU_TRY(gpuMemcpy(d_w, weight, sizeof(double) * (size_t)npairs, gpuMemcpyHostToDevice));
+	GPU_TRY(gpuMemcpy(d_P, P, sizeof(double) * (size_t)npairs * 3, gpuMemcpyHostToDevice));
+	GPU_TRY(gpuMemcpy(d_L, L, sizeof(int) * (size_t)npairs * 3, gpuMemcpyHostToDevice));
+	GPU_TRY(gpuMemcpy(d_off, off, sizeof(int) * (size_t)(npairs + 1), gpuMemcpyHostToDevice));
+	GPU_TRY(gpuMemcpy(d_coef, coef, sizeof(double) * (size_t)ncoef, gpuMemcpyHostToDevice));
+	GPU_TRY(gpuMemcpy(d_pcp, pc_pow, (size_t)ncoef, gpuMemcpyHostToDevice));
+	GPU_TRY(gpuMemcpy(d_fni, fn_idx, (size_t)ncoef, gpuMemcpyHostToDevice));
+	GPU_TRY(gpuMemcpy(d_tab, boys_tab, sizeof(double) * (size_t)nT * stride, gpuMemcpyHostToDevice));
 
 	//chunked: bounded device memory, and no launch long enough to trip a display driver's watchdog
 	const int chunk = np < ESP_CHUNK ? np : ESP_CHUNK;

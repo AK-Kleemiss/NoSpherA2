@@ -199,7 +199,7 @@ namespace eli_family
 		{
 			const double occ = wave.get_MO_occ(mo);
 			if (occ == 0.0) continue;
-			if (how == SpinSplit::restricted_open) { double n[2]; mo_spin_occupations(occ, 0, how, n); Na += n[0]; Nb += n[1]; }
+			if (!has_beta_set) { double n[2]; mo_spin_occupations(occ, 0, how, n); Na += n[0]; Nb += n[1]; }
 			else if (has_beta_set && wave.get_MO_op(mo) == 1) Nb += occ; else Na += occ;
 		}
 		const bool spin_polarised = how == SpinSplit::restricted_open
