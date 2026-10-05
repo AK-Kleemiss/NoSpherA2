@@ -4215,6 +4215,10 @@ namespace {
 		if (o.combined_tsc_calc || o.cif_based_combined_tsc_calc) return "-merge";
 		if (o.iam_switch) return "-IAM";
 		if (!o.cube_density.empty()) return "-cube_density";
+		//the conditions that skip the wavefunction block (d_sfac_scan has no option that sets it)
+		if (o.properties.calc()) return "a property cube (-rho, -lap, -esp, ...)";
+		if (o.do_XCW) return "-do_XCW";
+		if (o.gbw2wfn) return "-gbw2wfn";
 		return nullptr;
 	}
 }
@@ -4222,7 +4226,10 @@ namespace {
 void options::refuse_unread_bonding_options()
 {
 	const char *early = quit_early_analysis(*this);
-	const char *bonding = rgbi ? "-rgbi" : (npa ? "-npa" : nullptr);
+	//-fba runs RGBI (reading the -rgbi_* modifiers, each of which sets rgbi) and NPA itself;
+	//-do_XCW runs RGBI on each refined wavefunction unless a property cube takes the run first
+	const bool rgbi_read_early = fba || (do_XCW && !properties.calc());
+	const char *bonding = fba ? nullptr : ((rgbi && !rgbi_read_early) ? "-rgbi" : (npa ? "-npa" : nullptr));
 	if (early != nullptr && bonding != nullptr)
 		err_checkf(false, std::string("Cannot do both ") + early + " and " + bonding + " in one run: " +
 							  early + " ends the run before " + bonding + " would be reached, so " +

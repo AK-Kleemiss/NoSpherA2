@@ -356,7 +356,7 @@ namespace {
 }
 
 NboLewis nbo_search(const NAOResult& nao, const dMatrix2& gamma, const bvec2& bondable,
-					const int n_pairs, const double scale, const NboOptions& options)
+					const int n_pairs, const double scale, const NboOptions& options, std::ostream& log)
 {
 	ProfClock prof;
 	double p_ladder = 0, p_scf = 0, p_owso = 0, p_anti = 0, p_comp = 0, p_final = 0;
@@ -619,6 +619,16 @@ NboLewis nbo_search(const NAOResult& nao, const dMatrix2& gamma, const bvec2& bo
 		non_lewis.push_back(w / nrm);
 		non_lewis_fn.push_back(f);
 	}
+	//Each antibond is orthogonal to its own bond only; nbo_e2 and the occupancies need an orthonormal set,
+	//so take the (orthonormal) Lewis span out of them and orthonormalize them symmetrically
+	if (!non_lewis.empty()) {
+		MatrixXd VL(n, res.n_lewis), A(n, static_cast<int>(non_lewis.size()));
+		for (int j = 0; j < res.n_lewis; j++) VL.col(j) = vectors[j];
+		for (size_t j = 0; j < non_lewis.size(); j++) A.col(static_cast<int>(j)) = non_lewis[j];
+		A -= VL * (VL.transpose() * A);
+		A = A * sym_power(MatrixXd(A.transpose() * A), -0.5);
+		for (size_t j = 0; j < non_lewis.size(); j++) non_lewis[j] = A.col(static_cast<int>(j));
+	}
 	p_anti = prof.lap();
 
 	//Project the Rydberg space out of the Lewis and antibond subspaces.
@@ -723,7 +733,7 @@ NboLewis nbo_search(const NAOResult& nao, const dMatrix2& gamma, const bvec2& bo
 	res.rho_nl = total - lewis_density;
 	p_final = prof.lap();
 	if (options.debug) {
-		std::cout << "NBO search: n=" << n << " atoms=" << natoms << " lewis=" << res.n_lewis
+		log << "NBO search: n=" << n << " atoms=" << natoms << " lewis=" << res.n_lewis
 				  << " orbitals=" << res.orbitals.size() << " sweeps=" << n_sweeps
 				  << " levels=" << n_levels_used << " eig=" << n_eig1 + n_eig2
 				  << " | ladder " << p_ladder << " sweep " << p_scf << " owso " << p_owso
@@ -731,11 +741,11 @@ NboLewis nbo_search(const NAOResult& nao, const dMatrix2& gamma, const bvec2& bo
 				  << p_pivot << " rydberg " << p_ryd << ") coefficients " << p_final
 				  << std::endl;
 		//Report a sweep that reaches the iteration cap.
-		std::cout << "NBO search: sweep change";
+		log << "NBO search: sweep change";
 		for (size_t i = 0; i < ch_trace.size(); i++)
 			if (i < 3 || i + 3 >= ch_trace.size())
-				std::cout << " " << i << ":" << ch_trace[i];
-		std::cout << std::endl;
+				log << " " << i << ":" << ch_trace[i];
+		log << std::endl;
 	}
 	return res;
 }
@@ -786,7 +796,7 @@ namespace
 		const dMatrix2 fock_nao = fock.extent(0) ? nao_operator(fock, nao.C) : dMatrix2();
 		const auto clock = [] { return std::chrono::steady_clock::now(); };
 		auto t = clock();
-		NboLewis lewis = nbo_search(nao, gamma, bondable, n_pairs, scale, options);
+		NboLewis lewis = nbo_search(nao, gamma, bondable, n_pairs, scale, options, log);
 		res.search_seconds += std::chrono::duration<double>(clock() - t).count();
 		t = clock();
 		std::vector<NboE2Entry> e2 = nbo_e2(lewis, fock_nao, options.e2_threshold_kcal);
