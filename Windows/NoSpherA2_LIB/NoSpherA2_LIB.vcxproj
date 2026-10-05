@@ -93,6 +93,7 @@
     <ClInclude Include="..\..\Src\core\atoms.h" />
     <ClInclude Include="..\..\Src\core\aux_density.h" />
     <ClInclude Include="..\..\Src\core\aux_density_gpu.h" />
+    <ClInclude Include="..\..\Src\core\basin_field_gpu.h" />
     <ClInclude Include="..\..\Src\core\esp_gpu.h" />
     <ClInclude Include="..\..\Src\core\b2c.h" />
     <ClInclude Include="..\..\Src\core\basis_set.h" />
@@ -219,6 +220,7 @@
   <ItemGroup Condition="'$(NosUseCuda)' == 'true'">
     <CudaCompile Include="..\..\Src\core\aux_density_gpu.cu" />
     <CudaCompile Include="..\..\Src\core\blas_gpu.cu" />
+    <CudaCompile Include="..\..\Src\core\basin_field_gpu.cu" />
     <CudaCompile Include="..\..\Src\core\esp_gpu.cu" />
     <CudaCompile Include="..\..\Src\core\grid_gpu.cu" />
     <CudaCompile Include="..\..\Src\core\itensor_gpu.cu" />
@@ -239,6 +241,7 @@
     </ClCompile>
     <CustomBuild Include="..\..\Src\core\aux_density_gpu.cu" />
     <CustomBuild Include="..\..\Src\core\blas_gpu.cu" />
+    <CustomBuild Include="..\..\Src\core\basin_field_gpu.cu" />
     <CustomBuild Include="..\..\Src\core\esp_gpu.cu" />
     <CustomBuild Include="..\..\Src\core\grid_gpu.cu" />
     <CustomBuild Include="..\..\Src\core\itensor_gpu.cu" />

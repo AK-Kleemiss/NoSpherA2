@@ -14,6 +14,7 @@
 #ifdef NOSPHERA2_USE_GPU
 #include "aux_density_gpu.h"
 #include "esp_gpu.h"
+#include "basin_field_gpu.h"
 #endif
 
 namespace
@@ -2632,6 +2633,55 @@ void WFN::computeGrad(
 	if (rho) *rho = Rho;
 
 };
+
+bool WFN::field_grad_gpu(const bool eli, const int np, const double *pts, double *val, double *grad, double *rho) const
+{
+#ifdef NOSPHERA2_USE_GPU
+	const int _nmo = get_nmo(false);
+	if (np <= 0 || !get_coef_primitive_major())
+		return false;
+	const int nao = (int)(coef_ao_major.size() / _nmo);
+	//The primitives the host evaluators visit (a function, a type up to l = 10), grouped by
+	//function in ascending wfn order, so every function sums its primitives as ao.add does
+	ivec start(nao + 1, 0), lj(3 * (size_t)nex, -1);
+	for (int j = 0; j < nex; j++)
+	{
+		if (prim_ao[j] < 0) continue;
+		constants::type2vector(types[j], &lj[3 * (size_t)j]);
+		if (lj[3 * (size_t)j] >= 0) start[prim_ao[j] + 1]++;
+	}
+	for (int a = 0; a < nao; a++) start[a + 1] += start[a];
+	const int nprim = start[nao];
+	ivec fill(start.begin(), start.end() - 1), pc(nprim), pl(3 * (size_t)nprim);
+	vec pe(nprim), ps(nprim);
+	for (int j = 0; j < nex; j++)
+	{
+		if (prim_ao[j] < 0 || lj[3 * (size_t)j] < 0) continue;
+		const int i = fill[prim_ao[j]]++;
+		pc[i] = centers[j] - 1;
+		std::copy_n(&lj[3 * (size_t)j], 3, &pl[3 * (size_t)i]);
+		pe[i] = exponents[j];
+		ps[i] = prim_ao_scale[j];
+	}
+	//only the occupied MOs, in order: the host reduction skips the others
+	ivec mos;
+	vec occ;
+	for (int mo = 0; mo < _nmo; mo++)
+		if (get_MO_occ(mo) != 0) { mos.push_back(mo); occ.push_back(get_MO_occ(mo)); }
+	const int nocc = (int)mos.size();
+	vec coef((size_t)nao * nocc), cxyz(3 * (size_t)ncen);
+	for (int a = 0; a < nao; a++)
+		for (int i = 0; i < nocc; i++) coef[(size_t)a * nocc + i] = coef_ao_major[(size_t)a * _nmo + mos[i]];
+	for (int c = 0; c < ncen; c++)
+		for (int k = 0; k < 3; k++) cxyz[3 * (size_t)c + k] = atoms[c].get_coordinate(k);
+	return basin_field_gpu_eval(eli ? 10 : 4, ncen, cxyz.data(), center_min_exponent.data(), constants::exp_cutoff,
+		nao, start.data(), pc.data(), pl.data(), pe.data(), ps.data(), nocc, coef.data(), occ.data(),
+		np, pts, val, grad, rho);
+#else
+	(void)eli; (void)np; (void)pts; (void)val; (void)grad; (void)rho;
+	return false;
+#endif
+}
 
 const double WFN::computeELF(
 	const d3 &PosGrid // [3] vector with current position on te grid

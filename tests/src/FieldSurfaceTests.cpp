@@ -30,6 +30,7 @@
 #include <occ/qm/hf.h>
 #include <occ/qm/scf.h>
 #include <spdlog/spdlog.h>
+#include <random>
 #undef I
 #ifdef NOSPHERA2_USE_GPU
 #include "core/blas_gpu.h"
@@ -506,6 +507,148 @@ namespace NoSpherA2UnitTests
 				EXPECT_NEAR(grad[k], fd, 1E-6 * std::max(1.0, std::abs(fd))) << "axis " << k << " at " << p[0] << " " << p[1] << " " << p[2];
 			}
 		}
+	}
+
+	//Points around every nucleus at log-spaced radii (0.005 to 12 bohr) in fixed pseudo-random
+	//directions: the cores, where the heavy primitives and the large gradients are, and the tails
+	static std::vector<d3> field_probe_points(const WFN& wave, const int per_atom)
+	{
+		std::mt19937 rng(1234);
+		std::normal_distribution<double> nd;
+		std::vector<d3> pts;
+		for (int a = 0; a < wave.get_ncen(); a++)
+			for (int i = 0; i < per_atom; i++)
+			{
+				const double r = 0.005 * std::pow(12.0 / 0.005, (i % 24) / 23.0);
+				d3 u{ nd(rng), nd(rng), nd(rng) };
+				const double n = std::sqrt(u[0] * u[0] + u[1] * u[1] + u[2] * u[2]);
+				pts.push_back({ wave.get_atom_coordinate(a, 0) + r * u[0] / n, wave.get_atom_coordinate(a, 1) + r * u[1] / n,
+					wave.get_atom_coordinate(a, 2) + r * u[2] / n });
+			}
+		return pts;
+	}
+
+	struct field_diff
+	{
+		double val_abs = 0, val_rel = 0, grad_abs = 0, grad_rel = 0, rho_rel = 0;
+		int compared = 0;
+	};
+
+	//Device field_grad_gpu against the host computeELIGrad / computeGrad, point by point. rel is
+	//|d| / max(1, |host|) per quantity and per gradient component, over the points with rho > 1E-6
+	static field_diff compare_field_grad(const WFN& wave, const bool eli, const std::vector<d3>& pts,
+		double* host_s = nullptr, double* device_s = nullptr)
+	{
+		const int np = (int)pts.size();
+		vec hv(np), hg(3 * (size_t)np), hr(np), dv(np), dg(3 * (size_t)np), dr(np);
+		const auto t0 = std::chrono::steady_clock::now();
+#pragma omp parallel for schedule(dynamic, 16)
+		for (int i = 0; i < np; i++)
+		{
+			d3 g;
+			if (eli) wave.computeELIGrad(pts[i], hv[i], g, &hr[i]);
+			else wave.computeGrad(pts[i], g, &hr[i]);
+			for (int k = 0; k < 3; k++) hg[3 * (size_t)i + k] = g[k];
+		}
+		const auto t1 = std::chrono::steady_clock::now();
+		const bool ran = wave.field_grad_gpu(eli, np, pts[0].data(), dv.data(), dg.data(), dr.data());
+		const auto t2 = std::chrono::steady_clock::now();
+		if (host_s) *host_s = std::chrono::duration<double>(t1 - t0).count();
+		if (device_s) *device_s = std::chrono::duration<double>(t2 - t1).count();
+		field_diff d;
+		if (!ran) { d.compared = -1; return d; }
+		for (int i = 0; i < np; i++)
+		{
+			if (!(hr[i] > 1E-6)) continue;
+			d.compared++;
+			d.rho_rel = std::max(d.rho_rel, std::abs(dr[i] - hr[i]) / hr[i]);
+			if (eli)
+			{
+				d.val_abs = std::max(d.val_abs, std::abs(dv[i] - hv[i]));
+				d.val_rel = std::max(d.val_rel, std::abs(dv[i] - hv[i]) / std::max(1.0, std::abs(hv[i])));
+			}
+			for (int k = 0; k < 3; k++)
+			{
+				const double h = hg[3 * (size_t)i + k], e = std::abs(dg[3 * (size_t)i + k] - h);
+				d.grad_abs = std::max(d.grad_abs, e);
+				d.grad_rel = std::max(d.grad_rel, e / std::max(1.0, std::abs(h)));
+			}
+		}
+		return d;
+	}
+
+	static void check_field_grad_gpu(const std::filesystem::path& input)
+	{
+		if (!std::filesystem::exists(input)) GTEST_SKIP() << "Missing " << input;
+#if defined(NOSPHERA2_USE_GPU)
+		if (!aux_density_gpu_available()) GTEST_SKIP() << "no device";
+		WFN wave(input, false);
+		const std::vector<d3> pts = field_probe_points(wave, 48);
+		aux_density_gpu_set_enabled(true);
+		const field_diff q = compare_field_grad(wave, false, pts), e = compare_field_grad(wave, true, pts);
+		aux_density_gpu_set_enabled(false); // leave the flag as the rest of the suite found it
+		ASSERT_GE(q.compared, 0) << "the QTAIM kernel declined";
+		ASSERT_GE(e.compared, 0) << "the ELI-D kernel declined";
+		std::cout << input.filename().string() << ": " << pts.size() << " points, " << e.compared << " with rho > 1E-6\n"
+				  << "  QTAIM grad rho  max abs " << q.grad_abs << " rel " << q.grad_rel << ", rho rel " << q.rho_rel << "\n"
+				  << "  ELI-D value     max abs " << e.val_abs << " rel " << e.val_rel << "\n"
+				  << "  ELI-D grad      max abs " << e.grad_abs << " rel " << e.grad_rel << ", rho rel " << e.rho_rel << std::endl;
+		EXPECT_LT(q.grad_rel, 1E-10);
+		EXPECT_LT(q.rho_rel, 1E-10);
+		EXPECT_LT(e.val_rel, 1E-10);
+		EXPECT_LT(e.grad_rel, 1E-10);
+		EXPECT_LT(e.rho_rel, 1E-10);
+#else
+		GTEST_SKIP() << "built without a GPU backend";
+#endif
+	}
+
+	TEST(BasinFieldGpuTests, MatchesHostSToF)
+	{
+		check_field_grad_gpu(nos_test_repo_root() / "tests" / "epoxide_gbw" / "epoxide.gbw");
+	}
+
+	TEST(BasinFieldGpuTests, MatchesHostGFunctions)
+	{
+		check_field_grad_gpu(nos_test_repo_root() / "tests" / "esp_g_ref" / "g_ref.gbw");
+	}
+
+	TEST(BasinFieldGpuTests, MatchesHostTransitionMetal)
+	{
+		check_field_grad_gpu(nos_test_repo_root() / "tests" / "Fe_gbw" / "Fe.gbw");
+	}
+
+	TEST(BasinFieldGpuTests, MatchesHostWithEcp)
+	{
+		check_field_grad_gpu(nos_test_repo_root() / "tests" / "ECP_SF" / "Au2Br2.gbw");
+	}
+
+	//NOS_FIELD_GPU_BENCH=<wavefunction> times the host loop (all OpenMP threads) against the device on
+	//NOS_FIELD_GPU_BENCH_N points (default 200000), both fields, and checks them on the way
+	TEST(BasinFieldGpuTests, Benchmark)
+	{
+		const char* path = std::getenv("NOS_FIELD_GPU_BENCH");
+		if (!path) GTEST_SKIP() << "set NOS_FIELD_GPU_BENCH to a wavefunction";
+#if defined(NOSPHERA2_USE_GPU)
+		if (!aux_density_gpu_available()) GTEST_SKIP() << "no device";
+		WFN wave(path, false);
+		const char* nenv = std::getenv("NOS_FIELD_GPU_BENCH_N");
+		const int n = nenv ? std::atoi(nenv) : 200000;
+		const std::vector<d3> pts = field_probe_points(wave, std::max(1, n / wave.get_ncen()));
+		aux_density_gpu_set_enabled(true);
+		const std::vector<d3> warm(pts.begin(), pts.begin() + std::min<size_t>(pts.size(), 64));
+		compare_field_grad(wave, true, warm); // context creation and the coefficient cache, untimed
+		for (const bool eli : { false, true })
+		{
+			double hs = 0, ds = 0;
+			const field_diff d = compare_field_grad(wave, eli, pts, &hs, &ds);
+			std::cout << (eli ? "ELI-D" : "QTAIM") << " " << pts.size() << " points, " << omp_get_max_threads() << " threads: host "
+					  << hs << " s, device " << ds << " s, x" << hs / ds << "; compared " << d.compared << ", val rel " << d.val_rel
+					  << " grad rel " << d.grad_rel << " (abs " << d.grad_abs << ") rho rel " << d.rho_rel << std::endl;
+			EXPECT_GE(d.compared, 0);
+		}
+		aux_density_gpu_set_enabled(false);
+#endif
 	}
 
 	//The surface must sit around the molecule it belongs to: readxyzMinMax_fromWFN used to guess the unit

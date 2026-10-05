@@ -620,6 +620,10 @@ public:
 	//has phi, so the density is one multiply-add per MO instead of a second pass over every
 	//primitive.  The QTAIM climb needs both at every step.
 	void computeGrad(const d3 &PosGrid, d3& gradient, double *rho = nullptr) const;
+	//computeELIGrad (eli) or computeGrad (!eli) at np points, xyz interleaved, on the device
+	//(basin_field_gpu.h): grad 3 per point, val (ELI-D only) and rho optional. False, with nothing
+	//written, when the build has no GPU, there is no device or it declined; the caller keeps its loop.
+	bool field_grad_gpu(bool eli, int np, const double *pts, double *val, double *grad, double *rho = nullptr) const;
 	/** Compute ELI alone. */
 	const double computeELI(const d3& PosGrid) const;
 	/** Compute ELF alone. */
