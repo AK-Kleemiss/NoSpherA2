@@ -1379,8 +1379,10 @@ double eli_core_radius(const int Z)
 }
 
 //DGrid's ELIDcore over the reference set: Na, Al, P, S, Cl 10.05; Ti, Fe, Ni 9.2-10.3; Zn, Br 27.8;
-//Pd 26.7; Cd 44.8; Sn 46.6; Pt 51.7 (under-resolved at 0.1 bohr). The ELI-D N/O minimum of a free ZORA Pt
-//atom holds 58.13 e, not 60: 2.26 e of the 4f tail lie beyond it. Hence a relative tolerance
+//Pd 26.7; Cd 44.8; Sn 46.6; Pt 51.7 (under-resolved at 0.1 bohr). The ELI-D N/O minimum of a free 5d atom
+//(r2SCAN0, scalar ZORA, SARC-ZORA-TZVP) holds less than 60 because 2.2-3.2 e of the 4f tail lie beyond it:
+//Hf 57.1, W 57.6, Ir 58.0, Pt 58.1, Au 58.2, Hg 58.25, within 0.11 e of that whatever the charge
+//(Au+/Au, W6+/W). Hence a relative tolerance
 int eli_core_electrons(const int Z)
 {
 	if (Z >= 19 && Z <= 29) return 10;
@@ -1821,19 +1823,12 @@ std::vector<d4> analytic_eli_maxima(const WFN &wavy, const bool debug, const eli
 	//Monotone ascent along the normalised gradient: a step is taken only if ELI-D rises, grows
 	//after a success and halves after a failure. No Hessian test: a hydrogen's valence maximum sits
 	//on the cusp of the nucleus
-	const int ns = static_cast<int>(seeds.size());
-	std::vector<d4> ends(ns, d4{ 0.0, 0.0, 0.0, -1.0 });
-#pragma omp parallel for schedule(dynamic, 16)
-	for (int s = 0; s < ns; s++) {
-		d3 p = seeds[s], g;
+	auto climb = [&](d3 p) {
+		d3 g;
 		double f;
-		if (static_cast<size_t>(s) >= n_interior) {
-			if (bounded_eli_ascent(wavy, *eli, p, f)) ends[s] = d4{ p[0], p[1], p[2], f };
-			continue;
-		}
-		if (wavy.compute_dens(p) < basin_density_cutoff) continue;
+		if (wavy.compute_dens(p) < basin_density_cutoff) return d4{ 0.0, 0.0, 0.0, -1.0 };
 		eli_grad(p, f, g);
-		if (!std::isfinite(f)) continue;
+		if (!std::isfinite(f)) return d4{ 0.0, 0.0, 0.0, -1.0 };
 		bool inside = true;
 		double step = 0.05;
 		for (int it = 0; it < 500 && step > 1e-5; it++) {
@@ -1858,7 +1853,16 @@ std::vector<d4> analytic_eli_maxima(const WFN &wavy, const bool debug, const eli
 			}
 			else step *= 0.5;
 		}
-		if (inside) ends[s] = d4{ p[0], p[1], p[2], f };
+		return inside ? d4{ p[0], p[1], p[2], f } : d4{ 0.0, 0.0, 0.0, -1.0 };
+	};
+	const int ns = static_cast<int>(seeds.size());
+	std::vector<d4> ends(ns, d4{ 0.0, 0.0, 0.0, -1.0 });
+#pragma omp parallel for schedule(dynamic, 16)
+	for (int s = 0; s < ns; s++) {
+		if (static_cast<size_t>(s) < n_interior) { ends[s] = climb(seeds[s]); continue; }
+		d3 p = seeds[s];
+		double f;
+		if (bounded_eli_ascent(wavy, *eli, p, f)) ends[s] = d4{ p[0], p[1], p[2], f };
 	}
 	//Highest first; an end within 0.1 bohr of a kept one is that maximum reached again
 	std::vector<int> order;
@@ -1871,6 +1875,34 @@ std::vector<d4> analytic_eli_maxima(const WFN &wavy, const bool debug, const eli
 			if (std::pow(m[0] - ends[s][0], 2) + std::pow(m[1] - ends[s][1], 2) + std::pow(m[2] - ends[s][2], 2) < 0.01) { seen = true; break; }
 		if (!seen) maxima.push_back(ends[s]);
 	}
+	//A seed on a mirror plane climbs inside it and can stop on a saddle of the full field (H2CF2 turned
+	//90 degrees about z: an in-plane 1.6305 point beside the 1.6506 lone pairs became a basin). As in the
+	//density's accept, six starts displaced along the axes must come back; a saddle loses one to a
+	//clearly higher end elsewhere. Not tested: a nuclear maximum, a spin field's surface attractor
+	//(a maximum on the isosurface only), and the near-equal maxima on a core shell's ridge (Pt rings
+	//spread 0.3 %, Li cores less), which the core/shell unification merges anyway
+	//ponytail: a saddle within 0.5 % of the maximum it falls to is kept
+	std::vector<char> saddle(maxima.size(), 0);
+#pragma omp parallel for schedule(dynamic, 1)
+	for (int k = 0; k < static_cast<int>(maxima.size()); k++) {
+		const d3 m{ maxima[k][0], maxima[k][1], maxima[k][2] };
+		double rn = std::numeric_limits<double>::max();
+		for (int a = 0; a < ncen; a++) rn = std::min(rn, array_length(m, wavy.get_atom_pos(a)));
+		const double delta = std::min(0.05, 0.3 * rn);
+		if (delta < 1e-3 || wavy.compute_dens(m) < 2.0 * basin_density_cutoff) continue;
+		for (int t = 0; t < 6 && !saddle[k]; t++) {
+			d3 p = m;
+			p[t / 2] += t % 2 ? -delta : delta;
+			const d4 e = climb(p);
+			saddle[k] = e[3] > 1.005 * maxima[k][3] && std::pow(e[0] - m[0], 2) + std::pow(e[1] - m[1], 2) + std::pow(e[2] - m[2], 2) >= 0.01;
+		}
+	}
+	size_t kept = 0;
+	for (size_t k = 0; k < maxima.size(); k++) {
+		if (!saddle[k]) { maxima[kept++] = maxima[k]; continue; }
+		if (debug) std::cout << "Dropped an ELI-D saddle found as a maximum at " << maxima[k][0] << " " << maxima[k][1] << " " << maxima[k][2] << " (ELI-D " << maxima[k][3] << ")" << std::endl;
+	}
+	maxima.resize(kept);
 	if (debug)
 		std::cout << "ELI-D maxima from " << ns << " seeds by analytic ascent: " << order.size() << " climbs finished, " << maxima.size() << " distinct maxima" << std::endl;
 	return maxima;
@@ -2393,6 +2425,8 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 	config.angular_boost = grid_boost - 1;
 	config.partition_type = PartitionType::Becke;
 	config.no_density_eval = true;
+	const char *rot_env = std::getenv("NOS_BASIN_ROTATE"); // Flawfinder: ignore - compared only
+	config.rotate_angular = rot_env == nullptr || std::string(rot_env) != "0";
 	GridManager grids(config);
 	ivec every_atom(wavy.get_ncen());
 	std::iota(every_atom.begin(), every_atom.end(), 0);

@@ -131,26 +131,26 @@ Density Critical Points (13 found):
    V         :    -8.5708e-02   G         :         0.0350   K         :     5.0675e-02   L         :     1.5642e-02
 
 QTAIM attractors from the analytic field: 7 (7 nuclei, 0 non-nuclear)
-ELI-D maxima from the analytic field: 49
+ELI-D maxima from the analytic field: 47
 ELI-D basin boundaries from the analytic field (the default).
-Unified 36 core-shell basins into their atoms' cores, 13 ELI-D basins remain.
+Unified 34 core-shell basins into their atoms' cores, 13 ELI-D basins remain.
 GridManager: Setting up prototype grids for atom types...
 GridManager: Generating integration grids for atoms...
 GridManager: Generated total of 143592 grid points.
-Quadrature points sent along the field: 38445, left the grid: 0
+Quadrature points sent along the field: 40020, left the grid: 0
 
 QTAIM Analysis (atomic quadrature grids):
 [QTAIM] Bader, Atoms in Molecules: A Quantum Theory, Oxford University Press (1990), DOI 10.1093/oso/9780198551683.001.0001
 [QTAIM] Bader, Chem. Rev. 91 (1991) 893, DOI 10.1021/cr00005a013
   basin  label               electrons     charge      volume         maximum        x          y          z
-      1  U0                    89.0527     2.9473    199.9104   27946116.9797      0.000      0.000      0.000
-      2  H1                     1.4854    -0.4854    218.0078          0.3601      3.779      0.000      0.000
-      3  H2                     1.4854    -0.4854    218.0078          0.3601     -3.779      0.000      0.000
-      4  H3                     1.4854    -0.4854    218.0077          0.3601      0.000      3.779      0.000
-      5  H4                     1.4854    -0.4854    218.0077          0.3601      0.000     -3.779      0.000
-      6  H5                     1.4854    -0.4854    218.0076          0.3601      0.000      0.000      3.779
-      7  H6                     1.4854    -0.4854    218.0076          0.3601      0.000      0.000     -3.779
-  total in basins: 97.9649   outside every basin: 0.0349
+      1  U0                    88.9945     3.0055    136.4694   27946116.9797      0.000      0.000      0.000
+      2  H1                     1.4954    -0.4954    231.1843          0.3601      3.779      0.000      0.000
+      3  H2                     1.4954    -0.4954    231.1843          0.3601     -3.779      0.000      0.000
+      4  H3                     1.4960    -0.4960    229.9252          0.3601      0.000      3.779      0.000
+      5  H4                     1.4960    -0.4960    229.9252          0.3601      0.000     -3.779      0.000
+      6  H5                     1.4942    -0.4942    228.0154          0.3601      0.000      0.000      3.779
+      7  H6                     1.4942    -0.4942    228.0152          0.3601      0.000      0.000     -3.779
+  total in basins: 97.9655   outside every basin: 0.0342
 
 Delocalization indices (49 occupied orbitals):
 [LI/DI] Fradera, Austen & Bader, J. Phys. Chem. A 103 (1999) 304, DOI 10.1021/jp983362q
@@ -158,54 +158,54 @@ Delocalization indices (49 occupied orbitals):
 
   basin  label                 N(A)     lambda(A)   sum_B delta(A,B)/2   residual
   B includes the region beyond rho = 1e-04 e/bohr^3.
-      1  U0                    89.0527     86.5647            2.4878     -0.0002
-      2  H1                     1.4854      1.0361            0.4492     -0.0000
-      3  H2                     1.4854      1.0361            0.4492     -0.0000
-      4  H3                     1.4854      1.0361            0.4492     -0.0000
-      5  H4                     1.4854      1.0361            0.4492     -0.0000
-      6  H5                     1.4854      1.0361            0.4492     -0.0000
-      7  H6                     1.4854      1.0361            0.4492     -0.0000
+      1  U0                    88.9945     86.5380            2.4563     -0.0002
+      2  H1                     1.4954      1.0440            0.4513     -0.0000
+      3  H2                     1.4954      1.0440            0.4513     -0.0000
+      4  H3                     1.4960      1.0446            0.4514     -0.0000
+      5  H4                     1.4960      1.0446            0.4514     -0.0000
+      6  H5                     1.4942      1.0434            0.4508     -0.0000
+      7  H6                     1.4942      1.0434            0.4508     -0.0000
 
   basin pair                                delta(A,B)
-  U0                H1                      0.8260
-  U0                H2                      0.8260
-  U0                H3                      0.8260
-  U0                H4                      0.8260
-  U0                H6                      0.8260
-  U0                H5                      0.8260
-  H2                H3                      0.0140
-  H2                H4                      0.0140
-  H2                H6                      0.0140
-  H2                H5                      0.0140
-  H4                H6                      0.0140
-  H1                H6                      0.0140
-  H3                H6                      0.0140
-  H4                H5                      0.0140
-  H3                H5                      0.0140
-  H1                H4                      0.0140
-  H1                H3                      0.0140
-  H1                H5                      0.0140
+  U0                H1                      0.8161
+  U0                H2                      0.8161
+  U0                H3                      0.8157
+  U0                H4                      0.8157
+  U0                H6                      0.8152
+  U0                H5                      0.8152
+  H2                H3                      0.0179
+  H1                H4                      0.0179
+  H3                H5                      0.0177
+  H4                H6                      0.0177
+  H2                H4                      0.0176
+  H1                H3                      0.0176
+  H4                H5                      0.0175
+  H3                H6                      0.0175
+  H1                H5                      0.0174
+  H2                H6                      0.0174
+  H2                H5                      0.0173
+  H1                H6                      0.0173
   3 further pairs below 0.01
 GridManager: Setting up prototype grids for atom types...
 GridManager: Generating integration grids for atoms...
 GridManager: Generated total of 143592 grid points.
-Quadrature points sent along the field: 58225, left the grid: 0
+Quadrature points sent along the field: 59835, left the grid: 0
 
 ELI-D Analysis (atomic quadrature grids):
   basin  label               electrons      volume         maximum        x          y          z
-      1  H6                     1.7239     68.1771         13.7822      0.000      0.000     -3.850
-      2  H5                     1.7003     50.6276         13.7822     -0.000     -0.000      3.850
-      3  H1                     1.7140     60.9811         13.7822      3.850     -0.000      0.000
-      4  H3                     1.7106     61.4328         13.7822     -0.000      3.850     -0.000
-      5  H2                     1.7060     59.6883         13.7822     -3.850      0.000     -0.000
-      6  H4                     1.7107     62.0433         13.7822      0.000     -3.850     -0.000
-      7  U0 core               85.7528     67.7175         13.5603      0.000      0.000      0.000
-      8  H2 LP                  0.3247    178.0269         11.2194     -5.465     -0.000     -0.000
-      9  H5 LP                  0.3235    176.5810         11.2194      0.000      0.000      5.465
-     10  H1 LP                  0.3231    175.7587         11.2194      5.465      0.000     -0.000
-     11  H6 LP                  0.3240    177.2173         11.2194     -0.000      0.000     -5.465
-     12  H3 LP                  0.3247    178.0269         11.2194     -0.000      5.465     -0.000
-     13  H4 LP                  0.3251    178.0142         11.2194     -0.000     -5.465      0.000
-  total in basins: 97.9634   outside every basin: 0.0364
+      1  H6                     1.6950     53.7176         13.7822      0.000      0.000     -3.850
+      2  H5                     1.6950     53.7176         13.7822     -0.000     -0.000      3.850
+      3  H1                     1.6922     55.7377         13.7822      3.850     -0.000      0.000
+      4  H3                     1.7013     55.5455         13.7822      0.000      3.850      0.000
+      5  H2                     1.6922     55.7377         13.7822     -3.850      0.000     -0.000
+      6  H4                     1.7013     55.5455         13.7822      0.000     -3.850     -0.000
+      7  U0 core               85.8224     61.5072         13.5603      0.000      0.000      0.000
+      8  H2 LP                  0.3279    186.3215         11.2194     -5.465     -0.000     -0.000
+      9  H5 LP                  0.3265    183.2218         11.2194      0.000      0.000      5.465
+     10  H1 LP                  0.3279    186.3215         11.2194      5.465      0.000     -0.000
+     11  H6 LP                  0.3265    183.2218         11.2194     -0.000      0.000     -5.465
+     12  H3 LP                  0.3282    186.1088         11.2194     -0.000      5.465     -0.000
+     13  H4 LP                  0.3282    186.1088         11.2194     -0.000     -5.465      0.000
+  total in basins: 97.9643   outside every basin: 0.0355
 
 Spin-resolved ELI-D: skipped, restricted wavefunction - ELI-D(alpha-alpha) = ELI-D(beta-beta) is the ELI-D above and the triplet member a constant multiple of it.
