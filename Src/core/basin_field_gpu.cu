@@ -5,6 +5,9 @@
 #include <cstdio>
 #include <cstdlib>
 #include <chrono>
+#include <cmath>
+#include <algorithm>
+#include <vector>
 
 NOSPHERA2_GPU_API_BEGIN
 
@@ -77,6 +80,27 @@ __global__ void bf_ao_kernel(const int n, const int nao, const double* __restric
 	double* out = chi + (size_t)a * K * n + p;
 #pragma unroll
 	for (int k = 0; k < K; k++) out[(size_t)k * n] = t[k];
+}
+
+//Profile only: per (point, function) of chi, count[0] += nonzero, count[1] += largest component
+//times the function's largest occupied coefficient >= 1e-12
+__global__ void bf_count_kernel(const int n, const int nao, const int K, const double* __restrict__ chi,
+	const double* __restrict__ cmax, unsigned long long* __restrict__ count)
+{
+	__shared__ unsigned long long s[2];
+	if (threadIdx.x < 2) s[threadIdx.x] = 0;
+	__syncthreads();
+	const long long g = (long long)blockIdx.x * blockDim.x + threadIdx.x;
+	if (g < (long long)n * nao)
+	{
+		const int p = (int)(g % n), a = (int)(g / n);
+		double m = 0;
+		for (int k = 0; k < K; k++) m = fmax(m, fabs(chi[(size_t)a * K * n + (size_t)k * n + p]));
+		if (m > 0) atomicAdd(s, 1ULL);
+		if (m * cmax[a] >= 1e-12) atomicAdd(s + 1, 1ULL);
+	}
+	__syncthreads();
+	if (threadIdx.x < 2) atomicAdd(count + threadIdx.x, s[threadIdx.x]);
 }
 
 //One thread per point: phi[mo * K * n + k * n + p] reduced over the occupied MOs with the arithmetic
@@ -167,11 +191,19 @@ struct bf_ctx
 	bool prof = false;
 	double st[4]{ 0, 0, 0, 0 };
 	long long prof_points = 0, prof_runs = 0;
+	double* cmax = nullptr;
+	unsigned long long* count = nullptr;
 	~bf_ctx()
 	{
 		if (prof)
-			std::printf("  basin field GPU (K=%d, nao %d, nocc %d): %lld points in %lld runs; copy-in %.3f s, AOs %.3f s, GEMM %.3f s, reduce+copy-out %.3f s\n",
-				K, nao, nocc, prof_points, prof_runs, st[0], st[1], st[2], st[3]);
+		{
+			unsigned long long h[2]{ 0, 0 };
+			if (count) gpuMemcpy(h, count, sizeof(h), gpuMemcpyDeviceToHost);
+			const double np = prof_points > 0 ? (double)prof_points : 1.0;
+			std::printf("  basin field GPU (K=%d, nao %d, nocc %d): %lld points in %lld runs; copy-in %.3f s, AOs %.3f s, GEMM %.3f s, reduce+copy-out %.3f s; per point %.1f nonzero functions, %.1f above 1e-12\n",
+				K, nao, nocc, prof_points, prof_runs, st[0], st[1], st[2], st[3], h[0] / np, h[1] / np);
+		}
+		gpuFree(cmax); gpuFree(count);
 		gpuFree(c); gpuFree(cmin); gpuFree(pe); gpuFree(ps); gpuFree(coef); gpuFree(occ);
 		gpuFree(start); gpuFree(pc); gpuFree(pl);
 		gpuFree(pts); gpuFree(chi); gpuFree(phi); gpuFree(P); gpuFree(val); gpuFree(grad); gpuFree(rho);
@@ -237,6 +269,15 @@ void* basin_field_gpu_open(
 		delete x;
 		return nullptr;
 	}
+	if (x->prof)
+	{
+		std::vector<double> cm(nao, 0.0);
+		for (int a = 0; a < nao; a++)
+			for (int mo = 0; mo < nocc; mo++) cm[a] = std::max(cm[a], std::abs(coef[(size_t)a * nocc + mo]));
+		if (upload(x->cmax, cm.data(), (size_t)nao) && gpuMalloc(&x->count, 2 * sizeof(unsigned long long)) == gpuSuccess)
+			gpuMemset(x->count, 0, 2 * sizeof(unsigned long long));
+		else { gpuFree(x->count); x->count = nullptr; }
+	}
 	return x;
 }
 
@@ -285,6 +326,7 @@ bool basin_field_gpu_run(void* ctx, const int np, const double* pts, double* val
 			&& (!val || K == 4 || gpuMemcpy(val + first, x->val, sizeof(double) * (size_t)n, gpuMemcpyDeviceToHost) == gpuSuccess)
 			&& (!rho || gpuMemcpy(rho + first, x->rho, sizeof(double) * (size_t)n, gpuMemcpyDeviceToHost) == gpuSuccess);
 		lap(3);
+		if (x->count) bf_count_kernel<<<blocks, BF_BLOCK>>>(n, nao, K, x->chi, x->cmax, x->count);
 	}
 	if (!ok)
 		std::fprintf(stderr, "NoSpherA2 basin field GPU: %s, falling back to the host\n", gpuGetErrorString(err != gpuSuccess ? err : gpuGetLastError()));
