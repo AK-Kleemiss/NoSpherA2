@@ -468,15 +468,9 @@ TEST(ConvenienceTests, ProgressBarBatchedUpdateWritesOnce)
 	EXPECT_NE(out.str().find("100%"), std::string::npos);
 }
 
-//A file-backed bar is redrawn by seeking back to the start of its line, and that overwrites whatever the
-//loop printed in between. Both bar tests above use an ostringstream, which takes the "\r" branch, so the
-//file branch - the one every NoSpherA2.log goes through - was never covered. This is not a cosmetic
-//question: RGBI prints a population line per bond inside its bar loop and not one of them has ever reached
-//the log, and the same holds for every warning any other bar loop raises. A diagnostic that is printed and
-//then erased is worse than one that was never written, because the code looks like it reports.
-//WHAT MAKES THIS FAIL: a write_progress that seeks back unconditionally. Measured red by reverting the
-//guard: found came out 0 of 4, and the file held the bar followed by the truncated tail of the last line
-//("tion between atom 1 and atom 5: 27.09"), which is what silent corruption of a log looks like.
+//A file-backed bar redraws by seeking back, which would erase lines the loop printed in between; the
+//tests above use an ostringstream ("\r" branch), so this covers the file branch NoSpherA2.log takes.
+//Fails if write_progress seeks back unconditionally
 TEST(ConvenienceTests, FileBarKeepsWhatTheLoopPrinted)
 {
 	const TempFile tmp("progressbar", ".log");
@@ -666,13 +660,10 @@ TEST(ConvenienceMathTests, ReadxyzMinMaxFromWFNPadsAndSteps)
 	for (int i = 0; i < 3; i++)
 	{
 		EXPECT_EQ(opts.NbSteps[i], raw[i] + (raw[i] % 2));
-		//and the point of the parity: the callers step from MinMax[i] by (length)/NbSteps[i], so the centre
-		//of the box has to land ON a grid plane. Half a voxel off and the molecule's own mirror planes are
-		//not sampled, which is what broke UH6's six ELI-D attractors into six inequivalent positions.
+		//even count puts the box centre on a grid plane; half a voxel off, the mirror planes are not sampled
 		const double h = (opts.MinMax[3 + i] - opts.MinMax[i]) / opts.NbSteps[i];
 		const double centre_index = 0.5 * (opts.MinMax[3 + i] + opts.MinMax[i] - 2.0 * opts.MinMax[i]) / h;
 		EXPECT_NEAR(centre_index, std::round(centre_index), 1e-9) << "axis " << i;
-		//and the step is no coarser than the caller asked for
 		EXPECT_LE(constants::bohr2ang(h), 0.1 + 1e-12) << "axis " << i;
 	}
 	EXPECT_EQ(opts.n_grid_points(), size_t(opts.NbSteps[0]) * opts.NbSteps[1] * opts.NbSteps[2]);
@@ -681,18 +672,9 @@ TEST(ConvenienceMathTests, ReadxyzMinMaxFromWFNPadsAndSteps)
 	EXPECT_TRUE(opts.calc());
 }
 
-// A grid that cannot sample the molecule's mirror planes cannot give a symmetric answer, at any resolution.
-// This is octahedral UH6 as tests/ELI_heavy/uh6.gbw has it - uranium at the origin, six hydrogens on the
-// axes at 2 Angstrom - measured with the radius its test uses. The six ELI-D hydrogen attractors of that
-// molecule have to map onto themselves under all 48 operations of its point group, and before the parity
-// step in readxyzMinMax_fromWFN they did so under 1 of 48 at 0.15 and 0.10 Angstrom and under all 48 at
-// 0.20 and 0.12: what decided it was whether ceil(length/resolution) happened to come out even, since with
-// an odd count the box centre falls exactly halfway between two grid planes and the four voxels around each
-// axis are degenerate. 9.0/0.15 evaluates to 60.000000000000014, so the caller asking for 0.15 got 61.
-// The attractor positions themselves are checked by tests/ELI_heavy/uh6_eli.good; this is the precondition,
-// and it is the cheap place to notice it breaking again. The second half of the test pins the opposite case:
-// with even_steps = false the count must stay exactly what ceil returned, which at 0.15 and 0.10 is odd - so
-// this test goes red if the parameter is ignored in either direction.
+// Octahedral UH6 as in tests/ELI_heavy/uh6.gbw, with its radius.  An odd step count puts the box centre
+// between two planes and breaks the attractors' symmetry; ceil(length/res) is odd at 0.15 and 0.10
+// (9.0/0.15 = 60.000000000000014), so those resolutions pin both even_steps = true and false
 TEST(ConvenienceMathTests, GridCentreLandsOnAPlaneAtEveryResolution)
 {
 	WFN w(e_origin::NOT_YET_DEFINED);
@@ -712,8 +694,7 @@ TEST(ConvenienceMathTests, GridCentreLandsOnAPlaneAtEveryResolution)
 		opts.radius = 2.5;
 		opts.resolution = res;
 		readxyzMinMax_fromWFN(w, opts);
-		//the property-cube path keeps its step at the resolution rather than at the span over the count, so an
-		//extra point there only widens the box: it asks for even_steps = false and must get ceil's own parity.
+		//the property-cube path steps at the resolution, where an extra point only widens the box: even_steps = false
 		properties_options raw_opts;
 		raw_opts.radius = 2.5;
 		raw_opts.resolution = res;
@@ -729,7 +710,7 @@ TEST(ConvenienceMathTests, GridCentreLandsOnAPlaneAtEveryResolution)
 			EXPECT_EQ(opts.NbSteps[i] / 2 * 2, opts.NbSteps[i]) << "resolution " << res;
 			EXPECT_LE(constants::bohr2ang(h), res + 1e-12) << "resolution " << res << " axis " << i;
 		}
-		//and the molecule's octahedral axes are all equivalent, so the three counts must agree
+		//octahedral axes are equivalent
 		EXPECT_EQ(opts.NbSteps[0], opts.NbSteps[1]) << "resolution " << res;
 		EXPECT_EQ(opts.NbSteps[1], opts.NbSteps[2]) << "resolution " << res;
 	}
@@ -1049,8 +1030,7 @@ TEST(ConvenienceOptionsTests, IsosurfaceAndAnalysisOptionsReadOptionalValues)
 	EXPECT_TRUE(def.properties.rho);
 	const options val = parse({ "-esp_isosurface", "0.01" });
 	EXPECT_NEAR(val.properties.esp_isosurface, 0.01, 1e-15);
-	//a real file, because -eli_analysis refuses a positional wavefunction that is not there: the
-	//name used to be taken on trust and the run died minutes later, or not at all
+	//a real file: -eli_analysis refuses a positional wavefunction that does not exist
 	const TempFile mol("eli_analysis", ".wfn");
 	mol.write_text("");
 	const options eli = parse({ "-eli_analysis", mol.path.string(), "0.05", "3.5", "-acc", "4" });

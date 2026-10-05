@@ -610,6 +610,7 @@ void GridManager::generateIntegrationGrids(const WFN &wave, const cell &unit_cel
 		for (int coord = 0; coord < 10; coord++)
 			(*grid)[i][coord].resize((*num_points)[i], 0.0);
 	}
+	grid_atom_ = atom_of;
 	//The TFVC weights are only read for that partitioning and for the every-scheme
 	//output, and chi is a line-density extremum search over every atom pair
 	vec chi_matrix;
@@ -818,7 +819,8 @@ PartitionResults GridManager::calculatePartitionedCharges(const WFN &wave, const
 
 		// Add ECP electrons (only to computed schemes)
 		if (wave.get_has_ECPs()) {
-			const int ecp_e = wave.get_atom_ECP_electrons(atom); // map atom->basis if needed
+			//In a grown structure the grid index is not the wfn atom; the ECP core belongs to grid_atom_
+			const int ecp_e = wave.get_atom_ECP_electrons(grid_atom_.size() == num_atoms ? grid_atom_[atom] : atom);
 			if (config_.debug || config_.all_charges) {
 				results.atom_charges[PartitionResults::CHARGE_ORDER::S_BECKE][atom] += ecp_e;
 				results.atom_charges[PartitionResults::CHARGE_ORDER::S_HIRSH][atom] += ecp_e;
@@ -1109,23 +1111,21 @@ void GridManager::printChargeTable(const svec &labels, const WFN &wave, const iv
 	file << "\n";
 
 	for (int i = 0; i < atom_list.size(); i++) {
-		int atom_idx;
-		if (needs_helper_grids_)
-			atom_idx = i;
-		else
-			atom_idx = atom_list[i];
+		//Helper grids run over every wfn atom, the others over atom_list
+		const int atom_idx = atom_list[i];
+		const int r = needs_helper_grids_ ? atom_idx : i;
 		file << std::setw(10) << labels[i];
 
 		if (config_.partition_type == PartitionType::Becke || config_.all_charges || config_.debug)
-			file << std::fixed << std::setw(10) << std::setprecision(3) << wave.get_atom_charge(atom_idx) - results.atom_charges[0][i];  // Becke
+			file << std::fixed << std::setw(10) << std::setprecision(3) << wave.get_atom_charge(atom_idx) - results.atom_charges[0][r];  // Becke
 		if (config_.partition_type == PartitionType::Hirshfeld || config_.all_charges || config_.debug)
-			file << std::fixed << std::setw(10) << std::setprecision(3) << wave.get_atom_charge(atom_idx) - results.atom_charges[2][i];  // Hirshfeld
+			file << std::fixed << std::setw(10) << std::setprecision(3) << wave.get_atom_charge(atom_idx) - results.atom_charges[2][r];  // Hirshfeld
 		if (config_.partition_type == PartitionType::TFVC || config_.all_charges || config_.debug)
-			file << std::fixed << std::setw(10) << std::setprecision(3) << wave.get_atom_charge(atom_idx) - results.atom_charges[1][i];  // TFVC
+			file << std::fixed << std::setw(10) << std::setprecision(3) << wave.get_atom_charge(atom_idx) - results.atom_charges[1][r];  // TFVC
 		if (config_.partition_type == PartitionType::MBIS || config_.all_charges || config_.debug)
-			file << std::fixed << std::setw(10) << std::setprecision(3) << wave.get_atom_charge(atom_idx) - results.atom_charges[3][i];  // MBIS
+			file << std::fixed << std::setw(10) << std::setprecision(3) << wave.get_atom_charge(atom_idx) - results.atom_charges[3][r];  // MBIS
 		if (config_.partition_type == PartitionType::EMBIS || config_.all_charges || config_.debug)
-			file << std::fixed << std::setw(10) << std::setprecision(3) << wave.get_atom_charge(atom_idx) - results.atom_charges[4][i];  // EMBIS
+			file << std::fixed << std::setw(10) << std::setprecision(3) << wave.get_atom_charge(atom_idx) - results.atom_charges[4][r];  // EMBIS
 		file << "\n";
 	}
 

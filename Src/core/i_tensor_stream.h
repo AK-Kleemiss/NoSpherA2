@@ -2,13 +2,9 @@
 #include "convenience.h"
 #include <cassert>
 
-// The XCW I tensor is nr blocks of complex values, one per reflection, holding only the
-// (mu, nu) pairs that survived the overlap screening - kept of the nmo*(nmo+1)/2 - in the
-// order the pair list in the header gives. The header also says whether the elements are
-// single or double: a tensor built in single precision is stored as it was computed. Every
-// consumer walks it in reflection order, so only a window need be resident:
-//     resident = window * kept * (8 or 16) bytes.
-// C stdio, not ifstream, for read speed; only the 64-bit seek needs an #if.
+// XCW I tensor: nr blocks of complex values, one per reflection, over the kept of nmo*(nmo+1)/2 (mu, nu)
+// pairs in the header's pair-list order, single or double as built (header flag). Consumers walk reflections
+// in order, so only a window is resident: window * kept * (8 or 16) bytes. C stdio, not ifstream, for speed.
 class i_tensor_file
 {
 public:

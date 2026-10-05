@@ -1,9 +1,7 @@
 #pragma once
-//Per-analysis result files next to the wavefunction: <stem>.rgbi_log, .qtaim_log, .eli_log and
-//.nbo_log. The run log keeps everything it always had, byte for byte; a section's result blocks are
-//copied into its file as well, the way tee does it, under the program header, a title block and the
-//references of that analysis. Progress chatter, and citation lines the header already lists, stay in
-//the run log only.
+//Per-analysis result files beside the wavefunction (<stem>.rgbi_log, .qtaim_log, .eli_log, .nbo_log). The run
+//log is unchanged; a section's result blocks are teed into its file under a header with that analysis's
+//references. Progress chatter and citation lines the header already lists stay in the run log only.
 #include "convenience.h"
 #include "citations.h"
 #include <ctime>
@@ -24,7 +22,7 @@ namespace section_log
 	struct open_file
 	{
 		std::ostream *f;
-		std::set<std::string> cited;  //the header's reference lines, as citations::cite prints them
+		std::set<std::string> cited; //header reference lines, as citations::cite prints them
 	};
 	inline std::map<std::string, open_file> &open_files() { static std::map<std::string, open_file> m; return m; }
 
@@ -104,8 +102,8 @@ namespace section_log
 		tee &operator=(const tee &) = delete;
 	};
 
-	//Opens <wfn stem>.<kind>_log beside the wavefunction and writes its header. Registered sections
-	//are what tee finds; an unregistered one (the NBO thread's) is written through stream() only.
+	//Opens <wfn stem>.<kind>_log beside the wavefunction and writes its header. tee finds registered sections
+	//only; an unregistered one (the NBO thread's) is written through stream().
 	class section
 	{
 		std::string kind;

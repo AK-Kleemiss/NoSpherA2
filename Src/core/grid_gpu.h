@@ -2,33 +2,20 @@
 
 #include "gpu_api.h"
 
-//GPU path for the atomic integration grid weights. generateIntegrationGrids is 46% of a
-//production tsc run and 98.8% of it is AtomGrid::get_grid, which evaluates the Becke and
-//TFVC partitioning weights at every grid point. Each point is independent and the work is
-//O(centers^2) of plain arithmetic per point, which is the shape a device wants.
-//
-//This is partitioning physics, not a contraction: a slip changes every partitioned charge.
-//The device code is a verbatim transcription of get_integration_weights.
-//
-//One call covers every atom of the molecule at once: the prototype points of all grids
-//concatenated, pcen naming the owning centre of each point, and the outputs laid out the
-//same way. A call per atom cost more in allocation and synchronisation than the kernel
-//itself on a small molecule. chi may be null when TFVC weights are not wanted; the
-//kernel then takes the chi-absent branch. When it is given, it must be exactly
-//num_centers^2 - make_chi lays its rows out with a stride of wfn.get_ncen(), which is
-//not num_centers in general, and a wrongly sized chi copies without complaint and comes
-//back wrong.
-//
-//Returns false if there is no device, if the scratch will not fit, or if num_centers is
-//too large for the per-thread arrays, and the caller keeps the CPU loop.
+//Becke and TFVC partitioning weights per grid point, O(centers^2) each; the device code is a
+//verbatim transcription of get_integration_weights, keep the two in step.
+//One call covers every atom: prototype points of all grids concatenated, pcen the owning centre.
+//chi is null without TFVC; otherwise exactly num_centers^2, while make_chi strides by
+//wfn.get_ncen(), and a wrongly sized chi comes back wrong without complaint.
+//False without a device, room, or per-thread array space for num_centers; the caller keeps the CPU loop.
 
 NOSPHERA2_GPU_API_BEGIN
 
 bool grid_gpu_available();
-//"CUDA" or "HIP", for the log line
+//"CUDA" or "HIP"
 const char* grid_gpu_backend();
 
-//On by default; -no_gpu_grid turns this off
+//On by default, off with -no_gpu_grid
 void grid_gpu_set_enabled(bool on);
 bool grid_gpu_enabled();
 

@@ -40,13 +40,10 @@ enum e_origin {
 	XCW_fit = 14
 };
 
-//ORCA stores the pure components with |m| >= 3 - f(+-3), g(+-3), g(+-4) and the same for h and i -
-//with the sign opposite to libcint's, and a reader that keeps ORCA's coefficients keeps that
-//convention in its density matrix.  Two readers do: the gbw reader, and the molden reader, because
-//orca_2mkl writes the gbw's own coefficients.  An overlap paired with such a density has to take
-//ORCA's sign there as well; in the ORCA component order (m = 0, +1, -1, +2, -2, ...) that is every
-//component index from 5 on.  Measured on tests/CuF2_i_func/71/calc_occupied.molden, which carries
-//shells up to i: without it Tr(P S) is 46.958 of the file's 47 electrons.
+//ORCA stores the pure components with |m| >= 3 (f(+-3), g(+-3), g(+-4), likewise h and i) with the
+//sign opposite to libcint's.  The gbw reader and the molden reader (orca_2mkl writes the gbw's own
+//coefficients) keep that sign in the density matrix, so a paired overlap must take it too: in ORCA's
+//m = 0, +1, -1, +2, -2, ... order, every component index from 5 on.
 inline bool origin_has_orca_pure_phases(const e_origin o)
 {
 	return o == e_origin::gbw || o == e_origin::molden;
@@ -317,10 +314,9 @@ public:
 	bool add_exp(const int& cent, const int& type, const double& e);
 	/** Auto-detect file type and read wavefunction. */
 	void read_known_wavefunction_format(const std::filesystem::path& fileName, std::ostream& file, const bool debug = false);
-	/** @brief Declare def2 ECP cores when the orbitals hold exactly that many electrons fewer than
-	 *  the nuclei carry. No file format states an ECP unless -ECP is passed, and an analysis that
-	 *  fills orbitals from Z then works with electrons the basis does not describe. Only an exact
-	 *  match against constants::ECP_electrons acts; anything else is left alone. */
+	/** @brief Declare def2 ECP cores when the orbitals hold exactly constants::ECP_electrons fewer
+	 *  electrons than the nuclei carry; no file states an ECP without -ECP, and filling from Z would
+	 *  count electrons the basis does not describe.  Any other deficit is left alone. */
 	void declare_ECPs_if_core_electrons_are_missing(std::ostream& file);
 	/** Read legacy .wfn /.ffn file. */
 	bool read_wfn(const std::filesystem::path& fileName, const bool& debug, std::ostream& file);
@@ -616,9 +612,8 @@ public:
 	//the same orbital pass. A restricted wavefunction splits every occupation evenly, as spin_fields does
 	void computeELISpinGrad(const d3 &PosGrid, const int field, const double triplet_factor, double& Eli, d3& gradient, double *aux = nullptr) const;
 	/** Compute gradient. */
-	//rho comes out of the same orbital pass when a pointer is given: the reduction already
-	//has phi, so the density is one multiply-add per MO instead of a second pass over every
-	//primitive.  The QTAIM climb needs both at every step.
+	//rho, when asked for, comes from the same orbital pass: one multiply-add per MO instead of a second
+	//pass over every primitive, and the QTAIM climb needs both at every step
 	void computeGrad(const d3 &PosGrid, d3& gradient, double *rho = nullptr) const;
 	//computeELIGrad (eli) or computeGrad (!eli) at np points, xyz interleaved, on the device
 	//(basin_field_gpu.h): grad 3 per point, val (ELI-D only) and rho optional. False, with nothing

@@ -862,10 +862,8 @@ void create_SALTED_training_data(const WFN& orbital, const WFN& aux, const optio
 	DensityFitting::CONFIG config = DensityFitting::config_from_options(opts);
 	config.analyze_quality = true;
 
-	// SALTED learns one coefficient block per atom, so the fit has to keep each
-	// atom's density on its own centre. Grid-partitioned restraints pin the
-	// moments of the total density and leave the per-centre sums free, which
-	// trains the model on blocks that integrate to nothing physical.
+	// SALTED learns one coefficient block per atom: grid-partitioned restraints pin only the total
+	// density's moments and leave per-centre sums free, so the blocks integrate to nothing physical
 	if (config.partition_restraints) {
 		std::cout
 			<< "SALTED training: restraining the atom-centred populations instead of the grid-partitioned ones."

@@ -315,18 +315,14 @@ namespace
 		{
 			if (line.rfind("  total in basins:", 0) == 0)
 				break;
-			//the label column holds spaces - "NNA near H0", "O0 LP", "H2-Hg0 bond" - so it cannot be read
-			//with a single >>: that reads "NNA", then fails on "near" as a double and drops the row without
-			//saying so, which is how an NNA row would disappear from a table a test is asserting on.
+			//the label column holds spaces ("NNA near H0", "H2-Hg0 bond"), so a single >> would drop such rows silently
 			std::istringstream row(line);
 			std::vector<std::string> tok;
 			for (std::string t; row >> t; )
 				tok.push_back(t);
 			if (tok.size() < 4)
 				continue;
-			//the label runs from token 1 to the first token that is a number: electrons and charge are the
-			//first two numeric columns and four more follow them, so counting from the end would depend on
-			//how many columns the table happens to print
+			//the label runs from token 1 to the first numeric token; counting from the end would depend on how many columns are printed
 			size_t first_num = 1;
 			auto is_number = [](const std::string& t) {
 				try { size_t used = 0; (void)std::stod(t, &used); return used == t.size(); }
@@ -577,14 +573,9 @@ TEST(BondwiseCoverageRobyTests, EpoxideCarbonCarbonRowKeepsTheIdentities)
 }
 
 //wavefunction mode: the two-shell H2 model is written as a .wfn, read back and gridded with radius 1.1 A and 0.5 A steps,
-//which is 8 x 6 x 6 points from (-1 - r, -r, -r) with r = ang2bohr(1.1) = 2.0787 bohr and steps (2 + 2r) / 8 and
-//2r / 6 - the counts are even because readxyzMinMax_fromWFN forces them to be, which is what puts x index 4 exactly
-//on the H-H midplane, the mirror plane of this molecule. Only points strictly inside r of a nucleus are evaluated, so
-//the y = z = -r planes and the x = -1 - r plane stay empty and the basin of H0 covers the x columns 1..4 (the last of
-//them being that midplane, which the ascent hands to H0) and the y, z rows 1..5: a 4 x 5 x 5 cube from
-//(-1 - r + (2 + 2r) / 8, -2r/3, -2r/3). Of its 100 voxels eight carry the background: the four corners at x = -2.3090
-//lie 2.3568 bohr from H0, and the four at x = 0 lie 2.2002 bohr from both nuclei, all outside r; the other 92 hold
-//the finite, positive ELI-D (the x = -2.31 column lies 3.85 bohr from H1, which is why the model needs its second shell)
+//which is 8 x 6 x 6 points with r = ang2bohr(1.1); the counts are even (readxyzMinMax_fromWFN), which puts x index 4 on
+//the H-H mirror plane. Only points strictly inside r of a nucleus are evaluated, so H0's basin is a 4 x 5 x 5 cube whose
+//eight corner voxels lie beyond r and carry the background; the other 92 hold ELI-D (the far column needs H1's second shell)
 TEST(BondwiseCoverageMaskTests, WfnModeMasksTheFirstHydrogenBasin)
 {
 	Scratch s("WfnModeMasksTheFirstHydrogenBasin");
@@ -613,7 +604,7 @@ TEST(BondwiseCoverageMaskTests, WfnModeMasksTheFirstHydrogenBasin)
 	ASSERT_EQ(c.get_size(0), 4);
 	ASSERT_EQ(c.get_size(1), 5);
 	ASSERT_EQ(c.get_size(2), 5);
-	//1e-6 and not 0 because the cube header carries the origin and the step in six decimals (the residual is 5.3e-08)
+	//1e-6, not 0: the cube header stores the origin and step in six decimals
 	EXPECT_NEAR(c.get_origin(0) + 3.0 * step_x, 0.0, 1e-6) << "the last x column is the mirror plane itself";
 	EXPECT_NEAR(c.get_origin(0), -1.0 - r + step_x, 1e-5);
 	EXPECT_NEAR(c.get_origin(1), -r + step_yz, 1e-5);
@@ -647,8 +638,8 @@ TEST(BondwiseCoverageMaskTests, WfnModeMasksTheFirstHydrogenBasin)
 //maxima (at x = +-0.99933, the tail of the other Gaussian pulls them in by 2 exp(-8)) and one saddle at the origin
 //with Hessian eigenvalues (-4, -4, 12) rho, Laplacian 4 rho and ellipticity 0; the debug listing adds the eigenvectors
 //and the x axis carries the positive curvature. The QTAIM basins split at the midplane, so both hydrogens hold the
-//same electron count and charge = Z - electrons. The default path is analytic end to end, so -debug no longer has a
-//rho.cube or eli.cube to drop, and the bond point at 2 bohr (beyond 1.3 x the covalent radii) must still be found
+//same electron count and charge = Z - electrons. The default path is analytic, so -debug drops no rho.cube or eli.cube,
+//and the bond point at 2 bohr (beyond 1.3 x the covalent radii) must still be found
 TEST(BondwiseCoverageEliTests, DebugListsTheCriticalPointsOfTwoGaussians)
 {
 	Scratch s("DebugListsTheCriticalPointsOfTwoGaussians");
@@ -704,8 +695,6 @@ TEST(BondwiseCoverageEliTests, DebugListsTheCriticalPointsOfTwoGaussians)
 	EXPECT_EQ(attractors, 2);
 	EXPECT_EQ(bonds, 1);
 	const auto rows = parse_qtaim_table(out);
-	//H2 has two basins, so the table has two rows. A parser that dropped a row whose label carries a space
-	//("NNA near H0", "H0-H1 bond") would still satisfy the two lookups below while hiding a third basin.
 	ASSERT_EQ(rows.size(), 2u) << out;
 	ASSERT_TRUE(rows.count("H0") && rows.count("H1")) << out;
 	const double e0 = rows.at("H0").first, e1 = rows.at("H1").first;
@@ -715,8 +704,7 @@ TEST(BondwiseCoverageEliTests, DebugListsTheCriticalPointsOfTwoGaussians)
 	EXPECT_NEAR(rows.at("H1").second, 1.0 - e1, 2e-4);
 }
 
-//-basin_cube is the fallback that still builds the grid: the same H2 model, now with the cube files -debug drops and
-//the grid line, and the same two equal hydrogen basins
+//the same H2 model through -basin_cube: the cube files and the grid line appear, the two hydrogen basins stay equal
 TEST(BondwiseCoverageEliTests, BasinCubeFallbackStillBuildsTheGrid)
 {
 	Scratch s("BasinCubeFallbackStillBuildsTheGrid");
@@ -744,9 +732,7 @@ TEST(BondwiseCoverageEliTests, BasinCubeFallbackStillBuildsTheGrid)
 	EXPECT_NEAR(rows.at("H0").first, rows.at("H1").first, 5e-3 * (rows.at("H0").first + rows.at("H1").first));
 }
 
-//The H2 table above has two single-word labels, so the row-count assertion in it cannot by itself show
-//that the parser stopped dropping rows. This does, on a table written out here: two of its three rows
-//carry a label with a space, which is what the real tables print for NNA, lone-pair and bond basins.
+//real tables print labels with spaces for NNA, lone-pair and bond basins; two of the three rows here carry one
 TEST(BondwiseCoverageEliTests, QtaimTableParserKeepsLabelsThatCarrySpaces)
 {
 	const std::string out =
@@ -763,8 +749,7 @@ TEST(BondwiseCoverageEliTests, QtaimTableParserKeepsLabelsThatCarrySpaces)
 	EXPECT_NEAR(rows.at("NNA near H0").second, -0.1234, 1e-9);
 	EXPECT_NEAR(rows.at("H2-Hg0 bond").first, 0.9000, 1e-9);
 	EXPECT_NEAR(rows.at("H2-Hg0 bond").second, 0.1000, 1e-9);
-	//and the same table read the way it used to be read, kept here so this test cannot quietly become a
-	//tautology: a single >> for the label keeps one row of the three and says nothing about the two it lost
+	//a single >> for the label keeps one row of the three, so this test cannot become a tautology
 	size_t naive = 0;
 	std::istringstream in(out);
 	for (std::string line; std::getline(in, line); )
@@ -797,16 +782,9 @@ namespace {
 
 }  // namespace
 
-//The two basin tables of an ECP wavefunction close on two different electron counts, and both are
-//right: HgH2 with the def2 ECP on Hg has 22 electrons in its orbitals, and the QTAIM arm fills the
-//60-electron core with a Thakkar density before integrating, so its table closes on 82 while the
-//ELI-D arm - which only ever sees the orbitals - closes on 22. Comparing the wrong pair is how a
-//correct ECP run gets reported as a 60-electron error, and it is the question a colleague asks first.
-//
-//Conservation is what is asserted rather than any particular population, because the cube resolution
-//only decides where the boundaries fall: every quadrature point is charged either to a basin or to
-//"outside every basin", so the two must add to the electron count however coarse the grid is. That
-//is what makes this checkable at a resolution the suite can afford.
+//An ECP wavefunction's two tables close on different counts, both right: HgH2 with the def2 ECP on Hg has 22 orbital
+//electrons, the QTAIM arm adds the 60-electron core as a Thakkar density (82), ELI-D sees only the orbitals (22).
+//Conservation, not populations, is asserted: every quadrature point goes to a basin or outside, at any resolution.
 TEST(BondwiseCoverageEliTests, TheEcpBasinTablesCloseOnTheirOwnElectronCounts)
 {
 	const std::filesystem::path p = nos_test_repo_root() / "tests" / "ELI_heavy" / "hgh2_ecp.gbw";
@@ -846,14 +824,8 @@ TEST(BondwiseCoverageEliTests, TheEcpBasinTablesCloseOnTheirOwnElectronCounts)
 		<< "the difference between the two arms is the ECP core the one fills and the other cannot see";
 }
 
-// A free atom is the system ELI-D is calibrated against, and until af99fa2a the analysis could not
-// run on one: the ELI label branch looked for the two atoms nearest each maximum and aborted the
-// process when there was only one. Six of the twenty-two reader inputs in the robustness matrix
-// failed there and nowhere else, five of them the only ELI coverage their reader has. This is the
-// cheapest of the six, and it checks the two things a lone atom must satisfy: the basins plus
-// whatever left them close on the electron count the file itself declares, and no basin is a bond,
-// because there is nothing to bond to. If the abort comes back this test kills the whole binary
-// rather than failing, which is the nature of err_checkf and worth knowing when it happens.
+// A free atom is what ELI-D is calibrated against: basins plus what left them close on the file's electron count and
+// no basin is a bond. A label branch that needs two atoms aborts in err_checkf, killing the binary rather than failing.
 TEST(BondwiseCoverageEliTests, AFreeAtomIsAnalysedAndItsBasinsCloseOnItsOwnElectrons)
 {
 	const std::filesystem::path p = nos_test_repo_root() / "tests" / "molden_file" / "f_ref.wfx";
@@ -885,17 +857,14 @@ TEST(BondwiseCoverageEliTests, AFreeAtomIsAnalysedAndItsBasinsCloseOnItsOwnElect
 		<< "ELI-D on one atom: core shells plus valence, and nothing may go missing\n" << out;
 	EXPECT_EQ(out.find(" bond"), std::string::npos)
 		<< "a lone atom has no bond basin, so no label may carry one\n" << out;
-	//the label is the atom's own label with its index appended, so this fixture prints "F10":
-	//its single atom is named F1. Read the name from the wavefunction rather than spelling it out.
+	//the label is the atom's label plus its index, so F1 prints "F10"
 	const std::string own = wavy.get_atom_label(0) + "0";
 	EXPECT_NE(out.find(own), std::string::npos) << "every basin belongs to atom " << own << "\n" << out;
 }
 
 namespace
 {
-	//"  basin  label  <first number>  ..." rows of the table that follows `after`, up to the
-	//"total in basins" line that closes it. The first number is the population in every one of
-	//the four tables, whatever the remaining columns are.
+	//population (the first number) of each "  basin  label ..." row of the table after `after`, up to its "total in basins" line
 	std::map<std::string, double> parse_basin_rows(const std::string& out, const std::string& after)
 	{
 		std::map<std::string, double> rows;
@@ -918,19 +887,9 @@ namespace
 	}
 }  // namespace
 
-//An invariant that needs no reference calculation: nh3li.gbw is NH3 with a lithium on the
-//three-fold axis, so H1, H2 and H3 are related by symmetry and must carry the same population.
-//Anything else is the code's own error, and it is measurable without AIMAll or DGrid.
-//
-//The QTAIM arm holds the orbit to 7e-4 electrons and is asserted here. The ELI-D arm on the very
-//same runs does not, and the resolution scan says why it is not asserted: the spread over the three
-//equivalent hydrogens is 0.2077 e at resolution 0.4, 0.7420 e at 0.3 (one hydrogen at 2.6756
-//against two at 1.93), 0.1546 e at 0.2 and 0.0661 e at 0.15, while the conserved total stays at
-//12.67-12.68 throughout and the basin count grows 6, 6, 8, 9 with spurious 0.001-electron "bond"
-//basins. A defect the conserved total cannot see, in the voxel watershed that decides the
-//boundaries rather than in the field or the quadrature - the same quadrature integrates the QTAIM
-//basins of this molecule to 7e-4. Left as measured, not asserted, because no resolution the suite
-//can afford makes the ELI numbers symmetric.
+//nh3li.gbw has Li on the three-fold axis, so H1, H2 and H3 must carry the same population, checkable without a
+//reference program. Only the QTAIM arm is asserted: the ELI-D voxel watershed breaks the orbit at every resolution the
+//suite can afford, while its conserved total holds.
 TEST(BondwiseCoverageEliTests, QtaimHoldsTheThreefoldOrbitOfNH3Li)
 {
 	const std::filesystem::path p = nos_test_repo_root() / "tests" / "RGBI_groups" / "nh3li.gbw";

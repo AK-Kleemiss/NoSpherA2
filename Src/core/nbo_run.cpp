@@ -12,12 +12,8 @@
 #include <regex>
 #include <sstream>
 
-/*
- * The NBO output is a fixed-width report, so every table here is matched on the shape of its
- * numbers rather than on column positions: an occupancy always carries 5 decimals, an E(2)
- * value 2 and an F(L,NL) 3. That survives the one-space shifts between NBO builds and between
- * restricted and unrestricted output, which column slicing does not.
- */
+//NBO output is fixed-width, but its columns shift by a space between builds and between restricted and
+//unrestricted output, so tables are matched on the shape of their numbers: occupancy 5 decimals, E(2) 2, F(L,NL) 3.
 
 namespace {
 	const std::regex re_npa(R"(^\s*([A-Za-z]{1,2})\s+(\d+)\s+(-?\d+\.\d+)\s+(-?\d+\.\d+)\s+(-?\d+\.\d+)\s+(-?\d+\.\d+)\s+(-?\d+\.\d+)(?:\s+(-?\d+\.\d+))?\s*$)");
@@ -38,10 +34,8 @@ namespace {
 	const std::regex re_qpnrt(R"(QPNRT\((\d+)/(\d+)\):\s*D\(0\)=([\d.eE+-]+);\s*D\(w\)=([\d.eE+-]+))");
 	const std::regex re_timing(R"(Timing\(sec\):\s*search=([\d.]+);\s*Gram matrix=([\d.]+);\s*minimize=([\d.]+);\s*other=([\d.]+))");
 	const std::regex re_version(R"(Cite this program \[(.+?)\])");
-	//NBO echoes each keyword it recognised as "/NRTLST / : Set to 0.1%". That is the keylist as
-	//NBO understood it rather than as we wrote it - it also shows the defaults a keyword pulled in
-	//and drops anything misspelled - so it is what the reference set records, and it is the only
-	//source available when the parser runs on an output alone (-nbo_parse).
+	//NBO echoes each recognised keyword as "/NRTLST / : Set to 0.1%": the keylist as NBO understood it,
+	//with pulled-in defaults and without misspellings, and the only source when parsing an output alone.
 	const std::regex re_keyword(R"(^\s*/([A-Z0-9]+)\s*/ : )");
 	const std::regex re_e2_thresh(R"(^\s*Threshold for printing:\s*([\d.]+) kcal/mol)");
 	const std::regex re_e2_inter(R"(^\s*\(Intermolecular threshold:\s*([\d.]+) kcal/mol)");
@@ -72,8 +66,7 @@ namespace {
 		return out;
 	}
 
-	//Trim and squeeze the inner whitespace of an NBO label so two runs that pad differently
-	//still produce the same key.
+	//Trim and squeeze inner whitespace so differently padded labels give the same key.
 	std::string normalize(const std::string& s) {
 		std::string out;
 		bool space = false;
@@ -119,13 +112,8 @@ NboResults parse_nbo_output(const std::filesystem::path& nbo_file) {
 	enum class Section { none, npa, nao, hybrids, summary, e2, weights, cycles, topo, valencies, qp, symforms, nrtstr };
 	Section section = Section::none;
 	std::string spin;             //"", "alpha", "beta"
-	//The valency table takes its spin from its OWN title, not from the enclosing NBO section.
-	//Open shell prints three of them - "(alpha spin)", "(beta spin)" and "(composite alpha+beta)"
-	//- and the composite one comes after the last "Beta spin orbitals" header, so inheriting
-	//`spin` filed it as a second beta table: on ch3 that stored C as valency 3.0000 / covalency
-	//2.5079 / 7 electrons next to the real beta 1.5000 / 1.2959 / 3, and any consumer keying by
-	//(spin, atom) silently kept whichever came last. parse_bond_orders already reads the spin off
-	//its own title for exactly this reason - same three-table layout, same fix.
+	//The valency table takes its spin from its own title: the composite alpha+beta table follows the last
+	//"Beta spin orbitals" header and would otherwise be filed as a second beta table (as in parse_bond_orders).
 	std::string valency_spin;
 	bool nao_column_is_spin = false;  //set from each NAO table's own header, see Section::nao
 	std::map<std::pair<std::string, int>, size_t> orbital_index;  //(spin, NBO number) -> position
@@ -266,10 +254,8 @@ NboResults parse_nbo_output(const std::filesystem::path& nbo_file) {
 			break;
 		}
 		case Section::nao: {
-			//The second numeric column is the energy in a closed-shell run and in each spin block
-			//of an open-shell one, but the SPIN DENSITY in the spin-summed table of an open-shell
-			//run.  Reading it blind put spin densities in the energy field, where they were zero
-			//for every Cor and Ryd row and nothing else in the gate noticed.
+			//The second numeric column is the energy, except in the spin-summed table of an open-shell run,
+			//where it is the spin density.
 			if (line.find("Type(AO)") != std::string::npos) {
 				nao_column_is_spin = line.find("Spin") != std::string::npos;
 				break;
@@ -292,11 +278,8 @@ NboResults parse_nbo_output(const std::filesystem::path& nbo_file) {
 				r.nao.push_back(n);
 				break;
 			}
-			//An open-shell run prints a second and third NAO table, one per spin.  Those are the
-			//only per-spin NAO occupancies NBO gives, and they are the ones worth comparing: the
-			//spin-summed table hides a per-spin error that cancels between the spins.  They were
-			//dropped on the floor until now, which is why ch3's 0.212 e spin-density error could
-			//not be localised to individual orbitals.
+			//An open-shell run prints one NAO table per spin, the only per-spin NAO occupancies NBO gives; the
+			//spin-summed table hides per-spin errors that cancel.
 			if (spin == "alpha") r.nao_alpha.push_back(n);
 			else if (spin == "beta") r.nao_beta.push_back(n);
 			//alpha is also the set the spin-summed table is labelled from, and the per-spin tables
@@ -378,8 +361,7 @@ NboResults parse_nbo_output(const std::filesystem::path& nbo_file) {
 			if (line.find("* Total *") != std::string::npos) { section = Section::none; break; }
 			if (line.find("---") != std::string::npos || line.find("others") != std::string::npos) break;
 			if (!std::regex_match(line, m, re_weight)) {
-				//The Added(Removed) column wraps onto continuation lines; they belong to the
-				//structure above, and treating them as the end of the table truncated the list.
+				//The Added(Removed) column wraps onto continuation lines that belong to the structure above.
 				if (line.find_first_not_of(" \t") == std::string::npos) { section = Section::none; break; }
 				if (!r.nrt.weights.empty()) r.nrt.weights.back().changes += " " + normalize(line);
 				break;
@@ -441,8 +423,7 @@ NboResults parse_nbo_output(const std::filesystem::path& nbo_file) {
 		case Section::qp: {
 			if (line.find("---") != std::string::npos) break;
 			if (!std::regex_match(line, m, re_qp_row)) {
-				//The table opens with a header-less row holding only the starting rhoNL and the
-				//number of structures; ending the section on it dropped every iteration.
+				//The table opens with a header-less row (starting rhoNL, structure count) that must not end the section.
 				if (line.find_first_not_of(" \t") == std::string::npos) { section = Section::none; break; }
 				if (std::regex_match(line, m, re_qp_start)) {
 					NboQpIteration q0;
@@ -477,14 +458,9 @@ NboResults parse_nbo_output(const std::filesystem::path& nbo_file) {
 		default: break;
 		}
 	}
-	//Under NRTDTL the weight vector carries five decimals and, unlike the printed table, the
-	//zero-weight tail of the candidate set. Structures the table left out are added here, so
-	//"how many were examined" and "how many were kept" are both readable from the dataset.
-	//The table's RS column is a RANK, not a structure number: both it and the $NRTSTR keylist are
-	//sorted by descending weight, while the weight vector names its structures explicitly
-	//(acetylene prints RS 2 = 0.92 % against 0.00486(2)).  Matching the two by that column paired
-	//every row with another structure's fraction and appended the survivors a second time, which
-	//is why NO's alpha weights summed to 200 %.  So pair rank k with the k-th largest fraction.
+	//Under NRTDTL the weight vector carries five decimals and the zero-weight tail the printed table omits;
+	//those structures are added here. The table's RS column, like $NRTSTR, is a rank by descending weight,
+	//not a structure number, so rank k pairs with the k-th largest fraction.
 	for (const auto& [sp, fractions] : weight_fractions) {
 		std::vector<size_t> order(fractions.size());
 		for (size_t i = 0; i < order.size(); i++) order[i] = i;
@@ -516,10 +492,8 @@ NboResults parse_nbo_output(const std::filesystem::path& nbo_file) {
 	return r;
 }
 
-/*
- * The bond-order table interleaves three rows per atom (t/c/i) across column blocks, so it is
- * read in a second pass where the three rows can be held together.
- */
+//The bond-order table interleaves three rows per atom (t/c/i) across column blocks, so it is read
+//in a second pass that holds the three rows together.
 static void parse_bond_orders(const std::filesystem::path& nbo_file, NboNrt& nrt) {
 	std::ifstream in(nbo_file);
 	if (!in.good()) return;
@@ -532,9 +506,8 @@ static void parse_bond_orders(const std::filesystem::path& nbo_file, NboNrt& nrt
 	auto flush = [&](const std::vector<std::string>& ions) {
 		const size_t n = std::min({ columns.size(), totals.size(), covs.size(), ions.size() });
 		for (size_t c = 0; c < n; c++) {
-			//The matrix is symmetric, so the lower triangle is dropped; the diagonal and the
-			//zero entries are kept, because "this pair has bond order zero" is a statement a
-			//candidate implementation has to reproduce.
+			//Symmetric: the lower triangle is dropped. Diagonal and zero entries are kept, since a zero bond
+			//order is something a candidate implementation has to reproduce.
 			if (columns[c] < row) continue;
 			NboBondOrder b;
 			b.atom1 = row;
@@ -572,9 +545,7 @@ static void parse_bond_orders(const std::filesystem::path& nbo_file, NboNrt& nrt
 	}
 }
 
-//---------------------------------------------------------------------------------------------
-//JSON export; hand-written like BasisSet::write_occ_json, the tree carries no JSON library.
-//---------------------------------------------------------------------------------------------
+//JSON export, hand-written like BasisSet::write_occ_json: the tree carries no JSON library.
 namespace {
 	std::string jstr(const std::string& s) {
 		std::string out = "\"";
@@ -586,9 +557,8 @@ namespace {
 		return out + "\"";
 	}
 	std::string jnum(const double v) {
-		//Ten digits is what a reader wants.  NBO_JSON_DIGITS raises it, because the only way to
-		//prove an optimisation of the search changed nothing is to compare every reported number at
-		//full double precision - at ten digits a shift in the last bits of an orbital hides.
+		//Ten digits by default; NBO_JSON_DIGITS raises it to full double precision, needed to prove a search
+		//optimisation changed nothing.
 		static const int digits = [] {
 			const char* e = std::getenv("NBO_JSON_DIGITS");
 			const int d = e ? std::atoi(e) : 10;
@@ -772,9 +742,6 @@ void write_nbo_json(const NboResults& r, const std::filesystem::path& json_file)
 	f << "]\n  }\n}\n";
 }
 
-//---------------------------------------------------------------------------------------------
-//Comparison
-//---------------------------------------------------------------------------------------------
 namespace {
 	//Every quantity is compared the same way: build a keyed map of the candidate, walk the
 	//reference, record the worst deviation and count what is missing.
@@ -861,9 +828,6 @@ NboComparison compare_nbo_results(const NboResults& ref, const NboResults& cand,
 	return c;
 }
 
-//---------------------------------------------------------------------------------------------
-//Driving the external NBO
-//---------------------------------------------------------------------------------------------
 namespace {
 	//gennbo wants a stem in its own working directory. On Windows the licensed binary lives in
 	//WSL, so the whole call is handed over with the path translated.

@@ -3,10 +3,7 @@
 #include "core/convenience.h"
 #include "core/NoSpherA2.h"
 
-//A command line that names an analysis and cannot run it must fail, loudly. Every case here used
-//to end in "Did not understand the task to perform!" written into NoSpherA2.log with exit code 0,
-//or in the option being dropped and the analysis running with a default nobody asked for - both
-//read, from the outside, exactly like a successful run.
+//An analysis that cannot run, or an option nothing reads, must exit non-zero: exit 0 looks like success
 namespace {
 
 std::filesystem::path scratch(const std::string& name)
@@ -18,8 +15,8 @@ std::filesystem::path scratch(const std::string& name)
 	return dir;
 }
 
-//run_app() redirects std::cout into NoSpherA2.log in the working directory and restores the buffer
-//it found on entry, so the caller sees the final message and the log lands in the scratch.
+//run_app() logs std::cout to NoSpherA2.log in the cwd and restores the buffer it found, so the
+//capture sees the final message and the log lands in the scratch
 struct Cli
 {
 	std::filesystem::path dir;
@@ -52,8 +49,7 @@ struct Cli
 	std::string output() const { return console.str(); }
 };
 
-//The parser dies through err_checkf, so the unknown-option cases are death tests. They need no
-//input file: a misspelled option is refused before anything is read.
+//The parser exits through err_checkf, hence death tests; an unknown option is refused before any input is read
 void parse(const std::vector<std::string>& args)
 {
 	std::vector<std::string> owned{"NoSpherA2"};
@@ -73,8 +69,7 @@ std::filesystem::path fixture(const std::string& rel)
 
 } // namespace
 
-//RGBI has no positional form: `-rgbi water.gbw` sets the flag, leaves opt.wfn empty, and the
-//branch that would run the analysis is skipped. This is the case reported from the cluster share.
+//RGBI has no positional form: `-rgbi water.gbw` sets the flag and leaves opt.wfn empty
 TEST(CliRefusal, RgbiWithoutWavefunctionExitsNonZeroAndNamesTheInput)
 {
 	Cli cli("rgbi");
@@ -85,7 +80,7 @@ TEST(CliRefusal, RgbiWithoutWavefunctionExitsNonZeroAndNamesTheInput)
 	EXPECT_NE(out.find("-wfn"), std::string::npos) << out;
 }
 
-//NPA sits in the same branch and had the same silence
+//NPA shares the RGBI branch
 TEST(CliRefusal, NpaWithoutWavefunctionExitsNonZero)
 {
 	Cli cli("npa");
@@ -113,7 +108,7 @@ TEST(CliRefusal, UnrunnableAnalysisNamesTheAnalysisAndTheOptionItWanted)
 	EXPECT_FALSE(opt.unrunnable_analysis().empty());
 }
 
-//One misspelling per analysis family. Each of these used to be dropped without a word.
+//one misspelling per analysis family
 TEST(CliRefusal, MisspelledOptionInAnAnalysisFamilyIsFatal)
 {
 	EXPECT_EXIT(parse({"-rgbi_gruops", "0,1"}), ::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), ".*");
@@ -125,9 +120,8 @@ TEST(CliRefusal, MisspelledOptionInAnAnalysisFamilyIsFatal)
 	EXPECT_EXIT(parse({"-topologyy", "x.gbw"}), ::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), ".*");
 }
 
-//The -nbo/-nrt options are read by the -nbo_native handler itself, from the tokens after its
-//wavefunction, so the check above cannot see them: they need their own refusal. A real fixture,
-//because the point is that the run dies on the option instead of spending minutes and exiting 0.
+//-nbo/-nrt options are read by the -nbo_native handler from the tokens after its wavefunction, out of
+//sight of the check above; a real fixture, since the run must die on the option before computing
 TEST(CliRefusal, MisspelledNrtOptionAfterNboNativeIsFatal)
 {
 	const auto wfn = fixture("RGBI_groups/nh3li.gbw");
@@ -136,11 +130,8 @@ TEST(CliRefusal, MisspelledNrtOptionAfterNboNativeIsFatal)
 				::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), ".*");
 }
 
-//Few electrons is its own input kind. -nbo_native on a lone hydrogen runs; adding -nrt segfaulted,
-//because that spin channel asks for no orbitals at all - no core and no electron pair - and a
-//candidate of rank zero reached the OWSO overlap check as a 0x0 SelfAdjointEigenSolver, whose first
-//step is maxCoeff() over an empty matrix. Such a candidate is now infeasible, which leaves the
-//parent-structure check to refuse the run by name. A death test because err_checkf exits.
+//A lone hydrogen's empty spin channel gives a rank-zero candidate (a 0x0 eigensolve); it must be
+//infeasible so the parent-structure check refuses the run
 TEST(CliRefusal, NrtOnAOneElectronWavefunctionRefusesInsteadOfCrashing)
 {
 	const auto wfn = fixture("ptb_H_file/H.gbw");
@@ -150,8 +141,7 @@ TEST(CliRefusal, NrtOnAOneElectronWavefunctionRefusesInsteadOfCrashing)
 				::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), ".*");
 }
 
-//-wfn refuses a file that is not there; the positional forms of the ELI and topology analyses
-//took the name on trust
+//the positional wavefunction of the ELI and topology analyses is checked like -wfn
 TEST(CliRefusal, PositionalWavefunctionThatDoesNotExistIsFatal)
 {
 	EXPECT_EXIT(parse({"-topology", "no_such_wavefunction.gbw"}),
@@ -164,13 +154,9 @@ TEST(CliRefusal, PositionalWavefunctionThatDoesNotExistIsFatal)
 				::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), ".*");
 }
 
-//The refusal above is a trap for whoever adds the next option: a flag in one of the analysis
-//families that no digester claims is now fatal. Almost every option is safe by construction - a
-//digester claims it, and a claimed flag never reaches the refusal - but the -nbo/-nbo_native
-//handlers read their own -nbo_*/-nrt_* options from the tokens after their wavefunction, where no
-//digester sees them, and those need an entry in nbo_family_suboptions(). This reads the parser's
-//own source and asserts every family flag it mentions is one of the two, so a new option added the
-//second way cannot reach a release aborting runs that used to work.
+//An unclaimed family flag is fatal, and the -nbo/-nbo_native handlers read their -nbo_*/-nrt_* options
+//where no digester sees them, so those must be listed in nbo_family_suboptions().  Scanning the parser
+//source catches a new flag that is neither digested nor listed before it aborts real runs
 TEST(CliRefusal, AnalysisFlagsAreEitherDigestedOrListed)
 {
 	const auto src = nos_test_repo_root() / "Src" / "core" / "convenience.cpp";
@@ -210,12 +196,8 @@ TEST(CliRefusal, AnalysisFlagsAreEitherDigestedOrListed)
 		<< [&] { std::string s; for (const auto& o : orphans) s += o + " "; return s; }();
 }
 
-//A correctly spelled option that the analysis actually running does not read is the same defect as
-//a misspelled one, and harder to see: `-rgbi -nrt` computed Roby indices and no resonance theory,
-//`-eli_analysis f 0.3 2.0 -rgbi_basis nao` did the basins and no RGBI, and both exited 0. The cause
-//is structural - the -nbo_* options are read by the -nbo_native handler, which never ran, and
-//run_app_impl's early-exit analyses return before the RGBI/NPA block - so neither could be caught
-//by the unknown-option check.
+//A real option the running analysis never reads: -nbo_* belong to the -nbo_native handler, and
+//run_app_impl's early-exit analyses return before the RGBI/NPA block, so the unknown-option check misses both
 TEST(CliRefusal, RealOptionNoAnalysisReadsIsFatal)
 {
 	//-nrt and -nbo_threads are read by the NBO handlers, and this line runs RGBI
@@ -231,9 +213,8 @@ TEST(CliRefusal, RealOptionNoAnalysisReadsIsFatal)
 				::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), ".*");
 }
 
-//The other half of the check: an option that is real must still parse. -nrt and -nbo_json are
-//consumed by the -nbo_native handler, so at the top level no digester claims them - they must not
-//be mistaken for typos whichever order they were written in.
+//-nrt and -nbo_json belong to the -nbo_native handler, so no top-level digester claims them; they
+//must still parse in any order
 TEST(CliRefusal, RealOptionsStillParse)
 {
 	parse({"-rgbi", "-rgbi_no_sym", "-rgbi_EVs"});

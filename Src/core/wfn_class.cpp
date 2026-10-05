@@ -210,10 +210,8 @@ WFN::WFN(const occ::qm::Wavefunction &occ_WF, bool from_file) : WFN()
 		}
 		// insert_into_centers(std::views::repeat(atom+1, n_cart*nprim));
 		for (int j = 0; j < shell.exponents.size(); j++) {
-			//l + 1, the convention of every wavefunction basis in this program: WFN's own
-			//get_shell_type() hands this very field out and the primitive counters switch over it
-			//as 1 = s, 2 = p, ..., so an s shell stored as 0 matches no case and they count
-			//nothing. Only the aux bases, which carry origin NOT_YET_DEFINED, store l itself.
+			//shell type is l + 1, as get_shell_type() and the primitive counters expect (1 = s); an s stored as
+			//0 matches no case and counts nothing.  Only aux bases (origin NOT_YET_DEFINED) store l.
 			push_back_atom_basis_set(atom, shell.exponents(j), shell.contraction_coefficients(j), shell.l + 1, k);
 		}
 		k++;
@@ -1055,11 +1053,8 @@ const int WFN::get_shell_start_in_primitives(const unsigned int &nr_atom, const 
 {
 	if (static_cast<int>(nr_atom) < ncen && nr_shell < atoms[nr_atom].get_shellcount_size())
 	{
-		//The cartesian components of a shell are the gap between consecutive WFN type blocks:
-		//1, 3, 6, 10, 15, ... A switch over s/p/d/f used to stand here and added nothing at all for
-		//g and above, so every primitive index behind the first g shell of a wavefunction was short
-		//by 15 per g shell - which is how Fe.gbw's atom 2 asked for its s shell and was handed a g
-		//primitive 540 places later, then wrote past the end of a 1-component buffer.
+		//cartesian components of a shell: the gap between consecutive first_type blocks, 1, 3, 6, 10, 15, ...,
+		//so g and above count too
 		const auto cart_components = [](const int shell_type) {
 			return (shell_type >= 1 && shell_type < static_cast<int>(std::size(constants::first_type)))
 				? constants::first_type[shell_type] - constants::first_type[shell_type - 1]
@@ -1290,11 +1285,9 @@ bool WFN::build_DM(std::string basis_set_path, bool debug) {
 		}
 
 		//-------------------normalize the basis set shell wise into a copy vector---------
-		//The shell loop below spells out the cartesian component norms of s, p, d and f by hand and
-		//has nothing for g: a g shell used to leave `factor` at the previous shell's value, push no
-		//constants at all, and every later shell then read norm_const one shell off. Say so instead.
-		//Generalising it needs the component order this file's g types are written in, which is a
-		//convention no reader here agrees on yet - and build_DM has no caller outside the tests.
+		//the shell loop below has cartesian norms for s, p, d and f only: a g shell would leave every later
+		//shell's norm_const one shell off, so it is refused.  Generalising needs a g component order no
+		//reader here agrees on.
 		for (int a = 0; a < get_ncen(); a++)
 			for (int s = 0; s < get_atom_shell_count(a); s++)
 			{
@@ -1316,11 +1309,8 @@ bool WFN::build_DM(std::string basis_set_path, bool debug) {
 		{
 			for (int p = 0; p < get_atom_primitive_count(a); p++)
 			{
-				//This was the same s/p/d/f switch that lost a g shell in
-				//get_shell_start_in_primitives: a type of 5 matched no case, so the primitive kept
-				//its raw exponent as a normalisation constant. constants::axial_prim_norm is the
-				//general-l form of exactly these four numbers. The types are validated above,
-				//serially - err_checkf exits, and exiting from inside an OpenMP region does not.
+				//axial_prim_norm is the general-l form of the s/p/d/f norms.  Types are validated above, serially:
+				//err_checkf exits, and exiting from inside an OpenMP region does not.
 				const double temp_c =
 					constants::axial_prim_norm(get_atom_primitive_type(a, p) - 1,
 						get_atom_basis_set_exponent(a, p)) *
@@ -2364,10 +2354,8 @@ void WFN::set_has_ECPs(const bool &in, const bool &apply_to_atoms, const int &EC
 	ECP_m = ECP_mode;
 	if (!apply_to_atoms)
 		return;
-	//1 = def2, 2 = xTB, 3 = pTB. One loop over the atoms for all three, because the only difference
-	//between them was which table a table lookup read - and the bound-checked accessor is what keeps
-	//an atom heavier than the tables describe from reading past the end of one. A table lookup per
-	//atom does not need a thread each, so the three omp loops this replaces are no loss.
+	//1 = def2, 2 = xTB, 3 = pTB; the bound-checked accessor keeps an atom heavier than the tables from
+	//reading past their end
 	auto core_of = [ECP_mode](const int Z)
 		{
 			switch (ECP_mode)
@@ -2380,17 +2368,15 @@ void WFN::set_has_ECPs(const bool &in, const bool &apply_to_atoms, const int &EC
 		};
 	if (ECP_mode < 1 || ECP_mode > 3)
 		return;
-	//An atom past the end of the tables gets zero from the accessor, which is the right answer - no
-	//core is defined for it - but a silent zero on a run that asked for ECP cores would quietly
-	//count its cores as valence. Name the heaviest one instead; the number is in the tables, not here.
+	//past the tables the accessor returns zero, correctly, but a silent zero on a run that asked for ECP
+	//cores counts them as valence, so the heaviest such atom is named
 	int heaviest_beyond_tables = 0;
 	for (int i = 0; i < ncen; i++)
 	{
 		const int Z = get_atom_charge(i);
 		if (Z > constants::heaviest_ECP_element)
 			heaviest_beyond_tables = std::max(heaviest_beyond_tables, Z);
-		//Zero means the table declares no core for this element, and that is not the same as a
-		//declaration of zero: a count read from the file itself stays, as it did before.
+		//zero: the table declares no core, which is not a declaration of zero, so a count read from the file stays
 		const int core = core_of(Z);
 		if (core != 0)
 			atoms[i].set_ECP_electrons(core);

@@ -7,10 +7,8 @@
 #include <filesystem>
 #include <sstream>
 
-//The guards the bonding analyses grew when an input they were never given reached them: a shell
-//type nothing in build_DM knew, a list of basis-function indices longer than the matrix it
-//addresses, and a wavefunction that describes fewer electrons than its nuclei carry.  Each of these
-//used to produce a number rather than a complaint.
+//Inputs the bonding analyses must refuse rather than turn into a number: a shell type build_DM does not
+//know, an index list longer than its matrix, and a wavefunction with fewer electrons than its nuclei carry.
 
 namespace {
 
@@ -34,10 +32,8 @@ namespace {
 	}
 }
 
-//The primitive normalisation in build_DM was four hardcoded constants in an s/p/d/f switch, and a
-//g primitive matched no case and kept its raw exponent as a normalisation constant.  The general-l
-//expression that replaced them has to reproduce those four exactly, or the refactor moved every
-//number this function feeds.
+//build_DM's general-l primitive normalisation must reproduce the s/p/d/f constants exactly, or every
+//number build_DM feeds moves.
 TEST(BondingGuardsTests, AxialPrimNormReproducesTheHardcodedSpdfConstants)
 {
 	for (const double a : { 0.3, 1.0, 7.5, 120.0 }) {
@@ -60,9 +56,9 @@ TEST(BondingGuardsTests, AxialPrimNormReproducesTheHardcodedSpdfConstants)
 	}
 }
 
-//build_DM's shell walk still knows s, p, d and f only, and a g shell left `factor` at the previous
-//shell's value and pushed no constants, so every later shell read norm_const one shell off. Refusing
-//is the honest answer until the component order of a g shell in this file is settled.
+//build_DM's shell walk knows s, p, d and f only; a g shell would leave `factor` at the previous shell's
+//value and push no constants, shifting every later shell's norm_const by one. It refuses until the g
+//component order in this file is settled.
 TEST(BondingGuardsTests, BuildDmRefusesAGShellInsteadOfSlippingAShell)
 {
 	WFN w = make_s_and_g();
@@ -70,8 +66,8 @@ TEST(BondingGuardsTests, BuildDmRefusesAGShellInsteadOfSlippingAShell)
 	EXPECT_EQ(w.get_DM_size(), 0);
 }
 
-//Every caller builds its own index list from a shell description, and those have been wrong: the
-//submatrix loops used to index the full matrix with them unchecked and read past its end.
+//Every caller builds its own index list from a shell description, so an index past the matrix is named
+//instead of read past its end.
 TEST(BondingGuardsDeathTest, SubmatrixIndexPastTheMatrixIsNamed)
 {
 	dMatrix2 full(3, 3);
@@ -84,11 +80,9 @@ TEST(BondingGuardsDeathTest, SubmatrixIndexPastTheMatrixIsNamed)
 		::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), ".*");
 }
 
-//No file format states an ECP unless -ECP is passed, so the atoms of an ECP wavefunction keep their
-//full nuclear charge and anything that fills orbitals from Z works with electrons the basis never
-//described - RGBI's free-atom SCF put 79 electrons into a valence-only gold basis and corrupted the
-//heap inside libcint. Au2Br2 is two def2 gold ECPs, 120 electrons; bromine is all-electron in def2,
-//so the shortfall is only the gold.
+//No file format states an ECP unless -ECP is passed, so ECP atoms keep their full nuclear charge and
+//anything filling orbitals from Z (RGBI's free-atom SCF) works with electrons the basis never described.
+//Au2Br2: two def2 gold ECPs, 120 electrons; bromine is all-electron in def2, so only gold falls short.
 TEST(BondingGuardsTests, AnExactDef2CoreShortfallIsDeclaredAsAnEcp)
 {
 	const auto p = nos_test_repo_root() / "tests" / "ECP_SF" / "Au2Br2.gbw";

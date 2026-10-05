@@ -9,10 +9,9 @@
 
 NOSPHERA2_GPU_API_BEGIN
 
-//Each block owns a tile of k-points for one atom and streams that atom's grid points
-//through shared memory. F32 keeps the phase and its reduction in double and drops only
-//the transcendental and the running sum to single, which consumer parts run 32-64x
-//faster. 64, 128 and 256 k-points per tile measure the same, so 128 is not tuned.
+//Each block owns a tile of k-points for one atom and streams that atom's grid points through
+//shared memory. F32 keeps the phase and its reduction in double; only the transcendental and the
+//running sum drop to single.
 #define SF_TILE_K 128
 #define SF_CHUNK 256
 #define SF_TWO_PI 6.283185307179586476925286766559
@@ -29,9 +28,7 @@ __global__ void sf_kernel(const int imax, const long long smax,
 	const int ia = blockIdx.y;
 	const long long s = (long long)blockIdx.x * SF_TILE_K + threadIdx.x;
 	const bool live = (s < smax);
-	//Scaled to turns once per thread, so the phase reduction below is a rint and a
-	//subtract instead of a multiply, an add, a floor and an fma. Costs three fp64
-	//multiplies against the ~2000 grid points each thread then walks.
+	//In turns for F32, so the phase reduction below is a rint and a subtract.
 	const double kx = live ? k1[s] * (F32 ? SF_INV_TWO_PI : 1.0) : 0.0;
 	const double ky = live ? k2[s] * (F32 ? SF_INV_TWO_PI : 1.0) : 0.0;
 	const double kz = live ? k3[s] * (F32 ? SF_INV_TWO_PI : 1.0) : 0.0;
@@ -52,14 +49,11 @@ __global__ void sf_kernel(const int imax, const long long smax,
 				const double w = kx * s1[p] + ky * s2[p] + kz * s3[p];
 				const double r = sd[p];
 				if (F32) {
-					//w is in turns here. The reduction stays in double - sincospif of an
-					//unreduced argument would be meaningless - and only the transcendental
-					//and the running sum drop to fp32.
+					//Reduce in double: sincospif of an unreduced argument is meaningless in fp32.
 					const double wr = w - rint(w);
 					float sif, cof;
 					sincospif(2.0f * (float)wr, &sif, &cof);
-					//Compensated, so the error does not grow with the term count. Ten fp32
-					//operations still cost far less than two fp64 fmas on a consumer part.
+					//Kahan-compensated so the error does not grow with the term count.
 					const float pr = (float)r * cof;
 					const float pi = (float)r * sif;
 					float y = pr - kre;
@@ -97,12 +91,8 @@ namespace {
 __global__ void probe_kernel(int* p) { if (p) *p = 1; }
 }
 
-//A device being present is not the same as this binary having code for it. A build pinned
-//to particular architectures carries nothing for a card outside them, and every launch then
-//fails with "no kernel image is available for execution on the device" - which, once the
-//caller falls back, is indistinguishable from having no GPU at all. Launching an empty
-//kernel is the only way to find out, so do it once and say so plainly. Both backends raise
-//this, under different names, which is why neither is named here.
+//A build pinned to other architectures has no code for a present card, and every launch then fails
+//as if there were no GPU; one empty launch is the only way to find out, so say so plainly.
 bool sf_gpu_available()
 {
 	int n = 0;
@@ -114,9 +104,7 @@ bool sf_gpu_available()
 		//Clear the sticky error either way, so a later launch is judged on its own merits
 		(void)gpuGetLastError();
 		if (e == gpuSuccess) return true;
-		//Which architecture to name, and what to advise, is the one part of this that is
-		//not common to the two backends: compute capability has no HIP equivalent, and
-		//NOSPHERA2_CUDA_PORTABLE would be the wrong advice on an AMD card.
+		//Compute capability has no HIP equivalent, and NOSPHERA2_CUDA_PORTABLE is wrong advice on AMD.
 #ifdef NOSPHERA2_USE_HIP
 		std::fprintf(stderr, "NoSpherA2: a GPU is present but this build contains no code "
 					 "for it (%s), so every GPU path will use the CPU. Rebuild with this "
@@ -137,8 +125,7 @@ bool sf_gpu_available()
 	return usable;
 }
 
-//Context creation would otherwise happen on the first allocation, inside the transform.
-//Started when the grids begin, it overlaps CPU work that has to happen anyway.
+//Creates the context while the grids are built, not on the first allocation inside the transform.
 static std::future<void> g_warmup;
 
 void sf_gpu_warmup_start()
@@ -164,15 +151,13 @@ const char* sf_gpu_backend()
 #endif
 }
 
-//Single-to-double throughput ratio: 2 on datacentre parts, 32 or 64 on consumer ones.
-//Above the threshold the double sincos is not worth paying for.
+//Single-to-double throughput ratio, 2 on datacentre and 32 or 64 on consumer parts.
 int sf_gpu_fp64_ratio()
 {
 	int dev = 0;
 	if (gpuGetDevice(&dev) != gpuSuccess) return 0;
 #ifdef NOSPHERA2_USE_HIP
-	//HIP exposes no equivalent attribute, so the arch name has to stand in for it.
-	//CDNA parts carry the wide fp64 units; every RDNA and APU part does not.
+	//No HIP attribute: CDNA parts have the wide fp64 units, RDNA and APU parts do not.
 	gpuDeviceProp_t prop;
 	if (gpuGetDeviceProperties(&prop, dev) != gpuSuccess) return 0;
 	static const char* const cdna[] = { "gfx906", "gfx908", "gfx90a", "gfx940", "gfx941", "gfx942", "gfx950" };
@@ -186,8 +171,7 @@ int sf_gpu_fp64_ratio()
 #endif
 }
 
-//Resolved here, not at the call site, so the log line cannot name a precision the
-//transform did not use.
+//Resolved here so the log line cannot name a precision the transform did not use.
 bool sf_gpu_uses_fp32(const sf_precision prec)
 {
 	if (prec == sf_precision::FP32) return true;
@@ -212,9 +196,8 @@ bool sf_gpu_run(const int imax, const long long smax,
 	size_t freeb = 0, totalb = 0;
 	if (gpuMemGetInfo(&freeb, &totalb) != gpuSuccess) return false;
 	if (kb * 3 + (1u << 26) >= freeb) return false;
-	//Atoms are independent, so oversized problems go in batches rather than to the CPU.
-	//The budget is what is left once the k-points and a margin are accounted for; a batch
-	//costs its own grid points four times over plus one output row per atom.
+	//Atoms are independent, so oversized problems are batched; a batch costs its grid points four
+	//times over plus one output row per atom.
 	const size_t budget = freeb - kb * 3 - (1u << 26);
 	int batch = imax;
 	{
@@ -233,8 +216,7 @@ bool sf_gpu_run(const int imax, const long long smax,
 			batch = (batch + 1) / 2;
 		}
 	}
-	//Every card here has room for the whole problem, so the batching would otherwise never
-	//run until it met a protein on someone else's machine.
+	//Forces batching, which a card large enough for the whole problem never exercises.
 	if (const char* cap = std::getenv("NOSPHERA2_GPU_BATCH")) {
 		const int c = std::atoi(cap);
 		if (c > 0 && c < batch) batch = c;
@@ -274,8 +256,7 @@ bool sf_gpu_run(const int imax, const long long smax,
 			sf_kernel<false><<<grid, SF_TILE_K>>>(na, smax, dk1, dk2, dk3, dd1, dd2, dd3, dde, dof, dout);
 		GPU_TRY(gpuGetLastError());
 		GPU_TRY(gpuDeviceSynchronize());
-		//Straight into the caller's complex storage, one row per atom: no staging buffer to
-		//allocate, zero and scatter, which cost more than the transfer itself did.
+		//Straight into the caller's complex rows, no staging buffer.
 		for (int i = 0; i < na; i++)
 			GPU_TRY(gpuMemcpy(sf_rows[a0 + i], dout + (size_t)i * (size_t)smax, row, gpuMemcpyDeviceToHost));
 	}

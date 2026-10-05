@@ -1407,24 +1407,10 @@ void readxyzMinMax_fromWFN(
 	opts.NbSteps[1] = (int)ceil(constants::bohr2ang(opts.MinMax[4] - opts.MinMax[1]) / opts.resolution);
 	opts.NbSteps[2] = (int)ceil(constants::bohr2ang(opts.MinMax[5] - opts.MinMax[2]) / opts.resolution);
 
-	//An EVEN number of points, because an odd one cannot sample the molecule's own symmetry planes.
-	//Ten of the eleven callers lay the NbSteps points out from MinMax[i] with a step of (MinMax[3+i]-MinMax[i])/NbSteps[i],
-	//so the centre of the box - which for a box built from min/max plus one radius is the molecule's own
-	//symmetry centre - falls at index NbSteps/2: on a grid plane when NbSteps is even, exactly halfway
-	//between two planes when it is odd. In the odd case no grid plane contains a mirror plane or a rotation
-	//axis of the molecule, the four voxels around an axis are degenerate, and no single-voxel answer can be
-	//symmetric. Measured on octahedral UH6 (radius 2.5 A), whose six ELI-D hydrogen attractors must map onto
-	//themselves under all 48 operations of its point group: at 0.15 A the count came out 61 and 1 of 48
-	//operations held, the miss being 0.997 of a voxel; at 0.10 A, 91 points, likewise 1 of 48; at 0.20 A (46)
-	//and 0.12 A (76) all 48 held exactly. The parity was not the caller's choice either - 9.0/0.15 evaluates
-	//to 60.000000000000014, so ceil() hands back 61 rather than 60. One extra plane per axis costs a few per
-	//cent of the points and buys a grid that carries the point group at whatever resolution is asked for.
-	//The eleventh caller is the property-cube path (properties.cpp, the -cube/-esp/-elf/-MO run), which sets
-	//its step to ang2bohr(resolution) and not to the span over the count. There the parity of the count says
-	//nothing about where the centre falls - the centre sits at span/(2*resolution) whatever the count is - so
-	//an extra point only pushes the far face of the box half an Angstrom further out. Measured: the epoxide
-	//cube went 13 13 12 -> 14 14 12 with the step unchanged at 0.944863, i.e. ~16 % more points for no
-	//symmetry gained. That caller passes even_steps = false, which is why this is a parameter and not a rule.
+	//Callers that step by span/NbSteps put the box centre, the molecule's symmetry centre, at index NbSteps/2:
+	//on a grid plane only for an even count, so only then can the grid carry the point group (an odd count leaves
+	//mirror planes and axes between planes). ceil() makes the parity arbitrary (9.0/0.15 gives 61), hence forced here.
+	//The property-cube path steps by resolution, where parity does not move the centre; it passes even_steps = false.
 	if (even_steps)
 		for (int i = 0; i < 3; i++)
 			if (opts.NbSteps[i] % 2 != 0)
@@ -2628,11 +2614,8 @@ static std::vector<std::shared_ptr<BasisSet>> get_aux_basis(const int argc, cons
 	return aux_basis;
 }
 
-//Options the -nbo / -nbo_parse / -nbo_native / -convert_to_47 handlers read themselves, from
-//the tokens after their wavefunction, instead of through a digester. Listed once so both
-//readers of the list agree: those handlers refuse a -nbo_*/-nrt_* spelling that is not here,
-//and digest_options knows these as options rather than as typos when they are written before
-//the flag that consumes them.
+//Options the NBO handlers read from their own tokens, not through a digester. One list for both readers:
+//the handlers refuse a -nbo_*/-nrt_* spelling not in it, digest_options does not report these as typos.
 const std::set<std::string> &nbo_family_suboptions()
 {
 	static const std::set<std::string> known = {
@@ -2644,9 +2627,7 @@ const std::set<std::string> &nbo_family_suboptions()
 }
 
 namespace {
-	//A -nbo_*/-nrt_* token that the handlers' own loops do not know is read by nobody: the option
-	//was dropped and the analysis ran with its default, exit code 0. digest_options cannot catch
-	//these, they are consumed here rather than by a digester.
+	//No digester sees these tokens, so an unknown one would otherwise be dropped silently.
 	void refuse_unknown_nbo_suboption(const std::vector<std::string> &arguments, int from,
 									  const std::string &after)
 	{
@@ -2710,9 +2691,7 @@ bool options::digest_io_options(const std::string &temp, int &i)
 		}
 		finished = true;
 		citations::cite(citations::Method::NBOProgram, std::cout);
-		//Returning false here only told digest_options that nobody had claimed the option;
-		//run_app_impl saw finished and exited 0, so a gennbo that never ran looked like a run
-		//that had nothing to print.
+		//finished is set, so only this check keeps a failed gennbo from exiting 0.
 		const int nbo_rc = run_nbo(opt, std::cout);
 		err_checkf(nbo_rc == 0, "-nbo: gennbo did not finish (exit code " + std::to_string(nbo_rc) +
 									"), see the messages above",
@@ -2720,8 +2699,6 @@ bool options::digest_io_options(const std::string &temp, int &i)
 		return true;
 	}
 	else if (temp == "-nbo_parse") {
-		//Same parser as -nbo, on an output that already exists: the spread study re-runs gennbo
-		//itself on one archive with different keylists and only needs the reading back.
 		err_checkf(argc >= i + 2, "Not enough arguments for -nbo_parse\nPlease provide an NBO output file!", std::cout);
 		refuse_unknown_nbo_suboption(arguments, i + 2, "-nbo_parse");
 		std::filesystem::path out = arguments[i + 1];
@@ -2736,8 +2713,7 @@ bool options::digest_io_options(const std::string &temp, int &i)
 		return true;
 	}
 	else if (temp == "-nbo_native") {
-		//The in-house analysis, writing the same JSON -nbo writes, so the two are comparable by
-		//tests/nbo_reference/compare_nbo.py without a second format.
+		//Same JSON as -nbo, so tests/nbo_reference/compare_nbo.py compares the two.
 		err_checkf(argc >= i + 2, "Not enough arguments for -nbo_native\nPlease provide a wavefunction!", std::cout);
 		refuse_unknown_nbo_suboption(arguments, i + 2, "-nbo_native");
 		std::filesystem::path _wfn = arguments[i + 1];
@@ -2750,8 +2726,7 @@ bool options::digest_io_options(const std::string &temp, int &i)
 			else if (arguments[j] == "-nbo_47") opt.file47 = arguments[j + 1];
 			else if (arguments[j] == "-nbo_e2min") opt.e2_threshold_kcal = std::stod(arguments[j + 1]);
 			else if (arguments[j] == "-nbo_threads") opt.threads = std::stoi(arguments[j + 1]);
-			//This branch runs the analysis inline and returns, so a -cpus written after
-			//-nbo_native never reached the main digester and was silently dropped.
+			//This branch returns before the main digester reads a later -cpus.
 			else if (arguments[j] == "-cpus") {
 				threads = std::stoi(arguments[j + 1]);
 				MKL_Set_Num_Threads(threads);
@@ -2785,12 +2760,10 @@ bool options::digest_io_options(const std::string &temp, int &i)
 			else if (arguments[j] == "-nrt_no_components") opt.nrt_components = false;
 			else if (arguments[j] == "-nrt_no_ion") opt.nrt_ion = false;
 			else if (arguments[j] == "-nbo_keep47") opt.keep_file47 = true;
-		//-nbo_threads wins, then -cpus, then the OpenMP default; NRT read only the first of the three.
+		//-nbo_threads wins, then -cpus, then the OpenMP default.
 		if (opt.threads <= 0 && threads > 0) opt.threads = threads;
 		WFN wavy(e_origin::NOT_YET_DEFINED);
 		wavy.read_known_wavefunction_format(_wfn, std::cout, debug);
-		//Cited from here rather than from nbo.cpp/nrt.cpp, so the search and the resonance
-		//weights each name their paper without a second session's optimisation work colliding.
 		citations::cite(citations::Method::NAONPA, std::cout);
 		citations::cite(citations::Method::NBO, std::cout);
 		citations::cite(citations::Method::E2, std::cout);
@@ -2853,7 +2826,7 @@ bool options::digest_run_options(const std::string &temp, int &i)
 	else if (temp == "-no_spin_eli")
 		spin_eli = false;
 	else if (temp == "-basin_analytic")
-		; //the default since 30 Sep 2026; still accepted so older job scripts run
+		; //accepted and ignored, it is the default
 	else if (temp == "-basin_step")
 		basin_step_scale_set(stod(arguments[i + 1]));
 	else if (temp == "-basin_timing")
@@ -3126,7 +3099,6 @@ bool options::digest_partition_options(const std::string &temp, int &i)
 	{
 		partition_type = PartitionType::EMBIS;
 	}
-	//Both spellings: the help text mentions the flag as -hdef in one place and -HDEF in the other.
 	else if (temp == "-HDEF" || temp == "-hdef")
 		properties.hdef = true;
 	else if (temp == "-hirsh")
@@ -3226,8 +3198,7 @@ bool options::digest_partition_options(const std::string &temp, int &i)
 	else if (temp == "-SALTED" || temp == "-salted")
 	{
 		SALTED = true;
-		// Several models may follow, like -ri_fit takes several basis sets. The
-		// first one keeps salted_model_dir so every single-model path is unchanged.
+		// Several models may follow; the first also sets salted_model_dir for the single-model paths.
 		int next = i + 1;
 		while (next < argc && arguments[next].find("-") != 0)
 			salted_model_dirs.push_back(arguments[next++]);
@@ -3449,13 +3420,11 @@ bool options::digest_property_options(const std::string &temp, int &i)
 	}
 	else if (temp == "-eli")
 		properties.eli = true;
-	//Both analyses run on the analytic field; the cube, and so its resolution and radius, is only
-	//built for -basin_cube and a fitted density. -eli_analysis still takes the two for those
+	//The basins use the analytic field; resolution and radius only shape the cube built for -basin_cube
+	//and a fitted density
 	else if (temp == "-eli_analysis") {
 		err_checkf(argc >= i + 2, "Not enough arguments for -eli_analysis\nPlease provide a wfn!", std::cout);
 		wfn = arguments[i + 1];
-		//-wfn refuses a file that is not there; the positional forms took the name on trust and
-		//failed later, or not at all
 		err_checkf(std::filesystem::exists(wfn), "-eli_analysis: wavefunction does not exist: " + wfn.string(), std::cout);
 		properties.resolution = 0.05;
 		properties.radius = 3.0;
@@ -3467,8 +3436,6 @@ bool options::digest_property_options(const std::string &temp, int &i)
 		}
 		eli_analysis_run = true;
 	}
-	//RGBI, native NBO/NPA with NRT, then the QTAIM and ELI-D basins of -eli_analysis, on one
-	//wavefunction
 	else if (temp == "-fba") {
 		err_checkf(argc >= i + 2, "Not enough arguments for -fba\nPlease provide a wfn!", std::cout);
 		wfn = arguments[i + 1];
@@ -3478,8 +3445,7 @@ bool options::digest_property_options(const std::string &temp, int &i)
 		i += 1;
 		fba = true;
 	}
-	//The rest of Kohout's ELI family (ELI-D alpha/beta/triplet, ELI-q) as point values; runs here
-	//rather than setting a flag, it has no cube or basin output to schedule
+	//Runs inline rather than setting a flag: it has no cube or basin output to schedule
 	else if (temp == "-eli_family") {
 		err_checkf(argc >= i + 2, "Not enough arguments for -eli_family\nPlease provide at least a wfn!", std::cout);
 		err_checkf(std::filesystem::exists(arguments[i + 1]), "-eli_family: wavefunction does not exist: " + arguments[i + 1], std::cout);
@@ -3487,21 +3453,14 @@ bool options::digest_property_options(const std::string &temp, int &i)
 		eli_family::report(arguments[i + 1], has_points ? std::filesystem::path(arguments[i + 2]) : std::filesystem::path());
 		finished = true; return true;
 	}
-	//Every critical point of rho - nuclear, bond, ring and cage - from the analytic Hessian, with
-	//Poincare-Hopf as the check that none is missing. No cube: the seeding comes from the topology
 	else if (temp == "-topology") {
 		err_checkf(argc >= i + 2, "Not enough arguments for -topology\nPlease provide a wfn!", std::cout);
 		err_checkf(std::filesystem::exists(arguments[i + 1]), "-topology: wavefunction does not exist: " + arguments[i + 1], std::cout);
 		{
 			const bool complete = topology::report(arguments[i + 1], std::cout);
 			finished = true;
-			//The table above is still worth reading, but INCOMPLETE means the set provably does not
-			//close, and a run that prints INCOMPLETE and exits 0 is indistinguishable from a complete
-			//one to anything that reads the exit code. Same rule as -nbo, which exits non-zero when
-			//gennbo does not finish. The message deliberately does not name Poincare-Hopf alone:
-			//three of the eight fixtures that fail this have a BALANCED alternating sum and are
-			//caught by the bond-graph rank instead, so naming only the sum would be false on exactly
-			//the cases the new term exists for.
+			//An INCOMPLETE set must exit non-zero. Some incomplete sets balance the Poincare-Hopf sum and
+			//fail only the bond-graph rank, so the message names both.
 			err_checkf(complete, "-topology: the set of critical points printed above is INCOMPLETE "
 								 "for " + arguments[i + 1] + " - either the Poincare-Hopf sum does "
 								 "not close, or it closes while contradicting the bond graph. See the "
@@ -3963,7 +3922,7 @@ bool options::digest_ri_options(const std::string &temp, int &i)
 		rgbi_no_sym = true;
 	}
 	else if (temp == "-rgbi_EVs") {
-		rgbi = true; //like every other -rgbi_* option: on its own this used to be silently inert
+		rgbi = true;
 		rgbi_EVs = true;
 	}
 	else if (temp == "-rgbi_theta") {
@@ -4235,10 +4194,8 @@ bool options::digest_dev_options(const std::string &temp, int &i)
 	return true;
 };
 
-//The analysis an option's prefix names. A flag that starts with one of these and that no
-//digester claimed is a misspelling of one of that analysis' options, and a misspelling the
-//parser drops is a run that silently ignored its own arguments: `-rgbi_gruops 0,1 2,3` used
-//to compute RGBI for the default groups and exit 0.
+//The analysis an option's prefix names: an unclaimed flag with one of these prefixes is a misspelt
+//option of that analysis and is refused rather than silently ignored.
 const char *owning_analysis(const std::string &flag)
 {
 	static const std::pair<const char *, const char *> families[] = {
@@ -4252,10 +4209,8 @@ const char *owning_analysis(const std::string &flag)
 }
 
 namespace {
-	//run_app_impl tries the analyses below in a chain that each end in "return 0", and the
-	//RGBI/NPA block sits after that chain: a command line that names one of these AND -rgbi/-npa
-	//runs the first, drops the second, and exits 0 as if both had been done. Mirrors that chain -
-	//an analysis added there wants a line here, or its combinations go silent again.
+	//Mirrors run_app_impl's chain of analyses that return before the RGBI/NPA block is reached;
+	//an analysis added to that chain needs a line here.
 	const char *quit_early_analysis(const options &o)
 	{
 		if (o.qct) return "-qct";
@@ -4284,12 +4239,11 @@ void options::refuse_unread_bonding_options()
 							  early + " ends the run before " + bonding + " would be reached, so " +
 							  bonding + " would be dropped without a word. Run them one at a time",
 				   log_file);
-	//An -nbo_*/-nrt_* option is read by the -nbo/-nbo_parse/-nbo_native/-convert_to_47 handlers
-	//themselves, and those finish the command line where they run. Reaching here with one still in
-	//hand means no NBO analysis was asked for, so whatever analysis does run reads it from nobody.
+	//The NBO handlers finish the command line where they run, so an -nbo_*/-nrt_* option reaching
+	//here is read by no analysis.
 	const char *running = early != nullptr ? early : bonding;
 	if (running == nullptr)
-		return; //no analysis at all: run_app reports that on its own, with the help text
+		return;
 	for (const std::string &raw : arguments)
 	{
 		std::string o = raw;
@@ -4326,9 +4280,7 @@ void options::digest_options()
 			continue;
 		if (finished)
 			return;
-		//Either separator names the same flag, so -rgbi-groups and -rgbi_groups are one option.
-		//The digesters compare against the underscore spelling; a negative number keeps its
-		//dashes because the character after the first one is not a letter
+		//-rgbi-groups is -rgbi_groups; a negative number keeps its dashes (no letter after the first)
 		if (temp.size() > 1 && isalpha(static_cast<unsigned char>(temp[1])))
 			replace(temp.begin() + 1, temp.end(), '-', '_');
 		//The digesters index arguments[i + n] and call stoi/stod directly; a flag that is
@@ -4352,15 +4304,10 @@ void options::digest_options()
 		}
 		if (claimed)
 			continue;
-		//An inline handler (-nbo, -eli_family, -topology, ...) that ran and failed returns false
-		//with finished set. It claimed the command line all the same, so it must not be reported
-		//as an unknown option; run_app_impl turns the unfinished task into a non-zero exit.
+		//An inline handler that ran and failed returns false with finished set; not an unknown option.
 		if (finished)
 			return;
-		//No digester wanted it. That used to be silent, so a typo in an option name cost nothing
-		//at parse time and everything at read time: the run went ahead with the default and said
-		//so nowhere. A value that happens to start with a dash (a negative number) is not an
-		//option, same test as the separator normalisation above.
+		//No digester wanted it. A value starting with a dash (a negative number) is not an option.
 		if (!(temp.size() > 1 && isalpha(static_cast<unsigned char>(temp[1]))))
 			continue;
 		//look_for_debug() handles these before any digester sees them
@@ -4402,9 +4349,7 @@ std::string options::unrunnable_analysis() const
 {
 	if (!wfn.empty() || !occ.empty())
 		return "";
-	//Each of these runs only inside run_app_impl's wavefunction branch, and that branch is
-	//skipped without a word when there is nothing to read - the command then fell through to the
-	//help text and exit 0, which reads exactly like a run that had nothing to report.
+	//These run only in run_app_impl's wavefunction branch, which is skipped silently without a wavefunction.
 	const std::pair<bool, const char *> needs_a_wavefunction[] = {
 		{rgbi, "-rgbi (Roby-Gould bond indices)"},
 		{npa, "-npa (natural population analysis)"},
@@ -4513,9 +4458,8 @@ size_t available_memory_bytes()
 	status.dwLength = sizeof(status);
 	if (GlobalMemoryStatusEx(&status))
 		avail = static_cast<size_t>(status.ullAvailPhys);
-	//A job object limit is what a scheduler or a container puts on a Windows process, the
-	//counterpart of the cgroup ceiling below. Passing nullptr asks about this process's own
-	//job, and a process outside one simply reports no limit flags.
+	//A scheduler's or container's job object limit, the Windows counterpart of the cgroup ceiling;
+	//nullptr queries this process's job, a process outside one reports no limit flags.
 	JOBOBJECT_EXTENDED_LIMIT_INFORMATION limits{};
 	DWORD returned = 0;
 	if (QueryInformationJobObject(nullptr, JobObjectExtendedLimitInformation,
@@ -4531,9 +4475,7 @@ size_t available_memory_bytes()
 		}
 	}
 #elif defined(__APPLE__)
-	//Free alone understates it badly on a Mac, where the kernel keeps most of memory
-	//speculatively occupied: inactive and purgeable pages are handed back on demand and
-	//count as available, which is the same thing Activity Monitor calls memory pressure.
+	//macOS keeps most memory occupied: inactive and purgeable pages are returned on demand and count as available.
 	vm_size_t page_size = 0;
 	mach_port_t host = mach_host_self();
 	if (host_page_size(host, &page_size) == KERN_SUCCESS) {
@@ -4547,8 +4489,7 @@ size_t available_memory_bytes()
 		}
 	}
 	if (avail == 0) {
-		//Nothing else answered: the physical size, which is at least an upper bound the
-		//caller's fraction keeps it under.
+		//Fallback: physical size, an upper bound the caller's fraction keeps under.
 		uint64_t total = 0;
 		size_t len = sizeof(total);
 		if (sysctlbyname("hw.memsize", &total, &len, nullptr, 0) == 0)
@@ -4566,9 +4507,7 @@ size_t available_memory_bytes()
 		}
 		std::fclose(f);
 	}
-	//Under a batch system or a container the cgroup limit is the real ceiling and
-	///proc/meminfo reports the whole machine: a job given 180 GB of a 376 GB node would
-	//otherwise decide it can have 300 and be killed for it. v2 first, then v1.
+	//Under a batch system or container the cgroup limit is the ceiling, while meminfo reports the whole node. v2 first, then v1.
 	for (const char *path : { "/sys/fs/cgroup/memory.max",
 							  "/sys/fs/cgroup/memory/memory.limit_in_bytes" }) {
 		std::FILE *f = std::fopen(path, "r");
@@ -5304,11 +5243,8 @@ void ProgressBar::write_progress()
 	// Check if os is a file stream
 	if (dynamic_cast<std::filebuf *>(stream_.rdbuf()))
 	{
-		// A file stream is rewound so the bar is redrawn in place - and that OVERWRITES whatever the loop
-		// itself printed in the meantime. Every diagnostic raised inside a progress-bar loop was silently
-		// deleted from NoSpherA2.log this way, including RGBI's per-bond populations, which have been
-		// printed and lost since they were written. If the put position has moved since the bar was last
-		// drawn, someone else wrote there: keep that text and re-anchor the bar behind it.
+		// Rewinding would overwrite what the loop printed since the last redraw; if the put position
+		// moved, keep that text and re-anchor the bar behind it.
 		if (stream_.tellp() != barend_)
 			linestart = stream_.tellp();
 		stream_.seekp(linestart); // Is a file stream

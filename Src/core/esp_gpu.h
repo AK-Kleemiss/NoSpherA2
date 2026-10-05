@@ -2,12 +2,9 @@
 
 #include "gpu_api.h"
 
-//Electrostatic potential of a primitive-pair table on a point set, one thread per point running
-//the same text as WFN::computeESP. The pair table is what WFN::build_ESP_pairs returns, flattened:
-//P is 3 doubles and L 3 ints per pair, off/coef/pc_pow/fn_idx are the per-pair (l,r,s) blocks.
-//boys_tab is the table esp_boys_table() hands out, nT rows of stride values for T = row * step.
-//Returns false when no device is present or the arrays do not fit, and the caller keeps the
-//OpenMP loop. Shares the -no_gpu_density toggle with the other density kernels.
+//ESP of a WFN::build_ESP_pairs table on a point set, one thread per point, same arithmetic as WFN::computeESP.
+//P: 3 doubles, L: 3 ints per pair; off/coef/pc_pow/fn_idx: per-pair (l,r,s) blocks; boys_tab: esp_boys_table(), nT rows of stride, T = row * step.
+//false = no device or no room, caller keeps the OpenMP loop; -no_gpu_density switches it off
 
 NOSPHERA2_GPU_API_BEGIN
 

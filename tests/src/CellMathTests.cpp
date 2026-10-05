@@ -375,10 +375,8 @@ namespace NoSpherA2UnitTests
 		const ivec applied = cl.apply_grown(links);
 		ASSERT_EQ(applied.size(), 1u);
 		EXPECT_EQ(applied[0], 1);
-		// The weights and sym_op used to be checked here through the two-argument
-		// set_symmetry_factors, which is retired with orbit_copies (see below). The live
-		// three-argument overload divides by |linking_list[i][i]| alone, so it does not
-		// reproduce the 0.5 these two tests asserted - that factor was orbit_copies.
+		// asym_fact/sym_op are not checked: the live set_symmetry_factors divides by |linking_list[i][i]|
+		// alone, so the 0.5 from orbit_copies is not reproduced.
 	}
 
 	// when only one of two asymmetric atoms has its inversion image present the
@@ -405,9 +403,7 @@ namespace NoSpherA2UnitTests
 		const std::string err = testing::internal::GetCapturedStderr();
 		EXPECT_TRUE(applied.empty());
 		EXPECT_NE(err.find("Symmetry operation not fully matched"), std::string::npos);
-		// Same as above: the asym_fact/sym_op half of this test specified the retired
-		// two-argument set_symmetry_factors. What is live here is that a partially grown
-		// structure applies no operation and says so on stderr.
+		// asym_fact/sym_op not checked, as above
 	}
 
 	namespace
@@ -441,14 +437,8 @@ namespace NoSpherA2UnitTests
 		}
 	}
 
-	// The six tests below specify cell::compose_ops, grown_subgroup,
-	// coset_representatives and set_subgroup_factors - the old grown-structure
-	// implementation, which is commented out in cell.h, in cell.cpp and at its
-	// XCW.cpp call site as "an old but working implementation ... kept for reference
-	// purposes in case something goes wrong with the new implementation". These
-	// tests were the only live callers left, so every platform's build stopped on
-	// them. They are disabled the same way the code they specify is, and belong in
-	// whichever commit brings that implementation back.
+	// These six tests specify the old grown-structure implementation (compose_ops, grown_subgroup,
+	// coset_representatives, set_subgroup_factors), commented out in cell.h/cell.cpp, so they are disabled with it.
 #if 0
 	// composition is matched modulo lattice translations: the screw squared is
 	// (x, y+1, z), i.e. the identity, and screw after inversion is the glide
@@ -1025,12 +1015,8 @@ namespace NoSpherA2UnitTests
 		for (int i = 0; i < 4; i++)
 			EXPECT_NEAR(Sc[i], r3 / 2.0, 1e-12) << i;
 
-		// and the optional rank report, which exists because zeroing an eigenvalue here is the same class
-		// of silent rank decision as the pseudo-inverse's: RGBI routes a pair overlap through this, and a
-		// rank that differs between two bonds symmetry makes identical is the answer to why they differ.
-		// smallest_kept starts at 0.0 and is minimised from the first kept value, so a report that never
-		// saw a kept eigenvalue and one whose smallest kept is genuinely 0 look alike - kept tells them
-		// apart, which is why both are asserted.
+		// rank report: smallest_kept starts at 0.0, so "nothing kept" and "smallest kept is 0" look alike;
+		// kept tells them apart, hence both are asserted.
 		vec C = { 2, 1, 1, 2 };
 		vec Wr(2);
 		PinvRank all{}, cut{};

@@ -105,8 +105,6 @@ static PartitionType scheme_partition(const DensityFitting::CHARGE_SCHEME scheme
 	return PartitionType::Hirshfeld;
 }
 
-// Grids of every atom partitioned by scheme, set up on the returned copy of
-// wavy without its virtual orbitals.
 //Appends the atoms of aux to w with their basis functions as primitives, which is what the grid generator reads
 static void append_as_primitives(WFN& w, const WFN& aux)
 {
@@ -160,9 +158,7 @@ vec2 DensityFitting::calculate_expected_multipoles(
 	return grid_manager.calculatePartitionedMultipoles(temp, lmax);
 }
 
-// One row per atom. row[a] * c is the electron population carried by the
-// auxiliary basis functions centred on atom a. This is also used to construct
-// the optional exact total-electron constraint.
+// row[a] * c is the population of the auxiliary functions on atom a; also builds the exact total-electron constraint.
 static vec2 atomic_population_rows(
 	const aux_density_table& t)
 {
@@ -189,9 +185,7 @@ static vec2 atomic_population_rows(
 	return rows;
 }
 
-// Full [atom][l,m] row table for atom-centred analytic multipoles. l=0 is
-// intentionally left unused here; charge/population restraints are controlled
-// independently through atomic_population_rows().
+// [atom][l,m] rows for analytic multipoles; l=0 stays unused, populations come from atomic_population_rows().
 static vec2 analytic_multipole_rows(
 	const aux_density_table& t,
 	const int lmax)
@@ -469,9 +463,7 @@ static restraint_data build_restraint_data(
 	return data;
 }
 
-// Adds 1/2 * ||s (r c - t)||^2 to the quadratic objective. config strengths
-// therefore retain their historical meaning as row scales s; their squared
-// values are the actual penalty coefficients.
+// Adds 1/2 ||s (r c - t)||^2 to the objective: config strengths are row scales s, their squares the penalty coefficients.
 static void add_penalty_row(
 	vec& H,
 	vec& g,
@@ -656,14 +648,10 @@ static vec total_population_row(
 	return total;
 }
 
-// Electron count represented explicitly by the wavefunction/auxiliary density.
-// ECP core electrons are excluded because they are not present in the fitted
-// density. Molecular charge is included.
+// Electrons the fitted density holds explicitly: ECP core electrons excluded, molecular charge included.
 static double explicit_electron_count(const WFN& wavy)
 {
-	// When there are orbitals they say it outright. Files like .gbw leave the
-	// stored charge at 0, which turns the nuclear sum below into the count of a
-	// neutral molecule - wrong for every ion.
+	// Orbitals give the electron count directly; .gbw and similar files leave the stored charge at 0, wrong for any ion.
 	if (wavy.get_nmo() > 0) {
 		double occupied = 0.0;
 		for (int mo = 0; mo < wavy.get_nmo(); ++mo)
@@ -681,9 +669,8 @@ static double explicit_electron_count(const WFN& wavy)
 	return electrons;
 }
 
-// Minimise 1/2 c^T H c - g^T c. If total_row is supplied, additionally impose
-// total_row^T c = total_target exactly. The constrained solution is obtained
-// from two solves with the same H; the switch is off by default.
+// Minimise 1/2 c^T H c - g^T c; a total_row (off by default) imposes total_row^T c = total_target exactly
+// through two solves with the same H.
 static vec solve_quadratic_fit(
 	const vec& H,
 	const vec& g,
@@ -861,8 +848,7 @@ vec DensityFitting::density_fit(
 
 	std::cout << "\n=== Density Fitting ===" << std::endl;
 	citations::cite(citations::Method::RIFit, std::cout);
-	//The restraint targets are somebody's partitioning, so a restrained fit credits that too - this
-	//path never went through the grid routine in scattering_factors.cpp that cites the others.
+	//The restraint targets are somebody's partitioning, so a restrained fit cites it too; this path skips the citing grid routine in scattering_factors.cpp.
 	if (config.restrain_charges) {
 		switch (config.charge_scheme) {
 		case CHARGE_SCHEME::TFVC:  citations::cite(citations::Method::TFVC, std::cout); break;
@@ -873,7 +859,7 @@ vec DensityFitting::density_fit(
 				citations::cite(citations::Method::EMBIS, std::cout);
 			break;
 		case CHARGE_SCHEME::HIRSHFELD: citations::cite(citations::Method::Hirshfeld, std::cout); break;
-		default: break;  //Nuclear, Mulliken and the Sanderson estimate are not anybody's method here.
+		default: break; //Nuclear, Mulliken and the Sanderson estimate cite nothing
 		}
 	}
 	std::cout << "Normal basis functions: "
@@ -1034,10 +1020,8 @@ DensityFitting::CONFIG DensityFitting::config_from_options(const options& opt)
 		config.multipole_strength = opt.multipole_strength;
 		config.partition_restraints = opt.multipole_partition;
 
-		// Atom-centred targets are the populations of overlapping atoms, so the
-		// soft penalty pulls each centre up and the molecule ends up with a few
-		// tenths of an electron too many. Pin the sum. Grid-partitioned targets
-		// already add up to the electron count by construction.
+		// Atom-centred targets are populations of overlapping atoms, so the soft penalty overshoots the
+		// electron count; pin the sum. Grid-partitioned targets already sum to it.
 		config.constrain_total_electrons = !config.partition_restraints;
 
 		switch (opt.multipole_scheme) {
@@ -1059,9 +1043,7 @@ DensityFitting::CONFIG DensityFitting::config_from_options(const options& opt)
 	return config;
 }
 
-// Adaptive row scale for atomic population restraints. The value returned here
-// multiplies the restraint row; its square is the coefficient in the quadratic
-// penalty.
+// Adaptive row scale for atomic population restraints; its square is the penalty coefficient.
 vec DensityFitting::restraint_weights(
 	const WFN& wavy_aux,
 	const size_t n_aux,
@@ -1525,10 +1507,8 @@ vec DensityFitting::calculate_expected_populations(const WFN& wavy, const WFN& w
 	}
 	else if (scheme == CHARGE_SCHEME::MULLIKEN) {
 		dMatrix2 dm = wavy.get_dm();
-		//Mulliken's sum of diag(P S) is the electron count, so P and S have to be the same basis:
-		//ao_overlap is the spherical overlap in the density's own phase convention (an ORCA-convention
-		//density has the opposite sign on |m| >= 3, so a plain Overlap2C_SPH loses charge on every
-		//molecule with f or higher shells).
+		//Mulliken's sum of diag(P S) is the electron count, so S must share P's basis and phase convention: an ORCA-convention
+		//density flips sign on |m| >= 3, which a plain Overlap2C_SPH ignores.
 		const dMatrix2 S_ao = ao_overlap(wavy);
 		const size_t nao = dm.extent(1);
 
@@ -1562,9 +1542,8 @@ vec DensityFitting::calculate_expected_populations(const WFN& wavy, const WFN& w
 	else if (scheme == CHARGE_SCHEME::TFVC || scheme == CHARGE_SCHEME::HIRSHFELD || scheme == CHARGE_SCHEME::MBIS || scheme == CHARGE_SCHEME::EMBIS) {
 		PartitionType type = scheme_partition(scheme);
 		GridConfiguration config;
-		// These populations are restraint TARGETS, so their integration error goes straight
-		// into the fitted density: accuracy 0 (coarsest Lebedev) carried ~0.5 e over 35 atoms.
-		// The struct default is what the fit analysis one page down already uses.
+		// These populations are restraint targets, so their integration error goes straight into the fitted density;
+		// the struct default, as in the fit analysis below.
 		config.partition_type = type;
 		config.pbc = 0;
 		config.debug = false;
@@ -1603,11 +1582,8 @@ vec DensityFitting::calculate_expected_populations(const WFN& wavy, const WFN& w
 	return expected_populations;
 }
 
-// Analyze the quality of density fitting. The population of an atom is the
-// integral of the auxiliary functions sitting on that atom, which is what a
-// consumer that decomposes the coefficients per atom sees. With atom-centred
-// restraints that is the quantity the restraints constrain; with grid
-// partitioned ones it is not - see the note printed below.
+// An atom's population is the integral of the auxiliary functions on it: what atom-centred restraints
+// constrain, but not grid-partitioned ones.
 void DensityFitting::analyze_density_fit_quality(
 	const vec& coefficients,
 	const WFN& wavy_aux,

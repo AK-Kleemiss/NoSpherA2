@@ -167,7 +167,7 @@ namespace
 			w.dataset(std::vector<int32_t>{ 0, 1 }, { 2 });
 			w.dataset(vec{ 2.0, 0.7 }, { 2 });
 			w.dataset(vec{ 1.0, 1.0 }, { 2 });
-			// carbon carries one CONTRACTED shell: two primitives sharing one angular momentum
+			// carbon carries one contracted shell: two primitives sharing one angular momentum
 			w.raw(static_cast<int32_t>(6));
 			w.dataset(std::vector<int32_t>{ 2 }, { 1 });
 			w.dataset(std::vector<int32_t>{ 1 }, { 1 });

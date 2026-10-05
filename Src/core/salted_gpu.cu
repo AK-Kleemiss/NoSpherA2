@@ -10,11 +10,8 @@ NOSPHERA2_GPU_API_BEGIN
 	std::fprintf(stderr, "NoSpherA2 SALTED GPU: %s at %s:%d\n", gpuGetErrorString(e_), __FILE__, __LINE__); \
 	return false; } } while (0)
 
-//l21 reaches 17 with the v7 model (lam 8). The per-shell complex vector lives in shared
-//memory rather than in registers: 34 doubles per thread would spill.
-//l21 is 2*lam+1 and reaches 17 with the v7 model. It sizes the per-thread transform
-//vectors, so it is a stack-frame cost - but halving it to 32 measured neutral, so it
-//stays wide enough for models the v7 one does not cover. The entry point refuses more.
+//Sizes the per-thread transform vectors; l21 = 2*lam+1 is 17 for the v7 model, the margin is for
+//larger models, and the entry point refuses more
 #define SALTED_MAX_L21 64
 
 namespace {
@@ -78,10 +75,8 @@ __device__ __forceinline__ const double* desc_block(const double* v, const size_
 	return v + 2 * (off[l] + ((size_t)atom * nchannels + channel) * (2 * (size_t)l + 1));
 }
 
-//One block owns one (atom, n1) pair, which is what makes the Wigner-weighted v1 worth
-//building: it is reused by all nrad2 shells below, exactly as the CPU loop reuses it.
-//Recomputing it per (n1, n2, il) instead costs nrad2 times the traffic on an inner loop
-//that only does 0.2 flops per byte, which is why the first version measured no gain.
+//One block per (atom, n1), so the Wigner-weighted v1 is built once and reused by all nrad2 shells as
+//on the CPU; per (n1, n2, il) it would cost nrad2 times the traffic on a memory-bound inner loop
 __global__ void equicomb_kernel(const int natoms, const int nrad2, const int llmax,
 	const int l21, const int featsize, const int nfps, const bool conj,
 	const int total_terms,
@@ -101,7 +96,7 @@ __global__ void equicomb_kernel(const int natoms, const int nrad2, const int llm
 	const int n1 = blockIdx.x;
 	if (atom >= natoms) return;
 
-	//Build w3j * v1 once for this (atom, n1): one thread per (il, imu) run
+	//w3j * v1 for this (atom, n1), one thread per (il, imu) run
 	for (int idx = threadIdx.x; idx < llmax * l21; idx += blockDim.x) {
 		const int il = idx / l21;
 		const int* run = runs + 4 * idx;
@@ -119,8 +114,7 @@ __global__ void equicomb_kernel(const int natoms, const int nrad2, const int llm
 	double pc_re[SALTED_MAX_L21], pc_im[SALTED_MAX_L21];
 	double thread_inner = 0.0;
 	for (int job = threadIdx.x; job < nrad2 * llmax; job += blockDim.x) {
-		//n2 varies fastest so neighbouring threads read neighbouring v2 blocks: those
-		//are contiguous in the descriptor, where consecutive il are not
+		//n2 fastest: neighbouring v2 blocks are contiguous in the descriptor, consecutive il are not
 		const int n2 = job % nrad2;
 		const int il = job / nrad2;
 		const double* v2p = desc_block(v2, v2_off, v2_nch, atom, n2, llvec1[il]);
@@ -162,8 +156,7 @@ __global__ void equicomb_kernel(const int natoms, const int nrad2, const int llm
 		}
 		thread_inner += local_inner;
 	}
-	//One atomic per block instead of one per job: with 642 counters taking about
-	//70k updates each, the contention is on the counter, not the arithmetic
+	//One atomic per block, not per job: the contention is on the counter, not the arithmetic
 	double* red = sh + 2 * total_terms;
 	red[threadIdx.x] = thread_inner;
 	__syncthreads();
@@ -191,7 +184,7 @@ __global__ void normalise_kernel(const int natoms, const int l21, const int nfps
 	p[(size_t)atom * l21 * nfps + i + imu * nfps] = out[((size_t)atom * nfps + i) * l21 + imu] * nf;
 }
 
-} //namespace
+}
 
 bool salted_gpu_available()
 {

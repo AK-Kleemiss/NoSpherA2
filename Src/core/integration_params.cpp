@@ -133,19 +133,8 @@ void Int_Params::collect_basis_data()
 			exponents.push_back(basis[shell].get_exponent());
 		}
 		// Normalize the GTOs depending on the context
-		//A molden written by orca_2mkl carries the gbw's own contraction coefficients - they
-		//multiply bare x^l exp(-a r^2) with the contracted shell already normalised, which is what
-		//the molden reader documents and reads them as - so they need the gbw's conversion factor
-		//and not a second normalisation.  Without this branch a molden fell through to the
-		//"tread carefully" default, the overlap had no unit diagonal, and every analysis that pairs
-		//Int_Params with the density matrix (NPA/NBO, RGBI, Mulliken, the density fit) inherited it.
-		//An fchk belongs in the same branch, and reached none at all until now: read_fchk divides the
-		//file's contraction coefficients by the contraction norm and multiplies in the primitive norm
-		//of x^l, so what lands on the atoms multiplies bare x^l exp(-a r^2) exactly as a gbw's do.
-		//Measured on tests/alanine_occ/alanine.owf.fchk (spherical, 228 functions, 48 electrons):
-		//without this branch all 228 AOs had a non-unit overlap diagonal and Tr(P*S) came out at
-		//7.579076 electrons; with it the diagonal is 1 everywhere and Tr(P*S) is 47.938220. The
-		//alternative - normalize_gto(), as for ptb - gives 42.091936 and is not the convention.
+		//molden (orca_2mkl) and fchk (after read_fchk) coefficients multiply bare x^l exp(-a r^2) with the
+		//contracted shell already normalised, as gbw's do: they need this factor, not normalize_gto().
 		if (wfn_origin == e_origin::gbw || wfn_origin == e_origin::wfx || wfn_origin == e_origin::molden
 			|| wfn_origin == e_origin::fchk)
 		{
@@ -194,9 +183,7 @@ void Int_Params::collect_basis_data()
 				"overlap computed from this basis will not have a unit diagonal.\n";
 		}
 
-		//NOT_YET_DEFINED, the aux bases, stores l in get_type(); every wavefunction basis stores
-		//l + 1, the file readers (gbw, wfx, tonto, ptb, xtb, molden, fchk, XCW_fit) and the
-		//in-process OCC constructor alike
+		//get_type() is l for the aux bases (NOT_YET_DEFINED), l + 1 for every wavefunction basis incl. OCC
 		const int type_offset = (wfn_origin == e_origin::NOT_YET_DEFINED) ? 0 : 1;
 		int max_l = 1;
 		for (int func = 0; func < basis.size(); func++)
