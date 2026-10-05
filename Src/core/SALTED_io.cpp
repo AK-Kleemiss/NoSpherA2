@@ -375,13 +375,8 @@ bool SALTED_BINARY_FILE::read_header() {
 
 	header_end = file.tellg();
 
-	// A .salted that stopped copying part-way still has a perfectly good header:
-	// the table of contents is written first and lists blocks that are simply not
-	// there. Reading one then fails deep inside whichever block was asked for
-	// first, with a message about that block rather than about the file. Compare
-	// the offsets against the file size here and say what is actually wrong.
-	// A negative offset means the same thing for a >2 GB model: the location is
-	// an int32 in the format, so it wrapped.
+	// A truncated .salted keeps a valid header whose table of contents lists missing blocks, and
+	// the read would fail deep inside one block; a negative offset is an int32 that wrapped (>2 GB)
 	file.seekg(0, std::ios::end);
 	const std::streamoff file_size = file.tellg();
 	file.seekg(header_end, std::ios::beg);
@@ -686,9 +681,7 @@ std::shared_ptr<BasisSet> SALTED_BINARY_FILE::read_basis_set() {
 				err_checkf(contraction < angular_momenta_per_shell.size(),
 					"SALTED basis angular-momentum array shorter than contraction array", std::cout);
 				int angular_momentum = angular_momenta_per_shell[contraction];
-				// The angular momentum is per shell, the exponents and coefficients are
-				// per primitive: a contracted shell has more of the latter than of the
-				// former, so only those two may be indexed by the primitive.
+				// angular momentum is per shell, exponents and coefficients per primitive
 				for (int func = 0; func < contractions[contraction]; func++, primitive_index++) {
 					err_checkf(primitive_index < exponents_per_shell.size()
 						&& primitive_index < coefficients.size(),

@@ -7,8 +7,7 @@ namespace citations
 {
 	const std::vector<Reference> &table()
 	{
-		//Crossref-confirmed on 24 Sep 2026.  A method with two entries rests on both papers: the
-		//method itself and the implementation this code follows.
+		//a method with two entries rests on both: the method itself and the implementation this code follows
 		static const std::vector<Reference> refs = {
 			{Method::NoSpherA2, "NoSpherA2", "Kleemiss et al., Chem. Sci. 12 (2021) 1675", "10.1039/D0SC05526C"},
 			{Method::HAR, "HAR", "Jayatilaka & Dittrich, Acta Cryst. A 64 (2008) 383", "10.1107/S0108767308005709"},

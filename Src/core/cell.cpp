@@ -209,8 +209,7 @@ ivec cell::apply_grown(ivec3& linking_list) {
 	// closing function
 }
 
-// This is an old but working implementation for grown structures.
-// It is not used currently but kept for reference purposes in case something goes wrong with the new implementation.
+// Older working implementation for grown structures, unused, kept for reference.
 
 // Number of explicit atoms in asym_atoms that are symmetry images of the same
 // asymmetric atom as atom_links belongs to, itself included. Using the full,
@@ -469,8 +468,6 @@ void cell::project_into_subgroup(ivec& applied_symmetry, hkl_list& hkl_enlarged,
 		}
 	}
 	hkl_enlarged = new_enlarged;
-
-	//closing function
 }
 
 ivec cell::apply_grown(const hkl_list& hkl, hkl_list& hkl_enlarged, std::vector<asym_atom>& asym_atoms, ivec3& linking_list, ivec3& original_rotations) {
@@ -478,7 +475,6 @@ ivec cell::apply_grown(const hkl_list& hkl, hkl_list& hkl_enlarged, std::vector<
 	ivec applied_symmetry = confirm_applied_symmetry(linking_list);
 	project_into_subgroup(applied_symmetry, hkl_enlarged, hkl, linking_list);
 	return applied_symmetry;
-	// closing function
 }
 
 int cell::equal_to_concatenation(const int op_a, const int op_b) {

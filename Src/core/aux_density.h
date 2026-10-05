@@ -2,9 +2,8 @@
 #include <cmath>
 #include "spherical_harmonic.h"
 
-//The fitted density at one point from a flattened auxiliary basis. One text for the CPU loop
-//in SALTED_utilities.cpp and the kernel in aux_density_gpu.cu, so the two cannot drift; only
-//spherical_harmonic.h is included so the .cu stays parseable by nvcc and hipcc.
+//Fitted density at one point from a flattened auxiliary basis, one text for the CPU loop and
+//aux_density_gpu.cu so they cannot drift; include nothing nvcc or hipcc cannot parse.
 namespace aux_density
 {
 	//Value with its three derivatives, so constants::spherical_harmonic differentiates itself:

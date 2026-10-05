@@ -3,15 +3,9 @@
 #include <string>
 #include <vector>
 
-//The literature every method in this program implements, so that a run says which paper its
-//numbers come from.  Every entry below was checked against Crossref (api.crossref.org/works/<doi>)
-//on 24 Sep 2026: authors, journal, volume, year, first page and DOI all come from the registered
-//metadata, not from memory.  The full table, with how each line was verified, is in the vault note
-//Software-Notes/NoSpherA2-Codebase/NoSpherA2-Method-Citations-24-Sep-V1.0.
-//
-//No equation numbers are quoted here on purpose: a wrong one sends a reader to the wrong formula,
-//and the papers behind most of these entries are not readable without a subscription.  Where a
-//header in this tree does quote one (eli_family.h, Eq. 52/53 of Kohout III), that is the place for it.
+//The literature each method implements, so a run says which paper its numbers come from; entries follow
+//the registered Crossref metadata.  No equation numbers: a wrong one sends a reader to the wrong formula,
+//and a header that quotes one (eli_family.h) is the place for it.
 
 namespace citations
 {

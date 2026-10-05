@@ -66,9 +66,8 @@ double sanitize_finite(double value)
 	return value;
 }
 
-// The in-radius points of the grid in one batch instead of one call each: the ESP walks the whole
-// primitive-pair table per point, so the whole set is worth handing to a device at once. Points
-// outside stay zero as in evaluate_cube_in_radius, and wrap sums the periodic images per cell.
+// The in-radius points in one batch: the ESP walks the whole primitive-pair table per point, so the set is worth
+// handing to a device at once. Points outside stay zero as in evaluate_cube_in_radius; wrap sums periodic images per cell.
 template <typename BatchFn>
 void evaluate_cube_in_radius_batched(
 	cube &target,
@@ -839,18 +838,9 @@ void Calc_Fukui(
 
 namespace {
 
-// Overwrite the WFN_DENSITY column of an already-built integration grid with the
-// density of a single molecular orbital, |psi_mo(r)|^2.
-//
-// This is the whole trick behind the condensed Fukui functions. GridManager's
-// calculatePartitionedCharges() integrates whatever sits in that column against
-// all five partition weight columns at once; it does not recompute the density.
-// So substituting the frontier-orbital density for the total density turns the
-// existing five-way charge accumulation into a five-way condensed-Fukui
-// accumulation, with no change to GridManager at all.
-//
-// @p wavy must be the ORIGINAL wavefunction, still carrying its virtual
-// orbitals - the grid itself is built from a pruned copy (see below).
+// Replace the WFN_DENSITY column of a built grid by |psi_mo(r)|^2: calculatePartitionedCharges() integrates
+// that column against all five partition weights without recomputing it, giving the condensed Fukui functions.
+// wavy must be the original wavefunction with its virtual orbitals; the grid is built from a pruned copy.
 void fill_density_column_with_orbital(GridManager &gm, const WFN &wavy, int mo)
 {
 	GridData &gd = gm.getGridData();
@@ -874,7 +864,7 @@ void fill_density_column_with_orbital(GridManager &gm, const WFN &wavy, int mo)
 	}
 }
 
-} // namespace
+}
 
 CondensedFukuiResults Calc_Condensed_Fukui(
 	const WFN &wavy,
@@ -1491,8 +1481,7 @@ void promolecular_nci_analysis(
 	if (cif.empty())
 	{
 		readxyzMinMax_fromWFN(combined, local_opts);
-		// an intermolecular point lies within radius of two fragments, so only the pairwise overlaps of the fragment
-		// boxes can hold one; Olex2's crystal shell is ~30x the molecule's box, and the mask pass walked all of it
+		// an intermolecular point lies within radius of two fragments, so only the pairwise overlaps of the fragment boxes can hold one
 		std::array<double, 6> overlaps = { 1E300, 1E300, 1E300, -1E300, -1E300, -1E300 };
 		for (size_t f = 0; f < fragment_boxes.size(); f++)
 			for (size_t g = f + 1; g < fragment_boxes.size(); g++)
@@ -1620,9 +1609,9 @@ void promolecular_nci_analysis(
 	const int nci_write_threads = 1;
 #endif
 	std::vector<std::ostringstream> values_by_thread(nci_write_threads);
-	// the masked points next to a kept one get their RDG too: the mesh below is cut from that unmasked rim, so a sheet
-	// ends in a face whose centre fails the mask test (dropped) instead of in a wall along the mask's voxel staircase.
-	// Every other masked point stays at 101, above any iso, and the cubes are masked again after the mesh
+	// masked points next to a kept one get their RDG too, so the mesh below ends a sheet in a face whose centre fails the
+	// mask (dropped) instead of a wall along the mask's voxel staircase. Other masked points stay at 101, above any iso,
+	// and the cubes are masked again after the mesh
 	const int nx = rho_cube.get_size(0), ny = rho_cube.get_size(1), nz = rho_cube.get_size(2);
 	const auto at = [&](int x, int y, int z) { return (static_cast<size_t>(x) * ny + y) * nz + z; };
 	std::vector<char> masked(static_cast<size_t>(nx) * ny * nz), rim(masked.size(), 0);
@@ -1688,9 +1677,8 @@ void promolecular_nci_analysis(
 		values_file << local_values.str();
 	const _time_point t_mesh = get_time();
 
-	// the surface Olex2 draws: marching cubes on the unmasked RDG, so a sheet ends where the intermolecular region
-	// ends instead of closing into walls along the mask's voxel staircase. A face stays when its centre is
-	// intermolecular; its colour and the .dat value are sign(lambda2) rho there (VMD's BGR, +-colour_max)
+	// marching cubes on the unmasked RDG; a face stays when its centre is intermolecular, coloured and written to the
+	// .dat with sign(lambda2) rho there (VMD's BGR, +-colour_max)
 	const std::vector<Triangle> triangles = marchingCubes(rdg_cube, opts.promol_nci_iso);
 	std::vector<char> keep(triangles.size(), 0);
 	vec centre_signed_rho(triangles.size());
@@ -2226,14 +2214,13 @@ void properties_calculation(options &opt)
 			if (ml) Calc_Rho(box, *ml, box_opts.radius, log2, false);
 			else Calc_Rho(box, wavy, box_opts.radius, log2, false);
 		}
-		// the phases here cost wildly different amounts on different molecules, so each one says how long it took
+		// the phases' cost varies widely between molecules, so each reports its time
 		_time_point t0 = get_time();
 		std::vector<Triangle> triangles = marchingCubes(opt.cif != "" ? box : cubes[cube_type::Rho], opt.properties.esp_isosurface);
 		_time_point t1 = get_time();
 		log2 << "Found " << triangles.size() << " triangles in " << get_msec(t0, t1) << " ms" << endl;
-		// same staging as the Hirshfeld run: the isosurface is done, the per-face ESP below is the long pole, so the
-		// bare shape goes out first for Olex2 to show while it runs - in its own file, the coloured one must only ever
-		// appear complete
+		// the per-face ESP below is the long pole, so the bare isosurface goes out first in its own file: the coloured one
+		// must only ever appear complete
 		const std::string esp_stem = (wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_rho_esp";
 		writeColourObj(esp_stem + "_shape.obj", triangles);
 		{ ofstream stage1(esp_stem + "_shape.obj.stage1"); stage1 << triangles.size() << "\n"; }

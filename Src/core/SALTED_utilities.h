@@ -6,12 +6,9 @@
 #include "constants.h"
 #include "metatensor.h"
 
-//Predefine the SALTEDConfig struct, since it is used in the SALTED_Utils namespace
 struct SALTEDConfig;
 
-// Stores one contiguous slab per angular momentum. equicomb fixes l1/l2 for
-// substantial stretches of work, so this avoids the thousands of tiny vectors
-// in the former atom/channel/l/m representation.
+// One contiguous slab per angular momentum, since equicomb holds l1/l2 fixed over long stretches.
 class SALTEDDescriptors {
 public:
 	SALTEDDescriptors() = default;

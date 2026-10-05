@@ -56,13 +56,9 @@ int main(int argc, char** argv)
 	if (!death_test_child)
 		std::atexit(report_exit_during_test);
 
-	//The default "fast" death test style forks and runs the statement in the child. The child then
-	//owns copies of every thread object this process holds but none of the threads themselves, so
-	//its exit path can throw ("pthread_detach has failed: No such process") and abort with signal 6
-	//instead of the exit code the test expects - which is how
-	//FittingIoCoverageFchkTests.FreeFchkExitsWhenMissingBasisCannotBeRead failed on macOS arm64
-	//while passing everywhere else. "threadsafe" re-executes the binary for that one test instead
-	//of forking, so no death test inherits a thread it cannot join. Set before InitGoogleTest so
+	//The "fast" death test style forks: the child owns copies of every thread object but none of the
+	//threads, so its exit path can throw (pthread_detach) and abort with signal 6 instead of the expected
+	//exit code.  "threadsafe" re-executes the binary instead.  Set before InitGoogleTest so
 	//--gtest_death_test_style on the command line still wins.
 	GTEST_FLAG_SET(death_test_style, "threadsafe");
 	//The RGBI tests count free-atom SCFs and compare their digits run against run; a density read back

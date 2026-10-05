@@ -368,33 +368,9 @@ TEST(BondwiseSymmetrizeTests, SphericalMultiShellOffsets)
 	EXPECT_NEAR(trace(m), 45.0, 1e-10);
 }
 
-//The spherical transforms were tested up to d, and RGBI accepts shells up to h. Everything above d is
-//built by a pseudo-inverse solve against libcint's real-spherical convention
-//(spherical_transform_matrix: solve T_cart C = C T_sph), so f, g and h are the three l values where a
-//wrong or non-orthogonal representation would go unnoticed - and a wrong representation on one l shows
-//up as a molecule whose symmetry-equivalent bonds differ, which is the defect class this whole file is
-//about. UH6, the one octahedral fixture that still splits 4 + 2 after the atomic-rank fix, carries the
-//highest angular momenta of any RGBI fixture in the tree.
-//
-//Two invariants, and they need no reference and no eigensolver:
-//  * O_h-averaging the identity must return the identity. sum_g D(g) I D(g)^T / 48 = I holds if and only
-//    if every D(g) is orthogonal, which is what an orthogonal change of real-spherical basis has to be.
-//    A pseudo-inverse solve that loses a row, or picks up a normalisation factor, fails here.
-//  * The averaging is idempotent, symmetric and trace-preserving on an arbitrary matrix. Idempotence is
-//    the group-closure test: sum_g D(g) is a projector only if {D(g)} is closed under composition, so a
-//    transform matrix that is orthogonal but does not represent the operation it was built for fails
-//    here even though it passes the first test.
-//
-//WHAT THIS DOES NOT CHECK: that each D(g) is the representation of the RIGHT group element - a
-//relabelling of the 48 operations among themselves passes both invariants. That would need the
-//composition table, which is not exposed.
-//
-//Made red on purpose by transposing one of the two transform factors in the spherical branch of
-//symmetrize_atomic_matrix_oh (transforms[shell_a](a, transformed_a) instead of (transformed_a, a)):
-//the identity check then fails on every l from 1 to 5 (3, 5, 6, 11 and 11 entries of the 3, 5, 7, 9 and
-//11-function shells), the trace moves on all four shell combinations, and idempotence fails in 418
-//places. The three pre-existing spherical tests go red with it, which is the point of keeping them: this
-//test is the one that covers l = 3, 4 and 5, where a transform can be wrong without any of them noticing.
+//Above d the transforms come from a pseudo-inverse solve against libcint's real-spherical convention
+//(T_cart C = C T_sph).  O_h-averaging the identity returns it iff every D(g) is orthogonal; the average is
+//idempotent iff {D(g)} closes under composition.  A relabelling of the 48 operations passes both.
 TEST(BondwiseSymmetrizeTests, SphericalFGHTransformsAreOrthogonalAndClosed)
 {
 	for (const int l : { 0, 1, 2, 3, 4, 5 }) {
@@ -409,7 +385,7 @@ TEST(BondwiseSymmetrizeTests, SphericalFGHTransformsAreOrthogonalAndClosed)
 					<< i << ", " << j << "), so that shell's 48 transforms are not all orthogonal";
 	}
 
-	//one shell per l, and then the three high ones together, which also exercises the shell offsets
+	//one shell per l, then the three high ones together for the shell offsets
 	for (const ivec &shells : { ivec{ 3 }, ivec{ 4 }, ivec{ 5 }, ivec{ 3, 4, 5 } }) {
 		int n = 0;
 		for (const int l : shells)
@@ -433,28 +409,9 @@ TEST(BondwiseSymmetrizeTests, SphericalFGHTransformsAreOrthogonalAndClosed)
 	}
 }
 
-//Orthogonality and closure both survive a RELABELLING of the real-spherical components among themselves,
-//which the test above says in its own comment, and l = 3 is where that gap actually bites: f is the lowest
-//l where the Oh irreps mix m components, so the diagonal-pattern argument that pins d down
-//(SphericalDShellSplitsIntoT2gAndEg already asserts t_2g at 0, 1, 3 and e_g at 2, 4 in libcint's
-//m = -l .. +l order, and it is green - the d ordering is NOT the cause of the 4 + 2 RGBI shows on
-//octahedral fixtures) gives nothing above d. It does give ONE thing, and it is enough to fix the ordering:
-//
-//  f splits into a2u + t1u + t2u, and a2u is the single function xyz. xyz is not a mixture - it IS the
-//  m = -2 real solid harmonic, so in libcint's order (m = -3, -2, -1, 0, +1, +2, +3) it is component 1
-//  alone. A one-dimensional irrep that appears once makes the Oh average P_a2u M P_a2u + (t1u part) +
-//  (t2u part): row and column 1 must come out zero off the diagonal and entry (1, 1) must come out
-//  EXACTLY the value it went in with, while the other six mix. Permute the seven components and the
-//  decoupled one moves, so this asserts the ordering itself.
-//
-//The six t1u/t2u rows are deliberately not pinned further: each irrep spans combinations of m, so that
-//block is only block-diagonal in a basis this test does not have. Its trace is checked instead.
-//l = 4's a1g mixes m = 0 with m = +-4, so f is the only l above d where this argument exists at all.
-//
-//Made red on purpose at the two orderings it is meant to rule out, by moving the constant: at component 0
-//(m = -3 first) entry (1, 1) comes out 4.1016 instead of 2 and four assertions fail, and at component 5
-//(the reversed m = +3 .. -3 ordering) it comes out 6.0102 instead of 6.0500. Green at 1 and red at both,
-//which is what makes it an ordering check rather than a restatement of trace preservation.
+//Orthogonality and closure survive a relabelling of the m components.  f's a2u is the single function xyz,
+//the m = -2 component (index 1 in libcint's m = -3..+3 order), so the O_h average must leave (1,1) unchanged
+//and its row and column zero; another m order moves it.  t1u and t2u mix m, so only their trace is checked.
 TEST(BondwiseSymmetrizeTests, SphericalFShellDecouplesTheA2uComponent)
 {
 	const int xyz = 1; //m = -2 of l = 3 in libcint's ordering
@@ -483,16 +440,9 @@ TEST(BondwiseSymmetrizeTests, SphericalFShellDecouplesTheA2uComponent)
 	EXPECT_NEAR(rest, trace_before - a2u_before, 1e-10) << "with a2u fixed, t1u + t2u must carry the remainder";
 }
 
-//The exact rotational average of an atom-centred matrix: what the atomic reference is supposed to be and
-//what O_h only approximates. Schur's lemma fixes the answer completely - between two copies of the same
-//irreducible D^l the only rotation-invariant map is a multiple of the identity, and between different l
-//there is none - so one number survives per pair of shells of equal l and nothing else. O_h leaves TWO
-//numbers in a d shell (e_g and t_2g) and more above it, and that leftover freedom is what let the six
-//fluorines of an octahedral molecule keep references pointing in different directions.
-//
-//WHAT WOULD MAKE THIS FAIL: a shell whose 2l+1 components are not contiguous, an offset walked with the
-//Cartesian shell size, or a same-l cross-shell block dropped along with the different-l ones - that last
-//one would silently decouple 2p from 3p on every atom of every molecule.
+//The exact rotational average: by Schur's lemma one number per pair of shells of equal l and nothing
+//between different l, where O_h leaves e_g and t_2g apart.  Breaks if a shell's 2l+1 components are not
+//contiguous, an offset walks the Cartesian shell size, or the same-l cross-shell block (2p-3p) is dropped.
 TEST(BondwiseSymmetrizeTests, SphericalAverageLeavesOneNumberPerShellPair)
 {
 	dMatrix2 d = diagonal_matrix({ 1.0, 2.0, 3.0, 4.0, 5.0 });
@@ -533,12 +483,9 @@ TEST(BondwiseSymmetrizeTests, SphericalAverageLeavesOneNumberPerShellPair)
 	EXPECT_NEAR(trace(m), trace_before, 1e-12) << "still an average of orthogonal transforms";
 }
 
-//Why this average runs on every spherical basis and O_h does not: it cannot be fooled by an m ordering.
-//It reads only the diagonal of a shell-pair block and writes a multiple of the identity, so permuting the
-//components inside each shell permutes the result and changes nothing else. The O_h route needs libcint's
-//exact order and phases - SphericalFShellDecouplesTheA2uComponent above is red at two plausible orderings
-//on purpose - so a reader that hands it another convention gets a silently wrong reference, not an error.
-//WHAT WOULD MAKE THIS FAIL: any use of a component's index as more than a position inside its own shell.
+//Only shell-pair diagonals are read and multiples of the identity written, so the m order inside a shell
+//cannot matter, unlike the O_h route, which needs libcint's exact order and phases.  Breaks if a
+//component's index is used as more than a position inside its own shell.
 TEST(BondwiseSymmetrizeTests, SphericalAverageDoesNotDependOnTheMOrder)
 {
 	const ivec shells = { 0, 1, 2, 2 };
@@ -972,13 +919,8 @@ TEST(BondwiseRobyTests, NaoPopulationsMatchGolden)
 		EXPECT_NEAR(value_after(out, "Population of atom " + std::to_string(i) + ": "), golden[i], 2e-3) << i;
 	EXPECT_NEAR(value_after(out, "Total Population: "), 12.9218, 2e-3);
 
-	//The three hydrogens are one symmetry orbit of this C3v molecule, so their population is one
-	//number printed three times.  The golden these three replace read 1.4373, 1.4353 and 1.43756 - a
-	//2.5e-3 spread over three equivalent atoms.  That spread was the fixed-rank atomic subspace
-	//padding itself out of the degenerate null space of the projected density, and which direction it
-	//took was not reproducible; capping the rank at the occupied eigenvectors removed the padding.
-	//N and Li, whose subspaces never reached into the null space, did not move at all.  So this is
-	//the assertion with the content: equivalent atoms have to agree, which the old numbers did not.
+	//The three hydrogens are one C3v orbit and must agree; a rank padded out of the null space of the
+	//projected density breaks that.
 	const double h[3] = { value_after(out, "Population of atom 1: "),
 						  value_after(out, "Population of atom 2: "),
 						  value_after(out, "Population of atom 3: ") };
@@ -994,10 +936,7 @@ TEST(BondwiseRobyTests, NaoBondTableMatchesGolden)
 		GTEST_SKIP() << "tests/RGBI_groups/nh3li.gbw not found";
 	const vec li = row_numbers_after(out, "N - Li");
 	ASSERT_EQ(li.size(), 9u);
-	//columns 7 and 8 - Pyth. and Arak. - are percentages of a ratio of small numbers, so the 2.5e-3
-	//population shift of the previous test moves them by 0.015 and 0.012 while Cov., Ion. and Tot.
-	//themselves stay inside 3e-3.  They are re-recorded, and the two EXPECT_NEARs below derive them
-	//from Cov. and Ion. independently, which is what actually checks them.
+	//Pyth. and Arak. are percentages of a ratio of small numbers; the EXPECT_NEARs below derive them from Cov. and Ion.
 	const double golden_li[9] = { 9.420, 3.110, 12.393, 0.137, 0.184, 0.421, 0.459, 15.957, 26.161 };
 	for (int i = 0; i < 9; i++)
 		EXPECT_NEAR(li[i], golden_li[i], 3e-3) << i;
@@ -1012,16 +951,14 @@ TEST(BondwiseRobyTests, NaoBondTableMatchesGolden)
 		EXPECT_NEAR(h[i], golden_h[i], 3e-3) << i;
 	EXPECT_EQ(count_occurrences(out, "N -  H"), 3);
 
-	//and the three N-H rows are one symmetry orbit: printed to three decimals they are the same row.
-	//row_numbers_after takes the first match, so the rows are addressed by their atom pair.
+	//the three N-H rows are one orbit; row_numbers_after takes the first match, so rows are addressed by atom pair
 	const char* const nh_rows[3] = { "   0 -   1    N -  H", "   0 -   2    N -  H", "   0 -   3    N -  H" };
 	for (int r = 1; r < 3; r++) {
 		const vec other = row_numbers_after(out, nh_rows[r]);
 		ASSERT_EQ(other.size(), 9u) << nh_rows[r];
 		const vec first = row_numbers_after(out, nh_rows[0]);
 		ASSERT_EQ(first.size(), 9u);
-		//the two percentage columns amplify the last printed digit of Cov. and Ion., so 90.348 against
-		//90.346 is the three rows agreeing, not disagreeing
+		//the percentage columns amplify the last printed digit of Cov. and Ion.
 		for (int i = 0; i < 9; i++)
 			EXPECT_NEAR(other[i], first[i], i < 7 ? 1e-3 : 5e-3) << nh_rows[r] << " column " << i;
 	}
@@ -1089,11 +1026,7 @@ TEST(BondwiseRobyTests, ThetaInfoReportsEveryBond)
 	EXPECT_NEAR(value_after(out, "Population of atom 0: "), 9.42047, 2e-3);
 }
 
-//EVs=true prints the projected-density occupations per atom without changing the numbers.  The print
-//used to be headed "Eigenvalues of projected density P (unsorted):" and to come before the subspace
-//was split; it now comes after, says which rank was kept, and marks every value kept or omitted,
-//because where the boundary falls is the whole reason to ask for it.  This assertion went on
-//matching zero occurrences of a string the program no longer prints, so it now checks the split.
+//EVs=true prints the projected-density occupations per atom, marked kept or omitted, without changing the numbers
 TEST(BondwiseRobyTests, EigenvaluePrintsLeavePopulationsUnchanged)
 {
 	const std::string out = roby_output({}, true, false, true, false);
@@ -1194,12 +1127,8 @@ TEST(BondwiseRobyTests, AnoBasisMatchesGoldenWithoutFallback)
 
 namespace
 {
-	//A Roby analysis at a geometry of our choosing: Hartree-Fock/def2-SVP in process, then the
-	//index on the resulting wavefunction. The .gbw fixtures are single points, and the question
-	//the RGBI has to answer - does the number move smoothly when the molecule does - cannot be
-	//asked without a wavefunction per geometry.
-	//the analysis exits the process on an internal inconsistency, and a swallowed stdout would
-	//take the message with it, so this copy keeps the stream visible while recording it
+	//Roby analysis at a chosen geometry, HF/def2-SVP in process: smoothness in geometry needs a wavefunction
+	//per geometry.  The analysis exits on an internal inconsistency, so stdout is teed, not swallowed.
 	struct CoutTee : std::streambuf
 	{
 		std::ostringstream buffer;
@@ -1240,8 +1169,7 @@ namespace
 		return row.size() == 9u ? row[6] : -1.0;
 	}
 
-	//H2O2 with the dihedral as the only variable: a conformer coordinate of a four-atom molecule,
-	//so the O-O bond has to be a smooth function of it.
+	//H2O2 with the dihedral as the only variable, so the O-O bond must be smooth in it
 	std::string h2o2_xyz(double dihedral_deg)
 	{
 		const double roo = 1.452, roh = 0.965, ang = 100.0 * constants::PI_180;
@@ -1269,11 +1197,8 @@ namespace
 	}
 }
 
-//LiH is where the legacy subspace rule breaks: Li's second atomic natural orbital walks through the
-//1/6 occupancy cutoff between 1.575 and 1.600 A, so the rank of its projector - and every index
-//built on it - used to step there. With the subspace fixed by the element the four points have to
-//lie on one smooth curve. 0.02 per 0.025 A step is ten times the observed drift and a fortieth of
-//the jump it replaces.
+//Li's second ANO crosses the legacy 1/6 occupancy cutoff between 1.575 and 1.600 A; with the subspace
+//fixed by the element the index is smooth through it.
 TEST(BondwiseRobyTests, LiHBondIndexIsContinuousThroughTheOldCutoff)
 {
 	vec tot;
@@ -1284,15 +1209,12 @@ TEST(BondwiseRobyTests, LiHBondIndexIsContinuousThroughTheOldCutoff)
 		ASSERT_GT(tot[i], 0.0) << "no Li - H row at point " << i;
 	for (size_t i = 1; i < tot.size(); i++)
 		EXPECT_NEAR(tot[i], tot[i - 1], 0.02) << "step between points " << (i - 1) << " and " << i;
-	//and the free-atom ANO route, whose cutoff has always been applied to element constants rather
-	//than to the molecular occupations, has to agree with it - two independent subspace rules, one
-	//bond index
+	//the free-atom ANO route applies its cutoff to element constants: an independent rule, the same index
 	const double ano = bond_total(roby_geometry_output(diatomic_xyz("Li", "H", 1.600), true, false), "Li -  H");
 	EXPECT_NEAR(ano, tot[2], 0.03);
 }
 
-//the mirror of the test above: -rgbi_legacy_cutoff reproduces the old numbers, jump included. If
-//this one ever stops failing to be continuous the legacy path has silently changed too.
+//-rgbi_legacy_cutoff keeps the old step; if this stops stepping, the legacy path changed
 TEST(BondwiseRobyTests, LegacyCutoffStillStepsAtTheOldThreshold)
 {
 	const double before = bond_total(roby_geometry_output(diatomic_xyz("Li", "H", 1.575), false, false, "def2-svp", false, true), "Li -  H");
@@ -1304,10 +1226,8 @@ TEST(BondwiseRobyTests, LegacyCutoffStillStepsAtTheOldThreshold)
 
 namespace
 {
-	//the same molecule in a different frame: every bond index is a function of the density and the
-	//atomic projectors, so a rigid rotation may not move it. What a rotation does change is the AO
-	//representation, and with it the basis the diagonaliser happens to return inside a degenerate
-	//eigenspace - which is exactly what the index must not depend on.
+	//A rigid rotation changes the AO representation and with it the basis a diagonaliser returns inside a
+	//degenerate eigenspace, which the index must not depend on.
 	std::string rotate_xyz(const std::string& xyz, double a, double b, double c, double tx)
 	{
 		std::istringstream in(xyz);
@@ -1342,9 +1262,7 @@ namespace
 	}
 }
 
-//the index is a function of the density and the atomic projectors, both of which a rigid motion only
-//conjugates, so every column has to come back unchanged. The table prints three decimals, hence the
-//2e-3 window: it is rounding, not tolerance.
+//the table prints three decimals, so 2e-3 is rounding, not tolerance
 TEST(BondwiseRobyTests, RigidMotionLeavesEveryBondIndexUnchanged)
 {
 	const std::string plain = roby_geometry_output(h2o2_xyz(120.0), false, false);
@@ -1396,11 +1314,7 @@ namespace
 	}
 }
 
-//cross-molecule comparability, which is the point of fixing the subspace by the element: the same
-//N-H bond in two different molecules - one of them next to a dative bond to BH3 - has to come out
-//as the same number. It does, 0.966 against 0.968, and the fixtures agree: 0.952 in
-//tests/RGBI/nh3li_nao.good and 0.966 in tests/RGBI_groups/NH3BH3_sym.good. The window is ten times
-//the observed difference.
+//The same N-H bond in NH3 and beside NH3BH3's dative bond is one number: the point of an element-fixed subspace.
 TEST(BondwiseRobyTests, NHBondIndexComparesBetweenMolecules)
 {
 	const double nh3 = bond_total(roby_geometry_output(nh3_xyz(), false, false), "N -  H");

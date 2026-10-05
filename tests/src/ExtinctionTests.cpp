@@ -1,6 +1,5 @@
-//The extinction models of Src/core/extinction.h against their published forms and against
-//finite differences, and the settings keyword that switches them on through the only door it
-//has, the XCW constructor on the P1 fixture.
+//extinction.h's models against their published forms and finite differences, and the settings keyword
+//through its only entry, the XCW constructor on the P1 fixture
 #include "pch.h"
 #include <gtest/gtest.h>
 
@@ -146,9 +145,8 @@ namespace NoSpherA2UnitTests
 		}
 	}
 
-	// the azimuth-averaged anisotropic form reduces exactly to the isotropic one for an
-	// isotropic tensor, for every direction - that degeneracy is the whole justification for
-	// using it in place of the direction cosines an hkl file does not carry
+	// the azimuth-averaged anisotropic form equals the isotropic one for an isotropic tensor in every
+	// direction, which justifies it in place of the direction cosines an hkl file lacks
 	TEST(ExtinctionTests, AnisotropicReducesToIsotropic)
 	{
 		const double x = 3.7e-4;
@@ -181,8 +179,7 @@ namespace NoSpherA2UnitTests
 		EXPECT_NEAR(sum, 0.5 * (X[0] + X[1] + X[2] - hXh), 1e-14);
 	}
 
-	// `extinction <model> [iso|aniso] [fixed] [start]` in any order after the model, and a
-	// model name is required - the words are what the user types, so they are worth a check
+	// `extinction <model> [iso|aniso] [fixed] [start]`: options in any order, the model required
 	TEST(ExtinctionTests, SettingsKeywordNamesTheModel)
 	{
 		EXPECT_EQ(ext_parse_error("extinction"),

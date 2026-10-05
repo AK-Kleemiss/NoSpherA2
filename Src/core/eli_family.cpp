@@ -3,7 +3,6 @@
 #include "constants.h"
 #include "citations.h"
 
-//Evaluate spin-resolved ELI fields from the same density ingredients as WFN::computeELIELF.
 namespace eli_family
 {
 	SpinSplit spin_split(const WFN& wave)
@@ -44,9 +43,8 @@ namespace eli_family
 			differ = std::min(same, flip) > 1e-4 * big;
 		}
 		if (!differ) return false;
-		//Orbitals that differ can still span the same space: beta rotated within a degenerate (or any
-		//equally occupied) subspace gives rho_beta = rho_alpha. Only a spin density decides, so sample it
-		//at 0.3/1/2 bohr from each nucleus along two skew directions.
+		//Differing orbitals can span the same space, so the spin density decides: 0.3/1/2 bohr from each
+		//nucleus along two skew directions.
 		//ponytail: 6 points per atom, a spin density that vanishes at all of them is missed
 		const std::vector<atom>& atoms = *wave.get_atoms_ptr();
 		const double dir[2][3] = { { 0.48, 0.64, 0.6 }, { -0.6, 0.48, -0.64 } }, rad[3] = { 0.3, 1.0, 2.0 };
@@ -70,7 +68,7 @@ namespace eli_family
 		const int _nmo = wave.get_nmo();
 		const int _nex = wave.get_nex();
 		const std::vector<atom>& atoms = *wave.get_atoms_ptr();
-		//Primitive-major coefficients: every MO for one primitive is contiguous (see computeELIELF).
+		//Primitive-major: every MO for one primitive is contiguous
 		const double* const coefs = wave.get_coef_primitive_major();
 
 		vec phi(4 * (size_t)_nmo, 0.0);
@@ -119,8 +117,6 @@ namespace eli_family
 			}
 		}
 
-		//A closed-shell restricted wavefunction carries no beta MOs; its doubly occupied orbitals contribute
-		//occ/2 to each channel, giving rho_alpha = rho_beta = rho/2 exactly. ROHF: see spin_split.
 		const SpinSplit how = spin_split(wave);
 		f = SpinFields{};
 		for (int mo = 0; mo < _nmo; mo++)
@@ -143,7 +139,7 @@ namespace eli_family
 		}
 	}
 
-	//rho^(t) / rho = 1 - N_beta / (2(N-1)), DGrid 5.2's convention - see the header.
+	//rho^(t) / rho = 1 - N_beta / (2(N-1)), DGrid 5.2's convention
 	double triplet_density_factor(const WFN& wave)
 	{
 		const SpinSplit how = spin_split(wave);
@@ -187,9 +183,7 @@ namespace eli_family
 		return "?";
 	}
 
-	//Only ELI-D has maxima to walk up to.  ELI-q is ELI-D^(-8/3), so an ascent on it runs into ELI-D's
-	//minima and shatters into tail basins; the singlet member is 1 - zeta^2 and has no pair topology at
-	//all.  The measurements behind this are in the header, above eli_variants_for's declaration.
+	//ELI-q = ELI-D^(-8/3) ascends into ELI-D's minima and shatters into tail basins; 1 - zeta^2 has no pair topology
 	bool basins_independent(const Member m)
 	{
 		return m == Member::eli_d_aa || m == Member::eli_d_bb || m == Member::eli_d_triplet;
@@ -197,10 +191,7 @@ namespace eli_family
 
 	std::vector<Member> eli_variants_for(const WFN& wave, std::string* warning)
 	{
-		//Read off the wavefunction, never off a label: a beta MO set must actually be present, and the
-		//two channels must actually hold different numbers of electrons.
-		//A restricted open shell with integer occupations splits them by spin_split; a broken-symmetry
-		//singlet (N_alpha = N_beta, alpha orbitals != beta orbitals) is spin-polarised too.
+		//From the orbitals, never the label; a broken-symmetry singlet counts as spin-polarised
 		double Na = 0.0, Nb = 0.0;
 		const SpinSplit how = spin_split(wave);
 		const bool has_beta_set = how == SpinSplit::unrestricted;
@@ -214,7 +205,6 @@ namespace eli_family
 		const bool spin_polarised = how == SpinSplit::restricted_open
 			|| (has_beta_set && (std::abs(Na - Nb) > 1e-8 || alpha_beta_orbitals_differ(wave)));
 
-		//An empty spin channel has no ELI-D basins.
 		const bool has_alpha_electrons = Na > 1e-8;
 		const bool has_beta_electrons = Nb > 1e-8;
 		const bool has_a_pair = Na + Nb > 1.0 + 1e-8;
@@ -236,7 +226,6 @@ namespace eli_family
 			if (!has_alpha_electrons)
 				*warning += "the alpha orbital set holds no electrons either: there is no ELI"
 				" family to compute from this wavefunction at all. ";
-			//The stated multiplicity is a cross-check only; 2S+1 from the occupations is the truth.
 			const int stated = (int)wave.get_multi();
 			const int actual = (int)std::lround(std::abs(Na - Nb)) + 1;
 			if (stated > 0 && stated != actual)
@@ -293,9 +282,7 @@ namespace eli_family
 		if (points_file.empty()) return;
 		std::ifstream in(points_file);
 		err_checkf(in.good(), "Could not open " + points_file.string(), std::cout);
-		//Everything the family is built from, so a point dump doubles as the DGrid comparison input:
-		//the two densities, the two T_s = sum n_i |grad phi_i|^2, the three gradient invariants, then
-		//the members themselves.
+		//All ingredients, T_s = sum n_i |grad phi_i|^2, then the members, so the dump compares against DGrid
 		std::cout << "#         x           y           z         rho_a         rho_b"
 			<< "           T_a           T_b     |grad_a|^2     |grad_b|^2      grad_a.b"
 			<< "      ELI-D_aa      ELI-D_bb      ELI-q_aa      ELI-q_bb       ELI-D_t        ELIA_s\n";

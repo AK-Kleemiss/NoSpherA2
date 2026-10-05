@@ -819,8 +819,7 @@ PartitionResults GridManager::calculatePartitionedCharges(const WFN &wave, const
 
 		// Add ECP electrons (only to computed schemes)
 		if (wave.get_has_ECPs()) {
-			//pTB puts every heavy-atom core in an ECP, so in a grown structure the grid
-			//index picked a neighbour's core: +-2 e on the C6D6 of Graham's 2 Oct 2026 mail
+			//In a grown structure the grid index is not the wfn atom; the ECP core belongs to grid_atom_
 			const int ecp_e = wave.get_atom_ECP_electrons(grid_atom_.size() == num_atoms ? grid_atom_[atom] : atom);
 			if (config_.debug || config_.all_charges) {
 				results.atom_charges[PartitionResults::CHARGE_ORDER::S_BECKE][atom] += ecp_e;

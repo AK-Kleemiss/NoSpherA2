@@ -484,11 +484,8 @@ void generate_hkl(const double& dmin,
 	using namespace std;
 	const ivec3 sym = unit_cell.get_sym();
 	const int n_sym = sym[0][0].size();
-	//An index box narrows the sphere to the orbit of the measured indices: h is kept when one
-	//of its images h.R, or the Friedel mate of one, lies in the box. That is the set cctbx's
-	//table reader resolves for a measured list (smtbx table_based.h walks h.R over the
-	//rotations and falls back to -h.R), and since a rotation preserves d every image of a
-	//box index is inside the sphere already, so nothing the reader asks for is dropped.
+	//An index box keeps h when an image h.R, or its Friedel mate, lies in the box: the set smtbx table_based.h
+	//resolves for a measured list. A rotation preserves d, so every image of a box index is inside the sphere.
 	//sym[j][h][s] holds R^T, so the products below form h.R, the cctbx convention.
 	const bool boxed = hkl_min_max.size() == 3;
 	if (boxed)
@@ -515,9 +512,8 @@ void generate_hkl(const double& dmin,
 		return false;
 	};
 	file << "Generating hkl indices up to d=: " << fixed << setw(17) << setprecision(2) << dmin << flush;
-	//The sphere d*^2 <= 1/d_keep^2 (cctbx index_generator, smtbx n_beam.h) is closed under
-	//the point group, so the Friedel half l > 0 | l = 0, k > 0 | k = l = 0, h > 0 is the list.
-	//d_keep sits 1e-3 inside dmin so a reflection at dmin from a rounded cell is never lost.
+	//The sphere d*^2 <= 1/d_keep^2 (cctbx index_generator) is closed under the point group, so its Friedel half
+	//l > 0 | l = 0, k > 0 | k = l = 0, h > 0 is the list; d_keep sits 1e-3 inside dmin to keep a reflection at dmin from a rounded cell.
 	const double d_keep = dmin * (1.0 - 1e-3);
 	const double s_max = 1.0 / (d_keep * d_keep);
 	const array<double, 6> G = unit_cell.get_reciprocal_metric();
@@ -635,9 +631,8 @@ void generate_hkl(const ivec2& hkl_min_max,
 	reflections out to half the measured spacing, and it is the latter a
 	dynamical calculation asks for. A box and a resolution shell are different
 	shapes: the shell reaches further along the shorter axes, so this leaves a
-	gap there. Olex2 sends -dmin for ED, which generates the sphere and ignores
-	the box; this stays for callers that pass only a box, and says so rather
-	than looking complete.
+	gap there. Olex2 sends -dmin for ED, which generates the sphere; this
+	serves callers that pass only a box.
 	*/
 	if (ED) {
 		h_max *= 2, k_max *= 2, l_max *= 2;
@@ -905,19 +900,8 @@ void generate_fractional_hkl(const double& dmin,
  * @param file The output stream for the file.
  * @param debug A boolean indicating whether to enable debug mode.
  */
-// Read exactly n whitespace-separated values of one CIF loop row.
-//
-// Two things a real CIF does that "one stringstream per line" does not survive:
-//
-//   * a row may be WRAPPED over several lines. CIF has an 80-column heritage and
-//     writers still break long rows. Seen on a disordered structure whose carbon
-//     rows carry 14 of 15 values with the last on the following line - the empty
-//     field then reached std::stoi and aborted the whole run.
-//   * a value may be QUOTED and contain spaces, e.g. 'x, y, z'. Splitting on
-//     whitespace turns one value into three.
-//
-// Returns false if the file ends with the row incomplete. `line` is left holding
-// the last line consumed, which is what the surrounding loops expect.
+// Reads exactly n values of one CIF loop row: a row may wrap over several lines and a quoted value ('x, y, z')
+// may contain spaces. False if the file ends mid-row; line keeps the last line consumed, as the callers expect.
 static bool read_cif_loop_row(std::istream &input, std::string &line, int n, svec &fields)
 {
 	fields.assign(n, "");
@@ -1055,8 +1039,7 @@ svec read_atoms_from_CIF(std::ifstream& cif_input,
 				int group_nr = 0;
 				if (group_field != -1 && fields[group_field] != "." && fields[group_field] != "?"
 					&& !fields[group_field].empty()) {
-					// Belt and braces: an unreadable disorder group should not abort a
-					// run that is otherwise perfectly fine.
+					// An unreadable disorder group must not abort the run.
 					try { group_nr = std::stoi(fields[group_field]); }
 					catch (const std::exception &) {
 						file << "Could not read disorder group for atom " << fields[label_field]
@@ -1291,13 +1274,7 @@ void read_atoms_from_CIF(std::ifstream& cif_input, const cell& unit_cell, int& n
 	{
 		if (line.empty())
 			continue;
-		// Trim whitespace at both ends, not just the front. The header comparisons
-		// below are exact, and a CIF written on Windows - which is what Olex2 hands
-		// out - ends every line with \r, so "_atom_site_label\r" never matched and
-		// the atom loop went unrecognised. That left the caller with no atoms at all
-		// and the next reader indexing an empty array, i.e. a segfault on a file the
-		// rest of NoSpherA2 reads without complaint, since the older CIF readers
-		// compare with find() rather than ==.
+		// Trim both ends: the header comparisons below are exact, and a CIF from Windows (Olex2) ends lines with \r.
 		std::string trimmed = trim(line);
 		if (trimmed.empty())
 			continue;
@@ -1727,8 +1704,7 @@ void read_atoms_from_CIF(std::ifstream& cif_input, const cell& unit_cell, int& n
 //    return labels2;
 //}
 
-//Declared in the header so the XCW I tensor screens on the same ladder: what counts as
-//negligible is the run's accuracy setting, and there should be one answer to that.
+//Declared in the header so the XCW I tensor screens on the same accuracy ladder
 double cutoff(const int& accuracy)
 {
 	if (accuracy < 3)
@@ -1921,16 +1897,14 @@ void calc_SF(const int& points,
 		std::vector<double*> rows(imax);
 		for (int i = 0; i < imax; i++)
 			rows[i] = reinterpret_cast<double*>(sf[i].data());
-		//-gpu_fp64 wins over -gpu_fp32 if both are given: between two explicit requests the
-		//accurate one is the safer default.
+		//-gpu_fp64 wins over -gpu_fp32 if both are given: the accurate one is the safer default.
 		const sf_precision prec = gpu_fp64 ? sf_precision::FP64
 			: gpu_fp32 ? sf_precision::FP32 : sf_precision::Auto;
 		const _time_point sf_gpu_t0 = get_time();
 		if (sf_gpu_run((int)imax, smax, k_pt[0].data(), k_pt[1].data(), k_pt[2].data(),
 			fd1.data(), fd2.data(), fd3.data(), fde.data(), offs.data(), tot,
 			rows.data(), prec)) {
-			//Transfers included. What decides where this work belongs is the rate the caller
-			//actually gets, not the one the kernel would post with the copies left out.
+			//Rate includes the transfers: that is what the caller gets.
 			throughput::record("scattering-factor transform", true,
 				throughput::flops_ndft(static_cast<double>(tot), static_cast<double>(smax)),
 				get_msec(sf_gpu_t0, get_time()));
@@ -1965,9 +1939,7 @@ void calc_SF(const int& points,
 	const double* k2_data = k_pt[1].data();
 	const double* k3_data = k_pt[2].data();
 
-	//Timed around the whole atom loop, not inside it. The inner loop is an omp parallel for,
-	//and a per-thread timer there would sum concurrent time into a total larger than the
-	//wall clock - a profile that cannot be true is worse than none.
+	//Timed around the atom loop: a timer inside the omp parallel for would sum thread time beyond the wall clock.
 	const _time_point sf_cpu_t0 = get_time();
 	double sf_cpu_points = 0.0;
 
@@ -2371,14 +2343,8 @@ int build_fill_wavefunctions(const options& opt, const int nr, std::vector<WFN>&
 	return nr;
 }
 
-//One evaluator per ATOM, not per element type. Two atoms of the same element in
-//different environments carry different EEQ charges, and the tsc gives each atom
-//its own row anyway, so there is nothing to be gained by sharing.
-//
-//Charges are matched by position because the fill rebuilds its wavefunction from
-//the original file; that is also how CIF atoms are matched to WFN atoms here.
-//An atom with no recorded charge, or an element with no tabulated ion, falls
-//back to the neutral density.
+//One evaluator per atom: same-element atoms carry different EEQ charges. Charges are matched by position, as the
+//fill rebuilds its wavefunction from the original file; no recorded charge or no tabulated ion falls back to neutral.
 std::vector<HE_Spherical_Atom> make_he_evaluators(const salted_part_prep& sph,
 	const WFN& fill_wavy, const options& opt, std::ostream& file)
 {
@@ -2511,7 +2477,7 @@ struct spherical_fill_scope
 	spherical_fill_scope& operator=(const spherical_fill_scope&) = delete;
 };
 
-}  // namespace
+}
 
 
 int make_atomic_grids_wrapper(
@@ -2519,7 +2485,6 @@ int make_atomic_grids_wrapper(
 	std::vector<_time_point>& time_points, svec& time_descriptions, vec2& d1, vec2& d2, vec2& d3, vec2& dens,
 	const options& opt, std::ostream& file = std::cout) {
 
-	//The grid itself is Becke's; which partitioning runs on it is the user's choice.
 	citations::cite(citations::Method::BeckeGrid, file);
 	if (opt.partition_type == PartitionType::Hirshfeld)
 		citations::cite(citations::Method::Hirshfeld, file);
@@ -2527,7 +2492,7 @@ int make_atomic_grids_wrapper(
 		citations::cite(citations::Method::TFVC, file);
 	else if (opt.partition_type == PartitionType::MBIS || opt.partition_type == PartitionType::EMBIS) {
 		citations::cite(citations::Method::MBIS, file);
-		//EMBIS is MBIS with an ellipsoidal sigma, so it rests on both papers.
+		//EMBIS is MBIS with an ellipsoidal sigma: both papers
 		if (opt.partition_type == PartitionType::EMBIS)
 			citations::cite(citations::Method::EMBIS, file);
 	}
@@ -2782,7 +2747,6 @@ tsc_block_type calculate_scattering_factors(
 			}
 		}
 		err_checkf(opt.groups[nr].size() >= 1, "Not enough groups specified to work with!", file);
-		//What these form factors are, before any of them is computed.
 		citations::cite(citations::Method::NoSpherA2, file);
 		if (opt.iam_switch)
 			citations::cite(citations::Method::IAM, file);
@@ -3321,8 +3285,7 @@ bool stream_mtc_salted(options& opt, std::vector<WFN>& wavy, std::ostream& file,
 	//a table must hold either all atomIDs or all labels; salted_part_prep::labels holds hex strings while the
 	//predicted parts contribute atomID objects, so the spherical rows are converted here rather than passed through
 	std::vector<ScattererLabels> spherical_ids(n_parts);
-	//built inside the block below: the per-atom charges are matched against the
-	//fill wavefunctions, which only exist there
+	//built in the block below, where the fill wavefunctions the charges are matched against exist
 	std::vector<std::vector<HE_Spherical_Atom>> spheres(n_parts);
 	if (opt.needs_Thakkar_fill)
 	{

@@ -412,11 +412,8 @@ namespace
 	//------------------------------------------------------------ wfn / wfx / xyz ------------------------------------------------------------
 
 	//write_wfn then read_wfn on the in-code wavefunction: atoms, primitives, coefficients, occupations and energies
-	//come back.  What does not come back is the operator split, and that is the format speaking rather than a
-	//loss: this wavefunction's first MO is doubly occupied, so the file states spatial orbitals, and a .wfn has
-	//nowhere else to record a spin.  This test used to assert unrestricted with the operators split 2/1, which
-	//was the reader's energy-restart guess written down as an expectation - see
-	//WfnDegeneratePairIsNotASecondSpinSet for what that guess did to closed-shell files.
+	//come back. The operator split does not: the first MO is doubly occupied, so the file states spatial orbitals, and a
+	//.wfn has nowhere else to record a spin.
 	TEST(WfnReadIoTests, WfnRoundTripKeepsEverything)
 	{
 		WFN w = make_h2_wfn();
@@ -515,13 +512,9 @@ namespace
 		EXPECT_TRUE(ok) << log.str();
 	}
 
-	//Three label widths of the same atom line, all three present in the test tree: Gaussian right-justifies in
-	//four ("  C    1"), molden_file/temp_wavefunction.wfn writes "Co1     1" and RI_Test_2/temp_wavefunction.wfn
-	//"O     1", one narrower.  The absolute columns the reader used - field(24, 12) for the first coordinate,
-	//field(70, 3) for the charge - are therefore off by one in either direction, and on the Co1 dialect the
-	//charge field read "= 2", the stod threw, and no analysis could open that file at all.  The fourth line is
-	//why whitespace is not the answer: a negative coordinate eats the separator, so the three 12-character
-	//fields TOUCH and must still be cut by width - anchored on the ')' of "(CENTRE n)" rather than on column 24.
+	//Three label widths of one atom line, all in the test tree: Gaussian's "  C    1", molden_file's "Co1     1" and
+	//RI_Test_2's "O     1", so absolute columns are off by one either way. The fourth line has a negative coordinate eating
+	//the separator: the 12-character fields touch and are cut by width, anchored on the ')' of "(CENTRE n)".
 	TEST(WfnReadIoTests, WfnAtomLineSurvivesEveryLabelWidth)
 	{
 		WFN gaussian(e_origin::wfn), wide(e_origin::wfn), narrow(e_origin::wfn), touching(e_origin::wfn);
@@ -541,7 +534,7 @@ namespace
 		EXPECT_NEAR(touching.get_atom_coordinate(0, 0), 2.80503294, 1e-12);
 		EXPECT_NEAR(touching.get_atom_coordinate(0, 1), -12.05929207, 1e-12);
 		EXPECT_NEAR(touching.get_atom_coordinate(0, 2), -5.85443715, 1e-12);
-		//the fixture that motivated this: a cobalt complex whose every wfn field sits one column right
+		//a cobalt complex whose every wfn field sits one column right
 		const std::filesystem::path real = nos_test_repo_root() / "tests" / "molden_file" / "temp_wavefunction.wfn";
 		if (!std::filesystem::exists(real))
 			return;
@@ -552,13 +545,9 @@ namespace
 		EXPECT_GT(r.get_ncen(), 1);
 	}
 
-	//A .wfn carries no spin labels, so a second spin set can only be spotted by its energies starting over, and
-	//that guess had two ways to fire on a perfectly good closed-shell file: the energy was read as a fixed
-	//12-character field starting AT the '=' of "ORB. ENERGY =", so -0.301831 and -0.301830 both truncated to
-	//-0.30183, and "not greater than the last" counted equality as a restart - which every degenerate pair
-	//prints.  tests/polarizabilities/zero.wfn, closed-shell acetylene with seven doubly occupied MOs, came back
-	//as "unrestricted, N = 14, N_alpha = 12, N_beta = 2".  The decisive guard is the occupation: a spin-averaged
-	//orbital cannot belong to a spin channel, so a file listing an occupation near 2 has no beta set to find.
+	//A .wfn carries no spin labels, so a second spin set shows only as energies starting over. A closed-shell file must not
+	//fire that: a fixed-width energy field truncates -0.301831 and -0.301830 to equal values, and degenerate pairs print
+	//equal energies. An occupation near 2 rules out a beta set outright.
 	TEST(WfnReadIoTests, WfnDegeneratePairIsNotASecondSpinSet)
 	{
 		auto three_mo_wfn = [](const std::string& mos, WFN& w)
@@ -615,7 +604,7 @@ namespace
 		EXPECT_TRUE(spin.get_is_unrestricted());
 		EXPECT_EQ(spin.get_MO_op_count(0), 2);
 		EXPECT_EQ(spin.get_MO_op_count(1), 1);
-		//and the file that started it: seven doubly occupied MOs, 14 electrons, one operator
+		//zero.wfn: closed-shell acetylene, seven doubly occupied MOs, 14 electrons, one operator
 		const std::filesystem::path real = nos_test_repo_root() / "tests" / "polarizabilities" / "zero.wfn";
 		if (!std::filesystem::exists(real))
 			return;
@@ -627,12 +616,9 @@ namespace
 		EXPECT_EQ(r.get_MO_op_count(0), r.get_nmo());
 	}
 
-	//A wfx LABELS every orbital's spin, so there is nothing to guess - and the reader was guessing anyway.  These
-	//three orbitals rise in energy, so the energy heuristic finds no second set at all, while the labels say the
-	//third is beta.  The writer is the other half of the same defect: it decided the labels from the
-	//is_unrestricted flag, which push_back_MO(..., op) never sets, so a wavefunction carrying a beta orbital
-	//wrote a file claiming every orbital was spin-averaged.  "Alpha and Beta" is one spin-averaged orbital, not
-	//two, and belongs to the first operator rather than opening a beta channel.
+	//A wfx labels every orbital's spin. These three orbitals rise in energy, so the energy heuristic finds no second set,
+	//while the labels say the third is beta. The writer must take the labels from the orbitals, since push_back_MO(..., op)
+	//never sets is_unrestricted. "Alpha and Beta" is one spin-averaged orbital and belongs to the first operator.
 	TEST(WfnReadIoTests, WfxSpinLabelsOutrankTheEnergyGuess)
 	{
 		WFN w(e_origin::wfn);
@@ -688,9 +674,8 @@ namespace
 		EXPECT_EQ(w.get_ncen(), 2);
 	}
 
-	//write_wfx then read_wfx: charge and multiplicity travel through the tags, the third MO's operator travels
-	//as its "Beta" spin label - not as an energy restart, which is what the reader used to guess from - and a
-	//comment line dropped into the coefficient block is skipped rather than parsed
+	//write_wfx then read_wfx: charge and multiplicity travel through the tags, the third MO's operator as its "Beta" spin
+	//label, and a comment line dropped into the coefficient block is skipped rather than parsed
 	TEST(WfnReadIoTests, WfxRoundTripSkipsForeignLinesInCoefficientBlock)
 	{
 		WFN w = make_h2_wfn();

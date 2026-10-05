@@ -1,8 +1,3 @@
-//The stored two-electron integrals against OCC's direct Fock build: the same matrix to
-//working precision when every pair is kept, and still when the Schwarz screen drops the
-//pairs between two distant molecules; the screened contraction of a density difference
-//reproduces the full build to the screening threshold; and the device contraction, where a
-//device is there, matches the CPU one.
 #include "pch.h"
 #include <gtest/gtest.h>
 
@@ -56,7 +51,6 @@ namespace
 
 	double max_abs(const occ::Mat& m) { return m.cwiseAbs().maxCoeff(); }
 
-	//Stored against direct, full builds of the converged density
 	void expect_full_build(const scf_case& c, const stored_eri& eri, const double tol, const char* what) {
 		const occ::Mat F_direct = direct_fock(c, c.converged), F_stored = eri.fock(c.converged);
 		const double diff = max_abs(F_direct - F_stored);

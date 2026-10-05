@@ -2,18 +2,13 @@
 
 #include "core/nbo.h"
 
-//Natural resonance theory, checked on inputs small enough that the answer is known by hand rather
-//than by a golden file.  The internals of nrt.cpp are in an anonymous namespace on purpose, so the
-//checks drive the public entry point: a synthetic NAO basis, a synthetic density and a parent Lewis
-//structure go in, and what comes out has to satisfy the identities the printed NBO tables satisfy.
-//
-//The corpus comparison against the 22 stored NBO 7 references lives in tests/nbo_reference and is
-//run by compare_nbo.py; this file is the part that fails when the algebra breaks, not the chemistry.
+//Natural resonance theory on inputs small enough that the answer is known by hand. nrt.cpp's internals sit
+//in an anonymous namespace, so the checks drive the public entry point with a synthetic NAO basis, density
+//and parent Lewis structure. The NBO 7 corpus comparison is tests/nbo_reference (compare_nbo.py).
 
 namespace {
 
-    //One s-type valence NAO per atom, which is all these checks need: the topology bookkeeping, the
-    //OWSO orbital construction and the QP never look at l.
+    //One s-type valence NAO per atom: the topology bookkeeping, the OWSO construction and the QP never look at l.
     NAOResult h_chain(const int na)
     {
         NAOResult nao;
@@ -78,9 +73,8 @@ namespace {
         return L;
     }
 
-    //Several s NAOs per atom, so an atom block is wider than the one orbital taken out of it and a
-    //pair block is wider still.  h_chain's one-per-atom basis makes every block 1 or 2 wide, where
-    //the leading eigenpair is the only eigenpair and any way of computing it looks correct.
+    //Several s NAOs per atom, so a block is wider than the orbital taken out of it; with one per atom every
+    //block is 1 or 2 wide and any way of computing the leading eigenpair looks correct.
     NAOResult h_chain_shells(const int na, const int per_atom)
     {
         NAOResult nao;
@@ -144,8 +138,7 @@ namespace {
 
 }  //namespace
 
-//The density is exactly the parent's own orbital set, so the residual has to vanish: one structure
-//at 100 %, D(w) = 0, no electrons outside the Lewis set, bond order 1 and two electrons on each H.
+//The density is exactly the parent's orbital set, so the residual vanishes and the parent takes all the weight.
 TEST(NrtTests, ParentThatSpansTheDensityTakesAllTheWeight)
 {
     const NAOResult nao = h_chain(2);
@@ -175,10 +168,8 @@ TEST(NrtTests, ParentThatSpansTheDensityTakesAllTheWeight)
     EXPECT_EQ(nrt.leading_topo[0].matrix[0][1], 1);
 }
 
-//The ionic share of a bond order is |i| b with i = c_A^2 - c_B^2, linear in |i|, which is what
-//acetylene's printed table says (i = 0.2334, ionic/total = 0.2262/0.9693 = 0.23336) and what a
-//plausible-looking i^2 would get wrong.  Here the bond orbital is (sqrt(0.8), sqrt(0.2)) by
-//construction, so i = 0.6 exactly: ionic 0.6, covalent 0.4, and i^2 would give 0.36.
+//The ionic share of a bond order is |i| b with i = c_A^2 - c_B^2, linear in |i| as NBO's acetylene table
+//shows. Here i = 0.6 exactly: ionic 0.6, covalent 0.4, where i^2 would give 0.36.
 TEST(NrtTests, IonicBondOrderIsLinearInThePolarity)
 {
     const NAOResult nao = h_chain(2);
@@ -200,21 +191,15 @@ TEST(NrtTests, IonicBondOrderIsLinearInThePolarity)
     EXPECT_NEAR(valency_of(nrt, 1).covalency, 0.4, 1e-6);
 }
 
-//An open-shell NRT runs once per spin, and nrt.cpp's own opening comment says what one unit of the
-//integer topology is on each route: an electron PAIR closed shell, a SINGLE ELECTRON per spin open
-//shell.  A bond order is counted in pairs either way, so one alpha electron shared between two
-//hydrogens is HALF a bond and the alpha channel holds ONE electron.  Summing units straight into the
-//bond order gave 1.0 and an electron count of 2.0 - two electrons in a channel that has one, which
-//takes no external reference to refute.  It is also what a comparison against NBO 7 measured on ch3,
-//no and o2: every total came out at exactly twice gennbo's.
-//The closed-shell twin of this test is ParentThatSpansTheDensityTakesAllTheWeight above, whose
-//numbers are exactly twice these, and `scale` is the only difference between the two calls.
+//An open-shell NRT runs once per spin and its integer unit is a single electron (a pair closed shell).
+//Bond orders count pairs either way, so one alpha electron shared by two H is half a bond and the channel
+//holds one electron. ParentThatSpansTheDensityTakesAllTheWeight is the closed-shell twin, with exactly
+//twice these numbers and `scale` the only difference.
 TEST(NrtTests, AnOpenShellSpinChannelCountsItsBondOrdersInPairsNotElectrons)
 {
     const NAOResult nao = h_chain(2);
     const double r = 1.0 / std::sqrt(2.0);
-    //Gamma = 1 v v^T, not 2 v v^T: one electron in this spin channel and not a pair, which is what
-    //rank_one() would build. The Lewis bond's occupancy has to say the same.
+    //Gamma = 1 v v^T, not rank_one()'s 2 v v^T: one electron in this spin channel, as the Lewis bond's occupancy says.
     dMatrix2 gamma(2, 2);
     for (size_t i = 0; i < 2; i++)
         for (size_t j = 0; j < 2; j++)
@@ -236,39 +221,21 @@ TEST(NrtTests, AnOpenShellSpinChannelCountsItsBondOrdersInPairsNotElectrons)
     EXPECT_NEAR(v.electron_count, 1.0, 1e-8)
         << "the alpha channel of this system holds exactly one electron, so no bookkeeping derived "
            "from it may report two";
-    //and the conserved sum: every bond order and lone pair of a spin channel adds up to half that
-    //channel's electron count, because the weights are a probability vector over topologies that each
-    //place the same number of units.
+    //every bond order and lone pair of a spin channel sums to half its electron count: the weights are a
+    //probability vector over topologies that each place the same number of units
     double pairs = 0.0;
     for (const NboBondOrder& o : nrt.bond_orders) pairs += o.total;
     EXPECT_NEAR(pairs, 0.5, 1e-8)
         << "the bond orders and lone pairs of a one-electron spin channel must sum to 0.5 pairs";
 }
 
-//The unpolarised limit, which is where the open-shell route can be held to the closed-shell one with
-//no reference at all: a closed-shell density split into two IDENTICAL spin channels must reproduce the
-//closed-shell answer when the channels are added back up.  The same density is run twice - once as
-//gamma with occupancy 2 and scale 2, once as gamma/2 with occupancy 1 and scale 1, twice - and the
-//only differences in the two calls are those three numbers.
-//Two things are asserted and they are not the same thing.  The TOTALS must add up: that is the unit
-//conversion, and it is what goes red if scale/2 is taken back out of native_nrt.  The ionic FRACTION
-//must be the same in each channel as in the closed-shell run: that is the split, and it must not
-//depend on how many electrons occupy an orbital, because the polarity of an orbital does not.
-//THE FIXTURE HAS TWO BONDS ON PURPOSE.  The first version of this test used one, and with a single
-//orbital the OWSO step is the identity - c.V = M w (w S w)^-1/2 = M for k = 1 whatever the weight is -
-//so the fraction assertions could not have gone red at all.  Confirmed the hard way: with the OWSO
-//weight mutated to occ + 0.5, which destroys exactly the scale invariance this test is about, the
-//one-bond version passed every fraction check.  Two bonds sharing atom 2 overlap by about a fifth, the
-//weighting decides how that overlap is shared, and the mutation then moves the fractions.
-//The two fraction tolerances are 1e-12 and not the 1e-6 they started at, because that is how exactly
-//the invariant holds with the fix in place - the mutation moves them by 3.04e-06, so the margin between
-//passing and failing is a factor of about three million rather than three.
-//Both invariants hold, which is the BOUNDARY of the split defect this branch reports and does not fix:
-//on ch3 and no, where the two channels are genuinely different, native's ionic share disagrees with
-//gennbo's in opposite directions per spin - but the machinery is exactly self-consistent where the two
-//channels are the same, and o2, homonuclear and so of zero polarity by symmetry, agrees with gennbo on
-//all 34 of its numbers.  So whatever is wrong there is specific to spin POLARISATION, and it is not in
-//the per-spin algebra or in the unit conversion.
+//A closed-shell density split into two identical spin channels must reproduce the closed-shell answer: the
+//same density runs as gamma (occupancy 2, scale 2) and twice as gamma/2 (occupancy 1, scale 1). The totals
+//must add up (the unit conversion, scale/2 in native_nrt), and the ionic fraction of each channel must equal
+//the closed-shell one, as an orbital's polarity does not depend on its occupation. Two bonds on purpose: for
+//one orbital the OWSO step is the identity (M w (w S w)^-1/2 = M for k = 1), so the fraction checks could not
+//fail; two bonds sharing atom 2 overlap, and the weighting decides how. The invariant holds to roundoff,
+//hence the 1e-12 fraction tolerances.
 TEST(NrtTests, TwoIdenticalSpinChannelsAddUpToTheClosedShellAnswer)
 {
     const NAOResult nao = h_chain(3);
@@ -358,10 +325,9 @@ TEST(NrtTests, TwoIdenticalSpinChannelsAddUpToTheClosedShellAnswer)
            "and not to twice it";
 }
 
-//With more than one candidate the answer is no longer known by hand, but the identities are: the
-//weights are a probability vector, the minimiser cannot do worse than the parent alone, every
-//atom's valency is its bond-order row sum and its electron count is 2 (lone pairs + valency).
-//The exhaustive mode is used so the check does not depend on the arrow search or on an E2 table.
+//With several candidates the identities still hold: the weights are a probability vector, the fit is no
+//worse than the parent alone, each atom's valency is its bond-order row sum and its electron count is 2.
+//Exhaustive mode, so the check needs no arrow search or E2 table.
 TEST(NrtTests, DerivedQuantitiesAreConsistentOverAMultiStructureFit)
 {
     const NAOResult nao = h_chain(3);
@@ -400,14 +366,10 @@ TEST(NrtTests, DerivedQuantitiesAreConsistentOverAMultiStructureFit)
     EXPECT_NEAR(pairs, 1.0, 1e-3);
 }
 
-//The self-consistency sweep has to find the exact orbitals, and greedy filling alone cannot: gamma is
-//2(v1 v1^T + v2 v2^T) with v1 on atoms 1-2 and v2 on atoms 2-3, so the first 4-wide block the greedy
-//pass looks at contains all of v1 but also the part of v2 that reaches into it, and its leading
-//eigenvector is a mixture of the two.  Only removing the other orbital and re-solving recovers v1 and
-//v2 themselves, at which point the parent spans the density exactly and D(w) is 0.  Two NAOs per atom
-//is what makes this a real eigenproblem - with one, every block is 1 or 2 wide and the leading
-//eigenpair is not a choice.  This is the check the warm-started power iteration in leading_block has
-//to pass: a wrong eigenpair at any step of any sweep leaves D(w) above zero.
+//The self-consistency sweep must find the exact orbitals, which greedy filling cannot: gamma =
+//2(v1 v1^T + v2 v2^T) with v1 on atoms 1-2 and v2 on 2-3, so the first 4-wide block also holds part of v2
+//and its leading eigenvector mixes the two. Only removing the other orbital and re-solving recovers v1 and
+//v2, and then D(w) = 0. Two NAOs per atom make it a real eigenproblem for leading_block's power iteration.
 TEST(NrtTests, TheSweepRecoversTheExactOrbitalsOutOfOverlappingBlocks)
 {
     const NAOResult nao = h_chain_shells(3, 2);
@@ -439,10 +401,8 @@ TEST(NrtTests, TheSweepRecoversTheExactOrbitalsOutOfOverlappingBlocks)
 
     ASSERT_TRUE(nrt.present);
     ASSERT_FALSE(nrt.candidates.empty());
-    //The floor here is the sweep's own fixed point, not the eigenpair: 50 sweeps of a linearly
-    //convergent iteration leave D(w) at 4.2e-8 with the warm-started power iteration and 5.2e-8 with
-    //the full eigensolve.  Measured both ways - which is the point of the number being in a comment
-    //rather than the tolerance being widened until it passed.
+    //The floor is the sweep's own fixed point, not the eigenpair: 50 sweeps of a linearly convergent iteration
+    //leave D(w) near 5e-8.
     EXPECT_NEAR(nrt.d_w, 0.0, 1e-7);                      //the parent reproduces gamma
     EXPECT_NEAR(nrt.candidates[0].rho_nl, 0.0, 1e-7);     //nothing left outside the Lewis set
     EXPECT_NEAR(bond_total(nrt, 1, 2), 1.0, 1e-6);
@@ -453,20 +413,14 @@ TEST(NrtTests, TheSweepRecoversTheExactOrbitalsOutOfOverlappingBlocks)
     EXPECT_NEAR(pairs, 2.0, 1e-3);
 }
 
-//A candidate limit has to return a subset of the answer, not a different answer.  It used to truncate
-//in generation order, and the depth-1 half-moves that are discarded later spent the whole budget
-//first: sucrose at -nrt_max 20 came back with one structure, the parent alone, and its bond orders
-//were the parent's.  Here the 2-3 bond can form under a 25 kcal/mol interaction and the 3-4
-//bond under a 2 kcal/mol one, so a budget of four has to be spent on the first: the cheap
-//structure is the one to lose.
+//A candidate limit returns a subset of the answer: the 2-3 bond forms under a 25 kcal/mol interaction and
+//the 3-4 bond under a 2 kcal/mol one, so a budget of four goes to the first and the cheap structure is lost.
 TEST(NrtTests, ASmallCandidateBudgetKeepsTheExpensiveArrowsAndMoreThanTheParent)
 {
     const NAOResult nao = h_chain(4);
-    //Gamma has to contain the delocalised structure, or the check cannot see it: nrt.candidates holds
-    //the structures that survive the weight floor, so a gamma the parent reproduces exactly puts all
-    //the weight on the parent and reports one structure however many were generated.  So: 85 % of
-    //BD(1,2) + LP(3) + LP(4) and 15 % of the structure the 25 kcal/mol arrow makes, LP(1) + BD(2,3)
-    //+ LP(4).  Both are three pairs over the four NAOs, so the trace stays at six electrons.
+    //Gamma must contain the delocalised structure, as nrt.candidates holds only structures above the weight
+    //floor: 85 % BD(1,2) + LP(3) + LP(4) and 15 % LP(1) + BD(2,3) + LP(4), the 25 kcal/mol arrow's structure.
+    //Both are three pairs over four NAOs, so the trace stays at six electrons.
     const double r = 1.0 / std::sqrt(2.0);
     dMatrix2 gamma(4, 4);
     const std::vector<std::pair<double, std::vector<vec>>> mix = {
@@ -500,9 +454,8 @@ TEST(NrtTests, ASmallCandidateBudgetKeepsTheExpensiveArrowsAndMoreThanTheParent)
     lewis.topo[0][1] = lewis.topo[1][0] = 1;
     lewis.topo[2][2] = lewis.topo[3][3] = 1;
 
-    //The prices: LP(3)->BD(1,2) covers atoms 1,2,3 and so marks the 1-2 and 2-3 bonds at 25, while
-    //LP(4)->LP(3) marks 3-4 at 2.  Both are above the 1 kcal/mol resonance threshold, so a search
-    //with room for everything finds structures in both regions.
+    //LP(3)->BD(1,2) covers atoms 1,2,3 and marks the 1-2 and 2-3 bonds at 25, LP(4)->LP(3) marks 3-4 at 2;
+    //both are above the 1 kcal/mol resonance threshold.
     std::vector<NboE2Entry> e2(2);
     e2[0].donor_index = 2;      //LP on atom 3
     e2[0].acceptor_index = 1;   //BD 1-2
@@ -539,9 +492,7 @@ TEST(NrtTests, ASmallCandidateBudgetKeepsTheExpensiveArrowsAndMoreThanTheParent)
     EXPECT_TRUE(pair_seen(tight, 1, 2));                       //the 25 kcal/mol arrows survive
     EXPECT_LE(tight.d_w, tight.d_0 + 1e-9);
 
-    //The nbo_json writes `arrows` as an array of strings, and a consumer reading it cannot tell an
-    //arrow generation from a budget decision when the two share the field.  The budget of four and
-    //the dropped half-arrow intermediates are notes about the search, not arrows.
+    //`arrows` in the nbo_json holds arrows only; the budget and the dropped half-arrow intermediates are notes.
     for (const std::string& a : tight.arrows)
         EXPECT_EQ(a.rfind("ARROWS", 0), 0u) << a;
     for (const std::string& a : full.arrows)
@@ -549,11 +500,6 @@ TEST(NrtTests, ASmallCandidateBudgetKeepsTheExpensiveArrowsAndMoreThanTheParent)
     EXPECT_FALSE(tight.notes.empty());
 }
 
-//-nrt reported nowhere a reader looks: on tests/TFVC/Rh.gbw the search spent 6.6 s, wrote a complete
-//nrt block into Rh.native.nbo.json, and NoSpherA2.log carried the two NRT citations and not one
-//number - from the outside that is indistinguishable from a flag that was parsed and then dropped,
-//which is the failure mode this pass is looking for.  print_nrt prints the three tables; this asserts
-//every row the result carries reaches the text, so a table that silently stops being printed fails.
 TEST(NrtTests, EveryResonanceRowTheResultCarriesIsAlsoPrinted)
 {
     const NAOResult nao = h_chain(3);
@@ -601,7 +547,7 @@ TEST(NrtTests, EveryResonanceRowTheResultCarriesIsAlsoPrinted)
     EXPECT_TRUE(printed("H1")) << text;
     EXPECT_FALSE(printed("?")) << text;
 
-    //and nothing at all when the analysis did not run, so a run without -nrt keeps the log it had
+    //and nothing when the analysis did not run
     NboResults empty;
     std::ostringstream none;
     print_nrt(empty, none);

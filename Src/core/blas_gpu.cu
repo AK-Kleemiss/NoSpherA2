@@ -1,28 +1,21 @@
 #include "blas_gpu.h"
 #include "gpu_backend.h"
 #include "gemm_gpu.cuh"
-#include "sf_gpu.h"   //sf_gpu_fp64_ratio: the device property the threshold below scales on
+#include "sf_gpu.h"
 #include <cstdio>
 #include <cstdlib>
 
 NOSPHERA2_GPU_API_BEGIN
 
-//What the device has to earn before it is offered the work. The operands live on the host,
-//so every call ships them across and back, and a shape too small to hide that loses. Stated
-//in flops so it does not depend on how the caller shaped the matrices.
-//
-//Calibrated on square host-resident dgemm, RTX 4090 mobile against 16 Zen4 threads: the
-//device draws level near 2e9 flops and is clearly ahead by 8e9, so the gate sits between
-//them. Re-derive it elsewhere with -gflops; NOSPHERA2_BLAS_GPU_MIN_FLOP overrides it.
+//Operands cross the bus on every call, so only GEMMs above this many flops go to the device. Set at fp32:fp64
+//ratio 64 between break-even and a clear win; -gflops re-derives it, NOSPHERA2_BLAS_GPU_MIN_FLOP overrides it
 #define BLAS_GPU_MIN_FLOP_AT_RATIO_64 4.0e9
 
 static bool g_blas_gpu = false;
 void blas_gpu_set_enabled(bool on) { g_blas_gpu = on; }
 bool blas_gpu_enabled() { return g_blas_gpu; }
 
-//The device rate is what made the constant right, and the fp32:fp64 ratio is the only proxy
-//for it available without benchmarking. Scaling by it keeps the measured value where it was
-//measured and lowers the bar where doubles are cheap.
+//Scaled by the fp32:fp64 ratio, the only proxy for the device rate without benchmarking: a lower bar where doubles are cheap
 static double blas_gpu_min_flop()
 {
 	if (const char* env = std::getenv("NOSPHERA2_BLAS_GPU_MIN_FLOP")) {
@@ -34,7 +27,7 @@ static double blas_gpu_min_flop()
 	return BLAS_GPU_MIN_FLOP_AT_RATIO_64 * (double)ratio / 64.0;
 }
 
-//Shared with the transform so the "no code for this card" case is diagnosed in one place.
+//Shared with the transform, so a card without code is diagnosed in one place
 bool blas_gpu_available() { return sf_gpu_available(); }
 
 bool blas_gpu_dgemm(const bool transA, const bool transB, const int m, const int n, const int k,
@@ -45,9 +38,7 @@ bool blas_gpu_dgemm(const bool transA, const bool transB, const int m, const int
 	if (2.0 * m * n * k < blas_gpu_min_flop()) return false;
 	if (!blas_gpu_available()) return false;
 
-	//A row-major matrix read column-major is its own transpose, so computing
-	//C^T = op(B)^T * op(A)^T with the operands swapped gives the row-major C. The GEMM below
-	//takes column-major arguments, so the swap is what adapts it to this interface.
+	//Row-major C read column-major is C^T = op(B)^T op(A)^T, so the column-major GEMM runs with A and B swapped
 	const int cm = n, cn = m;
 	const int splits = gemm_gpu::split_count(cm, cn, k);
 	const size_t p_elems = gemm_gpu::workspace_elems(cm, cn, splits);
