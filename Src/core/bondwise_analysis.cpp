@@ -3889,8 +3889,12 @@ static void spin_eli_analysis(const WFN &l_w, const options &opt, const std::vec
 				r.maxima.erase(r.maxima.begin() + b); r.labels.erase(r.labels.begin() + b);
 				empty++;
 			}
-		std::cout << "\nELI-D " << names[f] << " Analysis (atomic quadrature grids), " << all.size() << " maxima, " << r.maxima.size() << " basins";
-		if (empty) std::cout << " (" << empty << " more below 5e-5 e not listed)";
+		//all.size() also counts the maxima unified into cores/shells and the empty rim attractors: say which
+		const size_t merged = all.size() - r.maxima.size() - empty;
+		std::cout << "\nELI-D " << names[f] << " Analysis (atomic quadrature grids), " << all.size() << " maxima";
+		if (merged) std::cout << ", " << merged << " unified into core/shell basins";
+		if (empty) std::cout << ", " << empty << " empty surface attractors (below 5e-5 e, not listed)";
+		std::cout << ", " << r.maxima.size() << " basins";
 		std::cout << ":\n"
 			<< "  basin  label               electrons    N_alpha     N_beta       spin  <ELI-q>      volume         maximum        x          y          z\n";
 		for (size_t b = 0; b < r.pop.size(); b++) {

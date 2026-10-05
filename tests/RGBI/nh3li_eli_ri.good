@@ -168,7 +168,7 @@ GridManager: Generating integration grids for atoms...
 GridManager: Generated total of 111906 grid points.
 Quadrature points sent along the field: 50221, left the grid: 0
 
-ELI-D alpha-alpha Analysis (atomic quadrature grids), 54 maxima, 12 basins (2 more below 5e-5 e not listed):
+ELI-D alpha-alpha Analysis (atomic quadrature grids), 54 maxima, 40 unified into core/shell basins, 2 empty surface attractors (below 5e-5 e, not listed), 12 basins:
   basin  label               electrons    N_alpha     N_beta       spin  <ELI-q>      volume         maximum        x          y          z
       1  Li4 core               2.0012     1.0114     0.9898     0.0217   0.3835     13.7948         41.2479    -10.574     13.773      2.314
       2  Li4 LP                 0.6881     0.6442     0.0439     0.6003   0.6337    818.0157         19.7951    -10.709     19.305      2.472
@@ -188,7 +188,7 @@ GridManager: Generating integration grids for atoms...
 GridManager: Generated total of 111906 grid points.
 Quadrature points sent along the field: 45230, left the grid: 0
 
-ELI-D beta-beta Analysis (atomic quadrature grids), 15 maxima, 10 basins (5 more below 5e-5 e not listed):
+ELI-D beta-beta Analysis (atomic quadrature grids), 15 maxima, 5 empty surface attractors (below 5e-5 e, not listed), 10 basins:
   basin  label               electrons    N_alpha     N_beta       spin  <ELI-q>      volume         maximum        x          y          z
       1  Li4 core               2.1889     1.1834     1.0055     0.1779   0.2817     64.3762         54.6660    -10.574     13.785      2.315
       2  N0 core                2.1114     1.0563     1.0551     0.0011   0.4447      0.4487         12.9452    -10.483     10.089      2.209
@@ -206,7 +206,7 @@ GridManager: Generating integration grids for atoms...
 GridManager: Generated total of 111906 grid points.
 Quadrature points sent along the field: 49665, left the grid: 0
 
-ELI-D triplet Analysis (atomic quadrature grids), 38 maxima, 11 basins (4 more below 5e-5 e not listed):
+ELI-D triplet Analysis (atomic quadrature grids), 38 maxima, 23 unified into core/shell basins, 4 empty surface attractors (below 5e-5 e, not listed), 11 basins:
   basin  label               electrons    N_alpha     N_beta       spin  <ELI-q>      volume         maximum        x          y          z
       1  Li4 core               2.0218     1.0257     0.9962     0.0295        -     16.7372         43.5027    -10.574     13.777      2.315
       2  Li4 LP                 0.6660     0.6391     0.0269     0.6122        -    799.4097         13.7989    -10.708     19.283      2.471

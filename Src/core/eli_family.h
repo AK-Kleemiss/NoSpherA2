@@ -55,7 +55,8 @@ namespace eli_family
 	}
 	//A beta set with N_alpha = N_beta is still spin-polarised when its orbitals differ from the alpha ones
 	//(a broken-symmetry singlet): occupied alpha and beta MOs compared in order, coefficients to 1e-4 of
-	//the largest, an overall sign allowed.
+	//the largest, an overall sign allowed. Orbitals that differ only by a rotation within the occupied
+	//space leave rho_beta = rho_alpha, so a difference is confirmed on the spin density near each nucleus.
 	bool alpha_beta_orbitals_differ(const WFN& wave);
 
 	//One pass over the primitives, alpha and beta accumulated separately.  A restricted wavefunction
