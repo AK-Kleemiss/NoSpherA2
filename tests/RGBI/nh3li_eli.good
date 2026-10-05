@@ -97,6 +97,7 @@ Density Critical Points (9 found):
 QTAIM attractors from the analytic field: 5 (5 nuclei, 0 non-nuclear)
 ELI-D maxima from the analytic field: 8
 ELI-D basin boundaries from the analytic field (the default).
+Shell saddle merge (phi 0.9900): 0 same-atom pairs tested, 0 joined.
 GridManager: Setting up prototype grids for atom types...
 GridManager: Generating integration grids for atoms...
 GridManager: Generated total of 111906 grid points.
@@ -157,6 +158,7 @@ ELI-D Analysis (atomic quadrature grids):
 [ELI family] Kohout, Faraday Discuss. 135 (2007) 43, DOI 10.1039/b605951c
 
 Spin-resolved ELI-D (Kohout): N_alpha = 7.0000, N_beta = 6.0000. The ELI-D above is the spin-summed field, not a pair function of either spin.
+Shell saddle merge (phi 0.9900): 0 same-atom pairs tested, 0 joined.
 GridManager: Setting up prototype grids for atom types...
 GridManager: Generating integration grids for atoms...
 GridManager: Generated total of 111906 grid points.
@@ -176,6 +178,7 @@ ELI-D alpha-alpha Analysis (atomic quadrature grids), 54 maxima, 40 unified into
      10  H3                     1.9237     0.9737     0.9499     0.0238   0.6087    104.3662          4.5643     -9.655      9.443      0.493
      11  N0-Li4 bond            2.1503     1.0858     1.0645     0.0213   0.7565     43.3354          1.9743    -10.517     11.448      2.248
   total in basins: 12.9198   N_alpha 6.9215 of 7.0000, N_beta 5.9983 of 6.0000   outside every basin: 0.0873
+Shell saddle merge (phi 0.9900): 0 same-atom pairs tested, 0 joined.
 GridManager: Setting up prototype grids for atom types...
 GridManager: Generating integration grids for atoms...
 GridManager: Generated total of 111906 grid points.
@@ -194,6 +197,7 @@ ELI-D beta-beta Analysis (atomic quadrature grids), 15 maxima, 5 empty surface a
       9  Li4 LP                 0.0093     0.0093     0.0000     0.0093        -     45.1021          0.1751    -14.559     14.762     -3.426
      10  Li4 LP                 0.0100     0.0100     0.0000     0.0100        -     48.0260          0.1750     -3.623     14.882      1.800
   total in basins: 12.9200   N_alpha 6.9217 of 7.0000, N_beta 5.9983 of 6.0000   outside every basin: 0.0871
+Shell saddle merge (phi 0.9900): 0 same-atom pairs tested, 0 joined.
 GridManager: Setting up prototype grids for atom types...
 GridManager: Generating integration grids for atoms...
 GridManager: Generated total of 111906 grid points.

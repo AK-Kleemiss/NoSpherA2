@@ -1468,7 +1468,7 @@ int unify_core_basins(cubei &basin_cube, std::vector<d4> &maxima, const std::vec
 }
 
 //Merge grid-fragmented ELI-D shells by persistence.
-int unify_shell_basins(cubei &basin_cube, std::vector<d4> &maxima, ivec *basin_map, double max_dist, double rel_tol, const std::vector<atom> *atoms)
+int unify_shell_basins(cubei &basin_cube, std::vector<d4> &maxima, ivec *basin_map, double max_dist, double rel_tol, const std::vector<atom> *atoms, const WFN *wavy, const eli_spin_field *eli)
 {
 	const int nb = static_cast<int>(maxima.size());
 	if (nb < 2 || max_dist <= 0.0) return 0;
@@ -1491,6 +1491,83 @@ int unify_shell_basins(cubei &basin_cube, std::vector<d4> &maxima, ivec *basin_m
 			//union by lower index, so a group's root is always its lowest member
 			if (rb != rc) root[std::max(rb, rc)] = std::min(rb, rc);
 		}
+	//Saddle criterion (NOS_ELI_SHELL_SADDLE = phi, default 0.99, 0 turns it off): two maxima nearest the
+	//same atom, at radii within 0.3 bohr of each other and less than 120 deg apart about it, join when the
+	//radial maximum of the field along the arc between them never drops below phi times the lower of the
+	//two. Measured on Pt in complex_Pt_Zn_PMe3 (8000 directions, job 815688): the Zn-side outer core
+	//shell is a flat torus with saddles at 0.998-0.99999 of its peaks, the P donor caps split at 0.9966,
+	//and the three shell maxima facing the trans P dip by 1.5 % - 0.99 joins the first two, not the third
+	double phi = 0.99;
+	if (const char *e = std::getenv("NOS_ELI_SHELL_SADDLE")) { const double v = std::atof(e); if (v >= 0.0 && v < 1.0) phi = v; }
+	if (wavy && phi > 0.0) {
+		auto field = [&](const d3 &p) { double f; d3 g; if (eli) (*eli)(p, f, g, nullptr); else wavy->computeELIGrad(p, f, g); return f; };
+		ivec na(nb, 0);
+		for (int b = 0; b < nb; b++) {
+			const d3 pb{ maxima[b][0], maxima[b][1], maxima[b][2] };
+			for (int a = 1; a < wavy->get_ncen(); a++)
+				if (array_length(pb, wavy->get_atom_pos(a)) < array_length(pb, wavy->get_atom_pos(na[b]))) na[b] = a;
+			//a spin field's surface attractor sits on the rho cutoff, where the ray reaches past the domain and
+			//never dips (NH3Li alpha-alpha: three equivalent 0.028 e Li surface basins joined into one)
+			if (wavy->compute_dens(pb) < 2.0 * basin_density_cutoff) na[b] = -1;
+		}
+		//The largest value along the ray from o through w within 0.25 bohr of r: 11 samples and a parabola
+		auto radial_max = [&](const d3 &o, const d3 &w, const double r) {
+			double s[11];
+			int j = 0;
+			for (int k = 0; k < 11; k++) {
+				const double rr = r + (k - 5) * 0.05;
+				s[k] = field(d3{ o[0] + rr * w[0], o[1] + rr * w[1], o[2] + rr * w[2] });
+				if (s[k] > s[j]) j = k;
+			}
+			if (j == 0 || j == 10) return s[j];
+			const double den = s[j + 1] - 2.0 * s[j] + s[j - 1];
+			return den < 0.0 ? s[j] - std::pow(s[j + 1] - s[j - 1], 2) / (8.0 * den) : s[j];
+		};
+		std::vector<std::pair<int, int>> pairs;
+		for (int b = 1; b < nb; b++)
+			for (int c = 0; c < b; c++) {
+				if (na[b] < 0 || na[b] != na[c] || find(b) == find(c)) continue;
+				const d3 o = wavy->get_atom_pos(na[b]);
+				const d3 u{ maxima[b][0] - o[0], maxima[b][1] - o[1], maxima[b][2] - o[2] }, v{ maxima[c][0] - o[0], maxima[c][1] - o[1], maxima[c][2] - o[2] };
+				const double ru = array_length(u), rv = array_length(v);
+				if (!(ru > 0.2) || !(rv > 0.2) || std::abs(ru - rv) > 0.3) continue;
+				if ((u[0] * v[0] + u[1] * v[1] + u[2] * v[2]) / (ru * rv) < -0.5) continue;
+				pairs.emplace_back(b, c);
+			}
+		std::vector<char> join(pairs.size(), 0);
+		//ponytail: every candidate pair gets its own arc, 16 x 11 field calls at worst (the first sample below
+		//the bar ends it); a merge tree over a sphere of directions if a shell ever has hundreds of maxima
+#pragma omp parallel for schedule(dynamic)
+		for (long long q = 0; q < static_cast<long long>(pairs.size()); q++) {
+			const d4 &mb = maxima[pairs[q].first], &mc = maxima[pairs[q].second];
+			const d3 o = wavy->get_atom_pos(na[pairs[q].first]);
+			const d3 u{ mb[0] - o[0], mb[1] - o[1], mb[2] - o[2] }, v{ mc[0] - o[0], mc[1] - o[1], mc[2] - o[2] };
+			const double ru = array_length(u), rv = array_length(v);
+			const d3 uh{ u[0] / ru, u[1] / ru, u[2] / ru }, vh{ v[0] / rv, v[1] / rv, v[2] / rv };
+			const double lo = phi * std::min(radial_max(o, uh, ru), radial_max(o, vh, rv));
+			bool ok = true;
+			for (int k = 1; k <= 16 && ok; k++) {
+				const double t = k / 17.0;
+				d3 w{ (1.0 - t) * uh[0] + t * vh[0], (1.0 - t) * uh[1] + t * vh[1], (1.0 - t) * uh[2] + t * vh[2] };
+				const double wl = array_length(w);
+				if (!(wl > 1e-6)) { ok = false; break; }
+				w = d3{ w[0] / wl, w[1] / wl, w[2] / wl };
+				ok = radial_max(o, w, (1.0 - t) * ru + t * rv) >= lo;
+			}
+			join[q] = ok;
+		}
+		const bool log = std::getenv("NOS_ELI_SHELL_SADDLE_LOG") != nullptr;
+		int joined = 0;
+		for (size_t q = 0; q < pairs.size(); q++) {
+			if (!join[q]) continue;
+			joined++;
+			const d4 &mb = maxima[pairs[q].first], &mc = maxima[pairs[q].second];
+			if (log) std::cout << "  saddle join about atom " << na[pairs[q].first] << ": " << mb[0] << " " << mb[1] << " " << mb[2] << " (" << mb[3] << ") + " << mc[0] << " " << mc[1] << " " << mc[2] << " (" << mc[3] << ")" << std::endl;
+			const int rb = find(pairs[q].first), rc = find(pairs[q].second);
+			if (rb != rc) root[std::max(rb, rc)] = std::min(rb, rc);
+		}
+		std::cout << "Shell saddle merge (phi " << phi << "): " << pairs.size() << " same-atom pairs tested, " << joined << " joined." << std::endl;
+	}
 	ivec keeper(nb);
 	for (int b = 0; b < nb; b++) { const int r = find(b); keeper[b] = (r == b ? -1 : r); }
 	return collapse_maxima_groups(basin_cube, maxima, keeper, basin_map);

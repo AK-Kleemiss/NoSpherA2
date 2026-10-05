@@ -65,6 +65,7 @@ QTAIM attractors from the analytic field: 3 (3 nuclei, 0 non-nuclear)
 ELI-D maxima from the analytic field: 51
 ELI-D basin boundaries from the analytic field (the default).
 Unified 46 core-shell basins into their atoms' cores, 5 ELI-D basins remain.
+Shell saddle merge (phi 0.9900): 0 same-atom pairs tested, 0 joined.
 GridManager: Setting up prototype grids for atom types...
 GridManager: Generating integration grids for atoms...
 GridManager: Generated total of 65266 grid points.
