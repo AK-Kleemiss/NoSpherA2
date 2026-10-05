@@ -3,15 +3,16 @@
 #include "gpu_api.h"
 
 //Density gradient (K = 4, WFN::computeGrad) or ELI-D value and gradient (K = 10,
-//WFN::computeELIGrad) of a wavefunction at np points, xyz interleaved. Three steps per chunk of
-//points: one thread per (point, contracted function) sums that function's primitives into its K
-//components, a device GEMM multiplies them into the occupied MOs, and one thread per point
-//reduces the MOs with the host's arithmetic. The tables are the ones WFN::field_grad_gpu builds:
+//WFN::computeELIGrad) of a wavefunction at np points, xyz interleaved. One block per point: it
+//screens the contracted functions by distance (the host's exponential cutoff, so only the functions
+//the host touches survive, ~16 % on NiLiL0Ph), evaluates and packs the survivors, multiplies them
+//into the occupied MOs and reduces with the host's arithmetic. The tables are the ones WFN::field_grad_gpu builds:
 //prim_* per primitive grouped by function (ao_start is the CSR offset, primitives in ascending wfn
 //order inside a function, so each function sums in the host's order), coef is [nao x nocc]
 //row-major over the occupied MOs only. val (K = 10) and rho may be null.
 //open uploads the tables once and sizes the buffers for up to max_points per chunk; run evaluates
-//any np (chunked) and may be called many times, from one thread at a time; close frees.
+//any np (chunked) and may be called many times, from one thread at a time per context (each
+//context has its own stream, so separate contexts run concurrently); close frees.
 //open returns null and run false when no device is present, -no_gpu_density turned it off or the
 //arrays do not fit; the caller then keeps its host loop.
 
