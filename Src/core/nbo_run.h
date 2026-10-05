@@ -253,5 +253,5 @@ struct NboRunOptions {
 	bool debug = false;
 };
 
-/** Write the .47, run the external NBO, parse the output, write the JSON. Returns 0 on success. */
+/** Write the .47, run the external NBO, parse the output, write the JSON. Returns NBO's exit status. */
 int run_nbo(const NboRunOptions& options, std::ostream& log);
