@@ -428,6 +428,8 @@ void cell::project_into_subgroup(ivec& applied_symmetry, hkl_list& hkl_enlarged,
 		applied_symmetry.push_back(additional_symmetries[i]);
 	}
 	std::sort(applied_symmetry.begin(), applied_symmetry.end());
+	//one sym_op2 can be found for several sym_op1; a duplicate would erase a second, unrelated column
+	applied_symmetry.erase(std::unique(applied_symmetry.begin(), applied_symmetry.end()), applied_symmetry.end());
 
 	for (int sym_op : std::views::reverse(applied_symmetry)) {
 		for (ivec2& middle : sym) {

@@ -154,6 +154,24 @@ void natural_minimal_shells(const int Z, int (&n_shell)[4], int (&n_core)[4])
 	if (b == 3) n_core[3] = std::max(0, n_core[3] - 1);
 }
 
+//Shells per l an ECP removes: complete shells in (n, then l) order until its electrons are used up,
+//as ecp_core_orbital_count in bondwise_analysis.cpp
+static constexpr int ecp_removed_shells(const int ecp_electrons, const int l)
+{
+	int electrons = ecp_electrons, removed = 0;
+	for (int n = 1; n <= 7; n++)
+		for (int k = 0; k < n; k++) {
+			if (electrons < 2 * (2 * k + 1)) return removed;
+			electrons -= 2 * (2 * k + 1);
+			if (k == l) removed++;
+		}
+	return removed;
+}
+static_assert(ecp_removed_shells(28, 0) == 3 && ecp_removed_shells(28, 1) == 2 && ecp_removed_shells(28, 2) == 1,
+	"a 28-electron ECP covers 1s..3d");
+static_assert(ecp_removed_shells(60, 0) == 4 && ecp_removed_shells(60, 2) == 2 && ecp_removed_shells(60, 3) == 1,
+	"a 60-electron ECP covers 1s..4f");
+
 std::vector<NAOBasisFunction> spherical_ao_map(const WFN &wavy)
 {
 	err_checkf(!wavy.get_d_f_switch(),
@@ -269,8 +287,11 @@ NAOResult build_naos(const dMatrix2 &P_in, const dMatrix2 &S_in, const std::vect
 		natural_minimal_shells(Z, shells, cores);
 		int n_nmb = (g.l < 4) ? shells[g.l] : 0;
 		int n_core = (g.l < 4) ? cores[g.l] : 0;
-		//an ECP removes the lowest shells of an l from the basis, so cap on what is there and
-		//take the missing ones off the core count
+		//an ECP removes the lowest shells of an l from the basis: the first pre-NAO of this l is the
+		//first shell above the ECP core
+		const int removed = (g.l < 4) ? ecp_removed_shells(ecp_electrons.at(static_cast<size_t>(g.atom)), g.l) : 0;
+		n_nmb = std::max(0, n_nmb - removed);
+		n_core = std::max(0, n_core - removed);
 		if (n_nmb > g.nshell) {
 			n_core = std::max(0, n_core - (n_nmb - g.nshell));
 			n_nmb = g.nshell;
@@ -288,12 +309,7 @@ NAOResult build_naos(const dMatrix2 &P_in, const dMatrix2 &S_in, const std::vect
 				(sh < n_nmb) ?  NAOClass::Valence :
 								NAOClass::Rydberg;
 
-			if (ecp_electrons.at(static_cast<size_t>(g.atom)) > 0 && g.l < 4) {
-				int full_shells[4] = { 0, 0, 0, 0 }, full_cores[4] = { 0, 0, 0, 0 };
-				natural_minimal_shells(Z, full_shells, full_cores);
-				const int missing = std::max(0, full_shells[g.l] - g.nshell);
-				orbital.n += missing;
-			}
+			orbital.n += removed;
 		}
 	}
 
