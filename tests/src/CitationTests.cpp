@@ -8,14 +8,10 @@
 #include <sstream>
 #include <string>
 
-// The citation table is data typed in by hand, so the failure it invites is a blank or malformed
-// DOI shipping unnoticed: the line still prints, it just sends the reader nowhere. Every entry was
-// checked against Crossref once (see Software-Notes/NoSpherA2-Codebase/NoSpherA2-Method-Citations
-// -24-Sep-V1.0); these assertions are what keeps a later edit from quietly undoing that.
+// The table is typed by hand: a blank or malformed DOI still prints and sends the reader nowhere
 TEST(Citations, EveryEntryCarriesAResolvableDoi)
 {
-	// 10.<registrant>/<suffix>, the shape the DOI handbook fixes: 4-9 digits, then a non-empty
-	// suffix with no whitespace in it.
+	// DOI handbook shape 10.<registrant>/<suffix>: 4-9 digits, non-empty suffix without whitespace
 	const std::regex doi_shape("^10\\.[0-9]{4,9}/\\S+$");
 	ASSERT_FALSE(citations::table().empty()) << "the citation table is empty";
 	for (const citations::Reference &r : citations::table())
@@ -28,7 +24,7 @@ TEST(Citations, EveryEntryCarriesAResolvableDoi)
 		EXPECT_FALSE(work.empty()) << "empty reference text next to DOI " << doi;
 		EXPECT_FALSE(doi.empty()) << "empty DOI for [" << tag << "] " << work;
 		EXPECT_TRUE(std::regex_match(doi, doi_shape)) << "not a DOI: '" << doi << "' for [" << tag << "]";
-		// A https:// prefix or a doi: prefix would break the regex above, but say why.
+		// a https:// or doi: prefix already fails the regex; this names the reason
 		EXPECT_EQ(doi.rfind("10.", 0), 0u) << "DOI should be bare, no prefix: " << doi;
 	}
 }
@@ -40,7 +36,7 @@ TEST(Citations, FormatsOneLinePerReference)
 	EXPECT_EQ(citations::format(bader),
 			  "[QTAIM] Bader, Chem. Rev. 91 (1991) 893, DOI 10.1021/cr00005a013");
 
-	// cite() is what the call sites use; it must emit every reference of that method and nothing else.
+	// cite() emits every reference of the method and nothing else
 	std::ostringstream os;
 	citations::cite(citations::Method::QTAIM, os);
 	const citations::Reference book{citations::Method::QTAIM, "QTAIM",
@@ -49,16 +45,15 @@ TEST(Citations, FormatsOneLinePerReference)
 
 	std::ostringstream two;
 	citations::cite(citations::Method::HAR, two);
-	//One string: str() returns a copy, so iterators from two calls point into different temporaries.
+	//str() returns a copy: iterators from two calls point into different temporaries
 	const std::string har = two.str();
 	EXPECT_EQ(std::count(har.begin(), har.end(), '\n'), 2) << "HAR rests on two papers";
 	EXPECT_NE(har.find("10.1107/S0108767308005709"), std::string::npos);
 	EXPECT_NE(har.find("10.1107/S2052252514014845"), std::string::npos);
 }
 
-// A reader cites from inside the caller's open "Reading: <file> ... done!" line, so it queues
-// instead of printing. The failure this guards against is the one that broke TomlIntegrationTests
-// .SucrosePtb: a citation landing mid-line and shifting every following line of the log.
+// A reader cites inside the caller's open "Reading: <file> ... done!" line, so it queues: printing
+// there lands mid-line and shifts every following log line
 TEST(Citations, QueueDefersUntilFlushAndThenForgets)
 {
 	std::ostringstream drain;
@@ -81,8 +76,7 @@ TEST(Citations, QueueDefersUntilFlushAndThenForgets)
 	EXPECT_TRUE(again.str().empty()) << "flush() must clear the queue";
 }
 
-// Two methods sharing a DOI is legitimate (the .tsc format and the program are one paper), but two
-// identical entries are a copy-paste slip.
+// Two methods may share a DOI (.tsc format and program are one paper); the same method twice is a copy-paste slip
 TEST(Citations, NoDuplicateEntries)
 {
 	std::set<std::string> seen;

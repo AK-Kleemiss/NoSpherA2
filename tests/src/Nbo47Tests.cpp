@@ -203,8 +203,7 @@ TEST(Nbo47, OpenShellNh3LiGbwWritesValidFile47)
 	ASSERT_NE(text.find("$DENSITY"), std::string::npos);
 	ASSERT_NE(text.find("$FOCK"), std::string::npos);
 	ASSERT_NE(text.find("$LCAOMO"), std::string::npos);
-	//Without OPEN, NBO reads the archive as restricted and silently halves the electron
-	//count it finds; the doubled blocks below are only meaningful together with it.
+	//Without OPEN, NBO reads the archive as restricted and halves the electron count it finds
 	ASSERT_NE(text.find(" OPEN "), std::string::npos);
 
 	EXPECT_EQ(parse_key_int(text, "NATOMS").value_or(-1), 5);
@@ -226,8 +225,7 @@ TEST(Nbo47, OpenShellNh3LiGbwWritesValidFile47)
 
 	const vec alpha_density(density.begin(), density.begin() + ntri);
 	const vec beta_density(density.begin() + ntri, density.end());
-	//13 electrons in a doublet: 7 alpha, 6 beta. A spin-summed archive would give 13 here
-	//twice, and a swapped one 6 then 7.
+	//13 electrons in a doublet: 7 alpha, 6 beta; a spin-summed archive gives 13 twice, a swapped one 6 then 7
 	EXPECT_NEAR(packed_trace_product(alpha_density, overlap, nbasis), 7.0, 1.0e-5);
 	EXPECT_NEAR(packed_trace_product(beta_density, overlap, nbasis), 6.0, 1.0e-5);
 }
@@ -295,10 +293,8 @@ TEST(NboRun, OpenShellNh3LiSpinResolvedNpaMatchesOrcaSpinPopulations)
 	EXPECT_NEAR(spin_sum, 1.0, 1.0e-4);
 	EXPECT_NEAR(charge_sum, 0.0, 1.0e-4);
 
-	//Independent reference: ORCA 6.1.1 on the same wavefunction puts 0.99 (Mulliken) / 0.90
-	//(Loewdin) of the unpaired electron on Li and leaves N slightly negative. NPA is a third
-	//partitioning, so only the pattern is compared - but a spin-summed or spin-swapped
-	//archive gets the pattern wrong, which is what this pins down.
+	//ORCA 6.1.1 on the same wavefunction puts 0.99 (Mulliken) / 0.90 (Loewdin) of the unpaired electron on Li with N
+	//slightly negative; NPA is a third partitioning, so only the pattern is compared
 	const NboAtomPopulation* li = nullptr;
 	const NboAtomPopulation* n = nullptr;
 	for (const auto& a : r.npa) { if (a.element == "Li") li = &a; if (a.element == "N") n = &a; }
@@ -308,7 +304,6 @@ TEST(NboRun, OpenShellNh3LiSpinResolvedNpaMatchesOrcaSpinPopulations)
 	EXPECT_LT(std::abs(n->spin_density), 0.15);
 	EXPECT_LT(n->charge, 0.0);
 
-	//The unrestricted analysis has to reach the spin-resolved NBO sections as well.
 	bool alpha = false, beta = false;
 	for (const auto& o : r.orbitals) { alpha |= o.spin == "alpha"; beta |= o.spin == "beta"; }
 	EXPECT_TRUE(alpha);
@@ -320,12 +315,8 @@ TEST(NboRun, OpenShellNh3LiSpinResolvedNpaMatchesOrcaSpinPopulations)
 
 TEST(Nbo47, GShellWavefunctionWritesFile47WithCorrectElectronCount)
 {
-	//A basis with g functions is what broke get_shell_start_in_primitives: its switch covered
-	//s, p, d and f and added nothing for g, so every primitive index behind the first g shell
-	//was short by 15 per g shell.  Fe.gbw's atom 2 then asked for its s shell and was handed a
-	//g primitive, wrote past the end of a one-component buffer and aborted in the heap later.
-	//Tr(P S) is what says the coefficients that came back are the right ones, not merely that
-	//nothing crashed.
+	//A g basis: every primitive index behind a g shell relies on get_shell_start_in_primitives covering g. Tr(P S) checks
+	//that the coefficients are the right ones, not merely that nothing crashed.
 	const auto root = repo_root();
 	const auto input_gbw = root / "tests" / "Fe_gbw" / "Fe.gbw";
 	ASSERT_TRUE(std::filesystem::exists(input_gbw));
@@ -357,9 +348,7 @@ TEST(Nbo47, GShellWavefunctionWritesFile47WithCorrectElectronCount)
 	for (size_t block = 0; block < density.size() / ntri; block++)
 		electrons += packed_trace_product(
 			vec(density.begin() + block * ntri, density.begin() + (block + 1) * ntri), overlap, nbasis);
-	//Against the wavefunction's own occupations, not against the nuclear charges: this fixture
-	//integrates to 128 while Z - charge gives 126, which is a question about the gbw charge field
-	//and not about whether the archive reproduces the wavefunction it was written from.
+	//Against the wavefunction's own occupations, not Z - charge: this fixture integrates to 128 while its gbw charge field gives 126
 	double occupied = 0.0;
 	for (int m = 0; m < wave.get_nmo(); m++)
 		occupied += wave.get_MO_occ(m);

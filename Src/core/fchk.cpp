@@ -758,9 +758,7 @@ double read_fchk_double(std::ifstream& in, const char* search, bool rewind)
 		return read_fchk_double(temp);
 };
 
-//the primitive normalisation fchk contraction coefficients leave out. The formula now lives beside
-//the (2l-1)!! table it is built from, in constants.h, because WFN::build_DM spelled the same four
-//numbers out as an s/p/d/f switch and had nothing for g.
+//the primitive normalisation fchk contraction coefficients leave out; shared with WFN::build_DM in constants.h
 using constants::axial_prim_norm;
 
 bool free_fchk(std::ostream &file, const std::filesystem::path &fchk_name, const std::filesystem::path &basis_set_path, WFN &wave, const bool &debug, const bool force_overwrite)
@@ -1202,11 +1200,9 @@ bool free_fchk(std::ostream &file, const std::filesystem::path &fchk_name, const
 																nao += 6;
 														break;
 												case 4:
-														// The fchk orders f functions differently from the wfn types, and the alpha branch above
-														// resolves that by asking which primitive carries each type.  This branch spelled the same
-														// permutation out as fixed offsets 0,1,2,6,3,4,7,8,5,9, which is only that permutation while
-														// the shell's primitives happen to be stored in ascending type order - the assumption
-														// prim_of_type exists to avoid.  A scrambled beta CMO block is invisible downstream.
+														// The fchk orders f functions differently from the wfn types; ask which primitive carries each type, as
+														// the alpha branch does. Fixed offsets hold only for primitives stored in ascending type order, and a
+														// scrambled beta CMO block is invisible downstream.
 														for (int i = 0; i < 10; i++)
 																CMO_beta.push_back(changed_coefs[m][prim_of_type(wave, wave.get_shell_start_in_primitives(a, s), fchk_f_types[i])]);
 														if (debug && wave.get_atom_shell_primitives(a, s) != 1)

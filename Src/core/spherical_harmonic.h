@@ -1,12 +1,9 @@
 #pragma once
 #include <limits>
 
-//constants::sqrt and the real spherical harmonics of one l contracted with their 2l+1
-//coefficients, x, y, z normalised; the l <= 8 switch of constants::spherical_harmonic(l, d, coefs)
-//in constants.cpp, which forwards here. Templated on the number type so aux_density.h
-//differentiates it with dual, and free of project includes so aux_density_gpu.cu compiles it
-//under nvcc and hipcc: those see the host-device attribute, every other compiler plain inline
-//functions. The prefactors are constants::sqrt, the same constexpr values as c_* in constants.h.
+//Real spherical harmonics of one l (x, y, z normalised) contracted with their 2l+1 coefficients, l <= 8;
+//constants::spherical_harmonic forwards here. Templated so aux_density.h differentiates it with dual, free of
+//project includes so aux_density_gpu.cu compiles it under nvcc and hipcc. Prefactors match c_* in constants.h.
 #if defined(__CUDACC__) || defined(__HIPCC__)
 #define AUX_HD __host__ __device__
 #else

@@ -1,10 +1,6 @@
-//The global GPU entry points of a build that carries both CUDA and HIP kernels. Every kernel
-//source is compiled once per backend with NOSPHERA2_GPU_BACKEND_NS naming its namespace
-//(gpu_api.h); the global names the six headers declare are defined here and forward to the
-//backend that has a device. Single-backend builds do not compile this file. The backend is
-//chosen once and sticks, since the two sides keep separate state: CUDA first, then HIP, and
-//neither gives the CUDA side, which reports no device as a CUDA-only build would.
-//NOSPHERA2_GPU_BACKEND=cuda|hip in the environment overrides the probe.
+//Global GPU entry points of a CUDA+HIP build, forwarding to the per-backend namespaces (gpu_api.h).
+//The backend is chosen once, as the two keep separate state: CUDA, then HIP, else CUDA reporting
+//no device. NOSPHERA2_GPU_BACKEND=cuda|hip overrides the probe.
 #include "sf_gpu.h"
 #include "itensor_gpu.h"
 #include "grid_gpu.h"
@@ -20,8 +16,8 @@
 #include <cstdlib>
 #include <string>
 
-//ret, name, parameter list, argument list: every function between the headers' NOSPHERA2_GPU_API
-//markers, defaults omitted. One missing here is an unresolved global at link time of a fat build.
+//ret, name, parameters, arguments of every function between the NOSPHERA2_GPU_API markers, defaults
+//omitted; one missing is an unresolved global when linking a fat build.
 #define NOSPHERA2_GPU_ENTRIES(F) \
 	F(bool, sf_gpu_available, (), ()) \
 	F(void, sf_gpu_warmup_start, (), ()) \

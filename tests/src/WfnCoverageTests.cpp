@@ -490,9 +490,7 @@ namespace
 		EXPECT_EQ(w.get_nr_ECP_electrons(), 120u);
 	}
 
-	//Without -ECP the cores still come from the file's ECP block: the electron-count fallback misses
-	//every charged molecule (a PdLiL0Ph cation's Pd was read as all-electron). An all-electron file
-	//stores a 0 pointer and stays all-electron instead of exiting.
+	//Cores come from the gbw ECP block, not an electron count that fails for ions; a 0 pointer means all-electron.
 	TEST(WfnCoverageIoTests, GbwEcpBlockReadWithoutFlag)
 	{
 		std::ostringstream log;

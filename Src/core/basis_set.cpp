@@ -475,16 +475,9 @@ namespace {
 		return basis_name;
 	}
 
-	// Every stored name carries the suffix of the file it was generated from
-	// ("def2-tzvp-basis", "def2-tzvp-rifit", ...), so a plain substring search hits
-	// several entries for almost any query and used to return whichever one the
-	// generator happened to emit first ("def2-tzvp" -> "def2-tzvpd-basis").
-	// Match in decreasing order of specificity instead, and never silently pick one
-	// of several equally good candidates.
-	// Returns the index into basis_sets, or -1; on -1 'candidates' holds the
-	// ambiguous matches (empty if there was no match at all). 'exact' says whether
-	// the name was taken at face value - the name as stored, or the orbital basis
-	// set of that name - so that only a guess gets reported to the user.
+	// Stored names carry their file suffix ("def2-tzvp-basis", "def2-tzvp-rifit"), so a substring search is ambiguous:
+	// match by decreasing specificity and never pick one of several equal candidates. On -1 candidates holds the
+	// ambiguous matches (empty: no match); exact is false for a guess, the only case reported.
 	int find_basis_set_index(const std::string& basis_name, std::vector<std::string>& candidates, bool& exact) {
 		const int count = static_cast<int>(basis_set_count);
 		candidates.clear();
@@ -668,10 +661,9 @@ WFN generate_aux_wfn(const WFN& orbital_wfn, std::vector<std::shared_ptr<BasisSe
 	WFN wavy_aux(e_origin::NOT_YET_DEFINED);
 	wavy_aux.set_atoms(orbital_wfn.get_atoms());
 	wavy_aux.set_ncen(orbital_wfn.get_ncen());
-	// The fitted density carries the charge of the density it fits; without this
-	// the aux wavefunction looks neutral to everything downstream. A wavefunction
-	// read from a file usually leaves the charge unset, so ask the occupations -
-	// they hold exactly the electrons the fit will see, ECP cores excluded.
+	// The fitted density carries the charge of the density it fits, or the aux wavefunction looks neutral
+	// downstream. A file-read wavefunction usually leaves the charge unset, so count the occupations: exactly
+	// the electrons the fit sees, ECP cores excluded.
 	if (orbital_wfn.get_nmo() > 0) {
 		double occupied = 0.0;
 		for (int mo = 0; mo < orbital_wfn.get_nmo(); ++mo)

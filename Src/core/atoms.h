@@ -1,8 +1,6 @@
 #pragma once
 #include "convenience.h"
-//atomID's string_view constructor calls std::from_chars. MSVC provides it transitively, so
-//Windows builds without this; libstdc++ does not, and the test targets - which include this
-//header outside the core precompiled header - fail to compile on Linux without it.
+//std::from_chars for atomID(string_view): MSVC includes it transitively, libstdc++ does not (tests build outside the pch)
 #include <charconv>
 
 //-----------------Definition of atoms and basis sets--------------------
@@ -347,7 +345,6 @@ public:
 	}
 };
 
-//We have to define a custom hash function for atomID because it is a user-defined type and the standard library does not provide a hash function for it.
 struct AtomIDHash {
 	[[nodiscard]]
 	std::size_t operator()(const atomID& id) const noexcept
@@ -377,8 +374,7 @@ namespace std {
 
 }
 
-//Test that atomID is exactly 16 bytes, trivially copyable, and standard layout.
-//To make sure every compiler will have the same binary representation of atomID.
+//16 bytes, trivially copyable, standard layout: the same binary representation on every compiler
 static_assert(
 	sizeof(atomID) == 16,
 	"atomID binary representation must be exactly 16 bytes");

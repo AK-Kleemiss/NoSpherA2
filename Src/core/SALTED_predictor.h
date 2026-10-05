@@ -28,12 +28,10 @@ public:
 
 private:
 	bool bbasis_set_loaded = false;
-	//Kept so several models can be stitched together: an atom's coefficients only
-	//mean anything together with the basis they were trained on
+	//An atom's coefficients mean something only with the basis they were trained on; kept for stitching models
 	std::shared_ptr<BasisSet> model_basis{};
-	// Several models in one prediction: every element is predicted by the first
-	// model on the command line that was trained on it, and the per-atom blocks
-	// are stitched back together. Empty for a single model.
+	// Several models: each element goes to the first model on the command line trained on it, and the
+	// per-atom blocks are stitched back together. Empty for a single model.
 	std::vector<std::unique_ptr<SALTEDPredictor>> sub_models{};
 	// Per atom of the merged structure: which sub model predicts it, and its index there
 	ivec atom_model{}, atom_in_model{};

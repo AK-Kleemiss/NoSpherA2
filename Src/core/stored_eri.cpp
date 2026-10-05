@@ -2,8 +2,7 @@
 #include "stored_eri.h"
 
 namespace {
-	//libcint mallocs its scratch per quartet unless handed one; the size query is the same call
-	//without an output
+	//libcint mallocs scratch per quartet unless handed one; the size query is the same call without output
 	std::array<int, 4> quartet(occ::qm::cint::IntegralEnvironment& env, const bool sph, std::array<int, 4> sh,
 		occ::qm::cint::Optimizer& opt, std::vector<double>& buffer, std::vector<double>& cache) {
 		const size_t need = sph
@@ -27,9 +26,8 @@ void stored_eri::clear() {
 	qmax_ = 0.0;
 }
 
-//Two passes over the significant shell pairs: the diagonal quartets (pq|pq) give the Schwarz
-//bound of every basis-function pair, which decides the kept set, then every unique quartet
-//of kept pairs is computed and each slot written by the one quartet that holds it
+//Diagonal quartets (pq|pq) give each pair's Schwarz bound and so the kept set; then each slot is
+//written by the one unique quartet of kept pairs that holds it
 bool stored_eri::build(const occ::qm::HartreeFock& hf, const size_t budget_bytes, std::ostream& log) {
 	clear();
 	if (!hf.fock_build_properties().density_screened) return false;
@@ -136,13 +134,11 @@ bool stored_eri::build(const occ::qm::HartreeFock& hf, const size_t budget_bytes
 	return true;
 }
 
-//With the off-diagonal pairs of D doubled J is the symmetric packed matrix times that vector,
-//one dot and one axpy per segment. K's four scatters per integral run along the segment c of a
-//row, where the second index is pair_b(): two dots against columns of the symmetric D and two
-//axpys into columns of the (symmetrised) K, on the run d = 0..c directly and through the index
-//list otherwise. The diagonal cd == ab carries half the weight and is taken back with its
-//segment. Per-thread partials merged in thread order, so the result does not depend on the
-//schedule.
+//With off-diagonal D pairs doubled, J is the packed symmetric matrix times that vector, a dot and an
+//axpy per segment. K's four scatters per integral run along segment c (second index pair_b()): two
+//dots against columns of D, two axpys into columns of the symmetrised K, directly on d = 0..c, else
+//through the index list. The diagonal cd == ab has half weight and is taken back with its segment.
+//Per-thread partials merge in thread order, so the result is schedule-independent.
 void stored_eri::JK(const occ::Mat& D, occ::Mat& J, occ::Mat& K, const bool screen) const {
 	const int n = nbf_, npk = npairs(), nthr = omp_get_max_threads();
 	const int *pa = pa_.data(), *pb = pb_.data(), *first = first_.data();
@@ -212,7 +208,7 @@ void stored_eri::JK(const occ::Mat& D, occ::Mat& J, occ::Mat& K, const bool scre
 	}
 	J = occ::Mat::Zero(n, n);
 	K.resize(n, n);
-	//The partials outweigh the matrices many times over, so their sum is parallel too
+	//The partials outweigh the matrices many times, so their sum is parallel too
 #pragma omp parallel for schedule(static)
 	for (int a = 0; a < n; a++) {
 		for (int b = 0; b <= a; b++) {

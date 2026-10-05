@@ -2,9 +2,8 @@
 #include "convenience.h"
 #include "SALTED_utilities.h"
 
-// The geometry-aid pipeline Olex2 drives through -calc_featomic_descriptor(s), -classify_atoms(_list) and
-// -geometry_aid_cutoff: the SOAP power spectrum of a structure and the classifier that turns it into element
-// probabilities. The flags queue jobs in options, run executes them from run_app_impl.
+// SOAP power spectrum and element-probability classifier behind -calc_featomic_descriptor(s), -classify_atoms(_list)
+// and -geometry_aid_cutoff; the flags queue jobs in options, run executes them from run_app_impl.
 namespace geometry_aid
 {
 	typedef std::vector<std::pair<std::filesystem::path, std::filesystem::path>> jobvec;

@@ -1,12 +1,9 @@
-//The HIP runtime, opened by name instead of linked: a fat binary has to start on a machine
-//without ROCm, and linking or delay-loading amdhip64 fails before main() because clang
-//registers the kernels from static initialisers. The kernel objects import the entry points
-//below by their plain C names; each definition forwards to libamdhip64.so.<major> /
-//amdhip64_<major>.dll once opened. All entry points resolve together and a library missing
-//one counts as absent: hipErrorNoDevice, a device count of zero, a registration that does
-//nothing. hip_runtime_api.h declares the same functions, so a definition whose parameters
-//differ does not compile; a new runtime call in a kernel source is an unresolved symbol at
-//link time and goes into NOSPHERA2_HIP_RUNTIME_ENTRIES.
+//HIP runtime opened by name, not linked: a fat binary must start without ROCm, and linking or
+//delay-loading amdhip64 fails before main() because clang registers kernels from static initialisers.
+//Kernel objects import the entry points below by plain C name; each forwards to the opened library,
+//and a library missing any of them counts as absent. hip_runtime_api.h declares the same functions,
+//so a mismatched signature does not compile; a new runtime call in a kernel source is an unresolved
+//symbol at link time and goes into NOSPHERA2_HIP_RUNTIME_ENTRIES.
 #include <hip/hip_runtime_api.h>
 
 #include <cstdio>
@@ -90,9 +87,8 @@ const char* const lib_plain = "libamdhip64.so";
 const char* const lib_subdir = "/lib/";
 #endif
 
-//NOSPHERA2_HIP_RUNTIME names the library file outright. Otherwise the versioned name is
-//tried on the loader's own search (PATH, LD_LIBRARY_PATH, the rpath, the usual places),
-//then under ROCM_PATH and HIP_PATH, then /opt/rocm, then the unversioned name the same way.
+//NOSPHERA2_HIP_RUNTIME names the file outright; else the versioned, then the unversioned name, each
+//on the loader's own search, then under ROCM_PATH, HIP_PATH and /opt/rocm
 lib_handle open_runtime()
 {
 	if (const char* file = std::getenv("NOSPHERA2_HIP_RUNTIME")) {
@@ -114,8 +110,7 @@ lib_handle open_runtime()
 	return nullptr;
 }
 
-//Resolved once, on the first call into any entry point, so the module constructors before
-//main() and the device probes later get the same answer
+//Resolved once, so the module constructors before main() and later device probes agree
 const hip_runtime& runtime()
 {
 	static const hip_runtime rt = [] {
@@ -141,9 +136,9 @@ const hip_runtime& runtime()
 	return rt;
 }
 
-} //namespace
+}
 
-//The plain forwarders: an error code when the runtime is absent.
+//An error code when the runtime is absent
 #define NOSPHERA2_HIP_FORWARD(name, params, args) \
 	extern "C" hipError_t name params \
 	{ \

@@ -54,7 +54,6 @@ void XCW::construct(const options& opt_in) {
 	// symmetry operations for every asymmetric atom
 	ivec applied_symmetry;
 	if (settings.grown) {
-		// Below is working
 		//unit_cell.apply_grown(symmetry_linking_list);
 		applied_symmetry = unit_cell.apply_grown(hkl, hkl_enlarged, asym_atoms, symmetry_linking_list, original_rotations);
 	}
@@ -72,7 +71,6 @@ void XCW::construct(const options& opt_in) {
 		std::cerr << "hkl_enlarged size: " << hkl_enlarged.size() << std::endl;
 	}
 
-	// Below is working
 	// Structure factors sum over every operation, unless the grown cluster is a union of complete
 	// orbits of a subgroup H: then one operation per coset of H covers the cell with |H| times fewer
 	// terms and the cluster's own symmetry is not applied a second time
@@ -176,7 +174,7 @@ XCW::SCF_settings XCW::loadSettings(const std::filesystem::path& settings_path) 
 	bool i_tensor_single = false, i_tensor_double = false;
 	std::filesystem::path i_tensor_file_path;
 	std::filesystem::path i_tensor_save_path;
-	// 0 = hold the whole tensor, which is what every run did before this existed.
+	// 0 = hold the whole tensor
 	size_t i_tensor_max_mb = 0;
 	occ::qm::SpinorbitalKind hf_type = occ::qm::SpinorbitalKind::Restricted;
 	if (!std::filesystem::exists(settings_path)) {
@@ -193,8 +191,8 @@ XCW::SCF_settings XCW::loadSettings(const std::filesystem::path& settings_path) 
 			};
 
 		handlers["extinction"] = [&](std::istream& is) {
-			//`extinction <model> [iso|aniso] [fixed] [start value]`, the rest of the line in
-			//any order: a word names the model or a flag, a number is the start value
+			//`extinction <model> [iso|aniso] [fixed] [start value]` in any order: a word names the model or a flag,
+			//a number is the start value
 			std::string rest, token;
 			std::getline(is, rest);
 			std::istringstream words(rest);
@@ -371,19 +369,14 @@ XCW::SCF_settings XCW::loadSettings(const std::filesystem::path& settings_path) 
 			speed_preset = "fast_conv";
 			};
 
-		//`safe` is `save` to the default path, which is where `read` without a path looks.
+		//`safe` is `save` to the default path, where a bare `read` looks
 		handlers["safe"] = [&](std::istream&) {
 			i_tensor_save_path = i_tensor_default;
 			};
 
-		//`read <path>` reuses the streamed tensor at that path, which is the expensive thing
-		//a run produces and which depends only on the geometry, the basis and the
-		//reflections, not on any refinement setting. So trying another lambda range or
-		//convergence preset need not rebuild it. It is held in memory when it fits.
-		//
-		//The path is optional, and the settings file is one whitespace-separated stream of
-		//tokens, so a bare `read` followed by another keyword must not swallow it: take the
-		//next token, put it back if it is a keyword.
+		//`read [path]` reuses a streamed tensor; it depends only on geometry, basis and reflections,
+		//not on refinement settings. The path is optional and the settings are one token stream,
+		//so a following keyword is put back rather than swallowed as the path.
 		handlers["read"] = [&](std::istream& is) {
 			read_tensor = true;
 			i_tensor_file_path = i_tensor_default;
@@ -406,23 +399,14 @@ XCW::SCF_settings XCW::loadSettings(const std::filesystem::path& settings_path) 
 		handlers["nbo"] = [&](std::istream&) {
 			nbo_output = true;
 			};
-		// The tensor is nr_small blocks of nmo(nmo+1)/2 complex doubles and grows
-		// quadratically with the basis, so on anything past a minimal basis it is
-		// the largest thing in the process. `stream` puts it on disk with a
-		// default budget; `i_tensor_mb <n>` names the budget.
+		// The tensor is nr_small blocks of nmo(nmo+1)/2 complex values, quadratic in the basis.
+		// `stream` puts it on disk with a default budget; `i_tensor_mb <n>` names the budget.
 		handlers["stream"] = [&](std::istream&) {
 			if (i_tensor_max_mb == 0) i_tensor_max_mb = 2048;
 			};
 
-		//The tensor comes off the device in single precision and was stored in double, so
-		//half of every byte the SCF loop reads back was padding. Holding it as computed is
-		//half the memory and, measured on the full twisted ethylene, 1.63x on the two walks
-		//each SCF iteration makes over it. Opt-in because it is a change of stored
-		//precision: the lambda scan agrees to 5e-13 and iteration for iteration, but that
-		//is a measurement on one system rather than a proof.
-		//Writing the tensor is worth ~40 minutes to a later run and costs this one nothing:
-		//the refinement only reads the tensor, so a thread can push it to disk while the SCF
-		//gets on with it. The path is what `read <path>` will want afterwards.
+		//Written on a thread while the SCF runs, which only reads the tensor; the path is the one
+		//a later `read <path>` takes.
 		handlers["save"] = [&](std::istream& is) {
 			std::string path;
 			if (!(is >> path))
@@ -430,6 +414,7 @@ XCW::SCF_settings XCW::loadSettings(const std::filesystem::path& settings_path) 
 			i_tensor_save_path = path;
 			};
 
+		//Force single or double storage of the tensor; by default it is held in the precision it was built in
 		handlers["i_float"] = [&](std::istream&) {
 			i_tensor_single = true;
 			};
@@ -856,7 +841,6 @@ void XCW::eval_phase(cvec2& phase_fact) {
 	}
 }
 
-// Below is working
 //void XCW::eval_translation_phase(cvec2& translation_phase) {
 //	translation_phase.resize(cryst.nr_small, cvec(sym_ops_.size(), 0));
 //	const double angstrom2bohr = constants::ang2bohr(1);
@@ -883,7 +867,6 @@ void XCW::eval_phase(cvec2& phase_fact) {
 //	// closing function
 //}
 
-// sym_ops_ is the opp
 void XCW::eval_translation_phase(cvec2& translation_phase) {
 	translation_phase.resize(cryst.nr_small, cvec(unit_cell.get_trans()[0].size(), 0));
 	const double angstrom2bohr = constants::ang2bohr(1);
@@ -958,10 +941,9 @@ void XCW::eval_anom_disp(cvec2& DW_fact, cvec2& phase_fact, cvec2& translation_p
 	}
 }
 
-//The wavelength the extinction models need. NoSpherA2 reads no wavelength anywhere else, so
-//it comes from the settings file's `wavelength` or from the CIF.
-//ponytail: only the inline `_diffrn_radiation_wavelength <value>` form is read, not the loop_
-//form of a multi-wavelength experiment - those pass `wavelength <lambda>` in the settings file.
+//NoSpherA2 reads no wavelength elsewhere, so it comes from the settings file's `wavelength` or the CIF.
+//ponytail: only the inline `_diffrn_radiation_wavelength <value>` form, not the loop_ of a multi-wavelength
+//experiment; those pass `wavelength <lambda>` in the settings file.
 static double read_cif_wavelength(const std::filesystem::path& cif) {
 	std::ifstream input(cif, std::ios::in);
 	std::string line;
@@ -1039,9 +1021,9 @@ void XCW::update_extinction() {
 	}
 }
 
-//One Gauss-Newton step on the coefficients against the criterion's own weighted residual,
-//with the scale held where solve_scale put it. Accepted only if it lowers that residual and
-//leaves x_r >= 0 everywhere, since a negative coefficient is not extinction.
+//One Gauss-Newton step on the coefficients against the criterion's weighted residual, scale held where
+//solve_scale put it. Accepted only if it lowers that residual and keeps x_r >= 0, as a negative coefficient
+//is not extinction.
 bool XCW::refine_extinction_step() {
 	const Eigen::Index np = static_cast<Eigen::Index>(ext_p_.size());
 	const bool against_F2 = settings.refine_against == 2, weighted = settings.XWR_type == 2;
@@ -1513,11 +1495,8 @@ void XCW::eval_I_anom_disp(std::vector<ao_data>& ao_data_shells, bool read) {
 	bool single_on_disk = false;
 	if (settings.read_tensor && !settings.i_tensor_file_path.empty()
 		&& i_tensor_file::matches(i_tensor_path(), cryst.nr_small, cryst.nmo, kept_on_disk, single_on_disk)) {
-		//A streamed tensor already there and big enough for this problem. It depends on the
-		//geometry, the basis and the reflections and on none of the refinement settings, so
-		//a second run that changes those can read it rather than spend the build again.
-		//open() checks the header and throws if the shape does not match, which is what
-		//stops a tensor from a different structure being used by accident.
+		//The tensor depends on geometry, basis and reflections, not on refinement settings, so it
+		//can be reused; open() throws on a header of another shape, so another structure's cannot.
 		i_compact_ = kept_on_disk;
 		const size_t packed = i_compact_;
 		const char* source = "";
@@ -1578,10 +1557,7 @@ void XCW::eval_I_anom_disp(std::vector<ao_data>& ao_data_shells, bool read) {
 	// closing function
 }
 
-//Whether the I tensor is held or streamed, and the largest window that fits the budget
-//The tensor is written on a thread while the refinement runs. Nothing in the SCF modifies
-//it - both walks only read - so a reader alongside them needs no lock, and the run pays only
-//the disk bandwidth, which it is not competing for while it works out of memory.
+//Written on a thread during the refinement; the SCF walks only read the tensor, so no lock
 void XCW::start_i_save()
 {
 	if (settings.i_tensor_save_path.empty() || i_streamed_) return;
@@ -1607,8 +1583,8 @@ void XCW::start_i_save()
 		});
 }
 
-//Called before the run ends, and before anything that could invalidate the tensor. A thread
-//left running past main is the bug 939268f was about; this one also holds a file handle.
+//Called before the run ends or anything invalidates the tensor: the writer holds a file handle
+//and must not outlive main.
 void XCW::finish_i_save()
 {
 	if (!i_writer_.joinable()) return;
@@ -1632,10 +1608,8 @@ size_t XCW::i_budget(const char*& source, bool& automatic) const {
 	if (budget == 0) {
 		const size_t avail = available_memory_bytes();
 		if (avail > 0) {
-			//Four fifths: the SCF matrices, the grids and OCC's own allocations live in the
-			//rest, and a tensor that only just fits would page rather than run. What the
-			//process can have is a platform question - a cgroup here, a job object on
-			//Windows, page classes on a Mac - and lives in convenience.cpp.
+			//Four fifths: SCF matrices, grids and OCC's allocations need the rest, and a tensor
+			//that only just fits would page. The platform limit comes from convenience.cpp.
 			budget = avail / 5 * 4;
 			source = "four fifths of the memory this job can have";
 			automatic = true;
@@ -1644,16 +1618,15 @@ size_t XCW::i_budget(const char*& source, bool& automatic) const {
 	return budget;
 }
 
+//Whether the I tensor is held or streamed, and the largest window that fits the budget
 void XCW::decide_i_storage() {
 	const size_t per_block = i_tensor_file::block_bytes(i_compact_, i_float_);
 	const size_t total = i_tensor_file::total_bytes(cryst.nr_small, i_compact_, i_float_);
 
-	//The settings file budget wins, then -mem; with neither, what the process can actually
-	//have. Left to a keyword this is the single most expensive decision in an XCW run and
-	//the wrong answer is silent: both SCF walks re-read the whole tensor every iteration, so
+	//The settings file budget wins, then -mem, then what the process can have. A wrong choice
+	//is silent: both SCF walks re-read the whole tensor every iteration, so
 	//streaming a tensor that would have fit is many times slower on the stage a
 	//lambda scan spends its life in.
-	//Nobody should have to know that to get it right.
 	const char* source = "";
 	bool automatic = false;
 	const size_t budget = i_budget(source, automatic);
@@ -1662,8 +1635,7 @@ void XCW::decide_i_storage() {
 	i_streamed_ = (w != 0);
 	if (!i_streamed_) {
 		//Announced only when someone asked about memory: saying it unconditionally
-		//shifts every reference output by a line, and the automatic budget would say it on
-		//every run - including the reference tests, which is why it stays quiet there.
+		//would shift every reference output by a line.
 		if ((budget > 0 && !automatic) || ProgressBar::report_counts) {
 			std::cout << std::fixed << std::setprecision(2)
 				<< "I tensor held in memory: " << (total / 1048576.0) << " MB"
@@ -1762,9 +1734,8 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 			for (int s = 0; s < static_cast<int>(num_syms); s++) {
 				total++;
 				if (asym_lookup[r][s] == 0) {
-					// index 0 is ambiguous: a genuine hit on hkl_enlarged's first entry, or the
-					// silent "not found" fallback in generate_asym_lookup. Recompute by hand to
-					// tell them apart.
+					// index 0 is ambiguous: a hit on hkl_enlarged's first entry or generate_asym_lookup's silent
+					// not-found fallback; recompute to tell them apart
 					auto it = hkl.begin();
 					std::advance(it, r);
 					ivec3 rots = unit_cell.get_sym();
@@ -1965,24 +1936,15 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 		}
 	}
 	std::cout << "AO values calculated for all grids." << std::endl;
-	//Morton-order every atom grid's points, so that a run of consecutive points is a
-	//compact ball rather than a spherical shell. This is what OCC does
-	//(occ/qm/spatial_grid_hierarchy.h) and what grid-based codes do generally, and the
-	//permutation is the point of it: the grid arrives sorted by radius, so consecutive
-	//points span a whole sphere and every AO reaching any part of it stays active. Measured
-	//on the twisted ethylene at def2-TZVP, cutting the radial bands into chunks without
-	//reordering moved the work by 2.7% and left n_active at 852; the innermost eighth of a
-	//grid, which is compact because its radius is small, needs 370 AOs against 803.
-	//
-	//Work is sum over blocks of n_active^2 * points, so this is quadratic in what it saves.
-	//Sums over points are order independent, so the reordering changes no result.
+	//Morton-order each atom grid's points so consecutive points form a compact ball, not a
+	//spherical shell (as OCC, occ/qm/spatial_grid_hierarchy.h): radially sorted, a block spans a
+	//whole sphere and every AO reaching any part of it stays active. Work is sum over blocks of
+	//n_active^2 * points; sums over points are order independent, so no result changes.
 	//Compaction and the AO threshold are worth nothing apart and a great deal together:
 	//reordering alone is slower (the blocks shrink and n_active does not), the threshold
 	//alone barely moves the work, and together they are faster with the GooF, energies and
 	//convergence lines identical.
-	//So only reorder when the threshold can actually prune: at -acc 4 cutoff() is 1e-30 and
-	//nothing would be dropped, and paying the compaction cost for that would make asking for
-	//more accuracy slower for no reason.
+	//So only reorder when the threshold can prune: at -acc 4 cutoff() is 1e-30 and drops nothing.
 	const double ao_block_threshold = [&] {
 		const char* e = std::getenv("NOSPHERA2_ITENSOR_AO_TOL"); // Flawfinder: ignore
 		if (e) { const double v = std::atof(e); return v >= 0.0 ? v : 0.0; }
@@ -2035,10 +1997,8 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 			};
 			apply(xs); apply(ys); apply(zs);
 			apply(grid[GridData::GridIndex::WEIGHT].data());
-			//The coordinates and weights the phase factor and the GEMM actually use are
-			//these, taken from getDensityVectors above and not the grid arrays: reordering
-			//the AO values without them pairs each value with another point's coordinate,
-			//which is wrong everywhere rather than only where a screening decision was made.
+			//The phase factor and GEMM use these copies from getDensityVectors, not the grid
+			//arrays; left unpermuted, every AO value would pair with another point's coordinate.
 			if (static_cast<int>(d1[g].size()) >= npts) apply(d1[g].data());
 			if (static_cast<int>(d2[g].size()) >= npts) apply(d2[g].data());
 			if (static_cast<int>(d3[g].size()) >= npts) apply(d3[g].data());
@@ -2053,8 +2013,7 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 					apply(v.data());
 				}
 			}
-			//Radial distance follows its point, and the band bounds below are recomputed
-			//from it - they are no longer monotone, which is what the chunking wants.
+			//Radial distance follows its point and is no longer monotone, see the chunking below
 			vec& rd = grid_radial_distances[g];
 			if (static_cast<int>(rd.size()) == npts) apply(rd.data());
 		}
@@ -2062,13 +2021,9 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 
 
 
-	//NOSPHERA2_ITENSOR_AOSTATS=1: how much of each block's AO set is actually carrying
-	//anything. The active set comes from a cutoff clamped into an 11-12 bohr band
-	//(std::clamp above), so it is set by the distance between two atom centres and barely
-	//by the block - a 266-point block keeps 756 of 852 AOs and a 7968-point one keeps 803.
-	//Work is sum over blocks of na^2 * points, so what an OCC-style per-batch bounding
-	//sphere would save is quadratic in whatever this measures. The AO values are already
-	//computed here, so the honest number is a max over the points they hold, not an estimate.
+	//NOSPHERA2_ITENSOR_AOSTATS=1: how much of each block's AO set carries anything, as a max over
+	//its points. The active set comes from a cutoff clamped to 11-12 bohr, so it barely depends
+	//on the block, and the work is quadratic in it.
 	if (std::getenv("NOSPHERA2_ITENSOR_AOSTATS")) { // Flawfinder: ignore
 		for (int g = 0; g < n_atom_grids; g++) {
 			const int npts = points[g];
@@ -2164,8 +2119,7 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 		std::vector<MatrixTile> matrix_tiles;
 		int tile_result_size = 0;
 	};
-	//128 rows a tile: at 64 the GEMM calls are overhead-bound in both precisions, and above
-	//it a double tile pair leaves the core's L2 while single precision stays flat to 256
+	//128 rows a tile: at 64 the GEMM calls are overhead-bound, above it a double tile pair leaves L2
 	constexpr int screened_tile_size = 128;
 	std::vector<std::vector<GridBlock>> grid_blocks(n_atom_grids);
 	auto make_matrix_tiles = [&](GridBlock& block) {
@@ -2193,12 +2147,9 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 		}
 		block.tile_result_size = static_cast<int>(result_offset);
 		};
-	//NOSPHERA2_ITENSOR_SKIPSTATS=1: what a spatial reordering of the active AOs would buy.
-	//Half the mu,nu pairs are screened out and none of the 64x64 tiles are, because AO index
-	//order is atom order as the CIF lists them and dead pairs land scattered. Sorting the
-	//active AOs of a block along a Morton curve over their centres puts distant atoms in
-	//distant tiles, which is the only way a tile becomes wholly dead. Measured here, per
-	//block, before anyone writes a kernel that depends on it.
+	//NOSPHERA2_ITENSOR_SKIPSTATS=1: tiles pruned with the active AOs in CIF atom order, where dead
+	//pairs land scattered, against Morton-sorted over their centres, which puts distant atoms in
+	//distant tiles.
 	auto skipstats = [&](const int g, const ivec& active, const int npoints) {
 		if (!std::getenv("NOSPHERA2_ITENSOR_SKIPSTATS")) return; // Flawfinder: ignore
 		const int na = static_cast<int>(active.size());
@@ -2259,13 +2210,9 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 		std::fprintf(stderr, "\n");
 	};
 
-	//Counted the way the mu,nu screening is, so a run says what this cost it as well as
-	//what it saved: how many AO-block entries were dropped, and what that did to the work
-	//the GEMMs actually do.
+	//AO-block entries carrying anything and kept, reported like the mu,nu screening
 	long long ao_slots_carrying = 0, ao_slots_kept = 0;
-	//ao_block_threshold is defined above, with the reordering it enables. What counts as
-	//nothing is the run's -acc setting, not a number invented here: cutoff() is the same
-	//ladder the scattering-factor code screens on, 1e-10 up to -acc 2 and 1e-14 at 3.
+	//ao_block_threshold (above) is cutoff() of the -acc setting, the scattering-factor screening ladder
 #pragma omp parallel for schedule(dynamic) reduction(+:ao_slots_carrying, ao_slots_kept)
 	for (int g = 0; g < n_atom_grids; g++) {
 		const ivec& active_aos = grid_active_aos[g];
@@ -2274,22 +2221,15 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 		const int inner_end = static_cast<int>(std::upper_bound(radial_distances.begin(), radial_distances.end(), minimum_ao_grid_cutoff) - radial_distances.begin());
 		const int middle_end = static_cast<int>(std::upper_bound(radial_distances.begin(), radial_distances.end(), maximum_ao_grid_cutoff) - radial_distances.begin());
 		const std::array<int, 4> block_bounds{ 0, inner_end, middle_end, points[g] };
-		//A block keeps every AO that is non-zero anywhere in it, and the work is
-		//sum over blocks of n_active^2 * points, so the block's spatial extent is what sets
-		//the cost. Three radial bands make the first one nearly the whole grid: measured on
-		//the twisted ethylene at def2-TZVP, a 7934-point band keeps 803 of 852 AOs while its
-		//innermost eighth needs 370. Cutting the bands into chunks is what OCC does with its
-		//Morton leaves (occ/qm/spatial_grid_hierarchy.h, 128 points a leaf) and what every
-		//grid-based code does for the same reason. The points come radially sorted, so
-		//consecutive chunks are already spatially compact and nothing has to be permuted.
-		//
-		//NOSPHERA2_ITENSOR_CHUNK sets the target; 0 restores the three whole bands.
+		//A block keeps every AO non-zero anywhere in it and the work is sum over blocks of
+		//n_active^2 * points, so the block's extent sets the cost: cut into chunks, as OCC's Morton
+		//leaves (occ/qm/spatial_grid_hierarchy.h). NOSPHERA2_ITENSOR_CHUNK sets the target size;
+		//0 restores the three whole bands.
 		const int chunk = [] {
 			const char* e = std::getenv("NOSPHERA2_ITENSOR_CHUNK"); // Flawfinder: ignore
 			return e ? std::atoi(e) : 1024;
 		}();
-		//Even chunks rather than a short tail: a 40-point remainder is a GEMM that costs a
-		//launch and returns almost nothing.
+		//Even chunks rather than a short tail, which would cost a GEMM launch for almost nothing
 		auto cut = [&](const int from, const int to, std::vector<std::pair<int, int>>& out) {
 			const int n = to - from;
 			if (n <= 0) return;
@@ -2300,14 +2240,9 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 		};
 		std::vector<std::pair<int, int>> spans;
 		if (morton_applied) {
-			//The three radial bands are what the point order was for, and after Morton
-			//ordering it is gone: block_bounds comes from upper_bound over the radial
-			//distances, which needs a sorted range and no longer has one. Left in, the
-			//bounds come back arbitrary, a band with end below start is skipped, and its
-			//points drop out of the integration entirely - the structure factors then move
-			//far more than any screening would explain (GooF 3.82 -> 26.34 on the twisted
-			//ethylene, which is how this was found). Cut the grid itself instead: the bands
-			//existed to group points by cutoff regime and a compact chunk does that better.
+			//Morton order unsorts the radial distances, so block_bounds from upper_bound is
+			//arbitrary: a band with end below start would be skipped and its points lost from the
+			//integration. Cut the grid itself instead.
 			cut(0, points[g], spans);
 		}
 		else {
@@ -2322,13 +2257,8 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 			GridBlock block{ point_start, point_count };
 			for (int local_ao = 0; local_ao < static_cast<int>(active_aos.size()); local_ao++) {
 				const double* full_row = full_ao_values.data() + static_cast<size_t>(local_ao) * points[g];
-				//Not "is it exactly zero" but "does it carry anything here". The values were
-				//only zeroed where the 11-12 bohr cutoff cut them off, so a function whose
-				//value on this block is 1e-40 was counted as active and multiplied at full
-				//cost: n_active stayed at 852 of 852 where the AOs actually carrying more
-				//than 1e-10 numbered 370. Work is n_active^2 * points, so this is quadratic.
-				//What every grid-based code does, and the threshold is the same kind of
-				//number as the 5e-4 the pair screening above already accepts.
+				//Not exactly zero but carrying anything here: values are zeroed only beyond the
+				//11-12 bohr cutoff, and an AO of 1e-40 on this block would still cost n_active^2 * points.
 				double largest = 0.0;
 				for (int p = point_start; p < point_end; p++)
 					largest = std::max(largest, std::abs(full_row[p]));
@@ -2347,10 +2277,7 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 			}
 		}
 	}
-	//Said next to "Screened out ... unique pairs of mu, nu", because it is the same kind of
-	//saving measured on the other axis: that one drops pairs whose product cannot reach the
-	//grid, this one drops an AO from a block where it carries nothing. Gated on no_date like
-	//the timing lines, so the reference outputs keep their shape.
+	//Gated on no_date like the timing lines, so the reference outputs keep their shape
 	if (!(opt->no_date) && ao_slots_carrying > 0) {
 		const long long dropped = ao_slots_carrying - ao_slots_kept;
 		std::cout << std::fixed << std::setprecision(2)
@@ -2360,11 +2287,7 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 			<< std::scientific << std::setprecision(0) << ao_block_threshold
 			<< std::fixed << std::setprecision(2) << " on their block\n";
 
-		//The screenings in one number. Each of the lines above counts what it removed on its
-		//own axis - pairs, AO-block entries, whole grids - and none of them says what the
-		//run will actually cost. This does: the I tensor's work is the sum over blocks of
-		//n_active^2 times points, and the same sum with every AO on every point is what it
-		//would be with no screening at all. The ratio is what the GEMMs were spared.
+		//All screenings in one number: sum over blocks of n_active^2 * points against every AO on every point
 		double work_done = 0.0, work_unscreened = 0.0;
 		for (int g = 0; g < n_atom_grids; g++)
 			for (const GridBlock& b : grid_blocks[g]) {
@@ -2372,9 +2295,7 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 				work_done += na * na * b.point_count;
 				work_unscreened += static_cast<double>(cryst.nmo) * cryst.nmo * b.point_count;
 			}
-		//Per reflection and symmetry operation the sum is a small number and says nothing;
-		//what the run costs is that times both, so scale it before printing or the figure
-		//reads as a thousandth of the truth.
+		//The sums are per reflection and symmetry operation
 		const double runs = static_cast<double>(cryst.nr_small) * static_cast<double>(num_syms);
 		if (work_done > 0.0)
 			std::cout << std::fixed << std::setprecision(2)
@@ -2384,9 +2305,8 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 				<< (work_unscreened / work_done) << "x less than unscreened)\n";
 	}
 
-	//The whole cost of the device path in one number: sum over blocks of n_active^2 times
-	//points, which is what the GEMMs do per reflection and symmetry operation. Printed under
-	//-gflops so a chunk size can be judged without running a reflection.
+	//Device path cost per reflection and symmetry operation, sum over blocks of n_active^2 * points;
+	//under -gflops so a chunk size can be judged without running a reflection
 	if (throughput::enabled()) {
 		double work = 0.0;
 		long long nblocks = 0, na_min = 1LL << 60, na_max = 0, pts_min = 1LL << 60, pts_max = 0;
@@ -2481,9 +2401,8 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 		if (itensor_on_gpu && throughput::enabled())
 			std::fprintf(stderr, "I tensor GPU: %.3f s upload and plan\n",
 				std::chrono::duration<double>(std::chrono::high_resolution_clock::now() - init_start).count());
-		//What the device path actually issues, the blocks padded to their batch shapes,
-		//real and imaginary halves together. Counted the way the path runs, or the GFLOP/s
-		//row is fiction.
+		//What the device path actually issues: blocks padded to their batch shapes, real and
+		//imaginary halves together
 		if (itensor_on_gpu)
 			itensor_gpu_dense_flops = itensor_gpu_issued_flops()
 				* static_cast<double>(cryst.nr_small) * static_cast<double>(num_syms);
@@ -2650,9 +2569,8 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 			mkl_set_num_threads_local(1);
 #endif
 #if defined(__SSE2__) || defined(_M_X64)
-			//Single precision underflows into subnormals on this data - AO tails of 1e-40 are
-			//ordinary here - and an x86 core handles those a hundred times slower. Flush
-			//them, as the device does; the double path never gets near 1e-308.
+			//Single precision underflows into subnormals on AO tails of 1e-40, which x86 handles
+			//very slowly; flush them as the device does. The double path never gets near 1e-308.
 			const unsigned int csr_before = _mm_getcsr();
 			if (opt->cpu_itensor_fp32) _mm_setcsr(csr_before | 0x8040);
 #endif
@@ -2845,9 +2763,8 @@ void XCW::calc_F_calc(const dMatrix2& D) {
 #pragma omp for schedule(static)
 			for (int r = r0; r < r1; ++r) {
 				if (!io_error.empty()) continue;
-				//One walk, either element type: the accumulation stays in double whatever
-				//the tensor is stored as, so float storage costs precision in the stored
-				//value and nothing in the sum.
+				//One walk for either element type, accumulated in double: float storage costs
+				//precision only in the stored value.
 				auto accumulate = [&](const auto* I_r) {
 					cdouble sum = F_calc[1][r];
 					const int* pmu = i_pair_mu_.data();
@@ -2883,9 +2800,8 @@ void XCW::calc_perturb(occ::Mat& perturb, const occ::qm::SCF<occ::qm::HartreeFoc
 	for (int r = 0; r < cryst.nr_small; r++) {
 		if (!valid || !fit_mask_[r]) continue;
 		cdouble precompute;
-		//with extinction the model is I = y |Fc|^2, so the residual carries sqrt(y)|Fc| and the
-		//carrier d/dD picks up dI/d|Fc|^2 (F^2) or d(sqrt(y)|Fc|)/d|Fc| (F); both are 1 without
-		//a model, and the expressions below are then exactly the ones this always used
+		//with extinction I = y |Fc|^2: the residual carries sqrt(y)|Fc| and the carrier picks up dI/d|Fc|^2 (F^2)
+		//or d(sqrt(y)|Fc|)/d|Fc| (F); both are 1 without a model
 		if (against_F2) {
 			const double I = ext_y(r) * std::pow(std::abs(F_calc[0][r]), 2);
 			precompute = ext_g(r) * std::conj(F_calc[0][r]) * (scale_sq * I - obs[r].F_obs2) / (obs[r].sigma_obs2 * obs[r].sigma_obs2);
@@ -3365,8 +3281,7 @@ bool XCW::SCF_iteration(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& l
 	scf.iter++;
 	const occ::Mat dm_old = scf.ctx.mo.D;
 	dMatrix2 dm_eff(cryst.nmo, cryst.nmo);
-	//This block is NoSpherA2 code, the Fock build below is OCC. Without the split the whole
-	//remainder looks equally ours.
+	//This block is NoSpherA2 code, the Fock build below is OCC
 	const _time_point it_t0 = get_time();
 	build_effective_dm(scf, dm_eff, dm_old);
 	calc_F_calc(dm_eff);
@@ -3391,13 +3306,9 @@ bool XCW::SCF_iteration(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& l
 	//the DIIS error has fallen tenfold since the last full build, as OCC's own loop does, so the
 	//screening error does not accumulate. A device that holds the integrals contracts the whole
 	//density each time, nothing to skip.
-	//Off once TRAH is steering: a step is accepted or rejected on a rise of E + lambda chi^2
-	//against the value at the orbitals it left, and trah_.noise puts that threshold at 1e-8 Eh,
-	//far below the screening error of a difference build. Comparing one against the other made
-	//good steps read as rises, and a rejection can only shrink the trust radius, so a single
-	//artefact capped it for the rest of the lambda step. A rotation moves the density by a whole
-	//step anyway, so there was little left to skip. OCC's own loop does the same (it forces a
-	//full rebuild while the second-order step is active).
+	//Off once TRAH is steering: it rejects a step on a rise above trah_.noise, far below the screening error
+	//of a difference build, and each spurious rejection shrinks the trust radius for the rest of the lambda
+	//step. A rotation moves the density by a whole step anyway; OCC's own loop also rebuilds fully there.
 	const bool incremental = opt->xcw_incremental && !soscf_ && !eri_on_device_ && scf.m_procedure.fock_build_properties().density_screened && G_last_.size() > 0
 		&& scf.iter - last_full_build_ < 8 && scf.diis_error > next_full_build_error_;
 	if (incremental) {
@@ -3514,10 +3425,8 @@ void XCW::soscf_reset() {
 	soscf_pred_ = 0;
 	soscf_boundary_ = false;
 	soscf_floored_ = 0;
-	//The radius the last lambda step earned carries into this one - consecutive lambda steps are
-	//nearly the same problem, which is the point of ramping lambda at all, and re-learning the
-	//radius from 0.5 costs a rejected macro step, hence up to micro_max Fock builds, per halving.
-	//Never above the default, so an easy lambda cannot set a hard one up for a fall.
+	//The radius the last lambda step earned carries over, as consecutive lambda steps are nearly the same
+	//problem; capped at the default so an easy lambda cannot set a hard one up for a fall.
 	soscf_trust_ = std::clamp(soscf_trust_, trah_.trust_min, trah_.trust_first);
 	trah_micro_total_ = 0;
 }
@@ -3581,13 +3490,10 @@ void XCW::rotate_orbitals(occ::qm::SCF<occ::qm::HartreeFock>& scf, const occ::Ma
 
 //One second-order macro iteration, see soscf_ in the header. phi is E + lambda chi^2 at the
 //current orbitals, which the last step produced. Above the functional it left by more than
-//the noise of a Fock build, the step is rejected: the step is re-solved at the smaller radius
-//in the subspace the micro-iterations already built, from the orbitals it left. The radius
-//itself follows occ::qm::trust_radius_update either way - the cube root of the model error the
-//step revealed, so the region tracks how far the quadratic model is actually worth trusting,
-//and it only moves for a step the region actually stopped or one the model got wrong.
-//Two rejections at the smallest radius end the second-order phase and give DIIS the orbitals
-//back. Otherwise a fresh gradient starts the next macro step.
+//the noise of a Fock build, the step is rejected and re-solved at the smaller radius in the subspace
+//the micro-iterations built, from the orbitals it left. The radius follows occ::qm::trust_radius_update
+//either way (the cube root of the model error the step revealed). Two rejections at the smallest radius
+//hand the orbitals back to DIIS; otherwise a fresh gradient starts the next macro step.
 void XCW::soscf_step(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double lambda, const double phi) {
 	const bool stepped = soscf_kappa_.size() > 0;
 	if (stepped) {
@@ -3599,10 +3505,8 @@ void XCW::soscf_step(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double lambd
 		soscf_trust_ = occ::qm::trust_radius_update(soscf_trust_, soscf_kappa_.norm(), soscf_pred_, actual, soscf_boundary_, trah_);
 	}
 	if (stepped && phi > soscf_phi_ + trah_.noise && soscf_kappa_.cwiseAbs().maxCoeff() > 1e-6) {
-		//A radius this small is the model saying it is worthless at these orbitals, not that the
-		//step should be shorter again. Two in a row and DIIS gets the orbitals back, with the
-		//rescue path available again, rather than the lambda step grinding out max_iter on steps
-		//too short to move anything.
+		//At the smallest radius the model is worthless here, so two such rejections in a row hand DIIS the
+		//orbitals (and the rescue path) rather than grind out max_iter on steps too short to move anything.
 		soscf_floored_ = soscf_trust_ <= trah_.trust_min * 1.000001 ? soscf_floored_ + 1 : 0;
 		if (soscf_floored_ >= 2) {
 			std::ostringstream give_up;
@@ -3722,9 +3626,9 @@ void XCW::trah_solve(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double lambd
 			}
 		}
 		else {
-			//no finite step from the subspace: the preconditioned gradient, scaled into the radius.
-			//Its curvature may come from a Fock build only while the Fock matrix still belongs to
-			//these orbitals - after a rejected step (!extend) the diagonal is all there is
+			//no finite step from the subspace: the preconditioned gradient scaled into the radius. Its curvature
+			//comes from a Fock build only while the Fock matrix belongs to these orbitals; after a rejected step
+			//(!extend) the diagonal is all there is
 			kappa = -g.cwiseQuotient(soscf_hdiag_);
 			kappa *= soscf_trust_ / kappa.norm();
 			Hkappa = extend ? hessian_vector(scf, lambda, kappa) : soscf_hdiag_.cwiseProduct(kappa);
@@ -3794,10 +3698,9 @@ occ::Vec XCW::hessian_vector(occ::qm::SCF<occ::qm::HartreeFock>& scf, const doub
 		for (int ch = 0; ch < nchunk; ch++) {
 			for (int r = ch * chunk; r < std::min((ch + 1) * chunk, cryst.nr_small); r++) {
 				if (!fit_mask_[r]) continue;
-				//ponytail: the extinction shape is frozen over the step (dy/d|Fc| dropped), so
-				//sqrt(y)|Fc| and m d|Fc| reproduce I and dI exactly but their own curvature is
-				//neglected. Only the Hessian's step proposal degrades - TRAH accepts on the
-				//exact energy rebuild_at returns, and calc_perturb's gradient stays exact.
+				//ponytail: the extinction shape is frozen over the step (dy/d|Fc| dropped), so I and dI are exact but
+				//their curvature is neglected. Only the step proposal degrades: TRAH accepts on the exact energy and
+				//calc_perturb's gradient stays exact.
 				const double w = weighted ? inv_H2_[r] : 1.0, Fa = ext_sqrt_y(r) * std::abs(F0[r]);
 				const double dFa = std::abs(F0[r]) > 0 ? ext_m(r) * std::real(std::conj(F0[r]) * dFr[r]) / std::abs(F0[r]) : 0.0;
 				if (against_F2) {
@@ -3826,8 +3729,7 @@ occ::Vec XCW::hessian_vector(occ::qm::SCF<occ::qm::HartreeFock>& scf, const doub
 			if (!fit_mask_[r]) continue;
 			const double w = weighted ? inv_H2_[r] : 1.0, Fm = std::abs(F0[r]);
 			if (Fm == 0) continue;
-			//as above: the model amplitude is sqrt(y)|Fc| and its response m d|Fc|, with the
-			//shape frozen. The carrier conj(F) keeps calc_perturb's chain factor.
+			//as above: amplitude sqrt(y)|Fc|, response m d|Fc|, shape frozen; the carrier conj(F) keeps calc_perturb's chain factor
 			const double Fa = ext_sqrt_y(r) * Fm, dFa = ext_m(r) * std::real(std::conj(F0[r]) * dFr[r]) / Fm;
 			const cdouble carrier = (against_F2 ? ext_g(r) : ext_m(r)) * std::conj(F0[r]);
 			const cdouble dcarrier = (against_F2 ? ext_g(r) : ext_m(r)) * std::conj(dFr[r]);
@@ -3990,9 +3892,8 @@ void XCW::flip_high_m_phases(occ::qm::Wavefunction& w) {
 void XCW::create_tscb(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& lambda) {
 	XCW_log << "Creating .tscb file from converged SCF calculation..." << std::endl;
 	std::vector<WFN> sf_wave_vec(1, { scf.wavefunction(), false });
-	//The constructor marks anything taken from OCC as OCC-origin. What this refinement holds
-	//is an OCC result over a basis this program loaded, so say that: Int_Params then reads the
-	//shells with the convention they actually have.
+	//The constructor marks anything from OCC as OCC-origin, but this is an OCC result over a basis
+	//this program loaded; Int_Params then reads the shells with the convention they actually have.
 	sf_wave_vec[0].set_origin(e_origin::XCW_fit);
 	svec known_atoms_;
 	tsc_block<int, cdouble> result;
@@ -4105,9 +4006,8 @@ occ::qm::HartreeFock XCW::setup_XCW_procedure(bool read_tensor) {
 		const std::string file = aux->get_name() + "_df.json";
 		aux->write_occ_json(file, elements);
 		hf.set_density_fitting_basis(file);
-		//OCC keeps the three-index integrals only under a 512 MB limit and otherwise recomputes
-		//them every iteration, which costs twice a direct build here. Held whenever they fit in
-		//half of what the process can have; they are computed once for the whole lambda scan.
+		//OCC keeps the three-index integrals only under 512 MB and otherwise recomputes them every
+		//iteration; held here whenever they fit in half the process memory, once per lambda scan.
 		const size_t naux = aux->to_AOBasis(mol.atoms()).nbf();
 		const size_t nbf = occ_basis_set.nbf();
 		const size_t store = naux * nbf * (nbf + 1) / 2 * sizeof(double);
@@ -4190,14 +4090,12 @@ occ::qm::HartreeFock XCW::setup_XCW_procedure(bool read_tensor) {
 //}
 
 void XCW::run_XCW_fitting() {
-	//OCC parallelises through TBB, which does not read OMP_NUM_THREADS. Not a speedup - it
-	//already used every core - but it makes -cpus bind the 82% of a run that OCC owns.
+	//OCC parallelises through TBB, which ignores OMP_NUM_THREADS; this makes -cpus bind OCC's part too
 	occ::parallel::set_num_threads(opt->threads > 0 ? opt->threads : omp_get_max_threads());
 	occ::qm::HartreeFock hf = setup_XCW_procedure(settings.read_tensor);
 #if defined(NOSPHERA2_USE_GPU) || defined(NOSPHERA2_USE_METAL)
-	//The two walks of an iteration read the whole tensor and the host is bound by its memory
-	//bandwidth doing so; the device reads it several times faster. The host copy stays for
-	//the background writer.
+	//Both walks of an iteration read the whole tensor, memory-bandwidth bound on the host; the
+	//host copy stays for the background writer.
 	if (opt->gpu_itensor && opt->use_gpu && !i_streamed_) {
 		i_on_device_ = i_float_ ? itensor_gpu_hold(I32.data(), cryst.nr_small, static_cast<int>(i_compact_))
 			: itensor_gpu_hold(I.data(), cryst.nr_small, static_cast<int>(i_compact_));
@@ -4391,9 +4289,7 @@ void XCW::run_XCW_fitting() {
 		report_gaussian_halting_summary();
 	}
 
-	//Before the run ends: the writer holds a file handle and reads the resident tensor, and
-	//by now it has usually been finished for a long while - the refinement takes far longer
-	//than the write. Joining is what keeps it from outliving the process.
+	//Join before the run ends: the writer holds a file handle and reads the resident tensor
 	finish_i_save();
 #if defined(NOSPHERA2_USE_GPU) || defined(NOSPHERA2_USE_METAL)
 	itensor_gpu_release();

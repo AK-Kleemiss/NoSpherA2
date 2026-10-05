@@ -4,14 +4,10 @@
 
 class WFN;
 
-//Natural Atomic Orbitals and Natural Population Analysis, after Reed, Weinstock and Weinhold,
-//J. Chem. Phys. 83 (1985) 735.  The pipeline is
-//  1. symmetry-averaged diagonalisation of the atomic (atom, l) blocks of the density  -> pre-NAOs
-//  2. partition into the natural minimal basis (NMB, core + valence) and the Rydberg set (NRB)
-//  3. occupancy-weighted symmetric orthogonalisation (OWSO) of the NMB across atoms, Schmidt
-//     projection of the NRB out of it, OWSO of the NRB
-//  4. restoration of natural character: re-diagonalisation inside every (atom, l) block
-//The occupancies of a complete NAO set sum to Tr(PS) - the exact electron count - by construction.
+//NAO/NPA after Reed, Weinstock and Weinhold, J. Chem. Phys. 83 (1985) 735: symmetry-averaged (atom, l)
+//block diagonalisation gives pre-NAOs, split into the minimal basis (NMB, core + valence) and Rydberg set (NRB);
+//occupancy-weighted symmetric orthogonalisation (OWSO) of the NMB, Schmidt projection of the NRB out of it,
+//OWSO of the NRB, then re-diagonalisation per (atom, l). Occupancies sum to Tr(PS) by construction.
 
 enum class NAOClass { Core, Valence, Rydberg };
 
@@ -67,22 +63,20 @@ struct NPAResult {
 	vec spin_population;
 };
 
-//The AO map of the internal spherical basis, built from Int_Params so it matches the overlap
-//computed over the same object and the density matrix the readers store.
+//AO map of the internal spherical basis, from Int_Params so it matches the overlap and the stored density matrix
 std::vector<NAOBasisFunction> spherical_ao_map(const WFN &wavy);
 
-//Overlap of the internal spherical AO basis, in the order spherical_ao_map describes.
+//in spherical_ao_map order
 dMatrix2 ao_overlap(const WFN &wavy);
 
-//Number of shells of angular momentum l in the natural minimal basis of element Z, and how many
-//of those are core.  l runs 0..3.
+//Shells per l = 0..3 in the natural minimal basis of element Z, and how many of them are core
 void natural_minimal_shells(const int Z, int (&n_shell)[4], int (&n_core)[4]);
 
-//NAOs of one density matrix.  P and S must both be in the order spherical_ao_map describes.
+//P and S both in spherical_ao_map order
 NAOResult build_naos(const dMatrix2 &P, const dMatrix2 &S, const std::vector<NAOBasisFunction> &ao,
 					 const std::vector<atom> &atoms, const ivec &ecp_electrons);
 
-//The whole analysis for a wavefunction, spin-resolved when the reader kept a beta density.
+//spin-resolved when the reader kept a beta density
 NPAResult natural_population_analysis(const WFN &wavy);
 
 void print_npa(const NPAResult &result, std::ostream &out);

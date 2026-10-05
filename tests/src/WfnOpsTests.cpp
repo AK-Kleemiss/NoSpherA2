@@ -318,9 +318,8 @@ namespace
 		}
 	}
 
-	//The ESP pair table's (l,r,s) tables stop at a g x g pair - Afac_pre is [9][5][9], pcp is [3][9], Fn is [25] -
-	//and the OCC WFN constructor accepts shells up to l = 10, so an h primitive has to be refused rather than
-	//indexed past all three
+	//The ESP pair table's (l,r,s) tables stop at g x g (Afac_pre [9][5][9], pcp [3][9], Fn [25]) while the
+	//OCC WFN constructor accepts l up to 10, so an h primitive must be refused, not indexed past all three
 	TEST(WfnOpsTests, EspRefusesPrimitivesBeyondG)
 	{
 		int l[3];
@@ -332,9 +331,8 @@ namespace
 		double c = 1.0;
 		w.add_primitive(1, 36, 1.0, &c);
 		w.set_exp_cutoff();
-		//not_implemented puts std::cout back on the original buffer before it prints, so its message escapes the
-		//death test's capture and only the exit code can be asserted - the message itself is checked by the run
-		//on tests/CuF2_i_func (cc-pV5Z, h and i shells), which prints it and exits
+		//not_implemented restores std::cout's buffer before printing, so the message escapes the death test's
+		//capture and only the exit code is asserted; the tests/CuF2_i_func run checks the message
 		EXPECT_EXIT(w.build_ESP_pairs(), ::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), ".*");
 	}
 
@@ -562,8 +560,7 @@ namespace
 		EXPECT_FALSE(w.get_has_ECPs());
 	}
 
-	//the tables stop at Rn: an actinide used to index past the end of one and come back with
-	//Z = -543649293 core electrons, and the run segfaulted rather than saying anything
+	//the tables stop at Rn: an actinide must not index past their end
 	TEST(WfnOpsAtomTests, EcpTablesEndAtRadonAndAnActinideGetsNoCore)
 	{
 		EXPECT_EQ(constants::heaviest_ECP_element, 86);

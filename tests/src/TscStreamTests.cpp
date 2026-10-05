@@ -1,6 +1,4 @@
-// The streamed writer must produce exactly the file the one-shot writer does.
-// Everything downstream reads these bytes, so "close enough" is not a category
-// that exists here: the test compares the two files byte for byte.
+// Everything downstream reads these bytes, so streamed and one-shot output must match exactly
 #include "pch.h"
 #include <gtest/gtest.h>
 

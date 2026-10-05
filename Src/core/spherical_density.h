@@ -363,20 +363,9 @@ public:
 	static bool available(const int g_atom_number);
 };
 
-// Fractionally charged spherical atom, built from the tabulated integer states.
-//
-// rho_q(r) = (1 - f) * rho_0(r) + f * rho_ion(r),   f = |q|
-//
-// which is the Hirshfeld-E build-up written as a two-point interpolation: the
-// partial density of one electron is delta = rho_0 - rho_cation, and removing a
-// fraction f of it is the same as weighting the two tabulated states. Because
-// rho_0 integrates to Z and the +1 state to Z-1, this integrates to Z - q for
-// ANY real q, which is the property the whole construction exists for.
-//
-// Cations are used for q > 0 and anions for q < 0. Note the asymmetry: cationic
-// reference states are bound and well defined, whereas atomic anions beyond -1
-// are not bound at all, so |q| > 1 on the anion side is extrapolation into
-// territory that has no reference state. See is_extrapolating().
+// rho_q = (1 - f) rho_0 + f rho_ion, f = |q|: the Hirshfeld-E build-up (delta = rho_0 - rho_cation) as a
+// two-point interpolation, integrating to Z - q for any real q. Cations for q > 0, anions for q < 0; anions
+// beyond -1 are unbound, so |q| > 1 there extrapolates without a reference state (is_extrapolating()).
 class HE_Spherical_Atom
 {
 public:

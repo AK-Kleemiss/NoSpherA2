@@ -395,7 +395,7 @@ double calc_d_i(const d3& p_t, const WFN& wavy) {
 
 double calc_d_norm_term(const d3& p_t, const WFN& wavy) {
 	// min over atoms of (d - r_vdW) / r_vdW; d_norm is this term for the molecule plus the one for the environment.
-	// Taking the radius of the nearest atom instead jumps by up to 0.8 where the nearest atom switches (H 1.09 vs C 1.70 A).
+	// Not the nearest atom's radius: that jumps where the nearest atom switches element.
 	double t = 1E100;
 	for (int i = 0; i < wavy.get_ncen(); i++) {
 		const d3 p_a = { p_t[0] - wavy.get_atom_coordinate(i,0), p_t[1] - wavy.get_atom_coordinate(i,1), p_t[2] - wavy.get_atom_coordinate(i,2) };
@@ -416,10 +416,8 @@ RGB mix_colour(double val, const std::array<std::array<int, 3>, 3>& Colourcode, 
 	}
 	else {
 		//Mix colours
-		// a + f * (b - a), not (1 - f) * a + f * b: the second form returns 254.99999999999997 for a
-		// channel that is 255 at both ends, and int() truncates that to 254. The red of a red-white
-		// ramp then depends on the last bits of val, which is how a 1E-16 change in the ESP moved the
-		// colour of a face (IsosurfaceTests.EspColourOfRhoIsosurface). With this form f * 0 == 0 exactly.
+		// a + f * (b - a), not (1 - f) * a + f * b: the latter gives 254.999... for a channel 255 at both ends,
+		// which int() truncates to 254; here f * 0 == 0 exactly.
 		if (val < mid_point) {
 			double factor = (val - low_lim) / (mid_point - low_lim);
 			colour = { int(Colourcode[0][0] + factor * (Colourcode[1][0] - Colourcode[0][0])),
@@ -499,8 +497,8 @@ void surface_curvature(const std::vector<Triangle>& triangles, const cube& field
 	for (int k = 0; k < 3; k++) h[k] = constants::bohr2ang(field.get_vector(k, k));
 #pragma omp parallel for
 	for (int t = 0; t < nt; t++) {
-		// the finite differences at the 8 nodes around the face centre, blended trilinearly: the nearest node alone
-		// makes the curvature a step function of the voxel, which the shape index shows as speckle on every grid
+		// finite differences at the 8 nodes around the face centre, blended trilinearly; the nearest node alone
+		// makes the curvature a step function of the voxel (speckle in the shape index)
 		const d3 c = triangles[t].calc_center();
 		int base[3];
 		double f[3];
@@ -551,15 +549,11 @@ vec surface_ESP(const std::vector<Triangle>& triangles, const WFN& wavy)
 	temp.delete_unoccupied_MOs();
 	temp.delete_Qs();
 	const WFN::ESP_pairs pairs = temp.build_ESP_pairs();
-	// the face centres in batches, so a device sees many at once (the generic overload below stays
-	// for callers that hand in their own per-point function); the bar still ticks per batch, since
-	// Olex2 tails it while the window stays alive
+	// face centres in batches so a device sees many at once; the bar ticks per batch because Olex2 tails it
 	const int n = (int)triangles.size();
 	vec esp(n);
-	// A device needs the whole set in one launch to fill itself - sucrose's 87312 faces in 4096-point
-	// slices is 32 blocks of 128 on 80 SMs, and they took 18056 ms against 6171 ms for a cube of 3x as
-	// many points handed over in one call. Without a device the slices are independent OpenMP loops that
-	// cost nothing (measured: the same 159 us per point either way), so there the bar stays fine grained.
+	// A device needs the whole set in one launch to fill itself; without one the slices are independent
+	// OpenMP loops that cost nothing, so the bar stays fine grained.
 #ifdef NOSPHERA2_USE_GPU
 	const bool one_call = aux_density_gpu_enabled() && aux_density_gpu_available();
 #else
