@@ -1,4 +1,5 @@
 #include "pch.h"
+#include "tuning.h"
 #include "convenience.h"
 #include "AtomGrid.h"
 #ifdef NOSPHERA2_USE_GPU
@@ -429,7 +430,7 @@ vec make_chi(const WFN& wfn, int samples, bool refine, bool debug, const Density
 		}
 	}
 
-	if (std::getenv("NOSPHERA2_CHI_DEBUG")) { // Flawfinder: ignore
+	if (tuning("NOSPHERA2_CHI_DEBUG")) {
 		double s = 0.0;
 		for (int i = 0; i < chi.size(); i++) s += chi[i] * chi[i];
 		std::fprintf(stderr, "chi checksum %.17g size %zu\n", s, chi.size());

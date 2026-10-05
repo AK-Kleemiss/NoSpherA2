@@ -150,6 +150,7 @@
     <ClInclude Include="..\..\Src\core\test_functions.h" />
     <ClInclude Include="..\..\Src\core\Thakkar_coefs.h" />
     <ClInclude Include="..\..\Src\core\throughput.h" />
+    <ClInclude Include="..\..\Src\core\tuning.h" />
     <ClInclude Include="..\..\Src\core\topology.h" />
     <ClInclude Include="..\..\Src\core\tsc_block.h" />
     <ClInclude Include="..\..\Src\core\tsc_label_converter.h" />

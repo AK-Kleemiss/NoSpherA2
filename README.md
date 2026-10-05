@@ -66,7 +66,7 @@ cmake --preset release-windows -DNOSPHERA2_BUILD_TESTS=ON
 - `NOSPHERA2_DEPENDENCIES_ONLY` (default: `OFF`): build dependency targets only; this is intended for dependency-cache preparation.
 - `NOSPHERA2_GPU_AUTO` (default: `ON`): select CUDA for an NVIDIA driver or HIP for an AMD driver detected on the build host. Set it to `OFF` when choosing a backend explicitly.
 - `NOSPHERA2_USE_CUDA` (default: `OFF`): compile the CUDA GPU paths. This can be enabled explicitly on a GPU-less build host when a CUDA compiler is available.
-- `NOSPHERA2_USE_HIP` (default: `OFF`): compile the HIP GPU paths. Together with `NOSPHERA2_USE_CUDA` it produces one binary carrying both backends; at run time the backend with a device is used (`NOSPHERA2_GPU_BACKEND=cuda|hip` in the environment overrides the choice).
+- `NOSPHERA2_USE_HIP` (default: `OFF`): compile the HIP GPU paths. Together with `NOSPHERA2_USE_CUDA` it produces one binary carrying both backends; at run time the backend with a device is used (`-tune NOSPHERA2_GPU_BACKEND=cuda|hip` overrides the choice).
 - `NOSPHERA2_CUDA_PORTABLE` / `NOSPHERA2_HIP_PORTABLE` (default: `OFF`): compile for every supported NVIDIA / AMD architecture instead of only the build machine's GPU. Use this for a binary distributed to different GPUs.
 - `NOSPHERA2_USE_CUTLASS` (default: `ON`): use CUTLASS headers for the CUDA single-precision I-tensor GEMM. It has no additional runtime dependency.
 

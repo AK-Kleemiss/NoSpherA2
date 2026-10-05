@@ -1,4 +1,5 @@
 #include "pch.h"
+#include "core/tuning.h"
 
 //Say where the executable should run before any test fails on a relative path
 static void warn_about_working_directory()
@@ -64,11 +65,7 @@ int main(int argc, char** argv)
 	//The RGBI tests count free-atom SCFs and compare their digits run against run; a density read back
 	//from a previous run's on-disk cache would answer them without running anything. A test that wants
 	//the disk cache sets NOS_FREEATOM_CACHE_DIR itself.
-#ifdef _WIN32
-	_putenv_s("NOS_FREEATOM_CACHE_DIR", "off");
-#else
-	setenv("NOS_FREEATOM_CACHE_DIR", "off", 1);
-#endif
+	set_tuning("NOS_FREEATOM_CACHE_DIR", "off");
 	::testing::InitGoogleTest(&argc, argv);
 	::testing::UnitTest::GetInstance()->listeners().Append(new CoutFormatReset);
 	warn_about_working_directory();

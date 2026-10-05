@@ -1,4 +1,5 @@
 #include "pch.h"
+#include "core/tuning.h"
 #include "core/wfn_class.h"
 #include "core/bondwise_analysis.h"
 
@@ -194,17 +195,9 @@ TEST(RgbiRobustnessTests, AFreeAtomThatRunsOutOfIterationsSaysSo)
 		<< quiet;
 
 	clear_rgbi_free_atom_cache();
-#ifdef _WIN32
-	_putenv_s("NOS_RGBI_FREE_ATOM_MAXITER", "1");
-#else
-	setenv("NOS_RGBI_FREE_ATOM_MAXITER", "1", 1);
-#endif
+	set_tuning("NOS_RGBI_FREE_ATOM_MAXITER", "1");
 	const std::string capped = rgbi_ano_output(false);
-#ifdef _WIN32
-	_putenv_s("NOS_RGBI_FREE_ATOM_MAXITER", "");
-#else
-	unsetenv("NOS_RGBI_FREE_ATOM_MAXITER");
-#endif
+	set_tuning("NOS_RGBI_FREE_ATOM_MAXITER", nullptr);
 	//and never leave a one-iteration density in the cache for whatever test runs next
 	clear_rgbi_free_atom_cache();
 	ASSERT_FALSE(capped.empty()) << "the capped arm produced no output at all";
@@ -342,18 +335,10 @@ TEST(RgbiRobustnessTests, IdenticalCentresShareOneFreeAtomScf)
 
 	struct ScopedEnv {
 		ScopedEnv() {
-#ifdef _WIN32
-			_putenv_s("NOS_RGBI_DEBUG", "1");
-#else
-			setenv("NOS_RGBI_DEBUG", "1", 1);
-#endif
+			set_tuning("NOS_RGBI_DEBUG", "1");
 		}
 		~ScopedEnv() {
-#ifdef _WIN32
-			_putenv_s("NOS_RGBI_DEBUG", "");
-#else
-			unsetenv("NOS_RGBI_DEBUG");
-#endif
+			set_tuning("NOS_RGBI_DEBUG", nullptr);
 		}
 	} debug_on;
 
@@ -379,17 +364,9 @@ TEST(RgbiRobustnessTests, IdenticalCentresShareOneFreeAtomScf)
 
 	//NOS_RGBI_NO_FREEATOM_CACHE recomputes every centre in this process, so the cached bond table has something
 	//to be identical to; that identity, not speed, is what justifies the cache.
-#ifdef _WIN32
-	_putenv_s("NOS_RGBI_NO_FREEATOM_CACHE", "1");
-#else
-	setenv("NOS_RGBI_NO_FREEATOM_CACHE", "1", 1);
-#endif
+	set_tuning("NOS_RGBI_NO_FREEATOM_CACHE", "1");
 	const std::string uncached = rgbi_ano_output(false);
-#ifdef _WIN32
-	_putenv_s("NOS_RGBI_NO_FREEATOM_CACHE", "");
-#else
-	unsetenv("NOS_RGBI_NO_FREEATOM_CACHE");
-#endif
+	set_tuning("NOS_RGBI_NO_FREEATOM_CACHE", nullptr);
 	ASSERT_FALSE(uncached.empty()) << "the uncached arm produced no output at all";
 
 	const auto count_in = [](const std::string &hay, const std::string &token) {
@@ -426,16 +403,7 @@ TEST(RgbiRobustnessTests, WarmingTheFreeAtomCacheInParallelDoesNotChangeTheAnswe
 	if (p.empty())
 		GTEST_SKIP() << "tests/TFVC/water.gbw not found";
 
-	const auto set_env = [](const char *name, const char *value) {
-#ifdef _WIN32
-		_putenv_s(name, value);
-#else
-		if (*value)
-			setenv(name, value, 1);
-		else
-			unsetenv(name);
-#endif
-		};
+	const auto set_env = [](const char *name, const char *value) { set_tuning(name, *value ? value : nullptr); };
 	const auto table = [](const std::string &s) {
 		const size_t from = s.find("Atom Nr");
 		return from == std::string::npos ? std::string() : s.substr(from);
@@ -506,22 +474,12 @@ TEST(RgbiRobustnessTests, EveryFreeAtomScfRunsWithOccPinnedForReal)
 
 	struct ScopedEnv {
 		ScopedEnv() {
-#ifdef _WIN32
-			_putenv_s("NOS_RGBI_DEBUG", "1");
-			_putenv_s("NOS_RGBI_NO_FREEATOM_CACHE", "1");
-#else
-			setenv("NOS_RGBI_DEBUG", "1", 1);
-			setenv("NOS_RGBI_NO_FREEATOM_CACHE", "1", 1);
-#endif
+			set_tuning("NOS_RGBI_DEBUG", "1");
+			set_tuning("NOS_RGBI_NO_FREEATOM_CACHE", "1");
 		}
 		~ScopedEnv() {
-#ifdef _WIN32
-			_putenv_s("NOS_RGBI_DEBUG", "");
-			_putenv_s("NOS_RGBI_NO_FREEATOM_CACHE", "");
-#else
-			unsetenv("NOS_RGBI_DEBUG");
-			unsetenv("NOS_RGBI_NO_FREEATOM_CACHE");
-#endif
+			set_tuning("NOS_RGBI_DEBUG", nullptr);
+			set_tuning("NOS_RGBI_NO_FREEATOM_CACHE", nullptr);
 		}
 	} debug_uncached;
 

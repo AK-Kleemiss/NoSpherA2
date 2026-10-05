@@ -1,6 +1,7 @@
 ﻿#pragma once
 #include "pch.h"
 #include "throughput.h"
+#include "tuning.h"
 
 
 

@@ -1,6 +1,7 @@
 #include "basin_field_gpu.h"
 #include "aux_density_gpu.h"
 #include "gpu_backend.h"
+#include "tuning.h"
 #include <cstdio>
 #include <cstdlib>
 #include <chrono>
@@ -252,7 +253,7 @@ struct bf_ctx
 	double *c = nullptr, *cmin = nullptr, *pe = nullptr, *ps = nullptr, *coef = nullptr, *occ = nullptr, *minpe = nullptr;
 	int *start = nullptr, *pc = nullptr, *pl = nullptr, *aoc = nullptr, *idx = nullptr;
 	double *pts = nullptr, *chi = nullptr, *val = nullptr, *grad = nullptr, *rho = nullptr;
-	//NOS_BASIN_GPU_PROFILE: a sync after every stage and the seconds per stage, printed at close
+	//-tune NOS_BASIN_GPU_PROFILE: a sync after every stage and the seconds per stage, printed at close
 	bool prof = false;
 	double st[3]{ 0, 0, 0 };
 	long long prof_points = 0, prof_runs = 0;
@@ -315,7 +316,7 @@ void* basin_field_gpu_open(
 
 	bf_ctx* x = new bf_ctx;
 	x->K = K; x->nao = nao; x->nocc = nocc; x->chunk = (int)nb; x->cutoff = exp_cutoff;
-	x->prof = std::getenv("NOS_BASIN_GPU_PROFILE") != nullptr;
+	x->prof = tuning("NOS_BASIN_GPU_PROFILE") != nullptr;
 	const size_t ch = (size_t)x->chunk;
 	const bool ok = gpuStreamCreateNonBlocking(&x->s) == gpuSuccess
 		&& upload(x->c, cxyz, 3 * (size_t)ncen) && upload(x->cmin, cmin_exp, (size_t)ncen)

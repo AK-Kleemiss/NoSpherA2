@@ -1,4 +1,5 @@
 #include "pch.h"
+#include "tuning.h"
 #include "wfn_class.h"
 #include "convenience.h"
 #include "constants.h"
@@ -1218,7 +1219,7 @@ std::pair<cubei, std::vector<d4>> topological_cube_analysis(const cube *cub, con
 	else {
 		std::cout << "Assigning basins by near-grid ascent..." << std::endl;
 		//An assigned voxel terminates ascent only after its basin is settled.
-		const bool reverse_scan = std::getenv("NOS_BASIN_SCAN_REVERSE") != nullptr;
+		const bool reverse_scan = tuning("NOS_BASIN_SCAN_REVERSE") != nullptr;
 		if (reverse_scan) std::cout << "NOS_BASIN_SCAN_REVERSE is set: scanning seed voxels in the opposite order (diagnostic)" << std::endl;
 		for (int xr = 0; xr < nx; xr++)
 			for (int yr = 0; yr < ny; yr++)
@@ -1481,7 +1482,7 @@ int unify_shell_basins(cubei &basin_cube, std::vector<d4> &maxima, ivec *basin_m
 	//within 0.3 bohr and less than 120 deg apart about it, join when the radial maximum of the field along the arc between
 	//them never drops below phi times the lower of the two
 	double phi = 0.99;
-	if (const char *e = std::getenv("NOS_ELI_SHELL_SADDLE")) { const double v = std::atof(e); if (v >= 0.0 && v < 1.0) phi = v; }
+	if (const char *e = tuning("NOS_ELI_SHELL_SADDLE")) { const double v = std::atof(e); if (v >= 0.0 && v < 1.0) phi = v; }
 	if (wavy && phi > 0.0) {
 		auto field = [&](const d3 &p) { double f; d3 g; if (eli) (*eli)(p, f, g, nullptr); else wavy->computeELIGrad(p, f, g); return f; };
 		ivec na(nb, 0);
@@ -1538,7 +1539,7 @@ int unify_shell_basins(cubei &basin_cube, std::vector<d4> &maxima, ivec *basin_m
 			}
 			join[q] = ok;
 		}
-		const bool log = std::getenv("NOS_ELI_SHELL_SADDLE_LOG") != nullptr;
+		const bool log = tuning("NOS_ELI_SHELL_SADDLE_LOG") != nullptr;
 		int joined = 0;
 		for (size_t q = 0; q < pairs.size(); q++) {
 			if (!join[q]) continue;
@@ -1769,7 +1770,7 @@ std::vector<d4> streaming_density_attractors(const WFN &wavy, const std::vector<
 static int g_basin_gpu = -1;
 void basin_gpu_set_mode(const int mode) { g_basin_gpu = mode < 0 ? -1 : mode > 0; }
 //Auto keeps the host below this cost per field evaluation, about what a park and batch costs a host thread
-//(NOS_BASIN_GPU_MIN_US overrides)
+//(-tune NOS_BASIN_GPU_MIN_US overrides)
 static constexpr double basin_gpu_min_us = 3.0;
 
 //One per host thread of a device-fed loop. Each fiber (fiber_loop) holds a trajectory and parks its evaluations here;
@@ -2062,9 +2063,9 @@ static double g_adp_cap = adp_cap_default;
 static double g_adp_grow = adp_grow_default;
 static double g_adp_keep = adp_keep_default;
 static double g_adp_reach = adp_reach_default;
-static double env_double(const char *name, const double fallback, const double upper = 0.0)
+static double tuning_double(const char *name, const double fallback, const double upper = 0.0)
 {
-	const char *v = std::getenv(name); // Flawfinder: ignore - parsed as one positive double
+	const char *v = tuning(name);
 	if (v == nullptr || *v == '\0') return fallback;
 	try {
 		const double d = std::stod(v);
@@ -2079,13 +2080,13 @@ static double env_double(const char *name, const double fallback, const double u
 	return fallback;
 }
 //Auto (-1) times host_eval on the sample (xyz) on one thread and the device on it in one batch after a warm-up; the device
-//is taken when a host evaluation costs at least NOS_BASIN_GPU_MIN_US and the device outruns all host threads together.
+//is taken when a host evaluation costs at least -tune NOS_BASIN_GPU_MIN_US and the device outruns all host threads together.
 static std::vector<std::unique_ptr<field_feed>> open_field_feeds(const WFN &wavy, const bool eli, const vec &sample,
 	const std::function<void(const d3 &)> &host_eval, const int threads, std::ostringstream &why)
 {
 	std::vector<std::unique_ptr<field_feed>> feeds;
 	if (g_basin_gpu == 0) { why << "-no_basin_gpu"; return feeds; }
-	const int fibers = std::max(1, static_cast<int>(env_double("NOS_BASIN_GPU_FIBERS", 256.0)));
+	const int fibers = std::max(1, static_cast<int>(tuning_double("NOS_BASIN_GPU_FIBERS", 256.0)));
 	const int ns = static_cast<int>(sample.size() / 3);
 	auto at = [&](const int i) { return d3{ sample[3 * i], sample[3 * i + 1], sample[3 * i + 2] }; };
 	double host_us = 0.0;
@@ -2095,7 +2096,7 @@ static std::vector<std::unique_ptr<field_feed>> open_field_feeds(const WFN &wavy
 		for (int i = 1; i < ns; i++) host_eval(at(i));
 		host_us = 1e6 * std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count() / (ns - 1);
 	}
-	const double min_us = env_double("NOS_BASIN_GPU_MIN_US", basin_gpu_min_us);
+	const double min_us = tuning_double("NOS_BASIN_GPU_MIN_US", basin_gpu_min_us);
 	std::ostringstream us;
 	us << std::setprecision(3) << "the host field costs " << host_us << " us a point";
 	if (g_basin_gpu < 0 && host_us < min_us) { why << "auto, " << us.str() << ", below " << min_us; return feeds; }
@@ -2118,17 +2119,17 @@ static std::vector<std::unique_ptr<field_feed>> open_field_feeds(const WFN &wavy
 	else why << "auto, " << us.str() << ", at least " << min_us;
 	return feeds;
 }
-static void adp_knobs_from_env()
+static void adp_knobs_from_tuning()
 {
-	//From the defaults every time, so unsetting a variable restores its default
-	g_adp_cap = env_double("NOS_ADP_CAP", adp_cap_default);
-	g_adp_grow = env_double("NOS_ADP_GROW", adp_grow_default);
-	g_adp_keep = env_double("NOS_ADP_KEEP", adp_keep_default);
-	g_adp_reach = env_double("NOS_ADP_REACH", adp_reach_default);
+	//From the defaults every time, so removing a knob restores its default
+	g_adp_cap = tuning_double("NOS_ADP_CAP", adp_cap_default);
+	g_adp_grow = tuning_double("NOS_ADP_GROW", adp_grow_default);
+	g_adp_keep = tuning_double("NOS_ADP_KEEP", adp_keep_default);
+	g_adp_reach = tuning_double("NOS_ADP_REACH", adp_reach_default);
 }
 //Keep beta spheres within the smallest sampled safe radius.
 static constexpr double beta_margin_default = 0.9;
-double basin_beta_margin() { return env_double("NOS_BETA_MARGIN", beta_margin_default, 1.0); }
+double basin_beta_margin() { return tuning_double("NOS_BETA_MARGIN", beta_margin_default, 1.0); }
 void basin_adaptive_step_knobs(double &cap, double &grow, double &keep, double &reach)
 {
 	cap = g_adp_cap; grow = g_adp_grow; keep = g_adp_keep; reach = g_adp_reach;
@@ -2203,7 +2204,7 @@ void basin_adaptive_step_counters_reset()
 {
 	g_adp_steps = 0; g_adp_tries = 0; g_adp_turn = 0; g_adp_fall = 0; g_adp_shrink = 0; g_adp_exhaust = 0;
 }
-void basin_adaptive_step_set_enabled(const bool on) { g_adaptive_step = on; if (on) adp_knobs_from_env(); }
+void basin_adaptive_step_set_enabled(const bool on) { g_adaptive_step = on; if (on) adp_knobs_from_tuning(); }
 bool basin_adaptive_step_enabled() { return g_adaptive_step; }
 static double g_basin_step_scale = 1.0;
 void basin_step_scale_set(const double f) { g_basin_step_scale = f > 0.0 ? f : 1.0; }
@@ -2328,16 +2329,16 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 	const bool streaming = cub == nullptr || basin_cube == nullptr;
 	//Cleared here and not at the print, so the count belongs to this call and survives it
 	g_stall_slope = 0;
-	if (const char *e = std::getenv("NOS_BASIN_STEP_CAP")) {
+	if (const char *e = tuning("NOS_BASIN_STEP_CAP")) {
 		const int v = std::atoi(e);
 		if (v >= 100) g_step_cap = v;
 	}
-	if (const char *e = std::getenv("NOS_BASIN_STEP_RELAX")) {
+	if (const char *e = tuning("NOS_BASIN_STEP_RELAX")) {
 		const double v = std::atof(e);
 		if (v >= 1.0 && v <= 4.0) g_step_relax = v;
 	}
-	if (const char *e = std::getenv("NOS_BASIN_SHRINK")) g_step_shrink = std::string(e) != "0";
-	if (const char *e = std::getenv("NOS_BASIN_SHRINK_FLOOR")) {
+	if (const char *e = tuning("NOS_BASIN_SHRINK")) g_step_shrink = std::string(e) != "0";
+	if (const char *e = tuning("NOS_BASIN_SHRINK_FLOOR")) {
 		const double v = std::atof(e);
 		if (v > 0.0 && v <= 1.0) g_shrink_floor = v;
 	}
@@ -2390,12 +2391,12 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 	//ponytail: 13-bit labels, so more than 8191 basins runs without the memo; widen the label field if that happens
 	std::unique_ptr<basin_memo> memo;
 	{
-		const char *e = std::getenv("NOS_BASIN_MEMO"); // Flawfinder: ignore - compared only
+		const char *e = tuning("NOS_BASIN_MEMO");
 		if (streaming && !atoms.empty() && nb < (1 << 13) && !(e != nullptr && std::string(e) == "0")) {
 			d3 lo = atoms[0].get_pos(), hi = lo;
 			for (const atom &at : atoms)
 				for (int d = 0; d < 3; d++) { lo[d] = std::min(lo[d], at.get_pos()[d]); hi[d] = std::max(hi[d], at.get_pos()[d]); }
-			memo = std::make_unique<basin_memo>(lo, hi, 0.5 * voxel, static_cast<size_t>(env_double("NOS_BASIN_MEMO_MB", 256.0)));
+			memo = std::make_unique<basin_memo>(lo, hi, 0.5 * voxel, static_cast<size_t>(tuning_double("NOS_BASIN_MEMO_MB", 256.0)));
 		}
 	}
 	//Trajectories by who asked for them (outer probe, inner probe, cell centre, bisection), their step iterations and how many a settled memo block ended
@@ -2595,7 +2596,7 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 	config.angular_boost = grid_boost - 1;
 	config.partition_type = PartitionType::Becke;
 	config.no_density_eval = true;
-	const char *rot_env = std::getenv("NOS_BASIN_ROTATE"); // Flawfinder: ignore - compared only
+	const char *rot_env = tuning("NOS_BASIN_ROTATE");
 	config.rotate_angular = rot_env == nullptr || std::string(rot_env) != "0";
 	GridManager grids(config);
 	ivec every_atom(wavy.get_ncen());
@@ -2607,7 +2608,7 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 #ifdef _OPENMP
 	host_threads = omp_get_max_threads();
 #endif
-	//On the device each host thread runs NOS_BASIN_GPU_FIBERS trajectories as fibers and batches their field calls
+	//On the device each host thread runs -tune NOS_BASIN_GPU_FIBERS trajectories as fibers and batches their field calls
 	//on its own feed. Plain wavefunction fields only: a density_source field and the spin ELI-D stay on the host.
 	//Auto decides on a sample of the grid points inside the density isosurface (open_field_feeds).
 	std::vector<std::unique_ptr<field_feed>> feeds;
@@ -2861,8 +2862,8 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 	long long boundary_points = 0, lost = 0;
 	//NOS_BASIN_SKIP: electrons per molecule the lightest points may move instead of being climbed; 0 climbs every point.
 	//The default, half the last printed digit of a population, cannot move a basin by a printed unit
-	const char *skip_env = std::getenv("NOS_BASIN_SKIP"); // Flawfinder: ignore - compared, then parsed by env_double
-	const double skip_budget = (skip_env != nullptr && std::string(skip_env) == "0") ? 0.0 : env_double("NOS_BASIN_SKIP", 5e-5);
+	const char *skip_env = tuning("NOS_BASIN_SKIP");
+	const double skip_budget = (skip_env != nullptr && std::string(skip_env) == "0") ? 0.0 : tuning_double("NOS_BASIN_SKIP", 5e-5);
 	long long skipped_points = 0;
 	double skipped_mass = 0.0;
 	for (size_t a = 0; a < gd.atomic_grids.size(); a++) {

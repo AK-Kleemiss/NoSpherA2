@@ -2,6 +2,7 @@
 //The backend is chosen once, as the two keep separate state: CUDA, then HIP, else CUDA reporting
 //no device. NOSPHERA2_GPU_BACKEND=cuda|hip overrides the probe.
 #include "sf_gpu.h"
+#include "tuning.h"
 #include "itensor_gpu.h"
 #include "grid_gpu.h"
 #include "salted_gpu.h"
@@ -82,7 +83,7 @@ enum class gpu_backend { cuda, hip };
 gpu_backend chosen_backend()
 {
 	static const gpu_backend chosen = [] {
-		if (const char* env = std::getenv("NOSPHERA2_GPU_BACKEND")) {
+		if (const char* env = tuning("NOSPHERA2_GPU_BACKEND")) {
 			std::string v(env);
 			for (char& c : v) c = (char)std::tolower((unsigned char)c);
 			if (v == "cuda") return gpu_backend::cuda;

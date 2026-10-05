@@ -1,4 +1,5 @@
 #include "sf_gpu.h"
+#include "tuning.h"
 #include "gpu_backend.h"
 #include <cstdio>
 #include <cstring>
@@ -217,7 +218,7 @@ bool sf_gpu_run(const int imax, const long long smax,
 		}
 	}
 	//Forces batching, which a card large enough for the whole problem never exercises.
-	if (const char* cap = std::getenv("NOSPHERA2_GPU_BATCH")) {
+	if (const char* cap = tuning("NOSPHERA2_GPU_BATCH")) {
 		const int c = std::atoi(cap);
 		if (c > 0 && c < batch) batch = c;
 	}

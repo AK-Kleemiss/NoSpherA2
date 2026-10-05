@@ -1,5 +1,6 @@
 
 #include "pch.h"
+#include "core/tuning.h"
 
 #include "core/convenience.h"
 #include "core/constants.h"
@@ -350,12 +351,7 @@ namespace NoSpherA2UnitTests
 #ifdef NOSPHERA2_USE_GPU
 	static void set_min_flop_env(const char* value)
 	{
-#ifdef _WIN32
-		_putenv_s("NOSPHERA2_BLAS_GPU_MIN_FLOP", value ? value : "");
-#else
-		if (value) setenv("NOSPHERA2_BLAS_GPU_MIN_FLOP", value, 1);
-		else unsetenv("NOSPHERA2_BLAS_GPU_MIN_FLOP");
-#endif
+		set_tuning("NOSPHERA2_BLAS_GPU_MIN_FLOP", value);
 	}
 
 	// blas_gpu_dgemm ships and, until this test, was reached by nothing at all: its size

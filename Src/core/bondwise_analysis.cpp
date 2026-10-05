@@ -1,4 +1,5 @@
 #include "pch.h"
+#include "tuning.h"
 #include "wfn_class.h"
 #include "convenience.h"
 #include "bondwise_analysis.h"
@@ -279,7 +280,7 @@ namespace {
 	//changes the density, hence one thread. NOS_RGBI_NO_PIN disables the pin to measure its cost; read once
 	//so constructor and destructor agree.
 	inline bool occ_pinning_disabled() {
-		static const bool disabled = std::getenv("NOS_RGBI_NO_PIN") != nullptr;
+		static const bool disabled = tuning("NOS_RGBI_NO_PIN") != nullptr;
 		return disabled;
 	}
 
@@ -507,13 +508,13 @@ namespace {
 
 	std::filesystem::path free_atom_cache_dir() {
 		//"off" disables the disk cache alone; NOS_RGBI_NO_FREEATOM_CACHE disables both caches.
-		if (const char *d = std::getenv("NOS_FREEATOM_CACHE_DIR"))
+		if (const char *d = tuning("NOS_FREEATOM_CACHE_DIR"))
 			return (std::string(d).empty() || std::string(d) == "off") ? std::filesystem::path() : std::filesystem::path(d);
-		if (const char *d = std::getenv("LOCALAPPDATA"))
+		if (const char *d = std::getenv("LOCALAPPDATA")) // Flawfinder: ignore - the user's cache root, used as a directory only
 			return std::filesystem::path(d) / "NoSpherA2" / "free_atom_cache";
-		if (const char *d = std::getenv("XDG_CACHE_HOME"))
+		if (const char *d = std::getenv("XDG_CACHE_HOME")) // Flawfinder: ignore - the user's cache root, used as a directory only
 			return std::filesystem::path(d) / "NoSpherA2" / "free_atom_cache";
-		if (const char *d = std::getenv("HOME"))
+		if (const char *d = std::getenv("HOME")) // Flawfinder: ignore - the user's cache root, used as a directory only
 			return std::filesystem::path(d) / ".cache" / "NoSpherA2" / "free_atom_cache";
 		return {};
 	}
@@ -521,7 +522,7 @@ namespace {
 	std::string free_atom_disk_key(const FreeAtomKey &key, const bool relativistic) {
 		std::string k = relativistic ? "sfx2c1e|" : "nonrel|";
 		k += build_date + "|pin=" + (occ_pinning_disabled() ? "0" : "1") + "|maxiter=";
-		if (const char *cap = std::getenv("NOS_RGBI_FREE_ATOM_MAXITER"))
+		if (const char *cap = tuning("NOS_RGBI_FREE_ATOM_MAXITER"))
 			k += cap;
 		auto put = [&k](const auto value) { k.append(reinterpret_cast<const char *>(&value), sizeof(value)); };
 		put(key.charge); put(key.ecp_electrons); put(static_cast<int>(key.origin)); put(key.cartesian);
@@ -647,12 +648,12 @@ namespace {
 							   origin, cartesian };
 		//NOS_RGBI_NO_FREEATOM_CACHE recomputes every centre (the reference for cached numbers) and neither reads
 		//nor writes the cache. Read per call so a test can flip it within one process.
-		const bool cache_disabled = std::getenv("NOS_RGBI_NO_FREEATOM_CACHE") != nullptr;
+		const bool cache_disabled = tuning("NOS_RGBI_NO_FREEATOM_CACHE") != nullptr;
 		if (!cache_disabled) {
 			const std::lock_guard<std::mutex> hold(free_atom_cache_mutex);
 			for (const auto &cached : free_atom_cache)
 				if (cached.first == key) {
-					if (std::getenv("NOS_RGBI_DEBUG") != nullptr) {
+					if (tuning("NOS_RGBI_DEBUG") != nullptr) {
 						std::ostringstream line;
 						line << "FREEATOM-CACHED " << atm.get_label() << " Z="
 							<< atm.get_charge() - atm.get_ECP_electrons();
@@ -665,13 +666,13 @@ namespace {
 		//All-electron atoms get sf-X2C-1e; an ECP carries relativity in its potential.
 		//NOS_RGBI_NONREL_FREEATOM restores the non-relativistic free atom, for comparison only.
 		const bool relativistic = atm.get_ECP_electrons() == 0 &&
-			std::getenv("NOS_RGBI_NONREL_FREEATOM") == nullptr;
+			tuning("NOS_RGBI_NONREL_FREEATOM") == nullptr;
 		const int effective_atomic_number = atm.get_charge() - atm.get_ECP_electrons();
 		const std::string disk_key = cache_disabled ? std::string() : free_atom_disk_key(key, relativistic);
 		const std::filesystem::path disk_path =
 			cache_disabled ? std::filesystem::path() : free_atom_disk_path(disk_key, effective_atomic_number);
 		if (FreeAtomDiskEntry hit; !cache_disabled && load_free_atom_from_disk(disk_path, disk_key, hit)) {
-			if (std::getenv("NOS_RGBI_DEBUG") != nullptr)
+			if (tuning("NOS_RGBI_DEBUG") != nullptr)
 				rgbi_debug_line("FREEATOM-DISK " + atm.get_label() + " Z=" + std::to_string(effective_atomic_number) +
 					" " + disk_path.string());
 			if (!hit.converged)
@@ -704,7 +705,7 @@ namespace {
 				"described them.");
 
 		//Printed before the SCF so a crash inside occ names the atom. pinned= is 1 only with a global_control at one thread.
-		if (std::getenv("NOS_RGBI_DEBUG") != nullptr) {
+		if (tuning("NOS_RGBI_DEBUG") != nullptr) {
 			std::ostringstream line;
 			line << "FREEATOM-START " << atm.get_label() << " Z=" << effective_atomic_number
 				<< " mult=" << multiplicity << (restricted ? " restricted" : " unrestricted")
@@ -728,7 +729,7 @@ namespace {
 			scf.set_guess_kind(occ::qm::GuessKind::Core);
 		scf.set_charge_multiplicity(0, multiplicity);
 		//NOS_RGBI_FREE_ATOM_MAXITER caps the iterations so the unconverged warning is testable; unset leaves occ's default.
-		if (const char *cap = std::getenv("NOS_RGBI_FREE_ATOM_MAXITER")) {
+		if (const char *cap = tuning("NOS_RGBI_FREE_ATOM_MAXITER")) {
 			const int capped_iterations = std::atoi(cap);
 			if (capped_iterations > 0)
 				scf.maxiter = capped_iterations;
@@ -747,7 +748,7 @@ namespace {
 		occ::qm::MolecularOrbitals mo = scf.wavefunction().mo;
 		mo.update_occupied_orbitals();
 		mo.update_density_matrix();
-		if (std::getenv("NOS_RGBI_DEBUG") != nullptr) {
+		if (tuning("NOS_RGBI_DEBUG") != nullptr) {
 			std::ostringstream line;
 			line << "FREEATOM " << atm.get_label() << " Z=" << effective_atomic_number
 				<< " mult=" << multiplicity << (restricted ? " restricted" : " unrestricted")
@@ -758,7 +759,7 @@ namespace {
 		}
 		//A separate line: the harness compares the FREEATOM line from " Z=" to the end, and a wall clock there
 		//would make every line unique. It carries no " E=", which that test filters on.
-		if (std::getenv("NOS_RGBI_DEBUG") != nullptr) {
+		if (tuning("NOS_RGBI_DEBUG") != nullptr) {
 			std::ostringstream line;
 			line << "FREEATOM-TIME " << atm.get_label() << " Z=" << effective_atomic_number
 				<< " nbf=" << basis.nbf() << " secs="
@@ -787,8 +788,8 @@ namespace {
 	void warm_free_atom_cache(const std::vector<atom> &ats, const e_origin origin,
 		const bool cartesian) {
 		//With the cache off nothing would read what this warms.
-		if (std::getenv("NOS_RGBI_PARALLEL_FREEATOM") == nullptr ||
-			std::getenv("NOS_RGBI_NO_FREEATOM_CACHE") != nullptr)
+		if (tuning("NOS_RGBI_PARALLEL_FREEATOM") == nullptr ||
+			tuning("NOS_RGBI_NO_FREEATOM_CACHE") != nullptr)
 			return;
 
 		//One representative per distinct cache key, i.e. exactly the set the serial loop would compute.
@@ -807,7 +808,7 @@ namespace {
 		}
 		if (distinct.size() < 2)
 			return;
-		if (std::getenv("NOS_RGBI_DEBUG") != nullptr) {
+		if (tuning("NOS_RGBI_DEBUG") != nullptr) {
 			std::ostringstream line;
 			line << "FREEATOM-WARM " << distinct.size() << " distinct of " << ats.size() << " centres";
 			rgbi_debug_line(line.str());
@@ -2878,7 +2879,7 @@ Roby_information::Roby_information(WFN &wavy, const ivec3 &group_sets, const boo
 	const ostream_format_guard restore_cout_format(std::cout);
 	//The pinv cutoff decides the rank of near-singular metrics: settable to tell physics from threshold, and
 	//announced so a non-default run is not mistaken for a default one.
-	if (const char *env = std::getenv("NOS_RGBI_PINV_CUTOFF")) {
+	if (const char *env = tuning("NOS_RGBI_PINV_CUTOFF")) {
 		try {
 			const double v = std::stod(env);
 			err_checkf(v > 0.0, "NOS_RGBI_PINV_CUTOFF must be positive, got '" + std::string(env) + "'.", std::cout);
@@ -4022,8 +4023,8 @@ void ELI_analysis(const WFN &wavy, options &opt) {
 	//Outside the cores the same sphere of maxima needs unify_shell_basins. NOS_ELI_SHELL_DIST / _TOL tune it;
 	//distance 0 turns the merge off.
 	double shell_dist = 1.2, shell_tol = 0.05;
-	if (const char *e = std::getenv("NOS_ELI_SHELL_DIST")) { const double v = std::atof(e); if (v >= 0.0 && v < 10.0) shell_dist = v; }
-	if (const char *e = std::getenv("NOS_ELI_SHELL_TOL")) { const double v = std::atof(e); if (v >= 0.0 && v < 1.0) shell_tol = v; }
+	if (const char *e = tuning("NOS_ELI_SHELL_DIST")) { const double v = std::atof(e); if (v >= 0.0 && v < 10.0) shell_dist = v; }
+	if (const char *e = tuning("NOS_ELI_SHELL_TOL")) { const double v = std::atof(e); if (v >= 0.0 && v < 1.0) shell_tol = v; }
 	ivec eli_shell_map;
 	const int shell_merged = unify_shell_basins(eli_results.first, eli_results.second, stream_eli ? &eli_shell_map : nullptr, shell_dist, shell_tol, &atoms, &l_w);
 	if (shell_merged) std::cout << "Unified " << shell_merged << " shattered shell basins, " << eli_results.second.size() << " ELI-D basins remain." << std::endl;

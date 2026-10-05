@@ -1,4 +1,5 @@
 #include "pch.h"
+#include "tuning.h"
 #include "wfn_class.h"
 #include "convenience.h"
 #include "mo_class.h"
@@ -515,7 +516,7 @@ void WFN::set_exp_cutoff() const {
 	//The accuracy the primitive screening holds. ELI-D amplifies any truncation, since g = rho tau - |grad rho|^2/4 is a
 	//difference of large terms, so a looser default moves basin populations and invents spurious maxima.
 	double acc = constants::density_accuracy;
-	if (const char *e = std::getenv("NOS_DENSITY_ACCURACY")) {
+	if (const char *e = tuning("NOS_DENSITY_ACCURACY")) {
 		try {
 			const double v = std::stod(e);
 			if (std::isfinite(v) && v > 0.0 && v < 1.0) acc = v;

@@ -62,7 +62,7 @@ to fetch a conda-forge CUDA toolkit without a GPU, and `-DNOSPHERA2_BOOTSTRAP_GP
 Both backends at once make a fat binary: every kernel source is compiled twice, once per backend,
 into its own namespace (`Src/core/gpu_api.h`, `NOSPHERA2_GPU_BACKEND_NS`), and
 `Src/core/gpu_dispatch.cpp` defines the global entry points by forwarding to the backend that has a
-device (CUDA probed first; `NOSPHERA2_GPU_BACKEND=cuda|hip` in the environment overrides). A function
+device (CUDA probed first; `-tune NOSPHERA2_GPU_BACKEND=cuda|hip` overrides). A function
 added to one of the six GPU headers has to be added to the X-macro in `gpu_dispatch.cpp` too, or the
 fat link fails on it. Neither runtime is linked: cudart is static, and the HIP runtime is opened by
 name in `Src/core/hip_runtime_shim.cpp`, which defines every `hip*` entry the kernel objects import,
