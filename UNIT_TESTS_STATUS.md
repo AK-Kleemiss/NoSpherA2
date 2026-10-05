@@ -1,5 +1,7 @@
 # Unit Test Status
 
+**2026-10-05 EQC energy decomposition:** New `Eqc.*` gtests (X-analysis' covalency index on both branches and at x = 0, reaction terms as products minus reactants, pairwise nuclear repulsion), a `-eqc`/`-eqc_frag` parse case in `ConvenienceOptionsTests`, and the `eqc_ethane` integration test (Mode 1 on an ORCA 6.1 HF/def2-SVP ethane gbw split into two CH3 radicals; Delta E -3.694453 eV as X-analysis -m 2, Delta(nX) -2.197440 against its -2.197319 eV). No ORCA .out is shipped, so the golden's E(ORCA) reads n/a. After merging `density_source` 7ad303d1 the full `release-windows` suite ran 1236 tests: 1223 passed, 13 skipped, 0 failed.
+
 **2026-09-29 Windows RGBI CI:** Run 36574377706 passed Linux and macOS, but Windows CPU and GPU failed only `RgbiRobustnessTests.SymmetryEquivalentGoldCentresAgreeToEveryDigit`: inversion-related Au populations printed as 17.998925 and 17.998926. The test now permits one unit in the printed sixth decimal (1.1e-6 e); the two bond-orbit comparisons remain exact and the omitted-projector population remains bounded at 1e-6 e. The test is renamed `SymmetryEquivalentGoldCentresAgreeWithinPrintedPrecision`.
 
 **2026-09-29 comment sweep:** Shortened narrative comments in the NBO, NRT, basin, ELI and related test sources to match the comment-sparse house style. No executable statements or test assertions changed; the prior validation counts below remain the current runtime evidence.
