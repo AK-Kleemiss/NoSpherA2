@@ -250,7 +250,7 @@ namespace eqc
 			return "";
 		}
 
-		//The reader already orders m = -l..l; ORCA and occ differ in the sign of |m| = 3, 4, 7, 8, as in WFN(occ)
+		//The reader already orders m = -l..l but keeps ORCA's phases (orca_pure_sign_flips)
 		MolecularOrbitals gbw_orbitals(const WFN &w, const occ::gto::AOBasis &basis)
 		{
 			const int nbf = static_cast<int>(basis.nbf());
@@ -286,7 +286,7 @@ namespace eqc
 			{
 				const int l = basis[s].l;
 				for (int m = 3; m <= l; m++)
-					if (m % 4 == 3 || m % 4 == 0)
+					if (orca_pure_sign_flips(m))
 						for (int spin = 0; spin < ops; spin++)
 						{
 							mo.C.row(spin * nbf + first[s] + l + m) *= -1.0;

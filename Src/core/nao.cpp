@@ -541,8 +541,8 @@ dMatrix2 ao_overlap(const WFN &wavy)
 	compute2C<Overlap2C_SPH>(params, S_flat);
 	const size_t n = static_cast<size_t>(std::llround(std::sqrt(static_cast<double>(S_flat.size()))));
 	dMatrix2 S = reshape<dMatrix2>(S_flat, Shape2D(n, n));
-	//An ORCA-convention density (gbw, or a molden written from one) flips the sign of every |m| >= 3
-	//component, so the overlap has to as well (origin_has_orca_pure_phases, as in the FILE47 writer);
+	//An ORCA-convention density (gbw, or a molden written from one) flips the sign of the |m| = 3, 4, 7, 8
+	//components, so the overlap has to as well (origin_has_orca_pure_phases, as in the FILE47 writer);
 	//otherwise Tr(P S) misses electrons and every NAO population inherits it.
 	if (origin_has_orca_pure_phases(wavy.get_origin())) {
 		const ivec bas = params.get_bas();
@@ -551,7 +551,7 @@ dMatrix2 ao_overlap(const WFN &wavy)
 		for (size_t s = 0; s < params.get_nbas() && k < n; s++) {
 			const int l = bas[8 * s + 1];
 			for (int m = -l; m <= l && k < n; m++, k++)
-				flip[k] = std::abs(m) >= 3;
+				flip[k] = orca_pure_sign_flips(m);
 		}
 		for (size_t i = 0; i < n; i++)
 			for (size_t j = 0; j < n; j++)

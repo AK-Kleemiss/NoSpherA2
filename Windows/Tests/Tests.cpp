@@ -89,6 +89,15 @@ namespace NoSpherA2IntegrationTests
             });
         }
 
+        TEST_METHOD(eqc_water_fg)
+        {
+            RunTest({
+                "eqc_water_fg", "eqc_water_fg", "eqc_water_fg.good", "water.eqc_log",
+                {"-eqc","water.gbw", "-eqc_frag","0,1","0","2","2","0","2",
+                 "-all_charges", "-no_date", "-no_gpu_grid"}
+            });
+        }
+
         TEST_METHOD(grown_water)
         {
             RunTest({

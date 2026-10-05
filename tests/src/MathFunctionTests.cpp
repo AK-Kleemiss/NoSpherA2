@@ -795,7 +795,8 @@ namespace NoSpherA2UnitTests
 		EXPECT_DOUBLE_EQ(constants::sph2cart(10)[65 * 21 + 19], 0.59362791713657326);
 	}
 
-	//Lukas Seifert's derivation: libcint's c2s with ORCA's phase for |m| = 3, 4, 7, 8 over ORCA's angular norm, which drops sqrt((2l-1)(2l-3)) from l = 5 on
+	//Lukas Seifert's derivation: libcint's c2s with ORCA's phase for |m| = 3, 4, 7, 8 over ORCA's angular norm, which drops sqrt((2l-1)(2l-3)) from l = 5 on;
+	//the phase is orca_pure_sign_flips, which every gbw/fchk/OCC conversion uses, so this pins it against libcint
 	TEST(Sph2CartTests, MatchesLibcintWithOrcaPhase)
 	{
 		for (int l = 2; l <= 10; l++)
@@ -814,7 +815,7 @@ namespace NoSpherA2UnitTests
 				lc += l - e[0] - e[1];
 				for (int m = -l; m <= l; m++)
 				{
-					const double phase = std::abs(m) % 4 == 3 || std::abs(m) % 4 == 0 && m != 0 ? -1.0 : 1.0;
+					const double phase = orca_pure_sign_flips(m) ? -1.0 : 1.0;
 					EXPECT_NEAR(constants::sph2cart(l)[cart * nsph + (m == 0 ? 0 : m > 0 ? 2 * m - 1 : -2 * m)], phase / norm * sph[(m + l) + nsph * lc], 1e-12) << "l " << l << " cart " << cart << " m " << m;
 				}
 			}

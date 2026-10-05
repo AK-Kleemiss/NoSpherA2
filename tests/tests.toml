@@ -148,6 +148,19 @@ actual = "ethane.eqc_log"
 eqc = "ethane.gbw"
 eqc_frag = ["0,2-4", 0, 2, "1,5-7", 0, 2]
 
+# EQC with f and g shells: distorted water, O def2-QZVP and H def2-SVP, ORCA
+# 6.1 RHF NORI, E(ORCA) -76.059090444. A wrong sign on f(+-3), g(+-3) or
+# g(+-4) makes the gbw orbitals non-orthonormal in occ's basis, so the golden's
+# seed energy turns into nan and an extra fallback line appears.
+[eqc_water_fg]
+directory = "eqc_water_fg"
+good = "eqc_water_fg.good"
+actual = "water.eqc_log"
+
+[eqc_water_fg.args]
+eqc = "water.gbw"
+eqc_frag = ["0,1", 0, 2, 2, 0, 2]
+
 [intermolecular_nci]
 directory = "intermolecular_nci"
 good = "good.dat"

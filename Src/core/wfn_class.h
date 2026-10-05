@@ -40,13 +40,20 @@ enum e_origin {
 	XCW_fit = 14
 };
 
-//ORCA stores the pure components with |m| >= 3 (f(+-3), g(+-3), g(+-4), likewise h and i) with the
-//sign opposite to libcint's.  The gbw reader and the molden reader (orca_2mkl writes the gbw's own
-//coefficients) keep that sign in the density matrix, so a paired overlap must take it too: in ORCA's
-//m = 0, +1, -1, +2, -2, ... order, every component index from 5 on.
+//ORCA stores the pure components with |m| = 3, 4, 7, 8 (f(+-3), g(+-3), g(+-4); h(+-5) and i(+-5),
+//i(+-6) keep libcint's sign) with the sign opposite to libcint's. The gbw reader and the molden reader
+//(orca_2mkl writes the gbw's own coefficients) keep that sign in the density matrix, so a paired
+//overlap must take it too (orca_pure_sign_flips).
 inline bool origin_has_orca_pure_phases(const e_origin o)
 {
 	return o == e_origin::gbw || o == e_origin::molden;
+}
+
+//True where the pure component m has the opposite sign in libcint/OCC (and fchk) to ORCA and the sph2cart tables
+inline bool orca_pure_sign_flips(const int m)
+{
+	const int a = m < 0 ? -m : m;
+	return a >= 3 && (a % 4 == 3 || a % 4 == 0);
 }
 
 /**

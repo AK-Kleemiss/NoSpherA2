@@ -1,5 +1,7 @@
 # Unit Test Status
 
+**2026-10-05 ORCA pure-function phases:** `orca_pure_sign_flips` (wfn_class.h) is now the one rule for the sign of f(+-3), g(+-3), g(+-4) between ORCA/the sph2cart tables and libcint/OCC/fchk. `Sph2CartTests.MatchesLibcintWithOrcaPhase` takes its phase from it, which pins it against libcint up to l = 10. New `WfnReadIoTests.OccRoundTripKeepsFAndGPhases` (H2 with s..g shells, bond off z) fails without the reverse flip `wfn_to_occ_wavefunction` lacked. New `eqc_water_fg` integration test (distorted water, O def2-QZVP, H def2-SVP, ORCA 6.1 RHF NORI, E(ORCA) -76.059090444): its golden pins E(occ) at the gbw orbitals at -76.059090445; with a wrong g(+-4) sign the orbitals fall back as non-orthonormal and the golden fails. The .47 writer and the NAO overlap previously flipped every |m| >= 3; ORCA cc-pV5Z/cc-pV6Z water shows that h(+-5) and i(+-5), i(+-6) keep libcint's sign.
+
 **2026-10-05 EQC energy decomposition:** New `Eqc.*` gtests (X-analysis' covalency index on both branches and at x = 0, reaction terms as products minus reactants, pairwise nuclear repulsion), a `-eqc`/`-eqc_frag` parse case in `ConvenienceOptionsTests`, and the `eqc_ethane` integration test (Mode 1 on an ORCA 6.1 HF/def2-SVP ethane gbw split into two CH3 radicals; Delta E -3.694453 eV as X-analysis -m 2, Delta(nX) -2.197440 against its -2.197319 eV). No ORCA .out is shipped, so the golden's E(ORCA) reads n/a. After merging `density_source` 7ad303d1 the full `release-windows` suite ran 1236 tests: 1223 passed, 13 skipped, 0 failed.
 
 **2026-09-29 Windows RGBI CI:** Run 36574377706 passed Linux and macOS, but Windows CPU and GPU failed only `RgbiRobustnessTests.SymmetryEquivalentGoldCentresAgreeToEveryDigit`: inversion-related Au populations printed as 17.998925 and 17.998926. The test now permits one unit in the printed sixth decimal (1.1e-6 e); the two bond-orbit comparisons remain exact and the omitted-projector population remains bounded at 1e-6 e. The test is renamed `SymmetryEquivalentGoldCentresAgreeWithinPrintedPrecision`.
@@ -813,6 +815,7 @@ Added: 2026-06-14.
 | alanine_integrated_occ | alanine_integrated_occ | alanine_integrated_occ.good | no | ✅ passing (regenerated 2026-07-03, see note below) |
 | disorder_THPP | disorder | disorder_THPP.good | no | ✅ passing |
 | eqc_ethane | eqc_ethane | eqc_ethane.good | no | ✅ passing (added 2026-10-05) |
+| eqc_water_fg | eqc_water_fg | eqc_water_fg.good | no | ✅ passing (added 2026-10-05) |
 | fractal | sucrose_fchk_SF | fractal.good | no | ✅ passing |
 | grown_water | grown | grown_water.good | no | ✅ passing |
 | Hybrid_mode | Hybrid | Hybrid_mode.good | no | ✅ passing |

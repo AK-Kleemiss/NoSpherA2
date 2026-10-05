@@ -2445,8 +2445,9 @@ bool WFN::write_nbo(const std::filesystem::path &fileName, const bool &debug, st
 	vec phase(nbo_nao, 1.0);
 	if (origin_has_orca_pure_phases(get_origin()))
 		for (const auto& shell : shells)
-			for (int c = 5; c < shell.nbo_components; c++)
-				phase[shell.nbo_start + c] = -1.0;
+			for (int c = 0; c < shell.nbo_components; c++)
+				if (orca_pure_sign_flips((c + 1) / 2))
+					phase[shell.nbo_start + c] = -1.0;
 	vec2 OVLP_nbo(nbo_nao, vec(nbo_nao, 0.0));
 	for (int i = 0; i < nbo_nao; i++)
 		for (int j = 0; j < nbo_nao; j++)
@@ -2958,8 +2959,8 @@ bool WFN::read_fchk(const std::filesystem::path &filename, std::ostream &log, co
 				vec2 shell(n, vec(size));
 				for (int m = 0; m < n; m++)
 				{
-					//pure fchk functions m = 0, +1, -1, ... carry the Gaussian/libcint phase, the sph2cart tables ORCA's: |m| = 3, 4, 7, 8 change sign
-					const double phase = shell_types[p] < 0 && ((m + 1) / 2 % 4 == 3 || (m + 1) / 2 % 4 == 0) && m > 0 ? -1.0 : 1.0;
+					//pure fchk functions m = 0, +1, -1, ... carry the Gaussian/libcint phase, the sph2cart tables ORCA's
+					const double phase = shell_types[p] < 0 && orca_pure_sign_flips((m + 1) / 2) ? -1.0 : 1.0;
 					for (int s = 0; s < size; s++)
 						shell[m][s] = phase * coef[i][j * nbas + coef_run + m] * prims[basis_run + s].get_coef();
 				}

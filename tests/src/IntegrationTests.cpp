@@ -630,6 +630,12 @@ TEST(TomlIntegrationTests, EqcEthane)
 	EXPECT_TRUE(result.success) << result.message;
 }
 
+TEST(TomlIntegrationTests, EqcWaterFAndGShells)
+{
+	const UT_Result result = run_inprocess_test(get_repo_root(), "eqc_water_fg");
+	EXPECT_TRUE(result.success) << result.message;
+}
+
 TEST(TomlIntegrationTests, GrownWater)
 {
 	const UT_Result result = run_inprocess_test(get_repo_root(), "grown_water");
