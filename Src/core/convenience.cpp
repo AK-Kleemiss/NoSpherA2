@@ -619,6 +619,10 @@ std::string help_message =
  "  -v | -v2 | -debug                  Verbose diagnostic output.\n"
  "  -profiling [tests-root]            Run the internal profiling suite\n"
  "                                    [./tests]. Alias: -profile.\n"
+ "  -tune NAME[=VALUE]                 Set a developer knob, repeatable; a bare NAME\n"
+ "                                    is 1. Diagnostics and cut-offs such as\n"
+ "                                    NOSPHERA2_GPU_BACKEND=hip or NOS_RGBI_DEBUG,\n"
+ "                                    formerly environment variables.\n"
  "  -no_date                           Suppress date information and the GPU notes, so\n"
  "                                    output does not depend on the machine it ran on.\n"
  "  -no_date_but_gpu                   As -no_date, but keeps the GPU notes. For the\n"
@@ -767,6 +771,25 @@ std::string help_message =
  "  Twin law\n"
  "    NoSpherA2 -cif A.cif -hkl A.hkl -wfn A.wfx -acc 1 -cpus 7 \\\n"
  "      -twin -1 0 0 0 -1 0 0 0 -1\n");
+static std::map<std::string, std::string> &tuning_knobs()
+{
+	static std::map<std::string, std::string> knobs;
+	return knobs;
+}
+const char *tuning(const char *name)
+{
+	const auto &knobs = tuning_knobs();
+	const auto it = knobs.find(name);
+	return it == knobs.end() ? nullptr : it->second.c_str();
+}
+void set_tuning(const std::string &name, const char *value)
+{
+	if (value)
+		tuning_knobs()[name] = value;
+	else
+		tuning_knobs().erase(name);
+}
+
 std::string NoSpherA2_message(bool no_date)
 {
 	std::string t = "    _   __     _____       __              ___   ___\n";
@@ -4137,6 +4160,11 @@ bool options::digest_xcw_options(const std::string &temp, int &i)
 bool options::digest_dev_options(const std::string &temp, int &i)
 {
 	using namespace std;
+	if (temp == "-tune") //applied before the main loop; this only checks there is a value
+	{
+		(void)arguments[++i];
+		return true;
+	}
 	if (temp == "-lahvatest")
 	{
 		//_test_lahva();
@@ -4266,6 +4294,14 @@ void options::digest_options()
 	{
 		std::cout << " Recap of input:\nsize: " << arguments.size() << endl;
 	}
+	//-tune first: some options run their job inside the loop below
+	for (size_t i = 0; i + 1 < arguments.size(); i++)
+		if (arguments[i] == "-tune")
+		{
+			const std::string &knob = arguments[++i];
+			const size_t eq = knob.find('=');
+			set_tuning(knob.substr(0, eq), eq == std::string::npos ? "1" : knob.c_str() + eq + 1);
+		}
 	// This loop figures out command line options
 	for (int i = 0; i < arguments.size(); i++)
 	{

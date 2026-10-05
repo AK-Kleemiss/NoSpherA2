@@ -1,4 +1,5 @@
 #include "pch.h"
+#include "tuning.h"
 #include "nbo.h"
 #include "wfn_class.h"
 #include "constants.h"
@@ -216,7 +217,7 @@ namespace
 	double bond_minority_floor()
 	{
 		static const double v = [] {
-			const char* e = std::getenv("NBO_BOND_FLOOR");
+			const char* e = tuning("NBO_BOND_FLOOR");
 			return e ? std::atof(e) : 0.15;
 		}();
 		return v;

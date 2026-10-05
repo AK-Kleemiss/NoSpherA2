@@ -88,14 +88,15 @@ const char* const lib_subdir = "/lib/";
 #endif
 
 //NOSPHERA2_HIP_RUNTIME names the file outright; else the versioned, then the unversioned name, each
-//on the loader's own search, then under ROCM_PATH, HIP_PATH and /opt/rocm
+//on the loader's own search, then under ROCM_PATH, HIP_PATH and /opt/rocm. Environment variables, not
+//-tune knobs: the kernel registration opens the runtime before main()
 lib_handle open_runtime()
 {
-	if (const char* file = std::getenv("NOSPHERA2_HIP_RUNTIME")) {
+	if (const char* file = std::getenv("NOSPHERA2_HIP_RUNTIME")) { // Flawfinder: ignore - a library location, like ROCM_PATH
 		if (*file) return open_lib(file);
 	}
 	const char* const names[] = { lib_versioned, lib_plain };
-	const char* const roots[] = { std::getenv("ROCM_PATH"), std::getenv("HIP_PATH"),
+	const char* const roots[] = { std::getenv("ROCM_PATH"), std::getenv("HIP_PATH"), // Flawfinder: ignore - the ROCm install
 #if !defined(_WIN32)
 		"/opt/rocm",
 #endif

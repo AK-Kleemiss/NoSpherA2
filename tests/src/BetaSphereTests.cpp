@@ -1,4 +1,5 @@
 #include "pch.h"
+#include "core/tuning.h"
 #include "core/b2c.h"
 #include "core/wfn_class.h"
 #include "core/atoms.h"
@@ -160,33 +161,17 @@ TEST(AdaptiveStep, NeverFallsBackMoreOftenThanItProposesOnELID)
 	EXPECT_LE(turned + fell, proposed) << "more proposals were rejected than were ever made";
 }
 
-//sets a variable for the scope and restores it, set or unset; a leaked knob changes every later test
+//sets a -tune knob for the scope and restores it, set or unset; a leaked knob changes every later test
 struct env_guard {
 	std::string name;
 	std::string old;
 	bool had = false;
 	env_guard(const char *n, const char *v) : name(n)
 	{
-		if (const char *e = std::getenv(n)) { old = e; had = true; }
-		set(v);
+		if (const char *e = tuning(n)) { old = e; had = true; }
+		set_tuning(name, v);
 	}
-	~env_guard() { if (had) set(old.c_str()); else clear(); }
-	void set(const char *v) const
-	{
-#ifdef _WIN32
-		_putenv_s(name.c_str(), v);
-#else
-		setenv(name.c_str(), v, 1);
-#endif
-	}
-	void clear() const
-	{
-#ifdef _WIN32
-		_putenv_s(name.c_str(), "");
-#else
-		unsetenv(name.c_str());
-#endif
-	}
+	~env_guard() { set_tuning(name, had ? old.c_str() : nullptr); }
 };
 
 //checks the NOS_ADP_* overrides reach the walk

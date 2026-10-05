@@ -1,4 +1,5 @@
 #include "pch.h"
+#include "tuning.h"
 #include "nbo_run.h"
 #include "convenience.h"
 #include "wfn_class.h"
@@ -560,7 +561,7 @@ namespace {
 		//Ten digits by default; NBO_JSON_DIGITS raises it to full double precision, needed to prove a search
 		//optimisation changed nothing.
 		static const int digits = [] {
-			const char* e = std::getenv("NBO_JSON_DIGITS");
+			const char* e = tuning("NBO_JSON_DIGITS");
 			const int d = e ? std::atoi(e) : 10;
 			return (d >= 1 && d <= 20) ? d : 10;
 		}();

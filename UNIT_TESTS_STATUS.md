@@ -115,7 +115,7 @@ with `-DNOSPHERA2_USE_CUDA=ON -DNOSPHERA2_USE_HIP=ON` and both `*_PORTABLE` opti
 compiled twice, once per backend, with `NOSPHERA2_GPU_BACKEND_NS` naming a namespace
 (`nosphera2_cuda` / `nosphera2_hip`, `Src/core/gpu_api.h`); `Src/core/gpu_dispatch.cpp` defines the
 global entry points of the six GPU headers by forwarding to the backend that has a device (CUDA probed
-first, `NOSPHERA2_GPU_BACKEND=cuda|hip` overrides). Host code sees `NOSPHERA2_USE_GPU` only; the
+first, `-tune NOSPHERA2_GPU_BACKEND=cuda|hip` overrides). Host code sees `NOSPHERA2_USE_GPU` only; the
 backend macros reach the device compilers alone. On the CMake HIP-language route a source has one
 LANGUAGE, so the HIP compiles of a fat build go through generated `hip/<name>.hip` wrappers that
 `#include` the `.cu`. Neither runtime is a load-time import: cudart stays static, and the HIP runtime

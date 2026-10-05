@@ -1,4 +1,5 @@
 #include "pch.h"
+#include "tuning.h"
 #include "XCW.h"
 #if defined(NOSPHERA2_USE_GPU) || defined(NOSPHERA2_USE_METAL)
 #include "itensor_gpu.h"
@@ -61,7 +62,7 @@ void XCW::construct(const options& opt_in) {
 	//unit_cell.set_symmetry_factors(asym_atoms, symmetry_linking_list);
 	unit_cell.set_symmetry_factors(asym_atoms, symmetry_linking_list, applied_symmetry);
 
-	if (std::getenv("NOSPHERA2_DEBUG_ASYMFACT")) { // Flawfinder: ignore
+	if (tuning("NOSPHERA2_DEBUG_ASYMFACT")) {
 		std::cerr << "applied_symmetry (deleted):";
 		for (int s : applied_symmetry) std::cerr << " " << s;
 		std::cerr << std::endl << "surviving sym ops: " << unit_cell.get_trans()[0].size() << std::endl;
@@ -1509,7 +1510,7 @@ void XCW::eval_I_anom_disp(std::vector<ao_data>& ao_data_shells, bool read) {
 		i_pair_nu_ = i_file_.pair_nu();
 		//The file's element type is kept as it is: a single-precision tensor cannot regain
 		//anything by widening, and a double one is narrowed only on request
-		const char* f = std::getenv("NOSPHERA2_XCW_I_FLOAT"); // Flawfinder: ignore
+		const char* f = tuning("NOSPHERA2_XCW_I_FLOAT");
 		i_float_ = single_on_disk || (!i_streamed_ && (settings.i_tensor_single || (f && std::atoi(f) != 0)));
 		std::cout << "I tensor read from " << i_tensor_path().string()
 			<< " (" << (i_tensor_file::total_bytes(cryst.nr_small, i_compact_, single_on_disk) / 1048576.0)
@@ -1728,7 +1729,7 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 	}
 	const unsigned int num_syms = asym_lookup[0].size();
 
-	if (std::getenv("NOSPHERA2_DEBUG_LOOKUP")) { // Flawfinder: ignore
+	if (tuning("NOSPHERA2_DEBUG_LOOKUP")) {
 		long long misses = 0, total = 0;
 		for (r = 0; r < cryst.nr_small; r++) {
 			for (int s = 0; s < static_cast<int>(num_syms); s++) {
@@ -1946,11 +1947,11 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 	//convergence lines identical.
 	//So only reorder when the threshold can prune: at -acc 4 cutoff() is 1e-30 and drops nothing.
 	const double ao_block_threshold = [&] {
-		const char* e = std::getenv("NOSPHERA2_ITENSOR_AO_TOL"); // Flawfinder: ignore
+		const char* e = tuning("NOSPHERA2_ITENSOR_AO_TOL");
 		if (e) { const double v = std::atof(e); return v >= 0.0 ? v : 0.0; }
 		return cutoff(opt->accuracy);
 	}();
-	const bool morton_applied = (std::getenv("NOSPHERA2_ITENSOR_NO_MORTON") == nullptr) // Flawfinder: ignore
+	const bool morton_applied = (tuning("NOSPHERA2_ITENSOR_NO_MORTON") == nullptr)
 		&& ao_block_threshold >= 1e-20;
 	if (morton_applied) {
 #pragma omp parallel for schedule(dynamic)
@@ -2024,7 +2025,7 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 	//NOSPHERA2_ITENSOR_AOSTATS=1: how much of each block's AO set carries anything, as a max over
 	//its points. The active set comes from a cutoff clamped to 11-12 bohr, so it barely depends
 	//on the block, and the work is quadratic in it.
-	if (std::getenv("NOSPHERA2_ITENSOR_AOSTATS")) { // Flawfinder: ignore
+	if (tuning("NOSPHERA2_ITENSOR_AOSTATS")) {
 		for (int g = 0; g < n_atom_grids; g++) {
 			const int npts = points[g];
 			if (npts <= 0) continue;
@@ -2151,7 +2152,7 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 	//pairs land scattered, against Morton-sorted over their centres, which puts distant atoms in
 	//distant tiles.
 	auto skipstats = [&](const int g, const ivec& active, const int npoints) {
-		if (!std::getenv("NOSPHERA2_ITENSOR_SKIPSTATS")) return; // Flawfinder: ignore
+		if (!tuning("NOSPHERA2_ITENSOR_SKIPSTATS")) return;
 		const int na = static_cast<int>(active.size());
 		if (na < 2) return;
 		auto tiles_alive = [&](const ivec& order, const int T) {
@@ -2226,7 +2227,7 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 		//leaves (occ/qm/spatial_grid_hierarchy.h). NOSPHERA2_ITENSOR_CHUNK sets the target size;
 		//0 restores the three whole bands.
 		const int chunk = [] {
-			const char* e = std::getenv("NOSPHERA2_ITENSOR_CHUNK"); // Flawfinder: ignore
+			const char* e = tuning("NOSPHERA2_ITENSOR_CHUNK");
 			return e ? std::atoi(e) : 1024;
 		}();
 		//Even chunks rather than a short tail, which would cost a GEMM launch for almost nothing
@@ -2430,7 +2431,7 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 	//any path that contributes runs single. nr_small * i_compact_ deliberately in size_t,
 	//the product passes 2^31 at nmo = 500 with 20k reflections.
 	{
-		const char* f = std::getenv("NOSPHERA2_XCW_I_FLOAT"); // Flawfinder: ignore
+		const char* f = tuning("NOSPHERA2_XCW_I_FLOAT");
 		const bool single_build = (itensor_on_gpu && !opt->gpu_fp64)
 			|| ((!itensor_on_gpu || opt->itensor_hybrid) && opt->cpu_itensor_fp32);
 		i_float_ = settings.i_tensor_single || (f && std::atoi(f) != 0) || (single_build && !settings.i_tensor_double);
