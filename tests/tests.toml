@@ -133,6 +133,21 @@ fukui = true
 resolution = 1.5
 radius = 2.0
 
+# EQC energy decomposition, Mode 1: ethane HF/def2-SVP from an ORCA 6.1 gbw,
+# re-converged in occ, then split into two CH3 radicals (UHF, seeded from the
+# parent's density block). No ORCA .out is shipped, so E(ORCA) reads n/a. The
+# golden pins the occ energy at the gbw orbitals, the SCF iteration counts and
+# the reaction terms, which match X-analysis -m 2 on the same ORCA runs to
+# 1e-4 eV (Delta E to 1e-6 eV).
+[eqc_ethane]
+directory = "eqc_ethane"
+good = "eqc_ethane.good"
+actual = "ethane.eqc_log"
+
+[eqc_ethane.args]
+eqc = "ethane.gbw"
+eqc_frag = ["0,2-4", 0, 2, "1,5-7", 0, 2]
+
 [intermolecular_nci]
 directory = "intermolecular_nci"
 good = "good.dat"

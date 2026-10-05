@@ -79,6 +79,16 @@ namespace NoSpherA2IntegrationTests
             });
         }
 
+        TEST_METHOD(eqc_ethane)
+        {
+            // Actual output is the analysis' own section log
+            RunTest({
+                "eqc_ethane", "eqc_ethane", "eqc_ethane.good", "ethane.eqc_log",
+                {"-eqc","ethane.gbw", "-eqc_frag","0,2-4","0","2","1,5-7","0","2",
+                 "-all_charges", "-no_date", "-no_gpu_grid"}
+            });
+        }
+
         TEST_METHOD(grown_water)
         {
             RunTest({
