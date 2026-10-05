@@ -2059,6 +2059,9 @@
     <ClInclude Include="..\..\Src\core\tuning.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Src\core\section_log.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Src\core\esp_gpu.h">
       <Filter>Header Files</Filter>
     </ClInclude>

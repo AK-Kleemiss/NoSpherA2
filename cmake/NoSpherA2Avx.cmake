@@ -29,15 +29,11 @@ elseif(NOS_AVX)
 endif()
 message(STATUS "NOS_AVX=${NOS_AVX} -> building with AVX: ${NOS_USE_AVX}")
 
+#C and C++ only: nvcc refuses -m flags, and the GPU sources get their host flags from it
 if(LINUX)
-    add_compile_options(
-        -msse2
-        -msse3
-        -msse4.1
-        -msse4.2
-    )
+    add_compile_options("$<$<COMPILE_LANGUAGE:C,CXX>:-msse2;-msse3;-msse4.1;-msse4.2>")
     if(NOS_USE_AVX)
-        add_compile_options(-mavx)
+        add_compile_options($<$<COMPILE_LANGUAGE:C,CXX>:-mavx>)
     endif()
 endif()
 
@@ -48,7 +44,7 @@ endif()
 #instruction on a pre-Haswell host is SIGILL, not a slow path - and NOT wired into the AUTO
 #detection above until the win is measured on a real case.
 if(NOS_AVX2 AND LINUX)
-    add_compile_options(-mavx2 -mfma)
+    add_compile_options("$<$<COMPILE_LANGUAGE:C,CXX>:-mavx2;-mfma>")
     add_link_options(-mavx2 -mfma)
 endif()
 
