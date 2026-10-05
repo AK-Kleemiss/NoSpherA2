@@ -379,10 +379,7 @@ namespace eqc
 		template <>
 		std::unique_ptr<occ::dft::DFT> procedure(const std::string &method, const occ::gto::AOBasis &basis)
 		{
-			//occ's composite pbe0/pbe1pbe evaluate as pure PBE (factor unused, hfx only on the polarised copies)
-			//ponytail: name map to libxc's single-id PBE0, drop when occ fixes DensityFunctional's factor/hfx
-			const std::string m = (method == "pbe0" || method == "pbe1pbe") ? "pbeh" : method;
-			return std::make_unique<occ::dft::DFT>(m, basis);
+			return std::make_unique<occ::dft::DFT>(method, basis);
 		}
 
 		template <class P>
