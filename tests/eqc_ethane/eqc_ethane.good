@@ -1,0 +1,49 @@
+    _   __     _____       __              ___   ___
+   / | / /___ / ___/____  / /_  ___  _____/   | |__ \
+  /  |/ / __ \\__ \/ __ \/ __ \/ _ \/ ___/ /| | __/ /
+ / /|  / /_/ /__/ / /_/ / / / /  __/ /  / ___ |/ __/
+/_/ |_/\____/____/ .___/_/ /_/\___/_/  /_/  |_/____/
+                /_/
+This software is part of the cuQCT software suite developed by Florian Kleemiss.
+Please give credit and cite corresponding pieces!
+This Software is published with BSD-2 clause license.
+
+================================================================================
+  EQC energy decomposition analysis
+================================================================================
+  Wavefunction : ethane.gbw
+  Full run log : NoSpherA2.log (this file repeats the result sections of it)
+
+  References for this analysis:
+    [EQC] Rahm & Hoffmann, J. Am. Chem. Soc. 137 (2015) 10282, DOI 10.1021/jacs.5b05600
+    [EQC] Rahm & Hoffmann, J. Am. Chem. Soc. 138 (2016) 3731, DOI 10.1021/jacs.5b12434
+EQC analysis, Mode 1: ethane.gbw, charge 0, multiplicity 1, 58 basis functions (from the gbw), 2 fragments, method hf
+
+Parent: E(ORCA) n/a (no ethane.out), E(occ) at the gbw orbitals -79.174969626, E(occ) converged -79.174969626 hartree
+        E(occ, gbw orbitals) - E(occ) -8.527e-14, nX(occ) - nX(ORCA) 1.788e-08
+        gbw max|C^T S C - 1| 3.442e-15, 4 iterations to re-converge
+Mode 1 (seeded): parent from the ORCA gbw re-converged in occ, fragments converged in occ from the parent's density block; SCF iterations parent 4 fragment 1 16 fragment 2 16
+
+Terms per wavefunction (eV; Eee = Vnn - (E - nX))
+                n                 E                nX               Vnn               Eee   iter   cold  source
+parent         18      -2154.460585      -1467.137927       1147.516133       1834.838791      4      -  ORCA gbw, re-converged in occ HF
+fragment 1      9      -1075.383066       -732.470244        261.375641        604.288463     16      -  occ HF, seeded from the parent
+fragment 2      9      -1075.383066       -732.470244        261.375641        604.288463     16      -  occ HF, seeded from the parent
+
+Fragments -> parent, products minus reactants (eV), as X-analysis -m 2 prints it
+  Delta E               -3.694453
+  Delta(nX-bar)         -2.197440
+  Delta(Vnn-Eee)        -1.497013
+  Delta(E/n)            -0.205247
+  Delta(X-bar)          -0.122080
+  Delta(Vnn/n)          34.709158
+  Delta(Eee/n)          34.792326
+  Delta(Vnn-Eee)/n      -0.083167
+  Q                      0.189589
+  Delta|Eee/E| (%)      28.971792
+  Covalency (%)         59.479440
+  Ionicity (%)          40.520560
+
+================================================================================
+  End of eqc results
+================================================================================

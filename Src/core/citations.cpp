@@ -51,6 +51,8 @@ namespace citations
 			{Method::Fukui, "Fukui", "Parr & Yang, J. Am. Chem. Soc. 106 (1984) 4049", "10.1021/ja00326a036"},
 			{Method::Fukui, "Fukui", "Morell, Grand & Toro-Labbe, J. Phys. Chem. A 109 (2005) 205", "10.1021/jp046577a"},
 			{Method::GordonKim, "Gordon-Kim", "Gordon & Kim, J. Chem. Phys. 56 (1972) 3122", "10.1063/1.1677649"},
+			{Method::EQC, "EQC", "Rahm & Hoffmann, J. Am. Chem. Soc. 137 (2015) 10282", "10.1021/jacs.5b05600"},
+			{Method::EQC, "EQC", "Rahm & Hoffmann, J. Am. Chem. Soc. 138 (2016) 3731", "10.1021/jacs.5b12434"},
 		};
 		return refs;
 	}

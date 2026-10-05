@@ -1508,7 +1508,7 @@ vec DensityFitting::calculate_expected_populations(const WFN& wavy, const WFN& w
 	else if (scheme == CHARGE_SCHEME::MULLIKEN) {
 		dMatrix2 dm = wavy.get_dm();
 		//Mulliken's sum of diag(P S) is the electron count, so S must share P's basis and phase convention: an ORCA-convention
-		//density flips sign on |m| >= 3, which a plain Overlap2C_SPH ignores.
+		//density flips sign on |m| = 3, 4, 7, 8, which a plain Overlap2C_SPH ignores.
 		const dMatrix2 S_ao = ao_overlap(wavy);
 		const size_t nao = dm.extent(1);
 

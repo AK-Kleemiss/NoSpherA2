@@ -44,7 +44,8 @@ namespace citations
 		TRAH,               //trust-region augmented Hessian second-order SCF
 		RGBI,               //Roby-Gould bond indices
 		Fukui,              //Fukui functions and the dual descriptor
-		GordonKim           //Gordon-Kim exchange repulsion
+		GordonKim,          //Gordon-Kim exchange repulsion
+		EQC                 //Rahm-Hoffmann EQC energy decomposition
 	};
 
 	struct Reference

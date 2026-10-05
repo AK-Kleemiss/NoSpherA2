@@ -174,7 +174,7 @@ WFN::WFN(const occ::qm::Wavefunction &occ_WF, bool from_file) : WFN()
 		for (const auto &shell : occ_WF.basis.shells()) {
 			for (int spin = 0; spin < n_spin; spin++)
 				for (int m = 3; m <= shell.l; m++)
-					if (m % 4 == 3 || m % 4 == 0) {
+					if (orca_pure_sign_flips(m)) {
 						mo_go.C.row(spin * occ_WF.nbf + row + 2 * m - 1) *= -1.0;
 						mo_go.C.row(spin * occ_WF.nbf + row + 2 * m) *= -1.0;
 					}
@@ -455,6 +455,10 @@ void WFN::wfn_to_occ_wavefunction(occ::qm::Wavefunction& occ_wf)
 				Eigen::MatrixXd A = Eigen::Map<const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>(constants::sph2cart(rs.l), rs.n_cart, constants::n_spher(rs.l));
 				if (rs.l == 1) A.setIdentity();
 				occ::Vec MOc = A.completeOrthogonalDecomposition().pseudoInverse() * cart_mo_coeffs;
+				//back to OCC's phases, the reverse of the flip in WFN(occ)
+				for (int m = 3; m <= rs.l; m++)
+					if (orca_pure_sign_flips(m))
+						MOc.segment(2 * m - 1, 2) *= -1.0;
 				C_gaussian_order.block(sph_offset, n, MOc.size(), 1) = MOc;
 				sph_offset += A.cols();
 				write_cursor += rs.n_prim * rs.n_cart;

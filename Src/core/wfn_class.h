@@ -40,13 +40,20 @@ enum e_origin {
 	XCW_fit = 14
 };
 
-//ORCA stores the pure components with |m| >= 3 (f(+-3), g(+-3), g(+-4), likewise h and i) with the
-//sign opposite to libcint's.  The gbw reader and the molden reader (orca_2mkl writes the gbw's own
-//coefficients) keep that sign in the density matrix, so a paired overlap must take it too: in ORCA's
-//m = 0, +1, -1, +2, -2, ... order, every component index from 5 on.
+//ORCA stores the pure components with |m| = 3, 4, 7, 8 (f(+-3), g(+-3), g(+-4); h(+-5) and i(+-5),
+//i(+-6) keep libcint's sign) with the sign opposite to libcint's. The gbw reader and the molden reader
+//(orca_2mkl writes the gbw's own coefficients) keep that sign in the density matrix, so a paired
+//overlap must take it too (orca_pure_sign_flips).
 inline bool origin_has_orca_pure_phases(const e_origin o)
 {
 	return o == e_origin::gbw || o == e_origin::molden;
+}
+
+//True where the pure component m has the opposite sign in libcint/OCC (and fchk) to ORCA and the sph2cart tables
+inline bool orca_pure_sign_flips(const int m)
+{
+	const int a = m < 0 ? -m : m;
+	return a >= 3 && (a % 4 == 3 || a % 4 == 0);
 }
 
 /**
@@ -143,7 +150,8 @@ private:
 	// (gbw, molden); empty for a restricted case and for readers that only sum the two.
 	dMatrix2 DM_beta;
 	// Spherical MO coefficients as OCC converged them, rows = AO in OCC's m = -l..l order
-	// (beta block below alpha when unrestricted), columns = MO. Filled by the OCC constructor.
+	// (beta block below alpha when unrestricted), columns = MO. Filled by the OCC constructor, and
+	// by read_gbw in file shell order with ORCA's phases (-eqc seeds OCC with those).
 	dMatrix2 MO_sph;
 	// basis set definition (118 elements for each element in the periodic table)
 	std::shared_ptr<std::array<std::vector<primitive>, 118>> basis_set;
@@ -467,6 +475,7 @@ public:
 	const vec get_norm_const(std::ostream& file, const bool debug = false) const;
 	/** Total SCF energy (if available). */
 	const double& get_total_energy() const { return total_energy; };
+	const dMatrix2& get_MO_sph() const { return MO_sph; };
 	/** Virial ratio (if available). */
 	const double& get_virial_ratio() const { return virial_ratio; };
 	/** Upper-triangular density matrix (linear storage). */

@@ -4,6 +4,7 @@
 *.qtaim_log
 *.eli_log
 *.nbo_log
+*.eqc_log
 *.tscb
 !tests/epoxide_gbw/fixture.tscb
 *.densities
