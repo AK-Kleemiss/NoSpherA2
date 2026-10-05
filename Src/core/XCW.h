@@ -473,9 +473,6 @@ private:
 	hkl_list hkl;
 	hkl_list hkl_enlarged;
 	ivec3 original_rotations;
-	// Symmetry operations the structure factors are summed over: all of them, or one per coset
-	// of the subgroup a grown cluster is closed under (cell::grown_subgroup)
-	ivec sym_ops_;
 	GridManager tsc_grids;
 	// hkl_ordered_[r] is the Miller index of reflection r of obs[r]/F_calc[0][r], see ensure_hkl_ordered
 	std::vector<i3> hkl_ordered_;
