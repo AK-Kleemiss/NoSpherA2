@@ -2023,6 +2023,7 @@ struct field_batcher {
 	std::vector<req *> reqs;
 	vec pts, val, grad, rho;
 	long long batches = 0, points = 0;
+	double device_s = 0.0; //inside field_gpu_run; the rest of a round is the host threads' turn
 	field_batcher(const WFN &w, const bool e, const int max_points) : wavy(w), eli(e), ctx(w.field_gpu_open(e, max_points)) {}
 	~field_batcher() { WFN::field_gpu_close(ctx); }
 	field_batcher(const field_batcher &) = delete;
@@ -2033,8 +2034,10 @@ struct field_batcher {
 		const size_t n = reqs.size();
 		pts.resize(3 * n); val.resize(n); grad.resize(3 * n); rho.resize(n);
 		for (size_t i = 0; i < n; i++) std::copy_n(reqs[i]->p.data(), 3, &pts[3 * i]);
+		const auto t0 = std::chrono::steady_clock::now();
 		if (!failed && !WFN::field_gpu_run(ctx, static_cast<int>(n), pts.data(), eli ? val.data() : nullptr, grad.data(), rho.data()))
 			failed = true;
+		device_s += std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
 		if (!failed)
 			for (size_t i = 0; i < n; i++) {
 				req &r = *reqs[i];
@@ -2980,7 +2983,8 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 	T.lap(fieldname + "point loop");
 	if (g_basin_timing && batch)
 		std::cout << "  [timing] " << fieldname << "GPU field: " << batch->points << " points in " << batch->batches << " batches from "
-			<< loop_threads << " host threads" << (batch->failed ? ", device failed part way, the host finished" : "") << std::endl;
+			<< loop_threads << " host threads, " << std::fixed << std::setprecision(2) << batch->device_s << " s of it on the device"
+			<< (batch->failed ? ", device failed part way, the host finished" : "") << std::endl;
 	{
 		//Read and reset unconditionally so the counts never carry into the next field or molecule
 		long long sv, sf, sfar; double srho;
