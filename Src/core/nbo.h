@@ -109,6 +109,10 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 				const NboOptions& options, const std::string& spin, double scale,
 				std::ostream& log);
 
+//Exits on a wavefunction WFN::write_nbo() cannot turn into a FILE47: no contracted basis (.wfn/.wfx) or
+//Cartesian d/f shells. -fba calls it before its NBO thread starts, where the exit would tear down RGBI.
+void refuse_unsupported_nbo_source(const WFN& wavy, std::ostream& log);
+
 //wavy is not const: WFN::write_nbo() renormalises the stored basis.
 NboResults native_nbo(WFN& wavy, const NboOptions& options, std::ostream& log);
 

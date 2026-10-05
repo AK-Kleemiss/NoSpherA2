@@ -889,6 +889,16 @@ namespace
 	}
 }
 
+void refuse_unsupported_nbo_source(const WFN& wavy, std::ostream& log)
+{
+	err_checkf(wavy.get_nr_basis_set_loaded() == wavy.get_ncen(),
+		"NBO needs the contracted basis set; a primitive-only source (.wfn/.wfx) does not carry one."
+		" Use the .gbw, .fchk or .molden of the same calculation.", log);
+	err_checkf(!wavy.get_d_f_switch(),
+		"NBO needs a spherical basis; this wavefunction carries Cartesian d/f shells. "
+		"Convert through a spherical .gbw/.molden of the same calculation.", log);
+}
+
 NboResults native_nbo(WFN& wavy, const NboOptions& options, std::ostream& log)
 {
 	const auto clock = [] { return std::chrono::steady_clock::now(); };
@@ -899,8 +909,12 @@ NboResults native_nbo(WFN& wavy, const NboOptions& options, std::ostream& log)
 		f47 = std::filesystem::temp_directory_path() /
 			  ("nbo_native_" + std::to_string(static_cast<unsigned long long>(
 				   std::chrono::steady_clock::now().time_since_epoch().count())) + ".47");
-		err_checkf(wavy.write_nbo(f47, options.debug, options.debug ? &log : nullptr, ""),
-				   "Could not write the FILE47 the native NBO analysis reads", log);
+		refuse_unsupported_nbo_source(wavy, log);
+		if (!wavy.write_nbo(f47, options.debug, options.debug ? &log : nullptr, "")) {
+			std::error_code ec;
+			std::filesystem::remove(f47, ec);
+			err_checkf(false, "Could not write the FILE47 the native NBO analysis reads", log);
+		}
 		temporary = !options.keep_file47;
 	}
 	const NboInput in = read_file47(f47);

@@ -217,11 +217,9 @@ static int run_app_impl(int argc, char **argv)
 		citations::cite(citations::Method::E2, nbo_log);
 		citations::cite(citations::Method::NRT, nbo_log);
 		const filesystem::path json = opt.wfn.parent_path() / (opt.wfn.stem().string() + ".native.nbo.json");
-		//Refused here, not by spherical_ao_map on the NBO thread, whose exit would tear down RGBI mid-run
+		//Refused here, not by write_nbo on the NBO thread, whose exit would tear down RGBI mid-run
 		WFN nbo_wfn = read_wfn();
-		err_checkf(!nbo_wfn.get_d_f_switch(),
-			"NAO/NPA needs a spherical basis; this wavefunction carries Cartesian d/f shells. "
-			"Convert through a spherical .gbw/.molden of the same calculation.", std::cout);
+		refuse_unsupported_nbo_source(nbo_wfn, std::cout);
 		auto nbo_done = std::async(std::launch::async, [&nbo_log, &opt, &json](WFN w) {
 			const auto t0 = std::chrono::steady_clock::now();
 			NboOptions nbo;
