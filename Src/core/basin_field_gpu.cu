@@ -4,6 +4,7 @@
 #include "tuning.h"
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <chrono>
 #include <cmath>
 #include <algorithm>
@@ -252,7 +253,9 @@ struct bf_ctx
 	gpuStream_t s = nullptr;
 	double *c = nullptr, *cmin = nullptr, *pe = nullptr, *ps = nullptr, *coef = nullptr, *occ = nullptr, *minpe = nullptr;
 	int *start = nullptr, *pc = nullptr, *pl = nullptr, *aoc = nullptr, *idx = nullptr;
-	double *pts = nullptr, *chi = nullptr, *val = nullptr, *grad = nullptr, *rho = nullptr;
+	//out holds a run's n values, 3n gradient components and n densities back to back, so one copy brings them home;
+	//host is pinned staging for the 3 chunk points in and the 5 chunk results out
+	double *pts = nullptr, *chi = nullptr, *out = nullptr, *host = nullptr;
 	//-tune NOS_BASIN_GPU_PROFILE: a sync after every stage and the seconds per stage, printed at close
 	bool prof = false;
 	double st[3]{ 0, 0, 0 };
@@ -271,7 +274,8 @@ struct bf_ctx
 		gpuFree(count);
 		gpuFree(c); gpuFree(cmin); gpuFree(pe); gpuFree(ps); gpuFree(coef); gpuFree(occ); gpuFree(minpe);
 		gpuFree(start); gpuFree(pc); gpuFree(pl); gpuFree(aoc); gpuFree(idx);
-		gpuFree(pts); gpuFree(chi); gpuFree(val); gpuFree(grad); gpuFree(rho);
+		gpuFree(pts); gpuFree(chi); gpuFree(out);
+		if (host) gpuFreeHost(host);
 		if (s) gpuStreamDestroy(s);
 	}
 };
@@ -327,9 +331,8 @@ void* basin_field_gpu_open(
 		&& gpuMalloc(&x->pts, sizeof(double) * 3 * ch) == gpuSuccess
 		&& gpuMalloc(&x->chi, sizeof(double) * (size_t)K * ch * nao) == gpuSuccess
 		&& gpuMalloc(&x->idx, sizeof(int) * ch * nao) == gpuSuccess
-		&& gpuMalloc(&x->val, sizeof(double) * ch) == gpuSuccess
-		&& gpuMalloc(&x->grad, sizeof(double) * 3 * ch) == gpuSuccess
-		&& gpuMalloc(&x->rho, sizeof(double) * ch) == gpuSuccess;
+		&& gpuMalloc(&x->out, sizeof(double) * 5 * ch) == gpuSuccess
+		&& gpuHostAlloc((void**)&x->host, sizeof(double) * 8 * ch) == gpuSuccess;
 	if (!ok)
 	{
 		std::fprintf(stderr, "NoSpherA2 basin field GPU: %s while allocating, falling back to the host\n", gpuGetErrorString(gpuGetLastError()));
@@ -361,25 +364,31 @@ bool basin_field_gpu_run(void* ctx, const int np, const double* pts, double* val
 	for (int first = 0; first < np && ok; first += chunk)
 	{
 		const int n = np - first < chunk ? np - first : chunk;
-		ok = gpuMemcpyAsync(x->pts, pts + 3 * (size_t)first, sizeof(double) * 3 * (size_t)n, gpuMemcpyHostToDevice, x->s) == gpuSuccess;
+		const size_t m = n;
+		double *hin = x->host, *hout = x->host + 3 * (size_t)chunk, *dv = x->out, *dg = x->out + m, *dr = x->out + 4 * m;
+		std::memcpy(hin, pts + 3 * (size_t)first, sizeof(double) * 3 * m);
+		ok = gpuMemcpyAsync(x->pts, hin, sizeof(double) * 3 * m, gpuMemcpyHostToDevice, x->s) == gpuSuccess;
 		if (!ok) break;
 		lap(0);
 		if (K == 4)
 			bf_point_kernel<4><<<n, BF_T, 0, x->s>>>(nao, nocc, x->pts, x->c, x->cmin, x->cutoff, x->start, x->pc, x->pl, x->pe, x->ps,
-				x->aoc, x->minpe, x->coef, x->occ, x->idx, x->chi, x->val, x->grad, x->rho, x->count);
+				x->aoc, x->minpe, x->coef, x->occ, x->idx, x->chi, dv, dg, dr, x->count);
 		else
 			bf_point_kernel<10><<<n, BF_T, 0, x->s>>>(nao, nocc, x->pts, x->c, x->cmin, x->cutoff, x->start, x->pc, x->pl, x->pe, x->ps,
-				x->aoc, x->minpe, x->coef, x->occ, x->idx, x->chi, x->val, x->grad, x->rho, x->count);
+				x->aoc, x->minpe, x->coef, x->occ, x->idx, x->chi, dv, dg, dr, x->count);
 		err = gpuGetLastError();
 		lap(1);
-		ok = err == gpuSuccess
-			&& gpuMemcpyAsync(grad + 3 * (size_t)first, x->grad, sizeof(double) * 3 * (size_t)n, gpuMemcpyDeviceToHost, x->s) == gpuSuccess
-			&& (!val || K == 4 || gpuMemcpyAsync(val + first, x->val, sizeof(double) * (size_t)n, gpuMemcpyDeviceToHost, x->s) == gpuSuccess)
-			&& (!rho || gpuMemcpyAsync(rho + first, x->rho, sizeof(double) * (size_t)n, gpuMemcpyDeviceToHost, x->s) == gpuSuccess);
+		ok = err == gpuSuccess && gpuMemcpyAsync(hout, x->out, sizeof(double) * 5 * m, gpuMemcpyDeviceToHost, x->s) == gpuSuccess;
 		if (ok)
 		{
 			err = gpuStreamSynchronize(x->s);
 			ok = err == gpuSuccess;
+		}
+		if (ok)
+		{
+			std::memcpy(grad + 3 * (size_t)first, hout + m, sizeof(double) * 3 * m);
+			if (val && K != 4) std::memcpy(val + first, hout, sizeof(double) * m);
+			if (rho) std::memcpy(rho + first, hout + 4 * m, sizeof(double) * m);
 		}
 		lap(2);
 	}
