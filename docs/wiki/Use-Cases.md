@@ -278,18 +278,15 @@ this is what fixes hydroxyl-H populations, at roughly twice the wall time:
 ## 16. A machine-learned (SALTED) density
 
 ```powershell
-.\NoSpherA2.exe -wfn mol.xyz -SALTED .\salted_model -salted_charge_constraint -esp -resolution 0.2
+.\NoSpherA2.exe -wfn mol.xyz -SALTED .\salted_model -esp -resolution 0.2
 ```
-
-Always pass `-salted_charge_constraint`: without it the prediction is short by
-about 0.4 e, which shifts the whole ESP by more than its range on the surface.
 
 Coefficients only, no field. `-SALTED_COEFS` runs inside the parser, so
 everything it needs — including `-no_gpu_salted` if you want the CPU path — has
 to come first:
 
 ```powershell
-.\NoSpherA2.exe -wfn mol.xyz -SALTED .\salted_model -salted_charge_constraint -SALTED_COEFS
+.\NoSpherA2.exe -wfn mol.xyz -SALTED .\salted_model -SALTED_COEFS
 ```
 
 ## 17. Electrostatic interaction energy between two molecules
