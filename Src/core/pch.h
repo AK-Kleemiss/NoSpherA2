@@ -51,7 +51,9 @@
 //serial armpl_lp64, nothing to set
 #define MKL_Set_Num_Threads(num) ((void)(num))
 #else
-#define MKL_Set_Num_Threads(num) openblas_set_num_threads(num)
+//pthreads OpenBLAS cannot tell it runs inside an OpenMP region (MKL can), so N threads
+//here would mean N BLAS threads per OpenMP thread: keep it serial, -cpus goes to OpenMP
+#define MKL_Set_Num_Threads(num) ((void)(num), openblas_set_num_threads(1))
 #endif
 #else
 // Linux/Windows with oneMKL
