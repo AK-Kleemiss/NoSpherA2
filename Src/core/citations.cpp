@@ -54,6 +54,7 @@ namespace citations
 			{Method::EQC, "EQC", "Rahm & Hoffmann, J. Am. Chem. Soc. 137 (2015) 10282", "10.1021/jacs.5b05600"},
 			{Method::EQC, "EQC", "Rahm & Hoffmann, J. Am. Chem. Soc. 138 (2016) 3731", "10.1021/jacs.5b12434"},
 			{Method::EQC, "EQC", "Rahm, Zeng & Hoffmann, J. Am. Chem. Soc. 141 (2019) 342", "10.1021/jacs.8b10246"},
+			{Method::IBO, "IBO", "Knizia, J. Chem. Theory Comput. 9 (2013) 4834", "10.1021/ct400687b"},
 		};
 		return refs;
 	}

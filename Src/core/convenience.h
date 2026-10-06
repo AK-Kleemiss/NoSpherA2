@@ -109,9 +109,11 @@ struct properties_options
 	std::array<int, 3> NbSteps = { 0, 0, 0 };
 	std::array<double, 6> MinMax = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
 	ivec MO_numbers;
+	//-ibo_cube <list>: IBOs to write as cubes (ibo_selection syntax)
+	std::string ibo_cube;
 	int hirsh_number = 0;
 	bool calc() const {
-		return rho || eli || esp || elf || lap || rdg || hdef || def || hirsh || s_rho || all_mos || fukui || esp_isosurface > 0 || MO_numbers.size() > 0;
+		return rho || eli || esp || elf || lap || rdg || hdef || def || hirsh || s_rho || all_mos || fukui || esp_isosurface > 0 || MO_numbers.size() > 0 || !ibo_cube.empty();
 	}
 	size_t n_grid_points() const {
 		size_t result = static_cast<size_t>(NbSteps[0]) * NbSteps[1] * NbSteps[2];
@@ -907,6 +909,8 @@ struct options
 	bool npa = false;
 	//per-NAO occupancy table beside the NPA; -npa_summary turns it off
 	bool npa_orbitals = true;
+	//-ibo: IAO charges and intrinsic bond orbitals, run in-process
+	bool ibo = false;
 	bool rgbi_no_sym = false;
 	bool rgbi_EVs = false;
 	bool rgbi_theta = false;

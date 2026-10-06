@@ -9,6 +9,7 @@
 #include "spherical_density.h"
 #include "cube.h"
 #include "constants.h"
+#include "ibo.h"
 #include "GridManager.h"
 #include "isosurface.h"
 #include "SALTED_predictor.h"
@@ -1968,6 +1969,20 @@ void properties_calculation(options &opt)
 			Calc_MO(cubes[cube_type::MO_val], opt.properties.MO_numbers[i], wavy, opt.properties.radius, log2, opt.cif != "");
 			cubes[cube_type::MO_val].write_file(true);
 		}
+	if (!opt.properties.ibo_cube.empty())
+	{
+		const IBOResult ibo = intrinsic_bond_orbitals(wavy);
+		print_ibo(ibo, wavy, log2);
+		const WFN local = ibo_wfn(wavy, ibo);
+		for (const int k : ibo_selection(ibo, opt.properties.ibo_cube))
+		{
+			log2 << "Calculating IBO " << k + 1 << endl;
+			cubes[cube_type::MO_val].set_zero();
+			cubes[cube_type::MO_val].set_path((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_IBO_" + to_string(k + 1) + ".cube");
+			Calc_MO(cubes[cube_type::MO_val], ibo.mos[k], local, opt.properties.radius, log2, opt.cif != "");
+			cubes[cube_type::MO_val].write_file(true);
+		}
+	}
 
 	// The Fukui functions need the LUMO, which is an UNOCCUPIED orbital. This
 	// block must therefore stay above the delete_unoccupied_MOs() call below -

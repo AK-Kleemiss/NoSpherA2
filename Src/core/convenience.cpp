@@ -432,6 +432,15 @@ std::string help_message =
  "                                    contracted spherical basis, so a .gbw,\n"
  "                                    .molden or .fchk, not a .wfn/.wfx.\n"
  "  -npa_summary                       -npa without the per-orbital NAO table.\n"
+ "  -ibo                               IAO partial charges and intrinsic bond\n"
+ "                                    orbitals (Knizia 2013, MINAO reference),\n"
+ "                                    classified as core, lone pair, bond-like.\n"
+ "                                    Closed shell, .gbw or spherical .molden.\n"
+ "  -ibo_cube <list>                   -ibo, then cubes <wfn>_IBO_<n>.cube of the\n"
+ "                                    IBOs in <list>: numbers as -ibo prints\n"
+ "                                    them, all, or C2:C3 for every bond-like\n"
+ "                                    IBO between two atoms, comma-separated\n"
+ "                                    (e.g. 6,C2:C3). Grid as for -MO.\n"
  "  -rgbi_no_sym                       RGBI without atomic O_h symmetrization. A\n"
  "                                    free-atom ANO reference stays spherical.\n"
  "  -rgbi_basis <nao|ano>              RGBI basis: occupied NAO or ANO [ano].\n"
@@ -4010,6 +4019,12 @@ bool options::digest_ri_options(const std::string &temp, int &i)
 	}
 	else if (temp == "-npa")
 		npa = true;
+	else if (temp == "-ibo")
+		ibo = true;
+	else if (temp == "-ibo_cube") {
+		err_checkf(i + 1 < argc, "-ibo_cube needs the IBO list", std::cout);
+		properties.ibo_cube = arguments[++i];
+	}
 	else if (temp == "-npa_summary") {
 		npa = true;
 		npa_orbitals = false;
@@ -4303,7 +4318,7 @@ bool options::digest_dev_options(const std::string &temp, int &i)
 const char *owning_analysis(const std::string &flag)
 {
 	static const std::pair<const char *, const char *> families[] = {
-		{"-rgbi", "RGBI"}, {"-npa", "NPA"}, {"-nbo", "NBO"}, {"-nrt", "NRT"},
+		{"-rgbi", "RGBI"}, {"-npa", "NPA"}, {"-ibo", "IBO"}, {"-nbo", "NBO"}, {"-nrt", "NRT"},
 		{"-nao", "NAO"}, {"-eli", "ELI-D"}, {"-elf", "ELF"}, {"-qtaim", "QTAIM"},
 		{"-basin", "QTAIM basin"}, {"-topology", "topology"}, {"-eqc", "EQC"}};
 	for (const auto &f : families)
@@ -4346,7 +4361,7 @@ void options::refuse_unread_bonding_options()
 	//reads neither -npa nor -npa_summary; -do_XCW runs RGBI on each refined wavefunction unless a
 	//property cube takes the run first or -calc_F stops it before the fit
 	const bool rgbi_read_early = fba || (do_XCW && !calc_F_calc && !properties.calc());
-	const char *bonding = (rgbi && !rgbi_read_early) ? "-rgbi" : (npa ? "-npa" : nullptr);
+	const char *bonding = (rgbi && !rgbi_read_early) ? "-rgbi" : (npa ? "-npa" : (ibo ? "-ibo" : nullptr));
 	if (early != nullptr && bonding != nullptr)
 		err_checkf(false, std::string("Cannot do both ") + early + " and " + bonding + " in one run: " +
 							  early + " ends the run before " + bonding + " would be reached, so " +
@@ -4474,6 +4489,7 @@ std::string options::unrunnable_analysis() const
 	const std::pair<bool, const char *> needs_a_wavefunction[] = {
 		{rgbi, "-rgbi (Roby-Gould bond indices)"},
 		{npa, "-npa (natural population analysis)"},
+		{ibo, "-ibo (intrinsic bond orbitals)"},
 		{!fchk.empty(), "-fchk (conversion to a formatted checkpoint)"},
 		{!cif.empty() || !hkl.empty(), "-cif/-hkl (scattering factor table)"}};
 	for (const auto &a : needs_a_wavefunction)

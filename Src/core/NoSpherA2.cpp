@@ -14,6 +14,7 @@
 #include "geometry_aid.h"
 #include "crystal_energies.h"
 #include "nao.h"
+#include "ibo.h"
 #include "nbo.h"
 #include "nbo_run.h"
 #include "citations.h"
@@ -798,6 +799,9 @@ static int run_app_impl(int argc, char **argv)
 			}
 			print_npa(npa, log_file);
 		}
+
+		if (opt.ibo)
+			print_ibo(intrinsic_bond_orbitals(wavy[0]), wavy[0], log_file);
 
 		// this one is for generation of an fchk file
 		if (opt.fchk != "")

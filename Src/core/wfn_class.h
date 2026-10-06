@@ -151,7 +151,8 @@ private:
 	dMatrix2 DM_beta;
 	// Spherical MO coefficients as OCC converged them, rows = AO in OCC's m = -l..l order
 	// (beta block below alpha when unrestricted), columns = MO. Filled by the OCC constructor, and
-	// by read_gbw in file shell order with ORCA's phases (-eqc seeds OCC with those).
+	// by read_gbw in file shell order with ORCA's phases (-eqc seeds OCC with those), and by
+	// read_molden (spherical) in the same layout, one column per MO, for -ibo.
 	dMatrix2 MO_sph;
 	// basis set definition (118 elements for each element in the periodic table)
 	std::shared_ptr<std::array<std::vector<primitive>, 118>> basis_set;

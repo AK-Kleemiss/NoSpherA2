@@ -45,7 +45,8 @@ namespace citations
 		RGBI,               //Roby-Gould bond indices
 		Fukui,              //Fukui functions and the dual descriptor
 		GordonKim,          //Gordon-Kim exchange repulsion
-		EQC                 //Rahm-Hoffmann EQC energy decomposition
+		EQC,                //Rahm-Hoffmann EQC energy decomposition
+		IBO                 //intrinsic atomic and bond orbitals
 	};
 
 	struct Reference
