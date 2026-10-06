@@ -606,7 +606,7 @@ vec SALTEDPredictor::predict()
 		_t_equicomb += _elapsed(_t_eq);
 		// In line, also with the descriptors on the device: overlapping it on a second thread
 		// gave that thread its own OpenMP/MKL team, whose spin-wait then cost the kernels below
-		// more than the overlap saved (0.44 against 0.19 s on 1EJG, 32 cores)
+		// more than the overlap could ever hide
 		const auto _t_wait = std::chrono::steady_clock::now();
 		load_model_lambda(lam);
 		const double model_wait = _elapsed(_t_wait);

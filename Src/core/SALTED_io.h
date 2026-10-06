@@ -81,7 +81,7 @@ private:
 	int header_end = -1;
 
 	void open_file();
-	// Model blocks are read through a raw handle: std::ifstream costs ~2.7x, and mapping
+	// Model blocks are read through a raw handle: std::ifstream is several times slower, and mapping
 	// leaves the touched pages resident. No zero-copy span either - the 5-byte species
 	// tag in every block header puts most payloads at an offset that is not a multiple of 8.
 	void open_raw();

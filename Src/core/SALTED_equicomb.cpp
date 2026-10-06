@@ -176,9 +176,9 @@ static double atom_norm2(const lambda_plan &q, const double *m1, const size_t ds
 
 // normfact[k][atom] for every plan. The density matrices do not depend on lambda, so each
 // atom's are built once into a per-thread buffer and contracted for all plans, instead of
-// being stored for all atoms (natoms * 4 * sum (2l+1)^2 doubles, 110 MB at 12k atoms and
-// lmax 5). Same time as that store: the norm still grows 14x for 8x the atoms (1EJG x1 -> x8,
-// 12 threads), so the excess is not the store's DRAM traffic. An empty environment keeps 0.
+// being stored for all atoms (natoms * 4 * sum (2l+1)^2 doubles). No faster than that store:
+// the norm still grows faster than the atom count, so that excess is not the store's DRAM
+// traffic. An empty environment keeps 0.
 static vec2 plan_norms(const int natoms, const int nrad1, const int nrad2, const SALTEDDescriptors &v1, const SALTEDDescriptors &v2,
 	const bool v2_is_conj_of_v1, const lambda_plan *const *plans, const size_t nplans)
 {

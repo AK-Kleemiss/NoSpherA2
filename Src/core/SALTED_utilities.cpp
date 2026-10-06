@@ -274,7 +274,8 @@ static size_t label_column(const metatensor::Labels& labels, const char* name)
 
 // Packs featomic's raw blocks into omega exactly as keys_to_samples("center_type") followed by
 // keys_to_properties("neighbor_type") (both sorting samples) would have laid them out, without
-// building the merged TensorMap and without a save/load buffer round trip (1.7 of 4.4 s at 12k atoms):
+// building the merged TensorMap and without a save/load buffer round trip, which together
+// cost more than featomic's own compute of the blocks:
 //  - rows are the sorted union of the centre atoms of the lambda = 0 blocks
 //  - channels of one lambda are the neighbour types in first-key order, each followed by its n
 //  - a sample a neighbour block lacks stays zero
@@ -410,7 +411,7 @@ metatensor::TensorMap SALTED_Utils::calculate_SOAP_Powerspectrum(featomic::Simpl
 	lap("calculator", time_phases);
 
 	std::vector<std::array<int32_t,3>> keys_array;
-	//keys for centre types the system does not contain cost only metatensor bookkeeping, 0.15 s a call for the full 726
+	//keys for centre types the system does not contain cost only metatensor bookkeeping, which for the full 726 is a large share of a call
 	std::set<int32_t> present(featomic_system.types(), featomic_system.types() + featomic_system.size());
 	for (const std::string& center_type : parameters.species)
 	{
