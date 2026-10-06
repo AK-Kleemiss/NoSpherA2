@@ -111,11 +111,15 @@ cmake -P scripts/SetupVSEnvironment.cmake
 
 It configures `build/release-windows` and `build/debug-windows` and installs the dependencies (`libcint`, `occ`, `featomic`, MKL, ...) into `deps-install-release` / `deps-install-debug`, which the projects under `Windows/` read through the `NoSpherA2_release.props` / `NoSpherA2_debug.props` sheets in `Windows/Windows_utils/`. Run it again whenever a dependency changes; a solution that suddenly fails to compile against `occ` or `libcint` after a `git pull` usually just needs this refresh. The script reconfigures the CMake build directories, so do not run it while a CMake build is in progress.
 
+The platform follows the developer shell, which matches the machine by default: on Windows on ARM it sets up `build/release-windows-arm64` and installs into `deps-install-release-arm64` / `deps-install-debug-arm64`, the folders the `|ARM64` solution platform reads. `-DPLATFORM=x64` or `-DPLATFORM=ARM64` overrides it; an ARM64 setup on an x64 machine runs from a `vcvarsamd64_arm64` prompt after the x64 setup.
+
 Then open `Windows/NoSpherA2/NoSpherA2.sln` or build it from the same developer shell:
 
 ```powershell
 msbuild Windows\NoSpherA2\NoSpherA2.sln /p:Configuration=Release /p:Platform=x64 /m
 ```
+
+(`/p:Platform=ARM64` on Windows on ARM.)
 
 The solution holds four projects: `NoSpherA2_LIB` (everything under `Src/core`), `NoSpherA2` (the executable), `NoSpherA2_DLL` (the Olex2 DLL) and `Tests` (the GTest suite). The executable and the DLL land in `build\Release_x64\`, the tests in `Windows\Tests\Release_x64\Tests.exe`. The projects list their sources by hand while CMake globs them, so a `.cpp` or `.cu` added on the CMake side has to be added to the `.vcxproj` as well; `python scripts/check_vcxproj.py` reports the difference and runs as the first CI step.
 
