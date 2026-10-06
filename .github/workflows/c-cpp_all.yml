@@ -67,18 +67,20 @@ jobs:
             artifact-name: NoSpherA2-windows-x64
 
           # oneMKL has no ARM64 build; this one links conda-forge OpenBLAS
-          # (environment-win-arm64.yaml) and uses vcomp for OpenMP
-          - name: Windows arm64 Release
-            os: windows-11-arm
-            configure-preset: release-windows-arm64
-            build-preset: release-windows-arm64
-            test-preset: release-windows-arm64
-            build-directory: build/release-windows-arm64
-            architecture: arm64
-            msvc-arch: arm64
-            shell: pwsh
-            artifact-path: artifacts/NoSpherA2-windows-arm64.zip
-            artifact-name: NoSpherA2-windows-arm64
+          # (environment-win-arm64.yaml) and uses vcomp for OpenMP.
+          # Disabled for now: its tests run 5-8x slower than x64 (XCW) and
+          # ArmPL cannot be fetched by CI (Arm's CDN refuses scripted downloads).
+          # - name: Windows arm64 Release
+          #   os: windows-11-arm
+          #   configure-preset: release-windows-arm64
+          #   build-preset: release-windows-arm64
+          #   test-preset: release-windows-arm64
+          #   build-directory: build/release-windows-arm64
+          #   architecture: arm64
+          #   msvc-arch: arm64
+          #   shell: pwsh
+          #   artifact-path: artifacts/NoSpherA2-windows-arm64.zip
+          #   artifact-name: NoSpherA2-windows-arm64
 
           - name: macOS arm64 Release
             os: macos-15
@@ -346,26 +348,6 @@ jobs:
           restore-keys: |
             sccache-v4/${{ runner.os }}-${{ matrix.architecture }}/${{ steps.dependency-fingerprint.outputs.value }}/
             sccache-v4/${{ runner.os }}-${{ matrix.architecture }}/
-
-      # Arm Performance Libraries in place of OpenBLAS on Windows ARM64 (serial
-      # armpl_lp64); CMake picks them up from NOSPHERA2_ARMPL_DIR. The include
-      # and lib listings go to the log for when the library names change.
-      - name: Install Arm Performance Libraries
-        if: matrix.name == 'Windows arm64 Release'
-        shell: pwsh
-        run: |
-          $msi = Join-Path $env:RUNNER_TEMP 'armpl.msi'
-          Invoke-WebRequest -Uri 'https://developer.arm.com/-/cdn-downloads/permalink/Arm-Performance-Libraries/Version_26.01/arm-performance-libraries_26.01_Windows.msi' -OutFile $msi
-          $hash = (Get-FileHash $msi -Algorithm SHA256).Hash
-          if ($hash -ne '67B68177479103FD0799F0BEA7B893FC11DC67B332F26910BEBBB27E12527356') { throw "ArmPL MSI hash $hash" }
-          $log = Join-Path $env:RUNNER_TEMP 'armpl-install.log'
-          $p = Start-Process msiexec -ArgumentList '/i', $msi, '/quiet', '/norestart', 'ACCEPT_EULA=1', '/l*v', $log -Wait -PassThru
-          if ($p.ExitCode -ne 0) { Get-Content $log -Tail 60; throw "msiexec exit $($p.ExitCode)" }
-          $root = Get-ChildItem 'C:\Program Files\Arm Performance Libraries' -Directory | Select-Object -First 1
-          if (-not $root) { Get-Content $log -Tail 60; throw 'ArmPL root not found' }
-          Get-ChildItem (Join-Path $root.FullName 'include') -Name
-          Get-ChildItem (Join-Path $root.FullName 'lib') -Name
-          "NOSPHERA2_ARMPL_DIR=$($root.FullName)" >> $env:GITHUB_ENV
 
       # Configure a fresh build tree. sccache reuses individual compilation
       # results, so the CMake/Ninja tree itself does not need to be cached.
