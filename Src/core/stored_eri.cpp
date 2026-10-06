@@ -32,6 +32,7 @@ void stored_eri::clear() {
 //of kept pairs is computed and each slot written by the one quartet that holds it
 bool stored_eri::build(const occ::qm::HartreeFock& hf, const size_t budget_bytes, std::ostream& log) {
 	clear();
+	// Returns false for density-fitted calculations
 	if (!hf.fock_build_properties().density_screened) return false;
 	occ::qm::IntegralEngine engine(hf.aobasis());
 	const int nbf = static_cast<int>(engine.nbf()), nsh = static_cast<int>(engine.nsh()), npq = nsh * (nsh + 1) / 2;

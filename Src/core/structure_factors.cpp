@@ -114,6 +114,7 @@ structure_factors::structure_factors(options& opt_in) {
 	// Initialize DW factors and phase factors, so that F_calc can be calculated without DW factors or phase factors if they are not requested
 	DW_facts.resize(model_data.ncen, cvec(model_data.nr_enlarged, 1));
 	phase_facts.resize(model_data.ncen, cvec(model_data.nr_enlarged, 1));
+	translation_phase_facts.resize(model_data.nr, cvec(unit_cell.get_trans()[0].size(), 1));
 
 }
 
@@ -219,33 +220,60 @@ void structure_factors::U_star2U_cart() {
 	}
 }
 
-void structure_factors::eval_DW() {
-	DW_facts.resize(model_data.ncen, cvec(model_data.nr_enlarged, 0));
+template <int N>
+static const std::vector<structure_factors::gc_term>& gc_terms() {
+	static const std::vector<structure_factors::gc_term> terms = [] {
+		const int fact[5] = { 1, 1, 2, 6, 24 };
+		int total = 1;
+		for (int i = 0; i < N; i++) total *= 3;
+		std::vector<structure_factors::gc_term> t;
+		for (int n = 0; n < total; n++) {
+			int idx[N], m = n;
+			for (int i = N - 1; i >= 0; i--) { idx[i] = m % 3; m /= 3; }
+			structure_factors::gc_term g = { { 0, 0, 0 }, 0.0 };
+			bool sorted = true;
+			for (int i = 0; i < N; i++) {
+				g.e[idx[i]]++;
+				if (i > 0 && idx[i] < idx[i - 1]) sorted = false;
+			}
+			if (!sorted) continue;
+			g.mult = static_cast<double>(fact[N]) / (fact[g.e[0]] * fact[g.e[1]] * fact[g.e[2]]);
+			t.push_back(g);
+		}
+		return t;
+	}();
+	return terms;
+}
+
+//Sum of mult * c * x^e0 y^e1 z^e2 over the packed tensor c, with p[d][axis] the d-th power of the point
+template <int N>
+static double gc_sum(const vec& c, const double (*p)[3]) {
+	const std::vector<structure_factors::gc_term>& t = gc_terms<N>();
+	double sum = 0.0;
+	for (int n = 0; n < static_cast<int>(t.size()); n++)
+		sum += t[n].mult * c[n] * p[t[n].e[0]][0] * p[t[n].e[1]][1] * p[t[n].e[2]][2];
+	return sum;
+}
+
+//0 isotropic, 1 U, 2 U and C, 3 U, C and D; an atom without ADPs gets empty ones
+static int adp_level(vec2& adp) {
+	if (adp.size() != 3) {
+		adp.resize(3);
+		return 0;
+	}
+	if (!adp[2].empty()) return 3;
+	if (!adp[1].empty()) return 2;
+	if (!adp[0].empty()) return 1;
+	return 0;
+}
+
+void structure_factors::set_DW() {
 	//Converts angstrom to bohr OR MORE IMPORTANTLY reciprocal bohr to reciprocal angstrom
 	const double angstrom2bohr = constants::ang2bohr(1);
 	ivec level;
 	level.reserve(model_data.ncen);
-	//Figure out which level of anisotropic displacements parameters are avaialable
-	for (int a = 0; a < model_data.ncen; a++) {
-		vec2 ADPs_ = ADPs[a];
-		if (ADPs_.size() != 3) {
-			ADPs_.resize(3);
-			ADPs[a] = ADPs_;
-			level.emplace_back(0);
-		}
-		else if (ADPs_[2].size() != 0) {
-			level.emplace_back(3);
-		}
-		else if (ADPs_[1].size() != 0) {
-			level.emplace_back(2);
-		}
-		else if (ADPs_[0].size() != 0) {
-			level.emplace_back(1);
-		}
-		else {
-			level.emplace_back(0);
-		}
-	}
+	for (int a = 0; a < model_data.ncen; a++)
+		level.emplace_back(adp_level(ADPs[a]));
 	vec2 q(model_data.nr_enlarged, vec(3));
 	for (int h = 0; h < model_data.nr_enlarged; h++) {
 		q[h][0] = k_pt[0][h];
@@ -256,70 +284,38 @@ void structure_factors::eval_DW() {
 		std::transform(vec.begin(), vec.end(), vec.begin(), [angstrom2bohr](double x) { return x * angstrom2bohr; });
 		return vec; });
 	for (int a = 0; a < model_data.ncen; a++) {
-		vec2 ADPs_ =ADPs[a];
-		vec2 Uij;
-		if (level[a] > 0) {
-			Uij = { { ADPs_[0][0], ADPs_[0][3], ADPs_[0][4] },
-						 { ADPs_[0][3], ADPs_[0][1], ADPs_[0][5] },
-						 { ADPs_[0][4], ADPs_[0][5], ADPs_[0][2] } };
-		}
-		switch (level[a]) {
-		case 0: {
+		vec2 ADPs_ = ADPs[a];
+		if (level[a] == 0) {
 			// Isotropic
 			double U = asym_atoms[a].U_iso, temp;
 			for (int r = 0; r < model_data.nr_enlarged; r++) {
 				temp = -0.5 * U * (q[r][0] * q[r][0] + q[r][1] * q[r][1] + q[r][2] * q[r][2]);
 				DW_facts[a][r] = std::exp(temp);
 			}
-			break;
+			continue;
 		}
-		case 1: {
-			// Anisotropic U_ij
-			double temp1;
-			for (int h = 0; h < model_data.nr_enlarged; h++) {
-				vec q_ = { q[h][0], q[h][1], q[h][2] };
-				temp1 = -0.5 * dot_BLAS(dot(Uij, q_, true), q_, false);
-				DW_facts[a][h] = std::exp(temp1);
-			}
-			break;
-		}
-		case 2: {
-			// Anisotropic C_ijk
-			double temp1, temp2;
-			for (int h = 0; h < model_data.nr_enlarged; h++) {
-				vec q_ = { q[h][0], q[h][1], q[h][2] };
-				temp1 = -0.5 * dot_BLAS(dot(Uij, q_, true), q_, false);
-				temp2 = -1.0 / 6.0 * (ADPs_[1][0] * q_[0] * q_[0] * q_[0] + ADPs_[1][6] * q_[1] * q_[1] * q_[1] + ADPs_[1][9] * q_[2] * q_[2] * q_[2]
-					+ 3 * ADPs_[1][1] * q_[0] * q_[0] * q_[1] + 3 * ADPs_[1][2] * q_[0] * q_[0] * q_[2] + 3 * ADPs_[1][3] * q_[0] * q_[1] * q_[1] + 3 * ADPs_[1][5] * q_[0] * q_[2] * q_[2] + 3 * ADPs_[1][7] * q_[1] * q_[1] * q_[2] + 3 * ADPs_[1][8] * q_[1] * q_[2] * q_[2]
-					+ 6 * ADPs_[1][4] * q_[0] * q_[1] * q_[2]);
-				DW_facts[a][h] = std::exp(temp1) * cdouble(1, temp2);
-			}
-			break;
-		}
-		case 3: {
-			// Anisotropic D_ijkl
-			double temp1, temp2, temp3;
-			for (int h = 0; h < model_data.nr_enlarged; h++) {
-				vec q_ = { q[h][0], q[h][1], q[h][2] };
-				temp1 = -0.5 * dot_BLAS(dot(Uij, q_, true), q_, false);
-				temp2 = -1.0 / 6.0 * (ADPs_[1][0] * q_[0] * q_[0] * q_[0] + ADPs_[1][6] * q_[1] * q_[1] * q_[1] + ADPs_[1][9] * q_[2] * q_[2] * q_[2]
-					+ 3 * ADPs_[1][1] * q_[0] * q_[0] * q_[1] + 3 * ADPs_[1][2] * q_[0] * q_[0] * q_[2] + 3 * ADPs_[1][3] * q_[0] * q_[1] * q_[1] + 3 * ADPs_[1][5] * q_[0] * q_[2] * q_[2] + 3 * ADPs_[1][7] * q_[1] * q_[1] * q_[2] + 3 * ADPs_[1][8] * q_[1] * q_[2] * q_[2]
-					+ 6 * ADPs_[1][4] * q_[0] * q_[1] * q_[2]);
-				temp3 = (1.0 / 24.0) * (ADPs_[2][0] * q_[0] * q_[0] * q_[0] * q_[0] + 4.0 * ADPs_[2][1] * q_[0] * q_[0] * q_[0] * q_[1] + 4.0 * ADPs_[2][2] * q_[0] * q_[0] * q_[0] * q_[2]
-					+ 6.0 * ADPs_[2][3] * q_[0] * q_[0] * q_[1] * q_[1] + 12.0 * ADPs_[2][4] * q_[0] * q_[0] * q_[1] * q_[2] + 6.0 * ADPs_[2][5] * q_[0] * q_[0] * q_[2] * q_[2] + 4.0 * ADPs_[2][6] * q_[0] * q_[1] * q_[1] * q_[1] + 12.0 * ADPs_[2][7] * q_[0] * q_[1] * q_[1] * q_[2]
-					+ 12.0 * ADPs_[2][8] * q_[0] * q_[1] * q_[2] * q_[2] + 4.0 * ADPs_[2][9] * q_[0] * q_[2] * q_[2] * q_[2] + ADPs_[2][10] * q_[1] * q_[1] * q_[1] * q_[1] + 4.0 * ADPs_[2][11] * q_[1] * q_[1] * q_[1] * q_[2] + 6.0 * ADPs_[2][12] * q_[1] * q_[1] * q_[2] * q_[2]
-					+ 4.0 * ADPs_[2][13] * q_[1] * q_[2] * q_[2] * q_[2] + ADPs_[2][14] * q_[2] * q_[2] * q_[2] * q_[2]);
-				DW_facts[a][h] = std::exp(temp1) * cdouble(1 + temp3, temp2);
-			}
-			break;
-		}
+		// Anisotropic U_ij, with the C_ijk (level 2) and D_ijkl (level 3) terms of the Gram-Charlier expansion
+		vec2 Uij = { { ADPs_[0][0], ADPs_[0][3], ADPs_[0][4] },
+					 { ADPs_[0][3], ADPs_[0][1], ADPs_[0][5] },
+					 { ADPs_[0][4], ADPs_[0][5], ADPs_[0][2] } };
+		for (int h = 0; h < model_data.nr_enlarged; h++) {
+			vec q_ = { q[h][0], q[h][1], q[h][2] };
+			const double temp1 = -0.5 * dot_BLAS(dot(Uij, q_, true), q_, false);
+			// p stores the powers of q up to 4
+			double p[5][3] = { { 1.0, 1.0, 1.0 } };
+			for (int d = 1; d < 5; d++)
+				for (int i = 0; i < 3; i++) {
+					p[d][i] = p[d - 1][i] * q_[i];
+				}
+			const double c3 = level[a] >= 2 ? -1.0 / 6.0 * gc_sum<3>(ADPs_[1], p) : 0.0;
+			const double d4 = level[a] >= 3 ? 1.0 / 24.0 * gc_sum<4>(ADPs_[2], p) : 0.0;
+			DW_facts[a][h] = std::exp(temp1) * cdouble(1 + d4, c3);
 		}
 	}
-	// closing function
+	DW_set_ = true;
 }
 
-void structure_factors::eval_phase() {
-	phase_facts.resize(model_data.ncen, cvec(model_data.nr_enlarged, 0));
+void structure_factors::set_phases() {
 	cdouble exponent;
 	for (int at = 0; at < model_data.ncen; at++) {
 		vec pos_cart = { asym_atoms[at].pos[0], asym_atoms[at].pos[1], asym_atoms[at].pos[2] };
@@ -329,11 +325,6 @@ void structure_factors::eval_phase() {
 			phase_facts[at][r] = std::exp(exponent);
 		}
 	}
-}
-
-// sym_ops_ is the opp
-void structure_factors::eval_translation_phase() {
-	translation_phase_facts.resize(model_data.nr, cvec(unit_cell.get_trans()[0].size(), 0));
 	const double angstrom2bohr = constants::ang2bohr(1);
 	const double bohr2angstrom = constants::bohr2ang(1);
 	vec2 trans = unit_cell.get_trans();
@@ -354,10 +345,11 @@ void structure_factors::eval_translation_phase() {
 			translation_phase_facts[r][t] = std::exp(exponent);
 		}
 	}
+	phases_set_ = true;
 	// closing function
 }
 
-void structure_factors::eval_anom_disp() {
+void structure_factors::set_anom() {
 	int r, at, r_asym;
 	ivec2 asym_lookup(model_data.nr);
 	for (r = 0; r < model_data.nr; r++) {
@@ -365,14 +357,17 @@ void structure_factors::eval_anom_disp() {
 	}
 	for (r = 0; r < model_data.nr; r++) {
 		const ivec& lookup = asym_lookup[r];
+		cdouble sum = 0;
 		for (at = 0; at < model_data.ncen; at++) {
 			cdouble temp1 = 0;
 			for (r_asym = 0; r_asym < lookup.size(); r_asym++) {
 				temp1 += phase_facts[at][lookup[r_asym]] * DW_facts[at][lookup[r_asym]] * translation_phase_facts[r][r_asym];
 			}
-			scatter_data.anom_correction[r] += temp1 * asym_atoms[at].asym_fact * asym_atoms[at].anom;
+			sum += temp1 * asym_atoms[at].asym_fact * asym_atoms[at].anom;
 		}
+		scatter_data.anom_correction[r] = sum;
 	}
+	anom_set_ = true;
 }
 
 //y_r and the chain factors, from the current F_calc and the current coefficients
@@ -464,7 +459,7 @@ std::string structure_factors::extinction_report() const {
 
 //The scale that minimises the criterion the SCF descends: k over the fit set from
 //Sum w (k|Fc| - |Fo|)^2 / sigma^2, or k^2 from Sum w (k^2|Fc|^2 - Fo^2)^2 / sigma(I)^2 against
-//F^2, with w the 1/|H|^2 weights of XWR_type 2. calc_perturb takes the scale as given, so the
+//F^2, with w the 1/|H|^2 weights of XWR_type 2. perturbation takes the scale as given, so the
 //scale had better be stationary for the criterion, or the SCF descends a different
 //functional than the one it prints: an unweighted fit of k put Fe(phen)2(SCN)2 (chi^2 12.96
 //vs 12.30 at the weighted k, dchi^2/dk 2e3) 4 mEh above the previous step's orbitals at
@@ -591,7 +586,7 @@ void structure_factors::ensure_inv_H2_weights() {
 	}
 }
 
-void structure_factors::create_prims(std::vector<ao_data>& ao_data_shells, occ::qm::AOBasis& occ_basis_set) {
+void structure_factors::create_prims(std::vector<ao_data>& ao_data_shells, const occ::qm::AOBasis& occ_basis_set) {
 	for (int atm = 0; atm < model_data.ncen; atm++) {
 		d3 pos = { occ_basis_set.atoms()[atm].x, occ_basis_set.atoms()[atm].y, occ_basis_set.atoms()[atm].z };
 		const int first_shell = *occ_basis_set.atom_to_shell()[atm].begin();
@@ -642,10 +637,12 @@ size_t structure_factors::tri_index(int mu, int nu) const noexcept {
 	return mu * model_data.nmo - (mu * (mu - 1)) / 2 + (nu - mu);
 }
 
-structure_factors::I_tensor& structure_factors::eval_I_anom_disp(std::vector<ao_data>& ao_data_shells) {
-	eval_phase();
-	eval_DW();
-	eval_translation_phase();
+structure_factors::I_tensor& structure_factors::eval_I(const occ::gto::AOBasis& aobasis) {
+	if (!DW_set_) std::cout << "Debye-Waller factors are not computed and set to 1. Continuing." << std::endl;
+	if (!phases_set_) std::cout << "Phase factors are not computed and set to 1. Continuing." << std::endl;
+	if (!anom_set_) std::cout << "Anomalous dispersion corrections are not computed and set to 0. Continuing." << std::endl;
+	std::vector<structure_factors::ao_data> ao_data_shells;
+	create_prims(ao_data_shells, aobasis);
 	size_t kept_on_disk = 0;
 	bool single_on_disk = false;
 	if (I_tens.read_tensor && !I_tens.i_tensor_file_path.empty()
@@ -702,7 +699,7 @@ structure_factors::I_tensor& structure_factors::eval_I_anom_disp(std::vector<ao_
 		double time_taken;
 		long long screen_counter = 0;
 		long long skipped_grids = 0;
-		eval_I(ao_data_shells, time_taken, screen_counter, skipped_grids);
+		build_I(ao_data_shells, time_taken, screen_counter, skipped_grids);
 		if (!(opt->no_date)) {
 			std::cout << std::fixed << std::setprecision(2) << "Time taken for XCW integrals: " << time_taken << " seconds. \n";
 		}
@@ -711,7 +708,6 @@ structure_factors::I_tensor& structure_factors::eval_I_anom_disp(std::vector<ao_
 		std::cout << std::fixed << std::setprecision(2) << "Skipped evaluation of " << skipped_grids << " grids (" << static_cast<double>(skipped_grids) / ((static_cast<double>(model_data.nmo * (model_data.nmo + 1)) / 2) * model_data.nr_enlarged * model_data.ncen) * 100.00 << "%) \n";
 
 	}
-	eval_anom_disp();
 	return I_tens;
 	// closing function
 }
@@ -845,7 +841,7 @@ static void tile_gemm(const int m, const int n, const int k, const float* a, con
 	cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasTrans, m, n, k, 1.0f, a, k, b, k, 0.0f, c, n);
 }
 
-void structure_factors::eval_I(std::vector<ao_data>& ao_data_shells, double& time_taken, long long& screen_counter, long long& skipped_grids_) {
+void structure_factors::build_I(const std::vector<ao_data>& ao_data_shells, double& time_taken, long long& screen_counter, long long& skipped_grids_) {
 	long long skipped_grids = 0;
 	const int packed_size = (model_data.nmo * (model_data.nmo + 1)) / 2;
 	int at = 0, mu = 0, nu = 0, r = 0, s = 0, r_asym = 0;
@@ -934,89 +930,56 @@ void structure_factors::eval_I(std::vector<ao_data>& ao_data_shells, double& tim
 	}
 
 	// Precompute screening
+	std::chrono::high_resolution_clock::time_point screening_start = std::chrono::high_resolution_clock::now();
 	ivec2 skip(model_data.nmo, ivec(model_data.nmo, 0));
 	{
-		double e_tol = 0.0005;
-		const double root_inv_four_pi = std::sqrt(constants::INV_FOUR_PI);
+		const double e_tol = 0.0005;
+		double estimate = 0.0;
+		const double sqrt_inv_four_pi = std::sqrt(constants::INV_FOUR_PI);
 		for (mu = 0; mu < model_data.nmo; mu++) {
-			const ao_data& mu_prims = ao_data_shells[mu];
-			const std::vector<primitive>& mu_primitives = mu_prims.prims;
-			const double& mp0 = mu_prims.pos[0];
-			const double& mp1 = mu_prims.pos[1];
-			const double& mp2 = mu_prims.pos[2];
-			for (nu = mu + 1; nu < model_data.nmo; nu++) {
-				const ao_data& nu_prims = ao_data_shells[nu];
-				const std::vector<primitive>& nu_primitives = nu_prims.prims;
-				const double& np0 = nu_prims.pos[0];
-				const double& np1 = nu_prims.pos[1];
-				const double& np2 = nu_prims.pos[2];
-				const double dist0 = mp0 - np0;
-				const double dist1 = mp1 - np1;
-				const double dist2 = mp2 - np2;
-				const double dist = dist0 * dist0 + dist1 * dist1 + dist2 * dist2;
-				if (dist < 1e-5) {
+			const std::vector<primitive>& mu_primitives = ao_data_shells[mu].prims;
+			const int mu_type = mu_primitives[0].get_type();
+			const double mu_type_half = static_cast<double>(mu_type) * 0.5;
+			const double min_mu_type_half_exp = std::exp(-mu_type_half);
+			const double sph_harmonic_max_mu = constants::spherical_harmonic_max(mu_type, ao_data_shells[mu].m);
+			for (nu = mu; nu < model_data.nmo; nu++) {
+				const double dist2 = (ao_data_shells[mu].pos[0] - ao_data_shells[nu].pos[0]) * (ao_data_shells[mu].pos[0] - ao_data_shells[nu].pos[0]) +
+					(ao_data_shells[mu].pos[1] - ao_data_shells[nu].pos[1]) * (ao_data_shells[mu].pos[1] - ao_data_shells[nu].pos[1]) +
+					(ao_data_shells[mu].pos[2] - ao_data_shells[nu].pos[2]) * (ao_data_shells[mu].pos[2] - ao_data_shells[nu].pos[2]);
+				if (dist2 < 1e-5) {
 					continue;
 				}
-
-				double c = 0;
-				double mu_min = std::numeric_limits<double>::max();
-				double nu_min = std::numeric_limits<double>::max();
-				const int mu_l = mu_prims.prims[0].get_type();
-				const double mu_l_half = 0.5 * mu_l;
-				const double temp_mu = std::sqrt((2 * mu_l + 1) * constants::INV_FOUR_PI) * std::exp(-mu_l_half);
-				const int nu_l = nu_prims.prims[0].get_type();
-				const double nu_l_half = 0.5 * nu_l;
-				const double temp_nu = std::sqrt((2 * nu_l + 1) * constants::INV_FOUR_PI) * std::exp(-nu_l_half);
-				std::vector<std::pair<double, double>> pairs;
-				pairs.reserve(mu_primitives.size() * nu_primitives.size());
+				const std::vector<primitive>& nu_primitives = ao_data_shells[nu].prims;
+				const double nu_type = static_cast<double>(nu_primitives[0].get_type());
+				const double nu_type_half = static_cast<double>(nu_type) * 0.5;
+				const double min_nu_type_half_exp = std::exp(-nu_type_half);
+				const double sph_harmonic_max_nu = constants::spherical_harmonic_max(nu_type, ao_data_shells[nu].m);
+				estimate = 0.0;
 				for (int k = 0; k < mu_primitives.size(); k++) {
-					mu_min = std::min(mu_min, mu_primitives[k].get_exp());
-					const double c_k = std::abs(mu_primitives[k].get_coef());
-					const double alpha_k = mu_primitives[k].get_exp();
-					const double N_k = mu_l == 0 ? root_inv_four_pi : temp_mu * std::pow(mu_l / alpha_k, mu_l_half);
+					const double k_coef = mu_primitives[k].get_coef();
+					const double k_exp = mu_primitives[k].get_exp();
+					const double N_k = mu_type == 0 ? sqrt_inv_four_pi : sph_harmonic_max_mu * min_mu_type_half_exp * std::pow(mu_type / k_exp, mu_type_half);
 					for (int l = 0; l < nu_primitives.size(); l++) {
-						nu_min = std::min(nu_min, nu_primitives[l].get_exp());
-						const double c_l = std::abs(nu_primitives[l].get_coef());
-						const double alpha_l = nu_primitives[l].get_exp();
-						const double N_l = nu_l == 0 ? root_inv_four_pi : temp_nu * std::pow(nu_l / alpha_l, nu_l_half);
-						const double N_kl = N_k * N_l * std::pow(constants::TWO_PI / (alpha_k + alpha_l), 1.5);
-						const double temp1 = c_k * c_l * N_kl;
-						c += temp1;
-						pairs.emplace_back(temp1, alpha_k * alpha_l / (2.0 * (alpha_k + alpha_l)));
+						const double l_coef = nu_primitives[l].get_coef();
+						const double l_exp = nu_primitives[l].get_exp();
+						const double inv_exp_sum = 1.0 / (k_exp + l_exp);
+						const double N_l = nu_type == 0 ? sqrt_inv_four_pi : sph_harmonic_max_nu * min_nu_type_half_exp * std::pow(nu_type / l_exp, nu_type_half);
+						const double combined_coeffs = std::abs(k_coef * l_coef);
+						const double N_kl = N_k * N_l * std::pow(constants::TWO_PI * inv_exp_sum, 1.5);
+						const double gamma = 0.5 * k_exp * l_exp * inv_exp_sum;
+						const double gaussian = std::exp(-gamma*dist2);
+						estimate += combined_coeffs * N_kl * gaussian;
 					}
 				}
-				const double gamma = 2 * (mu_min + nu_min) / (mu_min * nu_min);
-				const double cutoff = std::log(c / e_tol) * gamma;
-				//Newton method for finding correct cutoff
-				double newton_cutoff;
-				if (cutoff <= 0.0) {
-					newton_cutoff = 0.0;
-				}
-				else {
-					double lo = 0.0, hi = cutoff;
-					newton_cutoff = 0.5 * (lo + hi);
-					for (int iter = 0; iter < 50; iter++) {
-						double upper_bound = 0.0, bound_derivative = 0.0;
-						for (const auto& [weight, gamma_kl] : pairs) {
-							const double upper_bound_temp = weight * std::exp(-gamma_kl * newton_cutoff);
-							upper_bound += upper_bound_temp;
-							bound_derivative -= gamma_kl * upper_bound_temp;
-						}
-						const double delta = upper_bound - e_tol;
-						if (delta >= 0.0) lo = newton_cutoff; else hi = newton_cutoff;
-						double next = newton_cutoff - delta / bound_derivative;
-						if (!(next > lo) || !(next < hi)) next = 0.5 * (lo + hi);
-						const double step = std::abs(next - newton_cutoff);
-						newton_cutoff = next;
-						if (step < 1e-12 * hi) break;
-					}
-				}
-				if (dist > newton_cutoff) {
+				if (estimate < e_tol) {
 					skip[mu][nu] = 1;
 				}
 			}
 		}
 	}
+
+	std::chrono::high_resolution_clock::time_point screening_end = std::chrono::high_resolution_clock::now();
+	std::cout << std::fixed << std::setprecision(5) << "Time taken for AO screening: " << std::chrono::duration_cast<std::chrono::microseconds>(screening_end - screening_start).count() << " microseconds." << "\n";
 
 	// Grid screening
 	constexpr double maximum_ao_grid_cutoff = 12;

@@ -151,8 +151,7 @@ namespace {
 		CoutCapture out;
 		opt.loadXCWsettings();
 		{
-			structure_factors SF(opt);
-			XCW_solver x(SF);
+			XCW_solver x(opt);
 			x.run();
 		}
 		return out.str();
@@ -303,7 +302,7 @@ TEST(XcwHaltingReportTests, HaltingReportsAcrossTheExtendedLambdaScan)
 	EXPECT_EQ(std::filesystem::file_size(dir / "itensor.bin"),
 		HEADER_FIXED_BYTES + 8 * static_cast<std::uintmax_t>(kept) + static_cast<std::uintmax_t>(n_written) * kept * 16);
 
-	//eval_I_anom_disp read branch: the saved tensor is loaded, not rebuilt, and gives the same rows
+	//eval_I read branch: the saved tensor is loaded, not rebuilt, and gives the same rows
 	options opt2 = make_options(dir, RUN_BASE + "end 0.01 i_tensor_mb 4096 read itensor.bin gaussian_halt");
 	opt2.cpu_itensor_fp32 = false;
 	const std::string out2 = run_xcw(dir, opt2);
@@ -453,10 +452,9 @@ TEST(XcwHaltingReportTests, GrownConstructUsesTheXyzAtoms)
 		CoutCapture capture;
 		opt.loadXCWsettings();
 		{
-			structure_factors SF(opt);
+			XCW_solver x(opt);
 			EXPECT_TRUE(opt.xcw_settings.grown);
-			EXPECT_EQ(SF.model_data.ncen, 23);
-			XCW_solver x(SF);
+			EXPECT_EQ(x.structure().model_data.ncen, 23);
 		}
 		out = capture.str();
 	}

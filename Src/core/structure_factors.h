@@ -16,8 +16,6 @@ public:
 
 	options* opt;
 
-//private:
-
 	// Store cristallographic quality criteria
 	struct quality_criteria {
 		double GooF1;
@@ -100,6 +98,10 @@ public:
 		std::string basis_set_name;
 	};
 
+	//The entries of a rank-N symmetric tensor stored packed in the order i <= j <= k (<= l): the powers of x, y
+	//and z each one multiplies and how often its index tuple occurs among all 3^N
+	struct gc_term { int e[3]; double mult; };
+
 	// Stores the ADP tensors
 	vec3 ADPs;
 	// Stores the Debye-Waller factors
@@ -134,7 +136,7 @@ public:
 	std::vector<i3> hkl_ordered_;
 	// 1/|H_r|^2 per reflection, see ensure_inv_H2_weights.
 	vec inv_H2_;
-	// The I tensor, see eval_I_anom_disp
+	// The I tensor, see eval_I
 	I_tensor I_tens;
 	// The background writer for `save <path>`. Joined, never detached: a thread still
 	// running at exit is how the GPU warm-up bug of 939268f happened, and this one holds a
@@ -193,24 +195,25 @@ public:
 	// Generates a list that links the symmetry operations to symmetry-generated reflexes for given reflex r
 	ivec generate_asym_lookup(const int r);
 
-	// Evaluates Debye-Waller factors
-	void eval_DW();
-	// Evaluates the rotational contribution to the phase factors
-	void eval_phase();
-	// Evaluates the translational contribution to the phase factors
-	void eval_translation_phase();
-
-	// Calculates direct corrections of the anomalous dispersion onto F_calc
-	void eval_anom_disp();
+	// Each of the three setters computes its quantity and stores it; one never called leaves the
+	// value the constructor put there (DW and phases 1, anomalous dispersion 0)
+	// Evaluates and sets the Debye-Waller factors
+	void set_DW();
+	// Evaluates and sets the rotational and the translational phase factors
+	void set_phases();
+	// Evaluates and sets the direct corrections of the anomalous dispersion onto F_calc, from
+	// whatever DW and phase factors are set at the time
+	void set_anom();
+	bool DW_set_ = false, phases_set_ = false, anom_set_ = false;
 
 	// Creates primitive vectors from the basis set for calculating the XCW integrals
-	void create_prims(std::vector<ao_data>& ao_data_shells, occ::qm::AOBasis& occ_basis_set);
+	void create_prims(std::vector<ao_data>& ao_data_shells, const occ::qm::AOBasis& occ_basis_set);
 	// Helper function for flattening the I tensor
 	size_t tri_index(int mu, int nu) const noexcept;
-	// Combined method used to save memory, calculates (or reads) the I tensor and the correction for F_calc from anomalous dispersion
-	I_tensor& eval_I_anom_disp(std::vector<ao_data>& ao_data_shells);
-	// Evaluates the I tensor
-	void eval_I(std::vector<ao_data>& ao_data_shells, double& time_taken, long long& screen_counter, long long& skipped_grids);
+	// Calculates the I tensor with the DW and phase factors as set, or reads it from file
+	I_tensor& eval_I(const occ::gto::AOBasis& aobasis);
+	// The grid integration behind eval_I
+	void build_I(const std::vector<ao_data>& ao_data_shells, double& time_taken, long long& screen_counter, long long& skipped_grids);
 	void decide_i_storage();
 	void open_i_stream_for_reading();
 	std::filesystem::path i_tensor_path() const;

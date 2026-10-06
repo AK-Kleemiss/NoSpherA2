@@ -785,8 +785,7 @@ static int run_app_impl(int argc, char **argv)
 	{
 		opt.groups[0].push_back(0);
 		opt.loadXCWsettings();
-		structure_factors SF(opt);
-		XCW_solver xcw_solver(SF);
+		XCW_solver xcw_solver(opt);
 		xcw_solver.run();
 		log_file.flush();
 		std::cout.rdbuf(_coutbuf);

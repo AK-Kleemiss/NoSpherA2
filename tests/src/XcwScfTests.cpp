@@ -151,8 +151,7 @@ namespace {
 			cout_capture capture;
 			opt.loadXCWsettings();
 			{
-				structure_factors SF(opt);
-				XCW_solver x(SF);
+				XCW_solver x(opt);
 				x.run();
 			}
 			r.out = capture.buf.str();

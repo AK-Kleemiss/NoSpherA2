@@ -1,37 +1,79 @@
 #pragma once
 #include "convenience.h"
-#include "structure_factors.h"
+#include "cell.h"
+#include "SCF_log_writer.h"
 #include "stored_eri.h"
 #include <occ/qm/hf.h>
 #include <occ/qm/second_order_scf.h>
 #include <deque>
 
-class XCW_solver;
+// The crystallographic quantities of the current density, as the SCF prints and descends them
+struct fit_quality {
+	double criterion, GooF2, R1, criterion_all, R1_all;
+};
+
+// What the SCF needs from the structure factors, implemented by XCW_solver so that SCF_wrapper
+// never sees the structure factors, the I tensor or the reflection data
+class SCF_coupling {
+
+public:
+
+	virtual ~SCF_coupling() = default;
+	// F_calc, scale and criteria of the effective density
+	virtual void evaluate(const dMatrix2& dm_eff) = 0;
+	// The perturbation matrix of the last evaluate, nmo rows per spin block
+	virtual void perturbation(occ::Mat& perturb, const bool unrestricted) = 0;
+	virtual fit_quality quality() const = 0;
+	// lambda times the change of the perturbation matrix for a change of the effective density,
+	// the scale moving along; leaves F_calc and the scale as they were
+	virtual occ::Mat perturbation_response(const dMatrix2& dD_eff, const double lambda) = 0;
+	// F_calc and scale as they are now, and back
+	virtual void save_state() = 0;
+	virtual void restore_state() = 0;
+	// Whether the I tensor is walked on the device, for the timing record
+	virtual bool on_device() const = 0;
+};
 
 class SCF_wrapper {
 
 public:
 
 	SCF_wrapper() = default;
-	SCF_wrapper(XCW_solver& xcw_in, structure_factors& sf_in);
+	SCF_wrapper(const occ::core::Molecule& mol, const occ::qm::AOBasis& basis, const options::SCF_settings& settings, SCF_log_writer& writer);
 
-	// Sets up a molecule object from the asym_atoms
-	void setup_SCF_mol(occ::core::Molecule& mol);
+	// Creates an OCC molecule from an asym_atom vector with charge and multiplicity
+	static occ::core::Molecule setup_SCF_mol(const std::vector<asym_atom>& atoms, const int charge, const int multiplicity);
 
-	// Sets up the basis set with a previously generated molecule and basis set from JKFit, where the Olex2 basis sets are now located
-	void setup_basis(occ::core::Molecule& mol, std::string& basis_set_name, occ::qm::AOBasis& occ_basis_set);
+	// The basis set from the library (JKFit, where the Olex2 basis sets are now located) on the atoms of mol
+	static occ::qm::AOBasis setup_basis(const occ::core::Molecule& mol, const std::string& basis_set_name);
 
-	// Executes a single SCF solver (for specific lambda step)
-	bool do_SCF(const double& lambda, double& alpha, occ::qm::SCF<occ::qm::HartreeFock>& scf, occ::qm::Wavefunction& last_wfn, bool& has_guess, bool write_result = true);
+	// Builds the stored two-electron integrals when they fit in memory, and puts them on the device if asked to
+	void setup_eri(const occ::qm::HartreeFock& hf);
+	// Gives the device back
+	void release_device();
+
+	// One SCF solver (for specific lambda step); false when it did not converge
+	bool solve(occ::qm::HartreeFock& hf, const double lambda, occ::qm::Wavefunction& wfn, const bool use_guess, SCF_coupling& coupling);
+
+	// Mutable, the settings schedule of a lambda scan is XCW_solver's to change between steps
+	options::SCF_settings settings;
+
+private:
 
 	//Two-electron integrals over the screened-in pairs, built once per run when they fit in
 	//memory: the Fock build then contracts them instead of recomputing every quartet per iteration
 	stored_eri eri_;
 	bool eri_on_device_ = false;
 
-	std::ofstream SCF_log;
+	occ::core::Molecule mol_;
+	occ::qm::AOBasis basis_;
+	int nmo_ = 0;
+	SCF_log_writer* writer_ = nullptr;
+	SCF_coupling* coupling_ = nullptr;
 
-private:
+	// Executes a single SCF solver (for specific lambda step)
+	bool do_SCF(const double& lambda, double& alpha, occ::qm::SCF<occ::qm::HartreeFock>& scf, occ::qm::Wavefunction& last_wfn, bool& has_guess);
+
 
 	void small_basis_guess(occ::qm::SCF<occ::qm::HartreeFock>& scf);
 
@@ -126,8 +168,4 @@ private:
 	double next_full_build_error_ = 0.0;
 	occ::Mat eri_fock(const occ::qm::MolecularOrbitals& mo, bool screen) const;
 
-	options* opt;
-	structure_factors* sf;
-	// The solver the SCF takes its perturbation from
-	XCW_solver* xcw;
 };

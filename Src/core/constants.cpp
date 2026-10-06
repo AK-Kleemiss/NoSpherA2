@@ -768,6 +768,402 @@ namespace constants {
 		return SH;
 	}
 
+
+	// Basically a lookup table for the maximum values of the spherical harmonics
+	const double spherical_harmonic_max(const int& l, const int& m) {
+		double maximum = 0;
+		std::pair<double, double> spherical;
+		switch (l)
+		{
+		case 0: // S
+			maximum = constants::c_1_4p;
+			break;
+		case 1:
+			switch (m)
+			{
+			case 0: // P 0 Z
+				maximum = constants::c_3_4p;
+				break;
+			case 1: // P 1 X
+				maximum = constants::c_3_4p;
+				break;
+			case -1: // P -1 Y
+				maximum = constants::c_3_4p;
+				break;
+			default:
+				err_not_impl_f("Wrong spherical harmonic called!", std::cout);
+			}
+			break;
+		case 2:
+			switch (m)
+			{
+			case 0: // D 0 Z2
+				maximum = constants::c_5_16p * 2.0;
+				break;
+			case 1: // D 1 XZ
+				maximum = constants::c_15_4p;
+				break;
+			case -1: // D -1 YZ
+				maximum = constants::c_15_4p;
+				break;
+			case 2: // D 2 X2-Y2
+				maximum = constants::c_15_16p;
+				break;
+			case -2: // D -2 XY
+				maximum = constants::c_15_4p;
+				break;
+			default:
+				err_not_impl_f("Wrong spherical harmonic called!", std::cout);
+			}
+			break;
+		case 3:
+			switch (m)
+			{
+			case 0: // F 0 Z3
+				maximum = constants::c_7_16p * 2.0 / std::sqrt(5.0);
+				break;
+			case 1: // F 1 XZZ
+				maximum = constants::c_21_32p * 4.0 * sqrt(15.0) / 9.0;
+				break;
+			case -1: // F -1 YZZ
+				maximum = constants::c_21_32p * 4.0 * sqrt(15.0) / 9.0;
+				break;
+			case 2: // F 2 Z(X2-Y2)
+				maximum = constants::c_105_16p * 2.0 / sqrt(27.0);
+				break;
+			case -2: // F -2 XYZ
+				maximum = constants::c_105_4p;
+				break;
+			case 3: // F 3 X(X^2-3Y^2)
+				maximum = constants::c_35_32p;
+				break;
+			case -3: // F -3 Y(3X^2-Y^2)
+				maximum = constants::c_35_32p;
+				break;
+			default:
+				err_not_impl_f("Wrong spherical harmonic called!", std::cout);
+			}
+			break;
+		//case 4:
+		//	switch (m)
+		//	{
+		//	case 0: // G 0 Z^4
+		//		SH = constants::c_9_256p * (35 * z * z * z * z - 30 * z * z + 3.0);
+		//		break;
+		//	case 1: // G 1 X(7Z^3-3ZR^2)
+		//		SH = constants::c_45_32p * x * (7 * z * z * z - 3 * z);
+		//		break;
+		//	case -1: // G -1 Y(7Z^2-3ZR^2)
+		//		SH = constants::c_45_32p * y * (7 * z * z * z - 3 * z);
+		//		break;
+		//	case 2: // G 2
+		//		SH = constants::c_45_64p * (x * x - y * y) * (7 * z * z - 1.0);
+		//		break;
+		//	case -2: // G -2
+		//		SH = constants::c_45_16p * x * y * (7 * z * z - 1.0);
+		//		break;
+		//	case 3: // G 3 XZ(X^2-3Y^2)
+		//		SH = constants::c_315_32p * x * (x * x - 3 * y * y) * z;
+		//		break;
+		//	case -3: // G -3 XZ(3X^2-Y^2)
+		//		SH = constants::c_315_32p * y * (3 * x * x - y * y) * z;
+		//		break;
+		//	case 4: // G 4 X^2(X^-3Y^2)-Y^2(3X^2-Y^2)
+		//		SH = constants::c_315_256p * ((x * x * (x * x - 3 * y * y)) - (y * y * (3 * x * x - y * y)));
+		//		break;
+		//	case -4: // G -4 XY(X^2-Y^2)
+		//		SH = constants::c_315_16p * x * y * (x * x - y * y);
+		//		break;
+		//	default:
+		//		err_not_impl_f("Wrong spherical harmonic called!", std::cout);
+		//	}
+		//	break;
+		//case 5:
+		//	switch (m)
+		//	{
+		//	case 0: // H Z^5
+		//		SH = constants::c_11_256p * (63 * z * z * z * z * z - 70 * z * z * z + 15 * z);
+		//		break;
+		//	case 1:
+		//		SH = constants::c_165_256p * x * (21 * z * z * z * z - 14 * z * z + 1.0);
+		//		break;
+		//	case -1:
+		//		SH = constants::c_165_256p * y * (21 * z * z * z * z - 14 * z * z + 1.0);
+		//		break;
+		//	case 2:
+		//		SH = constants::c_1155_64p * (x * x - y * y) * (3 * z * z * z - z);
+		//		break;
+		//	case -2:
+		//		SH = constants::c_1155_64p * 2 * x * y * (3 * z * z * z - z);
+		//		break;
+		//	case 3:
+		//		SH = constants::c_385_512p * x * (x * x - 3 * y * y) * (9 * z * z - 1.0);
+		//		break;
+		//	case -3:
+		//		SH = constants::c_385_512p * y * (3 * x * x - y * y) * (9 * z * z - 1.0);
+		//		break;
+		//	case 4:
+		//		SH = constants::c_3465_256p * (x * x * x * x - 6 * x * x * y * y + y * y * y * y) * z;
+		//		break;
+		//	case -4:
+		//		SH = -constants::c_3465_256p * (4 * x * y * y * y - 4 * x * x * x * y) * z;
+		//		break;
+		//	case 5:
+		//		SH = constants::c_693_2048p * (2 * x * x * x * x * x - 20 * x * x * x * y * y + 10 * x * y * y * y * y);
+		//		break;
+		//	case -5:
+		//		SH = constants::c_693_2048p * (2 * y * y * y * y * y - 20 * x * x * y * y * y + 10 * y * x * x * x * x);
+		//		break;
+		//	default:
+		//		err_not_impl_f("Wrong spherical harmonic called!", std::cout);
+		//	}
+		//	break;
+		//case 6:  // Generated via Wolfram Alpha using: (SphericalHarmonicY[6,-m,theta,phi] + SphericalHarmonicY[6,m,theta,phi])  //BEWARE THE SIGN!!!!
+		//	switch (m)
+		//	{
+		//	case 0: // I Z^6
+		//		//1/32 sqrt(13/PI) (231 cos^6(theta) - 315 cos^4(theta) + 105 cos^2(theta) - 5)
+		//		SH = (1.0 / 32.0) * std::sqrt(13.0 / PI) * (z * z * (z * z * (231.0 * z * z - 315.0) + 105.0) - 5.0);
+		//		break;
+		//	case 1:
+		//		SH = (1.0 / 16.0) * std::sqrt(273.0 / (PI)) * x * z * (33 * z * z * z * z - 30 * z * z + 5);
+		//		break;
+		//	case -1:
+		//		//-1/256 i sqrt(273/(2 PI)) (5 sin(2 theta) + 12 sin(4 theta) + 33 sin(6 theta)) sin(phi)
+		//		SH = (1.0 / 16.0) * std::sqrt(273.0 / (PI)) * y * z * (33 * z * z * z * z - 30 * z * z + 5);
+		//		break;
+		//	case 2:
+		//		SH = (1.0 / 32.0) * std::sqrt(1365.0 / (2 * PI)) * (33 * z * z * z * z - 18 * z * z + 1) * (x * x - y * y);
+		//		break;
+		//	case -2:
+		//		// -1/256 i sqrt(1365/PI) sin^2(theta) (60 cos(2 theta) + 33 cos(4 theta) + 35) sin(2 phi)
+		//		SH = (1.0 / 32.0) * std::sqrt(1365.0 / (2 * PI)) * (33 * z * z * z * z - 18 * z * z + 1) * 2 * x * y;
+		//		break;
+		//	case 3:
+		//		//SH = (1.0 / 16.0) * std::sqrt(1365.0 / (2 * PI)) * pow(sin(spherical.first), 3) * z * (11 * z*z - 3) * cos(spherical.second * 3);
+		//		SH = (1.0 / 16.0) * std::sqrt(1365.0 / (2 * PI)) * z * (11 * z * z - 3) * x * (x * x - 3 * y * y);
+		//		break;
+		//	case -3:
+		//		//-1/64 i sqrt(1365/PI) sin^3(theta) (21 cos(theta) + 11 cos(3 theta)) sin(3 phi)
+		//		SH = (1.0 / 16.0) * std::sqrt(1365.0 / (2 * PI)) * z * (11 * z * z - 3) * y * (3 * x * x - y * y);
+		//		break;
+		//	case 4:
+		//		SH = (3.0 / 32.0) * std::sqrt(91.0 / (PI)) * (11 * z * z - 1) * (x * x * (x * x - 6 * y * y) + y * y * y * y);
+		//		break;
+		//	case -4:
+		//		//-3/32 i sqrt(91/(2 PI)) sin^4(theta) (11 cos(2 theta) + 9) sin(4 phi)
+		//		SH = (3.0 / 32.0) * std::sqrt(91.0 / (PI)) * (11 * z * z - 1) * x * y * 4 * (x * x - y * y);
+		//		break;
+		//	case 5:
+		//		SH = (3.0 / 16.0) * std::sqrt(1001.0 / (2 * PI)) * z * (x * x * x * x * x - 10 * x * x * x * y * y + 5 * x * y * y * y * y);
+		//		break;
+		//	case -5:
+		//		SH = (3.0 / 16.0) * std::sqrt(1001.0 / (2 * PI)) * z * (5 * x * x * x * x * y - 10 * x * x * y * y * y + y * y * y * y * y);
+		//		break;
+		//	case 6:
+		//		SH = (1.0 / 32.0) * std::sqrt(3003.0 / (2 * PI)) * (-y * y * y * y * y * y + 15 * y * y * y * y * x * x - 15 * y * y * x * x * x * x + x * x * x * x * x * x);
+		//		break;
+		//	case -6:
+		//		SH = (1.0 / 32.0) * std::sqrt(3003.0 / (2 * PI)) * (6 * x * x * x * x * x * y - 20 * x * x * x * y * y * y + 6 * x * y * y * y * y * y);
+		//		break;
+		//	default:
+		//		err_not_impl_f("Wrong spherical harmonic called!", std::cout);
+		//	}
+		//	break;
+		//case 7:// Generated via Wolfram Alpha using: (SphericalHarmonicY[7,-m,theta,phi] + SphericalHarmonicY[7,m,theta,phi])  //BEWARE THE SIGN!!!!
+		//	switch (m)
+		//	{
+		//	case 0:
+		//		SH = (1.0 / 32.0) * std::sqrt(15.0 / PI) * z * (z * z * (z * z * (429.0 * z * z - 693.0) + 315.0) - 35.0);
+		//		break;
+		//	case 1:
+		//		SH = (1.0 / 64.0) * std::sqrt(105.0 / PI) * x * (z * z * (z * z * (429.0 * z * z - 495.0) + 135.0) - 5.0);
+		//		break;
+		//	case -1:
+		//		SH = (1.0 / 64.0) * std::sqrt(105.0 / PI) * y * (z * z * (z * z * (429.0 * z * z - 495.0) + 135.0) - 5.0);
+		//		break;
+		//	case 2:
+		//		SH = (3.0 / 32.0) * std::sqrt(35.0 / (2 * PI)) * (x * x - y * y) * z * (z * z * (143.0 * z * z - 110.0) + 15.0);
+		//		break;
+		//	case -2:
+		//		SH = (3.0 / 32.0) * std::sqrt(35.0 / (2 * PI)) * 2 * x * y * z * (z * z * (143.0 * z * z - 110.0) + 15.0);
+		//		break;
+		//	case 3:
+		//		SH = (3.0 / 64.0) * std::sqrt(35.0 / PI) * x * (x * x - 3 * y * y) * (z * z * (143.0 * z * z - 66.0) + 3.0);
+		//		break;
+		//	case -3:
+		//		SH = (3.0 / 64.0) * std::sqrt(35.0 / PI) * y * (3 * x * x - y * y) * (z * z * (143.0 * z * z - 66.0) + 3.0);
+		//		break;
+		//	case 4:
+		//		SH = (3.0 / 32.0) * std::sqrt(385.0 / PI) * (x * x * (x * x - 6 * y * y) + y * y * y * y) * z * (13.0 * z * z - 3.0);
+		//		break;
+		//	case -4:
+		//		SH = (3.0 / 32.0) * std::sqrt(385.0 / PI) * x * y * 4 * (x * x - y * y) * z * (13.0 * z * z - 3.0);
+		//		break;
+		//	case 5:
+		//		SH = (3.0 / 64.0) * std::sqrt(385.0 / PI) * x * (x * x * x * x + 5 * y * y * (-2 * x * x + y * y)) * (13.0 * z * z - 1.0);
+		//		break;
+		//	case -5:
+		//		SH = (3.0 / 64.0) * std::sqrt(385.0 / PI) * y * (5 * x * x * (x * x - 2 * y * y) + y * y * y * y) * (13.0 * z * z - 1.0);
+		//		break;
+		//	case 6:
+		//		SH = (3.0 / 32.0) * std::sqrt(5005.0 / (2 * PI)) * (y * y * (y * y * (-y * y + 15 * x * x) - 15 * x * x * x * x) + x * x * x * x * x * x) * z;
+		//		break;
+		//	case -6:
+		//		SH = (3.0 / 32.0) * std::sqrt(5005.0 / (2 * PI)) * x * y * (x * x * (6 * x * x - 20 * y * y) + 6 * y * y * y * y) * z;
+		//		break;
+		//	case 7:
+		//		SH = (3.0 / 64.0) * std::sqrt(715.0 / PI) * x * (x * x * x * x * x * x + 7 * y * y * (-3 * x * x * x * x + y * y * (5 * x * x - y * y)));
+		//		break;
+		//	case -7:
+		//		SH = (3.0 / 64.0) * std::sqrt(715.0 / PI) * y * (x * x * (x * x * (7 * x * x - 35 * y * y) + 21 * y * y * y * y) - y * y * y * y * y * y);
+		//		break;
+		//	default:
+		//		err_not_impl_f("Wrong spherical harmonic called!", std::cout);
+		//	}
+		//	break;
+		//case 8:
+		//	switch (m)
+		//	{
+		//	case 0:
+		//		SH = (1.0 / 256.0) * std::sqrt(17.0 / PI) * (z * z * (z * z * (z * z * (6435.0 * z * z - 12012.0) + 6930.0) - 1260.0) + 35.0);
+		//		break;
+		//	case 1:
+		//		SH = (3.0 / 64.0) * std::sqrt(17.0 / PI) * x * z * (715.0 * z * z * z * z * z * z - 1001.0 * z * z * z * z + 385.0 * z * z - 35.0);
+		//		break;
+		//	case -1:
+		//		SH = (3.0 / 64.0) * std::sqrt(17.0 / PI) * y * z * (715.0 * z * z * z * z * z * z - 1001.0 * z * z * z * z + 385.0 * z * z - 35.0);
+		//		break;
+		//	case 2:
+		//		SH = (3.0 / 64.0) * std::sqrt(595.0 / (2 * PI)) * (x * x - y * y) * (143 * z * z * z * z * z * z - 143 * z * z * z * z + 33 * z * z - 1);
+		//		break;
+		//	case -2:
+		//		SH = (3.0 / 64.0) * std::sqrt(595.0 / (2 * PI)) * 2 * x * y * (143 * z * z * z * z * z * z - 143 * z * z * z * z + 33 * z * z - 1);
+		//		break;
+		//	case 3:
+		//		SH = (1.0 / 64.0) * std::sqrt(19635.0 / PI) * (x * x * x - 3 * x * y * y) * z * (39 * z * z * z * z - 26 * z * z + 3);
+		//		break;
+		//	case -3:
+		//		SH = (1.0 / 64.0) * std::sqrt(19635.0 / PI) * (3 * x * x * y - y * y * y) * z * (39 * z * z * z * z - 26 * z * z + 3);
+		//		break;
+		//	case 4:
+		//		SH = (3.0 / 128.0) * std::sqrt(1309.0 / PI) * (x * x * (x * x - 6 * y * y) + y * y * y * y) * (65 * z * z * z * z - 26 * z * z + 1); //TEST
+		//		break;
+		//	case -4:
+		//		SH = (3.0 / 128.0) * std::sqrt(1309.0 / PI) * x * y * 4 * (x * x - y * y) * (65 * z * z * z * z - 26 * z * z + 1);
+		//		break;
+		//	case 5:
+		//		SH = (3.0 / 64.0) * std::sqrt(17017.0 / PI) * x * (x * x * x * x + 5 * y * y * (-2 * x * x + y * y)) * z * (5 * z * z - 1);
+		//		break;
+		//	case -5:
+		//		SH = (3.0 / 64.0) * std::sqrt(17017.0 / PI) * y * (5 * x * x * (x * x - 2 * y * y) + y * y * y * y) * z * (5 * z * z - 1);
+		//		break;
+		//	case 6:
+		//		SH = (1.0 / 64.0) * std::sqrt(7293.0 / (2 * PI)) * (y * y * (y * y * (-y * y + 15 * x * x) - 15 * x * x * x * x) + x * x * x * x * x * x) * (15 * z * z - 1);
+		//		break;
+		//	case -6:
+		//		SH = (1.0 / 64.0) * std::sqrt(7293.0 / (2 * PI)) * x * y * (x * x * (6 * x * x - 20 * y * y) + 6 * y * y * y * y) * (15 * z * z - 1);
+		//		break;
+		//	case 7:
+		//		SH = (3.0 / 64.0) * std::sqrt(12155.0 / PI) * x * (x * x * x * x * x * x + 7 * y * y * (-3 * x * x * x * x + y * y * (5 * x * x - y * y))) * z;
+		//		break;
+		//	case -7:
+		//		SH = (3.0 / 64.0) * std::sqrt(12155.0 / PI) * y * (x * x * (x * x * (7 * x * x - 35 * y * y) + 21 * y * y * y * y) - y * y * y * y * y * y) * z;
+		//		break;
+		//	case 8:
+		//		SH = (3.0 / 256.0) * std::sqrt(12155.0 / PI) * (y * y * (y * y * (y * y * y * y - 28 * x * x * y * y + 70 * x * x * x * x) - 28 * x * x * x * x * x * x) + x * x * x * x * x * x * x * x);
+		//		break;
+		//	case -8:
+		//		SH = (3.0 / 256.0) * std::sqrt(12155.0 / PI) * y * x * (y * y * (y * y * (-8 * y * y + 56 * x * x) - 56 * x * x * x * x) + 8 * x * x * x * x * x * x);
+		//		break;
+		//	default:
+		//		err_not_impl_f("Wrong spherical harmonic called!", std::cout);
+		//	}
+		//	break;
+		//case 9:
+		//	switch (m) {
+		//	case 0:
+		//		// 1/256 sqrt(19/PI) cos(theta) (12155 cos^8(theta) - 25740 cos^6(theta) + 18018 cos^4(theta) - 4620 cos^2(theta) + 315)
+		//		SH = (1.0 / 256.0) * std::sqrt(19.0 / PI) * z * (12155 * z * z * z * z * z * z * z * z - 25740 * z * z * z * z * z * z + 18018 * z * z * z * z - 4620 * z * z + 315);
+		//		break;
+		//	case 1:
+		//		// 3/256 sqrt(95/PI) sin(theta) (2431 cos^8(theta) - 4004 cos^6(theta) + 2002 cos^4(theta) - 308 cos^2(theta) + 7) cos(phi) UIUIUIUI
+		//		SH = (3.0 / 256.0) * std::sqrt(95.0 / PI) * x * (2431 * z * z * z * z * z * z * z * z - 4004 * z * z * z * z * z * z + 2002 * z * z * z * z - 308 * z * z + 7);
+		//		break;
+		//	case -1:
+		//		SH = (3.0 / 256.0) * std::sqrt(95.0 / PI) * y * (2431 * z * z * z * z * z * z * z * z - 4004 * z * z * z * z * z * z + 2002 * z * z * z * z - 308 * z * z + 7);
+		//		break;
+		//	case 2:
+		//		// 3/64 sqrt(1045/(2 PI)) sin^2(theta) cos(theta) (221 cos^6(theta) - 273 cos^4(theta) + 91 cos^2(theta) - 7) cos(2 phi) UIUIUIUI
+		//		SH = (3.0 / 64.0) * std::sqrt(1045.0 / (2 * PI)) * (x * x - y * y) * z * (221 * z * z * z * z * z * z - 273 * z * z * z * z + 91 * z * z - 7);
+		//		break;
+		//	case -2:
+		//		SH = (3.0 / 64.0) * std::sqrt(1045.0 / (2 * PI)) * 2 * x * y * z * (221 * z * z * z * z * z * z - 273 * z * z * z * z + 91 * z * z - 7);
+		//		break;
+		//	case 3:
+		//		// 1/128 sqrt(21945/(2 PI)) sin^3(theta) (221 cos^6(theta) - 195 cos^4(theta) + 39 cos^2(theta) - 1) cos(3 phi)  UIUIUIUI
+		//		SH = (1.0 / 128.0) * std::sqrt(21945.0 / (2 * PI)) * x * (x * x - 3 * y * y) * (221 * z * z * z * z * z * z - 195 * z * z * z * z + 39 * z * z - 1);
+		//		break;
+		//	case -3:
+		//		SH = (1.0 / 128.0) * std::sqrt(21945.0 / (2 * PI)) * y * (3 * x * x - y * y) * (221 * z * z * z * z * z * z - 195 * z * z * z * z + 39 * z * z - 1);
+		//		break;
+		//	case 4:
+		//		// 3/128 sqrt(95095/PI) sin^4(theta) cos(theta) (17 cos^4(theta) - 10 cos^2(theta) + 1) cos(4 phi)
+		//		SH = (3.0 / 128.0) * std::sqrt(95095.0 / PI) * (x * x * (x * x - 6 * y * y) + y * y * y * y) * z * (17 * z * z * z * z - 10 * z * z + 1);
+		//		break;
+		//	case -4:
+		//		SH = (3.0 / 128.0) * std::sqrt(95095.0 / PI) * x * y * 4 * (x * x - y * y) * z * (17 * z * z * z * z - 10 * z * z + 1);
+		//		break;
+		//	case 5:
+		//		// 3/128 sqrt(2717/(2 PI)) sin^5(theta) (85 cos^4(theta) - 30 cos^2(theta) + 1) cos(5 phi)
+		//		SH = (3.0 / 128.0) * std::sqrt(2717.0 / (2 * PI)) * x * (x * x * x * x + 5 * y * y * (-2 * x * x + y * y)) * (85 * z * z * z * z - 30 * z * z + 1);
+		//		break;
+		//	case -5:
+		//		SH = (3.0 / 128.0) * std::sqrt(2717.0 / (2 * PI)) * y * (5 * x * x * (x * x - 2 * y * y) + y * y * y * y) * (85 * z * z * z * z - 30 * z * z + 1);
+		//		break;
+		//	case 6:
+		//		// 1/64 sqrt(40755/(2 PI)) sin^6(theta) cos(theta) (17 cos^2(theta) - 3) cos(6 phi)
+		//		SH = (1.0 / 64.0) * std::sqrt(40755.0 / (2 * PI)) * (y * y * (y * y * (-y * y + 15 * x * x) - 15 * x * x * x * x) + x * x * x * x * x * x) * z * (17 * z * z - 3);
+		//		break;
+		//	case -6:
+		//		SH = (1.0 / 64.0) * std::sqrt(40755.0 / (2 * PI)) * x * y * (x * x * (6 * x * x - 20 * y * y) + 6 * y * y * y * y) * z * (17 * z * z - 3);
+		//		break;
+		//	case 7:
+		//		// 3/256 sqrt(13585/(2 PI)) sin^7(theta) (17 cos^2(theta) - 1) cos(7 phi)
+		//		SH = (3.0 / 256.0) * std::sqrt(13585.0 / (2 * PI)) * x * (x * x * x * x * x * x + 7 * y * y * (-3 * x * x * x * x + y * y * (5 * x * x - y * y))) * (17 * z * z - 1);
+		//		break;
+		//	case -7:
+		//		SH = (3.0 / 256.0) * std::sqrt(13585.0 / (2 * PI)) * y * (x * x * (x * x * (7 * x * x - 35 * y * y) + 21 * y * y * y * y) - y * y * y * y * y * y) * (17 * z * z - 1);
+		//		break;
+		//	case 8:
+		//		// 3/256 sqrt(230945/PI) sin^8(theta) cos(theta) cos(8 phi)
+		//		SH = (3.0 / 256.0) * std::sqrt(230945.0 / PI) * (y * y * (y * y * (y * y * y * y - 28 * x * x * y * y + 70 * x * x * x * x) - 28 * x * x * x * x * x * x) + x * x * x * x * x * x * x * x) * z;
+		//		break;
+		//	case -8:
+		//		SH = (3.0 / 256.0) * std::sqrt(230945.0 / PI) * y * x * (y * y * (y * y * (-8 * y * y + 56 * x * x) - 56 * x * x * x * x) + 8 * x * x * x * x * x * x) * z;
+		//		break;
+		//	case 9:
+		//		// 1/256 sqrt(230945/(2 PI)) sin^9(theta) cos(9 phi)
+		//		SH = (1.0 / 256.0) * std::sqrt(230945.0 / (2 * PI)) * x * (y * y * (y * y * (y * y * (9 * y * y - 84 * x * x) + 126 * x * x * x * x) - 36 * x * x * x * x * x * x) + x * x * x * x * x * x * x * x);
+		//		break;
+		//	case -9:
+		//		// 1/256 sqrt(230945/(2 PI)) sin^9(theta) sin(9 phi)
+		//		SH = (1.0 / 256.0) * std::sqrt(230945.0 / (2 * PI)) * y * (9 * x * x * x * x * x * x * x * x + y * y * (-84 * x * x * x * x * x * x + y * y * (126 * x * x * x * x + y * y * (-36 * x * x + y * y))));
+		//		break;
+		//	default:
+		//		err_not_impl_f("Wrong spherical harmonic called!", std::cout);
+		//	}
+		//	break;
+		default:
+		{
+			maximum = sqrt((2*l + 1) * INV_FOUR_PI);
+		}
+
+		}
+		return maximum;
+	}
+
+
 	// Collapsed version of the spherical harmonic
 	// Calculates all values for one l at once
 	//l = principal quantum number

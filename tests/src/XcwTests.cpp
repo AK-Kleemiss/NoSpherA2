@@ -92,8 +92,7 @@ namespace
 		std::streambuf* const old_cout = std::cout.rdbuf(log.rdbuf());
 		opt.loadXCWsettings();
 		{
-			structure_factors SF(opt);
-			XCW_solver x(SF);
+			XCW_solver x(opt);
 		}
 		std::cout.rdbuf(old_cout);
 		std::filesystem::current_path(old_cwd);
@@ -536,6 +535,89 @@ namespace
 		}
 		target = -1.0;
 		EXPECT_FALSE(halting_minimum_beyond_scan(weak, target));
+	}
+
+	//set_DW for every ADP level (isotropic, U, U+C, U+C+D) on the atoms of the P1 fixture against the
+	//Gram-Charlier expansion written out term by term: exp(-q.U.q/2) (1 + D4/24 + i (-C3/6))
+	TEST(XcwAdpTests, DebyeWallerFactorsOfEveryLevelMatchTheExplicitExpansion)
+	{
+		const auto fixture = nos_test_repo_root() / "tests" / "P1_test";
+		if (!std::filesystem::exists(fixture / "P1_test.cif") || !std::filesystem::exists(fixture / "P1_test.hkl")) {
+			GTEST_SKIP() << "P1 fixture missing under " << fixture;
+		}
+		const auto dir = std::filesystem::temp_directory_path() / ("nosphera2_xcw_tests_dw_" + test_name());
+		std::filesystem::create_directories(dir);
+		std::ofstream(dir / "settings.txt") << "normal params 177 basis_set sto-3g charge 0 mult 1 rhf start 0 step_size 0.01 end 0";
+		options opt;
+		opt.xcw_settings_path = dir / "settings.txt";
+		opt.cif = std::filesystem::absolute(fixture / "P1_test.cif");
+		opt.hkl = std::filesystem::absolute(fixture / "P1_test.hkl");
+		opt.do_XCW = true;
+		const auto old_cwd = std::filesystem::current_path();
+		std::filesystem::current_path(dir);
+		std::stringstream log;
+		std::streambuf* const old_cout = std::cout.rdbuf(log.rdbuf());
+		opt.loadXCWsettings();
+		structure_factors SF(opt);
+		std::cout.rdbuf(old_cout);
+		std::filesystem::current_path(old_cwd);
+		std::filesystem::remove_all(dir);
+
+		const int ncen = SF.model_data.ncen;
+		ASSERT_GE(ncen, 4);
+		//atom a gets level a % 4: 0 isotropic (ADPs left empty), 1 U, 2 U and C, 3 U, C and D
+		for (int a = 0; a < ncen; a++) {
+			const int level = a % 4;
+			vec U = { 0.020 + 0.001 * a, 0.030, 0.025, 0.002, -0.003, 0.004 };
+			vec C(10), D(15);
+			for (int i = 0; i < 10; i++) C[i] = 2e-4 * (i % 3 - 1) * (i + 1);
+			for (int i = 0; i < 15; i++) D[i] = 3e-5 * (i % 4 - 1.5) * (i + 1);
+			SF.ADPs[a].clear();
+			if (level >= 1) SF.ADPs[a] = { U, level >= 2 ? C : vec(), level >= 3 ? D : vec() };
+		}
+		SF.set_DW();
+		EXPECT_TRUE(SF.DW_set_);
+
+		const double ang2bohr = constants::ang2bohr(1);
+		double t2_largest = 0.0, t3_largest = 0.0;
+		for (int a = 0; a < ncen; a++) {
+			const int level = a % 4;
+			const vec2& adp = SF.ADPs[a];
+			for (int h = 0; h < SF.model_data.nr_enlarged; h++) {
+				const double x = SF.k_pt[0][h] * ang2bohr, y = SF.k_pt[1][h] * ang2bohr, z = SF.k_pt[2][h] * ang2bohr;
+				cdouble expected;
+				if (level == 0) {
+					expected = std::exp(-0.5 * SF.asym_atoms[a].U_iso * (x * x + y * y + z * z));
+				}
+				else {
+					const vec& U = adp[0];
+					const double quad = U[0] * x * x + U[1] * y * y + U[2] * z * z + 2 * U[3] * x * y + 2 * U[4] * x * z + 2 * U[5] * y * z;
+					double t2 = 0.0, t3 = 0.0;
+					if (level >= 2) {
+						const vec& C = adp[1];
+						t2 = -1.0 / 6.0 * (C[0] * x * x * x + C[6] * y * y * y + C[9] * z * z * z
+							+ 3 * C[1] * x * x * y + 3 * C[2] * x * x * z + 3 * C[3] * x * y * y + 3 * C[5] * x * z * z + 3 * C[7] * y * y * z + 3 * C[8] * y * z * z
+							+ 6 * C[4] * x * y * z);
+					}
+					if (level >= 3) {
+						const vec& D = adp[2];
+						t3 = (1.0 / 24.0) * (D[0] * x * x * x * x + 4.0 * D[1] * x * x * x * y + 4.0 * D[2] * x * x * x * z
+							+ 6.0 * D[3] * x * x * y * y + 12.0 * D[4] * x * x * y * z + 6.0 * D[5] * x * x * z * z + 4.0 * D[6] * x * y * y * y + 12.0 * D[7] * x * y * y * z
+							+ 12.0 * D[8] * x * y * z * z + 4.0 * D[9] * x * z * z * z + D[10] * y * y * y * y + 4.0 * D[11] * y * y * y * z + 6.0 * D[12] * y * y * z * z
+							+ 4.0 * D[13] * y * z * z * z + D[14] * z * z * z * z);
+					}
+					t2_largest = std::max(t2_largest, std::abs(t2));
+					t3_largest = std::max(t3_largest, std::abs(t3));
+					expected = std::exp(-0.5 * quad) * cdouble(1 + t3, t2);
+				}
+				const cdouble got = SF.DW_facts[a][h];
+				ASSERT_NEAR(got.real(), expected.real(), 1e-13) << "atom " << a << " level " << level << " reflection " << h;
+				ASSERT_NEAR(got.imag(), expected.imag(), 1e-13) << "atom " << a << " level " << level << " reflection " << h;
+			}
+		}
+		//the C and D terms must actually move the factor, or the comparison above says nothing about them
+		EXPECT_GT(t2_largest, 1e-6);
+		EXPECT_GT(t3_largest, 1e-6);
 	}
 
 	//transform_ADPs takes M and applies T'_{ij..} = sum M_pi M_qj .. T_pq.. : for the rank-2 U that is

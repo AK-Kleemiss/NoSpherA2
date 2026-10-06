@@ -886,7 +886,47 @@ struct options
     //set once a streamed run wrote the file itself, so the caller does not overwrite it with an empty one-shot block
     bool tsc_written_by_stream = false;
     bool qct = false;
-	struct XCW_settings {
+	// What structure_factors reads: the crystal model, the extinction and the I tensor storage
+	struct SF_settings {
+		// `i_sigma <x>`: only reflections with I/sigma(I) >= x enter chi^2 and the scale, as in
+		// Tonto. Under the reader's sigma(F) = sigma(I)/2F that is F/sigma(F) >= 2x, so the
+		// default 2 is SHELX's I > 2 sigma(I) and F > 4 sigma(F) at once
+		double i_sigma_cutoff = 2;
+		std::string basis_set_name;
+		bool grown = false;
+		//`extinction <shelx|bc_gaussian|bc_lorentzian> [iso|aniso] [fixed] [start value]`
+		extinction::model extinction_model = extinction::model::none;
+		bool extinction_aniso = false;
+		bool extinction_refine = true;
+		double extinction_start = 1e-4;
+		//`wavelength <lambda>`, in Angstrom; overrides _diffrn_radiation_wavelength from the CIF
+		double wavelength = 0.0;
+		int n_params;
+		int refine_against = 1;
+		int XWR_type = 1;
+		bool read_tensor;
+		// Largest I tensor held resident, in MB. Above it the tensor goes to disk
+		// and is read back a window of reflections at a time; 0 means no limit,
+		// which is the original behaviour. Set with `i_tensor_mb <n>` in the XCW
+		// settings, or `stream` for the default budget.
+		size_t i_tensor_max_mb;
+		// `i_float` in the settings file: hold the I tensor in single precision. The device
+		// computes it in single anyway, so this stores what was computed rather than a
+		// widened copy of it.
+		bool i_tensor_single = false;
+		bool i_tensor_double = false;
+		// `I_tensor <path>` in the settings file: where the streamed tensor lives. Written
+		// there, and reused from there when it is already the right size for this problem,
+		// so that trying another refinement setting does not rebuild it.
+		std::filesystem::path i_tensor_file_path;
+		// `save <path>`: write the tensor there for a later `read <path>`, on a thread, so
+		// the refinement starts at once instead of waiting for 100 GB to reach the disk.
+		std::filesystem::path i_tensor_save_path;
+	};
+
+	// What SCF_wrapper reads: the convergence thresholds with their running state, the damping
+	// and level shift schedule, the spin kind and the second-order switches
+	struct SCF_settings {
 		double quant_diff;
 		double current_quant_diff;
 		bool conv_quant_diff = false;
@@ -913,64 +953,24 @@ struct options
 		//`check_hessian`: finite-difference check of the Hessian-vector product on the first
 		//second-order step, reported in XCW.log
 		bool check_hessian = false;
-		//`i_sigma <x>`: only reflections with I/sigma(I) >= x enter chi^2 and the scale, as in
-		//Tonto. Under the reader's sigma(F) = sigma(I)/2F that is F/sigma(F) >= 2x, so the
-		//default 2 is SHELX's I > 2 sigma(I) and F > 4 sigma(F) at once
-		double i_sigma_cutoff = 2;
 		bool apply_shift = true;
 		bool method_apply_shift = true;
 		double diis_stop_shift = 0;
 		bool apply_damping = true;
 		bool method_apply_damping = true;
-		std::string basis_set_name;
-		//`df_basis <name>`: density fitting of the Fock build with this auxiliary basis
-		std::string df_basis_name;
 		//`guess_basis <name>`: the first lambda starts from a Hartree-Fock converged in this
 		//(smaller) basis by OCC's own driver, its density projected into the orbital basis
 		std::string guess_basis_name;
-		bool grown = false;
-		//`extinction <shelx|bc_gaussian|bc_lorentzian> [iso|aniso] [fixed] [start value]`
-		extinction::model extinction_model = extinction::model::none;
-		bool extinction_aniso = false;
-		bool extinction_refine = true;
-		double extinction_start = 1e-4;
-		//`wavelength <lambda>`, in Angstrom; overrides _diffrn_radiation_wavelength from the CIF
-		double wavelength = 0.0;
-		int n_params;
-		int refine_against = 1;
-		int XWR_type = 1;
 		occ::qm::SpinorbitalKind hf_type;
 		double alpha = 0;
 		double level_shift = 0;
-		double xcw_start_value;
-		int num_xcw_steps;
-		double xcw_step_size;
 		int max_scf_iterations;
 		int charge = 0;
 		int multiplicity = 1;
-		bool read_tensor;
-		bool read_first_guess;
-		bool nbo_output = false;
-		// Largest I tensor held resident, in MB. Above it the tensor goes to disk
-		// and is read back a window of reflections at a time; 0 means no limit,
-		// which is the original behaviour. Set with `i_tensor_mb <n>` in the XCW
-		// settings, or `stream` for the default budget.
-		size_t i_tensor_max_mb;
-		// `i_float` in the settings file: hold the I tensor in single precision. The device
-		// computes it in single anyway, so this stores what was computed rather than a
-		// widened copy of it.
-		bool i_tensor_single = false;
-		bool i_tensor_double = false;
-		// `I_tensor <path>` in the settings file: where the streamed tensor lives. Written
-		// there, and reused from there when it is already the right size for this problem,
-		// so that trying another refinement setting does not rebuild it.
-		std::filesystem::path i_tensor_file_path;
-		// `save <path>`: write the tensor there for a later `read <path>`, on a thread, so
-		// the refinement starts at once instead of waiting for 100 GB to reach the disk.
-		std::filesystem::path i_tensor_save_path;
-		bool xcw_gaussian_halt = false;
-		double xcw_strong_cutoff = 3.0;
-
+		// Not settings-file keys: filled by XCW_solver from the options when it builds SCF_wrapper
+		bool incremental = true;
+		bool gpu_eri = false;
+		bool no_date = false;
 
 		// Clears the convergence flags
 		void clear() {
@@ -1005,6 +1005,19 @@ struct options
 				print_centered_message("***Turned off level shift***", 84, file);
 			}
 		}
+	};
+
+	// What XCW_solver reads itself; the two slices above go to structure_factors and SCF_wrapper
+	struct XCW_settings : SF_settings, SCF_settings {
+		//`df_basis <name>`: density fitting of the Fock build with this auxiliary basis
+		std::string df_basis_name;
+		double xcw_start_value;
+		int num_xcw_steps;
+		double xcw_step_size;
+		bool read_first_guess;
+		bool nbo_output = false;
+		bool xcw_gaussian_halt = false;
+		double xcw_strong_cutoff = 3.0;
 	};
 
 	XCW_settings xcw_settings;

@@ -8,11 +8,9 @@
 #include "bondwise_analysis.h"
 #include <limits>
 
-XCW_solver::XCW_solver(structure_factors& sf_in) : scf_solver(*this, sf_in) {
-	sf = &sf_in;
-	opt = sf->opt;
+XCW_solver::XCW_solver(options& opt_in) : opt(&opt_in), sf(opt_in) {
 	std::cout << "XCW orbital basis set: " << opt->xcw_settings.basis_set_name << std::endl;
-	std::cout << "XCW: I/sigma(I) >= " << opt->xcw_settings.i_sigma_cutoff << " (F/sigma(F) >= " << 2 * opt->xcw_settings.i_sigma_cutoff << "): " << sf->model_data.nr_fit << " of " << sf->model_data.nr << " reflections in the fit; R1 and Criterion are over these, R1(all) and Crit(all) over all" << std::endl;
+	std::cout << "XCW: I/sigma(I) >= " << opt->xcw_settings.i_sigma_cutoff << " (F/sigma(F) >= " << 2 * opt->xcw_settings.i_sigma_cutoff << "): " << sf.model_data.nr_fit << " of " << sf.model_data.nr << " reflections in the fit; R1 and Criterion are over these, R1(all) and Crit(all) over all" << std::endl;
 }
 
 //z_h = (|F_obs,h| - |F_calc,h|) / sigma_h for the converged F_calc/F_scale over
@@ -21,9 +19,9 @@ XCW_solver::XCW_solver(structure_factors& sf_in) : scf_solver(*this, sf_in) {
 //free/working-set cross-validation variant is not implemented.
 //Background: tests/P1_test/XCW_plan.md, Src/core/xcw_halting.h.
 void XCW_solver::evaluate_gaussian_halting(const double lambda) {
-	sf->ensure_hkl_ordered();
+	sf.ensure_hkl_ordered();
 
-	const int n_total = sf->model_data.nr;
+	const int n_total = sf.model_data.nr;
 	vec z_raw;
 	vec resolution;
 	vec abs_F;
@@ -32,18 +30,18 @@ void XCW_solver::evaluate_gaussian_halting(const double lambda) {
 	abs_F.reserve(n_total);
 
 	for (int i = 0; i < n_total; i++) {
-		if (sf->scatter_data.sigma_obs[i] <= 0.0) {
+		if (sf.scatter_data.sigma_obs[i] <= 0.0) {
 			continue;
 		}
-		const double f_over_sigma = sf->scatter_data.abs_F_obs[i] / sf->scatter_data.sigma_obs[i];
+		const double f_over_sigma = sf.scatter_data.abs_F_obs[i] / sf.scatter_data.sigma_obs[i];
 		if (f_over_sigma < opt->xcw_settings.xcw_strong_cutoff) {
 			continue;
 		}
-		const double scaled_F_calc = sf->scatter_data.scale * std::abs(sf->scatter_data.F_calc[i]);
-		const double diff = scaled_F_calc - sf->scatter_data.abs_F_obs[i];
-		z_raw.push_back(diff / sf->scatter_data.sigma_obs[i]);
-		resolution.push_back(sf->unit_cell.get_stl_of_hkl(sf->hkl_ordered_[i]));
-		abs_F.push_back(sf->scatter_data.abs_F_obs[i]);
+		const double scaled_F_calc = sf.scatter_data.scale * std::abs(sf.scatter_data.F_calc[i]);
+		const double diff = scaled_F_calc - sf.scatter_data.abs_F_obs[i];
+		z_raw.push_back(diff / sf.scatter_data.sigma_obs[i]);
+		resolution.push_back(sf.unit_cell.get_stl_of_hkl(sf.hkl_ordered_[i]));
+		abs_F.push_back(sf.scatter_data.abs_F_obs[i]);
 	}
 
 	GaussianHaltEntry entry;
@@ -52,7 +50,7 @@ void XCW_solver::evaluate_gaussian_halting(const double lambda) {
 	entry.n_used = static_cast<int>(z_raw.size());
 
 	if (entry.n_used < 8) {
-		scf_solver.SCF_log << "Gaussian halting criterion: only " << entry.n_used
+		writer.log << "Gaussian halting criterion: only " << entry.n_used
 			<< " strong reflections (|F|/sigma >= " << opt->xcw_settings.xcw_strong_cutoff
 			<< ") at lambda=" << lambda << ", skipping (need >= 8)." << std::endl;
 		gaussian_halt_history_.push_back(entry);
@@ -95,7 +93,7 @@ void XCW_solver::evaluate_gaussian_halting(const double lambda) {
 	entry.intensity_trend_r = int_trend.spearman_r;
 	entry.intensity_trend_flagged = int_trend.flagged;
 
-	scf_solver.SCF_log << "Gaussian halting criterion at lambda=" << std::fixed << std::setprecision(5) << lambda << ":\n"
+	writer.log << "Gaussian halting criterion at lambda=" << std::fixed << std::setprecision(5) << lambda << ":\n"
 		<< "  n_used=" << entry.n_used << "/" << entry.n_total << " (|F|/sigma >= " << opt->xcw_settings.xcw_strong_cutoff
 		<< "), sigma_scale=" << entry.sigma_scale << "\n"
 		<< "  A^2=" << entry.A2 << (entry.ad_reject_5pct ? " (rejects N(0,1) at 5%)" : " (consistent with N(0,1) at 5%)") << "\n"
@@ -116,11 +114,11 @@ void XCW_solver::report_gaussian_halting_summary() {
 		return;
 	}
 
-	scf_solver.SCF_log << "\n____________________________________________________________________________\n"
+	writer.log << "\n____________________________________________________________________________\n"
 		<< "Gaussian halting criterion summary (tests/P1_test/XCW_plan.md)\n"
 		<< " Lambda\t\tA^2\treject5%\tpp_slope\tpp_intercept\tskew\tkurt\tres_trend_r\tint_trend_r\tn_used\n";
 	for (const GaussianHaltEntry& e : gaussian_halt_history_) {
-		scf_solver.SCF_log << "\t" << std::fixed << std::setprecision(5) << e.lambda
+		writer.log << "\t" << std::fixed << std::setprecision(5) << e.lambda
 			<< "\t" << std::setprecision(4) << e.A2
 			<< "\t" << (e.ad_reject_5pct ? "yes" : "no")
 			<< "\t\t" << e.pp_slope << "\t\t" << e.pp_intercept
@@ -164,7 +162,7 @@ void XCW_solver::report_halting_progress_estimate(bool is_final) {
 	std::vector<PolynomialFit> candidates;
 	const PolynomialFit fit = choose_best_polynomial_fit(fit_lambda, fit_A2, { 2, 4 }, &candidates);
 
-	std::ostream* streams[2] = { &scf_solver.SCF_log, &std::cout };
+	std::ostream* streams[2] = { &writer.log, &std::cout };
 	for (std::ostream* s : streams) {
 		*s << "____________________________________________________________________________\n";
 		if (!is_final) {
@@ -220,8 +218,32 @@ void XCW_solver::report_halting_progress_estimate(bool is_final) {
 	}
 }
 
-void XCW_solver::calc_perturb(occ::Mat& perturb, const occ::qm::SCF<occ::qm::HartreeFock>& scf) {
-	sf->ensure_inv_H2_weights();
+void XCW_solver::evaluate(const dMatrix2& dm_eff) {
+	sf.calc_F_calc(*I_tens, dm_eff);
+	sf.eval_scale();
+	sf.calc_criteria();
+}
+
+fit_quality XCW_solver::quality() const {
+	return { sf.criterion(false), sf.quality_criteria.GooF2, sf.quality_criteria.R1, sf.criterion(true), sf.quality_criteria.R1_all };
+}
+
+void XCW_solver::save_state() {
+	saved_F_calc_ = sf.scatter_data.F_calc;
+	saved_scale_ = sf.scatter_data.scale;
+}
+
+void XCW_solver::restore_state() {
+	sf.scatter_data.F_calc = saved_F_calc_;
+	sf.scatter_data.scale = saved_scale_;
+}
+
+bool XCW_solver::on_device() const {
+	return I_tens->i_on_device_;
+}
+
+void XCW_solver::perturbation(occ::Mat& perturb, const bool unrestricted) {
+	sf.ensure_inv_H2_weights();
 
 	//The four (XWR_type, refine_against) combinations differ only in the per-reflection
 	//scalar and the prefactor, so one walk over I serves all of them
@@ -229,43 +251,114 @@ void XCW_solver::calc_perturb(occ::Mat& perturb, const occ::qm::SCF<occ::qm::Har
 	const bool against_F2 = (ref == 2);
 	const bool weighted = (xwr == 2);
 	const bool valid = (xwr == 1 || xwr == 2) && (ref == 1 || ref == 2);
-	if (!valid) scf_solver.SCF_log << "Invalid refinement option" << std::endl;
-	const double scale_sq = sf->scatter_data.scale * sf->scatter_data.scale;
+	if (!valid) writer.log << "Invalid refinement option" << std::endl;
+	const double scale_sq = sf.scatter_data.scale * sf.scatter_data.scale;
 	const double prefactor = against_F2
-		? 4.0 * scale_sq / (sf->model_data.nr_fit - sf->n_params())
-		: 2.0 * sf->scatter_data.scale / (sf->model_data.nr_fit - sf->n_params());
+		? 4.0 * scale_sq / (sf.model_data.nr_fit - sf.n_params())
+		: 2.0 * sf.scatter_data.scale / (sf.model_data.nr_fit - sf.n_params());
 
-	cvec pre(sf->model_data.nr);
+	cvec pre(sf.model_data.nr);
 #pragma omp parallel for
-	for (int r = 0; r < sf->model_data.nr; r++) {
-		if (!valid || !sf->scatter_data.hkl_mask[r]) continue;
+	for (int r = 0; r < sf.model_data.nr; r++) {
+		if (!valid || !sf.scatter_data.hkl_mask[r]) continue;
 		cdouble precompute;
 		//with extinction the model is I = y |Fc|^2, so the residual carries sqrt(y)|Fc| and the
 		//carrier d/dD picks up dI/d|Fc|^2 (F^2) or d(sqrt(y)|Fc|)/d|Fc| (F); both are 1 without
 		//a model, and the expressions below are then exactly the ones this always used
 		if (against_F2) {
-			const double I = sf->ext_y(r) * std::pow(std::abs(sf->scatter_data.F_calc[r]), 2);
-			precompute = sf->ext_g(r) * std::conj(sf->scatter_data.F_calc[r]) * (scale_sq * I - sf->scatter_data.F_obs2[r]) / (sf->scatter_data.sigma_obs2[r] * sf->scatter_data.sigma_obs2[r]);
+			const double I = sf.ext_y(r) * std::pow(std::abs(sf.scatter_data.F_calc[r]), 2);
+			precompute = sf.ext_g(r) * std::conj(sf.scatter_data.F_calc[r]) * (scale_sq * I - sf.scatter_data.F_obs2[r]) / (sf.scatter_data.sigma_obs2[r] * sf.scatter_data.sigma_obs2[r]);
 		}
 		else {
-			const double F_calc_abs = std::abs(sf->scatter_data.F_calc[r]);
-			precompute = sf->ext_m(r) * std::conj(sf->scatter_data.F_calc[r]) * (sf->scatter_data.scale * sf->ext_sqrt_y(r) * F_calc_abs - sf->scatter_data.abs_F_obs[r]) / (sf->scatter_data.sigma_obs[r] * sf->scatter_data.sigma_obs[r] * F_calc_abs);
+			const double F_calc_abs = std::abs(sf.scatter_data.F_calc[r]);
+			precompute = sf.ext_m(r) * std::conj(sf.scatter_data.F_calc[r]) * (sf.scatter_data.scale * sf.ext_sqrt_y(r) * F_calc_abs - sf.scatter_data.abs_F_obs[r]) / (sf.scatter_data.sigma_obs[r] * sf.scatter_data.sigma_obs[r] * F_calc_abs);
 		}
-		if (weighted) precompute *= sf->inv_H2_[r];
+		if (weighted) precompute *= sf.inv_H2_[r];
 		pre[r] = precompute;
 	}
 	contract_I(perturb, pre);
 	perturb *= prefactor;
-	if (scf.ctx.mo.kind == occ::qm::SpinorbitalKind::Unrestricted) {
-		perturb.conservativeResize(2 * sf->model_data.nmo, Eigen::NoChange);
-		perturb.bottomRows(sf->model_data.nmo) = perturb.topRows(sf->model_data.nmo);
+	if (unrestricted) {
+		perturb.conservativeResize(2 * sf.model_data.nmo, Eigen::NoChange);
+		perturb.bottomRows(sf.model_data.nmo) = perturb.topRows(sf.model_data.nmo);
 	}
 	//closing function
 }
 
+occ::Mat XCW_solver::perturbation_response(const dMatrix2& dD_eff, const double lambda) {
+	//dF_r = Sum c I_r dD_eff: calc_F_calc's walk with the fixed part zeroed
+	const cvec F0 = sf.scatter_data.F_calc, fixed = sf.scatter_data.anom_correction;
+	std::fill(sf.scatter_data.anom_correction.begin(), sf.scatter_data.anom_correction.end(), cdouble(0.0, 0.0));
+	sf.calc_F_calc(*I_tens, dD_eff);
+	const cvec dFr = sf.scatter_data.F_calc;
+	sf.scatter_data.F_calc = F0;
+	sf.scatter_data.anom_correction = fixed;
+	//the scale's response from the weighted least-squares scale of eval_scale
+	const bool against_F2 = opt->xcw_settings.refine_against == 2, weighted = opt->xcw_settings.XWR_type == 2;
+	const double k = sf.scatter_data.scale, s = k * k;
+	const int chunk = 128, nchunk = (sf.model_data.nr + chunk - 1) / chunk;
+	vec dnum(nchunk), dden(nchunk), den(nchunk);
+#pragma omp parallel for schedule(static)
+	for (int ch = 0; ch < nchunk; ch++) {
+		for (int r = ch * chunk; r < std::min((ch + 1) * chunk, sf.model_data.nr); r++) {
+			if (!sf.scatter_data.hkl_mask[r]) continue;
+			//ponytail: the extinction shape is frozen over the step (dy/d|Fc| dropped), so
+			//sqrt(y)|Fc| and m d|Fc| reproduce I and dI exactly but their own curvature is
+			//neglected. Only the Hessian's step proposal degrades - TRAH accepts on the
+			//exact energy rebuild_at returns, and perturbation's gradient stays exact.
+			const double w = weighted ? sf.inv_H2_[r] : 1.0, Fa = sf.ext_sqrt_y(r) * std::abs(F0[r]);
+			const double dFa = std::abs(F0[r]) > 0 ? sf.ext_m(r) * std::real(std::conj(F0[r]) * dFr[r]) / std::abs(F0[r]) : 0.0;
+			if (against_F2) {
+				const double wi = w / (sf.scatter_data.sigma_obs2[r] * sf.scatter_data.sigma_obs2[r]);
+				dnum[ch] += wi * 2.0 * Fa * dFa * sf.scatter_data.F_obs2[r];
+				dden[ch] += wi * 4.0 * Fa * Fa * Fa * dFa;
+				den[ch] += wi * Fa * Fa * Fa * Fa;
+			}
+			else {
+				const double wi = w / (sf.scatter_data.sigma_obs[r] * sf.scatter_data.sigma_obs[r]);
+				dnum[ch] += wi * dFa * sf.scatter_data.F_obs[r];
+				dden[ch] += wi * 2.0 * Fa * dFa;
+				den[ch] += wi * Fa * Fa;
+			}
+		}
+	}
+	double dnum_sum = 0, dden_sum = 0, den_sum = 0;
+	for (int ch = 0; ch < nchunk; ch++) { dnum_sum += dnum[ch]; dden_sum += dden[ch]; den_sum += den[ch]; }
+	//F: dk = (dN - k dD) / D; F^2: ds = (dN - s dD) / D for s = k^2
+	const double dscale = den_sum != 0 ? (dnum_sum - (against_F2 ? s : k) * dden_sum) / den_sum : 0.0;
+	//d(q_r) for q_r = prefactor's scale power times perturbation's scalar, both moving:
+	//F: q = w conj(F) (k^2 - k Fo / |F|) / sigma^2; F^2: q = w conj(F) (s^2 |F|^2 - s Fo^2) / sigma_I^2
+	cvec dq(sf.model_data.nr);
+#pragma omp parallel for
+	for (int r = 0; r < sf.model_data.nr; r++) {
+		if (!sf.scatter_data.hkl_mask[r]) continue;
+		const double w = weighted ? sf.inv_H2_[r] : 1.0, Fm = std::abs(F0[r]);
+		if (Fm == 0) continue;
+		//as above: the model amplitude is sqrt(y)|Fc| and its response m d|Fc|, with the
+		//shape frozen. The carrier conj(F) keeps perturbation's chain factor.
+		const double Fa = sf.ext_sqrt_y(r) * Fm, dFa = sf.ext_m(r) * std::real(std::conj(F0[r]) * dFr[r]) / Fm;
+		const cdouble carrier = (against_F2 ? sf.ext_g(r) : sf.ext_m(r)) * std::conj(F0[r]);
+		const cdouble dcarrier = (against_F2 ? sf.ext_g(r) : sf.ext_m(r)) * std::conj(dFr[r]);
+		if (against_F2) {
+			const double wi = w / (sf.scatter_data.sigma_obs2[r] * sf.scatter_data.sigma_obs2[r]), Fo2 = sf.scatter_data.F_obs2[r];
+			dq[r] = wi * (dcarrier * (s * s * Fa * Fa - s * Fo2)
+				+ carrier * (2.0 * s * dscale * Fa * Fa + 2.0 * s * s * Fa * dFa - dscale * Fo2));
+		}
+		else {
+			const double wi = w / (sf.scatter_data.sigma_obs[r] * sf.scatter_data.sigma_obs[r]), Fo = sf.scatter_data.abs_F_obs[r];
+			dq[r] = wi * (dcarrier * (k * k * sf.ext_sqrt_y(r) - k * Fo / Fm)
+				+ carrier * (dscale * (2.0 * k * sf.ext_sqrt_y(r) - Fo / Fm) + k * Fo * std::real(std::conj(F0[r]) * dFr[r]) / (Fm * Fm * Fm)));
+		}
+	}
+	occ::Mat dP;
+	contract_I(dP, dq);
+	dP *= (against_F2 ? 4.0 : 2.0) / (sf.model_data.nr_fit - sf.n_params()) * lambda;
+	return dP;
+}
+
 void XCW_solver::contract_I(occ::Mat& out, const cvec& pre) {
-	out.setZero(sf->model_data.nmo, sf->model_data.nmo);
-	const int step = std::max(1, I_tens->i_streamed_ ? I_tens->i_window_ : sf->model_data.nr);
+	out.setZero(sf.model_data.nmo, sf.model_data.nmo);
+	const int step = std::max(1, I_tens->i_streamed_ ? I_tens->i_window_ : sf.model_data.nr);
 	bool on_device = false;
 #if defined(NOSPHERA2_USE_GPU) || defined(NOSPHERA2_USE_METAL)
 	if (I_tens->i_on_device_) {
@@ -282,10 +375,10 @@ void XCW_solver::contract_I(occ::Mat& out, const cvec& pre) {
 	std::vector<occ::Mat> parts(omp_get_max_threads());
 #pragma omp parallel if (!on_device)
 	{
-		occ::Mat local = occ::Mat::Zero(sf->model_data.nmo, sf->model_data.nmo);
+		occ::Mat local = occ::Mat::Zero(sf.model_data.nmo, sf.model_data.nmo);
 		double* local_ptr = local.data();
-		for (int r0 = 0; !on_device && r0 < sf->model_data.nr; r0 += step) {
-			const int r1 = std::min(r0 + step, sf->model_data.nr);
+		for (int r0 = 0; !on_device && r0 < sf.model_data.nr; r0 += step) {
+			const int r1 = std::min(r0 + step, sf.model_data.nr);
 			if (I_tens->i_streamed_) {
 #pragma omp single
 				{
@@ -307,7 +400,7 @@ void XCW_solver::contract_I(occ::Mat& out, const cvec& pre) {
 					for (size_t k = 0; k < I_tens->i_compact_; k++) {
 						const double vr = static_cast<double>(I_r[k].real());
 						const double vi = static_cast<double>(I_r[k].imag());
-						local_ptr[pnu[k] * sf->model_data.nmo + pmu[k]] += precompute.real() * vr - precompute.imag() * vi;
+						local_ptr[pnu[k] * sf.model_data.nmo + pmu[k]] += precompute.real() * vr - precompute.imag() * vi;
 					}
 				};
 				if (I_tens->i_float_) accumulate(I_tens->i_block32(r)); else accumulate(I_tens->i_block(r));
@@ -319,8 +412,8 @@ void XCW_solver::contract_I(occ::Mat& out, const cvec& pre) {
 	//The partials outweigh the matrix many times over, so their sum is parallel too
 	if (!on_device) {
 #pragma omp parallel for schedule(static)
-		for (int mu = 0; mu < sf->model_data.nmo; mu++) {
-			for (int nu = mu; nu < sf->model_data.nmo; nu++) {
+		for (int mu = 0; mu < sf.model_data.nmo; mu++) {
+			for (int nu = mu; nu < sf.model_data.nmo; nu++) {
 				double sum = 0.0;
 				for (int t = 0; t < static_cast<int>(parts.size()); t++)
 					if (parts[t].size() != 0) sum += parts[t](mu, nu);
@@ -328,8 +421,8 @@ void XCW_solver::contract_I(occ::Mat& out, const cvec& pre) {
 			}
 		}
 	}
-	for (int mu = 0; mu < sf->model_data.nmo; mu++) {
-		for (int nu = mu + 1; nu < sf->model_data.nmo; nu++) {
+	for (int mu = 0; mu < sf.model_data.nmo; mu++) {
+		for (int nu = mu + 1; nu < sf.model_data.nmo; nu++) {
 			out(nu, mu) = out(mu, nu);
 		}
 	}
@@ -359,9 +452,9 @@ void XCW_solver::flip_high_m_phases(occ::qm::Wavefunction& w) {
 	w.mo.update_density_matrix();
 }
 
-void XCW_solver::create_tscb(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double& lambda) {
-	scf_solver.SCF_log << "Creating .tscb file from converged SCF calculation..." << std::endl;
-	std::vector<WFN> sf_wave_vec(1, { scf.wavefunction(), false });
+void XCW_solver::create_tscb(const occ::qm::Wavefunction& wfn, const double& lambda) {
+	writer.log << "Creating .tscb file from converged SCF calculation..." << std::endl;
+	std::vector<WFN> sf_wave_vec(1, { wfn, false });
 	//The constructor marks anything taken from OCC as OCC-origin. What this refinement holds
 	//is an OCC result over a basis this program loaded, so say that: Int_Params then reads the
 	//shells with the convention they actually have.
@@ -369,16 +462,16 @@ void XCW_solver::create_tscb(occ::qm::SCF<occ::qm::HartreeFock>& scf, const doub
 	svec known_atoms_;
 	tsc_block<int, cdouble> result;
 	vec2 known_kpts_;
-	opt->m_hkl_list = sf->scatter_data.hkl_enlarged;
+	opt->m_hkl_list = sf.scatter_data.hkl_enlarged;
 	opt->grid_cache = &tsc_grids;
 	result.append(calculate_scattering_factors<itsc_block, std::vector<WFN>&>(
 		*opt,
 		sf_wave_vec,
-		scf_solver.SCF_log,
+		writer.log,
 		known_atoms_,
 		0,
-		&sf->k_pt),
-		scf_solver.SCF_log);
+		&sf.k_pt),
+		writer.log);
 	std::string value = std::to_string(lambda);
 	value.erase(std::remove(value.begin(), value.end(), '.'), value.end());
 	while (value.length() < 7) {
@@ -393,18 +486,18 @@ void XCW_solver::create_tscb(occ::qm::SCF<occ::qm::HartreeFock>& scf, const doub
 	//the structure factors this step was scored on, for an R-factor against another route
 	//(an ORCA tsc through Olex2, or a Laue check between symmetry-equivalent rows)
 	{
-		sf->ensure_hkl_ordered();
+		sf.ensure_hkl_ordered();
 		std::ofstream fc("NA2_" + value + "_Fcalc.txt");
-		if (!sf->ext_p_.empty()) {
-			std::cout << "XCW lambda " << lambda << ": " << sf->extinction_report() << std::endl;
-			scf_solver.SCF_log << "XCW lambda " << lambda << ": " << sf->extinction_report() << std::endl;
+		if (!sf.ext_p_.empty()) {
+			std::cout << "XCW lambda " << lambda << ": " << sf.extinction_report() << std::endl;
+			writer.log << "XCW lambda " << lambda << ": " << sf.extinction_report() << std::endl;
 		}
-		fc << "#    h    k    l          F_obs        sig(F)   scale*|F_calc|     phase(deg)   R1(gt) = " << std::setprecision(5) << sf->quality_criteria.R1 << " R1(all) = " << sf->quality_criteria.R1_all << " scale = " << std::setprecision(10) << sf->scatter_data.scale << "\n";
-		for (int r = 0; r < sf->model_data.nr; r++) {
-			const cdouble& f = sf->scatter_data.F_calc[r];
-			fc << std::setw(5) << sf->hkl_ordered_[r][0] << std::setw(5) << sf->hkl_ordered_[r][1] << std::setw(5) << sf->hkl_ordered_[r][2]
-				<< std::fixed << std::setprecision(4) << std::setw(15) << sf->scatter_data.F_obs[r] << std::setw(14) << sf->scatter_data.sigma_obs[r]
-				<< std::setw(17) << sf->scatter_data.scale * sf->ext_sqrt_y(r) * std::abs(f) << std::setw(15) << std::arg(f) * 180.0 / constants::PI << "\n";
+		fc << "#    h    k    l          F_obs        sig(F)   scale*|F_calc|     phase(deg)   R1(gt) = " << std::setprecision(5) << sf.quality_criteria.R1 << " R1(all) = " << sf.quality_criteria.R1_all << " scale = " << std::setprecision(10) << sf.scatter_data.scale << "\n";
+		for (int r = 0; r < sf.model_data.nr; r++) {
+			const cdouble& f = sf.scatter_data.F_calc[r];
+			fc << std::setw(5) << sf.hkl_ordered_[r][0] << std::setw(5) << sf.hkl_ordered_[r][1] << std::setw(5) << sf.hkl_ordered_[r][2]
+				<< std::fixed << std::setprecision(4) << std::setw(15) << sf.scatter_data.F_obs[r] << std::setw(14) << sf.scatter_data.sigma_obs[r]
+				<< std::setw(17) << sf.scatter_data.scale * sf.ext_sqrt_y(r) * std::abs(f) << std::setw(15) << std::arg(f) * 180.0 / constants::PI << "\n";
 		}
 	}
 	std::ostringstream oss3;
@@ -413,14 +506,14 @@ void XCW_solver::create_tscb(occ::qm::SCF<occ::qm::HartreeFock>& scf, const doub
 	//and Gaussian's f(+-3), g(+-3), g(+-4) are the opposite sign; the file has to carry
 	//Gaussian's so that anything reading an fchk gets the density right
 	{
-		occ::qm::Wavefunction w = scf.wavefunction();
+		occ::qm::Wavefunction w = wfn;
 		flip_high_m_phases(w);
 		w.save(oss3.str());
 	}
 	if (opt->xcw_settings.nbo_output) {
 		std::ostringstream oss4;
 		oss4 << "NA2_" << value << ".47";
-		sf_wave_vec[0].write_nbo(oss4.str(), opt->debug, &scf_solver.SCF_log);
+		sf_wave_vec[0].write_nbo(oss4.str(), opt->debug, &writer.log);
 	}
 	//Neither file written above can carry this analysis - a .wfn has bare primitives and
 	//the fchk reader keeps no shells - so -rgbi runs it here, on the refined wavefunction,
@@ -434,27 +527,28 @@ void XCW_solver::create_tscb(occ::qm::SCF<occ::qm::HartreeFock>& scf, const doub
 			opt->rgbi_orbital_basis == RGBIOrbitalBasis::ANO, opt->rgbi_EVs, opt->rgbi_theta,
 			opt->rgbi_legacy_cutoff);
 		std::cout.rdbuf(cout_buf);
-		scf_solver.SCF_log << "RGBI analysis written to " << oss5.str() << std::endl;
+		writer.log << "RGBI analysis written to " << oss5.str() << std::endl;
 	}
 }
 
-occ::qm::HartreeFock XCW_solver::setup_XCW_procedure() {
-	std::vector<structure_factors::ao_data> ao_data_shells;
-	occ::core::Molecule mol;
-	scf_solver.setup_SCF_mol(mol);
-	occ::qm::AOBasis occ_basis_set;
-	std::string temp_basis = opt->xcw_settings.basis_set_name;
-	scf_solver.setup_basis(mol, temp_basis, occ_basis_set);
+/* Sets up the system for the XCW procedure
+* Sets up OCC molecule, loads a basis set (optional density fitting basis) and returns the Hartree-Fock object
+*/
+occ::qm::HartreeFock XCW_solver::setup_system() {
+
+	// Sets up the OCC molecule
+	const occ::core::Molecule mol = SCF_wrapper::setup_SCF_mol(sf.asym_atoms, opt->xcw_settings.charge, opt->xcw_settings.multiplicity);
+	// Sets up the OCC basis set
+	const occ::qm::AOBasis occ_basis_set = SCF_wrapper::setup_basis(mol, opt->xcw_settings.basis_set_name);
 	occ::qm::HartreeFock hf(occ_basis_set);
+
+	// Handles density fitting basis
 	if (!opt->xcw_settings.df_basis_name.empty()) {
-		//OCC loads a fitting basis by name from a data directory this build does not ship,
-		//but reads a .json path as given: the library's set is written out once, for the
-		//elements present, and handed over that way
 		std::shared_ptr<BasisSet> aux = BasisSetLibrary::get_basis_set(opt->xcw_settings.df_basis_name);
-		//a Coulomb-only set fits J and leaves the exchange to a basis never meant for it
 		if (aux->get_name().find("jkfit") == std::string::npos)
 			std::cout << "WARNING: " << aux->get_name() << " is not a JK-fitting basis; Hartree-Fock exchange is fitted with it all the same. "
 				"def2-universal-jkfit serves the def2 family, cc-pvXz-jkfit the cc-pVXZ family." << std::endl;
+		// Create a list storing all elements of the molecule
 		ivec elements;
 		for (int i = 0; i < static_cast<int>(mol.atoms().size()); i++)
 			if (std::find(elements.begin(), elements.end(), mol.atoms()[i].atomic_number) == elements.end())
@@ -474,49 +568,67 @@ occ::qm::HartreeFock XCW_solver::setup_XCW_procedure() {
 		std::cout << "XCW density fitting with " << aux->get_name() << ": " << naux << " functions, "
 			<< (store / 1048576.0) << " MB of three-index integrals " << (stored ? "held in memory" : "recomputed every iteration") << std::endl;
 	}
+
 	if (opt->xcw_int_precision > 0.0) hf.set_precision(opt->xcw_int_precision);
-	sf->create_prims(ao_data_shells, occ_basis_set);
-	I_tens = &sf->eval_I_anom_disp(ao_data_shells);
+
+	// The SCF gets its slice of the settings and no more
+	options::SCF_settings scf_settings = opt->xcw_settings;
+	scf_settings.incremental = opt->xcw_incremental;
+	scf_settings.gpu_eri = opt->gpu_itensor && opt->use_gpu;
+	scf_settings.no_date = opt->no_date;
+	scf_solver = SCF_wrapper(mol, occ_basis_set, scf_settings, writer);
 	return hf;
 	// closing function
+}
+
+//Everything a converged step puts on screen, in the order it always has: the halting statistic
+//first so its A^2 can be the last column of the row
+void XCW_solver::report_lambda(const double lambda, const occ::qm::Wavefunction& wfn, const bool write_result) {
+	if (opt->xcw_settings.xcw_gaussian_halt)
+		evaluate_gaussian_halting(lambda);
+	const fit_quality fit = quality();
+	writer.v.criterion = fit.criterion;
+	writer.v.GooF2 = fit.GooF2;
+	writer.v.R1 = fit.R1;
+	writer.v.criterion_all = fit.criterion_all;
+	writer.v.R1_all = fit.R1_all;
+	writer.v.has_A2 = opt->xcw_settings.xcw_gaussian_halt && !gaussian_halt_history_.empty();
+	if (writer.v.has_A2) writer.v.A2 = gaussian_halt_history_.back().A2;
+	writer.lambda_line();
+	if (write_result) {
+		const _time_point tscb_t0 = get_time();
+		create_tscb(wfn, lambda);
+		throughput::record_time("XCW tscb", false, get_msec(tscb_t0, get_time()));
+	}
 }
 
 void XCW_solver::run() {
 	//OCC parallelises through TBB, which does not read OMP_NUM_THREADS. Not a speedup - it
 	//already used every core - but it makes -cpus bind the 82% of a run that OCC owns.
 	occ::parallel::set_num_threads(opt->threads > 0 ? opt->threads : omp_get_max_threads());
-	occ::qm::HartreeFock hf = setup_XCW_procedure();
+	// Sets up the OCC objects (molecule and basis set)
+	occ::qm::HartreeFock hf = setup_system();
+	/* Calculate Debye - Waller and phase factors and anomalous dispersion corrections and sets them
+	* If they are not set, the default values are used; DW = 1, phases = 1, anom = 0 */
+	sf.set_DW();
+	sf.set_phases();
+	sf.set_anom();
+	// Computes the I tensor
+	I_tens = &sf.eval_I(hf.aobasis());
 #if defined(NOSPHERA2_USE_GPU) || defined(NOSPHERA2_USE_METAL)
 	//The two walks of an iteration read the whole tensor and the host is bound by its memory
 	//bandwidth doing so; the device reads it several times faster. The host copy stays for
 	//the background writer.
 	if (opt->gpu_itensor && opt->use_gpu && !I_tens->i_streamed_) {
-		I_tens->i_on_device_ = I_tens->i_float_ ? itensor_gpu_hold(I_tens->I32.data(), sf->model_data.nr, static_cast<int>(I_tens->i_compact_))
-			: itensor_gpu_hold(I_tens->I.data(), sf->model_data.nr, static_cast<int>(I_tens->i_compact_));
+		I_tens->i_on_device_ = I_tens->i_float_ ? itensor_gpu_hold(I_tens->I32.data(), sf.model_data.nr, static_cast<int>(I_tens->i_compact_))
+			: itensor_gpu_hold(I_tens->I.data(), sf.model_data.nr, static_cast<int>(I_tens->i_compact_));
 		if (!(opt->no_date))
 			std::cerr << "GPU in use: XCW structure factors and perturbation on "
 			<< (I_tens->i_on_device_ ? "the device" : "the CPU - device unavailable or the tensor too large") << std::endl;
 	}
 #endif
-	//Four fifths of the free memory, the I tensor's budget, for the stored integrals
-	scf_solver.eri_.clear();
-	if (opt->xcw_settings.hf_type != occ::qm::SpinorbitalKind::General) {
-		const _time_point eri_t0 = get_time();
-		const size_t avail = available_memory_bytes();
-		if (scf_solver.eri_.build(hf, avail ? avail / 5 * 4 : 0, scf_solver.SCF_log))
-			throughput::record_time("XCW two-electron integrals", false, get_msec(eri_t0, get_time()));
-	}
-#if defined(NOSPHERA2_USE_GPU) || defined(NOSPHERA2_USE_METAL)
-	if (scf_solver.eri_ && opt->gpu_itensor && opt->use_gpu) {
-		const auto up_t0 = get_time();
-		scf_solver.eri_on_device_ = eri_gpu_hold(scf_solver.eri_.data(), scf_solver.eri_.nbf(), scf_solver.eri_.npairs(), scf_solver.eri_.pair_a().data(), scf_solver.eri_.pair_b().data(),
-			scf_solver.eri_.first_pair().data(), scf_solver.eri_.pair_index().data());
-		if (scf_solver.eri_on_device_) throughput::record_time("XCW two-electron integrals upload", true, get_msec(up_t0, get_time()));
-		if (!(opt->no_date))
-			std::cerr << "GPU in use: XCW Fock build from the stored integrals on "
-			<< (scf_solver.eri_on_device_ ? "the device" : "the CPU - device unavailable or the integrals too large") << std::endl;
-	}
-#endif
+	// Computes the four center integrals and keeps them in memory if possible
+	scf_solver.setup_eri(hf);
 	bool has_guess = false;
 	occ::qm::Wavefunction last_wfn, prev_wfn;
 	const occ::Mat S_ao = hf.compute_overlap_matrix();
@@ -541,30 +653,16 @@ void XCW_solver::run() {
 	if (opt->xcw_settings.XWR_type == 2) {
 		std::cout << "XCW: fitting against the 1/|H|^2-weighted residual self-energy criterion "
 			<< "Criterion below is this weighted quantity, not the classical GoF." << std::endl;
-		scf_solver.SCF_log << "XCW: fitting against the 1/|H|^2-weighted residual self-energy criterion "
+		writer.log << "XCW: fitting against the 1/|H|^2-weighted residual self-energy criterion "
 			<< "Criterion below are this weighted quantity, not the classical GoF." << std::endl;
 	}
-	std::cout << "____________________________________________________________________________________\n";
-	std::cout << " Lambda\t\tCriterion\tGooF(F2)\tR1(gt)\t\tTotal Energy\t\tPerturbation\tTarget quantity\t\tCrit(all)\tR1(all)";
-	if (opt->xcw_settings.xcw_gaussian_halt) {
-		std::cout << "\t\tA^2 (halt)";
-	}
-	std::cout << "\n";
-	std::cout << "\t\t\t\t\t\t\t\t(Eh)\t\t\t(a. u.)\t\t(a. u.)\n";
-	std::cout << "____________________________________________________________________________________\n";
+	SCF_log_writer::console_header(opt->xcw_settings.xcw_gaussian_halt);
 
 	// Runs the lambda steps for XCW fitting
 	auto run_lambda = [&](const double lambda, occ::qm::Wavefunction guess, const bool use_guess, const bool write_result) {
-		occ::qm::SCF scf(hf, opt->xcw_settings.hf_type);
-		double alpha = opt->xcw_settings.alpha;
-		bool has_local_guess = use_guess;
-		scf.set_charge_multiplicity(opt->xcw_settings.charge, opt->xcw_settings.multiplicity);
-		scf.maxiter = opt->xcw_settings.max_scf_iterations;
-		scf.convergence_settings.level_shift = opt->xcw_settings.level_shift;
-		scf.convergence_settings.level_shift_threshold = 0;
-		scf.update_occupied_orbital_count();
-		const bool converged = scf_solver.do_SCF(lambda, alpha, scf, guess, has_local_guess, write_result);
-		return std::make_pair(converged, scf.wavefunction());
+		const bool converged = scf_solver.solve(hf, lambda, guess, use_guess, *this);
+		if (converged) report_lambda(lambda, guess, write_result);
+		return std::make_pair(converged, guess);
 	};
 	const double min_lambda_step = opt->xcw_settings.xcw_step_size / 128.0;
 	double last_lambda = opt->xcw_settings.xcw_start_value;
@@ -572,12 +670,13 @@ void XCW_solver::run() {
 	//converged orbitals; from the core guess it runs out of iterations (Fe(phen)2(SCN)2 UHF:
 	//200 iterations, RMSD still 4e-5). The first step without a guess takes the normal
 	//schedule, every later one the slow settings from the file
-	const bool slow_start = opt->xcw_settings.slow_conv && !has_guess;
-	const double slow_alpha = opt->xcw_settings.alpha, slow_shift = opt->xcw_settings.level_shift, slow_stop_damping = opt->xcw_settings.diis_stop_damping, slow_stop_shift = opt->xcw_settings.diis_stop_shift;
+	options::SCF_settings& scf_settings = scf_solver.settings;
+	const bool slow_start = scf_settings.slow_conv && !has_guess;
+	const double slow_alpha = scf_settings.alpha, slow_shift = scf_settings.level_shift, slow_stop_damping = scf_settings.diis_stop_damping, slow_stop_shift = scf_settings.diis_stop_shift;
 	if (slow_start) {
-		opt->xcw_settings.alpha = 0.5; opt->xcw_settings.level_shift = 0.5; opt->xcw_settings.diis_stop_damping = 1e-3; opt->xcw_settings.diis_stop_shift = 1e-2;
+		scf_settings.alpha = 0.5; scf_settings.level_shift = 0.5; scf_settings.diis_stop_damping = 1e-3; scf_settings.diis_stop_shift = 1e-2;
 		std::cout << "XCW: slow_conv - the unperturbed first step runs the normal schedule, slow damping from the second step on" << std::endl;
-		scf_solver.SCF_log << "XCW: slow_conv - the unperturbed first step runs the normal schedule, slow damping from the second step on" << std::endl;
+		writer.log << "XCW: slow_conv - the unperturbed first step runs the normal schedule, slow damping from the second step on" << std::endl;
 	}
 	//The scan used to stop at max_value even when A^2 was still falling there, i.e. on the
 	//scan boundary instead of on lambda*, and only printed "extend the scan" afterwards.
@@ -591,7 +690,7 @@ void XCW_solver::run() {
 	for (int step = 0; step < planned_steps; step++) {
 		const double lambda = step * opt->xcw_settings.xcw_step_size + opt->xcw_settings.xcw_start_value;
 		if (slow_start && step == 1) {
-			opt->xcw_settings.alpha = slow_alpha; opt->xcw_settings.level_shift = slow_shift; opt->xcw_settings.diis_stop_damping = slow_stop_damping; opt->xcw_settings.diis_stop_shift = slow_stop_shift;
+			scf_settings.alpha = slow_alpha; scf_settings.level_shift = slow_shift; scf_settings.diis_stop_damping = slow_stop_damping; scf_settings.diis_stop_shift = slow_stop_shift;
 		}
 		const occ::qm::Wavefunction previous_wfn = last_wfn;
 		occ::qm::Wavefunction guess = last_wfn;
@@ -612,7 +711,7 @@ void XCW_solver::run() {
 			while (!result.first && lambda_step > min_lambda_step) {
 				lambda_step *= 0.5;
 				const double trial_lambda = std::min(lambda, last_lambda + lambda_step);
-				scf_solver.SCF_log << "XCW: retrying lambda " << std::fixed << std::setprecision(8) << trial_lambda
+				writer.log << "XCW: retrying lambda " << std::fixed << std::setprecision(8) << trial_lambda
 					<< " from converged lambda " << last_lambda << " with step " << lambda_step << std::endl;
 				std::cout << "XCW: retrying lambda " << std::fixed << std::setprecision(8) << trial_lambda
 					<< " with step " << lambda_step << std::endl;
@@ -637,7 +736,7 @@ void XCW_solver::run() {
 				why << " in " << opt->xcw_settings.max_scf_iterations << " SCF iterations (raise max_iter or loosen the criteria); stopping scan.";
 			else
 				why << " with a continuation step above " << min_lambda_step << "; stopping scan.";
-			scf_solver.SCF_log << why.str() << std::endl;
+			writer.log << why.str() << std::endl;
 			std::cout << why.str() << std::endl;
 			break;
 		}
@@ -666,7 +765,7 @@ void XCW_solver::run() {
 					msg << "stopping anyway, the scan has already been extended by its limit of "
 						<< max_extra_steps << " steps; raise max_value in -do_XCW to continue";
 				}
-				scf_solver.SCF_log << msg.str() << std::endl;
+				writer.log << msg.str() << std::endl;
 				std::cout << msg.str() << std::endl;
 			}
 		}
@@ -685,12 +784,12 @@ void XCW_solver::run() {
 	//Before the run ends: the writer holds a file handle and reads the resident tensor, and
 	//by now it has usually been finished for a long while - the refinement takes far longer
 	//than the write. Joining is what keeps it from outliving the process.
-	sf->finish_i_save();
+	sf.finish_i_save();
 #if defined(NOSPHERA2_USE_GPU) || defined(NOSPHERA2_USE_METAL)
 	itensor_gpu_release();
-	eri_gpu_release();
-	I_tens->i_on_device_ = scf_solver.eri_on_device_ = false;
+	I_tens->i_on_device_ = false;
 #endif
+	scf_solver.release_device();
 
 	std::cout << "Finished XCW fitting procedure." << std::endl;
 }

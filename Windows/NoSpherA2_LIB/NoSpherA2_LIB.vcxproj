@@ -139,6 +139,7 @@
     <ClInclude Include="..\..\Src\core\SALTED_utilities.h" />
     <ClInclude Include="..\..\Src\core\scatterer_id.h" />
     <ClInclude Include="..\..\Src\core\scattering_factors.h" />
+    <ClInclude Include="..\..\Src\core\SCF_log_writer.h" />
     <ClInclude Include="..\..\Src\core\SCF_wrapper.h" />
     <ClInclude Include="..\..\Src\core\sf_gpu.h" />
     <ClInclude Include="..\..\Src\core\Slater_delta_coefs.h" />

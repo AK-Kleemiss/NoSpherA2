@@ -63,6 +63,7 @@ namespace constants
 	constexpr double INV_PI = 1.0 / PI;
 	constexpr double PI_2 = PI / 2.0;
 	constexpr double TWO_PI = 2 * PI;
+	constexpr double INV_TWO_PI = 1.0 / TWO_PI;
 	constexpr double FOUR_PI = 4 * PI;
 	constexpr double INV_FOUR_PI = 1.0 / FOUR_PI;
 	constexpr double EIGHT_PI = 8 * PI;
@@ -893,6 +894,7 @@ namespace constants
 	const double normgauss(const int &type, const double &exp);
 
 	const double spherical_harmonic(const int &l, const int &m, const double *d);
+	const double spherical_harmonic_max(const int& l, const int& m);
 	const double spherical_harmonic(const int &l, const double *d, const double *coefs);
 
 	constexpr int ASSOCIATED_LEGENDRE_MAX_L = 12;
