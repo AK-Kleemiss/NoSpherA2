@@ -52,7 +52,7 @@
 	F(bool, grid_gpu_becke_weights, (int np, int num_centers, const int* pcen, const double* proto_x, const double* proto_y, const double* proto_z, const double* proto_w, const double* cx, const double* cy, const double* cz, const double* R_v, const double* chi, double far_away, double cutoff, double* out_x, double* out_y, double* out_z, double* out_aw, double* out_becke, double* out_tfvc), (np, num_centers, pcen, proto_x, proto_y, proto_z, proto_w, cx, cy, cz, R_v, chi, far_away, cutoff, out_x, out_y, out_z, out_aw, out_becke, out_tfvc)) \
 	F(bool, salted_gpu_available, (), ()) \
 	F(void, salted_gpu_clear_cache, (), ()) \
-	F(bool, salted_gpu_equicomb, (const salted_gpu_problem& prob, int* empty_environments), (prob, empty_environments)) \
+	F(bool, salted_gpu_equicomb, (const salted_gpu_problem& prob), (prob)) \
 	F(bool, aux_density_gpu_available, (), ()) \
 	F(void, aux_density_gpu_set_enabled, (bool on), (on)) \
 	F(bool, aux_density_gpu_enabled, (), ()) \

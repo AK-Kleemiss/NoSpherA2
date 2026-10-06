@@ -75,113 +75,62 @@ __device__ __forceinline__ const double* desc_block(const double* v, const size_
 	return v + 2 * (off[l] + ((size_t)atom * nchannels + channel) * (2 * (size_t)l + 1));
 }
 
-//One block per (atom, n1), so the Wigner-weighted v1 is built once and reused by all nrad2 shells as
-//on the CPU; per (n1, n2, il) it would cost nrad2 times the traffic on a memory-bound inner loop
+//One thread per (atom, output slot): only the nfps selected features are built, the norm comes
+//from the host. Consecutive slots write consecutive p entries for every imu, so the stores coalesce.
 __global__ void equicomb_kernel(const int natoms, const int nrad2, const int llmax,
-	const int l21, const int featsize, const int nfps, const bool conj,
-	const int total_terms,
+	const int l21, const int shells, const int nfps, const bool conj,
 	const double* __restrict__ v1, const size_t* __restrict__ v1_off, const int v1_nch,
 	const double* __restrict__ v2, const size_t* __restrict__ v2_off, const int v2_nch,
 	const double* __restrict__ w3j, const int* __restrict__ llvec0, const int* __restrict__ llvec1,
 	const int* __restrict__ runs, const int* __restrict__ c2r_cols,
 	const double* __restrict__ c2r_re, const double* __restrict__ c2r_im,
-	const int* __restrict__ c2r_cnt, const int* __restrict__ sel,
-	double* __restrict__ out, double* __restrict__ inner)
+	const int* __restrict__ c2r_cnt, const int* __restrict__ vfps,
+	const double* __restrict__ normfact, double* __restrict__ p)
 {
-	extern __shared__ double sh[];
-	double* wv1_re = sh;
-	double* wv1_im = sh + total_terms;
-
 	const int atom = blockIdx.y;
-	const int n1 = blockIdx.x;
-	if (atom >= natoms) return;
-
-	//w3j * v1 for this (atom, n1), one thread per (il, imu) run
-	for (int idx = threadIdx.x; idx < llmax * l21; idx += blockDim.x) {
-		const int il = idx / l21;
-		const int* run = runs + 4 * idx;
-		const int im1_begin = run[0], count = run[2], w_off = run[3];
-		const double* v1p = desc_block(v1, v1_off, v1_nch, atom, n1, llvec0[il]);
+	const int slot = blockIdx.x * blockDim.x + threadIdx.x;
+	if (atom >= natoms || slot >= nfps) return;
+	double* out = p + (size_t)atom * l21 * nfps + slot;
+	const int f = vfps[slot];
+	//Features past nrad1*nrad2*llmax stay zero; the host zeroed p
+	if (f >= shells) return;
+	const int il = f % llmax, n2 = (f / llmax) % nrad2, n1 = f / (llmax * nrad2);
+	const double* v1p = desc_block(v1, v1_off, v1_nch, atom, n1, llvec0[il]);
+	const double* v2p = desc_block(v2, v2_off, v2_nch, atom, n2, llvec1[il]);
+	double pc_re[SALTED_MAX_L21], pc_im[SALTED_MAX_L21];
+	for (int imu = 0; imu < l21; imu++) {
+		const int* run = runs + 4 * (il * l21 + imu);
+		const int im1_begin = run[0], im2_begin = run[1], count = run[2], w_off = run[3];
+		double acc_r = 0.0, acc_i = 0.0;
 		for (int k = 0; k < count; k++) {
 			const double wk = w3j[w_off + k];
-			wv1_re[w_off + k] = wk * v1p[2 * (im1_begin + k)];
-			wv1_im[w_off + k] = wk * v1p[2 * (im1_begin + k) + 1];
-		}
-	}
-	__syncthreads();
-
-	//One thread per (n2, il); it walks imu itself, so nothing needs syncing below
-	double pc_re[SALTED_MAX_L21], pc_im[SALTED_MAX_L21];
-	double thread_inner = 0.0;
-	for (int job = threadIdx.x; job < nrad2 * llmax; job += blockDim.x) {
-		//n2 fastest: neighbouring v2 blocks are contiguous in the descriptor, consecutive il are not
-		const int n2 = job % nrad2;
-		const int il = job / nrad2;
-		const double* v2p = desc_block(v2, v2_off, v2_nch, atom, n2, llvec1[il]);
-		for (int imu = 0; imu < l21; imu++) {
-			const int* run = runs + 4 * (il * l21 + imu);
-			const int im2_begin = run[1], count = run[2], w_off = run[3];
-			double acc_r = 0.0, acc_i = 0.0;
-			for (int k = 0; k < count; k++) {
-				const double ar = wv1_re[w_off + k];
-				const double ai = wv1_im[w_off + k];
-				const double br = v2p[2 * (im2_begin + k)];
-				const double bi = v2p[2 * (im2_begin + k) + 1];
-				if (conj) {
-					acc_r += ar * br + ai * bi;
-					acc_i += ai * br - ar * bi;
-				}
-				else {
-					acc_r += ar * br - ai * bi;
-					acc_i += ar * bi + ai * br;
-				}
+			const double ar = wk * v1p[2 * (im1_begin + k)];
+			const double ai = wk * v1p[2 * (im1_begin + k) + 1];
+			const double br = v2p[2 * (im2_begin + k)];
+			const double bi = v2p[2 * (im2_begin + k) + 1];
+			if (conj) {
+				acc_r += ar * br + ai * bi;
+				acc_i += ai * br - ar * bi;
 			}
-			pc_re[imu] = acc_r;
-			pc_im[imu] = acc_i;
-		}
-		//Two nonzeros per transform row, ascending columns, so the sum matches the CPU
-		const int ifeat = (n1 * nrad2 + n2) * llmax + il;
-		const int slot = sel[ifeat];
-		double local_inner = 0.0;
-		for (int i = 0; i < l21; i++) {
-			double preal = 0.0;
-			const int nz = c2r_cnt[i];
-			for (int k = 0; k < nz; k++) {
-				const int j = c2r_cols[2 * i + k];
-				preal += c2r_re[2 * i + k] * pc_re[j] - c2r_im[2 * i + k] * pc_im[j];
+			else {
+				acc_r += ar * br - ai * bi;
+				acc_i += ar * bi + ai * br;
 			}
-			local_inner += preal * preal;
-			if (slot >= 0)
-				out[((size_t)atom * nfps + slot) * l21 + i] = preal;
 		}
-		thread_inner += local_inner;
+		pc_re[imu] = acc_r;
+		pc_im[imu] = acc_i;
 	}
-	//One atomic per block, not per job: the contention is on the counter, not the arithmetic
-	double* red = sh + 2 * total_terms;
-	red[threadIdx.x] = thread_inner;
-	__syncthreads();
-	for (int stride = blockDim.x / 2; stride > 0; stride >>= 1) {
-		if (threadIdx.x < stride) red[threadIdx.x] += red[threadIdx.x + stride];
-		__syncthreads();
+	//Two nonzeros per transform row, ascending columns, so the sum matches the CPU
+	const double nf = normfact[atom];
+	for (int i = 0; i < l21; i++) {
+		double preal = 0.0;
+		const int nz = c2r_cnt[i];
+		for (int k = 0; k < nz; k++) {
+			const int j = c2r_cols[2 * i + k];
+			preal += c2r_re[2 * i + k] * pc_re[j] - c2r_im[2 * i + k] * pc_im[j];
+		}
+		out[(size_t)i * nfps] = preal * nf;
 	}
-	if (threadIdx.x == 0) atomicAdd(&inner[atom], red[0]);
-}
-
-//p is laid out atom-major with imu striding by nfps, which is what the caller reads
-__global__ void normalise_kernel(const int natoms, const int l21, const int nfps,
-	const double* __restrict__ out, const double* __restrict__ inner,
-	double* __restrict__ p, int* __restrict__ empty)
-{
-	const int atom = blockIdx.y;
-	const int idx = blockIdx.x * blockDim.x + threadIdx.x;
-	if (atom >= natoms || idx >= nfps * l21) return;
-	const int i = idx / l21;
-	const int imu = idx % l21;
-	const double in = inner[atom];
-	//An empty environment gives an all-zero descriptor; zero is the meaningful answer
-	const double nf = (in > 0.0) ? rsqrt(in) : 0.0;
-	if (in <= 0.0 && idx == 0) atomicAdd(empty, 1);
-	p[(size_t)atom * l21 * nfps + i + imu * nfps] = out[((size_t)atom * nfps + i) * l21 + imu] * nf;
 }
 
 }
@@ -197,21 +146,19 @@ void salted_gpu_clear_cache()
 	g_descriptor_cache.clear();
 }
 
-bool salted_gpu_equicomb(const salted_gpu_problem& q, int* empty_environments)
+bool salted_gpu_equicomb(const salted_gpu_problem& q)
 {
-	if (q.natoms <= 0 || q.featsize <= 0 || q.nfps <= 0 || q.l21 <= 0) return false;
+	if (q.natoms <= 0 || q.shells <= 0 || q.nfps <= 0 || q.l21 <= 0) return false;
 	if (q.l21 > SALTED_MAX_L21) return false;
 	if (!salted_gpu_available()) return false;
 
-	const size_t out_bytes = sizeof(double) * (size_t)q.natoms * q.nfps * q.l21;
-	const size_t inner_bytes = sizeof(double) * (size_t)q.natoms;
+	const size_t p_bytes = sizeof(double) * (size_t)q.natoms * q.nfps * q.l21;
 	size_t freeb = 0, totalb = 0;
 	if (gpuMemGetInfo(&freeb, &totalb) != gpuSuccess) return false;
-	if (out_bytes + inner_bytes + (1u << 27) > freeb) return false;
+	if (p_bytes + (1u << 27) > freeb) return false;
 
-	double *d_w3j = nullptr, *d_c2r_re = nullptr, *d_c2r_im = nullptr;
-	double *d_out = nullptr, *d_inner = nullptr, *d_p = nullptr;
-	int *d_ll0 = nullptr, *d_ll1 = nullptr, *d_runs = nullptr, *d_cols = nullptr, *d_cnt = nullptr, *d_sel = nullptr, *d_empty = nullptr;
+	double *d_w3j = nullptr, *d_c2r_re = nullptr, *d_c2r_im = nullptr, *d_nf = nullptr, *d_p = nullptr;
+	int *d_ll0 = nullptr, *d_ll1 = nullptr, *d_runs = nullptr, *d_cols = nullptr, *d_cnt = nullptr, *d_vfps = nullptr;
 
 	if (!g_descriptor_cache.upload(q)) return false;
 	GPU_TRY(gpuMalloc(&d_w3j, sizeof(double) * (size_t)q.w3j_len));
@@ -230,45 +177,27 @@ bool salted_gpu_equicomb(const salted_gpu_problem& q, int* empty_environments)
 	GPU_TRY(gpuMemcpy(d_c2r_im, q.c2r_im, sizeof(double) * 2 * (size_t)q.l21, gpuMemcpyHostToDevice));
 	GPU_TRY(gpuMalloc(&d_cnt, sizeof(int) * (size_t)q.l21));
 	GPU_TRY(gpuMemcpy(d_cnt, q.c2r_cnt, sizeof(int) * (size_t)q.l21, gpuMemcpyHostToDevice));
-	GPU_TRY(gpuMalloc(&d_sel, sizeof(int) * (size_t)q.featsize));
-	GPU_TRY(gpuMemcpy(d_sel, q.sel, sizeof(int) * (size_t)q.featsize, gpuMemcpyHostToDevice));
-	GPU_TRY(gpuMalloc(&d_out, out_bytes));
-	GPU_TRY(gpuMalloc(&d_inner, inner_bytes));
-	GPU_TRY(gpuMalloc(&d_p, sizeof(double) * (size_t)q.natoms * q.l21 * q.nfps));
-	GPU_TRY(gpuMalloc(&d_empty, sizeof(int)));
-	GPU_TRY(gpuMemset(d_inner, 0, inner_bytes));
-	GPU_TRY(gpuMemset(d_empty, 0, sizeof(int)));
+	GPU_TRY(gpuMalloc(&d_vfps, sizeof(int) * (size_t)q.nfps));
+	GPU_TRY(gpuMemcpy(d_vfps, q.vfps, sizeof(int) * (size_t)q.nfps, gpuMemcpyHostToDevice));
+	GPU_TRY(gpuMalloc(&d_nf, sizeof(double) * (size_t)q.natoms));
+	GPU_TRY(gpuMemcpy(d_nf, q.normfact, sizeof(double) * (size_t)q.natoms, gpuMemcpyHostToDevice));
+	GPU_TRY(gpuMalloc(&d_p, p_bytes));
+	GPU_TRY(gpuMemset(d_p, 0, p_bytes));
 
-	//total_terms is the length w3j is consumed to; the runs table ends at it
-	int total_terms = 0;
-	for (int r = 0; r < q.llmax * q.l21; r++)
-		total_terms = std::max(total_terms, q.runs[4 * r + 3] + q.runs[4 * r + 2]);
-	const size_t shmem = sizeof(double) * (2 * (size_t)total_terms + 256);
-	//Shared holds the whole Wigner-weighted v1 for one (atom, n1)
-	if (shmem > 96u * 1024u) return false;
-	const dim3 thr(256), grid(q.nrad1, q.natoms);
-	equicomb_kernel<<<grid, thr, shmem>>>(q.natoms, q.nrad2, q.llmax, q.l21,
-		q.featsize, q.nfps, q.v2_is_conj_of_v1, total_terms,
+	const dim3 thr(128), grid((q.nfps + 127) / 128, q.natoms);
+	equicomb_kernel<<<grid, thr>>>(q.natoms, q.nrad2, q.llmax, q.l21,
+		q.shells, q.nfps, q.v2_is_conj_of_v1,
 		g_descriptor_cache.d_v1, g_descriptor_cache.d_v1off, q.v1_nchannels,
 		g_descriptor_cache.d_v2, g_descriptor_cache.d_v2off, q.v2_nchannels,
-		d_w3j, d_ll0, d_ll1, d_runs, d_cols, d_c2r_re, d_c2r_im, d_cnt, d_sel,
-		d_out, d_inner);
-	GPU_TRY(gpuGetLastError());
-
-	const int nrm = q.nfps * q.l21;
-	const dim3 nthr(256), ngrid((nrm + 255) / 256, q.natoms);
-	normalise_kernel<<<ngrid, nthr>>>(q.natoms, q.l21, q.nfps, d_out, d_inner, d_p, d_empty);
+		d_w3j, d_ll0, d_ll1, d_runs, d_cols, d_c2r_re, d_c2r_im, d_cnt, d_vfps, d_nf, d_p);
 	GPU_TRY(gpuGetLastError());
 	GPU_TRY(gpuDeviceSynchronize());
 
-	GPU_TRY(gpuMemcpy(q.p, d_p, sizeof(double) * (size_t)q.natoms * q.l21 * q.nfps, gpuMemcpyDeviceToHost));
-	int host_empty = 0;
-	GPU_TRY(gpuMemcpy(&host_empty, d_empty, sizeof(int), gpuMemcpyDeviceToHost));
-	if (empty_environments) *empty_environments += host_empty;
+	GPU_TRY(gpuMemcpy(q.p, d_p, p_bytes, gpuMemcpyDeviceToHost));
 
 	gpuFree(d_w3j); gpuFree(d_ll0); gpuFree(d_ll1); gpuFree(d_runs);
 	gpuFree(d_cols); gpuFree(d_c2r_re); gpuFree(d_c2r_im); gpuFree(d_cnt);
-	gpuFree(d_sel); gpuFree(d_out); gpuFree(d_inner); gpuFree(d_p); gpuFree(d_empty);
+	gpuFree(d_vfps); gpuFree(d_nf); gpuFree(d_p);
 	return true;
 }
 

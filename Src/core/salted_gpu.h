@@ -4,9 +4,9 @@
 #include <cstddef>
 #include <cstdint>
 
-//GPU SALTED equicomb, the CPU walk exactly: per atom and shell triple (n1, n2, il) the Wigner-weighted
-//v1 block is contracted with v2 over the surviving m pairs and made real; the normalisation sums
-//every feature, only the sparsified ones are written.
+//GPU SALTED equicomb, the CPU walk exactly: per atom and selected shell triple (n1, n2, il) the
+//Wigner-weighted v1 block is contracted with v2 over the surviving m pairs and made real. Only the
+//nfps sparsified features are built; the per-atom norm comes from the host.
 
 struct salted_gpu_problem {
 	int natoms = 0;
@@ -15,7 +15,7 @@ struct salted_gpu_problem {
 	int llmax = 0;
 	int lam = 0;
 	int l21 = 0;              //2 * lam + 1
-	int featsize = 0;         //nrad1 * nrad2 * llmax
+	int shells = 0;           //nrad1 * nrad2 * llmax; vfps entries past it are zero features
 	int nfps = 0;             //sparsified output features
 	bool v2_is_conj_of_v1 = false;
 
@@ -42,8 +42,8 @@ struct salted_gpu_problem {
 	const double* c2r_re = nullptr;
 	const double* c2r_im = nullptr;
 	const int* c2r_cnt = nullptr;
-	//sel[ifeat] is the output slot for that shell triple, or -1
-	const int* sel = nullptr;
+	const int* vfps = nullptr;           //[nfps] shell triple (n1*nrad2+n2)*llmax+il per output slot
+	const double* normfact = nullptr;    //[natoms] 1/|feature vector| over all shells, 0 if empty
 
 	double* p = nullptr;                 //[natoms * l21 * nfps], the caller's buffer
 };
@@ -54,6 +54,6 @@ bool salted_gpu_available();
 void salted_gpu_clear_cache();
 
 //Whole lambda block; false means fall back to the CPU.
-bool salted_gpu_equicomb(const salted_gpu_problem& prob, int* empty_environments);
+bool salted_gpu_equicomb(const salted_gpu_problem& prob);
 
 NOSPHERA2_GPU_API_END

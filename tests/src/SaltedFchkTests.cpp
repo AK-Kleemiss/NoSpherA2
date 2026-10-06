@@ -981,6 +981,67 @@ TEST(SaltedFchkEquicombTests, EmptyEnvironmentGivesZeros)
 	EXPECT_FALSE(std::isnan(sparse[0]));
 }
 
+// lam = 2 over every (l1, l2) up to 3 that couples to it, unequal channel counts: the sparse path builds only the
+// selected features and takes the norm from per-l density matrices, so a subset in shuffled order, with slots past
+// nrad1*nrad2*llmax, must still equal the dense path that builds and normalises all of them. Both conj forms, and
+// the device when one is present (it falls back to the CPU otherwise)
+TEST(SaltedFchkEquicombTests, SelectedFeaturesMatchDenseLam2)
+{
+	const int natoms = 3, nrad1 = 3, nrad2 = 2, lam = 2, l21 = 5, lmax = 3;
+	SALTEDDescriptors v1(natoms, nrad1, lmax), v2(natoms, nrad2, lmax);
+	double seed = 0.61;
+	auto next = [&seed]()
+	{
+		seed = std::fmod(seed * 7.31 + 0.113, 1.0);
+		return seed - 0.5;
+	};
+	for (auto& x : v1.values())
+		x = cdouble(next(), next());
+	for (auto& x : v2.values())
+		x = cdouble(next(), next());
+	ivec2 llvec(2);
+	for (int l1 = 0; l1 <= lmax; l1++)
+		for (int l2 = 0; l2 <= lmax; l2++)
+			if (std::abs(l1 - l2) <= lam && lam <= l1 + l2)
+			{
+				llvec[0].push_back(l1);
+				llvec[1].push_back(l2);
+			}
+	const int llmax = static_cast<int>(llvec[0].size());
+	vec w3j(4000);
+	for (double& w : w3j)
+		w = next();
+	cvec2 c2r = SALTED_Utils::complex_to_real_transformation({ l21 })[0];
+	const bool gpu_before = equicomb_gpu_enabled();
+	for (const bool conj : { false, true })
+	{
+		const int n2 = conj ? nrad1 : nrad2;
+		const SALTEDDescriptors& u = conj ? v1 : v2;
+		const int shells = nrad1 * n2 * llmax, featsize = shells + 4;
+		vec dense(static_cast<size_t>(natoms) * l21 * featsize, 0.0);
+		equicomb_set_gpu(false);
+		equicomb(natoms, nrad1, n2, v1, u, w3j, llmax, llvec, lam, c2r, featsize, dense, conj);
+		std::vector<int64_t> vfps;
+		for (int f = shells + 3; f >= 0; f -= 3)
+			vfps.push_back(f);
+		const int nfps = static_cast<int>(vfps.size());
+		for (const bool gpu : { false, true })
+		{
+			equicomb_set_gpu(gpu);
+			vec sub(static_cast<size_t>(natoms) * l21 * nfps, 7.0);
+			equicomb(natoms, nrad1, n2, v1, u, w3j, llvec, lam, c2r, featsize, nfps, vfps, sub, conj);
+			for (int iat = 0; iat < natoms; iat++)
+				for (int imu = 0; imu < l21; imu++)
+					for (int i = 0; i < nfps; i++)
+					{
+						const double want = vfps[i] < shells ? dense[iat * l21 * featsize + imu * featsize + vfps[i]] : 0.0;
+						EXPECT_NEAR(sub[iat * l21 * nfps + imu * nfps + i], want, 1e-13) << conj << gpu << iat << imu << i;
+					}
+		}
+	}
+	equicomb_set_gpu(gpu_before);
+}
+
 // --------------------------------------------------------- SALTED_predictor
 
 // a coefficient file with an auxiliary basis needs no model: the aux wavefunction is built and the npy returned as is
