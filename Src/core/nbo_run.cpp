@@ -3,6 +3,7 @@
 #include "nbo_run.h"
 #include "convenience.h"
 #include "wfn_class.h"
+#include <occ/3rdparty/subprocess.hpp>
 
 #include <algorithm>
 #include <chrono>
@@ -830,31 +831,25 @@ NboComparison compare_nbo_results(const NboResults& ref, const NboResults& cand,
 }
 
 namespace {
-	//POSIX single quotes take everything literally except ' itself, which closes, escapes and reopens
-	std::string sh_quote(const std::string& s) {
-		std::string q = "'";
-		for (const char c : s) q += c == '\'' ? std::string("'\\''") : std::string(1, c);
-		return q + "'";
-	}
-
-	//gennbo wants a stem in its own working directory. On Windows the licensed binary lives in
-	//WSL, so the whole call is handed over with the path translated.
-	std::string gennbo_command(const std::filesystem::path& dir, const std::string& stem, const std::string& exe) {
+	//gennbo wants a stem in its own working directory: argv for a process started in dir, no shell, so
+	//neither the -nbo_exe path nor the file name can inject a command. On Windows the licensed binary
+	//lives in WSL (default, or -nbo_exe wsl:<path>); bash gets dir, stem and binary as $1..$3 and never
+	//splices them into its script. wsl -e skips the default shell, which would re-split the arguments.
+	//The binary comes last and is left out when empty: Windows argv quoting drops an empty argument.
+	std::vector<std::string> gennbo_argv([[maybe_unused]] const std::filesystem::path& dir,const std::string& stem, const std::string& exe) {
 #ifdef _WIN32
-		if (exe.empty() || exe.rfind("wsl", 0) == 0) {
+		if (exe.empty() || exe.rfind("wsl:", 0) == 0) {
 			std::string wsl_dir = std::filesystem::absolute(dir).string();
 			std::replace(wsl_dir.begin(), wsl_dir.end(), '\\', '/');
 			if (wsl_dir.size() > 1 && wsl_dir[1] == ':')
 				wsl_dir = "/mnt/" + std::string(1, static_cast<char>(std::tolower(wsl_dir[0]))) + wsl_dir.substr(2);
-			const std::string bin = exe.empty() ? "~/nbo7/gennbo" : exe;
-			return "wsl bash -lc \"cd " + sh_quote(wsl_dir) + " && " + bin + " " + sh_quote(stem) + "\"";
+			std::vector<std::string> argv = { "wsl", "-e", "bash", "-lc",
+				R"(cd "$1" && exec "${3:-$HOME/nbo7/gennbo}" "$2")", "gennbo", wsl_dir, stem };
+			if (exe.size() > 4) argv.push_back(exe.substr(4));
+			return argv;
 		}
-		//cmd /c drops the first and the last quote of a line with more than two, hence the outer pair
-		return "\"\"" + exe + "\" \"" + (dir / stem).string() + "\"\"";
-#else
-		const std::string bin = exe.empty() ? "gennbo" : exe;
-		return "cd " + sh_quote(std::filesystem::absolute(dir).string()) + " && " + bin + " " + sh_quote(stem);
 #endif
+		return { exe.empty() ? "gennbo" : exe, stem };
 	}
 }
 
@@ -876,10 +871,20 @@ int run_nbo(const NboRunOptions& o, std::ostream& log) {
 	//a .nbo left by an earlier run would be parsed as this run's output
 	std::error_code ec;
 	std::filesystem::remove(out, ec);
-	const std::string command = gennbo_command(dir, stem, o.executable);
-	log << "Running: " << command << std::endl;
+	const std::vector<std::string> argv = gennbo_argv(dir, stem, o.executable);
+	log << "Running in " << dir.string() << ":";
+	for (const auto& a : argv) log << " " << a;
+	log << std::endl;
 	t0 = std::chrono::steady_clock::now();
-	const int rc = std::system(command.c_str()); /* Flawfinder: ignore - the NBO binary and a path we built */
+	int rc = -1;
+	try {
+		subprocess::RunOptions run;
+		run.cwd = std::filesystem::absolute(dir).string();
+		rc = subprocess::run(argv, run).returncode;
+	}
+	catch (const std::exception& e) {
+		log << "Could not start " << argv[0] << ": " << e.what() << std::endl;
+	}
 	const double nbo_seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
 	if (rc != 0) log << "NBO returned " << rc << "; parsing whatever output exists" << std::endl;
 	err_checkf(std::filesystem::exists(out), "NBO produced no " + out.string(), log);

@@ -248,7 +248,7 @@ All of these need a contracted basis, so `.gbw`, `.fchk` or `.molden` — not
 | `-nbo_parse <file>` | 1 | | Parse an existing `gennbo` output. |
 | `-convert_to_47 <wfn>` | 1 | | Write the `.47` archive and stop. |
 | `-nbo_keywords <"...">` | 1 | | Extra `$NBO` keylist entries. |
-| `-nbo_exe <path>` | 1 | | The `gennbo` executable. |
+| `-nbo_exe <path>` | 1 | | The `gennbo` executable. On Windows, `wsl:<path>` names a binary inside WSL. |
 | `-nbo_dir <dir>` | 1 | | Working directory for the external run. |
 | `-nbo_json <file>` | 1 | | Write the analysis as JSON. |
 | `-nbo_47 <file>` | 1 | | Name for the written `.47`. |
