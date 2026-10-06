@@ -194,6 +194,28 @@ inline double fast_exp_neg(double x) {
 	return x;
 }
 
+// sin and cos from one shared argument reduction, for MSVC ARM64: no SVML there, and the CRT reduces
+// twice. Not for x64, where /fp:fast already fuses sin+cos into SVML calls that beat this. Cody-Waite reduction by pi/2 and the FreeBSD k_sin/k_cos kernels: <= 2.2e-16
+// absolute error for |x| < 1e5; larger or non-finite x goes to the CRT.
+inline void sincos_shared(const double x, double* s, double* c) {
+	if (!(std::abs(x) < 1e5)) { *s = std::sin(x); *c = std::cos(x); return; }
+	const double q = std::nearbyint(x * 0.63661977236758134308);
+	const double r = ((x - q * 1.57079632673412561417e+00) - q * 6.07710050630396597660e-11) - q * 2.02226624871116645580e-21;
+	const double z = r * r;
+	const double sr = r + r * z * (-1.66666666666666324348e-01 + z * (8.33333333332248946124e-03 + z * (-1.98412698298579493134e-04 +
+		z * (2.75573137070700676789e-06 + z * (-2.50507602534068634195e-08 + z * 1.58969099521155010221e-10)))));
+	const double hz = 0.5 * z, w = 1.0 - hz;
+	const double cr = w + (((1.0 - w) - hz) + z * z * (4.16666666666666019037e-02 + z * (-1.38888888888741095749e-03 +
+		z * (2.48015872894767294178e-05 + z * (-2.75573143513906633035e-07 + z * (2.08757232129817482790e-09 +
+		z * -1.13596475577881948265e-11))))));
+	switch (static_cast<long long>(q) & 3) {
+	case 0: *s = sr; *c = cr; break;
+	case 1: *s = cr; *c = -sr; break;
+	case 2: *s = -sr; *c = -cr; break;
+	default: *s = -cr; *c = sr; break;
+	}
+}
+
 namespace sha
 {
 	// Rotate right operation

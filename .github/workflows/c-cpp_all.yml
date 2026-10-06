@@ -66,6 +66,22 @@ jobs:
             artifact-path: artifacts/NoSpherA2-windows-x64.zip
             artifact-name: NoSpherA2-windows-x64
 
+          # oneMKL has no ARM64 build; this one links conda-forge OpenBLAS
+          # (environment-win-arm64.yaml) and uses vcomp for OpenMP.
+          # Disabled for now: its tests run 5-8x slower than x64 (XCW) and
+          # ArmPL cannot be fetched by CI (Arm's CDN refuses scripted downloads).
+          # - name: Windows arm64 Release
+          #   os: windows-11-arm
+          #   configure-preset: release-windows-arm64
+          #   build-preset: release-windows-arm64
+          #   test-preset: release-windows-arm64
+          #   build-directory: build/release-windows-arm64
+          #   architecture: arm64
+          #   msvc-arch: arm64
+          #   shell: pwsh
+          #   artifact-path: artifacts/NoSpherA2-windows-arm64.zip
+          #   artifact-name: NoSpherA2-windows-arm64
+
           - name: macOS arm64 Release
             os: macos-15
             configure-preset: release-macos-arm64
@@ -226,18 +242,20 @@ jobs:
           PY
 
       # Ninja uses whichever compiler environment is active. On Windows,
-      # initialize the x64 MSVC environment before configuring CMake.
-      - name: Initialize MSVC x64 environment
+      # initialize the MSVC environment before configuring CMake.
+      - name: Initialize MSVC ${{ matrix.msvc-arch || 'x64' }} environment
         if: runner.os == 'Windows'
         uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1
         with:
-          arch: x64
+          arch: ${{ matrix.msvc-arch || 'x64' }}
 
       - name: Show toolchain
         run: |
           cmake --version
           ninja --version
           git --version
+        # windows-11-arm may not ship ninja; the build takes it from the micromamba env
+        continue-on-error: true
 
       - name: Show MSVC compiler
         if: runner.os == 'Windows'
@@ -346,9 +364,13 @@ jobs:
       - name: Build
         run: cmake --build --preset "${{ matrix.build-preset }}" --parallel 4
 
+      # The stats go to the run overview here, not from the action's own summary
+      # (zeros, see above); always() also covers a run cancelled during Build
       - name: Stop sccache
         if: always()
-        run: sccache --stop-server
+        shell: bash
+        run: |
+          { echo "### sccache, ${{ matrix.name }}"; echo '```'; sccache --stop-server; echo '```'; } | tee -a "$GITHUB_STEP_SUMMARY"
         continue-on-error: true
 
       - name: Save packed sccache
@@ -375,6 +397,10 @@ jobs:
           | xargs -r -n1 gh cache delete --repo "$GITHUB_REPOSITORY"
 
       - name: Run tests
+        # The pthreads OpenBLAS does not notice it is called inside an OpenMP region, as MKL does,
+        # and oversubscribes the cores; the code threads above BLAS anyway
+        env:
+          OPENBLAS_NUM_THREADS: ${{ matrix.name == 'Windows arm64 Release' && '1' || '' }}
         run: ctest --preset "${{ matrix.test-preset }}" --output-on-failure
 
       - name: Package Unix artifacts
@@ -410,8 +436,10 @@ jobs:
           path: ${{ matrix.artifact-path }}
           if-no-files-found: error
 
-      - name: Upload test logs after failure
-        if: failure()
+      # Every run, not just failures: LastTest.log holds the output of passing tests too
+      # (iteration counts, timings), which ctest prints only on failure
+      - name: Upload test logs
+        if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: test-logs-${{ matrix.artifact-name }}
