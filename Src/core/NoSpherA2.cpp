@@ -273,6 +273,27 @@ static int run_app_impl(int argc, char **argv)
 		fba_timer.lap("fba bondwise Laplacian");
 		ELI_analysis(read_wfn(), opt);
 		fba_timer.lap("fba QTAIM and ELI-D");
+		{
+			//Charges of the grid partitions, on a standard molecular grid: the basin grids carry no density.
+			//Labels as in the QTAIM/ELI-D tables, element plus 0-based wfn index.
+			WFN w = read_wfn();
+			w.delete_unoccupied_MOs();
+			GridConfiguration config;
+			config.accuracy = opt.accuracy;
+			config.all_charges = true;
+			GridManager grids(config);
+			ivec atoms(w.get_ncen());
+			std::iota(atoms.begin(), atoms.end(), 0);
+			grids.setup3DGridsForMolecule(w, atoms);
+			const PartitionResults charges = grids.calculatePartitionedCharges(w);
+			svec labels;
+			for (int a : atoms) labels.push_back(w.get_atom_label(a) + std::to_string(a));
+			const section_log::section part_file(opt.wfn, "partition", "Atomic charges: Becke, Hirshfeld, TFVC, MBIS and EMBIS partitions",
+				{ citations::Method::BeckeGrid, citations::Method::Hirshfeld, citations::Method::TFVC, citations::Method::MBIS, citations::Method::EMBIS }, opt.no_date);
+			const section_log::tee part_tee("partition", "Charges by partitioning scheme");
+			grids.printChargeTable(labels, w, atoms, std::cout, charges);
+		}
+		fba_timer.lap("fba partition charges");
 		//Rethrows whatever stopped the NBO side
 		nbo_done.get();
 		fba_timer.lap("fba waiting for NBO/NRT");
