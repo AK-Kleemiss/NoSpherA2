@@ -47,7 +47,12 @@
 #define lapack_complex_float std::complex<float>
 #define lapack_complex_double std::complex<double>
 #include <lapacke.h>
+#ifdef NSA2_ARMPL
+//serial armpl_lp64, nothing to set
+#define MKL_Set_Num_Threads(num) ((void)(num))
+#else
 #define MKL_Set_Num_Threads(num) openblas_set_num_threads(num)
+#endif
 #else
 // Linux/Windows with oneMKL
 #include <mkl.h>

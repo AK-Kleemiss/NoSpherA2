@@ -616,12 +616,35 @@ elseif(NOSPHERA2_OPENBLAS)
         PATHS "${MICROMAMBA_ENV_PREFIX}/Library/lib" NO_DEFAULT_PATH REQUIRED)
     find_file(NOSPHERA2_OPENBLAS_DLL NAMES openblas.dll libopenblas.dll
         PATHS "${MICROMAMBA_ENV_PREFIX}/Library/bin" NO_DEFAULT_PATH REQUIRED)
+    # Arm Performance Libraries in place of OpenBLAS when installed (CI sets the env variable).
+    # armpl_lp64 is the serial, /MD static library; its LAPACK is flang-built and needs the
+    # Fortran runtime libraries next to it.
+    set(NOSPHERA2_ARMPL_DIR "$ENV{NOSPHERA2_ARMPL_DIR}" CACHE PATH "Arm Performance Libraries root, empty for OpenBLAS")
+    if(NOSPHERA2_ARMPL_DIR)
+        find_path(NOSPHERA2_ARMPL_INCLUDE_DIR NAMES cblas.h lapacke.h
+            PATHS "${NOSPHERA2_ARMPL_DIR}/include" NO_DEFAULT_PATH REQUIRED)
+        find_library(NOSPHERA2_ARMPL_LIB armpl_lp64 PATHS "${NOSPHERA2_ARMPL_DIR}/lib" NO_DEFAULT_PATH REQUIRED)
+        set(_armpl_libs "${NOSPHERA2_ARMPL_LIB}")
+        foreach(_rt FortranRuntime FortranDecimal flang_rt.runtime)
+            find_library(NOSPHERA2_ARMPL_${_rt} ${_rt} PATHS "${NOSPHERA2_ARMPL_DIR}/lib" NO_DEFAULT_PATH)
+            if(NOSPHERA2_ARMPL_${_rt})
+                list(APPEND _armpl_libs "${NOSPHERA2_ARMPL_${_rt}}")
+            endif()
+        endforeach()
+        message(STATUS "BLAS/LAPACK: Arm Performance Libraries ${_armpl_libs}")
+        add_library(nosphera2_openblas INTERFACE IMPORTED)
+        set_target_properties(nosphera2_openblas PROPERTIES
+            INTERFACE_LINK_LIBRARIES "${_armpl_libs}"
+            INTERFACE_INCLUDE_DIRECTORIES "${NOSPHERA2_ARMPL_INCLUDE_DIR}"
+            INTERFACE_COMPILE_DEFINITIONS "NSA2_OPENBLAS;NSA2_ARMPL")
+    else()
     add_library(nosphera2_openblas SHARED IMPORTED)
     set_target_properties(nosphera2_openblas PROPERTIES
         IMPORTED_IMPLIB "${NOSPHERA2_OPENBLAS_IMPLIB}"
         IMPORTED_LOCATION "${NOSPHERA2_OPENBLAS_DLL}"
         INTERFACE_INCLUDE_DIRECTORIES "${NOSPHERA2_OPENBLAS_INCLUDE_DIR}"
         INTERFACE_COMPILE_DEFINITIONS NSA2_OPENBLAS)
+    endif()
 else()
     find_package(MKL CONFIG REQUIRED)
 endif()

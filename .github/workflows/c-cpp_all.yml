@@ -347,6 +347,26 @@ jobs:
             sccache-v4/${{ runner.os }}-${{ matrix.architecture }}/${{ steps.dependency-fingerprint.outputs.value }}/
             sccache-v4/${{ runner.os }}-${{ matrix.architecture }}/
 
+      # Arm Performance Libraries in place of OpenBLAS on Windows ARM64 (serial
+      # armpl_lp64); CMake picks them up from NOSPHERA2_ARMPL_DIR. The include
+      # and lib listings go to the log for when the library names change.
+      - name: Install Arm Performance Libraries
+        if: matrix.name == 'Windows arm64 Release'
+        shell: pwsh
+        run: |
+          $msi = Join-Path $env:RUNNER_TEMP 'armpl.msi'
+          Invoke-WebRequest -Uri 'https://developer.arm.com/-/cdn-downloads/permalink/Arm-Performance-Libraries/Version_26.01/arm-performance-libraries_26.01_Windows.msi' -OutFile $msi
+          $hash = (Get-FileHash $msi -Algorithm SHA256).Hash
+          if ($hash -ne '67B68177479103FD0799F0BEA7B893FC11DC67B332F26910BEBBB27E12527356') { throw "ArmPL MSI hash $hash" }
+          $log = Join-Path $env:RUNNER_TEMP 'armpl-install.log'
+          $p = Start-Process msiexec -ArgumentList '/i', $msi, '/quiet', '/norestart', 'ACCEPT_EULA=1', '/l*v', $log -Wait -PassThru
+          if ($p.ExitCode -ne 0) { Get-Content $log -Tail 60; throw "msiexec exit $($p.ExitCode)" }
+          $root = Get-ChildItem 'C:\Program Files\Arm Performance Libraries' -Directory | Select-Object -First 1
+          if (-not $root) { Get-Content $log -Tail 60; throw 'ArmPL root not found' }
+          Get-ChildItem (Join-Path $root.FullName 'include') -Name
+          Get-ChildItem (Join-Path $root.FullName 'lib') -Name
+          "NOSPHERA2_ARMPL_DIR=$($root.FullName)" >> $env:GITHUB_ENV
+
       # Configure a fresh build tree. sccache reuses individual compilation
       # results, so the CMake/Ninja tree itself does not need to be cached.
       - name: Configure

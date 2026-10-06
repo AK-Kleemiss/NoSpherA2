@@ -844,7 +844,9 @@ std::string NoSpherA2_message(bool no_date)
 		t.append("Please see, respectively:\n");
 		t.append("   https://github.com/Luthaf/featomic\n");
 		t.append("   https://github.com/lab-cosmo/metatensor\n");
-#ifdef NSA2_OPENBLAS
+#if defined(NSA2_ARMPL)
+		t.append("   This software utilizes Arm Performance Libraries (https://developer.arm.com/Tools%20and%20Software/Arm%20Performance%20Libraries) for optimized mathematical computations\n");
+#elif defined(NSA2_OPENBLAS)
 		t.append("   This software utilizes OpenBLAS (https://github.com/OpenMathLib/OpenBLAS) for optimized mathematical computations\n");
 #else
 		t.append("   This software utilizes Intel(c) Math Kernel Library (oneMKL), version 2025.2.0.629, for optimized mathematical computations\n");
