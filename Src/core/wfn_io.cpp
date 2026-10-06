@@ -2809,8 +2809,12 @@ bool WFN::read_fchk(const std::filesystem::path &filename, std::ostream &log, co
 	err_checkf(read_fchk_integer_block(fchk, "Atomic numbers", atnbrs), "Error reading atnbrs", log);
 	ncen = static_cast<int>(atnbrs.size());
 	atoms.resize(ncen);
+	//1-based like push_back_atom gives every other reader; RGBI indexes its per-atom blocks by get_nr() - 1
 	for (int i = 0; i < ncen; i++)
+	{
 		atoms[i].set_label(constants::atnr2letter(atnbrs[i]));
+		atoms[i].set_nr(i + 1);
+	}
 	vec charges;
 	err_checkf(read_fchk_double_block(fchk, "Nuclear charges", charges), "Error reading charges", log);
 	for (int i = 0; i < charges.size(); i++)
@@ -2971,6 +2975,50 @@ bool WFN::read_fchk(const std::filesystem::path &filename, std::ostream &log, co
 					push_back_cartesian_shell(i * nbas + j, l, shell, prims, basis_run, size, l == 3 ? gaussian_f_order : nullptr, cart_norm(l).data());
 				coef_run += n;
 				basis_run += size;
+			}
+		}
+	}
+	//DM over Int_Params' basis (per atom all s, then p, ...; libcint m order), which RGBI, NPA/NBO and Mulliken pair with
+	//their own overlap. Pure fchk components already carry the libcint phase, so only the order changes, as in the molden
+	//reader. A cartesian d/f/g shell has no place in that basis, so those files keep DM empty (warned above).
+	if (spherical_nbf == nbas)
+	{
+		ivec file_off(shell_types.size());
+		std::vector<ivec> atom_shells(ncen);
+		for (int s = 0, o = 0; s < static_cast<int>(shell_types.size()); s++)
+		{
+			file_off[s] = o;
+			o += constants::n_spher(abs(shell_types[s]));
+			atom_shells[shell2atom[s] - 1].push_back(s);
+		}
+		ivec perm(nbas, -1);
+		for (int a = 0, internal = 0; a < ncen; a++)
+			for (int l = 0; l <= 10; l++)
+				for (const int s : atom_shells[a])
+				{
+					if (abs(shell_types[s]) != l)
+						continue;
+					//p shells are x, y, z in an fchk, libcint (PYPZPX) wants y, z, x
+					for (int idx = 0; idx <= 2 * l; idx++)
+						perm[file_off[s] + idx] = internal + static_cast<int>(l == 1 ? std::array<int, 3>{2, 0, 1}[idx] : constants::orca_2_pySCF(l, idx).value());
+					internal += 2 * l + 1;
+				}
+		for (int i = 0; i < 2 && MOocc[i].size() > 0; i++)
+		{
+			const int nmo = static_cast<int>(MOocc[i].size());
+			dMatrix2 C(nmo, nbas);
+			for (int j = 0; j < nmo; j++)
+				for (int k = 0; k < nbas; k++)
+					C(j, perm[k]) = coef[i][j * nbas + k];
+			dMatrix2 D = dot(diag_dot(C, MOocc[i], true), C);
+			if (i == 0)
+				DM = D;
+			else
+			{
+				DM_beta = D;
+				for (int r = 0; r < nbas; r++)
+					for (int c = 0; c < nbas; c++)
+						DM(r, c) += D(r, c);
 			}
 		}
 	}

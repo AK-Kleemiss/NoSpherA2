@@ -23,8 +23,8 @@ int highest_shell_angular_momentum(const WFN& wavy);
 // Drop the per-process cache of free-atom densities (one per element+basis).
 void clear_rgbi_free_atom_cache();
 
-// Inputs RGBI runs on (.gbw, .molden), excluding the refused extension, for a refusal message.
-// A .wfn/.wfx carries no shell structure and a .fchk no contracted density matrix.
+// Inputs RGBI runs on (.gbw, .molden, pure-shell .fchk), excluding the refused extension, for a refusal message.
+// A .wfn/.wfx carries no shell structure and a cartesian .fchk no contracted density matrix.
 std::string rgbi_supported_input_phrase(const std::string& refused_extension);
 
 struct bond {

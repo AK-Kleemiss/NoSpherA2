@@ -315,7 +315,8 @@ TEST(NaoReaderConsistencyTests, ASphericalFchkBasisIsNormalised)
 		<< worst << " - e_origin::fchk has fallen out of its normalisation branch again";
 	//the basis Int_Params rebuilds from the shells must hold exactly the fchk's declared count
 	EXPECT_EQ(S.extent(0), size_t(228)) << "the fchk declares 228 basis functions";
-	//No Tr(P S) here: read_fchk leaves WFN::DM empty, the .47 writer builds its own density.
+	//read_fchk builds DM in Int_Params order, so a wrong component permutation shows up as a missing electron
+	EXPECT_NEAR(trace_PS(wavy), 48.0, 1e-4) << "alanine has 48 electrons";
 }
 
 TEST(NaoPrintTests, NoOccupancyIsPrintedAsANegativeZero)
