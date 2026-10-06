@@ -517,6 +517,23 @@ endif()
 # OCC
 # ---------------------------------------------------------------------------
 
+#MSVC does not define __ARM_NEON and Eigen 3.4's NEON code does not compile under it, so on Windows
+#ARM64 every Eigen kernel ran scalar. 5.0 compiles it; occ's own CPMAddPackage(eigen3) then reuses
+#this one and skips making the target.
+if(MSVC AND CMAKE_CXX_COMPILER_ARCHITECTURE_ID STREQUAL "ARM64")
+    include("${CMAKE_CURRENT_SOURCE_DIR}/occ/cmake/CPM.cmake")
+    CPMAddPackage(
+        NAME eigen3
+        URL "https://gitlab.com/libeigen/eigen/-/archive/5.0.1/eigen-5.0.1.zip"
+        DOWNLOAD_ONLY YES
+    )
+    add_library(Eigen3::Eigen INTERFACE IMPORTED GLOBAL)
+    target_include_directories(Eigen3::Eigen INTERFACE "${eigen3_SOURCE_DIR}")
+    target_compile_definitions(Eigen3::Eigen INTERFACE __ARM_NEON)
+    target_compile_options(Eigen3::Eigen INTERFACE
+        "$<$<COMPILE_LANGUAGE:CXX>:/FI${CMAKE_CURRENT_SOURCE_DIR}/cmake/eigen5_compat.h>")
+endif()
+
 set(USE_SYSTEM_LIBCINT ON)
 set(BUILD_FPIC ON)
 set(WITH_PYTHON_BINDINGS OFF)

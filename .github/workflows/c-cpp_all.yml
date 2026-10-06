@@ -391,6 +391,10 @@ jobs:
           | xargs -r -n1 gh cache delete --repo "$GITHUB_REPOSITORY"
 
       - name: Run tests
+        # The pthreads OpenBLAS does not notice it is called inside an OpenMP region, as MKL does,
+        # and oversubscribes the cores; the code threads above BLAS anyway
+        env:
+          OPENBLAS_NUM_THREADS: ${{ matrix.name == 'Windows arm64 Release' && '1' || '' }}
         run: ctest --preset "${{ matrix.test-preset }}" --output-on-failure
 
       - name: Package Unix artifacts
