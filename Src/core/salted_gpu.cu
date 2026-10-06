@@ -335,7 +335,14 @@ bool salted_gpu_equicomb(const salted_gpu_problem& q)
 	GPU_TRY(gpuGetLastError());
 	GPU_TRY(gpuDeviceSynchronize());
 
-	GPU_TRY(gpuMemcpy(q.p, d_p, p_bytes, gpuMemcpyDeviceToHost));
+	//Pin p in place for the copy: a pageable copy runs through the driver's single-threaded staging
+	//(66 MB in 14 ms on a V100 node), registering costs 2.4 + 1.0 ms and the copy then takes 5 ms.
+	//A pinned staging buffer of our own was no faster, its host-side memcpy is the same bottleneck
+	const bool pinned = gpuHostRegister(q.p, p_bytes) == gpuSuccess;
+	if (!pinned) (void)gpuGetLastError();
+	const gpuError_t copied = gpuMemcpy(q.p, d_p, p_bytes, gpuMemcpyDeviceToHost);
+	if (pinned) gpuHostUnregister(q.p);
+	GPU_TRY(copied);
 
 	gpuFree(d_w3j); gpuFree(d_ll0); gpuFree(d_ll1); gpuFree(d_runs);
 	gpuFree(d_cols); gpuFree(d_c2r_re); gpuFree(d_c2r_im); gpuFree(d_cnt);

@@ -37,6 +37,8 @@
 #define gpuMemcpyAsync hipMemcpyAsync
 #define gpuHostAlloc hipHostMalloc
 #define gpuFreeHost hipHostFree
+#define gpuHostRegister(p, n) hipHostRegister((p), (n), hipHostRegisterDefault)
+#define gpuHostUnregister hipHostUnregister
 //Kernels assume 32-lane warps (lane = threadIdx.x & 31); a gfx9 wavefront is 64, so shuffles pass
 //width 32 and act per half. Streaming load: non-temporal (slc bit), like __ldcs
 #define gpuShflDown32(v, o) __shfl_down((v), (o), 32)
@@ -74,6 +76,8 @@
 #define gpuMemcpyAsync cudaMemcpyAsync
 #define gpuHostAlloc(p, n) cudaHostAlloc((p), (n), cudaHostAllocDefault)
 #define gpuFreeHost cudaFreeHost
+#define gpuHostRegister(p, n) cudaHostRegister((p), (n), cudaHostRegisterDefault)
+#define gpuHostUnregister cudaHostUnregister
 #define gpuShflDown32(v, o) __shfl_down_sync(0xffffffffu, (v), (o))
 #define gpuShflXor32(v, m) __shfl_xor_sync(0xffffffffu, (v), (m))
 #define gpuLoadStreaming(p) __ldcs(p)
