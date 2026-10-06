@@ -135,6 +135,9 @@
     <ClCompile Include="..\..\tests\src\MoldenConventionTests.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\tests\src\IboTests.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\tests\src\NaoTests.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

@@ -5333,6 +5333,9 @@
     <ClCompile Include="..\..\Src\core\eli_family.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Src\core\ibo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Src\core\nao.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

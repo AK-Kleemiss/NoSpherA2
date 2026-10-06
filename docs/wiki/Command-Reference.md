@@ -170,6 +170,7 @@ is a separate flag and several can be written in one run.
 | `-def` | 0 | off | Static deformation density. Also `-DEF`. |
 | `-HDEF` | 0 | off | Hirshfeld deformation density. Also `-hdef`. |
 | `-MO <n>\|all` | 1 | | One molecular orbital, or every one. Repeat for several. |
+| `-ibo_cube <list>` | 1 | | Runs `-ibo` and writes `<wfn>_IBO_<n>.cube` for the IBOs in `<list>`: the numbers `-ibo` prints, `all`, or `C2:C3` (every bond-like IBO between atoms 2 and 3, labels 1-based, element optional), comma-separated, e.g. `6,C2:C3`. Same grid as `-MO`. |
 | `-s_rho` | 0 | off | Spin density. |
 | `-fukui` | 0 | off | Fukui function. Also `-Fukui`. Needs the virtual orbitals. |
 | `-esp_isosurface [v]` | 0-1 | `0.002` when bare, else off | ESP mapped onto a density isosurface at value `v`. |
@@ -233,7 +234,9 @@ Localised-orbital bonding descriptors. Two independent routes:
   result. `-nbo_parse` parses an existing output.
 
 `-rgbi` is a separate scheme (resonance-group bond indices) and `-npa` gives
-natural population analysis on its own.
+natural population analysis on its own. `-ibo` gives IAO partial charges and
+intrinsic bond orbitals (Knizia, JCTC 9 (2013) 4834) against the MINAO
+reference basis, closed shell only.
 
 All of these need a contracted basis, so `.gbw`, `.fchk` or `.molden` — not
 `.wfn`/`.wfx`.
@@ -264,6 +267,7 @@ All of these need a contracted basis, so `.gbw`, `.fchk` or `.molden` — not
 | `-nrt_no_ion` | 0 | off | Exclude ionic structures. |
 | `-npa` | 0 | off | Natural population analysis with the per-orbital table. |
 | `-npa_summary` | 0 | off | NPA, totals only. |
+| `-ibo` | 0 | off | IAO charges and IBOs (Pipek-Mezey-like, exponent 4, 2x2 Jacobi), listed as core / lone pair / bond-like / delocalised with IAO and Mulliken populations per atom. Closed-shell `.gbw` or spherical `.molden`; refuses unrestricted. `-ibo_cube` writes them as cubes. |
 | `-rgbi` | 0 | off | Resonance-group bond indices. |
 | `-rgbi_groups <"i,j,k"> [...]` | 1+ | | Explicit atom groups (comma-separated, per group). |
 | `-rgbi_basis nao\|ano` | 1 | `ano` | Orbital basis used for RGBI. |

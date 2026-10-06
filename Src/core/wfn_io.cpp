@@ -718,7 +718,7 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
 	//Every consumer of DM pairs it with an Int_Params overlap, whose shells are sorted by l with libcint component order;
 	//the molden lists shells in file order and a pure shell in ORCA's m order, so the coefficients are permuted as in the gbw reader.
 	if (spherical) {
-		ivec perm(expected_coefs, -1);
+		ivec perm(expected_coefs, -1), sph_row(expected_coefs, -1);
 		int file_idx = 0, internal = 0;
 		for (int a = 0; a < ncen; a++) {
 			ivec shell_l;
@@ -738,12 +738,13 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
 						internal += 2 * l + 1;
 					}
 			for (size_t sh = 0; sh < shell_l.size(); sh++) {
-				const int l = shell_l[sh];
+				const int l = shell_l[sh], shell_start = file_idx;
 				for (int idx = 0; idx <= 2 * l; idx++) {
 					//l = 1 is the one shell the file writes cartesian whatever the [5D] flags
 					const std::optional<std::size_t> to = (l == 1) ? std::optional<std::size_t>(std::array<std::size_t, 3>{2, 0, 1}[idx])
 						: constants::orca_2_pySCF(l, idx);
 					err_checkf(to.has_value(), "No component order known for l = " + to_string(l) + " in " + filename.string(), file);
+					sph_row[file_idx] = shell_start + static_cast<int>(to.value());
 					perm[file_idx++] = internal_off[sh] + static_cast<int>(to.value());
 				}
 			}
@@ -751,9 +752,13 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
 		err_checkf(file_idx == expected_coefs && internal == expected_coefs,
 			"Molden basis walk found " + to_string(file_idx) + "/" + to_string(internal) + " of " + to_string(expected_coefs) + " basis functions", file);
 		dMatrix2 reordered(nmo, expected_coefs);
+		//MO_sph in read_gbw's layout (file shell order, libcint m order), for -ibo
+		MO_sph = dMatrix2(expected_coefs, nmo);
 		for (int mo = 0; mo < nmo; mo++)
-			for (int i = 0; i < expected_coefs; i++)
+			for (int i = 0; i < expected_coefs; i++) {
 				reordered(mo, perm[i]) = m_coefs(mo, i);
+				MO_sph(sph_row[i], mo) = m_coefs(mo, i);
+			}
 		m_coefs = reordered;
 	}
 	dMatrix2 temp_co = diag_dot(m_coefs, occ, true);
