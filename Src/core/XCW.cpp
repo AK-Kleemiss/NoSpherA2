@@ -2494,7 +2494,7 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 			cvec blk;
 			if (i_streamed_ || i_float_) blk.assign(i_compact_, cdouble{});
 
-#if !defined(__APPLE__)
+#if !defined(__APPLE__) && !defined(NSA2_OPENBLAS)
 			mkl_set_num_threads_local(1);
 #endif
 #if defined(__SSE2__) || defined(_M_X64)
@@ -2558,6 +2558,11 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 #if defined(__APPLE__)
 						for (int p = 0; p < points[g]; p++) {
 							__sincos(angles[p], &sines[p], &cosines[p]);
+						}
+#elif defined(NSA2_OPENBLAS)
+						for (int p = 0; p < np_g; p++) {
+							sines[p] = std::sin(angles[p]);
+							cosines[p] = std::cos(angles[p]);
 						}
 #else
 						vdSinCos(np_g, angles, sines, cosines);

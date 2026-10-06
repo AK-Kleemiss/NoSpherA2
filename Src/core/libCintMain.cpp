@@ -6,7 +6,7 @@
 #if defined(__APPLE__)
 // On macOS we are using Accelerate for BLAS/LAPACK
 #include <Accelerate/Accelerate.h>
-#else
+#elif !defined(NSA2_OPENBLAS)
 // Linux/Windows with oneMKL
 #include <mkl.h>
 #endif

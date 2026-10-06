@@ -844,7 +844,11 @@ std::string NoSpherA2_message(bool no_date)
 		t.append("Please see, respectively:\n");
 		t.append("   https://github.com/Luthaf/featomic\n");
 		t.append("   https://github.com/lab-cosmo/metatensor\n");
+#ifdef NSA2_OPENBLAS
+		t.append("   This software utilizes OpenBLAS (https://github.com/OpenMathLib/OpenBLAS) for optimized mathematical computations\n");
+#else
 		t.append("   This software utilizes Intel(c) Math Kernel Library (oneMKL), version 2025.2.0.629, for optimized mathematical computations\n");
+#endif
 		t.append("OCC can be found at: https://github.com/peterspackman/occ\n");
 		t.append("OCC was published at        : Spackman et al. OCC, Zenodo 2026, doi:10.5281/zenodo.10703204.\n");
 		t.append("NoSpherA2 was published at  : Kleemiss et al. Chem. Sci., 2021, 12, 1675 - 1692.\n");
