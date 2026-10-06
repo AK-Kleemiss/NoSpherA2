@@ -1604,8 +1604,6 @@ void DensityFitting::analyze_density_fit_quality(
 			<< "carried by the neighbours' functions, not a failure of the fit."
 			<< std::endl;
 
-	const size_t n_aux = coefficients.size();
-	const vec2 population_rows = atomic_population_rows(aux_density);
 	const bool has_expected =
 		expected_populations.size() == (size_t)wavy_aux.get_ncen();
 
@@ -1616,9 +1614,12 @@ void DensityFitting::analyze_density_fit_quality(
 	for (int a = 0; a < wavy_aux.get_ncen(); ++a) {
 		const atom A = wavy_aux.get_atom(a);
 
+		//The s shells on atom a directly: atomic_population_rows() is natoms x n_aux dense,
+		//which made this loop quadratic (14 s of a 25 s run at 12032 atoms)
 		double explicit_population = 0.0;
-		for (size_t i = 0; i < n_aux; ++i)
-			explicit_population += population_rows[a][i] * coefficients[i];
+		for (int s = aux_density.sh_start[a]; s < aux_density.sh_start[a + 1]; ++s)
+			if (aux_density.sh_l[s] == 0)
+				explicit_population += aux_density.shell_population_integral(s) * coefficients[aux_density.coef_off[s]];
 
 		// Report conventional all-electron populations/charges by adding ECP
 		// core electrons back after integrating the fitted explicit density.
