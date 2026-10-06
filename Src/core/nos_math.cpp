@@ -77,7 +77,7 @@ dMatrix2 elementWiseExponentiation(dMatrix2& matrix, double exponent)
 	vec result(matrix.size(), 0.0);
 	dMatrix2 result_m = reshape<dMatrix2>(result, Shape2D({ matrix.extent(0), matrix.extent(1) }));
 
-#ifdef __APPLE__
+#if defined(__APPLE__) || defined(__ANDROID__) // libc++ has no std::execution::par
 	std::transform(matrix.container().begin(), matrix.container().end(), result_m.data(), [exponent](double val)
 		{ return std::pow(val, exponent); });
 #else

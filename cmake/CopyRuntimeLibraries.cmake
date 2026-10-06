@@ -8,6 +8,11 @@ function(nosphera2_copy_runtime_libraries target)
         )
     endif()
 
+    # Android: TBB, OpenMP and OpenBLAS are linked statically; there is nothing to copy
+    if(ANDROID)
+        return()
+    endif()
+
     if(NOT TARGET TBB::tbb)
         message(FATAL_ERROR
             "nosphera2_copy_runtime_libraries(): "
