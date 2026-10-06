@@ -22,8 +22,11 @@ option(NOSPHERA2_BOOTSTRAP_GPU "Add a CUDA toolkit to the environment when an NV
 # present - for the CI runners and for a head node that builds for the compute nodes. The
 # CUDA version is only used when one is fetched; the CI pins it so the artifact covers the
 # same cards from one week to the next (see the arch list in the top-level CMakeLists.txt).
-set(NOSPHERA2_BOOTSTRAP_GPU_VENDOR "AUTO" CACHE STRING "GPU toolkit to fetch: AUTO, NVIDIA or AMD")
+# ALL sets up the fat CUDA + HIP build the CI ships: the CUDA toolkit plus AMD's ROCm SDK
+# wheels (hipBLAS included) in .mambaenv/rocm, unless a ROCm is installed already.
+set(NOSPHERA2_BOOTSTRAP_GPU_VENDOR "AUTO" CACHE STRING "GPU toolkit to fetch: AUTO, NVIDIA, AMD or ALL")
 set(NOSPHERA2_BOOTSTRAP_CUDA_VERSION "" CACHE STRING "cuda-version to pin when fetching the CUDA toolkit, e.g. 12.9")
+set(NOSPHERA2_BOOTSTRAP_ROCM_VERSION "10.0.0" CACHE STRING "rocm[devel] wheel version for NOSPHERA2_BOOTSTRAP_GPU_VENDOR=ALL (the CI's)")
 
 set(_mamba_root
     "${NOSPHERA2_SOURCE_DIR}/.mambaenv/root"
@@ -138,7 +141,29 @@ else()
             set(_gpu_vendor "${NOSPHERA2_BOOTSTRAP_GPU_VENDOR}")
             message(STATUS "GPU toolkit chosen by NOSPHERA2_BOOTSTRAP_GPU_VENDOR: ${_gpu_vendor}")
         endif()
-        if(_gpu_vendor STREQUAL "NVIDIA")
+        if(_gpu_vendor STREQUAL "ALL")
+            nosphera2_bootstrap_cuda_toolkit(
+                PREFIX      "${MICROMAMBA_ENV_PREFIX}"
+                ROOT_PREFIX "${MICROMAMBA_ROOT_PREFIX}"
+                EXECUTABLE  "${MICROMAMBA_EXECUTABLE}"
+                VERSION     "${NOSPHERA2_BOOTSTRAP_CUDA_VERSION}"
+            )
+            nosphera2_find_rocm(_rocm_hipcc)
+            if(_rocm_hipcc)
+                message(STATUS "ROCm already installed: ${_rocm_hipcc}")
+            else()
+                if(WIN32)
+                    set(_env_python "${MICROMAMBA_ENV_PREFIX}/python.exe")
+                else()
+                    set(_env_python "${MICROMAMBA_ENV_PREFIX}/bin/python")
+                endif()
+                nosphera2_bootstrap_rocm_sdk(
+                    PYTHON    "${_env_python}"
+                    DIRECTORY "${NOSPHERA2_SOURCE_DIR}/.mambaenv/rocm"
+                    VERSION   "${NOSPHERA2_BOOTSTRAP_ROCM_VERSION}"
+                )
+            endif()
+        elseif(_gpu_vendor STREQUAL "NVIDIA")
             nosphera2_bootstrap_cuda_toolkit(
                 PREFIX      "${MICROMAMBA_ENV_PREFIX}"
                 ROOT_PREFIX "${MICROMAMBA_ROOT_PREFIX}"

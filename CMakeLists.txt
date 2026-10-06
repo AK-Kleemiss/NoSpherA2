@@ -88,6 +88,15 @@ if(NOSPHERA2_GPU_AUTO AND NOT NOSPHERA2_USE_CUDA AND NOT NOSPHERA2_USE_HIP)
     #who named the backend deserves.
     set(_nosphera2_gpu_auto_enabled TRUE)
 endif()
+#NOSPHERA2_BOOTSTRAP_GPU_VENDOR=ALL asked for the CI's fat binary whatever card is here. Outside
+#the block above so a build directory that already has one backend gets the other.
+if(NOSPHERA2_GPU_AUTO AND EXISTS "${CMAKE_SOURCE_DIR}/.mambaenv/rocm/root.txt"
+   AND NOT (NOSPHERA2_USE_CUDA AND NOSPHERA2_USE_HIP))
+    set(NOSPHERA2_USE_CUDA ON CACHE BOOL "" FORCE)
+    set(NOSPHERA2_USE_HIP ON CACHE BOOL "" FORCE)
+    message(STATUS "GPU auto-detect: CUDA and HIP, the ROCm SDK of the ALL bootstrap is present")
+    set(_nosphera2_gpu_auto_enabled TRUE)
+endif()
 
 #The toolkit the bootstrap fetched, in preference to whatever is first on PATH. Without this
 #the build silently follows PATH: on a machine carrying both, the binary can end up importing
@@ -279,6 +288,17 @@ if(NOSPHERA2_USE_HIP)
     #from the CMAKE_PREFIX_PATH entries - never from PATH, where Visual Studio's own clang++
     #would be found first and cannot compile HIP.
     set(_nosphera2_hip_version "")
+    #The ROCm SDK wheels of the ALL bootstrap, handed over the way the CI does it
+    #(the prefix path every time - it is not cached, unlike the compiler)
+    if(NOT DEFINED ENV{HIP_PATH} AND EXISTS "${CMAKE_SOURCE_DIR}/.mambaenv/rocm/root.txt")
+        file(READ "${CMAKE_SOURCE_DIR}/.mambaenv/rocm/root.txt" _rocm_root)
+        list(APPEND CMAKE_PREFIX_PATH "${_rocm_root}")
+        if(NOT CMAKE_HIP_COMPILER)
+            set(CMAKE_HIP_COMPILER "${_rocm_root}/lib/llvm/bin/clang++${CMAKE_EXECUTABLE_SUFFIX}"
+                CACHE FILEPATH "HIP compiler from the bootstrapped ROCm SDK" FORCE)
+            message(STATUS "Using the bootstrapped ROCm SDK: ${_rocm_root}")
+        endif()
+    endif()
     if(MSVC)
         if(CMAKE_HIP_COMPILER)
             set(NOSPHERA2_HIP_CLANG "${CMAKE_HIP_COMPILER}" CACHE FILEPATH "ROCm clang++ that compiles the HIP kernels")
