@@ -165,12 +165,12 @@ install(
         PATTERN "*.hpp"
 )
 
-file(GLOB_RECURSE FEATOMIC_LIBS "${CMAKE_BINARY_DIR}/_deps/featomic/target/*/featomic.lib")
-file(GLOB_RECURSE METATENSOR_LIBS "${CMAKE_BINARY_DIR}/_deps/metatensor-build/target/*/*/metatensor.lib")
+# The imported targets name the libraries of this build's RUST_BUILD_TARGET; a glob
+# over target/ also picks up a stale host (x64) build left in an ARM64 tree
 install(
     FILES
-        ${FEATOMIC_LIBS}
-        ${METATENSOR_LIBS}
+        $<TARGET_FILE:featomic::static>
+        $<TARGET_FILE:metatensor::static>
     DESTINATION lib
 )
 
