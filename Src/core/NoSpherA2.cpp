@@ -116,6 +116,8 @@ static int run_app_impl(int argc, char **argv)
 			std::cout.width(saved_width);
 		}
 	} restore_cout{_coutbuf, std::cout.flags(), std::cout.precision(), std::cout.width()};
+	//This run's -tune knobs end with it, so a unit test after an in-process run does not read them
+	struct tuning_ender { ~tuning_ender() { tuning_end_run(); } } end_tuning;
 
 	//A destructor because run_app_impl returns from a dozen places, and log_file rather than
 	//cout because most of those places put cout back on the console first.

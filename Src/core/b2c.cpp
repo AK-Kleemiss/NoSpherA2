@@ -2140,14 +2140,17 @@ static std::atomic<long long> g_adp_steps{ 0 }, g_adp_tries{ 0 }, g_adp_turn{ 0 
 //Trajectories that ran their step budget out
 static std::atomic<long long> g_adp_exhaust{ 0 };
 //Steps a single trajectory may take before it is given up on (NOS_BASIN_STEP_CAP)
-static int g_step_cap = 2000;
+static constexpr int step_cap_default = 2000;
+static int g_step_cap = step_cap_default;
 //Factor by which a shortened step grows back toward the base step
-static double g_step_relax = 1.5;
+static constexpr double step_relax_default = 1.5;
+static double g_step_relax = step_relax_default;
 //Whether a floor step that fails to rise may halve and try again (NOS_BASIN_SHRINK=0 turns it off)
 static bool g_step_shrink = true;
 //Fraction of the base step below which a failing step stops halving (NOS_BASIN_SHRINK_FLOOR).
 //ponytail: 1/64 clears more stalls but splits near-degenerate lone pairs apart, so the default stays 1/16
-static double g_shrink_floor = 0.0625;
+static constexpr double shrink_floor_default = 0.0625;
+static double g_shrink_floor = shrink_floor_default;
 //Account separately for density that never reaches a basin.
 static std::atomic<long long> g_stall_vacuum{ 0 }, g_stall_field{ 0 }, g_stall_far{ 0 };
 static std::atomic<double> g_stall_far_rho{ 0.0 };
@@ -2213,6 +2216,10 @@ double basin_step_scale() { return g_basin_step_scale; }
 static bool g_basin_timing = false;
 void basin_timing_set_enabled(const bool on) { g_basin_timing = on; }
 bool basin_timing_enabled() { return g_basin_timing; }
+void basin_flags_reset()
+{
+	g_basin_gpu = -1; g_beta_spheres = true; g_adaptive_step = false; g_basin_step_scale = 1.0; g_basin_timing = false;
+}
 void basin_stage_timer::lap(const std::string &what) {
 	const auto now = std::chrono::steady_clock::now();
 	const double s = std::chrono::duration<double>(now - t).count();
@@ -2330,6 +2337,8 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 	const bool streaming = cub == nullptr || basin_cube == nullptr;
 	//Cleared here and not at the print, so the count belongs to this call and survives it
 	g_stall_slope = 0;
+	//From the defaults every time, so a knob an earlier run in this process set does not stick
+	g_step_cap = step_cap_default; g_step_relax = step_relax_default; g_step_shrink = true; g_shrink_floor = shrink_floor_default;
 	if (const char *e = tuning("NOS_BASIN_STEP_CAP")) {
 		const int v = std::atoi(e);
 		if (v >= 100) g_step_cap = v;

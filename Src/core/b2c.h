@@ -158,6 +158,9 @@ bool basin_timing_enabled();
 //Where streaming wavefunction QTAIM / ELI-D integrations and the closed-shell ELI-D maxima search evaluate their field:
 //-1 auto (default, the device when it measurably wins), 0 the host (-no_basin_gpu), 1 the device if any (-basin_gpu)
 void basin_gpu_set_mode(const int mode);
+//Every setter above back to its default. The flags are per run but the state is per process, and Olex2 and the
+//in-process tests call run_app repeatedly, so digest_options starts from here.
+void basin_flags_reset();
 struct basin_stage_timer {
 	std::chrono::steady_clock::time_point t = std::chrono::steady_clock::now();
 	//Seconds since the last lap or construction, printed only under -basin_timing.

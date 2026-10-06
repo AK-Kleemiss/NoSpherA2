@@ -827,6 +827,14 @@ void set_tuning(const std::string &name, const char *value)
 	else
 		tuning_knobs().erase(name);
 }
+//What each -tune of the current run replaced, in order
+static std::vector<std::pair<std::string, std::optional<std::string>>> run_tuned;
+void tuning_end_run()
+{
+	for (auto it = run_tuned.rbegin(); it != run_tuned.rend(); ++it)
+		set_tuning(it->first, it->second ? it->second->c_str() : nullptr);
+	run_tuned.clear();
+}
 
 std::string NoSpherA2_message(bool no_date)
 {
@@ -4398,13 +4406,22 @@ void options::digest_options()
 	{
 		std::cout << " Recap of input:\nsize: " << arguments.size() << endl;
 	}
+	//Flags with process-wide state start from their defaults, not from the previous run in this process
+	tuning_end_run();
+	basin_flags_reset();
+	cube::binary_output = false;
+	throughput::set_enabled(false);
+	throughput::reset();
 	//-tune first: some options run their job inside the loop below
 	for (size_t i = 0; i + 1 < arguments.size(); i++)
 		if (arguments[i] == "-tune")
 		{
 			const std::string &knob = arguments[++i];
 			const size_t eq = knob.find('=');
-			set_tuning(knob.substr(0, eq), eq == std::string::npos ? "1" : knob.c_str() + eq + 1);
+			const std::string name = knob.substr(0, eq);
+			const char *old = tuning(name.c_str());
+			run_tuned.emplace_back(name, old ? std::optional<std::string>(old) : std::nullopt);
+			set_tuning(name, eq == std::string::npos ? "1" : knob.c_str() + eq + 1);
 		}
 	// This loop figures out command line options
 	for (int i = 0; i < arguments.size(); i++)
@@ -4514,6 +4531,8 @@ namespace {
 
 void options::look_for_debug(int &argc, char **argv)
 {
+	//-v sets it here, before digest_options; per process, so it starts off each run
+	ProgressBar::report_counts = false;
 	// This loop figures out command line options
 	for (int i = 0; i < argc; i++)
 	{
