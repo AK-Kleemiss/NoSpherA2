@@ -2425,9 +2425,13 @@ double get_lambda_1(double *a)
 
 	const double c00 = b00 / p, c01 = a01 / p, c02 = a02 / p;
 	const double c11 = b11 / p, c12 = a12 / p, c22 = b22 / p;
-	const double r = 0.5 * (c00 * (c11 * c22 - c12 * c12)
+	double r = 0.5 * (c00 * (c11 * c22 - c12 * c12)
 						  - c01 * (c01 * c22 - c12 * c02)
 						  + c02 * (c01 * c12 - c11 * c02));
+	//r = +-1 is a double eigenvalue, where acos turns an ulp of rounding in r into sqrt(eps) in lambda2
+	//(MSVC ARM64 fuses the products above and lands 1 ulp off for {4,1,1}); snap rounding-level misses.
+	if (std::abs(r) > 1.0 - 16 * std::numeric_limits<double>::epsilon())
+		r = std::copysign(1.0, r);
 
 	const double phi = std::acos(std::clamp(r, -1.0, 1.0)) / 3.0;
 	const double eig_max = q + 2.0 * p * std::cos(phi);

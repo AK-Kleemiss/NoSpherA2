@@ -2006,7 +2006,18 @@ void calc_SF(const int& points,
 				_mm256_store_pd(sr, _mm256_mul_pd(rv, sv));
 				re += cr[0] + cr[1] + cr[2] + cr[3];
 				im += sr[0] + sr[1] + sr[2] + sr[3];
+#elif defined(_M_ARM64)
+				//MSVC ARM64 has no SVML and calls sin and cos separately, each with its own reduction
+				double si0, c0, si1, c1, si2, c2, si3, c3;
+				sincos_shared(work0, &si0, &c0);
+				sincos_shared(work1, &si1, &c1);
+				sincos_shared(work2, &si2, &c2);
+				sincos_shared(work3, &si3, &c3);
+
+				re += rho0 * c0 + rho1 * c1 + rho2 * c2 + rho3 * c3;
+				im += rho0 * si0 + rho1 * si1 + rho2 * si2 + rho3 * si3;
 #else
+				//x64 /fp:fast: MSVC fuses each pair into __libm_sse2_sincos_ or vectorises to __vdecl_sin2/cos2
 				const double c0 = cos(work0);
 				const double si0 = sin(work0);
 				const double c1 = cos(work1);
@@ -2032,6 +2043,10 @@ void calc_SF(const int& points,
 				im += rho * si;
 #elif defined(__APPLE__)
 				__sincos(work, &si, &c);
+				re += rho * c;
+				im += rho * si;
+#elif defined(_M_ARM64)
+				sincos_shared(work, &si, &c);
 				re += rho * c;
 				im += rho * si;
 #else
