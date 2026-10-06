@@ -334,15 +334,22 @@ if(NOSPHERA2_USE_HIP)
         endif()
         if(_nosphera2_HIP_arch_managed)
             if(NOSPHERA2_HIP_PORTABLE)
+                #The APUs are listed too (gfx90c Ryzen 4000/5000, gfx1035/1036 Ryzen 6000/7000,
+                #gfx1103 Ryzen 7040/8040/8000G, gfx115x Ryzen AI 300 and Max): ROCm does not
+                #promise them, but the Windows driver runs HIP on them, and student laptops are
+                #where they turn up.
                 set(_arch_list
-                    gfx900 gfx906 gfx908 gfx90a gfx942
+                    gfx900 gfx906 gfx908 gfx90a gfx90c gfx942
                     gfx1010 gfx1012 gfx1030 gfx1031 gfx1032 gfx1034 gfx1035 gfx1036
                     gfx1100 gfx1101 gfx1102 gfx1103)
                 if(_nosphera2_hip_version VERSION_GREATER_EQUAL 19)
                     list(APPEND _arch_list gfx1150 gfx1151 gfx1200 gfx1201)
                 endif()
                 if(_nosphera2_hip_version VERSION_GREATER_EQUAL 20)
-                    list(APPEND _arch_list gfx950)
+                    list(APPEND _arch_list gfx950 gfx1152)
+                endif()
+                if(_nosphera2_hip_version VERSION_GREATER_EQUAL 21)
+                    list(APPEND _arch_list gfx1153)
                 endif()
             else()
                 set(_arch_list gfx90a gfx942 gfx1100)
