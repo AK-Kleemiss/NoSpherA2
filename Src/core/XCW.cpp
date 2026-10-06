@@ -1624,16 +1624,6 @@ void XCW::open_i_stream_for_reading() {
 }
 
 //One tile of the CPU I tensor, C = A * B^T row-major with k the block's points
-#if defined(NSA2_OPENBLAS)
-//OpenBLAS pays a fixed setup per call that dominates these <= 128-row tiles (XCW ran 5-8x slower
-//on ARM64 than MKL on x64); Eigen's serial NEON kernel has none
-template <typename T>
-static void tile_gemm(const int m, const int n, const int k, const T* a, const T* b, T* c)
-{
-	using RowMat = Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
-	Eigen::Map<RowMat>(c, m, n).noalias() = Eigen::Map<const RowMat>(a, m, k) * Eigen::Map<const RowMat>(b, n, k).transpose();
-}
-#else
 static void tile_gemm(const int m, const int n, const int k, const double* a, const double* b, double* c)
 {
 	cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasTrans, m, n, k, 1.0, a, k, b, k, 0.0, c, n);
@@ -1642,7 +1632,6 @@ static void tile_gemm(const int m, const int n, const int k, const float* a, con
 {
 	cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasTrans, m, n, k, 1.0f, a, k, b, k, 0.0f, c, n);
 }
-#endif
 
 //C = op(A) op(B) for column-major occ matrices through MKL, Src/core's Eigen being serial
 static occ::Mat gemm(const occ::Mat& A, const occ::Mat& B, const bool ta = false, const bool tb = false)
