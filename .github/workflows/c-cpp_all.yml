@@ -362,9 +362,13 @@ jobs:
       - name: Build
         run: cmake --build --preset "${{ matrix.build-preset }}" --parallel 4
 
+      # The stats go to the run overview here, not from the action's own summary
+      # (zeros, see above); always() also covers a run cancelled during Build
       - name: Stop sccache
         if: always()
-        run: sccache --stop-server
+        shell: bash
+        run: |
+          { echo "### sccache, ${{ matrix.name }}"; echo '```'; sccache --stop-server; echo '```'; } | tee -a "$GITHUB_STEP_SUMMARY"
         continue-on-error: true
 
       - name: Save packed sccache
