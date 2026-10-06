@@ -248,7 +248,9 @@
     <ClCompile Include="..\..\Src\core\eqc.cpp" />
     <ClCompile Include="..\..\Src\core\eli_family.cpp" />
     <ClCompile Include="..\..\Src\core\fchk.cpp" />
-    <ClCompile Include="..\..\Src\core\fiber_loop.cpp" />
+    <ClCompile Include="..\..\Src\core\fiber_loop.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    </ClCompile>
     <ClCompile Include="..\..\Src\core\GridManager.cpp" />
     <ClCompile Include="..\..\Src\core\integration_params.cpp" />
     <ClCompile Include="..\..\Src\core\integrator.cpp" />

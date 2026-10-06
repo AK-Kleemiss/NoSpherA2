@@ -109,6 +109,22 @@ install(
         PATTERN "*.hpp"
 )
 
+# occ's public headers include nlohmann/json.hpp (occ/dft/dft_method.h)
+install(
+    DIRECTORY "${nlohmann_json_SOURCE_DIR}/include/"
+    DESTINATION include
+)
+
+# and xc.h (occ/dft/functional.h); xc_version.h is generated
+install(
+    FILES
+        "${Libxc_SOURCE_DIR}/src/xc.h"
+        "${Libxc_SOURCE_DIR}/src/xc_funcs.h"
+        "${Libxc_SOURCE_DIR}/src/xc_funcs_removed.h"
+        "${Libxc_BINARY_DIR}/xc_version.h"
+    DESTINATION include
+)
+
 install(
     DIRECTORY "${CMAKE_BINARY_DIR}/_deps/spdlog-src/include/"
     DESTINATION include
