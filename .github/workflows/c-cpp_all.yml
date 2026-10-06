@@ -66,6 +66,20 @@ jobs:
             artifact-path: artifacts/NoSpherA2-windows-x64.zip
             artifact-name: NoSpherA2-windows-x64
 
+          # oneMKL has no ARM64 build; this one links conda-forge OpenBLAS
+          # (environment-win-arm64.yaml) and uses vcomp for OpenMP
+          - name: Windows arm64 Release
+            os: windows-11-arm
+            configure-preset: release-windows-arm64
+            build-preset: release-windows-arm64
+            test-preset: release-windows-arm64
+            build-directory: build/release-windows-arm64
+            architecture: arm64
+            msvc-arch: arm64
+            shell: pwsh
+            artifact-path: artifacts/NoSpherA2-windows-arm64.zip
+            artifact-name: NoSpherA2-windows-arm64
+
           - name: macOS arm64 Release
             os: macos-15
             configure-preset: release-macos-arm64
@@ -226,18 +240,20 @@ jobs:
           PY
 
       # Ninja uses whichever compiler environment is active. On Windows,
-      # initialize the x64 MSVC environment before configuring CMake.
-      - name: Initialize MSVC x64 environment
+      # initialize the MSVC environment before configuring CMake.
+      - name: Initialize MSVC ${{ matrix.msvc-arch || 'x64' }} environment
         if: runner.os == 'Windows'
         uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1
         with:
-          arch: x64
+          arch: ${{ matrix.msvc-arch || 'x64' }}
 
       - name: Show toolchain
         run: |
           cmake --version
           ninja --version
           git --version
+        # windows-11-arm may not ship ninja; the build takes it from the micromamba env
+        continue-on-error: true
 
       - name: Show MSVC compiler
         if: runner.os == 'Windows'
