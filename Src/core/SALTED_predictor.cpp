@@ -544,22 +544,38 @@ vec SALTEDPredictor::predict()
 	if (gpu_equicomb)
 		sf_gpu_warmup_wait();
 #endif
-	// The norm's density matrices hold every l of the descriptors, so one build serves all
-	// lambda; the device builds and keeps its own
-	equicomb_density dens;
+	const int lmax_max = SALTED_Utils::get_lmax_max(lmax);
+	// The (l1, l2) pairs and complex-to-real matrix of every lambda, which the norm wants up front
+	std::vector<ivec2> llvec_all(lmax_max + 1);
+	std::vector<cvec2> c2r_all(lmax_max + 1);
+	for (int lam = 0; lam <= lmax_max; lam++)
+	{
+		ivec2 llvec;
+		for (int l1 = 0; l1 < config.nang1 + 1; l1++)
+			for (int l2 = 0; l2 < config.nang2 + 1; l2++)
+				// keep only even combination to enforce inversion symmetry
+				if ((lam + l1 + l2) % 2 == 0 && abs(l2 - lam) <= l1 && l1 <= (l2 + lam))
+					llvec.push_back({ l1, l2 });
+		llvec_all[lam] = transpose<int>(llvec);
+		c2r_all[lam] = SALTED_Utils::complex_to_real_transformation({ 2 * lam + 1 })[0];
+	}
+	// Every lambda's norm in one pass over the atoms, with no density matrices kept for all of
+	// them; the device computes its own
+	vec2 norms;
 	if (config.sparsify && !gpu_equicomb)
 	{
-		const auto _t_dm = std::chrono::steady_clock::now();
-		dens = equicomb_density_matrices(natoms, config.nspe1 * config.nrad1, config.nspe2 * config.nrad2, v1, v2, v2_is_conj_of_v1);
-		const double dm_s = _elapsed(_t_dm);
-		_t_equicomb += dm_s;
-		throughput::record_time("SALTED equicomb", false, 1000.0 * dm_s);
+		const auto _t_norm = std::chrono::steady_clock::now();
+		std::vector<const vec *> w3j_all(lmax_max + 1);
+		for (int lam = 0; lam <= lmax_max; lam++)
+			w3j_all[lam] = &wigner3j[lam];
+		norms = equicomb_norms(natoms, config.nspe1 * config.nrad1, config.nspe2 * config.nrad2, v1, v2, w3j_all, llvec_all, c2r_all, v2_is_conj_of_v1);
+		const double norm_s = _elapsed(_t_norm);
+		_t_equicomb += norm_s;
+		throughput::record_time("SALTED equicomb", false, 1000.0 * norm_s);
+		if (ProgressBar::report_counts)
+			std::cout << "[equicomb] norms of lambda 0.." << lmax_max << ": " << 1000.0 * norm_s << " ms" << std::endl;
 	}
 	// Compute equivariant descriptors for each lambda value entering the SPH expansion of the electron density
-	// How many lambda blocks are alive at once. A block is natoms * (2*lam+1) *
-	// featsize doubles and holding all of them sums to (nang+1)^2 times a single
-	// block; fewer bounds that, at the cost of revisiting each species per group
-	const int lmax_max = SALTED_Utils::get_lmax_max(lmax);
 	ivec featsize(lmax_max + 1);
 	std::vector<std::vector<dMatrix2>> psi_nm(config.species.size());
 	for (int spe_idx = 0; spe_idx < (int)config.species.size(); spe_idx++)
@@ -570,40 +586,16 @@ vec SALTEDPredictor::predict()
 	{
 		vec p;
 		const auto _t_eq = std::chrono::steady_clock::now();
-		int llmax = 0;
-		unordered_map<int, ivec> lvalues{};
-		for (int l1 = 0; l1 < config.nang1 + 1; l1++)
-		{
-			for (int l2 = 0; l2 < config.nang2 + 1; l2++)
-			{
-				// keep only even combination to enforce inversion symmetry
-				if ((lam + l1 + l2) % 2 == 0)
-				{
-					if (abs(l2 - lam) <= l1 && l1 <= (l2 + lam))
-					{
-						lvalues[llmax] = { l1, l2 };
-						llmax += 1;
-					}
-				}
-			}
-		}
-		// Fill dense array from dictionary
-		ivec2 llvec(llmax, ivec(2));
-		for (int i = 0; i < llmax; i++)
-		{
-			llvec[i] = lvalues[i];
-		}
-
-		cvec2 c2r = SALTED_Utils::complex_to_real_transformation({ 2 * lam + 1 })[0];
-
+		ivec2 &llvec_t = llvec_all[lam];
+		cvec2 &c2r = c2r_all[lam];
+		const int llmax = static_cast<int>(llvec_t[0].size());
 		featsize[lam] = config.nspe1 * config.nspe2 * config.nrad1 * config.nrad2 * llmax;
-		ivec2 llvec_t = transpose<int>(llvec);
 		if (config.sparsify)
 		{
 			int nfps = static_cast<int>(vfps[lam].size());
 			p.assign((size_t)natoms * ((size_t)2 * lam + 1) * nfps, 0.0);
 			equicomb(natoms, (config.nspe1 * config.nrad1), (config.nspe2 * config.nrad2), v1, v2, wigner3j[lam], llvec_t, lam, c2r, featsize[lam], nfps, vfps[lam], p, v2_is_conj_of_v1,
-				dens.m1.empty() ? nullptr : &dens);
+				norms.empty() ? nullptr : norms[lam].data());
 			featsize[lam] = nfps;
 		}
 		else

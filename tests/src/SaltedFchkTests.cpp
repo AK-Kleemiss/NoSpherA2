@@ -999,19 +999,24 @@ TEST(SaltedFchkEquicombTests, SelectedFeaturesMatchDenseLam2)
 		x = cdouble(next(), next());
 	for (auto& x : v2.values())
 		x = cdouble(next(), next());
-	ivec2 llvec(2);
-	for (int l1 = 0; l1 <= lmax; l1++)
-		for (int l2 = 0; l2 <= lmax; l2++)
-			if (std::abs(l1 - l2) <= lam && lam <= l1 + l2)
-			{
-				llvec[0].push_back(l1);
-				llvec[1].push_back(l2);
-			}
+	// every lambda up to lam, for equicomb_norms' one pass over all of them
+	std::vector<ivec2> llvec_all(lam + 1, ivec2(2));
+	for (int k = 0; k <= lam; k++)
+		for (int l1 = 0; l1 <= lmax; l1++)
+			for (int l2 = 0; l2 <= lmax; l2++)
+				if (std::abs(l1 - l2) <= k && k <= l1 + l2)
+				{
+					llvec_all[k][0].push_back(l1);
+					llvec_all[k][1].push_back(l2);
+				}
+	ivec2& llvec = llvec_all[lam];
 	const int llmax = static_cast<int>(llvec[0].size());
 	vec w3j(4000);
 	for (double& w : w3j)
 		w = next();
-	cvec2 c2r = SALTED_Utils::complex_to_real_transformation({ l21 })[0];
+	const std::vector<cvec2> c2r_all = SALTED_Utils::complex_to_real_transformation({ 1, 3, l21 });
+	cvec2 c2r = c2r_all[lam];
+	const std::vector<const vec*> w3j_all(lam + 1, &w3j);
 	const bool gpu_before = equicomb_gpu_enabled();
 	for (const bool conj : { false, true })
 	{
@@ -1025,15 +1030,15 @@ TEST(SaltedFchkEquicombTests, SelectedFeaturesMatchDenseLam2)
 		for (int f = shells + 3; f >= 0; f -= 3)
 			vfps.push_back(f);
 		const int nfps = static_cast<int>(vfps.size());
-		// 0: CPU, matrices built inside; 1: CPU, matrices built once by the caller; 2: GPU
-		const equicomb_density dens = equicomb_density_matrices(natoms, nrad1, n2, v1, u, conj);
+		// 0: CPU, norm computed inside; 1: CPU, norm from equicomb_norms; 2: GPU
+		const vec2 norms = equicomb_norms(natoms, nrad1, n2, v1, u, w3j_all, llvec_all, c2r_all, conj);
 		for (const int mode : { 0, 1, 2 })
 		{
 			const bool gpu = mode == 2;
 			equicomb_set_gpu(gpu);
 			vec sub(static_cast<size_t>(natoms) * l21 * nfps, 7.0);
 			equicomb(natoms, nrad1, n2, v1, u, w3j, llvec, lam, c2r, featsize, nfps, vfps, sub, conj,
-				mode == 1 ? &dens : nullptr);
+				mode == 1 ? norms[lam].data() : nullptr);
 			for (int iat = 0; iat < natoms; iat++)
 				for (int imu = 0; imu < l21; imu++)
 					for (int i = 0; i < nfps; i++)

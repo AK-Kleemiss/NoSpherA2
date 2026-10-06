@@ -204,7 +204,7 @@ std::string SALTED_Utils::FeatomicHyperParameters::to_json() const
 }
 
 
-// Used to generate metatensor::TensorMap and save the buffer location into the descriptor_buffer
+// Runs featomic's spherical expansion for the SALTED keys
 static metatensor::TensorMap get_feats_projs(featomic::SimpleSystem featomic_system, const SALTED_Utils::FeatomicHyperParameters& parameters)
 {
 	// size_t nspe1 = neighspe.size();
@@ -259,50 +259,98 @@ static metatensor::TensorMap get_feats_projs(featomic::SimpleSystem featomic_sys
 	calc_opts.selected_keys = keys_selection;
 	calc_opts.use_native_system = true;
 	// run the calculation
-	metatensor::TensorMap descriptor = calculator.compute(featomic_system, calc_opts);
-
-	// The descriptor is a metatensor `TensorMap`, containing multiple blocks.
-	// We can transform it to a single block containing a dense representation,
-	// with one sample for each atom-centered environment.
-	descriptor = descriptor.keys_to_samples("center_type");
-	descriptor = descriptor.keys_to_properties("neighbor_type");
-	// descriptor.save("spx_pred.npy");
-
-	return descriptor;
+	// one block per (o3_lambda, o3_sigma, center_type, neighbor_type); get_expansion_coeffs
+	// densifies them itself
+	return calculator.compute(featomic_system, calc_opts);
 }
 
-// Reads the descriptor buffer and fills the expansion coefficients vector
-static SALTEDDescriptors get_expansion_coeffs(std::vector<uint8_t> descriptor_buffer, const featomic::SimpleSystem& featomic_system, const SALTED_Utils::FeatomicHyperParameters& parameters)
+static size_t label_column(const metatensor::Labels& labels, const char* name)
 {
-	metatensor::TensorMap descriptor = metatensor::TensorMap::load_buffer(descriptor_buffer);
-	std::vector<size_t> sizes = descriptor.block_by_id(0).values_shape(); //This has the size of the descriptor, meaning alle atoms that actually have a environment based on the neighborhood and species list
-	const int n_atoms = sizes[0];
-	const int nchannels = sizes[2]; //(int)parameters.neighspe.size() * parameters.max_radial;
-	SALTEDDescriptors omega(n_atoms, nchannels, parameters.max_angular);
-	for (int l = 0; l < parameters.max_angular + 1; ++l)
-	{
-		cvec2 c2r = SALTED_Utils::complex_to_real_transformation({ (2 * l) + 1 })[0];
-		metatensor::TensorBlock descriptor_block = descriptor.block_by_id(l);
-		metatensor::NDArray<double> descriptor_values = descriptor_block.values();
+	const auto& names = labels.names();
+	for (size_t i = 0; i < names.size(); ++i)
+		if (std::strcmp(names[i], name) == 0) return i;
+	throw std::runtime_error(std::string("featomic labels lack the dimension ") + name);
+}
 
-		// descriptor_values is contiguous in its property (d) dimension. The
-		// packed l slab keeps the corresponding output m values contiguous.
-		for (int a = 0; a < n_atoms; ++a)
-		{
-			for (int r = 0; r < 2 * l + 1; ++r)
-			{
-				for (int d = 0; d < nchannels; ++d)
-				{
-					cdouble* output = omega.block(a, d, l);
-					const double value = descriptor_values(a, r, d);
-					for (int c = 0; c < 2 * l + 1; ++c)
-					{
-						output[c] += conj(c2r[r][c]) * value;
+// Packs featomic's raw blocks into omega exactly as keys_to_samples("center_type") followed by
+// keys_to_properties("neighbor_type") (both sorting samples) would have laid them out, without
+// building the merged TensorMap and without a save/load buffer round trip (1.7 of 4.4 s at 12k atoms):
+//  - rows are the sorted union of the centre atoms of the lambda = 0 blocks
+//  - channels of one lambda are the neighbour types in first-key order, each followed by its n
+//  - a sample a neighbour block lacks stays zero
+// Every output element sums its r contributions in the same order as the merged loop did, so
+// the result is bit-identical; blocks of one lambda write disjoint (row, channel) cells.
+static SALTEDDescriptors get_expansion_coeffs(metatensor::TensorMap& descriptor, const SALTED_Utils::FeatomicHyperParameters& parameters)
+{
+	const metatensor::Labels keys = descriptor.keys();
+	const int32_t* key = keys.values().data();
+	const size_t key_width = keys.size(), n_blocks = keys.count();
+	const size_t k_lambda = label_column(keys, "o3_lambda"), k_neighbor = label_column(keys, "neighbor_type");
+
+	std::vector<int> row_of;
+	int nchannels = 0;
+	{
+		std::vector<int32_t> neighbors;
+		for (size_t b = 0; b < n_blocks; ++b) {
+			if (key[b * key_width + k_lambda] != 0) continue;
+			metatensor::TensorBlock block = descriptor.block_by_id(b);
+			const metatensor::Labels samples = block.samples();
+			const int32_t* s = samples.values().data();
+			const size_t width = samples.size(), atom = label_column(samples, "atom");
+			for (size_t i = 0; i < samples.count(); ++i) {
+				const int32_t a = s[i * width + atom];
+				if (static_cast<size_t>(a) >= row_of.size()) row_of.resize(static_cast<size_t>(a) + 1, -1);
+				row_of[a] = 0;
+			}
+			const int32_t neighbor = key[b * key_width + k_neighbor];
+			if (std::find(neighbors.begin(), neighbors.end(), neighbor) == neighbors.end()) {
+				neighbors.push_back(neighbor);
+				nchannels += static_cast<int>(block.properties().count());
+			}
+		}
+	}
+	int n_atoms = 0;
+	for (int& r : row_of)
+		if (r >= 0) r = n_atoms++;
+
+	SALTEDDescriptors omega(n_atoms, nchannels, parameters.max_angular);
+	for (int l = 0; l <= parameters.max_angular; ++l)
+	{
+		const int m = 2 * l + 1;
+		const cvec2 c2r = SALTED_Utils::complex_to_real_transformation({ m })[0];
+		std::vector<std::pair<int32_t, int>> channel_of; // neighbour type -> first channel
+		int next_channel = 0;
+		for (size_t b = 0; b < n_blocks; ++b) {
+			if (key[b * key_width + k_lambda] != l) continue;
+			metatensor::TensorBlock block = descriptor.block_by_id(b);
+			const metatensor::Labels samples = block.samples();
+			const metatensor::NDArray<double> values = block.values();
+			const int nprop = static_cast<int>(values.shape()[2]);
+			const int32_t neighbor = key[b * key_width + k_neighbor];
+			auto it = std::find_if(channel_of.begin(), channel_of.end(), [&](const auto& e) { return e.first == neighbor; });
+			if (it == channel_of.end()) {
+				channel_of.emplace_back(neighbor, next_channel);
+				it = channel_of.end() - 1;
+				next_channel += nprop;
+			}
+			const int first_channel = it->second;
+			const int32_t* s = samples.values().data();
+			const size_t width = samples.size(), atom = label_column(samples, "atom");
+			const double* v = values.data();
+			const int n_samples = static_cast<int>(samples.count());
+#pragma omp parallel for schedule(static)
+			for (int i = 0; i < n_samples; ++i) {
+				const int row = row_of[s[i * width + atom]];
+				for (int r = 0; r < m; ++r) {
+					const double* value = v + (static_cast<size_t>(i) * m + r) * nprop;
+					for (int d = 0; d < nprop; ++d) {
+						cdouble* output = omega.block(row, first_channel + d, l);
+						for (int c = 0; c < m; ++c)
+							output[c] += conj(c2r[r][c]) * value[d];
 					}
 				}
 			}
 		}
-		c2r.clear();
 	}
 
 	return omega;
@@ -312,8 +360,7 @@ static SALTEDDescriptors get_expansion_coeffs(std::vector<uint8_t> descriptor_bu
 SALTEDDescriptors SALTED_Utils::calculate_SALTED_descriptors(const featomic::SimpleSystem& featomic_system, const SALTED_Utils::FeatomicHyperParameters& parameters)
 {
 	metatensor::TensorMap descriptor = get_feats_projs(featomic_system, parameters);
-	std::vector<uint8_t> descriptor_buffer = descriptor.save_buffer();
-	return get_expansion_coeffs(descriptor_buffer, featomic_system, parameters);
+	return get_expansion_coeffs(descriptor, parameters);
 }
 
 

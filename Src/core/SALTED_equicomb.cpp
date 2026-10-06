@@ -21,58 +21,218 @@ bool equicomb_gpu_enabled() { return g_equicomb_use_gpu; }
 // Start of the l block in one atom's matrices: sum_{k<l} (2k+1)^2
 static size_t dm_offset(const int l) { return static_cast<size_t>(l * (2 * l - 1) * (2 * l + 1) / 3); }
 
-// A and B of every atom for l = 0..lmax, real and imaginary parts apart: plain double loops
-// vectorise, std::complex products without -ffast-math do not
-static void build_density(const SALTEDDescriptors &d, const int nch, const int lmax, const int natoms, vec &out)
+// One atom's A and B for l = 0..lmax into m ([are, aim, bre, bim][(2l+1)^2 blocks], dsz =
+// dm_offset(lmax + 1) apart), real and imaginary parts apart: plain double loops vectorise,
+// std::complex products without -ffast-math do not
+static void atom_density(const SALTEDDescriptors &d, const int nch, const int lmax, const int iat, const size_t dsz, double *m)
 {
-	err_checkf(2 * lmax + 1 <= 64, "equicomb: l above 31 in the descriptors", std::cout);
-	const size_t dsz = dm_offset(lmax + 1);
-	out.assign(static_cast<size_t>(natoms) * 4 * dsz, 0.0);
-#pragma omp parallel for schedule(static)
-	for (int iat = 0; iat < natoms; ++iat)
+	std::fill(m, m + 4 * dsz, 0.0);
+	double xr[64], xi[64];
+	for (int l = 0; l <= lmax; ++l)
 	{
-		double *m = out.data() + static_cast<size_t>(iat) * 4 * dsz;
-		double xr[64], xi[64];
-		for (int l = 0; l <= lmax; ++l)
+		const int nm = 2 * l + 1;
+		const size_t o = dm_offset(l);
+		double *__restrict are = m + o, *__restrict aim = m + dsz + o;
+		double *__restrict bre = m + 2 * dsz + o, *__restrict bim = m + 3 * dsz + o;
+		for (int n = 0; n < nch; ++n)
 		{
-			const int nm = 2 * l + 1;
-			const size_t o = dm_offset(l);
-			double *__restrict are = m + o, *__restrict aim = m + dsz + o;
-			double *__restrict bre = m + 2 * dsz + o, *__restrict bim = m + 3 * dsz + o;
-			for (int n = 0; n < nch; ++n)
-			{
-				const cdouble *x = d.block(iat, n, l);
-				for (int a = 0; a < nm; ++a) { xr[a] = x[a].real(); xi[a] = x[a].imag(); }
-				for (int a = 0; a < nm; ++a)
-					for (int b = 0; b < nm; ++b)
-					{
-						are[a * nm + b] += xr[a] * xr[b] + xi[a] * xi[b];
-						aim[a * nm + b] += xi[a] * xr[b] - xr[a] * xi[b];
-						bre[a * nm + b] += xr[a] * xr[b] - xi[a] * xi[b];
-						bim[a * nm + b] += xi[a] * xr[b] + xr[a] * xi[b];
-					}
-			}
+			const cdouble *x = d.block(iat, n, l);
+			for (int a = 0; a < nm; ++a) { xr[a] = x[a].real(); xi[a] = x[a].imag(); }
+			for (int a = 0; a < nm; ++a)
+				for (int b = 0; b < nm; ++b)
+				{
+					are[a * nm + b] += xr[a] * xr[b] + xi[a] * xi[b];
+					aim[a * nm + b] += xi[a] * xr[b] - xr[a] * xi[b];
+					bre[a * nm + b] += xr[a] * xr[b] - xi[a] * xi[b];
+					bim[a * nm + b] += xi[a] * xr[b] + xr[a] * xi[b];
+				}
 		}
 	}
 }
 
-equicomb_density equicomb_density_matrices(int natoms, int nrad1, int nrad2,
-	const SALTEDDescriptors &v1, const SALTEDDescriptors &v2, bool v2_is_conj_of_v1)
+// Which (im1, im2) pairs contribute is set by |im1 - mu| <= l2, which depends only on
+// (il, imu, lam), never on n1 or n2. That test selects a CONTIGUOUS run of im1, and
+// im2 = im1 - mu + l2 advances in lockstep with it, so a first index, a length and an
+// offset into w3j describe a group completely. w3j is consumed in exactly (il, imu, im1)
+// order, so a group's weights are a contiguous slice of it and need no copy.
+struct w3j_run { int im1_begin, im2_begin, count, w_off; };
+
+// Everything of one lambda the walk needs that does not depend on the atoms
+struct lambda_plan
 {
-	equicomb_density d;
-	d.natoms = natoms; d.nrad1 = nrad1; d.nrad2 = nrad2; d.conj = v2_is_conj_of_v1;
-	// u = conj(v1) has conj(A1), conj(B1) as its matrices; with nrad2 == nrad1 they are v1's own
-	const SALTEDDescriptors &u = v2_is_conj_of_v1 ? v1 : v2;
-	d.lmax1 = static_cast<int>(v1.offsets().size()) - 1;
-	build_density(v1, nrad1, d.lmax1, natoms, d.m1);
-	if (v2_is_conj_of_v1 && nrad2 == nrad1)
-		d.lmax2 = d.lmax1;
-	else
+	int lam = 0, l21 = 1, llmax = 0, lmax1 = 0, lmax2 = 0;
+	const vec *w3j = nullptr;
+	const ivec2 *llvec = nullptr;
+	std::vector<w3j_run> runs;
+	size_t total_terms = 0;
+	vec K_re, K_im, G_re, G_im;
+};
+
+static lambda_plan make_plan(const vec &w3j, const ivec2 &llvec, const int lam, const cvec2 &c2r)
+{
+	lambda_plan q;
+	q.lam = lam; q.l21 = 2 * lam + 1; q.llmax = static_cast<int>(llvec[0].size());
+	q.w3j = &w3j; q.llvec = &llvec;
+	const int l21 = q.l21;
+	q.runs.assign(static_cast<size_t>(q.llmax) * l21, w3j_run{0, 0, 0, 0});
+	int w_idx = 0;
+	for (int til = 0; til < q.llmax; ++til)
 	{
-		d.lmax2 = static_cast<int>(u.offsets().size()) - 1;
-		build_density(u, nrad2, d.lmax2, natoms, d.m2);
+		const int tl1 = llvec[0][til], tl2 = llvec[1][til];
+		err_checkf(tl1 >= 0 && tl2 >= 0, "equicomb: negative angular momentum in llvec", std::cout);
+		for (int timu = 0; timu < l21; ++timu)
+		{
+			const int tmu = timu - lam + tl1;
+			const int lo = std::max(0, tmu - tl2);
+			const int hi = std::min(2 * tl1, tmu + tl2);
+			const int cnt = (hi >= lo) ? (hi - lo + 1) : 0;
+			q.runs[static_cast<size_t>(til) * l21 + timu] = { lo, lo - tmu + tl2, cnt, w_idx };
+			w_idx += cnt;
+		}
 	}
-	return d;
+	q.total_terms = static_cast<size_t>(w_idx);
+	// w3j is consumed once per (n1,n2) shell pair, one entry per surviving m2, which is what the runs add up to
+	err_checkf(w3j.size() >= q.total_terms, "equicomb: w3j holds " + std::to_string(w3j.size()) +
+		" entries, the shell loop consumes " + std::to_string(q.total_terms), std::cout);
+	q.lmax1 = *std::max_element(llvec[0].begin(), llvec[0].end());
+	q.lmax2 = *std::max_element(llvec[1].begin(), llvec[1].end());
+
+	// Every atom is normalised over all featsize features, but only nfps of them are
+	// kept, and the norm needs none of the others. Feature (n1, n2, il) is Re(q) with
+	// q = c2r pc and pc[mu] = sum_m1 w v1[n1,l1,m1] u[n2,l2,m1-mu], where u is the factor
+	// the loop multiplies by (conj(v1), or v2 as stored). Then
+	//   sum_i Re(q_i)^2 = (q^H q + Re q^T q) / 2
+	//                   = Re(sum K[mu,mu'] pc_mu conj(pc_mu') + sum G[mu,mu'] pc_mu pc_mu') / 2
+	// with K = sum_i c2r[i,mu] conj(c2r[i,mu']) and G = sum_i c2r[i,mu] c2r[i,mu'], and
+	// summed over n1 and n2 both products factor into per-atom, per-l density matrices
+	// A[m,m'] = sum_n x_m conj(x_m') and B[m,m'] = sum_n x_m x_m' of v1 and of u. That is
+	// one pass over m pairs per shell instead of nrad1*nrad2 feature evaluations; the
+	// value is the same up to rounding (SALTED's equicombsparse_numba, a7fbc3a).
+	q.K_re.assign(static_cast<size_t>(l21) * l21, 0.0);
+	q.K_im = q.K_re; q.G_re = q.K_re; q.G_im = q.K_re;
+	for (int a = 0; a < l21; ++a)
+		for (int b = 0; b < l21; ++b)
+		{
+			cdouble k = constants::cnull, g = constants::cnull;
+			for (int i2 = 0; i2 < l21; ++i2)
+			{
+				k += c2r[i2][a] * std::conj(c2r[i2][b]);
+				g += c2r[i2][a] * c2r[i2][b];
+			}
+			const size_t ab = static_cast<size_t>(a) * l21 + b;
+			q.K_re[ab] = k.real(); q.K_im[ab] = k.imag(); q.G_re[ab] = g.real(); q.G_im[ab] = g.imag();
+		}
+	return q;
+}
+
+// sum of the squared features of one atom for one lambda, from its density matrices
+static double atom_norm2(const lambda_plan &q, const double *m1, const size_t dsz1, const double *m2, const size_t dsz2, const double s2)
+{
+	const int l21 = q.l21;
+	const vec &w3j = *q.w3j;
+	const ivec2 &llvec = *q.llvec;
+	double inner = 0.0;
+	for (int il = 0; il < q.llmax; ++il)
+	{
+		const int l1 = llvec[0][il], l2 = llvec[1][il];
+		const int nm1 = 2 * l1 + 1, nm2 = 2 * l2 + 1;
+		const size_t o1 = dm_offset(l1), o2 = dm_offset(l2);
+		const double *a1r = m1 + o1, *a1i = m1 + dsz1 + o1, *b1r = m1 + 2 * dsz1 + o1, *b1i = m1 + 3 * dsz1 + o1;
+		const double *a2r = m2 + o2, *a2i = m2 + dsz2 + o2, *b2r = m2 + 2 * dsz2 + o2, *b2i = m2 + 3 * dsz2 + o2;
+		double t = 0.0;
+		for (int mu = 0; mu < l21; ++mu)
+		{
+			const w3j_run &r = q.runs[static_cast<size_t>(il) * l21 + mu];
+			if (r.count == 0) continue;
+			for (int mu2 = 0; mu2 < l21; ++mu2)
+			{
+				const size_t mm = static_cast<size_t>(mu) * l21 + mu2;
+				const w3j_run &r2 = q.runs[static_cast<size_t>(il) * l21 + mu2];
+				if ((q.K_re[mm] == 0.0 && q.K_im[mm] == 0.0 && q.G_re[mm] == 0.0 && q.G_im[mm] == 0.0) || r2.count == 0) continue;
+				double Pr = 0.0, Pi = 0.0, Qr = 0.0, Qi = 0.0;
+				for (int x = 0; x < r.count; ++x)
+				{
+					const double w = w3j[static_cast<size_t>(r.w_off) + x];
+					const int i1 = (r.im1_begin + x) * nm1 + r2.im1_begin;
+					const int i2 = (r.im2_begin + x) * nm2 + r2.im2_begin;
+					for (int y = 0; y < r2.count; ++y)
+					{
+						const double ww = w * w3j[static_cast<size_t>(r2.w_off) + y];
+						const double ar = a2r[i2 + y], ai = s2 * a2i[i2 + y];
+						const double br = b2r[i2 + y], bi = s2 * b2i[i2 + y];
+						Pr += ww * (a1r[i1 + y] * ar - a1i[i1 + y] * ai);
+						Pi += ww * (a1r[i1 + y] * ai + a1i[i1 + y] * ar);
+						Qr += ww * (b1r[i1 + y] * br - b1i[i1 + y] * bi);
+						Qi += ww * (b1r[i1 + y] * bi + b1i[i1 + y] * br);
+					}
+				}
+				t += q.K_re[mm] * Pr - q.K_im[mm] * Pi + q.G_re[mm] * Qr - q.G_im[mm] * Qi;
+			}
+		}
+		inner += 0.5 * t;
+	}
+	return inner;
+}
+
+// normfact[k][atom] for every plan. The density matrices do not depend on lambda, so each
+// atom's are built once into a per-thread buffer and contracted for all plans, instead of
+// being stored for all atoms (natoms * 4 * sum (2l+1)^2 doubles, 110 MB at 12k atoms and
+// lmax 5). Same time as that store: the norm still grows 14x for 8x the atoms (1EJG x1 -> x8,
+// 12 threads), so the excess is not the store's DRAM traffic. An empty environment keeps 0.
+static vec2 plan_norms(const int natoms, const int nrad1, const int nrad2, const SALTEDDescriptors &v1, const SALTEDDescriptors &v2,
+	const bool v2_is_conj_of_v1, const lambda_plan *const *plans, const size_t nplans)
+{
+	// u = conj(v1) has conj(A1), conj(B1) as its matrices; with nrad2 == nrad1 they are v1's
+	// own (share) and the pair sum flips the sign of their imaginary parts
+	const SALTEDDescriptors &u = v2_is_conj_of_v1 ? v1 : v2;
+	const bool share = v2_is_conj_of_v1 && nrad2 == nrad1;
+	const double s2 = v2_is_conj_of_v1 ? -1.0 : 1.0;
+	int lmax1 = 0, lmax2 = 0;
+	for (size_t k = 0; k < nplans; ++k) { lmax1 = std::max(lmax1, plans[k]->lmax1); lmax2 = std::max(lmax2, plans[k]->lmax2); }
+	if (share) lmax1 = lmax2 = std::max(lmax1, lmax2);
+	err_checkf(2 * std::max(lmax1, lmax2) + 1 <= 64, "equicomb: l above 31 in the descriptors", std::cout);
+	err_checkf(lmax1 < static_cast<int>(v1.offsets().size()) && lmax2 < static_cast<int>(u.offsets().size()),
+		"equicomb: the shells need an l the descriptors do not hold", std::cout);
+	const size_t dsz1 = dm_offset(lmax1 + 1), dsz2 = dm_offset(lmax2 + 1);
+	vec2 normfact(nplans, vec(natoms, 0.0));
+#pragma omp parallel
+	{
+		vec m1(4 * dsz1), m2(share ? 0 : 4 * dsz2);
+#pragma omp for schedule(dynamic, 8)
+		for (int iat = 0; iat < natoms; ++iat)
+		{
+			atom_density(v1, nrad1, lmax1, iat, dsz1, m1.data());
+			if (!share)
+				atom_density(u, nrad2, lmax2, iat, dsz2, m2.data());
+			const double *M2 = share ? m1.data() : m2.data();
+			for (size_t k = 0; k < nplans; ++k)
+			{
+				const double inner = atom_norm2(*plans[k], m1.data(), dsz1, M2, dsz2, s2);
+				// An empty environment gives an all-zero descriptor, so inner is 0 and
+				// 1/sqrt(inner) is +inf, making every feature NaN. Zero is the meaningful
+				// answer: the kernel contributes nothing and the atom keeps the species
+				// average the model adds separately.
+				if (inner > 0.0) [[likely]]
+					normfact[k][iat] = 1.0 / sqrt(inner);
+			}
+		}
+	}
+	return normfact;
+}
+
+vec2 equicomb_norms(int natoms, int nrad1, int nrad2,
+	const SALTEDDescriptors &v1, const SALTEDDescriptors &v2,
+	const std::vector<const vec *> &w3j, const std::vector<ivec2> &llvec, const std::vector<cvec2> &c2r,
+	bool v2_is_conj_of_v1)
+{
+	err_checkf(w3j.size() == llvec.size() && c2r.size() == llvec.size(), "equicomb_norms: one w3j, llvec and c2r per lambda", std::cout);
+	std::vector<lambda_plan> plans;
+	plans.reserve(llvec.size());
+	for (size_t lam = 0; lam < llvec.size(); ++lam)
+		plans.push_back(make_plan(*w3j[lam], llvec[lam], static_cast<int>(lam), c2r[lam]));
+	std::vector<const lambda_plan *> ptr;
+	for (const lambda_plan &q : plans) ptr.push_back(&q);
+	return plan_norms(natoms, nrad1, nrad2, v1, v2, v2_is_conj_of_v1, ptr.data(), ptr.size());
 }
 
 // BE AWARE, THAT V2 IS ALREADY ASSUMED TO BE CONJUGATED!!!!!
@@ -85,7 +245,7 @@ void equicomb(int natoms, int nrad1, int nrad2,
 			  const int &nfps, const std::vector<int64_t> &vfps,
 			  vec &p,
 			  bool v2_is_conj_of_v1,
-			  const equicomb_density *density)
+			  const double *norms)
 {
 	if (natoms < 0 || nrad1 < 0 || nrad2 < 0 || lam < 0 || featsize < 0 || nfps < 0)
 	{
@@ -125,36 +285,9 @@ void equicomb(int natoms, int nrad1, int nrad2,
 
 	std::fill(p.begin(), p.begin() + static_cast<std::ptrdiff_t>(required_p), 0.0);
 
-	// Which (im1, im2) pairs contribute is set by |im1 - mu| <= l2, which depends
-	// only on (il, imu, lam), never on n1 or n2. That test selects a CONTIGUOUS run
-	// of im1, and im2 = im1 - mu + l2 advances in lockstep with it, so a first
-	// index, a length and an offset into w3j describe a group completely. w3j is
-	// consumed in exactly (il, imu, im1) order, so a group's weights are a
-	// contiguous slice of it and need no copy here.
-	struct w3j_run { int im1_begin, im2_begin, count, w_off; };
-	std::vector<w3j_run> runs(static_cast<size_t>(llmax) * l21, w3j_run{0, 0, 0, 0});
-	size_t total_terms = 0;
-	{
-		int w_idx = 0;
-		for (int til = 0; til < llmax; ++til)
-		{
-			const int tl1 = llvec[0][til], tl2 = llvec[1][til];
-			err_checkf(tl1 >= 0 && tl2 >= 0, "equicomb: negative angular momentum in llvec", std::cout);
-			for (int timu = 0; timu < l21; ++timu)
-			{
-				const int tmu = timu - lam + tl1;
-				const int lo = std::max(0, tmu - tl2);
-				const int hi = std::min(2 * tl1, tmu + tl2);
-				const int cnt = (hi >= lo) ? (hi - lo + 1) : 0;
-				runs[static_cast<size_t>(til) * l21 + timu] = { lo, lo - tmu + tl2, cnt, w_idx };
-				w_idx += cnt;
-			}
-		}
-		total_terms = static_cast<size_t>(w_idx);
-	}
-	// w3j is consumed once per (n1,n2) shell pair, one entry per surviving m2, which is what the runs add up to
-	err_checkf(w3j.size() >= total_terms, "equicomb: w3j holds " + std::to_string(w3j.size()) +
-		" entries, the shell loop consumes " + std::to_string(total_terms), std::cout);
+	const lambda_plan plan = make_plan(w3j, llvec, lam, c2r);
+	const std::vector<w3j_run> &runs = plan.runs;
+	const size_t total_terms = plan.total_terms;
 
 	// The complex-to-real matrix is a mirror-pair transform: row i couples only
 	// column i and column l21-1-i, so every row holds exactly two nonzeros (the
@@ -187,39 +320,9 @@ void equicomb(int natoms, int nrad1, int nrad2,
 				  << ", featsize " << featsize << ", nfps " << nfps << std::endl;
 	}
 
-	// Every atom is normalised over all featsize features, but only nfps of them are
-	// kept, and the norm needs none of the others. Feature (n1, n2, il) is Re(q) with
-	// q = c2r pc and pc[mu] = sum_m1 w v1[n1,l1,m1] u[n2,l2,m1-mu], where u is the factor
-	// the loop multiplies by (conj(v1), or v2 as stored). Then
-	//   sum_i Re(q_i)^2 = (q^H q + Re q^T q) / 2
-	//                   = Re(sum K[mu,mu'] pc_mu conj(pc_mu') + sum G[mu,mu'] pc_mu pc_mu') / 2
-	// with K = sum_i c2r[i,mu] conj(c2r[i,mu']) and G = sum_i c2r[i,mu] c2r[i,mu'], and
-	// summed over n1 and n2 both products factor into per-atom, per-l density matrices
-	// A[m,m'] = sum_n x_m conj(x_m') and B[m,m'] = sum_n x_m x_m' of v1 and of u. That is
-	// one pass over m pairs per shell instead of nrad1*nrad2 feature evaluations; the
-	// value is the same up to rounding (SALTED's equicombsparse_numba, a7fbc3a).
-	const int lmax1 = *std::max_element(llvec[0].begin(), llvec[0].end());
-	const int lmax2 = *std::max_element(llvec[1].begin(), llvec[1].end());
-	vec K_re(static_cast<size_t>(l21) * l21, 0.0), K_im(K_re), G_re(K_re), G_im(K_re);
-	for (int a = 0; a < l21; ++a)
-		for (int b = 0; b < l21; ++b)
-		{
-			cdouble k = constants::cnull, g = constants::cnull;
-			for (int i2 = 0; i2 < l21; ++i2)
-			{
-				k += c2r[i2][a] * std::conj(c2r[i2][b]);
-				g += c2r[i2][a] * c2r[i2][b];
-			}
-			const size_t ab = static_cast<size_t>(a) * l21 + b;
-			K_re[ab] = k.real(); K_im[ab] = k.imag(); G_re[ab] = g.real(); G_im[ab] = g.imag();
-		}
 	//Timed from here so both throughput rows include the norm; counted as the nfps
 	//features actually built
 	const _time_point eq_t0 = get_time();
-	// When u = conj(v1) its matrices are the conjugates of v1's, so the pair sum flips the
-	// sign of their imaginary parts; with nrad2 == nrad1 they are v1's own (share)
-	const bool share = v2_is_conj_of_v1 && nrad2 == nrad1;
-	const double s2 = v2_is_conj_of_v1 ? -1.0 : 1.0;
 	vec normfact(natoms, 0.0);
 	// Said once per run, on the first lambda that sees it - NOT gated on lam == 0.
 	// An atom with no neighbours still has an l = 0 descriptor, its own density being
@@ -283,7 +386,7 @@ void equicomb(int natoms, int nrad1, int nrad2,
 		q.runs = flat_runs.data(); q.c2r_cols = cols.data();
 		q.c2r_re = cre.data(); q.c2r_im = cim.data(); q.c2r_cnt = c2r_cnt.data();
 		q.vfps = fps.data(); q.normfact = normfact.data(); q.p = p.data();
-		q.K_re = K_re.data(); q.K_im = K_im.data(); q.G_re = G_re.data(); q.G_im = G_im.data();
+		q.K_re = plan.K_re.data(); q.K_im = plan.K_im.data(); q.G_re = plan.G_re.data(); q.G_im = plan.G_im.data();
 		const bool gpu_ok = salted_gpu_equicomb(q);
 		if (gpu_ok)
 			warn_empty(static_cast<int>(std::count(normfact.begin(), normfact.end(), 0.0)));
@@ -307,76 +410,16 @@ void equicomb(int natoms, int nrad1, int nrad2,
 	}
 #endif
 
+	// The predictor hands in all lambda's norms from one pass (equicomb_norms); a caller
+	// without them gets this lambda's alone
+	if (norms)
+		std::copy(norms, norms + natoms, normfact.begin());
+	else
 	{
-	// The matrices span every l the descriptors hold, so the predictor builds them once
-	// for all lambda; a caller without them, or with them for other dimensions, gets them here
-	equicomb_density local;
-	const equicomb_density *dens = density;
-	if (!dens || !dens->matches(natoms, nrad1, nrad2, v2_is_conj_of_v1))
-	{
-		local = equicomb_density_matrices(natoms, nrad1, nrad2, v1, v2, v2_is_conj_of_v1);
-		dens = &local;
+		const lambda_plan *one = &plan;
+		normfact = plan_norms(natoms, nrad1, nrad2, v1, v2, v2_is_conj_of_v1, &one, 1)[0];
 	}
-	err_checkf(dens->lmax1 >= lmax1 && dens->lmax2 >= lmax2,
-		"equicomb: density matrices stop below the l the shells need", std::cout);
-	const size_t dsz1 = dm_offset(dens->lmax1 + 1), dsz2 = share ? dsz1 : dm_offset(dens->lmax2 + 1);
-	const double *M1 = dens->m1.data(), *M2 = share ? dens->m1.data() : dens->m2.data();
-	int empty_environments = 0;
-#pragma omp parallel for schedule(dynamic, 1) reduction(+ : empty_environments)
-	for (int iat = 0; iat < natoms; ++iat)
-	{
-		const double *m1 = M1 + static_cast<size_t>(iat) * 4 * dsz1, *m2 = M2 + static_cast<size_t>(iat) * 4 * dsz2;
-		double inner = 0.0;
-		for (int il = 0; il < llmax; ++il)
-		{
-			const int l1 = llvec[0][il], l2 = llvec[1][il];
-			const int nm1 = 2 * l1 + 1, nm2 = 2 * l2 + 1;
-			const size_t o1 = dm_offset(l1), o2 = dm_offset(l2);
-			const double *a1r = m1 + o1, *a1i = m1 + dsz1 + o1, *b1r = m1 + 2 * dsz1 + o1, *b1i = m1 + 3 * dsz1 + o1;
-			const double *a2r = m2 + o2, *a2i = m2 + dsz2 + o2, *b2r = m2 + 2 * dsz2 + o2, *b2i = m2 + 3 * dsz2 + o2;
-			double t = 0.0;
-			for (int mu = 0; mu < l21; ++mu)
-			{
-				const w3j_run &r = runs[static_cast<size_t>(il) * l21 + mu];
-				if (r.count == 0) continue;
-				for (int mu2 = 0; mu2 < l21; ++mu2)
-				{
-					const size_t mm = static_cast<size_t>(mu) * l21 + mu2;
-					const w3j_run &r2 = runs[static_cast<size_t>(il) * l21 + mu2];
-					if ((K_re[mm] == 0.0 && K_im[mm] == 0.0 && G_re[mm] == 0.0 && G_im[mm] == 0.0) || r2.count == 0) continue;
-					double Pr = 0.0, Pi = 0.0, Qr = 0.0, Qi = 0.0;
-					for (int x = 0; x < r.count; ++x)
-					{
-						const double w = w3j[static_cast<size_t>(r.w_off) + x];
-						const int i1 = (r.im1_begin + x) * nm1 + r2.im1_begin;
-						const int i2 = (r.im2_begin + x) * nm2 + r2.im2_begin;
-						for (int y = 0; y < r2.count; ++y)
-						{
-							const double ww = w * w3j[static_cast<size_t>(r2.w_off) + y];
-							const double ar = a2r[i2 + y], ai = s2 * a2i[i2 + y];
-							const double br = b2r[i2 + y], bi = s2 * b2i[i2 + y];
-							Pr += ww * (a1r[i1 + y] * ar - a1i[i1 + y] * ai);
-							Pi += ww * (a1r[i1 + y] * ai + a1i[i1 + y] * ar);
-							Qr += ww * (b1r[i1 + y] * br - b1i[i1 + y] * bi);
-							Qi += ww * (b1r[i1 + y] * bi + b1i[i1 + y] * br);
-						}
-					}
-					t += K_re[mm] * Pr - K_im[mm] * Pi + G_re[mm] * Qr - G_im[mm] * Qi;
-				}
-			}
-			inner += 0.5 * t;
-		}
-		// An empty environment gives an all-zero descriptor, so inner is 0 and
-		// 1/sqrt(inner) is +inf, making every feature NaN. Zero is the meaningful
-		// answer: the kernel contributes nothing and the atom keeps the species
-		// average the model adds separately.
-		if (inner > 0.0) [[likely]]
-			normfact[iat] = 1.0 / sqrt(inner);
-		else
-			++empty_environments;
-	}
-	warn_empty(empty_environments);
-	}
+	warn_empty(static_cast<int>(std::count(normfact.begin(), normfact.end(), 0.0)));
 	if (ProgressBar::report_counts)
 		std::cout << "[equicomb] lam " << lam << ": norm " << get_msec(eq_t0, get_time()) << " ms" << std::endl;
 
