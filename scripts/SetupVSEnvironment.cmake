@@ -11,6 +11,15 @@ cmake_minimum_required(VERSION 3.25)
 #       -DRELEASE_PRESET=release-windows
 #       -DDEBUG_PRESET=debug-windows
 #       -P scripts/SetupVSEnvironment.cmake
+#
+# ARM64 (the |ARM64 platform in the solution):
+#
+#   cmake -DPLATFORM=ARM64 -P scripts/SetupVSEnvironment.cmake
+#
+# builds into build/<preset> and installs into deps-install-{release,debug}-arm64,
+# so no ARM64 library lands next to the x64 ones. On an x64 host this uses the
+# cross presets: run it from a vcvarsamd64_arm64 prompt after the x64 setup,
+# whose build/release-windows supplies the host BasisSetConverter.
 
 if(NOT WIN32)
     message(FATAL_ERROR
@@ -27,39 +36,54 @@ if(NOT DEFINED SOURCE_DIR)
     )
 endif()
 
+set(preset_suffix "")
+set(install_suffix "")
+if(PLATFORM STREQUAL "ARM64")
+    cmake_host_system_information(RESULT host_arch QUERY OS_PLATFORM)
+    if(host_arch MATCHES "ARM64")
+        set(preset_suffix "-arm64")
+    else()
+        set(preset_suffix "-arm64-cross")
+    endif()
+    set(install_suffix "-arm64")
+elseif(DEFINED PLATFORM AND NOT PLATFORM STREQUAL "x64")
+    message(FATAL_ERROR "PLATFORM must be x64 or ARM64, not '${PLATFORM}'")
+endif()
+
 if(NOT DEFINED RELEASE_PRESET)
-    set(RELEASE_PRESET "release-windows")
+    set(RELEASE_PRESET "release-windows${preset_suffix}")
 endif()
 
 if(NOT DEFINED DEBUG_PRESET)
-    set(DEBUG_PRESET "debug-windows")
+    set(DEBUG_PRESET "debug-windows${preset_suffix}")
 endif()
 
+# Every Windows preset builds into build/<preset name>
 if(NOT DEFINED RELEASE_BUILD_DIR)
     set(
         RELEASE_BUILD_DIR
-        "${SOURCE_DIR}/build/release-windows"
+        "${SOURCE_DIR}/build/${RELEASE_PRESET}"
     )
 endif()
 
 if(NOT DEFINED DEBUG_BUILD_DIR)
     set(
         DEBUG_BUILD_DIR
-        "${SOURCE_DIR}/build/debug-windows"
+        "${SOURCE_DIR}/build/${DEBUG_PRESET}"
     )
 endif()
 
 if(NOT DEFINED RELEASE_INSTALL_DIR)
     set(
         RELEASE_INSTALL_DIR
-        "${SOURCE_DIR}/deps-install-release"
+        "${SOURCE_DIR}/deps-install-release${install_suffix}"
     )
 endif()
 
 if(NOT DEFINED DEBUG_INSTALL_DIR)
     set(
         DEBUG_INSTALL_DIR
-        "${SOURCE_DIR}/deps-install-debug"
+        "${SOURCE_DIR}/deps-install-debug${install_suffix}"
     )
 endif()
 
