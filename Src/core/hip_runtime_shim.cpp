@@ -51,6 +51,8 @@ void __hipUnregisterFatBinary(void** modules);
 	F(hipError_t, hipHostMalloc, (void** ptr, size_t size, unsigned int flags), (ptr, size, flags)) \
 	F(hipError_t, hipFree, (void* ptr), (ptr)) \
 	F(hipError_t, hipHostFree, (void* ptr), (ptr)) \
+	F(hipError_t, hipHostRegister, (void* hostPtr, size_t sizeBytes, unsigned int flags), (hostPtr, sizeBytes, flags)) \
+	F(hipError_t, hipHostUnregister, (void* hostPtr), (hostPtr)) \
 	F(hipError_t, hipMemcpy, (void* dst, const void* src, size_t sizeBytes, hipMemcpyKind kind), (dst, src, sizeBytes, kind)) \
 	F(hipError_t, hipMemcpyAsync, (void* dst, const void* src, size_t sizeBytes, hipMemcpyKind kind, hipStream_t stream), (dst, src, sizeBytes, kind, stream)) \
 	F(hipError_t, hipMemset, (void* dst, int value, size_t sizeBytes), (dst, value, sizeBytes)) \
@@ -165,6 +167,8 @@ NOSPHERA2_HIP_FORWARD(hipMalloc, (void** ptr, size_t size), (ptr, size))
 NOSPHERA2_HIP_FORWARD(hipHostMalloc, (void** ptr, size_t size, unsigned int flags), (ptr, size, flags))
 NOSPHERA2_HIP_FORWARD(hipFree, (void* ptr), (ptr))
 NOSPHERA2_HIP_FORWARD(hipHostFree, (void* ptr), (ptr))
+NOSPHERA2_HIP_FORWARD(hipHostRegister, (void* hostPtr, size_t sizeBytes, unsigned int flags), (hostPtr, sizeBytes, flags))
+NOSPHERA2_HIP_FORWARD(hipHostUnregister, (void* hostPtr), (hostPtr))
 NOSPHERA2_HIP_FORWARD(hipMemcpy, (void* dst, const void* src, size_t sizeBytes, hipMemcpyKind kind), (dst, src, sizeBytes, kind))
 NOSPHERA2_HIP_FORWARD(hipMemcpyAsync, (void* dst, const void* src, size_t sizeBytes, hipMemcpyKind kind, hipStream_t stream), (dst, src, sizeBytes, kind, stream))
 NOSPHERA2_HIP_FORWARD(hipMemset, (void* dst, int value, size_t sizeBytes), (dst, value, sizeBytes))
