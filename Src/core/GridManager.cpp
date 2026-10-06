@@ -657,13 +657,13 @@ void GridManager::generateIntegrationGrids(const WFN &wave, const cell &unit_cel
 		}
 		//Once per run. Every other GPU path announces itself; this one did not, which
 		//is how it fell back to the CPU for a session with its test still passing.
-		static std::atomic<bool> announced{false};
-		if (first == num_atoms_with_grids && !announced.exchange(true) && !constants::hide_gpu_notes)
+		static std::atomic<unsigned> announced{0};
+		if (first == num_atoms_with_grids && constants::first_this_run(announced) && !constants::hide_gpu_notes)
 			std::cout << "GPU in use: atomic grid weights (Becke and TFVC) on " << grid_gpu_backend() << std::endl;
 	}
 	else if (grid_gpu_enabled() && total_atoms > 1) {
-		static std::atomic<bool> warned{false};
-		if (!warned.exchange(true) && !constants::hide_gpu_notes)
+		static std::atomic<unsigned> warned{0};
+		if (constants::first_this_run(warned) && !constants::hide_gpu_notes)
 			std::cout << "-gpu_grid asked for but not used: chi is " << chi_matrix.size()
 					  << " entries, the kernel needs " << (size_t)total_atoms * total_atoms
 					  << ". Weights stay on the CPU." << std::endl;

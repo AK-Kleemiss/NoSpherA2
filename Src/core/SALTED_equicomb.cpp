@@ -330,10 +330,9 @@ void equicomb(int natoms, int nrad1, int nrad2,
 	// them leaves the atom spherical, which is the right answer for it.
 	auto warn_empty = [](const int empty_environments)
 	{
-		static bool warned_empty_environment = false;
-		if (empty_environments > 0 && !warned_empty_environment)
+		static std::atomic<unsigned> warned_empty_environment{0};
+		if (empty_environments > 0 && constants::first_this_run(warned_empty_environment))
 		{
-			warned_empty_environment = true;
 			std::cout << "WARNING: " << empty_environments << " atom(s) have no neighbour"
 					  << " inside the descriptor cutoff.\n"
 					  << "         Their environment singles out no direction, so their"
@@ -396,9 +395,8 @@ void equicomb(int natoms, int nrad1, int nrad2,
 				get_msec(eq_t0, get_time()));
 		//Once per run, not once per lambda: nine identical lines say nothing extra.
 		//Printed before the progress bar exists, whose carriage returns would eat it.
-		static bool announced = false;
-		if (!announced && !constants::hide_gpu_notes) {
-			announced = true;
+		static std::atomic<unsigned> announced{0};
+		if (!constants::hide_gpu_notes && constants::first_this_run(announced)) {
 			std::cout << "GPU in use: SALTED descriptors on "
 					  << (gpu_ok ? "the device (double precision)" : "the CPU - device unavailable") << std::endl;
 		}

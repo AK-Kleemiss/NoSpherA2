@@ -696,8 +696,8 @@ void calc_aux_density(const aux_density_table& t, const vec& coefficients, const
 	err_checkf(hess == nullptr || gx != nullptr, "The Hessian of the fitted density needs the gradient arrays", std::cout);
 #ifdef NOSPHERA2_USE_GPU
 	if (aux_density_gpu_enabled() && aux_density_gpu_eval(t.n_at, t.cx.data(), t.cy.data(), t.cz.data(), t.r2_max.data(), t.n_sh, t.sh_start.data(), t.sh_l.data(), t.pr_start.data(), t.coef_off.data(), t.n_pr, t.pr_exp.data(), t.pr_norm.data(), t.n_coef, coefficients.data(), np, x, y, z, rho, gx, gy, gz, lap, hess)) {
-		static std::atomic<bool> announced{ false };
-		if (!announced.exchange(true) && !constants::hide_gpu_notes)
+		static std::atomic<unsigned> announced{ 0 };
+		if (constants::first_this_run(announced) && !constants::hide_gpu_notes)
 			std::cout << "GPU in use: fitted density on the grid" << std::endl;
 		return;
 	}

@@ -8,6 +8,11 @@ namespace constants
 	extern double exp_cutoff;
 	extern bool hide_gpu_notes;
 	extern bool hide_timings; //-no_date: wall-clock lines would make the log non-reproducible
+	//Bumped at the start of every run_app. Olex2 and the test suite call run_app repeatedly in one
+	//process, where a plain static "said it once" latch stays set and the next run's log loses the line.
+	extern unsigned run_id;
+	//True on the first call per run for this latch (a static std::atomic<unsigned> latch{0} at the call site)
+	inline bool first_this_run(std::atomic<unsigned> &latch) { return latch.exchange(run_id) != run_id; }
 	//x^lx y^ly z^lz = sum_m sph2cart(l)[cart * n_spher(l) + m] R_lm, cartesians in WFN type order,
 	//R_lm the real solid harmonics in ORCA/Gaussian order m = 0,+1,-1,+2,-2,...
 	constexpr int n_cart(const int l) { return (l + 1) * (l + 2) / 2; };

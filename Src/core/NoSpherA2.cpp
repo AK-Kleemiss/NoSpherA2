@@ -70,6 +70,10 @@ int run_app(int argc, char **argv)
 static int run_app_impl(int argc, char **argv)
 {
 	using namespace std;
+	//Process-wide state an earlier run in this process left behind: re-arm the once-per-run
+	//notes, and drop -no_date's hiding, which only the flags themselves ever set
+	++constants::run_id;
+	constants::hide_gpu_notes = constants::hide_timings = false;
 	const std::filesystem::path cwd = std::filesystem::current_path();
 	string output_file = "NoSpherA2.log";
 	bool no_date = false;
