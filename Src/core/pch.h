@@ -43,7 +43,9 @@
 // Windows on ARM: oneMKL has no ARM64 build, OpenBLAS supplies CBLAS and LAPACKE
 #include <cblas.h>
 // MSVC C++ cannot parse the C99 _Complex default
-#define LAPACK_COMPLEX_STRUCTURE
+#include <complex>
+#define lapack_complex_float std::complex<float>
+#define lapack_complex_double std::complex<double>
 #include <lapacke.h>
 #define MKL_Set_Num_Threads(num) openblas_set_num_threads(num)
 #else
