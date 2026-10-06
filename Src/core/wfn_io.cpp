@@ -2809,8 +2809,12 @@ bool WFN::read_fchk(const std::filesystem::path &filename, std::ostream &log, co
 	err_checkf(read_fchk_integer_block(fchk, "Atomic numbers", atnbrs), "Error reading atnbrs", log);
 	ncen = static_cast<int>(atnbrs.size());
 	atoms.resize(ncen);
+	//1-based like push_back_atom gives every other reader; RGBI indexes its per-atom blocks by get_nr() - 1
 	for (int i = 0; i < ncen; i++)
+	{
 		atoms[i].set_label(constants::atnr2letter(atnbrs[i]));
+		atoms[i].set_nr(i + 1);
+	}
 	vec charges;
 	err_checkf(read_fchk_double_block(fchk, "Nuclear charges", charges), "Error reading charges", log);
 	for (int i = 0; i < charges.size(); i++)
