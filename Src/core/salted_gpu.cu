@@ -337,8 +337,14 @@ bool salted_gpu_equicomb(const salted_gpu_problem& q)
 
 	//Pin p in place for the copy: a pageable copy runs through the driver's single-threaded staging
 	//(66 MB in 14 ms on a V100 node), registering costs 2.4 + 1.0 ms and the copy then takes 5 ms.
-	//A pinned staging buffer of our own was no faster, its host-side memcpy is the same bottleneck
+	//A pinned staging buffer of our own was no faster, its host-side memcpy is the same bottleneck.
+	//Not on Windows: under WDDM the pageable copy already runs at the PCIe rate (5.3 ms on a 2080 Ti)
+	//and a copy into registered memory is slower (8.5-14 ms), 1EJG went from 107 to 179 ms
+#ifdef _WIN32
+	const bool pinned = false;
+#else
 	const bool pinned = gpuHostRegister(q.p, p_bytes) == gpuSuccess;
+#endif
 	if (!pinned) (void)gpuGetLastError();
 	const gpuError_t copied = gpuMemcpy(q.p, d_p, p_bytes, gpuMemcpyDeviceToHost);
 	if (pinned) gpuHostUnregister(q.p);
