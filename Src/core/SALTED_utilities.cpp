@@ -121,23 +121,53 @@ std::vector<char> SALTED_Utils::filter_input(WFN& wavy, options& opt, const SALT
 	// rcut is in Angstrom, the coordinates may not be
 	const double rcut_internal = wavy.get_isBohr() ? constants::ang2bohr(rcut) : rcut;
 	const double cut_sq = rcut_internal * rcut_internal;
+	// Cells of edge rcut: a neighbour within rcut sits in the atom's own cell or one of the 26
+	// around it, so the test grows with the atom count rather than its square. No periodic
+	// images, because the featomic system has no cell either.
+	std::vector<std::array<double, 3>> pos(ncen_in);
+	std::array<double, 3> lo;
+	lo.fill(std::numeric_limits<double>::max());
+	for (int a = 0; a < ncen_in; a++)
+		for (int ax = 0; ax < 3; ax++)
+		{
+			pos[a][ax] = wavy.get_atom_coordinate(a, ax);
+			lo[ax] = std::min(lo[ax], pos[a][ax]);
+		}
+	auto cell = [&](const int a, const int ax) { return static_cast<long long>((pos[a][ax] - lo[ax]) / rcut_internal); };
+	long long n_cell[3] = { 1, 1, 1 };
+	for (int a = 0; a < ncen_in; a++)
+		for (int ax = 0; ax < 3; ax++)
+			n_cell[ax] = std::max(n_cell[ax], cell(a, ax) + 1);
+	auto key = [&](const long long x, const long long y, const long long z) { return x + n_cell[0] * (y + n_cell[1] * z); };
+	std::unordered_map<long long, ivec> cells;
+	for (int a = 0; a < ncen_in; a++)
+		cells[key(cell(a, 0), cell(a, 1), cell(a, 2))].push_back(a);
+
 	int n_isolated = 0;
 #pragma omp parallel for reduction(+ : n_isolated)
 	for (int a = 0; a < ncen_in; a++)
 	{
 		if (use_thakkar[a]) continue;
 		bool lonely = true;
-		for (int b = 0; b < ncen_in && lonely; b++)
-		{
-			if (b == a) continue;
-			double d_sq = 0.0;
-			for (unsigned int ax = 0; ax < 3; ax++)
-			{
-				const double dx = wavy.get_atom_coordinate(a, ax) - wavy.get_atom_coordinate(b, ax);
-				d_sq += dx * dx;
-			}
-			if (d_sq < cut_sq) lonely = false;
-		}
+		const long long cx = cell(a, 0), cy = cell(a, 1), cz = cell(a, 2);
+		for (long long x = std::max(cx - 1, 0LL); x <= std::min(cx + 1, n_cell[0] - 1) && lonely; x++)
+			for (long long y = std::max(cy - 1, 0LL); y <= std::min(cy + 1, n_cell[1] - 1) && lonely; y++)
+				for (long long z = std::max(cz - 1, 0LL); z <= std::min(cz + 1, n_cell[2] - 1) && lonely; z++)
+				{
+					const auto it = cells.find(key(x, y, z));
+					if (it == cells.end()) continue;
+					for (const int b : it->second)
+					{
+						if (b == a) continue;
+						double d_sq = 0.0;
+						for (int ax = 0; ax < 3; ax++)
+						{
+							const double dx = pos[a][ax] - pos[b][ax];
+							d_sq += dx * dx;
+						}
+						if (d_sq < cut_sq) { lonely = false; break; }
+					}
+				}
 		if (lonely)
 		{
 			use_thakkar[a] = 1;   // distinct indices, and char so there is no bitfield to race on

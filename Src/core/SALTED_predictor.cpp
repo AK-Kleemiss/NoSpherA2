@@ -68,7 +68,12 @@ SALTEDPredictor::SALTEDPredictor(WFN wavy_in, options& opt_in)
 			natoms++;
 	}//natoms is the number of atoms, that featomic creates a descriptor as a central atom for.
 
+	const auto _t_filter = std::chrono::steady_clock::now();
 	const std::vector<char> use_thakkar = SALTED_Utils::filter_input(wavy, opt_in, config);
+	if (ProgressBar::report_counts)
+		std::cout << "[stages] filter input "
+				  << std::chrono::duration<double>(std::chrono::steady_clock::now() - _t_filter).count()
+				  << " s" << std::endl;
 	if (!use_thakkar.empty()) {
 		spherical_fill_used = true;
 		estimate_fill_charges(wavy_in, use_thakkar, opt_in);
@@ -639,22 +644,27 @@ vec SALTEDPredictor::predict()
 
 			if (config.zeta == 1)
 			{
-				psi_nm[spe_idx][lam] = kernel_nm;
+				psi_nm[spe_idx][lam] = std::move(kernel_nm);
 			}
 			else {
 
 				if (lam == 0)
 				{
-					kernell0[spe_idx] = kernel_nm;
+					// Every lambda above scales by k0^(zeta-1), so that power is taken once, here
+					kernell0[spe_idx] = elementWiseExponentiation(kernel_nm, config.zeta - 1);
 					kernel_nm = elementWiseExponentiation(kernel_nm, config.zeta);
 				}
 				else
 				{
-					for (size_t i1 = 0; i1 < natom_dict[spe]; ++i1)
+					const dMatrix2 &k0 = kernell0[spe_idx];
+					const int n_at = (int)natom_dict[spe];
+					const size_t n_env = Mspe[spe];
+#pragma omp parallel for
+					for (int i1 = 0; i1 < n_at; ++i1)
 					{
-						for (size_t i2 = 0; i2 < Mspe[spe]; ++i2)
+						for (size_t i2 = 0; i2 < n_env; ++i2)
 						{
-							double scale_factor = pow(kernell0[spe_idx](i1, i2), config.zeta - 1);
+							const double scale_factor = k0(i1, i2);
 							size_t base_i = i1 * lam2_1;
 							size_t base_j = i2 * lam2_1;
 							for (size_t i = 0; i < lam2_1; ++i)

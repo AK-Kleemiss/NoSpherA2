@@ -3267,8 +3267,18 @@ bool options::digest_partition_options(const std::string &temp, int &i)
 		if (use_gpu && gpu_salted)
 			sf_gpu_warmup_start();
 #endif
+		// The stages around the prediction, which reports its own
+		auto mark = std::chrono::steady_clock::now();
+		auto lap = [&mark](const char* what) {
+			const auto now = std::chrono::steady_clock::now();
+			if (ProgressBar::report_counts)
+				std::cout << "[stages] " << what << " " << std::chrono::duration<double>(now - mark).count() << " s" << std::endl;
+			mark = now;
+		};
 		WFN wavy(wfn);
+		lap("read structure");
 		SALTEDPredictor SP(wavy, *this);
+		lap("predictor setup");
 		filesystem::path salted_model_path = SP.get_salted_filename();
 		log_file << "Using " << salted_model_path << " for the prediction" << endl;
 		if (!SP.basis_set_loaded()) {
@@ -3276,7 +3286,9 @@ bool options::digest_partition_options(const std::string &temp, int &i)
 			std::shared_ptr<BasisSet> _aux_basis = BasisSetLibrary::get_basis_set(df_basis_name);
 			load_basis_into_WFN(SP.wavy, _aux_basis);
 		}
+		lap("basis");
 		vec coefs = SP.gen_SALTED_densities();
+		lap("prediction");
 
 		const aux_density_table t(SP.wavy.get_atoms());
 
@@ -3286,12 +3298,14 @@ bool options::digest_partition_options(const std::string &temp, int &i)
 			t,
 			vec(),
 			false);
+		lap("fit quality");
 
 		npy::npy_data<double> np_coeffs;
 		np_coeffs.data = coefs;
 		np_coeffs.fortran_order = false;
 		np_coeffs.shape = { static_cast<unsigned long>(coefs.size()) };
 		npy::write_npy("SALTED_COEFS.npy", np_coeffs);
+		lap("write coefficients");
 	}
 	else if (temp == "-SALTED_Training") {
 		err_checkf(!wfn.empty(), "No wavefunction specified! Use -wfn option BEFORE -test_RI to specify a wavefunction.", std::cout);

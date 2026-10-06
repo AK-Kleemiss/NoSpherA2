@@ -13,6 +13,7 @@
 #include <occ/qm/hf.h>
 #include <occ/qm/scf.h>
 #include <spdlog/spdlog.h>
+#include <random>
 #undef I
 
 namespace
@@ -735,6 +736,36 @@ TEST(SaltedFchkUtilTests, FilterInputRemovesIsolatedAtom)
 	EXPECT_EQ(removed[0] + removed[1], 0);
 	EXPECT_EQ(w.get_ncen(), 2);
 	EXPECT_TRUE(opt.needs_Thakkar_fill);
+}
+
+// the cell list finds exactly the atoms an all-pairs scan finds: a sparse cloud across many
+// cells and negative coordinates, so pairs straddle every kind of cell boundary
+TEST(SaltedFchkUtilTests, FilterInputCellListMatchesAllPairs)
+{
+	WFN w;
+	std::mt19937 gen(7);
+	std::uniform_real_distribution<double> u(-25.0, 25.0);
+	for (int a = 0; a < 300; a++)
+		w.push_back_atom(a % 2 ? "H" : "O", u(gen), u(gen), u(gen), a % 2 ? 1 : 8);
+	const double rcut = 3.0;
+	const double r = w.get_isBohr() ? constants::ang2bohr(rcut) : rcut;
+	std::vector<char> expect(w.get_ncen(), 1);
+	for (int a = 0; a < w.get_ncen(); a++)
+		for (int b = 0; b < w.get_ncen(); b++)
+		{
+			double d_sq = 0.0;
+			for (int ax = 0; ax < 3; ax++)
+				d_sq += std::pow(w.get_atom_coordinate(a, ax) - w.get_atom_coordinate(b, ax), 2);
+			if (b != a && d_sq < r * r) expect[a] = 0;
+		}
+	const int n_lonely = (int)std::count(expect.begin(), expect.end(), (char)1);
+	ASSERT_GT(n_lonely, 10);
+	ASSERT_LT(n_lonely, 290);
+	options opt;
+	SALTEDConfig cfg{};
+	cfg.species = { "H", "O" };
+	cfg.rcut1 = cfg.rcut2 = rcut;
+	EXPECT_EQ(SALTED_Utils::filter_input(w, opt, cfg), expect);
 }
 
 // the cube overload evaluates the table on the grid; atom_nr slices out that atom's coefficients
