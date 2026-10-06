@@ -1904,6 +1904,9 @@
     <ClInclude Include="..\..\Src\core\properties.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Src\core\ibo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Src\core\scatterer_id.h">
       <Filter>Header Files</Filter>
     </ClInclude>

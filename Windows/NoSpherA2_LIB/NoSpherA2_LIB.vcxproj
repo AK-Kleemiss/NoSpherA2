@@ -122,6 +122,7 @@
     <ClInclude Include="..\..\Src\core\grid_gpu.h" />
     <ClInclude Include="..\..\Src\core\GridManager.h" />
     <ClInclude Include="..\..\Src\core\i_tensor_stream.h" />
+    <ClInclude Include="..\..\Src\core\ibo.h" />
     <ClInclude Include="..\..\Src\core\integration_params.h" />
     <ClInclude Include="..\..\Src\core\integrator.h" />
     <ClInclude Include="..\..\Src\core\isosurface.h" />
