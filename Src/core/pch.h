@@ -113,7 +113,7 @@
 #include <shobjidl.h>
 #include <algorithm>
 #else
-#define GetCurrentDir getcwd
+#define GetCurrentDir std::filesystem::current_path().string() // bare getcwd streamed a function pointer ("1" on glibc, an error on bionic)
 #include <optional>
 #include <unistd.h>
 #include <cfloat>

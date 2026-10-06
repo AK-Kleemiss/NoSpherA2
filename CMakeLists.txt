@@ -9,6 +9,9 @@ message(STATUS "CMAKE_BUILD_TYPE = ${CMAKE_BUILD_TYPE}")
 if((WIN32 AND CMAKE_CXX_COMPILER_ARCHITECTURE_ID STREQUAL "ARM64")
    OR (LINUX AND CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64"))
     set(NOSPHERA2_OPENBLAS ON)
+elseif(ANDROID)
+    # Android (NDK): static OpenBLAS from NOSPHERA2_OPENBLAS_ROOT, NDK libomp linked statically
+    set(NOSPHERA2_OPENBLAS ON)
 else()
     set(NOSPHERA2_OPENBLAS OFF)
 endif()
@@ -441,7 +444,9 @@ include(NoSpherA2Sanitizers)
 include(ValidateMambaEnvironemt)
 include(CopyRuntimeLibraries)
 include(NoSpherA2Optimizations)
-validate_micromamba_environment()
+if(NOT ANDROID) # the NDK cross build takes nothing from the micromamba environment
+    validate_micromamba_environment()
+endif()
 
 
 # ---------------------------------------------------------------------------
@@ -543,6 +548,22 @@ if(MSVC AND CMAKE_CXX_COMPILER_ARCHITECTURE_ID STREQUAL "ARM64")
         "$<$<COMPILE_LANGUAGE:CXX>:/FI${CMAKE_CURRENT_SOURCE_DIR}/cmake/eigen5_compat.h>")
 endif()
 
+#Android: oneTBB static, so the APK ships one executable and no libtbb.so.12 (a versioned SONAME
+#cannot live in jniLibs). occ's own CPMAddPackage(oneTBB) then reuses this one.
+if(ANDROID)
+    include("${CMAKE_CURRENT_SOURCE_DIR}/occ/cmake/CPM.cmake")
+    set(_nos_bsl ${BUILD_SHARED_LIBS})
+    set(BUILD_SHARED_LIBS OFF)
+    CPMAddPackage(
+        NAME oneTBB
+        GITHUB_REPOSITORY "uxlfoundation/oneTBB"
+        VERSION "2022.2.0"
+        OPTIONS "TBB_TEST OFF" "TBB_EXAMPLES OFF" "TBB_STRICT OFF" "BUILD_SHARED_LIBS OFF"
+                "TBB_DISABLE_HWLOC_AUTOMATIC_SEARCH ON"
+    )
+    set(BUILD_SHARED_LIBS ${_nos_bsl})
+endif()
+
 set(USE_SYSTEM_LIBCINT ON)
 set(BUILD_FPIC ON)
 set(WITH_PYTHON_BINDINGS OFF)
@@ -553,6 +574,11 @@ add_subdirectory(
     "${CMAKE_BINARY_DIR}/_deps/occ"
     EXCLUDE_FROM_ALL
 )
+#32-bit Android: clang 18 at -O3 needs >45 min per big generated libecpint Q*.cpp for i686 (6 min
+#on arm64); ECP integrals only run for ECP basis sets, so -O1 there costs nothing for light atoms
+if(ANDROID AND CMAKE_SIZEOF_VOID_P EQUAL 4 AND TARGET libecpint_static)
+    target_compile_options(libecpint_static PRIVATE -O1)
+endif()
 
 # ---------------------------------------------------------------------------
 # mdspan
@@ -629,6 +655,18 @@ elseif(NOSPHERA2_OPENBLAS AND LINUX)
         INTERFACE_COMPILE_DEFINITIONS NSA2_OPENBLAS
         #MKL's libiomp5 used to supply the GOMP_* symbols; without it libgomp has to be linked
         INTERFACE_LINK_OPTIONS -fopenmp)
+elseif(ANDROID)
+    # Static OpenBLAS built with the NDK (USE_OPENMP=1, C_LAPACK, LAPACKE) under NOSPHERA2_OPENBLAS_ROOT
+    set(NOSPHERA2_OPENBLAS_ROOT "" CACHE PATH "Android: install prefix of the NDK-built static OpenBLAS")
+    find_path(NOSPHERA2_OPENBLAS_INCLUDE_DIR cblas.h PATHS "${NOSPHERA2_OPENBLAS_ROOT}/include"
+        PATH_SUFFIXES openblas NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH REQUIRED)
+    find_library(NOSPHERA2_OPENBLAS_LIB NAMES libopenblas.a openblas PATHS "${NOSPHERA2_OPENBLAS_ROOT}/lib"
+        NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH REQUIRED)
+    add_library(nosphera2_openblas INTERFACE IMPORTED)
+    set_target_properties(nosphera2_openblas PROPERTIES
+        INTERFACE_LINK_LIBRARIES "${NOSPHERA2_OPENBLAS_LIB}"
+        INTERFACE_INCLUDE_DIRECTORIES "${NOSPHERA2_OPENBLAS_INCLUDE_DIR}"
+        INTERFACE_COMPILE_DEFINITIONS NSA2_OPENBLAS)
 elseif(NOSPHERA2_OPENBLAS)
     # oneMKL has no Windows ARM64 build. conda-forge's OpenBLAS carries LAPACKE and the headers;
     # its include dir is Library/include or Library/include/openblas depending on the build.

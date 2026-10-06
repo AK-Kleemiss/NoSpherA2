@@ -463,7 +463,8 @@ NboResults parse_nbo_output(const std::filesystem::path& nbo_file) {
 	//Under NRTDTL the weight vector carries five decimals and the zero-weight tail the printed table omits;
 	//those structures are added here. The table's RS column, like $NRTSTR, is a rank by descending weight,
 	//not a structure number, so rank k pairs with the k-th largest fraction.
-	for (const auto& [sp, fractions] : weight_fractions) {
+	for (const auto& wf : weight_fractions) {
+		const auto& sp = wf.first; const auto& fractions = wf.second; //no structured binding: clang<=18 cannot capture one under -fopenmp
 		std::vector<size_t> order(fractions.size());
 		for (size_t i = 0; i < order.size(); i++) order[i] = i;
 		std::stable_sort(order.begin(), order.end(),

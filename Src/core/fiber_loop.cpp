@@ -17,6 +17,9 @@
 #endif
 #if defined(__linux__) && defined(__x86_64__)
 #define NOS_FIBER_ASM 1
+#elif defined(__ANDROID__)
+//bionic has no getcontext/makecontext/swapcontext: no fibers, fiber_loop runs the body serially
+#define NOS_FIBER_NONE 1
 #else
 #include <ucontext.h>
 #endif
@@ -79,6 +82,8 @@ constexpr size_t fiber_stack = 512 * 1024;
 struct ctx { void *h = nullptr; };
 #elif defined(NOS_FIBER_ASM)
 struct ctx { void *sp = nullptr; };
+#elif defined(NOS_FIBER_NONE)
+struct ctx {};
 #else
 struct ctx { ucontext_t uc{}; };
 #endif
@@ -89,6 +94,8 @@ void switch_to(ctx &from, ctx &to)
 	SwitchToFiber(to.h);
 #elif defined(NOS_FIBER_ASM)
 	nos_fiber_switch(&from.sp, to.sp);
+#elif defined(NOS_FIBER_NONE)
+	(void)from; (void)to;
 #else
 	swapcontext(&from.uc, &to.uc);
 #endif
@@ -126,6 +133,7 @@ void fiber_main(fiber *f)
 void CALLBACK fiber_entry(void *p) { fiber_main(static_cast<fiber *>(p)); }
 #elif defined(NOS_FIBER_ASM)
 void fiber_entry(fiber *f) { fiber_main(f); }
+#elif defined(NOS_FIBER_NONE)
 #else
 void fiber_entry() { fiber_main(t_sched->cur); }
 #endif
@@ -135,6 +143,9 @@ bool make(fiber &f)
 #ifdef _WIN32
 	f.c.h = CreateFiberEx(64 * 1024, fiber_stack, FIBER_FLAG_FLOAT_SWITCH, fiber_entry, &f);
 	return f.c.h != nullptr;
+#elif defined(NOS_FIBER_NONE)
+	(void)f;
+	return false;
 #else
 	f.stack = mmap(nullptr, fiber_stack, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_STACK, -1, 0);
 	if (f.stack == MAP_FAILED) { f.stack = nullptr; return false; }
