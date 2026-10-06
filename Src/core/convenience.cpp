@@ -14,6 +14,9 @@
 #include "geometry_aid.h"
 #include "crystal_energies.h"
 #include "SALTED_equicomb.h"
+#ifdef NOSPHERA2_USE_GPU
+#include "sf_gpu.h"
+#endif
 #include "nbo_run.h"
 #include "nbo.h"
 #include "eli_family.h"
@@ -3255,12 +3258,16 @@ bool options::digest_partition_options(const std::string &temp, int &i)
 		//Check that wfn is not empty
 		err_checkf(!wfn.empty(), "No wavefunction specified! Use -wfn option BEFORE -SALTED_COEFS to specify a wavefunction.", std::cout);
 
-		WFN wavy(wfn);
 #ifdef NOSPHERA2_USE_GPU
 		//This runs inside the parser, before run_app_impl sets the GPU globals from opt, so the
 		//descriptor path was whatever the previous run in the process left on. Needs -no_gpu_salted before -SALTED_COEFS.
 		equicomb_set_gpu(use_gpu && gpu_salted);
+		//Nor does it get run_app's warm-up: started here, context creation overlaps reading the
+		//wavefunction and the model, and predict() joins it
+		if (use_gpu && gpu_salted)
+			sf_gpu_warmup_start();
 #endif
+		WFN wavy(wfn);
 		SALTEDPredictor SP(wavy, *this);
 		filesystem::path salted_model_path = SP.get_salted_filename();
 		log_file << "Using " << salted_model_path << " for the prediction" << endl;

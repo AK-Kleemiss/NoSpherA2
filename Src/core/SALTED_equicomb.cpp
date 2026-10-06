@@ -18,6 +18,63 @@ bool equicomb_gpu_enabled() { return g_equicomb_use_gpu; }
 #include "salted_gpu.h"
 #endif
 
+// Start of the l block in one atom's matrices: sum_{k<l} (2k+1)^2
+static size_t dm_offset(const int l) { return static_cast<size_t>(l * (2 * l - 1) * (2 * l + 1) / 3); }
+
+// A and B of every atom for l = 0..lmax, real and imaginary parts apart: plain double loops
+// vectorise, std::complex products without -ffast-math do not
+static void build_density(const SALTEDDescriptors &d, const int nch, const int lmax, const int natoms, vec &out)
+{
+	err_checkf(2 * lmax + 1 <= 64, "equicomb: l above 31 in the descriptors", std::cout);
+	const size_t dsz = dm_offset(lmax + 1);
+	out.assign(static_cast<size_t>(natoms) * 4 * dsz, 0.0);
+#pragma omp parallel for schedule(static)
+	for (int iat = 0; iat < natoms; ++iat)
+	{
+		double *m = out.data() + static_cast<size_t>(iat) * 4 * dsz;
+		double xr[64], xi[64];
+		for (int l = 0; l <= lmax; ++l)
+		{
+			const int nm = 2 * l + 1;
+			const size_t o = dm_offset(l);
+			double *__restrict are = m + o, *__restrict aim = m + dsz + o;
+			double *__restrict bre = m + 2 * dsz + o, *__restrict bim = m + 3 * dsz + o;
+			for (int n = 0; n < nch; ++n)
+			{
+				const cdouble *x = d.block(iat, n, l);
+				for (int a = 0; a < nm; ++a) { xr[a] = x[a].real(); xi[a] = x[a].imag(); }
+				for (int a = 0; a < nm; ++a)
+					for (int b = 0; b < nm; ++b)
+					{
+						are[a * nm + b] += xr[a] * xr[b] + xi[a] * xi[b];
+						aim[a * nm + b] += xi[a] * xr[b] - xr[a] * xi[b];
+						bre[a * nm + b] += xr[a] * xr[b] - xi[a] * xi[b];
+						bim[a * nm + b] += xi[a] * xr[b] + xr[a] * xi[b];
+					}
+			}
+		}
+	}
+}
+
+equicomb_density equicomb_density_matrices(int natoms, int nrad1, int nrad2,
+	const SALTEDDescriptors &v1, const SALTEDDescriptors &v2, bool v2_is_conj_of_v1)
+{
+	equicomb_density d;
+	d.natoms = natoms; d.nrad1 = nrad1; d.nrad2 = nrad2; d.conj = v2_is_conj_of_v1;
+	// u = conj(v1) has conj(A1), conj(B1) as its matrices; with nrad2 == nrad1 they are v1's own
+	const SALTEDDescriptors &u = v2_is_conj_of_v1 ? v1 : v2;
+	d.lmax1 = static_cast<int>(v1.offsets().size()) - 1;
+	build_density(v1, nrad1, d.lmax1, natoms, d.m1);
+	if (v2_is_conj_of_v1 && nrad2 == nrad1)
+		d.lmax2 = d.lmax1;
+	else
+	{
+		d.lmax2 = static_cast<int>(u.offsets().size()) - 1;
+		build_density(u, nrad2, d.lmax2, natoms, d.m2);
+	}
+	return d;
+}
+
 // BE AWARE, THAT V2 IS ALREADY ASSUMED TO BE CONJUGATED!!!!!
 void equicomb(int natoms, int nrad1, int nrad2,
 			  const SALTEDDescriptors &v1,
@@ -27,7 +84,8 @@ void equicomb(int natoms, int nrad1, int nrad2,
 			  const cvec2 &c2r, const int &featsize,
 			  const int &nfps, const std::vector<int64_t> &vfps,
 			  vec &p,
-			  bool v2_is_conj_of_v1)
+			  bool v2_is_conj_of_v1,
+			  const equicomb_density *density)
 {
 	if (natoms < 0 || nrad1 < 0 || nrad2 < 0 || lam < 0 || featsize < 0 || nfps < 0)
 	{
@@ -155,132 +213,32 @@ void equicomb(int natoms, int nrad1, int nrad2,
 			const size_t ab = static_cast<size_t>(a) * l21 + b;
 			K_re[ab] = k.real(); K_im[ab] = k.imag(); G_re[ab] = g.real(); G_im[ab] = g.imag();
 		}
-	// A and B of one atom for l = 0..lmax, packed per l as (2l+1)^2 blocks, real and
-	// imaginary parts apart: plain double loops vectorise, std::complex products without
-	// -ffast-math do not. When u = conj(v1) its matrices are the conjugates of v1's, so the
-	// pair sum flips the sign of their imaginary parts, and with nrad2 == nrad1 they are
-	// v1's own and are not built twice.
-	auto dm_offset = [](int l) { size_t o = 0; for (int k = 0; k < l; ++k) o += static_cast<size_t>(2 * k + 1) * (2 * k + 1); return o; };
-	struct dmat { vec are, aim, bre, bim; };
-	auto density_matrices = [&](const SALTEDDescriptors &d, int nch, int lmax, int iat, dmat &m) {
-		std::fill(m.are.begin(), m.are.end(), 0.0);
-		std::fill(m.aim.begin(), m.aim.end(), 0.0);
-		std::fill(m.bre.begin(), m.bre.end(), 0.0);
-		std::fill(m.bim.begin(), m.bim.end(), 0.0);
-		double xr[64], xi[64];
-		for (int l = 0; l <= lmax; ++l)
-		{
-			const int nm = 2 * l + 1;
-			const size_t o = dm_offset(l);
-			double *__restrict are = m.are.data() + o, *__restrict aim = m.aim.data() + o;
-			double *__restrict bre = m.bre.data() + o, *__restrict bim = m.bim.data() + o;
-			for (int n = 0; n < nch; ++n)
-			{
-				const cdouble *x = d.block(iat, n, l);
-				for (int a = 0; a < nm; ++a) { xr[a] = x[a].real(); xi[a] = x[a].imag(); }
-				for (int a = 0; a < nm; ++a)
-					for (int b = 0; b < nm; ++b)
-					{
-						are[a * nm + b] += xr[a] * xr[b] + xi[a] * xi[b];
-						aim[a * nm + b] += xi[a] * xr[b] - xr[a] * xi[b];
-						bre[a * nm + b] += xr[a] * xr[b] - xi[a] * xi[b];
-						bim[a * nm + b] += xi[a] * xr[b] + xr[a] * xi[b];
-					}
-			}
-		}
-	};
-	err_checkf(2 * std::max(lmax1, lmax2) + 1 <= 64, "equicomb: l above 31 in llvec", std::cout);
 	//Timed from here so both throughput rows include the norm; counted as the nfps
 	//features actually built
 	const _time_point eq_t0 = get_time();
-	// Shared, v1's matrices stand in for u's, so they then reach lmax2 as well
+	// When u = conj(v1) its matrices are the conjugates of v1's, so the pair sum flips the
+	// sign of their imaginary parts; with nrad2 == nrad1 they are v1's own (share)
 	const bool share = v2_is_conj_of_v1 && nrad2 == nrad1;
-	const int lm1 = share ? std::max(lmax1, lmax2) : lmax1;
-	const size_t dm1_size = dm_offset(lm1 + 1), dm2_size = dm_offset(lmax2 + 1);
 	const double s2 = v2_is_conj_of_v1 ? -1.0 : 1.0;
 	vec normfact(natoms, 0.0);
-	int empty_environments = 0;
-#pragma omp parallel
-	{
-		dmat m1{vec(dm1_size), vec(dm1_size), vec(dm1_size), vec(dm1_size)};
-		dmat m2_own;
-		if (!share)
-			m2_own = dmat{vec(dm2_size), vec(dm2_size), vec(dm2_size), vec(dm2_size)};
-		const dmat &m2 = share ? m1 : m2_own;
-#pragma omp for schedule(dynamic, 1) reduction(+ : empty_environments)
-		for (int iat = 0; iat < natoms; ++iat)
-		{
-			density_matrices(v1, nrad1, lm1, iat, m1);
-			if (!share)
-				density_matrices(v2_src, nrad2, lmax2, iat, m2_own);
-			double inner = 0.0;
-			for (int il = 0; il < llmax; ++il)
-			{
-				const int l1 = llvec[0][il], l2 = llvec[1][il];
-				const int nm1 = 2 * l1 + 1, nm2 = 2 * l2 + 1;
-				const size_t o1 = dm_offset(l1), o2 = dm_offset(l2);
-				const double *a1r = m1.are.data() + o1, *a1i = m1.aim.data() + o1, *b1r = m1.bre.data() + o1, *b1i = m1.bim.data() + o1;
-				const double *a2r = m2.are.data() + o2, *a2i = m2.aim.data() + o2, *b2r = m2.bre.data() + o2, *b2i = m2.bim.data() + o2;
-				double t = 0.0;
-				for (int mu = 0; mu < l21; ++mu)
-				{
-					const w3j_run &r = runs[static_cast<size_t>(il) * l21 + mu];
-					if (r.count == 0) continue;
-					for (int mu2 = 0; mu2 < l21; ++mu2)
-					{
-						const size_t mm = static_cast<size_t>(mu) * l21 + mu2;
-						const w3j_run &r2 = runs[static_cast<size_t>(il) * l21 + mu2];
-						if ((K_re[mm] == 0.0 && K_im[mm] == 0.0 && G_re[mm] == 0.0 && G_im[mm] == 0.0) || r2.count == 0) continue;
-						double Pr = 0.0, Pi = 0.0, Qr = 0.0, Qi = 0.0;
-						for (int x = 0; x < r.count; ++x)
-						{
-							const double w = w3j[static_cast<size_t>(r.w_off) + x];
-							const int i1 = (r.im1_begin + x) * nm1 + r2.im1_begin;
-							const int i2 = (r.im2_begin + x) * nm2 + r2.im2_begin;
-							for (int y = 0; y < r2.count; ++y)
-							{
-								const double ww = w * w3j[static_cast<size_t>(r2.w_off) + y];
-								const double ar = a2r[i2 + y], ai = s2 * a2i[i2 + y];
-								const double br = b2r[i2 + y], bi = s2 * b2i[i2 + y];
-								Pr += ww * (a1r[i1 + y] * ar - a1i[i1 + y] * ai);
-								Pi += ww * (a1r[i1 + y] * ai + a1i[i1 + y] * ar);
-								Qr += ww * (b1r[i1 + y] * br - b1i[i1 + y] * bi);
-								Qi += ww * (b1r[i1 + y] * bi + b1i[i1 + y] * br);
-							}
-						}
-						t += K_re[mm] * Pr - K_im[mm] * Pi + G_re[mm] * Qr - G_im[mm] * Qi;
-					}
-				}
-				inner += 0.5 * t;
-			}
-			// An empty environment gives an all-zero descriptor, so inner is 0 and
-			// 1/sqrt(inner) is +inf, making every feature NaN. Zero is the meaningful
-			// answer: the kernel contributes nothing and the atom keeps the species
-			// average the model adds separately.
-			if (inner > 0.0) [[likely]]
-				normfact[iat] = 1.0 / sqrt(inner);
-			else
-				++empty_environments;
-		}
-	}
-
 	// Said once per run, on the first lambda that sees it - NOT gated on lam == 0.
 	// An atom with no neighbours still has an l = 0 descriptor, its own density being
 	// spherically symmetric; only the equivariant lam >= 1 parts vanish, so zeroing
 	// them leaves the atom spherical, which is the right answer for it.
-	static bool warned_empty_environment = false;
-	if (empty_environments > 0 && !warned_empty_environment)
+	auto warn_empty = [](const int empty_environments)
 	{
-		warned_empty_environment = true;
-		std::cout << "WARNING: " << empty_environments << " atom(s) have no neighbour"
-				  << " inside the descriptor cutoff.\n"
-				  << "         Their environment singles out no direction, so their"
-				  << " predicted density stays spherical.\n"
-				  << "         Isolated solvent is the usual cause."
-				  << std::endl;
-	}
-	if (ProgressBar::report_counts)
-		std::cout << "[equicomb] lam " << lam << ": norm " << get_msec(eq_t0, get_time()) << " ms" << std::endl;
+		static bool warned_empty_environment = false;
+		if (empty_environments > 0 && !warned_empty_environment)
+		{
+			warned_empty_environment = true;
+			std::cout << "WARNING: " << empty_environments << " atom(s) have no neighbour"
+					  << " inside the descriptor cutoff.\n"
+					  << "         Their environment singles out no direction, so their"
+					  << " predicted density stays spherical.\n"
+					  << "         Isolated solvent is the usual cause."
+					  << std::endl;
+		}
+	};
 	// Features past nrad1*nrad2*llmax stay zero, as they were when ptemp was built in full
 	const int shells_i = static_cast<int>(shells);
 
@@ -325,7 +283,10 @@ void equicomb(int natoms, int nrad1, int nrad2,
 		q.runs = flat_runs.data(); q.c2r_cols = cols.data();
 		q.c2r_re = cre.data(); q.c2r_im = cim.data(); q.c2r_cnt = c2r_cnt.data();
 		q.vfps = fps.data(); q.normfact = normfact.data(); q.p = p.data();
+		q.K_re = K_re.data(); q.K_im = K_im.data(); q.G_re = G_re.data(); q.G_im = G_im.data();
 		const bool gpu_ok = salted_gpu_equicomb(q);
+		if (gpu_ok)
+			warn_empty(static_cast<int>(std::count(normfact.begin(), normfact.end(), 0.0)));
 		if (gpu_ok)
 			throughput::record("SALTED equicomb", true,
 				throughput::flops_equicomb(natoms, nfps, 1, 1, l21),
@@ -345,6 +306,79 @@ void equicomb(int natoms, int nrad1, int nrad2,
 			return;
 	}
 #endif
+
+	{
+	// The matrices span every l the descriptors hold, so the predictor builds them once
+	// for all lambda; a caller without them, or with them for other dimensions, gets them here
+	equicomb_density local;
+	const equicomb_density *dens = density;
+	if (!dens || !dens->matches(natoms, nrad1, nrad2, v2_is_conj_of_v1))
+	{
+		local = equicomb_density_matrices(natoms, nrad1, nrad2, v1, v2, v2_is_conj_of_v1);
+		dens = &local;
+	}
+	err_checkf(dens->lmax1 >= lmax1 && dens->lmax2 >= lmax2,
+		"equicomb: density matrices stop below the l the shells need", std::cout);
+	const size_t dsz1 = dm_offset(dens->lmax1 + 1), dsz2 = share ? dsz1 : dm_offset(dens->lmax2 + 1);
+	const double *M1 = dens->m1.data(), *M2 = share ? dens->m1.data() : dens->m2.data();
+	int empty_environments = 0;
+#pragma omp parallel for schedule(dynamic, 1) reduction(+ : empty_environments)
+	for (int iat = 0; iat < natoms; ++iat)
+	{
+		const double *m1 = M1 + static_cast<size_t>(iat) * 4 * dsz1, *m2 = M2 + static_cast<size_t>(iat) * 4 * dsz2;
+		double inner = 0.0;
+		for (int il = 0; il < llmax; ++il)
+		{
+			const int l1 = llvec[0][il], l2 = llvec[1][il];
+			const int nm1 = 2 * l1 + 1, nm2 = 2 * l2 + 1;
+			const size_t o1 = dm_offset(l1), o2 = dm_offset(l2);
+			const double *a1r = m1 + o1, *a1i = m1 + dsz1 + o1, *b1r = m1 + 2 * dsz1 + o1, *b1i = m1 + 3 * dsz1 + o1;
+			const double *a2r = m2 + o2, *a2i = m2 + dsz2 + o2, *b2r = m2 + 2 * dsz2 + o2, *b2i = m2 + 3 * dsz2 + o2;
+			double t = 0.0;
+			for (int mu = 0; mu < l21; ++mu)
+			{
+				const w3j_run &r = runs[static_cast<size_t>(il) * l21 + mu];
+				if (r.count == 0) continue;
+				for (int mu2 = 0; mu2 < l21; ++mu2)
+				{
+					const size_t mm = static_cast<size_t>(mu) * l21 + mu2;
+					const w3j_run &r2 = runs[static_cast<size_t>(il) * l21 + mu2];
+					if ((K_re[mm] == 0.0 && K_im[mm] == 0.0 && G_re[mm] == 0.0 && G_im[mm] == 0.0) || r2.count == 0) continue;
+					double Pr = 0.0, Pi = 0.0, Qr = 0.0, Qi = 0.0;
+					for (int x = 0; x < r.count; ++x)
+					{
+						const double w = w3j[static_cast<size_t>(r.w_off) + x];
+						const int i1 = (r.im1_begin + x) * nm1 + r2.im1_begin;
+						const int i2 = (r.im2_begin + x) * nm2 + r2.im2_begin;
+						for (int y = 0; y < r2.count; ++y)
+						{
+							const double ww = w * w3j[static_cast<size_t>(r2.w_off) + y];
+							const double ar = a2r[i2 + y], ai = s2 * a2i[i2 + y];
+							const double br = b2r[i2 + y], bi = s2 * b2i[i2 + y];
+							Pr += ww * (a1r[i1 + y] * ar - a1i[i1 + y] * ai);
+							Pi += ww * (a1r[i1 + y] * ai + a1i[i1 + y] * ar);
+							Qr += ww * (b1r[i1 + y] * br - b1i[i1 + y] * bi);
+							Qi += ww * (b1r[i1 + y] * bi + b1i[i1 + y] * br);
+						}
+					}
+					t += K_re[mm] * Pr - K_im[mm] * Pi + G_re[mm] * Qr - G_im[mm] * Qi;
+				}
+			}
+			inner += 0.5 * t;
+		}
+		// An empty environment gives an all-zero descriptor, so inner is 0 and
+		// 1/sqrt(inner) is +inf, making every feature NaN. Zero is the meaningful
+		// answer: the kernel contributes nothing and the atom keeps the species
+		// average the model adds separately.
+		if (inner > 0.0) [[likely]]
+			normfact[iat] = 1.0 / sqrt(inner);
+		else
+			++empty_environments;
+	}
+	warn_empty(empty_environments);
+	}
+	if (ProgressBar::report_counts)
+		std::cout << "[equicomb] lam " << lam << ": norm " << get_msec(eq_t0, get_time()) << " ms" << std::endl;
 
 	// Only the nfps selected features are built. Each is the same arithmetic the full
 	// walk did (w * v1 rounded to a double first, then the run sum, then c2r), so the

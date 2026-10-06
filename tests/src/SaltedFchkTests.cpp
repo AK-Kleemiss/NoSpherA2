@@ -1025,17 +1025,21 @@ TEST(SaltedFchkEquicombTests, SelectedFeaturesMatchDenseLam2)
 		for (int f = shells + 3; f >= 0; f -= 3)
 			vfps.push_back(f);
 		const int nfps = static_cast<int>(vfps.size());
-		for (const bool gpu : { false, true })
+		// 0: CPU, matrices built inside; 1: CPU, matrices built once by the caller; 2: GPU
+		const equicomb_density dens = equicomb_density_matrices(natoms, nrad1, n2, v1, u, conj);
+		for (const int mode : { 0, 1, 2 })
 		{
+			const bool gpu = mode == 2;
 			equicomb_set_gpu(gpu);
 			vec sub(static_cast<size_t>(natoms) * l21 * nfps, 7.0);
-			equicomb(natoms, nrad1, n2, v1, u, w3j, llvec, lam, c2r, featsize, nfps, vfps, sub, conj);
+			equicomb(natoms, nrad1, n2, v1, u, w3j, llvec, lam, c2r, featsize, nfps, vfps, sub, conj,
+				mode == 1 ? &dens : nullptr);
 			for (int iat = 0; iat < natoms; iat++)
 				for (int imu = 0; imu < l21; imu++)
 					for (int i = 0; i < nfps; i++)
 					{
 						const double want = vfps[i] < shells ? dense[iat * l21 * featsize + imu * featsize + vfps[i]] : 0.0;
-						EXPECT_NEAR(sub[iat * l21 * nfps + imu * nfps + i], want, 1e-13) << conj << gpu << iat << imu << i;
+						EXPECT_NEAR(sub[iat * l21 * nfps + imu * nfps + i], want, 1e-13) << conj << mode << iat << imu << i;
 					}
 		}
 	}

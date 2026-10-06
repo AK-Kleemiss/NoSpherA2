@@ -6,7 +6,8 @@
 
 //GPU SALTED equicomb, the CPU walk exactly: per atom and selected shell triple (n1, n2, il) the
 //Wigner-weighted v1 block is contracted with v2 over the surviving m pairs and made real. Only the
-//nfps sparsified features are built; the per-atom norm comes from the host.
+//nfps sparsified features are built. The per-atom norm is contracted on the device from density
+//matrices built once per descriptor set, so the host does no per-lambda work beyond the transfers.
 
 struct salted_gpu_problem {
 	int natoms = 0;
@@ -43,7 +44,9 @@ struct salted_gpu_problem {
 	const double* c2r_im = nullptr;
 	const int* c2r_cnt = nullptr;
 	const int* vfps = nullptr;           //[nfps] shell triple (n1*nrad2+n2)*llmax+il per output slot
-	const double* normfact = nullptr;    //[natoms] 1/|feature vector| over all shells, 0 if empty
+	//[l21*l21] K = c2r^T conj(c2r) and G = c2r^T c2r, which turn the density matrices into the norm
+	const double *K_re = nullptr, *K_im = nullptr, *G_re = nullptr, *G_im = nullptr;
+	double* normfact = nullptr;          //[natoms] out: 1/|feature vector| over all shells, 0 if empty
 
 	double* p = nullptr;                 //[natoms * l21 * nfps], the caller's buffer
 };

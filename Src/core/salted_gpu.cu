@@ -24,8 +24,19 @@ struct descriptor_cache {
 	bool conj = false, ready = false;
 	double *d_v1 = nullptr, *d_v2 = nullptr;
 	size_t *d_v1off = nullptr, *d_v2off = nullptr;
+	//Density matrices, lambda-independent; d_dm2 is d_dm1 when u's are v1's (share)
+	double *d_dm1 = nullptr, *d_dm2 = nullptr;
+	int dm_nrad1 = -1, dm_nrad2 = -1, dm_lmax1 = -1, dm_lmax2 = -1;
+	void clear_dm()
+	{
+		if (d_dm2 && d_dm2 != d_dm1) gpuFree(d_dm2);
+		if (d_dm1) gpuFree(d_dm1);
+		d_dm1 = nullptr; d_dm2 = nullptr;
+		dm_nrad1 = -1; dm_nrad2 = -1; dm_lmax1 = -1; dm_lmax2 = -1;
+	}
 	void clear()
 	{
+		clear_dm();
 		if (d_v1) gpuFree(d_v1);
 		if (d_v2 && d_v2 != d_v1) gpuFree(d_v2);
 		if (d_v1off) gpuFree(d_v1off);
@@ -75,8 +86,115 @@ __device__ __forceinline__ const double* desc_block(const double* v, const size_
 	return v + 2 * (off[l] + ((size_t)atom * nchannels + channel) * (2 * (size_t)l + 1));
 }
 
+//Start of the l block in one atom's matrices: sum_{k<l} (2k+1)^2, as on the host
+__host__ __device__ __forceinline__ int dm_offset(const int l) { return l * (2 * l - 1) * (2 * l + 1) / 3; }
+
+//A = sum_n x conj(x') and B = sum_n x x' per atom and l, one block per atom, one thread per matrix
+//entry; layout [atom][are, aim, bre, bim][l blocks] as build_density on the host
+__global__ void density_kernel(const int lmax, const int nch, const double* __restrict__ v,
+	const size_t* __restrict__ off, const int v_nch, double* __restrict__ out)
+{
+	const int atom = blockIdx.x;
+	const int dsz = dm_offset(lmax + 1);
+	double* m = out + (size_t)atom * 4 * dsz;
+	for (int e = threadIdx.x; e < dsz; e += blockDim.x) {
+		int l = 0;
+		while (dm_offset(l + 1) <= e) ++l;
+		const int nm = 2 * l + 1, r = e - dm_offset(l), a = r / nm, b = r % nm;
+		double ar = 0.0, ai = 0.0, br = 0.0, bi = 0.0;
+		for (int n = 0; n < nch; n++) {
+			const double* x = desc_block(v, off, v_nch, atom, n, l);
+			const double xar = x[2 * a], xai = x[2 * a + 1], xbr = x[2 * b], xbi = x[2 * b + 1];
+			ar += xar * xbr + xai * xbi;
+			ai += xai * xbr - xar * xbi;
+			br += xar * xbr - xai * xbi;
+			bi += xai * xbr + xar * xbi;
+		}
+		m[e] = ar; m[dsz + e] = ai; m[2 * dsz + e] = br; m[3 * dsz + e] = bi;
+	}
+}
+
+//sum_i Re(q_i)^2 = Re(sum K P + sum G Q) / 2 per atom, the host's pair sum: one block per atom,
+//threads over (il, mu), tree reduction, normfact = 1/sqrt or 0 for an empty environment
+#define NORM_THREADS 128
+__global__ void norm_kernel(const int llmax, const int l21, const double s2,
+	const double* __restrict__ dm1, const int dsz1, const double* __restrict__ dm2, const int dsz2,
+	const double* __restrict__ w3j, const int* __restrict__ llvec0, const int* __restrict__ llvec1,
+	const int* __restrict__ runs, const double* __restrict__ K_re, const double* __restrict__ K_im,
+	const double* __restrict__ G_re, const double* __restrict__ G_im, double* __restrict__ normfact)
+{
+	__shared__ double red[NORM_THREADS];
+	const int atom = blockIdx.x;
+	const double* m1 = dm1 + (size_t)atom * 4 * dsz1;
+	const double* m2 = dm2 + (size_t)atom * 4 * dsz2;
+	double t = 0.0;
+	for (int w = threadIdx.x; w < llmax * l21; w += blockDim.x) {
+		const int il = w / l21, mu = w % l21;
+		const int* r = runs + 4 * w;
+		if (r[2] == 0) continue;
+		const int l1 = llvec0[il], l2 = llvec1[il], nm1 = 2 * l1 + 1, nm2 = 2 * l2 + 1;
+		const int o1 = dm_offset(l1), o2 = dm_offset(l2);
+		const double *a1r = m1 + o1, *a1i = m1 + dsz1 + o1, *b1r = m1 + 2 * dsz1 + o1, *b1i = m1 + 3 * dsz1 + o1;
+		const double *a2r = m2 + o2, *a2i = m2 + dsz2 + o2, *b2r = m2 + 2 * dsz2 + o2, *b2i = m2 + 3 * dsz2 + o2;
+		for (int mu2 = 0; mu2 < l21; mu2++) {
+			const int mm = mu * l21 + mu2;
+			const int* r2 = runs + 4 * (il * l21 + mu2);
+			if ((K_re[mm] == 0.0 && K_im[mm] == 0.0 && G_re[mm] == 0.0 && G_im[mm] == 0.0) || r2[2] == 0) continue;
+			double Pr = 0.0, Pi = 0.0, Qr = 0.0, Qi = 0.0;
+			for (int x = 0; x < r[2]; x++) {
+				const double wx = w3j[r[3] + x];
+				const int i1 = (r[0] + x) * nm1 + r2[0];
+				const int i2 = (r[1] + x) * nm2 + r2[1];
+				for (int y = 0; y < r2[2]; y++) {
+					const double ww = wx * w3j[r2[3] + y];
+					const double ar = a2r[i2 + y], ai = s2 * a2i[i2 + y];
+					const double br = b2r[i2 + y], bi = s2 * b2i[i2 + y];
+					Pr += ww * (a1r[i1 + y] * ar - a1i[i1 + y] * ai);
+					Pi += ww * (a1r[i1 + y] * ai + a1i[i1 + y] * ar);
+					Qr += ww * (b1r[i1 + y] * br - b1i[i1 + y] * bi);
+					Qi += ww * (b1r[i1 + y] * bi + b1i[i1 + y] * br);
+				}
+			}
+			t += K_re[mm] * Pr - K_im[mm] * Pi + G_re[mm] * Qr - G_im[mm] * Qi;
+		}
+	}
+	red[threadIdx.x] = t;
+	__syncthreads();
+	for (int s = NORM_THREADS / 2; s > 0; s >>= 1) {
+		if (threadIdx.x < s) red[threadIdx.x] += red[threadIdx.x + s];
+		__syncthreads();
+	}
+	if (threadIdx.x == 0) {
+		const double inner = 0.5 * red[0];
+		normfact[atom] = inner > 0.0 ? 1.0 / sqrt(inner) : 0.0;
+	}
+}
+
+//Builds the density matrices once per descriptor set and radial split; every later lambda reuses them
+bool ensure_density(descriptor_cache& c, const salted_gpu_problem& q)
+{
+	const bool share = q.v2_is_conj_of_v1 && q.nrad2 == q.nrad1;
+	if (c.d_dm1 && c.dm_nrad1 == q.nrad1 && c.dm_nrad2 == q.nrad2) return true;
+	c.clear_dm();
+	const int lmax1 = q.v1_noff - 1, lmax2 = share ? lmax1 : q.v2_noff - 1;
+	if (lmax1 < 0 || lmax2 < 0) return false;
+	const size_t dsz1 = dm_offset(lmax1 + 1), dsz2 = dm_offset(lmax2 + 1);
+	GPU_TRY(gpuMalloc(&c.d_dm1, sizeof(double) * 4 * dsz1 * q.natoms));
+	density_kernel<<<q.natoms, 128>>>(lmax1, q.nrad1, c.d_v1, c.d_v1off, q.v1_nchannels, c.d_dm1);
+	GPU_TRY(gpuGetLastError());
+	if (share)
+		c.d_dm2 = c.d_dm1;
+	else {
+		GPU_TRY(gpuMalloc(&c.d_dm2, sizeof(double) * 4 * dsz2 * q.natoms));
+		density_kernel<<<q.natoms, 128>>>(lmax2, q.nrad2, c.d_v2, c.d_v2off, q.v2_nchannels, c.d_dm2);
+		GPU_TRY(gpuGetLastError());
+	}
+	c.dm_nrad1 = q.nrad1; c.dm_nrad2 = q.nrad2; c.dm_lmax1 = lmax1; c.dm_lmax2 = lmax2;
+	return true;
+}
+
 //One thread per (atom, output slot): only the nfps selected features are built, the norm comes
-//from the host. Consecutive slots write consecutive p entries for every imu, so the stores coalesce.
+//from norm_kernel. Consecutive slots write consecutive p entries for every imu, so the stores coalesce.
 __global__ void equicomb_kernel(const int natoms, const int nrad2, const int llmax,
 	const int l21, const int shells, const int nfps, const bool conj,
 	const double* __restrict__ v1, const size_t* __restrict__ v1_off, const int v1_nch,
@@ -180,9 +298,33 @@ bool salted_gpu_equicomb(const salted_gpu_problem& q)
 	GPU_TRY(gpuMalloc(&d_vfps, sizeof(int) * (size_t)q.nfps));
 	GPU_TRY(gpuMemcpy(d_vfps, q.vfps, sizeof(int) * (size_t)q.nfps, gpuMemcpyHostToDevice));
 	GPU_TRY(gpuMalloc(&d_nf, sizeof(double) * (size_t)q.natoms));
-	GPU_TRY(gpuMemcpy(d_nf, q.normfact, sizeof(double) * (size_t)q.natoms, gpuMemcpyHostToDevice));
 	GPU_TRY(gpuMalloc(&d_p, p_bytes));
 	GPU_TRY(gpuMemset(d_p, 0, p_bytes));
+
+	if (!ensure_density(g_descriptor_cache, q)) return false;
+	{
+		const descriptor_cache& c = g_descriptor_cache;
+		int lmax1 = 0, lmax2 = 0;
+		for (int il = 0; il < q.llmax; il++) {
+			lmax1 = std::max(lmax1, q.llvec0[il]);
+			lmax2 = std::max(lmax2, q.llvec1[il]);
+		}
+		if (lmax1 > c.dm_lmax1 || lmax2 > c.dm_lmax2) return false;
+		const size_t kg = sizeof(double) * (size_t)q.l21 * q.l21;
+		double* d_kg = nullptr;
+		GPU_TRY(gpuMalloc(&d_kg, 4 * kg));
+		const size_t n = (size_t)q.l21 * q.l21;
+		GPU_TRY(gpuMemcpy(d_kg, q.K_re, kg, gpuMemcpyHostToDevice));
+		GPU_TRY(gpuMemcpy(d_kg + n, q.K_im, kg, gpuMemcpyHostToDevice));
+		GPU_TRY(gpuMemcpy(d_kg + 2 * n, q.G_re, kg, gpuMemcpyHostToDevice));
+		GPU_TRY(gpuMemcpy(d_kg + 3 * n, q.G_im, kg, gpuMemcpyHostToDevice));
+		norm_kernel<<<q.natoms, NORM_THREADS>>>(q.llmax, q.l21, q.v2_is_conj_of_v1 ? -1.0 : 1.0,
+			c.d_dm1, dm_offset(c.dm_lmax1 + 1), c.d_dm2, dm_offset(c.dm_lmax2 + 1),
+			d_w3j, d_ll0, d_ll1, d_runs, d_kg, d_kg + n, d_kg + 2 * n, d_kg + 3 * n, d_nf);
+		GPU_TRY(gpuGetLastError());
+		GPU_TRY(gpuMemcpy(q.normfact, d_nf, sizeof(double) * (size_t)q.natoms, gpuMemcpyDeviceToHost));
+		gpuFree(d_kg);
+	}
 
 	const dim3 thr(128), grid((q.nfps + 127) / 128, q.natoms);
 	equicomb_kernel<<<grid, thr>>>(q.natoms, q.nrad2, q.llmax, q.l21,

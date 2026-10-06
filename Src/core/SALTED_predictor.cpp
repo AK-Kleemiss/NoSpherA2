@@ -2,6 +2,7 @@
 #include "SALTED_predictor.h"
 #ifdef NOSPHERA2_USE_GPU
 #include "salted_gpu.h"
+#include "sf_gpu.h"
 #include "SALTED_equicomb.h"
 #endif
 #include "SALTED_utilities.h"
@@ -536,10 +537,24 @@ vec SALTEDPredictor::predict()
 	auto _elapsed = [](const std::chrono::steady_clock::time_point &from)
 	{ return std::chrono::duration<double>(std::chrono::steady_clock::now() - from).count(); };
 	double _t_equicomb = 0.0, _t_kernels = 0.0, _t_model_wait = 0.0, _t_model_work = 0.0;
-	bool overlap_model_loading = false;
+	bool gpu_equicomb = false;
 #ifdef NOSPHERA2_USE_GPU
-	overlap_model_loading = equicomb_gpu_enabled() && salted_gpu_available();
+	gpu_equicomb = equicomb_gpu_enabled() && salted_gpu_available();
+	//Context creation started with the run; the first kernel would otherwise pay for it
+	if (gpu_equicomb)
+		sf_gpu_warmup_wait();
 #endif
+	// The norm's density matrices hold every l of the descriptors, so one build serves all
+	// lambda; the device builds and keeps its own
+	equicomb_density dens;
+	if (config.sparsify && !gpu_equicomb)
+	{
+		const auto _t_dm = std::chrono::steady_clock::now();
+		dens = equicomb_density_matrices(natoms, config.nspe1 * config.nrad1, config.nspe2 * config.nrad2, v1, v2, v2_is_conj_of_v1);
+		const double dm_s = _elapsed(_t_dm);
+		_t_equicomb += dm_s;
+		throughput::record_time("SALTED equicomb", false, 1000.0 * dm_s);
+	}
 	// Compute equivariant descriptors for each lambda value entering the SPH expansion of the electron density
 	// How many lambda blocks are alive at once. A block is natoms * (2*lam+1) *
 	// featsize doubles and holding all of them sums to (nang+1)^2 times a single
@@ -554,13 +569,6 @@ vec SALTEDPredictor::predict()
 	for (int lam = 0; lam <= lmax_max; lam++)
 	{
 		vec p;
-		std::future<double> model_loader;
-		if (overlap_model_loading)
-			model_loader = std::async(std::launch::async, [this, lam]() {
-				const auto start = std::chrono::steady_clock::now();
-				load_model_lambda(lam);
-				return std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
-			});
 		const auto _t_eq = std::chrono::steady_clock::now();
 		int llmax = 0;
 		unordered_map<int, ivec> lvalues{};
@@ -594,7 +602,8 @@ vec SALTEDPredictor::predict()
 		{
 			int nfps = static_cast<int>(vfps[lam].size());
 			p.assign((size_t)natoms * ((size_t)2 * lam + 1) * nfps, 0.0);
-			equicomb(natoms, (config.nspe1 * config.nrad1), (config.nspe2 * config.nrad2), v1, v2, wigner3j[lam], llvec_t, lam, c2r, featsize[lam], nfps, vfps[lam], p, v2_is_conj_of_v1);
+			equicomb(natoms, (config.nspe1 * config.nrad1), (config.nspe2 * config.nrad2), v1, v2, wigner3j[lam], llvec_t, lam, c2r, featsize[lam], nfps, vfps[lam], p, v2_is_conj_of_v1,
+				dens.m1.empty() ? nullptr : &dens);
 			featsize[lam] = nfps;
 		}
 		else
@@ -603,14 +612,14 @@ vec SALTEDPredictor::predict()
 			equicomb(natoms, (config.nspe1 * config.nrad1), (config.nspe2 * config.nrad2), v1, v2, wigner3j[lam], llmax, llvec_t, lam, c2r, featsize[lam], p, v2_is_conj_of_v1);
 		}
 		_t_equicomb += _elapsed(_t_eq);
+		// In line, also with the descriptors on the device: overlapping it on a second thread
+		// gave that thread its own OpenMP/MKL team, whose spin-wait then cost the kernels below
+		// more than the overlap saved (0.44 against 0.19 s on 1EJG, 32 cores)
 		const auto _t_wait = std::chrono::steady_clock::now();
-		if (overlap_model_loading)
-			_t_model_work += model_loader.get();
-		else
-			load_model_lambda(lam);
+		load_model_lambda(lam);
 		const double model_wait = _elapsed(_t_wait);
 		_t_model_wait += model_wait;
-		if (!overlap_model_loading) _t_model_work += model_wait;
+		_t_model_work += model_wait;
 		const auto _t_kn = std::chrono::steady_clock::now();
 		// Species-outer within the group, so a species keeps its sparse matrices hot
 		for (int spe_idx = 0; spe_idx < (int)config.species.size(); spe_idx++)
