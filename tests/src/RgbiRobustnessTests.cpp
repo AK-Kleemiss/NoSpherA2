@@ -552,16 +552,17 @@ TEST(RgbiRobustnessTests, TheUnsupportedShellQuestionIsAskedOfEveryAtomsBasis)
 	EXPECT_EQ(highest_shell_angular_momentum(wfn_of({ atom("H", {}, 1, 0.0, 0.0, 0.0, 1) })), -1);
 }
 
-//Only .gbw and .molden reach RGBI: .wfx and .wfn carry no basis, .fchk no contracted density matrix, and the
-//Tonto fixture in tests/cytidine_tonto lacks its companion stdout.
+//Only .gbw, .molden and a pure-shell .fchk reach RGBI: .wfx and .wfn carry no basis, a cartesian .fchk no
+//contracted density matrix, and the Tonto fixture in tests/cytidine_tonto lacks its companion stdout.
 TEST(RgbiRobustnessTests, TheRefusalNeverSuggestsTheFormatItIsRefusing)
 {
-	//the whole list, for the case where the refused file is neither of them
-	EXPECT_EQ(rgbi_supported_input_phrase(".wfn"), "a .gbw or a .molden");
-	//and each of the two working formats drops itself, because a .gbw whose basis did not survive the
+	//the whole list, for the case where the refused file is none of them
+	EXPECT_EQ(rgbi_supported_input_phrase(".wfn"), "a .gbw, a .molden or a .fchk");
+	//and each working format drops itself, because a .gbw whose basis did not survive the
 	//reader must not be answered with "use a .gbw"
-	EXPECT_EQ(rgbi_supported_input_phrase(".gbw"), "a .molden");
-	EXPECT_EQ(rgbi_supported_input_phrase(".molden"), "a .gbw");
+	EXPECT_EQ(rgbi_supported_input_phrase(".gbw"), "a .molden or a .fchk");
+	EXPECT_EQ(rgbi_supported_input_phrase(".molden"), "a .gbw or a .fchk");
+	EXPECT_EQ(rgbi_supported_input_phrase(".fchk"), "a .gbw or a .molden");
 
 	//The property, over every extension the matrix covers, written so that adding a format to the list
 	//cannot reintroduce the defect: whatever the phrase says, it does not say the input.

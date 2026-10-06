@@ -971,13 +971,13 @@ std::string rgbi_supported_input_phrase(const std::string &refused_extension) {
 	if (!ext.empty() && ext.front() != '.')
 		ext.insert(ext.begin(), '.');
 	std::vector<std::string> works;
-	for (const char *w : { ".gbw", ".molden" })
+	for (const char *w : { ".gbw", ".molden", ".fchk" })
 		if (ext != w)
 			works.push_back(w);
 	std::string phrase;
 	for (size_t i = 0; i < works.size(); i++)
 		phrase += (i == 0 ? "a " : (i + 1 == works.size() ? " or a " : ", a ")) + works[i];
-	//both formats cannot be the refused one at once, so the list is never empty
+	//only one format can be the refused one, so the list is never empty
 	return phrase;
 }
 
@@ -2107,10 +2107,10 @@ void Roby_information::computeAllAtomicNAOs(WFN &wavy, const bool symmetrize, co
 	ano_fallback_atoms.clear();
 
 	density_matrix = wavy.get_dm();
-	//Every index below reads DM; the .fchk readers keep the density only in UT_DensityMatrix and leave DM empty.
+	//Every index below reads DM; an .fchk with cartesian d/f shells and the primitive-only formats leave it empty.
 	err_checkf(density_matrix.extent(0) > 0 && density_matrix.extent(1) == density_matrix.extent(0),
 		"RGBI needs the density matrix over the contracted basis, and " + wavy.get_path().filename().string() +
-		" carries none: its reader stores the density in triangular form only. Use " +
+		" carries none: cartesian d/f shells (6D/10F) or a format without the contracted basis. Use pure shells (5D/7F) or " +
 		rgbi_supported_input_phrase(wavy.get_path().extension().string()) + " of the same calculation.",
 		std::cout);
 

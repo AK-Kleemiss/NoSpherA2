@@ -100,9 +100,11 @@ TEST(NboNativeTests, EveryAcceptedOrbitalNamesRealCentres)
 	}
 }
 
-//A .fchk archive whose AOs are unnormalised in the overlap (Tr(P*S) far from the electron count) must
-//be refused by name instead of yielding an NPA table with wrong charges.  std::cout goes to stderr in
-//the child: err_checkf writes to the stream it is handed and a death test matches stderr.
+//A density whose Tr(P*S) is far from the electron count must be refused by name instead of yielding an
+//NPA table with wrong charges. read_fchk's DM passes; without it the .47 writer rebuilds the density from
+//the fchk's primitives, whose normalisation it does not know - the path an open-shell fchk still takes.
+//std::cout goes to stderr in the child: err_checkf writes to the stream it is handed and a death test
+//matches stderr.
 TEST(NboNativeTests, AnArchiveThatDoesNotDescribeTheWavefunctionIsRefusedByName)
 {
 	const auto p = fchk_fixture();
@@ -114,11 +116,26 @@ TEST(NboNativeTests, AnArchiveThatDoesNotDescribeTheWavefunctionIsRefusedByName)
 		{
 			std::cout.rdbuf(std::cerr.rdbuf());
 			WFN wavy(p);
+			wavy.set_dm(dMatrix2());
 			wavy.write_nbo(out, false);
 		},
 		::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE),
 		"does not describe this wavefunction");
 
+	std::error_code ec;
+	std::filesystem::remove(out, ec);
+}
+
+//The same closed-shell fchk with the DM read_fchk builds is a valid archive (a refusal exits the process).
+TEST(NboNativeTests, ASphericalFchkWritesAnArchive)
+{
+	const auto p = fchk_fixture();
+	if (p.empty())
+		GTEST_SKIP() << "tests/alanine_occ/alanine.owf.fchk not found";
+	const auto out = std::filesystem::temp_directory_path() / "nos_nbo_native_fchk.47";
+	WFN wavy(p);
+	wavy.write_nbo(out, false);
+	EXPECT_TRUE(std::filesystem::exists(out));
 	std::error_code ec;
 	std::filesystem::remove(out, ec);
 }
