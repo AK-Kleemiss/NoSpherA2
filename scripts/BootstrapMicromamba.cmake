@@ -68,9 +68,25 @@ if(APPLE)
     )
 
 else()
-    set(_environment_file
-        "${NOSPHERA2_SOURCE_DIR}/environment.yaml"
-    )
+    # Windows on ARM. On an ARM64 host the one environment is win-arm64 (OpenBLAS, no MKL). On an
+    # x64 host it cross-builds: host tools stay in env, the ARM64 libraries go to env-win-arm64 and
+    # env's rustc gets the aarch64 standard library.
+    if(WIN32 AND "$ENV{PROCESSOR_ARCHITECTURE}" STREQUAL "ARM64")
+        set(_win_arm64_default ON)
+    else()
+        set(_win_arm64_default OFF)
+    endif()
+    option(NOSPHERA2_BOOTSTRAP_WIN_ARM64 "Set up for a Windows ARM64 build (native or cross from x64)" ${_win_arm64_default})
+
+    if(NOSPHERA2_BOOTSTRAP_WIN_ARM64 AND "$ENV{PROCESSOR_ARCHITECTURE}" STREQUAL "ARM64")
+        set(_environment_file
+            "${NOSPHERA2_SOURCE_DIR}/environment-win-arm64.yaml"
+        )
+    else()
+        set(_environment_file
+            "${NOSPHERA2_SOURCE_DIR}/environment.yaml"
+        )
+    endif()
 
     setup_micromamba_environment(
         ENVIRONMENT_FILE
@@ -82,6 +98,37 @@ else()
         DOWNLOAD_DIRECTORY
             "${_mamba_bootstrap}"
     )
+
+    if(NOSPHERA2_BOOTSTRAP_WIN_ARM64 AND NOT "$ENV{PROCESSOR_ARCHITECTURE}" STREQUAL "ARM64")
+        setup_micromamba_environment(
+            ENVIRONMENT_FILE "${NOSPHERA2_SOURCE_DIR}/environment-win-arm64.yaml"
+            PLATFORM "win-arm64"
+            PREFIX "${NOSPHERA2_SOURCE_DIR}/.mambaenv/env-win-arm64"
+            ROOT_PREFIX "${_mamba_root}"
+            DOWNLOAD_DIRECTORY "${_mamba_bootstrap}"
+            EXPORT_PREFIX_VARIABLE MICROMAMBA_ENV_WIN_ARM64_PREFIX
+        )
+        # rust-std is noarch; it has to match env's rustc exactly
+        execute_process(
+            COMMAND "${MICROMAMBA_ENV_PREFIX}/Library/bin/rustc.exe" --version
+            OUTPUT_VARIABLE _rustc_version
+            COMMAND_ERROR_IS_FATAL ANY
+        )
+        string(REGEX MATCH "[0-9]+\\.[0-9]+\\.[0-9]+" _rustc_version "${_rustc_version}")
+        execute_process(
+            COMMAND
+                "${CMAKE_COMMAND}" -E env
+                "MAMBA_ROOT_PREFIX=${MICROMAMBA_ROOT_PREFIX}"
+                "${MICROMAMBA_EXECUTABLE}"
+                install
+                --yes
+                --prefix "${MICROMAMBA_ENV_PREFIX}"
+                -c conda-forge
+                "rust-std-aarch64-pc-windows-msvc=${_rustc_version}"
+            COMMAND_ERROR_IS_FATAL ANY
+        )
+        message(STATUS "Windows ARM64 libraries: ${MICROMAMBA_ENV_WIN_ARM64_PREFIX}")
+    endif()
 
     # macOS is deliberately excluded above: no CUDA, and no AMD compute stack either.
     if(NOSPHERA2_BOOTSTRAP_GPU)

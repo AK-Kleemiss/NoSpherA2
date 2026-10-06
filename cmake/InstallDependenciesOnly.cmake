@@ -204,6 +204,20 @@ install(
     DESTINATION include
 )
 
+if(NOSPHERA2_OPENBLAS)
+    # The vcxprojs link openblas.lib whatever conda-forge named the import library
+    install(FILES "${NOSPHERA2_OPENBLAS_DLL}" DESTINATION bin)
+    install(FILES "${NOSPHERA2_OPENBLAS_IMPLIB}" DESTINATION lib RENAME openblas.lib)
+    install(
+        DIRECTORY "${NOSPHERA2_OPENBLAS_INCLUDE_DIR}/"
+        DESTINATION include
+        FILES_MATCHING
+            PATTERN "cblas*.h"
+            PATTERN "lapack*.h"
+            PATTERN "openblas*.h"
+            PATTERN "f77blas.h"
+    )
+else()
 install(
     FILES
         "${MICROMAMBA_ENV_PREFIX}/Library/bin/libiomp5md.dll"
@@ -228,3 +242,4 @@ install(
         "${MICROMAMBA_ENV_PREFIX}/Library/lib/mkl_rt.lib"
     DESTINATION lib
 )
+endif()
