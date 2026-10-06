@@ -25,7 +25,7 @@ namespace
 		const ivec bas = p.get_bas();
 		ivec at;
 		for (int s = 0; s < static_cast<int>(p.get_nbas()); s++)
-			at.insert(at.end(), (2 * bas[8 * s + 1] + 1) * bas[8 * s + 3], bas[8 * s]);
+			at.insert(at.end(), static_cast<size_t>(2 * bas[8 * s + 1] + 1) * bas[8 * s + 3], bas[8 * s]);
 		return at;
 	}
 
@@ -83,7 +83,7 @@ IBOResult intrinsic_bond_orbitals(const WFN &wavy)
 	vec flat;
 	compute2C<Overlap2C_SPH>(pc, flat);
 	const int n1 = static_cast<int>(pw.get_nao()), n2 = static_cast<int>(pm.get_nao()), n = n1 + n2;
-	err_checkf(static_cast<int>(flat.size()) == n * n, "IBO: combined overlap has the wrong size", std::cout);
+	err_checkf(flat.size() == static_cast<size_t>(n) * n,"IBO: combined overlap has the wrong size", std::cout);
 	const ivec ao_atom = function_atoms(pw), iao_atom = function_atoms(pm);
 	err_checkf(static_cast<int>(ao_atom.size()) == n1 && static_cast<int>(iao_atom.size()) == n2, "IBO: shell layout does not match the AO count", std::cout);
 	//ORCA phases on the molecular rows only, as ao_overlap does it
@@ -94,8 +94,11 @@ IBOResult intrinsic_bond_orbitals(const WFN &wavy)
 			flip[k] = orca_pure_sign_flips(m);
 	MatrixXd S(n, n);
 	for (int i = 0; i < n; i++)
+	{
+		const double *row = flat.data() + static_cast<size_t>(i) * n;
 		for (int j = 0; j < n; j++)
-			S(i, j) = flip[i] != flip[j] ? -flat[i * n + j] : flat[i * n + j];
+			S(i, j) = flip[i] != flip[j] ? -row[j] : row[j];
+	}
 	const MatrixXd S1 = S.topLeftCorner(n1, n1), S12 = S.topRightCorner(n1, n2), S2 = S.bottomRightCorner(n2, n2);
 	//MO_sph rows are in file shell order (libcint m order); Int_Params groups an atom's shells by l
 	const dMatrix2 &sph = wavy.get_MO_sph();
