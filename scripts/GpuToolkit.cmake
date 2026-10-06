@@ -127,8 +127,10 @@ function(nosphera2_bootstrap_rocm_toolkit)
         return()
     endif()
 
+    # CMAKE_HOST_SYSTEM_PROCESSOR is empty in script mode (cmake -P), which skipped every fetch
+    cmake_host_system_information(RESULT _host_processor QUERY OS_PLATFORM)
     if(NOT CMAKE_HOST_SYSTEM_NAME STREQUAL "Linux"
-       OR NOT CMAKE_HOST_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64")
+       OR NOT _host_processor MATCHES "x86_64|AMD64")
         message(STATUS
             "AMD GPU detected. conda-forge packages hipcc for linux-64 only, so nothing can\n"
             "  be fetched here - install the HIP SDK and configure will pick it up.")
