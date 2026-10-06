@@ -434,8 +434,10 @@ jobs:
           path: ${{ matrix.artifact-path }}
           if-no-files-found: error
 
-      - name: Upload test logs after failure
-        if: failure()
+      # Every run, not just failures: LastTest.log holds the output of passing tests too
+      # (iteration counts, timings), which ctest prints only on failure
+      - name: Upload test logs
+        if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: test-logs-${{ matrix.artifact-name }}
