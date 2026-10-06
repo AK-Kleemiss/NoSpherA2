@@ -1,0 +1,16 @@
+name: mambaenv
+channels:
+   - conda-forge
+dependencies:
+   # Explicit Python version ensures the interpreter is present for featomic's CMake checks.
+   # conda-forge win-arm64 starts at 3.14.
+   - python=3.14
+
+   # pkgconfig has no win-arm64 build
+   - pkg-config
+   - ninja
+   - rust
+
+   # oneMKL has no ARM64 build. The pthreads OpenBLAS keeps vcomp the only OpenMP runtime in
+   # the process; the openmp variant would bring a second one (libomp).
+   - openblas=*=pthreads*

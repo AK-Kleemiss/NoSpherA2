@@ -58,6 +58,10 @@ that is present; set it OFF and name the backend to build for a machine other th
 vendor still supports (the lists live in `CMakeLists.txt`) instead of the local card only. The
 bootstrap script takes `-DNOSPHERA2_BOOTSTRAP_GPU_VENDOR=NVIDIA -DNOSPHERA2_BOOTSTRAP_CUDA_VERSION=12.9`
 to fetch a conda-forge CUDA toolkit without a GPU, and `-DNOSPHERA2_BOOTSTRAP_GPU=OFF` to fetch none.
+`-DNOSPHERA2_BOOTSTRAP_GPU_VENDOR=ALL` sets up the CI's fat build locally: the CUDA toolkit plus
+the ROCm SDK wheels (`NOSPHERA2_BOOTSTRAP_ROCM_VERSION`, default the CI's 10.0.0) in a venv at
+`.mambaenv/rocm`, whose `root.txt` makes configure switch on both backends and take the HIP compiler
+from there. Skipped when a ROCm is already installed (`HIP_PATH`, `ROCM_PATH`, `/opt/rocm`).
 
 Both backends at once make a fat binary: every kernel source is compiled twice, once per backend,
 into its own namespace (`Src/core/gpu_api.h`, `NOSPHERA2_GPU_BACKEND_NS`), and

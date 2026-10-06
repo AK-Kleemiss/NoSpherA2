@@ -52,12 +52,15 @@ function(nosphera2_enable_optimizations target_name)
         #reads /OPT:REF as its own /O flag followed by rubbish, warning once per character.
         #They were ignored there rather than misapplied, so this was noise rather than a
         #defect, but it buried real warnings and made every build look unclean.
-        target_link_options(
-            "${target_name}"
-            PRIVATE
-                "$<HOST_LINK:/NODEFAULTLIB:vcomp>"
-                "$<HOST_LINK:/NODEFAULTLIB:vcompd>"
-        )
+        #ARM64 has no libiomp5; there vcomp is the OpenMP runtime
+        if(NOT NOSPHERA2_OPENBLAS)
+            target_link_options(
+                "${target_name}"
+                PRIVATE
+                    "$<HOST_LINK:/NODEFAULTLIB:vcomp>"
+                    "$<HOST_LINK:/NODEFAULTLIB:vcompd>"
+            )
+        endif()
 
         get_target_property(target_type "${target_name}" TYPE)
 

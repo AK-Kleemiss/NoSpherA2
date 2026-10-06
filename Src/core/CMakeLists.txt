@@ -105,17 +105,31 @@ if(NOT NOSPHERA2_BASIS_SET_FILES)
     )
 endif()
 
+#A cross build (Windows ARM64 from x64) cannot run the converter it builds; it takes one built for the host.
+if(CMAKE_CROSSCOMPILING)
+    set(NOSPHERA2_HOST_BASIS_CONVERTER "" CACHE FILEPATH "BasisSetConverter built for the build host")
+    if(NOT EXISTS "${NOSPHERA2_HOST_BASIS_CONVERTER}")
+        message(FATAL_ERROR "Cross build needs a host BasisSetConverter at '${NOSPHERA2_HOST_BASIS_CONVERTER}': "
+            "cmake --preset release-windows && cmake --build --preset release-windows --target BasisSetConverter")
+    endif()
+    set(_basis_converter "${NOSPHERA2_HOST_BASIS_CONVERTER}")
+    set(_basis_converter_dep "${NOSPHERA2_HOST_BASIS_CONVERTER}")
+else()
+    set(_basis_converter "$<TARGET_FILE:BasisSetConverter>")
+    set(_basis_converter_dep BasisSetConverter)
+endif()
+
 add_custom_command(
     OUTPUT
         "${NOSPHERA2_GENERATED_BASIS_SOURCE}"
 
     COMMAND
-        "$<TARGET_FILE:BasisSetConverter>"
+        "${_basis_converter}"
         "${NOSPHERA2_BASIS_SET_DIRECTORY}"
         "${PROJECT_SOURCE_DIR}/Src"
 
     DEPENDS
-        BasisSetConverter
+        "${_basis_converter_dep}"
         ${NOSPHERA2_BASIS_SET_FILES}
 
     WORKING_DIRECTORY
@@ -305,6 +319,8 @@ if(APPLE)
     #header, and the PCH (stdlib.h -> sys/signal.h) would define ucontext_t without that storage first.
     set_source_files_properties("${CMAKE_CURRENT_SOURCE_DIR}/fiber_loop.cpp"
         PROPERTIES SKIP_PRECOMPILE_HEADERS ON COMPILE_DEFINITIONS "_XOPEN_SOURCE=700;_DARWIN_C_SOURCE")
+elseif(NOSPHERA2_OPENBLAS)
+    target_link_libraries(NoSpherA2Core PUBLIC nosphera2_openblas)
 else()
     target_link_libraries(
         NoSpherA2Core

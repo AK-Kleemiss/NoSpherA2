@@ -864,7 +864,13 @@ std::string NoSpherA2_message(bool no_date)
 		t.append("Please see, respectively:\n");
 		t.append("   https://github.com/Luthaf/featomic\n");
 		t.append("   https://github.com/lab-cosmo/metatensor\n");
+#if defined(NSA2_ARMPL)
+		t.append("   This software utilizes Arm Performance Libraries (https://developer.arm.com/Tools%20and%20Software/Arm%20Performance%20Libraries) for optimized mathematical computations\n");
+#elif defined(NSA2_OPENBLAS)
+		t.append("   This software utilizes OpenBLAS (https://github.com/OpenMathLib/OpenBLAS) for optimized mathematical computations\n");
+#else
 		t.append("   This software utilizes Intel(c) Math Kernel Library (oneMKL), version 2025.2.0.629, for optimized mathematical computations\n");
+#endif
 		t.append("OCC can be found at: https://github.com/peterspackman/occ\n");
 		t.append("OCC was published at        : Spackman et al. OCC, Zenodo 2026, doi:10.5281/zenodo.10703204.\n");
 		t.append("NoSpherA2 was published at  : Kleemiss et al. Chem. Sci., 2021, 12, 1675 - 1692.\n");
@@ -2441,9 +2447,13 @@ double get_lambda_1(double *a)
 
 	const double c00 = b00 / p, c01 = a01 / p, c02 = a02 / p;
 	const double c11 = b11 / p, c12 = a12 / p, c22 = b22 / p;
-	const double r = 0.5 * (c00 * (c11 * c22 - c12 * c12)
+	double r = 0.5 * (c00 * (c11 * c22 - c12 * c12)
 						  - c01 * (c01 * c22 - c12 * c02)
 						  + c02 * (c01 * c12 - c11 * c02));
+	//r = +-1 is a double eigenvalue, where acos turns an ulp of rounding in r into sqrt(eps) in lambda2
+	//(MSVC ARM64 fuses the products above and lands 1 ulp off for {4,1,1}); snap rounding-level misses.
+	if (std::abs(r) > 1.0 - 16 * std::numeric_limits<double>::epsilon())
+		r = std::copysign(1.0, r);
 
 	const double phi = std::acos(std::clamp(r, -1.0, 1.0)) / 3.0;
 	const double eig_max = q + 2.0 * p * std::cos(phi);
