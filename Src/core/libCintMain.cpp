@@ -145,6 +145,9 @@ template <> struct Shell3C<Overlap3C_SPH> {
 //density-weighted Schwarz screen XCW uses for its stored ERIs. This replaces an atom-pair overlap
 //screen that rode on constants::exp_cutoff, which the ELI-D tail correction (16 Sep 2026) made
 //so tight that it stopped screening.
+//Tried 7 Oct 2026 on sucrose and dropped: QVl distance screening (Hollman, Schaefer, Valeev, JCP 142,
+//154106 (2015)) lies on the same time/error curve as a tighter Schwarz threshold (1e-13: 3.14 s, 1.1e-7
+//vs 3.24 s, 9e-8), and libcint's PTR_EXPCUTOFF at its floor of 40 instead of 60 changes nothing.
 template <typename Kernel>
 void computeRho(
 	const Int_Params &normal_basis,
