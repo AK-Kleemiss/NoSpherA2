@@ -1978,7 +1978,7 @@ void calc_SF(const int& points,
 				const double work2 = k1_local * d1_local[p + 2] + k2_local * d2_local[p + 2] + k3_local * d3_local[p + 2];
 				const double work3 = k1_local * d1_local[p + 3] + k2_local * d2_local[p + 3] + k3_local * d3_local[p + 3];
 
-#if (defined(__GNUC__) || defined(__clang__)) && !defined(__APPLE__)
+#if (defined(__GNUC__) || defined(__clang__)) && !defined(__APPLE__) && !defined(__ANDROID__)
 				double si0, c0, si1, c1, si2, c2, si3, c3;
 				sincos(work0, &si0, &c0);
 				sincos(work1, &si1, &c1);
@@ -2006,7 +2006,7 @@ void calc_SF(const int& points,
 				_mm256_store_pd(sr, _mm256_mul_pd(rv, sv));
 				re += cr[0] + cr[1] + cr[2] + cr[3];
 				im += sr[0] + sr[1] + sr[2] + sr[3];
-#elif defined(_M_ARM64)
+#elif defined(_M_ARM64) || defined(__ANDROID__) //bionic sincos is sin + cos, two reductions
 				//MSVC ARM64 has no SVML and calls sin and cos separately, each with its own reduction
 				double si0, c0, si1, c1, si2, c2, si3, c3;
 				sincos_shared(work0, &si0, &c0);
@@ -2037,7 +2037,7 @@ void calc_SF(const int& points,
 			{
 				rho = dens_local[p];
 				work = k1_local * d1_local[p] + k2_local * d2_local[p] + k3_local * d3_local[p];
-#if (defined(__GNUC__) || defined(__clang__)) && !defined(__APPLE__)
+#if (defined(__GNUC__) || defined(__clang__)) && !defined(__APPLE__) && !defined(__ANDROID__)
 				sincos(work, &si, &c);
 				re += rho * c;
 				im += rho * si;
@@ -2045,7 +2045,7 @@ void calc_SF(const int& points,
 				__sincos(work, &si, &c);
 				re += rho * c;
 				im += rho * si;
-#elif defined(_M_ARM64)
+#elif defined(_M_ARM64) || defined(__ANDROID__)
 				sincos_shared(work, &si, &c);
 				re += rho * c;
 				im += rho * si;
