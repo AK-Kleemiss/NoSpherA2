@@ -447,6 +447,10 @@ include(NoSpherA2Optimizations)
 if(NOT ANDROID) # the NDK cross build takes nothing from the micromamba environment
     validate_micromamba_environment()
 endif()
+#Android below API 28 (legacy APK line, API 21): posix_spawn and aligned_alloc stand-ins for all C++
+if(ANDROID AND ANDROID_PLATFORM_LEVEL LESS 28)
+    add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:SHELL:-include ${CMAKE_CURRENT_SOURCE_DIR}/cmake/android_legacy_compat.h>")
+endif()
 
 
 # ---------------------------------------------------------------------------
@@ -522,6 +526,10 @@ target_include_directories(
     PUBLIC
         "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/libcint/include>"
 )
+#Android below API 26 (legacy APK line, API 21): libm lacks the C99 complex functions (creal, conj, ...)
+if(ANDROID AND ANDROID_PLATFORM_LEVEL LESS 26)
+    target_compile_options(cint PRIVATE -include "${CMAKE_CURRENT_SOURCE_DIR}/cmake/android_complex_compat.h")
+endif()
 
 if(NOT TARGET libcint::libcint)
     add_library(libcint::libcint ALIAS cint)
