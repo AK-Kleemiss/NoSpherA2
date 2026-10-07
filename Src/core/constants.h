@@ -22,9 +22,11 @@ namespace constants
 	//ORCA stores g over sqrt(3) and h and up over sqrt((2l-1)!!) of the physical primitive norm; the tables follow ORCA, occ does not
 	constexpr double sph2cart_norm2[11] = { 1, 1, 1, 1, 3, 945, 10395, 135135, 2027025, 34459425, 654729075 };
 	static double density_accuracy = 5.0e-5; // SQRT of the desired accuracy for density calculations
-	//RI (ab|P) skipped below w max|D_ab| Q_ab Q_P, as in XCW; sucrose tsc within 4e-7 (relative) of the
-	//unscreened fit, 1e-10 gives 7e-5. -tune NOS_RI_SCREEN overrides it for one run.
-	constexpr double ri_screen_threshold = 1e-12;
+	//RI (ab|P) skipped below w max|D_ab| Q_ab Q_P, as in XCW. Sucrose/TZVP at 1e-13: tsc within 1.8e-6 and charges
+	//within 1e-6 e of the unscreened fit, the same as two unscreened runs differ (1-1.3e-6, dynamic-schedule summation
+	//through an ill-conditioned metric), at 75 % of its time; 1e-12 gives 3.4e-6, 1e-11 5e-5, 2e-11 1e-4 in the charges.
+	//-tune NOS_RI_SCREEN overrides it for one run.
+	constexpr double ri_screen_threshold = 1e-13;
 	constexpr int grid_max_no_flip = 50;
 	int constexpr const_abs(int x)
 	{
