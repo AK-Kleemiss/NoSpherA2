@@ -214,15 +214,23 @@ void computeRho(
 	Kernel::optimizer(opty, atm.data(), nat, bas.data(), nbas, env.data());
 	if (bound) libcint::int2e_optimizer(&opt2, atm.data(), nat, bas.data(), nbas, env.data());
 
+	//Every shell a sums into its own vector, and those are added to rho in a fixed order as soon as all before
+	//them are done: rho is bitwise the same whichever thread ran what, and only the out-of-order window is held.
+	//Per-thread vectors added in arrival order moved the sucrose tsc by 1e-6 between identical runs (the metric
+	//is ill-conditioned). Same speed as before (sucrose/TZVP 4.19 s vs 4.23 s); heaviest-a-first was slower.
+	std::vector<vec> part(nQM);
+	int merged = 0;
+
 	long long done = 0;
 	{ //the bar ends its line when it goes out of scope, before the summary below
 		ProgressBar pb(nQM, 60, "#", " ", "Calculating Eri3c Matrix");
 #pragma omp parallel reduction(+:done)
 		{
-			vec loc(naux, 0.0), cache(ncache), dblk(static_cast<size_t>(dmax_orb) * dmax_orb);
+			vec cache(ncache), dblk(static_cast<size_t>(dmax_orb) * dmax_orb);
 			vec buf3(static_cast<size_t>(dmax_orb) * dmax_orb * dmax_aux), buf2(static_cast<size_t>(dmax_orb) * dmax_orb * dmax_orb * dmax_orb);
 #pragma omp for schedule(dynamic)
 			for (int a = 0; a < nQM; a++) {
+				vec loc(naux, 0.0);
 				const int a0 = aoloc[a], da = aoloc[a + 1] - a0;
 				for (int b = 0; b <= a; b++) {
 					const int b0 = aoloc[b], db = aoloc[b + 1] - b0, dab = da * db;
@@ -260,9 +268,15 @@ void computeRho(
 					}
 				}
 				pb.update();
-			}
 #pragma omp critical
-			for (int k = 0; k < naux; k++) rho[k] += loc[k];
+				{
+					part[a] = std::move(loc);
+					for (; merged < nQM && !part[merged].empty(); merged++) {
+						for (int p = 0; p < naux; p++) rho[p] += part[merged][p];
+						vec().swap(part[merged]);
+					}
+				}
+			}
 		}
 	}
 	libcint::CINTdel_optimizer(&opty);
