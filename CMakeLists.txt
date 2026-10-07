@@ -4,8 +4,10 @@ project(NoSpherA2 LANGUAGES C CXX)
 
 message(STATUS "CMAKE_BUILD_TYPE = ${CMAKE_BUILD_TYPE}")
 
-# Windows on ARM: OpenBLAS instead of oneMKL, and MSVC's own vcomp for OpenMP instead of libiomp5
-if(WIN32 AND CMAKE_CXX_COMPILER_ARCHITECTURE_ID STREQUAL "ARM64")
+# Windows on ARM and Linux aarch64: OpenBLAS instead of oneMKL, and the compiler's own OpenMP
+# runtime (vcomp, libgomp) instead of libiomp5
+if((WIN32 AND CMAKE_CXX_COMPILER_ARCHITECTURE_ID STREQUAL "ARM64")
+   OR (LINUX AND CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64"))
     set(NOSPHERA2_OPENBLAS ON)
 else()
     set(NOSPHERA2_OPENBLAS OFF)
@@ -614,6 +616,19 @@ if(APPLE)
         REQUIRED
     )
     find_package(OpenMP REQUIRED COMPONENTS CXX)
+elseif(NOSPHERA2_OPENBLAS AND LINUX)
+    # conda-forge OpenBLAS: one libopenblas.so with CBLAS, LAPACK and LAPACKE
+    find_path(NOSPHERA2_OPENBLAS_INCLUDE_DIR cblas.h
+        PATHS "${MICROMAMBA_ENV_PREFIX}/include" PATH_SUFFIXES openblas NO_DEFAULT_PATH REQUIRED)
+    find_library(NOSPHERA2_OPENBLAS_LIB openblas
+        PATHS "${MICROMAMBA_ENV_PREFIX}/lib" NO_DEFAULT_PATH REQUIRED)
+    add_library(nosphera2_openblas SHARED IMPORTED)
+    set_target_properties(nosphera2_openblas PROPERTIES
+        IMPORTED_LOCATION "${NOSPHERA2_OPENBLAS_LIB}"
+        INTERFACE_INCLUDE_DIRECTORIES "${NOSPHERA2_OPENBLAS_INCLUDE_DIR}"
+        INTERFACE_COMPILE_DEFINITIONS NSA2_OPENBLAS
+        #MKL's libiomp5 used to supply the GOMP_* symbols; without it libgomp has to be linked
+        INTERFACE_LINK_OPTIONS -fopenmp)
 elseif(NOSPHERA2_OPENBLAS)
     # oneMKL has no Windows ARM64 build. conda-forge's OpenBLAS carries LAPACKE and the headers;
     # its include dir is Library/include or Library/include/openblas depending on the build.

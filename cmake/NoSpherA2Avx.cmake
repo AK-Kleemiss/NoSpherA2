@@ -29,8 +29,13 @@ elseif(NOS_AVX)
 endif()
 message(STATUS "NOS_AVX=${NOS_AVX} -> building with AVX: ${NOS_USE_AVX}")
 
-#C and C++ only: nvcc refuses -m flags, and the GPU sources get their host flags from it
-if(LINUX)
+#C and C++ only: nvcc refuses -m flags, and the GPU sources get their host flags from it.
+#x86 only: aarch64 gcc rejects -msse (NEON is always on there)
+set(NOS_X86 OFF)
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "(x86_64|AMD64|amd64)")
+    set(NOS_X86 ON)
+endif()
+if(LINUX AND NOS_X86)
     add_compile_options("$<$<COMPILE_LANGUAGE:C,CXX>:-msse2;-msse3;-msse4.1;-msse4.2>")
     if(NOS_USE_AVX)
         add_compile_options($<$<COMPILE_LANGUAGE:C,CXX>:-mavx>)
@@ -43,7 +48,7 @@ endif()
 #produced a byte-identical binary when this was tried per translation unit. Off by default - an AVX2
 #instruction on a pre-Haswell host is SIGILL, not a slow path - and NOT wired into the AUTO
 #detection above until the win is measured on a real case.
-if(NOS_AVX2 AND LINUX)
+if(NOS_AVX2 AND LINUX AND NOS_X86)
     add_compile_options("$<$<COMPILE_LANGUAGE:C,CXX>:-mavx2;-mfma>")
     add_link_options(-mavx2 -mfma)
 endif()

@@ -37,6 +37,20 @@ function(nosphera2_copy_runtime_libraries target)
         set(_tbb_destination_name
             "$<TARGET_FILE_NAME:TBB::tbb>"
         )
+    elseif(UNIX AND NOSPHERA2_OPENBLAS)
+        # aarch64: libgomp is the system's; ship OpenBLAS and the gfortran runtime its LAPACK needs
+        set(_openmp_source
+            "${MICROMAMBA_ENV_PREFIX}/lib/libopenblas.so.0"
+        )
+        set(_extra_runtime_source
+            "${MICROMAMBA_ENV_PREFIX}/lib/libgfortran.so.5"
+        )
+        set(_tbb_destination_name
+            "$<TARGET_SONAME_FILE_NAME:TBB::tbb>"
+        )
+        set(_runtime_rpath
+            "$ORIGIN"
+        )
     elseif(APPLE)
         set(_openmp_source
             "${MICROMAMBA_ENV_PREFIX}/lib/libomp.dylib"
@@ -118,6 +132,20 @@ function(nosphera2_copy_runtime_libraries target)
 
         VERBATIM
     )
+
+    if(DEFINED _extra_runtime_source)
+        get_filename_component(_extra_destination_name "${_extra_runtime_source}" NAME)
+        file(REAL_PATH "${_extra_runtime_source}" _extra_real_source)
+        add_custom_command(
+            TARGET "${target}"
+            POST_BUILD
+            COMMAND
+                "${CMAKE_COMMAND}" -E copy_if_different
+                "${_extra_real_source}"
+                "$<TARGET_FILE_DIR:${target}>/${_extra_destination_name}"
+            VERBATIM
+        )
+    endif()
 
     # No CUDA or ROCm runtime is copied. cuBLAS was the only one that ever needed to be, and
     # shipping it cost half a gigabyte for two GEMM calls; gemm_gpu.cuh replaced it.
