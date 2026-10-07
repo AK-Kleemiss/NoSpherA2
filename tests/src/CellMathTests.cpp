@@ -406,6 +406,48 @@ namespace NoSpherA2UnitTests
 		// asym_fact/sym_op not checked, as above
 	}
 
+	// a salt in I-4 whose two ions sit on different -4 sites (PPh4+ UF6-, Z' = 1/4): the cluster is kept only by
+	// H = {1, 2}, the -4 of U is not in H, and every atom must weigh |H| / (|stab| * copies) = 1/2 so the
+	// four kept cosets count each site of the cell once. 1/|stab| alone gave U 1/2 but F and C 1, R1 25 %.
+	TEST(CellMathIoTests, GrownSaltOnDifferentSitesWeighsByOrbit)
+	{
+		const std::filesystem::path p = write_text("i4bar.cif",
+			"data_t\n_cell_length_a 12.0\n_cell_length_b 12.0\n_cell_length_c 7.0\n"
+			"_cell_angle_alpha 90.0\n_cell_angle_beta 90.0\n_cell_angle_gamma 90.0\n_cell_volume 1008.0\n"
+			"loop_\n_space_group_symop_operation_xyz\n"
+			"'x, y, z'\n'-x, -y, z'\n'y, -x, -z'\n'-y, x, -z'\n"
+			"'x+1/2, y+1/2, z+1/2'\n'-x+1/2, -y+1/2, z+1/2'\n'y+1/2, -x+1/2, -z+1/2'\n'-y+1/2, x+1/2, -z+1/2'\n");
+		std::ostringstream log;
+		cell cl(p, log, false, true);
+		std::filesystem::remove(p);
+		ASSERT_EQ(cl.get_trans()[0].size(), 8u);
+
+		// U on the -4 at (1/2, 1/2, 0) with F, P on the -4 at (0, 1/2, 1/4) with C; each grown by its own -4
+		std::vector<asym_atom> asym = {
+			make_asym("U1", 92, { 0.5, 0.5, 0.0 }), make_asym("F1", 9, { 0.58, 0.65, 0.01 }),
+			make_asym("P1", 15, { 0.0, 0.5, 0.25 }), make_asym("C1", 6, { 0.1, 0.57, 0.4 }) };
+		std::vector<asym_atom> xyz = {
+			make_xyz(cl, "u", 92, 0.5, 0.5, 0.0),
+			make_xyz(cl, "f0", 9, 0.58, 0.65, 0.01), make_xyz(cl, "f1", 9, 0.42, 0.35, 0.01),
+			make_xyz(cl, "f2", 9, 0.65, 0.42, -0.01), make_xyz(cl, "f3", 9, 0.35, 0.58, -0.01),
+			make_xyz(cl, "p", 15, 0.0, 0.5, 0.25),
+			make_xyz(cl, "c0", 6, 0.1, 0.57, 0.4), make_xyz(cl, "c1", 6, -0.1, 0.43, 0.4),
+			make_xyz(cl, "c2", 6, 0.07, 0.4, 0.1), make_xyz(cl, "c3", 6, -0.07, 0.6, 0.1) };
+		cl.grow_asym_atoms(asym, xyz);
+		ASSERT_EQ(asym.size(), 10u);
+		ivec3 links;
+		cl.eval_symm(asym, 4, links);
+		ASSERT_EQ(links[0][0].size(), 4u); // U: the whole -4
+		const ivec3 full = links;
+		hkl_list hkl = { { 1, 0, 0 } }, enlarged;
+		ivec3 rotations;
+		cl.apply_grown(hkl, enlarged, asym, links, rotations);
+		ASSERT_EQ(cl.get_trans()[0].size(), 4u); // one operation per coset of H = {1, 2}
+		cl.set_symmetry_factors(asym, links, full, 2);
+		for (const asym_atom& a : asym)
+			EXPECT_NEAR(a.asym_fact, 0.5, 1e-12) << a.label;
+	}
+
 	namespace
 	{
 		// P21/c with an orthogonal 8 x 8 x 6 A cell: 0 identity, 1 screw, 2 inversion, 3 glide

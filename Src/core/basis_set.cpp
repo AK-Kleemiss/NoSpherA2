@@ -549,6 +549,7 @@ bool BasisSetLibrary::check_basis_set_exists(std::string basis_name) {
 
 std::shared_ptr<BasisSet> BasisSetLibrary::get_basis_set_with_overrides(const std::string& basis_name, const std::filesystem::path& path) {
 	const auto base = get_basis_set(basis_name);
+	if (!std::filesystem::is_regular_file(path)) throw std::runtime_error("XCW basis overrides file not found: " + path.string());
 	occ::gto::io::JsonBasisReader reader(path.string());
 	const auto& elements = reader.element_map();
 	if (elements.empty()) throw std::runtime_error("XCW basis overrides contain no elements");
@@ -636,29 +637,10 @@ int load_basis_into_WFN(WFN& wavy,const std::shared_ptr<BasisSet> b, const bool 
 				basis_set_entry bf_ = wavy.get_atom_basis_set_entry(i, b);
 				int temp_type = bf_.get_type();
 				double temp_exp = bf_.get_exponent();
-				int effective_type = 0;
 				//the wfn primitive types are Cartesian (d = 5..10, f = 11..20, ...), so a shell of l emits (l+1)(l+2)/2 primitives
+				//starting at 1 + l(l+1)(l+2)/6; the old switch stopped at h and left i and up at type 0
 				int end = (temp_type + 1) * (temp_type + 2) / 2;
-				switch (temp_type) {
-				case(0):
-					effective_type = 1;
-					break;
-				case(1):
-					effective_type = 2;
-					break;
-				case(2):
-					effective_type = 5;
-					break;
-				case(3):
-					effective_type = 11;
-					break;
-				case(4):
-					effective_type = 21;
-					break;
-				case(5):
-					effective_type = 36;
-					break;
-				}
+				int effective_type = 1 + temp_type * (temp_type + 1) * (temp_type + 2) / 6;
 				for (int idx = 0; idx < end; idx++, nex_++, effective_type++) {
 					exponents_.push_back(temp_exp);
 					types_.push_back(effective_type);

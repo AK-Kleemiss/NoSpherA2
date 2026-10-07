@@ -24,9 +24,7 @@ void XCW::construct(const options& opt_in) {
 	std::optional<std::filesystem::path> xyz_path;
 	std::optional<std::vector<asym_atom>> xyz_atoms;
 	if (settings.grown) {
-		if ((opt->xyz_file.empty())) {
-			std::cerr << "I need an xyz file to grow the crystal, but none was provided. Exiting." << std::endl;
-		}
+		err_checkf(!opt->xyz_file.empty(), "I need an xyz file to grow the crystal, but none was provided.", std::cerr);
 		xyz_path = opt->xyz_file;
 		WFN dummy_wave;
 		dummy_wave.read_xyz(*xyz_path, std::cout, opt->debug);
@@ -54,11 +52,15 @@ void XCW::construct(const options& opt_in) {
 	// Warn if a grown structure's explicit atoms don't consistently cover the same
 	// symmetry operations for every asymmetric atom
 	ivec applied_symmetry;
+	const ivec3 full_links = symmetry_linking_list; // the projection erases the operations it drops
+	int subgroup_order = 1;
 	if (settings.grown) {
+		const int all_ops = static_cast<int>(unit_cell.get_trans()[0].size());
 		applied_symmetry = unit_cell.apply_grown(hkl, hkl_enlarged, asym_atoms, symmetry_linking_list, original_rotations);
+		subgroup_order = all_ops / static_cast<int>(unit_cell.get_trans()[0].size()); // one kept operation per coset
 	}
 
-	unit_cell.set_symmetry_factors(asym_atoms, symmetry_linking_list);
+	unit_cell.set_symmetry_factors(asym_atoms, symmetry_linking_list, full_links, subgroup_order);
 
 	if (tuning("NOSPHERA2_DEBUG_ASYMFACT")) {
 		std::cerr << "applied_symmetry (deleted):";
@@ -82,6 +84,14 @@ void XCW::construct(const options& opt_in) {
 		temp_atom.set_charge(asym_atoms[at].type);
 		dummy_wave.push_back_atom(temp_atom);
 	}
+	// occ only finds this inside the first SCF, and its message names neither the atom count nor the charge
+	int n_electrons = -settings.charge;
+	for (int at = 0; at < cryst.ncen; at++) n_electrons += asym_atoms[at].type;
+	err_checkf(n_electrons > 0 && (n_electrons + settings.multiplicity - 1) % 2 == 0,
+		"The XCW model has " + std::to_string(cryst.ncen) + " atoms and " + std::to_string(n_electrons) +
+		" electrons at charge " + std::to_string(settings.charge) + ", which cannot have multiplicity " +
+		std::to_string(settings.multiplicity) + ". Check the charge and multiplicity, missing H atoms and disorder parts; a molecule on a special position needs the grown model (keyword grown and -xyz).",
+		std::cout);
 
 	// Load basis set & generate basis for each atom
 	orbital_basis_ = settings.basis_overrides.empty() ? BasisSetLibrary::get_basis_set(settings.basis_set_name) :

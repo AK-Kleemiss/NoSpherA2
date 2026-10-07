@@ -382,17 +382,27 @@ ivec cell::confirm_applied_symmetry(ivec3& linking_list) {
 	return applied_symmetry;
 }
 
-void cell::set_symmetry_factors(std::vector<asym_atom>& asym_atoms, const ivec3& linking_list) {
+void cell::set_symmetry_factors(std::vector<asym_atom>& asym_atoms, const ivec3& linking_list, const ivec3& full_links, const int subgroup_order) {
+	// The coset sum over G/H visits every site of an orbit copies * |stab_G| / |H| times, copies being the explicit
+	// atoms in that orbit; full_links still holds the whole site stabiliser, linking_list only what the projection kept.
+	// 1/|stab| alone holds only when every site stabiliser lies in H: one molecule on a special position, not a salt
+	// whose ions sit on different special positions (PPh4+ UF6- in I-4 counted F and C twice, R1 25 %).
+	auto weight = [&](const int p) {
+		int copies = 0;
+		for (const ivec& link : full_links[p])
+			if (!link.empty()) copies++;
+		return static_cast<double>(subgroup_order) / (full_links[p][p].size() * copies);
+		};
 	int idx1 = 0;
 	for (asym_atom& a : asym_atoms) {
 		if (!a.grown) {
-			a.asym_fact = 1.0 / linking_list[idx1][idx1].size();
+			a.asym_fact = weight(idx1);
 			idx1++;
 			continue;
 		}
 		for (int idx2 = 0; idx2 < linking_list.size(); idx2++) {
 			if (linking_list[idx2][idx1].size() != 0) {
-				a.asym_fact = 1.0 / linking_list[idx2][idx2].size();
+				a.asym_fact = weight(idx2);
 				a.sym_op = linking_list[idx2][idx1][0];
 			}
 		}
