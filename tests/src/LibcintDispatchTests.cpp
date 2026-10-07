@@ -10,8 +10,6 @@
 #include "core/NoSpherA2.h"
 
 // free functions of libCintMain.cpp / integration_params.cpp that have no header declaration
-void calc_screend_functions_and_max_ij(const std::vector<atom> &atoms, const ivec &aoloc, const ivec &bas_orbital_indices, bvec2 &screened, int &max_ij);
-ivec generate_bas_indices_per_atom(const Int_Params &params);
 double NOS_CINTcommon_fac_sp(int l);
 
 namespace LibcintDispatchTestHelpers
@@ -572,32 +570,8 @@ TEST(LibcintDispatchTests, ComputeRhoCartesianMatchesSphericalForSpBasis)
 	}
 }
 
-// the overlap screening flags a pair 60 bohr apart, keeps the diagonal, reports the largest block and clears on no atoms
-TEST(LibcintDispatchTests, ScreeningFlagsFarPairsAndHandlesNoAtoms)
-{
-	WFN qm = make_wfn({ make_atom("H", 1, 0.0, 0.0, 0.0, { {0, 1.0}, {1, 0.6} }), make_atom("Li", 3, 0.0, 0.0, 60.0, { {0, 0.8} }) });
-	Int_Params p(qm);
-	ivec bas = p.get_bas();
-	ivec aoloc = make_loc<COORDINATE_TYPE::SPH>(bas, (int)p.get_nbas());
-	ivec per_atom = generate_bas_indices_per_atom(p);
-	EXPECT_EQ(per_atom, (ivec{ 0, 2, 3 }));
-	bvec2 screened;
-	int max_ij = -1;
-	calc_screend_functions_and_max_ij(p.get_atoms(), aoloc, per_atom, screened, max_ij);
-	ASSERT_EQ(screened.size(), 2u);
-	EXPECT_FALSE(screened[0][0]);
-	EXPECT_TRUE(screened[0][1]);
-	EXPECT_FALSE(screened[1][1]);
-	EXPECT_EQ(max_ij, 16);
-
-	calc_screend_functions_and_max_ij({}, aoloc, per_atom, screened, max_ij);
-	EXPECT_TRUE(screened.empty());
-	EXPECT_EQ(max_ij, 0);
-}
-
-// a screened pair contributes exp(-1600) to rho, so the blocked contraction still matches the full one;
-// this only catches a pair screened wrongly (a lost contribution), a screen that never fires is
-// invisible here and is pinned down by ScreeningFlagsFarPairsAndHandlesNoAtoms instead
+// a pair 60 bohr apart has (ab|ab) ~ exp(-1600): the Schwarz screen drops its 2 shell pairs x 3 aux
+// shells (6 of 18 triplets) and the result still matches the full contraction
 TEST(LibcintDispatchTests, ComputeRhoWithScreenedPairMatchesFullContraction)
 {
 	WFN qm = make_wfn({ make_atom("H", 1, 0.0, 0.0, 0.0, { {0, 1.0}, {1, 0.6} }), make_atom("Li", 3, 0.0, 0.0, 60.0, { {0, 0.8} }) });
@@ -607,7 +581,9 @@ TEST(LibcintDispatchTests, ComputeRhoWithScreenedPairMatchesFullContraction)
 	dMatrix2 dm = symmetric_dm(nao);
 	vec eri, rho;
 	computeEri3c<Coulomb3C_SPH>(pq, pa, eri);
+	testing::internal::CaptureStdout();
 	computeRho<Coulomb3C_SPH>(pq, pa, dm, rho);
+	EXPECT_NE(testing::internal::GetCapturedStdout().find("kept 12 of 18 shell triplets"), std::string::npos);
 	const vec expected = contract_eri(eri, dm, nao, naok);
 	ASSERT_EQ((int)rho.size(), naok);
 	for (int k = 0; k < naok; k++) EXPECT_NEAR(rho[k], expected[k], 1e-10) << "k = " << k;

@@ -25,9 +25,9 @@ Generating densities...
 Normal basis functions: 62
 Auxiliary basis functions: 522
 Metric: Coulomb
-Screened out 0 atom pairs due to overlap criteria.
 [                   Calculating Eri3c Matrix                  ]
 [#############################################################] 100% 
+Schwarz screening (1e-12) kept 63240 of 63240 shell triplets
 Fit controls:
   Tikhonov: off
   Atomic charge restraints: on (Hirshfeld)

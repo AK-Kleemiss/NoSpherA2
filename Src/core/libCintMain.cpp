@@ -2,6 +2,7 @@
 #include "constants.h"
 #include "libCintMain.h"
 #include "libCintKernels.h"
+#include "tuning.h"
 //
 #if defined(__APPLE__)
 // On macOS we are using Accelerate for BLAS/LAPACK
@@ -123,119 +124,27 @@ template void compute2C<Overlap2C_SPH>(Int_Params &params, vec &ret);
 template void compute2C<Overlap2C_CRT>(Int_Params &params, vec &ret);
 
 
-void calc_screend_functions_and_max_ij(
-	const std::vector<atom> &atoms,
-	const ivec &aoloc,
-	const ivec &bas_orbital_indices,
-	bvec2 &screened,
-	int &max_ij
-) {
-	const int natoms = static_cast<int>(atoms.size());
-	if (natoms == 0) {
-		screened.clear();
-		max_ij = 0.0;
-		return;
-	}
+extern "C" libcint::CINTIntegralFunction int3c1e_sph;
 
-	// Initialize screened matrix (natoms x natoms) only once
-	screened.assign(natoms, bvec(natoms, false));
-	max_ij = 0.0;
+//Per-shell integrals behind each 3C kernel. pair and aux give the Schwarz factors of
+//|(ab|P)| <= sqrt((ab|ab)) sqrt((P|P)); nullptr where the metric has none.
+//ponytail: the overlap metric is not screened, its bound needs int4c1e which this libcint build may lack
+template <typename K> struct Shell3C;
+template <> struct Shell3C<Coulomb3C_SPH> {
+	static constexpr libcint::CINTIntegralFunction *three = libcint::int3c2e_sph, *pair = libcint::int2e_sph, *aux = libcint::int2c2e_sph;
+};
+template <> struct Shell3C<Coulomb3C_CRT> {
+	static constexpr libcint::CINTIntegralFunction *three = libcint::int3c2e_cart, *pair = libcint::int2e_cart, *aux = libcint::int2c2e_cart;
+};
+template <> struct Shell3C<Overlap3C_SPH> {
+	static constexpr libcint::CINTIntegralFunction *three = int3c1e_sph, *pair = nullptr, *aux = nullptr;
+};
 
-	// --- 1) Precompute worst exponents per atom (parallel) ---
-
-	vec worst_exp(natoms);
-
-#pragma omp parallel for schedule(static)
-	for (int i = 0; i < natoms; ++i) {
-		const int nbas = atoms[i].get_basis_set_size();
-
-		// Use a local variable; std::numeric_limits<double>::infinity() is more "semantic"
-		double w = std::numeric_limits<double>::infinity();
-		for (int s = 0; s < nbas; ++s) {
-			const double e = atoms[i].get_basis_set_exponent(s);
-			if (e < w) w = e;
-		}
-		worst_exp[i] = w;
-	}
-
-	// --- 2) Loop over atom pairs and do screening + max-block computation (parallel) ---
-
-	std::string output = "";    //Only used for debug output
-
-	int max_block_ij = 0;
-#pragma omp parallel
-	{
-		int local_max = 0;
-		std::string local_output = "";
-
-#pragma omp for schedule(dynamic) nowait
-		for (int atom_i = 0; atom_i < natoms; ++atom_i) {
-			for (int atom_j = atom_i; atom_j < natoms; ++atom_j) {
-				const double dist = atoms[atom_i].distance_to(atoms[atom_j]);
-				const double dist2 = dist * dist;
-
-				//Gaussian product prefactor exp(-a b / (a + b) d^2) of the two most diffuse primitives
-				const double crit = -dist2 * worst_exp[atom_i] * worst_exp[atom_j] / (worst_exp[atom_i] + worst_exp[atom_j]);
-				if (crit < constants::exp_cutoff) {
-					//if (false){
-						//local_output += "Screening atom pair (" + std::to_string(atom_i) + ", " + std::to_string(atom_j) + ") with distance " + std::to_string(dist) + " and criterion " + std::to_string(crit) + " < " + std::to_string(exp_cutoff) + "\n";
-					screened[atom_i][atom_j] = true;
-					continue;
-				}
-
-				const int bi = bas_orbital_indices[atom_i];
-				const int bip1 = bas_orbital_indices[atom_i + 1];
-				const int bj = bas_orbital_indices[atom_j];
-				const int bjp1 = bas_orbital_indices[atom_j + 1];
-
-				const int naoi = aoloc[bip1] - aoloc[bi];
-				const int naoj = aoloc[bjp1] - aoloc[bj];
-
-				const int block_ij = naoi * naoj;
-				if (block_ij > local_max) {
-					local_max = block_ij;
-				}
-			}
-		}
-#pragma omp critical
-		{
-			if (local_max > max_block_ij) {
-				max_block_ij = local_max;
-			}
-			output += local_output;    //Only used for debug output
-		}
-
-	}
-	max_ij = max_block_ij;    //Only used for debug output
-
-	std::cout << output << std::flush;
-	int skipped = std::accumulate(screened.begin(), screened.end(), 0,
-		[](int sum, const bvec &row) {
-			return sum + std::count(row.begin(), row.end(), true);
-		});
-	std::cout << "Screened out " << skipped << " atom pairs due to overlap criteria." << std::endl;
-}
-
-//Ivec contains the ao indices for the given wave object
-//The list contains (0, n_ao_atom1, last_item + n_ao_atom2, ...)
-//So that ao indices for atom i are in [ao_indices_per_atom[i-1], ao_indices_per_atom[i])
-ivec generate_bas_indices_per_atom(const Int_Params &params)
-{
-	const ivec bas = params.get_bas();
-	int nbas = params.get_nbas();
-	const int natoms = params.get_natoms();
-	ivec bas_indices_per_atom(natoms, 0);
-	for (int i = 0; i < nbas; i++)
-	{
-		bas_indices_per_atom[bas(ATOM_OF, i)]++;
-	}
-
-	ivec bas_indices_location(natoms + 1, 0);
-	std::partial_sum(bas_indices_per_atom.begin(), bas_indices_per_atom.end(), bas_indices_location.begin() + 1);
-
-	return bas_indices_location;
-}
-
+//rho_P = sum_ab w D_ab (ab|P) over orbital shell pairs a >= b (w = 2 off the diagonal), one shell
+//triplet at a time. A triplet is skipped when w max|D_ab| Q_ab Q_P < NOS_RI_SCREEN, the
+//density-weighted Schwarz screen XCW uses for its stored ERIs. This replaces an atom-pair overlap
+//screen that rode on constants::exp_cutoff, which the ELI-D tail correction (16 Sep 2026) made
+//so tight that it stopped screening.
 template <typename Kernel>
 void computeRho(
 	const Int_Params &normal_basis,
@@ -244,114 +153,120 @@ void computeRho(
 	vec &rho,
 	const std::optional<ivec> asym_atm_list)
 {
+	using S = Shell3C<Kernel>;
 	Int_Params combined(normal_basis, aux_basis);
 
 	ivec bas = combined.get_bas();
 	ivec atm = combined.get_atm();
 	vec  env = combined.get_env();
 
-	const int natoms = normal_basis.get_natoms();
 	const int nQM = normal_basis.get_nbas();
 	const int nAux = aux_basis.get_nbas();
 	const int nat = combined.get_natoms();
 	const int nbas = combined.get_nbas();
 
 	ivec aoloc = Kernel::gen_loc(bas, nbas);
+	const int aux0 = aoloc[nQM];
+	const int naux = aoloc[nQM + nAux] - aux0;
+	rho.assign(naux, 0.0);
 
-	rho.resize(aoloc[nQM + nAux] - aoloc[nQM], 0.0);
+	//1e-12 as in XCW: sucrose tsc within 4e-7 (relative) of the unscreened fit, 1e-10 gives 7e-5
+	double thr = 1e-12;
+	if (const char *e = tuning("NOS_RI_SCREEN")) thr = std::atof(e);
+	const bool bound = S::pair != nullptr && thr > 0.0;
 
-	ivec bas_orbital_indices = generate_bas_indices_per_atom(normal_basis);
-	ivec bas_aux_indices = generate_bas_indices_per_atom(aux_basis);
+	int dmax_orb = 0, dmax_aux = 0;
+	for (int s = 0; s < nbas; s++) {
+		int &d = s < nQM ? dmax_orb : dmax_aux;
+		d = std::max(d, aoloc[s + 1] - aoloc[s]);
+	}
+	//libcint mallocs scratch per call unless handed one; the size query is the call without output.
+	//{s,s,s,s} over every shell is the bound pyscf's GTOmax_cache_size uses
+	CACHE_SIZE_T ncache = 0;
+	for (int s = 0; s < nbas; s++) {
+		int shls[4] = { s, s, s, s };
+		ncache = std::max(ncache, S::three(nullptr, nullptr, shls, atm.data(), nat, bas.data(), nbas, env.data(), nullptr, nullptr));
+		if (bound) ncache = std::max({ ncache,
+			S::pair(nullptr, nullptr, shls, atm.data(), nat, bas.data(), nbas, env.data(), nullptr, nullptr),
+			S::aux(nullptr, nullptr, shls, atm.data(), nat, bas.data(), nbas, env.data(), nullptr, nullptr) });
+	}
 
-	bvec2 screened;
-	int max_block_ij = 0;
-	calc_screend_functions_and_max_ij(
-		normal_basis.get_atoms(),
-		aoloc,
-		bas_orbital_indices,
-		screened,
-		max_block_ij
-	);
+	//Q_P = sqrt(max_p (p|p)) per aux shell
+	vec qaux(nAux, 1.0);
+	double qaux_max = 1.0;
+	if (bound) {
+		vec buf(static_cast<size_t>(dmax_aux) * dmax_aux), cache(ncache);
+		qaux_max = 0.0;
+		for (int P = 0; P < nAux; P++) {
+			int shls[2] = { nQM + P, nQM + P };
+			const int dp = aoloc[nQM + P + 1] - aoloc[nQM + P];
+			double m = 0.0;
+			if (S::aux(buf.data(), nullptr, shls, atm.data(), nat, bas.data(), nbas, env.data(), nullptr, cache.data()))
+				for (int f = 0; f < dp; f++) m = std::max(m, std::abs(buf[f + dp * f]));
+			qaux[P] = std::sqrt(m);
+			qaux_max = std::max(qaux_max, qaux[P]);
+		}
+	}
 
-	libcint::CINTOpt* opty = nullptr;
+	libcint::CINTOpt *opty = nullptr, *opt2 = nullptr;
 	Kernel::optimizer(opty, atm.data(), nat, bas.data(), nbas, env.data());
+	if (bound) libcint::int2e_optimizer(&opt2, atm.data(), nat, bas.data(), nbas, env.data());
 
-	ProgressBar pb(natoms, 60, "#", " ", "Calculating Eri3c Matrix");
-#pragma omp parallel for schedule(dynamic) shared(pb, rho)
-	for (int atm_idx = 0; atm_idx < natoms; atm_idx++) {
-		//if (asym_atm_list.has_value() && std::find(asym_atm_list->begin(), asym_atm_list->end(), atm_idx) == asym_atm_list->end()) { //Frag mal Florian.... dass sollte irgendwie gehen?
-		//    // Skip this atom if it's not in the asymmetry list
-		//    pb.update(std::cout);
-		//    continue;
-		//}
-		double *rho_atom = rho.data() + aoloc[nQM + bas_aux_indices[atm_idx]] - aoloc[nQM];
-		int shl_slice[6] = {
-			0, 0,  // i shells
-			0,0,  // j shells
-			nQM + bas_aux_indices[atm_idx], nQM + bas_aux_indices[atm_idx + 1] };
-
-		int naok = aoloc[shl_slice[5]] - aoloc[shl_slice[4]];
-
-		vec res(static_cast<size_t>(max_block_ij) * naok);
-		vec dm_slice(max_block_ij);
-		for (int atom_i = 0; atom_i < natoms; atom_i++) {
-			shl_slice[0] = bas_orbital_indices[atom_i];
-			shl_slice[1] = bas_orbital_indices[atom_i + 1];
-			const int naoi = aoloc[shl_slice[1]] - aoloc[shl_slice[0]];
-			for (int atom_j = atom_i; atom_j < natoms; atom_j++) {
-				if (screened[atom_i][atom_j]) continue;
-				// Hoist weight calculation before kernel call
-				const double weight = 2.0 - static_cast<double>(atom_i == atom_j);
-
-				shl_slice[2] = bas_orbital_indices[atom_j];
-				shl_slice[3] = bas_orbital_indices[atom_j + 1];
-
-				const int naoj = aoloc[shl_slice[3]] - aoloc[shl_slice[2]];
-				const int block_ij = naoi * naoj;
-
-				Kernel::drv(res.data(),
-					1,
-					shl_slice,
-					aoloc.data(),
-					opty,
-					atm.data(), nat,
-					bas.data(), nbas,
-					env.data());
-
-				// Inline optimized matrix slice extraction
-				const int row_start = aoloc[shl_slice[2]];
-				const int row_end = aoloc[shl_slice[3]];
-				const int col_start = aoloc[shl_slice[0]];
-				const int col_end = aoloc[shl_slice[1]];
-
-				int idx = 0;
-				for (int i = row_start; i < row_end; i++) {
-					for (int j = col_start; j < col_end; j++) {
-						dm_slice[idx++] = dm(i, j) * weight;
+	long long done = 0;
+	{ //the bar ends its line when it goes out of scope, before the summary below
+		ProgressBar pb(nQM, 60, "#", " ", "Calculating Eri3c Matrix");
+#pragma omp parallel reduction(+:done)
+		{
+			vec loc(naux, 0.0), cache(ncache), dblk(static_cast<size_t>(dmax_orb) * dmax_orb);
+			vec buf3(static_cast<size_t>(dmax_orb) * dmax_orb * dmax_aux), buf2(static_cast<size_t>(dmax_orb) * dmax_orb * dmax_orb * dmax_orb);
+#pragma omp for schedule(dynamic)
+			for (int a = 0; a < nQM; a++) {
+				const int a0 = aoloc[a], da = aoloc[a + 1] - a0;
+				for (int b = 0; b <= a; b++) {
+					const int b0 = aoloc[b], db = aoloc[b + 1] - b0, dab = da * db;
+					const double w = a == b ? 1.0 : 2.0;
+					//same element order as the integral block: i (shell a) fastest, then j (shell b)
+					double dm_max = 0.0;
+					for (int j = 0; j < db; j++)
+						for (int i = 0; i < da; i++) {
+							dblk[i + da * j] = w * dm(b0 + j, a0 + i);
+							dm_max = std::max(dm_max, std::abs(dblk[i + da * j]));
+						}
+					if (dm_max == 0.0) continue;
+					double qab = 1.0;
+					if (bound) {
+						int shls[4] = { a, b, a, b };
+						double m = 0.0;
+						if (S::pair(buf2.data(), nullptr, shls, atm.data(), nat, bas.data(), nbas, env.data(), opt2, cache.data()))
+							for (int j = 0; j < db; j++)
+								for (int i = 0; i < da; i++) m = std::max(m, std::abs(buf2[i + da * j + dab * (i + da * j)]));
+						qab = std::sqrt(m);
+						if (dm_max * qab * qaux_max < thr) continue;
+					}
+					for (int P = 0; P < nAux; P++) {
+						if (bound && dm_max * qab * qaux[P] < thr) continue;
+						int shls[3] = { a, b, nQM + P };
+						done++;
+						if (!S::three(buf3.data(), nullptr, shls, atm.data(), nat, bas.data(), nbas, env.data(), opty, cache.data())) continue;
+						const int p0 = aoloc[nQM + P] - aux0, dp = aoloc[nQM + P + 1] - aoloc[nQM + P];
+						for (int k = 0; k < dp; k++) {
+							const double *col = buf3.data() + static_cast<size_t>(dab) * k;
+							double sum = 0.0;
+							for (int ij = 0; ij < dab; ij++) sum += col[ij] * dblk[ij];
+							loc[p0 + k] += sum;
+						}
 					}
 				}
-
-				// accumulate into rho[aux_ao0 .. aux_ao0+naok)
-				cblas_dgemv(CblasRowMajor,
-					CblasNoTrans,
-					naok,
-					block_ij,
-					1.0,
-					res.data(),
-					block_ij,
-					dm_slice.data(),
-					1,
-					1.0,
-					rho_atom,
-					1);
+				pb.update();
 			}
+#pragma omp critical
+			for (int k = 0; k < naux; k++) rho[k] += loc[k];
 		}
-		pb.update();
 	}
-	if (opty) {
-		delete opty;
-		opty = nullptr;
-	}
+	libcint::CINTdel_optimizer(&opty);
+	if (opt2) libcint::CINTdel_optimizer(&opt2);
+	const long long total = static_cast<long long>(nQM) * (nQM + 1) / 2 * nAux;
+	std::cout << "Schwarz screening (" << thr << ") kept " << done << " of " << total << " shell triplets" << std::endl;
 }
 template void computeRho<Coulomb3C_SPH>(
 	const Int_Params &normal_basis,

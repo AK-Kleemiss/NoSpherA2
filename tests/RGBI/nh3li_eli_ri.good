@@ -15,9 +15,9 @@ Analysing ELI basins in the wavefunction...
 Normal basis functions: 63
 Auxiliary basis functions: 182
 Metric: Coulomb
-Screened out 0 atom pairs due to overlap criteria.
 [                   Calculating Eri3c Matrix                  ]
 [#############################################################] 100% 
+Schwarz screening (1e-12) kept 29384 of 29760 shell triplets
 Solving unrestrained linear system...
 ==============================================
 
