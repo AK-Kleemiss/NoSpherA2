@@ -873,7 +873,7 @@ std::string NoSpherA2_message(bool no_date)
 		t.append("   This software utilizes Intel(c) Math Kernel Library (oneMKL), version 2025.2.0.629, for optimized mathematical computations\n");
 #endif
 		t.append("OCC can be found at: https://github.com/peterspackman/occ\n");
-		t.append("Was published at : Spackman, P. R., (2026). Open Computational Chemistry (OCC) - A portable software library and program for quantum chemistry and crystallography. Journal of Open Source Software, 11(117), 9609, https://doi.org/10.21105/joss.09609.\n");
+		t.append("OCC was published at        : Spackman, J. Open Source Softw. 2026, 11, 9609, doi:10.21105/joss.09609.\n");
 		t.append("NoSpherA2 was published at  : Kleemiss et al. Chem. Sci., 2021, 12, 1675 - 1692.\n");
 		t.append("Slater IAM was published at : Kleemiss et al. J. Appl. Cryst. 2024, 57, 161 - 174.\n");
 		t.append("ECP correction functions at : Kleemiss et al. J. Appl. Cryst. 2025, 58, 374 - 382.\n");

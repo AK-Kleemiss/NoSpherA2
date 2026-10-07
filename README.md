@@ -18,7 +18,7 @@ This software makes extensive use of the following external packages:
 - [mdspan](https://github.com/kokkos/mdspan/tree/stable)
 - [featomic](https://github.com/metatensor/featomic)
 - [occ](https://github.com/peterspackman/occ)
-  - OCC was extensively used in XCW and is the engine used for calculating WFNs inside NoSpherA2. Please cite it if those functionalities were used: [doi:10.5281/zenodo.10703204](https://doi.org/10.5281/zenodo.10703204).
+  - OCC was extensively used in XCW and is the engine used for calculating WFNs inside NoSpherA2. Please cite it if those functionalities were used: Spackman, P. R. (2026). Open Computational Chemistry (OCC) - A portable software library and program for quantum chemistry and crystallography. *J. Open Source Softw.* 11(117), 9609, [doi:10.21105/joss.09609](https://doi.org/10.21105/joss.09609).
 
 ## Building NoSpherA2
 To clone this repository with all of its dependencies do:
