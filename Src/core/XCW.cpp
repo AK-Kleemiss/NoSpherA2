@@ -84,7 +84,9 @@ void XCW::construct(const options& opt_in) {
 	}
 
 	// Load basis set & generate basis for each atom
-	std::shared_ptr<BasisSet> basis = BasisSetLibrary::get_basis_set(settings.basis_set_name);
+	orbital_basis_ = settings.basis_overrides.empty() ? BasisSetLibrary::get_basis_set(settings.basis_set_name) :
+		BasisSetLibrary::get_basis_set_with_overrides(settings.basis_set_name, settings.basis_overrides);
+	const auto& basis = orbital_basis_;
 	load_basis_into_WFN(dummy_wave, basis, false, true);
 
 	// Read isotropic displacement parameters
@@ -278,6 +280,14 @@ XCW::SCF_settings XCW::loadSettings(const std::filesystem::path& settings_path) 
 		handlers["basis_set"] = [&](std::istream& is) {
 			if (!(is >> basis_set_name))
 				throw std::runtime_error("Expected basis set name");
+			};
+		handlers["basis_overrides"] = [&](std::istream& is) {
+			std::string path;
+			if (!(is >> std::quoted(path, '"', '\0')) || path.empty())
+				throw std::runtime_error("Expected a JSON file after 'basis_overrides'");
+			settings.basis_overrides = path;
+			if (settings.basis_overrides.is_relative())
+				settings.basis_overrides = std::filesystem::absolute(settings_path).parent_path() / settings.basis_overrides;
 			};
 		handlers["df_basis"] = [&](std::istream& is) {
 			if (!(is >> df_basis_name))
@@ -3921,7 +3931,7 @@ occ::qm::HartreeFock XCW::setup_XCW_procedure(bool read_tensor) {
 	occ::core::Molecule mol;
 	setup_SCF_mol(mol);
 	occ::qm::AOBasis occ_basis_set;
-	setup_basis(mol, settings.basis_set_name, occ_basis_set);
+	occ_basis_set = orbital_basis_->to_AOBasis(mol.atoms());
 	occ::qm::HartreeFock hf(occ_basis_set);
 	if (!settings.df_basis_name.empty()) {
 		//OCC loads a fitting basis by name from a data directory this build does not ship,

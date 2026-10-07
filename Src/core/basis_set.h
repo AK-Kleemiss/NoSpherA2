@@ -44,6 +44,10 @@ public:
 		_elementCounts[element] = count;
 		_elementOffsets[element] = _primitiveCount;
 	}
+	void set_range_for_element(int element, int offset, int count) {
+		_elementCounts[element] = count;
+		_elementOffsets[element] = offset;
+	}
 
 	void add_owned_primitive(const SimplePrimitive& primitive) {
 		_ownedPrimitives.emplace_back(primitive);
@@ -87,6 +91,7 @@ private:
 namespace BasisSetLibrary {
 	// Access basis sets
 	std::shared_ptr<BasisSet> get_basis_set(std::string basis_name);
+	std::shared_ptr<BasisSet> get_basis_set_with_overrides(const std::string& basis_name, const std::filesystem::path& path);
 	bool check_basis_set_exists(std::string basis_name);
 
 	bool read_basis_set_vanilla(const std::filesystem::path& basis_set_path, WFN& wave, const bool& debug);

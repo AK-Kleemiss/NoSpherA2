@@ -2,6 +2,7 @@
 #include "basis_set.h"
 #include "convenience.h"
 #include "libCintMain.h"
+#include <occ/gto/io/json_basis.h>
 
 std::shared_ptr<std::array<std::vector<primitive>, 118>> BasisSet::get_data() {
 	if (_convertedData[0].size() == 0) {
@@ -544,6 +545,54 @@ bool BasisSetLibrary::check_basis_set_exists(std::string basis_name) {
 	std::vector<std::string> candidates;
 	bool exact = false;
 	return find_basis_set_index(normalize_basis_name(basis_name), candidates, exact) >= 0;
+}
+
+std::shared_ptr<BasisSet> BasisSetLibrary::get_basis_set_with_overrides(const std::string& basis_name, const std::filesystem::path& path) {
+	const auto base = get_basis_set(basis_name);
+	occ::gto::io::JsonBasisReader reader(path.string());
+	const auto& elements = reader.element_map();
+	if (elements.empty()) throw std::runtime_error("XCW basis overrides contain no elements");
+	for (const auto& [z, data] : elements)
+		if (z < 1 || z > 118) throw std::runtime_error("Invalid atomic number in XCW basis overrides");
+	auto result = std::make_shared<BasisSet>();
+	result->set_name(base->get_name() + "_overrides_" + path.filename().string());
+	for (int z = 1; z <= 118; z++) {
+		auto found = elements.find(z);
+		if (found == elements.end()) {
+			if (!base->has_element(z)) continue;
+			const auto prims = (*base)[z - 1];
+			result->set_count_for_element(z - 1, static_cast<int>(prims.size()));
+			for (int p = 0; p < static_cast<int>(prims.size()); p++) result->add_owned_primitive(prims[p]);
+			continue;
+		}
+		const auto& data = found->second;
+		if (data.ecp_electrons != 0 || !data.ecp_shells.empty())
+			throw std::runtime_error("XCW basis overrides must be all-electron, Z = " + std::to_string(z));
+		if (data.electron_shells.empty()) throw std::runtime_error("XCW basis override has no shells, Z = " + std::to_string(z));
+		int count = 0, shell = 0;
+		const int start = result->get_primitive_count();
+		for (int s = 0; s < static_cast<int>(data.electron_shells.size()); s++) {
+			const auto& sh = data.electron_shells[s];
+			if ((sh.function_type != "gto" && sh.function_type != "gto_spherical") || sh.angular_momentum.empty() ||
+				sh.exponents.empty() || sh.coefficients.empty() ||
+				(sh.angular_momentum.size() > 1 && sh.angular_momentum.size() != sh.coefficients.size()))
+				throw std::runtime_error("Invalid Gaussian shell in XCW basis override, Z = " + std::to_string(z));
+			for (int c = 0; c < static_cast<int>(sh.coefficients.size()); c++, shell++) {
+				const int l = sh.angular_momentum[sh.angular_momentum.size() == 1 ? 0 : c];
+				if (l < 0 || l > 10 || sh.coefficients[c].size() != sh.exponents.size())
+					throw std::runtime_error("Invalid contraction in XCW basis override, Z = " + std::to_string(z));
+				if (std::none_of(sh.coefficients[c].begin(), sh.coefficients[c].end(), [](double v) { return v != 0; }))
+					throw std::runtime_error("Zero contraction in XCW basis override, Z = " + std::to_string(z));
+				for (int p = 0; p < static_cast<int>(sh.exponents.size()); p++, count++) {
+					if (!std::isfinite(sh.exponents[p]) || sh.exponents[p] <= 0 || !std::isfinite(sh.coefficients[c][p]))
+						throw std::runtime_error("Invalid primitive in XCW basis override, Z = " + std::to_string(z));
+					result->add_owned_primitive({ 0, l, sh.exponents[p], sh.coefficients[c][p], shell });
+				}
+			}
+		}
+		result->set_range_for_element(z - 1, start, count);
+	}
+	return result;
 }
 
 

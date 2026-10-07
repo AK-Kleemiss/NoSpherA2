@@ -126,6 +126,7 @@ private:
 		bool apply_damping = true;
 		bool method_apply_damping = true;
 		std::string basis_set_name;
+		std::filesystem::path basis_overrides;
 		//`df_basis <name>`: density fitting of the Fock build with this auxiliary basis
 		std::string df_basis_name;
 		//`guess_basis <name>`: the first lambda starts from OCC's HF in this smaller basis, its density projected
@@ -498,5 +499,6 @@ private:
 	cell unit_cell;
 	std::ofstream XCW_log;
 	SCF_settings settings;
+	std::shared_ptr<BasisSet> orbital_basis_;
 	cryst_info cryst;
 };

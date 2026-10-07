@@ -682,6 +682,23 @@ TEST(XcwScfTests, StreamedTensorMatchesInMemory)
 //`guess_basis`: the first lambda starts from OCC's own Hartree-Fock in that basis. With the
 //orbital basis itself as the guess basis the small SCF is the whole answer, so the log line
 //carries the golden energy and the XCW loop has nothing left to do beyond recognising it.
+TEST(XcwScfTests, OrbitalJsonOverridesMatchTheLibraryBasis)
+{
+	if (p1_fixture().empty()) GTEST_SKIP() << "P1 fixture not found";
+	const auto dir = scratch_dir();
+	const auto basis = BasisSetLibrary::get_basis_set("sto-3g");
+	basis->write_occ_json(dir / "override basis.json", { 1, 6, 7, 8, 16, 17 });
+	const auto baseline = run_on_p1(dir, common + "start 0 end 0 ", false);
+	const auto overridden = run_on_p1(dir, common + "basis_overrides \"" + (dir / "override basis.json").string() + "\" start 0 end 0 ", false);
+	const auto a = lambda_rows(baseline.out), b = lambda_rows(overridden.out);
+	ASSERT_EQ(a.size(), 1u);
+	ASSERT_EQ(b.size(), 1u);
+	EXPECT_NEAR(a[0].d(a[0].energy), b[0].d(b[0].energy), 1e-8);
+	EXPECT_NEAR(a[0].d(a[0].criterion), b[0].d(b[0].criterion), 1e-6);
+	EXPECT_NE(overridden.log.find("_overrides_override basis.json"), std::string::npos);
+	std::filesystem::remove_all(dir);
+}
+
 TEST(XcwScfTests, SmallBasisGuessStartsFromConvergedDensity)
 {
 	if (p1_fixture().empty()) GTEST_SKIP() << "fixture tests/P1_test not found";
