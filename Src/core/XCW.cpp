@@ -2534,6 +2534,12 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 		//One core stays free for the thread feeding the device, which must not queue
 		//behind a tile GEMM to submit the next reflection
 		const int cpu_threads = itensor_on_gpu ? std::max(1, omp_get_max_threads() - 1) : omp_get_max_threads();
+#ifdef __ANDROID__
+		//Once its thread count is set explicitly, OpenMP OpenBLAS threads calls made inside a
+		//parallel region too, and they all queue for its one buffer slot spinning in sched_yield
+		const int blas_threads = openblas_get_num_threads();
+		openblas_set_num_threads(1);
+#endif
 #pragma omp parallel num_threads(cpu_threads) reduction(+:skipped_grids)
 		{
 			vec2 single_k_pts(num_syms, vec(3));
@@ -2696,6 +2702,9 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 #endif
 
 		}
+#ifdef __ANDROID__
+		openblas_set_num_threads(blas_threads);
+#endif
 	}
 	if (gpu_thread.joinable()) gpu_thread.join();
 	if (i_streamed_) {
