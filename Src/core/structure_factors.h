@@ -215,7 +215,7 @@ public:
 	// The grid integration behind eval_I
 	void build_I(const std::vector<ao_data>& ao_data_shells, double& time_taken, long long& screen_counter, long long& skipped_grids);
 	void decide_i_storage();
-	void open_i_stream_for_reading();
+	void open_i_stream_for_reading(const std::filesystem::path& p);
 	std::filesystem::path i_tensor_path() const;
 	void start_i_save();
 	void finish_i_save();

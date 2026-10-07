@@ -536,8 +536,8 @@ TEST(XcwScfTensorFileTests, OpenRejectsDamagedHeaders)
 
 //lambda = 0 is a plain Hartree-Fock: the energy of P1_test_XCW.good, the .tscb/.wfn/.fchk
 //of that step, damping and level shift switched off along the way. `save` writes the
-//tensor on a thread; a second run `read`s it instead of building and lands on the same
-//numbers.
+//tensor on a thread (`read` of a file not there yet builds it); a second run `read`s it
+//instead of building and lands on the same numbers.
 TEST(XcwScfTests, SaveThenReadTensorReproducesLambdaZero)
 {
 	if (p1_fixture().empty()) GTEST_SKIP() << "fixture tests/P1_test not found";
@@ -599,7 +599,8 @@ TEST(XcwScfTests, SaveThenReadTensorReproducesLambdaZero)
 	EXPECT_TRUE(single);
 	EXPECT_EQ(std::filesystem::file_size(dir / "tensor.bin"), 40u + 2u * kept * sizeof(int) + i_tensor_file::total_bytes(first.nr, kept, true));
 
-	const p1_run second = run_on_p1(dir, settings);
+	//a tensor that is read is not saved again
+	const p1_run second = run_on_p1(dir, common + "f rhf start 0 step_size 0.01 end 0 read tensor.bin");
 	EXPECT_NE(second.out.find("I tensor read from tensor.bin"), std::string::npos) << second.out;
 	EXPECT_NE(second.out.find(", single precision), not recomputed, held in memory"), std::string::npos) << second.out;
 	EXPECT_EQ(second.out.find("Screened out"), std::string::npos);

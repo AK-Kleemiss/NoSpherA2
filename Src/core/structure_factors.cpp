@@ -641,25 +641,30 @@ structure_factors::I_tensor& structure_factors::eval_I(const occ::gto::AOBasis& 
 	if (!DW_set_) std::cout << "Debye-Waller factors are not computed and set to 1. Continuing." << std::endl;
 	if (!phases_set_) std::cout << "Phase factors are not computed and set to 1. Continuing." << std::endl;
 	if (!anom_set_) std::cout << "Anomalous dispersion corrections are not computed and set to 0. Continuing." << std::endl;
+
+	// Creates the primitive data for each shell, needed to compute the I tensor
 	std::vector<structure_factors::ao_data> ao_data_shells;
 	create_prims(ao_data_shells, aobasis);
-	size_t kept_on_disk = 0;
+
 	bool single_on_disk = false;
+	// Path for reading the I tensor from disk
 	if (I_tens.read_tensor && !I_tens.i_tensor_file_path.empty()
-		&& i_tensor_file::matches(i_tensor_path(), model_data.nr, model_data.nmo, kept_on_disk, single_on_disk)) {
-		//A streamed tensor already there and big enough for this problem. It depends on the
-		//geometry, the basis and the reflections and on none of the refinement settings, so
-		//a second run that changes those can read it rather than spend the build again.
+		&& i_tensor_file::matches(i_tensor_path(), model_data.nr, model_data.nmo, I_tens.i_compact_, single_on_disk)) {
+		if (!I_tens.i_tensor_save_path.empty())
+			throw std::runtime_error("The I tensor is read from " + i_tensor_path().string() + " and should not be saved again to "
+				+ I_tens.i_tensor_save_path.string() + ": a second copy costs as much memory as the first. Remove `save`/`safe` from the XCW settings.");
 		//open() checks the header and throws if the shape does not match, which is what
 		//stops a tensor from a different structure being used by accident.
-		I_tens.i_compact_ = kept_on_disk;
-		const size_t packed = I_tens.i_compact_;
 		const char* source = "";
 		bool automatic = false;
-		I_tens.i_streamed_ = items_within_budget(static_cast<size_t>(model_data.nr),
-			i_tensor_file::block_bytes(I_tens.i_compact_, single_on_disk), i_budget(source, automatic)) != 0;
-		I_tens.i_window_ = std::max(1, std::min(model_data.nr, 64));
-		open_i_stream_for_reading();
+		const size_t w = items_within_budget(static_cast<size_t>(model_data.nr),
+			i_tensor_file::block_bytes(I_tens.i_compact_, single_on_disk), i_budget(source, automatic));
+		I_tens.i_streamed_ = w != 0;
+		//Streamed, the window the budget allows, as decide_i_storage gives a built tensor; held, the
+		//read below only passes through the window when it narrows
+		I_tens.i_window_ = I_tens.i_streamed_ ? static_cast<int>(std::min(w, static_cast<size_t>(model_data.nr))) : std::max(1, std::min(model_data.nr, 64));
+		open_i_stream_for_reading(i_tensor_path());
+		// Figure out which pair of mu,nu each compact index corresponds to
 		I_tens.i_pair_mu_ = I_tens.i_file_.pair_mu();
 		I_tens.i_pair_nu_ = I_tens.i_file_.pair_nu();
 		//The file's element type is kept as it is: a single-precision tensor cannot regain
@@ -669,32 +674,32 @@ structure_factors::I_tensor& structure_factors::eval_I(const occ::gto::AOBasis& 
 		std::cout << "I tensor read from " << i_tensor_path().string()
 			<< " (" << (i_tensor_file::total_bytes(model_data.nr, I_tens.i_compact_, single_on_disk) / 1048576.0)
 			<< " MB" << (single_on_disk ? ", single precision" : "") << "), not recomputed"
-			<< (I_tens.i_streamed_ ? ", read a window at a time" : ", held in memory") << std::endl;
+			<< (I_tens.i_streamed_ ? ", read a window at a time" : ", held in memory");
+		if (I_tens.i_streamed_) std::cout << " (" << I_tens.i_window_ << " of " << model_data.nr << " reflections resident)";
+		std::cout << std::endl;
 		if (I_tens.i_float_ && !single_on_disk)
 			std::cout << "NOTE: the tensor on disk is double precision; it is narrowed to single as i_float asks" << std::endl;
 		if (single_on_disk && I_tens.tensor_double)
 			std::cout << "NOTE: the tensor on disk is single precision; i_double cannot widen it, it is used as stored" << std::endl;
 		if (!I_tens.i_streamed_) {
-			if (I_tens.i_float_)
-				I_tens.I32.assign(static_cast<size_t>(model_data.nr) * packed, std::complex<float>{});
-			else
-				I_tens.I.resize(static_cast<size_t>(model_data.nr) * packed);
+			//Read straight into the tensor in the file's element type; only narrowing a double file goes through the window
+			const size_t n = I_tens.i_compact_;
+			if (I_tens.i_float_) I_tens.I32.resize(static_cast<size_t>(model_data.nr) * n);
+			else I_tens.I.resize(static_cast<size_t>(model_data.nr) * n);
 			for (int r0 = 0; r0 < model_data.nr; r0 += I_tens.i_window_) {
 				const int r1 = std::min(model_data.nr, r0 + I_tens.i_window_);
-				I_tens.i_file_.load(r0, r1);
-				for (int r = r0; r < r1; r++) {
-					if (single_on_disk)
-						std::copy(I_tens.i_file_.block32(r), I_tens.i_file_.block32(r) + packed, I_tens.I32.data() + static_cast<size_t>(r) * packed);
-					else if (I_tens.i_float_)
-						for (size_t i = 0; i < packed; i++)
-							I_tens.I32[static_cast<size_t>(r) * packed + i] = std::complex<float>(static_cast<float>(I_tens.i_file_.block(r)[i].real()), static_cast<float>(I_tens.i_file_.block(r)[i].imag()));
-					else
-						std::copy(I_tens.i_file_.block(r), I_tens.i_file_.block(r) + packed, I_tens.I.data() + static_cast<size_t>(r) * packed);
+				const size_t o = static_cast<size_t>(r0) * n;
+				if (!I_tens.i_float_) I_tens.i_file_.read(r0, r1, I_tens.I.data() + o);
+				else if (single_on_disk) I_tens.i_file_.read(r0, r1, I_tens.I32.data() + o);
+				else {
+					I_tens.i_file_.load(r0, r1);
+					std::copy_n(I_tens.i_file_.block(r0), static_cast<size_t>(r1 - r0) * n, I_tens.I32.data() + o);
 				}
 			}
 			I_tens.i_file_.close();
 		}
 	}
+	// Path for computing the I tensor (through build_I)
 	else {
 		double time_taken;
 		long long screen_counter = 0;
@@ -718,6 +723,7 @@ structure_factors::I_tensor& structure_factors::eval_I(const occ::gto::AOBasis& 
 //the disk bandwidth, which it is not competing for while it works out of memory.
 void structure_factors::start_i_save()
 {
+	//A streamed tensor was built straight into the save file, see decide_i_storage
 	if (I_tens.i_tensor_save_path.empty() || I_tens.i_streamed_) return;
 	const size_t packed = I_tens.i_compact_;
 	const int nr = model_data.nr;
@@ -809,7 +815,9 @@ void structure_factors::decide_i_storage() {
 		return;
 	}
 	I_tens.i_window_ = static_cast<int>(std::min(w, static_cast<size_t>(model_data.nr)));
-	I_tens.i_file_.create(i_tensor_path(), model_data.nr, model_data.nmo, I_tens.i_pair_mu_, I_tens.i_pair_nu_, I_tens.i_float_);
+	//Streamed straight into the `save` file when there is one, so saving it costs nothing
+	const std::filesystem::path path = I_tens.i_tensor_save_path.empty() ? i_tensor_path() : I_tens.i_tensor_save_path;
+	I_tens.i_file_.create(path, model_data.nr, model_data.nmo, I_tens.i_pair_mu_, I_tens.i_pair_nu_, I_tens.i_float_);
 	std::cout << std::fixed << std::setprecision(2)
 		<< "I tensor streamed to disk: " << (total / 1048576.0) << " MB" << (I_tens.i_float_ ? " (single precision)" : "") << " total, "
 		<< I_tens.i_window_ << " of " << model_data.nr << " reflections resident ("
@@ -818,6 +826,9 @@ void structure_factors::decide_i_storage() {
 	if (I_tens.i_window_ == 1 && per_block > budget)
 		std::cout << "  NOTE: one reflection alone is " << (per_block / 1048576.0)
 		<< " MB, over the budget. Running one at a time." << std::endl;
+	if (!I_tens.i_tensor_save_path.empty())
+		std::cout << "The streamed I tensor is saved in " << path.string() << "; a later run can `read "
+		<< path.string() << "` instead of building it" << std::endl;
 }
 
 std::filesystem::path structure_factors::i_tensor_path() const {
@@ -826,8 +837,8 @@ std::filesystem::path structure_factors::i_tensor_path() const {
 		: I_tens.i_tensor_file_path;
 }
 
-void structure_factors::open_i_stream_for_reading() {
-	I_tens.i_file_.open(i_tensor_path(), static_cast<size_t>(I_tens.i_window_));
+void structure_factors::open_i_stream_for_reading(const std::filesystem::path& p) {
+	I_tens.i_file_.open(p, static_cast<size_t>(I_tens.i_window_));
 }
 
 //One tile of the CPU I tensor, C = A * B^T row-major with k the block's points
@@ -979,7 +990,9 @@ void structure_factors::build_I(const std::vector<ao_data>& ao_data_shells, doub
 	}
 
 	std::chrono::high_resolution_clock::time_point screening_end = std::chrono::high_resolution_clock::now();
-	std::cout << std::fixed << std::setprecision(5) << "Time taken for AO screening: " << std::chrono::duration_cast<std::chrono::microseconds>(screening_end - screening_start).count() << " microseconds." << "\n";
+	if (!opt->no_date) {
+		std::cout << std::fixed << std::setprecision(5) << "Time taken for AO screening: " << std::chrono::duration_cast<std::chrono::microseconds>(screening_end - screening_start).count() << " microseconds." << "\n";
+	}
 
 	// Grid screening
 	constexpr double maximum_ao_grid_cutoff = 12;
@@ -1912,7 +1925,7 @@ void structure_factors::build_I(const std::vector<ao_data>& ao_data_shells, doub
 	if (gpu_thread.joinable()) gpu_thread.join();
 	if (I_tens.i_streamed_) {
 		I_tens.i_file_.finish_write();
-		open_i_stream_for_reading();
+		open_i_stream_for_reading(I_tens.i_file_.path());
 	}
 	auto end = std::chrono::high_resolution_clock::now();
 	auto duration = end - start;

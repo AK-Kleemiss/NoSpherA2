@@ -410,6 +410,59 @@ TEST(XcwHaltingReportTests, StreamedTensorRoundTrip)
 	}
 }
 
+//`save` on a tensor that has to be streamed: the stream is written into the save file itself and
+//no default file appears. Read back under the same budget it streams with the window the budget
+//allows (one reflection, where the read used to take 64). A tensor that is read must not be saved
+//again: `read` with `save` throws before the file is opened.
+TEST(XcwHaltingReportTests, StreamedTensorIsSavedWhereSaveSays)
+{
+	if (!fixture_present()) {
+		GTEST_SKIP() << "P1 fixture missing under " << fixture_dir();
+	}
+	const auto dir = scratch_dir();
+	int n_written = 0, n_strong = 0;
+	write_subset_hkl(dir / "subset.hkl", n_written, n_strong, 1e9);
+	ASSERT_EQ(n_written, 402);
+
+	options opt = make_options(dir, RUN_BASE + "end 0 save saved.bin");
+	opt.mem_given = true;
+	opt.mem = 0.001;
+	const std::string out = run_xcw(dir, opt);
+	EXPECT_NE(out.find("I tensor streamed to disk: "), std::string::npos) << out;
+	EXPECT_NE(out.find("The streamed I tensor is saved in saved.bin; a later run can `read saved.bin` instead of building it"), std::string::npos) << out;
+	EXPECT_EQ(out.find("Writing the I tensor"), std::string::npos);
+	EXPECT_FALSE(std::filesystem::exists(dir / "I_tensor_stream.bin"));
+	size_t kept = 0;
+	bool single = false;
+	ASSERT_TRUE(i_tensor_file::matches(dir / "saved.bin", n_written, P1_NMO, kept, single));
+	const std::vector<std::string> row = table_row(out, "0.00000");
+	ASSERT_EQ(row.size(), 9u) << out;
+
+	options opt2 = make_options(dir, RUN_BASE + "end 0 read saved.bin");
+	opt2.mem_given = true;
+	opt2.mem = 0.001;
+	const std::string out2 = run_xcw(dir, opt2);
+	EXPECT_NE(out2.find("not recomputed, read a window at a time (1 of 402 reflections resident)"), std::string::npos) << out2;
+	const std::vector<std::string> row2 = table_row(out2, "0.00000");
+	ASSERT_EQ(row2.size(), 9u) << out2;
+	EXPECT_NEAR(std::stod(row[1]), std::stod(row2[1]), 2e-3);
+	EXPECT_NEAR(std::stod(row[4]), std::stod(row2[4]), 1e-4);
+
+	for (const std::string save : { "save copy.bin", "save saved.bin", "safe" }) {
+		options opt3 = make_options(dir, RUN_BASE + "end 0 read saved.bin " + save);
+		std::string what;
+		try { run_xcw(dir, opt3); }
+		catch (const std::runtime_error& e) { what = e.what(); }
+		EXPECT_NE(what.find("The I tensor is read from saved.bin and should not be saved again"), std::string::npos) << save << ": " << what;
+	}
+	EXPECT_FALSE(std::filesystem::exists(dir / "copy.bin"));
+	EXPECT_FALSE(std::filesystem::exists(dir / "I_tensor_stream.bin"));
+
+	if (!::testing::Test::HasFailure()) {
+		std::filesystem::remove_all(dir);
+	}
+}
+
 //`grown` with an xyz that holds exactly the asymmetric unit: the xyz is read, nothing is
 //added, symmetry linking and the grown U_iso / ADP paths run on the 23 atoms and the
 //constructors finish as they do without the keyword.

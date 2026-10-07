@@ -170,22 +170,29 @@ public:
 		loaded_first_ = -1; loaded_last_ = -1;
 	}
 
-	// Call from one thread; pointers handed out by block() stay valid until the next load.
-	void load(const int r0, const int r1)
+	// Blocks [r0, r1) straight into dst, which must have the file's element type
+	template <typename T>
+	void read(const int r0, const int r1, T *dst)
 	{
 		if (r0 < 0 || r1 < r0 || r1 > nr_)
 			throw std::runtime_error("i_tensor_file: load(" + std::to_string(r0) + ", " +
 				std::to_string(r1) + ") is outside 0.." + std::to_string(nr_));
-		const size_t n = static_cast<size_t>(r1 - r0);
-		if (n > window_blocks_)
-			throw std::runtime_error("i_tensor_file: load of " + std::to_string(n) +
-									 " blocks exceeds the window");
+		if (sizeof(T) != elem_bytes())
+			throw std::runtime_error("i_tensor_file: element type does not match " + path_.string());
 		seek(offset_of(r0));
-		const size_t want = n * kept_;
-		const size_t got = single_ ? fread(window32_.data(), sizeof(std::complex<float>), want, f_)
-								   : fread(window_.data(), sizeof(cdouble), want, f_);
-		if (got != want)
+		const size_t want = static_cast<size_t>(r1 - r0) * kept_;
+		if (fread(dst, sizeof(T), want, f_) != want)
 			throw std::runtime_error("i_tensor_file: short read at reflection " + std::to_string(r0));
+	}
+
+	// Call from one thread; pointers handed out by block() stay valid until the next load.
+	void load(const int r0, const int r1)
+	{
+		if (r1 - r0 > static_cast<int>(window_blocks_))
+			throw std::runtime_error("i_tensor_file: load of " + std::to_string(r1 - r0) +
+									 " blocks exceeds the window");
+		if (single_) read(r0, r1, window32_.data());
+		else read(r0, r1, window_.data());
 		loaded_first_ = r0; loaded_last_ = r1;
 	}
 

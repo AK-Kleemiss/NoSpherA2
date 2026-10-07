@@ -261,6 +261,11 @@ Key core modules live in `Src/core`:
 
 ## Current Validation Notes
 
+As of 2026-10-07, `save <path>` in the XCW settings keeps a streamed I tensor too (the build streams
+into the save file), a tensor read from disk with `save` set throws, and a streamed `read` takes the window the memory
+budget allows instead of 64 reflections; `XcwHaltingReportTests.StreamedTensorIsSavedWhereSaveSays` is new
+and the XCW/P1 filter reports 87 passed, 0 failed. The full suite was not rerun. See `UNIT_TESTS_STATUS.md`.
+
 As of 2026-10-01, `Src/core/XCW.cpp` is split into `structure_factors`, `SCF_wrapper` and
 `XCW_solver`, the XCW settings file is read by `options::loadXCWsettings()`, anomalous dispersion
 comes only from the CIF (`-anom_disp` is gone) and the P1 XCW cases run on `P1_test.cif`. The XCW
