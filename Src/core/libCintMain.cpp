@@ -130,14 +130,19 @@ extern "C" libcint::CINTIntegralFunction int3c1e_sph;
 //|(ab|P)| <= sqrt((ab|ab)) sqrt((P|P)); nullptr where the metric has none. The overlap bound would need
 //int4c1e, which this libcint build may lack, so the overlap metric is not screened.
 template <typename K> struct Shell3C;
+//far_field: a pure Coulomb aux shell outside the orbital density sees it only through one local-expansion term (see computeRho);
+//a Cartesian d shell mixes in r^2 s, an overlap kernel has no far field.
 template <> struct Shell3C<Coulomb3C_SPH> {
 	static constexpr libcint::CINTIntegralFunction *three = libcint::int3c2e_sph, *pair = libcint::int2e_sph, *aux = libcint::int2c2e_sph;
+	static constexpr bool far_field = true;
 };
 template <> struct Shell3C<Coulomb3C_CRT> {
 	static constexpr libcint::CINTIntegralFunction *three = libcint::int3c2e_cart, *pair = libcint::int2e_cart, *aux = libcint::int2c2e_cart;
+	static constexpr bool far_field = false;
 };
 template <> struct Shell3C<Overlap3C_SPH> {
 	static constexpr libcint::CINTIntegralFunction *three = int3c1e_sph, *pair = nullptr, *aux = nullptr;
+	static constexpr bool far_field = false;
 };
 
 //rho_P = sum_ab w D_ab (ab|P) over orbital shell pairs a >= b (w = 2 off the diagonal), one shell triplet at a time,
@@ -176,12 +181,62 @@ void computeRho(
 		int &d = s < nQM ? dmax_orb : dmax_aux;
 		d = std::max(d, aoloc[s + 1] - aoloc[s]);
 	}
+	//Far field: once every orbital primitive pair (exponent p, centre R_p) overlaps an aux shell on atom C by less than
+	//erfc(x) < eps, x^2 = pq/(p+q) |R_p - C|^2 with q the shell's most diffuse exponent, the shell R(r) Y_lm acts as
+	//4pi/(2l+1) m Y_lm/r_C^(l+1) with m = sum_i c_i int r^(2l+2) e^(-q_i r^2) dr ~ sum_i c_i q_i^-(l+3/2). Every far shell of
+	//one l on C is then the same integral times its m: one single-primitive reference shell per (C, l), appended after
+	//the aux shells at the tightest exponent (so it is far whenever any of them is), is computed and scaled by m/m_ref.
+	double far_eps = constants::ri_far_erfc;
+	if (const char *e = tuning("NOS_RI_FAR")) far_eps = std::atof(e);
+	const bool use_far = S::far_field && far_eps > 0.0;
+	double X2 = 0.0;
+	ivec ref_of(nAux, -1);
+	vec ratio(nAux, 0.0), qmin(nAux, 0.0);
+	int nbx = nbas, maxprim = 1;
+	if (use_far) {
+		double lo = 0.0, hi = 30.0; //erfc(X) = eps
+		for (int it = 0; it < 100; it++) {
+			const double mid = 0.5 * (lo + hi);
+			(std::erfc(mid) > far_eps ? lo : hi) = mid;
+		}
+		X2 = hi * hi;
+		for (int s = 0; s < nQM; s++) maxprim = std::max(maxprim, bas[s * BAS_SLOTS + NPRIM_OF]);
+		std::map<std::pair<int, int>, double> qref;
+		for (int P = 0; P < nAux; P++) {
+			const int *s = &bas[(nQM + P) * BAS_SLOTS];
+			if (s[NCTR_OF] != 1) continue;
+			const double *ex = env.data() + s[PTR_EXP];
+			double &q = qref[{ s[ATOM_OF], s[ANG_OF] }];
+			q = std::max(q, *std::max_element(ex, ex + s[NPRIM_OF]));
+		}
+		std::map<std::pair<int, int>, int> ref_shell;
+		for (const auto &[key, q] : qref) {
+			ref_shell[key] = nbx++;
+			const int ptr = static_cast<int>(env.size());
+			env.push_back(q);
+			env.push_back(1.0);
+			const int row[BAS_SLOTS] = { key.first, key.second, 1, 1, 0, ptr, ptr + 1, 0 };
+			bas.insert(bas.end(), row, row + BAS_SLOTS);
+		}
+		for (int P = 0; P < nAux; P++) {
+			const int *s = &bas[(nQM + P) * BAS_SLOTS];
+			const double *ex = env.data() + s[PTR_EXP], *co = env.data() + s[PTR_COEFF];
+			const int l = s[ANG_OF];
+			qmin[P] = *std::min_element(ex, ex + s[NPRIM_OF]);
+			if (s[NCTR_OF] != 1) continue;
+			const std::pair<int, int> key{ s[ATOM_OF], l };
+			double m = 0.0;
+			for (int i = 0; i < s[NPRIM_OF]; i++) m += co[i] * std::pow(ex[i], -(l + 1.5));
+			ref_of[P] = ref_shell[key];
+			ratio[P] = m / std::pow(qref[key], -(l + 1.5));
+		}
+	}
 	//libcint mallocs scratch per call unless handed one; the size query is the call without output.
 	//{s,s,s,s} over every shell is the bound pyscf's GTOmax_cache_size uses
 	CACHE_SIZE_T ncache = 0;
-	for (int s = 0; s < nbas; s++) {
+	for (int s = 0; s < nbx; s++) {
 		int shls[4] = { s, s, s, s };
-		ncache = std::max(ncache, S::three(nullptr, nullptr, shls, atm.data(), nat, bas.data(), nbas, env.data(), nullptr, nullptr));
+		ncache = std::max(ncache, S::three(nullptr, nullptr, shls, atm.data(), nat, bas.data(), nbx, env.data(), nullptr, nullptr));
 		if (bound) ncache = std::max(ncache, s < nQM
 			? S::pair(nullptr, nullptr, shls, atm.data(), nat, bas.data(), nQM, env.data(), nullptr, nullptr)
 			: S::aux(nullptr, nullptr, shls, atm.data(), nat, bas.data(), nbas, env.data(), nullptr, nullptr));
@@ -205,7 +260,7 @@ void computeRho(
 	}
 
 	libcint::CINTOpt *opty = nullptr, *opt2 = nullptr;
-	Kernel::optimizer(opty, atm.data(), nat, bas.data(), nbas, env.data());
+	Kernel::optimizer(opty, atm.data(), nat, bas.data(), nbx, env.data());
 	//(ab|ab) only touches orbital shells, the first nQM, so its optimizer skips the aux pairs
 	if (bound) libcint::int2e_optimizer(&opt2, atm.data(), nat, bas.data(), nQM, env.data());
 
@@ -213,13 +268,25 @@ void computeRho(
 	//ill-conditioned metric turns summation-order noise into tsc noise, so rho must not depend on the thread schedule
 	std::vector<vec> part(nQM);
 	int merged = 0;
-	long long done = 0;
+	long long done = 0, nfar = 0, nref = 0;
+	const double far_lnk = use_far ? -std::log(far_eps) : 0.0;
 	{ //the bar ends its line when it goes out of scope, before the summary below
 		ProgressBar pb(nQM, 60, "#", " ", "Calculating Eri3c Matrix");
-#pragma omp parallel reduction(+:done)
+#pragma omp parallel reduction(+:done, nfar, nref)
 		{
 			vec cache(ncache), dblk(static_cast<size_t>(dmax_orb) * dmax_orb);
 			vec buf3(static_cast<size_t>(dmax_orb) * dmax_orb * dmax_aux), buf2(static_cast<size_t>(dmax_orb) * dmax_orb * dmax_orb * dmax_orb);
+			//far field per thread: primitive pairs (p, centre) of the current a, b; the contracted reference integrals,
+			//valid while refstamp matches the pair's stamp
+			vec pp(static_cast<size_t>(4) * maxprim * maxprim), refv(static_cast<size_t>(nbx - nbas) * dmax_aux);
+			std::vector<long long> refstamp(nbx - nbas, -1);
+			long long stamp = 0;
+			auto contract = [&](int k, int dab) {
+				const double *col = buf3.data() + static_cast<size_t>(dab) * k;
+				double sum = 0.0;
+				for (int ij = 0; ij < dab; ij++) sum += col[ij] * dblk[ij];
+				return sum;
+			};
 #pragma omp for schedule(dynamic)
 			for (int a = 0; a < nQM; a++) {
 				vec loc(naux, 0.0);
@@ -245,18 +312,59 @@ void computeRho(
 						qab = std::sqrt(m);
 						if (dm_max * qab * qaux_max < thr) continue;
 					}
+					int npp = 0, atom_c = -1;
+					double qstar = 0.0;
+					stamp++;
+					if (use_far) { //primitive pairs with exp(-ab/p |AB|^2) < eps carry no density
+						const int *sa = &bas[a * BAS_SLOTS], *sb = &bas[b * BAS_SLOTS];
+						const double *ea = env.data() + sa[PTR_EXP], *eb = env.data() + sb[PTR_EXP];
+						const double *A = env.data() + atm[PTR_COORD + ATM_SLOTS * sa[ATOM_OF]], *B = env.data() + atm[PTR_COORD + ATM_SLOTS * sb[ATOM_OF]];
+						const double AB2 = (A[0] - B[0]) * (A[0] - B[0]) + (A[1] - B[1]) * (A[1] - B[1]) + (A[2] - B[2]) * (A[2] - B[2]);
+						for (int i = 0; i < sa[NPRIM_OF]; i++)
+							for (int j = 0; j < sb[NPRIM_OF]; j++) {
+								const double p = ea[i] + eb[j];
+								if (ea[i] * eb[j] / p * AB2 > far_lnk) continue;
+								double *q = &pp[4 * npp++];
+								q[0] = p;
+								for (int d = 0; d < 3; d++) q[d + 1] = (ea[i] * A[d] + eb[j] * B[d]) / p;
+							}
+					}
 					for (int P = 0; P < nAux; P++) {
 						if (bound && dm_max * qab * qaux[P] < thr) continue;
-						int shls[3] = { a, b, nQM + P };
 						done++;
-						if (!S::three(buf3.data(), nullptr, shls, atm.data(), nat, bas.data(), nbas, env.data(), opty, cache.data())) continue;
 						const int p0 = aoloc[nQM + P] - aux0, dp = aoloc[nQM + P + 1] - aoloc[nQM + P];
-						for (int k = 0; k < dp; k++) {
-							const double *col = buf3.data() + static_cast<size_t>(dab) * k;
-							double sum = 0.0;
-							for (int ij = 0; ij < dab; ij++) sum += col[ij] * dblk[ij];
-							loc[p0 + k] += sum;
+						if (ref_of[P] >= 0) {
+							const int c = bas[(nQM + P) * BAS_SLOTS + ATOM_OF];
+							if (c != atom_c) { //smallest q that is far from every primitive pair: p q R^2 / (p + q) >= X^2
+								atom_c = c;
+								const double *C = env.data() + atm[PTR_COORD + ATM_SLOTS * c];
+								qstar = 0.0;
+								for (int k = 0; k < npp; k++) {
+									const double *q = &pp[4 * k];
+									const double R2 = (q[1] - C[0]) * (q[1] - C[0]) + (q[2] - C[1]) * (q[2] - C[1]) + (q[3] - C[2]) * (q[3] - C[2]);
+									const double d = q[0] * R2 - X2;
+									if (d <= 0.0) { qstar = HUGE_VAL; break; }
+									qstar = std::max(qstar, X2 * q[0] / d);
+								}
+							}
+							if (qmin[P] >= qstar) {
+								const int r = ref_of[P] - nbas;
+								double *v = refv.data() + static_cast<size_t>(r) * dmax_aux;
+								if (refstamp[r] != stamp) {
+									refstamp[r] = stamp;
+									nref++;
+									int shls[3] = { a, b, ref_of[P] };
+									const bool nz = S::three(buf3.data(), nullptr, shls, atm.data(), nat, bas.data(), nbx, env.data(), opty, cache.data());
+									for (int k = 0; k < dp; k++) v[k] = nz ? contract(k, dab) : 0.0;
+								}
+								for (int k = 0; k < dp; k++) loc[p0 + k] += ratio[P] * v[k];
+								nfar++;
+								continue;
+							}
 						}
+						int shls[3] = { a, b, nQM + P };
+						if (!S::three(buf3.data(), nullptr, shls, atm.data(), nat, bas.data(), nbx, env.data(), opty, cache.data())) continue;
+						for (int k = 0; k < dp; k++) loc[p0 + k] += contract(k, dab);
 					}
 				}
 				pb.update();
@@ -275,6 +383,7 @@ void computeRho(
 	if (opt2) libcint::CINTdel_optimizer(&opt2);
 	const long long total = static_cast<long long>(nQM) * (nQM + 1) / 2 * nAux;
 	if (bound) std::cout << "Charge-weighted Schwarz screening (" << thr << " e) kept " << done << " of " << total << " shell triplets" << std::endl;
+	if (use_far) std::cout << "Far field (erfc < " << far_eps << ") took " << nfar << " of " << done << " triplets from " << nref << " reference integrals" << std::endl;
 }
 template void computeRho<Coulomb3C_SPH>(
 	const Int_Params &normal_basis,

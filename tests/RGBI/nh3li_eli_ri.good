@@ -18,6 +18,7 @@ Metric: Coulomb
 [                   Calculating Eri3c Matrix                  ]
 [#############################################################] 100% 
 Charge-weighted Schwarz screening (3e-07 e) kept 28919 of 29760 shell triplets
+Far field (erfc < 1e-14) took 462 of 28919 triplets from 342 reference integrals
 Solving unrestrained linear system...
 ==============================================
 
