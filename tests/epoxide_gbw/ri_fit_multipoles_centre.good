@@ -28,7 +28,7 @@ Metric: Coulomb
 [                   Calculating Eri3c Matrix                  ]
 [#############################################################] 100% 
 Charge-weighted Schwarz screening (3e-07 e) kept 63029 of 63240 shell triplets
-Far field (erfc < 1e-14) took 974 of 63029 triplets from 593 reference integrals
+Far field (erfc < 1e-14) took 974 of 63029 triplets as point multipoles from 317 pair-atom sums
 Fit controls:
   Tikhonov: off
   Atomic charge restraints: on (Hirshfeld)
