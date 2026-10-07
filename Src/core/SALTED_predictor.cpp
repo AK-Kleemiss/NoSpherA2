@@ -498,24 +498,40 @@ void SALTEDPredictor::read_model_data() {
 
 // Model matrices are loaded per lambda and dropped after use: nothing rereads them, the weight
 // accounting works off psi_nm and the projector shapes
-void SALTEDPredictor::load_model_lambda(const int lam)
+// File reads only, touching no member the kernels use, so it can run on another thread
+SALTEDPredictor::lambda_blocks SALTEDPredictor::read_model_lambda(const int lam)
 {
-	if (!model_file) return;
+	lambda_blocks out;
+	if (!model_file) return out;
 	for (const std::string &spe : model_species)
 	{
-		if (lam > lmax[spe]) continue;
+		if (lam > lmax.at(spe)) continue;
 		const std::string key = spe + std::to_string(lam);
-		if (power_env_sparse.find(key) != power_env_sparse.end()) continue;
 		const auto pr = proj_index.find(key);
 		const auto ft = feat_index.find(key);
 		if (pr == proj_index.end() || ft == feat_index.end()) continue;
-		Vmat[key] = model_file->load_block(pr->second);
-		dMatrix2 feats = model_file->load_block(ft->second);
+		dMatrix2 V = model_file->load_block(pr->second);
+		out.emplace_back(key, std::move(V), model_file->load_block(ft->second));
+	}
+	return out;
+}
+
+void SALTEDPredictor::install_model_lambda(lambda_blocks blocks)
+{
+	for (auto &[key, V, feats] : blocks)
+	{
+		if (power_env_sparse.find(key) != power_env_sparse.end()) continue;
+		Vmat[key] = std::move(V);
 		if (config.zeta == 1.0)
 			power_env_sparse[key] = dot(Vmat[key], feats, true, false);
 		else
 			power_env_sparse[key] = std::move(feats);
 	}
+}
+
+void SALTEDPredictor::load_model_lambda(const int lam)
+{
+	install_model_lambda(read_model_lambda(lam));
 }
 
 void SALTEDPredictor::free_model_lambda(const int lam)
@@ -550,6 +566,12 @@ vec SALTEDPredictor::predict()
 		sf_gpu_warmup_wait();
 #endif
 	const int lmax_max = SALTED_Utils::get_lmax_max(lmax);
+#ifdef __ANDROID__
+	// Flash reads the model at 65-140 MB/s, about as long as the kernels take: read lambda + 1
+	// while lambda's kernels run. Plain file reads, so no OpenMP team of its own (see below).
+	// Holds two lambdas at once, 385 MB at the peak instead of 226 MB for the V6 model
+	std::future<lambda_blocks> next_lambda = std::async(std::launch::async, &SALTEDPredictor::read_model_lambda, this, 0);
+#endif
 	// The (l1, l2) pairs and complex-to-real matrix of every lambda, which the norm wants up front
 	std::vector<ivec2> llvec_all(lmax_max + 1);
 	std::vector<cvec2> c2r_all(lmax_max + 1);
@@ -613,7 +635,13 @@ vec SALTEDPredictor::predict()
 		// gave that thread its own OpenMP/MKL team, whose spin-wait then cost the kernels below
 		// more than the overlap could ever hide
 		const auto _t_wait = std::chrono::steady_clock::now();
+#ifdef __ANDROID__
+		install_model_lambda(next_lambda.get());
+		if (lam < lmax_max)
+			next_lambda = std::async(std::launch::async, &SALTEDPredictor::read_model_lambda, this, lam + 1);
+#else
 		load_model_lambda(lam);
+#endif
 		const double model_wait = _elapsed(_t_wait);
 		_t_model_wait += model_wait;
 		_t_model_work += model_wait;
