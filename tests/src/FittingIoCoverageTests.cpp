@@ -371,7 +371,7 @@ TEST(FittingIoCoverageIntegratorTests, ExpectedPopulationsHirshfeldSumsToElectro
 	}
 }
 
-//The unrestrained Coulomb fit is the plain solve of (aux|aux) c = (aux|rho); the fitted
+//The unrestrained Coulomb fit, unscreened, is the plain solve of (aux|aux) c = (aux|rho); the fitted
 //density carries the 24 electrons of epoxide and the quality report is printed on request.
 TEST(FittingIoCoverageIntegratorTests, UnrestrainedCoulombFitMatchesDirectSolve)
 {
@@ -387,7 +387,9 @@ TEST(FittingIoCoverageIntegratorTests, UnrestrainedCoulombFitMatchesDirectSolve)
 	DensityFitting::CONFIG cfg;
 	cfg.analyze_quality = true;
 	StreamCapture out(std::cout);
+	set_tuning("NOS_RI_SCREEN", "0");
 	const vec c = DensityFitting::density_fit(wave, aux, cfg);
+	set_tuning("NOS_RI_SCREEN", nullptr);
 	ASSERT_EQ(c.size(), sys.n);
 	double cmax = 0.0;
 	for (double v : c_ref) cmax = std::max(cmax, std::fabs(v));

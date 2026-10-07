@@ -127,8 +127,8 @@ template void compute2C<Overlap2C_CRT>(Int_Params &params, vec &ret);
 extern "C" libcint::CINTIntegralFunction int3c1e_sph;
 
 //Per-shell integrals behind each 3C kernel. pair and aux give the Schwarz factors of
-//|(ab|P)| <= sqrt((ab|ab)) sqrt((P|P)); nullptr where the metric has none.
-//ponytail: the overlap metric is not screened, its bound needs int4c1e which this libcint build may lack
+//|(ab|P)| <= sqrt((ab|ab)) sqrt((P|P)); nullptr where the metric has none. The overlap bound would need
+//int4c1e, which this libcint build may lack, so the overlap metric is not screened.
 template <typename K> struct Shell3C;
 template <> struct Shell3C<Coulomb3C_SPH> {
 	static constexpr libcint::CINTIntegralFunction *three = libcint::int3c2e_sph, *pair = libcint::int2e_sph, *aux = libcint::int2c2e_sph;
@@ -140,21 +140,17 @@ template <> struct Shell3C<Overlap3C_SPH> {
 	static constexpr libcint::CINTIntegralFunction *three = int3c1e_sph, *pair = nullptr, *aux = nullptr;
 };
 
-//rho_P = sum_ab w D_ab (ab|P) over orbital shell pairs a >= b (w = 2 off the diagonal), one shell
-//triplet at a time. A triplet is skipped when w max|D_ab| Q_ab Q_P < NOS_RI_SCREEN, the
-//density-weighted Schwarz screen XCW uses for its stored ERIs. This replaces an atom-pair overlap
-//screen that rode on constants::exp_cutoff, which the ELI-D tail correction (16 Sep 2026) made
-//so tight that it stopped screening.
-//Tried 7 Oct 2026 on sucrose and dropped: QVl distance screening (Hollman, Schaefer, Valeev, JCP 142,
-//154106 (2015)) lies on the same time/error curve as a tighter Schwarz threshold (1e-13: 3.14 s, 1.1e-7
-//vs 3.24 s, 9e-8), and libcint's PTR_EXPCUTOFF at its floor of 40 instead of 60 changes nothing.
+//rho_P = sum_ab w D_ab (ab|P) over orbital shell pairs a >= b (w = 2 off the diagonal), one shell triplet at a time,
+//skipped when w max|D_ab| Q_ab Q_P sigma_P < thr. sigma_p = max_A |(J^-1 n_A)_p| is the population a unit error in
+//rho_p moves onto atom A, so thr is in electrons; without sigma nothing is screened.
 template <typename Kernel>
 void computeRho(
 	const Int_Params &normal_basis,
 	const Int_Params &aux_basis,
 	const dMatrix2 &dm,
 	vec &rho,
-	const std::optional<ivec> asym_atm_list)
+	const std::optional<ivec> asym_atm_list,
+	const vec *sensitivity)
 {
 	using S = Shell3C<Kernel>;
 	Int_Params combined(normal_basis, aux_basis);
@@ -172,11 +168,9 @@ void computeRho(
 	const int aux0 = aoloc[nQM];
 	const int naux = aoloc[nQM + nAux] - aux0;
 	rho.assign(naux, 0.0);
-
 	double thr = constants::ri_screen_threshold;
 	if (const char *e = tuning("NOS_RI_SCREEN")) thr = std::atof(e);
-	const bool bound = S::pair != nullptr && thr > 0.0;
-
+	const bool bound = S::pair != nullptr && thr > 0.0 && sensitivity != nullptr;
 	int dmax_orb = 0, dmax_aux = 0;
 	for (int s = 0; s < nbas; s++) {
 		int &d = s < nQM ? dmax_orb : dmax_aux;
@@ -188,12 +182,11 @@ void computeRho(
 	for (int s = 0; s < nbas; s++) {
 		int shls[4] = { s, s, s, s };
 		ncache = std::max(ncache, S::three(nullptr, nullptr, shls, atm.data(), nat, bas.data(), nbas, env.data(), nullptr, nullptr));
-		if (bound) ncache = std::max({ ncache,
-			S::pair(nullptr, nullptr, shls, atm.data(), nat, bas.data(), nbas, env.data(), nullptr, nullptr),
-			S::aux(nullptr, nullptr, shls, atm.data(), nat, bas.data(), nbas, env.data(), nullptr, nullptr) });
+		if (bound) ncache = std::max(ncache, s < nQM
+			? S::pair(nullptr, nullptr, shls, atm.data(), nat, bas.data(), nQM, env.data(), nullptr, nullptr)
+			: S::aux(nullptr, nullptr, shls, atm.data(), nat, bas.data(), nbas, env.data(), nullptr, nullptr));
 	}
-
-	//Q_P = sqrt(max_p (p|p)) per aux shell
+	//Q_P = sqrt(max_p (p|p)) max_p sigma_p per aux shell
 	vec qaux(nAux, 1.0);
 	double qaux_max = 1.0;
 	if (bound) {
@@ -202,25 +195,24 @@ void computeRho(
 		for (int P = 0; P < nAux; P++) {
 			int shls[2] = { nQM + P, nQM + P };
 			const int dp = aoloc[nQM + P + 1] - aoloc[nQM + P];
-			double m = 0.0;
+			double m = 0.0, s = 0.0;
 			if (S::aux(buf.data(), nullptr, shls, atm.data(), nat, bas.data(), nbas, env.data(), nullptr, cache.data()))
 				for (int f = 0; f < dp; f++) m = std::max(m, std::abs(buf[f + dp * f]));
-			qaux[P] = std::sqrt(m);
+			for (int f = 0; f < dp; f++) s = std::max(s, std::abs((*sensitivity)[aoloc[nQM + P] - aux0 + f]));
+			qaux[P] = std::sqrt(m) * s;
 			qaux_max = std::max(qaux_max, qaux[P]);
 		}
 	}
 
 	libcint::CINTOpt *opty = nullptr, *opt2 = nullptr;
 	Kernel::optimizer(opty, atm.data(), nat, bas.data(), nbas, env.data());
-	if (bound) libcint::int2e_optimizer(&opt2, atm.data(), nat, bas.data(), nbas, env.data());
+	//(ab|ab) only touches orbital shells, the first nQM, so its optimizer skips the aux pairs
+	if (bound) libcint::int2e_optimizer(&opt2, atm.data(), nat, bas.data(), nQM, env.data());
 
-	//Every shell a sums into its own vector, and those are added to rho in a fixed order as soon as all before
-	//them are done: rho is bitwise the same whichever thread ran what, and only the out-of-order window is held.
-	//Per-thread vectors added in arrival order moved the sucrose tsc by 1e-6 between identical runs (the metric
-	//is ill-conditioned). Same speed as before (sucrose/TZVP 4.19 s vs 4.23 s); heaviest-a-first was slower.
+	//Every shell a sums into its own vector, added to rho in a fixed order once all before it are done: the
+	//ill-conditioned metric turns summation-order noise into tsc noise, so rho must not depend on the thread schedule
 	std::vector<vec> part(nQM);
 	int merged = 0;
-
 	long long done = 0;
 	{ //the bar ends its line when it goes out of scope, before the summary below
 		ProgressBar pb(nQM, 60, "#", " ", "Calculating Eri3c Matrix");
@@ -247,7 +239,7 @@ void computeRho(
 					if (bound) {
 						int shls[4] = { a, b, a, b };
 						double m = 0.0;
-						if (S::pair(buf2.data(), nullptr, shls, atm.data(), nat, bas.data(), nbas, env.data(), opt2, cache.data()))
+						if (S::pair(buf2.data(), nullptr, shls, atm.data(), nat, bas.data(), nQM, env.data(), opt2, cache.data()))
 							for (int j = 0; j < db; j++)
 								for (int i = 0; i < da; i++) m = std::max(m, std::abs(buf2[i + da * j + dab * (i + da * j)]));
 						qab = std::sqrt(m);
@@ -282,26 +274,29 @@ void computeRho(
 	libcint::CINTdel_optimizer(&opty);
 	if (opt2) libcint::CINTdel_optimizer(&opt2);
 	const long long total = static_cast<long long>(nQM) * (nQM + 1) / 2 * nAux;
-	std::cout << "Schwarz screening (" << thr << ") kept " << done << " of " << total << " shell triplets" << std::endl;
+	if (bound) std::cout << "Charge-weighted Schwarz screening (" << thr << " e) kept " << done << " of " << total << " shell triplets" << std::endl;
 }
 template void computeRho<Coulomb3C_SPH>(
 	const Int_Params &normal_basis,
 	const Int_Params &aux_basis,
 	const dMatrix2 &dm,
 	vec &rho,
-	const std::optional<ivec> asym_atm_list);
+	const std::optional<ivec> asym_atm_list,
+	const vec *sensitivity);
 template void computeRho<Coulomb3C_CRT>(
 	const Int_Params &normal_basis,
 	const Int_Params &aux_basis,
 	const dMatrix2 &dm,
 	vec &rho,
-	const std::optional<ivec> asym_atm_list);
+	const std::optional<ivec> asym_atm_list,
+	const vec *sensitivity);
 template void computeRho<Overlap3C_SPH>(
 	const Int_Params &normal_basis,
 	const Int_Params &aux_basis,
 	const dMatrix2 &dm,
 	vec &rho,
-	const std::optional<ivec> asym_atm_list);
+	const std::optional<ivec> asym_atm_list,
+	const vec *sensitivity);
 
 
 template <typename Kernel>

@@ -570,8 +570,8 @@ TEST(LibcintDispatchTests, ComputeRhoCartesianMatchesSphericalForSpBasis)
 	}
 }
 
-// a pair 60 bohr apart has (ab|ab) ~ exp(-1600): the Schwarz screen drops its 2 shell pairs x 3 aux
-// shells (6 of 18 triplets) and the result still matches the full contraction
+// a pair 60 bohr apart has (ab|ab) ~ exp(-1600): with unit sensitivities the Schwarz screen drops its 2 shell pairs x 3
+// aux shells (6 of 18 triplets) and the result still matches the full contraction
 TEST(LibcintDispatchTests, ComputeRhoWithScreenedPairMatchesFullContraction)
 {
 	WFN qm = make_wfn({ make_atom("H", 1, 0.0, 0.0, 0.0, { {0, 1.0}, {1, 0.6} }), make_atom("Li", 3, 0.0, 0.0, 60.0, { {0, 0.8} }) });
@@ -580,9 +580,10 @@ TEST(LibcintDispatchTests, ComputeRhoWithScreenedPairMatchesFullContraction)
 	const int nao = (int)pq.get_nao(), naok = (int)pa.get_nao();
 	dMatrix2 dm = symmetric_dm(nao);
 	vec eri, rho;
+	const vec sens(naok, 1.0);
 	computeEri3c<Coulomb3C_SPH>(pq, pa, eri);
 	testing::internal::CaptureStdout();
-	computeRho<Coulomb3C_SPH>(pq, pa, dm, rho);
+	computeRho<Coulomb3C_SPH>(pq, pa, dm, rho, std::nullopt, &sens);
 	EXPECT_NE(testing::internal::GetCapturedStdout().find("kept 12 of 18 shell triplets"), std::string::npos);
 	const vec expected = contract_eri(eri, dm, nao, naok);
 	ASSERT_EQ((int)rho.size(), naok);

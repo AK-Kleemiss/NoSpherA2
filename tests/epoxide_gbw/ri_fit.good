@@ -27,7 +27,7 @@ Auxiliary basis functions: 522
 Metric: Coulomb
 [                   Calculating Eri3c Matrix                  ]
 [#############################################################] 100% 
-Schwarz screening (1e-12) kept 63240 of 63240 shell triplets
+Charge-weighted Schwarz screening (3e-07 e) kept 63029 of 63240 shell triplets
 Solving unrestrained linear system...
 ==============================================
 

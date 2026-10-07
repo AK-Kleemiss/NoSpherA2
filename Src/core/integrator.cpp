@@ -680,7 +680,7 @@ static vec solve_quadratic_fit(
 {
 	vec Hc = H;
 	vec coefficients = g;
-	solve_linear_system(Hc, n_aux, coefficients);
+	solve_spd_system(Hc, n_aux, coefficients);
 
 	if (total_row == nullptr)
 		return coefficients;
@@ -692,7 +692,7 @@ static vec solve_quadratic_fit(
 
 	vec Hz = H;
 	vec response = *total_row;
-	solve_linear_system(Hz, n_aux, response);
+	solve_spd_system(Hz, n_aux, response);
 
 	double current_total = 0.0;
 	double denominator = 0.0;
@@ -845,8 +845,7 @@ vec DensityFitting::density_fit(
 	Int_Params normal_basis(wavy);
 	Int_Params aux_basis(wavy_aux);
 	dMatrix2 dm = wavy.get_dm();
-	//An ORCA-convention density (gbw, molden) has the opposite sign on |m| = 3, 4, 7, 8 to libcint's (ab|P),
-	//as in ao_overlap; without the flip a def2-TZVP sucrose fits to 181.82 electrons of 182.
+	//An ORCA-convention density (gbw, molden) has the opposite sign on |m| = 3, 4, 7, 8 to libcint's (ab|P), as in ao_overlap
 	if (origin_has_orca_pure_phases(wavy.get_origin())) {
 		const ivec bas = normal_basis.get_bas();
 		bvec flip;
@@ -883,16 +882,40 @@ vec DensityFitting::density_fit(
 		<< (config.metric == METRIC_TYPE::COULOMB ? "Coulomb" : "Overlap")
 		<< std::endl;
 
+	const size_t n_aux = aux_basis.get_nao();
+	const aux_density_table aux_table(
+		wavy_aux.get_atoms()
+	);
+	//eri2c keeps J's Cholesky factor for the unrestrained solve; diag gives J back for the modified fits
+	bool factored = false;
+	vec diag(n_aux);
 	switch (config.metric) {
-	case METRIC_TYPE::COULOMB:
+	case METRIC_TYPE::COULOMB: {
 		compute2C<Coulomb2C_SPH>(aux_basis, eri2c);
+		for (size_t i = 0; i < n_aux; i++) diag[i] = eri2c[i * (n_aux + 1)];
+		factored = cholesky_factor(eri2c, n_aux) == 0;
+		//row A of X = J^-1 n_A: the change in atom A's population per unit error in rho
+		vec sens;
+		if (factored) {
+			const vec2 rows = atomic_population_rows(aux_table);
+			vec X(rows.size() * n_aux);
+			for (size_t a = 0; a < rows.size(); a++)
+				for (size_t p = 0; p < n_aux; p++) X[a * n_aux + p] = rows[a][p];
+			cholesky_solve(eri2c, n_aux, X, rows.size());
+			sens.assign(n_aux, 0.0);
+			for (size_t a = 0; a < rows.size(); a++)
+				for (size_t p = 0; p < n_aux; p++) sens[p] = std::max(sens[p], std::abs(X[a * n_aux + p]));
+		}
+		else std::cout << "Coulomb metric not positive definite, the fit runs unscreened" << std::endl;
 		computeRho<Coulomb3C_SPH>(
 			normal_basis,
 			aux_basis,
 			dm,
 			rho,
-			config.asym_atm_list);
+			config.asym_atm_list,
+			factored ? &sens : nullptr);
 		break;
+	}
 
 	case METRIC_TYPE::OVERLAP:
 		compute2C<Overlap2C_SPH>(aux_basis, eri2c);
@@ -904,11 +927,6 @@ vec DensityFitting::density_fit(
 			config.asym_atm_list);
 		break;
 	}
-
-	const size_t n_aux = aux_basis.get_nao();
-	const aux_density_table aux_table(
-		wavy_aux.get_atoms()
-	);
 
 	err_checkf(
 		eri2c.size() == n_aux * n_aux && rho.size() == n_aux,
@@ -922,10 +940,11 @@ vec DensityFitting::density_fit(
 		|| has_soft_restraints
 		|| config.constrain_total_electrons;
 
-	// Completely unrestrained path: retain the original solve exactly.
+	// Completely unrestrained path: J c = rho with the factor from above.
 	if (!modified_fit) {
 		std::cout << "Solving unrestrained linear system..." << std::endl;
-		solve_linear_system(eri2c, n_aux, rho);
+		if (factored) cholesky_solve(eri2c, n_aux, rho);
+		else solve_spd_system(eri2c, n_aux, rho);
 
 		if (config.analyze_quality)
 			analyze_density_fit_quality(
@@ -941,6 +960,7 @@ vec DensityFitting::density_fit(
 
 	print_fit_configuration(config);
 
+	if (factored) cholesky_unfactor(eri2c, n_aux, diag);
 	vec H = eri2c;
 	vec g = rho;
 
