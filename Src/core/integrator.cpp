@@ -844,7 +844,20 @@ vec DensityFitting::density_fit(
 
 	Int_Params normal_basis(wavy);
 	Int_Params aux_basis(wavy_aux);
-	const dMatrix2 dm = wavy.get_dm();
+	dMatrix2 dm = wavy.get_dm();
+	//An ORCA-convention density (gbw, molden) has the opposite sign on |m| = 3, 4, 7, 8 to libcint's (ab|P),
+	//as in ao_overlap; without the flip a def2-TZVP sucrose fits to 181.82 electrons of 182.
+	if (origin_has_orca_pure_phases(wavy.get_origin())) {
+		const ivec bas = normal_basis.get_bas();
+		bvec flip;
+		for (int s = 0; s < static_cast<int>(normal_basis.get_nbas()); s++)
+			for (int m = -bas[8 * s + 1]; m <= bas[8 * s + 1]; m++)
+				flip.push_back(orca_pure_sign_flips(m));
+		err_checkf(flip.size() == dm.extent(0), "Density fit: the shell layout does not match the density matrix", std::cout);
+		for (size_t i = 0; i < flip.size(); i++)
+			for (size_t j = 0; j < flip.size(); j++)
+				if (flip[i] != flip[j]) dm(i, j) = -dm(i, j);
+	}
 
 	std::cout << "\n=== Density Fitting ===" << std::endl;
 	citations::cite(citations::Method::RIFit, std::cout);

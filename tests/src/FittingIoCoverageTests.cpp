@@ -434,6 +434,20 @@ TEST(FittingIoCoverageIntegratorTests, OverlapMetricFitMatchesDirectSolve)
 	EXPECT_NE(out.str().find("Metric: Overlap"), std::string::npos);
 }
 
+//A gbw keeps ORCA's sign on the |m| = 3, 4 components of f and g shells, libcint's (ab|P) does not;
+//without the flip in density_fit, water with O in def2-QZVP fits to 9.9981 e instead of 9.9998 (sucrose lost 0.18 e).
+TEST(FittingIoCoverageIntegratorTests, CoulombFitOfOrcaFAndGShellsKeepsTheElectronCount)
+{
+	const std::filesystem::path p = nos_test_repo_root() / "tests" / "eqc_water_fg" / "water.gbw";
+	if (!std::filesystem::exists(p)) GTEST_SKIP() << "tests/eqc_water_fg/water.gbw not found";
+	WFN wave(p);
+	std::vector<std::shared_ptr<BasisSet>> basis{ BasisSetLibrary::get_basis_set("def2-universal-jkfit") };
+	const WFN aux = generate_aux_wfn(wave, basis);
+	StreamCapture out(std::cout);
+	const vec c = DensityFitting::density_fit(wave, aux, DensityFitting::CONFIG());
+	EXPECT_NEAR(fitted_electrons(population_rows(aux), c), 10.0, 1e-3);
+}
+
 //Tikhonov with lambda = 1 solves (H + I) c = g exactly.
 TEST(FittingIoCoverageIntegratorTests, TikhonovShiftsTheDiagonal)
 {
