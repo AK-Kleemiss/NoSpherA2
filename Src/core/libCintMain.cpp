@@ -173,8 +173,7 @@ void computeRho(
 	const int naux = aoloc[nQM + nAux] - aux0;
 	rho.assign(naux, 0.0);
 
-	//1e-12 as in XCW: sucrose tsc within 4e-7 (relative) of the unscreened fit, 1e-10 gives 7e-5
-	double thr = 1e-12;
+	double thr = constants::ri_screen_threshold;
 	if (const char *e = tuning("NOS_RI_SCREEN")) thr = std::atof(e);
 	const bool bound = S::pair != nullptr && thr > 0.0;
 
