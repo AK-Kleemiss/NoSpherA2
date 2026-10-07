@@ -85,10 +85,9 @@ private:
 
 	featomic::SimpleSystem featomic_system;
 	void read_model_data();
-	// Fetch / drop the model matrices of one lambda; read_model_data() only indexes
-	void load_model_lambda(const int lam);
+	// Drop the model matrices of one lambda; read_model_data() only indexes
 	void free_model_lambda(const int lam);
-	// (species+lambda key, projector, features); read and install split for the Android prefetch
+	// (species+lambda key, projector, features); read and install split for the prefetch
 	using lambda_blocks = std::vector<std::tuple<std::string, dMatrix2, dMatrix2>>;
 	lambda_blocks read_model_lambda(const int lam);
 	void install_model_lambda(lambda_blocks blocks);
