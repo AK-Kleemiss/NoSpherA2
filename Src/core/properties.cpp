@@ -2025,8 +2025,12 @@ void properties_calculation(options &opt)
 
 	log2 << "Calculating for " << fixed << setprecision(0) << opt.properties.NbSteps[0] * opt.properties.NbSteps[1] * opt.properties.NbSteps[2] << " Gridpoints." << endl;
 
-	if (ml) Calc_Rho(cubes[cube_type::Rho], *ml, opt.properties.radius, log2, opt.cif != "");
-	else Calc_Rho(cubes[cube_type::Rho], wavy, opt.properties.radius, log2, opt.cif != "");
+	// -esp_isosurface with -cif marches its own box below, so a run asking only for that never reads the cell rho
+	const properties_options &p = opt.properties;
+	if (p.rho || p.lap || p.eli || p.elf || p.rdg || p.esp || p.def || p.hdef || p.hirsh || p.integral_accuracy != -1 || (p.esp_isosurface > 0 && opt.cif == "")) {
+		if (ml) Calc_Rho(cubes[cube_type::Rho], *ml, opt.properties.radius, log2, opt.cif != "");
+		else Calc_Rho(cubes[cube_type::Rho], wavy, opt.properties.radius, log2, opt.cif != "");
+	}
 
 	if (opt.properties.integral_accuracy != -1) {
 		log2 << "Refining grid files to integral accuracy of " << opt.properties.integral_accuracy << " ..." << flush;
