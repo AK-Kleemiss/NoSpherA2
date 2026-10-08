@@ -2613,9 +2613,7 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 							__sincos(angles[p], &sines[p], &cosines[p]);
 						}
 #elif defined(NSA2_OPENBLAS)
-						for (int p = 0; p < np_g; p++) {
-							sincos_shared(angles[p], &sines[p], &cosines[p]);
-						}
+						sincos_shared_n(np_g, angles, sines, cosines);
 #else
 						vdSinCos(np_g, angles, sines, cosines);
 #endif
