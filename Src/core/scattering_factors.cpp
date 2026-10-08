@@ -1822,98 +1822,218 @@ void calc_SF_SALTED(
 		}
 	}
 }
-#if (defined(__aarch64__) && !defined(__APPLE__)) || defined(_M_ARM64)
+//calc_SF phase recurrence: reflections per task, points per L1 tile, multiplies between sincos anchors, max row-jump steps
+constexpr int SF_BLOCK = 64, SF_TILE = 256, SF_ANCHOR = 32, SF_NMAX = 4;
+//calc_SF lanes: NEON on every ARM64 (Apple included), AVX or SSE2 on x86, plain doubles elsewhere (armv7). sf_fma and
+//sf_fms are fused where the ISA has it: c + a b and c - a b.
+#if defined(__aarch64__) || defined(_M_ARM64)
+using sf_v = float64x2_t;
+constexpr int SF_W = 2;
+static inline sf_v sf_ld(const double* p) { return vld1q_f64(p); }
+static inline void sf_st(double* p, const sf_v a) { vst1q_f64(p, a); }
+static inline sf_v sf_set(const double a) { return vdupq_n_f64(a); }
+static inline sf_v sf_add(const sf_v a, const sf_v b) { return vaddq_f64(a, b); }
+static inline sf_v sf_mul(const sf_v a, const sf_v b) { return vmulq_f64(a, b); }
+static inline sf_v sf_fma(const sf_v c, const sf_v a, const sf_v b) { return vfmaq_f64(c, a, b); }
+static inline sf_v sf_fms(const sf_v c, const sf_v a, const sf_v b) { return vfmsq_f64(c, a, b); }
+static inline double sf_hsum(const sf_v a) { return vgetq_lane_f64(a, 0) + vgetq_lane_f64(a, 1); }
+#elif defined(__AVX__)
+using sf_v = __m256d;
+constexpr int SF_W = 4;
+static inline sf_v sf_ld(const double* p) { return _mm256_loadu_pd(p); }
+static inline void sf_st(double* p, const sf_v a) { _mm256_storeu_pd(p, a); }
+static inline sf_v sf_set(const double a) { return _mm256_set1_pd(a); }
+static inline sf_v sf_add(const sf_v a, const sf_v b) { return _mm256_add_pd(a, b); }
+static inline sf_v sf_mul(const sf_v a, const sf_v b) { return _mm256_mul_pd(a, b); }
+#if defined(__FMA__) || defined(__AVX2__)
+static inline sf_v sf_fma(const sf_v c, const sf_v a, const sf_v b) { return _mm256_fmadd_pd(a, b, c); }
+static inline sf_v sf_fms(const sf_v c, const sf_v a, const sf_v b) { return _mm256_fnmadd_pd(a, b, c); }
+#else
+static inline sf_v sf_fma(const sf_v c, const sf_v a, const sf_v b) { return _mm256_add_pd(c, _mm256_mul_pd(a, b)); }
+static inline sf_v sf_fms(const sf_v c, const sf_v a, const sf_v b) { return _mm256_sub_pd(c, _mm256_mul_pd(a, b)); }
+#endif
+static inline double sf_hsum(const sf_v a) { alignas(32) double l[4]; _mm256_store_pd(l, a); return ((l[0] + l[1]) + l[2]) + l[3]; }
+#elif defined(__SSE2__) || defined(_M_X64)
+#include <emmintrin.h>
+using sf_v = __m128d;
+constexpr int SF_W = 2;
+static inline sf_v sf_ld(const double* p) { return _mm_loadu_pd(p); }
+static inline void sf_st(double* p, const sf_v a) { _mm_storeu_pd(p, a); }
+static inline sf_v sf_set(const double a) { return _mm_set1_pd(a); }
+static inline sf_v sf_add(const sf_v a, const sf_v b) { return _mm_add_pd(a, b); }
+static inline sf_v sf_mul(const sf_v a, const sf_v b) { return _mm_mul_pd(a, b); }
+static inline sf_v sf_fma(const sf_v c, const sf_v a, const sf_v b) { return _mm_add_pd(c, _mm_mul_pd(a, b)); }
+static inline sf_v sf_fms(const sf_v c, const sf_v a, const sf_v b) { return _mm_sub_pd(c, _mm_mul_pd(a, b)); }
+static inline double sf_hsum(const sf_v a) { alignas(16) double l[2]; _mm_store_pd(l, a); return l[0] + l[1]; }
+#else
+using sf_v = double;
+constexpr int SF_W = 1;
+static inline sf_v sf_ld(const double* p) { return *p; }
+static inline void sf_st(double* p, const sf_v a) { *p = a; }
+static inline sf_v sf_set(const double a) { return a; }
+static inline sf_v sf_add(const sf_v a, const sf_v b) { return a + b; }
+static inline sf_v sf_mul(const sf_v a, const sf_v b) { return a * b; }
+static inline sf_v sf_fma(const sf_v c, const sf_v a, const sf_v b) { return c + a * b; }
+static inline sf_v sf_fms(const sf_v c, const sf_v a, const sf_v b) { return c - a * b; }
+static inline double sf_hsum(const sf_v a) { return a; }
+#endif
+//n sines and cosines: the shared-reduction NEON kernels on ARM64, one SVML call for both on MSVC AVX, else the libm pair
+static inline void sf_sincos_n(const int n, const double* x, double* s, double* c)
+{
+#if defined(__aarch64__) || defined(_M_ARM64)
+	sincos_shared_n(n, x, s, c);
+#else
+	int p = 0;
+#if defined(_MSC_VER) && defined(__AVX__)
+	for (; p + 3 < n; p += 4)
+	{
+		__m256d cv;
+		_mm256_storeu_pd(s + p, _mm256_sincos_pd(&cv, _mm256_loadu_pd(x + p)));
+		_mm256_storeu_pd(c + p, cv);
+	}
+#endif
+	for (; p < n; p++)
+	{
+#if (defined(__GNUC__) || defined(__clang__)) && !defined(__APPLE__)
+		sincos(x[p], s + p, c + p);
+#elif defined(__APPLE__)
+		__sincos(x[p], s + p, c + p);
+#else
+		s[p] = sin(x[p]); c[p] = cos(x[p]);
+#endif
+	}
+#endif
+}
 //M consecutive recurrence steps of calc_SF in one pass over a tile: Q stays in registers between steps, so the A72's
-//~16 bytes/cycle of vector results go to multiplies instead of reloading Q. Two point pairs run side by side to hide
-//the chain latency. Every product and sum is the one a single step forms, in the same order: bit-identical.
+//~16 bytes/cycle of vector results go to multiplies instead of reloading Q. Two vectors run side by side to hide the
+//chain latency. Every product and sum is the one a single step forms, in the same order: bit-identical to M = 1
+//(MSVC /fp:fast may reassociate the intrinsic sums and differ by a few ulp).
 template <int M>
 static inline void sf_steps(const int nt, double* qr, double* qi, const double* tr, const double* ti, double* acc_r, double* acc_i)
 {
-	const int nt2 = nt & ~1;
-	float64x2_t sr[M], sm[M];
-	for (int k = 0; k < M; k++) sr[k] = sm[k] = vdupq_n_f64(0.0);
+	const int ntw = nt - nt % SF_W;
+	sf_v sr[M], sm[M];
+	for (int k = 0; k < M; k++) sr[k] = sm[k] = sf_set(0.0);
 	int q = 0;
-	for (; q + 3 < nt2; q += 4)
+	for (; q + 2 * SF_W <= ntw; q += 2 * SF_W)
 	{
-		float64x2_t a0 = vld1q_f64(qr + q), b0 = vld1q_f64(qi + q), a1 = vld1q_f64(qr + q + 2), b1 = vld1q_f64(qi + q + 2);
-		const float64x2_t c0 = vld1q_f64(tr + q), d0 = vld1q_f64(ti + q), c1 = vld1q_f64(tr + q + 2), d1 = vld1q_f64(ti + q + 2);
+		sf_v a0 = sf_ld(qr + q), b0 = sf_ld(qi + q), a1 = sf_ld(qr + q + SF_W), b1 = sf_ld(qi + q + SF_W);
+		const sf_v c0 = sf_ld(tr + q), d0 = sf_ld(ti + q), c1 = sf_ld(tr + q + SF_W), d1 = sf_ld(ti + q + SF_W);
 		for (int k = 0; k < M; k++)
 		{
-			const float64x2_t nr0 = vfmsq_f64(vmulq_f64(a0, c0), b0, d0), ni0 = vfmaq_f64(vmulq_f64(a0, d0), b0, c0);
-			const float64x2_t nr1 = vfmsq_f64(vmulq_f64(a1, c1), b1, d1), ni1 = vfmaq_f64(vmulq_f64(a1, d1), b1, c1);
-			sr[k] = vaddq_f64(vaddq_f64(sr[k], nr0), nr1); sm[k] = vaddq_f64(vaddq_f64(sm[k], ni0), ni1);
+			const sf_v nr0 = sf_fms(sf_mul(a0, c0), b0, d0), ni0 = sf_fma(sf_mul(a0, d0), b0, c0);
+			const sf_v nr1 = sf_fms(sf_mul(a1, c1), b1, d1), ni1 = sf_fma(sf_mul(a1, d1), b1, c1);
+			sr[k] = sf_add(sf_add(sr[k], nr0), nr1); sm[k] = sf_add(sf_add(sm[k], ni0), ni1);
 			a0 = nr0; b0 = ni0; a1 = nr1; b1 = ni1;
 		}
-		vst1q_f64(qr + q, a0); vst1q_f64(qi + q, b0); vst1q_f64(qr + q + 2, a1); vst1q_f64(qi + q + 2, b1);
+		sf_st(qr + q, a0); sf_st(qi + q, b0); sf_st(qr + q + SF_W, a1); sf_st(qi + q + SF_W, b1);
 	}
-	if (q < nt2)
+	if (q < ntw)
 	{
-		float64x2_t a = vld1q_f64(qr + q), b = vld1q_f64(qi + q);
-		const float64x2_t c2 = vld1q_f64(tr + q), d = vld1q_f64(ti + q);
+		sf_v a = sf_ld(qr + q), b = sf_ld(qi + q);
+		const sf_v c2 = sf_ld(tr + q), d = sf_ld(ti + q);
 		for (int k = 0; k < M; k++)
 		{
-			const float64x2_t nr = vfmsq_f64(vmulq_f64(a, c2), b, d), ni = vfmaq_f64(vmulq_f64(a, d), b, c2);
-			sr[k] = vaddq_f64(sr[k], nr); sm[k] = vaddq_f64(sm[k], ni);
+			const sf_v nr = sf_fms(sf_mul(a, c2), b, d), ni = sf_fma(sf_mul(a, d), b, c2);
+			sr[k] = sf_add(sr[k], nr); sm[k] = sf_add(sm[k], ni);
 			a = nr; b = ni;
 		}
-		vst1q_f64(qr + q, a); vst1q_f64(qi + q, b);
+		sf_st(qr + q, a); sf_st(qi + q, b);
 	}
 	double re1[M] = {}, im1[M] = {};
-	if (nt2 < nt)
+	for (int e = ntw; e < nt; e++)
 	{
-		double a = qr[nt2], b = qi[nt2];
+		double a = qr[e], b = qi[e];
 		for (int k = 0; k < M; k++)
 		{
-			const double nr = a * tr[nt2] - b * ti[nt2], ni = a * ti[nt2] + b * tr[nt2];
-			re1[k] = a = nr; im1[k] = b = ni;
+			const double nr = a * tr[e] - b * ti[e], ni = a * ti[e] + b * tr[e];
+			a = nr; b = ni;
+			re1[k] += a; im1[k] += b;
 		}
-		qr[nt2] = a; qi[nt2] = b;
+		qr[e] = a; qi[e] = b;
 	}
 	for (int k = 0; k < M; k++)
 	{
-		acc_r[k] += vgetq_lane_f64(sr[k], 0) + vgetq_lane_f64(sr[k], 1) + re1[k];
-		acc_i[k] += vgetq_lane_f64(sm[k], 0) + vgetq_lane_f64(sm[k], 1) + im1[k];
+		acc_r[k] += sf_hsum(sr[k]) + re1[k];
+		acc_i[k] += sf_hsum(sm[k]) + im1[k];
 	}
 }
 //Row jump: Q = R e^{i db.r} (e^{i dc.r}, or its conjugate for n < 0)^|n| from the saved row start R, summed like a step.
 static inline void sf_jump(const int nt, const int n, const double* rr, const double* ri, const double* br, const double* bi,
 	const double* tr, const double* ti, double* qr, double* qi, double* acc_r, double* acc_i)
 {
-	const int nt2 = nt & ~1, an = n < 0 ? -n : n;
+	const int ntw = nt - nt % SF_W, an = n < 0 ? -n : n;
 	const double sg = n < 0 ? -1.0 : 1.0;
-	const float64x2_t sgv = vdupq_n_f64(sg);
-	float64x2_t sr = vdupq_n_f64(0.0), sm = vdupq_n_f64(0.0);
-	for (int q = 0; q < nt2; q += 2)
+	const sf_v sgv = sf_set(sg);
+	sf_v sr = sf_set(0.0), sm = sf_set(0.0);
+	for (int q = 0; q < ntw; q += SF_W)
 	{
-		const float64x2_t a0 = vld1q_f64(rr + q), b0 = vld1q_f64(ri + q), c = vld1q_f64(br + q), d = vld1q_f64(bi + q);
-		const float64x2_t c2 = vld1q_f64(tr + q), d2 = vmulq_f64(sgv, vld1q_f64(ti + q));
-		float64x2_t a = vfmsq_f64(vmulq_f64(a0, c), b0, d), b = vfmaq_f64(vmulq_f64(a0, d), b0, c);
+		const sf_v a0 = sf_ld(rr + q), b0 = sf_ld(ri + q), c = sf_ld(br + q), d = sf_ld(bi + q);
+		const sf_v c2 = sf_ld(tr + q), d2 = sf_mul(sgv, sf_ld(ti + q));
+		sf_v a = sf_fms(sf_mul(a0, c), b0, d), b = sf_fma(sf_mul(a0, d), b0, c);
 		for (int k = 0; k < an; k++)
 		{
-			const float64x2_t na = vfmsq_f64(vmulq_f64(a, c2), b, d2);
-			b = vfmaq_f64(vmulq_f64(a, d2), b, c2);
+			const sf_v na = sf_fms(sf_mul(a, c2), b, d2);
+			b = sf_fma(sf_mul(a, d2), b, c2);
 			a = na;
 		}
-		vst1q_f64(qr + q, a); vst1q_f64(qi + q, b);
-		sr = vaddq_f64(sr, a); sm = vaddq_f64(sm, b);
+		sf_st(qr + q, a); sf_st(qi + q, b);
+		sr = sf_add(sr, a); sm = sf_add(sm, b);
 	}
 	double re1 = 0.0, im1 = 0.0;
-	if (nt2 < nt)
+	for (int e = ntw; e < nt; e++)
 	{
-		double a = rr[nt2] * br[nt2] - ri[nt2] * bi[nt2], b = rr[nt2] * bi[nt2] + ri[nt2] * br[nt2];
-		const double c2 = tr[nt2], d2 = sg * ti[nt2];
+		double a = rr[e] * br[e] - ri[e] * bi[e], b = rr[e] * bi[e] + ri[e] * br[e];
+		const double c2 = tr[e], d2 = sg * ti[e];
 		for (int k = 0; k < an; k++)
 		{
 			const double na = a * c2 - b * d2;
 			b = a * d2 + b * c2;
 			a = na;
 		}
-		qr[nt2] = re1 = a; qi[nt2] = im1 = b;
+		qr[e] = a; qi[e] = b;
+		re1 += a; im1 += b;
 	}
-	*acc_r += vgetq_lane_f64(sr, 0) + vgetq_lane_f64(sr, 1) + re1;
-	*acc_i += vgetq_lane_f64(sm, 0) + vgetq_lane_f64(sm, 1) + im1;
+	*acc_r += sf_hsum(sr) + re1;
+	*acc_i += sf_hsum(sm) + im1;
 }
-#endif
+//Anchor: Q = rho e^{i k.r} from a sincos per point, summed like a step
+static inline void sf_anchor(const int nt, const double k1, const double k2, const double k3, const double* x, const double* y,
+	const double* z, const double* r, double* qr, double* qi, double* acc_r, double* acc_i)
+{
+	alignas(32) double ph[SF_TILE], sn[SF_TILE], cs[SF_TILE];
+	const int ntw = nt - nt % SF_W;
+	const sf_v k1v = sf_set(k1), k2v = sf_set(k2), k3v = sf_set(k3);
+	int q = 0;
+	for (; q < ntw; q += SF_W)
+		sf_st(ph + q, sf_fma(sf_fma(sf_mul(k1v, sf_ld(x + q)), k2v, sf_ld(y + q)), k3v, sf_ld(z + q)));
+	for (; q < nt; q++)
+		ph[q] = k1 * x[q] + k2 * y[q] + k3 * z[q];
+	sf_sincos_n(nt, ph, sn, cs);
+	sf_v sr = sf_set(0.0), sm = sf_set(0.0);
+	for (q = 0; q + 2 * SF_W <= ntw; q += 2 * SF_W)
+	{
+		const sf_v r0 = sf_ld(r + q), r1 = sf_ld(r + q + SF_W);
+		const sf_v a0 = sf_mul(r0, sf_ld(cs + q)), b0 = sf_mul(r0, sf_ld(sn + q));
+		const sf_v a1 = sf_mul(r1, sf_ld(cs + q + SF_W)), b1 = sf_mul(r1, sf_ld(sn + q + SF_W));
+		sf_st(qr + q, a0); sf_st(qi + q, b0); sf_st(qr + q + SF_W, a1); sf_st(qi + q + SF_W, b1);
+		sr = sf_add(sf_add(sr, a0), a1); sm = sf_add(sf_add(sm, b0), b1);
+	}
+	if (q < ntw)
+	{
+		const sf_v rv = sf_ld(r + q), a = sf_mul(rv, sf_ld(cs + q)), b = sf_mul(rv, sf_ld(sn + q));
+		sf_st(qr + q, a); sf_st(qi + q, b);
+		sr = sf_add(sr, a); sm = sf_add(sm, b);
+	}
+	double re1 = 0.0, im1 = 0.0;
+	for (int e = ntw; e < nt; e++)
+	{
+		qr[e] = r[e] * cs[e]; qi[e] = r[e] * sn[e];
+		re1 += qr[e]; im1 += qi[e];
+	}
+	*acc_r += sf_hsum(sr) + re1;
+	*acc_i += sf_hsum(sm) + im1;
+}
 /**
  * Calculates the scattering factors for a given set of parameters.
  *
@@ -2022,11 +2142,6 @@ void calc_SF(const int& points,
 		progress = new ProgressBar(imax, 60, "=", " ", "Calculating Scattering Factors", file);
 	}
 	long long int pmax;
-#if !((defined(__aarch64__) && !defined(__APPLE__)) || defined(_M_ARM64))
-	long long int p, s;
-	complex<double>* sf_local;
-	double work, rho, c, si, re, im;
-#endif
 	const double* d1_local, * d2_local, * d3_local, * dens_local;
 
 	// Pre-fetch k_pt data pointers for better cache locality
@@ -2038,14 +2153,12 @@ void calc_SF(const int& points,
 	const _time_point sf_cpu_t0 = get_time();
 	double sf_cpu_points = 0.0;
 
-#if (defined(__aarch64__) && !defined(__APPLE__)) || defined(_M_ARM64)
 	//Phase recurrence: the reflections are a sorted hkl set, so most consecutive k differ by one step dc (c*), and
 	//Q_p = rho_p e^{i k.r_p} continues as Q_p e^{i dc.r_p}, one complex multiply instead of a sincos. Q is re-anchored
-	//with sincos_shared2 at block starts, row breaks no row jump (below) reaches and every SF_ANCHOR multiplies, so the
-	//drift stays at rounding level.
+	//with a sincos at block starts, row breaks no row jump (below) reaches and every SF_ANCHOR multiplies, so the
+	//drift stays at rounding level (1e-14 relative on sucrose against the direct sum).
 	//dc is taken where two successive steps agree, at the smallest |k| for the least rounding; cont[s] marks
 	//k[s] = k[s-1] + dc. An unsorted k list leaves cont all false and every reflection anchors.
-	constexpr int SF_BLOCK = 64, SF_TILE = 256, SF_ANCHOR = 32, SF_NMAX = 4;
 	constexpr signed char SF_STEP = 100, SF_ANC = 101; //sf_op values; anything else is a row jump by that many dc steps
 	double dc[3] = { 0.0, 0.0, 0.0 }, db[3] = { 0.0, 0.0, 0.0 };
 	bool jumps = false;
@@ -2119,7 +2232,6 @@ void calc_SF(const int& points,
 		}
 	}
 	vec e_ph, e_re, e_im, b_re, b_im;
-#endif
 
 	for (int i = 0; i < imax; i++)
 	{
@@ -2130,17 +2242,16 @@ void calc_SF(const int& points,
 		d2_local = d2[i].data();
 		d3_local = d3[i].data();
 
-#if (defined(__aarch64__) && !defined(__APPLE__)) || defined(_M_ARM64)
 		e_ph.resize(pmax); e_re.resize(pmax); e_im.resize(pmax);
 		for (long long t = 0; t < pmax; t++)
 			e_ph[t] = dc[0] * d1_local[t] + dc[1] * d2_local[t] + dc[2] * d3_local[t];
-		sincos_shared_n(static_cast<int>(pmax), e_ph.data(), e_im.data(), e_re.data());
+		sf_sincos_n(static_cast<int>(pmax), e_ph.data(), e_im.data(), e_re.data());
 		if (jumps)
 		{
 			b_re.resize(pmax); b_im.resize(pmax);
 			for (long long t = 0; t < pmax; t++)
 				e_ph[t] = db[0] * d1_local[t] + db[1] * d2_local[t] + db[2] * d3_local[t];
-			sincos_shared_n(static_cast<int>(pmax), e_ph.data(), b_im.data(), b_re.data());
+			sf_sincos_n(static_cast<int>(pmax), e_ph.data(), b_im.data(), b_re.data());
 		}
 		const double* er = e_re.data(), * ei = e_im.data(), * bre = b_re.data(), * bim = b_im.data();
 		//Blocks of SF_BLOCK reflections per task; per SF_TILE points (L1-resident Q) the block's reflections in order
@@ -2151,7 +2262,7 @@ void calc_SF(const int& points,
 			double qr[SF_TILE], qi[SF_TILE], rr[SF_TILE], ri[SF_TILE], acc_r[SF_BLOCK] = {}, acc_i[SF_BLOCK] = {};
 			for (long long t0 = 0; t0 < pmax; t0 += SF_TILE)
 			{
-				const int nt = static_cast<int>(std::min<long long>(SF_TILE, pmax - t0)), nt2 = nt & ~1;
+				const int nt = static_cast<int>(std::min<long long>(SF_TILE, pmax - t0));
 				const double* r = dens_local + t0, * x = d1_local + t0, * y = d2_local + t0, * z = d3_local + t0;
 				const double* tr = er + t0, * ti = ei + t0;
 				for (int j = 0; j < nb;)
@@ -2175,40 +2286,7 @@ void calc_SF(const int& points,
 					if (sf_op[sj] != SF_ANC)
 						sf_jump(nt, sf_op[sj], rr, ri, bre + t0, bim + t0, tr, ti, qr, qi, acc_r + j, acc_i + j);
 					else
-					{
-						float64x2_t sr = vdupq_n_f64(0.0), sm = vdupq_n_f64(0.0);
-						double re1 = 0.0, im1 = 0.0;
-						const float64x2_t k1v = vdupq_n_f64(k1_data[sj]), k2v = vdupq_n_f64(k2_data[sj]), k3v = vdupq_n_f64(k3_data[sj]);
-						const auto phase = [&](const int q) {
-							return vfmaq_f64(vfmaq_f64(vmulq_f64(k1v, vld1q_f64(x + q)), k2v, vld1q_f64(y + q)), k3v, vld1q_f64(z + q));
-						};
-						int q = 0;
-						for (; q + 3 < nt2; q += 4)
-						{
-							float64x2_t s0, c0, s1, c1;
-							sincos_shared4(phase(q), phase(q + 2), &s0, &c0, &s1, &c1);
-							const float64x2_t r0 = vld1q_f64(r + q), r1 = vld1q_f64(r + q + 2);
-							const float64x2_t a0 = vmulq_f64(r0, c0), b0 = vmulq_f64(r0, s0), a1 = vmulq_f64(r1, c1), b1 = vmulq_f64(r1, s1);
-							vst1q_f64(qr + q, a0); vst1q_f64(qi + q, b0); vst1q_f64(qr + q + 2, a1); vst1q_f64(qi + q + 2, b1);
-							sr = vaddq_f64(vaddq_f64(sr, a0), a1); sm = vaddq_f64(vaddq_f64(sm, b0), b1);
-						}
-						if (q < nt2)
-						{
-							float64x2_t sv, cv;
-							sincos_shared2(phase(q), &sv, &cv);
-							const float64x2_t rv = vld1q_f64(r + q), a = vmulq_f64(rv, cv), b = vmulq_f64(rv, sv);
-							vst1q_f64(qr + q, a); vst1q_f64(qi + q, b);
-							sr = vaddq_f64(sr, a); sm = vaddq_f64(sm, b);
-						}
-						if (nt2 < nt)
-						{
-							double sn, cs;
-							sincos_shared(k1_data[sj] * x[nt2] + k2_data[sj] * y[nt2] + k3_data[sj] * z[nt2], &sn, &cs);
-							qr[nt2] = re1 = r[nt2] * cs; qi[nt2] = im1 = r[nt2] * sn;
-						}
-						acc_r[j] += vgetq_lane_f64(sr, 0) + vgetq_lane_f64(sr, 1) + re1;
-						acc_i[j] += vgetq_lane_f64(sm, 0) + vgetq_lane_f64(sm, 1) + im1;
-					}
+						sf_anchor(nt, k1_data[sj], k2_data[sj], k3_data[sj], x, y, z, r, qr, qi, acc_r + j, acc_i + j);
 					//a row start is kept for the next row's jump
 					if (j == 0 || !cont[sj])
 					{
@@ -2222,101 +2300,6 @@ void calc_SF(const int& points,
 			for (int j = 0; j < nb; j++)
 				out[j] = complex<double>(acc_r[j], acc_i[j]);
 		}
-#else
-#pragma omp parallel for private(work, rho, c, si, re, im, s, p)
-		for (s = 0; s < smax; s++)
-		{
-			re = 0.0, im = 0.0;
-			const double& k1_local = k1_data[s];
-			const double& k2_local = k2_data[s];
-			const double& k3_local = k3_data[s];
-			sf_local = sf[i].data();
-			// Process loop in blocks of 4 for better instruction-level parallelism
-			const long long int pmax_vec = (pmax / 4) * 4;
-
-			// Vectorized main loop processing 4 elements at a time
-			for (p = 0; p < pmax_vec; p += 4)
-			{
-				// Load 4 density values
-				const double rho0 = dens_local[p];
-				const double rho1 = dens_local[p + 1];
-				const double rho2 = dens_local[p + 2];
-				const double rho3 = dens_local[p + 3];
-
-				// Calculate work values for 4 points using FMA pattern
-				const double work0 = k1_local * d1_local[p] + k2_local * d2_local[p] + k3_local * d3_local[p];
-				const double work1 = k1_local * d1_local[p + 1] + k2_local * d2_local[p + 1] + k3_local * d3_local[p + 1];
-				const double work2 = k1_local * d1_local[p + 2] + k2_local * d2_local[p + 2] + k3_local * d3_local[p + 2];
-				const double work3 = k1_local * d1_local[p + 3] + k2_local * d2_local[p + 3] + k3_local * d3_local[p + 3];
-
-#if (defined(__GNUC__) || defined(__clang__)) && !defined(__APPLE__)
-				double si0, c0, si1, c1, si2, c2, si3, c3;
-				sincos(work0, &si0, &c0);
-				sincos(work1, &si1, &c1);
-				sincos(work2, &si2, &c2);
-				sincos(work3, &si3, &c3);
-
-				re += rho0 * c0 + rho1 * c1 + rho2 * c2 + rho3 * c3;
-				im += rho0 * si0 + rho1 * si1 + rho2 * si2 + rho3 * si3;
-#elif defined(__APPLE__)
-				double si0, c0, si1, c1, si2, c2, si3, c3;
-				__sincos(work0, &si0, &c0);
-				__sincos(work1, &si1, &c1);
-				__sincos(work2, &si2, &c2);
-				__sincos(work3, &si3, &c3);
-
-				re += rho0 * c0 + rho1 * c1 + rho2 * c2 + rho3 * c3;
-				im += rho0 * si0 + rho1 * si1 + rho2 * si2 + rho3 * si3;
-#elif defined(_MSC_VER) && defined(__AVX__)
-				//one SVML call for both instead of the separate sin4 and cos4 the vectoriser emits
-				__m256d cv;
-				const __m256d sv = _mm256_sincos_pd(&cv, _mm256_set_pd(work3, work2, work1, work0));
-				const __m256d rv = _mm256_loadu_pd(dens_local + p);
-				alignas(32) double cr[4], sr[4];
-				_mm256_store_pd(cr, _mm256_mul_pd(rv, cv));
-				_mm256_store_pd(sr, _mm256_mul_pd(rv, sv));
-				re += cr[0] + cr[1] + cr[2] + cr[3];
-				im += sr[0] + sr[1] + sr[2] + sr[3];
-#else
-				//x64 /fp:fast: MSVC fuses each pair into __libm_sse2_sincos_ or vectorises to __vdecl_sin2/cos2
-				const double c0 = cos(work0);
-				const double si0 = sin(work0);
-				const double c1 = cos(work1);
-				const double si1 = sin(work1);
-				const double c2 = cos(work2);
-				const double si2 = sin(work2);
-				const double c3 = cos(work3);
-				const double si3 = sin(work3);
-
-				re += rho0 * c0 + rho1 * c1 + rho2 * c2 + rho3 * c3;
-				im += rho0 * si0 + rho1 * si1 + rho2 * si2 + rho3 * si3;
-#endif
-			}
-
-			// Handle remaining elements
-			for (p = pmax_vec; p < pmax; p++)
-			{
-				rho = dens_local[p];
-				work = k1_local * d1_local[p] + k2_local * d2_local[p] + k3_local * d3_local[p];
-#if (defined(__GNUC__) || defined(__clang__)) && !defined(__APPLE__)
-				sincos(work, &si, &c);
-				re += rho * c;
-				im += rho * si;
-#elif defined(__APPLE__)
-				__sincos(work, &si, &c);
-				re += rho * c;
-				im += rho * si;
-#else
-				c = cos(work);
-				si = sin(work);
-				re += rho * c;
-				im += rho * si;
-#endif
-			}
-			sf_local[s].real(re);
-			sf_local[s].imag(im);
-		}
-#endif
 		if (!do_XCW) {
 			progress->update();
 		}
