@@ -616,6 +616,12 @@ void GridManager::generateIntegrationGrids(const WFN &wave, const cell &unit_cel
 	vec chi_matrix;
 	if (total_atoms > 1 && (config_.partition_type == PartitionType::TFVC || config_.debug || config_.all_charges))
 		chi_matrix = make_chi(wave, 40, true, config_.debug, density_);
+	//The Becke and TFVC weights are read by those partitions, by RI (partitionWeightIndex's default) and by the
+	//every-scheme output; Hirshfeld integrates with WEIGHT * single / combined alone. There the CPU skips the pair loop:
+	//get_grid with one centre fills the coordinates and puts the plain atom weight in both columns, which nothing reads.
+	//The device keeps computing them, cheap there, and sucrose_SF_gpu_grid's note is the evidence it ran
+	const bool becke = config_.partition_type != PartitionType::Hirshfeld || config_.debug || config_.all_charges;
+	const int weight_centers = becke ? total_atoms : 1;
 	int first = 0;
 #ifdef NOSPHERA2_USE_GPU
 	//The whole molecule in one launch, in chunks of a few million points so the flat
@@ -673,7 +679,7 @@ void GridManager::generateIntegrationGrids(const WFN &wave, const cell &unit_cel
 	//first grid still to do
 	for (int i = first; i < num_atoms_with_grids; i++) {
 		prototype_grids_[proto_of[i]].get_grid(
-			total_atoms,
+			weight_centers,
 			atom_of[i],
 			x_coords.data(),
 			y_coords.data(),
@@ -1202,6 +1208,12 @@ void GridManager::calculateSphericalDensities(
 	// Point outer, atoms inner in index order: each sum gets the same additions in the same order as with
 	// the atoms outer, so the densities are bit-identical, from one parallel region instead of one per atom
 	// and grid (2025 for 45 atoms). The per-grid worksharing keeps all threads busy for a few atoms too.
+	// Past the last table radius the spline gives 0 and adding 0 changes no sum, so a pair whose squared
+	// distance is clearly beyond it skips hypot (three divisions and a root in libstdc++) and the spline.
+	// The 1e-12 margin is far above the few ulps between the plain squared sum and hypot on any library
+	vec reach2(radial_distances_.size());
+	for (size_t t = 0; t < reach2.size(); t++)
+		reach2[t] = radial_distances_[t].back() * radial_distances_[t].back() * (1.0 + 1e-12);
 	const int ngrids = static_cast<int>(grid->size());
 #pragma omp parallel
 	for (int g = 0; g < ngrids; g++) {
@@ -1217,11 +1229,14 @@ void GridManager::calculateSphericalDensities(
 				const int type_idx = atom_type[atom_idx];
 				if (type_idx == -1)
 					continue;
+				const double dx = gx[p] - atom_pos[atom_idx][0], dy = gy[p] - atom_pos[atom_idx][1], dz = gz[p] - atom_pos[atom_idx][2];
+				if (dx * dx + dy * dy + dz * dz > reach2[type_idx])
+					continue;
 				const double density = cubic_spline_interpolate_spherical_density(
 					radial_density_[type_idx],
 					radial_distances_[type_idx],
 					radial_second_deriv_[type_idx],
-					array_length(d3{ gx[p], gy[p], gz[p] }, atom_pos[atom_idx]),
+					std::hypot(dx, dy, dz),
 					lincr_,
 					start_dist_);
 
