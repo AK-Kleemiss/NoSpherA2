@@ -171,24 +171,30 @@ void Thakkar::calc_orbs(
 void Thakkar::calc_orbs_deriv(int& nr_ex, int& nr_coef, const double& dist, const int& offset, const int* n_vector,
 	const int lower_m, const int upper_m, double* Orb, double* dOrb, double* ddOrb) const
 {
-	for (int ex = 0; ex < n_vector[atomic_number - 1]; ex++) {
+	for (int ex = 0; ex < n_vector[atomic_number - 1]; ex++, nr_ex++) {
+		const double zz = z[nr_ex], exponent = -zz * dist;
+		if (exponent <= -46.5) {
+			for (int m = lower_m; m < upper_m; m++)
+				nr_coef += occ[offset + m] != 0;
+			continue;
+		}
+		//r^(n-1) exp(-z r): the powers r^(n-1), r^(n-2), r^(n-3), each 0 where its exponent is negative; one exp and one
+		//set of powers per exponent, shared by every occupied orbital of the shell
+		const int nn = n[nr_ex];
+		const double ez = exp(exponent);
+		const double p1 = nn >= 2 ? fast_int_pow(dist, nn - 1) : 1.0;
+		const double p2 = nn >= 3 ? fast_int_pow(dist, nn - 2) : (nn == 2 ? 1.0 : 0.0);
+		const double p3 = nn >= 4 ? fast_int_pow(dist, nn - 3) : (nn == 3 ? 1.0 : 0.0);
+		const double q1 = (nn - 1) * p2 - zz * p1;
+		const double q2 = (nn - 1) * (nn - 2) * p3 - 2 * zz * (nn - 1) * p2 + zz * zz * p1;
 		for (int m = lower_m; m < upper_m; m++) {
 			if (occ[offset + m] == 0) continue;
-			const double zz = z[nr_ex], exponent = -zz * dist;
-			if (exponent > -46.5) {
-				//r^(n-1) exp(-z r): the powers r^(n-1), r^(n-2), r^(n-3), each 0 where its exponent is negative
-				const int nn = n[nr_ex];
-				const double e = c[nr_coef] * exp(exponent);
-				const double p1 = nn >= 2 ? fast_int_pow(dist, nn - 1) : 1.0;
-				const double p2 = nn >= 3 ? fast_int_pow(dist, nn - 2) : (nn == 2 ? 1.0 : 0.0);
-				const double p3 = nn >= 4 ? fast_int_pow(dist, nn - 3) : (nn == 3 ? 1.0 : 0.0);
-				Orb[m] += e * p1;
-				dOrb[m] += e * ((nn - 1) * p2 - zz * p1);
-				ddOrb[m] += e * ((nn - 1) * (nn - 2) * p3 - 2 * zz * (nn - 1) * p2 + zz * zz * p1);
-			}
+			const double e = c[nr_coef] * ez;
+			Orb[m] += e * p1;
+			dOrb[m] += e * q1;
+			ddOrb[m] += e * q2;
 			nr_coef++;
 		}
-		nr_ex++;
 	}
 }
 
