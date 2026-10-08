@@ -2585,8 +2585,12 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 						for (int p = 0; p < points[g]; p++) {
 							__sincos(angles[p], &sines[p], &cosines[p]);
 						}
-#elif defined(NSA2_OPENBLAS)
+#elif defined(NSA2_OPENBLAS) && (defined(__aarch64__) || defined(_M_ARM64))
 						sincos_shared_n(np_g, angles, sines, cosines);
+#elif defined(NSA2_OPENBLAS) //32-bit Android: no NEON doubles
+						for (int p = 0; p < np_g; p++) {
+							sincos_shared(angles[p], &sines[p], &cosines[p]);
+						}
 #else
 						vdSinCos(np_g, angles, sines, cosines);
 #endif
