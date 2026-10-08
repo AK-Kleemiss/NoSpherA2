@@ -1853,6 +1853,15 @@ static inline sf_v sf_fma(const sf_v c, const sf_v a, const sf_v b) { return _mm
 static inline sf_v sf_fms(const sf_v c, const sf_v a, const sf_v b) { return _mm256_sub_pd(c, _mm256_mul_pd(a, b)); }
 #endif
 static inline double sf_hsum(const sf_v a) { alignas(32) double l[4]; _mm256_store_pd(l, a); return ((l[0] + l[1]) + l[2]) + l[3]; }
+static inline sf_v sf_sub(const sf_v a, const sf_v b) { return _mm256_sub_pd(a, b); }
+static inline sf_v sf_and(const sf_v a, const sf_v b) { return _mm256_and_pd(a, b); }
+static inline sf_v sf_andnot(const sf_v a, const sf_v b) { return _mm256_andnot_pd(a, b); }
+static inline sf_v sf_or(const sf_v a, const sf_v b) { return _mm256_or_pd(a, b); }
+static inline sf_v sf_xor(const sf_v a, const sf_v b) { return _mm256_xor_pd(a, b); }
+static inline bool sf_small(const sf_v a) { return _mm256_movemask_pd(_mm256_cmp_pd(_mm256_andnot_pd(_mm256_set1_pd(-0.0), a), _mm256_set1_pd(1e5), _CMP_LT_OQ)) == 15; }
+static inline __m128i sf_round_i(const sf_v a) { return _mm256_cvtpd_epi32(a); }
+static inline sf_v sf_from_i(const __m128i q) { return _mm256_cvtepi32_pd(q); }
+static inline sf_v sf_wide(const __m128i m) { return _mm256_castsi256_pd(_mm256_insertf128_si256(_mm256_castsi128_si256(_mm_unpacklo_epi32(m, m)), _mm_unpackhi_epi32(m, m), 1)); }
 #elif defined(__SSE2__) || defined(_M_X64)
 #include <emmintrin.h>
 using sf_v = __m128d;
@@ -1865,6 +1874,15 @@ static inline sf_v sf_mul(const sf_v a, const sf_v b) { return _mm_mul_pd(a, b);
 static inline sf_v sf_fma(const sf_v c, const sf_v a, const sf_v b) { return _mm_add_pd(c, _mm_mul_pd(a, b)); }
 static inline sf_v sf_fms(const sf_v c, const sf_v a, const sf_v b) { return _mm_sub_pd(c, _mm_mul_pd(a, b)); }
 static inline double sf_hsum(const sf_v a) { alignas(16) double l[2]; _mm_store_pd(l, a); return l[0] + l[1]; }
+static inline sf_v sf_sub(const sf_v a, const sf_v b) { return _mm_sub_pd(a, b); }
+static inline sf_v sf_and(const sf_v a, const sf_v b) { return _mm_and_pd(a, b); }
+static inline sf_v sf_andnot(const sf_v a, const sf_v b) { return _mm_andnot_pd(a, b); }
+static inline sf_v sf_or(const sf_v a, const sf_v b) { return _mm_or_pd(a, b); }
+static inline sf_v sf_xor(const sf_v a, const sf_v b) { return _mm_xor_pd(a, b); }
+static inline bool sf_small(const sf_v a) { return _mm_movemask_pd(_mm_cmplt_pd(_mm_andnot_pd(_mm_set1_pd(-0.0), a), _mm_set1_pd(1e5))) == 3; }
+static inline __m128i sf_round_i(const sf_v a) { return _mm_cvtpd_epi32(a); }
+static inline sf_v sf_from_i(const __m128i q) { return _mm_cvtepi32_pd(q); }
+static inline sf_v sf_wide(const __m128i m) { return _mm_castsi128_pd(_mm_unpacklo_epi32(m, m)); }
 #else
 using sf_v = double;
 constexpr int SF_W = 1;
@@ -1877,31 +1895,55 @@ static inline sf_v sf_fma(const sf_v c, const sf_v a, const sf_v b) { return c +
 static inline sf_v sf_fms(const sf_v c, const sf_v a, const sf_v b) { return c - a * b; }
 static inline double sf_hsum(const sf_v a) { return a; }
 #endif
-//n sines and cosines: the shared-reduction NEON kernels on ARM64, one SVML call for both on MSVC AVX, else the libm pair
+#if !(defined(__aarch64__) || defined(_M_ARM64)) && (defined(__AVX__) || defined(__SSE2__) || defined(_M_X64))
+//sincos_shared (convenience.h) on the SF_W x86 lanes: the same reduction and kernels, the quadrant from cvtpd_epi32
+//(round to nearest, as nearbyint) as int32 masks widened to the 64-bit lanes. |x| < 1e5 only, sf_sincos_n tests it.
+static inline void sf_sincos_v(const sf_v x, sf_v* s, sf_v* c)
+{
+	const __m128i qi = sf_round_i(sf_mul(x, sf_set(0.63661977236758134308)));
+	const sf_v q = sf_from_i(qi);
+	const sf_v r = sf_fms(sf_fms(sf_fms(x, q, sf_set(1.57079632673412561417e+00)), q, sf_set(6.07710050630396597660e-11)),
+		q, sf_set(2.02226624871116645580e-21));
+	const sf_v z = sf_mul(r, r);
+	sf_v ps = sf_fma(sf_set(-2.50507602534068634195e-08), z, sf_set(1.58969099521155010221e-10));
+	ps = sf_fma(sf_set(2.75573137070700676789e-06), z, ps);
+	ps = sf_fma(sf_set(-1.98412698298579493134e-04), z, ps);
+	ps = sf_fma(sf_set(8.33333333332248946124e-03), z, ps);
+	ps = sf_fma(sf_set(-1.66666666666666324348e-01), z, ps);
+	const sf_v sr = sf_fma(r, sf_mul(r, z), ps);
+	sf_v pc = sf_fma(sf_set(2.08757232129817482790e-09), z, sf_set(-1.13596475577881948265e-11));
+	pc = sf_fma(sf_set(-2.75573143513906633035e-07), z, pc);
+	pc = sf_fma(sf_set(2.48015872894767294178e-05), z, pc);
+	pc = sf_fma(sf_set(-1.38888888888741095749e-03), z, pc);
+	pc = sf_fma(sf_set(4.16666666666666019037e-02), z, pc);
+	const sf_v hz = sf_mul(sf_set(0.5), z), w = sf_sub(sf_set(1.0), hz);
+	const sf_v cr = sf_add(w, sf_fma(sf_sub(sf_sub(sf_set(1.0), w), hz), sf_mul(z, z), pc));
+	//quadrant q & 3: odd swaps sin and cos, q & 2 negates sin, (q + 1) & 2 negates cos
+	const __m128i one = _mm_set1_epi32(1);
+	const sf_v odd = sf_wide(_mm_cmpeq_epi32(_mm_and_si128(qi, one), one)), sign = sf_set(-0.0);
+	const sf_v sgn_s = sf_and(sf_wide(_mm_slli_epi32(qi, 30)), sign);
+	const sf_v sgn_c = sf_and(sf_wide(_mm_slli_epi32(_mm_add_epi32(qi, one), 30)), sign);
+	*s = sf_xor(sf_or(sf_and(odd, cr), sf_andnot(odd, sr)), sgn_s);
+	*c = sf_xor(sf_or(sf_and(odd, sr), sf_andnot(odd, cr)), sgn_c);
+}
+#endif
+//n sines and cosines from one shared reduction: the NEON kernels on ARM64, sf_sincos_v on x86, else sincos_shared
+//lane by lane (half the time of glibc's sincos)
 static inline void sf_sincos_n(const int n, const double* x, double* s, double* c)
 {
 #if defined(__aarch64__) || defined(_M_ARM64)
 	sincos_shared_n(n, x, s, c);
 #else
 	int p = 0;
-#if defined(_MSC_VER) && defined(__AVX__)
-	for (; p + 3 < n; p += 4)
+#if defined(__AVX__) || defined(__SSE2__) || defined(_M_X64)
+	for (; p + SF_W <= n; p += SF_W)
 	{
-		__m256d cv;
-		_mm256_storeu_pd(s + p, _mm256_sincos_pd(&cv, _mm256_loadu_pd(x + p)));
-		_mm256_storeu_pd(c + p, cv);
+		const sf_v v = sf_ld(x + p);
+		if (sf_small(v)) { sf_v sv, cv; sf_sincos_v(v, &sv, &cv); sf_st(s + p, sv); sf_st(c + p, cv); }
+		else for (int e = p; e < p + SF_W; e++) sincos_shared(x[e], s + e, c + e);
 	}
 #endif
-	for (; p < n; p++)
-	{
-#if (defined(__GNUC__) || defined(__clang__)) && !defined(__APPLE__)
-		sincos(x[p], s + p, c + p);
-#elif defined(__APPLE__)
-		__sincos(x[p], s + p, c + p);
-#else
-		s[p] = sin(x[p]); c[p] = cos(x[p]);
-#endif
-	}
+	for (; p < n; p++) sincos_shared(x[p], s + p, c + p);
 #endif
 }
 //M consecutive recurrence steps of calc_SF in one pass over a tile: Q stays in registers between steps, so the A72's

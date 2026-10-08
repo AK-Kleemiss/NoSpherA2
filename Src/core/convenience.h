@@ -194,9 +194,9 @@ inline double fast_exp_neg(double x) {
 	return x;
 }
 
-// sin and cos from one shared argument reduction, for MSVC ARM64: no SVML there, and the CRT reduces
-// twice. Not for x64, where /fp:fast already fuses sin+cos into SVML calls that beat this. Cody-Waite reduction by pi/2 and the FreeBSD k_sin/k_cos kernels: <= 2.2e-16
-// absolute error for |x| < 1e5; larger or non-finite x goes to the CRT.
+// sin and cos from one shared argument reduction, where the CRT reduces twice. Cody-Waite reduction by pi/2 and the
+// FreeBSD k_sin/k_cos kernels: <= 2.2e-16 absolute error for |x| < 1e5; larger or non-finite x goes to the CRT (which
+// MSVC /fp:fast swaps for a scalar sin good to ~4e-8 at |x| ~ 1e8). calc_SF runs the same kernels on vector lanes.
 inline void sincos_shared(const double x, double* s, double* c) {
 	if (!(std::abs(x) < 1e5)) { *s = std::sin(x); *c = std::cos(x); return; }
 	const double q = std::nearbyint(x * 0.63661977236758134308);
