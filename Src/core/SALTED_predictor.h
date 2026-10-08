@@ -75,6 +75,10 @@ private:
 	std::unordered_map<std::string, size_t> weight_offset{};
 	// A VERSION 4 file (PROJW) stores the projectors with the weights already folded in
 	bool projector_folded = false;
+	// VERSION 5, zeta = 1: ENVW holds VW^T F, the projector is in it (fold_salted_file)
+	bool env_folded = false;
+	// VERSION 5, zeta != 1: the (species, l) keys GENV holds G for, in place of features and projector
+	std::unordered_map<std::string, SALTED_BINARY_FILE::block_ref> g_index{};
 	// Held open for the whole prediction, indexed by (species, lambda)
 	std::unique_ptr<SALTED_BINARY_FILE> model_file{};
 	std::unordered_map<std::string, SALTED_BINARY_FILE::block_ref> feat_index{};
@@ -99,6 +103,7 @@ private:
 	vec predict();
 };
 
-// Writes the model `in` to `out` as VERSION 4: PROJW, each projector times its weights, replaces PROJ
+// Writes the model `in` to `out` as VERSION 5: weights and features folded into ENVW (zeta = 1) or
+// GENV + FEATL + PROJW (zeta != 1), which replace FEATS, PROJ and WEIGH
 void fold_salted_file(const std::filesystem::path& in, const std::filesystem::path& out);
 

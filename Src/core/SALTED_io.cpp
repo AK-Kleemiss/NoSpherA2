@@ -648,44 +648,57 @@ std::vector<dMatrix2> SALTED_BINARY_FILE::load_blocks(const std::vector<block_re
 	return out;
 }
 
-// The header is patched in place, so its padding and the table of contents order survive; a block
-// is found by its offset, which is what the table records, and runs up to the next one.
-void SALTED_BINARY_FILE::write_with_block_replaced(const std::filesystem::path& out, const int32_t version_out,
-	const std::string& key, const std::string& new_key, const std::string& block) {
-	const auto it = table_of_contents.find(key);
-	err_checkf(it != table_of_contents.end(), "No " + key + " block in " + filepath.string(), std::cout);
-	err_checkf(new_key.size() <= 5 && !has_block(new_key), "Cannot name the new block " + new_key, std::cout);
+// Every block but `drop` is copied byte for byte in file order, a block running from its table offset up
+// to the next one, then `add` (name, bytes from the datatype word on) is appended. What lies between the
+// table and the first block (the shipped model pads it) is kept; renaming a block is dropping and adding it
+void SALTED_BINARY_FILE::write_with_blocks(const std::filesystem::path& out, const int32_t version_out,
+	const std::set<std::string>& drop, const std::vector<std::pair<std::string, std::string>>& add) {
+	for (const std::string& key : drop)
+		err_checkf(has_block(key), "No " + key + " block in " + filepath.string(), std::cout);
+	for (const auto& [key, block] : add)
+		err_checkf(key.size() <= 5 && (drop.count(key) || !has_block(key)), "Cannot name the new block " + key, std::cout);
 	file.clear();
 	file.seekg(0, std::ios::end);
 	const std::streamoff size = file.tellg();
-	const std::streamoff start = static_cast<std::streamoff>(it->second);
-	std::streamoff end = size;
-	for (const auto& entry : table_of_contents)
-		if (static_cast<std::streamoff>(entry.second) > start) end = std::min(end, static_cast<std::streamoff>(entry.second));
-	const std::streamoff shift = static_cast<std::streamoff>(block.size()) - (end - start);
-
 	std::string head(static_cast<size_t>(header_end), '\0');
 	file.seekg(0, std::ios::beg);
 	read_exact_bytes(file, head.data(), header_end, "header");
-	std::memcpy(head.data() + HEADER_SIZE, &version_out, sizeof(int32_t));
+
+	std::set<std::streamoff> starts{ size }, dropped;
+	for (const auto& entry : table_of_contents) starts.insert(static_cast<std::streamoff>(entry.second));
+	for (const std::string& key : drop) dropped.insert(static_cast<std::streamoff>(table_of_contents.at(key)));
+	const std::streamoff first = *starts.begin();
+	err_checkf(first >= header_end, "A block of " + filepath.string() + " starts inside its header", std::cout);
+	// Kept entries with their raw 5-byte names, so the padding stays as it was
+	std::vector<std::pair<std::string, std::streamoff>> kept;
 	for (int i = 0; i < numBlocks; i++) {
-		char* entry = head.data() + HEADER_SIZE + 2 * sizeof(int32_t) + 9 * i;   // 5-byte name, int32 offset
+		const char* entry = head.data() + HEADER_SIZE + 2 * sizeof(int32_t) + 9 * i;   // 5-byte name, int32 offset
 		int32_t off;
 		std::memcpy(&off, entry + 5, sizeof(int32_t));
-		if (off == start) {
-			std::memset(entry, 0, 5);
-			std::memcpy(entry, new_key.data(), new_key.size());
-		}
-		else if (off > start) {
-			err_checkf(off + shift <= INT32_MAX, "The new SALTED file outgrows its 32-bit offsets", std::cout);
-			off = static_cast<int32_t>(off + shift);
-			std::memcpy(entry + 5, &off, sizeof(int32_t));
-		}
+		if (!dropped.count(off)) kept.emplace_back(std::string(entry, 5), off);
 	}
+	std::sort(kept.begin(), kept.end(), [](const auto& a, const auto& b) { return a.second < b.second; });
+	auto next = [&starts](const std::streamoff s) { return *starts.upper_bound(s); };
+
+	std::string table = head.substr(0, HEADER_SIZE);
+	auto put = [&table](const int32_t v) { table.append(reinterpret_cast<const char*>(&v), sizeof(v)); };
+	put(version_out);
+	put(static_cast<int32_t>(kept.size() + add.size()));
+	std::streamoff pos = static_cast<std::streamoff>(HEADER_SIZE + 2 * sizeof(int32_t) + 9 * (kept.size() + add.size()))
+		+ (first - header_end);
+	auto entry = [&](std::string name, const std::streamoff length) {
+		err_checkf(pos <= INT32_MAX, "The new SALTED file outgrows its 32-bit offsets", std::cout);
+		name.resize(5, '\0');
+		table += name;
+		put(static_cast<int32_t>(pos));
+		pos += length;
+	};
+	for (const auto& [name, start] : kept) entry(name, next(start) - start);
+	for (const auto& [name, block] : add) entry(name, static_cast<std::streamoff>(block.size()));
 
 	std::ofstream o(out, std::ios::binary);
 	err_checkf(o.good(), "Cannot write " + out.string(), std::cout);
-	o.write(head.data(), head.size());
+	o.write(table.data(), table.size());
 	std::vector<char> buf(1 << 22);
 	auto copy = [&](std::streamoff from, const std::streamoff to) {
 		file.seekg(from, std::ios::beg);
@@ -695,9 +708,9 @@ void SALTED_BINARY_FILE::write_with_block_replaced(const std::filesystem::path& 
 			o.write(buf.data(), n);
 		}
 	};
-	copy(header_end, start);
-	o.write(block.data(), static_cast<std::streamsize>(block.size()));
-	copy(end, size);
+	copy(header_end, first);
+	for (const auto& [name, start] : kept) copy(start, next(start));
+	for (const auto& [name, block] : add) o.write(block.data(), static_cast<std::streamsize>(block.size()));
 	err_checkf(o.good(), "Error writing " + out.string(), std::cout);
 }
 
