@@ -528,6 +528,42 @@ const double WFN::compute_dens_cartesian(
 }
 
 #if defined(__aarch64__) || defined(_M_ARM64)
+namespace
+{
+	//R consecutive union rows c[r], weights w[r][b], into phi[b * nmo + mo] of eight points over the occupied runs. Each
+	//(point, MO) still adds the rows in union order, one fma each, so only the phi loads and stores are shared by R FMAs
+	template <int R>
+	void batch_rows(const double* const* c, const double (*w)[8], const ivec& runs, const int nmo, double* phi)
+	{
+		float64x2_t wv[R][4];
+		for (int r = 0; r < R; r++)
+			for (int k = 0; k < 4; k++) wv[r][k] = vld1q_f64(w[r] + 2 * k);
+		for (size_t q = 0; q < runs.size(); q += 2) {
+			int mo = runs[q];
+			for (; mo + 2 <= runs[q + 1]; mo += 2) {
+				float64x2_t cv[R];
+				for (int r = 0; r < R; r++) cv[r] = vld1q_f64(c[r] + mo);
+				for (int k = 0; k < 4; k++) {
+					double* p0 = phi + (size_t)(2 * k) * nmo + mo;
+					double* p1 = p0 + nmo;
+					float64x2_t a0 = vld1q_f64(p0), a1 = vld1q_f64(p1);
+					for (int r = 0; r < R; r++) {
+						a0 = vfmaq_laneq_f64(a0, cv[r], wv[r][k], 0);
+						a1 = vfmaq_laneq_f64(a1, cv[r], wv[r][k], 1);
+					}
+					vst1q_f64(p0, a0);
+					vst1q_f64(p1, a1);
+				}
+			}
+			if (mo < runs[q + 1])
+				for (int b = 0; b < 8; b++) {
+					double& p = phi[(size_t)b * nmo + mo];
+					for (int r = 0; r < R; r++) p = std::fma(w[r][b], c[r][mo], p);
+				}
+		}
+	}
+}
+
 //ARM: to_mo reads one coefficient row per touched function and point, which a Cortex-A72 fetches from L2 or memory at
 //2-5 ns per FMA. Eight neighbouring points share the rows: the union of their functions is walked once and each row
 //feeds all eight. A point that did not touch a function adds fma(0, c, phi) = phi, so every point keeps its own sum
@@ -535,6 +571,8 @@ const double WFN::compute_dens_cartesian(
 //numbered by first primitive, so they usually do); a group where one did not, and a last partial group, multiply per
 //point. Microbench on the A72: 1.5x at 300 functions x 91 MOs, 3.6x at 600 x 200. x64 measured no gain, its L2 holds
 //the rows.
+//Four union rows per sweep (batch_rows<4>) load and store each phi pair once per four FMAs instead of once per FMA:
+//1.25-1.52x more on the A72, WFN on sucrose 1.58 -> 1.05 s.
 //The groups are neighbours in space, not in index: an atom grid comes shell by shell in Lebedev order, whose
 //consecutive points lie all over the sphere, so the union of eight points' functions, and the zero FMAs with it,
 //grew far past each point's own list. Morton order over the points' bounding box, as XCW orders its atom grids.
@@ -610,29 +648,20 @@ void WFN::compute_dens_batch(const int n, const double* x, const double* y, cons
 				for (const int a : ao[b].touched) mark[a] = 1;
 			for (int a = 0; a < nao; a++)
 				if (mark[a]) { mark[a] = 0; uni.push_back(a); }
-			for (const int a : uni) {
-				const double* c = coef + (size_t)a * nmo;
-				double w[B];
-				float64x2_t wv[B];
-				for (int b = 0; b < B; b++) {
-					w[b] = ao[b].hit[a] ? ao[b].v[a] : 0.0;
-					wv[b] = vdupq_n_f64(w[b]);
+			constexpr int R = 4;
+			const double* c[R];
+			double w[R][B];
+			const int nu = (int)uni.size();
+			for (int i = 0; i < nu; i += R) {
+				const int nr = std::min(R, nu - i);
+				for (int r = 0; r < nr; r++) {
+					const int a = uni[i + r];
+					c[r] = coef + (size_t)a * nmo;
+					for (int b = 0; b < B; b++) w[r][b] = ao[b].hit[a] ? ao[b].v[a] : 0.0;
 				}
-				for (size_t r = 0; r < runs.size(); r += 2) {
-					int mo = runs[r];
-					for (; mo + 2 <= runs[r + 1]; mo += 2) {
-						const float64x2_t cv = vld1q_f64(c + mo);
-						for (int b = 0; b < B; b++) {
-							double* p = phi.data() + (size_t)b * nmo + mo;
-							vst1q_f64(p, vfmaq_f64(vld1q_f64(p), wv[b], cv));
-						}
-					}
-					if (mo < runs[r + 1])
-						for (int b = 0; b < B; b++) {
-							double& p = phi[(size_t)b * nmo + mo];
-							p = std::fma(w[b], c[mo], p);
-						}
-				}
+				if (nr == R) batch_rows<R>(c, w, runs, nmo, phi.data());
+				else
+					for (int r = 0; r < nr; r++) batch_rows<1>(c + r, w + r, runs, nmo, phi.data());
 			}
 			for (int b = 0; b < B; b++)
 				for (const int a : ao[b].touched) ao[b].hit[a] = 0;
