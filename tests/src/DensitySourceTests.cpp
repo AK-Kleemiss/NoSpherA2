@@ -144,6 +144,12 @@ TEST(DensitySourceTests, WfnMatchesItsOrbitalFunctions)
 	const WFN w = make_wfn();
 	EXPECT_DOUBLE_EQ(calculate_density(w, probe), w.compute_dens(probe));
 	check_source(w, "WFN");
+	//17 points: two full groups of the ARM batch (WFN::compute_dens_batch) and a partial one, each bit-identical to the point
+	const int n = 17;
+	double x[n], y[n], z[n], rho_n[n];
+	for (int p = 0; p < n; p++) x[p] = 0.1 * p - 0.8, y[p] = 0.05 * p, z[p] = 0.3 - 0.04 * p;
+	calculate_density(w, n, x, y, z, rho_n);
+	for (int p = 0; p < n; p++) EXPECT_EQ(rho_n[p], w.compute_dens(d3{ x[p], y[p], z[p] })) << "p " << p;
 	EXPECT_NEAR(calculate_laplacian(w, probe), w.computeLap(probe), 1e-12);
 	EXPECT_DOUBLE_EQ(calculate_eli(w, probe), w.computeELI(probe));
 	//the old computeValues normGrad is the reduced density gradient
