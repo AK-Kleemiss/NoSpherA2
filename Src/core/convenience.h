@@ -293,6 +293,11 @@ inline void sincos_shared_n(const int n, const double* x, double* s, double* c) 
 	}
 	if (p < n) sincos_shared(x[p], s + p, c + p);
 }
+#else
+// No NEON double lanes (armv7, or an OpenBLAS build off ARM64, which XCW's sincos needs): angle by angle
+inline void sincos_shared_n(const int n, const double* x, double* s, double* c) {
+	for (int p = 0; p < n; p++) sincos_shared(x[p], s + p, c + p);
+}
 #endif
 
 namespace sha
