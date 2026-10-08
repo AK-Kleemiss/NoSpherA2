@@ -626,6 +626,7 @@ dMatrix2 SALTED_BINARY_FILE::load_block(const block_ref& ref) {
 	return out;
 }
 
+#ifndef __ANDROID__
 // A new dMatrix2 is zero-filled (std::vector value-initialises it, faulting in every page)
 // before read_at overwrites it, and the disk idles meanwhile. Filling block i+1 while a helper
 // reads block i hides that; one read in flight keeps the access sequential.
@@ -647,6 +648,70 @@ std::vector<dMatrix2> SALTED_BINARY_FILE::load_blocks(const std::vector<block_re
 		if (!raw[i].get()) out[i] = load_block(refs[i]);   // the stream fallback
 	return out;
 }
+#else
+#include <atomic>
+#include <thread>
+// Android: the model usually sits on a microSD card behind sdcardfs. Cold on the SM-T585 one
+// sequential stream gets ~68 MB/s; four readers with their own fd (so their own readahead
+// window) taking 4 MB pieces straight across block boundaries get ~76 MB/s. The fill still
+// runs ahead on this thread, ~10x faster than the card, so the readers rarely wait for it.
+// Sucrose, combo_v6 from the card, cold, -cpus 4: model wait 6.18-6.44 -> 5.35-5.43 s, same tscb.
+std::vector<dMatrix2> SALTED_BINARY_FILE::load_blocks(const std::vector<block_ref>& refs) {
+	using ext_t = typename dMatrix2::extents_type;
+	constexpr std::size_t piece = 4u << 20;
+	struct span { std::size_t block, from, bytes; };
+	std::vector<span> spans;
+	for (std::size_t i = 0; i < refs.size(); i++)
+		for (std::size_t n = refs[i].rows * refs[i].cols * sizeof(double), from = 0; from < n; from += piece)
+			spans.push_back({ i, from, std::min(piece, n - from) });
+	std::vector<dMatrix2> out(refs.size());
+	std::vector<std::atomic<bool>> failed(refs.size());
+	std::atomic<std::size_t> filled{ 0 }, next{ 0 };   // filled > refs.size(): the fill threw, stop
+	auto reader = [&] {
+		const int fd = ::open(filepath.string().c_str(), O_RDONLY);
+		for (std::size_t s; (s = next++) < spans.size();)
+		{
+			const span& p = spans[s];
+			for (std::size_t f; (f = filled.load(std::memory_order_acquire)) <= p.block;) filled.wait(f);
+			if (filled.load() > refs.size()) break;
+			char* dst = reinterpret_cast<char*>(out[p.block].data()) + p.from;
+			std::size_t done = 0;
+			while (fd >= 0 && done < p.bytes)
+			{
+				const ssize_t got = ::pread(fd, dst + done, p.bytes - done,
+					static_cast<off_t>(refs[p.block].offset) + static_cast<off_t>(p.from + done));
+				if (got <= 0) break;
+				done += static_cast<std::size_t>(got);
+			}
+			if (done < p.bytes) failed[p.block] = true;
+		}
+		if (fd >= 0) ::close(fd);
+	};
+	std::vector<std::thread> pool;
+	try
+	{
+		for (int t = 0; t < 4; t++) pool.emplace_back(reader);
+		for (std::size_t i = 0; i < refs.size(); i++)
+		{
+			if (refs[i].rows != 0 && refs[i].cols != 0)
+				out[i] = dMatrix2(ext_t(refs[i].rows, refs[i].cols));
+			filled.store(i + 1, std::memory_order_release);
+			filled.notify_all();
+		}
+	}
+	catch (...)
+	{
+		filled.store(refs.size() + 1);
+		filled.notify_all();
+		for (auto& t : pool) t.join();
+		throw;
+	}
+	for (auto& t : pool) t.join();
+	for (std::size_t i = 0; i < refs.size(); i++)
+		if (failed[i]) out[i] = load_block(refs[i]);   // the stream fallback
+	return out;
+}
+#endif
 
 // The header is patched in place, so its padding and the table of contents order survive; a block
 // is found by its offset, which is what the table records, and runs up to the next one.
