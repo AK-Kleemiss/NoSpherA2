@@ -71,6 +71,10 @@ namespace
 			}
 		}
 	};
+#if defined(__aarch64__) || defined(_M_ARM64)
+	//Set by compute_dens_batch: compute_dens_cartesian sums the primitives into this scratch and returns before the MOs
+	thread_local ao_scratch<1>* batch_ao = nullptr;
+#endif
 }
 
 const double WFN::compute_dens(
@@ -194,7 +198,12 @@ const double WFN::compute_dens_cartesian(
 	if (exps.size() < group_exponent.size()) exps.resize(group_exponent.size());
 	exp_table([&d](const int c) { return d[c][3]; }, exps.data());
 	const int *group = prim_exp_group.data();
+#if defined(__aarch64__) || defined(_M_ARM64)
+	thread_local ao_scratch<1> ao_own;
+	ao_scratch<1> &ao = batch_ao ? *batch_ao : ao_own;
+#else
 	thread_local ao_scratch<1> ao;
+#endif
 	ao.begin(coef_ao_major.size() / nmo);
 
 	for (j = 0; j < nex; j++)
@@ -499,6 +508,9 @@ const double WFN::compute_dens_cartesian(
 
 		ao.add(prim_ao[j], prim_ao_scale[j], &ex);
 	}
+#if defined(__aarch64__) || defined(_M_ARM64)
+	if (batch_ao) return 0.0; //compute_dens_batch multiplies into the MOs itself
+#endif
 	ao.to_mo(coef_ao_major.data(), nmo, phi_data, [MOs_data](const int mo) { return MOs_data[mo].get_occ(); });
 
 	// use pointer arithmetic and minimize overhead
@@ -514,6 +526,126 @@ const double WFN::compute_dens_cartesian(
 
 	return Rho;
 }
+
+#if defined(__aarch64__) || defined(_M_ARM64)
+//ARM: to_mo reads one coefficient row per touched function and point, which a Cortex-A72 fetches from L2 or memory at
+//2-5 ns per FMA. Eight neighbouring points share the rows: the union of their functions is walked once and each row
+//feeds all eight. A point that did not touch a function adds fma(0, c, phi) = phi, so every point keeps its own sum
+//order and rho is bit-identical to compute_dens, provided each point's functions came in ascending order (they are
+//numbered by first primitive, so they usually do); a group where one did not, and a last partial group, multiply per
+//point. Microbench on the A72: 1.5x at 300 functions x 91 MOs, 3.6x at 600 x 200. x64 measured no gain, its L2 holds
+//the rows.
+//The groups are neighbours in space, not in index: an atom grid comes shell by shell in Lebedev order, whose
+//consecutive points lie all over the sphere, so the union of eight points' functions, and the zero FMAs with it,
+//grew far past each point's own list. Morton order over the points' bounding box, as XCW orders its atom grids.
+void WFN::compute_dens_batch(const int n, const double* x, const double* y, const double* z, double* rho) const
+{
+	constexpr int B = 8;
+	if (!get_coef_primitive_major()) {
+		std::fill(rho, rho + n, 0.0);
+		return;
+	}
+	const int nao = (int)(coef_ao_major.size() / nmo);
+	const double* coef = coef_ao_major.data();
+	const MO* MOs_data = MOs.data();
+	auto occ = [MOs_data](const int mo) { return MOs_data[mo].get_occ(); };
+	ivec runs; //[begin, end) of the occupied MOs, as ao_scratch::to_mo finds them
+	for (int mo = 0; mo < nmo; mo++)
+		if (occ(mo) != 0.0) {
+			if (runs.empty() || runs.back() != mo) { runs.push_back(mo); runs.push_back(mo + 1); }
+			else runs.back() = mo + 1;
+		}
+	std::vector<std::pair<uint64_t, int>> ord(n); //Morton key, point
+	{
+		double lo[3] = { 1e300, 1e300, 1e300 }, hi[3] = { -1e300, -1e300, -1e300 };
+		for (int p = 0; p < n; p++) {
+			const double v[3] = { x[p], y[p], z[p] };
+			for (int k = 0; k < 3; k++) lo[k] = std::min(lo[k], v[k]), hi[k] = std::max(hi[k], v[k]);
+		}
+		auto spread = [](uint64_t v) { //21 bits to every third bit
+			v &= 0x1fffff;
+			v = (v | v << 32) & 0x1f00000000ffffull;
+			v = (v | v << 16) & 0x1f0000ff0000ffull;
+			v = (v | v << 8) & 0x100f00f00f00f00full;
+			v = (v | v << 4) & 0x10c30c30c30c30c3ull;
+			return (v | v << 2) & 0x1249249249249249ull;
+		};
+		for (int p = 0; p < n; p++) {
+			const double v[3] = { x[p], y[p], z[p] };
+			uint64_t key = 0;
+			for (int k = 0; k < 3; k++) {
+				const double s = hi[k] - lo[k] > 1e-12 ? (v[k] - lo[k]) / (hi[k] - lo[k]) : 0.0;
+				key |= spread(static_cast<uint64_t>(std::clamp(s, 0.0, 1.0) * 2097151.0)) << k;
+			}
+			ord[p] = { key, p };
+		}
+		std::sort(ord.begin(), ord.end());
+	}
+	const int ng = (n + B - 1) / B;
+#pragma omp parallel for schedule(dynamic, 8)
+	for (int g = 0; g < ng; g++) {
+		thread_local ao_scratch<1> ao[B];
+		thread_local vec2 d;
+		thread_local vec phi, phi1;
+		thread_local std::vector<char> mark;
+		thread_local ivec uni;
+		if (d.size() < (size_t)ncen) d.resize(ncen, vec(16, 0.0));
+		if (mark.size() < (size_t)nao) mark.resize(nao, 0);
+		if (phi1.size() < (size_t)nmo) phi1.resize(nmo);
+		phi.assign((size_t)B * nmo, 0.0);
+		const int p0 = g * B, nb = std::min(B, n - p0);
+		bool ascending = nb == B;
+		for (int b = 0; b < nb; b++) {
+			const int p = ord[p0 + b].second;
+			batch_ao = &ao[b];
+			compute_dens_cartesian(d3{ x[p], y[p], z[p] }, d, phi1);
+			batch_ao = nullptr;
+			ascending = ascending && std::is_sorted(ao[b].touched.begin(), ao[b].touched.end());
+		}
+		if (!ascending)
+			for (int b = 0; b < nb; b++) ao[b].to_mo(coef, nmo, phi.data() + (size_t)b * nmo, occ);
+		else {
+			uni.clear();
+			for (int b = 0; b < B; b++)
+				for (const int a : ao[b].touched) mark[a] = 1;
+			for (int a = 0; a < nao; a++)
+				if (mark[a]) { mark[a] = 0; uni.push_back(a); }
+			for (const int a : uni) {
+				const double* c = coef + (size_t)a * nmo;
+				double w[B];
+				float64x2_t wv[B];
+				for (int b = 0; b < B; b++) {
+					w[b] = ao[b].hit[a] ? ao[b].v[a] : 0.0;
+					wv[b] = vdupq_n_f64(w[b]);
+				}
+				for (size_t r = 0; r < runs.size(); r += 2) {
+					int mo = runs[r];
+					for (; mo + 2 <= runs[r + 1]; mo += 2) {
+						const float64x2_t cv = vld1q_f64(c + mo);
+						for (int b = 0; b < B; b++) {
+							double* p = phi.data() + (size_t)b * nmo + mo;
+							vst1q_f64(p, vfmaq_f64(vld1q_f64(p), wv[b], cv));
+						}
+					}
+					if (mo < runs[r + 1])
+						for (int b = 0; b < B; b++) {
+							double& p = phi[(size_t)b * nmo + mo];
+							p = std::fma(w[b], c[mo], p);
+						}
+				}
+			}
+			for (int b = 0; b < B; b++)
+				for (const int a : ao[b].touched) ao[b].hit[a] = 0;
+		}
+		for (int b = 0; b < nb; b++) {
+			const double* pb = phi.data() + (size_t)b * nmo;
+			double Rho = 0.0;
+			for (int mo = 0; mo < nmo; mo++) Rho += MOs_data[mo].get_occ() * pb[mo] * pb[mo];
+			rho[ord[p0 + b].second] = Rho;
+		}
+	}
+}
+#endif
 
 const double WFN::eval_ao(
 	std::array<double, 4>& d,
