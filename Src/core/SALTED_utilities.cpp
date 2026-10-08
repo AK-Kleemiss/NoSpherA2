@@ -531,6 +531,25 @@ aux_density_table::aux_density_table(const std::vector<atom>& atoms)
 				pr_uniq.push_back(slot);
 			}
 			coefficients = Int_Params::normalize_gto(coefficients, exponents, l);
+			{
+				// |r^l R| <= N t^(l/2) exp(-a t), t = r^2, N = sum |n_p|, a the smallest exponent; its log h(t) falls beyond
+				// t = l / 2a, so bisect there for h = ln 5e-11, half the kernels' 1e-10 so rounding cannot make a skip differ
+				double N = 0.0, a_min = DBL_MAX;
+				for (int p = 0; p < sc[s]; ++p) N += std::abs(coefficients[p]), a_min = std::min(a_min, exponents[p]);
+				const double target = std::log(5E-11);
+				auto h = [&](const double t) { return std::log(N) + (l == 0 ? 0.0 : 0.5 * l * std::log(t)) - a_min * t; };
+				double lo = l / (2.0 * a_min), hi = std::max(2.0 * lo, 1.0);
+				if (h(lo) < target) hi = lo;
+				else {
+					while (h(hi) >= target) lo = hi, hi *= 2.0;
+					for (int it = 0; it < 100; it++) {
+						const double mid = 0.5 * (lo + hi);
+						if (mid <= lo || mid >= hi) break;
+						(h(mid) < target ? hi : lo) = mid;
+					}
+				}
+				sh_r2.push_back(hi);
+			}
 
 			pr_norm.insert(
 				pr_norm.end(),
@@ -567,22 +586,22 @@ aux_density_table::aux_density_table(const std::vector<atom>& atoms)
 
 double aux_density_table::operator()(const double x, const double y, const double z, const double* coefs) const
 {
-	return aux_density::at(x, y, z, n_at, cx.data(), cy.data(), cz.data(), r2_max.data(), sh_start.data(), sh_l.data(), pr_start.data(), coef_off.data(), pr_exp.data(), pr_norm.data(), coefs);
+	return aux_density::at(x, y, z, n_at, cx.data(), cy.data(), cz.data(), r2_max.data(), sh_start.data(), sh_l.data(), pr_start.data(), coef_off.data(), pr_exp.data(), pr_norm.data(), coefs, sh_r2.data());
 }
 
 double aux_density_table::operator()(const double x, const double y, const double z, const double* coefs, double& gx, double& gy, double& gz) const
 {
-	return aux_density::at_grad(x, y, z, n_at, cx.data(), cy.data(), cz.data(), r2_max.data(), sh_start.data(), sh_l.data(), pr_start.data(), coef_off.data(), pr_exp.data(), pr_norm.data(), coefs, gx, gy, gz);
+	return aux_density::at_grad(x, y, z, n_at, cx.data(), cy.data(), cz.data(), r2_max.data(), sh_start.data(), sh_l.data(), pr_start.data(), coef_off.data(), pr_exp.data(), pr_norm.data(), coefs, gx, gy, gz, sh_r2.data());
 }
 
 double aux_density_table::operator()(const double x, const double y, const double z, const double* coefs, double& gx, double& gy, double& gz, double& lap) const
 {
-	return aux_density::at_lap(x, y, z, n_at, cx.data(), cy.data(), cz.data(), r2_max.data(), sh_start.data(), sh_l.data(), pr_start.data(), coef_off.data(), pr_exp.data(), pr_norm.data(), coefs, gx, gy, gz, lap);
+	return aux_density::at_lap(x, y, z, n_at, cx.data(), cy.data(), cz.data(), r2_max.data(), sh_start.data(), sh_l.data(), pr_start.data(), coef_off.data(), pr_exp.data(), pr_norm.data(), coefs, gx, gy, gz, lap, sh_r2.data());
 }
 
 double aux_density_table::operator()(const double x, const double y, const double z, const double* coefs, double& gx, double& gy, double& gz, double* H) const
 {
-	return aux_density::at_hess(x, y, z, n_at, cx.data(), cy.data(), cz.data(), r2_max.data(), sh_start.data(), sh_l.data(), pr_start.data(), coef_off.data(), pr_exp.data(), pr_norm.data(), coefs, gx, gy, gz, H);
+	return aux_density::at_hess(x, y, z, n_at, cx.data(), cy.data(), cz.data(), r2_max.data(), sh_start.data(), sh_l.data(), pr_start.data(), coef_off.data(), pr_exp.data(), pr_norm.data(), coefs, gx, gy, gz, H, sh_r2.data());
 }
 
 static inline cdouble apply_i_to_l(

@@ -23,10 +23,11 @@ namespace aux_density
 	//diffuse primitive is below 1e-20 and their shell range; shells carry l, the primitive range
 	//and the offset of their 2l+1 coefficients; primitives the exponent and the normalised
 	//contraction coefficient. The 1e-10 radial cutoff is the one calc_aux_density always had.
+	//sh_r2 (optional, see aux_density_table::sh_r2) skips a shell before its exponentials where that cutoff is certain
 	AUX_HD inline double at(const double x, const double y, const double z, const int n_at,
 		const double* cx, const double* cy, const double* cz, const double* r2_max,
 		const int* sh_start, const int* sh_l, const int* pr_start, const int* coef_off,
-		const double* pr_exp, const double* pr_norm, const double* coefs)
+		const double* pr_exp, const double* pr_norm, const double* coefs, const double* sh_r2 = nullptr)
 	{
 		double dens = 0.0;
 		for (int a = 0; a < n_at; a++) {
@@ -34,6 +35,7 @@ namespace aux_density
 			if (r2 > r2_max[a]) continue;
 			const double r = sqrt(r2), ux = dx / r, uy = dy / r, uz = dz / r;
 			for (int s = sh_start[a]; s < sh_start[a + 1]; s++) {
+				if (sh_r2 && r2 > sh_r2[s]) continue;
 				double radial = 0.0, rl = 1.0;
 				for (int p = pr_start[s]; p < pr_start[s + 1]; p++) radial += exp(-pr_exp[p] * r2) * pr_norm[p];
 				for (int i = 0; i < sh_l[s]; i++) rl *= r;
@@ -52,7 +54,7 @@ namespace aux_density
 	AUX_HD inline double at_deriv(const double x, const double y, const double z, const int n_at,
 		const double* cx, const double* cy, const double* cz, const double* r2_max,
 		const int* sh_start, const int* sh_l, const int* pr_start, const int* coef_off,
-		const double* pr_exp, const double* pr_norm, const double* coefs, double& gx, double& gy, double& gz, double& lap)
+		const double* pr_exp, const double* pr_norm, const double* coefs, double& gx, double& gy, double& gz, double& lap, const double* sh_r2 = nullptr)
 	{
 		double dens = 0.0;
 		gx = gy = gz = lap = 0.0;
@@ -64,6 +66,7 @@ namespace aux_density
 			if (r2 < NUCLEUS_R2) dx = NUCLEUS_R, r2 = NUCLEUS_R2;
 			const double r = sqrt(r2), ux = dx / r, uy = dy / r, uz = dz / r;
 			for (int s = sh_start[a]; s < sh_start[a + 1]; s++) {
+				if (sh_r2 && r2 > sh_r2[s]) continue;
 				const int l = sh_l[s];
 				double radial = 0.0, dradial = 0.0, ddradial = 0.0, rl = 1.0;
 				for (int p = pr_start[s]; p < pr_start[s + 1]; p++) {
@@ -88,17 +91,17 @@ namespace aux_density
 	AUX_HD inline double at_grad(const double x, const double y, const double z, const int n_at,
 		const double* cx, const double* cy, const double* cz, const double* r2_max,
 		const int* sh_start, const int* sh_l, const int* pr_start, const int* coef_off,
-		const double* pr_exp, const double* pr_norm, const double* coefs, double& gx, double& gy, double& gz)
+		const double* pr_exp, const double* pr_norm, const double* coefs, double& gx, double& gy, double& gz, const double* sh_r2 = nullptr)
 	{
 		double lap;
-		return at_deriv<false>(x, y, z, n_at, cx, cy, cz, r2_max, sh_start, sh_l, pr_start, coef_off, pr_exp, pr_norm, coefs, gx, gy, gz, lap);
+		return at_deriv<false>(x, y, z, n_at, cx, cy, cz, r2_max, sh_start, sh_l, pr_start, coef_off, pr_exp, pr_norm, coefs, gx, gy, gz, lap, sh_r2);
 	}
 	AUX_HD inline double at_lap(const double x, const double y, const double z, const int n_at,
 		const double* cx, const double* cy, const double* cz, const double* r2_max,
 		const int* sh_start, const int* sh_l, const int* pr_start, const int* coef_off,
-		const double* pr_exp, const double* pr_norm, const double* coefs, double& gx, double& gy, double& gz, double& lap)
+		const double* pr_exp, const double* pr_norm, const double* coefs, double& gx, double& gy, double& gz, double& lap, const double* sh_r2 = nullptr)
 	{
-		return at_deriv<true>(x, y, z, n_at, cx, cy, cz, r2_max, sh_start, sh_l, pr_start, coef_off, pr_exp, pr_norm, coefs, gx, gy, gz, lap);
+		return at_deriv<true>(x, y, z, n_at, cx, cy, cz, r2_max, sh_start, sh_l, pr_start, coef_off, pr_exp, pr_norm, coefs, gx, gy, gz, lap, sh_r2);
 	}
 	//Value, gradient and the six upper-triangle second derivatives (xx xy xz yy yz zz), so the harmonic differentiates
 	//itself twice through u(d) = d / r
@@ -136,7 +139,7 @@ namespace aux_density
 	AUX_HD inline double at_hess(const double x, const double y, const double z, const int n_at,
 		const double* cx, const double* cy, const double* cz, const double* r2_max,
 		const int* sh_start, const int* sh_l, const int* pr_start, const int* coef_off,
-		const double* pr_exp, const double* pr_norm, const double* coefs, double& gx, double& gy, double& gz, double* H)
+		const double* pr_exp, const double* pr_norm, const double* coefs, double& gx, double& gy, double& gz, double* H, const double* sh_r2 = nullptr)
 	{
 		double dens = 0.0, grad[3] = { 0.0, 0.0, 0.0 };
 		for (int i = 0; i < 9; i++) H[i] = 0.0;
@@ -154,6 +157,7 @@ namespace aux_density
 						hu[i].h[n] = (3 * u[i] * u[j] * u[k] - (i == j ? u[k] : 0.0) - (i == k ? u[j] : 0.0) - (j == k ? u[i] : 0.0)) / r2;
 			}
 			for (int s = sh_start[a]; s < sh_start[a + 1]; s++) {
+				if (sh_r2 && r2 > sh_r2[s]) continue;
 				const int l = sh_l[s];
 				double R = 0.0, Ra = 0.0, Raa = 0.0, rl = 1.0;
 				for (int p = pr_start[s]; p < pr_start[s + 1]; p++) {
