@@ -650,6 +650,20 @@ if(APPLE)
         REQUIRED
     )
     find_package(OpenMP REQUIRED COMPONENTS CXX)
+elseif(NOSPHERA2_OPENBLAS AND LINUX AND NOT "$ENV{NOSPHERA2_ARMPL_DIR}$CACHE{NOSPHERA2_ARMPL_DIR}" STREQUAL "")
+    # Arm Performance Libraries in place of OpenBLAS: armpl_lp64_mp is the OpenMP build, so like
+    # MKL it runs serial inside a parallel region and on -cpus threads outside one
+    set(NOSPHERA2_ARMPL_DIR "$ENV{NOSPHERA2_ARMPL_DIR}" CACHE PATH "Arm Performance Libraries root, empty for OpenBLAS")
+    find_path(NOSPHERA2_ARMPL_INCLUDE_DIR NAMES cblas.h lapacke.h
+        PATHS "${NOSPHERA2_ARMPL_DIR}/include" NO_DEFAULT_PATH REQUIRED)
+    find_library(NOSPHERA2_ARMPL_LIB armpl_lp64_mp PATHS "${NOSPHERA2_ARMPL_DIR}/lib" NO_DEFAULT_PATH REQUIRED)
+    message(STATUS "BLAS/LAPACK: Arm Performance Libraries ${NOSPHERA2_ARMPL_LIB}")
+    add_library(nosphera2_openblas SHARED IMPORTED)
+    set_target_properties(nosphera2_openblas PROPERTIES
+        IMPORTED_LOCATION "${NOSPHERA2_ARMPL_LIB}"
+        INTERFACE_INCLUDE_DIRECTORIES "${NOSPHERA2_ARMPL_INCLUDE_DIR}"
+        INTERFACE_COMPILE_DEFINITIONS "NSA2_OPENBLAS;NSA2_ARMPL"
+        INTERFACE_LINK_OPTIONS -fopenmp)
 elseif(NOSPHERA2_OPENBLAS AND LINUX)
     # conda-forge OpenBLAS: one libopenblas.so with CBLAS, LAPACK and LAPACKE
     find_path(NOSPHERA2_OPENBLAS_INCLUDE_DIR cblas.h

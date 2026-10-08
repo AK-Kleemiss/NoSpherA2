@@ -47,9 +47,12 @@
 #define lapack_complex_float std::complex<float>
 #define lapack_complex_double std::complex<double>
 #include <lapacke.h>
-#ifdef NSA2_ARMPL
+#if defined(NSA2_ARMPL) && defined(_WIN32)
 //serial armpl_lp64, nothing to set
 #define MKL_Set_Num_Threads(num) ((void)(num))
+#elif defined(NSA2_ARMPL)
+//armpl_lp64_mp takes its thread count from OpenMP, as Accelerate's macro above does
+#define MKL_Set_Num_Threads(num) omp_set_num_threads(num)
 #elif defined(__ANDROID__)
 #include <cstdio>
 //the NDK OpenBLAS is built USE_OPENMP=1 and runs serial inside OpenMP regions on its own, so
