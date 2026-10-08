@@ -13,6 +13,7 @@ struct UT_Result {
 };
 
 static const std::regex kNumberPattern(R"([-+]?\d*\.?\d+(?:[eE][-+]?\d+)?)");
+static const std::regex kGpuBackend(R"( on (CUDA|HIP)\b)");
 
 static std::vector<std::string> read_lines_stripped(const std::filesystem::path& path)
 {
@@ -32,6 +33,11 @@ static std::vector<std::string> read_lines_stripped(const std::filesystem::path&
 		// same way.
 		const bool is_placement = line.find(" on the host: ") != std::string::npos ||
 								  line.find(" on the device: ") != std::string::npos;
+		// "GPU in use: ... on CUDA" names the backend of the machine that ran; a HIP device runs the
+		// same kernels, so the two compare as one and a golden made on either passes on both.
+		if (line.rfind("GPU in use:", 0) == 0) {
+			line = std::regex_replace(line, kGpuBackend, " on <gpu>");
+		}
 		if (!line.empty() && !is_citation && !is_placement) {
 			lines.push_back(line);
 		}
