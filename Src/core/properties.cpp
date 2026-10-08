@@ -211,8 +211,10 @@ void accumulate_prop_values(std::vector<cube> &cubes, const i3 &mapped_idx, cons
 		cubes[cube_type::Eli].set_value(x, y, z, cubes[cube_type::Eli].get_value(x, y, z) + sanitize_finite(values.eli));
 }
 
-//Per B^3 block of cube points, the atoms (in input order) whose centre lies within reach[a] of some point of the block
-std::vector<std::vector<int>> block_atom_lists(const cube &c, const int B, const std::vector<d3> &pos, const vec &reach)
+//Per B^3 block of cube points (and `extra` more layers on the high side), the atoms (in input order) whose centre lies
+//within reach(b, a) of some point of block b
+template <class Reach>
+std::vector<std::vector<int>> block_atom_lists(const cube &c, const int B, const std::vector<d3> &pos, const Reach &reach, const int extra = 0)
 {
 	const i3 n = c.get_sizes();
 	const i3 nb = { (n[0] + B - 1) / B, (n[1] + B - 1) / B, (n[2] + B - 1) / B };
@@ -222,7 +224,7 @@ std::vector<std::vector<int>> block_atom_lists(const cube &c, const int B, const
 	{
 		const int bx = b / (nb[1] * nb[2]), by = (b / nb[2]) % nb[1], bz = b % nb[2];
 		const int lo[3] = { bx * B, by * B, bz * B };
-		const int hi[3] = { std::min(lo[0] + B, n[0]) - 1, std::min(lo[1] + B, n[1]) - 1, std::min(lo[2] + B, n[2]) - 1 };
+		const int hi[3] = { std::min(lo[0] + B + extra, n[0]) - 1, std::min(lo[1] + B + extra, n[1]) - 1, std::min(lo[2] + B + extra, n[2]) - 1 };
 		//the farthest point of the block's parallelepiped from its centre is a corner
 		d3 corner[8], centre = { 0, 0, 0 };
 		for (int k = 0; k < 8; k++)
@@ -233,7 +235,7 @@ std::vector<std::vector<int>> block_atom_lists(const cube &c, const int B, const
 		double rb = 0;
 		for (int k = 0; k < 8; k++) rb = std::max(rb, array_length(corner[k], centre));
 		for (int a = 0; a < (int)pos.size(); a++)
-			if (array_length(centre, pos[a]) <= reach[a] + rb + 1E-6)
+			if (array_length(centre, pos[a]) <= reach(b, a) + rb + 1E-6)
 				lists[b].push_back(a);
 	}
 	return lists;
@@ -319,7 +321,7 @@ void Calc_Spherical_Dens(
 			apos[a] = wavy_atoms[a].get_pos();
 			reach[a] = std::max(atom_models[wavy_atoms[a].get_charge() - 1].get_radial_dist().back(), radius_bohr);
 		}
-		const vector<vector<int>> block_atoms = block_atom_lists(CubeSpher, B, apos, reach);
+		const vector<vector<int>> block_atoms = block_atom_lists(CubeSpher, B, apos, [&](int, int a) { return reach[a]; });
 		CubeSpher.evaluate_on_grid(
 			[&](const d3 &pos, const i3 &idx, const i3 &) {
 				const vector<int> &nearby = block_atoms[((size_t)(idx[0] / B) * nb[1] + idx[1] / B) * nb[2] + idx[2] / B];
@@ -1290,10 +1292,11 @@ bool is_promolecular_nci_point(
 
 // rho, grad rho and the Hessian of the promolecule at pos, each Thakkar atom's analytic rho', rho''
 // summed through Centred<Thakkar>; replaces the finite-difference stencils on the rho cube, whose
-// error scaled with the grid step and whose edge points were clamped
+// error scaled with the grid step and whose edge points were clamped. nearby: indices into atoms, ascending
 double promolecular_derivatives_at(
 	const d3 &pos,
 	const std::vector<PromolecularAtom> &atoms,
+	const std::vector<int> &nearby,
 	const std::vector<Thakkar> &atom_models,
 	d3 &grad,
 	double *hessian)
@@ -1301,8 +1304,9 @@ double promolecular_derivatives_at(
 	double rho = 0.0;
 	grad = { 0.0, 0.0, 0.0 };
 	std::fill(hessian, hessian + 9, 0.0);
-	for (const PromolecularAtom &atom : atoms)
+	for (const int a : nearby)
 	{
+		const PromolecularAtom &atom = atoms[a];
 		const Centred<Thakkar> source{ atom_models[atom.charge - 1], atom.pos };
 		d3 g;
 		double H[9];
@@ -1630,7 +1634,7 @@ void promolecular_nci_analysis(
 		reach[a] = atom_models[atoms[a].charge - 1].get_radial_dist().back();
 		all_atoms[a] = (int)a;
 	}
-	const vector<vector<int>> block_atoms = block_atom_lists(rho_cube, B, apos, reach);
+	const vector<vector<int>> block_atoms = block_atom_lists(rho_cube, B, apos, [&](int, int a) { return reach[a]; });
 	const int nby = (rho_cube.get_size(1) + B - 1) / B, nbz = (rho_cube.get_size(2) + B - 1) / B;
 	ProgressBar density_progress(rho_cube.get_size(0), 50, "=", " ", "Calculating promolecular rho");
 #pragma omp parallel for schedule(dynamic)
@@ -1703,6 +1707,53 @@ void promolecular_nci_analysis(
 						for (int j = std::max(y - 1, 0); j <= std::min(y + 1, ny - 1); j++)
 							for (int k = std::max(z - 1, 0); k <= std::min(z + 1, nz - 1); k++)
 								rim[at(i, j, k)] = masked[at(i, j, k)];
+	// The analytic sums below, per 8^3 block plus the next grid layer (so a marching-cubes cell lies in the block of its
+	// low corner), only over the atoms that can add 1E-14 rho_min / (4 N) there. env(r) = 2 sup over r' >= r of
+	// |rho| + |rho'| + |rho''| + |rho'| / r', sampled every 0.01 bohr, bounds every term of rho, grad and Hessian, so the
+	// atoms left out move each sum by < 1E-14 rho; rho_min is the block's smallest mask-pass spline rho (<= 0 keeps all)
+	constexpr double env_dr = 0.01, inf = std::numeric_limits<double>::infinity();
+	std::vector<int> slot(atom_models.size(), -1);
+	std::vector<vec> envelope;
+	for (const PromolecularAtom &atom : atoms)
+	{
+		if (slot[atom.charge - 1] >= 0)
+			continue;
+		slot[atom.charge - 1] = (int)envelope.size();
+		vec &e = envelope.emplace_back();
+		for (int k = 0; k < 40000 && (e.empty() || e.back() >= 1E-300); k++)
+		{
+			const double r = k * env_dr;
+			double d1, d2;
+			const double rho = atom_models[atom.charge - 1].get_radial_density(r, d1, d2);
+			e.push_back(2 * (std::abs(rho) + std::abs(d1) + std::abs(d2) + (k > 0 ? std::abs(d1) / r : 0.0)));
+		}
+		for (int k = (int)e.size() - 2; k >= 0; k--)
+			e[k] = std::max(e[k], e[k + 1]);
+	}
+	const int sby = (ny + B - 1) / B, sbz = (nz + B - 1) / B;
+	const auto block_of = [&](int x, int y, int z) { return ((size_t)(x / B) * sby + y / B) * sbz + z / B; };
+	vec rho_min((size_t)((nx + B - 1) / B) * sby * sbz, inf); // inf: nothing in the block is evaluated
+#pragma omp parallel for schedule(dynamic)
+	for (int b = 0; b < (int)rho_min.size(); b++)
+	{
+		const int bx = b / (sby * sbz) * B, by = b / sbz % sby * B, bz = b % sbz * B;
+		for (int x = bx; x < std::min(bx + B + 1, nx); x++)
+			for (int y = by; y < std::min(by + B + 1, ny); y++)
+				for (int z = bz; z < std::min(bz + B + 1, nz); z++)
+					if (!masked[at(x, y, z)] || rim[at(x, y, z)])
+						rho_min[b] = std::min(rho_min[b], rho_cube.get_value(x, y, z));
+	}
+	const size_t nel = envelope.size();
+	vec cut(rho_min.size() * nel);
+	for (size_t b = 0; b < rho_min.size(); b++)
+		for (size_t s = 0; s < nel; s++)
+		{
+			const double thr = 1E-14 * rho_min[b] / (4.0 * atoms.size());
+			const auto it = std::partition_point(envelope[s].begin(), envelope[s].end(), [thr](double v) { return v >= thr; });
+			cut[b * nel + s] = rho_min[b] == inf ? -inf : it == envelope[s].end() ? inf : (it - envelope[s].begin()) * env_dr;
+		}
+	const vector<vector<int>> rdg_atoms = block_atom_lists(rho_cube, B, apos, [&](int b, int a) { return cut[b * nel + slot[atoms[a].charge - 1]]; }, 1);
+	const vector<vector<int>> face_atoms = block_atom_lists(rho_cube, B, apos, [&](int b, int a) { return rho_min[b] == inf ? -inf : reach[a]; }, 1);
 	ProgressBar rdg_progress(rho_cube.get_size(0), 50, "=", " ", "Calculating promolecular RDG");
 #pragma omp parallel reduction(+ : kept_points) num_threads(nci_write_threads)
 	{
@@ -1727,7 +1778,7 @@ void promolecular_nci_analysis(
 
 				d3 grad;
 				double hessian[9];
-				const double rho = promolecular_derivatives_at(rho_cube.get_pos(x, y, z), atoms, atom_models, grad, hessian);
+				const double rho = promolecular_derivatives_at(rho_cube.get_pos(x, y, z), atoms, rdg_atoms[block_of(x, y, z)], atom_models, grad, hessian);
 				const double lambda2 = get_lambda_1(hessian);
 				const double signed_rho = lambda2 < 0.0 ? -rho : rho;
 				const double rdg = sanitize_finite(reduced_density_gradient(rho, grad));
@@ -1758,16 +1809,27 @@ void promolecular_nci_analysis(
 	const std::vector<Triangle> triangles = marchingCubes(rdg_cube, opts.promol_nci_iso);
 	std::vector<char> keep(triangles.size(), 0);
 	vec centre_signed_rho(triangles.size());
+	const vec2 to_index = crystal_energies::inverse3(cell_matrix);
 #pragma omp parallel for schedule(dynamic, 256)
 	for (long long i = 0; i < static_cast<long long>(triangles.size()); i++)
 	{
 		const d3 c = triangles[i].calc_center();
-		const PromolecularFragmentDensities densities = promolecular_fragment_densities_at(c, atoms, all_atoms, atom_models);
+		// the cell holding the centre, by its low corner; a block with nothing evaluated (a centre rounded onto a face) keeps all atoms
+		int idx[3];
+		for (int d = 0; d < 3; d++)
+		{
+			double f = 0;
+			for (int e = 0; e < 3; e++)
+				f += to_index[d][e] * (c[e] - rho_cube.get_origin(e));
+			idx[d] = std::clamp((int)std::floor(f), 0, rho_cube.get_size(d) - 1);
+		}
+		const size_t b = block_of(idx[0], idx[1], idx[2]);
+		const PromolecularFragmentDensities densities = promolecular_fragment_densities_at(c, atoms, rho_min[b] == inf ? all_atoms : face_atoms[b], atom_models);
 		if (!is_promolecular_nci_point(densities, densities.total(), opts.promol_nci_rcut1, opts.promol_nci_rcut2))
 			continue;
 		d3 grad;
 		double hessian[9];
-		const double rho = promolecular_derivatives_at(c, atoms, atom_models, grad, hessian);
+		const double rho = promolecular_derivatives_at(c, atoms, rho_min[b] == inf ? all_atoms : rdg_atoms[b], atom_models, grad, hessian);
 		centre_signed_rho[i] = get_lambda_1(hessian) < 0.0 ? -rho : rho;
 		keep[i] = 1;
 	}
