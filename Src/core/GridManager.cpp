@@ -1181,53 +1181,56 @@ void GridManager::calculateSphericalDensities(
 		combined_spherical_density[g].resize(num_points, 0.0);
 	}
 
-	int type_idx = -1;
-	// For each atom
+	// Type index and position per atom; -1 = type not found, the atom is skipped
+	ivec atom_type(ncen, -1);
+	std::vector<d3> atom_pos(ncen);
 	for (int atom_idx = 0; atom_idx < ncen; atom_idx++) {
-		type_idx = -1;
 		if (sig_pop.size() == 0) {
-			// Find the type index for this atom
 			for (int j = 0; j < complete_type_list.size(); j++) {
 				if (wave.get_atom_charge(atom_idx) == complete_type_list[j]) {
-					type_idx = j;
+					atom_type[atom_idx] = j;
 					break;
 				}
 			}
-
-			if (type_idx == -1)
-				continue; // Skip if atom type not found
 		}
 		else {
-			type_idx = atom_idx;
+			atom_type[atom_idx] = atom_idx;
 		}
+		atom_pos[atom_idx] = wave.get_atom_pos(atom_idx);
+	}
 
-		const d3 ax = wave.get_atom_pos(atom_idx);
+	// Point outer, atoms inner in index order: each sum gets the same additions in the same order as with
+	// the atoms outer, so the densities are bit-identical, from one parallel region instead of one per atom
+	// and grid (2025 for 45 atoms). The per-grid worksharing keeps all threads busy for a few atoms too.
+	const int ngrids = static_cast<int>(grid->size());
+#pragma omp parallel
+	for (int g = 0; g < ngrids; g++) {
+		const int num_points = needs_helper_grids_ ? grid_data_.helper_num_points_per_atom[g] : grid_data_.num_points_per_atom[g];
+		const int comparator = needs_helper_grids_ ? g : atom_list[g];
+		const vec &gx = (*grid)[g][GridData::GridIndex::X], &gy = (*grid)[g][GridData::GridIndex::Y], &gz = (*grid)[g][GridData::GridIndex::Z];
+		double *single = single_spherical_density[g].data(), *combined = combined_spherical_density[g].data();
 
-		// Add this atom's spherical density contribution to all grids
-		for (int g = 0; g < grid->size(); g++) {
-			const int num_points = needs_helper_grids_ ? grid_data_.helper_num_points_per_atom[g] : grid_data_.num_points_per_atom[g];
-			const int comparator = needs_helper_grids_ ? g : atom_list[g];
-
-#pragma omp parallel for
-			for (int p = 0; p < num_points; p++) {
-
-				const double dist = array_length(d3{ (*grid)[g][GridData::GridIndex::X][p],
-				(*grid)[g][GridData::GridIndex::Y][p],
-				(*grid)[g][GridData::GridIndex::Z][p] }, ax);
-
+#pragma omp for schedule(static) nowait
+		for (int p = 0; p < num_points; p++) {
+			double s = single[p], c = combined[p];
+			for (int atom_idx = 0; atom_idx < ncen; atom_idx++) {
+				const int type_idx = atom_type[atom_idx];
+				if (type_idx == -1)
+					continue;
 				const double density = cubic_spline_interpolate_spherical_density(
 					radial_density_[type_idx],
 					radial_distances_[type_idx],
 					radial_second_deriv_[type_idx],
-					dist,
+					array_length(d3{ gx[p], gy[p], gz[p] }, atom_pos[atom_idx]),
 					lincr_,
 					start_dist_);
 
-				if (atom_idx == comparator) {
-					single_spherical_density[g][p] += density;
-				}
-				combined_spherical_density[g][p] += density;
+				if (atom_idx == comparator)
+					s += density;
+				c += density;
 			}
+			single[p] = s;
+			combined[p] = c;
 		}
 	}
 
