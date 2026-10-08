@@ -240,20 +240,25 @@ TEST(FittingIoCoverageIntegratorTests, ConfigFromOptionsMapsEveryScheme)
 	opt.debug = true;
 	opt.multipole_lmax = 0;
 	opt.multipole_strength = 2.5;
-	opt.multipole_partition = false;
 	opt.multipole_scheme = MultipoleScheme::TFVC;
 	cfg = DensityFitting::config_from_options(opt);
 	EXPECT_TRUE(cfg.analyze_quality);
-	EXPECT_FALSE(cfg.partition_restraints);
+	EXPECT_FALSE(cfg.grid_higher_moments);
+	EXPECT_FALSE(cfg.constrain_total_electrons);
 	EXPECT_EQ(cfg.multipole_lmax, 0);
 	EXPECT_DOUBLE_EQ(cfg.multipole_strength, 2.5);
 	EXPECT_EQ(cfg.charge_scheme, DensityFitting::CHARGE_SCHEME::TFVC);
 
+	opt.multipole_lmax = 1;
+	cfg = DensityFitting::config_from_options(opt);
+	EXPECT_FALSE(cfg.grid_higher_moments);
+	EXPECT_FALSE(cfg.constrain_total_electrons);
+
 	opt.multipole_lmax = 2;
-	opt.multipole_partition = true;
 	opt.multipole_scheme = MultipoleScheme::MBIS;
 	cfg = DensityFitting::config_from_options(opt);
-	EXPECT_TRUE(cfg.partition_restraints);
+	EXPECT_TRUE(cfg.grid_higher_moments);
+	EXPECT_FALSE(cfg.constrain_total_electrons);
 	EXPECT_EQ(cfg.multipole_lmax, 2);
 	EXPECT_EQ(cfg.charge_scheme, DensityFitting::CHARGE_SCHEME::MBIS);
 
@@ -264,8 +269,8 @@ TEST(FittingIoCoverageIntegratorTests, ConfigFromOptionsMapsEveryScheme)
 	opt.multipole_scheme = MultipoleScheme::NUCLEAR;
 	EXPECT_EQ(DensityFitting::config_from_options(opt).charge_scheme, DensityFitting::CHARGE_SCHEME::NUCLEAR);
 	EXPECT_EQ(DensityFitting::config_from_options(opt).multipole_lmax, 0);
-	EXPECT_FALSE(DensityFitting::config_from_options(opt).partition_restraints);
-	EXPECT_TRUE(DensityFitting::config_from_options(opt).constrain_total_electrons);
+	EXPECT_FALSE(DensityFitting::config_from_options(opt).grid_higher_moments);
+	EXPECT_FALSE(DensityFitting::config_from_options(opt).constrain_total_electrons);
 	opt.multipole_scheme = MultipoleScheme::MULLIKEN;
 	EXPECT_EQ(DensityFitting::config_from_options(opt).charge_scheme, DensityFitting::CHARGE_SCHEME::MULLIKEN);
 	opt.multipole_scheme = MultipoleScheme::SANDERSON;
@@ -521,8 +526,7 @@ TEST(FittingIoCoverageIntegratorTests, AtomCentredMultipoleRestraintsReport)
 	EXPECT_NEAR(monopoles, fitted_electrons(population_rows(aux), c), 1e-6);
 }
 
-//The l=0 multipole setting restrains only the grid-partitioned electron populations.
-TEST(FittingIoCoverageIntegratorTests, GridPartitionedMonopoleRestraints)
+TEST(FittingIoCoverageIntegratorTests, LowOrdersStayAtomCentred)
 {
 	const std::filesystem::path p = epoxide_fixture();
 	if (p.empty()) GTEST_SKIP() << "tests/epoxide_gbw/epoxide.gbw not found";
@@ -531,7 +535,7 @@ TEST(FittingIoCoverageIntegratorTests, GridPartitionedMonopoleRestraints)
 	const WFN aux = generate_aux_wfn(wave, basis);
 	DensityFitting::CONFIG cfg;
 	cfg.multipole_lmax = 0;
-	cfg.partition_restraints = true;
+	cfg.grid_higher_moments = true;
 	cfg.charge_scheme = DensityFitting::CHARGE_SCHEME::HIRSHFELD;
 	StreamCapture out(std::cout);
 	const vec c = DensityFitting::density_fit(wave, aux, cfg);
@@ -539,9 +543,10 @@ TEST(FittingIoCoverageIntegratorTests, GridPartitionedMonopoleRestraints)
 	EXPECT_NEAR(fitted_electrons(population_rows(aux), c), 24.0, 0.1);
 	const std::string log = out.str();
 	EXPECT_NE(log.find("Multipole restraints: on (lmax=0, Hirshfeld)"), std::string::npos);
-	EXPECT_NE(log.find("Restraint definition: grid partitioned"), std::string::npos);
+	EXPECT_NE(log.find("Restraint definition: atom centred"), std::string::npos);
 	EXPECT_NE(log.find("Added multipole restraints up to l=0 for 7 atoms."), std::string::npos);
 	EXPECT_NE(log.find("Atomic multipoles of the fitted density"), std::string::npos);
+	EXPECT_EQ(log.find("partitioned on the grid"), std::string::npos);
 }
 
 //The restraint set-up refuses lmax above 8, a non-grid scheme, and a negative Tikhonov parameter.

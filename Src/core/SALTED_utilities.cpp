@@ -941,14 +941,12 @@ void create_SALTED_training_data(const WFN& orbital, const WFN& aux, const optio
 	DensityFitting::CONFIG config = DensityFitting::config_from_options(opts);
 	config.analyze_quality = true;
 
-	// SALTED learns one coefficient block per atom: grid-partitioned restraints pin only the total
-	// density's moments and leave per-centre sums free, so the blocks integrate to nothing physical
-	if (config.partition_restraints) {
+	// SALTED learns one coefficient block per atom; keep all restrained moments on their centres.
+	if (config.grid_higher_moments) {
 		std::cout
-			<< "SALTED training: restraining atom-centred moments instead of grid-partitioned ones."
+			<< "SALTED training: restraining higher moments on their centres."
 			<< std::endl;
-		config.partition_restraints = false;
-		config.constrain_total_electrons = config.multipole_lmax >= 0;
+		config.grid_higher_moments = false;
 	}
 
 	vec coefs = DensityFitting::density_fit(orbital, aux, config);

@@ -229,7 +229,7 @@ static vec2 analytic_multipole_rows(
 	return rows;
 }
 
-void DensityFitting::partition_rows_on_grid(const aux_density_table& t, const int np, const double* x, const double* y, const double* z, const double* w, const double* centre, const int lmax, vec2& rows, const int row0)
+void DensityFitting::partition_rows_on_grid(const aux_density_table& t, const int np, const double* x, const double* y, const double* z, const double* w, const double* centre, const int lmax, vec2& rows, const int row0, const int lmin)
 {
 	const int n_mom = (lmax + 1) * (lmax + 1);
 	vec Y(n_mom), val(t.n_coef);
@@ -240,8 +240,8 @@ void DensityFitting::partition_rows_on_grid(const aux_density_table& t, const in
 		const double r = std::sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
 		if (r > 0.0)
 			for (int i = 0; i < 3; i++) d[i] /= r;
-		double rl = w[p];
-		for (int l = 0; l <= lmax; l++) {
+		double rl = w[p] * std::pow(r, lmin);
+		for (int l = lmin; l <= lmax; l++) {
 			for (int m = -l; m <= l; m++) Y[l * l + l + m] = rl * constants::spherical_harmonic(l, m, d);
 			rl *= r;
 		}
@@ -264,7 +264,7 @@ void DensityFitting::partition_rows_on_grid(const aux_density_table& t, const in
 				}
 			}
 		}
-		for (int k = 0; k < n_mom; k++) {
+		for (int k = lmin * lmin; k < n_mom; k++) {
 			double* row = rows[row0 + k].data();
 			const double yk = Y[k];
 			for (int i = 0; i < n; i++) row[idx[i]] += yk * val[i];
@@ -283,7 +283,8 @@ static vec2 partition_rows(
 	const WFN& wavy,
 	const aux_density_table& table,
 	GridManager& grid_manager,
-	const int lmax)
+	const int lmax,
+	const int lmin = 0)
 {
 	err_checkf(
 		lmax >= 0 && lmax <= 8,
@@ -330,7 +331,8 @@ static vec2 partition_rows(
 			centre,
 			lmax,
 			rows,
-			a * n_mom);
+			a * n_mom,
+			lmin);
 	}
 
 	return rows;
@@ -355,13 +357,13 @@ static partition_multipole_data calculate_partition_multipoles(
 
 	partition_multipole_data result;
 	result.targets = grid_manager.calculatePartitionedMultipoles(temp, lmax);
-	result.rows = partition_rows(wavy, table, grid_manager, lmax);
+	result.rows = partition_rows(wavy, table, grid_manager, lmax, 2);
 	return result;
 }
 
 struct restraint_data
 {
-	bool partitioned = false;
+	bool grid_higher_moments = false;
 	int lmax = 0;
 
 	vec2 multipole_targets;
@@ -415,7 +417,7 @@ static restraint_data build_restraint_data(
 	const DensityFitting::CONFIG& config)
 {
 	restraint_data data;
-	data.partitioned = config.partition_restraints && config.multipole_lmax >= 0;
+	data.grid_higher_moments = config.grid_higher_moments && config.multipole_lmax >= 2;
 	data.lmax = config.multipole_lmax;
 	if (config.multipole_lmax >= 0) {
 		err_checkf(
@@ -423,7 +425,7 @@ static restraint_data build_restraint_data(
 			"Multipole restraints require 0 <= multipole_lmax <= 8",
 			std::cout);
 		err_checkf(
-			is_grid_partition_scheme(config.charge_scheme) || (is_population_only_scheme(config.charge_scheme) && config.multipole_lmax == 0 && !data.partitioned),
+			is_grid_partition_scheme(config.charge_scheme) || (is_population_only_scheme(config.charge_scheme) && config.multipole_lmax == 0 && !data.grid_higher_moments),
 			"Nuclear, Mulliken and Sanderson support atom-centred l=0 restraints only",
 			std::cout);
 	}
@@ -438,7 +440,7 @@ static restraint_data build_restraint_data(
 			data.multipole_targets[a][0] = populations[a] / std::sqrt(constants::FOUR_PI);
 		data.multipole_rows = analytic_multipole_rows(aux_table, 0);
 	}
-	else if (data.partitioned) {
+	else if (data.grid_higher_moments) {
 		auto result = calculate_partition_multipoles(
 			wavy,
 			aux_table,
@@ -447,6 +449,11 @@ static restraint_data build_restraint_data(
 
 		data.multipole_targets = std::move(result.targets);
 		data.multipole_rows = std::move(result.rows);
+		const vec2 centre_rows = analytic_multipole_rows(aux_table, 1);
+		const int n_mom = (data.lmax + 1) * (data.lmax + 1);
+		for (int a = 0; a < wavy.get_ncen(); ++a)
+			for (int k = 0; k < 4; ++k)
+				data.multipole_rows[a * n_mom + k] = centre_rows[a * 4 + k];
 	}
 	else {
 		data.multipole_targets = DensityFitting::calculate_expected_multipoles(
@@ -563,16 +570,14 @@ static void apply_multipole_restraints(
 		}
 	}
 
-	if (!restraints.partitioned) {
-		for (int l = 1; l <= config.multipole_lmax; ++l) {
-			if (skipped[l] > 0) {
-				std::cout
-					<< skipped[l]
-					<< " atoms carry no l=" << l
-					<< " auxiliary functions; their order " << l
-					<< " moments are not restrained."
-					<< "\n";
-			}
+	for (int l = 1; l <= (restraints.grid_higher_moments ? 1 : config.multipole_lmax); ++l) {
+		if (skipped[l] > 0) {
+			std::cout
+				<< skipped[l]
+				<< " atoms carry no l=" << l
+				<< " auxiliary functions; their order " << l
+				<< " moments are not restrained."
+				<< "\n";
 		}
 	}
 
@@ -712,7 +717,7 @@ static void print_multipole_report(
 
 	std::cout
 		<< "\nAtomic multipoles of the fitted density"
-		<< (restraints.partitioned ? " partitioned on the grid" : "")
+		<< (restraints.grid_higher_moments ? " (l<=1 atom centred, l>=2 partitioned on the grid)" : "")
 		<< ", Racah normalisation, e bohr^l\n"
 		<< "  Atom  l  m"
 		<< "       target"
@@ -765,8 +770,8 @@ static void print_fit_configuration(
 
 	if (config.multipole_lmax >= 0) {
 		std::cout << "  Restraint definition: "
-			<< (config.partition_restraints
-				? "grid partitioned"
+			<< (config.grid_higher_moments && config.multipole_lmax >= 2
+				? "atom centred through l=1, grid partitioned from l=2"
 				: "atom centred")
 			<< std::endl;
 	}
@@ -965,8 +970,7 @@ vec DensityFitting::density_fit(
 			rho,
 			wavy_aux,
 			aux_table,
-			expected_populations,
-			restraints.partitioned);
+			expected_populations);
 
 	std::cout << "==============================================\n"
 		<< std::endl;
@@ -981,7 +985,7 @@ DensityFitting::CONFIG DensityFitting::config_from_options(const options& opt)
 	if (opt.multipole_lmax >= 0) {
 		config.multipole_lmax = opt.multipole_lmax;
 		config.multipole_strength = opt.multipole_strength;
-		config.partition_restraints = opt.multipole_partition;
+		config.grid_higher_moments = opt.multipole_lmax >= 2;
 
 		switch (opt.multipole_scheme) {
 		case MultipoleScheme::TFVC:
@@ -1008,9 +1012,8 @@ DensityFitting::CONFIG DensityFitting::config_from_options(const options& opt)
 		}
 		if (is_population_only_scheme(config.charge_scheme)) {
 			config.multipole_lmax = 0;
-			config.partition_restraints = false;
+			config.grid_higher_moments = false;
 		}
-		config.constrain_total_electrons = !config.partition_restraints;
 	}
 
 	return config;
@@ -1405,34 +1408,22 @@ void DensityFitting::print_interaction_energy(const Interaction_Energy& E, const
 	file << std::endl;
 }
 
-// An atom's population is the integral of the auxiliary functions on it: what atom-centred restraints
-// constrain, but not grid-partitioned ones.
 void DensityFitting::analyze_density_fit_quality(
 	const vec& coefficients,
 	const WFN& wavy_aux,
 	const aux_density_table& aux_density,
-	const vec& expected_populations,
-	const bool partitioned)
+	const vec& expected_populations)
 {
 	std::cout << "\n=== Density Fitting Quality Analysis ===" << std::endl;
 	std::cout
 		<< "Population: the auxiliary functions on that centre only."
 		<< std::endl;
 
-	if (partitioned)
-		std::cout
-			<< "Expected: the grid-partitioned population the restraints target.\n"
-			<< "Those restraints fix the partitioned moments of the total fitted\n"
-			<< "density, not the per-centre sums, so a deviation here is density\n"
-			<< "carried by the neighbours' functions, not a failure of the fit."
-			<< std::endl;
-
 	const bool has_expected =
 		expected_populations.size() == (size_t)wavy_aux.get_ncen();
 
 	double real_total_electrons = 0.0;
 	double expected_total_electrons = -wavy_aux.get_charge();
-	int delocalised_atoms = 0;
 
 	for (int a = 0; a < wavy_aux.get_ncen(); ++a) {
 		const atom A = wavy_aux.get_atom(a);
@@ -1474,21 +1465,12 @@ void DensityFitting::analyze_density_fit_quality(
 				<< ", Deviation = " << deviation;
 
 			if (deviation > 1.0) {
-				++delocalised_atoms;
 				std::cout << "  WARNING: significant deviation";
 			}
 		}
 
 		std::cout << "\n";
 	}
-
-	if (partitioned && delocalised_atoms > 0)
-		std::cout
-			<< delocalised_atoms
-			<< " atoms hold more than 1 e of their partitioned density on other\n"
-			   "centres. Use -multipole_centre when the coefficients are taken apart\n"
-			   "per atom downstream (SALTED training, per-atom densities)."
-			<< std::endl;
 
 	std::cout
 		<< "Expected / Real total electrons: "

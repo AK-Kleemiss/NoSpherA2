@@ -1133,7 +1133,7 @@ TEST(ConvenienceOptionsTests, PromolNciCollectsFragmentsAndCutoffs)
 // -multipole_moments picks the scheme by name, bounds the order, turns on the RI fit and gets an auto_aux basis when none was named
 TEST(ConvenienceOptionsTests, MultipoleAndRepulsionOptions)
 {
-	const options opt = parse({ "-multipole_moments", "TFVC", "3", "-multipole_strength", "2.5", "-multipole_centre",
+	const options opt = parse({ "-multipole_moments", "TFVC", "3", "-multipole_strength", "2.5",
 		"-repulsion_overlap", "0.3", "-repulsion_exchange", "b88", "-geometry_aid_cutoff", "3.0" });
 	EXPECT_EQ(opt.multipole_scheme, MultipoleScheme::TFVC);
 	EXPECT_EQ(opt.multipole_lmax, 3);
@@ -1141,7 +1141,6 @@ TEST(ConvenienceOptionsTests, MultipoleAndRepulsionOptions)
 	EXPECT_EQ(opt.partition_type, PartitionType::RI);
 	EXPECT_EQ(opt.aux_basis.size(), 1u) << "auto_aux pushed after parsing";
 	EXPECT_NEAR(opt.multipole_strength, 2.5, 1e-15);
-	EXPECT_FALSE(opt.multipole_partition);
 	EXPECT_NEAR(opt.repulsion_overlap, 0.3, 1e-15);
 	EXPECT_EQ(opt.repulsion_exchange, 2);
 	EXPECT_NEAR(opt.geometry_aid_cutoff, 3.0, 1e-15);

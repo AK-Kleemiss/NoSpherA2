@@ -1207,3 +1207,25 @@ target formulas are checked against the penalised fit matrix in
 `FittingIoCoverageIntegratorTests.NuclearMullikenSandersonUseMonopoleRows`.
 The focused Windows CTest set, including parser and RI golden cases, passed
 23/23.
+
+## 2026-10-08 — Coefficient-based charge and dipole restraints
+
+`-multipole_moments` now builds atom-centred auxiliary-coefficient rows for
+`l=0` and `l=1`, including when `lmax >= 2`. Only `l>=2` rows use the grid
+partition of the fitted density, preserving the documented higher-order
+stability path. The grid still supplies Hirshfeld/TFVC/MBIS/EMBIS target moments.
+The public `-multipole_partition` and `-multipole_centre` switches and the
+obsolete centre-only l=2 golden case were removed. The exact total-electron
+constraint remains available through `CONFIG::constrain_total_electrons` but is
+off by default, including for SALTED training. Its explicit unit test remains.
+The epoxide l=2 golden now covers the mixed rows without the exact constraint;
+the fitted electron count is 24.0005 and its largest printed absolute moment
+deviations are 0.000578 e at l=0, 0.001103 e bohr at l=1 and 0.000504 e
+bohr^2 at l=2. The rebuilt Windows CLI and C++ test executable passed the
+focused restraint set 23/23. On the user's sucrose wavefunction, both
+`-multipole_moments Hirshfeld 0` and `Hirshfeld 2` reported all 45 atomic
+charge deviations as 0.000 e at three decimal places and 182.000/182.000 total
+electrons at that precision. Summing the six-decimal fitted monopoles gives
+181.999580 e at lmax=0 and 182.000233 e at lmax=2, confirming no exact total
+constraint was applied. The lmax=2 maximum printed absolute moment deviations
+were 0.000094 e at l=0, 0.000227 e bohr at l=1 and 0.001255 e bohr^2 at l=2.

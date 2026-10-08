@@ -26,7 +26,7 @@ namespace DensityFitting
 		METRIC_TYPE metric = METRIC_TYPE::COULOMB; // Metric to use for density fitting
 		bool analyze_quality = false; // Whether to analyze the quality of the density fitting
 		bool use_tikhonov = false;
-		bool partition_restraints = false;
+		bool grid_higher_moments = false;
 		bool constrain_total_electrons = false;
 
 		double tikhonov_lambda = 1e-6;
@@ -38,7 +38,7 @@ namespace DensityFitting
 	};
 
 	// Helper function to partition the density-fitting rows on a grid for multipole restraints. The rows are stored in a 2D vector, where each row corresponds to a multipole moment (l, m) and each column corresponds to an auxiliary basis function. The function takes the auxiliary density table, the number of grid points, the grid coordinates and weights, the center of the atom, the maximum multipole order, and the starting row index as input. It fills the rows vector with the contributions of each auxiliary basis function to each multipole moment at the given grid points.
-	void partition_rows_on_grid(const aux_density_table& t, const int np, const double* x, const double* y, const double* z, const double* w, const double* centre, const int lmax, vec2& rows, const int row0);
+	void partition_rows_on_grid(const aux_density_table& t, const int np, const double* x, const double* y, const double* z, const double* w, const double* centre, const int lmax, vec2& rows, const int row0, const int lmin = 0);
 
 	vec density_fit(const WFN& wavy, const WFN& wavy_aux, const CONFIG& config);
 	// Fit settings from the command line: -multipole_moments switches the restraints on
@@ -52,9 +52,7 @@ namespace DensityFitting
 	// density (density_batch of a Gaussian_Molecule) or else from wavy's orbitals
 	vec2 partition_multipole_rows(const WFN& wavy, const aux_density_table& table, const CHARGE_SCHEME scheme, const int lmax, DensityBatch density = {});
 
-	// partitioned: the expected populations come from the grid partition, which constrains the moments of the total
-	// fitted density and not the per-centre coefficient sums the table reports
-	void analyze_density_fit_quality(const vec& coefficients, const WFN& wavy_aux, const aux_density_table& aux_density, const vec& expected_charges = vec(), const bool partitioned = false);
+	void analyze_density_fit_quality(const vec& coefficients, const WFN& wavy_aux, const aux_density_table& aux_density, const vec& expected_charges = vec());
 	// Interaction energy of two fitted densities and their nuclei in Hartree, from the coefficients and the aux basis
 	// alone (RI or SALTED). pair[a][b] over the atoms, rank[i][j] with 0 the nuclei and l+1 the aux functions of rank l.
 	// pol_X = -1/2 sum alpha_a F_a^2 with Thakkar polarizabilities in the partner's field, disp the D4 dimer minus

@@ -912,12 +912,6 @@ TEST(TomlIntegrationTests, SF_embis)
 	EXPECT_TRUE(result.success) << result.message;
 }
 
-TEST(TomlIntegrationTests, ri_fit_multipoles_centre)
-{
-	const UT_Result result = run_inprocess_test(get_repo_root(), "ri_fit_multipoles_centre");
-	EXPECT_TRUE(result.success) << result.message;
-}
-
 TEST(TomlIntegrationTests, hirshfeld_surface)
 {
 	const UT_Result result = run_inprocess_test(get_repo_root(), "hirshfeld_surface");

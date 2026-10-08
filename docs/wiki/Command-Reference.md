@@ -323,10 +323,8 @@ available from it.
 | --- | --- | --- | --- |
 | `-ri_fit <basis> [basis ...]` | 1+ | | RI-fit the density in these auxiliary basis sets, and use RI partitioning. Also `-RI_FIT`. |
 | `-ri_fit auto_aux [elements...] [basis...]` | 1+ | | Generate the auxiliary set automatically; element symbols right after `auto_aux` restrict which elements it is generated for, the basis names that follow fill the rest (first match wins). |
-| `-multipole_moments <scheme> [lmax]` | 1-2 | off; omitted `lmax` is `0` | Restrain atomic moments up to `lmax` (0-8). `Hirshfeld`, `TFVC`, `MBIS` and `EMBIS` support all orders. `Nuclear`, `Mulliken` and `Sanderson` use atom-centred charge-only order 0; any supplied order is ignored. |
+| `-multipole_moments <scheme> [lmax]` | 1-2 | off; omitted `lmax` is `0` | Restrain atomic moments up to `lmax` (0-8). The fit restrains atom-centred auxiliary coefficients for charges and dipoles; orders 2 and above use grid-partitioned rows for stability. It does not constrain the total electron count exactly. `Hirshfeld`, `TFVC`, `MBIS` and `EMBIS` supply the targets. `Nuclear`, `Mulliken` and `Sanderson` use atom-centred charge-only order 0; any supplied order is ignored. |
 | `-multipole_strength <w>` | 1 | `1.0` | Weight of the multipole restraints. Must be positive. |
-| `-multipole_partition` | 0 | on for grid schemes | Restrain each atom's share of the whole fitted density, using grid partition weights. Applies to `Hirshfeld`, `TFVC`, `MBIS` and `EMBIS`. |
-| `-multipole_centre` | 0 | off | Restrain the auxiliary functions based on each atom about that atom's nucleus. Also `-multipole_center`. `Nuclear`, `Mulliken` and `Sanderson` always use this mode. |
 | `-write_ri_coefs` | 0 | | Fit and write `RI_COEFS.npy`. One-shot. |
 | `-ri_cube <...>` | | | Cube of the fitted density. Also `-RI_CUBE`. |
 | `-SALTED <model>` | 1 | | Predict the density with a SALTED model — a directory or a `.salted` file. Also `-salted`. |

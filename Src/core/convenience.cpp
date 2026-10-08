@@ -244,13 +244,13 @@ std::string help_message =
  "  -multipole_moments <scheme> [N]    Restrain RI atomic moments through order N\n"
  "                                    (default 0). Hirshfeld, TFVC, MBIS and EMBIS\n"
  "                                    support 0-8; Nuclear, Mulliken and Sanderson\n"
- "                                    use atom-centred charge-only order 0\n"
- "                                    (implies -ri_fit).\n"
+ "                                    use atom-centred charge-only order 0.\n"
+ "                                    Charge and dipole rows use atom-centred\n"
+ "                                    coefficients; higher rows use grid weights.\n"
+ "                                    Does not fix the total electrons exactly.\n"
+ "                                    Implies -ri_fit.\n"
  "  -multipole_strength <x>            Weight of the restraint rows against the\n"
  "                                    density-fit metric, default 1.\n"
- "  -multipole_centre                  Restrain the moments of each atom's own\n"
- "                                    functions instead of the partition-weighted\n"
- "                                    moments of the whole fitted density.\n"
  "  -cpus <n>                          Maximum worker threads [all available].\n"
  "  -mem <MB>                          Memory budget for everything sliceable\n"
  "                                    [unset]. When given, the tsc block size\n"
@@ -3330,8 +3330,7 @@ bool options::digest_partition_options(const std::string &temp, int &i)
 			coefs,
 			SP.wavy,
 			t,
-			vec(),
-			false);
+			vec());
 		lap("fit quality");
 
 		npy::npy_data<double> np_coeffs;
@@ -4144,10 +4143,6 @@ bool options::digest_ri_options(const std::string &temp, int &i)
 		RI_FIT = true;
 		partition_type = PartitionType::RI;
 	}
-	else if (temp == "-multipole_partition")
-		multipole_partition = true;
-	else if (temp == "-multipole_centre" || temp == "-multipole_center")
-		multipole_partition = false;
 	else if (temp == "-multipole_strength") {
 		multipole_strength = std::stod(arguments[++i]);
 		err_checkf(multipole_strength > 0.0, "-multipole_strength must be positive", std::cout);
