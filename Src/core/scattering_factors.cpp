@@ -1929,9 +1929,12 @@ void calc_SF(const int& points,
 	if (!do_XCW) {
 		progress = new ProgressBar(imax, 60, "=", " ", "Calculating Scattering Factors", file);
 	}
-	long long int pmax, p, s;
+	long long int pmax;
+#if !((defined(__aarch64__) && !defined(__APPLE__)) || defined(_M_ARM64))
+	long long int p, s;
 	complex<double>* sf_local;
 	double work, rho, c, si, re, im;
+#endif
 	const double* d1_local, * d2_local, * d3_local, * dens_local;
 
 	// Pre-fetch k_pt data pointers for better cache locality
@@ -1943,6 +1946,36 @@ void calc_SF(const int& points,
 	const _time_point sf_cpu_t0 = get_time();
 	double sf_cpu_points = 0.0;
 
+#if (defined(__aarch64__) && !defined(__APPLE__)) || defined(_M_ARM64)
+	//Phase recurrence: the reflections are a sorted hkl set, so most consecutive k differ by one step dc (c*), and
+	//Q_p = rho_p e^{i k.r_p} continues as Q_p e^{i dc.r_p}, one complex multiply instead of a sincos. Q is re-anchored
+	//with sincos_shared2 at block starts, row breaks and every SF_ANCHOR steps, so the drift stays at rounding level.
+	//dc is taken where two successive steps agree, at the smallest |k| for the least rounding; cont[s] marks
+	//k[s] = k[s-1] + dc. An unsorted k list leaves cont all false and every reflection anchors.
+	constexpr int SF_BLOCK = 64, SF_TILE = 256, SF_ANCHOR = 32;
+	double dc[3] = { 0.0, 0.0, 0.0 };
+	std::vector<char> cont(smax, 0);
+	{
+		double kmax = 0.0, best = std::numeric_limits<double>::max();
+		for (long long t = 0; t < smax; t++)
+			kmax = std::max({ kmax, std::abs(k1_data[t]), std::abs(k2_data[t]), std::abs(k3_data[t]) });
+		const double tol = 1e-13 * (1.0 + kmax);
+		const auto steps_by = [&](const long long t, const double* d) {
+			return std::abs(k1_data[t] - k1_data[t - 1] - d[0]) <= tol && std::abs(k2_data[t] - k2_data[t - 1] - d[1]) <= tol
+				&& std::abs(k3_data[t] - k3_data[t - 1] - d[2]) <= tol;
+		};
+		for (long long t = 2; t < smax; t++) {
+			const double d[3] = { k1_data[t - 1] - k1_data[t - 2], k2_data[t - 1] - k2_data[t - 2], k3_data[t - 1] - k3_data[t - 2] };
+			const double n = k1_data[t - 1] * k1_data[t - 1] + k2_data[t - 1] * k2_data[t - 1] + k3_data[t - 1] * k3_data[t - 1];
+			if (n < best && steps_by(t, d)) { best = n; std::copy(d, d + 3, dc); }
+		}
+		if (best < std::numeric_limits<double>::max())
+			for (long long t = 1; t < smax; t++)
+				cont[t] = steps_by(t, dc);
+	}
+	vec e_ph, e_re, e_im;
+#endif
+
 	for (int i = 0; i < imax; i++)
 	{
 		pmax = static_cast<long long int>(dens[i].size());
@@ -1952,6 +1985,74 @@ void calc_SF(const int& points,
 		d2_local = d2[i].data();
 		d3_local = d3[i].data();
 
+#if (defined(__aarch64__) && !defined(__APPLE__)) || defined(_M_ARM64)
+		e_ph.resize(pmax); e_re.resize(pmax); e_im.resize(pmax);
+		for (long long t = 0; t < pmax; t++)
+			e_ph[t] = dc[0] * d1_local[t] + dc[1] * d2_local[t] + dc[2] * d3_local[t];
+		sincos_shared_n(static_cast<int>(pmax), e_ph.data(), e_im.data(), e_re.data());
+		const double* er = e_re.data(), * ei = e_im.data();
+		//Blocks of SF_BLOCK reflections per task; per SF_TILE points (L1-resident Q) the block's reflections in order
+#pragma omp parallel for schedule(dynamic, 1)
+		for (long long b0 = 0; b0 < smax; b0 += SF_BLOCK)
+		{
+			const int nb = static_cast<int>(std::min<long long>(SF_BLOCK, smax - b0));
+			double qr[SF_TILE], qi[SF_TILE], acc_r[SF_BLOCK] = {}, acc_i[SF_BLOCK] = {};
+			for (long long t0 = 0; t0 < pmax; t0 += SF_TILE)
+			{
+				const int nt = static_cast<int>(std::min<long long>(SF_TILE, pmax - t0)), nt2 = nt & ~1;
+				const double* r = dens_local + t0, * x = d1_local + t0, * y = d2_local + t0, * z = d3_local + t0;
+				const double* tr = er + t0, * ti = ei + t0;
+				int since = 0;
+				for (int j = 0; j < nb; j++)
+				{
+					const long long sj = b0 + j;
+					float64x2_t sr = vdupq_n_f64(0.0), sm = vdupq_n_f64(0.0);
+					double re1 = 0.0, im1 = 0.0;
+					if (j == 0 || !cont[sj] || since == SF_ANCHOR)
+					{
+						since = 0;
+						const float64x2_t k1v = vdupq_n_f64(k1_data[sj]), k2v = vdupq_n_f64(k2_data[sj]), k3v = vdupq_n_f64(k3_data[sj]);
+						for (int q = 0; q < nt2; q += 2)
+						{
+							float64x2_t sv, cv;
+							sincos_shared2(vfmaq_f64(vfmaq_f64(vmulq_f64(k1v, vld1q_f64(x + q)), k2v, vld1q_f64(y + q)),
+								k3v, vld1q_f64(z + q)), &sv, &cv);
+							const float64x2_t rv = vld1q_f64(r + q), a = vmulq_f64(rv, cv), b = vmulq_f64(rv, sv);
+							vst1q_f64(qr + q, a); vst1q_f64(qi + q, b);
+							sr = vaddq_f64(sr, a); sm = vaddq_f64(sm, b);
+						}
+						if (nt2 < nt)
+						{
+							double sn, cs;
+							sincos_shared(k1_data[sj] * x[nt2] + k2_data[sj] * y[nt2] + k3_data[sj] * z[nt2], &sn, &cs);
+							qr[nt2] = re1 = r[nt2] * cs; qi[nt2] = im1 = r[nt2] * sn;
+						}
+					}
+					else
+					{
+						since++;
+						for (int q = 0; q < nt2; q += 2)
+						{
+							const float64x2_t a = vld1q_f64(qr + q), b = vld1q_f64(qi + q), c2 = vld1q_f64(tr + q), d = vld1q_f64(ti + q);
+							const float64x2_t nr = vfmsq_f64(vmulq_f64(a, c2), b, d), ni = vfmaq_f64(vmulq_f64(a, d), b, c2);
+							vst1q_f64(qr + q, nr); vst1q_f64(qi + q, ni);
+							sr = vaddq_f64(sr, nr); sm = vaddq_f64(sm, ni);
+						}
+						if (nt2 < nt)
+						{
+							const double a = qr[nt2], b = qi[nt2];
+							qr[nt2] = re1 = a * tr[nt2] - b * ti[nt2]; qi[nt2] = im1 = a * ti[nt2] + b * tr[nt2];
+						}
+					}
+					acc_r[j] += vgetq_lane_f64(sr, 0) + vgetq_lane_f64(sr, 1) + re1;
+					acc_i[j] += vgetq_lane_f64(sm, 0) + vgetq_lane_f64(sm, 1) + im1;
+				}
+			}
+			complex<double>* out = sf[i].data() + b0;
+			for (int j = 0; j < nb; j++)
+				out[j] = complex<double>(acc_r[j], acc_i[j]);
+		}
+#else
 #pragma omp parallel for private(work, rho, c, si, re, im, s, p)
 		for (s = 0; s < smax; s++)
 		{
@@ -1963,25 +2064,6 @@ void calc_SF(const int& points,
 			// Process loop in blocks of 4 for better instruction-level parallelism
 			const long long int pmax_vec = (pmax / 4) * 4;
 
-#if (defined(__aarch64__) && !defined(__APPLE__)) || defined(_M_ARM64)
-			//NEON: phase and sincos_shared2 two points at a time. glibc and the MSVC CRT have no vector sincos
-			//and reduce once per scalar call, the CRT twice; 75 % of a sucrose tsc on a Cortex-A72 was this loop
-			{
-				const float64x2_t k1v = vdupq_n_f64(k1_local), k2v = vdupq_n_f64(k2_local), k3v = vdupq_n_f64(k3_local);
-				float64x2_t re_v = vdupq_n_f64(0.0), im_v = vdupq_n_f64(0.0);
-				for (p = 0; p < pmax_vec; p += 2)
-				{
-					float64x2_t sv, cv;
-					sincos_shared2(vfmaq_f64(vfmaq_f64(vmulq_f64(k1v, vld1q_f64(d1_local + p)), k2v, vld1q_f64(d2_local + p)),
-						k3v, vld1q_f64(d3_local + p)), &sv, &cv);
-					const float64x2_t rv = vld1q_f64(dens_local + p);
-					re_v = vfmaq_f64(re_v, rv, cv);
-					im_v = vfmaq_f64(im_v, rv, sv);
-				}
-				re = vgetq_lane_f64(re_v, 0) + vgetq_lane_f64(re_v, 1);
-				im = vgetq_lane_f64(im_v, 0) + vgetq_lane_f64(im_v, 1);
-			}
-#else
 			// Vectorized main loop processing 4 elements at a time
 			for (p = 0; p < pmax_vec; p += 4)
 			{
@@ -2040,7 +2122,6 @@ void calc_SF(const int& points,
 				im += rho0 * si0 + rho1 * si1 + rho2 * si2 + rho3 * si3;
 #endif
 			}
-#endif
 
 			// Handle remaining elements
 			for (p = pmax_vec; p < pmax; p++)
@@ -2055,10 +2136,6 @@ void calc_SF(const int& points,
 				__sincos(work, &si, &c);
 				re += rho * c;
 				im += rho * si;
-#elif defined(_M_ARM64)
-				sincos_shared(work, &si, &c);
-				re += rho * c;
-				im += rho * si;
 #else
 				c = cos(work);
 				si = sin(work);
@@ -2069,6 +2146,7 @@ void calc_SF(const int& points,
 			sf_local[s].real(re);
 			sf_local[s].imag(im);
 		}
+#endif
 		if (!do_XCW) {
 			progress->update();
 		}
