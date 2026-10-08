@@ -336,8 +336,8 @@ vec SALTEDPredictor::merge_predictions()
 // 258 MB -> PROJW 0.5 MB. The weights are walked as read_model_data() walks them
 void fold_salted_file(const std::filesystem::path& in, const std::filesystem::path& out)
 {
-	// One BLAS thread: a threaded GEMM sums in an order set by the thread count, and the file must
-	// not depend on the machine that wrote it (Pi 4 OpenBLAS: 1.6e-14 rel. apart). The run ends here
+	// One BLAS thread: a threaded GEMM sums in an order set by the thread count (Pi 4 OpenBLAS, 4 vs 1:
+	// 1.6e-14 rel. apart). Another BLAS still differs in the last bits: fold once, ship the file. The run ends here
 	MKL_Set_Num_Threads(1);
 	SALTED_BINARY_FILE file(in);
 	err_checkf(!file.has_block("PROJW"), in.string() + " is folded already", std::cout);
