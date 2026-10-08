@@ -1600,11 +1600,23 @@ const double WFN::compute_dens_spherical(
 //find it cold and one reallocates under the other. The valid flag is read through an
 //atomic_ref so the warm path takes no lock (it is called per grid point from every
 //density evaluator); the member stays a plain bool so WFN stays copyable.
+#include <atomic>
+#if defined(__cpp_lib_atomic_ref) || defined(_MSC_VER)
+using nos_bool_ref = std::atomic_ref<bool>;
+#else
+//libc++ before 19 (Android NDK r27) has no std::atomic_ref; the compiler builtins are the same thing
+struct nos_bool_ref {
+	bool& b;
+	explicit nos_bool_ref(bool& x) : b(x) {}
+	bool load(std::memory_order o) const { return __atomic_load_n(&b, static_cast<int>(o)); }
+	void store(bool v, std::memory_order o) { __atomic_store_n(&b, v, static_cast<int>(o)); }
+};
+#endif
 const double* WFN::get_coef_primitive_major() const
 {
 	const int _nmo = get_nmo(false);
 	if (_nmo <= 0 || nex <= 0) return nullptr;
-	std::atomic_ref<bool> valid(coef_primitive_major_valid);
+	nos_bool_ref valid(coef_primitive_major_valid);
 	if (valid.load(std::memory_order_acquire)
 		&& coef_primitive_major.size() == (size_t)nex * (size_t)_nmo)
 		return coef_primitive_major.data();
