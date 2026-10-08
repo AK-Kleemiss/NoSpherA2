@@ -241,9 +241,11 @@ std::string help_message =
  "                                    the orbital-free PC07 estimate). Given\n"
  "                                    before -eli_analysis or -qtaim_eli the\n"
  "                                    QTAIM basins follow the fitted density.\n"
- "  -multipole_moments <scheme> <N>    Restrain the RI fit to the Hirshfeld, TFVC,\n"
- "                                    MBIS or EMBIS atomic charges and multipoles\n"
- "                                    up to order N (implies -ri_fit).\n"
+ "  -multipole_moments <scheme> [N]    Restrain RI atomic moments through order N\n"
+ "                                    (default 0). Hirshfeld, TFVC, MBIS and EMBIS\n"
+ "                                    support 0-8; Nuclear, Mulliken and Sanderson\n"
+ "                                    use atom-centred charge-only order 0\n"
+ "                                    (implies -ri_fit).\n"
  "  -multipole_strength <x>            Weight of the restraint rows against the\n"
  "                                    density-fit metric, default 1.\n"
  "  -multipole_centre                  Restrain the moments of each atom's own\n"
@@ -4104,22 +4106,41 @@ bool options::digest_ri_options(const std::string &temp, int &i)
 		aux_basis = get_aux_basis(argc, arguments, i);
 	}
 	else if (temp == "-multipole_moments") {
-		err_checkf(i + 2 < argc, "-multipole_moments needs a partitioning scheme and the highest order, e.g. -multipole_moments Hirshfeld 2", std::cout);
+		err_checkf(i + 1 < argc, "-multipole_moments needs a scheme, e.g. -multipole_moments Hirshfeld 2", std::cout);
 		std::string scheme = arguments[++i];
 		std::transform(scheme.begin(), scheme.end(), scheme.begin(),
 			[](unsigned char c) { return static_cast<char>(std::tolower(c)); });
 		if (scheme == "hirshfeld" || scheme == "hirsh")
-			multipole_scheme = PartitionType::Hirshfeld;
+			multipole_scheme = MultipoleScheme::HIRSHFELD;
 		else if (scheme == "tfvc")
-			multipole_scheme = PartitionType::TFVC;
+			multipole_scheme = MultipoleScheme::TFVC;
 		else if (scheme == "mbis")
-			multipole_scheme = PartitionType::MBIS;
+			multipole_scheme = MultipoleScheme::MBIS;
 		else if (scheme == "embis")
-			multipole_scheme = PartitionType::EMBIS;
+			multipole_scheme = MultipoleScheme::EMBIS;
+		else if (scheme == "nuclear")
+			multipole_scheme = MultipoleScheme::NUCLEAR;
+		else if (scheme == "mulliken")
+			multipole_scheme = MultipoleScheme::MULLIKEN;
+		else if (scheme == "sanderson")
+			multipole_scheme = MultipoleScheme::SANDERSON;
 		else
-			err("Unknown partitioning for -multipole_moments: " + arguments[i] + " (Hirshfeld, TFVC, MBIS or EMBIS)", std::cout);
-		multipole_lmax = std::stoi(arguments[++i]);
-		err_checkf(multipole_lmax >= 0 && multipole_lmax <= 8, "-multipole_moments: the order must be between 0 and 8", std::cout);
+			err("Unknown scheme for -multipole_moments: " + arguments[i] + " (Hirshfeld, TFVC, MBIS, EMBIS, Nuclear, Mulliken or Sanderson)", std::cout);
+		long order = 0;
+		if (i + 1 < argc) {
+			char* end = nullptr;
+			const long parsed = std::strtol(arguments[i + 1].c_str(), &end, 10);
+			if (end != arguments[i + 1].c_str() && *end == '\0') {
+				order = parsed;
+				++i;
+			}
+		}
+		if (multipole_scheme == MultipoleScheme::NUCLEAR || multipole_scheme == MultipoleScheme::MULLIKEN || multipole_scheme == MultipoleScheme::SANDERSON)
+			multipole_lmax = 0;
+		else {
+			err_checkf(order >= 0 && order <= 8, "-multipole_moments: the order must be between 0 and 8", std::cout);
+			multipole_lmax = static_cast<int>(order);
+		}
 		RI_FIT = true;
 		partition_type = PartitionType::RI;
 	}

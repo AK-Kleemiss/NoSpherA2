@@ -1186,3 +1186,24 @@ See also the rule in `CLAUDE.md` → *Agent / AI coding-assistant rules*.
    with matching args (always append `-all_charges` and `-no_date`)
 4. **Validate** in all four configurations: pytest Release, pytest Debug, VS Debug, VS Release
 5. **Update this file** — mark the test as passing or note blockers
+
+## 2026-10-08 — Unified RI multipole restraints
+
+The RI fit now uses `multipole_lmax >= 0` as its sole soft restraint switch.
+`-multipole_moments <scheme> 0` applies only the monopole (atomic electron
+population) rows; higher orders add their own rows. The separate
+`restrain_charges` switch, adaptive charge weights, and their target calculation
+were removed. Atom-centred and grid-partitioned l=0 cases are covered in
+`FittingIoCoverageTests`; the atom-centred case checks the resulting penalised
+linear system against independently assembled population rows.
+The focused Windows CTest set passed 20/20, including both RI multipole golden
+cases after removing the obsolete charge-restraint log lines. The existing
+golden moments and fitted values were unchanged.
+
+The same day, `-multipole_moments` gained `Nuclear`, `Mulliken` and `Sanderson`
+schemes. An omitted order defaults to 0; for those three schemes a supplied
+order is clamped to 0 and the fit uses atom-centred population rows. Their
+target formulas are checked against the penalised fit matrix in
+`FittingIoCoverageIntegratorTests.NuclearMullikenSandersonUseMonopoleRows`.
+The focused Windows CTest set, including parser and RI golden cases, passed
+23/23.

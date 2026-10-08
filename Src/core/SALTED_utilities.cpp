@@ -945,15 +945,11 @@ void create_SALTED_training_data(const WFN& orbital, const WFN& aux, const optio
 	// density's moments and leave per-centre sums free, so the blocks integrate to nothing physical
 	if (config.partition_restraints) {
 		std::cout
-			<< "SALTED training: restraining the atom-centred populations instead of the grid-partitioned ones."
+			<< "SALTED training: restraining atom-centred moments instead of grid-partitioned ones."
 			<< std::endl;
 		config.partition_restraints = false;
-		config.constrain_total_electrons = config.restrain_charges;
+		config.constrain_total_electrons = config.multipole_lmax >= 0;
 	}
-	//config.restrain_type = DensityFitting::RESTRAINT_TYPE::SIMPLE_AND_TIK;
-	//config.charge_scheme = DensityFitting::CHARGE_SCHEME::HIRSHFELD;
-	//if (wavy->get_origin() == e_origin::ptb)
-	//    config.restraint_strength = 1.0e-4;
 
 	vec coefs = DensityFitting::density_fit(orbital, aux, config);
 

@@ -31,14 +31,12 @@ Charge-weighted Schwarz screening (3e-07 e) kept 63029 of 63240 shell triplets
 Far field (erfc < 1e-14) took 974 of 63029 triplets as point multipoles from 317 pair-atom sums
 Fit controls:
   Tikhonov: off
-  Atomic charge restraints: on (Hirshfeld)
   Multipole restraints: on (lmax=2, Hirshfeld)
   Restraint definition: grid partitioned
   Exact total-electron constraint: off
 GridManager: Setting up prototype grids for atom types...
 GridManager: Generating integration grids for atoms...
 GridManager: Generated total of 32776 grid points.
-Added charge restraints for 7 atoms.
 Added multipole restraints up to l=2 for 7 atoms.
 Solving density-fitting system...
 
