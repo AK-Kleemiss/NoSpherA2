@@ -1822,6 +1822,60 @@ void calc_SF_SALTED(
 		}
 	}
 }
+#if (defined(__aarch64__) && !defined(__APPLE__)) || defined(_M_ARM64)
+//M consecutive recurrence steps of calc_SF in one pass over a tile: Q stays in registers between steps, so the A72's
+//~16 bytes/cycle of vector results go to multiplies instead of reloading Q. Two point pairs run side by side to hide
+//the chain latency. Every product and sum is the one a single step forms, in the same order: bit-identical.
+template <int M>
+static inline void sf_steps(const int nt, double* qr, double* qi, const double* tr, const double* ti, double* acc_r, double* acc_i)
+{
+	const int nt2 = nt & ~1;
+	float64x2_t sr[M], sm[M];
+	for (int k = 0; k < M; k++) sr[k] = sm[k] = vdupq_n_f64(0.0);
+	int q = 0;
+	for (; q + 3 < nt2; q += 4)
+	{
+		float64x2_t a0 = vld1q_f64(qr + q), b0 = vld1q_f64(qi + q), a1 = vld1q_f64(qr + q + 2), b1 = vld1q_f64(qi + q + 2);
+		const float64x2_t c0 = vld1q_f64(tr + q), d0 = vld1q_f64(ti + q), c1 = vld1q_f64(tr + q + 2), d1 = vld1q_f64(ti + q + 2);
+		for (int k = 0; k < M; k++)
+		{
+			const float64x2_t nr0 = vfmsq_f64(vmulq_f64(a0, c0), b0, d0), ni0 = vfmaq_f64(vmulq_f64(a0, d0), b0, c0);
+			const float64x2_t nr1 = vfmsq_f64(vmulq_f64(a1, c1), b1, d1), ni1 = vfmaq_f64(vmulq_f64(a1, d1), b1, c1);
+			sr[k] = vaddq_f64(vaddq_f64(sr[k], nr0), nr1); sm[k] = vaddq_f64(vaddq_f64(sm[k], ni0), ni1);
+			a0 = nr0; b0 = ni0; a1 = nr1; b1 = ni1;
+		}
+		vst1q_f64(qr + q, a0); vst1q_f64(qi + q, b0); vst1q_f64(qr + q + 2, a1); vst1q_f64(qi + q + 2, b1);
+	}
+	if (q < nt2)
+	{
+		float64x2_t a = vld1q_f64(qr + q), b = vld1q_f64(qi + q);
+		const float64x2_t c2 = vld1q_f64(tr + q), d = vld1q_f64(ti + q);
+		for (int k = 0; k < M; k++)
+		{
+			const float64x2_t nr = vfmsq_f64(vmulq_f64(a, c2), b, d), ni = vfmaq_f64(vmulq_f64(a, d), b, c2);
+			sr[k] = vaddq_f64(sr[k], nr); sm[k] = vaddq_f64(sm[k], ni);
+			a = nr; b = ni;
+		}
+		vst1q_f64(qr + q, a); vst1q_f64(qi + q, b);
+	}
+	double re1[M] = {}, im1[M] = {};
+	if (nt2 < nt)
+	{
+		double a = qr[nt2], b = qi[nt2];
+		for (int k = 0; k < M; k++)
+		{
+			const double nr = a * tr[nt2] - b * ti[nt2], ni = a * ti[nt2] + b * tr[nt2];
+			re1[k] = a = nr; im1[k] = b = ni;
+		}
+		qr[nt2] = a; qi[nt2] = b;
+	}
+	for (int k = 0; k < M; k++)
+	{
+		acc_r[k] += vgetq_lane_f64(sr[k], 0) + vgetq_lane_f64(sr[k], 1) + re1[k];
+		acc_i[k] += vgetq_lane_f64(sm[k], 0) + vgetq_lane_f64(sm[k], 1) + im1[k];
+	}
+}
+#endif
 /**
  * Calculates the scattering factors for a given set of parameters.
  *
@@ -2003,20 +2057,32 @@ void calc_SF(const int& points,
 				const double* r = dens_local + t0, * x = d1_local + t0, * y = d2_local + t0, * z = d3_local + t0;
 				const double* tr = er + t0, * ti = ei + t0;
 				int since = 0;
-				for (int j = 0; j < nb; j++)
+				for (int j = 0; j < nb;)
 				{
 					const long long sj = b0 + j;
-					float64x2_t sr = vdupq_n_f64(0.0), sm = vdupq_n_f64(0.0);
-					double re1 = 0.0, im1 = 0.0;
 					if (j == 0 || !cont[sj] || since == SF_ANCHOR)
 					{
 						since = 0;
+						float64x2_t sr = vdupq_n_f64(0.0), sm = vdupq_n_f64(0.0);
+						double re1 = 0.0, im1 = 0.0;
 						const float64x2_t k1v = vdupq_n_f64(k1_data[sj]), k2v = vdupq_n_f64(k2_data[sj]), k3v = vdupq_n_f64(k3_data[sj]);
-						for (int q = 0; q < nt2; q += 2)
+						const auto phase = [&](const int q) {
+							return vfmaq_f64(vfmaq_f64(vmulq_f64(k1v, vld1q_f64(x + q)), k2v, vld1q_f64(y + q)), k3v, vld1q_f64(z + q));
+						};
+						int q = 0;
+						for (; q + 3 < nt2; q += 4)
+						{
+							float64x2_t s0, c0, s1, c1;
+							sincos_shared4(phase(q), phase(q + 2), &s0, &c0, &s1, &c1);
+							const float64x2_t r0 = vld1q_f64(r + q), r1 = vld1q_f64(r + q + 2);
+							const float64x2_t a0 = vmulq_f64(r0, c0), b0 = vmulq_f64(r0, s0), a1 = vmulq_f64(r1, c1), b1 = vmulq_f64(r1, s1);
+							vst1q_f64(qr + q, a0); vst1q_f64(qi + q, b0); vst1q_f64(qr + q + 2, a1); vst1q_f64(qi + q + 2, b1);
+							sr = vaddq_f64(vaddq_f64(sr, a0), a1); sm = vaddq_f64(vaddq_f64(sm, b0), b1);
+						}
+						if (q < nt2)
 						{
 							float64x2_t sv, cv;
-							sincos_shared2(vfmaq_f64(vfmaq_f64(vmulq_f64(k1v, vld1q_f64(x + q)), k2v, vld1q_f64(y + q)),
-								k3v, vld1q_f64(z + q)), &sv, &cv);
+							sincos_shared2(phase(q), &sv, &cv);
 							const float64x2_t rv = vld1q_f64(r + q), a = vmulq_f64(rv, cv), b = vmulq_f64(rv, sv);
 							vst1q_f64(qr + q, a); vst1q_f64(qi + q, b);
 							sr = vaddq_f64(sr, a); sm = vaddq_f64(sm, b);
@@ -2027,25 +2093,23 @@ void calc_SF(const int& points,
 							sincos_shared(k1_data[sj] * x[nt2] + k2_data[sj] * y[nt2] + k3_data[sj] * z[nt2], &sn, &cs);
 							qr[nt2] = re1 = r[nt2] * cs; qi[nt2] = im1 = r[nt2] * sn;
 						}
+						acc_r[j] += vgetq_lane_f64(sr, 0) + vgetq_lane_f64(sr, 1) + re1;
+						acc_i[j] += vgetq_lane_f64(sm, 0) + vgetq_lane_f64(sm, 1) + im1;
+						j++;
+						continue;
 					}
-					else
+					//steps j .. j+m-1 all continue the row, none reaching the anchor limit
+					int m = 1;
+					while (m < 4 && j + m < nb && cont[sj + m] && since + m < SF_ANCHOR) m++;
+					switch (m)
 					{
-						since++;
-						for (int q = 0; q < nt2; q += 2)
-						{
-							const float64x2_t a = vld1q_f64(qr + q), b = vld1q_f64(qi + q), c2 = vld1q_f64(tr + q), d = vld1q_f64(ti + q);
-							const float64x2_t nr = vfmsq_f64(vmulq_f64(a, c2), b, d), ni = vfmaq_f64(vmulq_f64(a, d), b, c2);
-							vst1q_f64(qr + q, nr); vst1q_f64(qi + q, ni);
-							sr = vaddq_f64(sr, nr); sm = vaddq_f64(sm, ni);
-						}
-						if (nt2 < nt)
-						{
-							const double a = qr[nt2], b = qi[nt2];
-							qr[nt2] = re1 = a * tr[nt2] - b * ti[nt2]; qi[nt2] = im1 = a * ti[nt2] + b * tr[nt2];
-						}
+					case 1: sf_steps<1>(nt, qr, qi, tr, ti, acc_r + j, acc_i + j); break;
+					case 2: sf_steps<2>(nt, qr, qi, tr, ti, acc_r + j, acc_i + j); break;
+					case 3: sf_steps<3>(nt, qr, qi, tr, ti, acc_r + j, acc_i + j); break;
+					default: sf_steps<4>(nt, qr, qi, tr, ti, acc_r + j, acc_i + j); break;
 					}
-					acc_r[j] += vgetq_lane_f64(sr, 0) + vgetq_lane_f64(sr, 1) + re1;
-					acc_i[j] += vgetq_lane_f64(sm, 0) + vgetq_lane_f64(sm, 1) + im1;
+					since += m;
+					j += m;
 				}
 			}
 			complex<double>* out = sf[i].data() + b0;
