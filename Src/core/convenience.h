@@ -200,7 +200,14 @@ inline double fast_exp_neg(double x) {
 // MSVC /fp:fast swaps for a scalar sin good to ~4e-8 at |x| ~ 1e8). calc_SF runs the same kernels on vector lanes.
 inline void sincos_shared(const double x, double* s, double* c) {
 	if (!(std::abs(x) < 1e5)) { *s = std::sin(x); *c = std::cos(x); return; }
+#ifdef __ANDROID__
+	//armv7 has no inline nearbyint or double->int64: both are calls, 2.4x the kernel on the A53. The 1.5*2^52 shift rounds to nearest without -ffast-math
+	const double q = (x * 0.63661977236758134308 + 6755399441055744.0) - 6755399441055744.0;
+	const int quad = static_cast<int>(q);
+#else
 	const double q = std::nearbyint(x * 0.63661977236758134308);
+	const long long quad = static_cast<long long>(q);
+#endif
 	const double r = ((x - q * 1.57079632673412561417e+00) - q * 6.07710050630396597660e-11) - q * 2.02226624871116645580e-21;
 	const double z = r * r;
 	const double sr = r + r * z * (-1.66666666666666324348e-01 + z * (8.33333333332248946124e-03 + z * (-1.98412698298579493134e-04 +
@@ -209,7 +216,7 @@ inline void sincos_shared(const double x, double* s, double* c) {
 	const double cr = w + (((1.0 - w) - hz) + z * z * (4.16666666666666019037e-02 + z * (-1.38888888888741095749e-03 +
 		z * (2.48015872894767294178e-05 + z * (-2.75573143513906633035e-07 + z * (2.08757232129817482790e-09 +
 		z * -1.13596475577881948265e-11))))));
-	switch (static_cast<long long>(q) & 3) {
+	switch (quad & 3) {
 	case 0: *s = sr; *c = cr; break;
 	case 1: *s = cr; *c = -sr; break;
 	case 2: *s = -sr; *c = -cr; break;
