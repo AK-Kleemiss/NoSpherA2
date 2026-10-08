@@ -367,7 +367,8 @@ TEST(PropertiesCoverageSpinTests, SpinDensityCubeIsAlphaMinusBeta)
 	Calc_S_Rho(t, w, log, nodate);
 	const std::string console = capture_end();
 	EXPECT_NE(console.find("Calculating Values"), std::string::npos);
-	EXPECT_NE(log.str().find("Time to calculate Values: 0 s"), std::string::npos);
+	//the seconds are wall time: a loaded CI runner needed a second or more for these 27 points, so only the line is checked
+	EXPECT_NE(log.str().find("Time to calculate Values: "), std::string::npos);
 	EXPECT_NEAR(t.get_value(1, 1, 1), 0.75, 1e-12);
 }
 
