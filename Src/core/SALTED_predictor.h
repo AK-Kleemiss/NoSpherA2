@@ -99,6 +99,6 @@ private:
 	vec predict();
 };
 
-// Writes the model `in` to `out` as VERSION 4: PROJW holds what install_model_lambda() folds on every run
+// Writes the model `in` to `out` as VERSION 4: PROJW, each projector times its weights, replaces PROJ
 void fold_salted_file(const std::filesystem::path& in, const std::filesystem::path& out);
 
