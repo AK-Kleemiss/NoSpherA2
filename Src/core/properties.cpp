@@ -211,6 +211,34 @@ void accumulate_prop_values(std::vector<cube> &cubes, const i3 &mapped_idx, cons
 		cubes[cube_type::Eli].set_value(x, y, z, cubes[cube_type::Eli].get_value(x, y, z) + sanitize_finite(values.eli));
 }
 
+//Per B^3 block of cube points, the atoms (in input order) whose centre lies within reach[a] of some point of the block
+std::vector<std::vector<int>> block_atom_lists(const cube &c, const int B, const std::vector<d3> &pos, const vec &reach)
+{
+	const i3 n = c.get_sizes();
+	const i3 nb = { (n[0] + B - 1) / B, (n[1] + B - 1) / B, (n[2] + B - 1) / B };
+	std::vector<std::vector<int>> lists((size_t)nb[0] * nb[1] * nb[2]);
+#pragma omp parallel for schedule(dynamic)
+	for (int b = 0; b < (int)lists.size(); b++)
+	{
+		const int bx = b / (nb[1] * nb[2]), by = (b / nb[2]) % nb[1], bz = b % nb[2];
+		const int lo[3] = { bx * B, by * B, bz * B };
+		const int hi[3] = { std::min(lo[0] + B, n[0]) - 1, std::min(lo[1] + B, n[1]) - 1, std::min(lo[2] + B, n[2]) - 1 };
+		//the farthest point of the block's parallelepiped from its centre is a corner
+		d3 corner[8], centre = { 0, 0, 0 };
+		for (int k = 0; k < 8; k++)
+		{
+			corner[k] = c.get_pos(k & 1 ? hi[0] : lo[0], k & 2 ? hi[1] : lo[1], k & 4 ? hi[2] : lo[2]);
+			for (int d = 0; d < 3; d++) centre[d] += corner[k][d] / 8;
+		}
+		double rb = 0;
+		for (int k = 0; k < 8; k++) rb = std::max(rb, array_length(corner[k], centre));
+		for (int a = 0; a < (int)pos.size(); a++)
+			if (array_length(centre, pos[a]) <= reach[a] + rb + 1E-6)
+				lists[b].push_back(a);
+	}
+	return lists;
+}
+
 } // namespace
 
 void Calc_Spherical_Dens(
@@ -277,21 +305,51 @@ void Calc_Spherical_Dens(
 	}
 #endif
 
-	evaluate_cube_in_radius(
-		CubeSpher,
-		wrap,
-		wavy_atoms,
-		radius_bohr,
-		[&](const d3 &pos) {
-			vector<double> dists(wavy.get_ncen(), 0.0);
-			for (int a = 0; a < wavy.get_ncen(); a++)
-				dists[a] = array_length(pos, wavy.get_atom_pos(a));
+	if (!wrap)
+	{
+		//Per 8^3 block of points only the atoms that can reach it: Thakkar is exactly 0 past its table end, so a
+		//dropped atom only ever added +0.0 and the in-radius test sees every atom within radius_bohr; values bit-identical.
+		constexpr int B = 8;
+		const i3 n = CubeSpher.get_sizes();
+		const i3 nb = { (n[0] + B - 1) / B, (n[1] + B - 1) / B, (n[2] + B - 1) / B };
+		vector<d3> apos(wavy_atoms.size());
+		vec reach(wavy_atoms.size());
+		for (size_t a = 0; a < wavy_atoms.size(); a++)
+		{
+			apos[a] = wavy_atoms[a].get_pos();
+			reach[a] = std::max(atom_models[wavy_atoms[a].get_charge() - 1].get_radial_dist().back(), radius_bohr);
+		}
+		const vector<vector<int>> block_atoms = block_atom_lists(CubeSpher, B, apos, reach);
+		CubeSpher.evaluate_on_grid(
+			[&](const d3 &pos, const i3 &idx, const i3 &) {
+				const vector<int> &nearby = block_atoms[((size_t)(idx[0] / B) * nb[1] + idx[1] / B) * nb[2] + idx[2] / B];
+				bool inside = false;
+				for (const int a : nearby)
+					if (array_length(pos, wavy_atoms[a].get_pos()) < radius_bohr) { inside = true; break; }
+				if (!inside)
+					return 0.0;
+				double dens_all = 0.0;
+				for (const int a : nearby)
+					dens_all += atom_models[wavy_atoms[a].get_charge() - 1].get_interpolated_density(array_length(pos, wavy_atoms[a].get_pos()));
+				return dens_all;
+			});
+	}
+	else
+		evaluate_cube_in_radius(
+			CubeSpher,
+			wrap,
+			wavy_atoms,
+			radius_bohr,
+			[&](const d3 &pos) {
+				vector<double> dists(wavy.get_ncen(), 0.0);
+				for (int a = 0; a < wavy.get_ncen(); a++)
+					dists[a] = array_length(pos, wavy.get_atom_pos(a));
 
-			double dens_all = 0.0;
-			for (int a = 0; a < wavy.get_ncen(); a++)
-				dens_all += atom_models[wavy.get_atom_charge(a) - 1].get_interpolated_density(dists[a]);
-			return dens_all;
-		});
+				double dens_all = 0.0;
+				for (int a = 0; a < wavy.get_ncen(); a++)
+					dens_all += atom_models[wavy.get_atom_charge(a) - 1].get_interpolated_density(dists[a]);
+				return dens_all;
+			});
 
 	_time_point end = get_time();
 	print_time(start, end, file);
@@ -1178,18 +1236,21 @@ struct PromolecularAtom {
 	int fragment = 0;
 };
 
+// nearby: indices into atoms, ascending; atoms left out must be past their spline table end (exactly 0)
 PromolecularFragmentDensities promolecular_fragment_densities_at(
 	const d3 &pos,
 	const std::vector<PromolecularAtom> &atoms,
+	const std::vector<int> &nearby,
 	const std::vector<Thakkar> &atom_models)
 {
 	PromolecularFragmentDensities result;
 	// atoms are grouped by fragment (add_promolecular_atoms appends whole fragments),
 	// so a running per-fragment sum needs no per-fragment storage
 	double fragment_sum = 0.0;
-	int current_fragment = atoms.empty() ? 0 : atoms.front().fragment;
-	for (const PromolecularAtom &atom : atoms)
+	int current_fragment = nearby.empty() ? 0 : atoms[nearby.front()].fragment;
+	for (const int a : nearby)
 	{
+		const PromolecularAtom &atom = atoms[a];
 		if (atom.fragment != current_fragment)
 		{
 			result.dominant = std::max(result.dominant, fragment_sum);
@@ -1558,6 +1619,19 @@ void promolecular_nci_analysis(
 	log << "Fragment-sum density keep cutoff: " << opts.promol_nci_rcut2 << endl;
 
 	const _time_point t_mask = get_time();
+	//Per 8^3 block only the atoms within their spline table end: the rest add exactly 0, in order, so bit-identical
+	constexpr int B = 8;
+	vector<d3> apos(atoms.size());
+	vec reach(atoms.size());
+	vector<int> all_atoms(atoms.size());
+	for (size_t a = 0; a < atoms.size(); a++)
+	{
+		apos[a] = atoms[a].pos;
+		reach[a] = atom_models[atoms[a].charge - 1].get_radial_dist().back();
+		all_atoms[a] = (int)a;
+	}
+	const vector<vector<int>> block_atoms = block_atom_lists(rho_cube, B, apos, reach);
+	const int nby = (rho_cube.get_size(1) + B - 1) / B, nbz = (rho_cube.get_size(2) + B - 1) / B;
 	ProgressBar density_progress(rho_cube.get_size(0), 50, "=", " ", "Calculating promolecular rho");
 #pragma omp parallel for schedule(dynamic)
 	for (int x = 0; x < rho_cube.get_size(0); x++)
@@ -1566,7 +1640,8 @@ void promolecular_nci_analysis(
 			for (int z = 0; z < rho_cube.get_size(2); z++)
 			{
 				const d3 pos = rho_cube.get_pos(x, y, z);
-				const PromolecularFragmentDensities densities = promolecular_fragment_densities_at(pos, atoms, atom_models);
+				const vector<int> &nearby = block_atoms[((size_t)(x / B) * nby + y / B) * nbz + z / B];
+				const PromolecularFragmentDensities densities = promolecular_fragment_densities_at(pos, atoms, nearby, atom_models);
 				const double rho = densities.total();
 				rho_cube.set_value(x, y, z, rho);
 				rdg_cube.set_value(
@@ -1687,7 +1762,7 @@ void promolecular_nci_analysis(
 	for (long long i = 0; i < static_cast<long long>(triangles.size()); i++)
 	{
 		const d3 c = triangles[i].calc_center();
-		const PromolecularFragmentDensities densities = promolecular_fragment_densities_at(c, atoms, atom_models);
+		const PromolecularFragmentDensities densities = promolecular_fragment_densities_at(c, atoms, all_atoms, atom_models);
 		if (!is_promolecular_nci_point(densities, densities.total(), opts.promol_nci_rcut1, opts.promol_nci_rcut2))
 			continue;
 		d3 grad;
