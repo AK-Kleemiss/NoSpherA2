@@ -71,11 +71,11 @@ static inline int lm_index(const int l, const int m)
 static const char* charge_scheme_name(const DensityFitting::CHARGE_SCHEME scheme)
 {
 	switch (scheme) {
+	case DensityFitting::CHARGE_SCHEME::NUCLEAR:             return "Nuclear";
 	case DensityFitting::CHARGE_SCHEME::MULLIKEN:            return "Mulliken";
-	case DensityFitting::CHARGE_SCHEME::SANDERSON_ESTIMATE: return "Sanderson Estimate";
+	case DensityFitting::CHARGE_SCHEME::SANDERSON_ESTIMATE: return "Sanderson";
 	case DensityFitting::CHARGE_SCHEME::TFVC:                return "TFVC";
 	case DensityFitting::CHARGE_SCHEME::HIRSHFELD:           return "Hirshfeld";
-	case DensityFitting::CHARGE_SCHEME::NUCLEAR:             return "Nuclear Charge";
 	case DensityFitting::CHARGE_SCHEME::MBIS:                return "MBIS";
 	case DensityFitting::CHARGE_SCHEME::EMBIS:               return "EMBIS";
 	}
@@ -88,6 +88,13 @@ static bool is_grid_partition_scheme(const DensityFitting::CHARGE_SCHEME scheme)
 		|| scheme == DensityFitting::CHARGE_SCHEME::HIRSHFELD
 		|| scheme == DensityFitting::CHARGE_SCHEME::MBIS
 		|| scheme == DensityFitting::CHARGE_SCHEME::EMBIS;
+}
+
+static bool is_population_only_scheme(const DensityFitting::CHARGE_SCHEME scheme)
+{
+	return scheme == DensityFitting::CHARGE_SCHEME::NUCLEAR
+		|| scheme == DensityFitting::CHARGE_SCHEME::MULLIKEN
+		|| scheme == DensityFitting::CHARGE_SCHEME::SANDERSON_ESTIMATE;
 }
 
 static PartitionType scheme_partition(const DensityFitting::CHARGE_SCHEME scheme)
@@ -185,7 +192,7 @@ static vec2 atomic_population_rows(
 	return rows;
 }
 
-// [atom][l,m] rows for analytic multipoles; l=0 stays unused, populations come from atomic_population_rows().
+// [atom][l,m] rows for analytic multipoles; l=0 is the atomic population divided by sqrt(4 pi).
 static vec2 analytic_multipole_rows(
 	const aux_density_table& t,
 	const int lmax)
@@ -200,7 +207,6 @@ static vec2 analytic_multipole_rows(
 		{
 			const int l = t.sh_l[s];
 
-			// l=0 is penalised through population_rows, the row here only feeds the report
 			if (l > lmax)
 				continue;
 
@@ -223,7 +229,7 @@ static vec2 analytic_multipole_rows(
 	return rows;
 }
 
-void DensityFitting::partition_rows_on_grid(const aux_density_table& t, const int np, const double* x, const double* y, const double* z, const double* w, const double* centre, const int lmax, vec2& rows, const int row0)
+void DensityFitting::partition_rows_on_grid(const aux_density_table& t, const int np, const double* x, const double* y, const double* z, const double* w, const double* centre, const int lmax, vec2& rows, const int row0, const int lmin)
 {
 	const int n_mom = (lmax + 1) * (lmax + 1);
 	vec Y(n_mom), val(t.n_coef);
@@ -234,8 +240,8 @@ void DensityFitting::partition_rows_on_grid(const aux_density_table& t, const in
 		const double r = std::sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
 		if (r > 0.0)
 			for (int i = 0; i < 3; i++) d[i] /= r;
-		double rl = w[p];
-		for (int l = 0; l <= lmax; l++) {
+		double rl = w[p] * std::pow(r, lmin);
+		for (int l = lmin; l <= lmax; l++) {
 			for (int m = -l; m <= l; m++) Y[l * l + l + m] = rl * constants::spherical_harmonic(l, m, d);
 			rl *= r;
 		}
@@ -258,7 +264,7 @@ void DensityFitting::partition_rows_on_grid(const aux_density_table& t, const in
 				}
 			}
 		}
-		for (int k = 0; k < n_mom; k++) {
+		for (int k = lmin * lmin; k < n_mom; k++) {
 			double* row = rows[row0 + k].data();
 			const double yk = Y[k];
 			for (int i = 0; i < n; i++) row[idx[i]] += yk * val[i];
@@ -277,7 +283,8 @@ static vec2 partition_rows(
 	const WFN& wavy,
 	const aux_density_table& table,
 	GridManager& grid_manager,
-	const int lmax)
+	const int lmax,
+	const int lmin = 0)
 {
 	err_checkf(
 		lmax >= 0 && lmax <= 8,
@@ -324,7 +331,8 @@ static vec2 partition_rows(
 			centre,
 			lmax,
 			rows,
-			a * n_mom);
+			a * n_mom,
+			lmin);
 	}
 
 	return rows;
@@ -349,74 +357,90 @@ static partition_multipole_data calculate_partition_multipoles(
 
 	partition_multipole_data result;
 	result.targets = grid_manager.calculatePartitionedMultipoles(temp, lmax);
-	result.rows = partition_rows(wavy, table, grid_manager, lmax);
+	result.rows = partition_rows(wavy, table, grid_manager, lmax, 2);
 	return result;
 }
 
 struct restraint_data
 {
-	bool partitioned = false;
+	bool grid_higher_moments = false;
 	int lmax = 0;
 
-	vec expected_populations;
 	vec2 multipole_targets;
-
-	// Used by atom-centred charge restraints and by the optional exact total
-	// electron constraint. Empty when neither is needed.
 	vec2 population_rows;
-
-	// Full atom*(lmax+1)^2 table. The penalty uses l>=1 in analytic mode, l>=0 partitioned;
-	// the report reads every row.
 	vec2 multipole_rows;
 };
 
-static void subtract_ecp_electrons(
-	vec& populations,
-	const WFN& wavy)
+static vec simple_population_targets(const WFN& wavy, const DensityFitting::CHARGE_SCHEME scheme)
 {
-	if (!wavy.get_has_ECPs())
-		return;
-
-	for (int a = 0; a < wavy.get_ncen(); ++a)
-		populations[a] -= wavy.get_atom_ECP_electrons(a);
+	vec populations(wavy.get_ncen(), 0.0);
+	if (scheme == DensityFitting::CHARGE_SCHEME::NUCLEAR) {
+		for (int a = 0; a < wavy.get_ncen(); ++a)
+			populations[a] = wavy.get_atom_charge(a) - wavy.get_atom_ECP_electrons(a);
+	}
+	else if (scheme == DensityFitting::CHARGE_SCHEME::SANDERSON_ESTIMATE) {
+		double compound = 1.0;
+		for (int a = 0; a < wavy.get_ncen(); ++a)
+			compound *= constants::allen_electronegativities[wavy.get_atom_charge(a) - 1];
+		compound = std::pow(compound, 1.0 / wavy.get_ncen());
+		for (int a = 0; a < wavy.get_ncen(); ++a) {
+			const double chi = constants::allen_electronegativities[wavy.get_atom_charge(a) - 1];
+			populations[a] = wavy.get_atom_charge(a) + (compound - chi) / (1.57 * std::sqrt(chi)) - wavy.get_atom_ECP_electrons(a);
+		}
+	}
+	else if (scheme == DensityFitting::CHARGE_SCHEME::MULLIKEN) {
+		const dMatrix2 dm = wavy.get_dm();
+		const dMatrix2 S = ao_overlap(wavy);
+		const size_t nao = dm.extent(1);
+		size_t mu_begin = 0;
+		for (int a = 0; a < wavy.get_ncen(); ++a) {
+			const atom A = wavy.get_atom(a);
+			size_t n_ao = 0;
+			int prim = 0;
+			for (size_t s = 0; s < A.get_shellcount().size(); ++s) {
+				const int l = A.get_basis_set_entry(prim).get_type() - 1;
+				n_ao += 2 * l + 1;
+				prim += A.get_shellcount()[s];
+			}
+			for (size_t m = mu_begin; m < mu_begin + n_ao; ++m)
+				for (size_t n = 0; n < nao; ++n)
+					populations[a] += dm(m, n) * S(n, m);
+			mu_begin += n_ao;
+		}
+	}
+	return populations;
 }
 
 static restraint_data build_restraint_data(
 	const WFN& wavy,
-	const WFN& wavy_aux,
 	const aux_density_table& aux_table,
 	const DensityFitting::CONFIG& config)
 {
 	restraint_data data;
-	data.partitioned = config.partition_restraints;
-	data.lmax = config.restrain_multipoles
-		? config.multipole_lmax
-		: 0;
-
-	if (config.restrain_multipoles) {
+	data.grid_higher_moments = config.grid_higher_moments && config.multipole_lmax >= 2;
+	data.lmax = config.multipole_lmax;
+	if (config.multipole_lmax >= 0) {
 		err_checkf(
-			config.multipole_lmax >= 1 && config.multipole_lmax <= 8,
-			"Multipole restraints require 1 <= multipole_lmax <= 8",
+			config.multipole_lmax <= 8,
+			"Multipole restraints require 0 <= multipole_lmax <= 8",
+			std::cout);
+		err_checkf(
+			is_grid_partition_scheme(config.charge_scheme) || (is_population_only_scheme(config.charge_scheme) && config.multipole_lmax == 0 && !data.grid_higher_moments),
+			"Nuclear, Mulliken and Sanderson support atom-centred l=0 restraints only",
 			std::cout);
 	}
-
-	if (config.restrain_multipoles
-		|| (data.partitioned && config.restrain_charges)) {
-		err_checkf(
-			is_grid_partition_scheme(config.charge_scheme),
-			"Grid-partitioned charges/multipoles require TFVC, Hirshfeld, MBIS or EMBIS",
-			std::cout);
-	}
-
-	// The exact total-electron constraint is deliberately independent of the
-	// atomic partitioning scheme.
-	if ((!data.partitioned && config.restrain_charges)
-		|| config.constrain_total_electrons) {
+	if (config.constrain_total_electrons)
 		data.population_rows = atomic_population_rows(aux_table);
+	if (config.multipole_lmax < 0)
+		return data;
+	if (is_population_only_scheme(config.charge_scheme)) {
+		const vec populations = simple_population_targets(wavy, config.charge_scheme);
+		data.multipole_targets.resize(wavy.get_ncen(), vec(1));
+		for (int a = 0; a < wavy.get_ncen(); ++a)
+			data.multipole_targets[a][0] = populations[a] / std::sqrt(constants::FOUR_PI);
+		data.multipole_rows = analytic_multipole_rows(aux_table, 0);
 	}
-
-	if (data.partitioned
-		&& (config.restrain_charges || config.restrain_multipoles)) {
+	else if (data.grid_higher_moments) {
 		auto result = calculate_partition_multipoles(
 			wavy,
 			aux_table,
@@ -425,39 +449,17 @@ static restraint_data build_restraint_data(
 
 		data.multipole_targets = std::move(result.targets);
 		data.multipole_rows = std::move(result.rows);
-
-		if (config.restrain_charges) {
-			data.expected_populations.resize(wavy.get_ncen());
-			for (int a = 0; a < wavy.get_ncen(); ++a)
-				data.expected_populations[a] =
-				std::sqrt(constants::FOUR_PI)
-				* data.multipole_targets[a][0];
-		}
+		const vec2 centre_rows = analytic_multipole_rows(aux_table, 1);
+		const int n_mom = (data.lmax + 1) * (data.lmax + 1);
+		for (int a = 0; a < wavy.get_ncen(); ++a)
+			for (int k = 0; k < 4; ++k)
+				data.multipole_rows[a * n_mom + k] = centre_rows[a * 4 + k];
 	}
 	else {
-		if (config.restrain_charges) {
-			data.expected_populations =
-				DensityFitting::calculate_expected_populations(
-					wavy,
-					wavy_aux,
-					config.charge_scheme);
-
-			// Preserve the existing convention for non-grid population
-			// targets: the fitted auxiliary density contains no ECP electrons.
-			subtract_ecp_electrons(data.expected_populations, wavy);
-		}
-
-		if (config.restrain_multipoles) {
-			data.multipole_targets =
-				DensityFitting::calculate_expected_multipoles(
-					wavy,
-					config.charge_scheme,
-					config.multipole_lmax);
-
-			data.multipole_rows = analytic_multipole_rows(
-				aux_table,
-				config.multipole_lmax);
-		}
+		data.multipole_targets = DensityFitting::calculate_expected_multipoles(
+			wavy, config.charge_scheme, config.multipole_lmax);
+		data.multipole_rows = analytic_multipole_rows(
+			aux_table, config.multipole_lmax);
 	}
 
 	return data;
@@ -515,53 +517,6 @@ static void apply_tikhonov_regularization(
 		H[i * n_aux + i] += lambda;
 }
 
-static void apply_charge_restraints(
-	vec& H,
-	vec& g,
-	const WFN& wavy_aux,
-	const DensityFitting::CONFIG& config,
-	const restraint_data& restraints,
-	const size_t n_aux)
-{
-	if (!config.restrain_charges)
-		return;
-
-	const int n_atoms = wavy_aux.get_ncen();
-	// -multipole_moments: the population rows share the multipole weight, otherwise the adaptive charge weights
-	const vec weights = config.multipole_lmax >= 0
-		? vec(n_atoms, config.multipole_strength)
-		: DensityFitting::restraint_weights(wavy_aux, n_aux, config.restraint_strength, config.adaptive_restraint);
-
-	if (restraints.partitioned) {
-		const int n_mom = (restraints.lmax + 1) * (restraints.lmax + 1);
-		const double stone = std::sqrt(constants::FOUR_PI);
-
-		for (int a = 0; a < n_atoms; ++a) {
-			add_penalty_row(
-				H,
-				g,
-				restraints.multipole_rows[static_cast<size_t>(a) * static_cast<size_t>(n_mom)],
-				restraints.multipole_targets[a][0],
-				weights[a] * stone,
-				n_aux);
-		}
-	}
-	else {
-		for (int a = 0; a < n_atoms; ++a) {
-			add_penalty_row(
-				H,
-				g,
-				restraints.population_rows[a],
-				restraints.expected_populations[a],
-				weights[a],
-				n_aux);
-		}
-	}
-
-	std::cout << "Added charge restraints for "
-		<< n_atoms << " atoms." << std::endl;
-}
-
 static void apply_multipole_restraints(
 	vec& H,
 	vec& g,
@@ -570,7 +525,7 @@ static void apply_multipole_restraints(
 	const restraint_data& restraints,
 	const size_t n_aux)
 {
-	if (!config.restrain_multipoles)
+	if (config.multipole_lmax < 0)
 		return;
 
 	const int n_atoms = wavy_aux.get_ncen();
@@ -583,9 +538,9 @@ static void apply_multipole_restraints(
 		const double r_cov = constants::ang2bohr(
 			constants::covalent_radii[wavy_aux.get_atom_charge(a)]);
 
-		for (int l = 1; l <= config.multipole_lmax; ++l) {
+		for (int l = 0; l <= config.multipole_lmax; ++l) {
 			const double row_scale = config.multipole_strength
-				* std::pow(r_cov, -l);
+				* (l == 0 ? std::sqrt(constants::FOUR_PI) : std::pow(r_cov, -l));
 
 			bool has_l = false;
 			for (int m = -l; m <= l; ++m) {
@@ -615,16 +570,14 @@ static void apply_multipole_restraints(
 		}
 	}
 
-	if (!restraints.partitioned) {
-		for (int l = 1; l <= config.multipole_lmax; ++l) {
-			if (skipped[l] > 0) {
-				std::cout
-					<< skipped[l]
-					<< " atoms carry no l=" << l
-					<< " auxiliary functions; their order " << l
-					<< " moments are not restrained."
-					<< "\n";
-			}
+	for (int l = 1; l <= (restraints.grid_higher_moments ? 1 : config.multipole_lmax); ++l) {
+		if (skipped[l] > 0) {
+			std::cout
+				<< skipped[l]
+				<< " atoms carry no l=" << l
+				<< " auxiliary functions; their order " << l
+				<< " moments are not restrained."
+				<< "\n";
 		}
 	}
 
@@ -680,7 +633,7 @@ static vec solve_quadratic_fit(
 {
 	vec Hc = H;
 	vec coefficients = g;
-	solve_linear_system(Hc, n_aux, coefficients);
+	solve_spd_system(Hc, n_aux, coefficients);
 
 	if (total_row == nullptr)
 		return coefficients;
@@ -692,7 +645,7 @@ static vec solve_quadratic_fit(
 
 	vec Hz = H;
 	vec response = *total_row;
-	solve_linear_system(Hz, n_aux, response);
+	solve_spd_system(Hz, n_aux, response);
 
 	double current_total = 0.0;
 	double denominator = 0.0;
@@ -764,7 +717,7 @@ static void print_multipole_report(
 
 	std::cout
 		<< "\nAtomic multipoles of the fitted density"
-		<< (restraints.partitioned ? " partitioned on the grid" : "")
+		<< (restraints.grid_higher_moments ? " (l<=1 atom centred, l>=2 partitioned on the grid)" : "")
 		<< ", Racah normalisation, e bohr^l\n"
 		<< "  Atom  l  m"
 		<< "       target"
@@ -808,23 +761,17 @@ static void print_fit_configuration(
 		std::cout << " (lambda=" << config.tikhonov_lambda << ")";
 	std::cout << std::endl;
 
-	std::cout << "  Atomic charge restraints: "
-		<< (config.restrain_charges ? "on" : "off");
-	if (config.restrain_charges)
-		std::cout << " (" << charge_scheme_name(config.charge_scheme) << ")";
-	std::cout << std::endl;
-
 	std::cout << "  Multipole restraints: "
-		<< (config.restrain_multipoles ? "on" : "off");
-	if (config.restrain_multipoles)
+		<< (config.multipole_lmax >= 0 ? "on" : "off");
+	if (config.multipole_lmax >= 0)
 		std::cout << " (lmax=" << config.multipole_lmax
 		<< ", " << charge_scheme_name(config.charge_scheme) << ")";
 	std::cout << std::endl;
 
-	if (config.restrain_charges || config.restrain_multipoles) {
+	if (config.multipole_lmax >= 0) {
 		std::cout << "  Restraint definition: "
-			<< (config.partition_restraints
-				? "grid partitioned"
+			<< (config.grid_higher_moments && config.multipole_lmax >= 2
+				? "atom centred through l=1, grid partitioned from l=2"
 				: "atom centred")
 			<< std::endl;
 	}
@@ -844,12 +791,24 @@ vec DensityFitting::density_fit(
 
 	Int_Params normal_basis(wavy);
 	Int_Params aux_basis(wavy_aux);
-	const dMatrix2 dm = wavy.get_dm();
+	dMatrix2 dm = wavy.get_dm();
+	//An ORCA-convention density (gbw, molden) has the opposite sign on |m| = 3, 4, 7, 8 to libcint's (ab|P), as in ao_overlap
+	if (origin_has_orca_pure_phases(wavy.get_origin())) {
+		const ivec bas = normal_basis.get_bas();
+		bvec flip;
+		for (int s = 0; s < static_cast<int>(normal_basis.get_nbas()); s++)
+			for (int m = -bas[8 * s + 1]; m <= bas[8 * s + 1]; m++)
+				flip.push_back(orca_pure_sign_flips(m));
+		err_checkf(flip.size() == dm.extent(0), "Density fit: the shell layout does not match the density matrix", std::cout);
+		for (size_t i = 0; i < flip.size(); i++)
+			for (size_t j = 0; j < flip.size(); j++)
+				if (flip[i] != flip[j]) dm(i, j) = -dm(i, j);
+	}
 
 	std::cout << "\n=== Density Fitting ===" << std::endl;
 	citations::cite(citations::Method::RIFit, std::cout);
 	//The restraint targets are somebody's partitioning, so a restrained fit cites it too; this path skips the citing grid routine in scattering_factors.cpp.
-	if (config.restrain_charges) {
+	if (config.multipole_lmax >= 0) {
 		switch (config.charge_scheme) {
 		case CHARGE_SCHEME::TFVC:  citations::cite(citations::Method::TFVC, std::cout); break;
 		case CHARGE_SCHEME::MBIS:
@@ -859,7 +818,7 @@ vec DensityFitting::density_fit(
 				citations::cite(citations::Method::EMBIS, std::cout);
 			break;
 		case CHARGE_SCHEME::HIRSHFELD: citations::cite(citations::Method::Hirshfeld, std::cout); break;
-		default: break; //Nuclear, Mulliken and the Sanderson estimate cite nothing
+		default: break;
 		}
 	}
 	std::cout << "Normal basis functions: "
@@ -870,16 +829,40 @@ vec DensityFitting::density_fit(
 		<< (config.metric == METRIC_TYPE::COULOMB ? "Coulomb" : "Overlap")
 		<< std::endl;
 
+	const size_t n_aux = aux_basis.get_nao();
+	const aux_density_table aux_table(
+		wavy_aux.get_atoms()
+	);
+	//eri2c keeps J's Cholesky factor for the unrestrained solve; diag gives J back for the modified fits
+	bool factored = false;
+	vec diag(n_aux);
 	switch (config.metric) {
-	case METRIC_TYPE::COULOMB:
+	case METRIC_TYPE::COULOMB: {
 		compute2C<Coulomb2C_SPH>(aux_basis, eri2c);
+		for (size_t i = 0; i < n_aux; i++) diag[i] = eri2c[i * (n_aux + 1)];
+		factored = cholesky_factor(eri2c, n_aux) == 0;
+		//row A of X = J^-1 n_A: the change in atom A's population per unit error in rho
+		vec sens;
+		if (factored) {
+			const vec2 rows = atomic_population_rows(aux_table);
+			vec X(rows.size() * n_aux);
+			for (size_t a = 0; a < rows.size(); a++)
+				for (size_t p = 0; p < n_aux; p++) X[a * n_aux + p] = rows[a][p];
+			cholesky_solve(eri2c, n_aux, X, rows.size());
+			sens.assign(n_aux, 0.0);
+			for (size_t a = 0; a < rows.size(); a++)
+				for (size_t p = 0; p < n_aux; p++) sens[p] = std::max(sens[p], std::abs(X[a * n_aux + p]));
+		}
+		else std::cout << "Coulomb metric not positive definite, the fit runs unscreened" << std::endl;
 		computeRho<Coulomb3C_SPH>(
 			normal_basis,
 			aux_basis,
 			dm,
 			rho,
-			config.asym_atm_list);
+			config.asym_atm_list,
+			factored ? &sens : nullptr);
 		break;
+	}
 
 	case METRIC_TYPE::OVERLAP:
 		compute2C<Overlap2C_SPH>(aux_basis, eri2c);
@@ -892,27 +875,21 @@ vec DensityFitting::density_fit(
 		break;
 	}
 
-	const size_t n_aux = aux_basis.get_nao();
-	const aux_density_table aux_table(
-		wavy_aux.get_atoms()
-	);
-
 	err_checkf(
 		eri2c.size() == n_aux * n_aux && rho.size() == n_aux,
 		"Density-fitting metric dimensions do not match the auxiliary basis",
 		std::cout);
 
-	const bool has_soft_restraints =
-		config.restrain_charges || config.restrain_multipoles;
 	const bool modified_fit =
 		config.use_tikhonov
-		|| has_soft_restraints
+		|| config.multipole_lmax >= 0
 		|| config.constrain_total_electrons;
 
-	// Completely unrestrained path: retain the original solve exactly.
+	// Completely unrestrained path: J c = rho with the factor from above.
 	if (!modified_fit) {
 		std::cout << "Solving unrestrained linear system..." << std::endl;
-		solve_linear_system(eri2c, n_aux, rho);
+		if (factored) cholesky_solve(eri2c, n_aux, rho);
+		else solve_spd_system(eri2c, n_aux, rho);
 
 		if (config.analyze_quality)
 			analyze_density_fit_quality(
@@ -928,6 +905,7 @@ vec DensityFitting::density_fit(
 
 	print_fit_configuration(config);
 
+	if (factored) cholesky_unfactor(eri2c, n_aux, diag);
 	vec H = eri2c;
 	vec g = rho;
 
@@ -939,17 +917,8 @@ vec DensityFitting::density_fit(
 
 	const restraint_data restraints = build_restraint_data(
 		wavy,
-		wavy_aux,
 		aux_table,
 		config);
-
-	apply_charge_restraints(
-		H,
-		g,
-		wavy_aux,
-		config,
-		restraints,
-		n_aux);
 
 	apply_multipole_restraints(
 		H,
@@ -984,21 +953,24 @@ vec DensityFitting::density_fit(
 		total_row_ptr,
 		total_target);
 
-	if (config.restrain_multipoles)
+	if (config.multipole_lmax >= 0)
 		print_multipole_report(
 			rho,
 			wavy_aux,
 			restraints);
 
+	vec expected_populations;
+	if (config.multipole_lmax >= 0) {
+		expected_populations.resize(wavy.get_ncen());
+		for (int a = 0; a < wavy.get_ncen(); ++a)
+			expected_populations[a] = std::sqrt(constants::FOUR_PI) * restraints.multipole_targets[a][0];
+	}
 	if (config.analyze_quality)
 		analyze_density_fit_quality(
 			rho,
 			wavy_aux,
 			aux_table,
-			config.restrain_charges
-			? restraints.expected_populations
-			: vec(),
-			restraints.partitioned);
+			expected_populations);
 
 	std::cout << "==============================================\n"
 		<< std::endl;
@@ -1010,75 +982,41 @@ DensityFitting::CONFIG DensityFitting::config_from_options(const options& opt)
 	CONFIG config;
 	config.analyze_quality = opt.debug;
 
-	// Preserve the previous command-line behaviour: requesting multipoles also
-	// enables the corresponding atomic population restraints. The CONFIG
-	// booleans themselves remain independently controllable by callers.
 	if (opt.multipole_lmax >= 0) {
-		config.restrain_charges = true;
-		config.restrain_multipoles = opt.multipole_lmax > 0;
 		config.multipole_lmax = opt.multipole_lmax;
 		config.multipole_strength = opt.multipole_strength;
-		config.partition_restraints = opt.multipole_partition;
-
-		// Atom-centred targets are populations of overlapping atoms, so the soft penalty overshoots the
-		// electron count; pin the sum. Grid-partitioned targets already sum to it.
-		config.constrain_total_electrons = !config.partition_restraints;
+		config.grid_higher_moments = opt.multipole_lmax >= 2;
 
 		switch (opt.multipole_scheme) {
-		case PartitionType::TFVC:
+		case MultipoleScheme::TFVC:
 			config.charge_scheme = CHARGE_SCHEME::TFVC;
 			break;
-		case PartitionType::MBIS:
+		case MultipoleScheme::MBIS:
 			config.charge_scheme = CHARGE_SCHEME::MBIS;
 			break;
-		case PartitionType::EMBIS:
+		case MultipoleScheme::EMBIS:
 			config.charge_scheme = CHARGE_SCHEME::EMBIS;
 			break;
-		default:
+		case MultipoleScheme::NUCLEAR:
+			config.charge_scheme = CHARGE_SCHEME::NUCLEAR;
+			break;
+		case MultipoleScheme::MULLIKEN:
+			config.charge_scheme = CHARGE_SCHEME::MULLIKEN;
+			break;
+		case MultipoleScheme::SANDERSON:
+			config.charge_scheme = CHARGE_SCHEME::SANDERSON_ESTIMATE;
+			break;
+		case MultipoleScheme::HIRSHFELD:
 			config.charge_scheme = CHARGE_SCHEME::HIRSHFELD;
 			break;
+		}
+		if (is_population_only_scheme(config.charge_scheme)) {
+			config.multipole_lmax = 0;
+			config.grid_higher_moments = false;
 		}
 	}
 
 	return config;
-}
-
-// Adaptive row scale for atomic population restraints; its square is the penalty coefficient.
-vec DensityFitting::restraint_weights(
-	const WFN& wavy_aux,
-	const size_t n_aux,
-	double base_restraint_coef,
-	bool adaptive_weighting)
-{
-	const size_t n_atoms = wavy_aux.get_ncen();
-	double restraint_coef = base_restraint_coef;
-
-	if (adaptive_weighting) {
-		restraint_coef *=
-			std::max(0.1, 1.0 - std::log10(n_aux) * 0.1);
-		restraint_coef *=
-			std::min(2.0, 1.0 + std::sqrt(n_atoms) * 0.1);
-	}
-
-	std::cout
-		<< "Setting charge-restraint row scale to: "
-		<< std::fixed
-		<< std::showpoint
-		<< std::setprecision(6)
-		<< restraint_coef
-		<< std::endl;
-
-	vec weights(n_atoms, restraint_coef);
-
-	if (adaptive_weighting) {
-		for (size_t a = 0; a < n_atoms; ++a) {
-			weights[a] *= std::min(
-				2.0,
-				1.0 + wavy_aux.get_atom_charge((int)a) * 0.02);
-		}
-	}
-
-	return weights;
 }
 
 double DensityFitting::lower_gamma_half(const int l, const double x)
@@ -1470,146 +1408,22 @@ void DensityFitting::print_interaction_energy(const Interaction_Energy& E, const
 	file << std::endl;
 }
 
-//PartitionType and PartitionResults::CHARGE_ORDER are numbered differently
-static int charge_order(const PartitionType type)
-{
-	switch (type) {
-	case PartitionType::TFVC: return PartitionResults::CHARGE_ORDER::S_TFVC;
-	case PartitionType::MBIS: return PartitionResults::CHARGE_ORDER::S_MBIS;
-	case PartitionType::EMBIS: return PartitionResults::CHARGE_ORDER::S_EMBIS;
-	default: return PartitionResults::CHARGE_ORDER::S_HIRSH;
-	}
-}
-
-// Calculate expected atomic populations based on different partitioning schemes
-vec DensityFitting::calculate_expected_populations(const WFN& wavy, const WFN& wavy_aux, const CHARGE_SCHEME& scheme)
-{
-	vec expected_populations(wavy_aux.get_ncen());
-
-	if (scheme == CHARGE_SCHEME::NUCLEAR) {
-		// Simple nuclear populations
-		for (int i = 0; i < wavy_aux.get_ncen(); i++) {
-			expected_populations[i] = wavy_aux.get_atoms()[i].get_charge();
-		}
-	}
-	// https://pubs.acs.org/doi/10.1021/ed065p227
-	else if (scheme == CHARGE_SCHEME::SANDERSON_ESTIMATE) {
-		double compound_electronegativity = 1.0;
-		for (const auto& atom : wavy.get_atoms()) {
-			compound_electronegativity *= constants::allen_electronegativities[atom.get_charge() - 1];
-		}
-		compound_electronegativity = std::pow(compound_electronegativity, 1.0 / wavy.get_ncen());
-
-		for (int iat = 0; iat < wavy_aux.get_ncen(); iat++) {
-			double atom_electronegativity = constants::allen_electronegativities[wavy_aux.get_atoms()[iat].get_charge() - 1];
-			expected_populations[iat] = wavy_aux.get_atoms()[iat].get_charge() + (compound_electronegativity - atom_electronegativity) / (1.57 * std::sqrt(atom_electronegativity));
-		}
-	}
-	else if (scheme == CHARGE_SCHEME::MULLIKEN) {
-		dMatrix2 dm = wavy.get_dm();
-		//Mulliken's sum of diag(P S) is the electron count, so S must share P's basis and phase convention: an ORCA-convention
-		//density flips sign on |m| = 3, 4, 7, 8, which a plain Overlap2C_SPH ignores.
-		const dMatrix2 S_ao = ao_overlap(wavy);
-		const size_t nao = dm.extent(1);
-
-		// optional: symmetric Mulliken operator M = 1/2 (P S + S P)
-		// (avoid forming full matrices if memory is tight; just accumulate the diagonal)
-		size_t mu_begin = 0;
-		for (unsigned iat = 0; iat < wavy.get_ncen(); iat++) {
-			const atom A = wavy.get_atoms()[iat];
-
-			// determine how many AOs belong to this atom (use contracted shells, not primitives!)
-			size_t nAO_A = 0;
-			int prim = 0;
-			for (size_t sh = 0; sh < A.get_shellcount().size(); sh++) {
-				const int l = A.get_basis_set_entry(prim).get_type() - 1;
-				nAO_A += size_t(2 * l + 1);
-				prim += A.get_shellcount()[sh];
-			}
-			size_t mu_end = mu_begin + nAO_A;
-
-			double GA = 0.0;
-			for (size_t m = mu_begin; m < mu_end; m++) {
-				double diag_PS = 0.0;
-				for (size_t n = 0; n < nao; n++)
-					diag_PS += dm(m, n) * S_ao(n, m);
-				GA += diag_PS;
-			}
-			expected_populations[iat] = GA;//A.get_charge() - GA;        // Mulliken charge
-			mu_begin = mu_end;
-		}
-	}
-	else if (scheme == CHARGE_SCHEME::TFVC || scheme == CHARGE_SCHEME::HIRSHFELD || scheme == CHARGE_SCHEME::MBIS || scheme == CHARGE_SCHEME::EMBIS) {
-		PartitionType type = scheme_partition(scheme);
-		GridConfiguration config;
-		// These populations are restraint targets, so their integration error goes straight into the fitted density;
-		// the struct default, as in the fit analysis below.
-		config.partition_type = type;
-		config.pbc = 0;
-		config.debug = false;
-		const int ncen = wavy.get_ncen();
-
-		ivec asym_atom_list(ncen);
-		for (int atom_nr = 0; atom_nr < ncen; atom_nr++) {
-			asym_atom_list[atom_nr] = atom_nr;
-		}
-		svec labels(ncen);
-		const auto atoms = wavy.get_atoms();
-		for (int i = 0; i < ncen; i++) {
-			labels[i] = atoms[i].get_label();
-		}
-
-		GridManager grid_manager(config);
-
-		WFN temp = wavy;
-		temp.delete_unoccupied_MOs();
-		// Setup grids for the molecule
-		grid_manager.setup3DGridsForMolecule(temp, asym_atom_list);
-
-
-		// Calculate partitioned charges
-		auto results = grid_manager.calculatePartitionedCharges(temp);
-		//results.printChargeTable(labels, temp, std::cout);
-		for (int i = 0; i < temp.get_ncen(); i++) {
-			expected_populations[i] = results.atom_charges[charge_order(type)][i];
-		}
-	}
-	else {
-		std::cerr << "Warning: Unknown charge scheme. Defaulting to nuclear charges.'" << std::endl;
-		expected_populations = calculate_expected_populations(wavy, wavy_aux, CHARGE_SCHEME::NUCLEAR);
-	}
-
-	return expected_populations;
-}
-
-// An atom's population is the integral of the auxiliary functions on it: what atom-centred restraints
-// constrain, but not grid-partitioned ones.
 void DensityFitting::analyze_density_fit_quality(
 	const vec& coefficients,
 	const WFN& wavy_aux,
 	const aux_density_table& aux_density,
-	const vec& expected_populations,
-	const bool partitioned)
+	const vec& expected_populations)
 {
 	std::cout << "\n=== Density Fitting Quality Analysis ===" << std::endl;
 	std::cout
 		<< "Population: the auxiliary functions on that centre only."
 		<< std::endl;
 
-	if (partitioned)
-		std::cout
-			<< "Expected: the grid-partitioned population the restraints target.\n"
-			<< "Those restraints fix the partitioned moments of the total fitted\n"
-			<< "density, not the per-centre sums, so a deviation here is density\n"
-			<< "carried by the neighbours' functions, not a failure of the fit."
-			<< std::endl;
-
 	const bool has_expected =
 		expected_populations.size() == (size_t)wavy_aux.get_ncen();
 
 	double real_total_electrons = 0.0;
 	double expected_total_electrons = -wavy_aux.get_charge();
-	int delocalised_atoms = 0;
 
 	for (int a = 0; a < wavy_aux.get_ncen(); ++a) {
 		const atom A = wavy_aux.get_atom(a);
@@ -1651,21 +1465,12 @@ void DensityFitting::analyze_density_fit_quality(
 				<< ", Deviation = " << deviation;
 
 			if (deviation > 1.0) {
-				++delocalised_atoms;
 				std::cout << "  WARNING: significant deviation";
 			}
 		}
 
 		std::cout << "\n";
 	}
-
-	if (partitioned && delocalised_atoms > 0)
-		std::cout
-			<< delocalised_atoms
-			<< " atoms hold more than 1 e of their partitioned density on other\n"
-			   "centres. Use -multipole_centre when the coefficients are taken apart\n"
-			   "per atom downstream (SALTED training, per-atom densities)."
-			<< std::endl;
 
 	std::cout
 		<< "Expected / Real total electrons: "
@@ -1683,30 +1488,27 @@ void DensityFitting::demonstrate_enhanced_density_fitting(WFN& wavy, const WFN& 
 	//#include "test_functions.h"
 	std::cout << "\n=== Enhanced Density Fitting Demonstration ===" << std::endl;
 	CONFIG ri_config;
-	ri_config.adaptive_restraint = true;
 	ri_config.analyze_quality = true;
 	ri_config.charge_scheme = CHARGE_SCHEME::HIRSHFELD;
 	ri_config.metric = METRIC_TYPE::COULOMB;
-	ri_config.restraint_strength = 2e-4;
+	ri_config.multipole_strength = 2e-4;
 	ri_config.tikhonov_lambda = 1e-6;
 
 	_time_point start_time = get_time();
 	// Method 0: Unrestrained (original approach)
 	std::cout << "\n--- Method 0: Unrestrained (Baseline) ---" << std::endl;
 	ri_config.use_tikhonov = false;
-	ri_config.restrain_charges = false;
-	ri_config.restrain_multipoles = false;
+	ri_config.multipole_lmax = -1;
 	ri_config.constrain_total_electrons = false;
 	vec coeff_unrestrained = density_fit(wavy, wavy_aux, ri_config);
 	std::cout << "Time for unrestrained fit: "
 		<< std::chrono::duration<double>(get_time() - start_time).count() << " seconds." << std::endl;
 
 	start_time = get_time();
-	// Method 1: Enhanced restraints with adaptive weighting
-	std::cout << "\n--- Method 1: Enhanced Adaptive Restraints ---" << std::endl;
+	// Method 1: Monopole restraints
+	std::cout << "\n--- Method 1: Monopole Restraints ---" << std::endl;
 	ri_config.use_tikhonov = false;
-	ri_config.restrain_charges = true;
-	ri_config.restrain_multipoles = false;
+	ri_config.multipole_lmax = 0;
 	vec coeff_enhanced = density_fit(wavy, wavy_aux, ri_config);     // analyze quality
 	std::cout << "Time for enhanced restraint fit: "
 		<< std::chrono::duration<double>(get_time() - start_time).count() << " seconds." << std::endl;
@@ -1715,8 +1517,7 @@ void DensityFitting::demonstrate_enhanced_density_fitting(WFN& wavy, const WFN& 
 	// Method 2: Hybrid approach
 	std::cout << "\n--- Method 2: Hybrid Regularization ---" << std::endl;
 	ri_config.use_tikhonov = true;
-	ri_config.restrain_charges = true;
-	ri_config.restrain_multipoles = false;
+	ri_config.multipole_lmax = 0;
 	vec coeff_hybrid = density_fit(wavy, wavy_aux, ri_config); // charge scheme
 	std::cout << "Time for hybrid fit: "
 		<< std::chrono::duration<double>(get_time() - start_time).count() << " seconds." << std::endl;
@@ -1934,19 +1735,17 @@ void DensityFitting::QM_RI_difference_cube(WFN& wavy, const WFN& wavy_aux) {
 	//#include "test_functions.h"
 	std::cout << "\n=== Enhanced Density Fitting Demonstration ===" << std::endl;
 	CONFIG ri_config;
-	ri_config.adaptive_restraint = true;
 	ri_config.analyze_quality = true;
 	ri_config.charge_scheme = CHARGE_SCHEME::HIRSHFELD;
 	ri_config.metric = METRIC_TYPE::COULOMB;
-	ri_config.restraint_strength = 2e-4;
+	ri_config.multipole_strength = 2e-4;
 	ri_config.tikhonov_lambda = 1e-6;
 
 	_time_point start_time = get_time();
 	// Method 0: Unrestrained (original approach)
 	std::cout << "\n--- Method 0: Unrestrained (Baseline) ---" << std::endl;
 	ri_config.use_tikhonov = false;
-	ri_config.restrain_charges = false;
-	ri_config.restrain_multipoles = false;
+	ri_config.multipole_lmax = -1;
 	ri_config.constrain_total_electrons = false;
 	vec coeffs = density_fit(wavy, wavy_aux, ri_config);
 	std::cout << "Time for unrestrained fit: "

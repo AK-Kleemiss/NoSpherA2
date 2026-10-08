@@ -13,6 +13,7 @@ class GridManager;
 class BasisSet;
 struct asym_atom;
 enum PartitionType { Becke, TFVC, Hirshfeld, RI, MBIS, EMBIS };
+enum class MultipoleScheme { TFVC, HIRSHFELD, MBIS, EMBIS, NUCLEAR, MULLIKEN, SANDERSON };
 enum class RGBIOrbitalBasis { NAO, ANO };
 
 void error_check(const bool condition, const std::source_location loc, const std::string& error_mesasge, std::ostream& log_file = std::cout);
@@ -1121,10 +1122,8 @@ struct options
 	PartitionType partition_type = PartitionType::Hirshfeld;
 	//-multipole_moments: the RI fit is restrained to this scheme's atomic moments up to this order, -1 = unrestrained
 	int multipole_lmax = -1;
-	PartitionType multipole_scheme = PartitionType::Hirshfeld;
+	MultipoleScheme multipole_scheme = MultipoleScheme::HIRSHFELD;
 	double multipole_strength = 1.0;
-	//-multipole_centre switches the restraint rows from partition-weighted grid moments of every aux function to centre moments
-	bool multipole_partition = true;
 	//-repulsion_overlap: exchange-repulsion of -interaction_energy as K * Int rhoA rhoB, 0 = not included
 	double repulsion_overlap = 0.0;
 	//-repulsion_exchange: exchange functional of the Gordon-Kim repulsion, 0 Dirac, 1 PBE, 2 B88, 3 r2SCAN-L

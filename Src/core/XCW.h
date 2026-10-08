@@ -16,6 +16,13 @@
 
 // Applies M to the U/C/D tensors of one atom in their Voigt storage: T'_{ij..} = sum_pq.. M_pi M_qj .. T_pq..
 void transform_ADPs(vec2& ADPs, const vec2& M);
+// r^l * spherical_harmonic(l, m, r/|r|) as monomials {x^i y^j z^k, coefficient}; residual is the max misfit of the fit
+std::vector<std::pair<i3, double>> solid_harmonic_monomials(const int l, const int m, double* residual = nullptr);
+// Upper bound on int |chi_a chi_b| d3r for two contracted AOs (primitives, centre, solid harmonic from above);
+// returns as soon as the partial sum exceeds stop
+double ao_pair_abs_overlap_bound(const std::vector<primitive>& pa, const d3& A, const std::vector<std::pair<i3, double>>& sa,
+	const std::vector<primitive>& pb, const d3& B, const std::vector<std::pair<i3, double>>& sb,
+	const double stop = std::numeric_limits<double>::infinity());
 
 class XCW {
 public:
@@ -126,6 +133,7 @@ private:
 		bool apply_damping = true;
 		bool method_apply_damping = true;
 		std::string basis_set_name;
+		std::filesystem::path basis_overrides;
 		//`df_basis <name>`: density fitting of the Fock build with this auxiliary basis
 		std::string df_basis_name;
 		//`guess_basis <name>`: the first lambda starts from OCC's HF in this smaller basis, its density projected
@@ -498,5 +506,6 @@ private:
 	cell unit_cell;
 	std::ofstream XCW_log;
 	SCF_settings settings;
+	std::shared_ptr<BasisSet> orbital_basis_;
 	cryst_info cryst;
 };

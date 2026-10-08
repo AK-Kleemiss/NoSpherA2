@@ -198,6 +198,14 @@ void _test_lahva();
 int solve_linear_system(const vec2& A, vec& b);
 int solve_linear_system(vec& A, const size_t& size_A, vec& b);
 int solve_linear_system(vec& A, const unsigned long long& rows_A, const unsigned long long& cols_A, vec& b);
+//Symmetric n x n A, either storage order. cholesky_factor writes L over one triangle and keeps the other (returns LAPACK
+//info; on > 0, not positive definite, A is unchanged); cholesky_solve overwrites the nrhs systems stored one after another
+//in b; cholesky_unfactor rebuilds A from the kept triangle and the saved diagonal.
+int cholesky_factor(vec& A, const size_t& n);
+void cholesky_solve(const vec& L, const size_t& n, vec& b, const size_t& nrhs = 1);
+void cholesky_unfactor(vec& A, const size_t& n, const vec& diag);
+//Half the flops of LU for a positive definite A, which then holds L; otherwise A is restored and LU solves it.
+int solve_spd_system(vec& A, const size_t& n, vec& b);
 
 //Small implementation of the non-negative least squares problem
 // A small struct to hold results

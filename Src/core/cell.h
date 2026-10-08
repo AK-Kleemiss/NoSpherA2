@@ -49,7 +49,7 @@ private:
 
 public:
 
-	void set_symmetry_factors(std::vector<asym_atom>& asym_atoms, const ivec3& linking_list);
+	void set_symmetry_factors(std::vector<asym_atom>& asym_atoms, const ivec3& linking_list, const ivec3& full_links, const int subgroup_order);
 	ivec apply_grown(const hkl_list& hkl, hkl_list& hkl_enlarged, std::vector<asym_atom>& asym_atoms, ivec3& linking_list, ivec3& original_rotations);
 
 

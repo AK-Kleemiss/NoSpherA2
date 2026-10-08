@@ -1,5 +1,19 @@
 # NoSpherA2
 
+### XCW per-element orbital bases
+
+The XCW settings keyword `basis_overrides <file>` reads an all-electron BSE JSON
+file, replacing the orbital shells for its elements while retaining `basis_set`
+for all other elements. Relative paths are resolved beside the settings file;
+paths containing spaces can be quoted. General and combined angular-momentum
+contractions are split into individual spherical shells. The assembled basis
+is shared by the SCF, atomic grids and output wavefunction. ECP overrides are
+rejected. Olex2's XCW advanced-basis controls can fetch `SARC-DKH2` from BSE for
+selected heavy elements; light elements retain the fallback basis.
+
+This supplies SARC-DKH2 basis functions, not a DKH2 Hamiltonian: XCW's
+Hartree-Fock Hamiltonian remains non-relativistic.
+
 ![Build](https://github.com/AK-Kleemiss/NoSpherA2/actions/workflows/c-cpp_all.yml/badge.svg)
 [![DOI](https://img.shields.io/badge/DOI-10.1039/D0SC05526C-blue.svg)](https://doi.org/10.1039/D0SC05526C)
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/10849/badge)](https://www.bestpractices.dev/projects/10849)

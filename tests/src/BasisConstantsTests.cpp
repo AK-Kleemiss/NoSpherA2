@@ -532,6 +532,58 @@ TEST(BasisConstantsLibraryTests, WriteOccJsonRoundTripsThroughOccReader)
 	}
 }
 
+TEST(BasisConstantsLibraryTests, JsonOverridesReplaceOneElementAndKeepTheFallback)
+{
+	const auto path = temp_file("BasisConstants_overrides.json",
+		R"({"elements":{"78":{"electron_shells":[{"function_type":"gto_spherical","angular_momentum":[2],"exponents":["2.0","0.5"],"coefficients":[["0.8","0.2"],["0.1","0.9"]]}]}}})");
+	const auto b = BasisSetLibrary::get_basis_set_with_overrides("sto-3g", path);
+	std::filesystem::remove(path);
+	const auto base = BasisSetLibrary::get_basis_set("sto-3g");
+	ASSERT_TRUE(b->has_element(78));
+	ASSERT_EQ((*b)[77].size(), 4u);
+	EXPECT_DOUBLE_EQ((*b)[77][0].exp, 2.0);
+	EXPECT_DOUBLE_EQ((*b)[77][2].coefficient, 0.1);
+	EXPECT_EQ((*b)[77][0].shell, 0);
+	EXPECT_EQ((*b)[77][2].shell, 1);
+	ASSERT_EQ((*b)[0].size(), (*base)[0].size());
+	for (int p = 0; p < static_cast<int>((*base)[0].size()); p++)
+		EXPECT_DOUBLE_EQ((*b)[0][p].coefficient, (*base)[0][p].coefficient);
+	const std::vector<occ::core::Atom> atoms{ { 78, 0.0, 0.0, 0.0 }, { 1, 0.0, 0.0, 2.0 } };
+	const auto ao = b->to_AOBasis(atoms);
+	EXPECT_EQ(ao.nbf(), 11u);
+	WFN w;
+	w.push_back_atom("Pt", 0.0, 0.0, 0.0, 78);
+	w.push_back_atom("H", 0.0, 0.0, 2.0, 1);
+	load_basis_into_WFN(w, b, false, true);
+	EXPECT_EQ(w.get_atom(0).get_basis_set_size(), 4);
+	EXPECT_EQ(w.get_atom(1).get_basis_set_size(), 3);
+}
+
+TEST(BasisConstantsLibraryTests, JsonOverridesSplitCombinedAngularMomentumShells)
+{
+	const auto path = temp_file("BasisConstants_sp_overrides.json",
+		R"({"elements":{"6":{"electron_shells":[{"function_type":"gto","angular_momentum":[0,1],"exponents":[2.0,0.5],"coefficients":[[0.8,0.2],[0.1,0.9]]}]}}})");
+	const auto b = BasisSetLibrary::get_basis_set_with_overrides("sto-3g", path);
+	std::filesystem::remove(path);
+	ASSERT_EQ((*b)[5].size(), 4u);
+	EXPECT_EQ((*b)[5][0].type, 0);
+	EXPECT_EQ((*b)[5][2].type, 1);
+	EXPECT_EQ((*b)[5][2].shell, 1);
+	EXPECT_DOUBLE_EQ((*b)[5][2].coefficient, 0.1);
+}
+
+TEST(BasisConstantsLibraryTests, JsonOverridesRejectEcpAndMalformedContractions)
+{
+	const auto path = temp_file("BasisConstants_bad_overrides.json",
+		R"({"elements":{"78":{"ecp_electrons":60,"electron_shells":[{"function_type":"gto","angular_momentum":[0],"exponents":[1.0],"coefficients":[[1.0]]}]}}})");
+	EXPECT_THROW(BasisSetLibrary::get_basis_set_with_overrides("sto-3g", path), std::runtime_error);
+	std::ofstream(path) << R"({"elements":{"78":{"electron_shells":[{"function_type":"gto","angular_momentum":[0],"exponents":[1.0,0.5],"coefficients":[[1.0]]}]}}})";
+	EXPECT_THROW(BasisSetLibrary::get_basis_set_with_overrides("sto-3g", path), std::runtime_error);
+	std::ofstream(path) << R"({"elements":{}})";
+	EXPECT_THROW(BasisSetLibrary::get_basis_set_with_overrides("sto-3g", path), std::runtime_error);
+	std::filesystem::remove(path);
+}
+
 //to_AOBasis builds one spherical shell per library shell: H2 is two s functions, C adds 2s and 2p
 TEST(BasisConstantsLibraryTests, ToAOBasisCountsShellsAndFunctions)
 {

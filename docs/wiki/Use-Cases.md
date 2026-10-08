@@ -262,7 +262,8 @@ or `.wfx` is rejected.
 
 Fit the density in an auxiliary basis and use the fit for the partitioning. The
 restraints hold the fit's atomic multipole moments up to `lmax` at the values a
-real partitioning gives.
+real partitioning gives. Charge and dipole restraints act on the auxiliary
+functions centred on each atom; higher moments use grid-partitioned rows.
 
 ```powershell
 .\NoSpherA2.exe -wfn epoxide.gbw -cif epoxide.cif -hkl epoxide.hkl -acc 2 -ri_fit def2-universal-jkfit -multipole_moments Hirshfeld 2 -multipole_strength 0.5

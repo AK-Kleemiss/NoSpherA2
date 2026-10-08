@@ -7,57 +7,44 @@ struct aux_density_table;
 namespace DensityFitting
 {
 
-	enum class RESTRAINT_TYPE {
-		NONE,
-		SIMPLE,
-		SIMPLE_AND_TIK,
-		PARTITION
-	};
-
 	enum class METRIC_TYPE {
 		COULOMB,
 		OVERLAP
 	};
 
 	enum class CHARGE_SCHEME {
-		NUCLEAR,
-		MULLIKEN,
-		SANDERSON_ESTIMATE,
 		TFVC,
 		HIRSHFELD,
 		MBIS,
-		EMBIS
+		EMBIS,
+		NUCLEAR,
+		MULLIKEN,
+		SANDERSON_ESTIMATE
 	};
 
 	struct CONFIG {
 		METRIC_TYPE metric = METRIC_TYPE::COULOMB; // Metric to use for density fitting
 		bool analyze_quality = false; // Whether to analyze the quality of the density fitting
 		bool use_tikhonov = false;
-		bool restrain_charges = false;
-		bool restrain_multipoles = false;
-		bool partition_restraints = false;
+		bool grid_higher_moments = false;
 		bool constrain_total_electrons = false;
 
-		//Next only neccecary if restraints are used
-		double restraint_strength = 5.0e-5; // Base strength of electron population restraints
 		double tikhonov_lambda = 1e-6;
-		bool adaptive_restraint = true; // Whether to use adaptive weighting for restraints
-		CHARGE_SCHEME charge_scheme = CHARGE_SCHEME::TFVC; // Scheme to use for calculating expected electron populations
-		int multipole_lmax = -1; // >= 0: restrain the grid moments of charge_scheme's atoms up to this order with weight multipole_strength, replacing the adaptive weights
+		CHARGE_SCHEME charge_scheme = CHARGE_SCHEME::TFVC;
+		int multipole_lmax = -1; // >= 0: restrain atomic moments through this order; 0 restrains charges only
 		double multipole_strength = 1.0;
 
 		std::optional<ivec> asym_atm_list = std::nullopt; //Currently unsued till fixed!// Optional list of atom indices to only compute atoms actually present in the assymetic unit
 	};
 
 	// Helper function to partition the density-fitting rows on a grid for multipole restraints. The rows are stored in a 2D vector, where each row corresponds to a multipole moment (l, m) and each column corresponds to an auxiliary basis function. The function takes the auxiliary density table, the number of grid points, the grid coordinates and weights, the center of the atom, the maximum multipole order, and the starting row index as input. It fills the rows vector with the contributions of each auxiliary basis function to each multipole moment at the given grid points.
-	void partition_rows_on_grid(const aux_density_table& t, const int np, const double* x, const double* y, const double* z, const double* w, const double* centre, const int lmax, vec2& rows, const int row0);
+	void partition_rows_on_grid(const aux_density_table& t, const int np, const double* x, const double* y, const double* z, const double* w, const double* centre, const int lmax, vec2& rows, const int row0, const int lmin = 0);
 
 	vec density_fit(const WFN& wavy, const WFN& wavy_aux, const CONFIG& config);
 	// Fit settings from the command line: -multipole_moments switches the restraints on
 	CONFIG config_from_options(const options& opt);
 
-	// Helper functions for charge analysis and restraints
-	vec calculate_expected_populations(const WFN& wavy, const WFN& wavy_aux, const CHARGE_SCHEME & = CHARGE_SCHEME::NUCLEAR);
+	// Helper functions for multipole restraints
 	// Grid moments of the partitioned density about each nucleus, [atom][l*l+l+m] for l = 0..lmax, electrons only
 	vec2 calculate_expected_multipoles(const WFN& wavy, const CHARGE_SCHEME& scheme, const int lmax);
 	// Rows [atom*(lmax+1)^2 + l*l+l+m] over the aux functions whose product with the coefficients is Int w_a rho r^l Y_lm
@@ -65,11 +52,7 @@ namespace DensityFitting
 	// density (density_batch of a Gaussian_Molecule) or else from wavy's orbitals
 	vec2 partition_multipole_rows(const WFN& wavy, const aux_density_table& table, const CHARGE_SCHEME scheme, const int lmax, DensityBatch density = {});
 
-	// partitioned: the expected populations come from the grid partition, which constrains the moments of the total
-	// fitted density and not the per-centre coefficient sums the table reports
-	void analyze_density_fit_quality(const vec& coefficients, const WFN& wavy_aux, const aux_density_table& aux_density, const vec& expected_charges = vec(), const bool partitioned = false);
-	// Per-atom row weight of the restraints
-	vec restraint_weights(const WFN& wavy_aux, const size_t n_aux, double base_restraint_coef = 0.00005, bool adaptive_weighting = true);
+	void analyze_density_fit_quality(const vec& coefficients, const WFN& wavy_aux, const aux_density_table& aux_density, const vec& expected_charges = vec());
 	// Interaction energy of two fitted densities and their nuclei in Hartree, from the coefficients and the aux basis
 	// alone (RI or SALTED). pair[a][b] over the atoms, rank[i][j] with 0 the nuclei and l+1 the aux functions of rank l.
 	// pol_X = -1/2 sum alpha_a F_a^2 with Thakkar polarizabilities in the partner's field, disp the D4 dimer minus
