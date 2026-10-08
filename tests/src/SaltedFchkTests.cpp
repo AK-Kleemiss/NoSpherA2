@@ -267,12 +267,6 @@ namespace
 		std::getline(in, line);
 		return line;
 	}
-
-	bool full_tests_enabled()
-	{
-		const char* env = std::getenv("RUN_FULL_TEST");
-		return env && std::string(env) != "0" && std::string(env) != "false";
-	}
 }
 
 // ---------------------------------------------------------------- SALTED_io
@@ -1209,10 +1203,8 @@ TEST(SaltedFchkPredictorTests, EmptyModelDirExits)
 
 // the full prediction on the water monomer with the shipped model, which does not describe isolated water: the
 // count is pinned, not compared to ten
-TEST(SaltedFchkPredictorTests, PredictWaterMonomer_full)
+TEST(SaltedFchkPredictorTests, PredictWaterMonomer)
 {
-	if (!full_tests_enabled())
-		GTEST_SKIP() << "Set RUN_FULL_TEST=1 to run the SALTED prediction";
 	equicomb_set_gpu(false);
 	const auto root = nos_test_repo_root() / "tests";
 	WFN w(root / "reading_SALTED" / "water_monomer.xyz", false);
