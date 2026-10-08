@@ -467,6 +467,25 @@ TEST(GridSphericalTests, CubicSplineHelpersReproduceSmoothFunction)
 		EXPECT_NEAR(c.get_interpolated_density_spline(r), c.get_radial_density(r), 1e-4 * c.get_radial_density(r));
 }
 
+//the table_log2 estimate in log_spline_index brackets the interval a binary search finds, on the nodes,
+//one ulp either side of them and between them, for both spacings in use (MBIS 1.0025, Thakkar 1.005)
+TEST(GridSphericalTests, LogSplineIndexMatchesBinarySearch)
+{
+	for (const auto &[incr, start] : { std::pair{ 1.0025, 1e-8 }, std::pair{ 1.005, 1e-7 } }) {
+		vec x;
+		for (double r = start; r < 30.0; r *= incr)
+			x.push_back(r);
+		const double lincr = std::log(incr);
+		for (size_t k = 0; k + 1 < x.size(); k++)
+			for (const double r : { x[k], std::nextafter(x[k], 1e300), 0.5 * (x[k] + x[k + 1]), std::nextafter(x[k + 1], 0.0) }) {
+				const int ref = static_cast<int>(std::upper_bound(x.begin(), x.end(), r) - x.begin()) - 1;
+				ASSERT_EQ(log_spline_index(x, r, lincr, start), ref) << "incr " << incr << " r " << r;
+			}
+	}
+	EXPECT_NEAR(table_log2(3.0), std::log2(3.0), 3e-6);
+	EXPECT_EQ(table_log2(0.25), -2.0);
+}
+
 //the configuration helpers: cutoff by accuracy and the scheme names
 TEST(GridManagerTests, ConfigurationCutoffAndPartitionName)
 {
