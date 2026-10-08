@@ -2790,7 +2790,7 @@ void Roby_information::computeGroupAnalysis(const ivec2 &group_defs, const vec &
 			EVC.container().clear();
 
 			const int n0 = static_cast<int>(pruned_eigvals.size());
-			auto pairs = find_eigenvalue_pairs(pruned_eigvals);
+			auto pairs = find_eigenvalue_pairs(pruned_eigvals, pair_tolerance);
 
 			transform_group_Ionic_orbitals(EVC2, pruned_eigvals, pairs, ga_sorted, gb_sorted, bond_bf, P_GA, P_GB);
 
@@ -2886,21 +2886,26 @@ void Roby_information::computeGroupAnalysis(const ivec2 &group_defs, const vec &
 Roby_information::Roby_information(WFN &wavy, const ivec3 &group_sets, const bool symmetrize, const bool use_ano_basis, const bool EVs, const bool theta_info, const bool legacy_occupancy_cutoff) {
 	//The tables set three or four decimals on cout; restore so later output keeps its precision.
 	const ostream_format_guard restore_cout_format(std::cout);
-	//The pinv cutoff decides the rank of near-singular metrics: settable to tell physics from threshold, and
-	//announced so a non-default run is not mistaken for a default one.
-	if (const char *env = tuning("NOS_RGBI_PINV_CUTOFF")) {
+	//Both thresholds decide a rank or a pairing rather than a physical quantity: settable to tell physics from
+	//threshold, and announced so a non-default run is not mistaken for a default one.
+	const auto read_threshold = [](const char *name, double &value, const double max, const char *what) {
+		const char *env = tuning(name);
+		if (env == nullptr)
+			return;
 		try {
 			const double v = std::stod(env);
-			err_checkf(v > 0.0, "NOS_RGBI_PINV_CUTOFF must be positive, got '" + std::string(env) + "'.", std::cout);
-			pinv_cutoff = v;
-			std::cout << "NOS_RGBI_PINV_CUTOFF is set: RGBI pseudo-inverses cut singular values below "
-				<< std::scientific << std::setprecision(3) << pinv_cutoff << " instead of the default 1.000e-05\n"
-				<< std::defaultfloat;
+			err_checkf(v > 0.0 && v < max, std::string(name) + " must lie in (0, " + std::to_string(max) + "), got '" + env + "'.", std::cout);
+			const ostream_format_guard keep_population_digits(std::cout);  //setprecision(3) would stick to the tables below
+			std::cout << name << " is set: " << what << std::scientific << std::setprecision(3) << v
+				<< " instead of the default " << value << "\n";
+			value = v;
 		}
 		catch (const std::invalid_argument &) {
-			err_checkf(false, "NOS_RGBI_PINV_CUTOFF is not a number: '" + std::string(env) + "'.", std::cout);
+			err_checkf(false, std::string(name) + " is not a number: '" + env + "'.", std::cout);
 		}
-	}
+	};
+	read_threshold("NOS_RGBI_PINV_CUTOFF", pinv_cutoff, std::numeric_limits<double>::infinity(), "RGBI pseudo-inverses cut singular values below ");
+	read_threshold("NOS_RGBI_PAIR_TOL", pair_tolerance, 1.0, "RGBI pairs ionic eigenvalues and spares lone pairs within ");
 	auto bonds = get_bonded_atom_pairs(wavy);
 	//A .wfn has no shell structure, so every atom's basis is empty; OCC would segfault (uncatchable) in
 	//gensqrtinv on the ANO route. One check for both routes.
@@ -3215,7 +3220,7 @@ Roby_information::Roby_information(WFN &wavy, const ivec3 &group_sets, const boo
 #endif
 		EVC.container().clear();
 
-		auto pairs = find_eigenvalue_pairs(pruned_eigvals);
+		auto pairs = find_eigenvalue_pairs(pruned_eigvals, pair_tolerance);
 #ifdef NSA2DEBUG
 		std::cout << "Pairs:\n";
 		for (size_t i = 0; i < n0; i++) {
