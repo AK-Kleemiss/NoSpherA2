@@ -591,7 +591,7 @@ std::array<double, 2> get_integration_weights(const int& num_centers,
 	double dist_a, dist_b;
 	double vx, vy, vz;
 	double R_a, R_b, u_ab, chi_mod;
-#if !(defined(__aarch64__) || defined(_M_ARM64))
+#if !(defined(__aarch64__) || defined(_M_ARM64) || defined(__arm__))
 	double chi_becke;
 #endif
 	const double* chi_off, * bragg = constants::bragg_angstrom;
@@ -620,7 +620,7 @@ std::array<double, 2> get_integration_weights(const int& num_centers,
 			}
 		dist_ab_table = pair_dist.data();
 	}
-#if defined(__aarch64__) || defined(_M_ARM64)
+#if defined(__aarch64__) || defined(_M_ARM64) || defined(__arm__)
 	//The Becke size adjustment u_ab depends only on the two elements: a table instead of three divisions per pair,
 	//which were 16 % of the grid on a Cortex-A72. Same formula, same values. x64 keeps the divisions, faster there.
 	static const std::vector<double> u_elem = [] {
@@ -653,7 +653,7 @@ std::array<double, 2> get_integration_weights(const int& num_centers,
 
 			R_a = R_v[a];
 			const double *dist_ab_row = dist_ab_table + (size_t)a * num_centers;
-#if defined(__aarch64__) || defined(_M_ARM64)
+#if defined(__aarch64__) || defined(_M_ARM64) || defined(__arm__)
 			u_row = u_elem.data() + (size_t)proton_charges[a] * std::size(constants::bragg_angstrom);
 #endif
 
@@ -668,7 +668,7 @@ std::array<double, 2> get_integration_weights(const int& num_centers,
 				mu_ab = (dist_a - dist_b) / dist_ab;
 
 				if (std::abs(R_a - R_b) > cut) {
-#if defined(__aarch64__) || defined(_M_ARM64)
+#if defined(__aarch64__) || defined(_M_ARM64) || defined(__arm__)
 					u_ab = u_row[proton_charges[b]];
 #else
 					chi_becke = R_a / R_b;
@@ -720,7 +720,7 @@ std::array<double, 2> get_integration_weights(const int& num_centers,
 			R_a = R_v[a];
 			chi_off = chi.data() + a * num_centers;
 			const double *dist_ab_row = dist_ab_table + (size_t)a * num_centers;
-#if defined(__aarch64__) || defined(_M_ARM64)
+#if defined(__aarch64__) || defined(_M_ARM64) || defined(__arm__)
 			u_row = u_elem.data() + (size_t)proton_charges[a] * std::size(constants::bragg_angstrom);
 #endif
 
@@ -760,7 +760,7 @@ std::array<double, 2> get_integration_weights(const int& num_centers,
 
 
 				if (std::abs(R_a - R_b) > cut) {
-#if defined(__aarch64__) || defined(_M_ARM64)
+#if defined(__aarch64__) || defined(_M_ARM64) || defined(__arm__)
 					u_ab = u_row[proton_charges[b]];
 #else
 					chi_becke = R_a / R_b;
