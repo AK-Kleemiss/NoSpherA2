@@ -2825,15 +2825,14 @@ void Roby_information::computeGroupAnalysis(const ivec2 &group_defs, const vec &
 			// can push these to ~0.996 rather than exactly 1, so they evade the
 			// angle cutoff (84.6° lies inside its [0.573°, 89.427°] window) and corrupt
 			// the ionic index with large contributions of the wrong sign.  Exclude any
-			// pair whose positive eigval exceeds this threshold.
+			// pair whose positive eigval exceeds group_lone_pair_threshold.
 			// TODO: the atom-pair loop lacks this guard, so the two paths disagree on lone pairs.
-			const double lone_pair_eigval_threshold = 0.99;
 			for (int i = 0; i < n0; i++) {
 				if (covalent_info['A'](i, 0) < zero_angle_cutoff || covalent_info['A'](i, 0) > 90.0 - zero_angle_cutoff)
 					continue;
 				if (pruned_eigvals[i] < pruned_eigvals[pairs[i]])
 					continue;
-				if (pruned_eigvals[i] > lone_pair_eigval_threshold)
+				if (pruned_eigvals[i] > group_lone_pair_threshold)
 					continue;
 				if (pairs[i] != i) {
 					result.covalent += 0.5 * (covalent_popul[i] - covalent_popul[pairs[i]]);
@@ -2906,6 +2905,7 @@ Roby_information::Roby_information(WFN &wavy, const ivec3 &group_sets, const boo
 	};
 	read_threshold("NOS_RGBI_PINV_CUTOFF", pinv_cutoff, std::numeric_limits<double>::infinity(), "RGBI pseudo-inverses cut singular values below ");
 	read_threshold("NOS_RGBI_PAIR_TOL", pair_tolerance, 1.0, "RGBI pairs ionic eigenvalues and spares lone pairs within ");
+	read_threshold("NOS_RGBI_GROUP_LP", group_lone_pair_threshold, 2.0, "RGBI groups drop ionic pairs as lone pairs above ");
 	auto bonds = get_bonded_atom_pairs(wavy);
 	//A .wfn has no shell structure, so every atom's basis is empty; OCC would segfault (uncatchable) in
 	//gensqrtinv on the ANO route. One check for both routes.

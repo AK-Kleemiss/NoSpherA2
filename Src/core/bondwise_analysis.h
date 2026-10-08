@@ -95,6 +95,9 @@ private:
 	//Width of the +/-1 window in find_eigenvalue_pairs: an eigenvalue this close to +/-1 is a lone pair left
 	//unpaired, and two summing to within it are a bond pair. H2O2 O-O Cov. moves 0.645 -> 0.818 at 2E-3.
 	double pair_tolerance = 1E-4;  //NOS_RGBI_PAIR_TOL overrides it
+	//Group path only: an ionic pair whose positive eigenvalue exceeds this is a lone pair and skipped. Ionic
+	//eigenvalues lie in [-1, 1], so >= 1 switches the guard off, as on the atom-pair path. H2O2 O-O 0.800 vs 0.645.
+	double group_lone_pair_threshold = 0.99;  //NOS_RGBI_GROUP_LP overrides it
 	int last_pinv_n = 0, last_pinv_kept = 0;
 	double last_pinv_smallest_kept = 0.0, last_pinv_largest_dropped = 0.0;
 	std::vector<std::string> pinv_warnings;
