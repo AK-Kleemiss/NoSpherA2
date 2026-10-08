@@ -218,17 +218,8 @@ inline void sincos_shared(const double x, double* s, double* c) {
 
 #if defined(__aarch64__) || defined(_M_ARM64)
 // sincos_shared on two NEON lanes: the same reduction and kernels with fused multiply-adds, the quadrant switch as a
-// lane select plus sign bits. A pair with a lane at |x| >= 1e5 or non-finite goes lane by lane through sincos_shared.
-inline void sincos_shared2(const float64x2_t x, float64x2_t* s, float64x2_t* c) {
-	const uint64x2_t in_range = vcaltq_f64(x, vdupq_n_f64(1e5));
-	if ((vgetq_lane_u64(in_range, 0) & vgetq_lane_u64(in_range, 1)) == 0) {
-		double xs[2], ss[2], cs[2];
-		vst1q_f64(xs, x);
-		sincos_shared(xs[0], ss, cs);
-		sincos_shared(xs[1], ss + 1, cs + 1);
-		*s = vld1q_f64(ss); *c = vld1q_f64(cs);
-		return;
-	}
+// lane select plus sign bits. Branch-free and for |x| < 1e5 only; sincos_shared2/4 test the range.
+inline void sincos_kernel2(const float64x2_t x, float64x2_t* s, float64x2_t* c) {
 	const float64x2_t q = vrndnq_f64(vmulq_f64(x, vdupq_n_f64(0.63661977236758134308)));
 	float64x2_t r = vfmsq_f64(x, q, vdupq_n_f64(1.57079632673412561417e+00));
 	r = vfmsq_f64(r, q, vdupq_n_f64(6.07710050630396597660e-11));
@@ -257,9 +248,42 @@ inline void sincos_shared2(const float64x2_t x, float64x2_t* s, float64x2_t* c) 
 	*c = vreinterpretq_f64_u64(veorq_u64(vreinterpretq_u64_f64(vbslq_f64(odd, sr, cr)), sgn_c));
 }
 
-// sincos_shared2 over n angles, an odd last one through sincos_shared
+// A pair with a lane at |x| >= 1e5 or non-finite goes lane by lane through sincos_shared.
+inline void sincos_shared2(const float64x2_t x, float64x2_t* s, float64x2_t* c) {
+	const uint64x2_t in_range = vcaltq_f64(x, vdupq_n_f64(1e5));
+	if ((vgetq_lane_u64(in_range, 0) & vgetq_lane_u64(in_range, 1)) == 0) {
+		double xs[2], ss[2], cs[2];
+		vst1q_f64(xs, x);
+		sincos_shared(xs[0], ss, cs);
+		sincos_shared(xs[1], ss + 1, cs + 1);
+		*s = vld1q_f64(ss); *c = vld1q_f64(cs);
+		return;
+	}
+	sincos_kernel2(x, s, c);
+}
+
+// Two pairs, lane for lane the results of sincos_shared2. One range test puts both kernels in one basic block: each
+// kernel is a long dependency chain, and the A72 (Pi 4) only overlaps two of them when they sit side by side, 1.44x.
+inline void sincos_shared4(const float64x2_t x0, const float64x2_t x1, float64x2_t* s0, float64x2_t* c0, float64x2_t* s1, float64x2_t* c1) {
+	const uint64x2_t in_range = vandq_u64(vcaltq_f64(x0, vdupq_n_f64(1e5)), vcaltq_f64(x1, vdupq_n_f64(1e5)));
+	if ((vgetq_lane_u64(in_range, 0) & vgetq_lane_u64(in_range, 1)) == 0) {
+		sincos_shared2(x0, s0, c0);
+		sincos_shared2(x1, s1, c1);
+		return;
+	}
+	sincos_kernel2(x0, s0, c0);
+	sincos_kernel2(x1, s1, c1);
+}
+
+// sincos_shared4/2 over n angles, an odd last one through sincos_shared
 inline void sincos_shared_n(const int n, const double* x, double* s, double* c) {
 	int p = 0;
+	for (; p + 3 < n; p += 4) {
+		float64x2_t s0, c0, s1, c1;
+		sincos_shared4(vld1q_f64(x + p), vld1q_f64(x + p + 2), &s0, &c0, &s1, &c1);
+		vst1q_f64(s + p, s0); vst1q_f64(s + p + 2, s1);
+		vst1q_f64(c + p, c0); vst1q_f64(c + p + 2, c1);
+	}
 	for (; p + 1 < n; p += 2) {
 		float64x2_t sv, cv;
 		sincos_shared2(vld1q_f64(x + p), &sv, &cv);
