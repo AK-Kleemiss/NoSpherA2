@@ -550,10 +550,11 @@ TEST(SaltedFchkIoTests, SyntheticModelIndexAndLoadBlock)
 	std::filesystem::remove(p);
 }
 
-// -salted_fold's writer: PROJ becomes PROJW, the blocks behind it move and still read back
+// -salted_fold's writer: PROJ becomes PROJW, the blocks behind it move and still read back; a block
+// dropped without a replacement is gone
 TEST(SaltedFchkIoTests, BlockReplacedCopy)
 {
-	const auto p = tmp_path("fold_in.salted"), q = tmp_path("fold_out.salted");
+	const auto p = tmp_path("fold_in.salted"), q = tmp_path("fold_out.salted"), r = tmp_path("fold_drop.salted");
 	write_synthetic_model(p, 3, true, true);
 	{
 		salted_writer w;
@@ -562,7 +563,8 @@ TEST(SaltedFchkIoTests, BlockReplacedCopy)
 		w.raw(static_cast<int32_t>(1));
 		w.dataset(vec{ 1.5, 2.5, 3.5 }, { 3, 1 });
 		SALTED_BINARY_FILE f(p);
-		f.write_with_block_replaced(q, 4, "PROJ", "PROJW", w.buf);
+		f.write_with_blocks(q, 4, { "PROJ" }, { { "PROJW", w.buf } });
+		f.write_with_blocks(r, 5, { "WEIGH", "FEATS" }, {});
 	}
 	{
 		SALTED_BINARY_FILE g(q);
@@ -577,15 +579,23 @@ TEST(SaltedFchkIoTests, BlockReplacedCopy)
 		ASSERT_TRUE(g.basis_set_defined());
 		EXPECT_EQ(g.read_basis_set()->get_owned_primitive_count(), 5u);
 	}
+	{
+		SALTED_BINARY_FILE g(r);
+		EXPECT_FALSE(g.has_block("WEIGH"));
+		EXPECT_FALSE(g.has_block("FEATS"));
+		EXPECT_NEAR(g.read_projectors().at("H1")(0, 1), 80.0, 1e-15);
+		EXPECT_EQ(g.read_basis_set()->get_owned_primitive_count(), 5u);
+	}
 	std::filesystem::remove(p);
 	std::filesystem::remove(q);
+	std::filesystem::remove(r);
 }
 
 // a file from the future warns but still reads through its table of contents
 TEST(SaltedFchkIoTests, NewerVersionStillReads)
 {
 	const auto p = tmp_path("future.salted");
-	write_synthetic_model(p, 5, false, true);
+	write_synthetic_model(p, 6, false, true);
 	{
 		SALTED_BINARY_FILE f(p);
 		EXPECT_EQ(f.read_weights().size(), 4u);
@@ -1219,6 +1229,59 @@ TEST(SaltedFchkPredictorTests, PredictWaterMonomer)
 	// each H gets 0.460 e against 0.807 e in the reference fit of this geometry (reading_SALTED/coefficients_conf0.npy,
 	// same basis, 10.000 e); the Aug and Sep 2026 builds predict the same coefficients to 1e-16
 	EXPECT_NEAR(e[0] + e[1] + e[2], 9.1937, 1e-3);
+}
+
+// -salted_fold: the folded model predicts what the unfolded one does, through ENVW for the shipped
+// zeta = 1 and, in a copy with zeta set to 2, through GENV from the lambda on where it is no larger
+TEST(SaltedFchkPredictorTests, FoldedModelPredictsTheSame)
+{
+	equicomb_set_gpu(false);
+	const auto root = nos_test_repo_root() / "tests";
+	auto predict = [&root](const std::filesystem::path& dir) {
+		WFN w(root / "reading_SALTED" / "water_monomer.xyz", false);
+		options opt;
+		opt.salted_model_dir = dir;
+		SALTEDPredictor SP(w, opt);
+		load_basis_into_WFN(SP.wavy, BasisSetLibrary::get_basis_set(SP.get_dfbasis_name()));
+		return SP.gen_SALTED_densities();
+	};
+	const auto dir = tmp_path("fold");
+	for (const double zeta : { 1.0, 2.0 })
+	{
+		std::filesystem::remove_all(dir);
+		std::filesystem::create_directories(dir / "plain");
+		std::filesystem::create_directories(dir / "folded");
+		const auto plain = dir / "plain" / "model.salted", folded = dir / "folded" / "model.salted";
+		std::filesystem::copy_file(root / "SALTED" / "Model" / "model.salted", plain);
+		if (zeta != 1.0)
+		{
+			// CONFG: the value follows its 5-byte tag and a 4-byte type word
+			std::fstream f(plain, std::ios::in | std::ios::out | std::ios::binary);
+			std::string head(4096, '\0');
+			f.read(head.data(), head.size());
+			const size_t at = head.find("zeta");
+			ASSERT_NE(at, std::string::npos);
+			f.clear();
+			f.seekp(at + 9);
+			f.write(reinterpret_cast<const char*>(&zeta), sizeof(zeta));
+		}
+		const int threads = omp_get_max_threads();
+		fold_salted_file(plain, folded);
+		MKL_Set_Num_Threads(threads);   // the converter leaves BLAS on one thread
+		{
+			SALTED_BINARY_FILE f(folded);
+			EXPECT_FALSE(f.has_block("FEATS"));
+			EXPECT_EQ(f.has_block("ENVW"), zeta == 1.0);
+			EXPECT_EQ(f.has_block("GENV"), zeta != 1.0);
+		}
+		const vec a = predict(dir / "plain"), b = predict(dir / "folded");
+		ASSERT_EQ(a.size(), b.size());
+		double big = 0.0;
+		for (const double x : a) big = std::max(big, std::abs(x));
+		for (size_t i = 0; i < a.size(); i++)
+			EXPECT_NEAR(b[i], a[i], 1e-10 * big) << "zeta " << zeta << ", coefficient " << i;
+	}
+	std::filesystem::remove_all(dir);
 }
 
 // ------------------------------------------------------------------ fchk
