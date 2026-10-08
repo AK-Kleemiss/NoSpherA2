@@ -21,19 +21,19 @@ GridManager: Generating integration grids for atoms...
 GridManager: Generated total of 93098 grid points.
 Total number of grid points after pruning: 93092
 AO values calculated for all grids.
-Screened out 3020 unique pairs of mu, nu (56.39%) 
-Skipped evaluation of 4735560 grids (9.56%) 
+Screened out 2668 unique pairs of mu, nu (49.81%) 
+Skipped evaluation of 5584182 grids (11.28%) 
 More detailed output in XCW.log file...
 ____________________________________________________________________________________
  Lambda		Criterion	GooF(F2)	R1(gt)		Total Energy		Perturbation	Target quantity		Crit(all)	R1(all)
 								(Eh)			(a. u.)		(a. u.)
 ____________________________________________________________________________________
 0.00000		5.4821		5.4821		0.02535		-1961.923538820		0.000		-1961.923538820		5.3845		0.02571
-0.01000		4.4924		4.4924		0.02340		-1961.887521928		0.045		-1961.842597585		4.4127		0.02376
-0.02000		4.1053		4.1053		0.02243		-1961.839402477		0.082		-1961.757297162		4.0325		0.02278
-0.03000		3.8619		3.8619		0.02178		-1961.791632749		0.116		-1961.675776074		3.7936		0.02213
-0.04000		3.6870		3.6870		0.02129		-1961.745792399		0.147		-1961.598312430		3.6218		0.02164
+0.01000		4.4924		4.4924		0.02340		-1961.887522344		0.045		-1961.842598131		4.4127		0.02376
+0.02000		4.1053		4.1053		0.02243		-1961.839403381		0.082		-1961.757298266		4.0325		0.02278
+0.03000		3.8619		3.8619		0.02178		-1961.791634087		0.116		-1961.675777662		3.7936		0.02213
+0.04000		3.6870		3.6870		0.02129		-1961.745794142		0.147		-1961.598314460		3.6218		0.02164
 WARNING: Unexpected number of extrema (0) found between atoms 8 and 9. Setting chi to 1.0.
-0.05000		3.5523		3.5523		0.02093		-1961.702119710		0.178		-1961.524506740		3.4896		0.02128
+0.05000		3.5523		3.5523		0.02093		-1961.702121843		0.178		-1961.524509185		3.4895		0.02128
 WARNING: Unexpected number of extrema (0) found between atoms 8 and 9. Setting chi to 1.0.
 Finished XCW fitting procedure.

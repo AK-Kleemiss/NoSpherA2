@@ -1803,7 +1803,8 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 	{
 		const auto screen_start = std::chrono::high_resolution_clock::now();
 		const char* tol = tuning("NOS_XCW_PAIR_TOL");
-		const double e_tol = tol ? std::atof(tol) : 5e-4;
+		//1e-4: at 5e-4 this bound left def2-SVP 1.1e-5 of max|F| and 6.5e-6 Eh off unscreened
+		const double e_tol = tol ? std::atof(tol) : 1e-4;
 		std::vector<std::vector<std::pair<i3, double>>> harmonic(cryst.nmo);
 		for (mu = 0; mu < cryst.nmo; mu++) {
 			double residual;
