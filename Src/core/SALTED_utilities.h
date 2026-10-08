@@ -118,6 +118,8 @@ struct aux_density_table
 	int n_at = 0, n_sh = 0, n_pr = 0, n_coef = 0;
 
 	vec cx, cy, cz, r2_max, pr_exp, pr_norm;
+	// per shell, the squared distance beyond which |r^l R| < 1e-10 for certain: the point kernels skip it there unevaluated
+	vec sh_r2;
 	// alpha^(l + 3/2), needed for Fourier-Bessel transform
 	vec pr_exp_l32;
 	ivec sh_start, sh_atom, sh_l, pr_start, coef_off;
