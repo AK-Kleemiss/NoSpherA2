@@ -68,7 +68,9 @@ private:
 	// diagnostic whatsoever. Builds already shipped cannot be fixed, but from
 	// here on a file from the future says so instead of quietly dropping a
 	// correction.
-	static const int SUPPORTED_VERSION = 3;
+	// VERSION 4 (-salted_fold): PROJW, each projector times its weights, replaces
+	// PROJ, so an older build stops at the missing PROJ instead of misreading it.
+	static const int SUPPORTED_VERSION = 4;
 	enum DataType { INT32 = 0, FLOAT64 = 1, STRING = 2 };
 
 	std::filesystem::path filepath;
@@ -147,6 +149,11 @@ public:
 	std::vector<dMatrix2> load_blocks(const std::vector<block_ref>& refs);
 
 	const bool basis_set_defined() { return table_of_contents.find("BASIS") != table_of_contents.end(); }
+	bool has_block(const std::string& key) const { return table_of_contents.count(key) != 0; }
+	// This file as VERSION version_out with block `key` swapped for `new_key` holding `block`
+	// (datatype word onwards); every other byte is copied, later blocks shifted
+	void write_with_block_replaced(const std::filesystem::path& out, int32_t version_out,
+		const std::string& key, const std::string& new_key, const std::string& block);
 
 	std::shared_ptr<BasisSet> read_basis_set();
 };

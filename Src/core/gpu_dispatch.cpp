@@ -29,6 +29,7 @@
 	F(bool, sf_gpu_uses_fp32, (const sf_precision prec), (prec)) \
 	F(bool, sf_gpu_run, (const int imax, const long long smax, const double* k1, const double* k2, const double* k3, const double* d1, const double* d2, const double* d3, const double* dens, const int* offs, const long long total_points, double* const* sf_rows, const sf_precision prec), (imax, smax, k1, k2, k3, d1, d2, d3, dens, offs, total_points, sf_rows, prec)) \
 	F(bool, itensor_gpu_available, (), ()) \
+	F(bool, itensor_gpu_integrated, (), ()) \
 	F(const char*, itensor_gpu_gemm_name, (), ()) \
 	F(double, itensor_gpu_issued_flops, (), ()) \
 	F(int, itensor_gpu_batch, (int num_syms), (num_syms)) \

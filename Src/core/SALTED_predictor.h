@@ -71,6 +71,10 @@ private:
 	// Projector shapes for every species the model knows, present or not: the flat
 	// weight vector is laid out over all of them, so absent widths shift the offsets
 	std::unordered_map<std::string, std::array<size_t, 2>> proj_dims{};
+	// Start of each present (species, l) block in that flat vector: n-major, one projector width per n
+	std::unordered_map<std::string, size_t> weight_offset{};
+	// A VERSION 4 file (PROJW) stores the projectors with the weights already folded in
+	bool projector_folded = false;
 	// Held open for the whole prediction, indexed by (species, lambda)
 	std::unique_ptr<SALTED_BINARY_FILE> model_file{};
 	std::unordered_map<std::string, SALTED_BINARY_FILE::block_ref> feat_index{};
@@ -94,4 +98,7 @@ private:
 
 	vec predict();
 };
+
+// Writes the model `in` to `out` as VERSION 4: PROJW holds what install_model_lambda() folds on every run
+void fold_salted_file(const std::filesystem::path& in, const std::filesystem::path& out);
 

@@ -14,6 +14,7 @@
 #include "geometry_aid.h"
 #include "crystal_energies.h"
 #include "SALTED_equicomb.h"
+#include "SALTED_predictor.h"
 #ifdef NOSPHERA2_USE_GPU
 #include "sf_gpu.h"
 #endif
@@ -632,6 +633,10 @@ std::string help_message =
  "                                    is the structure's density for -rho,\n"
  "                                    -esp, -lap, -eli, -esp_isosurface and the Hirshfeld\n"
  "                                    surface ESP. \n"
+ "  -salted_fold <in.salted> <out.salted>\n"
+ "                                    Store the model with its weights folded\n"
+ "                                    into the projectors: a third smaller,\n"
+ "                                    faster to load, same prediction.\n"
  "  -SALTED_COEFS <model-dir>          Write SALTED_COEFS.npy (requires -wfn).\n"
  "  -RI_CUBE <coefficients.npy>        Write an RI density cube; use -wfn and\n"
  "                                    -ri_fit first.\n"
@@ -3216,6 +3221,12 @@ bool options::digest_partition_options(const std::string &temp, int &i)
 			n++;
 		}
 		merge_tscs_without_checks("combine", filenames, old_tsc);
+		finished = true; return true;
+	}
+	else if (temp == "-salted_fold")
+	{
+		err_checkf(i + 2 < argc, "-salted_fold needs the model and the file to write", std::cout);
+		fold_salted_file(arguments[i + 1], arguments[i + 2]);
 		finished = true; return true;
 	}
 	else if (temp == "-mtc")

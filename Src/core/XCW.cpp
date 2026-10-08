@@ -3011,6 +3011,13 @@ void XCW::build_effective_dm(const occ::qm::SCF<occ::qm::HartreeFock>& scf, dMat
 
 bool XCW::do_SCF(const double& lambda, double& alpha, occ::qm::SCF<occ::qm::HartreeFock>& scf, occ::qm::Wavefunction& last_wfn, bool& has_guess, const bool write_result) {
 
+#if !defined(__APPLE__) && !defined(NSA2_OPENBLAS)
+	//The SCF's own MKL calls (DIIS, the diagonalisation) run serial on every path: they are small against
+	//the Fock build, and threaded they wait for a time slice at every barrier once another job loads the
+	//host (Radeon 780M box beside a 16-thread job: 170 s against 7 s for 14 iterations). A CPU or hybrid I tensor
+	//has left this thread serial anyway, through mkl_set_num_threads_local in eval_I.
+	mkl_set_num_threads_local(1);
+#endif
 	settings.clear();
 	diis_F_.clear();
 	diis_E_.clear();
@@ -4113,7 +4120,7 @@ void XCW::run_XCW_fitting() {
 		if (eri_on_device_) throughput::record_time("XCW two-electron integrals upload", true, get_msec(up_t0, get_time()));
 		if (!(opt->no_date))
 			std::cerr << "GPU in use: XCW Fock build from the stored integrals on "
-			<< (eri_on_device_ ? "the device" : "the CPU - device unavailable or the integrals too large") << std::endl;
+			<< (eri_on_device_ ? "the device" : "the CPU - device unavailable, an APU without fast fp64, or the integrals too large") << std::endl;
 	}
 #endif
 	occ::qm::SCF scf(hf, settings.hf_type);
