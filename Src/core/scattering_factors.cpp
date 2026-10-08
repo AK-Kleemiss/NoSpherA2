@@ -1899,62 +1899,17 @@ void calc_SF_SALTED(
 			for (int kk = 0; kk < kb; kk++) d[kk] = c * r[kk] * y[kk];
 		}
 	};
-	//re (nm x kb) = Ce B[:ne, :], im = Co B[ne:, :]; with -gpu_blas a GEMM large enough for the device goes there
+	//re (nm x kb) = Ce B[:ne, :], im = Co B[ne:, :]. Not offloaded: GEMM on the device lost on every card tried,
+	//V100 included, since B and the form factors cross the bus (branch salted-ft-gpu-attempt)
 	auto products = [&](const salted_sf_group& g, const int kb, const double* B, const int ldb, vec& re, vec& im, const int ldc) {
 		const int nm = static_cast<int>(g.members.size()), no = g.nf - g.ne;
 		const auto gemm = [&](const int k, const double* A, const double* Bk, vec& C) {
 			if (k == 0) { std::fill(C.begin(), C.end(), 0.0); return; }
-#ifdef NOSPHERA2_USE_GPU
-			if (blas_gpu_dgemm(false, false, nm, kb, k, 1.0, A, k, Bk, ldb, 0.0, C.data(), ldc)) return;
-#endif
 			cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, nm, kb, k, 1.0, A, k, Bk, ldb, 0.0, C.data(), ldc);
 		};
 		gemm(g.ne, g.Ce.data(), B, re);
 		gemm(no, g.Co.data(), B + static_cast<size_t>(g.ne) * ldb, im);
 	};
-
-#ifdef NOSPHERA2_USE_GPU
-	//-gpu_blas: B over KC reflections per group, so a group's GEMM pair is large enough to be worth shipping. Taken only
-	//when some GEMM clears the device gate, since the chunks alone are slower than the blocks below.
-	//ponytail: B is still built on the host and shipped per GEMM; a 2080 Ti (fp64 1/32) runs it 2x slower than 8 MKL
-	//threads even forced, so only an fp64 card can win; tabulate on the device if one ever shows a gain.
-	constexpr int KC = 8192;
-	bool device = false;
-	if (blas_gpu_enabled() && blas_gpu_available())
-		for (const salted_sf_group& g : groups)
-			device |= 2.0 * g.members.size() * std::min(KC, nk) * std::max(g.ne, g.nf - g.ne) >= blas_gpu_min_flop();
-	if (device) {
-		std::vector<vec> B(groups.size());
-		for (size_t gi = 0; gi < groups.size(); gi++)
-			B[gi].resize(static_cast<size_t>(groups[gi].nf) * KC);
-		vec re(static_cast<size_t>(nm_max) * KC), im(static_cast<size_t>(nm_max) * KC);
-		for (int c0 = 0; c0 < nk; c0 += KC) {
-			const int kc = std::min(KC, nk - c0);
-#pragma omp parallel
-			{
-				vec rad(static_cast<size_t>(n_uniq) * KB), Y(static_cast<size_t>(lmax + 1) * (lmax + 1) * KB), rs(static_cast<size_t>(nsh_max) * KB);
-#pragma omp for schedule(dynamic)
-				for (int k0 = c0; k0 < c0 + kc; k0 += KB) {
-					const int kb = std::min(KB, c0 + kc - k0);
-					tabulate(rad, Y, k0, kb);
-					for (size_t gi = 0; gi < groups.size(); gi++)
-						fill_B(rad, Y, rs, groups[gi], kb, B[gi].data() + (k0 - c0), KC);
-				}
-			}
-			for (size_t gi = 0; gi < groups.size(); gi++) {
-				const salted_sf_group& g = groups[gi];
-				products(g, kc, B[gi].data(), KC, re, im, KC);
-#pragma omp parallel for
-				for (int i = 0; i < static_cast<int>(g.members.size()); i++) {
-					cdouble* out = sf[g.members[i]].data() + c0;
-					for (int kk = 0; kk < kc; kk++) out[kk] = cdouble(re[static_cast<size_t>(i) * KC + kk], im[static_cast<size_t>(i) * KC + kk]);
-				}
-			}
-			pb.update(kc);
-		}
-		return;
-	}
-#endif
 
 #pragma omp parallel
 	{

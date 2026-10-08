@@ -14,9 +14,6 @@ bool blas_gpu_available();
 void blas_gpu_set_enabled(bool on);
 bool blas_gpu_enabled();
 
-//Smallest GEMM, in flops, that blas_gpu_dgemm ships to the device
-double blas_gpu_min_flop();
-
 //Row-major C(m x n) = alpha * op(A) * op(B) + beta * C, arguments and leading dimensions as cblas_dgemm.
 bool blas_gpu_dgemm(bool transA, bool transB, int m, int n, int k,
 	double alpha, const double* A, int lda, const double* B, int ldb,

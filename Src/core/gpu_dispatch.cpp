@@ -66,7 +66,6 @@
 	F(bool, blas_gpu_available, (), ()) \
 	F(void, blas_gpu_set_enabled, (bool on), (on)) \
 	F(bool, blas_gpu_enabled, (), ()) \
-	F(double, blas_gpu_min_flop, (), ()) \
 	F(bool, blas_gpu_dgemm, (bool transA, bool transB, int m, int n, int k, double alpha, const double* A, int lda, const double* B, int ldb, double beta, double* C, int ldc), (transA, transB, m, n, k, alpha, A, lda, B, ldb, beta, C, ldc))
 
 #define NOSPHERA2_GPU_DECLARE(ret, name, params, args) ret name params;

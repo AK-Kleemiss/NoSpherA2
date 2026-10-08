@@ -17,7 +17,7 @@ void blas_gpu_set_enabled(bool on) { g_blas_gpu = on; }
 bool blas_gpu_enabled() { return g_blas_gpu; }
 
 //Scaled by the fp32:fp64 ratio, the only proxy for the device rate without benchmarking: a lower bar where doubles are cheap
-double blas_gpu_min_flop()
+static double blas_gpu_min_flop()
 {
 	if (const char* env = tuning("NOSPHERA2_BLAS_GPU_MIN_FLOP")) {
 		const double v = std::atof(env);

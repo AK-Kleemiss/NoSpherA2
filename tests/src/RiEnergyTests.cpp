@@ -393,14 +393,6 @@ namespace NoSpherA2UnitTests
 				}
 		};
 		check(150);
-#ifdef NOSPHERA2_USE_GPU
-		// -gpu_blas builds B over chunks of 8192 reflections; 8300 crosses one. With no device the chunks go to BLAS.
-		blas_gpu_set_enabled(true);
-		set_tuning("NOSPHERA2_BLAS_GPU_MIN_FLOP", "1");
-		check(8300);
-		set_tuning("NOSPHERA2_BLAS_GPU_MIN_FLOP", nullptr);
-		blas_gpu_set_enabled(false);
-#endif
 	}
 
 #ifdef NOSPHERA2_USE_GPU
