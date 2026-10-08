@@ -144,6 +144,7 @@ public:
 	struct block_ref { std::streamoff offset = 0; size_t rows = 0, cols = 0; };
 	std::unordered_map<std::string, block_ref> index_lambda_based_data(const std::string& key);
 	dMatrix2 load_block(const block_ref& ref);
+	std::vector<dMatrix2> load_blocks(const std::vector<block_ref>& refs);
 
 	const bool basis_set_defined() { return table_of_contents.find("BASIS") != table_of_contents.end(); }
 

@@ -503,6 +503,8 @@ SALTEDPredictor::lambda_blocks SALTEDPredictor::read_model_lambda(const int lam)
 {
 	lambda_blocks out;
 	if (!model_file) return out;
+	std::vector<std::string> keys;
+	std::vector<SALTED_BINARY_FILE::block_ref> refs;   // projector, features per key
 	for (const std::string &spe : model_species)
 	{
 		if (lam > lmax.at(spe)) continue;
@@ -510,9 +512,13 @@ SALTEDPredictor::lambda_blocks SALTEDPredictor::read_model_lambda(const int lam)
 		const auto pr = proj_index.find(key);
 		const auto ft = feat_index.find(key);
 		if (pr == proj_index.end() || ft == feat_index.end()) continue;
-		dMatrix2 V = model_file->load_block(pr->second);
-		out.emplace_back(key, std::move(V), model_file->load_block(ft->second));
+		keys.push_back(key);
+		refs.push_back(pr->second);
+		refs.push_back(ft->second);
 	}
+	std::vector<dMatrix2> blocks = model_file->load_blocks(refs);
+	for (std::size_t k = 0; k < keys.size(); k++)
+		out.emplace_back(keys[k], std::move(blocks[2 * k]), std::move(blocks[2 * k + 1]));
 	return out;
 }
 
