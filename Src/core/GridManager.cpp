@@ -619,7 +619,7 @@ void GridManager::generateIntegrationGrids(const WFN &wave, const cell &unit_cel
 	//The Becke and TFVC weights are read by those partitions, by RI (partitionWeightIndex's default) and by the
 	//every-scheme output; Hirshfeld integrates with WEIGHT * single / combined alone. There the CPU skips the pair loop:
 	//get_grid with one centre fills the coordinates and puts the plain atom weight in both columns, which nothing reads.
-	//The device keeps computing them, cheap there, and sucrose_SF_gpu_grid's note is the evidence it ran
+	//The device is skipped there too: its launch and copies cost 130 ms on sucrose against 23 ms for the one-centre loop
 	const bool becke = config_.partition_type != PartitionType::Hirshfeld || config_.debug || config_.all_charges;
 	const int weight_centers = becke ? total_atoms : 1;
 	int first = 0;
@@ -628,7 +628,7 @@ void GridManager::generateIntegrationGrids(const WFN &wave, const cell &unit_cel
 	//copies stay bounded. make_chi lays chi out with a stride of ncen, so with periodic
 	//images it does not fit the kernel and the weights stay on the CPU.
 	const bool chi_fits = chi_matrix.empty() || chi_matrix.size() == (size_t)total_atoms * total_atoms;
-	if (grid_gpu_enabled() && total_atoms > 1 && chi_fits) {
+	if (grid_gpu_enabled() && becke && total_atoms > 1 && chi_fits) {
 		const int chunk = 1 << 21;
 		vec R_v(total_atoms);
 		for (int a = 0; a < total_atoms; a++) R_v[a] = constants::bragg_angstrom[charges[a]];
@@ -667,7 +667,7 @@ void GridManager::generateIntegrationGrids(const WFN &wave, const cell &unit_cel
 		if (first == num_atoms_with_grids && constants::first_this_run(announced) && !constants::hide_gpu_notes)
 			std::cout << "GPU in use: atomic grid weights (Becke and TFVC) on " << grid_gpu_backend() << std::endl;
 	}
-	else if (grid_gpu_enabled() && total_atoms > 1) {
+	else if (grid_gpu_enabled() && becke && total_atoms > 1) {
 		static std::atomic<unsigned> warned{0};
 		if (constants::first_this_run(warned) && !constants::hide_gpu_notes)
 			std::cout << "-gpu_grid asked for but not used: chi is " << chi_matrix.size()

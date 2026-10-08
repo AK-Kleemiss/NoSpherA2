@@ -11,14 +11,12 @@
 NOSPHERA2_GPU_API_BEGIN
 
 //Each block owns a tile of k-points for one atom and streams that atom's grid points through
-//shared memory. F32 keeps the phase and its reduction in double; only the transcendental and the
-//running sum drop to single.
+//shared memory.
 #define SF_TILE_K 128
 #define SF_CHUNK 256
 #define SF_TWO_PI 6.283185307179586476925286766559
 #define SF_INV_TWO_PI 0.15915494309189533576888376337251
 
-template <bool F32>
 __global__ void sf_kernel(const int imax, const long long smax,
 	const double* __restrict__ k1, const double* __restrict__ k2, const double* __restrict__ k3,
 	const double* __restrict__ d1, const double* __restrict__ d2, const double* __restrict__ d3,
@@ -29,10 +27,59 @@ __global__ void sf_kernel(const int imax, const long long smax,
 	const int ia = blockIdx.y;
 	const long long s = (long long)blockIdx.x * SF_TILE_K + threadIdx.x;
 	const bool live = (s < smax);
-	//In turns for F32, so the phase reduction below is a rint and a subtract.
-	const double kx = live ? k1[s] * (F32 ? SF_INV_TWO_PI : 1.0) : 0.0;
-	const double ky = live ? k2[s] * (F32 ? SF_INV_TWO_PI : 1.0) : 0.0;
-	const double kz = live ? k3[s] * (F32 ? SF_INV_TWO_PI : 1.0) : 0.0;
+	const double kx = live ? k1[s] : 0.0;
+	const double ky = live ? k2[s] : 0.0;
+	const double kz = live ? k3[s] : 0.0;
+	double re = 0.0, im = 0.0;
+	const int lo = offs[ia], hi = offs[ia + 1];
+	for (int base = lo; base < hi; base += SF_CHUNK) {
+		const int n = min(SF_CHUNK, hi - base);
+		for (int t = threadIdx.x; t < n; t += blockDim.x) {
+			s1[t] = d1[base + t];
+			s2[t] = d2[base + t];
+			s3[t] = d3[base + t];
+			sd[t] = dens[base + t];
+		}
+		__syncthreads();
+		if (live)
+			for (int p = 0; p < n; p++) {
+				double si, co;
+				sincos(kx * s1[p] + ky * s2[p] + kz * s3[p], &si, &co);
+				re += sd[p] * co;
+				im += sd[p] * si;
+			}
+		__syncthreads();
+	}
+	if (live) {
+		double2 v;
+		v.x = re;
+		v.y = im;
+		sf_out[(long long)ia * smax + s] = v;
+	}
+}
+
+//No double in the point loop, which a consumer card runs at 1/32 or 1/64 rate: the points arrive as floats relative
+//to their atom's centre, so k.r splits into the centre's phase, reduced once per thread in double, and a k.delta that
+//floats carry to ~1e-7 turns per turn of |k.delta|. sincospif reduces any argument exactly. Each chunk's sum is
+//Kahan-compensated in float and folded into a double, so the error does not grow with the point count.
+__global__ void sf_kernel_f32(const int imax, const long long smax,
+	const double* __restrict__ k1, const double* __restrict__ k2, const double* __restrict__ k3,
+	const double* __restrict__ centre,
+	const float* __restrict__ d1, const float* __restrict__ d2, const float* __restrict__ d3,
+	const float* __restrict__ dens, const int* __restrict__ offs,
+	double2* __restrict__ sf_out)
+{
+	__shared__ float s1[SF_CHUNK], s2[SF_CHUNK], s3[SF_CHUNK], sd[SF_CHUNK];
+	const int ia = blockIdx.y;
+	const long long s = (long long)blockIdx.x * SF_TILE_K + threadIdx.x;
+	const bool live = (s < smax);
+	//In turns, so the reduction is a rint and a subtract
+	const double kx = live ? k1[s] * SF_INV_TWO_PI : 0.0;
+	const double ky = live ? k2[s] * SF_INV_TWO_PI : 0.0;
+	const double kz = live ? k3[s] * SF_INV_TWO_PI : 0.0;
+	const double w0 = kx * centre[3 * ia] + ky * centre[3 * ia + 1] + kz * centre[3 * ia + 2];
+	const float p0 = (float)(w0 - rint(w0));
+	const float fx = (float)kx, fy = (float)ky, fz = (float)kz;
 	double re = 0.0, im = 0.0;
 	const int lo = offs[ia], hi = offs[ia + 1];
 	for (int base = lo; base < hi; base += SF_CHUNK) {
@@ -47,36 +94,19 @@ __global__ void sf_kernel(const int imax, const long long smax,
 		if (live) {
 			float cre = 0.0f, cim = 0.0f, kre = 0.0f, kim = 0.0f;
 			for (int p = 0; p < n; p++) {
-				const double w = kx * s1[p] + ky * s2[p] + kz * s3[p];
-				const double r = sd[p];
-				if (F32) {
-					//Reduce in double: sincospif of an unreduced argument is meaningless in fp32.
-					const double wr = w - rint(w);
-					float sif, cof;
-					sincospif(2.0f * (float)wr, &sif, &cof);
-					//Kahan-compensated so the error does not grow with the term count.
-					const float pr = (float)r * cof;
-					const float pi = (float)r * sif;
-					float y = pr - kre;
-					float t = cre + y;
-					kre = (t - cre) - y;
-					cre = t;
-					y = pi - kim;
-					t = cim + y;
-					kim = (t - cim) - y;
-					cim = t;
-				}
-				else {
-					double si, co;
-					sincos(w, &si, &co);
-					re += r * co;
-					im += r * si;
-				}
+				float sif, cof;
+				sincospif(2.0f * fmaf(fx, s1[p], fmaf(fy, s2[p], fmaf(fz, s3[p], p0))), &sif, &cof);
+				float y = sd[p] * cof - kre;
+				float t = cre + y;
+				kre = (t - cre) - y;
+				cre = t;
+				y = sd[p] * sif - kim;
+				t = cim + y;
+				kim = (t - cim) - y;
+				cim = t;
 			}
-			if (F32) {
-				re += (double)cre;
-				im += (double)cim;
-			}
+			re += (double)cre;
+			im += (double)cim;
 		}
 		__syncthreads();
 	}
@@ -238,23 +268,51 @@ bool sf_gpu_run(const int imax, const long long smax,
 	GPU_TRY(gpuMemcpy(dk2, k2, kb, gpuMemcpyHostToDevice));
 	GPU_TRY(gpuMemcpy(dk3, k3, kb, gpuMemcpyHostToDevice));
 	const bool f32 = sf_gpu_uses_fp32(prec);
+	double* dce = nullptr;
+	if (f32) GPU_TRY(gpuMalloc(&dce, sizeof(double) * 3 * (size_t)batch));
 	std::vector<int> rel(batch + 1);
+	std::vector<float> h1, h2, h3, hd;
+	std::vector<double> cen;
 	for (int a0 = 0; a0 < imax; a0 += batch) {
 		const int na = std::min(batch, imax - a0);
 		const int p0 = offs[a0];
 		const size_t np = (size_t)(offs[a0 + na] - p0);
 		for (int i = 0; i <= na; i++)
 			rel[i] = offs[a0 + i] - p0;
-		GPU_TRY(gpuMemcpy(dd1, d1 + p0, sizeof(double) * np, gpuMemcpyHostToDevice));
-		GPU_TRY(gpuMemcpy(dd2, d2 + p0, sizeof(double) * np, gpuMemcpyHostToDevice));
-		GPU_TRY(gpuMemcpy(dd3, d3 + p0, sizeof(double) * np, gpuMemcpyHostToDevice));
-		GPU_TRY(gpuMemcpy(dde, dens + p0, sizeof(double) * np, gpuMemcpyHostToDevice));
 		GPU_TRY(gpuMemcpy(dof, rel.data(), sizeof(int) * (size_t)(na + 1), gpuMemcpyHostToDevice));
 		const dim3 grid((unsigned int)((smax + SF_TILE_K - 1) / SF_TILE_K), (unsigned int)na);
-		if (f32)
-			sf_kernel<true><<<grid, SF_TILE_K>>>(na, smax, dk1, dk2, dk3, dd1, dd2, dd3, dde, dof, dout);
-		else
-			sf_kernel<false><<<grid, SF_TILE_K>>>(na, smax, dk1, dk2, dk3, dd1, dd2, dd3, dde, dof, dout);
+		if (f32) {
+			//Each atom's points about their mean, the centre that keeps |delta| and with it the float error smallest
+			h1.resize(np); h2.resize(np); h3.resize(np); hd.resize(np);
+			cen.assign(3 * (size_t)na, 0.0);
+			for (int i = 0; i < na; i++) {
+				const int lo = p0 + rel[i], hi = p0 + rel[i + 1];
+				double* c = cen.data() + 3 * i;
+				for (int p = lo; p < hi; p++) { c[0] += d1[p]; c[1] += d2[p]; c[2] += d3[p]; }
+				for (int x = 0; x < 3; x++) c[x] /= std::max(1, hi - lo);
+				for (int p = lo; p < hi; p++) {
+					h1[p - p0] = (float)(d1[p] - c[0]);
+					h2[p - p0] = (float)(d2[p] - c[1]);
+					h3[p - p0] = (float)(d3[p] - c[2]);
+					hd[p - p0] = (float)dens[p];
+				}
+			}
+			//The double buffers are reused, half filled
+			GPU_TRY(gpuMemcpy(dd1, h1.data(), sizeof(float) * np, gpuMemcpyHostToDevice));
+			GPU_TRY(gpuMemcpy(dd2, h2.data(), sizeof(float) * np, gpuMemcpyHostToDevice));
+			GPU_TRY(gpuMemcpy(dd3, h3.data(), sizeof(float) * np, gpuMemcpyHostToDevice));
+			GPU_TRY(gpuMemcpy(dde, hd.data(), sizeof(float) * np, gpuMemcpyHostToDevice));
+			GPU_TRY(gpuMemcpy(dce, cen.data(), sizeof(double) * cen.size(), gpuMemcpyHostToDevice));
+			sf_kernel_f32<<<grid, SF_TILE_K>>>(na, smax, dk1, dk2, dk3, dce, reinterpret_cast<float*>(dd1),
+				reinterpret_cast<float*>(dd2), reinterpret_cast<float*>(dd3), reinterpret_cast<float*>(dde), dof, dout);
+		}
+		else {
+			GPU_TRY(gpuMemcpy(dd1, d1 + p0, sizeof(double) * np, gpuMemcpyHostToDevice));
+			GPU_TRY(gpuMemcpy(dd2, d2 + p0, sizeof(double) * np, gpuMemcpyHostToDevice));
+			GPU_TRY(gpuMemcpy(dd3, d3 + p0, sizeof(double) * np, gpuMemcpyHostToDevice));
+			GPU_TRY(gpuMemcpy(dde, dens + p0, sizeof(double) * np, gpuMemcpyHostToDevice));
+			sf_kernel<<<grid, SF_TILE_K>>>(na, smax, dk1, dk2, dk3, dd1, dd2, dd3, dde, dof, dout);
+		}
 		GPU_TRY(gpuGetLastError());
 		GPU_TRY(gpuDeviceSynchronize());
 		//Straight into the caller's complex rows, no staging buffer.
@@ -263,7 +321,7 @@ bool sf_gpu_run(const int imax, const long long smax,
 	}
 	gpuFree(dk1); gpuFree(dk2); gpuFree(dk3);
 	gpuFree(dd1); gpuFree(dd2); gpuFree(dd3); gpuFree(dde);
-	gpuFree(dof); gpuFree(dout);
+	gpuFree(dof); gpuFree(dout); gpuFree(dce);
 	return true;
 }
 

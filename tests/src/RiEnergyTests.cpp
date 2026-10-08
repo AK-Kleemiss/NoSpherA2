@@ -31,6 +31,7 @@
 #include <occ/qm/hf.h>
 #include <occ/qm/scf.h>
 #include <spdlog/spdlog.h>
+#include <random>
 #undef I
 #ifdef NOSPHERA2_USE_GPU
 #include "core/blas_gpu.h"
@@ -346,6 +347,60 @@ namespace NoSpherA2UnitTests
 		}
 
 		EXPECT_NEAR(norm2, 1.0, 1e-12);
+	}
+
+	// calc_SF_SALTED groups atoms by their shells and transforms each group as one GEMM; the one-atom
+	// fourier_atom is the reference. Two C share a basis, a third C has another exponent so it must not
+	// join them, l runs to 4 with a contracted shell, the asym list is a shuffled subset, and k = 0 and
+	// a partial last block of reflections are included.
+	TEST(AuxDensityTableTests, GroupedFourierTransformMatchesTheOneAtomReference)
+	{
+		struct sh { int l; vec e, c; };
+		auto make = [](const char* el, int Z, double x, const std::vector<sh>& shells) {
+			atom A(el, {}, 0, x, 0.0, 0.0, Z);
+			std::vector<unsigned int> count;
+			for (size_t s = 0; s < shells.size(); s++) {
+				for (size_t p = 0; p < shells[s].e.size(); p++)
+					A.push_back_basis_set(shells[s].e[p], shells[s].c[p], shells[s].l, static_cast<int>(s));
+				count.push_back(static_cast<unsigned int>(shells[s].e.size()));
+			}
+			A.set_shellcount(count);
+			return A;
+		};
+		const std::vector<sh> C = { {0, {8.0, 1.5}, {0.6, 0.4}}, {0, {0.4}, {1.0}}, {1, {1.2}, {1.0}}, {2, {0.9}, {1.0}}, {3, {0.7}, {1.0}}, {4, {0.6}, {1.0}} };
+		std::vector<sh> C2 = C;
+		C2[2].e = { 1.3 };
+		const std::vector<sh> H = { {0, {2.0}, {1.0}}, {1, {0.8}, {1.0}}, {2, {0.5}, {1.0}} };
+		const aux_density_table t({ make("C", 6, 0.0, C), make("H", 1, 1.0, H), make("C", 6, 2.0, C), make("C", 6, 3.0, C2), make("H", 1, 4.0, H) });
+
+		std::mt19937 rng(7);
+		std::uniform_real_distribution<double> u(-1.0, 1.0);
+		vec coefs(t.n_coef);
+		for (double& c : coefs) c = u(rng);
+		const ivec asym = { 3, 0, 4, 2 };
+		auto check = [&](const int nk) {
+			vec2 k(3, vec(nk, 0.0));
+			for (int i = 1; i < nk; i++)
+				for (int d = 0; d < 3; d++) k[d][i] = 3.0 * u(rng);
+			cvec2 sf;
+			calc_SF_SALTED(k, coefs, t, asym, sf, nullptr);
+			ASSERT_EQ(sf.size(), asym.size());
+			for (size_t ia = 0; ia < asym.size(); ia++)
+				for (int i = 0; i < nk; i++) {
+					const cdouble ref = t.fourier_atom(k[0][i], k[1][i], k[2][i], coefs.data(), asym[ia]);
+					ASSERT_NEAR(sf[ia][i].real(), ref.real(), 1e-12 * (1.0 + std::abs(ref))) << "atom " << asym[ia] << " k " << i << " of " << nk;
+					ASSERT_NEAR(sf[ia][i].imag(), ref.imag(), 1e-12 * (1.0 + std::abs(ref))) << "atom " << asym[ia] << " k " << i << " of " << nk;
+				}
+		};
+		check(150);
+#ifdef NOSPHERA2_USE_GPU
+		// -gpu_blas builds B over chunks of 8192 reflections; 8300 crosses one. With no device the chunks go to BLAS.
+		blas_gpu_set_enabled(true);
+		set_tuning("NOSPHERA2_BLAS_GPU_MIN_FLOP", "1");
+		check(8300);
+		set_tuning("NOSPHERA2_BLAS_GPU_MIN_FLOP", nullptr);
+		blas_gpu_set_enabled(false);
+#endif
 	}
 
 #ifdef NOSPHERA2_USE_GPU

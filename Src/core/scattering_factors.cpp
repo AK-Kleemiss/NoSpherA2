@@ -28,6 +28,7 @@
 #include "cube.h"
 #ifdef NOSPHERA2_USE_GPU
 #include "sf_gpu.h"
+#include "itensor_gpu.h"
 #endif
 
 
@@ -1766,7 +1767,36 @@ static inline cdouble sfac_bessel_r(const primitive& p, const double* k_point, c
 	}
 }
 
-//a streaming caller owns one bar for the whole table and passes it in, else every block draws its own
+namespace {
+//Atoms whose shells match (one element of one basis) share their transformed basis functions
+struct salted_sf_group {
+	int t = 0;                 //template atom
+	ivec members;              //indices into asym_atom_list
+	int ne = 0, nf = 0;        //columns: the ne even-l ones first, then the odd
+	ivec col_shell, col_lm;    //shell offset from the template's first, and l*l + m
+	vec col_sign;              //PI3_2 times the sign of i^l
+	vec Ce, Co;                //[members][ne] and [members][nf - ne], the coefficients in column order
+};
+
+bool salted_same_shells(const aux_density_table& t, const int a, const int b)
+{
+	const int n = t.sh_start[a + 1] - t.sh_start[a];
+	if (n != t.sh_start[b + 1] - t.sh_start[b]) return false;
+	for (int i = 0; i < n; i++) {
+		const int sa = t.sh_start[a] + i, sb = t.sh_start[b] + i, np = t.pr_start[sa + 1] - t.pr_start[sa];
+		if (t.sh_l[sa] != t.sh_l[sb] || np != t.pr_start[sb + 1] - t.pr_start[sb]) return false;
+		for (int p = 0; p < np; p++)
+			if (t.pr_uniq[t.pr_start[sa] + p] != t.pr_uniq[t.pr_start[sb] + p] || t.pr_norm[t.pr_start[sa] + p] != t.pr_norm[t.pr_start[sb] + p]) return false;
+	}
+	return true;
+}
+}
+
+//The transform as one GEMM per group of atoms with the same shells: B[j][k] = i^l PI3_2 R_s(|k|) Y_lm(k^) depends on the
+//basis function alone, so the form factors of a group are its coefficient rows times B, even l into the real part and odd
+//l into the imaginary. The functions are atom-centred, so there is no phase. A per-atom loop recomputed Y_lm per shell
+//and summed scalar complex terms, ~25 ns per atom and reflection on 8 threads. aux_density_table::fourier_atom is the
+//one-atom reference. A streaming caller owns one bar for the whole table and passes it in, else every block draws its own.
 void calc_SF_SALTED(
 	const vec2& k_pt,
 	const vec& coefs,
@@ -1786,40 +1816,171 @@ void calc_SF_SALTED(
 	ProgressBar& pb = progress ? *progress : *local_pb;
 	const int n_uniq = static_cast<int>(table.uniq_exp.size());
 
-#pragma omp parallel
-	{
-		//the radial factor (H/2)^l exp(-H^2/4a) / a^(l+3/2) of aux_density_table::fourier_atom depends on (a, l) and |k| alone,
-		//so it is tabulated once per k-point over the distinct pairs instead of per primitive per atom
-		vec radial(n_uniq);
-#pragma omp for
-		for (int ik = 0; ik < nk; ++ik)
-		{
-			const double kx = k_pt[0][ik], ky = k_pt[1][ik], kz = k_pt[2][ik];
+	std::vector<salted_sf_group> groups;
+	for (int ia = 0; ia < num_asym_atoms; ++ia) {
+		const int a = asym_atom_list[ia];
+		auto g = std::find_if(groups.begin(), groups.end(), [&](const salted_sf_group& x) { return salted_same_shells(table, x.t, a); });
+		if (g == groups.end()) {
+			groups.emplace_back();
+			g = groups.end() - 1;
+			g->t = a;
+		}
+		g->members.push_back(ia);
+	}
+	int lmax = 0, nsh_max = 0, nf_max = 0, nm_max = 0;
+	for (salted_sf_group& g : groups) {
+		const int s0 = table.sh_start[g.t], s1 = table.sh_start[g.t + 1];
+		ivec col_off;
+		for (int odd = 0; odd < 2; odd++)
+			for (int s = s0; s < s1; s++) {
+				const int l = table.sh_l[s];
+				if ((l & 1) != odd) continue;
+				for (int m = 0; m <= 2 * l; m++) {
+					g.col_shell.push_back(s - s0);
+					g.col_lm.push_back(l * l + m);
+					g.col_sign.push_back((l & 2) ? -constants::PI3_2 : constants::PI3_2);
+					col_off.push_back(table.coef_off[s] - table.coef_off[s0] + m);
+				}
+				lmax = std::max(lmax, l);
+				if (!odd) g.ne += 2 * l + 1;
+			}
+		g.nf = static_cast<int>(col_off.size());
+		const int no = g.nf - g.ne;
+		g.Ce.resize(g.members.size() * g.ne);
+		g.Co.resize(g.members.size() * no);
+		for (size_t i = 0; i < g.members.size(); i++) {
+			const double* c = coefs.data() + table.coef_off[table.sh_start[asym_atom_list[g.members[i]]]];
+			for (int j = 0; j < g.ne; j++)
+				g.Ce[i * g.ne + j] = c[col_off[j]];
+			for (int j = 0; j < no; j++)
+				g.Co[i * no + j] = c[col_off[g.ne + j]];
+		}
+		nsh_max = std::max(nsh_max, s1 - s0);
+		nf_max = std::max(nf_max, g.nf);
+		nm_max = std::max(nm_max, static_cast<int>(g.members.size()));
+	}
+	//reflections per GEMM: a block of B stays in L2 at ~150 functions an atom
+	constexpr int KB = 64;
+	const int nblk = (nk + KB - 1) / KB;
+	//unit + 16 - m is 1 at index m and 0 elsewhere for m <= 16, so the contraction returns Y_lm alone
+	static constexpr double unit[33] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1 };
+	//the radial factor (H/2)^l exp(-H^2/4a) / a^(l+3/2) depends on (a, l) and |k| alone, so it is tabulated per k over the
+	//distinct pairs; rad and Y hold KB reflections from k0
+	auto tabulate = [&](vec& rad, vec& Y, const int k0, const int kb) {
+		for (int kk = 0; kk < kb; kk++) {
+			const double kx = k_pt[0][k0 + kk], ky = k_pt[1][k0 + kk], kz = k_pt[2][k0 + kk];
 			const double H2 = kx * kx + ky * ky + kz * kz, H = std::sqrt(H2);
 			const double k[3] = { H > 0.0 ? kx / H : 0.0, H > 0.0 ? ky / H : 0.0, H > 0.0 ? kz / H : 1.0 };
-			for (int u = 0; u < n_uniq; u++)
-			{
+			for (int u = 0; u < n_uniq; u++) {
 				double Hl_over_2l = 1.0;
 				for (int i = 0; i < table.uniq_l[u]; i++)
 					Hl_over_2l *= 0.5 * H;
-				radial[u] = Hl_over_2l * std::exp(-H2 / (4.0 * table.uniq_exp[u])) / table.uniq_exp_l32[u];
+				rad[u * KB + kk] = Hl_over_2l * std::exp(-H2 / (4.0 * table.uniq_exp[u])) / table.uniq_exp_l32[u];
 			}
-			for (int ia = 0; ia < num_asym_atoms; ++ia)
-			{
-				const int a = asym_atom_list[ia];
-				cdouble v = constants::cnull;
-				for (int s = table.sh_start[a]; s < table.sh_start[a + 1]; ++s)
-				{
-					const int l = table.sh_l[s];
-					double r = 0.0;
-					for (int p = table.pr_start[s]; p < table.pr_start[s + 1]; ++p)
-						r += table.pr_norm[p] * radial[table.pr_uniq[p]];
-					v += constants::i_pows[l & 3] * (constants::PI3_2 * r * constants::spherical_harmonic(l, k[0], k[1], k[2], coefs.data() + table.coef_off[s]));
-				}
-				sf[ia][ik] = v;
-			}
-			pb.update();
+			for (int l = 0; l <= lmax; l++)
+				for (int m = 0; m <= 2 * l; m++)
+					Y[(l * l + m) * KB + kk] = constants::spherical_harmonic(l, k[0], k[1], k[2], unit + 16 - m);
 		}
+	};
+	//B[j * ld + kk] of group g from the tables, rs the contracted shells
+	auto fill_B = [&](const vec& rad, const vec& Y, vec& rs, const salted_sf_group& g, const int kb, double* B, const size_t ld) {
+		const int s0 = table.sh_start[g.t];
+		for (int i = 0; i < table.sh_start[g.t + 1] - s0; i++) {
+			double* r = &rs[i * KB];
+			std::fill(r, r + kb, 0.0);
+			for (int p = table.pr_start[s0 + i]; p < table.pr_start[s0 + i + 1]; p++) {
+				const double w = table.pr_norm[p], * q = &rad[table.pr_uniq[p] * KB];
+				for (int kk = 0; kk < kb; kk++) r[kk] += w * q[kk];
+			}
+		}
+		for (int j = 0; j < g.nf; j++) {
+			const double c = g.col_sign[j], * r = &rs[g.col_shell[j] * KB], * y = &Y[g.col_lm[j] * KB];
+			double* d = B + j * ld;
+			for (int kk = 0; kk < kb; kk++) d[kk] = c * r[kk] * y[kk];
+		}
+	};
+	//re (nm x kb) = Ce B[:ne, :], im = Co B[ne:, :]; with -gpu_blas a GEMM large enough for the device goes there
+	auto products = [&](const salted_sf_group& g, const int kb, const double* B, const int ldb, vec& re, vec& im, const int ldc) {
+		const int nm = static_cast<int>(g.members.size()), no = g.nf - g.ne;
+		const auto gemm = [&](const int k, const double* A, const double* Bk, vec& C) {
+			if (k == 0) { std::fill(C.begin(), C.end(), 0.0); return; }
+#ifdef NOSPHERA2_USE_GPU
+			if (blas_gpu_dgemm(false, false, nm, kb, k, 1.0, A, k, Bk, ldb, 0.0, C.data(), ldc)) return;
+#endif
+			cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, nm, kb, k, 1.0, A, k, Bk, ldb, 0.0, C.data(), ldc);
+		};
+		gemm(g.ne, g.Ce.data(), B, re);
+		gemm(no, g.Co.data(), B + static_cast<size_t>(g.ne) * ldb, im);
+	};
+
+#ifdef NOSPHERA2_USE_GPU
+	//-gpu_blas: B over KC reflections per group, so a group's GEMM pair is large enough to be worth shipping. Taken only
+	//when some GEMM clears the device gate, since the chunks alone are slower than the blocks below.
+	//ponytail: B is still built on the host and shipped per GEMM; a 2080 Ti (fp64 1/32) runs it 2x slower than 8 MKL
+	//threads even forced, so only an fp64 card can win; tabulate on the device if one ever shows a gain.
+	constexpr int KC = 8192;
+	bool device = false;
+	if (blas_gpu_enabled() && blas_gpu_available())
+		for (const salted_sf_group& g : groups)
+			device |= 2.0 * g.members.size() * std::min(KC, nk) * std::max(g.ne, g.nf - g.ne) >= blas_gpu_min_flop();
+	if (device) {
+		std::vector<vec> B(groups.size());
+		for (size_t gi = 0; gi < groups.size(); gi++)
+			B[gi].resize(static_cast<size_t>(groups[gi].nf) * KC);
+		vec re(static_cast<size_t>(nm_max) * KC), im(static_cast<size_t>(nm_max) * KC);
+		for (int c0 = 0; c0 < nk; c0 += KC) {
+			const int kc = std::min(KC, nk - c0);
+#pragma omp parallel
+			{
+				vec rad(static_cast<size_t>(n_uniq) * KB), Y(static_cast<size_t>(lmax + 1) * (lmax + 1) * KB), rs(static_cast<size_t>(nsh_max) * KB);
+#pragma omp for schedule(dynamic)
+				for (int k0 = c0; k0 < c0 + kc; k0 += KB) {
+					const int kb = std::min(KB, c0 + kc - k0);
+					tabulate(rad, Y, k0, kb);
+					for (size_t gi = 0; gi < groups.size(); gi++)
+						fill_B(rad, Y, rs, groups[gi], kb, B[gi].data() + (k0 - c0), KC);
+				}
+			}
+			for (size_t gi = 0; gi < groups.size(); gi++) {
+				const salted_sf_group& g = groups[gi];
+				products(g, kc, B[gi].data(), KC, re, im, KC);
+#pragma omp parallel for
+				for (int i = 0; i < static_cast<int>(g.members.size()); i++) {
+					cdouble* out = sf[g.members[i]].data() + c0;
+					for (int kk = 0; kk < kc; kk++) out[kk] = cdouble(re[static_cast<size_t>(i) * KC + kk], im[static_cast<size_t>(i) * KC + kk]);
+				}
+			}
+			pb.update(kc);
+		}
+		return;
+	}
+#endif
+
+#pragma omp parallel
+	{
+#if !defined(__APPLE__) && !defined(NSA2_OPENBLAS)
+		const int mkl_before = mkl_set_num_threads_local(1);
+#endif
+		vec rad(static_cast<size_t>(n_uniq) * KB), Y(static_cast<size_t>(lmax + 1) * (lmax + 1) * KB), rs(static_cast<size_t>(nsh_max) * KB),
+			Bt(static_cast<size_t>(nf_max) * KB), re(static_cast<size_t>(nm_max) * KB), im(static_cast<size_t>(nm_max) * KB);
+#pragma omp for schedule(dynamic)
+		for (int b = 0; b < nblk; b++)
+		{
+			const int k0 = b * KB, kb = std::min(KB, nk - k0);
+			tabulate(rad, Y, k0, kb);
+			for (const salted_sf_group& g : groups) {
+				fill_B(rad, Y, rs, g, kb, Bt.data(), KB);
+				products(g, kb, Bt.data(), KB, re, im, KB);
+				for (size_t i = 0; i < g.members.size(); i++) {
+					cdouble* out = sf[g.members[i]].data() + k0;
+					for (int kk = 0; kk < kb; kk++) out[kk] = cdouble(re[i * KB + kk], im[i * KB + kk]);
+				}
+			}
+			pb.update(kb);
+		}
+#if !defined(__APPLE__) && !defined(NSA2_OPENBLAS)
+		mkl_set_num_threads_local(mkl_before);
+#endif
 	}
 }
 //calc_SF phase recurrence: reflections per task, points per L1 tile, multiplies between sincos anchors, max row-jump steps
@@ -2135,7 +2296,12 @@ void calc_SF(const int& points,
 			file << "Time to prepare: " << fixed << setprecision(0) << dur << " s" << endl << endl;
 	}
 #ifdef NOSPHERA2_USE_GPU
-	if (use_gpu && sf_gpu_available()) {
+	//-gpu_fp64 wins over -gpu_fp32 if both are given: the accurate one is the safer default.
+	const sf_precision prec = gpu_fp64 ? sf_precision::FP64
+		: gpu_fp32 ? sf_precision::FP32 : sf_precision::Auto;
+	//An APU's own cores beat its device here unless a precision is asked for (Radeon 780M f32: 176 ms at d 0.5 sucrose,
+	//its Ryzen 8700G 106 ms)
+	if (use_gpu && sf_gpu_available() && (prec != sf_precision::Auto || !itensor_gpu_integrated())) {
 		ivec offs(imax + 1, 0);
 		for (int i = 0; i < imax; i++)
 			offs[i + 1] = offs[i] + (int)dens[i].size();
@@ -2151,9 +2317,6 @@ void calc_SF(const int& points,
 		std::vector<double*> rows(imax);
 		for (int i = 0; i < imax; i++)
 			rows[i] = reinterpret_cast<double*>(sf[i].data());
-		//-gpu_fp64 wins over -gpu_fp32 if both are given: the accurate one is the safer default.
-		const sf_precision prec = gpu_fp64 ? sf_precision::FP64
-			: gpu_fp32 ? sf_precision::FP32 : sf_precision::Auto;
 		const _time_point sf_gpu_t0 = get_time();
 		if (sf_gpu_run((int)imax, smax, k_pt[0].data(), k_pt[1].data(), k_pt[2].data(),
 			fd1.data(), fd2.data(), fd3.data(), fde.data(), offs.data(), tot,
@@ -2172,7 +2335,7 @@ void calc_SF(const int& points,
 				_time_point gend = get_time();
 				const int ratio = sf_gpu_fp64_ratio();
 				file << "GPU in use: scattering-factor Fourier transform on " << sf_gpu_backend() << ": " << get_msec(end1, gend) << " ms ("
-					 << (sf_gpu_uses_fp32(prec) ? "reduced-argument f32 sincos" : "f64 sincos")
+					 << (sf_gpu_uses_fp32(prec) ? "centre-relative f32 phase and sincos" : "f64 sincos")
 					 << ", fp32:fp64 ratio " << ratio << ")" << std::endl;
 			}
 			return;
