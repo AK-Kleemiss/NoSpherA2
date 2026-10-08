@@ -3002,6 +3002,13 @@ void XCW::build_effective_dm(const occ::qm::SCF<occ::qm::HartreeFock>& scf, dMat
 
 bool XCW::do_SCF(const double& lambda, double& alpha, occ::qm::SCF<occ::qm::HartreeFock>& scf, occ::qm::Wavefunction& last_wfn, bool& has_guess, const bool write_result) {
 
+#if !defined(__APPLE__) && !defined(NSA2_OPENBLAS)
+	//The SCF's own MKL calls (DIIS, the diagonalisation) run serial on every path: they are small against
+	//the Fock build, and threaded they wait for a time slice at every barrier once another job loads the
+	//host (Radeon 780M box beside a 16-thread job: 170 s against 7 s for 14 iterations). A CPU or hybrid I tensor
+	//has left this thread serial anyway, through mkl_set_num_threads_local in eval_I.
+	mkl_set_num_threads_local(1);
+#endif
 	settings.clear();
 	diis_F_.clear();
 	diis_E_.clear();
