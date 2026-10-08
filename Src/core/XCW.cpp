@@ -1410,6 +1410,93 @@ void XCW::report_halting_progress_estimate(bool is_final) {
 	}
 }
 
+//r^l Y_lm(r/|r|) is a homogeneous polynomial of degree l, and its monomials stay independent on the unit sphere,
+//so a least-squares fit on Fibonacci-sphere points recovers the coefficients exactly
+std::vector<std::pair<i3, double>> solid_harmonic_monomials(const int l, const int m, double* residual) {
+	std::vector<i3> mono;
+	for (int i = l; i >= 0; i--)
+		for (int j = l - i; j >= 0; j--)
+			mono.push_back({ i, j, l - i - j });
+	const int nc = mono.size(), np = 4 * nc + 8;
+	occ::Mat A(np, nc);
+	occ::Vec y(np);
+	for (int p = 0; p < np; p++) {
+		const double z = 1.0 - (2.0 * p + 1.0) / np, s = std::sqrt(1.0 - z * z), phi = 2.399963229728653 * p;
+		const double d[3] = { s * std::cos(phi), s * std::sin(phi), z };
+		for (int c = 0; c < nc; c++)
+			A(p, c) = std::pow(d[0], mono[c][0]) * std::pow(d[1], mono[c][1]) * std::pow(d[2], mono[c][2]);
+		y(p) = constants::spherical_harmonic(l, m, d);
+	}
+	const occ::Vec x = A.colPivHouseholderQr().solve(y);
+	if (residual != nullptr) *residual = (A * x - y).cwiseAbs().maxCoeff();
+	const double cmax = x.cwiseAbs().maxCoeff();
+	std::vector<std::pair<i3, double>> res;
+	for (int c = 0; c < nc; c++)
+		if (std::abs(x(c)) > 1e-12 * cmax) res.emplace_back(mono[c], x(c));
+	return res;
+}
+
+//Per primitive pair the Gaussian product theorem gives exp(-mu R^2) exp(-p u^2), u = r - P, mu = alpha beta / p,
+//the full product decay. S_a(u + PA) S_b(u + PB) is expanded in monomials u^n by the binomial shift; the solid
+//harmonics on the shifted centres carry the m selectivity (a pi AO sees only the small PA part of the bond vector).
+//Triangle: int |S_a S_b| g <= sum |a_n||b_n'| prod_x G(n_x + n'_x), G(k) = int |u|^k exp(-p u^2) = Gamma((k+1)/2) / p^((k+1)/2).
+//Cauchy-Schwarz: <= sqrt(Q_a Q_b), Q = int S(u + PA)^2 g, where odd moments vanish. Each pair takes the smaller.
+double ao_pair_abs_overlap_bound(const std::vector<primitive>& pa, const d3& A, const std::vector<std::pair<i3, double>>& sa,
+	const std::vector<primitive>& pb, const d3& B, const std::vector<std::pair<i3, double>>& sb, const double stop) {
+	const int la = pa[0].get_type(), lb = pb[0].get_type();
+	const d3 AB = { B[0] - A[0], B[1] - A[1], B[2] - A[2] };
+	const double R2 = AB[0] * AB[0] + AB[1] * AB[1] + AB[2] * AB[2];
+	vec G(2 * std::max(la, lb) + 2);
+	std::vector<std::pair<i3, double>> ua, ub;
+	auto binom = [](const int n, const int k) { return double(constants::ft[n]) / double(constants::ft[k] * constants::ft[n - k]); };
+	//S(u + d) = sum_c s_c prod_x sum_a binom(e_x, a) u_x^a d_x^(e_x - a)
+	auto shift = [&binom](const std::vector<std::pair<i3, double>>& s, const int l, const d3& d, std::vector<std::pair<i3, double>>& out) {
+		const int n = l + 1;
+		vec dense(n * n * n, 0.0);
+		for (int c = 0; c < s.size(); c++) {
+			const i3& e = s[c].first;
+			for (int a = 0; a <= e[0]; a++)
+				for (int b = 0; b <= e[1]; b++)
+					for (int g = 0; g <= e[2]; g++)
+						dense[(a * n + b) * n + g] += s[c].second * binom(e[0], a) * binom(e[1], b) * binom(e[2], g)
+							* std::pow(d[0], e[0] - a) * std::pow(d[1], e[1] - b) * std::pow(d[2], e[2] - g);
+		}
+		out.clear();
+		for (int i = 0; i < dense.size(); i++)
+			if (dense[i] != 0.0) out.push_back({ i3{ i / (n * n), (i / n) % n, i % n }, dense[i] });
+	};
+	auto Q = [&G](const std::vector<std::pair<i3, double>>& u) {
+		double q = 0.0;
+		for (int i = 0; i < u.size(); i++)
+			for (int j = 0; j < u.size(); j++) {
+				const int x = u[i].first[0] + u[j].first[0], y = u[i].first[1] + u[j].first[1], z = u[i].first[2] + u[j].first[2];
+				if (x % 2 == 0 && y % 2 == 0 && z % 2 == 0) q += u[i].second * u[j].second * G[x] * G[y] * G[z];
+			}
+		return q;
+	};
+	double sum = 0.0;
+	for (int k = 0; k < pa.size(); k++) {
+		const double alpha = pa[k].get_exp();
+		for (int l = 0; l < pb.size(); l++) {
+			const double beta = pb[l].get_exp(), p = alpha + beta;
+			const double pref = std::abs(pa[k].get_coef() * pb[l].get_coef()) * std::exp(-alpha * beta / p * R2);
+			if (pref == 0.0) continue;
+			G[0] = std::sqrt(constants::PI / p);
+			G[1] = 1.0 / p;
+			for (int n = 2; n < G.size(); n++) G[n] = (n - 1) / (2.0 * p) * G[n - 2];
+			shift(sa, la, { beta / p * AB[0], beta / p * AB[1], beta / p * AB[2] }, ua);
+			shift(sb, lb, { -alpha / p * AB[0], -alpha / p * AB[1], -alpha / p * AB[2] }, ub);
+			double T = 0.0;
+			for (int i = 0; i < ua.size(); i++)
+				for (int j = 0; j < ub.size(); j++)
+					T += std::abs(ua[i].second * ub[j].second) * G[ua[i].first[0] + ub[j].first[0]] * G[ua[i].first[1] + ub[j].first[1]] * G[ua[i].first[2] + ub[j].first[2]];
+			sum += pref * std::min(T, std::sqrt(Q(ua) * Q(ub)));
+			if (sum > stop) return sum;
+		}
+	}
+	return sum;
+}
+
 void XCW::create_prims(std::vector<ao_data>& ao_data_shells, occ::qm::AOBasis& occ_basis_set) {
 	for (int atm = 0; atm < cryst.ncen; atm++) {
 		d3 pos = { occ_basis_set.atoms()[atm].x, occ_basis_set.atoms()[atm].y, occ_basis_set.atoms()[atm].z };
@@ -1709,88 +1796,33 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 	}
 
 	// Precompute screening
+	//Drops a pair whose bound on int |chi_mu chi_nu| is below e_tol: |I_mu,nu(h)| <= num_syms * asym_fact * int |chi_mu chi_nu|
+	//holds while |DW| <= 1, which a Gram-Charlier DW factor can exceed; the screen does not account for that.
+	//sigma-pi pairs do not vanish in I(h != 0), so no selection rule replaces the bound. NOS_XCW_PAIR_TOL=0 keeps every pair.
 	ivec2 skip(cryst.nmo, ivec(cryst.nmo, 0));
 	{
-		double e_tol = 0.0005;
-		const double root_inv_four_pi = std::sqrt(constants::INV_FOUR_PI);
+		const auto screen_start = std::chrono::high_resolution_clock::now();
+		const char* tol = tuning("NOS_XCW_PAIR_TOL");
+		const double e_tol = tol ? std::atof(tol) : 5e-4;
+		std::vector<std::vector<std::pair<i3, double>>> harmonic(cryst.nmo);
 		for (mu = 0; mu < cryst.nmo; mu++) {
-			const ao_data& mu_prims = ao_data_shells[mu];
-			const std::vector<primitive>& mu_primitives = mu_prims.prims;
-			const double& mp0 = mu_prims.pos[0];
-			const double& mp1 = mu_prims.pos[1];
-			const double& mp2 = mu_prims.pos[2];
-			for (nu = mu + 1; nu < cryst.nmo; nu++) {
-				const ao_data& nu_prims = ao_data_shells[nu];
-				const std::vector<primitive>& nu_primitives = nu_prims.prims;
-				const double& np0 = nu_prims.pos[0];
-				const double& np1 = nu_prims.pos[1];
-				const double& np2 = nu_prims.pos[2];
-				const double dist0 = mp0 - np0;
-				const double dist1 = mp1 - np1;
-				const double dist2 = mp2 - np2;
-				const double dist = dist0 * dist0 + dist1 * dist1 + dist2 * dist2;
-				if (dist < 1e-5) {
-					continue;
-				}
-
-				double c = 0;
-				double mu_min = std::numeric_limits<double>::max();
-				double nu_min = std::numeric_limits<double>::max();
-				const int mu_l = mu_prims.prims[0].get_type();
-				const double mu_l_half = 0.5 * mu_l;
-				const double temp_mu = std::sqrt((2 * mu_l + 1) * constants::INV_FOUR_PI) * std::exp(-mu_l_half);
-				const int nu_l = nu_prims.prims[0].get_type();
-				const double nu_l_half = 0.5 * nu_l;
-				const double temp_nu = std::sqrt((2 * nu_l + 1) * constants::INV_FOUR_PI) * std::exp(-nu_l_half);
-				std::vector<std::pair<double, double>> pairs;
-				pairs.reserve(mu_primitives.size() * nu_primitives.size());
-				for (int k = 0; k < mu_primitives.size(); k++) {
-					mu_min = std::min(mu_min, mu_primitives[k].get_exp());
-					const double c_k = std::abs(mu_primitives[k].get_coef());
-					const double alpha_k = mu_primitives[k].get_exp();
-					const double N_k = mu_l == 0 ? root_inv_four_pi : temp_mu * std::pow(mu_l / alpha_k, mu_l_half);
-					for (int l = 0; l < nu_primitives.size(); l++) {
-						nu_min = std::min(nu_min, nu_primitives[l].get_exp());
-						const double c_l = std::abs(nu_primitives[l].get_coef());
-						const double alpha_l = nu_primitives[l].get_exp();
-						const double N_l = nu_l == 0 ? root_inv_four_pi : temp_nu * std::pow(nu_l / alpha_l, nu_l_half);
-						const double N_kl = N_k * N_l * std::pow(constants::TWO_PI / (alpha_k + alpha_l), 1.5);
-						const double temp1 = c_k * c_l * N_kl;
-						c += temp1;
-						pairs.emplace_back(temp1, alpha_k * alpha_l / (2.0 * (alpha_k + alpha_l)));
-					}
-				}
-				const double gamma = 2 * (mu_min + nu_min) / (mu_min * nu_min);
-				const double cutoff = std::log(c / e_tol) * gamma;
-				//Newton method for finding correct cutoff
-				double newton_cutoff;
-				if (cutoff <= 0.0) {
-					newton_cutoff = 0.0;
-				}
-				else {
-					double lo = 0.0, hi = cutoff;
-					newton_cutoff = 0.5 * (lo + hi);
-					for (int iter = 0; iter < 50; iter++) {
-						double upper_bound = 0.0, bound_derivative = 0.0;
-						for (const auto& [weight, gamma_kl] : pairs) {
-							const double upper_bound_temp = weight * std::exp(-gamma_kl * newton_cutoff);
-							upper_bound += upper_bound_temp;
-							bound_derivative -= gamma_kl * upper_bound_temp;
-						}
-						const double delta = upper_bound - e_tol;
-						if (delta >= 0.0) lo = newton_cutoff; else hi = newton_cutoff;
-						double next = newton_cutoff - delta / bound_derivative;
-						if (!(next > lo) || !(next < hi)) next = 0.5 * (lo + hi);
-						const double step = std::abs(next - newton_cutoff);
-						newton_cutoff = next;
-						if (step < 1e-12 * hi) break;
-					}
-				}
-				if (dist > newton_cutoff) {
-					skip[mu][nu] = 1;
-				}
+			double residual;
+			harmonic[mu] = solid_harmonic_monomials(ao_data_shells[mu].prims[0].get_type(), ao_data_shells[mu].m, &residual);
+			err_checkf(residual < 1e-10, "Solid harmonic fit failed for AO " + std::to_string(mu), std::cout);
+		}
+#pragma omp parallel for schedule(dynamic)
+		for (int a = 0; a < cryst.nmo; a++) {
+			const auto& A = ao_data_shells[a].pos;
+			for (int b = a + 1; b < cryst.nmo; b++) {
+				const auto& B = ao_data_shells[b].pos;
+				const double dist = (A[0] - B[0]) * (A[0] - B[0]) + (A[1] - B[1]) * (A[1] - B[1]) + (A[2] - B[2]) * (A[2] - B[2]);
+				if (dist >= 1e-5 && ao_pair_abs_overlap_bound(ao_data_shells[a].prims, A, harmonic[a], ao_data_shells[b].prims, B, harmonic[b], e_tol) < e_tol)
+					skip[a][b] = 1;
 			}
 		}
+		if (!(opt->no_date))
+			std::cout << "Time taken for the AO pair screen: "
+				<< std::chrono::duration<double>(std::chrono::high_resolution_clock::now() - screen_start).count() << " seconds.\n";
 	}
 
 	// Grid screening
