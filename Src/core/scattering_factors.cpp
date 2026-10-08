@@ -1875,6 +1875,44 @@ static inline void sf_steps(const int nt, double* qr, double* qi, const double* 
 		acc_i[k] += vgetq_lane_f64(sm[k], 0) + vgetq_lane_f64(sm[k], 1) + im1[k];
 	}
 }
+//Row jump: Q = R e^{i db.r} (e^{i dc.r}, or its conjugate for n < 0)^|n| from the saved row start R, summed like a step.
+static inline void sf_jump(const int nt, const int n, const double* rr, const double* ri, const double* br, const double* bi,
+	const double* tr, const double* ti, double* qr, double* qi, double* acc_r, double* acc_i)
+{
+	const int nt2 = nt & ~1, an = n < 0 ? -n : n;
+	const double sg = n < 0 ? -1.0 : 1.0;
+	const float64x2_t sgv = vdupq_n_f64(sg);
+	float64x2_t sr = vdupq_n_f64(0.0), sm = vdupq_n_f64(0.0);
+	for (int q = 0; q < nt2; q += 2)
+	{
+		const float64x2_t a0 = vld1q_f64(rr + q), b0 = vld1q_f64(ri + q), c = vld1q_f64(br + q), d = vld1q_f64(bi + q);
+		const float64x2_t c2 = vld1q_f64(tr + q), d2 = vmulq_f64(sgv, vld1q_f64(ti + q));
+		float64x2_t a = vfmsq_f64(vmulq_f64(a0, c), b0, d), b = vfmaq_f64(vmulq_f64(a0, d), b0, c);
+		for (int k = 0; k < an; k++)
+		{
+			const float64x2_t na = vfmsq_f64(vmulq_f64(a, c2), b, d2);
+			b = vfmaq_f64(vmulq_f64(a, d2), b, c2);
+			a = na;
+		}
+		vst1q_f64(qr + q, a); vst1q_f64(qi + q, b);
+		sr = vaddq_f64(sr, a); sm = vaddq_f64(sm, b);
+	}
+	double re1 = 0.0, im1 = 0.0;
+	if (nt2 < nt)
+	{
+		double a = rr[nt2] * br[nt2] - ri[nt2] * bi[nt2], b = rr[nt2] * bi[nt2] + ri[nt2] * br[nt2];
+		const double c2 = tr[nt2], d2 = sg * ti[nt2];
+		for (int k = 0; k < an; k++)
+		{
+			const double na = a * c2 - b * d2;
+			b = a * d2 + b * c2;
+			a = na;
+		}
+		qr[nt2] = re1 = a; qi[nt2] = im1 = b;
+	}
+	*acc_r += vgetq_lane_f64(sr, 0) + vgetq_lane_f64(sr, 1) + re1;
+	*acc_i += vgetq_lane_f64(sm, 0) + vgetq_lane_f64(sm, 1) + im1;
+}
 #endif
 /**
  * Calculates the scattering factors for a given set of parameters.
@@ -2003,12 +2041,16 @@ void calc_SF(const int& points,
 #if (defined(__aarch64__) && !defined(__APPLE__)) || defined(_M_ARM64)
 	//Phase recurrence: the reflections are a sorted hkl set, so most consecutive k differ by one step dc (c*), and
 	//Q_p = rho_p e^{i k.r_p} continues as Q_p e^{i dc.r_p}, one complex multiply instead of a sincos. Q is re-anchored
-	//with sincos_shared2 at block starts, row breaks and every SF_ANCHOR steps, so the drift stays at rounding level.
+	//with sincos_shared2 at block starts, row breaks no row jump (below) reaches and every SF_ANCHOR multiplies, so the
+	//drift stays at rounding level.
 	//dc is taken where two successive steps agree, at the smallest |k| for the least rounding; cont[s] marks
 	//k[s] = k[s-1] + dc. An unsorted k list leaves cont all false and every reflection anchors.
-	constexpr int SF_BLOCK = 64, SF_TILE = 256, SF_ANCHOR = 32;
-	double dc[3] = { 0.0, 0.0, 0.0 };
+	constexpr int SF_BLOCK = 64, SF_TILE = 256, SF_ANCHOR = 32, SF_NMAX = 4;
+	constexpr signed char SF_STEP = 100, SF_ANC = 101; //sf_op values; anything else is a row jump by that many dc steps
+	double dc[3] = { 0.0, 0.0, 0.0 }, db[3] = { 0.0, 0.0, 0.0 };
+	bool jumps = false;
 	std::vector<char> cont(smax, 0);
+	std::vector<signed char> sf_op(smax, SF_ANC);
 	{
 		double kmax = 0.0, best = std::numeric_limits<double>::max();
 		for (long long t = 0; t < smax; t++)
@@ -2026,8 +2068,57 @@ void calc_SF(const int& points,
 		if (best < std::numeric_limits<double>::max())
 			for (long long t = 1; t < smax; t++)
 				cont[t] = steps_by(t, dc);
+		//Row jumps: a row start that is the saved start of the previous row (or the block's first reflection) plus
+		//db and n whole dc steps, |n| <= SF_NMAX, is reached as R e^{i db.r} e^{+-i dc.r}^|n| instead of anchored.
+		//db is the commonest difference between consecutive row starts, reduced by whole dc steps. Every complex
+		//multiply since the last sincos counts towards SF_ANCHOR, along the chain of saved row starts too.
+		const double dcc = dc[0] * dc[0] + dc[1] * dc[1] + dc[2] * dc[2];
+		const auto reduce = [&](const long long t, const long long u, const double* base, double* v) {
+			v[0] = k1_data[t] - k1_data[u] - base[0]; v[1] = k2_data[t] - k2_data[u] - base[1]; v[2] = k3_data[t] - k3_data[u] - base[2];
+			const long long n = std::llround((v[0] * dc[0] + v[1] * dc[1] + v[2] * dc[2]) / dcc);
+			v[0] -= n * dc[0]; v[1] -= n * dc[1]; v[2] -= n * dc[2];
+			return n;
+		};
+		const auto same = [&](const double* v, const double* w) {
+			return std::abs(v[0] - w[0]) <= tol && std::abs(v[1] - w[1]) <= tol && std::abs(v[2] - w[2]) <= tol;
+		};
+		const double zero[3] = { 0.0, 0.0, 0.0 };
+		if (dcc > 0.0)
+		{
+			std::vector<std::array<double, 3>> cand;
+			for (long long t = 1, u = 0; t < smax; t++)
+				if (!cont[t]) { double v[3]; reduce(t, u, zero, v); cand.push_back({ v[0], v[1], v[2] }); u = t; }
+			size_t most = 1;
+			for (size_t c = 0; c < std::min<size_t>(cand.size(), 32); c++)
+			{
+				const size_t hits = std::count_if(cand.begin(), cand.end(), [&](const std::array<double, 3>& w) { return same(cand[c].data(), w.data()); });
+				if (hits > most) { most = hits; std::copy(cand[c].begin(), cand[c].end(), db); jumps = true; }
+			}
+		}
+		for (long long b0 = 0; b0 < smax; b0 += SF_BLOCK)
+		{
+			const long long b1 = std::min<long long>(b0 + SF_BLOCK, smax);
+			long long rs = b0;
+			int since = 0, rs_since = 0;
+			for (long long t = b0; t < b1; t++)
+			{
+				if (t > b0 && cont[t] && since < SF_ANCHOR) { sf_op[t] = SF_STEP; since++; continue; }
+				since = 0;
+				if (jumps && t > b0 && !cont[t])
+				{
+					double v[3];
+					const long long n = reduce(t, rs, db, v);
+					if (same(v, zero) && std::llabs(n) <= SF_NMAX && rs_since + 1 + std::llabs(n) <= SF_ANCHOR)
+					{
+						sf_op[t] = static_cast<signed char>(n);
+						since = rs_since + 1 + static_cast<int>(std::llabs(n));
+					}
+				}
+				if (t == b0 || !cont[t]) { rs = t; rs_since = since; }
+			}
+		}
 	}
-	vec e_ph, e_re, e_im;
+	vec e_ph, e_re, e_im, b_re, b_im;
 #endif
 
 	for (int i = 0; i < imax; i++)
@@ -2044,25 +2135,47 @@ void calc_SF(const int& points,
 		for (long long t = 0; t < pmax; t++)
 			e_ph[t] = dc[0] * d1_local[t] + dc[1] * d2_local[t] + dc[2] * d3_local[t];
 		sincos_shared_n(static_cast<int>(pmax), e_ph.data(), e_im.data(), e_re.data());
-		const double* er = e_re.data(), * ei = e_im.data();
+		if (jumps)
+		{
+			b_re.resize(pmax); b_im.resize(pmax);
+			for (long long t = 0; t < pmax; t++)
+				e_ph[t] = db[0] * d1_local[t] + db[1] * d2_local[t] + db[2] * d3_local[t];
+			sincos_shared_n(static_cast<int>(pmax), e_ph.data(), b_im.data(), b_re.data());
+		}
+		const double* er = e_re.data(), * ei = e_im.data(), * bre = b_re.data(), * bim = b_im.data();
 		//Blocks of SF_BLOCK reflections per task; per SF_TILE points (L1-resident Q) the block's reflections in order
 #pragma omp parallel for schedule(dynamic, 1)
 		for (long long b0 = 0; b0 < smax; b0 += SF_BLOCK)
 		{
 			const int nb = static_cast<int>(std::min<long long>(SF_BLOCK, smax - b0));
-			double qr[SF_TILE], qi[SF_TILE], acc_r[SF_BLOCK] = {}, acc_i[SF_BLOCK] = {};
+			double qr[SF_TILE], qi[SF_TILE], rr[SF_TILE], ri[SF_TILE], acc_r[SF_BLOCK] = {}, acc_i[SF_BLOCK] = {};
 			for (long long t0 = 0; t0 < pmax; t0 += SF_TILE)
 			{
 				const int nt = static_cast<int>(std::min<long long>(SF_TILE, pmax - t0)), nt2 = nt & ~1;
 				const double* r = dens_local + t0, * x = d1_local + t0, * y = d2_local + t0, * z = d3_local + t0;
 				const double* tr = er + t0, * ti = ei + t0;
-				int since = 0;
 				for (int j = 0; j < nb;)
 				{
 					const long long sj = b0 + j;
-					if (j == 0 || !cont[sj] || since == SF_ANCHOR)
+					if (sf_op[sj] == SF_STEP)
 					{
-						since = 0;
+						//steps j .. j+m-1 all continue the row, none reaching the anchor limit
+						int m = 1;
+						while (m < 4 && j + m < nb && sf_op[sj + m] == SF_STEP) m++;
+						switch (m)
+						{
+						case 1: sf_steps<1>(nt, qr, qi, tr, ti, acc_r + j, acc_i + j); break;
+						case 2: sf_steps<2>(nt, qr, qi, tr, ti, acc_r + j, acc_i + j); break;
+						case 3: sf_steps<3>(nt, qr, qi, tr, ti, acc_r + j, acc_i + j); break;
+						default: sf_steps<4>(nt, qr, qi, tr, ti, acc_r + j, acc_i + j); break;
+						}
+						j += m;
+						continue;
+					}
+					if (sf_op[sj] != SF_ANC)
+						sf_jump(nt, sf_op[sj], rr, ri, bre + t0, bim + t0, tr, ti, qr, qi, acc_r + j, acc_i + j);
+					else
+					{
 						float64x2_t sr = vdupq_n_f64(0.0), sm = vdupq_n_f64(0.0);
 						double re1 = 0.0, im1 = 0.0;
 						const float64x2_t k1v = vdupq_n_f64(k1_data[sj]), k2v = vdupq_n_f64(k2_data[sj]), k3v = vdupq_n_f64(k3_data[sj]);
@@ -2095,21 +2208,14 @@ void calc_SF(const int& points,
 						}
 						acc_r[j] += vgetq_lane_f64(sr, 0) + vgetq_lane_f64(sr, 1) + re1;
 						acc_i[j] += vgetq_lane_f64(sm, 0) + vgetq_lane_f64(sm, 1) + im1;
-						j++;
-						continue;
 					}
-					//steps j .. j+m-1 all continue the row, none reaching the anchor limit
-					int m = 1;
-					while (m < 4 && j + m < nb && cont[sj + m] && since + m < SF_ANCHOR) m++;
-					switch (m)
+					//a row start is kept for the next row's jump
+					if (j == 0 || !cont[sj])
 					{
-					case 1: sf_steps<1>(nt, qr, qi, tr, ti, acc_r + j, acc_i + j); break;
-					case 2: sf_steps<2>(nt, qr, qi, tr, ti, acc_r + j, acc_i + j); break;
-					case 3: sf_steps<3>(nt, qr, qi, tr, ti, acc_r + j, acc_i + j); break;
-					default: sf_steps<4>(nt, qr, qi, tr, ti, acc_r + j, acc_i + j); break;
+						std::copy(qr, qr + nt, rr);
+						std::copy(qi, qi + nt, ri);
 					}
-					since += m;
-					j += m;
+					j++;
 				}
 			}
 			complex<double>* out = sf[i].data() + b0;
