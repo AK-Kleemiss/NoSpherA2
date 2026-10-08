@@ -3,6 +3,7 @@
 #include "convenience.h"
 #include <unordered_set>
 #include <array>
+#include <set>
 #include "npy.h"
 
 std::filesystem::path find_first_salted_file(const std::filesystem::path &directory_path);
@@ -70,7 +71,9 @@ private:
 	// correction.
 	// VERSION 4 (-salted_fold): PROJW, each projector times its weights, replaces
 	// PROJ, so an older build stops at the missing PROJ instead of misreading it.
-	static const int SUPPORTED_VERSION = 4;
+	// VERSION 5 (-salted_fold): the features are folded in as well; ENVW (zeta = 1)
+	// or GENV + FEATL (zeta != 1) replace FEATS, at which an older build stops.
+	static const int SUPPORTED_VERSION = 5;
 	enum DataType { INT32 = 0, FLOAT64 = 1, STRING = 2 };
 
 	std::filesystem::path filepath;
@@ -150,10 +153,10 @@ public:
 
 	const bool basis_set_defined() { return table_of_contents.find("BASIS") != table_of_contents.end(); }
 	bool has_block(const std::string& key) const { return table_of_contents.count(key) != 0; }
-	// This file as VERSION version_out with block `key` swapped for `new_key` holding `block`
-	// (datatype word onwards); every other byte is copied, later blocks shifted
-	void write_with_block_replaced(const std::filesystem::path& out, int32_t version_out,
-		const std::string& key, const std::string& new_key, const std::string& block);
+	// This file as VERSION version_out without the blocks in `drop` and with `add` (name, bytes from
+	// the datatype word on) appended; every other byte is copied
+	void write_with_blocks(const std::filesystem::path& out, int32_t version_out,
+		const std::set<std::string>& drop, const std::vector<std::pair<std::string, std::string>>& add);
 
 	std::shared_ptr<BasisSet> read_basis_set();
 };

@@ -329,31 +329,61 @@ vec SALTEDPredictor::merge_predictions()
 	return coefs;
 }
 
-// predict() only wants C_n = psi_nm w_n = (K V) w_n; PROJW stores V W^T per (species, l), so the
-// kernel product makes nmax columns instead of Mcut (V6 carbon l = 5: 1936) and C_n is column n.
-// PROJW has the PROJ layout: datatype word, species count, then per species its tag, lambda count
-// and one 2D dataset per lambda, Mspe (2l + 1) x nmax instead of x Mcut. V6: 782 -> 525 MB, PROJ
-// 258 MB -> PROJW 0.5 MB. The weights are walked as read_model_data() walks them
+/// predict() only wants C_n = psi w_n per (species, l), psi = K V with K the kernel between the structure's
+// descriptors p and the model's sparse features F. VERSION 4 folded the weights into the projector,
+// VW = V W^T (PROJW, nmax columns instead of Mcut); VERSION 5 folds the features in as well:
+//  zeta = 1:  K = p F^T, so psi W^T = p (VW^T F)^T. ENVW holds VW^T F, nmax x ncut, in place of FEATS and the
+//             projector; the kernel product of the run makes nmax columns, nothing else is left of the model.
+//  zeta != 1: above l = 0, K[(a,m),(M,m')] = k0(a,M) (p F^T)[(a,m),(M,m')] with k0 = (p0 F0^T)^(zeta - 1), so
+//             psi W^T[(a,m), n] = sum_f p[(a,m), f] H[a, n ncut + f] with H = k0 G and
+//             G[M, n ncut + f] = sum_m' VW[(M,m'), n] F[(M,m'), f].
+//             GENV holds G, Mspe x nmax ncut, from the lambda on where nmax <= 2l + 1, so it is never larger than
+//             the features it replaces and the kernel takes nmax / (2l + 1)^2 of the flops; FEATL and PROJW keep
+//             the lambdas below, l = 0 always (k0 is made from it). V6: features 524 -> 216 MB.
+// Input is an unfolded file or a VERSION 4 one. The sums are plain loops and VW takes one BLAS thread (a
+// threaded GEMM sums in an order set by the thread count), so a file folds the same everywhere. The run ends here
 void fold_salted_file(const std::filesystem::path& in, const std::filesystem::path& out)
 {
-	// One BLAS thread: a threaded GEMM sums in an order set by the thread count (Pi 4 OpenBLAS, 4 vs 1:
-	// 1.6e-14 rel. apart). Another BLAS still differs in the last bits: fold once, ship the file. The run ends here
 	MKL_Set_Num_Threads(1);
 	SALTED_BINARY_FILE file(in);
-	err_checkf(!file.has_block("PROJW"), in.string() + " is folded already", std::cout);
+	err_checkf(file.has_block("FEATS"), in.string() + " is folded already", std::cout);
 	SALTEDConfig config;
 	file.populate_config(config);
 	const std::shared_ptr<BasisSet> basis = file.basis_set_defined() ? file.read_basis_set() : BasisSetLibrary::get_basis_set(config.dfbasis);
 	std::unordered_map<std::string, int> lmax, nmax;
 	SALTED_Utils::set_lmax_nmax(lmax, nmax, *basis, config.species);
-	const vec weights = file.read_weights();
-	const auto proj = file.index_lambda_based_data("PROJ");
+	const std::string proj_key = file.has_block("PROJW") ? "PROJW" : "PROJ";
+	const vec weights = proj_key == "PROJ" ? file.read_weights() : vec{};
+	const auto proj = file.index_lambda_based_data(proj_key);
+	const auto feat = file.index_lambda_based_data("FEATS");
+	const bool zeta1 = config.zeta == 1.0;
 
-	std::string block;
-	auto put = [&block](const auto v) { block.append(reinterpret_cast<const char*>(&v), sizeof(v)); };
-	put(int32_t(3));   // the datatype word SALTED writes for these blocks; nothing reads it
-	put(int32_t(0));   // species count, set below
-	int32_t n_species = 0;
+	// Lambda-based blocks as SALTED writes them: datatype word, species count, then per species its tag,
+	// lambda count and one 2D dataset per lambda
+	std::string envw, genv, featl, projw;
+	auto put = [](std::string& b, const auto v) { b.append(reinterpret_cast<const char*>(&v), sizeof(v)); };
+	for (std::string* b : { &envw, &genv, &featl, &projw })
+	{
+		put(*b, int32_t(3));   // the datatype word; nothing reads it
+		put(*b, int32_t(0));   // species count, counted up below
+	}
+	auto species = [&put](std::string& b, std::string tag, const int nlam) {
+		int32_t n;
+		std::memcpy(&n, b.data() + sizeof(int32_t), sizeof(n));
+		n++;
+		std::memcpy(b.data() + sizeof(int32_t), &n, sizeof(n));
+		tag.resize(5, '\0');
+		b += tag;
+		put(b, int32_t(nlam));
+	};
+	auto matrix = [&put](std::string& b, const dMatrix2& m) {
+		put(b, int32_t(2));
+		put(b, uint32_t(m.extent(0)));
+		put(b, uint32_t(m.extent(1)));
+		if (m.extent(0) * m.extent(1) != 0)
+			b.append(reinterpret_cast<const char*>(m.data()), m.extent(0) * m.extent(1) * sizeof(double));
+	};
+	std::string report;
 	size_t isize = 0;
 	for (const std::string& spe : config.species)
 	{
@@ -365,30 +395,72 @@ void fold_salted_file(const std::filesystem::path& in, const std::filesystem::pa
 			nlam++;
 		}
 		if (nlam == 0) continue;
-		n_species++;
-		std::string tag = spe;
-		tag.resize(5, '\0');
-		block += tag;
-		put(int32_t(nlam));
+		// G from lambda L on; nmax falls and 2l + 1 grows with l, so this is where it starts to fit
+		int L = nlam;
+		while (!zeta1 && L > 1 && nmax.at(spe + std::to_string(L - 1)) <= 2 * L - 1) L--;
+		if (zeta1)
+			species(envw, spe, nlam);
+		else
+		{
+			species(genv, spe, nlam);
+			species(featl, spe, L);
+			species(projw, spe, L);
+			report += " " + spe + (L < nlam ? " l>=" + std::to_string(L) : " none");
+		}
 		for (int l = 0; l < nlam; l++)
 		{
 			const std::string key = spe + std::to_string(l);
-			const dMatrix2 V = file.load_block(proj.at(key));
-			err_checkf(isize + nmax.at(key) * V.extent(1) <= weights.size(), "The weights end before the projectors of " + key, std::cout);
-			// nmax rows of V's width, n-major as the flat weights lie
-			dMatrix2 Wt(nmax.at(key), V.extent(1));
-			std::copy_n(weights.data() + isize, Wt.extent(0) * Wt.extent(1), Wt.data());
-			const dMatrix2 VW = dot(V, Wt, false, true);
-			isize += Wt.extent(0) * Wt.extent(1);
-			put(int32_t(2));
-			put(uint32_t(VW.extent(0)));
-			put(uint32_t(VW.extent(1)));
-			block.append(reinterpret_cast<const char*>(VW.data()), VW.extent(0) * VW.extent(1) * sizeof(double));
+			dMatrix2 VW = file.load_block(proj.at(key));
+			if (proj_key == "PROJ")
+			{
+				err_checkf(isize + nmax.at(key) * VW.extent(1) <= weights.size(), "The weights end before the projectors of " + key, std::cout);
+				// nmax rows of V's width, n-major as the flat weights lie
+				dMatrix2 Wt(nmax.at(key), VW.extent(1));
+				std::copy_n(weights.data() + isize, Wt.extent(0) * Wt.extent(1), Wt.data());
+				isize += Wt.extent(0) * Wt.extent(1);
+				VW = dot(VW, Wt, false, true);
+			}
+			const auto ft = feat.find(key);
+			const size_t d = 2 * l + 1;
+			err_checkf(ft != feat.end() && ft->second.rows == VW.extent(0) && ft->second.rows % d == 0,
+				"The features of " + key + " do not fit its projector", std::cout);
+			const dMatrix2 F = file.load_block(ft->second);
+			const size_t nm = VW.extent(1), nc = F.extent(1), M = F.extent(0) / d;
+			if (zeta1)
+			{
+				dMatrix2 E(nm, nc);
+				for (size_t r = 0; r < F.extent(0); r++)
+					for (size_t n = 0; n < nm; n++)
+						for (size_t f = 0; f < nc; f++)
+							E(n, f) += VW(r, n) * F(r, f);
+				matrix(envw, E);
+			}
+			else if (l < L)
+			{
+				matrix(genv, dMatrix2{});
+				matrix(featl, F);
+				matrix(projw, VW);
+			}
+			else
+			{
+				dMatrix2 G(M, nm * nc);
+				for (size_t e = 0; e < M; e++)
+					for (size_t m = 0; m < d; m++)
+						for (size_t n = 0; n < nm; n++)
+							for (size_t f = 0; f < nc; f++)
+								G(e, n * nc + f) += VW(e * d + m, n) * F(e * d + m, f);
+				matrix(genv, G);
+			}
 		}
 	}
-	std::memcpy(block.data() + sizeof(int32_t), &n_species, sizeof(int32_t));
-	file.write_with_block_replaced(out, 4, "PROJ", "PROJW", block);
-	std::cout << "Wrote " << out.string() << ": " << n_species << " species, projectors with the weights folded in" << std::endl;
+	std::set<std::string> drop{ "FEATS", proj_key };
+	if (file.has_block("WEIGH")) drop.insert("WEIGH");   // in VW now
+	if (zeta1)
+		file.write_with_blocks(out, 5, drop, { { "ENVW", envw } });
+	else
+		file.write_with_blocks(out, 5, drop, { { "FEATL", featl }, { "PROJW", projw }, { "GENV", genv } });
+	std::cout << "Wrote " << out.string() << ": weights and features folded in, "
+			  << (zeta1 ? "zeta = 1, ENVW" : "GENV for" + report) << std::endl;
 }
 
 void calculateConjugate(SALTEDDescriptors& v2)
@@ -498,7 +570,8 @@ void SALTEDPredictor::read_model_data() {
 	if (config.field) {
 		err_not_impl_f("Calculations using 'Field = True' are not yet supported", std::cout);
 	}
-	projector_folded = file.has_block("PROJW");
+	env_folded = file.has_block("ENVW");
+	projector_folded = env_folded || file.has_block("PROJW");
 	if (!projector_folded) weights = file.read_weights();
 	wigner3j = file.read_wigners();
 
@@ -515,9 +588,22 @@ void SALTEDPredictor::read_model_data() {
 
 	// Indexing only, no payload: offset and shape per (species, lambda). The matrices
 	// are read in read_model_lambda() and dropped again, each block used once per run
-	feat_index = file.index_lambda_based_data("FEATS");
-	proj_index = file.index_lambda_based_data(projector_folded ? "PROJW" : "PROJ");
+	feat_index = file.index_lambda_based_data(env_folded ? "ENVW" : file.has_block("FEATL") ? "FEATL" : "FEATS");
+	if (!env_folded) proj_index = file.index_lambda_based_data(projector_folded ? "PROJW" : "PROJ");
+	if (file.has_block("GENV"))
+		for (const auto &[k, ref] : file.index_lambda_based_data("GENV"))
+			if (ref.rows != 0) g_index[k] = ref;   // 0 x 0 below the lambda G starts at
+	err_checkf(!(env_folded && config.zeta != 1.0) && !(!g_index.empty() && config.zeta == 1.0),
+		_SALTEDpath.string() + " was folded for another zeta than its CONFG names", std::cout);
 	model_species = present;
+	// A (species, l) without its blocks would leave its coefficients unset
+	for (const std::string &spe : present)
+		for (int l = 0; l < lmax[spe] + 1; ++l)
+		{
+			const std::string k = spe + std::to_string(l);
+			err_checkf(g_index.count(k) || (feat_index.count(k) && (env_folded || proj_index.count(k))),
+				_SALTEDpath.string() + " holds no features or projector for " + spe + " l = " + std::to_string(l), std::cout);
+		}
 
 	// From the shapes alone: Mspe, the number of sparse environments of a present
 	// species, and the projector width of every species the model knows
@@ -562,8 +648,9 @@ void SALTEDPredictor::read_model_data() {
 			for (int lam = 0; lam < lmax[spe] + 1; lam++)
 			{
 				const std::string k = spe + std::to_string(lam);
-				const auto f = feat_index.find(k), pr = proj_index.find(k);
-				const size_t p = (f == feat_index.end()) ? 0 : f->second.rows * f->second.cols;
+				const auto f = feat_index.find(k), pr = proj_index.find(k), g = g_index.find(k);
+				const size_t p = (g != g_index.end()) ? g->second.rows * g->second.cols
+								 : (f == feat_index.end()) ? 0 : f->second.rows * f->second.cols;
 				const size_t v = (pr == proj_index.end()) ? 0 : pr->second.rows * pr->second.cols;
 				pes += p; vm += v; per_lam[lam] += p + v;
 			}
@@ -597,12 +684,14 @@ SALTEDPredictor::lambda_blocks SALTEDPredictor::read_model_lambda(const int lam)
 	{
 		if (lam > lmax.at(spe)) continue;
 		const std::string key = spe + std::to_string(lam);
+		const auto g = g_index.find(key);
 		const auto pr = proj_index.find(key);
 		const auto ft = feat_index.find(key);
-		if (pr == proj_index.end() || ft == feat_index.end()) continue;
+		// G and ENVW carry their projector; an empty ref reads as a 0 x 0 matrix
+		if (g == g_index.end() && (ft == feat_index.end() || (!env_folded && pr == proj_index.end()))) continue;
 		keys.push_back(key);
-		refs.push_back(pr->second);
-		refs.push_back(ft->second);
+		refs.push_back(g != g_index.end() || env_folded ? SALTED_BINARY_FILE::block_ref{} : pr->second);
+		refs.push_back(g != g_index.end() ? g->second : ft->second);
 	}
 	std::vector<dMatrix2> blocks = model_file->load_blocks(refs);
 	for (std::size_t k = 0; k < keys.size(); k++)
@@ -616,7 +705,8 @@ void SALTEDPredictor::install_model_lambda(lambda_blocks blocks)
 	{
 		if (power_env_sparse.find(key) != power_env_sparse.end()) continue;
 		Vmat[key] = std::move(V);
-		if (config.zeta == 1.0)
+		// ENVW has V^T F already, G is used as it is (predict)
+		if (config.zeta == 1.0 && Vmat[key].extent(0) != 0)
 			power_env_sparse[key] = dot(Vmat[key], feats, true, false);
 		else
 			power_env_sparse[key] = std::move(feats);
@@ -762,6 +852,29 @@ vec SALTEDPredictor::predict()
 				auto _temp = Kokkos::submdspan(_pvec, idx, Kokkos::full_extent);
 				std::copy(_temp.data_handle(), _temp.data_handle() + row_size, pvec_ptr);
 				pvec_ptr += row_size;
+			}
+			const string key = spe + to_string(lam);
+			if (g_index.count(key))
+			{
+				// GENV (fold_salted_file): psi W^T[(a,m), n] = sum_f p[(a,m), f] H[a, n ncut + f] with H = k0 G,
+				// no kernel and no k0 scaling over (2l + 1)^2 blocks
+				const dMatrix2 H = dot(kernell0[spe_idx], power_env_sparse[key], false, false);
+				const size_t nm = nmax[key], nc = featsize[lam];
+				err_checkf(H.extent(1) == nm * nc, "The GENV block of " + key + " does not fit the descriptors", std::cout);
+				dMatrix2 psi(pvec_lam.extent(0), nm);
+#pragma omp parallel for
+				for (int r = 0; r < (int)psi.extent(0); r++)
+				{
+					const size_t a = r / lam2_1;
+					for (size_t n = 0; n < nm; n++)
+					{
+						double s = 0.0;
+						for (size_t f = 0; f < nc; f++) s += pvec_lam(r, f) * H(a, n * nc + f);
+						psi(r, n) = s;
+					}
+				}
+				psi_nm[spe_idx][lam] = std::move(psi);
+				continue;
 			}
 			//The regression GEMM stays on the CPU: the device barely wins, because fp64 runs
 			//at a sixty-fourth rate on a consumer part and each call ships its own operands.
