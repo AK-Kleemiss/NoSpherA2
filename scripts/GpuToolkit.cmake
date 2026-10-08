@@ -47,7 +47,10 @@ function(nosphera2_detect_gpu out_var)
         elseif(EXISTS "/sys/module/amdgpu")
             set(_vendor "AMD")
         else()
-            foreach(_dir "/usr/lib/x86_64-linux-gnu" "/usr/lib64" "/usr/lib" "/lib/x86_64-linux-gnu")
+            # aarch64: Grace Hopper puts the driver in the multiarch dir, a Jetson in its
+            # tegra subdirectory
+            foreach(_dir "/usr/lib/x86_64-linux-gnu" "/usr/lib64" "/usr/lib" "/lib/x86_64-linux-gnu"
+                    "/usr/lib/aarch64-linux-gnu" "/usr/lib/aarch64-linux-gnu/tegra")
                 if(EXISTS "${_dir}/libcuda.so.1")
                     set(_vendor "NVIDIA")
                     break()

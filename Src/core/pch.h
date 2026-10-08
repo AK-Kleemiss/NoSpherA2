@@ -104,6 +104,9 @@ inline int nsa2_cluster_threads(int num) {
 #ifdef __AVX__
 #include <immintrin.h>
 #endif
+#if defined(__aarch64__) || defined(_M_ARM64)
+#include <arm_neon.h>
+#endif
 #define MDSPAN_USE_BRACKET_OPERATOR 0
 #define MDSPAN_USE_PAREN_OPERATOR 1
 #ifdef __CMAKE_BUILD__
