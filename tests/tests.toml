@@ -854,19 +854,6 @@ acc = 1
 embis = true
 old_tsc = true
 
-# Centre-moment restraints instead of the partition default, with a non-default weight
-[ri_fit_multipoles_centre]
-directory = "epoxide_gbw"
-
-[ri_fit_multipoles_centre.args]
-wfn = "epoxide.gbw"
-cif = "epoxide.cif"
-dmin = 0.4
-ri_fit = "combo_basis_fit"
-multipole_moments = ["Hirshfeld", 2]
-multipole_centre = true
-multipole_strength = 0.5
-
 # Promolecular Hirshfeld surface of the asymmetric unit inside the packed cluster;
 # the golden is the per-vertex d_i/d_e/d_norm/shape-index/curvedness table
 [hirshfeld_surface]

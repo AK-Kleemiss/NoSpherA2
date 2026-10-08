@@ -14,6 +14,7 @@
 #include "wfn_class.h"
 #include "basis_set.h"
 #include "citations.h"
+#include <cstring>
 #include <filesystem>
 #include <future>
 
@@ -328,6 +329,68 @@ vec SALTEDPredictor::merge_predictions()
 	return coefs;
 }
 
+// predict() only wants C_n = psi_nm w_n = (K V) w_n; PROJW stores V W^T per (species, l), so the
+// kernel product makes nmax columns instead of Mcut (V6 carbon l = 5: 1936) and C_n is column n.
+// PROJW has the PROJ layout: datatype word, species count, then per species its tag, lambda count
+// and one 2D dataset per lambda, Mspe (2l + 1) x nmax instead of x Mcut. V6: 782 -> 525 MB, PROJ
+// 258 MB -> PROJW 0.5 MB. The weights are walked as read_model_data() walks them
+void fold_salted_file(const std::filesystem::path& in, const std::filesystem::path& out)
+{
+	// One BLAS thread: a threaded GEMM sums in an order set by the thread count (Pi 4 OpenBLAS, 4 vs 1:
+	// 1.6e-14 rel. apart). Another BLAS still differs in the last bits: fold once, ship the file. The run ends here
+	MKL_Set_Num_Threads(1);
+	SALTED_BINARY_FILE file(in);
+	err_checkf(!file.has_block("PROJW"), in.string() + " is folded already", std::cout);
+	SALTEDConfig config;
+	file.populate_config(config);
+	const std::shared_ptr<BasisSet> basis = file.basis_set_defined() ? file.read_basis_set() : BasisSetLibrary::get_basis_set(config.dfbasis);
+	std::unordered_map<std::string, int> lmax, nmax;
+	SALTED_Utils::set_lmax_nmax(lmax, nmax, *basis, config.species);
+	const vec weights = file.read_weights();
+	const auto proj = file.index_lambda_based_data("PROJ");
+
+	std::string block;
+	auto put = [&block](const auto v) { block.append(reinterpret_cast<const char*>(&v), sizeof(v)); };
+	put(int32_t(3));   // the datatype word SALTED writes for these blocks; nothing reads it
+	put(int32_t(0));   // species count, set below
+	int32_t n_species = 0;
+	size_t isize = 0;
+	for (const std::string& spe : config.species)
+	{
+		int nlam = 0;
+		while (nlam < lmax.at(spe) + 1)
+		{
+			const auto it = proj.find(spe + std::to_string(nlam));
+			if (it == proj.end() || it->second.cols == 0) break;
+			nlam++;
+		}
+		if (nlam == 0) continue;
+		n_species++;
+		std::string tag = spe;
+		tag.resize(5, '\0');
+		block += tag;
+		put(int32_t(nlam));
+		for (int l = 0; l < nlam; l++)
+		{
+			const std::string key = spe + std::to_string(l);
+			const dMatrix2 V = file.load_block(proj.at(key));
+			err_checkf(isize + nmax.at(key) * V.extent(1) <= weights.size(), "The weights end before the projectors of " + key, std::cout);
+			// nmax rows of V's width, n-major as the flat weights lie
+			dMatrix2 Wt(nmax.at(key), V.extent(1));
+			std::copy_n(weights.data() + isize, Wt.extent(0) * Wt.extent(1), Wt.data());
+			const dMatrix2 VW = dot(V, Wt, false, true);
+			isize += Wt.extent(0) * Wt.extent(1);
+			put(int32_t(2));
+			put(uint32_t(VW.extent(0)));
+			put(uint32_t(VW.extent(1)));
+			block.append(reinterpret_cast<const char*>(VW.data()), VW.extent(0) * VW.extent(1) * sizeof(double));
+		}
+	}
+	std::memcpy(block.data() + sizeof(int32_t), &n_species, sizeof(int32_t));
+	file.write_with_block_replaced(out, 4, "PROJ", "PROJW", block);
+	std::cout << "Wrote " << out.string() << ": " << n_species << " species, projectors with the weights folded in" << std::endl;
+}
+
 void calculateConjugate(SALTEDDescriptors& v2)
 {
 #pragma omp parallel for
@@ -435,7 +498,8 @@ void SALTEDPredictor::read_model_data() {
 	if (config.field) {
 		err_not_impl_f("Calculations using 'Field = True' are not yet supported", std::cout);
 	}
-	weights = file.read_weights();
+	projector_folded = file.has_block("PROJW");
+	if (!projector_folded) weights = file.read_weights();
 	wigner3j = file.read_wigners();
 
 	if (config.average) av_coefs = file.read_averages();
@@ -452,7 +516,7 @@ void SALTEDPredictor::read_model_data() {
 	// Indexing only, no payload: offset and shape per (species, lambda). The matrices
 	// are read in read_model_lambda() and dropped again, each block used once per run
 	feat_index = file.index_lambda_based_data("FEATS");
-	proj_index = file.index_lambda_based_data("PROJ");
+	proj_index = file.index_lambda_based_data(projector_folded ? "PROJW" : "PROJ");
 	model_species = present;
 
 	// From the shapes alone: Mspe, the number of sparse environments of a present
@@ -463,6 +527,30 @@ void SALTEDPredictor::read_model_data() {
 	{
 		const auto it = feat_index.find(spe + "0");
 		if (it != feat_index.end()) Mspe[spe] = static_cast<int>(it->second.rows);
+	}
+	// Where each present (species, l) starts in the flat weights, which run species, l, n over
+	// every species the model knows; predict() contracts psi_nm with that block
+	if (!projector_folded)
+	{
+		size_t isize = 0;
+		for (const std::string &spe : config.species)
+			for (int l = 0; l < lmax[spe] + 1; ++l)
+			{
+				const std::string k = spe + std::to_string(l);
+				const auto dim_it = proj_dims.find(k);
+				if (dim_it == proj_dims.end() || dim_it->second[1] == 0)
+				{
+					if (!present.count(spe))
+					{
+						std::cout << "The projector for species " << spe << " and l = " << l << " does not exist. This is a problem with the model, not NoSpherA2.\n";
+						std::cout << "Continuing with the next species..., make sure there is no: " << spe << " in the structure you are trying to predict!!!!\n";
+					}
+					break;
+				}
+				if (present.count(spe)) weight_offset[k] = isize;
+				isize += dim_it->second[1] * nmax[k];
+			}
+		err_checkf(isize <= weights.size(), "isize + Mcut > weights.size()", std::cout);
 	}
 
 	if (ProgressBar::report_counts)
@@ -497,12 +585,14 @@ void SALTEDPredictor::read_model_data() {
 
 
 // Model matrices are loaded per lambda and dropped after use: nothing rereads them, the weight
-// accounting works off psi_nm and the projector shapes
+// offsets come from the projector shapes
 // File reads only, touching no member the kernels use, so it can run on another thread
 SALTEDPredictor::lambda_blocks SALTEDPredictor::read_model_lambda(const int lam)
 {
 	lambda_blocks out;
 	if (!model_file) return out;
+	std::vector<std::string> keys;
+	std::vector<SALTED_BINARY_FILE::block_ref> refs;   // projector, features per key
 	for (const std::string &spe : model_species)
 	{
 		if (lam > lmax.at(spe)) continue;
@@ -510,9 +600,13 @@ SALTEDPredictor::lambda_blocks SALTEDPredictor::read_model_lambda(const int lam)
 		const auto pr = proj_index.find(key);
 		const auto ft = feat_index.find(key);
 		if (pr == proj_index.end() || ft == feat_index.end()) continue;
-		dMatrix2 V = model_file->load_block(pr->second);
-		out.emplace_back(key, std::move(V), model_file->load_block(ft->second));
+		keys.push_back(key);
+		refs.push_back(pr->second);
+		refs.push_back(ft->second);
 	}
+	std::vector<dMatrix2> blocks = model_file->load_blocks(refs);
+	for (std::size_t k = 0; k < keys.size(); k++)
+		out.emplace_back(keys[k], std::move(blocks[2 * k]), std::move(blocks[2 * k + 1]));
 	return out;
 }
 
@@ -625,9 +719,10 @@ vec SALTEDPredictor::predict()
 			equicomb(natoms, (config.nspe1 * config.nrad1), (config.nspe2 * config.nrad2), v1, v2, wigner3j[lam], llmax, llvec_t, lam, c2r, featsize[lam], p, v2_is_conj_of_v1);
 		}
 		_t_equicomb += _elapsed(_t_eq);
-		// In line, also with the descriptors on the device: overlapping it on a second thread
-		// gave that thread its own OpenMP/MKL team, whose spin-wait then cost the kernels below
-		// more than the overlap could ever hide
+		// The file reads of lambda ran during lambda - 1's kernels; installing the blocks (the
+		// projector products) stays in line, also with the descriptors on the device: doing that
+		// on a second thread gave that thread its own OpenMP/MKL team, whose spin-wait then cost
+		// the kernels below more than the overlap could ever hide
 		const auto _t_wait = std::chrono::steady_clock::now();
 		install_model_lambda(next_lambda.get());
 		if (lam < lmax_max)
@@ -636,6 +731,19 @@ vec SALTEDPredictor::predict()
 		_t_model_wait += model_wait;
 		_t_model_work += model_wait;
 		const auto _t_kn = std::chrono::steady_clock::now();
+#if defined(NSA2_OPENBLAS) && !defined(NSA2_ARMPL) && !defined(__ANDROID__)
+		// pch.h keeps a pthreads OpenBLAS serial, as it cannot see an enclosing OpenMP region
+		// (Android's OpenMP OpenBLAS keeps the count pch.h caps to cpu0's cluster, so not there).
+		// This loop is outside one (its parallel for calls no BLAS), so its GEMMs may take every core,
+		// but one while lambda + 1 is read: OpenBLAS splits a GEMM evenly, so a thread the reader
+		// pushes off its core holds back all of them (Pi 4, -cpus 4: kernels 1.9 -> 3.0 s)
+		const int blas_n = lam < lmax_max ? std::max(1, std::min(omp_get_max_threads(), omp_get_num_procs() - 1))
+		                                  : omp_get_max_threads();
+		struct blas_threads_scope {
+			explicit blas_threads_scope(const int n) { openblas_set_num_threads(n); }
+			~blas_threads_scope() { openblas_set_num_threads(1); }
+		} blas_threads(blas_n);
+#endif
 		// Species-outer within the group, so a species keeps its sparse matrices hot
 		for (int spe_idx = 0; spe_idx < (int)config.species.size(); spe_idx++)
 		{
@@ -704,47 +812,30 @@ vec SALTEDPredictor::predict()
 
 	unordered_map<string, dMatrix1> C{};
 	unordered_map<string, int> ispe{};
-	int isize = 0;
 	for (int spe_idx = 0; spe_idx < config.species.size(); spe_idx++)
 	{
 		const string spe = config.species[spe_idx];
-		if (atom_idx.find(spe) == atom_idx.end())
-		{
-			for (int l = 0; l < lmax[spe] + 1; ++l)
-			{
-				// Never loaded for an absent species; its shape was, and that is all this needs
-				const auto dim_it = proj_dims.find(spe + to_string(l));
-				if (dim_it == proj_dims.end() || dim_it->second[1] == 0)
-				{
-				   std::cout << "The projector for species " << spe << " and l = " << l << " does not exist. This is a problem with the model, not NoSpherA2.\n";
-				   std::cout << "Continuing with the next species..., make sure there is no: " << spe << " in the structure you are trying to predict!!!!\n";
-					break;
-				}
-
-				// for (int n = 0; n < nmax[spe + to_string(l)]; ++n)
-				//{
-				//     isize += static_cast<int>(Vmat[spe + to_string(l)][0].size());
-				// }
-				isize += static_cast<int>(dim_it->second[1]) * nmax[spe + to_string(l)];
-			}
-			continue;
-		}
+		if (atom_idx.find(spe) == atom_idx.end()) continue;
 		ispe[spe] = 0;
 		for (int l = 0; l < lmax[spe] + 1; ++l)
 		{
-			for (int n = 0; n < nmax[spe + to_string(l)]; ++n)
+			const string key = spe + to_string(l);
+			const dMatrix2 &psi = psi_nm[spe_idx][l];
+			const size_t Mcut = psi.extent(1);
+			for (int n = 0; n < nmax[key]; ++n)
 			{
-				// int Mcut = static_cast<int>(psi_nm[spe + to_string(l)][0].size());
-				int Mcut = static_cast<int>(psi_nm[spe_idx][l].extent(1));
-				// Check if isize + Mcut > weights.size()
-				err_checkf(isize + Mcut <= weights.size(), "isize + Mcut > weights.size()", std::cout);
-
+				if (projector_folded)
+				{
+					// The weights are in the PROJW projector (fold_salted_file): column n is C_n
+					dMatrix1 c(psi.extent(0));
+					for (size_t i = 0; i < psi.extent(0); i++) c(i) = psi(i, n);
+					C[key + to_string(n)] = std::move(c);
+					continue;
+				}
 				dMatrix1 weights_subset(Mcut);
-				std::copy(weights.data() + isize, weights.data() + isize + Mcut, weights_subset.data());
-
-				C[spe + to_string(l) + to_string(n)] = dot(psi_nm[spe_idx][l], weights_subset, false);
-
-				isize += Mcut;
+				const double *w = weights.data() + weight_offset.at(key) + n * Mcut;
+				std::copy(w, w + Mcut, weights_subset.data());
+				C[key + to_string(n)] = dot(psi, weights_subset, false);
 			}
 		}
 	}

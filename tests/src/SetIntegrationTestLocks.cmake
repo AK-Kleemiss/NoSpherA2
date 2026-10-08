@@ -91,7 +91,6 @@ set_tests_properties(
 set_tests_properties(
     TomlIntegrationTests.RiFit
     TomlIntegrationTests.RiFitMultipoles
-    TomlIntegrationTests.ri_fit_multipoles_centre
     TomlIntegrationTests.cube_rho
     TomlIntegrationTests.cube_esp
     TomlIntegrationTests.cube_elf

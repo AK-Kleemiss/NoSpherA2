@@ -22,11 +22,12 @@ namespace constants
 	//ORCA stores g over sqrt(3) and h and up over sqrt((2l-1)!!) of the physical primitive norm; the tables follow ORCA, occ does not
 	constexpr double sph2cart_norm2[11] = { 1, 1, 1, 1, 3, 945, 10395, 135135, 2027025, 34459425, 654729075 };
 	static double density_accuracy = 5.0e-5; // SQRT of the desired accuracy for density calculations
-	//RI (ab|P) skipped below w max|D_ab| Q_ab Q_P, as in XCW. Sucrose/TZVP at 1e-13: tsc within 1.8e-6 and charges
-	//within 1e-6 e of the unscreened fit, the same as two unscreened runs differ (1-1.3e-6, dynamic-schedule summation
-	//through an ill-conditioned metric), at 75 % of its time; 1e-12 gives 3.4e-6, 1e-11 5e-5, 2e-11 1e-4 in the charges.
-	//-tune NOS_RI_SCREEN overrides it for one run.
-	constexpr double ri_screen_threshold = 1e-13;
+	//Electrons an RI (ab|P) triplet may move onto an atom before it is computed (see computeRho), sized for tsc within 1e-5
+	//of max|f| and charges within 1e-4 e of the unscreened fit; -tune NOS_RI_SCREEN overrides it for one run.
+	constexpr double ri_screen_threshold = 3e-7;
+	//Overlap left between an orbital primitive pair and an aux shell, as erfc(sqrt(pq/(p+q)) R), below which computeRho
+	//takes (ab|P) from the local expansion at the aux atom; -tune NOS_RI_FAR overrides it, 0 switches it off.
+	constexpr double ri_far_erfc = 1e-14;
 	constexpr int grid_max_no_flip = 50;
 	int constexpr const_abs(int x)
 	{

@@ -463,6 +463,8 @@ bool collect_impl(const int slot, std::complex<double>* I_r)
 } //namespace
 
 bool itensor_gpu_available() { return open_device(); }
+//open_device takes unified-memory devices only
+bool itensor_gpu_integrated() { return open_device(); }
 
 const char* itensor_gpu_gemm_name() { return "Metal Performance Shaders"; }
 

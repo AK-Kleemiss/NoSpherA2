@@ -556,11 +556,42 @@ TEST(SaltedFchkIoTests, SyntheticModelIndexAndLoadBlock)
 	std::filesystem::remove(p);
 }
 
+// -salted_fold's writer: PROJ becomes PROJW, the blocks behind it move and still read back
+TEST(SaltedFchkIoTests, BlockReplacedCopy)
+{
+	const auto p = tmp_path("fold_in.salted"), q = tmp_path("fold_out.salted");
+	write_synthetic_model(p, 3, true, true);
+	{
+		salted_writer w;
+		w.block_head(1);
+		w.tag("O");
+		w.raw(static_cast<int32_t>(1));
+		w.dataset(vec{ 1.5, 2.5, 3.5 }, { 3, 1 });
+		SALTED_BINARY_FILE f(p);
+		f.write_with_block_replaced(q, 4, "PROJ", "PROJW", w.buf);
+	}
+	{
+		SALTED_BINARY_FILE g(q);
+		EXPECT_FALSE(g.has_block("PROJ"));
+		const auto idx = g.index_lambda_based_data("PROJW");
+		ASSERT_EQ(idx.size(), 1u);
+		const dMatrix2 o = g.load_block(idx.at("O0"));
+		ASSERT_EQ(o.extent(0), 3u);
+		EXPECT_EQ(o(2, 0), 3.5);
+		EXPECT_EQ(g.read_weights(), weights);
+		EXPECT_EQ(g.read_features().at("O0")(2, 1), 14.0);
+		ASSERT_TRUE(g.basis_set_defined());
+		EXPECT_EQ(g.read_basis_set()->get_owned_primitive_count(), 5u);
+	}
+	std::filesystem::remove(p);
+	std::filesystem::remove(q);
+}
+
 // a file from the future warns but still reads through its table of contents
 TEST(SaltedFchkIoTests, NewerVersionStillReads)
 {
 	const auto p = tmp_path("future.salted");
-	write_synthetic_model(p, 4, false, true);
+	write_synthetic_model(p, 5, false, true);
 	{
 		SALTED_BINARY_FILE f(p);
 		EXPECT_EQ(f.read_weights().size(), 4u);

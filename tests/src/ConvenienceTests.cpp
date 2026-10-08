@@ -1161,21 +1161,28 @@ TEST(ConvenienceOptionsTests, PromolNciCollectsFragmentsAndCutoffs)
 // -multipole_moments picks the scheme by name, bounds the order, turns on the RI fit and gets an auto_aux basis when none was named
 TEST(ConvenienceOptionsTests, MultipoleAndRepulsionOptions)
 {
-	const options opt = parse({ "-multipole_moments", "TFVC", "3", "-multipole_strength", "2.5", "-multipole_centre",
+	const options opt = parse({ "-multipole_moments", "TFVC", "3", "-multipole_strength", "2.5",
 		"-repulsion_overlap", "0.3", "-repulsion_exchange", "b88", "-geometry_aid_cutoff", "3.0" });
-	EXPECT_EQ(opt.multipole_scheme, PartitionType::TFVC);
+	EXPECT_EQ(opt.multipole_scheme, MultipoleScheme::TFVC);
 	EXPECT_EQ(opt.multipole_lmax, 3);
 	EXPECT_TRUE(opt.RI_FIT);
 	EXPECT_EQ(opt.partition_type, PartitionType::RI);
 	EXPECT_EQ(opt.aux_basis.size(), 1u) << "auto_aux pushed after parsing";
 	EXPECT_NEAR(opt.multipole_strength, 2.5, 1e-15);
-	EXPECT_FALSE(opt.multipole_partition);
 	EXPECT_NEAR(opt.repulsion_overlap, 0.3, 1e-15);
 	EXPECT_EQ(opt.repulsion_exchange, 2);
 	EXPECT_NEAR(opt.geometry_aid_cutoff, 3.0, 1e-15);
-	EXPECT_EQ(parse({ "-multipole_moments", "hirsh", "0" }).multipole_scheme, PartitionType::Hirshfeld);
-	EXPECT_EQ(parse({ "-multipole_moments", "mbis", "1" }).multipole_scheme, PartitionType::MBIS);
-	EXPECT_EQ(parse({ "-multipole_moments", "EMBIS", "8" }).multipole_scheme, PartitionType::EMBIS);
+	EXPECT_EQ(parse({ "-multipole_moments", "hirsh", "0" }).multipole_scheme, MultipoleScheme::HIRSHFELD);
+	EXPECT_EQ(parse({ "-multipole_moments", "mbis", "1" }).multipole_scheme, MultipoleScheme::MBIS);
+	EXPECT_EQ(parse({ "-multipole_moments", "EMBIS", "8" }).multipole_scheme, MultipoleScheme::EMBIS);
+	EXPECT_EQ(parse({ "-multipole_moments", "Nuclear" }).multipole_lmax, 0);
+	EXPECT_EQ(parse({ "-multipole_moments", "Mulliken", "9" }).multipole_lmax, 0);
+	EXPECT_EQ(parse({ "-multipole_moments", "Mulliken", "9" }).multipole_scheme, MultipoleScheme::MULLIKEN);
+	const options sanderson = parse({ "-multipole_moments", "Sanderson", "-acc", "2" });
+	EXPECT_EQ(sanderson.multipole_scheme, MultipoleScheme::SANDERSON);
+	EXPECT_EQ(sanderson.multipole_lmax, 0);
+	EXPECT_EQ(sanderson.accuracy, 2);
+	EXPECT_EQ(parse({ "-multipole_moments", "Hirshfeld", "-acc", "2" }).multipole_lmax, 0);
 	EXPECT_EQ(parse({ "-repulsion_exchange", "dirac" }).repulsion_exchange, 0);
 	EXPECT_EQ(parse({ "-repulsion_exchange", "pbe" }).repulsion_exchange, 1);
 	EXPECT_EQ(parse({ "-repulsion_exchange", "r2scan" }).repulsion_exchange, 3);

@@ -131,6 +131,54 @@ int solve_linear_system(vec& A, const size_t& size_A, vec& b)
 	return info;
 }
 
+//Column-major lower: for a symmetric A that is the row-major upper triangle, so neither call copies or transposes.
+int cholesky_factor(vec& A, const size_t& n)
+{
+	vec diag(n);
+	for (size_t i = 0; i < n; i++) diag[i] = A[i * (n + 1)];
+	lapack_int info = 0;
+#if defined(__APPLE__)
+	int n_ = (int)n;
+	dpotrf_((char*)"L", &n_, A.data(), &n_, &info);
+#else
+	info = LAPACKE_dpotrf(LAPACK_COL_MAJOR, 'L', (lapack_int)n, A.data(), (lapack_int)n);
+#endif
+	if (info != 0) cholesky_unfactor(A, n, diag);
+	return info;
+}
+
+void cholesky_unfactor(vec& A, const size_t& n, const vec& diag)
+{
+	for (size_t j = 0; j < n; j++) {
+		A[j * (n + 1)] = diag[j];
+		for (size_t i = j + 1; i < n; i++) A[i + j * n] = A[j + i * n];
+	}
+}
+
+void cholesky_solve(const vec& L, const size_t& n, vec& b, const size_t& nrhs)
+{
+	err_checkf(b.size() == n * nrhs && L.size() == n * n, "Inconsistent size of arrays in cholesky_solve", std::cout);
+	lapack_int info = 0;
+#if defined(__APPLE__)
+	int n_ = (int)n, nrhs_ = (int)nrhs;
+	dpotrs_((char*)"L", &n_, &nrhs_, (double*)L.data(), &n_, b.data(), &n_, &info);
+#else
+	info = LAPACKE_dpotrs(LAPACK_COL_MAJOR, 'L', (lapack_int)n, (lapack_int)nrhs, L.data(), (lapack_int)n, b.data(), (lapack_int)n);
+#endif
+	err_checkf(info == 0, "cholesky_solve: dpotrs returned " + std::to_string(info), std::cout);
+}
+
+int solve_spd_system(vec& A, const size_t& n, vec& b)
+{
+	const int info = cholesky_factor(A, n);
+	if (info == 0) {
+		cholesky_solve(A, n, b);
+		return 0;
+	}
+	std::cout << "Matrix not positive definite (dpotrf " << info << "), solving with LU instead" << std::endl;
+	return solve_linear_system(A, n, b);
+}
+
 int solve_linear_system(vec& A, const unsigned long long& rows_A, const unsigned long long& cols_A, vec& b)
 {
 	err_checkf(rows_A == b.size(), "Inconsitent size of arrays in linear_solve", std::cout);

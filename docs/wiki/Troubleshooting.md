@@ -223,8 +223,11 @@ names that follow fill the rest, first match winning. `auto_aux H
 def2-universal-jkfit` is what fixes hydroxyl-hydrogen populations (0.13 e down to
 under 0.013 e) at about twice the wall time.
 
-`-multipole_centre` with `lmax >= 2` breaks the fit. Use partitioned moments —
-i.e. the default `-multipole_partition`.
+With `-multipole_moments`, the fitted charge and dipole rows use auxiliary
+coefficients on each atom. For `lmax >= 2`, only quadrupoles and higher moments
+use grid-partitioned rows because atom-centred higher moments have shown fit
+instabilities. The grid also supplies the target moments for Hirshfeld, TFVC,
+MBIS and EMBIS at every order.
 
 ## ELI family: two of the four members carry no new information
 

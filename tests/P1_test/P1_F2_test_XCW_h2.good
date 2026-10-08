@@ -21,8 +21,8 @@ GridManager: Generating integration grids for atoms...
 GridManager: Generated total of 93098 grid points.
 Total number of grid points after pruning: 93092
 AO values calculated for all grids.
-Screened out 1798 unique pairs of mu, nu (33.57%) 
-Skipped evaluation of 8004222 grids (16.16%) 
+Screened out 2668 unique pairs of mu, nu (49.81%) 
+Skipped evaluation of 5584182 grids (11.28%) 
 More detailed output in XCW.log file...
 XCW: fitting against the 1/|H|^2-weighted residual self-energy criterion Criterion below is this weighted quantity, not the classical GoF.
 ____________________________________________________________________________________
@@ -30,8 +30,8 @@ ________________________________________________________________________________
 								(Eh)			(a. u.)		(a. u.)
 ____________________________________________________________________________________
 0.00000		10.5830		5.4885		0.02513		-1961.923538820		0.000		-1961.923538820		10.3934		0.02549
-0.01000		6.2643		4.0234		0.02273		-1961.744461436		0.063		-1961.681817999		6.1524		0.02310
+0.01000		6.2644		4.0234		0.02273		-1961.744462753		0.063		-1961.681819234		6.1524		0.02310
 WARNING: Unexpected number of extrema (0) found between atoms 8 and 9. Setting chi to 1.0.
-0.02000		5.3089		3.6726		0.02185		-1961.586666960		0.106		-1961.480489414		5.2141		0.02222
+0.02000		5.3089		3.6726		0.02185		-1961.586668340		0.106		-1961.480490595		5.2141		0.02222
 WARNING: Unexpected number of extrema (0) found between atoms 8 and 9. Setting chi to 1.0.
 Finished XCW fitting procedure.

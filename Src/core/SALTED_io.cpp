@@ -1,6 +1,8 @@
 #include "pch.h"
 #include "SALTED_io.h"
+#include <cstring>
 #include <filesystem>
+#include <future>
 #include <iostream>
 #include "nos_math.h"
 #include "basis_set.h"
@@ -622,6 +624,81 @@ dMatrix2 SALTED_BINARY_FILE::load_block(const block_ref& ref) {
 			"lazily loaded dataset");
 	}
 	return out;
+}
+
+// A new dMatrix2 is zero-filled (std::vector value-initialises it, faulting in every page)
+// before read_at overwrites it, and the disk idles meanwhile. Filling block i+1 while a helper
+// reads block i hides that; one read in flight keeps the access sequential.
+// Sucrose, 650 MB, cold on the Pi 4: 2.66 -> 2.14 s.
+std::vector<dMatrix2> SALTED_BINARY_FILE::load_blocks(const std::vector<block_ref>& refs) {
+	using ext_t = typename dMatrix2::extents_type;
+	std::vector<dMatrix2> out(refs.size());
+	std::vector<std::future<bool>> raw(refs.size());   // after out: destroyed first, waits for the reads
+	for (std::size_t i = 0; i < refs.size(); i++)
+	{
+		if (refs[i].rows != 0 && refs[i].cols != 0)
+			out[i] = dMatrix2(ext_t(refs[i].rows, refs[i].cols));
+		if (i > 0) raw[i - 1].wait();
+		raw[i] = std::async(std::launch::async, [this, &refs, &out, i] {
+			return read_at(refs[i].offset, out[i].data(), refs[i].rows * refs[i].cols * sizeof(double));
+			});
+	}
+	for (std::size_t i = 0; i < refs.size(); i++)
+		if (!raw[i].get()) out[i] = load_block(refs[i]);   // the stream fallback
+	return out;
+}
+
+// The header is patched in place, so its padding and the table of contents order survive; a block
+// is found by its offset, which is what the table records, and runs up to the next one.
+void SALTED_BINARY_FILE::write_with_block_replaced(const std::filesystem::path& out, const int32_t version_out,
+	const std::string& key, const std::string& new_key, const std::string& block) {
+	const auto it = table_of_contents.find(key);
+	err_checkf(it != table_of_contents.end(), "No " + key + " block in " + filepath.string(), std::cout);
+	err_checkf(new_key.size() <= 5 && !has_block(new_key), "Cannot name the new block " + new_key, std::cout);
+	file.clear();
+	file.seekg(0, std::ios::end);
+	const std::streamoff size = file.tellg();
+	const std::streamoff start = static_cast<std::streamoff>(it->second);
+	std::streamoff end = size;
+	for (const auto& entry : table_of_contents)
+		if (static_cast<std::streamoff>(entry.second) > start) end = std::min(end, static_cast<std::streamoff>(entry.second));
+	const std::streamoff shift = static_cast<std::streamoff>(block.size()) - (end - start);
+
+	std::string head(static_cast<size_t>(header_end), '\0');
+	file.seekg(0, std::ios::beg);
+	read_exact_bytes(file, head.data(), header_end, "header");
+	std::memcpy(head.data() + HEADER_SIZE, &version_out, sizeof(int32_t));
+	for (int i = 0; i < numBlocks; i++) {
+		char* entry = head.data() + HEADER_SIZE + 2 * sizeof(int32_t) + 9 * i;   // 5-byte name, int32 offset
+		int32_t off;
+		std::memcpy(&off, entry + 5, sizeof(int32_t));
+		if (off == start) {
+			std::memset(entry, 0, 5);
+			std::memcpy(entry, new_key.data(), new_key.size());
+		}
+		else if (off > start) {
+			err_checkf(off + shift <= INT32_MAX, "The new SALTED file outgrows its 32-bit offsets", std::cout);
+			off = static_cast<int32_t>(off + shift);
+			std::memcpy(entry + 5, &off, sizeof(int32_t));
+		}
+	}
+
+	std::ofstream o(out, std::ios::binary);
+	err_checkf(o.good(), "Cannot write " + out.string(), std::cout);
+	o.write(head.data(), head.size());
+	std::vector<char> buf(1 << 22);
+	auto copy = [&](std::streamoff from, const std::streamoff to) {
+		file.seekg(from, std::ios::beg);
+		for (; from < to; from += static_cast<std::streamoff>(buf.size())) {
+			const std::streamsize n = static_cast<std::streamsize>(std::min<std::streamoff>(to - from, buf.size()));
+			read_exact_bytes(file, buf.data(), n, "block to copy");
+			o.write(buf.data(), n);
+		}
+	};
+	copy(header_end, start);
+	o.write(block.data(), static_cast<std::streamsize>(block.size()));
+	copy(end, size);
+	err_checkf(o.good(), "Error writing " + out.string(), std::cout);
 }
 
 std::unordered_map<std::string, dMatrix2> SALTED_BINARY_FILE::read_lambda_based_data(

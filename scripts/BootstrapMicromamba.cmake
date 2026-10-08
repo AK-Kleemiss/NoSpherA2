@@ -81,9 +81,14 @@ else()
     endif()
     option(NOSPHERA2_BOOTSTRAP_WIN_ARM64 "Set up for a Windows ARM64 build (native or cross from x64)" ${_win_arm64_default})
 
+    cmake_host_system_information(RESULT _host_processor QUERY OS_PLATFORM)
     if(NOSPHERA2_BOOTSTRAP_WIN_ARM64 AND "$ENV{PROCESSOR_ARCHITECTURE}" STREQUAL "ARM64")
         set(_environment_file
             "${NOSPHERA2_SOURCE_DIR}/environment-win-arm64.yaml"
+        )
+    elseif(CMAKE_HOST_LINUX AND _host_processor MATCHES "aarch64|arm64")
+        set(_environment_file
+            "${NOSPHERA2_SOURCE_DIR}/environment-linux-aarch64.yaml"
         )
     else()
         set(_environment_file

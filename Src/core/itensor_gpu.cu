@@ -570,6 +570,14 @@ bool hold_impl(const std::complex<T>* I, const int nr, const int packed)
 //Shared with the transform, so "no code for this card" is diagnosed in one place
 bool itensor_gpu_available() { return sf_gpu_available(); }
 
+bool itensor_gpu_integrated()
+{
+	int dev = 0;
+	gpuDeviceProp_t prop{};
+	return itensor_gpu_available() && gpuGetDevice(&dev) == gpuSuccess
+		&& gpuGetDeviceProperties(&prop, dev) == gpuSuccess && prop.integrated != 0;
+}
+
 bool itensor_gpu_hold(const std::complex<float>* I, const int nr, const int packed) { return hold_impl(I, nr, packed); }
 bool itensor_gpu_hold(const std::complex<double>* I, const int nr, const int packed) { return hold_impl(I, nr, packed); }
 bool itensor_gpu_held() { return g_held.I != nullptr; }
@@ -767,6 +775,9 @@ bool eri_gpu_hold(const double* eri, const int n, const int npair, const int* pa
 {
 	eri_gpu_release();
 	if (!itensor_gpu_available() || n <= 0 || npair <= 0 || 6 * n * sizeof(double) > 48 * 1024) return false;
+	//An APU with consumer fp64 builds Fock slower than its own cores: both read the integrals over one
+	//memory bus, the device twice and at 1/32 rate (Radeon 780M: 0.32 s a build, its CPU 0.20 s)
+	if (itensor_gpu_integrated() && sf_gpu_fp64_ratio() > 4) return false;
 	HeldEri& h = g_eri;
 	const int npacked = n * (n + 1) / 2;
 	const size_t bytes = sizeof(double) * (size_t)npair * (npair + 1) / 2, kbytes = sizeof(double) * (size_t)npair * n;

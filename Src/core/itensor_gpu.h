@@ -37,6 +37,9 @@ NOSPHERA2_GPU_API_BEGIN
 
 bool itensor_gpu_available();
 
+//The device shares the host's memory bus (an APU, Apple silicon).
+bool itensor_gpu_integrated();
+
 //For the log: the GEMM backends differ in the last digits.
 const char* itensor_gpu_gemm_name();
 
