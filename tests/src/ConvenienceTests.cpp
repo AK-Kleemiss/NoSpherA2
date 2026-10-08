@@ -283,6 +283,34 @@ TEST(ConvenienceTests, FastExpNegTracksExpWithinItsLeadingError)
 	}
 }
 
+#if defined(__aarch64__) || defined(_M_ARM64)
+// sincos_shared_n against std::sin and std::cos: quadrant boundaries on both sides, an odd count for the scalar tail,
+// and pairs that have to take the lane-by-lane fallback (|x| >= 1e5, inf, nan) next to in-range lanes
+TEST(ConvenienceTests, SincosSharedNeonMatchesLibm)
+{
+	std::vector<double> x;
+	for (int k = -40; k <= 40; k++)
+		for (const double d : { -1e-12, 0.0, 1e-12 })
+			x.push_back(k * constants::PI / 4 + d);
+	for (int i = 0; i < 2001; i++) x.push_back(-99999.0 + i * 99.9993);
+	for (const double v : { 0.0, -0.0, 1e-300, 2.5, 1e5, 2.5, -3e5, 1e300, 0.5, std::numeric_limits<double>::infinity(), 0.25, std::numeric_limits<double>::quiet_NaN(), 0.125 })
+		x.push_back(v);
+	ASSERT_EQ(x.size() % 2, 1u);
+	std::vector<double> s(x.size()), c(x.size());
+	sincos_shared_n(static_cast<int>(x.size()), x.data(), s.data(), c.data());
+	for (size_t i = 0; i < x.size(); i++)
+	{
+		if (!std::isfinite(x[i])) {
+			EXPECT_TRUE(std::isnan(s[i]) && std::isnan(c[i])) << "x = " << x[i];
+			continue;
+		}
+		const double tol = std::abs(x[i]) < 1e5 ? 3e-16 : 1e-15;
+		EXPECT_NEAR(s[i], std::sin(x[i]), tol) << "x = " << x[i];
+		EXPECT_NEAR(c[i], std::cos(x[i]), tol) << "x = " << x[i];
+	}
+}
+#endif
+
 // sha256 against three published digests, the third one crossing the 64 byte block boundary
 TEST(ConvenienceTests, Sha256MatchesPublishedDigests)
 {

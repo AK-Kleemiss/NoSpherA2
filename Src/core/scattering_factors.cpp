@@ -1963,6 +1963,25 @@ void calc_SF(const int& points,
 			// Process loop in blocks of 4 for better instruction-level parallelism
 			const long long int pmax_vec = (pmax / 4) * 4;
 
+#if (defined(__aarch64__) && !defined(__APPLE__)) || defined(_M_ARM64)
+			//NEON: phase and sincos_shared2 two points at a time. glibc and the MSVC CRT have no vector sincos
+			//and reduce once per scalar call, the CRT twice; 75 % of a sucrose tsc on a Cortex-A72 was this loop
+			{
+				const float64x2_t k1v = vdupq_n_f64(k1_local), k2v = vdupq_n_f64(k2_local), k3v = vdupq_n_f64(k3_local);
+				float64x2_t re_v = vdupq_n_f64(0.0), im_v = vdupq_n_f64(0.0);
+				for (p = 0; p < pmax_vec; p += 2)
+				{
+					float64x2_t sv, cv;
+					sincos_shared2(vfmaq_f64(vfmaq_f64(vmulq_f64(k1v, vld1q_f64(d1_local + p)), k2v, vld1q_f64(d2_local + p)),
+						k3v, vld1q_f64(d3_local + p)), &sv, &cv);
+					const float64x2_t rv = vld1q_f64(dens_local + p);
+					re_v = vfmaq_f64(re_v, rv, cv);
+					im_v = vfmaq_f64(im_v, rv, sv);
+				}
+				re = vgetq_lane_f64(re_v, 0) + vgetq_lane_f64(re_v, 1);
+				im = vgetq_lane_f64(im_v, 0) + vgetq_lane_f64(im_v, 1);
+			}
+#else
 			// Vectorized main loop processing 4 elements at a time
 			for (p = 0; p < pmax_vec; p += 4)
 			{
@@ -2006,16 +2025,6 @@ void calc_SF(const int& points,
 				_mm256_store_pd(sr, _mm256_mul_pd(rv, sv));
 				re += cr[0] + cr[1] + cr[2] + cr[3];
 				im += sr[0] + sr[1] + sr[2] + sr[3];
-#elif defined(_M_ARM64)
-				//MSVC ARM64 has no SVML and calls sin and cos separately, each with its own reduction
-				double si0, c0, si1, c1, si2, c2, si3, c3;
-				sincos_shared(work0, &si0, &c0);
-				sincos_shared(work1, &si1, &c1);
-				sincos_shared(work2, &si2, &c2);
-				sincos_shared(work3, &si3, &c3);
-
-				re += rho0 * c0 + rho1 * c1 + rho2 * c2 + rho3 * c3;
-				im += rho0 * si0 + rho1 * si1 + rho2 * si2 + rho3 * si3;
 #else
 				//x64 /fp:fast: MSVC fuses each pair into __libm_sse2_sincos_ or vectorises to __vdecl_sin2/cos2
 				const double c0 = cos(work0);
@@ -2031,6 +2040,7 @@ void calc_SF(const int& points,
 				im += rho0 * si0 + rho1 * si1 + rho2 * si2 + rho3 * si3;
 #endif
 			}
+#endif
 
 			// Handle remaining elements
 			for (p = pmax_vec; p < pmax; p++)

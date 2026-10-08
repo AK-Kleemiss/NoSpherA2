@@ -216,6 +216,60 @@ inline void sincos_shared(const double x, double* s, double* c) {
 	}
 }
 
+#if defined(__aarch64__) || defined(_M_ARM64)
+// sincos_shared on two NEON lanes: the same reduction and kernels with fused multiply-adds, the quadrant switch as a
+// lane select plus sign bits. A pair with a lane at |x| >= 1e5 or non-finite goes lane by lane through sincos_shared.
+inline void sincos_shared2(const float64x2_t x, float64x2_t* s, float64x2_t* c) {
+	const uint64x2_t in_range = vcaltq_f64(x, vdupq_n_f64(1e5));
+	if ((vgetq_lane_u64(in_range, 0) & vgetq_lane_u64(in_range, 1)) == 0) {
+		double xs[2], ss[2], cs[2];
+		vst1q_f64(xs, x);
+		sincos_shared(xs[0], ss, cs);
+		sincos_shared(xs[1], ss + 1, cs + 1);
+		*s = vld1q_f64(ss); *c = vld1q_f64(cs);
+		return;
+	}
+	const float64x2_t q = vrndnq_f64(vmulq_f64(x, vdupq_n_f64(0.63661977236758134308)));
+	float64x2_t r = vfmsq_f64(x, q, vdupq_n_f64(1.57079632673412561417e+00));
+	r = vfmsq_f64(r, q, vdupq_n_f64(6.07710050630396597660e-11));
+	r = vfmsq_f64(r, q, vdupq_n_f64(2.02226624871116645580e-21));
+	const float64x2_t z = vmulq_f64(r, r);
+	float64x2_t ps = vfmaq_f64(vdupq_n_f64(-2.50507602534068634195e-08), z, vdupq_n_f64(1.58969099521155010221e-10));
+	ps = vfmaq_f64(vdupq_n_f64(2.75573137070700676789e-06), z, ps);
+	ps = vfmaq_f64(vdupq_n_f64(-1.98412698298579493134e-04), z, ps);
+	ps = vfmaq_f64(vdupq_n_f64(8.33333333332248946124e-03), z, ps);
+	ps = vfmaq_f64(vdupq_n_f64(-1.66666666666666324348e-01), z, ps);
+	const float64x2_t sr = vfmaq_f64(r, vmulq_f64(r, z), ps);
+	float64x2_t pc = vfmaq_f64(vdupq_n_f64(2.08757232129817482790e-09), z, vdupq_n_f64(-1.13596475577881948265e-11));
+	pc = vfmaq_f64(vdupq_n_f64(-2.75573143513906633035e-07), z, pc);
+	pc = vfmaq_f64(vdupq_n_f64(2.48015872894767294178e-05), z, pc);
+	pc = vfmaq_f64(vdupq_n_f64(-1.38888888888741095749e-03), z, pc);
+	pc = vfmaq_f64(vdupq_n_f64(4.16666666666666019037e-02), z, pc);
+	const float64x2_t hz = vmulq_f64(vdupq_n_f64(0.5), z);
+	const float64x2_t w = vsubq_f64(vdupq_n_f64(1.0), hz);
+	const float64x2_t cr = vaddq_f64(w, vfmaq_f64(vsubq_f64(vsubq_f64(vdupq_n_f64(1.0), w), hz), vmulq_f64(z, z), pc));
+	//quadrant q & 3: odd swaps sin and cos, q & 2 negates sin, (q + 1) & 2 negates cos
+	const int64x2_t qi = vcvtq_s64_f64(q);
+	const uint64x2_t odd = vtstq_s64(qi, vdupq_n_s64(1));
+	const uint64x2_t sgn_s = vshlq_n_u64(vreinterpretq_u64_s64(vandq_s64(qi, vdupq_n_s64(2))), 62);
+	const uint64x2_t sgn_c = vshlq_n_u64(vreinterpretq_u64_s64(vandq_s64(vaddq_s64(qi, vdupq_n_s64(1)), vdupq_n_s64(2))), 62);
+	*s = vreinterpretq_f64_u64(veorq_u64(vreinterpretq_u64_f64(vbslq_f64(odd, cr, sr)), sgn_s));
+	*c = vreinterpretq_f64_u64(veorq_u64(vreinterpretq_u64_f64(vbslq_f64(odd, sr, cr)), sgn_c));
+}
+
+// sincos_shared2 over n angles, an odd last one through sincos_shared
+inline void sincos_shared_n(const int n, const double* x, double* s, double* c) {
+	int p = 0;
+	for (; p + 1 < n; p += 2) {
+		float64x2_t sv, cv;
+		sincos_shared2(vld1q_f64(x + p), &sv, &cv);
+		vst1q_f64(s + p, sv);
+		vst1q_f64(c + p, cv);
+	}
+	if (p < n) sincos_shared(x[p], s + p, c + p);
+}
+#endif
+
 namespace sha
 {
 	// Rotate right operation
