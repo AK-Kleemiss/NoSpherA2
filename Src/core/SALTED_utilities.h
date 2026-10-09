@@ -66,11 +66,15 @@ namespace SALTED_Utils
 	void set_lmax_nmax(std::unordered_map<std::string, int> &lmax, std::unordered_map<std::string, int> &nmax, const BasisSet& basis_set, std::vector<std::string> species);
 	int get_lmax_max(std::unordered_map<std::string, int> &lmax);
 
-	inline featomic::SimpleSystem gen_featomic_system(const WFN& wfn)
+	// skip[a] != 0 leaves atom a out
+	inline featomic::SimpleSystem gen_featomic_system(const WFN& wfn, const std::vector<char>& skip = {})
 	{
 		featomic::SimpleSystem featomic_system;
-		for (const atom& a : *wfn.get_atoms_ptr())
+		const auto& atoms = *wfn.get_atoms_ptr();
+		for (size_t i = 0; i < atoms.size(); i++)
 		{
+			if (i < skip.size() && skip[i]) continue;
+			const atom& a = atoms[i];
 			d3 xyz = { constants::bohr2ang(a.get_coordinate(0)),
 										  constants::bohr2ang(a.get_coordinate(1)),
 										  constants::bohr2ang(a.get_coordinate(2)) };

@@ -1030,10 +1030,11 @@ svec read_atoms_from_CIF(std::ifstream& cif_input,
 					continue;
 				}
 				bool old_atom = false;
+				const int row_Z = constants::get_Z_from_label(fields[type_field].c_str()) + 1; //0 when the type is no plain symbol
 				const atomID cif_atom_id(
 					stod(fields[position_field[0]]), stod(fields[position_field[1]]), stod(fields[position_field[2]]),
 					group_nr,
-					constants::get_Z_from_label(fields[type_field].c_str()) + 1);
+					row_Z);
 				const std::string atom_ID = cif_atom_id.to_hex_string();
 #pragma omp parallel for reduction(|| : old_atom)
 				for (int run = 0; run < known_atoms.size(); run++)
@@ -1066,6 +1067,15 @@ svec read_atoms_from_CIF(std::ifstream& cif_input,
 					}
 					if (is_similar_abs(position[0], wave.get_atom_coordinate(i, 0), tolerances[0]) && is_similar_abs(position[1], wave.get_atom_coordinate(i, 1), tolerances[1]) && is_similar_abs(position[2], wave.get_atom_coordinate(i, 2), tolerances[2]))
 					{
+						/* Each wfn atom belongs to one row, and to a row of its own element.
+						A mixed site (EXYZ Se1 S1) puts two atoms on one position and the label
+						test below takes "se1" for sulfur, so Se1 claimed the S atom, S1 claimed
+						it again and the table got a column too many (COD 7236927). Two H 0.06 A
+						apart in different PARTs did the same (2238091).
+						ponytail: first free atom in wfn order, right while Olex2 writes the xyz in
+						row order; pick the nearest free atom if that ever stops holding. */
+						if (!labels[i].empty() || (row_Z > 0 && wave.get_atom_charge(i) != row_Z))
+							continue;
 						wave.set_atom_frac_coords(i, { stod(fields[position_field[0]]), stod(fields[position_field[1]]), stod(fields[position_field[2]]) });
 						wave.set_atom_group_nr(i, group_nr);
 						// Store exactly the identifier used above for the MTC duplicate check.
@@ -3187,22 +3197,11 @@ tsc_block_type calculate_scattering_factors(
 		needs_grid,
 		file,
 		opt.debug,
-		opt.allow_empty_asym);
+		//a -mtc part whose new atoms the model all dropped (a lone metal or isolated ion in its own PART) predicts
+		//nothing; stream_mtc_salted gives it only its spherical rows
+		opt.allow_empty_asym || (prep_out && opt.needs_Thakkar_fill && std::is_same_v<calculator_type, SALTEDPredictor&>));
 
 	cif_input.close();
-
-	//empty only means a broken CIF unless the caller allowed it: a spherical fill of an already covered part finds nothing
-	if (asym_atom_list.empty())
-	{
-		if (prep_out) *prep_out = salted_part_prep();
-		return tsc_block_type();
-	}
-
-	if (opt.debug)
-		file << "There are " << atom_type_list.size() << " Types of atoms and " << asym_atom_to_type_list.size() << " atoms in total" << endl;
-
-	time_points.push_back(get_time());
-	time_descriptions.push_back("cif reading");
 
 	vec2 k_pt;
 	hkl_list hkl;
@@ -3215,6 +3214,21 @@ tsc_block_type calculate_scattering_factors(
 		generate_hkl_from_options(opt, hkl, unit_cell, file);
 		opt.m_hkl_list = hkl;
 	}
+
+	//empty only means a broken CIF unless the caller allowed it: a spherical fill of an already covered part finds nothing.
+	//After the hkl list, which the later parts take from part 0 even when part 0 is the empty one (COD 2018514)
+	if (asym_atom_list.empty())
+	{
+		if (prep_out) *prep_out = salted_part_prep();
+		return tsc_block_type();
+	}
+
+	if (opt.debug)
+		file << "There are " << atom_type_list.size() << " Types of atoms and " << asym_atom_to_type_list.size() << " atoms in total" << endl;
+
+	time_points.push_back(get_time());
+	time_descriptions.push_back("cif reading");
+
 	if (kpts == NULL || kpts->size() == 0)
 	{
 		make_k_pts(
@@ -3682,10 +3696,14 @@ bool stream_mtc_salted(options& opt, std::vector<WFN>& wavy, std::ostream& file,
 	std::vector<ScattererLabels> spherical_ids(n_parts);
 	//built in the block below, where the fill wavefunctions the charges are matched against exist
 	std::vector<std::vector<HE_Spherical_Atom>> spheres(n_parts);
+	//every part reads the same reflections, but a part the model predicts nothing of returns none
+	const auto ref = std::find_if(preps.begin(), preps.end(), [](const salted_part_prep& p) { return !p.hkl_v.empty(); });
+	err_checkf(ref != preps.end(), "The SALTED model predicts no atom of any part", file);
+	const std::vector<i3>& hkl_v = ref->hkl_v;
 	if (opt.needs_Thakkar_fill)
 	{
 		hkl_list fill_reflections;
-		for (const auto& h : preps[0].hkl_v)
+		for (const auto& h : hkl_v)
 			fill_reflections.emplace(h);
 		const spherical_fill_scope fill(opt, fill_reflections);
 
@@ -3702,10 +3720,10 @@ bool stream_mtc_salted(options& opt, std::vector<WFN>& wavy, std::ostream& file,
 			have_spherical[i] = spherical[i].asym_atom_list.empty() ? 0 : 1;
 			if (!have_spherical[i]) continue;
 			n_filled += spherical[i].asym_atom_list.size();
-			err_checkf(spherical[i].k_of_reflection.size() == preps[0].hkl_v.size(),
+			err_checkf(spherical[i].k_of_reflection.size() == hkl_v.size(),
 				"Spherical remainder of part " + std::to_string(i + 1) + " covers " +
 				std::to_string(spherical[i].k_of_reflection.size()) +
-				" reflections, the parts cover " + std::to_string(preps[0].hkl_v.size()), file);
+				" reflections, the parts cover " + std::to_string(hkl_v.size()), file);
 			// keep feeding `known`, so a later part cannot claim these atoms again
 			for (size_t a = 0; a < spherical[i].labels.size(); a++)
 				known.push_back(spherical[i].labels[a]);
@@ -3727,11 +3745,11 @@ bool stream_mtc_salted(options& opt, std::vector<WFN>& wavy, std::ostream& file,
 			ids.emplace_back(sid);
 	}
 
-	const size_t n_refl = preps[0].hkl_v.size();
+	const size_t n_refl = hkl_v.size();
 	file << "Combined tsc: " << ids.size() << " scatterers from "
 		<< n_parts << " parts" << std::endl;
 	//the bar counts reflections * parts, since every part is evaluated for every block
-	stream_blocks(opt, file, "experimental.tscb", ids, preps[0].hkl_v,
+	stream_blocks(opt, file, "experimental.tscb", ids, hkl_v,
 		n_refl * preps.size(),
 		[&](const size_t lo, const size_t hi, ProgressBar& progress)
 		{
@@ -3739,6 +3757,12 @@ bool stream_mtc_salted(options& opt, std::vector<WFN>& wavy, std::ostream& file,
 			combined.reserve(ids.size());
 			for (size_t p = 0; p < preps.size(); p++)
 			{
+				if (!preps[p].mol)  // the model predicts nothing in this part, only its spherical rows
+				{
+					if (have_spherical[p])
+						append_spherical_rows(combined, spherical[p], spheres[p], opt.electron_diffraction, lo, hi);
+					continue;
+				}
 				cvec2 chunk = preps[p].mol->scattering_factors(slice_k_points(preps[p].k_pt, lo, hi), preps[p].asym_atom_list, &progress);
 				if (opt.electron_diffraction)
 					convert_to_ED(preps[p].asym_atom_list, preds[p]->wavy, chunk,

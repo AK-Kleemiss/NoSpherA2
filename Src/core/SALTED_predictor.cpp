@@ -60,14 +60,21 @@ SALTEDPredictor::SALTEDPredictor(WFN wavy_in, options& opt_in)
 	SALTED_BINARY_FILE file = SALTED_BINARY_FILE(_path);
 	file.populate_config(config);
 
-	featomic_system = SALTED_Utils::gen_featomic_system(wavy);
-
 	const auto _t_filter = std::chrono::steady_clock::now();
 	const std::vector<char> use_thakkar = SALTED_Utils::filter_input(wavy, opt_in, config);
 	if (ProgressBar::report_counts)
 		std::cout << "[stages] filter input "
 				  << std::chrono::duration<double>(std::chrono::steady_clock::now() - _t_filter).count()
 				  << " s" << std::endl;
+	// The descriptors see the unfiltered input, so unknown species stay neighbours. The isolated atoms of model
+	// species go, though: the filter dropped them from the basis, and left in they would be descriptor centres
+	// with no coefficients (Tsize != n_coef, "model and basis do not belong together"). Isolated means nobody's
+	// neighbour within rcut either, so no other environment changes.
+	std::vector<char> isolated = use_thakkar;
+	for (size_t a = 0; a < isolated.size(); a++)
+		if (std::find(config.species.begin(), config.species.end(), constants::atnr2letter(wavy_in.get_atom_charge(a))) == config.species.end())
+			isolated[a] = 0;
+	featomic_system = SALTED_Utils::gen_featomic_system(wavy_in, isolated);
 	if (!use_thakkar.empty()) {
 		spherical_fill_used = true;
 		estimate_fill_charges(wavy_in, use_thakkar, opt_in);
