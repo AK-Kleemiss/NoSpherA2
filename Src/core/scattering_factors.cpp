@@ -2788,21 +2788,22 @@ void append_spherical_rows(cvec2& chunk,
 	const bool electron_diffraction,
 	const size_t lo, const size_t hi)
 {
-	for (size_t a = 0; a < sph.asym_atom_list.size(); a++)
-	{
-		const int t = sph.asym_atom_to_type_list[a];
-		cvec row(hi - lo);
-		for (size_t r = lo; r < hi; r++)
+	const size_t first = chunk.size();
+	const size_t n_atoms = sph.asym_atom_list.size();
+	chunk.resize(first + n_atoms, cvec(hi - lo));
+	//every value is independent, so the threads split the reflections; this ran serially and outlasted the prediction
+#pragma omp parallel for
+	for (int s = 0; s < (int)(hi - lo); s++)
+		for (size_t a = 0; a < n_atoms; a++)
 		{
-			const double f = spheres[a].get_form_factor(sph.k_of_reflection[r]);
+			const int t = sph.asym_atom_to_type_list[a];
+			const double f = spheres[a].get_form_factor(sph.k_of_reflection[lo + s]);
 			//IAM form of Mott-Bethe: tabulated charge, no imaginary part
-			row[r - lo] = electron_diffraction
+			chunk[first + a][s] = electron_diffraction
 				? cdouble(constants::ED_fact * (sph.atom_type_list[t] - f) /
-					pow(sph.stl_of_reflection[r], 2), 0.0)
+					pow(sph.stl_of_reflection[lo + s], 2), 0.0)
 				: cdouble(f, 0.0);
 		}
-		chunk.push_back(std::move(row));
-	}
 }
 
 //writes a tsc as a sequence of reflection blocks; peak memory is queue depth * scatterers * block size * 16 bytes
@@ -3300,10 +3301,14 @@ tsc_block_type calculate_scattering_factors(
 						const double stl = unit_cell.get_stl_of_hkl(hkl_vector[lo + s]);
 						const double k = constants::bohr2ang(constants::FOUR_PI * stl);
 						const double h2 = pow(stl, 2);
+						//once per element, not once per atom
+						vec f_type(spherical_atoms.size());
+						for (size_t t = 0; t < spherical_atoms.size(); t++)
+							f_type[t] = spherical_atoms[t].get_form_factor(k);
 						for (int i = 0; i < imax; i++)
 						{
 							const int type = asym_atom_to_type_list[i];
-							const double f = spherical_atoms[type].get_form_factor(k);
+							const double f = f_type[type];
 							//IAM form of Mott-Bethe: tabulated charge, no imaginary part
 							chunk[i][s] = opt.electron_diffraction
 								? cdouble(constants::ED_fact * (atom_type_list[type] - f) / h2, 0.0)
@@ -3322,10 +3327,13 @@ tsc_block_type calculate_scattering_factors(
 				const double stl = unit_cell.get_stl_of_hkl(hkl_vector[s]);
 				const double k = constants::bohr2ang(constants::FOUR_PI * stl);
 				const double h2 = pow(stl, 2);
+				vec f_type(spherical_atoms.size());
+				for (size_t t = 0; t < spherical_atoms.size(); t++)
+					f_type[t] = spherical_atoms[t].get_form_factor(k);
 				for (int i = 0; i < imax; i++)
 				{
 					const int type = asym_atom_to_type_list[i];
-					const double f = spherical_atoms[type].get_form_factor(k);
+					const double f = f_type[type];
 					//IAM form of Mott-Bethe: tabulated charge, no imaginary part
 					sf[i][s] = opt.electron_diffraction
 						? cdouble(constants::ED_fact * (atom_type_list[type] - f) / h2, 0.0)
