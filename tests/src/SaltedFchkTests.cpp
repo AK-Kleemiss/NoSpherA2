@@ -1231,6 +1231,36 @@ TEST(SaltedFchkPredictorTests, PredictWaterMonomer)
 	EXPECT_NEAR(e[0] + e[1] + e[2], 9.1937, 1e-3);
 }
 
+// a .wfx names its atoms "C1", "H2": the species come from the nuclear charge, so it predicts what the same atoms
+// named by element do. Read from the label, no atom matched a species and the model predicted nothing
+TEST(SaltedFchkPredictorTests, WfxLabelsPredictLikeElements)
+{
+	equicomb_set_gpu(false);
+	const auto root = nos_test_repo_root() / "tests";
+	auto predict = [&root](const WFN& w) {
+		options opt;
+		opt.salted_model_dir = root / "SALTED" / "Model";
+		SALTEDPredictor SP(w, opt);
+		load_basis_into_WFN(SP.wavy, BasisSetLibrary::get_basis_set(SP.get_dfbasis_name()));
+		const vec coefs = SP.gen_SALTED_densities();
+		EXPECT_EQ(coefs.size(), static_cast<size_t>(aux_density_table(SP.wavy.get_atoms()).n_coef));
+		return coefs;
+	};
+	WFN wfx(root / "eqc_ch3f_wfx" / "ch3p.wfx", false);
+	ASSERT_EQ(wfx.get_ncen(), 4);
+	ASSERT_EQ(wfx.get_atom_label(0), "C1");
+	WFN named = wfx;
+	for (int a = 0; a < named.get_ncen(); a++)
+		named.set_atom_label(a, constants::atnr2letter(named.get_atom_charge(a)));
+	const vec a = predict(wfx), b = predict(named);
+	ASSERT_FALSE(a.empty());
+	ASSERT_EQ(a.size(), b.size());
+	double big = 0.0;
+	for (const double x : b) big = std::max(big, std::abs(x));
+	for (size_t i = 0; i < a.size(); i++)
+		EXPECT_NEAR(a[i], b[i], 1e-12 * big) << "coefficient " << i;
+}
+
 // -salted_fold: the folded model predicts what the unfolded one does, through ENVW for the shipped
 // zeta = 1 and, in a copy with zeta set to 2, through GENV from the lambda on where it is no larger
 TEST(SaltedFchkPredictorTests, FoldedModelPredictsTheSame)

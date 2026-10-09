@@ -62,13 +62,6 @@ SALTEDPredictor::SALTEDPredictor(WFN wavy_in, options& opt_in)
 
 	featomic_system = SALTED_Utils::gen_featomic_system(wavy);
 
-	natoms = 0;
-	for (auto a : wavy.get_atoms()) {
-		const std::string atom_symbol = a.get_label();
-		if (std::find(config.species.begin(), config.species.end(), atom_symbol) != config.species.end())
-			natoms++;
-	}//natoms is the number of atoms, that featomic creates a descriptor as a central atom for.
-
 	const auto _t_filter = std::chrono::steady_clock::now();
 	const std::vector<char> use_thakkar = SALTED_Utils::filter_input(wavy, opt_in, config);
 	if (ProgressBar::report_counts)
@@ -476,19 +469,16 @@ void SALTEDPredictor::setup_atomic_environment()
 {
 	SALTED_Utils::set_lmax_nmax(lmax, nmax, *get_model_basis(), config.species);
 
-	atomic_symbols.reserve(natoms);
+	// The element from the nuclear charge, never the atom label: a .wfx names its atoms "O1", "H2", which
+	// matched no species and left nothing to predict. Deuterium is read with Z = 1 and so already arrives as H.
 	for (int i = 0; i < featomic_system.size(); i++)
 	{
-		std::string label = constants::Labels[featomic_system.types()[i]];
-		if (std::find(config.species.begin(), config.species.end(), label) == config.species.end()) continue;
-		// Deuterium is hydrogen for the electron density; without this a joint
-		// X-ray/neutron structure is refused with "Excluded species: D"
-		if (label == "D" || label == "d")
-		{
-			label = "H";
-		}
-		atomic_symbols.emplace_back(label);
+		const std::string label = constants::Labels[featomic_system.types()[i]];
+		if (std::find(config.species.begin(), config.species.end(), label) != config.species.end())
+			atomic_symbols.emplace_back(label);
 	}
+	// The atoms featomic makes a descriptor centre of; counted here, from the same symbols, so the two cannot disagree
+	natoms = static_cast<int>(atomic_symbols.size());
 
 	// Print all Atomic symbols
 	if (debug)
