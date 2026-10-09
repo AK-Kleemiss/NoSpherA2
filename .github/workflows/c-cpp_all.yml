@@ -24,6 +24,9 @@ env:
   CMAKE_BUILD_PARALLEL_LEVEL: 4
   CTEST_PARALLEL_LEVEL: 4
   CARGO_TERM_COLOR: always
+  # SSE4.2 compatibility build: CI binaries are handed out and must run on any x64 CPU.
+  # Unset, cmake/NoSpherA2Avx.cmake detects the runner and builds AVX2 + FMA, as local builds do.
+  NOS_AVX: "OFF"
 
 jobs:
   build:
