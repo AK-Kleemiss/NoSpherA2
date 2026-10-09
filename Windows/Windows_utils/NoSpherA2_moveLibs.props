@@ -23,7 +23,7 @@
   <Target Name="RunBasisSetConverterIfNeeded" BeforeTargets="PreBuildEvent">
     <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(WindowsUtilsDir)run_basis_converter_if_needed.ps1&quot; -ConverterExe &quot;$(NosConverterDir)\BasisSetConverter.exe&quot; -Configuration &quot;$(Configuration)&quot; -Platform &quot;$(Platform)&quot; -PlatformToolset &quot;$(PlatformToolset)&quot; -MSBuildExe &quot;$(MSBuildBinPath)\MSBuild.exe&quot;" />
   </Target>
-  <Target Name="CopyOpenBLAS" AfterTargets="Build" Condition="'$(Platform)' == 'ARM64'">
+  <Target Name="CopyOpenBLAS" AfterTargets="Build" Condition="'$(Platform)' == 'ARM64' and '$(NosArmPL)' != 'true'">
     <Copy SourceFiles="$(deps_install_dir)\bin\openblas.dll" DestinationFolder="$(TargetDir)" SkipUnchangedFiles="true" Condition="Exists('$(deps_install_dir)\bin\openblas.dll')" />
     <Copy SourceFiles="$(deps_install_dir)\bin\libopenblas.dll" DestinationFolder="$(TargetDir)" SkipUnchangedFiles="true" Condition="Exists('$(deps_install_dir)\bin\libopenblas.dll')" />
   </Target>

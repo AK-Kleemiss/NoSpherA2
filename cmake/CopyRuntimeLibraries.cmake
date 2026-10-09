@@ -82,25 +82,32 @@ function(nosphera2_copy_runtime_libraries target)
         )
     endif()
 
-    if(NOT EXISTS "${_openmp_source}")
+    # ArmPL is linked statically and OpenMP is the system's (libgomp, vcomp): only TBB to ship, so
+    # the OpenMP copy below repeats the TBB one, which copy_if_different skips
+    if(NOSPHERA2_ARMPL)
+        set(_openmp_source "$<TARGET_FILE:TBB::tbb>")
+        set(_openmp_real_source "${_openmp_source}")
+        set(_openmp_destination_name "${_tbb_destination_name}")
+        unset(_extra_runtime_source)
+    elseif(NOT EXISTS "${_openmp_source}")
         message(FATAL_ERROR
             "OpenMP runtime does not exist: ${_openmp_source}"
         )
+    else()
+        # The source may be a symlink. Copy the actual file while retaining the
+        # public runtime filename, such as libiomp5.so.
+        get_filename_component(
+            _openmp_destination_name
+            "${_openmp_source}"
+            NAME
+        )
+
+        file(
+            REAL_PATH
+            "${_openmp_source}"
+            _openmp_real_source
+        )
     endif()
-
-    # The source may be a symlink. Copy the actual file while retaining the
-    # public runtime filename, such as libiomp5.so.
-    get_filename_component(
-        _openmp_destination_name
-        "${_openmp_source}"
-        NAME
-    )
-
-    file(
-        REAL_PATH
-        "${_openmp_source}"
-        _openmp_real_source
-    )
 
     # Windows searches the executable directory automatically.
     if(DEFINED _runtime_rpath)

@@ -9,6 +9,18 @@
     <NosDepsSuffix Condition="'$(Platform)' == 'ARM64'">-arm64</NosDepsSuffix>
     <NosArchDefine Condition="'$(Platform)' == 'x64'">X64</NosArchDefine>
     <NosArchDefine Condition="'$(Platform)' == 'ARM64'">NSA2_OPENBLAS</NosArchDefine>
+    <!-- ArmPL in place of OpenBLAS when the CMake dependency install found one and put armpl_lp64.lib
+         into deps-install-*-arm64\lib (NOSPHERA2_ARMPL); static, so there is no DLL to copy -->
+    <NosDepsLib Condition="'$(Configuration)' == 'Debug'">$(NosMainFolder)deps-install-debug$(NosDepsSuffix)\lib\</NosDepsLib>
+    <NosDepsLib Condition="'$(Configuration)' != 'Debug'">$(NosMainFolder)deps-install-release$(NosDepsSuffix)\lib\</NosDepsLib>
+    <NosArmPL Condition="'$(Platform)' == 'ARM64' and Exists('$(NosDepsLib)armpl_lp64.lib')">true</NosArmPL>
+    <NosArchDefine Condition="'$(NosArmPL)' == 'true'">NSA2_OPENBLAS;NSA2_ARMPL</NosArchDefine>
+    <NosBlasLibs Condition="'$(Platform)' == 'ARM64'">openblas.lib</NosBlasLibs>
+    <NosBlasLibs Condition="'$(NosArmPL)' == 'true'">armpl_lp64.lib</NosBlasLibs>
+    <!-- armpl_lp64's LAPACK is flang-built; its runtime libraries come with it where the release has them -->
+    <NosBlasLibs Condition="'$(NosArmPL)' == 'true' and Exists('$(NosDepsLib)FortranRuntime.lib')">$(NosBlasLibs);FortranRuntime.lib</NosBlasLibs>
+    <NosBlasLibs Condition="'$(NosArmPL)' == 'true' and Exists('$(NosDepsLib)FortranDecimal.lib')">$(NosBlasLibs);FortranDecimal.lib</NosBlasLibs>
+    <NosBlasLibs Condition="'$(NosArmPL)' == 'true' and Exists('$(NosDepsLib)flang_rt.runtime.lib')">$(NosBlasLibs);flang_rt.runtime.lib</NosBlasLibs>
     <NosIgnoreLibs Condition="'$(Platform)' == 'ARM64'">LIBCMT</NosIgnoreLibs>
     <NosIgnoreLibs Condition="'$(Platform)' != 'ARM64'">VCOMPD.lib;VCOMP.lib;LIBCMT</NosIgnoreLibs>
   </PropertyGroup>

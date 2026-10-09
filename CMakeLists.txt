@@ -643,6 +643,48 @@ else()
     )
 endif()
 
+# Arm Performance Libraries in place of OpenBLAS on Linux aarch64 and Windows ARM64 whenever one is
+# installed, searched in this order: NOSPHERA2_ARMPL_DIR, the bootstrap's copy in .mambaenv/armpl
+# (NOSPHERA2_ARMPL_PACKAGE), ARMPL_DIR from Arm's module file or installer, then the default
+# install places. Android has no ArmPL. -DNOSPHERA2_USE_ARMPL=OFF keeps OpenBLAS for an A/B run.
+option(NOSPHERA2_USE_ARMPL "Use the Arm Performance Libraries instead of OpenBLAS when installed" ON)
+set(NOSPHERA2_ARMPL_DIR "$ENV{NOSPHERA2_ARMPL_DIR}" CACHE PATH "Arm Performance Libraries root, empty to search")
+set(NOSPHERA2_ARMPL OFF)
+if(NOSPHERA2_OPENBLAS AND NOT ANDROID AND NOSPHERA2_USE_ARMPL)
+    set(_armpl_roots "${NOSPHERA2_ARMPL_DIR}")
+    if(EXISTS "${CMAKE_SOURCE_DIR}/.mambaenv/armpl/root.txt")
+        file(STRINGS "${CMAKE_SOURCE_DIR}/.mambaenv/armpl/root.txt" _armpl_bootstrap LIMIT_COUNT 1)
+        list(APPEND _armpl_roots "${_armpl_bootstrap}")
+    endif()
+    list(APPEND _armpl_roots "$ENV{ARMPL_DIR}")
+    foreach(_glob "$ENV{HOME}/armpl/armpl_*" "/opt/arm/armpl_*"
+                  "$ENV{ProgramFiles}/Arm Performance Libraries/*/armpl_*")
+        file(TO_CMAKE_PATH "${_glob}" _glob)
+        file(GLOB _found LIST_DIRECTORIES true "${_glob}")
+        list(SORT _found COMPARE NATURAL ORDER DESCENDING)
+        list(APPEND _armpl_roots ${_found})
+    endforeach()
+    list(TRANSFORM _armpl_roots REPLACE "\\\\" "/")
+    list(REMOVE_ITEM _armpl_roots "")
+    find_path(NOSPHERA2_ARMPL_INCLUDE_DIR NAMES armpl.h PATHS ${_armpl_roots} PATH_SUFFIXES include NO_DEFAULT_PATH)
+    if(NOSPHERA2_ARMPL_INCLUDE_DIR)
+        get_filename_component(_armpl_root "${NOSPHERA2_ARMPL_INCLUDE_DIR}" DIRECTORY)
+        # Static archives on both systems, so there is no ArmPL runtime to ship. Linux takes the
+        # OpenMP build: like MKL it runs serial inside a parallel region and on -cpus threads
+        # outside one, on the system libgomp the rest of NoSpherA2 uses (the 247 MB shared one
+        # carries its own). Windows takes the serial /MD library.
+        if(WIN32)
+            set(_armpl_name armpl_lp64)
+        else()
+            set(_armpl_name libarmpl_lp64_mp.a)
+        endif()
+        find_library(NOSPHERA2_ARMPL_LIB ${_armpl_name} PATHS "${_armpl_root}/lib" NO_DEFAULT_PATH)
+    endif()
+    if(NOSPHERA2_ARMPL_LIB)
+        set(NOSPHERA2_ARMPL ON)
+    endif()
+endif()
+
 if(APPLE)
     find_library(
         NOSPHERA2_ACCELERATE_FRAMEWORK
@@ -650,20 +692,15 @@ if(APPLE)
         REQUIRED
     )
     find_package(OpenMP REQUIRED COMPONENTS CXX)
-elseif(NOSPHERA2_OPENBLAS AND LINUX AND NOT "$ENV{NOSPHERA2_ARMPL_DIR}$CACHE{NOSPHERA2_ARMPL_DIR}" STREQUAL "")
-    # Arm Performance Libraries in place of OpenBLAS: armpl_lp64_mp is the OpenMP build, so like
-    # MKL it runs serial inside a parallel region and on -cpus threads outside one
-    set(NOSPHERA2_ARMPL_DIR "$ENV{NOSPHERA2_ARMPL_DIR}" CACHE PATH "Arm Performance Libraries root, empty for OpenBLAS")
-    find_path(NOSPHERA2_ARMPL_INCLUDE_DIR NAMES cblas.h lapacke.h
-        PATHS "${NOSPHERA2_ARMPL_DIR}/include" NO_DEFAULT_PATH REQUIRED)
-    find_library(NOSPHERA2_ARMPL_LIB armpl_lp64_mp PATHS "${NOSPHERA2_ARMPL_DIR}/lib" NO_DEFAULT_PATH REQUIRED)
-    message(STATUS "BLAS/LAPACK: Arm Performance Libraries ${NOSPHERA2_ARMPL_LIB}")
-    add_library(nosphera2_openblas SHARED IMPORTED)
+elseif(NOSPHERA2_ARMPL AND LINUX)
+    message(STATUS "BLAS/LAPACK: Arm Performance Libraries ${NOSPHERA2_ARMPL_LIB} (-DNOSPHERA2_USE_ARMPL=OFF for OpenBLAS)")
+    add_library(nosphera2_openblas INTERFACE IMPORTED)
     set_target_properties(nosphera2_openblas PROPERTIES
-        IMPORTED_LOCATION "${NOSPHERA2_ARMPL_LIB}"
+        INTERFACE_LINK_LIBRARIES "${NOSPHERA2_ARMPL_LIB}"
         INTERFACE_INCLUDE_DIRECTORIES "${NOSPHERA2_ARMPL_INCLUDE_DIR}"
         INTERFACE_COMPILE_DEFINITIONS "NSA2_OPENBLAS;NSA2_ARMPL"
-        INTERFACE_LINK_OPTIONS -fopenmp)
+        # the archive's kernels sit in their own sections; without the GC a dgemm+dsyev probe is 113 MB, with it 69
+        INTERFACE_LINK_OPTIONS "-fopenmp;-Wl,--gc-sections")
 elseif(NOSPHERA2_OPENBLAS AND LINUX)
     # conda-forge OpenBLAS: one libopenblas.so with CBLAS, LAPACK and LAPACKE
     find_path(NOSPHERA2_OPENBLAS_INCLUDE_DIR cblas.h
@@ -698,17 +735,13 @@ elseif(NOSPHERA2_OPENBLAS)
         PATHS "${MICROMAMBA_ENV_PREFIX}/Library/lib" NO_DEFAULT_PATH REQUIRED)
     find_file(NOSPHERA2_OPENBLAS_DLL NAMES openblas.dll libopenblas.dll
         PATHS "${MICROMAMBA_ENV_PREFIX}/Library/bin" NO_DEFAULT_PATH REQUIRED)
-    # Arm Performance Libraries in place of OpenBLAS when installed (CI sets the env variable).
-    # armpl_lp64 is the serial, /MD static library; its LAPACK is flang-built and needs the
-    # Fortran runtime libraries next to it.
-    set(NOSPHERA2_ARMPL_DIR "$ENV{NOSPHERA2_ARMPL_DIR}" CACHE PATH "Arm Performance Libraries root, empty for OpenBLAS")
-    if(NOSPHERA2_ARMPL_DIR)
-        find_path(NOSPHERA2_ARMPL_INCLUDE_DIR NAMES cblas.h lapacke.h
-            PATHS "${NOSPHERA2_ARMPL_DIR}/include" NO_DEFAULT_PATH REQUIRED)
-        find_library(NOSPHERA2_ARMPL_LIB armpl_lp64 PATHS "${NOSPHERA2_ARMPL_DIR}/lib" NO_DEFAULT_PATH REQUIRED)
+    # Arm Performance Libraries in place of OpenBLAS when found above. armpl_lp64's LAPACK is
+    # flang-built and needs the Fortran runtime libraries next to it.
+    if(NOSPHERA2_ARMPL)
+        get_filename_component(_armpl_lib_dir "${NOSPHERA2_ARMPL_LIB}" DIRECTORY)
         set(_armpl_libs "${NOSPHERA2_ARMPL_LIB}")
         foreach(_rt FortranRuntime FortranDecimal flang_rt.runtime)
-            find_library(NOSPHERA2_ARMPL_${_rt} ${_rt} PATHS "${NOSPHERA2_ARMPL_DIR}/lib" NO_DEFAULT_PATH)
+            find_library(NOSPHERA2_ARMPL_${_rt} ${_rt} PATHS "${_armpl_lib_dir}" NO_DEFAULT_PATH)
             if(NOSPHERA2_ARMPL_${_rt})
                 list(APPEND _armpl_libs "${NOSPHERA2_ARMPL_${_rt}}")
             endif()

@@ -191,6 +191,54 @@ else()
         endif()
     endif()
 
+    # Arm Performance Libraries (Linux aarch64, Windows ARM64). Arm's site refuses scripted
+    # downloads, so the package is fetched by hand (https://learn.arm.com/install-guides/armpl/)
+    # and named in NOSPHERA2_ARMPL_PACKAGE or put into .mambaenv/bootstrap. Installing it accepts
+    # Arm's licence. It goes to .mambaenv/armpl, whose root.txt the top-level CMakeLists.txt reads.
+    set(NOSPHERA2_ARMPL_PACKAGE "$ENV{NOSPHERA2_ARMPL_PACKAGE}" CACHE FILEPATH "Arm Performance Libraries package (.tar, .sh or .msi) to install")
+    if(NOT NOSPHERA2_ARMPL_PACKAGE)
+        file(GLOB _armpl_packages "${_mamba_bootstrap}/arm-performance-libraries_*")
+        list(FILTER _armpl_packages INCLUDE REGEX "\\.(tar|sh|msi)$")
+        list(SORT _armpl_packages COMPARE NATURAL ORDER DESCENDING)
+        list(POP_FRONT _armpl_packages NOSPHERA2_ARMPL_PACKAGE)
+    endif()
+    set(_armpl_dir "${NOSPHERA2_SOURCE_DIR}/.mambaenv/armpl")
+    if(NOSPHERA2_ARMPL_PACKAGE AND NOT EXISTS "${_armpl_dir}/root.txt")
+        message(STATUS "Installing ${NOSPHERA2_ARMPL_PACKAGE} into ${_armpl_dir}, which accepts Arm's licence")
+        if(NOSPHERA2_ARMPL_PACKAGE MATCHES "\\.msi$")
+            # administrative install: unpacks the files without touching Program Files or the registry
+            file(TO_NATIVE_PATH "${NOSPHERA2_ARMPL_PACKAGE}" _armpl_msi)
+            file(TO_NATIVE_PATH "${_armpl_dir}" _armpl_target)
+            execute_process(
+                COMMAND msiexec /a "${_armpl_msi}" /qn "TARGETDIR=${_armpl_target}" ACCEPT_EULA=1
+                COMMAND_ERROR_IS_FATAL ANY
+            )
+        else()
+            set(_armpl_installer "${NOSPHERA2_ARMPL_PACKAGE}")
+            if(_armpl_installer MATCHES "\\.tar$")
+                file(ARCHIVE_EXTRACT INPUT "${_armpl_installer}" DESTINATION "${_mamba_bootstrap}/armpl_package")
+                file(GLOB_RECURSE _armpl_installer "${_mamba_bootstrap}/armpl_package/arm-performance-libraries_*.sh")
+            endif()
+            # it unpacks ~1 GB into TMPDIR, more than a small machine's tmpfs /tmp holds (Pi 4: 922 MB);
+            # --force lets a rerun install over an attempt that died half way (no root.txt yet)
+            execute_process(
+                COMMAND "${CMAKE_COMMAND}" -E env "TMPDIR=${_mamba_bootstrap}"
+                    bash "${_armpl_installer}" --accept --force --install-to "${_armpl_dir}"
+                COMMAND_ERROR_IS_FATAL ANY
+            )
+        endif()
+        file(GLOB_RECURSE _armpl_headers "${_armpl_dir}/armpl.h")
+        list(FILTER _armpl_headers INCLUDE REGEX "/include/armpl\\.h$")
+        list(POP_FRONT _armpl_headers _armpl_header)
+        if(NOT _armpl_header)
+            message(FATAL_ERROR "No include/armpl.h under ${_armpl_dir} after installing ${NOSPHERA2_ARMPL_PACKAGE}")
+        endif()
+        get_filename_component(_armpl_root "${_armpl_header}" DIRECTORY)
+        get_filename_component(_armpl_root "${_armpl_root}" DIRECTORY)
+        file(WRITE "${_armpl_dir}/root.txt" "${_armpl_root}")
+        message(STATUS "Arm Performance Libraries: ${_armpl_root}")
+    endif()
+
     message(STATUS "Bootstrap complete")
     message(STATUS "Environment: ${MICROMAMBA_ENV_PREFIX}")
     message(STATUS "Configure with: cmake --preset release-xxxx")
