@@ -89,6 +89,10 @@ function(nosphera2_copy_runtime_libraries target)
         set(_openmp_real_source "${_openmp_source}")
         set(_openmp_destination_name "${_tbb_destination_name}")
         unset(_extra_runtime_source)
+        if(NOSPHERA2_ARMPL_DLL)
+            # Windows Debug links the ArmPL DLL instead (see CMakeLists.txt)
+            set(_extra_runtime_source "${NOSPHERA2_ARMPL_DLL}")
+        endif()
     elseif(NOT EXISTS "${_openmp_source}")
         message(FATAL_ERROR
             "OpenMP runtime does not exist: ${_openmp_source}"

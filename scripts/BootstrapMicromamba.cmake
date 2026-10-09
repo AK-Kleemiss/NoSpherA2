@@ -199,6 +199,8 @@ else()
     if(NOT NOSPHERA2_ARMPL_PACKAGE)
         file(GLOB _armpl_packages "${_mamba_bootstrap}/arm-performance-libraries_*")
         list(FILTER _armpl_packages INCLUDE REGEX "\\.(tar|sh|msi)$")
+        # the Arm64EC .msi is for x64-compatible ARM code, not a native ARM64 link
+        list(FILTER _armpl_packages EXCLUDE REGEX "Arm64EC")
         list(SORT _armpl_packages COMPARE NATURAL ORDER DESCENDING)
         list(POP_FRONT _armpl_packages NOSPHERA2_ARMPL_PACKAGE)
     endif()

@@ -674,7 +674,8 @@ if(NOSPHERA2_OPENBLAS AND NOT ANDROID AND NOSPHERA2_USE_ARMPL)
         # outside one, on the system libgomp the rest of NoSpherA2 uses (the 247 MB shared one
         # carries its own). Windows takes the serial /MD library.
         if(WIN32)
-            set(_armpl_name armpl_lp64)
+            # full name: CMake 4 tries .dll.lib first and would find the import library
+            set(_armpl_name armpl_lp64.lib)
         else()
             set(_armpl_name libarmpl_lp64_mp.a)
         endif()
@@ -735,21 +736,32 @@ elseif(NOSPHERA2_OPENBLAS)
         PATHS "${MICROMAMBA_ENV_PREFIX}/Library/lib" NO_DEFAULT_PATH REQUIRED)
     find_file(NOSPHERA2_OPENBLAS_DLL NAMES openblas.dll libopenblas.dll
         PATHS "${MICROMAMBA_ENV_PREFIX}/Library/bin" NO_DEFAULT_PATH REQUIRED)
-    # Arm Performance Libraries in place of OpenBLAS when found above. armpl_lp64's LAPACK is
-    # flang-built and needs the Fortran runtime libraries next to it.
+    # Arm Performance Libraries in place of OpenBLAS when found above. armpl_lp64.lib is the /MD
+    # build; its LAPACK is flang-built and pulls in the two runtime libraries below by DEFAULTLIB.
     if(NOSPHERA2_ARMPL)
         get_filename_component(_armpl_lib_dir "${NOSPHERA2_ARMPL_LIB}" DIRECTORY)
-        set(_armpl_libs "${NOSPHERA2_ARMPL_LIB}")
-        foreach(_rt FortranRuntime FortranDecimal flang_rt.runtime)
-            find_library(NOSPHERA2_ARMPL_${_rt} ${_rt} PATHS "${_armpl_lib_dir}" NO_DEFAULT_PATH)
-            if(NOSPHERA2_ARMPL_${_rt})
+        if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+            # the archives are /MD with _ITERATOR_DEBUG_LEVEL 0 and refuse a /MDd link (LNK2038);
+            # Debug takes armpl_lp64.dll, which keeps its CRT behind the DLL boundary
+            set(_armpl_libs "${_armpl_lib_dir}/armpl_lp64.dll.lib")
+            find_file(NOSPHERA2_ARMPL_DLL armpl_lp64.dll PATHS "${_armpl_lib_dir}/../bin" NO_DEFAULT_PATH REQUIRED)
+            message(STATUS "BLAS/LAPACK: Arm Performance Libraries ${NOSPHERA2_ARMPL_DLL} (Debug)")
+            add_library(nosphera2_openblas SHARED IMPORTED)
+            set_target_properties(nosphera2_openblas PROPERTIES
+                IMPORTED_IMPLIB "${_armpl_libs}"
+                IMPORTED_LOCATION "${NOSPHERA2_ARMPL_DLL}")
+        else()
+            set(_armpl_libs "${NOSPHERA2_ARMPL_LIB}")
+            foreach(_rt flang_rt.runtime.dynamic clang_rt.builtins)
+                find_library(NOSPHERA2_ARMPL_${_rt} ${_rt}.lib PATHS "${_armpl_lib_dir}" NO_DEFAULT_PATH REQUIRED)
                 list(APPEND _armpl_libs "${NOSPHERA2_ARMPL_${_rt}}")
-            endif()
-        endforeach()
-        message(STATUS "BLAS/LAPACK: Arm Performance Libraries ${_armpl_libs}")
-        add_library(nosphera2_openblas INTERFACE IMPORTED)
+            endforeach()
+            message(STATUS "BLAS/LAPACK: Arm Performance Libraries ${_armpl_libs}")
+            add_library(nosphera2_openblas INTERFACE IMPORTED)
+            set_target_properties(nosphera2_openblas PROPERTIES
+                INTERFACE_LINK_LIBRARIES "${_armpl_libs}")
+        endif()
         set_target_properties(nosphera2_openblas PROPERTIES
-            INTERFACE_LINK_LIBRARIES "${_armpl_libs}"
             INTERFACE_INCLUDE_DIRECTORIES "${NOSPHERA2_ARMPL_INCLUDE_DIR}"
             INTERFACE_COMPILE_DEFINITIONS "NSA2_OPENBLAS;NSA2_ARMPL")
     else()

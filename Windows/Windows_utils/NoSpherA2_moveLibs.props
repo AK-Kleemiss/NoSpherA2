@@ -27,6 +27,10 @@
     <Copy SourceFiles="$(deps_install_dir)\bin\openblas.dll" DestinationFolder="$(TargetDir)" SkipUnchangedFiles="true" Condition="Exists('$(deps_install_dir)\bin\openblas.dll')" />
     <Copy SourceFiles="$(deps_install_dir)\bin\libopenblas.dll" DestinationFolder="$(TargetDir)" SkipUnchangedFiles="true" Condition="Exists('$(deps_install_dir)\bin\libopenblas.dll')" />
   </Target>
+  <!-- Debug links the ArmPL DLL (NoSpherA2_universal.props); Release is static and has none -->
+  <Target Name="CopyArmPL" AfterTargets="Build" Condition="'$(NosArmPL)' == 'true' and '$(Configuration)' == 'Debug'">
+    <Copy SourceFiles="$(deps_install_dir)\bin\armpl_lp64.dll" DestinationFolder="$(TargetDir)" SkipUnchangedFiles="true" />
+  </Target>
   <Target Name="CopyIntelOpenMP" AfterTargets="Build" Condition="'$(Platform)' != 'ARM64'">
     <ItemGroup>
       <IntelOpenMPDlls Include="$(deps_install_dir)\bin\libiomp5md.dll" />
