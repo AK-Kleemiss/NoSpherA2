@@ -45,8 +45,13 @@ if(NOS_AVX2)
 endif()
 message(STATUS "NOS_AVX=${NOS_AVX} -> building with AVX: ${NOS_USE_AVX}, AVX2+FMA: ${NOS_USE_AVX2}")
 
-#C and C++ only: nvcc refuses -m flags, and the GPU sources get their host flags from it
-if(LINUX)
+#C and C++ only: nvcc refuses -m flags, and the GPU sources get their host flags from it.
+#x86 only: aarch64 gcc rejects -msse (NEON is always on there)
+set(NOS_X86 OFF)
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "(x86_64|AMD64|amd64)")
+    set(NOS_X86 ON)
+endif()
+if(LINUX AND NOS_X86)
     add_compile_options("$<$<COMPILE_LANGUAGE:C,CXX>:-msse2;-msse3;-msse4.1;-msse4.2>")
     if(NOS_USE_AVX)
         add_compile_options($<$<COMPILE_LANGUAGE:C,CXX>:-mavx>)
@@ -59,7 +64,7 @@ endif()
 #when this was tried per translation unit. Only where the host has it - an AVX2 instruction on a
 #pre-Haswell host is SIGILL, not a slow path. i7-7700HQ, rubredoxin -cmtc: calc_SF's Fourier
 #transform 17 % faster with the SF kernels built AVX2 (FLOWOFFICE 13 %).
-if(NOS_USE_AVX2 AND LINUX)
+if(NOS_USE_AVX2 AND LINUX AND NOS_X86)
     add_compile_options("$<$<COMPILE_LANGUAGE:C,CXX>:-mavx2;-mfma>")
     add_link_options(-mavx2 -mfma)
 endif()

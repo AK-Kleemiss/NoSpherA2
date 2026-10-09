@@ -9,6 +9,19 @@
     <NosDepsSuffix Condition="'$(Platform)' == 'ARM64'">-arm64</NosDepsSuffix>
     <NosArchDefine Condition="'$(Platform)' == 'x64'">X64</NosArchDefine>
     <NosArchDefine Condition="'$(Platform)' == 'ARM64'">NSA2_OPENBLAS</NosArchDefine>
+    <!-- ArmPL in place of OpenBLAS when the CMake dependency install found one and put it into
+         deps-install-*-arm64\lib (NOSPHERA2_ARMPL). Release links the static armpl_lp64.lib, the
+         /MD build, whose flang-built LAPACK needs the two runtimes installed next to it. Its objects
+         refuse a /MDd link (LNK2038), so Debug links armpl_lp64.dll, copied by NoSpherA2_moveLibs -->
+    <NosDepsLib Condition="'$(Configuration)' == 'Debug'">$(NosMainFolder)deps-install-debug$(NosDepsSuffix)\lib\</NosDepsLib>
+    <NosDepsLib Condition="'$(Configuration)' != 'Debug'">$(NosMainFolder)deps-install-release$(NosDepsSuffix)\lib\</NosDepsLib>
+    <NosArmPLLib>armpl_lp64.lib</NosArmPLLib>
+    <NosArmPLLib Condition="'$(Configuration)' == 'Debug'">armpl_lp64.dll.lib</NosArmPLLib>
+    <NosArmPL Condition="'$(Platform)' == 'ARM64' and Exists('$(NosDepsLib)$(NosArmPLLib)')">true</NosArmPL>
+    <NosArchDefine Condition="'$(NosArmPL)' == 'true'">NSA2_OPENBLAS;NSA2_ARMPL</NosArchDefine>
+    <NosBlasLibs Condition="'$(Platform)' == 'ARM64'">openblas.lib</NosBlasLibs>
+    <NosBlasLibs Condition="'$(NosArmPL)' == 'true'">armpl_lp64.lib;flang_rt.runtime.dynamic.lib;clang_rt.builtins.lib</NosBlasLibs>
+    <NosBlasLibs Condition="'$(NosArmPL)' == 'true' and '$(Configuration)' == 'Debug'">armpl_lp64.dll.lib</NosBlasLibs>
     <NosIgnoreLibs Condition="'$(Platform)' == 'ARM64'">LIBCMT</NosIgnoreLibs>
     <NosIgnoreLibs Condition="'$(Platform)' != 'ARM64'">VCOMPD.lib;VCOMP.lib;LIBCMT</NosIgnoreLibs>
   </PropertyGroup>

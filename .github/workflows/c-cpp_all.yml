@@ -66,6 +66,21 @@ jobs:
             artifact-path: artifacts/NoSpherA2-windows-x64.zip
             artifact-name: NoSpherA2-windows-x64
 
+          # The only job that runs all of the code behind the __aarch64__ gates
+          # (NEON sincos, phase recurrence, Becke pairs, to_mo batch); Apple's
+          # arm64 build leaves the recurrence and the NEON Becke out. conda-forge
+          # pthreads OpenBLAS (environment-linux-aarch64.yaml), libgomp.
+          - name: Linux aarch64 Release
+            os: ubuntu-24.04-arm
+            configure-preset: release-linux
+            build-preset: release-linux
+            test-preset: release-linux
+            build-directory: build/release-linux
+            architecture: aarch64
+            shell: bash
+            artifact-path: artifacts/NoSpherA2-linux-aarch64.tar.gz
+            artifact-name: NoSpherA2-linux-aarch64
+
           # oneMKL has no ARM64 build; this one links conda-forge OpenBLAS
           # (environment-win-arm64.yaml) and uses vcomp for OpenMP.
           # Disabled for now: its tests run 5-8x slower than x64 (XCW) and

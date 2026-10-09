@@ -220,7 +220,18 @@ install(
     DESTINATION include
 )
 
-if(NOSPHERA2_OPENBLAS)
+if(NOSPHERA2_ARMPL)
+    # armpl_lp64.lib (static, Release) or armpl_lp64.dll.lib (Debug, DLL to bin) in lib is what
+    # switches the vcxprojs to ArmPL (NosArmPL in NoSpherA2_universal.props); the flang runtime
+    # libraries ride along with the static one.
+    install(FILES ${_armpl_libs} DESTINATION lib)
+    if(NOSPHERA2_ARMPL_DLL)
+        install(FILES "${NOSPHERA2_ARMPL_DLL}" DESTINATION bin)
+    endif()
+    install(DIRECTORY "${NOSPHERA2_ARMPL_INCLUDE_DIR}/" DESTINATION include)
+elseif(NOSPHERA2_OPENBLAS)
+    # back from ArmPL: drop the markers so the vcxprojs link OpenBLAS again
+    install(CODE "file(REMOVE \"\${CMAKE_INSTALL_PREFIX}/lib/armpl_lp64.lib\" \"\${CMAKE_INSTALL_PREFIX}/lib/armpl_lp64.dll.lib\")")
     # The vcxprojs link openblas.lib whatever conda-forge named the import library
     install(FILES "${NOSPHERA2_OPENBLAS_DLL}" DESTINATION bin)
     install(FILES "${NOSPHERA2_OPENBLAS_IMPLIB}" DESTINATION lib RENAME openblas.lib)

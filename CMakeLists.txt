@@ -4,8 +4,13 @@ project(NoSpherA2 LANGUAGES C CXX)
 
 message(STATUS "CMAKE_BUILD_TYPE = ${CMAKE_BUILD_TYPE}")
 
-# Windows on ARM: OpenBLAS instead of oneMKL, and MSVC's own vcomp for OpenMP instead of libiomp5
-if(WIN32 AND CMAKE_CXX_COMPILER_ARCHITECTURE_ID STREQUAL "ARM64")
+# Windows on ARM and Linux aarch64: OpenBLAS instead of oneMKL, and the compiler's own OpenMP
+# runtime (vcomp, libgomp) instead of libiomp5
+if((WIN32 AND CMAKE_CXX_COMPILER_ARCHITECTURE_ID STREQUAL "ARM64")
+   OR (LINUX AND CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64"))
+    set(NOSPHERA2_OPENBLAS ON)
+elseif(ANDROID)
+    # Android (NDK): static OpenBLAS from NOSPHERA2_OPENBLAS_ROOT, NDK libomp linked statically
     set(NOSPHERA2_OPENBLAS ON)
 else()
     set(NOSPHERA2_OPENBLAS OFF)
@@ -439,7 +444,13 @@ include(NoSpherA2Sanitizers)
 include(ValidateMambaEnvironemt)
 include(CopyRuntimeLibraries)
 include(NoSpherA2Optimizations)
-validate_micromamba_environment()
+if(NOT ANDROID) # the NDK cross build takes nothing from the micromamba environment
+    validate_micromamba_environment()
+endif()
+#Android below API 28 (legacy APK line, API 21): posix_spawn and aligned_alloc stand-ins for all C++
+if(ANDROID AND ANDROID_PLATFORM_LEVEL LESS 28)
+    add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:SHELL:-include ${CMAKE_CURRENT_SOURCE_DIR}/cmake/android_legacy_compat.h>")
+endif()
 
 
 # ---------------------------------------------------------------------------
@@ -515,6 +526,10 @@ target_include_directories(
     PUBLIC
         "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/libcint/include>"
 )
+#Android below API 26 (legacy APK line, API 21): libm lacks the C99 complex functions (creal, conj, ...)
+if(ANDROID AND ANDROID_PLATFORM_LEVEL LESS 26)
+    target_compile_options(cint PRIVATE -include "${CMAKE_CURRENT_SOURCE_DIR}/cmake/android_complex_compat.h")
+endif()
 
 if(NOT TARGET libcint::libcint)
     add_library(libcint::libcint ALIAS cint)
@@ -541,6 +556,22 @@ if(MSVC AND CMAKE_CXX_COMPILER_ARCHITECTURE_ID STREQUAL "ARM64")
         "$<$<COMPILE_LANGUAGE:CXX>:/FI${CMAKE_CURRENT_SOURCE_DIR}/cmake/eigen5_compat.h>")
 endif()
 
+#Android: oneTBB static, so the APK ships one executable and no libtbb.so.12 (a versioned SONAME
+#cannot live in jniLibs). occ's own CPMAddPackage(oneTBB) then reuses this one.
+if(ANDROID)
+    include("${CMAKE_CURRENT_SOURCE_DIR}/occ/cmake/CPM.cmake")
+    set(_nos_bsl ${BUILD_SHARED_LIBS})
+    set(BUILD_SHARED_LIBS OFF)
+    CPMAddPackage(
+        NAME oneTBB
+        GITHUB_REPOSITORY "uxlfoundation/oneTBB"
+        VERSION "2022.2.0"
+        OPTIONS "TBB_TEST OFF" "TBB_EXAMPLES OFF" "TBB_STRICT OFF" "BUILD_SHARED_LIBS OFF"
+                "TBB_DISABLE_HWLOC_AUTOMATIC_SEARCH ON"
+    )
+    set(BUILD_SHARED_LIBS ${_nos_bsl})
+endif()
+
 set(USE_SYSTEM_LIBCINT ON)
 set(BUILD_FPIC ON)
 set(WITH_PYTHON_BINDINGS OFF)
@@ -551,6 +582,11 @@ add_subdirectory(
     "${CMAKE_BINARY_DIR}/_deps/occ"
     EXCLUDE_FROM_ALL
 )
+#32-bit Android: clang 18 at -O3 needs >45 min per big generated libecpint Q*.cpp for i686 (6 min
+#on arm64); ECP integrals only run for ECP basis sets, so -O1 there costs nothing for light atoms
+if(ANDROID AND CMAKE_SIZEOF_VOID_P EQUAL 4 AND TARGET libecpint_static)
+    target_compile_options(libecpint_static PRIVATE -O1)
+endif()
 
 # ---------------------------------------------------------------------------
 # mdspan
@@ -607,6 +643,49 @@ else()
     )
 endif()
 
+# Arm Performance Libraries in place of OpenBLAS on Linux aarch64 and Windows ARM64 whenever one is
+# installed, searched in this order: NOSPHERA2_ARMPL_DIR, the bootstrap's copy in .mambaenv/armpl
+# (NOSPHERA2_ARMPL_PACKAGE), ARMPL_DIR from Arm's module file or installer, then the default
+# install places. Android has no ArmPL. -DNOSPHERA2_USE_ARMPL=OFF keeps OpenBLAS for an A/B run.
+option(NOSPHERA2_USE_ARMPL "Use the Arm Performance Libraries instead of OpenBLAS when installed" ON)
+set(NOSPHERA2_ARMPL_DIR "$ENV{NOSPHERA2_ARMPL_DIR}" CACHE PATH "Arm Performance Libraries root, empty to search")
+set(NOSPHERA2_ARMPL OFF)
+if(NOSPHERA2_OPENBLAS AND NOT ANDROID AND NOSPHERA2_USE_ARMPL)
+    set(_armpl_roots "${NOSPHERA2_ARMPL_DIR}")
+    if(EXISTS "${CMAKE_SOURCE_DIR}/.mambaenv/armpl/root.txt")
+        file(STRINGS "${CMAKE_SOURCE_DIR}/.mambaenv/armpl/root.txt" _armpl_bootstrap LIMIT_COUNT 1)
+        list(APPEND _armpl_roots "${_armpl_bootstrap}")
+    endif()
+    list(APPEND _armpl_roots "$ENV{ARMPL_DIR}")
+    foreach(_glob "$ENV{HOME}/armpl/armpl_*" "/opt/arm/armpl_*"
+                  "$ENV{ProgramFiles}/Arm Performance Libraries/*/armpl_*")
+        file(TO_CMAKE_PATH "${_glob}" _glob)
+        file(GLOB _found LIST_DIRECTORIES true "${_glob}")
+        list(SORT _found COMPARE NATURAL ORDER DESCENDING)
+        list(APPEND _armpl_roots ${_found})
+    endforeach()
+    list(TRANSFORM _armpl_roots REPLACE "\\\\" "/")
+    list(REMOVE_ITEM _armpl_roots "")
+    find_path(NOSPHERA2_ARMPL_INCLUDE_DIR NAMES armpl.h PATHS ${_armpl_roots} PATH_SUFFIXES include NO_DEFAULT_PATH)
+    if(NOSPHERA2_ARMPL_INCLUDE_DIR)
+        get_filename_component(_armpl_root "${NOSPHERA2_ARMPL_INCLUDE_DIR}" DIRECTORY)
+        # Static archives on both systems, so there is no ArmPL runtime to ship. Linux takes the
+        # OpenMP build: like MKL it runs serial inside a parallel region and on -cpus threads
+        # outside one, on the system libgomp the rest of NoSpherA2 uses (the 247 MB shared one
+        # carries its own). Windows takes the serial /MD library.
+        if(WIN32)
+            # full name: CMake 4 tries .dll.lib first and would find the import library
+            set(_armpl_name armpl_lp64.lib)
+        else()
+            set(_armpl_name libarmpl_lp64_mp.a)
+        endif()
+        find_library(NOSPHERA2_ARMPL_LIB ${_armpl_name} PATHS "${_armpl_root}/lib" NO_DEFAULT_PATH)
+    endif()
+    if(NOSPHERA2_ARMPL_LIB)
+        set(NOSPHERA2_ARMPL ON)
+    endif()
+endif()
+
 if(APPLE)
     find_library(
         NOSPHERA2_ACCELERATE_FRAMEWORK
@@ -614,6 +693,40 @@ if(APPLE)
         REQUIRED
     )
     find_package(OpenMP REQUIRED COMPONENTS CXX)
+elseif(NOSPHERA2_ARMPL AND LINUX)
+    message(STATUS "BLAS/LAPACK: Arm Performance Libraries ${NOSPHERA2_ARMPL_LIB} (-DNOSPHERA2_USE_ARMPL=OFF for OpenBLAS)")
+    add_library(nosphera2_openblas INTERFACE IMPORTED)
+    set_target_properties(nosphera2_openblas PROPERTIES
+        INTERFACE_LINK_LIBRARIES "${NOSPHERA2_ARMPL_LIB}"
+        INTERFACE_INCLUDE_DIRECTORIES "${NOSPHERA2_ARMPL_INCLUDE_DIR}"
+        INTERFACE_COMPILE_DEFINITIONS "NSA2_OPENBLAS;NSA2_ARMPL"
+        # the archive's kernels sit in their own sections; without the GC a dgemm+dsyev probe is 113 MB, with it 69
+        INTERFACE_LINK_OPTIONS "-fopenmp;-Wl,--gc-sections")
+elseif(NOSPHERA2_OPENBLAS AND LINUX)
+    # conda-forge OpenBLAS: one libopenblas.so with CBLAS, LAPACK and LAPACKE
+    find_path(NOSPHERA2_OPENBLAS_INCLUDE_DIR cblas.h
+        PATHS "${MICROMAMBA_ENV_PREFIX}/include" PATH_SUFFIXES openblas NO_DEFAULT_PATH REQUIRED)
+    find_library(NOSPHERA2_OPENBLAS_LIB openblas
+        PATHS "${MICROMAMBA_ENV_PREFIX}/lib" NO_DEFAULT_PATH REQUIRED)
+    add_library(nosphera2_openblas SHARED IMPORTED)
+    set_target_properties(nosphera2_openblas PROPERTIES
+        IMPORTED_LOCATION "${NOSPHERA2_OPENBLAS_LIB}"
+        INTERFACE_INCLUDE_DIRECTORIES "${NOSPHERA2_OPENBLAS_INCLUDE_DIR}"
+        INTERFACE_COMPILE_DEFINITIONS NSA2_OPENBLAS
+        #MKL's libiomp5 used to supply the GOMP_* symbols; without it libgomp has to be linked
+        INTERFACE_LINK_OPTIONS -fopenmp)
+elseif(ANDROID)
+    # Static OpenBLAS built with the NDK (USE_OPENMP=1, C_LAPACK, LAPACKE) under NOSPHERA2_OPENBLAS_ROOT
+    set(NOSPHERA2_OPENBLAS_ROOT "" CACHE PATH "Android: install prefix of the NDK-built static OpenBLAS")
+    find_path(NOSPHERA2_OPENBLAS_INCLUDE_DIR cblas.h PATHS "${NOSPHERA2_OPENBLAS_ROOT}/include"
+        PATH_SUFFIXES openblas NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH REQUIRED)
+    find_library(NOSPHERA2_OPENBLAS_LIB NAMES libopenblas.a openblas PATHS "${NOSPHERA2_OPENBLAS_ROOT}/lib"
+        NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH REQUIRED)
+    add_library(nosphera2_openblas INTERFACE IMPORTED)
+    set_target_properties(nosphera2_openblas PROPERTIES
+        INTERFACE_LINK_LIBRARIES "${NOSPHERA2_OPENBLAS_LIB}"
+        INTERFACE_INCLUDE_DIRECTORIES "${NOSPHERA2_OPENBLAS_INCLUDE_DIR}"
+        INTERFACE_COMPILE_DEFINITIONS NSA2_OPENBLAS)
 elseif(NOSPHERA2_OPENBLAS)
     # oneMKL has no Windows ARM64 build. conda-forge's OpenBLAS carries LAPACKE and the headers;
     # its include dir is Library/include or Library/include/openblas depending on the build.
@@ -623,25 +736,32 @@ elseif(NOSPHERA2_OPENBLAS)
         PATHS "${MICROMAMBA_ENV_PREFIX}/Library/lib" NO_DEFAULT_PATH REQUIRED)
     find_file(NOSPHERA2_OPENBLAS_DLL NAMES openblas.dll libopenblas.dll
         PATHS "${MICROMAMBA_ENV_PREFIX}/Library/bin" NO_DEFAULT_PATH REQUIRED)
-    # Arm Performance Libraries in place of OpenBLAS when installed (CI sets the env variable).
-    # armpl_lp64 is the serial, /MD static library; its LAPACK is flang-built and needs the
-    # Fortran runtime libraries next to it.
-    set(NOSPHERA2_ARMPL_DIR "$ENV{NOSPHERA2_ARMPL_DIR}" CACHE PATH "Arm Performance Libraries root, empty for OpenBLAS")
-    if(NOSPHERA2_ARMPL_DIR)
-        find_path(NOSPHERA2_ARMPL_INCLUDE_DIR NAMES cblas.h lapacke.h
-            PATHS "${NOSPHERA2_ARMPL_DIR}/include" NO_DEFAULT_PATH REQUIRED)
-        find_library(NOSPHERA2_ARMPL_LIB armpl_lp64 PATHS "${NOSPHERA2_ARMPL_DIR}/lib" NO_DEFAULT_PATH REQUIRED)
-        set(_armpl_libs "${NOSPHERA2_ARMPL_LIB}")
-        foreach(_rt FortranRuntime FortranDecimal flang_rt.runtime)
-            find_library(NOSPHERA2_ARMPL_${_rt} ${_rt} PATHS "${NOSPHERA2_ARMPL_DIR}/lib" NO_DEFAULT_PATH)
-            if(NOSPHERA2_ARMPL_${_rt})
+    # Arm Performance Libraries in place of OpenBLAS when found above. armpl_lp64.lib is the /MD
+    # build; its LAPACK is flang-built and pulls in the two runtime libraries below by DEFAULTLIB.
+    if(NOSPHERA2_ARMPL)
+        get_filename_component(_armpl_lib_dir "${NOSPHERA2_ARMPL_LIB}" DIRECTORY)
+        if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+            # the archives are /MD with _ITERATOR_DEBUG_LEVEL 0 and refuse a /MDd link (LNK2038);
+            # Debug takes armpl_lp64.dll, which keeps its CRT behind the DLL boundary
+            set(_armpl_libs "${_armpl_lib_dir}/armpl_lp64.dll.lib")
+            find_file(NOSPHERA2_ARMPL_DLL armpl_lp64.dll PATHS "${_armpl_lib_dir}/../bin" NO_DEFAULT_PATH REQUIRED)
+            message(STATUS "BLAS/LAPACK: Arm Performance Libraries ${NOSPHERA2_ARMPL_DLL} (Debug)")
+            add_library(nosphera2_openblas SHARED IMPORTED)
+            set_target_properties(nosphera2_openblas PROPERTIES
+                IMPORTED_IMPLIB "${_armpl_libs}"
+                IMPORTED_LOCATION "${NOSPHERA2_ARMPL_DLL}")
+        else()
+            set(_armpl_libs "${NOSPHERA2_ARMPL_LIB}")
+            foreach(_rt flang_rt.runtime.dynamic clang_rt.builtins)
+                find_library(NOSPHERA2_ARMPL_${_rt} ${_rt}.lib PATHS "${_armpl_lib_dir}" NO_DEFAULT_PATH REQUIRED)
                 list(APPEND _armpl_libs "${NOSPHERA2_ARMPL_${_rt}}")
-            endif()
-        endforeach()
-        message(STATUS "BLAS/LAPACK: Arm Performance Libraries ${_armpl_libs}")
-        add_library(nosphera2_openblas INTERFACE IMPORTED)
+            endforeach()
+            message(STATUS "BLAS/LAPACK: Arm Performance Libraries ${_armpl_libs}")
+            add_library(nosphera2_openblas INTERFACE IMPORTED)
+            set_target_properties(nosphera2_openblas PROPERTIES
+                INTERFACE_LINK_LIBRARIES "${_armpl_libs}")
+        endif()
         set_target_properties(nosphera2_openblas PROPERTIES
-            INTERFACE_LINK_LIBRARIES "${_armpl_libs}"
             INTERFACE_INCLUDE_DIRECTORIES "${NOSPHERA2_ARMPL_INCLUDE_DIR}"
             INTERFACE_COMPILE_DEFINITIONS "NSA2_OPENBLAS;NSA2_ARMPL")
     else()

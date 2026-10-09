@@ -571,6 +571,65 @@ constexpr double f(const double &x)
 	return f;
 }
 
+#if defined(__aarch64__) && !defined(__APPLE__) && \
+	((defined(__clang__) && __clang_major__ >= 14) || (defined(__GNUC__) && !defined(__clang__) && !defined(__STRICT_ANSI__)))
+#define NSA2_BECKE_NEON
+//Becke pairs (a, b), b = a+1, a+2, ... two per NEON op; returns the first b left to the scalar loop (at most one).
+//The scalar loop is one dependent chain of ~70 cycles per pair (division, size adjustment, f3, pa update) and the
+//Cortex-A72 keeps about one pair in flight: 58 cycles/pair. Three vectors side by side: 41 cycles/pair (1.4x).
+//Bit-identical to the scalar loop as the compiler contracts it by default, which the gate pins:
+//1 - mu^2 and mu + u (1 - mu^2) fused, each f3 step h = 0.5 f, t = 1.5 - h f fused, f = t f. GCC in gnu++ modes
+//(-ffp-contract=fast; checked in the disassembly) also fuses the last f = t f into 1 - f3; clang 14+ (-ffp-contract=on,
+//per expression) does not, as f3 is a separate function. Clang's scalar loop is slower, 66 cycles/pair: 1.63x there.
+//An explicit -ffp-contract would break the identity. MSVC contracts differently again; Apple is not measured yet.
+//pa_a only ever gets multiplied or set to 0, and 0 stays 0: its zero tests are collected and applied once at the end,
+//which leaves a bare multiply chain in the loop.
+static int becke_pairs_neon(const int a, const int n, const double* dist, const double* R_v, const double* dist_ab_row,
+	const double* u_row, const int* Z, double* pa_b)
+{
+	const float64x2_t da = vdupq_n_f64(dist[a]), Ra = vdupq_n_f64(R_v[a]), one = vdupq_n_f64(1.0), half = vdupq_n_f64(0.5),
+		c15 = vdupq_n_f64(1.5), two = vdupq_n_f64(2.0), cut = vdupq_n_f64(constants::cutoff), tiny = vdupq_n_f64(1E-250),
+		zero = vdupq_n_f64(0.0);
+	double pa_a = pa_b[a];
+	uint64x2_t dead = vdupq_n_u64(0);
+	bool small = false;
+	const auto f_of = [&](const int b) {
+		const float64x2_t mu = vdivq_f64(vsubq_f64(da, vld1q_f64(dist + b)), vld1q_f64(dist_ab_row + b));
+		const float64x2_t u = vsetq_lane_f64(u_row[Z[b + 1]], vdupq_n_f64(u_row[Z[b]]), 1);
+		float64x2_t f = vbslq_f64(vcagtq_f64(vsubq_f64(Ra, vld1q_f64(R_v + b)), cut), vfmaq_f64(mu, vfmsq_f64(one, mu, mu), u), mu);
+		f = vmulq_f64(vfmsq_f64(c15, vmulq_f64(f, half), f), f);
+		f = vmulq_f64(f, vfmsq_f64(c15, f, vmulq_f64(f, half)));
+#ifdef __clang__
+		return vsubq_f64(one, vmulq_f64(f, vfmsq_f64(c15, f, vmulq_f64(f, half))));
+#else
+		return vfmsq_f64(one, f, vfmsq_f64(c15, f, vmulq_f64(f, half)));
+#endif
+	};
+	const auto apply = [&](const int b, const float64x2_t f) {
+		const float64x2_t pb = vld1q_f64(pa_b + b);
+		const uint64x2_t lt = vcaltq_f64(f, cut);
+		vst1q_f64(pa_b + b, vbslq_f64(lt, pb, vbslq_f64(vcagtq_f64(pb, tiny), vmulq_f64(vmulq_f64(vsubq_f64(two, f), half), pb), zero)));
+		dead = vorrq_u64(dead, lt);
+		const float64x2_t h = vmulq_f64(f, half);
+		small |= !(std::abs(pa_a) > 1E-250);
+		pa_a = vgetq_lane_f64(h, 0) * pa_a;
+		small |= !(std::abs(pa_a) > 1E-250);
+		pa_a = vgetq_lane_f64(h, 1) * pa_a;
+	};
+	int b = a + 1;
+	for (; b + 6 <= n; b += 6) {
+		const float64x2_t f0 = f_of(b), f1 = f_of(b + 2), f2 = f_of(b + 4);
+		apply(b, f0);
+		apply(b + 2, f1);
+		apply(b + 4, f2);
+	}
+	for (; b + 2 <= n; b += 2)
+		apply(b, f_of(b));
+	pa_b[a] = small || (vgetq_lane_u64(dead, 0) | vgetq_lane_u64(dead, 1)) ? 0.0 : pa_a;
+	return b;
+}
+#endif
+
 // JCP 139, 071103 (2013) for TFVC
 // JCP 88, 2547 (1988) for Becke
 std::array<double, 2> get_integration_weights(const int& num_centers,
@@ -590,7 +649,10 @@ std::array<double, 2> get_integration_weights(const int& num_centers,
 	double mu_ab, nu_ab, f, dist_ab;
 	double dist_a, dist_b;
 	double vx, vy, vz;
-	double R_a, R_b, chi_becke, u_ab, chi_mod;
+	double R_a, R_b, u_ab, chi_mod;
+#if !(defined(__aarch64__) || defined(__arm__) || defined(_M_ARM64))
+	double chi_becke;
+#endif
 	const double* chi_off, * bragg = constants::bragg_angstrom;
 	const double& cut = constants::cutoff;
 	//Called once per grid point: no allocation, and the distances to every centre
@@ -617,6 +679,24 @@ std::array<double, 2> get_integration_weights(const int& num_centers,
 			}
 		dist_ab_table = pair_dist.data();
 	}
+#if defined(__aarch64__) || defined(__arm__) || defined(_M_ARM64)
+	//The Becke size adjustment u_ab depends only on the two elements: a table instead of three divisions per pair,
+	//which were 16 % of the grid on a Cortex-A72; the armv7 Cortex-A53 divider is unpipelined too (grid setup 1.36x).
+	//Same formula, same values. x64 keeps the divisions, faster there.
+	static const std::vector<double> u_elem = [] {
+		constexpr int nz = std::size(constants::bragg_angstrom);
+		std::vector<double> u((size_t)nz * nz);
+		for (int za = 0; za < nz; za++)
+			for (int zb = 0; zb < nz; zb++) {
+				const double cb = constants::bragg_angstrom[za] / constants::bragg_angstrom[zb];
+				double v = (cb - 1.0) / (cb + 1.0);
+				v = v / (v * v - 1.0);
+				u[(size_t)za * nz + zb] = v > 0.5 ? 0.5 : v < -0.5 ? -0.5 : v;
+			}
+		return u;
+	}();
+	const double* u_row;
+#endif
 
 	if (chi.size() == 0) [[unlikely]] {
 		for (int a = 0; a < num_centers; a++) {
@@ -633,8 +713,15 @@ std::array<double, 2> get_integration_weights(const int& num_centers,
 
 			R_a = R_v[a];
 			const double *dist_ab_row = dist_ab_table + (size_t)a * num_centers;
+#if defined(__aarch64__) || defined(__arm__) || defined(_M_ARM64)
+			u_row = u_elem.data() + (size_t)proton_charges[a] * std::size(constants::bragg_angstrom);
+#endif
 
+#ifdef NSA2_BECKE_NEON
+			for (int b = becke_pairs_neon(a, num_centers, dist.data(), R_v.data(), dist_ab_row, u_row, proton_charges, pa_b.data()); b < num_centers; b++) {
+#else
 			for (int b = a + 1; b < num_centers; b++) {
+#endif
 				double &pa_b_b = pa_b[b];
 				double &pa_tv_b = pa_tv[b];
 
@@ -645,6 +732,9 @@ std::array<double, 2> get_integration_weights(const int& num_centers,
 				mu_ab = (dist_a - dist_b) / dist_ab;
 
 				if (std::abs(R_a - R_b) > cut) {
+#if defined(__aarch64__) || defined(__arm__) || defined(_M_ARM64)
+					u_ab = u_row[proton_charges[b]];
+#else
 					chi_becke = R_a / R_b;
 					u_ab = (chi_becke - 1.0) / (chi_becke + 1.0);
 					u_ab = u_ab / (u_ab * u_ab - 1.0);
@@ -654,6 +744,7 @@ std::array<double, 2> get_integration_weights(const int& num_centers,
 						u_ab = 0.5;
 					else if (u_ab < -0.5)
 						u_ab = -0.5;
+#endif
 
 					nu_ab = mu_ab + u_ab * (1.0 - mu_ab * mu_ab);
 				}
@@ -693,6 +784,9 @@ std::array<double, 2> get_integration_weights(const int& num_centers,
 			R_a = R_v[a];
 			chi_off = chi.data() + a * num_centers;
 			const double *dist_ab_row = dist_ab_table + (size_t)a * num_centers;
+#if defined(__aarch64__) || defined(__arm__) || defined(_M_ARM64)
+			u_row = u_elem.data() + (size_t)proton_charges[a] * std::size(constants::bragg_angstrom);
+#endif
 
 			for (int b = a + 1; b < num_centers; b++) {
 				double &pa_b_b = pa_b[b];
@@ -730,6 +824,9 @@ std::array<double, 2> get_integration_weights(const int& num_centers,
 
 
 				if (std::abs(R_a - R_b) > cut) {
+#if defined(__aarch64__) || defined(__arm__) || defined(_M_ARM64)
+					u_ab = u_row[proton_charges[b]];
+#else
 					chi_becke = R_a / R_b;
 					u_ab = (chi_becke - 1.0) / (chi_becke + 1.0);
 					u_ab = u_ab / (u_ab * u_ab - 1.0);
@@ -739,6 +836,7 @@ std::array<double, 2> get_integration_weights(const int& num_centers,
 						u_ab = 0.5;
 					else if (u_ab < -0.5)
 						u_ab = -0.5;
+#endif
 
 					nu_ab = mu_ab + u_ab * (1.0 - mu_ab * mu_ab);
 				}

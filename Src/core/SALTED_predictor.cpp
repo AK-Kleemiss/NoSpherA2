@@ -817,6 +817,19 @@ vec SALTEDPredictor::predict()
 		_t_model_wait += model_wait;
 		_t_model_work += model_wait;
 		const auto _t_kn = std::chrono::steady_clock::now();
+#if defined(NSA2_OPENBLAS) && !defined(NSA2_ARMPL) && !defined(__ANDROID__)
+		// pch.h keeps a pthreads OpenBLAS serial, as it cannot see an enclosing OpenMP region
+		// (Android's OpenMP OpenBLAS keeps the count pch.h caps to cpu0's cluster, so not there).
+		// This loop is outside one (its parallel for calls no BLAS), so its GEMMs may take every core,
+		// but one while lambda + 1 is read: OpenBLAS splits a GEMM evenly, so a thread the reader
+		// pushes off its core holds back all of them (Pi 4, -cpus 4: kernels 1.9 -> 3.0 s)
+		const int blas_n = lam < lmax_max ? std::max(1, std::min(omp_get_max_threads(), omp_get_num_procs() - 1))
+		                                  : omp_get_max_threads();
+		struct blas_threads_scope {
+			explicit blas_threads_scope(const int n) { openblas_set_num_threads(n); }
+			~blas_threads_scope() { openblas_set_num_threads(1); }
+		} blas_threads(blas_n);
+#endif
 		// Species-outer within the group, so a species keeps its sparse matrices hot
 		for (int spe_idx = 0; spe_idx < (int)config.species.size(); spe_idx++)
 		{

@@ -23,9 +23,13 @@
   <Target Name="RunBasisSetConverterIfNeeded" BeforeTargets="PreBuildEvent">
     <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(WindowsUtilsDir)run_basis_converter_if_needed.ps1&quot; -ConverterExe &quot;$(NosConverterDir)\BasisSetConverter.exe&quot; -Configuration &quot;$(Configuration)&quot; -Platform &quot;$(Platform)&quot; -PlatformToolset &quot;$(PlatformToolset)&quot; -MSBuildExe &quot;$(MSBuildBinPath)\MSBuild.exe&quot;" />
   </Target>
-  <Target Name="CopyOpenBLAS" AfterTargets="Build" Condition="'$(Platform)' == 'ARM64'">
+  <Target Name="CopyOpenBLAS" AfterTargets="Build" Condition="'$(Platform)' == 'ARM64' and '$(NosArmPL)' != 'true'">
     <Copy SourceFiles="$(deps_install_dir)\bin\openblas.dll" DestinationFolder="$(TargetDir)" SkipUnchangedFiles="true" Condition="Exists('$(deps_install_dir)\bin\openblas.dll')" />
     <Copy SourceFiles="$(deps_install_dir)\bin\libopenblas.dll" DestinationFolder="$(TargetDir)" SkipUnchangedFiles="true" Condition="Exists('$(deps_install_dir)\bin\libopenblas.dll')" />
+  </Target>
+  <!-- Debug links the ArmPL DLL (NoSpherA2_universal.props); Release is static and has none -->
+  <Target Name="CopyArmPL" AfterTargets="Build" Condition="'$(NosArmPL)' == 'true' and '$(Configuration)' == 'Debug'">
+    <Copy SourceFiles="$(deps_install_dir)\bin\armpl_lp64.dll" DestinationFolder="$(TargetDir)" SkipUnchangedFiles="true" />
   </Target>
   <Target Name="CopyIntelOpenMP" AfterTargets="Build" Condition="'$(Platform)' != 'ARM64'">
     <ItemGroup>

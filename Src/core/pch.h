@@ -41,15 +41,33 @@
 #define MKL_Set_Num_Threads(num) omp_set_num_threads(num)
 #elif defined(NSA2_OPENBLAS)
 // Windows on ARM: oneMKL has no ARM64 build, OpenBLAS supplies CBLAS and LAPACKE
-#include <cblas.h>
-// MSVC C++ cannot parse the C99 _Complex default
+// MSVC C++ cannot parse the C99 _Complex default; set before cblas.h, whose ArmPL version
+// otherwise defines them as _Dcomplex first
 #include <complex>
 #define lapack_complex_float std::complex<float>
 #define lapack_complex_double std::complex<double>
+#include <cblas.h>
 #include <lapacke.h>
-#ifdef NSA2_ARMPL
+#if defined(NSA2_ARMPL) && defined(_WIN32)
 //serial armpl_lp64, nothing to set
 #define MKL_Set_Num_Threads(num) ((void)(num))
+#elif defined(NSA2_ARMPL)
+//armpl_lp64_mp takes its thread count from OpenMP, as Accelerate's macro above does
+#define MKL_Set_Num_Threads(num) omp_set_num_threads(num)
+#elif defined(__ANDROID__)
+#include <cstdio>
+//the NDK OpenBLAS is built USE_OPENMP=1 and runs serial inside OpenMP regions on its own, so
+//the serial SALTED GEMMs get -cpus threads, but only within cpu0's core cluster: Exynos 7870
+//sucrose kernels 8.5 s on 1 thread, 3.0 s on 4, 14-16 s on 5-8 (spilling into the 2nd cluster)
+inline int nsa2_cluster_threads(int num) {
+  int a = 0, b = 3;
+  if (FILE* f = fopen("/sys/devices/system/cpu/cpu0/topology/core_siblings_list", "r")) {
+    if (fscanf(f, "%d-%d", &a, &b) != 2) b = a + 3;
+    fclose(f);
+  }
+  return std::max(1, std::min(num, b - a + 1));
+}
+#define MKL_Set_Num_Threads(num) openblas_set_num_threads(nsa2_cluster_threads(num))
 #else
 //pthreads OpenBLAS cannot tell it runs inside an OpenMP region (MKL can), so N threads
 //here would mean N BLAS threads per OpenMP thread: keep it serial, -cpus goes to OpenMP
