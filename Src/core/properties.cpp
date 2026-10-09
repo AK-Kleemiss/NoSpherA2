@@ -1238,7 +1238,7 @@ struct PromolecularAtom {
 	int fragment = 0;
 };
 
-// nearby: indices into atoms, ascending; atoms left out must be past their spline table end (exactly 0)
+// nearby: indices into atoms, ascending; atoms left out must be past their spline_reach() (exactly 0)
 PromolecularFragmentDensities promolecular_fragment_densities_at(
 	const d3 &pos,
 	const std::vector<PromolecularAtom> &atoms,
@@ -1725,7 +1725,7 @@ void promolecular_nci_analysis(
 	log << "Fragment-sum density keep cutoff: " << opts.promol_nci_rcut2 << endl;
 
 	const _time_point t_mask = get_time();
-	//Per 8^3 block only the atoms within their spline table end: the rest add exactly 0, in order, so bit-identical
+	//Per 8^3 block only the atoms within spline_reach(): the rest add exactly 0, in order, so bit-identical
 	constexpr int B = 8;
 	vector<d3> apos(atoms.size());
 	vec reach(atoms.size());
@@ -1733,7 +1733,7 @@ void promolecular_nci_analysis(
 	for (size_t a = 0; a < atoms.size(); a++)
 	{
 		apos[a] = atoms[a].pos;
-		reach[a] = atom_models[atoms[a].charge - 1].get_radial_dist().back();
+		reach[a] = atom_models[atoms[a].charge - 1].spline_reach();
 		all_atoms[a] = (int)a;
 	}
 	const vector<vector<int>> block_atoms = block_atom_lists(rho_cube, B, apos, [&](int, int a) { return reach[a]; });
