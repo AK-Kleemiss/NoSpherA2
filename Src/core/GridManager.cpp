@@ -622,6 +622,11 @@ void GridManager::generateIntegrationGrids(const WFN &wave, const cell &unit_cel
 	//The device is skipped there too: its launch and copies cost 130 ms on sucrose against 23 ms for the one-centre loop
 	const bool becke = config_.partition_type != PartitionType::Hirshfeld || config_.debug || config_.all_charges;
 	const int weight_centers = becke ? total_atoms : 1;
+	//One line per atom on either path, so the debug file does not depend on where the weights ran
+	const auto log_grid = [&](const int i) {
+		if (config_.debug) file << "Generated grid for atom " << i + 1 << "/" << num_atoms_with_grids
+			<< " (Type " << wave.get_atom_charge(atom_of[i]) << ") with " << (*num_points)[i] << " points." << std::endl;
+	};
 	int first = 0;
 #ifdef NOSPHERA2_USE_GPU
 	//The whole molecule in one launch, in chunks of a few million points so the flat
@@ -656,9 +661,11 @@ void GridManager::generateIntegrationGrids(const WFN &wave, const cell &unit_cel
 					flat[4].data(), flat[5].data(), flat[6].data(), flat[7].data(), flat[8].data(), flat[9].data()))
 				break;
 			static const GridData::GridIndex out_idx[6] = { GridData::X, GridData::Y, GridData::Z, GridData::WEIGHT, GridData::BECKE_WEIGHT, GridData::TFVC_WEIGHT };
-			for (int i = first, off = 0; i < last; off += (*num_points)[i++])
+			for (int i = first, off = 0; i < last; off += (*num_points)[i++]) {
 				for (int k = 0; k < 6; k++)
 					std::copy_n(flat[4 + k].data() + off, (*num_points)[i], (*grid)[i][out_idx[k]].data());
+				log_grid(i);
+			}
 			first = last;
 		}
 		//Once per run. Every other GPU path announces itself; this one did not, which
@@ -693,8 +700,7 @@ void GridManager::generateIntegrationGrids(const WFN &wave, const cell &unit_cel
 			(*grid)[i][GridData::GridIndex::TFVC_WEIGHT].data(),
 			chi_matrix
 		);
-		if (config_.debug) file << "Generated grid for atom " << i + 1 << "/" << num_atoms_with_grids
-			<< " (Type " << wave.get_atom_charge(atom_of[i]) << ") with " << (*num_points)[i] << " points." << std::endl;
+		log_grid(i);
 	}
 	if (needs_helper_grids_)
 		grid_data_.total_points = std::accumulate(grid_data_.helper_num_points_per_atom.begin(), grid_data_.helper_num_points_per_atom.end(), 0);
