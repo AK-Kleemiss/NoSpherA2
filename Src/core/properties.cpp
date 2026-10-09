@@ -1290,6 +1290,87 @@ bool is_promolecular_nci_point(
 	return fragment_density >= total_density * fragment_sum_cutoff;
 }
 
+// rho, rho', rho'' of one Thakkar atom on [r0, r0 + n h) as quintic Hermite pieces through the exact rho, rho', rho''
+// at the nodes; rho' and rho'' are the piece's own derivatives
+struct RadialQuintic
+{
+	double r0 = 0.0, inv_h = 0.0;
+	std::vector<std::array<double, 6>> c; // per piece, in t = (r - r_i) / h
+
+	bool eval(const double r, double &rho, double &d1, double &d2) const
+	{
+		const double s = (r - r0) * inv_h;
+		if (!(s >= 0.0) || s >= (double)c.size())
+			return false;
+		const int i = (int)s;
+		const double t = s - i;
+		const std::array<double, 6> &k = c[i];
+		if (std::isnan(k[0]))
+			return false;
+		rho =k[0] + t * (k[1] + t * (k[2] + t * (k[3] + t * (k[4] + t * k[5]))));
+		d1 = (k[1] + t * (2 * k[2] + t * (3 * k[3] + t * (4 * k[4] + t * 5 * k[5])))) * inv_h;
+		d2 = (2 * k[2] + t * (6 * k[3] + t * (12 * k[4] + t * 20 * k[5]))) * inv_h * inv_h;
+		return true;
+	}
+};
+
+// The table on [r0, r1). A piece that strays more than tol * env(r) from the exact rho, rho' or rho'' at t = 1/4, 1/2, 3/4
+// (env: the sup envelope of the RDG pass, sampled every env_dr) is NaN, and atoms there take the Slater sums: Thakkar
+// drops each exponent's term past z r = 46.5, a step no smooth piece follows. h is the step with the fewest NaN pieces;
+// coarse steps fail on truncation, fine ones on rounding, since rho'' comes from differences of rho over h^2
+RadialQuintic make_radial_quintic(const Thakkar &model, const double r0, const double r1, const vec &env, const double env_dr, const double tol)
+{
+	RadialQuintic best;
+	double best_bad = 2.0;
+	for (double h = 0.05; h >= 1E-4; h /= 2)
+	{
+		RadialQuintic q;
+		q.r0 = r0;
+		q.inv_h = 1.0 / h;
+		const int n = (int)std::ceil((r1 - r0) / h);
+		q.c.resize(n);
+		double d1, d2;
+		double f0 = model.get_radial_density(r0, d1, d2), m0 = h * d1, a0 = h * h * d2;
+		int bad = 0;
+		for (int i = 0; i < n; i++)
+		{
+			const double f1 = model.get_radial_density(r0 + (i + 1) * h, d1, d2), m1 = h * d1, a1 = h * h * d2;
+			const double A = f1 - f0 - m0 - a0 / 2, B = m1 - m0 - a0, C = a1 - a0;
+			q.c[i] = { f0, m0, a0 / 2, 10 * A - 4 * B + C / 2, -15 * A + 7 * B - C, 6 * A - 3 * B + C / 2 };
+			f0 = f1, m0 = m1, a0 = a1;
+			for (const double t : { 0.25, 0.5, 0.75 })
+			{
+				const double r = r0 + (i + t) * h, bound = tol * env[std::min((size_t)(r / env_dr), env.size() - 1)];
+				double e1, e2, p, p1, p2;
+				const double e = model.get_radial_density(r, e1, e2);
+				q.eval(r, p, p1, p2);
+				if (!(std::abs(p - e) <= bound && std::abs(p1 - e1) <= bound && std::abs(p2 - e2) <= bound))
+				{
+					q.c[i][0] = std::numeric_limits<double>::quiet_NaN();
+					bad++;
+					break;
+				}
+			}
+		}
+		const double frac = (double)bad / n;
+		if (frac > best_bad)
+			break; // past the bottom
+		if (frac < best_bad)
+			best = std::move(q), best_bad = frac;
+		if (bad == 0)
+			break;
+	}
+	return best;
+}
+
+// Atoms past from[slot] (per element, this block's far radius) are summed from their table instead of the Slater sums
+struct FarAtoms
+{
+	const double *from;
+	const std::vector<int> &slot;
+	const std::vector<RadialQuintic> &tables;
+};
+
 // rho, grad rho and the Hessian of the promolecule at pos, each Thakkar atom's analytic rho', rho''
 // summed through Centred<Thakkar>; replaces the finite-difference stencils on the rho cube, whose
 // error scaled with the grid step and whose edge points were clamped. nearby: indices into atoms, ascending
@@ -1299,7 +1380,8 @@ double promolecular_derivatives_at(
 	const std::vector<int> &nearby,
 	const std::vector<Thakkar> &atom_models,
 	d3 &grad,
-	double *hessian)
+	double *hessian,
+	const FarAtoms *distant = nullptr)
 {
 	double rho = 0.0;
 	grad = { 0.0, 0.0, 0.0 };
@@ -1307,9 +1389,29 @@ double promolecular_derivatives_at(
 	for (const int a : nearby)
 	{
 		const PromolecularAtom &atom = atoms[a];
-		const Centred<Thakkar> source{ atom_models[atom.charge - 1], atom.pos };
 		d3 g;
 		double H[9];
+		if (distant)
+		{
+			// calculate_hessian(Centred<A>) regrouped: grad = rho'/r d, H = (rho'' - rho'/r) d d / r^2 + rho'/r delta
+			const int s = distant->slot[atom.charge - 1];
+			const d3 d{ pos[0] - atom.pos[0], pos[1] - atom.pos[1], pos[2] - atom.pos[2] };
+			const double r = array_length(d);
+			double f, d1, d2;
+			if (r >= distant->from[s] && r > 1E-4 && distant->tables[s].eval(r, f, d1, d2))
+			{
+				const double inv_r = 1.0 / r, a1 = d1 * inv_r, b = (d2 - a1) * inv_r * inv_r;
+				rho += f;
+				for (int i = 0; i < 3; i++)
+				{
+					grad[i] += a1 * d[i];
+					for (int j = 0; j < 3; j++)
+						hessian[3 * i + j] += b * d[i] * d[j] + (i == j ? a1 : 0.0);
+				}
+				continue;
+			}
+		}
+		const Centred<Thakkar> source{ atom_models[atom.charge - 1], atom.pos };
 		rho += calculate_hessian(source, pos, g, H);
 		for (int k = 0; k < 3; k++)
 			grad[k] += g[k];
@@ -1752,6 +1854,31 @@ void promolecular_nci_analysis(
 			const auto it = std::partition_point(envelope[s].begin(), envelope[s].end(), [thr](double v) { return v >= thr; });
 			cut[b * nel + s] = rho_min[b] == inf ? -inf : it == envelope[s].end() ? inf : (it - envelope[s].begin()) * env_dr;
 		}
+	// Past far_from (env < T rho_min, about 86 % of the terms on sucrose) an atom comes from its quintic table, which stays
+	// within 1E-13 / (T N) env of the Slater sums: all N atoms together move each sum by < 1E-13 rho_min
+	constexpr double T = 1E-7;
+	vec far_from(cut.size(), inf);
+	vector<RadialQuintic> tables(nel);
+	for (size_t z = 0; z < slot.size(); z++)
+	{
+		const int s = slot[z];
+		if (s < 0)
+			continue;
+		double lo = inf, hi = 0;
+		for (size_t b = 0; b < rho_min.size(); b++)
+		{
+			if (rho_min[b] == inf)
+				continue;
+			const double thr = T * rho_min[b];
+			const auto it = std::partition_point(envelope[s].begin(), envelope[s].end(), [thr](double v) { return v >= thr; });
+			if (it != envelope[s].end())
+				lo = std::min(lo, far_from[b * nel + s] = (it - envelope[s].begin()) * env_dr);
+			if (cut[b * nel + s] != inf)
+				hi = std::max(hi, cut[b * nel + s]);
+		}
+		if (lo < hi)
+			tables[s] = make_radial_quintic(atom_models[z], lo, hi + 2.0, envelope[s], env_dr, 1E-13 / (T * atoms.size()));
+	}
 	const vector<vector<int>> rdg_atoms = block_atom_lists(rho_cube, B, apos, [&](int b, int a) { return cut[b * nel + slot[atoms[a].charge - 1]]; }, 1);
 	const vector<vector<int>> face_atoms = block_atom_lists(rho_cube, B, apos, [&](int b, int a) { return rho_min[b] == inf ? -inf : reach[a]; }, 1);
 	ProgressBar rdg_progress(rho_cube.get_size(0), 50, "=", " ", "Calculating promolecular RDG");
@@ -1778,7 +1905,9 @@ void promolecular_nci_analysis(
 
 				d3 grad;
 				double hessian[9];
-				const double rho = promolecular_derivatives_at(rho_cube.get_pos(x, y, z), atoms, rdg_atoms[block_of(x, y, z)], atom_models, grad, hessian);
+				const size_t b = block_of(x, y, z);
+				const FarAtoms distant{ &far_from[b * nel], slot, tables };
+				const double rho = promolecular_derivatives_at(rho_cube.get_pos(x, y, z), atoms, rdg_atoms[b], atom_models, grad, hessian, &distant);
 				const double lambda2 = get_lambda_1(hessian);
 				const double signed_rho = lambda2 < 0.0 ? -rho : rho;
 				const double rdg = sanitize_finite(reduced_density_gradient(rho, grad));
@@ -1829,7 +1958,8 @@ void promolecular_nci_analysis(
 			continue;
 		d3 grad;
 		double hessian[9];
-		const double rho = promolecular_derivatives_at(c, atoms, rho_min[b] == inf ? all_atoms : rdg_atoms[b], atom_models, grad, hessian);
+		const FarAtoms distant{ &far_from[b * nel], slot, tables };
+		const double rho = promolecular_derivatives_at(c, atoms, rho_min[b] == inf ? all_atoms : rdg_atoms[b], atom_models, grad, hessian, rho_min[b] == inf ? nullptr : &distant);
 		centre_signed_rho[i] = get_lambda_1(hessian) < 0.0 ? -rho : rho;
 		keep[i] = 1;
 	}
