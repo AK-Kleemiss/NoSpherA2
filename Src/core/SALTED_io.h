@@ -69,11 +69,12 @@ private:
 	// diagnostic whatsoever. Builds already shipped cannot be fixed, but from
 	// here on a file from the future says so instead of quietly dropping a
 	// correction.
-	// VERSION 4 (-salted_fold): PROJW, each projector times its weights, replaces
-	// PROJ, so an older build stops at the missing PROJ instead of misreading it.
-	// VERSION 5 (-salted_fold): the features are folded in as well; ENVW (zeta = 1)
-	// or GENV + FEATL (zeta != 1) replace FEATS, at which an older build stops.
-	static const int SUPPORTED_VERSION = 5;
+	// VERSION 4 (-salted_fold, or SALTED's pack_model.py directly): the weights are
+	// folded into the projector and, where that pays, the features as well. PROJW
+	// (projector times weights), ENVW (zeta = 1) or GENV + FEATL (zeta != 1) replace
+	// PROJ, WEIGH and FEATS, so an older build stops at a missing block instead of
+	// misreading it. Files written 8-9 Oct 2026 say 5 for the same format.
+	static const int SUPPORTED_VERSION = 4;
 	enum DataType { INT32 = 0, FLOAT64 = 1, STRING = 2 };
 
 	std::filesystem::path filepath;

@@ -62,13 +62,6 @@ SALTEDPredictor::SALTEDPredictor(WFN wavy_in, options& opt_in)
 
 	featomic_system = SALTED_Utils::gen_featomic_system(wavy);
 
-	natoms = 0;
-	for (auto a : wavy.get_atoms()) {
-		const std::string atom_symbol = a.get_label();
-		if (std::find(config.species.begin(), config.species.end(), atom_symbol) != config.species.end())
-			natoms++;
-	}//natoms is the number of atoms, that featomic creates a descriptor as a central atom for.
-
 	const auto _t_filter = std::chrono::steady_clock::now();
 	const std::vector<char> use_thakkar = SALTED_Utils::filter_input(wavy, opt_in, config);
 	if (ProgressBar::report_counts)
@@ -330,8 +323,8 @@ vec SALTEDPredictor::merge_predictions()
 }
 
 /// predict() only wants C_n = psi w_n per (species, l), psi = K V with K the kernel between the structure's
-// descriptors p and the model's sparse features F. VERSION 4 folded the weights into the projector,
-// VW = V W^T (PROJW, nmax columns instead of Mcut); VERSION 5 folds the features in as well:
+// descriptors p and the model's sparse features F. VERSION 4 folds the weights into the projector,
+// VW = V W^T (PROJW, nmax columns instead of Mcut), and the features in as well:
 //  zeta = 1:  K = p F^T, so psi W^T = p (VW^T F)^T. ENVW holds VW^T F, nmax x ncut, in place of FEATS and the
 //             projector; the kernel product of the run makes nmax columns, nothing else is left of the model.
 //  zeta != 1: above l = 0, K[(a,m),(M,m')] = k0(a,M) (p F^T)[(a,m),(M,m')] with k0 = (p0 F0^T)^(zeta - 1), so
@@ -340,7 +333,7 @@ vec SALTEDPredictor::merge_predictions()
 //             GENV holds G, Mspe x nmax ncut, from the lambda on where nmax <= 2l + 1, so it is never larger than
 //             the features it replaces and the kernel takes nmax / (2l + 1)^2 of the flops; FEATL and PROJW keep
 //             the lambdas below, l = 0 always (k0 is made from it). V6: features 524 -> 216 MB.
-// Input is an unfolded file or a VERSION 4 one. The sums are plain loops and VW takes one BLAS thread (a
+// Input is an unfolded file or one with PROJW only. salted/pack_model.py writes the same blocks. The sums are plain loops and VW takes one BLAS thread (a
 // threaded GEMM sums in an order set by the thread count), so a file folds the same everywhere. The run ends here
 void fold_salted_file(const std::filesystem::path& in, const std::filesystem::path& out)
 {
@@ -453,12 +446,15 @@ void fold_salted_file(const std::filesystem::path& in, const std::filesystem::pa
 			}
 		}
 	}
+	// As in read_model_data: weights left over mean nmax is not the trained basis'
+	err_checkf(proj_key != "PROJ" || isize == weights.size(), "The model's basis does not fit its weights (" + std::to_string(isize)
+		+ " used, " + std::to_string(weights.size()) + " stored): its BASIS block is not the set it was trained with", std::cout);
 	std::set<std::string> drop{ "FEATS", proj_key };
 	if (file.has_block("WEIGH")) drop.insert("WEIGH");   // in VW now
 	if (zeta1)
-		file.write_with_blocks(out, 5, drop, { { "ENVW", envw } });
+		file.write_with_blocks(out, 4, drop, { { "ENVW", envw } });
 	else
-		file.write_with_blocks(out, 5, drop, { { "FEATL", featl }, { "PROJW", projw }, { "GENV", genv } });
+		file.write_with_blocks(out, 4, drop, { { "FEATL", featl }, { "PROJW", projw }, { "GENV", genv } });
 	std::cout << "Wrote " << out.string() << ": weights and features folded in, "
 			  << (zeta1 ? "zeta = 1, ENVW" : "GENV for" + report) << std::endl;
 }
@@ -476,19 +472,16 @@ void SALTEDPredictor::setup_atomic_environment()
 {
 	SALTED_Utils::set_lmax_nmax(lmax, nmax, *get_model_basis(), config.species);
 
-	atomic_symbols.reserve(natoms);
+	// The element from the nuclear charge, never the atom label: a .wfx names its atoms "O1", "H2", which
+	// matched no species and left nothing to predict. Deuterium is read with Z = 1 and so already arrives as H.
 	for (int i = 0; i < featomic_system.size(); i++)
 	{
-		std::string label = constants::Labels[featomic_system.types()[i]];
-		if (std::find(config.species.begin(), config.species.end(), label) == config.species.end()) continue;
-		// Deuterium is hydrogen for the electron density; without this a joint
-		// X-ray/neutron structure is refused with "Excluded species: D"
-		if (label == "D" || label == "d")
-		{
-			label = "H";
-		}
-		atomic_symbols.emplace_back(label);
+		const std::string label = constants::Labels[featomic_system.types()[i]];
+		if (std::find(config.species.begin(), config.species.end(), label) != config.species.end())
+			atomic_symbols.emplace_back(label);
 	}
+	// The atoms featomic makes a descriptor centre of; counted here, from the same symbols, so the two cannot disagree
+	natoms = static_cast<int>(atomic_symbols.size());
 
 	// Print all Atomic symbols
 	if (debug)
@@ -636,7 +629,10 @@ void SALTEDPredictor::read_model_data() {
 				if (present.count(spe)) weight_offset[k] = isize;
 				isize += dim_it->second[1] * nmax[k];
 			}
-		err_checkf(isize <= weights.size(), "isize + Mcut > weights.size()", std::cout);
+		// The weights run over exactly these blocks; fewer means nmax is not the trained basis'
+		// (an uncontracted-trained model repacked with the contracted set: cc-pvtz-jkfit Br 16,14,12,10,7 vs 14,13,11,9,4)
+		err_checkf(isize == weights.size(), "The model's basis does not fit its weights (" + std::to_string(isize) + " used, "
+			+ std::to_string(weights.size()) + " stored): its BASIS block is not the set it was trained with", std::cout);
 	}
 
 	if (ProgressBar::report_counts)
@@ -935,6 +931,8 @@ vec SALTEDPredictor::predict()
 			const string key = spe + to_string(l);
 			const dMatrix2 &psi = psi_nm[spe_idx][l];
 			const size_t Mcut = psi.extent(1);
+			err_checkf(!projector_folded || Mcut == size_t(nmax[key]),
+				"The folded model holds " + std::to_string(Mcut) + " radial functions for " + key + ", its basis " + std::to_string(nmax[key]), std::cout);
 			for (int n = 0; n < nmax[key]; ++n)
 			{
 				if (projector_folded)
