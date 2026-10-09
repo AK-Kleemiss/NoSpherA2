@@ -65,6 +65,9 @@ struct Dev {
 	double* kvec[2] = { nullptr, nullptr };
 	double* fac[2] = { nullptr, nullptr };
 	double* host_kf[2] = { nullptr, nullptr };
+	//First column of every reflection of the batch, and the end
+	int* col_off[2] = { nullptr, nullptr };
+	int* host_off[2] = { nullptr, nullptr };
 	double* I_re[2] = { nullptr, nullptr };
 	double* I_im[2] = { nullptr, nullptr };
 	double* host_re[2] = { nullptr, nullptr };
@@ -196,31 +199,33 @@ __global__ void table_kernel(const int e0, const int n_rows, const long long tab
 }
 
 //One thread per stored pair and reflection adds up the pair's rows of this chunk, over the
-//symmetry operations, with the per-grid factors. Fixed order and no atomics, so the result
+//reflection's columns, with the per-grid factors. Fixed order and no atomics, so the result
 //does not depend on how the device scheduled the blocks. Neighbouring threads take
 //neighbouring reflections, whose results sit side by side in a row of cres.
+//J f + conj(J) f_inv with A = f + f_inv, B = f - f_inv: Re = re A_re - im B_im, Im = re A_im + im B_re
 template <typename T>
-__global__ void gather_kernel(const int packed, const int n_refl, const int ns, const int n_grids,
+__global__ void gather_kernel(const int packed, const int n_refl, const int* __restrict__ col_off, const int n_grids,
 	const int ncol8, const int e_base, const int* __restrict__ acc_ptr, const int* __restrict__ acc_e,
 	const int* __restrict__ ent_grid, const T* __restrict__ cres,
-	const double* __restrict__ fre, const double* __restrict__ fim,
+	const double* __restrict__ are, const double* __restrict__ aim,
+	const double* __restrict__ bre, const double* __restrict__ bim,
 	double* __restrict__ I_re, double* __restrict__ I_im)
 {
 	const int idx = blockIdx.x * blockDim.x + threadIdx.x;
 	const int r = idx % n_refl, t = idx / n_refl;
 	if (t >= packed) return;
 	const int start = acc_ptr[t], end = acc_ptr[packed + t];
+	const int j0 = col_off[r], j1 = col_off[r + 1];
 	double sre = 0.0, sim = 0.0;
 	for (int k = start; k < end; k++) {
 		const int e = acc_e[k];
 		const T* c = cres + (long long)(e - e_base) * ncol8;
 		const int gi = ent_grid[e];
-		for (int s = 0; s < ns; s++) {
-			const int j = r * ns + s;
+		for (int j = j0; j < j1; j++) {
 			const double re = (double)c[2 * j], im = (double)c[2 * j + 1];
-			const double a = fre[j * n_grids + gi], b = fim[j * n_grids + gi];
-			sre += re * a - im * b;
-			sim += re * b + im * a;
+			const int f = j * n_grids + gi;
+			sre += re * are[f] - im * bim[f];
+			sim += re * aim[f] + im * bre[f];
 		}
 	}
 	I_re[(long long)r * packed + t] += sre;
@@ -244,8 +249,9 @@ void free_impl()
 	gpuFree(d.acc_ptr); gpuFree(d.acc_e);
 	gpuFree(d.phase); gpuFree(d.tab); gpuFree(d.cres); gpuFree(d.gemm_ws);
 	for (int i = 0; i < 2; i++) {
-		gpuFree(d.kvec[i]); gpuFree(d.fac[i]); gpuFree(d.I_re[i]); gpuFree(d.I_im[i]);
+		gpuFree(d.kvec[i]); gpuFree(d.fac[i]); gpuFree(d.col_off[i]); gpuFree(d.I_re[i]); gpuFree(d.I_im[i]);
 		if (d.host_kf[i]) gpuFreeHost(d.host_kf[i]);
+		if (d.host_off[i]) gpuFreeHost(d.host_off[i]);
 		if (d.host_re[i]) gpuFreeHost(d.host_re[i]);
 		if (d.host_im[i]) gpuFreeHost(d.host_im[i]);
 		if (d.done[i]) gpuEventDestroy(d.done[i]);
@@ -423,8 +429,10 @@ bool init_impl(const itensor_gpu_layout& L)
 	const size_t ncomb = (size_t)d.ncol_cap / 2, nI = (size_t)d.batch_max * L.packed;
 	for (int i = 0; i < 2; i++) {
 		GPU_TRY(gpuMalloc(&d.kvec[i], sizeof(double) * 3 * ncomb));
-		GPU_TRY(gpuMalloc(&d.fac[i], sizeof(double) * 2 * ncomb * L.n_grids));
-		GPU_TRY(gpuHostAlloc((void**)&d.host_kf[i], sizeof(double) * ncomb * (3 + 2 * (size_t)L.n_grids)));
+		GPU_TRY(gpuMalloc(&d.fac[i], sizeof(double) * 4 * ncomb * L.n_grids));
+		GPU_TRY(gpuHostAlloc((void**)&d.host_kf[i], sizeof(double) * ncomb * (3 + 4 * (size_t)L.n_grids)));
+		GPU_TRY(gpuMalloc(&d.col_off[i], sizeof(int) * ((size_t)d.batch_max + 1)));
+		GPU_TRY(gpuHostAlloc((void**)&d.host_off[i], sizeof(int) * ((size_t)d.batch_max + 1)));
 		GPU_TRY(gpuMalloc(&d.I_re[i], sizeof(double) * nI));
 		GPU_TRY(gpuMalloc(&d.I_im[i], sizeof(double) * nI));
 		GPU_TRY(gpuHostAlloc((void**)&d.host_re[i], sizeof(double) * nI));
@@ -449,14 +457,14 @@ int batch_impl(const int num_syms)
 }
 
 template <typename T>
-bool submit_impl(const int slot, const int n_refl, const int num_syms,
+bool submit_impl(const int slot, const int n_refl, const int* col_off,
 	const double* kx, const double* ky, const double* kz,
-	const std::complex<double>* factors)
+	const std::complex<double>* factors, const std::complex<double>* factors_inv)
 {
 	Dev<T>& d = g<T>;
 	if (!d.ready || slot < 0 || slot > 1 || n_refl < 1 || n_refl > d.batch_max) return false;
-	const int ncomb = n_refl * num_syms, ncol8 = (2 * ncomb + 7) & ~7;
-	if (ncol8 > d.ncol_cap) return false;
+	const int ncomb = col_off[n_refl], ncol8 = (2 * ncomb + 7) & ~7;
+	if (ncomb < 1 || ncol8 > d.ncol_cap) return false;
 	const size_t nf = (size_t)ncomb * d.n_grids;
 	double* const hk = d.host_kf[slot];
 	double* const hf = hk + 3 * (size_t)ncomb;
@@ -466,11 +474,16 @@ bool submit_impl(const int slot, const int n_refl, const int num_syms,
 		hk[3 * c] = kx[c] * SF_INV_TWO_PI; hk[3 * c + 1] = ky[c] * SF_INV_TWO_PI; hk[3 * c + 2] = kz[c] * SF_INV_TWO_PI;
 	}
 	for (size_t i = 0; i < nf; i++) {
-		hf[i] = factors[i].real();
-		hf[nf + i] = factors[i].imag();
+		const std::complex<double> a = factors[i] + factors_inv[i], b = factors[i] - factors_inv[i];
+		hf[i] = a.real();
+		hf[nf + i] = a.imag();
+		hf[2 * nf + i] = b.real();
+		hf[3 * nf + i] = b.imag();
 	}
+	std::copy(col_off, col_off + n_refl + 1, d.host_off[slot]);
 	GPU_TRY(gpuMemcpyAsync(d.kvec[slot], hk, sizeof(double) * 3 * (size_t)ncomb, gpuMemcpyHostToDevice, 0));
-	GPU_TRY(gpuMemcpyAsync(d.fac[slot], hf, sizeof(double) * 2 * nf, gpuMemcpyHostToDevice, 0));
+	GPU_TRY(gpuMemcpyAsync(d.fac[slot], hf, sizeof(double) * 4 * nf, gpuMemcpyHostToDevice, 0));
+	GPU_TRY(gpuMemcpyAsync(d.col_off[slot], d.host_off[slot], sizeof(int) * ((size_t)n_refl + 1), gpuMemcpyHostToDevice, 0));
 	const long long nI = (long long)n_refl * d.packed;
 	zero_kernel<<<(unsigned int)((nI + 255) / 256), 256>>>(nI, d.I_re[slot], d.I_im[slot]);
 	phase_kernel<T><<<dim3((d.np8_total + 255) / 256, (ncol8 / 2 + phase_run - 1) / phase_run), 256>>>(
@@ -492,9 +505,9 @@ bool submit_impl(const int slot, const int n_refl, const int num_syms,
 				d.cres + (long long)(pc.e0 - ch.e0) * ncol8, ncol8, d.gemm_ws))
 				return false;
 		}
-		gather_kernel<T><<<(unsigned int)((nI + 255) / 256), 256>>>(d.packed, n_refl, num_syms, d.n_grids,
+		gather_kernel<T><<<(unsigned int)((nI + 255) / 256), 256>>>(d.packed, n_refl, d.col_off[slot], d.n_grids,
 			ncol8, ch.e0, d.acc_ptr + (size_t)c * d.packed, d.acc_e, d.ent_grid, d.cres,
-			d.fac[slot], d.fac[slot] + nf, d.I_re[slot], d.I_im[slot]);
+			d.fac[slot], d.fac[slot] + nf, d.fac[slot] + 2 * nf, d.fac[slot] + 3 * nf, d.I_re[slot], d.I_im[slot]);
 	}
 	d.table_ready = true;
 	d.n_refl[slot] = n_refl;
@@ -912,12 +925,12 @@ int itensor_gpu_batch(const int num_syms)
 	return g_fp64 ? batch_impl<double>(num_syms) : batch_impl<float>(num_syms);
 }
 
-bool itensor_gpu_submit(const int slot, const int n_refl, const int num_syms,
+bool itensor_gpu_submit(const int slot, const int n_refl, const int* col_off,
 	const double* kx, const double* ky, const double* kz,
-	const std::complex<double>* factors)
+	const std::complex<double>* factors, const std::complex<double>* factors_inv)
 {
-	return g_fp64 ? submit_impl<double>(slot, n_refl, num_syms, kx, ky, kz, factors)
-				  : submit_impl<float>(slot, n_refl, num_syms, kx, ky, kz, factors);
+	return g_fp64 ? submit_impl<double>(slot, n_refl, col_off, kx, ky, kz, factors, factors_inv)
+				  : submit_impl<float>(slot, n_refl, col_off, kx, ky, kz, factors, factors_inv);
 }
 
 bool itensor_gpu_collect(const int slot, std::complex<double>* I_r, const long long row_stride)

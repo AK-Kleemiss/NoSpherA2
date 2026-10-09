@@ -13,8 +13,9 @@ struct asym_atom {
 	double asym_fact;
 	cdouble anom;
 	bool grown = false;
-	// symmetry operation that generates a grown atom from its asymmetric parent, -1 for the parent itself
-	int sym_op = -1;
+	// grown_by and grown_from are used to track the symmetry operation that generated a grown atom from its asymmetric parent (-1 for asymmetric atoms)
+	int grown_by = -1;
+	int grown_from = -1;
 	double U_iso = 0.0;
 };
 
@@ -40,25 +41,34 @@ private:
 	void convert_to_fracs(std::vector<asym_atom>& atoms, const std::string input_unit);
 	vec apply_symmetry(const vec& pos, const int sym_op);
 	bool check_special(const vec& pos1, const vec& pos2, const double& tolerance = 1e-10);
+	bool check_equal_pos(const vec& pos1, const vec& pos2, const double& tolerance = 1e-10);
 	bool check_identity(const int& sym_op);
 	//static int orbit_copies(const ivec2& atom_links);
 
 	// Subgroup projection for grown structures
-	void project_into_subgroup(ivec& applied_symmetry, hkl_list& hkl_enlarged, const hkl_list& hkl, ivec3& linking_list);
+	void project_into_subgroup(ivec& applied_symmetry, hkl_list& hkl_enlarged, const hkl_list& hkl);
 	int equal_to_concatenation(const int op_a, const int op_b);
 	
 
 public:
 
+	// Sets the symmetry factors for the asymmetric unit
+	void asym_unit_symmetry_factors(std::vector<asym_atom>& asym_atoms);
 	// Subgroup projection for grown structures
 	void set_symmetry_factors(std::vector<asym_atom>& asym_atoms, const ivec3& linking_list, const ivec& applied_symmetry);
-	ivec apply_grown(const hkl_list& hkl, hkl_list& hkl_enlarged, std::vector<asym_atom>& asym_atoms, ivec3& linking_list);
+	ivec apply_grown(const hkl_list& hkl, hkl_list& hkl_enlarged, std::vector<asym_atom>& asym_atoms);
 	// U_iso, dispersion and ADPs of the grown atoms from their parents, the ADPs rotated onto the image
-	void grow_ADPs(std::vector<asym_atom>& asym_atoms, const ivec3& symmetry_linking_list, vec3& ADPs);
+	void grow_ADPs(std::vector<asym_atom>& asym_atoms, vec3& ADPs);
 	// Rotates one atom's U (as read from the CIF), C and D by the rotation of sym_op
 	void rotate_grown_ADPs(vec2& ADPs, const int sym_op) const;
 	// Applies M to the U/C/D tensors of one atom in their Voigt storage: T'_{ij..} = sum_pq.. M_pi M_qj .. T_pq..
 	static void transform_ADPs(vec2& ADPs, const vec2& M);
+	const unsigned int get_num_syms() const { return sym[0][0].size(); }
+	// Whether h1 = -h2
+	static bool check_inversion(const i3& h1, const i3& h2);
+	// Fills inversion_cleaned_hkl with one entry of every inversion related pair in hkl_enlarged; per entry its
+	// index in hkl_enlarged, followed by the index of its inverse when hkl_enlarged has one
+	static ivec2 remove_inv_vectors(const hkl_list& hkl_enlarged, hkl_list& inversion_cleaned_hkl);
 
 
 
@@ -83,8 +93,9 @@ public:
 
 	//void get_asym_atoms(std::vector<asym_atom>& asym_atoms, svec& labels, ivec& atom_type_list, ivec& asym_atom_to_type_list, ivec& asym_atom_list);
 	void grow_asym_atoms(std::vector<asym_atom>& asym_atoms, std::vector<asym_atom>& xyz_atoms);
+	void resolve_internal_symmetry(std::vector<asym_atom>& asym_atoms);
 	void eval_symm(std::vector<asym_atom>& asym_atoms, const int& asymmetric_atoms, ivec3& linking_list);
-	ivec confirm_applied_symmetry(const ivec3& linking_list);
+	ivec confirm_applied_symmetry(const std::vector<asym_atom>& asym_atoms);
 
 	// Retired together with orbit_copies below. A declaration whose definition is commented out
 	// does not fail where it is called, it fails at link time in whichever target calls it - which

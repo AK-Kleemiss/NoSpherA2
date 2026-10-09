@@ -35,7 +35,7 @@
 	F(double, itensor_gpu_issued_flops, (), ()) \
 	F(int, itensor_gpu_batch, (int num_syms), (num_syms)) \
 	F(bool, itensor_gpu_init, (const itensor_gpu_layout& L, sf_precision prec, bool tensor), (L, prec, tensor)) \
-	F(bool, itensor_gpu_submit, (int slot, int n_refl, int num_syms, const double* kx, const double* ky, const double* kz, const std::complex<double>* factors), (slot, n_refl, num_syms, kx, ky, kz, factors)) \
+	F(bool, itensor_gpu_submit, (int slot, int n_refl, const int* col_off, const double* kx, const double* ky, const double* kz, const std::complex<double>* factors, const std::complex<double>* factors_inv), (slot, n_refl, col_off, kx, ky, kz, factors, factors_inv)) \
 	F(bool, itensor_gpu_collect, (int slot, std::complex<double>* I_r, long long row_stride), (slot, I_r, row_stride)) \
 	F(void, itensor_gpu_free, (), ()) \
 	F(bool, itensor_gpu_hold, (const std::complex<float>* I, int nr, int packed), (I, nr, packed)) \

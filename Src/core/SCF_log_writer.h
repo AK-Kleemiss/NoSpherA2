@@ -19,6 +19,8 @@ public:
 	std::ofstream log;
 	values v;
 
+	void WAEmpiRe() { log << WAEmpiRe_message() << std::endl; }
+
 	// The head of the table of one lambda step in SCF.log
 	void start_lambda(const double lambda) {
 		log << "Starting XCW SCF solver with lambda = " << std::fixed << std::setprecision(5) << lambda << "\n";

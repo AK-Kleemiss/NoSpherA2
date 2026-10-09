@@ -54,6 +54,8 @@ struct scatter_data {
 	ivec hkl_mask;
 	hkl_list hkl;
 	hkl_list hkl_enlarged;
+	// hkl_enlarged with one entry of every inversion related pair, see cell::remove_inv_vectors
+	hkl_list inversion_cleaned_hkl;
 	cvec anom_correction;
 };
 

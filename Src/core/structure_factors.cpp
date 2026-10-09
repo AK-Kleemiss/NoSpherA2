@@ -46,8 +46,11 @@ structure_factors::structure_factors(options& opt_in) {
 	model_data.wavelength = opt_in.xcw_settings.wavelength > 0.0 ? opt_in.xcw_settings.wavelength : wavelength_;
 	err_checkf(model_data.ncen > 0, "No atoms were read from " + cif.string() + "! Is there an _atom_site loop with labels, type symbols and fractional coordinates?", std::cout);
 
+	// First step of the symmetry resolution: Calculate the symmetry factors for the asymmetric unit
+	unit_cell.asym_unit_symmetry_factors(asym_atoms);
+
 	{
-		ivec3 symmetry_linking_list;
+		//ivec3 symmetry_linking_list;
 		ivec applied_symmetry;
 		// Handle grown structures
 		std::vector<asym_atom> xyz_atoms;
@@ -58,27 +61,30 @@ structure_factors::structure_factors(options& opt_in) {
 			WFN dummy_wave(xyz_path, opt_in.debug);
 			dummy_wave.read_xyz(xyz_path, std::cout, opt_in.debug);
 			xyz_atoms = dummy_wave.extract_xyz("bohr");
+			// Second step of the symmetry resolution: Grow the asymmetric unit (this will now grow from the complete xyz file since we hope that we can deal with improperly grown structures)
+			// No check for symmetry equivalency is done here anymore
 			unit_cell.grow_asym_atoms(asym_atoms, xyz_atoms);
+			// Third step of the symmetry resolution: Modify the symmetry factors for the grown atoms, leave ungrown atoms untouched, set the symmetry operation that generated the grown atom from its asymmetric parent (grown_by and grown_from)
+			unit_cell.resolve_internal_symmetry(asym_atoms);
 		}
 		/*Generate the symmetry linking list
 		The linking list is ordered like this: Asymmetric atom, list with all atoms, then index of symmetry operation that generated it
 		"diagonal elements" have to have size equivalent to multiplicity, otherwise something broke */
-		unit_cell.eval_symm(asym_atoms, model_data.ncen, symmetry_linking_list);
+		//unit_cell.eval_symm(asym_atoms, model_data.ncen, symmetry_linking_list);
 		model_data.ncen = asym_atoms.size();
 		if (opt_in.xcw_settings.grown) {
-			// Copy U_iso, the dispersion and the ADPs of each grown atom's parent, the ADPs rotated onto the image
-			unit_cell.grow_ADPs(asym_atoms, symmetry_linking_list, ADPs);
-			// Project grown structure into its symmetry subgroup and update everything accordingly
-			applied_symmetry = unit_cell.apply_grown(scatter_data.hkl, scatter_data.hkl_enlarged, asym_atoms, symmetry_linking_list);
+			// Fourth step of the symmetry resolution: Copy U_iso, the dispersion and the ADPs of each grown atom's parent, the ADPs rotated onto the symmetry generated atoms
+			unit_cell.grow_ADPs(asym_atoms, ADPs);
+			// Fifth step of the symmetry resolution: Find fully applied operations and if possible, project the grown structure into its symmetry subgroup and update everything accordingly
+			applied_symmetry = unit_cell.apply_grown(scatter_data.hkl, scatter_data.hkl_enlarged, asym_atoms);
+			// Sixth step of the symmetry resolution: 
 		}
-		// Set the symmetry factors for each atom
-		unit_cell.set_symmetry_factors(asym_atoms, symmetry_linking_list, applied_symmetry);
 		if (std::getenv("NOSPHERA2_DEBUG_ASYMFACT")) { // Flawfinder: ignore
 			std::cerr << "applied_symmetry (deleted):";
 			for (int s : applied_symmetry) std::cerr << " " << s;
 			std::cerr << std::endl << "surviving sym ops: " << unit_cell.get_trans()[0].size() << std::endl;
 			for (size_t i = 0; i < asym_atoms.size(); i++)
-				std::cerr << i << " grown=" << asym_atoms[i].grown << " sym_op=" << asym_atoms[i].sym_op
+				std::cerr << i << " grown=" << asym_atoms[i].grown << " sym_op=" << asym_atoms[i].grown_by
 				<< " asym_fact=" << asym_atoms[i].asym_fact << std::endl;
 			std::cerr << "hkl_enlarged size: " << scatter_data.hkl_enlarged.size() << std::endl;
 		}
@@ -869,6 +875,7 @@ void structure_factors::build_I(const std::vector<ao_data>& ao_data_shells, doub
 	config.debug = opt->debug;
 	config.all_charges = opt->all_charges;
 	GridManager grid_manager(config);
+	// Construct a dummy wavefunction from the asym atoms (needed for grids)
 	WFN dummy_wave;
 	for (int at = 0; at < model_data.ncen; at++) {
 		atom temp_atom;
@@ -878,6 +885,7 @@ void structure_factors::build_I(const std::vector<ao_data>& ao_data_shells, doub
 		temp_atom.set_charge(asym_atoms[at].type);
 		dummy_wave.push_back_atom(temp_atom);
 	}
+	// Load the basis set into the dummy wavefunction
 	std::shared_ptr<BasisSet> basis = BasisSetLibrary::get_basis_set(I_tens.basis_set_name);
 	load_basis_into_WFN(dummy_wave, basis, false, true);
 	dummy_wave.delete_unoccupied_MOs();
@@ -888,8 +896,7 @@ void structure_factors::build_I(const std::vector<ao_data>& ao_data_shells, doub
 	}
 	grid_manager.setup3DGridsForMolecule(dummy_wave, asym_atom_list, needs_grid, unit_cell);
 
-	bool equal = false;
-
+	// Evaluation of density on the grids for grid pruning
 	GridData& GD = grid_manager.getGridData();
 	vec2* grids = grid_manager.getNeedsHelper() ? GD.helper_grids.data() : GD.atomic_grids.data();
 	vec2 d1, d2, d3, weights;
@@ -902,11 +909,64 @@ void structure_factors::build_I(const std::vector<ao_data>& ao_data_shells, doub
 	const int total_points = grid_manager.getTotalGridPoints();
 	std::cout << "Total number of grid points after pruning: " << total_points << std::endl;
 
+	// Precompute the lookup table linking each unique reflection to its symmetry equivalents
 	ivec2 asym_lookup(model_data.nr);
 	for (r = 0; r < model_data.nr; r++) {
 		asym_lookup[r] = generate_asym_lookup(r);
 	}
-	const unsigned int num_syms = asym_lookup[0].size();
+	const unsigned int num_syms = unit_cell.get_num_syms();
+	// The AO values and weights are real, so the grid integral sum_p w_p phi_mu phi_nu exp(i q d_p) of -q is the
+	// conjugate of that of q: only the entries of inversion_cleaned_hkl are integrated
+	const ivec2 inversion_link = unit_cell.remove_inv_vectors(scatter_data.hkl_enlarged, scatter_data.inversion_cleaned_hkl);
+	const bool inversion_screening = scatter_data.inversion_cleaned_hkl.size() != scatter_data.hkl_enlarged.size();
+	ivec clean_of(model_data.nr_enlarged);
+	bvec is_inverse(model_data.nr_enlarged, false);
+	for (int c = 0; c < inversion_link.size(); c++)
+		for (int i = 0; i < inversion_link[c].size(); i++) {
+			clean_of[inversion_link[c][i]] = c;
+			is_inverse[inversion_link[c][i]] = i == 1;
+		}
+	// The integrations of reflection r: with inversion screening one per cleaned entry its k-points land on, carrying
+	// the summed translation phases of the operations landing on the entry and on its inverse; without, one per operation
+	struct k_job { int c; bool self, inv; cdouble t_self, t_inv; };
+	auto make_jobs = [&](const int r, std::vector<k_job>& jobs) {
+		jobs.clear();
+		for (int s = 0; s < static_cast<int>(num_syms); s++) {
+			const int e = asym_lookup[r][s];
+			int j = inversion_screening ? 0 : static_cast<int>(jobs.size());
+			while (j < jobs.size() && jobs[j].c != clean_of[e]) j++;
+			if (j == jobs.size()) jobs.push_back({ clean_of[e], false, false, 0.0, 0.0 });
+			if (is_inverse[e]) {
+				jobs[j].inv = true;
+				jobs[j].t_inv += translation_phase_facts[r][s];
+			}
+			else {
+				jobs[j].self = true;
+				jobs[j].t_self += translation_phase_facts[r][s];
+			}
+		}
+	};
+	// The basis function independent factor of atom grid g at k-point e
+	auto grid_factor = [&](const int g, const int e) {
+		const double asym_fact = asym_atoms[g].asym_fact;
+		const cdouble DW = DW_facts[g][e], ph = phase_facts[g][e];
+		return cdouble(asym_fact * (DW.real() * ph.real() - DW.imag() * ph.imag()),
+			asym_fact * (DW.real() * ph.imag() + DW.imag() * ph.real()));
+	};
+	long long n_integrations = 0;
+	{
+		std::vector<k_job> jobs;
+		for (r = 0; r < model_data.nr; r++) {
+			make_jobs(r, jobs);
+			n_integrations += jobs.size();
+		}
+	}
+	const long long n_runs = static_cast<long long>(model_data.nr) * num_syms;
+	if (inversion_screening && !(opt->no_date)) {
+		const size_t n_inv = scatter_data.hkl_enlarged.size() - scatter_data.inversion_cleaned_hkl.size();
+		std::cout << std::fixed << std::setprecision(2) << "Inversion screening: Screened out " << n_inv << " of " << scatter_data.hkl_enlarged.size()
+			<< " symmetry generated reflections (" << 100.0 * n_inv / scatter_data.hkl_enlarged.size() << "%)" << std::endl;
+	}
 
 	if (std::getenv("NOSPHERA2_DEBUG_LOOKUP")) { // Flawfinder: ignore
 		long long misses = 0, total = 0;
@@ -935,6 +995,7 @@ void structure_factors::build_I(const std::vector<ao_data>& ao_data_shells, doub
 		std::exit(0);
 	}
 
+	// Save the grid positions for each atom in the dummy wavefunction (used for screening)
 	vec2 grid_positions(model_data.ncen);
 	for (int at = 0; at < model_data.ncen; at++) {
 		grid_positions[at] = { dummy_wave.get_atom_pos(at)[0], dummy_wave.get_atom_pos(at)[1], dummy_wave.get_atom_pos(at)[2] };
@@ -953,7 +1014,12 @@ void structure_factors::build_I(const std::vector<ao_data>& ao_data_shells, doub
 			const double mu_type_half = static_cast<double>(mu_type) * 0.5;
 			const double min_mu_type_half_exp = std::exp(-mu_type_half);
 			const double sph_harmonic_max_mu = constants::spherical_harmonic_max(mu_type, ao_data_shells[mu].m);
-			for (nu = mu; nu < model_data.nmo; nu++) {
+			vec N_k_cache(mu_primitives.size());
+			for (int k = 0; k < mu_primitives.size(); k++) {
+				const double k_exp = mu_primitives[k].get_exp();
+				N_k_cache[k] = mu_type == 0 ? sqrt_inv_four_pi : sph_harmonic_max_mu * min_mu_type_half_exp * std::pow(mu_type / k_exp, mu_type_half);
+			}
+			for (nu = mu + 1; nu < model_data.nmo; nu++) {
 				const double dist2 = (ao_data_shells[mu].pos[0] - ao_data_shells[nu].pos[0]) * (ao_data_shells[mu].pos[0] - ao_data_shells[nu].pos[0]) +
 					(ao_data_shells[mu].pos[1] - ao_data_shells[nu].pos[1]) * (ao_data_shells[mu].pos[1] - ao_data_shells[nu].pos[1]) +
 					(ao_data_shells[mu].pos[2] - ao_data_shells[nu].pos[2]) * (ao_data_shells[mu].pos[2] - ao_data_shells[nu].pos[2]);
@@ -965,16 +1031,21 @@ void structure_factors::build_I(const std::vector<ao_data>& ao_data_shells, doub
 				const double nu_type_half = static_cast<double>(nu_type) * 0.5;
 				const double min_nu_type_half_exp = std::exp(-nu_type_half);
 				const double sph_harmonic_max_nu = constants::spherical_harmonic_max(nu_type, ao_data_shells[nu].m);
+				vec N_l_cache(nu_primitives.size());
+				for (int l = 0; l < nu_primitives.size(); l++) {
+					const double l_exp = nu_primitives[l].get_exp();
+					N_l_cache[l] = nu_type == 0 ? sqrt_inv_four_pi : sph_harmonic_max_nu * min_nu_type_half_exp * std::pow(nu_type / l_exp, nu_type_half);
+				}
 				estimate = 0.0;
 				for (int k = 0; k < mu_primitives.size(); k++) {
 					const double k_coef = mu_primitives[k].get_coef();
 					const double k_exp = mu_primitives[k].get_exp();
-					const double N_k = mu_type == 0 ? sqrt_inv_four_pi : sph_harmonic_max_mu * min_mu_type_half_exp * std::pow(mu_type / k_exp, mu_type_half);
+					const double N_k = N_k_cache[k];
 					for (int l = 0; l < nu_primitives.size(); l++) {
 						const double l_coef = nu_primitives[l].get_coef();
 						const double l_exp = nu_primitives[l].get_exp();
 						const double inv_exp_sum = 1.0 / (k_exp + l_exp);
-						const double N_l = nu_type == 0 ? sqrt_inv_four_pi : sph_harmonic_max_nu * min_nu_type_half_exp * std::pow(nu_type / l_exp, nu_type_half);
+						const double N_l = N_l_cache[l];
 						const double combined_coeffs = std::abs(k_coef * l_coef);
 						const double N_kl = N_k * N_l * std::pow(constants::TWO_PI * inv_exp_sum, 1.5);
 						const double gamma = 0.5 * k_exp * l_exp * inv_exp_sum;
@@ -1057,7 +1128,6 @@ void structure_factors::build_I(const std::vector<ao_data>& ao_data_shells, doub
 	}
 
 	// Precompute AO values
-	// add a timer for computation time of AO values
 	std::chrono::high_resolution_clock::time_point start_AOs = std::chrono::high_resolution_clock::now();
 	vec3 mu_vals(model_data.nmo, vec2(n_grids));
 #pragma omp parallel for schedule(dynamic)
@@ -1092,24 +1162,16 @@ void structure_factors::build_I(const std::vector<ao_data>& ao_data_shells, doub
 	std::cout << "AO values calculated for all grids." << std::endl;
 	if (!(opt->no_date))
 		std::cout << "Time taken for AO values computation: " << std::chrono::duration_cast<std::chrono::milliseconds>(end_AOs - start_AOs).count() << " milliseconds." << std::endl;
+
 	//Morton-order every atom grid's points, so that a run of consecutive points is a
-	//compact ball rather than a spherical shell. This is what OCC does
-	//(occ/qm/spatial_grid_hierarchy.h) and what grid-based codes do generally, and the
-	//permutation is the point of it: the grid arrives sorted by radius, so consecutive
-	//points span a whole sphere and every AO reaching any part of it stays active. Measured
-	//on the twisted ethylene at def2-TZVP, cutting the radial bands into chunks without
-	//reordering moved the work by 2.7% and left n_active at 852; the innermost eighth of a
-	//grid, which is compact because its radius is small, needs 370 AOs against 803.
-	//
+	//compact ball rather than a spherical shell.
 	//Work is sum over blocks of n_active^2 * points, so this is quadratic in what it saves.
 	//Sums over points are order independent, so the reordering changes no result.
 	//Compaction and the AO threshold are worth nothing apart and a great deal together:
 	//reordering alone is slower (the blocks shrink and n_active does not), the threshold
 	//alone barely moves the work, and together they are faster with the GooF, energies and
 	//convergence lines identical.
-	//So only reorder when the threshold can actually prune: at -acc 4 cutoff() is 1e-30 and
-	//nothing would be dropped, and paying the compaction cost for that would make asking for
-	//more accuracy slower for no reason.
+	//So only reorder when the threshold can actually prune
 	const double ao_block_threshold = [&] {
 		const char* e = std::getenv("NOSPHERA2_ITENSOR_AO_TOL"); // Flawfinder: ignore
 		if (e) { const double v = std::atof(e); return v >= 0.0 ? v : 0.0; }
@@ -1403,13 +1465,7 @@ void structure_factors::build_I(const std::vector<ao_data>& ao_data_shells, doub
 		const std::array<int, 4> block_bounds{ 0, inner_end, middle_end, points[g] };
 		//A block keeps every AO that is non-zero anywhere in it, and the work is
 		//sum over blocks of n_active^2 * points, so the block's spatial extent is what sets
-		//the cost. Three radial bands make the first one nearly the whole grid: measured on
-		//the twisted ethylene at def2-TZVP, a 7934-point band keeps 803 of 852 AOs while its
-		//innermost eighth needs 370. Cutting the bands into chunks is what OCC does with its
-		//Morton leaves (occ/qm/spatial_grid_hierarchy.h, 128 points a leaf) and what every
-		//grid-based code does for the same reason. The points come radially sorted, so
-		//consecutive chunks are already spatially compact and nothing has to be permuted.
-		//
+		//the cost.
 		//NOSPHERA2_ITENSOR_CHUNK sets the target; 0 restores the three whole bands.
 		const int chunk = [] {
 			const char* e = std::getenv("NOSPHERA2_ITENSOR_CHUNK"); // Flawfinder: ignore
@@ -1427,14 +1483,6 @@ void structure_factors::build_I(const std::vector<ao_data>& ao_data_shells, doub
 		};
 		std::vector<std::pair<int, int>> spans;
 		if (morton_applied) {
-			//The three radial bands are what the point order was for, and after Morton
-			//ordering it is gone: block_bounds comes from upper_bound over the radial
-			//distances, which needs a sorted range and no longer has one. Left in, the
-			//bounds come back arbitrary, a band with end below start is skipped, and its
-			//points drop out of the integration entirely - the structure factors then move
-			//far more than any screening would explain (GooF 3.82 -> 26.34 on the twisted
-			//ethylene, which is how this was found). Cut the grid itself instead: the bands
-			//existed to group points by cutoff regime and a compact chunk does that better.
 			cut(0, points[g], spans);
 		}
 		else {
@@ -1449,13 +1497,6 @@ void structure_factors::build_I(const std::vector<ao_data>& ao_data_shells, doub
 			GridBlock block{ point_start, point_count };
 			for (int local_ao = 0; local_ao < static_cast<int>(active_aos.size()); local_ao++) {
 				const double* full_row = full_ao_values.data() + static_cast<size_t>(local_ao) * points[g];
-				//Not "is it exactly zero" but "does it carry anything here". The values were
-				//only zeroed where the 11-12 bohr cutoff cut them off, so a function whose
-				//value on this block is 1e-40 was counted as active and multiplied at full
-				//cost: n_active stayed at 852 of 852 where the AOs actually carrying more
-				//than 1e-10 numbered 370. Work is n_active^2 * points, so this is quadratic.
-				//What every grid-based code does, and the threshold is the same kind of
-				//number as the 5e-4 the pair screening above already accepts.
 				double largest = 0.0;
 				for (int p = point_start; p < point_end; p++)
 					largest = std::max(largest, std::abs(full_row[p]));
@@ -1474,10 +1515,6 @@ void structure_factors::build_I(const std::vector<ao_data>& ao_data_shells, doub
 			}
 		}
 	}
-	//Said next to "Screened out ... unique pairs of mu, nu", because it is the same kind of
-	//saving measured on the other axis: that one drops pairs whose product cannot reach the
-	//grid, this one drops an AO from a block where it carries nothing. Gated on no_date like
-	//the timing lines, so the reference outputs keep their shape.
 	if (!(opt->no_date) && ao_slots_carrying > 0) {
 		const long long dropped = ao_slots_carrying - ao_slots_kept;
 		std::cout << std::fixed << std::setprecision(2)
@@ -1487,11 +1524,6 @@ void structure_factors::build_I(const std::vector<ao_data>& ao_data_shells, doub
 			<< std::scientific << std::setprecision(0) << ao_block_threshold
 			<< std::fixed << std::setprecision(2) << " on their block\n";
 
-		//The screenings in one number. Each of the lines above counts what it removed on its
-		//own axis - pairs, AO-block entries, whole grids - and none of them says what the
-		//run will actually cost. This does: the I tensor's work is the sum over blocks of
-		//n_active^2 times points, and the same sum with every AO on every point is what it
-		//would be with no screening at all. The ratio is what the GEMMs were spared.
 		double work_done = 0.0, work_unscreened = 0.0;
 		for (int g = 0; g < n_atom_grids; g++)
 			for (const GridBlock& b : grid_blocks[g]) {
@@ -1499,10 +1531,9 @@ void structure_factors::build_I(const std::vector<ao_data>& ao_data_shells, doub
 				work_done += na * na * b.point_count;
 				work_unscreened += static_cast<double>(model_data.nmo) * model_data.nmo * b.point_count;
 			}
-		//Per reflection and symmetry operation the sum is a small number and says nothing;
-		//what the run costs is that times both, so scale it before printing or the figure
-		//reads as a thousandth of the truth.
-		const double runs = static_cast<double>(model_data.nr) * static_cast<double>(num_syms);
+		//Unscreened is every operation of every reflection, screened only the integrations inversion screening leaves
+		const double runs = static_cast<double>(n_runs);
+		work_done *= static_cast<double>(n_integrations) / runs;
 		if (work_done > 0.0)
 			std::cout << std::fixed << std::setprecision(2)
 				<< "I tensor work after all screening: " << (work_done * runs / 1e12)
@@ -1612,8 +1643,7 @@ void structure_factors::build_I(const std::vector<ao_data>& ao_data_shells, doub
 		//real and imaginary halves together. Counted the way the path runs, or the GFLOP/s
 		//row is fiction.
 		if (itensor_on_gpu)
-			itensor_gpu_dense_flops = itensor_gpu_issued_flops()
-				* static_cast<double>(model_data.nr) * static_cast<double>(num_syms);
+			itensor_gpu_dense_flops = itensor_gpu_issued_flops() * static_cast<double>(n_integrations);
 		//Say which processor produced the numbers, and which GEMM: the three do not agree
 		//in the last digits, so a log that does not name one cannot be compared with
 		//another. Gated like the other timing lines so the golden-file tests, which run
@@ -1666,8 +1696,11 @@ void structure_factors::build_I(const std::vector<ao_data>& ao_data_shells, doub
 		const int gpu_batch = itensor_gpu_batch(static_cast<int>(num_syms));
 		cvec blk_gpu;
 		if (I_tens.i_streamed_ || I_tens.i_float_) blk_gpu.assign(static_cast<size_t>(gpu_batch) * I_tens.i_compact_, cdouble{});
+		//A column per integration, at most num_syms per reflection
 		vec kxs(static_cast<size_t>(gpu_batch) * num_syms), kys(kxs.size()), kzs(kxs.size());
-		cvec facs(kxs.size() * n_atom_grids);
+		cvec facs(kxs.size() * n_atom_grids), facs_inv(facs.size());
+		ivec col_off(gpu_batch + 1);
+		std::vector<k_job> jobs_gpu;
 		int done = 0;
 		auto collect_gpu = [&](const int rr0, const int n, const int slot) {
 			if (I_tens.i_streamed_ || I_tens.i_float_) std::fill(blk_gpu.begin(), blk_gpu.end(), cdouble{});
@@ -1700,18 +1733,27 @@ void structure_factors::build_I(const std::vector<ao_data>& ao_data_shells, doub
 			const int rr0 = next_refl.fetch_add(gpu_batch);
 			if (rr0 >= model_data.nr) break;
 			const int n = std::min(gpu_batch, model_data.nr - rr0);
-			for (int r = 0; r < n; r++)
-				for (int sy = 0; sy < static_cast<int>(num_syms); sy++) {
-					const int rr = rr0 + r, c = r * static_cast<int>(num_syms) + sy;
-					kxs[c] = k_pt[0][asym_lookup[rr][sy]];
-					kys[c] = k_pt[1][asym_lookup[rr][sy]];
-					kzs[c] = k_pt[2][asym_lookup[rr][sy]];
-					for (int gg = 0; gg < n_atom_grids; gg++)
-						facs[static_cast<size_t>(c) * n_atom_grids + gg] =
-						asym_atoms[gg].asym_fact * DW_facts[gg][asym_lookup[rr][sy]]
-						* phase_facts[gg][asym_lookup[rr][sy]] * translation_phase_facts[rr][sy];
+			//The integrations of the CPU path: at the cleaned entry, its inverse taking the conjugate
+			int c = 0;
+			for (int r = 0; r < n; r++) {
+				col_off[r] = c;
+				make_jobs(rr0 + r, jobs_gpu);
+				for (int jb = 0; jb < static_cast<int>(jobs_gpu.size()); jb++, c++) {
+					const k_job& job = jobs_gpu[jb];
+					const int idx = inversion_link[job.c][0];
+					const int inv_idx = job.inv ? inversion_link[job.c][1] : idx;
+					kxs[c] = k_pt[0][idx];
+					kys[c] = k_pt[1][idx];
+					kzs[c] = k_pt[2][idx];
+					for (int gg = 0; gg < n_atom_grids; gg++) {
+						const size_t f = static_cast<size_t>(c) * n_atom_grids + gg;
+						facs[f] = job.self ? grid_factor(gg, idx) * job.t_self : cdouble(0.0, 0.0);
+						facs_inv[f] = job.inv ? grid_factor(gg, inv_idx) * job.t_inv : cdouble(0.0, 0.0);
+					}
 				}
-			if (!itensor_gpu_submit(slot, n, static_cast<int>(num_syms), kxs.data(), kys.data(), kzs.data(), facs.data()))
+			}
+			col_off[n] = c;
+			if (!itensor_gpu_submit(slot, n, col_off.data(), kxs.data(), kys.data(), kzs.data(), facs.data(), facs_inv.data()))
 				err_checkf(false, "I tensor GPU evaluation failed", std::cout);
 			if (prev >= 0) collect_gpu(prev, prev_n, slot ^ 1);
 			prev = rr0; prev_n = n;
@@ -1745,8 +1787,8 @@ void structure_factors::build_I(const std::vector<ao_data>& ao_data_shells, doub
 						std::min(screened_tile_size, n_active - col), block.point_count);
 			}
 		}
-	itensor_flops *= static_cast<double>(model_data.nr) * static_cast<double>(num_syms);
-	itensor_unscreened_tile_flops *= static_cast<double>(model_data.nr) * static_cast<double>(num_syms);
+	itensor_flops *= static_cast<double>(n_integrations);
+	itensor_unscreened_tile_flops *= static_cast<double>(n_integrations);
 	if (itensor_on_gpu && throughput::enabled()) {
 		const double screened = itensor_unscreened_tile_flops > 0.0
 			? 100.0 * (1.0 - itensor_flops / itensor_unscreened_tile_flops) : 0.0;
@@ -1762,7 +1804,7 @@ void structure_factors::build_I(const std::vector<ao_data>& ao_data_shells, doub
 		const int cpu_threads = itensor_on_gpu ? std::max(1, omp_get_max_threads() - 1) : omp_get_max_threads();
 #pragma omp parallel num_threads(cpu_threads) reduction(+:skipped_grids)
 		{
-			vec2 single_k_pts(num_syms, vec(3));
+			std::vector<k_job> jobs;
 			vec phase_angles;
 			vec phase_sines;
 			vec phase_cosines;
@@ -1822,18 +1864,21 @@ void structure_factors::build_I(const std::vector<ao_data>& ao_data_shells, doub
 				if (I_tens.i_streamed_ || I_tens.i_float_) std::fill(blk.begin(), blk.end(), cdouble{});
 				cdouble* const I_r = (I_tens.i_streamed_ || I_tens.i_float_) ? blk.data()
 					: I_tens.I.data() + static_cast<size_t>(r) * I_tens.i_compact_;
-				const int* asym_lookup_r = asym_lookup[r].data();
+				make_jobs(r, jobs);
 				// Precompute weighted phase factors for integration
-				for (int syms = 0; syms < num_syms; syms++) {
-					single_k_pts[syms] = { k_pt[0][asym_lookup_r[syms]], k_pt[1][asym_lookup_r[syms]], k_pt[2][asym_lookup_r[syms]] };
-					const int idx = asym_lookup_r[syms];
+				for (int jb = 0; jb < jobs.size(); jb++) {
+					const k_job& job = jobs[jb];
+					// Integrated at the cleaned entry, the operations landing on its inverse take the conjugate
+					const int idx = inversion_link[job.c][0];
+					const int inv_idx = job.inv ? inversion_link[job.c][1] : idx;
+					const double kx = k_pt[0][idx], ky = k_pt[1][idx], kz = k_pt[2][idx];
 					for (int g = 0; g < n_grids; g++) {
 						const int np_g = points[g];
 						double* const angles = phase_angles.data();
 						double* const sines = phase_sines.data();
 						double* const cosines = phase_cosines.data();
 						for (int p = 0; p < points[g]; p++) {
-							angles[p] = single_k_pts[syms][0] * d1[g][p] + single_k_pts[syms][1] * d2[g][p] + single_k_pts[syms][2] * d3[g][p];
+							angles[p] = kx * d1[g][p] + ky * d2[g][p] + kz * d3[g][p];
 						}
 #if defined(__APPLE__)
 						for (int p = 0; p < points[g]; p++) {
@@ -1847,17 +1892,8 @@ void structure_factors::build_I(const std::vector<ao_data>& ao_data_shells, doub
 						for (int p = 0; p < np_g; p++) {
 							phase_g[p] = cdouble(w_g[p] * cosines[p], w_g[p] * sines[p]);
 						}
-						const double asym_fact = asym_atoms[g].asym_fact;
-						const cdouble* DW_fact_g = DW_facts[g].data();
-						const double DW_im = DW_fact_g[idx].imag();
-						const cdouble* phase_fact_g = phase_facts[g].data();
-						const double phase_im = phase_fact_g[idx].imag();
-						const double DW_re = DW_fact_g[idx].real();
-						const double phase_re = phase_fact_g[idx].real();
 						// Precompute basis function independent factors
-						const cdouble grid_factor = cdouble(asym_fact * (DW_re * phase_re - DW_im * phase_im),
-							asym_fact * (DW_re * phase_im + DW_im * phase_re));
-						const cdouble factor = grid_factor * translation_phase_facts[r][syms];
+						const cdouble factor = grid_factor(g, idx) * job.t_self, factor_inv = grid_factor(g, inv_idx) * job.t_inv;
 						// This is where the magic happens
 						for (const GridBlock& block : grid_blocks[g]) {
 							const ivec& active_aos = block.active_aos;
@@ -1888,8 +1924,10 @@ void structure_factors::build_I(const std::vector<ao_data>& ao_data_shells, doub
 										for (int tile_col = first_tile_col; tile_col < tile.col_count; tile_col++) {
 											const int nu = active_aos[tile.col_start + tile_col];
 											const int t = tri_compact[tri_index(mu, nu)];
-											if (t >= 0)
-												I_r[t] += cdouble(crow[2 * tile_col], crow[2 * tile_col + 1]) * factor;
+											if (t < 0) continue;
+											const cdouble v(crow[2 * tile_col], crow[2 * tile_col + 1]);
+											if (job.self) I_r[t] += v * factor;
+											if (job.inv) I_r[t] += std::conj(v) * factor_inv;
 										}
 									}
 								}

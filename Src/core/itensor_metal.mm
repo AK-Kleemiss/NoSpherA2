@@ -99,8 +99,9 @@ kernel void weight_kernel(device const float* ao [[buffer(0)]],
 	wim[e] = v * pim[a.point_base + p];
 }
 
-struct acc_args { uint na, nmo, ldc, aos_off; float fre, fim; };
+struct acc_args { uint na, nmo, ldc, aos_off; float fre, fim, gre, gim; };
 
+//J f + conj(J) f_inv, with (fre, fim) = f + f_inv and (gre, gim) = f - f_inv; without an inverse both are f.
 //C is row-major 2 n_active x n_active: the real rows first, the imaginary ones below. It is
 //symmetric, so only i <= j is read. Distinct (i,j) map to distinct stored indices and the
 //dispatches of one command buffer run in order, so the read-modify-write needs no atomics.
@@ -118,8 +119,8 @@ kernel void accumulate_kernel(device const int* aos [[buffer(0)]],
 	if (t < 0) return;
 	const float re = c[(ulong)j * a.ldc + i];
 	const float im = c[(ulong)(a.na + j) * a.ldc + i];
-	const float2 dre = df_add(two_prod(re, a.fre), two_prod(-im, a.fim));
-	const float2 dim = df_add(two_prod(re, a.fim), two_prod(im, a.fre));
+	const float2 dre = df_add(two_prod(re, a.fre), two_prod(-im, a.gim));
+	const float2 dim = df_add(two_prod(re, a.fim), two_prod(im, a.gre));
 	const float2 sre = df_add(float2(I_re_hi[t], I_re_lo[t]), dre);
 	const float2 sim = df_add(float2(I_im_hi[t], I_im_lo[t]), dim);
 	I_re_hi[t] = sre.x; I_re_lo[t] = sre.y;
@@ -131,7 +132,7 @@ kernel void accumulate_kernel(device const int* aos [[buffer(0)]],
 //layouts reproduce by hand.
 struct phase_args { float kx[2], ky[2], kz[2]; uint32_t n, pad; };
 struct weight_args { uint32_t na, np, ld, point_base; uint64_t ao_off; };
-struct acc_args { uint32_t na, nmo, ldc, aos_off; float fre, fim; };
+struct acc_args { uint32_t na, nmo, ldc, aos_off; float fre, fim, gre, gim; };
 
 inline void split(const double v, float* hi, float* lo)
 {
@@ -357,9 +358,9 @@ bool init_impl(const itensor_gpu_layout& L)
 	return true;
 }
 
-bool submit_impl(const int slot, const int num_syms,
+bool submit_impl(const int slot, const int n_cols,
 	const double* kx, const double* ky, const double* kz,
-	const std::complex<double>* factors)
+	const std::complex<double>* factors, const std::complex<double>* factors_inv)
 {
 	State& s = state();
 	Device& d = device();
@@ -373,7 +374,7 @@ bool submit_impl(const int slot, const int num_syms,
 			[blit endEncoding];
 		}
 		const size_t I_bytes = sizeof(float) * (size_t)s.packed;
-		for (int sy = 0; sy < num_syms; sy++) {
+		for (int sy = 0; sy < n_cols; sy++) {
 			phase_args pa;
 			split(kx[sy] * 0.15915494309189533576888376337251, &pa.kx[0], &pa.kx[1]);
 			split(ky[sy] * 0.15915494309189533576888376337251, &pa.ky[0], &pa.ky[1]);
@@ -395,8 +396,10 @@ bool submit_impl(const int slot, const int num_syms,
 				[enc endEncoding];
 			}
 			for (const Block& blk : s.blocks) {
-				const std::complex<double> f = factors[(size_t)sy * s.n_grids + blk.grid];
-				if (f.real() == 0.0 && f.imag() == 0.0) continue;
+				const std::complex<double> fs = factors[(size_t)sy * s.n_grids + blk.grid];
+				const std::complex<double> fi = factors_inv[(size_t)sy * s.n_grids + blk.grid];
+				const std::complex<double> f = fs + fi, gf = fs - fi;
+				if (fs == 0.0 && fi == 0.0) continue;
 				const size_t half = sizeof(float) * (size_t)blk.na * blk.ld;
 				weight_args wa{ (uint32_t)blk.na, (uint32_t)blk.np, (uint32_t)blk.ld,
 					(uint32_t)(s.grid_off[blk.grid] + blk.point_start), blk.ao_off };
@@ -415,7 +418,7 @@ bool submit_impl(const int slot, const int num_syms,
 				}
 				[blk.gemm encodeToCommandBuffer:cb leftMatrix:blk.W rightMatrix:blk.A resultMatrix:blk.C];
 				acc_args aa{ (uint32_t)blk.na, (uint32_t)s.nmo, (uint32_t)blk.ldc, blk.aos_off,
-					(float)f.real(), (float)f.imag() };
+					(float)f.real(), (float)f.imag(), (float)gf.real(), (float)gf.imag() };
 				{
 					id<MTLComputeCommandEncoder> enc = [cb computeCommandEncoder];
 					[enc setComputePipelineState:d.accumulate];
@@ -485,12 +488,12 @@ bool itensor_gpu_init(const itensor_gpu_layout& L, const sf_precision prec, cons
 //The Metal engine contracts one reflection at a time, so a batch is one reflection here
 int itensor_gpu_batch(const int) { return 1; }
 
-bool itensor_gpu_submit(const int slot, const int n_refl, const int num_syms,
+bool itensor_gpu_submit(const int slot, const int n_refl, const int* col_off,
 	const double* kx, const double* ky, const double* kz,
-	const std::complex<double>* factors)
+	const std::complex<double>* factors, const std::complex<double>* factors_inv)
 {
-	if (n_refl != 1) return false;
-	return submit_impl(slot, num_syms, kx, ky, kz, factors);
+	if (n_refl != 1 || col_off[0] != 0) return false;
+	return submit_impl(slot, col_off[1], kx, ky, kz, factors, factors_inv);
 }
 
 bool itensor_gpu_collect(const int slot, std::complex<double>* I_r, const long long)

@@ -983,4 +983,31 @@ namespace
 		EXPECT_EQ(d.i_tensor_save_path, std::filesystem::path("I_tensor_stream.bin"));
 		EXPECT_EQ(d.i_tensor_max_mb, 2048u);
 	}
+
+	//cell::remove_inv_vectors keeps the first of every inversion related pair in hkl_enlarged's order and
+	//links it to its partner. (-1, -2, 3) and (1, 2, -3) are a pair without either being the inverse
+	//image of (1, 2, 3), which is what images of two different operations look like.
+	TEST(XcwInversionTests, RemoveInvVectorsKeepsOneOfEveryPair)
+	{
+		EXPECT_TRUE(cell::check_inversion({ 1, 2, 3 }, { -1, -2, -3 }));
+		EXPECT_TRUE(cell::check_inversion({ -2, 0, 0 }, { 2, 0, 0 }));
+		EXPECT_FALSE(cell::check_inversion({ 1, 2, 3 }, { 1, 2, 3 }));
+		EXPECT_FALSE(cell::check_inversion({ 1, 2, 3 }, { -1, -2, 3 }));
+
+		//sorted: (-2,0,0) (-1,-2,-3) (-1,-2,3) (0,0,5) (0,1,0) (1,2,-3) (1,2,3) (2,0,0)
+		const hkl_list enlarged = { { 1, 2, 3 }, { -1, -2, -3 }, { 2, 0, 0 }, { -2, 0, 0 }, { 0, 1, 0 }, { -1, -2, 3 }, { 1, 2, -3 }, { 0, 0, 5 } };
+		hkl_list cleaned = { { 9, 9, 9 } };
+		const ivec2 link = cell::remove_inv_vectors(enlarged, cleaned);
+		const ivec2 expected_link = { { 0, 7 }, { 1, 6 }, { 2, 5 }, { 3 }, { 4 } };
+		EXPECT_EQ(link, expected_link);
+		const hkl_list expected_cleaned = { { -2, 0, 0 }, { -1, -2, -3 }, { -1, -2, 3 }, { 0, 0, 5 }, { 0, 1, 0 } };
+		EXPECT_EQ(cleaned, expected_cleaned);
+
+		//nothing to pair: every entry links to itself only, in ascending order
+		const hkl_list acentric = { { 1, 0, 0 }, { 0, 1, 0 }, { 0, 0, 1 }, { 1, 1, 0 } };
+		const ivec2 self_only = cell::remove_inv_vectors(acentric, cleaned);
+		const ivec2 expected_self = { { 0 }, { 1 }, { 2 }, { 3 } };
+		EXPECT_EQ(self_only, expected_self);
+		EXPECT_EQ(cleaned, acentric);
+	}
 }

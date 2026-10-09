@@ -261,6 +261,10 @@ Key core modules live in `Src/core`:
 
 ## Current Validation Notes
 
+As of 2026-10-08, the XCW I tensor integrates only one k-point of every inversion related pair
+(`cell::remove_inv_vectors`, `XcwInversionTests` new); the XCW/cell/P1 filter reports 116 passed, 0 failed,
+and Fe_phen reproduces its reference lambda table in 448 s of I tensor instead of 610 s. See `UNIT_TESTS_STATUS.md`.
+
 As of 2026-10-07, `save <path>` in the XCW settings keeps a streamed I tensor too (the build streams
 into the save file), a tensor read from disk with `save` set throws, and a streamed `read` takes the window the memory
 budget allows instead of 64 reflections; `XcwHaltingReportTests.StreamedTensorIsSavedWhereSaveSays` is new

@@ -47,7 +47,7 @@ bool itensor_gpu_available();
 //last digits, so a run says which one produced its numbers.
 const char* itensor_gpu_gemm_name();
 
-//Flops of the GEMMs the device path issues for one reflection and one symmetry operation,
+//Flops of the GEMMs the device path issues for one column (one grid integration),
 //padding included, so the throughput row counts what ran. Valid after init.
 double itensor_gpu_issued_flops();
 
@@ -60,13 +60,15 @@ int itensor_gpu_batch(int num_syms);
 bool itensor_gpu_init(const itensor_gpu_layout& L, sf_precision prec = sf_precision::FP32,
 	bool tensor = false);
 
-//Submit a batch of reflections to one of two result slots: kx..kz hold n_refl * num_syms
-//scattering vectors, factors n_refl * num_syms * n_grids per-grid prefactors, reflection
-//major. collect() adds the batch into n_refl rows of I_r, row_stride apart, after a later
-//batch has started, so the device-to-host copy overlaps that calculation.
-bool itensor_gpu_submit(int slot, int n_refl, int num_syms,
+//Submit a batch of reflections to one of two result slots. A column is one grid integration
+//J(k): reflection r owns columns col_off[r] .. col_off[r + 1], at most num_syms of them as
+//itensor_gpu_batch counted, kx..kz hold their scattering vectors, and factors and factors_inv
+//col_off[n_refl] * n_grids per-grid prefactors, column major, with which J and its conjugate
+//(the integral of -k) are added. collect() adds the batch into n_refl rows of I_r, row_stride
+//apart, after a later batch has started, so the device-to-host copy overlaps that calculation.
+bool itensor_gpu_submit(int slot, int n_refl, const int* col_off,
 	const double* kx, const double* ky, const double* kz,
-	const std::complex<double>* factors);
+	const std::complex<double>* factors, const std::complex<double>* factors_inv);
 bool itensor_gpu_collect(int slot, std::complex<double>* I_r, long long row_stride);
 
 void itensor_gpu_free();

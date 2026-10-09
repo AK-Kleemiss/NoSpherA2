@@ -772,6 +772,21 @@ std::string NoSpherA2_message(bool no_date)
     return t;
 }
 
+std::string WAEmpiRe_message()
+{
+    std::string t = " _   _   __ __    _____               __ ___  \n";
+    t.append("| | / | / /   |  / ___/_   __  ____ /_/ __ \\___) \n");
+    t.append("| |/  |/ / /| | / /__/  | /  |/ __ \\__/ /_/ / _ \\ \n");
+	t.append("|  / |  / __  |/ /__/ /||//| / /_/ / / __  /  __/ \n");
+	t.append("|_/  |_/_/  |_/____/_/ |_/ |/ .___/_/_/  |_\\___/ \n");
+	t.append("                           /_/				\n");
+    t.append("Wavefunction Augmentation through Emprirical Restraints \n");
+    t.append("is part of the NoSpherA2 project developed by Florian Kleemiss. \n");
+    return t;
+}
+
+
+
 std::string build_date = ("This Executable was built on: " + std::string(__DATE__) + " " + std::string(__TIME__) + "\n");
 
 bool ensure_occ_data_path(const char *argv0)
