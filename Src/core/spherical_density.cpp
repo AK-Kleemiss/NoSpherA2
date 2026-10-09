@@ -630,6 +630,20 @@ double Thakkar::get_interpolated_density_spline(const double &dist) const {
 	return cubic_spline_interpolate_spherical_density(radial_density, radial_dist, radial_second_deriv, dist, lincr, start);
 };
 
+double Thakkar::spline_reach() const {
+	// On [r_k, r_k+1] the spline is at most max(y_k, y_k+1) + 2/(3 sqrt 3) (|y''_k| + |y''_k+1|) h^2 / 6, since
+	// |a^3 - a| <= 2/(3 sqrt 3) on [0, 1]; 0.4 and 0.99E-10 leave room for rounding against the 1E-10 cut
+	for (size_t k = radial_dist.size() - 1; k-- > 0;)
+	{
+		const double h = radial_dist[k + 1] - radial_dist[k];
+		const double bound = std::max(radial_density[k], radial_density[k + 1]) +
+			0.4 * (std::abs(radial_second_deriv[k]) + std::abs(radial_second_deriv[k + 1])) * h * h / 6.0;
+		if (bound >= 0.99E-10)
+			return radial_dist[k + 1];
+	}
+	return radial_dist[0];
+};
+
 MBIS_Atom::MBIS_Atom(const int g_atom_number, const vec &g_sig, const vec &g_pop)
 {
 	sig = g_sig;

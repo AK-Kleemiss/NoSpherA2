@@ -333,6 +333,8 @@ public:
 	// Same table as get_interpolated_density(), but evaluated as a natural cubic
 	// spline (C2-continuous) instead of piecewise-linear.
 	double get_interpolated_density_spline(const double& dist) const;
+	// Past this distance get_interpolated_density_spline() is exactly 0 (its 1E-10 cut), well inside the table end
+	double spline_reach() const;
 };
 
 class MBIS_Atom
