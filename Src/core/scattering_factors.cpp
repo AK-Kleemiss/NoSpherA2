@@ -181,6 +181,13 @@ void make_k_pts(const bool& read_k_pts,
 	}
 }
 
+//header/comment lines carry a letter or bracket; uppercase X Y Z are left out as before.
+//strpbrk instead of the per-line std::regex, which made read_hkl most of rubredoxin's 0.9 s k-point phase (148k lines, i7-7700HQ)
+static bool hkl_text_line(const std::string& line)
+{
+	return std::strpbrk(line.c_str(), "abcdefghijklmnopqrstuvwxyz()ABCDEFGHIJKLMNOPQRSTUVW") != nullptr;
+}
+
 /**
  * Reads the hkl data from the specified file and populates the hkl_list with the data.
  *
@@ -204,7 +211,6 @@ void read_hkl(const std::filesystem::path& hkl_filename,
 	err_checkf(std::filesystem::exists(hkl_filename), "HKL file does not exists!", file);
 	std::ifstream hkl_input(hkl_filename, std::ios::in);
 	hkl_input.seekg(0, hkl_input.beg);
-	std::regex r{ R"([abcdefghijklmnopqrstuvwxyz\(\)ABCDEFGHIJKLMNOPQRSTUVW])" };
 	std::string line, temp;
 	while (!hkl_input.eof())
 	{
@@ -213,8 +219,7 @@ void read_hkl(const std::filesystem::path& hkl_filename,
 			break;
 		if (line.size() < 2)
 			continue;
-		std::cmatch result;
-		if (regex_search(line.c_str(), result, r))
+		if (hkl_text_line(line))
 			continue;
 		err_checkf(line.size() >= 12, "hkl line too short for h k l: '" + line + "'", file);
 		// if (debug) file << "hkl: ";
@@ -275,42 +280,8 @@ void read_hkl(const std::filesystem::path& hkl_filename,
 	else
 		file << "Number of symmetry operations: " << sym[0][0].size() << std::endl;
 
-	i3 tempv;
-	hkl_list hkl_enlarged = hkl;
-	for (int s = 0; s < sym[0][0].size(); s++)
-	{
-		if (sym[0][0][s] == 1 && sym[1][1][s] == 1 && sym[2][2][s] == 1 &&
-			sym[0][1][s] == 0 && sym[0][2][s] == 0 && sym[1][2][s] == 0 &&
-			sym[1][0][s] == 0 && sym[2][0][s] == 0 && sym[2][1][s] == 0)
-		{
-			continue;
-		}
-		for (const i3& hkl__ : hkl)
-		{
-			tempv = { 0, 0, 0 };
-			for (int h = 0; h < 3; h++)
-			{
-				for (int j = 0; j < 3; j++)
-					tempv[j] += hkl__[h] * sym[j][h][s];
-			}
-			hkl_enlarged.emplace(tempv);
-		}
-	}
-
-	for (const i3& hkl__ : hkl_enlarged)
-	{
-		tempv = hkl__;
-		tempv[0] *= -1;
-		tempv[1] *= -1;
-		tempv[2] *= -1;
-		if (hkl_enlarged.find(tempv) != hkl_enlarged.end())
-		{
-			hkl_enlarged.erase(tempv);
-		}
-	}
-	if (unit_cell.get_sym().empty()) {
-		hkl = hkl_enlarged;
-	}
+	//the list stays the file's reflections: a symmetry-enlarged, Friedel-pruned copy used to be built
+	//here and kept only if get_sym() was empty, which it never is (cell always holds its 3 rows)
 	// Remove 0 0 0 if it exists
 	if (hkl.find(i3{ 0, 0, 0 }) != hkl.end())
 		hkl.erase(i3{ 0, 0, 0 });
@@ -332,7 +303,6 @@ hkl_list read_hkl_full(const std::filesystem::path& hkl_filename,
 	err_checkf(std::filesystem::exists(hkl_filename), "HKL file does not exists!", file);
 	std::ifstream hkl_input(hkl_filename, std::ios::in);
 	hkl_input.seekg(0, hkl_input.beg);
-	std::regex r{ R"([abcdefghijklmnopqrstuvwxyz\(\)ABCDEFGHIJKLMNOPQRSTUVW])" };
 	std::string line, temp;
 	//hkl is a set, so it hands the reflections back in (h,k,l) order whatever the file order;
 	//obs has to follow that order, or F_calc[i] meets the wrong observation
@@ -344,8 +314,7 @@ hkl_list read_hkl_full(const std::filesystem::path& hkl_filename,
 			break;
 		if (line.size() < 2)
 			continue;
-		std::cmatch result;
-		if (regex_search(line.c_str(), result, r))
+		if (hkl_text_line(line))
 			continue;
 		err_checkf(line.size() >= 12, "hkl line too short for h k l: '" + line + "'", file);
 		// if (debug) file << "hkl: ";
@@ -1808,6 +1777,8 @@ void calc_SF_SALTED(
 	const int num_asym_atoms = static_cast<int>(asym_atom_list.size());
 	const int nk = static_cast<int>(k_pt[0].size());
 	sf.resize(num_asym_atoms);
+	//in parallel: a whole-sphere table is GBs, and one thread zeroing it page by page left the transform flat in threads
+#pragma omp parallel for schedule(dynamic)
 	for (int ia = 0; ia < num_asym_atoms; ++ia)
 		sf[ia].assign(nk, constants::cnull);
 	std::unique_ptr<ProgressBar> local_pb;
