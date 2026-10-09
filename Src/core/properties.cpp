@@ -1238,12 +1238,14 @@ struct PromolecularAtom {
 	int fragment = 0;
 };
 
-// nearby: indices into atoms, ascending; atoms left out must be past their spline_reach() (exactly 0)
+// nearby: indices into atoms, ascending; atoms left out must be past their spline_reach() (exactly 0).
+// reach2[a]: spline_reach()^2 of atom a, past which it is skipped here too
 PromolecularFragmentDensities promolecular_fragment_densities_at(
 	const d3 &pos,
 	const std::vector<PromolecularAtom> &atoms,
 	const std::vector<int> &nearby,
-	const std::vector<Thakkar> &atom_models)
+	const std::vector<Thakkar> &atom_models,
+	const vec &reach2)
 {
 	PromolecularFragmentDensities result;
 	// atoms are grouped by fragment (add_promolecular_atoms appends whole fragments),
@@ -1259,10 +1261,15 @@ PromolecularFragmentDensities promolecular_fragment_densities_at(
 			fragment_sum = 0.0;
 			current_fragment = atom.fragment;
 		}
+		// the block list holds atoms that reach some point of the block; past spline_reach() this one adds exactly 0
+		const double dx = pos[0] - atom.pos[0], dy = pos[1] - atom.pos[1], dz = pos[2] - atom.pos[2];
+		const double d2 = dx * dx + dy * dy + dz * dz;
+		if (d2 > reach2[a])
+			continue;
 		// Table lookup for the mask pass only; lambda2 and the RDG come from the
 		// analytic Thakkar derivatives in promolecular_derivatives_at(); the exact
 		// Slater sums here cost several times the run for a handful of kept points
-		const double contribution = atom_models[atom.charge - 1].get_interpolated_density_spline(array_length(pos, atom.pos));
+		const double contribution = atom_models[atom.charge - 1].get_interpolated_density_spline(std::sqrt(d2));
 		fragment_sum += contribution;
 		result.sum += contribution;
 	}
@@ -1728,12 +1735,13 @@ void promolecular_nci_analysis(
 	//Per 8^3 block only the atoms within spline_reach(): the rest add exactly 0, in order, so bit-identical
 	constexpr int B = 8;
 	vector<d3> apos(atoms.size());
-	vec reach(atoms.size());
+	vec reach(atoms.size()), reach2(atoms.size());
 	vector<int> all_atoms(atoms.size());
 	for (size_t a = 0; a < atoms.size(); a++)
 	{
 		apos[a] = atoms[a].pos;
 		reach[a] = atom_models[atoms[a].charge - 1].spline_reach();
+		reach2[a] = reach[a] * reach[a];
 		all_atoms[a] = (int)a;
 	}
 	const vector<vector<int>> block_atoms = block_atom_lists(rho_cube, B, apos, [&](int, int a) { return reach[a]; });
@@ -1747,7 +1755,7 @@ void promolecular_nci_analysis(
 			{
 				const d3 pos = rho_cube.get_pos(x, y, z);
 				const vector<int> &nearby = block_atoms[((size_t)(x / B) * nby + y / B) * nbz + z / B];
-				const PromolecularFragmentDensities densities = promolecular_fragment_densities_at(pos, atoms, nearby, atom_models);
+				const PromolecularFragmentDensities densities = promolecular_fragment_densities_at(pos, atoms, nearby, atom_models, reach2);
 				const double rho = densities.total();
 				rho_cube.set_value(x, y, z, rho);
 				rdg_cube.set_value(
@@ -1953,7 +1961,7 @@ void promolecular_nci_analysis(
 			idx[d] = std::clamp((int)std::floor(f), 0, rho_cube.get_size(d) - 1);
 		}
 		const size_t b = block_of(idx[0], idx[1], idx[2]);
-		const PromolecularFragmentDensities densities = promolecular_fragment_densities_at(c, atoms, rho_min[b] == inf ? all_atoms : face_atoms[b], atom_models);
+		const PromolecularFragmentDensities densities = promolecular_fragment_densities_at(c, atoms, rho_min[b] == inf ? all_atoms : face_atoms[b], atom_models, reach2);
 		if (!is_promolecular_nci_point(densities, densities.total(), opts.promol_nci_rcut1, opts.promol_nci_rcut2))
 			continue;
 		d3 grad;
