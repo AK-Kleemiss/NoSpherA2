@@ -120,7 +120,7 @@ private:
 				}                     // mutex released here, before the slow part
 				space_.notify_one();  // a slot freed: a waiting producer may proceed
 
-				block_type::write_tscb_reflection_block(out_, next.idx, next.sf);
+				block_type::write_tscb_reflection_block(out_, next.idx, next.sf, buffer_);
 			}
 		}
 		catch (...)
@@ -134,6 +134,7 @@ private:
 	}
 
 	std::ofstream out_;                     // only the writer thread touches this
+	std::vector<char> buffer_;              // ... and this, the file-order copy of one block
 	std::size_t queue_depth_;               // how many blocks may be resident
 	std::map<std::size_t, item> pending_;   // ordered by id, so order is restored
 	std::size_t next_id_ = 0;               // the id the writer will accept next

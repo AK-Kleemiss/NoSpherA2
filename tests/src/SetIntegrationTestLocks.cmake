@@ -59,6 +59,8 @@ set_tests_properties(
     TomlIntegrationTests.SALTED_write_coefs
     TomlIntegrationTests.SALTED_coef_file
     SALTEDTests.ReadingSALTEDBinaryFile
+    SaltedFchkPredictorTests.PredictWaterMonomer
+    SaltedFchkPredictorTests.FoldedModelPredictsTheSame
     BesselTests.AnalyticFourier
     PROPERTIES
         RESOURCE_LOCK integration_SALTED

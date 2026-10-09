@@ -1,4 +1,5 @@
 #include "salted_gpu.h"
+#include "itensor_gpu.h"
 #include "gpu_backend.h"
 #include <cstdio>
 #include <vector>
@@ -256,7 +257,11 @@ __global__ void equicomb_kernel(const int natoms, const int nrad2, const int llm
 bool salted_gpu_available()
 {
 	int n = 0;
-	return gpuGetDeviceCount(&n) == gpuSuccess && n > 0;
+	if (gpuGetDeviceCount(&n) != gpuSuccess || n <= 0) return false;
+	//Doubles at 1/32 rate over the host's memory bus: the Radeon 780M took 3.67 s for 720 atoms, its 8700G 0.70 s.
+	//Once per process, as the properties query is slow and this is asked per lambda
+	static const bool apu = itensor_gpu_integrated() && sf_gpu_fp64_ratio() > 4;
+	return !apu;
 }
 
 void salted_gpu_clear_cache()

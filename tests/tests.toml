@@ -656,7 +656,7 @@ no_gpu_cublas = ""
 # suite would report two passes having tested one path twice.
 #
 # Both are held to the same CPU reference, which is the point: the f64 kernel agrees to
-# ~1e-14 and the reduced-argument f32 one to ~2e-8, and both are inside what the reference
+# ~1e-14 and the all-f32 one to ~4e-8 of max |F|, and both are inside what the reference
 # comparison accepts. That is the numerical-agreement contract in AGENTS.md, checked.
 
 [sucrose_SF_gpu_fp64]
