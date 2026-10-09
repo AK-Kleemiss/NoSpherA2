@@ -41,6 +41,8 @@ function(nosphera2_enable_optimizations target_name)
                     /Zc:inline
                 >
                 $<$<COMPILE_LANGUAGE:CXX>:/openmp:experimental>
+                # unoptimised objects outgrow the COFF section limit (C1128), as in the vcxprojs' Debug
+                $<$<AND:$<CONFIG:Debug>,$<COMPILE_LANGUAGE:CXX>>:/bigobj>
                 $<$<AND:$<BOOL:${NOSPHERA2_PROFILE_SYMBOLS}>,$<COMPILE_LANGUAGE:CXX>>:/Zi>
         )
         if(NOSPHERA2_PROFILE_SYMBOLS)
