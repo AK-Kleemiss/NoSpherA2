@@ -754,29 +754,27 @@ public:
 		write_tscb_prologue(out, scatterers_, header_, reflection_count);
 	}
 
-	// sf_block is [scatterer][reflection within the block], idx is [dimension][same]
+	// sf_block is [scatterer][reflection within the block], idx is [dimension][same]; buffer is the caller's scratch,
+	// reused across blocks. Filled in place: an insert per value made this transpose slower than the SALTED transform.
 	static void write_tscb_reflection_block(
 		std::ostream& out,
 		const std::vector<std::vector<numtype_index>>& idx,
-		const cvec2& sf_block)
+		const cvec2& sf_block,
+		std::vector<char>& buffer)
 	{
-		const std::size_t n = idx.empty() ? 0 : idx[0].size();
-		std::vector<char> buffer;
-		buffer.reserve(n * (3 * sizeof(numtype_index) + sf_block.size() * sizeof(numtype)) + 64);
-		auto append = [&buffer]<typename T>(const T& value)
-		{
-			static_assert(std::is_trivially_copyable_v<T>);
-			const char *const bytes = reinterpret_cast<const char *>(&value);
-			buffer.insert(buffer.end(), bytes, bytes + sizeof(T));
-		};
+		constexpr std::size_t fs = sizeof(cdouble), head = 3 * sizeof(numtype_index);
+		const std::size_t n = idx.empty() ? 0 : idx[0].size(), rec = head + sf_block.size() * fs;
+		if (buffer.size() < n * rec)
+			buffer.resize(n * rec);
 		for (std::size_t r = 0; r < n; ++r)
 		{
+			char* p = buffer.data() + r * rec;
 			for (std::size_t dimension = 0; dimension < 3; ++dimension)
-				append(idx[dimension][r]);
-			for (const auto& row : sf_block)
-				append(row[r]);
+				std::memcpy(p + dimension * sizeof(numtype_index), &idx[dimension][r], sizeof(numtype_index));
+			for (std::size_t a = 0; a < sf_block.size(); ++a)
+				std::memcpy(p + head + a * fs, &sf_block[a][r], fs);
 		}
-		write_bytes(out, buffer.data(), buffer.size());
+		write_bytes(out, buffer.data(), n * rec);
 	}
 
 	void write_tscb_file(

@@ -171,24 +171,30 @@ void Thakkar::calc_orbs(
 void Thakkar::calc_orbs_deriv(int& nr_ex, int& nr_coef, const double& dist, const int& offset, const int* n_vector,
 	const int lower_m, const int upper_m, double* Orb, double* dOrb, double* ddOrb) const
 {
-	for (int ex = 0; ex < n_vector[atomic_number - 1]; ex++) {
+	for (int ex = 0; ex < n_vector[atomic_number - 1]; ex++, nr_ex++) {
+		const double zz = z[nr_ex], exponent = -zz * dist;
+		if (exponent <= -46.5) {
+			for (int m = lower_m; m < upper_m; m++)
+				nr_coef += occ[offset + m] != 0;
+			continue;
+		}
+		//r^(n-1) exp(-z r): the powers r^(n-1), r^(n-2), r^(n-3), each 0 where its exponent is negative; one exp and one
+		//set of powers per exponent, shared by every occupied orbital of the shell
+		const int nn = n[nr_ex];
+		const double ez = exp(exponent);
+		const double p1 = nn >= 2 ? fast_int_pow(dist, nn - 1) : 1.0;
+		const double p2 = nn >= 3 ? fast_int_pow(dist, nn - 2) : (nn == 2 ? 1.0 : 0.0);
+		const double p3 = nn >= 4 ? fast_int_pow(dist, nn - 3) : (nn == 3 ? 1.0 : 0.0);
+		const double q1 = (nn - 1) * p2 - zz * p1;
+		const double q2 = (nn - 1) * (nn - 2) * p3 - 2 * zz * (nn - 1) * p2 + zz * zz * p1;
 		for (int m = lower_m; m < upper_m; m++) {
 			if (occ[offset + m] == 0) continue;
-			const double zz = z[nr_ex], exponent = -zz * dist;
-			if (exponent > -46.5) {
-				//r^(n-1) exp(-z r): the powers r^(n-1), r^(n-2), r^(n-3), each 0 where its exponent is negative
-				const int nn = n[nr_ex];
-				const double e = c[nr_coef] * exp(exponent);
-				const double p1 = nn >= 2 ? fast_int_pow(dist, nn - 1) : 1.0;
-				const double p2 = nn >= 3 ? fast_int_pow(dist, nn - 2) : (nn == 2 ? 1.0 : 0.0);
-				const double p3 = nn >= 4 ? fast_int_pow(dist, nn - 3) : (nn == 3 ? 1.0 : 0.0);
-				Orb[m] += e * p1;
-				dOrb[m] += e * ((nn - 1) * p2 - zz * p1);
-				ddOrb[m] += e * ((nn - 1) * (nn - 2) * p3 - 2 * zz * (nn - 1) * p2 + zz * zz * p1);
-			}
+			const double e = c[nr_coef] * ez;
+			Orb[m] += e * p1;
+			dOrb[m] += e * q1;
+			ddOrb[m] += e * q2;
 			nr_coef++;
 		}
-		nr_ex++;
 	}
 }
 
@@ -622,6 +628,20 @@ double Thakkar::get_interpolated_density(const double &dist) const {
 
 double Thakkar::get_interpolated_density_spline(const double &dist) const {
 	return cubic_spline_interpolate_spherical_density(radial_density, radial_dist, radial_second_deriv, dist, lincr, start);
+};
+
+double Thakkar::spline_reach() const {
+	// On [r_k, r_k+1] the spline is at most max(y_k, y_k+1) + 2/(3 sqrt 3) (|y''_k| + |y''_k+1|) h^2 / 6, since
+	// |a^3 - a| <= 2/(3 sqrt 3) on [0, 1]; 0.4 and 0.99E-10 leave room for rounding against the 1E-10 cut
+	for (size_t k = radial_dist.size() - 1; k-- > 0;)
+	{
+		const double h = radial_dist[k + 1] - radial_dist[k];
+		const double bound = std::max(radial_density[k], radial_density[k + 1]) +
+			0.4 * (std::abs(radial_second_deriv[k]) + std::abs(radial_second_deriv[k + 1])) * h * h / 6.0;
+		if (bound >= 0.99E-10)
+			return radial_dist[k + 1];
+	}
+	return radial_dist[0];
 };
 
 MBIS_Atom::MBIS_Atom(const int g_atom_number, const vec &g_sig, const vec &g_pop)

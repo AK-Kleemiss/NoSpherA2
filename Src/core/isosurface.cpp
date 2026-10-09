@@ -2,6 +2,7 @@
 #include "cube.h"
 #include "isosurface.h"
 #include <set>
+#include <charconv>
 #include "properties.h"
 #include "citations.h"
 #ifdef NOSPHERA2_USE_GPU
@@ -777,29 +778,29 @@ bool writeColourObj(const std::filesystem::path& filename, std::vector<Triangle>
 
 	file << "mtllib " << mtl_filename << std::endl;
 
-	// 1) Write each triangle’s vertices
-	//    Keep track of how many vertices we’ve written so far
-	//    so we can index them properly in the 'f' lines.
-	//size_t vertexCount = 0;
+	// The lines go through to_chars into a buffer: general format at precision 6 is the "%.6g" a stream's default
+	// prints, byte for byte, without its per-number locale work (13 s per 360k-face mesh on an armv7 tablet)
+	std::string out;
+	char num[32];
+	auto put = [&](const double v) { out.append(num, std::to_chars(num, num + sizeof(num), v, std::chars_format::general, 6).ptr); };
+	auto put_i = [&](const size_t v) { out.append(num, std::to_chars(num, num + sizeof(num), v).ptr); };
+	auto spill = [&]() { if (out.size() > (1 << 20)) file.write(out.data(), out.size()), out.clear(); };
+	// 1) the three vertices of every triangle, "v x y z"
 	for (const auto& tri : triangles) {
-		// "v x y z"
-		file << "v " << tri.get_v(1)[0] << " " << tri.get_v(1)[1] << " " << tri.get_v(1)[2] << "\n";
-		file << "v " << tri.get_v(2)[0] << " " << tri.get_v(2)[1] << " " << tri.get_v(2)[2] << "\n";
-		file << "v " << tri.get_v(3)[0] << " " << tri.get_v(3)[1] << " " << tri.get_v(3)[2] << "\n";
+		for (int k = 1; k <= 3; k++) {
+			out += "v ", put(tri.get_v(k)[0]), out += ' ', put(tri.get_v(k)[1]), out += ' ', put(tri.get_v(k)[2]), out += '\n';
+		}
+		spill();
 	}
 	writeMTL((filename.parent_path() / mtl_filename).string(), triangles);  // next to the obj, not in the cwd
 
-	// 2) Write faces
-	//    Each triangle is 3 vertices, so the i-th triangle’s vertices
-	//    have indices: 3*i+1, 3*i+2, 3*i+3 (1-based)
+	// 2) faces: the i-th triangle's vertices are 3i+1, 3i+2, 3i+3 (1-based), "f index1 index2 index3"
 	for (size_t i = 0; i < triangles.size(); i++) {
-		size_t i1 = 3 * i + 1;
-		size_t i2 = 3 * i + 2;
-		size_t i3 = 3 * i + 3;
-		// "f index1 index2 index3"
-		file << "usemtl " << mtl_name(triangles[i].get_colour()) << "\n";
-		file << "f " << i1 << " " << i2 << " " << i3 << "\n";
+		out += "usemtl ", out += mtl_name(triangles[i].get_colour()), out += "\nf ";
+		put_i(3 * i + 1), out += ' ', put_i(3 * i + 2), out += ' ', put_i(3 * i + 3), out += '\n';
+		spill();
 	}
+	file.write(out.data(), out.size());
 
 	file.close();
 	std::cout << "OBJ file written to " << filename << std::endl;
