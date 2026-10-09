@@ -564,7 +564,7 @@ TEST(SaltedFchkIoTests, BlockReplacedCopy)
 		w.dataset(vec{ 1.5, 2.5, 3.5 }, { 3, 1 });
 		SALTED_BINARY_FILE f(p);
 		f.write_with_blocks(q, 4, { "PROJ" }, { { "PROJW", w.buf } });
-		f.write_with_blocks(r, 5, { "WEIGH", "FEATS" }, {});
+		f.write_with_blocks(r, 4, { "WEIGH", "FEATS" }, {});
 	}
 	{
 		SALTED_BINARY_FILE g(q);
@@ -1312,6 +1312,24 @@ TEST(SaltedFchkPredictorTests, FoldedModelPredictsTheSame)
 			EXPECT_NEAR(b[i], a[i], 1e-10 * big) << "zeta " << zeta << ", coefficient " << i;
 	}
 	std::filesystem::remove_all(dir);
+}
+
+// weights left over mean the BASIS block is not the set the model was trained with (a contracted
+// cc-pvtz-jkfit packed for an uncontracted model): stop instead of misreading them
+TEST(SaltedFchkPredictorTests, BasisNotFittingWeightsExits)
+{
+	const auto extra = tmp_path("extra_weight.salted");
+	{
+		SALTED_BINARY_FILE f(nos_test_repo_root() / "tests" / "SALTED" / "Model" / "model.salted");
+		vec w = f.read_weights();
+		w.push_back(0.0);
+		salted_writer b;
+		b.block_head(1);
+		b.dataset(w, { static_cast<uint32_t>(w.size()) });
+		f.write_with_blocks(extra, 2, { "WEIGH" }, { { "WEIGH", b.buf } });
+	}
+	EXPECT_EXIT(fold_salted_file(extra, tmp_path("extra_weight_folded.salted")), ::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), ".*");
+	std::filesystem::remove(extra);
 }
 
 // ------------------------------------------------------------------ fchk

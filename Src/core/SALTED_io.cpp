@@ -325,6 +325,8 @@ bool SALTED_BINARY_FILE::read_header() {
 	// Read version
 	file.read((char*)&version, sizeof(int));
 	if (debug) std::cout << "File Version: " << version << std::endl;
+	// 5 was the interim number of the folded format, now VERSION 4; those files are the same and still read
+	if (version == 5) version = 4;
 	// Not fatal: the format is additive and read through the table of contents,
 	// so the parts this build knows are still correct. But anything introduced
 	// after SUPPORTED_VERSION is silently absent, and for the VERSION 3 charge
