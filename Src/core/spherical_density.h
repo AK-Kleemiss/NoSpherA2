@@ -445,55 +445,27 @@ protected:
 
 public:
 	Spherical_Gaussian_Density(const int g_atom_number, const int ECP_m = 1) : atomic_number(g_atom_number),
-		ECP_mode(ECP_m),
-		charge(0)
+		ECP_mode(ECP_m), nex(0), z(NULL), c(NULL), charge(0)
 	{
-		int temp_Z;
+		//Table rows: def2 and xTB run Rb..Rn; pTB runs H..La, then Hf..Rn, with no Ce-Lu fits yet, so those get none.
+		//pTB used to be read at Z - 2: every element got its lighter neighbour's fit (C took B's, B none) and from W on
+		//the read ran past the end of the table, which crashed at random (9 Oct 2026)
+		const vec2* tz = NULL, * tc = NULL;
+		int row = -1;
 		switch (ECP_m)
 		{
-		case 2:
-			temp_Z = atomic_number - 2;
-			if (temp_Z < 0) {
-				nex = 0;
-				z = NULL;
-				c = NULL;
-			}
-			else {
-				nex = static_cast<int>(xtb_corrections::c[temp_Z].size());
-				z = xtb_corrections::z[temp_Z].data();
-				c = xtb_corrections::c[temp_Z].data();
-			}
-			break;
+		case 1: tz = &def_corrections::z; tc = &def_corrections::c; row = atomic_number - 37; break;
+		case 2: tz = &xtb_corrections::z; tc = &xtb_corrections::c; row = atomic_number - 37; break;
 		case 3:
-			temp_Z = atomic_number - 2;
-			if (temp_Z < 0) {
-				nex = 0;
-				z = NULL;
-				c = NULL;
-			}
-			else {
-				nex = static_cast<int>(ptb_corrections::c[temp_Z].size());
-				z = ptb_corrections::z[temp_Z].data();
-				c = ptb_corrections::c[temp_Z].data();
-			}
+			tz = &ptb_corrections::z; tc = &ptb_corrections::c;
+			row = atomic_number <= 57 ? atomic_number - 1 : atomic_number >= 72 ? atomic_number - 15 : -1;
 			break;
-		case 1:
-			temp_Z = atomic_number - 37;
-			if (temp_Z < 0) {
-				nex = 0;
-				z = NULL;
-				c = NULL;
-			}
-			else {
-				nex = static_cast<int>(def_corrections::c[temp_Z].size());
-				z = def_corrections::z[temp_Z].data();
-				c = def_corrections::c[temp_Z].data();
-			}
-			break;
-		default:
-			z = NULL;
-			c = NULL;
-			nex = 0;
+		}
+		if (tc != NULL && row >= 0 && row < static_cast<int>(tc->size()))
+		{
+			nex = static_cast<int>((*tc)[row].size());
+			z = (*tz)[row].data();
+			c = (*tc)[row].data();
 		}
 	};
 	Spherical_Gaussian_Density() : c(NULL), nex(0), z(NULL), charge(0), atomic_number(1), ECP_mode(1) {};
