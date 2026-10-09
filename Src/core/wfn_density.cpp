@@ -149,24 +149,310 @@ const double WFN::compute_spin_dens(
 	//}
 };
 
-const double WFN::compute_dens_cartesian(
-	const d3 &Pos,
-	vec2 &d,
-	vec &phi) const
+namespace
 {
-	std::fill(phi.begin(), phi.end(), 0.0);
-	double Rho = 0.0;
-	int j;
-	double ex, *d_;
-
-	// precalculate some distances and powers of distances for faster computation
-	for (j = 0; j < ncen; j++)
+	//The Cartesian monomial x^l y^m z^n of a primitive type, from the powers table d_ of compute_dens_cartesian:
+	//0-2 dx dy dz, 3 r^2, 4-6 squares, 7-9 cubes, 10-12 fourth, 13-15 fifth powers
+	inline double cart_monomial(const int type, const double* d_)
 	{
-		const atom &a = atoms[j];
-		d_ = d[j].data();
-		d_[0] = Pos[0] - a.get_coordinate(0);
-		d_[1] = Pos[1] - a.get_coordinate(1);
-		d_[2] = Pos[2] - a.get_coordinate(2);
+		switch (type)
+		{
+		case 0: return 1.0;
+		case 1: return 1.0;// 0, 0, 0,
+		case 2: return d_[0];// 1, 0, 0,
+		case 3: return d_[1];// 0, 1, 0,
+		case 4: return d_[2];// 0, 0, 1,
+		case 5: return d_[4];// 2, 0, 0,
+		case 6: return d_[5];// 0, 2, 0,
+		case 7: return d_[6];// 0, 0, 2,
+		case 8: return d_[0] * d_[1];// 1, 1, 0,
+		case 9: return d_[0] * d_[2];// 1, 0, 1,
+		case 10: return d_[1] * d_[2];// 0, 1, 1,
+		case 11: return d_[7];// 3, 0, 0,
+		case 12: return d_[8];// 0, 3, 0,
+		case 13: return d_[9];// 0, 0, 3,
+		case 14: return d_[4] * d_[1];// 2, 1, 0,
+		case 15: return d_[4] * d_[2];// 2, 0, 1,
+		case 16: return d_[5] * d_[2];// 0, 2, 1,
+		case 17: return d_[0] * d_[5];// 1, 2, 0,
+		case 18: return d_[0] * d_[6];// 1, 0, 2,
+		case 19: return d_[1] * d_[6];// 0, 1, 2,
+		case 20: return d_[0] * d_[1] * d_[2];// 1, 1, 1,
+		case 21: return d_[12];// 0, 0, 4,
+		case 22: return d_[1] * d_[9];// 0, 1, 3,
+		case 23: return d_[5] * d_[6];// 0, 2, 2,
+		case 24: return d_[8] * d_[2];// 0, 3, 1,
+		case 25: return d_[11];// 0, 4, 0,
+		case 26: return d_[0] * d_[9];// 1, 0, 3,
+		case 27: return d_[0] * d_[1] * d_[6];// 1, 1, 2,
+		case 28: return d_[0] * d_[5] * d_[2];// 1, 2, 1,
+		case 29: return d_[0] * d_[8];// 1, 3, 0,
+		case 30: return d_[4] * d_[6];// 2, 0, 2,
+		case 31: return d_[4] * d_[1] * d_[2];// 2, 1, 1,
+		case 32: return d_[4] * d_[5];// 2, 2, 0,
+		case 33: return d_[7] * d_[2];// 3, 0, 1,
+		case 34: return d_[7] * d_[1];// 3, 1, 0,
+		case 35: return d_[10];// 4, 0, 0,
+		case 36: return d_[15];// 0, 0, 5,
+		case 37: return d_[1] * d_[12];// 0, 1, 4,
+		case 38: return d_[5] * d_[9];// 0, 2, 3,
+		case 39: return d_[8] * d_[6];// 0, 3, 2,
+		case 40: return d_[11] * d_[2];// 0, 4, 1,
+		case 41: return d_[14];// 0, 5, 0,
+		case 42: return d_[0] * d_[12];// 1, 0, 4,
+		case 43: return d_[0] * d_[1] * d_[9];// 1, 1, 3,
+		case 44: return d_[0] * d_[5] * d_[6];// 1, 2, 2,
+		case 45: return d_[0] * d_[8] * d_[2];// 1, 3, 1,
+		case 46: return d_[0] * d_[11];// 1, 4, 0,
+		case 47: return d_[4] * d_[9];// 2, 0, 3,
+		case 48: return d_[4] * d_[1] * d_[6];// 2, 1, 2,
+		case 49: return d_[4] * d_[5] * d_[2];// 2, 2, 1,
+		case 50: return d_[4] * d_[8];// 2, 3, 0,
+		case 51: return d_[7] * d_[6];// 3, 0, 2,
+		case 52: return d_[7] * d_[1] * d_[2];// 3, 1, 1,
+		case 53: return d_[7] * d_[5];// 3, 2, 0,
+		case 54: return d_[10] * d_[2];// 4, 0, 1,
+		case 55: return d_[10] * d_[1];// 4, 1, 0,
+		case 56: return d_[13];// 5, 0, 0,
+		case 57: return d_[15] * d_[2];// 0, 0, 6,
+		case 58: return d_[1] * d_[15];// 0, 1, 5,
+		case 59: return d_[5] * d_[12];// 0, 2, 4,
+		case 60: return d_[8] * d_[9];// 0, 3, 3,
+		case 61: return d_[11] * d_[6];// 0, 4, 2,
+		case 62: return d_[14] * d_[2];// 0, 5, 1,
+		case 63: return d_[14] * d_[1];// 0, 6, 0,
+		case 64: return d_[0] * d_[15];// 1, 0, 5,
+		case 65: return d_[0] * d_[1] * d_[12];// 1, 1, 4,
+		case 66: return d_[0] * d_[5] * d_[9];// 1, 2, 3,
+		case 67: return d_[0] * d_[8] * d_[6];// 1, 3, 2,
+		case 68: return d_[0] * d_[11] * d_[2];// 1, 4, 1,
+		case 69: return d_[0] * d_[14];// 1, 5, 0,
+		case 70: return d_[4] * d_[12];// 2, 0, 4,
+		case 71: return d_[4] * d_[1] * d_[9];// 2, 1, 3,
+		case 72: return d_[4] * d_[5] * d_[6];// 2, 2, 2,
+		case 73: return d_[4] * d_[8] * d_[2];// 2, 3, 1,
+		case 74: return d_[4] * d_[11];// 2, 4, 0,
+		case 75: return d_[7] * d_[9];// 3, 0, 3,
+		case 76: return d_[7] * d_[1] * d_[6];// 3, 1, 2,
+		case 77: return d_[7] * d_[5] * d_[2];// 3, 2, 1,
+		case 78: return d_[7] * d_[8];// 3, 3, 0,
+		case 79: return d_[10] * d_[6];// 4, 0, 2,
+		case 80: return d_[10] * d_[1] * d_[2];// 4, 1, 1,
+		case 81: return d_[10] * d_[5];// 4, 2, 0,
+		case 82: return d_[13] * d_[2];// 5, 0, 1,
+		case 83: return d_[13] * d_[1];// 5, 1, 0,
+		case 84: return d_[13] * d_[0];// 6, 0, 0,
+		case 85: return d_[15] * d_[6];// 0, 0, 7,
+		case 86: return d_[1] * d_[15] * d_[2];// 0, 1, 6,
+		case 87: return d_[5] * d_[15];// 0, 2, 5,
+		case 88: return d_[8] * d_[12];// 0, 3, 4,
+		case 89: return d_[11] * d_[9];// 0, 4, 3,
+		case 90: return d_[14] * d_[6];// 0, 5, 2,
+		case 91: return d_[14] * d_[1] * d_[2];// 0, 6, 1,
+		case 92: return d_[14] * d_[5];// 0, 7, 0,
+		case 93: return d_[0] * d_[15] * d_[2];// 1, 0, 6,
+		case 94: return d_[0] * d_[1] * d_[15];// 1, 1, 5,
+		case 95: return d_[0] * d_[5] * d_[12];// 1, 2, 4,
+		case 96: return d_[0] * d_[8] * d_[9];// 1, 3, 3,
+		case 97: return d_[0] * d_[11] * d_[6];// 1, 4, 2,
+		case 98: return d_[0] * d_[14] * d_[2];// 1, 5, 1,
+		case 99: return d_[0] * d_[14] * d_[1];// 1, 6, 0,
+		case 100: return d_[4] * d_[15];// 2, 0, 5,
+		case 101: return d_[4] * d_[1] * d_[12];// 2, 1, 4,
+		case 102: return d_[4] * d_[5] * d_[9];// 2, 2, 3,
+		case 103: return d_[4] * d_[8] * d_[6];// 2, 3, 2,
+		case 104: return d_[4] * d_[11] * d_[2];// 2, 4, 1,
+		case 105: return d_[4] * d_[14];// 2, 5, 0,
+		case 106: return d_[7] * d_[12];// 3, 0, 4,
+		case 107: return d_[7] * d_[1] * d_[9];// 3, 1, 3,
+		case 108: return d_[7] * d_[5] * d_[6];// 3, 2, 2,
+		case 109: return d_[7] * d_[8] * d_[2];// 3, 3, 1,
+		case 110: return d_[7] * d_[11];// 3, 4, 0,
+		case 111: return d_[10] * d_[9];// 4, 0, 3,
+		case 112: return d_[10] * d_[1] * d_[6];// 4, 1, 2,
+		case 113: return d_[10] * d_[5] * d_[2];// 4, 2, 1,
+		case 114: return d_[10] * d_[8];// 4, 3, 0,
+		case 115: return d_[13] * d_[6];// 5, 0, 2,
+		case 116: return d_[13] * d_[1] * d_[2];// 5, 1, 1,
+		case 117: return d_[13] * d_[5];// 5, 2, 0,
+		case 118: return d_[13] * d_[0] * d_[2];// 6, 0, 1,
+		case 119: return d_[13] * d_[0] * d_[1];// 6, 1, 0,
+		case 120: return d_[13] * d_[4];// 7, 0, 0,
+		case 121: return d_[15] * d_[9];// 0, 0, 8,
+		case 122: return d_[1] * d_[15] * d_[6];// 0, 1, 7,
+		case 123: return d_[5] * d_[15] * d_[2];// 0, 2, 6,
+		case 124: return d_[8] * d_[15];// 0, 3, 5,
+		case 125: return d_[11] * d_[12];// 0, 4, 4,
+		case 126: return d_[14] * d_[9];// 0, 5, 3,
+		case 127: return d_[14] * d_[1] * d_[6];// 0, 6, 2,
+		case 128: return d_[14] * d_[5] * d_[2];// 0, 7, 1,
+		case 129: return d_[14] * d_[8];// 0, 8, 0,
+		case 130: return d_[0] * d_[15] * d_[6];// 1, 0, 7,
+		case 131: return d_[0] * d_[1] * d_[15] * d_[2];// 1, 1, 6,
+		case 132: return d_[0] * d_[5] * d_[15];// 1, 2, 5,
+		case 133: return d_[0] * d_[8] * d_[12];// 1, 3, 4,
+		case 134: return d_[0] * d_[11] * d_[9];// 1, 4, 3,
+		case 135: return d_[0] * d_[14] * d_[6];// 1, 5, 2,
+		case 136: return d_[0] * d_[14] * d_[1] * d_[2];// 1, 6, 1,
+		case 137: return d_[0] * d_[14] * d_[5];// 1, 7, 0,
+		case 138: return d_[4] * d_[15] * d_[2];// 2, 0, 6,
+		case 139: return d_[4] * d_[1] * d_[15];// 2, 1, 5,
+		case 140: return d_[4] * d_[5] * d_[12];// 2, 2, 4,
+		case 141: return d_[4] * d_[8] * d_[9];// 2, 3, 3,
+		case 142: return d_[4] * d_[11] * d_[6];// 2, 4, 2,
+		case 143: return d_[4] * d_[14] * d_[2];// 2, 5, 1,
+		case 144: return d_[4] * d_[14] * d_[1];// 2, 6, 0,
+		case 145: return d_[7] * d_[15];// 3, 0, 5,
+		case 146: return d_[7] * d_[1] * d_[12];// 3, 1, 4,
+		case 147: return d_[7] * d_[5] * d_[9];// 3, 2, 3,
+		case 148: return d_[7] * d_[8] * d_[6];// 3, 3, 2,
+		case 149: return d_[7] * d_[11] * d_[2];// 3, 4, 1,
+		case 150: return d_[7] * d_[14];// 3, 5, 0,
+		case 151: return d_[10] * d_[12];// 4, 0, 4,
+		case 152: return d_[10] * d_[1] * d_[9];// 4, 1, 3,
+		case 153: return d_[10] * d_[5] * d_[6];// 4, 2, 2,
+		case 154: return d_[10] * d_[8] * d_[2];// 4, 3, 1,
+		case 155: return d_[10] * d_[11];// 4, 4, 0,
+		case 156: return d_[13] * d_[9];// 5, 0, 3,
+		case 157: return d_[13] * d_[1] * d_[6];// 5, 1, 2,
+		case 158: return d_[13] * d_[5] * d_[2];// 5, 2, 1,
+		case 159: return d_[13] * d_[8];// 5, 3, 0,
+		case 160: return d_[13] * d_[0] * d_[6];// 6, 0, 2,
+		case 161: return d_[13] * d_[0] * d_[1] * d_[2];// 6, 1, 1,
+		case 162: return d_[13] * d_[0] * d_[5];// 6, 2, 0,
+		case 163: return d_[13] * d_[4] * d_[2];// 7, 0, 1,
+		case 164: return d_[13] * d_[4] * d_[1];// 7, 1, 0,
+		case 165: return d_[13] * d_[7];// 8, 0, 0,
+		case 166: return d_[15] * d_[12];// 0, 0, 9,
+		case 167: return d_[1] * d_[15] * d_[9];// 0, 1, 8,
+		case 168: return d_[5] * d_[15] * d_[6];// 0, 2, 7,
+		case 169: return d_[8] * d_[15] * d_[2];// 0, 3, 6,
+		case 170: return d_[11] * d_[15];// 0, 4, 5,
+		case 171: return d_[14] * d_[12];// 0, 5, 4,
+		case 172: return d_[14] * d_[1] * d_[9];// 0, 6, 3,
+		case 173: return d_[14] * d_[5] * d_[6];// 0, 7, 2,
+		case 174: return d_[14] * d_[8] * d_[2];// 0, 8, 1,
+		case 175: return d_[14] * d_[11];// 0, 9, 0,
+		case 176: return d_[0] * d_[15] * d_[9];// 1, 0, 8,
+		case 177: return d_[0] * d_[1] * d_[15] * d_[6];// 1, 1, 7,
+		case 178: return d_[0] * d_[5] * d_[15] * d_[2];// 1, 2, 6,
+		case 179: return d_[0] * d_[8] * d_[15];// 1, 3, 5,
+		case 180: return d_[0] * d_[11] * d_[12];// 1, 4, 4,
+		case 181: return d_[0] * d_[14] * d_[9];// 1, 5, 3,
+		case 182: return d_[0] * d_[14] * d_[1] * d_[6];// 1, 6, 2,
+		case 183: return d_[0] * d_[14] * d_[5] * d_[2];// 1, 7, 1,
+		case 184: return d_[0] * d_[14] * d_[8];// 1, 8, 0,
+		case 185: return d_[4] * d_[15] * d_[6];// 2, 0, 7,
+		case 186: return d_[4] * d_[1] * d_[15] * d_[2];// 2, 1, 6,
+		case 187: return d_[4] * d_[5] * d_[15];// 2, 2, 5,
+		case 188: return d_[4] * d_[8] * d_[12];// 2, 3, 4,
+		case 189: return d_[4] * d_[11] * d_[9];// 2, 4, 3,
+		case 190: return d_[4] * d_[14] * d_[6];// 2, 5, 2,
+		case 191: return d_[4] * d_[14] * d_[1] * d_[2];// 2, 6, 1,
+		case 192: return d_[4] * d_[14] * d_[5];// 2, 7, 0,
+		case 193: return d_[7] * d_[15] * d_[2];// 3, 0, 6,
+		case 194: return d_[7] * d_[1] * d_[15];// 3, 1, 5,
+		case 195: return d_[7] * d_[5] * d_[12];// 3, 2, 4,
+		case 196: return d_[7] * d_[8] * d_[9];// 3, 3, 3,
+		case 197: return d_[7] * d_[11] * d_[6];// 3, 4, 2,
+		case 198: return d_[7] * d_[14] * d_[2];// 3, 5, 1,
+		case 199: return d_[7] * d_[14] * d_[1];// 3, 6, 0,
+		case 200: return d_[10] * d_[15];// 4, 0, 5,
+		case 201: return d_[10] * d_[1] * d_[12];// 4, 1, 4,
+		case 202: return d_[10] * d_[5] * d_[9];// 4, 2, 3,
+		case 203: return d_[10] * d_[8] * d_[6];// 4, 3, 2,
+		case 204: return d_[10] * d_[11] * d_[2];// 4, 4, 1,
+		case 205: return d_[10] * d_[14];// 4, 5, 0,
+		case 206: return d_[13] * d_[12];// 5, 0, 4,
+		case 207: return d_[13] * d_[1] * d_[9];// 5, 1, 3,
+		case 208: return d_[13] * d_[5] * d_[6];// 5, 2, 2,
+		case 209: return d_[13] * d_[8] * d_[2];// 5, 3, 1,
+		case 210: return d_[13] * d_[11];// 5, 4, 0,
+		case 211: return d_[13] * d_[0] * d_[9];// 6, 0, 3,
+		case 212: return d_[13] * d_[0] * d_[1] * d_[6];// 6, 1, 2,
+		case 213: return d_[13] * d_[0] * d_[5] * d_[2];// 6, 2, 1,
+		case 214: return d_[13] * d_[0] * d_[8];// 6, 3, 0,
+		case 215: return d_[13] * d_[4] * d_[6];// 7, 0, 2,
+		case 216: return d_[13] * d_[4] * d_[1] * d_[2];// 7, 1, 1,
+		case 217: return d_[13] * d_[4] * d_[5];// 7, 2, 0,
+		case 218: return d_[13] * d_[7] * d_[2];// 8, 0, 1,
+		case 219: return d_[13] * d_[7] * d_[1];// 8, 1, 0,
+		case 220: return d_[13] * d_[10];// 9, 0, 0,
+		case 221: return d_[15] * d_[15];// 0, 0, 10,
+		case 222: return d_[1] * d_[15] * d_[12];// 0, 1, 9,
+		case 223: return d_[5] * d_[15] * d_[9];// 0, 2, 8,
+		case 224: return d_[8] * d_[15] * d_[6];// 0, 3, 7,
+		case 225: return d_[11] * d_[15] * d_[2];// 0, 4, 6,
+		case 226: return d_[14] * d_[15];// 0, 5, 5,
+		case 227: return d_[14] * d_[1] * d_[12];// 0, 6, 4,
+		case 228: return d_[14] * d_[5] * d_[9];// 0, 7, 3,
+		case 229: return d_[14] * d_[8] * d_[6];// 0, 8, 2,
+		case 230: return d_[14] * d_[11] * d_[2];// 0, 9, 1,
+		case 231: return d_[14] * d_[14];// 0, 10, 0,
+		case 232: return d_[0] * d_[15] * d_[12];// 1, 0, 9,
+		case 233: return d_[0] * d_[1] * d_[15] * d_[9];// 1, 1, 8,
+		case 234: return d_[0] * d_[5] * d_[15] * d_[6];// 1, 2, 7,
+		case 235: return d_[0] * d_[8] * d_[15] * d_[2];// 1, 3, 6,
+		case 236: return d_[0] * d_[11] * d_[15];// 1, 4, 5,
+		case 237: return d_[0] * d_[14] * d_[12];// 1, 5, 4,
+		case 238: return d_[0] * d_[14] * d_[1] * d_[9];// 1, 6, 3,
+		case 239: return d_[0] * d_[14] * d_[5] * d_[6];// 1, 7, 2,
+		case 240: return d_[0] * d_[14] * d_[8] * d_[2];// 1, 8, 1,
+		case 241: return d_[0] * d_[14] * d_[11];// 1, 9, 0,
+		case 242: return d_[4] * d_[15] * d_[9];// 2, 0, 8,
+		case 243: return d_[4] * d_[1] * d_[15] * d_[6];// 2, 1, 7,
+		case 244: return d_[4] * d_[5] * d_[15] * d_[2];// 2, 2, 6,
+		case 245: return d_[4] * d_[8] * d_[15];// 2, 3, 5,
+		case 246: return d_[4] * d_[11] * d_[12];// 2, 4, 4,
+		case 247: return d_[4] * d_[14] * d_[9];// 2, 5, 3,
+		case 248: return d_[4] * d_[14] * d_[1] * d_[6];// 2, 6, 2,
+		case 249: return d_[4] * d_[14] * d_[5] * d_[2];// 2, 7, 1,
+		case 250: return d_[4] * d_[14] * d_[8];// 2, 8, 0,
+		case 251: return d_[7] * d_[15] * d_[6];// 3, 0, 7,
+		case 252: return d_[7] * d_[1] * d_[15] * d_[2];// 3, 1, 6,
+		case 253: return d_[7] * d_[5] * d_[15];// 3, 2, 5,
+		case 254: return d_[7] * d_[8] * d_[12];// 3, 3, 4,
+		case 255: return d_[7] * d_[11] * d_[9];// 3, 4, 3,
+		case 256: return d_[7] * d_[14] * d_[6];// 3, 5, 2,
+		case 257: return d_[7] * d_[14] * d_[1] * d_[2];// 3, 6, 1,
+		case 258: return d_[7] * d_[14] * d_[5];// 3, 7, 0,
+		case 259: return d_[10] * d_[15] * d_[2];// 4, 0, 6,
+		case 260: return d_[10] * d_[1] * d_[15];// 4, 1, 5,
+		case 261: return d_[10] * d_[5] * d_[12];// 4, 2, 4,
+		case 262: return d_[10] * d_[8] * d_[9];// 4, 3, 3,
+		case 263: return d_[10] * d_[11] * d_[6];// 4, 4, 2,
+		case 264: return d_[10] * d_[14] * d_[2];// 4, 5, 1,
+		case 265: return d_[10] * d_[14] * d_[1];// 4, 6, 0,
+		case 266: return d_[13] * d_[15];// 5, 0, 5,
+		case 267: return d_[13] * d_[1] * d_[12];// 5, 1, 4,
+		case 268: return d_[13] * d_[5] * d_[9];// 5, 2, 3,
+		case 269: return d_[13] * d_[8] * d_[6];// 5, 3, 2,
+		case 270: return d_[13] * d_[11] * d_[2];// 5, 4, 1,
+		case 271: return d_[13] * d_[14];// 5, 5, 0,
+		case 272: return d_[13] * d_[0] * d_[12];// 6, 0, 4,
+		case 273: return d_[13] * d_[0] * d_[1] * d_[9];// 6, 1, 3,
+		case 274: return d_[13] * d_[0] * d_[5] * d_[6];// 6, 2, 2,
+		case 275: return d_[13] * d_[0] * d_[8] * d_[2];// 6, 3, 1,
+		case 276: return d_[13] * d_[0] * d_[11];// 6, 4, 0,
+		case 277: return d_[13] * d_[4] * d_[9];// 7, 0, 3,
+		case 278: return d_[13] * d_[4] * d_[1] * d_[6];// 7, 1, 2,
+		case 279: return d_[13] * d_[4] * d_[5] * d_[2];// 7, 2, 1,
+		case 280: return d_[13] * d_[4] * d_[8];// 7, 3, 0,
+		case 281: return d_[13] * d_[7] * d_[6];// 8, 0, 2,
+		case 282: return d_[13] * d_[7] * d_[1] * d_[2];// 8, 1, 1,
+		case 283: return d_[13] * d_[7] * d_[5];// 8, 2, 0,
+		case 284: return d_[13] * d_[10] * d_[2];// 9, 0, 1,
+		case 285: return d_[13] * d_[10] * d_[1];// 9, 1, 0,
+		case 286: return d_[13] * d_[13];// 10, 0, 0,
+		default: return 1.0;
+		}
+	}
+	//The table cart_monomial reads, for the point Pos relative to the centre c
+	inline void cart_powers(double* d_, const d3& Pos, const atom& c)
+	{
+		d_[0] = Pos[0] - c.get_coordinate(0);
+		d_[1] = Pos[1] - c.get_coordinate(1);
+		d_[2] = Pos[2] - c.get_coordinate(2);
 		d_[4] = d_[0] * d_[0];
 		d_[5] = d_[1] * d_[1];
 		d_[6] = d_[2] * d_[2];
@@ -181,6 +467,21 @@ const double WFN::compute_dens_cartesian(
 		d_[14] = d_[1] * d_[11];
 		d_[15] = d_[2] * d_[12];
 	}
+}
+
+const double WFN::compute_dens_cartesian(
+	const d3 &Pos,
+	vec2 &d,
+	vec &phi) const
+{
+	std::fill(phi.begin(), phi.end(), 0.0);
+	double Rho = 0.0;
+	int j;
+	double ex, *d_;
+
+	// precalculate some distances and powers of distances for faster computation
+	for (j = 0; j < ncen; j++)
+		cart_powers(d[j].data(), Pos, atoms[j]);
 
 	// Pre-cache frequently accessed data
 	const int *centers_data = centers.data();
@@ -205,297 +506,7 @@ const double WFN::compute_dens_cartesian(
 			continue;
 		}
 		d_ = d[centers_data[j] - 1].data();
-		switch (types_data[j])
-		{
-		case 0:  break;
-		case 1:  break;// 0, 0, 0,
-		case 2:  ex *= d_[0]; break;// 1, 0, 0,
-		case 3:  ex *= d_[1]; break;// 0, 1, 0,
-		case 4:  ex *= d_[2]; break;// 0, 0, 1,
-		case 5:  ex *= d_[4]; break;// 2, 0, 0,
-		case 6:  ex *= d_[5]; break;// 0, 2, 0,
-		case 7:  ex *= d_[6]; break;// 0, 0, 2,
-		case 8:  ex *= d_[0] * d_[1]; break;// 1, 1, 0,
-		case 9:  ex *= d_[0] * d_[2]; break;// 1, 0, 1,
-		case 10: ex *= d_[1] * d_[2]; break;// 0, 1, 1,
-		case 11: ex *= d_[7]; break;// 3, 0, 0,
-		case 12: ex *= d_[8]; break;// 0, 3, 0,
-		case 13: ex *= d_[9]; break;// 0, 0, 3,
-		case 14: ex *= d_[4] * d_[1]; break;// 2, 1, 0,
-		case 15: ex *= d_[4] * d_[2]; break;// 2, 0, 1,
-		case 16: ex *= d_[5] * d_[2]; break;// 0, 2, 1,
-		case 17: ex *= d_[0] * d_[5]; break;// 1, 2, 0,
-		case 18: ex *= d_[0] * d_[6]; break;// 1, 0, 2,
-		case 19: ex *= d_[1] * d_[6]; break;// 0, 1, 2,
-		case 20: ex *= d_[0] * d_[1] * d_[2]; break;// 1, 1, 1,
-		case 21: ex *= d_[12]; break;// 0, 0, 4,
-		case 22: ex *= d_[1] * d_[9]; break;// 0, 1, 3,
-		case 23: ex *= d_[5] * d_[6]; break;// 0, 2, 2,
-		case 24: ex *= d_[8] * d_[2]; break;// 0, 3, 1,
-		case 25: ex *= d_[11]; break;// 0, 4, 0,
-		case 26: ex *= d_[0] * d_[9]; break;// 1, 0, 3,
-		case 27: ex *= d_[0] * d_[1] * d_[6]; break;// 1, 1, 2,
-		case 28: ex *= d_[0] * d_[5] * d_[2]; break;// 1, 2, 1,
-		case 29: ex *= d_[0] * d_[8]; break;// 1, 3, 0,
-		case 30: ex *= d_[4] * d_[6]; break;// 2, 0, 2,
-		case 31: ex *= d_[4] * d_[1] * d_[2]; break;// 2, 1, 1,
-		case 32: ex *= d_[4] * d_[5]; break;// 2, 2, 0,
-		case 33: ex *= d_[7] * d_[2]; break;// 3, 0, 1,
-		case 34: ex *= d_[7] * d_[1]; break;// 3, 1, 0,
-		case 35: ex *= d_[10]; break;// 4, 0, 0,
-		case 36: ex *= d_[15]; break;// 0, 0, 5,
-		case 37: ex *= d_[1] * d_[12]; break;// 0, 1, 4,
-		case 38: ex *= d_[5] * d_[9]; break;// 0, 2, 3,
-		case 39: ex *= d_[8] * d_[6]; break;// 0, 3, 2,
-		case 40: ex *= d_[11] * d_[2]; break;// 0, 4, 1,
-		case 41: ex *= d_[14]; break;// 0, 5, 0,
-		case 42: ex *= d_[0] * d_[12]; break;// 1, 0, 4,
-		case 43: ex *= d_[0] * d_[1] * d_[9]; break;// 1, 1, 3,
-		case 44: ex *= d_[0] * d_[5] * d_[6]; break;// 1, 2, 2,
-		case 45: ex *= d_[0] * d_[8] * d_[2]; break;// 1, 3, 1,
-		case 46: ex *= d_[0] * d_[11]; break;// 1, 4, 0,
-		case 47: ex *= d_[4] * d_[9]; break;// 2, 0, 3,
-		case 48: ex *= d_[4] * d_[1] * d_[6]; break;// 2, 1, 2,
-		case 49: ex *= d_[4] * d_[5] * d_[2]; break;// 2, 2, 1,
-		case 50: ex *= d_[4] * d_[8]; break;// 2, 3, 0,
-		case 51: ex *= d_[7] * d_[6]; break;// 3, 0, 2,
-		case 52: ex *= d_[7] * d_[1] * d_[2]; break;// 3, 1, 1,
-		case 53: ex *= d_[7] * d_[5]; break;// 3, 2, 0,
-		case 54: ex *= d_[10] * d_[2]; break;// 4, 0, 1,
-		case 55: ex *= d_[10] * d_[1]; break;// 4, 1, 0,
-		case 56: ex *= d_[13]; break;// 5, 0, 0,
-		case 57: ex *= d_[15] * d_[2]; break;// 0, 0, 6,
-		case 58: ex *= d_[1] * d_[15]; break;// 0, 1, 5,
-		case 59: ex *= d_[5] * d_[12]; break;// 0, 2, 4,
-		case 60: ex *= d_[8] * d_[9]; break;// 0, 3, 3,
-		case 61: ex *= d_[11] * d_[6]; break;// 0, 4, 2,
-		case 62: ex *= d_[14] * d_[2]; break;// 0, 5, 1,
-		case 63: ex *= d_[14] * d_[1]; break;// 0, 6, 0,
-		case 64: ex *= d_[0] * d_[15]; break;// 1, 0, 5,
-		case 65: ex *= d_[0] * d_[1] * d_[12]; break;// 1, 1, 4,
-		case 66: ex *= d_[0] * d_[5] * d_[9]; break;// 1, 2, 3,
-		case 67: ex *= d_[0] * d_[8] * d_[6]; break;// 1, 3, 2,
-		case 68: ex *= d_[0] * d_[11] * d_[2]; break;// 1, 4, 1,
-		case 69: ex *= d_[0] * d_[14]; break;// 1, 5, 0,
-		case 70: ex *= d_[4] * d_[12]; break;// 2, 0, 4,
-		case 71: ex *= d_[4] * d_[1] * d_[9]; break;// 2, 1, 3,
-		case 72: ex *= d_[4] * d_[5] * d_[6]; break;// 2, 2, 2,
-		case 73: ex *= d_[4] * d_[8] * d_[2]; break;// 2, 3, 1,
-		case 74: ex *= d_[4] * d_[11]; break;// 2, 4, 0,
-		case 75: ex *= d_[7] * d_[9]; break;// 3, 0, 3,
-		case 76: ex *= d_[7] * d_[1] * d_[6]; break;// 3, 1, 2,
-		case 77: ex *= d_[7] * d_[5] * d_[2]; break;// 3, 2, 1,
-		case 78: ex *= d_[7] * d_[8]; break;// 3, 3, 0,
-		case 79: ex *= d_[10] * d_[6]; break;// 4, 0, 2,
-		case 80: ex *= d_[10] * d_[1] * d_[2]; break;// 4, 1, 1,
-		case 81: ex *= d_[10] * d_[5]; break;// 4, 2, 0,
-		case 82: ex *= d_[13] * d_[2]; break;// 5, 0, 1,
-		case 83: ex *= d_[13] * d_[1]; break;// 5, 1, 0,
-		case 84: ex *= d_[13] * d_[0]; break;// 6, 0, 0,
-		case 85: ex *= d_[15] * d_[6]; break;// 0, 0, 7,
-		case 86: ex *= d_[1] * d_[15] * d_[2]; break;// 0, 1, 6,
-		case 87: ex *= d_[5] * d_[15]; break;// 0, 2, 5,
-		case 88: ex *= d_[8] * d_[12]; break;// 0, 3, 4,
-		case 89: ex *= d_[11] * d_[9]; break;// 0, 4, 3,
-		case 90: ex *= d_[14] * d_[6]; break;// 0, 5, 2,
-		case 91: ex *= d_[14] * d_[1] * d_[2]; break;// 0, 6, 1,
-		case 92: ex *= d_[14] * d_[5]; break;// 0, 7, 0,
-		case 93: ex *= d_[0] * d_[15] * d_[2]; break;// 1, 0, 6,
-		case 94: ex *= d_[0] * d_[1] * d_[15]; break;// 1, 1, 5,
-		case 95: ex *= d_[0] * d_[5] * d_[12]; break;// 1, 2, 4,
-		case 96: ex *= d_[0] * d_[8] * d_[9]; break;// 1, 3, 3,
-		case 97: ex *= d_[0] * d_[11] * d_[6]; break;// 1, 4, 2,
-		case 98: ex *= d_[0] * d_[14] * d_[2]; break;// 1, 5, 1,
-		case 99: ex *= d_[0] * d_[14] * d_[1]; break;// 1, 6, 0,
-		case 100: ex *= d_[4] * d_[15]; break;// 2, 0, 5,
-		case 101: ex *= d_[4] * d_[1] * d_[12]; break;// 2, 1, 4,
-		case 102: ex *= d_[4] * d_[5] * d_[9]; break;// 2, 2, 3,
-		case 103: ex *= d_[4] * d_[8] * d_[6]; break;// 2, 3, 2,
-		case 104: ex *= d_[4] * d_[11] * d_[2]; break;// 2, 4, 1,
-		case 105: ex *= d_[4] * d_[14]; break;// 2, 5, 0,
-		case 106: ex *= d_[7] * d_[12]; break;// 3, 0, 4,
-		case 107: ex *= d_[7] * d_[1] * d_[9]; break;// 3, 1, 3,
-		case 108: ex *= d_[7] * d_[5] * d_[6]; break;// 3, 2, 2,
-		case 109: ex *= d_[7] * d_[8] * d_[2]; break;// 3, 3, 1,
-		case 110: ex *= d_[7] * d_[11]; break;// 3, 4, 0,
-		case 111: ex *= d_[10] * d_[9]; break;// 4, 0, 3,
-		case 112: ex *= d_[10] * d_[1] * d_[6]; break;// 4, 1, 2,
-		case 113: ex *= d_[10] * d_[5] * d_[2]; break;// 4, 2, 1,
-		case 114: ex *= d_[10] * d_[8]; break;// 4, 3, 0,
-		case 115: ex *= d_[13] * d_[6]; break;// 5, 0, 2,
-		case 116: ex *= d_[13] * d_[1] * d_[2]; break;// 5, 1, 1,
-		case 117: ex *= d_[13] * d_[5]; break;// 5, 2, 0,
-		case 118: ex *= d_[13] * d_[0] * d_[2]; break;// 6, 0, 1,
-		case 119: ex *= d_[13] * d_[0] * d_[1]; break;// 6, 1, 0,
-		case 120: ex *= d_[13] * d_[4]; break;// 7, 0, 0,
-		case 121: ex *= d_[15] * d_[9]; break;// 0, 0, 8,
-		case 122: ex *= d_[1] * d_[15] * d_[6]; break;// 0, 1, 7,
-		case 123: ex *= d_[5] * d_[15] * d_[2]; break;// 0, 2, 6,
-		case 124: ex *= d_[8] * d_[15]; break;// 0, 3, 5,
-		case 125: ex *= d_[11] * d_[12]; break;// 0, 4, 4,
-		case 126: ex *= d_[14] * d_[9]; break;// 0, 5, 3,
-		case 127: ex *= d_[14] * d_[1] * d_[6]; break;// 0, 6, 2,
-		case 128: ex *= d_[14] * d_[5] * d_[2]; break;// 0, 7, 1,
-		case 129: ex *= d_[14] * d_[8]; break;// 0, 8, 0,
-		case 130: ex *= d_[0] * d_[15] * d_[6]; break;// 1, 0, 7,
-		case 131: ex *= d_[0] * d_[1] * d_[15] * d_[2]; break;// 1, 1, 6,
-		case 132: ex *= d_[0] * d_[5] * d_[15]; break;// 1, 2, 5,
-		case 133: ex *= d_[0] * d_[8] * d_[12]; break;// 1, 3, 4,
-		case 134: ex *= d_[0] * d_[11] * d_[9]; break;// 1, 4, 3,
-		case 135: ex *= d_[0] * d_[14] * d_[6]; break;// 1, 5, 2,
-		case 136: ex *= d_[0] * d_[14] * d_[1] * d_[2]; break;// 1, 6, 1,
-		case 137: ex *= d_[0] * d_[14] * d_[5]; break;// 1, 7, 0,
-		case 138: ex *= d_[4] * d_[15] * d_[2]; break;// 2, 0, 6,
-		case 139: ex *= d_[4] * d_[1] * d_[15]; break;// 2, 1, 5,
-		case 140: ex *= d_[4] * d_[5] * d_[12]; break;// 2, 2, 4,
-		case 141: ex *= d_[4] * d_[8] * d_[9]; break;// 2, 3, 3,
-		case 142: ex *= d_[4] * d_[11] * d_[6]; break;// 2, 4, 2,
-		case 143: ex *= d_[4] * d_[14] * d_[2]; break;// 2, 5, 1,
-		case 144: ex *= d_[4] * d_[14] * d_[1]; break;// 2, 6, 0,
-		case 145: ex *= d_[7] * d_[15]; break;// 3, 0, 5,
-		case 146: ex *= d_[7] * d_[1] * d_[12]; break;// 3, 1, 4,
-		case 147: ex *= d_[7] * d_[5] * d_[9]; break;// 3, 2, 3,
-		case 148: ex *= d_[7] * d_[8] * d_[6]; break;// 3, 3, 2,
-		case 149: ex *= d_[7] * d_[11] * d_[2]; break;// 3, 4, 1,
-		case 150: ex *= d_[7] * d_[14]; break;// 3, 5, 0,
-		case 151: ex *= d_[10] * d_[12]; break;// 4, 0, 4,
-		case 152: ex *= d_[10] * d_[1] * d_[9]; break;// 4, 1, 3,
-		case 153: ex *= d_[10] * d_[5] * d_[6]; break;// 4, 2, 2,
-		case 154: ex *= d_[10] * d_[8] * d_[2]; break;// 4, 3, 1,
-		case 155: ex *= d_[10] * d_[11]; break;// 4, 4, 0,
-		case 156: ex *= d_[13] * d_[9]; break;// 5, 0, 3,
-		case 157: ex *= d_[13] * d_[1] * d_[6]; break;// 5, 1, 2,
-		case 158: ex *= d_[13] * d_[5] * d_[2]; break;// 5, 2, 1,
-		case 159: ex *= d_[13] * d_[8]; break;// 5, 3, 0,
-		case 160: ex *= d_[13] * d_[0] * d_[6]; break;// 6, 0, 2,
-		case 161: ex *= d_[13] * d_[0] * d_[1] * d_[2]; break;// 6, 1, 1,
-		case 162: ex *= d_[13] * d_[0] * d_[5]; break;// 6, 2, 0,
-		case 163: ex *= d_[13] * d_[4] * d_[2]; break;// 7, 0, 1,
-		case 164: ex *= d_[13] * d_[4] * d_[1]; break;// 7, 1, 0,
-		case 165: ex *= d_[13] * d_[7]; break;// 8, 0, 0,
-		case 166: ex *= d_[15] * d_[12]; break;// 0, 0, 9,
-		case 167: ex *= d_[1] * d_[15] * d_[9]; break;// 0, 1, 8,
-		case 168: ex *= d_[5] * d_[15] * d_[6]; break;// 0, 2, 7,
-		case 169: ex *= d_[8] * d_[15] * d_[2]; break;// 0, 3, 6,
-		case 170: ex *= d_[11] * d_[15]; break;// 0, 4, 5,
-		case 171: ex *= d_[14] * d_[12]; break;// 0, 5, 4,
-		case 172: ex *= d_[14] * d_[1] * d_[9]; break;// 0, 6, 3,
-		case 173: ex *= d_[14] * d_[5] * d_[6]; break;// 0, 7, 2,
-		case 174: ex *= d_[14] * d_[8] * d_[2]; break;// 0, 8, 1,
-		case 175: ex *= d_[14] * d_[11]; break;// 0, 9, 0,
-		case 176: ex *= d_[0] * d_[15] * d_[9]; break;// 1, 0, 8,
-		case 177: ex *= d_[0] * d_[1] * d_[15] * d_[6]; break;// 1, 1, 7,
-		case 178: ex *= d_[0] * d_[5] * d_[15] * d_[2]; break;// 1, 2, 6,
-		case 179: ex *= d_[0] * d_[8] * d_[15]; break;// 1, 3, 5,
-		case 180: ex *= d_[0] * d_[11] * d_[12]; break;// 1, 4, 4,
-		case 181: ex *= d_[0] * d_[14] * d_[9]; break;// 1, 5, 3,
-		case 182: ex *= d_[0] * d_[14] * d_[1] * d_[6]; break;// 1, 6, 2,
-		case 183: ex *= d_[0] * d_[14] * d_[5] * d_[2]; break;// 1, 7, 1,
-		case 184: ex *= d_[0] * d_[14] * d_[8]; break;// 1, 8, 0,
-		case 185: ex *= d_[4] * d_[15] * d_[6]; break;// 2, 0, 7,
-		case 186: ex *= d_[4] * d_[1] * d_[15] * d_[2]; break;// 2, 1, 6,
-		case 187: ex *= d_[4] * d_[5] * d_[15]; break;// 2, 2, 5,
-		case 188: ex *= d_[4] * d_[8] * d_[12]; break;// 2, 3, 4,
-		case 189: ex *= d_[4] * d_[11] * d_[9]; break;// 2, 4, 3,
-		case 190: ex *= d_[4] * d_[14] * d_[6]; break;// 2, 5, 2,
-		case 191: ex *= d_[4] * d_[14] * d_[1] * d_[2]; break;// 2, 6, 1,
-		case 192: ex *= d_[4] * d_[14] * d_[5]; break;// 2, 7, 0,
-		case 193: ex *= d_[7] * d_[15] * d_[2]; break;// 3, 0, 6,
-		case 194: ex *= d_[7] * d_[1] * d_[15]; break;// 3, 1, 5,
-		case 195: ex *= d_[7] * d_[5] * d_[12]; break;// 3, 2, 4,
-		case 196: ex *= d_[7] * d_[8] * d_[9]; break;// 3, 3, 3,
-		case 197: ex *= d_[7] * d_[11] * d_[6]; break;// 3, 4, 2,
-		case 198: ex *= d_[7] * d_[14] * d_[2]; break;// 3, 5, 1,
-		case 199: ex *= d_[7] * d_[14] * d_[1]; break;// 3, 6, 0,
-		case 200: ex *= d_[10] * d_[15]; break;// 4, 0, 5,
-		case 201: ex *= d_[10] * d_[1] * d_[12]; break;// 4, 1, 4,
-		case 202: ex *= d_[10] * d_[5] * d_[9]; break;// 4, 2, 3,
-		case 203: ex *= d_[10] * d_[8] * d_[6]; break;// 4, 3, 2,
-		case 204: ex *= d_[10] * d_[11] * d_[2]; break;// 4, 4, 1,
-		case 205: ex *= d_[10] * d_[14]; break;// 4, 5, 0,
-		case 206: ex *= d_[13] * d_[12]; break;// 5, 0, 4,
-		case 207: ex *= d_[13] * d_[1] * d_[9]; break;// 5, 1, 3,
-		case 208: ex *= d_[13] * d_[5] * d_[6]; break;// 5, 2, 2,
-		case 209: ex *= d_[13] * d_[8] * d_[2]; break;// 5, 3, 1,
-		case 210: ex *= d_[13] * d_[11]; break;// 5, 4, 0,
-		case 211: ex *= d_[13] * d_[0] * d_[9]; break;// 6, 0, 3,
-		case 212: ex *= d_[13] * d_[0] * d_[1] * d_[6]; break;// 6, 1, 2,
-		case 213: ex *= d_[13] * d_[0] * d_[5] * d_[2]; break;// 6, 2, 1,
-		case 214: ex *= d_[13] * d_[0] * d_[8]; break;// 6, 3, 0,
-		case 215: ex *= d_[13] * d_[4] * d_[6]; break;// 7, 0, 2,
-		case 216: ex *= d_[13] * d_[4] * d_[1] * d_[2]; break;// 7, 1, 1,
-		case 217: ex *= d_[13] * d_[4] * d_[5]; break;// 7, 2, 0,
-		case 218: ex *= d_[13] * d_[7] * d_[2]; break;// 8, 0, 1,
-		case 219: ex *= d_[13] * d_[7] * d_[1]; break;// 8, 1, 0,
-		case 220: ex *= d_[13] * d_[10]; break;// 9, 0, 0,
-		case 221: ex *= d_[15] * d_[15]; break;// 0, 0, 10,
-		case 222: ex *= d_[1] * d_[15] * d_[12]; break;// 0, 1, 9,
-		case 223: ex *= d_[5] * d_[15] * d_[9]; break;// 0, 2, 8,
-		case 224: ex *= d_[8] * d_[15] * d_[6]; break;// 0, 3, 7,
-		case 225: ex *= d_[11] * d_[15] * d_[2]; break;// 0, 4, 6,
-		case 226: ex *= d_[14] * d_[15]; break;// 0, 5, 5,
-		case 227: ex *= d_[14] * d_[1] * d_[12]; break;// 0, 6, 4,
-		case 228: ex *= d_[14] * d_[5] * d_[9]; break;// 0, 7, 3,
-		case 229: ex *= d_[14] * d_[8] * d_[6]; break;// 0, 8, 2,
-		case 230: ex *= d_[14] * d_[11] * d_[2]; break;// 0, 9, 1,
-		case 231: ex *= d_[14] * d_[14]; break;// 0, 10, 0,
-		case 232: ex *= d_[0] * d_[15] * d_[12]; break;// 1, 0, 9,
-		case 233: ex *= d_[0] * d_[1] * d_[15] * d_[9]; break;// 1, 1, 8,
-		case 234: ex *= d_[0] * d_[5] * d_[15] * d_[6]; break;// 1, 2, 7,
-		case 235: ex *= d_[0] * d_[8] * d_[15] * d_[2]; break;// 1, 3, 6,
-		case 236: ex *= d_[0] * d_[11] * d_[15]; break;// 1, 4, 5,
-		case 237: ex *= d_[0] * d_[14] * d_[12]; break;// 1, 5, 4,
-		case 238: ex *= d_[0] * d_[14] * d_[1] * d_[9]; break;// 1, 6, 3,
-		case 239: ex *= d_[0] * d_[14] * d_[5] * d_[6]; break;// 1, 7, 2,
-		case 240: ex *= d_[0] * d_[14] * d_[8] * d_[2]; break;// 1, 8, 1,
-		case 241: ex *= d_[0] * d_[14] * d_[11]; break;// 1, 9, 0,
-		case 242: ex *= d_[4] * d_[15] * d_[9]; break;// 2, 0, 8,
-		case 243: ex *= d_[4] * d_[1] * d_[15] * d_[6]; break;// 2, 1, 7,
-		case 244: ex *= d_[4] * d_[5] * d_[15] * d_[2]; break;// 2, 2, 6,
-		case 245: ex *= d_[4] * d_[8] * d_[15]; break;// 2, 3, 5,
-		case 246: ex *= d_[4] * d_[11] * d_[12]; break;// 2, 4, 4,
-		case 247: ex *= d_[4] * d_[14] * d_[9]; break;// 2, 5, 3,
-		case 248: ex *= d_[4] * d_[14] * d_[1] * d_[6]; break;// 2, 6, 2,
-		case 249: ex *= d_[4] * d_[14] * d_[5] * d_[2]; break;// 2, 7, 1,
-		case 250: ex *= d_[4] * d_[14] * d_[8]; break;// 2, 8, 0,
-		case 251: ex *= d_[7] * d_[15] * d_[6]; break;// 3, 0, 7,
-		case 252: ex *= d_[7] * d_[1] * d_[15] * d_[2]; break;// 3, 1, 6,
-		case 253: ex *= d_[7] * d_[5] * d_[15]; break;// 3, 2, 5,
-		case 254: ex *= d_[7] * d_[8] * d_[12]; break;// 3, 3, 4,
-		case 255: ex *= d_[7] * d_[11] * d_[9]; break;// 3, 4, 3,
-		case 256: ex *= d_[7] * d_[14] * d_[6]; break;// 3, 5, 2,
-		case 257: ex *= d_[7] * d_[14] * d_[1] * d_[2]; break;// 3, 6, 1,
-		case 258: ex *= d_[7] * d_[14] * d_[5]; break;// 3, 7, 0,
-		case 259: ex *= d_[10] * d_[15] * d_[2]; break;// 4, 0, 6,
-		case 260: ex *= d_[10] * d_[1] * d_[15]; break;// 4, 1, 5,
-		case 261: ex *= d_[10] * d_[5] * d_[12]; break;// 4, 2, 4,
-		case 262: ex *= d_[10] * d_[8] * d_[9]; break;// 4, 3, 3,
-		case 263: ex *= d_[10] * d_[11] * d_[6]; break;// 4, 4, 2,
-		case 264: ex *= d_[10] * d_[14] * d_[2]; break;// 4, 5, 1,
-		case 265: ex *= d_[10] * d_[14] * d_[1]; break;// 4, 6, 0,
-		case 266: ex *= d_[13] * d_[15]; break;// 5, 0, 5,
-		case 267: ex *= d_[13] * d_[1] * d_[12]; break;// 5, 1, 4,
-		case 268: ex *= d_[13] * d_[5] * d_[9]; break;// 5, 2, 3,
-		case 269: ex *= d_[13] * d_[8] * d_[6]; break;// 5, 3, 2,
-		case 270: ex *= d_[13] * d_[11] * d_[2]; break;// 5, 4, 1,
-		case 271: ex *= d_[13] * d_[14]; break;// 5, 5, 0,
-		case 272: ex *= d_[13] * d_[0] * d_[12]; break;// 6, 0, 4,
-		case 273: ex *= d_[13] * d_[0] * d_[1] * d_[9]; break;// 6, 1, 3,
-		case 274: ex *= d_[13] * d_[0] * d_[5] * d_[6]; break;// 6, 2, 2,
-		case 275: ex *= d_[13] * d_[0] * d_[8] * d_[2]; break;// 6, 3, 1,
-		case 276: ex *= d_[13] * d_[0] * d_[11]; break;// 6, 4, 0,
-		case 277: ex *= d_[13] * d_[4] * d_[9]; break;// 7, 0, 3,
-		case 278: ex *= d_[13] * d_[4] * d_[1] * d_[6]; break;// 7, 1, 2,
-		case 279: ex *= d_[13] * d_[4] * d_[5] * d_[2]; break;// 7, 2, 1,
-		case 280: ex *= d_[13] * d_[4] * d_[8]; break;// 7, 3, 0,
-		case 281: ex *= d_[13] * d_[7] * d_[6]; break;// 8, 0, 2,
-		case 282: ex *= d_[13] * d_[7] * d_[1] * d_[2]; break;// 8, 1, 1,
-		case 283: ex *= d_[13] * d_[7] * d_[5]; break;// 8, 2, 0,
-		case 284: ex *= d_[13] * d_[10] * d_[2]; break;// 9, 0, 1,
-		case 285: ex *= d_[13] * d_[10] * d_[1]; break;// 9, 1, 0,
-		case 286: ex *= d_[13] * d_[13]; break;// 10, 0, 0,
-		default: break;
-		}
+		ex *= cart_monomial(types_data[j], d_);
 
 		ao.add(prim_ao[j], prim_ao_scale[j], &ex);
 	}
@@ -513,6 +524,78 @@ const double WFN::compute_dens_cartesian(
 	}
 
 	return Rho;
+}
+
+//compute_dens_cartesian at n points, 64 at a time: the contracted functions of a block (the union over its points of
+//those the exponent cutoff keeps) go into one column-major table X, and one dgemm X * C into the occupied MOs replaces
+//the per-point multiply, which streamed every touched coefficient row once per point (47 % of a sucrose grid run)
+void WFN::compute_dens_batch(const int n, const double* x, const double* y, const double* z, double* rho) const
+{
+	if (n <= 0) return;
+	if (!get_coef_primitive_major()) {
+		std::fill(rho, rho + n, 0.0);
+		return;
+	}
+	const int nao = (int)(coef_ao_major.size() / nmo);
+	ivec occ_mo;
+	vec occ;
+	for (int mo = 0; mo < nmo; mo++)
+		if (MOs[mo].get_occ() != 0.0) occ_mo.push_back(mo), occ.push_back(MOs[mo].get_occ());
+	const int nocc = (int)occ_mo.size();
+	if (nocc == 0) {
+		std::fill(rho, rho + n, 0.0);
+		return;
+	}
+	//The occupied columns of coef_ao_major, [nao * nocc]; a block gathers its rows from here
+	vec C((size_t)nao * nocc);
+	for (int a = 0; a < nao; a++)
+		for (int m = 0; m < nocc; m++) C[(size_t)a * nocc + m] = coef_ao_major[(size_t)a * nmo + occ_mo[m]];
+	constexpr int B = 64;
+	const int nblk = (n + B - 1) / B;
+#pragma omp parallel
+	{
+		vec d((size_t)ncen * 16), exps(group_exponent.size()), X((size_t)B * nao), Cg, Phi((size_t)B * nocc);
+		Cg.reserve((size_t)nao * nocc);
+		ivec col(nao, -1), cols;
+		const int* group = prim_exp_group.data();
+#pragma omp for schedule(dynamic)
+		for (int b = 0; b < nblk; b++) {
+			const int p0 = b * B, nb = std::min(B, n - p0);
+			cols.clear();
+			for (int p = 0; p < nb; p++) {
+				const d3 Pos{ x[p0 + p], y[p0 + p], z[p0 + p] };
+				for (int c = 0; c < ncen; c++) cart_powers(d.data() + 16 * c, Pos, atoms[c]);
+				exp_table([&d](const int c) { return d[16 * c + 3]; }, exps.data());
+				for (int j = 0; j < nex; j++) {
+					double ex = exps[group[j]];
+					const int a = prim_ao[j];
+					if (ex == 0.0 || a < 0) continue;
+					ex *= cart_monomial(types[j], d.data() + 16 * (centers[j] - 1));
+					if (col[a] < 0) {
+						col[a] = (int)cols.size();
+						cols.push_back(a);
+						std::fill_n(X.data() + (size_t)B * col[a], B, 0.0);
+					}
+					X[(size_t)B * col[a] + p] += prim_ao_scale[j] * ex;
+				}
+			}
+			const int ncol = (int)cols.size();
+			double* r = rho + p0;
+			std::fill(r, r + nb, 0.0);
+			if (ncol == 0) continue;
+			Cg.resize((size_t)ncol * nocc);
+			for (int c = 0; c < ncol; c++) {
+				std::copy_n(C.data() + (size_t)cols[c] * nocc, nocc, Cg.data() + (size_t)c * nocc);
+				col[cols[c]] = -1;
+			}
+			//Phi[m * B + p] = sum_c X[c * B + p] Cg[c * nocc + m]
+			cblas_dgemm(CblasColMajor, CblasNoTrans, CblasTrans, nb, nocc, ncol, 1.0, X.data(), B, Cg.data(), nocc, 0.0, Phi.data(), B);
+			for (int m = 0; m < nocc; m++) {
+				const double* f = Phi.data() + (size_t)m * B;
+				for (int p = 0; p < nb; p++) r[p] += occ[m] * f[p] * f[p];
+			}
+		}
+	}
 }
 
 const double WFN::eval_ao(

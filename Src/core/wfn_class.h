@@ -592,6 +592,8 @@ public:
 	const double compute_dens(const d3& Pos) const;
 	/** Density with caller-provided scratch arrays (faster, reusable). */
 	const double compute_dens(const d3& Pos, vec2& d, vec& phi) const;
+	/** Density at n points (x, y, z) into rho, in parallel over blocks of points, one GEMM per block. */
+	void compute_dens_batch(const int n, const double* x, const double* y, const double* z, double* rho) const;
 	/**Evaluates value of primitives at position relative to atom center*/
 	const double eval_ao(std::array<double, 4>& d, const std::vector<primitive>& prims, const int& m) const;
 	/** Spin density at position (allocating version). */
