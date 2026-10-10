@@ -1,16 +1,15 @@
-//The global GPU entry points of a build that carries both CUDA and HIP kernels. Every kernel
-//source is compiled once per backend with NOSPHERA2_GPU_BACKEND_NS naming its namespace
-//(gpu_api.h); the global names the six headers declare are defined here and forward to the
-//backend that has a device. Single-backend builds do not compile this file. The backend is
-//chosen once and sticks, since the two sides keep separate state: CUDA first, then HIP, and
-//neither gives the CUDA side, which reports no device as a CUDA-only build would.
-//NOSPHERA2_GPU_BACKEND=cuda|hip in the environment overrides the probe.
+//Global GPU entry points of a CUDA+HIP build, forwarding to the per-backend namespaces (gpu_api.h).
+//The backend is chosen once, as the two keep separate state: CUDA, then HIP, else CUDA reporting
+//no device. NOSPHERA2_GPU_BACKEND=cuda|hip overrides the probe.
 #include "sf_gpu.h"
+#include "tuning.h"
 #include "itensor_gpu.h"
 #include "grid_gpu.h"
 #include "salted_gpu.h"
 #include "aux_density_gpu.h"
 #include "spherical_density_gpu.h"
+#include "esp_gpu.h"
+#include "basin_field_gpu.h"
 #include "blas_gpu.h"
 
 #include <cctype>
@@ -19,8 +18,8 @@
 #include <cstdlib>
 #include <string>
 
-//ret, name, parameter list, argument list: every function between the headers' NOSPHERA2_GPU_API
-//markers, defaults omitted. One missing here is an unresolved global at link time of a fat build.
+//ret, name, parameters, arguments of every function between the NOSPHERA2_GPU_API markers, defaults
+//omitted; one missing is an unresolved global when linking a fat build.
 #define NOSPHERA2_GPU_ENTRIES(F) \
 	F(bool, sf_gpu_available, (), ()) \
 	F(void, sf_gpu_warmup_start, (), ()) \
@@ -30,6 +29,7 @@
 	F(bool, sf_gpu_uses_fp32, (const sf_precision prec), (prec)) \
 	F(bool, sf_gpu_run, (const int imax, const long long smax, const double* k1, const double* k2, const double* k3, const double* d1, const double* d2, const double* d3, const double* dens, const int* offs, const long long total_points, double* const* sf_rows, const sf_precision prec), (imax, smax, k1, k2, k3, d1, d2, d3, dens, offs, total_points, sf_rows, prec)) \
 	F(bool, itensor_gpu_available, (), ()) \
+	F(bool, itensor_gpu_integrated, (), ()) \
 	F(const char*, itensor_gpu_gemm_name, (), ()) \
 	F(double, itensor_gpu_issued_flops, (), ()) \
 	F(int, itensor_gpu_batch, (int num_syms), (num_syms)) \
@@ -53,12 +53,16 @@
 	F(bool, grid_gpu_becke_weights, (int np, int num_centers, const int* pcen, const double* proto_x, const double* proto_y, const double* proto_z, const double* proto_w, const double* cx, const double* cy, const double* cz, const double* R_v, const double* chi, double far_away, double cutoff, double* out_x, double* out_y, double* out_z, double* out_aw, double* out_becke, double* out_tfvc), (np, num_centers, pcen, proto_x, proto_y, proto_z, proto_w, cx, cy, cz, R_v, chi, far_away, cutoff, out_x, out_y, out_z, out_aw, out_becke, out_tfvc)) \
 	F(bool, salted_gpu_available, (), ()) \
 	F(void, salted_gpu_clear_cache, (), ()) \
-	F(bool, salted_gpu_equicomb, (const salted_gpu_problem& prob, int* empty_environments), (prob, empty_environments)) \
+	F(bool, salted_gpu_equicomb, (const salted_gpu_problem& prob), (prob)) \
 	F(bool, aux_density_gpu_available, (), ()) \
 	F(void, aux_density_gpu_set_enabled, (bool on), (on)) \
 	F(bool, aux_density_gpu_enabled, (), ()) \
 	F(bool, aux_density_gpu_eval, (int n_at, const double* cx, const double* cy, const double* cz, const double* r2_max, int n_sh, const int* sh_start, const int* sh_l, const int* pr_start, const int* coef_off, int n_pr, const double* pr_exp, const double* pr_norm, int n_coef, const double* coefs, int np, const double* x, const double* y, const double* z, double* rho, double* gx, double* gy, double* gz, double* lap, double* hess), (n_at, cx, cy, cz, r2_max, n_sh, sh_start, sh_l, pr_start, coef_off, n_pr, pr_exp, pr_norm, n_coef, coefs, np, x, y, z, rho, gx, gy, gz, lap, hess)) \
 	F(bool, spherical_density_gpu_eval, (int nx, int ny, int nz, const double* origin, const double* vectors, int n_at, const double* ax, const double* ay, const double* az, const int* at_tab, int n_tab, const int* tab_off, const double* r_tab, const double* rho_tab, double lincr, double start, double radius_bohr, double* out), (nx, ny, nz, origin, vectors, n_at, ax, ay, az, at_tab, n_tab, tab_off, r_tab, rho_tab, lincr, start, radius_bohr, out)) \
+	F(bool, esp_gpu_eval, (int n_at, const double* ax, const double* ay, const double* az, const double* q, int npairs, const double* ex_sum, const double* weight, const double* P, const int* L, const int* off, const double* coef, const unsigned char* pc_pow, const unsigned char* fn_idx, int nT, int stride, double step, const double* boys_tab, int np, const double* points, double* out), (n_at, ax, ay, az, q, npairs, ex_sum, weight, P, L, off, coef, pc_pow, fn_idx, nT, stride, step, boys_tab, np, points, out)) \
+	F(void*, basin_field_gpu_open, (int K, int ncen, const double* cxyz, const double* cmin_exp, double exp_cutoff, int nao, const int* ao_start, const int* prim_center, const int* prim_l, const double* prim_exp, const double* prim_scale, int nocc, const double* coef, const double* occ, int max_points), (K, ncen, cxyz, cmin_exp, exp_cutoff, nao, ao_start, prim_center, prim_l, prim_exp, prim_scale, nocc, coef, occ, max_points)) \
+	F(bool, basin_field_gpu_run, (void* ctx, int np, const double* pts, double* val, double* grad, double* rho), (ctx, np, pts, val, grad, rho)) \
+	F(void, basin_field_gpu_close, (void* ctx), (ctx)) \
 	F(bool, blas_gpu_available, (), ()) \
 	F(void, blas_gpu_set_enabled, (bool on), (on)) \
 	F(bool, blas_gpu_enabled, (), ()) \
@@ -80,7 +84,7 @@ enum class gpu_backend { cuda, hip };
 gpu_backend chosen_backend()
 {
 	static const gpu_backend chosen = [] {
-		if (const char* env = std::getenv("NOSPHERA2_GPU_BACKEND")) {
+		if (const char* env = tuning("NOSPHERA2_GPU_BACKEND")) {
 			std::string v(env);
 			for (char& c : v) c = (char)std::tolower((unsigned char)c);
 			if (v == "cuda") return gpu_backend::cuda;

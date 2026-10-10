@@ -2,11 +2,9 @@
 
 #include "gpu_api.h"
 
-//Sum of tabulated spherical atomic densities on a cube grid, one thread per grid point, the
-//same log-spaced linear lookup as Thakkar::get_interpolated_density and the same
-//"0 outside radius_bohr of every atom" rule as evaluate_cube_in_radius. Returns false when no
-//device is present, the grid is too small to pay for the copies or the arrays do not fit, and
-//the caller keeps the OpenMP loop. Toggled with aux_density_gpu_set_enabled (-no_gpu_density).
+//Sum of tabulated spherical atomic densities on a cube grid: the log-spaced lookup of
+//Thakkar::get_interpolated_density, and 0 outside radius_bohr of every atom as in evaluate_cube_in_radius.
+//False without a device, room, or a grid big enough to pay for the copies; -no_gpu_density turns it off.
 
 NOSPHERA2_GPU_API_BEGIN
 

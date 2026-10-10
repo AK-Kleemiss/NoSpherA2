@@ -23,9 +23,23 @@ public:
 	WFN wavy;
 	void shrink_intermediate_vectors();
 	const bool basis_set_loaded() const { return bbasis_set_loaded; };
+	//The basis this model predicts in: its own BASIS block if it has one, else the library set it names
+	std::shared_ptr<BasisSet> get_model_basis() const;
 
 private:
 	bool bbasis_set_loaded = false;
+	//An atom's coefficients mean something only with the basis they were trained on; kept for stitching models
+	std::shared_ptr<BasisSet> model_basis{};
+	// Several models (on the command line, or a folder's lead + element models): each element goes to the first model trained on it, and the
+	// per-atom blocks are stitched back together. Empty for a single model.
+	std::vector<std::unique_ptr<SALTEDPredictor>> sub_models{};
+	// Per atom of the merged structure: which sub model predicts it, and its index there
+	ivec atom_model{}, atom_in_model{};
+	void build_merged(const WFN& wavy_in, options& opt_in, const pathvec& models);
+	vec merge_predictions();
+	// Estimate what the spherically filled atoms should carry, so the size of the
+	// neutral-fill assumption is reported rather than hidden
+	void estimate_fill_charges(const WFN& wavy_in, const std::vector<char>& use_thakkar, options& opt_in);
 	// Set when atoms were moved to the spherical Thakkar fill. The charge
 	// constraint needs it: with a mixed ML/Thakkar system the split of a net
 	// charge between the two regions is undefined.
@@ -38,8 +52,6 @@ private:
 	// this, so predicted + filled still sums to the right number of electrons.
 	double applied_fill_charge = 0.0;
 	int n_filled = 0;
-	//-salted_charge_constraint: apply the constraint even when the model file does not ask for it
-	bool force_charge_constraint = false;
 	SALTEDConfig config;
 	int natoms;
 	std::filesystem::path SALTED_DIR;
@@ -59,6 +71,14 @@ private:
 	// Projector shapes for every species the model knows, present or not: the flat
 	// weight vector is laid out over all of them, so absent widths shift the offsets
 	std::unordered_map<std::string, std::array<size_t, 2>> proj_dims{};
+	// Start of each present (species, l) block in that flat vector: n-major, one projector width per n
+	std::unordered_map<std::string, size_t> weight_offset{};
+	// A VERSION 4 file (PROJW) stores the projectors with the weights already folded in
+	bool projector_folded = false;
+	// VERSION 4, zeta = 1: ENVW holds VW^T F, the projector is in it (fold_salted_file)
+	bool env_folded = false;
+	// VERSION 4, zeta != 1: the (species, l) keys GENV holds G for, in place of features and projector
+	std::unordered_map<std::string, SALTED_BINARY_FILE::block_ref> g_index{};
 	// Held open for the whole prediction, indexed by (species, lambda)
 	std::unique_ptr<SALTED_BINARY_FILE> model_file{};
 	std::unordered_map<std::string, SALTED_BINARY_FILE::block_ref> feat_index{};
@@ -70,11 +90,20 @@ private:
 	std::unordered_map<std::string, dMatrix2> power_env_sparse{};
 	std::unordered_map<std::string, vec> av_coefs{};
 	std::unordered_map<int, int> featsize{};
+
+	featomic::SimpleSystem featomic_system;
 	void read_model_data();
-	// Fetch / drop the model matrices of one lambda; read_model_data() only indexes
-	void load_model_lambda(const int lam);
+	// Drop the model matrices of one lambda; read_model_data() only indexes
 	void free_model_lambda(const int lam);
+	// (species+lambda key, projector, features); read and install split for the prefetch
+	using lambda_blocks = std::vector<std::tuple<std::string, dMatrix2, dMatrix2>>;
+	lambda_blocks read_model_lambda(const int lam);
+	void install_model_lambda(lambda_blocks blocks);
 
 	vec predict();
 };
+
+// Writes the model `in` to `out` as VERSION 4: weights and features folded into ENVW (zeta = 1) or
+// GENV + FEATL + PROJW (zeta != 1), which replace FEATS, PROJ and WEIGH
+void fold_salted_file(const std::filesystem::path& in, const std::filesystem::path& out);
 

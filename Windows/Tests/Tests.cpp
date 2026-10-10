@@ -79,6 +79,43 @@ namespace NoSpherA2IntegrationTests
             });
         }
 
+        TEST_METHOD(eqc_ethane)
+        {
+            // Actual output is the analysis' own section log
+            RunTest({
+                "eqc_ethane", "eqc_ethane", "eqc_ethane.good", "ethane.eqc_log",
+                {"-eqc","ethane.gbw", "-eqc_frag","0,2-4","0","2","1,5-7","0","2",
+                 "-all_charges", "-no_date", "-no_gpu_grid"}
+            });
+        }
+
+        TEST_METHOD(eqc_water_fg)
+        {
+            RunTest({
+                "eqc_water_fg", "eqc_water_fg", "eqc_water_fg.good", "water.eqc_log",
+                {"-eqc","water.gbw", "-eqc_frag","0,1","0","2","2","0","2",
+                 "-all_charges", "-no_date", "-no_gpu_grid"}
+            });
+        }
+
+        TEST_METHOD(eqc_ch3f_pbe0)
+        {
+            RunTest({
+                "eqc_ch3f_pbe0", "eqc_ch3f_pbe0", "eqc_ch3f_pbe0.good", "parent.eqc_log",
+                {"-eqc","parent.gbw", "-eqc_frag","0,2-4","1","1","1","-1","1", "-eqc_method","pbe0",
+                 "-all_charges", "-no_date", "-no_gpu_grid"}
+            });
+        }
+
+        TEST_METHOD(eqc_ch3f_wfx)
+        {
+            RunTest({
+                "eqc_ch3f_wfx", "eqc_ch3f_wfx", "eqc_ch3f_wfx.good", "parent.eqc_log",
+                {"-eqc_wfn","parent.wfx","ch3p.wfx","fm.wfx",
+                 "-all_charges", "-no_date", "-no_gpu_grid"}
+            });
+        }
+
         TEST_METHOD(grown_water)
         {
             RunTest({
@@ -186,16 +223,6 @@ namespace NoSpherA2IntegrationTests
             });
         }
 
-        TEST_METHOD(SALTED_charge_constraint)
-        {
-            RunTest({
-                "SALTED_charge_constraint", "SALTED", "SALTED_charge_constraint.good", "",
-                {"-SALTED","Model", "-cif","test_cysteine.cif",
-                 "-wfn","test_cysteine.xyz", "-dmin","0.73",
-                 "-salted_charge_constraint", "-all_charges", "-no_date"}
-            });
-        }
-
         TEST_METHOD(sucrose_IAM)
         {
             RunTest({
@@ -274,7 +301,7 @@ namespace NoSpherA2IntegrationTests
         {
             RunTest({
                 "RGBI_Groups_NH3BH3", "RGBI_groups", "NH3BH3.good", "",
-                {"-wfn","nh3bh3.gbw", "-rgbi_no_sym", "-rgbi-groups", "0,4,5,7", "1,2,3,6",
+                {"-wfn","nh3bh3.gbw", "-rgbi_no_sym", "-rgbi_groups", "0,4,5,7", "1,2,3,6",
                  "-all_charges", "-no_date"}
             });
         }
@@ -283,7 +310,7 @@ namespace NoSpherA2IntegrationTests
         {
             RunTest({
                 "RGBI_Groups_NH3Li", "RGBI_groups", "NH3Li.good", "",
-                {"-wfn","nh3li.gbw", "-rgbi_no_sym", "-rgbi-groups", "0,1,2,3", "4",
+                {"-wfn","nh3li.gbw", "-rgbi_no_sym", "-rgbi_groups", "0,1,2,3", "4",
                  "-all_charges", "-no_date"}
                     });
         }

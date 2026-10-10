@@ -1,4 +1,5 @@
 #include "grid_gpu.h"
+#include "tuning.h"
 #include "gpu_backend.h"
 #include <cstdio>
 #include <algorithm>
@@ -10,9 +11,8 @@ NOSPHERA2_GPU_API_BEGIN
 	std::fprintf(stderr, "NoSpherA2 grid GPU: %s at %s:%d\n", gpuGetErrorString(e_), __FILE__, __LINE__); \
 	release(); return false; } } while (0)
 
-//Each thread needs two scratch values per centre, held in shared memory. 48 KB of shared
-//per block divided by that is the block size, and below 32 threads the launch is not worth
-//making, which puts the ceiling at 384 centres.
+//Two shared scratch values per centre per thread; 48 KB over that is the block size, and below 32
+//threads the launch is not worth making, so at most 384 centres
 #define GRID_SHARED_BYTES (48 * 1024)
 #define GRID_MIN_BLOCK 32
 //Neighbours within far_away (10 bohr) of one point; a protein has a few dozen
@@ -44,15 +44,9 @@ __device__ __forceinline__ double f4d(double x)
 	return f;
 }
 
-//Wide molecules: the scratch only has to cover the centres that are actually near the
-//point. far_away is 10 bohr, so on a protein almost every centre is skipped by the same
-//test the CPU applies, its pa stays zero and contributes nothing to either sum - and the
-//pair updates written to a far centre are discarded when its own iteration zeroes it.
-//Keeping pa only for the near centres is therefore exactly the CPU result, with the
-//scratch set by the local environment rather than by the size of the molecule.
-//
-//A point with more than GRID_MAX_NEAR neighbours raises the flag and the caller falls
-//back, rather than silently truncating a partitioning weight.
+//Wide molecules: scratch only for centres within far_away of the point. A far centre's pa is zeroed
+//by the CPU's own test and its pair updates are discarded, so this is exactly the CPU result. More
+//than GRID_MAX_NEAR neighbours sets overflow and the caller falls back rather than truncate a weight.
 __global__ void becke_kernel_local(const int np, const int nc, const int* __restrict__ pcen,
 	const double* __restrict__ px, const double* __restrict__ py,
 	const double* __restrict__ pz, const double* __restrict__ pw,
@@ -170,10 +164,8 @@ __global__ void becke_kernel_local(const int np, const int nc, const int* __rest
 	out_aw[ipoint] = temp;
 }
 
-//A verbatim transcription of get_integration_weights. The pair loop updates both a and
-//b, so it stays sequential per point exactly as on the CPU; the parallelism is over
-//points, which are independent. Without chi the TFVC factors stay at one, as in the
-//chi-absent branch there.
+//Transcription of get_integration_weights: the pair loop updates both a and b, so it stays sequential
+//per point and the parallelism is over points. Without chi the TFVC factors stay one, as on the CPU.
 __global__ void becke_kernel(const int np, const int nc, const int* __restrict__ pcen,
 	const double* __restrict__ px, const double* __restrict__ py,
 	const double* __restrict__ pz, const double* __restrict__ pw,
@@ -265,7 +257,7 @@ __global__ void becke_kernel(const int np, const int nc, const int* __restrict__
 	out_aw[ipoint] = temp;
 }
 
-} //namespace
+}
 
 bool grid_gpu_available()
 {
@@ -292,13 +284,10 @@ bool grid_gpu_becke_weights(const int np, const int nc, const int* pcen,
 {
 	if (np <= 0 || nc <= 1) return false;
 	if (!g_grid_use_gpu || !grid_gpu_available()) return false;
-	//Two doubles per centre per thread, so a wide molecule shrinks the block
-	//Narrow molecules keep pa for every centre; wide ones keep it only for the centres
-	//near the point, which is what makes a protein fit at all
+	//Two doubles per centre per thread; wide molecules keep pa only for the near centres, so a protein fits
 	int block = (int)(GRID_SHARED_BYTES / (2 * sizeof(double) * (size_t)nc));
-	//Only a molecule wider than a few hundred centres reaches the neighbour-local kernel,
-	//so without this it would ship untested on every machine here
-	const char* force = std::getenv("NOSPHERA2_GRID_LOCAL");
+	//Only molecules wider than a few hundred centres reach the local kernel; this lets it be tested
+	const char* force = tuning("NOSPHERA2_GRID_LOCAL");
 	const bool local_mode = (block < GRID_MIN_BLOCK) || (force && force[0] == '1');
 	if (local_mode)
 		block = (int)(GRID_SHARED_BYTES / (2 * sizeof(double) * (size_t)GRID_MAX_NEAR));
@@ -349,8 +338,6 @@ bool grid_gpu_becke_weights(const int np, const int nc, const int* pcen,
 			d[9], d[10], d[11], d[12], d[13], d[14]);
 	GPU_TRY(gpuGetLastError());
 	GPU_TRY(gpuDeviceSynchronize());
-	//A point with more neighbours than the scratch holds: hand the grid back rather than
-	//return a truncated weight
 	if (local_mode) GPU_TRY(gpuMemcpy(&host_over, d_over, sizeof(int), gpuMemcpyDeviceToHost));
 	if (host_over) { release(); return false; }
 	for (int i = 0; i < 6; i++) GPU_TRY(gpuMemcpy(dst[i], d[9 + i], pts, gpuMemcpyDeviceToHost));

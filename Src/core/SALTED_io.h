@@ -3,9 +3,17 @@
 #include "convenience.h"
 #include <unordered_set>
 #include <array>
+#include <set>
 #include "npy.h"
 
+// A model folder holds one lead model, the first .salted by name that is not named after an element, and per-element
+// add-ons <El>.salted (Co.salted). The lead is what a bare folder path selects; a folder of element models only
+// falls back to its first file.
 std::filesystem::path find_first_salted_file(const std::filesystem::path &directory_path);
+// Z of a model named after an element ("Co.salted" -> 27), 0 for any other name.
+int salted_element_file_Z(const std::filesystem::path &file);
+// The models a folder contributes to a structure with these elements: the lead, then <El>.salted for each element present.
+pathvec salted_folder_models(const std::filesystem::path &directory_path, const std::set<int> &present_Z);
 
 template <class T>
 std::vector<T> readVectorFromFile(const std::filesystem::path &filename);
@@ -68,7 +76,12 @@ private:
 	// diagnostic whatsoever. Builds already shipped cannot be fixed, but from
 	// here on a file from the future says so instead of quietly dropping a
 	// correction.
-	static const int SUPPORTED_VERSION = 3;
+	// VERSION 4 (-salted_fold, or SALTED's pack_model.py directly): the weights are
+	// folded into the projector and, where that pays, the features as well. PROJW
+	// (projector times weights), ENVW (zeta = 1) or GENV + FEATL (zeta != 1) replace
+	// PROJ, WEIGH and FEATS, so an older build stops at a missing block instead of
+	// misreading it. Files written 8-9 Oct 2026 say 5 for the same format.
+	static const int SUPPORTED_VERSION = 4;
 	enum DataType { INT32 = 0, FLOAT64 = 1, STRING = 2 };
 
 	std::filesystem::path filepath;
@@ -81,7 +94,7 @@ private:
 	int header_end = -1;
 
 	void open_file();
-	// Model blocks are read through a raw handle: std::ifstream costs ~2.7x, and mapping
+	// Model blocks are read through a raw handle: std::ifstream is several times slower, and mapping
 	// leaves the touched pages resident. No zero-copy span either - the 5-byte species
 	// tag in every block header puts most payloads at an offset that is not a multiple of 8.
 	void open_raw();
@@ -144,12 +157,14 @@ public:
 	struct block_ref { std::streamoff offset = 0; size_t rows = 0, cols = 0; };
 	std::unordered_map<std::string, block_ref> index_lambda_based_data(const std::string& key);
 	dMatrix2 load_block(const block_ref& ref);
+	std::vector<dMatrix2> load_blocks(const std::vector<block_ref>& refs);
 
 	const bool basis_set_defined() { return table_of_contents.find("BASIS") != table_of_contents.end(); }
+	bool has_block(const std::string& key) const { return table_of_contents.count(key) != 0; }
+	// This file as VERSION version_out without the blocks in `drop` and with `add` (name, bytes from
+	// the datatype word on) appended; every other byte is copied
+	void write_with_blocks(const std::filesystem::path& out, int32_t version_out,
+		const std::set<std::string>& drop, const std::vector<std::pair<std::string, std::string>>& add);
 
-	// Optional NORMC block (file VERSION 3): electron-count constraint.
-	// Absent in every V2 model, so this returns 0 and nothing changes for them.
-	const bool charge_constraint_defined() { return table_of_contents.find("NORMC") != table_of_contents.end(); }
-	std::unordered_map<std::string, vec> read_charge_constraint();
 	std::shared_ptr<BasisSet> read_basis_set();
 };

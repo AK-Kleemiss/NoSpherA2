@@ -533,7 +533,8 @@ void GridManager::setupPrototypeGrids(const WFN &wave, const ivec &atom_types, s
 			max_l_temp,
 			alpha_min.data(),
 			std::cout,
-			config_.radial_step_scale
+			config_.radial_step_scale,
+			config_.rotate_angular
 		);
 		if (config_.debug) {
 			file << std::setw(9) << atom_type << " | "
@@ -609,18 +610,30 @@ void GridManager::generateIntegrationGrids(const WFN &wave, const cell &unit_cel
 		for (int coord = 0; coord < 10; coord++)
 			(*grid)[i][coord].resize((*num_points)[i], 0.0);
 	}
+	grid_atom_ = atom_of;
 	//The TFVC weights are only read for that partitioning and for the every-scheme
 	//output, and chi is a line-density extremum search over every atom pair
 	vec chi_matrix;
 	if (total_atoms > 1 && (config_.partition_type == PartitionType::TFVC || config_.debug || config_.all_charges))
 		chi_matrix = make_chi(wave, 40, true, config_.debug, density_);
+	//The Becke and TFVC weights are read by those partitions, by RI (partitionWeightIndex's default) and by the
+	//every-scheme output; Hirshfeld integrates with WEIGHT * single / combined alone. There the CPU skips the pair loop:
+	//get_grid with one centre fills the coordinates and puts the plain atom weight in both columns, which nothing reads.
+	//The device is skipped there too: its launch and copies cost 130 ms on sucrose against 23 ms for the one-centre loop
+	const bool becke = config_.partition_type != PartitionType::Hirshfeld || config_.debug || config_.all_charges;
+	const int weight_centers = becke ? total_atoms : 1;
+	//One line per atom on either path, so the debug file does not depend on where the weights ran
+	const auto log_grid = [&](const int i) {
+		if (config_.debug) file << "Generated grid for atom " << i + 1 << "/" << num_atoms_with_grids
+			<< " (Type " << wave.get_atom_charge(atom_of[i]) << ") with " << (*num_points)[i] << " points." << std::endl;
+	};
 	int first = 0;
 #ifdef NOSPHERA2_USE_GPU
 	//The whole molecule in one launch, in chunks of a few million points so the flat
 	//copies stay bounded. make_chi lays chi out with a stride of ncen, so with periodic
 	//images it does not fit the kernel and the weights stay on the CPU.
 	const bool chi_fits = chi_matrix.empty() || chi_matrix.size() == (size_t)total_atoms * total_atoms;
-	if (grid_gpu_enabled() && total_atoms > 1 && chi_fits) {
+	if (grid_gpu_enabled() && becke && total_atoms > 1 && chi_fits) {
 		const int chunk = 1 << 21;
 		vec R_v(total_atoms);
 		for (int a = 0; a < total_atoms; a++) R_v[a] = constants::bragg_angstrom[charges[a]];
@@ -648,20 +661,22 @@ void GridManager::generateIntegrationGrids(const WFN &wave, const cell &unit_cel
 					flat[4].data(), flat[5].data(), flat[6].data(), flat[7].data(), flat[8].data(), flat[9].data()))
 				break;
 			static const GridData::GridIndex out_idx[6] = { GridData::X, GridData::Y, GridData::Z, GridData::WEIGHT, GridData::BECKE_WEIGHT, GridData::TFVC_WEIGHT };
-			for (int i = first, off = 0; i < last; off += (*num_points)[i++])
+			for (int i = first, off = 0; i < last; off += (*num_points)[i++]) {
 				for (int k = 0; k < 6; k++)
 					std::copy_n(flat[4 + k].data() + off, (*num_points)[i], (*grid)[i][out_idx[k]].data());
+				log_grid(i);
+			}
 			first = last;
 		}
 		//Once per run. Every other GPU path announces itself; this one did not, which
 		//is how it fell back to the CPU for a session with its test still passing.
-		static std::atomic<bool> announced{false};
-		if (first == num_atoms_with_grids && !announced.exchange(true) && !constants::hide_gpu_notes)
+		static std::atomic<unsigned> announced{0};
+		if (first == num_atoms_with_grids && constants::first_this_run(announced) && !constants::hide_gpu_notes)
 			std::cout << "GPU in use: atomic grid weights (Becke and TFVC) on " << grid_gpu_backend() << std::endl;
 	}
-	else if (grid_gpu_enabled() && total_atoms > 1) {
-		static std::atomic<bool> warned{false};
-		if (!warned.exchange(true) && !constants::hide_gpu_notes)
+	else if (grid_gpu_enabled() && becke && total_atoms > 1) {
+		static std::atomic<unsigned> warned{0};
+		if (constants::first_this_run(warned) && !constants::hide_gpu_notes)
 			std::cout << "-gpu_grid asked for but not used: chi is " << chi_matrix.size()
 					  << " entries, the kernel needs " << (size_t)total_atoms * total_atoms
 					  << ". Weights stay on the CPU." << std::endl;
@@ -671,7 +686,7 @@ void GridManager::generateIntegrationGrids(const WFN &wave, const cell &unit_cel
 	//first grid still to do
 	for (int i = first; i < num_atoms_with_grids; i++) {
 		prototype_grids_[proto_of[i]].get_grid(
-			total_atoms,
+			weight_centers,
 			atom_of[i],
 			x_coords.data(),
 			y_coords.data(),
@@ -685,8 +700,7 @@ void GridManager::generateIntegrationGrids(const WFN &wave, const cell &unit_cel
 			(*grid)[i][GridData::GridIndex::TFVC_WEIGHT].data(),
 			chi_matrix
 		);
-		if (config_.debug) file << "Generated grid for atom " << i + 1 << "/" << num_atoms_with_grids
-			<< " (Type " << wave.get_atom_charge(atom_of[i]) << ") with " << (*num_points)[i] << " points." << std::endl;
+		log_grid(i);
 	}
 	if (needs_helper_grids_)
 		grid_data_.total_points = std::accumulate(grid_data_.helper_num_points_per_atom.begin(), grid_data_.helper_num_points_per_atom.end(), 0);
@@ -817,7 +831,8 @@ PartitionResults GridManager::calculatePartitionedCharges(const WFN &wave, const
 
 		// Add ECP electrons (only to computed schemes)
 		if (wave.get_has_ECPs()) {
-			const int ecp_e = wave.get_atom_ECP_electrons(atom); // map atom->basis if needed
+			//In a grown structure the grid index is not the wfn atom; the ECP core belongs to grid_atom_
+			const int ecp_e = wave.get_atom_ECP_electrons(grid_atom_.size() == num_atoms ? grid_atom_[atom] : atom);
 			if (config_.debug || config_.all_charges) {
 				results.atom_charges[PartitionResults::CHARGE_ORDER::S_BECKE][atom] += ecp_e;
 				results.atom_charges[PartitionResults::CHARGE_ORDER::S_HIRSH][atom] += ecp_e;
@@ -1108,23 +1123,21 @@ void GridManager::printChargeTable(const svec &labels, const WFN &wave, const iv
 	file << "\n";
 
 	for (int i = 0; i < atom_list.size(); i++) {
-		int atom_idx;
-		if (needs_helper_grids_)
-			atom_idx = i;
-		else
-			atom_idx = atom_list[i];
+		//Helper grids run over every wfn atom, the others over atom_list
+		const int atom_idx = atom_list[i];
+		const int r = needs_helper_grids_ ? atom_idx : i;
 		file << std::setw(10) << labels[i];
 
 		if (config_.partition_type == PartitionType::Becke || config_.all_charges || config_.debug)
-			file << std::fixed << std::setw(10) << std::setprecision(3) << wave.get_atom_charge(atom_idx) - results.atom_charges[0][i];  // Becke
+			file << std::fixed << std::setw(10) << std::setprecision(3) << wave.get_atom_charge(atom_idx) - results.atom_charges[0][r];  // Becke
 		if (config_.partition_type == PartitionType::Hirshfeld || config_.all_charges || config_.debug)
-			file << std::fixed << std::setw(10) << std::setprecision(3) << wave.get_atom_charge(atom_idx) - results.atom_charges[2][i];  // Hirshfeld
+			file << std::fixed << std::setw(10) << std::setprecision(3) << wave.get_atom_charge(atom_idx) - results.atom_charges[2][r];  // Hirshfeld
 		if (config_.partition_type == PartitionType::TFVC || config_.all_charges || config_.debug)
-			file << std::fixed << std::setw(10) << std::setprecision(3) << wave.get_atom_charge(atom_idx) - results.atom_charges[1][i];  // TFVC
+			file << std::fixed << std::setw(10) << std::setprecision(3) << wave.get_atom_charge(atom_idx) - results.atom_charges[1][r];  // TFVC
 		if (config_.partition_type == PartitionType::MBIS || config_.all_charges || config_.debug)
-			file << std::fixed << std::setw(10) << std::setprecision(3) << wave.get_atom_charge(atom_idx) - results.atom_charges[3][i];  // MBIS
+			file << std::fixed << std::setw(10) << std::setprecision(3) << wave.get_atom_charge(atom_idx) - results.atom_charges[3][r];  // MBIS
 		if (config_.partition_type == PartitionType::EMBIS || config_.all_charges || config_.debug)
-			file << std::fixed << std::setw(10) << std::setprecision(3) << wave.get_atom_charge(atom_idx) - results.atom_charges[4][i];  // EMBIS
+			file << std::fixed << std::setw(10) << std::setprecision(3) << wave.get_atom_charge(atom_idx) - results.atom_charges[4][r];  // EMBIS
 		file << "\n";
 	}
 
@@ -1180,53 +1193,65 @@ void GridManager::calculateSphericalDensities(
 		combined_spherical_density[g].resize(num_points, 0.0);
 	}
 
-	int type_idx = -1;
-	// For each atom
+	// Type index and position per atom; -1 = type not found, the atom is skipped
+	ivec atom_type(ncen, -1);
+	std::vector<d3> atom_pos(ncen);
 	for (int atom_idx = 0; atom_idx < ncen; atom_idx++) {
-		type_idx = -1;
 		if (sig_pop.size() == 0) {
-			// Find the type index for this atom
 			for (int j = 0; j < complete_type_list.size(); j++) {
 				if (wave.get_atom_charge(atom_idx) == complete_type_list[j]) {
-					type_idx = j;
+					atom_type[atom_idx] = j;
 					break;
 				}
 			}
-
-			if (type_idx == -1)
-				continue; // Skip if atom type not found
 		}
 		else {
-			type_idx = atom_idx;
+			atom_type[atom_idx] = atom_idx;
 		}
+		atom_pos[atom_idx] = wave.get_atom_pos(atom_idx);
+	}
 
-		const d3 ax = wave.get_atom_pos(atom_idx);
+	// Point outer, atoms inner in index order: each sum gets the same additions in the same order as with
+	// the atoms outer, so the densities are bit-identical, from one parallel region instead of one per atom
+	// and grid (2025 for 45 atoms). The per-grid worksharing keeps all threads busy for a few atoms too.
+	// Past the last table radius the spline gives 0 and adding 0 changes no sum, so a pair whose squared
+	// distance is clearly beyond it skips hypot (three divisions and a root in libstdc++) and the spline.
+	// The 1e-12 margin is far above the few ulps between the plain squared sum and hypot on any library
+	vec reach2(radial_distances_.size());
+	for (size_t t = 0; t < reach2.size(); t++)
+		reach2[t] = radial_distances_[t].back() * radial_distances_[t].back() * (1.0 + 1e-12);
+	const int ngrids = static_cast<int>(grid->size());
+#pragma omp parallel
+	for (int g = 0; g < ngrids; g++) {
+		const int num_points = needs_helper_grids_ ? grid_data_.helper_num_points_per_atom[g] : grid_data_.num_points_per_atom[g];
+		const int comparator = needs_helper_grids_ ? g : atom_list[g];
+		const vec &gx = (*grid)[g][GridData::GridIndex::X], &gy = (*grid)[g][GridData::GridIndex::Y], &gz = (*grid)[g][GridData::GridIndex::Z];
+		double *single = single_spherical_density[g].data(), *combined = combined_spherical_density[g].data();
 
-		// Add this atom's spherical density contribution to all grids
-		for (int g = 0; g < grid->size(); g++) {
-			const int num_points = needs_helper_grids_ ? grid_data_.helper_num_points_per_atom[g] : grid_data_.num_points_per_atom[g];
-			const int comparator = needs_helper_grids_ ? g : atom_list[g];
-
-#pragma omp parallel for
-			for (int p = 0; p < num_points; p++) {
-
-				const double dist = array_length(d3{ (*grid)[g][GridData::GridIndex::X][p],
-				(*grid)[g][GridData::GridIndex::Y][p],
-				(*grid)[g][GridData::GridIndex::Z][p] }, ax);
-
+#pragma omp for schedule(static) nowait
+		for (int p = 0; p < num_points; p++) {
+			double s = single[p], c = combined[p];
+			for (int atom_idx = 0; atom_idx < ncen; atom_idx++) {
+				const int type_idx = atom_type[atom_idx];
+				if (type_idx == -1)
+					continue;
+				const double dx = gx[p] - atom_pos[atom_idx][0], dy = gy[p] - atom_pos[atom_idx][1], dz = gz[p] - atom_pos[atom_idx][2];
+				if (dx * dx + dy * dy + dz * dz > reach2[type_idx])
+					continue;
 				const double density = cubic_spline_interpolate_spherical_density(
 					radial_density_[type_idx],
 					radial_distances_[type_idx],
 					radial_second_deriv_[type_idx],
-					dist,
+					std::hypot(dx, dy, dz),
 					lincr_,
 					start_dist_);
 
-				if (atom_idx == comparator) {
-					single_spherical_density[g][p] += density;
-				}
-				combined_spherical_density[g][p] += density;
+				if (atom_idx == comparator)
+					s += density;
+				c += density;
 			}
+			single[p] = s;
+			combined[p] = c;
 		}
 	}
 

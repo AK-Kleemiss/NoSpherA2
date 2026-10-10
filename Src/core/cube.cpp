@@ -5,29 +5,38 @@
 #include <charconv>
 
 //The value block of a cube file, %13.5E six per line, formatted with to_chars: byte-identical to the
-//iostream formatting and several times faster
+//iostream formatting and several times faster. One x slab per thread, written in order
 static void write_cube_values(std::ostream& of, const vec3& values, const i3& size, const bool absolute)
 {
-	std::string line;
-	line.reserve(static_cast<size_t>(size[1]) * (size[2] * 13 + size[2] / 6 + 1));
-	char buf[32];
-	for (int run_x = 0; run_x < size[0]; run_x++)
+	const int batch = std::max(1, std::min(omp_get_max_threads(), size[0]));
+	std::vector<std::string> lines(batch);
+	for (int x0 = 0; x0 < size[0]; x0 += batch)
 	{
-		line.clear();
-		for (int run_y = 0; run_y < size[1]; run_y++)
+		const int n = std::min(batch, size[0] - x0);
+#pragma omp parallel for schedule(static, 1)
+		for (int i = 0; i < n; i++)
 		{
-			for (int run_z = 0; run_z < size[2]; run_z++)
+			std::string& line = lines[i];
+			line.clear();
+			line.reserve(static_cast<size_t>(size[1]) * (size[2] * 13 + size[2] / 6 + 1));
+			char buf[32];
+			const int run_x = x0 + i;
+			for (int run_y = 0; run_y < size[1]; run_y++)
 			{
-				const double v = absolute ? std::abs(values[run_x][run_y][run_z]) : values[run_x][run_y][run_z];
-				char* end = std::to_chars(buf, buf + sizeof(buf), v, std::chars_format::scientific, 5).ptr;
-				for (char* c = buf; c != end; c++)
-					if (*c == 'e') *c = 'E';
-				line.append(13 - std::min<size_t>(13, end - buf), ' ');
-				line.append(buf, end);
-				if (run_z % 6 == 5 || run_z + 1 == size[2]) line.push_back('\n');
+				for (int run_z = 0; run_z < size[2]; run_z++)
+				{
+					const double v = absolute ? std::abs(values[run_x][run_y][run_z]) : values[run_x][run_y][run_z];
+					char* end = std::to_chars(buf, buf + sizeof(buf), v, std::chars_format::scientific, 5).ptr;
+					for (char* c = buf; c != end; c++)
+						if (*c == 'e') *c = 'E';
+					line.append(13 - std::min<size_t>(13, end - buf), ' ');
+					line.append(buf, end);
+					if (run_z % 6 == 5 || run_z + 1 == size[2]) line.push_back('\n');
+				}
 			}
 		}
-		of.write(line.data(), line.size());
+		for (int i = 0; i < n; i++)
+			of.write(lines[i].data(), lines[i].size());
 	}
 }
 
@@ -76,7 +85,7 @@ bool cube::write_binary(const std::filesystem::path& given_path, bool absolute) 
 		for (int j = 0; j < 3; j++) put<double>(of, parent_wavefunction->get_atom_coordinate(i, j));
 	}
 	const uint32_t header_bytes = (uint32_t)of.tellp();
-	std::vector<double> row(size[2]);
+	vec row(size[2]);
 	for (int x = 0; x < size[0]; x++)
 		for (int y = 0; y < size[1]; y++)
 		{

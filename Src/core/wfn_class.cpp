@@ -58,12 +58,16 @@ void WFN::reset()
 	group_exponent.clear();
 	center_group_start.clear();
 	center_min_exponent.clear();
+	prim_ao.clear();
+	prim_ao_scale.clear();
+	coef_ao_major.clear();
 	centers.clear();
 	types.clear();
 	exponents.clear();
 	UT_DensityMatrix.clear();
 	UT_SpinDensityMatrix.clear();
 	DM = dMatrix2();
+	DM_beta = dMatrix2();
 	MO_sph = dMatrix2();
 	basis_set = NULL;
 	cub.clear();
@@ -170,7 +174,7 @@ WFN::WFN(const occ::qm::Wavefunction &occ_WF, bool from_file) : WFN()
 		for (const auto &shell : occ_WF.basis.shells()) {
 			for (int spin = 0; spin < n_spin; spin++)
 				for (int m = 3; m <= shell.l; m++)
-					if (m % 4 == 3 || m % 4 == 0) {
+					if (orca_pure_sign_flips(m)) {
 						mo_go.C.row(spin * occ_WF.nbf + row + 2 * m - 1) *= -1.0;
 						mo_go.C.row(spin * occ_WF.nbf + row + 2 * m) *= -1.0;
 					}
@@ -206,6 +210,8 @@ WFN::WFN(const occ::qm::Wavefunction &occ_WF, bool from_file) : WFN()
 		}
 		// insert_into_centers(std::views::repeat(atom+1, n_cart*nprim));
 		for (int j = 0; j < shell.exponents.size(); j++) {
+			//shell type is l + 1, as get_shell_type() and the primitive counters expect (1 = s); an s stored as
+			//0 matches no case and counts nothing.  Only aux bases (origin NOT_YET_DEFINED) store l.
 			push_back_atom_basis_set(atom, shell.exponents(j), shell.contraction_coefficients(j), shell.l + 1, k);
 		}
 		k++;
@@ -449,6 +455,10 @@ void WFN::wfn_to_occ_wavefunction(occ::qm::Wavefunction& occ_wf)
 				Eigen::MatrixXd A = Eigen::Map<const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>(constants::sph2cart(rs.l), rs.n_cart, constants::n_spher(rs.l));
 				if (rs.l == 1) A.setIdentity();
 				occ::Vec MOc = A.completeOrthogonalDecomposition().pseudoInverse() * cart_mo_coeffs;
+				//back to OCC's phases, the reverse of the flip in WFN(occ)
+				for (int m = 3; m <= rs.l; m++)
+					if (orca_pure_sign_flips(m))
+						MOc.segment(2 * m - 1, 2) *= -1.0;
 				C_gaussian_order.block(sph_offset, n, MOc.size(), 1) = MOc;
 				sph_offset += A.cols();
 				write_cursor += rs.n_prim * rs.n_cart;
@@ -1047,42 +1057,19 @@ const int WFN::get_shell_start_in_primitives(const unsigned int &nr_atom, const 
 {
 	if (static_cast<int>(nr_atom) < ncen && nr_shell < atoms[nr_atom].get_shellcount_size())
 	{
+		//cartesian components of a shell: the gap between consecutive first_type blocks, 1, 3, 6, 10, 15, ...,
+		//so g and above count too
+		const auto cart_components = [](const int shell_type) {
+			return (shell_type >= 1 && shell_type < static_cast<int>(std::size(constants::first_type)))
+				? constants::first_type[shell_type] - constants::first_type[shell_type - 1]
+				: 0;
+		};
 		int primitive_counter = 0;
 		for (unsigned int a = 0; a < nr_atom; a++)
 			for (unsigned int s = 0; s < atoms[a].get_shellcount_size(); s++)
-				switch (get_shell_type(a, s))
-				{
-				case 1:
-					primitive_counter += atoms[a].get_shellcount(s);
-					break;
-				case 2:
-					primitive_counter += (3 * atoms[a].get_shellcount(s));
-					break;
-				case 3:
-					primitive_counter += (6 * atoms[a].get_shellcount(s));
-					break;
-				case 4:
-					primitive_counter += (10 * atoms[a].get_shellcount(s));
-					break;
-				}
+				primitive_counter += cart_components(get_shell_type(a, s)) * atoms[a].get_shellcount(s);
 		for (unsigned int s = 0; s < nr_shell; s++)
-		{
-			switch (get_shell_type(nr_atom, s))
-			{
-			case 1:
-				primitive_counter += atoms[nr_atom].get_shellcount(s);
-				break;
-			case 2:
-				primitive_counter += (3 * atoms[nr_atom].get_shellcount(s));
-				break;
-			case 3:
-				primitive_counter += (6 * atoms[nr_atom].get_shellcount(s));
-				break;
-			case 4:
-				primitive_counter += (10 * atoms[nr_atom].get_shellcount(s));
-				break;
-			}
-		}
+			primitive_counter += cart_components(get_shell_type(nr_atom, s)) * atoms[nr_atom].get_shellcount(s);
 		return primitive_counter;
 	}
 	else
@@ -1222,7 +1209,7 @@ bool WFN::build_DM(std::string basis_set_path, bool debug) {
 	for (int i = 0; i < ncen; i++)
 	{
 		elcount += get_atom_charge(i);
-		elcount -= constants::ECP_electrons_pTB[get_atom_charge(i)];
+		elcount -= constants::ECP_core_electrons(constants::ECP_electrons_pTB, get_atom_charge(i));
 	}
 	if (debug)
 		std::cout << "elcount after: " << elcount << std::endl;
@@ -1302,32 +1289,36 @@ bool WFN::build_DM(std::string basis_set_path, bool debug) {
 		}
 
 		//-------------------normalize the basis set shell wise into a copy vector---------
+		//the shell loop below has cartesian norms for s, p, d and f only: a g shell would leave every later
+		//shell's norm_const one shell off, so it is refused.  Generalising needs a g component order no
+		//reader here agrees on.
+		for (int a = 0; a < get_ncen(); a++)
+			for (int s = 0; s < get_atom_shell_count(a); s++)
+			{
+				const int type = get_shell_type(a, s);
+				err_checkf(type >= 1, "The type of shell " + std::to_string(s) + " of atom " +
+					std::to_string(a) + " was never read", std::cout);
+				if (type > 4)
+				{
+					std::cout << "build_DM normalises s, p, d and f shells only; shell " << s
+						<< " of atom " << a << " is of type " << type
+						<< " (l = " << type - 1 << "). Refusing rather than building a density "
+						"matrix from normalisation constants that are one shell out of step.\n";
+					return false;
+				}
+			}
 		vec2 basis_coefficients(get_ncen());
 #pragma omp parallel for
 		for (int a = 0; a < get_ncen(); a++)
 		{
 			for (int p = 0; p < get_atom_primitive_count(a); p++)
 			{
-				double temp_c = get_atom_basis_set_exponent(a, p);
-				switch (get_atom_primitive_type(a, p))
-				{
-				case 1:
-					temp_c = 8 * pow(temp_c, 3) / constants::PI3;
-					break;
-				case 2:
-					temp_c = 128 * pow(temp_c, 5) / constants::PI3;
-					break;
-				case 3:
-					temp_c = 2048 * pow(temp_c, 7) / (9 * constants::PI3);
-					break;
-				case 4:
-					temp_c = 32768 * pow(temp_c, 9) / (225 * constants::PI3);
-					break;
-				case -1:
-					std::cout << "Sorry, the type reading went wrong somwhere, look where it may have gone crazy...\n";
-					break;
-				}
-				temp_c = pow(temp_c, 0.25) * get_atom_basis_set_coefficient(a, p);
+				//axial_prim_norm is the general-l form of the s/p/d/f norms.  Types are validated above, serially:
+				//err_checkf exits, and exiting from inside an OpenMP region does not.
+				const double temp_c =
+					constants::axial_prim_norm(get_atom_primitive_type(a, p) - 1,
+						get_atom_basis_set_exponent(a, p)) *
+					get_atom_basis_set_coefficient(a, p);
 				if (debug)
 					std::cout << "temp_c:" << temp_c << "\n";
 				basis_coefficients[a].push_back(temp_c);
@@ -2365,39 +2356,40 @@ void WFN::set_has_ECPs(const bool &in, const bool &apply_to_atoms, const int &EC
 {
 	has_ECPs = in;
 	ECP_m = ECP_mode;
-	if (apply_to_atoms && ECP_mode == 1) // This is the def2 ECPs
-	{
-#pragma omp parallel for
-		for (int i = 0; i < ncen; i++)
+	if (!apply_to_atoms)
+		return;
+	//1 = def2, 2 = xTB, 3 = pTB; the bound-checked accessor keeps an atom heavier than the tables from
+	//reading past their end
+	auto core_of = [ECP_mode](const int Z)
 		{
-			if (constants::ECP_electrons[get_atom_charge(i)] != 0)
+			switch (ECP_mode)
 			{
-				atoms[i].set_ECP_electrons(constants::ECP_electrons[get_atom_charge(i)]);
+			case 1: return constants::ECP_core_electrons(constants::ECP_electrons, Z);
+			case 2: return constants::ECP_core_electrons(constants::ECP_electrons_xTB, Z);
+			case 3: return constants::ECP_core_electrons(constants::ECP_electrons_pTB, Z);
+			default: return 0;
 			}
-		}
-	}
-	if (apply_to_atoms && ECP_mode == 2) // xTB ECPs
+		};
+	if (ECP_mode < 1 || ECP_mode > 3)
+		return;
+	//past the tables the accessor returns zero, correctly, but a silent zero on a run that asked for ECP
+	//cores counts them as valence, so the heaviest such atom is named
+	int heaviest_beyond_tables = 0;
+	for (int i = 0; i < ncen; i++)
 	{
-#pragma omp parallel for
-		for (int i = 0; i < ncen; i++)
-		{
-			if (constants::ECP_electrons_xTB[get_atom_charge(i)] != 0)
-			{
-				atoms[i].set_ECP_electrons(constants::ECP_electrons_xTB[get_atom_charge(i)]);
-			}
-		}
+		const int Z = get_atom_charge(i);
+		if (Z > constants::heaviest_ECP_element)
+			heaviest_beyond_tables = std::max(heaviest_beyond_tables, Z);
+		//zero: the table declares no core, which is not a declaration of zero, so a count read from the file stays
+		const int core = core_of(Z);
+		if (core != 0)
+			atoms[i].set_ECP_electrons(core);
 	}
-	if (apply_to_atoms && ECP_mode == 3) // pTB ECPs
-	{
-#pragma omp parallel for
-		for (int i = 0; i < ncen; i++)
-		{
-			if (constants::ECP_electrons_pTB[get_atom_charge(i)] != 0)
-			{
-				atoms[i].set_ECP_electrons(constants::ECP_electrons_pTB[get_atom_charge(i)]);
-			}
-		}
-	}
+	if (heaviest_beyond_tables != 0)
+		std::cout << "\nECP cores were asked for, but the tables stop at Z = "
+		<< constants::heaviest_ECP_element << " and this structure contains Z = "
+		<< heaviest_beyond_tables << ": those atoms are treated as all-electron, which is what "
+		"their basis set has to be for the electron count to add up.\n";
 };
 
 void WFN::set_ECPs(ivec &nr, ivec &elcount)
@@ -2452,6 +2444,7 @@ WFN &WFN::operator=(const WFN &right)
 	UT_DensityMatrix = right.UT_DensityMatrix;
 	UT_SpinDensityMatrix = right.UT_SpinDensityMatrix;
 	DM = right.DM;
+	DM_beta = right.DM_beta;
 	MO_sph = right.MO_sph;
 	basis_set = right.basis_set;
 	cub = right.cub;

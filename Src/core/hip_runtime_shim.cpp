@@ -1,12 +1,9 @@
-//The HIP runtime, opened by name instead of linked: a fat binary has to start on a machine
-//without ROCm, and linking or delay-loading amdhip64 fails before main() because clang
-//registers the kernels from static initialisers. The kernel objects import the entry points
-//below by their plain C names; each definition forwards to libamdhip64.so.<major> /
-//amdhip64_<major>.dll once opened. All entry points resolve together and a library missing
-//one counts as absent: hipErrorNoDevice, a device count of zero, a registration that does
-//nothing. hip_runtime_api.h declares the same functions, so a definition whose parameters
-//differ does not compile; a new runtime call in a kernel source is an unresolved symbol at
-//link time and goes into NOSPHERA2_HIP_RUNTIME_ENTRIES.
+//HIP runtime opened by name, not linked: a fat binary must start without ROCm, and linking or
+//delay-loading amdhip64 fails before main() because clang registers kernels from static initialisers.
+//Kernel objects import the entry points below by plain C name; each forwards to the opened library,
+//and a library missing any of them counts as absent. hip_runtime_api.h declares the same functions,
+//so a mismatched signature does not compile; a new runtime call in a kernel source is an unresolved
+//symbol at link time and goes into NOSPHERA2_HIP_RUNTIME_ENTRIES.
 #include <hip/hip_runtime_api.h>
 
 #include <cstdio>
@@ -54,6 +51,8 @@ void __hipUnregisterFatBinary(void** modules);
 	F(hipError_t, hipHostMalloc, (void** ptr, size_t size, unsigned int flags), (ptr, size, flags)) \
 	F(hipError_t, hipFree, (void* ptr), (ptr)) \
 	F(hipError_t, hipHostFree, (void* ptr), (ptr)) \
+	F(hipError_t, hipHostRegister, (void* hostPtr, size_t sizeBytes, unsigned int flags), (hostPtr, sizeBytes, flags)) \
+	F(hipError_t, hipHostUnregister, (void* hostPtr), (hostPtr)) \
 	F(hipError_t, hipMemcpy, (void* dst, const void* src, size_t sizeBytes, hipMemcpyKind kind), (dst, src, sizeBytes, kind)) \
 	F(hipError_t, hipMemcpyAsync, (void* dst, const void* src, size_t sizeBytes, hipMemcpyKind kind, hipStream_t stream), (dst, src, sizeBytes, kind, stream)) \
 	F(hipError_t, hipMemset, (void* dst, int value, size_t sizeBytes), (dst, value, sizeBytes)) \
@@ -90,16 +89,16 @@ const char* const lib_plain = "libamdhip64.so";
 const char* const lib_subdir = "/lib/";
 #endif
 
-//NOSPHERA2_HIP_RUNTIME names the library file outright. Otherwise the versioned name is
-//tried on the loader's own search (PATH, LD_LIBRARY_PATH, the rpath, the usual places),
-//then under ROCM_PATH and HIP_PATH, then /opt/rocm, then the unversioned name the same way.
+//NOSPHERA2_HIP_RUNTIME names the file outright; else the versioned, then the unversioned name, each
+//on the loader's own search, then under ROCM_PATH, HIP_PATH and /opt/rocm. Environment variables, not
+//-tune knobs: the kernel registration opens the runtime before main()
 lib_handle open_runtime()
 {
-	if (const char* file = std::getenv("NOSPHERA2_HIP_RUNTIME")) {
+	if (const char* file = std::getenv("NOSPHERA2_HIP_RUNTIME")) { // Flawfinder: ignore - a library location, like ROCM_PATH
 		if (*file) return open_lib(file);
 	}
 	const char* const names[] = { lib_versioned, lib_plain };
-	const char* const roots[] = { std::getenv("ROCM_PATH"), std::getenv("HIP_PATH"),
+	const char* const roots[] = { std::getenv("ROCM_PATH"), std::getenv("HIP_PATH"), // Flawfinder: ignore - the ROCm install
 #if !defined(_WIN32)
 		"/opt/rocm",
 #endif
@@ -114,8 +113,7 @@ lib_handle open_runtime()
 	return nullptr;
 }
 
-//Resolved once, on the first call into any entry point, so the module constructors before
-//main() and the device probes later get the same answer
+//Resolved once, so the module constructors before main() and later device probes agree
 const hip_runtime& runtime()
 {
 	static const hip_runtime rt = [] {
@@ -141,9 +139,9 @@ const hip_runtime& runtime()
 	return rt;
 }
 
-} //namespace
+}
 
-//The plain forwarders: an error code when the runtime is absent.
+//An error code when the runtime is absent
 #define NOSPHERA2_HIP_FORWARD(name, params, args) \
 	extern "C" hipError_t name params \
 	{ \
@@ -169,6 +167,8 @@ NOSPHERA2_HIP_FORWARD(hipMalloc, (void** ptr, size_t size), (ptr, size))
 NOSPHERA2_HIP_FORWARD(hipHostMalloc, (void** ptr, size_t size, unsigned int flags), (ptr, size, flags))
 NOSPHERA2_HIP_FORWARD(hipFree, (void* ptr), (ptr))
 NOSPHERA2_HIP_FORWARD(hipHostFree, (void* ptr), (ptr))
+NOSPHERA2_HIP_FORWARD(hipHostRegister, (void* hostPtr, size_t sizeBytes, unsigned int flags), (hostPtr, sizeBytes, flags))
+NOSPHERA2_HIP_FORWARD(hipHostUnregister, (void* hostPtr), (hostPtr))
 NOSPHERA2_HIP_FORWARD(hipMemcpy, (void* dst, const void* src, size_t sizeBytes, hipMemcpyKind kind), (dst, src, sizeBytes, kind))
 NOSPHERA2_HIP_FORWARD(hipMemcpyAsync, (void* dst, const void* src, size_t sizeBytes, hipMemcpyKind kind, hipStream_t stream), (dst, src, sizeBytes, kind, stream))
 NOSPHERA2_HIP_FORWARD(hipMemset, (void* dst, int value, size_t sizeBytes), (dst, value, sizeBytes))

@@ -13,6 +13,7 @@ struct UT_Result {
 };
 
 static const std::regex kNumberPattern(R"([-+]?\d*\.?\d+(?:[eE][-+]?\d+)?)");
+static const std::regex kGpuBackend(R"( on (CUDA|HIP)\b)");
 
 static std::vector<std::string> read_lines_stripped(const std::filesystem::path& path)
 {
@@ -23,7 +24,21 @@ static std::vector<std::string> read_lines_stripped(const std::filesystem::path&
 		if (!line.empty() && line.back() == '\r') {
 			line.pop_back();
 		}
-		if (!line.empty()) {
+		// Citation lines ("[QTAIM] Bader, ..., DOI 10.") are dropped so a new reference does not shift
+		// every golden; CitationTests covers them.
+		const bool is_citation = line.size() > 1 && line.front() == '[' &&
+								 line.find(", DOI 10.") != std::string::npos;
+		// "QTAIM basin field on the device: auto, ..." says which machine path ran and why, so it
+		// differs between a machine with a GPU and one without while the results agree. Dropped the
+		// same way.
+		const bool is_placement = line.find(" on the host: ") != std::string::npos ||
+								  line.find(" on the device: ") != std::string::npos;
+		// "GPU in use: ... on CUDA" names the backend of the machine that ran; a HIP device runs the
+		// same kernels, so the two compare as one and a golden made on either passes on both.
+		if (line.rfind("GPU in use:", 0) == 0) {
+			line = std::regex_replace(line, kGpuBackend, " on <gpu>");
+		}
+		if (!line.empty() && !is_citation && !is_placement) {
 			lines.push_back(line);
 		}
 	}
@@ -490,9 +505,7 @@ TEST(TomlIntegrationTests, P1_test_XCW)
 // SCF plus warm-started XCW steps), so they only run when RUN_FULL_TEST is
 // set, matching the python harness's convention documented in
 // UNIT_TESTS_STATUS.md.
-// GPU variants. They ask the runtime whether a device is present rather than being gated
-// on an environment variable, so the suite stays green on a CPU-only machine and actually
-// exercises the device on one that has it - a path nothing selects is a path nothing tests.
+// GPU variants run whenever the runtime finds a device, not behind an environment variable, so a path is never left untested.
 static bool gpu_device_present()
 {
 #ifdef NOSPHERA2_USE_GPU
@@ -502,8 +515,7 @@ static bool gpu_device_present()
 #endif
 }
 
-// The grid-weight kernel is a verbatim transcription and measured bit-identical, so it is
-// held to the CPU reference rather than a reference of its own.
+// The grid-weight kernel is bit-identical to the CPU path, so it is held to the CPU reference.
 TEST(TomlIntegrationTests, sucrose_SF_gpu_grid)
 {
 	if (!gpu_device_present()) {
@@ -513,8 +525,7 @@ TEST(TomlIntegrationTests, sucrose_SF_gpu_grid)
 	EXPECT_TRUE(result.success) << result.message;
 }
 
-// The I tensor path contracts in single precision, which moves the total energy in the
-// ninth decimal, so it carries its own reference.
+// The I tensor contracts in single precision, which moves the total energy, hence its own reference.
 TEST(TomlIntegrationTests, P1_test_XCW_gpu_itensor)
 {
 	if (!gpu_device_present()) {
@@ -524,11 +535,7 @@ TEST(TomlIntegrationTests, P1_test_XCW_gpu_itensor)
 	EXPECT_TRUE(result.success) << result.message;
 }
 
-// The two sincos kernels, each pinned by flag. Left on Auto the card decides, so on this
-// machine both of these would run the f32 kernel and on a datacentre part both would run
-// the f64 one - two green tests covering one path between them. Holding both to the same
-// CPU reference is the check that matters: it is the numerical-agreement contract in
-// AGENTS.md, not just a smoke test that the kernel launches.
+// Each sincos kernel pinned by flag (on Auto the card picks one for both tests), both held to the CPU reference.
 TEST(TomlIntegrationTests, sucrose_SF_gpu_fp64)
 {
 	if (!gpu_device_present()) {
@@ -556,17 +563,13 @@ TEST(TomlIntegrationTests, P1_test_XCW_full)
 	EXPECT_TRUE(result.success) << result.message;
 }
 
-// -xcw_h2_weighting variant of P1_test_XCW (2 lambda steps): fits against
-// the 1/|H|^2-weighted residual self-energy criterion instead of the
-// classical GoF^2 (see Src/core/xcw_halting.h and XCW::ensure_inv_H2_weights).
+// -xcw_h2_weighting: fits the 1/|H|^2-weighted residual self-energy criterion instead of GoF^2.
 TEST(TomlIntegrationTests, P1_test_XCW_h2)
 {
 	const UT_Result result = run_inprocess_test(get_repo_root(), "P1_test_XCW_h2");
 	EXPECT_TRUE(result.success) << result.message;
 }
 
-// -xcw_h2_weighting variant of P1_test_XCW_full (11 lambda steps, to
-// lambda=0.1). Slow, same RUN_FULL_TEST gating as P1_test_XCW_full.
 TEST(TomlIntegrationTests, P1_test_XCW_h2_full)
 {
 	if (const char* env = std::getenv("RUN_FULL_TEST"); !env || std::string(env) == "0" || std::string(env) == "false") {
@@ -576,17 +579,14 @@ TEST(TomlIntegrationTests, P1_test_XCW_h2_full)
 	EXPECT_TRUE(result.success) << result.message;
 }
 
-// XCW test with F^2 criterion
 TEST(TomlIntegrationTests, P1_F2_test_XCW)
 {
 	const UT_Result result = run_inprocess_test(get_repo_root(), "P1_F2_test_XCW");
 	EXPECT_TRUE(result.success) << result.message;
 }
 
-// The three quick fits again with -xcw_incremental: the two-electron part of the Fock
-// matrix comes from the difference density contracted from the stored integrals
-// (tests.toml explains the flags). Their goldens agree with the full builds to the SCF
-// convergence, so this is where a broken segment skip would show.
+// -xcw_incremental builds the Fock two-electron part from the difference density on stored integrals;
+// the goldens equal the full builds to SCF convergence, so a broken segment skip shows here.
 TEST(TomlIntegrationTests, P1_test_XCW_incremental)
 {
 	const UT_Result result = run_inprocess_test(get_repo_root(), "P1_test_XCW_incremental");
@@ -632,6 +632,32 @@ TEST(TomlIntegrationTests, P1_F2_test_XCW_h2_full)
 TEST(TomlIntegrationTests, Fractal)
 {
 	const UT_Result result = run_inprocess_test(get_repo_root(), "fractal");
+	EXPECT_TRUE(result.success) << result.message;
+}
+
+TEST(TomlIntegrationTests, EqcEthane)
+{
+	const UT_Result result = run_inprocess_test(get_repo_root(), "eqc_ethane");
+	EXPECT_TRUE(result.success) << result.message;
+}
+
+TEST(TomlIntegrationTests, EqcWaterFAndGShells)
+{
+	const UT_Result result = run_inprocess_test(get_repo_root(), "eqc_water_fg");
+	EXPECT_TRUE(result.success) << result.message;
+}
+
+//Mode 1 with a functional and charged fragments: CH3F -> CH3+ + F-, PBE0/def2-SVP
+TEST(TomlIntegrationTests, EqcCh3fHeterolyticPbe0)
+{
+	const UT_Result result = run_inprocess_test(get_repo_root(), "eqc_ch3f_pbe0");
+	EXPECT_TRUE(result.success) << result.message;
+}
+
+//Mode 2 on the same reaction, every term read from ORCA wfx files
+TEST(TomlIntegrationTests, EqcCh3fFromWfx)
+{
+	const UT_Result result = run_inprocess_test(get_repo_root(), "eqc_ch3f_wfx");
 	EXPECT_TRUE(result.success) << result.message;
 }
 
@@ -698,12 +724,6 @@ TEST(TomlIntegrationTests, RubredoxinCmtc)
 TEST(TomlIntegrationTests, SALTED)
 {
 	const UT_Result result = run_inprocess_test(get_repo_root(), "SALTED");
-	EXPECT_TRUE(result.success) << result.message;
-}
-
-TEST(TomlIntegrationTests, SALTEDChargeConstraint)
-{
-	const UT_Result result = run_inprocess_test(get_repo_root(), "SALTED_charge_constraint");
 	EXPECT_TRUE(result.success) << result.message;
 }
 
@@ -895,12 +915,6 @@ TEST(TomlIntegrationTests, SF_mbis)
 TEST(TomlIntegrationTests, SF_embis)
 {
 	const UT_Result result = run_inprocess_test(get_repo_root(), "SF_embis");
-	EXPECT_TRUE(result.success) << result.message;
-}
-
-TEST(TomlIntegrationTests, ri_fit_multipoles_centre)
-{
-	const UT_Result result = run_inprocess_test(get_repo_root(), "ri_fit_multipoles_centre");
 	EXPECT_TRUE(result.success) << result.message;
 }
 

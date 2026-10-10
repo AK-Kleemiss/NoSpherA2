@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -13,19 +13,38 @@
       <Configuration>Debug</Configuration>
       <Platform>x64</Platform>
     </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|ARM64">
+      <Configuration>Debug</Configuration>
+      <Platform>ARM64</Platform>
+    </ProjectConfiguration>
     <ProjectConfiguration Include="Profile|x64">
       <Configuration>Profile</Configuration>
       <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Profile|ARM64">
+      <Configuration>Profile</Configuration>
+      <Platform>ARM64</Platform>
     </ProjectConfiguration>
     <ProjectConfiguration Include="Release|x64">
       <Configuration>Release</Configuration>
       <Platform>x64</Platform>
     </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|ARM64">
+      <Configuration>Release</Configuration>
+      <Platform>ARM64</Platform>
+    </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\tests\src\BetaSphereTests.cpp" />
     <ClCompile Include="..\..\tests\src\DeltaSeriesTests.cpp" />
     <ClCompile Include="..\..\tests\src\DensitySourceTests.cpp" />
+    <ClCompile Include="..\..\tests\src\CliRefusalTests.cpp" />
+    <ClCompile Include="..\..\tests\src\RgbiRobustnessTests.cpp" />
+    <ClCompile Include="..\..\tests\src\BondingGuardsTests.cpp" />
     <ClCompile Include="..\..\tests\src\Nbo47Tests.cpp" />
+    <ClCompile Include="..\..\tests\src\NboNativeTests.cpp" />
+    <ClCompile Include="..\..\tests\src\NrtTests.cpp" />
+    <ClCompile Include="..\..\tests\src\NboSearchTests.cpp" />
     <ClCompile Include="..\..\tests\src\pch.cpp">
       <PrecompiledHeader>Create</PrecompiledHeader>
     </ClCompile>
@@ -36,19 +55,30 @@
     <ClCompile Include="..\..\tests\src\BasisConstantsTests.cpp" />
     <ClCompile Include="..\..\tests\src\BondwiseTests.cpp" />
     <ClCompile Include="..\..\tests\src\CellMathTests.cpp" />
+    <ClCompile Include="..\..\tests\src\CitationTests.cpp" />
     <ClCompile Include="..\..\tests\src\ConvenienceTests.cpp" />
     <ClCompile Include="..\..\tests\src\CubeTests.cpp" />
+    <ClCompile Include="..\..\tests\src\DelocalizationTests.cpp" />
+    <ClCompile Include="..\..\tests\src\EliFamilyTests.cpp" />
+    <ClCompile Include="..\..\tests\src\EqcTests.cpp" />
+    <ClCompile Include="..\..\tests\src\ExtinctionTests.cpp" />
     <ClCompile Include="..\..\tests\src\FieldSurfaceTests.cpp" />
     <ClCompile Include="..\..\tests\src\GridTests.cpp" />
     <ClCompile Include="..\..\tests\src\HighAngularTests.cpp" />
     <ClCompile Include="..\..\tests\src\LibcintDispatchTests.cpp" />
     <ClCompile Include="..\..\tests\src\MathFunctionTests.cpp" />
+    <ClCompile Include="..\..\tests\src\MoldenConventionTests.cpp" />
+    <ClCompile Include="..\..\tests\src\IboTests.cpp" />
+    <ClCompile Include="..\..\tests\src\NaoTests.cpp" />
+    <ClCompile Include="..\..\tests\src\OccSecondOrderScfTests.cpp" />
     <ClCompile Include="..\..\tests\src\PropertiesTests.cpp" />
     <ClCompile Include="..\..\tests\src\RiEnergyTests.cpp" />
     <ClCompile Include="..\..\tests\src\SaltedFchkTests.cpp" />
     <ClCompile Include="..\..\tests\src\ScatteringFactorTests.cpp" />
     <ClCompile Include="..\..\tests\src\StoredEriTests.cpp" />
+    <ClCompile Include="..\..\tests\src\StreamingBasinTests.cpp" />
     <ClCompile Include="..\..\tests\src\StringUtilTests.cpp" />
+    <ClCompile Include="..\..\tests\src\TopologyTests.cpp" />
     <ClCompile Include="..\..\tests\src\TscIoTests.cpp" />
     <ClCompile Include="..\..\tests\src\WfnOpsTests.cpp" />
     <ClCompile Include="..\..\tests\src\WfnReadTests.cpp" />
@@ -97,7 +127,15 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
     <Import Project="..\Windows_utils\NoSpherA2_debug.props" />
   </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+    <Import Project="..\Windows_utils\NoSpherA2_debug.props" />
+  </ImportGroup>
   <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Profile|x64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+    <Import Project="..\Windows_utils\NoSpherA2_profile.props" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Profile|ARM64'" Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
     <Import Project="..\Windows_utils\NoSpherA2_profile.props" />
   </ImportGroup>
@@ -105,9 +143,19 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
     <Import Project="..\Windows_utils\NoSpherA2_release.props" />
   </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+    <Import Project="..\Windows_utils\NoSpherA2_release.props" />
+  </ImportGroup>
   <ItemDefinitionGroup>
     <ClCompile>
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);$(NosMainFolder)Src</AdditionalIncludeDirectories>
+      <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/bigobj %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">/bigobj %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">/bigobj %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Profile|ARM64'">/bigobj %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/bigobj %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">/bigobj %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <AdditionalDependencies>gtest.lib;%(AdditionalDependencies)</AdditionalDependencies>

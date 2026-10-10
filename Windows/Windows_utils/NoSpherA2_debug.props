@@ -7,9 +7,9 @@
       <WarningLevel>Level4</WarningLevel>
       <SDLCheck>false</SDLCheck>
       <UseDynamicDebugging>false</UseDynamicDebugging>
-      <PreprocessorDefinitions>%(PreprocessorDefinitions);_CONSOLE;_CRT_SECURE_NO_WARNINGS;SPDLOG_COMPILED_LIB;DEBUG_;X64</PreprocessorDefinitions>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);_CONSOLE;_CRT_SECURE_NO_WARNINGS;SPDLOG_COMPILED_LIB;DEBUG_;$(NosArchDefine)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);$(NosMainFolder)deps-install-debug/include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);$(NosMainFolder)deps-install-debug$(NosDepsSuffix)/include</AdditionalIncludeDirectories>
       <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
       <Optimization>Disabled</Optimization>
     </ClCompile>
@@ -18,11 +18,11 @@
       <OptimizeReferences>false</OptimizeReferences>
       <EnableCOMDATFolding>false</EnableCOMDATFolding>
       <LinkTimeCodeGeneration>Default</LinkTimeCodeGeneration>
-      <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories);$(NosMainFolder)deps-install-debug/lib</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories);$(NosMainFolder)deps-install-debug$(NosDepsSuffix)/lib</AdditionalLibraryDirectories>
       <AdditionalDependencies>fmtd.lib;spdlogd.lib;tbb12_debug.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <Lib>
-      <AdditionalLibraryDirectories>$(NosMainFolder)deps-install-debug/lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(NosMainFolder)deps-install-debug$(NosDepsSuffix)/lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>fmtd.lib;spdlogd.lib;tbb12_debug.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Lib>
   </ItemDefinitionGroup>

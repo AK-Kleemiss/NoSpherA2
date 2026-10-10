@@ -44,6 +44,10 @@ public:
 		_elementCounts[element] = count;
 		_elementOffsets[element] = _primitiveCount;
 	}
+	void set_range_for_element(int element, int offset, int count) {
+		_elementCounts[element] = count;
+		_elementOffsets[element] = offset;
+	}
 
 	void add_owned_primitive(const SimplePrimitive& primitive) {
 		_ownedPrimitives.emplace_back(primitive);
@@ -87,6 +91,7 @@ private:
 namespace BasisSetLibrary {
 	// Access basis sets
 	std::shared_ptr<BasisSet> get_basis_set(std::string basis_name);
+	std::shared_ptr<BasisSet> get_basis_set_with_overrides(const std::string& basis_name, const std::filesystem::path& path);
 	bool check_basis_set_exists(std::string basis_name);
 
 	bool read_basis_set_vanilla(const std::filesystem::path& basis_set_path, WFN& wave, const bool& debug);
@@ -94,6 +99,6 @@ namespace BasisSetLibrary {
 	bool read_basis_set_missing(const std::filesystem::path& basis_set_path, WFN& wave, bool debug);
 }
 
-int load_basis_into_WFN(WFN& wavy, const std::shared_ptr<BasisSet> b,const bool decontract = true, const bool complete = false);
-WFN generate_aux_wfn(const WFN& orbital_wfn, std::vector<std::shared_ptr<BasisSet>>& aux_basis, const bool decontract = true);
+int load_basis_into_WFN(WFN& wavy, const std::shared_ptr<BasisSet> b,const bool decontract = false, const bool complete = false);
+WFN generate_aux_wfn(const WFN& orbital_wfn, std::vector<std::shared_ptr<BasisSet>>& aux_basis, const bool decontract = false);
 

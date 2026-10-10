@@ -7,6 +7,7 @@
 
 #include <array>
 #include <cmath>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -314,12 +315,27 @@ namespace
 		{
 			if (line.rfind("  total in basins:", 0) == 0)
 				break;
+			//the label column holds spaces ("NNA near H0", "H2-Hg0 bond"), so a single >> would drop such rows silently
 			std::istringstream row(line);
-			int idx;
-			std::string label;
-			double electrons, charge;
-			if (row >> idx >> label >> electrons >> charge)
-				rows[label] = { electrons, charge };
+			std::vector<std::string> tok;
+			for (std::string t; row >> t; )
+				tok.push_back(t);
+			if (tok.size() < 4)
+				continue;
+			//the label runs from token 1 to the first numeric token; counting from the end would depend on how many columns are printed
+			size_t first_num = 1;
+			auto is_number = [](const std::string& t) {
+				try { size_t used = 0; (void)std::stod(t, &used); return used == t.size(); }
+				catch (const std::exception&) { return false; }
+			};
+			while (first_num < tok.size() && !is_number(tok[first_num]))
+				first_num++;
+			if (first_num < 2 || first_num + 1 >= tok.size() || !is_number(tok[0]))
+				continue; //not a data row
+			std::string label = tok[1];
+			for (size_t t = 2; t < first_num; t++)
+				label += " " + tok[t];
+			rows[label] = { std::stod(tok[first_num]), std::stod(tok[first_num + 1]) };
 		}
 		return rows;
 	}
@@ -557,12 +573,9 @@ TEST(BondwiseCoverageRobyTests, EpoxideCarbonCarbonRowKeepsTheIdentities)
 }
 
 //wavefunction mode: the two-shell H2 model is written as a .wfn, read back and gridded with radius 1.1 A and 0.5 A steps,
-//which is 7 x 5 x 5 points from (-1 - r, -r, -r) with r = ang2bohr(1.1) = 2.0787 bohr and steps (2 + 2r) / 7 and
-//2r / 5. Only points strictly inside r of a nucleus are evaluated, so the y = z = -r planes and the x = -1 - r
-//plane stay empty and the basin of H0 (the half space x < 0) covers the x columns 1..3 and the y, z rows 1..4:
-//a 3 x 4 x 4 cube from (-1 - r + (2 + 2r) / 7, -0.6 r, -0.6 r). Of its 48 voxels the four corners at x index 0,
-//|y| = |z| = 0.6 r lie 2.13 bohr from H0 and carry the background; the other 44 hold the finite, positive ELI-D
-//(the x = -2.20 column lies more than 3.15 bohr from H1, which is why the model needs its second shell)
+//which is 8 x 6 x 6 points with r = ang2bohr(1.1); the counts are even (readxyzMinMax_fromWFN), which puts x index 4 on
+//the H-H mirror plane. Only points strictly inside r of a nucleus are evaluated, so H0's basin is a 4 x 5 x 5 cube whose
+//eight corner voxels lie beyond r and carry the background; the other 92 hold ELI-D (the far column needs H1's second shell)
 TEST(BondwiseCoverageMaskTests, WfnModeMasksTheFirstHydrogenBasin)
 {
 	Scratch s("WfnModeMasksTheFirstHydrogenBasin");
@@ -580,17 +593,19 @@ TEST(BondwiseCoverageMaskTests, WfnModeMasksTheFirstHydrogenBasin)
 		run_QTAIM_ELI_mask(wfn_path, {}, { 0 }, -1.0, opt, log);
 	}
 	EXPECT_NE(log.str().find("Loading wavefunction: "), std::string::npos) << log.str();
-	EXPECT_NE(log.str().find("Calculating density and ELI grid (7 x 5 x 5)"), std::string::npos) << log.str();
+	EXPECT_NE(log.str().find("Calculating density and ELI grid (8 x 6 x 6)"), std::string::npos) << log.str();
 	const auto masked = s.dir / "eli_qtaim_masked.cube";
 	ASSERT_TRUE(std::filesystem::exists(masked));
 	const cube c = read_cube(masked);
 	EXPECT_NE(c.get_comment1().find("QTAIM-masked ELI"), std::string::npos);
 	EXPECT_NE(c.get_comment2().find("Selected atoms: 0"), std::string::npos);
 	const double r = constants::ang2bohr(1.1);
-	const double step_x = (2.0 + 2.0 * r) / 7.0, step_yz = 2.0 * r / 5.0;
-	ASSERT_EQ(c.get_size(0), 3);
-	ASSERT_EQ(c.get_size(1), 4);
-	ASSERT_EQ(c.get_size(2), 4);
+	const double step_x = (2.0 + 2.0 * r) / 8.0, step_yz = 2.0 * r / 6.0;
+	ASSERT_EQ(c.get_size(0), 4);
+	ASSERT_EQ(c.get_size(1), 5);
+	ASSERT_EQ(c.get_size(2), 5);
+	//1e-6, not 0: the cube header stores the origin and step in six decimals
+	EXPECT_NEAR(c.get_origin(0) + 3.0 * step_x, 0.0, 1e-6) << "the last x column is the mirror plane itself";
 	EXPECT_NEAR(c.get_origin(0), -1.0 - r + step_x, 1e-5);
 	EXPECT_NEAR(c.get_origin(1), -r + step_yz, 1e-5);
 	EXPECT_NEAR(c.get_origin(2), -r + step_yz, 1e-5);
@@ -598,12 +613,12 @@ TEST(BondwiseCoverageMaskTests, WfnModeMasksTheFirstHydrogenBasin)
 	EXPECT_NEAR(c.get_vector(1, 1), step_yz, 1e-5);
 	EXPECT_NEAR(c.get_vector(2, 2), step_yz, 1e-5);
 	int kept = 0, background = 0;
-	for (int i = 0; i < 3; i++)
-		for (int j = 0; j < 4; j++)
-			for (int k = 0; k < 4; k++)
+	for (int i = 0; i < 4; i++)
+		for (int j = 0; j < 5; j++)
+			for (int k = 0; k < 5; k++)
 			{
 				const double v = c.get_value(i, j, k);
-				const bool corner = i == 0 && (j == 0 || j == 3) && (k == 0 || k == 3);
+				const bool corner = (i == 0 || i == 3) && (j == 0 || j == 4) && (k == 0 || k == 4);
 				if (v == -1.0)
 				{
 					EXPECT_TRUE(corner) << "background at " << i << " " << j << " " << k;
@@ -615,15 +630,16 @@ TEST(BondwiseCoverageMaskTests, WfnModeMasksTheFirstHydrogenBasin)
 				EXPECT_GT(v, 0.0);
 				kept++;
 			}
-	EXPECT_EQ(kept, 44);
-	EXPECT_EQ(background, 4);
+	EXPECT_EQ(kept, 92);
+	EXPECT_EQ(background, 8);
 }
 
 //debug run of ELI_analysis on the two-Gaussian H2 model: rho = 4 (exp(-2 r_a^2) + exp(-2 r_b^2)) has the two nuclear
 //maxima (at x = +-0.99933, the tail of the other Gaussian pulls them in by 2 exp(-8)) and one saddle at the origin
 //with Hessian eigenvalues (-4, -4, 12) rho, Laplacian 4 rho and ellipticity 0; the debug listing adds the eigenvectors
 //and the x axis carries the positive curvature. The QTAIM basins split at the midplane, so both hydrogens hold the
-//same electron count and charge = Z - electrons; -debug also drops rho.cube and eli.cube into the working directory
+//same electron count and charge = Z - electrons. The default path is analytic, so -debug drops no rho.cube or eli.cube,
+//and the bond point at 2 bohr (beyond 1.3 x the covalent radii) must still be found
 TEST(BondwiseCoverageEliTests, DebugListsTheCriticalPointsOfTwoGaussians)
 {
 	Scratch s("DebugListsTheCriticalPointsOfTwoGaussians");
@@ -640,9 +656,10 @@ TEST(BondwiseCoverageEliTests, DebugListsTheCriticalPointsOfTwoGaussians)
 		ELI_analysis(wavy, opt);
 		out = cap.str();
 	}
-	EXPECT_TRUE(std::filesystem::exists(s.dir / "rho.cube"));
-	EXPECT_TRUE(std::filesystem::exists(s.dir / "eli.cube"));
-	EXPECT_NE(out.find("Calcualting grid of size 18 x 13 x 13"), std::string::npos);
+	EXPECT_FALSE(std::filesystem::exists(s.dir / "rho.cube"));
+	EXPECT_FALSE(std::filesystem::exists(s.dir / "eli.cube"));
+	EXPECT_EQ(out.find("Calcualting grid of size"), std::string::npos) << out;
+	EXPECT_NE(out.find("NCP 2, BCP 1, RCP 0, CCP 0; Poincare-Hopf sum 1 against 1 (COMPLETE)"), std::string::npos) << out;
 	EXPECT_NE(out.find("Density Critical Points (3 found):"), std::string::npos);
 	const std::vector<CriticalPoint> cps = parse_critical_points(out);
 	ASSERT_EQ(cps.size(), 3u) << out;
@@ -678,10 +695,232 @@ TEST(BondwiseCoverageEliTests, DebugListsTheCriticalPointsOfTwoGaussians)
 	EXPECT_EQ(attractors, 2);
 	EXPECT_EQ(bonds, 1);
 	const auto rows = parse_qtaim_table(out);
+	ASSERT_EQ(rows.size(), 2u) << out;
 	ASSERT_TRUE(rows.count("H0") && rows.count("H1")) << out;
 	const double e0 = rows.at("H0").first, e1 = rows.at("H1").first;
 	EXPECT_GT(e0, 0.0);
 	EXPECT_NEAR(e0, e1, 5e-3 * (e0 + e1));
 	EXPECT_NEAR(rows.at("H0").second, 1.0 - e0, 2e-4);
 	EXPECT_NEAR(rows.at("H1").second, 1.0 - e1, 2e-4);
+}
+
+//the same H2 model through -basin_cube: the cube files and the grid line appear, the two hydrogen basins stay equal
+TEST(BondwiseCoverageEliTests, BasinCubeFallbackStillBuildsTheGrid)
+{
+	Scratch s("BasinCubeFallbackStillBuildsTheGrid");
+	std::filesystem::current_path(s.dir);
+	WFN wavy = h2_wfn();
+	wavy.set_path(s.dir / "h2.wfn");
+	options opt;
+	opt.debug = true;
+	opt.basin_cube = true;
+	opt.properties.radius = 1.6;
+	opt.properties.resolution = 0.25;
+	std::string out;
+	{
+		CoutCapture cap;
+		ELI_analysis(wavy, opt);
+		out = cap.str();
+	}
+	EXPECT_TRUE(std::filesystem::exists(s.dir / "rho.cube"));
+	EXPECT_TRUE(std::filesystem::exists(s.dir / "eli.cube"));
+	EXPECT_NE(out.find("Calcualting grid of size 18 x 14 x 14"), std::string::npos) << out;
+	EXPECT_NE(out.find("Density Critical Points (3 found):"), std::string::npos) << out;
+	const auto rows = parse_qtaim_table(out);
+	ASSERT_EQ(rows.size(), 2u) << out;
+	ASSERT_TRUE(rows.count("H0") && rows.count("H1")) << out;
+	EXPECT_NEAR(rows.at("H0").first, rows.at("H1").first, 5e-3 * (rows.at("H0").first + rows.at("H1").first));
+}
+
+//real tables print labels with spaces for NNA, lone-pair and bond basins; two of the three rows here carry one
+TEST(BondwiseCoverageEliTests, QtaimTableParserKeepsLabelsThatCarrySpaces)
+{
+	const std::string out =
+		"QTAIM Analysis (atomic quadrature grids):\n"
+		"  basin  label               electrons     charge      volume         maximum        x          y          z\n"
+		"      1  Hg0                   79.4496     0.5504  12885.2903     367149.1320      0.000      0.000      0.000\n"
+		"      2  NNA near H0            0.1234    -0.1234     42.0000          1.2300      0.500      0.000      0.000\n"
+		"      3  H2-Hg0 bond            0.9000     0.1000     99.0000          0.4500     -0.500      0.000      0.000\n"
+		"  total in basins:     80.4730   outside every basin:     0.0100\n";
+	const auto rows = parse_qtaim_table(out);
+	ASSERT_EQ(rows.size(), 3u);
+	EXPECT_NEAR(rows.at("Hg0").first, 79.4496, 1e-9);
+	EXPECT_NEAR(rows.at("NNA near H0").first, 0.1234, 1e-9);
+	EXPECT_NEAR(rows.at("NNA near H0").second, -0.1234, 1e-9);
+	EXPECT_NEAR(rows.at("H2-Hg0 bond").first, 0.9000, 1e-9);
+	EXPECT_NEAR(rows.at("H2-Hg0 bond").second, 0.1000, 1e-9);
+	//a single >> for the label keeps one row of the three, so this test cannot become a tautology
+	size_t naive = 0;
+	std::istringstream in(out);
+	for (std::string line; std::getline(in, line); )
+	{
+		std::istringstream row(line);
+		int idx = 0; std::string label; double electrons = 0.0, charge = 0.0;
+		if (row >> idx >> label >> electrons >> charge)
+			naive++;
+	}
+	EXPECT_EQ(naive, 1u) << "the old parser kept only the row whose label is a single word";
+}
+
+namespace {
+
+	//every "total in basins: X   outside every basin: Y" line, in the order printed
+	std::vector<std::pair<double, double>> parse_basin_totals(const std::string& out)
+	{
+		std::vector<std::pair<double, double>> totals;
+		const std::string key = "  total in basins:", mid = "outside every basin:";
+		for (size_t at = out.find(key); at != std::string::npos; at = out.find(key, at + 1))
+		{
+			const size_t m = out.find(mid, at);
+			if (m == std::string::npos)
+				break;
+			totals.emplace_back(std::strtod(out.c_str() + at + key.size(), nullptr),
+								std::strtod(out.c_str() + m + mid.size(), nullptr));
+		}
+		return totals;
+	}
+
+}  // namespace
+
+//An ECP wavefunction's two tables close on different counts, both right: HgH2 with the def2 ECP on Hg has 22 orbital
+//electrons, the QTAIM arm adds the 60-electron core as a Thakkar density (82), ELI-D sees only the orbitals (22).
+//Conservation, not populations, is asserted: every quadrature point goes to a basin or outside, at any resolution.
+TEST(BondwiseCoverageEliTests, TheEcpBasinTablesCloseOnTheirOwnElectronCounts)
+{
+	const std::filesystem::path p = nos_test_repo_root() / "tests" / "ELI_heavy" / "hgh2_ecp.gbw";
+	if (!std::filesystem::exists(p))
+		GTEST_SKIP() << "tests/ELI_heavy/hgh2_ecp.gbw not found";
+	Scratch s("TheEcpBasinTablesCloseOnTheirOwnElectronCounts");
+	std::filesystem::current_path(s.dir);
+
+	WFN wavy(p);
+	ASSERT_TRUE(wavy.get_has_ECPs());
+	const double explicit_electrons = wavy.count_nr_electrons();
+	const double cores = static_cast<double>(wavy.get_nr_ECP_electrons());
+	ASSERT_NEAR(explicit_electrons, 22.0, 1e-9);
+	ASSERT_NEAR(cores, 60.0, 1e-9);
+
+	options opt;
+	opt.properties.radius = 2.0;
+	opt.properties.resolution = 0.4;
+	std::string out;
+	{
+		CoutCapture cap;
+		ELI_analysis(wavy, opt);
+		out = cap.str();
+	}
+
+	const auto totals = parse_basin_totals(out);
+	ASSERT_EQ(totals.size(), 2u) << "expected a QTAIM table and an ELI-D table\n" << out;
+	const double qtaim = totals[0].first + totals[0].second;
+	const double eli = totals[1].first + totals[1].second;
+	EXPECT_NEAR(qtaim, explicit_electrons + cores, 1e-2 * (explicit_electrons + cores))
+		<< "the QTAIM arm integrates the Thakkar cores too, so it must close on "
+		<< explicit_electrons + cores << " electrons\n" << out;
+	EXPECT_NEAR(eli, explicit_electrons, 1e-2 * explicit_electrons)
+		<< "the ELI-D arm sees only the orbitals, so it must close on " << explicit_electrons
+		<< " electrons\n" << out;
+	EXPECT_NEAR(qtaim - eli, cores, 2e-2 * cores)
+		<< "the difference between the two arms is the ECP core the one fills and the other cannot see";
+}
+
+// A free atom is what ELI-D is calibrated against: basins plus what left them close on the file's electron count and
+// no basin is a bond. A label branch that needs two atoms aborts in err_checkf, killing the binary rather than failing.
+TEST(BondwiseCoverageEliTests, AFreeAtomIsAnalysedAndItsBasinsCloseOnItsOwnElectrons)
+{
+	const std::filesystem::path p = nos_test_repo_root() / "tests" / "molden_file" / "f_ref.wfx";
+	if (!std::filesystem::exists(p))
+		GTEST_SKIP() << "tests/molden_file/f_ref.wfx not found";
+	Scratch s("AFreeAtomIsAnalysedAndItsBasinsCloseOnItsOwnElectrons");
+	std::filesystem::current_path(s.dir);
+
+	WFN wavy(p);
+	ASSERT_EQ(wavy.get_ncen(), 1) << "the fixture is meant to be a single fluoride ion";
+	const double electrons = wavy.count_nr_electrons();
+	ASSERT_NEAR(electrons, 10.0, 1e-9) << "f_ref.wfx declares 10 electrons (F-)";
+
+	options opt;
+	opt.properties.radius = 2.5;
+	opt.properties.resolution = 0.3;
+	std::string out;
+	{
+		CoutCapture cap;
+		ELI_analysis(wavy, opt);
+		out = cap.str();
+	}
+
+	const auto totals = parse_basin_totals(out);
+	ASSERT_EQ(totals.size(), 2u) << "expected a QTAIM table and an ELI-D table\n" << out;
+	EXPECT_NEAR(totals[0].first + totals[0].second, electrons, 1e-2 * electrons)
+		<< "QTAIM on one atom: everything is in that atom's basin\n" << out;
+	EXPECT_NEAR(totals[1].first + totals[1].second, electrons, 1e-2 * electrons)
+		<< "ELI-D on one atom: core shells plus valence, and nothing may go missing\n" << out;
+	EXPECT_EQ(out.find(" bond"), std::string::npos)
+		<< "a lone atom has no bond basin, so no label may carry one\n" << out;
+	//the label is the atom's label plus its index, so F1 prints "F10"
+	const std::string own = wavy.get_atom_label(0) + "0";
+	EXPECT_NE(out.find(own), std::string::npos) << "every basin belongs to atom " << own << "\n" << out;
+}
+
+namespace
+{
+	//population (the first number) of each "  basin  label ..." row of the table after `after`, up to its "total in basins" line
+	std::map<std::string, double> parse_basin_rows(const std::string& out, const std::string& after)
+	{
+		std::map<std::string, double> rows;
+		const size_t start = out.find(after);
+		if (start == std::string::npos)
+			return rows;
+		const size_t stop = out.find("total in basins", start);
+		std::istringstream in(out.substr(start, stop == std::string::npos ? std::string::npos : stop - start));
+		std::string line;
+		while (std::getline(in, line))
+		{
+			std::istringstream row(line);
+			int index = 0;
+			std::string label;
+			double value = 0;
+			if (row >> index >> label >> value)
+				rows[label] = value;   //a two-word label ("H2-Li4 bond") keeps its first word, which is enough
+		}
+		return rows;
+	}
+}  // namespace
+
+//nh3li.gbw has Li on the three-fold axis, so H1, H2 and H3 must carry the same population, checkable without a
+//reference program. Only the QTAIM arm is asserted: the ELI-D voxel watershed breaks the orbit at every resolution the
+//suite can afford, while its conserved total holds.
+TEST(BondwiseCoverageEliTests, QtaimHoldsTheThreefoldOrbitOfNH3Li)
+{
+	const std::filesystem::path p = nos_test_repo_root() / "tests" / "RGBI_groups" / "nh3li.gbw";
+	if (!std::filesystem::exists(p))
+		GTEST_SKIP() << "tests/RGBI_groups/nh3li.gbw not found";
+	Scratch s("QtaimHoldsTheThreefoldOrbitOfNH3Li");
+	std::filesystem::current_path(s.dir);
+
+	WFN wavy(p);
+	ASSERT_EQ(wavy.get_ncen(), 5);
+	options opt;
+	opt.properties.radius = 2.5;
+	opt.properties.resolution = 0.4;   //the QTAIM basins follow the analytic gradient, so this only sizes the ELI arm
+	std::string out;
+	{
+		CoutCapture cap;
+		ELI_analysis(wavy, opt);
+		out = cap.str();
+	}
+
+	const auto rows = parse_basin_rows(out, "QTAIM Analysis");
+	ASSERT_EQ(rows.count("H1") + rows.count("H2") + rows.count("H3"), 3u)
+		<< "expected one QTAIM basin per hydrogen\n" << out;
+	const double h1 = rows.at("H1"), h2 = rows.at("H2"), h3 = rows.at("H3");
+	EXPECT_NEAR(h1, h2, 2e-3) << "H1 and H2 are related by the three-fold axis\n" << out;
+	EXPECT_NEAR(h1, h3, 2e-3) << "H1 and H3 are related by the three-fold axis\n" << out;
+	EXPECT_NEAR(h2, h3, 2e-3) << "H2 and H3 are related by the three-fold axis\n" << out;
+
+	//and the whole table closes on the molecule's own electron count, 13 for NH3Li
+	const auto totals = parse_basin_totals(out);
+	ASSERT_GE(totals.size(), 1u) << out;
+	const double electrons = wavy.count_nr_electrons();
+	EXPECT_NEAR(totals[0].first + totals[0].second, electrons, 1e-2 * electrons) << out;
 }

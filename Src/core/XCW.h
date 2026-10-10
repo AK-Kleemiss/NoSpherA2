@@ -6,7 +6,9 @@
 #include "cell.h"
 #include "basis_set.h"
 #include "xcw_halting.h"
+#include "extinction.h"
 #include <occ/qm/hf.h>
+#include <occ/qm/second_order_scf.h>
 #include "i_tensor_stream.h"
 #include "stored_eri.h"
 #include <thread>
@@ -14,6 +16,13 @@
 
 // Applies M to the U/C/D tensors of one atom in their Voigt storage: T'_{ij..} = sum_pq.. M_pi M_qj .. T_pq..
 void transform_ADPs(vec2& ADPs, const vec2& M);
+// r^l * spherical_harmonic(l, m, r/|r|) as monomials {x^i y^j z^k, coefficient}; residual is the max misfit of the fit
+std::vector<std::pair<i3, double>> solid_harmonic_monomials(const int l, const int m, double* residual = nullptr);
+// Upper bound on int |chi_a chi_b| d3r for two contracted AOs (primitives, centre, solid harmonic from above);
+// returns as soon as the partial sum exceeds stop
+double ao_pair_abs_overlap_bound(const std::vector<primitive>& pa, const d3& A, const std::vector<std::pair<i3, double>>& sa,
+	const std::vector<primitive>& pb, const d3& B, const std::vector<std::pair<i3, double>>& sb,
+	const double stop = std::numeric_limits<double>::infinity());
 
 class XCW {
 public:
@@ -109,7 +118,7 @@ private:
 		double diis_stop_damping = 0;
 		//`slow_conv` chosen: the unperturbed first step still runs the normal schedule, see run_XCW_fitting
 		bool slow_conv = false;
-		//`soscf`: second-order steps as soon as the DIIS error is below soscf_start_, see soscf_step
+		//`soscf`: second-order steps as soon as the DIIS error is below trah_.start_threshold, see soscf_step
 		bool soscf = false;
 		//`check_hessian`: finite-difference check of the Hessian-vector product on the first
 		//second-order step, reported in XCW.log
@@ -124,12 +133,19 @@ private:
 		bool apply_damping = true;
 		bool method_apply_damping = true;
 		std::string basis_set_name;
+		std::filesystem::path basis_overrides;
 		//`df_basis <name>`: density fitting of the Fock build with this auxiliary basis
 		std::string df_basis_name;
-		//`guess_basis <name>`: the first lambda starts from a Hartree-Fock converged in this
-		//(smaller) basis by OCC's own driver, its density projected into the orbital basis
+		//`guess_basis <name>`: the first lambda starts from OCC's HF in this smaller basis, its density projected
 		std::string guess_basis_name;
 		bool grown = false;
+		//`extinction <shelx|bc_gaussian|bc_lorentzian> [iso|aniso] [fixed] [start value]`
+		extinction::model extinction_model = extinction::model::none;
+		bool extinction_aniso = false;
+		bool extinction_refine = true;
+		double extinction_start = 1e-4;
+		//`wavelength <lambda>`, in Angstrom; overrides _diffrn_radiation_wavelength from the CIF
+		double wavelength = 0.0;
 		int n_params;
 		int refine_against;
 		int XWR_type;
@@ -145,22 +161,15 @@ private:
 		bool read_tensor;
 		bool read_first_guess;
 		bool nbo_output = false;
-		// Largest I tensor held resident, in MB. Above it the tensor goes to disk
-		// and is read back a window of reflections at a time; 0 means no limit,
-		// which is the original behaviour. Set with `i_tensor_mb <n>` in the XCW
-		// settings, or `stream` for the default budget.
+		// Largest I tensor held resident, in MB; above it the tensor is streamed from disk a window
+		// of reflections at a time. 0 = no limit; `i_tensor_mb <n>`, or `stream` for the default budget.
 		size_t i_tensor_max_mb;
-		// `i_float` in the settings file: hold the I tensor in single precision. The device
-		// computes it in single anyway, so this stores what was computed rather than a
-		// widened copy of it.
+		// `i_float` / `i_double`: force the tensor's storage precision over the build precision
 		bool i_tensor_single = false;
 		bool i_tensor_double = false;
-		// `I_tensor <path>` in the settings file: where the streamed tensor lives. Written
-		// there, and reused from there when it is already the right size for this problem,
-		// so that trying another refinement setting does not rebuild it.
+		// `I_tensor <path>`: where the streamed tensor is written, and reused from when it fits this problem
 		std::filesystem::path i_tensor_file_path;
-		// `save <path>`: write the tensor there for a later `read <path>`, on a thread, so
-		// the refinement starts at once instead of waiting for 100 GB to reach the disk.
+		// `save <path>`: write the tensor for a later `read <path>` on a thread, so the refinement need not wait
 		std::filesystem::path i_tensor_save_path;
 
 		// Clears the convergence flags
@@ -265,49 +274,61 @@ private:
 	// Parses the anomalous dispersion information from a CIF style .txt file
 	void parse_anom_atoms(std::vector<anom_atom>& anom_atoms);
 
-	// Evaluates the scaling factor for |F_calc| by least squares fitting
+	// Evaluates the scaling factor for |F_calc| by least squares fitting, and the extinction coefficients when refined
 	void eval_scale();
+	// The closed-form weighted least-squares scale alone, extinction shape held fixed
+	void solve_scale();
 
-	// Calculates quality criteria like GooF and chi^2. When
-	// h2 weighting is set, both are computed with an additional
-	// 1/|H|^2 weighting (XCW_plan.md sec. 6.2, residual self-energy
-	// criterion) instead of the traditional unweighted sums.
+	// GooF and chi^2; with h2 weighting both carry an extra 1/|H|^2 weight (residual self-energy
+	// criterion, XCW_plan.md 6.2)
 	void calc_criteria();
 
-	// Builds (once) the per-reflection 1/|H|^2 cache used by calc_criteria/
-	// calc_perturb when h2 weighting is set. No-op otherwise.
+	// Caches 1/|H|^2 per reflection for calc_criteria/calc_perturb under h2 weighting; no-op otherwise
 	void ensure_inv_H2_weights();
 
-	// Distributional (Gaussian) halting criterion (see xcw_halting.h and
-	// tests/P1_test/XCW_plan.md). Computes standardized residuals z_h from
-	// the current F_calc/obs/F_scale, evaluates the Anderson-Darling
-	// statistic and supporting diagnostics, logs them, and stores the
-	// result for the final lambda* recommendation. Only called when
-	// opt->xcw_gaussian_halt is set.
+	// Wavelength (settings file, else the CIF's _diffrn_radiation_wavelength), coefficient vector and
+	// per-reflection extinction geometry; no-op without a model
+	void setup_extinction(const std::filesystem::path& cif);
+	// y_r, sqrt(y_r), dI/d|Fc|^2 and d|Fc_ext|/d|Fc| from the current F_calc and coefficients; no-op without a model
+	void update_extinction();
+	// One Levenberg-damped Gauss-Newton step on the coefficients against eval_scale's weighted residual,
+	// scale held fixed; false when the step was negligible or rejected
+	bool refine_extinction_step();
+	// "ext 0.000123" or the six tensor components, for the per-lambda log
+	std::string extinction_report() const;
+	// The parameter count the criteria divide by: `params` plus the extinction coefficients while they are refined
+	int n_params() const {
+		return settings.n_params + static_cast<int>(settings.extinction_refine ? ext_p_.size() : 0);
+	}
+	// The extinction shape of reflection r, 1 where no model is active
+	double ext_y(const int r) const { return ext_y_.empty() ? 1.0 : ext_y_[r]; }
+	double ext_sqrt_y(const int r) const { return ext_sqrt_y_.empty() ? 1.0 : ext_sqrt_y_[r]; }
+	// dI/d|Fc|^2 and d(sqrt(y)|Fc|)/d|Fc|, the chain factors the gradient needs
+	double ext_g(const int r) const { return ext_g_.empty() ? 1.0 : ext_g_[r]; }
+	double ext_m(const int r) const { return ext_m_.empty() ? 1.0 : ext_m_[r]; }
+	// a_{r,p} of x_r = sum_p a_{r,p} P_p; 1 for the isotropic models, which have one P
+	double ext_a(const int r, const size_t p) const {
+		return ext_a_.empty() ? 1.0 : ext_a_[static_cast<size_t>(r) * ext_p_.size() + p];
+	}
+	double ext_x(const int r) const {
+		double x = 0.0;
+		for (size_t p = 0; p < ext_p_.size(); p++) x += ext_a(r, p) * ext_p_[p];
+		return x;
+	}
+
+	// Gaussian halting criterion (xcw_halting.h, tests/P1_test/XCW_plan.md): Anderson-Darling
+	// statistic of the standardized residuals z_h, stored for the final lambda* recommendation
 	void evaluate_gaussian_halting(const double lambda);
 
-	// Prints the full per-lambda Gaussian-halting table (XCW_log only), then
-	// calls report_halting_progress_estimate(true). Called once at the end
-	// of run_XCW_fitting().
+	// Per-lambda Gaussian-halting table to XCW_log, then the final estimate
 	void report_gaussian_halting_summary();
 
-	// Prints the recommended lambda* = argmin A^2 so far (subject to the
-	// binned-trend test), a scan-boundary warning if that argmin sits at
-	// the last evaluated lambda, and -- fitting the A^2(lambda) trend so
-	// far with a small family of polynomial models and picking the best by
-	// AIC (see xcw_halting.h) -- an extrapolated estimate of where the
-	// true minimum likely lies, with the fit's residual/quality diagnostics
-	// for every candidate model tried. Called periodically during the scan
-	// (is_final=false, every 5 lambda steps) and once more at the end
-	// (is_final=true, from report_gaussian_halting_summary). Uses whatever
-	// is in gaussian_halt_history_ at call time, so periodic calls are
-	// naturally based on partial data.
+	// lambda* = argmin A^2 so far, subject to the binned-trend test, a warning when it is the last
+	// lambda, and the minimum extrapolated from polynomial fits of A^2(lambda) chosen by AIC
+	// (xcw_halting.h); periodic calls see only the history so far
 	void report_halting_progress_estimate(bool is_final);
 
-	// Builds the (once-cached) ordered list of Miller indices matching the
-	// index r used for obs[r]/F_calc[0][r] (see generate_asym_lookup),
-	// needed to look up per-reflection resolution for the binned trend
-	// test.
+	// Miller index of each reflection r in obs[r]/F_calc[0][r] order, cached for the binned trend test
 	void ensure_hkl_ordered();
 
 	// Calculates the perturbation matrix elements
@@ -354,20 +375,24 @@ private:
 	// is the gradient of. Each macro step solves the augmented-Hessian eigenproblem by Davidson
 	// micro-iterations with the exact Hessian-vector product (Fock response plus the response
 	// of the perturbation, scale included), the level shift set so the step fits the trust
-	// radius, the orbitals moved by the Cayley transform, and the trust radius updated from the
-	// ratio of the actual to the predicted decrease; a step that raises the functional is
-	// re-solved at half the radius from the retained subspace. It keeps the occupation, so it
+	// radius, the orbitals moved by the Cayley transform, and the trust radius updated by
+	// occ::qm::trust_radius_update from the model error the step revealed; a step that raises
+	// the functional is re-solved at the smaller radius from the retained subspace, and two
+	// rejections at trust_min hand the orbitals back to DIIS. It keeps the occupation, so it
 	// cannot swap orbitals. Entered when the orbital gradient has not halved in
-	// soscf_patience_ iterations, or with `soscf` once the DIIS error is below soscf_start_;
-	// it stays on for the rest of the lambda step. Micro-iterations do not count towards
+	// trah_.patience iterations, or with `soscf` once the DIIS error is below its
+	// start_threshold; it stays on for the rest of the lambda step, and the radius it earned
+	// carries into the next one. Micro-iterations do not count towards
 	// max_iter; L-BFGS with a diagonal Hessian wandered for 100+ iterations on the same case
 	// (E +-5e-6 Eh, a halved step every 2-3 iterations) where the curvature of chi^2 is stiff.
 	bool soscf_ = false;
 	int soscf_patience_iter_ = 0;
 	double soscf_patience_grad_ = 0;
-	static constexpr int soscf_patience_ = 30, soscf_patience_requested_ = 8, trah_micro_max_ = 30;
-	static constexpr double soscf_start_ = 1e-2, soscf_trust_max_ = 1.0, soscf_trust_first_ = 0.5, soscf_noise_ = 1e-8;
-	double soscf_trust_ = soscf_trust_first_;
+	// The knobs and the radius policy are occ's, shared with plain -occ jobs (second_order_scf.h) so they cannot drift
+	occ::qm::SecondOrderSettings trah_;
+	double soscf_trust_ = trah_.trust_first;
+	// Consecutive rejected steps at the smallest radius
+	int soscf_floored_ = 0;
 	std::vector<occ::Vec> trah_B_, trah_HB_;
 	occ::Vec soscf_kappa_, soscf_grad_, soscf_hdiag_;
 	occ::Mat soscf_C_;
@@ -412,17 +437,14 @@ private:
 	// Held resident only while it fits settings.i_tensor_max_mb; otherwise empty
 	// and i_file_ carries the tensor. Read through i_block(r) either way.
 	cvec I;
-	//A tensor built in single precision is held, streamed and saved in single: half the
-	//memory and half the traffic of the two walks per iteration, and the values are the
-	//ones the GEMM produced either way. i_float / i_double in the settings override the
-	//choice the build precision makes.
+	//A tensor built in single precision is held, streamed and saved in single, as the GEMM
+	//produced it; i_float / i_double override.
 	std::vector<std::complex<float>> I32;
 	bool i_float_ = false;
 	//A copy of the resident tensor on the device does both SCF walks there
 	bool i_on_device_ = false;
-	// The background writer for `save <path>`. Joined, never detached: a thread still
-	// running at exit is how the GPU warm-up bug of 939268f happened, and this one holds a
-	// FILE* and reads the resident tensor.
+	// The background writer for `save <path>`. Joined, never detached: it holds a FILE* and
+	// reads the resident tensor.
 	std::thread i_writer_;
 	//Incremental Fock build: the two-electron part and the density it was built from
 	occ::Mat G_last_, D_last_build_;
@@ -458,15 +480,21 @@ private:
 	std::vector<scattering_data> obs;
 	hkl_list hkl;
 	hkl_list hkl_enlarged;
-	// Symmetry operations the structure factors are summed over: all of them, or one per coset
-	// of the subgroup a grown cluster is closed under (cell::grown_subgroup)
-	ivec sym_ops_;
+	ivec3 original_rotations;
 	GridManager tsc_grids;
-	// Ordered snapshot of `hkl` (see ensure_hkl_ordered), i.e. hkl_ordered_[r]
-	// is the Miller index of reflection r as used for obs[r]/F_calc[0][r].
+	// hkl_ordered_[r] is the Miller index of reflection r of obs[r]/F_calc[0][r], see ensure_hkl_ordered
 	std::vector<i3> hkl_ordered_;
 	// 1/|H_r|^2 per reflection, see ensure_inv_H2_weights.
 	vec inv_H2_;
+	// The refined extinction coefficient, or the Voigt components X11 X22 X33 X12 X13 X23 of the anisotropic
+	// tensor; empty when no model is active, which every extinction branch tests on
+	vec ext_p_;
+	// Per-reflection geometry, built once: 0.001 lambda^3/sin(2 theta), cos(2 theta), and (for
+	// the anisotropic models only) the nr_small x 6 coefficients a_{r,p}
+	vec ext_c_, ext_cos2t_, ext_a_;
+	// Per-iteration shape, see update_extinction. ext_dyc_ is dy/dt * c_r * |Fc_r|^2, so that
+	// dy/dP_p = ext_dyc_[r] * a_{r,p}.
+	vec ext_y_, ext_sqrt_y_, ext_g_, ext_m_, ext_dyc_;
 	// Reflection r is in the fit set (I/sigma(I) >= i_sigma_cutoff), see construct
 	bvec fit_mask_;
 	// The criterion the SCF descends (XWR_type x refine_against), over the fit set or over all
@@ -478,5 +506,6 @@ private:
 	cell unit_cell;
 	std::ofstream XCW_log;
 	SCF_settings settings;
+	std::shared_ptr<BasisSet> orbital_basis_;
 	cryst_info cryst;
 };

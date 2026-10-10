@@ -16,6 +16,9 @@
 #include <chrono>
 #include <complex>
 #include <cstdint>
+#include <cstring>
+#include <numeric>
+#include <random>
 #include <set>
 #include <string>
 #include <vector>
@@ -450,6 +453,21 @@ TEST(ScatteringCoverageEdTests, ConvertToEdIsMottBethe)
 	}
 }
 
+//pTB removes a core from B on and every such element outside Ce-Lu has a valence correction fit; reading the table at
+//Z - 2 gave B none, C the B row, and from W on read past the end
+TEST(ScatteringCoverageEcpTests, PtbCorrectionRowFollowsTheCore)
+{
+	for (int Z = 1; Z <= constants::heaviest_ECP_element; Z++)
+	{
+		if (Z >= 58 && Z <= 71)
+			continue;
+		const bool has_fit = Spherical_Gaussian_Density(Z, 3).get_form_factor(1.0) != 0.0;
+		EXPECT_EQ(has_fit, constants::ECP_electrons_pTB[Z] > 0) << "Z = " << Z;
+	}
+	EXPECT_EQ(Spherical_Gaussian_Density(64, 3).get_form_factor(1.0), 0.0);
+	EXPECT_EQ(Spherical_Gaussian_Density(90, 3).get_form_factor(1.0), 0.0);
+}
+
 //the IAM path of calculate_scattering_factors: one Thakkar row per asymmetric atom, keyed by atomID
 TEST(ScatteringCoverageIamTests, IamRowsAreThakkarFactors)
 {
@@ -691,6 +709,71 @@ TEST(ScatteringCoverageTransformTests, CalcSfSumsPhasesAndReportsPreparationTime
 	EXPECT_NE(log2.str().find(" ms"), std::string::npos);
 	EXPECT_EQ(log2.str().find("Initialized FFs"), std::string::npos);
 	EXPECT_NEAR(sf2[0][0].imag(), 1.0, 1e-12);
+}
+
+//calc_SF's phase recurrence (steps along l, row jumps of +-3 steps between rows of one h, sincos anchors at block
+//starts, h changes and after SF_ANCHOR multiplies in rows of up to 49) against the direct sum; the same set shuffled,
+//where every reflection anchors. Point counts leave odd tile and lane tails. The bytes do not depend on the thread count.
+TEST(ScatteringCoverageTransformTests, CalcSfRecurrenceMatchesDirectSumAndThreadCount)
+{
+	const double a = 2.0 * constants::PI / kA;
+	vec2 k_sorted(3);
+	for (int h = -4; h <= 4; h++)
+		for (int k = -4; k <= 4; k++)
+		{
+			const int lmax = 24 - 3 * std::abs(k) - std::abs(h);
+			for (int l = -lmax; l <= lmax; l++)
+			{
+				k_sorted[0].push_back(h * a); k_sorted[1].push_back(k * a); k_sorted[2].push_back(l * a);
+			}
+		}
+	std::mt19937 rng(7);
+	std::uniform_real_distribution<double> pos(-8.0, 8.0), w(0.0, 1.0);
+	vec2 dx, dy, dz, dens;
+	double norm = 0.0;
+	for (const int n : { 1, 3, 6, 257, 515 })
+	{
+		vec x(n), y(n), z(n), r(n);
+		for (int p = 0; p < n; p++) { x[p] = pos(rng); y[p] = pos(rng); z[p] = pos(rng); r[p] = w(rng); norm += r[p]; }
+		dx.push_back(x); dy.push_back(y); dz.push_back(z); dens.push_back(r);
+	}
+	std::vector<size_t> order(k_sorted[0].size());
+	std::iota(order.begin(), order.end(), size_t{ 0 });
+	std::shuffle(order.begin(), order.end(), rng);
+	vec2 k_shuffled(3, vec(order.size()));
+	for (size_t s = 0; s < order.size(); s++)
+		for (int c = 0; c < 3; c++)
+			k_shuffled[c][s] = k_sorted[c][order[s]];
+	const int threads = omp_get_max_threads();
+	for (const vec2* k_pt : { &k_sorted, &k_shuffled })
+	{
+		std::ostringstream log;
+		_time_point start = get_time(), end1;
+		cvec2 sf, sf1;
+		calc_SF(0, *k_pt, dx, dy, dz, dens, sf, log, start, end1, false, true, true, false);
+		omp_set_num_threads(1);
+		calc_SF(0, *k_pt, dx, dy, dz, dens, sf1, log, start, end1, false, true, true, false);
+		omp_set_num_threads(threads);
+		double err = 0.0;
+		for (size_t i = 0; i < dens.size(); i++)
+		{
+			ASSERT_EQ(sf[i].size(), (*k_pt)[0].size());
+			EXPECT_EQ(std::memcmp(sf[i].data(), sf1[i].data(), sf[i].size() * sizeof(sf[i][0])), 0) << "atom " << i;
+			for (size_t s = 0; s < sf[i].size(); s++)
+			{
+				std::complex<double> f(0.0, 0.0);
+				for (size_t p = 0; p < dens[i].size(); p++)
+				{
+					const double ph = (*k_pt)[0][s] * dx[i][p] + (*k_pt)[1][s] * dy[i][p] + (*k_pt)[2][s] * dz[i][p];
+					f += dens[i][p] * std::complex<double>(std::cos(ph), std::sin(ph));
+				}
+				err = std::max(err, std::abs(sf[i][s] - f));
+			}
+		}
+		//the tsc carries F to 1e-12 of F(000); the recurrence stays at the 1e-14 level
+		EXPECT_LT(err / norm, 1e-12) << (k_pt == &k_sorted ? "sorted" : "shuffled");
+		std::cout << (k_pt == &k_sorted ? "sorted" : "shuffled") << " hkl: max |F - F_direct| / F(000) = " << err / norm << std::endl;
+	}
 }
 
 //calc_sfac_diffuse: a normalised Gaussian on one hydrogen at the origin gives F = exp(-k^2/4), real,

@@ -58,11 +58,15 @@ that is present; set it OFF and name the backend to build for a machine other th
 vendor still supports (the lists live in `CMakeLists.txt`) instead of the local card only. The
 bootstrap script takes `-DNOSPHERA2_BOOTSTRAP_GPU_VENDOR=NVIDIA -DNOSPHERA2_BOOTSTRAP_CUDA_VERSION=12.9`
 to fetch a conda-forge CUDA toolkit without a GPU, and `-DNOSPHERA2_BOOTSTRAP_GPU=OFF` to fetch none.
+`-DNOSPHERA2_BOOTSTRAP_GPU_VENDOR=ALL` sets up the CI's fat build locally: the CUDA toolkit plus
+the ROCm SDK wheels (`NOSPHERA2_BOOTSTRAP_ROCM_VERSION`, default the CI's 10.0.0) in a venv at
+`.mambaenv/rocm`, whose `root.txt` makes configure switch on both backends and take the HIP compiler
+from there. Skipped when a ROCm is already installed (`HIP_PATH`, `ROCM_PATH`, `/opt/rocm`).
 
 Both backends at once make a fat binary: every kernel source is compiled twice, once per backend,
 into its own namespace (`Src/core/gpu_api.h`, `NOSPHERA2_GPU_BACKEND_NS`), and
 `Src/core/gpu_dispatch.cpp` defines the global entry points by forwarding to the backend that has a
-device (CUDA probed first; `NOSPHERA2_GPU_BACKEND=cuda|hip` in the environment overrides). A function
+device (CUDA probed first; `-tune NOSPHERA2_GPU_BACKEND=cuda|hip` overrides). A function
 added to one of the six GPU headers has to be added to the X-macro in `gpu_dispatch.cpp` too, or the
 fat link fails on it. Neither runtime is linked: cudart is static, and the HIP runtime is opened by
 name in `Src/core/hip_runtime_shim.cpp`, which defines every `hip*` entry the kernel objects import,
@@ -200,6 +204,14 @@ Whenever an agent adds, removes, modifies, or investigates a test in `tests/test
 
 `tests/tests.toml`, `tests/src`, and `Windows/Tests/Tests.cpp` should stay in sync where they cover the same workflows. Check all relevant harnesses when adding or removing tests.
 
+### Keep the wiki in shape
+
+`docs/wiki/` holds the four pages of the GitHub wiki — `Home.md`, `Command-Reference.md`, `Use-Cases.md`, `Troubleshooting.md` — and is the source; the published copy is its own repository, `https://github.com/AK-Kleemiss/NoSpherA2.wiki.git`, cloned and pushed by hand. A flag that is added, renamed or given a new default must be updated in `docs/wiki/Command-Reference.md` in the same commit, or the wiki is wrong the moment the change lands.
+
+- Document what the parser accepts, not what `-h` claims. The pages were written from the seven `digest_*` functions in `Src/core/convenience.cpp` and the defaults in `struct options` and `struct properties_options`; reading them that way is what found `-hdef`, the cuBLAS default and the `acc = 0` examples.
+- Every command shown on a page must be one that runs. Take it from `tests/tests.toml` rather than composing it.
+- The published copy links pages without the extension (`](Troubleshooting#flag-order-matters)`), the in-repo copy with it. That is the only permitted difference between the two.
+
 ### Respect submodule boundaries
 
 Do not casually edit vendored submodules. For local parent-side workarounds, prefer generated-source or CMake target augmentation in the parent project. If an OCC source fix is required, commit it inside `occ` first, then update the parent submodule pointer.
@@ -252,6 +264,17 @@ Key core modules live in `Src/core`:
 - New libcint parallel call sites should pre-allocate per-thread scratch buffers instead of passing `cache=nullptr` inside TBB parallel regions. Use the existing `three_center_max_cache_size<kind>` and `tbb::enumerable_thread_specific` pattern in OCC.
 
 ## Current Validation Notes
+
+As of 2026-09-24, the in-house NBO analysis (`-nbo_native`, `Src/core/nbo.cpp` and
+`Src/core/nrt.cpp`) is checked in two places: `NrtTests`, `Nbo47Tests` and
+`NaoTests.OverlapCarriesTheDensitysPhaseConvention` as gtests, and
+`py -3.12 tests/nbo_reference/compare_nbo.py --all .` against the 22 stored NBO 7.0.9 references,
+which reports **22 PASS, exit 0**. NRT weights are compared by rank and never by label - gennbo
+reproduces TiCl4's `D(w)`, valencies and bond orders exactly while individual weights move 7.1
+points. `cmake --build --preset release-windows --target NoSpherA2_Tests` links again since
+`tests/src/CellMathTests.cpp` (which calls `cell` members that no longer exist) was excluded, and the
+binary reports **1111 passed, 0 failed, 8 skipped** from `build/release-windows/bin` - the relative
+fixture paths in the tests are what makes that the working directory. See `UNIT_TESTS_STATUS.md`.
 
 As of 2026-09-08, `ctest --preset release-linux` reports **267/267 passing** outside the XCW
 cases (`-E XCW`), including the new `TomlIntegrationTests.ELI_NH3Li` golden case for the

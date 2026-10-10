@@ -30,10 +30,14 @@
 #include <occ/qm/hf.h>
 #include <occ/qm/scf.h>
 #include <spdlog/spdlog.h>
+#include <random>
 #undef I
 #ifdef NOSPHERA2_USE_GPU
 #include "core/blas_gpu.h"
 #include "core/aux_density_gpu.h"
+#include "core/esp_gpu.h"
+//defined next to boys() in wfn_density.cpp, which has no header of its own
+const double* esp_boys_table(int& nT, int& stride, double& step);
 #endif
 
 
@@ -183,6 +187,258 @@ namespace NoSpherA2UnitTests
 			EXPECT_NEAR(wave.computeESP(pos, pairs), esp, 1E-5); // the cube header rounds the grid positions to 1E-6 bohr
 	}
 
+	//g x g is the upper edge of the (l,r,s) tables in computeESP and build_ESP_pairs. Reference: orca_vpot
+	//(ORCA 6.1.1) on tests/esp_g_ref/g_ref.inp (HF/def2-QZVPP water) at vpot_pts.inp, output in vpot_orca611.txt.
+	TEST(EspTests, GPrimitivesAgreeWithOrcaVpot)
+	{
+		const auto input = nos_test_repo_root() / "tests" / "esp_g_ref" / "g_ref.gbw";
+		if (!std::filesystem::exists(input)) GTEST_SKIP() << "Missing " << input;
+		WFN wave(input, false);
+		int max_l = 0;
+		for (int p = 0; p < wave.get_nex(); p++)
+		{
+			int l[3];
+			constants::type2vector(wave.get_type(p), l);
+			max_l = std::max(max_l, l[0] + l[1] + l[2]);
+		}
+		ASSERT_EQ(max_l, 4) << "def2-QZVPP is meant to put g primitives in this wavefunction";
+		const WFN::ESP_pairs pairs = wave.build_ESP_pairs();
+		const std::array<std::pair<d3, double>, 4> reference = { {
+			{ { 0.0, 0.0, -2.0 }, -0.0701658972531333 },
+			{ { 2.5, 0.0, 1.0 }, -0.0243475067049982 },
+			{ { 0.0, 3.0, 2.0 }, 0.1107006768580323 },
+			{ { 1.0, -1.5, -2.5 }, -0.0538336472988921 } } };
+		std::vector<d3> pts;
+		double worst = 0;
+		for (const auto& [pos, esp] : reference)
+		{
+			const double mine = wave.computeESP(pos, pairs);
+			std::cout << "orca_vpot " << esp << "  ours " << mine << "  diff " << mine - esp << std::endl;
+			worst = std::max(worst, std::abs(mine - esp));
+			pts.push_back(pos);
+		}
+		EXPECT_LT(worst, 1E-7) << "ESP of a g wavefunction against an external reference"; // the Boys table's interpolation error
+		vec batch(pts.size());
+		wave.computeESP_batch(pts, pairs, batch.data());
+		for (size_t i = 0; i < pts.size(); i++)
+			EXPECT_NEAR(batch[i], reference[i].second, 1E-7) << "batch, point " << i;
+	}
+
+	//computeESP_batch must match the per-point computeESP. The set clears the (points x pairs) gate of
+	//esp_gpu_eval; the test binary never parses -no_gpu_density, so the first pass is the OpenMP fallback
+	//and the second calls the CUDA kernel itself. High-l pairs are where its (l,r,s) loops would diverge.
+	static void check_esp_batch_against_loop(const std::filesystem::path& input)
+	{
+		if (!std::filesystem::exists(input)) GTEST_SKIP() << "Missing " << input;
+		WFN wave(input, false);
+		const WFN::ESP_pairs pairs = wave.build_ESP_pairs();
+		d3 lo{ 1E30, 1E30, 1E30 }, hi{ -1E30, -1E30, -1E30 };
+		for (int a = 0; a < wave.get_ncen(); a++)
+			for (int k = 0; k < 3; k++)
+			{
+				lo[k] = std::min(lo[k], wave.get_atom_coordinate(a, k));
+				hi[k] = std::max(hi[k], wave.get_atom_coordinate(a, k));
+			}
+		const int n = 26;
+		std::vector<d3> pts;
+		for (int i = 0; i < n; i++)
+			for (int j = 0; j < n; j++)
+				for (int k = 0; k < n; k++)
+				{
+					const d3 p = { lo[0] - 2 + (hi[0] - lo[0] + 4) * i / (n - 1.0),
+								   lo[1] - 2 + (hi[1] - lo[1] + 4) * j / (n - 1.0),
+								   lo[2] - 2 + (hi[2] - lo[2] + 4) * k / (n - 1.0) };
+					bool at_nucleus = false;
+					for (int a = 0; a < wave.get_ncen(); a++)
+					{
+						double r2 = 0;
+						for (int c = 0; c < 3; c++)
+							r2 += std::pow(p[c] - wave.get_atom_coordinate(a, c), 2);
+						at_nucleus |= r2 < 0.25; // the nuclear term diverges
+					}
+					if (!at_nucleus)
+						pts.push_back(p);
+				}
+		vec batch(pts.size());
+		wave.computeESP_batch(pts, pairs, batch.data());
+		double worst = 0;
+		for (size_t i = 0; i < pts.size(); i++)
+			worst = std::max(worst, std::abs(batch[i] - wave.computeESP(pts[i], pairs)));
+		std::cout << pairs.weight.size() << " pairs x " << pts.size() << " points, max |batch - per point| " << worst << std::endl;
+		EXPECT_LT(worst, 1E-10);
+#if defined(NOSPHERA2_USE_GPU)
+		if (!aux_density_gpu_available()) GTEST_SKIP() << "no device for the second pass";
+		// the fallback compared with itself reads as a perfect match, so call the kernel directly and insist it ran
+		const int ncen = wave.get_ncen(), npairs = (int)pairs.weight.size();
+		vec ax(ncen), ay(ncen), az(ncen), q(ncen);
+		for (int a = 0; a < ncen; a++)
+		{
+			ax[a] = wave.get_atom_coordinate(a, 0), ay[a] = wave.get_atom_coordinate(a, 1), az[a] = wave.get_atom_coordinate(a, 2);
+			q[a] = wave.get_atom_charge(a) - wave.get_atom_ECP_electrons(a);
+		}
+		int nT = 0, stride = 0;
+		double step = 0;
+		const double* tab = esp_boys_table(nT, stride, step);
+		vec device(pts.size());
+		aux_density_gpu_set_enabled(true);
+		const bool ran = esp_gpu_eval(ncen, ax.data(), ay.data(), az.data(), q.data(),
+									  npairs, pairs.ex_sum.data(), pairs.weight.data(), pairs.P[0].data(), pairs.L[0].data(),
+									  pairs.off.data(), pairs.coef.data(), pairs.pc_pow.data(), pairs.fn_idx.data(),
+									  nT, stride, step, tab, (int)pts.size(), pts[0].data(), device.data());
+		aux_density_gpu_set_enabled(false);
+		ASSERT_TRUE(ran) << "the CUDA kernel declined, so this would compare the host loop with itself";
+		double worst_dev = 0;
+		for (size_t i = 0; i < pts.size(); i++)
+			worst_dev = std::max(worst_dev, std::abs(device[i] - batch[i]));
+		std::cout << "max |device - host| " << worst_dev << std::endl;
+		//only nvcc's FMA contraction and the device exp() separate the two
+		EXPECT_LT(worst_dev, 1E-9);
+#endif
+	}
+
+	TEST(EspTests, BatchMatchesThePerPointLoop)
+	{
+		check_esp_batch_against_loop(nos_test_repo_root() / "tests" / "epoxide_gbw" / "epoxide.gbw");
+	}
+
+	TEST(EspTests, BatchMatchesThePerPointLoopWithGFunctions)
+	{
+		check_esp_batch_against_loop(nos_test_repo_root() / "tests" / "esp_g_ref" / "g_ref.gbw");
+	}
+
+	//The host fallback shares one pair-table pass among 64 points while every thread still gets a block,
+	//then 8, then 1, each leaving a remainder to the scalar path; these sizes straddle both thresholds and
+	//block boundaries. The device is off: the host tiers are on trial.
+	TEST(EspTests, EveryHostPassWidthMatchesTheScalarPath)
+	{
+		const auto input = nos_test_repo_root() / "tests" / "epoxide_gbw" / "epoxide.gbw";
+		if (!std::filesystem::exists(input)) GTEST_SKIP() << "Missing " << input;
+		WFN wave(input, false);
+		const WFN::ESP_pairs pairs = wave.build_ESP_pairs();
+#ifdef _OPENMP
+		const int nthr = omp_get_max_threads();
+#else
+		const int nthr = 1;
+#endif
+#if defined(NOSPHERA2_USE_GPU)
+		const bool device_was_on = aux_density_gpu_enabled();
+		aux_density_gpu_set_enabled(false);
+#endif
+		for (const int np : { 1, 7, 8 * nthr - 1, 8 * nthr + 3, 64 * nthr, 64 * nthr + 5 })
+		{
+			std::vector<d3> pts((size_t)np);
+			for (int i = 0; i < np; i++)
+			{
+				const double a = 0.37 * i, r = 3.0 + 0.003 * i; // nuclei or not: both paths use the same formula
+				pts[i] = { 1.7 + r * std::cos(a), 13.0 + r * std::sin(a), 1.5 + 0.01 * i };
+			}
+			vec batch((size_t)np);
+			wave.computeESP_batch(pts, pairs, batch.data());
+			double worst = 0;
+			for (int i = 0; i < np; i++)
+				worst = std::max(worst, std::abs(batch[i] - wave.computeESP(pts[i], pairs)));
+			//lanes replay the scalar order, so 0 in practice; FMA contraction may differ between widths
+			EXPECT_LT(worst, 1E-12) << np << " points on " << nthr << " threads, max |batch - per point| " << worst;
+		}
+#if defined(NOSPHERA2_USE_GPU)
+		aux_density_gpu_set_enabled(device_was_on);
+#endif
+	}
+
+	//A lane block shares one pair-table pass, so the exp(-T) gate, the Boys large-T branch and 1/r at a nucleus
+	//are decided for points of very different magnitude. The far field needs no reference: a neutral molecule
+	//has no monopole, though its nuclear and electronic halves are each 24/r.
+	TEST(EspTests, AwkwardPointSetsAndTheFarFieldNetCharge)
+	{
+		const auto input = nos_test_repo_root() / "tests" / "epoxide_gbw" / "epoxide.gbw";
+		if (!std::filesystem::exists(input)) GTEST_SKIP() << "Missing " << input;
+		WFN wave(input, false);
+		const WFN::ESP_pairs pairs = wave.build_ESP_pairs();
+		const int ncen = wave.get_ncen(), npairs = (int)pairs.weight.size();
+
+		vec canary{ -7.0 };
+		wave.computeESP_batch({}, pairs, canary.data());
+		EXPECT_EQ(canary[0], -7.0);
+
+		// on a nucleus both paths give the same inf, not NaN; the mixed set below checks the other 63 lanes stay intact
+		std::vector<d3> nuclei;
+		d3 centre{ 0, 0, 0 };
+		double Ztot = 0;
+		for (int a = 0; a < ncen; a++)
+		{
+			nuclei.push_back({ wave.get_atom_coordinate(a, 0), wave.get_atom_coordinate(a, 1), wave.get_atom_coordinate(a, 2) });
+			Ztot += wave.get_atom_charge(a) - wave.get_atom_ECP_electrons(a);
+			for (int k = 0; k < 3; k++) centre[k] += nuclei.back()[k] / ncen;
+		}
+		vec at_nuc(nuclei.size());
+		wave.computeESP_batch(nuclei, pairs, at_nuc.data());
+		for (size_t i = 0; i < nuclei.size(); i++)
+		{
+			EXPECT_TRUE(std::isinf(at_nuc[i])) << "nucleus " << i;
+			EXPECT_EQ(at_nuc[i], wave.computeESP(nuclei[i], pairs)) << "nucleus " << i;
+		}
+
+		// |ESP| r^2 stays of order the dipole only if the electronic monopole cancels the nuclear one to twelve
+		// digits; every point here is in the Boys sqrt(pi/4T) branch with exp(-T) gated to zero
+		ASSERT_NEAR(Ztot, 24.0, 1E-9); // C2H4O, no ECP
+		for (const double r : { 1E3, 1E4, 1E5 })
+			for (const d3 dir : { d3{ 1, 0, 0 }, d3{ 0, 0.6, 0.8 } })
+			{
+				const d3 p{ centre[0] + r * dir[0], centre[1] + r * dir[1], centre[2] + r * dir[2] };
+				const double esp = wave.computeESP(p, pairs);
+				EXPECT_LT(std::abs(esp) * r * r, 5.0) << "r = " << r << ", ESP " << esp << ": only the dipole may survive";
+				vec one(1);
+				wave.computeESP_batch({ p }, pairs, one.data());
+				EXPECT_EQ(one[0], esp) << "r = " << r;
+			}
+
+		// one lane block holding 0.1 and 1E-8 hartree points exposes per-block decisions; sized so the device branch fires
+#ifdef _OPENMP
+		const int nthr = omp_get_max_threads();
+#else
+		const int nthr = 1;
+#endif
+		const int np = std::max(64 * nthr + 3, (int)((1LL << 22) / std::max(1, npairs)) + 64);
+		std::vector<d3> mixed((size_t)np);
+		for (int i = 0; i < np; i++)
+		{
+			const double a = 0.37 * i, r = (i % 2) ? 1E4 + i : 2.5 + 0.001 * (i % 997);
+			mixed[i] = { centre[0] + r * std::cos(a), centre[1] + r * std::sin(a) * 0.6, centre[2] + r * std::sin(a) * 0.8 };
+		}
+		vec batch((size_t)np);
+#if defined(NOSPHERA2_USE_GPU)
+		const bool dev_was_on = aux_density_gpu_enabled();
+		aux_density_gpu_set_enabled(false);
+#endif
+		wave.computeESP_batch(mixed, pairs, batch.data());
+		double worst = 0;
+		for (int i = 0; i < np; i++)
+		{
+			const double ref = wave.computeESP(mixed[i], pairs);
+			ASSERT_TRUE(std::isfinite(ref)) << "point " << i;
+			worst = std::max(worst, std::abs(batch[i] - ref));
+		}
+		EXPECT_LT(worst, 1E-12) << np << " mixed points, max |batch - per point| " << worst;
+		for (int i = 1; i < np; i += 2)
+			ASSERT_LT(std::abs(batch[i]), 1E-6) << "far lane " << i << " sharing a block with near ones";
+#if defined(NOSPHERA2_USE_GPU)
+		if (aux_density_gpu_available())
+		{
+			aux_density_gpu_set_enabled(true);
+			vec dev((size_t)np);
+			wave.computeESP_batch(mixed, pairs, dev.data());
+			double worst_dev = 0;
+			for (int i = 0; i < np; i++)
+				worst_dev = std::max(worst_dev, std::abs(dev[i] - batch[i]));
+			std::cout << np << " mixed points, max |device - host| " << worst_dev << std::endl;
+			EXPECT_LT(worst_dev, 1E-9);
+			for (int i = 1; i < np; i += 2)
+				ASSERT_LT(std::abs(dev[i]), 1E-6) << "far lane " << i << " on the device";
+		}
+		aux_density_gpu_set_enabled(dev_was_on);
+#endif
+	}
+
 	//A valence-only wavefunction (xTB/pTB, ECP) is neutral once the core electrons are counted as screening the
 	//nucleus: far outside the molecule the ESP of neutral sucrose vanishes. With the full Z in the nuclear term
 	//it would be ~ (46 core electrons) / r instead
@@ -232,6 +488,152 @@ namespace NoSpherA2UnitTests
 				EXPECT_NEAR(grad[k], fd, 1E-6 * std::max(1.0, std::abs(fd))) << "axis " << k << " at " << p[0] << " " << p[1] << " " << p[2];
 			}
 		}
+	}
+
+	//Points around every nucleus at log-spaced radii (0.005 to 12 bohr) in fixed pseudo-random
+	//directions: the cores, where the heavy primitives and the large gradients are, and the tails
+	static std::vector<d3> field_probe_points(const WFN& wave, const int per_atom)
+	{
+		std::mt19937 rng(1234);
+		std::normal_distribution<double> nd;
+		std::vector<d3> pts;
+		for (int a = 0; a < wave.get_ncen(); a++)
+			for (int i = 0; i < per_atom; i++)
+			{
+				const double r = 0.005 * std::pow(12.0 / 0.005, (i % 24) / 23.0);
+				d3 u{ nd(rng), nd(rng), nd(rng) };
+				const double n = std::sqrt(u[0] * u[0] + u[1] * u[1] + u[2] * u[2]);
+				pts.push_back({ wave.get_atom_coordinate(a, 0) + r * u[0] / n, wave.get_atom_coordinate(a, 1) + r * u[1] / n,
+					wave.get_atom_coordinate(a, 2) + r * u[2] / n });
+			}
+		return pts;
+	}
+
+	struct field_diff
+	{
+		double val_abs = 0, val_rel = 0, grad_abs = 0, grad_rel = 0, rho_rel = 0;
+		int compared = 0;
+	};
+
+	//Device field_grad_gpu against the host computeELIGrad / computeGrad, point by point. rel is
+	//|d| / max(1, |host|) per quantity and per gradient component, over the points with rho > 1E-6
+	static field_diff compare_field_grad(const WFN& wave, const bool eli, const std::vector<d3>& pts,
+		double* host_s = nullptr, double* device_s = nullptr)
+	{
+		const int np = (int)pts.size();
+		vec hv(np), hg(3 * (size_t)np), hr(np), dv(np), dg(3 * (size_t)np), dr(np);
+		const auto t0 = std::chrono::steady_clock::now();
+#pragma omp parallel for schedule(dynamic, 16)
+		for (int i = 0; i < np; i++)
+		{
+			d3 g;
+			if (eli) wave.computeELIGrad(pts[i], hv[i], g, &hr[i]);
+			else wave.computeGrad(pts[i], g, &hr[i]);
+			for (int k = 0; k < 3; k++) hg[3 * (size_t)i + k] = g[k];
+		}
+		const auto t1 = std::chrono::steady_clock::now();
+		const bool ran = wave.field_grad_gpu(eli, np, pts[0].data(), dv.data(), dg.data(), dr.data());
+		const auto t2 = std::chrono::steady_clock::now();
+		if (host_s) *host_s = std::chrono::duration<double>(t1 - t0).count();
+		if (device_s) *device_s = std::chrono::duration<double>(t2 - t1).count();
+		field_diff d;
+		if (!ran) { d.compared = -1; return d; }
+		for (int i = 0; i < np; i++)
+		{
+			if (!(hr[i] > 1E-6)) continue;
+			d.compared++;
+			d.rho_rel = std::max(d.rho_rel, std::abs(dr[i] - hr[i]) / hr[i]);
+			if (eli)
+			{
+				d.val_abs = std::max(d.val_abs, std::abs(dv[i] - hv[i]));
+				d.val_rel = std::max(d.val_rel, std::abs(dv[i] - hv[i]) / std::max(1.0, std::abs(hv[i])));
+			}
+			for (int k = 0; k < 3; k++)
+			{
+				const double h = hg[3 * (size_t)i + k], e = std::abs(dg[3 * (size_t)i + k] - h);
+				d.grad_abs = std::max(d.grad_abs, e);
+				d.grad_rel = std::max(d.grad_rel, e / std::max(1.0, std::abs(h)));
+			}
+		}
+		return d;
+	}
+
+	static void check_field_grad_gpu(const std::filesystem::path& input)
+	{
+		if (!std::filesystem::exists(input)) GTEST_SKIP() << "Missing " << input;
+#if defined(NOSPHERA2_USE_GPU)
+		if (!aux_density_gpu_available()) GTEST_SKIP() << "no device";
+		WFN wave(input, false);
+		const std::vector<d3> pts = field_probe_points(wave, 48);
+		aux_density_gpu_set_enabled(true);
+		const field_diff q = compare_field_grad(wave, false, pts), e = compare_field_grad(wave, true, pts);
+		aux_density_gpu_set_enabled(false); // leave the flag as the rest of the suite found it
+		ASSERT_GE(q.compared, 0) << "the QTAIM kernel declined";
+		ASSERT_GE(e.compared, 0) << "the ELI-D kernel declined";
+		std::cout << input.filename().string() << ": " << pts.size() << " points, " << e.compared << " with rho > 1E-6\n"
+				  << "  QTAIM grad rho  max abs " << q.grad_abs << " rel " << q.grad_rel << ", rho rel " << q.rho_rel << "\n"
+				  << "  ELI-D value     max abs " << e.val_abs << " rel " << e.val_rel << "\n"
+				  << "  ELI-D grad      max abs " << e.grad_abs << " rel " << e.grad_rel << ", rho rel " << e.rho_rel << std::endl;
+		EXPECT_LT(q.grad_rel, 1E-10);
+		EXPECT_LT(q.rho_rel, 1E-10);
+		EXPECT_LT(e.val_rel, 1E-10);
+		EXPECT_LT(e.grad_rel, 1E-10);
+		EXPECT_LT(e.rho_rel, 1E-10);
+#else
+		GTEST_SKIP() << "built without a GPU backend";
+#endif
+	}
+
+	TEST(BasinFieldGpuTests, MatchesHostSToF)
+	{
+		check_field_grad_gpu(nos_test_repo_root() / "tests" / "epoxide_gbw" / "epoxide.gbw");
+	}
+
+	TEST(BasinFieldGpuTests, MatchesHostGFunctions)
+	{
+		check_field_grad_gpu(nos_test_repo_root() / "tests" / "esp_g_ref" / "g_ref.gbw");
+	}
+
+	TEST(BasinFieldGpuTests, MatchesHostTransitionMetal)
+	{
+		check_field_grad_gpu(nos_test_repo_root() / "tests" / "Fe_gbw" / "Fe.gbw");
+	}
+
+	TEST(BasinFieldGpuTests, MatchesHostWithEcp)
+	{
+		check_field_grad_gpu(nos_test_repo_root() / "tests" / "ECP_SF" / "Au2Br2.gbw");
+	}
+
+	//NOS_FIELD_GPU_BENCH=<wavefunction> times the host loop (all OpenMP threads) against the device on
+	//NOS_FIELD_GPU_BENCH_N points (default 200000), both fields, and checks them on the way
+	TEST(BasinFieldGpuTests, Benchmark)
+	{
+		const char* path = std::getenv("NOS_FIELD_GPU_BENCH");
+		if (!path) GTEST_SKIP() << "set NOS_FIELD_GPU_BENCH to a wavefunction";
+#if defined(NOSPHERA2_USE_GPU)
+		if (!aux_density_gpu_available()) GTEST_SKIP() << "no device";
+		WFN wave(path, false);
+		const char* nenv = std::getenv("NOS_FIELD_GPU_BENCH_N");
+		const int n = nenv ? std::atoi(nenv) : 200000;
+		const std::vector<d3> pts = field_probe_points(wave, std::max(1, n / wave.get_ncen()));
+		int nocc = 0;
+		for (int mo = 0; mo < wave.get_nmo(false); mo++) nocc += wave.get_MO_occ(mo) != 0.0;
+		std::cout << path << ": " << wave.get_ncen() << " atoms, " << wave.get_nex() << " primitives, " << wave.get_nmo(false)
+				  << " MOs, " << nocc << " occupied" << std::endl;
+		aux_density_gpu_set_enabled(true);
+		const std::vector<d3> warm(pts.begin(), pts.begin() + std::min<size_t>(pts.size(), 64));
+		compare_field_grad(wave, true, warm); // context creation and the coefficient cache, untimed
+		for (const bool eli : { false, true })
+		{
+			double hs = 0, ds = 0;
+			const field_diff d = compare_field_grad(wave, eli, pts, &hs, &ds);
+			std::cout << (eli ? "ELI-D" : "QTAIM") << " " << pts.size() << " points, " << omp_get_max_threads() << " threads: host "
+					  << hs << " s, device " << ds << " s, x" << hs / ds << "; compared " << d.compared << ", val rel " << d.val_rel
+					  << " grad rel " << d.grad_rel << " (abs " << d.grad_abs << ") rho rel " << d.rho_rel << std::endl;
+			EXPECT_GE(d.compared, 0);
+		}
+		aux_density_gpu_set_enabled(false);
+#endif
 	}
 
 	//The surface must sit around the molecule it belongs to: readxyzMinMax_fromWFN used to guess the unit
@@ -346,7 +748,9 @@ namespace NoSpherA2UnitTests
 			const double d = std::hypot(c[0] - O[0], c[1] - O[1], c[2] - O[2]);
 			if (d < d_min) d_min = d, at_oxygen = t.get_colour();
 		}
-		EXPECT_EQ(at_oxygen[0], 255);
+		//saturation, not the last count: which grid plane the nearest triangle sits on decides whether mix_colour
+		//rounds the top of the ramp to 255 or 254
+		EXPECT_GE(at_oxygen[0], 250);
 		EXPECT_LT(at_oxygen[2], 128) << "the surface above the oxygen must be red";
 		EXPECT_NE(log.str().find("ESP on the surface from -0.06"), std::string::npos) << log.str();
 	}

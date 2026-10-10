@@ -7,6 +7,7 @@
 
 #include <complex>
 #include <cstdio>
+#include <cmath>
 #include <cstring>
 #include <numeric>
 
@@ -282,6 +283,34 @@ TEST(ConvenienceTests, FastExpNegTracksExpWithinItsLeadingError)
 	}
 }
 
+#if defined(__aarch64__) || defined(_M_ARM64)
+// sincos_shared_n against std::sin and std::cos: quadrant boundaries on both sides, an odd count for the scalar tail,
+// and pairs that have to take the lane-by-lane fallback (|x| >= 1e5, inf, nan) next to in-range lanes
+TEST(ConvenienceTests, SincosSharedNeonMatchesLibm)
+{
+	std::vector<double> x;
+	for (int k = -40; k <= 40; k++)
+		for (const double d : { -1e-12, 0.0, 1e-12 })
+			x.push_back(k * constants::PI / 4 + d);
+	for (int i = 0; i < 2001; i++) x.push_back(-99999.0 + i * 99.9993);
+	for (const double v : { 0.0, -0.0, 1e-300, 2.5, 1e5, 2.5, -3e5, 1e300, 0.5, std::numeric_limits<double>::infinity(), 0.25, std::numeric_limits<double>::quiet_NaN(), 0.125 })
+		x.push_back(v);
+	ASSERT_EQ(x.size() % 2, 1u);
+	std::vector<double> s(x.size()), c(x.size());
+	sincos_shared_n(static_cast<int>(x.size()), x.data(), s.data(), c.data());
+	for (size_t i = 0; i < x.size(); i++)
+	{
+		if (!std::isfinite(x[i])) {
+			EXPECT_TRUE(std::isnan(s[i]) && std::isnan(c[i])) << "x = " << x[i];
+			continue;
+		}
+		const double tol = std::abs(x[i]) < 1e5 ? 3e-16 : 1e-15;
+		EXPECT_NEAR(s[i], std::sin(x[i]), tol) << "x = " << x[i];
+		EXPECT_NEAR(c[i], std::cos(x[i]), tol) << "x = " << x[i];
+	}
+}
+#endif
+
 // sha256 against three published digests, the third one crossing the 64 byte block boundary
 TEST(ConvenienceTests, Sha256MatchesPublishedDigests)
 {
@@ -467,6 +496,30 @@ TEST(ConvenienceTests, ProgressBarBatchedUpdateWritesOnce)
 	EXPECT_NE(out.str().find("100%"), std::string::npos);
 }
 
+//A file-backed bar redraws by seeking back, which would erase lines the loop printed in between; the
+//tests above use an ostringstream ("\r" branch), so this covers the file branch NoSpherA2.log takes.
+//Fails if write_progress seeks back unconditionally
+TEST(ConvenienceTests, FileBarKeepsWhatTheLoopPrinted)
+{
+	const TempFile tmp("progressbar", ".log");
+	{
+		std::ofstream f(tmp.path);
+		ProgressBar bar(4, 10, "-", " ", "pairs", f);
+		for (int i = 0; i < 4; i++) {
+			f << "Bond population between atom 1 and atom " << i + 2 << ": 27.09\n";
+			bar.update();
+		}
+	}
+	std::ifstream in(tmp.path);
+	const std::string text{ std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>() };
+	int found = 0;
+	for (size_t at = text.find("Bond population"); at != std::string::npos;
+		at = text.find("Bond population", at + 1))
+		found++;
+	EXPECT_EQ(found, 4) << "the bar overwrote the loop's own output in the log file:\n" << text;
+	EXPECT_NE(text.find("100%"), std::string::npos) << "and the bar itself must still finish";
+}
+
 // the contributor block is the part -no_date suppresses; the banner stays
 TEST(ConvenienceTests, MessageOmitsContributorsWithNoDate)
 {
@@ -628,13 +681,67 @@ TEST(ConvenienceMathTests, ReadxyzMinMaxFromWFNPadsAndSteps)
 	EXPECT_NEAR(opts.MinMax[4], 3.0 + pad, 1e-12);
 	EXPECT_NEAR(opts.MinMax[2], -0.5 - pad, 1e-12);
 	EXPECT_NEAR(opts.MinMax[5], 0.5 + pad, 1e-12);
-	EXPECT_EQ(opts.NbSteps[0], (int)ceil(constants::bohr2ang(3.0 + 2.0 * pad) / 0.1));
-	EXPECT_EQ(opts.NbSteps[1], (int)ceil(constants::bohr2ang(3.0 + 2.0 * pad) / 0.1));
-	EXPECT_EQ(opts.NbSteps[2], (int)ceil(constants::bohr2ang(1.0 + 2.0 * pad) / 0.1));
+	//the count is the ceil of length over resolution, rounded up once more to an even number
+	const int raw[3] = { (int)ceil(constants::bohr2ang(3.0 + 2.0 * pad) / 0.1),
+						 (int)ceil(constants::bohr2ang(3.0 + 2.0 * pad) / 0.1),
+						 (int)ceil(constants::bohr2ang(1.0 + 2.0 * pad) / 0.1) };
+	for (int i = 0; i < 3; i++)
+	{
+		EXPECT_EQ(opts.NbSteps[i], raw[i] + (raw[i] % 2));
+		//even count puts the box centre on a grid plane; half a voxel off, the mirror planes are not sampled
+		const double h = (opts.MinMax[3 + i] - opts.MinMax[i]) / opts.NbSteps[i];
+		const double centre_index = 0.5 * (opts.MinMax[3 + i] + opts.MinMax[i] - 2.0 * opts.MinMax[i]) / h;
+		EXPECT_NEAR(centre_index, std::round(centre_index), 1e-9) << "axis " << i;
+		EXPECT_LE(constants::bohr2ang(h), 0.1 + 1e-12) << "axis " << i;
+	}
 	EXPECT_EQ(opts.n_grid_points(), size_t(opts.NbSteps[0]) * opts.NbSteps[1] * opts.NbSteps[2]);
 	EXPECT_FALSE(opts.calc());
 	opts.rho = true;
 	EXPECT_TRUE(opts.calc());
+}
+
+// Octahedral UH6 as in tests/ELI_heavy/uh6.gbw, with its radius.  An odd step count puts the box centre
+// between two planes and breaks the attractors' symmetry; ceil(length/res) is odd at 0.15 and 0.10
+// (9.0/0.15 = 60.000000000000014), so those resolutions pin both even_steps = true and false
+TEST(ConvenienceMathTests, GridCentreLandsOnAPlaneAtEveryResolution)
+{
+	WFN w(e_origin::NOT_YET_DEFINED);
+	w.push_back_atom("U", 0.0, 0.0, 0.0, 92);
+	const double d = constants::ang2bohr(2.0);
+	for (int ax = 0; ax < 3; ax++)
+		for (int sign = -1; sign <= 1; sign += 2)
+		{
+			double p[3] = { 0.0, 0.0, 0.0 };
+			p[ax] = sign * d;
+			w.push_back_atom("H", p[0], p[1], p[2], 1);
+		}
+	ASSERT_EQ(w.get_ncen(), 7);
+	for (double res : { 0.20, 0.15, 0.12, 0.10, 0.08, 0.05 })
+	{
+		properties_options opts;
+		opts.radius = 2.5;
+		opts.resolution = res;
+		readxyzMinMax_fromWFN(w, opts);
+		//the property-cube path steps at the resolution, where an extra point only widens the box: even_steps = false
+		properties_options raw_opts;
+		raw_opts.radius = 2.5;
+		raw_opts.resolution = res;
+		readxyzMinMax_fromWFN(w, raw_opts, false);
+		for (int i = 0; i < 3; i++)
+		{
+			const int raw = (int)ceil(constants::bohr2ang(raw_opts.MinMax[3 + i] - raw_opts.MinMax[i]) / res);
+			EXPECT_EQ(raw_opts.NbSteps[i], raw) << "resolution " << res << " axis " << i;
+			EXPECT_EQ(opts.NbSteps[i], raw + (raw % 2)) << "resolution " << res << " axis " << i;
+			EXPECT_EQ(opts.NbSteps[i] % 2, 0) << "resolution " << res << " axis " << i;
+			const double h = (opts.MinMax[3 + i] - opts.MinMax[i]) / opts.NbSteps[i];
+			//the box centre sits at index NbSteps/2 because the points start at MinMax[i]
+			EXPECT_EQ(opts.NbSteps[i] / 2 * 2, opts.NbSteps[i]) << "resolution " << res;
+			EXPECT_LE(constants::bohr2ang(h), res + 1e-12) << "resolution " << res << " axis " << i;
+		}
+		//octahedral axes are equivalent
+		EXPECT_EQ(opts.NbSteps[0], opts.NbSteps[1]) << "resolution " << res;
+		EXPECT_EQ(opts.NbSteps[1], opts.NbSteps[2]) << "resolution " << res;
+	}
 }
 
 // a shortest interatomic distance below 2 reads as Angstrom, above as bohr
@@ -951,9 +1058,12 @@ TEST(ConvenienceOptionsTests, IsosurfaceAndAnalysisOptionsReadOptionalValues)
 	EXPECT_TRUE(def.properties.rho);
 	const options val = parse({ "-esp_isosurface", "0.01" });
 	EXPECT_NEAR(val.properties.esp_isosurface, 0.01, 1e-15);
-	const options eli = parse({ "-eli_analysis", "mol.wfn", "0.05", "3.5", "-acc", "4" });
+	//a real file: -eli_analysis refuses a positional wavefunction that does not exist
+	const TempFile mol("eli_analysis", ".wfn");
+	mol.write_text("");
+	const options eli = parse({ "-eli_analysis", mol.path.string(), "0.05", "3.5", "-acc", "4" });
 	EXPECT_TRUE(eli.eli_analysis_run);
-	EXPECT_EQ(eli.wfn, std::filesystem::path("mol.wfn"));
+	EXPECT_EQ(eli.wfn, mol.path);
 	EXPECT_NEAR(eli.properties.resolution, 0.05, 1e-15);
 	EXPECT_NEAR(eli.properties.radius, 3.5, 1e-15);
 	EXPECT_EQ(eli.accuracy, 4);
@@ -964,6 +1074,23 @@ TEST(ConvenienceOptionsTests, IsosurfaceAndAnalysisOptionsReadOptionalValues)
 	const options fukui_bare = parse({ "-fukui_analysis", "-acc", "1" });
 	EXPECT_TRUE(fukui_bare.fukui_analysis_run);
 	EXPECT_TRUE(fukui_bare.wfn.empty());
+	//-eqc_frag reads triples until a flag; a negative charge must not end the list
+	const options eqc = parse({ "-eqc", "mol.gbw", "-eqc_frag", "0,2-4", "1", "1", "1", "-1", "1", "-eqc_cold" });
+	EXPECT_TRUE(eqc.eqc);
+	EXPECT_TRUE(eqc.eqc_cold);
+	EXPECT_EQ(eqc.wfn, std::filesystem::path("mol.gbw"));
+	ASSERT_EQ(eqc.eqc_frags.size(), 2u);
+	EXPECT_EQ(eqc.eqc_frags[0].atoms, (ivec{ 0, 2, 3, 4 }));
+	EXPECT_EQ(eqc.eqc_frags[1].charge, -1);
+	EXPECT_EQ(eqc.eqc_frags[1].mult, 1);
+	EXPECT_EQ(eqc.eqc_method, "hf");
+	//-eqc_wfn alone switches EQC on and reads files until the next flag
+	const options eqc_wfn = parse({ "-eqc_wfn", "p.wfx", "a.wfx", "b.fchk", "-eqc_method", "pbe0", "-eqc_basis", "def2-svp" });
+	EXPECT_TRUE(eqc_wfn.eqc);
+	ASSERT_EQ(eqc_wfn.eqc_wfns.size(), 3u);
+	EXPECT_EQ(eqc_wfn.eqc_wfns[2], std::filesystem::path("b.fchk"));
+	EXPECT_EQ(eqc_wfn.eqc_method, "pbe0");
+	EXPECT_EQ(eqc_wfn.eqc_basis, "def2-svp");
 	const options pol = parse({ "-polarizabilities", "a", "b", "c", "d", "e", "f", "g" });
 	ASSERT_EQ(pol.pol_wfns.size(), 7u);
 	EXPECT_EQ(pol.pol_wfns[6], std::filesystem::path("g"));
@@ -973,7 +1100,7 @@ TEST(ConvenienceOptionsTests, IsosurfaceAndAnalysisOptionsReadOptionalValues)
 TEST(ConvenienceOptionsTests, GpuAndXcwTogglesFlipTheirFields)
 {
 	const options opt = parse({ "-no_gpu", "-gpu_fp64", "-gpu_fp32", "-no_gpu_itensor", "-gpu_itensor_tensor", "-no_gpu_cublas",
-		"-no_gpu_salted", "-salted_charge_constraint", "-no_gpu_grid", "-no_gpu_density", "-gpu_blas", "-no_cpu_itensor_fp32",
+		"-no_gpu_salted", "-no_gpu_grid", "-no_gpu_density", "-gpu_blas", "-no_cpu_itensor_fp32",
 		"-itensor_hybrid", "-no_xcw_extrapolate", "-xcw_incremental", "-xcw_int_precision", "1e-12",
 		"-do_XCW", "-calc_F", "-xcw_gaussian_halt", "-xcw_strong_cutoff", "2.5", "-XCW_settings", "settings.toml" });
 	EXPECT_FALSE(opt.use_gpu);
@@ -983,7 +1110,6 @@ TEST(ConvenienceOptionsTests, GpuAndXcwTogglesFlipTheirFields)
 	EXPECT_TRUE(opt.gpu_itensor_tensor);
 	EXPECT_FALSE(opt.gpu_cublas);
 	EXPECT_FALSE(opt.gpu_salted);
-	EXPECT_TRUE(opt.salted_charge_constraint);
 	EXPECT_FALSE(opt.gpu_grid);
 	EXPECT_FALSE(opt.gpu_density);
 	EXPECT_TRUE(opt.gpu_blas);
@@ -1035,21 +1161,28 @@ TEST(ConvenienceOptionsTests, PromolNciCollectsFragmentsAndCutoffs)
 // -multipole_moments picks the scheme by name, bounds the order, turns on the RI fit and gets an auto_aux basis when none was named
 TEST(ConvenienceOptionsTests, MultipoleAndRepulsionOptions)
 {
-	const options opt = parse({ "-multipole_moments", "TFVC", "3", "-multipole_strength", "2.5", "-multipole_centre",
+	const options opt = parse({ "-multipole_moments", "TFVC", "3", "-multipole_strength", "2.5",
 		"-repulsion_overlap", "0.3", "-repulsion_exchange", "b88", "-geometry_aid_cutoff", "3.0" });
-	EXPECT_EQ(opt.multipole_scheme, PartitionType::TFVC);
+	EXPECT_EQ(opt.multipole_scheme, MultipoleScheme::TFVC);
 	EXPECT_EQ(opt.multipole_lmax, 3);
 	EXPECT_TRUE(opt.RI_FIT);
 	EXPECT_EQ(opt.partition_type, PartitionType::RI);
 	EXPECT_EQ(opt.aux_basis.size(), 1u) << "auto_aux pushed after parsing";
 	EXPECT_NEAR(opt.multipole_strength, 2.5, 1e-15);
-	EXPECT_FALSE(opt.multipole_partition);
 	EXPECT_NEAR(opt.repulsion_overlap, 0.3, 1e-15);
 	EXPECT_EQ(opt.repulsion_exchange, 2);
 	EXPECT_NEAR(opt.geometry_aid_cutoff, 3.0, 1e-15);
-	EXPECT_EQ(parse({ "-multipole_moments", "hirsh", "0" }).multipole_scheme, PartitionType::Hirshfeld);
-	EXPECT_EQ(parse({ "-multipole_moments", "mbis", "1" }).multipole_scheme, PartitionType::MBIS);
-	EXPECT_EQ(parse({ "-multipole_moments", "EMBIS", "8" }).multipole_scheme, PartitionType::EMBIS);
+	EXPECT_EQ(parse({ "-multipole_moments", "hirsh", "0" }).multipole_scheme, MultipoleScheme::HIRSHFELD);
+	EXPECT_EQ(parse({ "-multipole_moments", "mbis", "1" }).multipole_scheme, MultipoleScheme::MBIS);
+	EXPECT_EQ(parse({ "-multipole_moments", "EMBIS", "8" }).multipole_scheme, MultipoleScheme::EMBIS);
+	EXPECT_EQ(parse({ "-multipole_moments", "Nuclear" }).multipole_lmax, 0);
+	EXPECT_EQ(parse({ "-multipole_moments", "Mulliken", "9" }).multipole_lmax, 0);
+	EXPECT_EQ(parse({ "-multipole_moments", "Mulliken", "9" }).multipole_scheme, MultipoleScheme::MULLIKEN);
+	const options sanderson = parse({ "-multipole_moments", "Sanderson", "-acc", "2" });
+	EXPECT_EQ(sanderson.multipole_scheme, MultipoleScheme::SANDERSON);
+	EXPECT_EQ(sanderson.multipole_lmax, 0);
+	EXPECT_EQ(sanderson.accuracy, 2);
+	EXPECT_EQ(parse({ "-multipole_moments", "Hirshfeld", "-acc", "2" }).multipole_lmax, 0);
 	EXPECT_EQ(parse({ "-repulsion_exchange", "dirac" }).repulsion_exchange, 0);
 	EXPECT_EQ(parse({ "-repulsion_exchange", "pbe" }).repulsion_exchange, 1);
 	EXPECT_EQ(parse({ "-repulsion_exchange", "r2scan" }).repulsion_exchange, 3);
@@ -1090,6 +1223,17 @@ TEST(ConvenienceOptionsTests, RgbiGroupsParseRangesAndBasis)
 	EXPECT_TRUE(nosym.rgbi);
 	EXPECT_TRUE(nosym.rgbi_no_sym);
 	EXPECT_EQ(parse({ "-rgbi-groups" }).rgbi_group_sets.size(), 0u) << "no group after the flag adds no set";
+}
+
+// a flag may be written with either separator, and a negative value is not a flag
+TEST(ConvenienceOptionsTests, EitherSeparatorNamesTheSameFlag)
+{
+	EXPECT_EQ(parse({ "-rgbi-groups", "1,2" }).rgbi_group_sets, parse({ "-rgbi_groups", "1,2" }).rgbi_group_sets);
+	EXPECT_EQ(parse({ "-density-difference", "b.wfn" }).wfn2, parse({ "-density_difference", "b.wfn" }).wfn2);
+	EXPECT_EQ(parse({ "-multipole-moments", "TFVC", "2" }).multipole_lmax, parse({ "-multipole_moments", "TFVC", "2" }).multipole_lmax);
+	EXPECT_EQ(parse({ "-multipole-moments", "TFVC", "2" }).multipole_lmax, 2);
+	// -charge does not advance i, so the value is read again in flag position next round
+	EXPECT_EQ(parse({ "-charge", "-1" }).charge, -1);
 }
 
 // a one-shot option sets finished and stops the parse, so nothing after it is read

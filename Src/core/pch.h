@@ -39,6 +39,22 @@
 #include <Accelerate/Accelerate.h>
 #define lapack_int int
 #define MKL_Set_Num_Threads(num) omp_set_num_threads(num)
+#elif defined(NSA2_OPENBLAS)
+// Windows on ARM: oneMKL has no ARM64 build, OpenBLAS supplies CBLAS and LAPACKE
+#include <cblas.h>
+// MSVC C++ cannot parse the C99 _Complex default
+#include <complex>
+#define lapack_complex_float std::complex<float>
+#define lapack_complex_double std::complex<double>
+#include <lapacke.h>
+#ifdef NSA2_ARMPL
+//serial armpl_lp64, nothing to set
+#define MKL_Set_Num_Threads(num) ((void)(num))
+#else
+//pthreads OpenBLAS cannot tell it runs inside an OpenMP region (MKL can), so N threads
+//here would mean N BLAS threads per OpenMP thread: keep it serial, -cpus goes to OpenMP
+#define MKL_Set_Num_Threads(num) ((void)(num), openblas_set_num_threads(1))
+#endif
 #else
 // Linux/Windows with oneMKL
 #include <mkl.h>
@@ -74,6 +90,9 @@
 #ifdef __AVX__
 #include <immintrin.h>
 #endif
+#if defined(__aarch64__) || defined(_M_ARM64)
+#include <arm_neon.h>
+#endif
 #define MDSPAN_USE_BRACKET_OPERATOR 0
 #define MDSPAN_USE_PAREN_OPERATOR 1
 #ifdef __CMAKE_BUILD__
@@ -94,7 +113,7 @@
 #include <shobjidl.h>
 #include <algorithm>
 #else
-#define GetCurrentDir getcwd
+#define GetCurrentDir std::filesystem::current_path().string() // bare getcwd streamed a function pointer ("1" on glibc, an error on bionic)
 #include <optional>
 #include <unistd.h>
 #include <cfloat>

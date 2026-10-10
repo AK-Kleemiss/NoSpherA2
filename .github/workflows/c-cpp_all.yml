@@ -1,7 +1,8 @@
 name: CI
 
 # Least privilege by default. The CodeQL and Flawfinder jobs need more and
-# declare their own permissions block, which overrides this one; every other
+# declare their own permissions block, which overrides this one, as does the
+# build job, which deletes its own superseded sccache entries; every other
 # job only ever reads the repository.
 permissions:
   contents: read
@@ -23,10 +24,17 @@ env:
   CMAKE_BUILD_PARALLEL_LEVEL: 4
   CTEST_PARALLEL_LEVEL: 4
   CARGO_TERM_COLOR: always
+  # SSE4.2 compatibility build: CI binaries are handed out and must run on any x64 CPU.
+  # Unset, cmake/NoSpherA2Avx.cmake detects the runner and builds AVX2 + FMA, as local builds do.
+  NOS_AVX: "OFF"
 
 jobs:
   build:
     name: ${{ matrix.name }}
+
+    permissions:
+      contents: read
+      actions: write
 
     env:
       SCCACHE_DIR: ${{ github.workspace }}/.sccache
@@ -60,6 +68,22 @@ jobs:
             shell: pwsh
             artifact-path: artifacts/NoSpherA2-windows-x64.zip
             artifact-name: NoSpherA2-windows-x64
+
+          # oneMKL has no ARM64 build; this one links conda-forge OpenBLAS
+          # (environment-win-arm64.yaml) and uses vcomp for OpenMP.
+          # Disabled for now: its tests run 5-8x slower than x64 (XCW) and
+          # ArmPL cannot be fetched by CI (Arm's CDN refuses scripted downloads).
+          # - name: Windows arm64 Release
+          #   os: windows-11-arm
+          #   configure-preset: release-windows-arm64
+          #   build-preset: release-windows-arm64
+          #   test-preset: release-windows-arm64
+          #   build-directory: build/release-windows-arm64
+          #   architecture: arm64
+          #   msvc-arch: arm64
+          #   shell: pwsh
+          #   artifact-path: artifacts/NoSpherA2-windows-arm64.zip
+          #   artifact-name: NoSpherA2-windows-arm64
 
           - name: macOS arm64 Release
             os: macos-15
@@ -167,8 +191,9 @@ jobs:
           submodules: recursive
           fetch-depth: 1
 
-      # The .sln lists its sources by hand, CMake globs them
+      # The .sln lists its sources by hand, CMake globs them; only the Windows jobs need the .sln
       - name: Check the Visual Studio projects against the CMake globs
+        if: runner.os == 'Windows'
         shell: bash
         run: python scripts/check_vcxproj.py
 
@@ -220,18 +245,20 @@ jobs:
           PY
 
       # Ninja uses whichever compiler environment is active. On Windows,
-      # initialize the x64 MSVC environment before configuring CMake.
-      - name: Initialize MSVC x64 environment
+      # initialize the MSVC environment before configuring CMake.
+      - name: Initialize MSVC ${{ matrix.msvc-arch || 'x64' }} environment
         if: runner.os == 'Windows'
         uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1
         with:
-          arch: x64
+          arch: ${{ matrix.msvc-arch || 'x64' }}
 
       - name: Show toolchain
         run: |
           cmake --version
           ninja --version
           git --version
+        # windows-11-arm may not ship ninja; the build takes it from the micromamba env
+        continue-on-error: true
 
       - name: Show MSVC compiler
         if: runner.os == 'Windows'
@@ -301,17 +328,29 @@ jobs:
         uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # v0.0.11
         with:
           version: "v0.16.0"
+          # its job summary queries a fresh server after "Stop sccache" and
+          # reads all zeros; the real numbers are in that step's log
+          disable_annotations: true
 
+      # One cache family per OS and architecture: the CPU and GPU jobs share
+      # the preset, build directory and flags, so every dependency object is
+      # interchangeable between them. Cache keys are immutable, hence the
+      # run-unique key, and every run saves - also pull requests, failed and
+      # cancelled builds, since cancel-in-progress kills the long Windows
+      # builds before they finish. The "/" stops linux-x86_64 from matching
+      # a longer name. The last step deletes what this save superseded.
       - name: Restore packed sccache
         id: sccache-restore
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: ${{ env.SCCACHE_DIR }}
           key: >-
-            sccache-packed-v3-sccache-0.16.0-${{ matrix.artifact-name }}-${{
-            steps.dependency-fingerprint.outputs.value }}
+            sccache-v4/${{ runner.os }}-${{ matrix.architecture }}/${{
+            steps.dependency-fingerprint.outputs.value }}/${{ github.run_id }}-${{
+            github.run_attempt }}-${{ matrix.artifact-name }}
           restore-keys: |
-            sccache-packed-v3-sccache-0.16.0-${{ matrix.artifact-name }}-
+            sccache-v4/${{ runner.os }}-${{ matrix.architecture }}/${{ steps.dependency-fingerprint.outputs.value }}/
+            sccache-v4/${{ runner.os }}-${{ matrix.architecture }}/
 
       # Configure a fresh build tree. sccache reuses individual compilation
       # results, so the CMake/Ninja tree itself does not need to be cached.
@@ -328,21 +367,43 @@ jobs:
       - name: Build
         run: cmake --build --preset "${{ matrix.build-preset }}" --parallel 4
 
+      # The stats go to the run overview here, not from the action's own summary
+      # (zeros, see above); always() also covers a run cancelled during Build
       - name: Stop sccache
-        run: sccache --stop-server
+        if: always()
+        shell: bash
+        run: |
+          { echo "### sccache, ${{ matrix.name }}"; echo '```'; sccache --stop-server; echo '```'; } | tee -a "$GITHUB_STEP_SUMMARY"
         continue-on-error: true
 
       - name: Save packed sccache
-        if: >-
-          success() &&
-          github.event_name != 'pull_request' &&
-          steps.sccache-restore.outputs.cache-hit != 'true'
+        id: sccache-save
+        if: always() && steps.sccache-restore.outcome == 'success'
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: ${{ env.SCCACHE_DIR }}
           key: ${{ steps.sccache-restore.outputs.cache-primary-key }}
 
+      # The newest entry of a family carries everything the older ones did,
+      # it was restored from them. Scoped to this ref: a pull request never
+      # touches master's entries, which every pull request restores from.
+      - name: Drop superseded sccache entries
+        if: always() && steps.sccache-save.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FAMILY: sccache-v4/${{ runner.os }}-${{ matrix.architecture }}/
+        run: >-
+          gh cache list --repo "$GITHUB_REPOSITORY" --ref "$GITHUB_REF" --key "$FAMILY"
+          --sort created_at --order desc --limit 100 --json id --jq '.[1:][].id'
+          | xargs -r -n1 gh cache delete --repo "$GITHUB_REPOSITORY"
+
       - name: Run tests
+        # The pthreads OpenBLAS does not notice it is called inside an OpenMP region, as MKL does,
+        # and oversubscribes the cores; the code threads above BLAS anyway
+        env:
+          OPENBLAS_NUM_THREADS: ${{ matrix.name == 'Windows arm64 Release' && '1' || '' }}
         run: ctest --preset "${{ matrix.test-preset }}" --output-on-failure
 
       - name: Package Unix artifacts
@@ -378,8 +439,10 @@ jobs:
           path: ${{ matrix.artifact-path }}
           if-no-files-found: error
 
-      - name: Upload test logs after failure
-        if: failure()
+      # Every run, not just failures: LastTest.log holds the output of passing tests too
+      # (iteration counts, timings), which ctest prints only on failure
+      - name: Upload test logs
+        if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: test-logs-${{ matrix.artifact-name }}

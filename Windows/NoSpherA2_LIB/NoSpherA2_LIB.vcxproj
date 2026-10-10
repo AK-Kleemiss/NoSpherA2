@@ -5,13 +5,25 @@
       <Configuration>Debug</Configuration>
       <Platform>x64</Platform>
     </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|ARM64">
+      <Configuration>Debug</Configuration>
+      <Platform>ARM64</Platform>
+    </ProjectConfiguration>
     <ProjectConfiguration Include="Profile|x64">
       <Configuration>Profile</Configuration>
       <Platform>x64</Platform>
     </ProjectConfiguration>
+    <ProjectConfiguration Include="Profile|ARM64">
+      <Configuration>Profile</Configuration>
+      <Platform>ARM64</Platform>
+    </ProjectConfiguration>
     <ProjectConfiguration Include="Release|x64">
       <Configuration>Release</Configuration>
       <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|ARM64">
+      <Configuration>Release</Configuration>
+      <Platform>ARM64</Platform>
     </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
@@ -30,6 +42,13 @@
     <CharacterSet>Unicode</CharacterSet>
     <EnableASAN>false</EnableASAN>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v145</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+    <EnableASAN>false</EnableASAN>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Profile|x64'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
@@ -37,7 +56,21 @@
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Profile|ARM64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v145</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v145</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>v145</PlatformToolset>
@@ -53,10 +86,13 @@
     <Import Project="..\Windows_utils\NoSpherA2_includes.props" />
     <Import Project="..\Windows_utils\NoSpherA2_universal.props" />
     <Import Project="..\Windows_utils\NoSpherA2_moveLibs.props" />
-    <Import Project="..\Windows_utils\NoSpherA2_detect_AVX.props" />
     <Import Project="..\Windows_utils\NoSpherA2_gpu.props" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+    <Import Project="..\Windows_utils\NoSpherA2_debug.props" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
     <Import Project="..\Windows_utils\NoSpherA2_debug.props" />
   </ImportGroup>
@@ -64,7 +100,15 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
     <Import Project="..\Windows_utils\NoSpherA2_profile.props" />
   </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Profile|ARM64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+    <Import Project="..\Windows_utils\NoSpherA2_profile.props" />
+  </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+    <Import Project="..\Windows_utils\NoSpherA2_release.props" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
     <Import Project="..\Windows_utils\NoSpherA2_release.props" />
   </ImportGroup>
@@ -72,15 +116,31 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <OutDir>$(SolutionDir)..\..\build\$(Configuration)_$(Platform)\</OutDir>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">
+    <OutDir>$(SolutionDir)..\..\build\$(Configuration)_$(Platform)\</OutDir>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">
+    <OutDir>$(SolutionDir)..\..\build\$(Configuration)_$(Platform)\</OutDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Profile|ARM64'">
     <OutDir>$(SolutionDir)..\..\build\$(Configuration)_$(Platform)\</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <OutDir>$(SolutionDir)..\..\build\$(Configuration)_$(Platform)\</OutDir>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">
+    <OutDir>$(SolutionDir)..\..\build\$(Configuration)_$(Platform)\</OutDir>
+  </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">
+    <ClCompile>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
@@ -92,6 +152,8 @@
     <ClInclude Include="..\..\Src\core\atoms.h" />
     <ClInclude Include="..\..\Src\core\aux_density.h" />
     <ClInclude Include="..\..\Src\core\aux_density_gpu.h" />
+    <ClInclude Include="..\..\Src\core\basin_field_gpu.h" />
+    <ClInclude Include="..\..\Src\core\esp_gpu.h" />
     <ClInclude Include="..\..\Src\core\b2c.h" />
     <ClInclude Include="..\..\Src\core\basis_set.h" />
     <ClInclude Include="..\..\Src\core\blas_gpu.h" />
@@ -101,6 +163,7 @@
     <ClInclude Include="..\..\Src\core\constants.h" />
     <ClInclude Include="..\..\Src\core\convenience.h" />
     <ClInclude Include="..\..\Src\core\crystal_energies.h" />
+    <ClInclude Include="..\..\Src\core\eqc.h" />
     <ClInclude Include="..\..\Src\core\gaussian_atom.h" />
     <ClInclude Include="..\..\Src\core\density_source.h" />
     <ClInclude Include="..\..\Src\core\cube.h" />
@@ -108,7 +171,9 @@
     <ClInclude Include="..\..\Src\core\CUDA_utilities.h" />
     <ClInclude Include="..\..\Src\core\early_exit.h" />
     <ClInclude Include="..\..\Src\core\ECPs_corrections.h" />
+    <ClInclude Include="..\..\Src\core\extinction.h" />
     <ClInclude Include="..\..\Src\core\fchk.h" />
+    <ClInclude Include="..\..\Src\core\fiber_loop.h" />
     <ClInclude Include="..\..\Src\core\geometry_aid.h" />
     <ClInclude Include="..\..\Src\core\gemm_gpu.cuh" />
     <ClInclude Include="..\..\Src\core\gpu_api.h" />
@@ -116,6 +181,7 @@
     <ClInclude Include="..\..\Src\core\grid_gpu.h" />
     <ClInclude Include="..\..\Src\core\GridManager.h" />
     <ClInclude Include="..\..\Src\core\i_tensor_stream.h" />
+    <ClInclude Include="..\..\Src\core\ibo.h" />
     <ClInclude Include="..\..\Src\core\integration_params.h" />
     <ClInclude Include="..\..\Src\core\integrator.h" />
     <ClInclude Include="..\..\Src\core\isosurface.h" />
@@ -146,6 +212,9 @@
     <ClInclude Include="..\..\Src\core\test_functions.h" />
     <ClInclude Include="..\..\Src\core\Thakkar_coefs.h" />
     <ClInclude Include="..\..\Src\core\throughput.h" />
+    <ClInclude Include="..\..\Src\core\tuning.h" />
+    <ClInclude Include="..\..\Src\core\section_log.h" />
+    <ClInclude Include="..\..\Src\core\topology.h" />
     <ClInclude Include="..\..\Src\core\tsc_block.h" />
     <ClInclude Include="..\..\Src\core\tsc_label_converter.h" />
     <ClInclude Include="..\..\Src\core\tsc_stream.h" />
@@ -171,11 +240,17 @@
     <ClCompile Include="..\..\Src\core\bondwise_analysis.cpp" />
     <ClCompile Include="..\..\Src\core\cell.cpp" />
     <ClCompile Include="..\..\Src\core\cif.cpp" />
+    <ClCompile Include="..\..\Src\core\citations.cpp" />
     <ClCompile Include="..\..\Src\core\constants.cpp" />
     <ClCompile Include="..\..\Src\core\convenience.cpp" />
     <ClCompile Include="..\..\Src\core\cube.cpp" />
     <ClCompile Include="..\..\Src\core\ECPs_corrections.cpp" />
+    <ClCompile Include="..\..\Src\core\eqc.cpp" />
+    <ClCompile Include="..\..\Src\core\eli_family.cpp" />
     <ClCompile Include="..\..\Src\core\fchk.cpp" />
+    <ClCompile Include="..\..\Src\core\fiber_loop.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    </ClCompile>
     <ClCompile Include="..\..\Src\core\GridManager.cpp" />
     <ClCompile Include="..\..\Src\core\integration_params.cpp" />
     <ClCompile Include="..\..\Src\core\integrator.cpp" />
@@ -183,8 +258,13 @@
     <ClCompile Include="..\..\Src\core\libCintKernels.cpp" />
     <ClCompile Include="..\..\Src\core\libCintMain.cpp" />
     <ClCompile Include="..\..\Src\core\molecule.cpp" />
+    <ClCompile Include="..\..\Src\core\ibo.cpp" />
+    <ClCompile Include="..\..\Src\core\nao.cpp" />
+    <ClCompile Include="..\..\Src\core\nbo.cpp" />
+    <ClCompile Include="..\..\Src\core\nbo_run.cpp" />
     <ClCompile Include="..\..\Src\core\NoSpherA2.cpp" />
     <ClCompile Include="..\..\Src\core\nos_math.cpp" />
+    <ClCompile Include="..\..\Src\core\nrt.cpp" />
     <ClCompile Include="..\..\Src\core\properties.cpp" />
     <ClCompile Include="..\..\Src\core\qct.cpp" />
     <ClCompile Include="..\..\Src\core\SALTED_equicomb.cpp" />
@@ -193,19 +273,25 @@
     <ClCompile Include="..\..\Src\core\SALTED_utilities.cpp" />
     <ClCompile Include="..\..\Src\core\scattering_factors.cpp" />
     <ClCompile Include="..\..\Src\core\throughput.cpp" />
+    <ClCompile Include="..\..\Src\core\topology.cpp" />
     <ClCompile Include="..\..\Src\core\tsc_label_converter.cpp" />
     <ClCompile Include="..\..\Src\core\sphere_lebedev_rule.cpp" />
     <ClCompile Include="..\..\Src\core\spherical_density.cpp" />
     <ClCompile Include="..\..\Src\core\wfn_class.cpp" />
     <ClCompile Include="..\..\Src\core\wfn_density.cpp" />
     <ClCompile Include="..\..\Src\core\wfn_io.cpp" />
-    <ClCompile Include="..\..\Src\core\XCW.cpp" />
+    <ClCompile Include="..\..\Src\core\XCW.cpp">
+      <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/bigobj %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
     <ClCompile Include="..\..\Src\core\stored_eri.cpp" />
     <ClCompile Include="..\..\Src\core\xcw_halting.cpp" />
   </ItemGroup>
   <ItemGroup Condition="'$(NosUseCuda)' == 'true'">
     <CudaCompile Include="..\..\Src\core\aux_density_gpu.cu" />
     <CudaCompile Include="..\..\Src\core\blas_gpu.cu" />
+    <CudaCompile Include="..\..\Src\core\basin_field_gpu.cu" />
+    <CudaCompile Include="..\..\Src\core\esp_gpu.cu" />
     <CudaCompile Include="..\..\Src\core\grid_gpu.cu" />
     <CudaCompile Include="..\..\Src\core\itensor_gpu.cu" />
     <CudaCompile Include="..\..\Src\core\salted_gpu.cu" />
@@ -225,6 +311,8 @@
     </ClCompile>
     <CustomBuild Include="..\..\Src\core\aux_density_gpu.cu" />
     <CustomBuild Include="..\..\Src\core\blas_gpu.cu" />
+    <CustomBuild Include="..\..\Src\core\basin_field_gpu.cu" />
+    <CustomBuild Include="..\..\Src\core\esp_gpu.cu" />
     <CustomBuild Include="..\..\Src\core\grid_gpu.cu" />
     <CustomBuild Include="..\..\Src\core\itensor_gpu.cu" />
     <CustomBuild Include="..\..\Src\core\salted_gpu.cu" />

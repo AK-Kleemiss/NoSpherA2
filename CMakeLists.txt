@@ -4,6 +4,13 @@ project(NoSpherA2 LANGUAGES C CXX)
 
 message(STATUS "CMAKE_BUILD_TYPE = ${CMAKE_BUILD_TYPE}")
 
+# Windows on ARM: OpenBLAS instead of oneMKL, and MSVC's own vcomp for OpenMP instead of libiomp5
+if(WIN32 AND CMAKE_CXX_COMPILER_ARCHITECTURE_ID STREQUAL "ARM64")
+    set(NOSPHERA2_OPENBLAS ON)
+else()
+    set(NOSPHERA2_OPENBLAS OFF)
+endif()
+
 option(NOSPHERA2_BUILD_DLL "Build the NoSpherA2 DLL" OFF)
 option(NOSPHERA2_BUILD_TESTS "Build NoSpherA2 tests" OFF)
 option(NOSPHERA2_DEPENDENCIES_ONLY "Build dependencies without building NoSpherA2" OFF)
@@ -79,6 +86,15 @@ if(NOSPHERA2_GPU_AUTO AND NOT NOSPHERA2_USE_CUDA AND NOT NOSPHERA2_USE_HIP)
     message(STATUS "GPU auto-detect: ${NOSPHERA2_GPU_VENDOR} (-DNOSPHERA2_GPU_AUTO=OFF to choose by hand)")
     #A missing compiler after auto-enabling is a status line below, not the warning someone
     #who named the backend deserves.
+    set(_nosphera2_gpu_auto_enabled TRUE)
+endif()
+#NOSPHERA2_BOOTSTRAP_GPU_VENDOR=ALL asked for the CI's fat binary whatever card is here. Outside
+#the block above so a build directory that already has one backend gets the other.
+if(NOSPHERA2_GPU_AUTO AND EXISTS "${CMAKE_SOURCE_DIR}/.mambaenv/rocm/root.txt"
+   AND NOT (NOSPHERA2_USE_CUDA AND NOSPHERA2_USE_HIP))
+    set(NOSPHERA2_USE_CUDA ON CACHE BOOL "" FORCE)
+    set(NOSPHERA2_USE_HIP ON CACHE BOOL "" FORCE)
+    message(STATUS "GPU auto-detect: CUDA and HIP, the ROCm SDK of the ALL bootstrap is present")
     set(_nosphera2_gpu_auto_enabled TRUE)
 endif()
 
@@ -272,6 +288,17 @@ if(NOSPHERA2_USE_HIP)
     #from the CMAKE_PREFIX_PATH entries - never from PATH, where Visual Studio's own clang++
     #would be found first and cannot compile HIP.
     set(_nosphera2_hip_version "")
+    #The ROCm SDK wheels of the ALL bootstrap, handed over the way the CI does it
+    #(the prefix path every time - it is not cached, unlike the compiler)
+    if(NOT DEFINED ENV{HIP_PATH} AND EXISTS "${CMAKE_SOURCE_DIR}/.mambaenv/rocm/root.txt")
+        file(READ "${CMAKE_SOURCE_DIR}/.mambaenv/rocm/root.txt" _rocm_root)
+        list(APPEND CMAKE_PREFIX_PATH "${_rocm_root}")
+        if(NOT CMAKE_HIP_COMPILER)
+            set(CMAKE_HIP_COMPILER "${_rocm_root}/lib/llvm/bin/clang++${CMAKE_EXECUTABLE_SUFFIX}"
+                CACHE FILEPATH "HIP compiler from the bootstrapped ROCm SDK" FORCE)
+            message(STATUS "Using the bootstrapped ROCm SDK: ${_rocm_root}")
+        endif()
+    endif()
     if(MSVC)
         if(CMAKE_HIP_COMPILER)
             set(NOSPHERA2_HIP_CLANG "${CMAKE_HIP_COMPILER}" CACHE FILEPATH "ROCm clang++ that compiles the HIP kernels")
@@ -334,15 +361,22 @@ if(NOSPHERA2_USE_HIP)
         endif()
         if(_nosphera2_HIP_arch_managed)
             if(NOSPHERA2_HIP_PORTABLE)
+                #The APUs are listed too (gfx90c Ryzen 4000/5000, gfx1035/1036 Ryzen 6000/7000,
+                #gfx1103 Ryzen 7040/8040/8000G, gfx115x Ryzen AI 300 and Max): ROCm does not
+                #promise them, but the Windows driver runs HIP on them, and student laptops are
+                #where they turn up.
                 set(_arch_list
-                    gfx900 gfx906 gfx908 gfx90a gfx942
+                    gfx900 gfx906 gfx908 gfx90a gfx90c gfx942
                     gfx1010 gfx1012 gfx1030 gfx1031 gfx1032 gfx1034 gfx1035 gfx1036
                     gfx1100 gfx1101 gfx1102 gfx1103)
                 if(_nosphera2_hip_version VERSION_GREATER_EQUAL 19)
                     list(APPEND _arch_list gfx1150 gfx1151 gfx1200 gfx1201)
                 endif()
                 if(_nosphera2_hip_version VERSION_GREATER_EQUAL 20)
-                    list(APPEND _arch_list gfx950)
+                    list(APPEND _arch_list gfx950 gfx1152)
+                endif()
+                if(_nosphera2_hip_version VERSION_GREATER_EQUAL 21)
+                    list(APPEND _arch_list gfx1153)
                 endif()
             else()
                 set(_arch_list gfx90a gfx942 gfx1100)
@@ -490,6 +524,23 @@ endif()
 # OCC
 # ---------------------------------------------------------------------------
 
+#MSVC does not define __ARM_NEON and Eigen 3.4's NEON code does not compile under it, so on Windows
+#ARM64 every Eigen kernel ran scalar. 5.0 compiles it; occ's own CPMAddPackage(eigen3) then reuses
+#this one and skips making the target.
+if(MSVC AND CMAKE_CXX_COMPILER_ARCHITECTURE_ID STREQUAL "ARM64")
+    include("${CMAKE_CURRENT_SOURCE_DIR}/occ/cmake/CPM.cmake")
+    CPMAddPackage(
+        NAME eigen3
+        URL "https://gitlab.com/libeigen/eigen/-/archive/5.0.1/eigen-5.0.1.zip"
+        DOWNLOAD_ONLY YES
+    )
+    add_library(Eigen3::Eigen INTERFACE IMPORTED GLOBAL)
+    target_include_directories(Eigen3::Eigen INTERFACE "${eigen3_SOURCE_DIR}")
+    target_compile_definitions(Eigen3::Eigen INTERFACE __ARM_NEON)
+    target_compile_options(Eigen3::Eigen INTERFACE
+        "$<$<COMPILE_LANGUAGE:CXX>:/FI${CMAKE_CURRENT_SOURCE_DIR}/cmake/eigen5_compat.h>")
+endif()
+
 set(USE_SYSTEM_LIBCINT ON)
 set(BUILD_FPIC ON)
 set(WITH_PYTHON_BINDINGS OFF)
@@ -563,6 +614,44 @@ if(APPLE)
         REQUIRED
     )
     find_package(OpenMP REQUIRED COMPONENTS CXX)
+elseif(NOSPHERA2_OPENBLAS)
+    # oneMKL has no Windows ARM64 build. conda-forge's OpenBLAS carries LAPACKE and the headers;
+    # its include dir is Library/include or Library/include/openblas depending on the build.
+    find_path(NOSPHERA2_OPENBLAS_INCLUDE_DIR cblas.h
+        PATHS "${MICROMAMBA_ENV_PREFIX}/Library/include" PATH_SUFFIXES openblas NO_DEFAULT_PATH REQUIRED)
+    find_library(NOSPHERA2_OPENBLAS_IMPLIB NAMES openblas libopenblas
+        PATHS "${MICROMAMBA_ENV_PREFIX}/Library/lib" NO_DEFAULT_PATH REQUIRED)
+    find_file(NOSPHERA2_OPENBLAS_DLL NAMES openblas.dll libopenblas.dll
+        PATHS "${MICROMAMBA_ENV_PREFIX}/Library/bin" NO_DEFAULT_PATH REQUIRED)
+    # Arm Performance Libraries in place of OpenBLAS when installed (CI sets the env variable).
+    # armpl_lp64 is the serial, /MD static library; its LAPACK is flang-built and needs the
+    # Fortran runtime libraries next to it.
+    set(NOSPHERA2_ARMPL_DIR "$ENV{NOSPHERA2_ARMPL_DIR}" CACHE PATH "Arm Performance Libraries root, empty for OpenBLAS")
+    if(NOSPHERA2_ARMPL_DIR)
+        find_path(NOSPHERA2_ARMPL_INCLUDE_DIR NAMES cblas.h lapacke.h
+            PATHS "${NOSPHERA2_ARMPL_DIR}/include" NO_DEFAULT_PATH REQUIRED)
+        find_library(NOSPHERA2_ARMPL_LIB armpl_lp64 PATHS "${NOSPHERA2_ARMPL_DIR}/lib" NO_DEFAULT_PATH REQUIRED)
+        set(_armpl_libs "${NOSPHERA2_ARMPL_LIB}")
+        foreach(_rt FortranRuntime FortranDecimal flang_rt.runtime)
+            find_library(NOSPHERA2_ARMPL_${_rt} ${_rt} PATHS "${NOSPHERA2_ARMPL_DIR}/lib" NO_DEFAULT_PATH)
+            if(NOSPHERA2_ARMPL_${_rt})
+                list(APPEND _armpl_libs "${NOSPHERA2_ARMPL_${_rt}}")
+            endif()
+        endforeach()
+        message(STATUS "BLAS/LAPACK: Arm Performance Libraries ${_armpl_libs}")
+        add_library(nosphera2_openblas INTERFACE IMPORTED)
+        set_target_properties(nosphera2_openblas PROPERTIES
+            INTERFACE_LINK_LIBRARIES "${_armpl_libs}"
+            INTERFACE_INCLUDE_DIRECTORIES "${NOSPHERA2_ARMPL_INCLUDE_DIR}"
+            INTERFACE_COMPILE_DEFINITIONS "NSA2_OPENBLAS;NSA2_ARMPL")
+    else()
+    add_library(nosphera2_openblas SHARED IMPORTED)
+    set_target_properties(nosphera2_openblas PROPERTIES
+        IMPORTED_IMPLIB "${NOSPHERA2_OPENBLAS_IMPLIB}"
+        IMPORTED_LOCATION "${NOSPHERA2_OPENBLAS_DLL}"
+        INTERFACE_INCLUDE_DIRECTORIES "${NOSPHERA2_OPENBLAS_INCLUDE_DIR}"
+        INTERFACE_COMPILE_DEFINITIONS NSA2_OPENBLAS)
+    endif()
 else()
     find_package(MKL CONFIG REQUIRED)
 endif()

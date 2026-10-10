@@ -2,6 +2,15 @@
   "version": "0.2.0",
   "configurations": [
     {
+      "name": "NoSpherA2 CMake Release: native NBO",
+      "type": "cppvsdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/build/release-windows/bin/NoSpherA2.exe",
+      "args": ["-nbo_native", "epoxide.gbw", "-nrt", "-nbo_json", "epoxide-native.nbo.json"],
+      "cwd": "${workspaceFolder}/tests/epoxide_gbw",
+      "console": "integratedTerminal"
+    },
+    {
       "name": "(gdb) Launch",
       "type": "cppdbg",
       "request": "launch",

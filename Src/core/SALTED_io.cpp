@@ -1,9 +1,13 @@
 #include "pch.h"
 #include "SALTED_io.h"
+#include <cstring>
 #include <filesystem>
+#include <future>
 #include <iostream>
 #include "nos_math.h"
 #include "basis_set.h"
+#include "constants.h"
+#include <algorithm>
 
 namespace {
 constexpr int kMaxSaltedBlocks = 10000;
@@ -31,30 +35,47 @@ void skip_exact(std::ifstream& file, const std::streamoff offset, const std::str
 }
 }
 
-std::filesystem::path find_first_salted_file(const std::filesystem::path &directory_path)
+int salted_element_file_Z(const std::filesystem::path &file)
 {
+	const std::string s = file.stem().string();
+	const int Z = constants::get_Z_from_label(s.c_str());
+	return (Z >= 0 && s == constants::atnr2letter(Z + 1)) ? Z + 1 : 0;
+}
+
+// The .salted files of a folder sorted by name, so the choice of a lead does not depend on the file system's order.
+static pathvec salted_files(const std::filesystem::path &directory_path)
+{
+	pathvec files;
 	try
 	{
-		// Iterate through the directory
 		for (const auto &entry : std::filesystem::directory_iterator(directory_path))
-		{
-			// Check if the entry is a regular file and has a .salted extension
 			if (entry.is_regular_file() && entry.path().extension() == ".salted")
-			{
-				return entry.path().filename().string(); // Return the filename
-			}
-		}
+				files.push_back(entry.path());
 	}
 	catch (const std::filesystem::filesystem_error &e)
 	{
 		std::cerr << "Filesystem error: " << e.what() << std::endl;
 	}
-	catch (const std::exception &e)
-	{
-		std::cerr << "General error: " << e.what() << std::endl;
-	}
+	std::sort(files.begin(), files.end());
+	return files;
+}
 
-	return std::filesystem::path(); // Return an empty path if no .salted file is found
+std::filesystem::path find_first_salted_file(const std::filesystem::path &directory_path)
+{
+	const pathvec files = salted_files(directory_path);
+	for (const auto &f : files)
+		if (!salted_element_file_Z(f)) return f.filename();
+	return files.empty() ? std::filesystem::path() : files[0].filename(); // a folder of element models only
+}
+
+pathvec salted_folder_models(const std::filesystem::path &directory_path, const std::set<int> &present_Z)
+{
+	pathvec models;
+	const std::filesystem::path lead = find_first_salted_file(directory_path);
+	if (!lead.empty() && !salted_element_file_Z(lead)) models.push_back(directory_path / lead);
+	for (const auto &f : salted_files(directory_path))
+		if (present_Z.count(salted_element_file_Z(f))) models.push_back(f);
+	return models;
 }
 
 template <typename Scalar>
@@ -323,6 +344,8 @@ bool SALTED_BINARY_FILE::read_header() {
 	// Read version
 	file.read((char*)&version, sizeof(int));
 	if (debug) std::cout << "File Version: " << version << std::endl;
+	// 5 was the interim number of the folded format, now VERSION 4; those files are the same and still read
+	if (version == 5) version = 4;
 	// Not fatal: the format is additive and read through the table of contents,
 	// so the parts this build knows are still correct. But anything introduced
 	// after SUPPORTED_VERSION is silently absent, and for the VERSION 3 charge
@@ -374,6 +397,22 @@ bool SALTED_BINARY_FILE::read_header() {
 
 
 	header_end = file.tellg();
+
+	// A truncated .salted keeps a valid header whose table of contents lists missing blocks, and
+	// the read would fail deep inside one block; a negative offset is an int32 that wrapped (>2 GB)
+	file.seekg(0, std::ios::end);
+	const std::streamoff file_size = file.tellg();
+	file.seekg(header_end, std::ios::beg);
+	for (const auto& entry : table_of_contents) {
+		if (static_cast<std::streamoff>(entry.second) >= 0
+			&& static_cast<std::streamoff>(entry.second) < file_size)
+			continue;
+		std::cerr << "SALTED file " << filepath.string() << " is incomplete: block "
+			<< entry.first << " is announced at byte " << entry.second
+			<< " but the file is only " << file_size
+			<< " bytes long. Copy or download it again." << std::endl;
+		return false;
+	}
 
 	return true;
 }
@@ -534,21 +573,6 @@ std::unordered_map<std::string, vec> SALTED_BINARY_FILE::read_averages() {
 	);
 }
 
-std::unordered_map<std::string, vec> SALTED_BINARY_FILE::read_charge_constraint() {
-	// Same layout as AVERG: a 5-byte key then a float64 dataset. Keys are
-	// MODE (0 = off, 1 = global scale), DEFCT (the reference fit's measured
-	// relative deficit, for reporting) and NCAL (structures it was measured on).
-	return read_generic_blocks<std::unordered_map<std::string, vec>>("NORMC",
-		[this](std::unordered_map<std::string, vec>& entries, int i) {
-			std::string key = read_string_remove_NULL(5);
-			std::vector<size_t> dims;
-			vec data;
-			read_dataset(data, dims);
-			entries[key] = data;
-		}
-	);
-}
-
 std::unordered_map<int, vec> SALTED_BINARY_FILE::read_wigners() {
 	return read_generic_blocks<std::unordered_map<int, vec>>("WIG",
 		[this](std::unordered_map<int, vec>& wigners, int i) {
@@ -623,6 +647,94 @@ dMatrix2 SALTED_BINARY_FILE::load_block(const block_ref& ref) {
 	return out;
 }
 
+// A new dMatrix2 is zero-filled (std::vector value-initialises it, faulting in every page)
+// before read_at overwrites it, and the disk idles meanwhile. Filling block i+1 while a helper
+// reads block i hides that; one read in flight keeps the access sequential.
+// Sucrose, 650 MB, cold on the Pi 4: 2.66 -> 2.14 s.
+std::vector<dMatrix2> SALTED_BINARY_FILE::load_blocks(const std::vector<block_ref>& refs) {
+	using ext_t = typename dMatrix2::extents_type;
+	std::vector<dMatrix2> out(refs.size());
+	std::vector<std::future<bool>> raw(refs.size());   // after out: destroyed first, waits for the reads
+	for (std::size_t i = 0; i < refs.size(); i++)
+	{
+		if (refs[i].rows != 0 && refs[i].cols != 0)
+			out[i] = dMatrix2(ext_t(refs[i].rows, refs[i].cols));
+		if (i > 0) raw[i - 1].wait();
+		raw[i] = std::async(std::launch::async, [this, &refs, &out, i] {
+			return read_at(refs[i].offset, out[i].data(), refs[i].rows * refs[i].cols * sizeof(double));
+			});
+	}
+	for (std::size_t i = 0; i < refs.size(); i++)
+		if (!raw[i].get()) out[i] = load_block(refs[i]);   // the stream fallback
+	return out;
+}
+
+// Every block but `drop` is copied byte for byte in file order, a block running from its table offset up
+// to the next one, then `add` (name, bytes from the datatype word on) is appended. What lies between the
+// table and the first block (the shipped model pads it) is kept; renaming a block is dropping and adding it
+void SALTED_BINARY_FILE::write_with_blocks(const std::filesystem::path& out, const int32_t version_out,
+	const std::set<std::string>& drop, const std::vector<std::pair<std::string, std::string>>& add) {
+	for (const std::string& key : drop)
+		err_checkf(has_block(key), "No " + key + " block in " + filepath.string(), std::cout);
+	for (const auto& [key, block] : add)
+		err_checkf(key.size() <= 5 && (drop.count(key) || !has_block(key)), "Cannot name the new block " + key, std::cout);
+	file.clear();
+	file.seekg(0, std::ios::end);
+	const std::streamoff size = file.tellg();
+	std::string head(static_cast<size_t>(header_end), '\0');
+	file.seekg(0, std::ios::beg);
+	read_exact_bytes(file, head.data(), header_end, "header");
+
+	std::set<std::streamoff> starts{ size }, dropped;
+	for (const auto& entry : table_of_contents) starts.insert(static_cast<std::streamoff>(entry.second));
+	for (const std::string& key : drop) dropped.insert(static_cast<std::streamoff>(table_of_contents.at(key)));
+	const std::streamoff first = *starts.begin();
+	err_checkf(first >= header_end, "A block of " + filepath.string() + " starts inside its header", std::cout);
+	// Kept entries with their raw 5-byte names, so the padding stays as it was
+	std::vector<std::pair<std::string, std::streamoff>> kept;
+	for (int i = 0; i < numBlocks; i++) {
+		const char* entry = head.data() + HEADER_SIZE + 2 * sizeof(int32_t) + 9 * i;   // 5-byte name, int32 offset
+		int32_t off;
+		std::memcpy(&off, entry + 5, sizeof(int32_t));
+		if (!dropped.count(off)) kept.emplace_back(std::string(entry, 5), off);
+	}
+	std::sort(kept.begin(), kept.end(), [](const auto& a, const auto& b) { return a.second < b.second; });
+	auto next = [&starts](const std::streamoff s) { return *starts.upper_bound(s); };
+
+	std::string table = head.substr(0, HEADER_SIZE);
+	auto put = [&table](const int32_t v) { table.append(reinterpret_cast<const char*>(&v), sizeof(v)); };
+	put(version_out);
+	put(static_cast<int32_t>(kept.size() + add.size()));
+	std::streamoff pos = static_cast<std::streamoff>(HEADER_SIZE + 2 * sizeof(int32_t) + 9 * (kept.size() + add.size()))
+		+ (first - header_end);
+	auto entry = [&](std::string name, const std::streamoff length) {
+		err_checkf(pos <= INT32_MAX, "The new SALTED file outgrows its 32-bit offsets", std::cout);
+		name.resize(5, '\0');
+		table += name;
+		put(static_cast<int32_t>(pos));
+		pos += length;
+	};
+	for (const auto& [name, start] : kept) entry(name, next(start) - start);
+	for (const auto& [name, block] : add) entry(name, static_cast<std::streamoff>(block.size()));
+
+	std::ofstream o(out, std::ios::binary);
+	err_checkf(o.good(), "Cannot write " + out.string(), std::cout);
+	o.write(table.data(), table.size());
+	std::vector<char> buf(1 << 22);
+	auto copy = [&](std::streamoff from, const std::streamoff to) {
+		file.seekg(from, std::ios::beg);
+		for (; from < to; from += static_cast<std::streamoff>(buf.size())) {
+			const std::streamsize n = static_cast<std::streamsize>(std::min<std::streamoff>(to - from, buf.size()));
+			read_exact_bytes(file, buf.data(), n, "block to copy");
+			o.write(buf.data(), n);
+		}
+	};
+	copy(header_end, first);
+	for (const auto& [name, start] : kept) copy(start, next(start));
+	for (const auto& [name, block] : add) o.write(block.data(), static_cast<std::streamsize>(block.size()));
+	err_checkf(o.good(), "Error writing " + out.string(), std::cout);
+}
+
 std::unordered_map<std::string, dMatrix2> SALTED_BINARY_FILE::read_lambda_based_data(
 	const std::string& key,
 	const std::unordered_set<std::string>* wanted,
@@ -680,12 +792,12 @@ std::shared_ptr<BasisSet> SALTED_BINARY_FILE::read_basis_set() {
 				err_checkf(contraction < angular_momenta_per_shell.size(),
 					"SALTED basis angular-momentum array shorter than contraction array", std::cout);
 				int angular_momentum = angular_momenta_per_shell[contraction];
+				// angular momentum is per shell, exponents and coefficients per primitive
 				for (int func = 0; func < contractions[contraction]; func++, primitive_index++) {
-					err_checkf(primitive_index < angular_momenta_per_shell.size()
-						&& primitive_index < exponents_per_shell.size()
+					err_checkf(primitive_index < exponents_per_shell.size()
 						&& primitive_index < coefficients.size(),
 						"SALTED basis primitive arrays have inconsistent sizes", std::cout);
-					bs->add_owned_primitive({ 1, angular_momenta_per_shell[primitive_index], exponents_per_shell[primitive_index], coefficients[primitive_index], contraction });
+					bs->add_owned_primitive({ 1, angular_momentum, exponents_per_shell[primitive_index], coefficients[primitive_index], contraction });
 				}
 			}
 		}

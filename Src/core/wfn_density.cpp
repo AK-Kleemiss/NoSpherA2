@@ -8,9 +8,70 @@
 #include "basis_set.h"
 #include "nos_math.h"
 #include "libCintMain.h"
+#include "eli_family.h"
 #include "integrator.h"
 #include "cell.h"
+#ifdef NOSPHERA2_USE_GPU
+#include "aux_density_gpu.h"
+#include "esp_gpu.h"
+#include "basin_field_gpu.h"
+#endif
 
+namespace
+{
+	//Per-thread scratch: K components per function summed over its primitives, then one multiply into
+	//the MOs; only functions the exponent cutoff kept are visited and reset
+	template <int K>
+	struct ao_scratch {
+		vec v;
+		std::vector<char> hit;
+		ivec touched;
+		void begin(const size_t nao)
+		{
+			if (hit.size() < nao) {
+				hit.resize(nao, 0);
+				v.resize(K * nao);
+			}
+			touched.clear();
+		}
+		void add(const int a, const double s, const double* chi)
+		{
+			double* t = v.data() + (size_t)K * a;
+			if (!hit[a]) {
+				hit[a] = 1;
+				touched.push_back(a);
+				for (int k = 0; k < K; k++) t[k] = s * chi[k];
+			}
+			else
+				for (int k = 0; k < K; k++) t[k] += s * chi[k];
+		}
+		//phi[k * nmo + mo] += sum_A v[A][k] C[A][mo] over the occupied MOs only: every caller weighs phi by the occupation,
+		//so the virtuals stay at the caller's zero. The occ != 0 runs are rescanned per call, O(nmo), so a changed occupation
+		//never goes stale; the per-MO sum order is unchanged, so the occupied values are bit-identical to the full loop
+		ivec runs;
+		template <class Occ>
+		void to_mo(const double* coef_ao, const int nmo, double* phi, Occ occ)
+		{
+			runs.clear();
+			for (int mo = 0; mo < nmo; mo++)
+				if (occ(mo) != 0.0) {
+					if (runs.empty() || runs.back() != mo) { runs.push_back(mo); runs.push_back(mo + 1); }
+					else runs.back() = mo + 1;
+				}
+			for (const int a : touched) {
+				hit[a] = 0;
+				const double* c = coef_ao + (size_t)a * nmo;
+				const double* t = v.data() + (size_t)K * a;
+				for (int k = 0; k < K; k++) {
+					double* const pk = phi + (size_t)k * nmo;
+					const double ck = t[k];
+					for (size_t r = 0; r < runs.size(); r += 2)
+						for (int mo = runs[r]; mo < runs[r + 1]; mo++) pk[mo] += ck * c[mo];
+				}
+			}
+		}
+	};
+}
 
 const double WFN::compute_dens(
 	const d3 &Pos,
@@ -88,24 +149,310 @@ const double WFN::compute_spin_dens(
 	//}
 };
 
-const double WFN::compute_dens_cartesian(
-	const d3 &Pos,
-	vec2 &d,
-	vec &phi) const
+namespace
 {
-	std::fill(phi.begin(), phi.end(), 0.0);
-	double Rho = 0.0;
-	int j;
-	double ex, *d_;
-
-	// precalculate some distances and powers of distances for faster computation
-	for (j = 0; j < ncen; j++)
+	//The Cartesian monomial x^l y^m z^n of a primitive type, from the powers table d_ of compute_dens_cartesian:
+	//0-2 dx dy dz, 3 r^2, 4-6 squares, 7-9 cubes, 10-12 fourth, 13-15 fifth powers
+	inline double cart_monomial(const int type, const double* d_)
 	{
-		const atom &a = atoms[j];
-		d_ = d[j].data();
-		d_[0] = Pos[0] - a.get_coordinate(0);
-		d_[1] = Pos[1] - a.get_coordinate(1);
-		d_[2] = Pos[2] - a.get_coordinate(2);
+		switch (type)
+		{
+		case 0: return 1.0;
+		case 1: return 1.0;// 0, 0, 0,
+		case 2: return d_[0];// 1, 0, 0,
+		case 3: return d_[1];// 0, 1, 0,
+		case 4: return d_[2];// 0, 0, 1,
+		case 5: return d_[4];// 2, 0, 0,
+		case 6: return d_[5];// 0, 2, 0,
+		case 7: return d_[6];// 0, 0, 2,
+		case 8: return d_[0] * d_[1];// 1, 1, 0,
+		case 9: return d_[0] * d_[2];// 1, 0, 1,
+		case 10: return d_[1] * d_[2];// 0, 1, 1,
+		case 11: return d_[7];// 3, 0, 0,
+		case 12: return d_[8];// 0, 3, 0,
+		case 13: return d_[9];// 0, 0, 3,
+		case 14: return d_[4] * d_[1];// 2, 1, 0,
+		case 15: return d_[4] * d_[2];// 2, 0, 1,
+		case 16: return d_[5] * d_[2];// 0, 2, 1,
+		case 17: return d_[0] * d_[5];// 1, 2, 0,
+		case 18: return d_[0] * d_[6];// 1, 0, 2,
+		case 19: return d_[1] * d_[6];// 0, 1, 2,
+		case 20: return d_[0] * d_[1] * d_[2];// 1, 1, 1,
+		case 21: return d_[12];// 0, 0, 4,
+		case 22: return d_[1] * d_[9];// 0, 1, 3,
+		case 23: return d_[5] * d_[6];// 0, 2, 2,
+		case 24: return d_[8] * d_[2];// 0, 3, 1,
+		case 25: return d_[11];// 0, 4, 0,
+		case 26: return d_[0] * d_[9];// 1, 0, 3,
+		case 27: return d_[0] * d_[1] * d_[6];// 1, 1, 2,
+		case 28: return d_[0] * d_[5] * d_[2];// 1, 2, 1,
+		case 29: return d_[0] * d_[8];// 1, 3, 0,
+		case 30: return d_[4] * d_[6];// 2, 0, 2,
+		case 31: return d_[4] * d_[1] * d_[2];// 2, 1, 1,
+		case 32: return d_[4] * d_[5];// 2, 2, 0,
+		case 33: return d_[7] * d_[2];// 3, 0, 1,
+		case 34: return d_[7] * d_[1];// 3, 1, 0,
+		case 35: return d_[10];// 4, 0, 0,
+		case 36: return d_[15];// 0, 0, 5,
+		case 37: return d_[1] * d_[12];// 0, 1, 4,
+		case 38: return d_[5] * d_[9];// 0, 2, 3,
+		case 39: return d_[8] * d_[6];// 0, 3, 2,
+		case 40: return d_[11] * d_[2];// 0, 4, 1,
+		case 41: return d_[14];// 0, 5, 0,
+		case 42: return d_[0] * d_[12];// 1, 0, 4,
+		case 43: return d_[0] * d_[1] * d_[9];// 1, 1, 3,
+		case 44: return d_[0] * d_[5] * d_[6];// 1, 2, 2,
+		case 45: return d_[0] * d_[8] * d_[2];// 1, 3, 1,
+		case 46: return d_[0] * d_[11];// 1, 4, 0,
+		case 47: return d_[4] * d_[9];// 2, 0, 3,
+		case 48: return d_[4] * d_[1] * d_[6];// 2, 1, 2,
+		case 49: return d_[4] * d_[5] * d_[2];// 2, 2, 1,
+		case 50: return d_[4] * d_[8];// 2, 3, 0,
+		case 51: return d_[7] * d_[6];// 3, 0, 2,
+		case 52: return d_[7] * d_[1] * d_[2];// 3, 1, 1,
+		case 53: return d_[7] * d_[5];// 3, 2, 0,
+		case 54: return d_[10] * d_[2];// 4, 0, 1,
+		case 55: return d_[10] * d_[1];// 4, 1, 0,
+		case 56: return d_[13];// 5, 0, 0,
+		case 57: return d_[15] * d_[2];// 0, 0, 6,
+		case 58: return d_[1] * d_[15];// 0, 1, 5,
+		case 59: return d_[5] * d_[12];// 0, 2, 4,
+		case 60: return d_[8] * d_[9];// 0, 3, 3,
+		case 61: return d_[11] * d_[6];// 0, 4, 2,
+		case 62: return d_[14] * d_[2];// 0, 5, 1,
+		case 63: return d_[14] * d_[1];// 0, 6, 0,
+		case 64: return d_[0] * d_[15];// 1, 0, 5,
+		case 65: return d_[0] * d_[1] * d_[12];// 1, 1, 4,
+		case 66: return d_[0] * d_[5] * d_[9];// 1, 2, 3,
+		case 67: return d_[0] * d_[8] * d_[6];// 1, 3, 2,
+		case 68: return d_[0] * d_[11] * d_[2];// 1, 4, 1,
+		case 69: return d_[0] * d_[14];// 1, 5, 0,
+		case 70: return d_[4] * d_[12];// 2, 0, 4,
+		case 71: return d_[4] * d_[1] * d_[9];// 2, 1, 3,
+		case 72: return d_[4] * d_[5] * d_[6];// 2, 2, 2,
+		case 73: return d_[4] * d_[8] * d_[2];// 2, 3, 1,
+		case 74: return d_[4] * d_[11];// 2, 4, 0,
+		case 75: return d_[7] * d_[9];// 3, 0, 3,
+		case 76: return d_[7] * d_[1] * d_[6];// 3, 1, 2,
+		case 77: return d_[7] * d_[5] * d_[2];// 3, 2, 1,
+		case 78: return d_[7] * d_[8];// 3, 3, 0,
+		case 79: return d_[10] * d_[6];// 4, 0, 2,
+		case 80: return d_[10] * d_[1] * d_[2];// 4, 1, 1,
+		case 81: return d_[10] * d_[5];// 4, 2, 0,
+		case 82: return d_[13] * d_[2];// 5, 0, 1,
+		case 83: return d_[13] * d_[1];// 5, 1, 0,
+		case 84: return d_[13] * d_[0];// 6, 0, 0,
+		case 85: return d_[15] * d_[6];// 0, 0, 7,
+		case 86: return d_[1] * d_[15] * d_[2];// 0, 1, 6,
+		case 87: return d_[5] * d_[15];// 0, 2, 5,
+		case 88: return d_[8] * d_[12];// 0, 3, 4,
+		case 89: return d_[11] * d_[9];// 0, 4, 3,
+		case 90: return d_[14] * d_[6];// 0, 5, 2,
+		case 91: return d_[14] * d_[1] * d_[2];// 0, 6, 1,
+		case 92: return d_[14] * d_[5];// 0, 7, 0,
+		case 93: return d_[0] * d_[15] * d_[2];// 1, 0, 6,
+		case 94: return d_[0] * d_[1] * d_[15];// 1, 1, 5,
+		case 95: return d_[0] * d_[5] * d_[12];// 1, 2, 4,
+		case 96: return d_[0] * d_[8] * d_[9];// 1, 3, 3,
+		case 97: return d_[0] * d_[11] * d_[6];// 1, 4, 2,
+		case 98: return d_[0] * d_[14] * d_[2];// 1, 5, 1,
+		case 99: return d_[0] * d_[14] * d_[1];// 1, 6, 0,
+		case 100: return d_[4] * d_[15];// 2, 0, 5,
+		case 101: return d_[4] * d_[1] * d_[12];// 2, 1, 4,
+		case 102: return d_[4] * d_[5] * d_[9];// 2, 2, 3,
+		case 103: return d_[4] * d_[8] * d_[6];// 2, 3, 2,
+		case 104: return d_[4] * d_[11] * d_[2];// 2, 4, 1,
+		case 105: return d_[4] * d_[14];// 2, 5, 0,
+		case 106: return d_[7] * d_[12];// 3, 0, 4,
+		case 107: return d_[7] * d_[1] * d_[9];// 3, 1, 3,
+		case 108: return d_[7] * d_[5] * d_[6];// 3, 2, 2,
+		case 109: return d_[7] * d_[8] * d_[2];// 3, 3, 1,
+		case 110: return d_[7] * d_[11];// 3, 4, 0,
+		case 111: return d_[10] * d_[9];// 4, 0, 3,
+		case 112: return d_[10] * d_[1] * d_[6];// 4, 1, 2,
+		case 113: return d_[10] * d_[5] * d_[2];// 4, 2, 1,
+		case 114: return d_[10] * d_[8];// 4, 3, 0,
+		case 115: return d_[13] * d_[6];// 5, 0, 2,
+		case 116: return d_[13] * d_[1] * d_[2];// 5, 1, 1,
+		case 117: return d_[13] * d_[5];// 5, 2, 0,
+		case 118: return d_[13] * d_[0] * d_[2];// 6, 0, 1,
+		case 119: return d_[13] * d_[0] * d_[1];// 6, 1, 0,
+		case 120: return d_[13] * d_[4];// 7, 0, 0,
+		case 121: return d_[15] * d_[9];// 0, 0, 8,
+		case 122: return d_[1] * d_[15] * d_[6];// 0, 1, 7,
+		case 123: return d_[5] * d_[15] * d_[2];// 0, 2, 6,
+		case 124: return d_[8] * d_[15];// 0, 3, 5,
+		case 125: return d_[11] * d_[12];// 0, 4, 4,
+		case 126: return d_[14] * d_[9];// 0, 5, 3,
+		case 127: return d_[14] * d_[1] * d_[6];// 0, 6, 2,
+		case 128: return d_[14] * d_[5] * d_[2];// 0, 7, 1,
+		case 129: return d_[14] * d_[8];// 0, 8, 0,
+		case 130: return d_[0] * d_[15] * d_[6];// 1, 0, 7,
+		case 131: return d_[0] * d_[1] * d_[15] * d_[2];// 1, 1, 6,
+		case 132: return d_[0] * d_[5] * d_[15];// 1, 2, 5,
+		case 133: return d_[0] * d_[8] * d_[12];// 1, 3, 4,
+		case 134: return d_[0] * d_[11] * d_[9];// 1, 4, 3,
+		case 135: return d_[0] * d_[14] * d_[6];// 1, 5, 2,
+		case 136: return d_[0] * d_[14] * d_[1] * d_[2];// 1, 6, 1,
+		case 137: return d_[0] * d_[14] * d_[5];// 1, 7, 0,
+		case 138: return d_[4] * d_[15] * d_[2];// 2, 0, 6,
+		case 139: return d_[4] * d_[1] * d_[15];// 2, 1, 5,
+		case 140: return d_[4] * d_[5] * d_[12];// 2, 2, 4,
+		case 141: return d_[4] * d_[8] * d_[9];// 2, 3, 3,
+		case 142: return d_[4] * d_[11] * d_[6];// 2, 4, 2,
+		case 143: return d_[4] * d_[14] * d_[2];// 2, 5, 1,
+		case 144: return d_[4] * d_[14] * d_[1];// 2, 6, 0,
+		case 145: return d_[7] * d_[15];// 3, 0, 5,
+		case 146: return d_[7] * d_[1] * d_[12];// 3, 1, 4,
+		case 147: return d_[7] * d_[5] * d_[9];// 3, 2, 3,
+		case 148: return d_[7] * d_[8] * d_[6];// 3, 3, 2,
+		case 149: return d_[7] * d_[11] * d_[2];// 3, 4, 1,
+		case 150: return d_[7] * d_[14];// 3, 5, 0,
+		case 151: return d_[10] * d_[12];// 4, 0, 4,
+		case 152: return d_[10] * d_[1] * d_[9];// 4, 1, 3,
+		case 153: return d_[10] * d_[5] * d_[6];// 4, 2, 2,
+		case 154: return d_[10] * d_[8] * d_[2];// 4, 3, 1,
+		case 155: return d_[10] * d_[11];// 4, 4, 0,
+		case 156: return d_[13] * d_[9];// 5, 0, 3,
+		case 157: return d_[13] * d_[1] * d_[6];// 5, 1, 2,
+		case 158: return d_[13] * d_[5] * d_[2];// 5, 2, 1,
+		case 159: return d_[13] * d_[8];// 5, 3, 0,
+		case 160: return d_[13] * d_[0] * d_[6];// 6, 0, 2,
+		case 161: return d_[13] * d_[0] * d_[1] * d_[2];// 6, 1, 1,
+		case 162: return d_[13] * d_[0] * d_[5];// 6, 2, 0,
+		case 163: return d_[13] * d_[4] * d_[2];// 7, 0, 1,
+		case 164: return d_[13] * d_[4] * d_[1];// 7, 1, 0,
+		case 165: return d_[13] * d_[7];// 8, 0, 0,
+		case 166: return d_[15] * d_[12];// 0, 0, 9,
+		case 167: return d_[1] * d_[15] * d_[9];// 0, 1, 8,
+		case 168: return d_[5] * d_[15] * d_[6];// 0, 2, 7,
+		case 169: return d_[8] * d_[15] * d_[2];// 0, 3, 6,
+		case 170: return d_[11] * d_[15];// 0, 4, 5,
+		case 171: return d_[14] * d_[12];// 0, 5, 4,
+		case 172: return d_[14] * d_[1] * d_[9];// 0, 6, 3,
+		case 173: return d_[14] * d_[5] * d_[6];// 0, 7, 2,
+		case 174: return d_[14] * d_[8] * d_[2];// 0, 8, 1,
+		case 175: return d_[14] * d_[11];// 0, 9, 0,
+		case 176: return d_[0] * d_[15] * d_[9];// 1, 0, 8,
+		case 177: return d_[0] * d_[1] * d_[15] * d_[6];// 1, 1, 7,
+		case 178: return d_[0] * d_[5] * d_[15] * d_[2];// 1, 2, 6,
+		case 179: return d_[0] * d_[8] * d_[15];// 1, 3, 5,
+		case 180: return d_[0] * d_[11] * d_[12];// 1, 4, 4,
+		case 181: return d_[0] * d_[14] * d_[9];// 1, 5, 3,
+		case 182: return d_[0] * d_[14] * d_[1] * d_[6];// 1, 6, 2,
+		case 183: return d_[0] * d_[14] * d_[5] * d_[2];// 1, 7, 1,
+		case 184: return d_[0] * d_[14] * d_[8];// 1, 8, 0,
+		case 185: return d_[4] * d_[15] * d_[6];// 2, 0, 7,
+		case 186: return d_[4] * d_[1] * d_[15] * d_[2];// 2, 1, 6,
+		case 187: return d_[4] * d_[5] * d_[15];// 2, 2, 5,
+		case 188: return d_[4] * d_[8] * d_[12];// 2, 3, 4,
+		case 189: return d_[4] * d_[11] * d_[9];// 2, 4, 3,
+		case 190: return d_[4] * d_[14] * d_[6];// 2, 5, 2,
+		case 191: return d_[4] * d_[14] * d_[1] * d_[2];// 2, 6, 1,
+		case 192: return d_[4] * d_[14] * d_[5];// 2, 7, 0,
+		case 193: return d_[7] * d_[15] * d_[2];// 3, 0, 6,
+		case 194: return d_[7] * d_[1] * d_[15];// 3, 1, 5,
+		case 195: return d_[7] * d_[5] * d_[12];// 3, 2, 4,
+		case 196: return d_[7] * d_[8] * d_[9];// 3, 3, 3,
+		case 197: return d_[7] * d_[11] * d_[6];// 3, 4, 2,
+		case 198: return d_[7] * d_[14] * d_[2];// 3, 5, 1,
+		case 199: return d_[7] * d_[14] * d_[1];// 3, 6, 0,
+		case 200: return d_[10] * d_[15];// 4, 0, 5,
+		case 201: return d_[10] * d_[1] * d_[12];// 4, 1, 4,
+		case 202: return d_[10] * d_[5] * d_[9];// 4, 2, 3,
+		case 203: return d_[10] * d_[8] * d_[6];// 4, 3, 2,
+		case 204: return d_[10] * d_[11] * d_[2];// 4, 4, 1,
+		case 205: return d_[10] * d_[14];// 4, 5, 0,
+		case 206: return d_[13] * d_[12];// 5, 0, 4,
+		case 207: return d_[13] * d_[1] * d_[9];// 5, 1, 3,
+		case 208: return d_[13] * d_[5] * d_[6];// 5, 2, 2,
+		case 209: return d_[13] * d_[8] * d_[2];// 5, 3, 1,
+		case 210: return d_[13] * d_[11];// 5, 4, 0,
+		case 211: return d_[13] * d_[0] * d_[9];// 6, 0, 3,
+		case 212: return d_[13] * d_[0] * d_[1] * d_[6];// 6, 1, 2,
+		case 213: return d_[13] * d_[0] * d_[5] * d_[2];// 6, 2, 1,
+		case 214: return d_[13] * d_[0] * d_[8];// 6, 3, 0,
+		case 215: return d_[13] * d_[4] * d_[6];// 7, 0, 2,
+		case 216: return d_[13] * d_[4] * d_[1] * d_[2];// 7, 1, 1,
+		case 217: return d_[13] * d_[4] * d_[5];// 7, 2, 0,
+		case 218: return d_[13] * d_[7] * d_[2];// 8, 0, 1,
+		case 219: return d_[13] * d_[7] * d_[1];// 8, 1, 0,
+		case 220: return d_[13] * d_[10];// 9, 0, 0,
+		case 221: return d_[15] * d_[15];// 0, 0, 10,
+		case 222: return d_[1] * d_[15] * d_[12];// 0, 1, 9,
+		case 223: return d_[5] * d_[15] * d_[9];// 0, 2, 8,
+		case 224: return d_[8] * d_[15] * d_[6];// 0, 3, 7,
+		case 225: return d_[11] * d_[15] * d_[2];// 0, 4, 6,
+		case 226: return d_[14] * d_[15];// 0, 5, 5,
+		case 227: return d_[14] * d_[1] * d_[12];// 0, 6, 4,
+		case 228: return d_[14] * d_[5] * d_[9];// 0, 7, 3,
+		case 229: return d_[14] * d_[8] * d_[6];// 0, 8, 2,
+		case 230: return d_[14] * d_[11] * d_[2];// 0, 9, 1,
+		case 231: return d_[14] * d_[14];// 0, 10, 0,
+		case 232: return d_[0] * d_[15] * d_[12];// 1, 0, 9,
+		case 233: return d_[0] * d_[1] * d_[15] * d_[9];// 1, 1, 8,
+		case 234: return d_[0] * d_[5] * d_[15] * d_[6];// 1, 2, 7,
+		case 235: return d_[0] * d_[8] * d_[15] * d_[2];// 1, 3, 6,
+		case 236: return d_[0] * d_[11] * d_[15];// 1, 4, 5,
+		case 237: return d_[0] * d_[14] * d_[12];// 1, 5, 4,
+		case 238: return d_[0] * d_[14] * d_[1] * d_[9];// 1, 6, 3,
+		case 239: return d_[0] * d_[14] * d_[5] * d_[6];// 1, 7, 2,
+		case 240: return d_[0] * d_[14] * d_[8] * d_[2];// 1, 8, 1,
+		case 241: return d_[0] * d_[14] * d_[11];// 1, 9, 0,
+		case 242: return d_[4] * d_[15] * d_[9];// 2, 0, 8,
+		case 243: return d_[4] * d_[1] * d_[15] * d_[6];// 2, 1, 7,
+		case 244: return d_[4] * d_[5] * d_[15] * d_[2];// 2, 2, 6,
+		case 245: return d_[4] * d_[8] * d_[15];// 2, 3, 5,
+		case 246: return d_[4] * d_[11] * d_[12];// 2, 4, 4,
+		case 247: return d_[4] * d_[14] * d_[9];// 2, 5, 3,
+		case 248: return d_[4] * d_[14] * d_[1] * d_[6];// 2, 6, 2,
+		case 249: return d_[4] * d_[14] * d_[5] * d_[2];// 2, 7, 1,
+		case 250: return d_[4] * d_[14] * d_[8];// 2, 8, 0,
+		case 251: return d_[7] * d_[15] * d_[6];// 3, 0, 7,
+		case 252: return d_[7] * d_[1] * d_[15] * d_[2];// 3, 1, 6,
+		case 253: return d_[7] * d_[5] * d_[15];// 3, 2, 5,
+		case 254: return d_[7] * d_[8] * d_[12];// 3, 3, 4,
+		case 255: return d_[7] * d_[11] * d_[9];// 3, 4, 3,
+		case 256: return d_[7] * d_[14] * d_[6];// 3, 5, 2,
+		case 257: return d_[7] * d_[14] * d_[1] * d_[2];// 3, 6, 1,
+		case 258: return d_[7] * d_[14] * d_[5];// 3, 7, 0,
+		case 259: return d_[10] * d_[15] * d_[2];// 4, 0, 6,
+		case 260: return d_[10] * d_[1] * d_[15];// 4, 1, 5,
+		case 261: return d_[10] * d_[5] * d_[12];// 4, 2, 4,
+		case 262: return d_[10] * d_[8] * d_[9];// 4, 3, 3,
+		case 263: return d_[10] * d_[11] * d_[6];// 4, 4, 2,
+		case 264: return d_[10] * d_[14] * d_[2];// 4, 5, 1,
+		case 265: return d_[10] * d_[14] * d_[1];// 4, 6, 0,
+		case 266: return d_[13] * d_[15];// 5, 0, 5,
+		case 267: return d_[13] * d_[1] * d_[12];// 5, 1, 4,
+		case 268: return d_[13] * d_[5] * d_[9];// 5, 2, 3,
+		case 269: return d_[13] * d_[8] * d_[6];// 5, 3, 2,
+		case 270: return d_[13] * d_[11] * d_[2];// 5, 4, 1,
+		case 271: return d_[13] * d_[14];// 5, 5, 0,
+		case 272: return d_[13] * d_[0] * d_[12];// 6, 0, 4,
+		case 273: return d_[13] * d_[0] * d_[1] * d_[9];// 6, 1, 3,
+		case 274: return d_[13] * d_[0] * d_[5] * d_[6];// 6, 2, 2,
+		case 275: return d_[13] * d_[0] * d_[8] * d_[2];// 6, 3, 1,
+		case 276: return d_[13] * d_[0] * d_[11];// 6, 4, 0,
+		case 277: return d_[13] * d_[4] * d_[9];// 7, 0, 3,
+		case 278: return d_[13] * d_[4] * d_[1] * d_[6];// 7, 1, 2,
+		case 279: return d_[13] * d_[4] * d_[5] * d_[2];// 7, 2, 1,
+		case 280: return d_[13] * d_[4] * d_[8];// 7, 3, 0,
+		case 281: return d_[13] * d_[7] * d_[6];// 8, 0, 2,
+		case 282: return d_[13] * d_[7] * d_[1] * d_[2];// 8, 1, 1,
+		case 283: return d_[13] * d_[7] * d_[5];// 8, 2, 0,
+		case 284: return d_[13] * d_[10] * d_[2];// 9, 0, 1,
+		case 285: return d_[13] * d_[10] * d_[1];// 9, 1, 0,
+		case 286: return d_[13] * d_[13];// 10, 0, 0,
+		default: return 1.0;
+		}
+	}
+	//The table cart_monomial reads, for the point Pos relative to the centre c
+	inline void cart_powers(double* d_, const d3& Pos, const atom& c)
+	{
+		d_[0] = Pos[0] - c.get_coordinate(0);
+		d_[1] = Pos[1] - c.get_coordinate(1);
+		d_[2] = Pos[2] - c.get_coordinate(2);
 		d_[4] = d_[0] * d_[0];
 		d_[5] = d_[1] * d_[1];
 		d_[6] = d_[2] * d_[2];
@@ -120,6 +467,21 @@ const double WFN::compute_dens_cartesian(
 		d_[14] = d_[1] * d_[11];
 		d_[15] = d_[2] * d_[12];
 	}
+}
+
+const double WFN::compute_dens_cartesian(
+	const d3 &Pos,
+	vec2 &d,
+	vec &phi) const
+{
+	std::fill(phi.begin(), phi.end(), 0.0);
+	double Rho = 0.0;
+	int j;
+	double ex, *d_;
+
+	// precalculate some distances and powers of distances for faster computation
+	for (j = 0; j < ncen; j++)
+		cart_powers(d[j].data(), Pos, atoms[j]);
 
 	// Pre-cache frequently accessed data
 	const int *centers_data = centers.data();
@@ -127,323 +489,28 @@ const double WFN::compute_dens_cartesian(
 	const double *exponents_data = exponents.data();
 	const MO *MOs_data = MOs.data();
 	double *phi_data = phi.data();
-	//Primitive-major: every MO for one primitive is contiguous, where MOs keeps them nex
-	//apart. Same arithmetic in the same order, and no per-point allocation.
-	const double *const coefs = get_coef_primitive_major();
+	//Builds the exponent groups and the contraction the loop below reads
+	if (!get_coef_primitive_major()) return 0.0;
 	thread_local vec exps;
 	if (exps.size() < group_exponent.size()) exps.resize(group_exponent.size());
 	exp_table([&d](const int c) { return d[c][3]; }, exps.data());
 	const int *group = prim_exp_group.data();
+	thread_local ao_scratch<1> ao;
+	ao.begin(coef_ao_major.size() / nmo);
 
 	for (j = 0; j < nex; j++)
 	{
 		ex = exps[group[j]];
-		if (ex == 0.0)
+		if (ex == 0.0 || prim_ao[j] < 0)
 		{ // corresponds to cutoff of maximum density contribution of 1E-5
 			continue;
 		}
 		d_ = d[centers_data[j] - 1].data();
-		switch (types_data[j])
-		{
-		case 0:  break;
-		case 1:  break;// 0, 0, 0,
-		case 2:  ex *= d_[0]; break;// 1, 0, 0,
-		case 3:  ex *= d_[1]; break;// 0, 1, 0,
-		case 4:  ex *= d_[2]; break;// 0, 0, 1,
-		case 5:  ex *= d_[4]; break;// 2, 0, 0,
-		case 6:  ex *= d_[5]; break;// 0, 2, 0,
-		case 7:  ex *= d_[6]; break;// 0, 0, 2,
-		case 8:  ex *= d_[0] * d_[1]; break;// 1, 1, 0,
-		case 9:  ex *= d_[0] * d_[2]; break;// 1, 0, 1,
-		case 10: ex *= d_[1] * d_[2]; break;// 0, 1, 1,
-		case 11: ex *= d_[7]; break;// 3, 0, 0,
-		case 12: ex *= d_[8]; break;// 0, 3, 0,
-		case 13: ex *= d_[9]; break;// 0, 0, 3,
-		case 14: ex *= d_[4] * d_[1]; break;// 2, 1, 0,
-		case 15: ex *= d_[4] * d_[2]; break;// 2, 0, 1,
-		case 16: ex *= d_[5] * d_[2]; break;// 0, 2, 1,
-		case 17: ex *= d_[0] * d_[5]; break;// 1, 2, 0,
-		case 18: ex *= d_[0] * d_[6]; break;// 1, 0, 2,
-		case 19: ex *= d_[1] * d_[6]; break;// 0, 1, 2,
-		case 20: ex *= d_[0] * d_[1] * d_[2]; break;// 1, 1, 1,
-		case 21: ex *= d_[12]; break;// 0, 0, 4,
-		case 22: ex *= d_[1] * d_[9]; break;// 0, 1, 3,
-		case 23: ex *= d_[5] * d_[6]; break;// 0, 2, 2,
-		case 24: ex *= d_[8] * d_[2]; break;// 0, 3, 1,
-		case 25: ex *= d_[11]; break;// 0, 4, 0,
-		case 26: ex *= d_[0] * d_[9]; break;// 1, 0, 3,
-		case 27: ex *= d_[0] * d_[1] * d_[6]; break;// 1, 1, 2,
-		case 28: ex *= d_[0] * d_[5] * d_[2]; break;// 1, 2, 1,
-		case 29: ex *= d_[0] * d_[8]; break;// 1, 3, 0,
-		case 30: ex *= d_[4] * d_[6]; break;// 2, 0, 2,
-		case 31: ex *= d_[4] * d_[1] * d_[2]; break;// 2, 1, 1,
-		case 32: ex *= d_[4] * d_[5]; break;// 2, 2, 0,
-		case 33: ex *= d_[7] * d_[2]; break;// 3, 0, 1,
-		case 34: ex *= d_[7] * d_[1]; break;// 3, 1, 0,
-		case 35: ex *= d_[10]; break;// 4, 0, 0,
-		case 36: ex *= d_[15]; break;// 0, 0, 5,
-		case 37: ex *= d_[1] * d_[12]; break;// 0, 1, 4,
-		case 38: ex *= d_[5] * d_[9]; break;// 0, 2, 3,
-		case 39: ex *= d_[8] * d_[6]; break;// 0, 3, 2,
-		case 40: ex *= d_[11] * d_[2]; break;// 0, 4, 1,
-		case 41: ex *= d_[14]; break;// 0, 5, 0,
-		case 42: ex *= d_[0] * d_[12]; break;// 1, 0, 4,
-		case 43: ex *= d_[0] * d_[1] * d_[9]; break;// 1, 1, 3,
-		case 44: ex *= d_[0] * d_[5] * d_[6]; break;// 1, 2, 2,
-		case 45: ex *= d_[0] * d_[8] * d_[2]; break;// 1, 3, 1,
-		case 46: ex *= d_[0] * d_[11]; break;// 1, 4, 0,
-		case 47: ex *= d_[4] * d_[9]; break;// 2, 0, 3,
-		case 48: ex *= d_[4] * d_[1] * d_[6]; break;// 2, 1, 2,
-		case 49: ex *= d_[4] * d_[5] * d_[2]; break;// 2, 2, 1,
-		case 50: ex *= d_[4] * d_[8]; break;// 2, 3, 0,
-		case 51: ex *= d_[7] * d_[6]; break;// 3, 0, 2,
-		case 52: ex *= d_[7] * d_[1] * d_[2]; break;// 3, 1, 1,
-		case 53: ex *= d_[7] * d_[5]; break;// 3, 2, 0,
-		case 54: ex *= d_[10] * d_[2]; break;// 4, 0, 1,
-		case 55: ex *= d_[10] * d_[1]; break;// 4, 1, 0,
-		case 56: ex *= d_[13]; break;// 5, 0, 0,
-		case 57: ex *= d_[15] * d_[2]; break;// 0, 0, 6,
-		case 58: ex *= d_[1] * d_[15]; break;// 0, 1, 5,
-		case 59: ex *= d_[5] * d_[12]; break;// 0, 2, 4,
-		case 60: ex *= d_[8] * d_[9]; break;// 0, 3, 3,
-		case 61: ex *= d_[11] * d_[6]; break;// 0, 4, 2,
-		case 62: ex *= d_[14] * d_[2]; break;// 0, 5, 1,
-		case 63: ex *= d_[14] * d_[1]; break;// 0, 6, 0,
-		case 64: ex *= d_[0] * d_[15]; break;// 1, 0, 5,
-		case 65: ex *= d_[0] * d_[1] * d_[12]; break;// 1, 1, 4,
-		case 66: ex *= d_[0] * d_[5] * d_[9]; break;// 1, 2, 3,
-		case 67: ex *= d_[0] * d_[8] * d_[6]; break;// 1, 3, 2,
-		case 68: ex *= d_[0] * d_[11] * d_[2]; break;// 1, 4, 1,
-		case 69: ex *= d_[0] * d_[14]; break;// 1, 5, 0,
-		case 70: ex *= d_[4] * d_[12]; break;// 2, 0, 4,
-		case 71: ex *= d_[4] * d_[1] * d_[9]; break;// 2, 1, 3,
-		case 72: ex *= d_[4] * d_[5] * d_[6]; break;// 2, 2, 2,
-		case 73: ex *= d_[4] * d_[8] * d_[2]; break;// 2, 3, 1,
-		case 74: ex *= d_[4] * d_[11]; break;// 2, 4, 0,
-		case 75: ex *= d_[7] * d_[9]; break;// 3, 0, 3,
-		case 76: ex *= d_[7] * d_[1] * d_[6]; break;// 3, 1, 2,
-		case 77: ex *= d_[7] * d_[5] * d_[2]; break;// 3, 2, 1,
-		case 78: ex *= d_[7] * d_[8]; break;// 3, 3, 0,
-		case 79: ex *= d_[10] * d_[6]; break;// 4, 0, 2,
-		case 80: ex *= d_[10] * d_[1] * d_[2]; break;// 4, 1, 1,
-		case 81: ex *= d_[10] * d_[5]; break;// 4, 2, 0,
-		case 82: ex *= d_[13] * d_[2]; break;// 5, 0, 1,
-		case 83: ex *= d_[13] * d_[1]; break;// 5, 1, 0,
-		case 84: ex *= d_[13] * d_[0]; break;// 6, 0, 0,
-		case 85: ex *= d_[15] * d_[6]; break;// 0, 0, 7,
-		case 86: ex *= d_[1] * d_[15] * d_[2]; break;// 0, 1, 6,
-		case 87: ex *= d_[5] * d_[15]; break;// 0, 2, 5,
-		case 88: ex *= d_[8] * d_[12]; break;// 0, 3, 4,
-		case 89: ex *= d_[11] * d_[9]; break;// 0, 4, 3,
-		case 90: ex *= d_[14] * d_[6]; break;// 0, 5, 2,
-		case 91: ex *= d_[14] * d_[1] * d_[2]; break;// 0, 6, 1,
-		case 92: ex *= d_[14] * d_[5]; break;// 0, 7, 0,
-		case 93: ex *= d_[0] * d_[15] * d_[2]; break;// 1, 0, 6,
-		case 94: ex *= d_[0] * d_[1] * d_[15]; break;// 1, 1, 5,
-		case 95: ex *= d_[0] * d_[5] * d_[12]; break;// 1, 2, 4,
-		case 96: ex *= d_[0] * d_[8] * d_[9]; break;// 1, 3, 3,
-		case 97: ex *= d_[0] * d_[11] * d_[6]; break;// 1, 4, 2,
-		case 98: ex *= d_[0] * d_[14] * d_[2]; break;// 1, 5, 1,
-		case 99: ex *= d_[0] * d_[14] * d_[1]; break;// 1, 6, 0,
-		case 100: ex *= d_[4] * d_[15]; break;// 2, 0, 5,
-		case 101: ex *= d_[4] * d_[1] * d_[12]; break;// 2, 1, 4,
-		case 102: ex *= d_[4] * d_[5] * d_[9]; break;// 2, 2, 3,
-		case 103: ex *= d_[4] * d_[8] * d_[6]; break;// 2, 3, 2,
-		case 104: ex *= d_[4] * d_[11] * d_[2]; break;// 2, 4, 1,
-		case 105: ex *= d_[4] * d_[14]; break;// 2, 5, 0,
-		case 106: ex *= d_[7] * d_[12]; break;// 3, 0, 4,
-		case 107: ex *= d_[7] * d_[1] * d_[9]; break;// 3, 1, 3,
-		case 108: ex *= d_[7] * d_[5] * d_[6]; break;// 3, 2, 2,
-		case 109: ex *= d_[7] * d_[8] * d_[2]; break;// 3, 3, 1,
-		case 110: ex *= d_[7] * d_[11]; break;// 3, 4, 0,
-		case 111: ex *= d_[10] * d_[9]; break;// 4, 0, 3,
-		case 112: ex *= d_[10] * d_[1] * d_[6]; break;// 4, 1, 2,
-		case 113: ex *= d_[10] * d_[5] * d_[2]; break;// 4, 2, 1,
-		case 114: ex *= d_[10] * d_[8]; break;// 4, 3, 0,
-		case 115: ex *= d_[13] * d_[6]; break;// 5, 0, 2,
-		case 116: ex *= d_[13] * d_[1] * d_[2]; break;// 5, 1, 1,
-		case 117: ex *= d_[13] * d_[5]; break;// 5, 2, 0,
-		case 118: ex *= d_[13] * d_[0] * d_[2]; break;// 6, 0, 1,
-		case 119: ex *= d_[13] * d_[0] * d_[1]; break;// 6, 1, 0,
-		case 120: ex *= d_[13] * d_[4]; break;// 7, 0, 0,
-		case 121: ex *= d_[15] * d_[9]; break;// 0, 0, 8,
-		case 122: ex *= d_[1] * d_[15] * d_[6]; break;// 0, 1, 7,
-		case 123: ex *= d_[5] * d_[15] * d_[2]; break;// 0, 2, 6,
-		case 124: ex *= d_[8] * d_[15]; break;// 0, 3, 5,
-		case 125: ex *= d_[11] * d_[12]; break;// 0, 4, 4,
-		case 126: ex *= d_[14] * d_[9]; break;// 0, 5, 3,
-		case 127: ex *= d_[14] * d_[1] * d_[6]; break;// 0, 6, 2,
-		case 128: ex *= d_[14] * d_[5] * d_[2]; break;// 0, 7, 1,
-		case 129: ex *= d_[14] * d_[8]; break;// 0, 8, 0,
-		case 130: ex *= d_[0] * d_[15] * d_[6]; break;// 1, 0, 7,
-		case 131: ex *= d_[0] * d_[1] * d_[15] * d_[2]; break;// 1, 1, 6,
-		case 132: ex *= d_[0] * d_[5] * d_[15]; break;// 1, 2, 5,
-		case 133: ex *= d_[0] * d_[8] * d_[12]; break;// 1, 3, 4,
-		case 134: ex *= d_[0] * d_[11] * d_[9]; break;// 1, 4, 3,
-		case 135: ex *= d_[0] * d_[14] * d_[6]; break;// 1, 5, 2,
-		case 136: ex *= d_[0] * d_[14] * d_[1] * d_[2]; break;// 1, 6, 1,
-		case 137: ex *= d_[0] * d_[14] * d_[5]; break;// 1, 7, 0,
-		case 138: ex *= d_[4] * d_[15] * d_[2]; break;// 2, 0, 6,
-		case 139: ex *= d_[4] * d_[1] * d_[15]; break;// 2, 1, 5,
-		case 140: ex *= d_[4] * d_[5] * d_[12]; break;// 2, 2, 4,
-		case 141: ex *= d_[4] * d_[8] * d_[9]; break;// 2, 3, 3,
-		case 142: ex *= d_[4] * d_[11] * d_[6]; break;// 2, 4, 2,
-		case 143: ex *= d_[4] * d_[14] * d_[2]; break;// 2, 5, 1,
-		case 144: ex *= d_[4] * d_[14] * d_[1]; break;// 2, 6, 0,
-		case 145: ex *= d_[7] * d_[15]; break;// 3, 0, 5,
-		case 146: ex *= d_[7] * d_[1] * d_[12]; break;// 3, 1, 4,
-		case 147: ex *= d_[7] * d_[5] * d_[9]; break;// 3, 2, 3,
-		case 148: ex *= d_[7] * d_[8] * d_[6]; break;// 3, 3, 2,
-		case 149: ex *= d_[7] * d_[11] * d_[2]; break;// 3, 4, 1,
-		case 150: ex *= d_[7] * d_[14]; break;// 3, 5, 0,
-		case 151: ex *= d_[10] * d_[12]; break;// 4, 0, 4,
-		case 152: ex *= d_[10] * d_[1] * d_[9]; break;// 4, 1, 3,
-		case 153: ex *= d_[10] * d_[5] * d_[6]; break;// 4, 2, 2,
-		case 154: ex *= d_[10] * d_[8] * d_[2]; break;// 4, 3, 1,
-		case 155: ex *= d_[10] * d_[11]; break;// 4, 4, 0,
-		case 156: ex *= d_[13] * d_[9]; break;// 5, 0, 3,
-		case 157: ex *= d_[13] * d_[1] * d_[6]; break;// 5, 1, 2,
-		case 158: ex *= d_[13] * d_[5] * d_[2]; break;// 5, 2, 1,
-		case 159: ex *= d_[13] * d_[8]; break;// 5, 3, 0,
-		case 160: ex *= d_[13] * d_[0] * d_[6]; break;// 6, 0, 2,
-		case 161: ex *= d_[13] * d_[0] * d_[1] * d_[2]; break;// 6, 1, 1,
-		case 162: ex *= d_[13] * d_[0] * d_[5]; break;// 6, 2, 0,
-		case 163: ex *= d_[13] * d_[4] * d_[2]; break;// 7, 0, 1,
-		case 164: ex *= d_[13] * d_[4] * d_[1]; break;// 7, 1, 0,
-		case 165: ex *= d_[13] * d_[7]; break;// 8, 0, 0,
-		case 166: ex *= d_[15] * d_[12]; break;// 0, 0, 9,
-		case 167: ex *= d_[1] * d_[15] * d_[9]; break;// 0, 1, 8,
-		case 168: ex *= d_[5] * d_[15] * d_[6]; break;// 0, 2, 7,
-		case 169: ex *= d_[8] * d_[15] * d_[2]; break;// 0, 3, 6,
-		case 170: ex *= d_[11] * d_[15]; break;// 0, 4, 5,
-		case 171: ex *= d_[14] * d_[12]; break;// 0, 5, 4,
-		case 172: ex *= d_[14] * d_[1] * d_[9]; break;// 0, 6, 3,
-		case 173: ex *= d_[14] * d_[5] * d_[6]; break;// 0, 7, 2,
-		case 174: ex *= d_[14] * d_[8] * d_[2]; break;// 0, 8, 1,
-		case 175: ex *= d_[14] * d_[11]; break;// 0, 9, 0,
-		case 176: ex *= d_[0] * d_[15] * d_[9]; break;// 1, 0, 8,
-		case 177: ex *= d_[0] * d_[1] * d_[15] * d_[6]; break;// 1, 1, 7,
-		case 178: ex *= d_[0] * d_[5] * d_[15] * d_[2]; break;// 1, 2, 6,
-		case 179: ex *= d_[0] * d_[8] * d_[15]; break;// 1, 3, 5,
-		case 180: ex *= d_[0] * d_[11] * d_[12]; break;// 1, 4, 4,
-		case 181: ex *= d_[0] * d_[14] * d_[9]; break;// 1, 5, 3,
-		case 182: ex *= d_[0] * d_[14] * d_[1] * d_[6]; break;// 1, 6, 2,
-		case 183: ex *= d_[0] * d_[14] * d_[5] * d_[2]; break;// 1, 7, 1,
-		case 184: ex *= d_[0] * d_[14] * d_[8]; break;// 1, 8, 0,
-		case 185: ex *= d_[4] * d_[15] * d_[6]; break;// 2, 0, 7,
-		case 186: ex *= d_[4] * d_[1] * d_[15] * d_[2]; break;// 2, 1, 6,
-		case 187: ex *= d_[4] * d_[5] * d_[15]; break;// 2, 2, 5,
-		case 188: ex *= d_[4] * d_[8] * d_[12]; break;// 2, 3, 4,
-		case 189: ex *= d_[4] * d_[11] * d_[9]; break;// 2, 4, 3,
-		case 190: ex *= d_[4] * d_[14] * d_[6]; break;// 2, 5, 2,
-		case 191: ex *= d_[4] * d_[14] * d_[1] * d_[2]; break;// 2, 6, 1,
-		case 192: ex *= d_[4] * d_[14] * d_[5]; break;// 2, 7, 0,
-		case 193: ex *= d_[7] * d_[15] * d_[2]; break;// 3, 0, 6,
-		case 194: ex *= d_[7] * d_[1] * d_[15]; break;// 3, 1, 5,
-		case 195: ex *= d_[7] * d_[5] * d_[12]; break;// 3, 2, 4,
-		case 196: ex *= d_[7] * d_[8] * d_[9]; break;// 3, 3, 3,
-		case 197: ex *= d_[7] * d_[11] * d_[6]; break;// 3, 4, 2,
-		case 198: ex *= d_[7] * d_[14] * d_[2]; break;// 3, 5, 1,
-		case 199: ex *= d_[7] * d_[14] * d_[1]; break;// 3, 6, 0,
-		case 200: ex *= d_[10] * d_[15]; break;// 4, 0, 5,
-		case 201: ex *= d_[10] * d_[1] * d_[12]; break;// 4, 1, 4,
-		case 202: ex *= d_[10] * d_[5] * d_[9]; break;// 4, 2, 3,
-		case 203: ex *= d_[10] * d_[8] * d_[6]; break;// 4, 3, 2,
-		case 204: ex *= d_[10] * d_[11] * d_[2]; break;// 4, 4, 1,
-		case 205: ex *= d_[10] * d_[14]; break;// 4, 5, 0,
-		case 206: ex *= d_[13] * d_[12]; break;// 5, 0, 4,
-		case 207: ex *= d_[13] * d_[1] * d_[9]; break;// 5, 1, 3,
-		case 208: ex *= d_[13] * d_[5] * d_[6]; break;// 5, 2, 2,
-		case 209: ex *= d_[13] * d_[8] * d_[2]; break;// 5, 3, 1,
-		case 210: ex *= d_[13] * d_[11]; break;// 5, 4, 0,
-		case 211: ex *= d_[13] * d_[0] * d_[9]; break;// 6, 0, 3,
-		case 212: ex *= d_[13] * d_[0] * d_[1] * d_[6]; break;// 6, 1, 2,
-		case 213: ex *= d_[13] * d_[0] * d_[5] * d_[2]; break;// 6, 2, 1,
-		case 214: ex *= d_[13] * d_[0] * d_[8]; break;// 6, 3, 0,
-		case 215: ex *= d_[13] * d_[4] * d_[6]; break;// 7, 0, 2,
-		case 216: ex *= d_[13] * d_[4] * d_[1] * d_[2]; break;// 7, 1, 1,
-		case 217: ex *= d_[13] * d_[4] * d_[5]; break;// 7, 2, 0,
-		case 218: ex *= d_[13] * d_[7] * d_[2]; break;// 8, 0, 1,
-		case 219: ex *= d_[13] * d_[7] * d_[1]; break;// 8, 1, 0,
-		case 220: ex *= d_[13] * d_[10]; break;// 9, 0, 0,
-		case 221: ex *= d_[15] * d_[15]; break;// 0, 0, 10,
-		case 222: ex *= d_[1] * d_[15] * d_[12]; break;// 0, 1, 9,
-		case 223: ex *= d_[5] * d_[15] * d_[9]; break;// 0, 2, 8,
-		case 224: ex *= d_[8] * d_[15] * d_[6]; break;// 0, 3, 7,
-		case 225: ex *= d_[11] * d_[15] * d_[2]; break;// 0, 4, 6,
-		case 226: ex *= d_[14] * d_[15]; break;// 0, 5, 5,
-		case 227: ex *= d_[14] * d_[1] * d_[12]; break;// 0, 6, 4,
-		case 228: ex *= d_[14] * d_[5] * d_[9]; break;// 0, 7, 3,
-		case 229: ex *= d_[14] * d_[8] * d_[6]; break;// 0, 8, 2,
-		case 230: ex *= d_[14] * d_[11] * d_[2]; break;// 0, 9, 1,
-		case 231: ex *= d_[14] * d_[14]; break;// 0, 10, 0,
-		case 232: ex *= d_[0] * d_[15] * d_[12]; break;// 1, 0, 9,
-		case 233: ex *= d_[0] * d_[1] * d_[15] * d_[9]; break;// 1, 1, 8,
-		case 234: ex *= d_[0] * d_[5] * d_[15] * d_[6]; break;// 1, 2, 7,
-		case 235: ex *= d_[0] * d_[8] * d_[15] * d_[2]; break;// 1, 3, 6,
-		case 236: ex *= d_[0] * d_[11] * d_[15]; break;// 1, 4, 5,
-		case 237: ex *= d_[0] * d_[14] * d_[12]; break;// 1, 5, 4,
-		case 238: ex *= d_[0] * d_[14] * d_[1] * d_[9]; break;// 1, 6, 3,
-		case 239: ex *= d_[0] * d_[14] * d_[5] * d_[6]; break;// 1, 7, 2,
-		case 240: ex *= d_[0] * d_[14] * d_[8] * d_[2]; break;// 1, 8, 1,
-		case 241: ex *= d_[0] * d_[14] * d_[11]; break;// 1, 9, 0,
-		case 242: ex *= d_[4] * d_[15] * d_[9]; break;// 2, 0, 8,
-		case 243: ex *= d_[4] * d_[1] * d_[15] * d_[6]; break;// 2, 1, 7,
-		case 244: ex *= d_[4] * d_[5] * d_[15] * d_[2]; break;// 2, 2, 6,
-		case 245: ex *= d_[4] * d_[8] * d_[15]; break;// 2, 3, 5,
-		case 246: ex *= d_[4] * d_[11] * d_[12]; break;// 2, 4, 4,
-		case 247: ex *= d_[4] * d_[14] * d_[9]; break;// 2, 5, 3,
-		case 248: ex *= d_[4] * d_[14] * d_[1] * d_[6]; break;// 2, 6, 2,
-		case 249: ex *= d_[4] * d_[14] * d_[5] * d_[2]; break;// 2, 7, 1,
-		case 250: ex *= d_[4] * d_[14] * d_[8]; break;// 2, 8, 0,
-		case 251: ex *= d_[7] * d_[15] * d_[6]; break;// 3, 0, 7,
-		case 252: ex *= d_[7] * d_[1] * d_[15] * d_[2]; break;// 3, 1, 6,
-		case 253: ex *= d_[7] * d_[5] * d_[15]; break;// 3, 2, 5,
-		case 254: ex *= d_[7] * d_[8] * d_[12]; break;// 3, 3, 4,
-		case 255: ex *= d_[7] * d_[11] * d_[9]; break;// 3, 4, 3,
-		case 256: ex *= d_[7] * d_[14] * d_[6]; break;// 3, 5, 2,
-		case 257: ex *= d_[7] * d_[14] * d_[1] * d_[2]; break;// 3, 6, 1,
-		case 258: ex *= d_[7] * d_[14] * d_[5]; break;// 3, 7, 0,
-		case 259: ex *= d_[10] * d_[15] * d_[2]; break;// 4, 0, 6,
-		case 260: ex *= d_[10] * d_[1] * d_[15]; break;// 4, 1, 5,
-		case 261: ex *= d_[10] * d_[5] * d_[12]; break;// 4, 2, 4,
-		case 262: ex *= d_[10] * d_[8] * d_[9]; break;// 4, 3, 3,
-		case 263: ex *= d_[10] * d_[11] * d_[6]; break;// 4, 4, 2,
-		case 264: ex *= d_[10] * d_[14] * d_[2]; break;// 4, 5, 1,
-		case 265: ex *= d_[10] * d_[14] * d_[1]; break;// 4, 6, 0,
-		case 266: ex *= d_[13] * d_[15]; break;// 5, 0, 5,
-		case 267: ex *= d_[13] * d_[1] * d_[12]; break;// 5, 1, 4,
-		case 268: ex *= d_[13] * d_[5] * d_[9]; break;// 5, 2, 3,
-		case 269: ex *= d_[13] * d_[8] * d_[6]; break;// 5, 3, 2,
-		case 270: ex *= d_[13] * d_[11] * d_[2]; break;// 5, 4, 1,
-		case 271: ex *= d_[13] * d_[14]; break;// 5, 5, 0,
-		case 272: ex *= d_[13] * d_[0] * d_[12]; break;// 6, 0, 4,
-		case 273: ex *= d_[13] * d_[0] * d_[1] * d_[9]; break;// 6, 1, 3,
-		case 274: ex *= d_[13] * d_[0] * d_[5] * d_[6]; break;// 6, 2, 2,
-		case 275: ex *= d_[13] * d_[0] * d_[8] * d_[2]; break;// 6, 3, 1,
-		case 276: ex *= d_[13] * d_[0] * d_[11]; break;// 6, 4, 0,
-		case 277: ex *= d_[13] * d_[4] * d_[9]; break;// 7, 0, 3,
-		case 278: ex *= d_[13] * d_[4] * d_[1] * d_[6]; break;// 7, 1, 2,
-		case 279: ex *= d_[13] * d_[4] * d_[5] * d_[2]; break;// 7, 2, 1,
-		case 280: ex *= d_[13] * d_[4] * d_[8]; break;// 7, 3, 0,
-		case 281: ex *= d_[13] * d_[7] * d_[6]; break;// 8, 0, 2,
-		case 282: ex *= d_[13] * d_[7] * d_[1] * d_[2]; break;// 8, 1, 1,
-		case 283: ex *= d_[13] * d_[7] * d_[5]; break;// 8, 2, 0,
-		case 284: ex *= d_[13] * d_[10] * d_[2]; break;// 9, 0, 1,
-		case 285: ex *= d_[13] * d_[10] * d_[1]; break;// 9, 1, 0,
-		case 286: ex *= d_[13] * d_[13]; break;// 10, 0, 0,
-		default: break;
-		}
+		ex *= cart_monomial(types_data[j], d_);
 
-		// use pointer arithmetic and cache coefficient pointer
-		// This avoids repeated virtual function calls to get_coefficient_f
-		const double *c_row = coefs + (size_t)j * nmo;
-		double *phi_ptr = phi_data;
-		for (int mo = 0; mo < nmo; ++mo, ++phi_ptr)
-		{
-			*phi_ptr += c_row[mo] * ex;
-		}
+		ao.add(prim_ao[j], prim_ao_scale[j], &ex);
 	}
+	ao.to_mo(coef_ao_major.data(), nmo, phi_data, [MOs_data](const int mo) { return MOs_data[mo].get_occ(); });
 
 	// use pointer arithmetic and minimize overhead
 	const double *phi_ptr = phi_data;
@@ -457,6 +524,78 @@ const double WFN::compute_dens_cartesian(
 	}
 
 	return Rho;
+}
+
+//compute_dens_cartesian at n points, 64 at a time: the contracted functions of a block (the union over its points of
+//those the exponent cutoff keeps) go into one column-major table X, and one dgemm X * C into the occupied MOs replaces
+//the per-point multiply, which streamed every touched coefficient row once per point (47 % of a sucrose grid run)
+void WFN::compute_dens_batch(const int n, const double* x, const double* y, const double* z, double* rho) const
+{
+	if (n <= 0) return;
+	if (!get_coef_primitive_major()) {
+		std::fill(rho, rho + n, 0.0);
+		return;
+	}
+	const int nao = (int)(coef_ao_major.size() / nmo);
+	ivec occ_mo;
+	vec occ;
+	for (int mo = 0; mo < nmo; mo++)
+		if (MOs[mo].get_occ() != 0.0) occ_mo.push_back(mo), occ.push_back(MOs[mo].get_occ());
+	const int nocc = (int)occ_mo.size();
+	if (nocc == 0) {
+		std::fill(rho, rho + n, 0.0);
+		return;
+	}
+	//The occupied columns of coef_ao_major, [nao * nocc]; a block gathers its rows from here
+	vec C((size_t)nao * nocc);
+	for (int a = 0; a < nao; a++)
+		for (int m = 0; m < nocc; m++) C[(size_t)a * nocc + m] = coef_ao_major[(size_t)a * nmo + occ_mo[m]];
+	constexpr int B = 64;
+	const int nblk = (n + B - 1) / B;
+#pragma omp parallel
+	{
+		vec d((size_t)ncen * 16), exps(group_exponent.size()), X((size_t)B * nao), Cg, Phi((size_t)B * nocc);
+		Cg.reserve((size_t)nao * nocc);
+		ivec col(nao, -1), cols;
+		const int* group = prim_exp_group.data();
+#pragma omp for schedule(dynamic)
+		for (int b = 0; b < nblk; b++) {
+			const int p0 = b * B, nb = std::min(B, n - p0);
+			cols.clear();
+			for (int p = 0; p < nb; p++) {
+				const d3 Pos{ x[p0 + p], y[p0 + p], z[p0 + p] };
+				for (int c = 0; c < ncen; c++) cart_powers(d.data() + 16 * c, Pos, atoms[c]);
+				exp_table([&d](const int c) { return d[16 * c + 3]; }, exps.data());
+				for (int j = 0; j < nex; j++) {
+					double ex = exps[group[j]];
+					const int a = prim_ao[j];
+					if (ex == 0.0 || a < 0) continue;
+					ex *= cart_monomial(types[j], d.data() + 16 * (centers[j] - 1));
+					if (col[a] < 0) {
+						col[a] = (int)cols.size();
+						cols.push_back(a);
+						std::fill_n(X.data() + (size_t)B * col[a], B, 0.0);
+					}
+					X[(size_t)B * col[a] + p] += prim_ao_scale[j] * ex;
+				}
+			}
+			const int ncol = (int)cols.size();
+			double* r = rho + p0;
+			std::fill(r, r + nb, 0.0);
+			if (ncol == 0) continue;
+			Cg.resize((size_t)ncol * nocc);
+			for (int c = 0; c < ncol; c++) {
+				std::copy_n(C.data() + (size_t)cols[c] * nocc, nocc, Cg.data() + (size_t)c * nocc);
+				col[cols[c]] = -1;
+			}
+			//Phi[m * B + p] = sum_c X[c * B + p] Cg[c * nocc + m]
+			cblas_dgemm(CblasColMajor, CblasNoTrans, CblasTrans, nb, nocc, ncol, 1.0, X.data(), B, Cg.data(), nocc, 0.0, Phi.data(), B);
+			for (int m = 0; m < nocc; m++) {
+				const double* f = Phi.data() + (size_t)m * B;
+				for (int p = 0; p < nb; p++) r[p] += occ[m] * f[p] * f[p];
+			}
+		}
+	}
 }
 
 const double WFN::eval_ao(
@@ -1544,11 +1683,23 @@ const double WFN::compute_dens_spherical(
 //find it cold and one reallocates under the other. The valid flag is read through an
 //atomic_ref so the warm path takes no lock (it is called per grid point from every
 //density evaluator); the member stays a plain bool so WFN stays copyable.
+#include <atomic>
+#if defined(__cpp_lib_atomic_ref) || defined(_MSC_VER)
+using nos_bool_ref = std::atomic_ref<bool>;
+#else
+//libc++ before 19 (Android NDK r27) has no std::atomic_ref; the compiler builtins are the same thing
+struct nos_bool_ref {
+	bool& b;
+	explicit nos_bool_ref(bool& x) : b(x) {}
+	bool load(std::memory_order o) const { return __atomic_load_n(&b, static_cast<int>(o)); }
+	void store(bool v, std::memory_order o) { __atomic_store_n(&b, v, static_cast<int>(o)); }
+};
+#endif
 const double* WFN::get_coef_primitive_major() const
 {
 	const int _nmo = get_nmo(false);
 	if (_nmo <= 0 || nex <= 0) return nullptr;
-	std::atomic_ref<bool> valid(coef_primitive_major_valid);
+	nos_bool_ref valid(coef_primitive_major_valid);
 	if (valid.load(std::memory_order_acquire)
 		&& coef_primitive_major.size() == (size_t)nex * (size_t)_nmo)
 		return coef_primitive_major.data();
@@ -1566,9 +1717,50 @@ const double* WFN::get_coef_primitive_major() const
 			coef_primitive_major[(size_t)j * _nmo + mo] = src[j];
 	}
 	build_exp_groups();
+	build_ao_contraction();
 	valid.store(true, std::memory_order_release);
 	return coef_primitive_major.data();
 }
+
+void WFN::build_ao_contraction() const
+{
+	const int _nmo = get_nmo(false);
+	const double* const cp = coef_primitive_major.data();
+	prim_ao.assign(nex, -1);
+	prim_ao_scale.assign(nex, 0.0);
+	ivec rep;  //the first primitive of every function; its row is the function's row
+	std::map<std::pair<int, int>, ivec> by_shape;  //(centre, type) -> functions
+	for (int j = 0; j < nex; j++) {
+		const double* r = cp + (size_t)j * _nmo;
+		int m = 0;
+		for (int mo = 1; mo < _nmo; mo++)
+			if (std::abs(r[mo]) > std::abs(r[m])) m = mo;
+		if (r[m] == 0.0) continue;
+		ivec& fs = by_shape[{ centers[j], types[j] }];
+		for (const int a : fs) {
+			const double* q = cp + (size_t)rep[a] * _nmo;
+			if (q[m] == 0.0) continue;
+			const double s = r[m] / q[m];
+			bool same = true;
+			for (int mo = 0; mo < _nmo && same; mo++) same = std::abs(r[mo] - s * q[mo]) <= 1e-12 * std::abs(r[m]);
+			if (same) {
+				prim_ao[j] = a;
+				prim_ao_scale[j] = s;
+				break;
+			}
+		}
+		if (prim_ao[j] < 0) {
+			prim_ao[j] = (int)rep.size();
+			prim_ao_scale[j] = 1.0;
+			fs.push_back(prim_ao[j]);
+			rep.push_back(j);
+		}
+	}
+	coef_ao_major.resize(rep.size() * (size_t)_nmo);
+	for (size_t a = 0; a < rep.size(); a++)
+		std::copy_n(cp + (size_t)rep[a] * _nmo, _nmo, coef_ao_major.data() + a * _nmo);
+}
+
 
 void WFN::build_exp_groups() const
 {
@@ -2176,19 +2368,10 @@ void WFN::computeRhoELI(
 	out_Rho = Rho;
 };
 
-void WFN::computeELIGrad(
-	const d3 &PosGrid,
-	double& out_Eli,
-	d3& out_grad
-) const
+bool WFN::eli_orbital_pass(const d3 &PosGrid, vec &phi) const
 {
-	//ELI-D Y = rho/2 (48/g)^(3/8) with g = rho tau - |grad rho|^2 / 4, so
-	//grad Y = (48/g)^(3/8) / 2 (grad rho - 3/8 rho grad g / g) with
-	//grad g = tau grad rho + rho grad tau - H grad rho / 2, H the density Hessian.
-	//One pass with orbital values, gradients and Hessians replaces the six ELI
-	//evaluations of the central difference the basin climb used before
 	const int _nmo = get_nmo(false);
-	thread_local vec phi, d;
+	thread_local vec d;
 	phi.assign(10 * _nmo, 0.0);
 	if (d.size() < 4 * (size_t)ncen) d.resize(4 * (size_t)ncen);
 	for (int j = 0; j < ncen; j++)
@@ -2197,15 +2380,18 @@ void WFN::computeELIGrad(
 		for (int k = 0; k < 3; k++) d_[k] = PosGrid[k] - atoms[j].get_coordinate(k);
 		d_[3] = d_[0] * d_[0] + d_[1] * d_[1] + d_[2] * d_[2];
 	}
-	const double *const coefs = get_coef_primitive_major();
+	if (!get_coef_primitive_major())
+		return false;
 	thread_local vec exps;
 	if (exps.size() < group_exponent.size()) exps.resize(group_exponent.size());
 	exp_table([r2 = d.data()](const int c) { return r2[4 * (size_t)c + 3]; }, exps.data());
 	const int *group = prim_exp_group.data();
+	thread_local ao_scratch<10> ao;
+	ao.begin(coef_ao_major.size() / _nmo);
 	for (int j = 0; j < nex; j++)
 	{
 		const double ex = exps[group[j]];
-		if (ex == 0.0)
+		if (ex == 0.0 || prim_ao[j] < 0)
 			continue;
 		const double *d_ = d.data() + 4 * (centers[j] - 1);
 		const double ex2 = 2 * exponents[j];
@@ -2229,14 +2415,31 @@ void WFN::computeELIGrad(
 			f1[0] * f[1] * f[2] * ex, f[0] * f1[1] * f[2] * ex, f[0] * f[1] * f1[2] * ex,
 			f2[0] * f[1] * f[2] * ex, f[0] * f2[1] * f[2] * ex, f[0] * f[1] * f2[2] * ex,
 			f1[0] * f1[1] * f[2] * ex, f1[0] * f[1] * f1[2] * ex, f[0] * f1[1] * f1[2] * ex };
-		const double *c_row = coefs + (size_t)j * _nmo;
-		double *phi_ptr = phi.data();
-		for (int mo = 0; mo < _nmo; ++mo, phi_ptr += 10)
-		{
-			const double c = c_row[mo];
-			for (int k = 0; k < 10; k++)
-				phi_ptr[k] += c * chi[k];
-		}
+		ao.add(prim_ao[j], prim_ao_scale[j], chi);
+	}
+	//Component-major, as in computeGrad: ten unit-stride accumulations per function
+	ao.to_mo(coef_ao_major.data(), _nmo, phi.data(), [this](const int mo) { return MOs[mo].get_occ(); });
+	return true;
+}
+
+void WFN::computeELIGrad(
+	const d3 &PosGrid,
+	double& out_Eli,
+	d3& out_grad,
+	double *out_rho
+) const
+{
+	//ELI-D Y = rho/2 (48/g)^(3/8) with g = rho tau - |grad rho|^2 / 4, so
+	//grad Y = (48/g)^(3/8) / 2 (grad rho - 3/8 rho grad g / g) with
+	//grad g = tau grad rho + rho grad tau - H grad rho / 2, H the density Hessian
+	const int _nmo = get_nmo(false);
+	thread_local vec phi;
+	if (!eli_orbital_pass(PosGrid, phi))
+	{
+		out_Eli = 0;
+		out_grad = { 0, 0, 0 };
+		if (out_rho) *out_rho = 0.0;
+		return;
 	}
 	static constexpr int hidx[3][3] = { {4, 7, 8}, {7, 5, 9}, {8, 9, 6} };
 	double rho = 0, tau = 0, G[3]{ 0, 0, 0 }, T[3]{ 0, 0, 0 }, H[3][3]{ {0, 0, 0}, {0, 0, 0}, {0, 0, 0} };
@@ -2244,7 +2447,9 @@ void WFN::computeELIGrad(
 	{
 		const double occ = get_MO_occ(mo);
 		if (occ == 0) continue;
-		const double *p = &phi[mo * 10], docc = 2 * occ;
+		double p[10];
+		for (int k = 0; k < 10; k++) p[k] = phi[(size_t)k * _nmo + mo];
+		const double docc = 2 * occ;
 		rho += occ * p[0] * p[0];
 		for (int i = 0; i < 3; i++)
 		{
@@ -2257,6 +2462,7 @@ void WFN::computeELIGrad(
 			}
 		}
 	}
+	if (out_rho) *out_rho = rho;
 	const double g = rho * tau - 0.25 * (G[0] * G[0] + G[1] * G[1] + G[2] * G[2]);
 	if (!(g > 0))
 	{
@@ -2274,9 +2480,108 @@ void WFN::computeELIGrad(
 	}
 };
 
+void WFN::computeELISpinGrad(
+	const d3 &PosGrid,
+	const int field,
+	const double triplet_factor,
+	double& out_Eli,
+	d3& out_grad,
+	double *aux
+) const
+{
+	//Per spin channel s the same ingredients as computeELIGrad: rho_s, T_s = sum n |grad phi|^2,
+	//G_s = grad rho_s, dT_s = grad T_s, H_s the Hessian of rho_s.  Same spin (eli_family.h):
+	//g = rho_s T_s - |G_s|^2/4, grad g = G_s T_s + rho_s dT_s - H_s G_s / 2; triplet:
+	//g = g_a + g_b + (rho_a T_b + rho_b T_a)/2 - G_a.G_b/4, differentiated term by term.
+	//Y = r (12/g)^(3/8), r = rho_s or triplet_factor * rho, grad Y = (12/g)^(3/8) (grad r - 3/8 r grad g / g)
+	const int _nmo = get_nmo(false);
+	thread_local vec phi;
+	out_Eli = 0;
+	out_grad = { 0, 0, 0 };
+	if (aux) for (int k = 0; k < 4; k++) aux[k] = 0.0;
+	if (!eli_orbital_pass(PosGrid, phi)) return;
+	static constexpr int hidx[3][3] = { {4, 7, 8}, {7, 5, 9}, {8, 9, 6} };
+	//spin_split scans serially: get_MO_op_count opens an OpenMP region and this runs per climb point
+	const eli_family::SpinSplit how = eli_family::spin_split(*this);
+	const bool halves = how == eli_family::SpinSplit::halves;
+	double rho[2]{ 0, 0 }, tau[2]{ 0, 0 }, G[2][3]{}, T[2][3]{}, H[2][3][3]{};
+	for (int mo = 0; mo < _nmo; mo++)
+	{
+		const double occ = get_MO_occ(mo);
+		if (occ == 0) continue;
+		double p[10];
+		for (int k = 0; k < 10; k++) p[k] = phi[(size_t)k * _nmo + mo];
+		//halves: half of every occupation in each channel, accumulated once into alpha and copied
+		double nc[2];
+		eli_family::mo_spin_occupations(occ, get_MO_op(mo), how, nc);
+		for (int s = 0; s < (halves ? 1 : 2); s++)
+		{
+			const double n = nc[s], dn = 2 * n;
+			if (n == 0.0) continue;
+			rho[s] += n * p[0] * p[0];
+			for (int i = 0; i < 3; i++)
+			{
+				tau[s] += n * p[1 + i] * p[1 + i];
+				G[s][i] += dn * p[0] * p[1 + i];
+				for (int k = 0; k < 3; k++)
+				{
+					H[s][i][k] += dn * (p[0] * p[hidx[i][k]] + p[1 + i] * p[1 + k]);
+					T[s][k] += dn * p[1 + i] * p[hidx[i][k]];
+				}
+			}
+		}
+	}
+	if (halves)
+	{
+		rho[1] = rho[0]; tau[1] = tau[0];
+		for (int i = 0; i < 3; i++) { G[1][i] = G[0][i]; T[1][i] = T[0][i]; for (int k = 0; k < 3; k++) H[1][i][k] = H[0][i][k]; }
+	}
+	//g_s and grad g_s of one channel
+	auto same = [&](const int s, double &g, double *dg) {
+		g = rho[s] * tau[s] - 0.25 * (G[s][0] * G[s][0] + G[s][1] * G[s][1] + G[s][2] * G[s][2]);
+		for (int k = 0; k < 3; k++)
+			dg[k] = G[s][k] * tau[s] + rho[s] * T[s][k] - 0.5 * (G[s][0] * H[s][0][k] + G[s][1] * H[s][1][k] + G[s][2] * H[s][2][k]);
+	};
+	double g, dg[3], r, dr[3];
+	if (field == 2)
+	{
+		double ga, gb, dga[3], dgb[3];
+		same(0, ga, dga);
+		same(1, gb, dgb);
+		g = ga + gb + 0.5 * (rho[0] * tau[1] + rho[1] * tau[0]) - 0.25 * (G[0][0] * G[1][0] + G[0][1] * G[1][1] + G[0][2] * G[1][2]);
+		for (int k = 0; k < 3; k++)
+		{
+			dg[k] = dga[k] + dgb[k] + 0.5 * (G[0][k] * tau[1] + rho[0] * T[1][k] + G[1][k] * tau[0] + rho[1] * T[0][k])
+				- 0.25 * (H[0][k][0] * G[1][0] + H[0][k][1] * G[1][1] + H[0][k][2] * G[1][2] + H[1][k][0] * G[0][0] + H[1][k][1] * G[0][1] + H[1][k][2] * G[0][2]);
+			dr[k] = triplet_factor * (G[0][k] + G[1][k]);
+		}
+		r = triplet_factor * (rho[0] + rho[1]);
+	}
+	else
+	{
+		same(field, g, dg);
+		r = rho[field];
+		for (int k = 0; k < 3; k++) dr[k] = G[field][k];
+	}
+	if (aux)
+	{
+		aux[0] = rho[0] + rho[1];
+		aux[1] = rho[0];
+		aux[2] = rho[1];
+		//rho_s Y_q = g_s / (12 rho_s^(5/3)), so the basin average of ELI-q is this integral over N_s
+		aux[3] = field != 2 && r > 0.0 && g > 0.0 ? g / (12.0 * std::pow(r, 5.0 / 3.0)) : 0.0;
+	}
+	//an empty channel, or a single orbital carrying it: no pair, no finite ELI-D
+	if (!(g > 0) || !(r > 0)) return;
+	const double f = pow(12 / g, constants::c_38);
+	out_Eli = r * f;
+	for (int k = 0; k < 3; k++) out_grad[k] = f * (dr[k] - 0.375 * r * dg[k] / g);
+}
+
 void WFN::computeGrad(
 	const d3 &PosGrid, // [3] vector with current position on te grid
-	d3& gradient
+	d3& gradient,
+	double *rho
 ) const
 {
 	const int _nmo = get_nmo(false);
@@ -2285,7 +2590,6 @@ void WFN::computeGrad(
 	thread_local vec phi, d;
 	phi.assign(4 * _nmo, 0.0);
 	if (d.size() < 16 * (size_t)ncen) d.resize(16 * (size_t)ncen);
-	double *phi_temp;
 	double chi[4]{ 0, 0, 0, 0 };
 	int k, j;
 	double ex = 0;
@@ -2316,20 +2620,23 @@ void WFN::computeGrad(
 	const int *types_data = types.data();
 	const double *exponents_data = exponents.data();
 
-	const MO *MOs_data = MOs.data();
-	//Primitive-major coefficients: every MO for one primitive is contiguous here, where
-	//MOs keeps them nex apart. Identical arithmetic in identical order - one sequential
-	//read per primitive instead of nmo scattered ones, and no per-point heap allocation.
-	const double *const coefs = get_coef_primitive_major();
+	if (!get_coef_primitive_major())
+	{
+		gradient = { 0, 0, 0 };
+		if (rho) *rho = 0.0;
+		return;
+	}
 	thread_local vec exps;
 	if (exps.size() < group_exponent.size()) exps.resize(group_exponent.size());
 	exp_table([r2 = d.data()](const int c) { return r2[16 * (size_t)c + 3]; }, exps.data());
 	const int *group = prim_exp_group.data();
+	thread_local ao_scratch<4> ao;
+	ao.begin(coef_ao_major.size() / _nmo);
 
 	for (j = 0; j < nex; j++)
 	{
 		ex = exps[group[j]];
-		if (ex == 0.0)
+		if (ex == 0.0 || prim_ao[j] < 0)
 			continue;
 		const double *d_ = d.data() + 16 * (centers_data[j] - 1);
 		const int type = types_data[j];
@@ -2402,17 +2709,12 @@ void WFN::computeGrad(
 		chi[2] = (y1 - ex2 * ynext) * x0 * z0 * ex;
 		chi[3] = (z1 - ex2 * znext) * x0 * y0 * ex;
 
-		const double *c_row = coefs + (size_t)j * _nmo;
-		double *phi_ptr = phi.data();
-		for (int mo = 0; mo < _nmo; ++mo, phi_ptr += 4)
-		{
-			const double c = c_row[mo];
-			for (k = 0; k < 4; k++)
-				phi_ptr[k] += c * chi[k];
-		}
+		ao.add(prim_ao[j], prim_ao_scale[j], chi);
 	}
+	//Component-major: phi[k * nmo + mo], unit stride against one broadcast scalar per function
+	ao.to_mo(coef_ao_major.data(), _nmo, phi.data(), [this](const int mo) { return MOs[mo].get_occ(); });
 
-	double Grad[3]{ 0, 0, 0 };
+	double Grad[3]{ 0, 0, 0 }, Rho = 0.0;
 
 	for (int mo = 0; mo < _nmo; mo++)
 	{
@@ -2420,17 +2722,96 @@ void WFN::computeGrad(
 		const double docc = 2 * occ;
 		if (occ != 0)
 		{
-			phi_temp = &phi[mo * 4];
-			Grad[0] += docc * *phi_temp * phi_temp[1];
-			Grad[1] += docc * *phi_temp * phi_temp[2];
-			Grad[2] += docc * *phi_temp * phi_temp[3];
+			const double v = phi[mo], gx = phi[(size_t)_nmo + mo],
+				gy = phi[(size_t)2 * _nmo + mo], gz = phi[(size_t)3 * _nmo + mo];
+			Grad[0] += docc * v * gx;
+			Grad[1] += docc * v * gy;
+			Grad[2] += docc * v * gz;
+			if (rho) Rho += occ * v * v;
 		}
 	}
 	gradient[0] = Grad[0];
 	gradient[1] = Grad[1];
 	gradient[2] = Grad[2];
+	if (rho) *rho = Rho;
 
 };
+
+bool WFN::field_grad_gpu(const bool eli, const int np, const double *pts, double *val, double *grad, double *rho) const
+{
+	void* ctx = field_gpu_open(eli, np);
+	const bool ok = field_gpu_run(ctx, np, pts, val, grad, rho);
+	field_gpu_close(ctx);
+	return ok;
+}
+
+bool WFN::field_gpu_run(void* ctx, const int np, const double *pts, double *val, double *grad, double *rho)
+{
+#ifdef NOSPHERA2_USE_GPU
+	return ctx && basin_field_gpu_run(ctx, np, pts, val, grad, rho);
+#else
+	(void)ctx; (void)np; (void)pts; (void)val; (void)grad; (void)rho;
+	return false;
+#endif
+}
+
+void WFN::field_gpu_close(void* ctx)
+{
+#ifdef NOSPHERA2_USE_GPU
+	if (ctx) basin_field_gpu_close(ctx);
+#else
+	(void)ctx;
+#endif
+}
+
+void* WFN::field_gpu_open(const bool eli, const int max_points) const
+{
+#ifdef NOSPHERA2_USE_GPU
+	const int _nmo = get_nmo(false);
+	if (max_points <= 0 || !get_coef_primitive_major())
+		return nullptr;
+	const int nao = (int)(coef_ao_major.size() / _nmo);
+	//The primitives the host evaluators visit (a function, a type up to l = 10), grouped by
+	//function in ascending wfn order, so every function sums its primitives as ao.add does
+	ivec start(nao + 1, 0), lj(3 * (size_t)nex, -1);
+	for (int j = 0; j < nex; j++)
+	{
+		if (prim_ao[j] < 0) continue;
+		constants::type2vector(types[j], &lj[3 * (size_t)j]);
+		if (lj[3 * (size_t)j] >= 0) start[prim_ao[j] + 1]++;
+	}
+	for (int a = 0; a < nao; a++) start[a + 1] += start[a];
+	const int nprim = start[nao];
+	ivec fill(start.begin(), start.end() - 1), pc(nprim), pl(3 * (size_t)nprim);
+	vec pe(nprim), ps(nprim);
+	for (int j = 0; j < nex; j++)
+	{
+		if (prim_ao[j] < 0 || lj[3 * (size_t)j] < 0) continue;
+		const int i = fill[prim_ao[j]]++;
+		pc[i] = centers[j] - 1;
+		std::copy_n(&lj[3 * (size_t)j], 3, &pl[3 * (size_t)i]);
+		pe[i] = exponents[j];
+		ps[i] = prim_ao_scale[j];
+	}
+	//only the occupied MOs, in order: the host reduction skips the others
+	ivec mos;
+	vec occ;
+	for (int mo = 0; mo < _nmo; mo++)
+		if (get_MO_occ(mo) != 0) { mos.push_back(mo); occ.push_back(get_MO_occ(mo)); }
+	const int nocc = (int)mos.size();
+	vec coef((size_t)nao * nocc), cxyz(3 * (size_t)ncen);
+	for (int a = 0; a < nao; a++)
+		for (int i = 0; i < nocc; i++) coef[(size_t)a * nocc + i] = coef_ao_major[(size_t)a * _nmo + mos[i]];
+	for (int c = 0; c < ncen; c++)
+		for (int k = 0; k < 3; k++) cxyz[3 * (size_t)c + k] = atoms[c].get_coordinate(k);
+	if (nocc == 0) return nullptr;
+	return basin_field_gpu_open(eli ? 10 : 4, ncen, cxyz.data(), center_min_exponent.data(), constants::exp_cutoff,
+		nao, start.data(), pc.data(), pl.data(), pe.data(), ps.data(), nocc, coef.data(), occ.data(), max_points);
+#else
+	(void)eli; (void)max_points;
+	return nullptr;
+#endif
+}
 
 const double WFN::computeELF(
 	const d3 &PosGrid // [3] vector with current position on te grid
@@ -3020,39 +3401,52 @@ const double WFN::computeMO(
 
 // Boys function F_m(T) by a 6-term Taylor expansion around a tabulated grid (step 0.1 up to
 // T = 30, error < 1E-10), asymptotic beyond (1E-14); expn = exp(-T), which the caller has anyway
+// Pairs stop at g x g, so MaxFn <= 8 and the Taylor reads m .. m + 5: rows of 15, not 31, keep a row in two cache lines
+static constexpr int boys_mmax = 8 + 6, boys_nT = 301;
+static constexpr double boys_step = 0.1;
+// 1/k! factors as multiplies: a double division is a software sequence on a device
+static constexpr double boys_inv_k[6] = { 0.0, 1.0, 0.5, 1.0 / 3.0, 0.25, 0.2 };
+// 1 / (2n - 1) for the downward F_n recursion, n = 1 .. MaxFn
+static constexpr double boys_inv_odd[9] = { 0.0, 1.0, 1.0 / 3.0, 0.2, 1.0 / 7.0, 1.0 / 9.0, 1.0 / 11.0, 1.0 / 13.0, 1.0 / 15.0 };
+// File scope: no static-init guard in the hot loop, and esp_boys_table() hands it to the GPU
+static const vec boys_tab = []()
+{
+	vec F((size_t)boys_nT * (boys_mmax + 1));
+	for (int i = 0; i < boys_nT; i++)
+	{
+		const double T0 = i * boys_step, e = exp(-T0);
+		// F_mmax by its series e^-T sum_k (2T)^k / ((2m+1)...(2m+2k+1)), then downward
+		double term = 1.0 / (2 * boys_mmax + 1), sum = term;
+		for (int k = 1; term > 1E-17 * sum; k++)
+			term *= 2 * T0 / (2 * boys_mmax + 2 * k + 1), sum += term;
+		double *row = F.data() + (size_t)i * (boys_mmax + 1);
+		row[boys_mmax] = e * sum;
+		for (int n = boys_mmax - 1; n >= 0; n--)
+			row[n] = (2 * T0 * row[n + 1] + e) / (2 * n + 1);
+	}
+	return F;
+}();
+
+const double *esp_boys_table(int &nT, int &stride, double &step)
+{
+	nT = boys_nT, stride = boys_mmax + 1, step = boys_step;
+	return boys_tab.data();
+}
+
 static double boys(const int m, const double T, const double expn)
 {
-	constexpr int mmax = 24 + 6, nT = 301;
-	constexpr double step = 0.1;
-	static const vec table = []()
-	{
-		vec F((size_t)nT * (mmax + 1));
-		for (int i = 0; i < nT; i++)
-		{
-			const double T0 = i * step, e = exp(-T0);
-			// F_mmax by its series e^-T sum_k (2T)^k / ((2m+1)...(2m+2k+1)), then downward
-			double term = 1.0 / (2 * mmax + 1), sum = term;
-			for (int k = 1; term > 1E-17 * sum; k++)
-				term *= 2 * T0 / (2 * mmax + 2 * k + 1), sum += term;
-			double *row = F.data() + (size_t)i * (mmax + 1);
-			row[mmax] = e * sum;
-			for (int n = mmax - 1; n >= 0; n--)
-				row[n] = (2 * T0 * row[n + 1] + e) / (2 * n + 1);
-		}
-		return F;
-	}();
-	if (T >= (nT - 1) * step)
+	if (T >= (boys_nT - 1) * boys_step)
 	{
 		double f = 0.5 * sqrt(constants::PI / T); // F_0, then upward, stable at this T
 		for (int n = 1; n <= m; n++)
 			f = ((2 * n - 1) * f - expn) / (2 * T);
 		return f;
 	}
-	const int i = (int)(T / step + 0.5);
-	const double dT = i * step - T, *row = table.data() + (size_t)i * (mmax + 1) + m;
-	double f = 0, pw = 1;
-	for (int k = 0; k <= 5; k++, pw *= dT / k)
-		f += row[k] * pw;
+	const int i = (int)(T * (1.0 / boys_step) + 0.5);
+	const double dT = i * boys_step - T, *row = boys_tab.data() + (size_t)i * (boys_mmax + 1) + m;
+	double f = row[0], pw = 1;
+	for (int k = 1; k <= 5; k++)
+		pw *= dT * boys_inv_k[k], f += row[k] * pw;
 	return f;
 }
 const double WFN::fj(int &j, int &l, int &m, double &aa, double &bb) const
@@ -3087,14 +3481,11 @@ const double WFN::Afac(int &l, int &r, int &i, double &PC, double &gamma, double
 		return temp;
 }
 
-// number of (l, r, s) terms of one axis with l_i + l_j = L
+// (l, r, s) terms of one axis with l_i + l_j = L: sum over l <= L, r <= l / 2 of (l - 2 r) / 2 + 1; L <= 8 (g x g)
 static int esp_axis_terms(const int L)
 {
-	int n = 0;
-	for (int l = 0; l <= L; l++)
-		for (int r = 0; r <= l / 2; r++)
-			n += (l - 2 * r) / 2 + 1;
-	return n;
+	static constexpr int n[9] = { 1, 2, 5, 8, 14, 20, 30, 40, 55 };
+	return n[L];
 }
 
 WFN::ESP_pairs WFN::build_ESP_pairs() const
@@ -3105,6 +3496,14 @@ WFN::ESP_pairs WFN::build_ESP_pairs() const
 	const double *coef = get_coef_primitive_major(); // [prim][mo]
 	int l_i[3], l_j[3];
 	double Pi[3], Pj[3];
+	// Tables are sized for g x g (Afac_pre [9][5][9], Fn [9]): an h primitive would index past them
+	// silently, and the OCC reader accepts l up to 10
+	for (int iprim = 0; iprim < nprim; iprim++)
+	{
+		constants::type2vector(get_type(iprim), l_i);
+		if (l_i[0] < 0 || l_i[0] + l_i[1] + l_i[2] > 4)
+			err_not_impl_f("ESP of a primitive beyond g functions (type " + std::to_string(get_type(iprim)) + ")", std::cout);
+	}
 	t.off.push_back(0);
 	for (int iprim = 0; iprim < nprim; iprim++)
 	{
@@ -3159,58 +3558,160 @@ WFN::ESP_pairs WFN::build_ESP_pairs() const
 	return t;
 }
 
-const double WFN::computeESP(const d3 &PosGrid, const ESP_pairs &t) const
+// Pair loop over VL points: every index belongs to the pair, so lanes carry only arithmetic and vectorise.
+// Each lane replays the scalar operations in scalar order, so any VL is bitwise identical (EspTests pins it)
+template <int VL>
+static void esp_lanes(const WFN &wfn, const WFN::ESP_pairs &t,
+					  const double *px, const double *py, const double *pz, double *out)
 {
-	double ESP = 0;
-	for (int iat = 0; iat < get_ncen(); iat++)
+	double ESP[VL];
+	for (int v = 0; v < VL; v++)
+		ESP[v] = 0.0;
+	for (int iat = 0; iat < wfn.get_ncen(); iat++)
 	{
-		double r2 = 0;
-		for (int k = 0; k < 3; k++)
-			r2 += pow(PosGrid[k] - atoms[iat].get_coordinate(k), 2);
-		ESP += (get_atom_charge(iat) - atoms[iat].get_ECP_electrons()) / sqrt(r2); // ECP/xTB/pTB: only the valence electrons are in the MOs, so the core must not count as nuclear charge
+		const double cx = wfn.get_atom_coordinate(iat, 0), cy = wfn.get_atom_coordinate(iat, 1), cz = wfn.get_atom_coordinate(iat, 2);
+		// ECP/xTB/pTB: MOs hold only valence electrons, so the core is removed from the nuclear charge
+		const double Z = wfn.get_atom_charge(iat) - wfn.get_atom_ECP_electrons(iat);
+		for (int v = 0; v < VL; v++)
+		{
+			const double dx = px[v] - cx, dy = py[v] - cy, dz = pz[v] - cz;
+			ESP[v] += Z / sqrt((dx * dx + dy * dy) + dz * dz);
+		}
 	}
 
-	double Fn[25], pcp[3][9], Al[506], Am[506], An[506]; // l_i, l_j <= 4 per axis (pre tables)
-	int mapl[506], mapm[506], mapn[506];
+	// B[axis][k]: one axis summed by the F index its (l, r, s) terms feed, so the product loop indexes Fn directly
+	double Fn[9][VL], B[3][9][VL], pw[9][VL], PC[3][VL], T[VL], expc[VL], term[VL]; // MaxFn <= 8, L[k] <= 8 for g x g
 	const int npairs = (int)t.weight.size();
 	for (int p = 0; p < npairs; p++)
 	{
 		const double ex_sum = t.ex_sum[p];
 		const std::array<int, 3> &L = t.L[p];
-		double sqpc = 0;
+		const int MaxFn = L[0] + L[1] + L[2];
+		const double Px = t.P[p][0], Py = t.P[p][1], Pz = t.P[p][2], w = t.weight[p];
+		for (int v = 0; v < VL; v++)
+		{
+			PC[0][v] = Px - px[v], PC[1][v] = Py - py[v], PC[2][v] = Pz - pz[v];
+			T[v] = ex_sum * ((PC[0][v] * PC[0][v] + PC[1][v] * PC[1][v]) + PC[2][v] * PC[2][v]);
+		}
+		int c = t.off[p];
+		// s-s: one term per axis, PC power 0, and F_0 never reads exp(-T): bitwise the general path without the exp
+		if (MaxFn == 0)
+		{
+			const double cc = (t.coef[c] * t.coef[c + 1]) * t.coef[c + 2];
+			for (int v = 0; v < VL; v++)
+				ESP[v] -= w * (cc * boys(0, T[v], 0.0));
+			continue;
+		}
+		// Beyond T = 60, exp(-T) is below the last bit of F_0, so the libm call is skipped
+		for (int v = 0; v < VL; v++)
+		{
+			expc[v] = T[v] < 60.0 ? exp(-T[v]) : 0.0;
+			Fn[MaxFn][v] = boys(MaxFn, T[v], expc[v]);
+		}
+		for (int nu = MaxFn - 1; nu >= 0; nu--)
+			for (int v = 0; v < VL; v++)
+				Fn[nu][v] = (expc[v] + 2 * T[v] * Fn[nu + 1][v]) * boys_inv_odd[nu + 1];
+
+		// Each (l, r, s) term feeds one F index, so summing each axis into B[k] first factorises the
+		// nl * nm * nn triple product exactly into (L0+1)(L1+1)(L2+1) terms with index kx + ky + kz
 		for (int k = 0; k < 3; k++)
 		{
-			const double PC = t.P[p][k] - PosGrid[k];
-			sqpc += PC * PC;
-			pcp[k][0] = 1.0;
+			for (int v = 0; v < VL; v++)
+				pw[0][v] = 1.0;
 			for (int n = 1; n <= L[k]; n++)
-				pcp[k][n] = pcp[k][n - 1] * PC;
-		}
-		double expc = exp(-ex_sum * sqpc);
-		int MaxFn = L[0] + L[1] + L[2];
-		Fn[MaxFn] = boys(MaxFn, ex_sum * sqpc, expc);
-		const double twoexpc = 2 * ex_sum * sqpc;
-		for (int nu = MaxFn - 1; nu >= 0; nu--)
-			Fn[nu] = (expc + twoexpc * Fn[nu + 1]) / (2 * (nu + 1) - 1);
-
-		int c = t.off[p];
-		const int nl = esp_axis_terms(L[0]), nm = esp_axis_terms(L[1]), nn = esp_axis_terms(L[2]);
-		for (int l = 0; l < nl; l++, c++)
-			Al[l] = t.coef[c] * pcp[0][t.pc_pow[c]], mapl[l] = t.fn_idx[c];
-		for (int m = 0; m < nm; m++, c++)
-			Am[m] = t.coef[c] * pcp[1][t.pc_pow[c]], mapm[m] = t.fn_idx[c];
-		for (int n = 0; n < nn; n++, c++)
-			An[n] = t.coef[c] * pcp[2][t.pc_pow[c]], mapn[n] = t.fn_idx[c];
-
-		double term = 0.0;
-		for (int l = 0; l < nl; l++)
-			for (int m = 0; m < nm; m++)
+				for (int v = 0; v < VL; v++)
+					pw[n][v] = pw[n - 1][v] * PC[k][v];
+			for (int i = 0; i <= L[k]; i++)
+				for (int v = 0; v < VL; v++)
+					B[k][i][v] = 0.0;
+			for (int i = esp_axis_terms(L[k]); i--; c++)
 			{
-				const double lm = Al[l] * Am[m];
-				for (int n = 0; n < nn; n++)
-					term += lm * An[n] * Fn[mapl[l] + mapm[m] + mapn[n]];
+				const double cf = t.coef[c];
+				const double *const p_pw = pw[t.pc_pow[c]];
+				double *const p_B = B[k][t.fn_idx[c]];
+				for (int v = 0; v < VL; v++)
+					p_B[v] += cf * p_pw[v];
 			}
-		ESP -= t.weight[p] * term;
+		}
+
+		for (int v = 0; v < VL; v++)
+			term[v] = 0.0;
+		for (int kx = 0; kx <= L[0]; kx++)
+			for (int ky = 0; ky <= L[1]; ky++)
+				for (int kz = 0; kz <= L[2]; kz++)
+				{
+					const double *const f = Fn[kx + ky + kz];
+					for (int v = 0; v < VL; v++)
+						term[v] += (B[0][kx][v] * B[1][ky][v]) * B[2][kz][v] * f[v];
+				}
+		for (int v = 0; v < VL; v++)
+			ESP[v] -= w * term[v];
 	}
+	for (int v = 0; v < VL; v++)
+		out[v] = ESP[v];
+}
+
+const double WFN::computeESP(const d3 &PosGrid, const ESP_pairs &t) const
+{
+	double ESP = 0;
+	esp_lanes<1>(*this, t, &PosGrid[0], &PosGrid[1], &PosGrid[2], &ESP);
 	return ESP;
 };
+
+// Host path: VL points share one pass over the pair table, leftovers go scalar.  The loop is bound by
+// fetching the table, so wider passes win until the lane state no longer fits in L1
+template <int VL>
+static void esp_host_pass(const WFN &wfn, const WFN::ESP_pairs &t, const std::vector<d3> &points, double *out)
+{
+	const int np = (int)points.size(), nblk = np / VL;
+#pragma omp parallel for schedule(static)
+	for (int b = 0; b < nblk; b++)
+	{
+		double px[VL], py[VL], pz[VL];
+		for (int v = 0; v < VL; v++)
+			px[v] = points[b * VL + v][0], py[v] = points[b * VL + v][1], pz[v] = points[b * VL + v][2];
+		esp_lanes<VL>(wfn, t, px, py, pz, out + (size_t)b * VL);
+	}
+	for (int i = nblk * VL; i < np; i++)
+		out[i] = wfn.computeESP(points[i], t);
+}
+
+// Every point walks the whole O(nprim^2) pair table, so a whole set goes to the device at once; host
+// fallback without a device or when the set is too small to pay the copies
+void WFN::computeESP_batch(const std::vector<d3> &points, const ESP_pairs &t, double *out) const
+{
+	const int np = (int)points.size();
+	if (np == 0)
+		return;
+#ifdef NOSPHERA2_USE_GPU
+	const int ncen = get_ncen(), npairs = (int)t.weight.size();
+	// The device buffers stay allocated between calls; each call uploads the atoms and the pair table, O(npairs) next to O(np * npairs)
+	if (npairs > 0 && (long long)np * npairs >= (1LL << 22) && aux_density_gpu_enabled())
+	{
+		vec ax(ncen), ay(ncen), az(ncen), q(ncen);
+		for (int a = 0; a < ncen; a++)
+		{
+			ax[a] = atoms[a].get_coordinate(0), ay[a] = atoms[a].get_coordinate(1), az[a] = atoms[a].get_coordinate(2);
+			q[a] = get_atom_charge(a) - atoms[a].get_ECP_electrons();
+		}
+		int nT = 0, stride = 0;
+		double step = 0;
+		const double *tab = esp_boys_table(nT, stride, step);
+		// One launch for the whole set: the kernel is latency bound and needs every SM occupied, so
+		// split launches lose more in tail occupancy than overlapping the host cores gains
+		if (esp_gpu_eval(ncen, ax.data(), ay.data(), az.data(), q.data(),
+						 npairs, t.ex_sum.data(), t.weight.data(), t.P[0].data(), t.L[0].data(),
+						 t.off.data(), t.coef.data(), t.pc_pow.data(), t.fn_idx.data(),
+						 nT, stride, step, tab, np, points[0].data(), out))
+			return;
+	}
+#endif
+	// Never fewer VL blocks than threads: idle cores cost more than the wide pass gains.  All widths are bitwise identical
+	const int nthr = omp_get_max_threads();
+	if (np >= 64 * nthr)
+		esp_host_pass<64>(*this, t, points, out);
+	else if (np >= 8 * nthr)
+		esp_host_pass<8>(*this, t, points, out);
+	else
+		esp_host_pass<1>(*this, t, points, out);
+}

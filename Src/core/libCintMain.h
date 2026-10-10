@@ -37,6 +37,7 @@ void compute2C(Int_Params& params, vec& ret);
  * param2: Int_Params object for the auxiliary basis
  * dm: Density matrix
  * rho: Resulting density matrix
+ * sensitivity: per aux function, the electrons a unit error in rho moves onto an atom; screening is off without it
  */
 template <typename Kernel>
 void computeRho(
@@ -44,7 +45,8 @@ void computeRho(
 	const Int_Params& aux_basis,
 	const dMatrix2& dm,
 	vec& rho,
-	const std::optional<ivec> asym_atm_list = std::nullopt);
+	const std::optional<ivec> asym_atm_list = std::nullopt,
+	const vec* sensitivity = nullptr);
 
 
 //DEPRICATED::Function to compute electron repulsion integrals

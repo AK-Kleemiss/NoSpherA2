@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string.h>
+#include <string>
 #include <vector>
 
 class WFN;
@@ -8,8 +9,23 @@ class WFN;
 // Average an atom-centred AO matrix over the 48 operations of O_h.
 // Shells must be contiguous. Cartesian matrices use constants::type_vector;
 // spherical matrices use the libcint real-spherical ordering and phases.
+// Cartesian route only; O_h approximates the spherical average but keeps the molecule's orientation.
 void symmetrize_atomic_matrix_oh(dMatrix2& matrix, const ivec& shell_angular_momenta,
 	bool spherical = false);
+
+// Average an atom-centred AO matrix over all rotations. Real-spherical basis only; each shell's
+// 2l+1 components must be contiguous, their order and phase convention do not matter.
+void spherically_average_atomic_matrix(dMatrix2& matrix, const ivec& shell_angular_momenta);
+
+// Highest shell l of the basis, -1 if it has no shells; lets RGBI refuse l > h before any SCF.
+int highest_shell_angular_momentum(const WFN& wavy);
+
+// Drop the per-process cache of free-atom densities (one per element+basis).
+void clear_rgbi_free_atom_cache();
+
+// Inputs RGBI runs on (.gbw, .molden, pure-shell .fchk), excluding the refused extension, for a refusal message.
+// A .wfn/.wfx carries no shell structure and a cartesian .fchk no contracted density matrix.
+std::string rgbi_supported_input_phrase(const std::string& refused_extension);
 
 struct bond {
 	std::string label_1;
@@ -73,12 +89,27 @@ private:
 	std::vector<bond_index_result> RGBI;
 	std::vector<group_bond_index_result> RGBI_groups;
 	ivec ano_fallback_atoms;
+	//The pseudo-inverse rank is set by a hard singular-value cutoff and can split symmetry-equivalent
+	//bonds; the last rank is kept so a bond whose rank sits at the cutoff, not at a spectral gap, is flagged.
+	double pinv_cutoff = 1E-5;  //NOS_RGBI_PINV_CUTOFF overrides it
+	//Width of the +/-1 window in find_eigenvalue_pairs: an eigenvalue this close to +/-1 is a lone pair left
+	//unpaired, and two summing to within it are a bond pair. H2O2 O-O Cov. moves 0.645 -> 0.818 at 2E-3.
+	double pair_tolerance = 1E-4;  //NOS_RGBI_PAIR_TOL overrides it
+	//Group path only: an ionic pair whose positive eigenvalue exceeds this is a lone pair and skipped. Ionic
+	//eigenvalues lie in [-1, 1], so >= 1 switches the guard off, as on the atom-pair path. H2O2 O-O 0.800 vs 0.645.
+	double group_lone_pair_threshold = 0.99;  //NOS_RGBI_GROUP_LP overrides it
+	int last_pinv_n = 0, last_pinv_kept = 0;
+	double last_pinv_smallest_kept = 0.0, last_pinv_largest_dropped = 0.0;
+	std::vector<std::string> pinv_warnings;
+	//Roby-Gould atomic NOs: per atom, Loewdin S^-1/2, no interatomic orthogonalisation (unlike nao.h).
+	//keep_orbitals >= 0 fixes the subspace rank and ignores occupancy_cutoff, keeping indices continuous in geometry.
 	NAOResult calculateAtomicNAO(const dMatrix2& D_full, const dMatrix2& S_full,
 		const ivec& atom_indices, const ivec& shell_angular_momenta = {},
 		bool spherical = false, double occupancy_cutoff = 1.0 / 6.0,
-		int leading_orbitals_to_skip = 0, bool EVs = false);
+		int leading_orbitals_to_skip = 0, bool EVs = false, int keep_orbitals = -1);
 	double projection_matrix_and_expectation(const ivec& indices, const ivec& eigvals = {}, const ivec& eigvecs = {}, dMatrix2* given_NAO = nullptr, dMatrix2* proj_out = nullptr);
-	void computeAllAtomicNAOs(WFN& wavy, bool symmetrize, bool use_ano_basis, bool EVs= false);
+	void computeAllAtomicNAOs(WFN& wavy, bool symmetrize, bool use_ano_basis, bool EVs= false,
+		bool legacy_occupancy_cutoff = false);
 	ivec find_eigenvalue_pairs(const vec& eigvals, const double tolerance = 1E-4);
 	void transform_Ionic_eigenvectors_to_Ionic_orbitals(dMatrix2& EVC,
 		const vec& eigvals,
@@ -104,7 +135,7 @@ public:
 	Roby_information() = default;
 	~Roby_information() = default;
 	Roby_information(const Roby_information&) = default;
-	Roby_information(WFN& wavy, const ivec3& group_sets = {}, bool symmetrize = true, bool use_ano_basis = false, bool EVs = false, bool theta_info = false);
+	Roby_information(WFN& wavy, const ivec3& group_sets = {}, bool symmetrize = true, bool use_ano_basis = false, bool EVs = false, bool theta_info = false, bool legacy_occupancy_cutoff = false);
 
 };
 
