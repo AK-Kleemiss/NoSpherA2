@@ -6,6 +6,8 @@
 #include <iostream>
 #include "nos_math.h"
 #include "basis_set.h"
+#include "constants.h"
+#include <algorithm>
 
 namespace {
 constexpr int kMaxSaltedBlocks = 10000;
@@ -33,30 +35,47 @@ void skip_exact(std::ifstream& file, const std::streamoff offset, const std::str
 }
 }
 
-std::filesystem::path find_first_salted_file(const std::filesystem::path &directory_path)
+int salted_element_file_Z(const std::filesystem::path &file)
 {
+	const std::string s = file.stem().string();
+	const int Z = constants::get_Z_from_label(s.c_str());
+	return (Z >= 0 && s == constants::atnr2letter(Z + 1)) ? Z + 1 : 0;
+}
+
+// The .salted files of a folder sorted by name, so the choice of a lead does not depend on the file system's order.
+static pathvec salted_files(const std::filesystem::path &directory_path)
+{
+	pathvec files;
 	try
 	{
-		// Iterate through the directory
 		for (const auto &entry : std::filesystem::directory_iterator(directory_path))
-		{
-			// Check if the entry is a regular file and has a .salted extension
 			if (entry.is_regular_file() && entry.path().extension() == ".salted")
-			{
-				return entry.path().filename().string(); // Return the filename
-			}
-		}
+				files.push_back(entry.path());
 	}
 	catch (const std::filesystem::filesystem_error &e)
 	{
 		std::cerr << "Filesystem error: " << e.what() << std::endl;
 	}
-	catch (const std::exception &e)
-	{
-		std::cerr << "General error: " << e.what() << std::endl;
-	}
+	std::sort(files.begin(), files.end());
+	return files;
+}
 
-	return std::filesystem::path(); // Return an empty path if no .salted file is found
+std::filesystem::path find_first_salted_file(const std::filesystem::path &directory_path)
+{
+	const pathvec files = salted_files(directory_path);
+	for (const auto &f : files)
+		if (!salted_element_file_Z(f)) return f.filename();
+	return files.empty() ? std::filesystem::path() : files[0].filename(); // a folder of element models only
+}
+
+pathvec salted_folder_models(const std::filesystem::path &directory_path, const std::set<int> &present_Z)
+{
+	pathvec models;
+	const std::filesystem::path lead = find_first_salted_file(directory_path);
+	if (!lead.empty() && !salted_element_file_Z(lead)) models.push_back(directory_path / lead);
+	for (const auto &f : salted_files(directory_path))
+		if (present_Z.count(salted_element_file_Z(f))) models.push_back(f);
+	return models;
 }
 
 template <typename Scalar>

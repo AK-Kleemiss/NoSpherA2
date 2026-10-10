@@ -390,6 +390,30 @@ TEST(SaltedFchkIoTests, FindFirstSaltedFile)
 	EXPECT_TRUE(find_first_salted_file(dir).empty());
 }
 
+// a model folder: the lead is the first non-element name, element models join only for elements present
+TEST(SaltedFchkIoTests, SaltedFolderModels)
+{
+	const auto dir = tmp_path("modelfolder");
+	std::filesystem::create_directories(dir);
+	for (const char* f : {"Co.salted", "Ag.salted", "v8.salted", "z_old.salted", "Cl.salted", "xyz.salted", "Fe.txt"})
+		std::ofstream(dir / f) << "x";
+	EXPECT_EQ(salted_element_file_Z("Co.salted"), 27);
+	EXPECT_EQ(salted_element_file_Z("CO.salted"), 0);
+	EXPECT_EQ(salted_element_file_Z("D.salted"), 0);
+	EXPECT_EQ(find_first_salted_file(dir).string(), "v8.salted");
+	const pathvec m = salted_folder_models(dir, {1, 6, 17, 27});
+	ASSERT_EQ(m.size(), 3u);
+	EXPECT_EQ(m[0].filename().string(), "v8.salted");
+	EXPECT_EQ(m[1].filename().string(), "Cl.salted");
+	EXPECT_EQ(m[2].filename().string(), "Co.salted");
+	EXPECT_EQ(salted_folder_models(dir, {1, 6}).size(), 1u);
+	for (const char* f : {"v8.salted", "z_old.salted", "xyz.salted"})
+		std::filesystem::remove(dir / f);
+	EXPECT_EQ(find_first_salted_file(dir).string(), "Ag.salted"); // element models only: the first file
+	EXPECT_EQ(salted_folder_models(dir, {27}).size(), 1u);
+	std::filesystem::remove_all(dir);
+}
+
 // the CONFG block of the synthetic model reads back field for field
 TEST(SaltedFchkIoTests, SyntheticModelConfig)
 {

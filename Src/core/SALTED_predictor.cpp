@@ -35,10 +35,18 @@ SALTEDPredictor::SALTEDPredictor(WFN wavy_in, options& opt_in)
 		return;
 	}
 
-	if (opt_in.salted_model_dirs.size() > 1) {
-		build_merged(wavy_in, opt_in);
+	// A folder brings its lead plus the element models of the elements in this structure (salted_folder_models).
+	pathvec models = opt_in.salted_model_dirs;
+	if (models.size() <= 1 && std::filesystem::is_directory(_path)) {
+		std::set<int> present;
+		for (int a = 0; a < wavy_in.get_ncen(); a++) present.insert(wavy_in.get_atom_charge(a));
+		models = salted_folder_models(_path, present);
+	}
+	if (models.size() > 1) {
+		build_merged(wavy_in, opt_in, models);
 		return;
 	}
+	if (models.size() == 1) _path = models[0];
 
 	// A model may be named by its own file: two models in one folder are otherwise indistinguishable.
 	if (std::filesystem::is_regular_file(_path)) {
@@ -192,14 +200,14 @@ static ivec coef_offsets(const WFN& w)
 	return off;
 }
 
-void SALTEDPredictor::build_merged(const WFN& wavy_in, options& opt_in)
+void SALTEDPredictor::build_merged(const WFN& wavy_in, options& opt_in, const pathvec& models)
 {
 	// One prediction per model on the whole structure: an atom another model owns is still a neighbour.
 	// Each per-atom block carries its own model's auxiliary basis, so stitching them is a concatenation.
-	std::cout << "Combining " << opt_in.salted_model_dirs.size()
+	std::cout << "Combining " << models.size()
 			  << " SALTED models. Each of them first reports what IT alone cannot predict;"
 			  << " the assignment that counts is printed below." << std::endl;
-	for (const auto& model : opt_in.salted_model_dirs)
+	for (const auto& model : models)
 	{
 		options sub_opt = opt_in;               // its own spherical-fill bookkeeping
 		sub_opt.salted_model_dirs.clear();

@@ -6,7 +6,14 @@
 #include <set>
 #include "npy.h"
 
+// A model folder holds one lead model, the first .salted by name that is not named after an element, and per-element
+// add-ons <El>.salted (Co.salted). The lead is what a bare folder path selects; a folder of element models only
+// falls back to its first file.
 std::filesystem::path find_first_salted_file(const std::filesystem::path &directory_path);
+// Z of a model named after an element ("Co.salted" -> 27), 0 for any other name.
+int salted_element_file_Z(const std::filesystem::path &file);
+// The models a folder contributes to a structure with these elements: the lead, then <El>.salted for each element present.
+pathvec salted_folder_models(const std::filesystem::path &directory_path, const std::set<int> &present_Z);
 
 template <class T>
 std::vector<T> readVectorFromFile(const std::filesystem::path &filename);
