@@ -251,9 +251,9 @@ void read_hkl(const std::filesystem::path& hkl_filename,
 		for (const i3& hkl__ : hkl)
 			for (int i = 0; i < twin_law.size(); i++)
 				hkl.emplace(i3{
-					static_cast<int>(twin_law[i][0] * hkl__[0] + twin_law[i][1] * hkl__[1] + twin_law[i][2] * hkl__[2]),
-					static_cast<int>(twin_law[i][3] * hkl__[0] + twin_law[i][4] * hkl__[1] + twin_law[i][5] * hkl__[2]),
-					static_cast<int>(twin_law[i][6] * hkl__[0] + twin_law[i][7] * hkl__[1] + twin_law[i][8] * hkl__[2]) });
+					int(std::lround(twin_law[i][0] * hkl__[0] + twin_law[i][1] * hkl__[1] + twin_law[i][2] * hkl__[2])),
+					int(std::lround(twin_law[i][3] * hkl__[0] + twin_law[i][4] * hkl__[1] + twin_law[i][5] * hkl__[2])),
+					int(std::lround(twin_law[i][6] * hkl__[0] + twin_law[i][7] * hkl__[1] + twin_law[i][8] * hkl__[2])) });
 	}
 	if (debug)
 		file << "Number of reflections after twin: " << hkl.size() << std::endl;
@@ -374,9 +374,9 @@ hkl_list read_hkl_full(const std::filesystem::path& hkl_filename,
 		for (const i3& hkl__ : hkl)
 			for (int i = 0; i < twin_law.size(); i++)
 				hkl.emplace(i3{
-					static_cast<int>(twin_law[i][0] * hkl__[0] + twin_law[i][1] * hkl__[1] + twin_law[i][2] * hkl__[2]),
-					static_cast<int>(twin_law[i][3] * hkl__[0] + twin_law[i][4] * hkl__[1] + twin_law[i][5] * hkl__[2]),
-					static_cast<int>(twin_law[i][6] * hkl__[0] + twin_law[i][7] * hkl__[1] + twin_law[i][8] * hkl__[2]) });
+					int(std::lround(twin_law[i][0] * hkl__[0] + twin_law[i][1] * hkl__[1] + twin_law[i][2] * hkl__[2])),
+					int(std::lround(twin_law[i][3] * hkl__[0] + twin_law[i][4] * hkl__[1] + twin_law[i][5] * hkl__[2])),
+					int(std::lround(twin_law[i][6] * hkl__[0] + twin_law[i][7] * hkl__[1] + twin_law[i][8] * hkl__[2])) });
 	}
 	if (debug)
 		file << "Number of reflections after twin: " << hkl.size() << std::endl;
@@ -538,9 +538,9 @@ void generate_hkl(const double& dmin,
 		for (const i3& hkl__ : hkl)
 			for (int i = 0; i < twin_law.size(); i++)
 				twinned.emplace(i3{
-					int(twin_law[i][0] * hkl__[0] + twin_law[i][1] * hkl__[1] + twin_law[i][2] * hkl__[2]),
-					int(twin_law[i][3] * hkl__[0] + twin_law[i][4] * hkl__[1] + twin_law[i][5] * hkl__[2]),
-					int(twin_law[i][6] * hkl__[0] + twin_law[i][7] * hkl__[1] + twin_law[i][8] * hkl__[2]) });
+					int(std::lround(twin_law[i][0] * hkl__[0] + twin_law[i][1] * hkl__[1] + twin_law[i][2] * hkl__[2])),
+					int(std::lround(twin_law[i][3] * hkl__[0] + twin_law[i][4] * hkl__[1] + twin_law[i][5] * hkl__[2])),
+					int(std::lround(twin_law[i][6] * hkl__[0] + twin_law[i][7] * hkl__[1] + twin_law[i][8] * hkl__[2])) });
 		if (debug)
 			file << "Number of reflections after twin: " << twinned.size() << endl;
 		i3 tempv;
@@ -635,9 +635,9 @@ void generate_hkl(const ivec2& hkl_min_max,
 		for (const i3& hkl__ : hkl)
 			for (int i = 0; i < twin_law.size(); i++)
 				hkl.emplace(i3{
-					int(twin_law[i][0] * hkl__[0] + twin_law[i][1] * hkl__[1] + twin_law[i][2] * hkl__[2]),
-					int(twin_law[i][3] * hkl__[0] + twin_law[i][4] * hkl__[1] + twin_law[i][5] * hkl__[2]),
-					int(twin_law[i][6] * hkl__[0] + twin_law[i][7] * hkl__[1] + twin_law[i][8] * hkl__[2]) });
+					int(std::lround(twin_law[i][0] * hkl__[0] + twin_law[i][1] * hkl__[1] + twin_law[i][2] * hkl__[2])),
+					int(std::lround(twin_law[i][3] * hkl__[0] + twin_law[i][4] * hkl__[1] + twin_law[i][5] * hkl__[2])),
+					int(std::lround(twin_law[i][6] * hkl__[0] + twin_law[i][7] * hkl__[1] + twin_law[i][8] * hkl__[2])) });
 	}
 	if (debug)
 		file << "Number of reflections after twin: " << hkl.size() << endl;
