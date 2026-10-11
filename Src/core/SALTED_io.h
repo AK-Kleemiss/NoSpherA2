@@ -51,6 +51,9 @@ public:
 	int Ntrain;
 	double trainfrac;
 	std::string dfbasis;
+	// The ECP the labels were computed with (ECP block, -salted_ecp), as -ECP counts them: 1 def2, 2 xTB, 3 pTB.
+	// The model then predicts valence densities only, and the core goes back on at prediction. 0: all-electron
+	int ecp_mode = 0;
 
 	// The are initialized to -1 to check if they are set
 	// They are set in the populateFromFile function as static_cast<int>(neighspeX.size())
@@ -81,7 +84,9 @@ private:
 	// (projector times weights), ENVW (zeta = 1) or GENV + FEATL (zeta != 1) replace
 	// PROJ, WEIGH and FEATS, so an older build stops at a missing block instead of
 	// misreading it. Files written 8-9 Oct 2026 say 5 for the same format.
-	static const int SUPPORTED_VERSION = 4;
+	// VERSION 6 (-salted_ecp): an ECP block says the model predicts valence densities; without it the
+	// core of every heavy atom is missing, so an older build has to warn.
+	static const int SUPPORTED_VERSION = 6;
 	enum DataType { INT32 = 0, FLOAT64 = 1, STRING = 2 };
 
 	std::filesystem::path filepath;
@@ -168,3 +173,6 @@ public:
 
 	std::shared_ptr<BasisSet> read_basis_set();
 };
+
+// Writes the model `in` to `out` as VERSION 6 with an ECP block holding `mode` (as -ECP: 1 def2, 2 xTB, 3 pTB)
+void write_salted_ecp(const std::filesystem::path& in, const std::filesystem::path& out, const int mode);

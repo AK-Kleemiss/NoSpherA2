@@ -74,6 +74,16 @@ SALTEDPredictor::SALTEDPredictor(WFN wavy_in, options& opt_in)
 		std::cout << "[stages] filter input "
 				  << std::chrono::duration<double>(std::chrono::steady_clock::now() - _t_filter).count()
 				  << " s" << std::endl;
+	// A model trained on ECP densities predicts the valence only. wavy holds just this model's atoms now (the filter
+	// erased the spherical fill, which stays all-electron), so its cores are the ones that go back on
+	if (config.ecp_mode > 0)
+	{
+		wavy.set_has_ECPs(true, true, config.ecp_mode);
+		int n_core = 0;
+		for (int a = 0; a < wavy.get_ncen(); a++) n_core += wavy.get_atom_ECP_electrons(a) != 0;
+		std::cout << "Model " << config.salted_filename.string() << " predicts valence densities (ECP mode "
+				  << config.ecp_mode << "): the core goes back on for " << n_core << " atom(s)." << std::endl;
+	}
 	// The descriptors see the unfiltered input, so unknown species stay neighbours. The isolated atoms of model
 	// species go, though: the filter dropped them from the basis, and left in they would be descriptor centres
 	// with no coefficients (Tsize != n_coef, "model and basis do not belong together"). Isolated means nobody's
@@ -278,6 +288,19 @@ void SALTEDPredictor::build_merged(const WFN& wavy_in, options& opt_in, const pa
 				atom_in_model.erase(atom_in_model.begin() + a);
 			}
 	}
+
+	// Each atom has the core of the model that predicts it (none for an all-electron one)
+	int ecp_mode = 0;
+	for (int a = 0; a < wavy.get_ncen(); a++)
+	{
+		const SALTEDPredictor& sub = *sub_models[atom_model[a]];
+		if (sub.config.ecp_mode == 0) continue;
+		err_checkf(ecp_mode == 0 || ecp_mode == sub.config.ecp_mode,
+			"The models of this folder were trained with different ECPs", std::cout);
+		ecp_mode = sub.config.ecp_mode;
+		wavy.set_atom_ECP_electrons(a, sub.wavy.get_atom_ECP_electrons(atom_in_model[a]));
+	}
+	if (ecp_mode > 0) wavy.set_has_ECPs(true, false, ecp_mode);
 
 	natoms = wavy.get_ncen();
 	if (wavy.get_nmo() != 0) wavy.clear_MOs();

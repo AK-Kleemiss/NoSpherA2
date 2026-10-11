@@ -470,6 +470,27 @@ void SALTED_BINARY_FILE::populate_config(SALTEDConfig& config) {
 
 	read_config_string("dfbasis");
 	config.dfbasis = std::string(string_out.begin(), string_out.end());
+
+	config.ecp_mode = 0;
+	if (has_block("ECP")) {
+		file.seekg(table_of_contents["ECP"], std::ios::beg);
+		skip_exact(file, 4, "block datatype for ECP");
+		read_exact(file, config.ecp_mode, "ECP mode");
+		err_checkf(config.ecp_mode >= 0 && config.ecp_mode <= 3,
+			"Invalid ECP mode " + std::to_string(config.ecp_mode) + " in " + filepath.string(), std::cout);
+	}
+}
+
+void write_salted_ecp(const std::filesystem::path& in, const std::filesystem::path& out, const int mode)
+{
+	err_checkf(mode >= 1 && mode <= 3, "-salted_ecp takes the mode as -ECP does: 1 def2, 2 xTB, 3 pTB", std::cout);
+	SALTED_BINARY_FILE file(in);
+	std::string block(2 * sizeof(int32_t), '\0');   // datatype word (INT32), then the mode
+	const int32_t words[2] = { 0, mode };
+	std::memcpy(block.data(), words, sizeof(words));
+	const std::set<std::string> drop = file.has_block("ECP") ? std::set<std::string>{ "ECP" } : std::set<std::string>{};
+	file.write_with_blocks(out, 6, drop, { { "ECP", block } });
+	std::cout << "Wrote " << out.string() << ": predicts valence densities of ECP mode " << mode << std::endl;
 }
 
 

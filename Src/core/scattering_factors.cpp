@@ -2530,18 +2530,17 @@ void calc_SF_CUDA(const int& points,
  * @param mode The mode of operation. 0 = Gaussian tight core function, 1,2,3 = Thakkar core density based on the ECP type used
  * @param debug Flag indicating whether to enable debug mode.
  */
+//column s of sf belongs to stl[s], so a streamed block gets its core as readily as a whole table
 static void add_ECP_contribution(const ivec& asym_atom_list,
 	const WFN& wave,
 	cvec2& sf,
-	const cell& cell,
-	hkl_list& hkl,
+	const vec& stl,
 	std::ostream& file,
 	const int& mode,
 	const bool debug)
 {
 	using namespace std;
 	double k = 1.0;
-	hkl_list_it it = hkl.begin();
 	err_checkf(mode >= 0, "Invalid mode for ECP contribution!", file);
 	if (mode == 0)
 	{ // Using a gaussian tight core function
@@ -2557,11 +2556,10 @@ static void add_ECP_contribution(const ivec& asym_atom_list,
 					<< " and at 1 angstrom: " << exp(-pow(constants::bohr2ang(k), 2) / 16.0 / constants::PI) * wave.get_atom_ECP_electrons(asym_atom_list[i]) << "\n";
 			}
 		}
-#pragma omp parallel for private(it, k)
-		for (int s = 0; s < sf[0].size(); s++)
+#pragma omp parallel for private(k)
+		for (int s = 0; s < (int)stl.size(); s++)
 		{
-			it = next(hkl.begin(), s);
-			k = constants::FOUR_PI * cell.get_stl_of_hkl(*it);
+			k = constants::FOUR_PI * stl[s];
 			for (int i = 0; i < asym_atom_list.size(); i++)
 			{
 				sf[i][s] += wave.get_atom_ECP_electrons(asym_atom_list[i]) * exp(-k / 16.0 / constants::PI);
@@ -2603,12 +2601,11 @@ static void add_ECP_contribution(const ivec& asym_atom_list,
 			}
 		}
 
-#pragma omp parallel for private(it, k)
-		for (int s = 0; s < sf[0].size(); s++)
+#pragma omp parallel for private(k)
+		for (int s = 0; s < (int)stl.size(); s++)
 		{
 			int n_el = 0, charge = 0;
-			it = next(hkl.begin(), s);
-			k = constants::FOUR_PI * constants::bohr2ang(cell.get_stl_of_hkl(*it));
+			k = constants::FOUR_PI * constants::bohr2ang(stl[s]);
 			for (int i = 0; i < asym_atom_list.size(); i++)
 			{
 				n_el = wave.get_atom_ECP_electrons(asym_atom_list[i]);
@@ -2625,6 +2622,22 @@ static void add_ECP_contribution(const ivec& asym_atom_list,
 	{
 		err_not_impl_f("No higher ECP mode than 3 implemented!", file);
 	}
+}
+
+static void add_ECP_contribution(const ivec& asym_atom_list,
+	const WFN& wave,
+	cvec2& sf,
+	const cell& cell,
+	hkl_list& hkl,
+	std::ostream& file,
+	const int& mode,
+	const bool debug)
+{
+	vec stl;
+	stl.reserve(hkl.size());
+	for (const auto& h : hkl)
+		stl.push_back(cell.get_stl_of_hkl(h));
+	add_ECP_contribution(asym_atom_list, wave, sf, stl, file, mode, debug);
 }
 
 /**
@@ -3443,6 +3456,15 @@ tsc_block_type calculate_scattering_factors(
 				[&](const size_t lo, const size_t hi, ProgressBar& progress)
 				{
 					cvec2 chunk = ml->scattering_factors(slice_k_points(k_pt, lo, hi), asym_atom_list, &progress);
+					//the core before Mott-Bethe, which wants all electrons
+					if (calculator.wavy.get_has_ECPs())
+					{
+						vec stl(hi - lo);
+						for (size_t s = lo; s < hi; s++)
+							stl[s - lo] = unit_cell.get_stl_of_hkl(hkl_v[s]);
+						add_ECP_contribution(asym_atom_list, calculator.wavy, chunk, stl, file,
+							calculator.wavy.get_ECP_mode(), false);
+					}
 					//Mott-Bethe never looks outside one reflection, so a block is as valid a unit as a table
 					if (opt.electron_diffraction)
 						convert_to_ED(asym_atom_list, *wavy, chunk, unit_cell,
@@ -3460,7 +3482,8 @@ tsc_block_type calculate_scattering_factors(
 		time_points.push_back(get_time());
 		time_descriptions.push_back("Fourier transform");
 
-		if (calculator.wavy.get_has_ECPs())
+		//streamed blocks got theirs as they were made; the mode is the model's (-salted_ecp) or -ECP's
+		if (calculator.wavy.get_has_ECPs() && !stream_tsc)
 		{
 			add_ECP_contribution(
 				asym_atom_list,
@@ -3469,7 +3492,7 @@ tsc_block_type calculate_scattering_factors(
 				unit_cell,
 				hkl,
 				file,
-				opt.ECP_mode,
+				calculator.wavy.get_ECP_mode(),
 				opt.debug);
 		}
 	}
@@ -3560,6 +3583,13 @@ tsc_block_type calculate_scattering_factors(
 					[&](const size_t lo, const size_t hi, ProgressBar& progress)
 					{
 						cvec2 chunk = ml.scattering_factors(slice_k_points(k_pt, lo, hi), asym_atom_list, &progress);
+						if (wavy->get_has_ECPs())
+						{
+							vec stl(hi - lo);
+							for (size_t s = lo; s < hi; s++)
+								stl[s - lo] = unit_cell.get_stl_of_hkl(hkl_v[s]);
+							add_ECP_contribution(asym_atom_list, *wavy, chunk, stl, file, opt.ECP_mode, false);
+						}
 						if (opt.electron_diffraction)
 							convert_to_ED(asym_atom_list, *wavy, chunk, unit_cell,
 								std::vector<i3>(hkl_v.begin() + lo, hkl_v.begin() + hi));
@@ -3575,7 +3605,8 @@ tsc_block_type calculate_scattering_factors(
 		else {
 			std::cout << "Unknown Partition type, stopping here!" << std::endl;
 		}
-		if (wavy->get_has_ECPs())
+		//a streamed RI table is empty here, its blocks got the core as they were made; Hirshfeld fills sf even when streaming
+		if (wavy->get_has_ECPs() && !sf.empty())
 		{
 			add_ECP_contribution(
 				asym_atom_list,
@@ -3589,8 +3620,9 @@ tsc_block_type calculate_scattering_factors(
 		}
 	}
 
-	//not when streaming: sf is empty there and each block was converted as it was produced
-	if (opt.electron_diffraction && !opt.iam_switch && !stream_tsc)
+	//not when streamed: sf is empty there and each block was converted as it was produced (calc_SF fills sf whole
+	//even under stream_tsc, so a Hirshfeld table still needs it)
+	if (opt.electron_diffraction && !opt.iam_switch && !sf.empty())
 	{
 		convert_to_ED(asym_atom_list,
 			*wavy,
@@ -3764,10 +3796,13 @@ bool stream_mtc_salted(options& opt, std::vector<WFN>& wavy, std::ostream& file,
 					continue;
 				}
 				cvec2 chunk = preps[p].mol->scattering_factors(slice_k_points(preps[p].k_pt, lo, hi), preps[p].asym_atom_list, &progress);
+				const vec stl(preps[p].stl_of_reflection.begin() + lo, preps[p].stl_of_reflection.begin() + hi);
+				//the core before Mott-Bethe, as in the single-table stream
+				if (preds[p]->wavy.get_has_ECPs())
+					add_ECP_contribution(preps[p].asym_atom_list, preds[p]->wavy, chunk, stl, file,
+						preds[p]->wavy.get_ECP_mode(), false);
 				if (opt.electron_diffraction)
-					convert_to_ED(preps[p].asym_atom_list, preds[p]->wavy, chunk,
-						vec(preps[p].stl_of_reflection.begin() + lo,
-							preps[p].stl_of_reflection.begin() + hi));
+					convert_to_ED(preps[p].asym_atom_list, preds[p]->wavy, chunk, stl);
 				for (auto& row : chunk)
 					combined.push_back(std::move(row));
 				// this part's spherical remainder, where the id list put it

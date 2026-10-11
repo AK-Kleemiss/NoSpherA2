@@ -460,6 +460,8 @@ public:
 	void set_has_ECPs(const bool& in, const bool& apply_to_aotms = true, const int& ECP_mode = 1);
 	/** Manually assign ECP core electron counts for given atomic numbers. */
 	void set_ECPs(ivec& nr, ivec& elcount);
+	/** Core electron count of one atom. */
+	void set_atom_ECP_electrons(const int& nr, const int& n) { atoms[nr].set_ECP_electrons(n); };
 	/** Query whether ECPs are active. */
 	const bool& get_has_ECPs() const { return has_ECPs; };
 	/** Copy assignment (deep copy except shared basis definition pointer). */

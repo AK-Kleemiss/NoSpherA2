@@ -638,7 +638,11 @@ std::string help_message =
  "                                    features folded together: smaller and\n"
  "                                    faster to predict, same prediction to\n"
  "                                    rounding. Older builds refuse the file.\n"
- "  -SALTED_COEFS <model-dir>          Write SALTED_COEFS.npy (requires -wfn).\n"
+ "  -salted_ecp <in.salted> <out.salted> <mode>\n"
+ "                                    Mark a model trained on ECP densities\n"
+ "                                    (mode as -ECP: 1 def2, 2 xTB, 3 pTB);\n"
+ "                                    its atoms get the core back at prediction.\n"
+ "  -SALTED_COEFS <model-dir>         Write SALTED_COEFS.npy (requires -wfn).\n"
  "  -RI_CUBE <coefficients.npy>        Write an RI density cube; use -wfn and\n"
  "                                    -ri_fit first.\n"
  "  -write_ri_coefs                    Write RI_COEFS.npy; use -wfn, -ri_fit\n"
@@ -3228,6 +3232,12 @@ bool options::digest_partition_options(const std::string &temp, int &i)
 	{
 		err_checkf(i + 2 < argc, "-salted_fold needs the model and the file to write", std::cout);
 		fold_salted_file(arguments[i + 1], arguments[i + 2]);
+		finished = true; return true;
+	}
+	else if (temp == "-salted_ecp")
+	{
+		err_checkf(i + 3 < argc, "-salted_ecp needs the model, the file to write and the ECP mode", std::cout);
+		write_salted_ecp(arguments[i + 1], arguments[i + 2], stoi(arguments[i + 3]));
 		finished = true; return true;
 	}
 	else if (temp == "-mtc")

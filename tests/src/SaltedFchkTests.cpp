@@ -615,11 +615,38 @@ TEST(SaltedFchkIoTests, BlockReplacedCopy)
 	std::filesystem::remove(r);
 }
 
+// -salted_ecp: the ECP block reads back as the mode, a flagged copy is VERSION 6 and still reads, an unflagged
+// model is all-electron (0), and re-flagging replaces the block instead of adding a second one
+TEST(SaltedFchkIoTests, EcpBlockRoundTrip)
+{
+	const auto p = tmp_path("ecp_in.salted"), q = tmp_path("ecp_out.salted"), r = tmp_path("ecp_again.salted");
+	write_synthetic_model(p, 3, true, true);
+	write_salted_ecp(p, q, 1);
+	write_salted_ecp(q, r, 3);
+	SALTEDConfig c{}, cq{}, cr{};
+	{
+		SALTED_BINARY_FILE f(p), g(q), h(r);
+		f.populate_config(c);
+		g.populate_config(cq);
+		h.populate_config(cr);
+		EXPECT_EQ(g.read_weights(), weights);
+		EXPECT_EQ(g.read_basis_set()->get_owned_primitive_count(), 5u);
+	}
+	EXPECT_EQ(c.ecp_mode, 0);
+	EXPECT_EQ(cq.ecp_mode, 1);
+	EXPECT_EQ(cr.ecp_mode, 3);
+	EXPECT_EQ(std::filesystem::file_size(r), std::filesystem::file_size(q));
+	EXPECT_EXIT(write_salted_ecp(p, q, 4), ::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), ".*");
+	std::filesystem::remove(p);
+	std::filesystem::remove(q);
+	std::filesystem::remove(r);
+}
+
 // a file from the future warns but still reads through its table of contents
 TEST(SaltedFchkIoTests, NewerVersionStillReads)
 {
 	const auto p = tmp_path("future.salted");
-	write_synthetic_model(p, 6, false, true);
+	write_synthetic_model(p, 7, false, true);
 	{
 		SALTED_BINARY_FILE f(p);
 		EXPECT_EQ(f.read_weights().size(), 4u);
