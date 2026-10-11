@@ -346,13 +346,9 @@ TEST(ScatteringCoverageCifTests, ReadAtomsRejectsRowByLabelAndType)
 		EXPECT_TRUE(labels.empty()) << debug;
 		EXPECT_TRUE(asym.empty()) << debug;
 		EXPECT_EQ(types, (ivec{ 6 })) << debug;
+		EXPECT_NE(log.str().find("CIF row Q1 has type N but the wavefunction atom at its position is C, skipping!"), std::string::npos) << debug;
 		if (debug)
-		{
-			EXPECT_NE(log.str().find("Element symbol not found in label, this is a problem!\n checking type... ALSO FAILED! WILL IGNORE ATOM!"), std::string::npos);
 			EXPECT_NE(log.str().find("I did not find this atom! Tolerances were: "), std::string::npos);
-		}
-		else
-			EXPECT_NE(log.str().find("Atom q1 was not matching by element determined by label reduction or type field, skipping!"), std::string::npos);
 	}
 	//without permission for an empty asymmetric unit the same CIF ends the run
 	{
@@ -381,7 +377,7 @@ TEST(ScatteringCoverageCifTests, ReadAtomsHydrogenLabelRules)
 	const std::vector<probe> probes{
 		{ "Q1 H 0.25 0.35 0.45\n", true, " will check type..." },
 		{ "T1 H 0.25 0.35 0.45\n", true, "" },
-		{ "Q1 C 0.25 0.35 0.45\n", false, " will check type... ALSO FAILED! WILL IGNORE ATOM!" } };
+		{ "Q1 C 0.25 0.35 0.45\n", false, "CIF row Q1 has type C but the wavefunction atom at its position is H, skipping!" } };
 	const double f = constants::ang2bohr(kA);
 	for (const probe& p : probes)
 	{

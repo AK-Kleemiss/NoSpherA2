@@ -1052,6 +1052,7 @@ svec read_atoms_from_CIF(std::ifstream& cif_input,
 					continue;
 				}
 				vec tolerances(3);
+				int wrong_element = -1; //free wfn atom at the row's position, of another element
 				for (int i = 0; i < wave.get_ncen(); i++)
 				{
 					for (int j = 0; j < 3; j++)
@@ -1074,8 +1075,13 @@ svec read_atoms_from_CIF(std::ifstream& cif_input,
 						apart in different PARTs did the same (2238091).
 						ponytail: first free atom in wfn order, right while Olex2 writes the xyz in
 						row order; pick the nearest free atom if that ever stops holding. */
-						if (!labels[i].empty() || (row_Z > 0 && wave.get_atom_charge(i) != row_Z))
+						if (!labels[i].empty())
 							continue;
+						if (row_Z > 0 && wave.get_atom_charge(i) != row_Z)
+						{
+							wrong_element = i;
+							continue;
+						}
 						wave.set_atom_frac_coords(i, { stod(fields[position_field[0]]), stod(fields[position_field[1]]), stod(fields[position_field[2]]) });
 						wave.set_atom_group_nr(i, group_nr);
 						// Store exactly the identifier used above for the MTC duplicate check.
@@ -1171,6 +1177,9 @@ svec read_atoms_from_CIF(std::ifstream& cif_input,
 				}
 				else if (!old_atom)
 				{
+					if (wrong_element != -1)
+						file << "\nCIF row " << fields[label_field] << " has type " << fields[type_field] << " but the wavefunction atom at its position is "
+							<< constants::atnr2letter(wave.get_atom_charge(wrong_element)) << ", skipping!\n";
 					if (debug)
 					{
 						file << "I did not find this atom! Tolerances were: ";
