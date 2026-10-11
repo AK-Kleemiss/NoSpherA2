@@ -44,7 +44,7 @@ skipped by default - pass --include-tests to keep them.
 
 Resulting zip structure:
     basis_sets/...
-    etc/geometry_aid_model.npz
+    etc/geometry_aid_model.npz  etc/geometry_aid_full.npz  etc/typing_gnn.npz
     occ/share/basis/...  occ/share/methods/...  occ/share/solvent/...  occ/share/sgdata.json
     <platform build files>   (NoSpherA2_Tests[.exe] excluded by default)
     ptb[.exe]                (mode 0755 in the unix zips)
