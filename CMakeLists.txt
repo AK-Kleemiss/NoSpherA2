@@ -545,6 +545,10 @@ set(USE_SYSTEM_LIBCINT ON)
 set(BUILD_FPIC ON)
 set(WITH_PYTHON_BINDINGS OFF)
 set(BUILD_SHARED_LIBS OFF)
+# lld cannot read GCC's LTO objects
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    set(WITH_LLD OFF)
+endif()
 
 add_subdirectory(
     occ
