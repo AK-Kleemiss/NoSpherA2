@@ -364,12 +364,15 @@ good = "nh3li_eli.good"
 [ELI_NH3Li.args]
 eli_analysis = "../RGBI_groups/nh3li.gbw"
 
+# The ELI-D tables come from the orbitals even with -ri_fit, so they are ELI_NH3Li's byte for
+# byte; -no_spin_eli keeps the spin-resolved half of them from being computed a second time.
 [ELI_NH3Li_RI]
 directory = "RGBI"
 good = "nh3li_eli_ri.good"
 
 [ELI_NH3Li_RI.args]
 ri_fit = "def2-universal-jkfit"
+no_spin_eli = ""
 eli_analysis = ["../RGBI_groups/nh3li.gbw", 0.1, 3.0]
 
 [ELI_HgH2_ECP]
