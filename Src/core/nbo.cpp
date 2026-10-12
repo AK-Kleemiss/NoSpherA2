@@ -1069,6 +1069,36 @@ void print_nrt(const NboResults& r, std::ostream& out)
 		const auto it = element.find(a);
 		return (it == element.end() ? std::string("?") : it->second) + std::to_string(a);
 	};
+	//the parent the search starts from: dense in column blocks up to 40 atoms, one row per atom beyond
+	for (const NboTopo& t : n.parent_topo) {
+		const int na = static_cast<int>(t.matrix.size());
+		out << title("Parent Lewis structure", t.spin);
+		if (na <= 40) {
+			out << "  valence lone pairs on the diagonal, bond orders off it\n";
+			for (int c0 = 0; c0 < na; c0 += 12) {
+				out << "\n        ";
+				for (int b = c0; b < std::min(na, c0 + 12); b++) out << setw(6) << label(b + 1);
+				out << "\n";
+				for (int a = 0; a < na; a++) {
+					out << "  " << left << setw(6) << label(a + 1) << right;
+					for (int b = c0; b < std::min(na, c0 + 12); b++)
+						out << setw(6) << (t.matrix[a][b] ? std::to_string(t.matrix[a][b]) : ".");
+					out << "\n";
+				}
+			}
+		}
+		else {
+			out << "  atom   lone pairs   partner:bond order\n";
+			for (int a = 0; a < na; a++) {
+				out << "  " << left << setw(7) << label(a + 1) << right << setw(10) << t.matrix[a][a] << "  ";
+				for (int b = 0; b < na; b++)
+					if (b != a && t.matrix[a][b]) out << " " << label(b + 1) << ":" << t.matrix[a][b];
+				out << "\n";
+			}
+		}
+	}
+	if (!n.parent_topo.empty())
+		out << "\nParent Lewis structure as NRT input (JSON):\n" << parent_lewis_json(r) << "\n";
 
 	out << "\nNatural resonance theory (in house):\n"
 		<< "  " << n.structures_used << " of " << n.structures_found

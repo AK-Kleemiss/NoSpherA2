@@ -312,7 +312,7 @@ which reports **22 PASS, exit 0**. NRT weights are compared by rank and never by
 reproduces TiCl4's `D(w)`, valencies and bond orders exactly while individual weights move 7.1
 points. `cmake --build --preset release-windows --target NoSpherA2_Tests` links again since
 `tests/src/CellMathTests.cpp` (which calls `cell` members that no longer exist) was excluded, and the
-binary reports **1111 passed, 0 failed, 8 skipped** from `build/release-windows/bin` - the relative
+binary reports **1265 passed, 0 failed, 9 skipped** (1274 tests, 2026-10-12) from `build/release-windows/bin` - the relative
 fixture paths in the tests are what makes that the working directory. See `UNIT_TESTS_STATUS.md`.
 
 As of 2026-09-08, `ctest --preset release-linux` reports **267/267 passing** outside the XCW

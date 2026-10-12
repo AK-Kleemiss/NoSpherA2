@@ -707,6 +707,7 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 		for (int b = 0; b < na; b++)
 			if (b != a) parent.at(a, b) = lewis.topo[a][b];
 	}
+	nrt.parent_topo.push_back(NboTopo{ spin, parent.matrix() });
 	const int n_pairs = parent.pairs();
 
 	Limits L;

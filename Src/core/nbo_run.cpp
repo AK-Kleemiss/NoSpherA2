@@ -573,6 +573,47 @@ namespace {
 	}
 }
 
+std::string parent_lewis_json(const NboResults& r, const std::string& indent) {
+	const std::vector<NboTopo>& parents = r.nrt.parent_topo;
+	if (parents.empty()) return "";
+	std::map<int, std::string> element;
+	for (const NboAtomPopulation& p : r.npa) element[p.index] = p.element;
+	for (const NboValency& v : r.nrt.valencies) element[v.atom] = v.element;
+	const auto label = [&element](const int a) {
+		const auto it = element.find(a + 1);
+		return jstr((it == element.end() ? std::string("?") : it->second) + std::to_string(a + 1));
+	};
+	//eight entries to a line keeps a 108-atom parent readable and still pastes as one JSON value
+	const auto body = [&label](const NboTopo& t, const std::string& in) {
+		std::ostringstream o;
+		const int na = static_cast<int>(t.matrix.size());
+		int k = 0;
+		const auto sep = [&k, &in] { return k++ == 0 ? std::string(" ") : (k % 8 == 1 ? ",\n" + in + "  " : ", "); };
+		o << in << "\"lone_pairs\": {";
+		for (int a = 0; a < na; a++)
+			if (t.matrix[a][a] > 0) o << sep() << label(a) << ": " << t.matrix[a][a];
+		o << (k ? " }" : "}") << ",\n" << in << "\"bonds\": [";
+		k = 0;
+		for (int a = 0; a < na; a++)
+			for (int b = a + 1; b < na; b++)
+				if (t.matrix[a][b] > 0) o << sep() << "[" << label(a) << ", " << label(b) << ", " << t.matrix[a][b] << "]";
+		o << (k ? " ]" : "]");
+		return o.str();
+	};
+	std::ostringstream o;
+	o << "{\n" << indent << "  \"format\": \"NoSpherA2 Lewis structure\",\n" << indent << "  \"version\": 1,\n"
+		<< indent << "  \"wavefunction\": " << jstr(std::filesystem::path(r.source).filename().string()) << ",\n"
+		<< indent << "  \"atoms\": " << parents[0].matrix.size() << ",\n";
+	if (parents.size() == 1 && parents[0].spin.empty())
+		o << body(parents[0], indent + "  ") << "\n";
+	else
+		for (size_t s = 0; s < parents.size(); s++)
+			o << indent << "  " << jstr(parents[s].spin) << ": {\n" << body(parents[s], indent + "    ") << "\n"
+				<< indent << "  }" << (s + 1 < parents.size() ? "," : "") << "\n";
+	o << indent << "}";
+	return o.str();
+}
+
 void write_nbo_json(const NboResults& r, const std::filesystem::path& json_file) {
 	std::ofstream f(json_file);
 	err_checkf(f.good(), "Could not write " + json_file.string(), std::cout);
@@ -742,7 +783,10 @@ void write_nbo_json(const NboResults& r, const std::filesystem::path& json_file)
 	write_strings(r.nrt.notes);
 	f << "],\n    \"symmetry_forms\": [";
 	write_strings(r.nrt.symmetry_forms);
-	f << "]\n  }\n}\n";
+	f << "]\n  }";
+	const std::string parent = r.nrt.present ? parent_lewis_json(r, "  ") : "";
+	if (!parent.empty()) f << ",\n  \"parent_lewis\": " << parent;
+	f << "\n}\n";
 }
 
 namespace {

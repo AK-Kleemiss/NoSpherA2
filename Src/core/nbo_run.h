@@ -159,6 +159,8 @@ struct NboNrt {
 	std::vector<NboValency> valencies;
 	std::vector<NboNrtCycle> cycles;
 	std::vector<NboTopo> leading_topo;
+	//Native NRT only: the Lewis structure the search starts from, valence lone pairs on the diagonal, one per spin.
+	std::vector<NboTopo> parent_topo;
 	//NRTDTL only.
 	std::vector<NboNrtCandidate> candidates;
 	std::vector<NboQpIteration> qp_iterations;
@@ -210,6 +212,10 @@ NboResults parse_nbo_output(const std::filesystem::path& nbo_file);
 
 /** Write the results as JSON, the format the reference dataset is stored in. */
 void write_nbo_json(const NboResults& results, const std::filesystem::path& json_file);
+
+/** The NRT parent as a "NoSpherA2 Lewis structure" JSON object, the format a parent can be read back from.
+	Lines after the first start with indent; an open shell gets "alpha"/"beta" sub-objects. Empty without a parent. */
+std::string parent_lewis_json(const NboResults& results, const std::string& indent = "");
 
 struct NboTolerances {
 	double charge = 2.0e-3;
