@@ -57,6 +57,7 @@ struct NboOptions {
 	double nrt_bond_scale = 1.75;
 	int nrt_max_candidates = 4000;
 	bool nrt_max_set = false;          //-nrt_max given: obey the number, skip the size guard
+	double nrt_target = -1.0;          //-nrt_target: grow from weighted structures until D(w) <= it; < 0 = one search
 	double nrt_weight_floor = 5.0e-5;  //weights below this are dropped from the reported set
 	bool nrt = false;
 	bool nrt_exhaustive = false;       //enumerate every feasible topology instead of arrows
@@ -88,7 +89,8 @@ dMatrix2 nao_operator(const dMatrix2& F, const dMatrix2& C);
 /**
  * Atom pairs a two-centre orbital may be searched over: |R_AB| <= scale * (r_cov,A + r_cov,B).
  * Without it two-centre blocks between non-neighbours outbid genuine lone pairs (TiCl4).
- * NRT uses it for the bonds a candidate may place.
+ * NRT uses it for the bonds a candidate may place.  A pair with a third atom on the line between them
+ * (angle above 150 degrees) is never bondable.
  */
 bvec2 bondable_pairs(const std::vector<atom>& atoms, double scale = 1.3);
 
@@ -114,8 +116,8 @@ std::vector<NboE2Entry> nbo_e2(NboLewis& lewis, const dMatrix2& fock_nao, double
 /**
  * Natural resonance theory on one spin's NAO basis, appended to nrt.  e2's donor/acceptor indices must
  * still be 1-based into lewis.orbitals, i.e. passed before analyse_spin renumbers them.
- * D(w) is the plain Frobenius norm of Gamma - sum_a w_a Gamma_a, not NBO's normalised D: compare
- * weights by rank, bond orders, valencies and the retained-structure count.
+ * D(w) is the plain Frobenius norm of Gamma - sum_a w_a Gamma_a; for a closed shell NBO 7's D is it over
+ * 2 sqrt(n_NAO), printed and written alongside (d_0_nbo, d_w_nbo).  Open shells have no NBO-unit value.
  */
 void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 				const std::vector<NboE2Entry>& e2, const bvec2& bondable,

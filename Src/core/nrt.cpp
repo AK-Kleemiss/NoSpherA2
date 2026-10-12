@@ -7,6 +7,9 @@
 #include <functional>
 #include <limits>
 #include <map>
+#include <optional>
+#include <set>
+#include <sstream>
 
 using Eigen::MatrixXd;
 using Eigen::VectorXd;
@@ -627,10 +630,20 @@ namespace
 		return std::numeric_limits<double>::infinity();
 	}
 
-	//FISTA on the simplex with adaptive restart, step 1/L, L = 2 lambda_max(G)
+	//Frank-Wolfe gap grad.w - min_i grad_i, grad = 2 (G w - g): an upper bound on f(w) - min f over the
+	//simplex, zero exactly at the optimum.  Gw = G w.
+	double fw_gap(const VectorXd& Gw, const VectorXd& g, const VectorXd& w)
+	{
+		const VectorXd grad = 2.0 * (Gw - g);
+		return std::max(0.0, grad.dot(w) - grad.minCoeff());
+	}
+
+	//FISTA on the simplex with adaptive restart, step 1/L, L = 2 lambda_max(G).  status: a progress line
+	//every 500 iterations.  gap_out: the Frank-Wolfe gap of the returned weights.
 	double solve_qp(const MatrixXd& G, const VectorXd& g, const double trg2, VectorXd& w,
 					const int maxit, const vec* rho, const std::string& spin,
-					std::vector<NboQpIteration>* trace)
+					std::vector<NboQpIteration>* trace, std::ostream* status = nullptr,
+					double* gap_out = nullptr, int* it_out = nullptr, const double nbo_norm = 0.0)
 	{
 		const int n = static_cast<int>(G.rows());
 		if (!n) return trg2;
@@ -652,7 +665,8 @@ namespace
 		VectorXd Gy(n), Gwn(n), Gwp(n);
 		gather_mv(G, y, Gy);
 		Gwp = Gy;                                     //wp == y == w on entry
-		for (int it = 1; it <= maxit; it++) {
+		int it = 1;
+		for (; it <= maxit; it++) {
 			VectorXd wn = y - (2.0 / L) * (Gy - g);
 			project_simplex(wn);
 			gather_mv(G, wn, Gwn);
@@ -681,12 +695,21 @@ namespace
 				trace->push_back(q);
 			}
 			if (df < 1e-14 * std::max(1.0, std::abs(f)) && step < 1e-12) break;
+			if (it % 50 == 0 && fw_gap(Gwn, g, wn) <= 1e-10 * std::max(1e-6, f)) break;
 			if (it % 500 == 0) {
+				if (status)
+					*status << "NRT" << (spin.empty() ? "" : " " + spin) << ": iteration " << it << ", D(w) "
+							<< std::sqrt(std::max(0.0, f))
+							<< (nbo_norm > 0.0 ? " (NBO " + std::to_string(std::sqrt(std::max(0.0, f)) / nbo_norm) + ")" : "")
+							<< ", " << (wn.array() > 1e-6).count()
+							<< " weighted, gap " << fw_gap(Gwn, g, wn) << std::endl;
 				if (f_window - f < 1e-11 * std::max(1.0, std::abs(f))) break;
 				f_window = f;
 			}
 		}
 		w = wp;
+		if (gap_out) gap_out[0] = fw_gap(Gwp, g, wp);
+		if (it_out) it_out[0] = std::min(it, maxit);
 		return f;
 	}
 }
@@ -705,6 +728,12 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 
 	const int na = static_cast<int>(nao.atoms.size());
 	const int nn = static_cast<int>(nao.orbitals.size());
+	//NBO 7 prints D / (2 sqrt(n_NAO)) for a closed shell (Ni(CO)4 to 0.02 %, formate 0.3 %).  No open-shell
+	//factor reproduces CH3's alpha and beta lines at once, so none is claimed there.
+	const double nbo_norm = scale == 2.0 ? 2.0 * std::sqrt(static_cast<double>(nn)) : 0.0;
+	const auto nbo_d = [&](const double d) {
+		return nbo_norm > 0.0 ? " (NBO " + std::to_string(d / nbo_norm) + ")" : std::string();
+	};
 	ivec Z(na, 0);
 	for (int a = 0; a < na; a++) Z[a] = nao.atoms[a].Z;
 
@@ -742,6 +771,8 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 
 	//Budget from octet slots and a Gram-matrix work guard (k^2 n_NAO per pair); -nrt_max overrides both
 	int budget = options.nrt_max_candidates;
+	//-nrt_target growth stops at this many candidates: the Gram matrix is nc^2
+	size_t pool_cap = static_cast<size_t>(options.nrt_max_candidates);
 	if (!options.nrt_max_set) {
 		int slots = 0, active = 0;
 		for (int a = 0; a < na; a++) {
@@ -757,6 +788,7 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 		const int afford = static_cast<int>(std::sqrt(1.0e14 / std::max(k * k * nn, 1.0)));
 		const int chem = std::max(64, NRT_PER_SLOT * slots);
 		const int want = std::min(chem, std::max(64, afford));
+		pool_cap = std::min(pool_cap, static_cast<size_t>(std::max(64, afford)));
 		if (want < budget) {
 			budget = want;
 			//The budget changes the answer, so it is reported
@@ -774,66 +806,89 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 	}
 
 	std::vector<Candidate> cands;
-	std::map<ivec, int> seen;
+	std::set<ivec> seen;
+	std::set<ivec> walked{ parent.key() };  //roots the arrow walk has started from
 	{
 		Candidate p;
 		p.topo = parent;
 		cands.push_back(p);
-		seen[parent.key()] = 0;
+		seen.insert(parent.key());
 	}
-	const auto t_search0 = clock();
-	if (options.nrt_exhaustive) {
-		std::vector<Candidate> all;
-		enumerate(parent, L, n_pairs, static_cast<size_t>(budget), all);
-		for (Candidate& c : all)
-			if (seen.emplace(c.topo.key(), static_cast<int>(cands.size())).second)
-				cands.push_back(std::move(c));
-		nrt.notes.push_back("exhaustive enumeration yields " + std::to_string(cands.size()) +
-							 " feasible topologies");
-	}
-	else {
+	//Arrow walk from roots, at most `want` structures past depth one.  A resonance arrow couples two
+	//pair moves, so depth-one states are intermediates: walked through, counted, not returned
+	size_t intermediates = 0;
+	const auto grow = [&](std::vector<Candidate> level, const size_t want, const bool report) {
 		//Rank intermediates by summed E2 price before applying the budget.
 		const auto richer = [](const Candidate& a, const Candidate& b) { return a.score > b.score; };
 		const auto shortlist = [&richer](std::vector<Candidate>& v, const size_t keep) {
 			std::stable_sort(v.begin(), v.end(), richer);
 			if (v.size() > keep) v.resize(keep);
 		};
-		size_t level_begin = 0, paid = 0;
+		std::vector<Candidate> found;
+		size_t paid = 0;
 		for (int depth = 1; depth <= options.nrt_max_arrows; depth++) {
-			const size_t level_end = cands.size();
-			const size_t level_cap = (depth == 1) ? 4 * static_cast<size_t>(budget)
-												  : static_cast<size_t>(budget) - paid;
+			const size_t level_cap = (depth == 1) ? 4 * want : want - paid;
 			std::vector<Candidate> made;
-			for (size_t i = level_begin; i < level_end; i++) {
-				expand(cands[i], L, made);
+			for (const Candidate& c : level) {
+				expand(c, L, made);
 				//O(n^2) children per parent: prune before the level grows an order of magnitude past its cap
 				if (made.size() > 8 * level_cap + 1024) shortlist(made, level_cap);
 			}
 			shortlist(made, level_cap);
-			size_t added = 0;
-			for (Candidate& c : made) {
-				if (seen.emplace(c.topo.key(), static_cast<int>(cands.size())).second) {
-					if (c.depth > 1) paid++;
-					cands.push_back(std::move(c));
-					added++;
+			std::vector<Candidate> next;
+			for (Candidate& c : made)
+				if (seen.insert(c.topo.key()).second) {
+					if (c.depth > 1) { paid++; found.push_back(c); }
+					else intermediates++;
+					next.push_back(std::move(c));
 				}
-			}
-			nrt.arrows.push_back("ARROWS depth " + std::to_string(depth) + " generates " +
-								 std::to_string(added) + " new structures from " +
-								 std::to_string(level_end - level_begin));
-			level_begin = level_end;
-			if (!added || paid >= static_cast<size_t>(budget)) break;
+			if (report)
+				nrt.arrows.push_back("ARROWS depth " + std::to_string(depth) + " generates " +
+									 std::to_string(next.size()) + " new structures from " +
+									 std::to_string(level.size()));
+			level = std::move(next);
+			if (level.empty() || paid >= want) break;
 		}
-		//A resonance arrow couples two pair moves; depth-one states are intermediates.
-		const size_t before = cands.size();
-		cands.erase(std::remove_if(cands.begin() + 1, cands.end(),
-								   [](const Candidate& c) { return c.depth == 1; }),
-					cands.end());
-		nrt.notes.push_back("half-arrow intermediates dropped: " +
-							 std::to_string(before - cands.size()) + " of " +
-							 std::to_string(before));
+		return found;
+	};
+	const auto t_search0 = clock();
+	if (options.nrt_exhaustive) {
+		std::vector<Candidate> all;
+		enumerate(parent, L, n_pairs, static_cast<size_t>(budget), all);
+		for (Candidate& c : all)
+			if (seen.insert(c.topo.key()).second)
+				cands.push_back(std::move(c));
+		nrt.notes.push_back("exhaustive enumeration yields " + std::to_string(cands.size()) +
+							 " feasible topologies");
 	}
-	const double search_seconds = secs(t_search0, clock());
+	else {
+		for (Candidate& c : grow({ cands[0] }, static_cast<size_t>(budget), true))
+			cands.push_back(std::move(c));
+		nrt.notes.push_back("half-arrow intermediates dropped: " + std::to_string(intermediates) +
+							 " of " + std::to_string(cands.size() + intermediates));
+		//NBO's symmetry references: the structures the parent's own invariant matches are walked as well, so
+		//a parent that breaks the molecule's symmetry (Ni(CO)4's one Ni-C bond) does not tilt the arrow walk
+		//toward its own ligand
+		if (options.nrt_symmetry) {
+			const std::string pform = canonical_form(parent, Z);
+			std::vector<Candidate> refs;
+			for (size_t i = 1; i < cands.size(); i++)
+				if (canonical_form(cands[i].topo, Z) == pform) {
+					Candidate r;
+					r.topo = cands[i].topo;
+					refs.push_back(std::move(r));
+				}
+			if (!refs.empty() && cands.size() < pool_cap) {
+				const size_t before = cands.size(), n_refs = refs.size();
+				for (const Candidate& r : refs) walked.insert(r.topo.key());
+				const size_t room = std::min(n_refs * static_cast<size_t>(budget), pool_cap - cands.size());
+				for (Candidate& c : grow(std::move(refs), room, false)) cands.push_back(std::move(c));
+				nrt.notes.push_back(std::to_string(n_refs) + " symmetry reference(s) of the parent walked, " +
+									 std::to_string(cands.size() - before) + " new structures");
+			}
+		}
+	}
+	double search_seconds = secs(t_search0, clock());
 
 	const auto t_gram0 = clock();
 	const MatrixXd gamma = to_eigen(lewis.gamma);
@@ -871,147 +926,231 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 #else
 	const int nthreads = 1;
 #endif
-	const int nc0 = static_cast<int>(cands.size());
-#pragma omp parallel for schedule(dynamic) num_threads(nthreads)
-	for (int i = 0; i < nc0; i++) {
-		build_orbitals(cands[i], gamma, B, 200);
-		if (!cands[i].feasible) continue;
-		const MatrixXd GV = gamma * cands[i].V;
-		double tr = 0.0;
-		for (int c = 0; c < cands[i].V.cols(); c++) tr += cands[i].V.col(c).dot(GV.col(c));
-		cands[i].g = scale * tr;
-		cands[i].rho_nl = electrons - tr;
-	}
-
-	if (options.debug) {
-		int capped = 0, feas = 0;
-		long total = 0;
-		double worst = 0.0;
-		for (const Candidate& c : cands) {
-			if (!c.feasible) continue;
-			feas++;
-			total += c.sweeps;
-			if (!c.converged) { capped++; worst = std::max(worst, c.change); }
-		}
-		log << "NRT" << (spin.empty() ? "" : " " + spin) << ": orbital sweeps " << total << " over "
-			<< feas << " candidates, " << capped << " stopped at the cap (worst change " << worst
-			<< ", parent " << cands[0].change << " after " << cands[0].sweeps << "); last change by decade:";
-		ivec dec(13, 0);
-		for (const Candidate& c : cands)
-			if (c.feasible)
-				dec[std::min(12, std::max(0, static_cast<int>(-std::floor(std::log10(std::max(c.change, 1e-300))))))]++;
-		for (int d = 0; d < 13; d++)
-			if (dec[d]) log << " 1e-" << d << ":" << dec[d];
-		log << "\n";
-	}
-	//parent stays at index 0
-	std::vector<Candidate> keep;
-	for (Candidate& c : cands)
-		if (c.feasible) keep.push_back(std::move(c));
-	err_checkf(!keep.empty() && keep[0].topo.key() == parent.key(),
-			   "NRT: the parent Lewis structure is not representable in its own NAO basis", log);
-	cands = std::move(keep);
-	const int nc = static_cast<int>(cands.size());
-
-	MatrixXd G(nc, nc);
-	VectorXd g(nc);
-	vec rho(nc, 0.0);
-	for (int i = 0; i < nc; i++) { g(i) = cands[i].g; rho[i] = cands[i].rho_nl; }
-	const double orbital_seconds = secs(t_gram0, clock());
-	const auto t_pairs0 = clock();
-
-	//G_ij = s^2 ||V_i^T V_j||_F^2 = s^2 <P_i, P_j>: pair loop or projector product, whichever is cheaper
-	int kmax = 0;
-	for (const Candidate& c : cands) kmax = std::max(kmax, static_cast<int>(c.V.cols()));
-	const double dnc = static_cast<double>(nc), dnn = static_cast<double>(nn);
-	const double cost_pairs = 0.5 * dnc * dnc * static_cast<double>(kmax) * kmax * dnn;
-	const double cost_proj = 0.25 * dnc * dnc * dnn * dnn + 0.5 * dnc * dnn * dnn * kmax;
-	const bool projector = cost_proj < cost_pairs;
-	if (projector) {
-		//One (R, C) NAO block per pass, sized so Z (nc columns of wr*wc rows) stays near 128 MB
-		int nbs = static_cast<int>(std::sqrt(134217728.0 / (8.0 * std::max(1, nc))));
-		nbs = std::max(16, std::min(nbs, nn));
-		const int nblk = (nn + nbs - 1) / nbs;
-		std::vector<std::pair<int, int>> blocks;
-		for (int R = 0; R < nblk; R++)
-			for (int C = R; C < nblk; C++) blocks.push_back({ R, C });
-		vec Zbuf(static_cast<size_t>(nbs) * nbs * nc);
-		MatrixXd Goff = MatrixXd::Zero(nc, nc);      //blocks with R < C, counted twice below
-		G.setZero();                                 //blocks with R == C, counted once
-		//Upper-triangle candidate tiles; diagonal tiles also fill their lower half to stay a plain GEMM,
-		//since Eigen does not parallelise the triangular kernel
-		const int tile = 128;
-		std::vector<std::pair<int, int>> tiles;
-		for (int I = 0; I < nc; I += tile)
-			for (int J = I; J < nc; J += tile) tiles.push_back({ I, J });
-		const int ntiles = static_cast<int>(tiles.size());
-		for (const std::pair<int, int>& blk : blocks) {
-			const int r0 = blk.first * nbs, c0 = blk.second * nbs;
-			const int wr = std::min(nbs, nn - r0), wc = std::min(nbs, nn - c0);
-			const size_t rows = static_cast<size_t>(wr) * wc;
-#pragma omp parallel for schedule(static) num_threads(nthreads)
-			for (int a = 0; a < nc; a++) {
-				Eigen::Map<MatrixXd> Y(Zbuf.data() + static_cast<size_t>(a) * rows, wr, wc);
-				Y.noalias() = cands[a].V.middleRows(r0, wr) *
-							  cands[a].V.middleRows(c0, wc).transpose();
-			}
-			const Eigen::Map<const MatrixXd> Z(Zbuf.data(), static_cast<Eigen::Index>(rows), nc);
-			MatrixXd& acc = (blk.first == blk.second) ? G : Goff;
-#pragma omp parallel for schedule(dynamic) num_threads(nthreads)
-			for (int t = 0; t < ntiles; t++) {
-				const int I = tiles[t].first, J = tiles[t].second;
-				const int wi = std::min(tile, nc - I), wj = std::min(tile, nc - J);
-				acc.block(I, J, wi, wj).noalias() +=
-					Z.middleCols(I, wi).transpose() * Z.middleCols(J, wj);
-			}
-		}
-		const double s2 = scale * scale;
-		for (int i = 0; i < nc; i++)
-			for (int j = i; j < nc; j++) {
-				G(i, j) = s2 * (G(i, j) + 2.0 * Goff(i, j));
-				G(j, i) = G(i, j);
-			}
-
-		//Probe the tiled product against the direct formula
-		const int probes = 96;
-		//nc * nc passes INT_MAX from about 46000 candidates
-		const size_t ncc = static_cast<size_t>(nc) * nc;
-		const size_t stride = std::max<size_t>(1, ncc / probes);
-		double worst = 0.0, scale_ref = 1e-300;
-		int bad_i = -1, bad_j = -1;
-		for (size_t p = 0; p < ncc; p += stride) {
-			const int i = static_cast<int>(p / nc), j = static_cast<int>(p % nc);
-			if (j < i) continue;
-			const double direct = s2 * (cands[i].V.transpose() * cands[j].V).squaredNorm();
-			const double d = std::abs(direct - G(i, j));
-			scale_ref = std::max(scale_ref, std::abs(direct));
-			if (d > worst) { worst = d; bad_i = i; bad_j = j; }
-		}
-		err_checkf(worst <= 1e-8 * scale_ref,
-				   "NRT: the projector route disagrees with the pair product at G(" +
-					   std::to_string(bad_i) + "," + std::to_string(bad_j) + ") by " +
-					   std::to_string(worst),
-				   log);
-	}
-	else {
-#pragma omp parallel for schedule(dynamic) num_threads(nthreads)
-		for (int i = 0; i < nc; i++)
-			for (int j = i; j < nc; j++) {
-				const double v = scale * scale *
-								 (cands[i].V.transpose() * cands[j].V).squaredNorm();
-				G(i, j) = v;
-				G(j, i) = v;
-			}
-	}
-	const double pair_seconds = secs(t_pairs0, clock());
 	const double trg2 = gamma.squaredNorm();
-	const double gram_seconds = secs(t_gram0, clock());
+	double orbital_seconds = 0.0, pair_seconds = 0.0, gram_seconds = 0.0, minimize_seconds = 0.0;
+	bool projector = false;
+	int nc = 0;
+	MatrixXd G;
+	VectorXd g, w;
+	vec rho;
+	double f = 0.0, f0 = 0.0, fista_gap = 0.0;
+	int fista_its = 0;
+	//-nrt_target: walk arrows from every structure the fit weights and refit, until D(w) reaches the
+	//target or no unwalked structure carries weight (NBO 7's multi-reference search)
+	const size_t trace_mark = nrt.qp_iterations.size();
+	size_t built = 0;
+	auto t_cycle0 = t_gram0;
+	for (int cycle = 1;; cycle++) {
+		const int nc0 = static_cast<int>(cands.size());
+		//progress output only where a step takes long enough to watch; -no_date silences it
+		const bool show = !constants::hide_timings && nc0 >= 500;
+		std::optional<ProgressBar> pb;
+		if (show)
+			pb.emplace(static_cast<unsigned long long>(nc0 - static_cast<int>(built)), 50, "=", " ",
+					   "NRT: orbitals of " + std::to_string(nc0 - static_cast<int>(built)) + " structures", log);
+#pragma omp parallel for schedule(dynamic) num_threads(nthreads)
+		for (int i = static_cast<int>(built); i < nc0; i++) {
+			if (pb) pb->update();
+			build_orbitals(cands[i], gamma, B, 200);
+			if (!cands[i].feasible) continue;
+			const MatrixXd GV = gamma * cands[i].V;
+			double tr = 0.0;
+			for (int c = 0; c < cands[i].V.cols(); c++) tr += cands[i].V.col(c).dot(GV.col(c));
+			cands[i].g = scale * tr;
+			cands[i].rho_nl = electrons - tr;
+		}
+		pb.reset();
 
-	const auto t_min0 = clock();
-	VectorXd w = VectorXd::Zero(nc);
-	w(0) = 1.0;
-	const double f0 = objective(G, g, trg2, w);
-	double f = solve_qp(G, g, trg2, w, 5000, &rho, spin, &nrt.qp_iterations);
+		if (options.debug) {
+			int capped = 0, feas = 0;
+			long total = 0;
+			double worst = 0.0;
+			for (const Candidate& c : cands) {
+				if (!c.feasible) continue;
+				feas++;
+				total += c.sweeps;
+				if (!c.converged) { capped++; worst = std::max(worst, c.change); }
+			}
+			log << "NRT" << (spin.empty() ? "" : " " + spin) << ": orbital sweeps " << total << " over "
+				<< feas << " candidates, " << capped << " stopped at the cap (worst change " << worst
+				<< ", parent " << cands[0].change << " after " << cands[0].sweeps << "); last change by decade:";
+			ivec dec(13, 0);
+			for (const Candidate& c : cands)
+				if (c.feasible)
+					dec[std::min(12, std::max(0, static_cast<int>(-std::floor(std::log10(std::max(c.change, 1e-300))))))]++;
+			for (int d = 0; d < 13; d++)
+				if (dec[d]) log << " 1e-" << d << ":" << dec[d];
+			log << "\n";
+		}
+		//parent stays at index 0, earlier cycles keep their indices
+		size_t kept = built;
+		for (size_t i = built; i < cands.size(); i++)
+			if (cands[i].feasible) {
+				if (i != kept) cands[kept] = std::move(cands[i]);
+				kept++;
+			}
+		cands.resize(kept);
+		err_checkf(!cands.empty() && cands[0].topo.key() == parent.key(),
+				   "NRT: the parent Lewis structure is not representable in its own NAO basis", log);
+		nc = static_cast<int>(cands.size());
+
+		G.resize(nc, nc);
+		g.resize(nc);
+		rho.assign(nc, 0.0);
+		for (int i = 0; i < nc; i++) { g(i) = cands[i].g; rho[i] = cands[i].rho_nl; }
+		orbital_seconds += secs(t_cycle0, clock());
+		const auto t_pairs0 = clock();
+
+		//G_ij = s^2 ||V_i^T V_j||_F^2 = s^2 <P_i, P_j>: pair loop or projector product, whichever is cheaper
+		int kmax = 0;
+		for (const Candidate& c : cands) kmax = std::max(kmax, static_cast<int>(c.V.cols()));
+		const double dnc = static_cast<double>(nc), dnn = static_cast<double>(nn);
+		const double cost_pairs = 0.5 * dnc * dnc * static_cast<double>(kmax) * kmax * dnn;
+		const double cost_proj = 0.25 * dnc * dnc * dnn * dnn + 0.5 * dnc * dnn * dnn * kmax;
+		projector = cost_proj < cost_pairs;
+		if (projector) {
+			//One (R, C) NAO block per pass, sized so Z (nc columns of wr*wc rows) stays near 128 MB
+			int nbs = static_cast<int>(std::sqrt(134217728.0 / (8.0 * std::max(1, nc))));
+			nbs = std::max(16, std::min(nbs, nn));
+			const int nblk = (nn + nbs - 1) / nbs;
+			std::vector<std::pair<int, int>> blocks;
+			for (int R = 0; R < nblk; R++)
+				for (int C = R; C < nblk; C++) blocks.push_back({ R, C });
+			vec Zbuf(static_cast<size_t>(nbs) * nbs * nc);
+			MatrixXd Goff = MatrixXd::Zero(nc, nc);      //blocks with R < C, counted twice below
+			G.setZero();                                 //blocks with R == C, counted once
+			//Upper-triangle candidate tiles; diagonal tiles also fill their lower half to stay a plain GEMM,
+			//since Eigen does not parallelise the triangular kernel
+			const int tile = 128;
+			std::vector<std::pair<int, int>> tiles;
+			for (int I = 0; I < nc; I += tile)
+				for (int J = I; J < nc; J += tile) tiles.push_back({ I, J });
+			const int ntiles = static_cast<int>(tiles.size());
+			if (show)
+				pb.emplace(static_cast<unsigned long long>(blocks.size()), 50, "=", " ",
+						   "NRT: overlaps of " + std::to_string(nc) + " structures", log);
+			for (const std::pair<int, int>& blk : blocks) {
+				if (pb) pb->update();
+				const int r0 = blk.first * nbs, c0 = blk.second * nbs;
+				const int wr = std::min(nbs, nn - r0), wc = std::min(nbs, nn - c0);
+				const size_t rows = static_cast<size_t>(wr) * wc;
+#pragma omp parallel for schedule(static) num_threads(nthreads)
+				for (int a = 0; a < nc; a++) {
+					Eigen::Map<MatrixXd> Y(Zbuf.data() + static_cast<size_t>(a) * rows, wr, wc);
+					Y.noalias() = cands[a].V.middleRows(r0, wr) *
+								  cands[a].V.middleRows(c0, wc).transpose();
+				}
+				const Eigen::Map<const MatrixXd> Z(Zbuf.data(), static_cast<Eigen::Index>(rows), nc);
+				MatrixXd& acc = (blk.first == blk.second) ? G : Goff;
+#pragma omp parallel for schedule(dynamic) num_threads(nthreads)
+				for (int t = 0; t < ntiles; t++) {
+					const int I = tiles[t].first, J = tiles[t].second;
+					const int wi = std::min(tile, nc - I), wj = std::min(tile, nc - J);
+					acc.block(I, J, wi, wj).noalias() +=
+						Z.middleCols(I, wi).transpose() * Z.middleCols(J, wj);
+				}
+			}
+			pb.reset();
+			const double s2 = scale * scale;
+			for (int i = 0; i < nc; i++)
+				for (int j = i; j < nc; j++) {
+					G(i, j) = s2 * (G(i, j) + 2.0 * Goff(i, j));
+					G(j, i) = G(i, j);
+				}
+
+			//Probe the tiled product against the direct formula
+			const int probes = 96;
+			//nc * nc passes INT_MAX from about 46000 candidates
+			const size_t ncc = static_cast<size_t>(nc) * nc;
+			const size_t stride = std::max<size_t>(1, ncc / probes);
+			double worst = 0.0, scale_ref = 1e-300;
+			int bad_i = -1, bad_j = -1;
+			for (size_t p = 0; p < ncc; p += stride) {
+				const int i = static_cast<int>(p / nc), j = static_cast<int>(p % nc);
+				if (j < i) continue;
+				const double direct = s2 * (cands[i].V.transpose() * cands[j].V).squaredNorm();
+				const double d = std::abs(direct - G(i, j));
+				scale_ref = std::max(scale_ref, std::abs(direct));
+				if (d > worst) { worst = d; bad_i = i; bad_j = j; }
+			}
+			err_checkf(worst <= 1e-8 * scale_ref,
+					   "NRT: the projector route disagrees with the pair product at G(" +
+						   std::to_string(bad_i) + "," + std::to_string(bad_j) + ") by " +
+						   std::to_string(worst),
+					   log);
+		}
+		else {
+			if (show)
+				pb.emplace(static_cast<unsigned long long>(nc), 50, "=", " ",
+						   "NRT: overlaps of " + std::to_string(nc) + " structures", log);
+#pragma omp parallel for schedule(dynamic) num_threads(nthreads)
+			for (int i = 0; i < nc; i++) {
+				if (pb) pb->update();
+				for (int j = i; j < nc; j++) {
+					const double v = scale * scale *
+									 (cands[i].V.transpose() * cands[j].V).squaredNorm();
+					G(i, j) = v;
+					G(j, i) = v;
+				}
+			}
+			pb.reset();
+		}
+		pair_seconds += secs(t_pairs0, clock());
+		gram_seconds += secs(t_cycle0, clock());
+
+		const auto t_min0 = clock();
+		//warm start: the previous cycle's weights, zero on the new structures
+		const VectorXd w_prev = w;
+		w = VectorXd::Zero(nc);
+		if (built == 0) {
+			w(0) = 1.0;
+			f0 = objective(G, g, trg2, w);
+		}
+		else w.head(w_prev.size()) = w_prev;
+		built = static_cast<size_t>(nc);
+		nrt.qp_iterations.resize(trace_mark);  //the trace describes the final fit
+		f = solve_qp(G, g, trg2, w, 5000, &rho, spin, &nrt.qp_iterations, show ? &log : nullptr,
+					 &fista_gap, &fista_its, nbo_norm);
+		minimize_seconds += secs(t_min0, clock());
+
+		const double dw = std::sqrt(std::max(0.0, f));
+		if (options.nrt_exhaustive || options.nrt_target < 0.0 || dw <= options.nrt_target) {
+			if (cycle > 1)
+				nrt.notes.push_back("D(w) target " + std::to_string(options.nrt_target) + " reached after " +
+									 std::to_string(cycle) + " cycles, " + std::to_string(nc) + " structures");
+			break;
+		}
+		t_cycle0 = clock();
+		std::vector<Candidate> roots;
+		for (int i = 0; i < nc; i++)
+			if (w(i) > options.nrt_weight_floor && walked.insert(cands[i].topo.key()).second) {
+				Candidate r;
+				r.topo = cands[i].topo;
+				roots.push_back(std::move(r));
+			}
+		const size_t n_roots = roots.size();
+		std::string stop;
+		if (roots.empty()) stop = "no unwalked structure carries weight";
+		else if (cands.size() >= pool_cap)
+			stop = "the candidate pool is full at " + std::to_string(pool_cap) + " (-nrt_max raises it)";
+		else {
+			const size_t room = std::min(static_cast<size_t>(budget), pool_cap - cands.size());
+			const size_t before = cands.size();
+			for (Candidate& c : grow(std::move(roots), room, false)) cands.push_back(std::move(c));
+			if (cands.size() == before) stop = "the weighted structures generate no new structure";
+		}
+		nrt.notes.push_back("cycle " + std::to_string(cycle) + ": D(w) = " + std::to_string(dw) + nbo_d(dw) + " over " +
+							 std::to_string(nc) + " structures, " + std::to_string(n_roots) +
+							 " weighted structure(s) walked, " + std::to_string(cands.size() - static_cast<size_t>(nc)) + " new");
+		if (!constants::hide_timings) log << "NRT" << (spin.empty() ? "" : " " + spin) << ": " << nrt.notes.back() << std::endl;
+		search_seconds += secs(t_cycle0, clock());
+		if (!stop.empty()) {
+			nrt.notes.push_back("D(w) target " + std::to_string(options.nrt_target) + " not reached: " + stop);
+			break;
+		}
+		t_cycle0 = clock();
+	}
+	const auto t_min1 = clock();
 	{
 		NboNrtCycle cy;
 		cy.cycle = 1;
@@ -1054,6 +1193,53 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 		cy.structures_used = static_cast<int>((w.array() > options.nrt_weight_floor).count());
 		cy.d_w = std::sqrt(std::max(0.0, f));
 		nrt.cycles.push_back(cy);
+	}
+	//Active-set finish: FISTA stops on a stall or its cap, not on optimality.  Add the unweighted structures
+	//whose gradient says they lower D(w), re-solve exactly on the grown support, until the Frank-Wolfe gap
+	//over all nc structures certifies the optimum.
+	{
+		const double tol = 1e-10 * std::max(1e-6, f);
+		double gap = fw_gap(G * w, g, w);
+		const double gap0 = gap;
+		int added = 0, pass = 0;
+		for (; pass < 100 && gap > tol; pass++) {
+			const VectorXd grad = 2.0 * (G * w - g);
+			const double level = grad.dot(w);
+			std::vector<std::pair<double, int>> viol;
+			for (int i = 0; i < nc; i++)
+				if (w(i) <= 0.0 && grad(i) < level) viol.push_back({ grad(i), i });
+			if (viol.empty()) break;
+			std::sort(viol.begin(), viol.end());
+			ivec sup;
+			for (int i = 0; i < nc; i++)
+				if (w(i) > 0.0) sup.push_back(i);
+			const int nadd = static_cast<int>(std::min<size_t>(10, viol.size()));
+			for (int k = 0; k < nadd; k++) sup.push_back(viol[k].second);
+			const int ns = static_cast<int>(sup.size());
+			MatrixXd Gs(ns, ns);
+			VectorXd gs(ns), ws(ns);
+			for (int i = 0; i < ns; i++) {
+				gs(i) = g(sup[i]);
+				ws(i) = w(sup[i]);
+				for (int j = 0; j < ns; j++) Gs(i, j) = G(sup[i], sup[j]);
+			}
+			VectorXd wq = ws;
+			double fs = solve_qp_support(Gs, gs, trg2, wq);
+			if (fs < f) ws = wq;
+			else fs = solve_qp(Gs, gs, trg2, ws, 200000, nullptr, spin, nullptr);   //singular: iterate
+			if (!(fs < f)) break;
+			w.setZero();
+			for (int i = 0; i < ns; i++) w(sup[i]) = ws(i);
+			f = fs;
+			added += nadd;
+			gap = fw_gap(G * w, g, w);
+		}
+		std::ostringstream os;
+		os << "minimiser: FISTA " << fista_its << " iterations, Frank-Wolfe gap " << fista_gap
+		   << "; active-set finish " << pass << " pass(es), " << added << " structure(s) added, gap "
+		   << gap0 << " -> " << gap << (gap > tol ? " (not certified)" : "");
+		nrt.notes.push_back(os.str());
+		if (!constants::hide_timings) log << "NRT" << (spin.empty() ? "" : " " + spin) << ": " << os.str() << std::endl;
 	}
 
 	int orbits = 0, in_orbits = 0;
@@ -1116,7 +1302,7 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 			? (std::to_string(orbits) + " graph-invariant orbit(s) covering " +
 			   std::to_string(in_orbits) + " structure(s), weights averaged inside each")
 			: "symmetry screen off";
-	const double minimize_seconds = secs(t_min0, clock());
+	minimize_seconds += secs(t_min1, clock());
 
 	const auto t_other0 = clock();
 	vec2 bo(na, vec(na, 0.0));        //bond orders, diagonal = lone pairs
@@ -1210,6 +1396,7 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 	nrt.structures_found += nc;
 	nrt.d_w = std::sqrt(std::max(0.0, f));
 	nrt.d_0 = std::sqrt(std::max(0.0, f0));
+	nrt.d_nbo_norm = nbo_norm;
 	nrt.deloc_threshold_kcal = options.nrt_e2_kcal;
 	nrt.max_search_cycles = static_cast<int>(nrt.cycles.size());
 	nrt.initial_topo = nc;

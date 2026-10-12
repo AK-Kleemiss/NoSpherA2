@@ -610,6 +610,12 @@ std::string help_message =
  "                                    parent does not - ozone's ring structure at\n"
  "                                    23.6 % spans 2.24 A against 1.32 A.\n"
  "  -nrt_max <n>                       Candidate limit, default 4000 capped by a size guard on big molecules.\n"
+ "  -nrt_target <D(w)>                 Keep searching until the fit error D(w)\n"
+ "                                    reaches this value: arrows are walked again\n"
+ "                                    from every structure the fit weights, then\n"
+ "                                    refitted. Stops early when no new structure\n"
+ "                                    takes weight or the -nrt_max pool is full;\n"
+ "                                    0 = until then. Implies -nrt.\n"
  "  -nrt_atoms <a,b,...>               Subspace NRT: only these 1-based atoms may\n"
  "                                    change, the rest keep the parent structure's\n"
  "                                    bonding. NBO's 'NRT <atoms>'.\n"
@@ -2727,7 +2733,8 @@ const std::set<std::string> &nbo_family_suboptions()
 		"-nbo", "-nbo_parse", "-nbo_native", "-nbo_keywords", "-nbo_exe", "-nbo_json",
 		"-nbo_dir", "-nbo_47", "-nbo_e2min", "-nbo_threads", "-nbo_keep47", "-nrt",
 		"-nrt_e2", "-nrt_arrows", "-nrt_bond_scale", "-nrt_max", "-nrt_atoms",
-		"-nrt_exhaustive", "-nrt_no_symmetry", "-nrt_no_components", "-nrt_no_ion", "-nrt_parent"};
+		"-nrt_exhaustive", "-nrt_no_symmetry", "-nrt_no_components", "-nrt_no_ion", "-nrt_parent",
+		"-nrt_target"};
 	return known;
 }
 
@@ -2849,6 +2856,10 @@ bool options::digest_io_options(const std::string &temp, int &i)
 						   "-nrt_parent: Lewis structure file doesn't exist: " + opt.nrt_parent.string(), std::cout);
 			}
 			else if (arguments[j] == "-nrt_arrows") opt.nrt_max_arrows = std::stoi(arguments[j + 1]);
+			else if (arguments[j] == "-nrt_target") {
+				opt.nrt_target = std::stod(arguments[j + 1]);
+				opt.nrt = true;
+			}
 			else if (arguments[j] == "-nrt_bond_scale")
 				opt.nrt_bond_scale = std::stod(arguments[j + 1]);
 			else if (arguments[j] == "-nrt_max") {

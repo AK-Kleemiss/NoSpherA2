@@ -498,6 +498,20 @@ TEST(NrtTests, ASmallCandidateBudgetKeepsTheExpensiveArrowsAndMoreThanTheParent)
     for (const std::string& a : full.arrows)
         EXPECT_EQ(a.rfind("ARROWS", 0), 0u) << a;
     EXPECT_FALSE(tight.notes.empty());
+
+    //-nrt_target 0: walk again from every weighted structure until none is left; never a worse fit, and the
+    //notes say why it stopped.
+    opt.nrt_max_candidates = 10000;
+    opt.nrt_target = 0.0;
+    NboNrt grown;
+    native_nrt(grown, nao, lewis, e2, chain_bondable(4), opt, "", 2.0, log);
+    ASSERT_TRUE(grown.present);
+    EXPECT_GE(grown.structures_found, full.structures_found);
+    EXPECT_LE(grown.d_w, full.d_w + 1e-6);
+    bool stop_note = false;
+    for (const std::string& n : grown.notes)
+        stop_note = stop_note || n.find("D(w) target") != std::string::npos;
+    EXPECT_TRUE(stop_note);
 }
 
 TEST(NrtTests, EveryResonanceRowTheResultCarriesIsAlsoPrinted)

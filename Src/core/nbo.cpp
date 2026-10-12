@@ -340,7 +340,23 @@ bvec2 bondable_pairs(const std::vector<atom>& atoms, const double scale)
 			const double ra = za > 0 && za < 114 ? constants::covalent_radii[za] : 1.5;
 			const double rb = zb > 0 && zb < 114 ? constants::covalent_radii[zb] : 1.5;
 			const double cut = constants::ang2bohr(scale * (ra + rb));
-			out[a][b] = out[b][a] = d2 <= cut * cut;
+			bool ok = d2 <= cut * cut;
+			//No bond through an atom lying on the line between them (A-X-B above 150 degrees): the loose NRT
+			//scale otherwise admits Ni(CO)4's Ni-O across the linear Ni-C-O
+			for (size_t x = 0; x < na && ok; x++) {
+				if (x == a || x == b) continue;
+				double ax[3], bx[3];
+				for (unsigned int k = 0; k < 3; k++) {
+					ax[k] = atoms[a].get_coordinate(k) - atoms[x].get_coordinate(k);
+					bx[k] = atoms[b].get_coordinate(k) - atoms[x].get_coordinate(k);
+				}
+				const double la = ax[0] * ax[0] + ax[1] * ax[1] + ax[2] * ax[2];
+				const double lb = bx[0] * bx[0] + bx[1] * bx[1] + bx[2] * bx[2];
+				if (la >= d2 || lb >= d2) continue;
+				const double c = (ax[0] * bx[0] + ax[1] * bx[1] + ax[2] * bx[2]) / std::sqrt(la * lb);
+				ok = c > -0.8660254037844386;  //cos 150
+			}
+			out[a][b] = out[b][a] = ok;
 		}
 	return out;
 }
@@ -1300,7 +1316,10 @@ void print_nrt(const NboResults& r, std::ostream& out)
 	out << "\nNatural resonance theory (in house):\n"
 		<< "  " << n.structures_used << " of " << n.structures_found
 		<< " resonance structures carry the fit, D(0) = " << fixed << setprecision(5) << n.d_0
-		<< ", D(w) = " << n.d_w << "\n";
+		<< ", D(w) = " << n.d_w;
+	if (n.d_nbo_norm > 0.0)
+		out << "; in NBO's units (/ 2 sqrt(n_NAO)) D(0) = " << n.d_0 / n.d_nbo_norm << ", D(w) = " << n.d_w / n.d_nbo_norm;
+	out << "\n";
 	//an open shell runs the search once per spin, and both runs push the same budget line
 	svec seen;
 	for (const std::string& s : n.notes)

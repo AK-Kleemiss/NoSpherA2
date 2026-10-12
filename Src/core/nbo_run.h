@@ -143,6 +143,8 @@ struct NboNrt {
 	int structures_found = 0;
 	double d_w = 0.0;
 	double d_0 = 0.0;
+	//native only: d / d_nbo_norm is NBO 7's D, 2 sqrt(n_NAO) for a closed shell; 0 = not known (open shell)
+	double d_nbo_norm = 0.0;
 	double search_seconds = 0.0;
 	double gram_seconds = 0.0;
 	double minimize_seconds = 0.0;

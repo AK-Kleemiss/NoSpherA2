@@ -701,8 +701,10 @@ void write_nbo_json(const NboResults& r, const std::filesystem::path& json_file)
 
 	f << "  \"nrt\": {\"present\": " << (r.nrt.present ? "true" : "false")
 		<< ", \"structures_used\": " << r.nrt.structures_used << ", \"structures_found\": " << r.nrt.structures_found
-		<< ", \"d_0\": " << jnum(r.nrt.d_0) << ", \"d_w\": " << jnum(r.nrt.d_w)
-		<< ", \"max_search_cycles\": " << r.nrt.max_search_cycles
+		<< ", \"d_0\": " << jnum(r.nrt.d_0) << ", \"d_w\": " << jnum(r.nrt.d_w);
+	if (r.nrt.d_nbo_norm > 0.0)
+		f << ", \"d_0_nbo\": " << jnum(r.nrt.d_0 / r.nrt.d_nbo_norm) << ", \"d_w_nbo\": " << jnum(r.nrt.d_w / r.nrt.d_nbo_norm);
+	f << ", \"max_search_cycles\": " << r.nrt.max_search_cycles
 		<< ", \"symmetry\": " << jstr(r.nrt.symmetry)
 		<< ", \"initial_structures\": {\"total\": " << r.nrt.initial_topo << ", \"nls\": " << r.nrt.initial_nls
 		<< ", \"nbi\": " << r.nrt.initial_nbi << ", \"sym\": " << r.nrt.initial_sym << "}"
