@@ -30,11 +30,14 @@ private:
 	bool bbasis_set_loaded = false;
 	//An atom's coefficients mean something only with the basis they were trained on; kept for stitching models
 	std::shared_ptr<BasisSet> model_basis{};
-	// Several models (on the command line, or a folder's lead + element models): each element goes to the first model trained on it, and the
-	// per-atom blocks are stitched back together. Empty for a single model.
+	// Several models (on the command line, or a folder's lead + element models): each element goes to the first model trained on it,
+	// an atom bonded to an element model's element to that model (first shell), and the per-atom blocks are stitched back together.
+	// Empty for a single model.
 	std::vector<std::unique_ptr<SALTEDPredictor>> sub_models{};
 	// Per atom of the merged structure: which sub model predicts it, and its index there
 	ivec atom_model{}, atom_in_model{};
+	// A first-shell atom bonded to the elements of several models: the further (model, index) its mean takes in
+	std::vector<std::vector<std::pair<int, int>>> atom_also{};
 	void build_merged(const WFN& wavy_in, options& opt_in, const pathvec& models);
 	vec merge_predictions();
 	// Estimate what the spherically filled atoms should carry, so the size of the

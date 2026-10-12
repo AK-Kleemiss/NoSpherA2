@@ -265,6 +265,13 @@ Key core modules live in `Src/core`:
 
 ## Current Validation Notes
 
+As of 2026-10-12, `ctest --preset release-linux` on `density_source` `0e6a0d3` reports
+**1246 passed, 0 failed, 22 skipped** (2 disabled) of 1270 on a GPU-less 4-core VM with GCC 13.3.
+The skips are 12 GPU tests, 7 `RUN_FULL_TEST` cases, two NBO tests that need gennbo and the Ce RGBI
+case behind `NOS_RGBI_SLOW_TESTS`. `0e6a0d3` keeps OCC from linking with lld under GCC, whose LTO
+objects lld cannot read; without it a GCC build fails wherever lld is installed. See
+`UNIT_TESTS_STATUS.md`.
+
 As of 2026-09-24, the in-house NBO analysis (`-nbo_native`, `Src/core/nbo.cpp` and
 `Src/core/nrt.cpp`) is checked in two places: `NrtTests`, `Nbo47Tests` and
 `NaoTests.OverlapCarriesTheDensitysPhaseConvention` as gtests, and
