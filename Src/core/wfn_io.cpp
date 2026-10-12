@@ -1311,6 +1311,9 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
 		double geo_vals[6]{ 0, 0, 0, 0, 0, 0 }; // x,y,z, ch, exp_fin_nuc, mass
 		// Use int64_t to safely hold soi-sized reads (soi may be 4 or 8 bytes)
 		int64_t geo_ints[5]{ 0, 0, 0, 0, 0 };
+		//file atom -> WFN atom, -1 for an embedding atom ("Na> 1.0 x y z NewECP ..." in the input: a capped ECP or
+		//point charge, written as Z 119 with its charge in ch and no basis). Not part of the molecule, so dropped here.
+		ivec idx(at, -1);
 		for (int a = 0; a < at; a++)
 		{
 			for (int i = 0; i < 6; i++)
@@ -1322,6 +1325,9 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
 				geo_ints[i] = 0;
 				rd(&geo_ints[i], soi, "geo_int");
 			}
+			if (geo_ints[0] == 119)
+				continue;
+			idx[a] = ncen;
 			string temp = constants::atnr2letter(static_cast<int>(geo_ints[0]));
 			err_checkf(temp != "PROBLEM", "Problem identifying atoms!", std::cout);
 			err_checkf(push_back_atom(temp,
@@ -1331,6 +1337,10 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
 				static_cast<int>(geo_ints[0])),
 				"Error pushing back atom", file);
 		}
+		err_checkf(ncen > 0, "gbw file without a single basis-carrying atom", file);
+		if (ncen < at)
+			file << "\nThe gbw file holds " << at - ncen << " embedding atoms (capped ECPs or point charges) next to the "
+				<< ncen << " atoms of the molecule: reading the molecule only.\n";
 		if (debug)
 			file << "I read the geometry of " << at << " atoms successfully" << endl;
 
@@ -1352,8 +1362,14 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
 		{
 			int atom_based = 0, nr_shells = 0;
 			rd(&atom_based, constants::soi, "atom_based");
-			err_checkf(atom_based >= 0 && atom_based < ncen, "Basis set for atom " + to_string(atom_based + 1) + " of " + to_string(ncen), file);
+			err_checkf(atom_based >= 0 && atom_based < at, "Basis set for atom " + to_string(atom_based + 1) + " of " + to_string(at), file);
 			rd(&nr_shells, constants::soi, "nr_shells");
+			if (idx[atom_based] < 0)
+			{
+				err_checkf(nr_shells == 0, "Embedding atom " + to_string(atom_based + 1) + " carries basis functions", file);
+				continue;
+			}
+			atom_based = idx[atom_based];
 			check_count(nr_shells, "shell count");
 			int shell = 0;
 			for (int p = 0; p < nr_shells; p++)
@@ -1603,10 +1619,8 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
 			err_checkf(ECP_start != 0, "Could not read ECP information location from GBW file!", file);
 		if (ECP_start != 0)
 		{
-			has_ECPs = true;
-			if (ECP_m == 0)
-				ECP_m = 1; //the def2 core densities, as the electron-count fallback chose
 			vector<ECP_primitive> ECP_prims;
+			bool molecule_ecp = false; //only embedding atoms carry an ECP: the molecule is all-electron
 			check_offset(ECP_start, "ECP section");
 			if (debug)
 				file << "I read the pointer of ECP successfully" << endl;
@@ -1617,7 +1631,7 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
 			const int sod = 8;
 			rd(&i1, 8, "ECP count");
 			check_count(i1, "ECP count");
-			err_checkf(i1 <= (int64_t)atoms.size(), "ECP block lists more atoms than the geometry", file);
+			err_checkf(i1 <= at, "ECP block lists more atoms than the geometry", file);
 			if (debug)
 				file << "First line: " << i1 << endl;
 			for (int i = 0; i < i1; i++)
@@ -1645,13 +1659,18 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
 				rd(temp_c, temp_0, "temp_c in ECPs");
 				rd(&nr_core, soi, "nr_core");
 				err_checkf(nr_core >= 0, "Error reading nr_core in ECPs", file);
-				atoms[i].set_ECP_electrons(nr_core);
+				const int wa = idx[i]; //an embedding atom's record is read past, it is not the molecule's ECP
+				if (wa >= 0)
+				{
+					atoms[wa].set_ECP_electrons(nr_core);
+					molecule_ecp = true;
+				}
 				rd(&max_contract, soi, "max_contract");
 				err_checkf(max_contract > 0, "Error reading max_contract in ECPs", file);
 				rd(&max_angular, soi, "max_angular");
 				err_checkf(max_angular > 0, "Error reading max_angular in ECPs", file);
 				rd(&center, soi, "center");
-				err_checkf(center >= 0 && center < (int)atoms.size(), "Error reading center in ECPs", file); //0-based atom index
+				err_checkf(center >= 0 && center < at, "Error reading center in ECPs", file); //0-based file atom index
 				if (debug)
 					file << "I read " << Z << " " << temp_0 << " " << nr_core << " " << max_contract << " " << max_angular << "\n";
 				for (int l = 0; l < max_angular; l++)
@@ -1676,20 +1695,28 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
 						err_checkf(std::isfinite(c), "Unreasonable coefficient in ECPs", file);
 						if (debug)
 							file << fun << " " << c << " " << e << " " << n << "\n";
-						ECP_prims.push_back(ECP_primitive(center, type, e, c, static_cast<int>(n)));
+						if (wa >= 0)
+							ECP_prims.push_back(ECP_primitive(idx[center], type, e, c, static_cast<int>(n)));
 					}
 				}
-				for (int _i = 0; _i < ncen; _i++)
-					if (atoms[_i].get_charge() == Z)
-						atoms[_i].set_ECP_electrons(nr_core);
+				if (wa >= 0)
+					for (int _i = 0; _i < ncen; _i++)
+						if (atoms[_i].get_charge() == Z)
+							atoms[_i].set_ECP_electrons(nr_core);
 			}
 			if (debug)
 			{
 				file << "Ended reading" << endl;
 			}
-			//The newline first: this runs between the caller's "Reading: x" and its " done!"
-			file << "\nThe gbw file's ECP block removes " << get_nr_ECP_electrons()
-				<< " core electrons from the orbitals: treating them as ECP atoms, as -ECP would.\n";
+			if (molecule_ecp)
+			{
+				has_ECPs = true;
+				if (ECP_m == 0)
+					ECP_m = 1; //the def2 core densities, as the electron-count fallback chose
+				//The newline first: this runs between the caller's "Reading: x" and its " done!"
+				file << "\nThe gbw file's ECP block removes " << get_nr_ECP_electrons()
+					<< " core electrons from the orbitals: treating them as ECP atoms, as -ECP would.\n";
+			}
 		}
 	}
 	catch (const exception &e)

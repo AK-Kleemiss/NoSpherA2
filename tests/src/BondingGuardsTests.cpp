@@ -108,3 +108,24 @@ TEST(BondingGuardsTests, AnAllElectronWavefunctionIsNotGivenEcps)
 	EXPECT_FALSE(w.get_has_ECPs());
 	EXPECT_EQ(w.get_nr_ECP_electrons(), 0u);
 }
+
+//An embedded cluster: "Na> 1.0 x y z NewECP "SDD" end" lines are capped ECPs that ORCA writes into the gbw as Z 119
+//atoms without basis functions. The molecule is H2O + Na+ (def2-SVP, all-electron); one embedding atom sits between
+//O and the H atoms in the input, and the SDD record on the embedding Na must not give the real Na a core.
+TEST(BondingGuardsTests, EmbeddingAtomsAreDroppedFromTheGbw)
+{
+	const auto p = nos_test_repo_root() / "tests" / "ECP_SF" / "emb_water.gbw";
+	if (!std::filesystem::exists(p))
+		GTEST_SKIP() << "tests/ECP_SF/emb_water.gbw not found";
+	std::ostringstream log;
+	WFN w(e_origin::NOT_YET_DEFINED);
+	w.read_known_wavefunction_format(p, log, false);
+	ASSERT_EQ(w.get_ncen(), 4);
+	EXPECT_EQ(w.get_atom_charge(0), 8);
+	EXPECT_EQ(w.get_atom_charge(1), 1);
+	EXPECT_EQ(w.get_atom_charge(3), 11);
+	EXPECT_NEAR(constants::bohr2ang(w.get_atom_coordinate(3, 2)), 2.4, 1e-5); //the real Na
+	EXPECT_FALSE(w.get_has_ECPs());
+	EXPECT_EQ(w.get_nr_ECP_electrons(), 0u);
+	EXPECT_NEAR(w.count_nr_electrons(), 20.0, 1e-8);
+}
