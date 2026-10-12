@@ -261,9 +261,11 @@ namespace NoSpherA2UnitTests
 				}
 		vec batch(pts.size());
 		wave.computeESP_batch(pts, pairs, batch.data());
-		double worst = 0;
-		for (size_t i = 0; i < pts.size(); i++)
-			worst = std::max(worst, std::abs(batch[i] - wave.computeESP(pts[i], pairs)));
+		vec dev(pts.size());
+#pragma omp parallel for
+		for (int i = 0; i < (int)pts.size(); i++)
+			dev[i] = std::abs(batch[i] - wave.computeESP(pts[i], pairs));
+		const double worst = *std::max_element(dev.begin(), dev.end());
 		std::cout << pairs.weight.size() << " pairs x " << pts.size() << " points, max |batch - per point| " << worst << std::endl;
 		EXPECT_LT(worst, 1E-10);
 #if defined(NOSPHERA2_USE_GPU)
