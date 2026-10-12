@@ -64,6 +64,10 @@ struct NboOptions {
 	bool nrt_symmetry = true;          //collapse candidates related by an automorphism
 	bool nrt_components = true;        //split into connected components of the delocalisation graph
 	ivec nrt_subspace;                 //1-based atoms the search may alter, empty = all of them
+	//NBO's $CHOOSE: the search places exactly this Lewis structure, valence lone pairs on the diagonal and
+	//bond orders off it; empty = the search picks.  native_nbo fills it from nrt_parent.
+	ivec2 parent_lewis;
+	std::filesystem::path nrt_parent;  //-nrt_parent <file.json>, read by read_lewis_structure
 	int threads = 0;                   //0: OpenMP default
 	int search_threads = 0;            //Lewis search only, 0: threads
 									   //-fba runs it serial: its regions are too fine to share a loaded machine
@@ -94,6 +98,15 @@ bvec2 bondable_pairs(const std::vector<atom>& atoms, double scale = 1.3);
  */
 NboLewis nbo_search(const NAOResult& nao, const dMatrix2& gamma, const bvec2& bondable, int n_pairs,
 					double scale, const NboOptions& options, std::ostream& log = std::cout);
+
+/**
+ * -nrt_parent: read a "NoSpherA2 Lewis structure" JSON, or the "parent_lewis" object of a .native.nbo.json,
+ * into topo (valence lone pairs on the diagonal, bond orders off it).  n_pairs counts the core pairs too;
+ * wavefunction is the file name the structure is checked against.  Returns "" or the one-line reason it is
+ * refused; warnings go to log.
+ */
+std::string read_lewis_structure(const std::filesystem::path& file, const NAOResult& nao, int n_pairs,
+								 const std::string& wavefunction, ivec2& topo, std::ostream& log);
 
 /** Second-order donor-acceptor energies.  Fills the orbital energies, the NBO-basis Fock diagonal, into lewis. */
 std::vector<NboE2Entry> nbo_e2(NboLewis& lewis, const dMatrix2& fock_nao, double threshold_kcal);

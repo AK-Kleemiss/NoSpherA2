@@ -130,6 +130,24 @@ TEST(CliRefusal, MisspelledNrtOptionAfterNboNativeIsFatal)
 				::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), ".*");
 }
 
+//-nrt_parent: a missing file dies at parse time, a structure that does not fit the wavefunction before
+//the search, and -fba, which runs no NRT, refuses the option
+TEST(CliRefusal, NrtParentThatDoesNotFitIsFatal)
+{
+	const auto wfn = fixture("TFVC/ethane.gbw");
+	if (!std::filesystem::exists(wfn))
+		GTEST_SKIP() << wfn.string() << " not found";
+	EXPECT_EXIT(parse({"-nbo_native", wfn.string(), "-nrt_parent", "no_such_structure.json"}),
+				::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), ".*");
+	const auto bad = std::filesystem::temp_directory_path() / "nos_cli_nrt_parent.json";
+	std::ofstream(bad) << "{\"bonds\": [[\"C1\", \"C2\", 1]]}";
+	EXPECT_EXIT(parse({"-nbo_native", wfn.string(), "-nrt_parent", bad.string()}),
+				::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), ".*");
+	EXPECT_EXIT(parse({"-fba", wfn.string(), "-nrt_parent", bad.string()}),
+				::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), ".*");
+	std::filesystem::remove(bad);
+}
+
 //A lone hydrogen's empty spin channel gives a rank-zero candidate (a 0x0 eigensolve); it must be
 //infeasible so the parent-structure check refuses the run
 TEST(CliRefusal, NrtOnAOneElectronWavefunctionRefusesInsteadOfCrashing)

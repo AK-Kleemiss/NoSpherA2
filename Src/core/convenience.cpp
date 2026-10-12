@@ -620,7 +620,22 @@ std::string help_message =
  "                                    of splitting it into connected components of\n"
  "                                    the delocalisation graph.\n"
  "  -nrt_no_ion                        Forbid candidates that move a bond onto a\n"
- "                                    lone pair (NBO's NRTION off).\n\n"
+ "                                    lone pair (NBO's NRTION off).\n"
+ "  -nrt_parent <file.json>            Start NRT from this Lewis structure instead\n"
+ "                                    of the search's own (NBO's $CHOOSE; implies\n"
+ "                                    -nrt): the NBOs and occupancies are those of\n"
+ "                                    the given structure, the resonance search\n"
+ "                                    runs on top. Closed shell only. The file:\n"
+ "                                    {\"format\": \"NoSpherA2 Lewis structure\",\n"
+ "                                     \"version\": 1, \"atoms\": 3,\n"
+ "                                     \"lone_pairs\": {\"O1\": 2},\n"
+ "                                     \"bonds\": [[\"O1\", \"H2\", 1], [\"O1\", 3, 1]]}\n"
+ "                                    Atoms are element + 1-based index or a bare\n"
+ "                                    index; valence lone pairs only, the cores\n"
+ "                                    are added; bond orders 1-3. A\n"
+ "                                    .native.nbo.json is read through its\n"
+ "                                    \"parent_lewis\". The log compares its rho(NL)\n"
+ "                                    with the search's own best structure.\n\n"
  "CONVERSION, ML, AND SPECIALISED TOOLS\n"
  "  -gbw2wfn -wfn <file.gbw>            Convert GBW input to .wfn.\n"
  "  -fchk <output.fchk>              Write FCHK output (requires -b and -d).\n"
@@ -2712,7 +2727,7 @@ const std::set<std::string> &nbo_family_suboptions()
 		"-nbo", "-nbo_parse", "-nbo_native", "-nbo_keywords", "-nbo_exe", "-nbo_json",
 		"-nbo_dir", "-nbo_47", "-nbo_e2min", "-nbo_threads", "-nbo_keep47", "-nrt",
 		"-nrt_e2", "-nrt_arrows", "-nrt_bond_scale", "-nrt_max", "-nrt_atoms",
-		"-nrt_exhaustive", "-nrt_no_symmetry", "-nrt_no_components", "-nrt_no_ion"};
+		"-nrt_exhaustive", "-nrt_no_symmetry", "-nrt_no_components", "-nrt_no_ion", "-nrt_parent"};
 	return known;
 }
 
@@ -2827,6 +2842,12 @@ bool options::digest_io_options(const std::string &temp, int &i)
 			}
 			else if (arguments[j] == "-nrt") opt.nrt = true;
 			else if (arguments[j] == "-nrt_e2") opt.nrt_e2_kcal = std::stod(arguments[j + 1]);
+			else if (arguments[j] == "-nrt_parent") {
+				opt.nrt_parent = arguments[j + 1];
+				opt.nrt = true;
+				err_checkf(std::filesystem::exists(opt.nrt_parent),
+						   "-nrt_parent: Lewis structure file doesn't exist: " + opt.nrt_parent.string(), std::cout);
+			}
 			else if (arguments[j] == "-nrt_arrows") opt.nrt_max_arrows = std::stoi(arguments[j + 1]);
 			else if (arguments[j] == "-nrt_bond_scale")
 				opt.nrt_bond_scale = std::stod(arguments[j + 1]);

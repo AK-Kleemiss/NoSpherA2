@@ -3,6 +3,8 @@
 #include "core/wfn_class.h"
 
 #include <cmath>
+#include <fstream>
+#include <map>
 #include <sstream>
 
 //native_nbo() on a real wavefunction, checked by sum rules rather than a golden: a column read one
@@ -163,4 +165,169 @@ TEST(NboNativeTests, ACartesianFchkNamesTheTwoCountsAndASphericalOneStaysQuiet)
 	ASSERT_TRUE(sph.read_fchk(spherical, quiet, false));
 	EXPECT_EQ(quiet.str().find("WARNING"), std::string::npos)
 		<< "a spherical fchk needs no warning, and got: " << quiet.str();
+}
+
+namespace {
+
+	std::filesystem::path write_text(const std::string& name, const std::string& text)
+	{
+		const auto p = std::filesystem::temp_directory_path() / name;
+		std::ofstream(p) << text;
+		return p;
+	}
+
+	//the Lewis set of a native result as -nrt_parent JSON, bare 1-based indices
+	std::string lewis_json(const NboResults& r)
+	{
+		std::map<int, int> lp;
+		std::map<std::pair<int, int>, int> bd;
+		for (const NboOrbital& o : r.orbitals)
+			if (o.type == "LP") lp[o.centers[0]]++;
+			else if (o.type == "BD") bd[{ std::min(o.centers[0], o.centers[1]), std::max(o.centers[0], o.centers[1]) }]++;
+		std::string s = "{\"format\": \"NoSpherA2 Lewis structure\", \"version\": 1, \"lone_pairs\": {";
+		for (const auto& [a, n] : lp) s += (s.back() == '{' ? "\"" : ", \"") + std::to_string(a) + "\": " + std::to_string(n);
+		s += "}, \"bonds\": [";
+		for (const auto& [ab, n] : bd)
+			s += (s.back() == '[' ? "[" : ", [") + std::to_string(ab.first) + ", " + std::to_string(ab.second) + ", " +
+				 std::to_string(n) + "]";
+		return s + "]}";
+	}
+
+	//O1 H2 H3 with one O core NAO: water's 5 pairs are 1 core + 2 lone pairs + 2 bonds
+	NAOResult water_naos()
+	{
+		NAOResult nao;
+		const int Z[3] = { 8, 1, 1 };
+		for (int a = 0; a < 3; a++) {
+			NAOAtom at;
+			at.index = a;
+			at.Z = Z[a];
+			nao.atoms.push_back(at);
+			NAO o;
+			o.atom = a;
+			o.type = a == 0 ? NAOClass::Core : NAOClass::Valence;
+			nao.orbitals.push_back(o);
+		}
+		return nao;
+	}
+
+}  // namespace
+
+//$CHOOSE with the search's own structure must change nothing: the constrained ladder looks only at the
+//blocks the structure names, and the free ladder's choice was one of them at every step.
+TEST(NboNativeTests, NrtParentFedTheSearchsOwnStructureReproducesTheWeights)
+{
+	const auto p = ethane_fixture();
+	if (p.empty())
+		GTEST_SKIP() << "tests/TFVC/ethane.gbw not found";
+	WFN wavy(p);
+	NboOptions free;
+	free.nrt = true;
+	std::ostringstream log0;
+	const NboResults own = native_nbo(wavy, free, log0);
+	ASSERT_TRUE(own.nrt.present);
+
+	NboOptions chosen = free;
+	chosen.nrt_parent = write_text("nos_nrt_parent_own.json", lewis_json(own));
+	std::ostringstream log1;
+	const NboResults again = native_nbo(wavy, chosen, log1);
+	EXPECT_NE(log1.str().find("NRT parent from"), std::string::npos) << log1.str();
+	EXPECT_NE(log1.str().find("the same structure"), std::string::npos) << log1.str();
+	ASSERT_EQ(again.nrt.weights.size(), own.nrt.weights.size());
+	for (size_t i = 0; i < own.nrt.weights.size(); i++)
+		EXPECT_NEAR(again.nrt.weights[i].weight_fraction, own.nrt.weights[i].weight_fraction, 1.0e-10) << i;
+	ASSERT_EQ(again.nrt.bond_orders.size(), own.nrt.bond_orders.size());
+	for (size_t i = 0; i < own.nrt.bond_orders.size(); i++)
+		EXPECT_NEAR(again.nrt.bond_orders[i].total, own.nrt.bond_orders[i].total, 1.0e-10) << i;
+	std::filesystem::remove(chosen.nrt_parent);
+}
+
+//Ethane's hyperconjugative structure H(a)+ C=C H(b)-: the Lewis set must carry it and the log name the change.
+TEST(NboNativeTests, NrtParentPlacesADifferentStructureAndTheLogSaysWhatChanged)
+{
+	const auto p = ethane_fixture();
+	if (p.empty())
+		GTEST_SKIP() << "tests/TFVC/ethane.gbw not found";
+	WFN wavy(p);
+	NboOptions free;
+	free.nrt = true;
+	std::ostringstream log0;
+	const NboResults own = native_nbo(wavy, free, log0);
+	int c1 = 0, c2 = 0, ha = 0, hb = 0;
+	for (const NboOrbital& o : own.orbitals)
+		if (o.type == "BD" && o.hybrids[0].element == "C" && o.hybrids[1].element == "C") {
+			c1 = o.centers[0];
+			c2 = o.centers[1];
+		}
+	ASSERT_GT(c1, 0);
+	std::string bonds = "[\"C" + std::to_string(c1) + "\", \"C" + std::to_string(c2) + "\", 2]";
+	for (const NboOrbital& o : own.orbitals) {
+		if (o.type != "BD" || o.hybrids[0].element == o.hybrids[1].element) continue;
+		const int c = o.hybrids[0].element == "C" ? o.centers[0] : o.centers[1];
+		const int h = o.centers[0] + o.centers[1] - c;
+		if (c == c1 && !ha) { ha = h; continue; }
+		if (c == c2 && !hb) { hb = h; continue; }
+		bonds += ", [\"C" + std::to_string(c) + "\", \"H" + std::to_string(h) + "\", 1]";
+	}
+	ASSERT_GT(ha * hb, 0);
+	NboOptions chosen = free;
+	chosen.nrt_parent = write_text("nos_nrt_parent_hyper.json",
+		"{\"atoms\": 8, \"lone_pairs\": {\"H" + std::to_string(hb) + "\": 1}, \"bonds\": [" + bonds + "]}");
+	std::ostringstream log1;
+	const NboResults r = native_nbo(wavy, chosen, log1);
+	int cc = 0, lp_hb = 0, bd_ha = 0;
+	for (const NboOrbital& o : r.orbitals) {
+		if (o.type == "BD" && o.centers == std::vector<int>{ std::min(c1, c2), std::max(c1, c2) }) cc++;
+		if (o.type == "LP" && o.centers[0] == hb) lp_hb++;
+		if (o.type == "BD" && (o.centers[0] == ha || o.centers[1] == ha)) bd_ha++;
+	}
+	EXPECT_EQ(cc, 2);
+	EXPECT_EQ(lp_hb, 1);
+	EXPECT_EQ(bd_ha, 0);
+	EXPECT_TRUE(r.nrt.present);
+	const std::string said = log1.str();
+	EXPECT_NE(said.find("NRT parent from " + chosen.nrt_parent.string()), std::string::npos) << said;
+	EXPECT_NE(said.find("4 entries differ"), std::string::npos) << said;
+	std::filesystem::remove(chosen.nrt_parent);
+}
+
+TEST(NboNativeTests, NrtParentFilesAreReadOrRefusedWithTheOffendingEntry)
+{
+	const NAOResult nao = water_naos();
+	const std::string head = "{\"format\": \"NoSpherA2 Lewis structure\", \"version\": 1, \"wavefunction\": \"water.gbw\", "
+							 "\"atoms\": 3, \"lone_pairs\": {\"O1\": 2}, \"bonds\": ";
+	const auto read = [&](const std::string& text, ivec2& topo, std::string* warned = nullptr) {
+		const auto f = write_text("nos_nrt_parent_case.json", text);
+		std::ostringstream log;
+		const std::string why = read_lewis_structure(f, nao, 5, "water.gbw", topo, log);
+		if (warned) *warned = log.str();
+		std::filesystem::remove(f);
+		return why;
+	};
+	ivec2 topo;
+	ASSERT_EQ(read(head + "[[\"O1\", \"H2\", 1], [3, \"o1\", 1]]}", topo), "");
+	EXPECT_EQ(topo, (ivec2{ { 2, 1, 1 }, { 1, 0, 0 }, { 1, 0, 0 } }));
+	//a whole .native.nbo.json, and a structure written for another file is used with a warning
+	std::string warned;
+	ASSERT_EQ(read("{\"name\": \"w\", \"parent_lewis\": {\"wavefunction\": \"other.gbw\", \"lone_pairs\": {\"1\": 2}, "
+				   "\"bonds\": [[\"O1\", \"H2\", 1], [\"O1\", \"H3\", 1]]}}", topo, &warned), "");
+	EXPECT_NE(warned.find("other.gbw"), std::string::npos) << warned;
+	const std::vector<std::pair<std::string, std::string>> bad = {
+		{ head + "[[\"O1\", \"H2\", 1], [\"O1\", \"H4\", 1]]}", "atom \"H4\" is outside 1..3" },
+		{ head + "[[\"O1\", \"H2\", 1], [\"O1\", \"C3\", 1]]}", "atom 3 is H, not C" },
+		{ head + "[[\"O1\", \"H2\", 1], [\"H2\", \"O1\", 1]]}", "[\"H2\",\"O1\",1] is listed twice" },
+		{ head + "[[\"O1\", \"H2\", 4], [\"O1\", \"H3\", 1]]}", "the order must be 1, 2 or 3" },
+		{ head + "[[\"O1\", \"H2\", 1]]}", "1 bond pairs + 2 lone pairs + 1 core pairs hold 8 electrons, "
+										   "the wavefunction has 10: 1 pair(s) too few" },
+		{ head + "[[\"O1\", \"H2\", 1], [\"O1\", \"H3\", 1]], \"three_centre\": [[\"O1\", \"H2\", \"H3\"]]}", "three_centre" },
+		{ "{\"alpha\": {}, \"beta\": {}}", "closed-shell" },
+		{ "{\"atoms\": 4, \"bonds\": []}", "\"atoms\" is 4, the wavefunction has 3" },
+		{ "{\"lonepairs\": {}}", "unknown key \"lonepairs\"" },
+		{ "{\"bonds\": [[\"O1\", \"H2\", 1]", "not valid JSON" },
+	};
+	for (const auto& [text, expected] : bad) {
+		const std::string why = read(text, topo);
+		EXPECT_NE(why.find(expected), std::string::npos) << text << "\n  gave: " << why;
+		EXPECT_EQ(why.find('\n'), std::string::npos) << "not one line: " << why;
+	}
 }

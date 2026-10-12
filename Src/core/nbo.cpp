@@ -7,6 +7,7 @@
 
 #include <Eigen/Dense>
 #include <fstream>
+#include <nlohmann/json.hpp>
 
 using Eigen::MatrixXd;
 using Eigen::VectorXd;
@@ -411,6 +412,19 @@ NboLewis nbo_search(const NAOResult& nao, const dMatrix2& gamma, const bvec2& bo
 	ivec used(natoms, 0);
 	ivec cap(natoms, 0);
 	for (int a = 0; a < natoms; a++) cap[a] = static_cast<int>(idx[a].valence.size());
+	//$CHOOSE: the ladder only looks at blocks the chosen structure still lacks, so fed its own structure
+	//it accepts the same orbitals in the same order
+	ivec2 want = options.parent_lewis;
+	const bool chosen = !want.empty();
+	if (chosen) {
+		int total = static_cast<int>(res.orbitals.size());
+		for (int a = 0; a < natoms && a < static_cast<int>(want.size()); a++)
+			for (int b = a; b < natoms; b++) total += want[a][b];
+		err_checkf(static_cast<int>(want.size()) == natoms && total == n_pairs,
+				   "NBO: the chosen Lewis structure fills " + std::to_string(total) + " orbitals over " +
+				   std::to_string(want.size()) + " atoms, this density " + std::to_string(n_pairs) +
+				   " over " + std::to_string(natoms), log);
+	}
 	for (int relax = 0; relax < 2; relax++) {
 	  if (relax && static_cast<int>(res.orbitals.size()) >= n_pairs) break;
 	  for (const double t0 : ladder) {
@@ -426,6 +440,7 @@ NboLewis nbo_search(const NAOResult& nao, const dMatrix2& gamma, const bvec2& bo
 			for (int a = 0; a < natoms; a++) {
 				if (idx[a].valence.empty()) continue;
 				if (!relax && used[a] >= cap[a]) continue;
+				if (chosen && want[a][a] == 0) continue;
 				lam1[a] = leading_block(G, idx[a].all, cand1[a]);
 				have1[a] = 1;
 			}
@@ -440,6 +455,7 @@ NboLewis nbo_search(const NAOResult& nao, const dMatrix2& gamma, const bvec2& bo
 			if (ba >= 0) {
 				accept(bv, "LP", { ba });
 				res.topo[ba][ba]++;
+				if (chosen) want[ba][ba]--;
 				used[ba]++;
 				res.threshold = t;
 				progress = true;
@@ -456,7 +472,7 @@ NboLewis nbo_search(const NAOResult& nao, const dMatrix2& gamma, const bvec2& bo
 				for (int b = a + 1; b < natoms; b++) {
 					if (idx[b].valence.empty()) continue;
 					if (!relax && used[b] >= cap[b]) continue;
-					if (!bondable.empty() && !bondable[a][b]) continue;
+					if (chosen ? want[a][b] == 0 : !bondable.empty() && !bondable[a][b]) continue;
 					plist.push_back({ a, b });
 				}
 			}
@@ -484,6 +500,10 @@ NboLewis nbo_search(const NAOResult& nao, const dMatrix2& gamma, const bvec2& bo
 				accept(bvp, "BD", { pa, pb });
 				res.topo[pa][pb]++;
 				res.topo[pb][pa]++;
+				if (chosen) {
+					want[pa][pb]--;
+					want[pb][pa]--;
+				}
 				used[pa]++;
 				used[pb]++;
 				res.threshold = t;
@@ -492,6 +512,29 @@ NboLewis nbo_search(const NAOResult& nao, const dMatrix2& gamma, const bvec2& bo
 		}
 		if (static_cast<int>(res.orbitals.size()) >= n_pairs) break;
 	  }
+	}
+	//What thresholds, the minority floor and the caps left of a chosen structure (a dative bond, a lone
+	//pair in a Rydberg-heavy block), best block first; the count check above ends the loop.
+	while (chosen && static_cast<int>(res.orbitals.size()) < n_pairs) {
+		double best = -1.0;
+		VectorXd bv;
+		int ba = -1, bb = -1;
+		for (int a = 0; a < natoms; a++)
+			for (int b = a; b < natoms; b++) {
+				if (want[a][b] == 0) continue;
+				ivec block = idx[a].all;
+				if (b != a) block.insert(block.end(), idx[b].all.begin(), idx[b].all.end());
+				VectorXd v;
+				const double lam = leading_block(G, block, v);
+				if (lam > best) { best = lam; bv = v; ba = a; bb = b; }
+			}
+		accept(bv, ba == bb ? "LP" : "BD", ba == bb ? ivec{ ba } : ivec{ ba, bb });
+		res.topo[ba][bb]++;
+		want[ba][bb]--;
+		if (ba != bb) {
+			res.topo[bb][ba]++;
+			want[bb][ba]--;
+		}
 	}
 	res.n_lewis = static_cast<int>(res.orbitals.size());
 	{
@@ -798,6 +841,33 @@ namespace
 		const auto clock = [] { return std::chrono::steady_clock::now(); };
 		auto t = clock();
 		NboLewis lewis = nbo_search(nao, gamma, bondable, n_pairs, scale, options, log);
+		if (!options.parent_lewis.empty()) {
+			//the free search once more, so the log can say what the chosen structure costs
+			NboOptions free = options;
+			free.parent_lewis.clear();
+			std::ostringstream quiet;
+			const NboLewis own = nbo_search(nao, gamma, bondable, n_pairs, scale, free, quiet);
+			std::string diff;
+			int n_diff = 0;
+			for (size_t a = 0; a < own.topo.size(); a++)
+				for (size_t b = a; b < own.topo.size(); b++) {
+					if (own.topo[a][b] == lewis.topo[a][b]) continue;
+					const std::string la = constants::atnr2letter(nao.atoms[a].Z) + std::to_string(a + 1);
+					//valence lone pairs, as the file gives them: the diagonal also holds the cores
+					const int core = a != b ? 0 : static_cast<int>(std::count_if(nao.orbitals.begin(), nao.orbitals.end(),
+						[&](const NAO& o) { return o.atom == static_cast<int>(a) && o.type == NAOClass::Core; }));
+					if (n_diff++ < 8)
+						diff += " " + (a == b ? "LP(" + la + ")" : la + "-" + constants::atnr2letter(nao.atoms[b].Z) +
+								std::to_string(b + 1)) + " " + std::to_string(own.topo[a][b] - core) + "->" +
+								std::to_string(lewis.topo[a][b] - core);
+				}
+			log << "NRT parent from " << (options.nrt_parent.empty() ? std::string("the caller") : options.nrt_parent.string())
+				<< ": rho(NL) = " << std::fixed << std::setprecision(5) << lewis.rho_nl << " e against "
+				<< own.rho_nl << " e for the search's own best structure, "
+				<< (n_diff ? std::to_string(n_diff) + " entries differ (own->chosen):" + diff + (n_diff > 8 ? " ..." : "")
+						   : std::string("the same structure"))
+				<< std::defaultfloat << std::endl;
+		}
 		res.search_seconds += std::chrono::duration<double>(clock() - t).count();
 		t = clock();
 		std::vector<NboE2Entry> e2 = nbo_e2(lewis, fock_nao, options.e2_threshold_kcal);
@@ -889,6 +959,102 @@ namespace
 	}
 }
 
+std::string read_lewis_structure(const std::filesystem::path& file, const NAOResult& nao, const int n_pairs,
+								 const std::string& wavefunction, ivec2& topo, std::ostream& log)
+{
+	using nlohmann::json;
+	std::ifstream in(file);
+	if (!in.good()) return "cannot open " + file.string();
+	json root;
+	try {
+		root = json::parse(in);
+	}
+	catch (const json::exception& e) {
+		return std::string("not valid JSON: ") + e.what();
+	}
+	//a whole .native.nbo.json carries the structure under "parent_lewis"
+	const json& j = root.is_object() && root.contains("parent_lewis") ? root["parent_lewis"] : root;
+	if (!j.is_object()) return "expected a JSON object with \"lone_pairs\" and \"bonds\"";
+	for (const auto& [key, value] : j.items()) {
+		static const std::set<std::string> known = { "format", "version", "wavefunction", "atoms", "lone_pairs",
+													 "bonds", "three_centre", "alpha", "beta" };
+		if (!known.count(key)) return "unknown key \"" + key + "\"";
+	}
+	if (j.contains("format") && j["format"] != "NoSpherA2 Lewis structure")
+		return "\"format\" is " + j["format"].dump() + ", not \"NoSpherA2 Lewis structure\"";
+	if (j.contains("version") && (!j["version"].is_number_integer() || j["version"].get<int>() != 1))
+		return "\"version\" " + j["version"].dump() + " is not 1, the only version this build reads";
+	if (j.contains("alpha") || j.contains("beta"))
+		return "per-spin \"alpha\"/\"beta\" structures are not supported: -nrt_parent takes a closed-shell wavefunction";
+	if (j.contains("three_centre") && !(j["three_centre"].is_array() && j["three_centre"].empty()))
+		return "\"three_centre\" bonds are not supported: the search places one- and two-centre orbitals only";
+	const int na = static_cast<int>(nao.atoms.size());
+	if (j.contains("atoms") && !(j["atoms"].is_number_integer() && j["atoms"].get<int>() == na))
+		return "\"atoms\" is " + j["atoms"].dump() + ", the wavefunction has " + std::to_string(na);
+	if (j.contains("wavefunction") && j["wavefunction"].is_string() &&
+		j["wavefunction"].get<std::string>() != wavefunction)
+		log << "Warning: -nrt_parent " << file.string() << " was written for " << j["wavefunction"].get<std::string>()
+			<< ", this is " << wavefunction << "; the atom count and elements match, so it is used" << std::endl;
+	//"Pd1", or a bare 1-based index as a number or a string
+	const auto atom_of = [&](const json& x, int& a) -> std::string {
+		std::string s = x.is_string() ? x.get<std::string>() : x.is_number_integer() ? std::to_string(x.get<int>()) : "";
+		if (s.empty()) return "atom " + x.dump() + " is neither a label like \"C1\" nor a 1-based index";
+		const size_t d = s.find_first_of("0123456789");
+		if (d == std::string::npos || s.find_first_not_of("0123456789", d) != std::string::npos || d > 2)
+			return "atom " + x.dump() + " is neither a label like \"C1\" nor a 1-based index";
+		a = std::stoi(s.substr(d)) - 1;
+		if (a < 0 || a >= na) return "atom " + x.dump() + " is outside 1.." + std::to_string(na);
+		const std::string el = constants::atnr2letter(nao.atoms[a].Z), given = s.substr(0, d);
+		const auto same = [](char p, char q) { return std::tolower(p) == std::tolower(q); };
+		if (d > 0 && (el.size() != d || !std::equal(el.begin(), el.end(), given.begin(), same)))
+			return "atom " + x.dump() + ": atom " + std::to_string(a + 1) + " is " + el + ", not " + given;
+		return "";
+	};
+	topo.assign(na, ivec(na, 0));
+	if (!j.contains("lone_pairs") && !j.contains("bonds")) return "holds neither \"lone_pairs\" nor \"bonds\"";
+	if (j.contains("lone_pairs")) {
+		if (!j["lone_pairs"].is_object()) return "\"lone_pairs\" must be an object like {\"O1\": 2}";
+		bvec seen(na, false);
+		for (const auto& [key, value] : j["lone_pairs"].items()) {
+			int a = -1;
+			const std::string why = atom_of(json(key), a);
+			if (!why.empty()) return "lone_pairs: " + why;
+			if (seen[a]) return "lone_pairs: atom " + std::to_string(a + 1) + " is listed twice";
+			seen[a] = true;
+			if (!value.is_number_integer() || value.get<int>() < 0)
+				return "lone_pairs: \"" + key + "\": " + value.dump() + " is not a lone-pair count >= 0";
+			topo[a][a] = value.get<int>();
+		}
+	}
+	if (j.contains("bonds")) {
+		if (!j["bonds"].is_array()) return "\"bonds\" must be an array of [A, B, order]";
+		for (const json& b : j["bonds"]) {
+			if (!b.is_array() || b.size() != 3) return "bond " + b.dump() + " is not [A, B, order]";
+			int x = -1, y = -1;
+			std::string why = atom_of(b[0], x);
+			if (why.empty()) why = atom_of(b[1], y);
+			if (!why.empty()) return "bond " + b.dump() + ": " + why;
+			if (x == y) return "bond " + b.dump() + " joins an atom to itself";
+			if (!b[2].is_number_integer() || b[2].get<int>() < 1 || b[2].get<int>() > 3)
+				return "bond " + b.dump() + ": the order must be 1, 2 or 3";
+			if (topo[x][y]) return "bond " + b.dump() + " is listed twice";
+			topo[x][y] = topo[y][x] = b[2].get<int>();
+		}
+	}
+	int lps = 0, bonds = 0, cores = 0;
+	for (int a = 0; a < na; a++) {
+		lps += topo[a][a];
+		for (int b = a + 1; b < na; b++) bonds += topo[a][b];
+	}
+	for (const NAO& o : nao.orbitals) cores += o.type == NAOClass::Core;
+	const int have = 2 * (bonds + lps + cores), need = 2 * n_pairs;
+	if (have != need)
+		return std::to_string(bonds) + " bond pairs + " + std::to_string(lps) + " lone pairs + " + std::to_string(cores) +
+			   " core pairs hold " + std::to_string(have) + " electrons, the wavefunction has " + std::to_string(need) +
+			   ": " + std::to_string(std::abs(have - need) / 2) + " pair(s) too " + (have > need ? "many" : "few");
+	return "";
+}
+
 void refuse_unsupported_nbo_source(const WFN& wavy, std::ostream& log)
 {
 	err_checkf(wavy.get_nr_basis_set_loaded() == wavy.get_ncen(),
@@ -944,8 +1110,23 @@ NboResults native_nbo(WFN& wavy, const NboOptions& options, std::ostream& log)
 		double electrons = 0.0;
 		for (const NAOAtom& a : nao.atoms) electrons += a.population;
 		const int n_pairs = static_cast<int>(std::llround(electrons / 2.0));
+		NboOptions chosen = options;
+		if (!options.nrt_parent.empty()) {
+			const std::string why = read_lewis_structure(options.nrt_parent, nao, n_pairs,
+														 wavy.get_path().filename().string(), chosen.parent_lewis, log);
+			err_checkf(why.empty(), "-nrt_parent " + options.nrt_parent.string() + ": " + why, log);
+			//NRT rebuilds the parent's orbitals over its own bondable pairs and cannot place one outside them
+			for (size_t a = 0; a < atoms.size() && options.nrt; a++)
+				for (size_t b = a + 1; b < atoms.size(); b++)
+					err_checkf(!chosen.parent_lewis[a][b] || nrt_bondable[a][b],
+							   "-nrt_parent " + options.nrt_parent.string() + ": bond " +
+							   constants::atnr2letter(nao.atoms[a].Z) + std::to_string(a + 1) + "-" +
+							   constants::atnr2letter(nao.atoms[b].Z) + std::to_string(b + 1) +
+							   " is longer than -nrt_bond_scale " + std::to_string(options.nrt_bond_scale) +
+							   " x the covalent radius sum; raise it or drop the bond", log);
+		}
 		analyse_spin(res, in, nao, bondable, nrt_bondable, in.density[0],
-					 in.fock.empty() ? dMatrix2() : in.fock[0], n_pairs, 2.0, "", options, lewis, log);
+					 in.fock.empty() ? dMatrix2() : in.fock[0], n_pairs, 2.0, "", chosen, lewis, log);
 		vec occ(nao.orbitals.size(), 0.0);
 		for (size_t i = 0; i < occ.size(); i++) occ[i] = nao.orbitals[i].occupation;
 		fill_nao_table(res.nao, nao, occ, in.fock.empty() ? dMatrix2() : nao_operator(in.fock[0], nao.C));
@@ -962,6 +1143,9 @@ NboResults native_nbo(WFN& wavy, const NboOptions& options, std::ostream& log)
 		}
 	}
 	else {
+		err_checkf(options.nrt_parent.empty() && options.parent_lewis.empty(),
+				   "-nrt_parent takes a closed-shell wavefunction; this one is open shell, whose alpha and beta "
+				   "Lewis structures the search places apart", log);
 		//NPA tables share total-density NAOs; NBO searches use separate spin densities.
 		const auto t_nao = clock();
 		const dMatrix2 total_density = to_dmatrix(MatrixXd(to_eigen(in.density[0]) + to_eigen(in.density[1])));

@@ -265,6 +265,7 @@ All of these need a contracted basis, so `.gbw`, `.fchk` or `.molden` — not
 | `-nrt_no_symmetry` | 0 | off | Skip symmetry detection. |
 | `-nrt_no_components` | 0 | off | Do not split into components. |
 | `-nrt_no_ion` | 0 | off | Exclude ionic structures. |
+| `-nrt_parent <file.json>` | 1 | search's own | Native only, closed shell, implies `-nrt`: the NBO search places this Lewis structure (NBO's `$CHOOSE`) and NRT starts from it. JSON `{"format": "NoSpherA2 Lewis structure", "version": 1, "atoms": N, "lone_pairs": {"O1": 2}, "bonds": [["O1", "H2", 1]]}`: atoms as element + 1-based index or a bare index, valence lone pairs only, bond orders 1-3; a `.native.nbo.json` is read through its `"parent_lewis"`. Refused with a one-line reason on an unknown label, wrong element, duplicate bond, order outside 1-3, an electron count that does not add up, `three_centre` or `alpha`/`beta` entries, or a bond beyond `-nrt_bond_scale`. The log compares its rho(NL) with the search's own best structure. |
 | `-npa` | 0 | off | Natural population analysis with the per-orbital table. |
 | `-npa_summary` | 0 | off | NPA, totals only. |
 | `-ibo` | 0 | off | IAO charges and IBOs (Pipek-Mezey-like, exponent 4, 2x2 Jacobi), listed as core / lone pair / bond-like / delocalised with IAO and Mulliken populations per atom. Closed-shell `.gbw` or spherical `.molden`; refuses unrestricted. `-ibo_cube` writes them as cubes. |
