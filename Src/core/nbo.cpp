@@ -659,7 +659,8 @@ NboLewis nbo_search(const NAOResult& nao, const dMatrix2& gamma, const bvec2& bo
 		if (nrm < 1e-8) continue;
 		//An antibond holding over half an orbital means bond and antibond are two lone pairs rotated
 		//into each other (a four-electron pair), which the ladder accepted from the leading eigenvalue.
-		if (w.dot(G0 * w) > 0.5 * scale * nrm * nrm) {
+		//A chosen parent ($CHOOSE) places its bonds regardless of bondable, so banning one there would recurse forever.
+		if (options.parent_lewis.empty() && w.dot(G0 * w) > 0.5 * scale * nrm * nrm) {
 			if (allowed.empty()) allowed = bondable.empty() ? bvec2(natoms, bvec(natoms, true)) : bondable;
 			allowed[a][b] = allowed[b][a] = false;
 			if (options.debug)
