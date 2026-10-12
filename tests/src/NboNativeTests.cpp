@@ -331,3 +331,39 @@ TEST(NboNativeTests, NrtParentFilesAreReadOrRefusedWithTheOffendingEntry)
 		EXPECT_EQ(why.find('\n'), std::string::npos) << "not one line: " << why;
 	}
 }
+
+//Ni(CO)4, B3LYP/def2-TZVP (def2-SVP does not show the second trap): NBO 7 puts one dative Ni-C bond
+//and d10 lone pairs on Ni. The search used to accept a Ni d pair plus a C lone pair as Ni-C bonds
+//(four electrons, two centres), and NRT then built the
+//parent with a bond slot that took a d pair before the lone pairs were placed, so the parent it fitted
+//was not the structure NBO found and dropped out of the weights.
+TEST(NboNativeTests, NickelTetracarbonylKeepsOneDativeBondAndItsParent)
+{
+	const auto p = nos_test_repo_root() / "tests" / "NiCO4_gbw" / "ni_co_4.gbw";
+	if (!std::filesystem::exists(p))
+		GTEST_SKIP() << "tests/NiCO4_gbw/ni_co_4.gbw not found";
+	WFN wavy(p);
+	const double electrons = wavy.count_nr_electrons();
+	NboOptions options;
+	options.nrt = true;
+	std::ostringstream log;
+	const NboResults r = native_nbo(wavy, options, log);
+	int ni_c = 0;
+	double lewis = 0.0;
+	for (const NboOrbital &o : r.orbitals) {
+		if (o.type == "CR" || o.type == "LP" || o.type == "BD") lewis += o.occupancy;
+		if (o.type == "BD" && o.centers.size() == 2) {
+			const std::string a = r.npa[o.centers[0] - 1].element, b = r.npa[o.centers[1] - 1].element;
+			if ((a == "Ni" && b == "C") || (a == "C" && b == "Ni")) ni_c++;
+		}
+	}
+	EXPECT_EQ(ni_c, 1) << log.str();
+	ASSERT_TRUE(r.nrt.present);
+	bool parent = false;
+	for (const NboNrtCandidate &c : r.nrt.candidates)
+		if (c.idxres == 1) {
+			parent = true;
+			EXPECT_NEAR(c.rho_nl, electrons - lewis, 1.0e-3) << "NRT built a different parent than NBO found";
+		}
+	EXPECT_TRUE(parent) << "the parent Lewis structure carries no weight";
+}

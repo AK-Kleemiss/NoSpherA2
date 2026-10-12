@@ -247,6 +247,7 @@ namespace
 		int sweeps = 0;
 		double change = 0.0;      //largest vector change of the last sweep
 		bool converged = false;   //valence span stopped moving before the sweep cap
+		std::array<int, 3> moved{ -1, -1, -1 };  //atoms the last pair move touched
 	};
 
 	struct Limits {
@@ -275,12 +276,18 @@ namespace
 	void expand(const Candidate& c, const Limits& L, std::vector<Candidate>& out)
 	{
 		const int n = c.topo.n;
-		const auto emit = [&](Topology s, const int x, const int y) {
+		const auto emit = [&](Topology s, const int x, const int y, const int z = -1) {
 			if (!L.free_atom[x] || !L.free_atom[y]) return;
 			if (!acceptable(s, L)) return;
+			//Two moves that share no atom are two separate charge separations, not one arrow
+			const auto touched = [&](const int t) {
+				return t >= 0 && std::find(c.moved.begin(), c.moved.end(), t) != c.moved.end();
+			};
+			if (c.depth > 0 && !touched(x) && !touched(y) && !touched(z)) return;
 			Candidate d;
 			d.topo = std::move(s);
 			d.depth = c.depth + 1;
+			d.moved = { x, y, z };
 			const int comp = L.comp[x];
 			if (L.use_components && c.component >= 0 && comp != c.component) return;
 			d.component = comp;
@@ -318,7 +325,7 @@ namespace
 					Topology s = c.topo;
 					s.set(a, b, s.at(a, b) - 1);
 					s.set(a, d, s.at(a, d) + 1);
-					emit(std::move(s), a, d);
+					emit(std::move(s), a, d, b);
 				}
 			}
 		}
@@ -405,7 +412,10 @@ namespace
 					if (it == B.score_pair.end()) return;   //not a bondable pair: infeasible
 					slots.push_back({ a, b, c.topo.at(a, b), it->second });
 				}
+		//Lone pairs first, as in the search: a bond slot filled earlier takes a metal d pair and keeps
+		//it at every sweep, leaving the ligand pair it should hold unclaimed
 		std::sort(slots.begin(), slots.end(), [](const Slot& x, const Slot& y) {
+			if ((x.a == x.b) != (y.a == y.b)) return x.a == x.b;
 			if (x.score != y.score) return x.score > y.score;
 			return std::tie(x.a, x.b) < std::tie(y.a, y.b);
 		});

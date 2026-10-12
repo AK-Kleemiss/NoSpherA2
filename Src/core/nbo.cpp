@@ -645,6 +645,7 @@ NboLewis nbo_search(const NAOResult& nao, const dMatrix2& gamma, const bvec2& bo
 	//has almost no occupancy to find it by.
 	std::vector<VectorXd> non_lewis;
 	std::vector<NboFunction> non_lewis_fn;
+	bvec2 allowed;
 	for (int j = 0; j < res.n_lewis; j++) {
 		if (res.orbitals[j].type != "BD") continue;
 		const int a = res.orbitals[j].centers[0], b = res.orbitals[j].centers[1];
@@ -656,6 +657,15 @@ NboLewis nbo_search(const NAOResult& nao, const dMatrix2& gamma, const bvec2& bo
 		VectorXd w = (cb / ca) * va - (ca / cb) * vb;
 		const double nrm = w.norm();
 		if (nrm < 1e-8) continue;
+		//An antibond holding over half an orbital means bond and antibond are two lone pairs rotated
+		//into each other (a four-electron pair), which the ladder accepted from the leading eigenvalue.
+		if (w.dot(G0 * w) > 0.5 * scale * nrm * nrm) {
+			if (allowed.empty()) allowed = bondable.empty() ? bvec2(natoms, bvec(natoms, true)) : bondable;
+			allowed[a][b] = allowed[b][a] = false;
+			if (options.debug)
+				log << "NBO search: " << nao.atoms[a].label << "-" << nao.atoms[b].label
+					<< " is no bond after refinement, searching again without it" << std::endl;
+		}
 		NboFunction f;
 		f.type = "BD*";
 		f.centers = { a, b };
@@ -663,6 +673,8 @@ NboLewis nbo_search(const NAOResult& nao, const dMatrix2& gamma, const bvec2& bo
 		non_lewis.push_back(w / nrm);
 		non_lewis_fn.push_back(f);
 	}
+	//every pass removes at least one pair, so this ends
+	if (!allowed.empty()) return nbo_search(nao, gamma, allowed, n_pairs, scale, options, log);
 	//Each antibond is orthogonal to its own bond only; nbo_e2 and the occupancies need an orthonormal set,
 	//so take the (orthonormal) Lewis span out of them and orthonormalize them symmetrically
 	if (!non_lewis.empty()) {
