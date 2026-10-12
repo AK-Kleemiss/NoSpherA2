@@ -1452,7 +1452,7 @@ double ao_pair_abs_overlap_bound(const std::vector<primitive>& pa, const d3& A, 
 	//S(u + d) = sum_c s_c prod_x sum_a binom(e_x, a) u_x^a d_x^(e_x - a)
 	auto shift = [&binom](const std::vector<std::pair<i3, double>>& s, const int l, const d3& d, std::vector<std::pair<i3, double>>& out) {
 		const int n = l + 1;
-		vec dense(n * n * n, 0.0);
+		vec dense(static_cast<size_t>(n) * n * n, 0.0);
 		for (int c = 0; c < s.size(); c++) {
 			const i3& e = s[c].first;
 			for (int a = 0; a <= e[0]; a++)
