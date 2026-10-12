@@ -375,7 +375,11 @@
     {
       "name": "test-base",
       "hidden": true,
+      "description": "ctest runs several tests at once and each opens a thread per core; passive OpenMP workers sleep at once instead of spinning for 200 ms on the cores the other tests compute on",
       "inheritConfigureEnvironment": true,
+      "environment": {
+        "OMP_WAIT_POLICY": "PASSIVE"
+      },
       "output": {
         "outputOnFailure": true
       }
