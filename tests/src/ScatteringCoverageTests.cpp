@@ -695,7 +695,13 @@ TEST(ScatteringCoverageTransformTests, CalcSfSumsPhasesAndReportsPreparationTime
 	EXPECT_NEAR(sf[1][1].imag(), 0.0, 1e-12);
 	EXPECT_NE(log.str().find("Initialized FFs"), std::string::npos);
 	EXPECT_NE(log.str().find("asym atom list size: 2 total grid size: 3"), std::string::npos);
-	EXPECT_NE(log.str().find("Time to prepare: 2 s"), std::string::npos);
+	//2 s plus calc_SF's own run time: check the seconds branch, never the count (Debug, ARM, loaded runners add to it)
+	const std::string out = log.str();
+	const size_t prep = out.find("Time to prepare: ");
+	ASSERT_NE(prep, std::string::npos);
+	const std::string prep_line = out.substr(prep, out.find('\n', prep) - prep);
+	EXPECT_NE(prep_line.find(" s"), std::string::npos);
+	EXPECT_EQ(prep_line.find(" ms"), std::string::npos);
 	EXPECT_GE(end1, start);
 	//under a second the preparation time is reported in milliseconds
 	std::ostringstream log2;
