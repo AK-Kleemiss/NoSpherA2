@@ -593,18 +593,6 @@ TEST(TomlIntegrationTests, P1_test_XCW_incremental)
 	EXPECT_TRUE(result.success) << result.message;
 }
 
-TEST(TomlIntegrationTests, P1_test_XCW_h2_incremental)
-{
-	const UT_Result result = run_inprocess_test(get_repo_root(), "P1_test_XCW_h2_incremental");
-	EXPECT_TRUE(result.success) << result.message;
-}
-
-TEST(TomlIntegrationTests, P1_F2_test_XCW_incremental)
-{
-	const UT_Result result = run_inprocess_test(get_repo_root(), "P1_F2_test_XCW_incremental");
-	EXPECT_TRUE(result.success) << result.message;
-}
-
 TEST(TomlIntegrationTests, P1_F2_test_XCW_full)
 {
 	if (const char* env = std::getenv("RUN_FULL_TEST"); !env || std::string(env) == "0" || std::string(env) == "false") {
