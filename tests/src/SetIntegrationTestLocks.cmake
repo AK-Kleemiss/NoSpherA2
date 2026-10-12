@@ -121,3 +121,26 @@ set_tests_properties(
     PROPERTIES
         RESOURCE_LOCK tests_src_cwd
 )
+
+# XcwScfTests.SharedTensorBuild writes the P1 subset's I tensor into NOS_TEST_SHARED_DIR; these
+# runs test the SCF, not the tensor, and read it instead of each building the same one
+set_tests_properties(
+    XcwScfTests.SharedTensorBuild
+    PROPERTIES
+        FIXTURES_SETUP xcw_p1_tensor
+)
+set_tests_properties(
+    XcwScfTests.OrbitalJsonOverridesMatchTheLibraryBasis
+    XcwScfTests.SmallBasisGuessStartsFromConvergedDensity
+    XcwScfTests.UnrestrictedClosedShellAgainstF2MatchesRestricted
+    XcwScfTests.FastConvWeightedRunsWithoutDampingOrShift
+    XcwScfTests.FiveIterationsAreDeterministicAndPhysical
+    XcwScfTests.MaxIterOneStopsScanWithoutTscb
+    XcwScfTests.ISigmaCutoffShrinksFitSetAndReportsAllReflections
+    XcwScfTests.SlowConvStartsFromTheNormalSchedule
+    XcwScfTests.ScaleIsStationaryForTheCriterion
+    XcwScfTests.SecondOrderStepsReachTheGoldenEnergy
+    XcwScfTests.HessianVectorProductMatchesFiniteDifference
+    PROPERTIES
+        FIXTURES_REQUIRED xcw_p1_tensor
+)
