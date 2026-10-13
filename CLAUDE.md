@@ -270,9 +270,10 @@ Key core modules live in `Src/core`:
 
 ## Current Validation Notes
 
-As of 2026-10-13, after `a5fdbe5`, `ctest --preset release-linux` reports **1255 passed, 0 failed,
-22 skipped** (2 disabled) of 1277. New since `d5a9755`: `NboNativeTests.MethylRadicalSplitsItsBondsPerSpinAsNbo7Does`
-(fixture `tests/ch3_occ/ch3.owf.fchk`), `NrtTests.TheParentsSymmetryImageCompletesTheHexagon` and
+As of 2026-10-13, after `2a0fd80`, `ctest --preset release-linux` reports **1256 passed, 0 failed,
+22 skipped** (2 disabled) of 1278. New since `d5a9755`: `NboNativeTests.MethylRadicalSplitsItsBondsPerSpinAsNbo7Does`
+(fixture `tests/ch3_occ/ch3.owf.fchk`), `NboNativeTests.AGrownNrtCycleStatesAFloorItsFitRespects`,
+`NrtTests.TheParentsSymmetryImageCompletesTheHexagon` and
 `NrtTests.OppositelyPolarisedOrbitalsOfABondDoNotCancelInItsIonicShare`. See `UNIT_TESTS_STATUS.md`.
 
 As of 2026-10-13, `ctest --preset release-linux` on `density_source` `d5a9755` reports

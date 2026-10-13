@@ -154,6 +154,29 @@ TEST(NboNativeTests, ASphericalFchkWritesAnArchive)
 	std::filesystem::remove(out, ec);
 }
 
+//-nrt_target 0 on ethane: the second cycle walks from the weighted structures and states the Frank-Wolfe floor of
+//its fit at the warm start, which the fit cannot go below
+TEST(NboNativeTests, AGrownNrtCycleStatesAFloorItsFitRespects)
+{
+	const auto p = ethane_fixture();
+	if (p.empty())
+		GTEST_SKIP() << "tests/TFVC/ethane.gbw not found";
+	WFN wavy(p);
+	NboOptions options;
+	options.nrt = true;
+	options.nrt_target = 0.0;
+	std::ostringstream log;
+	const NboResults r = native_nbo(wavy, options, log);
+	int floors = 0;
+	for (const std::string& n : r.nrt.notes) {
+		const size_t b = n.find("bound before the fit ");
+		if (b == std::string::npos) continue;
+		floors++;
+		EXPECT_LE(std::stod(n.substr(b + 21)), std::stod(n.substr(n.find("D(w) = ") + 7)) + 1e-6) << n;
+	}
+	EXPECT_GT(floors, 0);
+}
+
 //CH3 doublet, `occ scf` B3LYP(VWN5)/def2-TZVP at the geometry of tests/nbo_reference_v2/data/ch3, where NBO 7
 //splits each C-H bond 0.404/0.096 (covalent/ionic) in the spin holding the radical and 0.432/0.068 in the other,
 //with D 0.0103 and 0.0065. OCC puts the radical in beta, NBO 7's ORCA run in alpha.

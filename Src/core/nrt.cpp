@@ -31,8 +31,8 @@ namespace
 		return out;
 	}
 
-	//Leading eigenpair on block idx by warm-started power iteration; a negative dominant eigenvalue
-	//falls back to the full symmetric solve
+	//Leading eigenpair on block idx by warm-started power iteration; where that stalls or meets a negative dominant
+	//eigenvalue, inverse iteration from the warm vector, and the full symmetric solve without one
 	double leading_block(const MatrixXd& R, const ivec& idx, VectorXd& v,
 						 const MatrixXd* minus = nullptr, const VectorXd* warm = nullptr)
 	{
@@ -71,6 +71,29 @@ namespace
 			}
 		}
 
+		if (warm && k > 2) {
+			//lambda_max from the tridiagonal form, then sigma - B is positive definite for sigma just above it
+			Eigen::Tridiagonalization<MatrixXd> tri(B);
+			Eigen::SelfAdjointEigenSolver<MatrixXd> ev;
+			ev.computeFromTridiagonal(tri.diagonal(), tri.subDiagonal(), Eigen::EigenvaluesOnly);
+			const double lam = ev.eigenvalues()(k - 1);
+			MatrixXd A = -B;
+			A.diagonal().array() += lam + 1e-9 * std::max(1.0, std::abs(lam));
+			const Eigen::LLT<MatrixXd> llt(A);
+			VectorXd x(k);
+			for (int i = 0; i < k; i++) x(i) = (*warm)(idx[i]);
+			if (llt.info() == Eigen::Success && x.norm() > 0.0) {
+				x.normalize();
+				for (int it = 0; it < 20; it++) {
+					VectorXd y = llt.solve(x);
+					y.normalize();
+					if (y.dot(x) < 0.0) y = -y;
+					const double d = (y - x).norm();
+					x = y;
+					if (d < 1e-13) { embed(x); return lam; }
+				}
+			}
+		}
 		Eigen::SelfAdjointEigenSolver<MatrixXd> es(B);
 		embed(es.eigenvectors().col(k - 1));
 		return es.eigenvalues()(k - 1);
@@ -1108,7 +1131,9 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 				   "NRT: the parent Lewis structure is not representable in its own NAO basis", log);
 		nc = static_cast<int>(cands.size());
 
-		G.resize(nc, nc);
+		//structures of earlier cycles keep their indices, so their block of G stands
+		const int n0 = static_cast<int>(built);
+		G.conservativeResize(nc, nc);
 		g.resize(nc);
 		rho.assign(nc, 0.0);
 		for (int i = 0; i < nc; i++) { g(i) = cands[i].g; rho[i] = cands[i].rho_nl; }
@@ -1118,9 +1143,9 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 		//G_ij = s^2 ||V_i^T V_j||_F^2 = s^2 <P_i, P_j>: pair loop or projector product, whichever is cheaper
 		int kmax = 0;
 		for (const Candidate& c : cands) kmax = std::max(kmax, static_cast<int>(c.V.cols()));
-		const double dnc = static_cast<double>(nc), dnn = static_cast<double>(nn);
-		const double cost_pairs = 0.5 * dnc * dnc * static_cast<double>(kmax) * kmax * dnn;
-		const double cost_proj = 0.25 * dnc * dnc * dnn * dnn + 0.5 * dnc * dnn * dnn * kmax;
+		const double dnc = static_cast<double>(nc), dnn = static_cast<double>(nn), dnew = dnc * dnc - static_cast<double>(n0) * n0;
+		const double cost_pairs = 0.5 * dnew * static_cast<double>(kmax) * kmax * dnn;
+		const double cost_proj = 0.25 * dnew * dnn * dnn + 0.5 * dnc * dnn * dnn * kmax;
 		projector = cost_proj < cost_pairs;
 		if (projector) {
 			//One (R, C) NAO block per pass, sized so Z (nc columns of wr*wc rows) stays near 128 MB
@@ -1132,13 +1157,14 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 				for (int C = R; C < nblk; C++) blocks.push_back({ R, C });
 			vec Zbuf(static_cast<size_t>(nbs) * nbs * nc);
 			MatrixXd Goff = MatrixXd::Zero(nc, nc);      //blocks with R < C, counted twice below
-			G.setZero();                                 //blocks with R == C, counted once
-			//Upper-triangle candidate tiles; diagonal tiles also fill their lower half to stay a plain GEMM,
-			//since Eigen does not parallelise the triangular kernel
+			G.rightCols(nc - n0).setZero();              //blocks with R == C, counted once
+			G.bottomRows(nc - n0).setZero();
+			//Tiles over the new structures' columns and every row up to them; a tile across the diagonal also fills
+			//part of the lower half to stay a plain GEMM, since Eigen does not parallelise the triangular kernel
 			const int tile = 128;
 			std::vector<std::pair<int, int>> tiles;
-			for (int I = 0; I < nc; I += tile)
-				for (int J = I; J < nc; J += tile) tiles.push_back({ I, J });
+			for (int J = n0; J < nc; J += tile)
+				for (int I = 0; I < std::min(nc, J + tile); I += tile) tiles.push_back({ I, J });
 			const int ntiles = static_cast<int>(tiles.size());
 			if (show)
 				pb.emplace(static_cast<unsigned long long>(blocks.size()), 50, "=", " ",
@@ -1167,7 +1193,7 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 			pb.reset();
 			const double s2 = scale * scale;
 			for (int i = 0; i < nc; i++)
-				for (int j = i; j < nc; j++) {
+				for (int j = std::max(i, n0); j < nc; j++) {
 					G(i, j) = s2 * (G(i, j) + 2.0 * Goff(i, j));
 					G(j, i) = G(i, j);
 				}
@@ -1200,7 +1226,7 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 #pragma omp parallel for schedule(dynamic) num_threads(nthreads)
 			for (int i = 0; i < nc; i++) {
 				if (pb) pb->update();
-				for (int j = i; j < nc; j++) {
+				for (int j = std::max(i, n0); j < nc; j++) {
 					const double v = scale * scale *
 									 (cands[i].V.transpose() * cands[j].V).squaredNorm();
 					G(i, j) = v;
@@ -1221,6 +1247,14 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 			f0 = objective(G, g, trg2, w);
 		}
 		else w.head(w_prev.size()) = w_prev;
+		//Frank-Wolfe gap of the warm start over the grown set: f(w_prev) - min f, so this cycle cannot take D(w)
+		//below sqrt(f(w_prev) - gap)
+		double floor_dw = -1.0;
+		if (built > 0) {
+			VectorXd Gw;
+			gather_mv(G, w, Gw);
+			floor_dw = std::sqrt(std::max(0.0, objective(G, g, trg2, w) - fw_gap(Gw, g, w)));
+		}
 		built = static_cast<size_t>(nc);
 		nrt.qp_iterations.resize(trace_mark);  //the trace describes the final fit
 		f = solve_qp(G, g, trg2, w, 5000, &rho, spin, &nrt.qp_iterations, show ? &log : nullptr,
@@ -1253,7 +1287,8 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 			for (Candidate& c : grow(std::move(roots), room, false)) cands.push_back(std::move(c));
 			if (cands.size() == before) stop = "the weighted structures generate no new structure";
 		}
-		nrt.notes.push_back("cycle " + std::to_string(cycle) + ": D(w) = " + std::to_string(dw) + nbo_d(dw) + " over " +
+		nrt.notes.push_back("cycle " + std::to_string(cycle) + ": D(w) = " + std::to_string(dw) + nbo_d(dw) +
+							 (floor_dw >= 0.0 ? ", bound before the fit " + std::to_string(floor_dw) + nbo_d(floor_dw) : std::string()) + " over " +
 							 std::to_string(nc) + " structures, " + std::to_string(n_roots) +
 							 " weighted structure(s) walked, " + std::to_string(cands.size() - static_cast<size_t>(nc)) + " new");
 		if (!constants::hide_timings) log << "NRT" << (spin.empty() ? "" : " " + spin) << ": " << nrt.notes.back() << std::endl;
