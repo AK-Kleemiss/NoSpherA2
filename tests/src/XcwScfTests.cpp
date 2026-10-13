@@ -176,20 +176,22 @@ namespace {
 	//The tensor depends on geometry, basis and reflections only. Under ctest, SharedTensorBuild writes the
 	//subset's into NOS_TEST_SHARED_DIR once and the runs that test the SCF rather than the tensor read it;
 	//without that directory or file every run builds its own, with the same numbers.
-	std::filesystem::path shared_tensor(const bool held_double)
+	std::filesystem::path shared_tensor()
 	{
 		const char* d = std::getenv("NOS_TEST_SHARED_DIR");
 		if (d == nullptr || *d == '\0') return {};
-		return std::filesystem::path(d) / (held_double ? "xcw_p1_subset_i_double.bin" : "xcw_p1_subset_i_single.bin");
+		return std::filesystem::path(d) / "xcw_p1_subset_i.bin";
 	}
 
-	//A read path is one settings token, so the file is copied into dir rather than named where it lies
+	//A read path is one settings token, so the file is copied into dir rather than named where it lies. The file
+	//holds the single-precision tiles summed in double; i_float rounds that sum to float on reading, as a
+	//single-precision build rounds it on storing.
 	std::string read_shared_tensor(const std::filesystem::path& dir, const bool held_double = false)
 	{
-		const auto p = shared_tensor(held_double);
+		const auto p = shared_tensor();
 		if (p.empty() || !std::filesystem::exists(p)) return "";
 		std::filesystem::copy_file(p, dir / "shared_i.bin", std::filesystem::copy_options::overwrite_existing);
-		return " read shared_i.bin";
+		return held_double ? " read shared_i.bin" : " read shared_i.bin i_float";
 	}
 
 	//One line of the lambda table run_XCW_fitting prints per converged step:
@@ -556,23 +558,21 @@ TEST(XcwScfTensorFileTests, OpenRejectsDamagedHeaders)
 //XCW runs on P1
 
 //The FIXTURES_SETUP of xcw_p1_tensor (SetIntegrationTestLocks.cmake): one SCF iteration is enough
-//to have the tensor written, single as the runs below build it and double as i_double holds it
+//to have the tensor written, held in double as i_double keeps it
 TEST(XcwScfTests, SharedTensorBuild)
 {
 	if (p1_fixture().empty()) GTEST_SKIP() << "fixture tests/P1_test not found";
-	if (shared_tensor(false).empty()) GTEST_SKIP() << "NOS_TEST_SHARED_DIR is not set, so every run builds its own tensor";
+	if (shared_tensor().empty()) GTEST_SKIP() << "NOS_TEST_SHARED_DIR is not set, so every run builds its own tensor";
 	const auto dir = scratch_dir();
-	std::filesystem::create_directories(shared_tensor(false).parent_path());
-	for (const bool held_double : { false, true }) {
-		std::filesystem::remove(shared_tensor(held_double));
-		const p1_run run = run_on_p1(dir, "normal normal_conv params 177 basis_set sto-3g max_iter 1 charge 0 mult 1 f rhf start 0 step_size 0.01 end 0 save i.bin" + std::string(held_double ? " i_double" : ""), true);
-		ASSERT_NE(run.out.find("I tensor written to i.bin"), std::string::npos) << run.out;
-		size_t kept = 0;
-		bool single = false;
-		ASSERT_TRUE(i_tensor_file::matches(dir / "i.bin", run.nr, p1_nmo, kept, single));
-		EXPECT_EQ(single, !held_double);
-		std::filesystem::copy_file(dir / "i.bin", shared_tensor(held_double));
-	}
+	std::filesystem::create_directories(shared_tensor().parent_path());
+	std::filesystem::remove(shared_tensor());
+	const p1_run run = run_on_p1(dir, "normal normal_conv params 177 basis_set sto-3g max_iter 1 charge 0 mult 1 f rhf start 0 step_size 0.01 end 0 i_double save i.bin", true);
+	ASSERT_NE(run.out.find("I tensor written to i.bin"), std::string::npos) << run.out;
+	size_t kept = 0;
+	bool single = true;
+	ASSERT_TRUE(i_tensor_file::matches(dir / "i.bin", run.nr, p1_nmo, kept, single));
+	EXPECT_FALSE(single);
+	std::filesystem::copy_file(dir / "i.bin", shared_tensor());
 	std::filesystem::remove_all(dir);
 }
 
@@ -667,7 +667,7 @@ TEST(XcwScfTests, StreamedTensorMatchesInMemory)
 	const auto dir = scratch_dir();
 	const std::string settings = common + "f rhf start 0.01 step_size 0.01 end 0.01";
 
-	const p1_run held = run_on_p1(dir, settings, true);
+	const p1_run held = run_on_p1(dir, settings + read_shared_tensor(dir), true);
 	EXPECT_EQ(held.out.find("I tensor streamed to disk"), std::string::npos);
 	EXPECT_FALSE(std::filesystem::exists(dir / "I_tensor_stream.bin"));
 	const auto rows = lambda_rows(held.out);
@@ -684,12 +684,12 @@ TEST(XcwScfTests, StreamedTensorMatchesInMemory)
 	EXPECT_TRUE(physical_criterion(rows[0].goof2)) << rows[0].goof2;
 	EXPECT_NE(held.log.find("Starting XCW SCF solver with lambda = 0.01000"), std::string::npos);
 	EXPECT_NE(held.log.find("***SCF converged in "), std::string::npos);
-	const int screened = static_cast<int>(number_after(held.out, "Screened out "));
-	EXPECT_GT(screened, 0);
-	const size_t kept = static_cast<size_t>(p1_pairs - screened);
 
 	std::filesystem::remove(dir / "NA2_0010000.tscb");
 	const p1_run streamed = run_on_p1(dir, settings + " i_tensor_mb 1", true);
+	const int screened = static_cast<int>(number_after(streamed.out, "Screened out "));
+	EXPECT_GT(screened, 0);
+	const size_t kept = static_cast<size_t>(p1_pairs - screened);
 	const std::string line_key = "I tensor streamed to disk: ";
 	ASSERT_NE(streamed.out.find(line_key), std::string::npos) << streamed.out;
 	EXPECT_NE(streamed.out.find("(single precision) total, "), std::string::npos) << streamed.out;

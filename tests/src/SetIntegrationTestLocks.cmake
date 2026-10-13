@@ -130,6 +130,7 @@ set_tests_properties(
         FIXTURES_SETUP xcw_p1_tensor
 )
 set_tests_properties(
+    XcwScfTests.StreamedTensorMatchesInMemory
     XcwScfTests.OrbitalJsonOverridesMatchTheLibraryBasis
     XcwScfTests.SmallBasisGuessStartsFromConvergedDensity
     XcwScfTests.UnrestrictedClosedShellAgainstF2MatchesRestricted
