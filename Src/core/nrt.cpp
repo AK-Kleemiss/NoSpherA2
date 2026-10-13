@@ -269,7 +269,9 @@ namespace
 		bool feasible = false;
 		double g = 0.0;           //s Tr(V^T Gamma V)
 		double rho_nl = 0.0;      //electrons outside the structure's own orbital set
-		MatrixXd V;
+		vec Mp;                   //orbitals V = M diag(wt) X, kept as M packed over each column's block, rebuilt by orbitals()
+		VectorXd wt;
+		MatrixXd X;
 		std::vector<std::array<double, 3>> polarity;  //{a, b, c_a^2 - c_b^2} per two-centre orbital
 		int sweeps = 0;
 		double change = 0.0;      //largest vector change of the last sweep
@@ -683,10 +685,26 @@ namespace
 		std::map<std::pair<int, int>, double> score_pair;
 	};
 
+	//V of a built candidate, the product build_orbitals formed
+	MatrixXd orbitals(const Candidate& c, const Blocks& B, const int n)
+	{
+		const int k = static_cast<int>(c.owner.size());
+		MatrixXd M = MatrixXd::Zero(n, k);
+		size_t p = 0;
+		for (int j = 0; j < k; j++) {
+			const std::pair<int, int>& o = c.owner[j];
+			if (o.first < 0) M(B.core[j], j) = c.Mp[p++];
+			else
+				for (const int i : o.first == o.second ? B.atom[o.first] : B.pair.at(o)) M(i, j) = c.Mp[p++];
+		}
+		return M * c.wt.asDiagonal() * c.X;
+	}
+
 	//Orbitals of a prescribed topology by the NBO search's steps: greedy fill, self-consistency sweep,
 	//occupancy-weighted orthogonalisation.  The sweep is required: a greedy pass leaves each orbital
-	//biased by later ones and the residual stops distinguishing topologies
-	void build_orbitals(Candidate& c, const MatrixXd& G0, const Blocks& B, const int max_sweeps, const bool keep = false)
+	//biased by later ones and the residual stops distinguishing topologies.  Returns V, empty if infeasible
+	MatrixXd build_orbitals(Candidate& c, const MatrixXd& G0, const Blocks& B, const int max_sweeps, const bool keep = false,
+							const int stall = 0)
 	{
 		struct Slot { int a, b, mult; double score; };
 		std::vector<Slot> slots;
@@ -696,7 +714,7 @@ namespace
 			for (int b = a + 1; b < c.topo.n; b++)
 				if (c.topo.at(a, b) > 0) {
 					const auto it = B.score_pair.find({ a, b });
-					if (it == B.score_pair.end()) return;   //not a bondable pair: infeasible
+					if (it == B.score_pair.end()) return {};   //not a bondable pair: infeasible
 					slots.push_back({ a, b, c.topo.at(a, b), it->second });
 				}
 		//Lone pairs first, as in the search: a bond slot filled earlier takes a metal d pair and keeps
@@ -710,8 +728,8 @@ namespace
 		const int n = static_cast<int>(G0.rows());
 		int k = static_cast<int>(B.core.size());
 		for (const Slot& sl : slots) k += sl.mult;
-		if (k > n) return;
-		if (k == 0) return;
+		if (k > n) return {};
+		if (k == 0) return {};
 		std::vector<VectorXd> v(k);
 		std::vector<const ivec*> blk(k, nullptr);
 		std::vector<std::pair<int, int>> owner(k, { -1, -1 });
@@ -736,7 +754,7 @@ namespace
 		ivec open;
 		for (const Slot& sl : slots) {
 			const ivec& idx = (sl.a == sl.b) ? B.atom[sl.a] : B.pair.at({ sl.a, sl.b });
-			if (static_cast<int>(idx.size()) < sl.mult) return;
+			if (static_cast<int>(idx.size()) < sl.mult) return {};
 			for (int m = 0; m < sl.mult; m++) {
 				int t = 0;
 				while (t < given && (taken[t] || c.owner[t] != std::make_pair(sl.a, sl.b))) t++;
@@ -789,6 +807,8 @@ namespace
 		MatrixXd Q;  //span the sweep started from; a QR costs about a sweep, so only kept near the end
 		std::deque<VectorXd> dX, dF;
 		VectorXd x_prev, f_prev;
+		double least = 0.0;   //-nrt_stall: smallest change since mixing started, and its sweep
+		int least_at = -1;
 		c.converged = nv == 0;
 		for (int s = 0; s < max_sweeps && !c.converged; s++) {
 			const VectorXd x0 = pack();
@@ -814,6 +834,10 @@ namespace
 				Q = Qn;
 			}
 			else Q.resize(0, 0);
+			if (stall > 0 && (x_prev.size() || change <= anderson_start) && (least_at < 0 || change < 0.999 * least)) {
+				least = change;
+				least_at = s;
+			}
 			if (x_prev.size() == 0 && change > anderson_start) continue;
 			//Anderson (type II) on the stacked block vectors
 			const VectorXd F = pack(), f = F - x0;
@@ -841,6 +865,7 @@ namespace
 				rank1_block(sum, idx, occ[o], v[o]);
 			}
 			if (Q.size()) Q = orth();  //the next sweep starts from the mixed iterate
+			if (stall > 0 && least_at >= 0 && s - least_at >= stall) break;
 		}
 
 		//Occupancy-weighted symmetric orthogonalisation: V = M W (W S W)^(-1/2)
@@ -852,19 +877,26 @@ namespace
 		if (keep) c.M = M;
 		else c.M.resize(0, 0);
 		const MatrixXd S = M.transpose() * M;
-		if (Eigen::SelfAdjointEigenSolver<MatrixXd>(S).eigenvalues()(0) < 1e-8) return;
-		c.V = M * wt.asDiagonal() *
-			  sym_power(MatrixXd(wt.asDiagonal() * S * wt.asDiagonal()), -0.5);
+		if (Eigen::SelfAdjointEigenSolver<MatrixXd>(S).eigenvalues()(0) < 1e-8) return {};
+		c.wt = wt;
+		c.X = sym_power(MatrixXd(wt.asDiagonal() * S * wt.asDiagonal()), -0.5);
+		c.Mp.clear();
+		for (int j = 0; j < k; j++)
+			if (j < first_valence) c.Mp.push_back(M(B.core[j], j));
+			else
+				for (const int i : *blk[j]) c.Mp.push_back(M(i, j));
+		MatrixXd V = orbitals(c, B, n);
 
 		for (int j = first_valence; j < k; j++) {
 			if (owner[j].first == owner[j].second) continue;
 			const int a = owner[j].first, b = owner[j].second;
 			double wa = 0.0, wb = 0.0;
-			for (const int i : B.atom[a]) wa += c.V(i, j) * c.V(i, j);
-			for (const int i : B.atom[b]) wb += c.V(i, j) * c.V(i, j);
+			for (const int i : B.atom[a]) wa += V(i, j) * V(i, j);
+			for (const int i : B.atom[b]) wb += V(i, j) * V(i, j);
 			c.polarity.push_back({ static_cast<double>(a), static_cast<double>(b), wa - wb });
 		}
 		c.feasible = true;
+		return V;
 	}
 
 	//Euclidean projection onto the probability simplex, Duchi et al., ICML 2008.
@@ -1282,7 +1314,7 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 			nrt.notes.push_back(std::to_string(maps.size() - ops.size()) + " of " + std::to_string(maps.size()) +
 								 " isometries miss the NAO density by 1 % or more; their images start from scratch");
 	}
-	int rotated = 0;
+	int rotated = 0, stalled = 0;
 #ifdef _OPENMP
 	const int nthreads = options.threads > 0 ? options.threads : omp_get_max_threads();
 #else
@@ -1315,21 +1347,22 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 			for (int a = 0; a < na; a++)
 				for (int b = 0; b < na; b++)
 					if (c.topo.at(a, b) != r.topo.at(a, b)) touched[a] = touched[b] = true;
+			const MatrixXd rV = orbitals(r, B, nn);
 			ivec keep;
-			for (int q = 0; q < r.V.cols(); q++)
+			for (int q = 0; q < rV.cols(); q++)
 				if (r.owner[q].first >= 0 && !touched[r.owner[q].first] && !touched[r.owner[q].second]) keep.push_back(q);
 			c.M = MatrixXd::Zero(nn, keep.size());
 			for (size_t q = 0; q < keep.size(); q++) {
 				const std::pair<int, int> o = r.owner[keep[q]];
-				for (const int i : o.first == o.second ? B.atom[o.first] : B.pair.at(o)) c.M(i, q) = r.V(i, keep[q]);
+				for (const int i : o.first == o.second ? B.atom[o.first] : B.pair.at(o)) c.M(i, q) = rV(i, keep[q]);
 				c.owner.push_back(o);
 			}
 		}
-		build_orbitals(c, gamma, B, 3);
+		const MatrixXd V = build_orbitals(c, gamma, B, 3);
 		if (!c.feasible) return;
-		const MatrixXd GV = gamma * c.V;
+		const MatrixXd GV = gamma * V;
 		double tr = 0.0;
-		for (int y = 0; y < c.V.cols(); y++) tr += c.V.col(y).dot(GV.col(y));
+		for (int y = 0; y < V.cols(); y++) tr += V.col(y).dot(GV.col(y));
 		c.g = scale * tr;
 	};
 	const auto admit = [&]() {
@@ -1337,16 +1370,20 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 		if (!nd) return 0;
 		MatrixXd gw = MatrixXd::Zero(nn, nn);
 		for (int i = 0; i < nc; i++)
-			if (w(i) > 0.0) gw.noalias() += (w(i) * scale) * cands[i].V * cands[i].V.transpose();
+			if (w(i) > 0.0) {
+				const MatrixXd V = orbitals(cands[i], B, nn);
+				gw.noalias() += (w(i) * scale) * V * V.transpose();
+			}
 		VectorXd Gw;
 		gather_mv(G, w, Gw);
 		const double level = w.dot(Gw) - g.dot(w);
 		vec r(nd);
 #pragma omp parallel for schedule(dynamic) num_threads(nthreads)
 		for (int j = 0; j < nd; j++) {
-			const MatrixXd GV = gw * deferred[j].V;
+			const MatrixXd V = orbitals(deferred[j], B, nn);
+			const MatrixXd GV = gw * V;
 			double tr = 0.0;
-			for (int y = 0; y < deferred[j].V.cols(); y++) tr += deferred[j].V.col(y).dot(GV.col(y));
+			for (int y = 0; y < V.cols(); y++) tr += V.col(y).dot(GV.col(y));
 			r[j] = 2.0 * (scale * tr - deferred[j].g) - 2.0 * level;
 		}
 		ivec order(nd);
@@ -1460,15 +1497,17 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 			for (int x = 0; x < nb; x++) {
 				if (pb) pb->update();
 				Candidate& c = cands[list[x]];
-				build_orbitals(c, gamma, B, 200, keep[list[x]]);
+				const MatrixXd V = build_orbitals(c, gamma, B, 200, keep[list[x]], options.nrt_stall);
 				if (!c.feasible) continue;
-				const MatrixXd GV = gamma * c.V;
+				const MatrixXd GV = gamma * V;
 				double tr = 0.0;
-				for (int y = 0; y < c.V.cols(); y++) tr += c.V.col(y).dot(GV.col(y));
+				for (int y = 0; y < V.cols(); y++) tr += V.col(y).dot(GV.col(y));
 				c.g = scale * tr;
 				c.rho_nl = electrons - tr;
 			}
 			pb.reset();
+			for (const int i : list)
+				if (cands[i].feasible && !cands[i].converged && cands[i].sweeps < 200) stalled++;
 		}
 		for (int i = static_cast<int>(built); i < nc0; i++) {
 			rotated += cands[i].feasible && cands[i].warm;
@@ -1520,7 +1559,7 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 
 		//G_ij = s^2 ||V_i^T V_j||_F^2 = s^2 <P_i, P_j>: pair loop or projector product, whichever is cheaper
 		int kmax = 0;
-		for (const Candidate& c : cands) kmax = std::max(kmax, static_cast<int>(c.V.cols()));
+		for (const Candidate& c : cands) kmax = std::max(kmax, static_cast<int>(c.X.cols()));
 		const double dnc = static_cast<double>(nc), dnn = static_cast<double>(nn), dnew = dnc * dnc - static_cast<double>(n0) * n0;
 		const double cost_pairs = 0.5 * dnew * static_cast<double>(kmax) * kmax * dnn;
 		const double cost_proj = 0.25 * dnew * dnn * dnn + 0.5 * dnc * dnn * dnn * kmax;
@@ -1534,7 +1573,7 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 			for (int R = 0; R < nblk; R++)
 				for (int C = R; C < nblk; C++) blocks.push_back({ R, C });
 			vec Zbuf(static_cast<size_t>(nbs) * nbs * nc);
-			MatrixXd Goff = MatrixXd::Zero(nc, nc);      //blocks with R < C, counted twice below
+			MatrixXd Goff = MatrixXd::Zero(nblk > 1 ? nc : 0, nc - n0);  //blocks with R < C over the new columns, counted twice below
 			G.rightCols(nc - n0).setZero();              //blocks with R == C, counted once
 			G.bottomRows(nc - n0).setZero();
 			//Tiles over the new structures' columns and every row up to them; a tile across the diagonal also fills
@@ -1554,17 +1593,19 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 				const size_t rows = static_cast<size_t>(wr) * wc;
 #pragma omp parallel for schedule(static) num_threads(nthreads)
 				for (int a = 0; a < nc; a++) {
+					const MatrixXd V = orbitals(cands[a], B, nn);
 					Eigen::Map<MatrixXd> Y(Zbuf.data() + static_cast<size_t>(a) * rows, wr, wc);
-					Y.noalias() = cands[a].V.middleRows(r0, wr) *
-								  cands[a].V.middleRows(c0, wc).transpose();
+					Y.noalias() = V.middleRows(r0, wr) * V.middleRows(c0, wc).transpose();
 				}
 				const Eigen::Map<const MatrixXd> Z(Zbuf.data(), static_cast<Eigen::Index>(rows), nc);
-				MatrixXd& acc = (blk.first == blk.second) ? G : Goff;
+				const bool diag = blk.first == blk.second;
+				MatrixXd& acc = diag ? G : Goff;
+				const int shift = diag ? 0 : n0;
 #pragma omp parallel for schedule(dynamic) num_threads(nthreads)
 				for (int t = 0; t < ntiles; t++) {
 					const int I = tiles[t].first, J = tiles[t].second;
 					const int wi = std::min(tile, nc - I), wj = std::min(tile, nc - J);
-					acc.block(I, J, wi, wj).noalias() +=
+					acc.block(I, J - shift, wi, wj).noalias() +=
 						Z.middleCols(I, wi).transpose() * Z.middleCols(J, wj);
 				}
 			}
@@ -1572,7 +1613,7 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 			const double s2 = scale * scale;
 			for (int i = 0; i < nc; i++)
 				for (int j = std::max(i, n0); j < nc; j++) {
-					G(i, j) = s2 * (G(i, j) + 2.0 * Goff(i, j));
+					G(i, j) = s2 * (nblk > 1 ? G(i, j) + 2.0 * Goff(i, j - n0) : G(i, j));
 					G(j, i) = G(i, j);
 				}
 
@@ -1586,7 +1627,7 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 			for (size_t p = 0; p < ncc; p += stride) {
 				const int i = static_cast<int>(p / nc), j = static_cast<int>(p % nc);
 				if (j < i) continue;
-				const double direct = s2 * (cands[i].V.transpose() * cands[j].V).squaredNorm();
+				const double direct = s2 * (orbitals(cands[i], B, nn).transpose() * orbitals(cands[j], B, nn)).squaredNorm();
 				const double d = std::abs(direct - G(i, j));
 				scale_ref = std::max(scale_ref, std::abs(direct));
 				if (d > worst) { worst = d; bad_i = i; bad_j = j; }
@@ -1601,12 +1642,16 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 			if (show)
 				pb.emplace(static_cast<unsigned long long>(nc), 50, "=", " ",
 						   "NRT: overlaps of " + std::to_string(nc) + " structures", log);
+			std::vector<MatrixXd> Vn(nc - n0);
+#pragma omp parallel for schedule(dynamic) num_threads(nthreads)
+			for (int j = n0; j < nc; j++) Vn[j - n0] = orbitals(cands[j], B, nn);
 #pragma omp parallel for schedule(dynamic) num_threads(nthreads)
 			for (int i = 0; i < nc; i++) {
 				if (pb) pb->update();
+				const MatrixXd Vi = i >= n0 ? Vn[i - n0] : orbitals(cands[i], B, nn);
 				for (int j = std::max(i, n0); j < nc; j++) {
 					const double v = scale * scale *
-									 (cands[i].V.transpose() * cands[j].V).squaredNorm();
+									 (Vi.transpose() * Vn[j - n0]).squaredNorm();
 					G(i, j) = v;
 					G(j, i) = v;
 				}
@@ -1700,6 +1745,9 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 							 std::to_string(screen_walked) + " walked structures built, over " + std::to_string(screen_rounds) + " refit(s)");
 	if (rotated)
 		nrt.notes.push_back(std::to_string(rotated) + " structure(s) started from a symmetry image's orbitals, rotated");
+	if (stalled)
+		nrt.notes.push_back("-nrt_stall " + std::to_string(options.nrt_stall) + ": " + std::to_string(stalled) +
+							 " structure(s) stopped their sweeps unconverged before the cap of 200");
 	const auto t_min1 = clock();
 	{
 		NboNrtCycle cy;

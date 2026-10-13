@@ -628,6 +628,11 @@ std::string help_message =
  "                                    images, refitting in between. Default off:\n"
  "                                    it can miss structures (SF6 at 0.2: D(w)\n"
  "                                    0.23 % higher); about 2.5 times faster.\n"
+ "  -nrt_stall <n>                     A structure's orbital sweeps stop once\n"
+ "                                    Anderson mixing has not lowered the largest\n"
+ "                                    vector change by 0.1 % for n sweeps, instead\n"
+ "                                    of running to the cap of 200. Default 0 =\n"
+ "                                    off.\n"
  "  -nrt_atoms <a,b,...>               Subspace NRT: only these 1-based atoms may\n"
  "                                    change, the rest keep the parent structure's\n"
  "                                    bonding. NBO's 'NRT <atoms>'.\n"
@@ -2746,7 +2751,7 @@ const std::set<std::string> &nbo_family_suboptions()
 		"-nbo_dir", "-nbo_47", "-nbo_e2min", "-nbo_threads", "-nbo_keep47", "-nrt",
 		"-nrt_e2", "-nrt_arrows", "-nrt_bond_scale", "-nrt_max", "-nrt_atoms",
 		"-nrt_exhaustive", "-nrt_no_symmetry", "-nrt_no_components", "-nrt_no_ion", "-nrt_parent",
-		"-nrt_target", "-nrt_screen", "-nrt_rotate"};
+		"-nrt_target", "-nrt_screen", "-nrt_rotate", "-nrt_stall"};
 	return known;
 }
 
@@ -2874,6 +2879,7 @@ bool options::digest_io_options(const std::string &temp, int &i)
 			}
 			else if (arguments[j] == "-nrt_screen")
 				opt.nrt_screen = arguments[j + 1] == "off" ? -1.0 : std::stod(arguments[j + 1]);
+			else if (arguments[j] == "-nrt_stall") opt.nrt_stall = std::stoi(arguments[j + 1]);
 			else if (arguments[j] == "-nrt_bond_scale")
 				opt.nrt_bond_scale = std::stod(arguments[j + 1]);
 			else if (arguments[j] == "-nrt_max") {

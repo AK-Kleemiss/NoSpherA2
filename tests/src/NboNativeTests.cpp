@@ -183,6 +183,13 @@ TEST(NboNativeTests, AGrownNrtCycleStatesAFloorItsFitRespects)
 	EXPECT_EQ(s.nrt.structures_found, r.nrt.structures_found);
 	EXPECT_NEAR(s.nrt.d_w, r.nrt.d_w, 1e-6);
 	EXPECT_TRUE(std::any_of(s.nrt.notes.begin(), s.nrt.notes.end(), [](const std::string& n) { return n.rfind("-nrt_screen", 0) == 0; }));
+	//-nrt_stall: nine builds whose mixing stopped gaining end before the cap, and the fit does not move
+	options.nrt_screen = -1.0;
+	options.nrt_stall = 20;
+	const NboResults t = native_nbo(wavy, options, log);
+	EXPECT_EQ(t.nrt.structures_found, r.nrt.structures_found);
+	EXPECT_NEAR(t.nrt.d_w, r.nrt.d_w, 1e-6);
+	EXPECT_TRUE(std::any_of(t.nrt.notes.begin(), t.nrt.notes.end(), [](const std::string& n) { return n.rfind("-nrt_stall", 0) == 0; }));
 }
 
 //CH3 doublet, `occ scf` B3LYP(VWN5)/def2-TZVP at the geometry of tests/nbo_reference_v2/data/ch3, where NBO 7
