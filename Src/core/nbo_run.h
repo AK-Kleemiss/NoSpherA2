@@ -87,6 +87,8 @@ struct NboBondOrder {
 	//Upper triangle and diagonal of the symmetric table only; on the diagonal covalent and ionic print "---" and stay 0.
 	bool diagonal = false;
 	std::string spin;           //"", "alpha", "beta", "composite"
+	//native only: the bond order's range over the weights with D(w) within 0.1 % of the fit's; < 0 = not computed
+	double range_lo = -1.0, range_hi = -1.0;
 };
 
 //What NRT derives from the converged weights per atom; the valency is the atom's bond-order sum.

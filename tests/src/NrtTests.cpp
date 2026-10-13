@@ -718,6 +718,12 @@ TEST(NrtTests, TheParentsSymmetryImageCompletesTheHexagon)
     EXPECT_NEAR(nrt.d_w, 0.0, 1e-8) << "the second Kekule structure is missing";
     for (int a = 0; a < na; a++)
         EXPECT_NEAR(bond_total(nrt, a + 1, (a + 1) % na + 1), 0.5, 1e-6) << "ring pair " << a + 1;
+    //an exact fit leaves no slack: every range is the bond order itself
+    for (const NboBondOrder& o : nrt.bond_orders)
+        if (!o.diagonal) {
+            EXPECT_NEAR(o.range_lo, o.total, 1e-6);
+            EXPECT_NEAR(o.range_hi, o.total, 1e-6);
+        }
 }
 
 //A double bond whose two orbitals lean to opposite atoms, i = c_A^2 - c_B^2 = +0.6 and -0.6, like Ni(CO)4's donor

@@ -732,8 +732,9 @@ void write_nbo_json(const NboResults& r, const std::filesystem::path& json_file)
 		const auto& b = r.nrt.bond_orders[i];
 		f << "      {\"atom1\": " << b.atom1 << ", \"atom2\": " << b.atom2 << ", \"total\": " << jnum(b.total)
 			<< ", \"covalent\": " << jnum(b.covalent) << ", \"ionic\": " << jnum(b.ionic)
-			<< ", \"diagonal\": " << (b.diagonal ? "true" : "false")
-			<< ", \"spin\": " << jstr(b.spin) << "}" << (i + 1 < r.nrt.bond_orders.size() ? "," : "") << "\n";
+			<< ", \"diagonal\": " << (b.diagonal ? "true" : "false");
+		if (b.range_lo >= 0.0) f << ", \"range\": [" << jnum(b.range_lo) << ", " << jnum(b.range_hi) << "]";
+		f << ", \"spin\": " << jstr(b.spin) << "}" << (i + 1 < r.nrt.bond_orders.size() ? "," : "") << "\n";
 	}
 	f << "    ],\n    \"valencies\": [\n";
 	for (size_t i = 0; i < r.nrt.valencies.size(); i++) {

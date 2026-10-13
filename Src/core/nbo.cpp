@@ -1342,12 +1342,15 @@ void print_nrt(const NboResults& r, std::ostream& out)
 	for (const NboBondOrder& b : n.bond_orders)
 		if (b.diagonal) lone_pairs[{ b.spin, b.atom1 }] = b.total;
 	for (const std::string& spin : spins_of(n.bond_orders)) {
-		out << title("Natural bond orders", spin) << "  atom   atom        total  covalent     ionic\n"
+		out << title("Natural bond orders", spin) << "  atom   atom        total  covalent     ionic   range at D(w) + 0.1 %\n"
 			<< setprecision(4);
 		for (const NboBondOrder& b : n.bond_orders)
-			if (b.spin == spin && !b.diagonal)
+			if (b.spin == spin && !b.diagonal) {
 				out << "  " << left << setw(7) << label(b.atom1) << setw(7) << label(b.atom2) << right
-					<< setw(10) << b.total << setw(10) << b.covalent << setw(10) << b.ionic << "\n";
+					<< setw(10) << b.total << setw(10) << b.covalent << setw(10) << b.ionic;
+				if (b.range_lo >= 0.0) out << "   " << b.range_lo << " - " << b.range_hi;
+				out << "\n";
+			}
 	}
 	for (const std::string& spin : spins_of(n.valencies)) {
 		out << title("Natural atomic valencies", spin)

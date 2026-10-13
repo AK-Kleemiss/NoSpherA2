@@ -1505,6 +1505,63 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 		}
 	}
 
+	//Bond orders the near-optimal fits allow: f(w') >= f + sum_j w'_j r_j with reduced costs r_j >= 0, so within
+	//D(w')^2 <= 1.001^2 f only structures with r_j <= eps carry weight; on them min and max of t.w' by bisection on the
+	//multiplier mu of f(w') + mu t.w'
+	const double eps = 0.002001 * std::max(f, 0.0);
+	ivec near;
+	{
+		VectorXd Gw;
+		gather_mv(G, w, Gw);
+		const VectorXd grad = 2.0 * (Gw - g);
+		const double level = grad.dot(w);
+		for (int i = 0; i < nc; i++)
+			if (w(i) > 0.0 || grad(i) - level <= eps) near.push_back(i);
+	}
+	const int nr = static_cast<int>(near.size());
+	MatrixXd Gn(nr, nr);
+	VectorXd gn(nr), wn(nr);
+	for (int i = 0; i < nr; i++) {
+		gn(i) = g(near[i]);
+		wn(i) = w(near[i]);
+		for (int j = 0; j < nr; j++) Gn(i, j) = G(near[i], near[j]);
+	}
+	std::map<std::pair<int, int>, std::pair<double, double>> ranges;
+	const auto bond_range = [&](const int a, const int b) {
+		//one bisection per pair orbit of the symmetry maps
+		std::set<std::pair<int, int>> orbit{ { a, b } };
+		std::vector<std::pair<int, int>> todo{ { a, b } };
+		while (!todo.empty()) {
+			const std::pair<int, int> q = todo.back();
+			todo.pop_back();
+			for (const ivec& p : maps) {
+				const std::pair<int, int> r{ std::min(p[q.first], p[q.second]), std::max(p[q.first], p[q.second]) };
+				if (orbit.insert(r).second) todo.push_back(r);
+			}
+		}
+		const auto known = ranges.find(*orbit.begin());
+		if (known != ranges.end()) return known->second;
+		VectorXd t(nr);
+		for (int i = 0; i < nr; i++) t(i) = unit * cands[near[i]].topo.at(a, b);
+		double ext[2];
+		for (int s = 0; s < 2; s++) {
+			VectorXd x = wn, best = wn;
+			const auto feasible = [&](const double mu) {
+				solve_qp(Gn, gn - (s ? -0.5 : 0.5) * mu * t, trg2, x, 3000, nullptr, spin, nullptr);
+				return objective(Gn, gn, trg2, x) <= f + eps;
+			};
+			double lo = 0.0, hi = 1e-3;
+			while (hi < 1e6 && feasible(hi)) { best = x; lo = hi; hi *= 4.0; }
+			for (int it = 0; it < 30; it++) {
+				const double mid = 0.5 * (lo + hi);
+				if (feasible(mid)) { best = x; lo = mid; }
+				else hi = mid;
+			}
+			ext[s] = t.dot(best);
+		}
+		return ranges[*orbit.begin()] = { ext[0], ext[1] };
+	};
+
 	//Ionic share of a bond order is |i| b per structure, i = c_A^2 - c_B^2: linear in |i|, not i^2 (NBO 7 convention);
 	//Ni(CO)4's donor and back-donor Ni-C orbitals have opposite i and must not cancel
 	vec valency(na, 0.0), covalency(na, 0.0), electrovalency(na, 0.0);
@@ -1520,6 +1577,9 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 			o.total = t;
 			o.ionic = ion * t;
 			o.covalent = t - o.ionic;
+			const std::pair<double, double> range = bond_range(a, b);
+			o.range_lo = range.first;
+			o.range_hi = range.second;
 			nrt.bond_orders.push_back(o);
 			valency[a] += t;            valency[b] += t;
 			covalency[a] += o.covalent; covalency[b] += o.covalent;

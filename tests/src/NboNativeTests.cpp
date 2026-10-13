@@ -459,4 +459,11 @@ TEST(NboNativeTests, NickelTetracarbonylKeepsOneDativeBondAndItsParent)
 	}
 	for (const auto &x : range)
 		EXPECT_NEAR(x.second.first, x.second.second, 1e-6) << x.first;
+	//Ni-C is barely determined: weights within 0.1 % of the optimal D(w) move it by more than 0.1 either way
+	for (const NboBondOrder &b : r.nrt.bond_orders) {
+		if (b.diagonal || b.total < 0.1) continue;
+		EXPECT_LE(b.range_lo, b.total + 1e-9);
+		EXPECT_GE(b.range_hi, b.total - 1e-9);
+		if (r.npa[b.atom1 - 1].element == "Ni") EXPECT_GT(b.range_hi - b.range_lo, 0.2);
+	}
 }
