@@ -423,6 +423,9 @@ rgbi = ""
 # so the TFVC pass in each tscb creation is part of them: from lambda 0.04 on the subset
 # density has no minimum along N8-H8 and the F/F2 scans log its 'Unexpected number of
 # extrema (0)' line twice.
+# P1_test_XCW builds the subset's I tensor and saves it to p1_i.bin; the other subset goldens
+# read it (ctest fixture xcw_p1_golden_tensor). Reading prints one line in place of the build's
+# seven and leaves every number as the build gives it.
 
 [P1_test_XCW]
 directory = "P1_test"
@@ -434,7 +437,7 @@ no_gpu = ""
 cif = "P1_test_NA2.cif"
 hkl = "P1_subset.hkl"
 anom_disp = "anom_disp.txt"
-XCW_settings = "test_settings.txt"
+XCW_settings = "test_settings_save.txt"
 no_date = ""
 
 # Longer lambda scan exercising the Gaussian halting criterion over a real
@@ -469,7 +472,7 @@ no_gpu = ""
 cif = "P1_test_NA2.cif"
 hkl = "P1_subset.hkl"
 anom_disp = "anom_disp.txt"
-XCW_settings = "h2_test_settings.txt"
+XCW_settings = "h2_test_settings_read.txt"
 no_date = ""
 
 # h2_weighting variant of P1_test_XCW_full, same RUN_FULL_TEST gating,
@@ -515,7 +518,7 @@ xcw_int_precision = "1e-12"
 cif = "P1_test_NA2.cif"
 hkl = "P1_subset.hkl"
 anom_disp = "anom_disp.txt"
-XCW_settings = "test_settings.txt"
+XCW_settings = "test_settings_read.txt"
 no_date = ""
 
 # P1_test_XCW against the F^2 criterion
@@ -530,7 +533,7 @@ no_gpu = ""
 cif = "P1_test_NA2.cif"
 hkl = "P1_subset.hkl"
 anom_disp = "anom_disp.txt"
-XCW_settings = "test_settings_f2.txt"
+XCW_settings = "test_settings_f2_read.txt"
 no_date = ""
 
 [P1_F2_test_XCW_full]
@@ -561,7 +564,7 @@ no_gpu = ""
 cif = "P1_test_NA2.cif"
 hkl = "P1_subset.hkl"
 anom_disp = "anom_disp.txt"
-XCW_settings = "h2_test_settings_f2.txt"
+XCW_settings = "h2_test_settings_f2_read.txt"
 no_date = ""
 
 [P1_F2_test_XCW_h2_full]

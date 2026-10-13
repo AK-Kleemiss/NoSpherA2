@@ -21,6 +21,7 @@ GridManager: Generating integration grids for atoms...
 GridManager: Generated total of 93098 grid points.
 Total number of grid points after pruning: 93092
 AO values calculated for all grids.
+Writing the I tensor to p1_i.bin in the background; a later run can `read p1_i.bin` instead of building it
 Screened out 2668 unique pairs of mu, nu (49.81%) 
 Skipped evaluation of 5584182 grids (11.28%) 
 More detailed output in XCW.log file...
@@ -36,4 +37,5 @@ ________________________________________________________________________________
 WARNING: Unexpected number of extrema (0) found between atoms 8 and 9. Setting chi to 1.0.
 0.05000		3.5536		3.5689		0.02090		-1961.706062594		0.178		-1961.528380282		3.4934		0.02125
 WARNING: Unexpected number of extrema (0) found between atoms 8 and 9. Setting chi to 1.0.
+I tensor written to p1_i.bin
 Finished XCW fitting procedure.
