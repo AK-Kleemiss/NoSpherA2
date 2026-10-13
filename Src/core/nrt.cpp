@@ -1788,22 +1788,22 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 	//D(w')^2 <= 1.001^2 f only structures with r_j <= eps carry weight; on them min and max of t.w' by bisection on the
 	//multiplier mu of f(w') + mu t.w'
 	const double eps = 0.002001 * std::max(f, 0.0);
-	ivec near;
+	ivec nearw;
 	{
 		VectorXd Gw;
 		gather_mv(G, w, Gw);
 		const VectorXd grad = 2.0 * (Gw - g);
 		const double level = grad.dot(w);
 		for (int i = 0; i < nc; i++)
-			if (w(i) > 0.0 || grad(i) - level <= eps) near.push_back(i);
+			if (w(i) > 0.0 || grad(i) - level <= eps) nearw.push_back(i);
 	}
-	const int nr = static_cast<int>(near.size());
+	const int nr = static_cast<int>(nearw.size());
 	MatrixXd Gn(nr, nr);
 	VectorXd gn(nr), wn(nr);
 	for (int i = 0; i < nr; i++) {
-		gn(i) = g(near[i]);
-		wn(i) = w(near[i]);
-		for (int j = 0; j < nr; j++) Gn(i, j) = G(near[i], near[j]);
+		gn(i) = g(nearw[i]);
+		wn(i) = w(nearw[i]);
+		for (int j = 0; j < nr; j++) Gn(i, j) = G(nearw[i], nearw[j]);
 	}
 	std::map<std::pair<int, int>, std::pair<double, double>> ranges;
 	const auto bond_range = [&](const int a, const int b) {
@@ -1821,7 +1821,7 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 		const auto known = ranges.find(*orbit.begin());
 		if (known != ranges.end()) return known->second;
 		VectorXd t(nr);
-		for (int i = 0; i < nr; i++) t(i) = unit * cands[near[i]].topo.at(a, b);
+		for (int i = 0; i < nr; i++) t(i) = unit * cands[nearw[i]].topo.at(a, b);
 		double ext[2];
 		for (int s = 0; s < 2; s++) {
 			VectorXd x = wn, best = wn;
