@@ -295,6 +295,7 @@ namespace
 		ivec valence;        //valence electrons of the neutral atom: Z_eff minus two per core NAO
 		bool ion = true;
 		bool use_components = true;
+		bool shift_arrows = false;  //-nrt_mirror
 	};
 
 	bool acceptable(const Topology& s, const Limits& L)
@@ -320,7 +321,7 @@ namespace
 	void expand(const Candidate& c, const Limits& L, std::vector<Candidate>& out)
 	{
 		const int n = c.topo.n;
-		const int q0 = c.depth == 0 ? separation(c.topo, L) : 0;
+		const int q0 = L.shift_arrows && c.depth == 0 ? separation(c.topo, L) : 0;
 		const auto emit = [&](Topology s, const int x, const int y, const int z = -1) {
 			if (!L.free_atom[x] || !L.free_atom[y]) return;
 			if (!acceptable(s, L)) return;
@@ -330,7 +331,7 @@ namespace
 			};
 			if (c.depth > 0 && !touched(x) && !touched(y) && !touched(z)) return;
 			Candidate d;
-			d.arrow = c.depth == 0 && separation(s, L) <= q0;
+			d.arrow = L.shift_arrows && c.depth == 0 && separation(s, L) <= q0;
 			d.topo = std::move(s);
 			d.root = c.root;
 			d.depth = c.depth + 1;
@@ -1099,6 +1100,7 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 	L.bondable = bondable;  //nrt_bond_scale screen, not the search's
 	L.ion = options.nrt_ion;
 	L.use_components = options.nrt_components;
+	L.shift_arrows = options.nrt_mirror;
 	L.deloc = delocalisation_graph(lewis, e2, options.nrt_e2_kcal, na, L.bondable);
 	L.comp = components(L.deloc);
 	L.cap.assign(na, 0);
@@ -1216,9 +1218,10 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 				dist[a][b] = std::hypot((*xyz)[a][0] - (*xyz)[b][0], (*xyz)[a][1] - (*xyz)[b][1], (*xyz)[a][2] - (*xyz)[b][2]);
 	}
 	const std::vector<ivec> maps = options.nrt_symmetry && !options.nrt_exhaustive ? symmetry_maps(Z, L, xyz ? &dist : nullptr) : std::vector<ivec>();
-	//the walk's budget can cut through a symmetry orbit; the images of what it kept complete it.  New means not a
-	//candidate: seen also holds the dropped intermediates
+	//the walk's budget can cut through a symmetry orbit; the images of what it kept complete it.  New means not seen,
+	//or under -nrt_mirror not a candidate: seen also holds the dropped intermediates
 	const auto listed = [&]() {
+		if (!options.nrt_mirror) return seen;
 		std::set<ivec> keys;
 		for (const Candidate& c : cands) keys.insert(c.topo.key());
 		return keys;
@@ -1287,7 +1290,7 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 				const size_t before = cands.size(), n_refs = refs.size();
 				for (const Candidate& r : refs) walked.insert(r.topo.key());
 				const size_t room = std::min(n_refs * static_cast<size_t>(budget), pool_cap - cands.size());
-				for (Candidate& c : grow(std::move(refs), room, false, true)) cands.push_back(std::move(c));
+				for (Candidate& c : grow(std::move(refs), room, false, options.nrt_mirror)) cands.push_back(std::move(c));
 				nrt.notes.push_back(std::to_string(n_refs) + " symmetry reference(s) of the parent walked, " +
 									 std::to_string(cands.size() - before) + " new structures");
 			}

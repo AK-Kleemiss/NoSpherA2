@@ -61,6 +61,7 @@ struct NboOptions {
 	double nrt_screen = -1.0;          //-nrt_screen: a walk of nrt_screen_min+ structures builds those whose approximate reduced cost is below it; < 0 = all
 	int nrt_screen_min = 200;
 	int nrt_stall = 0;                 //-nrt_stall: a build stops once mixing has made no new 0.1 % low of the largest change for this many sweeps; 0 = off
+	bool nrt_mirror = false;           //-nrt_mirror: one-move arrows that separate no charge, orbits completed against the candidates
 	bool nrt_rotate = false;           //-nrt_rotate: an image of a converged structure starts from its orbitals, rotated; moves bond orders by up to 2e-4
 	double nrt_weight_floor = 5.0e-5;  //weights below this are dropped from the reported set
 	bool nrt = false;

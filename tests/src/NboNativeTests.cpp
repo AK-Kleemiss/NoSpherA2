@@ -35,6 +35,7 @@ namespace {
 		WFN wavy(p);
 		NboOptions options;
 		options.nrt = true;
+		options.nrt_mirror = true;
 		std::ostringstream log;
 		return native_nbo(wavy, options, log);
 	}
@@ -245,7 +246,7 @@ TEST(NboNativeTests, MethylRadicalSplitsItsBondsPerSpinAsNbo7Does)
 //Allyl, `occ scf` B3LYP(VWN5)/def2-SVP at the geometry of tests/nbo_reference_v2/data/allyl made exactly C2v:
 //the doublet, the cation, and the cation with C1-C2 0.006 A shorter than C1-C3 (allyl_cation_d), beyond the 0.01 A
 //distance tolerance that pairs C2 with C3.  The parent's mirror image is one bond shift away: as a half-arrow
-//intermediate it was walked through and lost, and the mirror bonds came out 1.446 and 1.462.
+//intermediate it is walked through and lost, and without -nrt_mirror the mirror bonds come out 1.446 and 1.462.
 TEST(NboNativeTests, TheAllylCationsMirrorStructuresWeighAlike)
 {
 	const auto p = allyl_fixture("allyl_cation");
