@@ -597,7 +597,7 @@ TEST(XcwScfTests, SaveThenReadTensorReproducesLambdaZero)
 	const auto dir = scratch_dir();
 	const std::string settings = common + "f rhf start 0 step_size 0.01 end 0 read tensor.bin save tensor.bin";
 
-	const p1_run first = run_on_p1(dir, settings, true);
+	const p1_run first = run_on_p1(dir, settings + read_shared_eri(dir), true);
 	EXPECT_EQ(first.nr, 402);
 	EXPECT_NE(first.out.find("XCW orbital basis set: sto-3g-basis"), std::string::npos);
 	EXPECT_EQ(first.out.find("Could not open anomalous dispersion file"), std::string::npos);
@@ -740,13 +740,17 @@ TEST(XcwScfTests, OrbitalJsonOverridesMatchTheLibraryBasis)
 	const auto basis = BasisSetLibrary::get_basis_set("sto-3g");
 	basis->write_occ_json(dir / "override basis.json", { 1, 6, 7, 8, 16, 17 });
 	const auto baseline = run_on_p1(dir, common + "start 0 end 0 " + read_shared_tensor(dir), false);
-	const auto overridden = run_on_p1(dir, common + "basis_overrides \"" + (dir / "override basis.json").string() + "\" start 0 end 0 ", false);
+	const std::string eri = read_shared_eri(dir);
+	const auto overridden = run_on_p1(dir, common + "basis_overrides \"" + (dir / "override basis.json").string() + "\" start 0 end 0" + eri, false);
 	const auto a = lambda_rows(baseline.out), b = lambda_rows(overridden.out);
 	ASSERT_EQ(a.size(), 1u);
 	ASSERT_EQ(b.size(), 1u);
 	EXPECT_NEAR(a[0].d(a[0].energy), b[0].d(b[0].energy), 1e-8);
 	EXPECT_NEAR(a[0].d(a[0].criterion), b[0].d(b[0].criterion), 1e-6);
 	EXPECT_NE(overridden.log.find("_overrides_override basis.json"), std::string::npos);
+	//The library basis's stored integrals are keyed on every exponent, coefficient and centre: read back, the
+	//override is that basis to the last bit
+	if (!eri.empty()) EXPECT_NE(overridden.log.find("read from shared_eri.bin"), std::string::npos) << overridden.log;
 	std::filesystem::remove_all(dir);
 }
 
