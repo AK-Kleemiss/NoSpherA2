@@ -1,5 +1,6 @@
 #include "pch.h"
 
+#include "core/constants.h"
 #include "core/nbo.h"
 
 //Natural resonance theory on inputs small enough that the answer is known by hand. nrt.cpp's internals sit
@@ -673,4 +674,86 @@ TEST(NrtTests, AnOpenShellParentSplitsBySpinAndALargeOneIsPrintedAsRows)
     EXPECT_NE(json.find("[\"C8\", \"C9\", 1],\n      [\"C9\", \"C10\", 1]"), std::string::npos) << json;
     EXPECT_NE(json.find("[\"C40\", \"C41\", 1] ]\n  },\n  \"beta\": {\n"), std::string::npos) << json;
     EXPECT_EQ(json.substr(json.size() - 7), "]\n  }\n}");
+}
+
+//A hexagon of one-NAO atoms whose density lies halfway between its two Kekule structures, with no E2 to walk on:
+//the second structure is only reachable as the parent's image under the hexagon's rotation, and the two then fit
+//the density exactly with half a bond on every ring pair.
+TEST(NrtTests, TheParentsSymmetryImageCompletesTheHexagon)
+{
+    const int na = 6;
+    const NAOResult nao = h_chain(na);
+    bvec2 ring(na, bvec(na, false));
+    vec2 dist(na, vec(na, 0.0));
+    dMatrix2 gamma(na, na);
+    for (int a = 0; a < na; a++) {
+        const int b = (a + 1) % na;
+        ring[a][b] = ring[b][a] = true;
+        gamma(a, a) += 0.5;
+        gamma(b, b) += 0.5;
+        gamma(a, b) += 0.5;
+        gamma(b, a) += 0.5;
+        for (int c = 0; c < na; c++)
+            dist[a][c] = 2.0 * std::abs(std::sin(constants::PI * (a - c) / na));
+    }
+    NboLewis L;
+    L.gamma = gamma;
+    L.topo.assign(na, ivec(na, 0));
+    for (int a = 0; a < na; a += 2) {
+        NboFunction f;
+        f.centers = { a, a + 1 };
+        f.type = "BD";
+        f.multiplicity = 1;
+        f.occupancy = 1.5;
+        L.orbitals.push_back(f);
+        L.topo[a][a + 1] = L.topo[a + 1][a] = 1;
+    }
+    L.n_lewis = 3;
+    NboOptions opt;
+    opt.nrt = true;
+    NboNrt nrt;
+    std::ostringstream log;
+    native_nrt(nrt, nao, L, {}, ring, opt, "", 2.0, log, &dist);
+    ASSERT_TRUE(nrt.present);
+    EXPECT_NEAR(nrt.d_w, 0.0, 1e-8) << "the second Kekule structure is missing";
+    for (int a = 0; a < na; a++)
+        EXPECT_NEAR(bond_total(nrt, a + 1, (a + 1) % na + 1), 0.5, 1e-6) << "ring pair " << a + 1;
+}
+
+//A double bond whose two orbitals lean to opposite atoms, i = c_A^2 - c_B^2 = +0.6 and -0.6, like Ni(CO)4's donor
+//and back-donor Ni-C orbitals: the ionic share is the weighted |i| of each orbital, 0.6 of the bond order, not
+//|0.6 - 0.6| = 0. Occupancies 2 and 1.8 keep the two orbitals apart.
+TEST(NrtTests, OppositelyPolarisedOrbitalsOfABondDoNotCancelInItsIonicShare)
+{
+    const NAOResult nao = h_chain_shells(2, 2);
+    const vec v1 = { std::sqrt(0.8), 0.0, std::sqrt(0.2), 0.0 };
+    const vec v2 = { 0.0, std::sqrt(0.2), 0.0, std::sqrt(0.8) };
+    dMatrix2 gamma(4, 4);
+    for (int i = 0; i < 4; i++)
+        for (int j = 0; j < 4; j++)
+            gamma(i, j) = 2.0 * v1[i] * v1[j] + 1.8 * v2[i] * v2[j];
+    NboLewis L;
+    L.gamma = gamma;
+    NboFunction f;
+    f.centers = { 0, 1 };
+    f.type = "BD";
+    f.occupancy = 2.0;
+    f.multiplicity = 1;
+    L.orbitals.push_back(f);
+    f.multiplicity = 2;
+    f.occupancy = 1.8;
+    L.orbitals.push_back(f);
+    L.n_lewis = 2;
+    L.topo = { { 0, 2 }, { 2, 0 } };
+    NboOptions opt;
+    opt.nrt = true;
+    NboNrt nrt;
+    std::ostringstream log;
+    native_nrt(nrt, nao, L, {}, chain_bondable(2), opt, "", 2.0, log);
+    ASSERT_TRUE(nrt.present);
+    for (const NboBondOrder& o : nrt.bond_orders)
+        if (!o.diagonal) {
+            EXPECT_NEAR(o.total, 2.0, 1e-12);
+            EXPECT_NEAR(o.ionic, 1.2, 1e-6);
+        }
 }

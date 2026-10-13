@@ -380,6 +380,107 @@ namespace
 		rec(0, n_pairs - fixed_pairs);
 	}
 
+	//Weisfeiler-Lehman colours of the bondable skeleton, starting from Z, three rounds
+	ivec skeleton_colours(const ivec& Z, const bvec2& adj)
+	{
+		const int n = static_cast<int>(Z.size());
+		ivec col = Z;
+		for (int r = 0; r < 3; r++) {
+			std::map<std::pair<int, ivec>, int> id;
+			ivec next(n);
+			for (int a = 0; a < n; a++) {
+				ivec nb;
+				for (int b = 0; b < n; b++)
+					if (b != a && adj[a][b]) nb.push_back(col[b]);
+				std::sort(nb.begin(), nb.end());
+				next[a] = id.emplace(std::make_pair(col[a], nb), static_cast<int>(id.size())).first->second;
+			}
+			col = next;
+		}
+		return col;
+	}
+
+	//An automorphism pi of the coloured skeleton with pi[u] = v, atoms placed breadth first from u; with distances
+	//(bohr) an isometry to 0.01 bohr
+	bool skeleton_map(const int u, const int v, const ivec& col, const bvec2& adj, const vec2* dist, ivec& pi, long budget)
+	{
+		const int n = static_cast<int>(col.size());
+		ivec order, from(n, -1);
+		bvec in(n, false);
+		for (int r = -1; r < n; r++) {
+			const int s = r < 0 ? u : r;
+			if (in[s]) continue;
+			in[s] = true;
+			order.push_back(s);
+			for (size_t k = order.size() - 1; k < order.size(); k++)
+				for (int b = 0; b < n; b++)
+					if (!in[b] && adj[order[k]][b]) { in[b] = true; from[b] = order[k]; order.push_back(b); }
+		}
+		pi.assign(n, -1);
+		bvec used(n, false);
+		std::function<bool(int)> place = [&](const int k) {
+			if (k == n) return true;
+			if (--budget < 0) return false;
+			const int a = order[k];
+			for (int b = 0; b < n; b++) {
+				if (used[b] || col[b] != col[a] || (k == 0 && b != v) || (from[a] >= 0 && !adj[pi[from[a]]][b])) continue;
+				bool ok = true;
+				for (int j = 0; j < k && ok; j++)
+					ok = dist ? std::abs((*dist)[a][order[j]] - (*dist)[b][pi[order[j]]]) < 0.01 : adj[a][order[j]] == adj[b][pi[order[j]]];
+				if (!ok) continue;
+				pi[a] = b;
+				used[b] = true;
+				if (place(k + 1)) return true;
+				pi[a] = -1;
+				used[b] = false;
+			}
+			return false;
+		};
+		return place(0);
+	}
+
+	//The parent's images under the skeleton's automorphisms, closed under composition up to cap images, without
+	//those that break the limits or move a fixed atom
+	std::vector<Topology> parent_images(const Topology& parent, const ivec& Z, const Limits& L, const vec2* dist, const size_t cap, bool& capped)
+	{
+		const int n = parent.n;
+		const ivec col = skeleton_colours(Z, L.bondable);
+		//one map per pair of atoms the maps found so far do not already join into one orbit
+		std::vector<ivec> maps;
+		ivec pi, orbit(n);
+		for (int a = 0; a < n; a++) orbit[a] = a;
+		const auto root = [&](int a) {
+			while (orbit[a] != a) a = orbit[a] = orbit[orbit[a]];
+			return a;
+		};
+		for (int u = 0; u < n; u++)
+			for (int v = u + 1; v < n; v++)
+				if (col[v] == col[u] && root(u) != root(v) && skeleton_map(u, v, col, L.bondable, dist, pi, 20000)) {
+					maps.push_back(pi);
+					for (int a = 0; a < n; a++) orbit[root(a)] = root(pi[a]);
+				}
+		std::set<ivec> seen{ parent.key() };
+		std::vector<Topology> all{ parent };
+		capped = false;
+		for (size_t i = 0; i < all.size() && !capped; i++)
+			for (const ivec& p : maps) {
+				Topology t(n);
+				for (int a = 0; a < n; a++)
+					for (int b = 0; b < n; b++) t.at(p[a], p[b]) = all[i].at(a, b);
+				if (!seen.insert(t.key()).second) continue;
+				if (all.size() > cap) { capped = true; break; }
+				all.push_back(std::move(t));
+			}
+		std::vector<Topology> out;
+		for (size_t i = 1; i < all.size(); i++) {
+			bool keep = acceptable(all[i], L);
+			for (int a = 0; a < n && keep; a++)
+				for (int b = 0; b < n && keep && !L.free_atom[a]; b++) keep = all[i].at(a, b) == parent.at(a, b);
+			if (keep) out.push_back(all[i]);
+		}
+		return out;
+	}
+
 	MatrixXd sym_power(const MatrixXd& M, const double p, const double rel_floor = 1e-10)
 	{
 		Eigen::SelfAdjointEigenSolver<MatrixXd> es(M);
@@ -717,7 +818,7 @@ namespace
 void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 				const std::vector<NboE2Entry>& e2, const bvec2& bondable,
 				const NboOptions& options, const std::string& spin, const double scale,
-				std::ostream& log)
+				std::ostream& log, const vec2* distances)
 {
 	const auto clock = [] { return std::chrono::steady_clock::now(); };
 	const auto secs = [](const std::chrono::steady_clock::time_point a,
@@ -876,6 +977,21 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 					r.topo = cands[i].topo;
 					refs.push_back(std::move(r));
 				}
+			//the images no arrow walk reaches, such as benzene's second Kekule structure three pair moves away
+			bool capped = false;
+			int images = 0;
+			for (Topology& t : parent_images(parent, Z, L, distances, 64, capped))
+				if (seen.insert(t.key()).second) {
+					Candidate c;
+					c.topo = t;
+					cands.push_back(std::move(c));
+					Candidate r;
+					r.topo = std::move(t);
+					refs.push_back(std::move(r));
+					images++;
+				}
+			nrt.notes.push_back(std::to_string(images) + " symmetry image(s) of the parent added" +
+								 (capped ? ", the closure stopped at 64 images" : ""));
 			if (!refs.empty() && cands.size() < pool_cap) {
 				const size_t before = cands.size(), n_refs = refs.size();
 				for (const Candidate& r : refs) walked.insert(r.topo.key());
@@ -1252,7 +1368,7 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 			std::sort(m.begin(), m.end(),
 					  [&](const int a, const int b) { return cands[a].g < cands[b].g; });
 			for (size_t k = 0; k < m.size(); k++) {
-				if (k && cands[m[k]].g - cands[m[k - 1]].g <= 1e-5)
+				if (k && cands[m[k]].g - cands[m[k - 1]].g <= 1e-3)
 					member.back().push_back(m[k]);
 				else
 					member.push_back(ivec{ m[k] });
@@ -1304,7 +1420,7 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 
 	const auto t_other0 = clock();
 	vec2 bo(na, vec(na, 0.0));        //bond orders, diagonal = lone pairs
-	vec2 pol(na, vec(na, 0.0));       //weight-summed c_A^2 - c_B^2 of the bonds on the pair
+	vec2 pol(na, vec(na, 0.0));       //weight-summed |c_A^2 - c_B^2| of the bonds on the pair
 	//Topology units: electron pairs closed shell, single electrons per spin open shell
 	const double unit = scale / 2.0;
 	for (int i = 0; i < nc; i++) {
@@ -1314,17 +1430,18 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 				bo[a][b] += unit * w(i) * cands[i].topo.at(a, b);
 		for (const std::array<double, 3>& p : cands[i].polarity) {
 			const int a = static_cast<int>(p[0]), b = static_cast<int>(p[1]);
-			pol[std::min(a, b)][std::max(a, b)] += unit * w(i) * ((a < b) ? p[2] : -p[2]);
+			pol[std::min(a, b)][std::max(a, b)] += unit * w(i) * std::abs(p[2]);
 		}
 	}
 
-	//Ionic share of a bond order is |i| b, i = c_A^2 - c_B^2: linear in |i|, not i^2 (NBO 7 convention)
+	//Ionic share of a bond order is |i| b per structure, i = c_A^2 - c_B^2: linear in |i|, not i^2 (NBO 7 convention);
+	//Ni(CO)4's donor and back-donor Ni-C orbitals have opposite i and must not cancel
 	vec valency(na, 0.0), covalency(na, 0.0), electrovalency(na, 0.0);
 	for (int a = 0; a < na; a++)
 		for (int b = a + 1; b < na; b++) {
 			const double t = bo[a][b];
 			if (t <= 0.0) continue;
-			const double ion = std::min(1.0, std::abs(pol[a][b]) / std::max(t, 1e-30));
+			const double ion = std::min(1.0, pol[a][b] / std::max(t, 1e-30));
 			NboBondOrder o;
 			o.atom1 = a + 1;
 			o.atom2 = b + 1;
