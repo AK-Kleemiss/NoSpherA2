@@ -264,6 +264,7 @@ namespace
 	struct Candidate {
 		Topology topo;
 		int depth = 0;
+		bool arrow = false;       //one move that separates no new charge: a whole arrow, not half of one
 		int component = -1;       //delocalisation-graph component the moves touched
 		double score = 0.0;       //summed E2 price of its arrows, kcal/mol
 		bool feasible = false;
@@ -291,6 +292,7 @@ namespace
 		ivec comp;
 		int max_charge = 2;  //max change of an atom's Lewis electron count
 		ivec parent_electrons;
+		ivec valence;        //valence electrons of the neutral atom: Z_eff minus two per core NAO
 		bool ion = true;
 		bool use_components = true;
 	};
@@ -304,11 +306,21 @@ namespace
 		return true;
 	}
 
+	//sum over atoms of |formal charge|, in electrons() units (twice the charge for a spin's topology)
+	int separation(const Topology& s, const Limits& L)
+	{
+		int q = 0;
+		for (int a = 0; a < s.n; a++) q += std::abs(L.valence[a] - s.electrons(a));
+		return q;
+	}
+
 	//One arrow moves one electron pair between slots; the charge-neutral NRT arrow is two of these,
-	//hence nrt_max_arrows = 2
+	//hence nrt_max_arrows = 2.  A single move that only carries an existing charge (allyl cation's bond shift)
+	//is a whole arrow
 	void expand(const Candidate& c, const Limits& L, std::vector<Candidate>& out)
 	{
 		const int n = c.topo.n;
+		const int q0 = c.depth == 0 ? separation(c.topo, L) : 0;
 		const auto emit = [&](Topology s, const int x, const int y, const int z = -1) {
 			if (!L.free_atom[x] || !L.free_atom[y]) return;
 			if (!acceptable(s, L)) return;
@@ -318,6 +330,7 @@ namespace
 			};
 			if (c.depth > 0 && !touched(x) && !touched(y) && !touched(z)) return;
 			Candidate d;
+			d.arrow = c.depth == 0 && separation(s, L) <= q0;
 			d.topo = std::move(s);
 			d.root = c.root;
 			d.depth = c.depth + 1;
@@ -1100,6 +1113,10 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 			if (o.type == NAOClass::Valence) nval[o.atom]++;
 		//Cap = valence NAOs, but never below the parent's count: a hypervalent parent must stay reachable
 		for (int a = 0; a < na; a++) L.cap[a] = std::max(nval[a], parent.used(a));
+		L.valence.assign(na, 0);
+		for (int a = 0; a < na; a++) L.valence[a] = static_cast<int>(std::lround(nao.atoms[a].Z_eff));
+		for (const NAO& o : nao.orbitals)
+			if (o.type == NAOClass::Core) L.valence[o.atom] -= 2;
 	}
 
 	//Budget from octet slots and a Gram-matrix work guard (k^2 n_NAO per pair); -nrt_max overrides both
@@ -1148,9 +1165,10 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 		seen.insert(parent.key());
 	}
 	//Arrow walk from roots, at most `want` structures past depth one.  A resonance arrow couples two
-	//pair moves, so depth-one states are intermediates: walked through, counted, not returned
+	//pair moves, so depth-one states are intermediates: walked through, counted, not returned, unless arrow
 	size_t intermediates = 0;
-	const auto grow = [&](std::vector<Candidate> level, const size_t want, const bool report) {
+	//rewalk: expand through structures earlier walks reached, so a symmetry reference's neighbourhood is its own
+	const auto grow = [&](std::vector<Candidate> level, const size_t want, const bool report, const bool rewalk = false) {
 		//Rank intermediates by summed E2 price before applying the budget.
 		const auto richer = [](const Candidate& a, const Candidate& b) { return a.score > b.score; };
 		const auto shortlist = [&richer](std::vector<Candidate>& v, const size_t keep) {
@@ -1158,6 +1176,7 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 			if (v.size() > keep) v.resize(keep);
 		};
 		std::vector<Candidate> found;
+		std::set<ivec> here;
 		size_t paid = 0;
 		for (int depth = 1; depth <= options.nrt_max_arrows; depth++) {
 			const size_t level_cap = (depth == 1) ? 4 * want : want - paid;
@@ -1169,12 +1188,16 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 			}
 			shortlist(made, level_cap);
 			std::vector<Candidate> next;
-			for (Candidate& c : made)
-				if (seen.insert(c.topo.key()).second) {
-					if (c.depth > 1) { paid++; found.push_back(c); }
+			for (Candidate& c : made) {
+				const bool fresh = seen.insert(c.topo.key()).second;
+				if (!(fresh || (rewalk && here.insert(c.topo.key()).second))) continue;
+				if (fresh) {
+					here.insert(c.topo.key());
+					if (c.depth > 1 || c.arrow) { paid++; found.push_back(c); }
 					else intermediates++;
-					next.push_back(std::move(c));
 				}
+				next.push_back(std::move(c));
+			}
 			if (report)
 				nrt.arrows.push_back("ARROWS depth " + std::to_string(depth) + " generates " +
 									 std::to_string(next.size()) + " new structures from " +
@@ -1193,13 +1216,21 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 				dist[a][b] = std::hypot((*xyz)[a][0] - (*xyz)[b][0], (*xyz)[a][1] - (*xyz)[b][1], (*xyz)[a][2] - (*xyz)[b][2]);
 	}
 	const std::vector<ivec> maps = options.nrt_symmetry && !options.nrt_exhaustive ? symmetry_maps(Z, L, xyz ? &dist : nullptr) : std::vector<ivec>();
-	//the walk's budget can cut through a symmetry orbit; the images of what it kept complete it
+	//the walk's budget can cut through a symmetry orbit; the images of what it kept complete it.  New means not a
+	//candidate: seen also holds the dropped intermediates
+	const auto listed = [&]() {
+		std::set<ivec> keys;
+		for (const Candidate& c : cands) keys.insert(c.topo.key());
+		return keys;
+	};
 	const auto complete_orbits = [&](const size_t from) {
 		bool capped = false;
+		std::set<ivec> have = listed();
 		for (size_t i = from, end = cands.size(); i < end; i++) {
 			const Candidate c0 = cands[i];
 			for (Topology& t : images_of(c0.topo, maps, L, 64, capped))
-				if (seen.insert(t.key()).second) {
+				if (have.insert(t.key()).second) {
+					seen.insert(t.key());
 					Candidate c;
 					c.topo = std::move(t);
 					c.depth = c0.depth;
@@ -1238,8 +1269,10 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 			//the images no arrow walk reaches, such as benzene's second Kekule structure three pair moves away
 			bool capped = false;
 			int images = 0;
+			std::set<ivec> have = listed();
 			for (Topology& t : images_of(parent, maps, L, 64, capped))
-				if (seen.insert(t.key()).second) {
+				if (have.insert(t.key()).second) {
+					seen.insert(t.key());
 					Candidate c;
 					c.topo = t;
 					cands.push_back(std::move(c));
@@ -1254,7 +1287,7 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 				const size_t before = cands.size(), n_refs = refs.size();
 				for (const Candidate& r : refs) walked.insert(r.topo.key());
 				const size_t room = std::min(n_refs * static_cast<size_t>(budget), pool_cap - cands.size());
-				for (Candidate& c : grow(std::move(refs), room, false)) cands.push_back(std::move(c));
+				for (Candidate& c : grow(std::move(refs), room, false, true)) cands.push_back(std::move(c));
 				nrt.notes.push_back(std::to_string(n_refs) + " symmetry reference(s) of the parent walked, " +
 									 std::to_string(cands.size() - before) + " new structures");
 			}

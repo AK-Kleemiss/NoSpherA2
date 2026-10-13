@@ -270,6 +270,12 @@ Key core modules live in `Src/core`:
 
 ## Current Validation Notes
 
+As of 2026-10-13, after the NRT symmetry fixes, `ctest --preset release-linux` reports **1260 passed, 0 failed,
+22 skipped** (2 disabled) of 1282. New: `NboNativeTests.TheAllylCationsMirrorStructuresWeighAlike`,
+`NboNativeTests.TheAllylRadicalIsSymmetricInEachSpin` and `NboNativeTests.ASlightlyDistortedAllylCationStaysNearTheSymmetricOne`
+(fixtures `tests/allyl_occ/`). NRT results change for molecules whose resonance includes a single bond shift (allyl,
+NaCl, LiF, CF3, C2H5) and for `-nrt_target` runs; see `UNIT_TESTS_STATUS.md`.
+
 As of 2026-10-13, after `72d83cd`, `ctest --preset release-linux` reports **1257 passed, 0 failed,
 22 skipped** (2 disabled) of 1279. New since `d5a9755`: `NboNativeTests.MethylRadicalSplitsItsBondsPerSpinAsNbo7Does`
 (fixture `tests/ch3_occ/ch3.owf.fchk`), `NboNativeTests.AGrownNrtCycleStatesAFloorItsFitRespects`,
