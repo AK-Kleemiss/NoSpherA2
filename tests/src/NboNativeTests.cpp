@@ -175,6 +175,14 @@ TEST(NboNativeTests, AGrownNrtCycleStatesAFloorItsFitRespects)
 		EXPECT_LE(std::stod(n.substr(b + 21)), std::stod(n.substr(n.find("D(w) = ") + 7)) + 1e-6) << n;
 	}
 	EXPECT_GT(floors, 0);
+	//-nrt_screen on every walk with a threshold no reduced cost reaches: each walk's structures get approximate
+	//orbitals, wait and join 16 at a time between refits, and the end is the unscreened set and fit
+	options.nrt_screen = 1e6;
+	options.nrt_screen_min = 1;
+	const NboResults s = native_nbo(wavy, options, log);
+	EXPECT_EQ(s.nrt.structures_found, r.nrt.structures_found);
+	EXPECT_NEAR(s.nrt.d_w, r.nrt.d_w, 1e-6);
+	EXPECT_TRUE(std::any_of(s.nrt.notes.begin(), s.nrt.notes.end(), [](const std::string& n) { return n.rfind("-nrt_screen", 0) == 0; }));
 }
 
 //CH3 doublet, `occ scf` B3LYP(VWN5)/def2-TZVP at the geometry of tests/nbo_reference_v2/data/ch3, where NBO 7

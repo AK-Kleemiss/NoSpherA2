@@ -58,6 +58,8 @@ struct NboOptions {
 	int nrt_max_candidates = 4000;
 	bool nrt_max_set = false;          //-nrt_max given: obey the number, skip the size guard
 	double nrt_target = -1.0;          //-nrt_target: grow from weighted structures until D(w) <= it; < 0 = one search
+	double nrt_screen = -1.0;          //-nrt_screen: a walk of nrt_screen_min+ structures builds those whose approximate reduced cost is below it; < 0 = all
+	int nrt_screen_min = 200;
 	double nrt_weight_floor = 5.0e-5;  //weights below this are dropped from the reported set
 	bool nrt = false;
 	bool nrt_exhaustive = false;       //enumerate every feasible topology instead of arrows

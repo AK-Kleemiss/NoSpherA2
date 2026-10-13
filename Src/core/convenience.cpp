@@ -616,6 +616,13 @@ std::string help_message =
  "                                    refitted. Stops early when no new structure\n"
  "                                    takes weight or the -nrt_max pool is full;\n"
  "                                    0 = until then. Implies -nrt.\n"
+ "  -nrt_screen <r|off>                With -nrt_target, a walk of 200 or more new\n"
+ "                                    structures builds in full only those whose\n"
+ "                                    reduced cost, from approximate orbitals, is\n"
+ "                                    below r, 16 at a time with their symmetry\n"
+ "                                    images, refitting in between. Default off:\n"
+ "                                    it can miss structures (SF6 at 0.2: D(w)\n"
+ "                                    0.23 % higher); about 2.5 times faster.\n"
  "  -nrt_atoms <a,b,...>               Subspace NRT: only these 1-based atoms may\n"
  "                                    change, the rest keep the parent structure's\n"
  "                                    bonding. NBO's 'NRT <atoms>'.\n"
@@ -2734,7 +2741,7 @@ const std::set<std::string> &nbo_family_suboptions()
 		"-nbo_dir", "-nbo_47", "-nbo_e2min", "-nbo_threads", "-nbo_keep47", "-nrt",
 		"-nrt_e2", "-nrt_arrows", "-nrt_bond_scale", "-nrt_max", "-nrt_atoms",
 		"-nrt_exhaustive", "-nrt_no_symmetry", "-nrt_no_components", "-nrt_no_ion", "-nrt_parent",
-		"-nrt_target"};
+		"-nrt_target", "-nrt_screen"};
 	return known;
 }
 
@@ -2860,6 +2867,8 @@ bool options::digest_io_options(const std::string &temp, int &i)
 				opt.nrt_target = std::stod(arguments[j + 1]);
 				opt.nrt = true;
 			}
+			else if (arguments[j] == "-nrt_screen")
+				opt.nrt_screen = arguments[j + 1] == "off" ? -1.0 : std::stod(arguments[j + 1]);
 			else if (arguments[j] == "-nrt_bond_scale")
 				opt.nrt_bond_scale = std::stod(arguments[j + 1]);
 			else if (arguments[j] == "-nrt_max") {
