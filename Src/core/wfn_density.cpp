@@ -58,10 +58,38 @@ namespace
 					if (runs.empty() || runs.back() != mo) { runs.push_back(mo); runs.push_back(mo + 1); }
 					else runs.back() = mo + 1;
 				}
-			for (const int a : touched) {
-				hit[a] = 0;
-				const double* c = coef_ao + (size_t)a * nmo;
-				const double* t = v.data() + (size_t)K * a;
+			//Eight functions per pass over phi, added one after the other: every element sees the products in the
+			//order the one-function loop adds them, with an eighth of the loads and stores of phi
+			const int nt = static_cast<int>(touched.size());
+			int i = 0;
+			for (; i + 8 <= nt; i += 8) {
+				const double* c[8];
+				const double* t[8];
+				for (int j = 0; j < 8; j++) {
+					c[j] = coef_ao + (size_t)touched[i + j] * nmo;
+					t[j] = v.data() + (size_t)K * touched[i + j];
+				}
+				for (int k = 0; k < K; k++) {
+					double* const pk = phi + (size_t)k * nmo;
+					const double s0 = t[0][k], s1 = t[1][k], s2 = t[2][k], s3 = t[3][k], s4 = t[4][k], s5 = t[5][k], s6 = t[6][k], s7 = t[7][k];
+					for (size_t r = 0; r < runs.size(); r += 2)
+						for (int mo = runs[r]; mo < runs[r + 1]; mo++) {
+							double x = pk[mo];
+							x += s0 * c[0][mo];
+							x += s1 * c[1][mo];
+							x += s2 * c[2][mo];
+							x += s3 * c[3][mo];
+							x += s4 * c[4][mo];
+							x += s5 * c[5][mo];
+							x += s6 * c[6][mo];
+							x += s7 * c[7][mo];
+							pk[mo] = x;
+						}
+				}
+			}
+			for (; i < nt; i++) {
+				const double* c = coef_ao + (size_t)touched[i] * nmo;
+				const double* t = v.data() + (size_t)K * touched[i];
 				for (int k = 0; k < K; k++) {
 					double* const pk = phi + (size_t)k * nmo;
 					const double ck = t[k];
@@ -69,6 +97,7 @@ namespace
 						for (int mo = runs[r]; mo < runs[r + 1]; mo++) pk[mo] += ck * c[mo];
 				}
 			}
+			for (const int a : touched) hit[a] = 0;
 		}
 	};
 }

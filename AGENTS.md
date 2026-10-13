@@ -315,9 +315,9 @@ As of 2026-10-13, after `72d83cd`, `ctest --preset release-linux` reports **1257
 `NboNativeTests.AnEcpFchkKeepsTheElementAndItsCore` (fixture `tests/hi_occ/hi.owf.fchk`),
 `NrtTests.TheParentsSymmetryImageCompletesTheHexagon` and
 `NrtTests.OppositelyPolarisedOrbitalsOfABondDoNotCancelInItsIonicShare`. After `36e482b` the counts are the
-same. The suite takes 298.7 +- 27.8 s wall, against 334.2 +- 29.5 s before (95 % CI, n = 3 each). Two changes account
-for it: the P1 subset goldens read the I tensor `P1_test_XCW` saves, and the adaptive-step fallback test runs on
-NH3Li. See `UNIT_TESTS_STATUS.md`.
+same. The suite takes 280.5 +- 5.9 s wall, against 334.2 +- 29.5 s before (95 % CI, n = 3 each). Three changes account
+for it: the P1 subset goldens read the I tensor `P1_test_XCW` saves; the adaptive-step fallback test runs on NH3Li; and the
+AO-to-MO step takes eight functions per pass, with outputs identical on GCC. See `UNIT_TESTS_STATUS.md`.
 
 As of 2026-10-13, `ctest --preset release-linux` on `density_source` `d5a9755` reports
 **1252 passed, 0 failed, 22 skipped** (2 disabled) of 1274 on the same 4-core VM. It took
