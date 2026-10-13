@@ -1,5 +1,7 @@
 # Unit Test Status
 
+**2026-10-13 Windows CI, NRT exact fits:** `NrtTests.TheParentsSymmetryImageCompletesTheHexagon` failed in both Windows jobs of CI run 38394009598 (`72d83cd`) and nowhere else: D(w) = 5.9604644775390625e-08 against a bound of 1e-8. D(w) is sqrt(|Gamma|^2 - 2 g.w + w.G.w), which for the hexagon cancels 9 - 18 + 9; one rounding of the 18 leaves sqrt(ulp(18)) = 2^-24 exactly, the value both MSVC builds report (they compile with `/fp:fast`, which may reorder the sum), while GCC and Clang round to 0. An exact fit cannot be read below about sqrt(eps |Gamma|^2), so the test and `ParentThatSpansTheDensityTakesAllTheWeight` (4 - 8 + 4, floor 4.2e-8, passing by luck) now require D(w) < 1e-6; the fits they guard against leave sqrt(3) and more.
+
 **2026-10-13 NRT bond-order ranges:** Each native NRT bond order now carries its range over the weights whose D(w) is within 0.1 % of the fit's (JSON `range`, printed beside the bond order). Since f(w') >= f + sum_j w'_j r_j with the reduced costs r_j, only structures with r_j <= ((1.001)^2 - 1) f can take weight there; on them the minimum and maximum of t.w' come from bisection on the multiplier of f(w') + mu t.w', and pairs one symmetry map relates share one bisection. Benzene C-C 1.507 [1.445-1.571], SO2 1.452 [1.387-1.518], nitromethane C-N 0.804 [0.764-0.845], Ni(CO)4 Ni-C 0.368 [0.188-0.550], SF6 0.612 [0.521-0.700]; the Python study over the dumped Gram matrices gave the same; 0.01-0.7 s per run. `TheParentsSymmetryImageCompletesTheHexagon` checks that an exact fit leaves no range; `NickelTetracarbonylKeepsOneDativeBondAndItsParent` that every range holds its bond order and Ni-C spans more than 0.2. `ctest --preset release-linux`: 1257 passed, 0 failed, 22 skipped of 1279.
 
 **2026-10-13 fchk with ECPs:** `read_fchk` took each atom's charge from "Nuclear charges", which for an ECP atom is Z minus the core, and read none of the ECP blocks, so OCC's def2-TZVP HI was iodine with Z = 25: native NBO printed it as Mn (NPA, NBO labels, NRT) and the FILE47 carried 25 25 in `$COORD`. The atom now keeps Z (nuclear charge plus `ECP-RNFroz`), the core goes to its ECP count and `has_ECPs` is set with the def2 core mode, as the gbw reader does. HI: I charge -0.098, 18 NAO core electrons, FILE47 `53 25`; QTAIM fills the core (I basin 52.90 e). New `NboNativeTests.AnEcpFchkKeepsTheElementAndItsCore` (fixture `tests/hi_occ/hi.owf.fchk`, 86 kB) fails on the old reader. The v2 NBO 7 golden for HI is itself unusable (NPA I +27.15, no bond): gennbo saw iodine without its ECP core. `ctest --preset release-linux`: 1257 passed, 0 failed, 22 skipped of 1279.
@@ -112,7 +114,7 @@ analytic expectations and no golden file:
 
 - `ParentThatSpansTheDensityTakesAllTheWeight` — two one-NAO hydrogens, `Gamma = 2 v v^T` with
   `v = (1,1)/sqrt(2)`, parent = one bond. The parent's own orbital set is then exactly the density,
-  so the answer is known: one structure at 100 %, `D(w) = 0` to 1e-8, `rho_NL = 0`, bond order 1,
+  so the answer is known: one structure at 100 %, `D(w)` below 1e-6, `rho_NL = 0`, bond order 1,
   valency 1, electron count 2.
 - `IonicBondOrderIsLinearInThePolarity` — the same system with `v = (sqrt(0.8), sqrt(0.2))`, so the
   bond orbital's polarity is `i = c_A^2 - c_B^2 = 0.6` exactly. The ionic share of a bond order is

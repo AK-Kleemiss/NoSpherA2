@@ -157,7 +157,8 @@ TEST(NrtTests, ParentThatSpansTheDensityTakesAllTheWeight)
     EXPECT_EQ(nrt.structures_used, 1);
     ASSERT_EQ(nrt.weights.size(), 1u);
     EXPECT_NEAR(nrt.weights[0].weight_percent, 100.0, 1e-6);
-    EXPECT_NEAR(nrt.d_w, 0.0, 1e-8);
+    //D(w) = sqrt(|Gamma|^2 - 2 g.w + w.G.w) cancels 4 - 8 + 4: one rounding of the 8 leaves sqrt(ulp(8)) = 4.2e-8
+    EXPECT_LT(nrt.d_w, 1e-6);
     EXPECT_NEAR(nrt.candidates[0].rho_nl, 0.0, 1e-8);
 
     EXPECT_NEAR(bond_total(nrt, 1, 2), 1.0, 1e-8);
@@ -715,7 +716,8 @@ TEST(NrtTests, TheParentsSymmetryImageCompletesTheHexagon)
     std::ostringstream log;
     native_nrt(nrt, nao, L, {}, ring, opt, "", 2.0, log, &dist);
     ASSERT_TRUE(nrt.present);
-    EXPECT_NEAR(nrt.d_w, 0.0, 1e-8) << "the second Kekule structure is missing";
+    //9 - 18 + 9 here, so an exact fit reads up to sqrt(ulp(18)) = 2^-24; one Kekule structure alone leaves sqrt(3)
+    EXPECT_LT(nrt.d_w, 1e-6) << "the second Kekule structure is missing";
     for (int a = 0; a < na; a++)
         EXPECT_NEAR(bond_total(nrt, a + 1, (a + 1) % na + 1), 0.5, 1e-6) << "ring pair " << a + 1;
     //an exact fit leaves no slack: every range is the bond order itself
