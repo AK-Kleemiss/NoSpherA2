@@ -136,6 +136,11 @@ Useful environment variables:
 - `NOS_EXE` - path to the executable for Python tests.
 - `OCC_DATA_PATH` - OCC runtime data directory. CTest defaults this to `occ/share`; local Windows Python runs commonly need `D:\git\NoSpherA2\Lib\occ\share\occ` or the current equivalent.
 - `RUN_FULL_TEST` - truthy value enables slow/full Python integration tests.
+- `NOS_TEST_SHARED_DIR` - set by ctest for every gtest (`<build>/tests/src/shared`). `XcwScfTests.SharedTensorBuild`
+  writes the P1 subset's I tensor there once (ctest fixture `xcw_p1_tensor`) and the XCW tests that test the SCF
+  rather than the tensor read it; a test binary run without it builds its own tensor, with the same numbers.
+- `OMP_WAIT_POLICY=PASSIVE` - set by the `test-base` test preset: ctest runs several tests at once and each opens a
+  thread per core, so spinning idle OpenMP workers would take the cores the other tests compute on.
 
 Tests are golden-file comparisons: the harness runs NoSpherA2 with args from `tests/tests.toml`, captures stdout, and diffs against `.good` reference files in each test subdirectory.
 
@@ -264,6 +269,13 @@ Key core modules live in `Src/core`:
 - New libcint parallel call sites should pre-allocate per-thread scratch buffers instead of passing `cache=nullptr` inside TBB parallel regions. Use the existing `three_center_max_cache_size<kind>` and `tbb::enumerable_thread_specific` pattern in OCC.
 
 ## Current Validation Notes
+
+As of 2026-10-13, `ctest --preset release-linux` on `density_source` `d5a9755` reports
+**1252 passed, 0 failed, 22 skipped** (2 disabled) of 1274 on the same 4-core VM. It took
+308.2 +- 13.1 s wall and 1207 +- 47 CPU-s, against 432.8 +- 5.5 s and 1704 +- 22 CPU-s for `80876cc`
+(95 % CI, n = 3 and 4). The changes: the XCW SCF tests read one shared I tensor, the two redundant
+`-xcw_incremental` goldens are gone, NH3Li's spin-resolved ELI-D is computed once, and the test preset
+sets `OMP_WAIT_POLICY=PASSIVE`. See `UNIT_TESTS_STATUS.md`.
 
 As of 2026-10-12, `ctest --preset release-linux` on `density_source` `0e6a0d3` reports
 **1246 passed, 0 failed, 22 skipped** (2 disabled) of 1270 on a GPU-less 4-core VM with GCC 13.3.
