@@ -84,7 +84,8 @@ set_tests_properties(
     PROPERTIES
         RESOURCE_LOCK integration_P1_test
 )
-# P1_test_XCW saves the subset's I tensor as tests/P1_test/p1_i.bin; the other subset goldens read it
+# P1_test_XCW saves the subset's I tensor as tests/P1_test/p1_i.bin and its two-electron integrals as p1_eri.bin;
+# the other subset goldens read them
 set_tests_properties(TomlIntegrationTests.P1_test_XCW PROPERTIES FIXTURES_SETUP xcw_p1_golden_tensor)
 set_tests_properties(
     TomlIntegrationTests.P1_test_XCW_h2
@@ -132,8 +133,9 @@ set_tests_properties(
         RESOURCE_LOCK tests_src_cwd
 )
 
-# XcwScfTests.SharedTensorBuild writes the P1 subset's I tensor into NOS_TEST_SHARED_DIR; these
-# runs test the SCF, not the tensor, and read it instead of each building the same one
+# XcwScfTests.SharedTensorBuild writes the P1 subset's I tensor and stored two-electron integrals into
+# NOS_TEST_SHARED_DIR; these runs test the SCF, not the tensor, and read them instead of each building the same.
+# SaveThenRead and the two halting-report runs on the P1 subset build their tensors and read only the integrals
 set_tests_properties(
     XcwScfTests.SharedTensorBuild
     PROPERTIES
@@ -152,6 +154,9 @@ set_tests_properties(
     XcwScfTests.ScaleIsStationaryForTheCriterion
     XcwScfTests.SecondOrderStepsReachTheGoldenEnergy
     XcwScfTests.HessianVectorProductMatchesFiniteDifference
+    XcwScfTests.SaveThenReadTensorReproducesLambdaZero
+    XcwHaltingReportTests.HaltingReportsAcrossTheExtendedLambdaScan
+    XcwHaltingReportTests.StreamedTensorRoundTrip
     PROPERTIES
         FIXTURES_REQUIRED xcw_p1_tensor
 )

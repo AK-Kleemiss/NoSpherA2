@@ -361,7 +361,7 @@ mostly about where that tensor lives.
 | Flag | Arguments | Default | Meaning |
 | --- | --- | --- | --- |
 | `-do_XCW` | 0 | off | Run the XCW lambda scan. |
-| `-XCW_settings <file>` | 1 | | Settings file. Keywords include `stream`, `i_tensor_mb`, `save`, `read`, `df_basis`, `i_double`, `i_float`. |
+| `-XCW_settings <file>` | 1 | | Settings file. Keywords include `stream`, `i_tensor_mb`, `save`, `read`, `df_basis`, `i_double`, `i_float`, and `save_eri <file>` / `read_eri <file>`, which write and reuse the stored two-electron integrals (geometry and basis only; a file of another basis or geometry is refused and the integrals are built). |
 | `-calc_F` | 0 | off | Compute structure factors from the fitted wavefunction. |
 | `-xcw_int_precision <eps>` | 1 | `1e-10` | Integral screening threshold. |
 | `-xcw_extrapolate` / `-no_xcw_extrapolate` | 0 | on | Extrapolate between lambda steps. |

@@ -168,6 +168,7 @@ XCW::SCF_settings XCW::loadSettings(const std::filesystem::path& settings_path) 
 	bool i_tensor_single = false, i_tensor_double = false;
 	std::filesystem::path i_tensor_file_path;
 	std::filesystem::path i_tensor_save_path;
+	std::filesystem::path eri_read_path, eri_save_path;
 	// 0 = hold the whole tensor
 	size_t i_tensor_max_mb = 0;
 	occ::qm::SpinorbitalKind hf_type = occ::qm::SpinorbitalKind::Restricted;
@@ -415,6 +416,20 @@ XCW::SCF_settings XCW::loadSettings(const std::filesystem::path& settings_path) 
 				throw std::runtime_error("Expected a path after 'save'");
 			i_tensor_save_path = path;
 			};
+		//The stored two-electron integrals depend on geometry and basis only; read_eri falls back to building
+		//them when the file holds another basis or geometry
+		handlers["save_eri"] = [&](std::istream& is) {
+			std::string path;
+			if (!(is >> path))
+				throw std::runtime_error("Expected a path after 'save_eri'");
+			eri_save_path = path;
+			};
+		handlers["read_eri"] = [&](std::istream& is) {
+			std::string path;
+			if (!(is >> path))
+				throw std::runtime_error("Expected a path after 'read_eri'");
+			eri_read_path = path;
+			};
 
 		//Force single or double storage of the tensor; by default it is held in the precision it was built in
 		handlers["i_float"] = [&](std::istream&) {
@@ -538,6 +553,8 @@ XCW::SCF_settings XCW::loadSettings(const std::filesystem::path& settings_path) 
 	settings.i_tensor_double = i_tensor_double;
 	settings.i_tensor_file_path = i_tensor_file_path;
 	settings.i_tensor_save_path = i_tensor_save_path;
+	settings.eri_read_path = eri_read_path;
+	settings.eri_save_path = eri_save_path;
 	settings.nbo_output = nbo_output;
 	settings.df_basis_name = df_basis_name;
 	settings.guess_basis_name = guess_basis_name;
@@ -4100,9 +4117,12 @@ void XCW::run_XCW_fitting() {
 	eri_.clear();
 	if (settings.hf_type != occ::qm::SpinorbitalKind::General) {
 		const _time_point eri_t0 = get_time();
-		const size_t avail = available_memory_bytes();
-		if (eri_.build(hf, avail ? avail / 5 * 4 : 0, XCW_log))
+		const size_t avail = available_memory_bytes(), budget = avail ? avail / 5 * 4 : 0;
+		const bool read = !settings.eri_read_path.empty() && eri_.load(settings.eri_read_path, hf, budget, XCW_log);
+		if (!read && eri_.build(hf, budget, XCW_log))
 			throughput::record_time("XCW two-electron integrals", false, get_msec(eri_t0, get_time()));
+		if (eri_ && !settings.eri_save_path.empty() && !eri_.save(settings.eri_save_path, hf))
+			XCW_log << "XCW: could not write the two-electron integrals to " << settings.eri_save_path.string() << std::endl;
 	}
 #if defined(NOSPHERA2_USE_GPU) || defined(NOSPHERA2_USE_METAL)
 	if (eri_ && opt->gpu_itensor && opt->use_gpu) {

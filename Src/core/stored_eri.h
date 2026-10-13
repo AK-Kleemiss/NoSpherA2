@@ -1,5 +1,6 @@
 #pragma once
 #include <occ/qm/hf.h>
+#include <filesystem>
 #include <functional>
 #include <memory>
 #include <ostream>
@@ -19,6 +20,9 @@ public:
 
 	//False, holding nothing, over budget_bytes (0: no budget) or when hf's Fock build is not the quartet one
 	bool build(const occ::qm::HartreeFock& hf, size_t budget_bytes, std::ostream& log);
+	//What build() holds, written and read back bit for bit; load() refuses a file of another basis or geometry
+	bool save(const std::filesystem::path& path, const occ::qm::HartreeFock& hf) const;
+	bool load(const std::filesystem::path& path, const occ::qm::HartreeFock& hf, size_t budget_bytes, std::ostream& log);
 	void clear();
 	explicit operator bool() const { return static_cast<bool>(v_); }
 

@@ -313,9 +313,10 @@ As of 2026-10-13, after the NRT symmetry fixes, `ctest --preset release-linux` r
 22 skipped** (2 disabled) of 1282. New: `NboNativeTests.TheAllylCationsMirrorStructuresWeighAlike`,
 `NboNativeTests.TheAllylRadicalIsSymmetricInEachSpin` and `NboNativeTests.ASlightlyDistortedAllylCationStaysNearTheSymmetricOne`
 (fixtures `tests/allyl_occ/`), which run under the opt-in `-nrt_mirror`; default NRT output is unchanged. See
-`UNIT_TESTS_STATUS.md`. At `1349eba` the suite takes 255.7 +- 9.1 s wall and 993 +- 40 CPU-s (95 % CI, n = 3) with 3.88 of
-the 4 cores busy: CPU / 4 = 248 s, so the wall time is within 3 % of what the tests' own work allows, and a
-further cut has to come out of what the heavy tests compute.
+`UNIT_TESTS_STATUS.md`. At `1349eba` the suite took 255.7 +- 9.1 s wall and 993 +- 40 CPU-s (95 % CI, n = 3) with 3.88 of
+the 4 cores busy. Since the XCW tests share one build of the stored two-electron integrals (`save_eri` /
+`read_eri`): **1261 passed, 0 failed, 22 skipped** (2 disabled) of 1283, 230.6 +- 16.8 s wall and 899 +- 66 CPU-s,
+3.90 of 4 cores busy.
 
 As of 2026-10-13, after `72d83cd`, `ctest --preset release-linux` reports **1257 passed, 0 failed,
 22 skipped** (2 disabled) of 1279. New since `d5a9755`: `NboNativeTests.MethylRadicalSplitsItsBondsPerSpinAsNbo7Does`

@@ -173,9 +173,9 @@ namespace {
 		return r;
 	}
 
-	//The tensor depends on geometry, basis and reflections only. Under ctest, SharedTensorBuild writes the
-	//subset's into NOS_TEST_SHARED_DIR once and the runs that test the SCF rather than the tensor read it;
-	//without that directory or file every run builds its own, with the same numbers.
+	//The tensor depends on geometry, basis and reflections only, the stored two-electron integrals on geometry and
+	//basis. Under ctest, SharedTensorBuild writes the subset's into NOS_TEST_SHARED_DIR once and the runs that test
+	//the SCF rather than these read them; without that directory or file every run builds its own, with the same numbers.
 	std::filesystem::path shared_tensor()
 	{
 		const char* d = std::getenv("NOS_TEST_SHARED_DIR");
@@ -186,12 +186,20 @@ namespace {
 	//A read path is one settings token, so the file is copied into dir rather than named where it lies. The file
 	//holds the single-precision tiles summed in double; i_float rounds that sum to float on reading, as a
 	//single-precision build rounds it on storing.
+	std::string read_shared_eri(const std::filesystem::path& dir)
+	{
+		const auto p = shared_tensor();
+		if (p.empty() || !std::filesystem::exists(p.parent_path() / "xcw_p1_subset_eri.bin")) return "";
+		std::filesystem::copy_file(p.parent_path() / "xcw_p1_subset_eri.bin", dir / "shared_eri.bin", std::filesystem::copy_options::overwrite_existing);
+		return " read_eri shared_eri.bin";
+	}
+
 	std::string read_shared_tensor(const std::filesystem::path& dir, const bool held_double = false)
 	{
 		const auto p = shared_tensor();
 		if (p.empty() || !std::filesystem::exists(p)) return "";
 		std::filesystem::copy_file(p, dir / "shared_i.bin", std::filesystem::copy_options::overwrite_existing);
-		return held_double ? " read shared_i.bin" : " read shared_i.bin i_float";
+		return (held_double ? " read shared_i.bin" : " read shared_i.bin i_float") + read_shared_eri(dir);
 	}
 
 	//One line of the lambda table run_XCW_fitting prints per converged step:
@@ -566,13 +574,16 @@ TEST(XcwScfTests, SharedTensorBuild)
 	const auto dir = scratch_dir();
 	std::filesystem::create_directories(shared_tensor().parent_path());
 	std::filesystem::remove(shared_tensor());
-	const p1_run run = run_on_p1(dir, "normal normal_conv params 177 basis_set sto-3g max_iter 1 charge 0 mult 1 f rhf start 0 step_size 0.01 end 0 i_double save i.bin", true);
+	std::filesystem::remove(shared_tensor().parent_path() / "xcw_p1_subset_eri.bin");
+	const p1_run run = run_on_p1(dir, "normal normal_conv params 177 basis_set sto-3g max_iter 1 charge 0 mult 1 f rhf start 0 step_size 0.01 end 0 i_double save i.bin save_eri eri.bin", true);
 	ASSERT_NE(run.out.find("I tensor written to i.bin"), std::string::npos) << run.out;
+	ASSERT_TRUE(std::filesystem::exists(dir / "eri.bin")) << run.log;
 	size_t kept = 0;
 	bool single = true;
 	ASSERT_TRUE(i_tensor_file::matches(dir / "i.bin", run.nr, p1_nmo, kept, single));
 	EXPECT_FALSE(single);
 	std::filesystem::copy_file(dir / "i.bin", shared_tensor());
+	std::filesystem::copy_file(dir / "eri.bin", shared_tensor().parent_path() / "xcw_p1_subset_eri.bin");
 	std::filesystem::remove_all(dir);
 }
 
@@ -642,7 +653,7 @@ TEST(XcwScfTests, SaveThenReadTensorReproducesLambdaZero)
 	EXPECT_TRUE(single);
 	EXPECT_EQ(std::filesystem::file_size(dir / "tensor.bin"), 40u + 2u * kept * sizeof(int) + i_tensor_file::total_bytes(first.nr, kept, true));
 
-	const p1_run second = run_on_p1(dir, settings, true);
+	const p1_run second = run_on_p1(dir, settings + read_shared_eri(dir), true);
 	EXPECT_NE(second.out.find("I tensor read from tensor.bin"), std::string::npos) << second.out;
 	EXPECT_NE(second.out.find(", single precision), not recomputed, held in memory"), std::string::npos) << second.out;
 	EXPECT_EQ(second.out.find("Screened out"), std::string::npos);
@@ -686,7 +697,7 @@ TEST(XcwScfTests, StreamedTensorMatchesInMemory)
 	EXPECT_NE(held.log.find("***SCF converged in "), std::string::npos);
 
 	std::filesystem::remove(dir / "NA2_0010000.tscb");
-	const p1_run streamed = run_on_p1(dir, settings + " i_tensor_mb 1", true);
+	const p1_run streamed = run_on_p1(dir, settings + " i_tensor_mb 1" + read_shared_eri(dir), true);
 	const int screened = static_cast<int>(number_after(streamed.out, "Screened out "));
 	EXPECT_GT(screened, 0);
 	const size_t kept = static_cast<size_t>(p1_pairs - screened);

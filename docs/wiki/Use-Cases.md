@@ -322,7 +322,9 @@ Get-Content .\NoSpherA2.log -Tail 60
 
 The settings file controls where the two-electron integral tensor lives
 (`stream`, `i_tensor_mb`, `save`, `read`, `df_basis`, `i_double`, `i_float`),
-which is the whole memory question for a fit of any size.
+which is the whole memory question for a fit of any size; `save_eri <file>` and
+`read_eri <file>` keep the stored two-electron integrals for a later run on the
+same geometry and basis.
 
 ## 19. Force the GPU, and prove it ran
 
