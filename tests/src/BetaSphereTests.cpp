@@ -127,12 +127,28 @@ TEST(AdaptiveStep, AgreesWithTheFloorStepOnHydroxide)
 	expect_adaptive_matches_floor(wfn, 2u);
 }
 
+//sets a -tune knob for the scope and restores it, set or unset; a leaked knob changes every later test
+struct env_guard {
+	std::string name;
+	std::string old;
+	bool had = false;
+	env_guard(const char *n, const char *v) : name(n)
+	{
+		if (const char *e = tuning(n)) { old = e; had = true; }
+		set_tuning(name, v);
+	}
+	~env_guard() { set_tuning(name, had ? old.c_str() : nullptr); }
+};
+
 //A fallback is the fate of a proposal and cannot outnumber proposals; misreading mult, which is raised
 //at the end of a step, reverts floor steps and moves no population. Only ELI-D stresses it: its broad
 //flat maxima (stall_reach) stop trajectories rising far from an attractor; QTAIM never falls back.
+//At the shipped cosine gate a floor step that fails right after a doubling is too rare for the bug to show
+//(UH6: 2 fallbacks either way); at 0.9 mult doubles after most steps, and a step that passed the midpoint
+//turn test and still does not rise stays rare: 0 of 527555 proposals, 73322 of 529026 with mult misread.
 TEST(AdaptiveStep, NeverFallsBackMoreOftenThanItProposesOnELID)
 {
-	const std::filesystem::path wfn = nos_test_repo_root() / "tests" / "ELI_heavy" / "uh6.gbw";
+	const std::filesystem::path wfn = nos_test_repo_root() / "tests" / "RGBI_groups" / "nh3li.gbw";
 	if (!std::filesystem::exists(wfn)) GTEST_SKIP() << "fixture missing: " << wfn.string();
 	const WFN wavy(wfn);
 	const cube rho = seed_cube(wavy, 0.3, 2.5);
@@ -148,6 +164,7 @@ TEST(AdaptiveStep, NeverFallsBackMoreOftenThanItProposesOnELID)
 	ASSERT_GT(maxima.size(), 3u) << "no ELI-D attractors, so nothing is climbed";
 
 	adaptive_guard guard;
+	env_guard gate("NOS_ADP_GROW", "0.9");
 	basin_adaptive_step_set_enabled(true);
 	basin_adaptive_step_counters_reset();
 	vec volumes;
@@ -163,20 +180,8 @@ TEST(AdaptiveStep, NeverFallsBackMoreOftenThanItProposesOnELID)
 		<< fell << " steps were reverted as grown against " << proposed
 		<< " grown proposals, so the fallback is blaming steps that ran at the floor";
 	EXPECT_LE(turned + fell, proposed) << "more proposals were rejected than were ever made";
+	EXPECT_LT(fell * 1000, proposed) << fell << " of " << proposed << " grown steps fell back, so floor steps are being reverted";
 }
-
-//sets a -tune knob for the scope and restores it, set or unset; a leaked knob changes every later test
-struct env_guard {
-	std::string name;
-	std::string old;
-	bool had = false;
-	env_guard(const char *n, const char *v) : name(n)
-	{
-		if (const char *e = tuning(n)) { old = e; had = true; }
-		set_tuning(name, v);
-	}
-	~env_guard() { set_tuning(name, had ? old.c_str() : nullptr); }
-};
 
 //checks the NOS_ADP_* overrides reach the walk
 TEST(AdaptiveStep, KnobsComeFromTheEnvironment)
