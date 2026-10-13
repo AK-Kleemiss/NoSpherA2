@@ -462,13 +462,11 @@ namespace
 		return place(0);
 	}
 
-	//The parent's images under the skeleton's automorphisms, closed under composition up to cap images, without
-	//those that break the limits or move a fixed atom
-	std::vector<Topology> parent_images(const Topology& parent, const ivec& Z, const Limits& L, const vec2* dist, const size_t cap, bool& capped)
+	//Isometries of the coloured skeleton, one per pair of atoms the maps found so far do not already join into one orbit
+	std::vector<ivec> symmetry_maps(const ivec& Z, const Limits& L, const vec2* dist)
 	{
-		const int n = parent.n;
+		const int n = static_cast<int>(Z.size());
 		const ivec col = skeleton_colours(Z, L.bondable);
-		//one map per pair of atoms the maps found so far do not already join into one orbit
 		std::vector<ivec> maps;
 		ivec pi, orbit(n);
 		for (int a = 0; a < n; a++) orbit[a] = a;
@@ -482,8 +480,16 @@ namespace
 					maps.push_back(pi);
 					for (int a = 0; a < n; a++) orbit[root(a)] = root(pi[a]);
 				}
-		std::set<ivec> seen{ parent.key() };
-		std::vector<Topology> all{ parent };
+		return maps;
+	}
+
+	//The images of s under the maps, closed under composition up to cap images, without those that overfill an atom or
+	//move a fixed atom. The charge screen is the parent's and not symmetric: an image passes it for the parent's image
+	std::vector<Topology> images_of(const Topology& s, const std::vector<ivec>& maps, const Limits& L, const size_t cap, bool& capped)
+	{
+		const int n = s.n;
+		std::set<ivec> seen{ s.key() };
+		std::vector<Topology> all{ s };
 		capped = false;
 		for (size_t i = 0; i < all.size() && !capped; i++)
 			for (const ivec& p : maps) {
@@ -496,9 +502,10 @@ namespace
 			}
 		std::vector<Topology> out;
 		for (size_t i = 1; i < all.size(); i++) {
-			bool keep = acceptable(all[i], L);
+			bool keep = true;
+			for (int a = 0; a < n && keep; a++) keep = all[i].used(a) <= L.cap[a];
 			for (int a = 0; a < n && keep; a++)
-				for (int b = 0; b < n && keep && !L.free_atom[a]; b++) keep = all[i].at(a, b) == parent.at(a, b);
+				for (int b = 0; b < n && keep && !L.free_atom[a]; b++) keep = all[i].at(a, b) == s.at(a, b);
 			if (keep) out.push_back(all[i]);
 		}
 		return out;
@@ -974,6 +981,22 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 		return found;
 	};
 	const auto t_search0 = clock();
+	const std::vector<ivec> maps = options.nrt_symmetry && !options.nrt_exhaustive ? symmetry_maps(Z, L, distances) : std::vector<ivec>();
+	//the walk's budget can cut through a symmetry orbit; the images of what it kept complete it
+	const auto complete_orbits = [&](const size_t from) {
+		bool capped = false;
+		for (size_t i = from, end = cands.size(); i < end; i++) {
+			const Candidate c0 = cands[i];
+			for (Topology& t : images_of(c0.topo, maps, L, 64, capped))
+				if (seen.insert(t.key()).second) {
+					Candidate c;
+					c.topo = std::move(t);
+					c.depth = c0.depth;
+					c.score = c0.score;
+					cands.push_back(std::move(c));
+				}
+		}
+	};
 	if (options.nrt_exhaustive) {
 		std::vector<Candidate> all;
 		enumerate(parent, L, n_pairs, static_cast<size_t>(budget), all);
@@ -1003,7 +1026,7 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 			//the images no arrow walk reaches, such as benzene's second Kekule structure three pair moves away
 			bool capped = false;
 			int images = 0;
-			for (Topology& t : parent_images(parent, Z, L, distances, 64, capped))
+			for (Topology& t : images_of(parent, maps, L, 64, capped))
 				if (seen.insert(t.key()).second) {
 					Candidate c;
 					c.topo = t;
@@ -1023,6 +1046,9 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 				nrt.notes.push_back(std::to_string(n_refs) + " symmetry reference(s) of the parent walked, " +
 									 std::to_string(cands.size() - before) + " new structures");
 			}
+			const size_t before = cands.size();
+			complete_orbits(1);
+			nrt.notes.push_back(std::to_string(cands.size() - before) + " symmetry image(s) complete the walk's orbits");
 		}
 	}
 	double search_seconds = secs(t_search0, clock());
@@ -1285,6 +1311,7 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 			const size_t room = std::min(static_cast<size_t>(budget), pool_cap - cands.size());
 			const size_t before = cands.size();
 			for (Candidate& c : grow(std::move(roots), room, false)) cands.push_back(std::move(c));
+			complete_orbits(before);
 			if (cands.size() == before) stop = "the weighted structures generate no new structure";
 		}
 		nrt.notes.push_back("cycle " + std::to_string(cycle) + ": D(w) = " + std::to_string(dw) + nbo_d(dw) +
@@ -1393,13 +1420,22 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 
 	int orbits = 0, in_orbits = 0;
 	if (options.nrt_symmetry) {
-		//Orbits: graph-isomorphic structures with equal g; one weight per orbit, shared equally
+		//Orbits: structures one symmetry map takes into another, or without maps graph-isomorphic structures with
+		//equal g; one weight per orbit, shared equally
 		std::map<std::string, ivec> classes;
-		for (int i = 0; i < nc; i++)
-			if (cands[i].feasible) classes[canonical_form(cands[i].topo, Z)].push_back(i);
 		std::vector<ivec> member;
+		bool capped = false;
+		for (int i = 0; i < nc; i++) {
+			if (!cands[i].feasible) continue;
+			if (maps.empty()) { classes[canonical_form(cands[i].topo, Z)].push_back(i); continue; }
+			ivec least = cands[i].topo.key();
+			for (const Topology& t : images_of(cands[i].topo, maps, L, 64, capped)) least = std::min(least, t.key());
+			std::string k(least.begin(), least.end());
+			classes[k].push_back(i);
+		}
 		for (auto& kv : classes) {
 			ivec& m = kv.second;
+			if (!maps.empty()) { member.push_back(m); continue; }
 			std::sort(m.begin(), m.end(),
 					  [&](const int a, const int b) { return cands[a].g < cands[b].g; });
 			for (size_t k = 0; k < m.size(); k++) {

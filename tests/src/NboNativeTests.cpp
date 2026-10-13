@@ -422,11 +422,19 @@ TEST(NboNativeTests, NickelTetracarbonylKeepsOneDativeBondAndItsParent)
 	}
 	EXPECT_EQ(ni_c, 1) << log.str();
 	ASSERT_TRUE(r.nrt.present);
-	bool parent = false;
-	for (const NboNrtCandidate &c : r.nrt.candidates)
-		if (c.idxres == 1) {
-			parent = true;
-			EXPECT_NEAR(c.rho_nl, electrons - lewis, 1.0e-3) << "NRT built a different parent than NBO found";
-		}
-	EXPECT_TRUE(parent) << "the parent Lewis structure carries no weight";
+	//D(0) is the parent's residual: n_NAO D(0)^2 = rho_NL(parent) + 0.001 in NBO's units for an idempotent density
+	ASSERT_EQ(r.nrt.spin_d.size(), 1u);
+	const double d0 = r.nrt.spin_d[0].d_0;
+	EXPECT_NEAR(static_cast<double>(r.nao.size()) * d0 * d0 - 0.001, electrons - lewis, 1.0e-3) << "NRT built a different parent than NBO found";
+	//Td: one Ni-C and one C-O bond order however the walk's budget cut the candidates
+	std::map<std::string, std::pair<double, double>> range;
+	for (const NboBondOrder &b : r.nrt.bond_orders) {
+		if (b.diagonal || b.total < 0.1) continue;
+		std::string a = r.npa[b.atom1 - 1].element, c = r.npa[b.atom2 - 1].element;
+		if (a > c) std::swap(a, c);
+		auto it = range.emplace(a + "-" + c, std::make_pair(b.total, b.total)).first;
+		it->second = { std::min(it->second.first, b.total), std::max(it->second.second, b.total) };
+	}
+	for (const auto &x : range)
+		EXPECT_NEAR(x.second.first, x.second.second, 1e-6) << x.first;
 }
