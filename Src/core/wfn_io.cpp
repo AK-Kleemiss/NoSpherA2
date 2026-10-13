@@ -2343,6 +2343,8 @@ bool WFN::write_nbo(const std::filesystem::path &fileName, const bool &debug, st
 			", beta=" + std::to_string(beta_mos));
 	int alpha_run = 0;
 	int beta_run = 0;
+	//the sph2cart tables return |m| = 3, 4 with ORCA's sign; fchk and OCC coefficients, their DM and the overlap keep libcint's
+	const bool libcint_phase = !origin_has_orca_pure_phases(get_origin());
 	int mo_progress_next = 10;
 	int mo_seen = 0;
 	for (int m = 0; m < get_nmo() && !cached_mos; m++)
@@ -2392,7 +2394,7 @@ bool WFN::write_nbo(const std::filesystem::path &fileName, const bool &debug, st
 			}
 			const vec nbo_values = project_to_nbo(shell.type, cart_values);
 			for (int c = 0; c < shell.nbo_components; c++)
-				(*target)[shell.nbo_start + c] = nbo_values[c];
+				(*target)[shell.nbo_start + c] = libcint_phase && orca_pure_sign_flips((c + 1) / 2) ? -nbo_values[c] : nbo_values[c];
 		}
 		progress_percent("MO coefficient reconstruction", mo_seen, alpha_mos + beta_mos, mo_progress_next);
 	}
@@ -2988,7 +2990,7 @@ bool WFN::read_fchk(const std::filesystem::path &filename, std::ostream &log, co
 		if (MOocc[i].size() == 0)
 			break;
 		for (int j = 0; j < nbas; j++) {
-			push_back_MO(i * nbas + j + 1, MOocc[i][j], MOene[i][j], 0);
+			push_back_MO(i * nbas + j + 1, MOocc[i][j], MOene[i][j], i);
 			int coef_run = 0, basis_run = 0;
 			for (int p = 0; p < nr_prims_shell.size(); p++)
 			{

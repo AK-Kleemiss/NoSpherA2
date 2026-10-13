@@ -103,8 +103,8 @@ TEST(NboNativeTests, EveryAcceptedOrbitalNamesRealCentres)
 }
 
 //A density whose Tr(P*S) is far from the electron count must be refused by name instead of yielding an
-//NPA table with wrong charges. read_fchk's DM passes; without it the .47 writer rebuilds the density from
-//the fchk's primitives, whose normalisation it does not know - the path an open-shell fchk still takes.
+//NPA table with wrong charges. Without read_fchk's DM the .47 writer rebuilds the density from the
+//primitives, where the first MO is stretched by 10 %.
 //std::cout goes to stderr in the child: err_checkf writes to the stream it is handed and a death test
 //matches stderr.
 TEST(NboNativeTests, AnArchiveThatDoesNotDescribeTheWavefunctionIsRefusedByName)
@@ -119,6 +119,8 @@ TEST(NboNativeTests, AnArchiveThatDoesNotDescribeTheWavefunctionIsRefusedByName)
 			std::cout.rdbuf(std::cerr.rdbuf());
 			WFN wavy(p);
 			wavy.set_dm(dMatrix2());
+			for (int i = 0; i < wavy.get_nex(); i++)
+				wavy.set_MO_coef(0, i, 1.1 * wavy.get_MO_coef(0, i));
 			wavy.write_nbo(out, false);
 		},
 		::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE),
@@ -129,6 +131,7 @@ TEST(NboNativeTests, AnArchiveThatDoesNotDescribeTheWavefunctionIsRefusedByName)
 }
 
 //The same closed-shell fchk with the DM read_fchk builds is a valid archive (a refusal exits the process).
+//F = S C^T eps C S belongs to that density only if C is orthonormal in the archive's S: Tr(P F) = sum n_m eps_m.
 TEST(NboNativeTests, ASphericalFchkWritesAnArchive)
 {
 	const auto p = fchk_fixture();
@@ -137,7 +140,16 @@ TEST(NboNativeTests, ASphericalFchkWritesAnArchive)
 	const auto out = std::filesystem::temp_directory_path() / "nos_nbo_native_fchk.47";
 	WFN wavy(p);
 	wavy.write_nbo(out, false);
-	EXPECT_TRUE(std::filesystem::exists(out));
+	ASSERT_TRUE(std::filesystem::exists(out));
+	const NboInput in = read_file47(out);
+	ASSERT_EQ(in.fock.size(), 1u);
+	double tr = 0.0, sum = 0.0;
+	for (int i = 0; i < in.n; i++)
+		for (int j = 0; j < in.n; j++)
+			tr += in.density[0](i, j) * in.fock[0](j, i);
+	for (int m = 0; m < wavy.get_nmo(); m++)
+		sum += wavy.get_MO_occ(m) * wavy.get_MO_energy(m);
+	EXPECT_NEAR(tr, sum, 1e-6 * std::abs(sum));
 	std::error_code ec;
 	std::filesystem::remove(out, ec);
 }

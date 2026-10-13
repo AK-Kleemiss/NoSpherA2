@@ -1427,7 +1427,7 @@ TEST(SaltedFchkTests, UnrestrictedDoubletRoundTrip)
 	std::filesystem::remove(tmp);
 }
 
-// the occ-built H2+ doublet written to fchk and read back keeps its density (the occupied orbital sits in the beta block)
+// the occ-built H2+ doublet written to fchk and read back keeps its density and spin density (the occupied orbital sits in the beta block)
 TEST(SaltedFchkTests, UnrestrictedDoubletRoundTripKeepsDensity)
 {
 	const auto tmp = tmp_path("h2p_density.fchk");
@@ -1439,6 +1439,10 @@ TEST(SaltedFchkTests, UnrestrictedDoubletRoundTripKeepsDensity)
 	ASSERT_TRUE(free_fchk(log, tmp, "", w, false, true));
 	WFN back(tmp, false);
 	expect_same_density(w, back, 1e-6, "H2+ via fchk");
+	EXPECT_EQ(back.get_MO_op_count(1), 8);
+	const d3 pos{ w.get_atom_coordinate(0, 0) + 0.3, w.get_atom_coordinate(0, 1), w.get_atom_coordinate(0, 2) };
+	EXPECT_LT(w.compute_spin_dens(pos), 0.0);
+	EXPECT_NEAR(back.compute_spin_dens(pos), w.compute_spin_dens(pos), 1e-6);
 	std::filesystem::remove(tmp);
 }
 
