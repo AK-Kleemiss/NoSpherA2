@@ -126,7 +126,7 @@
 #endif
 
 
-// Must be last: redefines exit() as a throw when NOSPHERA2_IN_PROCESS is set.
+// Must be last: redefines exit() as a throw when nos_in_process is set.
 #include "early_exit.h"
 
 #endif // NOSPHERA2_PCH_H
