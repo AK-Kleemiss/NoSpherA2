@@ -270,6 +270,11 @@ Key core modules live in `Src/core`:
 
 ## Current Validation Notes
 
+As of 2026-10-13, after `0f42a6d`, `ctest --preset release-linux` reports **1253 passed, 0 failed,
+22 skipped** (2 disabled) of 1275. The new case is `NboNativeTests.MethylRadicalSplitsItsBondsPerSpinAsNbo7Does`
+(fixture `tests/ch3_occ/ch3.owf.fchk`): an open shell's NBO searches now share the total-density NAOs and
+NRT reports D per spin in NBO 7's units. See `UNIT_TESTS_STATUS.md`.
+
 As of 2026-10-13, `ctest --preset release-linux` on `density_source` `d5a9755` reports
 **1252 passed, 0 failed, 22 skipped** (2 disabled) of 1274 on the same 4-core VM. It took
 308.2 +- 13.1 s wall and 1207 +- 47 CPU-s, against 432.8 +- 5.5 s and 1704 +- 22 CPU-s for `80876cc`

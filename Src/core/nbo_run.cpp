@@ -702,8 +702,15 @@ void write_nbo_json(const NboResults& r, const std::filesystem::path& json_file)
 	f << "  \"nrt\": {\"present\": " << (r.nrt.present ? "true" : "false")
 		<< ", \"structures_used\": " << r.nrt.structures_used << ", \"structures_found\": " << r.nrt.structures_found
 		<< ", \"d_0\": " << jnum(r.nrt.d_0) << ", \"d_w\": " << jnum(r.nrt.d_w);
-	if (r.nrt.d_nbo_norm > 0.0)
-		f << ", \"d_0_nbo\": " << jnum(r.nrt.d_0 / r.nrt.d_nbo_norm) << ", \"d_w_nbo\": " << jnum(r.nrt.d_w / r.nrt.d_nbo_norm);
+	if (r.nrt.spin_d.size() == 1)
+		f << ", \"d_0_nbo\": " << jnum(r.nrt.spin_d[0].d_0) << ", \"d_w_nbo\": " << jnum(r.nrt.spin_d[0].d_w);
+	if (!r.nrt.spin_d.empty()) {
+		f << ", \"spin_d_nbo\": [";
+		for (size_t i = 0; i < r.nrt.spin_d.size(); i++)
+			f << (i ? ", " : "") << "{\"spin\": " << jstr(r.nrt.spin_d[i].spin) << ", \"d_0\": " << jnum(r.nrt.spin_d[i].d_0)
+			  << ", \"d_w\": " << jnum(r.nrt.spin_d[i].d_w) << "}";
+		f << "]";
+	}
 	f << ", \"max_search_cycles\": " << r.nrt.max_search_cycles
 		<< ", \"symmetry\": " << jstr(r.nrt.symmetry)
 		<< ", \"initial_structures\": {\"total\": " << r.nrt.initial_topo << ", \"nls\": " << r.nrt.initial_nls

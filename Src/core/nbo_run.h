@@ -137,14 +137,20 @@ struct NboQpIteration {
 	std::string spin;
 };
 
+//Native only: one spin's D(0) and D(w) in NBO 7's units
+struct NboNrtD {
+	std::string spin;
+	double d_0 = 0.0, d_w = 0.0;
+};
+
 struct NboNrt {
 	bool present = false;
 	int structures_used = 0;
 	int structures_found = 0;
+	//native: ||Gamma - sum_a w_a Gamma_a||_F, over both spins of an open shell
 	double d_w = 0.0;
 	double d_0 = 0.0;
-	//native only: d / d_nbo_norm is NBO 7's D, 2 sqrt(n_NAO) for a closed shell; 0 = not known (open shell)
-	double d_nbo_norm = 0.0;
+	std::vector<NboNrtD> spin_d;  //native only, one per spin
 	double search_seconds = 0.0;
 	double gram_seconds = 0.0;
 	double minimize_seconds = 0.0;

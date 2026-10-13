@@ -154,6 +154,34 @@ TEST(NboNativeTests, ASphericalFchkWritesAnArchive)
 	std::filesystem::remove(out, ec);
 }
 
+//CH3 doublet, `occ scf` B3LYP(VWN5)/def2-TZVP at the geometry of tests/nbo_reference_v2/data/ch3, where NBO 7
+//splits each C-H bond 0.404/0.096 (covalent/ionic) in the spin holding the radical and 0.432/0.068 in the other,
+//with D 0.0103 and 0.0065. OCC puts the radical in beta, NBO 7's ORCA run in alpha.
+TEST(NboNativeTests, MethylRadicalSplitsItsBondsPerSpinAsNbo7Does)
+{
+	const auto p = nos_test_repo_root() / "tests" / "ch3_occ" / "ch3.owf.fchk";
+	if (!std::filesystem::exists(p))
+		GTEST_SKIP() << "tests/ch3_occ/ch3.owf.fchk not found";
+	WFN wavy(p);
+	NboOptions options;
+	options.nrt = true;
+	std::ostringstream log;
+	const NboResults r = native_nbo(wavy, options, log);
+	ASSERT_TRUE(r.open_shell);
+	EXPECT_NEAR(r.npa[0].spin_density, -1.08333, 2e-3);
+	int bonds = 0;
+	for (const NboBondOrder& b : r.nrt.bond_orders) {
+		if (b.diagonal || b.total == 0.0) continue;
+		const double cov = b.spin == "beta" ? 0.404 : 0.432;
+		EXPECT_NEAR(b.covalent, cov, 3e-3) << b.spin << " C1-H" << b.atom2;
+		EXPECT_NEAR(b.covalent + b.ionic, 0.5, 1e-9);
+		bonds++;
+	}
+	EXPECT_EQ(bonds, 6);
+	ASSERT_EQ(r.nrt.spin_d.size(), 2u);
+	EXPECT_GT(r.nrt.spin_d[1].d_0, r.nrt.spin_d[0].d_0) << "the radical's spin carries the larger D";
+}
+
 //A cartesian fchk declares more functions than the 2l+1 per shell Int_Params builds, and no
 //normalisation constant maps one onto the other, so the reader names both counts; a spherical fchk
 //stays silent, since a warning on every fchk is read by nobody.

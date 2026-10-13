@@ -643,7 +643,7 @@ namespace
 	double solve_qp(const MatrixXd& G, const VectorXd& g, const double trg2, VectorXd& w,
 					const int maxit, const vec* rho, const std::string& spin,
 					std::vector<NboQpIteration>* trace, std::ostream* status = nullptr,
-					double* gap_out = nullptr, int* it_out = nullptr, const double nbo_norm = 0.0)
+					double* gap_out = nullptr, int* it_out = nullptr, const std::function<double(double)>& nbo = {})
 	{
 		const int n = static_cast<int>(G.rows());
 		if (!n) return trg2;
@@ -700,7 +700,7 @@ namespace
 				if (status)
 					*status << "NRT" << (spin.empty() ? "" : " " + spin) << ": iteration " << it << ", D(w) "
 							<< std::sqrt(std::max(0.0, f))
-							<< (nbo_norm > 0.0 ? " (NBO " + std::to_string(std::sqrt(std::max(0.0, f)) / nbo_norm) + ")" : "")
+							<< (nbo ? " (NBO " + std::to_string(nbo(std::sqrt(std::max(0.0, f)))) + ")" : "")
 							<< ", " << (wn.array() > 1e-6).count()
 							<< " weighted, gap " << fw_gap(Gwn, g, wn) << std::endl;
 				if (f_window - f < 1e-11 * std::max(1.0, std::abs(f))) break;
@@ -728,12 +728,10 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 
 	const int na = static_cast<int>(nao.atoms.size());
 	const int nn = static_cast<int>(nao.orbitals.size());
-	//NBO 7 prints D / (2 sqrt(n_NAO)) for a closed shell (Ni(CO)4 to 0.02 %, formate 0.3 %).  No open-shell
-	//factor reproduces CH3's alpha and beta lines at once, so none is claimed there.
-	const double nbo_norm = scale == 2.0 ? 2.0 * std::sqrt(static_cast<double>(nn)) : 0.0;
-	const auto nbo_d = [&](const double d) {
-		return nbo_norm > 0.0 ? " (NBO " + std::to_string(d / nbo_norm) + ")" : std::string();
-	};
+	//NBO 7's D per spin is sqrt((||Gamma_s - sum_a w_a P_a||^2 + 0.001) / n_NAO), Gamma_s = Gamma / scale: one structure
+	//leaves 2 rho_NL(s) in the norm, and n D^2 - 2 rho_NL(s) = 0.0010 in every spin of the 41 nbo_reference_v2 goldens
+	const auto nbo_units = [&](const double d) { return std::sqrt((d * d / (scale * scale) + 0.001) / nn); };
+	const auto nbo_d = [&](const double d) { return " (NBO " + std::to_string(nbo_units(d)) + ")"; };
 	ivec Z(na, 0);
 	for (int a = 0; a < na; a++) Z[a] = nao.atoms[a].Z;
 
@@ -1110,7 +1108,7 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 		built = static_cast<size_t>(nc);
 		nrt.qp_iterations.resize(trace_mark);  //the trace describes the final fit
 		f = solve_qp(G, g, trg2, w, 5000, &rho, spin, &nrt.qp_iterations, show ? &log : nullptr,
-					 &fista_gap, &fista_its, nbo_norm);
+					 &fista_gap, &fista_its, nbo_units);
 		minimize_seconds += secs(t_min0, clock());
 
 		const double dw = std::sqrt(std::max(0.0, f));
@@ -1394,9 +1392,10 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 	nrt.present = true;
 	nrt.structures_used += static_cast<int>(order.size());
 	nrt.structures_found += nc;
-	nrt.d_w = std::sqrt(std::max(0.0, f));
-	nrt.d_0 = std::sqrt(std::max(0.0, f0));
-	nrt.d_nbo_norm = nbo_norm;
+	const double d_w = std::sqrt(std::max(0.0, f)), d_0 = std::sqrt(std::max(0.0, f0));
+	nrt.d_w = std::sqrt(nrt.d_w * nrt.d_w + d_w * d_w);
+	nrt.d_0 = std::sqrt(nrt.d_0 * nrt.d_0 + d_0 * d_0);
+	nrt.spin_d.push_back({ spin, nbo_units(d_0), nbo_units(d_w) });
 	nrt.deloc_threshold_kcal = options.nrt_e2_kcal;
 	nrt.max_search_cycles = static_cast<int>(nrt.cycles.size());
 	nrt.initial_topo = nc;
@@ -1406,7 +1405,7 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 	nrt.other_seconds += secs(t_other0, clock()) + secs(t_start, t_search0);
 	if (options.debug)
 		log << "NRT" << (spin.empty() ? "" : " " + spin) << ": " << nc << " candidates, "
-			<< order.size() << " retained, D(0) = " << nrt.d_0 << ", D(w) = " << nrt.d_w
+			<< order.size() << " retained, D(0) = " << d_0 << ", D(w) = " << d_w
 			<< " (search " << search_seconds << " s, gram " << gram_seconds << " s [orbitals "
 			<< orbital_seconds << " s, pairs " << pair_seconds << " s, "
 			<< (projector ? "projector" : "pair loop") << "], minimise "

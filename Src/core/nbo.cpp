@@ -1175,19 +1175,17 @@ NboResults native_nbo(WFN& wavy, const NboOptions& options, std::ostream& log)
 		err_checkf(options.nrt_parent.empty() && options.parent_lewis.empty(),
 				   "-nrt_parent takes a closed-shell wavefunction; this one is open shell, whose alpha and beta "
 				   "Lewis structures the search places apart", log);
-		//NPA tables share total-density NAOs; NBO searches use separate spin densities.
+		//one NAO basis from the total density for the NPA tables and both spins' searches, as in NBO 7's per-spin tables
 		const auto t_nao = clock();
 		const dMatrix2 total_density = to_dmatrix(MatrixXd(to_eigen(in.density[0]) + to_eigen(in.density[1])));
 		const dMatrix2 spin_density = to_dmatrix(MatrixXd(to_eigen(in.density[0]) - to_eigen(in.density[1])));
 		const NAOResult total_nao = build_naos(total_density, in.overlap, in.ao, atoms, ecp);
-		const NAOResult a_nao = build_naos(in.density[0], in.overlap, in.ao, atoms, ecp);
-		const NAOResult b_nao = build_naos(in.density[1], in.overlap, in.ao, atoms, ecp);
 		res.nao_seconds = std::chrono::duration<double>(clock() - t_nao).count();
+		const dMatrix2 spin_nao[2] = { nao_density(in.density[0], in.overlap, total_nao.C), nao_density(in.density[1], in.overlap, total_nao.C) };
 		for (int s = 0; s < 2; s++) {
-			const NAOResult& nao = s ? b_nao : a_nao;
 			double electrons = 0.0;
-			for (const NAOAtom& a : nao.atoms) electrons += a.population;
-			analyse_spin(res, in, nao, bondable, nrt_bondable, in.density[s],
+			for (size_t i = 0; i < spin_nao[s].extent(0); i++) electrons += spin_nao[s](i, i);
+			analyse_spin(res, in, total_nao, bondable, nrt_bondable, in.density[s],
 						 static_cast<int>(in.fock.size()) > s ? in.fock[s] : dMatrix2(),
 						 static_cast<int>(std::llround(electrons)), 1.0, s ? "beta" : "alpha",
 						 options, lewis, log);
@@ -1198,14 +1196,13 @@ NboResults native_nbo(WFN& wavy, const NboOptions& options, std::ostream& log)
 		fill_nao_table(res.nao, total_nao, occ,
 					   in.fock.empty() ? dMatrix2() : nao_operator(in.fock[0], total_nao.C));
 		for (int s = 0; s < 2; s++) {
-			const dMatrix2 spin_nao = nao_density(in.density[s], in.overlap, total_nao.C);
 			vec spin_occ(total_nao.orbitals.size(), 0.0);
-			for (size_t i = 0; i < spin_occ.size(); i++) spin_occ[i] = spin_nao(i, i);
+			for (size_t i = 0; i < spin_occ.size(); i++) spin_occ[i] = spin_nao[s](i, i);
 			fill_nao_table(s ? res.nao_beta : res.nao_alpha, total_nao, spin_occ,
 						   static_cast<int>(in.fock.size()) > s ? nao_operator(in.fock[s], total_nao.C)
 																: dMatrix2());
 		}
-		const dMatrix2 spin_nao = nao_density(spin_density, in.overlap, total_nao.C);
+		const dMatrix2 spin_pop = nao_density(spin_density, in.overlap, total_nao.C);
 		for (const NAOAtom& x : total_nao.atoms) {
 			NboAtomPopulation p;
 			p.element = constants::atnr2letter(x.Z);
@@ -1216,7 +1213,7 @@ NboResults native_nbo(WFN& wavy, const NboOptions& options, std::ostream& log)
 			p.total = x.population;
 			p.charge = x.charge;
 			for (size_t i = 0; i < total_nao.orbitals.size(); i++)
-				if (total_nao.orbitals[i].atom == x.index) p.spin_density += spin_nao(i, i);
+				if (total_nao.orbitals[i].atom == x.index) p.spin_density += spin_pop(i, i);
 			p.has_spin_density = true;
 			res.npa.push_back(p);
 		}
@@ -1316,10 +1313,9 @@ void print_nrt(const NboResults& r, std::ostream& out)
 	out << "\nNatural resonance theory (in house):\n"
 		<< "  " << n.structures_used << " of " << n.structures_found
 		<< " resonance structures carry the fit, D(0) = " << fixed << setprecision(5) << n.d_0
-		<< ", D(w) = " << n.d_w;
-	if (n.d_nbo_norm > 0.0)
-		out << "; in NBO's units (/ 2 sqrt(n_NAO)) D(0) = " << n.d_0 / n.d_nbo_norm << ", D(w) = " << n.d_w / n.d_nbo_norm;
-	out << "\n";
+		<< ", D(w) = " << n.d_w << "\n";
+	for (const NboNrtD& d : n.spin_d)
+		out << "  in NBO's units" << (d.spin.empty() ? "" : " (" + d.spin + ")") << ": D(0) = " << d.d_0 << ", D(w) = " << d.d_w << "\n";
 	//an open shell runs the search once per spin, and both runs push the same budget line
 	svec seen;
 	for (const std::string& s : n.notes)

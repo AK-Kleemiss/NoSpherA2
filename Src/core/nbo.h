@@ -116,8 +116,8 @@ std::vector<NboE2Entry> nbo_e2(NboLewis& lewis, const dMatrix2& fock_nao, double
 /**
  * Natural resonance theory on one spin's NAO basis, appended to nrt.  e2's donor/acceptor indices must
  * still be 1-based into lewis.orbitals, i.e. passed before analyse_spin renumbers them.
- * D(w) is the plain Frobenius norm of Gamma - sum_a w_a Gamma_a; for a closed shell NBO 7's D is it over
- * 2 sqrt(n_NAO), printed and written alongside (d_0_nbo, d_w_nbo).  Open shells have no NBO-unit value.
+ * D(w) is the plain Frobenius norm of Gamma - sum_a w_a Gamma_a, summed in squares over the spins of an open
+ * shell; NBO 7's D, sqrt((D^2 / scale^2 + 0.001) / n_NAO) per spin, goes to nrt.spin_d.
  */
 void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 				const std::vector<NboE2Entry>& e2, const bvec2& bondable,

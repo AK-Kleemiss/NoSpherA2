@@ -292,6 +292,9 @@ TEST(NrtTests, TwoIdenticalSpinChannelsAddUpToTheClosedShellAnswer)
         NboLewis ls = two_bond_lewis(half, 1.0);
         native_nrt(s, nao, ls, {}, chain_bondable(3), opt, spin, 1.0, log);
         ASSERT_TRUE(s.present) << spin;
+        ASSERT_EQ(s.spin_d.size(), 1u);
+        EXPECT_NEAR(s.spin_d[0].d_0, closed.spin_d[0].d_0, 1e-10) << spin << ": NBO's D is per spin, Gamma / 2 is each spin of the closed shell";
+        EXPECT_NEAR(s.spin_d[0].d_w, closed.spin_d[0].d_w, 1e-10) << spin;
         for (int k = 0; k < 2; k++) {
             const NboBondOrder o = bond_of(s, pair_a[k], pair_b[k]);
             const NboBondOrder c = bond_of(closed, pair_a[k], pair_b[k]);
