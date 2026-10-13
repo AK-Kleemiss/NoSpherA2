@@ -205,6 +205,28 @@ TEST(NboNativeTests, MethylRadicalSplitsItsBondsPerSpinAsNbo7Does)
 	EXPECT_GT(r.nrt.spin_d[1].d_0, r.nrt.spin_d[0].d_0) << "the radical's spin carries the larger D";
 }
 
+//HI from `occ scf` B3LYP(VWN5)/def2-TZVP: the fchk's "Nuclear charges" give iodine 25, Z minus its 28-electron ECP
+//core. The atom keeps Z = 53 with the core as its ECP count, so NBO sees iodine and its 18 remaining core electrons.
+TEST(NboNativeTests, AnEcpFchkKeepsTheElementAndItsCore)
+{
+	const auto p = nos_test_repo_root() / "tests" / "hi_occ" / "hi.owf.fchk";
+	if (!std::filesystem::exists(p))
+		GTEST_SKIP() << "tests/hi_occ/hi.owf.fchk not found";
+	WFN wavy(p);
+	EXPECT_EQ(wavy.get_atom_charge(0), 53);
+	EXPECT_TRUE(wavy.get_has_ECPs());
+	EXPECT_EQ(wavy.get_atom_ECP_electrons(0), 28);
+	EXPECT_NEAR(wavy.count_nr_electrons(), 26.0, 1e-6);
+	NboOptions options;
+	std::ostringstream log;
+	const NboResults r = native_nbo(wavy, options, log);
+	ASSERT_EQ(r.npa.size(), 2u);
+	EXPECT_EQ(r.npa[0].element, "I");
+	EXPECT_NEAR(r.npa[0].core, 18.0, 1e-3);
+	EXPECT_NEAR(r.npa[0].charge + r.npa[1].charge, 0.0, 1e-4);
+	EXPECT_LT(std::abs(r.npa[0].charge), 0.5);
+}
+
 //A cartesian fchk declares more functions than the 2l+1 per shell Int_Params builds, and no
 //normalisation constant maps one onto the other, so the reader names both counts; a spherical fchk
 //stays silent, since a warning on every fchk is read by nobody.

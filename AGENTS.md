@@ -309,9 +309,10 @@ alternative is one flag away in each case.
 
 ## Current Validation Notes
 
-As of 2026-10-13, after `2a0fd80`, `ctest --preset release-linux` reports **1256 passed, 0 failed,
-22 skipped** (2 disabled) of 1278. New since `d5a9755`: `NboNativeTests.MethylRadicalSplitsItsBondsPerSpinAsNbo7Does`
+As of 2026-10-13, after `72d83cd`, `ctest --preset release-linux` reports **1257 passed, 0 failed,
+22 skipped** (2 disabled) of 1279. New since `d5a9755`: `NboNativeTests.MethylRadicalSplitsItsBondsPerSpinAsNbo7Does`
 (fixture `tests/ch3_occ/ch3.owf.fchk`), `NboNativeTests.AGrownNrtCycleStatesAFloorItsFitRespects`,
+`NboNativeTests.AnEcpFchkKeepsTheElementAndItsCore` (fixture `tests/hi_occ/hi.owf.fchk`),
 `NrtTests.TheParentsSymmetryImageCompletesTheHexagon` and
 `NrtTests.OppositelyPolarisedOrbitalsOfABondDoNotCancelInItsIonicShare`. See `UNIT_TESTS_STATUS.md`.
 

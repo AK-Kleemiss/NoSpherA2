@@ -2849,10 +2849,27 @@ bool WFN::read_fchk(const std::filesystem::path &filename, std::ostream &log, co
 		atoms[i].set_label(constants::atnr2letter(atnbrs[i]));
 		atoms[i].set_nr(i + 1);
 	}
-	vec charges;
+	vec charges, frozen;
 	err_checkf(read_fchk_double_block(fchk, "Nuclear charges", charges), "Error reading charges", log);
+	//"Nuclear charges" is Z minus an ECP core: the atom keeps Z and the core goes to its ECP count, as in the gbw reader
+	if (go_get_string(fchk, "ECP-RNFroz", true) != "")
+		err_checkf(read_fchk_double_block(fchk, "ECP-RNFroz", frozen), "Error reading ECP-RNFroz", log);
+	int ecp_core = 0;
 	for (int i = 0; i < charges.size(); i++)
-		atoms[i].set_charge(static_cast<int>(charges[i]));
+	{
+		const int core = i < static_cast<int>(frozen.size()) ? static_cast<int>(std::lround(frozen[i])) : 0;
+		atoms[i].set_charge(static_cast<int>(charges[i]) + core);
+		if (core > 0)
+			atoms[i].set_ECP_electrons(core);
+		ecp_core += core;
+	}
+	if (ecp_core > 0)
+	{
+		has_ECPs = true;
+		if (ECP_m == 0)
+			ECP_m = 1;
+		log << "\nThe fchk's ECP block removes " << ecp_core << " core electrons from the orbitals: treating them as ECP atoms, as -ECP would.\n";
+	}
 	vec coords;
 	err_checkf(read_fchk_double_block(fchk, "Current cartesian coordinates", coords), "Error reading coordinates", log);
 	if (coords.size() != ncen * 3)
