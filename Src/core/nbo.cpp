@@ -860,7 +860,7 @@ namespace
 {
 	//One spin's worth of the analysis, appended to the results.
 	void analyse_spin(NboResults& res, const NboInput& in, const NAOResult& nao,
-					  const bvec2& bondable, const bvec2& nrt_bondable, const vec2& distances, const dMatrix2& density,
+					  const bvec2& bondable, const bvec2& nrt_bondable, const vec2& xyz, const dMatrix2& density,
 					  const dMatrix2& fock,
 					  const int n_pairs, const double scale, const std::string& spin,
 					  const NboOptions& options, std::vector<NboLewis>& out_lewis, std::ostream& log)
@@ -904,7 +904,7 @@ namespace
 		//before the renumbering below, while e2's indices still point into lewis.orbitals
 		if (options.nrt)
 			//log, not std::cout: under -fba this runs on the NBO thread and cout is RGBI's
-			native_nrt(res.nrt, nao, lewis, e2, nrt_bondable, options, spin, scale, log, &distances);
+			native_nrt(res.nrt, nao, lewis, e2, nrt_bondable, options, spin, scale, log, &xyz);
 
 		//NBO numbers by type group: the Lewis set in found order, then LV, BD*, RY
 		ivec order;
@@ -1126,12 +1126,9 @@ NboResults native_nbo(WFN& wavy, const NboOptions& options, std::ostream& log)
 	std::vector<atom> atoms = wavy.get_atoms();
 	const bvec2 bondable = bondable_pairs(atoms);
 	const bvec2 nrt_bondable = bondable_pairs(atoms, options.nrt_bond_scale);
-	vec2 distances(atoms.size(), vec(atoms.size(), 0.0));
+	vec2 xyz(atoms.size(), vec(3, 0.0));
 	for (size_t a = 0; a < atoms.size(); a++)
-		for (size_t b = 0; b < atoms.size(); b++)
-			distances[a][b] = std::hypot(atoms[a].get_coordinate(0) - atoms[b].get_coordinate(0),
-										 atoms[a].get_coordinate(1) - atoms[b].get_coordinate(1),
-										 atoms[a].get_coordinate(2) - atoms[b].get_coordinate(2));
+		for (int x = 0; x < 3; x++) xyz[a][x] = atoms[a].get_coordinate(x);
 	ivec ecp(atoms.size(), 0);
 	if (wavy.get_has_ECPs())
 		for (size_t a = 0; a < atoms.size(); a++)
@@ -1160,7 +1157,7 @@ NboResults native_nbo(WFN& wavy, const NboOptions& options, std::ostream& log)
 							   " is longer than -nrt_bond_scale " + std::to_string(options.nrt_bond_scale) +
 							   " x the covalent radius sum; raise it or drop the bond", log);
 		}
-		analyse_spin(res, in, nao, bondable, nrt_bondable, distances, in.density[0],
+		analyse_spin(res, in, nao, bondable, nrt_bondable, xyz, in.density[0],
 					 in.fock.empty() ? dMatrix2() : in.fock[0], n_pairs, 2.0, "", chosen, lewis, log);
 		vec occ(nao.orbitals.size(), 0.0);
 		for (size_t i = 0; i < occ.size(); i++) occ[i] = nao.orbitals[i].occupation;
@@ -1191,7 +1188,7 @@ NboResults native_nbo(WFN& wavy, const NboOptions& options, std::ostream& log)
 		for (int s = 0; s < 2; s++) {
 			double electrons = 0.0;
 			for (size_t i = 0; i < spin_nao[s].extent(0); i++) electrons += spin_nao[s](i, i);
-			analyse_spin(res, in, total_nao, bondable, nrt_bondable, distances, in.density[s],
+			analyse_spin(res, in, total_nao, bondable, nrt_bondable, xyz, in.density[s],
 						 static_cast<int>(in.fock.size()) > s ? in.fock[s] : dMatrix2(),
 						 static_cast<int>(std::llround(electrons)), 1.0, s ? "beta" : "alpha",
 						 options, lewis, log);

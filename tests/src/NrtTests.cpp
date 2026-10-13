@@ -685,7 +685,7 @@ TEST(NrtTests, TheParentsSymmetryImageCompletesTheHexagon)
     const int na = 6;
     const NAOResult nao = h_chain(na);
     bvec2 ring(na, bvec(na, false));
-    vec2 dist(na, vec(na, 0.0));
+    vec2 xyz(na, vec(3, 0.0));
     dMatrix2 gamma(na, na);
     for (int a = 0; a < na; a++) {
         const int b = (a + 1) % na;
@@ -694,8 +694,8 @@ TEST(NrtTests, TheParentsSymmetryImageCompletesTheHexagon)
         gamma(b, b) += 0.5;
         gamma(a, b) += 0.5;
         gamma(b, a) += 0.5;
-        for (int c = 0; c < na; c++)
-            dist[a][c] = 2.0 * std::abs(std::sin(constants::PI * (a - c) / na));
+        xyz[a][0] = std::cos(2.0 * constants::PI * a / na);
+        xyz[a][1] = std::sin(2.0 * constants::PI * a / na);
     }
     NboLewis L;
     L.gamma = gamma;
@@ -714,10 +714,12 @@ TEST(NrtTests, TheParentsSymmetryImageCompletesTheHexagon)
     opt.nrt = true;
     NboNrt nrt;
     std::ostringstream log;
-    native_nrt(nrt, nao, L, {}, ring, opt, "", 2.0, log, &dist);
+    native_nrt(nrt, nao, L, {}, ring, opt, "", 2.0, log, &xyz);
     ASSERT_TRUE(nrt.present);
     //9 - 18 + 9 here, so an exact fit reads up to sqrt(ulp(18)) = 2^-24; one Kekule structure alone leaves sqrt(3)
     EXPECT_LT(nrt.d_w, 1e-6) << "the second Kekule structure is missing";
+    EXPECT_NE(std::find_if(nrt.notes.begin(), nrt.notes.end(), [](const std::string& s) { return s.find("rotated") != std::string::npos; }),
+              nrt.notes.end()) << "the image's orbitals were built, not rotated";
     for (int a = 0; a < na; a++)
         EXPECT_NEAR(bond_total(nrt, a + 1, (a + 1) % na + 1), 0.5, 1e-6) << "ring pair " << a + 1;
     //an exact fit leaves no slack: every range is the bond order itself

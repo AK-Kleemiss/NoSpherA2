@@ -117,13 +117,14 @@ std::vector<NboE2Entry> nbo_e2(NboLewis& lewis, const dMatrix2& fock_nao, double
  * Natural resonance theory on one spin's NAO basis, appended to nrt.  e2's donor/acceptor indices must
  * still be 1-based into lewis.orbitals, i.e. passed before analyse_spin renumbers them.
  * D(w) is the plain Frobenius norm of Gamma - sum_a w_a Gamma_a, summed in squares over the spins of an open
- * shell; NBO 7's D, sqrt((D^2 / scale^2 + 0.001) / n_NAO) per spin, goes to nrt.spin_d.  distances (bohr)
- * make the parent's symmetry images those of the geometry, without them the bondable graph's.
+ * shell; NBO 7's D, sqrt((D^2 / scale^2 + 0.001) / n_NAO) per spin, goes to nrt.spin_d.  With xyz (bohr, one row
+ * per atom) the symmetry images are those of the geometry and an image's orbitals are its source's rotated,
+ * without them the bondable graph's images are built one by one.
  */
 void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 				const std::vector<NboE2Entry>& e2, const bvec2& bondable,
 				const NboOptions& options, const std::string& spin, double scale,
-				std::ostream& log, const vec2* distances = nullptr);
+				std::ostream& log, const vec2* xyz = nullptr);
 
 //Exits on a wavefunction WFN::write_nbo() cannot turn into a FILE47: no contracted basis (.wfn/.wfx) or
 //Cartesian d/f shells. -fba calls it before its NBO thread starts, where the exit would tear down RGBI.

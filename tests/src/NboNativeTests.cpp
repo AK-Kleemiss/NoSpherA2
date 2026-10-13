@@ -459,6 +459,12 @@ TEST(NboNativeTests, NickelTetracarbonylKeepsOneDativeBondAndItsParent)
 	}
 	for (const auto &x : range)
 		EXPECT_NEAR(x.second.first, x.second.second, 1e-6) << x.first;
+	//every isometry holds in the NAO basis with ORCA's f phases, and images start from their source's orbitals rotated
+	const auto noted = [&](const std::string &s) {
+		return std::any_of(r.nrt.notes.begin(), r.nrt.notes.end(), [&](const std::string &n) { return n.find(s) != std::string::npos; });
+	};
+	EXPECT_FALSE(noted("miss the NAO density"));
+	EXPECT_TRUE(noted("symmetry image's orbitals, rotated"));
 	//Ni-C is barely determined: weights within 0.1 % of the optimal D(w) move it by more than 0.1 either way
 	for (const NboBondOrder &b : r.nrt.bond_orders) {
 		if (b.diagonal || b.total < 0.1) continue;

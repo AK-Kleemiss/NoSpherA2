@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "nbo.h"
 #include "constants.h"
+#include "wfn_class.h"
 
 #include <Eigen/Dense>
 #include <chrono>
@@ -274,6 +275,9 @@ namespace
 		double change = 0.0;      //largest vector change of the last sweep
 		bool converged = false;   //valence span stopped moving before the sweep cap
 		std::array<int, 3> moved{ -1, -1, -1 };  //atoms the last pair move touched
+		MatrixXd M;                                //vectors before the orthogonalisation, cores first, while images may start from them
+		std::vector<std::pair<int, int>> owner;    //slot of each column of M, {-1, -1} for a core
+		bool warm = false;                         //started from a symmetry image's rotated vectors
 	};
 
 	struct Limits {
@@ -511,6 +515,153 @@ namespace
 		return out;
 	}
 
+	//Real spherical harmonics of order l at the unit vector u, in FILE47's m = 0, +1, -1, +2, -2, ... order, without
+	//the Condon-Shortley phase: P_l^m by the upward recursion in l
+	VectorXd real_harmonics(const int l, const Eigen::Vector3d& u)
+	{
+		const double x = std::max(-1.0, std::min(1.0, u(2))), st = std::sqrt(std::max(0.0, 1.0 - x * x));
+		const double phi = std::atan2(u(1), u(0));
+		VectorXd y(2 * l + 1);
+		double ratio = 1.0;  //(l - m)! / (l + m)!
+		for (int m = 0; m <= l; m++) {
+			if (m) ratio /= (l - m + 1.0) * (l + m);
+			double pmm = 1.0;
+			for (int i = 1; i <= m; i++) pmm *= (2 * i - 1) * st;
+			double p0 = pmm, p1 = l > m ? x * (2 * m + 1) * pmm : pmm;
+			for (int ll = m + 2; ll <= l; ll++) {
+				const double p2 = ((2 * ll - 1) * x * p1 - (ll + m - 1) * p0) / (ll - m);
+				p0 = p1;
+				p1 = p2;
+			}
+			const double norm = std::sqrt((2 * l + 1) / (4.0 * constants::PI) * ratio) * p1;
+			if (m == 0) y(0) = norm;
+			else {
+				y(2 * m - 1) = std::sqrt(2.0) * norm * std::cos(m * phi);
+				y(2 * m) = std::sqrt(2.0) * norm * std::sin(m * phi);
+			}
+		}
+		return y;
+	}
+
+	//c' = D c carries sum_m c_m Y_m(r) to sum_m c_m Y_m(R^T r); fitted on Fibonacci directions
+	MatrixXd wigner_real(const int l, const Eigen::Matrix3d& R)
+	{
+		const int k = 4 * (2 * l + 1);
+		MatrixXd A(k, 2 * l + 1), Y(k, 2 * l + 1);
+		for (int i = 0; i < k; i++) {
+			const double z = 1.0 - (2.0 * i + 1.0) / k, r = std::sqrt(1.0 - z * z), phi = 2.399963229728653 * i;
+			const Eigen::Vector3d u(r * std::cos(phi), r * std::sin(phi), z);
+			A.row(i) = real_harmonics(l, u);
+			Y.row(i) = real_harmonics(l, R.transpose() * u);
+		}
+		return A.colPivHouseholderQr().solve(Y);
+	}
+
+	//NAOs of one (atom, l, shell), idx[c] the NAO of component c
+	struct NaoGroup {
+		int atom = 0, l = 0, shell = 0;
+		ivec idx;
+	};
+
+	//An isometry in the NAO basis: group g goes to group target[g] through D[g], which carries the group's sign;
+	//miss = ||U Gamma U^T - Gamma|| / ||Gamma||
+	struct SymOp {
+		ivec perm, target;
+		std::vector<MatrixXd> D;
+		double miss = 0.0;
+	};
+
+	MatrixXd apply_op(const SymOp& op, const std::vector<NaoGroup>& groups, const MatrixXd& V, const bool inverse)
+	{
+		MatrixXd out = MatrixXd::Zero(V.rows(), V.cols());
+		for (size_t g = 0; g < groups.size(); g++) {
+			const ivec& from = inverse ? groups[op.target[g]].idx : groups[g].idx;
+			const ivec& to = inverse ? groups[g].idx : groups[op.target[g]].idx;
+			const int w = static_cast<int>(from.size());
+			MatrixXd x(w, V.cols());
+			for (int c = 0; c < w; c++) x.row(c) = V.row(from[c]);
+			const MatrixXd y = inverse ? MatrixXd(op.D[g].transpose() * x) : MatrixXd(op.D[g] * x);
+			for (int c = 0; c < w; c++) out.row(to[c]) = y.row(c);
+		}
+		return out;
+	}
+
+	//The NAO-basis image of the atom map pi: R from the coordinates (improper allowed), D^l(R) per group, and per group
+	//the sign the NAO construction left arbitrary, taken from the density along a maximum spanning tree of the group
+	//couplings. Without and with ORCA's sign on |m| = 3, 4, whichever U Gamma U^T matches better; empty when that
+	//misses Gamma by 1 %
+	std::optional<SymOp> nao_op(const ivec& pi, const vec2& xyz, const std::vector<NaoGroup>& groups, const MatrixXd& gamma)
+	{
+		const int na = static_cast<int>(pi.size()), ng = static_cast<int>(groups.size());
+		Eigen::Vector3d c0 = Eigen::Vector3d::Zero();
+		for (int a = 0; a < na; a++) c0 += Eigen::Vector3d(xyz[a][0], xyz[a][1], xyz[a][2]) / na;
+		Eigen::Matrix3d H = Eigen::Matrix3d::Zero();
+		for (int a = 0; a < na; a++)
+			H += (Eigen::Vector3d(xyz[a][0], xyz[a][1], xyz[a][2]) - c0) *
+				 (Eigen::Vector3d(xyz[pi[a]][0], xyz[pi[a]][1], xyz[pi[a]][2]) - c0).transpose();
+		const Eigen::JacobiSVD<Eigen::Matrix3d> svd(H, Eigen::ComputeFullU | Eigen::ComputeFullV);
+		const Eigen::Matrix3d R = svd.matrixV() * svd.matrixU().transpose();
+		for (int a = 0; a < na; a++)
+			if ((R * (Eigen::Vector3d(xyz[a][0], xyz[a][1], xyz[a][2]) - c0) -
+				 (Eigen::Vector3d(xyz[pi[a]][0], xyz[pi[a]][1], xyz[pi[a]][2]) - c0)).norm() > 0.01) return std::nullopt;
+		SymOp op;
+		op.perm = pi;
+		op.target.assign(ng, -1);
+		for (int g = 0; g < ng; g++)
+			for (int h = 0; h < ng && op.target[g] < 0; h++)
+				if (groups[h].atom == pi[groups[g].atom] && groups[h].l == groups[g].l && groups[h].shell == groups[g].shell)
+					op.target[g] = h;
+		for (int g = 0; g < ng; g++)
+			if (op.target[g] < 0 || groups[op.target[g]].idx.size() != groups[g].idx.size()) return std::nullopt;
+		const auto block = [&](const int g, const int h) {
+			MatrixXd b(groups[g].idx.size(), groups[h].idx.size());
+			for (int i = 0; i < b.rows(); i++)
+				for (int j = 0; j < b.cols(); j++) b(i, j) = gamma(groups[g].idx[i], groups[h].idx[j]);
+			return b;
+		};
+		std::map<int, MatrixXd> wig;
+		std::optional<SymOp> best;
+		for (int orca = 0; orca < 2; orca++) {
+			op.D.assign(ng, MatrixXd());
+			for (int g = 0; g < ng; g++) {
+				const int l = groups[g].l;
+				if (!wig.count(l)) wig[l] = wigner_real(l, R);
+				op.D[g] = wig[l];
+				if (orca)
+					for (int c = 1; c < 2 * l + 1; c++)
+						if (orca_pure_sign_flips((c + 1) / 2)) { op.D[g].row(c) *= -1.0; op.D[g].col(c) *= -1.0; }
+			}
+			vec sign(ng, 0.0), link(ng, 0.0);
+			ivec from(ng, -1);
+			for (int left = ng; left > 0; left--) {
+				int g = -1;
+				for (int h = 0; h < ng; h++)
+					if (sign[h] == 0.0 && (g < 0 || link[h] > link[g])) g = h;
+				sign[g] = 1.0;
+				if (from[g] >= 0) {
+					const int f = from[g];
+					sign[g] = sign[f] * ((block(op.target[f], op.target[g]).cwiseProduct(op.D[f] * block(f, g) * op.D[g].transpose())).sum() < 0.0 ? -1.0 : 1.0);
+				}
+				for (int h = 0; h < ng; h++)
+					if (sign[h] == 0.0) {
+						const double c = block(g, h).norm();
+						if (c > link[h]) { link[h] = c; from[h] = g; }
+					}
+			}
+			for (int g = 0; g < ng; g++) op.D[g] *= sign[g];
+			double num = 0.0, den = 0.0;
+			for (int g = 0; g < ng; g++)
+				for (int h = 0; h < ng; h++) {
+					num += (block(op.target[g], op.target[h]) - op.D[g] * block(g, h) * op.D[h].transpose()).squaredNorm();
+					den += block(g, h).squaredNorm();
+				}
+			op.miss = std::sqrt(num / std::max(den, 1e-300));
+			if (!best || op.miss < best->miss) best = op;
+		}
+		if (best && best->miss < 1e-2) return best;
+		return std::nullopt;
+	}
+
 	MatrixXd sym_power(const MatrixXd& M, const double p, const double rel_floor = 1e-10)
 	{
 		Eigen::SelfAdjointEigenSolver<MatrixXd> es(M);
@@ -533,7 +684,7 @@ namespace
 	//Orbitals of a prescribed topology by the NBO search's steps: greedy fill, self-consistency sweep,
 	//occupancy-weighted orthogonalisation.  The sweep is required: a greedy pass leaves each orbital
 	//biased by later ones and the residual stops distinguishing topologies
-	void build_orbitals(Candidate& c, const MatrixXd& G0, const Blocks& B, const int max_sweeps)
+	void build_orbitals(Candidate& c, const MatrixXd& G0, const Blocks& B, const int max_sweeps, const bool keep = false)
 	{
 		struct Slot { int a, b, mult; double score; };
 		std::vector<Slot> slots;
@@ -576,15 +727,28 @@ namespace
 		}
 		const int first_valence = col;
 
-		//greedy fill from the density depleted by cores and earlier orbitals
-		MatrixXd R = G0 - sum;
+		//from a symmetry image's rotated vectors slot by slot, else greedy fill from the density depleted by cores and
+		//earlier orbitals
+		c.warm = c.M.cols() == k;
+		for (const Slot& sl : slots)
+			c.warm = c.warm && std::count(c.owner.begin(), c.owner.end(), std::make_pair(sl.a, sl.b)) == sl.mult;
+		bvec taken(k, false);
+		MatrixXd R = c.warm ? MatrixXd() : MatrixXd(G0 - sum);
 		for (const Slot& sl : slots) {
 			const ivec& idx = (sl.a == sl.b) ? B.atom[sl.a] : B.pair.at({ sl.a, sl.b });
 			if (static_cast<int>(idx.size()) < sl.mult) return;
 			for (int m = 0; m < sl.mult; m++) {
 				VectorXd x;
-				const double lam = leading_block(R, idx, x);
-				rank1_block(R, idx, -lam, x);
+				if (c.warm) {
+					int t = first_valence;
+					while (taken[t] || c.owner[t] != std::make_pair(sl.a, sl.b)) t++;
+					taken[t] = true;
+					x = c.M.col(t).normalized();
+				}
+				else {
+					const double lam = leading_block(R, idx, x);
+					rank1_block(R, idx, -lam, x);
+				}
 				v[col] = x;
 				blk[col] = &idx;
 				owner[col] = { sl.a, sl.b };
@@ -679,6 +843,14 @@ namespace
 		for (int j = 0; j < k; j++) M.col(j) = v[j];
 		VectorXd wt(k);
 		for (int j = 0; j < k; j++) wt(j) = std::max(occ[j], 1e-6);
+		if (keep) {
+			c.M = M;
+			c.owner = owner;
+		}
+		else {
+			c.M.resize(0, 0);
+			c.owner.clear();
+		}
 		const MatrixXd S = M.transpose() * M;
 		if (Eigen::SelfAdjointEigenSolver<MatrixXd>(S).eigenvalues()(0) < 1e-8) return;
 		c.V = M * wt.asDiagonal() *
@@ -848,7 +1020,7 @@ namespace
 void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 				const std::vector<NboE2Entry>& e2, const bvec2& bondable,
 				const NboOptions& options, const std::string& spin, const double scale,
-				std::ostream& log, const vec2* distances)
+				std::ostream& log, const vec2* xyz)
 {
 	const auto clock = [] { return std::chrono::steady_clock::now(); };
 	const auto secs = [](const std::chrono::steady_clock::time_point a,
@@ -981,7 +1153,14 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 		return found;
 	};
 	const auto t_search0 = clock();
-	const std::vector<ivec> maps = options.nrt_symmetry && !options.nrt_exhaustive ? symmetry_maps(Z, L, distances) : std::vector<ivec>();
+	vec2 dist;
+	if (xyz) {
+		dist.assign(na, vec(na, 0.0));
+		for (int a = 0; a < na; a++)
+			for (int b = 0; b < na; b++)
+				dist[a][b] = std::hypot((*xyz)[a][0] - (*xyz)[b][0], (*xyz)[a][1] - (*xyz)[b][1], (*xyz)[a][2] - (*xyz)[b][2]);
+	}
+	const std::vector<ivec> maps = options.nrt_symmetry && !options.nrt_exhaustive ? symmetry_maps(Z, L, xyz ? &dist : nullptr) : std::vector<ivec>();
 	//the walk's budget can cut through a symmetry orbit; the images of what it kept complete it
 	const auto complete_orbits = [&](const size_t from) {
 		bool capped = false;
@@ -1084,6 +1263,25 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 			B.pair[{ a, b }] = std::move(idx);
 		}
 
+	//the isometries in the NAO basis: an image of a built structure starts its sweeps from the source's vectors, rotated
+	std::vector<NaoGroup> groups;
+	std::vector<SymOp> ops;
+	if (xyz && !maps.empty()) {
+		std::map<std::array<int, 3>, std::vector<std::pair<int, int>>> members;
+		for (int i = 0; i < nn; i++) members[{ nao.orbitals[i].atom, nao.orbitals[i].l, nao.orbitals[i].shell }].push_back({ nao.orbitals[i].m, i });
+		for (auto& [k, v] : members) {
+			std::sort(v.begin(), v.end());
+			NaoGroup grp{ k[0], k[1], k[2], ivec() };
+			for (const auto& mi : v) grp.idx.push_back(mi.second);
+			groups.push_back(std::move(grp));
+		}
+		for (const ivec& pi : maps)
+			if (std::optional<SymOp> op = nao_op(pi, *xyz, groups, gamma)) ops.push_back(std::move(*op));
+		if (ops.size() < maps.size())
+			nrt.notes.push_back(std::to_string(maps.size() - ops.size()) + " of " + std::to_string(maps.size()) +
+								 " isometries miss the NAO density by 1 % or more; their images start from scratch");
+	}
+	int rotated = 0;
 #ifdef _OPENMP
 	const int nthreads = options.threads > 0 ? options.threads : omp_get_max_threads();
 #else
@@ -1108,34 +1306,113 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 		//progress output only where a step takes long enough to watch; -no_date silences it
 		const bool show = !constants::hide_timings && nc0 >= 500;
 		std::optional<ProgressBar> pb;
-		if (show)
-			pb.emplace(static_cast<unsigned long long>(nc0 - static_cast<int>(built)), 50, "=", " ",
-					   "NRT: orbitals of " + std::to_string(nc0 - static_cast<int>(built)) + " structures", log);
-#pragma omp parallel for schedule(dynamic) num_threads(nthreads)
-		for (int i = static_cast<int>(built); i < nc0; i++) {
-			if (pb) pb->update();
-			build_orbitals(cands[i], gamma, B, 200);
-			if (!cands[i].feasible) continue;
-			const MatrixXd GV = gamma * cands[i].V;
-			double tr = 0.0;
-			for (int c = 0; c < cands[i].V.cols(); c++) tr += cands[i].V.col(c).dot(GV.col(c));
-			cands[i].g = scale * tr;
-			cands[i].rho_nl = electrons - tr;
+		//source[i] = {j, op, inverse}: breadth first through the ops from the structures that have orbitals, then from
+		//each structure no op reaches, which is built
+		std::vector<std::array<int, 3>> source(nc0, { -1, -1, 0 });
+		ivec order;
+		if (!ops.empty()) {
+			std::map<ivec, int> index;
+			for (int i = 0; i < nc0; i++) index.emplace(cands[i].topo.key(), i);
+			bvec reached(nc0, false);
+			std::deque<int> queue;
+			const auto spread = [&]() {
+				while (!queue.empty()) {
+					const int j = queue.front();
+					queue.pop_front();
+					for (int k = 0; k < static_cast<int>(ops.size()); k++)
+						for (int inv = 0; inv < 2; inv++) {
+							const ivec& p = ops[k].perm;
+							Topology t(na);
+							for (int a = 0; a < na; a++)
+								for (int b = 0; b < na; b++)
+									if (inv) t.at(a, b) = cands[j].topo.at(p[a], p[b]);
+									else t.at(p[a], p[b]) = cands[j].topo.at(a, b);
+							const auto it = index.find(t.key());
+							if (it == index.end() || reached[it->second]) continue;
+							reached[it->second] = true;
+							source[it->second] = { j, k, inv };
+							order.push_back(it->second);
+							queue.push_back(it->second);
+						}
+				}
+			};
+			for (int i = 0; i < static_cast<int>(built); i++) {
+				reached[i] = true;
+				queue.push_back(i);
+			}
+			spread();
+			for (int i = static_cast<int>(built); i < nc0; i++)
+				if (!reached[i]) {
+					reached[i] = true;
+					queue.push_back(i);
+					spread();
+				}
 		}
-		pb.reset();
+		//levels of the breadth-first tree: a structure starts from its source's rotated vectors once the source is built,
+		//and only from a source whose sweeps converged; one that stopped at the cap leaves its images their own start
+		std::vector<ivec> levels(1);
+		ivec depth(nc0, 0);
+		bvec keep(nc0, false);
+		for (int i = static_cast<int>(built); i < nc0; i++)
+			if (source[i][0] < 0) levels[0].push_back(i);
+		for (const int i : order) {
+			keep[source[i][0]] = true;
+			depth[i] = depth[source[i][0]] + 1;
+			if (static_cast<int>(levels.size()) <= depth[i]) levels.emplace_back();
+			levels[depth[i]].push_back(i);
+		}
+		for (const ivec& list : levels) {
+			for (const int i : list) {
+				if (source[i][0] < 0) continue;
+				const Candidate& s = cands[source[i][0]];
+				if (!s.feasible || !s.converged || !s.M.cols()) continue;
+				const SymOp& op = ops[source[i][1]];
+				const bool inv = source[i][2] != 0;
+				ivec p = op.perm;
+				if (inv)
+					for (int a = 0; a < na; a++) p[op.perm[a]] = a;
+				Candidate& c = cands[i];
+				c.M = apply_op(op, groups, s.M, inv);
+				c.owner = s.owner;
+				for (std::pair<int, int>& o : c.owner)
+					if (o.first >= 0) o = std::minmax(p[o.first], p[o.second]);
+			}
+			const int nb = static_cast<int>(list.size());
+			if (show && nb >= 500)
+				pb.emplace(static_cast<unsigned long long>(nb), 50, "=", " ", "NRT: orbitals of " + std::to_string(nb) + " structures", log);
+#pragma omp parallel for schedule(dynamic) num_threads(nthreads)
+			for (int x = 0; x < nb; x++) {
+				if (pb) pb->update();
+				Candidate& c = cands[list[x]];
+				build_orbitals(c, gamma, B, 200, keep[list[x]]);
+				if (!c.feasible) continue;
+				const MatrixXd GV = gamma * c.V;
+				double tr = 0.0;
+				for (int y = 0; y < c.V.cols(); y++) tr += c.V.col(y).dot(GV.col(y));
+				c.g = scale * tr;
+				c.rho_nl = electrons - tr;
+			}
+			pb.reset();
+		}
+		for (int i = static_cast<int>(built); i < nc0; i++) {
+			rotated += cands[i].feasible && cands[i].warm;
+			cands[i].M.resize(0, 0);
+			cands[i].owner.clear();
+		}
 
 		if (options.debug) {
-			int capped = 0, feas = 0;
-			long total = 0;
+			int capped = 0, feas = 0, warm = 0;
+			long total = 0, warm_sweeps = 0;
 			double worst = 0.0;
 			for (const Candidate& c : cands) {
 				if (!c.feasible) continue;
 				feas++;
 				total += c.sweeps;
+				if (c.warm) { warm++; warm_sweeps += c.sweeps; }
 				if (!c.converged) { capped++; worst = std::max(worst, c.change); }
 			}
 			log << "NRT" << (spin.empty() ? "" : " " + spin) << ": orbital sweeps " << total << " over "
-				<< feas << " candidates, " << capped << " stopped at the cap (worst change " << worst
+				<< feas << " candidates (" << warm_sweeps << " over " << warm << " rotated starts), " << capped << " stopped at the cap (worst change " << worst
 				<< ", parent " << cands[0].change << " after " << cands[0].sweeps << "); last change by decade:";
 			ivec dec(13, 0);
 			for (const Candidate& c : cands)
@@ -1326,6 +1603,8 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 		}
 		t_cycle0 = clock();
 	}
+	if (rotated)
+		nrt.notes.push_back(std::to_string(rotated) + " structure(s) started from a symmetry image's orbitals, rotated");
 	const auto t_min1 = clock();
 	{
 		NboNrtCycle cy;
