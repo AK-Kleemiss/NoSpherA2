@@ -2930,7 +2930,8 @@ void XCW::small_basis_guess(occ::qm::SCF<occ::qm::HartreeFock>& scf) {
 	scf.set_core_matrices();
 	scf.ctx.F = scf.ctx.H;
 	scf.set_conditioning_orthogonalizer();
-	scf.ctx.F += scf.m_procedure.compute_fock_mixed_basis(guess, small_bs, false);
+	const bool same_basis = guess.kind == occ::qm::SpinorbitalKind::Restricted && small_bs.nbf() == scf.m_procedure.aobasis().nbf() && small_bs == scf.m_procedure.aobasis();
+	scf.ctx.F += same_basis ? scf.m_procedure.compute_fock_from_density(guess) : scf.m_procedure.compute_fock_mixed_basis(guess, small_bs, false);
 	scf.ctx.orthogonalizer.orthogonalize_molecular_orbitals(scf.ctx.mo, scf.ctx.F);
 	scf.m_have_initial_guess = true;
 }
