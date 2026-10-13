@@ -1267,7 +1267,7 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 	//the isometries in the NAO basis: an image of a built structure starts its sweeps from the source's vectors, rotated
 	std::vector<NaoGroup> groups;
 	std::vector<SymOp> ops;
-	if (xyz && !maps.empty()) {
+	if (options.nrt_rotate && xyz && !maps.empty()) {
 		std::map<std::array<int, 3>, std::vector<std::pair<int, int>>> members;
 		for (int i = 0; i < nn; i++) members[{ nao.orbitals[i].atom, nao.orbitals[i].l, nao.orbitals[i].shell }].push_back({ nao.orbitals[i].m, i });
 		for (auto& [k, v] : members) {

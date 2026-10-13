@@ -60,6 +60,7 @@ struct NboOptions {
 	double nrt_target = -1.0;          //-nrt_target: grow from weighted structures until D(w) <= it; < 0 = one search
 	double nrt_screen = -1.0;          //-nrt_screen: a walk of nrt_screen_min+ structures builds those whose approximate reduced cost is below it; < 0 = all
 	int nrt_screen_min = 200;
+	bool nrt_rotate = false;           //-nrt_rotate: an image of a converged structure starts from its orbitals, rotated; moves bond orders by up to 2e-4
 	double nrt_weight_floor = 5.0e-5;  //weights below this are dropped from the reported set
 	bool nrt = false;
 	bool nrt_exhaustive = false;       //enumerate every feasible topology instead of arrows

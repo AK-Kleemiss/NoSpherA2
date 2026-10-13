@@ -616,6 +616,11 @@ std::string help_message =
  "                                    refitted. Stops early when no new structure\n"
  "                                    takes weight or the -nrt_max pool is full;\n"
  "                                    0 = until then. Implies -nrt.\n"
+ "  -nrt_rotate                        A structure that is a symmetry image of one\n"
+ "                                    whose orbitals converged starts from them,\n"
+ "                                    rotated, instead of the greedy fill: SF6\n"
+ "                                    needs half the sweeps; bond orders move by\n"
+ "                                    up to 2e-4. Default off.\n"
  "  -nrt_screen <r|off>                With -nrt_target, a walk of 200 or more new\n"
  "                                    structures builds in full only those whose\n"
  "                                    reduced cost, from approximate orbitals, is\n"
@@ -2741,7 +2746,7 @@ const std::set<std::string> &nbo_family_suboptions()
 		"-nbo_dir", "-nbo_47", "-nbo_e2min", "-nbo_threads", "-nbo_keep47", "-nrt",
 		"-nrt_e2", "-nrt_arrows", "-nrt_bond_scale", "-nrt_max", "-nrt_atoms",
 		"-nrt_exhaustive", "-nrt_no_symmetry", "-nrt_no_components", "-nrt_no_ion", "-nrt_parent",
-		"-nrt_target", "-nrt_screen"};
+		"-nrt_target", "-nrt_screen", "-nrt_rotate"};
 	return known;
 }
 
@@ -2890,6 +2895,7 @@ bool options::digest_io_options(const std::string &temp, int &i)
 			else if (arguments[j] == "-nrt_no_symmetry") opt.nrt_symmetry = false;
 			else if (arguments[j] == "-nrt_no_components") opt.nrt_components = false;
 			else if (arguments[j] == "-nrt_no_ion") opt.nrt_ion = false;
+			else if (arguments[j] == "-nrt_rotate") opt.nrt_rotate = true;
 			else if (arguments[j] == "-nbo_keep47") opt.keep_file47 = true;
 		//-nbo_threads wins, then -cpus, then the OpenMP default.
 		if (opt.threads <= 0 && threads > 0) opt.threads = threads;

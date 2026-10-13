@@ -439,6 +439,7 @@ TEST(NboNativeTests, NickelTetracarbonylKeepsOneDativeBondAndItsParent)
 	const double electrons = wavy.count_nr_electrons();
 	NboOptions options;
 	options.nrt = true;
+	options.nrt_rotate = true;
 	std::ostringstream log;
 	const NboResults r = native_nbo(wavy, options, log);
 	int ni_c = 0;
