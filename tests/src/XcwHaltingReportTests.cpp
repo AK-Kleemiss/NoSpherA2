@@ -127,6 +127,16 @@ namespace {
 		}
 	}
 
+	//The P1 molecule's stored two-electron integrals, which XcwScfTests.SharedTensorBuild writes under ctest; without
+	//them the run builds its own, with the same numbers
+	std::string shared_eri(const std::filesystem::path& dir)
+	{
+		const char* d = std::getenv("NOS_TEST_SHARED_DIR");
+		if (d == nullptr || *d == '\0' || !std::filesystem::exists(std::filesystem::path(d) / "xcw_p1_subset_eri.bin")) return "";
+		std::filesystem::copy_file(std::filesystem::path(d) / "xcw_p1_subset_eri.bin", dir / "shared_eri.bin", std::filesystem::copy_options::overwrite_existing);
+		return " read_eri shared_eri.bin";
+	}
+
 	//The options the NoSpherA2 driver would build for -XCW on the fixture cif, the subset hkl
 	//and the settings text, CPU only. opt must outlive the solver, which keeps a pointer to it.
 	options make_options(const std::filesystem::path& dir, const std::string& settings_text)
@@ -223,7 +233,7 @@ TEST(XcwHaltingReportTests, HaltingReportsAcrossTheExtendedLambdaScan)
 	ASSERT_EQ(n_written, 402);
 	ASSERT_GE(n_strong, 8);
 
-	options opt = make_options(dir, RUN_BASE + "end 0.05 i_tensor_mb 4096 save itensor.bin gaussian_halt");
+	options opt = make_options(dir, RUN_BASE + "end 0.05 i_tensor_mb 4096 save itensor.bin gaussian_halt" + shared_eri(dir));
 	opt.cpu_itensor_fp32 = false;
 	const std::string out = run_xcw(dir, opt);
 	const std::string log = read_file(dir / "SCF.log");
@@ -303,7 +313,7 @@ TEST(XcwHaltingReportTests, HaltingReportsAcrossTheExtendedLambdaScan)
 		HEADER_FIXED_BYTES + 8 * static_cast<std::uintmax_t>(kept) + static_cast<std::uintmax_t>(n_written) * kept * 16);
 
 	//eval_I read branch: the saved tensor is loaded, not rebuilt, and gives the same rows
-	options opt2 = make_options(dir, RUN_BASE + "end 0.01 i_tensor_mb 4096 read itensor.bin gaussian_halt");
+	options opt2 = make_options(dir, RUN_BASE + "end 0.01 i_tensor_mb 4096 read itensor.bin gaussian_halt" + shared_eri(dir));
 	opt2.cpu_itensor_fp32 = false;
 	const std::string out2 = run_xcw(dir, opt2);
 	EXPECT_NE(out2.find("I tensor read from itensor.bin ("), std::string::npos) << out2;
@@ -344,7 +354,7 @@ TEST(XcwHaltingReportTests, StreamedTensorRoundTrip)
 	ASSERT_EQ(n_written, 402);
 	ASSERT_EQ(n_strong, 0);
 
-	options opt = make_options(dir, RUN_BASE + "end 0 gaussian_halt strong_cutoff 1e9");
+	options opt = make_options(dir, RUN_BASE + "end 0 gaussian_halt strong_cutoff 1e9" + shared_eri(dir));
 	opt.mem_given = true;
 	opt.mem = 0.001;
 	opt.no_date = false;
@@ -391,7 +401,7 @@ TEST(XcwHaltingReportTests, StreamedTensorRoundTrip)
 		HEADER_FIXED_BYTES + 8 * static_cast<std::uintmax_t>(kept) + static_cast<std::uintmax_t>(n_written) * kept * 8);
 
 	//read it back a window at a time under the same budget
-	options opt2 = make_options(dir, RUN_BASE + "end 0 read");
+	options opt2 = make_options(dir, RUN_BASE + "end 0 read" + shared_eri(dir));
 	opt2.mem_given = true;
 	opt2.mem = 0.001;
 	const std::string out2 = run_xcw(dir, opt2);

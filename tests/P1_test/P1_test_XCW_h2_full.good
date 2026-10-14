@@ -15,8 +15,7 @@ Nr of reflections to be used: 3215
 Generating k-points...                            ... done!
 Number of k-points to evaluate: 3215
 XCW: I/sigma(I) >= 2 (F/sigma(F) >= 4): 3146 of 3215 reflections in the fit; R1 and Criterion are over these, R1(all) and Crit(all) over all
-XCW orbital basis set: sto-3g
-XCW: I/sigma(I) >= 2 (F/sigma(F) >= 4): 3146 of 3215 reflections in the fit; R1 and Criterion are over these, R1(all) and Crit(all) over all
+XCW orbital basis set: sto-3g-basis
 GridManager: Setting up prototype grids for atom types...
 GridManager: Generating integration grids for atoms...
 GridManager: Generated total of 93098 grid points.
@@ -30,11 +29,11 @@ ________________________________________________________________________________
  Lambda		Criterion	GooF(F2)	R1(gt)		Total Energy		Perturbation	Target quantity		Crit(all)	R1(all)		A^2 (halt)
 								(Eh)			(a. u.)		(a. u.)
 ____________________________________________________________________________________
-0.00000		10.0922		5.0172		0.02505		-1961.925585145		0.000		-1961.925585145		9.9781		0.02560		198.4329
-0.01000		6.1761		3.7734		0.02375		-1961.760148779		0.062		-1961.698387641		6.1075		0.02429		121.8687
-0.02000		5.5003		3.5442		0.02343		-1961.648761947		0.110		-1961.538755324		5.4397		0.02397		122.3900
+0.00000		10.0922		5.0172		0.02505		-1961.925585145		0.000		-1961.925585145		9.9781		0.02560		198.4330
+0.01000		6.1761		3.7734		0.02375		-1961.760148554		0.062		-1961.698387404		6.1075		0.02429		121.8688
+0.02000		5.5003		3.5442		0.02343		-1961.648761631		0.110		-1961.538754992		5.4397		0.02397		122.3902
 ____________________________________________________________________________
-Recommended halting lambda* = 0.01000 (A^2=121.8687) -- WARNING: binned <z^2> trend test flagged at this lambda; residuals may be spatially correlated, inspect before trusting lambda*.
+Recommended halting lambda* = 0.01000 (A^2=121.8688) -- WARNING: binned <z^2> trend test flagged at this lambda; residuals may be spatially correlated, inspect before trusting lambda*.
   candidate fit: degree=2 -- not enough points yet (need >= degree+3 evaluated lambda steps)
   candidate fit: degree=4 -- not enough points yet (need >= degree+3 evaluated lambda steps)
 Finished XCW fitting procedure.

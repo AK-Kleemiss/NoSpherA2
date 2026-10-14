@@ -15,15 +15,8 @@ Nr of reflections to be used: 402
 Generating k-points...                            ... done!
 Number of k-points to evaluate: 402
 XCW: I/sigma(I) >= 2 (F/sigma(F) >= 4): 394 of 402 reflections in the fit; R1 and Criterion are over these, R1(all) and Crit(all) over all
-XCW orbital basis set: sto-3g
-XCW: I/sigma(I) >= 2 (F/sigma(F) >= 4): 394 of 402 reflections in the fit; R1 and Criterion are over these, R1(all) and Crit(all) over all
-GridManager: Setting up prototype grids for atom types...
-GridManager: Generating integration grids for atoms...
-GridManager: Generated total of 93098 grid points.
-Total number of grid points after pruning: 93092
-AO values calculated for all grids.
-Screened out 1802 unique pairs of mu, nu (33.64%) 
-Skipped evaluation of 8107938 grids (16.37%) 
+XCW orbital basis set: sto-3g-basis
+I tensor read from p1_i.bin (10.9002 MB, single precision), not recomputed, held in memory
 More detailed output in SCF.log file...
 XCW: fitting against the 1/|H|^2-weighted residual self-energy criterion Criterion below is this weighted quantity, not the classical GoF.
 ____________________________________________________________________________________
@@ -31,6 +24,6 @@ ________________________________________________________________________________
 								(Eh)			(a. u.)		(a. u.)
 ____________________________________________________________________________________
 0.00000		10.4866		5.6325		0.02510		-1961.925585145		0.000		-1961.925585145		10.3003		0.02553
-0.01000		5.9757		3.9685		0.02241		-1961.749733469		0.060		-1961.689976694		5.8712		0.02279
-0.02000		5.0332		3.6007		0.02144		-1961.601777417		0.101		-1961.501114326		4.9458		0.02179
+0.01000		5.9757		3.9685		0.02241		-1961.749733284		0.060		-1961.689976499		5.8712		0.02279
+0.02000		5.0332		3.6007		0.02144		-1961.601777202		0.101		-1961.501114094		4.9458		0.02179
 Finished XCW fitting procedure.

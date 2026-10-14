@@ -109,6 +109,22 @@ install(
         PATTERN "*.hpp"
 )
 
+# occ's public headers include nlohmann/json.hpp (occ/dft/dft_method.h)
+install(
+    DIRECTORY "${nlohmann_json_SOURCE_DIR}/include/"
+    DESTINATION include
+)
+
+# and xc.h (occ/dft/functional.h); xc_version.h is generated
+install(
+    FILES
+        "${Libxc_SOURCE_DIR}/src/xc.h"
+        "${Libxc_SOURCE_DIR}/src/xc_funcs.h"
+        "${Libxc_SOURCE_DIR}/src/xc_funcs_removed.h"
+        "${Libxc_BINARY_DIR}/xc_version.h"
+    DESTINATION include
+)
+
 install(
     DIRECTORY "${CMAKE_BINARY_DIR}/_deps/spdlog-src/include/"
     DESTINATION include
@@ -165,12 +181,12 @@ install(
         PATTERN "*.hpp"
 )
 
-file(GLOB_RECURSE FEATOMIC_LIBS "${CMAKE_BINARY_DIR}/_deps/featomic/target/*/featomic.lib")
-file(GLOB_RECURSE METATENSOR_LIBS "${CMAKE_BINARY_DIR}/_deps/metatensor-build/target/*/*/metatensor.lib")
+# The imported targets name the libraries of this build's RUST_BUILD_TARGET; a glob
+# over target/ also picks up a stale host (x64) build left in an ARM64 tree
 install(
     FILES
-        ${FEATOMIC_LIBS}
-        ${METATENSOR_LIBS}
+        $<TARGET_FILE:featomic::static>
+        $<TARGET_FILE:metatensor::static>
     DESTINATION lib
 )
 
@@ -204,6 +220,20 @@ install(
     DESTINATION include
 )
 
+if(NOSPHERA2_OPENBLAS)
+    # The vcxprojs link openblas.lib whatever conda-forge named the import library
+    install(FILES "${NOSPHERA2_OPENBLAS_DLL}" DESTINATION bin)
+    install(FILES "${NOSPHERA2_OPENBLAS_IMPLIB}" DESTINATION lib RENAME openblas.lib)
+    install(
+        DIRECTORY "${NOSPHERA2_OPENBLAS_INCLUDE_DIR}/"
+        DESTINATION include
+        FILES_MATCHING
+            PATTERN "cblas*.h"
+            PATTERN "lapack*.h"
+            PATTERN "openblas*.h"
+            PATTERN "f77blas.h"
+    )
+else()
 install(
     FILES
         "${MICROMAMBA_ENV_PREFIX}/Library/bin/libiomp5md.dll"
@@ -228,3 +258,4 @@ install(
         "${MICROMAMBA_ENV_PREFIX}/Library/lib/mkl_rt.lib"
     DESTINATION lib
 )
+endif()

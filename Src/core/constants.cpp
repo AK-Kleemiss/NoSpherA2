@@ -8,6 +8,7 @@ namespace constants {
 	double exp_cutoff = -23.5;
 	bool hide_gpu_notes = false;
 	bool hide_timings = false;
+	unsigned run_id = 1; //not 0, so latches fire for code reached without run_app (unit tests)
 	namespace {
 		//rows in WFN type order, columns m = 0,+1,-1,...; s to g are rational * sqrt(rational), h and up are libcint's real solid harmonics
 		//with ORCA's phase (-1 for |m| = 3, 4, 7, 8) over ORCA's angular norm sqrt((2l+1)/(4 pi)), see Sph2CartTests.MatchesLibcintWithOrcaPhase
@@ -768,7 +769,6 @@ namespace constants {
 		return SH;
 	}
 
-
 	// Basically a lookup table for the maximum values of the spherical harmonics
 	const double spherical_harmonic_max(const int& l, const int& m) {
 		double maximum = 0;
@@ -1162,7 +1162,6 @@ namespace constants {
 		}
 		return maximum;
 	}
-
 
 	// Collapsed version of the spherical harmonic
 	// Calculates all values for one l at once

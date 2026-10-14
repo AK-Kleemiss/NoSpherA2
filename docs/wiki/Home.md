@@ -46,6 +46,8 @@ log.
   arguments and defaults, taken from the option parser.
 * **[Use cases](Use-Cases.md)** — numbered, copy-pasteable PowerShell
   invocations for the common jobs.
+* **[EQC energy decomposition](EQC-Energy-Decomposition.md)** — what `-eqc`
+  computes, how to read its output, and the literature behind it.
 * **[Troubleshooting](Troubleshooting.md)** — the guards the code actually
   raises, the flag-order rules, and the known traps.
 

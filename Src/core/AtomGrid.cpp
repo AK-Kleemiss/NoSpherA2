@@ -1,4 +1,5 @@
 #include "pch.h"
+#include "tuning.h"
 #include "convenience.h"
 #include "AtomGrid.h"
 #ifdef NOSPHERA2_USE_GPU
@@ -143,7 +144,8 @@ AtomGrid::AtomGrid(const double radial_precision,
 	const int max_l_quantum_number,
 	const double alpha_min[],
 	std::ostream &file,
-	const double radial_step_scale)
+	const double radial_step_scale,
+	const bool generic_rotation)
 {
 	using namespace std;
 	const int min_num_angular_points_closest =
@@ -166,6 +168,21 @@ AtomGrid::AtomGrid(const double radial_precision,
 			angular_y.data() + angular_off,
 			angular_z.data() + angular_off,
 			angular_w.data() + angular_off);
+	}
+	//Lebedev grids are O_h symmetric: a molecular mirror on x=0, y=0 or z=0 puts whole grid rings on a
+	//separatrix. A generic rotation (quaternion with no special angles) keeps the quadrature exact and moves them off.
+	if (generic_rotation) {
+		const double w = 0.9, x = 0.2, y = 0.3, z = 0.25, n = w * w + x * x + y * y + z * z;
+		const double R[3][3] = {
+			{ 1 - 2 * (y * y + z * z) / n, 2 * (x * y - w * z) / n, 2 * (x * z + w * y) / n },
+			{ 2 * (x * y + w * z) / n, 1 - 2 * (x * x + z * z) / n, 2 * (y * z - w * x) / n },
+			{ 2 * (x * z - w * y) / n, 2 * (y * z + w * x) / n, 1 - 2 * (x * x + y * y) / n } };
+		for (size_t k = 0; k < angular_x.size(); k++) {
+			const double a = angular_x[k], b = angular_y[k], c = angular_z[k];
+			angular_x[k] = R[0][0] * a + R[0][1] * b + R[0][2] * c;
+			angular_y[k] = R[1][0] * a + R[1][1] * b + R[1][2] * c;
+			angular_z[k] = R[2][0] * a + R[2][1] * b + R[2][2] * c;
+		}
 	}
 
 	// radial parameters
@@ -229,14 +246,13 @@ AtomGrid::AtomGrid(const double radial_precision,
 		const int start = (int)atom_grid_x_bohr_.size();
 		angular_off -= start;
 		const int size = start + num_angular;
-		int p = 0;
 		atom_grid_x_bohr_.resize(size);
 		atom_grid_y_bohr_.resize(size);
 		atom_grid_z_bohr_.resize(size);
 		atom_grid_w_.resize(size);
-#pragma omp parallel for private(p)
+		//serial: a few thousand multiplies per shell; a parallel region per shell stalls at its barrier on busy threads
 		for (int iang = start; iang < size; iang++) {
-			p = angular_off + iang;
+			const int p = angular_off + iang;
 			atom_grid_x_bohr_[iang] = angular_x[p] * radial_r;
 			atom_grid_y_bohr_[iang] = angular_y[p] * radial_r;
 			atom_grid_z_bohr_[iang] = angular_z[p] * radial_r;
@@ -313,8 +329,7 @@ vec make_chi(const WFN& wfn, int samples, bool refine, bool debug, const Density
 					auto extrema = find_line_density_extrema(wfn, a, b, rho, samples, refine);
 					size_t use_extr = 0;
 					if (wfn.get_atom_ECP_electrons(a) != 0 || wfn.get_atom_ECP_electrons(b) != 0) {
-						//No sign change in the sampled line (minimum inside the last interval of a polar bond):
-						//extrema[use_extr] below read an empty vector and crashed without a message
+						//No sign change on the sampled line (minimum in the last interval of a polar bond) leaves extrema empty
 						if (extrema.empty()) {
 							std::cout << "WARNING: No density extremum found between atoms " << a << " and " << b << ". Setting chi to 1.0.\n";
 							chi[a * ncen + b] = 1.0;
@@ -415,7 +430,7 @@ vec make_chi(const WFN& wfn, int samples, bool refine, bool debug, const Density
 		}
 	}
 
-	if (std::getenv("NOSPHERA2_CHI_DEBUG")) { // Flawfinder: ignore
+	if (tuning("NOSPHERA2_CHI_DEBUG")) {
 		double s = 0.0;
 		for (int i = 0; i < chi.size(); i++) s += chi[i] * chi[i];
 		std::fprintf(stderr, "chi checksum %.17g size %zu\n", s, chi.size());

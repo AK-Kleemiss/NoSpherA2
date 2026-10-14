@@ -1,0 +1,290 @@
+{
+ "_note": [
+  "The held-out set of make_holdout.py. None of these molecules is in",
+  "tests/nbo_reference/index.json, so accept.py's exact basis-function identity",
+  "test is not available and this weaker criterion is what was checked instead.",
+  "basis_functions and the energy are RECORDED here so the next regeneration has",
+  "the exact test."
+ ],
+ "_criterion": "converged optimisation + converged last SCF + charge/multiplicity/basis/keyword line as asked + <S**2> within 4 %% of S(S+1); basis functions recorded for next time",
+ "_keyword_line": "! B3LYP def2-TZVP TightSCF Opt",
+ "bf4_minus": {
+  "accepted": true,
+  "basis_functions": 155,
+  "final_single_point_energy": -424.575411327008,
+  "charge": -1,
+  "multiplicity": 1,
+  "electrons": 42,
+  "s_squared": null,
+  "s_squared_exact": 0.0,
+  "optimisation_converged": true,
+  "scf_cycles_last": 3,
+  "orca_version": "6.1.1",
+  "ecp_lines": [],
+  "reasons": [
+   "converged, charge/multiplicity/basis as asked"
+  ]
+ },
+ "bh3": {
+  "accepted": true,
+  "basis_functions": 49,
+  "final_single_point_energy": -26.595417129992,
+  "charge": 0,
+  "multiplicity": 1,
+  "electrons": 8,
+  "s_squared": null,
+  "s_squared_exact": 0.0,
+  "optimisation_converged": true,
+  "scf_cycles_last": 3,
+  "orca_version": "6.1.1",
+  "ecp_lines": [],
+  "reasons": [
+   "converged, charge/multiplicity/basis as asked"
+  ]
+ },
+ "c2h5": {
+  "accepted": true,
+  "basis_functions": 92,
+  "final_single_point_energy": -79.131217109378,
+  "charge": 0,
+  "multiplicity": 2,
+  "electrons": 17,
+  "s_squared": 0.754065,
+  "s_squared_exact": 0.75,
+  "optimisation_converged": true,
+  "scf_cycles_last": 4,
+  "orca_version": "6.1.1",
+  "ecp_lines": [],
+  "reasons": [
+   "converged, charge/multiplicity/basis as asked"
+  ]
+ },
+ "cf3": {
+  "accepted": true,
+  "basis_functions": 124,
+  "final_single_point_energy": -337.591812402262,
+  "charge": 0,
+  "multiplicity": 2,
+  "electrons": 33,
+  "s_squared": 0.751746,
+  "s_squared_exact": 0.75,
+  "optimisation_converged": true,
+  "scf_cycles_last": 3,
+  "orca_version": "6.1.1",
+  "ecp_lines": [],
+  "reasons": [
+   "converged, charge/multiplicity/basis as asked"
+  ]
+ },
+ "ch2": {
+  "accepted": true,
+  "basis_functions": 43,
+  "final_single_point_energy": -39.140744380504,
+  "charge": 0,
+  "multiplicity": 3,
+  "electrons": 8,
+  "s_squared": 2.005485,
+  "s_squared_exact": 2.0,
+  "optimisation_converged": true,
+  "scf_cycles_last": 2,
+  "orca_version": "6.1.1",
+  "ecp_lines": [],
+  "reasons": [
+   "converged, charge/multiplicity/basis as asked"
+  ]
+ },
+ "cl2": {
+  "accepted": true,
+  "basis_functions": 74,
+  "final_single_point_energy": -920.290974623174,
+  "charge": 0,
+  "multiplicity": 1,
+  "electrons": 34,
+  "s_squared": null,
+  "s_squared_exact": 0.0,
+  "optimisation_converged": true,
+  "scf_cycles_last": 2,
+  "orca_version": "6.1.1",
+  "ecp_lines": [],
+  "reasons": [
+   "converged, charge/multiplicity/basis as asked"
+  ]
+ },
+ "clf3": {
+  "accepted": true,
+  "basis_functions": 130,
+  "final_single_point_energy": -759.510161826168,
+  "charge": 0,
+  "multiplicity": 1,
+  "electrons": 44,
+  "s_squared": null,
+  "s_squared_exact": 0.0,
+  "optimisation_converged": true,
+  "scf_cycles_last": 4,
+  "orca_version": "6.1.1",
+  "ecp_lines": [],
+  "reasons": [
+   "converged, charge/multiplicity/basis as asked"
+  ]
+ },
+ "hi": {
+  "accepted": true,
+  "basis_functions": 56,
+  "final_single_point_energy": -298.307475417868,
+  "charge": 0,
+  "multiplicity": 1,
+  "electrons": 26,
+  "s_squared": null,
+  "s_squared_exact": 0.0,
+  "optimisation_converged": true,
+  "scf_cycles_last": 2,
+  "orca_version": "6.1.1",
+  "ecp_lines": [
+   "cite the ECPs for I  [Def2-ECP] as follows:",
+   "ECP parameters for I  [Def2-ECP] have been obtained from:",
+   "* core charge reduced due to ECP",
+   "ECP PARAMETER INFORMATION",
+   "Group 1, Type I  ECP Def2-ECP (replacing 28 core electrons, lmax=3)",
+   "Atom   0I    ECP group =>   1"
+  ],
+  "reasons": [
+   "converged, charge/multiplicity/basis as asked"
+  ]
+ },
+ "hs": {
+  "accepted": true,
+  "basis_functions": 43,
+  "final_single_point_energy": -398.709643488117,
+  "charge": 0,
+  "multiplicity": 2,
+  "electrons": 17,
+  "s_squared": 0.754048,
+  "s_squared_exact": 0.75,
+  "optimisation_converged": true,
+  "scf_cycles_last": 2,
+  "orca_version": "6.1.1",
+  "ecp_lines": [],
+  "reasons": [
+   "converged, charge/multiplicity/basis as asked"
+  ]
+ },
+ "mg_h2": {
+  "accepted": true,
+  "basis_functions": 44,
+  "final_single_point_energy": -201.211174638178,
+  "charge": 0,
+  "multiplicity": 1,
+  "electrons": 14,
+  "s_squared": null,
+  "s_squared_exact": 0.0,
+  "optimisation_converged": true,
+  "scf_cycles_last": 2,
+  "orca_version": "6.1.1",
+  "ecp_lines": [],
+  "reasons": [
+   "converged, charge/multiplicity/basis as asked"
+  ]
+ },
+ "nacl": {
+  "accepted": true,
+  "basis_functions": 69,
+  "final_single_point_energy": -622.497411701473,
+  "charge": 0,
+  "multiplicity": 1,
+  "electrons": 28,
+  "s_squared": null,
+  "s_squared_exact": 0.0,
+  "optimisation_converged": true,
+  "scf_cycles_last": 2,
+  "orca_version": "6.1.1",
+  "ecp_lines": [],
+  "reasons": [
+   "converged, charge/multiplicity/basis as asked"
+  ]
+ },
+ "nh4_plus": {
+  "accepted": true,
+  "basis_functions": 55,
+  "final_single_point_energy": -56.88734942594,
+  "charge": 1,
+  "multiplicity": 1,
+  "electrons": 10,
+  "s_squared": null,
+  "s_squared_exact": 0.0,
+  "optimisation_converged": true,
+  "scf_cycles_last": 3,
+  "orca_version": "6.1.1",
+  "ecp_lines": [],
+  "reasons": [
+   "converged, charge/multiplicity/basis as asked"
+  ]
+ },
+ "si2h6": {
+  "accepted": true,
+  "basis_functions": 110,
+  "final_single_point_energy": -582.515259668482,
+  "charge": 0,
+  "multiplicity": 1,
+  "electrons": 34,
+  "s_squared": null,
+  "s_squared_exact": 0.0,
+  "optimisation_converged": true,
+  "scf_cycles_last": 3,
+  "orca_version": "6.1.1",
+  "ecp_lines": [],
+  "reasons": [
+   "converged, charge/multiplicity/basis as asked"
+  ]
+ },
+ "sih4": {
+  "accepted": true,
+  "basis_functions": 61,
+  "final_single_point_energy": -291.849353922871,
+  "charge": 0,
+  "multiplicity": 1,
+  "electrons": 18,
+  "s_squared": null,
+  "s_squared_exact": 0.0,
+  "optimisation_converged": true,
+  "scf_cycles_last": 3,
+  "orca_version": "6.1.1",
+  "ecp_lines": [],
+  "reasons": [
+   "converged, charge/multiplicity/basis as asked"
+  ]
+ },
+ "thiophene": {
+  "accepted": true,
+  "basis_functions": 185,
+  "final_single_point_energy": -552.934014678955,
+  "charge": 0,
+  "multiplicity": 1,
+  "electrons": 44,
+  "s_squared": null,
+  "s_squared_exact": 0.0,
+  "optimisation_converged": true,
+  "scf_cycles_last": 4,
+  "orca_version": "6.1.1",
+  "ecp_lines": [],
+  "reasons": [
+   "converged, charge/multiplicity/basis as asked"
+  ]
+ },
+ "zn_cl2": {
+  "accepted": true,
+  "basis_functions": 122,
+  "final_single_point_energy": -2699.763472036054,
+  "charge": 0,
+  "multiplicity": 1,
+  "electrons": 64,
+  "s_squared": null,
+  "s_squared_exact": 0.0,
+  "optimisation_converged": true,
+  "scf_cycles_last": 3,
+  "orca_version": "6.1.1",
+  "ecp_lines": [],
+  "reasons": [
+   "converged, charge/multiplicity/basis as asked"
+  ]
+ }
+}

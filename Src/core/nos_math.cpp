@@ -6,7 +6,7 @@
 // On macOS we are using Accelerate for BLAS/LAPACK
 #define __ASSERT_MACROS_DEFINE_VERSIONS_WITHOUT_UNDERSCORES 0
 #include <Accelerate/Accelerate.h>
-#else
+#elif !defined(NSA2_OPENBLAS)
 // Linux/Windows with oneMKL
 #include <mkl.h>
 #endif
@@ -129,6 +129,54 @@ int solve_linear_system(vec& A, const size_t& size_A, vec& b)
 		std::cout << "Error: LAPACKE_dgesv returned " << info << std::endl;
 	}
 	return info;
+}
+
+//Column-major lower: for a symmetric A that is the row-major upper triangle, so neither call copies or transposes.
+int cholesky_factor(vec& A, const size_t& n)
+{
+	vec diag(n);
+	for (size_t i = 0; i < n; i++) diag[i] = A[i * (n + 1)];
+	lapack_int info = 0;
+#if defined(__APPLE__)
+	int n_ = (int)n;
+	dpotrf_((char*)"L", &n_, A.data(), &n_, &info);
+#else
+	info = LAPACKE_dpotrf(LAPACK_COL_MAJOR, 'L', (lapack_int)n, A.data(), (lapack_int)n);
+#endif
+	if (info != 0) cholesky_unfactor(A, n, diag);
+	return info;
+}
+
+void cholesky_unfactor(vec& A, const size_t& n, const vec& diag)
+{
+	for (size_t j = 0; j < n; j++) {
+		A[j * (n + 1)] = diag[j];
+		for (size_t i = j + 1; i < n; i++) A[i + j * n] = A[j + i * n];
+	}
+}
+
+void cholesky_solve(const vec& L, const size_t& n, vec& b, const size_t& nrhs)
+{
+	err_checkf(b.size() == n * nrhs && L.size() == n * n, "Inconsistent size of arrays in cholesky_solve", std::cout);
+	lapack_int info = 0;
+#if defined(__APPLE__)
+	int n_ = (int)n, nrhs_ = (int)nrhs;
+	dpotrs_((char*)"L", &n_, &nrhs_, (double*)L.data(), &n_, b.data(), &n_, &info);
+#else
+	info = LAPACKE_dpotrs(LAPACK_COL_MAJOR, 'L', (lapack_int)n, (lapack_int)nrhs, L.data(), (lapack_int)n, b.data(), (lapack_int)n);
+#endif
+	err_checkf(info == 0, "cholesky_solve: dpotrs returned " + std::to_string(info), std::cout);
+}
+
+int solve_spd_system(vec& A, const size_t& n, vec& b)
+{
+	const int info = cholesky_factor(A, n);
+	if (info == 0) {
+		cholesky_solve(A, n, b);
+		return 0;
+	}
+	std::cout << "Matrix not positive definite (dpotrf " << info << "), solving with LU instead" << std::endl;
+	return solve_linear_system(A, n, b);
 }
 
 int solve_linear_system(vec& A, const unsigned long long& rows_A, const unsigned long long& cols_A, vec& b)
@@ -442,217 +490,6 @@ NNLSResult nnls(dMatrix2& A,
 	return NNLSResult{ x, res, 0 };
 }
 
-//NNLSResult nnls(dMatrix2& A,
-//    dMatrix1& b,
-//    int maxiter, double tol) {
-//    int m = A.extent(0), n = A.extent(1);
-//
-//    if (maxiter == -1) maxiter = 3 * n;
-//
-//    std::vector<int> inds(n);
-//    std::vector<double> w(n, 0.0), x(n, 0.0), work(m, 0.0), zz(m, 0.0);
-//
-//    for (int i = 0; i < n; ++i) inds[i] = i;
-//
-//    int i = 0, ii = 0, ip = 0, iteration = 0, iz = 0, iz1 = 0, izmax = 0, j = 0, jj = 0, k = 0, col = 0, nrow = 0, nsetp = 0, one = 1, tmpint = 0;
-//    double tau = 0.0, unorm = 0.0, ztest, tmp, alpha, beta, cc, ss, wmax, T;
-//    bool skip = false;
-//
-//    while (iz1 < n && nsetp < m) {
-//        // simulating a goto from col independence check
-//        if (skip) {
-//            skip = false;
-//        }
-//        else {
-//            std::fill(w.begin() + iz1, w.end(), 0.0);
-//            for (int i = iz1; i < n; ++i) {
-//                for (int j = nrow; j < m; ++j) {
-//                    w[i] += b(j) * A(j, inds[i]);
-//                }
-//            }
-//        }
-//
-//        //Find the largest w[j] and its index.
-//        wmax = 0.0;
-//        for (int i = iz1; i < n; ++i) {
-//            if (w[i] > wmax) {
-//                wmax = w[i];
-//                izmax = i;
-//            }
-//        }
-//        iz = izmax;
-//        j = inds[iz];
-//
-//        // If wmax <= 0.0, terminate since this is a KKT certificate.
-//        if (wmax <= 0.0) break;
-//
-//        //# The sign of wmax is OK for j to be moved to set p.Begin the transformation
-//        for (int i = nrow; i < m; ++i) {
-//            work[i] = A(i, j);
-//        }
-//        int tmpint = m - nrow;
-//
-//        //DLARFGP(N, ALPHA, X, INCX, TAU)
-//        LAPACKE_dlarfg(tmpint, &work[nrow], &work[nrow + 1], 1, &tau);
-//        beta = work[nrow];
-//        work[nrow] = 1.0;
-//        unorm = 0.0;
-//        if (nsetp > 0) {
-//            for (int i = 0; i < nsetp; ++i) {
-//                unorm += A(i, j) * A(i, j);
-//            }
-//            unorm = std::sqrt(unorm);
-//        }
-//        if (unorm + std::abs(beta) * 0.01 - unorm > 0.0) {
-//            // Column j is sufficiently independent.Copy b into zz and solve for
-//            // ztest which is the new prospective value for x[j].
-//            for (int i = 0; i < m; ++i) {
-//                zz[i] = b(i);
-//            }
-//            LAPACKE_dlarfx(LAPACK_COL_MAJOR, 'L', tmpint, one, &work[nrow], tau, &zz[nrow], tmpint, &tmp);
-//            ztest = zz[nrow] / beta;
-//            if (ztest <= 0.0) {
-//                // reject column j as a candidate to be moved from set z to set p.
-//                // Set w[j] to 0.0 and move to the next greatest entry in w.
-//                w[j] = 0.0;
-//                skip = true;
-//                continue;
-//            }
-//        }
-//        else {
-//            // Column j is not numerically independent, reject column j
-//            w[j] = 0.0;
-//            skip = true;
-//            continue;
-//        }
-//        // column j accepted
-//        A(nrow, j) = beta;
-//        std::copy(zz.begin(), zz.end(), b.data());
-//        inds[iz] = inds[iz1];
-//        inds[iz1] = j;
-//        iz1 += 1;
-//        nsetp += 1;
-//
-//        if (iz1 < n) {
-//            for (int i = iz1; i < n; ++i) {
-//                col = inds[i];
-//                for (int j = nrow; j < m; ++j) {
-//                    zz[j] = A(j, col);
-//                }
-//                LAPACKE_dlarfx(LAPACK_COL_MAJOR, 'L', tmpint, one, &work[nrow], tau, &zz[nrow], tmpint, &tmp);
-//                for (int j = nrow; j < m; ++j) {
-//                    A(j, col) = zz[j];
-//                }
-//            }
-//        }
-//        nrow += 1;
-//
-//        if (nsetp < m - 1) {
-//            for (int i = nrow; i < m; ++i) {
-//                A(i, j) = 0.0;
-//            }
-//        }
-//        w[j] = 0.0;
-//
-//        std::copy(b.container().begin(), b.container().end(), zz.begin());
-//        for (int k = 0; k < nsetp; ++k) {
-//            ip = nsetp - k - 1;
-//            if (k != 0) {
-//                for (int ii = 0; ii < ip + 1; ++ii) {
-//                    zz[ii] -= A(ii, jj) * zz[ip + 1];
-//                }
-//            }
-//            jj = inds[ip];
-//            zz[ip] /= A(ip, jj);
-//        }
-//        while (true) {
-//            iteration++;
-//            if (iteration > maxiter) {
-//                std::cerr << "NNLS did not converge after " << maxiter << " iterations.\n";
-//                return NNLSResult{ x, 0.0, 1 };
-//            }
-//
-//            alpha = 2.0;
-//            for (int ip = 0; ip < nsetp; ++ip) {
-//                k = inds[ip];
-//                if (zz[ip] <= 0.0) {
-//                    T = -x[k] / (zz[ip] - x[k]);
-//                    if (alpha > T) {
-//                        alpha = T;
-//                        jj = ip;
-//                    }
-//                }
-//            }
-//            if (alpha == 2.0) break;
-//
-//            for (int i = 0; i < nsetp; ++i) {
-//                x[inds[i]] = (1 - alpha) * x[inds[i]] + alpha * zz[i];
-//            }
-//
-//            // Modify A, B, and the indices to move coefficient
-//            // i from set p to set z.While loop simulates a goto
-//            i = inds[jj];
-//            while (true)
-//            {
-//                x[i] = 0.0;
-//                if (jj != nsetp) {
-//                    jj += 1;
-//                    for (int j = jj; j < nsetp; ++j) {
-//                        ii = inds[j];
-//                        inds[j - 1] = ii;
-//                        LAPACKE_dlartgp(A(j - 1, ii), A(j, ii), &cc, &ss, &A(j - 1, ii));
-//                        A(j, ii) = 0.0;
-//                        for (int col = 0; col < n; ++col) {
-//                            if (col != ii) {
-//                                tmp = A(j - 1, col);
-//                                A(j - 1, col) = cc * tmp + ss * A(j, col);
-//                                A(j, col) = -ss * tmp + cc * A(j, col);
-//                            }
-//                        }
-//                        tmp = b(j - 1);
-//                        b(j - 1) = cc * tmp + ss * b(j);
-//                        b(j) = -ss * tmp + cc * b(j);
-//                    }
-//                }
-//                nrow -= 1;
-//                nsetp -= 1;
-//                iz1 -= 1;
-//                inds[iz1] = i;
-//                bool loop_broken = false;
-//                for (int jj = 0; jj < nsetp; ++jj) {
-//                    i = inds[jj];
-//                    if (x[i] <= 0.0) {
-//                        loop_broken = true;
-//                        break;
-//                    }
-//                }
-//                if (!loop_broken) break;
-//            }
-//            std::copy(b.container().begin(), b.container().end(), zz.begin());
-//            for (int k = 0; k < nsetp; ++k) {
-//                ip = nsetp - k - 1;
-//                if (k != 0) {
-//                    for (int ii = 0; ii < ip + 1; ++ii) {
-//                        zz[ii] -= A(ii, jj) * zz[ip + 1];
-//                    }
-//                }
-//                jj = inds[ip];
-//                zz[ip] /= A(ip, jj);
-//            }
-//        }
-//        for (int i = 0; i < nsetp; ++i) {
-//            x[inds[i]] = zz[i];
-//        }
-//
-//    }
-//    //Calculate the residual np.linalg.norm(b[nrow:])
-//    double res = 0.0;
-//    for (int i = nrow; i < m; ++i) {
-//        res += b(i) * b(i);
-//    }
-//    res = std::sqrt(res);
-//    return NNLSResult{ x, res, 0 };
-//}
 
 // Remaining functions which were separated for readability
 #include "mat_nos_math.cpp"

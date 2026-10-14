@@ -17,8 +17,7 @@
 //sum rule lambda(A) + sum_B delta(A,B)/2 = N(A) has to hold whatever the matrices say.
 namespace
 {
-	//nmo orbitals, occ each, all alpha unless spins says otherwise; no primitives, the overlap
-	//matrices are handed in ready
+	//two H nuclei and the given MOs with no primitives; the overlap matrices are handed in ready
 	WFN orbital_wfn(const vec &occ, const ivec &spin)
 	{
 		WFN wavy(e_origin::NOT_YET_DEFINED);
@@ -29,8 +28,7 @@ namespace
 		return wavy;
 	}
 
-	//S[basin][mo] on the diagonal, off-diagonals zero: every orbital is split between the basins
-	//by the fractions given and none of them overlaps another
+	//S[basin] diagonal only: each orbital is split between the basins by the given fractions
 	basin_overlaps diagonal_overlaps(const vec2 &fraction)
 	{
 		basin_overlaps ovl;
@@ -73,7 +71,6 @@ TEST(Delocalization, RestrictedTwoElectronBondIsOne)
 	EXPECT_NEAR(r.lambda[0], 0.5, 1e-12);
 	EXPECT_NEAR(r.population[0], 1.0, 1e-12);
 	EXPECT_NEAR(r.identity_error, 0.0, 1e-12);
-	//the sum rule, which is what makes the numbers mean anything
 	EXPECT_NEAR(r.lambda[0] + 0.5 * r.di[0] - r.population[0], 0.0, 1e-12);
 }
 
@@ -126,12 +123,9 @@ TEST(Delocalization, ReportNamesTheBasinsAndThePair)
 	EXPECT_NE(text.find("1.0000"), std::string::npos);
 }
 
-//The .wfn and .wfx readers have no record of where the beta orbitals begin and look for the
-//place the orbital energies stop rising instead, so two exactly degenerate orbitals in a closed
-//shell - the two pi lone pairs of OH- - make the reader label the second of them beta. An MO
-//holding two electrons is a spatial orbital whatever that flag says; believing the flag gave
-//m = 1 with a spin-orbital occupation of 2 and put every lambda and delta at exactly twice its
-//value, while the population, which sees only the product m * occ, stayed right and hid it
+//The .wfn/.wfx readers put the alpha/beta boundary where orbital energies stop rising, so OH-'s two
+//degenerate pi lone pairs get the second flagged beta. An MO holding two electrons is spatial whatever
+//the flag; trusting it doubles every lambda and delta while the population (m * occ) stays right.
 TEST(Delocalization, DoublyOccupiedOrbitalsStayRestrictedWhateverTheSpinFlagSays)
 {
 	const basin_overlaps ovl = diagonal_overlaps({ { 0.5, 0.5 }, { 0.5, 0.5 } });
@@ -151,10 +145,8 @@ TEST(Delocalization, DoublyOccupiedOrbitalsStayRestrictedWhateverTheSpinFlagSays
 
 namespace
 {
-	//The QTAIM half of ELI_analysis: a density cube around the molecule, the basins the density's
-	//own gradient carves out of it, and the populations and overlap matrices taken together on
-	//the atomic quadrature grids. The synthetic matrices above never reach this path, which is
-	//where the overlaps are actually made
+	//The QTAIM half of ELI_analysis: density cube, gradient basins, then populations and overlap matrices on
+	//the atomic quadrature grids, the path where the overlaps are actually made
 	struct basin_integration
 	{
 		vec pop, volumes;
@@ -192,11 +184,9 @@ namespace
 		return out;
 	}
 
-	//S^A is an integral of phi_i phi_j over a piece of space, so it is positive semi-definite,
-	//and the pieces add up to the whole, so S^A <= I: every eigenvalue lies in [0, 1] and
-	//tr(S^2) <= tr(S). An off-diagonal element that carries too much weight breaks this while
-	//leaving the diagonal - and with it the population - untouched, which is the one thing the
-	//identity check cannot see
+	//S^A integrates phi_i phi_j over a piece of space and the pieces sum to the whole, so 0 <= S^A <= I:
+	//eigenvalues in [0, 1], tr(S^2) <= tr(S). An overweight off-diagonal breaks this while the diagonal, and
+	//with it the population and the identity check, stays untouched.
 	void expect_overlaps_are_a_projection(const basin_overlaps &ovl, const double tol)
 	{
 		const int n = ovl.nmo;
@@ -235,9 +225,8 @@ namespace
 	}
 }
 
-//The whole path on a real wavefunction: OH- has five doubly occupied orbitals, two of them
-//exactly degenerate, so it is both the smallest bonded case in tests/ and the one the spin-flag
-//guess trips over. Everything here is physics the code does not get to choose
+//OH-: five doubly occupied orbitals, two exactly degenerate, the smallest bonded case in tests/ and the
+//one the spin-flag guess trips over
 TEST(Delocalization, HydroxideIntegratesToPhysicalIndices)
 {
 	const std::filesystem::path wfn = nos_test_repo_root() / "tests" / "cytidine_tonto" / "OH.wfn";
@@ -254,14 +243,14 @@ TEST(Delocalization, HydroxideIntegratesToPhysicalIndices)
 	expect_overlaps_are_a_projection(in.ovl, 5e-3);
 	const delocalization_result r = delocalization_indices(wavy, in.ovl);
 	EXPECT_LT(r.identity_error, 0.05);
-	//the basins are labelled by their maxima, and the oxygen carries all but a fraction of an electron
+	//basin order follows the maxima; O is the basin holding all but a fraction of an electron
 	const int O = in.pop[0] > in.pop[1] ? 0 : 1, H = 1 - O;
 	EXPECT_NEAR(r.population[O], in.pop[O], 1e-9) << "the AOM diagonal and the integrated population must be the same number";
 	EXPECT_NEAR(r.population[H], in.pop[H], 1e-9);
 	EXPECT_GT(r.population[O], 9.0);
 	EXPECT_LT(r.population[H], 1.0);
 	expect_sum_rule(r, total, 0.05);
-	//a polar O-H bond shares about one pair; twice this was what the doubled m produced
+	//a polar O-H bond shares about one pair; a misread spin flag doubles it
 	ASSERT_EQ(r.di.size(), 1u);
 	EXPECT_GT(r.di[0], 0.5);
 	EXPECT_LT(r.di[0], 1.2);

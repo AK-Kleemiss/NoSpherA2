@@ -1,7 +1,9 @@
 #include "pch.h"
+#include "tuning.h"
 #include "nbo_run.h"
 #include "convenience.h"
 #include "wfn_class.h"
+#include <occ/3rdparty/subprocess.hpp>
 
 #include <algorithm>
 #include <chrono>
@@ -12,12 +14,8 @@
 #include <regex>
 #include <sstream>
 
-/*
- * The NBO output is a fixed-width report, so every table here is matched on the shape of its
- * numbers rather than on column positions: an occupancy always carries 5 decimals, an E(2)
- * value 2 and an F(L,NL) 3. That survives the one-space shifts between NBO builds and between
- * restricted and unrestricted output, which column slicing does not.
- */
+//NBO output is fixed-width, but its columns shift by a space between builds and between restricted and
+//unrestricted output, so tables are matched on the shape of their numbers: occupancy 5 decimals, E(2) 2, F(L,NL) 3.
 
 namespace {
 	const std::regex re_npa(R"(^\s*([A-Za-z]{1,2})\s+(\d+)\s+(-?\d+\.\d+)\s+(-?\d+\.\d+)\s+(-?\d+\.\d+)\s+(-?\d+\.\d+)\s+(-?\d+\.\d+)(?:\s+(-?\d+\.\d+))?\s*$)");
@@ -38,10 +36,8 @@ namespace {
 	const std::regex re_qpnrt(R"(QPNRT\((\d+)/(\d+)\):\s*D\(0\)=([\d.eE+-]+);\s*D\(w\)=([\d.eE+-]+))");
 	const std::regex re_timing(R"(Timing\(sec\):\s*search=([\d.]+);\s*Gram matrix=([\d.]+);\s*minimize=([\d.]+);\s*other=([\d.]+))");
 	const std::regex re_version(R"(Cite this program \[(.+?)\])");
-	//NBO echoes each keyword it recognised as "/NRTLST / : Set to 0.1%". That is the keylist as
-	//NBO understood it rather than as we wrote it - it also shows the defaults a keyword pulled in
-	//and drops anything misspelled - so it is what the reference set records, and it is the only
-	//source available when the parser runs on an output alone (-nbo_parse).
+	//NBO echoes each recognised keyword as "/NRTLST / : Set to 0.1%": the keylist as NBO understood it,
+	//with pulled-in defaults and without misspellings, and the only source when parsing an output alone.
 	const std::regex re_keyword(R"(^\s*/([A-Z0-9]+)\s*/ : )");
 	const std::regex re_e2_thresh(R"(^\s*Threshold for printing:\s*([\d.]+) kcal/mol)");
 	const std::regex re_e2_inter(R"(^\s*\(Intermolecular threshold:\s*([\d.]+) kcal/mol)");
@@ -72,8 +68,7 @@ namespace {
 		return out;
 	}
 
-	//Trim and squeeze the inner whitespace of an NBO label so two runs that pad differently
-	//still produce the same key.
+	//Trim and squeeze inner whitespace so differently padded labels give the same key.
 	std::string normalize(const std::string& s) {
 		std::string out;
 		bool space = false;
@@ -119,6 +114,9 @@ NboResults parse_nbo_output(const std::filesystem::path& nbo_file) {
 	enum class Section { none, npa, nao, hybrids, summary, e2, weights, cycles, topo, valencies, qp, symforms, nrtstr };
 	Section section = Section::none;
 	std::string spin;             //"", "alpha", "beta"
+	//The valency table takes its spin from its own title: the composite alpha+beta table follows the last
+	//"Beta spin orbitals" header and would otherwise be filed as a second beta table (as in parse_bond_orders).
+	std::string valency_spin;
 	bool nao_column_is_spin = false;  //set from each NAO table's own header, see Section::nao
 	std::map<std::pair<std::string, int>, size_t> orbital_index;  //(spin, NBO number) -> position
 	//The TOPO matrices of the leading structure and, under NRTDTL, of every candidate are the
@@ -156,7 +154,14 @@ NboResults parse_nbo_output(const std::filesystem::path& nbo_file) {
 			section = Section::topo;
 			continue;
 		}
-		if (line.find("Natural Atomic Valencies") != std::string::npos) { section = Section::valencies; valencies_at_section_start = r.nrt.valencies.size(); continue; }
+		if (line.find("Natural Atomic Valencies") != std::string::npos) {
+			section = Section::valencies;
+			valencies_at_section_start = r.nrt.valencies.size();
+			valency_spin = line.find("composite") != std::string::npos ? "composite"
+				: line.find("alpha") != std::string::npos ? "alpha"
+				: line.find("beta") != std::string::npos ? "beta" : "";
+			continue;
+		}
 		if (line.find("cycle  structures") != std::string::npos) { section = Section::cycles; continue; }
 		if (line.find("iter  nres") != std::string::npos) { section = Section::qp; continue; }
 		if (line.find("Symmetry equivalent resonance forms") != std::string::npos) { section = Section::symforms; continue; }
@@ -251,27 +256,14 @@ NboResults parse_nbo_output(const std::filesystem::path& nbo_file) {
 			break;
 		}
 		case Section::nao: {
-			//The second numeric column is the energy in a closed-shell run and in each spin block
-			//of an open-shell one, but the SPIN DENSITY in the spin-summed table of an open-shell
-			//run.  Reading it blind put spin densities in the energy field, where they were zero
-			//for every Cor and Ryd row and nothing else in the gate noticed.
+			//The second numeric column is the energy, except in the spin-summed table of an open-shell run,
+			//where it is the spin density.
 			if (line.find("Type(AO)") != std::string::npos) {
 				nao_column_is_spin = line.find("Spin") != std::string::npos;
 				break;
 			}
 			if (!std::regex_match(line, m, re_nao)) {
 				if (!r.nao.empty() && line.find("---") == std::string::npos && line.find_first_not_of(" \t") != std::string::npos) section = Section::none;
-				break;
-			}
-			if (!spin.empty()) {
-				//The per-spin tables are the only place an open-shell run prints NAO energies, and
-				//alpha is the set the spin-summed table is labelled from, so its energies belong on
-				//those rows.
-				if (spin == "alpha" && !nao_column_is_spin) {
-					const size_t at = static_cast<size_t>(std::stoi(m[1].str())) - 1;
-					if (at < r.nao.size() && r.nao[at].element == m[2].str() && r.nao[at].lang == m[4].str())
-						r.nao[at].energy = to_d(m[8].str());
-				}
 				break;
 			}
 			NboNao n;
@@ -284,7 +276,21 @@ NboResults parse_nbo_output(const std::filesystem::path& nbo_file) {
 			n.occupancy = to_d(m[7].str());
 			if (nao_column_is_spin) { n.spin_density = to_d(m[8].str()); n.has_spin_density = true; }
 			else n.energy = to_d(m[8].str());
-			r.nao.push_back(n);
+			if (spin.empty()) {
+				r.nao.push_back(n);
+				break;
+			}
+			//An open-shell run prints one NAO table per spin, the only per-spin NAO occupancies NBO gives; the
+			//spin-summed table hides per-spin errors that cancel.
+			if (spin == "alpha") r.nao_alpha.push_back(n);
+			else if (spin == "beta") r.nao_beta.push_back(n);
+			//alpha is also the set the spin-summed table is labelled from, and the per-spin tables
+			//are the only place an open-shell run prints an NAO energy, so its energies go there too.
+			if (spin == "alpha" && !nao_column_is_spin) {
+				const size_t at = static_cast<size_t>(n.index) - 1;
+				if (at < r.nao.size() && r.nao[at].element == n.element && r.nao[at].lang == n.lang)
+					r.nao[at].energy = n.energy;
+			}
 			break;
 		}
 		case Section::hybrids: {
@@ -357,8 +363,7 @@ NboResults parse_nbo_output(const std::filesystem::path& nbo_file) {
 			if (line.find("* Total *") != std::string::npos) { section = Section::none; break; }
 			if (line.find("---") != std::string::npos || line.find("others") != std::string::npos) break;
 			if (!std::regex_match(line, m, re_weight)) {
-				//The Added(Removed) column wraps onto continuation lines; they belong to the
-				//structure above, and treating them as the end of the table truncated the list.
+				//The Added(Removed) column wraps onto continuation lines that belong to the structure above.
 				if (line.find_first_not_of(" \t") == std::string::npos) { section = Section::none; break; }
 				if (!r.nrt.weights.empty()) r.nrt.weights.back().changes += " " + normalize(line);
 				break;
@@ -413,15 +418,14 @@ NboResults parse_nbo_output(const std::filesystem::path& nbo_file) {
 			v.covalency = to_d(m[4].str());
 			v.electrovalency = to_d(m[5].str());
 			v.electron_count = to_d(m[6].str());
-			v.spin = spin;
+			v.spin = valency_spin;
 			r.nrt.valencies.push_back(v);
 			break;
 		}
 		case Section::qp: {
 			if (line.find("---") != std::string::npos) break;
 			if (!std::regex_match(line, m, re_qp_row)) {
-				//The table opens with a header-less row holding only the starting rhoNL and the
-				//number of structures; ending the section on it dropped every iteration.
+				//The table opens with a header-less row (starting rhoNL, structure count) that must not end the section.
 				if (line.find_first_not_of(" \t") == std::string::npos) { section = Section::none; break; }
 				if (std::regex_match(line, m, re_qp_start)) {
 					NboQpIteration q0;
@@ -456,15 +460,11 @@ NboResults parse_nbo_output(const std::filesystem::path& nbo_file) {
 		default: break;
 		}
 	}
-	//Under NRTDTL the weight vector carries five decimals and, unlike the printed table, the
-	//zero-weight tail of the candidate set. Structures the table left out are added here, so
-	//"how many were examined" and "how many were kept" are both readable from the dataset.
-	//The table's RS column is a RANK, not a structure number: both it and the $NRTSTR keylist are
-	//sorted by descending weight, while the weight vector names its structures explicitly
-	//(acetylene prints RS 2 = 0.92 % against 0.00486(2)).  Matching the two by that column paired
-	//every row with another structure's fraction and appended the survivors a second time, which
-	//is why NO's alpha weights summed to 200 %.  So pair rank k with the k-th largest fraction.
-	for (const auto& [sp, fractions] : weight_fractions) {
+	//Under NRTDTL the weight vector carries five decimals and the zero-weight tail the printed table omits;
+	//those structures are added here. The table's RS column, like $NRTSTR, is a rank by descending weight,
+	//not a structure number, so rank k pairs with the k-th largest fraction.
+	for (const auto& wf : weight_fractions) {
+		const auto& sp = wf.first; const auto& fractions = wf.second; //no structured binding: clang<=18 cannot capture one under -fopenmp
 		std::vector<size_t> order(fractions.size());
 		for (size_t i = 0; i < order.size(); i++) order[i] = i;
 		std::stable_sort(order.begin(), order.end(),
@@ -495,10 +495,8 @@ NboResults parse_nbo_output(const std::filesystem::path& nbo_file) {
 	return r;
 }
 
-/*
- * The bond-order table interleaves three rows per atom (t/c/i) across column blocks, so it is
- * read in a second pass where the three rows can be held together.
- */
+//The bond-order table interleaves three rows per atom (t/c/i) across column blocks, so it is read
+//in a second pass that holds the three rows together.
 static void parse_bond_orders(const std::filesystem::path& nbo_file, NboNrt& nrt) {
 	std::ifstream in(nbo_file);
 	if (!in.good()) return;
@@ -511,9 +509,8 @@ static void parse_bond_orders(const std::filesystem::path& nbo_file, NboNrt& nrt
 	auto flush = [&](const std::vector<std::string>& ions) {
 		const size_t n = std::min({ columns.size(), totals.size(), covs.size(), ions.size() });
 		for (size_t c = 0; c < n; c++) {
-			//The matrix is symmetric, so the lower triangle is dropped; the diagonal and the
-			//zero entries are kept, because "this pair has bond order zero" is a statement a
-			//candidate implementation has to reproduce.
+			//Symmetric: the lower triangle is dropped. Diagonal and zero entries are kept, since a zero bond
+			//order is something a candidate implementation has to reproduce.
 			if (columns[c] < row) continue;
 			NboBondOrder b;
 			b.atom1 = row;
@@ -551,9 +548,7 @@ static void parse_bond_orders(const std::filesystem::path& nbo_file, NboNrt& nrt
 	}
 }
 
-//---------------------------------------------------------------------------------------------
-//JSON export; hand-written like BasisSet::write_occ_json, the tree carries no JSON library.
-//---------------------------------------------------------------------------------------------
+//JSON export, hand-written like BasisSet::write_occ_json: the tree carries no JSON library.
 namespace {
 	std::string jstr(const std::string& s) {
 		std::string out = "\"";
@@ -565,11 +560,10 @@ namespace {
 		return out + "\"";
 	}
 	std::string jnum(const double v) {
-		//Ten digits is what a reader wants.  NBO_JSON_DIGITS raises it, because the only way to
-		//prove an optimisation of the search changed nothing is to compare every reported number at
-		//full double precision - at ten digits a shift in the last bits of an orbital hides.
+		//Ten digits by default; NBO_JSON_DIGITS raises it to full double precision, needed to prove a search
+		//optimisation changed nothing.
 		static const int digits = [] {
-			const char* e = std::getenv("NBO_JSON_DIGITS");
+			const char* e = tuning("NBO_JSON_DIGITS");
 			const int d = e ? std::atoi(e) : 10;
 			return (d >= 1 && d <= 20) ? d : 10;
 		}();
@@ -579,11 +573,54 @@ namespace {
 	}
 }
 
+std::string parent_lewis_json(const NboResults& r, const std::string& indent) {
+	const std::vector<NboTopo>& parents = r.nrt.parent_topo;
+	if (parents.empty()) return "";
+	std::map<int, std::string> element;
+	for (const NboAtomPopulation& p : r.npa) element[p.index] = p.element;
+	for (const NboValency& v : r.nrt.valencies) element[v.atom] = v.element;
+	const auto label = [&element](const int a) {
+		const auto it = element.find(a + 1);
+		return jstr((it == element.end() ? std::string("?") : it->second) + std::to_string(a + 1));
+	};
+	//eight entries to a line keeps a 108-atom parent readable and still pastes as one JSON value
+	const auto body = [&label](const NboTopo& t, const std::string& in) {
+		std::ostringstream o;
+		const int na = static_cast<int>(t.matrix.size());
+		int k = 0;
+		const auto sep = [&k, &in] { return k++ == 0 ? std::string(" ") : (k % 8 == 1 ? ",\n" + in + "  " : ", "); };
+		o << in << "\"lone_pairs\": {";
+		for (int a = 0; a < na; a++)
+			if (t.matrix[a][a] > 0) o << sep() << label(a) << ": " << t.matrix[a][a];
+		o << (k ? " }" : "}") << ",\n" << in << "\"bonds\": [";
+		k = 0;
+		for (int a = 0; a < na; a++)
+			for (int b = a + 1; b < na; b++)
+				if (t.matrix[a][b] > 0) o << sep() << "[" << label(a) << ", " << label(b) << ", " << t.matrix[a][b] << "]";
+		o << (k ? " ]" : "]");
+		return o.str();
+	};
+	std::ostringstream o;
+	o << "{\n" << indent << "  \"format\": \"NoSpherA2 Lewis structure\",\n" << indent << "  \"version\": 1,\n"
+		<< indent << "  \"wavefunction\": " << jstr(std::filesystem::path(r.source).filename().string()) << ",\n"
+		<< indent << "  \"atoms\": " << parents[0].matrix.size() << ",\n";
+	if (parents.size() == 1 && parents[0].spin.empty())
+		o << body(parents[0], indent + "  ") << "\n";
+	else
+		for (size_t s = 0; s < parents.size(); s++)
+			o << indent << "  " << jstr(parents[s].spin) << ": {\n" << body(parents[s], indent + "    ") << "\n"
+				<< indent << "  }" << (s + 1 < parents.size() ? "," : "") << "\n";
+	o << indent << "}";
+	return o.str();
+}
+
 void write_nbo_json(const NboResults& r, const std::filesystem::path& json_file) {
 	std::ofstream f(json_file);
 	err_checkf(f.good(), "Could not write " + json_file.string(), std::cout);
 	f << "{\n";
 	f << "  \"name\": " << jstr(r.name) << ",\n";
+	f << "  \"parser_version\": " << NBO_JSON_PARSER_VERSION << ",\n";	//refuse, do not reinterpret
+
 	f << "  \"source\": " << jstr(r.source) << ",\n";
 	f << "  \"nbo_version\": " << jstr(r.version) << ",\n";
 	f << "  \"keywords\": " << jstr(r.keywords) << ",\n";
@@ -614,16 +651,23 @@ void write_nbo_json(const NboResults& r, const std::filesystem::path& json_file)
 	}
 	f << "  ],\n";
 
-	f << "  \"nao\": [\n";
-	for (size_t i = 0; i < r.nao.size(); i++) {
-		const auto& n = r.nao[i];
-		f << "    {\"index\": " << n.index << ", \"element\": " << jstr(n.element) << ", \"atom\": " << n.center
-			<< ", \"lang\": " << jstr(n.lang) << ", \"type\": " << jstr(n.type) << ", \"shell\": " << jstr(n.shell)
-			<< ", \"occupancy\": " << jnum(n.occupancy) << ", \"energy\": " << jnum(n.energy);
-		if (n.has_spin_density) f << ", \"spin_density\": " << jnum(n.spin_density);
-		f << "}" << (i + 1 < r.nao.size() ? "," : "") << "\n";
-	}
-	f << "  ],\n";
+	//The spin-summed table, and for an open shell each spin's own: a per-spin error that
+	//cancels in the sum is invisible in the first array and plain in the other two.
+	const auto nao_array = [&](const char* key, const std::vector<NboNao>& t) {
+		f << "  \"" << key << "\": [\n";
+		for (size_t i = 0; i < t.size(); i++) {
+			const auto& n = t[i];
+			f << "    {\"index\": " << n.index << ", \"element\": " << jstr(n.element) << ", \"atom\": " << n.center
+				<< ", \"lang\": " << jstr(n.lang) << ", \"type\": " << jstr(n.type) << ", \"shell\": " << jstr(n.shell)
+				<< ", \"occupancy\": " << jnum(n.occupancy) << ", \"energy\": " << jnum(n.energy);
+			if (n.has_spin_density) f << ", \"spin_density\": " << jnum(n.spin_density);
+			f << "}" << (i + 1 < t.size() ? "," : "") << "\n";
+		}
+		f << "  ],\n";
+	};
+	nao_array("nao", r.nao);
+	if (!r.nao_alpha.empty()) nao_array("nao_alpha", r.nao_alpha);
+	if (!r.nao_beta.empty()) nao_array("nao_beta", r.nao_beta);
 
 	f << "  \"nbos\": [\n";
 	for (size_t i = 0; i < r.orbitals.size(); i++) {
@@ -637,7 +681,8 @@ void write_nbo_json(const NboResults& r, const std::filesystem::path& json_file)
 			const auto& y = o.hybrids[h];
 			f << (h ? ", " : "") << "{\"atom\": " << y.center << ", \"element\": " << jstr(y.element)
 				<< ", \"weight_percent\": " << jnum(y.weight_percent) << ", \"coefficient\": " << jnum(y.coefficient)
-				<< ", \"s\": " << jnum(y.s) << ", \"p\": " << jnum(y.p) << ", \"d\": " << jnum(y.d) << ", \"f\": " << jnum(y.f) << "}";
+				<< ", \"s\": " << jnum(y.s) << ", \"p\": " << jnum(y.p) << ", \"d\": " << jnum(y.d) << ", \"f\": " << jnum(y.f)
+				<< ", \"sp_exponent\": " << (y.sp_exponent() > 0.0 ? jnum(y.sp_exponent()) : "null") << "}";
 		}
 		f << "]}" << (i + 1 < r.orbitals.size() ? "," : "") << "\n";
 	}
@@ -656,8 +701,17 @@ void write_nbo_json(const NboResults& r, const std::filesystem::path& json_file)
 
 	f << "  \"nrt\": {\"present\": " << (r.nrt.present ? "true" : "false")
 		<< ", \"structures_used\": " << r.nrt.structures_used << ", \"structures_found\": " << r.nrt.structures_found
-		<< ", \"d_0\": " << jnum(r.nrt.d_0) << ", \"d_w\": " << jnum(r.nrt.d_w)
-		<< ", \"max_search_cycles\": " << r.nrt.max_search_cycles
+		<< ", \"d_0\": " << jnum(r.nrt.d_0) << ", \"d_w\": " << jnum(r.nrt.d_w);
+	if (r.nrt.spin_d.size() == 1)
+		f << ", \"d_0_nbo\": " << jnum(r.nrt.spin_d[0].d_0) << ", \"d_w_nbo\": " << jnum(r.nrt.spin_d[0].d_w);
+	if (!r.nrt.spin_d.empty()) {
+		f << ", \"spin_d_nbo\": [";
+		for (size_t i = 0; i < r.nrt.spin_d.size(); i++)
+			f << (i ? ", " : "") << "{\"spin\": " << jstr(r.nrt.spin_d[i].spin) << ", \"d_0\": " << jnum(r.nrt.spin_d[i].d_0)
+			  << ", \"d_w\": " << jnum(r.nrt.spin_d[i].d_w) << "}";
+		f << "]";
+	}
+	f << ", \"max_search_cycles\": " << r.nrt.max_search_cycles
 		<< ", \"symmetry\": " << jstr(r.nrt.symmetry)
 		<< ", \"initial_structures\": {\"total\": " << r.nrt.initial_topo << ", \"nls\": " << r.nrt.initial_nls
 		<< ", \"nbi\": " << r.nrt.initial_nbi << ", \"sym\": " << r.nrt.initial_sym << "}"
@@ -678,8 +732,9 @@ void write_nbo_json(const NboResults& r, const std::filesystem::path& json_file)
 		const auto& b = r.nrt.bond_orders[i];
 		f << "      {\"atom1\": " << b.atom1 << ", \"atom2\": " << b.atom2 << ", \"total\": " << jnum(b.total)
 			<< ", \"covalent\": " << jnum(b.covalent) << ", \"ionic\": " << jnum(b.ionic)
-			<< ", \"diagonal\": " << (b.diagonal ? "true" : "false")
-			<< ", \"spin\": " << jstr(b.spin) << "}" << (i + 1 < r.nrt.bond_orders.size() ? "," : "") << "\n";
+			<< ", \"diagonal\": " << (b.diagonal ? "true" : "false");
+		if (b.range_lo >= 0.0) f << ", \"range\": [" << jnum(b.range_lo) << ", " << jnum(b.range_hi) << "]";
+		f << ", \"spin\": " << jstr(b.spin) << "}" << (i + 1 < r.nrt.bond_orders.size() ? "," : "") << "\n";
 	}
 	f << "    ],\n    \"valencies\": [\n";
 	for (size_t i = 0; i < r.nrt.valencies.size(); i++) {
@@ -734,14 +789,16 @@ void write_nbo_json(const NboResults& r, const std::filesystem::path& json_file)
 	};
 	f << "    ],\n    \"arrows\": [";
 	write_strings(r.nrt.arrows);
+	f << "],\n    \"notes\": [";
+	write_strings(r.nrt.notes);
 	f << "],\n    \"symmetry_forms\": [";
 	write_strings(r.nrt.symmetry_forms);
-	f << "]\n  }\n}\n";
+	f << "]\n  }";
+	const std::string parent = r.nrt.present ? parent_lewis_json(r, "  ") : "";
+	if (!parent.empty()) f << ",\n  \"parent_lewis\": " << parent;
+	f << "\n}\n";
 }
 
-//---------------------------------------------------------------------------------------------
-//Comparison
-//---------------------------------------------------------------------------------------------
 namespace {
 	//Every quantity is compared the same way: build a keyed map of the candidate, walk the
 	//reference, record the worst deviation and count what is missing.
@@ -828,27 +885,26 @@ NboComparison compare_nbo_results(const NboResults& ref, const NboResults& cand,
 	return c;
 }
 
-//---------------------------------------------------------------------------------------------
-//Driving the external NBO
-//---------------------------------------------------------------------------------------------
 namespace {
-	//gennbo wants a stem in its own working directory. On Windows the licensed binary lives in
-	//WSL, so the whole call is handed over with the path translated.
-	std::string gennbo_command(const std::filesystem::path& dir, const std::string& stem, const std::string& exe) {
+	//gennbo wants a stem in its own working directory: argv for a process started in dir, no shell, so
+	//neither the -nbo_exe path nor the file name can inject a command. On Windows the licensed binary
+	//lives in WSL (default, or -nbo_exe wsl:<path>); bash gets dir, stem and binary as $1..$3 and never
+	//splices them into its script. wsl -e skips the default shell, which would re-split the arguments.
+	//The binary comes last and is left out when empty: Windows argv quoting drops an empty argument.
+	std::vector<std::string> gennbo_argv([[maybe_unused]] const std::filesystem::path& dir,const std::string& stem, const std::string& exe) {
 #ifdef _WIN32
-		if (exe.empty() || exe.rfind("wsl", 0) == 0) {
+		if (exe.empty() || exe.rfind("wsl:", 0) == 0) {
 			std::string wsl_dir = std::filesystem::absolute(dir).string();
 			std::replace(wsl_dir.begin(), wsl_dir.end(), '\\', '/');
 			if (wsl_dir.size() > 1 && wsl_dir[1] == ':')
 				wsl_dir = "/mnt/" + std::string(1, static_cast<char>(std::tolower(wsl_dir[0]))) + wsl_dir.substr(2);
-			const std::string bin = exe.empty() ? "~/nbo7/gennbo" : exe;
-			return "wsl bash -lc \"cd '" + wsl_dir + "' && " + bin + " " + stem + "\"";
+			std::vector<std::string> argv = { "wsl", "-e", "bash", "-lc",
+				R"(cd "$1" && exec "${3:-$HOME/nbo7/gennbo}" "$2")", "gennbo", wsl_dir, stem };
+			if (exe.size() > 4) argv.push_back(exe.substr(4));
+			return argv;
 		}
-		return "\"" + exe + "\" " + (dir / stem).string();
-#else
-		const std::string bin = exe.empty() ? "gennbo" : exe;
-		return "cd \"" + std::filesystem::absolute(dir).string() + "\" && " + bin + " " + stem;
 #endif
+		return { exe.empty() ? "gennbo" : exe, stem };
 	}
 }
 
@@ -867,10 +923,23 @@ int run_nbo(const NboRunOptions& o, std::ostream& log) {
 	err_checkf(wavy.write_nbo(f47, o.debug, &log, o.keywords), "Could not write " + f47.string(), log);
 	const double file47_seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
 
-	const std::string command = gennbo_command(dir, stem, o.executable);
-	log << "Running: " << command << std::endl;
+	//a .nbo left by an earlier run would be parsed as this run's output
+	std::error_code ec;
+	std::filesystem::remove(out, ec);
+	const std::vector<std::string> argv = gennbo_argv(dir, stem, o.executable);
+	log << "Running in " << dir.string() << ":";
+	for (const auto& a : argv) log << " " << a;
+	log << std::endl;
 	t0 = std::chrono::steady_clock::now();
-	const int rc = std::system(command.c_str()); /* Flawfinder: ignore - the NBO binary and a path we built */
+	int rc = -1;
+	try {
+		subprocess::RunOptions run;
+		run.cwd = std::filesystem::absolute(dir).string();
+		rc = subprocess::run(argv, run).returncode;
+	}
+	catch (const std::exception& e) {
+		log << "Could not start " << argv[0] << ": " << e.what() << std::endl;
+	}
 	const double nbo_seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
 	if (rc != 0) log << "NBO returned " << rc << "; parsing whatever output exists" << std::endl;
 	err_checkf(std::filesystem::exists(out), "NBO produced no " + out.string(), log);
@@ -886,5 +955,5 @@ int run_nbo(const NboRunOptions& o, std::ostream& log) {
 	log << "Parsed " << results.npa.size() << " atoms, " << results.nao.size() << " NAOs, "
 		<< results.orbitals.size() << " NBOs, " << results.e2.size() << " E2 entries, "
 		<< results.nrt.bond_orders.size() << " NRT bond orders -> " << json.string() << std::endl;
-	return 0;
+	return rc;
 }

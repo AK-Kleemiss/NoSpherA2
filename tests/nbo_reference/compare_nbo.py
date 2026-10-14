@@ -4,15 +4,18 @@
     python compare_nbo.py --all <candidate_dir>     # every molecule of the dataset
 
 <candidate_dir> is the directory holding the candidate <molecule>.nbo.json files; the
-references are always read from the directory this script lives in, so `--all .` run from
-tests/nbo_reference compares the dataset against itself. In --all mode a reference molecule
-with no candidate file is a failure, so pointing the gate at the wrong directory cannot
-pass by comparing nothing.
+references are always read from the directory this script lives in. In --all mode a reference
+molecule with no candidate file is a failure, so pointing the gate at the wrong directory
+cannot pass by comparing nothing - and <candidate_dir> may not BE the reference directory,
+because `--all .` run from tests/nbo_reference compared the dataset with itself and reported
+22 of 22 at max dev 0.00000. A check that passes when handed its own answers cannot see the
+failure mode it exists for, so it is refused rather than reported as a pass.
 
 Both files are the JSON that `NoSpherA2 -nbo` writes (see nbo_run.h for the structures);
-an in-house implementation only has to emit the same keys. The reference drives: every
-reference entry must have a counterpart in the candidate, extra candidate entries are
-ignored. Exit code 0 means every quantity agreed within tolerance.
+an in-house implementation only has to emit the same keys. The reference drives, but the
+comparison is symmetric on membership: a reference entry with no counterpart is `missing`, a
+candidate entry with no counterpart is `surplus`, and either fails. Exit code 0 means every
+quantity agreed within tolerance and neither side printed anything the other did not.
 
 The C++ side of the same check is compare_nbo_results() in Src/core/nbo_run.h, used by
 tests/src/Nbo47Tests.cpp; this script is for comparing against the stored dataset, which
@@ -37,7 +40,7 @@ TOL = {  # mirrors NboTolerances in Src/core/nbo_run.h
 class Quantity:
     def __init__(self, name, tol):
         self.name, self.tol = name, tol
-        self.compared = self.missing = self.failed = 0
+        self.compared = self.missing = self.surplus = self.failed = 0
         self.max_dev, self.worst = 0.0, ""
 
     def check(self, label, ref, cand):
@@ -49,18 +52,26 @@ class Quantity:
             self.failed += 1
 
     def ok(self):
-        return self.failed == 0 and self.missing == 0
+        return self.failed == 0 and self.missing == 0 and self.surplus == 0
 
     def line(self):
-        return "  %-18s %4d compared %3d missing %3d failed  max dev %10.5f  %s" % (
-            self.name, self.compared, self.missing, self.failed, self.max_dev, self.worst)
+        return ("  %-18s %4d compared %3d missing %3d surplus %3d failed  max dev %10.5f  %s"
+                % (self.name, self.compared, self.missing, self.surplus, self.failed,
+                   self.max_dev, self.worst))
 
 
 def compare_keyed(q, ref_items, cand_items, key, fields):
     """fields: list of (json key, label suffix). Entries are matched by key(). A key is not
     unique - two resonance structures can carry the same Added(Removed) description, and
     acetylene has four such pairs - so entries sharing a key pair up in order of appearance
-    instead of all comparing against the first one. Without that a file fails against itself."""
+    instead of all comparing against the first one. Without that a file fails against itself.
+
+    Unmatched entries are counted on BOTH sides. The loop walks the reference, so for a long
+    time an entry the candidate printed and the reference lacks was neither `compared` nor
+    `missing` and left no trace at all - twelve extra native E2 rows on ch3 went unreported by
+    the very check that exists to find them. A candidate that invents entries disagrees with
+    the reference exactly as much as one that omits them, so the leftovers are `surplus` and
+    `ok()` fails on them."""
     index = {}
     for it in cand_items:
         index.setdefault(key(it), []).append(it)
@@ -75,6 +86,7 @@ def compare_keyed(q, ref_items, cand_items, key, fields):
         for f, suffix in fields:
             if f in it:
                 q.check("%s %s" % (k, suffix), it[f], other.get(f, float("nan")))
+    q.surplus += sum(len(queue) - taken.get(k, 0) for k, queue in index.items())
 
 
 def compare(reference, candidate):
@@ -180,7 +192,7 @@ def report(name, qs, notes):
     for n in notes:
         print("  note: " + n)
     for q in qs:
-        if q.compared or q.missing:
+        if q.compared or q.missing or q.surplus:
             print(q.line())
     return ok
 
@@ -201,9 +213,54 @@ def run(ref_path, cand_path):
     return report(reference.get("name", ref_path), compare(reference, candidate), notes)
 
 
+def selftest():
+    """`python compare_nbo.py --selftest` - the membership check, both directions.
+
+    The interesting case is the one that used to pass: an identical file plus one extra
+    candidate entry. Nothing is out of tolerance, nothing is missing, and before Quantity
+    gained `surplus` the whole comparison reported PASS."""
+    base = {"name": "t", "npa": [{"atom": 1, "element": "H", "charge": 0.1}],
+            "nao": [], "nbos": [], "nrt": {},
+            "e2": [{"donor": "BD 1", "acceptor": "BD* 2", "spin": "alpha",
+                    "energy_kcal": 1.0}]}
+    same = json.loads(json.dumps(base))
+    qs = {q.name: q for q in compare(base, same)}
+    assert all(q.ok() for q in qs.values()), "a file must agree with itself"
+
+    extra = json.loads(json.dumps(base))
+    extra["e2"].append({"donor": "BD 1", "acceptor": "BD* 3", "spin": "alpha",
+                        "energy_kcal": 0.4})
+    qs = {q.name: q for q in compare(base, extra)}
+    assert qs["E2"].surplus == 1, qs["E2"].line()
+    assert qs["E2"].missing == 0 and qs["E2"].failed == 0, qs["E2"].line()
+    assert not qs["E2"].ok(), "a surplus entry must fail, not be a footnote"
+
+    short = json.loads(json.dumps(base))
+    short["e2"] = []
+    qs = {q.name: q for q in compare(base, short)}
+    assert (qs["E2"].missing, qs["E2"].surplus) == (1, 0), qs["E2"].line()
+
+    # Two entries sharing a key pair up in order of appearance, so duplicates are not a surplus.
+    dup = {"name": "t", "npa": [], "nao": [], "nbos": [], "nrt": {},
+           "e2": [{"donor": "BD 1", "acceptor": "BD* 2", "spin": "", "energy_kcal": 1.0},
+                  {"donor": "BD 1", "acceptor": "BD* 2", "spin": "", "energy_kcal": 2.0}]}
+    qs = {q.name: q for q in compare(dup, json.loads(json.dumps(dup)))}
+    assert qs["E2"].ok() and qs["E2"].surplus == 0, qs["E2"].line()
+    import socket
+    print("compare_nbo selftest OK on %s" % socket.gethostname())
+    return 0
+
+
 def main(argv):
     here = os.path.dirname(os.path.abspath(__file__))
+    if len(argv) == 2 and argv[1] == "--selftest":
+        return selftest()
     if len(argv) == 3 and argv[1] == "--all":
+        if os.path.realpath(argv[2]) == os.path.realpath(here):
+            print("refusing --all %s: that is the reference directory itself, so every molecule\n"
+                  "would be compared with its own file and pass at max dev 0.00000. Point it at\n"
+                  "the directory holding the candidate results." % argv[2])
+            return 2
         names = [f[:-len(".nbo.json")] for f in sorted(os.listdir(here))
                  if f.endswith(".nbo.json")]
         passed, failed, missing = 0, 0, []

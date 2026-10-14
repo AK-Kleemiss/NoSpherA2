@@ -1,0 +1,20 @@
+{
+  "stage": "nbo_stage",
+  "molecule": "n2",
+  "threads": 8,
+  "wall_seconds": 1,
+  "exit_code": 0,
+  "hostname": "AKL028",
+  "node_cores_total": 96,
+  "slurm_job_id": "581339",
+  "slurm_partition": "Active",
+  "slurm_cpus_on_node": "8",
+  "finished_utc": "2026-09-25T02:57:20Z",
+  "nospher_a2": "/work/akkleemiss/share/NoSpherA2_RGBI_NBO/NoSpherA2",
+  "nospher_a2_commit": "c8130055  built 2026-09-25 02:20  on AKL007, branch density_source",
+  "gennbo_bin": "/work/software/bin/NBO/bin",
+  "nbo_keywords": "NRT E2PERT=0.5 NRTLST=0.1 NRTDTL",
+  "native_flags": "-nrt -nbo_e2min 0.5 -nrt_e2 1 -nbo_threads 8",
+  "seconds": {"convert_47": 0, "gennbo": 1, "parse": 0, "native": 0},
+  "exit_codes": {"convert_47": 0, "gennbo": 0, "parse": 0, "native": 0}
+}

@@ -14,11 +14,17 @@
 #include "geometry_aid.h"
 #include "crystal_energies.h"
 #include "SALTED_equicomb.h"
+#include "SALTED_predictor.h"
+#ifdef NOSPHERA2_USE_GPU
+#include "sf_gpu.h"
+#endif
 #include "nbo_run.h"
 #include "nbo.h"
 #include "eli_family.h"
 #include "topology.h"
 #include "citations.h"
+#include "b2c.h"
+#include "section_log.h"
 
 #ifdef _WIN32
 #include <windows.h>
@@ -236,14 +242,16 @@ std::string help_message =
  "                                    the orbital-free PC07 estimate). Given\n"
  "                                    before -eli_analysis or -qtaim_eli the\n"
  "                                    QTAIM basins follow the fitted density.\n"
- "  -multipole_moments <scheme> <N>    Restrain the RI fit to the Hirshfeld, TFVC,\n"
- "                                    MBIS or EMBIS atomic charges and multipoles\n"
- "                                    up to order N (implies -ri_fit).\n"
+ "  -multipole_moments <scheme> [N]    Restrain RI atomic moments through order N\n"
+ "                                    (default 0). Hirshfeld, TFVC, MBIS and EMBIS\n"
+ "                                    support 0-8; Nuclear, Mulliken and Sanderson\n"
+ "                                    use atom-centred charge-only order 0.\n"
+ "                                    Charge and dipole rows use atom-centred\n"
+ "                                    coefficients; higher rows use grid weights.\n"
+ "                                    Does not fix the total electrons exactly.\n"
+ "                                    Implies -ri_fit.\n"
  "  -multipole_strength <x>            Weight of the restraint rows against the\n"
  "                                    density-fit metric, default 1.\n"
- "  -multipole_centre                  Restrain the moments of each atom's own\n"
- "                                    functions instead of the partition-weighted\n"
- "                                    moments of the whole fitted density.\n"
  "  -cpus <n>                          Maximum worker threads [all available].\n"
  "  -mem <MB>                          Memory budget for everything sliceable\n"
  "                                    [unset]. When given, the tsc block size\n"
@@ -390,6 +398,25 @@ std::string help_message =
  "                                    condensed Fukui functions under Hirshfeld,\n"
  "                                    Becke, TFVC, MBIS and EMBIS. No cubes, so\n"
  "                                    no grid, radius or CIF is needed.\n"
+ "  -eqc <gbw> -eqc_frag <atoms> <charge> <mult> <atoms> <charge> <mult> ...\n"
+ "                                    Rahm-Hoffmann EQC energy decomposition of\n"
+ "                                    the bonds between the fragments: Delta E\n"
+ "                                    into Delta(nX) and Delta(Vnn-Eee), Q and\n"
+ "                                    the covalency index. occ re-converges the\n"
+ "                                    parent from the gbw, then each fragment\n"
+ "                                    from the parent's density. Atoms are\n"
+ "                                    0-based, e.g. 0,2-4.\n"
+ "    -eqc_method <hf|functional>     occ method, default hf (match the gbw).\n"
+ "    -eqc_basis <name>               Basis by name instead of from the gbw;\n"
+ "                                    needed when the gbw uses ECPs.\n"
+ "    -eqc_cold                       Also converge from occ's own guess.\n"
+ "  -eqc_wfn <parent> <frag> <frag> ...\n"
+ "                                    EQC from given wavefunctions, no SCF:\n"
+ "                                    wfx or fchk; wfn, gbw or molden with the\n"
+ "                                    ORCA .out of the same name beside them.\n"
+ "    Writes <stem>.eqc_log. Example, ethane into two CH3 radicals:\n"
+ "      -eqc ethane.gbw -eqc_frag 0,2-4 0 2 1,5-7 0 2\n"
+ "    Theory, output and caveats: docs/wiki/EQC-Energy-Decomposition.md\n"
  "  -radius <angstrom>  -resolution <angstrom>\n"
  "                                    Grid settings for property calculations.\n"
  "  -hirsh <atom-index>                Hirshfeld analysis for one atom.\n"
@@ -408,7 +435,17 @@ std::string help_message =
  "                                    contracted spherical basis, so a .gbw,\n"
  "                                    .molden or .fchk, not a .wfn/.wfx.\n"
  "  -npa_summary                       -npa without the per-orbital NAO table.\n"
- "  -rgbi_no_sym                       RGBI without atomic O_h symmetrization.\n"
+ "  -ibo                               IAO partial charges and intrinsic bond\n"
+ "                                    orbitals (Knizia 2013, MINAO reference),\n"
+ "                                    classified as core, lone pair, bond-like.\n"
+ "                                    Closed shell, .gbw or spherical .molden.\n"
+ "  -ibo_cube <list>                   -ibo, then cubes <wfn>_IBO_<n>.cube of the\n"
+ "                                    IBOs in <list>: numbers as -ibo prints\n"
+ "                                    them, all, or C2:C3 for every bond-like\n"
+ "                                    IBO between two atoms, comma-separated\n"
+ "                                    (e.g. 6,C2:C3). Grid as for -MO.\n"
+ "  -rgbi_no_sym                       RGBI without atomic O_h symmetrization. A\n"
+ "                                    free-atom ANO reference stays spherical.\n"
  "  -rgbi_basis <nao|ano>              RGBI basis: occupied NAO or ANO [ano].\n"
  "  -rgbi_groups <range ...>           RGBI groups, e.g. 0-5,7; repeat option\n"
  "                                    for multiple group sets.\n"
@@ -423,17 +460,28 @@ std::string help_message =
  "                                    Poincare-Hopf completeness check and any\n"
  "                                    non-nuclear attractors.\n"
  "  -laplacian_bonds <wfn>             Plot density Laplacian along bonds.\n"
- "  -eli_analysis <wfn> <resolution> <radius>\n"
- "                                    QTAIM and ELI-D basins of the density and\n"
- "                                    ELI-D cubes (resolution and radius in\n"
- "                                    Angstrom), each basin's electrons by a\n"
- "                                    voxel sum and on the atomic quadrature\n"
- "                                    grids, the boundary followed along the\n"
- "                                    field; -acc 4 before it tightens the\n"
- "                                    latter from 0.005 to 0.002 e. With -ECP\n"
+ "  -fba <wfn>                         Full bonding analysis in one run: RGBI,\n"
+ "                                    the Laplacian along every bond\n"
+ "                                    (-laplacian_bonds), the QTAIM and ELI-D\n"
+ "                                    basins of -eli_analysis, and beside them\n"
+ "                                    on a thread of its own native NBO with\n"
+ "                                    NPA, E2 and NRT (JSON as -nbo_native\n"
+ "                                    writes it, log block printed last).\n"
+ "  -eli_analysis <wfn> [resolution radius]\n"
+ "                                    QTAIM and ELI-D basins: critical points\n"
+ "                                    as -topology finds them, ELI-D maxima by\n"
+ "                                    gradient ascent, each basin's electrons\n"
+ "                                    on the atomic quadrature grids, the\n"
+ "                                    boundary followed along the analytic\n"
+ "                                    field to rho = 0.0001 e/bohr^3; no cube.\n"
+ "                                    -acc 4 before it tightens the grid sum\n"
+ "                                    from 0.005 to 0.002 e. With -ECP\n"
  "                                    the core an ECP removed is filled from\n"
  "                                    Thakkar densities for the QTAIM basins.\n"
- "                                    A real analysis needs 0.05 A or finer;\n"
+ "                                    Resolution and radius (Angstrom, default\n"
+ "                                    0.05 and 3) set the cube that\n"
+ "                                    -basin_cube and a fitted density still\n"
+ "                                    use, 0.05 A or finer for a real run;\n"
  "                                    -ri_fit <aux basis> before it (or\n"
  "                                    -SALTED <model> with an xyz as <wfn>)\n"
  "                                    takes rho and its gradient from the\n"
@@ -454,11 +502,46 @@ std::string help_message =
  "                                    tightest exponent sharpened n^2-fold, the\n"
  "                                    radial step divided by n, the angular\n"
  "                                    order up n-1 steps. For heavy atoms.\n"
- "  -basin_cube                        Find the QTAIM basins on the cube, as\n"
- "                                    before. The default takes their attractors\n"
- "                                    from the analytic critical-point search, so\n"
- "                                    the grid can no longer invent one; use this\n"
- "                                    to compare against the older behaviour.\n"
+ "  -basin_cube                        Find the QTAIM and ELI-D basins on the\n"
+ "                                    cube, as before. The default takes the\n"
+ "                                    density's attractors from the analytic\n"
+ "                                    critical-point search, so the grid can no\n"
+ "                                    longer invent one, and walks the analytic\n"
+ "                                    field from every quadrature point for its\n"
+ "                                    basin; use this for the older behaviour.\n"
+ "  -basin_analytic                    Accepted and ignored: the analytic ELI-D\n"
+ "                                    boundaries are the default at every\n"
+ "                                    electron count now.\n"
+ "  -basin_step <f>                    Scale the trajectory step of the streaming\n"
+ "                                    basin quadrature by f. The step is a fraction\n"
+ "                                    of the cube's voxel; f says how much of it the\n"
+ "                                    basins need. Same basins, f times fewer steps.\n"
+ "  -basin_timing                      Print the wall clock of every stage of the\n"
+ "                                    basin analysis: the cube, the critical\n"
+ "                                    points, the beta spheres, the quadrature.\n"
+ "  -basin_gpu / -no_basin_gpu         Always / never evaluate the streaming QTAIM\n"
+ "                                    and ELI-D trajectories' field and the ELI-D\n"
+ "                                    maxima climbs on the GPU. Default: the GPU\n"
+ "                                    when one is found, a host evaluation costs\n"
+ "                                    at least 15 us (-tune NOS_BASIN_GPU_MIN_US)\n"
+ "                                    and the device outruns all host threads;\n"
+ "                                    the log says which ran and why.\n"
+ "  -adaptive_step                     Let a straight run of field earn a longer\n"
+ "                                    ascent step than the validated one: sucrose\n"
+ "                                    363 -> 296 s, UH6 26 -> 13 s, at up to 8e-4\n"
+ "                                    electrons per basin. Off by default.\n"
+ "  -no_adaptive_step                  Every ascent step at the validated step\n"
+ "                                    length. The default, and the reference the\n"
+ "                                    equivalence check compares against.\n"
+ "  -no_beta_spheres                   Climb every quadrature point the whole way\n"
+ "                                    instead of stopping it at the radius around\n"
+ "                                    an attractor that no ascent path can leave.\n"
+ "                                    Same basins, many times the time; it is\n"
+ "                                    there to check that they are the same.\n"
+ "  -no_spin_eli                       Skip the spin-resolved ELI-D basins\n"
+ "                                    (alpha-alpha, beta-beta, triplet) that\n"
+ "                                    -fba and -eli_analysis add for an\n"
+ "                                    unrestricted, spin-polarised wavefunction.\n"
  "  -eli_family <wfn> [points_file]\n"
  "                                    The rest of Kohout's ELI family as point\n"
  "                                    values: ELI-D for alpha-alpha, beta-beta and\n"
@@ -485,7 +568,8 @@ std::string help_message =
 "                                    -nbo_exe <gennbo>, -nbo_json <file>,\n"
 "                                    -nbo_dir <dir>. Without -nbo_exe it calls\n"
 "                                    ~/nbo7/gennbo through WSL on Windows and\n"
-"                                    gennbo from PATH elsewhere.\n"
+"                                    gennbo from PATH elsewhere; -nbo_exe\n"
+"                                    wsl:<path> names a binary inside WSL.\n"
 "  -nbo_parse <out.nbo>               Parse an NBO output that already exists into\n"
 "                                    <stem>.nbo.json. Options: -nbo_json <file>.\n"
  "  -nbo_native <wfn>                  The same analysis without the external\n"
@@ -526,6 +610,36 @@ std::string help_message =
  "                                    parent does not - ozone's ring structure at\n"
  "                                    23.6 % spans 2.24 A against 1.32 A.\n"
  "  -nrt_max <n>                       Candidate limit, default 4000 capped by a size guard on big molecules.\n"
+ "  -nrt_target <D(w)>                 Keep searching until the fit error D(w)\n"
+ "                                    reaches this value: arrows are walked again\n"
+ "                                    from every structure the fit weights, then\n"
+ "                                    refitted. Stops early when no new structure\n"
+ "                                    takes weight or the -nrt_max pool is full;\n"
+ "                                    0 = until then. Implies -nrt.\n"
+ "  -nrt_rotate                        A structure that is a symmetry image of one\n"
+ "                                    whose orbitals converged starts from them,\n"
+ "                                    rotated, instead of the greedy fill: SF6\n"
+ "                                    needs half the sweeps; bond orders move by\n"
+ "                                    up to 2e-4. Default off.\n"
+ "  -nrt_screen <r|off>                With -nrt_target, a walk of 200 or more new\n"
+ "                                    structures builds in full only those whose\n"
+ "                                    reduced cost, from approximate orbitals, is\n"
+ "                                    below r, 16 at a time with their symmetry\n"
+ "                                    images, refitting in between. Default off:\n"
+ "                                    it can miss structures (SF6 at 0.2: D(w)\n"
+ "                                    0.23 % higher); about 2.5 times faster.\n"
+ "  -nrt_no_mirror                     Treat a single move that adds no formal-\n"
+ "                                    charge separation (the allyl cation's bond\n"
+ "                                    shift) as half an arrow, complete symmetry\n"
+ "                                    images against every walked state and walk\n"
+ "                                    symmetry references only through new ones:\n"
+ "                                    the behaviour before 2026-10-14, which can\n"
+ "                                    give mirror bonds unequal orders.\n"
+ "  -nrt_stall <n>                     A structure's orbital sweeps stop once\n"
+ "                                    Anderson mixing has not lowered the largest\n"
+ "                                    vector change by 0.1 % for n sweeps, instead\n"
+ "                                    of running to the cap of 200. Default 0 =\n"
+ "                                    off.\n"
  "  -nrt_atoms <a,b,...>               Subspace NRT: only these 1-based atoms may\n"
  "                                    change, the rest keep the parent structure's\n"
  "                                    bonding. NBO's 'NRT <atoms>'.\n"
@@ -536,7 +650,22 @@ std::string help_message =
  "                                    of splitting it into connected components of\n"
  "                                    the delocalisation graph.\n"
  "  -nrt_no_ion                        Forbid candidates that move a bond onto a\n"
- "                                    lone pair (NBO's NRTION off).\n\n"
+ "                                    lone pair (NBO's NRTION off).\n"
+ "  -nrt_parent <file.json>            Start NRT from this Lewis structure instead\n"
+ "                                    of the search's own (NBO's $CHOOSE; implies\n"
+ "                                    -nrt): the NBOs and occupancies are those of\n"
+ "                                    the given structure, the resonance search\n"
+ "                                    runs on top. Closed shell only. The file:\n"
+ "                                    {\"format\": \"NoSpherA2 Lewis structure\",\n"
+ "                                     \"version\": 1, \"atoms\": 3,\n"
+ "                                     \"lone_pairs\": {\"O1\": 2},\n"
+ "                                     \"bonds\": [[\"O1\", \"H2\", 1], [\"O1\", 3, 1]]}\n"
+ "                                    Atoms are element + 1-based index or a bare\n"
+ "                                    index; valence lone pairs only, the cores\n"
+ "                                    are added; bond orders 1-3. A\n"
+ "                                    .native.nbo.json is read through its\n"
+ "                                    \"parent_lewis\". The log compares its rho(NL)\n"
+ "                                    with the search's own best structure.\n\n"
  "CONVERSION, ML, AND SPECIALISED TOOLS\n"
  "  -gbw2wfn -wfn <file.gbw>            Convert GBW input to .wfn.\n"
  "  -fchk <output.fchk>              Write FCHK output (requires -b and -d).\n"
@@ -548,13 +677,17 @@ std::string help_message =
  "                                    With -xyz instead of -wfn the prediction\n"
  "                                    is the structure's density for -rho,\n"
  "                                    -esp, -lap, -eli, -esp_isosurface and the Hirshfeld\n"
- "                                    surface ESP; add\n"
- "                                    -salted_charge_constraint there, a\n"
- "                                    fraction of an electron missing shifts\n"
- "                                    the whole ESP by q/r.\n"
- "  -SALTED_COEFS <model-dir>          Write SALTED_COEFS.npy (requires -wfn).\n"
- "  -salted_charge_constraint          Rescale the l=0 coefficients of every\n"
- "                                    SALTED prediction to the electron count.\n"
+ "                                    surface ESP. \n"
+ "  -salted_fold <in.salted> <out.salted>\n"
+ "                                    Store the model with its weights and\n"
+ "                                    features folded together: smaller and\n"
+ "                                    faster to predict, same prediction to\n"
+ "                                    rounding. Older builds refuse the file.\n"
+ "  -salted_ecp <in.salted> <out.salted> <mode>\n"
+ "                                    Mark a model trained on ECP densities\n"
+ "                                    (mode as -ECP: 1 def2, 2 xTB, 3 pTB);\n"
+ "                                    its atoms get the core back at prediction.\n"
+ "  -SALTED_COEFS <model-dir>         Write SALTED_COEFS.npy (requires -wfn).\n"
  "  -RI_CUBE <coefficients.npy>        Write an RI density cube; use -wfn and\n"
  "                                    -ri_fit first.\n"
  "  -write_ri_coefs                    Write RI_COEFS.npy; use -wfn, -ri_fit\n"
@@ -582,6 +715,10 @@ std::string help_message =
  "  -v | -v2 | -debug                  Verbose diagnostic output.\n"
  "  -profiling [tests-root]            Run the internal profiling suite\n"
  "                                    [./tests]. Alias: -profile.\n"
+ "  -tune NAME[=VALUE]                 Set a developer knob, repeatable; a bare NAME\n"
+ "                                    is 1. Diagnostics and cut-offs such as\n"
+ "                                    NOSPHERA2_GPU_BACKEND=hip or NOS_RGBI_DEBUG,\n"
+ "                                    formerly environment variables.\n"
  "  -no_date                           Suppress date information and the GPU notes, so\n"
  "                                    output does not depend on the machine it ran on.\n"
  "  -no_date_but_gpu                   As -no_date, but keeps the GPU notes. For the\n"
@@ -671,6 +808,17 @@ std::string help_message =
  "                                                      there while the\n"
  "                                                      refinement runs, for\n"
  "                                                      a later read <path>\n"
+ "                                      save_eri <path> write the stored\n"
+ "                                                      two-electron integrals\n"
+ "                                      read_eri <path> reuse them: they depend\n"
+ "                                                      on structure and basis\n"
+ "                                                      only; another basis or\n"
+ "                                                      geometry is refused and\n"
+ "                                                      they are built\n"
+ "                                      basis_overrides <file>\n"
+ "                                                      per-element all-electron\n"
+ "                                                      BSE JSON orbital bases;\n"
+ "                                                      other elements keep basis_set\n"
  "                                      df_basis <name> density-fit the Fock\n"
  "                                                      build with that\n"
  "                                                      auxiliary basis from\n"
@@ -730,6 +878,33 @@ std::string help_message =
  "  Twin law\n"
  "    NoSpherA2 -cif A.cif -hkl A.hkl -wfn A.wfx -acc 1 -cpus 7 \\\n"
  "      -twin -1 0 0 0 -1 0 0 0 -1\n");
+static std::map<std::string, std::string> &tuning_knobs()
+{
+	static std::map<std::string, std::string> knobs;
+	return knobs;
+}
+const char *tuning(const char *name)
+{
+	const auto &knobs = tuning_knobs();
+	const auto it = knobs.find(name);
+	return it == knobs.end() ? nullptr : it->second.c_str();
+}
+void set_tuning(const std::string &name, const char *value)
+{
+	if (value)
+		tuning_knobs()[name] = value;
+	else
+		tuning_knobs().erase(name);
+}
+//What each -tune of the current run replaced, in order
+static std::vector<std::pair<std::string, std::optional<std::string>>> run_tuned;
+void tuning_end_run()
+{
+	for (auto it = run_tuned.rbegin(); it != run_tuned.rend(); ++it)
+		set_tuning(it->first, it->second ? it->second->c_str() : nullptr);
+	run_tuned.clear();
+}
+
 std::string NoSpherA2_message(bool no_date)
 {
 	std::string t = "    _   __     _____       __              ___   ___\n";
@@ -758,8 +933,15 @@ std::string NoSpherA2_message(bool no_date)
 		t.append("Please see, respectively:\n");
 		t.append("   https://github.com/Luthaf/featomic\n");
 		t.append("   https://github.com/lab-cosmo/metatensor\n");
+#if defined(NSA2_ARMPL)
+		t.append("   This software utilizes Arm Performance Libraries (https://developer.arm.com/Tools%20and%20Software/Arm%20Performance%20Libraries) for optimized mathematical computations\n");
+#elif defined(NSA2_OPENBLAS)
+		t.append("   This software utilizes OpenBLAS (https://github.com/OpenMathLib/OpenBLAS) for optimized mathematical computations\n");
+#else
 		t.append("   This software utilizes Intel(c) Math Kernel Library (oneMKL), version 2025.2.0.629, for optimized mathematical computations\n");
+#endif
 		t.append("OCC can be found at: https://github.com/peterspackman/occ\n");
+		t.append("OCC was published at        : Spackman, J. Open Source Softw. 2026, 11, 9609, doi:10.21105/joss.09609.\n");
 		t.append("NoSpherA2 was published at  : Kleemiss et al. Chem. Sci., 2021, 12, 1675 - 1692.\n");
 		t.append("Slater IAM was published at : Kleemiss et al. J. Appl. Cryst. 2024, 57, 161 - 174.\n");
 		t.append("ECP correction functions at : Kleemiss et al. J. Appl. Cryst. 2025, 58, 374 - 382.\n");
@@ -1199,7 +1381,7 @@ bool read_block_from_fortran_binary(std::ifstream &file, std::vector<T> &Target)
 	}
 	return true;
 }
-template bool read_block_from_fortran_binary(std::ifstream &file, std::vector<double> &Target);
+template bool read_block_from_fortran_binary(std::ifstream &file, vec &Target);
 template bool read_block_from_fortran_binary(std::ifstream &file, std::vector<int> &Target);
 template bool read_block_from_fortran_binary(std::ifstream &file, std::vector<float> &Target);
 template bool read_block_from_fortran_binary(std::ifstream &file, std::vector<char> &Target);
@@ -1345,7 +1527,8 @@ bool unsaved_files(std::vector<WFN> &wavy)
 
 void readxyzMinMax_fromWFN(
 	const WFN &wavy,
-	properties_options &opts)
+	properties_options &opts,
+	const bool even_steps)
 {
 	vec2 PosAtoms;
 	PosAtoms.resize(3);
@@ -1376,6 +1559,15 @@ void readxyzMinMax_fromWFN(
 	opts.NbSteps[0] = (int)ceil(constants::bohr2ang(opts.MinMax[3] - opts.MinMax[0]) / opts.resolution);
 	opts.NbSteps[1] = (int)ceil(constants::bohr2ang(opts.MinMax[4] - opts.MinMax[1]) / opts.resolution);
 	opts.NbSteps[2] = (int)ceil(constants::bohr2ang(opts.MinMax[5] - opts.MinMax[2]) / opts.resolution);
+
+	//Callers that step by span/NbSteps put the box centre, the molecule's symmetry centre, at index NbSteps/2:
+	//on a grid plane only for an even count, so only then can the grid carry the point group (an odd count leaves
+	//mirror planes and axes between planes). ceil() makes the parity arbitrary (9.0/0.15 gives 61), hence forced here.
+	//The property-cube path steps by resolution, where parity does not move the centre; it passes even_steps = false.
+	if (even_steps)
+		for (int i = 0; i < 3; i++)
+			if (opts.NbSteps[i] % 2 != 0)
+				opts.NbSteps[i]++;
 }
 
 void readxyzMinMax_fromCIF(
@@ -2108,9 +2300,13 @@ double get_lambda_1(double *a)
 
 	const double c00 = b00 / p, c01 = a01 / p, c02 = a02 / p;
 	const double c11 = b11 / p, c12 = a12 / p, c22 = b22 / p;
-	const double r = 0.5 * (c00 * (c11 * c22 - c12 * c12)
+	double r = 0.5 * (c00 * (c11 * c22 - c12 * c12)
 						  - c01 * (c01 * c22 - c12 * c02)
 						  + c02 * (c01 * c12 - c11 * c02));
+	//r = +-1 is a double eigenvalue, where acos turns an ulp of rounding in r into sqrt(eps) in lambda2
+	//(MSVC ARM64 fuses the products above and lands 1 ulp off for {4,1,1}); snap rounding-level misses.
+	if (std::abs(r) > 1.0 - 16 * std::numeric_limits<double>::epsilon())
+		r = std::copysign(1.0, r);
 
 	const double phi = std::acos(std::clamp(r, -1.0, 1.0)) / 3.0;
 	const double eig_max = q + 2.0 * p * std::cos(phi);
@@ -2332,7 +2528,7 @@ static std::vector<std::shared_ptr<BasisSet>> get_aux_basis(const int argc, cons
 			next_basis_set++;
 			continue;
 		}
-		err_chkf(BasisSetLibrary::check_basis_set_exists(arguments[next_basis_set]),
+		err_checkf(BasisSetLibrary::check_basis_set_exists(arguments[next_basis_set]),
 			"Basis set " + arguments[next_basis_set] + " not found in the library. Exiting.", std::cout);
 		aux_basis.push_back(BasisSetLibrary::get_basis_set(arguments[next_basis_set]));
 		next_basis_set++;
@@ -2342,6 +2538,38 @@ static std::vector<std::shared_ptr<BasisSet>> get_aux_basis(const int argc, cons
 		aux_basis.push_back(std::make_shared<BasisSet>());
 	}
 	return aux_basis;
+}
+
+//Options the NBO handlers read from their own tokens, not through a digester. One list for both readers:
+//the handlers refuse a -nbo_*/-nrt_* spelling not in it, digest_options does not report these as typos.
+const std::set<std::string> &nbo_family_suboptions()
+{
+	static const std::set<std::string> known = {
+		"-nbo", "-nbo_parse", "-nbo_native", "-nbo_keywords", "-nbo_exe", "-nbo_json",
+		"-nbo_dir", "-nbo_47", "-nbo_e2min", "-nbo_threads", "-nbo_keep47", "-nrt",
+		"-nrt_e2", "-nrt_arrows", "-nrt_bond_scale", "-nrt_max", "-nrt_atoms",
+		"-nrt_exhaustive", "-nrt_no_symmetry", "-nrt_no_components", "-nrt_no_ion", "-nrt_parent",
+		"-nrt_target", "-nrt_screen", "-nrt_rotate", "-nrt_stall", "-nrt_mirror", "-nrt_no_mirror"};
+	return known;
+}
+
+namespace {
+	//No digester sees these tokens, so an unknown one would otherwise be dropped silently.
+	void refuse_unknown_nbo_suboption(const std::vector<std::string> &arguments, int from,
+									  const std::string &after)
+	{
+		for (int j = from; j < (int)arguments.size(); j++)
+		{
+			const std::string &o = arguments[j];
+			if ((o.rfind("-nbo", 0) == 0 || o.rfind("-nrt", 0) == 0) &&
+				nbo_family_suboptions().count(o) == 0)
+				err_checkf(false, "Unknown option " + o + " after " + after +
+									  ": it names no NBO/NRT option this build has. Check the "
+									  "spelling, -h lists them; running on with it ignored would "
+									  "give you a default you did not ask for",
+						   std::cout);
+		}
+	}
 }
 
 //file, format and conversion options
@@ -2365,6 +2593,7 @@ bool options::digest_io_options(const std::string &temp, int &i)
 	}
 	else if (temp == "-convert_to_47") {
 		err_checkf(argc >= i + 2, "Not enough arguments for -convert_to_47\nPlease provide at least stdout name!", std::cout);
+		refuse_unknown_nbo_suboption(arguments, i + 2, "-convert_to_47");
 		std::filesystem::path _wfn = arguments[i + 1];
 		std::string keys;
 		for (int j = i + 2; j + 1 < argc; j++)
@@ -2377,6 +2606,7 @@ bool options::digest_io_options(const std::string &temp, int &i)
 	}
 	else if (temp == "-nbo") {
 		err_checkf(argc >= i + 2, "Not enough arguments for -nbo\nPlease provide a wavefunction!", std::cout);
+		refuse_unknown_nbo_suboption(arguments, i + 2, "-nbo");
 		NboRunOptions opt;
 		opt.wavefunction = arguments[i + 1];
 		opt.debug = debug;
@@ -2388,12 +2618,16 @@ bool options::digest_io_options(const std::string &temp, int &i)
 		}
 		finished = true;
 		citations::cite(citations::Method::NBOProgram, std::cout);
-		return run_nbo(opt, std::cout) == 0;
+		//finished is set, so only this check keeps a failed gennbo from exiting 0.
+		const int nbo_rc = run_nbo(opt, std::cout);
+		err_checkf(nbo_rc == 0, "-nbo: gennbo did not finish (exit code " + std::to_string(nbo_rc) +
+									"), see the messages above",
+				   std::cout);
+		return true;
 	}
 	else if (temp == "-nbo_parse") {
-		//Same parser as -nbo, on an output that already exists: the spread study re-runs gennbo
-		//itself on one archive with different keylists and only needs the reading back.
 		err_checkf(argc >= i + 2, "Not enough arguments for -nbo_parse\nPlease provide an NBO output file!", std::cout);
+		refuse_unknown_nbo_suboption(arguments, i + 2, "-nbo_parse");
 		std::filesystem::path out = arguments[i + 1];
 		err_checkf(std::filesystem::exists(out), "NBO output doesn't exist: " + out.string(), std::cout);
 		std::filesystem::path json = out.parent_path() / (out.stem().string() + ".nbo.json");
@@ -2406,9 +2640,9 @@ bool options::digest_io_options(const std::string &temp, int &i)
 		return true;
 	}
 	else if (temp == "-nbo_native") {
-		//The in-house analysis, writing the same JSON -nbo writes, so the two are comparable by
-		//tests/nbo_reference/compare_nbo.py without a second format.
+		//Same JSON as -nbo, so tests/nbo_reference/compare_nbo.py compares the two.
 		err_checkf(argc >= i + 2, "Not enough arguments for -nbo_native\nPlease provide a wavefunction!", std::cout);
+		refuse_unknown_nbo_suboption(arguments, i + 2, "-nbo_native");
 		std::filesystem::path _wfn = arguments[i + 1];
 		err_checkf(std::filesystem::exists(_wfn), "wavefunction doesn't exist: " + _wfn.string(), std::cout);
 		NboOptions opt;
@@ -2419,8 +2653,7 @@ bool options::digest_io_options(const std::string &temp, int &i)
 			else if (arguments[j] == "-nbo_47") opt.file47 = arguments[j + 1];
 			else if (arguments[j] == "-nbo_e2min") opt.e2_threshold_kcal = std::stod(arguments[j + 1]);
 			else if (arguments[j] == "-nbo_threads") opt.threads = std::stoi(arguments[j + 1]);
-			//This branch runs the analysis inline and returns, so a -cpus written after
-			//-nbo_native never reached the main digester and was silently dropped.
+			//This branch returns before the main digester reads a later -cpus.
 			else if (arguments[j] == "-cpus") {
 				threads = std::stoi(arguments[j + 1]);
 				MKL_Set_Num_Threads(threads);
@@ -2431,7 +2664,20 @@ bool options::digest_io_options(const std::string &temp, int &i)
 			}
 			else if (arguments[j] == "-nrt") opt.nrt = true;
 			else if (arguments[j] == "-nrt_e2") opt.nrt_e2_kcal = std::stod(arguments[j + 1]);
+			else if (arguments[j] == "-nrt_parent") {
+				opt.nrt_parent = arguments[j + 1];
+				opt.nrt = true;
+				err_checkf(std::filesystem::exists(opt.nrt_parent),
+						   "-nrt_parent: Lewis structure file doesn't exist: " + opt.nrt_parent.string(), std::cout);
+			}
 			else if (arguments[j] == "-nrt_arrows") opt.nrt_max_arrows = std::stoi(arguments[j + 1]);
+			else if (arguments[j] == "-nrt_target") {
+				opt.nrt_target = std::stod(arguments[j + 1]);
+				opt.nrt = true;
+			}
+			else if (arguments[j] == "-nrt_screen")
+				opt.nrt_screen = arguments[j + 1] == "off" ? -1.0 : std::stod(arguments[j + 1]);
+			else if (arguments[j] == "-nrt_stall") opt.nrt_stall = std::stoi(arguments[j + 1]);
 			else if (arguments[j] == "-nrt_bond_scale")
 				opt.nrt_bond_scale = std::stod(arguments[j + 1]);
 			else if (arguments[j] == "-nrt_max") {
@@ -2453,13 +2699,14 @@ bool options::digest_io_options(const std::string &temp, int &i)
 			else if (arguments[j] == "-nrt_no_symmetry") opt.nrt_symmetry = false;
 			else if (arguments[j] == "-nrt_no_components") opt.nrt_components = false;
 			else if (arguments[j] == "-nrt_no_ion") opt.nrt_ion = false;
+			else if (arguments[j] == "-nrt_rotate") opt.nrt_rotate = true;
+			else if (arguments[j] == "-nrt_mirror") opt.nrt_mirror = true;
+			else if (arguments[j] == "-nrt_no_mirror") opt.nrt_mirror = false;
 			else if (arguments[j] == "-nbo_keep47") opt.keep_file47 = true;
-		//-nbo_threads wins, then -cpus, then the OpenMP default; NRT read only the first of the three.
+		//-nbo_threads wins, then -cpus, then the OpenMP default.
 		if (opt.threads <= 0 && threads > 0) opt.threads = threads;
 		WFN wavy(e_origin::NOT_YET_DEFINED);
 		wavy.read_known_wavefunction_format(_wfn, std::cout, debug);
-		//Cited from here rather than from nbo.cpp/nrt.cpp, so the search and the resonance
-		//weights each name their paper without a second session's optimisation work colliding.
 		citations::cite(citations::Method::NAONPA, std::cout);
 		citations::cite(citations::Method::NBO, std::cout);
 		citations::cite(citations::Method::E2, std::cout);
@@ -2467,7 +2714,13 @@ bool options::digest_io_options(const std::string &temp, int &i)
 			citations::cite(citations::Method::NRT, std::cout);
 		NboResults r = native_nbo(wavy, opt, std::cout);
 		r.name = _wfn.stem().string();
-		print_nbo(r, std::cout);
+		{
+			using citations::Method;
+			const section_log::section nbo_file(_wfn, "nbo", std::string("Natural bond orbitals: NPA, NBO, second-order E(2)") + (opt.nrt ? " and NRT" : ""),
+				opt.nrt ? std::vector<Method>{ Method::NAONPA, Method::NBO, Method::E2, Method::NRT } : std::vector<Method>{ Method::NAONPA, Method::NBO, Method::E2 }, no_date);
+			const section_log::tee nbo_tee("nbo");
+			print_nbo(r, std::cout);
+		}
 		write_nbo_json(r, json);
 		std::cout << "wrote " << json.string() << std::endl;
 		finished = true;
@@ -2513,6 +2766,26 @@ bool options::digest_run_options(const std::string &temp, int &i)
 		basin_grid = std::max(1, stoi(arguments[i + 1]));
 	else if (temp == "-basin_cube")
 		basin_cube = true;
+	else if (temp == "-no_spin_eli")
+		spin_eli = false;
+	else if (temp == "-basin_analytic")
+		; //accepted and ignored, it is the default
+	else if (temp == "-basin_step")
+		basin_step_scale_set(stod(arguments[i + 1]));
+	else if (temp == "-basin_timing")
+		basin_timing_set_enabled(true);
+	else if (temp == "-basin_gpu")
+		basin_gpu_set_mode(1);
+	else if (temp == "-no_basin_gpu")
+		basin_gpu_set_mode(0);
+	else if (temp == "-no_beta_spheres")
+		beta_spheres_set_enabled(false);
+	else if (temp == "-no_adaptive_step")
+		basin_adaptive_step_set_enabled(false);
+	else if (temp == "-adaptive_step")
+		basin_adaptive_step_set_enabled(true);
+	else if (temp == "-beta_spheres")
+		beta_spheres_set_enabled(true);
 	else if (temp == "-Anion")
 	{
 		int n = 1;
@@ -2681,7 +2954,6 @@ bool options::digest_partition_options(const std::string &temp, int &i)
 	const int argc = (int)arguments.size();
 	if (temp == "-atom_sfac")
 	{
-		std::cout << NoSpherA2_message() << endl;
 		wfn = arguments[i + 1];
 		wfn2 = arguments[i + 2];
 		err_checkf(std::filesystem::exists(wfn), "WFN doesn't exist", std::cout);
@@ -2770,7 +3042,6 @@ bool options::digest_partition_options(const std::string &temp, int &i)
 	{
 		partition_type = PartitionType::EMBIS;
 	}
-	//Both spellings: the help text mentions the flag as -hdef in one place and -HDEF in the other.
 	else if (temp == "-HDEF" || temp == "-hdef")
 		properties.hdef = true;
 	else if (temp == "-hirsh")
@@ -2808,6 +3079,18 @@ bool options::digest_partition_options(const std::string &temp, int &i)
 			n++;
 		}
 		merge_tscs_without_checks("combine", filenames, old_tsc);
+		finished = true; return true;
+	}
+	else if (temp == "-salted_fold")
+	{
+		err_checkf(i + 2 < argc, "-salted_fold needs the model and the file to write", std::cout);
+		fold_salted_file(arguments[i + 1], arguments[i + 2]);
+		finished = true; return true;
+	}
+	else if (temp == "-salted_ecp")
+	{
+		err_checkf(i + 3 < argc, "-salted_ecp needs the model, the file to write and the ECP mode", std::cout);
+		write_salted_ecp(arguments[i + 1], arguments[i + 2], stoi(arguments[i + 3]));
 		finished = true; return true;
 	}
 	else if (temp == "-mtc")
@@ -2870,12 +3153,11 @@ bool options::digest_partition_options(const std::string &temp, int &i)
 	else if (temp == "-SALTED" || temp == "-salted")
 	{
 		SALTED = true;
-		// Several models may follow, like -ri_fit takes several basis sets. The
-		// first one keeps salted_model_dir so every single-model path is unchanged.
+		// Several models may follow; the first also sets salted_model_dir for the single-model paths.
 		int next = i + 1;
 		while (next < argc && arguments[next].find("-") != 0)
 			salted_model_dirs.push_back(arguments[next++]);
-		err_chkf(!salted_model_dirs.empty(), "No SALTED model given after -SALTED.", std::cout);
+		err_checkf(!salted_model_dirs.empty(), "No SALTED model given after -SALTED.", std::cout);
 		salted_model_dir = salted_model_dirs[0];
 	}
 	else if (temp == "-SALTED_COEFS" || temp == "-salted_coefs")
@@ -2883,15 +3165,29 @@ bool options::digest_partition_options(const std::string &temp, int &i)
 		salted_model_dir = arguments[i + 1];
 
 		//Check that wfn is not empty
-		err_chkf(!wfn.empty(), "No wavefunction specified! Use -wfn option BEVORE -SALTED_COEFS to specify a wavefunction.", std::cout);
+		err_checkf(!wfn.empty(), "No wavefunction specified! Use -wfn option BEFORE -SALTED_COEFS to specify a wavefunction.", std::cout);
 
-		WFN wavy(wfn);
 #ifdef NOSPHERA2_USE_GPU
 		//This runs inside the parser, before run_app_impl sets the GPU globals from opt, so the
 		//descriptor path was whatever the previous run in the process left on. Needs -no_gpu_salted before -SALTED_COEFS.
 		equicomb_set_gpu(use_gpu && gpu_salted);
+		//Nor does it get run_app's warm-up: started here, context creation overlaps reading the
+		//wavefunction and the model, and predict() joins it
+		if (use_gpu && gpu_salted)
+			sf_gpu_warmup_start();
 #endif
+		// The stages around the prediction, which reports its own
+		auto mark = std::chrono::steady_clock::now();
+		auto lap = [&mark](const char* what) {
+			const auto now = std::chrono::steady_clock::now();
+			if (ProgressBar::report_counts)
+				std::cout << "[stages] " << what << " " << std::chrono::duration<double>(now - mark).count() << " s" << std::endl;
+			mark = now;
+		};
+		WFN wavy(wfn);
+		lap("read structure");
 		SALTEDPredictor SP(wavy, *this);
+		lap("predictor setup");
 		filesystem::path salted_model_path = SP.get_salted_filename();
 		log_file << "Using " << salted_model_path << " for the prediction" << endl;
 		if (!SP.basis_set_loaded()) {
@@ -2899,16 +3195,29 @@ bool options::digest_partition_options(const std::string &temp, int &i)
 			std::shared_ptr<BasisSet> _aux_basis = BasisSetLibrary::get_basis_set(df_basis_name);
 			load_basis_into_WFN(SP.wavy, _aux_basis);
 		}
+		lap("basis");
 		vec coefs = SP.gen_SALTED_densities();
+		lap("prediction");
+
+		const aux_density_table t(SP.wavy.get_atoms());
+
+		DensityFitting::analyze_density_fit_quality(
+			coefs,
+			SP.wavy,
+			t,
+			vec());
+		lap("fit quality");
+
 		npy::npy_data<double> np_coeffs;
 		np_coeffs.data = coefs;
 		np_coeffs.fortran_order = false;
 		np_coeffs.shape = { static_cast<unsigned long>(coefs.size()) };
 		npy::write_npy("SALTED_COEFS.npy", np_coeffs);
+		lap("write coefficients");
 	}
 	else if (temp == "-SALTED_Training") {
-		err_chkf(!wfn.empty(), "No wavefunction specified! Use -wfn option BEVORE -test_RI to specify a wavefunction.", std::cout);
-		err_checkf(!aux_basis.empty(), "No auxiliary basis set specified! Use -RI_FIT option BEVORE -test_RI to specify an auxiliary basis set.", std::cout);
+		err_checkf(!wfn.empty(), "No wavefunction specified! Use -wfn option BEFORE -test_RI to specify a wavefunction.", std::cout);
+		err_checkf(!aux_basis.empty(), "No auxiliary basis set specified! Use -RI_FIT option BEFORE -test_RI to specify an auxiliary basis set.", std::cout);
 
 		WFN wavy(wfn);
 		WFN wavy_aux = generate_aux_wfn(wavy, aux_basis);
@@ -3001,7 +3310,6 @@ bool options::digest_property_options(const std::string &temp, int &i)
 	}
 	else if (temp == "-atom_dens")
 	{
-		std::cout << NoSpherA2_message() << endl;
 		wfn = arguments[i + 1];
 		err_checkf(std::filesystem::exists(wfn), "WFN doesn't exist", std::cout);
 		ivec val_MOs;
@@ -3080,28 +3388,55 @@ bool options::digest_property_options(const std::string &temp, int &i)
 	}
 	else if (temp == "-eli")
 		properties.eli = true;
+	//The basins use the analytic field; resolution and radius only shape the cube built for -basin_cube
+	//and a fitted density
 	else if (temp == "-eli_analysis") {
-		err_checkf(argc >= i + 4, "Not enough arguments for -eli_analysis\nPlease provide at least wfn, resolution and radius!", std::cout);
+		err_checkf(argc >= i + 2, "Not enough arguments for -eli_analysis\nPlease provide a wfn!", std::cout);
 		wfn = arguments[i + 1];
-		properties.resolution = stod(arguments[i + 2]);
-		properties.radius = stod(arguments[i + 3]);
+		err_checkf(std::filesystem::exists(wfn), "-eli_analysis: wavefunction does not exist: " + wfn.string(), std::cout);
+		properties.resolution = 0.05;
+		properties.radius = 3.0;
+		i += 1;
+		if (argc >= i + 3 && arguments[i + 1][0] != '-' && arguments[i + 2][0] != '-') {
+			properties.resolution = stod(arguments[i + 1]);
+			properties.radius = stod(arguments[i + 2]);
+			i += 2;
+		}
 		eli_analysis_run = true;
-		i += 3;
 	}
-	//The rest of Kohout's ELI family (ELI-D alpha/beta/triplet, ELI-q) as point values; runs here
-	//rather than setting a flag, it has no cube or basin output to schedule
+	else if (temp == "-fba") {
+		err_checkf(argc >= i + 2, "Not enough arguments for -fba\nPlease provide a wfn!", std::cout);
+		wfn = arguments[i + 1];
+		err_checkf(std::filesystem::exists(wfn), "-fba: wavefunction does not exist: " + wfn.string(), std::cout);
+		properties.resolution = 0.05;
+		properties.radius = 3.0;
+		i += 1;
+		fba = true;
+	}
+	//Runs inline rather than setting a flag: it has no cube or basin output to schedule
 	else if (temp == "-eli_family") {
 		err_checkf(argc >= i + 2, "Not enough arguments for -eli_family\nPlease provide at least a wfn!", std::cout);
+		err_checkf(std::filesystem::exists(arguments[i + 1]), "-eli_family: wavefunction does not exist: " + arguments[i + 1], std::cout);
 		const bool has_points = argc >= i + 3 && arguments[i + 2].size() > 0 && arguments[i + 2][0] != '-';
 		eli_family::report(arguments[i + 1], has_points ? std::filesystem::path(arguments[i + 2]) : std::filesystem::path());
 		finished = true; return true;
 	}
-	//Every critical point of rho - nuclear, bond, ring and cage - from the analytic Hessian, with
-	//Poincare-Hopf as the check that none is missing. No cube: the seeding comes from the topology
 	else if (temp == "-topology") {
 		err_checkf(argc >= i + 2, "Not enough arguments for -topology\nPlease provide a wfn!", std::cout);
-		topology::report(arguments[i + 1], std::cout);
-		finished = true; return true;
+		err_checkf(std::filesystem::exists(arguments[i + 1]), "-topology: wavefunction does not exist: " + arguments[i + 1], std::cout);
+		{
+			const bool complete = topology::report(arguments[i + 1], std::cout);
+			finished = true;
+			//An INCOMPLETE set must exit non-zero. Some incomplete sets balance the Poincare-Hopf sum and
+			//fail only the bond-graph rank, so the message names both.
+			err_checkf(complete, "-topology: the set of critical points printed above is INCOMPLETE "
+								 "for " + arguments[i + 1] + " - either the Poincare-Hopf sum does "
+								 "not close, or it closes while contradicting the bond graph. See the "
+								 "diagnosis printed with the verdict for which class is short or "
+								 "spurious",
+					   std::cout);
+		}
+		return true;
 	}
 	else if (temp == "-qtaim_eli") {
 		// Cube-files mode:  -qtaim_eli <rho.cube> <eli.cube> <atoms_csv> [<bg_value>]
@@ -3115,6 +3450,7 @@ bool options::digest_property_options(const std::string &temp, int &i)
 			std::cout);
 
 		std::filesystem::path arg1 = arguments[i + 1];
+		err_checkf(std::filesystem::exists(arg1), "-qtaim_eli: input does not exist: " + arg1.string(), std::cout);
 		const bool cube_mode = (arg1.extension() == ".cube");
 
 		std::filesystem::path rho_path, eli_path_arg;
@@ -3217,8 +3553,6 @@ bool options::digest_property_options(const std::string &temp, int &i)
 		gpu_salted = true;
 	else if (temp == "-no_gpu_salted")
 		gpu_salted = false;
-	else if (temp == "-salted_charge_constraint")
-		salted_charge_constraint = true;
 	else if (temp == "-gpu_grid")
 		gpu_grid = true;
 	else if (temp == "-no_gpu_grid")
@@ -3255,6 +3589,41 @@ bool options::digest_property_options(const std::string &temp, int &i)
 			i++;
 		}
 	}
+	else if (temp == "-eqc")
+	{
+		// Only records the request; eqc::run is called from run_app_impl.
+		eqc = true;
+		if (i + 1 < argc && arguments[i + 1][0] != '-')
+			wfn = arguments[++i];
+	}
+	else if (temp == "-eqc_frag")
+	{
+		// Triples <atoms> <charge> <multiplicity> for as long as the next token starts with a
+		// digit; a charge may be negative, which is why only the atoms token is tested
+		while (i + 3 < argc && std::isdigit(static_cast<unsigned char>(arguments[i + 1][0])))
+		{
+			eqc_fragment f;
+			f.atoms = parse_rgbi_group_indices(arguments[i + 1]);
+			f.charge = std::stoi(arguments[i + 2]);
+			f.mult = std::stoi(arguments[i + 3]);
+			err_checkf(f.mult >= 1, "-eqc_frag: multiplicity must be 1 or more", std::cout);
+			eqc_frags.push_back(f);
+			i += 3;
+		}
+		err_checkf(!eqc_frags.empty(), "-eqc_frag wants <atoms> <charge> <multiplicity> triples", std::cout);
+	}
+	else if (temp == "-eqc_wfn")
+	{
+		eqc = true;
+		while (i + 1 < argc && arguments[i + 1][0] != '-')
+			eqc_wfns.emplace_back(arguments[++i]);
+	}
+	else if (temp == "-eqc_method")
+		eqc_method = arguments[++i];
+	else if (temp == "-eqc_basis")
+		eqc_basis = arguments[++i];
+	else if (temp == "-eqc_cold")
+		eqc_cold = true;
 	else if (temp == "-ewal_sum")
 	{
 		// bool read, WFN& wave, std::ostream& file,
@@ -3451,8 +3820,8 @@ bool options::digest_property_options(const std::string &temp, int &i)
 	}
 	else if (temp == "-calc_dens_1D")
 	{
-		err_chkf(!wfn.empty(), "No wavefunction specified! Use -wfn option BEVORE -calc_dens_1D to specify a wavefunction.", std::cout);
-		err_checkf(!aux_basis.empty(), "No auxiliary basis set specified! Use -RI_FIT option BEVORE -calc_dens_1D to specify an auxiliary basis set.", std::cout);
+		err_checkf(!wfn.empty(), "No wavefunction specified! Use -wfn option BEFORE -calc_dens_1D to specify a wavefunction.", std::cout);
+		err_checkf(!aux_basis.empty(), "No auxiliary basis set specified! Use -RI_FIT option BEFORE -calc_dens_1D to specify an auxiliary basis set.", std::cout);
 		int atom_idx_1 = 0;
 		int atom_idx_2 = 1;
 		int gridpoints = 1000;
@@ -3545,6 +3914,12 @@ bool options::digest_ri_options(const std::string &temp, int &i)
 	}
 	else if (temp == "-npa")
 		npa = true;
+	else if (temp == "-ibo")
+		ibo = true;
+	else if (temp == "-ibo_cube") {
+		err_checkf(i + 1 < argc, "-ibo_cube needs the IBO list", std::cout);
+		properties.ibo_cube = arguments[++i];
+	}
 	else if (temp == "-npa_summary") {
 		npa = true;
 		npa_orbitals = false;
@@ -3556,6 +3931,7 @@ bool options::digest_ri_options(const std::string &temp, int &i)
 		rgbi_no_sym = true;
 	}
 	else if (temp == "-rgbi_EVs") {
+		rgbi = true;
 		rgbi_EVs = true;
 	}
 	else if (temp == "-rgbi_theta") {
@@ -3600,29 +3976,44 @@ bool options::digest_ri_options(const std::string &temp, int &i)
 		aux_basis = get_aux_basis(argc, arguments, i);
 	}
 	else if (temp == "-multipole_moments") {
-		err_checkf(i + 2 < argc, "-multipole_moments needs a partitioning scheme and the highest order, e.g. -multipole_moments Hirshfeld 2", std::cout);
+		err_checkf(i + 1 < argc, "-multipole_moments needs a scheme, e.g. -multipole_moments Hirshfeld 2", std::cout);
 		std::string scheme = arguments[++i];
 		std::transform(scheme.begin(), scheme.end(), scheme.begin(),
 			[](unsigned char c) { return static_cast<char>(std::tolower(c)); });
 		if (scheme == "hirshfeld" || scheme == "hirsh")
-			multipole_scheme = PartitionType::Hirshfeld;
+			multipole_scheme = MultipoleScheme::HIRSHFELD;
 		else if (scheme == "tfvc")
-			multipole_scheme = PartitionType::TFVC;
+			multipole_scheme = MultipoleScheme::TFVC;
 		else if (scheme == "mbis")
-			multipole_scheme = PartitionType::MBIS;
+			multipole_scheme = MultipoleScheme::MBIS;
 		else if (scheme == "embis")
-			multipole_scheme = PartitionType::EMBIS;
+			multipole_scheme = MultipoleScheme::EMBIS;
+		else if (scheme == "nuclear")
+			multipole_scheme = MultipoleScheme::NUCLEAR;
+		else if (scheme == "mulliken")
+			multipole_scheme = MultipoleScheme::MULLIKEN;
+		else if (scheme == "sanderson")
+			multipole_scheme = MultipoleScheme::SANDERSON;
 		else
-			err("Unknown partitioning for -multipole_moments: " + arguments[i] + " (Hirshfeld, TFVC, MBIS or EMBIS)", std::cout);
-		multipole_lmax = std::stoi(arguments[++i]);
-		err_checkf(multipole_lmax >= 0 && multipole_lmax <= 8, "-multipole_moments: the order must be between 0 and 8", std::cout);
+			err("Unknown scheme for -multipole_moments: " + arguments[i] + " (Hirshfeld, TFVC, MBIS, EMBIS, Nuclear, Mulliken or Sanderson)", std::cout);
+		long order = 0;
+		if (i + 1 < argc) {
+			char* end = nullptr;
+			const long parsed = std::strtol(arguments[i + 1].c_str(), &end, 10);
+			if (end != arguments[i + 1].c_str() && *end == '\0') {
+				order = parsed;
+				++i;
+			}
+		}
+		if (multipole_scheme == MultipoleScheme::NUCLEAR || multipole_scheme == MultipoleScheme::MULLIKEN || multipole_scheme == MultipoleScheme::SANDERSON)
+			multipole_lmax = 0;
+		else {
+			err_checkf(order >= 0 && order <= 8, "-multipole_moments: the order must be between 0 and 8", std::cout);
+			multipole_lmax = static_cast<int>(order);
+		}
 		RI_FIT = true;
 		partition_type = PartitionType::RI;
 	}
-	else if (temp == "-multipole_partition")
-		multipole_partition = true;
-	else if (temp == "-multipole_centre" || temp == "-multipole_center")
-		multipole_partition = false;
 	else if (temp == "-multipole_strength") {
 		multipole_strength = std::stod(arguments[++i]);
 		err_checkf(multipole_strength > 0.0, "-multipole_strength must be positive", std::cout);
@@ -3670,8 +4061,8 @@ bool options::digest_ri_options(const std::string &temp, int &i)
 	}
 	else if (temp == "-RI_CUBE" || temp == "-ri_cube")
 	{
-		err_chkf(!wfn.empty(), "No wavefunction specified! Use -wfn option BEVORE -SALTED_COEFS to specify a wavefunction.", std::cout);
-		err_checkf(!aux_basis.empty(), "No auxiliary basis set specified! Use -RI_FIT option BEVORE -test_RI to specify an auxiliary basis set.", std::cout);
+		err_checkf(!wfn.empty(), "No wavefunction specified! Use -wfn option BEFORE -SALTED_COEFS to specify a wavefunction.", std::cout);
+		err_checkf(!aux_basis.empty(), "No auxiliary basis set specified! Use -RI_FIT option BEFORE -test_RI to specify an auxiliary basis set.", std::cout);
 		std::string coef_file = arguments[i + 1];
 		std::vector<unsigned long> shape{};
 		bool fortran_order;
@@ -3709,8 +4100,8 @@ bool options::digest_ri_options(const std::string &temp, int &i)
 
 	else if (temp == "-test_RI")
 	{
-		err_chkf(!wfn.empty(), "No wavefunction specified! Use -wfn option BEVORE -test_RI to specify a wavefunction.", std::cout);
-		err_checkf(!aux_basis.empty(), "No auxiliary basis set specified! Use -RI_FIT option BEVORE -test_RI to specify an auxiliary basis set.", std::cout);
+		err_checkf(!wfn.empty(), "No wavefunction specified! Use -wfn option BEFORE -test_RI to specify a wavefunction.", std::cout);
+		err_checkf(!aux_basis.empty(), "No auxiliary basis set specified! Use -RI_FIT option BEFORE -test_RI to specify an auxiliary basis set.", std::cout);
 
 
 		WFN wavy(wfn);
@@ -3720,8 +4111,8 @@ bool options::digest_ri_options(const std::string &temp, int &i)
 
 	}
 	else if (temp == "-RI_WFN_DIFF") {
-		err_chkf(!wfn.empty(), "No wavefunction specified! Use -wfn option BEVORE -RI_WFN_DIFF to specify a wavefunction.", std::cout);
-		err_checkf(!aux_basis.empty(), "No auxiliary basis set specified! Use -RI_FIT option BEVORE -RI_WFN_DIFF to specify an auxiliary basis set.", std::cout);
+		err_checkf(!wfn.empty(), "No wavefunction specified! Use -wfn option BEFORE -RI_WFN_DIFF to specify a wavefunction.", std::cout);
+		err_checkf(!aux_basis.empty(), "No auxiliary basis set specified! Use -RI_FIT option BEFORE -RI_WFN_DIFF to specify an auxiliary basis set.", std::cout);
 		WFN wavy(wfn);
 		WFN wavy_aux = generate_aux_wfn(wavy, aux_basis);
 		DensityFitting::QM_RI_difference_cube(wavy, wavy_aux);
@@ -3762,6 +4153,11 @@ bool options::digest_xcw_options(const std::string &temp, int &i)
 bool options::digest_dev_options(const std::string &temp, int &i)
 {
 	using namespace std;
+	if (temp == "-tune") //applied before the main loop; this only checks there is a value
+	{
+		(void)arguments[++i];
+		return true;
+	}
 	if (temp == "-lahvatest")
 	{
 		//_test_lahva();
@@ -3781,8 +4177,8 @@ bool options::digest_dev_options(const std::string &temp, int &i)
 	else if (temp == "-lukas_test")
 	{
 		//Check that wfn is not empty
-		err_chkf(!wfn.empty(), "No wavefunction specified! Use -wfn option BEFORE -SALTED_COEFS to specify a wavefunction.", std::cout);
-		err_chkf(!salted_model_dir.empty(), "No SALTED model directory specified! Use -SALTED option BEFORE -lukas_test to specify a model directory.", std::cout);
+		err_checkf(!wfn.empty(), "No wavefunction specified! Use -wfn option BEFORE -SALTED_COEFS to specify a wavefunction.", std::cout);
+		err_checkf(!salted_model_dir.empty(), "No SALTED model directory specified! Use -SALTED option BEFORE -lukas_test to specify a model directory.", std::cout);
 
 		WFN wavy(wfn);
 		SALTEDPredictor SP(wavy, *this);
@@ -3808,6 +4204,82 @@ bool options::digest_dev_options(const std::string &temp, int &i)
 	return true;
 };
 
+//The analysis an option's prefix names: an unclaimed flag with one of these prefixes is a misspelt
+//option of that analysis and is refused rather than silently ignored.
+const char *owning_analysis(const std::string &flag)
+{
+	static const std::pair<const char *, const char *> families[] = {
+		{"-rgbi", "RGBI"}, {"-npa", "NPA"}, {"-ibo", "IBO"}, {"-nbo", "NBO"}, {"-nrt", "NRT"},
+		{"-nao", "NAO"}, {"-eli", "ELI-D"}, {"-elf", "ELF"}, {"-qtaim", "QTAIM"},
+		{"-basin", "QTAIM basin"}, {"-topology", "topology"}, {"-eqc", "EQC"}};
+	for (const auto &f : families)
+		if (flag.rfind(f.first, 0) == 0)
+			return f.second;
+	return nullptr;
+}
+
+namespace {
+	//Mirrors run_app_impl's chain of analyses that return before the RGBI/NPA block is reached;
+	//an analysis added to that chain needs a line here.
+	const char *quit_early_analysis(const options &o)
+	{
+		if (o.qct) return "-qct";
+		if (o.fukui_analysis_run) return "-fukui_analysis";
+		if (o.eqc) return "-eqc";
+		if (o.fba) return "-fba";
+		if (o.eli_analysis_run) return "-eli_analysis";
+		if (o.fract) return "-fractal";
+		if (o.promol_nci) return "-promol_nci";
+		if (!o.interaction_energies_job.empty()) return "-interaction_energy";
+		if (!o.hirshfeld_surface.empty()) return "-hirshfeld_surface";
+		if (!o.wfn2.empty()) return "-wfn2";
+		if (!o.pol_wfns.empty()) return "-polarizabilities";
+		if (o.combined_tsc_calc || o.cif_based_combined_tsc_calc) return "-merge";
+		if (o.iam_switch) return "-IAM";
+		if (!o.cube_density.empty()) return "-cube_density";
+		//the conditions that skip the wavefunction block (d_sfac_scan has no option that sets it)
+		if (o.properties.calc()) return "a property cube (-rho, -lap, -esp, ...)";
+		if (o.do_XCW) return "-do_XCW";
+		if (o.gbw2wfn) return "-gbw2wfn";
+		return nullptr;
+	}
+}
+
+void options::refuse_unread_bonding_options()
+{
+	const char *early = quit_early_analysis(*this);
+	//-fba runs RGBI (reading the -rgbi_* modifiers, each of which sets rgbi) and its own NPA, which
+	//reads neither -npa nor -npa_summary; -do_XCW runs RGBI on each refined wavefunction unless a
+	//property cube takes the run first
+	const bool rgbi_read_early = fba || (do_XCW && !properties.calc());
+	const char *bonding = (rgbi && !rgbi_read_early) ? "-rgbi" : (npa ? "-npa" : (ibo ? "-ibo" : nullptr));
+	if (early != nullptr && bonding != nullptr)
+		err_checkf(false, std::string("Cannot do both ") + early + " and " + bonding + " in one run: " +
+							  early + " ends the run before " + bonding + " would be reached, so " +
+							  bonding + " would be dropped without a word. Run them one at a time",
+				   log_file);
+	//The NBO handlers finish the command line where they run, so an -nbo_*/-nrt_* option reaching
+	//here is read by no analysis.
+	const char *running = early != nullptr ? early : bonding;
+	if (running == nullptr)
+		return;
+	for (const std::string &raw : arguments)
+	{
+		std::string o = raw;
+		if (o.size() > 1 && o[0] == '-' && isalpha(static_cast<unsigned char>(o[1])))
+			std::replace(o.begin() + 1, o.end(), '-', '_');
+		if (nbo_family_suboptions().count(o) == 0)
+			continue;
+		err_checkf(false, "Option " + o + " is an NBO/NRT option and this run is " + running +
+							  (fba ? ", which runs NBO and NRT at their defaults and does not read it: the "
+									 "option would be ignored and the run would still exit 0. Use "
+									 "-nbo_native <wavefunction> -nrt for NRT options, or drop " + o
+								   : ", which does not read it: no NBO analysis was asked for, so the "
+									 "option would be ignored and the run would still exit 0. Add "
+									 "-nbo_native <wavefunction>, or drop " + o),
+				   log_file);
+	}
+}
 
 void options::digest_options()
 {
@@ -3817,6 +4289,23 @@ void options::digest_options()
 	{
 		std::cout << " Recap of input:\nsize: " << arguments.size() << endl;
 	}
+	//Flags with process-wide state start from their defaults, not from the previous run in this process
+	tuning_end_run();
+	basin_flags_reset();
+	cube::binary_output = false;
+	throughput::set_enabled(false);
+	throughput::reset();
+	//-tune first: some options run their job inside the loop below
+	for (size_t i = 0; i + 1 < arguments.size(); i++)
+		if (arguments[i] == "-tune")
+		{
+			const std::string &knob = arguments[++i];
+			const size_t eq = knob.find('=');
+			const std::string name = knob.substr(0, eq);
+			const char *old = tuning(name.c_str());
+			run_tuned.emplace_back(name, old ? std::optional<std::string>(old) : std::nullopt);
+			set_tuning(name, eq == std::string::npos ? "1" : knob.c_str() + eq + 1);
+		}
 	// This loop figures out command line options
 	for (int i = 0; i < arguments.size(); i++)
 	{
@@ -3827,30 +4316,19 @@ void options::digest_options()
 			continue;
 		if (finished)
 			return;
-		//Either separator names the same flag, so -rgbi-groups and -rgbi_groups are one option.
-		//The digesters compare against the underscore spelling; a negative number keeps its
-		//dashes because the character after the first one is not a letter
+		//-rgbi-groups is -rgbi_groups; a negative number keeps its dashes (no letter after the first)
 		if (temp.size() > 1 && isalpha(static_cast<unsigned char>(temp[1])))
 			replace(temp.begin() + 1, temp.end(), '-', '_');
 		//The digesters index arguments[i + n] and call stoi/stod directly; a flag that is
 		//last on the line or followed by a non-number used to die as a bare "invalid stod
 		//argument" with no hint which option it was
+		bool claimed = false;
 		try
 		{
-			if (digest_io_options(temp, i))
-				continue;
-			if (digest_run_options(temp, i))
-				continue;
-			if (digest_partition_options(temp, i))
-				continue;
-			if (digest_property_options(temp, i))
-				continue;
-			if (digest_ri_options(temp, i))
-				continue;
-			if (digest_xcw_options(temp, i))
-				continue;
-			if (digest_dev_options(temp, i))
-				continue;
+			claimed = digest_io_options(temp, i) || digest_run_options(temp, i) ||
+					  digest_partition_options(temp, i) || digest_property_options(temp, i) ||
+					  digest_ri_options(temp, i) || digest_xcw_options(temp, i) ||
+					  digest_dev_options(temp, i);
 		}
 		catch (const missing_argument &)
 		{
@@ -3860,6 +4338,30 @@ void options::digest_options()
 		{
 			err_checkf(false, "Option " + temp + ": " + e.what() + " - check the value(s) that follow it", log_file);
 		}
+		if (claimed)
+			continue;
+		//An inline handler that ran and failed returns false with finished set; not an unknown option.
+		if (finished)
+			return;
+		//No digester wanted it. A value starting with a dash (a negative number) is not an option.
+		if (!(temp.size() > 1 && isalpha(static_cast<unsigned char>(temp[1]))))
+			continue;
+		//look_for_debug() handles these before any digester sees them
+		if (temp == "-v" || temp == "-v2" || temp == "-debug" || temp == "-h" || temp == "--h" ||
+			temp == "-help" || temp == "--help")
+			continue;
+		//consumed by the -nbo/-nbo_native handler itself, in whichever order they were written
+		if (nbo_family_suboptions().count(temp))
+			continue;
+		if (const char *family = owning_analysis(temp))
+			err_checkf(false, "Unknown option " + temp + ": it names no " + family +
+								  " option this build has. Check the spelling, -h lists them; "
+								  "running on with it ignored would give you a default you did "
+								  "not ask for",
+					   log_file);
+		log_file << "WARNING: ignoring unknown option " << temp << endl;
+		if (log_file.rdbuf() != std::cout.rdbuf())
+			std::cout << "WARNING: ignoring unknown option " << temp << endl;
 	}
 
 	// SALTED predicts a density from atom positions.  Historically its
@@ -3875,6 +4377,8 @@ void options::digest_options()
 	//-multipole_moments without -ri_fit: auto_aux, whichever order the two came in
 	if (multipole_lmax >= 0 && aux_basis.empty())
 		aux_basis.push_back(std::make_shared<BasisSet>());
+	//last, so it sees every flag whichever order they were written in
+	refuse_unread_bonding_options();
 };
 
 void options::loadXCWsettings() {
@@ -3902,6 +4406,7 @@ void options::loadXCWsettings() {
 	bool i_tensor_single = false, i_tensor_double = false;
 	std::filesystem::path i_tensor_file_path;
 	std::filesystem::path i_tensor_save_path;
+	std::filesystem::path eri_read_path, eri_save_path, basis_overrides;
 	// 0 = hold the whole tensor, which is what every run did before this existed.
 	size_t i_tensor_max_mb = 0;
 	occ::qm::SpinorbitalKind hf_type = occ::qm::SpinorbitalKind::Restricted;
@@ -4024,6 +4529,14 @@ void options::loadXCWsettings() {
 		handlers["basis_set"] = [&](std::istream& is) {
 			if (!(is >> basis_set_name))
 				throw std::runtime_error("Expected basis set name");
+			};
+		handlers["basis_overrides"] = [&](std::istream& is) {
+			std::string path;
+			if (!(is >> std::quoted(path, '"', '\0')) || path.empty())
+				throw std::runtime_error("Expected a JSON file after 'basis_overrides'");
+			basis_overrides = path;
+			if (basis_overrides.is_relative())
+				basis_overrides = std::filesystem::absolute(xcw_settings_path).parent_path() / basis_overrides;
 			};
 		handlers["df_basis"] = [&](std::istream& is) {
 			if (!(is >> df_basis_name))
@@ -4155,6 +4668,20 @@ void options::loadXCWsettings() {
 				throw std::runtime_error("Expected a path after 'save'");
 			i_tensor_save_path = path;
 			};
+		//The stored two-electron integrals depend on geometry and basis only; read_eri falls back to building
+		//them when the file holds another basis or geometry
+		handlers["save_eri"] = [&](std::istream& is) {
+			std::string path;
+			if (!(is >> path))
+				throw std::runtime_error("Expected a path after 'save_eri'");
+			eri_save_path = path;
+			};
+		handlers["read_eri"] = [&](std::istream& is) {
+			std::string path;
+			if (!(is >> path))
+				throw std::runtime_error("Expected a path after 'read_eri'");
+			eri_read_path = path;
+			};
 
 		handlers["i_float"] = [&](std::istream&) {
 			i_tensor_single = true;
@@ -4228,7 +4755,6 @@ void options::loadXCWsettings() {
 	}
 
 	if (speed_preset == "slow_conv") {
-		xcw_settings.slow_conv = true;
 		xcw_settings.alpha = 0.8;
 		xcw_settings.level_shift = 1;
 		xcw_settings.diis_stop_damping = 1e-5;
@@ -4249,6 +4775,7 @@ void options::loadXCWsettings() {
 		throw std::runtime_error("Basis set name not specified in settings file! Aborting run!");
 	}
 	xcw_settings.basis_set_name = basis_set_name;
+	xcw_settings.basis_overrides = basis_overrides;
 	if (quant_diff != 32768) xcw_settings.quant_diff = quant_diff;
 	if (diis_stop_damping != 32768) xcw_settings.diis_stop_damping = diis_stop_damping;
 	if (diis_stop_shift != 32768) xcw_settings.diis_stop_shift = diis_stop_shift;
@@ -4285,6 +4812,8 @@ void options::loadXCWsettings() {
 	xcw_settings.i_tensor_double = i_tensor_double;
 	xcw_settings.i_tensor_file_path = i_tensor_file_path;
 	xcw_settings.i_tensor_save_path = i_tensor_save_path;
+	xcw_settings.eri_read_path = eri_read_path;
+	xcw_settings.eri_save_path = eri_save_path;
 	xcw_settings.nbo_output = nbo_output;
 	xcw_settings.df_basis_name = df_basis_name;
 	xcw_settings.guess_basis_name = guess_basis_name;
@@ -4292,6 +4821,25 @@ void options::loadXCWsettings() {
 	xcw_settings.check_hessian = check_hessian;
 	xcw_settings.xcw_gaussian_halt = xcw_gaussian_halt;
 	xcw_settings.xcw_strong_cutoff = xcw_strong_cutoff;
+}
+
+std::string options::unrunnable_analysis() const
+{
+	if (!wfn.empty() || !occ.empty())
+		return "";
+	//These run only in run_app_impl's wavefunction branch, which is skipped silently without a wavefunction.
+	const std::pair<bool, const char *> needs_a_wavefunction[] = {
+		{rgbi, "-rgbi (Roby-Gould bond indices)"},
+		{npa, "-npa (natural population analysis)"},
+		{ibo, "-ibo (intrinsic bond orbitals)"},
+		{!fchk.empty(), "-fchk (conversion to a formatted checkpoint)"},
+		{!cif.empty() || !hkl.empty(), "-cif/-hkl (scattering factor table)"}};
+	for (const auto &a : needs_a_wavefunction)
+		if (a.first)
+			return std::string(a.second) + " was asked for, but no wavefunction was given.\n" +
+				   "       Name one with -wfn <file.gbw|.wfx|.fchk|.molden|.wfn> or with -occ;\n" +
+				   "       this option does not take the wavefunction as a bare argument.";
+	return "";
 }
 
 namespace {
@@ -4308,6 +4856,8 @@ namespace {
 
 void options::look_for_debug(int &argc, char **argv)
 {
+	//-v sets it here, before digest_options; per process, so it starts off each run
+	ProgressBar::report_counts = false;
 	// This loop figures out command line options
 	for (int i = 0; i < argc; i++)
 	{
@@ -4389,9 +4939,8 @@ size_t available_memory_bytes()
 	status.dwLength = sizeof(status);
 	if (GlobalMemoryStatusEx(&status))
 		avail = static_cast<size_t>(status.ullAvailPhys);
-	//A job object limit is what a scheduler or a container puts on a Windows process, the
-	//counterpart of the cgroup ceiling below. Passing nullptr asks about this process's own
-	//job, and a process outside one simply reports no limit flags.
+	//A scheduler's or container's job object limit, the Windows counterpart of the cgroup ceiling;
+	//nullptr queries this process's job, a process outside one reports no limit flags.
 	JOBOBJECT_EXTENDED_LIMIT_INFORMATION limits{};
 	DWORD returned = 0;
 	if (QueryInformationJobObject(nullptr, JobObjectExtendedLimitInformation,
@@ -4407,9 +4956,7 @@ size_t available_memory_bytes()
 		}
 	}
 #elif defined(__APPLE__)
-	//Free alone understates it badly on a Mac, where the kernel keeps most of memory
-	//speculatively occupied: inactive and purgeable pages are handed back on demand and
-	//count as available, which is the same thing Activity Monitor calls memory pressure.
+	//macOS keeps most memory occupied: inactive and purgeable pages are returned on demand and count as available.
 	vm_size_t page_size = 0;
 	mach_port_t host = mach_host_self();
 	if (host_page_size(host, &page_size) == KERN_SUCCESS) {
@@ -4423,8 +4970,7 @@ size_t available_memory_bytes()
 		}
 	}
 	if (avail == 0) {
-		//Nothing else answered: the physical size, which is at least an upper bound the
-		//caller's fraction keeps it under.
+		//Fallback: physical size, an upper bound the caller's fraction keeps under.
 		uint64_t total = 0;
 		size_t len = sizeof(total);
 		if (sysctlbyname("hw.memsize", &total, &len, nullptr, 0) == 0)
@@ -4442,9 +4988,7 @@ size_t available_memory_bytes()
 		}
 		std::fclose(f);
 	}
-	//Under a batch system or a container the cgroup limit is the real ceiling and
-	///proc/meminfo reports the whole machine: a job given 180 GB of a 376 GB node would
-	//otherwise decide it can have 300 and be killed for it. v2 first, then v1.
+	//Under a batch system or container the cgroup limit is the ceiling, while meminfo reports the whole node. v2 first, then v1.
 	for (const char *path : { "/sys/fs/cgroup/memory.max",
 							  "/sys/fs/cgroup/memory/memory.limit_in_bytes" }) {
 		std::FILE *f = std::fopen(path, "r");
@@ -4970,7 +5514,6 @@ void error_check(const bool condition, const std::source_location loc, const std
 	if (!condition)
 	{
 		log_file << "Error in " << loc.function_name() << "\n\t\tat: " << loc.file_name() << " line: " << loc.line() << "\n\t\t\t" << error_message << std::endl;
-		log_file.flush();
 		std::cout.rdbuf(original_coutbuf()); // reset to standard output again
 		std::cout << "Error in " << loc.function_name() << " at: " << loc.file_name() << " line: " << loc.line() << " " << error_message << std::endl;
 		exit(-1);
@@ -4979,7 +5522,6 @@ void error_check(const bool condition, const std::source_location loc, const std
 void not_implemented(const std::source_location loc, const std::string &error_message, std::ostream &log_file)
 {
 	log_file << loc.function_name() << "\n\t\tat: " << loc.file_name() << " line: " << loc.line() << "\n\t\t\t" << error_message << " not yet implemented!" << std::endl;
-	log_file.flush();
 	std::cout.rdbuf(original_coutbuf()); // reset to standard output again
 	std::cout << "Error in " << loc.function_name() << " at: " << loc.file_name() << " : " << loc.line() << " " << error_message << " not yet implemented!" << std::endl;
 	exit(-1);
@@ -5182,6 +5724,10 @@ void ProgressBar::write_progress()
 	// Check if os is a file stream
 	if (dynamic_cast<std::filebuf *>(stream_.rdbuf()))
 	{
+		// Rewinding would overwrite what the loop printed since the last redraw; if the put position
+		// moved, keep that text and re-anchor the bar behind it.
+		if (stream_.tellp() != barend_)
+			linestart = stream_.tellp();
 		stream_.seekp(linestart); // Is a file stream
 	}
 	else
@@ -5202,6 +5748,7 @@ void ProgressBar::write_progress()
 	if (((progress_ < 100.0f) ? progress_ : 100.0f) == 100)
 	{
 		stream_ << "] 100% " << std::flush;
+		barend_ = stream_.tellp();
 #ifdef _WIN32
 		if (taskbarList_)
 		{
@@ -5213,6 +5760,7 @@ void ProgressBar::write_progress()
 	}
 
 	stream_ << std::flush;
+	barend_ = stream_.tellp();
 
 #ifdef _WIN32
 	// Update taskbar progress

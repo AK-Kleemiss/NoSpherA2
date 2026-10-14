@@ -1,4 +1,5 @@
 #include "pch.h"
+#include "tuning.h"
 #include "structure_factors.h"
 #if defined(NOSPHERA2_USE_GPU) || defined(NOSPHERA2_USE_METAL)
 #include "itensor_gpu.h"
@@ -24,6 +25,8 @@ structure_factors::structure_factors(options& opt_in) {
 	I_tens.tensor_single = opt_in.xcw_settings.i_tensor_single;
 	I_tens.tensor_double = opt_in.xcw_settings.i_tensor_double;
 	I_tens.basis_set_name = opt_in.xcw_settings.basis_set_name;
+	orbital_basis = opt_in.xcw_settings.basis_overrides.empty() ? BasisSetLibrary::get_basis_set(opt_in.xcw_settings.basis_set_name) :
+		BasisSetLibrary::get_basis_set_with_overrides(opt_in.xcw_settings.basis_set_name, opt_in.xcw_settings.basis_overrides);
 	extinction_settings.aniso = opt_in.xcw_settings.extinction_aniso;
 	extinction_settings.refine = opt_in.xcw_settings.extinction_refine;
 	extinction_settings.start = opt_in.xcw_settings.extinction_start;
@@ -77,10 +80,10 @@ structure_factors::structure_factors(options& opt_in) {
 			unit_cell.grow_ADPs(asym_atoms, ADPs);
 			// Fifth step of the symmetry resolution: Find fully applied operations and if possible, project the grown structure into its symmetry subgroup and update everything accordingly
 			applied_symmetry = unit_cell.apply_grown(scatter_data.hkl, scatter_data.hkl_enlarged, asym_atoms);
-			// Convenience function to precompute the symmetry factors
-			unit_cell.set_sym_fact_from_mult(asym_atoms);
 		}
-		if (std::getenv("NOSPHERA2_DEBUG_ASYMFACT")) { // Flawfinder: ignore
+		// Convenience function to precompute the symmetry factors, also for an ungrown atom on a special position
+		unit_cell.set_sym_fact_from_mult(asym_atoms);
+		if (tuning("NOSPHERA2_DEBUG_ASYMFACT")) {
 			std::cerr << "applied_symmetry (deleted):";
 			for (int s : applied_symmetry) std::cerr << " " << s;
 			std::cerr << std::endl << "surviving sym ops: " << unit_cell.get_trans()[0].size() << std::endl;
@@ -90,6 +93,14 @@ structure_factors::structure_factors(options& opt_in) {
 			std::cerr << "hkl_enlarged size: " << scatter_data.hkl_enlarged.size() << std::endl;
 		}
 	}
+	// occ only finds this inside the first SCF, and its message names neither the atom count nor the charge
+	int n_electrons = -opt_in.xcw_settings.charge;
+	for (int at = 0; at < model_data.ncen; at++) n_electrons += asym_atoms[at].type;
+	err_checkf(n_electrons > 0 && (n_electrons + opt_in.xcw_settings.multiplicity - 1) % 2 == 0,
+		"The XCW model has " + std::to_string(model_data.ncen) + " atoms and " + std::to_string(n_electrons) +
+		" electrons at charge " + std::to_string(opt_in.xcw_settings.charge) + ", which cannot have multiplicity " +
+		std::to_string(opt_in.xcw_settings.multiplicity) + ". Check the charge and multiplicity, missing H atoms and disorder parts; a molecule on a special position needs the grown model (keyword grown and -xyz).",
+		std::cout);
 
 	// Convert the ADPs from reciprocal space to Cartesian coordinates
 	U_star2U_cart();
@@ -629,12 +640,11 @@ ivec structure_factors::generate_asym_lookup(const int r) {
 				tempv[j] += hkl_temp[h] * rots[j][h][s];
 			}
 		}
-		int idx_ = 0;
+		//a miss would silently read reflection 0's scattering factors
 		auto idx = scatter_data.hkl_enlarged.find(tempv);
-		if (idx != scatter_data.hkl_enlarged.end()) {
-			idx_ = std::distance(scatter_data.hkl_enlarged.begin(), idx);
-		}
-		asym_list.push_back(idx_);
+		err_checkf(idx != scatter_data.hkl_enlarged.end(), "Reflection " + std::to_string(hkl_temp[0]) + " " + std::to_string(hkl_temp[1]) + " " +
+			std::to_string(hkl_temp[2]) + " rotated by symmetry operation " + std::to_string(s) + " is not in the enlarged reflection list", std::cout);
+		asym_list.push_back(static_cast<int>(std::distance(scatter_data.hkl_enlarged.begin(), idx)));
 	}
 	return asym_list;
 	// closing function
@@ -676,7 +686,7 @@ structure_factors::I_tensor& structure_factors::eval_I(const occ::gto::AOBasis& 
 		I_tens.i_pair_nu_ = I_tens.i_file_.pair_nu();
 		//The file's element type is kept as it is: a single-precision tensor cannot regain
 		//anything by widening, and a double one is narrowed only on request
-		const char* f = std::getenv("NOSPHERA2_XCW_I_FLOAT"); // Flawfinder: ignore
+		const char* f = tuning("NOSPHERA2_XCW_I_FLOAT");
 		I_tens.i_float_ = single_on_disk || (!I_tens.i_streamed_ && (I_tens.tensor_single || (f && std::atoi(f) != 0)));
 		std::cout << "I tensor read from " << i_tensor_path().string()
 			<< " (" << (i_tensor_file::total_bytes(model_data.nr, I_tens.i_compact_, single_on_disk) / 1048576.0)
@@ -887,8 +897,7 @@ void structure_factors::build_I(const std::vector<ao_data>& ao_data_shells, doub
 		dummy_wave.push_back_atom(temp_atom);
 	}
 	// Load the basis set into the dummy wavefunction
-	std::shared_ptr<BasisSet> basis = BasisSetLibrary::get_basis_set(I_tens.basis_set_name);
-	load_basis_into_WFN(dummy_wave, basis, false, true);
+	load_basis_into_WFN(dummy_wave, orbital_basis, false, true);
 	dummy_wave.delete_unoccupied_MOs();
 	bvec needs_grid(model_data.ncen, true);
 	ivec asym_atom_list(model_data.ncen);
@@ -918,7 +927,7 @@ void structure_factors::build_I(const std::vector<ao_data>& ao_data_shells, doub
 	const unsigned int num_syms = unit_cell.get_num_syms();
 	// The AO values and weights are real, so the grid integral sum_p w_p phi_mu phi_nu exp(i q d_p) of -q is the
 	// conjugate of that of q: only the entries of inversion_cleaned_hkl are integrated
-	const bool no_screening = std::getenv("NOSPHERA2_NO_INVERSION_SCREENING") != nullptr; // Flawfinder: ignore
+	const bool no_screening = tuning("NOSPHERA2_NO_INVERSION_SCREENING") != nullptr;
 	ivec2 inversion_link;
 	if (no_screening)
 		for (int e = 0; e < model_data.nr_enlarged; e++) inversion_link.push_back({ e });
@@ -988,33 +997,6 @@ void structure_factors::build_I(const std::vector<ao_data>& ao_data_shells, doub
 		const size_t n_inv = scatter_data.hkl_enlarged.size() - scatter_data.inversion_cleaned_hkl.size();
 		std::cout << std::fixed << std::setprecision(2) << "Inversion screening: Screened out " << n_inv << " of " << scatter_data.hkl_enlarged.size()
 			<< " symmetry generated reflections (" << 100.0 * n_inv / scatter_data.hkl_enlarged.size() << "%)" << std::endl;
-	}
-
-	if (std::getenv("NOSPHERA2_DEBUG_LOOKUP")) { // Flawfinder: ignore
-		long long misses = 0, total = 0;
-		for (r = 0; r < model_data.nr; r++) {
-			for (int s = 0; s < static_cast<int>(num_syms); s++) {
-				total++;
-				if (asym_lookup[r][s] == 0) {
-					// index 0 is ambiguous: a genuine hit on hkl_enlarged's first entry, or the
-					// silent "not found" fallback in generate_asym_lookup. Recompute by hand to
-					// tell them apart.
-					auto it = scatter_data.hkl.begin();
-					std::advance(it, r);
-					ivec3 rots = unit_cell.get_sym();
-					i3 tempv{ 0,0,0 };
-					const i3& hkl_temp = *it;
-					for (int h = 0; h < 3; h++)
-						for (int j = 0; j < 3; j++)
-							tempv[j] += hkl_temp[h] * rots[j][h][s];
-					if (scatter_data.hkl_enlarged.find(tempv) == scatter_data.hkl_enlarged.end()) misses++;
-				}
-			}
-		}
-		std::cerr << "asym_lookup misses: " << misses << " of " << total
-			<< "  (hkl_enlarged size " << scatter_data.hkl_enlarged.size() << ")" << std::endl;
-		std::cerr.flush();
-		std::exit(0);
 	}
 
 	// Save the grid positions for each atom in the dummy wavefunction (used for screening)
@@ -1195,11 +1177,11 @@ void structure_factors::build_I(const std::vector<ao_data>& ao_data_shells, doub
 	//convergence lines identical.
 	//So only reorder when the threshold can actually prune
 	const double ao_block_threshold = [&] {
-		const char* e = std::getenv("NOSPHERA2_ITENSOR_AO_TOL"); // Flawfinder: ignore
+		const char* e = tuning("NOSPHERA2_ITENSOR_AO_TOL");
 		if (e) { const double v = std::atof(e); return v >= 0.0 ? v : 0.0; }
 		return cutoff(opt->accuracy);
 	}();
-	const bool morton_applied = (std::getenv("NOSPHERA2_ITENSOR_NO_MORTON") == nullptr) // Flawfinder: ignore
+	const bool morton_applied = (tuning("NOSPHERA2_ITENSOR_NO_MORTON") == nullptr)
 		&& ao_block_threshold >= 1e-20;
 	if (morton_applied) {
 #pragma omp parallel for schedule(dynamic)
@@ -1280,7 +1262,7 @@ void structure_factors::build_I(const std::vector<ao_data>& ao_data_shells, doub
 	//Work is sum over blocks of na^2 * points, so what an OCC-style per-batch bounding
 	//sphere would save is quadratic in whatever this measures. The AO values are already
 	//computed here, so the honest number is a max over the points they hold, not an estimate.
-	if (std::getenv("NOSPHERA2_ITENSOR_AOSTATS")) { // Flawfinder: ignore
+	if (tuning("NOSPHERA2_ITENSOR_AOSTATS")) {
 		for (int g = 0; g < n_atom_grids; g++) {
 			const int npts = points[g];
 			if (npts <= 0) continue;
@@ -1411,7 +1393,7 @@ void structure_factors::build_I(const std::vector<ao_data>& ao_data_shells, doub
 	//distant tiles, which is the only way a tile becomes wholly dead. Measured here, per
 	//block, before anyone writes a kernel that depends on it.
 	auto skipstats = [&](const int g, const ivec& active, const int npoints) {
-		if (!std::getenv("NOSPHERA2_ITENSOR_SKIPSTATS")) return; // Flawfinder: ignore
+		if (!tuning("NOSPHERA2_ITENSOR_SKIPSTATS")) return;
 		const int na = static_cast<int>(active.size());
 		if (na < 2) return;
 		auto tiles_alive = [&](const ivec& order, const int T) {
@@ -1490,7 +1472,7 @@ void structure_factors::build_I(const std::vector<ao_data>& ao_data_shells, doub
 		//the cost.
 		//NOSPHERA2_ITENSOR_CHUNK sets the target; 0 restores the three whole bands.
 		const int chunk = [] {
-			const char* e = std::getenv("NOSPHERA2_ITENSOR_CHUNK"); // Flawfinder: ignore
+			const char* e = tuning("NOSPHERA2_ITENSOR_CHUNK");
 			return e ? std::atoi(e) : 1024;
 		}();
 		//Even chunks rather than a short tail: a 40-point remainder is a GEMM that costs a
@@ -1718,7 +1700,7 @@ void structure_factors::build_I(const std::vector<ao_data>& ao_data_shells, doub
 	//any path that contributes runs single. nr_small * i_compact_ deliberately in size_t,
 	//the product passes 2^31 at nmo = 500 with 20k reflections.
 	{
-		const char* f = std::getenv("NOSPHERA2_XCW_I_FLOAT"); // Flawfinder: ignore
+		const char* f = tuning("NOSPHERA2_XCW_I_FLOAT");
 		const bool single_build = (itensor_on_gpu && !opt->gpu_fp64)
 			|| ((!itensor_on_gpu || opt->itensor_hybrid) && opt->cpu_itensor_fp32);
 		I_tens.i_float_ = I_tens.tensor_single || (f && std::atoi(f) != 0) || (single_build && !I_tens.tensor_double);
@@ -1858,7 +1840,7 @@ void structure_factors::build_I(const std::vector<ao_data>& ao_data_shells, doub
 			cvec blk;
 			if (I_tens.i_streamed_ || I_tens.i_float_) blk.assign(I_tens.i_compact_, cdouble{});
 
-#if !defined(__APPLE__)
+#if !defined(__APPLE__) && !defined(NSA2_OPENBLAS)
 			mkl_set_num_threads_local(1);
 #endif
 #if defined(__SSE2__) || defined(_M_X64)
@@ -1931,6 +1913,8 @@ void structure_factors::build_I(const std::vector<ao_data>& ao_data_shells, doub
 						for (int p = 0; p < points[g]; p++) {
 							__sincos(angles[p], &sines[p], &cosines[p]);
 						}
+#elif defined(NSA2_OPENBLAS)
+						sincos_shared_n(np_g, angles, sines, cosines);
 #else
 						vdSinCos(np_g, angles, sines, cosines);
 #endif

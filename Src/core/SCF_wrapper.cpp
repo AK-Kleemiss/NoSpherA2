@@ -48,9 +48,12 @@ occ::core::Molecule SCF_wrapper::setup_SCF_mol(const std::vector<asym_atom>& ato
 void SCF_wrapper::setup_eri(const occ::qm::HartreeFock& hf) {
 	eri_.clear();
 	const _time_point eri_t0 = get_time();
-	const size_t avail = available_memory_bytes();
-	if (eri_.build(hf, avail ? avail / 5 * 4 : 0, writer_->log))
+	const size_t avail = available_memory_bytes(), budget = avail ? avail / 5 * 4 : 0;
+	const bool read = !settings.eri_read_path.empty() && eri_.load(settings.eri_read_path, hf, budget, writer_->log);
+	if (!read && eri_.build(hf, budget, writer_->log))
 		throughput::record_time("XCW two-electron integrals", false, get_msec(eri_t0, get_time()));
+	if (eri_ && !settings.eri_save_path.empty() && !eri_.save(settings.eri_save_path, hf))
+		writer_->log << "XCW: could not write the two-electron integrals to " << settings.eri_save_path.string() << std::endl;
 #if defined(NOSPHERA2_USE_GPU) || defined(NOSPHERA2_USE_METAL)
 	if (eri_ && settings.gpu_eri) {
 		const auto up_t0 = get_time();
@@ -59,7 +62,7 @@ void SCF_wrapper::setup_eri(const occ::qm::HartreeFock& hf) {
 		if (eri_on_device_) throughput::record_time("XCW two-electron integrals upload", true, get_msec(up_t0, get_time()));
 		if (!settings.no_date)
 			std::cerr << "GPU in use: XCW Fock build from the stored integrals on "
-			<< (eri_on_device_ ? "the device" : "the CPU - device unavailable or the integrals too large") << std::endl;
+			<< (eri_on_device_ ? "the device" : "the CPU - device unavailable, an APU without fast fp64, or the integrals too large") << std::endl;
 	}
 #endif
 }
@@ -113,7 +116,8 @@ void SCF_wrapper::small_basis_guess(occ::qm::SCF<occ::qm::HartreeFock>& scf) {
 	scf.set_core_matrices();
 	scf.ctx.F = scf.ctx.H;
 	scf.set_conditioning_orthogonalizer();
-	scf.ctx.F += scf.m_procedure.compute_fock_mixed_basis(guess, small_bs, false);
+	const bool same_basis = guess.kind == occ::qm::SpinorbitalKind::Restricted && small_bs.nbf() == scf.m_procedure.aobasis().nbf() && small_bs == scf.m_procedure.aobasis();
+	scf.ctx.F += same_basis ? scf.m_procedure.compute_fock_from_density(guess) : scf.m_procedure.compute_fock_mixed_basis(guess, small_bs, false);
 	scf.ctx.orthogonalizer.orthogonalize_molecular_orbitals(scf.ctx.mo, scf.ctx.F);
 	scf.m_have_initial_guess = true;
 }
@@ -185,6 +189,13 @@ void SCF_wrapper::build_effective_dm(const occ::qm::SCF<occ::qm::HartreeFock>& s
 
 bool SCF_wrapper::do_SCF(const double& lambda, double& alpha, occ::qm::SCF<occ::qm::HartreeFock>& scf, occ::qm::Wavefunction& last_wfn, bool& has_guess) {
 
+#if !defined(__APPLE__) && !defined(NSA2_OPENBLAS)
+	//The SCF's own MKL calls (DIIS, the diagonalisation) run serial on every path: they are small against
+	//the Fock build, and threaded they wait for a time slice at every barrier once another job loads the
+	//host (Radeon 780M box beside a 16-thread job: 170 s against 7 s for 14 iterations). A CPU or hybrid I tensor
+	//has left this thread serial anyway, through mkl_set_num_threads_local in build_I.
+	mkl_set_num_threads_local(1);
+#endif
 	settings.clear();
 	diis_F_.clear();
 	diis_E_.clear();

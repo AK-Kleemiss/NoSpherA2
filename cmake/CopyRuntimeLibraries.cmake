@@ -22,7 +22,15 @@ function(nosphera2_copy_runtime_libraries target)
     endif()
 
     # Select the OpenMP runtime provided by the Micromamba environment.
-    if(WIN32)
+    if(WIN32 AND NOSPHERA2_OPENBLAS)
+        # ARM64: vcomp is OpenMP and comes with the VC redistributable; the DLL to ship is OpenBLAS
+        set(_openmp_source
+            "${NOSPHERA2_OPENBLAS_DLL}"
+        )
+        set(_tbb_destination_name
+            "$<TARGET_FILE_NAME:TBB::tbb>"
+        )
+    elseif(WIN32)
         set(_openmp_source
             "${MICROMAMBA_ENV_PREFIX}/Library/bin/libiomp5md.dll"
         )

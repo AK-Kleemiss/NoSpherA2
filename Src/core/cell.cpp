@@ -285,6 +285,26 @@ ivec cell::confirm_applied_symmetry(const std::vector<asym_atom>& asym_atoms) {
 				count++;
 			}
 		}
+		// Only an operation that maps the whole model onto itself can leave the sum: the operations that do form a group,
+		// so the projection's cosets exist. A grown atom whose image is missing (screw and inversion images of one atom,
+		// without the glide image the two compose to) would otherwise be counted twice by the operations that stay
+		for (const asym_atom& grown_atom : asym_atoms) {
+			if (!grown_atom.grown) {
+				continue;
+			}
+			const vec image = apply_symmetry({ grown_atom.frac_pos[0], grown_atom.frac_pos[1], grown_atom.frac_pos[2] }, sym_op);
+			bool present = false;
+			for (const asym_atom& other : asym_atoms) {
+				if (check_special({ other.frac_pos[0], other.frac_pos[1], other.frac_pos[2] }, image, 1e-2)) {
+					present = true;
+					break;
+				}
+			}
+			if (!present) {
+				count = -1;
+				break;
+			}
+		}
 		// Now we have counted the number of atoms in the model, for which the symmetry operation was applied
 		// If this number is equal to the number of asymmetric atoms, then the symmetry operation is fully applied
 		int original_ncen = 0;

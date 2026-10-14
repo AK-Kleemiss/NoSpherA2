@@ -171,24 +171,30 @@ void Thakkar::calc_orbs(
 void Thakkar::calc_orbs_deriv(int& nr_ex, int& nr_coef, const double& dist, const int& offset, const int* n_vector,
 	const int lower_m, const int upper_m, double* Orb, double* dOrb, double* ddOrb) const
 {
-	for (int ex = 0; ex < n_vector[atomic_number - 1]; ex++) {
+	for (int ex = 0; ex < n_vector[atomic_number - 1]; ex++, nr_ex++) {
+		const double zz = z[nr_ex], exponent = -zz * dist;
+		if (exponent <= -46.5) {
+			for (int m = lower_m; m < upper_m; m++)
+				nr_coef += occ[offset + m] != 0;
+			continue;
+		}
+		//r^(n-1) exp(-z r): the powers r^(n-1), r^(n-2), r^(n-3), each 0 where its exponent is negative; one exp and one
+		//set of powers per exponent, shared by every occupied orbital of the shell
+		const int nn = n[nr_ex];
+		const double ez = exp(exponent);
+		const double p1 = nn >= 2 ? fast_int_pow(dist, nn - 1) : 1.0;
+		const double p2 = nn >= 3 ? fast_int_pow(dist, nn - 2) : (nn == 2 ? 1.0 : 0.0);
+		const double p3 = nn >= 4 ? fast_int_pow(dist, nn - 3) : (nn == 3 ? 1.0 : 0.0);
+		const double q1 = (nn - 1) * p2 - zz * p1;
+		const double q2 = (nn - 1) * (nn - 2) * p3 - 2 * zz * (nn - 1) * p2 + zz * zz * p1;
 		for (int m = lower_m; m < upper_m; m++) {
 			if (occ[offset + m] == 0) continue;
-			const double zz = z[nr_ex], exponent = -zz * dist;
-			if (exponent > -46.5) {
-				//r^(n-1) exp(-z r): the powers r^(n-1), r^(n-2), r^(n-3), each 0 where its exponent is negative
-				const int nn = n[nr_ex];
-				const double e = c[nr_coef] * exp(exponent);
-				const double p1 = nn >= 2 ? fast_int_pow(dist, nn - 1) : 1.0;
-				const double p2 = nn >= 3 ? fast_int_pow(dist, nn - 2) : (nn == 2 ? 1.0 : 0.0);
-				const double p3 = nn >= 4 ? fast_int_pow(dist, nn - 3) : (nn == 3 ? 1.0 : 0.0);
-				Orb[m] += e * p1;
-				dOrb[m] += e * ((nn - 1) * p2 - zz * p1);
-				ddOrb[m] += e * ((nn - 1) * (nn - 2) * p3 - 2 * zz * (nn - 1) * p2 + zz * zz * p1);
-			}
+			const double e = c[nr_coef] * ez;
+			Orb[m] += e * p1;
+			dOrb[m] += e * q1;
+			ddOrb[m] += e * q2;
 			nr_coef++;
 		}
-		nr_ex++;
 	}
 }
 
@@ -319,24 +325,20 @@ const double Thakkar::get_radial_custom_density(const double &dist,
 	return Rho / (constants::FOUR_PI);
 };
 
-constexpr double cosinus_integral(const int N, const double z, const double k);
-
-static constexpr double sinus_integral(const int N, const double z, const double k)
+// The integral 0 - inf r ^ N e ^ -zr sin(kr) dr by partial integration, using int e^ax sin(bx) dx = -e^-ax/(a^2+b^2) * (a sin(bx) + b cos(bx))
+// and its cosine partner: S(n) = n/(z^2+k^2) (z S(n-1) + k C(n-1)), C(n) = n/(z^2+k^2) (z C(n-1) - k S(n-1)), S(0) = k/(z^2+k^2), C(0) = z/(z^2+k^2)
+// walked upwards: the mutual recursion recomputed both chains at every level, 2^N calls for the same N steps
+static double sinus_integral(const int N, const double z, const double k)
 {
-	// Calculates the integral 0 - inf r ^ N e ^ -zr sin(kr) dr through recursion using the general integral int e^ax sin(bx) dx = -e^-ax/(a^2+b^2) * (a sin(bx) + b cos(bx)) and partial integration
-	if (N == 0)
-		return k / (z * z + k * k);
-	else
-		return N / (z * z + k * k) * (z * sinus_integral(N - 1, z, k) + k * cosinus_integral(N - 1, z, k));
-};
-
-constexpr double cosinus_integral(const int N, const double z, const double k)
-{
-	// Calculates the integral 0 - inf r ^ N e ^ -zr cos(kr) dr through recursion using the general integral int e^ax cos(bx) dx = -e^-ax/(a^2+b^2) * (a cos(bx) - b sin(bx)) and partial integration
-	if (N == 0)
-		return z / (z * z + k * k);
-	else
-		return N / (z * z + k * k) * (z * cosinus_integral(N - 1, z, k) - k * sinus_integral(N - 1, z, k));
+	const double d = z * z + k * k;
+	double s = k / d, c = z / d;
+	for (int n = 1; n <= N; n++)
+	{
+		const double s_n = n / d * (z * s + k * c);
+		c = n / d * (z * c - k * s);
+		s = s_n;
+	}
+	return s;
 };
 
 const double Thakkar::get_form_factor(const double &k_vector) const
@@ -500,11 +502,6 @@ const double Thakkar::get_core_density(const double &dist, const int &core_els)
 	return get_radial_custom_density(dist, max_s, max_p, max_d, max_f, 0, 0, 0, 0);
 };
 
-static double calc_int(const int &occ, const double &coef, const double &exp, const int &radial_exp, const double &k_vector)
-{
-	return occ * coef * sinus_integral(radial_exp, exp, k_vector);
-}
-
 static double calc_int_at_k0(const int &occ, const double &coef, const double &exp, const int &radial_exp, const double &)
 {
 	// k -> 0 limit of sinus_integral(N, z, k) / k = Int r^(N+1) e^{-zr} dr = (N+1)! / z^(N+2)
@@ -522,34 +519,40 @@ double Thakkar::calc_type(
 	const int &max,
 	const int &min) const
 {
-
-	std::function<double(const int &, const double &, const double &, const int &, const double &)> func;
-	if (k_vector == 0)
-		func = calc_int_at_k0;
-	else
-		func = calc_int;
 	const int l_n = n_vector[atomic_number - 1];
 	double temp, result = 0;
 	int i_j_distance = 0;
 	for (int m = lower_m; m < upper_m; m++)
 		if (occ[offset + m] != 0)
 			i_j_distance++;
+	// the radial integral of an exponent pair is the same for every orbital m: one table per call, filled on first use,
+	// every term still formed as occ * coef * integral in the same order; the tables hold at most 15 functions per type
+	constexpr int max_l_n = 16;
+	err_checkf(l_n <= max_l_n, "Thakkar table with more than 16 functions of one type", std::cout);
+	double integral[max_l_n * max_l_n];
+	bool have_integrals = false;
 	for (int m = lower_m + min; m < lower_m + max; m++)
 	{
 		const int offset_m = offset + m;
 		if (occ[offset_m] == 0)
 			continue;
+		if (!have_integrals && k_vector != 0)
+		{
+			for (int i = 0; i < l_n; i++)
+				for (int j = 0; j < l_n - i; j++)
+					integral[i * max_l_n + j] = sinus_integral(n[nr_ex + i] + n[nr_ex + i + j] - 1, z[nr_ex + i] + z[nr_ex + i + j], k_vector);
+			have_integrals = true;
+		}
 		const int coef_n = nr_coef + m - lower_m;
 		for (int i = 0; i < l_n; i++)
 		{
 			const int nr_ex_i = nr_ex + i;
 			for (int j = 0; j < l_n - i; j++)
 			{
-				temp = func(occ[offset_m],
-					c[coef_n + i * i_j_distance] * c[coef_n + (i + j) * i_j_distance],
-					z[nr_ex_i] + z[nr_ex_i + j],
-					n[nr_ex_i] + n[nr_ex_i + j] - 1,
-					k_vector);
+				const double coef = c[coef_n + i * i_j_distance] * c[coef_n + (i + j) * i_j_distance];
+				temp = k_vector == 0
+					? calc_int_at_k0(occ[offset_m], coef, z[nr_ex_i] + z[nr_ex_i + j], n[nr_ex_i] + n[nr_ex_i + j] - 1, k_vector)
+					: occ[offset_m] * coef * integral[i * max_l_n + j];
 				if (j != 0)
 					result += 2 * temp;
 				else
@@ -622,6 +625,20 @@ double Thakkar::get_interpolated_density(const double &dist) const {
 
 double Thakkar::get_interpolated_density_spline(const double &dist) const {
 	return cubic_spline_interpolate_spherical_density(radial_density, radial_dist, radial_second_deriv, dist, lincr, start);
+};
+
+double Thakkar::spline_reach() const {
+	// On [r_k, r_k+1] the spline is at most max(y_k, y_k+1) + 2/(3 sqrt 3) (|y''_k| + |y''_k+1|) h^2 / 6, since
+	// |a^3 - a| <= 2/(3 sqrt 3) on [0, 1]; 0.4 and 0.99E-10 leave room for rounding against the 1E-10 cut
+	for (size_t k = radial_dist.size() - 1; k-- > 0;)
+	{
+		const double h = radial_dist[k + 1] - radial_dist[k];
+		const double bound = std::max(radial_density[k], radial_density[k + 1]) +
+			0.4 * (std::abs(radial_second_deriv[k]) + std::abs(radial_second_deriv[k + 1])) * h * h / 6.0;
+		if (bound >= 0.99E-10)
+			return radial_dist[k + 1];
+	}
+	return radial_dist[0];
 };
 
 MBIS_Atom::MBIS_Atom(const int g_atom_number, const vec &g_sig, const vec &g_pop)

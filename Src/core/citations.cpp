@@ -7,8 +7,7 @@ namespace citations
 {
 	const std::vector<Reference> &table()
 	{
-		//Crossref-confirmed on 24 Sep 2026.  A method with two entries rests on both papers: the
-		//method itself and the implementation this code follows.
+		//a method with two entries rests on both: the method itself and the implementation this code follows
 		static const std::vector<Reference> refs = {
 			{Method::NoSpherA2, "NoSpherA2", "Kleemiss et al., Chem. Sci. 12 (2021) 1675", "10.1039/D0SC05526C"},
 			{Method::HAR, "HAR", "Jayatilaka & Dittrich, Acta Cryst. A 64 (2008) 383", "10.1107/S0108767308005709"},
@@ -24,6 +23,7 @@ namespace citations
 			{Method::ECP, "ECP", "Kleemiss et al., J. Appl. Cryst. 58 (2025) 374", "10.1107/S1600576725000901"},
 			{Method::RIFit, "RI fit", "Seifert et al., Z. Kristallogr. Cryst. Mater. 241 (2026) 283", "10.1515/zkri-2026-0013"},
 			{Method::Embedding, "Embedding", "Landeros-Rivera & Kleemiss, J. Appl. Cryst. 59 (2026)", "10.1107/S160057672600717X"},
+			{Method::QTAIM, "QTAIM", "Bader, Atoms in Molecules: A Quantum Theory, Oxford University Press (1990)", "10.1093/oso/9780198551683.001.0001"},
 			{Method::QTAIM, "QTAIM", "Bader, Chem. Rev. 91 (1991) 893", "10.1021/cr00005a013"},
 			{Method::LIDI, "LI/DI", "Fradera, Austen & Bader, J. Phys. Chem. A 103 (1999) 304", "10.1021/jp983362q"},
 			{Method::ELF, "ELF", "Becke & Edgecombe, J. Chem. Phys. 92 (1990) 5397", "10.1063/1.458517"},
@@ -51,6 +51,10 @@ namespace citations
 			{Method::Fukui, "Fukui", "Parr & Yang, J. Am. Chem. Soc. 106 (1984) 4049", "10.1021/ja00326a036"},
 			{Method::Fukui, "Fukui", "Morell, Grand & Toro-Labbe, J. Phys. Chem. A 109 (2005) 205", "10.1021/jp046577a"},
 			{Method::GordonKim, "Gordon-Kim", "Gordon & Kim, J. Chem. Phys. 56 (1972) 3122", "10.1063/1.1677649"},
+			{Method::EQC, "EQC", "Rahm & Hoffmann, J. Am. Chem. Soc. 137 (2015) 10282", "10.1021/jacs.5b05600"},
+			{Method::EQC, "EQC", "Rahm & Hoffmann, J. Am. Chem. Soc. 138 (2016) 3731", "10.1021/jacs.5b12434"},
+			{Method::EQC, "EQC", "Rahm, Zeng & Hoffmann, J. Am. Chem. Soc. 141 (2019) 342", "10.1021/jacs.8b10246"},
+			{Method::IBO, "IBO", "Knizia, J. Chem. Theory Comput. 9 (2013) 4834", "10.1021/ct400687b"},
 		};
 		return refs;
 	}

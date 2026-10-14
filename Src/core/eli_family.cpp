@@ -3,18 +3,76 @@
 #include "constants.h"
 #include "citations.h"
 
-//The spin-resolved evaluator.  Structurally WFN::computeELIELF (wfn_density.cpp), i.e. the same
-//4-component primitive loop (value + three Cartesian derivatives), but the MO accumulation is split
-//into the alpha and beta channels instead of being spin-summed.  Free function on the public WFN
-//accessors, so nothing in wfn_class.h / wfn_density.cpp has to change.
 namespace eli_family
 {
+	SpinSplit spin_split(const WFN& wave)
+	{
+		const int nmo = wave.get_nmo();
+		//An MO holding more than one electron is spatial whatever its flag: the .wfn/.wfx readers flag
+		//beta where orbital energies stop rising, which splits degenerate restricted pairs
+		bool doubles = false;
+		for (int mo = 0; mo < nmo; mo++) doubles = doubles || wave.get_MO_occ(mo) > 1.0 + 1e-6;
+		int singles = 0;
+		for (int mo = 0; mo < nmo; mo++)
+		{
+			if (!doubles && wave.get_MO_op(mo) == 1) return SpinSplit::unrestricted;
+			const double occ = wave.get_MO_occ(mo);
+			if (occ == 1.0) singles++;
+			else if (occ != 0.0 && occ != 2.0) return SpinSplit::halves;
+		}
+		const int stated = (int)wave.get_multi();
+		return singles > 0 && (stated == 0 || stated == singles + 1) ? SpinSplit::restricted_open : SpinSplit::halves;
+	}
+
+	bool alpha_beta_orbitals_differ(const WFN& wave)
+	{
+		std::vector<int> occ[2];
+		for (int mo = 0; mo < wave.get_nmo(); mo++)
+			if (wave.get_MO_occ(mo) != 0.0) occ[wave.get_MO_op(mo) == 1 ? 1 : 0].push_back(mo);
+		if (occ[0].size() != occ[1].size()) return true;
+		const int nex = wave.get_nex();
+		bool differ = false;
+		for (size_t k = 0; k < occ[0].size() && !differ; k++)
+		{
+			const int a = occ[0][k], b = occ[1][k];
+			if (wave.get_MO_occ(a) != wave.get_MO_occ(b)) return true;
+			double big = 0.0, same = 0.0, flip = 0.0;
+			for (int j = 0; j < nex; j++)
+			{
+				const double ca = wave.get_MO_coef(a, j), cb = wave.get_MO_coef(b, j);
+				big = std::max(big, std::abs(ca));
+				same = std::max(same, std::abs(ca - cb));
+				flip = std::max(flip, std::abs(ca + cb));
+			}
+			differ = std::min(same, flip) > 1e-4 * big;
+		}
+		if (!differ) return false;
+		//Differing orbitals can span the same space, so the spin density decides: 0.3/1/2 bohr from each
+		//nucleus along two skew directions.
+		//ponytail: 6 points per atom, a spin density that vanishes at all of them is missed
+		const std::vector<atom>& atoms = *wave.get_atoms_ptr();
+		const double dir[2][3] = { { 0.48, 0.64, 0.6 }, { -0.6, 0.48, -0.64 } }, rad[3] = { 0.3, 1.0, 2.0 };
+		bool polarised = false;
+		wave.get_coef_primitive_major(); //build the lazy cache before the threads read it
+#pragma omp parallel for reduction(||:polarised)
+		for (int i = 0; i < (int)atoms.size(); i++)
+			for (int s = 0; s < 6 && !polarised; s++)
+			{
+				d3 p;
+				for (int c = 0; c < 3; c++) p[c] = atoms[i].get_coordinate(c) + rad[s % 3] * dir[s / 3][c];
+				SpinFields f;
+				spin_fields(wave, p, f);
+				polarised = std::abs(f.rho[0] - f.rho[1]) > 1e-10 + 1e-6 * (f.rho[0] + f.rho[1]);
+			}
+		return polarised;
+	}
+
 	void spin_fields(const WFN& wave, const d3& p, SpinFields& f)
 	{
 		const int _nmo = wave.get_nmo();
 		const int _nex = wave.get_nex();
 		const std::vector<atom>& atoms = *wave.get_atoms_ptr();
-		//Primitive-major coefficients: every MO for one primitive is contiguous (see computeELIELF).
+		//Primitive-major: every MO for one primitive is contiguous
 		const double* const coefs = wave.get_coef_primitive_major();
 
 		vec phi(4 * (size_t)_nmo, 0.0);
@@ -63,20 +121,19 @@ namespace eli_family
 			}
 		}
 
-		//A restricted wavefunction carries no beta MOs; its doubly occupied orbitals contribute
-		//occ/2 to each channel, giving rho_alpha = rho_beta = rho/2 exactly.
-		const bool unrestricted = wave.get_MO_op_count(1) > 0;
+		const SpinSplit how = spin_split(wave);
 		f = SpinFields{};
 		for (int mo = 0; mo < _nmo; mo++)
 		{
 			const double occ = wave.get_MO_occ(mo);
 			if (occ == 0.0) continue;
 			const double* ph = &phi[(size_t)mo * 4];
-			const double n = unrestricted ? occ : 0.5 * occ;
-			const int s = unrestricted ? wave.get_MO_op(mo) : 0;
-			const int lo = unrestricted ? s : 0, hi = unrestricted ? s : 1;
-			for (int c = lo; c <= hi; c++)
+			double nc[2];
+			mo_spin_occupations(occ, wave.get_MO_op(mo), how, nc);
+			for (int c = 0; c < 2; c++)
 			{
+				const double n = nc[c];
+				if (n == 0.0) continue;
 				f.rho[c] += n * ph[0] * ph[0];
 				f.grad[c][0] += 2 * n * ph[0] * ph[1];
 				f.grad[c][1] += 2 * n * ph[0] * ph[2];
@@ -86,17 +143,18 @@ namespace eli_family
 		}
 	}
 
-	//rho^(t) / rho = 1 - N_beta / (2(N-1)), DGrid 5.2's convention - see the header.
+	//rho^(t) / rho = 1 - N_beta / (2(N-1)), DGrid 5.2's convention
 	double triplet_density_factor(const WFN& wave)
 	{
-		const bool unrestricted = wave.get_MO_op_count(1) > 0;
+		const SpinSplit how = spin_split(wave);
 		double N = 0.0, Nb = 0.0;
 		for (int mo = 0; mo < wave.get_nmo(); mo++)
 		{
 			const double occ = wave.get_MO_occ(mo);
+			double n[2];
+			mo_spin_occupations(occ, wave.get_MO_op(mo), how, n);
 			N += occ;
-			if (unrestricted) { if (wave.get_MO_op(mo) == 1) Nb += occ; }
-			else Nb += 0.5 * occ;
+			Nb += n[1];
 		}
 		return N > 1.0 ? 1.0 - Nb / (2.0 * (N - 1.0)) : 0.0;
 	}
@@ -129,9 +187,7 @@ namespace eli_family
 		return "?";
 	}
 
-	//Only ELI-D has maxima to walk up to.  ELI-q is ELI-D^(-8/3), so an ascent on it runs into ELI-D's
-	//minima and shatters into tail basins; the singlet member is 1 - zeta^2 and has no pair topology at
-	//all.  The measurements behind this are in the header, above eli_variants_for's declaration.
+	//ELI-q = ELI-D^(-8/3) ascends into ELI-D's minima and shatters into tail basins; 1 - zeta^2 has no pair topology
 	bool basins_independent(const Member m)
 	{
 		return m == Member::eli_d_aa || m == Member::eli_d_bb || m == Member::eli_d_triplet;
@@ -139,30 +195,48 @@ namespace eli_family
 
 	std::vector<Member> eli_variants_for(const WFN& wave, std::string* warning)
 	{
-		//Read off the wavefunction, never off a label: a beta MO set must actually be present, and the
-		//two channels must actually hold different numbers of electrons.
+		//From the orbitals, never the label; a broken-symmetry singlet counts as spin-polarised
 		double Na = 0.0, Nb = 0.0;
-		const bool has_beta_set = wave.get_MO_op_count(1) > 0;
+		const SpinSplit how = spin_split(wave);
+		const bool has_beta_set = how == SpinSplit::unrestricted;
+		bool fractional = false;
 		for (int mo = 0; mo < wave.get_nmo(); mo++)
 		{
 			const double occ = wave.get_MO_occ(mo);
 			if (occ == 0.0) continue;
-			if (has_beta_set && wave.get_MO_op(mo) == 1) Nb += occ; else Na += occ;
+			fractional = fractional || (occ != 1.0 && occ != 2.0);
+			if (!has_beta_set) { double n[2]; mo_spin_occupations(occ, 0, how, n); Na += n[0]; Nb += n[1]; }
+			else if (has_beta_set && wave.get_MO_op(mo) == 1) Nb += occ; else Na += occ;
 		}
-		const bool spin_polarised = has_beta_set && std::abs(Na - Nb) > 1e-8;
+		const bool spin_polarised = how == SpinSplit::restricted_open
+			|| (has_beta_set && (std::abs(Na - Nb) > 1e-8 || alpha_beta_orbitals_differ(wave)));
 
-		std::vector<Member> out{ Member::eli_d_aa, Member::eli_q_aa };
-		if (spin_polarised)
-			out = { Member::eli_d_aa, Member::eli_d_bb, Member::eli_d_triplet,
-					Member::eli_q_aa, Member::eli_q_bb, Member::elia_singlet };
+		const bool has_alpha_electrons = Na > 1e-8;
+		const bool has_beta_electrons = Nb > 1e-8;
+		const bool has_a_pair = Na + Nb > 1.0 + 1e-8;
+		std::vector<Member> out;
+		if (has_alpha_electrons) out.push_back(Member::eli_d_aa);
+		if (spin_polarised && has_beta_electrons) out.push_back(Member::eli_d_bb);
+		if (spin_polarised && has_beta_electrons && has_a_pair) out.push_back(Member::eli_d_triplet);
+		if (has_alpha_electrons) out.push_back(Member::eli_q_aa);
+		if (spin_polarised && has_beta_electrons) out.push_back(Member::eli_q_bb);
+		if (spin_polarised && has_beta_electrons) out.push_back(Member::elia_singlet);
 		if (warning)
 		{
 			warning->clear();
-			//The stated multiplicity is a cross-check only; 2S+1 from the occupations is the truth.
+			if (has_beta_set && !has_beta_electrons)
+				*warning = "the beta orbital set of this wavefunction holds no electrons (N_alpha = "
+				+ std::to_string(Na) + ", N_beta = 0), so ELI-D(bb), ELI-q(bb), the triplet member"
+				" and the singlet ELI-q are identically zero everywhere and are not listed; the"
+				" alpha-alpha members are the whole family this input has. ";
+			if (!has_alpha_electrons)
+				*warning += "the alpha orbital set holds no electrons either: there is no ELI"
+				" family to compute from this wavefunction at all. ";
 			const int stated = (int)wave.get_multi();
 			const int actual = (int)std::lround(std::abs(Na - Nb)) + 1;
-			if (stated > 0 && stated != actual)
-				*warning = "multiplicity label says " + std::to_string(stated)
+			//restricted natural orbitals split every occupation in halves: no spin count to compare against
+			if (stated > 0 && stated != actual && !(how == SpinSplit::halves && fractional))
+				*warning += "multiplicity label says " + std::to_string(stated)
 				+ " but the orbital occupations give " + std::to_string(actual)
 				+ (spin_polarised ? "" : " (no beta orbital set: this file is restricted)")
 				+ "; the ELI member list follows the occupations.";
@@ -186,20 +260,23 @@ namespace eli_family
 	void report(const std::filesystem::path& wfn_path, const std::filesystem::path& points_file)
 	{
 		WFN wave(wfn_path);
-		const bool unrestricted = wave.get_MO_op_count(1) > 0;
+		const SpinSplit how = spin_split(wave);
+		const bool unrestricted = how == SpinSplit::unrestricted;
 		double N = 0.0, Nb = 0.0;
 		for (int mo = 0; mo < wave.get_nmo(); mo++)
 		{
 			const double occ = wave.get_MO_occ(mo);
+			double n[2];
+			mo_spin_occupations(occ, wave.get_MO_op(mo), how, n);
 			N += occ;
-			Nb += unrestricted ? (wave.get_MO_op(mo) == 1 ? occ : 0.0) : 0.5 * occ;
+			Nb += n[1];
 		}
 		const double factor = triplet_density_factor(wave);
 		std::string warning;
 		const std::vector<Member> members = eli_variants_for(wave, &warning);
 		citations::cite(citations::Method::ELIFamily, std::cout);
 		std::cout << "ELI family for " << wfn_path.string() << "\n"
-			<< "  " << (unrestricted ? "unrestricted" : "restricted") << ", N = " << N
+			<< "  " << (unrestricted ? "unrestricted" : how == SpinSplit::restricted_open ? "restricted open shell" : "restricted") << ", N = " << N
 			<< ", N_alpha = " << N - Nb << ", N_beta = " << Nb << "\n"
 			<< "  members worth computing:";
 		for (const Member m : members)
@@ -212,9 +289,7 @@ namespace eli_family
 		if (points_file.empty()) return;
 		std::ifstream in(points_file);
 		err_checkf(in.good(), "Could not open " + points_file.string(), std::cout);
-		//Everything the family is built from, so a point dump doubles as the DGrid comparison input:
-		//the two densities, the two T_s = sum n_i |grad phi_i|^2, the three gradient invariants, then
-		//the members themselves.
+		//All ingredients, T_s = sum n_i |grad phi_i|^2, then the members, so the dump compares against DGrid
 		std::cout << "#         x           y           z         rho_a         rho_b"
 			<< "           T_a           T_b     |grad_a|^2     |grad_b|^2      grad_a.b"
 			<< "      ELI-D_aa      ELI-D_bb      ELI-q_aa      ELI-q_bb       ELI-D_t        ELIA_s\n";
