@@ -4,6 +4,7 @@
 #include "Thakkar_coefs.h"
 #include "Slater_ion_coefs.h"
 #include "Slater_delta_coefs.h"
+#include "GTO_ion_delta_coefs.h"
 #include "ECPs_corrections.h"
 #include "constants.h"
 
@@ -903,14 +904,108 @@ namespace
 	{
 		return constants::ang2bohr(k) / constants::FOUR_PI;
 	}
+
+	// Four-point Lagrange on a uniform grid, x in grid units. The GTO tables carry the
+	// relativistic core contraction, which linear interpolation would blur at the 1e-3 e level.
+	// The end intervals use the four end points one-sided: f_T is quadratic in s near s = 0 and a
+	// linear first interval misses it by 5e-3 e for Au.
+	double cubic_at(const double *t, const int n, const double x)
+	{
+		if (x >= n - 1) return t[n - 1];
+		const int i = std::min(std::max(static_cast<int>(x), 1), n - 3);
+		const double f = x - i;
+		return -f * (f - 1.0) * (f - 2.0) / 6.0 * t[i - 1] + (f + 1.0) * (f - 1.0) * (f - 2.0) / 2.0 * t[i]
+			 - (f + 1.0) * f * (f - 2.0) / 2.0 * t[i + 1] + (f + 1.0) * f * (f - 1.0) / 6.0 * t[i + 2];
+	}
+
+	int gto_table(const int Z, const int q)
+	{
+		const int span = GTOIon_q_max - GTOIon_q_min + 1;
+		return GTOIon_offset[(Z - 1) * span + (q - GTOIon_q_min)];
+	}
+
+	double gto_rho_at(const int table, const double r)
+	{
+		static const double log_rmin = std::log(GTOIon_r_min);
+		static const double dlog = (std::log(GTOIon_r_max) - log_rmin) / (GTOIon_n_r - 1);
+		const double *t = GTOIon_rho + static_cast<size_t>(table) * GTOIon_n_r;
+		if (r <= GTOIon_r_min) return t[0];
+		if (r >= GTOIon_r_max) return 0.0;   // both densities have decayed long before
+		return cubic_at(t, GTOIon_n_r, (std::log(r) - log_rmin) / dlog);
+	}
+
+	double gto_f_at(const int table, const double s)
+	{
+		static const double ds = (GTOIon_s_max - GTOIon_s_min) / (GTOIon_n_s - 1);
+		const double *t = GTOIon_f + static_cast<size_t>(table) * GTOIon_n_s;
+		if (s <= GTOIon_s_min) return t[0];
+		return cubic_at(t, GTOIon_n_s, (std::min(s, GTOIon_s_max) - GTOIon_s_min) / ds);
+	}
+
+	bool gto_present(const int Z)
+	{
+		return Z >= 1 && Z <= 103 && GTOIon_qmax[Z - 1] >= 0;
+	}
+
+	// Electrons outside the noble-gas core and any filled d10/f14 below the valence shell: U 6, Pb 4, Lu 3
+	int valence_electrons(const int Z)
+	{
+		const int ng = Z > 86 ? 86 : Z > 54 ? 54 : Z > 36 ? 36 : Z > 18 ? 18 : Z > 10 ? 10 : Z > 2 ? 2 : 0;
+		int n = Z - ng;
+		if (ng >= 54 && n > 16) n -= 14;   // past the f-block (Lu, Lr onwards)
+		if (ng >= 18 && n > 12) n -= 10;   // p-block below a filled d10
+		return n;
+	}
+}
+
+bool HE_Spherical_Atom::ion_available(const int atomic_number, const double charge)
+{
+	if (gto_present(atomic_number))
+		return charge > 0.0 ? GTOIon_qmax[atomic_number - 1] >= 1
+			 : charge < 0.0 ? GTOIon_anion[atomic_number - 1] == 1 : true;
+	return charge > 0.0 ? Thakkar_Cation::available(atomic_number)
+		 : charge < 0.0 ? Thakkar_Anion::available(atomic_number) : true;
+}
+
+// A cation never loses more than its valence shell; EEQ can overshoot that, the tables cannot follow it
+double HE_Spherical_Atom::carried_charge(const int atomic_number, const double charge)
+{
+	if (!ion_available(atomic_number, charge))
+		return 0.0;
+	return std::min(charge, static_cast<double>(valence_electrons(atomic_number)));
 }
 
 HE_Spherical_Atom::HE_Spherical_Atom(const int atomic_number, const double charge)
 	: _Z(atomic_number), _charge(charge), _weight(std::abs(charge)),
 	  _electrons(static_cast<double>(atomic_number)), _most_negative(0.0),
 	  _has_ion(false), _use_delta(false), _delta_n(0), _delta_frac(0.0),
+	  _use_gto(false), _gto_extrap(false), _gto_lo(0), _gto_frac(0.0),
 	  _neutral(atomic_number)
 {
+	if (gto_present(atomic_number))
+	{
+		// Heavy element: the neutral too is the DKH2 atom, Koga/Thakkar being non-relativistic.
+		// Between two computed states the weights stay in [0, 1]; beyond them it extrapolates.
+		_use_gto = true;
+		_weight = 0.0;
+		const int q_lo = GTOIon_anion[atomic_number - 1] ? -1 : 0;
+		const int q_hi = GTOIon_qmax[atomic_number - 1];
+		if (std::abs(charge) >= 1e-12 && ion_available(atomic_number, charge) && q_hi > q_lo)
+		{
+			_gto_lo = std::clamp(static_cast<int>(std::floor(charge)), q_lo, q_hi - 1);
+			_gto_frac = charge - _gto_lo;
+			_gto_extrap = _gto_frac < 0.0 || _gto_frac > 1.0;
+			_has_ion = true;
+			_electrons = static_cast<double>(atomic_number) - charge;
+		}
+		for (double r = 1e-4; r < 30.0; r *= 1.05)
+		{
+			const double d = get_radial_density(r);
+			if (d < _most_negative) _most_negative = d;
+		}
+		return;
+	}
+
 	if (std::abs(charge) < 1e-12)
 		return;   // neutral: nothing to blend
 
@@ -979,6 +1074,13 @@ HE_Spherical_Atom::HE_Spherical_Atom(const int atomic_number, const double charg
 
 double HE_Spherical_Atom::get_radial_density(const double &r) const
 {
+	if (_use_gto)
+	{
+		double d = _neutral.get_radial_density(r) + (1.0 - _gto_frac) * gto_rho_at(gto_table(_Z, _gto_lo), r);
+		if (_gto_frac != 0.0)
+			d += _gto_frac * gto_rho_at(gto_table(_Z, _gto_lo + 1), r);
+		return d;
+	}
 	if (_use_delta)
 	{
 		// rho_1 stays the tabulated Slater cation; only the steps down from it
@@ -997,6 +1099,14 @@ double HE_Spherical_Atom::get_radial_density(const double &r) const
 
 double HE_Spherical_Atom::get_form_factor(const double &k) const
 {
+	if (_use_gto)
+	{
+		const double s = s_of_k(k);
+		double d = _neutral.get_form_factor(k) + (1.0 - _gto_frac) * gto_f_at(gto_table(_Z, _gto_lo), s);
+		if (_gto_frac != 0.0)
+			d += _gto_frac * gto_f_at(gto_table(_Z, _gto_lo + 1), s);
+		return d;
+	}
 	if (_use_delta)
 	{
 		// Same walk in reciprocal space - the transform is linear, so the

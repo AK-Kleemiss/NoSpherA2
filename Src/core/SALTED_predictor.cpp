@@ -131,7 +131,10 @@ void SALTEDPredictor::estimate_fill_charges(const WFN& wavy_in, const std::vecto
 			const bool bohr = wavy_in.get_isBohr();
 			for (int a = 0; a < ncen_in; a++)
 			{
+				// occ's EEQ tables stop at Rn and read past their end above it (U came out +9.2 in COD
+				// 1548085). ponytail: the lanthanide homologue stands in for Fr-Lr, until EEQ has them.
 				nums(a) = wavy_in.get_atom_charge(a);
+				if (nums(a) > 86) nums(a) -= 32;
 				for (int ax = 0; ax < 3; ax++)
 				{
 					const double c = wavy_in.get_atom_coordinate(a, ax);
@@ -152,9 +155,8 @@ void SALTEDPredictor::estimate_fill_charges(const WFN& wavy_in, const std::vecto
 				// the fill stays neutral, so the target must stay neutral too -
 				// otherwise the two disagree and the system total is wrong.
 				const int Zf = wavy_in.get_atom_charge(a);
-				const bool ion_ok = (q(a) > 0.0) ? Thakkar_Cation::available(Zf)
-												 : Thakkar_Anion::available(Zf);
-				if (ion_ok) applied_fill_charge += q(a);
+				const double qf = HE_Spherical_Atom::carried_charge(Zf, q(a));
+				applied_fill_charge += qf;
 				// Position-keyed, in the wavefunction's own units: the fill
 				// rebuilds its wavefunction from the original file, so indices
 				// there are not ours to assume.
@@ -162,7 +164,7 @@ void SALTEDPredictor::estimate_fill_charges(const WFN& wavy_in, const std::vecto
 					wavy_in.get_atom_coordinate(a, 0),
 					wavy_in.get_atom_coordinate(a, 1),
 					wavy_in.get_atom_coordinate(a, 2),
-					ion_ok ? q(a) : 0.0});
+					qf});
 			}
 		}
 		catch (const std::exception &e)

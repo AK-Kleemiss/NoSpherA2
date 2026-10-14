@@ -2050,6 +2050,9 @@
     <ClInclude Include="..\..\Src\core\Slater_delta_coefs.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Src\core\GTO_ion_delta_coefs.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Src\core\Slater_ion_coefs.h">
       <Filter>Header Files</Filter>
     </ClInclude>

@@ -205,6 +205,7 @@
     <ClInclude Include="..\..\Src\core\scattering_factors.h" />
     <ClInclude Include="..\..\Src\core\sf_gpu.h" />
     <ClInclude Include="..\..\Src\core\Slater_delta_coefs.h" />
+    <ClInclude Include="..\..\Src\core\GTO_ion_delta_coefs.h" />
     <ClInclude Include="..\..\Src\core\Slater_ion_coefs.h" />
     <ClInclude Include="..\..\Src\core\sphere_lebedev_rule.h" />
     <ClInclude Include="..\..\Src\core\spherical_density.h" />
