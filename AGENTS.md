@@ -309,6 +309,11 @@ alternative is one flag away in each case.
 
 ## Current Validation Notes
 
+As of 2026-10-14, `Src/core/XCW.cpp` runs on XCW_refactor's symmetry handling (`cell.cpp`), its h/-h inversion
+screening of the I tensor and its AO pair screen, and `slow_conv` damps the lambda = 0 step too;
+`ctest --preset release-linux` reports **1262 passed, 0 failed, 22 skipped** (2 disabled) of 1284. See
+`UNIT_TESTS_STATUS.md`.
+
 As of 2026-10-13, after the NRT symmetry fixes, `ctest --preset release-linux` reports **1260 passed, 0 failed,
 22 skipped** (2 disabled) of 1282. New: `NboNativeTests.TheAllylCationsMirrorStructuresWeighAlike`,
 `NboNativeTests.TheAllylRadicalIsSymmetricInEachSpin` and `NboNativeTests.ASlightlyDistortedAllylCationStaysNearTheSymmetricOne`
