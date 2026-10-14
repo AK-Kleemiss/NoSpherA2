@@ -568,6 +568,8 @@ namespace NoSpherA2UnitTests
 			make_asym("x2", 7, { -0.1, -0.15, -0.2 }) }, 3), 1e-12) << "ligand pair around an inversion centre";
 		EXPECT_LT(p21c_coverage({ c1 }, { make_asym("x0", 6, { 0.1, 0.2, 0.3 }), make_asym("x1", 6, { -0.1, 0.7, 0.2 }),
 			make_asym("x2", 6, { -0.1, -0.2, -0.3 }), make_asym("x3", 6, { 0.1, 0.3, 0.8 }) }, 4), 1e-12) << "whole unit cell";
+		EXPECT_LT(p21c_coverage({ c1 }, { make_asym("x0", 6, { 0.1, 0.2, 0.3 }), make_asym("x1", 6, { -0.1, 0.7, 0.2 }),
+			make_asym("x2", 6, { -0.1, -0.2, -0.3 }) }, 3), 1e-12) << "screw and inversion images without the glide image";
 		EXPECT_LT(p21c_coverage({ c1, n2 }, { make_asym("x", 6, { -0.1, -0.2, -0.3 }) }, 3), 1e-12) << "image of one of two atoms";
 		EXPECT_LT(p21c_coverage({ c1 }, {}, 1), 1e-12) << "nothing grown";
 		EXPECT_LT(p21c_coverage({ fe1, n1 }, { make_asym("x0", 26, { 0.0, 0.0, 0.0 }), make_asym("x1", 26, { 0.0, 0.5, 0.5 }),
