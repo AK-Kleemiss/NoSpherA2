@@ -132,7 +132,7 @@ void cell::convert_to_fracs(std::vector<asym_atom>& atoms, const std::string inp
 			inv_cell << cm[0][0], cm[1][0], cm[2][0], cm[0][1], cm[1][1], cm[2][1], cm[0][2], cm[1][2], cm[2][2];
 		}
 		else if (input_unit == "angstrom") {
-			inv_cell << constants::bohr2ang(cm[0][0]), constants::bohr2ang(cm[0][1]), constants::bohr2ang(cm[0][2]), constants::bohr2ang(cm[1][0]), constants::bohr2ang(cm[1][1]), constants::bohr2ang(cm[1][2]), constants::bohr2ang(cm[2][0]), constants::bohr2ang(cm[2][1]), constants::bohr2ang(cm[2][2]);
+			inv_cell << constants::bohr2ang(cm[0][0]), constants::bohr2ang(cm[1][0]), constants::bohr2ang(cm[2][0]), constants::bohr2ang(cm[0][1]), constants::bohr2ang(cm[1][1]), constants::bohr2ang(cm[2][1]), constants::bohr2ang(cm[0][2]), constants::bohr2ang(cm[1][2]), constants::bohr2ang(cm[2][2]);
 		}
 		else {
 			std::cerr << "Unknown input unit. Choose 'bohr' or 'angstrom'.\n";
@@ -151,12 +151,10 @@ void cell::grow_asym_atoms(std::vector<asym_atom>& asym_atoms, std::vector<asym_
 	Important: Label is a dummy and should not be used before being properly set (hopefully I will remember to set it later on ^^)*/
 	for (asym_atom& xyz_atom : xyz_atoms) {
 		bool found = false;
-		const vec pos1 = { xyz_atom.frac_pos[0], xyz_atom.frac_pos[1], xyz_atom.frac_pos[2] };
+		const vec xyz_pos = { xyz_atom.frac_pos[0], xyz_atom.frac_pos[1], xyz_atom.frac_pos[2] };
 		for (const asym_atom& asym_atom : asym_atoms) {
-			const vec pos2 = { asym_atom.frac_pos[0], asym_atom.frac_pos[1], asym_atom.frac_pos[2] };
-			// This is not a real solution, only a quick fix. Should use the same procedure as in the cif reader (scattering_factors.cpp)
-
-			if (check_special(pos1, pos2, 1e-2)) {
+			const vec asym_unit_pos = { asym_atom.frac_pos[0], asym_atom.frac_pos[1], asym_atom.frac_pos[2] };
+			if (check_special(xyz_pos, asym_unit_pos, 1e-2)) {
 				found = true;
 				break;
 			}
@@ -164,6 +162,43 @@ void cell::grow_asym_atoms(std::vector<asym_atom>& asym_atoms, std::vector<asym_
 		if (!found) {
 			xyz_atom.grown = true;
 			asym_atoms.push_back(xyz_atom);
+		}
+	}
+}
+
+void cell::resolve_internal_symmetry(std::vector<asym_atom>& asym_atoms) {
+	// Loop over the grown atoms
+	for (asym_atom& grown_atom : asym_atoms) {
+		if (!grown_atom.grown) {
+			continue;
+		}
+		const vec grown_pos = { grown_atom.frac_pos[0], grown_atom.frac_pos[1], grown_atom.frac_pos[2] };
+		// Now we have a grown atom, let's find out which asymmetric unit atom it was generated from and by which symmetry
+		bool found = false;
+		for (int sym_op = 0; sym_op < sym[0][0].size(); sym_op++) {
+			if (check_identity(sym_op)) {
+				continue;
+			}
+			for (asym_atom& asymm_atom : asym_atoms) {
+				if (asymm_atom.grown) {
+					continue;
+				}
+				const vec asymm_pos = { asymm_atom.frac_pos[0], asymm_atom.frac_pos[1], asymm_atom.frac_pos[2] };
+				const vec symmetry_generated_pos = apply_symmetry(asymm_pos, sym_op);
+				if (check_special(grown_pos, symmetry_generated_pos, 1e-2)) {
+					grown_atom.grown_from = &asymm_atom - &asym_atoms[0];
+					if (grown_atom.grown_by[0] == -1) {
+						grown_atom.grown_by[0] = sym_op;
+					}
+					else {
+						grown_atom.grown_by.push_back(sym_op);
+					}
+					grown_atom.cryst_mult = asymm_atom.cryst_mult;
+				}
+				if (check_special(asymm_pos, apply_symmetry(grown_pos, sym_op), 1e-2)) {
+					grown_atom.maps_to_parent.push_back(sym_op);
+				}
+			}
 		}
 	}
 }
@@ -203,133 +238,6 @@ bool cell::check_special(const vec& pos1, const vec& pos2, const double& toleran
 	//closing function
 }
 
-// Handles the processing of grown structures
-ivec cell::apply_grown(ivec3& linking_list) {
-	return confirm_applied_symmetry(linking_list);
-	// closing function
-}
-
-// Older working implementation for grown structures, unused, kept for reference.
-
-// Number of explicit atoms in asym_atoms that are symmetry images of the same
-// asymmetric atom as atom_links belongs to, itself included. Using the full,
-// undeleted symmetry operation set to rebuild each atom's orbit always visits
-// each of its physical sites exactly self_links.size() times,
-// uniformly, whether or not another explicit atom already covers part
-// of that orbit; dividing by orbit_copies as well corrects for that overlap.
-//int cell::orbit_copies(const ivec2& atom_links) {
-//	int count = 0;
-//	for (const ivec& link : atom_links) {
-//		if (!link.empty()) count++;
-//	}
-//	return count;
-//}
-//
-//void cell::set_symmetry_factors(std::vector<asym_atom>& asym_atoms, const ivec3& linking_list) {
-//	int idx1 = 0;
-//	for (asym_atom& a : asym_atoms) {
-//		if (!a.grown) {
-//			a.asym_fact = 1.0 / (linking_list[idx1][idx1].size() * orbit_copies(linking_list[idx1]));
-//			idx1++;
-//			continue;
-//		}
-//		for (int idx2 = 0; idx2 < linking_list.size(); idx2++) {
-//			if (linking_list[idx2][idx1].size() != 0) {
-//				a.asym_fact = 1.0 / (linking_list[idx2][idx2].size() * orbit_copies(linking_list[idx2]));
-//				a.sym_op = linking_list[idx2][idx1][0];
-//			}
-//		}
-//		idx1++;
-//	}
-//}
-//
-//int cell::compose_ops(const int op_a, const int op_b) {
-//	// sym[y][x][op] holds R[x][y]; (a after b)(x) = R_a (R_b x + t_b) + t_a
-//	int rot[3][3];
-//	double t[3];
-//	for (int i = 0; i < 3; i++) {
-//		rot[i][0] = rot[i][1] = rot[i][2] = 0;
-//		t[i] = trans[i][op_a];
-//		for (int k = 0; k < 3; k++) {
-//			t[i] += sym[k][i][op_a] * trans[k][op_b];
-//			for (int j = 0; j < 3; j++)
-//				rot[i][j] += sym[k][i][op_a] * sym[j][k][op_b];
-//		}
-//	}
-//	const int num_sym_ops = static_cast<int>(sym[0][0].size());
-//	for (int c = 0; c < num_sym_ops; c++) {
-//		bool same = true;
-//		for (int i = 0; i < 3 && same; i++) {
-//			const double dt = trans[i][c] - t[i];
-//			same = std::abs(dt - std::round(dt)) < 1e-6;
-//			for (int j = 0; j < 3 && same; j++)
-//				same = sym[j][i][c] == rot[i][j];
-//		}
-//		if (same) return c;
-//	}
-//	return -1;
-//}
-//
-//ivec cell::grown_subgroup(const ivec3& linking_list) {
-//	const int num_sym_ops = static_cast<int>(sym[0][0].size());
-//	const int asymmetric_atoms = static_cast<int>(linking_list.size());
-//	// per asymmetric atom: the operations that land on an explicit atom, and one operation per explicit image
-//	std::vector<bvec> lands(asymmetric_atoms, bvec(num_sym_ops, false));
-//	ivec2 image_ops(asymmetric_atoms);
-//	for (int idx1 = 0; idx1 < asymmetric_atoms; idx1++)
-//		for (const ivec& link : linking_list[idx1]) {
-//			if (link.empty()) continue;
-//			image_ops[idx1].push_back(link[0]);
-//			for (const int s : link) lands[idx1][s] = true;
-//		}
-//	// H = operations that map every explicit atom (parents and images alike) onto an explicit atom:
-//	// the setwise stabiliser of the cluster, a group, never smaller than {identity}
-//	ivec subgroup;
-//	for (int sym_op = 0; sym_op < num_sym_ops; sym_op++) {
-//		bool keeps = true;
-//		for (int idx1 = 0; idx1 < asymmetric_atoms && keeps; idx1++)
-//			for (const int h : image_ops[idx1]) {
-//				const int gh = compose_ops(sym_op, h);
-//				if (gh < 0 || !lands[idx1][gh]) { keeps = false; break; }
-//			}
-//		if (keeps) subgroup.push_back(sym_op);
-//	}
-//	return subgroup;
-//}
-//
-//ivec cell::coset_representatives(const ivec& subgroup) {
-//	const int num_sym_ops = static_cast<int>(sym[0][0].size());
-//	ivec reps;
-//	bvec covered(num_sym_ops, false);
-//	auto take = [&](const int g) {
-//		if (covered[g]) return;
-//		reps.push_back(g);
-//		for (const int h : subgroup) {
-//			const int gh = compose_ops(g, h);
-//			if (gh >= 0) covered[gh] = true;
-//		}
-//		};
-//	// the identity coset first: eval_translation_phase reads the unrotated reflection from slot 0
-//	for (int g = 0; g < num_sym_ops; g++)
-//		if (check_identity(g)) take(g);
-//	for (int g = 0; g < num_sym_ops; g++) take(g);
-//	return reps;
-//}
-//
-//void cell::set_subgroup_factors(std::vector<asym_atom>& asym_atoms, const ivec3& linking_list, const ivec& subgroup) {
-//	vec weight(linking_list.size());
-//	for (int idx1 = 0; idx1 < linking_list.size(); idx1++) {
-//		int stab = 0;
-//		for (const int s : linking_list[idx1][idx1])
-//			if (std::find(subgroup.begin(), subgroup.end(), s) != subgroup.end()) stab++;
-//		// the coset sum visits every site of the orbit copies * |stab_G| / |H| times
-//		weight[idx1] = static_cast<double>(subgroup.size()) / (linking_list[idx1][idx1].size() * orbit_copies(linking_list[idx1]));
-//	}
-//	for (int at = 0; at < asym_atoms.size(); at++)
-//		for (int idx1 = 0; idx1 < linking_list.size(); idx1++)
-//			if (!linking_list[idx1][at].empty()) { asym_atoms[at].asym_fact = weight[idx1]; break; }
-//}
-
 bool cell::check_identity(const int& sym_op) {
 	bool is_identity = false;
 	vec trans_identity = { 0 ,0, 0 };
@@ -344,101 +252,165 @@ bool cell::check_identity(const int& sym_op) {
 	return is_identity;
 }
 
-ivec cell::confirm_applied_symmetry(ivec3& linking_list) {
-	ivec applied_symmetry;
-	const int asymmetric_atoms = linking_list.size();
+// This function does not check for improperly applied symmetry operations anymore, hoping that the new symmetry resolution can handle such cases
+ivec cell::confirm_applied_symmetry(const std::vector<asym_atom>& asym_atoms) {
+	const int asymmetric_atoms = asym_atoms.size();
 	const int num_sym_ops = sym[0][0].size();
+	ivec applied_symmetry;
+
+	// Count how often a symmetry operation is applied (check if it is applied to all asymmetric atoms)
 	for (int sym_op = 0; sym_op < num_sym_ops; sym_op++) {
 		if (check_identity(sym_op)) {
 			continue;
 		}
-		int counter = 0;
-		for (int idx1 = 0; idx1 < linking_list.size(); idx1++) {
-			for (int idx2 = 0; idx2 < linking_list[idx1].size(); idx2++) {
-				for (int idx3 = 0; idx3 < linking_list[idx1][idx2].size(); idx3++) {
-					if (linking_list[idx1][idx2][idx3] == sym_op) {
-						counter++;
-					}
+		int count = 0;
+		// This loop counts the asymmetric atoms whose image under the symmetry operation is in the model, either the atom itself
+		// (a special position) or a grown atom, whichever operation that grown atom was credited to in resolve_internal_symmetry
+		for (const asym_atom& asymm_atom : asym_atoms) {
+			if (asymm_atom.grown) {
+				continue;
+			}
+			const vec original_pos = { asymm_atom.frac_pos[0], asymm_atom.frac_pos[1], asymm_atom.frac_pos[2] };
+			const vec symmetry_generated_pos = apply_symmetry(original_pos, sym_op);
+			bool present = check_special(original_pos, symmetry_generated_pos, 1e-4);
+			for (const asym_atom& grown_atom : asym_atoms) {
+				if (present) {
+					break;
+				}
+				if (grown_atom.grown) {
+					present = check_special({ grown_atom.frac_pos[0], grown_atom.frac_pos[1], grown_atom.frac_pos[2] }, symmetry_generated_pos, 1e-2);
 				}
 			}
+			if (present) {
+				count++;
+			}
 		}
-		if (counter == asymmetric_atoms) {
+		// Now we have counted the number of atoms in the model, for which the symmetry operation was applied
+		// If this number is equal to the number of asymmetric atoms, then the symmetry operation is fully applied
+		int original_ncen = 0;
+		for (const asym_atom& asym_atom : asym_atoms) {
+			if (!asym_atom.grown) {
+				original_ncen++;
+			}
+		}
+		if (count == original_ncen) {
 			applied_symmetry.push_back(sym_op);
-		}
-		else if (counter != 0) {
-			int counter2 = 0;
-			for (int idx1 = 0; idx1 < linking_list.size(); idx1++) {
-				for (int idx2 = 0; idx2 < linking_list[idx1][idx1].size(); idx2++) {
-					if (linking_list[idx1][idx1][idx2] == sym_op) {
-						counter2++;
-					}
-				}
-			}
-			if (counter != counter2) {
-				std::cerr << "Warning: Symmetry operation not fully matched. Structure seems to be grown improperly!\n";
-			}
 		}
 	}
 	return applied_symmetry;
 }
 
-void cell::set_symmetry_factors(std::vector<asym_atom>& asym_atoms, const ivec3& linking_list, const ivec3& full_links, const int subgroup_order) {
-	// The coset sum over G/H visits every site of an orbit copies * |stab_G| / |H| times, copies being the explicit
-	// atoms in that orbit; full_links still holds the whole site stabiliser, linking_list only what the projection kept.
-	// 1/|stab| alone holds only when every site stabiliser lies in H: one molecule on a special position, not a salt
-	// whose ions sit on different special positions (PPh4+ UF6- in I-4 counted F and C twice, R1 25 %).
-	auto weight = [&](const int p) {
-		int copies = 0;
-		for (const ivec& link : full_links[p])
-			if (!link.empty()) copies++;
-		return static_cast<double>(subgroup_order) / (full_links[p][p].size() * copies);
-		};
-	int idx1 = 0;
-	for (asym_atom& a : asym_atoms) {
-		if (!a.grown) {
-			a.asym_fact = weight(idx1);
-			idx1++;
-			continue;
-		}
-		for (int idx2 = 0; idx2 < linking_list.size(); idx2++) {
-			if (linking_list[idx2][idx1].size() != 0) {
-				a.asym_fact = weight(idx2);
-				a.sym_op = linking_list[idx2][idx1][0];
+void cell::adjust_sym_facts(const ivec& applied_symmetry, std::vector<asym_atom>& asym_atoms) {
+	/* Following rules should apply (hopefully) :
+	* 1: If an atom is grown explicitly and a symmetry operation that generated it will be deleted, then nothing should change
+	* 2: If an atom is grown explicitly and a symmetry operation that maps it back onto its parent will be kept, the cryst_mult for original atom and grown atom should be increased by 1 to avoid double counting
+	* 3: If an atom is on a special position for an applied symmetry that will be deleted, the cryst_mult for that atom and its symmetry images should decrease by 1 to avoid missing the contribution of that atom
+	* 4: If an atom is on a special position for a symmetry operation will be kept, the cryst_mult for that atom should not change
+	*/
+	for (int sym_op = 0; sym_op < sym[0][0].size(); sym_op++) {
+		bool will_be_deleted = std::find(applied_symmetry.begin(), applied_symmetry.end(), sym_op) != applied_symmetry.end();
+		for (int atom_idx = 0; atom_idx < asym_atoms.size(); atom_idx++) {
+			asym_atom& atom = asym_atoms[atom_idx];
+			const vec original_pos = { atom.frac_pos[0], atom.frac_pos[1], atom.frac_pos[2] };
+			const vec symmetry_generated_pos = apply_symmetry(original_pos, sym_op);
+			// Check if the symmetry operation leads to a special position for this atom (rule 3 and 4)
+			if (!atom.grown && will_be_deleted && check_special(original_pos, symmetry_generated_pos, 1e-4)) {
+				atom.cryst_mult -= 1;
+				for (int equal_atom_idx = 0; equal_atom_idx < asym_atoms.size(); equal_atom_idx++) {
+					if (asym_atoms[equal_atom_idx].grown_from == atom_idx) {
+						asym_atoms[equal_atom_idx].cryst_mult -= 1;
+					}
+				}
+				continue;
+			}
+			// Check if this symmetry operation maps the grown atom back onto its parent (rule 1 and 2); for operations that are not their own
+			// inverse (3-, 4- and 6-fold axes) this differs from grown_by, and it is the hits landing on the parent that are counted here
+			bool maps_back_by_this = std::find(atom.maps_to_parent.begin(), atom.maps_to_parent.end(), sym_op) != atom.maps_to_parent.end();
+			if (maps_back_by_this) {
+				// Check if the symmetry operation is NOT fully applied (rule 2) and will thus be kept
+				if (!will_be_deleted) {
+					atom.cryst_mult += 1;
+					asym_atoms[atom.grown_from].cryst_mult += 1;
+					for (int equal_atom_idx = 0; equal_atom_idx < asym_atoms.size(); equal_atom_idx++) {
+						if (equal_atom_idx == atom_idx || equal_atom_idx == atom.grown_from) {
+							continue;
+						}
+						if (asym_atoms[equal_atom_idx].grown_from == atom.grown_from) {
+							asym_atoms[equal_atom_idx].cryst_mult += 1;
+						}
+					}
+				}
 			}
 		}
-		idx1++;
+	}
+
+}
+
+void cell::asym_unit_cryst_mult(std::vector<asym_atom>& asym_atoms) {
+	for (asym_atom& a : asym_atoms) {
+		int counter = 1;
+		vec originial_pos = { a.frac_pos[0], a.frac_pos[1], a.frac_pos[2] };
+		for (int sym_op = 0; sym_op < sym[0][0].size(); sym_op++) {
+			if (check_identity(sym_op)) {
+				continue;
+			}
+			vec symmetry_pos = apply_symmetry(originial_pos, sym_op);
+			if (check_special(originial_pos, symmetry_pos, 1e-4)) {
+				counter++;
+			}
+		}
+		a.cryst_mult = counter;
 	}
 }
 
-void cell::project_into_subgroup(ivec& applied_symmetry, hkl_list& hkl_enlarged, const hkl_list& hkl, ivec3& linking_list) {
-	// The grown cluster is H(asym) for the subgroup H the applied operations generate, so one operation r
-	// per left coset rH is kept and every r*h is removed: the kept r applied to the cluster then visit
-	// each operation of G once. Pairing op2 with op1*op2 instead held only for |H| = 2 in an abelian group.
+void cell::project_into_subgroup(ivec& applied_symmetry, hkl_list& hkl_enlarged, const hkl_list& hkl, std::vector<asym_atom>& asym_atoms) {
 	const int num_sym_ops = static_cast<int>(sym[0][0].size());
-	ivec subgroup = applied_symmetry; // H without the identity, closed under composition
-	for (size_t i = 0; i < subgroup.size(); i++)
-		for (size_t j = 0; j <= i; j++)
-			for (const int c : { equal_to_concatenation(subgroup[i], subgroup[j]), equal_to_concatenation(subgroup[j], subgroup[i]) })
-				if (c >= 0 && !check_identity(c) && std::find(subgroup.begin(), subgroup.end(), c) == subgroup.end())
-					subgroup.push_back(c);
-	bvec removed(num_sym_ops, false);
-	auto keep = [&](const int g) {
-		if (removed[g]) return;
-		for (const int h : subgroup) {
-			const int gh = equal_to_concatenation(g, h);
-			if (gh >= 0 && gh != g) removed[gh] = true;
+	int e = 0, inv = -1;
+	while (!check_identity(e)) e++;
+	ivec already_applied = applied_symmetry;
+	already_applied.push_back(e);
+	// Find the inversion symmetry
+	for (int sym_op = 0; sym_op < num_sym_ops; sym_op++) {
+		bool is_inversion = true;
+		for (int i = 0; i < 3 && is_inversion; i++) {
+			for (int j = 0; j < 3 && is_inversion; j++) {
+				is_inversion = sym[i][j][sym_op] == (i == j ? -1 : 0);
+			}
+		}
+		if (is_inversion) {
+			inv = sym_op;
+		}
+	}
+	// Covered: Operation belongs to a subset that already has one symmetry operation chosen to be kept. Kept is exactly this operation
+	bvec covered(num_sym_ops, false), kept(num_sym_ops, false);
+	// This function keeps a symmetry operation and marks the symmetry operation that is equal to it being concatenated with an already applied symmetry as covered
+	auto keep = [&](const int r) {
+		kept[r] = true;
+		for (int h : already_applied) {
+			covered[equal_to_concatenation(r, h)] = true;
 		}
 		};
-	// the identity coset first: eval_translation_phase reads the unrotated reflection from slot 0;
-	// then the highest index first, which removes what the pairing did wherever that was right
-	for (int g = 0; g < num_sym_ops; g++)
-		if (check_identity(g)) keep(g);
-	for (int g = num_sym_ops - 1; g >= 0; g--) keep(g);
+	// If the space group is not centrosymmetric, just keep the symmetry operation already chosen, if it is centrosymmetric, keep the inversion symmetric operation, maximizing what can be screened by inversion screening
+	for (int sym_op = 0; sym_op < num_sym_ops; sym_op++) {
+		if (covered[sym_op]) {
+			continue;
+		}
+		keep(sym_op);
+		if (inv < 0) {
+			continue;
+		}
+		const int inversion_symmetric_operation = equal_to_concatenation(inv, sym_op);
+		if (!covered[inversion_symmetric_operation]) {
+			keep(inversion_symmetric_operation);
+		}
+	}
 	applied_symmetry.clear();
-	for (int g = 0; g < num_sym_ops; g++)
-		if (removed[g]) applied_symmetry.push_back(g);
-
-	for (int sym_op : std::views::reverse(applied_symmetry)) {
+	for (int sym_op = 0; sym_op < num_sym_ops; sym_op++)
+		if (!kept[sym_op]) {
+			applied_symmetry.push_back(sym_op);
+		}
+	adjust_sym_facts(applied_symmetry, asym_atoms);
+	for (const int sym_op : std::views::reverse(applied_symmetry)) {
 		for (ivec2& middle : sym) {
 			for (ivec& inner : middle) {
 				inner.erase(inner.begin() + sym_op);
@@ -449,41 +421,245 @@ void cell::project_into_subgroup(ivec& applied_symmetry, hkl_list& hkl_enlarged,
 		}
 	}
 
-	for (int applied_sym : applied_symmetry) {
-		for (int idx1 = 0; idx1 < linking_list.size(); idx1++) {
-			for (int idx2 = 0; idx2 < linking_list[idx1].size(); idx2++) {
-				for (int sym_op = 0; sym_op < linking_list[idx1][idx2].size(); sym_op++) {
-					if (linking_list[idx1][idx2][sym_op] == applied_sym && linking_list[idx1][idx2].size() > 1) {
-						linking_list[idx1][idx2].erase(linking_list[idx1][idx2].begin() + sym_op);
-						sym_op--;
-					}
-				}
-			}
-		}
+	vec3 rotations;
+	for (int sym_op = 0; sym_op < sym[0][0].size(); ++sym_op) {
+		rotations.push_back({ {
+				static_cast<double>(sym[0][0][sym_op]),
+				static_cast<double>(sym[0][1][sym_op]),
+				static_cast<double>(sym[0][2][sym_op])},{
+				static_cast<double>(sym[1][0][sym_op]),
+				static_cast<double>(sym[1][1][sym_op]),
+				static_cast<double>(sym[1][2][sym_op])},{
+				static_cast<double>(sym[2][0][sym_op]),
+				static_cast<double>(sym[2][1][sym_op]),
+				static_cast<double>(sym[2][2][sym_op])} });
 	}
 
 	const int nr = hkl.size();
 	std::vector<i3> hkl_vec(hkl.begin(), hkl.end());
 	hkl_list new_enlarged;
-	for (int r = 0; r < nr; r++) {
-		vec hkl_temp = { (double)hkl_vec[r][0], (double)hkl_vec[r][1], (double)hkl_vec[r][2] };
-		for (int sym_op = 0; sym_op < sym[0][0].size(); sym_op++) {
-			const vec2 rot_temp = { { (double)sym[0][0][sym_op], (double)sym[0][1][sym_op], (double)sym[0][2][sym_op] },
-									{ (double)sym[1][0][sym_op], (double)sym[1][1][sym_op], (double)sym[1][2][sym_op] },
-									{ (double)sym[2][0][sym_op], (double)sym[2][1][sym_op], (double)sym[2][2][sym_op] } };
-			vec new_hkl = self_dot(rot_temp, hkl_temp, false);
+	for (const auto& h : hkl) {
+		vec hkl_temp = { static_cast<double>(h[0]), static_cast<double>(h[1]), static_cast<double>(h[2]) };
+		for (const vec2& rot : rotations) {
+			vec new_hkl = self_dot(rot, hkl_temp, false);
 			i3 new_hkl_int = { (int)std::round(new_hkl[0]), (int)std::round(new_hkl[1]), (int)std::round(new_hkl[2]) };
 			new_enlarged.insert(new_hkl_int);
 		}
 	}
 	hkl_enlarged = new_enlarged;
+	//closing function
 }
 
-ivec cell::apply_grown(const hkl_list& hkl, hkl_list& hkl_enlarged, std::vector<asym_atom>& asym_atoms, ivec3& linking_list, ivec3& original_rotations) {
-	original_rotations = sym;
-	ivec applied_symmetry = confirm_applied_symmetry(linking_list);
-	project_into_subgroup(applied_symmetry, hkl_enlarged, hkl, linking_list);
+void cell::grow_ADPs(std::vector<asym_atom>& asym_atoms, vec3& ADPs) {
+	vec3 new_ADPs(asym_atoms.size());
+	for (int i = 0; i < ADPs.size(); i++) {
+		new_ADPs[i] = ADPs[i];
+	}
+	// The grown atoms follow the asymmetric ones; each takes its parent's values, the ADPs rotated by the linking operation
+	int idx = 0;
+	for (asym_atom& grown_atom : asym_atoms) {
+		if (!grown_atom.grown) {
+			idx++;
+			continue;
+		}
+		const int parent_idx = grown_atom.grown_from;
+		const int sym_op = grown_atom.grown_by[0];
+		new_ADPs[idx] = ADPs[parent_idx];
+		rotate_grown_ADPs(new_ADPs[idx], sym_op);
+		grown_atom.U_iso = asym_atoms[parent_idx].U_iso;
+		grown_atom.anom = asym_atoms[parent_idx].anom;
+		idx++;
+	}
+	ADPs = new_ADPs;
+};
+
+// U*, C and D are contravariant tensors in the fractional basis, so an image's are T' = R T R^T with R
+// the rotation of sym_op (x' = R x + t); sym holds R transposed, which is what transform_ADPs takes.
+// U comes as the CIF gives it, U*_ij / (a*_i a*_j), so it is rotated as U* and scaled back.
+void cell::rotate_grown_ADPs(vec2& ADPs, const int sym_op) const {
+	vec2 M(3, vec(3));
+	for (int i = 0; i < 3; i++)
+		for (int j = 0; j < 3; j++)
+			M[i][j] = sym[i][j][sym_op];
+	transform_ADPs(ADPs, M);
+}
+
+// Position of a sorted index triple/quadruple in the Voigt storage of C (10) and D (15)
+static int get_voigt_index(const ivec& indices) {
+	static const ivec2 map3{ { 0, 0, 0 }, { 0, 0, 1 }, { 0, 0, 2 }, { 0, 1, 1 }, {0, 1, 2}, {0, 2, 2}, {1, 1, 1}, { 1, 1, 2 }, { 1, 2, 2 }, { 2, 2, 2 } };
+	static const ivec2 map4{ { 0, 0, 0, 0 }, { 0, 0, 0, 1 }, { 0, 0, 0, 2 }, { 0, 0, 1, 1 }, { 0, 0, 1, 2 }, { 0, 0, 2, 2 }, { 0, 1, 1, 1 }, { 0, 1, 1, 2 }, { 0, 1, 2, 2 }, { 0, 2, 2, 2 }, { 1, 1, 1, 1 }, { 1, 1, 1, 2 }, { 1, 1, 2, 2 }, { 1, 2, 2, 2 }, { 2, 2, 2, 2 } };
+	const auto& map = indices.size() == 3 ? map3 : map4;
+	return std::find(map.begin(), map.end(), indices) - map.begin();
+}
+
+//Maybe an alternative to transform_ADPs but I don't like it yet since it has many auxiliary functions and is really hard to read.
+//template <std::size_t N>
+//int flat_index(const std::array<int, N>& t) {
+//	int f = 0;
+//	for (int i : t) f = 3 * f + i;
+//	return f;
+//}
+//
+//template <std::size_t N, std::size_t K>
+//vec transform_symmetric(const vec& packed, const vec2& M, const std::array<std::array<int, N>, K>& order) {
+//	assert(packed.size() == K);
+//	constexpr int full = ipow3(N);
+//
+//	// Unpack into the full tensor: every permutation of a stored tuple gets its value.
+//	std::array<double, full> T{};
+//	for (std::size_t c = 0; c < K; ++c) {
+//		auto t = order[c];  // tuples are stored sorted, so next_permutation hits all of them
+//		do T[flat_index(t)] = packed[c];
+//		while (std::next_permutation(t.begin(), t.end()));
+//	}
+//
+//	// Contract M into one axis at a time: N * 3^(N+1) flops instead of 3^(2N).
+//	for (std::size_t axis = 0; axis < N; ++axis) {
+//		const int stride = ipow3(N - 1 - axis);
+//		std::array<double, full> R{};
+//		for (int f = 0; f < full; ++f) {
+//			const int i = (f / stride) % 3;
+//			const int base = f - i * stride;
+//			for (int p = 0; p < 3; ++p)
+//				R[f] += M[p][i] * T[base + p * stride];
+//		}
+//		T = R;
+//	}
+//
+//	// Pack back into the independent components.
+//	vec out(K);
+//	for (std::size_t c = 0; c < K; ++c)
+//		out[c] = T[flat_index(order[c])];
+//	return out;
+//}
+//
+//
+//constexpr int ipow3(std::size_t n) { return n == 0 ? 1 : 3 * ipow3(n - 1); }
+//void cell::transform_ADPs(vec2& ADPs, const vec2& M) {
+//	constexpr std::array<std::array<int, 2>, 6> voigt2{ { {0,0}, {1,1}, {2,2}, {0,1}, {0,2}, {1,2} } };
+//	constexpr std::array<std::array<int, 3>, 10> voigt3{ {
+//		{0,0,0}, {0,0,1}, {0,0,2}, {0,1,1}, {0,1,2}, {0,2,2}, {1,1,1}, {1,1,2}, {1,2,2}, {2,2,2} } };
+//	constexpr std::array<std::array<int, 4>, 15> voigt4{ {{0,0,0,0}, {0,0,0,1}, {0,0,0,2}, {0,0,1,1}, {0,0,1,2}, {0,0,2,2}, {0,1,1,1}, {0,1,1,2},
+//		{0,1,2,2}, {0,2,2,2}, {1,1,1,1}, {1,1,1,2}, {1,1,2,2}, {1,2,2,2}, {2,2,2,2} } };
+//	if (ADPs.size() > 0 && !ADPs[0].empty()) ADPs[0] = transform_symmetric(ADPs[0], M, voigt2);
+//	if (ADPs.size() > 1 && !ADPs[1].empty()) ADPs[1] = transform_symmetric(ADPs[1], M, voigt3);
+//	if (ADPs.size() > 2 && !ADPs[2].empty()) ADPs[2] = transform_symmetric(ADPs[2], M, voigt4);
+//}
+
+
+
+// T'_{ij..} = sum M_pi M_qj .. T_pq.. for the U (rank 2), C (rank 3) and D (rank 4) tensors in their
+// Voigt storage: structure_factors::U_star2U_cart hands in the cell matrix, rotate_grown_ADPs the transposed symmetry operation
+void cell::transform_ADPs(vec2& ADPs, const vec2& M) {
+	if (ADPs.size() > 0 && ADPs[0].size() > 0) {
+		vec2 U(3, vec(3));
+		U[0][0] = ADPs[0][0];
+		U[0][1] = ADPs[0][3];
+		U[0][2] = ADPs[0][4];
+		U[1][0] = ADPs[0][3];
+		U[1][1] = ADPs[0][1];
+		U[1][2] = ADPs[0][5];
+		U[2][0] = ADPs[0][4];
+		U[2][1] = ADPs[0][5];
+		U[2][2] = ADPs[0][2];
+		U = self_dot(self_dot(M, U, true, false), M, false, false);
+		ADPs[0][0] = U[0][0];
+		ADPs[0][1] = U[1][1];
+		ADPs[0][2] = U[2][2];
+		ADPs[0][3] = U[0][1];
+		ADPs[0][4] = U[0][2];
+		ADPs[0][5] = U[1][2];
+	}
+	if (ADPs.size() > 1 && ADPs[1].size() > 0) {
+		int running_idx = 0;
+		vec C_out(10);
+		for (int i = 0, idx = 0; i < 3; i++) {
+			for (int j = i; j < 3; j++) {
+				for (int k = j; k < 3; k++) {
+					double sum = 0;
+					for (int p = 0; p < 3; p++) {
+						for (int q = 0; q < 3; q++) {
+							for (int r = 0; r < 3; r++) {
+								ivec sorted_idx = { p, q, r };
+								std::sort(sorted_idx.begin(), sorted_idx.end());
+								int ADP_idx;
+								ADP_idx = get_voigt_index(sorted_idx);
+								sum += M[p][i] * M[q][j] * M[r][k] * ADPs[1][ADP_idx];
+							}
+						}
+					}
+					C_out[idx++] = sum;
+				}
+			}
+		}
+		ADPs[1] = C_out;
+	}
+	if (ADPs.size() > 2 && ADPs[2].size() > 0) {
+		int running_idx = 0;
+		vec D_out(15);
+		for (int i = 0; i < 3; i++) {
+			for (int j = i; j < 3; j++) {
+				for (int k = j; k < 3; k++) {
+					for (int l = k; l < 3; l++) {
+						double sum = 0;
+						for (int p = 0; p < 3; p++) {
+							for (int q = 0; q < 3; q++) {
+								for (int r = 0; r < 3; r++) {
+									for (int s = 0; s < 3; s++) {
+										ivec sorted_idx = { p, q, r, s };
+										std::sort(sorted_idx.begin(), sorted_idx.end());
+										int ADP_idx;
+										ADP_idx = get_voigt_index(sorted_idx);
+										sum += M[p][i] * M[q][j] * M[r][k] * M[s][l] * ADPs[2][ADP_idx];
+									}
+								}
+							}
+						}
+						D_out[running_idx] = sum;
+						running_idx++;
+					}
+				}
+			}
+		}
+		ADPs[2] = D_out;
+	}
+}
+
+bool cell::check_inversion(const i3& h1, const i3& h2) {
+	return h1[0] == -h2[0] && h1[1] == -h2[1] && h1[2] == -h2[2];
+}
+
+// -h is looked up among all entries, not only among images under an inversion operation: two images of
+// different operations can be each other's inverse, and a grown structure need not keep the inversion at all
+ivec2 cell::remove_inv_vectors(const hkl_list& hkl_enlarged, hkl_list& inversion_cleaned_hkl) {
+	const std::vector<i3> h(hkl_enlarged.begin(), hkl_enlarged.end());
+	const int n = static_cast<int>(h.size());
+	bvec paired(n, false);
+	ivec2 link;
+	inversion_cleaned_hkl.clear();
+	for (int i = 0; i < n; i++) {
+		if (paired[i]) continue;
+		link.push_back({ i });
+		inversion_cleaned_hkl.insert(inversion_cleaned_hkl.end(), h[i]);
+		// The entries are sorted and unique, so a vector has one inverse at most and a binary search finds it
+		const i3 minus_h = { -h[i][0], -h[i][1], -h[i][2] };
+		const int j = static_cast<int>(std::lower_bound(h.begin(), h.end(), minus_h) - h.begin());
+		if (j > i && j < n && check_inversion(h[i], h[j])) {
+			link.back().push_back(j);
+			paired[j] = true;
+		}
+	}
+	return link;
+}
+
+ivec cell::apply_grown(const hkl_list& hkl, hkl_list& hkl_enlarged, std::vector<asym_atom>& asym_atoms) {
+	// Check which symmetry operations are fully applied to the asymmetric unit, ONLY those can be deleted
+	ivec applied_symmetry = confirm_applied_symmetry(asym_atoms);
+	// Adjust the symmetry factor of each atom according to the applied symmetry operations (this makes my head hurt)
+	// This is done inside project_into_subgroup now because of funny symmetry reasons (redundant symmetry operations also have to be considered and these are only generated in the projection function)
+	project_into_subgroup(applied_symmetry, hkl_enlarged, hkl, asym_atoms);
 	return applied_symmetry;
+	// closing function
 }
 
 int cell::equal_to_concatenation(const int op_a, const int op_b) {

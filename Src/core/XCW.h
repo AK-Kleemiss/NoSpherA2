@@ -16,13 +16,6 @@
 
 // Applies M to the U/C/D tensors of one atom in their Voigt storage: T'_{ij..} = sum_pq.. M_pi M_qj .. T_pq..
 void transform_ADPs(vec2& ADPs, const vec2& M);
-// r^l * spherical_harmonic(l, m, r/|r|) as monomials {x^i y^j z^k, coefficient}; residual is the max misfit of the fit
-std::vector<std::pair<i3, double>> solid_harmonic_monomials(const int l, const int m, double* residual = nullptr);
-// Upper bound on int |chi_a chi_b| d3r for two contracted AOs (primitives, centre, solid harmonic from above);
-// returns as soon as the partial sum exceeds stop
-double ao_pair_abs_overlap_bound(const std::vector<primitive>& pa, const d3& A, const std::vector<std::pair<i3, double>>& sa,
-	const std::vector<primitive>& pb, const d3& B, const std::vector<std::pair<i3, double>>& sb,
-	const double stop = std::numeric_limits<double>::infinity());
 
 class XCW {
 public:
@@ -482,6 +475,9 @@ private:
 	std::vector<scattering_data> obs;
 	hkl_list hkl;
 	hkl_list hkl_enlarged;
+	// hkl_enlarged with one entry of every inversion related pair, see cell::remove_inv_vectors
+	hkl_list inversion_cleaned_hkl;
+	// The symmetry operations before a grown structure is projected into its subgroup; grown_by indexes these
 	ivec3 original_rotations;
 	GridManager tsc_grids;
 	// hkl_ordered_[r] is the Miller index of reflection r of obs[r]/F_calc[0][r], see ensure_hkl_ordered

@@ -22,8 +22,8 @@ GridManager: Generated total of 93098 grid points.
 Total number of grid points after pruning: 93092
 AO values calculated for all grids.
 Writing the I tensor to p1_i.bin in the background; a later run can `read p1_i.bin` instead of building it
-Screened out 2668 unique pairs of mu, nu (49.81%) 
-Skipped evaluation of 5584182 grids (11.28%) 
+Screened out 1798 unique pairs of mu, nu (33.57%) 
+Skipped evaluation of 8004222 grids (16.16%) 
 More detailed output in XCW.log file...
 ____________________________________________________________________________________
  Lambda		Criterion	GooF(F2)	R1(gt)		Total Energy		Perturbation	Target quantity		Crit(all)	R1(all)
