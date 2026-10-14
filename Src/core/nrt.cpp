@@ -1413,8 +1413,9 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 		VectorXd Gw;
 		gather_mv(G, w, Gw);
 		const double level = w.dot(Gw) - g.dot(w);
+		const int nt = nthreads;
 		vec r(nd);
-#pragma omp parallel for schedule(dynamic) num_threads(nthreads)
+#pragma omp parallel for schedule(dynamic) num_threads(nt)
 		for (int j = 0; j < nd; j++) {
 			const MatrixXd V = orbitals(deferred[j], B, nn);
 			const MatrixXd GV = gw * V;
