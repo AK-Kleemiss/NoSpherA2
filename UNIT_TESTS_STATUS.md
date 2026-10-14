@@ -20,6 +20,27 @@ with the golden case `SALTED_charge_constraint`, the `-interaction_energy` input
 `WFN::isBohr` reader fix, the interaction energy itself, the `Int_Params` fix, multipole-restrained
 RI fit, `computeRho` screening fix.)
 
+## 2026-10-10 - inversion screening also for measured h / -h pairs
+
+`make_jobs` (2026-10-08) merges the integrations of the images of one reflection that are each other's inverse, which
+is where a centrosymmetric group with merged data saves (Fe_phen). A P1 list that holds h and -h as separate reflections
+(1597 pairs in `P1_test.hkl`, one operation) has one image per reflection, so nothing merged and the I tensor took as
+long as without screening. `build_I` now also integrates only the lower index of every measured h / -h pair and stores
+the conjugate row for the other (the images of -h are minus those of h, phases and Debye-Waller factors conjugate);
+the device path does the same (copied rows get no columns, their read-back is skipped and a batch of copied rows only
+is not submitted), neither compiled nor run here. The work estimate is now measured
+against one integration per entry of `hkl_enlarged`. P1 with `refactor.txt`: 9.8 s -> 5.0 s of I tensor, 1.53 -> 0.77
+Tflop-equivalents, `SCF.log` and the `NA2_*_Fcalc.txt` identical to the run before. `NOSPHERA2_NO_INVERSION_SCREENING`
+in the environment switches the screening off; the two new gtests use it to compare the screened against the unscreened
+tensor to 1e-12 and check the reported count against the inverse pairs of `hkl_enlarged`:
+`XcwScfTests.InversionScreeningOfMeasuredPairsIsExact` (the P1 subset) and
+`XcwScfTests.InversionScreeningOfSymmetryGeneratedPairsIsExact` (the P1 molecule in P-1 against the upper half of the
+subset, so that every pair comes from the inversion, as in Fe_phen). With `ExtinctionTests`, `XcwHaltingTests`,
+`XcwSettingsTests`, `XcwHaltingReportTests`, `XcwScfTensorFileTests`, `XcwScfTests` and the seven P1 XCW goldens: 45
+passed, 0 failed (`XcwTests.cpp` and `CellMathTests.cpp` do not compile against the uncommitted `cell` changes and were
+left out of that binary, so `XcwInversionTests` did not run). Fe_phen was not rerun: the uncommitted grown-structure
+code stops in the `structure_factors` constructor before the I tensor; `build_I`'s merging is the one of 2026-10-08.
+
 ## 2026-10-08 — Inversion screening of the XCW I tensor (`XcwInversionTests`)
 
 `build_I` integrates each k-point of `scatter_data.inversion_cleaned_hkl` only: `cell::remove_inv_vectors`

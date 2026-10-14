@@ -300,6 +300,10 @@ alternative is one flag away in each case.
 
 ## Current Validation Notes
 
+As of 2026-10-10, the XCW inversion screening also covers measured h / -h pairs (the row of -h is the conjugate of
+the row of h), next to the merging of inverse images within one reflection of 2026-10-08; P1 takes 5.0 s of I tensor
+instead of 9.8 s, and the XCW suites and P1 goldens report 45 passed, 0 failed. See `UNIT_TESTS_STATUS.md`.
+
 As of 2026-10-08, the XCW I tensor integrates only one k-point of every inversion related pair
 (`cell::remove_inv_vectors`, `XcwInversionTests` new); the XCW/cell/P1 filter reports 116 passed, 0 failed,
 and Fe_phen reproduces its reference lambda table in 448 s of I tensor instead of 610 s. See `UNIT_TESTS_STATUS.md`.

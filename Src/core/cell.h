@@ -10,11 +10,14 @@ struct asym_atom {
 	int type;
 	d3 pos;
 	d3 frac_pos;
-	double asym_fact;
+	int cryst_mult;
+	double sym_fact = 1.0;
 	cdouble anom;
 	bool grown = false;
 	// grown_by and grown_from are used to track the symmetry operation that generated a grown atom from its asymmetric parent (-1 for asymmetric atoms)
-	int grown_by = -1;
+	ivec grown_by = { -1 };
+	// The symmetry operations that map a grown atom back onto its parent, the inverses of grown_by
+	ivec maps_to_parent;
 	int grown_from = -1;
 	double U_iso = 0.0;
 };
@@ -41,21 +44,19 @@ private:
 	void convert_to_fracs(std::vector<asym_atom>& atoms, const std::string input_unit);
 	vec apply_symmetry(const vec& pos, const int sym_op);
 	bool check_special(const vec& pos1, const vec& pos2, const double& tolerance = 1e-10);
-	bool check_equal_pos(const vec& pos1, const vec& pos2, const double& tolerance = 1e-10);
 	bool check_identity(const int& sym_op);
-	//static int orbit_copies(const ivec2& atom_links);
 
 	// Subgroup projection for grown structures
-	void project_into_subgroup(ivec& applied_symmetry, hkl_list& hkl_enlarged, const hkl_list& hkl);
+	void project_into_subgroup(ivec& applied_symmetry, hkl_list& hkl_enlarged, const hkl_list& hkl, std::vector<asym_atom>& asym_atoms);
 	int equal_to_concatenation(const int op_a, const int op_b);
 	
 
 public:
 
 	// Sets the symmetry factors for the asymmetric unit
-	void asym_unit_symmetry_factors(std::vector<asym_atom>& asym_atoms);
+	void asym_unit_cryst_mult(std::vector<asym_atom>& asym_atoms);
 	// Subgroup projection for grown structures
-	void set_symmetry_factors(std::vector<asym_atom>& asym_atoms, const ivec3& linking_list, const ivec& applied_symmetry);
+	//void set_symmetry_factors(std::vector<asym_atom>& asym_atoms, const ivec3& linking_list, const ivec& applied_symmetry);
 	ivec apply_grown(const hkl_list& hkl, hkl_list& hkl_enlarged, std::vector<asym_atom>& asym_atoms);
 	// U_iso, dispersion and ADPs of the grown atoms from their parents, the ADPs rotated onto the image
 	void grow_ADPs(std::vector<asym_atom>& asym_atoms, vec3& ADPs);
@@ -96,6 +97,13 @@ public:
 	void resolve_internal_symmetry(std::vector<asym_atom>& asym_atoms);
 	void eval_symm(std::vector<asym_atom>& asym_atoms, const int& asymmetric_atoms, ivec3& linking_list);
 	ivec confirm_applied_symmetry(const std::vector<asym_atom>& asym_atoms);
+	void adjust_sym_facts(const ivec& applied_symmetry, std::vector<asym_atom>& asym_atoms);
+	// Just a helper function that speeds up future computation
+	void set_sym_fact_from_mult(std::vector<asym_atom>& asym_atoms) {
+		for (asym_atom& atom : asym_atoms) {
+			atom.sym_fact = 1.0 / static_cast<double>(atom.cryst_mult);
+		}
+	};
 
 	// Retired together with orbit_copies below. A declaration whose definition is commented out
 	// does not fail where it is called, it fails at link time in whichever target calls it - which

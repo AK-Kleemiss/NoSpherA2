@@ -46,8 +46,8 @@ structure_factors::structure_factors(options& opt_in) {
 	model_data.wavelength = opt_in.xcw_settings.wavelength > 0.0 ? opt_in.xcw_settings.wavelength : wavelength_;
 	err_checkf(model_data.ncen > 0, "No atoms were read from " + cif.string() + "! Is there an _atom_site loop with labels, type symbols and fractional coordinates?", std::cout);
 
-	// First step of the symmetry resolution: Calculate the symmetry factors for the asymmetric unit
-	unit_cell.asym_unit_symmetry_factors(asym_atoms);
+	// First step of the symmetry resolution: Calculate the crystallographic multiplicities for the asymmetric unit
+	unit_cell.asym_unit_cryst_mult(asym_atoms);
 
 	{
 		//ivec3 symmetry_linking_list;
@@ -77,15 +77,16 @@ structure_factors::structure_factors(options& opt_in) {
 			unit_cell.grow_ADPs(asym_atoms, ADPs);
 			// Fifth step of the symmetry resolution: Find fully applied operations and if possible, project the grown structure into its symmetry subgroup and update everything accordingly
 			applied_symmetry = unit_cell.apply_grown(scatter_data.hkl, scatter_data.hkl_enlarged, asym_atoms);
-			// Sixth step of the symmetry resolution: 
+			// Convenience function to precompute the symmetry factors
+			unit_cell.set_sym_fact_from_mult(asym_atoms);
 		}
 		if (std::getenv("NOSPHERA2_DEBUG_ASYMFACT")) { // Flawfinder: ignore
 			std::cerr << "applied_symmetry (deleted):";
 			for (int s : applied_symmetry) std::cerr << " " << s;
 			std::cerr << std::endl << "surviving sym ops: " << unit_cell.get_trans()[0].size() << std::endl;
 			for (size_t i = 0; i < asym_atoms.size(); i++)
-				std::cerr << i << " grown=" << asym_atoms[i].grown << " sym_op=" << asym_atoms[i].grown_by
-				<< " asym_fact=" << asym_atoms[i].asym_fact << std::endl;
+				std::cerr << i << " grown=" << asym_atoms[i].grown << " sym_op=" << asym_atoms[i].grown_by[0]
+				<< " sym_fact=" << asym_atoms[i].sym_fact << std::endl;
 			std::cerr << "hkl_enlarged size: " << scatter_data.hkl_enlarged.size() << std::endl;
 		}
 	}
@@ -369,7 +370,7 @@ void structure_factors::set_anom() {
 			for (r_asym = 0; r_asym < lookup.size(); r_asym++) {
 				temp1 += phase_facts[at][lookup[r_asym]] * DW_facts[at][lookup[r_asym]] * translation_phase_facts[r][r_asym];
 			}
-			sum += temp1 * asym_atoms[at].asym_fact * asym_atoms[at].anom;
+			sum += temp1 * asym_atoms[at].sym_fact * asym_atoms[at].anom;
 		}
 		scatter_data.anom_correction[r] = sum;
 	}
@@ -917,8 +918,13 @@ void structure_factors::build_I(const std::vector<ao_data>& ao_data_shells, doub
 	const unsigned int num_syms = unit_cell.get_num_syms();
 	// The AO values and weights are real, so the grid integral sum_p w_p phi_mu phi_nu exp(i q d_p) of -q is the
 	// conjugate of that of q: only the entries of inversion_cleaned_hkl are integrated
-	const ivec2 inversion_link = unit_cell.remove_inv_vectors(scatter_data.hkl_enlarged, scatter_data.inversion_cleaned_hkl);
-	const bool inversion_screening = scatter_data.inversion_cleaned_hkl.size() != scatter_data.hkl_enlarged.size();
+	const bool no_screening = std::getenv("NOSPHERA2_NO_INVERSION_SCREENING") != nullptr; // Flawfinder: ignore
+	ivec2 inversion_link;
+	if (no_screening)
+		for (int e = 0; e < model_data.nr_enlarged; e++) inversion_link.push_back({ e });
+	else
+		inversion_link = unit_cell.remove_inv_vectors(scatter_data.hkl_enlarged, scatter_data.inversion_cleaned_hkl);
+	const bool inversion_screening = static_cast<int>(inversion_link.size()) != model_data.nr_enlarged;
 	ivec clean_of(model_data.nr_enlarged);
 	bvec is_inverse(model_data.nr_enlarged, false);
 	for (int c = 0; c < inversion_link.size(); c++)
@@ -926,11 +932,28 @@ void structure_factors::build_I(const std::vector<ao_data>& ao_data_shells, doub
 			clean_of[inversion_link[c][i]] = c;
 			is_inverse[inversion_link[c][i]] = i == 1;
 		}
+	// A reflection whose inverse is measured too has the conjugate of the inverse's row, the images of -h being minus those
+	// of h with conjugate phases: only the lower of the two is integrated
+	ivec row_partner(model_data.nr, -1);
+	bvec row_copy(model_data.nr, false);
+	if (!no_screening) {
+		const std::vector<i3> hv(scatter_data.hkl.begin(), scatter_data.hkl.end());
+		for (r = 0; r < model_data.nr; r++) {
+			if (row_copy[r]) continue;
+			const i3 minus_h = { -hv[r][0], -hv[r][1], -hv[r][2] };
+			const int j = static_cast<int>(std::lower_bound(hv.begin(), hv.end(), minus_h) - hv.begin());
+			if (j > r && j < model_data.nr && cell::check_inversion(hv[r], hv[j])) {
+				row_partner[r] = j;
+				row_copy[j] = true;
+			}
+		}
+	}
 	// The integrations of reflection r: with inversion screening one per cleaned entry its k-points land on, carrying
 	// the summed translation phases of the operations landing on the entry and on its inverse; without, one per operation
 	struct k_job { int c; bool self, inv; cdouble t_self, t_inv; };
 	auto make_jobs = [&](const int r, std::vector<k_job>& jobs) {
 		jobs.clear();
+		if (row_copy[r]) return;
 		for (int s = 0; s < static_cast<int>(num_syms); s++) {
 			const int e = asym_lookup[r][s];
 			int j = inversion_screening ? 0 : static_cast<int>(jobs.size());
@@ -948,10 +971,10 @@ void structure_factors::build_I(const std::vector<ao_data>& ao_data_shells, doub
 	};
 	// The basis function independent factor of atom grid g at k-point e
 	auto grid_factor = [&](const int g, const int e) {
-		const double asym_fact = asym_atoms[g].asym_fact;
+		const double sym_fact = asym_atoms[g].sym_fact;
 		const cdouble DW = DW_facts[g][e], ph = phase_facts[g][e];
-		return cdouble(asym_fact * (DW.real() * ph.real() - DW.imag() * ph.imag()),
-			asym_fact * (DW.real() * ph.imag() + DW.imag() * ph.real()));
+		return cdouble(sym_fact * (DW.real() * ph.real() - DW.imag() * ph.imag()),
+			sym_fact * (DW.real() * ph.imag() + DW.imag() * ph.real()));
 	};
 	long long n_integrations = 0;
 	{
@@ -961,7 +984,6 @@ void structure_factors::build_I(const std::vector<ao_data>& ao_data_shells, doub
 			n_integrations += jobs.size();
 		}
 	}
-	const long long n_runs = static_cast<long long>(model_data.nr) * num_syms;
 	if (inversion_screening && !(opt->no_date)) {
 		const size_t n_inv = scatter_data.hkl_enlarged.size() - scatter_data.inversion_cleaned_hkl.size();
 		std::cout << std::fixed << std::setprecision(2) << "Inversion screening: Screened out " << n_inv << " of " << scatter_data.hkl_enlarged.size()
@@ -1531,13 +1553,13 @@ void structure_factors::build_I(const std::vector<ao_data>& ao_data_shells, doub
 				work_done += na * na * b.point_count;
 				work_unscreened += static_cast<double>(model_data.nmo) * model_data.nmo * b.point_count;
 			}
-		//Unscreened is every operation of every reflection, screened only the integrations inversion screening leaves
-		const double runs = static_cast<double>(n_runs);
-		work_done *= static_cast<double>(n_integrations) / runs;
+		//Unscreened is one integration for every entry of hkl_enlarged, screened only the integrations inversion screening leaves
+		work_done *= static_cast<double>(n_integrations);
+		work_unscreened *= static_cast<double>(model_data.nr_enlarged);
 		if (work_done > 0.0)
 			std::cout << std::fixed << std::setprecision(2)
-				<< "I tensor work after all screening: " << (work_done * runs / 1e12)
-				<< " of " << (work_unscreened * runs / 1e12) << " Tflop-equivalents ("
+				<< "I tensor work after all screening: " << (work_done / 1e12)
+				<< " of " << (work_unscreened / 1e12) << " Tflop-equivalents ("
 				<< std::setprecision(2) << 100.0 * work_done / work_unscreened << "%, "
 				<< (work_unscreened / work_done) << "x less than unscreened)\n";
 	}
@@ -1586,6 +1608,34 @@ void structure_factors::build_I(const std::vector<ao_data>& ao_data_shells, doub
 	std::atomic<long long> gpu_ns_per_refl{0};
 	std::mutex i_write_mutex;
 	std::thread gpu_thread;
+	//Row r of the tensor and, when the inverse of r is measured too, the conjugate row of that one, whichever way the tensor is held
+	auto store_rows = [&](const int r, const cdouble* row) {
+		const size_t n = I_tens.i_compact_;
+		cvec flipped;
+		for (int i = 0; i < 2; i++) {
+			const int rr = i == 0 ? r : row_partner[r];
+			if (rr < 0) break;
+			const cdouble* src = row;
+			if (i == 1) {
+				flipped.resize(n);
+				for (size_t t = 0; t < n; t++) flipped[t] = std::conj(row[t]);
+				src = flipped.data();
+			}
+			const size_t at = static_cast<size_t>(rr) * n;
+			if (I_tens.i_streamed_) {
+				//A write is packed_size * 16 bytes against a whole reflection's worth
+				//of integration, so the lock is not on the hot path
+				std::lock_guard<std::mutex> lock(i_write_mutex);
+				I_tens.i_file_.write_block(rr, src);
+			}
+			else if (I_tens.i_float_) {
+				std::complex<float>* const dst = I_tens.I32.data() + at;
+				for (size_t t = 0; t < n; t++) dst[t] = std::complex<float>(static_cast<float>(src[t].real()), static_cast<float>(src[t].imag()));
+			}
+			else if (src != I_tens.I.data() + at)
+				std::copy(src, src + n, I_tens.I.data() + at);
+		}
+	};
 #if defined(NOSPHERA2_USE_GPU) || defined(NOSPHERA2_USE_METAL)
 	//Read with use_gpu rather than on its own, so -no_gpu means what it says. Checking the
 	//pair here rather than clearing the flag at parse time keeps it order-independent.
@@ -1694,8 +1744,7 @@ void structure_factors::build_I(const std::vector<ao_data>& ao_data_shells, doub
 		//The device takes reflections in batches; the CPU threads keep taking them one at
 		//a time from the same counter
 		const int gpu_batch = itensor_gpu_batch(static_cast<int>(num_syms));
-		cvec blk_gpu;
-		if (I_tens.i_streamed_ || I_tens.i_float_) blk_gpu.assign(static_cast<size_t>(gpu_batch) * I_tens.i_compact_, cdouble{});
+		cvec blk_gpu(static_cast<size_t>(gpu_batch) * I_tens.i_compact_, cdouble{});
 		//A column per integration, at most num_syms per reflection
 		vec kxs(static_cast<size_t>(gpu_batch) * num_syms), kys(kxs.size()), kzs(kxs.size());
 		cvec facs(kxs.size() * n_atom_grids), facs_inv(facs.size());
@@ -1703,24 +1752,12 @@ void structure_factors::build_I(const std::vector<ao_data>& ao_data_shells, doub
 		std::vector<k_job> jobs_gpu;
 		int done = 0;
 		auto collect_gpu = [&](const int rr0, const int n, const int slot) {
-			if (I_tens.i_streamed_ || I_tens.i_float_) std::fill(blk_gpu.begin(), blk_gpu.end(), cdouble{});
-			cdouble* const I_rr = (I_tens.i_streamed_ || I_tens.i_float_) ? blk_gpu.data()
-									  : I_tens.I.data() + static_cast<size_t>(rr0) * I_tens.i_compact_;
-			if (!itensor_gpu_collect(slot, I_rr, static_cast<long long>(I_tens.i_compact_)))
+			std::fill(blk_gpu.begin(), blk_gpu.end(), cdouble{});
+			if (!itensor_gpu_collect(slot, blk_gpu.data(), static_cast<long long>(I_tens.i_compact_)))
 				err_checkf(false, "I tensor GPU read-back failed", std::cout);
-			for (int r = 0; r < n && (I_tens.i_streamed_ || I_tens.i_float_); r++) {
-				const cdouble* const row = blk_gpu.data() + static_cast<size_t>(r) * I_tens.i_compact_;
-				if (I_tens.i_streamed_) {
-					std::lock_guard<std::mutex> lock(i_write_mutex);
-					I_tens.i_file_.write_block(rr0 + r, row);
-				}
-				else if (I_tens.i_float_) {
-					std::complex<float>* const dst = I_tens.I32.data() + static_cast<size_t>(rr0 + r) * I_tens.i_compact_;
-					for (size_t i = 0; i < I_tens.i_compact_; i++)
-						dst[i] = std::complex<float>(static_cast<float>(row[i].real()),
-													 static_cast<float>(row[i].imag()));
-				}
-			}
+			//A row whose inverse is measured too had no columns and comes back empty; the row it is copied from writes it
+			for (int r = 0; r < n; r++)
+				if (!row_copy[rr0 + r]) store_rows(rr0 + r, blk_gpu.data() + static_cast<size_t>(r) * I_tens.i_compact_);
 			done += n;
 			gpu_ns_per_refl = std::chrono::duration_cast<std::chrono::nanoseconds>(
 				std::chrono::high_resolution_clock::now() - gpu_start).count() / done;
@@ -1753,6 +1790,12 @@ void structure_factors::build_I(const std::vector<ao_data>& ao_data_shells, doub
 				}
 			}
 			col_off[n] = c;
+			if (c == 0) {
+				//Every row of the batch is the conjugate of one integrated elsewhere
+				done += n;
+				if (!(opt->no_date) && pb) for (int r = 0; r < n; r++) pb->update();
+				continue;
+			}
 			if (!itensor_gpu_submit(slot, n, col_off.data(), kxs.data(), kys.data(), kzs.data(), facs.data(), facs_inv.data()))
 				err_checkf(false, "I tensor GPU evaluation failed", std::cout);
 			if (prev >= 0) collect_gpu(prev, prev_n, slot ^ 1);
@@ -1860,6 +1903,10 @@ void structure_factors::build_I(const std::vector<ao_data>& ao_data_shells, doub
 				if (itensor_on_gpu && my_done > 0 && gpu_ns_per_refl.load() > 0 &&
 					static_cast<long long>(model_data.nr - r) * gpu_ns_per_refl.load() < my_ns / my_done) break;
 				if (!next_refl.compare_exchange_strong(r, r + 1)) continue;
+				if (row_copy[r]) {
+					if (!(opt->no_date) && pb) pb->update();
+					continue;
+				}
 				const auto r_start = std::chrono::high_resolution_clock::now();
 				if (I_tens.i_streamed_ || I_tens.i_float_) std::fill(blk.begin(), blk.end(), cdouble{});
 				cdouble* const I_r = (I_tens.i_streamed_ || I_tens.i_float_) ? blk.data()
@@ -1937,17 +1984,7 @@ void structure_factors::build_I(const std::vector<ao_data>& ao_data_shells, doub
 						}
 					}
 				}
-				if (I_tens.i_streamed_) {
-					//A write is packed_size * 16 bytes against a whole reflection's worth
-					//of integration, so the lock is not on the hot path
-					std::lock_guard<std::mutex> lock(i_write_mutex);
-					I_tens.i_file_.write_block(r, blk.data());
-				}
-				else if (I_tens.i_float_) {
-					std::complex<float>* const dst = I_tens.I32.data() + static_cast<size_t>(r) * I_tens.i_compact_;
-					for (size_t i = 0; i < I_tens.i_compact_; i++)
-						dst[i] = std::complex<float>(static_cast<float>(blk[i].real()), static_cast<float>(blk[i].imag()));
-				}
+				store_rows(r, I_r);
 				my_ns += std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - r_start).count();
 				my_done++;
 				if (!(opt->no_date) && pb) {
@@ -1973,7 +2010,7 @@ void structure_factors::build_I(const std::vector<ao_data>& ao_data_shells, doub
 		1.0e3 * std::chrono::duration<double>(duration).count());
 }
 
-//F_r = Sum_at asym_fact Sum_s f_at(h R_s) exp(i h R_s x_at) T_at(h R_s) exp(2 pi i h t_s) plus the
+//F_r = Sum_at sym_fact Sum_s f_at(h R_s) exp(i h R_s x_at) T_at(h R_s) exp(2 pi i h t_s) plus the
 //anomalous dispersion correction, with the atomic scattering factors laid out like DW_facts
 void structure_factors::calc_F_calc(const cvec2& scattering_factors) {
 #pragma omp parallel for
@@ -1985,7 +2022,7 @@ void structure_factors::calc_F_calc(const cvec2& scattering_factors) {
 			for (int r_asym = 0; r_asym < lookup.size(); r_asym++) {
 				temp1 += scattering_factors[at][lookup[r_asym]] * phase_facts[at][lookup[r_asym]] * DW_facts[at][lookup[r_asym]] * translation_phase_facts[r][r_asym];
 			}
-			sum += temp1 * asym_atoms[at].asym_fact;
+			sum += temp1 * asym_atoms[at].sym_fact;
 		}
 		scatter_data.F_calc[r] = sum;
 	}

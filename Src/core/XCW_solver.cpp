@@ -10,7 +10,6 @@
 
 XCW_solver::XCW_solver(options& opt_in) : opt(&opt_in), sf(opt_in) {
 	std::cout << "XCW orbital basis set: " << opt->xcw_settings.basis_set_name << std::endl;
-	std::cout << "XCW: I/sigma(I) >= " << opt->xcw_settings.i_sigma_cutoff << " (F/sigma(F) >= " << 2 * opt->xcw_settings.i_sigma_cutoff << "): " << sf.model_data.nr_fit << " of " << sf.model_data.nr << " reflections in the fit; R1 and Criterion are over these, R1(all) and Crit(all) over all" << std::endl;
 }
 
 //z_h = (|F_obs,h| - |F_calc,h|) / sigma_h for the converged F_calc/F_scale over
