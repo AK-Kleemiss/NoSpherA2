@@ -109,8 +109,6 @@ private:
 		//flags, yet run_lambda copies alpha and level_shift and SCF_iteration mixes the
 		//density with alpha regardless of the flag
 		double diis_stop_damping = 0;
-		//`slow_conv` chosen: the unperturbed first step still runs the normal schedule, see run_XCW_fitting
-		bool slow_conv = false;
 		//`soscf`: second-order steps as soon as the DIIS error is below trah_.start_threshold, see soscf_step
 		bool soscf = false;
 		//`check_hessian`: finite-difference check of the Hessian-vector product on the first

@@ -1072,14 +1072,13 @@ TEST(XcwScfTests, ISigmaCutoffShrinksFitSetAndReportsAllReflections)
 	std::filesystem::remove_all(dir);
 }
 
-//`slow_conv` keeps its damping for the perturbed steps; the unperturbed first step runs the
-//normal schedule, which reaches the golden lambda = 0 energy where slow damping stalls
-TEST(XcwScfTests, SlowConvStartsFromTheNormalSchedule)
+//`slow_conv` damps every step, the unperturbed first one included, and still reaches the golden lambda = 0 energy
+TEST(XcwScfTests, SlowConvDampsFromTheFirstStep)
 {
 	if (p1_fixture().empty()) GTEST_SKIP() << "fixture tests/P1_test not found";
 	const auto dir = scratch_dir();
 	const p1_run run = run_on_p1(dir, common + "f rhf start 0 step_size 0.01 end 0.01 slow_conv" + read_shared_tensor(dir), true);
-	EXPECT_NE(run.out.find("XCW: slow_conv - the unperturbed first step runs the normal schedule"), std::string::npos) << run.out;
+	EXPECT_EQ(run.out.find("normal schedule"), std::string::npos) << run.out;
 	const auto rows = lambda_rows(run.out);
 	ASSERT_EQ(rows.size(), 2u) << run.out;
 	EXPECT_NEAR(rows[0].d(rows[0].energy), golden_energy, 1e-6);

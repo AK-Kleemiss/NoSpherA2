@@ -494,7 +494,6 @@ XCW::SCF_settings XCW::loadSettings(const std::filesystem::path& settings_path) 
 	}
 
 	if (speed_preset == "slow_conv") {
-		settings.slow_conv = true;
 		settings.alpha = 0.8;
 		settings.level_shift = 1;
 		settings.diis_stop_damping = 1e-5;
@@ -4226,17 +4225,6 @@ void XCW::run_XCW_fitting() {
 	};
 	const double min_lambda_step = settings.xcw_step_size / 128.0;
 	double last_lambda = settings.xcw_start_value;
-	//slow_conv's damping (alpha 0.8, shift 1) is for the perturbed steps, which start from
-	//converged orbitals; from the core guess it runs out of iterations (Fe(phen)2(SCN)2 UHF:
-	//200 iterations, RMSD still 4e-5). The first step without a guess takes the normal
-	//schedule, every later one the slow settings from the file
-	const bool slow_start = settings.slow_conv && !has_guess;
-	const double slow_alpha = settings.alpha, slow_shift = settings.level_shift, slow_stop_damping = settings.diis_stop_damping, slow_stop_shift = settings.diis_stop_shift;
-	if (slow_start) {
-		settings.alpha = 0.5; settings.level_shift = 0.5; settings.diis_stop_damping = 1e-3; settings.diis_stop_shift = 1e-2;
-		std::cout << "XCW: slow_conv - the unperturbed first step runs the normal schedule, slow damping from the second step on" << std::endl;
-		XCW_log << "XCW: slow_conv - the unperturbed first step runs the normal schedule, slow damping from the second step on" << std::endl;
-	}
 	//The scan used to stop at max_value even when A^2 was still falling there, i.e. on the
 	//scan boundary instead of on lambda*, and only printed "extend the scan" afterwards.
 	//The perturbed steps start from converged orbitals and TRAH takes the ones that DIIS
@@ -4248,9 +4236,6 @@ void XCW::run_XCW_fitting() {
 	int extra_steps = 0;
 	for (int step = 0; step < planned_steps; step++) {
 		const double lambda = step * settings.xcw_step_size + settings.xcw_start_value;
-		if (slow_start && step == 1) {
-			settings.alpha = slow_alpha; settings.level_shift = slow_shift; settings.diis_stop_damping = slow_stop_damping; settings.diis_stop_shift = slow_stop_shift;
-		}
 		const occ::qm::Wavefunction previous_wfn = last_wfn;
 		occ::qm::Wavefunction guess = last_wfn;
 		if (opt->xcw_extrapolate && step >= 2 && settings.hf_type == occ::qm::SpinorbitalKind::Restricted) {
