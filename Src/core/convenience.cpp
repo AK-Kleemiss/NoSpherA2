@@ -628,14 +628,13 @@ std::string help_message =
  "                                    images, refitting in between. Default off:\n"
  "                                    it can miss structures (SF6 at 0.2: D(w)\n"
  "                                    0.23 % higher); about 2.5 times faster.\n"
- "  -nrt_mirror                        A single move that adds no formal-charge\n"
- "                                    separation (the allyl cation's bond shift)\n"
- "                                    is a whole arrow, symmetry images complete\n"
- "                                    the candidate set, and the walk from a\n"
- "                                    symmetry reference of the parent explores\n"
- "                                    its own neighbourhood. Makes allyl's mirror\n"
- "                                    bonds equal; changes the output of 20 of\n"
- "                                    the 41 reference molecules. Default off.\n"
+ "  -nrt_no_mirror                     Treat a single move that adds no formal-\n"
+ "                                    charge separation (the allyl cation's bond\n"
+ "                                    shift) as half an arrow, complete symmetry\n"
+ "                                    images against every walked state and walk\n"
+ "                                    symmetry references only through new ones:\n"
+ "                                    the behaviour before 2026-10-14, which can\n"
+ "                                    give mirror bonds unequal orders.\n"
  "  -nrt_stall <n>                     A structure's orbital sweeps stop once\n"
  "                                    Anderson mixing has not lowered the largest\n"
  "                                    vector change by 0.1 % for n sweeps, instead\n"
@@ -2766,7 +2765,7 @@ const std::set<std::string> &nbo_family_suboptions()
 		"-nbo_dir", "-nbo_47", "-nbo_e2min", "-nbo_threads", "-nbo_keep47", "-nrt",
 		"-nrt_e2", "-nrt_arrows", "-nrt_bond_scale", "-nrt_max", "-nrt_atoms",
 		"-nrt_exhaustive", "-nrt_no_symmetry", "-nrt_no_components", "-nrt_no_ion", "-nrt_parent",
-		"-nrt_target", "-nrt_screen", "-nrt_rotate", "-nrt_stall", "-nrt_mirror"};
+		"-nrt_target", "-nrt_screen", "-nrt_rotate", "-nrt_stall", "-nrt_mirror", "-nrt_no_mirror"};
 	return known;
 }
 
@@ -2918,6 +2917,7 @@ bool options::digest_io_options(const std::string &temp, int &i)
 			else if (arguments[j] == "-nrt_no_ion") opt.nrt_ion = false;
 			else if (arguments[j] == "-nrt_rotate") opt.nrt_rotate = true;
 			else if (arguments[j] == "-nrt_mirror") opt.nrt_mirror = true;
+			else if (arguments[j] == "-nrt_no_mirror") opt.nrt_mirror = false;
 			else if (arguments[j] == "-nbo_keep47") opt.keep_file47 = true;
 		//-nbo_threads wins, then -cpus, then the OpenMP default.
 		if (opt.threads <= 0 && threads > 0) opt.threads = threads;

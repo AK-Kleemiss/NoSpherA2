@@ -273,7 +273,7 @@ Key core modules live in `Src/core`:
 As of 2026-10-13, after the NRT symmetry fixes, `ctest --preset release-linux` reports **1260 passed, 0 failed,
 22 skipped** (2 disabled) of 1282. New: `NboNativeTests.TheAllylCationsMirrorStructuresWeighAlike`,
 `NboNativeTests.TheAllylRadicalIsSymmetricInEachSpin` and `NboNativeTests.ASlightlyDistortedAllylCationStaysNearTheSymmetricOne`
-(fixtures `tests/allyl_occ/`), which run under the opt-in `-nrt_mirror`; default NRT output is unchanged. See
+(fixtures `tests/allyl_occ/`), under what is the default since 2026-10-14 (`-nrt_no_mirror` restores the old behaviour). See
 `UNIT_TESTS_STATUS.md`. At `1349eba` the suite took 255.7 +- 9.1 s wall and 993 +- 40 CPU-s (95 % CI, n = 3) with 3.88 of
 the 4 cores busy. Since the XCW tests share one build of the stored two-electron integrals (`save_eri` /
 `read_eri`): **1261 passed, 0 failed, 22 skipped** (2 disabled) of 1283, 230.6 +- 16.8 s wall and 899 +- 66 CPU-s,
