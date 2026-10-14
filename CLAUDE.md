@@ -270,6 +270,11 @@ Key core modules live in `Src/core`:
 
 ## Current Validation Notes
 
+As of 2026-10-14, XCW_refactor carries density_source with the XCW split into `structure_factors`, `SCF_wrapper` and
+`XCW_solver` kept: `basis_overrides`, `save_eri`/`read_eri` and the charge/multiplicity check are ported, the pair screen
+and symmetry handling stay XCW_refactor's, and `slow_conv` damps the lambda = 0 step too. `ctest --preset release-linux`
+reports **1262 passed, 0 failed, 22 skipped** (2 disabled) of 1284. See `UNIT_TESTS_STATUS.md`.
+
 As of 2026-10-13, after the NRT symmetry fixes, `ctest --preset release-linux` reports **1260 passed, 0 failed,
 22 skipped** (2 disabled) of 1282. New: `NboNativeTests.TheAllylCationsMirrorStructuresWeighAlike`,
 `NboNativeTests.TheAllylRadicalIsSymmetricInEachSpin` and `NboNativeTests.ASlightlyDistortedAllylCationStaysNearTheSymmetricOne`
