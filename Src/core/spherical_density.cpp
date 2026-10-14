@@ -947,6 +947,14 @@ namespace
 		return Z >= 1 && Z <= 103 && GTOIon_qmax[Z - 1] >= 0;
 	}
 
+	// An anion DKH2 did not bind (Rb-, Mo-, Sb- ...) keeps its Slater anion on the old route.
+	// ponytail: that side then blends from the non-relativistic neutral; a GTO-neutral + Slater
+	// anion delta would close the step at q = 0, if a 5th-row anion fill ever matters.
+	bool gto_route(const int Z, const double q)
+	{
+		return gto_present(Z) && (q >= 0.0 || GTOIon_anion[Z - 1] == 1 || !Thakkar_Anion::available(Z));
+	}
+
 	// Electrons outside the noble-gas core and any filled d10/f14 below the valence shell: U 6, Pb 4, Lu 3
 	int valence_electrons(const int Z)
 	{
@@ -960,7 +968,7 @@ namespace
 
 bool HE_Spherical_Atom::ion_available(const int atomic_number, const double charge)
 {
-	if (gto_present(atomic_number))
+	if (gto_route(atomic_number, charge))
 		return charge > 0.0 ? GTOIon_qmax[atomic_number - 1] >= 1
 			 : charge < 0.0 ? GTOIon_anion[atomic_number - 1] == 1 : true;
 	return charge > 0.0 ? Thakkar_Cation::available(atomic_number)
@@ -982,7 +990,7 @@ HE_Spherical_Atom::HE_Spherical_Atom(const int atomic_number, const double charg
 	  _use_gto(false), _gto_extrap(false), _gto_lo(0), _gto_frac(0.0),
 	  _neutral(atomic_number)
 {
-	if (gto_present(atomic_number))
+	if (gto_route(atomic_number, charge))
 	{
 		// Heavy element: the neutral too is the DKH2 atom, Koga/Thakkar being non-relativistic.
 		// Between two computed states the weights stay in [0, 1]; beyond them it extrapolates.

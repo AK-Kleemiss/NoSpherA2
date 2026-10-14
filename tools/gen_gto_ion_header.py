@@ -2,7 +2,7 @@
 
     average  <molden> <out.npz>          spherically averaged density of one atomic state
     thakkar  <Thakkar_coefs.h> <Z> ...   electron count of the ported Thakkar neutral (self-check)
-    header   <dir> <Thakkar_coefs.h> <out.h> [z_min=56]
+    header   <dir> <Thakkar_coefs.h> <out.h> [z_min=37]
                                          GTO_ion_delta_coefs.h from <dir>/<El>/q<q>.npz
 
 The states come from ORCA (UHF, DKH2, SARC-DKH-TZVP plus one diffuse s/p/d
@@ -193,9 +193,9 @@ def cmd_thakkar(header, *zs):
         print(f"Z={z}: N = {integrate(th.rho(int(z), R_FINE)):.6f}")
 
 
-def cmd_header(d, thakkar_h, out, z_min="56"):
-    """z_min: lightest element taken from <dir>. 56 (Ba) leaves Rb-Cs on Slater/Thakkar;
-    37 would make the 5th row relativistic too."""
+def cmd_header(d, thakkar_h, out, z_min="37"):
+    """z_min: lightest element taken from <dir>. 37 (Rb): the Slater delta series stops at Kr, so
+    from Rb on only the DKH2 tables reach +2..+4."""
     th = ThakkarNeutral(thakkar_h)
     span = Q_MAX - Q_MIN + 1
     qmax, anion, offset, rho_t, f_t, log = [0] * 103, [0] * 103, [-1] * (103 * span), [], [], []

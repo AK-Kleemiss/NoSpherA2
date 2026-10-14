@@ -266,15 +266,19 @@ TEST(DeltaSeriesTests, HeavyElementsUseTheRelativisticTables)
 // negative density. Bound anions lose up to 0.014 e beyond the 25 bohr table edge (Pu-), hence 2e-2.
 TEST(DeltaSeriesTests, EveryRelativisticTableCountsItsElectrons)
 {
-	for (int Z = 56; Z <= 103; Z++)
+	for (int Z = 37; Z <= 103; Z++)
 	{
 		for (const double q : {-0.5, 0.0, 1.5, 3.0, 4.0})
 		{
 			if (!HE_Spherical_Atom::ion_available(Z, q))
 				continue;
 			const HE_Spherical_Atom a(Z, q);
-			ASSERT_TRUE(a.uses_gto_tables()) << "Z=" << Z << " q=" << q;
 			EXPECT_NEAR(a.get_form_factor(kNearZero), Z - q, kCountTol) << "Z=" << Z << " q=" << q;
+			if (!a.uses_gto_tables())   // an anion DKH2 did not bind keeps its Slater anion (Rb-, Mo-)
+			{
+				EXPECT_LT(q, 0.0) << "Z=" << Z;
+				continue;
+			}
 			if (!a.is_extrapolating())   // a chain that stops below q extrapolates, and that may dip
 				EXPECT_GE(a.most_negative_density(), -1e-4) << "Z=" << Z << " q=" << q;
 			if (q <= 0.0)
@@ -294,9 +298,15 @@ TEST(DeltaSeriesTests, FillChargeStopsAtTheEmptyValenceShell)
 	EXPECT_DOUBLE_EQ(HE_Spherical_Atom::carried_charge(92, 2.5), 2.5);
 }
 
-// Rb-Cs are computed too but left on Slater/Thakkar (gen_gto_ion_header.py z_min = 56)
+// Up to Kr the Slater delta series reaches +3, so those stay; from Rb on DKH2 (z_min = 37).
+// An anion DKH2 did not bind keeps its Slater anion instead of dropping the charge.
 TEST(DeltaSeriesTests, LighterElementsKeepTheirTables)
 {
-	for (const int Z : {26, 37, 55})
+	for (const int Z : {26, 36})
 		EXPECT_FALSE(HE_Spherical_Atom(Z, 1.5).uses_gto_tables()) << "Z=" << Z;
+	EXPECT_TRUE(HE_Spherical_Atom(42, 3.0).uses_gto_tables());   // Mo3+, extrapolated from +1 before
+	const HE_Spherical_Atom rb(37, -0.5);                          // Rb-: Slater only
+	EXPECT_FALSE(rb.uses_gto_tables());
+	EXPECT_TRUE(HE_Spherical_Atom::ion_available(37, -0.5));
+	EXPECT_NEAR(rb.get_form_factor(kNearZero), 37.5, kCountTol);
 }
