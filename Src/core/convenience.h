@@ -1,6 +1,7 @@
 ﻿#pragma once
 #include "pch.h"
 #include "throughput.h"
+#include "tuning.h"
 
 
 
@@ -12,14 +13,15 @@ class GridManager;
 class BasisSet;
 struct asym_atom;
 enum PartitionType { Becke, TFVC, Hirshfeld, RI, MBIS, EMBIS };
+enum class MultipoleScheme { TFVC, HIRSHFELD, MBIS, EMBIS, NUCLEAR, MULLIKEN, SANDERSON };
 enum class RGBIOrbitalBasis { NAO, ANO };
 
 void error_check(const bool condition, const std::source_location loc, const std::string& error_mesasge, std::ostream& log_file = std::cout);
 void not_implemented(const std::source_location loc, const std::string& error_mesasge, std::ostream& log_file);
-#define err_checkf(condition, error_message, file) error_check(condition, std::source_location::current(), error_message, file)
+//The message is built only on failure: a literal past the SSO length cost a heap allocation per call, also in passing
+//checks inside hot loops (get_atom_pos per grid point and atom)
+#define err_checkf(condition, error_message, file) ((condition) ? (void)0 : error_check(false, std::source_location::current(), error_message, file))
 #define err(error_message, file) error_check(false, std::source_location::current(), error_message, file)
-#define err_chkf(condition, error_message, file) error_check(condition, std::source_location::current(), error_message, file)
-#define err_chekf(condition, error_message, file) error_check(condition, std::source_location::current(), error_message, file)
 #define err_not_impl_f(error_message, file) not_implemented(std::source_location::current(), error_message, file)
 
 typedef std::complex<double> cdouble;
@@ -36,21 +38,19 @@ typedef std::vector<std::vector<cvec2>> cvec4;
 typedef std::vector<bool> bvec;
 typedef std::vector<bvec> bvec2;
 typedef std::vector<bvec2> bvec3;
-//A std::vector<std::string> whose operator[] fails with the index instead of reading past the
-//end: the file readers split a line into fields and index them, so a short or blank line in a
-//truncated file used to be undefined behaviour instead of an error
+//operator[] fails naming the index instead of reading past the end, so a short line in a truncated file is an error, not UB
 struct svec : std::vector<std::string>
 {
-    using std::vector<std::string>::vector;
-    svec(const std::vector<std::string> &v) : std::vector<std::string>(v) {}
-    svec(std::vector<std::string> &&v) : std::vector<std::string>(std::move(v)) {}
-    const std::string &operator[](size_t i) const
-    {
-        if (i >= size())
-            throw std::out_of_range("field " + std::to_string(i + 1) + " missing, the line has only " + std::to_string(size()));
-        return std::vector<std::string>::operator[](i);
-    }
-    std::string &operator[](size_t i) { return const_cast<std::string &>(std::as_const(*this)[i]); }
+	using std::vector<std::string>::vector;
+	svec(const std::vector<std::string> &v) : std::vector<std::string>(v) {}
+	svec(std::vector<std::string> &&v) : std::vector<std::string>(std::move(v)) {}
+	const std::string &operator[](size_t i) const
+	{
+		if (i >= size())
+			throw std::out_of_range("field " + std::to_string(i + 1) + " missing, the line has only " + std::to_string(size()));
+		return std::vector<std::string>::operator[](i);
+	}
+	std::string &operator[](size_t i) { return const_cast<std::string &>(std::as_const(*this)[i]); }
 };
 typedef std::vector<std::filesystem::path> pathvec;
 typedef std::chrono::high_resolution_clock::time_point _time_point;
@@ -106,14 +106,17 @@ struct properties_options
 	double promol_nci_rho_abs_max = 0.5;
 	double promol_nci_rdg_max = 1.0;
 	double promol_nci_colour_max = 0.015; // VMD/Olex2 colour range on sign(l2)rho in a.u., symmetric
+	double promol_nci_iso = 0.5; // RDG of the _nci.obj surface
 	//The _values.dat writer schedules grid points dynamically, so row order (not the values) varies between runs; forces single-threaded for golden files
 	bool promol_nci_single_threaded = false;
 	std::array<int, 3> NbSteps = { 0, 0, 0 };
 	std::array<double, 6> MinMax = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
 	ivec MO_numbers;
+	//-ibo_cube <list>: IBOs to write as cubes (ibo_selection syntax)
+	std::string ibo_cube;
 	int hirsh_number = 0;
 	bool calc() const {
-		return rho || eli || esp || elf || lap || rdg || hdef || def || hirsh || s_rho || all_mos || fukui || esp_isosurface > 0 || MO_numbers.size() > 0;
+		return rho || eli || esp || elf || lap || rdg || hdef || def || hirsh || s_rho || all_mos || fukui || esp_isosurface > 0 || MO_numbers.size() > 0 || !ibo_cube.empty();
 	}
 	size_t n_grid_points() const {
 		size_t result = static_cast<size_t>(NbSteps[0]) * NbSteps[1] * NbSteps[2];
@@ -193,6 +196,111 @@ inline double fast_exp_neg(double x) {
 	x *= x; x *= x; x *= x; x *= x; x *= x; // x^1024
 	return x;
 }
+
+// sin and cos from one shared argument reduction, where the CRT reduces twice. Cody-Waite reduction by pi/2 and the
+// FreeBSD k_sin/k_cos kernels: <= 2.2e-16 absolute error for |x| < 1e5; larger or non-finite x goes to the CRT (which
+// MSVC /fp:fast swaps for a scalar sin good to ~4e-8 at |x| ~ 1e8). calc_SF runs the same kernels on vector lanes.
+inline void sincos_shared(const double x, double* s, double* c) {
+	if (!(std::abs(x) < 1e5)) { *s = std::sin(x); *c = std::cos(x); return; }
+	const double q = std::nearbyint(x * 0.63661977236758134308);
+	const double r = ((x - q * 1.57079632673412561417e+00) - q * 6.07710050630396597660e-11) - q * 2.02226624871116645580e-21;
+	const double z = r * r;
+	const double sr = r + r * z * (-1.66666666666666324348e-01 + z * (8.33333333332248946124e-03 + z * (-1.98412698298579493134e-04 +
+		z * (2.75573137070700676789e-06 + z * (-2.50507602534068634195e-08 + z * 1.58969099521155010221e-10)))));
+	const double hz = 0.5 * z, w = 1.0 - hz;
+	const double cr = w + (((1.0 - w) - hz) + z * z * (4.16666666666666019037e-02 + z * (-1.38888888888741095749e-03 +
+		z * (2.48015872894767294178e-05 + z * (-2.75573143513906633035e-07 + z * (2.08757232129817482790e-09 +
+		z * -1.13596475577881948265e-11))))));
+	switch (static_cast<long long>(q) & 3) {
+	case 0: *s = sr; *c = cr; break;
+	case 1: *s = cr; *c = -sr; break;
+	case 2: *s = -sr; *c = -cr; break;
+	default: *s = -cr; *c = sr; break;
+	}
+}
+
+#if defined(__aarch64__) || defined(_M_ARM64)
+// sincos_shared on two NEON lanes: the same reduction and kernels with fused multiply-adds, the quadrant switch as a
+// lane select plus sign bits. Branch-free and for |x| < 1e5 only; sincos_shared2/4 test the range.
+inline void sincos_kernel2(const float64x2_t x, float64x2_t* s, float64x2_t* c) {
+	const float64x2_t q = vrndnq_f64(vmulq_f64(x, vdupq_n_f64(0.63661977236758134308)));
+	float64x2_t r = vfmsq_f64(x, q, vdupq_n_f64(1.57079632673412561417e+00));
+	r = vfmsq_f64(r, q, vdupq_n_f64(6.07710050630396597660e-11));
+	r = vfmsq_f64(r, q, vdupq_n_f64(2.02226624871116645580e-21));
+	const float64x2_t z = vmulq_f64(r, r);
+	float64x2_t ps = vfmaq_f64(vdupq_n_f64(-2.50507602534068634195e-08), z, vdupq_n_f64(1.58969099521155010221e-10));
+	ps = vfmaq_f64(vdupq_n_f64(2.75573137070700676789e-06), z, ps);
+	ps = vfmaq_f64(vdupq_n_f64(-1.98412698298579493134e-04), z, ps);
+	ps = vfmaq_f64(vdupq_n_f64(8.33333333332248946124e-03), z, ps);
+	ps = vfmaq_f64(vdupq_n_f64(-1.66666666666666324348e-01), z, ps);
+	const float64x2_t sr = vfmaq_f64(r, vmulq_f64(r, z), ps);
+	float64x2_t pc = vfmaq_f64(vdupq_n_f64(2.08757232129817482790e-09), z, vdupq_n_f64(-1.13596475577881948265e-11));
+	pc = vfmaq_f64(vdupq_n_f64(-2.75573143513906633035e-07), z, pc);
+	pc = vfmaq_f64(vdupq_n_f64(2.48015872894767294178e-05), z, pc);
+	pc = vfmaq_f64(vdupq_n_f64(-1.38888888888741095749e-03), z, pc);
+	pc = vfmaq_f64(vdupq_n_f64(4.16666666666666019037e-02), z, pc);
+	const float64x2_t hz = vmulq_f64(vdupq_n_f64(0.5), z);
+	const float64x2_t w = vsubq_f64(vdupq_n_f64(1.0), hz);
+	const float64x2_t cr = vaddq_f64(w, vfmaq_f64(vsubq_f64(vsubq_f64(vdupq_n_f64(1.0), w), hz), vmulq_f64(z, z), pc));
+	//quadrant q & 3: odd swaps sin and cos, q & 2 negates sin, (q + 1) & 2 negates cos
+	const int64x2_t qi = vcvtq_s64_f64(q);
+	const uint64x2_t odd = vtstq_s64(qi, vdupq_n_s64(1));
+	const uint64x2_t sgn_s = vshlq_n_u64(vreinterpretq_u64_s64(vandq_s64(qi, vdupq_n_s64(2))), 62);
+	const uint64x2_t sgn_c = vshlq_n_u64(vreinterpretq_u64_s64(vandq_s64(vaddq_s64(qi, vdupq_n_s64(1)), vdupq_n_s64(2))), 62);
+	*s = vreinterpretq_f64_u64(veorq_u64(vreinterpretq_u64_f64(vbslq_f64(odd, cr, sr)), sgn_s));
+	*c = vreinterpretq_f64_u64(veorq_u64(vreinterpretq_u64_f64(vbslq_f64(odd, sr, cr)), sgn_c));
+}
+
+// A pair with a lane at |x| >= 1e5 or non-finite goes lane by lane through sincos_shared.
+inline void sincos_shared2(const float64x2_t x, float64x2_t* s, float64x2_t* c) {
+	const uint64x2_t in_range = vcaltq_f64(x, vdupq_n_f64(1e5));
+	if ((vgetq_lane_u64(in_range, 0) & vgetq_lane_u64(in_range, 1)) == 0) {
+		double xs[2], ss[2], cs[2];
+		vst1q_f64(xs, x);
+		sincos_shared(xs[0], ss, cs);
+		sincos_shared(xs[1], ss + 1, cs + 1);
+		*s = vld1q_f64(ss); *c = vld1q_f64(cs);
+		return;
+	}
+	sincos_kernel2(x, s, c);
+}
+
+// Two pairs, lane for lane the results of sincos_shared2. One range test puts both kernels in one basic block: each
+// kernel is a long dependency chain, and the A72 (Pi 4) only overlaps two of them when they sit side by side, 1.44x.
+inline void sincos_shared4(const float64x2_t x0, const float64x2_t x1, float64x2_t* s0, float64x2_t* c0, float64x2_t* s1, float64x2_t* c1) {
+	const uint64x2_t in_range = vandq_u64(vcaltq_f64(x0, vdupq_n_f64(1e5)), vcaltq_f64(x1, vdupq_n_f64(1e5)));
+	if ((vgetq_lane_u64(in_range, 0) & vgetq_lane_u64(in_range, 1)) == 0) {
+		sincos_shared2(x0, s0, c0);
+		sincos_shared2(x1, s1, c1);
+		return;
+	}
+	sincos_kernel2(x0, s0, c0);
+	sincos_kernel2(x1, s1, c1);
+}
+
+// sincos_shared4/2 over n angles, an odd last one through sincos_shared
+inline void sincos_shared_n(const int n, const double* x, double* s, double* c) {
+	int p = 0;
+	for (; p + 3 < n; p += 4) {
+		float64x2_t s0, c0, s1, c1;
+		sincos_shared4(vld1q_f64(x + p), vld1q_f64(x + p + 2), &s0, &c0, &s1, &c1);
+		vst1q_f64(s + p, s0); vst1q_f64(s + p + 2, s1);
+		vst1q_f64(c + p, c0); vst1q_f64(c + p + 2, c1);
+	}
+	for (; p + 1 < n; p += 2) {
+		float64x2_t sv, cv;
+		sincos_shared2(vld1q_f64(x + p), &sv, &cv);
+		vst1q_f64(s + p, sv);
+		vst1q_f64(c + p, cv);
+	}
+	if (p < n) sincos_shared(x[p], s + p, c + p);
+}
+#else
+// No NEON double lanes (armv7, or an OpenBLAS build off ARM64, which XCW's sincos needs): angle by angle
+inline void sincos_shared_n(const int n, const double* x, double* s, double* c) {
+	for (int p = 0; p < n; p++) sincos_shared(x[p], s + p, c + p);
+}
+#endif
 
 namespace sha
 {
@@ -335,30 +443,12 @@ bool unsaved_files(std::vector<WFN>& wavy);
 std::string trim(const std::string& s);
 
 /**
- * @brief Physical memory this process can actually get, in bytes, or 0 when it cannot be told.
- *
- * Not what the machine has: a scheduler or container ceiling counts, and on a cluster it is
- * usually well below the node's total. Windows reads the available physical memory and any
- * job object limit, macOS counts free, inactive and purgeable pages, Linux takes
- * MemAvailable against the cgroup v2 or v1 limit. Zero means no answer was available and
- * the caller should keep whatever it would have done without asking.
+ * @brief Physical memory this process can get in bytes, capped by a scheduler or container limit
+ * (job object, cgroup); 0 when unknown, and the caller keeps its default.
  */
 size_t available_memory_bytes();
 
-/**
- * @brief std::getline that also accepts CRLF line endings.
- *
- * Files here move between Windows and the Linux servers constantly, and a text
- * file written on Windows ends every line with \r\n. std::getline splits on \n
- * and leaves the \r on the string, where it survives every comparison, every
- * substr() at a fixed column and every conversion of the last field on the line.
- * That is not a theoretical problem: it silently cost the XCW CIF reader its
- * whole atom loop. Every reader in NoSpherA2 uses this instead.
- *
- * @param is Stream to read from.
- * @param line Receives the line without its terminator, \r included.
- * @return The stream, so it can be tested as a condition like std::getline.
- */
+/** std::getline that drops a CRLF file's trailing \r, which would otherwise spoil comparisons and the last field; every reader uses it. */
 inline std::istream& getline_universal(std::istream& is, std::string& line)
 {
 	std::getline(is, line);
@@ -389,6 +479,26 @@ void append_numbers(const std::string& line, std::vector<T>& out, const std::str
 		out.push_back(v);
 	err_checkf(is.eof(), "Not a number in " + what + ": '" + line + "'", log);
 }
+
+//Restores a stream's flags, precision and width on scope exit, including unwinding. std::fixed and
+//setprecision are sticky, so every analysis entry point that formats output holds one of these.
+struct ostream_format_guard
+{
+	std::ostream& stream;
+	const std::ios_base::fmtflags flags;
+	const std::streamsize precision;
+	const std::streamsize width;
+	explicit ostream_format_guard(std::ostream& s)
+		: stream(s), flags(s.flags()), precision(s.precision()), width(s.width()) {}
+	ostream_format_guard(const ostream_format_guard&) = delete;
+	ostream_format_guard& operator=(const ostream_format_guard&) = delete;
+	~ostream_format_guard()
+	{
+		stream.flags(flags);
+		stream.precision(precision);
+		stream.width(width);
+	}
+};
 
 inline void print_centered_text(const std::string& text, int& bar_width, std::ostream& file = std::cout)
 {
@@ -422,13 +532,13 @@ inline void print_centered_message(const std::string& text, int bar_width, std::
 //The fits-test is a division rather than n_items * item_bytes because that product is exactly what overflows on the structures this serves
 inline size_t items_within_budget(const size_t n_items, const size_t item_bytes, const size_t budget_bytes)
 {
-    if (budget_bytes == 0 || n_items == 0 || item_bytes == 0)
-        return 0;
-    const size_t n = budget_bytes / item_bytes;
-    if (n_items <= n)
-        return 0;
-    //a single item larger than the whole budget still has to be processed, one at a time
-    return n ? n : 1;
+	if (budget_bytes == 0 || n_items == 0 || item_bytes == 0)
+		return 0;
+	const size_t n = budget_bytes / item_bytes;
+	if (n_items <= n)
+		return 0;
+	//a single item larger than the whole budget still has to be processed, one at a time
+	return n ? n : 1;
 }
 
 //-------------------------Progress_bar--------------------------------------------------
@@ -444,6 +554,7 @@ public:
 		int bw = bar_width_ + 2;
 		print_centered_text(status_text_, bw, stream_);
 		linestart = stream_.tellp();
+		barend_ = linestart;
 #ifdef _WIN32
 			initialize_taskbar_progress();
 #endif
@@ -474,7 +585,7 @@ public:
 	// How often callers asked, and how often that actually needed the lock.
 	unsigned long long update_calls() const { return update_calls_.load(); }
 	unsigned long long bar_writes() const { return bar_writes_.load(); }
-	static bool report_counts;   // set from the -debug flag
+	static bool report_counts;
 
 	void write_progress();
 
@@ -492,6 +603,8 @@ private:
 	std::atomic<unsigned long long> bar_writes_{0};
 	float progress_;
 	std::streampos linestart;
+	//end of the bar's last write; a put position elsewhere means the loop printed in between
+	std::streampos barend_{};
 	bool finished_ = false;
 #ifdef _WIN32
 	//Assigned only inside initialize_taskbar_progress()'s SUCCEEDED checks; without the initialiser the destructor calls through stack garbage when COM refuses
@@ -501,9 +614,12 @@ private:
 #endif
 };
 
+//even_steps rounds the point count up to even so the box centre lies on a grid plane. Pass false only when
+//the step is the resolution, not (Max-Min)/NbSteps: there an extra point only enlarges the box.
 void readxyzMinMax_fromWFN(
 	const WFN& wavy,
-	properties_options& opts);
+	properties_options& opts,
+	const bool even_steps = true);
 
 void readxyzMinMax_fromCIF(
 	std::filesystem::path cif,
@@ -757,238 +873,265 @@ struct ECP_primitive : primitive
 struct options
 	/** @brief All command line options and settings controlling a run. */
 {
-    std::ostream &log_file;
-    double d_sfac_scan = 0.0;
-    d3 sfac_diffuse = { 0.0, 0.0, 0.0 };
-    double dmin = 99.0;
-    double mem = 1000.0; // In MB
-    //Set only when -mem was passed; only then is mem a budget the tsc block size and XCW I tensor window are fitted to
-    bool mem_given = false;
-    double efield = 0.005;
-    ivec2 groups;
-    ivec2 hkl_min_max{ {-100, 100}, {-100, 100}, {-100, 100} };
-    vec2 twin_law;
-    ivec2 combined_tsc_groups;
-    pathvec combined_tsc_calc_files;
-    pathvec combined_tsc_calc_cifs;
-    std::vector<unsigned int> combined_tsc_calc_mult;
-    ivec combined_tsc_calc_charge;
-    ivec combined_tsc_calc_ECP;
-    //Bounds-checked: the digesters read arguments[i + n] freely, so a flag that is last on the
-    //line throws missing_argument (caught in digest_options with the flag's name) instead of
-    //reading past the end
-    struct missing_argument : std::out_of_range
-    {
-        using std::out_of_range::out_of_range;
-    };
-    struct checked_svec : svec
-    {
-        using svec::svec;
-        std::string &operator[](size_t i) { return const_cast<std::string &>(std::as_const(*this)[i]); }
-        const std::string &operator[](size_t i) const
-        {
-            if (i >= size())
-                throw missing_argument("argument " + std::to_string(i));
-            return svec::operator[](i);
-        }
-    };
-    checked_svec arguments;
-    pathvec combine_mo;
-    svec Cations;
-    svec Anions;
-    pathvec pol_wfns;
-    ivec cmo1;
-    ivec cmo2;
-    ivec ignore;
-    std::filesystem::path salted_model_dir;
-    std::vector<std::shared_ptr<BasisSet>> aux_basis;
-    std::filesystem::path wfn;
-    std::filesystem::path wfn2;
-    std::filesystem::path cube_density;
-    std::filesystem::path fchk;
-    std::string basis_set;
-    std::filesystem::path hkl;
-    std::filesystem::path cif;
-    std::string method;
-    std::filesystem::path xyz_file;
-    std::filesystem::path coef_file;
-    std::filesystem::path hirshfeld_surface;
-    std::filesystem::path hirshfeld_surface2;
-    std::filesystem::path fract_name;
-    std::filesystem::path wavename;
-    std::filesystem::path gaussian_path;
-    std::filesystem::path turbomole_path;
-    std::filesystem::path basis_set_path;
-    std::filesystem::path anom_disp_path;
-    std::string occ;
-    std::filesystem::path occ_toml_path;
-    std::filesystem::path cwd;
-    std::filesystem::path profiling_tests_root = "tests";
-    pathvec promol_nci_xyz; //Two or more fragments; a grid point is intermolecular when no single fragment dominates
-    //Geometry-aid jobs (-calc_featomic_descriptor(s), -classify_atoms(_list)): the flags queue, run_app_impl runs geometry_aid::run and quits
-    bool calc_featomic_descriptor = false;
-    std::filesystem::path classify_atoms_out;
-    std::filesystem::path geometry_aid_model;
-    pathvec featomic_structures;
-    pathvec classify_structures;
-    double geometry_aid_cutoff = 3.5;
-    bool geometry_aid_metals = false;
-    double geometry_aid_center_weight = 1.0;
-    std::filesystem::path interaction_energies_job;
+	std::ostream &log_file;
+	double d_sfac_scan = 0.0;
+	d3 sfac_diffuse = { 0.0, 0.0, 0.0 };
+	double dmin = 99.0;
+	double mem = 1000.0; // In MB
+	//Set only when -mem was passed; only then is mem a budget the tsc block size and XCW I tensor window are fitted to
+	bool mem_given = false;
+	double efield = 0.005;
+	ivec2 groups;
+	ivec2 hkl_min_max{ {-100, 100}, {-100, 100}, {-100, 100} };
+	vec2 twin_law;
+	ivec2 combined_tsc_groups;
+	pathvec combined_tsc_calc_files;
+	pathvec combined_tsc_calc_cifs;
+	std::vector<unsigned int> combined_tsc_calc_mult;
+	ivec combined_tsc_calc_charge;
+	ivec combined_tsc_calc_ECP;
+	//Bounds-checked: the digesters read arguments[i + n] freely, so a flag that is last on the
+	//line throws missing_argument (caught in digest_options with the flag's name) instead of
+	//reading past the end
+	struct missing_argument : std::out_of_range
+	{
+		using std::out_of_range::out_of_range;
+	};
+	struct checked_svec : svec
+	{
+		using svec::svec;
+		std::string &operator[](size_t i) { return const_cast<std::string &>(std::as_const(*this)[i]); }
+		const std::string &operator[](size_t i) const
+		{
+			if (i >= size())
+				throw missing_argument("argument " + std::to_string(i));
+			return svec::operator[](i);
+		}
+	};
+	checked_svec arguments;
+	pathvec combine_mo;
+	svec Cations;
+	svec Anions;
+	pathvec pol_wfns;
+	ivec cmo1;
+	ivec cmo2;
+	ivec ignore;
+	std::filesystem::path salted_model_dir;
+	//Every model given to -SALTED, in that order; salted_model_dir is the first of them
+	pathvec salted_model_dirs;
+	std::vector<std::shared_ptr<BasisSet>> aux_basis;
+	std::filesystem::path wfn;
+	std::filesystem::path wfn2;
+	std::filesystem::path cube_density;
+	std::filesystem::path fchk;
+	std::string basis_set;
+	std::filesystem::path hkl;
+	std::filesystem::path cif;
+	std::string method;
+	std::filesystem::path xyz_file;
+	std::filesystem::path coef_file;
+	std::filesystem::path hirshfeld_surface;
+	std::filesystem::path hirshfeld_surface2;
+	std::filesystem::path fract_name;
+	std::filesystem::path wavename;
+	std::filesystem::path gaussian_path;
+	std::filesystem::path turbomole_path;
+	std::filesystem::path basis_set_path;
+	std::filesystem::path anom_disp_path;
+	std::string occ;
+	std::filesystem::path occ_toml_path;
+	std::filesystem::path cwd;
+	std::filesystem::path profiling_tests_root = "tests";
+	pathvec promol_nci_xyz; //Two or more fragments; a grid point is intermolecular when no single fragment dominates
+	//Geometry-aid jobs (-calc_featomic_descriptor(s), -classify_atoms(_list)): the flags queue, run_app_impl runs geometry_aid::run and quits
+	bool calc_featomic_descriptor = false;
+	std::filesystem::path classify_atoms_out;
+	std::filesystem::path geometry_aid_model;
+	pathvec featomic_structures;
+	pathvec classify_structures;
+	double geometry_aid_cutoff = 3.5;
+	bool geometry_aid_metals = false;
+	double geometry_aid_center_weight = 1.0;
+	std::filesystem::path interaction_energies_job;
 	std::filesystem::path xcw_settings_path;
-    properties_options properties;
-    bool debug = false;
-    //Set by the one-shot options (-merge, -dipole_moments, -convert_to_47, ...) that used to
-    //exit(0) inside the parser: that killed the host when run_app is a library call (Olex2, the
-    //in-process tests), and no option after them was read. run_app_impl returns 0 instead.
-    bool finished = false;
-    bool all_charges = false;
-    bool SALTED = false;
-    bool Olex2_1_3_switch = false;
-    bool iam_switch = false;
-    bool read_k_pts = false;
-    bool save_k_pts = false;
-    bool combined_tsc_calc = false;
-    bool binary_tsc = true;
-    bool cif_based_combined_tsc_calc = false;
-    bool no_date = false;
-    bool gbw2wfn = false;
-    bool old_tsc = false;
-    bool label_tsc_output = false;
-    bool write_CIF = false;
-    bool test = false;
-    bool electron_diffraction = false;
-    bool ECP = false;
-    bool RI_FIT = false;
-    bool needs_Thakkar_fill = false;
-    //Set around a spherical fill, where a disorder part already covered by an earlier one legitimately yields no atoms and must not read as a broken CIF
-    bool allow_empty_asym = false;
-    //Set while a spherical fill runs for somebody else: it must RETURN a block, not stream experimental.tscb out from under the table being built
-    bool spherical_fill = false;
-    // Per-atom EEQ charges for atoms handed to the spherical fill, as
-    // {x, y, z, q} in the wavefunction's own coordinate units. Keyed by
-    // POSITION rather than index because the fill rebuilds its wavefunction
-    // from the original file, and that is how CIF and WFN atoms are matched
-    // everywhere else here. Empty means "no charges known" -> neutral fill,
-    // which is the previous behaviour.
-    std::vector<std::array<double, 4>> spherical_fill_charges{};
-    //Reflections per block when streaming the tsc; 0 restores the single allocation of the whole scatterers x reflections x 16 byte table
-    //The exact block size is not performance-critical
-    size_t tsc_block_size = 1000;
-    //Set only when -tsc_block was passed, so an explicit block size wins over one derived from -mem
-    bool tsc_block_given = false;
-    //Reflections to hold at once for n_scat scatterers, 0 for the whole table; -tsc_block wins, then -mem, then the default
-    //A block costs about three copies of n_scat * block * 16 bytes - producer, queue and writer - which is what the budget is spent against
-    size_t tsc_block_for(const size_t n_refl, const size_t n_scat) const
-    {
-        if (tsc_block_given || !mem_given || mem <= 0.0)
-            return tsc_block_size;
-        const size_t item = 3 * (n_scat ? n_scat : 1) * sizeof(std::complex<double>);
-        return items_within_budget(n_refl, item, static_cast<size_t>(mem * 1024.0 * 1024.0));
-    }
+	properties_options properties;
+	bool debug = false;
+	//Set by the one-shot options (-merge, -dipole_moments, -convert_to_47, ...) that used to
+	//exit(0) inside the parser: that killed the host when run_app is a library call (Olex2, the
+	//in-process tests), and no option after them was read. run_app_impl returns 0 instead.
+	bool finished = false;
+	bool all_charges = false;
+	bool SALTED = false;
+	bool Olex2_1_3_switch = false;
+	bool iam_switch = false;
+	bool read_k_pts = false;
+	bool save_k_pts = false;
+	bool combined_tsc_calc = false;
+	bool binary_tsc = true;
+	bool cif_based_combined_tsc_calc = false;
+	bool no_date = false;
+	bool gbw2wfn = false;
+	bool old_tsc = false;
+	bool label_tsc_output = false;
+	bool write_CIF = false;
+	bool test = false;
+	bool electron_diffraction = false;
+	bool ECP = false;
+	bool RI_FIT = false;
+	bool needs_Thakkar_fill = false;
+	//Set around a spherical fill, where a disorder part already covered by an earlier one legitimately yields no atoms and must not read as a broken CIF
+	bool allow_empty_asym = false;
+	//Set while a spherical fill runs for somebody else: it must RETURN a block, not stream experimental.tscb out from under the table being built
+	bool spherical_fill = false;
+	// Per-atom EEQ charges for atoms handed to the spherical fill, as
+	// {x, y, z, q} in the wavefunction's own coordinate units. Keyed by
+	// POSITION rather than index because the fill rebuilds its wavefunction
+	// from the original file, and that is how CIF and WFN atoms are matched
+	// everywhere else here. Empty means "no charges known" -> neutral fill,
+	// which is the previous behaviour.
+	std::vector<std::array<double, 4>> spherical_fill_charges{};
+	//Reflections per block when streaming the tsc; 0 restores the single allocation of the whole scatterers x reflections x 16 byte table
+	//The exact block size is not performance-critical
+	size_t tsc_block_size = 1000;
+	//Set only when -tsc_block was passed, so an explicit block size wins over one derived from -mem
+	bool tsc_block_given = false;
+	//Reflections to hold at once for n_scat scatterers, 0 for the whole table; -tsc_block wins, then -mem, then the default
+	//A block costs about three copies of n_scat * block * 16 bytes - producer, queue and writer - which is what the budget is spent against
+	size_t tsc_block_for(const size_t n_refl, const size_t n_scat) const
+	{
+		if (tsc_block_given || !mem_given || mem <= 0.0)
+			return tsc_block_size;
+		const size_t item = 3 * (n_scat ? n_scat : 1) * sizeof(std::complex<double>);
+		return items_within_budget(n_refl, item, static_cast<size_t>(mem * 1024.0 * 1024.0));
+	}
 
-    //set once a streamed run wrote the file itself, so the caller does not overwrite it with an empty one-shot block
-    bool tsc_written_by_stream = false;
-    bool qct = false;
-    bool do_XCW = false;
+	//set once a streamed run wrote the file itself, so the caller does not overwrite it with an empty one-shot block
+	bool tsc_written_by_stream = false;
+	bool qct = false;
+	bool do_XCW = false;
 	bool xcw_gaussian_halt = false;
 	double xcw_strong_cutoff = 3.0;
-    bool calc_F_calc = false;
-    bool rgbi = false;
-    bool rgbi_no_sym = false;
-    bool rgbi_EVs = false;
-    bool rgbi_theta = false;
-    RGBIOrbitalBasis rgbi_orbital_basis = RGBIOrbitalBasis::ANO;
-    ivec3 rgbi_group_sets;
-    bool fract = false;
-    //GPU scattering factors when a device is present; -no_gpu forces the CPU loop
-    bool use_gpu = true;
-    //-gpu_fp64 keeps the double sincos on a card that would otherwise pick the fp32 one
-    bool gpu_fp64 = false;
-    //Single-precision tiles for the CPU I tensor, as the device path runs; sgemm is twice
-    //dgemm's rate. -no_cpu_itensor_fp32 keeps double.
-    bool cpu_itensor_fp32 = true;
-    //-itensor_hybrid lets the CPU threads take reflections alongside the device. Off by
-    //default: the two sides differ in the last bits and a shared counter decides which rows
-    //each takes, so the result changes from run to run. For a card slow in double only.
-    bool itensor_hybrid = false;
-    //Seed each lambda step from the density extrapolated through the two previous steps
-    //rather than the last one alone; the step is small and the trajectory smooth.
-    bool xcw_extrapolate = true;
-    //Build the two-electron Fock matrix from the change of the density between iterations,
-    //rather than from the whole density every time: the stored integrals skip the segments
-    //the difference cannot reach (stored_eri::JK), the direct kernel skips shell quartets.
-    //The direct build only with xcw_int_precision 1e-12: at 1e-10 the increments' screening
-    //error accumulates to a gradient floor of 3e-5 and the SCF never meets its 1e-5, and the
-    //full build at 1e-10 is the faster of the two anyway.
-    bool xcw_incremental = false;
-    //Integral screening threshold of the XCW Fock build; OCC's own default is 1e-12.
-    double xcw_int_precision = 1e-10;
-    //-gflops reports achieved GFLOP/s per stage for the CPU and GPU paths at the end of a
-    //run. The thresholds deciding what goes to the device were calibrated on one machine;
-    //this is how they get re-derived on another.
-    bool track_gflops = false;
-    //-gpu_fp32 forces the reduced-argument single-precision sincos on a card that would
-    //otherwise keep the double one. It exists for the test suite: without it the precision
-    //a run uses depends on the card, so neither path can be pinned. -gpu_fp64 wins if both
-    //are given, the accurate path being the safer thing to fall back to.
-    bool gpu_fp32 = false;
-    //-no_gpu_itensor keeps the XCW I tensor GEMMs on the CPU. On by default: it is much the
-    //largest of the device paths, and it moves the total energy only in the tenth
-    //significant figure. Read together with use_gpu, so -no_gpu turns it off as well.
-    bool gpu_itensor = true;
-    //FP16 Tensor Core operands with FP32 accumulation for the I tensor. Off by default: the
-    //half-precision operands move the XCW energies in the fourth decimal, plain FP32 GEMM
-    //sits within 1e-8 Eh of double.
-    bool gpu_itensor_tensor = false;
-    //SALTED descriptor combination uses the device when one is available; -no_gpu_salted keeps it on the CPU.
-    bool gpu_salted = true;
-    //-salted_charge_constraint rescales the l=0 coefficients of every SALTED prediction to the electron count, whether or not the model asks for it
-    bool salted_charge_constraint = false;
-    //-no_gpu_grid keeps the Becke/TFVC integration weights on the CPU
-    bool gpu_grid = true;
-    //Owned by the caller; the scattering-factor grid is built in it instead of a local, so
-    //a second table for the same geometry reuses the points and weights
-    GridManager* grid_cache = nullptr;
-    //-no_gpu_density keeps the fitted density of the Gordon-Kim repulsion grid and the spherical-atom grids on the CPU
-    bool gpu_density = true;
-    //-gpu_blas offers large dense GEMMs in nos_math to the device
-    bool gpu_blas = false;
-    //The I tensor GEMM goes through cuBLAS when the machine has it, and through the
-    //built-in CUTLASS path otherwise. cuBLAS is 1.65x faster on a V100 and level with
-    //CUTLASS within measurement noise on consumer cards, so preferring it costs nothing
-    //where it does not help. -no_gpu_cublas pins CUTLASS, which is what the reference tests
-    //do: the two differ in the last digits, so a test left to pick would pass or fail on
-    //whether a CUDA toolkit happened to be installed.
-    bool gpu_cublas = true;
-    //Standalone conceptual-DFT reactivity analysis (-fukui_analysis), run from run_app_impl rather than at parse time so its output survives
-    bool fukui_analysis_run = false;
-    //Basin analysis (-eli_analysis), run from run_app_impl for the same reason
-    bool eli_analysis_run = false;
-    bool profiling = false;
-    bool promol_nci = false;
-    bool get_g = false;
-    int accuracy = 2;
-    //-basin_grid <n>: the quadrature of the basin analysis pulled into the core, tightest
-    //exponent sharpened n^2-fold, radial step divided by n, Lebedev order up n - 1 entries
-    int basin_grid = 1;
-    int threads = -1;
-    int pbc = 0;
-    int charge = 0;
-    int ECP_mode = 0;
-    PartitionType partition_type = PartitionType::Hirshfeld;
-    //-multipole_moments: the RI fit is restrained to this scheme's atomic moments up to this order, -1 = unrestrained
-    int multipole_lmax = -1;
-    PartitionType multipole_scheme = PartitionType::Hirshfeld;
-    double multipole_strength = 1.0;
-    //-multipole_centre switches the restraint rows from partition-weighted grid moments of every aux function to centre moments
-    bool multipole_partition = true;
-    //-repulsion_overlap: exchange-repulsion of -interaction_energy as K * Int rhoA rhoB, 0 = not included
-    double repulsion_overlap = 0.0;
-    //-repulsion_exchange: exchange functional of the Gordon-Kim repulsion, 0 Dirac, 1 PBE, 2 B88, 3 r2SCAN-L
-    int repulsion_exchange = 0;
-    unsigned int mult = 0;
-    hkl_list m_hkl_list;
+	bool calc_F_calc = false;
+	bool rgbi = false;
+	//-npa: NAO/NPA, run in-process
+	bool npa = false;
+	//per-NAO occupancy table beside the NPA; -npa_summary turns it off
+	bool npa_orbitals = true;
+	//-ibo: IAO charges and intrinsic bond orbitals, run in-process
+	bool ibo = false;
+	bool rgbi_no_sym = false;
+	bool rgbi_EVs = false;
+	bool rgbi_theta = false;
+	//-rgbi_legacy_cutoff: atomic subspace by occupation threshold (1/6 NAO, 1/14 ANO) instead of the
+	//free-atom orbital count; the projector rank, and so every bond index, jumps when an occupation
+	//crosses it. Only for reproducing older numbers.
+	bool rgbi_legacy_cutoff = false;
+	RGBIOrbitalBasis rgbi_orbital_basis = RGBIOrbitalBasis::ANO;
+	ivec3 rgbi_group_sets;
+	bool fract = false;
+	//GPU scattering factors when a device is present; -no_gpu forces the CPU loop
+	bool use_gpu = true;
+	//-gpu_fp64 keeps the double sincos on a card that would otherwise pick the fp32 one
+	bool gpu_fp64 = false;
+	//Single-precision tiles for the CPU I tensor, as the device path runs; sgemm is twice
+	//dgemm's rate. -no_cpu_itensor_fp32 keeps double.
+	bool cpu_itensor_fp32 = true;
+	//-itensor_hybrid lets the CPU threads take reflections alongside the device. Off by
+	//default: the two sides differ in the last bits and a shared counter decides which rows
+	//each takes, so the result changes from run to run. For a card slow in double only.
+	bool itensor_hybrid = false;
+	//Seed each lambda step from the density extrapolated through the two previous steps
+	//rather than the last one alone; the step is small and the trajectory smooth.
+	bool xcw_extrapolate = true;
+	//Build the two-electron Fock matrix from the change of the density between iterations,
+	//rather than from the whole density every time: the stored integrals skip the segments
+	//the difference cannot reach (stored_eri::JK), the direct kernel skips shell quartets.
+	//The direct build only with xcw_int_precision 1e-12: at 1e-10 the increments' screening
+	//error accumulates to a gradient floor of 3e-5 and the SCF never meets its 1e-5, and the
+	//full build at 1e-10 is the faster of the two anyway.
+	bool xcw_incremental = false;
+	//Integral screening threshold of the XCW Fock build; OCC's own default is 1e-12.
+	double xcw_int_precision = 1e-10;
+	//-gflops reports achieved GFLOP/s per stage for the CPU and GPU paths at the end of a
+	//run. The thresholds deciding what goes to the device were calibrated on one machine;
+	//this is how they get re-derived on another.
+	bool track_gflops = false;
+	//-gpu_fp32 forces the reduced-argument single-precision sincos on a card that would
+	//otherwise keep the double one. It exists for the test suite: without it the precision
+	//a run uses depends on the card, so neither path can be pinned. -gpu_fp64 wins if both
+	//are given, the accurate path being the safer thing to fall back to.
+	bool gpu_fp32 = false;
+	//-no_gpu_itensor keeps the XCW I tensor GEMMs on the CPU. On by default: it is much the
+	//largest of the device paths, and it moves the total energy only in the tenth
+	//significant figure. Read together with use_gpu, so -no_gpu turns it off as well.
+	bool gpu_itensor = true;
+	//FP16 Tensor Core operands with FP32 accumulation for the I tensor. Off by default: the
+	//half-precision operands move the XCW energies in the fourth decimal, plain FP32 GEMM
+	//sits within 1e-8 Eh of double.
+	bool gpu_itensor_tensor = false;
+	//SALTED descriptor combination uses the device when one is available; -no_gpu_salted keeps it on the CPU.
+	bool gpu_salted = true;
+	//-no_gpu_grid keeps the Becke/TFVC integration weights on the CPU
+	bool gpu_grid = true;
+	//Owned by the caller; the scattering-factor grid is built in it instead of a local, so
+	//a second table for the same geometry reuses the points and weights
+	GridManager* grid_cache = nullptr;
+	//-no_gpu_density keeps the fitted density of the Gordon-Kim repulsion grid and the spherical-atom grids on the CPU
+	bool gpu_density = true;
+	//-gpu_blas offers large dense GEMMs in nos_math to the device
+	bool gpu_blas = false;
+	//The I tensor GEMM goes through cuBLAS when the machine has it, and through the
+	//built-in CUTLASS path otherwise. cuBLAS is 1.65x faster on a V100 and level with
+	//CUTLASS within measurement noise on consumer cards, so preferring it costs nothing
+	//where it does not help. -no_gpu_cublas pins CUTLASS, which is what the reference tests
+	//do: the two differ in the last digits, so a test left to pick would pass or fail on
+	//whether a CUDA toolkit happened to be installed.
+	bool gpu_cublas = true;
+	//Standalone conceptual-DFT reactivity analysis (-fukui_analysis), run from run_app_impl rather than at parse time so its output survives
+	bool fukui_analysis_run = false;
+	//EQC decomposition (-eqc), run from run_app_impl like -fukui_analysis; fragments are 0-based atoms, charge, mult
+	bool eqc = false;
+	struct eqc_fragment
+	{
+		ivec atoms;
+		int charge = 0;
+		int mult = 1;
+	};
+	std::vector<eqc_fragment> eqc_frags;
+	std::vector<std::filesystem::path> eqc_wfns;
+	std::string eqc_method = "hf";  //occ's method name: hf or a functional
+	std::string eqc_basis;          //a basis-library name; empty takes the basis out of the gbw
+	bool eqc_cold = false;          //also converge everything from occ's own guess, to count what seeding saves
+	//Basin analysis (-eli_analysis), run from run_app_impl for the same reason
+	bool eli_analysis_run = false;
+	//-fba: RGBI, native NBO/NPA with NRT, bondwise Laplacian, QTAIM and ELI-D on one wavefunction
+	bool fba = false;
+	bool profiling = false;
+	bool promol_nci = false;
+	bool get_g = false;
+	int accuracy = 2;
+	//-basin_grid <n>: the quadrature of the basin analysis pulled into the core, tightest
+	//exponent sharpened n^2-fold, radial step divided by n, Lebedev order up n - 1 entries
+	int basin_grid = 1;
+	//-basin_cube: QTAIM and ELI-D basins on the cube instead of from the analytic critical points and field
+	bool basin_cube = false;
+	//-no_spin_eli: skip the spin-resolved ELI-D basins of a spin-polarised wavefunction
+	bool spin_eli = true;
+	int threads = -1;
+	int pbc = 0;
+	int charge = 0;
+	int ECP_mode = 0;
+	PartitionType partition_type = PartitionType::Hirshfeld;
+	//-multipole_moments: the RI fit is restrained to this scheme's atomic moments up to this order, -1 = unrestrained
+	int multipole_lmax = -1;
+	MultipoleScheme multipole_scheme = MultipoleScheme::HIRSHFELD;
+	double multipole_strength = 1.0;
+	//-repulsion_overlap: exchange-repulsion of -interaction_energy as K * Int rhoA rhoB, 0 = not included
+	double repulsion_overlap = 0.0;
+	//-repulsion_exchange: exchange functional of the Gordon-Kim repulsion, 0 Dirac, 1 PBE, 2 B88, 3 r2SCAN-L
+	int repulsion_exchange = 0;
+	unsigned int mult = 0;
+	hkl_list m_hkl_list;
 
 	/** @brief Finds the debug flag, removes it from argc/argv and stores the rest internally. */
 	void look_for_debug(int& argc, char** argv);
@@ -1008,6 +1151,12 @@ struct options
 	//development and test-only switches
 	bool digest_dev_options(const std::string &temp, int &i);
 	void digest_options();
+	/** @brief The error for a requested analysis with no wavefunction to run on, "" when runnable;
+	 *  without -wfn/-occ run_app_impl skips its wavefunction branch silently. */
+	std::string unrunnable_analysis() const;
+	/** @brief Refuses -rgbi/-npa with an analysis that ends the run before them, and an -nbo_/-nrt_
+	 *  option on a line with no NBO analysis. Called last in digest_options(), so order does not matter. */
+	void refuse_unread_bonding_options();
 
 	options() : log_file(std::cout)
 	{
@@ -1019,6 +1168,14 @@ struct options
 		look_for_debug(argc, argv);
 	};
 };
+
+/** @brief The analysis whose options begin with this flag's prefix, nullptr if none;
+ *  digest_options refuses an unclaimed flag in such a family. */
+const char *owning_analysis(const std::string &flag);
+
+/** @brief The -nbo_/-nrt_ options the NBO handlers read from their own tokens, not through a digester.
+ *  An option added to a handler's scan loop needs an entry here (CliRefusalTests asserts it). */
+const std::set<std::string> &nbo_family_suboptions();
 
 void convert_tonto_XCW_lambda_steps(const std::string& str, const std::string& lambda_step, bool debug, options& opt);
 

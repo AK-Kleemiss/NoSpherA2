@@ -9,12 +9,14 @@
 #include "spherical_density.h"
 #include "cube.h"
 #include "constants.h"
+#include "ibo.h"
 #include "GridManager.h"
 #include "isosurface.h"
 #include "SALTED_predictor.h"
 #include "crystal_energies.h"
 #include "b2c.h"
 #include "density_source.h"
+#include "citations.h"
 
 std::vector<Thakkar> make_thakkar_interpolators()
 {
@@ -63,6 +65,39 @@ double sanitize_finite(double value)
 	if (std::isnan(value) || std::isinf(value))
 		return 0.0;
 	return value;
+}
+
+// The in-radius points in one batch: the ESP walks the whole primitive-pair table per point, so the set is worth
+// handing to a device at once. Points outside stay zero as in evaluate_cube_in_radius; wrap sums periodic images per cell.
+template <typename BatchFn>
+void evaluate_cube_in_radius_batched(
+	cube &target,
+	bool wrap,
+	const std::vector<atom> &atoms,
+	double radius_bohr,
+	BatchFn &&batch)
+{
+	std::vector<d3> points;
+	std::vector<i3> cells;
+	target.evaluate_on_grid(
+		[&](const d3 &pos, const i3 &, const i3 &mapped) {
+			if (!is_within_radius(pos, atoms, radius_bohr))
+				return 0.0;
+#pragma omp critical(cube_gather)
+			{
+				points.push_back(pos);
+				cells.push_back(mapped);
+			}
+			return 0.0;
+		},
+		wrap);
+	vec values(points.size());
+	batch(points, values.data());
+	for (size_t i = 0; i < points.size(); i++)
+	{
+		const i3 &c = cells[i];
+		target.set_value(c[0], c[1], c[2], target.get_value(c[0], c[1], c[2]) + values[i]);
+	}
 }
 
 template <typename EvalFn>
@@ -176,6 +211,36 @@ void accumulate_prop_values(std::vector<cube> &cubes, const i3 &mapped_idx, cons
 		cubes[cube_type::Eli].set_value(x, y, z, cubes[cube_type::Eli].get_value(x, y, z) + sanitize_finite(values.eli));
 }
 
+//Per B^3 block of cube points (and `extra` more layers on the high side), the atoms (in input order) whose centre lies
+//within reach(b, a) of some point of block b
+template <class Reach>
+std::vector<std::vector<int>> block_atom_lists(const cube &c, const int B, const std::vector<d3> &pos, const Reach &reach, const int extra = 0)
+{
+	const i3 n = c.get_sizes();
+	const i3 nb = { (n[0] + B - 1) / B, (n[1] + B - 1) / B, (n[2] + B - 1) / B };
+	std::vector<std::vector<int>> lists((size_t)nb[0] * nb[1] * nb[2]);
+#pragma omp parallel for schedule(dynamic)
+	for (int b = 0; b < (int)lists.size(); b++)
+	{
+		const int bx = b / (nb[1] * nb[2]), by = (b / nb[2]) % nb[1], bz = b % nb[2];
+		const int lo[3] = { bx * B, by * B, bz * B };
+		const int hi[3] = { std::min(lo[0] + B + extra, n[0]) - 1, std::min(lo[1] + B + extra, n[1]) - 1, std::min(lo[2] + B + extra, n[2]) - 1 };
+		//the farthest point of the block's parallelepiped from its centre is a corner
+		d3 corner[8], centre = { 0, 0, 0 };
+		for (int k = 0; k < 8; k++)
+		{
+			corner[k] = c.get_pos(k & 1 ? hi[0] : lo[0], k & 2 ? hi[1] : lo[1], k & 4 ? hi[2] : lo[2]);
+			for (int d = 0; d < 3; d++) centre[d] += corner[k][d] / 8;
+		}
+		double rb = 0;
+		for (int k = 0; k < 8; k++) rb = std::max(rb, array_length(corner[k], centre));
+		for (int a = 0; a < (int)pos.size(); a++)
+			if (array_length(centre, pos[a]) <= reach(b, a) + rb + 1E-6)
+				lists[b].push_back(a);
+	}
+	return lists;
+}
+
 } // namespace
 
 void Calc_Spherical_Dens(
@@ -242,21 +307,51 @@ void Calc_Spherical_Dens(
 	}
 #endif
 
-	evaluate_cube_in_radius(
-		CubeSpher,
-		wrap,
-		wavy_atoms,
-		radius_bohr,
-		[&](const d3 &pos) {
-			vector<double> dists(wavy.get_ncen(), 0.0);
-			for (int a = 0; a < wavy.get_ncen(); a++)
-				dists[a] = array_length(pos, wavy.get_atom_pos(a));
+	if (!wrap)
+	{
+		//Per 8^3 block of points only the atoms that can reach it: Thakkar is exactly 0 past its table end, so a
+		//dropped atom only ever added +0.0 and the in-radius test sees every atom within radius_bohr; values bit-identical.
+		constexpr int B = 8;
+		const i3 n = CubeSpher.get_sizes();
+		const i3 nb = { (n[0] + B - 1) / B, (n[1] + B - 1) / B, (n[2] + B - 1) / B };
+		vector<d3> apos(wavy_atoms.size());
+		vec reach(wavy_atoms.size());
+		for (size_t a = 0; a < wavy_atoms.size(); a++)
+		{
+			apos[a] = wavy_atoms[a].get_pos();
+			reach[a] = std::max(atom_models[wavy_atoms[a].get_charge() - 1].get_radial_dist().back(), radius_bohr);
+		}
+		const vector<vector<int>> block_atoms = block_atom_lists(CubeSpher, B, apos, [&](int, int a) { return reach[a]; });
+		CubeSpher.evaluate_on_grid(
+			[&](const d3 &pos, const i3 &idx, const i3 &) {
+				const vector<int> &nearby = block_atoms[((size_t)(idx[0] / B) * nb[1] + idx[1] / B) * nb[2] + idx[2] / B];
+				bool inside = false;
+				for (const int a : nearby)
+					if (array_length(pos, wavy_atoms[a].get_pos()) < radius_bohr) { inside = true; break; }
+				if (!inside)
+					return 0.0;
+				double dens_all = 0.0;
+				for (const int a : nearby)
+					dens_all += atom_models[wavy_atoms[a].get_charge() - 1].get_interpolated_density(array_length(pos, wavy_atoms[a].get_pos()));
+				return dens_all;
+			});
+	}
+	else
+		evaluate_cube_in_radius(
+			CubeSpher,
+			wrap,
+			wavy_atoms,
+			radius_bohr,
+			[&](const d3 &pos) {
+				vector<double> dists(wavy.get_ncen(), 0.0);
+				for (int a = 0; a < wavy.get_ncen(); a++)
+					dists[a] = array_length(pos, wavy.get_atom_pos(a));
 
-			double dens_all = 0.0;
-			for (int a = 0; a < wavy.get_ncen(); a++)
-				dens_all += atom_models[wavy.get_atom_charge(a) - 1].get_interpolated_density(dists[a]);
-			return dens_all;
-		});
+				double dens_all = 0.0;
+				for (int a = 0; a < wavy.get_ncen(); a++)
+					dens_all += atom_models[wavy.get_atom_charge(a) - 1].get_interpolated_density(dists[a]);
+				return dens_all;
+			});
 
 	_time_point end = get_time();
 	print_time(start, end, file);
@@ -629,13 +724,13 @@ void Calc_ESP(
 	const double radius_bohr = constants::ang2bohr(radius);
 	const vector<atom> atoms = wavy.get_atoms();
 
-	evaluate_cube_in_radius(
+	evaluate_cube_in_radius_batched(
 		CubeESP,
 		wrap,
 		atoms,
 		radius_bohr,
-		[&](const d3 &pos) {
-			return wavy.computeESP(pos, pairs);
+		[&](const std::vector<d3> &points, double *out) {
+			wavy.computeESP_batch(points, pairs, out);
 		});
 
 	if (!no_date)
@@ -654,7 +749,7 @@ void Calc_MO(
 	bool wrap)
 {
 	using namespace std;
-	err_checkf(mo <= wavy.get_nmo(), to_string(mo) + " bigger MO selected than " + to_string(wavy.get_nmo()) + " contained in the wavefunctions!", file);
+	err_checkf(mo >= 0 && mo < wavy.get_nmo(), "MO index " + to_string(mo) + " out of range, the wavefunction has " + to_string(wavy.get_nmo()) + " MOs (0 to " + to_string(wavy.get_nmo() - 1) + ")!", file);
 	_time_point start = get_time();
 	const double radius_bohr = constants::ang2bohr(radius);
 	const vector<atom> atoms = wavy.get_atoms();
@@ -804,18 +899,9 @@ void Calc_Fukui(
 
 namespace {
 
-// Overwrite the WFN_DENSITY column of an already-built integration grid with the
-// density of a single molecular orbital, |psi_mo(r)|^2.
-//
-// This is the whole trick behind the condensed Fukui functions. GridManager's
-// calculatePartitionedCharges() integrates whatever sits in that column against
-// all five partition weight columns at once; it does not recompute the density.
-// So substituting the frontier-orbital density for the total density turns the
-// existing five-way charge accumulation into a five-way condensed-Fukui
-// accumulation, with no change to GridManager at all.
-//
-// @p wavy must be the ORIGINAL wavefunction, still carrying its virtual
-// orbitals - the grid itself is built from a pruned copy (see below).
+// Replace the WFN_DENSITY column of a built grid by |psi_mo(r)|^2: calculatePartitionedCharges() integrates
+// that column against all five partition weights without recomputing it, giving the condensed Fukui functions.
+// wavy must be the original wavefunction with its virtual orbitals; the grid is built from a pruned copy.
 void fill_density_column_with_orbital(GridManager &gm, const WFN &wavy, int mo)
 {
 	GridData &gd = gm.getGridData();
@@ -839,7 +925,7 @@ void fill_density_column_with_orbital(GridManager &gm, const WFN &wavy, int mo)
 	}
 }
 
-} // namespace
+}
 
 CondensedFukuiResults Calc_Condensed_Fukui(
 	const WFN &wavy,
@@ -980,6 +1066,7 @@ void fukui_analysis(options &opt, std::ostream &log2)
 	err_checkf(opt.wfn != "", "Error, no wfn file specified! Use -fukui_analysis <wfn> or -wfn <wfn>.", log2);
 	WFN wavy(opt.wfn);
 	log2 << "\nConceptual-DFT reactivity analysis of " << opt.wfn.string() << endl;
+	citations::cite(citations::Method::Fukui, log2);
 	log2 << "Read " << wavy.get_ncen() << " atoms and " << wavy.get_nmo()
 		 << " molecular orbitals (" << wavy.get_nmo(true) << " occupied)." << endl;
 
@@ -1151,28 +1238,38 @@ struct PromolecularAtom {
 	int fragment = 0;
 };
 
+// nearby: indices into atoms, ascending; atoms left out must be past their spline_reach() (exactly 0).
+// reach2[a]: spline_reach()^2 of atom a, past which it is skipped here too
 PromolecularFragmentDensities promolecular_fragment_densities_at(
 	const d3 &pos,
 	const std::vector<PromolecularAtom> &atoms,
-	const std::vector<Thakkar> &atom_models)
+	const std::vector<int> &nearby,
+	const std::vector<Thakkar> &atom_models,
+	const vec &reach2)
 {
 	PromolecularFragmentDensities result;
 	// atoms are grouped by fragment (add_promolecular_atoms appends whole fragments),
 	// so a running per-fragment sum needs no per-fragment storage
 	double fragment_sum = 0.0;
-	int current_fragment = atoms.empty() ? 0 : atoms.front().fragment;
-	for (const PromolecularAtom &atom : atoms)
+	int current_fragment = nearby.empty() ? 0 : atoms[nearby.front()].fragment;
+	for (const int a : nearby)
 	{
+		const PromolecularAtom &atom = atoms[a];
 		if (atom.fragment != current_fragment)
 		{
 			result.dominant = std::max(result.dominant, fragment_sum);
 			fragment_sum = 0.0;
 			current_fragment = atom.fragment;
 		}
+		// the block list holds atoms that reach some point of the block; past spline_reach() this one adds exactly 0
+		const double dx = pos[0] - atom.pos[0], dy = pos[1] - atom.pos[1], dz = pos[2] - atom.pos[2];
+		const double d2 = dx * dx + dy * dy + dz * dz;
+		if (d2 > reach2[a])
+			continue;
 		// Table lookup for the mask pass only; lambda2 and the RDG come from the
 		// analytic Thakkar derivatives in promolecular_derivatives_at(); the exact
 		// Slater sums here cost several times the run for a handful of kept points
-		const double contribution = atom_models[atom.charge - 1].get_interpolated_density_spline(array_length(pos, atom.pos));
+		const double contribution = atom_models[atom.charge - 1].get_interpolated_density_spline(std::sqrt(d2));
 		fragment_sum += contribution;
 		result.sum += contribution;
 	}
@@ -1200,24 +1297,128 @@ bool is_promolecular_nci_point(
 	return fragment_density >= total_density * fragment_sum_cutoff;
 }
 
+// rho, rho', rho'' of one Thakkar atom on [r0, r0 + n h) as quintic Hermite pieces through the exact rho, rho', rho''
+// at the nodes; rho' and rho'' are the piece's own derivatives
+struct RadialQuintic
+{
+	double r0 = 0.0, inv_h = 0.0;
+	std::vector<std::array<double, 6>> c; // per piece, in t = (r - r_i) / h
+
+	bool eval(const double r, double &rho, double &d1, double &d2) const
+	{
+		const double s = (r - r0) * inv_h;
+		if (!(s >= 0.0) || s >= (double)c.size())
+			return false;
+		const int i = (int)s;
+		const double t = s - i;
+		const std::array<double, 6> &k = c[i];
+		if (std::isnan(k[0]))
+			return false;
+		rho =k[0] + t * (k[1] + t * (k[2] + t * (k[3] + t * (k[4] + t * k[5]))));
+		d1 = (k[1] + t * (2 * k[2] + t * (3 * k[3] + t * (4 * k[4] + t * 5 * k[5])))) * inv_h;
+		d2 = (2 * k[2] + t * (6 * k[3] + t * (12 * k[4] + t * 20 * k[5]))) * inv_h * inv_h;
+		return true;
+	}
+};
+
+// The table on [r0, r1). A piece that strays more than tol * env(r) from the exact rho, rho' or rho'' at t = 1/4, 1/2, 3/4
+// (env: the sup envelope of the RDG pass, sampled every env_dr) is NaN, and atoms there take the Slater sums: Thakkar
+// drops each exponent's term past z r = 46.5, a step no smooth piece follows. h is the step with the fewest NaN pieces;
+// coarse steps fail on truncation, fine ones on rounding, since rho'' comes from differences of rho over h^2
+RadialQuintic make_radial_quintic(const Thakkar &model, const double r0, const double r1, const vec &env, const double env_dr, const double tol)
+{
+	RadialQuintic best;
+	double best_bad = 2.0;
+	for (double h = 0.05; h >= 1E-4; h /= 2)
+	{
+		RadialQuintic q;
+		q.r0 = r0;
+		q.inv_h = 1.0 / h;
+		const int n = (int)std::ceil((r1 - r0) / h);
+		q.c.resize(n);
+		double d1, d2;
+		double f0 = model.get_radial_density(r0, d1, d2), m0 = h * d1, a0 = h * h * d2;
+		int bad = 0;
+		for (int i = 0; i < n; i++)
+		{
+			const double f1 = model.get_radial_density(r0 + (i + 1) * h, d1, d2), m1 = h * d1, a1 = h * h * d2;
+			const double A = f1 - f0 - m0 - a0 / 2, B = m1 - m0 - a0, C = a1 - a0;
+			q.c[i] = { f0, m0, a0 / 2, 10 * A - 4 * B + C / 2, -15 * A + 7 * B - C, 6 * A - 3 * B + C / 2 };
+			f0 = f1, m0 = m1, a0 = a1;
+			for (const double t : { 0.25, 0.5, 0.75 })
+			{
+				const double r = r0 + (i + t) * h, bound = tol * env[std::min((size_t)(r / env_dr), env.size() - 1)];
+				double e1, e2, p, p1, p2;
+				const double e = model.get_radial_density(r, e1, e2);
+				q.eval(r, p, p1, p2);
+				if (!(std::abs(p - e) <= bound && std::abs(p1 - e1) <= bound && std::abs(p2 - e2) <= bound))
+				{
+					q.c[i][0] = std::numeric_limits<double>::quiet_NaN();
+					bad++;
+					break;
+				}
+			}
+		}
+		const double frac = (double)bad / n;
+		if (frac > best_bad)
+			break; // past the bottom
+		if (frac < best_bad)
+			best = std::move(q), best_bad = frac;
+		if (bad == 0)
+			break;
+	}
+	return best;
+}
+
+// Atoms past from[slot] (per element, this block's far radius) are summed from their table instead of the Slater sums
+struct FarAtoms
+{
+	const double *from;
+	const std::vector<int> &slot;
+	const std::vector<RadialQuintic> &tables;
+};
+
 // rho, grad rho and the Hessian of the promolecule at pos, each Thakkar atom's analytic rho', rho''
 // summed through Centred<Thakkar>; replaces the finite-difference stencils on the rho cube, whose
-// error scaled with the grid step and whose edge points were clamped
+// error scaled with the grid step and whose edge points were clamped. nearby: indices into atoms, ascending
 double promolecular_derivatives_at(
 	const d3 &pos,
 	const std::vector<PromolecularAtom> &atoms,
+	const std::vector<int> &nearby,
 	const std::vector<Thakkar> &atom_models,
 	d3 &grad,
-	double *hessian)
+	double *hessian,
+	const FarAtoms *distant = nullptr)
 {
 	double rho = 0.0;
 	grad = { 0.0, 0.0, 0.0 };
 	std::fill(hessian, hessian + 9, 0.0);
-	for (const PromolecularAtom &atom : atoms)
+	for (const int a : nearby)
 	{
-		const Centred<Thakkar> source{ atom_models[atom.charge - 1], atom.pos };
+		const PromolecularAtom &atom = atoms[a];
 		d3 g;
 		double H[9];
+		if (distant)
+		{
+			// calculate_hessian(Centred<A>) regrouped: grad = rho'/r d, H = (rho'' - rho'/r) d d / r^2 + rho'/r delta
+			const int s = distant->slot[atom.charge - 1];
+			const d3 d{ pos[0] - atom.pos[0], pos[1] - atom.pos[1], pos[2] - atom.pos[2] };
+			const double r = array_length(d);
+			double f, d1, d2;
+			if (r >= distant->from[s] && r > 1E-4 && distant->tables[s].eval(r, f, d1, d2))
+			{
+				const double inv_r = 1.0 / r, a1 = d1 * inv_r, b = (d2 - a1) * inv_r * inv_r;
+				rho += f;
+				for (int i = 0; i < 3; i++)
+				{
+					grad[i] += a1 * d[i];
+					for (int j = 0; j < 3; j++)
+						hessian[3 * i + j] += b * d[i] * d[j] + (i == j ? a1 : 0.0);
+				}
+				continue;
+			}
+		}
+		const Centred<Thakkar> source{ atom_models[atom.charge - 1], atom.pos };
 		rho += calculate_hessian(source, pos, g, H);
 		for (int k = 0; k < 3; k++)
 			grad[k] += g[k];
@@ -1422,6 +1623,7 @@ void promolecular_nci_analysis(
 	const _time_point t_start = get_time();
 
 	err_checkf(xyz_files.size() >= 2, "Promolecular NCI needs at least two XYZ fragments.", log);
+	citations::cite(citations::Method::NCI, log);
 
 	// Output names join every fragment stem: a_b_c_values.dat etc.
 	std::string joined_stems = xyz_files.front().stem().string();
@@ -1435,11 +1637,15 @@ void promolecular_nci_analysis(
 	WFN combined(e_origin::xyz);
 	combined.set_path(xyz_files.front().parent_path() / (joined_stems + ".xyz"));
 	vector<PromolecularAtom> atoms;
+	vector<std::array<double, 6>> fragment_boxes; // each fragment's atoms + radius, bohr
 	for (size_t f = 0; f < xyz_files.size(); f++)
 	{
 		err_checkf(std::filesystem::exists(xyz_files[f]), "XYZ file does not exist: " + xyz_files[f].string(), log);
 		WFN fragment(e_origin::xyz);
 		fragment.read_xyz(xyz_files[f], log, false);
+		properties_options fragment_opts = opts;
+		readxyzMinMax_fromWFN(fragment, fragment_opts);
+		fragment_boxes.push_back(fragment_opts.MinMax);
 		add_atoms_to_combined_wfn(fragment, combined);
 		add_promolecular_atoms(fragment, static_cast<int>(f) + 1, atoms);
 	}
@@ -1450,6 +1656,34 @@ void promolecular_nci_analysis(
 	if (cif.empty())
 	{
 		readxyzMinMax_fromWFN(combined, local_opts);
+		// an intermolecular point lies within radius of two fragments, so only the pairwise overlaps of the fragment boxes can hold one
+		std::array<double, 6> overlaps = { 1E300, 1E300, 1E300, -1E300, -1E300, -1E300 };
+		for (size_t f = 0; f < fragment_boxes.size(); f++)
+			for (size_t g = f + 1; g < fragment_boxes.size(); g++)
+			{
+				std::array<double, 6> o;
+				bool empty = false;
+				for (int i = 0; i < 3; i++)
+				{
+					o[i] = std::max(fragment_boxes[f][i], fragment_boxes[g][i]);
+					o[i + 3] = std::min(fragment_boxes[f][i + 3], fragment_boxes[g][i + 3]);
+					empty |= o[i] >= o[i + 3];
+				}
+				if (!empty)
+					for (int i = 0; i < 3; i++)
+					{
+						overlaps[i] = std::min(overlaps[i], o[i]);
+						overlaps[i + 3] = std::max(overlaps[i + 3], o[i + 3]);
+					}
+			}
+		err_checkf(overlaps[0] < overlaps[3], "The fragments are more than two -radius apart; no intermolecular region.", log);
+		for (int i = 0; i < 3; i++)
+		{
+			local_opts.MinMax[i] = std::max(local_opts.MinMax[i], overlaps[i]);
+			local_opts.MinMax[i + 3] = std::min(local_opts.MinMax[i + 3], overlaps[i + 3]);
+			local_opts.NbSteps[i] = (int)ceil(constants::bohr2ang(local_opts.MinMax[i + 3] - local_opts.MinMax[i]) / local_opts.resolution);
+			local_opts.NbSteps[i] += local_opts.NbSteps[i] % 2; // even, as readxyzMinMax_fromWFN
+		}
 		for (int i = 0; i < 3; i++)
 			cell_matrix[i][i] = (local_opts.MinMax[i + 3] - local_opts.MinMax[i]) / local_opts.NbSteps[i];
 	}
@@ -1498,6 +1732,20 @@ void promolecular_nci_analysis(
 	log << "Fragment-sum density keep cutoff: " << opts.promol_nci_rcut2 << endl;
 
 	const _time_point t_mask = get_time();
+	//Per 8^3 block only the atoms within spline_reach(): the rest add exactly 0, in order, so bit-identical
+	constexpr int B = 8;
+	vector<d3> apos(atoms.size());
+	vec reach(atoms.size()), reach2(atoms.size());
+	vector<int> all_atoms(atoms.size());
+	for (size_t a = 0; a < atoms.size(); a++)
+	{
+		apos[a] = atoms[a].pos;
+		reach[a] = atom_models[atoms[a].charge - 1].spline_reach();
+		reach2[a] = reach[a] * reach[a];
+		all_atoms[a] = (int)a;
+	}
+	const vector<vector<int>> block_atoms = block_atom_lists(rho_cube, B, apos, [&](int, int a) { return reach[a]; });
+	const int nby = (rho_cube.get_size(1) + B - 1) / B, nbz = (rho_cube.get_size(2) + B - 1) / B;
 	ProgressBar density_progress(rho_cube.get_size(0), 50, "=", " ", "Calculating promolecular rho");
 #pragma omp parallel for schedule(dynamic)
 	for (int x = 0; x < rho_cube.get_size(0); x++)
@@ -1506,7 +1754,8 @@ void promolecular_nci_analysis(
 			for (int z = 0; z < rho_cube.get_size(2); z++)
 			{
 				const d3 pos = rho_cube.get_pos(x, y, z);
-				const PromolecularFragmentDensities densities = promolecular_fragment_densities_at(pos, atoms, atom_models);
+				const vector<int> &nearby = block_atoms[((size_t)(x / B) * nby + y / B) * nbz + z / B];
+				const PromolecularFragmentDensities densities = promolecular_fragment_densities_at(pos, atoms, nearby, atom_models, reach2);
 				const double rho = densities.total();
 				rho_cube.set_value(x, y, z, rho);
 				rdg_cube.set_value(
@@ -1550,6 +1799,96 @@ void promolecular_nci_analysis(
 	const int nci_write_threads = 1;
 #endif
 	std::vector<std::ostringstream> values_by_thread(nci_write_threads);
+	// masked points next to a kept one get their RDG too, so the mesh below ends a sheet in a face whose centre fails the
+	// mask (dropped) instead of a wall along the mask's voxel staircase. Other masked points stay at 101, above any iso,
+	// and the cubes are masked again after the mesh
+	const int nx = rho_cube.get_size(0), ny = rho_cube.get_size(1), nz = rho_cube.get_size(2);
+	const auto at = [&](int x, int y, int z) { return (static_cast<size_t>(x) * ny + y) * nz + z; };
+	std::vector<char> masked(static_cast<size_t>(nx) * ny * nz), rim(masked.size(), 0);
+	for (int x = 0; x < nx; x++)
+		for (int y = 0; y < ny; y++)
+			for (int z = 0; z < nz; z++)
+				masked[at(x, y, z)] = std::abs(rdg_cube.get_value(x, y, z) - 101.0) <= 1E-12;
+	for (int x = 0; x < nx; x++)
+		for (int y = 0; y < ny; y++)
+			for (int z = 0; z < nz; z++)
+				if (!masked[at(x, y, z)])
+					for (int i = std::max(x - 1, 0); i <= std::min(x + 1, nx - 1); i++)
+						for (int j = std::max(y - 1, 0); j <= std::min(y + 1, ny - 1); j++)
+							for (int k = std::max(z - 1, 0); k <= std::min(z + 1, nz - 1); k++)
+								rim[at(i, j, k)] = masked[at(i, j, k)];
+	// The analytic sums below, per 8^3 block plus the next grid layer (so a marching-cubes cell lies in the block of its
+	// low corner), only over the atoms that can add 1E-14 rho_min / (4 N) there. env(r) = 2 sup over r' >= r of
+	// |rho| + |rho'| + |rho''| + |rho'| / r', sampled every 0.01 bohr, bounds every term of rho, grad and Hessian, so the
+	// atoms left out move each sum by < 1E-14 rho; rho_min is the block's smallest mask-pass spline rho (<= 0 keeps all)
+	constexpr double env_dr = 0.01, inf = std::numeric_limits<double>::infinity();
+	std::vector<int> slot(atom_models.size(), -1);
+	std::vector<vec> envelope;
+	for (const PromolecularAtom &atom : atoms)
+	{
+		if (slot[atom.charge - 1] >= 0)
+			continue;
+		slot[atom.charge - 1] = (int)envelope.size();
+		vec &e = envelope.emplace_back();
+		for (int k = 0; k < 40000 && (e.empty() || e.back() >= 1E-300); k++)
+		{
+			const double r = k * env_dr;
+			double d1, d2;
+			const double rho = atom_models[atom.charge - 1].get_radial_density(r, d1, d2);
+			e.push_back(2 * (std::abs(rho) + std::abs(d1) + std::abs(d2) + (k > 0 ? std::abs(d1) / r : 0.0)));
+		}
+		for (int k = (int)e.size() - 2; k >= 0; k--)
+			e[k] = std::max(e[k], e[k + 1]);
+	}
+	const int sby = (ny + B - 1) / B, sbz = (nz + B - 1) / B;
+	const auto block_of = [&](int x, int y, int z) { return ((size_t)(x / B) * sby + y / B) * sbz + z / B; };
+	vec rho_min((size_t)((nx + B - 1) / B) * sby * sbz, inf); // inf: nothing in the block is evaluated
+#pragma omp parallel for schedule(dynamic)
+	for (int b = 0; b < (int)rho_min.size(); b++)
+	{
+		const int bx = b / (sby * sbz) * B, by = b / sbz % sby * B, bz = b % sbz * B;
+		for (int x = bx; x < std::min(bx + B + 1, nx); x++)
+			for (int y = by; y < std::min(by + B + 1, ny); y++)
+				for (int z = bz; z < std::min(bz + B + 1, nz); z++)
+					if (!masked[at(x, y, z)] || rim[at(x, y, z)])
+						rho_min[b] = std::min(rho_min[b], rho_cube.get_value(x, y, z));
+	}
+	const size_t nel = envelope.size();
+	vec cut(rho_min.size() * nel);
+	for (size_t b = 0; b < rho_min.size(); b++)
+		for (size_t s = 0; s < nel; s++)
+		{
+			const double thr = 1E-14 * rho_min[b] / (4.0 * atoms.size());
+			const auto it = std::partition_point(envelope[s].begin(), envelope[s].end(), [thr](double v) { return v >= thr; });
+			cut[b * nel + s] = rho_min[b] == inf ? -inf : it == envelope[s].end() ? inf : (it - envelope[s].begin()) * env_dr;
+		}
+	// Past far_from (env < T rho_min, about 86 % of the terms on sucrose) an atom comes from its quintic table, which stays
+	// within 1E-13 / (T N) env of the Slater sums: all N atoms together move each sum by < 1E-13 rho_min
+	constexpr double T = 1E-7;
+	vec far_from(cut.size(), inf);
+	vector<RadialQuintic> tables(nel);
+	for (size_t z = 0; z < slot.size(); z++)
+	{
+		const int s = slot[z];
+		if (s < 0)
+			continue;
+		double lo = inf, hi = 0;
+		for (size_t b = 0; b < rho_min.size(); b++)
+		{
+			if (rho_min[b] == inf)
+				continue;
+			const double thr = T * rho_min[b];
+			const auto it = std::partition_point(envelope[s].begin(), envelope[s].end(), [thr](double v) { return v >= thr; });
+			if (it != envelope[s].end())
+				lo = std::min(lo, far_from[b * nel + s] = (it - envelope[s].begin()) * env_dr);
+			if (cut[b * nel + s] != inf)
+				hi = std::max(hi, cut[b * nel + s]);
+		}
+		if (lo < hi)
+			tables[s] = make_radial_quintic(atom_models[z], lo, hi + 2.0, envelope[s], env_dr, 1E-13 / (T * atoms.size()));
+	}
+	const vector<vector<int>> rdg_atoms = block_atom_lists(rho_cube, B, apos, [&](int b, int a) { return cut[b * nel + slot[atoms[a].charge - 1]]; }, 1);
+	const vector<vector<int>> face_atoms = block_atom_lists(rho_cube, B, apos, [&](int b, int a) { return rho_min[b] == inf ? -inf : reach[a]; }, 1);
 	ProgressBar rdg_progress(rho_cube.get_size(0), 50, "=", " ", "Calculating promolecular RDG");
 #pragma omp parallel reduction(+ : kept_points) num_threads(nci_write_threads)
 	{
@@ -1565,22 +1904,26 @@ void promolecular_nci_analysis(
 		{
 			for (int z = 0; z < rho_cube.get_size(2); z++)
 			{
-				if (std::abs(rdg_cube.get_value(x, y, z) - 101.0) <= 1E-12)
+				const bool is_masked = masked[at(x, y, z)];
+				if (is_masked && !rim[at(x, y, z)])
 				{
-					signed_rho_cube.set_value(x, y, z, 0.0);
-					rdg_cube.set_value(x, y, z, 101.0);
+					signed_rho_cube.set_value(x, y, z, 0.0); // rdg is still the mask's 101
 					continue;
 				}
 
 				d3 grad;
 				double hessian[9];
-				const double rho = promolecular_derivatives_at(rho_cube.get_pos(x, y, z), atoms, atom_models, grad, hessian);
+				const size_t b = block_of(x, y, z);
+				const FarAtoms distant{ &far_from[b * nel], slot, tables };
+				const double rho = promolecular_derivatives_at(rho_cube.get_pos(x, y, z), atoms, rdg_atoms[b], atom_models, grad, hessian, &distant);
 				const double lambda2 = get_lambda_1(hessian);
 				const double signed_rho = lambda2 < 0.0 ? -rho : rho;
 				const double rdg = sanitize_finite(reduced_density_gradient(rho, grad));
 
 				signed_rho_cube.set_value(x, y, z, signed_rho);
 				rdg_cube.set_value(x, y, z, rdg);
+				if (is_masked)
+					continue;
 
 				if (opts.promol_nci_rho_abs_max >= 0.0 && std::abs(signed_rho) > opts.promol_nci_rho_abs_max)
 					continue;
@@ -1596,6 +1939,68 @@ void promolecular_nci_analysis(
 	}
 	for (const std::ostringstream &local_values : values_by_thread)
 		values_file << local_values.str();
+	const _time_point t_mesh = get_time();
+
+	// marching cubes on the unmasked RDG; a face stays when its centre is intermolecular, coloured and written to the
+	// .dat with sign(lambda2) rho there (VMD's BGR, +-colour_max)
+	const std::vector<Triangle> triangles = marchingCubes(rdg_cube, opts.promol_nci_iso);
+	std::vector<char> keep(triangles.size(), 0);
+	vec centre_signed_rho(triangles.size());
+	const vec2 to_index = crystal_energies::inverse3(cell_matrix);
+#pragma omp parallel for schedule(dynamic, 256)
+	for (long long i = 0; i < static_cast<long long>(triangles.size()); i++)
+	{
+		const d3 c = triangles[i].calc_center();
+		// the cell holding the centre, by its low corner; a block with nothing evaluated (a centre rounded onto a face) keeps all atoms
+		int idx[3];
+		for (int d = 0; d < 3; d++)
+		{
+			double f = 0;
+			for (int e = 0; e < 3; e++)
+				f += to_index[d][e] * (c[e] - rho_cube.get_origin(e));
+			idx[d] = std::clamp((int)std::floor(f), 0, rho_cube.get_size(d) - 1);
+		}
+		const size_t b = block_of(idx[0], idx[1], idx[2]);
+		const PromolecularFragmentDensities densities = promolecular_fragment_densities_at(c, atoms, rho_min[b] == inf ? all_atoms : face_atoms[b], atom_models, reach2);
+		if (!is_promolecular_nci_point(densities, densities.total(), opts.promol_nci_rcut1, opts.promol_nci_rcut2))
+			continue;
+		d3 grad;
+		double hessian[9];
+		const FarAtoms distant{ &far_from[b * nel], slot, tables };
+		const double rho = promolecular_derivatives_at(c, atoms, rho_min[b] == inf ? all_atoms : rdg_atoms[b], atom_models, grad, hessian, rho_min[b] == inf ? nullptr : &distant);
+		centre_signed_rho[i] = get_lambda_1(hessian) < 0.0 ? -rho : rho;
+		keep[i] = 1;
+	}
+	std::vector<Triangle> faces;
+	vec face_signed_rho;
+	for (size_t i = 0; i < triangles.size(); i++)
+	{
+		if (!keep[i])
+			continue;
+		const Triangle &t = triangles[i];
+		face_signed_rho.push_back(centre_signed_rho[i]);
+		faces.emplace_back(t.get_v(1), t.get_v(3), t.get_v(2), // low RDG is inside: wind as the density surfaces
+			mix_colour(centre_signed_rho[i], { { { 0, 0, 255 }, { 0, 255, 0 }, { 255, 0, 0 } } },
+				-opts.promol_nci_colour_max, opts.promol_nci_colour_max));
+	}
+	writeColourObj(output_base.string() + "_nci.obj", faces);
+	{
+		ofstream face_file(output_base.string() + "_nci.dat");
+		face_file << "# signed_rho\n" << scientific << setprecision(6);
+		for (const double s : face_signed_rho)
+			face_file << s << "\n";
+	}
+	log << "Intermolecular NCI surface: " << faces.size() << " of " << triangles.size() << " RDG = "
+		<< opts.promol_nci_iso << " faces, " << output_base.string() << "_nci.obj" << endl;
+
+	for (int x = 0; x < nx; x++)
+		for (int y = 0; y < ny; y++)
+			for (int z = 0; z < nz; z++)
+				if (rim[at(x, y, z)])
+				{
+					signed_rho_cube.set_value(x, y, z, 0.0);
+					rdg_cube.set_value(x, y, z, 101.0);
+				}
 	const _time_point t_write = get_time();
 
 	signed_rho_cube.set_path(output_base.string() + "_signed_rho.cube");
@@ -1606,7 +2011,7 @@ void promolecular_nci_analysis(
 	write_promolecular_nci_plot_script(output_base, opts, log);
 	if (!constants::hide_timings)
 		log << "Promolecular NCI setup: " << get_msec(t_start, t_mask) << " ms, mask pass: " << get_msec(t_mask, t_rdg)
-			<< " ms, RDG pass: " << get_msec(t_rdg, t_write) << " ms, cube writing: " << get_msec(t_write, get_time()) << " ms" << endl;
+			<< " ms, RDG pass: " << get_msec(t_rdg, t_mesh) << " ms, surface: " << get_msec(t_mesh, t_write) << " ms, cube writing: " << get_msec(t_write, get_time()) << " ms" << endl;
 
 	log << "Wrote " << signed_rho_cube.get_path() << endl;
 	log << "Wrote " << rdg_cube.get_path() << endl;
@@ -1677,7 +2082,9 @@ void properties_calculation(options &opt)
 		readxyzMinMax_fromCIF(opt.cif, opt.properties, cell_matrix);
 	else
 	{
-		readxyzMinMax_fromWFN(wavy, opt.properties);
+		//no even-point rounding here: the step below is the requested resolution and not the span over the
+		//point count, so one more point would enlarge the box instead of putting its centre on a grid plane
+		readxyzMinMax_fromWFN(wavy, opt.properties, false);
 		for (int i = 0; i < 3; i++)
 			cell_matrix[i][i] = constants::ang2bohr(opt.properties.resolution);
 	}
@@ -1802,10 +2209,28 @@ void properties_calculation(options &opt)
 		log2 << "Fukui functions and dual descriptor, ";
 	log2 << endl;
 
+	//Which paper each of those grids implements.  Same guards as the list above.
+	if (opt.properties.hdef || opt.properties.def || opt.properties.hirsh)
+		citations::cite(citations::Method::Hirshfeld, log2);
+	if (opt.properties.eli)
+		citations::cite(citations::Method::ELID, log2);
+	if (opt.properties.elf)
+		citations::cite(citations::Method::ELF, log2);
+	if (opt.properties.rdg)
+		citations::cite(citations::Method::NCI, log2);
+	if (opt.properties.esp)
+		citations::cite(citations::Method::ESP, log2);
+	if (opt.properties.fukui)
+		citations::cite(citations::Method::Fukui, log2);
+
 	log2 << "Calculating for " << fixed << setprecision(0) << opt.properties.NbSteps[0] * opt.properties.NbSteps[1] * opt.properties.NbSteps[2] << " Gridpoints." << endl;
 
-	if (ml) Calc_Rho(cubes[cube_type::Rho], *ml, opt.properties.radius, log2, opt.cif != "");
-	else Calc_Rho(cubes[cube_type::Rho], wavy, opt.properties.radius, log2, opt.cif != "");
+	// -esp_isosurface with -cif marches its own box below, so a run asking only for that never reads the cell rho
+	const properties_options &p = opt.properties;
+	if (p.rho || p.lap || p.eli || p.elf || p.rdg || p.esp || p.def || p.hdef || p.hirsh || p.integral_accuracy != -1 || (p.esp_isosurface > 0 && opt.cif == "")) {
+		if (ml) Calc_Rho(cubes[cube_type::Rho], *ml, opt.properties.radius, log2, opt.cif != "");
+		else Calc_Rho(cubes[cube_type::Rho], wavy, opt.properties.radius, log2, opt.cif != "");
+	}
 
 	if (opt.properties.integral_accuracy != -1) {
 		log2 << "Refining grid files to integral accuracy of " << opt.properties.integral_accuracy << " ..." << flush;
@@ -1823,6 +2248,20 @@ void properties_calculation(options &opt)
 			Calc_MO(cubes[cube_type::MO_val], opt.properties.MO_numbers[i], wavy, opt.properties.radius, log2, opt.cif != "");
 			cubes[cube_type::MO_val].write_file(true);
 		}
+	if (!opt.properties.ibo_cube.empty())
+	{
+		const IBOResult ibo = intrinsic_bond_orbitals(wavy);
+		print_ibo(ibo, wavy, log2);
+		const WFN local = ibo_wfn(wavy, ibo);
+		for (const int k : ibo_selection(ibo, opt.properties.ibo_cube))
+		{
+			log2 << "Calculating IBO " << k + 1 << endl;
+			cubes[cube_type::MO_val].set_zero();
+			cubes[cube_type::MO_val].set_path((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_IBO_" + to_string(k + 1) + ".cube");
+			Calc_MO(cubes[cube_type::MO_val], ibo.mos[k], local, opt.properties.radius, log2, opt.cif != "");
+			cubes[cube_type::MO_val].write_file(true);
+		}
+	}
 
 	// The Fukui functions need the LUMO, which is an UNOCCUPIED orbital. This
 	// block must therefore stay above the delete_unoccupied_MOs() call below -
@@ -2049,11 +2488,14 @@ void properties_calculation(options &opt)
 		WFN temp = wavy;
 		temp.delete_unoccupied_MOs();
 		temp.delete_Qs();
+		_time_point e0 = get_time();
 		if (ml) Calc_ESP(cubes[cube_type::ESP], *ml, opt.properties.radius, opt.no_date, log2, opt.cif != "");
 		else Calc_ESP(cubes[cube_type::ESP], temp, opt.properties.radius, opt.no_date, log2, opt.cif != "");
+		_time_point e1 = get_time();
 		log2 << "Writing cube to Disk..." << flush;
 		cubes[cube_type::ESP].write_file(true);
-		log2 << "  done!" << endl;
+		_time_point e2 = get_time();
+		log2 << "  done! ESP " << get_msec(e0, e1) << " ms, cube written in " << get_msec(e1, e2) << " ms" << endl;
 	}
 	if (opt.properties.esp_isosurface > 0)
 	{
@@ -2066,11 +2508,24 @@ void properties_calculation(options &opt)
 			if (ml) Calc_Rho(box, *ml, box_opts.radius, log2, false);
 			else Calc_Rho(box, wavy, box_opts.radius, log2, false);
 		}
+		// the phases' cost varies widely between molecules, so each reports its time
+		_time_point t0 = get_time();
 		std::vector<Triangle> triangles = marchingCubes(opt.cif != "" ? box : cubes[cube_type::Rho], opt.properties.esp_isosurface);
-		log2 << "Found " << triangles.size() << " triangles" << endl;
+		_time_point t1 = get_time();
+		log2 << "Found " << triangles.size() << " triangles in " << get_msec(t0, t1) << " ms" << endl;
+		// the per-face ESP below is the long pole, so the bare isosurface goes out first in its own file: the coloured one
+		// must only ever appear complete
+		const std::string esp_stem = (wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_rho_esp";
+		writeColourObj(esp_stem + "_shape.obj", triangles);
+		{ ofstream stage1(esp_stem + "_shape.obj.stage1"); stage1 << triangles.size() << "\n"; }
+		_time_point t2 = get_time();
 		if (ml) colour_by_ESP(triangles, surface_ESP(triangles, ml_esp), log2);
 		else colour_by_ESP(triangles, wavy, log2);
-		writeColourObj((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_rho_esp.obj", triangles);
+		_time_point t3 = get_time();
+		writeColourObj(esp_stem + ".obj", triangles);
+		_time_point t4 = get_time();
+		log2 << "shape mesh " << get_msec(t1, t2) << " ms, ESP on the faces " << get_msec(t2, t3)
+			 << " ms, coloured mesh " << get_msec(t3, t4) << " ms" << endl;
 	}
 	// return output tostd::cout
 	std::cout.rdbuf(_coutbuf);
@@ -2316,9 +2771,7 @@ vec calc_dipole_for_atom(WFN &wavy, const int &i, cube &Hirshfeld_atom, vec &cha
 void dipole_moments(options &opt, std::ostream &log2)
 {
 	using namespace std;
-	log2 << NoSpherA2_message(opt.no_date);
-	if (!opt.no_date)
-		log2 << build_date;
+	//no header here: run_app_impl has written it to the log before the options were read
 	err_checkf(opt.wfn != "", "Error, no wfn file specified!", log2);
 	WFN wavy(opt.wfn);
 	if (opt.debug)

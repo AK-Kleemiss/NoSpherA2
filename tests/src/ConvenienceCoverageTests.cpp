@@ -801,13 +801,13 @@ TEST(ConvenienceCoverageOptionTests, GflopsEnablesThroughputTracking)
 TEST(ConvenienceCoverageOptionTests, MultipoleMomentsMbisAddsAnAutoAuxBasis)
 {
 	const options opt = parse({ "-multipole_moments", "MBIS", "2" });
-	EXPECT_EQ(opt.multipole_scheme, PartitionType::MBIS);
+	EXPECT_EQ(opt.multipole_scheme, MultipoleScheme::MBIS);
 	EXPECT_EQ(opt.multipole_lmax, 2);
 	EXPECT_TRUE(opt.RI_FIT);
 	EXPECT_EQ(opt.partition_type, PartitionType::RI);
 	EXPECT_EQ(opt.aux_basis.size(), 1u);
 	const options embis = parse({ "-multipole_moments", "embis", "0", "-multipole_strength", "0.5" });
-	EXPECT_EQ(embis.multipole_scheme, PartitionType::EMBIS);
+	EXPECT_EQ(embis.multipole_scheme, MultipoleScheme::EMBIS);
 	EXPECT_EQ(embis.multipole_lmax, 0);
 	EXPECT_DOUBLE_EQ(embis.multipole_strength, 0.5);
 }

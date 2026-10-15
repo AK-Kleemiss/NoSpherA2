@@ -1,0 +1,20 @@
+{
+  "stage": "nbo_stage",
+  "molecule": "no2",
+  "threads": 8,
+  "wall_seconds": 3,
+  "exit_code": 0,
+  "hostname": "AKL028",
+  "node_cores_total": 96,
+  "slurm_job_id": "584654",
+  "slurm_partition": "Active",
+  "slurm_cpus_on_node": "8",
+  "finished_utc": "2026-09-25T04:10:45Z",
+  "nospher_a2": "/work/akkleemiss/florian/nos_nboref/build/release-linux/bin/NoSpherA2",
+  "nospher_a2_commit": "bd27740f plus the uncommitted per-spin NAO patch; the same content is committed as 46515bfb on nbo_external_reference on FLOWOFFICE and is NOT pushed",
+  "gennbo_bin": "/work/software/bin/NBO/bin",
+  "nbo_keywords": "NRT E2PERT=0.25 NRTLST=0.1 NRTDTL",
+  "native_flags": "-nrt -nbo_e2min 0.25 -nrt_e2 1 -nbo_threads 8",
+  "seconds": {"convert_47": 1, "gennbo": 2, "parse": 0, "native": 0},
+  "exit_codes": {"convert_47": 0, "gennbo": 0, "parse": 0, "native": 0}
+}

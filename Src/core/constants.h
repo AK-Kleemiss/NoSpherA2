@@ -8,6 +8,11 @@ namespace constants
 	extern double exp_cutoff;
 	extern bool hide_gpu_notes;
 	extern bool hide_timings; //-no_date: wall-clock lines would make the log non-reproducible
+	//Bumped at the start of every run_app. Olex2 and the test suite call run_app repeatedly in one
+	//process, where a plain static "said it once" latch stays set and the next run's log loses the line.
+	extern unsigned run_id;
+	//True on the first call per run for this latch (a static std::atomic<unsigned> latch{0} at the call site)
+	inline bool first_this_run(std::atomic<unsigned> &latch) { return latch.exchange(run_id) != run_id; }
 	//x^lx y^ly z^lz = sum_m sph2cart(l)[cart * n_spher(l) + m] R_lm, cartesians in WFN type order,
 	//R_lm the real solid harmonics in ORCA/Gaussian order m = 0,+1,-1,+2,-2,...
 	constexpr int n_cart(const int l) { return (l + 1) * (l + 2) / 2; };
@@ -17,6 +22,12 @@ namespace constants
 	//ORCA stores g over sqrt(3) and h and up over sqrt((2l-1)!!) of the physical primitive norm; the tables follow ORCA, occ does not
 	constexpr double sph2cart_norm2[11] = { 1, 1, 1, 1, 3, 945, 10395, 135135, 2027025, 34459425, 654729075 };
 	static double density_accuracy = 5.0e-5; // SQRT of the desired accuracy for density calculations
+	//Electrons an RI (ab|P) triplet may move onto an atom before it is computed (see computeRho), sized for tsc within 1e-5
+	//of max|f| and charges within 1e-4 e of the unscreened fit; -tune NOS_RI_SCREEN overrides it for one run.
+	constexpr double ri_screen_threshold = 3e-7;
+	//Overlap left between an orbital primitive pair and an aux shell, as erfc(sqrt(pq/(p+q)) R), below which computeRho
+	//takes (ab|P) from the local expansion at the aux atom; -tune NOS_RI_FAR overrides it, 0 switches it off.
+	constexpr double ri_far_erfc = 1e-14;
 	constexpr int grid_max_no_flip = 50;
 	int constexpr const_abs(int x)
 	{
@@ -85,6 +96,11 @@ namespace constants
 									   590, 770, 974, 1202, 1454, 1730, 2030, 2354,
 									   2702, 3074, 3470, 3890, 4334, 4802, 5294, 5810 };
 	constexpr long long int double_ft[25]{ 1, 1, 2, 3, 8, 15, 48, 105, 384, 945, 3840, 10395, 46080, 135135, 645120, 2027025, 10321920, 34459425, 185794560, 654729075, 3715891200, 13749310575, 81749606400, 316234143225, 1961990553600 };
+	//Norm of the axial cartesian primitive x^l exp(-a r^2): (2a/PI)^(3/4) (4a)^(l/2) / sqrt((2l-1)!!), any l
+	inline double axial_prim_norm(const int l, const double a)
+	{
+		return pow(pow(2, 3 + 4 * l) * pow(a, 2 * l + 3) / PI3 / pow(double_ft[std::max(2 * l - 1, 0)], 2), 0.25);
+	}
 	constexpr double alpha_coef = 0.1616204596739954813316614;
 	constexpr double c_13 = 1.0 / 3.0;
 	constexpr double c_43 = 4.0 / 3.0;
@@ -412,6 +428,21 @@ namespace constants
 									 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 28, 28, 28, 28, 28, 28,
 									 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 46, 46, 46, 46, 46, 46,
 									 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 60, 60, 60, 60, 60, 60, 60, 60, 60, 78, 78, 78, 78, 78, 78 };
+
+	//The tables stop at Rn (Z = 86), where the def2, xTB and pTB core definitions stop; direct indexing
+	//reads past the end for heavier atoms. Beyond the table no core is defined: 0, the all-electron reading.
+	template <std::size_t N>
+	constexpr int ECP_core_electrons(const int(&table)[N], const int Z) noexcept
+	{
+		return (Z >= 0 && static_cast<std::size_t>(Z) < N) ? table[Z] : 0;
+	}
+
+	//Heaviest element the tables describe, for callers that warn instead of taking the zero
+	constexpr int heaviest_ECP_element = static_cast<int>(sizeof(ECP_electrons) / sizeof(int)) - 1;
+	static_assert(sizeof(ECP_electrons_xTB) == sizeof(ECP_electrons) &&
+		sizeof(ECP_electrons_pTB) == sizeof(ECP_electrons),
+		"the three ECP core tables are indexed by the same atomic number and reported by the same "
+		"heaviest_ECP_element, so they have to end at the same element");
 
 	constexpr std::complex<double> i_pows[] = {
 		std::complex<double>(1.0, 0.0),

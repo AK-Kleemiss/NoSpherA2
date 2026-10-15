@@ -697,4 +697,40 @@ namespace
 		}
 		EXPECT_NE(log.find("xcw orbital basis set: sto-3g"), std::string::npos) << log;
 	}
+
+	//The I-tensor pair screen. Bound: unnormalised single primitives, alpha 0.8 at the origin and beta 0.5 at (0, 0, R),
+	//against min(triangle, Cauchy-Schwarz) and int |chi_a chi_b| from an independent script (h = 0.05 bohr quadrature).
+	//z is the bond: pz is sigma, px pi, dxy delta. Fit: r^l Y_lm(r/|r|) away from the unit sphere for every l, m.
+	TEST(XcwPairBoundTests, BoundsAbsoluteOverlapAndFitsSolidHarmonics)
+	{
+		typedef std::vector<std::pair<i3, double>> poly;
+		const poly s = { { i3{ 0, 0, 0 }, 1.0 } }, px = { { i3{ 1, 0, 0 }, 1.0 } }, pz = { { i3{ 0, 0, 1 }, 1.0 } };
+		const poly dz2 = { { i3{ 0, 0, 2 }, 2.0 }, { i3{ 2, 0, 0 }, -1.0 }, { i3{ 0, 2, 0 }, -1.0 } }, dxy = { { i3{ 1, 1, 0 }, 1.0 } };
+		struct pair_case { const poly* a; const poly* b; int la, lb; double R, bound, exact; };
+		const pair_case cases[] = {
+			{ &pz, &pz, 1, 1, 3.0, 6.01020724e-01, 4.238913e-01 },
+			{ &px, &pz, 1, 1, 3.0, 2.72897392e-01, 2.151564e-01 },
+			{ &px, &px, 1, 1, 3.0, 9.06097204e-02, 9.060972e-02 },
+			{ &dz2, &pz, 2, 1, 3.0, 1.89496301e+00, 9.151047e-01 },
+			{ &s, &s, 0, 0, 3.0, 2.35585273e-01, 2.355853e-01 },
+			{ &px, &px, 1, 1, 5.0, 6.59340342e-04, 6.593403e-04 },
+			{ &px, &pz, 1, 1, 5.0, 3.02982432e-03, 2.608661e-03 },
+			{ &dxy, &dxy, 2, 2, 5.0, 2.53592439e-04, 2.535924e-04 } };
+		for (const pair_case& c : cases) {
+			const std::vector<primitive> pa = { primitive(0, c.la, 0.8, 1.0) }, pb = { primitive(0, c.lb, 0.5, 1.0) };
+			const double b = ao_pair_abs_overlap_bound(pa, d3{ 0.0, 0.0, 0.0 }, *c.a, pb, d3{ 0.0, 0.0, c.R }, *c.b);
+			EXPECT_NEAR(b, c.bound, 1e-7 * c.bound) << c.la << c.lb << " R=" << c.R;
+			EXPECT_GE(b, c.exact * (1.0 - 1e-6)) << c.la << c.lb << " R=" << c.R;
+		}
+		const double r[3] = { 0.3, -1.1, 0.7 }, n = std::sqrt(r[0] * r[0] + r[1] * r[1] + r[2] * r[2]);
+		const double u[3] = { r[0] / n, r[1] / n, r[2] / n };
+		for (int l = 0; l <= 6; l++)
+			for (int m = -l; m <= l; m++) {
+				double residual = 1.0, v = 0.0;
+				for (const auto& t : solid_harmonic_monomials(l, m, &residual))
+					v += t.second * std::pow(r[0], t.first[0]) * std::pow(r[1], t.first[1]) * std::pow(r[2], t.first[2]);
+				EXPECT_LT(residual, 1e-11) << l << " " << m;
+				EXPECT_NEAR(v, std::pow(n, l) * constants::spherical_harmonic(l, m, u), 1e-10) << l << " " << m;
+			}
+	}
 }

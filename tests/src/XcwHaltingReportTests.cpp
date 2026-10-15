@@ -133,6 +133,16 @@ namespace {
 		std::ofstream(p) << "\nC 0.00313 0.00162\n\nCl 0.14908 0.15974\nH 0.0 0.0\nN 0.00611 0.00317\nO 0.01110 0.00600\nS 0.12463 0.12335\n\n";
 	}
 
+	//The P1 molecule's stored two-electron integrals, which XcwScfTests.SharedTensorBuild writes under ctest; without
+	//them the run builds its own, with the same numbers
+	std::string shared_eri(const std::filesystem::path& dir)
+	{
+		const char* d = std::getenv("NOS_TEST_SHARED_DIR");
+		if (d == nullptr || *d == '\0' || !std::filesystem::exists(std::filesystem::path(d) / "xcw_p1_subset_eri.bin")) return "";
+		std::filesystem::copy_file(std::filesystem::path(d) / "xcw_p1_subset_eri.bin", dir / "shared_eri.bin", std::filesystem::copy_options::overwrite_existing);
+		return " read_eri shared_eri.bin";
+	}
+
 	//The options the NoSpherA2 driver would build for -XCW on the fixture cif, the subset hkl
 	//and the settings text, CPU only. opt must outlive the XCW, which keeps a pointer to it.
 	options make_options(const std::filesystem::path& dir, const std::string& settings_text)
@@ -230,7 +240,7 @@ TEST(XcwHaltingReportTests, HaltingReportsAcrossTheExtendedLambdaScan)
 	ASSERT_GE(n_strong, 8);
 	write_anom(dir / "anom.txt");
 
-	options opt = make_options(dir, RUN_BASE + "end 0.05 i_tensor_mb 4096 save itensor.bin");
+	options opt = make_options(dir, RUN_BASE + "end 0.05 i_tensor_mb 4096 save itensor.bin" + shared_eri(dir));
 	opt.xcw_gaussian_halt = true;
 	opt.cpu_itensor_fp32 = false;
 	const std::string out = run_xcw(dir, opt);
@@ -311,7 +321,7 @@ TEST(XcwHaltingReportTests, HaltingReportsAcrossTheExtendedLambdaScan)
 		HEADER_FIXED_BYTES + 8 * static_cast<std::uintmax_t>(kept) + static_cast<std::uintmax_t>(n_written) * kept * 16);
 
 	//eval_I_anom_disp read branch: the saved tensor is loaded, not rebuilt, and gives the same rows
-	options opt2 = make_options(dir, RUN_BASE + "end 0.01 i_tensor_mb 4096 read itensor.bin");
+	options opt2 = make_options(dir, RUN_BASE + "end 0.01 i_tensor_mb 4096 read itensor.bin" + shared_eri(dir));
 	opt2.xcw_gaussian_halt = true;
 	opt2.cpu_itensor_fp32 = false;
 	const std::string out2 = run_xcw(dir, opt2);
@@ -354,7 +364,7 @@ TEST(XcwHaltingReportTests, StreamedTensorRoundTrip)
 	ASSERT_EQ(n_strong, 0);
 	write_anom(dir / "anom.txt");
 
-	options opt = make_options(dir, RUN_BASE + "end 0");
+	options opt = make_options(dir, RUN_BASE + "end 0" + shared_eri(dir));
 	opt.mem_given = true;
 	opt.mem = 0.001;
 	opt.no_date = false;
@@ -403,7 +413,7 @@ TEST(XcwHaltingReportTests, StreamedTensorRoundTrip)
 		HEADER_FIXED_BYTES + 8 * static_cast<std::uintmax_t>(kept) + static_cast<std::uintmax_t>(n_written) * kept * 8);
 
 	//read it back a window at a time under the same budget
-	options opt2 = make_options(dir, RUN_BASE + "end 0 read");
+	options opt2 = make_options(dir, RUN_BASE + "end 0 read" + shared_eri(dir));
 	opt2.mem_given = true;
 	opt2.mem = 0.001;
 	const std::string out2 = run_xcw(dir, opt2);

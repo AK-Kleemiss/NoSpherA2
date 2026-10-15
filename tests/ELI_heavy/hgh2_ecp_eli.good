@@ -7,17 +7,16 @@
 This software is part of the cuQCT software suite developed by Florian Kleemiss.
 Please give credit and cite corresponding pieces!
 This Software is published with BSD-2 clause license.
+
+The gbw file's ECP block removes 60 core electrons from the orbitals: treating them as ECP atoms, as -ECP would.
 Analysing ELI basins in the wavefunction...
-Calcualting grid of size 120 x 120 x 187...
-Number of points: 2692800
-Grid parameters:
-  Min: (-5.66918, -5.66918, -8.78723)
-  Max: (5.66918, 5.66918, 8.78723)
+[ELI-D] Kohout, Pernal, Wagner & Grin, Theor. Chem. Acc. 112 (2004) 453, DOI 10.1007/s00214-004-0615-y
 Atom positions:
   Atom 0: (0, 0, 0)
   Atom 1: (0, 0, 3.11805)
   Atom 2: (0, 0, -3.11805)
 ECP cores of 1 atoms filled with Thakkar densities: 60.0 electrons added for the QTAIM basins
+Density critical points from the analytic field: NCP 3, BCP 4, RCP 2, CCP 0; Poincare-Hopf sum 1 against 1 (INCOMPLETE: The bond graph has 3 nuclei, 2 bonds and 1 component(s), cycle rank 0; found n_ring - n_cage = 2. More ring than cage points than the bond graph allows: either a spurious ring point, or 2 cage point(s) were not found - cage seeding is the likely gap. 1 nucleus/nuclei carry no core density (rho below 1 at a nucleus of Z >= 5), atom number 1: a pseudopotential replaced the core there, so the density has no cusp at those nuclei and no readable shell structure around them. A missing nuclear attractor on one of them, or a spurious ring or cage point within about a bohr of one, is a property of this wavefunction and not a gap in the seeding - QTAIM is not defined on a pseudo-density inside the core radius. )
 Density Critical Points (5 found):
 
   CP   1  [attractor   ]  converged   H2
@@ -26,15 +25,15 @@ Density Critical Points (5 found):
     GradRho   :         0.0000         0.0000         0.0000   |GradRho| :         0.0000
     HessRho_EigVals:    -6.9607e+00    -6.9607e+00    -6.8000e+00
     DelSqRho  :       -20.7215
-   V         :     5.1804e+00   G         :         0.0037   K         :     5.1841e+00   L         :     5.1804e+00
+   V         :    -5.1878e+00   G         :         0.0037   K         :     5.1841e+00   L         :     5.1804e+00
 
   CP   2  [attractor   ]  converged   H1
     Position  :         0.0000         0.0000         3.1029
     Rho       :         0.3485
-    GradRho   :         0.0000         0.0000         0.0000   |GradRho| :         0.0000
+    GradRho   :         0.0000         0.0000        -0.0000   |GradRho| :         0.0000
     HessRho_EigVals:    -6.9607e+00    -6.9607e+00    -6.8000e+00
     DelSqRho  :       -20.7215
-   V         :     5.1804e+00   G         :         0.0037   K         :     5.1841e+00   L         :     5.1804e+00
+   V         :    -5.1878e+00   G         :         0.0037   K         :     5.1841e+00   L         :     5.1804e+00
 
   CP   3  [attractor   ]  converged   Hg0
     Position  :         0.0000         0.0000         0.0000
@@ -42,7 +41,7 @@ Density Critical Points (5 found):
     GradRho   :         0.0000         0.0000         0.0000   |GradRho| :         0.0000
     HessRho_EigVals:    -7.5323e-02    -7.5323e-02    -6.7014e-02
     DelSqRho  :        -0.2177
-   V         :     5.4415e-02   G         :         0.0154   K         :     6.9816e-02   L         :     5.4415e-02
+   V         :    -8.5216e-02   G         :         0.0154   K         :     6.9816e-02   L         :     5.4415e-02
 
   CP   4  [bond        ]  converged   H2-Hg0 bond
     Position  :         0.0000         0.0000        -2.1083
@@ -51,7 +50,7 @@ Density Critical Points (5 found):
     HessRho_EigVals:    -2.2404e-01    -2.2404e-01     4.6573e-01
     DelSqRho  :         0.0176
     Bond Ellipticity:         0.0000
-   V         :    -4.4108e-03   G         :         0.0918   K         :     8.7438e-02   L         :    -4.4108e-03
+   V         :    -1.7929e-01   G         :         0.0918   K         :     8.7438e-02   L         :    -4.4108e-03
 
   CP   5  [bond        ]  converged   H1-Hg0 bond
     Position  :         0.0000         0.0000         2.1083
@@ -60,47 +59,56 @@ Density Critical Points (5 found):
     HessRho_EigVals:    -2.2404e-01    -2.2404e-01     4.6573e-01
     DelSqRho  :         0.0176
     Bond Ellipticity:         0.0000
-   V         :    -4.4108e-03   G         :         0.0918   K         :     8.7438e-02   L         :    -4.4108e-03
+   V         :    -1.7929e-01   G         :         0.0918   K         :     8.7438e-02   L         :    -4.4108e-03
 
-Assigning basins along the density gradient...
-I found 3 Basins.
-Assigning basins by near-grid ascent...
-I found 28 Basins.
-Merged 22 noise maxima, 6 basins remain.
-Unified 1 core-shell basins into their atoms' cores, 5 ELI-D basins remain.
-
-QTAIM Analysis (voxel sum):
-basin:    0 label:              Hg0 integrated value:  78.6104 volume:  485.0438
-basin:    1 label:               H1 integrated value:   1.2874 volume:  445.7662
-basin:    2 label:               H2 integrated value:   1.2874 volume:  445.7662
+QTAIM attractors from the analytic field: 3 (3 nuclei, 0 non-nuclear)
+ELI-D maxima from the analytic field: 51
+ELI-D basin boundaries from the analytic field (the default).
+Unified 46 core-shell basins into their atoms' cores, 5 ELI-D basins remain.
+Shell saddle merge (phi 0.9900): 0 same-atom pairs tested, 0 joined.
 GridManager: Setting up prototype grids for atom types...
 GridManager: Generating integration grids for atoms...
 GridManager: Generated total of 65266 grid points.
-Quadrature points sent along the field: 328799, left the grid: 0
+Quadrature points sent along the field: 18692, left the grid: 0
 
 QTAIM Analysis (atomic quadrature grids):
-  basin  label               electrons     charge      volume     maximum        x          y          z
-      1  Hg0                   79.4314     0.5686    808.4662   4856.9128      0.000      0.000      0.000
-      2  H1                     1.2826    -0.2826    744.9110      0.3415      0.000      0.000      3.118
-      3  H2                     1.2826    -0.2826    748.7134      0.3415      0.000      0.000     -3.118
-  total in basins: 81.9965   outside every basin: 0.0035
+[QTAIM] Bader, Atoms in Molecules: A Quantum Theory, Oxford University Press (1990), DOI 10.1093/oso/9780198551683.001.0001
+[QTAIM] Bader, Chem. Rev. 91 (1991) 893, DOI 10.1021/cr00005a013
+  basin  label               electrons     charge      volume         maximum        x          y          z
+      1  Hg0                   79.4352     0.5648    449.2519     367149.1320      0.000      0.000      0.000
+      2  H1                     1.2675    -0.2675    203.9201          0.3478      0.000      0.000      3.118
+      3  H2                     1.2675    -0.2675    203.9201          0.3478      0.000      0.000     -3.118
+  total in basins: 81.9702   outside every basin: 0.0298
 
-ELI-D Analysis (voxel sum):
-basin:    0 label:      H2-Hg0 bond integrated value:   0.5034 volume:  280.5199
-basin:    1 label:      H1-Hg0 bond integrated value:   0.4627 volume:  274.8942
-basin:    2 label:               H2 integrated value:   1.3938 volume:   32.6140
-basin:    3 label:               H1 integrated value:   1.4346 volume:   38.2732
-basin:    4 label:         Hg0 core integrated value:  77.3692 volume:  232.3914
+Delocalization indices (11 occupied orbitals):
+[LI/DI] Fradera, Austen & Bader, J. Phys. Chem. A 103 (1999) 304, DOI 10.1021/jp983362q
+  sum over basins and outside of S^A - identity: 1.62e-06   (the quadrature's own error; AIMAll's integrations reach ~1e-3)
+
+  basin  label                 N(A)     lambda(A)   sum_B delta(A,B)/2   residual
+  B includes the region beyond rho = 1e-04 e/bohr^3.
+      1  Hg0                   19.4352     18.4484            0.9868     -0.0000
+      2  H1                     1.2675      0.7325            0.5350     -0.0000
+      3  H2                     1.2675      0.7325            0.5350     -0.0000
+
+  basin pair                                delta(A,B)
+  Hg0               H2                      0.9713
+  Hg0               H1                      0.9713
+  H1                H2                      0.0847
+  0 further pairs below 0.01
+  An ECP took core electrons out of the orbitals: N(A) here is the valence count
+  and is short of the basin population above by the core the Thakkar fill added.
 GridManager: Setting up prototype grids for atom types...
 GridManager: Generating integration grids for atoms...
 GridManager: Generated total of 65266 grid points.
-Quadrature points sent along the field: 5532, left the grid: 0
+Quadrature points sent along the field: 24910, left the grid: 0
 
 ELI-D Analysis (atomic quadrature grids):
-  basin  label               electrons      volume     maximum        x          y          z
-      1  H2-Hg0 bond            0.4667    284.1871      5.0732      0.000      0.000     -5.028
-      2  H1-Hg0 bond            0.4506    281.7936      5.0732      0.000      0.000      5.028
-      3  H2                     1.4321     36.9442      7.2167      0.000      0.000     -3.148
-      4  H1                     1.4482     39.3377      7.2167      0.000      0.000      3.148
-      5  Hg0 core              18.1725    213.0064      1.4330      0.283     -0.472      0.705
-  total in basins: 21.9700   outside every basin: 0.0300
+  basin  label               electrons      volume         maximum        x          y          z
+      1  H2                     1.4363     36.5949          7.2480     -0.000      0.000     -3.170
+      2  H1                     1.4363     36.5949          7.2480     -0.000      0.000      3.170
+      3  H1 LP                  0.4676    286.0155          5.0790     -0.000      0.000      4.989
+      4  H2 LP                  0.4676    286.0155          5.0790      0.000      0.000     -4.989
+      5  Hg0 core              18.1624    211.8713          1.4332      0.579      0.030     -0.682
+  total in basins: 21.9702   outside every basin: 0.0298
+
+Spin-resolved ELI-D: skipped, restricted wavefunction - ELI-D(alpha-alpha) = ELI-D(beta-beta) is the ELI-D above and the triplet member a constant multiple of it.

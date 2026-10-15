@@ -16,10 +16,7 @@
 #include <dlfcn.h>
 #endif
 
-//cuBLAS's own headers are deliberately not included. The four entry points below are the
-//v2 C API, whose signatures are fixed, so declaring them here keeps the build free of any
-//dependency on the toolkit - which is the point: this file must compile on a machine that
-//has never seen CUDA.
+//No cuBLAS headers: the v2 C API signatures are fixed, so declaring them here compiles without a CUDA toolkit
 namespace {
 
 typedef void* cublas_handle;
@@ -53,9 +50,7 @@ bool g_enabled = false;
 
 void* open_library()
 {
-	//Only the major this binary's runtime was built against. Mixing a cuBLAS from one CUDA
-	//major with a runtime from another is unsupported, and the failure is not a clean one:
-	//the load succeeds and the first call misbehaves.
+	//Only the runtime's CUDA major: a cuBLAS of another major loads, then misbehaves on the first call
 #ifdef NOSPHERA2_CUDART_MAJOR
 	const int major = NOSPHERA2_CUDART_MAJOR;
 #else

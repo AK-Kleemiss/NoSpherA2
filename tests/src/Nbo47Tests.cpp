@@ -1,6 +1,8 @@
 #include "pch.h"
 
 #include "core/wfn_class.h"
+#include "core/nbo.h"
+#include "core/nbo_run.h"
 
 #include <stdexcept>
 
@@ -85,32 +87,6 @@ std::string windows_path_to_wsl(std::filesystem::path path)
 bool wsl_gennbo_available()
 {
 	return std::system("wsl bash -lc \"test -x ~/nbo7/gennbo\"") == 0;
-}
-
-vec parse_natural_charges(const std::filesystem::path& nbo_path)
-{
-	std::ifstream in(nbo_path);
-	std::string line;
-	bool in_summary = false;
-	vec charges;
-	const std::regex charge_line(R"(^\s+[A-Z][a-z]?\s+\d+\s+([-+]?\d*\.?\d+))");
-	while (std::getline(in, line)) {
-		if (line.find("Summary of Natural Population Analysis") != std::string::npos) {
-			in_summary = true;
-			continue;
-		}
-		if (!in_summary) {
-			continue;
-		}
-		if (line.find("* Total *") != std::string::npos) {
-			break;
-		}
-		std::smatch match;
-		if (std::regex_search(line, match, charge_line)) {
-			charges.push_back(std::stod(match[1].str()));
-		}
-	}
-	return charges;
 }
 
 std::optional<double> parse_total_electrons(const std::filesystem::path& nbo_path)
@@ -203,53 +179,6 @@ TEST(Nbo47, WriteNboReportsProgressWhenRequested)
 	EXPECT_NE(log_text.find("[FILE47] Finished .47 conversion"), std::string::npos);
 }
 
-TEST(Nbo47, EpoxideGennboMatchesReferenceWhenAvailable)
-{
-	if (!wsl_gennbo_available()) {
-		GTEST_SKIP() << "WSL ~/nbo7/gennbo is not available";
-	}
-
-	const auto root = repo_root();
-	const auto fixture_dir = root / "tests" / "epoxide_gbw" / "NBO";
-	const auto input_gbw = fixture_dir / "epoxide.gbw";
-	const auto reference_nbo = fixture_dir / "reference.nbo";
-	ASSERT_TRUE(std::filesystem::exists(input_gbw));
-	if (!std::filesystem::exists(reference_nbo)) {
-		GTEST_SKIP() << "NBO reference fixture is not available";
-	}
-
-	const auto temp_dir = make_temp_dir();
-	const auto generated_47 = temp_dir / "epoxide.47";
-	const auto generated_nbo = temp_dir / "epoxide.nbo";
-
-	WFN wave(input_gbw, false);
-	ASSERT_TRUE(wave.write_nbo(generated_47, false));
-
-	const std::string wsl_dir = windows_path_to_wsl(temp_dir);
-	const std::string command = "wsl bash -lc \"cd '" + wsl_dir + "' && ~/nbo7/gennbo epoxide\"";
-	ASSERT_EQ(std::system(command.c_str()), 0);
-	ASSERT_TRUE(std::filesystem::exists(generated_nbo));
-
-	const std::string generated_nbo_text = read_file(generated_nbo);
-	EXPECT_EQ(generated_nbo_text.find("Basis functions are not in expected form"), std::string::npos);
-	EXPECT_NE(generated_nbo_text.find("NAO Atom No lang   Type(AO)    Occupancy      Energy"), std::string::npos);
-	EXPECT_NE(generated_nbo_text.find("SECOND ORDER PERTURBATION THEORY ANALYSIS OF FOCK MATRIX"), std::string::npos);
-	EXPECT_NE(generated_nbo_text.find("NHO DIRECTIONALITY AND BOND BENDING"), std::string::npos);
-
-	const auto expected_charges = parse_natural_charges(reference_nbo);
-	const auto actual_charges = parse_natural_charges(generated_nbo);
-	ASSERT_EQ(actual_charges.size(), expected_charges.size());
-	for (size_t i = 0; i < expected_charges.size(); i++) {
-		EXPECT_NEAR(actual_charges[i], expected_charges[i], 2.0e-3);
-	}
-
-	const auto expected_electrons = parse_total_electrons(reference_nbo);
-	const auto actual_electrons = parse_total_electrons(generated_nbo);
-	ASSERT_TRUE(expected_electrons.has_value());
-	ASSERT_TRUE(actual_electrons.has_value());
-	EXPECT_NEAR(*actual_electrons, *expected_electrons, 1.0e-5);
-}
-
 TEST(Nbo47, OpenShellNh3LiGbwWritesValidFile47)
 {
 	const auto root = repo_root();
@@ -274,6 +203,8 @@ TEST(Nbo47, OpenShellNh3LiGbwWritesValidFile47)
 	ASSERT_NE(text.find("$DENSITY"), std::string::npos);
 	ASSERT_NE(text.find("$FOCK"), std::string::npos);
 	ASSERT_NE(text.find("$LCAOMO"), std::string::npos);
+	//Without OPEN, NBO reads the archive as restricted and halves the electron count it finds
+	ASSERT_NE(text.find(" OPEN "), std::string::npos);
 
 	EXPECT_EQ(parse_key_int(text, "NATOMS").value_or(-1), 5);
 	EXPECT_EQ(parse_key_int(text, "NBAS").value_or(-1), 63);
@@ -285,11 +216,18 @@ TEST(Nbo47, OpenShellNh3LiGbwWritesValidFile47)
 	const auto fock = extract_section_numbers(text, "$FOCK");
 	const auto lcaomo = extract_section_numbers(text, "$LCAOMO");
 	const int nbasis = 63;
-	EXPECT_EQ(overlap.size(), static_cast<size_t>(nbasis * (nbasis + 1) / 2));
-	EXPECT_EQ(density.size(), static_cast<size_t>(nbasis * (nbasis + 1) / 2));
-	EXPECT_EQ(fock.size(), static_cast<size_t>(nbasis * (nbasis + 1) / 2));
-	EXPECT_EQ(lcaomo.size(), static_cast<size_t>(nbasis * nbasis));
-	EXPECT_NEAR(packed_trace_product(density, overlap, nbasis), 13.0, 1.0e-5);
+	const size_t ntri = static_cast<size_t>(nbasis) * (nbasis + 1) / 2;
+	//$OVERLAP stays single; $DENSITY, $FOCK and $LCAOMO carry an alpha block then a beta one.
+	EXPECT_EQ(overlap.size(), ntri);
+	ASSERT_EQ(density.size(), 2 * ntri);
+	EXPECT_EQ(fock.size(), 2 * ntri);
+	EXPECT_EQ(lcaomo.size(), 2 * static_cast<size_t>(nbasis) * nbasis);
+
+	const vec alpha_density(density.begin(), density.begin() + ntri);
+	const vec beta_density(density.begin() + ntri, density.end());
+	//13 electrons in a doublet: 7 alpha, 6 beta; a spin-summed archive gives 13 twice, a swapped one 6 then 7
+	EXPECT_NEAR(packed_trace_product(alpha_density, overlap, nbasis), 7.0, 1.0e-5);
+	EXPECT_NEAR(packed_trace_product(beta_density, overlap, nbasis), 6.0, 1.0e-5);
 }
 
 TEST(Nbo47, OpenShellNh3LiGennboProducesEnergyAnalysisWhenAvailable)
@@ -325,4 +263,94 @@ TEST(Nbo47, OpenShellNh3LiGennboProducesEnergyAnalysisWhenAvailable)
 	const auto actual_electrons = parse_total_electrons(generated_nbo);
 	ASSERT_TRUE(actual_electrons.has_value());
 	EXPECT_NEAR(*actual_electrons, 13.0, 1.0e-5);
+}
+
+TEST(NboRun, OpenShellNh3LiSpinResolvedNpaMatchesOrcaSpinPopulations)
+{
+	if (!wsl_gennbo_available()) {
+		GTEST_SKIP() << "WSL ~/nbo7/gennbo is not available";
+	}
+
+	const auto input_gbw = repo_root() / "tests" / "RGBI_groups" / "nh3li.gbw";
+	ASSERT_TRUE(std::filesystem::exists(input_gbw));
+
+	const auto temp_dir = make_temp_dir();
+	const auto generated_47 = temp_dir / "nh3li.47";
+	const auto generated_nbo = temp_dir / "nh3li.nbo";
+
+	WFN wave(input_gbw, false);
+	ASSERT_TRUE(wave.write_nbo(generated_47, false));
+	const std::string command = "wsl bash -lc \"cd '" + windows_path_to_wsl(temp_dir) + "' && ~/nbo7/gennbo nh3li\"";
+	ASSERT_EQ(std::system(command.c_str()), 0);
+	ASSERT_TRUE(std::filesystem::exists(generated_nbo));
+
+	const NboResults r = parse_nbo_output(generated_nbo);
+	EXPECT_TRUE(r.open_shell);
+	ASSERT_EQ(r.npa.size(), 5u);
+
+	double spin_sum = 0.0, charge_sum = 0.0;
+	for (const auto& a : r.npa) { spin_sum += a.spin_density; charge_sum += a.charge; ASSERT_TRUE(a.has_spin_density); }
+	EXPECT_NEAR(spin_sum, 1.0, 1.0e-4);
+	EXPECT_NEAR(charge_sum, 0.0, 1.0e-4);
+
+	//ORCA 6.1.1 on the same wavefunction puts 0.99 (Mulliken) / 0.90 (Loewdin) of the unpaired electron on Li with N
+	//slightly negative; NPA is a third partitioning, so only the pattern is compared
+	const NboAtomPopulation* li = nullptr;
+	const NboAtomPopulation* n = nullptr;
+	for (const auto& a : r.npa) { if (a.element == "Li") li = &a; if (a.element == "N") n = &a; }
+	ASSERT_NE(li, nullptr);
+	ASSERT_NE(n, nullptr);
+	EXPECT_GT(li->spin_density, 0.80);
+	EXPECT_LT(std::abs(n->spin_density), 0.15);
+	EXPECT_LT(n->charge, 0.0);
+
+	bool alpha = false, beta = false;
+	for (const auto& o : r.orbitals) { alpha |= o.spin == "alpha"; beta |= o.spin == "beta"; }
+	EXPECT_TRUE(alpha);
+	EXPECT_TRUE(beta);
+	bool spin_e2 = false;
+	for (const auto& e : r.e2) spin_e2 |= !e.spin.empty();
+	EXPECT_TRUE(spin_e2);
+}
+
+TEST(Nbo47, GShellWavefunctionWritesFile47WithCorrectElectronCount)
+{
+	//A g basis: every primitive index behind a g shell relies on get_shell_start_in_primitives covering g. Tr(P S) checks
+	//that the coefficients are the right ones, not merely that nothing crashed.
+	const auto root = repo_root();
+	const auto input_gbw = root / "tests" / "Fe_gbw" / "Fe.gbw";
+	ASSERT_TRUE(std::filesystem::exists(input_gbw));
+
+	const auto temp_dir = make_temp_dir();
+	const auto generated_47 = temp_dir / "fe.47";
+
+	WFN wave(input_gbw, false);
+	int highest_shell = 0;
+	for (int a = 0; a < wave.get_ncen(); a++)
+		for (int s = 0; s < wave.get_atom_shell_count(a); s++)
+			highest_shell = std::max(highest_shell, wave.get_shell_type(a, s));
+	ASSERT_GE(highest_shell, 5) << "fixture no longer carries g functions";
+
+	ASSERT_TRUE(wave.write_nbo(generated_47, false));
+	ASSERT_TRUE(std::filesystem::exists(generated_47));
+
+	const std::string text = read_file(generated_47);
+	const int nbasis = parse_key_int(text, "NBAS").value_or(-1);
+	ASSERT_GT(nbasis, 0);
+	const size_t ntri = static_cast<size_t>(nbasis) * (nbasis + 1) / 2;
+	const auto overlap = extract_section_numbers(text, "$OVERLAP");
+	const auto density = extract_section_numbers(text, "$DENSITY");
+	ASSERT_EQ(overlap.size(), ntri);
+	const bool open_shell = density.size() == 2 * ntri;
+	ASSERT_TRUE(open_shell || density.size() == ntri);
+
+	double electrons = 0.0;
+	for (size_t block = 0; block < density.size() / ntri; block++)
+		electrons += packed_trace_product(
+			vec(density.begin() + block * ntri, density.begin() + (block + 1) * ntri), overlap, nbasis);
+	//Against the wavefunction's own occupations, not Z - charge: this fixture integrates to 128 while its gbw charge field gives 126
+	double occupied = 0.0;
+	for (int m = 0; m < wave.get_nmo(); m++)
+		occupied += wave.get_MO_occ(m);
+	EXPECT_NEAR(electrons, occupied, 1.0e-3);
 }

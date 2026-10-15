@@ -76,8 +76,7 @@ void make_k_pts(const bool& read_k_pts,
 //streams a combined (-mtc) SALTED table in reflection blocks; false means nothing was written, take the ordinary path
 bool stream_mtc_salted(options& opt, std::vector<WFN>& wavy, std::ostream& file, vec2* known_kpts);
 
-//everything a disorder part needs for the transform, gathered once; all of it is reflection-independent,
-//which is what lets the -mtc reflection loop be moved outside the parts
+//per disorder part, gathered once; reflection-independent, so the -mtc reflection loop runs outside the parts
 class Gaussian_Molecule;
 
 struct salted_part_prep
@@ -137,10 +136,8 @@ void generate_hkl(
 	const ivec2& hkl_min_max = ivec2());
 
 /**
- * @brief Fills the hkl list from the options: -dmin and -hkl_min_max together give the
- * orbit of the measured box inside the resolution sphere, either alone gives that set, and
- * without both the -hkl file is read. ED callers get the sphere at dmin/2 - 0.001 and the
- * box is ignored, since the dynamical calculation needs every beam to that resolution.
+ * @brief hkl from -dmin, -hkl_min_max (both: the box orbit inside the sphere), else the -hkl file.
+ * ED gets the whole sphere at dmin/2 - 0.001, box ignored: the dynamical calculation needs every beam.
  */
 void generate_hkl_from_options(
 	const options& opt,
@@ -192,11 +189,8 @@ void generate_fractional_hkl(
  * @param debug Flag indicating whether to enable debug mode.
  */
 /**
- * @brief The magnitude below which a contribution is negligible at a given -acc level.
- *
- * 1e-10 up to -acc 2, 1e-14 at 3, 1e-30 above: the ladder the scattering-factor code has
- * always used, shared so that the XCW I tensor drops AO contributions on the same terms
- * rather than on a constant of its own.
+ * @brief Negligible magnitude at a -acc level, shared so the XCW I tensor screens AO
+ * contributions on the same terms as the scattering factors.
  */
 double cutoff(const int& accuracy);
 

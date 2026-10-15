@@ -412,7 +412,8 @@ namespace
 	//------------------------------------------------------------ wfn / wfx / xyz ------------------------------------------------------------
 
 	//write_wfn then read_wfn on the in-code wavefunction: atoms, primitives, coefficients, occupations and energies
-	//come back, the energy restart of MO 3 marks the file unrestricted and the operators split 2/1
+	//come back. The operator split does not: the first MO is doubly occupied, so the file states spatial orbitals, and a
+	//.wfn has nowhere else to record a spin.
 	TEST(WfnReadIoTests, WfnRoundTripKeepsEverything)
 	{
 		WFN w = make_h2_wfn();
@@ -427,9 +428,9 @@ namespace
 		EXPECT_EQ(r.get_nex(), 3);
 		EXPECT_EQ(r.get_nmo(), 3);
 		EXPECT_TRUE(r.get_isBohr());
-		EXPECT_TRUE(r.get_is_unrestricted());
-		EXPECT_EQ(r.get_MO_op_count(0), 2);
-		EXPECT_EQ(r.get_MO_op_count(1), 1);
+		EXPECT_FALSE(r.get_is_unrestricted());
+		EXPECT_EQ(r.get_MO_op_count(0), 3);
+		EXPECT_EQ(r.get_MO_op_count(1), 0);
 		EXPECT_EQ(r.get_atom_label(0), "H");
 		EXPECT_NEAR(r.get_atom_coordinate(1, 2), 0.7, 1e-8);
 		for (int p_i = 0; p_i < 3; p_i++)
@@ -492,6 +493,174 @@ namespace
 		EXPECT_FALSE(r.get_is_unrestricted());
 	}
 
+	//one atom, two primitives, one MO - the smallest wfn that reads, with the atom line supplied by the caller
+	static void read_one_atom_wfn(const std::string& atom_line, WFN& w)
+	{
+		const std::filesystem::path p = tmp_path("atomline.wfn");
+		write_text(p, "dialects\n"
+					  "GAUSSIAN 1 MOL ORBITALS 2 PRIMITIVES 1 NUCLEI\n" +
+						  atom_line +
+						  "CENTRE ASSIGNMENTS    1  1\n"
+						  "TYPE ASSIGNMENTS      1  2\n"
+						  "EXPONENTS  0.1200000D+01 0.9000000D+00\n"
+						  "MO    1    MO 0.0        OCC NO =    2.0000000  ORB. ENERGY  =-0.50000000\n"
+						  "  0.50000000E+00  0.30000000E+00\n"
+						  "END DATA\n");
+		std::ostringstream log;
+		const bool ok = w.read_wfn(p, false, log);
+		std::filesystem::remove(p);
+		EXPECT_TRUE(ok) << log.str();
+	}
+
+	//Three label widths of one atom line, all in the test tree: Gaussian's "  C    1", molden_file's "Co1     1" and
+	//RI_Test_2's "O     1", so absolute columns are off by one either way. The fourth line has a negative coordinate eating
+	//the separator: the 12-character fields touch and are cut by width, anchored on the ')' of "(CENTRE n)".
+	TEST(WfnReadIoTests, WfnAtomLineSurvivesEveryLabelWidth)
+	{
+		WFN gaussian(e_origin::wfn), wide(e_origin::wfn), narrow(e_origin::wfn), touching(e_origin::wfn);
+		read_one_atom_wfn("  C    1    (CENTRE  1)   0.10000000 -0.20000000  0.30000000  CHARGE =  6.0\n", gaussian);
+		read_one_atom_wfn("Co1     1    (CENTRE  1)   0.10000000 -0.20000000  0.30000000  CHARGE = 27.0\n", wide);
+		read_one_atom_wfn("O     1    (CENTRE  1)   0.10000000 -0.20000000  0.30000000  CHARGE =  8.0\n", narrow);
+		read_one_atom_wfn("O1     1    (CENTRE  1)   2.80503294-12.05929207 -5.85443715  CHARGE =  8.0\n", touching);
+		EXPECT_EQ(gaussian.get_atom_charge(0), 6);
+		EXPECT_EQ(wide.get_atom_charge(0), 27);
+		EXPECT_EQ(narrow.get_atom_charge(0), 8);
+		for (WFN* w : { &gaussian, &wide, &narrow })
+		{
+			EXPECT_NEAR(w->get_atom_coordinate(0, 0), 0.1, 1e-12);
+			EXPECT_NEAR(w->get_atom_coordinate(0, 1), -0.2, 1e-12);
+			EXPECT_NEAR(w->get_atom_coordinate(0, 2), 0.3, 1e-12);
+		}
+		EXPECT_NEAR(touching.get_atom_coordinate(0, 0), 2.80503294, 1e-12);
+		EXPECT_NEAR(touching.get_atom_coordinate(0, 1), -12.05929207, 1e-12);
+		EXPECT_NEAR(touching.get_atom_coordinate(0, 2), -5.85443715, 1e-12);
+		//a cobalt complex whose every wfn field sits one column right
+		const std::filesystem::path real = nos_test_repo_root() / "tests" / "molden_file" / "temp_wavefunction.wfn";
+		if (!std::filesystem::exists(real))
+			return;
+		WFN r(e_origin::wfn);
+		std::ostringstream log;
+		ASSERT_TRUE(r.read_wfn(real, false, log)) << log.str();
+		EXPECT_EQ(r.get_atom_charge(0), 27);
+		EXPECT_GT(r.get_ncen(), 1);
+	}
+
+	//A .wfn carries no spin labels, so a second spin set shows only as energies starting over. A closed-shell file must not
+	//fire that: a fixed-width energy field truncates -0.301831 and -0.301830 to equal values, and degenerate pairs print
+	//equal energies. An occupation near 2 rules out a beta set outright.
+	TEST(WfnReadIoTests, WfnDegeneratePairIsNotASecondSpinSet)
+	{
+		auto three_mo_wfn = [](const std::string& mos, WFN& w)
+		{
+			const std::filesystem::path p = tmp_path("spin.wfn");
+			write_text(p, "spin structure\n"
+						  "GAUSSIAN 3 MOL ORBITALS 1 PRIMITIVES 1 NUCLEI\n"
+						  "H      1    (CENTRE  1)   0.00000000  0.00000000  0.00000000  CHARGE =  1.0\n"
+						  "CENTRE ASSIGNMENTS    1\n"
+						  "TYPE ASSIGNMENTS      1\n"
+						  "EXPONENTS  0.1200000D+01\n" +
+							  mos + "END DATA\n");
+			std::ostringstream log;
+			const bool ok = w.read_wfn(p, false, log);
+			std::filesystem::remove(p);
+			EXPECT_TRUE(ok) << log.str();
+		};
+		//the degenerate pair the fixed field truncated, then a higher orbital: one spatial set, no restart
+		WFN closed(e_origin::wfn);
+		three_mo_wfn("MO    1    MO 0.0        OCC NO =    2.0000000  ORB. ENERGY  =-0.30183100\n"
+					 "  0.50000000E+00\n"
+					 "MO    2    MO 0.0        OCC NO =    2.0000000  ORB. ENERGY  =-0.30183000\n"
+					 "  0.40000000E+00\n"
+					 "MO    3    MO 0.0        OCC NO =    2.0000000  ORB. ENERGY  =-0.10000000\n"
+					 "  0.30000000E+00\n",
+					 closed);
+		EXPECT_FALSE(closed.get_is_unrestricted());
+		EXPECT_EQ(closed.get_MO_op_count(0), 3);
+		EXPECT_EQ(closed.get_MO_op_count(1), 0);
+		//the truncation itself: these two energies differ in the sixth decimal and must not come back equal
+		EXPECT_NE(closed.get_MO_energy(0), closed.get_MO_energy(1));
+		EXPECT_NEAR(closed.get_MO_energy(0), -0.301831, 1e-9);
+		EXPECT_NEAR(closed.get_MO_energy(1), -0.301830, 1e-9);
+		//an occupation of 2 outranks even a strict decrease: a spatial orbital cannot open a beta channel
+		WFN falling(e_origin::wfn);
+		three_mo_wfn("MO    1    MO 0.0        OCC NO =    2.0000000  ORB. ENERGY  =-0.20000000\n"
+					 "  0.50000000E+00\n"
+					 "MO    2    MO 0.0        OCC NO =    2.0000000  ORB. ENERGY  =-0.90000000\n"
+					 "  0.40000000E+00\n"
+					 "MO    3    MO 0.0        OCC NO =    2.0000000  ORB. ENERGY  =-0.80000000\n"
+					 "  0.30000000E+00\n",
+					 falling);
+		EXPECT_FALSE(falling.get_is_unrestricted());
+		EXPECT_EQ(falling.get_MO_op_count(0), 3);
+		//the control, so this is not a blanket "always restricted": spin orbitals whose energies restart split
+		WFN spin(e_origin::wfn);
+		three_mo_wfn("MO    1    MO 0.0        OCC NO =    1.0000000  ORB. ENERGY  =-0.60000000\n"
+					 "  0.50000000E+00\n"
+					 "MO    2    MO 0.0        OCC NO =    1.0000000  ORB. ENERGY  =-0.20000000\n"
+					 "  0.40000000E+00\n"
+					 "MO    3    MO 0.0        OCC NO =    1.0000000  ORB. ENERGY  =-0.55000000\n"
+					 "  0.30000000E+00\n",
+					 spin);
+		EXPECT_TRUE(spin.get_is_unrestricted());
+		EXPECT_EQ(spin.get_MO_op_count(0), 2);
+		EXPECT_EQ(spin.get_MO_op_count(1), 1);
+		//zero.wfn: closed-shell acetylene, seven doubly occupied MOs, 14 electrons, one operator
+		const std::filesystem::path real = nos_test_repo_root() / "tests" / "polarizabilities" / "zero.wfn";
+		if (!std::filesystem::exists(real))
+			return;
+		WFN r(e_origin::wfn);
+		std::ostringstream log;
+		ASSERT_TRUE(r.read_wfn(real, false, log)) << log.str();
+		EXPECT_FALSE(r.get_is_unrestricted());
+		EXPECT_EQ(r.get_MO_op_count(1), 0);
+		EXPECT_EQ(r.get_MO_op_count(0), r.get_nmo());
+	}
+
+	//A wfx labels every orbital's spin. These three orbitals rise in energy, so the energy heuristic finds no second set,
+	//while the labels say the third is beta. The writer must take the labels from the orbitals, since push_back_MO(..., op)
+	//never sets is_unrestricted. "Alpha and Beta" is one spin-averaged orbital and belongs to the first operator.
+	TEST(WfnReadIoTests, WfxSpinLabelsOutrankTheEnergyGuess)
+	{
+		WFN w(e_origin::wfn);
+		w.push_back_atom("H", 0.0, 0.0, 0.0, 1);
+		w.push_back_MO(1, 1.0, -0.6);
+		w.push_back_MO(2, 1.0, -0.5);
+		w.push_back_MO(3, 1.0, -0.4, 1);
+		double c[3] = { 0.5, 0.4, 0.3 };
+		w.add_primitive(1, 1, 1.2, c);
+		EXPECT_FALSE(w.get_is_unrestricted()) << "the flag is unset, which is exactly what used to mislabel the file";
+		const std::filesystem::path p = tmp_path("labels.wfx");
+		ASSERT_TRUE(w.write_wfx(p, false));
+		std::ifstream in(p);
+		std::stringstream buf;
+		buf << in.rdbuf();
+		in.close();
+		const std::string text = buf.str();
+		EXPECT_NE(text.find("Beta"), std::string::npos) << text;
+		EXPECT_EQ(text.find("Alpha and Beta"), std::string::npos) << text;
+		WFN r(e_origin::wfx);
+		std::ostringstream log;
+		ASSERT_TRUE(r.read_wfx(p, false, log));
+		std::filesystem::remove(p);
+		EXPECT_TRUE(r.get_is_unrestricted());
+		EXPECT_EQ(r.get_MO_op_count(0), 2);
+		EXPECT_EQ(r.get_MO_op_count(1), 1);
+		//a genuinely closed-shell wavefunction writes "Alpha and Beta" throughout, and that is one operator
+		WFN c1(e_origin::wfn);
+		c1.push_back_atom("H", 0.0, 0.0, 0.0, 1);
+		c1.push_back_MO(1, 2.0, -0.6);
+		c1.push_back_MO(2, 2.0, -0.6);
+		c1.add_primitive(1, 1, 1.2, c);
+		const std::filesystem::path q = tmp_path("restricted.wfx");
+		ASSERT_TRUE(c1.write_wfx(q, false));
+		WFN rc(e_origin::wfx);
+		ASSERT_TRUE(rc.read_wfx(q, false, log));
+		std::filesystem::remove(q);
+		EXPECT_FALSE(rc.get_is_unrestricted());
+		EXPECT_EQ(rc.get_MO_op_count(0), 2);
+		EXPECT_EQ(rc.get_MO_op_count(1), 0);
+	}
+
 	//read_wfn into a wavefunction that already holds atoms refuses and says so instead of appending
 	TEST(WfnReadIoTests, ReadWfnRefusesSecondLoad)
 	{
@@ -505,8 +674,8 @@ namespace
 		EXPECT_EQ(w.get_ncen(), 2);
 	}
 
-	//write_wfx then read_wfx: charge and multiplicity travel through the tags, the energy restart marks the
-	//second spin and a comment line dropped into the coefficient block is skipped rather than parsed
+	//write_wfx then read_wfx: charge and multiplicity travel through the tags, the third MO's operator as its "Beta" spin
+	//label, and a comment line dropped into the coefficient block is skipped rather than parsed
 	TEST(WfnReadIoTests, WfxRoundTripSkipsForeignLinesInCoefficientBlock)
 	{
 		WFN w = make_h2_wfn();
@@ -899,14 +1068,16 @@ namespace
 	//------------------------------------------------------------ occ bridge ------------------------------------------------------------
 
 	//H2 in a one-primitive s + p basis through OCC's SCF (deliberately compact exponents, so the orbital energies are
-	//positive, but the SCF is well defined)
-	static occ::qm::Wavefunction h2_occ_wavefunction()
+	//positive, but the SCF is well defined); lmax = 4 adds d, f and g and tilts the bond off z so every m mixes in
+	static occ::qm::Wavefunction h2_occ_wavefunction(const int lmax = 1)
 	{
 		spdlog::set_level(spdlog::level::err);
-		const std::vector<occ::core::Atom> atoms{ { 1, 0.0, 0.0, -0.7 }, { 1, 0.0, 0.0, 0.7 } };
+		const std::vector<occ::core::Atom> atoms = lmax == 1
+			? std::vector<occ::core::Atom>{ { 1, 0.0, 0.0, -0.7 }, { 1, 0.0, 0.0, 0.7 } }
+			: std::vector<occ::core::Atom>{ { 1, -0.31, -0.42, -0.5 }, { 1, 0.31, 0.42, 0.5 } };
 		std::vector<occ::gto::Shell> shells;
 		for (const auto& at : atoms)
-			for (int l = 0; l <= 1; l++)
+			for (int l = 0; l <= lmax; l++)
 			{
 				shells.emplace_back(l, vec{ l == 0 ? 1.2 : 0.9 }, vec2{ { 1.0 } }, std::array<double, 3>{ at.x, at.y, at.z });
 				shells.back().kind = occ::gto::Shell::Kind::Spherical;
@@ -961,6 +1132,27 @@ namespace
 		for (int i = 0; i < wf.mo.D.rows(); i++)
 			for (int j = 0; j < wf.mo.D.cols(); j++)
 				EXPECT_NEAR(back.mo.D(i, j), wf.mo.D(i, j), 1e-6) << i << "," << j;
+	}
+
+	//f(+-3), g(+-3) and g(+-4) change sign between the sph2cart tables and OCC in both directions; a missed flip
+	//on the way back leaves those rows of D with the wrong sign and the second WFN with another density
+	TEST(WfnReadIoTests, OccRoundTripKeepsFAndGPhases)
+	{
+		const occ::qm::Wavefunction wf = h2_occ_wavefunction(4);
+		WFN w(wf, false);
+		occ::qm::Wavefunction back;
+		w.wfn_to_occ_wavefunction(back);
+		ASSERT_EQ(back.mo.D.rows(), wf.mo.D.rows());
+		double flipped = 0.0;
+		for (size_t s = 0; s < wf.basis.size(); s++)
+			for (int m = 3; m <= wf.basis[s].l; m++)
+				flipped = std::max(flipped, wf.mo.D.row(wf.basis.first_bf()[s] + wf.basis[s].l + m).cwiseAbs().maxCoeff());
+		ASSERT_GT(flipped, 1e-4) << "the tilted bond should put weight on the |m| >= 3 rows";
+		for (int i = 0; i < wf.mo.D.rows(); i++)
+			for (int j = 0; j < wf.mo.D.cols(); j++)
+				EXPECT_NEAR(back.mo.D(i, j), wf.mo.D(i, j), 1e-6) << i << "," << j;
+		WFN again(back, false);
+		expect_same_density(w, again, 1e-6);
 	}
 
 	//------------------------------------------------------------ death tests ------------------------------------------------------------
