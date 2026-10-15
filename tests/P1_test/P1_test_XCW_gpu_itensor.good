@@ -7,7 +7,7 @@
 This software is part of the cuQCT software suite developed by Florian Kleemiss.
 Please give credit and cite corresponding pieces!
 This Software is published with BSD-2 clause license.
-Reading:                            "P1_test_NA2.cif" done!
+Reading:                                "P1_test.cif" done!
 Reading:                                "P1_test.hkl" done!
 Nr of reflections read from file: 3215
 Number of symmetry operations: 1
@@ -21,17 +21,17 @@ GridManager: Generating integration grids for atoms...
 GridManager: Generated total of 93098 grid points.
 Total number of grid points after pruning: 93092
 AO values calculated for all grids.
-Screened out 1798 unique pairs of mu, nu (33.57%) 
-Skipped evaluation of 64013865 grids (16.16%) 
+Screened out 1802 unique pairs of mu, nu (33.64%) 
+Skipped evaluation of 64843335 grids (16.37%) 
 More detailed output in XCW.log file...
 ____________________________________________________________________________________
  Lambda		Criterion	GooF(F2)	R1(gt)		Total Energy		Perturbation	Target quantity		Crit(all)	R1(all)
 								(Eh)			(a. u.)		(a. u.)
 ____________________________________________________________________________________
-0.00000		4.7111		4.7351		0.02495		-1961.923538820		0.000		-1961.923538820		4.6607		0.02550
-0.01000		4.2581		4.2684		0.02426		-1961.905934167		0.043		-1961.863352807		4.2133		0.02480
-0.02000		4.0032		4.0065		0.02381		-1961.875248151		0.080		-1961.795185015		3.9614		0.02435
-0.03000		3.8319		3.8310		0.02348		-1961.842131883		0.115		-1961.727175016		3.7923		0.02402
-0.04000		3.7057		3.7020		0.02321		-1961.809074350		0.148		-1961.660847247		3.6676		0.02375
-0.05000		3.6070		3.6013		0.02298		-1961.776759200		0.180		-1961.596408200		3.5702		0.02352
+0.00000		4.8533		4.8749		0.02531		-1961.925585145		0.000		-1961.925585145		4.8014		0.02585
+0.01000		4.3724		4.3816		0.02451		-1961.906262458		0.044		-1961.862538005		4.3265		0.02505
+0.02000		4.0952		4.0979		0.02401		-1961.872042279		0.082		-1961.790137442		4.0527		0.02455
+0.03000		3.9062		3.9050		0.02363		-1961.834705445		0.117		-1961.717518517		3.8661		0.02416
+0.04000		3.7652		3.7613		0.02332		-1961.797102877		0.151		-1961.646495157		3.7268		0.02385
+0.05000		3.6537		3.6478		0.02306		-1961.760047819		0.183		-1961.577362843		3.6167		0.02359
 Finished XCW fitting procedure.

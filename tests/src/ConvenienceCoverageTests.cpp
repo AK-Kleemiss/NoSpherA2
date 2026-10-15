@@ -173,6 +173,97 @@ namespace
 		"C1 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25\n"
 		"\n";
 
+	//The same model for read_CIF, with type symbols, dispersion and a second data block
+	const char* const typed_cif_text =
+		"data_cov\n"
+		"_cell_length_a 10.0\n"
+		"_cell_length_b 10.0\n"
+		"_cell_length_c 10.0\n"
+		"_diffrn_radiation_wavelength 0.71073\n"
+		"loop_\n"
+		"_atom_type_symbol\n"
+		"_atom_type_scat_dispersion_real\n"
+		"_atom_type_scat_dispersion_imag\n"
+		"_atom_type_scat_source\n"
+		"C 0.00313 0.00162\n"
+		"'Brennan, Cowan, Rev. Sci. Instrum., 1992, 63, 850'\n"
+		"O 0.01085 0.00610\n"
+		"'Brennan, Cowan, Rev. Sci. Instrum., 1992, 63, 850'\n"
+		"_iucr_refine_fcf_details\n"
+		";\n"
+		"data_cov\n"
+		"_cell_length_a 99.0\n"
+		";\n"
+		"loop_\n"
+		"_atom_site_label\n"
+		"_atom_site_type_symbol\n"
+		"_atom_site_fract_x\n"
+		"_atom_site_fract_y\n"
+		"_atom_site_fract_z\n"
+		"_atom_site_U_iso_or_equiv\n"
+		"C1 C 0.1 0.2 0.3(1) 0.03125\n"
+		"O1 O 0.5 0.5 0.5 ?\n"
+		"N9 N 0.9 0.9 0.9 0.5\n"
+		"\n"
+		"loop_\n"
+		"_atom_site_dispersion_label\n"
+		"_atom_site_dispersion_real\n"
+		"_atom_site_dispersion_imag\n"
+		"N9 0.00612 0.00332\n"
+		"\n"
+		"loop_\n"
+		"_atom_site_aniso_label\n"
+		"_atom_site_aniso_U_11\n"
+		"_atom_site_aniso_U_22\n"
+		"_atom_site_aniso_U_33\n"
+		"_atom_site_aniso_U_23\n"
+		"_atom_site_aniso_U_13\n"
+		"_atom_site_aniso_U_12\n"
+		"C1 0.0625 0.125 0.1875 0.25 0.3125 0.375\n"
+		"O1 0.5 0.5 0.5 0.0 0.0 0.0\n"
+		"\n"
+		"loop_\n"
+		"_atom_site_anharm_GC_C_label\n"
+		"_atom_site_anharm_GC_C_111\n"
+		"_atom_site_anharm_GC_C_112\n"
+		"_atom_site_anharm_GC_C_113\n"
+		"_atom_site_anharm_GC_C_122\n"
+		"_atom_site_anharm_GC_C_123\n"
+		"_atom_site_anharm_GC_C_133\n"
+		"_atom_site_anharm_GC_C_222\n"
+		"_atom_site_anharm_GC_C_223\n"
+		"_atom_site_anharm_GC_C_233\n"
+		"_atom_site_anharm_GC_C_333\n"
+		"C1 1 2 3 4 5 6 7 8 9 10\n"
+		"\n"
+		"loop_\n"
+		"_atom_site_anharm_GC_D_label\n"
+		"_atom_site_anharm_GC_D_1111\n"
+		"_atom_site_anharm_GC_D_1112\n"
+		"_atom_site_anharm_GC_D_1113\n"
+		"_atom_site_anharm_GC_D_1122\n"
+		"_atom_site_anharm_GC_D_1123\n"
+		"_atom_site_anharm_GC_D_1133\n"
+		"_atom_site_anharm_GC_D_1222\n"
+		"_atom_site_anharm_GC_D_1223\n"
+		"_atom_site_anharm_GC_D_1233\n"
+		"_atom_site_anharm_GC_D_1333\n"
+		"_atom_site_anharm_GC_D_2222\n"
+		"_atom_site_anharm_GC_D_2223\n"
+		"_atom_site_anharm_GC_D_2233\n"
+		"_atom_site_anharm_GC_D_2333\n"
+		"_atom_site_anharm_GC_D_3333\n"
+		"C1 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25\n"
+		"\n"
+		"data_second\n"
+		"loop_\n"
+		"_atom_site_label\n"
+		"_atom_site_type_symbol\n"
+		"_atom_site_fract_x\n"
+		"_atom_site_fract_y\n"
+		"_atom_site_fract_z\n"
+		"X1 C 0 0 0\n";
+
 	//U_11, U_22, U_33, U_12, U_13, U_23 of C1 in the storage order of the readers
 	const vec c1_U = { 0.0625, 0.125, 0.1875, 0.375, 0.3125, 0.25 };
 
@@ -212,6 +303,17 @@ namespace
 		return w;
 	}
 
+	//read_CIF on text in a 10 A cube; returns the wavelength
+	double read_cif_text(const std::string& text, std::vector<asym_atom>& atoms, vec3& ADPs)
+	{
+		std::istringstream in(text);
+		const cell unit_cell(10.0, 10.0, 10.0, 90.0, 90.0, 90.0);
+		int ncen = 0;
+		const double wavelength = read_CIF(in, unit_cell, ncen, atoms, ADPs, false);
+		EXPECT_EQ(ncen, static_cast<int>(atoms.size()));
+		return wavelength;
+	}
+
 	std::string hex_digest(const uint8_t hash[32])
 	{
 		std::ostringstream s;
@@ -229,6 +331,90 @@ namespace
 }
 
 //---------------------------------------------------------------- CIF readers
+
+//only the first data block is read, the text field with its own data_ line inside it included
+TEST(ConvenienceCoverageCifTests, ReadCifAssignsLabelsTypesPositionsAndUiso)
+{
+	std::vector<asym_atom> atoms;
+	vec3 ADPs;
+	EXPECT_DOUBLE_EQ(read_cif_text(typed_cif_text, atoms, ADPs), 0.71073);
+	ASSERT_EQ(atoms.size(), 3u);
+	ASSERT_EQ(ADPs.size(), 3u);
+	EXPECT_EQ(atoms[0].label, "C1");
+	EXPECT_EQ(atoms[1].label, "O1");
+	EXPECT_EQ(atoms[2].label, "N9");
+	EXPECT_EQ(atoms[0].type, 6);
+	EXPECT_EQ(atoms[1].type, 8);
+	EXPECT_EQ(atoms[2].type, 7);
+	//the standard uncertainty in brackets is dropped
+	EXPECT_DOUBLE_EQ(atoms[0].frac_pos[0], 0.1);
+	EXPECT_DOUBLE_EQ(atoms[0].frac_pos[1], 0.2);
+	EXPECT_DOUBLE_EQ(atoms[0].frac_pos[2], 0.3);
+	for (int d = 0; d < 3; d++)
+		EXPECT_NEAR(atoms[1].pos[d], constants::ang2bohr(5.0), 1e-9) << d;
+	EXPECT_NEAR(atoms[0].pos[2], constants::ang2bohr(3.0), 1e-9);
+	EXPECT_DOUBLE_EQ(atoms[0].U_iso, 0.03125);
+	EXPECT_DOUBLE_EQ(atoms[1].U_iso, 0.0); //'?'
+	EXPECT_DOUBLE_EQ(atoms[2].U_iso, 0.5);
+}
+
+//U_ij by column name whatever the column order, C and D in Voigt order, nothing for atoms the
+//aniso loops do not list
+TEST(ConvenienceCoverageCifTests, ReadCifReadsUijCijkDijklByLabel)
+{
+	std::vector<asym_atom> atoms;
+	vec3 ADPs;
+	read_cif_text(typed_cif_text, atoms, ADPs);
+	ASSERT_EQ(ADPs.size(), 3u);
+	ASSERT_EQ(ADPs[0].size(), 3u);
+	ASSERT_EQ(ADPs[0][0].size(), 6u);
+	for (int j = 0; j < 6; j++)
+		EXPECT_DOUBLE_EQ(ADPs[0][0][j], c1_U[j]) << j; //columns 23,13,12 land in slots 5,4,3
+	ASSERT_EQ(ADPs[0][1].size(), 10u);
+	for (int j = 0; j < 10; j++)
+		EXPECT_DOUBLE_EQ(ADPs[0][1][j], 1.0 + j) << j;
+	ASSERT_EQ(ADPs[0][2].size(), 15u);
+	for (int j = 0; j < 15; j++)
+		EXPECT_DOUBLE_EQ(ADPs[0][2][j], 11.0 + j) << j;
+	ASSERT_EQ(ADPs[1][0].size(), 6u);
+	EXPECT_DOUBLE_EQ(ADPs[1][0][0], 0.5);
+	EXPECT_DOUBLE_EQ(ADPs[1][0][3], 0.0);
+	EXPECT_TRUE(ADPs[1][1].empty());
+	EXPECT_TRUE(ADPs[1][2].empty());
+	EXPECT_TRUE(ADPs[2][0].empty());
+}
+
+//f' and f'' by element from the _atom_type loop even when its rows wrap, a site-specific value
+//for N9, and 0 for an element the loop does not list
+TEST(ConvenienceCoverageCifTests, ReadCifReadsDispersionByTypeAndBySite)
+{
+	std::vector<asym_atom> atoms;
+	vec3 ADPs;
+	read_cif_text(typed_cif_text, atoms, ADPs);
+	ASSERT_EQ(atoms.size(), 3u);
+	EXPECT_DOUBLE_EQ(atoms[0].anom.real(), 0.00313);
+	EXPECT_DOUBLE_EQ(atoms[0].anom.imag(), 0.00162);
+	EXPECT_DOUBLE_EQ(atoms[1].anom.real(), 0.01085);
+	EXPECT_DOUBLE_EQ(atoms[1].anom.imag(), 0.00610);
+	EXPECT_DOUBLE_EQ(atoms[2].anom.real(), 0.00612);
+	EXPECT_DOUBLE_EQ(atoms[2].anom.imag(), 0.00332);
+	std::string no_site = typed_cif_text;
+	no_site.replace(no_site.find("N9 0.00612 0.00332"), std::string("N9 0.00612 0.00332").size(), "C1 0.1 0.2");
+	read_cif_text(no_site, atoms, ADPs);
+	EXPECT_DOUBLE_EQ(atoms[0].anom.real(), 0.1);
+	EXPECT_DOUBLE_EQ(atoms[0].anom.imag(), 0.2);
+	EXPECT_EQ(atoms[2].anom, cdouble(0.0, 0.0));
+}
+
+//an aniso row for an atom the atom_site loop does not have is an error, not a silent skip
+TEST(ConvenienceCoverageCifTests, ReadCifThrowsForUnknownAnisoLabel)
+{
+	std::string text = typed_cif_text;
+	text.replace(text.find("O1 0.5 0.5 0.5 0.0 0.0 0.0"), std::string("O1").size(), "Zz9");
+	std::vector<asym_atom> atoms;
+	vec3 ADPs;
+	EXPECT_THROW(read_cif_text(text, atoms, ADPs), std::runtime_error);
+}
 
 TEST(ConvenienceCoverageCifTests, AdpReaderWithCellAssignsLabelsFracsAndUij)
 {
@@ -778,9 +964,8 @@ TEST(ConvenienceCoverageOptionTests, AnomDispOccAndSimpleFlags)
 {
 	ScratchDir scratch("occ_flag");
 	write_text(scratch.file("occ.toml"), "x\n");
-	const options opt = parse({ "-anom_disp", "disp.dat", "-occ", scratch.file("occ.toml").string(), "-all_charges",
+	const options opt = parse({ "-occ", scratch.file("occ.toml").string(), "-all_charges",
 		"-s_rho", "-no_gpu_cublas", "-geometry_aid_metals", "-test" });
-	EXPECT_EQ(opt.anom_disp_path, std::filesystem::path("disp.dat"));
 	EXPECT_EQ(opt.occ, scratch.file("occ.toml").string());
 	EXPECT_TRUE(opt.all_charges);
 	EXPECT_TRUE(opt.properties.s_rho);

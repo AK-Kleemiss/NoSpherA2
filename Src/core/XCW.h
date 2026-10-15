@@ -46,12 +46,6 @@ private:
 		int m;
 	};
 
-	// Data for anomalous dispersion correction
-	struct anom_atom {
-		std::string identifier;
-		cdouble dispersion;
-	};
-
 	// Miscellaneous crystallographic data
 	struct cryst_info {
 		int nr_small;
@@ -263,9 +257,6 @@ private:
 
 	// Calculates direct corrections of the anomalous dispersion onto F_calc
 	void eval_anom_disp(cvec2& DW_fact, cvec2& phase_fact, cvec2& translation_phase);
-
-	// Parses the anomalous dispersion information from a CIF style .txt file
-	void parse_anom_atoms(std::vector<anom_atom>& anom_atoms);
 
 	// Evaluates the scaling factor for |F_calc| by least squares fitting, and the extinction coefficients when refined
 	void eval_scale();

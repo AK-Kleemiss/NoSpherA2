@@ -75,7 +75,7 @@ namespace
 	std::string construct_on_p1(const std::string& text)
 	{
 		const auto fixture = nos_test_repo_root() / "tests" / "P1_test";
-		if (!std::filesystem::exists(fixture / "P1_test_NA2.cif") || !std::filesystem::exists(fixture / "P1_test.hkl")) {
+		if (!std::filesystem::exists(fixture / "P1_test.cif") || !std::filesystem::exists(fixture / "P1_test.hkl")) {
 			return "";
 		}
 		const auto dir = std::filesystem::temp_directory_path() / ("nosphera2_xcw_tests_p1_" + test_name());
@@ -84,7 +84,7 @@ namespace
 		std::ofstream(settings) << text;
 		options opt;
 		opt.xcw_settings_path = settings;
-		opt.cif = std::filesystem::absolute(fixture / "P1_test_NA2.cif");
+		opt.cif = std::filesystem::absolute(fixture / "P1_test.cif");
 		opt.hkl = std::filesystem::absolute(fixture / "P1_test.hkl");
 		opt.do_XCW = true;
 		const auto old_cwd = std::filesystem::current_path();

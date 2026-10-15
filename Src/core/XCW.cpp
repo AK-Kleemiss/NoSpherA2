@@ -33,8 +33,9 @@ void XCW::construct(const options& opt_in) {
 	unit_cell = cell(cif, std::cout, opt->debug, opt->do_XCW);
 	hkl_enlarged = read_hkl_full(hkl_filename, hkl, opt->twin_law, unit_cell, std::cout, obs, opt->debug);
 	std::ofstream log3("log3.txt", std::ios::out);
-	bvec needs_grid;
-	read_atoms_from_CIF(cif_input, unit_cell, cryst.ncen, needs_grid, asym_atoms, opt->debug);
+	// The anomalous dispersion of every atom comes from the CIF, per type or per site
+	std::vector<vec2> cif_ADPs;
+	read_CIF(cif_input, unit_cell, cryst.ncen, asym_atoms, cif_ADPs, opt->debug);
 	err_checkf(cryst.ncen > 0, "No atoms were read from " + cif.string() + "! Is there an _atom_site loop with labels, type symbols and fractional coordinates?", std::cout);
 
 	// Crystallographic multiplicity of every asymmetric atom, the order of its site stabiliser
@@ -46,12 +47,13 @@ void XCW::construct(const options& opt_in) {
 		unit_cell.resolve_internal_symmetry(asym_atoms);
 	}
 	cryst.ncen = asym_atoms.size();
-	// links[parent][image]: the operations generating the image, so the CIF readers hand it its parent's U_iso and ADPs
+	// links[parent][image]: the operations generating the image, so the CIF readers hand it its parent's U_iso and ADPs; its dispersion is the parent's
 	ivec3 symmetry_linking_list(n_asym, ivec2(cryst.ncen));
 	for (int at = 0; at < cryst.ncen; at++) {
 		if (!asym_atoms[at].grown) continue;
 		err_checkf(asym_atoms[at].grown_from >= 0, "Grown atom " + std::to_string(at) + " is not a symmetry image of an atom in the asymmetric unit", std::cout);
 		symmetry_linking_list[asym_atoms[at].grown_from][at] = asym_atoms[at].grown_by;
+		asym_atoms[at].anom = asym_atoms[asym_atoms[at].grown_from].anom;
 	}
 	// A grown structure keeps the operations it does not apply explicitly, the multiplicities adjusted to match
 	ivec applied_symmetry;
@@ -882,39 +884,8 @@ void XCW::eval_translation_phase(cvec2& translation_phase) {
 	// closing function
 }
 
-void XCW::parse_anom_atoms(std::vector<anom_atom>& anom_atoms) {
-	std::ifstream file(opt->anom_disp_path);
-	if (!file) {
-		std::cout << "Could not open anomalous dispersion file. Continuing without anomalous dispersions." << std::endl;
-	}
-	std::string line;
-	while (getline_universal(file, line)) {
-		if (line.empty())
-			continue;
-		std::istringstream iss(line);
-		std::string symbol;
-		double real_part, imag_part;
-		if (iss >> symbol >> real_part >> imag_part) {
-			if (!symbol.empty() && symbol[0] != '_' && symbol != "loop_") {
-				anom_atoms.push_back({ symbol, cdouble(real_part, imag_part) });
-			}
-		}
-	}
-}
-
 void XCW::eval_anom_disp(cvec2& DW_fact, cvec2& phase_fact, cvec2& translation_phase) {
-	std::vector<anom_atom> anom_atoms;
-	parse_anom_atoms(anom_atoms);
 	int r, at, r_asym;
-	for (int at = 0; at < cryst.ncen; at++) {
-		const char* symbol = constants::atnr2letter(asym_atoms[at].type);
-		for (const anom_atom& anom_atom : anom_atoms) {
-			if (symbol == anom_atom.identifier) {
-				asym_atoms[at].anom = anom_atom.dispersion;
-				break;
-			}
-		}
-	}
 	ivec2 asym_lookup(cryst.nr_small);
 	for (r = 0; r < cryst.nr_small; r++) {
 		asym_lookup[r] = generate_asym_lookup(r);
