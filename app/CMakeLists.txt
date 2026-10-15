@@ -15,13 +15,13 @@ if(WIN32)
     target_sources(
         NoSpherA2
         PRIVATE
-            "${PROJECT_SOURCE_DIR}/Windows/NoSpherA2/Resource.rc"
+            "${CMAKE_CURRENT_SOURCE_DIR}/resources/Resource.rc"
     )
 
     target_include_directories(
         NoSpherA2
         PRIVATE
-            "${PROJECT_SOURCE_DIR}/Windows/NoSpherA2"
+            "${CMAKE_CURRENT_SOURCE_DIR}/resources"
     )
 endif()
 

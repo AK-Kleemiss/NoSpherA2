@@ -1,5 +1,20 @@
 # Unit Test Status
 
+**2026-10-14 Visual Studio solution removed, CMake-only build:** The `Windows/` solution, its
+`Tests` project (the VS/DLL in-process harness), `scripts/SetupVSEnvironment.cmake`,
+`scripts/check_vcxproj.py`, the CI vcxproj-check step and `coverage.runsettings` are gone;
+CMake presets are the only build system and `.vscode/` carries the IDE setup for Windows, Linux
+and macOS. The app icon resources moved from `Windows/NoSpherA2/` to `app/resources/`,
+`cmake/InstallDependenciesOnly.cmake` shrank to `cmake/DependenciesOnly.cmake` (its install rules
+only fed the VS props sheets), and every preset now exports `compile_commands.json`. The VS-only
+`GeometryTests`/`NumericTests` were dropped, not ported: `tests/src/ConvenienceTests.cpp` and
+`tests/src/MathFunctionTests.cpp` cover the same functions. Same-sitting A/B on one Windows
+machine, `ctest --preset release-windows`: before and after the rework, **12 failed of 1279**
+(1281 defined, 2 disabled) with the *identical* failing set, all twelve being this machine's
+temp-file locking (`remove: The process cannot access the file ...` on `%TEMP%` files, an
+antivirus/indexer artefact), so the rework changed no test behavior. The Linux baseline remains
+the 2026-10-13 note below.
+
 **2026-10-13 NRT symmetry images start rotated:** `native_nrt` takes coordinates instead of distances and turns each isometry of the molecule into an operator on the NAO basis: R by Procrustes from the atom map, real-harmonic D^l(R) per (atom, l, shell) group in the FILE47 m order (0, +1, -1, ...), a sign per group from the density along a maximum spanning tree, with and without ORCA's |m| = 3, 4 phase, whichever reproduces Gamma better; an operator missing Gamma by 1 % or more is dropped. A structure that is an image of one whose sweeps converged starts its own sweeps from that structure's vectors, rotated, instead of the greedy fill; images of capped structures are still built cold, since there the images' own starts reach other fixed points (BF4-: g 82.6502 against the source's 82.6491; the warm-start study saw the same in SF6). Sweeps: benzene 6157 -> 3424, SF6 59124 -> 31900, PF5 19171 -> 10599, TiCl4 9355 -> 2921, thiophene 15514 -> 11166, Ni(CO)4 20058 -> 20305 (its sources stop at the cap); orbital time SF6 8.43 +- 1.86 -> 5.55 +- 1.11 s, TiCl4 1.40 +- 0.32 -> 0.45 +- 0.09 s (95 % CI, n = 3). Over the 41 v2 molecules the largest bond-order change is 2.2e-4 (PF5) and the largest D(w) change -2.1e-4 relative (BF4-); the mean |dBO| against NBO 7 stays 0.0384. Rotating the orbitals outright instead was not exact: OCC's densities are C3-symmetric only to about 1e-6 in P (SCF commutator 1e-5; HF energies of rotated ammonia agree to 1e-12 Eh, so the basis is not at fault), and the NAO step turns that into 1e-3 in the Rydberg blocks of Gamma, so C3 and off-axis mirror operators miss Gamma by 1e-3 while axis-aligned ones hold to 1e-7. `TheParentsSymmetryImageCompletesTheHexagon` and `NickelTetracarbonylKeepsOneDativeBondAndItsParent` (d and f NAOs, ORCA phases) now require rotated starts, the latter also that no operator is dropped. `ctest --preset release-linux`: 1257 passed, 0 failed, 22 skipped of 1279.
 
 **2026-10-13 Windows CI, NRT exact fits:** `NrtTests.TheParentsSymmetryImageCompletesTheHexagon` failed in both Windows jobs of CI run 38394009598 (`72d83cd`) and nowhere else: D(w) = 5.9604644775390625e-08 against a bound of 1e-8. D(w) is sqrt(|Gamma|^2 - 2 g.w + w.G.w), which for the hexagon cancels 9 - 18 + 9; one rounding of the 18 leaves sqrt(ulp(18)) = 2^-24 exactly, the value both MSVC builds report (they compile with `/fp:fast`, which may reorder the sum), while GCC and Clang round to 0. An exact fit cannot be read below about sqrt(eps |Gamma|^2), so the test and `ParentThatSpansTheDensityTakesAllTheWeight` (4 - 8 + 4, floor 4.2e-8, passing by luck) now require D(w) < 1e-6; the fits they guard against leave sqrt(3) and more.
@@ -809,12 +824,15 @@ baseline remains **201/201 ctest passing**.
 
 | Harness | How to run | Notes |
 |---------|-----------|-------|
+| ctest / gtest | `ctest --preset <preset>` (configure with `-DNOSPHERA2_BUILD_TESTS=ON`) | Unit tests plus `TomlIntegrationTests` golden-file cases |
 | Python pytest | `uv run pytest` | Golden-file diffs vs `.good` files |
-| Windows VS Tests | `msbuild Windows\Tests\Tests.vcxproj` + `vstest.console.exe` | In-process via `NoSpherA2_DLL.dll`; same golden files |
+
+The Windows VS Tests harness (`Windows/Tests`, in-process via `NoSpherA2_DLL.dll`) was removed with
+the Visual Studio solution in October 2026; mentions of it below are history.
 
 Environment variables:
 - `NOS_EXE` — path to exe (pytest only; default: `NoSpherA2` on PATH)
-- `OCC_DATA_PATH` — path to OCC data share (`Lib/occ/share/occ` for VS tests, injected by TestRunner.h)
+- `OCC_DATA_PATH` — path to OCC data share
 - `RUN_FULL_TEST` — set to any truthy value to include slow/full tests
 
 ---
@@ -838,11 +856,12 @@ tests presently failing because of the spline change.
 
 ---
 
-## VS-Only Unit Tests (no `tests/tests.toml` counterpart)
+## VS-Only Unit Tests (removed October 2026 with the VS solution)
 
-These tests live in `Windows/Tests/UnitTests.cpp` and exercise individual Src/ functions
-via a thin C-shim exported from `NoSpherA2_DLL.dll` (`NoSpherA2_DLL/unit_test_api.h/.cpp`).
-They do NOT need a pytest counterpart and must NOT be added to `tests/tests.toml`.
+These tests lived in `Windows/Tests/UnitTests.cpp` and exercised individual Src/ functions
+via a thin C-shim exported from `NoSpherA2_DLL.dll`. The same functions are covered by the
+gtest suite (`tests/src/ConvenienceTests.cpp`, `tests/src/MathFunctionTests.cpp`), which is
+why they were dropped rather than ported. Kept as history:
 
 | Class | Methods | Coverage | Status |
 |-------|---------|----------|--------|
@@ -863,7 +882,7 @@ Added: 2026-06-14.
 
 ---
 
-## Tests Registered in `tests/tests.toml` and `Windows/Tests/Tests.cpp`
+## Tests Registered in `tests/tests.toml`
 
 | Test name | Directory | Good file | Full? | Status |
 |-----------|-----------|-----------|-------|--------|
@@ -925,7 +944,7 @@ files generated before they can be registered.
 | BasisSetConverter | auxiliary_basis.hpp | header only, no runtime test |
 
 **To add a new test**: generate a `.good` reference file from a known-good run, add an entry to
-`tests/tests.toml`, and add a `TEST_METHOD` to `Windows/Tests/Tests.cpp`.
+`tests/tests.toml`, and add a matching case to `tests/src` where ctest should cover it.
 
 ---
 
@@ -1232,9 +1251,8 @@ See also the rule in `CLAUDE.md` → *Agent / AI coding-assistant rules*.
    capturing stdout: `NoSpherA2 [args] > tests/<dir>/<name>.good`
 2. **Register in `tests/tests.toml`** — add a `[test_name]` section with `directory`, optional
    `good` (if not `<name>.good`), optional `actual` (if output is not the log), and `[test_name.args]`
-3. **Register in `Windows/Tests/Tests.cpp`** — add a `TEST_METHOD(<name>)` block calling `RunTest`
-   with matching args (always append `-all_charges` and `-no_date`)
-4. **Validate** in all four configurations: pytest Release, pytest Debug, VS Debug, VS Release
+3. **Register in `tests/src`** where ctest should cover it (the `TomlIntegrationTests` pattern)
+4. **Validate** with `ctest --preset <preset>` (Release and, where it matters, Debug) and `uv run pytest`
 5. **Update this file** — mark the test as passing or note blockers
 
 ## 2026-10-08 — Unified RI multipole restraints

@@ -436,7 +436,7 @@ list(PREPEND CMAKE_MODULE_PATH
 
 include(NoSpherA2Avx)
 include(NoSpherA2Sanitizers)
-include(ValidateMambaEnvironemt)
+include(ValidateMambaEnvironment)
 include(CopyRuntimeLibraries)
 include(NoSpherA2Optimizations)
 validate_micromamba_environment()
@@ -688,8 +688,7 @@ endfunction()
 # NoSpherA2 targets
 # ---------------------------------------------------------------------------
 if(NOSPHERA2_DEPENDENCIES_ONLY)
-    enable_googletests()
-    include(cmake/InstallDependenciesOnly.cmake)
+    include(cmake/DependenciesOnly.cmake)
     return()
 endif()
 
