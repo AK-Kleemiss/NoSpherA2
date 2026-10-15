@@ -171,6 +171,8 @@ private:
 		std::filesystem::path i_tensor_file_path;
 		// `save <path>`: write the tensor for a later `read <path>` on a thread, so the refinement need not wait
 		std::filesystem::path i_tensor_save_path;
+		// `save_eri <path>` / `read_eri <path>`: the stored two-electron integrals, for a later run on the same geometry and basis
+		std::filesystem::path eri_read_path, eri_save_path;
 
 		// Clears the convergence flags
 		void clear() {

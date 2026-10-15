@@ -616,6 +616,30 @@ std::string help_message =
  "                                    refitted. Stops early when no new structure\n"
  "                                    takes weight or the -nrt_max pool is full;\n"
  "                                    0 = until then. Implies -nrt.\n"
+ "  -nrt_rotate                        A structure that is a symmetry image of one\n"
+ "                                    whose orbitals converged starts from them,\n"
+ "                                    rotated, instead of the greedy fill: SF6\n"
+ "                                    needs half the sweeps; bond orders move by\n"
+ "                                    up to 2e-4. Default off.\n"
+ "  -nrt_screen <r|off>                With -nrt_target, a walk of 200 or more new\n"
+ "                                    structures builds in full only those whose\n"
+ "                                    reduced cost, from approximate orbitals, is\n"
+ "                                    below r, 16 at a time with their symmetry\n"
+ "                                    images, refitting in between. Default off:\n"
+ "                                    it can miss structures (SF6 at 0.2: D(w)\n"
+ "                                    0.23 % higher); about 2.5 times faster.\n"
+ "  -nrt_no_mirror                     Treat a single move that adds no formal-\n"
+ "                                    charge separation (the allyl cation's bond\n"
+ "                                    shift) as half an arrow, complete symmetry\n"
+ "                                    images against every walked state and walk\n"
+ "                                    symmetry references only through new ones:\n"
+ "                                    the behaviour before 2026-10-14, which can\n"
+ "                                    give mirror bonds unequal orders.\n"
+ "  -nrt_stall <n>                     A structure's orbital sweeps stop once\n"
+ "                                    Anderson mixing has not lowered the largest\n"
+ "                                    vector change by 0.1 % for n sweeps, instead\n"
+ "                                    of running to the cap of 200. Default 0 =\n"
+ "                                    off.\n"
  "  -nrt_atoms <a,b,...>               Subspace NRT: only these 1-based atoms may\n"
  "                                    change, the rest keep the parent structure's\n"
  "                                    bonding. NBO's 'NRT <atoms>'.\n"
@@ -784,6 +808,13 @@ std::string help_message =
  "                                                      there while the\n"
  "                                                      refinement runs, for\n"
  "                                                      a later read <path>\n"
+ "                                      save_eri <path> write the stored\n"
+ "                                                      two-electron integrals\n"
+ "                                      read_eri <path> reuse them: they depend\n"
+ "                                                      on structure and basis\n"
+ "                                                      only; another basis or\n"
+ "                                                      geometry is refused and\n"
+ "                                                      they are built\n"
  "                                      basis_overrides <file>\n"
  "                                                      per-element all-electron\n"
  "                                                      BSE JSON orbital bases;\n"
@@ -2734,7 +2765,7 @@ const std::set<std::string> &nbo_family_suboptions()
 		"-nbo_dir", "-nbo_47", "-nbo_e2min", "-nbo_threads", "-nbo_keep47", "-nrt",
 		"-nrt_e2", "-nrt_arrows", "-nrt_bond_scale", "-nrt_max", "-nrt_atoms",
 		"-nrt_exhaustive", "-nrt_no_symmetry", "-nrt_no_components", "-nrt_no_ion", "-nrt_parent",
-		"-nrt_target"};
+		"-nrt_target", "-nrt_screen", "-nrt_rotate", "-nrt_stall", "-nrt_mirror", "-nrt_no_mirror"};
 	return known;
 }
 
@@ -2860,6 +2891,9 @@ bool options::digest_io_options(const std::string &temp, int &i)
 				opt.nrt_target = std::stod(arguments[j + 1]);
 				opt.nrt = true;
 			}
+			else if (arguments[j] == "-nrt_screen")
+				opt.nrt_screen = arguments[j + 1] == "off" ? -1.0 : std::stod(arguments[j + 1]);
+			else if (arguments[j] == "-nrt_stall") opt.nrt_stall = std::stoi(arguments[j + 1]);
 			else if (arguments[j] == "-nrt_bond_scale")
 				opt.nrt_bond_scale = std::stod(arguments[j + 1]);
 			else if (arguments[j] == "-nrt_max") {
@@ -2881,6 +2915,9 @@ bool options::digest_io_options(const std::string &temp, int &i)
 			else if (arguments[j] == "-nrt_no_symmetry") opt.nrt_symmetry = false;
 			else if (arguments[j] == "-nrt_no_components") opt.nrt_components = false;
 			else if (arguments[j] == "-nrt_no_ion") opt.nrt_ion = false;
+			else if (arguments[j] == "-nrt_rotate") opt.nrt_rotate = true;
+			else if (arguments[j] == "-nrt_mirror") opt.nrt_mirror = true;
+			else if (arguments[j] == "-nrt_no_mirror") opt.nrt_mirror = false;
 			else if (arguments[j] == "-nbo_keep47") opt.keep_file47 = true;
 		//-nbo_threads wins, then -cpus, then the OpenMP default.
 		if (opt.threads <= 0 && threads > 0) opt.threads = threads;

@@ -16,13 +16,7 @@ Generating k-points...                            ... done!
 Number of k-points to evaluate: 402
 XCW orbital basis set: sto-3g-basis
 XCW: I/sigma(I) >= 2 (F/sigma(F) >= 4): 394 of 402 reflections in the fit; R1 and Criterion are over these, R1(all) and Crit(all) over all
-GridManager: Setting up prototype grids for atom types...
-GridManager: Generating integration grids for atoms...
-GridManager: Generated total of 93098 grid points.
-Total number of grid points after pruning: 93092
-AO values calculated for all grids.
-Screened out 2668 unique pairs of mu, nu (49.81%) 
-Skipped evaluation of 5584182 grids (11.28%) 
+I tensor read from p1_i.bin (8.24414 MB, single precision), not recomputed, held in memory
 More detailed output in XCW.log file...
 XCW: fitting against the 1/|H|^2-weighted residual self-energy criterion Criterion below is this weighted quantity, not the classical GoF.
 ____________________________________________________________________________________

@@ -399,6 +399,10 @@ class HE_Spherical_Atom
 public:
 	// Falls back to the neutral density if no ion is tabulated for this element.
 	HE_Spherical_Atom(const int atomic_number, const double charge);
+	// Whether a charge of this sign can be carried for this element, by either route.
+	static bool ion_available(const int atomic_number, const double charge);
+	// The part of an estimated charge the fill carries: 0 without an ion, at most the valence shell.
+	static double carried_charge(const int atomic_number, const double charge);
 
 	double get_radial_density(const double &r) const;
 	double get_form_factor(const double &k) const;
@@ -411,7 +415,10 @@ public:
 	// extrapolated even though the electron count stays exact. False once the
 	// delta series covers the charge: that blend is between two adjacent BOUND
 	// states, with every weight in [0, 1].
-	bool is_extrapolating() const { return _weight > 1.0 && !_use_delta; }
+	bool is_extrapolating() const { return _use_gto ? _gto_extrap : (_weight > 1.0 && !_use_delta); }
+	// Heavy elements (GTO_ion_delta_coefs.h): every charge state, the neutral included, is the
+	// scalar-relativistic DKH2 atom, evaluated as Thakkar neutral + tabulated difference.
+	bool uses_gto_tables() const { return _use_gto; }
 	// |q| > 1 reached by walking down the delta_k series rather than
 	// extrapolating. Cations only - atomic anions past -1 are unbound, so there
 	// is no honest reference state to walk towards.
@@ -430,6 +437,10 @@ private:
 	bool _use_delta;
 	int _delta_n;
 	double _delta_frac;
+	// GTO route: rho_q = rho_0(Thakkar) + (1 - _gto_frac) T_{_gto_lo} + _gto_frac T_{_gto_lo+1}.
+	bool _use_gto, _gto_extrap;
+	int _gto_lo;
+	double _gto_frac;
 	Thakkar _neutral;
 	std::unique_ptr<Thakkar> _ion;
 };

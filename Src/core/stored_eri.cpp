@@ -17,6 +17,34 @@ namespace {
 	inline size_t packed(const int a, const int b) {
 		return a >= b ? (size_t)a * (a + 1) / 2 + b : (size_t)b * (b + 1) / 2 + a;
 	}
+
+	//FNV-1a over what the integrals depend on: each shell's kind, l, centre, exponents and coefficients
+	uint64_t basis_key(const occ::qm::AOBasis& basis) {
+		uint64_t h = 1469598103934665603ull;
+		const auto mix = [&h](const void* p, const size_t n) {
+			const unsigned char* c = static_cast<const unsigned char*>(p);
+			for (size_t i = 0; i < n; i++) h = (h ^ c[i]) * 1099511628211ull;
+		};
+		for (const occ::qm::Shell& s : basis.shells()) {
+			const int kl[2] = { static_cast<int>(s.kind), static_cast<int>(s.l) };
+			mix(kl, sizeof(kl));
+			mix(s.origin.data(), 3 * sizeof(double));
+			mix(s.exponents.data(), s.exponents.size() * sizeof(double));
+			mix(s.contraction_coefficients.data(), s.contraction_coefficients.size() * sizeof(double));
+		}
+		const double t = stored_eri::threshold;
+		mix(&t, sizeof(t));
+		return h;
+	}
+
+	constexpr char eri_magic[8] = { 'N', 'O', 'S', 'E', 'R', 'I', '0', '1' };
+
+	template <typename T> void put(std::ofstream& f, const T* p, const size_t n) {
+		f.write(reinterpret_cast<const char*>(p), static_cast<std::streamsize>(n * sizeof(T)));
+	}
+	template <typename T> void get(std::ifstream& f, T* p, const size_t n) {
+		f.read(reinterpret_cast<char*>(p), static_cast<std::streamsize>(n * sizeof(T)));
+	}
 }
 
 void stored_eri::clear() {
@@ -24,6 +52,55 @@ void stored_eri::clear() {
 	nbf_ = 0;
 	pa_.clear(), pb_.clear(), first_.clear(), idx_.clear(), q_.clear(), qseg_.clear();
 	qmax_ = 0.0;
+}
+
+bool stored_eri::save(const std::filesystem::path& path, const occ::qm::HartreeFock& hf) const {
+	if (!v_) return false;
+	std::ofstream f(path, std::ios::binary);
+	const uint64_t key = basis_key(hf.aobasis());
+	const int npk = npairs();
+	f.write(eri_magic, sizeof(eri_magic));
+	put(f, &key, 1), put(f, &nbf_, 1), put(f, &npk, 1), put(f, &qmax_, 1);
+	put(f, pa_.data(), npk), put(f, pb_.data(), npk), put(f, first_.data(), first_.size()), put(f, idx_.data(), idx_.size());
+	put(f, q_.data(), npk), put(f, qseg_.data(), qseg_.size()), put(f, v_.get(), bytes() / sizeof(double));
+	return static_cast<bool>(f);
+}
+
+bool stored_eri::load(const std::filesystem::path& path, const occ::qm::HartreeFock& hf, const size_t budget_bytes, std::ostream& log) {
+	clear();
+	if (!hf.fock_build_properties().density_screened) return false;
+	if (!std::filesystem::exists(path)) {
+		log << "XCW: " << path.string() << " not found, building the two-electron integrals" << std::endl;
+		return false;
+	}
+	std::ifstream f(path, std::ios::binary);
+	char magic[sizeof(eri_magic)] = {};
+	uint64_t key = 0;
+	int nbf = 0, npk = 0;
+	f.read(magic, sizeof(magic));
+	get(f, &key, 1), get(f, &nbf, 1), get(f, &npk, 1);
+	if (!f || !std::equal(magic, magic + sizeof(magic), eri_magic) || key != basis_key(hf.aobasis()) || nbf != static_cast<int>(hf.aobasis().nbf())
+		|| npk < 0) {
+		log << "XCW: " << path.string() << " holds no two-electron integrals of this basis and geometry, building them" << std::endl;
+		return false;
+	}
+	const size_t npair = (size_t)nbf * (nbf + 1) / 2, nint = (size_t)npk * (npk + 1) / 2;
+	if (budget_bytes != 0 && nint * sizeof(double) > budget_bytes) return false;
+	get(f, &qmax_, 1);
+	pa_.resize(npk), pb_.resize(npk), first_.resize(nbf + 1), idx_.resize(npair), q_.resize(npk), qseg_.resize(nbf);
+	get(f, pa_.data(), npk), get(f, pb_.data(), npk), get(f, first_.data(), first_.size()), get(f, idx_.data(), npair);
+	get(f, q_.data(), npk), get(f, qseg_.data(), nbf);
+	v_.reset(new double[nint]);
+	get(f, v_.get(), nint);
+	if (!f || f.peek() != std::char_traits<char>::eof()) {
+		clear();
+		log << "XCW: " << path.string() << " is cut short or too long, building the two-electron integrals" << std::endl;
+		return false;
+	}
+	nbf_ = nbf;
+	log << "XCW: " << nint * sizeof(double) / 1048576.0 << " MB of two-electron integrals over " << npk << " of " << npair
+		<< " basis-function pairs read from " << path.string() << std::endl;
+	return true;
 }
 
 //Diagonal quartets (pq|pq) give each pair's Schwarz bound and so the kept set; then each slot is

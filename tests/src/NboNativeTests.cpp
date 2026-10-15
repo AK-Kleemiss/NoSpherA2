@@ -24,6 +24,28 @@ namespace {
 		return std::filesystem::exists(p) ? p : std::filesystem::path{};
 	}
 
+	std::filesystem::path allyl_fixture(const std::string& name)
+	{
+		const auto p = nos_test_repo_root() / "tests" / "allyl_occ" / (name + ".owf.fchk");
+		return std::filesystem::exists(p) ? p : std::filesystem::path{};
+	}
+
+	NboResults allyl_nrt(const std::filesystem::path& p)
+	{
+		WFN wavy(p);
+		NboOptions options;
+		options.nrt = true;
+		std::ostringstream log;
+		return native_nbo(wavy, options, log);
+	}
+
+	const NboBondOrder* bond_order(const NboResults& r, const std::string& spin, const int a, const int b)
+	{
+		for (const NboBondOrder& o : r.nrt.bond_orders)
+			if (!o.diagonal && o.spin == spin && o.atom1 == a && o.atom2 == b) return &o;
+		return nullptr;
+	}
+
 }  // namespace
 
 //Ethane, closed shell, no ECP: the totals must reproduce the MO occupation sum and the charges the
@@ -175,6 +197,21 @@ TEST(NboNativeTests, AGrownNrtCycleStatesAFloorItsFitRespects)
 		EXPECT_LE(std::stod(n.substr(b + 21)), std::stod(n.substr(n.find("D(w) = ") + 7)) + 1e-6) << n;
 	}
 	EXPECT_GT(floors, 0);
+	//-nrt_screen on every walk with a threshold no reduced cost reaches: each walk's structures get approximate
+	//orbitals, wait and join 16 at a time between refits, and the end is the unscreened set and fit
+	options.nrt_screen = 1e6;
+	options.nrt_screen_min = 1;
+	const NboResults s = native_nbo(wavy, options, log);
+	EXPECT_EQ(s.nrt.structures_found, r.nrt.structures_found);
+	EXPECT_NEAR(s.nrt.d_w, r.nrt.d_w, 1e-6);
+	EXPECT_TRUE(std::any_of(s.nrt.notes.begin(), s.nrt.notes.end(), [](const std::string& n) { return n.rfind("-nrt_screen", 0) == 0; }));
+	//-nrt_stall: nine builds whose mixing stopped gaining end before the cap, and the fit does not move
+	options.nrt_screen = -1.0;
+	options.nrt_stall = 20;
+	const NboResults t = native_nbo(wavy, options, log);
+	EXPECT_EQ(t.nrt.structures_found, r.nrt.structures_found);
+	EXPECT_NEAR(t.nrt.d_w, r.nrt.d_w, 1e-6);
+	EXPECT_TRUE(std::any_of(t.nrt.notes.begin(), t.nrt.notes.end(), [](const std::string& n) { return n.rfind("-nrt_stall", 0) == 0; }));
 }
 
 //CH3 doublet, `occ scf` B3LYP(VWN5)/def2-TZVP at the geometry of tests/nbo_reference_v2/data/ch3, where NBO 7
@@ -203,6 +240,66 @@ TEST(NboNativeTests, MethylRadicalSplitsItsBondsPerSpinAsNbo7Does)
 	EXPECT_EQ(bonds, 6);
 	ASSERT_EQ(r.nrt.spin_d.size(), 2u);
 	EXPECT_GT(r.nrt.spin_d[1].d_0, r.nrt.spin_d[0].d_0) << "the radical's spin carries the larger D";
+}
+
+//Allyl, `occ scf` B3LYP(VWN5)/def2-SVP at the geometry of tests/nbo_reference_v2/data/allyl made exactly C2v:
+//the doublet, the cation, and the cation with C1-C2 0.006 A shorter than C1-C3 (allyl_cation_d), beyond the 0.01 A
+//distance tolerance that pairs C2 with C3.  The parent's mirror image is one bond shift away: as a half-arrow
+//intermediate it is walked through and lost, and with -nrt_no_mirror the mirror bonds come out 1.446 and 1.462.
+TEST(NboNativeTests, TheAllylCationsMirrorStructuresWeighAlike)
+{
+	const auto p = allyl_fixture("allyl_cation");
+	if (p.empty())
+		GTEST_SKIP() << "tests/allyl_occ/allyl_cation.owf.fchk not found";
+	const NboResults r = allyl_nrt(p);
+	const NboBondOrder *a = bond_order(r, "", 1, 2), *b = bond_order(r, "", 1, 3);
+	ASSERT_TRUE(a && b);
+	EXPECT_NEAR(a->total, b->total, 1e-6);
+	ASSERT_GE(r.nrt.weights.size(), 2u);
+	EXPECT_NEAR(r.nrt.weights[0].weight_percent, r.nrt.weights[1].weight_percent, 1e-4);
+	EXPECT_GT(r.nrt.weights[1].weight_percent, 30.0) << "the parent's mirror image is missing";
+}
+
+//In the spin without the radical the mirror is one bond shift away as well; NBO 7 weighs the two 42.76 % each
+TEST(NboNativeTests, TheAllylRadicalIsSymmetricInEachSpin)
+{
+	const auto p = allyl_fixture("allyl");
+	if (p.empty())
+		GTEST_SKIP() << "tests/allyl_occ/allyl.owf.fchk not found";
+	const NboResults r = allyl_nrt(p);
+	ASSERT_TRUE(r.open_shell);
+	for (const std::string spin : { "alpha", "beta" }) {
+		const NboBondOrder *a = bond_order(r, spin, 1, 2), *b = bond_order(r, spin, 1, 3);
+		ASSERT_TRUE(a && b) << spin;
+		EXPECT_NEAR(a->total, b->total, 1e-6) << spin;
+	}
+	EXPECT_NEAR(r.npa[1].charge, r.npa[2].charge, 1e-6);
+}
+
+//Nearly degenerate: no symmetry map pairs the two ends, so only the walk can supply the mirror and its neighbourhood.
+//The result has to follow the symmetric one within the latter's 0.1 % D(w) range and lean the right way: the shorter
+//bond carries the larger order and the NBO search's pi bond, and the positive charge leans to the far end, C3
+TEST(NboNativeTests, ASlightlyDistortedAllylCationStaysNearTheSymmetricOne)
+{
+	const auto ps = allyl_fixture("allyl_cation"), pd = allyl_fixture("allyl_cation_d");
+	if (ps.empty() || pd.empty())
+		GTEST_SKIP() << "tests/allyl_occ/allyl_cation(_d).owf.fchk not found";
+	const NboResults s = allyl_nrt(ps), d = allyl_nrt(pd);
+	const NboBondOrder *s12 = bond_order(s, "", 1, 2), *d12 = bond_order(d, "", 1, 2), *d13 = bond_order(d, "", 1, 3);
+	ASSERT_TRUE(s12 && d12 && d13);
+	int pi = 0;
+	for (const NboOrbital& o : d.orbitals)
+		if (o.type == "BD" && o.centers == std::vector<int>{ 1, 2 }) pi++;
+	EXPECT_EQ(pi, 2) << "the NBO search put the double bond on the longer C1-C3";
+	EXPECT_GT(d12->total, d13->total);
+	EXPECT_LT(d12->total - d13->total, 0.05);
+	EXPECT_GT(d.npa[2].charge, d.npa[1].charge);
+	EXPECT_NEAR(0.5 * (d12->total + d13->total), s12->total, 5e-3);
+	EXPECT_NEAR(d.nrt.d_w, s.nrt.d_w, 5e-3 * s.nrt.d_w);
+	for (const NboBondOrder* o : { d12, d13 }) {
+		EXPECT_GE(o->total, s12->range_lo) << o->atom1 << "-" << o->atom2;
+		EXPECT_LE(o->total, s12->range_hi) << o->atom1 << "-" << o->atom2;
+	}
 }
 
 //HI from `occ scf` B3LYP(VWN5)/def2-TZVP: the fchk's "Nuclear charges" give iodine 25, Z minus its 28-electron ECP
@@ -431,6 +528,7 @@ TEST(NboNativeTests, NickelTetracarbonylKeepsOneDativeBondAndItsParent)
 	const double electrons = wavy.count_nr_electrons();
 	NboOptions options;
 	options.nrt = true;
+	options.nrt_rotate = true;
 	std::ostringstream log;
 	const NboResults r = native_nbo(wavy, options, log);
 	int ni_c = 0;

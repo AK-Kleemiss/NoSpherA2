@@ -712,6 +712,7 @@ TEST(NrtTests, TheParentsSymmetryImageCompletesTheHexagon)
     L.n_lewis = 3;
     NboOptions opt;
     opt.nrt = true;
+    opt.nrt_rotate = true;
     NboNrt nrt;
     std::ostringstream log;
     native_nrt(nrt, nao, L, {}, ring, opt, "", 2.0, log, &xyz);

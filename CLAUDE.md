@@ -245,12 +245,24 @@ rework on the same machine in the same sitting, with the identical failing set â
 that machine's temp-file locking on `%TEMP%` (`remove: The process cannot access the file ...`),
 not code failures. The rework changed no test behavior. See `UNIT_TESTS_STATUS.md`.
 
+As of 2026-10-13, after the NRT symmetry fixes, `ctest --preset release-linux` reports **1260 passed, 0 failed,
+22 skipped** (2 disabled) of 1282. New: `NboNativeTests.TheAllylCationsMirrorStructuresWeighAlike`,
+`NboNativeTests.TheAllylRadicalIsSymmetricInEachSpin` and `NboNativeTests.ASlightlyDistortedAllylCationStaysNearTheSymmetricOne`
+(fixtures `tests/allyl_occ/`), under what is the default since 2026-10-14 (`-nrt_no_mirror` restores the old behaviour). See
+`UNIT_TESTS_STATUS.md`. At `1349eba` the suite took 255.7 +- 9.1 s wall and 993 +- 40 CPU-s (95 % CI, n = 3) with 3.88 of
+the 4 cores busy. Since the XCW tests share one build of the stored two-electron integrals (`save_eri` /
+`read_eri`): **1261 passed, 0 failed, 22 skipped** (2 disabled) of 1283, 230.6 +- 16.8 s wall and 899 +- 66 CPU-s,
+3.90 of 4 cores busy.
+
 As of 2026-10-13, after `72d83cd`, `ctest --preset release-linux` reports **1257 passed, 0 failed,
 22 skipped** (2 disabled) of 1279. New since `d5a9755`: `NboNativeTests.MethylRadicalSplitsItsBondsPerSpinAsNbo7Does`
 (fixture `tests/ch3_occ/ch3.owf.fchk`), `NboNativeTests.AGrownNrtCycleStatesAFloorItsFitRespects`,
 `NboNativeTests.AnEcpFchkKeepsTheElementAndItsCore` (fixture `tests/hi_occ/hi.owf.fchk`),
 `NrtTests.TheParentsSymmetryImageCompletesTheHexagon` and
-`NrtTests.OppositelyPolarisedOrbitalsOfABondDoNotCancelInItsIonicShare`. See `UNIT_TESTS_STATUS.md`.
+`NrtTests.OppositelyPolarisedOrbitalsOfABondDoNotCancelInItsIonicShare`. After `36e482b` the counts are the
+same. The suite takes 280.5 +- 5.9 s wall, against 334.2 +- 29.5 s before (95 % CI, n = 3 each). Three changes account
+for it: the P1 subset goldens read the I tensor `P1_test_XCW` saves; the adaptive-step fallback test runs on NH3Li; and the
+AO-to-MO step takes eight functions per pass, with outputs identical on GCC. See `UNIT_TESTS_STATUS.md`.
 
 As of 2026-10-13, `ctest --preset release-linux` on `density_source` `d5a9755` reports
 **1252 passed, 0 failed, 22 skipped** (2 disabled) of 1274 on the same 4-core VM. It took
