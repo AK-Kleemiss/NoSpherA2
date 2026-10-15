@@ -70,7 +70,7 @@ namespace
 	}
 
 	//construct an XCW on the P1 fixture with this settings text, in a scratch directory
-	//because construct() writes XCW.log and log3.txt into the working directory; returns
+	//because construct() writes XCW.log into the working directory; returns
 	//the XCW.log text, empty when the fixture is missing
 	std::string construct_on_p1(const std::string& text)
 	{

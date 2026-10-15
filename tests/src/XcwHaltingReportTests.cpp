@@ -471,7 +471,6 @@ TEST(XcwHaltingReportTests, GrownConstructUsesTheXyzAtoms)
 	EXPECT_EQ(out.find("I need an xyz file"), std::string::npos) << out;
 	EXPECT_NE(out.find("Nr of reflections read from file: 402"), std::string::npos) << out;
 	EXPECT_NE(out.find("XCW orbital basis set: sto-3g"), std::string::npos) << out;
-	EXPECT_TRUE(std::filesystem::exists(dir / "log3.txt"));
 	EXPECT_NE(read_file(dir / "XCW.log").find("XCW orbital basis set: sto-3g"), std::string::npos);
 
 	if (!::testing::Test::HasFailure()) {

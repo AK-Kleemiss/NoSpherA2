@@ -32,28 +32,28 @@ void XCW::construct(const options& opt_in) {
 	}
 	unit_cell = cell(cif, std::cout, opt->debug, opt->do_XCW);
 	hkl_enlarged = read_hkl_full(hkl_filename, hkl, opt->twin_law, unit_cell, std::cout, obs, opt->debug);
-	std::ofstream log3("log3.txt", std::ios::out);
-	// The anomalous dispersion of every atom comes from the CIF, per type or per site
+	// Positions, U_iso, U_ij, C, D and the anomalous dispersion (per type or per site) of every atom
 	std::vector<vec2> cif_ADPs;
 	read_CIF(cif_input, unit_cell, cryst.ncen, asym_atoms, cif_ADPs, opt->debug);
 	err_checkf(cryst.ncen > 0, "No atoms were read from " + cif.string() + "! Is there an _atom_site loop with labels, type symbols and fractional coordinates?", std::cout);
 
 	// Crystallographic multiplicity of every asymmetric atom, the order of its site stabiliser
 	unit_cell.asym_unit_cryst_mult(asym_atoms);
-	const int n_asym = cryst.ncen;
 	if (settings.grown) {
 		// Adds the symmetry generated atoms of the xyz file, then finds parent and generating operation of each
 		unit_cell.grow_asym_atoms(asym_atoms, xyz_atoms.value());
 		unit_cell.resolve_internal_symmetry(asym_atoms);
 	}
 	cryst.ncen = asym_atoms.size();
-	// links[parent][image]: the operations generating the image, so the CIF readers hand it its parent's U_iso and ADPs; its dispersion is the parent's
-	ivec3 symmetry_linking_list(n_asym, ivec2(cryst.ncen));
+	// A grown atom takes its parent's U_iso, dispersion and ADPs; rotate_grown_ADPs turns the ADPs onto the image
+	cif_ADPs.resize(cryst.ncen);
 	for (int at = 0; at < cryst.ncen; at++) {
 		if (!asym_atoms[at].grown) continue;
-		err_checkf(asym_atoms[at].grown_from >= 0, "Grown atom " + std::to_string(at) + " is not a symmetry image of an atom in the asymmetric unit", std::cout);
-		symmetry_linking_list[asym_atoms[at].grown_from][at] = asym_atoms[at].grown_by;
-		asym_atoms[at].anom = asym_atoms[asym_atoms[at].grown_from].anom;
+		const int parent = asym_atoms[at].grown_from;
+		err_checkf(parent >= 0, "Grown atom " + std::to_string(at) + " is not a symmetry image of an atom in the asymmetric unit", std::cout);
+		asym_atoms[at].U_iso = asym_atoms[parent].U_iso;
+		asym_atoms[at].anom = asym_atoms[parent].anom;
+		cif_ADPs[at] = cif_ADPs[parent];
 	}
 	// A grown structure keeps the operations it does not apply explicitly, the multiplicities adjusted to match
 	ivec applied_symmetry;
@@ -82,7 +82,11 @@ void XCW::construct(const options& opt_in) {
 		temp_atom.set_coordinate(1, asym_atoms[at].pos[1]);
 		temp_atom.set_coordinate(2, asym_atoms[at].pos[2]);
 		temp_atom.set_charge(asym_atoms[at].type);
+		temp_atom.set_label(asym_atoms[at].label);
+		temp_atom.set_frac_coords(asym_atoms[at].frac_pos);
+		temp_atom.set_ADPs(cif_ADPs[at]);
 		dummy_wave.push_back_atom(temp_atom);
+		cryst.U_iso.push_back(asym_atoms[at].U_iso);
 	}
 	// occ only finds this inside the first SCF, and its message names neither the atom count nor the charge
 	int n_electrons = -settings.charge;
@@ -99,19 +103,10 @@ void XCW::construct(const options& opt_in) {
 	const auto& basis = orbital_basis_;
 	load_basis_into_WFN(dummy_wave, basis, false, true);
 
-	// Read isotropic displacement parameters
-	cryst.U_iso = read_U_iso_from_CIF(cif, dummy_wave, unit_cell, log3, opt->debug);
-	if (settings.grown) {
-		cryst.grow_U_iso(asym_atoms, symmetry_linking_list);
-	}
-
 	// Generate k_pts and set the number of reflections
 	cryst.nr = hkl_enlarged.size();
 	cryst.nr_small = hkl.size();
 	make_k_pts(cryst.nr != 0 && hkl.size() == 0, opt->save_k_pts, unit_cell, hkl_enlarged, k_pt, std::cout, opt->debug);
-
-	// Read ADPs
-	read_fracs_ADPs_from_CIF(cif, dummy_wave, log3, opt->debug, settings.grown, symmetry_linking_list);
 
 	// Prepare output files
 	XCW_log.open("XCW.log");
@@ -713,7 +708,7 @@ void XCW::U_star2U_cart() {
 	}
 }
 
-// A grown atom carries a copy of its parent's ADPs (read_fracs_ADPs_from_CIF); U*, C and D are
+// A grown atom carries a copy of its parent's ADPs (XCW::construct); U*, C and D are
 // contravariant tensors in the fractional basis, so the image's are T' = R T R^T with R the rotation
 // of the linking operation (x' = R x + t). cell stores R transposed, which is what transform_ADPs takes.
 void XCW::rotate_grown_ADPs() {
