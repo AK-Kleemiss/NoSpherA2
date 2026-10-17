@@ -2,6 +2,7 @@
 #include "cell.h"
 #include "convenience.h"
 #include "nos_math.h"
+#include <bit>
 #include <cctype>
 #include <Eigen/Dense>
 
@@ -318,50 +319,261 @@ void cell::asym_unit_cryst_mult(std::vector<asym_atom>& asym_atoms) {
 	}
 }
 
-void cell::project_into_subgroup(ivec& applied_symmetry, hkl_list& hkl_enlarged, const hkl_list& hkl) {
+namespace {
+	// The subgroup the generators generate: every operation reached from the identity by applying them again and again
+	ivec generated_subgroup(const ivec2& product, const int identity, const ivec& generators) {
+		bvec member(product.size(), false);
+		member[identity] = true;
+		ivec subgroup = { identity };
+		for (int next = 0; next < subgroup.size(); next++)
+			for (int generator = 0; generator < generators.size(); generator++) {
+				const int op = product[subgroup[next]][generators[generator]];
+				if (!member[op]) {
+					member[op] = true;
+					subgroup.push_back(op);
+				}
+			}
+		std::sort(subgroup.begin(), subgroup.end());
+		return subgroup;
+	}
+
+	// Every subgroup: the cyclic ones, joined with each other until no join gives a new subgroup
+	ivec2 all_subgroups(const ivec2& product, const int identity) {
+		std::map<ivec, ivec> generators_of;
+		for (int op = 0; op < product.size(); op++)
+			generators_of.emplace(generated_subgroup(product, identity, { op }), ivec{ op });
+		const std::vector<std::pair<ivec, ivec>> cyclic(generators_of.begin(), generators_of.end());
+		std::vector<std::pair<ivec, ivec>> frontier = cyclic;
+		while (!frontier.empty()) {
+			std::vector<std::pair<ivec, ivec>> next_frontier;
+			for (int known = 0; known < frontier.size(); known++)
+				for (int added = 0; added < cyclic.size(); added++) {
+					const ivec& members = frontier[known].first;
+					if (std::includes(members.begin(), members.end(), cyclic[added].first.begin(), cyclic[added].first.end()))
+						continue;
+					ivec generators = frontier[known].second;
+					generators.insert(generators.end(), cyclic[added].second.begin(), cyclic[added].second.end());
+					const ivec joined = generated_subgroup(product, identity, generators);
+					if (generators_of.emplace(joined, generators).second)
+						next_frontier.push_back({ joined, generators });
+				}
+			frontier = next_frontier;
+		}
+		ivec2 subgroups;
+		for (const auto& [members, generators] : generators_of)
+			subgroups.push_back(members);
+		return subgroups;
+	}
+
+	// Each family needs a model atom that some operation of every right coset L.h of H puts on a model atom
+	bool families_fit(const ivec2& product, const ivec& coset_subgroup, const ivec& kept_subgroup, const std::vector<std::vector<bvec>>& lands_in_model) {
+		ivec2 right_cosets;
+		bvec assigned(product.size(), false);
+		for (int outer = 0; outer < coset_subgroup.size(); outer++) {
+			if (assigned[coset_subgroup[outer]]) continue;
+			ivec coset;
+			for (int inner = 0; inner < kept_subgroup.size(); inner++) {
+				coset.push_back(product[kept_subgroup[inner]][coset_subgroup[outer]]);
+				assigned[coset.back()] = true;
+			}
+			right_cosets.push_back(coset);
+		}
+		for (int family = 0; family < lands_in_model.size(); family++) {
+			bool fits = false;
+			for (int member = 0; member < lands_in_model[family].size() && !fits; member++) {
+				fits = true;
+				for (int coset = 0; coset < right_cosets.size() && fits; coset++) {
+					bool reaches_model = false;
+					for (int op = 0; op < right_cosets[coset].size(); op++)
+						reaches_model = reaches_model || lands_in_model[family][member][right_cosets[coset][op]];
+					fits = reaches_model;
+				}
+			}
+			if (!fits) return false;
+		}
+		return true;
+	}
+
+	// Branch and bound: every coset takes one footprint (the classes of its d.L), the union of all as small as possible
+	void cover_classes(const std::vector<std::map<unsigned, int>>& options_per_coset, const unsigned covered, unsigned& best_covered, int& best_count) {
+		if (std::popcount(covered) >= best_count) return;
+		int open_coset = -1;
+		for (int coset = 0; coset < options_per_coset.size(); coset++) {
+			bool done = false;
+			for (const auto& [footprint, op] : options_per_coset[coset])
+				done = done || (footprint & ~covered) == 0;
+			if (!done && (open_coset < 0 || options_per_coset[coset].size() < options_per_coset[open_coset].size()))
+				open_coset = coset;
+		}
+		if (open_coset < 0) {
+			best_covered = covered;
+			best_count = std::popcount(covered);
+			return;
+		}
+		std::vector<unsigned> footprints;
+		for (const auto& [footprint, op] : options_per_coset[open_coset])
+			footprints.push_back(footprint);
+		std::sort(footprints.begin(), footprints.end(), [covered](const unsigned first, const unsigned second) {
+			return std::popcount(first & ~covered) < std::popcount(second & ~covered); });
+		for (int option = 0; option < footprints.size(); option++)
+			cover_classes(options_per_coset, covered | footprints[option], best_covered, best_count);
+	}
+
+	// K = D.L with one d per left coset d.H, no d.L holding a forbidden operation, as few classes as possible; empty if none exists
+	ivec cheapest_kept_set(const ivec2& product, const ivec& rotation_class, const int identity, const ivec& coset_subgroup, const ivec& kept_subgroup, const bvec& forbidden) {
+		std::vector<std::map<unsigned, int>> options_per_coset;
+		bvec assigned(product.size(), false);
+		for (int start = 0; start < product.size(); start++) {
+			if (assigned[start]) continue;
+			ivec coset;
+			for (int outer = 0; outer < coset_subgroup.size(); outer++) {
+				coset.push_back(product[start][coset_subgroup[outer]]);
+				assigned[coset.back()] = true;
+			}
+			const bool holds_identity = std::find(coset.begin(), coset.end(), identity) != coset.end();
+			std::map<unsigned, int> options;
+			for (int candidate = 0; candidate < coset.size(); candidate++) {
+				if (holds_identity && coset[candidate] != identity) continue;
+				unsigned footprint = 0;
+				bool allowed = true;
+				for (int inner = 0; inner < kept_subgroup.size(); inner++) {
+					const int op = product[coset[candidate]][kept_subgroup[inner]];
+					allowed = allowed && !forbidden[op];
+					footprint |= 1u << rotation_class[op];
+				}
+				if (allowed) options.emplace(footprint, coset[candidate]);
+			}
+			if (options.empty()) return {};
+			options_per_coset.push_back(options);
+		}
+		unsigned best_covered = 0;
+		int best_count = 33;
+		cover_classes(options_per_coset, 0u, best_covered, best_count);
+		ivec kept;
+		for (int coset = 0; coset < options_per_coset.size(); coset++)
+			for (const auto& [footprint, representative] : options_per_coset[coset])
+				if ((footprint & ~best_covered) == 0) {
+					for (int inner = 0; inner < kept_subgroup.size(); inner++)
+						kept.push_back(product[representative][kept_subgroup[inner]]);
+					break;
+				}
+		std::sort(kept.begin(), kept.end());
+		kept.erase(std::unique(kept.begin(), kept.end()), kept.end());
+		return kept;
+	}
+}
+
+// K = D.L for subgroups L inside H, D one operation per left coset of H: a model atom per right coset L.h of H gives a set C with K.C = D.H = G
+ivec cell::choose_kept_operations(const std::vector<asym_atom>& asym_atoms, const ivec& applied_symmetry) {
 	const int num_sym_ops = static_cast<int>(sym[0][0].size());
-	int e = 0, inv = -1;
-	while (!check_identity(e)) e++;
-	ivec already_applied = applied_symmetry;
-	already_applied.push_back(e);
-	// Find the inversion symmetry
-	for (int sym_op = 0; sym_op < num_sym_ops; sym_op++) {
-		bool is_inversion = true;
-		for (int i = 0; i < 3 && is_inversion; i++) {
-			for (int j = 0; j < 3 && is_inversion; j++) {
-				is_inversion = sym[i][j][sym_op] == (i == j ? -1 : 0);
+	int identity = 0;
+	while (!check_identity(identity)) identity++;
+	ivec2 product(num_sym_ops, ivec(num_sym_ops));
+	for (int first = 0; first < num_sym_ops; first++)
+		for (int second = 0; second < num_sym_ops; second++)
+			product[first][second] = equal_to_concatenation(first, second);
+	// Operations with equal or opposite rotations share one k-point after inversion screening: one class, the cost is the number of classes
+	ivec rotation_class(num_sym_ops, -1), rotation_sign(num_sym_ops, 1);
+	int num_classes = 0;
+	for (int op = 0; op < num_sym_ops; op++) {
+		for (int earlier = 0; earlier < op && rotation_class[op] < 0; earlier++)
+			for (int sign = -1; sign <= 1 && rotation_class[op] < 0; sign += 2) {
+				bool same = true;
+				for (int row = 0; row < 3 && same; row++)
+					for (int column = 0; column < 3 && same; column++)
+						same = sym[row][column][op] == sign * sym[row][column][earlier];
+				if (same) {
+					rotation_class[op] = rotation_class[earlier];
+					rotation_sign[op] = sign * rotation_sign[earlier];
+				}
+			}
+		if (rotation_class[op] < 0) rotation_class[op] = num_classes++;
+	}
+	err_checkf(num_classes <= 32, "More than 32 rotation classes in the symmetry operations", std::cout);
+	auto class_count = [&](const ivec& ops) {
+		unsigned classes = 0;
+		for (int op = 0; op < ops.size(); op++) classes |= 1u << rotation_class[ops[op]];
+		return std::popcount(classes);
+		};
+	// Kept operations whose opposite rotation is kept too: the pairs inversion screening integrates once
+	auto inversion_partners = [&](const ivec& ops) {
+		int partners = 0;
+		for (int op = 0; op < ops.size(); op++) {
+			bool has_partner = false;
+			for (int other = 0; other < ops.size() && !has_partner; other++)
+				has_partner = rotation_class[ops[other]] == rotation_class[ops[op]] && rotation_sign[ops[other]] != rotation_sign[ops[op]];
+			partners += has_partner;
+		}
+		return partners;
+		};
+	// Per family (an asymmetric atom and the atoms grown from it), which operations put each member on a member
+	std::vector<std::vector<bvec>> lands_in_model;
+	for (int parent = 0; parent < asym_atoms.size(); parent++) {
+		if (asym_atoms[parent].grown) continue;
+		ivec family = { parent };
+		for (int atom = 0; atom < asym_atoms.size(); atom++)
+			if (asym_atoms[atom].grown && asym_atoms[atom].grown_from == parent) family.push_back(atom);
+		std::vector<bvec> member_lands(family.size(), bvec(num_sym_ops, false));
+		for (int member = 0; member < family.size(); member++)
+			for (int op = 0; op < num_sym_ops; op++) {
+				const vec image = apply_symmetry({ asym_atoms[family[member]].frac_pos[0], asym_atoms[family[member]].frac_pos[1], asym_atoms[family[member]].frac_pos[2] }, op);
+				for (int target = 0; target < family.size() && !member_lands[member][op]; target++)
+					member_lands[member][op] = check_special({ asym_atoms[family[target]].frac_pos[0], asym_atoms[family[target]].frac_pos[1], asym_atoms[family[target]].frac_pos[2] }, image, 1e-2);
+			}
+		lands_in_model.push_back(member_lands);
+	}
+	// Pairs L inside H with the fewest classes any D.L can have: classes(G) * classes(L) / classes(H)
+	const ivec2 subgroups = all_subgroups(product, identity);
+	std::vector<std::tuple<double, int, int>> pairs;
+	for (int coset_subgroup = 0; coset_subgroup < subgroups.size(); coset_subgroup++)
+		for (int kept_subgroup = 0; kept_subgroup < subgroups.size(); kept_subgroup++)
+			if (std::includes(subgroups[coset_subgroup].begin(), subgroups[coset_subgroup].end(), subgroups[kept_subgroup].begin(), subgroups[kept_subgroup].end()))
+				pairs.push_back({ static_cast<double>(num_classes) * class_count(subgroups[kept_subgroup]) / class_count(subgroups[coset_subgroup]), coset_subgroup, kept_subgroup });
+	std::sort(pairs.begin(), pairs.end());
+	// Fewest classes, then most inversion partners, then fewest operations; first every applied operation stays out, then only those whose powers are all applied, then none
+	bvec forbidden(num_sym_ops, false);
+	for (int op = 0; op < applied_symmetry.size(); op++) forbidden[applied_symmetry[op]] = true;
+	for (int attempt = 0; attempt < 3; attempt++) {
+		if (attempt == 1) {
+			const bvec applied = forbidden;
+			for (int op = 0; op < num_sym_ops; op++)
+				for (int power = op; power != identity && forbidden[op]; power = product[power][op])
+					forbidden[op] = applied[power];
+		}
+		if (attempt == 2) forbidden.assign(num_sym_ops, false);
+		ivec best_kept;
+		int best_cost = num_classes + 1, best_partners = -1;
+		for (int pair = 0; pair < pairs.size(); pair++) {
+			const auto& [lowest_cost, coset_subgroup, kept_subgroup] = pairs[pair];
+			if (lowest_cost > best_cost + 1e-9) break;
+			bool deletes_none = true;
+			for (int op = 0; op < subgroups[kept_subgroup].size(); op++)
+				deletes_none = deletes_none && !forbidden[subgroups[kept_subgroup][op]];
+			if (!deletes_none || !families_fit(product, subgroups[coset_subgroup], subgroups[kept_subgroup], lands_in_model)) continue;
+			const ivec kept = cheapest_kept_set(product, rotation_class, identity, subgroups[coset_subgroup], subgroups[kept_subgroup], forbidden);
+			if (kept.empty()) continue;
+			const int cost = class_count(kept), partners = inversion_partners(kept);
+			if (cost < best_cost || (cost == best_cost && (partners > best_partners || (partners == best_partners && kept.size() < best_kept.size())))) {
+				best_kept = kept;
+				best_cost = cost;
+				best_partners = partners;
 			}
 		}
-		if (is_inversion) {
-			inv = sym_op;
-		}
+		if (best_kept.empty()) continue;
+		if (attempt > 0)
+			std::cout << "No kept symmetry operations count every position once with all applied operations deleted, some of them stay in the sum\n";
+		return best_kept;
 	}
-	// Covered: Operation belongs to a subset that already has one symmetry operation chosen to be kept. Kept is exactly this operation
-	bvec covered(num_sym_ops, false), kept(num_sym_ops, false);
-	// This function keeps a symmetry operation and marks the symmetry operation that is equal to it being concatenated with an already applied symmetry as covered
-	auto keep = [&](const int r) {
-		kept[r] = true;
-		for (int h : already_applied) {
-			covered[equal_to_concatenation(r, h)] = true;
-		}
-		};
-	// If the space group is not centrosymmetric, just keep the symmetry operation already chosen, if it is centrosymmetric, keep the inversion symmetric operation, maximizing what can be screened by inversion screening
-	for (int sym_op = 0; sym_op < num_sym_ops; sym_op++) {
-		if (covered[sym_op]) {
-			continue;
-		}
-		keep(sym_op);
-		if (inv < 0) {
-			continue;
-		}
-		const int inversion_symmetric_operation = equal_to_concatenation(inv, sym_op);
-		if (!covered[inversion_symmetric_operation]) {
-			keep(inversion_symmetric_operation);
-		}
-	}
+	err_checkf(false, "No kept symmetry operations count every position once", std::cout);
+	return {};
+}
+
+// Deletes every operation not in kept and enlarges hkl by the kept rotations; applied_symmetry returns the deleted operations
+void cell::keep_operations(const ivec& kept, ivec& applied_symmetry, hkl_list& hkl_enlarged, const hkl_list& hkl) {
+	const int num_sym_ops = static_cast<int>(sym[0][0].size());
 	applied_symmetry.clear();
 	for (int sym_op = 0; sym_op < num_sym_ops; sym_op++)
-		if (!kept[sym_op]) {
+		if (std::find(kept.begin(), kept.end(), sym_op) == kept.end()) {
 			applied_symmetry.push_back(sym_op);
 		}
 	for (const int sym_op : std::views::reverse(applied_symmetry)) {
@@ -610,7 +822,7 @@ ivec cell::apply_grown(const hkl_list& hkl, hkl_list& hkl_enlarged, std::vector<
 	// Check which symmetry operations are fully applied to the asymmetric unit, ONLY those can be deleted
 	ivec applied_symmetry = confirm_applied_symmetry(asym_atoms);
 	const int operations_before_deletion = static_cast<int>(sym[0][0].size());
-	project_into_subgroup(applied_symmetry, hkl_enlarged, hkl);
+	keep_operations(choose_kept_operations(asym_atoms, applied_symmetry), applied_symmetry, hkl_enlarged, hkl);
 	set_sym_fact_from_position_counts(asym_atoms, operations_before_deletion);
 	return applied_symmetry;
 	// closing function
