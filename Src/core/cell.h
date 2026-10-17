@@ -47,7 +47,7 @@ private:
 	bool check_identity(const int& sym_op);
 
 	// Subgroup projection for grown structures
-	void project_into_subgroup(ivec& applied_symmetry, hkl_list& hkl_enlarged, const hkl_list& hkl, std::vector<asym_atom>& asym_atoms);
+	void project_into_subgroup(ivec& applied_symmetry, hkl_list& hkl_enlarged, const hkl_list& hkl);
 	int equal_to_concatenation(const int op_a, const int op_b);
 	
 
@@ -97,8 +97,9 @@ public:
 	void resolve_internal_symmetry(std::vector<asym_atom>& asym_atoms);
 	void eval_symm(std::vector<asym_atom>& asym_atoms, const int& asymmetric_atoms, ivec3& linking_list);
 	ivec confirm_applied_symmetry(const std::vector<asym_atom>& asym_atoms);
-	void adjust_sym_facts(const ivec& applied_symmetry, std::vector<asym_atom>& asym_atoms);
-	// Just a helper function that speeds up future computation
+	// sym_fact of a grown model: every position the kept operations reach is counted exactly once
+	void set_sym_fact_from_position_counts(std::vector<asym_atom>& asym_atoms, const int operations_before_deletion);
+	// sym_fact of an ungrown model: 1 / (number of operations leaving the atom in place)
 	void set_sym_fact_from_mult(std::vector<asym_atom>& asym_atoms) {
 		for (asym_atom& atom : asym_atoms) {
 			atom.sym_fact = 1.0 / static_cast<double>(atom.cryst_mult);

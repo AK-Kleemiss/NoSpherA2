@@ -78,11 +78,13 @@ structure_factors::structure_factors(options& opt_in) {
 		if (opt_in.xcw_settings.grown) {
 			// Fourth step of the symmetry resolution: Copy U_iso, the dispersion and the ADPs of each grown atom's parent, the ADPs rotated onto the symmetry generated atoms
 			unit_cell.grow_ADPs(asym_atoms, ADPs);
-			// Fifth step of the symmetry resolution: Find fully applied operations and if possible, project the grown structure into its symmetry subgroup and update everything accordingly
+			// Fifth step of the symmetry resolution: Delete the fully applied operations and solve the symmetry factors for the operations that are kept
 			applied_symmetry = unit_cell.apply_grown(scatter_data.hkl, scatter_data.hkl_enlarged, asym_atoms);
 		}
-		// Convenience function to precompute the symmetry factors, also for an ungrown atom on a special position
-		unit_cell.set_sym_fact_from_mult(asym_atoms);
+		else {
+			// Symmetry factors of an ungrown model, also for an atom on a special position
+			unit_cell.set_sym_fact_from_mult(asym_atoms);
+		}
 		if (tuning("NOSPHERA2_DEBUG_ASYMFACT")) {
 			std::cerr << "applied_symmetry (deleted):";
 			for (int s : applied_symmetry) std::cerr << " " << s;

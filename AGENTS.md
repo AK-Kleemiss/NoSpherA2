@@ -309,6 +309,10 @@ alternative is one flag away in each case.
 
 ## Current Validation Notes
 
+As of 2026-10-17, grown XCW models delete every fully applied symmetry operation and solve the sym_facts so that every
+position the kept operations reach is counted once (`cell::set_sym_fact_from_position_counts`); `ctest --preset release-linux`
+reports **1263 passed, 0 failed, 22 skipped** (2 disabled) of 1285. See `UNIT_TESTS_STATUS.md`.
+
 As of 2026-10-14, XCW_refactor carries density_source with the XCW split into `structure_factors`, `SCF_wrapper` and
 `XCW_solver` kept: `basis_overrides`, `save_eri`/`read_eri` and the charge/multiplicity check are ported, the pair screen
 and symmetry handling stay XCW_refactor's, and `slow_conv` damps the lambda = 0 step too. `ctest --preset release-linux`

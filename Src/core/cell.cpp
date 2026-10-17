@@ -3,6 +3,7 @@
 #include "convenience.h"
 #include "nos_math.h"
 #include <cctype>
+#include <Eigen/Dense>
 
 namespace {
 	/**
@@ -285,26 +286,6 @@ ivec cell::confirm_applied_symmetry(const std::vector<asym_atom>& asym_atoms) {
 				count++;
 			}
 		}
-		// Only an operation that maps the whole model onto itself can leave the sum: the operations that do form a group,
-		// so the projection's cosets exist. A grown atom whose image is missing (screw and inversion images of one atom,
-		// without the glide image the two compose to) would otherwise be counted twice by the operations that stay
-		for (const asym_atom& grown_atom : asym_atoms) {
-			if (!grown_atom.grown) {
-				continue;
-			}
-			const vec image = apply_symmetry({ grown_atom.frac_pos[0], grown_atom.frac_pos[1], grown_atom.frac_pos[2] }, sym_op);
-			bool present = false;
-			for (const asym_atom& other : asym_atoms) {
-				if (check_special({ other.frac_pos[0], other.frac_pos[1], other.frac_pos[2] }, image, 1e-2)) {
-					present = true;
-					break;
-				}
-			}
-			if (!present) {
-				count = -1;
-				break;
-			}
-		}
 		// Now we have counted the number of atoms in the model, for which the symmetry operation was applied
 		// If this number is equal to the number of asymmetric atoms, then the symmetry operation is fully applied
 		int original_ncen = 0;
@@ -318,52 +299,6 @@ ivec cell::confirm_applied_symmetry(const std::vector<asym_atom>& asym_atoms) {
 		}
 	}
 	return applied_symmetry;
-}
-
-void cell::adjust_sym_facts(const ivec& applied_symmetry, std::vector<asym_atom>& asym_atoms) {
-	/* Following rules should apply (hopefully) :
-	* 1: If an atom is grown explicitly and a symmetry operation that generated it will be deleted, then nothing should change
-	* 2: If an atom is grown explicitly and a symmetry operation that maps it back onto its parent will be kept, the cryst_mult for original atom and grown atom should be increased by 1 to avoid double counting
-	* 3: If an atom is on a special position for an applied symmetry that will be deleted, the cryst_mult for that atom and its symmetry images should decrease by 1 to avoid missing the contribution of that atom
-	* 4: If an atom is on a special position for a symmetry operation will be kept, the cryst_mult for that atom should not change
-	*/
-	for (int sym_op = 0; sym_op < sym[0][0].size(); sym_op++) {
-		bool will_be_deleted = std::find(applied_symmetry.begin(), applied_symmetry.end(), sym_op) != applied_symmetry.end();
-		for (int atom_idx = 0; atom_idx < asym_atoms.size(); atom_idx++) {
-			asym_atom& atom = asym_atoms[atom_idx];
-			const vec original_pos = { atom.frac_pos[0], atom.frac_pos[1], atom.frac_pos[2] };
-			const vec symmetry_generated_pos = apply_symmetry(original_pos, sym_op);
-			// Check if the symmetry operation leads to a special position for this atom (rule 3 and 4)
-			if (!atom.grown && will_be_deleted && check_special(original_pos, symmetry_generated_pos, 1e-4)) {
-				atom.cryst_mult -= 1;
-				for (int equal_atom_idx = 0; equal_atom_idx < asym_atoms.size(); equal_atom_idx++) {
-					if (asym_atoms[equal_atom_idx].grown_from == atom_idx) {
-						asym_atoms[equal_atom_idx].cryst_mult -= 1;
-					}
-				}
-				continue;
-			}
-			// Check if this symmetry operation maps the grown atom back onto its parent (rule 1 and 2); for operations that are not their own
-			// inverse (3-, 4- and 6-fold axes) this differs from grown_by, and it is the hits landing on the parent that are counted here
-			bool maps_back_by_this = std::find(atom.maps_to_parent.begin(), atom.maps_to_parent.end(), sym_op) != atom.maps_to_parent.end();
-			if (maps_back_by_this) {
-				// Check if the symmetry operation is NOT fully applied (rule 2) and will thus be kept
-				if (!will_be_deleted) {
-					atom.cryst_mult += 1;
-					asym_atoms[atom.grown_from].cryst_mult += 1;
-					for (int equal_atom_idx = 0; equal_atom_idx < asym_atoms.size(); equal_atom_idx++) {
-						if (equal_atom_idx == atom_idx || equal_atom_idx == atom.grown_from) {
-							continue;
-						}
-						if (asym_atoms[equal_atom_idx].grown_from == atom.grown_from) {
-							asym_atoms[equal_atom_idx].cryst_mult += 1;
-						}
-					}
-				}
-			}
-		}
-	}
-
 }
 
 void cell::asym_unit_cryst_mult(std::vector<asym_atom>& asym_atoms) {
@@ -383,7 +318,7 @@ void cell::asym_unit_cryst_mult(std::vector<asym_atom>& asym_atoms) {
 	}
 }
 
-void cell::project_into_subgroup(ivec& applied_symmetry, hkl_list& hkl_enlarged, const hkl_list& hkl, std::vector<asym_atom>& asym_atoms) {
+void cell::project_into_subgroup(ivec& applied_symmetry, hkl_list& hkl_enlarged, const hkl_list& hkl) {
 	const int num_sym_ops = static_cast<int>(sym[0][0].size());
 	int e = 0, inv = -1;
 	while (!check_identity(e)) e++;
@@ -429,7 +364,6 @@ void cell::project_into_subgroup(ivec& applied_symmetry, hkl_list& hkl_enlarged,
 		if (!kept[sym_op]) {
 			applied_symmetry.push_back(sym_op);
 		}
-	adjust_sym_facts(applied_symmetry, asym_atoms);
 	for (const int sym_op : std::views::reverse(applied_symmetry)) {
 		for (ivec2& middle : sym) {
 			for (ivec& inner : middle) {
@@ -675,11 +609,64 @@ ivec2 cell::remove_inv_vectors(const hkl_list& hkl_enlarged, hkl_list& inversion
 ivec cell::apply_grown(const hkl_list& hkl, hkl_list& hkl_enlarged, std::vector<asym_atom>& asym_atoms) {
 	// Check which symmetry operations are fully applied to the asymmetric unit, ONLY those can be deleted
 	ivec applied_symmetry = confirm_applied_symmetry(asym_atoms);
-	// Adjust the symmetry factor of each atom according to the applied symmetry operations (this makes my head hurt)
-	// This is done inside project_into_subgroup now because of funny symmetry reasons (redundant symmetry operations also have to be considered and these are only generated in the projection function)
-	project_into_subgroup(applied_symmetry, hkl_enlarged, hkl, asym_atoms);
+	const int operations_before_deletion = static_cast<int>(sym[0][0].size());
+	project_into_subgroup(applied_symmetry, hkl_enlarged, hkl);
+	set_sym_fact_from_position_counts(asym_atoms, operations_before_deletion);
 	return applied_symmetry;
 	// closing function
+}
+
+// The structure factor is right if the sym_facts of all atoms a kept operation puts on a position add up to 1 there
+void cell::set_sym_fact_from_position_counts(std::vector<asym_atom>& asym_atoms, const int operations_before_deletion) {
+	const int kept_operations = static_cast<int>(sym[0][0].size());
+	for (int parent_idx = 0; parent_idx < asym_atoms.size(); parent_idx++) {
+		if (asym_atoms[parent_idx].grown) {
+			continue;
+		}
+		// An asymmetric atom and the atoms grown from it are the only atoms that can land on each other's positions
+		ivec family = { parent_idx };
+		for (int atom_idx = 0; atom_idx < asym_atoms.size(); atom_idx++) {
+			if (asym_atoms[atom_idx].grown && asym_atoms[atom_idx].grown_from == parent_idx) {
+				family.push_back(atom_idx);
+			}
+		}
+		// Every distinct position a family member is put on, and how often each member lands there
+		vec2 positions;
+		ivec2 landings_per_position;
+		for (int member = 0; member < family.size(); member++) {
+			const asym_atom& atom = asym_atoms[family[member]];
+			for (int sym_op = 0; sym_op < kept_operations; sym_op++) {
+				const vec image = apply_symmetry({ atom.frac_pos[0], atom.frac_pos[1], atom.frac_pos[2] }, sym_op);
+				int position_idx = 0;
+				while (position_idx < positions.size() && !check_special(positions[position_idx], image, 1e-2)) {
+					position_idx++;
+				}
+				if (position_idx == positions.size()) {
+					positions.push_back(image);
+					landings_per_position.push_back(ivec(family.size(), 0));
+				}
+				landings_per_position[position_idx][member]++;
+			}
+		}
+		// All operations together put the asymmetric atom on (all operations / operations leaving it in place) positions
+		err_checkf(positions.size() * asym_atoms[parent_idx].cryst_mult == operations_before_deletion,
+			"The kept symmetry operations do not reach every position of atom " + asym_atoms[parent_idx].label, std::cout);
+		// One condition per position: the weights of all members landing there add up to 1
+		Eigen::MatrixXd landing_counts(positions.size(), family.size());
+		for (int position_idx = 0; position_idx < positions.size(); position_idx++) {
+			for (int member = 0; member < family.size(); member++) {
+				landing_counts(position_idx, member) = landings_per_position[position_idx][member];
+			}
+		}
+		const Eigen::VectorXd one_per_position = Eigen::VectorXd::Ones(positions.size());
+		// When several weightings fulfil the conditions, the minimum norm solution shares the weight evenly between members
+		const Eigen::VectorXd weights = landing_counts.completeOrthogonalDecomposition().solve(one_per_position);
+		const double largest_deviation = (landing_counts * weights - one_per_position).cwiseAbs().maxCoeff();
+		err_checkf(largest_deviation < 1e-8, "No sym_facts count every position of atom " + asym_atoms[parent_idx].label + " exactly once under the kept symmetry operations", std::cout);
+		for (int member = 0; member < family.size(); member++) {
+			asym_atoms[family[member]].sym_fact = weights[member];
+		}
+	}
 }
 
 int cell::equal_to_concatenation(const int op_a, const int op_b) {
