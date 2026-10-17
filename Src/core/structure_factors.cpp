@@ -70,10 +70,6 @@ structure_factors::structure_factors(options& opt_in) {
 			// Third step of the symmetry resolution: Modify the symmetry factors for the grown atoms, leave ungrown atoms untouched, set the symmetry operation that generated the grown atom from its asymmetric parent (grown_by and grown_from)
 			unit_cell.resolve_internal_symmetry(asym_atoms);
 		}
-		/*Generate the symmetry linking list
-		The linking list is ordered like this: Asymmetric atom, list with all atoms, then index of symmetry operation that generated it
-		"diagonal elements" have to have size equivalent to multiplicity, otherwise something broke */
-		//unit_cell.eval_symm(asym_atoms, model_data.ncen, symmetry_linking_list);
 		model_data.ncen = asym_atoms.size();
 		if (opt_in.xcw_settings.grown) {
 			// Fourth step of the symmetry resolution: Copy U_iso, the dispersion and the ADPs of each grown atom's parent, the ADPs rotated onto the symmetry generated atoms

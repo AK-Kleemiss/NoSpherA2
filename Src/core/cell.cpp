@@ -469,24 +469,29 @@ ivec cell::choose_kept_operations(const std::vector<asym_atom>& asym_atoms, cons
 	int identity = 0;
 	while (!check_identity(identity)) identity++;
 	ivec2 product(num_sym_ops, ivec(num_sym_ops));
-	for (int first = 0; first < num_sym_ops; first++)
-		for (int second = 0; second < num_sym_ops; second++)
+	for (int first = 0; first < num_sym_ops; first++) {
+		for (int second = 0; second < num_sym_ops; second++) {
 			product[first][second] = equal_to_concatenation(first, second);
+		}
+	}
 	// Operations with equal or opposite rotations share one k-point after inversion screening: one class, the cost is the number of classes
 	ivec rotation_class(num_sym_ops, -1), rotation_sign(num_sym_ops, 1);
 	int num_classes = 0;
 	for (int op = 0; op < num_sym_ops; op++) {
-		for (int earlier = 0; earlier < op && rotation_class[op] < 0; earlier++)
+		for (int earlier = 0; earlier < op && rotation_class[op] < 0; earlier++) {
 			for (int sign = -1; sign <= 1 && rotation_class[op] < 0; sign += 2) {
 				bool same = true;
-				for (int row = 0; row < 3 && same; row++)
-					for (int column = 0; column < 3 && same; column++)
-						same = sym[row][column][op] == sign * sym[row][column][earlier];
+				for (int i = 0; i < 3 && same; i++) {
+					for (int j = 0; j < 3 && same; j++) {
+						same = sym[i][j][op] == sign * sym[i][j][earlier];
+					}
+				}
 				if (same) {
 					rotation_class[op] = rotation_class[earlier];
 					rotation_sign[op] = sign * rotation_sign[earlier];
 				}
 			}
+		}
 		if (rotation_class[op] < 0) rotation_class[op] = num_classes++;
 	}
 	err_checkf(num_classes <= 32, "More than 32 rotation classes in the symmetry operations", std::cout);
@@ -507,13 +512,13 @@ ivec cell::choose_kept_operations(const std::vector<asym_atom>& asym_atoms, cons
 		return partners;
 		};
 	// Per family (an asymmetric atom and the atoms grown from it), which operations put each member on a member
-	std::vector<std::vector<bvec>> lands_in_model;
+	bvec3 lands_in_model;
 	for (int parent = 0; parent < asym_atoms.size(); parent++) {
 		if (asym_atoms[parent].grown) continue;
 		ivec family = { parent };
 		for (int atom = 0; atom < asym_atoms.size(); atom++)
 			if (asym_atoms[atom].grown && asym_atoms[atom].grown_from == parent) family.push_back(atom);
-		std::vector<bvec> member_lands(family.size(), bvec(num_sym_ops, false));
+		bvec2 member_lands(family.size(), bvec(num_sym_ops, false));
 		for (int member = 0; member < family.size(); member++)
 			for (int op = 0; op < num_sym_ops; op++) {
 				const vec image = apply_symmetry({ asym_atoms[family[member]].frac_pos[0], asym_atoms[family[member]].frac_pos[1], asym_atoms[family[member]].frac_pos[2] }, op);
