@@ -270,6 +270,11 @@ Key core modules live in `Src/core`:
 
 ## Current Validation Notes
 
+As of 2026-10-17 (later), grown XCW models choose their kept operations as K = D.L for nested subgroups L inside H
+(`cell::choose_kept_operations`, replacing `project_into_subgroup`), which always admits per-position weights and keeps
+the fewest I tensor k-points; `ctest` on a CPU-only `release-windows` build (`build/release-windows-cpu`) reports
+**1269 passed, 0 failed, 22 skipped** (2 disabled) of 1293. See `UNIT_TESTS_STATUS.md`.
+
 As of 2026-10-17, grown XCW models delete every fully applied symmetry operation and solve the sym_facts so that every
 position the kept operations reach is counted once (`cell::set_sym_fact_from_position_counts`); `ctest --preset release-linux`
 reports **1267 passed, 0 failed, 22 skipped** (2 disabled) of 1289. See `UNIT_TESTS_STATUS.md`.
