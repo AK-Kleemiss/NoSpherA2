@@ -309,6 +309,10 @@ alternative is one flag away in each case.
 
 ## Current Validation Notes
 
+As of 2026-10-17, grown XCW models delete every fully applied symmetry operation and solve the sym_facts so that every
+position the kept operations reach is counted once (`cell::set_sym_fact_from_position_counts`); `ctest --preset release-linux`
+reports **1267 passed, 0 failed, 22 skipped** (2 disabled) of 1289. See `UNIT_TESTS_STATUS.md`.
+
 As of 2026-10-15, `-anom_disp` is gone: XCW reads positions, U_iso, ADPs and the anomalous dispersion from the CIF
 through XCW_refactor's `read_CIF`, and the P1 XCW cases run on `P1_test.cif`, reproducing XCW_refactor's goldens. `ctest --preset release-linux`
 reports **1266 passed, 0 failed, 22 skipped** (2 disabled) of 1288. See `UNIT_TESTS_STATUS.md`.

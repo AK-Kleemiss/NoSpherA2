@@ -396,9 +396,7 @@ namespace NoSpherA2UnitTests
 			cl.grow_asym_atoms(asym, xyz);
 			cl.resolve_internal_symmetry(asym);
 			hkl_list hkl = { { 1, 0, 0 } }, enlarged;
-			const ivec applied = cl.apply_grown(hkl, enlarged, asym);
-			cl.set_sym_fact_from_mult(asym);
-			return applied;
+			return cl.apply_grown(hkl, enlarged, asym);
 		}
 
 		cell p1bar_cell()
@@ -507,6 +505,33 @@ namespace NoSpherA2UnitTests
 			make_xyz(cl, "c2", 6, 0.07, 0.4, 0.1), make_xyz(cl, "c3", 6, -0.07, 0.6, 0.1) };
 		grow_and_project(cl, asym, xyz);
 		ASSERT_EQ(asym.size(), 10u);
+		EXPECT_LT(cell_coverage_error(sym0, trans0, cl, asym), 1e-12);
+	}
+
+	// I-4, C1 grown by 2z and -4: the kept -4^3 makes the -4 image redundant, only weights 1, 1, 0 count every position once
+	TEST(CellMathIoTests, GrownI4barChainGivesTheRedundantImageNoWeight)
+	{
+		const std::filesystem::path p = write_text("i4bar_chain.cif",
+			"data_t\n_cell_length_a 10.0\n_cell_length_b 10.0\n_cell_length_c 11.0\n"
+			"_cell_angle_alpha 90.0\n_cell_angle_beta 90.0\n_cell_angle_gamma 90.0\n_cell_volume 1100.0\n"
+			"loop_\n_space_group_symop_operation_xyz\n"
+			"'x, y, z'\n'-x, -y, z'\n'y, -x, -z'\n'-y, x, -z'\n"
+			"'x+1/2, y+1/2, z+1/2'\n'-x+1/2, -y+1/2, z+1/2'\n'y+1/2, -x+1/2, -z+1/2'\n'-y+1/2, x+1/2, -z+1/2'\n");
+		std::ostringstream log;
+		cell cl(p, log, false, true);
+		std::filesystem::remove(p);
+		const ivec3 sym0 = cl.get_sym();
+		const vec2 trans0 = cl.get_trans();
+		std::vector<asym_atom> asym = { make_asym("C1", 6, { 0.1, 0.2, 0.3 }) };
+		std::vector<asym_atom> xyz = { make_xyz(cl, "c", 6, 0.1, 0.2, 0.3), make_xyz(cl, "c_2z", 6, -0.1, -0.2, 0.3),
+			make_xyz(cl, "c_4bar", 6, 0.2, -0.1, -0.3) };
+		const ivec applied = grow_and_project(cl, asym, xyz);
+		ASSERT_EQ(asym.size(), 3u);
+		EXPECT_EQ(applied, (ivec{ 1, 2, 5, 6 }));
+		EXPECT_EQ(cl.get_trans()[0].size(), 4u);
+		EXPECT_NEAR(asym[0].sym_fact, 1.0, 1e-12);
+		EXPECT_NEAR(asym[1].sym_fact, 1.0, 1e-12);
+		EXPECT_NEAR(asym[2].sym_fact, 0.0, 1e-12);
 		EXPECT_LT(cell_coverage_error(sym0, trans0, cl, asym), 1e-12);
 	}
 

@@ -55,12 +55,13 @@ void XCW::construct(const options& opt_in) {
 		asym_atoms[at].anom = asym_atoms[parent].anom;
 		cif_ADPs[at] = cif_ADPs[parent];
 	}
-	// A grown structure keeps the operations it does not apply explicitly, the multiplicities adjusted to match
+	// A grown structure keeps the operations it does not apply explicitly and weighs its atoms to match
 	ivec applied_symmetry;
 	original_rotations = unit_cell.get_sym();
 	if (settings.grown)
 		applied_symmetry = unit_cell.apply_grown(hkl, hkl_enlarged, asym_atoms);
-	unit_cell.set_sym_fact_from_mult(asym_atoms);
+	else
+		unit_cell.set_sym_fact_from_mult(asym_atoms);
 
 	if (tuning("NOSPHERA2_DEBUG_ASYMFACT")) {
 		std::cerr << "applied_symmetry (deleted):";
