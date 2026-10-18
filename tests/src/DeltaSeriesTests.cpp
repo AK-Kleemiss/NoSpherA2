@@ -243,3 +243,70 @@ TEST(DeltaSeriesTests, ChargeBeyondTheTabulatedRangeFallsBack)
 	EXPECT_TRUE(a.is_extrapolating());
 	EXPECT_NEAR(a.get_form_factor(kNearZero), 26.0 - 4.5, kCountTol);
 }
+
+// Ba-Lr come from the DKH2 tables (GTO_ion_delta_coefs.h), the neutral included; the r and s
+// tables must describe the same atom and count Z - q between the tabulated states
+TEST(DeltaSeriesTests, HeavyElementsUseTheRelativisticTables)
+{
+	for (const int Z : {79 /*Au*/, 92 /*U*/})
+	{
+		for (const double q : {0.0, 0.5, 1.5, 3.0})
+		{
+			const HE_Spherical_Atom a(Z, q);
+			ASSERT_TRUE(a.uses_gto_tables()) << "Z=" << Z << " q=" << q;
+			EXPECT_FALSE(a.is_extrapolating()) << "Z=" << Z << " q=" << q;
+			EXPECT_NEAR(a.get_form_factor(kNearZero), Z - q, kCountTol) << "Z=" << Z << " q=" << q;
+			EXPECT_NEAR(integrate_density(a), Z - q, 5e-3) << "Z=" << Z << " q=" << q;
+			EXPECT_GE(a.most_negative_density(), -1e-4) << "Z=" << Z << " q=" << q;
+		}
+	}
+}
+
+// Every tabulated element, not just Au and U: a bad generated table shows up as a wrong count or a
+// negative density. Bound anions lose up to 0.014 e beyond the 25 bohr table edge (Pu-), hence 2e-2.
+TEST(DeltaSeriesTests, EveryRelativisticTableCountsItsElectrons)
+{
+	for (int Z = 37; Z <= 103; Z++)
+	{
+		for (const double q : {-0.5, 0.0, 1.5, 3.0, 4.0})
+		{
+			if (!HE_Spherical_Atom::ion_available(Z, q))
+				continue;
+			const HE_Spherical_Atom a(Z, q);
+			EXPECT_NEAR(a.get_form_factor(kNearZero), Z - q, kCountTol) << "Z=" << Z << " q=" << q;
+			if (!a.uses_gto_tables())   // an anion DKH2 did not bind keeps its Slater anion (Rb-, Mo-)
+			{
+				EXPECT_LT(q, 0.0) << "Z=" << Z;
+				continue;
+			}
+			if (!a.is_extrapolating())   // a chain that stops below q extrapolates, and that may dip
+				EXPECT_GE(a.most_negative_density(), -1e-4) << "Z=" << Z << " q=" << q;
+			if (q <= 0.0)
+				EXPECT_NEAR(integrate_density(a), Z - q, q < 0 ? 2e-2 : 5e-3) << "Z=" << Z << " q=" << q;
+		}
+	}
+}
+
+// The fill never strips core: an EEQ overshoot stops at the empty valence shell
+TEST(DeltaSeriesTests, FillChargeStopsAtTheEmptyValenceShell)
+{
+	EXPECT_DOUBLE_EQ(HE_Spherical_Atom::carried_charge(92, 9.2), 6.0);   // U  5f3 6d1 7s2
+	EXPECT_DOUBLE_EQ(HE_Spherical_Atom::carried_charge(82, 5.0), 4.0);   // Pb past 4f14 5d10
+	EXPECT_DOUBLE_EQ(HE_Spherical_Atom::carried_charge(71, 4.0), 3.0);   // Lu past 4f14
+	EXPECT_DOUBLE_EQ(HE_Spherical_Atom::carried_charge(31, 3.5), 3.0);   // Ga past 3d10
+	EXPECT_DOUBLE_EQ(HE_Spherical_Atom::carried_charge(26, 4.5), 4.5);   // Fe, within 3d6 4s2
+	EXPECT_DOUBLE_EQ(HE_Spherical_Atom::carried_charge(92, 2.5), 2.5);
+}
+
+// Up to Kr the Slater delta series reaches +3, so those stay; from Rb on DKH2 (z_min = 37).
+// An anion DKH2 did not bind keeps its Slater anion instead of dropping the charge.
+TEST(DeltaSeriesTests, LighterElementsKeepTheirTables)
+{
+	for (const int Z : {26, 36})
+		EXPECT_FALSE(HE_Spherical_Atom(Z, 1.5).uses_gto_tables()) << "Z=" << Z;
+	EXPECT_TRUE(HE_Spherical_Atom(42, 3.0).uses_gto_tables());   // Mo3+, extrapolated from +1 before
+	const HE_Spherical_Atom rb(37, -0.5);                          // Rb-: Slater only
+	EXPECT_FALSE(rb.uses_gto_tables());
+	EXPECT_TRUE(HE_Spherical_Atom::ion_available(37, -0.5));
+	EXPECT_NEAR(rb.get_form_factor(kNearZero), 37.5, kCountTol);
+}

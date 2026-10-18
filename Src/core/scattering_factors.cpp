@@ -2770,7 +2770,7 @@ std::vector<HE_Spherical_Atom> make_he_evaluators(const salted_part_prep& sph,
 	std::vector<HE_Spherical_Atom> out;
 	out.reserve(sph.asym_atom_list.size());
 	int n_charged = 0, n_extrap = 0, n_nofit = 0, n_delta = 0;
-	double worst_neg = 0.0;
+	double worst_neg = 0.0, q_min = 1e300, q_max = -1e300;
 	for (size_t a = 0; a < sph.asym_atom_list.size(); a++)
 	{
 		const int idx = sph.asym_atom_list[a];
@@ -2787,7 +2787,7 @@ std::vector<HE_Spherical_Atom> make_he_evaluators(const salted_part_prep& sph,
 			}
 			if (d < best) { best = d; q = e[3]; }
 		}
-		if (std::abs(q) > 1e-6) n_charged++;
+		if (std::abs(q) > 1e-6) { n_charged++; q_min = std::min(q_min, q); q_max = std::max(q_max, q); }
 		else if (!opt.spherical_fill_charges.empty()) n_nofit++;
 		out.emplace_back(Z, q);
 		if (out.back().is_extrapolating()) n_extrap++;
@@ -2797,11 +2797,11 @@ std::vector<HE_Spherical_Atom> make_he_evaluators(const salted_part_prep& sph,
 	if (n_charged)
 	{
 		file << "Spherical fill: " << n_charged << " of " << out.size()
-			 << " atom(s) given a fractional charge";
+			 << " atom(s) given a fractional charge (" << q_min << " to " << q_max << ")";
 		if (n_delta)
 			file << ", " << n_delta << " past +1 via the delta_k series (interpolated between bound states)";
 		if (n_extrap)
-			file << ", " << n_extrap << " beyond the tabulated +/-1 ion (shape extrapolated)";
+			file << ", " << n_extrap << " beyond the tabulated ions (shape extrapolated)";
 		file << "." << std::endl;
 		if (worst_neg < -1e-8)
 			file << "      most negative density from the blend: " << worst_neg

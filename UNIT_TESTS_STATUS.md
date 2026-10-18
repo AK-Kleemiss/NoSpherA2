@@ -7,6 +7,20 @@
 **2026-10-15 XCW reads the anomalous dispersion from the CIF; the P1 cases run on XCW_refactor's input:** `-anom_disp` is gone (option, `options::anom_disp_path`, `XCW::parse_anom_atoms`). `XCW::construct` reads the atom list with XCW_refactor's `read_CIF` (`convenience.cpp`), which takes f' and f'' per type from `_atom_type_scat_dispersion_real/imag` and per site from `_atom_site_dispersion_*`; a grown atom takes its parent's. U_iso, U_ij and the Gram-Charlier C and D come from `read_CIF` too, as on XCW_refactor, instead of `read_U_iso_from_CIF` / `read_fracs_ADPs_from_CIF` (which parsed U_ij in single precision), so `construct` no longer writes `log3.txt` and `XcwHaltingReportTests.GrownConstructUsesTheXyzAtoms` no longer expects it. Every P1 case (`tests.toml`, `XcwScfTests`, `XcwTests`, `ExtinctionTests`, `XcwHaltingReportTests`, `Windows/Tests` `P1_XWR`, `scripts/stress_itensor_gpu.ps1`) runs on `P1_test.cif` instead of `P1_test_NA2.cif` + `anom_disp.txt` (deleted); `XcwScfTests` `golden_energy` is -1961.925585145. The P1 goldens were regenerated and print XCW_refactor's numbers to the last digit, screening lines included (1802 pairs, 33.64 %); only the line order and the log name (`XCW.log`) differ. `P1_test_XCW_gpu_itensor.good` is the CPU run of its input (`-no_gpu`), not yet checked on a device. New: `ConvenienceCoverageCifTests.ReadCifAssignsLabelsTypesPositionsAndUiso`, `ReadCifReadsUijCijkDijklByLabel`, `ReadCifReadsDispersionByTypeAndBySite`, `ReadCifThrowsForUnknownAnisoLabel`, from XCW_refactor. `ctest --preset release-linux`: 1288 run, 1266 passed, 0 failed, 22 skipped (2 disabled); the four `full` P1 goldens pass with `RUN_FULL_TEST=1`.
 
 **2026-10-14 XCW: XCW_refactor's symmetry handling, inversion screening and AO pair screen; `slow_conv` from lambda = 0:** `cell.cpp`/`cell.h` are XCW_refactor's (`cryst_mult`/`sym_fact`, `grown_by`/`grown_from`, `resolve_internal_symmetry`, `apply_grown` with `adjust_sym_facts`), plus one check of ours: an operation leaves the sum only if it maps the whole model onto itself. The grown-structure cell tests no longer specify an implementation; they check that the kept operations, weighted by `sym_fact`, count every site of the cell once (`CellMathIoTests.GrownStructureLinksInversionImage`, `PartiallyGrownStructureKeepsTheInversion`, `UngrownSpecialPositionWeighsByItsStabiliser`, `GrownSaltOnDifferentSitesWeighsByOrbit`, and `GrownP21cClustersCountEverySiteOnce` for the five P21/c clusters that were `#if 0` - its screw-plus-inversion case failed before that check). The I tensor integrates one entry of every h/-h pair (`-tune NOSPHERA2_NO_INVERSION_SCREENING` turns it off); the AO pair screen is XCW_refactor's distance bound, so `XcwPairBoundTests` left with the m-resolved bound. P1 goldens: only the screening lines (1798 pairs, 33.57 %; 8004222 grids subset, 64013865 full) and the shared tensor's size (10.9124 MB). `XcwScfTests.SlowConvStartsFromTheNormalSchedule` became `SlowConvDampsFromTheFirstStep`: the lambda = 0 step reaches the golden energy with slow damping too. `ctest --preset release-linux`: 1284 run, 1262 passed, 0 failed, 22 skipped (2 disabled).
+**2026-10-14 Visual Studio solution removed, CMake-only build:** The `Windows/` solution, its
+`Tests` project (the VS/DLL in-process harness), `scripts/SetupVSEnvironment.cmake`,
+`scripts/check_vcxproj.py`, the CI vcxproj-check step and `coverage.runsettings` are gone;
+CMake presets are the only build system and `.vscode/` carries the IDE setup for Windows, Linux
+and macOS. The app icon resources moved from `Windows/NoSpherA2/` to `app/resources/`,
+`cmake/InstallDependenciesOnly.cmake` shrank to `cmake/DependenciesOnly.cmake` (its install rules
+only fed the VS props sheets), and every preset now exports `compile_commands.json`. The VS-only
+`GeometryTests`/`NumericTests` were dropped, not ported: `tests/src/ConvenienceTests.cpp` and
+`tests/src/MathFunctionTests.cpp` cover the same functions. Same-sitting A/B on one Windows
+machine, `ctest --preset release-windows`: before and after the rework, **12 failed of 1279**
+(1281 defined, 2 disabled) with the *identical* failing set, all twelve being this machine's
+temp-file locking (`remove: The process cannot access the file ...` on `%TEMP%` files, an
+antivirus/indexer artefact), so the rework changed no test behavior. The Linux baseline remains
+the 2026-10-13 note below.
 
 **2026-10-14 The mirror-structure fixes are the default (`-nrt_no_mirror` restores the old behaviour):** The default output now equals what `-nrt_mirror` gave (41 of 41 v2 molecules identical), and `-nrt_no_mirror` equals the previous default (41 of 41); `-nrt_mirror` is still accepted. The allyl tests no longer set the option. `ctest --preset release-linux`: 1283 run, 0 failed, 22 skipped (2 disabled).
 
@@ -855,12 +869,15 @@ baseline remains **201/201 ctest passing**.
 
 | Harness | How to run | Notes |
 |---------|-----------|-------|
+| ctest / gtest | `ctest --preset <preset>` (configure with `-DNOSPHERA2_BUILD_TESTS=ON`) | Unit tests plus `TomlIntegrationTests` golden-file cases |
 | Python pytest | `uv run pytest` | Golden-file diffs vs `.good` files |
-| Windows VS Tests | `msbuild Windows\Tests\Tests.vcxproj` + `vstest.console.exe` | In-process via `NoSpherA2_DLL.dll`; same golden files |
+
+The Windows VS Tests harness (`Windows/Tests`, in-process via `NoSpherA2_DLL.dll`) was removed with
+the Visual Studio solution in October 2026; mentions of it below are history.
 
 Environment variables:
 - `NOS_EXE` — path to exe (pytest only; default: `NoSpherA2` on PATH)
-- `OCC_DATA_PATH` — path to OCC data share (`Lib/occ/share/occ` for VS tests, injected by TestRunner.h)
+- `OCC_DATA_PATH` — path to OCC data share
 - `RUN_FULL_TEST` — set to any truthy value to include slow/full tests
 
 ---
@@ -884,11 +901,12 @@ tests presently failing because of the spline change.
 
 ---
 
-## VS-Only Unit Tests (no `tests/tests.toml` counterpart)
+## VS-Only Unit Tests (removed October 2026 with the VS solution)
 
-These tests live in `Windows/Tests/UnitTests.cpp` and exercise individual Src/ functions
-via a thin C-shim exported from `NoSpherA2_DLL.dll` (`NoSpherA2_DLL/unit_test_api.h/.cpp`).
-They do NOT need a pytest counterpart and must NOT be added to `tests/tests.toml`.
+These tests lived in `Windows/Tests/UnitTests.cpp` and exercised individual Src/ functions
+via a thin C-shim exported from `NoSpherA2_DLL.dll`. The same functions are covered by the
+gtest suite (`tests/src/ConvenienceTests.cpp`, `tests/src/MathFunctionTests.cpp`), which is
+why they were dropped rather than ported. Kept as history:
 
 | Class | Methods | Coverage | Status |
 |-------|---------|----------|--------|
@@ -909,7 +927,7 @@ Added: 2026-06-14.
 
 ---
 
-## Tests Registered in `tests/tests.toml` and `Windows/Tests/Tests.cpp`
+## Tests Registered in `tests/tests.toml`
 
 | Test name | Directory | Good file | Full? | Status |
 |-----------|-----------|-----------|-------|--------|
@@ -971,7 +989,7 @@ files generated before they can be registered.
 | BasisSetConverter | auxiliary_basis.hpp | header only, no runtime test |
 
 **To add a new test**: generate a `.good` reference file from a known-good run, add an entry to
-`tests/tests.toml`, and add a `TEST_METHOD` to `Windows/Tests/Tests.cpp`.
+`tests/tests.toml`, and add a matching case to `tests/src` where ctest should cover it.
 
 ---
 
@@ -1278,9 +1296,8 @@ See also the rule in `CLAUDE.md` → *Agent / AI coding-assistant rules*.
    capturing stdout: `NoSpherA2 [args] > tests/<dir>/<name>.good`
 2. **Register in `tests/tests.toml`** — add a `[test_name]` section with `directory`, optional
    `good` (if not `<name>.good`), optional `actual` (if output is not the log), and `[test_name.args]`
-3. **Register in `Windows/Tests/Tests.cpp`** — add a `TEST_METHOD(<name>)` block calling `RunTest`
-   with matching args (always append `-all_charges` and `-no_date`)
-4. **Validate** in all four configurations: pytest Release, pytest Debug, VS Debug, VS Release
+3. **Register in `tests/src`** where ctest should cover it (the `TomlIntegrationTests` pattern)
+4. **Validate** with `ctest --preset <preset>` (Release and, where it matters, Debug) and `uv run pytest`
 5. **Update this file** — mark the test as passing or note blockers
 
 ## 2026-10-08 — Unified RI multipole restraints

@@ -61,27 +61,12 @@ build*
 #build* is meant for build DIRECTORIES; this driver is a script and has to stay in git
 !tests/nbo_reference_v2/build_nboref.sh
 deps-install-*
-#Escape build directory for Windows
-/Windows/NoSpherA2**/Debug*
-/Windows/NoSpherA2**/Release*
-/Windows/Test**/Debug*
-/Windows/Test**/Release*
 
 #Libs
 Lib/*
 
 #Folders created by IDEs
 /.vs
-/Windows/NoSpherA2/.vs
-/Windows/Windows_cuda/.vs
-/Windows/**/*.pdb
-/Windows/**/*.idb
-/Windows/**/*.tlog
-/Windows/**/*.recipe
-/Windows/**/*.pch
-/Windows/**/*.lib
-/Windows/NoSpherA2**/Profile*
-/Windows/Test**/Profile*
 *.iobj
 *.ipdb
 *.ilk
@@ -91,9 +76,6 @@ Lib/*
 *_fukui.dat
 *_fukui.vmd
 
-# MSBuild leftovers. The existing /Windows/Test**/Release* rule does not reach
-# Windows/Tests/x64/Release: ** inside a path segment matches one segment only.
-/Windows/**/x64/
 
 # XCW on-disk tensor cache, written and read back by Src/core/XCW.cpp. Multi-GB.
 I_tensor
@@ -138,3 +120,5 @@ tests/partition/converted.wfn
 tests/partition/converted.wfx
 tests/partition/occupied.wfn
 tests/SALTED/SALTED_COEFS.npy
+tests/P1_test/NA2_*
+tests/isosurface/Hirshfeld_surface_i.obj.stage1

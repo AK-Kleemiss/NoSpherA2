@@ -74,9 +74,7 @@ name in `Src/core/hip_runtime_shim.cpp`, which defines every `hip*` entry the ke
 (`NOSPHERA2_HIP_RUNTIME=<file>` names one explicitly) and answers `hipErrorNoDevice` when there is
 none - the shim rather than delay-loading because clang registers the kernels with the runtime from
 static initialisers before `main()`, where nothing else can intercept. The CMake HIP language would
-link `libamdhip64` on its own; `CMAKE_HIP_RUNTIME_LIBRARY NONE` in `CMakeLists.txt` stops it. The
-Visual Studio solution does the same through `Windows/Windows_utils/NoSpherA2_gpu.props`: a machine
-with `CUDA_PATH` and `HIP_PATH` gets the fat build.
+link `libamdhip64` on its own; `CMAKE_HIP_RUNTIME_LIBRARY NONE` in `CMakeLists.txt` stops it.
 
 CI builds that fat binary for Linux and Windows on GPU-less runners (`Linux GPU Release`, `Windows
 GPU Release` in `.github/workflows/c-cpp_all.yml`, artifacts `NoSpherA2-linux-x86_64-gpu` and
@@ -119,23 +117,7 @@ Useful environment variables:
 
 Tests are golden-file comparisons: the harness runs NoSpherA2 with args from `tests/tests.toml`, captures stdout, and diffs against `.good` reference files in each test subdirectory.
 
-### Windows Visual Studio Tests
-
-The CMake flow is the default for new validation. The legacy Visual Studio solution and test project still exist under `Windows/` and remain useful for Windows/OCC integration debugging:
-
-```ps
-msbuild Windows\Tests\Tests.vcxproj /m /p:Configuration=Release /p:Platform=x64 /p:SolutionDir=D:\git\NoSpherA2\Windows\
-vstest.console.exe Windows\Tests\Release_x64\Tests.exe /Platform:x64
-```
-
-Visual Studio tests must run in-process through `NoSpherA2_DLL.dll`; do not add subprocess fallbacks for failing VS tests, including `alanine_integrated_occ`. If all tests complete in under a second, the test binary or working directory is probably wrong.
-
-The VS solution's `NoSpherA2`/`NoSpherA2_LIB` projects use a shared `OutDir`
-(`Windows\Windows_utils\NoSpherA2_universal.props`) that writes into the same top-level `build/`
-tree the CMake presets use, but under `build\$(Configuration)_$(Platform)\` (e.g.
-`build\Release_x64\NoSpherA2.exe`) rather than the CMake preset's
-`build\release-windows\bin\NoSpherA2.exe`. `Windows\Tests\Tests.vcxproj` was not repointed and
-still builds to its own `Windows\Tests\$(Configuration)_$(Platform)\`.
+Tests that are documented as in-process (e.g. `alanine_integrated_occ`) must stay in-process in the gtest binary; do not add subprocess fallbacks for failing tests. The Visual Studio solution and its test project were removed in October 2026; CMake/Ninja is the only build system, and `.vscode/` carries the IDE setup for Windows, Linux and macOS.
 
 ## Adding or Changing Tests
 
@@ -157,7 +139,7 @@ CLI args are always under `<testname>.args`; the test framework passes these as 
 
 When touching tests:
 
-- Keep `tests/tests.toml`, `tests/src`, and `Windows/Tests/Tests.cpp` in sync where the same behavior is covered by more than one harness.
+- Keep `tests/tests.toml` and `tests/src` in sync where the same behavior is covered by more than one harness.
 - Update `UNIT_TESTS_STATUS.md` whenever adding, removing, modifying, or investigating tests.
 - Update the validation-status block in this file and `CLAUDE.md` if the overall validated pass count changes.
 
@@ -210,8 +192,7 @@ featomic/            Rust/C++ submodule for ML feature generation via metatensor
 libcint/             C submodule for electron integral evaluation
 mdspan/              C++ multidimensional-array reference implementation
 cmake/               Project CMake modules
-scripts/             Micromamba/bootstrap/Visual Studio helper scripts
-Windows/             Legacy Visual Studio solution/projects and Windows test harness
+scripts/             Micromamba/bootstrap/GPU-toolkit helper scripts
 Linux/               Linux packaging/build helper scripts
 ```
 
@@ -326,6 +307,11 @@ As of 2026-10-14, `Src/core/XCW.cpp` runs on XCW_refactor's symmetry handling (`
 screening of the I tensor and its AO pair screen, and `slow_conv` damps the lambda = 0 step too;
 `ctest --preset release-linux` reports **1262 passed, 0 failed, 22 skipped** (2 disabled) of 1284. See
 `UNIT_TESTS_STATUS.md`.
+As of 2026-10-14, after the Visual Studio solution's removal (CMake-only build, `.vscode/` IDE
+setup), `ctest --preset release-windows` reports **12 failed of 1279** both before and after the
+rework on the same machine in the same sitting, with the identical failing set — all twelve are
+that machine's temp-file locking on `%TEMP%` (`remove: The process cannot access the file ...`),
+not code failures. The rework changed no test behavior. See `UNIT_TESTS_STATUS.md`.
 
 As of 2026-10-13, after the NRT symmetry fixes, `ctest --preset release-linux` reports **1260 passed, 0 failed,
 22 skipped** (2 disabled) of 1282. New: `NboNativeTests.TheAllylCationsMirrorStructuresWeighAlike`,

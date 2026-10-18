@@ -74,9 +74,7 @@ name in `Src/core/hip_runtime_shim.cpp`, which defines every `hip*` entry the ke
 (`NOSPHERA2_HIP_RUNTIME=<file>` names one explicitly) and answers `hipErrorNoDevice` when there is
 none - the shim rather than delay-loading because clang registers the kernels with the runtime from
 static initialisers before `main()`, where nothing else can intercept. The CMake HIP language would
-link `libamdhip64` on its own; `CMAKE_HIP_RUNTIME_LIBRARY NONE` in `CMakeLists.txt` stops it. The
-Visual Studio solution does the same through `Windows/Windows_utils/NoSpherA2_gpu.props`: a machine
-with `CUDA_PATH` and `HIP_PATH` gets the fat build.
+link `libamdhip64` on its own; `CMAKE_HIP_RUNTIME_LIBRARY NONE` in `CMakeLists.txt` stops it.
 
 CI builds that fat binary for Linux and Windows on GPU-less runners (`Linux GPU Release`, `Windows
 GPU Release` in `.github/workflows/c-cpp_all.yml`, artifacts `NoSpherA2-linux-x86_64-gpu` and
@@ -94,26 +92,9 @@ path and falls back to the CPU at run time when `MTLCreateSystemDefaultDevice()`
 
 For CMake preset builds, run from an x64 Visual Studio Developer PowerShell or initialize the MSVC environment before invoking CMake/Ninja. If Ninja can find `cl.exe` but compilation fails on missing standard headers such as `stdlib.h`, the shell/toolchain environment is incomplete.
 
-The legacy Visual Studio solution still exists for Windows/OCC integration debugging. If using MSBuild from a normal PowerShell session, pass the full `MSBuild.exe` path and preserve `/p:` switches:
-
-```powershell
-$msbuild = "C:\Program Files\Microsoft Visual Studio\18\Community\MSBuild\Current\Bin\amd64\MSBuild.exe"
-$solDir = "D:\git\NoSpherA2\Windows\"
-
-& $msbuild "D:\git\NoSpherA2\Windows\Tests\Tests.vcxproj" `
-    /p:Configuration=Release /p:Platform=x64 "/p:SolutionDir=$solDir" /v:minimal
-```
-
-Do not invoke MSBuild through Bash for this project; Bash can strip leading `/` from `/p:` switches.
-
-The VS solution's `NoSpherA2`/`NoSpherA2_LIB` projects use a shared `OutDir`
-(`Windows\Windows_utils\NoSpherA2_universal.props`) that writes into the same top-level `build/`
-tree the CMake presets use, but under `build\$(Configuration)_$(Platform)\` (e.g.
-`build\Release_x64\NoSpherA2.exe`, `build\Debug_x64\NoSpherA2.exe`) rather than the CMake preset's
-`build\release-windows\bin\NoSpherA2.exe`. Don't confuse the two when picking an executable to
-run — see `update_good_from_pytest_results.py --build {vs,cmake}` for a way to pick one
-explicitly. `Windows\Tests\Tests.vcxproj` was not repointed and still builds to its own
-`Windows\Tests\$(Configuration)_$(Platform)\` (e.g. `Windows\Tests\Release_x64\Tests.exe`).
+The Visual Studio solution was removed in October 2026; CMake/Ninja is the only build system. For
+IDE work on any platform use the VS Code setup in `.vscode/` (CMake Tools with the presets; on
+Windows it sets up the MSVC environment itself via `cmake.useVsDeveloperEnvironment`).
 
 ## Running Tests
 
@@ -144,18 +125,7 @@ Useful environment variables:
 
 Tests are golden-file comparisons: the harness runs NoSpherA2 with args from `tests/tests.toml`, captures stdout, and diffs against `.good` reference files in each test subdirectory.
 
-### Windows Visual Studio Tests
-
-The CMake flow is the default for new validation. The Visual Studio test project remains useful when debugging Windows DLL/OCC behavior:
-
-```powershell
-msbuild Windows\Tests\Tests.vcxproj /m /p:Configuration=Release /p:Platform=x64 /p:SolutionDir=D:\git\NoSpherA2\Windows\
-vstest.console.exe Windows\Tests\Release_x64\Tests.exe /Platform:x64
-```
-
-Visual Studio tests must run in-process through `NoSpherA2_DLL.dll`; do not add subprocess fallbacks for failing VS tests, including `alanine_integrated_occ`. If all tests complete in under a second, the test binary or working directory is probably wrong.
-
-For coverage, keep `coverage.runsettings` aligned with the current DLL/test output layout before trusting the report.
+Tests that are documented as in-process (e.g. `alanine_integrated_occ`) must stay in-process in the gtest binary; do not add subprocess fallbacks for failing tests.
 
 ## Agent Rules
 
@@ -199,7 +169,7 @@ and the measured evidence behind each item.
 
 ### Unit-test documentation is mandatory
 
-Whenever an agent adds, removes, modifies, or investigates a test in `tests/tests.toml`, `tests/src`, `Windows/Tests`, `tests/run_test.py`, `TestRunner.h`, or any `.good` reference file, it must:
+Whenever an agent adds, removes, modifies, or investigates a test in `tests/tests.toml`, `tests/src`, `tests/run_test.py`, or any `.good` reference file, it must:
 
 1. Update `UNIT_TESTS_STATUS.md`.
 2. Update the validation-status block in this file and `AGENTS.md` if the overall pass count changes.
@@ -207,7 +177,7 @@ Whenever an agent adds, removes, modifies, or investigates a test in `tests/test
 
 ### Keep test harnesses aligned
 
-`tests/tests.toml`, `tests/src`, and `Windows/Tests/Tests.cpp` should stay in sync where they cover the same workflows. Check all relevant harnesses when adding or removing tests.
+`tests/tests.toml` and `tests/src` should stay in sync where they cover the same workflows. Check both harnesses when adding or removing tests.
 
 ### Keep the wiki in shape
 
@@ -235,8 +205,7 @@ featomic/            Rust/C++ submodule for ML feature generation via metatensor
 libcint/             C submodule for electron integral evaluation
 mdspan/              C++ multidimensional-array reference implementation
 cmake/               Project CMake modules
-scripts/             Micromamba/bootstrap/Visual Studio helper scripts
-Windows/             Legacy Visual Studio solution/projects and Windows test harness
+scripts/             Micromamba/bootstrap/GPU-toolkit helper scripts
 Linux/               Linux packaging/build helper scripts
 ```
 
@@ -265,7 +234,7 @@ Key core modules live in `Src/core`:
 - Golden-file float parsing must support scientific notation and multi-value lines without weakening existing thresholds.
 - Clone with `--recursive`; if submodules are missing, run `git submodule update --init --recursive`.
 - CI and local runs can differ because CI uses a dependency-only cache flow. Compare `.github/workflows/c-cpp_all.yml` step-by-step when a failure only appears in CI.
-- VS tests are always in-process. Never reintroduce subprocess execution to work around a crash; fix the underlying OCC/libcint/DLL issue instead.
+- In-process tests stay in-process. Never reintroduce subprocess execution to work around a crash; fix the underlying OCC/libcint/DLL issue instead.
 - New libcint parallel call sites should pre-allocate per-thread scratch buffers instead of passing `cache=nullptr` inside TBB parallel regions. Use the existing `three_center_max_cache_size<kind>` and `tbb::enumerable_thread_specific` pattern in OCC.
 
 ## Current Validation Notes
@@ -287,6 +256,11 @@ As of 2026-10-14, `Src/core/XCW.cpp` runs on XCW_refactor's symmetry handling (`
 screening of the I tensor and its AO pair screen, and `slow_conv` damps the lambda = 0 step too;
 `ctest --preset release-linux` reports **1262 passed, 0 failed, 22 skipped** (2 disabled) of 1284. See
 `UNIT_TESTS_STATUS.md`.
+As of 2026-10-14, after the Visual Studio solution's removal (CMake-only build, `.vscode/` IDE
+setup), `ctest --preset release-windows` reports **12 failed of 1279** both before and after the
+rework on the same machine in the same sitting, with the identical failing set — all twelve are
+that machine's temp-file locking on `%TEMP%` (`remove: The process cannot access the file ...`),
+not code failures. The rework changed no test behavior. See `UNIT_TESTS_STATUS.md`.
 
 As of 2026-10-13, after the NRT symmetry fixes, `ctest --preset release-linux` reports **1260 passed, 0 failed,
 22 skipped** (2 disabled) of 1282. New: `NboNativeTests.TheAllylCationsMirrorStructuresWeighAlike`,

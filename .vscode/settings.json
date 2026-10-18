@@ -1,56 +1,31 @@
 {
-    // Place your settings here
-    // This file is used to configure Visual Studio Code settings
-    // Learn more about configuring settings: https://code.visualstudio.com/docs/getstarted/settings
-    // Editor settings
-    "terminal.integrated.scrollback": 100000,
+    // Build/debug goes through the CMake Tools extension using the presets in
+    // CMakePresets.json. Pick a configure preset in the status bar, build with
+    // F7, pick a launch target (NoSpherA2 or NoSpherA2_Tests) and debug with
+    // ctrl+F5. ctest runs through the Testing panel or the preset's test task.
+    "cmake.useCMakePresets": "always",
+    // On Windows the presets use Ninja + cl.exe; this makes CMake Tools set up
+    // the MSVC environment itself, so VS Code does not have to be started from
+    // a developer prompt. Ignored on Linux/macOS.
+    "cmake.useVsDeveloperEnvironment": "always",
+    // IntelliSense comes from the CMake configure, not a hand-kept
+    // c_cpp_properties.json.
+    "C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools",
+    "C_Cpp.default.cppStandard": "c++20",
     "editor.tabSize": 4,
     "editor.insertSpaces": true,
-    "editor.wordWrap": "on",
-    // Language specific settings
-    "[typescript]": {
-        "editor.formatOnSave": true
-    },
-    "[python]": {
-        "formatting.provider": "black",
-        "formatting.blackArgs": [
-            "--line-length",
-            "120"
-        ],
-        "editor.formatOnSave": true
-    },
+    "terminal.integrated.scrollback": 100000,
+    // A terminal for running cmake/ctest by hand on Windows, where Ninja needs
+    // the MSVC environment. Adjust the Visual Studio path to your install.
     "terminal.integrated.profiles.windows": {
-        "PowerShell": {
+        "VS x64 Developer PowerShell": {
             "source": "PowerShell",
             "args": [
-                "-ExecutionPolicy",
-                "ByPass",
                 "-NoExit",
                 "-Command",
-                ". \"C:\\Program Files\\Microsoft Visual Studio\\18\\Community\\Common7\\Tools\\Launch-VsDevShell.ps1\" -Arch x64 -HostArch x64 -SkipAutomaticLocation; cd ${workspaceFolder}"
+                "& { $vs = & \"${env:ProgramFiles(x86)}\\Microsoft Visual Studio\\Installer\\vswhere.exe\" -latest -property installationPath; . \"$vs\\Common7\\Tools\\Launch-VsDevShell.ps1\" -Arch x64 -HostArch x64 -SkipAutomaticLocation; Set-Location \"${workspaceFolder}\" }"
             ]
         }
     },
-    "terminal.integrated.defaultProfile.windows": "PowerShell",
-    "files.associations": {
-        "functional": "cpp",
-        "vector": "cpp",
-    },
-    "C_Cpp.default.cppStandard": "c++20",
-    "cmake.useCMakePresets": "always",
-    "cmake.configurePreset": "release-windows",
-    "cmake.buildPreset": "release-windows",
-    "makefile.configureOnOpen": true,
-    "C_Cpp.default.cStandard": "c23",
-    "C_Cpp.default.includePath": [
-        "Windows\\packages\\**",
-        "${default}"
-    ],
-    "C_Cpp.inlayHints.autoDeclarationTypes.enabled": true,
-    "C_Cpp.inlayHints.autoDeclarationTypes.showOnLeft": true,
-    "C_Cpp.inlayHints.parameterNames.enabled": true,
-    "chat.tools.terminal.autoApprove": {
-        "msbuild": true
-    },
-    "python-envs.defaultEnvManager": "ms-python.python:system",
+    "terminal.integrated.defaultProfile.windows": "VS x64 Developer PowerShell"
 }
