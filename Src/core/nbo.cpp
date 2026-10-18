@@ -1113,7 +1113,12 @@ NboResults native_nbo(WFN& wavy, const NboOptions& options, std::ostream& log)
 		temporary = !options.keep_file47;
 	}
 	const NboInput in = read_file47(f47);
-	if (temporary) std::filesystem::remove(f47);
+	if (temporary) {
+		//Windows refuses to delete a file another process holds open (the CI runner's virus scanner on the
+		//freshly written .47); a stale temp file must not throw away an analysis that has its input already
+		std::error_code ec;
+		std::filesystem::remove(f47, ec);
+	}
 
 	NboResults res;
 	res.file47_seconds = std::chrono::duration<double>(clock() - t_f47).count();
