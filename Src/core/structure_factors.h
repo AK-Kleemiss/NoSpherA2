@@ -113,13 +113,15 @@ public:
 	// Store information about the model
 	model_data model_data;
 	// Store scattering data for each reflection
-	scatter_data scatter_data;
+	::scatter_data scatter_data;
 	// Store cristallographic quality criteria
 	quality_criteria quality_criteria;
 	// Store the unit cell
 	cell unit_cell;
 	// Store the atoms of the asymmetric unit (or the grown unit)
 	std::vector<asym_atom> asym_atoms;
+	// The orbital basis, the library one or its per-element overrides
+	std::shared_ptr<BasisSet> orbital_basis;
 	// Store the k points
 	vec2 k_pt;
 	// The refined extinction coefficient, or the six Voigt components X11 X22 X33 X12 X13 X23

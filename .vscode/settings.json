@@ -37,6 +37,9 @@
         "vector": "cpp",
     },
     "C_Cpp.default.cppStandard": "c++20",
+    "cmake.useCMakePresets": "always",
+    "cmake.configurePreset": "release-windows",
+    "cmake.buildPreset": "release-windows",
     "makefile.configureOnOpen": true,
     "C_Cpp.default.cStandard": "c23",
     "C_Cpp.default.includePath": [

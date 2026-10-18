@@ -32,9 +32,7 @@ namespace topology
 		}
 	}
 
-	//Same adjugate/determinant inverse b2c.cpp uses for its Newton step, and for the same reason:
-	//a fixed 3x3 system solved thousands of times, where a LAPACK call is all overhead.  Kept here
-	//rather than exported from b2c.cpp so that file needs no edit.
+	//Adjugate/determinant inverse as in b2c.cpp: a 3x3 solved thousands of times, LAPACK is all overhead
 	bool invert_3x3_topology(const double m[9], double inv[9])
 	{
 		const double det =
@@ -77,12 +75,11 @@ namespace topology
 		eigenvalues = { 0.0, 0.0, 0.0 };
 		vec A(H, H + 9), W(3);
 		if (!try_make_Eigenvalues(A, W))
-			return cp_kind::degenerate; //no eigenvalues, so no signature: not silently binned
+			return cp_kind::degenerate;
 		std::sort(W.begin(), W.end());
 		eigenvalues = { W[0], W[1], W[2] };
 		const double max_abs = std::max({ std::abs(W[0]), std::abs(W[1]), std::abs(W[2]) });
-		//Relative to the largest curvature, with an absolute floor so a vacuum point where all
-		//three eigenvalues are ~0 is degenerate rather than accidentally signed
+		//Absolute floor so a vacuum point with all eigenvalues ~0 is degenerate, not accidentally signed
 		const double tol = std::max(1E-12, max_abs * eigen_tolerance);
 		zero = 0;
 		for (int i = 0; i < 3; i++) {
@@ -107,9 +104,7 @@ namespace topology
 		return n;
 	}
 
-	//A bond critical point lies on the path between the two nuclei it connects, so the two nearest
-	//nuclei are that pair.  Cheap and standard; it only mis-assigns where two candidate pairs are
-	//degenerate in distance, which would also make the ring seed indistinguishable.
+	//A bond critical point is assigned to its two nearest nuclei
 	std::vector<std::vector<int>> bond_graph_cycles(result& r, const std::vector<nucleus>& nuclei)
 	{
 		const int V = (int)nuclei.size();
@@ -145,9 +140,8 @@ namespace topology
 		}
 		r.graph_edges = (int)edges.size();
 
-		//Spanning forest by BFS.  Its non-tree edges number E - V + C, the graph's cycle rank, which
-		//is exactly how many independent rings the molecule has - and so, by Poincare-Hopf with
-		//n_NCP = V and n_BCP = E, how many ring points minus cage points there must be
+		//BFS spanning forest.  Non-tree edges number E - V + C, the cycle rank, which by Poincare-Hopf
+		//with n_NCP = V and n_BCP = E is n_RCP - n_CCP
 		std::vector<int> parent(V, -2);
 		std::vector<std::array<int, 2>> non_tree;
 		std::vector<std::pair<int, int>> tree_edges;
@@ -177,20 +171,14 @@ namespace topology
 
 		std::vector<std::vector<int>> cycles;
 
-		//Every simple cycle up to six vertices, enumerated exhaustively.  The cycle rank alone is
-		//not enough to seed from: an octahedron has rank 12 - 6 + 1 = 7 but eight triangular faces,
-		//because the eight are linearly dependent in the cycle space, so a basis of seven can only
-		//ever reach seven of the eight ring points.  Enumerating the small cycles instead costs
-		//nothing - a seed that is not inside a ring is rejected by the search, and two seeds inside
-		//the same ring merge - and covers the 3- to 6-membered rings that are almost all of them.
-		//ponytail: length capped at 6 and the list capped at max_cycles; the fundamental cycles
-		//below still give one seed per independent ring of any size, so a macrocycle is not lost.
+		//All simple cycles up to six vertices: a cycle basis is not enough to seed from (an octahedron
+		//has rank 7 but eight faces), and surplus seeds are rejected or merged by the search.
+		//ponytail: capped at length 6 and max_cycles; the fundamental cycles below still seed larger rings
 		{
 			const size_t max_cycles = 5000;
 			std::vector<int> path;
 			std::vector<char> on_path(V, 0);
-			//start only from the smallest vertex of the cycle, and fix the direction by requiring the
-			//second vertex to be smaller than the last, so each cycle is enumerated exactly once
+			//Start from the smallest vertex and require path[1] < path.back(), so each cycle appears once
 			std::function<void(const int, const int)> walk = [&](const int start, const int u) {
 				if (cycles.size() >= max_cycles)
 					return;
@@ -217,9 +205,7 @@ namespace topology
 			}
 		}
 
-		//For each non-tree edge, the smallest cycle through it: the shortest path between its ends
-		//in the graph with that edge cut.  This is what still gives a seed for a ring larger than
-		//the six-vertex cap above.
+		//Smallest cycle through each non-tree edge: shortest path between its ends with the edge cut
 		for (const std::array<int, 2>& e : non_tree) {
 			std::vector<int> prev(V, -1);
 			std::vector<char> visited(V, 0);
@@ -242,13 +228,40 @@ namespace topology
 				}
 			}
 			if (!visited[e[1]])
-				continue; //no cycle through this edge after all
+				continue;
 			std::vector<int> cycle;
 			for (int at = e[1]; at != -1; at = prev[at]) cycle.push_back(at);
 			if (cycle.size() >= 3)
 				cycles.push_back(cycle);
 		}
 		return cycles;
+	}
+
+	bool covalently_bonded(const nucleus& a, const nucleus& b, const options& opt)
+	{
+		const double ra = a.Z > 0 && a.Z < 114 ? constants::covalent_radii[a.Z] : 1.5;
+		const double rb = b.Z > 0 && b.Z < 114 ? constants::covalent_radii[b.Z] : 1.5;
+		return array_length(a.pos, b.pos) <= constants::ang2bohr(opt.bond_scale * (ra + rb));
+	}
+
+	int covalent_fragment_count(const std::vector<nucleus>& nuclei, const options& opt)
+	{
+		const int V = (int)nuclei.size();
+		if (V <= 1)
+			return 1;
+		//Union-find over the pair criterion
+		std::vector<int> parent(V);
+		for (int a = 0; a < V; a++) parent[a] = a;
+		auto root = [&parent](int x) { while (parent[x] != x) { parent[x] = parent[parent[x]]; x = parent[x]; } return x; };
+		for (int a = 0; a < V; a++)
+			for (int b = a + 1; b < V; b++)
+				if (covalently_bonded(nuclei[a], nuclei[b], opt)) {
+					const int ra = root(a), rb = root(b);
+					if (ra != rb) parent[ra] = rb;
+				}
+		int components = 0;
+		for (int a = 0; a < V; a++) if (root(a) == a) components++;
+		return components;
 	}
 
 	void tally(result& r, const options& opt)
@@ -265,9 +278,12 @@ namespace topology
 		}
 		r.sum = r.n_attractor - r.n_bond + r.n_ring - r.n_cage;
 		r.target = opt.poincare_hopf_target;
+		//C separated molecules sum to C.  C comes from the found bond paths, not the covalent geometry: a
+		//hydrogen-bonded dimer is two covalent fragments but sums to 1.  Only the molecular default is raised
+		if (opt.poincare_hopf_target == 1 && r.graph_components > 1)
+			r.target = r.graph_components;
 		r.balanced = r.sum == r.target;
 		r.found_ring_minus_cage = r.n_ring - r.n_cage;
-		r.complete = r.balanced && r.n_degenerate == 0;
 
 		std::ostringstream d;
 		if (r.n_degenerate > 0)
@@ -277,13 +293,21 @@ namespace topology
 		if (!r.balanced) {
 			const int deficit = r.target - r.sum;
 			d << "Poincare-Hopf sum is " << r.sum << ", not " << r.target << " (deficit " << deficit << "). ";
-			//Which class.  Adding an attractor or a ring point raises the sum by one, a bond or cage
-			//point lowers it, so the sign of the deficit already halves the search
+			//Attractor and ring points raise the sum, bond and cage points lower it
 			if (deficit > 0)
 				d << "The search is short of " << deficit << " attractor or ring point(s), or has that many spurious bond or cage points. ";
 			else
 				d << "The search is short of " << -deficit << " bond or cage point(s), or has that many spurious attractor or ring points. ";
-			if (r.graph_vertices > 0) {
+		}
+		//Checked even when balanced: a spurious bond point and a spurious ring point cancel in the sum
+		{
+			const bool rings_ok = r.found_ring_minus_cage == r.required_ring_minus_cage;
+			const bool attractors_ok = r.n_attractor == r.graph_vertices + r.n_nna;
+			//Bond paths can join covalent fragments, never split one: a missing bridging bond point moves
+			//the sum and its target together, so only this catches it
+			const bool connected_ok = r.graph_components <= r.covalent_fragments;
+			r.graph_consistent = r.graph_vertices == 0 || (rings_ok && attractors_ok && connected_ok);
+			if (r.graph_vertices > 0 && !(r.balanced && r.graph_consistent)) {
 				d << "The bond graph has " << r.graph_vertices << " nuclei, " << r.graph_edges
 				  << " bonds and " << r.graph_components << " component(s), cycle rank "
 				  << r.required_ring_minus_cage << "; found n_ring - n_cage = " << r.found_ring_minus_cage << ". ";
@@ -296,12 +320,29 @@ namespace topology
 				if (r.n_attractor != r.graph_vertices + r.n_nna)
 					d << "Attractors (" << r.n_attractor << ") do not match nuclei plus non-nuclear attractors ("
 					  << r.graph_vertices << " + " << r.n_nna << "): nuclear seeding is the likely gap. ";
-				if (r.graph_components > 1 && r.target == 1)
-					d << "The bond graph falls into " << r.graph_components << " covalent fragments; a genuinely "
-					  << "separated set of molecules sums to the number of fragments, and the closed-shell contacts "
-					  << "that join them carry bond and ring points the covalent graph does not predict. ";
+				if (r.graph_components > r.covalent_fragments)
+					d << "The bond paths fall into " << r.graph_components << " component(s) where the covalent "
+					  << "geometry has only " << r.covalent_fragments << ": " << (r.graph_components - r.covalent_fragments)
+					  << " covalently bonded pair(s) carry no bond critical point, so a bridging bond point is "
+					  << "missing - and that is the one gap the alternating sum cannot see, because losing a "
+					  << "bridge raises the sum and splits a component at the same time. ";
 			}
 		}
+		//On an ECP wavefunction the seeding blame above is wrong; said only when something already failed
+		if (!r.coreless_nuclei.empty() && d.tellp() > 0) {
+			d << r.coreless_nuclei.size() << " nucleus/nuclei carry no core density (rho below "
+			  << opt.core_rho_floor << " at a nucleus of Z >= 5), atom number";
+			for (size_t i = 0; i < r.coreless_nuclei.size() && i < 8; i++)
+				d << (i ? "," : " ") << r.coreless_nuclei[i] + 1;
+			if (r.coreless_nuclei.size() > 8)
+				d << " and " << r.coreless_nuclei.size() - 8 << " more";
+			d << ": a pseudopotential replaced the core there, so the density has no cusp at those "
+			  << "nuclei and no readable shell structure around them. A missing nuclear attractor on "
+			  << "one of them, or a spurious ring or cage point within about a bohr of one, is a "
+			  << "property of this wavefunction and not a gap in the seeding - QTAIM is not defined on "
+			  << "a pseudo-density inside the core radius. ";
+		}
+		r.complete = r.balanced && r.n_degenerate == 0 && r.graph_consistent;
 		r.diagnosis = d.str();
 	}
 
@@ -310,9 +351,7 @@ namespace topology
 		log << "\n---------------- Topological analysis of rho ----------------\n";
 		citations::cite(citations::Method::QTAIM, log);
 		log << "Newton-Raphson on grad rho = 0 with the analytic Hessian. Positions in bohr.\n"
-			//A rejected point is as much a result as an accepted one, so the thresholds that did the
-			//rejecting are printed: a critical point below the density floor would not appear above
-			<< "Accepted when |grad rho| <= " << opt.gradient_tolerance << " and <= "
+			<< "Accepted when |grad rho| <= " << opt.gradient_tolerance << " * max(1, rho) and <= "
 			<< opt.relative_gradient_tolerance << " * rho, with rho > " << opt.density_floor
 			<< "; points merged below " << opt.merge_distance << " bohr; an eigenvalue below "
 			<< opt.eigen_tolerance << " * max|lambda| counts as zero.\n\n"
@@ -342,10 +381,14 @@ namespace topology
 		if (r.n_degenerate)
 			log << ", " << r.n_degenerate << " DEGENERATE";
 		log << "\n";
-		//Molecular form.  A periodic density in a unit cell obeys the Morse relation, whose sum is 0
 		log << "Poincare-Hopf (molecular form, isolated molecule): n_NCP - n_BCP + n_RCP - n_CCP = "
 			<< r.n_attractor << " - " << r.n_bond << " + " << r.n_ring << " - " << r.n_cage
 			<< " = " << r.sum << " (expected " << r.target << ")\n";
+		if (r.target > 1 && opt.poincare_hopf_target == 1)
+			log << "The bond paths fall into " << r.graph_components << " disconnected component(s), so the "
+				<< "expected sum is " << r.target << " and not 1: each separated fragment contributes 1. The "
+				<< "covalent geometry has " << r.covalent_fragments << " fragment(s), and a component count "
+				<< "above that would mean a bond path is missing rather than that the system is separated.\n";
 		if (r.escalated) {
 			int from_grid = 0;
 			for (const cp& p : r.points) if (p.from == seed_class::grid) from_grid++;
@@ -353,7 +396,8 @@ namespace topology
 				<< "contributed " << from_grid << " point(s).\n";
 		}
 		if (r.complete)
-			log << "The set of critical points is COMPLETE: the relation holds and no point is degenerate.\n";
+			log << "The set of critical points is COMPLETE: the relation holds, no point is degenerate, and "
+				"n_ring - n_cage matches the bond graph's cycle rank of " << r.required_ring_minus_cage << ".\n";
 		else
 			log << "The set of critical points is INCOMPLETE. " << r.diagnosis << "\n";
 
@@ -375,7 +419,7 @@ namespace topology
 		log << "------------------------------------------------------------\n";
 	}
 
-	void report(const std::filesystem::path& wfn_path, std::ostream& log)
+	bool report(const std::filesystem::path& wfn_path, std::ostream& log)
 	{
 		err_checkf(std::filesystem::exists(wfn_path), "Could not find " + wfn_path.string(), log);
 		WFN wavy(wfn_path);
@@ -385,5 +429,6 @@ namespace topology
 		const options opt{};
 		const result r = analyze_topology(wavy, n, opt);
 		report_topology(r, n, log, opt);
+		return r.complete;
 	}
 }

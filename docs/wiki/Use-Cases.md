@@ -262,7 +262,8 @@ or `.wfx` is rejected.
 
 Fit the density in an auxiliary basis and use the fit for the partitioning. The
 restraints hold the fit's atomic multipole moments up to `lmax` at the values a
-real partitioning gives.
+real partitioning gives. Charge and dipole restraints act on the auxiliary
+functions centred on each atom; higher moments use grid-partitioned rows.
 
 ```powershell
 .\NoSpherA2.exe -wfn epoxide.gbw -cif epoxide.cif -hkl epoxide.hkl -acc 2 -ri_fit def2-universal-jkfit -multipole_moments Hirshfeld 2 -multipole_strength 0.5
@@ -278,18 +279,15 @@ this is what fixes hydroxyl-H populations, at roughly twice the wall time:
 ## 16. A machine-learned (SALTED) density
 
 ```powershell
-.\NoSpherA2.exe -wfn mol.xyz -SALTED .\salted_model -salted_charge_constraint -esp -resolution 0.2
+.\NoSpherA2.exe -wfn mol.xyz -SALTED .\salted_model -esp -resolution 0.2
 ```
-
-Always pass `-salted_charge_constraint`: without it the prediction is short by
-about 0.4 e, which shifts the whole ESP by more than its range on the surface.
 
 Coefficients only, no field. `-SALTED_COEFS` runs inside the parser, so
 everything it needs — including `-no_gpu_salted` if you want the CPU path — has
 to come first:
 
 ```powershell
-.\NoSpherA2.exe -wfn mol.xyz -SALTED .\salted_model -salted_charge_constraint -SALTED_COEFS
+.\NoSpherA2.exe -wfn mol.xyz -SALTED .\salted_model -SALTED_COEFS
 ```
 
 ## 17. Electrostatic interaction energy between two molecules
@@ -324,7 +322,9 @@ Get-Content .\NoSpherA2.log -Tail 60
 
 The settings file controls where the two-electron integral tensor lives
 (`stream`, `i_tensor_mb`, `save`, `read`, `df_basis`, `i_double`, `i_float`),
-which is the whole memory question for a fit of any size.
+which is the whole memory question for a fit of any size; `save_eri <file>` and
+`read_eri <file>` keep the stored two-electron integrals for a later run on the
+same geometry and basis.
 
 ## 19. Force the GPU, and prove it ran
 

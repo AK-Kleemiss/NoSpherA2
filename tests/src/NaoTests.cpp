@@ -3,8 +3,7 @@
 #include "core/nao.h"
 #include "core/wfn_class.h"
 
-//NAO/NPA checks.  The numbers come from NBO 7.0.9 run on the same wavefunction; the epoxide
-//reference is committed as tests/epoxide_gbw/NBO/reference.nbo.
+//NAO/NPA checks.  The numbers come from NBO 7.0.9 run on the same wavefunction.
 
 namespace {
 
@@ -42,7 +41,7 @@ namespace {
 	double orthonormality_error(const dMatrix2& C, const dMatrix2& S)
 	{
 		const size_t n = C.extent(0);
-		//SC first, so the check is two n^3 products rather than one n^4 loop
+		//SC first: two n^3 products instead of one n^4 loop
 		std::vector<double> SC(n * n, 0.0);
 		for (size_t i = 0; i < n; i++)
 			for (size_t k = 0; k < n; k++) {
@@ -63,9 +62,8 @@ namespace {
 	}
 }
 
-//The natural minimal basis is fixed by the element, not by the basis set: one s shell per period,
-//p from period 2 on, d from period 4 on, f from period 6 on.  Checked against the epoxide NBO
-//reference (H, C, O) and PySCF's AOSHELL table.
+//The natural minimal basis depends on the element only: one s shell per period, p from period 2, d from 4,
+//f from 6 (as in the epoxide NBO reference and PySCF's AOSHELL table).
 TEST(NaoMinimalBasisTests, ShellCountsFollowThePeriodicTable)
 {
 	struct Case { int Z; int shell[4]; int core[4]; };
@@ -91,10 +89,8 @@ TEST(NaoMinimalBasisTests, ShellCountsFollowThePeriodicTable)
 	}
 }
 
-//The AO map has to describe the same ordering the overlap is computed in, or every block of the
-//pipeline mixes unrelated functions.  Two consequences are checked: a shell's own diagonal block
-//of S is the identity (normalised, orthogonal components), and shells of different l on one atom
-//do not overlap (different irreps of the atomic rotation group).
+//The AO map must follow the ordering the overlap is computed in: a shell's own diagonal block of S is the
+//identity, and shells of different l on one atom do not overlap.
 TEST(NaoBasisMapTests, EpoxideAoMapMatchesTheOverlap)
 {
 	const auto p = fixture("epoxide_gbw", "epoxide.gbw");
@@ -114,15 +110,6 @@ TEST(NaoBasisMapTests, EpoxideAoMapMatchesTheOverlap)
 		}
 }
 
-//The overlap has to carry the same convention as the coefficients the reader kept.  ORCA writes the
-//|m| >= 3 components of an f or g shell - f(+-3), g(+-3), g(+-4) - with the sign opposite to
-//libcint's, and the gbw reader keeps ORCA's convention in the density, so an uncorrected overlap
-//makes Tr(P S) miss the electron count: 0.018 e here, 0.009 e on Zn(NH3), 0.31 of SF6's 70.  It
-//hides in every linear molecule, because the sign cancels between two flipped functions and the
-//surviving cross terms vanish by axial symmetry - which is why the diatomic references never showed
-//it.  ao_overlap() applies the same correction the FILE47 writer does; what is checked here is the
-//exact statement, that the natural populations sum to the nuclear charge whatever the partition
-//does with them.  The epoxide and ethane fixtures cannot see this and pass either way.
 TEST(NaoBasisMapTests, OverlapCarriesTheDensitysPhaseConvention)
 {
 	const auto p = fixture("RGBI_groups", "nh3bh3.gbw");
@@ -135,6 +122,46 @@ TEST(NaoBasisMapTests, OverlapCarriesTheDensitysPhaseConvention)
 	for (const NAOAtom& a : npa.total.atoms)
 		charge_sum += a.charge;
 	EXPECT_NEAR(charge_sum, 0.0, 1e-9);
+}
+
+TEST(NaoBasisMapTests, PrintedComponentsFollowLibcintAOOrder)
+{
+	const auto p = fixture("RGBI_groups", "nh3bh3.gbw");
+	if (p.empty()) GTEST_SKIP() << "tests/RGBI_groups/nh3bh3.gbw not found";
+	WFN wavy(p);
+	const auto ao = spherical_ao_map(wavy);
+	int shells = 0;
+	for (int i = 0; i + 2 < ao.size(); i++) {
+		if (ao[i].l != 1 || ao[i].m != 2) continue;
+		EXPECT_EQ(ao[i + 1].m, 0);
+		EXPECT_EQ(ao[i + 2].m, 1);
+		shells++;
+	}
+	EXPECT_GT(shells, 0);
+}
+
+//A NAO's m is its AOs' m, which shell_label and lang_label print: the largest AO coefficient of a core or
+//valence NAO sits on its own atom, l and m.
+TEST(NaoBasisMapTests, NaoComponentIsTheComponentOfItsAOs)
+{
+	const auto p = fixture("RGBI_groups", "nh3bh3.gbw");
+	if (p.empty()) GTEST_SKIP() << "tests/RGBI_groups/nh3bh3.gbw not found";
+	WFN wavy(p);
+	const auto ao = spherical_ao_map(wavy);
+	const NPAResult npa = natural_population_analysis(wavy);
+	int checked = 0;
+	for (size_t k = 0; k < npa.total.orbitals.size(); k++) {
+		const NAO& o = npa.total.orbitals[k];
+		if (o.l == 0 || o.type == NAOClass::Rydberg) continue;
+		size_t best = 0;
+		for (size_t i = 1; i < ao.size(); i++)
+			if (std::abs(npa.total.C(i, k)) > std::abs(npa.total.C(best, k))) best = i;
+		EXPECT_EQ(ao[best].atom, o.atom) << "NAO " << k;
+		EXPECT_EQ(ao[best].l, o.l) << "NAO " << k;
+		EXPECT_EQ(ao[best].m, o.m) << "NAO " << k;
+		checked++;
+	}
+	EXPECT_GE(checked, 6) << "the N and B 2p NAOs";
 }
 
 TEST(NaoEpoxideTests, OccupanciesSumToTheElectronCountAndTheTransformIsOrthogonal)
@@ -153,20 +180,6 @@ TEST(NaoEpoxideTests, OccupanciesSumToTheElectronCountAndTheTransformIsOrthogona
 	EXPECT_LT(orthonormality_error(npa.total.C, ao_overlap(wavy)), 1e-9);
 }
 
-//NBO 7.0.9, tests/epoxide_gbw/NBO/reference.nbo, "Summary of Natural Population Analysis".
-//Tolerance: oxygen and the cores come out to 2e-3 and 4e-5, but a residual C -> H transfer of
-//about 0.009 e per hydrogen is left, so the carbons sit 0.02 e too positive.  Ruled out as the
-//cause: the OWSO formula (re-derived), equal-weight Loewdin instead of OWSO (much worse), the
-//core definition (exact), the step-4 class merge (intra-atomic and unitary), self-consistent
-//weights (converges to hydrogens at +0.66) and one OWSO over the whole natural minimal basis
-//instead of core before valence (worse here and on nh3bh3 and benzene).  Also ruled out: NBO's
-//symmetry averaging, which the 22-molecule reference spine now makes testable and which does not
-//explain it - the reference prints distinct charges for symmetry-equivalent atoms wherever the
-//geometry allows, and where it does not our spread is zero too.  The overlap phase convention was
-//a real cause and is fixed (see OverlapCarriesTheDensitysPhaseConvention): it carried the whole
-//error on the hypervalent and heavy-atom references, PF5 0.099 -> 0.013 e and SF6 0.080 -> 0.016,
-//but none of this one, which has no |m| >= 3 cross terms.  The bound below is the measured
-//agreement; if a later change makes it pass at a tighter one, tighten it.
 TEST(NaoEpoxideTests, NaturalChargesMatchNbo7)
 {
 	const auto p = fixture("epoxide_gbw", "epoxide.gbw");
@@ -184,9 +197,6 @@ TEST(NaoEpoxideTests, NaturalChargesMatchNbo7)
 	EXPECT_NEAR(npa.total.rydberg, nbo_rydberg, 1.5e-2);
 }
 
-//An open-shell case with chemistry in it: the NH3...Li doublet.  NBO 7.0.9 on the .47 of the same
-//gbw gives the charges below and puts 0.947 of the unpaired electron on lithium; we agree on the
-//charges to 5e-3 and put 0.976 there, so the tolerances differ by column.
 TEST(NaoOpenShellTests, Nh3LiChargesAndSpinFollowNbo7)
 {
 	const auto p = fixture("RGBI_groups", "nh3li.gbw");
@@ -199,21 +209,23 @@ TEST(NaoOpenShellTests, Nh3LiChargesAndSpinFollowNbo7)
 	const double nbo_spin[5] = { 0.03529, 0.00575, 0.00575, 0.00575, 0.94747 };
 	double spin_sum = 0.0;
 	for (size_t a = 0; a < 5; a++) {
-		EXPECT_NEAR(npa.total.atoms[a].charge, nbo_charge[a], 6e-3) << "atom " << a + 1;
-		EXPECT_NEAR(npa.spin_population[a], nbo_spin[a], 3e-2) << "spin, atom " << a + 1;
+		EXPECT_NEAR(npa.total.atoms[a].charge, nbo_charge[a], 3e-3) << "atom " << a + 1;
+		EXPECT_NEAR(npa.spin_population[a], nbo_spin[a], 1e-3) << "spin, atom " << a + 1;
 		spin_sum += npa.spin_population[a];
 	}
-	//the spin populations sum to Tr((P_alpha - P_beta) S) exactly, whatever the partition does
-	//with it - which for this gbw is 1.00003, not 1, because that is what ORCA converged to
+	//the spin populations sum to Tr((P_alpha - P_beta) S) exactly, which is 1.00003 for this gbw as ORCA converged it
 	EXPECT_NEAR(spin_sum, trace_spin(wavy), 1e-9);
 	EXPECT_NEAR(npa.total.population, trace_PS(wavy), 1e-9);
 	EXPECT_NEAR(npa.total.population, npa.alpha.population + npa.beta.population, 1e-9);
+	for (size_t i = 0; i < npa.total.orbitals.size(); i++)
+		EXPECT_NEAR(npa.total.orbitals[i].occupation,
+		            npa.alpha.orbitals[i].occupation + npa.beta.orbitals[i].occupation, 1e-9);
+	EXPECT_LT(orthonormality_error(npa.total.C, ao_overlap(wavy)), 1e-9);
 	EXPECT_LT(orthonormality_error(npa.alpha.C, ao_overlap(wavy)), 1e-9);
 	EXPECT_LT(orthonormality_error(npa.beta.C, ao_overlap(wavy)), 1e-9);
 }
 
-//A free hydrogen atom: one electron, all of it alpha, so the spin population is exactly one and
-//the natural charge exactly zero whatever the basis does.
+//A free H atom: one alpha electron, so spin population one and charge zero whatever the basis.
 TEST(NaoOpenShellTests, HydrogenAtomCarriesOneUnpairedElectron)
 {
 	const auto p = fixture("ptb_H_file", "H.gbw");
@@ -229,4 +241,98 @@ TEST(NaoOpenShellTests, HydrogenAtomCarriesOneUnpairedElectron)
 	EXPECT_NEAR(npa.spin_population[0], 1.0, 1e-9);
 	EXPECT_NEAR(npa.alpha.population, 1.0, 1e-9);
 	EXPECT_NEAR(npa.beta.population, 0.0, 1e-9);
+}
+
+//Tr(P S) checks that a reader and its overlap use the same AO basis.
+TEST(NaoReaderConsistencyTests, EveryReaderConservesTheElectronCount)
+{
+	struct Case { const char* dir; const char* file; double tol; };
+	const Case cases[] = {
+		//A molden prints MO coefficients to about ten digits, so its density is only that precise.
+		{ "molden_file", "F_open.molden",   1e-7 },
+		{ "molden_file", "F_full.molden",   1e-7 },
+		{ "molden_file", "Sc_full.molden",  1e-7 },
+		{ "molden_file", "Ce_full.molden",  1e-7 },
+		//High-l ORCA phase conventions are checked against the matching GBW.
+		{ "CuF2_i_func/71", "calc_occupied.molden", 1e-3 },
+		{ "CuF2_i_func/71", "calc.gbw",             1e-3 },
+		//gbw controls
+		{ "ECP_SF", "Au2Br2.gbw",       1e-9 },
+		{ "RGBI_groups", "nh3li.gbw",   1e-9 },
+		{ "ptb_H_file", "H.gbw",        1e-9 },
+		{ "epoxide_gbw", "epoxide.gbw", 1e-9 },
+	};
+	for (const Case& c : cases) {
+		const auto p = fixture(c.dir, c.file);
+		if (p.empty()) { GTEST_LOG_(INFO) << "skipping absent " << c.dir << "/" << c.file; continue; }
+		WFN wavy(p);
+		//no contracted density or a cartesian basis is a refusal, which NaoRefusalTests and the CLI cover
+		if (wavy.get_dm().extent(0) == 0 || wavy.get_d_f_switch()) {
+			GTEST_LOG_(INFO) << "no spherical contracted density in " << c.file;
+			continue;
+		}
+		double occ = 0.0;
+		for (int i = 0; i < wavy.get_nmo(); i++)
+			occ += wavy.get_MO_occ(i);
+		EXPECT_NEAR(trace_PS(wavy), occ, c.tol) << c.dir << "/" << c.file;
+	}
+}
+
+TEST(NaoReaderConsistencyTests, MoldenAndGbwOfTheSameCalculationAgree)
+{
+	const auto g = fixture("CuF2_i_func/71", "calc.gbw");
+	const auto m = fixture("CuF2_i_func/71", "calc_occupied.molden");
+	if (g.empty() || m.empty()) GTEST_SKIP() << "tests/CuF2_i_func/71 fixtures not found";
+	WFN gbw(g), mol(m);
+	ASSERT_EQ(gbw.get_origin(), e_origin::gbw);
+	ASSERT_EQ(mol.get_origin(), e_origin::molden);
+	EXPECT_NEAR(trace_PS(mol), trace_PS(gbw), 1e-4);
+	const NPAResult a = natural_population_analysis(gbw), b = natural_population_analysis(mol);
+	ASSERT_EQ(a.total.atoms.size(), b.total.atoms.size());
+	for (size_t i = 0; i < a.total.atoms.size(); i++)
+		EXPECT_NEAR(b.total.atoms[i].charge, a.total.atoms[i].charge, 5e-3) << "atom " << i + 1;
+}
+
+TEST(NaoReaderConsistencyTests, ASphericalFchkBasisIsNormalised)
+{
+	const auto p = fixture("alanine_occ", "alanine.owf.fchk");
+	if (p.empty()) GTEST_SKIP() << "tests/alanine_occ/alanine.owf.fchk not found";
+	WFN wavy(p);
+	ASSERT_EQ(wavy.get_origin(), e_origin::fchk);
+	//A cartesian fchk (NiP3_fchk/good.fchk) declares more functions than the spherical basis Int_Params rebuilds,
+	//which no normalisation closes; this fixture is spherical.
+	ASSERT_FALSE(wavy.get_d_f_switch()) << "fixture is no longer spherical";
+	const dMatrix2 S = ao_overlap(wavy);
+	ASSERT_GT(S.extent(0), size_t(0));
+	int off = 0;
+	double worst = 0.0;
+	for (size_t i = 0; i < S.extent(0); i++) {
+		const double d = std::abs(S(i, i) - 1.0);
+		worst = std::max(worst, d);
+		if (d > 1e-8) off++;
+	}
+	EXPECT_EQ(off, 0) << off << " of " << S.extent(0) << " AOs are not normalised, worst |S_ii - 1| = "
+		<< worst << " - e_origin::fchk has fallen out of its normalisation branch again";
+	//the basis Int_Params rebuilds from the shells must hold exactly the fchk's declared count
+	EXPECT_EQ(S.extent(0), size_t(228)) << "the fchk declares 228 basis functions";
+	//read_fchk builds DM in Int_Params order, so a wrong component permutation shows up as a missing electron
+	EXPECT_NEAR(trace_PS(wavy), 48.0, 1e-4) << "alanine has 48 electrons";
+}
+
+TEST(NaoPrintTests, NoOccupancyIsPrintedAsANegativeZero)
+{
+	const auto p = fixture("molden_file", "Sc_full.molden");
+	if (p.empty()) GTEST_SKIP() << "tests/molden_file/Sc_full.molden not found";
+	WFN wavy(p);
+	ASSERT_FALSE(wavy.get_d_f_switch()) << "NPA needs a spherical basis; fixture is no longer spherical";
+	const NPAResult r = natural_population_analysis(wavy);
+	std::ostringstream os;
+	print_npa(r, os);
+	const std::string out = os.str();
+	ASSERT_NE(out.find("Natural atomic orbital occupancies"), std::string::npos) << "no occupancy table was printed";
+	EXPECT_EQ(out.find("-0.00000"), std::string::npos)
+		<< "an occupancy printed as a negative zero: the sign is roundoff from the diagonalisation and it "
+		   "flips when the molecule is translated, so it says nothing and reads as a negative population";
+	EXPECT_NE(out.find("0.00000"), std::string::npos)
+		<< "the nearly empty NAO rows have gone missing entirely, which is not what the clamp does";
 }

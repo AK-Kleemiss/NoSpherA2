@@ -208,11 +208,12 @@ On the `-ri_fit` and `-SALTED` paths:
   rho > 0.01, but peaks are capped near 3.4 and the tail is lost.
 * **QTAIM charges** from a fitted density are good to about 0.01 e.
 
-## SALTED: pass the charge constraint
+## SALTED: the electron count is not constrained
 
-Without `-salted_charge_constraint` the prediction is short by about 0.42 e,
-which shifts the whole ESP by roughly 0.08 au — larger than the ESP range on the
-surface itself. There is no reason not to pass it.
+The predicted density is not rescaled to the electron count (the old
+`-salted_charge_constraint` is gone). A prediction short by a fraction of an
+electron shifts the whole ESP by about q/r, which can exceed the ESP range on
+the surface itself.
 
 ## RI fitting
 
@@ -222,8 +223,11 @@ names that follow fill the rest, first match winning. `auto_aux H
 def2-universal-jkfit` is what fixes hydroxyl-hydrogen populations (0.13 e down to
 under 0.013 e) at about twice the wall time.
 
-`-multipole_centre` with `lmax >= 2` breaks the fit. Use partitioned moments —
-i.e. the default `-multipole_partition`.
+With `-multipole_moments`, the fitted charge and dipole rows use auxiliary
+coefficients on each atom. For `lmax >= 2`, only quadrupoles and higher moments
+use grid-partitioned rows because atom-centred higher moments have shown fit
+instabilities. The grid also supplies the target moments for Hirshfeld, TFVC,
+MBIS and EMBIS at every order.
 
 ## ELI family: two of the four members carry no new information
 

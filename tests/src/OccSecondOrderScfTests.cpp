@@ -1,10 +1,5 @@
-//The trust-region augmented-Hessian second-order step OCC's SCF hands over to once DIIS has
-//reached the quadratic region (see <occ/qm/second_order_scf.h>), which is what -occ jobs from
-//Olex2 get. A run that takes the second-order route has to end on the same solution as the plain
-//DIIS run: for Hartree-Fock, where the Hessian-vector product is an exact Fock build of the
-//density difference, for the unrestricted case, where the rotation is addressed block by block,
-//and for a GGA functional, where the XC quadrature is not linear in the density and the response
-//is differenced instead.
+//OCC's trust-region augmented-Hessian SCF step (occ/qm/second_order_scf.h) must end where plain DIIS does:
+//HF (exact Fock build of the density difference), unrestricted (block-wise rotation), GGA (differenced XC response).
 #include "pch.h"
 #include <gtest/gtest.h>
 
@@ -29,8 +24,7 @@ namespace
 		return BasisSetLibrary::get_basis_set(name)->to_AOBasis(mol.atoms());
 	}
 
-	//`engaged` reports whether the second-order step actually took over - without it a run that
-	//quietly stayed with DIIS would pass the comparison against DIIS
+	//`engaged` keeps a run that quietly stayed with DIIS from passing the comparison against DIIS
 	template <typename Proc>
 	double run(Proc& proc, const occ::qm::SpinorbitalKind kind, const unsigned int mult,
 	           const bool second_order, bool* engaged = nullptr)
@@ -69,8 +63,7 @@ TEST(OccSecondOrderScf, UnrestrictedHartreeFockMatchesDiis)
 	EXPECT_NEAR(trah, diis, 1e-8);
 }
 
-//The differenced Fock response: PBE has no exact exchange, so every bit of the Hessian-vector
-//product goes through the finite difference of the whole build
+//PBE has no exact exchange, so the whole Hessian-vector product goes through the differenced Fock build
 TEST(OccSecondOrderScf, GgaDftMatchesDiis)
 {
 	spdlog::set_level(spdlog::level::err);
@@ -86,25 +79,19 @@ TEST(OccSecondOrderScf, GgaDftMatchesDiis)
 	EXPECT_NEAR(trah, diis, 1e-7);
 }
 
-//The trust radius itself: the tests above only compare final energies, which a radius policy
-//can get right while wasting Fock builds on the way. These drive occ::qm::trust_radius_update
-//with the three numbers a macro step reports and check the properties the SCF relies on.
+//Final energies cannot catch a radius policy that wastes Fock builds, so trust_radius_update is checked directly.
 TEST(OccSecondOrderScf, TrustRadiusFollowsTheModelError)
 {
 	const occ::qm::SecondOrderSettings s;
 	//a good step that the radius stopped may go twice as far next time
 	EXPECT_NEAR(occ::qm::trust_radius_update(0.1, 0.1, -1e-3, -1e-3 + 1e-9, true, s), 0.2, 1e-12);
-	//a good step that stopped short of the boundary leaves the radius alone: what stopped it was
-	//the model, not the region, so its error says nothing about how far the region should reach.
-	//Sizing the radius from that step instead collapsed it as the steps shrank towards
-	//convergence, and P1 then spent seven macro steps per lambda climbing back out.
+	//a good step that stopped short of the boundary leaves the radius alone: the model stopped it, not the
+	//region, and sizing the radius from it collapses the region as steps shrink towards convergence
 	EXPECT_EQ(occ::qm::trust_radius_update(0.5, 0.01, -1e-3, -1e-3 + 1e-9, false, s), 0.5);
 	//a step whose model was badly wrong shrinks wherever it stopped: 80 % of the predicted
 	//decrease missing asks for cbrt(0.1/0.8) = 0.5 of it
 	EXPECT_NEAR(occ::qm::trust_radius_update(1.0, 0.5, -1.0, -0.2, false, s), 0.25, 1e-2);
-	//a merely mediocre step keeps the radius it ran in. Sizing that band from the model error
-	//instead held the iron case at a radius of 0.37 where the plain rule had reached 1.0, and it
-	//cost ten macro steps
+	//a merely mediocre step keeps the radius it ran in; sizing that band from the model error stalls the radius
 	EXPECT_EQ(occ::qm::trust_radius_update(0.4, 0.4, -1.0, -0.5, true, s), 0.4);
 	//a shrink is bounded against the radius, so one bad step cannot collapse the region
 	EXPECT_GE(occ::qm::trust_radius_update(0.4, 0.4, -1.0, -1e-9, true, s), 0.04);

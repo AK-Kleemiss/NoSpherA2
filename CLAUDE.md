@@ -58,11 +58,15 @@ that is present; set it OFF and name the backend to build for a machine other th
 vendor still supports (the lists live in `CMakeLists.txt`) instead of the local card only. The
 bootstrap script takes `-DNOSPHERA2_BOOTSTRAP_GPU_VENDOR=NVIDIA -DNOSPHERA2_BOOTSTRAP_CUDA_VERSION=12.9`
 to fetch a conda-forge CUDA toolkit without a GPU, and `-DNOSPHERA2_BOOTSTRAP_GPU=OFF` to fetch none.
+`-DNOSPHERA2_BOOTSTRAP_GPU_VENDOR=ALL` sets up the CI's fat build locally: the CUDA toolkit plus
+the ROCm SDK wheels (`NOSPHERA2_BOOTSTRAP_ROCM_VERSION`, default the CI's 10.0.0) in a venv at
+`.mambaenv/rocm`, whose `root.txt` makes configure switch on both backends and take the HIP compiler
+from there. Skipped when a ROCm is already installed (`HIP_PATH`, `ROCM_PATH`, `/opt/rocm`).
 
 Both backends at once make a fat binary: every kernel source is compiled twice, once per backend,
 into its own namespace (`Src/core/gpu_api.h`, `NOSPHERA2_GPU_BACKEND_NS`), and
 `Src/core/gpu_dispatch.cpp` defines the global entry points by forwarding to the backend that has a
-device (CUDA probed first; `NOSPHERA2_GPU_BACKEND=cuda|hip` in the environment overrides). A function
+device (CUDA probed first; `-tune NOSPHERA2_GPU_BACKEND=cuda|hip` overrides). A function
 added to one of the six GPU headers has to be added to the X-macro in `gpu_dispatch.cpp` too, or the
 fat link fails on it. Neither runtime is linked: cudart is static, and the HIP runtime is opened by
 name in `Src/core/hip_runtime_shim.cpp`, which defines every `hip*` entry the kernel objects import,
@@ -132,6 +136,11 @@ Useful environment variables:
 - `NOS_EXE` - path to the executable for Python tests.
 - `OCC_DATA_PATH` - OCC runtime data directory. CTest defaults this to `occ/share`; local Windows Python runs commonly need `D:\git\NoSpherA2\Lib\occ\share\occ` or the current equivalent.
 - `RUN_FULL_TEST` - truthy value enables slow/full Python integration tests.
+- `NOS_TEST_SHARED_DIR` - set by ctest for every gtest (`<build>/tests/src/shared`). `XcwScfTests.SharedTensorBuild`
+  writes the P1 subset's I tensor there once (ctest fixture `xcw_p1_tensor`) and the XCW tests that test the SCF
+  rather than the tensor read it; a test binary run without it builds its own tensor, with the same numbers.
+- `OMP_WAIT_POLICY=PASSIVE` - set by the `test-base` test preset: ctest runs several tests at once and each opens a
+  thread per core, so spinning idle OpenMP workers would take the cores the other tests compute on.
 
 Tests are golden-file comparisons: the harness runs NoSpherA2 with args from `tests/tests.toml`, captures stdout, and diffs against `.good` reference files in each test subdirectory.
 
@@ -261,6 +270,53 @@ Key core modules live in `Src/core`:
 
 ## Current Validation Notes
 
+As of 2026-10-17 (later), grown XCW models choose their kept operations as K = D.L for nested subgroups L inside H
+(`cell::choose_kept_operations`, replacing `project_into_subgroup`), which always admits per-position weights and keeps
+the fewest I tensor k-points; `ctest` on a CPU-only `release-windows` build (`build/release-windows-cpu`) reports
+**1265 passed, 0 failed, 22 skipped** (2 disabled) of 1289. See `UNIT_TESTS_STATUS.md`.
+
+As of 2026-10-17, grown XCW models delete every fully applied symmetry operation and solve the sym_facts so that every
+position the kept operations reach is counted once (`cell::set_sym_fact_from_position_counts`); `ctest --preset release-linux`
+reports **1263 passed, 0 failed, 22 skipped** (2 disabled) of 1285. See `UNIT_TESTS_STATUS.md`.
+
+As of 2026-10-14, XCW_refactor carries density_source with the XCW split into `structure_factors`, `SCF_wrapper` and
+`XCW_solver` kept: `basis_overrides`, `save_eri`/`read_eri` and the charge/multiplicity check are ported, the pair screen
+and symmetry handling stay XCW_refactor's, and `slow_conv` damps the lambda = 0 step too. `ctest --preset release-linux`
+reports **1262 passed, 0 failed, 22 skipped** (2 disabled) of 1284. See `UNIT_TESTS_STATUS.md`.
+
+As of 2026-10-13, after the NRT symmetry fixes, `ctest --preset release-linux` reports **1260 passed, 0 failed,
+22 skipped** (2 disabled) of 1282. New: `NboNativeTests.TheAllylCationsMirrorStructuresWeighAlike`,
+`NboNativeTests.TheAllylRadicalIsSymmetricInEachSpin` and `NboNativeTests.ASlightlyDistortedAllylCationStaysNearTheSymmetricOne`
+(fixtures `tests/allyl_occ/`), under what is the default since 2026-10-14 (`-nrt_no_mirror` restores the old behaviour). See
+`UNIT_TESTS_STATUS.md`. At `1349eba` the suite took 255.7 +- 9.1 s wall and 993 +- 40 CPU-s (95 % CI, n = 3) with 3.88 of
+the 4 cores busy. Since the XCW tests share one build of the stored two-electron integrals (`save_eri` /
+`read_eri`): **1261 passed, 0 failed, 22 skipped** (2 disabled) of 1283, 230.6 +- 16.8 s wall and 899 +- 66 CPU-s,
+3.90 of 4 cores busy.
+
+As of 2026-10-13, after `72d83cd`, `ctest --preset release-linux` reports **1257 passed, 0 failed,
+22 skipped** (2 disabled) of 1279. New since `d5a9755`: `NboNativeTests.MethylRadicalSplitsItsBondsPerSpinAsNbo7Does`
+(fixture `tests/ch3_occ/ch3.owf.fchk`), `NboNativeTests.AGrownNrtCycleStatesAFloorItsFitRespects`,
+`NboNativeTests.AnEcpFchkKeepsTheElementAndItsCore` (fixture `tests/hi_occ/hi.owf.fchk`),
+`NrtTests.TheParentsSymmetryImageCompletesTheHexagon` and
+`NrtTests.OppositelyPolarisedOrbitalsOfABondDoNotCancelInItsIonicShare`. After `36e482b` the counts are the
+same. The suite takes 280.5 +- 5.9 s wall, against 334.2 +- 29.5 s before (95 % CI, n = 3 each). Three changes account
+for it: the P1 subset goldens read the I tensor `P1_test_XCW` saves; the adaptive-step fallback test runs on NH3Li; and the
+AO-to-MO step takes eight functions per pass, with outputs identical on GCC. See `UNIT_TESTS_STATUS.md`.
+
+As of 2026-10-13, `ctest --preset release-linux` on `density_source` `d5a9755` reports
+**1252 passed, 0 failed, 22 skipped** (2 disabled) of 1274 on the same 4-core VM. It took
+308.2 +- 13.1 s wall and 1207 +- 47 CPU-s, against 432.8 +- 5.5 s and 1704 +- 22 CPU-s for `80876cc`
+(95 % CI, n = 3 and 4). The changes: the XCW SCF tests read one shared I tensor, the two redundant
+`-xcw_incremental` goldens are gone, NH3Li's spin-resolved ELI-D is computed once, and the test preset
+sets `OMP_WAIT_POLICY=PASSIVE`. See `UNIT_TESTS_STATUS.md`.
+
+As of 2026-10-12, `ctest --preset release-linux` on `density_source` `0e6a0d3` reports
+**1246 passed, 0 failed, 22 skipped** (2 disabled) of 1270 on a GPU-less 4-core VM with GCC 13.3.
+The skips are 12 GPU tests, 7 `RUN_FULL_TEST` cases, two NBO tests that need gennbo and the Ce RGBI
+case behind `NOS_RGBI_SLOW_TESTS`. `0e6a0d3` keeps OCC from linking with lld under GCC, whose LTO
+objects lld cannot read; without it a GCC build fails wherever lld is installed. See
+`UNIT_TESTS_STATUS.md`.
+
 As of 2026-10-10, the XCW inversion screening also covers measured h / -h pairs (the row of -h is the conjugate of
 the row of h), next to the merging of inverse images within one reflection of 2026-10-08; P1 takes 5.0 s of I tensor
 instead of 9.8 s, and the XCW suites and P1 goldens report 45 passed, 0 failed. See `UNIT_TESTS_STATUS.md`.
@@ -289,7 +345,7 @@ which reports **22 PASS, exit 0**. NRT weights are compared by rank and never by
 reproduces TiCl4's `D(w)`, valencies and bond orders exactly while individual weights move 7.1
 points. `cmake --build --preset release-windows --target NoSpherA2_Tests` links again since
 `tests/src/CellMathTests.cpp` (which calls `cell` members that no longer exist) was excluded, and the
-binary reports **1111 passed, 0 failed, 8 skipped** from `build/release-windows/bin` - the relative
+binary reports **1270 passed, 0 failed, 9 skipped** (2026-10-12) from `build/release-windows/bin` - the relative
 fixture paths in the tests are what makes that the working directory. See `UNIT_TESTS_STATUS.md`.
 
 As of 2026-09-08, `ctest --preset release-linux` reports **267/267 passing** outside the XCW

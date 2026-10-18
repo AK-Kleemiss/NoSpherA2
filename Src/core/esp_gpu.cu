@@ -16,17 +16,15 @@ NOSPHERA2_GPU_API_BEGIN
 
 namespace {
 
-//esp_axis_terms in wfn_density.cpp: the (l, r, s) count of one axis with l_i + l_j = L, tabulated
-//the same way - three of these per pair is no place for a nested loop
+//esp_axis_terms of wfn_density.cpp: (l, r, s) count of one axis with l_i + l_j = L
 __device__ __constant__ int d_axis_terms[9] = { 1, 2, 5, 8, 14, 20, 30, 40, 55 };
 __device__ int axis_terms(const int L)
 {
 	return d_axis_terms[L];
 }
 
-//dT^k / k! and 1 / (2n - 1) as constants: a double division on a device is a software sequence and
-//the kernel did five per Boys call plus one per step of the F_n recursion. wfn_density.cpp carries
-//the same two tables, so host and device stay comparable to the 1E-9 the unit test gates on.
+//1/k! and 1/(2n-1) as constant multiplies: a device double division is a software sequence.
+//wfn_density.cpp carries the same tables, so host and device agree
 __device__ __constant__ double d_inv_k[6] = { 0.0, 1.0, 0.5, 1.0 / 3.0, 0.25, 0.2 };
 __device__ __constant__ double d_inv_odd[9] = { 0.0, 1.0, 1.0 / 3.0, 0.2, 1.0 / 7.0, 1.0 / 9.0, 1.0 / 11.0, 1.0 / 13.0, 1.0 / 15.0 };
 
@@ -68,8 +66,7 @@ __global__ void esp_kernel(
 		ESP += q[a] / sqrt(dx * dx + dy * dy + dz * dz);
 	}
 
-	//build_ESP_pairs refuses past g, so MaxFn = |l_i| + |l_j| <= 8. B[axis][k] is the axis summed by
-	//F index and pw the powers of one axis' PC, reused - 45 doubles of per-thread state
+	//build_ESP_pairs refuses past g, so MaxFn = |l_i| + |l_j| <= 8; B[axis][k]: axis summed by F index, pw: powers of one axis' PC
 	double Fn[9], B[3][9], pw[9];
 	for (int p = 0; p < npairs; p++)
 	{
@@ -85,9 +82,8 @@ __global__ void esp_kernel(
 			ESP -= weight[p] * ((coef[c] * coef[c + 1]) * coef[c + 2] * boys_dev(0, ex * sqpc, 0.0, tab, nT, stride, step));
 			continue;
 		}
-		//the host's gate, on the device: past T = 60 exp(-T) is 8.8E-27 against an F_0 of 0.114
-		//and an F_8 of 7E-12, so it sits below the last bit of every term it is added to. Most of
-		//a 45-atom table is distant from any one point, and exp() is the only transcendental here.
+		//same gate as the host: past T = 60 exp(-T) is below the last bit of every F_n it enters;
+		//most pairs are far from any one point and exp() is the only transcendental here
 		const double T = ex * sqpc;
 		const double expc = T < 60.0 ? exp(-T) : 0.0;
 		Fn[MaxFn] = boys_dev(MaxFn, T, expc, tab, nT, stride, step);
@@ -95,9 +91,8 @@ __global__ void esp_kernel(
 		for (int nu = MaxFn - 1; nu >= 0; nu--)
 			Fn[nu] = (expc + twoexpc * Fn[nu + 1]) * d_inv_odd[nu + 1];
 
-		//every (l, r, s) term of an axis multiplies exactly one F index, so summing each axis into
-		//B[k] first replaces nl * nm * nn products - each of them three global loads deep - with
-		//nl + nm + nn loads and (L0+1)(L1+1)(L2+1) register products indexed by the loop counters
+		//each (l, r, s) term of an axis multiplies exactly one F index, so summing each axis into B[k]
+		//first turns nl * nm * nn global-load products into nl + nm + nn loads and (L0+1)(L1+1)(L2+1) register products
 		const int Lv[3] = { L0, L1, L2 };
 		const double PCv[3] = { PCx, PCy, PCz };
 #pragma unroll
@@ -125,9 +120,8 @@ __global__ void esp_kernel(
 	out[g] = ESP;
 }
 
-//The pair table is the same for every point set of a run (one wavefunction, one cube or one
-//mesh), so it is uploaded once and kept until the table pointer changes or the process ends.
-const double* held_coef = nullptr;
+//buffers stay allocated while the sizes match; the contents are uploaded on every call, since a table
+//at the same address with the same sizes can still be a different molecule or geometry
 int held_npairs = 0, held_ncoef = 0, held_nat = 0;
 double *d_ax = nullptr, *d_ay = nullptr, *d_az = nullptr, *d_q = nullptr;
 double *d_ex = nullptr, *d_w = nullptr, *d_P = nullptr, *d_coef = nullptr, *d_tab = nullptr;
@@ -142,7 +136,6 @@ void esp_gpu_free()
 	d_ax = d_ay = d_az = d_q = d_ex = d_w = d_P = d_coef = d_tab = nullptr;
 	d_L = d_off = nullptr;
 	d_pcp = d_fni = nullptr;
-	held_coef = nullptr;
 	held_npairs = held_ncoef = held_nat = 0;
 }
 }
@@ -163,13 +156,13 @@ bool esp_gpu_eval(
 	const size_t pt_bytes = sizeof(double) * (size_t)(np < ESP_CHUNK ? np : ESP_CHUNK) * 4;
 	size_t freeb = 0, totalb = 0;
 	if (gpuMemGetInfo(&freeb, &totalb) != gpuSuccess) return false;
-	const bool reuse = (held_coef == coef && held_npairs == npairs && held_ncoef == ncoef && held_nat == n_at);
-	if ((reuse ? 0 : pairs_bytes) + pt_bytes + (1u << 26) > freeb) return false;
+	const bool sized = (held_npairs == npairs && held_ncoef == ncoef && held_nat == n_at);
+	if ((sized ? 0 : pairs_bytes) + pt_bytes + (1u << 26) > freeb) return false;
 
-	if (!reuse)
+	const size_t at = sizeof(double) * (size_t)n_at;
+	if (!sized)
 	{
 		esp_gpu_free();
-		const size_t at = sizeof(double) * (size_t)n_at;
 		GPU_TRY(gpuMalloc(&d_ax, at)); GPU_TRY(gpuMalloc(&d_ay, at)); GPU_TRY(gpuMalloc(&d_az, at)); GPU_TRY(gpuMalloc(&d_q, at));
 		GPU_TRY(gpuMalloc(&d_ex, sizeof(double) * (size_t)npairs));
 		GPU_TRY(gpuMalloc(&d_w, sizeof(double) * (size_t)npairs));
@@ -179,24 +172,23 @@ bool esp_gpu_eval(
 		GPU_TRY(gpuMalloc(&d_coef, sizeof(double) * (size_t)ncoef));
 		GPU_TRY(gpuMalloc(&d_pcp, (size_t)ncoef)); GPU_TRY(gpuMalloc(&d_fni, (size_t)ncoef));
 		GPU_TRY(gpuMalloc(&d_tab, sizeof(double) * (size_t)nT * stride));
-		GPU_TRY(gpuMemcpy(d_ax, ax, at, gpuMemcpyHostToDevice));
-		GPU_TRY(gpuMemcpy(d_ay, ay, at, gpuMemcpyHostToDevice));
-		GPU_TRY(gpuMemcpy(d_az, az, at, gpuMemcpyHostToDevice));
-		GPU_TRY(gpuMemcpy(d_q, q, at, gpuMemcpyHostToDevice));
-		GPU_TRY(gpuMemcpy(d_ex, ex_sum, sizeof(double) * (size_t)npairs, gpuMemcpyHostToDevice));
-		GPU_TRY(gpuMemcpy(d_w, weight, sizeof(double) * (size_t)npairs, gpuMemcpyHostToDevice));
-		GPU_TRY(gpuMemcpy(d_P, P, sizeof(double) * (size_t)npairs * 3, gpuMemcpyHostToDevice));
-		GPU_TRY(gpuMemcpy(d_L, L, sizeof(int) * (size_t)npairs * 3, gpuMemcpyHostToDevice));
-		GPU_TRY(gpuMemcpy(d_off, off, sizeof(int) * (size_t)(npairs + 1), gpuMemcpyHostToDevice));
-		GPU_TRY(gpuMemcpy(d_coef, coef, sizeof(double) * (size_t)ncoef, gpuMemcpyHostToDevice));
-		GPU_TRY(gpuMemcpy(d_pcp, pc_pow, (size_t)ncoef, gpuMemcpyHostToDevice));
-		GPU_TRY(gpuMemcpy(d_fni, fn_idx, (size_t)ncoef, gpuMemcpyHostToDevice));
-		GPU_TRY(gpuMemcpy(d_tab, boys_tab, sizeof(double) * (size_t)nT * stride, gpuMemcpyHostToDevice));
-		held_coef = coef, held_npairs = npairs, held_ncoef = ncoef, held_nat = n_at;
+		held_npairs = npairs, held_ncoef = ncoef, held_nat = n_at;
 	}
+	GPU_TRY(gpuMemcpy(d_ax, ax, at, gpuMemcpyHostToDevice));
+	GPU_TRY(gpuMemcpy(d_ay, ay, at, gpuMemcpyHostToDevice));
+	GPU_TRY(gpuMemcpy(d_az, az, at, gpuMemcpyHostToDevice));
+	GPU_TRY(gpuMemcpy(d_q, q, at, gpuMemcpyHostToDevice));
+	GPU_TRY(gpuMemcpy(d_ex, ex_sum, sizeof(double) * (size_t)npairs, gpuMemcpyHostToDevice));
+	GPU_TRY(gpuMemcpy(d_w, weight, sizeof(double) * (size_t)npairs, gpuMemcpyHostToDevice));
+	GPU_TRY(gpuMemcpy(d_P, P, sizeof(double) * (size_t)npairs * 3, gpuMemcpyHostToDevice));
+	GPU_TRY(gpuMemcpy(d_L, L, sizeof(int) * (size_t)npairs * 3, gpuMemcpyHostToDevice));
+	GPU_TRY(gpuMemcpy(d_off, off, sizeof(int) * (size_t)(npairs + 1), gpuMemcpyHostToDevice));
+	GPU_TRY(gpuMemcpy(d_coef, coef, sizeof(double) * (size_t)ncoef, gpuMemcpyHostToDevice));
+	GPU_TRY(gpuMemcpy(d_pcp, pc_pow, (size_t)ncoef, gpuMemcpyHostToDevice));
+	GPU_TRY(gpuMemcpy(d_fni, fn_idx, (size_t)ncoef, gpuMemcpyHostToDevice));
+	GPU_TRY(gpuMemcpy(d_tab, boys_tab, sizeof(double) * (size_t)nT * stride, gpuMemcpyHostToDevice));
 
-	//chunked, so the device side stays bounded however big the grid is and no single launch runs
-	//long enough to meet a display driver's watchdog
+	//chunked: bounded device memory, and no launch long enough to trip a display driver's watchdog
 	const int chunk = np < ESP_CHUNK ? np : ESP_CHUNK;
 	double *d_pts = nullptr, *d_out = nullptr;
 	if (gpuMalloc(&d_pts, sizeof(double) * (size_t)chunk * 3) != gpuSuccess) return false;

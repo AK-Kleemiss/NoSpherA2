@@ -3,16 +3,8 @@
 #include "core/spherical_density.h"
 #include "core/constants.h"
 
-// Tests for the compiled-in delta_k series, which turns a charge |q| > 1 from an
-// EXTRAPOLATION (the neutral picking up a negative weight in
-// rho_q = (1-|q|) rho_0 + |q| rho_ion) into an interpolation between two
-// adjacent bound states:
-//
-//     rho_q = rho_n - f * delta_{n+1},   rho_n = rho_1 - sum_{k=2..n} delta_k
-//
-// The properties worth pinning down are the ones a silent indexing mistake
-// would break: the electron count, the absence of a negative excursion, that
-// r-space and s-space agree, and that nothing changed for |q| <= 1.
+// The delta_k series replaces the extrapolation rho_q = (1-|q|) rho_0 + |q| rho_ion for |q| > 1 by
+// rho_q = rho_n - f * delta_{n+1}, rho_n = rho_1 - sum_{k=2..n} delta_k, between adjacent bound states.
 
 namespace
 {
@@ -61,8 +53,6 @@ namespace
 	}
 }
 
-// The whole point of the exercise: past +1 the shape must come from bound
-// states, not from running the neutral past its own weight.
 TEST(DeltaSeriesTests, PastPlusOneInterpolatesInsteadOfExtrapolating)
 {
 	for (const int Z : kDeltaElements)
@@ -78,9 +68,7 @@ TEST(DeltaSeriesTests, PastPlusOneInterpolatesInsteadOfExtrapolating)
 	}
 }
 
-// Each delta_k is normalised to exactly one electron, so f(k->0) must land on
-// Z - q. This is the property the old linear blend got exactly right, and the
-// delta route is not allowed to regress on it.
+// Each delta_k holds exactly one electron, so f(k->0) = Z - q
 TEST(DeltaSeriesTests, ElectronCountStaysExactPastPlusOne)
 {
 	for (const int Z : kDeltaElements)
@@ -94,9 +82,7 @@ TEST(DeltaSeriesTests, ElectronCountStaysExactPastPlusOne)
 	}
 }
 
-// Where does the residual negative excursion sit, and how big is it next to the
-// local density? Absolute size alone cannot answer that: 1e-5 e/bohr^3 is
-// nothing at r ~ 1 bohr and a sign error out in the tail.
+// Relative to the local density: 1e-5 e/bohr^3 is nothing at r ~ 1 bohr but a sign error in the tail
 TEST(DeltaSeriesTests, DISABLED_ProfileTheNegativeExcursion)
 {
 	for (const int Z : {20, 24, 26, 29, 30, 35})
@@ -135,8 +121,6 @@ TEST(DeltaSeriesTests, DISABLED_ProfileTheNegativeExcursion)
 	}
 }
 
-// What does the form factor actually do as k -> 0? It should tend to the
-// electron count; the value AT k = 0 turned out not to.
 TEST(DeltaSeriesTests, DISABLED_ProbeFormFactorNearZero)
 {
 	const HE_Spherical_Atom a(26, 2.5);
@@ -145,11 +129,7 @@ TEST(DeltaSeriesTests, DISABLED_ProbeFormFactorNearZero)
 	std::cout << "  expected electron count = " << 26.0 - 2.5 << std::endl;
 }
 
-// The old path gave the neutral a negative weight, so it dipped by construction.
-// Walking down through bound states removes that mechanism, but the base is a
-// Slater cation while the differences are GTO, and the two do not cancel to
-// machine precision -- a small residual dip survives. Pin it to the measured
-// scale so a real regression still shows up.
+// The Slater cation base and the GTO differences do not cancel exactly, so a small dip survives
 TEST(DeltaSeriesTests, ResidualNegativeExcursionStaysNegligible)
 {
 	for (const int Z : kDeltaElements)
@@ -159,10 +139,7 @@ TEST(DeltaSeriesTests, ResidualNegativeExcursionStaysNegligible)
 	}
 }
 
-// The reason for the whole exercise, stated as a number: the dip has to be
-// much smaller than what the extrapolation it replaces would have produced.
-// Measured 39x (Ca) to 490x (Cu); require at least 10x so a genuine regression
-// trips the test without it being brittle about the exact factor.
+// 10x leaves margin, so the test is not brittle about the exact factor
 TEST(DeltaSeriesTests, DeltaRouteBeatsTheExtrapolationItReplaces)
 {
 	for (const int Z : kDeltaElements)
@@ -186,10 +163,7 @@ TEST(DeltaSeriesTests, DeltaRouteBeatsTheExtrapolationItReplaces)
 	}
 }
 
-// r-space and s-space are two tabulations of one atom. If the log-grid index
-// were off by one, or the r tables were misaligned with the f tables, the
-// integrated density would stop matching the electron count while both still
-// looked plausible on their own.
+// An off-by-one log-grid index or r tables misaligned with the f tables break the count while each looks plausible
 TEST(DeltaSeriesTests, IntegratedDensityMatchesTheElectronCount)
 {
 	for (const int Z : {20, 26, 29})
@@ -203,8 +177,7 @@ TEST(DeltaSeriesTests, IntegratedDensityMatchesTheElectronCount)
 	}
 }
 
-// At exactly +1 the old path returns the tabulated ion. Stepping just past it
-// must not jump: the delta route has to start from that same ion.
+// At exactly +1 the tabulated ion is returned; the delta route must start from it
 TEST(DeltaSeriesTests, ContinuousAcrossPlusOne)
 {
 	for (const int Z : kDeltaElements)
@@ -228,8 +201,6 @@ TEST(DeltaSeriesTests, ContinuousAcrossPlusOne)
 	}
 }
 
-// |q| <= 1 was already an interpolation between neutral and the tabulated ion.
-// The delta tables must not touch it.
 TEST(DeltaSeriesTests, UpToPlusOneIsUnaffected)
 {
 	for (const int Z : kDeltaElements)
@@ -245,10 +216,7 @@ TEST(DeltaSeriesTests, UpToPlusOneIsUnaffected)
 	}
 }
 
-// Carbon is the one element whose delta_2 failed validation when the series was
-// generated, and rho_m is a running sum from k=2, so delta_3 alone is unusable.
-// It must fall back to the old extrapolation rather than half-apply a chain,
-// and must still report itself as extrapolating.
+// Carbon's delta_2 failed validation and rho_m sums from k=2, so delta_3 alone is unusable
 TEST(DeltaSeriesTests, ElementWithoutAContiguousChainFallsBack)
 {
 	const HE_Spherical_Atom c(6, 2.5);
@@ -258,8 +226,7 @@ TEST(DeltaSeriesTests, ElementWithoutAContiguousChainFallsBack)
 	EXPECT_NEAR(c.get_form_factor(kNearZero), 6.0 - 2.5, kCountTol);
 }
 
-// Anions past -1 are unbound, so no reference state exists to walk towards and
-// the delta route must not engage for negative charges.
+// Anions past -1 are unbound, so there is no reference state to walk towards
 TEST(DeltaSeriesTests, AnionsPastMinusOneDoNotUseTheSeries)
 {
 	for (const int Z : {8 /*O*/, 17 /*Cl*/})
@@ -269,8 +236,6 @@ TEST(DeltaSeriesTests, AnionsPastMinusOneDoNotUseTheSeries)
 	}
 }
 
-// Beyond the tabulated k the chain simply is not there, so a charge past it has
-// to fall back rather than silently truncate the walk at the last delta.
 TEST(DeltaSeriesTests, ChargeBeyondTheTabulatedRangeFallsBack)
 {
 	const HE_Spherical_Atom a(26, 4.5);   // Fe, tables stop at delta_3

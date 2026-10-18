@@ -15,25 +15,18 @@ Nr of reflections to be used: 402
 Generating k-points...                            ... done!
 Number of k-points to evaluate: 402
 XCW: I/sigma(I) >= 2 (F/sigma(F) >= 4): 394 of 402 reflections in the fit; R1 and Criterion are over these, R1(all) and Crit(all) over all
-XCW orbital basis set: sto-3g
-XCW: I/sigma(I) >= 2 (F/sigma(F) >= 4): 394 of 402 reflections in the fit; R1 and Criterion are over these, R1(all) and Crit(all) over all
-GridManager: Setting up prototype grids for atom types...
-GridManager: Generating integration grids for atoms...
-GridManager: Generated total of 93098 grid points.
-Total number of grid points after pruning: 93092
-AO values calculated for all grids.
-Screened out 1802 unique pairs of mu, nu (33.64%) 
-Skipped evaluation of 8107938 grids (16.37%) 
+XCW orbital basis set: sto-3g-basis
+I tensor read from p1_i.bin (10.9002 MB, single precision), not recomputed, held in memory
 More detailed output in SCF.log file...
 ____________________________________________________________________________________
  Lambda		Criterion	GooF(F2)	R1(gt)		Total Energy		Perturbation	Target quantity		Crit(all)	R1(all)
 								(Eh)			(a. u.)		(a. u.)
 ____________________________________________________________________________________
 0.00000		5.5935		5.5935		0.02545		-1961.925585145		0.000		-1961.925585145		5.4939		0.02588
-0.01000		4.5157		4.5157		0.02351		-1961.885911620		0.045		-1961.840754315		4.4357		0.02391
-0.02000		4.0969		4.0969		0.02255		-1961.833803511		0.082		-1961.751865733		4.0244		0.02293
-0.03000		3.8338		3.8338		0.02187		-1961.782409063		0.115		-1961.667394387		3.7660		0.02224
-0.04000		3.6439		3.6439		0.02134		-1961.733087769		0.146		-1961.587333210		3.5795		0.02170
-0.05000		3.4967		3.4967		0.02091		-1961.686038575		0.175		-1961.511203377		3.4350		0.02126
+0.01000		4.5157		4.5157		0.02351		-1961.885911569		0.045		-1961.840754256		4.4357		0.02391
+0.02000		4.0969		4.0969		0.02255		-1961.833803428		0.082		-1961.751865638		4.0244		0.02293
+0.03000		3.8338		3.8338		0.02187		-1961.782408959		0.115		-1961.667394267		3.7660		0.02224
+0.04000		3.6439		3.6439		0.02134		-1961.733087646		0.146		-1961.587333068		3.5795		0.02170
+0.05000		3.4967		3.4967		0.02091		-1961.686038436		0.175		-1961.511203215		3.4350		0.02126
 WARNING: Unexpected number of extrema (0) found between atoms 8 and 9. Setting chi to 1.0.
 Finished XCW fitting procedure.

@@ -9,7 +9,8 @@
 #include <limits>
 
 XCW_solver::XCW_solver(options& opt_in) : opt(&opt_in), sf(opt_in) {
-	std::cout << "XCW orbital basis set: " << opt->xcw_settings.basis_set_name << std::endl;
+	std::cout << "XCW orbital basis set: " << sf.orbital_basis->get_name() << std::endl;
+	writer.log << "XCW orbital basis set: " << sf.orbital_basis->get_name() << std::endl;
 }
 
 //z_h = (|F_obs,h| - |F_calc,h|) / sigma_h for the converged F_calc/F_scale over
@@ -538,7 +539,7 @@ occ::qm::HartreeFock XCW_solver::setup_system() {
 	// Sets up the OCC molecule
 	const occ::core::Molecule mol = SCF_wrapper::setup_SCF_mol(sf.asym_atoms, opt->xcw_settings.charge, opt->xcw_settings.multiplicity);
 	// Sets up the OCC basis set
-	const occ::qm::AOBasis occ_basis_set = SCF_wrapper::setup_basis(mol, opt->xcw_settings.basis_set_name);
+	const occ::qm::AOBasis occ_basis_set = sf.orbital_basis->to_AOBasis(mol.atoms());
 	occ::qm::HartreeFock hf(occ_basis_set);
 
 	// Handles density fitting basis
@@ -666,18 +667,6 @@ void XCW_solver::run() {
 	};
 	const double min_lambda_step = opt->xcw_settings.xcw_step_size / 128.0;
 	double last_lambda = opt->xcw_settings.xcw_start_value;
-	//slow_conv's damping (alpha 0.8, shift 1) is for the perturbed steps, which start from
-	//converged orbitals; from the core guess it runs out of iterations (Fe(phen)2(SCN)2 UHF:
-	//200 iterations, RMSD still 4e-5). The first step without a guess takes the normal
-	//schedule, every later one the slow settings from the file
-	options::SCF_settings& scf_settings = scf_solver.settings;
-	const bool slow_start = scf_settings.slow_conv && !has_guess;
-	const double slow_alpha = scf_settings.alpha, slow_shift = scf_settings.level_shift, slow_stop_damping = scf_settings.diis_stop_damping, slow_stop_shift = scf_settings.diis_stop_shift;
-	if (slow_start) {
-		scf_settings.alpha = 0.5; scf_settings.level_shift = 0.5; scf_settings.diis_stop_damping = 1e-3; scf_settings.diis_stop_shift = 1e-2;
-		std::cout << "XCW: slow_conv - the unperturbed first step runs the normal schedule, slow damping from the second step on" << std::endl;
-		writer.log << "XCW: slow_conv - the unperturbed first step runs the normal schedule, slow damping from the second step on" << std::endl;
-	}
 	//The scan used to stop at max_value even when A^2 was still falling there, i.e. on the
 	//scan boundary instead of on lambda*, and only printed "extend the scan" afterwards.
 	//The perturbed steps start from converged orbitals and TRAH takes the ones that DIIS
@@ -689,9 +678,6 @@ void XCW_solver::run() {
 	int extra_steps = 0;
 	for (int step = 0; step < planned_steps; step++) {
 		const double lambda = step * opt->xcw_settings.xcw_step_size + opt->xcw_settings.xcw_start_value;
-		if (slow_start && step == 1) {
-			scf_settings.alpha = slow_alpha; scf_settings.level_shift = slow_shift; scf_settings.diis_stop_damping = slow_stop_damping; scf_settings.diis_stop_shift = slow_stop_shift;
-		}
 		const occ::qm::Wavefunction previous_wfn = last_wfn;
 		occ::qm::Wavefunction guess = last_wfn;
 		if (opt->xcw_extrapolate && step >= 2 && opt->xcw_settings.hf_type == occ::qm::SpinorbitalKind::Restricted) {

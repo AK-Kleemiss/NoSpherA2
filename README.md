@@ -1,5 +1,19 @@
 # NoSpherA2
 
+### XCW per-element orbital bases
+
+The XCW settings keyword `basis_overrides <file>` reads an all-electron BSE JSON
+file, replacing the orbital shells for its elements while retaining `basis_set`
+for all other elements. Relative paths are resolved beside the settings file;
+paths containing spaces can be quoted. General and combined angular-momentum
+contractions are split into individual spherical shells. The assembled basis
+is shared by the SCF, atomic grids and output wavefunction. ECP overrides are
+rejected. Olex2's XCW advanced-basis controls can fetch `SARC-DKH2` from BSE for
+selected heavy elements; light elements retain the fallback basis.
+
+This supplies SARC-DKH2 basis functions, not a DKH2 Hamiltonian: XCW's
+Hartree-Fock Hamiltonian remains non-relativistic.
+
 ![Build](https://github.com/AK-Kleemiss/NoSpherA2/actions/workflows/c-cpp_all.yml/badge.svg)
 [![DOI](https://img.shields.io/badge/DOI-10.1039/D0SC05526C-blue.svg)](https://doi.org/10.1039/D0SC05526C)
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/10849/badge)](https://www.bestpractices.dev/projects/10849)
@@ -12,9 +26,16 @@ Olex2 is provided free of charge by OlexSys Ltd. (https://www.olexsys.org)
 
 The software is provided as-is under the BSD-2 licence. Please see [LICENSE](./LICENSE) for further details!
 
-## Building NoSpherA2
+## Acknowledgments
+This software makes extensive use of the following external packages:
+- [libcint](https://github.com/sunqm/libcint)
+- [mdspan](https://github.com/kokkos/mdspan/tree/stable)
+- [featomic](https://github.com/metatensor/featomic)
+- [occ](https://github.com/peterspackman/occ)
+  - OCC was extensively used in XCW and is the engine used for calculating WFNs inside NoSpherA2. Please cite it if those functionalities were used: Spackman, P. R. (2026). Open Computational Chemistry (OCC) - A portable software library and program for quantum chemistry and crystallography. *J. Open Source Softw.* 11(117), 9609, [doi:10.21105/joss.09609](https://doi.org/10.21105/joss.09609).
 
-NoSpherA2 relies heavily on the submodule [featomic](https://github.com/metatensor/featomic) and the [mdSpan](https://github.com/kokkos/mdspan/tree/d34b447fbfdddfad63d2204923917e889ebe2e20) reference implementation. To clone this repository with all of its dependencies do:
+## Building NoSpherA2
+To clone this repository with all of its dependencies do:
 
 ```sh
 git clone --recursive https://github.com/AK-Kleemiss/NoSpherA2.git
@@ -66,7 +87,7 @@ cmake --preset release-windows -DNOSPHERA2_BUILD_TESTS=ON
 - `NOSPHERA2_DEPENDENCIES_ONLY` (default: `OFF`): build dependency targets only; this is intended for dependency-cache preparation.
 - `NOSPHERA2_GPU_AUTO` (default: `ON`): select CUDA for an NVIDIA driver or HIP for an AMD driver detected on the build host. Set it to `OFF` when choosing a backend explicitly.
 - `NOSPHERA2_USE_CUDA` (default: `OFF`): compile the CUDA GPU paths. This can be enabled explicitly on a GPU-less build host when a CUDA compiler is available.
-- `NOSPHERA2_USE_HIP` (default: `OFF`): compile the HIP GPU paths. Together with `NOSPHERA2_USE_CUDA` it produces one binary carrying both backends; at run time the backend with a device is used (`NOSPHERA2_GPU_BACKEND=cuda|hip` in the environment overrides the choice).
+- `NOSPHERA2_USE_HIP` (default: `OFF`): compile the HIP GPU paths. Together with `NOSPHERA2_USE_CUDA` it produces one binary carrying both backends; at run time the backend with a device is used (`-tune NOSPHERA2_GPU_BACKEND=cuda|hip` overrides the choice).
 - `NOSPHERA2_CUDA_PORTABLE` / `NOSPHERA2_HIP_PORTABLE` (default: `OFF`): compile for every supported NVIDIA / AMD architecture instead of only the build machine's GPU. Use this for a binary distributed to different GPUs.
 - `NOSPHERA2_USE_CUTLASS` (default: `ON`): use CUTLASS headers for the CUDA single-precision I-tensor GEMM. It has no additional runtime dependency.
 
@@ -104,11 +125,15 @@ cmake -P scripts/SetupVSEnvironment.cmake
 
 It configures `build/release-windows` and `build/debug-windows` and installs the dependencies (`libcint`, `occ`, `featomic`, MKL, ...) into `deps-install-release` / `deps-install-debug`, which the projects under `Windows/` read through the `NoSpherA2_release.props` / `NoSpherA2_debug.props` sheets in `Windows/Windows_utils/`. Run it again whenever a dependency changes; a solution that suddenly fails to compile against `occ` or `libcint` after a `git pull` usually just needs this refresh. The script reconfigures the CMake build directories, so do not run it while a CMake build is in progress.
 
+The platform follows the developer shell, which matches the machine by default: on Windows on ARM it sets up `build/release-windows-arm64` and installs into `deps-install-release-arm64` / `deps-install-debug-arm64`, the folders the `|ARM64` solution platform reads. `-DPLATFORM=x64` or `-DPLATFORM=ARM64` overrides it; an ARM64 setup on an x64 machine runs from a `vcvarsamd64_arm64` prompt after the x64 setup.
+
 Then open `Windows/NoSpherA2/NoSpherA2.sln` or build it from the same developer shell:
 
 ```powershell
 msbuild Windows\NoSpherA2\NoSpherA2.sln /p:Configuration=Release /p:Platform=x64 /m
 ```
+
+(`/p:Platform=ARM64` on Windows on ARM.)
 
 The solution holds four projects: `NoSpherA2_LIB` (everything under `Src/core`), `NoSpherA2` (the executable), `NoSpherA2_DLL` (the Olex2 DLL) and `Tests` (the GTest suite). The executable and the DLL land in `build\Release_x64\`, the tests in `Windows\Tests\Release_x64\Tests.exe`. The projects list their sources by hand while CMake globs them, so a `.cpp` or `.cu` added on the CMake side has to be added to the `.vcxproj` as well; `python scripts/check_vcxproj.py` reports the difference and runs as the first CI step.
 

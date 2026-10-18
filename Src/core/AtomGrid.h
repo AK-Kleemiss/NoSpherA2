@@ -15,7 +15,8 @@ public:
 		const int max_l_quantum_number,
 		const double alpha_min[],
 		std::ostream &file,
-		const double radial_step_scale = 1.0);
+		const double radial_step_scale = 1.0,
+		const bool generic_rotation = false);
 
 	~AtomGrid();
 

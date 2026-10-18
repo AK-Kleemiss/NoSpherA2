@@ -695,15 +695,14 @@ namespace
 		atoms[0].U_iso = 0.02;
 		atoms[0].anom = cdouble(0.1, 0.2);
 		atoms[1].grown = true;
+		//atom 1 is the image of atom 0 under -y, x-y, z
+		atoms[1].grown_from = 0;
+		atoms[1].grown_by = { 1 };
 		const vec U = { 0.03, 0.05, 0.02, 0.004, -0.006, 0.008 };
 		vec3 ADPs(1, vec2(3));
 		ADPs[0][0] = U;
 		ADPs[0][1] = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };
-		//atom 0 is its own image under x, y, z and maps onto atom 1 under -y, x-y, z
-		ivec3 links(1, ivec2(2));
-		links[0][0] = { 0 };
-		links[0][1] = { 1 };
-		c.grow_ADPs(atoms, links, ADPs);
+		c.grow_ADPs(atoms, ADPs);
 		ASSERT_EQ(ADPs.size(), 2u);
 		EXPECT_EQ(ADPs[0][0], U);
 		EXPECT_DOUBLE_EQ(atoms[1].U_iso, 0.02);
@@ -888,7 +887,6 @@ namespace
 		EXPECT_DOUBLE_EQ(s.level_shift, 0.5);
 		EXPECT_DOUBLE_EQ(s.diis_stop_damping, 1e-3);
 		EXPECT_DOUBLE_EQ(s.diis_stop_shift, 1e-2);
-		EXPECT_FALSE(s.slow_conv);
 		EXPECT_TRUE(s.method_apply_damping);
 		EXPECT_TRUE(s.method_apply_shift);
 		EXPECT_DOUBLE_EQ(s.xcw_start_value, 0.0);
@@ -913,7 +911,6 @@ namespace
 		EXPECT_DOUBLE_EQ(sloppy.gradient, 5e-4);
 		EXPECT_DOUBLE_EQ(sloppy.MaxP_diff, 1e-4);
 		EXPECT_DOUBLE_EQ(sloppy.RMSP_diff, 1e-5);
-		EXPECT_TRUE(sloppy.slow_conv);
 		EXPECT_DOUBLE_EQ(sloppy.alpha, 0.8);
 		EXPECT_DOUBLE_EQ(sloppy.level_shift, 1.0);
 		EXPECT_DOUBLE_EQ(sloppy.diis_stop_damping, 1e-5);

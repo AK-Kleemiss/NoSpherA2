@@ -15,6 +15,7 @@
 
 #include "core/convenience.h"
 #include "core/XCW_solver.h"
+#include "core/basis_set.h"
 #include "core/i_tensor_stream.h"
 #include "core/tsc_block.h"
 
@@ -169,6 +170,35 @@ namespace {
 		p1_run r = run_xcw(dir, fixture / "P1_test.cif", hkl, settings_text);
 		r.nr = nr;
 		return r;
+	}
+
+	//The tensor depends on geometry, basis and reflections only, the stored two-electron integrals on geometry and
+	//basis. Under ctest, SharedTensorBuild writes the subset's into NOS_TEST_SHARED_DIR once and the runs that test
+	//the SCF rather than these read them; without that directory or file every run builds its own, with the same numbers.
+	std::filesystem::path shared_tensor()
+	{
+		const char* d = std::getenv("NOS_TEST_SHARED_DIR");
+		if (d == nullptr || *d == '\0') return {};
+		return std::filesystem::path(d) / "xcw_p1_subset_i.bin";
+	}
+
+	//A read path is one settings token, so the file is copied into dir rather than named where it lies. The file
+	//holds the single-precision tiles summed in double; i_float rounds that sum to float on reading, as a
+	//single-precision build rounds it on storing.
+	std::string read_shared_eri(const std::filesystem::path& dir)
+	{
+		const auto p = shared_tensor();
+		if (p.empty() || !std::filesystem::exists(p.parent_path() / "xcw_p1_subset_eri.bin")) return "";
+		std::filesystem::copy_file(p.parent_path() / "xcw_p1_subset_eri.bin", dir / "shared_eri.bin", std::filesystem::copy_options::overwrite_existing);
+		return " read_eri shared_eri.bin";
+	}
+
+	std::string read_shared_tensor(const std::filesystem::path& dir, const bool held_double = false)
+	{
+		const auto p = shared_tensor();
+		if (p.empty() || !std::filesystem::exists(p)) return "";
+		std::filesystem::copy_file(p, dir / "shared_i.bin", std::filesystem::copy_options::overwrite_existing);
+		return (held_double ? " read shared_i.bin" : " read shared_i.bin i_float") + read_shared_eri(dir);
 	}
 
 	//One line of the lambda table XCW_solver::run prints per converged step:
@@ -534,6 +564,28 @@ TEST(XcwScfTensorFileTests, OpenRejectsDamagedHeaders)
 //------------------------------------------------------------------
 //XCW runs on P1
 
+//The FIXTURES_SETUP of xcw_p1_tensor (SetIntegrationTestLocks.cmake): one SCF iteration is enough
+//to have the tensor written, held in double as i_double keeps it
+TEST(XcwScfTests, SharedTensorBuild)
+{
+	if (p1_fixture().empty()) GTEST_SKIP() << "fixture tests/P1_test not found";
+	if (shared_tensor().empty()) GTEST_SKIP() << "NOS_TEST_SHARED_DIR is not set, so every run builds its own tensor";
+	const auto dir = scratch_dir();
+	std::filesystem::create_directories(shared_tensor().parent_path());
+	std::filesystem::remove(shared_tensor());
+	std::filesystem::remove(shared_tensor().parent_path() / "xcw_p1_subset_eri.bin");
+	const p1_run run = run_on_p1(dir, "normal normal_conv params 177 basis_set sto-3g max_iter 1 charge 0 mult 1 f rhf start 0 step_size 0.01 end 0 i_double save i.bin save_eri eri.bin");
+	ASSERT_NE(run.out.find("I tensor written to i.bin"), std::string::npos) << run.out;
+	ASSERT_TRUE(std::filesystem::exists(dir / "eri.bin")) << run.log;
+	size_t kept = 0;
+	bool single = true;
+	ASSERT_TRUE(i_tensor_file::matches(dir / "i.bin", run.nr, p1_nmo, kept, single));
+	EXPECT_FALSE(single);
+	std::filesystem::copy_file(dir / "i.bin", shared_tensor());
+	std::filesystem::copy_file(dir / "eri.bin", shared_tensor().parent_path() / "xcw_p1_subset_eri.bin");
+	std::filesystem::remove_all(dir);
+}
+
 //lambda = 0 is a plain Hartree-Fock: the energy of P1_test_XCW.good, the .tscb/.wfn/.fchk
 //of that step, damping and level shift switched off along the way. `save` writes the
 //tensor on a thread (`read` of a file not there yet builds it); a second run `read`s it
@@ -544,7 +596,7 @@ TEST(XcwScfTests, SaveThenReadTensorReproducesLambdaZero)
 	const auto dir = scratch_dir();
 	const std::string settings = common + "f rhf start 0 step_size 0.01 end 0 read tensor.bin save tensor.bin";
 
-	const p1_run first = run_on_p1(dir, settings);
+	const p1_run first = run_on_p1(dir, settings + read_shared_eri(dir));
 	EXPECT_EQ(first.nr, 402);
 	EXPECT_NE(first.out.find("XCW orbital basis set: sto-3g"), std::string::npos);
 	EXPECT_EQ(first.out.find("I tensor read from"), std::string::npos);
@@ -600,7 +652,7 @@ TEST(XcwScfTests, SaveThenReadTensorReproducesLambdaZero)
 	EXPECT_EQ(std::filesystem::file_size(dir / "tensor.bin"), 40u + 2u * kept * sizeof(int) + i_tensor_file::total_bytes(first.nr, kept, true));
 
 	//a tensor that is read is not saved again
-	const p1_run second = run_on_p1(dir, common + "f rhf start 0 step_size 0.01 end 0 read tensor.bin");
+	const p1_run second = run_on_p1(dir, common + "f rhf start 0 step_size 0.01 end 0 read tensor.bin" + read_shared_eri(dir));
 	EXPECT_NE(second.out.find("I tensor read from tensor.bin"), std::string::npos) << second.out;
 	EXPECT_NE(second.out.find(", single precision), not recomputed, held in memory"), std::string::npos) << second.out;
 	EXPECT_EQ(second.out.find("Screened out"), std::string::npos);
@@ -625,7 +677,7 @@ TEST(XcwScfTests, StreamedTensorMatchesInMemory)
 	const auto dir = scratch_dir();
 	const std::string settings = common + "f rhf start 0.01 step_size 0.01 end 0.01";
 
-	const p1_run held = run_on_p1(dir, settings);
+	const p1_run held = run_on_p1(dir, settings + read_shared_tensor(dir));
 	EXPECT_EQ(held.out.find("I tensor streamed to disk"), std::string::npos);
 	EXPECT_FALSE(std::filesystem::exists(dir / "I_tensor_stream.bin"));
 	const auto rows = lambda_rows(held.out);
@@ -642,12 +694,12 @@ TEST(XcwScfTests, StreamedTensorMatchesInMemory)
 	EXPECT_TRUE(physical_criterion(rows[0].goof2)) << rows[0].goof2;
 	EXPECT_NE(held.log.find("Starting XCW SCF solver with lambda = 0.01000"), std::string::npos);
 	EXPECT_NE(held.log.find("***SCF converged in "), std::string::npos);
-	const int screened = static_cast<int>(number_after(held.out, "Screened out "));
-	EXPECT_GT(screened, 0);
-	const size_t kept = static_cast<size_t>(p1_pairs - screened);
 
 	std::filesystem::remove(dir / "NA2_0010000.tscb");
-	const p1_run streamed = run_on_p1(dir, settings + " i_tensor_mb 1");
+	const p1_run streamed = run_on_p1(dir, settings + " i_tensor_mb 1" + read_shared_eri(dir));
+	const int screened = static_cast<int>(number_after(streamed.out, "Screened out "));
+	EXPECT_GT(screened, 0);
+	const size_t kept = static_cast<size_t>(p1_pairs - screened);
 	const std::string line_key = "I tensor streamed to disk: ";
 	ASSERT_NE(streamed.out.find(line_key), std::string::npos) << streamed.out;
 	EXPECT_NE(streamed.out.find("(single precision) total, "), std::string::npos) << streamed.out;
@@ -680,11 +732,32 @@ TEST(XcwScfTests, StreamedTensorMatchesInMemory)
 //`guess_basis`: the first lambda starts from OCC's own Hartree-Fock in that basis. With the
 //orbital basis itself as the guess basis the small SCF is the whole answer, so the log line
 //carries the golden energy and the XCW loop has nothing left to do beyond recognising it.
+TEST(XcwScfTests, OrbitalJsonOverridesMatchTheLibraryBasis)
+{
+	if (p1_fixture().empty()) GTEST_SKIP() << "P1 fixture not found";
+	const auto dir = scratch_dir();
+	const auto basis = BasisSetLibrary::get_basis_set("sto-3g");
+	basis->write_occ_json(dir / "override basis.json", { 1, 6, 7, 8, 16, 17 });
+	const auto baseline = run_on_p1(dir, common + "start 0 end 0 " + read_shared_tensor(dir));
+	const std::string eri = read_shared_eri(dir);
+	const auto overridden = run_on_p1(dir, common + "basis_overrides \"" + (dir / "override basis.json").string() + "\" start 0 end 0" + eri);
+	const auto a = lambda_rows(baseline.out), b = lambda_rows(overridden.out);
+	ASSERT_EQ(a.size(), 1u);
+	ASSERT_EQ(b.size(), 1u);
+	EXPECT_NEAR(a[0].d(a[0].energy), b[0].d(b[0].energy), 1e-8);
+	EXPECT_NEAR(a[0].d(a[0].criterion), b[0].d(b[0].criterion), 1e-6);
+	EXPECT_NE(overridden.log.find("_overrides_override basis.json"), std::string::npos);
+	//The library basis's stored integrals are keyed on every exponent, coefficient and centre: read back, the
+	//override is that basis to the last bit
+	if (!eri.empty()) EXPECT_NE(overridden.log.find("read from shared_eri.bin"), std::string::npos) << overridden.log;
+	std::filesystem::remove_all(dir);
+}
+
 TEST(XcwScfTests, SmallBasisGuessStartsFromConvergedDensity)
 {
 	if (p1_fixture().empty()) GTEST_SKIP() << "fixture tests/P1_test not found";
 	const auto dir = scratch_dir();
-	const p1_run run = run_on_p1(dir, common + "f rhf start 0 step_size 0.01 end 0 guess_basis sto-3g");
+	const p1_run run = run_on_p1(dir, common + "f rhf start 0 step_size 0.01 end 0 guess_basis sto-3g" + read_shared_tensor(dir));
 
 	const std::string key = "XCW: initial guess from a sto-3g Hartree-Fock (";
 	ASSERT_NE(run.log.find(key), std::string::npos) << run.log;
@@ -714,7 +787,7 @@ TEST(XcwScfTests, UnrestrictedClosedShellAgainstF2MatchesRestricted)
 {
 	if (p1_fixture().empty()) GTEST_SKIP() << "fixture tests/P1_test not found";
 	const auto dir = scratch_dir();
-	const p1_run run = run_on_p1(dir, common + "f2 uhf start 0 step_size 0.01 end 0");
+	const p1_run run = run_on_p1(dir, common + "f2 uhf start 0 step_size 0.01 end 0" + read_shared_tensor(dir));
 
 	ASSERT_NE(run.log.find("***SCF converged in "), std::string::npos) << run.log;
 	EXPECT_EQ(occurrences(run.log, "***Turned off level shift***"), 1u);
@@ -726,7 +799,7 @@ TEST(XcwScfTests, UnrestrictedClosedShellAgainstF2MatchesRestricted)
 	EXPECT_TRUE(std::filesystem::exists(dir / "NA2_0000000.tscb"));
 	EXPECT_TRUE(std::filesystem::exists(dir / "NA2_0000000.fchk"));
 
-	const p1_run rhf = run_on_p1(dir, common + "f2 rhf start 0 step_size 0.01 end 0");
+	const p1_run rhf = run_on_p1(dir, common + "f2 rhf start 0 step_size 0.01 end 0" + read_shared_tensor(dir));
 	const auto rows_rhf = lambda_rows(rhf.out);
 	ASSERT_EQ(rows_rhf.size(), 1u) << rhf.out;
 	EXPECT_EQ(rows_rhf[0].goof2, rows[0].goof2);
@@ -741,7 +814,7 @@ TEST(XcwScfTests, FastConvWeightedRunsWithoutDampingOrShift)
 {
 	if (p1_fixture().empty()) GTEST_SKIP() << "fixture tests/P1_test not found";
 	const auto dir = scratch_dir();
-	const p1_run run = run_on_p1(dir, "normal fast_conv params 177 basis_set sto-3g max_iter 100 charge 0 mult 1 f rhf start 0 step_size 0.01 end 0 weighted");
+	const p1_run run = run_on_p1(dir, "normal fast_conv params 177 basis_set sto-3g max_iter 100 charge 0 mult 1 f rhf start 0 step_size 0.01 end 0 weighted" + read_shared_tensor(dir));
 
 	EXPECT_NE(run.out.find("XCW: fitting against the 1/|H|^2-weighted residual self-energy criterion"), std::string::npos) << run.out;
 	EXPECT_NE(run.log.find("XCW: fitting against the 1/|H|^2-weighted residual self-energy criterion"), std::string::npos);
@@ -766,7 +839,7 @@ TEST(XcwScfTests, FiveIterationsAreDeterministicAndPhysical)
 {
 	if (p1_fixture().empty()) GTEST_SKIP() << "fixture tests/P1_test not found";
 	const auto dir = scratch_dir();
-	const std::string settings = "normal normal_conv params 177 basis_set sto-3g max_iter 5 charge 0 mult 1 f rhf start 0.01 step_size 0.01 end 0.01";
+	const std::string settings = "normal normal_conv params 177 basis_set sto-3g max_iter 5 charge 0 mult 1 f rhf start 0.01 step_size 0.01 end 0.01" + read_shared_tensor(dir);
 
 	const p1_run first = run_on_p1(dir, settings);
 	const auto rows = iteration_rows(first.log);
@@ -806,7 +879,7 @@ TEST(XcwScfTests, MaxIterOneStopsScanWithoutTscb)
 {
 	if (p1_fixture().empty()) GTEST_SKIP() << "fixture tests/P1_test not found";
 	const auto dir = scratch_dir();
-	const p1_run run = run_on_p1(dir, "normal normal_conv params 177 basis_set sto-3g max_iter 1 charge 0 mult 1 f rhf start 0 step_size 0.01 end 0.01");
+	const p1_run run = run_on_p1(dir, "normal normal_conv params 177 basis_set sto-3g max_iter 1 charge 0 mult 1 f rhf start 0 step_size 0.01 end 0.01" + read_shared_tensor(dir));
 
 	EXPECT_NE(run.log.find("***SCF did not converge***"), std::string::npos) << run.log;
 	EXPECT_EQ(run.log.find("***SCF converged in "), std::string::npos);
@@ -970,7 +1043,7 @@ TEST(XcwScfTests, ISigmaCutoffShrinksFitSetAndReportsAllReflections)
 {
 	if (p1_fixture().empty()) GTEST_SKIP() << "fixture tests/P1_test not found";
 	const auto dir = scratch_dir();
-	const p1_run run = run_on_p1(dir, common + "f rhf start 0 step_size 0.01 end 0 i_sigma 20");
+	const p1_run run = run_on_p1(dir, common + "f rhf start 0 step_size 0.01 end 0 i_sigma 20" + read_shared_tensor(dir));
 
 	const auto rows = lambda_rows(run.out);
 	ASSERT_EQ(rows.size(), 1u) << run.out;
@@ -996,14 +1069,13 @@ TEST(XcwScfTests, ISigmaCutoffShrinksFitSetAndReportsAllReflections)
 	std::filesystem::remove_all(dir);
 }
 
-//`slow_conv` keeps its damping for the perturbed steps; the unperturbed first step runs the
-//normal schedule, which reaches the golden lambda = 0 energy where slow damping stalls
-TEST(XcwScfTests, SlowConvStartsFromTheNormalSchedule)
+//`slow_conv` damps every step, the unperturbed first one included, and still reaches the golden lambda = 0 energy
+TEST(XcwScfTests, SlowConvDampsFromTheFirstStep)
 {
 	if (p1_fixture().empty()) GTEST_SKIP() << "fixture tests/P1_test not found";
 	const auto dir = scratch_dir();
-	const p1_run run = run_on_p1(dir, common + "f rhf start 0 step_size 0.01 end 0.01 slow_conv");
-	EXPECT_NE(run.out.find("XCW: slow_conv - the unperturbed first step runs the normal schedule"), std::string::npos) << run.out;
+	const p1_run run = run_on_p1(dir, common + "f rhf start 0 step_size 0.01 end 0.01 slow_conv" + read_shared_tensor(dir));
+	EXPECT_EQ(run.out.find("normal schedule"), std::string::npos) << run.out;
 	const auto rows = lambda_rows(run.out);
 	ASSERT_EQ(rows.size(), 2u) << run.out;
 	EXPECT_NEAR(rows[0].d(rows[0].energy), golden_energy, 1e-6);
@@ -1019,7 +1091,7 @@ TEST(XcwScfTests, ScaleIsStationaryForTheCriterion)
 {
 	if (p1_fixture().empty()) GTEST_SKIP() << "fixture tests/P1_test not found";
 	const auto dir = scratch_dir();
-	const p1_run run = run_on_p1(dir, common + "f rhf start 0 step_size 0.01 end 0");
+	const p1_run run = run_on_p1(dir, common + "f rhf start 0 step_size 0.01 end 0" + read_shared_tensor(dir));
 	std::istringstream dump(read_text(dir / "NA2_0000000_Fcalc.txt"));
 	std::string line;
 	double numerator = 0.0, denominator = 0.0;
@@ -1047,7 +1119,7 @@ TEST(XcwScfTests, SecondOrderStepsReachTheGoldenEnergy)
 {
 	if (p1_fixture().empty()) GTEST_SKIP() << "fixture tests/P1_test not found";
 	const auto dir = scratch_dir();
-	const p1_run run = run_on_p1(dir, common + "f rhf start 0 step_size 0.01 end 0 soscf");
+	const p1_run run = run_on_p1(dir, common + "f rhf start 0 step_size 0.01 end 0 soscf" + read_shared_tensor(dir));
 	EXPECT_NE(run.log.find("second-order steps on the orbital rotations from here"), std::string::npos) << run.log;
 	EXPECT_NE(run.log.find("TRAH: "), std::string::npos) << run.log;
 	EXPECT_NE(run.log.find("***SCF converged in"), std::string::npos) << run.log;
@@ -1066,7 +1138,7 @@ TEST(XcwScfTests, HessianVectorProductMatchesFiniteDifference)
 	if (p1_fixture().empty()) GTEST_SKIP() << "fixture tests/P1_test not found";
 	for (const std::string kind : { "f rhf", "f2 uhf" }) {
 		const auto dir = scratch_dir();
-		const p1_run run = run_on_p1(dir, common + kind + " start 0.02 step_size 0.01 end 0.02 i_double soscf check_hessian");
+		const p1_run run = run_on_p1(dir, common + kind + " start 0.02 step_size 0.01 end 0.02 i_double soscf check_hessian" + read_shared_tensor(dir, true));
 		const size_t at = run.log.find("Hessian check: |Hv - FD| / |FD| = ");
 		ASSERT_NE(at, std::string::npos) << run.log;
 		const double rel = std::stod(run.log.substr(at + std::string("Hessian check: |Hv - FD| / |FD| = ").size()));

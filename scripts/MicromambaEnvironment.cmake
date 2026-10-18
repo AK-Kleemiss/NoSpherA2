@@ -163,6 +163,11 @@ function(setup_micromamba_environment)
         "${CMAKE_HOST_SYSTEM_PROCESSOR}"
         host_processor
     )
+    # Unset in script mode (cmake -P), which made a Windows ARM64 host fetch win-64 packages
+    if(host_processor STREQUAL "")
+        cmake_host_system_information(RESULT host_processor QUERY OS_PLATFORM)
+        string(TOLOWER "${host_processor}" host_processor)
+    endif()
 
     if(WIN32)
         if(host_processor MATCHES "^(arm64|aarch64)$")

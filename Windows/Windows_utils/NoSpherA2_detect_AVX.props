@@ -1,42 +1,46 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <!--
-    Instruction-set policy for all x64 MSBuild projects in this repository.
+    Instruction-set policy for all x64 MSBuild projects in this repository,
+    the same as cmake/NoSpherA2Avx.cmake. Imported by NoSpherA2_universal.props,
+    so the LIB, the exe, the DLL and the tests all compile with one /arch.
 
     OCC static libs (Lib/occ/lib) and every binary linking them must agree on
     AVX vs SSE: Eigen object layouts differ between the two, and mixing them
     across the link boundary causes access-violation crashes.
 
-    Policy:
-      NOS_AVX=ON / OFF  (environment variable or msbuild property) - obey it.
-                        CI sets NOS_AVX=OFF for maximum compatibility.
-      unset             - detect the build host's AVX capability.
-
-    The same NOS_AVX variable is honored by the CMake build of OCC
-    (root CMakeLists.txt), keeping both sides consistent.
+    Policy (environment variable or msbuild property):
+      NOS_AVX=ON         /arch:AVX
+      NOS_AVX=OFF        /arch:SSE4.2 - the compatibility build, used by CI and
+                         for binaries handed out
+      unset              detect the build host: AVX, then AVX2
+      NOS_AVX2=ON / OFF  force /arch:AVX2, or keep a detecting build at AVX
+    The ISA is a build-time choice, never a run-time dispatch.
   -->
   <Target Name="NosSelectInstructionSet" BeforeTargets="ClCompile"
           Condition="'$(Platform)' == 'x64'">
-    <PropertyGroup>
-      <NosAvx Condition="'$(NOS_AVX)' != ''">$(NOS_AVX)</NosAvx>
-    </PropertyGroup>
-    <Exec Condition="'$(NosAvx)' == ''"
+    <!-- MSBuild compares strings case-insensitively, so ON also matches on -->
+    <Exec Condition="'$(NOS_AVX)' == ''"
           Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(SolutionDir)..\Windows_utils\detect_avx.ps1&quot;"
           ConsoleToMSBuild="true" StandardOutputImportance="low" EchoOff="true">
-      <Output TaskParameter="ConsoleOutput" PropertyName="NosAvx" />
+      <Output TaskParameter="ConsoleOutput" PropertyName="NosIsa" />
     </Exec>
     <PropertyGroup>
-      <NosInstructionSet Condition="'$(NosAvx)' == 'ON' or '$(NosAvx)' == 'on' or '$(NosAvx)' == 'true' or '$(NosAvx)' == 'TRUE' or '$(NosAvx)' == '1'">AdvancedVectorExtensions</NosInstructionSet>
-      <NosInstructionSet Condition="'$(NosInstructionSet)' == '' and ('$(NosAvx)' == 'OFF' or '$(NosAvx)' == 'off' or '$(NosAvx)' == 'false' or '$(NosAvx)' == 'FALSE' or '$(NosAvx)' == '0')">NotSet</NosInstructionSet>
+      <NosIsa Condition="'$(NOS_AVX)' == 'ON' or '$(NOS_AVX)' == 'TRUE' or '$(NOS_AVX)' == '1'">AVX</NosIsa>
+      <NosIsa Condition="'$(NOS_AVX)' == 'OFF' or '$(NOS_AVX)' == 'FALSE' or '$(NOS_AVX)' == '0'">SSE4.2</NosIsa>
+      <NosIsa Condition="'$(NOS_AVX2)' == 'ON' or '$(NOS_AVX2)' == 'TRUE' or '$(NOS_AVX2)' == '1'">AVX2</NosIsa>
+      <NosIsa Condition="'$(NosIsa)' == 'AVX2' and ('$(NOS_AVX2)' == 'OFF' or '$(NOS_AVX2)' == 'FALSE' or '$(NOS_AVX2)' == '0')">AVX</NosIsa>
     </PropertyGroup>
-    <Error Condition="'$(NosInstructionSet)' == ''"
-           Text="AVX detection failed (NOS_AVX='$(NosAvx)'). Set the NOS_AVX environment variable to ON or OFF, matching how the OCC libs in Lib/occ/lib were built." />
+    <Error Condition="'$(NosIsa)' != 'AVX2' and '$(NosIsa)' != 'AVX' and '$(NosIsa)' != 'SSE4.2'"
+           Text="Instruction-set detection failed (NOS_AVX='$(NOS_AVX)', got '$(NosIsa)'). Set the NOS_AVX environment variable to ON or OFF, matching how the OCC libs in Lib/occ/lib were built." />
+    <!-- MSBuild has no enum value for SSE4.2, so the switch goes in as an option -->
     <ItemGroup>
       <ClCompile>
-        <EnableEnhancedInstructionSet>$(NosInstructionSet)</EnableEnhancedInstructionSet>
+        <EnableEnhancedInstructionSet>NotSet</EnableEnhancedInstructionSet>
+        <AdditionalOptions>/arch:$(NosIsa) %(AdditionalOptions)</AdditionalOptions>
       </ClCompile>
     </ItemGroup>
     <Message Importance="high"
-             Text="NoSpherA2 instruction set: $(NosInstructionSet) (NOS_AVX='$(NosAvx)')" />
+             Text="NoSpherA2 instruction set: /arch:$(NosIsa) (NOS_AVX='$(NOS_AVX)', NOS_AVX2='$(NOS_AVX2)')" />
   </Target>
 </Project>

@@ -52,8 +52,6 @@ namespace {
 			if (!SP.basis_set_loaded()) load_basis_into_WFN(SP.wavy, BasisSetLibrary::get_basis_set(SP.get_dfbasis_name()));
 			coef = SP.gen_SALTED_densities();
 			err_checkf(SP.wavy.get_ncen() == wavy.get_ncen(), "The SALTED model does not cover every atom of " + wavy.get_path().string(), std::cout);
-			if (!opt.salted_charge_constraint)
-				std::cout << "Hint: -salted_charge_constraint pins the electron count of the prediction; a missing fraction of an electron shifts the whole ESP by q/r" << std::endl;
 			aux = SP.wavy;
 			aux.set_origin(e_origin::NOT_YET_DEFINED);
 		}

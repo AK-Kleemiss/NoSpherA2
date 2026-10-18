@@ -6,12 +6,9 @@
 #include "constants.h"
 #include "metatensor.h"
 
-//Predefine the SALTEDConfig struct, since it is used in the SALTED_Utils namespace
 struct SALTEDConfig;
 
-// Stores one contiguous slab per angular momentum. equicomb fixes l1/l2 for
-// substantial stretches of work, so this avoids the thousands of tiny vectors
-// in the former atom/channel/l/m representation.
+// One contiguous slab per angular momentum, since equicomb holds l1/l2 fixed over long stretches.
 class SALTEDDescriptors {
 public:
 	SALTEDDescriptors() = default;
@@ -66,14 +63,18 @@ namespace SALTED_Utils
 	cvec3 complex_to_real_transformation(ivec sizes);
 	//Removes the atoms the model cannot predict from wavy; returns which of the input atoms were removed
 	std::vector<char> filter_input(WFN& wavy, options& opt, const SALTEDConfig& config);
-	void set_lmax_nmax(std::unordered_map<std::string, int> &lmax, std::unordered_map<std::string, int> &nmax, const std::array<std::vector<primitive>, 118> &basis_set, std::vector<std::string> species);
+	void set_lmax_nmax(std::unordered_map<std::string, int> &lmax, std::unordered_map<std::string, int> &nmax, const BasisSet& basis_set, std::vector<std::string> species);
 	int get_lmax_max(std::unordered_map<std::string, int> &lmax);
 
-	inline featomic::SimpleSystem gen_featomic_system(const WFN& wfn)
+	// skip[a] != 0 leaves atom a out
+	inline featomic::SimpleSystem gen_featomic_system(const WFN& wfn, const std::vector<char>& skip = {})
 	{
 		featomic::SimpleSystem featomic_system;
-		for (const atom& a : *wfn.get_atoms_ptr())
+		const auto& atoms = *wfn.get_atoms_ptr();
+		for (size_t i = 0; i < atoms.size(); i++)
 		{
+			if (i < skip.size() && skip[i]) continue;
+			const atom& a = atoms[i];
 			d3 xyz = { constants::bohr2ang(a.get_coordinate(0)),
 										  constants::bohr2ang(a.get_coordinate(1)),
 										  constants::bohr2ang(a.get_coordinate(2)) };
@@ -121,6 +122,8 @@ struct aux_density_table
 	int n_at = 0, n_sh = 0, n_pr = 0, n_coef = 0;
 
 	vec cx, cy, cz, r2_max, pr_exp, pr_norm;
+	// per shell, the squared distance beyond which |r^l R| < 1e-10 for certain: the point kernels skip it there unevaluated
+	vec sh_r2;
 	// alpha^(l + 3/2), needed for Fourier-Bessel transform
 	vec pr_exp_l32;
 	ivec sh_start, sh_atom, sh_l, pr_start, coef_off;
@@ -168,13 +171,6 @@ struct aux_density_table
 void calc_aux_density(const aux_density_table& t, const vec& coefficients, const int np, const double* x, const double* y, const double* z, double* rho, double* gx = nullptr, double* gy = nullptr, double* gz = nullptr, double* lap = nullptr, double* hess = nullptr);
 
 vec calc_atomic_density(const std::vector<atom> &atoms, const vec &coefs);
-
-// Scale the l=0 coefficients so the predicted density integrates to the exact
-// electron count. Returns the applied factor (1.0 if nothing was done).
-double apply_charge_constraint(const std::vector<atom> &atoms, vec &coefs,
-							   int net_charge, bool spherical_fill_used,
-							   int n_filled, double filled_eeq_charge,
-							   double applied_fill_charge, std::ostream &file);
 
 cube calc_cube_ML(const vec& data, WFN &dummy, const int& atom_nr = -1);
 void calc_cube_ML(const vec& data, WFN& dummy, cube& cube_data, const int& atom_nr = -1);

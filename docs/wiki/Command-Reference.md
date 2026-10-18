@@ -169,6 +169,7 @@ is a separate flag and several can be written in one run.
 | `-def` | 0 | off | Static deformation density. Also `-DEF`. |
 | `-HDEF` | 0 | off | Hirshfeld deformation density. Also `-hdef`. |
 | `-MO <n>\|all` | 1 | | One molecular orbital, or every one. Repeat for several. |
+| `-ibo_cube <list>` | 1 | | Runs `-ibo` and writes `<wfn>_IBO_<n>.cube` for the IBOs in `<list>`: the numbers `-ibo` prints, `all`, or `C2:C3` (every bond-like IBO between atoms 2 and 3, labels 1-based, element optional), comma-separated, e.g. `6,C2:C3`. Same grid as `-MO`. |
 | `-s_rho` | 0 | off | Spin density. |
 | `-fukui` | 0 | off | Fukui function. Also `-Fukui`. Needs the virtual orbitals. |
 | `-esp_isosurface [v]` | 0-1 | `0.002` when bare, else off | ESP mapped onto a density isosurface at value `v`. |
@@ -217,6 +218,8 @@ delocalisation indices (LI/DI).
 
 Basins walk the analytic gradient by default; `-basin_cube` restores the older
 cube-based path. ELI-D and the fitted densities still use a cube on purpose.
+Both paths stop at the electron-density isosurface of 0.0001 e/bohr³; density
+outside it is reported separately from the finite basin populations and volumes.
 
 ## 7. Bonding analysis
 
@@ -225,12 +228,16 @@ Localised-orbital bonding descriptors. Two independent routes:
 * **In house**: `-nbo_native` runs the NBO search, the hybrid analysis, second-
   order perturbative (E2) donor-acceptor energies and natural resonance theory
   (NRT) inside NoSpherA2, with no external program. NRT is solved as a convex QP
-  over the simplex and parallelised over candidate structures.
+  over the simplex and parallelised over candidate structures. Each NRT bond
+  order comes with its range over the weights whose D(w) lies within 0.1 % of the
+  fit's: the fit determines a bond order only that far (benzene C-C 1.44-1.57).
 * **External**: `-nbo` writes a `.47` archive, calls `gennbo`, and parses the
   result. `-nbo_parse` parses an existing output.
 
 `-rgbi` is a separate scheme (resonance-group bond indices) and `-npa` gives
-natural population analysis on its own.
+natural population analysis on its own. `-ibo` gives IAO partial charges and
+intrinsic bond orbitals (Knizia, JCTC 9 (2013) 4834) against the MINAO
+reference basis, closed shell only.
 
 All of these need a contracted basis, so `.gbw`, `.fchk` or `.molden` — not
 `.wfn`/`.wfx`.
@@ -242,7 +249,7 @@ All of these need a contracted basis, so `.gbw`, `.fchk` or `.molden` — not
 | `-nbo_parse <file>` | 1 | | Parse an existing `gennbo` output. |
 | `-convert_to_47 <wfn>` | 1 | | Write the `.47` archive and stop. |
 | `-nbo_keywords <"...">` | 1 | | Extra `$NBO` keylist entries. |
-| `-nbo_exe <path>` | 1 | | The `gennbo` executable. |
+| `-nbo_exe <path>` | 1 | | The `gennbo` executable. On Windows, `wsl:<path>` names a binary inside WSL. |
 | `-nbo_dir <dir>` | 1 | | Working directory for the external run. |
 | `-nbo_json <file>` | 1 | | Write the analysis as JSON. |
 | `-nbo_47 <file>` | 1 | | Name for the written `.47`. |
@@ -259,8 +266,15 @@ All of these need a contracted basis, so `.gbw`, `.fchk` or `.molden` — not
 | `-nrt_no_symmetry` | 0 | off | Skip symmetry detection. |
 | `-nrt_no_components` | 0 | off | Do not split into components. |
 | `-nrt_no_ion` | 0 | off | Exclude ionic structures. |
+| `-nrt_rotate` | 0 | off | Native: a structure that is a symmetry image of one whose orbital sweeps converged starts its own sweeps from that structure's orbitals, rotated into place in the NAO basis, instead of the greedy fill. Sweeps on single runs: SF6 59124 -> 31900, TiCl4 9355 -> 2921, benzene 6157 -> 3424; bond orders over the 41 v2 molecules move by up to 2.2e-4. |
+| `-nrt_target <D(w)>` | 1 | one search | Native only, implies `-nrt`: walk arrows again from every structure the fit weights and refit, until D(w) reaches the value, no new structure takes weight or the `-nrt_max` pool is full; `0` = until one of the latter. |
+| `-nrt_screen <r\|off>` | 1 | off | Native, with `-nrt_target`: a walk that yields 200 or more new structures builds in full only those whose reduced cost, from orbitals taken from the walk root's untouched slots plus three sweeps, is below `r` - 16 at a time with their symmetry images, refitting in between. At `r` = 0.2 grown benzene, thiophene and PF5 run 2.4-2.9 times faster, but a structure whose orbitals settle late is missed: SF6 builds none of its walk and ends with D(w) 0.23 % above the unscreened fit, while thiophene, pyridine and Ni(CO)4 end below it through a different walk. |
+| `-nrt_no_mirror` | 0 | mirror on | Native: switches off what is otherwise default since 2026-10-14 (formerly opt-in `-nrt_mirror`, still accepted): a single move that adds no formal-charge separation (sum over atoms of \|valence electrons - Lewis electron count\|), such as the allyl cation's bond shift, counts as a whole resonance arrow instead of a dropped intermediate; symmetry images complete the candidate set even where the walk passed them as intermediates; the walk from a symmetry reference of the parent explores the structures the parent's walk already reached. With it allyl's and the allyl cation's mirror bonds are equal (without: 0.744/0.721 in the minority spin, 1.463/1.445 in the cation; NBO 7 weighs the two mirror structures equally), a cation distorted by 0.006 A stays within the symmetric fit's 0.1 % range, and grown Ni(CO)4 keeps Td. Mean \|dBO\| against NBO 7 over the 41 v2 molecules: 0.0356 with, 0.0384 without (LiF 0.997 against 0.000, NaCl 0.000 against 1.000, CF3 beta 0.031 against 0.167); r2SCAN 0.0451 against 0.0477. Grown thiophene finds 50 % more structures with it. |
+| `-nrt_stall <n>` | 1 | `0` = off | Native: a structure's orbital sweeps stop once Anderson mixing has not lowered the largest vector change by 0.1 % for `n` sweeps, instead of running to the cap of 200; the log counts the structures stopped this way. With `n` = 20, CPU time of single runs: Ni(CO)4 -41 %, SF6 -23 %, PF5 -20 %; 29 of the 41 v2 molecules give identical output, ten move by at most 1.6e-6 in D(w), BF4- by 5.5e-5, and Ni(CO)4 ends 0.05 % higher with bond orders moved by up to 0.0017; agreement with NBO 7 (mean \|dBO\| 0.0384 -> 0.0383) unchanged. Grown Ni(CO)4 (`-nrt_target 0`) ends 0.12 % higher with bond orders moved by up to 0.006. |
+| `-nrt_parent <file.json>` | 1 | search's own | Native only, closed shell, implies `-nrt`: the NBO search places this Lewis structure (NBO's `$CHOOSE`) and NRT starts from it. JSON `{"format": "NoSpherA2 Lewis structure", "version": 1, "atoms": N, "lone_pairs": {"O1": 2}, "bonds": [["O1", "H2", 1]]}`: atoms as element + 1-based index or a bare index, valence lone pairs only, bond orders 1-3; a `.native.nbo.json` is read through its `"parent_lewis"`. Refused with a one-line reason on an unknown label, wrong element, duplicate bond, order outside 1-3, an electron count that does not add up, `three_centre` or `alpha`/`beta` entries, or a bond beyond `-nrt_bond_scale`. The log compares its rho(NL) with the search's own best structure. |
 | `-npa` | 0 | off | Natural population analysis with the per-orbital table. |
 | `-npa_summary` | 0 | off | NPA, totals only. |
+| `-ibo` | 0 | off | IAO charges and IBOs (Pipek-Mezey-like, exponent 4, 2x2 Jacobi), listed as core / lone pair / bond-like / delocalised with IAO and Mulliken populations per atom. Closed-shell `.gbw` or spherical `.molden`; refuses unrestricted. `-ibo_cube` writes them as cubes. |
 | `-rgbi` | 0 | off | Resonance-group bond indices. |
 | `-rgbi_groups <"i,j,k"> [...]` | 1+ | | Explicit atom groups (comma-separated, per group). |
 | `-rgbi_basis nao\|ano` | 1 | `ano` | Orbital basis used for RGBI. |
@@ -272,6 +286,33 @@ All of these need a contracted basis, so `.gbw`, `.fchk` or `.molden` — not
 `-nbo_native`/`-nbo`/`-nbo_parse`/`-convert_to_47` flag it belongs to** — they
 are read by a loop starting at that flag's position, so anything earlier on the
 line is ignored without a warning.
+
+### EQC energy decomposition
+
+Rahm and Hoffmann's E = nX̄ + (Vnn − Eee) split of a bond-forming reaction,
+fragments → parent, printed as X-analysis `-m 2` prints it (Q, covalency and
+ionicity). Two modes:
+
+* **Mode 1** (`-eqc <gbw> -eqc_frag ...`): the ORCA `.gbw` seeds occ, which
+  re-converges the parent and then each fragment from the parent's density
+  block, so every term comes from one program. `E(ORCA)` is read from the `.out`
+  next to the gbw.
+* **Mode 2** (`-eqc_wfn <parent> <frag> <frag> ...`): every term read from the
+  files, no SCF. `.wfx` and `.fchk` carry their own energy; `.wfn`, `.gbw` and
+  `.molden` need the ORCA `.out` of the same name beside them.
+
+| Flag | Arguments | Default | Meaning |
+| --- | --- | --- | --- |
+| `-eqc [gbw]` | 0-1 | | Mode 1 on this ORCA gbw (or `-wfn`). |
+| `-eqc_frag <atoms> <charge> <mult>` | 3+ | | One fragment per triple, atoms 0-based as `0,2-4`; every atom in exactly one fragment. |
+| `-eqc_method hf\|<functional>` | 1 | `hf` | occ method for Mode 1; must be the gbw's. |
+| `-eqc_basis <name>` | 1 | from the gbw | Load the basis by name (needed with ECPs); checked against the gbw. |
+| `-eqc_cold` | 0 | off | Also converge every SCF from occ's own guess and report its iteration count. |
+| `-eqc_wfn <files>` | 3+ | | Mode 2: parent first, then the fragments. |
+
+Example, ethane into two methyl radicals:
+`NoSpherA2 -eqc ethane.gbw -eqc_frag 0,2-4 0 2 1,5-7 0 2`.
+Theory, every output line and the caveats: [EQC energy decomposition](EQC-Energy-Decomposition.md).
 
 ## 8. RI density fitting, SALTED and interaction energies
 
@@ -289,16 +330,13 @@ available from it.
 | --- | --- | --- | --- |
 | `-ri_fit <basis> [basis ...]` | 1+ | | RI-fit the density in these auxiliary basis sets, and use RI partitioning. Also `-RI_FIT`. |
 | `-ri_fit auto_aux [elements...] [basis...]` | 1+ | | Generate the auxiliary set automatically; element symbols right after `auto_aux` restrict which elements it is generated for, the basis names that follow fill the rest (first match wins). |
-| `-multipole_moments <scheme> <lmax>` | 2 | off (`lmax -1`) | Restrain the fit's multipole moments up to `lmax` (0-8), using `Hirshfeld`, `Becke`, `TFVC`, `MBIS` or `EMBIS` moments. |
+| `-multipole_moments <scheme> [lmax]` | 1-2 | off; omitted `lmax` is `0` | Restrain atomic moments up to `lmax` (0-8). The fit restrains atom-centred auxiliary coefficients for charges and dipoles; orders 2 and above use grid-partitioned rows for stability. It does not constrain the total electron count exactly. `Hirshfeld`, `TFVC`, `MBIS` and `EMBIS` supply the targets. `Nuclear`, `Mulliken` and `Sanderson` use atom-centred charge-only order 0; any supplied order is ignored. |
 | `-multipole_strength <w>` | 1 | `1.0` | Weight of the multipole restraints. Must be positive. |
-| `-multipole_partition` | 0 | on | Restrain partitioned atomic moments (the default). |
-| `-multipole_centre` | 0 | | Restrain moments about a single centre instead. Also `-multipole_center`. |
 | `-write_ri_coefs` | 0 | | Fit and write `RI_COEFS.npy`. One-shot. |
 | `-ri_cube <...>` | | | Cube of the fitted density. Also `-RI_CUBE`. |
 | `-SALTED <model>` | 1 | | Predict the density with a SALTED model — a directory or a `.salted` file. Also `-salted`. |
 | `-SALTED_COEFS` | 0 | | Predict and write the coefficients only. Needs `-wfn` (or `-xyz`) first. One-shot. Also `-salted_coefs`. |
 | `-SALTED_Training` | 0 | | Generate SALTED training data. Needs `-wfn` and `-ri_fit` first. One-shot. |
-| `-salted_charge_constraint` | 0 | off | Constrain the predicted density to the correct electron count. **Use it.** |
 | `-interaction_energy <A> <B>` | 2 | | Electrostatic interaction between two fitted densities. With `-SALTED` both are predicted, otherwise both are RI-fitted. One-shot. |
 | `-interaction_energy <A> <A.npy> <B> <B.npy>` | 4 | | The same from pre-computed coefficient files. One-shot. |
 | `-interaction_energies <job>` | 1 | | Every contacting molecule pair in the crystal, from a job file. |
@@ -322,7 +360,7 @@ mostly about where that tensor lives.
 | Flag | Arguments | Default | Meaning |
 | --- | --- | --- | --- |
 | `-do_XCW` | 0 | off | Run the XCW lambda scan. |
-| `-XCW_settings <file>` | 1 | | Settings file. Keywords include `stream`, `i_tensor_mb`, `save`, `read`, `df_basis`, `i_double`, `i_float`, `gaussian_halt` (halt the scan on the Gaussian-statistics criterion) and `strong_cutoff <x>` (cut-off separating strong from weak reflections, default `3.0`). |
+| `-XCW_settings <file>` | 1 | | Settings file. Keywords include `stream`, `i_tensor_mb`, `save`, `read`, `df_basis`, `i_double`, `i_float`, `gaussian_halt` (halt the scan on the Gaussian-statistics criterion), `strong_cutoff <x>` (cut-off separating strong from weak reflections, default `3.0`), and `save_eri <file>` / `read_eri <file>`, which write and reuse the stored two-electron integrals (geometry and basis only; a file of another basis or geometry is refused and the integrals are built). |
 | `-xcw_int_precision <eps>` | 1 | `1e-10` | Integral screening threshold. |
 | `-xcw_extrapolate` / `-no_xcw_extrapolate` | 0 | on | Extrapolate between lambda steps. |
 | `-xcw_incremental` / `-no_xcw_incremental` | 0 | off | Build the Fock matrix incrementally. |
