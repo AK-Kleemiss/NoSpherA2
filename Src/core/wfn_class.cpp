@@ -835,7 +835,7 @@ std::vector<asym_atom> WFN::extract_xyz(const std::string& unit) {
 			temp_coords[1] = constants::ang2bohr(temp_coords[1]);
 			temp_coords[2] = constants::ang2bohr(temp_coords[2]);
 		}
-		atoms.emplace_back(asym_atom(temp_atom.get_label(), temp_atom.get_charge(), temp_coords, dummy_coords, 1.0, cdouble(0.0, 0.0)));
+		atoms.emplace_back(asym_atom(temp_atom.get_label(), temp_atom.get_charge(), temp_coords, dummy_coords, 1.0, 1.0, cdouble(0.0, 0.0)));
 	}
 	return atoms;
 }

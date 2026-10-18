@@ -32,43 +32,44 @@ void XCW::construct(const options& opt_in) {
 	}
 	unit_cell = cell(cif, std::cout, opt->debug, opt->do_XCW);
 	hkl_enlarged = read_hkl_full(hkl_filename, hkl, opt->twin_law, unit_cell, std::cout, obs, opt->debug);
-	std::ofstream log3("log3.txt", std::ios::out);
-	bvec needs_grid;
-	read_atoms_from_CIF(cif_input, unit_cell, cryst.ncen, needs_grid, asym_atoms, opt->debug);
+	// Positions, U_iso, U_ij, C, D and the anomalous dispersion (per type or per site) of every atom
+	std::vector<vec2> cif_ADPs;
+	read_CIF(cif_input, unit_cell, cryst.ncen, asym_atoms, cif_ADPs, opt->debug);
 	err_checkf(cryst.ncen > 0, "No atoms were read from " + cif.string() + "! Is there an _atom_site loop with labels, type symbols and fractional coordinates?", std::cout);
 
-	// Adds symmetry generated atoms
+	// Crystallographic multiplicity of every asymmetric atom, the order of its site stabiliser
+	unit_cell.asym_unit_cryst_mult(asym_atoms);
 	if (settings.grown) {
+		// Adds the symmetry generated atoms of the xyz file, then finds parent and generating operation of each
 		unit_cell.grow_asym_atoms(asym_atoms, xyz_atoms.value());
+		unit_cell.resolve_internal_symmetry(asym_atoms);
 	}
-
-	// Evaluate symmetry and assign asymmetry factors to each atom (also update ncen)
-	//The linking list is ordered like this: Asymmetric atom, list with all atoms, then index of symmetry operation that generated it
-	// "diagonal elements" have to have size equivalent to multiplicity, otherwise something broke
-	ivec3 symmetry_linking_list;
-	unit_cell.eval_symm(asym_atoms, cryst.ncen, symmetry_linking_list);
 	cryst.ncen = asym_atoms.size();
-
-	// Warn if a grown structure's explicit atoms don't consistently cover the same
-	// symmetry operations for every asymmetric atom
-	ivec applied_symmetry;
-	const ivec3 full_links = symmetry_linking_list; // the projection erases the operations it drops
-	int subgroup_order = 1;
-	if (settings.grown) {
-		const int all_ops = static_cast<int>(unit_cell.get_trans()[0].size());
-		applied_symmetry = unit_cell.apply_grown(hkl, hkl_enlarged, asym_atoms, symmetry_linking_list, original_rotations);
-		subgroup_order = all_ops / static_cast<int>(unit_cell.get_trans()[0].size()); // one kept operation per coset
+	// A grown atom takes its parent's U_iso, dispersion and ADPs; rotate_grown_ADPs turns the ADPs onto the image
+	cif_ADPs.resize(cryst.ncen);
+	for (int at = 0; at < cryst.ncen; at++) {
+		if (!asym_atoms[at].grown) continue;
+		const int parent = asym_atoms[at].grown_from;
+		err_checkf(parent >= 0, "Grown atom " + std::to_string(at) + " is not a symmetry image of an atom in the asymmetric unit", std::cout);
+		asym_atoms[at].U_iso = asym_atoms[parent].U_iso;
+		asym_atoms[at].anom = asym_atoms[parent].anom;
+		cif_ADPs[at] = cif_ADPs[parent];
 	}
-
-	unit_cell.set_symmetry_factors(asym_atoms, symmetry_linking_list, full_links, subgroup_order);
+	// A grown structure keeps the operations it does not apply explicitly and weighs its atoms to match
+	ivec applied_symmetry;
+	original_rotations = unit_cell.get_sym();
+	if (settings.grown)
+		applied_symmetry = unit_cell.apply_grown(hkl, hkl_enlarged, asym_atoms);
+	else
+		unit_cell.set_sym_fact_from_mult(asym_atoms);
 
 	if (tuning("NOSPHERA2_DEBUG_ASYMFACT")) {
 		std::cerr << "applied_symmetry (deleted):";
 		for (int s : applied_symmetry) std::cerr << " " << s;
 		std::cerr << std::endl << "surviving sym ops: " << unit_cell.get_trans()[0].size() << std::endl;
 		for (size_t i = 0; i < asym_atoms.size(); i++)
-			std::cerr << i << " grown=" << asym_atoms[i].grown << " sym_op=" << asym_atoms[i].sym_op
-				<< " asym_fact=" << asym_atoms[i].asym_fact << std::endl;
+			std::cerr << i << " grown=" << asym_atoms[i].grown << " sym_op=" << asym_atoms[i].grown_by[0]
+				<< " cryst_mult=" << asym_atoms[i].cryst_mult << " sym_fact=" << asym_atoms[i].sym_fact << std::endl;
 		std::cerr << "hkl_enlarged size: " << hkl_enlarged.size() << std::endl;
 	}
 
@@ -82,7 +83,11 @@ void XCW::construct(const options& opt_in) {
 		temp_atom.set_coordinate(1, asym_atoms[at].pos[1]);
 		temp_atom.set_coordinate(2, asym_atoms[at].pos[2]);
 		temp_atom.set_charge(asym_atoms[at].type);
+		temp_atom.set_label(asym_atoms[at].label);
+		temp_atom.set_frac_coords(asym_atoms[at].frac_pos);
+		temp_atom.set_ADPs(cif_ADPs[at]);
 		dummy_wave.push_back_atom(temp_atom);
+		cryst.U_iso.push_back(asym_atoms[at].U_iso);
 	}
 	// occ only finds this inside the first SCF, and its message names neither the atom count nor the charge
 	int n_electrons = -settings.charge;
@@ -99,19 +104,10 @@ void XCW::construct(const options& opt_in) {
 	const auto& basis = orbital_basis_;
 	load_basis_into_WFN(dummy_wave, basis, false, true);
 
-	// Read isotropic displacement parameters
-	cryst.U_iso = read_U_iso_from_CIF(cif, dummy_wave, unit_cell, log3, opt->debug);
-	if (settings.grown) {
-		cryst.grow_U_iso(asym_atoms, symmetry_linking_list);
-	}
-
 	// Generate k_pts and set the number of reflections
 	cryst.nr = hkl_enlarged.size();
 	cryst.nr_small = hkl.size();
 	make_k_pts(cryst.nr != 0 && hkl.size() == 0, opt->save_k_pts, unit_cell, hkl_enlarged, k_pt, std::cout, opt->debug);
-
-	// Read ADPs
-	read_fracs_ADPs_from_CIF(cif, dummy_wave, log3, opt->debug, settings.grown, symmetry_linking_list);
 
 	// Prepare output files
 	XCW_log.open("XCW.log");
@@ -496,7 +492,6 @@ XCW::SCF_settings XCW::loadSettings(const std::filesystem::path& settings_path) 
 	}
 
 	if (speed_preset == "slow_conv") {
-		settings.slow_conv = true;
 		settings.alpha = 0.8;
 		settings.level_shift = 1;
 		settings.diis_stop_damping = 1e-5;
@@ -714,13 +709,13 @@ void XCW::U_star2U_cart() {
 	}
 }
 
-// A grown atom carries a copy of its parent's ADPs (read_fracs_ADPs_from_CIF); U*, C and D are
+// A grown atom carries a copy of its parent's ADPs (XCW::construct); U*, C and D are
 // contravariant tensors in the fractional basis, so the image's are T' = R T R^T with R the rotation
 // of the linking operation (x' = R x + t). cell stores R transposed, which is what transform_ADPs takes.
 void XCW::rotate_grown_ADPs() {
 	for (int a = 0; a < cryst.ncen; a++) {
-		const int op = asym_atoms[a].sym_op;
-		if (op < 0) continue;
+		if (!asym_atoms[a].grown) continue;
+		const int op = asym_atoms[a].grown_by[0];
 		vec2 M(3, vec(3));
 		for (int i = 0; i < 3; i++) {
 			for (int j = 0; j < 3; j++) {
@@ -885,39 +880,8 @@ void XCW::eval_translation_phase(cvec2& translation_phase) {
 	// closing function
 }
 
-void XCW::parse_anom_atoms(std::vector<anom_atom>& anom_atoms) {
-	std::ifstream file(opt->anom_disp_path);
-	if (!file) {
-		std::cout << "Could not open anomalous dispersion file. Continuing without anomalous dispersions." << std::endl;
-	}
-	std::string line;
-	while (getline_universal(file, line)) {
-		if (line.empty())
-			continue;
-		std::istringstream iss(line);
-		std::string symbol;
-		double real_part, imag_part;
-		if (iss >> symbol >> real_part >> imag_part) {
-			if (!symbol.empty() && symbol[0] != '_' && symbol != "loop_") {
-				anom_atoms.push_back({ symbol, cdouble(real_part, imag_part) });
-			}
-		}
-	}
-}
-
 void XCW::eval_anom_disp(cvec2& DW_fact, cvec2& phase_fact, cvec2& translation_phase) {
-	std::vector<anom_atom> anom_atoms;
-	parse_anom_atoms(anom_atoms);
 	int r, at, r_asym;
-	for (int at = 0; at < cryst.ncen; at++) {
-		const char* symbol = constants::atnr2letter(asym_atoms[at].type);
-		for (const anom_atom& anom_atom : anom_atoms) {
-			if (symbol == anom_atom.identifier) {
-				asym_atoms[at].anom = anom_atom.dispersion;
-				break;
-			}
-		}
-	}
 	ivec2 asym_lookup(cryst.nr_small);
 	for (r = 0; r < cryst.nr_small; r++) {
 		asym_lookup[r] = generate_asym_lookup(r);
@@ -929,7 +893,7 @@ void XCW::eval_anom_disp(cvec2& DW_fact, cvec2& phase_fact, cvec2& translation_p
 			for (r_asym = 0; r_asym < lookup.size(); r_asym++) {
 				temp1 += phase_fact[at][lookup[r_asym]] * DW_fact[at][lookup[r_asym]] * translation_phase[r][r_asym];
 			}
-			F_calc[1][r] += temp1 * asym_atoms[at].asym_fact * asym_atoms[at].anom;
+			F_calc[1][r] += temp1 * asym_atoms[at].sym_fact * asym_atoms[at].anom;
 		}
 	}
 }
@@ -1427,93 +1391,6 @@ void XCW::report_halting_progress_estimate(bool is_final) {
 	}
 }
 
-//r^l Y_lm(r/|r|) is a homogeneous polynomial of degree l, and its monomials stay independent on the unit sphere,
-//so a least-squares fit on Fibonacci-sphere points recovers the coefficients exactly
-std::vector<std::pair<i3, double>> solid_harmonic_monomials(const int l, const int m, double* residual) {
-	std::vector<i3> mono;
-	for (int i = l; i >= 0; i--)
-		for (int j = l - i; j >= 0; j--)
-			mono.push_back({ i, j, l - i - j });
-	const int nc = mono.size(), np = 4 * nc + 8;
-	occ::Mat A(np, nc);
-	occ::Vec y(np);
-	for (int p = 0; p < np; p++) {
-		const double z = 1.0 - (2.0 * p + 1.0) / np, s = std::sqrt(1.0 - z * z), phi = 2.399963229728653 * p;
-		const double d[3] = { s * std::cos(phi), s * std::sin(phi), z };
-		for (int c = 0; c < nc; c++)
-			A(p, c) = std::pow(d[0], mono[c][0]) * std::pow(d[1], mono[c][1]) * std::pow(d[2], mono[c][2]);
-		y(p) = constants::spherical_harmonic(l, m, d);
-	}
-	const occ::Vec x = A.colPivHouseholderQr().solve(y);
-	if (residual != nullptr) *residual = (A * x - y).cwiseAbs().maxCoeff();
-	const double cmax = x.cwiseAbs().maxCoeff();
-	std::vector<std::pair<i3, double>> res;
-	for (int c = 0; c < nc; c++)
-		if (std::abs(x(c)) > 1e-12 * cmax) res.emplace_back(mono[c], x(c));
-	return res;
-}
-
-//Per primitive pair the Gaussian product theorem gives exp(-mu R^2) exp(-p u^2), u = r - P, mu = alpha beta / p,
-//the full product decay. S_a(u + PA) S_b(u + PB) is expanded in monomials u^n by the binomial shift; the solid
-//harmonics on the shifted centres carry the m selectivity (a pi AO sees only the small PA part of the bond vector).
-//Triangle: int |S_a S_b| g <= sum |a_n||b_n'| prod_x G(n_x + n'_x), G(k) = int |u|^k exp(-p u^2) = Gamma((k+1)/2) / p^((k+1)/2).
-//Cauchy-Schwarz: <= sqrt(Q_a Q_b), Q = int S(u + PA)^2 g, where odd moments vanish. Each pair takes the smaller.
-double ao_pair_abs_overlap_bound(const std::vector<primitive>& pa, const d3& A, const std::vector<std::pair<i3, double>>& sa,
-	const std::vector<primitive>& pb, const d3& B, const std::vector<std::pair<i3, double>>& sb, const double stop) {
-	const int la = pa[0].get_type(), lb = pb[0].get_type();
-	const d3 AB = { B[0] - A[0], B[1] - A[1], B[2] - A[2] };
-	const double R2 = AB[0] * AB[0] + AB[1] * AB[1] + AB[2] * AB[2];
-	vec G(2 * std::max(la, lb) + 2);
-	std::vector<std::pair<i3, double>> ua, ub;
-	auto binom = [](const int n, const int k) { return double(constants::ft[n]) / double(constants::ft[k] * constants::ft[n - k]); };
-	//S(u + d) = sum_c s_c prod_x sum_a binom(e_x, a) u_x^a d_x^(e_x - a)
-	auto shift = [&binom](const std::vector<std::pair<i3, double>>& s, const int l, const d3& d, std::vector<std::pair<i3, double>>& out) {
-		const int n = l + 1;
-		vec dense(static_cast<size_t>(n) * n * n, 0.0);
-		for (int c = 0; c < s.size(); c++) {
-			const i3& e = s[c].first;
-			for (int a = 0; a <= e[0]; a++)
-				for (int b = 0; b <= e[1]; b++)
-					for (int g = 0; g <= e[2]; g++)
-						dense[(a * n + b) * n + g] += s[c].second * binom(e[0], a) * binom(e[1], b) * binom(e[2], g)
-							* std::pow(d[0], e[0] - a) * std::pow(d[1], e[1] - b) * std::pow(d[2], e[2] - g);
-		}
-		out.clear();
-		for (int i = 0; i < dense.size(); i++)
-			if (dense[i] != 0.0) out.push_back({ i3{ i / (n * n), (i / n) % n, i % n }, dense[i] });
-	};
-	auto Q = [&G](const std::vector<std::pair<i3, double>>& u) {
-		double q = 0.0;
-		for (int i = 0; i < u.size(); i++)
-			for (int j = 0; j < u.size(); j++) {
-				const int x = u[i].first[0] + u[j].first[0], y = u[i].first[1] + u[j].first[1], z = u[i].first[2] + u[j].first[2];
-				if (x % 2 == 0 && y % 2 == 0 && z % 2 == 0) q += u[i].second * u[j].second * G[x] * G[y] * G[z];
-			}
-		return q;
-	};
-	double sum = 0.0;
-	for (int k = 0; k < pa.size(); k++) {
-		const double alpha = pa[k].get_exp();
-		for (int l = 0; l < pb.size(); l++) {
-			const double beta = pb[l].get_exp(), p = alpha + beta;
-			const double pref = std::abs(pa[k].get_coef() * pb[l].get_coef()) * std::exp(-alpha * beta / p * R2);
-			if (pref == 0.0) continue;
-			G[0] = std::sqrt(constants::PI / p);
-			G[1] = 1.0 / p;
-			for (int n = 2; n < G.size(); n++) G[n] = (n - 1) / (2.0 * p) * G[n - 2];
-			shift(sa, la, { beta / p * AB[0], beta / p * AB[1], beta / p * AB[2] }, ua);
-			shift(sb, lb, { -alpha / p * AB[0], -alpha / p * AB[1], -alpha / p * AB[2] }, ub);
-			double T = 0.0;
-			for (int i = 0; i < ua.size(); i++)
-				for (int j = 0; j < ub.size(); j++)
-					T += std::abs(ua[i].second * ub[j].second) * G[ua[i].first[0] + ub[j].first[0]] * G[ua[i].first[1] + ub[j].first[1]] * G[ua[i].first[2] + ub[j].first[2]];
-			sum += pref * std::min(T, std::sqrt(Q(ua) * Q(ub)));
-			if (sum > stop) return sum;
-		}
-	}
-	return sum;
-}
-
 void XCW::create_prims(std::vector<ao_data>& ao_data_shells, occ::qm::AOBasis& occ_basis_set) {
 	for (int atm = 0; atm < cryst.ncen; atm++) {
 		d3 pos = { occ_basis_set.atoms()[atm].x, occ_basis_set.atoms()[atm].y, occ_basis_set.atoms()[atm].z };
@@ -1787,8 +1664,6 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 	bvec needs_grid(cryst.ncen, true);
 	grid_manager.setup3DGridsForMolecule(dummy_wave, asym_atom_list, needs_grid, unit_cell);
 
-	bool equal = false;
-
 	GridData& GD = grid_manager.getGridData();
 	vec2* grids = grid_manager.getNeedsHelper() ? GD.helper_grids.data() : GD.atomic_grids.data();
 	vec2 d1, d2, d3, weights;
@@ -1801,11 +1676,85 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 	const int total_points = grid_manager.getTotalGridPoints();
 	std::cout << "Total number of grid points after pruning: " << total_points << std::endl;
 
+	// Precompute the lookup table linking each unique reflection to its symmetry equivalents
 	ivec2 asym_lookup(cryst.nr_small);
 	for (r = 0; r < cryst.nr_small; r++) {
 		asym_lookup[r] = generate_asym_lookup(r);
 	}
-	const unsigned int num_syms = asym_lookup[0].size();
+	const unsigned int num_syms = unit_cell.get_num_syms();
+	// The AO values and weights are real, so the grid integral sum_p w_p phi_mu phi_nu exp(i q d_p) of -q is the
+	// conjugate of that of q: only the entries of inversion_cleaned_hkl are integrated
+	const bool no_screening = tuning("NOSPHERA2_NO_INVERSION_SCREENING") != nullptr;
+	ivec2 inversion_link;
+	if (no_screening)
+		for (int e = 0; e < cryst.nr; e++) inversion_link.push_back({ e });
+	else
+		inversion_link = unit_cell.remove_inv_vectors(hkl_enlarged, inversion_cleaned_hkl);
+	const bool inversion_screening = static_cast<int>(inversion_link.size()) != cryst.nr;
+	ivec clean_of(cryst.nr);
+	bvec is_inverse(cryst.nr, false);
+	for (int c = 0; c < inversion_link.size(); c++)
+		for (int i = 0; i < inversion_link[c].size(); i++) {
+			clean_of[inversion_link[c][i]] = c;
+			is_inverse[inversion_link[c][i]] = i == 1;
+		}
+	// A reflection whose inverse is measured too has the conjugate of the inverse's row, the images of -h being minus those
+	// of h with conjugate phases: only the lower of the two is integrated
+	ivec row_partner(cryst.nr_small, -1);
+	bvec row_copy(cryst.nr_small, false);
+	if (!no_screening) {
+		const std::vector<i3> hv(hkl.begin(), hkl.end());
+		for (r = 0; r < cryst.nr_small; r++) {
+			if (row_copy[r]) continue;
+			const i3 minus_h = { -hv[r][0], -hv[r][1], -hv[r][2] };
+			const int j = static_cast<int>(std::lower_bound(hv.begin(), hv.end(), minus_h) - hv.begin());
+			if (j > r && j < cryst.nr_small && cell::check_inversion(hv[r], hv[j])) {
+				row_partner[r] = j;
+				row_copy[j] = true;
+			}
+		}
+	}
+	// The integrations of reflection r: with inversion screening one per cleaned entry its k-points land on, carrying
+	// the summed translation phases of the operations landing on the entry and on its inverse; without, one per operation
+	struct k_job { int c; bool self, inv; cdouble t_self, t_inv; };
+	auto make_jobs = [&](const int r, std::vector<k_job>& jobs) {
+		jobs.clear();
+		if (row_copy[r]) return;
+		for (int s = 0; s < static_cast<int>(num_syms); s++) {
+			const int e = asym_lookup[r][s];
+			int j = inversion_screening ? 0 : static_cast<int>(jobs.size());
+			while (j < jobs.size() && jobs[j].c != clean_of[e]) j++;
+			if (j == jobs.size()) jobs.push_back({ clean_of[e], false, false, 0.0, 0.0 });
+			if (is_inverse[e]) {
+				jobs[j].inv = true;
+				jobs[j].t_inv += translation_phase[r][s];
+			}
+			else {
+				jobs[j].self = true;
+				jobs[j].t_self += translation_phase[r][s];
+			}
+		}
+	};
+	// The basis function independent factor of atom grid g at k-point e
+	auto grid_factor = [&](const int g, const int e) {
+		const double sym_fact = asym_atoms[g].sym_fact;
+		const cdouble DW = DW_fact[g][e], ph = phase_fact[g][e];
+		return cdouble(sym_fact * (DW.real() * ph.real() - DW.imag() * ph.imag()),
+			sym_fact * (DW.real() * ph.imag() + DW.imag() * ph.real()));
+	};
+	long long n_integrations = 0;
+	{
+		std::vector<k_job> jobs;
+		for (r = 0; r < cryst.nr_small; r++) {
+			make_jobs(r, jobs);
+			n_integrations += jobs.size();
+		}
+	}
+	if (inversion_screening && !(opt->no_date)) {
+		const size_t n_inv = hkl_enlarged.size() - inversion_cleaned_hkl.size();
+		std::cout << std::fixed << std::setprecision(2) << "Inversion screening: Screened out " << n_inv << " of " << hkl_enlarged.size()
+			<< " symmetry generated reflections (" << 100.0 * n_inv / hkl_enlarged.size() << "%)" << std::endl;
+	}
 
 	vec2 grid_positions(cryst.ncen);
 	for (int at = 0; at < cryst.ncen; at++) {
@@ -1813,34 +1762,67 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 	}
 
 	// Precompute screening
-	//Drops a pair whose bound on int |chi_mu chi_nu| is below e_tol: |I_mu,nu(h)| <= num_syms * asym_fact * int |chi_mu chi_nu|
-	//holds while |DW| <= 1, which a Gram-Charlier DW factor can exceed; the screen does not account for that.
-	//sigma-pi pairs do not vanish in I(h != 0), so no selection rule replaces the bound. NOS_XCW_PAIR_TOL=0 keeps every pair.
+	std::chrono::high_resolution_clock::time_point screening_start = std::chrono::high_resolution_clock::now();
 	ivec2 skip(cryst.nmo, ivec(cryst.nmo, 0));
 	{
-		const auto screen_start = std::chrono::high_resolution_clock::now();
-		const char* tol = tuning("NOS_XCW_PAIR_TOL");
-		//1e-4: at 5e-4 this bound left def2-SVP 1.1e-5 of max|F| and 6.5e-6 Eh off unscreened
-		const double e_tol = tol ? std::atof(tol) : 1e-4;
-		std::vector<std::vector<std::pair<i3, double>>> harmonic(cryst.nmo);
+		const double e_tol = 0.0005;
+		double estimate = 0.0;
+		const double sqrt_inv_four_pi = std::sqrt(constants::INV_FOUR_PI);
 		for (mu = 0; mu < cryst.nmo; mu++) {
-			double residual;
-			harmonic[mu] = solid_harmonic_monomials(ao_data_shells[mu].prims[0].get_type(), ao_data_shells[mu].m, &residual);
-			err_checkf(residual < 1e-10, "Solid harmonic fit failed for AO " + std::to_string(mu), std::cout);
-		}
-#pragma omp parallel for schedule(dynamic)
-		for (int a = 0; a < cryst.nmo; a++) {
-			const auto& A = ao_data_shells[a].pos;
-			for (int b = a + 1; b < cryst.nmo; b++) {
-				const auto& B = ao_data_shells[b].pos;
-				const double dist = (A[0] - B[0]) * (A[0] - B[0]) + (A[1] - B[1]) * (A[1] - B[1]) + (A[2] - B[2]) * (A[2] - B[2]);
-				if (dist >= 1e-5 && ao_pair_abs_overlap_bound(ao_data_shells[a].prims, A, harmonic[a], ao_data_shells[b].prims, B, harmonic[b], e_tol) < e_tol)
-					skip[a][b] = 1;
+			const std::vector<primitive>& mu_primitives = ao_data_shells[mu].prims;
+			const int mu_type = mu_primitives[0].get_type();
+			const double mu_type_half = static_cast<double>(mu_type) * 0.5;
+			const double min_mu_type_half_exp = std::exp(-mu_type_half);
+			const double sph_harmonic_max_mu = constants::spherical_harmonic_max(mu_type, ao_data_shells[mu].m);
+			vec N_k_cache(mu_primitives.size());
+			for (int k = 0; k < mu_primitives.size(); k++) {
+				const double k_exp = mu_primitives[k].get_exp();
+				N_k_cache[k] = mu_type == 0 ? sqrt_inv_four_pi : sph_harmonic_max_mu * min_mu_type_half_exp * std::pow(mu_type / k_exp, mu_type_half);
+			}
+			for (nu = mu + 1; nu < cryst.nmo; nu++) {
+				const double dist2 = (ao_data_shells[mu].pos[0] - ao_data_shells[nu].pos[0]) * (ao_data_shells[mu].pos[0] - ao_data_shells[nu].pos[0]) +
+					(ao_data_shells[mu].pos[1] - ao_data_shells[nu].pos[1]) * (ao_data_shells[mu].pos[1] - ao_data_shells[nu].pos[1]) +
+					(ao_data_shells[mu].pos[2] - ao_data_shells[nu].pos[2]) * (ao_data_shells[mu].pos[2] - ao_data_shells[nu].pos[2]);
+				if (dist2 < 1e-5) {
+					continue;
+				}
+				const std::vector<primitive>& nu_primitives = ao_data_shells[nu].prims;
+				const double nu_type = static_cast<double>(nu_primitives[0].get_type());
+				const double nu_type_half = static_cast<double>(nu_type) * 0.5;
+				const double min_nu_type_half_exp = std::exp(-nu_type_half);
+				const double sph_harmonic_max_nu = constants::spherical_harmonic_max(nu_type, ao_data_shells[nu].m);
+				vec N_l_cache(nu_primitives.size());
+				for (int l = 0; l < nu_primitives.size(); l++) {
+					const double l_exp = nu_primitives[l].get_exp();
+					N_l_cache[l] = nu_type == 0 ? sqrt_inv_four_pi : sph_harmonic_max_nu * min_nu_type_half_exp * std::pow(nu_type / l_exp, nu_type_half);
+				}
+				estimate = 0.0;
+				for (int k = 0; k < mu_primitives.size(); k++) {
+					const double k_coef = mu_primitives[k].get_coef();
+					const double k_exp = mu_primitives[k].get_exp();
+					const double N_k = N_k_cache[k];
+					for (int l = 0; l < nu_primitives.size(); l++) {
+						const double l_coef = nu_primitives[l].get_coef();
+						const double l_exp = nu_primitives[l].get_exp();
+						const double inv_exp_sum = 1.0 / (k_exp + l_exp);
+						const double N_l = N_l_cache[l];
+						const double combined_coeffs = std::abs(k_coef * l_coef);
+						const double N_kl = N_k * N_l * std::pow(constants::TWO_PI * inv_exp_sum, 1.5);
+						const double gamma = 0.5 * k_exp * l_exp * inv_exp_sum;
+						const double gaussian = std::exp(-gamma*dist2);
+						estimate += combined_coeffs * N_kl * gaussian;
+					}
+				}
+				if (estimate < e_tol) {
+					skip[mu][nu] = 1;
+				}
 			}
 		}
-		if (!(opt->no_date))
-			std::cout << "Time taken for the AO pair screen: "
-				<< std::chrono::duration<double>(std::chrono::high_resolution_clock::now() - screen_start).count() << " seconds.\n";
+	}
+
+	std::chrono::high_resolution_clock::time_point screening_end = std::chrono::high_resolution_clock::now();
+	if (!opt->no_date) {
+		std::cout << std::fixed << std::setprecision(5) << "Time taken for AO screening: " << std::chrono::duration_cast<std::chrono::microseconds>(screening_end - screening_start).count() << " microseconds." << "\n";
 	}
 
 	// Grid screening
@@ -2294,12 +2276,13 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 				work_done += na * na * b.point_count;
 				work_unscreened += static_cast<double>(cryst.nmo) * cryst.nmo * b.point_count;
 			}
-		//The sums are per reflection and symmetry operation
-		const double runs = static_cast<double>(cryst.nr_small) * static_cast<double>(num_syms);
+		//Unscreened is one integration for every entry of hkl_enlarged, screened only the integrations inversion screening leaves
+		work_done *= static_cast<double>(n_integrations);
+		work_unscreened *= static_cast<double>(cryst.nr);
 		if (work_done > 0.0)
 			std::cout << std::fixed << std::setprecision(2)
-				<< "I tensor work after all screening: " << (work_done * runs / 1e12)
-				<< " of " << (work_unscreened * runs / 1e12) << " Tflop-equivalents ("
+				<< "I tensor work after all screening: " << (work_done / 1e12)
+				<< " of " << (work_unscreened / 1e12) << " Tflop-equivalents ("
 				<< std::setprecision(2) << 100.0 * work_done / work_unscreened << "%, "
 				<< (work_unscreened / work_done) << "x less than unscreened)\n";
 	}
@@ -2347,6 +2330,34 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 	std::atomic<long long> gpu_ns_per_refl{0};
 	std::mutex i_write_mutex;
 	std::thread gpu_thread;
+	//Row r of the tensor and, when the inverse of r is measured too, the conjugate row of that one, whichever way the tensor is held
+	auto store_rows = [&](const int r, const cdouble* row) {
+		const size_t n = i_compact_;
+		cvec flipped;
+		for (int i = 0; i < 2; i++) {
+			const int rr = i == 0 ? r : row_partner[r];
+			if (rr < 0) break;
+			const cdouble* src = row;
+			if (i == 1) {
+				flipped.resize(n);
+				for (size_t t = 0; t < n; t++) flipped[t] = std::conj(row[t]);
+				src = flipped.data();
+			}
+			const size_t at = static_cast<size_t>(rr) * n;
+			if (i_streamed_) {
+				//A write is packed_size * 16 bytes against a whole reflection's worth
+				//of integration, so the lock is not on the hot path
+				std::lock_guard<std::mutex> lock(i_write_mutex);
+				i_file_.write_block(rr, src);
+			}
+			else if (i_float_) {
+				std::complex<float>* const dst = I32.data() + at;
+				for (size_t t = 0; t < n; t++) dst[t] = std::complex<float>(static_cast<float>(src[t].real()), static_cast<float>(src[t].imag()));
+			}
+			else if (src != I.data() + at)
+				std::copy(src, src + n, I.data() + at);
+		}
+	};
 #if defined(NOSPHERA2_USE_GPU) || defined(NOSPHERA2_USE_METAL)
 	//Read with use_gpu rather than on its own, so -no_gpu means what it says. Checking the
 	//pair here rather than clearing the flag at parse time keeps it order-independent.
@@ -2403,8 +2414,7 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 		//What the device path actually issues: blocks padded to their batch shapes, real and
 		//imaginary halves together
 		if (itensor_on_gpu)
-			itensor_gpu_dense_flops = itensor_gpu_issued_flops()
-				* static_cast<double>(cryst.nr_small) * static_cast<double>(num_syms);
+			itensor_gpu_dense_flops = itensor_gpu_issued_flops() * static_cast<double>(n_integrations);
 		//Say which processor produced the numbers, and which GEMM: the three do not agree
 		//in the last digits, so a log that does not name one cannot be compared with
 		//another. Gated like the other timing lines so the golden-file tests, which run
@@ -2455,30 +2465,20 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 		//The device takes reflections in batches; the CPU threads keep taking them one at
 		//a time from the same counter
 		const int gpu_batch = itensor_gpu_batch(static_cast<int>(num_syms));
-		cvec blk_gpu;
-		if (i_streamed_ || i_float_) blk_gpu.assign(static_cast<size_t>(gpu_batch) * i_compact_, cdouble{});
+		cvec blk_gpu(static_cast<size_t>(gpu_batch) * i_compact_, cdouble{});
+		//A column per integration, at most num_syms per reflection
 		vec kxs(static_cast<size_t>(gpu_batch) * num_syms), kys(kxs.size()), kzs(kxs.size());
-		cvec facs(kxs.size() * n_atom_grids);
+		cvec facs(kxs.size() * n_atom_grids), facs_inv(facs.size());
+		ivec col_off(gpu_batch + 1);
+		std::vector<k_job> jobs_gpu;
 		int done = 0;
 		auto collect_gpu = [&](const int rr0, const int n, const int slot) {
-			if (i_streamed_ || i_float_) std::fill(blk_gpu.begin(), blk_gpu.end(), cdouble{});
-			cdouble* const I_rr = (i_streamed_ || i_float_) ? blk_gpu.data()
-									  : I.data() + static_cast<size_t>(rr0) * i_compact_;
-			if (!itensor_gpu_collect(slot, I_rr, static_cast<long long>(i_compact_)))
+			std::fill(blk_gpu.begin(), blk_gpu.end(), cdouble{});
+			if (!itensor_gpu_collect(slot, blk_gpu.data(), static_cast<long long>(i_compact_)))
 				err_checkf(false, "I tensor GPU read-back failed", std::cout);
-			for (int r = 0; r < n && (i_streamed_ || i_float_); r++) {
-				const cdouble* const row = blk_gpu.data() + static_cast<size_t>(r) * i_compact_;
-				if (i_streamed_) {
-					std::lock_guard<std::mutex> lock(i_write_mutex);
-					i_file_.write_block(rr0 + r, row);
-				}
-				else if (i_float_) {
-					std::complex<float>* const dst = I32.data() + static_cast<size_t>(rr0 + r) * i_compact_;
-					for (size_t i = 0; i < i_compact_; i++)
-						dst[i] = std::complex<float>(static_cast<float>(row[i].real()),
-													 static_cast<float>(row[i].imag()));
-				}
-			}
+			//A row whose inverse is measured too had no columns and comes back empty; the row it is copied from writes it
+			for (int r = 0; r < n; r++)
+				if (!row_copy[rr0 + r]) store_rows(rr0 + r, blk_gpu.data() + static_cast<size_t>(r) * i_compact_);
 			done += n;
 			gpu_ns_per_refl = std::chrono::duration_cast<std::chrono::nanoseconds>(
 				std::chrono::high_resolution_clock::now() - gpu_start).count() / done;
@@ -2491,18 +2491,33 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 			const int rr0 = next_refl.fetch_add(gpu_batch);
 			if (rr0 >= cryst.nr_small) break;
 			const int n = std::min(gpu_batch, cryst.nr_small - rr0);
-			for (int r = 0; r < n; r++)
-				for (int sy = 0; sy < static_cast<int>(num_syms); sy++) {
-					const int rr = rr0 + r, c = r * static_cast<int>(num_syms) + sy;
-					kxs[c] = k_pt[0][asym_lookup[rr][sy]];
-					kys[c] = k_pt[1][asym_lookup[rr][sy]];
-					kzs[c] = k_pt[2][asym_lookup[rr][sy]];
-					for (int gg = 0; gg < n_atom_grids; gg++)
-						facs[static_cast<size_t>(c) * n_atom_grids + gg] =
-						asym_atoms[gg].asym_fact * DW_fact[gg][asym_lookup[rr][sy]]
-						* phase_fact[gg][asym_lookup[rr][sy]] * translation_phase[rr][sy];
+			//The integrations of the CPU path: at the cleaned entry, its inverse taking the conjugate
+			int c = 0;
+			for (int r = 0; r < n; r++) {
+				col_off[r] = c;
+				make_jobs(rr0 + r, jobs_gpu);
+				for (int jb = 0; jb < static_cast<int>(jobs_gpu.size()); jb++, c++) {
+					const k_job& job = jobs_gpu[jb];
+					const int idx = inversion_link[job.c][0];
+					const int inv_idx = job.inv ? inversion_link[job.c][1] : idx;
+					kxs[c] = k_pt[0][idx];
+					kys[c] = k_pt[1][idx];
+					kzs[c] = k_pt[2][idx];
+					for (int gg = 0; gg < n_atom_grids; gg++) {
+						const size_t f = static_cast<size_t>(c) * n_atom_grids + gg;
+						facs[f] = job.self ? grid_factor(gg, idx) * job.t_self : cdouble(0.0, 0.0);
+						facs_inv[f] = job.inv ? grid_factor(gg, inv_idx) * job.t_inv : cdouble(0.0, 0.0);
+					}
 				}
-			if (!itensor_gpu_submit(slot, n, static_cast<int>(num_syms), kxs.data(), kys.data(), kzs.data(), facs.data()))
+			}
+			col_off[n] = c;
+			if (c == 0) {
+				//Every row of the batch is the conjugate of one integrated elsewhere
+				done += n;
+				if (!(opt->no_date) && pb) for (int r = 0; r < n; r++) pb->update();
+				continue;
+			}
+			if (!itensor_gpu_submit(slot, n, col_off.data(), kxs.data(), kys.data(), kzs.data(), facs.data(), facs_inv.data()))
 				err_checkf(false, "I tensor GPU evaluation failed", std::cout);
 			if (prev >= 0) collect_gpu(prev, prev_n, slot ^ 1);
 			prev = rr0; prev_n = n;
@@ -2536,8 +2551,8 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 						std::min(screened_tile_size, n_active - col), block.point_count);
 			}
 		}
-	itensor_flops *= static_cast<double>(cryst.nr_small) * static_cast<double>(num_syms);
-	itensor_unscreened_tile_flops *= static_cast<double>(cryst.nr_small) * static_cast<double>(num_syms);
+	itensor_flops *= static_cast<double>(n_integrations);
+	itensor_unscreened_tile_flops *= static_cast<double>(n_integrations);
 	if (itensor_on_gpu && throughput::enabled()) {
 		const double screened = itensor_unscreened_tile_flops > 0.0
 			? 100.0 * (1.0 - itensor_flops / itensor_unscreened_tile_flops) : 0.0;
@@ -2553,7 +2568,7 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 		const int cpu_threads = itensor_on_gpu ? std::max(1, omp_get_max_threads() - 1) : omp_get_max_threads();
 #pragma omp parallel num_threads(cpu_threads) reduction(+:skipped_grids)
 		{
-			vec2 single_k_pts(num_syms, vec(3));
+			std::vector<k_job> jobs;
 			vec phase_angles;
 			vec phase_sines;
 			vec phase_cosines;
@@ -2608,22 +2623,29 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 				if (itensor_on_gpu && my_done > 0 && gpu_ns_per_refl.load() > 0 &&
 					static_cast<long long>(cryst.nr_small - r) * gpu_ns_per_refl.load() < my_ns / my_done) break;
 				if (!next_refl.compare_exchange_strong(r, r + 1)) continue;
+				if (row_copy[r]) {
+					if (!(opt->no_date) && pb) pb->update();
+					continue;
+				}
 				const auto r_start = std::chrono::high_resolution_clock::now();
 				if (i_streamed_ || i_float_) std::fill(blk.begin(), blk.end(), cdouble{});
 				cdouble* const I_r = (i_streamed_ || i_float_) ? blk.data()
 					: I.data() + static_cast<size_t>(r) * i_compact_;
-				const int* asym_lookup_r = asym_lookup[r].data();
+				make_jobs(r, jobs);
 				// Precompute weighted phase factors for integration
-				for (int syms = 0; syms < num_syms; syms++) {
-					single_k_pts[syms] = { k_pt[0][asym_lookup_r[syms]], k_pt[1][asym_lookup_r[syms]], k_pt[2][asym_lookup_r[syms]] };
-					const int idx = asym_lookup_r[syms];
+				for (int jb = 0; jb < jobs.size(); jb++) {
+					const k_job& job = jobs[jb];
+					// Integrated at the cleaned entry, the operations landing on its inverse take the conjugate
+					const int idx = inversion_link[job.c][0];
+					const int inv_idx = job.inv ? inversion_link[job.c][1] : idx;
+					const double kx = k_pt[0][idx], ky = k_pt[1][idx], kz = k_pt[2][idx];
 					for (int g = 0; g < n_grids; g++) {
 						const int np_g = points[g];
 						double* const angles = phase_angles.data();
 						double* const sines = phase_sines.data();
 						double* const cosines = phase_cosines.data();
 						for (int p = 0; p < points[g]; p++) {
-							angles[p] = single_k_pts[syms][0] * d1[g][p] + single_k_pts[syms][1] * d2[g][p] + single_k_pts[syms][2] * d3[g][p];
+							angles[p] = kx * d1[g][p] + ky * d2[g][p] + kz * d3[g][p];
 						}
 #if defined(__APPLE__)
 						for (int p = 0; p < points[g]; p++) {
@@ -2639,17 +2661,8 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 						for (int p = 0; p < np_g; p++) {
 							phase_g[p] = cdouble(w_g[p] * cosines[p], w_g[p] * sines[p]);
 						}
-						const double asym_fact = asym_atoms[g].asym_fact;
-						const cdouble* DW_fact_g = DW_fact[g].data();
-						const double DW_im = DW_fact_g[idx].imag();
-						const cdouble* phase_fact_g = phase_fact[g].data();
-						const double phase_im = phase_fact_g[idx].imag();
-						const double DW_re = DW_fact_g[idx].real();
-						const double phase_re = phase_fact_g[idx].real();
 						// Precompute basis function independent factors
-						const cdouble grid_factor = cdouble(asym_fact * (DW_re * phase_re - DW_im * phase_im),
-							asym_fact * (DW_re * phase_im + DW_im * phase_re));
-						const cdouble factor = grid_factor * translation_phase[r][syms];
+						const cdouble factor = grid_factor(g, idx) * job.t_self, factor_inv = grid_factor(g, inv_idx) * job.t_inv;
 						// This is where the magic happens
 						for (const GridBlock& block : grid_blocks[g]) {
 							const ivec& active_aos = block.active_aos;
@@ -2680,8 +2693,10 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 										for (int tile_col = first_tile_col; tile_col < tile.col_count; tile_col++) {
 											const int nu = active_aos[tile.col_start + tile_col];
 											const int t = tri_compact[tri_index(mu, nu)];
-											if (t >= 0)
-												I_r[t] += cdouble(crow[2 * tile_col], crow[2 * tile_col + 1]) * factor;
+											if (t < 0) continue;
+											const cdouble v(crow[2 * tile_col], crow[2 * tile_col + 1]);
+											if (job.self) I_r[t] += v * factor;
+											if (job.inv) I_r[t] += std::conj(v) * factor_inv;
 										}
 									}
 								}
@@ -2691,17 +2706,7 @@ void XCW::eval_I(std::vector<ao_data>& ao_data_shells, cvec2& DW_fact, cvec2& ph
 						}
 					}
 				}
-				if (i_streamed_) {
-					//A write is packed_size * 16 bytes against a whole reflection's worth
-					//of integration, so the lock is not on the hot path
-					std::lock_guard<std::mutex> lock(i_write_mutex);
-					i_file_.write_block(r, blk.data());
-				}
-				else if (i_float_) {
-					std::complex<float>* const dst = I32.data() + static_cast<size_t>(r) * i_compact_;
-					for (size_t i = 0; i < i_compact_; i++)
-						dst[i] = std::complex<float>(static_cast<float>(blk[i].real()), static_cast<float>(blk[i].imag()));
-				}
+				store_rows(r, I_r);
 				my_ns += std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - r_start).count();
 				my_done++;
 				if (!(opt->no_date) && pb) {
@@ -4187,17 +4192,6 @@ void XCW::run_XCW_fitting() {
 	};
 	const double min_lambda_step = settings.xcw_step_size / 128.0;
 	double last_lambda = settings.xcw_start_value;
-	//slow_conv's damping (alpha 0.8, shift 1) is for the perturbed steps, which start from
-	//converged orbitals; from the core guess it runs out of iterations (Fe(phen)2(SCN)2 UHF:
-	//200 iterations, RMSD still 4e-5). The first step without a guess takes the normal
-	//schedule, every later one the slow settings from the file
-	const bool slow_start = settings.slow_conv && !has_guess;
-	const double slow_alpha = settings.alpha, slow_shift = settings.level_shift, slow_stop_damping = settings.diis_stop_damping, slow_stop_shift = settings.diis_stop_shift;
-	if (slow_start) {
-		settings.alpha = 0.5; settings.level_shift = 0.5; settings.diis_stop_damping = 1e-3; settings.diis_stop_shift = 1e-2;
-		std::cout << "XCW: slow_conv - the unperturbed first step runs the normal schedule, slow damping from the second step on" << std::endl;
-		XCW_log << "XCW: slow_conv - the unperturbed first step runs the normal schedule, slow damping from the second step on" << std::endl;
-	}
 	//The scan used to stop at max_value even when A^2 was still falling there, i.e. on the
 	//scan boundary instead of on lambda*, and only printed "extend the scan" afterwards.
 	//The perturbed steps start from converged orbitals and TRAH takes the ones that DIIS
@@ -4209,9 +4203,6 @@ void XCW::run_XCW_fitting() {
 	int extra_steps = 0;
 	for (int step = 0; step < planned_steps; step++) {
 		const double lambda = step * settings.xcw_step_size + settings.xcw_start_value;
-		if (slow_start && step == 1) {
-			settings.alpha = slow_alpha; settings.level_shift = slow_shift; settings.diis_stop_damping = slow_stop_damping; settings.diis_stop_shift = slow_stop_shift;
-		}
 		const occ::qm::Wavefunction previous_wfn = last_wfn;
 		occ::qm::Wavefunction guess = last_wfn;
 		if (opt->xcw_extrapolate && step >= 2 && settings.hf_type == occ::qm::SpinorbitalKind::Restricted) {

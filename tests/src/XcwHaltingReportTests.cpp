@@ -50,7 +50,7 @@ namespace {
 
 	bool fixture_present()
 	{
-		return std::filesystem::exists(fixture_dir() / "P1_test_NA2.cif") && std::filesystem::exists(fixture_dir() / "P1_test.hkl");
+		return std::filesystem::exists(fixture_dir() / "P1_test.cif") && std::filesystem::exists(fixture_dir() / "P1_test.hkl");
 	}
 
 	std::filesystem::path scratch_dir()
@@ -127,12 +127,6 @@ namespace {
 		}
 	}
 
-	//A short anomalous dispersion table with blank lines, which parse_anom_atoms skips
-	void write_anom(const std::filesystem::path& p)
-	{
-		std::ofstream(p) << "\nC 0.00313 0.00162\n\nCl 0.14908 0.15974\nH 0.0 0.0\nN 0.00611 0.00317\nO 0.01110 0.00600\nS 0.12463 0.12335\n\n";
-	}
-
 	//The P1 molecule's stored two-electron integrals, which XcwScfTests.SharedTensorBuild writes under ctest; without
 	//them the run builds its own, with the same numbers
 	std::string shared_eri(const std::filesystem::path& dir)
@@ -150,9 +144,8 @@ namespace {
 		std::ofstream(dir / "settings.txt") << settings_text;
 		options opt;
 		opt.xcw_settings_path = dir / "settings.txt";
-		opt.cif = std::filesystem::absolute(fixture_dir() / "P1_test_NA2.cif");
+		opt.cif = std::filesystem::absolute(fixture_dir() / "P1_test.cif");
 		opt.hkl = dir / "subset.hkl";
-		opt.anom_disp_path = dir / "anom.txt";
 		opt.do_XCW = true;
 		opt.use_gpu = false;
 		opt.no_date = true;
@@ -238,7 +231,6 @@ TEST(XcwHaltingReportTests, HaltingReportsAcrossTheExtendedLambdaScan)
 	write_subset_hkl(dir / "subset.hkl", n_written, n_strong, 3.0);
 	ASSERT_EQ(n_written, 402);
 	ASSERT_GE(n_strong, 8);
-	write_anom(dir / "anom.txt");
 
 	options opt = make_options(dir, RUN_BASE + "end 0.05 i_tensor_mb 4096 save itensor.bin" + shared_eri(dir));
 	opt.xcw_gaussian_halt = true;
@@ -362,7 +354,6 @@ TEST(XcwHaltingReportTests, StreamedTensorRoundTrip)
 	write_subset_hkl(dir / "subset.hkl", n_written, n_strong, 1e9);
 	ASSERT_EQ(n_written, 402);
 	ASSERT_EQ(n_strong, 0);
-	write_anom(dir / "anom.txt");
 
 	options opt = make_options(dir, RUN_BASE + "end 0" + shared_eri(dir));
 	opt.mem_given = true;
@@ -441,7 +432,7 @@ TEST(XcwHaltingReportTests, GrownConstructUsesTheXyzAtoms)
 		GTEST_SKIP() << "P1 fixture missing under " << fixture_dir();
 	}
 	const auto dir = scratch_dir();
-	const auto cif = std::filesystem::absolute(fixture_dir() / "P1_test_NA2.cif");
+	const auto cif = std::filesystem::absolute(fixture_dir() / "P1_test.cif");
 
 	//the asymmetric unit in Angstrom, from the same reader construct uses
 	std::vector<asym_atom> atoms;
@@ -449,8 +440,8 @@ TEST(XcwHaltingReportTests, GrownConstructUsesTheXyzAtoms)
 		cell unit_cell(cif, std::cout, false, true);
 		std::ifstream cif_in(cif);
 		int ncen = 0;
-		bvec needs_grid;
-		read_atoms_from_CIF(cif_in, unit_cell, ncen, needs_grid, atoms, false);
+		std::vector<vec2> ADPs;
+		read_CIF(cif_in, unit_cell, ncen, atoms, ADPs, false);
 		ASSERT_EQ(ncen, 23);
 		ASSERT_EQ(atoms.size(), 23u);
 	}
@@ -480,7 +471,6 @@ TEST(XcwHaltingReportTests, GrownConstructUsesTheXyzAtoms)
 	EXPECT_EQ(out.find("I need an xyz file"), std::string::npos) << out;
 	EXPECT_NE(out.find("Nr of reflections read from file: 402"), std::string::npos) << out;
 	EXPECT_NE(out.find("XCW orbital basis set: sto-3g"), std::string::npos) << out;
-	EXPECT_TRUE(std::filesystem::exists(dir / "log3.txt"));
 	EXPECT_NE(read_file(dir / "XCW.log").find("XCW orbital basis set: sto-3g"), std::string::npos);
 
 	if (!::testing::Test::HasFailure()) {

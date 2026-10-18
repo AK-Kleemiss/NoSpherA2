@@ -239,6 +239,23 @@ Key core modules live in `Src/core`:
 
 ## Current Validation Notes
 
+As of 2026-10-17 (later), grown XCW models choose their kept operations as K = D.L for nested subgroups L inside H
+(`cell::choose_kept_operations`, replacing `project_into_subgroup`), which always admits per-position weights and keeps
+the fewest I tensor k-points; `ctest` on a CPU-only `release-windows` build (`build/release-windows-cpu`) reports
+**1269 passed, 0 failed, 22 skipped** (2 disabled) of 1293. See `UNIT_TESTS_STATUS.md`.
+
+As of 2026-10-17, grown XCW models delete every fully applied symmetry operation and solve the sym_facts so that every
+position the kept operations reach is counted once (`cell::set_sym_fact_from_position_counts`); `ctest --preset release-linux`
+reports **1267 passed, 0 failed, 22 skipped** (2 disabled) of 1289. See `UNIT_TESTS_STATUS.md`.
+
+As of 2026-10-15, `-anom_disp` is gone: XCW reads positions, U_iso, ADPs and the anomalous dispersion from the CIF
+through XCW_refactor's `read_CIF`, and the P1 XCW cases run on `P1_test.cif`, reproducing XCW_refactor's goldens. `ctest --preset release-linux`
+reports **1266 passed, 0 failed, 22 skipped** (2 disabled) of 1288. See `UNIT_TESTS_STATUS.md`.
+
+As of 2026-10-14, `Src/core/XCW.cpp` runs on XCW_refactor's symmetry handling (`cell.cpp`), its h/-h inversion
+screening of the I tensor and its AO pair screen, and `slow_conv` damps the lambda = 0 step too;
+`ctest --preset release-linux` reports **1262 passed, 0 failed, 22 skipped** (2 disabled) of 1284. See
+`UNIT_TESTS_STATUS.md`.
 As of 2026-10-14, after the Visual Studio solution's removal (CMake-only build, `.vscode/` IDE
 setup), `ctest --preset release-windows` reports **12 failed of 1279** both before and after the
 rework on the same machine in the same sitting, with the identical failing set — all twelve are
