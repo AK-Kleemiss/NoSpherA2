@@ -951,9 +951,10 @@ CcsdDensityResult local_ccsd_natural_orbitals(const occ::qm::Wavefunction &scf, 
 	occ::Vec fdiag(n);
 	for (int k = 0; k < n; k++) fdiag(k) = L.col(k).dot(FL.col(k));
 	mark("DF store");
-	//one cluster per LMO I: MP2 pairs (I, J) over the candidates within r_cluster, in their PAO domain; pairs above
-	//pair_threshold make the cluster, the natural orbitals of their MP2 virtual density above lno_threshold its
-	//virtual space (local natural orbitals)
+	//per LMO I: MP2 pairs (I, J) over the candidates within r_cluster, in their PAO domain; pairs above
+	//pair_threshold select I's LMOs, and their MP2 virtual density is kept with the domain's virtuals
+	ivec2 sel(n), doms(n);
+	std::vector<occ::Mat> Cdom(n), Dvir(n);
 	for (int I = 0; I < n; I++)
 	{
 		ivec cand{ I };
@@ -1004,14 +1005,73 @@ CcsdDensityResult local_ccsd_natural_orbitals(const occ::qm::Wavefunction &scf, 
 			Dv += t * (2.0 * t - t.transpose()).transpose();
 			if (k > 0) Dv += t.transpose() * (2.0 * t.transpose() - t).transpose();
 		}
-		Dv = 0.5 * (Dv + Dv.transpose());
+		sel[I] = cl;
+		doms[I] = dom;
+		Cdom[I] = Cds;
+		Dvir[I] = 0.5 * (Dv + Dv.transpose());
+		sum_cand += nc;
+		sum_dom += nd;
+	}
+	mark("MP2 pair screening");
+	//merging: an LMO whose selection lies inside a larger one's is one more central LMO of that cluster
+	ivec order(n), owner(n, -1);
+	for (int I = 0; I < n; I++) order[I] = I;
+	std::stable_sort(order.begin(), order.end(), [&](const int a, const int b) { return sel[a].size() > sel[b].size(); });
+	ivec2 groups;
+	for (int x = 0; x < n; x++)
+	{
+		const int I = order[x];
+		if (owner[I] >= 0) continue;
+		bvec in(n, false);
+		for (int k = 0; k < static_cast<int>(sel[I].size()); k++) in[sel[I][k]] = true;
+		ivec g{ I };
+		owner[I] = static_cast<int>(groups.size());
+		for (int y = x + 1; y < n; y++)
+		{
+			const int J = order[y];
+			if (owner[J] >= 0) continue;
+			bool inside = true;
+			for (int k = 0; k < static_cast<int>(sel[J].size()) && inside; k++) inside = in[sel[J][k]];
+			if (!inside) continue;
+			g.push_back(J);
+			owner[J] = static_cast<int>(groups.size());
+		}
+		groups.push_back(g);
+	}
+	//per cluster: the leader's LMOs, and the natural orbitals above lno_threshold of the members' summed MP2 virtual
+	//densities in their joint PAO domain (local natural orbitals)
+	for (int gi = 0; gi < static_cast<int>(groups.size()); gi++)
+	{
+		const ivec &g = groups[gi], &cl = sel[g[0]];
+		bvec use(nbf, false);
+		for (int m = 0; m < static_cast<int>(g.size()); m++)
+			for (int k = 0; k < static_cast<int>(doms[g[m]].size()); k++) use[doms[g[m]][k]] = true;
+		ivec dom;
+		for (int mu = 0; mu < nbf; mu++)
+			if (use[mu]) dom.push_back(mu);
+		occ::Mat P(nbf, dom.size());
+		for (size_t k = 0; k < dom.size(); k++) P.col(k) = Q.col(dom[k]);
+		Eigen::SelfAdjointEigenSolver<occ::Mat> sp(P.transpose() * S * P);
+		ivec keep;
+		for (int k = 0; k < sp.eigenvalues().size(); k++)
+			if (sp.eigenvalues()(k) > 1e-6) keep.push_back(k);
+		const int nu = static_cast<int>(keep.size());
+		occ::Mat Cu(nbf, nu);
+		for (int k = 0; k < nu; k++) Cu.col(k) = P * sp.eigenvectors().col(keep[k]) / std::sqrt(sp.eigenvalues()(keep[k]));
+		const occ::Mat CuS = Cu.transpose() * S;
+		occ::Mat Dv = occ::Mat::Zero(nu, nu);
+		for (int m = 0; m < static_cast<int>(g.size()); m++)
+		{
+			const occ::Mat X = CuS * Cdom[g[m]];
+			Dv += X * Dvir[g[m]] * X.transpose();
+		}
 		Eigen::SelfAdjointEigenSolver<occ::Mat> no(Dv);
 		ivec lno;
-		for (int k = 0; k < nd; k++)
+		for (int k = 0; k < nu; k++)
 			if (no.eigenvalues()(k) > opts.lno_threshold) lno.push_back(k);
 		const int v = static_cast<int>(lno.size());
 		occ::Mat Cv(nbf, v);
-		for (int k = 0; k < v; k++) Cv.col(k) = Cds * no.eigenvectors().col(lno[k]);
+		for (int k = 0; k < v; k++) Cv.col(k) = Cu * no.eigenvectors().col(lno[k]);
 		const int o = static_cast<int>(cl.size());
 		occ::Mat Co(nbf, o);
 		for (int k = 0; k < o; k++) Co.col(k) = L.col(cl[k]);
@@ -1029,16 +1089,21 @@ CcsdDensityResult local_ccsd_natural_orbitals(const occ::qm::Wavefunction &scf, 
 		mo.energies.resize(o + v);
 		mo.energies << fo.eigenvalues(), fv.eigenvalues();
 		const occ::qm::cc::CCIntegrals eris = use_df ? occ::qm::cc::df_eris(df, mo, 0) : build_eris(basis, mo, 0, opts, backend, aux_name, log);
-		sum_cand += nc;
-		sum_dom += nd;
-		const occ::Mat proj = R.row(0).transpose();  //LMO I in the semicanonical orbitals
+		ivec central(g.size());
+		occ::Mat proj(o, g.size());  //the central LMOs in the semicanonical orbitals
+		for (int m = 0; m < static_cast<int>(g.size()); m++)
+		{
+			central[m] = static_cast<int>(std::find(cl.begin(), cl.end(), g[m]) - cl.begin());
+			proj.col(m) = R.row(central[m]).transpose();
+		}
 		const CcSolution s = solve_cc(eris, opts, log, quiet, &proj);
-		const occ::Mat H = cluster_half_density(s, R, { 0 }, opts.triples);
+		const occ::Mat H = cluster_half_density(s, R, central, opts.triples);
 		occ::Mat Ccl(nbf, o + v);
 		Ccl << Co, Cvs;
 		Dhalf += Ccl * H * Ccl.transpose();
-		e_corr += cluster_energy(s, R, from_tensor(eris.ovov), 0);
-		e_t += s.tr.e_t / o;  //a log figure: (T) shared evenly by the cluster's LMOs
+		const Tn ovov = from_tensor(eris.ovov);
+		for (int m = 0; m < static_cast<int>(g.size()); m++) e_corr += cluster_energy(s, R, ovov, central[m]);
+		e_t += s.tr.e_t * g.size() / o;  //a log figure: (T) shared evenly by the cluster's LMOs
 		sum_o += o;
 		sum_v += v;
 		max_o = std::max(max_o, o);
@@ -1056,8 +1121,8 @@ CcsdDensityResult local_ccsd_natural_orbitals(const occ::qm::Wavefunction &scf, 
 		<< "  " << n << " Pipek-Mezey LMOs, frozen core: " << nf << " orbitals; candidate radius " << opts.cluster_radius << " A, domain threshold "
 		<< opts.domain_threshold << ", pair threshold " << opts.pair_threshold << " Eh, LNO threshold " << opts.lno_threshold << "\n"
 		<< "  candidates " << std::fixed << std::setprecision(1) << double(sum_cand) / n << " LMOs, PAO domains " << double(sum_dom) / n << " virtuals on average\n"
-		<< "  clusters: occupied " << double(sum_o) / n << " on average (max " << max_o << "), virtual "
-		<< double(sum_v) / n << " (max " << max_v << ")\n"
+		<< "  " << groups.size() << " clusters: occupied " << double(sum_o) / groups.size() << " on average (max " << max_o << "), virtual "
+		<< double(sum_v) / groups.size() << " (max " << max_v << ")\n"
 		<< std::setprecision(10) << "  E(CCSD correlation, sum over clusters) = " << e_corr << "\n"
 		<< "  natural occupations:";
 	for (int k = 0; k < std::min(nmo, 8); k++) log << " " << std::setprecision(6) << result.occupations(k);
