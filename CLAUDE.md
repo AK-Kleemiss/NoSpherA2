@@ -44,7 +44,7 @@ The executable is written to the preset build tree under `bin`, for example `bui
 
 Important CMake options:
 
-- `NOSPHERA2_BUILD_TESTS=ON` builds the C++ GTest/CTest suite in `tests/src`.
+- `NOSPHERA2_BUILD_TESTS=ON` builds the C++ GTest/CTest suite in `tests/src`. Every desktop release/debug preset has a `-tests` variant (`release-windows-tests`, `debug-linux-tests`, `release-macos-arm64-tests`, ...) that sets it in the same build tree as its plain counterpart, which sets it OFF explicitly (for VS Code's CMake Tools, where `-D` flags cannot be passed).
 - `NOSPHERA2_BUILD_DLL=ON` builds the optional Windows DLL target from `Src/dll`.
 - `NOSPHERA2_DEPENDENCIES_ONLY=ON` configures/builds dependency targets and then returns before building NoSpherA2. CI uses this to cache dependency build trees.
 

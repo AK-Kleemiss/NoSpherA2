@@ -150,7 +150,10 @@
         "windows-base",
         "release-base"
       ],
-      "binaryDir": "${sourceDir}/build/release-windows"
+      "binaryDir": "${sourceDir}/build/release-windows",
+      "cacheVariables": {
+        "NOSPHERA2_BUILD_TESTS": "OFF"
+      }
     },
     {
       "name": "debug-windows",
@@ -159,7 +162,26 @@
         "windows-base",
         "debug-base"
       ],
-      "binaryDir": "${sourceDir}/build/debug-windows"
+      "binaryDir": "${sourceDir}/build/debug-windows",
+      "cacheVariables": {
+        "NOSPHERA2_BUILD_TESTS": "OFF"
+      }
+    },
+    {
+      "name": "release-windows-tests",
+      "displayName": "Release — Windows (+tests)",
+      "inherits": "release-windows",
+      "cacheVariables": {
+        "NOSPHERA2_BUILD_TESTS": "ON"
+      }
+    },
+    {
+      "name": "debug-windows-tests",
+      "displayName": "Debug — Windows (+tests)",
+      "inherits": "debug-windows",
+      "cacheVariables": {
+        "NOSPHERA2_BUILD_TESTS": "ON"
+      }
     },
 
     {
@@ -241,7 +263,10 @@
         "lhs": "${hostSystemName}",
         "rhs": "Linux"
       },
-      "binaryDir": "${sourceDir}/build/release-linux"
+      "binaryDir": "${sourceDir}/build/release-linux",
+      "cacheVariables": {
+        "NOSPHERA2_BUILD_TESTS": "OFF"
+      }
     },
     {
       "name": "debug-linux",
@@ -255,7 +280,26 @@
         "lhs": "${hostSystemName}",
         "rhs": "Linux"
       },
-      "binaryDir": "${sourceDir}/build/debug-linux"
+      "binaryDir": "${sourceDir}/build/debug-linux",
+      "cacheVariables": {
+        "NOSPHERA2_BUILD_TESTS": "OFF"
+      }
+    },
+    {
+      "name": "release-linux-tests",
+      "displayName": "Release — Linux (+tests)",
+      "inherits": "release-linux",
+      "cacheVariables": {
+        "NOSPHERA2_BUILD_TESTS": "ON"
+      }
+    },
+    {
+      "name": "debug-linux-tests",
+      "displayName": "Debug — Linux (+tests)",
+      "inherits": "debug-linux",
+      "cacheVariables": {
+        "NOSPHERA2_BUILD_TESTS": "ON"
+      }
     },
 
     {
@@ -265,7 +309,10 @@
         "macos-arm64-base",
         "release-base"
       ],
-      "binaryDir": "${sourceDir}/build/release-macos-arm64"
+      "binaryDir": "${sourceDir}/build/release-macos-arm64",
+      "cacheVariables": {
+        "NOSPHERA2_BUILD_TESTS": "OFF"
+      }
     },
     {
       "name": "release-macos-x86_64",
@@ -274,7 +321,10 @@
         "macos-x86_64-base",
         "release-base"
       ],
-      "binaryDir": "${sourceDir}/build/release-macos-x86_64"
+      "binaryDir": "${sourceDir}/build/release-macos-x86_64",
+      "cacheVariables": {
+        "NOSPHERA2_BUILD_TESTS": "OFF"
+      }
     },
     {
       "name": "debug-macos-arm64",
@@ -283,7 +333,10 @@
         "macos-arm64-base",
         "debug-base"
       ],
-      "binaryDir": "${sourceDir}/build/debug-macos-arm64"
+      "binaryDir": "${sourceDir}/build/debug-macos-arm64",
+      "cacheVariables": {
+        "NOSPHERA2_BUILD_TESTS": "OFF"
+      }
     },
     {
       "name": "debug-macos-x86_64",
@@ -292,7 +345,42 @@
         "macos-x86_64-base",
         "debug-base"
       ],
-      "binaryDir": "${sourceDir}/build/debug-macos-x86_64"
+      "binaryDir": "${sourceDir}/build/debug-macos-x86_64",
+      "cacheVariables": {
+        "NOSPHERA2_BUILD_TESTS": "OFF"
+      }
+    },
+    {
+      "name": "release-macos-arm64-tests",
+      "displayName": "Release — macOS arm64 (+tests)",
+      "inherits": "release-macos-arm64",
+      "cacheVariables": {
+        "NOSPHERA2_BUILD_TESTS": "ON"
+      }
+    },
+    {
+      "name": "release-macos-x86_64-tests",
+      "displayName": "Release — macOS x86_64 (+tests)",
+      "inherits": "release-macos-x86_64",
+      "cacheVariables": {
+        "NOSPHERA2_BUILD_TESTS": "ON"
+      }
+    },
+    {
+      "name": "debug-macos-arm64-tests",
+      "displayName": "Debug — macOS arm64 (+tests)",
+      "inherits": "debug-macos-arm64",
+      "cacheVariables": {
+        "NOSPHERA2_BUILD_TESTS": "ON"
+      }
+    },
+    {
+      "name": "debug-macos-x86_64-tests",
+      "displayName": "Debug — macOS x86_64 (+tests)",
+      "inherits": "debug-macos-x86_64",
+      "cacheVariables": {
+        "NOSPHERA2_BUILD_TESTS": "ON"
+      }
     }
   ],
 
@@ -312,6 +400,16 @@
       "name": "debug-windows",
       "inherits": "build-base",
       "configurePreset": "debug-windows"
+    },
+    {
+      "name": "release-windows-tests",
+      "inherits": "build-base",
+      "configurePreset": "release-windows-tests"
+    },
+    {
+      "name": "debug-windows-tests",
+      "inherits": "build-base",
+      "configurePreset": "debug-windows-tests"
     },
     {
       "name": "release-windows-arm64",
@@ -344,6 +442,16 @@
       "configurePreset": "debug-linux"
     },
     {
+      "name": "release-linux-tests",
+      "inherits": "build-base",
+      "configurePreset": "release-linux-tests"
+    },
+    {
+      "name": "debug-linux-tests",
+      "inherits": "build-base",
+      "configurePreset": "debug-linux-tests"
+    },
+    {
       "name": "release-macos-arm64",
       "inherits": "build-base",
       "configurePreset": "release-macos-arm64"
@@ -362,6 +470,26 @@
       "name": "debug-macos-x86_64",
       "inherits": "build-base",
       "configurePreset": "debug-macos-x86_64"
+    },
+    {
+      "name": "release-macos-arm64-tests",
+      "inherits": "build-base",
+      "configurePreset": "release-macos-arm64-tests"
+    },
+    {
+      "name": "release-macos-x86_64-tests",
+      "inherits": "build-base",
+      "configurePreset": "release-macos-x86_64-tests"
+    },
+    {
+      "name": "debug-macos-arm64-tests",
+      "inherits": "build-base",
+      "configurePreset": "debug-macos-arm64-tests"
+    },
+    {
+      "name": "debug-macos-x86_64-tests",
+      "inherits": "build-base",
+      "configurePreset": "debug-macos-x86_64-tests"
     },
     {
       "name": "release-macos-universal",
@@ -399,6 +527,16 @@
       "configurePreset": "debug-windows"
     },
     {
+      "name": "release-windows-tests",
+      "inherits": "test-base",
+      "configurePreset": "release-windows-tests"
+    },
+    {
+      "name": "debug-windows-tests",
+      "inherits": "test-base",
+      "configurePreset": "debug-windows-tests"
+    },
+    {
       "name": "release-windows-arm64",
       "inherits": "test-base",
       "configurePreset": "release-windows-arm64"
@@ -419,6 +557,16 @@
       "configurePreset": "debug-linux"
     },
     {
+      "name": "release-linux-tests",
+      "inherits": "test-base",
+      "configurePreset": "release-linux-tests"
+    },
+    {
+      "name": "debug-linux-tests",
+      "inherits": "test-base",
+      "configurePreset": "debug-linux-tests"
+    },
+    {
       "name": "release-macos-arm64",
       "inherits": "test-base",
       "configurePreset": "release-macos-arm64"
@@ -437,6 +585,26 @@
       "name": "debug-macos-x86_64",
       "inherits": "test-base",
       "configurePreset": "debug-macos-x86_64"
+    },
+    {
+      "name": "release-macos-arm64-tests",
+      "inherits": "test-base",
+      "configurePreset": "release-macos-arm64-tests"
+    },
+    {
+      "name": "release-macos-x86_64-tests",
+      "inherits": "test-base",
+      "configurePreset": "release-macos-x86_64-tests"
+    },
+    {
+      "name": "debug-macos-arm64-tests",
+      "inherits": "test-base",
+      "configurePreset": "debug-macos-arm64-tests"
+    },
+    {
+      "name": "debug-macos-x86_64-tests",
+      "inherits": "test-base",
+      "configurePreset": "debug-macos-x86_64-tests"
     }
   ]
 }

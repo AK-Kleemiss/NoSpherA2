@@ -33,25 +33,6 @@
                     "ignoreFailures": true
                 }
             ]
-        },
-        {
-            // Example of a concrete debugging session: native NBO on the
-            // epoxide fixture. Copy this block and swap args/cwd for others.
-            "name": "Example: native NBO on epoxide (Windows)",
-            "type": "cppvsdbg",
-            "request": "launch",
-            "program": "${command:cmake.launchTargetPath}",
-            "args": ["-nbo_native", "epoxide.gbw", "-nrt", "-nbo_json", "epoxide-native.nbo.json"],
-            "cwd": "${workspaceFolder}/tests/epoxide_gbw",
-            "console": "integratedTerminal"
-        },
-        {
-            "name": "Python: Current File",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${file}",
-            "console": "integratedTerminal",
-            "justMyCode": true
         }
     ]
 }
