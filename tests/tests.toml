@@ -26,6 +26,27 @@ cif = "alanine.cif"
 dmin = 0.5
 acc = 1
 
+# CCSD scattering factors of water, cc-pVDZ, all electrons: occ's CCSD with the Lambda-equation density, and
+# ORCA's unrelaxed CCSD natural orbitals of the same job (water_ccsd.inp). The two charge tables agree;
+# tests/src/CcsdDensityTests.cpp holds the tight comparisons against PySCF.
+[ccsd_occ_water]
+directory = "ccsd_water"
+
+[ccsd_occ_water.args]
+occ = "water_ccsd.toml"
+cif = "water.cif"
+dmin = 0.8
+acc = 1
+
+[ccsd_orca_nat]
+directory = "ccsd_water"
+
+[ccsd_orca_nat.args]
+wfn = "water_ccsd.mdci.nat"
+cif = "water.cif"
+dmin = 0.8
+acc = 1
+
 [disorder_THPP]
 directory = "disorder"
 good = "disorder_THPP.good"

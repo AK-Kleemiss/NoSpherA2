@@ -26,6 +26,14 @@ set_tests_properties(
         RESOURCE_LOCK integration_sucrose_IAM_SF
 )
 
+# Tests using tests/ccsd_water
+set_tests_properties(
+    TomlIntegrationTests.CcsdOccWater
+    TomlIntegrationTests.CcsdOrcaNat
+    PROPERTIES
+        RESOURCE_LOCK integration_ccsd_water
+)
+
 # Tests using tests/TFVC
 set_tests_properties(
     TomlIntegrationTests.TFVC
