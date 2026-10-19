@@ -250,8 +250,12 @@ WFN::WFN(const occ::qm::Wavefunction &occ_WF, bool from_file) : WFN()
 		{
 			basis_offset = 0;
 			write_cursor = 0;
-			occ = (n < nocc) ? (unrestricted ? 1.0 : 2.0) : 0.0;
 			int energy_index = unrestricted ? spin * occ_WF.nbf + n : n;
+			//mo.occupation is per spin orbital; a correlated density's natural orbitals carry fractional ones
+			if (mo.occupation.size() == n_spin * occ_WF.nbf)
+				occ = (unrestricted ? 1.0 : 2.0) * mo.occupation(energy_index);
+			else
+				occ = (n < nocc) ? (unrestricted ? 1.0 : 2.0) : 0.0;
 			push_back_MO(energy_index + 1, occ, mo.energies[energy_index], spin);
 			MO& currentMO = MOs.back();
 			currentMO.assign_coefficients_size(nex);

@@ -21,6 +21,7 @@
 #include "b2c.h"
 #include "section_log.h"
 #include "eqc.h"
+#include "ccsd_density.h"
 #include <future>
 #ifdef NOSPHERA2_USE_GPU
 #include "grid_gpu.h"
@@ -539,7 +540,7 @@ static int run_app_impl(int argc, char **argv)
 				std::filesystem::path log_path = opt.combined_tsc_calc_files[i].stem().string() + ".log";
 				occ::log::set_log_file(log_path.string());
 				occ::parallel::set_num_threads(config.runtime.threads);
-				wavy.emplace_back(occ::main::run_scf_external(config, true));
+				wavy.emplace_back(wavefunction_from_occ_input(opt.combined_tsc_calc_files[i].string(), config, log_file));
 				occ::main::shutdown();
 				wavy[i].set_multi(opt.combined_tsc_calc_mult[i]);
 				wavy[i].set_charge(opt.combined_tsc_calc_charge[i]);
@@ -765,7 +766,7 @@ static int run_app_impl(int argc, char **argv)
 				occ::io::OccInput config = occ::io::read_occ_input_file(opt.occ);
 				occ::log::set_log_file("NoSpherA2_OCC.log");
 				occ::parallel::set_num_threads(config.runtime.threads);
-				wavy.emplace_back(occ::main::run_scf_external(config, true));
+				wavy.emplace_back(wavefunction_from_occ_input(opt.occ, config, log_file));
 				occ::main::shutdown();
 			}
 			else {

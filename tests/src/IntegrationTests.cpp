@@ -485,6 +485,18 @@ TEST(TomlIntegrationTests, AlanineIntegratedOcc)
 	EXPECT_TRUE(result.success) << result.message;
 }
 
+TEST(TomlIntegrationTests, CcsdOccWater)
+{
+	const UT_Result result = run_inprocess_test(get_repo_root(), "ccsd_occ_water");
+	EXPECT_TRUE(result.success) << result.message;
+}
+
+TEST(TomlIntegrationTests, CcsdOrcaNat)
+{
+	const UT_Result result = run_inprocess_test(get_repo_root(), "ccsd_orca_nat");
+	EXPECT_TRUE(result.success) << result.message;
+}
+
 TEST(TomlIntegrationTests, DisorderTHPP)
 {
 	const UT_Result result = run_inprocess_test(get_repo_root(), "disorder_THPP");

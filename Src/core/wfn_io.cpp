@@ -49,7 +49,7 @@ void WFN::read_known_wavefunction_format(const std::filesystem::path &fileName, 
 		err_checkf(read_xyz(fileName, file, debug), "Problem reading xyz", file);
 	else if (fileName.extension() == ".molden")
 		err_checkf(read_molden(fileName, file, debug), "Problem reading molden file", file);
-	else if (fileName.extension() == ".gbw")
+	else if (fileName.extension() == ".gbw" || fileName.extension() == ".nat")  //ORCA natural orbitals (base.mdci.nat) are gbw format
 		err_checkf(read_gbw(fileName, file, debug), "Problem reading gbw file", file);
 	else if (fileName.extension() == ".xtb")
 		err_checkf(read_ptb(fileName, file, debug), "Problem reading xtb file", file);
@@ -1583,12 +1583,15 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
 
 		for (int i = 0; i < dimension; i++) {
 			for (int oc = 0; oc < occupations[0].size(); oc++) {
-				if (occupations[0][oc] <= 0.0) continue;
-				coeff_mo_s1(i, oc) = reorderd_coefs_s1(i, oc) * occupations[0][oc];
-				coeff_small_s1(i, oc) = reorderd_coefs_s1(i, oc);
-
-				if (operators == 2) coeff_mo_s2(i, oc) = reorderd_coefs_s2(i, oc) * occupations[1][oc];
-				if (operators == 2) coeff_small_s2(i, oc) = reorderd_coefs_s2(i, oc);
+				//natural orbitals of a correlated density (.mdci.nat) carry small negative occupations, which belong in the DM
+				if (occupations[0][oc] != 0.0) {
+					coeff_mo_s1(i, oc) = reorderd_coefs_s1(i, oc) * occupations[0][oc];
+					coeff_small_s1(i, oc) = reorderd_coefs_s1(i, oc);
+				}
+				if (operators == 2 && occupations[1][oc] != 0.0) {
+					coeff_mo_s2(i, oc) = reorderd_coefs_s2(i, oc) * occupations[1][oc];
+					coeff_small_s2(i, oc) = reorderd_coefs_s2(i, oc);
+				}
 			}
 		}
 
