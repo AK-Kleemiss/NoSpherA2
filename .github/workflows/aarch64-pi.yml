@@ -4,8 +4,8 @@ name: aarch64 (flowiPi)
 # schedule and workflow_dispatch only act once this file is on the default branch (master).
 on:
   push:
-    # density_source joins once PR #219 lands: until then it has no environment-linux-aarch64.yaml and the bootstrap asks for MKL
-    branches: [linux-aarch64]
+    # density_source only since PR #219 landed there (cf22f61b); linux-aarch64 is retired
+    branches: [density_source]
   schedule:
     - cron: '0 20 * * *'
   workflow_dispatch:
