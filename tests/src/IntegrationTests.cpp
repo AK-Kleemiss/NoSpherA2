@@ -497,6 +497,13 @@ TEST(TomlIntegrationTests, P1_test_XCW)
 	EXPECT_TRUE(result.success) << result.message;
 }
 
+// The other subset goldens read the I tensor P1_test_XCW saves; outside ctest's fixture order they make it first
+static void ensure_p1_tensor()
+{
+	if (!std::filesystem::exists(get_repo_root() / "tests" / "P1_test" / "p1_i.bin"))
+		run_inprocess_test(get_repo_root(), "P1_test_XCW");
+}
+
 // Longer lambda scan (6 requested steps vs. P1_test_XCW's 2), with
 // -xcw_gaussian_halt enabled so the Gaussian halting criterion
 // (tests/P1_test/XCW_plan.md) gets exercised against a real trajectory
@@ -566,6 +573,7 @@ TEST(TomlIntegrationTests, P1_test_XCW_full)
 // -xcw_h2_weighting: fits the 1/|H|^2-weighted residual self-energy criterion instead of GoF^2.
 TEST(TomlIntegrationTests, P1_test_XCW_h2)
 {
+	ensure_p1_tensor();
 	const UT_Result result = run_inprocess_test(get_repo_root(), "P1_test_XCW_h2");
 	EXPECT_TRUE(result.success) << result.message;
 }
@@ -581,6 +589,7 @@ TEST(TomlIntegrationTests, P1_test_XCW_h2_full)
 
 TEST(TomlIntegrationTests, P1_F2_test_XCW)
 {
+	ensure_p1_tensor();
 	const UT_Result result = run_inprocess_test(get_repo_root(), "P1_F2_test_XCW");
 	EXPECT_TRUE(result.success) << result.message;
 }
@@ -589,19 +598,8 @@ TEST(TomlIntegrationTests, P1_F2_test_XCW)
 // the goldens equal the full builds to SCF convergence, so a broken segment skip shows here.
 TEST(TomlIntegrationTests, P1_test_XCW_incremental)
 {
+	ensure_p1_tensor();
 	const UT_Result result = run_inprocess_test(get_repo_root(), "P1_test_XCW_incremental");
-	EXPECT_TRUE(result.success) << result.message;
-}
-
-TEST(TomlIntegrationTests, P1_test_XCW_h2_incremental)
-{
-	const UT_Result result = run_inprocess_test(get_repo_root(), "P1_test_XCW_h2_incremental");
-	EXPECT_TRUE(result.success) << result.message;
-}
-
-TEST(TomlIntegrationTests, P1_F2_test_XCW_incremental)
-{
-	const UT_Result result = run_inprocess_test(get_repo_root(), "P1_F2_test_XCW_incremental");
 	EXPECT_TRUE(result.success) << result.message;
 }
 
@@ -616,6 +614,7 @@ TEST(TomlIntegrationTests, P1_F2_test_XCW_full)
 
 TEST(TomlIntegrationTests, P1_F2_test_XCW_h2)
 {
+	ensure_p1_tensor();
 	const UT_Result result = run_inprocess_test(get_repo_root(), "P1_F2_test_XCW_h2");
 	EXPECT_TRUE(result.success) << result.message;
 }

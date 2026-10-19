@@ -294,6 +294,8 @@ TEST(RgbiRobustnessTests, SymmetryEquivalentGoldCentresAgreeWithinPrintedPrecisi
 		Roby_information roby(wavy, {}, true, true, false, false);
 		out = cap.str();
 	}
+	//occ has no ECP potential, so the ECP golds take the molecular local orbitals instead of a free atom
+	EXPECT_NE(out.find("used molecular local-orbital fallback for 2/53 atoms (0, 1)."), std::string::npos);
 
 	//the three orbits of the inversion centre: 0<->1 (Au), 2<->3 (Br), 4<->5 (P)
 	for (const int a : { 0, 2, 4 }) {

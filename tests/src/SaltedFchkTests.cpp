@@ -390,6 +390,30 @@ TEST(SaltedFchkIoTests, FindFirstSaltedFile)
 	EXPECT_TRUE(find_first_salted_file(dir).empty());
 }
 
+// a model folder: the lead is the first non-element name, element models join only for elements present
+TEST(SaltedFchkIoTests, SaltedFolderModels)
+{
+	const auto dir = tmp_path("modelfolder");
+	std::filesystem::create_directories(dir);
+	for (const char* f : {"Co.salted", "Ag.salted", "v8.salted", "z_old.salted", "Cl.salted", "xyz.salted", "Fe.txt"})
+		std::ofstream(dir / f) << "x";
+	EXPECT_EQ(salted_element_file_Z("Co.salted"), 27);
+	EXPECT_EQ(salted_element_file_Z("CO.salted"), 0);
+	EXPECT_EQ(salted_element_file_Z("D.salted"), 0);
+	EXPECT_EQ(find_first_salted_file(dir).string(), "v8.salted");
+	const pathvec m = salted_folder_models(dir, {1, 6, 17, 27});
+	ASSERT_EQ(m.size(), 3u);
+	EXPECT_EQ(m[0].filename().string(), "v8.salted");
+	EXPECT_EQ(m[1].filename().string(), "Cl.salted");
+	EXPECT_EQ(m[2].filename().string(), "Co.salted");
+	EXPECT_EQ(salted_folder_models(dir, {1, 6}).size(), 1u);
+	for (const char* f : {"v8.salted", "z_old.salted", "xyz.salted"})
+		std::filesystem::remove(dir / f);
+	EXPECT_EQ(find_first_salted_file(dir).string(), "Ag.salted"); // element models only: the first file
+	EXPECT_EQ(salted_folder_models(dir, {27}).size(), 1u);
+	std::filesystem::remove_all(dir);
+}
+
 // the CONFG block of the synthetic model reads back field for field
 TEST(SaltedFchkIoTests, SyntheticModelConfig)
 {
@@ -591,11 +615,38 @@ TEST(SaltedFchkIoTests, BlockReplacedCopy)
 	std::filesystem::remove(r);
 }
 
+// -salted_ecp: the ECP block reads back as the mode, a flagged copy is VERSION 6 and still reads, an unflagged
+// model is all-electron (0), and re-flagging replaces the block instead of adding a second one
+TEST(SaltedFchkIoTests, EcpBlockRoundTrip)
+{
+	const auto p = tmp_path("ecp_in.salted"), q = tmp_path("ecp_out.salted"), r = tmp_path("ecp_again.salted");
+	write_synthetic_model(p, 3, true, true);
+	write_salted_ecp(p, q, 1);
+	write_salted_ecp(q, r, 3);
+	SALTEDConfig c{}, cq{}, cr{};
+	{
+		SALTED_BINARY_FILE f(p), g(q), h(r);
+		f.populate_config(c);
+		g.populate_config(cq);
+		h.populate_config(cr);
+		EXPECT_EQ(g.read_weights(), weights);
+		EXPECT_EQ(g.read_basis_set()->get_owned_primitive_count(), 5u);
+	}
+	EXPECT_EQ(c.ecp_mode, 0);
+	EXPECT_EQ(cq.ecp_mode, 1);
+	EXPECT_EQ(cr.ecp_mode, 3);
+	EXPECT_EQ(std::filesystem::file_size(r), std::filesystem::file_size(q));
+	EXPECT_EXIT(write_salted_ecp(p, q, 4), ::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), ".*");
+	std::filesystem::remove(p);
+	std::filesystem::remove(q);
+	std::filesystem::remove(r);
+}
+
 // a file from the future warns but still reads through its table of contents
 TEST(SaltedFchkIoTests, NewerVersionStillReads)
 {
 	const auto p = tmp_path("future.salted");
-	write_synthetic_model(p, 6, false, true);
+	write_synthetic_model(p, 7, false, true);
 	{
 		SALTED_BINARY_FILE f(p);
 		EXPECT_EQ(f.read_weights().size(), 4u);
@@ -1376,7 +1427,7 @@ TEST(SaltedFchkTests, UnrestrictedDoubletRoundTrip)
 	std::filesystem::remove(tmp);
 }
 
-// the occ-built H2+ doublet written to fchk and read back keeps its density (the occupied orbital sits in the beta block)
+// the occ-built H2+ doublet written to fchk and read back keeps its density and spin density (the occupied orbital sits in the beta block)
 TEST(SaltedFchkTests, UnrestrictedDoubletRoundTripKeepsDensity)
 {
 	const auto tmp = tmp_path("h2p_density.fchk");
@@ -1388,6 +1439,10 @@ TEST(SaltedFchkTests, UnrestrictedDoubletRoundTripKeepsDensity)
 	ASSERT_TRUE(free_fchk(log, tmp, "", w, false, true));
 	WFN back(tmp, false);
 	expect_same_density(w, back, 1e-6, "H2+ via fchk");
+	EXPECT_EQ(back.get_MO_op_count(1), 8);
+	const d3 pos{ w.get_atom_coordinate(0, 0) + 0.3, w.get_atom_coordinate(0, 1), w.get_atom_coordinate(0, 2) };
+	EXPECT_LT(w.compute_spin_dens(pos), 0.0);
+	EXPECT_NEAR(back.compute_spin_dens(pos), w.compute_spin_dens(pos), 1e-6);
 	std::filesystem::remove(tmp);
 }
 

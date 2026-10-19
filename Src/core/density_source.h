@@ -90,11 +90,8 @@ template<PointDensity S> double calculate_eli(const S& s, const d3& p)
 	return aux_density::eli_from_density(rho, g[0] * g[0] + g[1] * g[1] + g[2] * g[2], lap);
 }
 
-#if defined(__aarch64__) || defined(_M_ARM64)
-//ARM: eight points at a time, bit-identical to the per-point loop below (WFN::compute_dens_batch)
+//rho at n points, in parallel over the points; a WFN in blocks with one GEMM each (wfn_density.cpp)
 inline void calculate_density(const WFN& w, const int n, const double* x, const double* y, const double* z, double* rho) { w.compute_dens_batch(n, x, y, z, rho); }
-#endif
-//rho at n points, in parallel over the points; the WFN keeps its scratch per thread
 template<class S> void calculate_density(const S& s, const int n, const double* x, const double* y, const double* z, double* rho)
 {
 #pragma omp parallel for schedule(dynamic, 64)

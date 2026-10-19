@@ -219,8 +219,8 @@ namespace {
 
 	occ::gto::AOBasis build_occ_atomic_basis_from_wfn_atom(
 		const atom &atm, const e_origin origin, const bool cartesian) {
-		//The ECP core comes off the nucleus (Z - N_core, neutral pseudo-atom): occ gets no ECP potential here,
-		//so declaring frozen core electrons would build a highly charged cation.
+		//The ECP core comes off the nucleus (Z - N_core, neutral pseudo-atom) but occ gets no ECP potential here,
+		//so that pseudo-atom is the wrong atom (Pd ECP-28 = argon); computeAllAtomicNAOs keeps ECP atoms away.
 		const int effective_Z = atm.get_charge() - atm.get_ECP_electrons();
 		std::vector<occ::core::Atom> occ_atoms{ { effective_Z, 0.0, 0.0, 0.0 } };
 		std::vector<occ::gto::Shell> shells;
@@ -805,6 +805,8 @@ namespace {
 		std::vector<const atom *> distinct;
 		std::vector<FreeAtomKey> keys;
 		for (const auto &a : ats) {
+			if (a.get_ECP_electrons() > 0)
+				continue;  //computeAllAtomicNAOs never asks for an ECP free atom
 			const FreeAtomKey key{ a.get_basis_set(), a.get_charge(), a.get_ECP_electrons(),
 								   origin, cartesian };
 			bool seen = false;
@@ -2239,7 +2241,12 @@ void Roby_information::computeAllAtomicNAOs(WFN &wavy, const bool symmetrize, co
 			fallback.atom_index = a.get_nr() - 1;
 			return fallback;
 		};
-		if (use_ano_basis) {
+		//occ gets no ECP potential, so an ECP free atom would be the Z - N_core pseudo-atom (Pd ECP-28 = argon).
+		if (use_ano_basis && a.get_ECP_electrons() > 0) {
+			ano_fallback_atoms.push_back(a.get_nr() - 1);
+			NAOs.emplace_back(make_molecular_fallback());
+		}
+		else if (use_ano_basis) {
 			try {
 				const dMatrix2 atomic_density =
 					compute_tonto_style_atomic_density(a, wavy.get_origin(), wavy.get_d_f_switch());
@@ -2825,8 +2832,8 @@ void Roby_information::computeGroupAnalysis(const ivec2 &group_defs, const vec &
 			// can push these to ~0.996 rather than exactly 1, so they evade the
 			// angle cutoff (84.6° lies inside its [0.573°, 89.427°] window) and corrupt
 			// the ionic index with large contributions of the wrong sign.  Exclude any
-			// pair whose positive eigval exceeds group_lone_pair_threshold.
-			// TODO: the atom-pair loop lacks this guard, so the two paths disagree on lone pairs.
+			// pair whose positive eigval exceeds group_lone_pair_threshold. The atom-pair loop
+			// has the same guard at pair_lone_pair_threshold.
 			for (int i = 0; i < n0; i++) {
 				if (covalent_info['A'](i, 0) < zero_angle_cutoff || covalent_info['A'](i, 0) > 90.0 - zero_angle_cutoff)
 					continue;
@@ -2906,6 +2913,7 @@ Roby_information::Roby_information(WFN &wavy, const ivec3 &group_sets, const boo
 	read_threshold("NOS_RGBI_PINV_CUTOFF", pinv_cutoff, std::numeric_limits<double>::infinity(), "RGBI pseudo-inverses cut singular values below ");
 	read_threshold("NOS_RGBI_PAIR_TOL", pair_tolerance, 1.0, "RGBI pairs ionic eigenvalues and spares lone pairs within ");
 	read_threshold("NOS_RGBI_GROUP_LP", group_lone_pair_threshold, 2.0, "RGBI groups drop ionic pairs as lone pairs above ");
+	read_threshold("NOS_RGBI_PAIR_LP", pair_lone_pair_threshold, 2.0, "RGBI atom pairs drop ionic pairs as lone pairs above ");
 	auto bonds = get_bonded_atom_pairs(wavy);
 	//A .wfn has no shell structure, so every atom's basis is empty; OCC would segfault (uncatchable) in
 	//gensqrtinv on the ANO route. One check for both routes.
@@ -3274,6 +3282,9 @@ Roby_information::Roby_information(WFN &wavy, const ivec3 &group_sets, const boo
 
 			if (pruned_eigvals[i] < pruned_eigvals[pairs[i]])
 				continue; // skip antibonding
+
+			if (pruned_eigvals[i] > pair_lone_pair_threshold)
+				continue; // near-nonbonding pair that misses the 89.99 deg skip, e.g. Pd 4d against Zn
 
 			if (pairs[i] != i) {
 				cov_index[i] = 0.5 * (covalent_popul[i] - covalent_popul[pairs[i]]);

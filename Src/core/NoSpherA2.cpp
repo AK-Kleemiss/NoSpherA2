@@ -57,6 +57,11 @@ int run_app(int argc, char **argv)
 	{
 		return run_app_impl(argc, argv);
 	}
+	//exit() inside the DLL; the message is already in the log
+	catch (const NosEarlyExit &e)
+	{
+		return e.code;
+	}
 	catch (const std::exception &e)
 	{
 		return report(e.what());

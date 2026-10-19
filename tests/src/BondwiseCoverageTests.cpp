@@ -903,6 +903,7 @@ TEST(BondwiseCoverageEliTests, QtaimHoldsTheThreefoldOrbitOfNH3Li)
 	options opt;
 	opt.properties.radius = 2.5;
 	opt.properties.resolution = 0.4;   //the QTAIM basins follow the analytic gradient, so this only sizes the ELI arm
+	opt.spin_eli = false;   //the spin-resolved basins are ELI_NH3Li's to check
 	std::string out;
 	{
 		CoutCapture cap;

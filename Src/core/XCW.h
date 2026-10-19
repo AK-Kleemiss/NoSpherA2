@@ -16,13 +16,6 @@
 
 // Applies M to the U/C/D tensors of one atom in their Voigt storage: T'_{ij..} = sum_pq.. M_pi M_qj .. T_pq..
 void transform_ADPs(vec2& ADPs, const vec2& M);
-// r^l * spherical_harmonic(l, m, r/|r|) as monomials {x^i y^j z^k, coefficient}; residual is the max misfit of the fit
-std::vector<std::pair<i3, double>> solid_harmonic_monomials(const int l, const int m, double* residual = nullptr);
-// Upper bound on int |chi_a chi_b| d3r for two contracted AOs (primitives, centre, solid harmonic from above);
-// returns as soon as the partial sum exceeds stop
-double ao_pair_abs_overlap_bound(const std::vector<primitive>& pa, const d3& A, const std::vector<std::pair<i3, double>>& sa,
-	const std::vector<primitive>& pb, const d3& B, const std::vector<std::pair<i3, double>>& sb,
-	const double stop = std::numeric_limits<double>::infinity());
 
 class XCW {
 public:
@@ -53,12 +46,6 @@ private:
 		int m;
 	};
 
-	// Data for anomalous dispersion correction
-	struct anom_atom {
-		std::string identifier;
-		cdouble dispersion;
-	};
-
 	// Miscellaneous crystallographic data
 	struct cryst_info {
 		int nr_small;
@@ -82,16 +69,6 @@ private:
 		double weighted_GooF2_all;
 		int n_fit;
 		vec U_iso;
-
-		void grow_U_iso(const std::vector<asym_atom>& asym_atoms, const ivec3& symmetry_linking_list) {
-			for (int i = 0; i < symmetry_linking_list.size(); i++) {
-				for (int j = 0; j < symmetry_linking_list[i].size(); j++) {
-					if (symmetry_linking_list[i][j].size() != 0) {
-						U_iso[j] = U_iso[i];
-					}
-				}
-			}
-		};
 	};
 
 	/* Data concerning convergence criteria, molecule information, basis set, etc.
@@ -116,8 +93,6 @@ private:
 		//flags, yet run_lambda copies alpha and level_shift and SCF_iteration mixes the
 		//density with alpha regardless of the flag
 		double diis_stop_damping = 0;
-		//`slow_conv` chosen: the unperturbed first step still runs the normal schedule, see run_XCW_fitting
-		bool slow_conv = false;
 		//`soscf`: second-order steps as soon as the DIIS error is below trah_.start_threshold, see soscf_step
 		bool soscf = false;
 		//`check_hessian`: finite-difference check of the Hessian-vector product on the first
@@ -171,6 +146,8 @@ private:
 		std::filesystem::path i_tensor_file_path;
 		// `save <path>`: write the tensor for a later `read <path>` on a thread, so the refinement need not wait
 		std::filesystem::path i_tensor_save_path;
+		// `save_eri <path>` / `read_eri <path>`: the stored two-electron integrals, for a later run on the same geometry and basis
+		std::filesystem::path eri_read_path, eri_save_path;
 
 		// Clears the convergence flags
 		void clear() {
@@ -270,9 +247,6 @@ private:
 
 	// Calculates direct corrections of the anomalous dispersion onto F_calc
 	void eval_anom_disp(cvec2& DW_fact, cvec2& phase_fact, cvec2& translation_phase);
-
-	// Parses the anomalous dispersion information from a CIF style .txt file
-	void parse_anom_atoms(std::vector<anom_atom>& anom_atoms);
 
 	// Evaluates the scaling factor for |F_calc| by least squares fitting, and the extinction coefficients when refined
 	void eval_scale();
@@ -480,6 +454,9 @@ private:
 	std::vector<scattering_data> obs;
 	hkl_list hkl;
 	hkl_list hkl_enlarged;
+	// hkl_enlarged with one entry of every inversion related pair, see cell::remove_inv_vectors
+	hkl_list inversion_cleaned_hkl;
+	// The symmetry operations before a grown structure is projected into its subgroup; grown_by indexes these
 	ivec3 original_rotations;
 	GridManager tsc_grids;
 	// hkl_ordered_[r] is the Miller index of reflection r of obs[r]/F_calc[0][r], see ensure_hkl_ordered

@@ -460,6 +460,8 @@ public:
 	void set_has_ECPs(const bool& in, const bool& apply_to_aotms = true, const int& ECP_mode = 1);
 	/** Manually assign ECP core electron counts for given atomic numbers. */
 	void set_ECPs(ivec& nr, ivec& elcount);
+	/** Core electron count of one atom. */
+	void set_atom_ECP_electrons(const int& nr, const int& n) { atoms[nr].set_ECP_electrons(n); };
 	/** Query whether ECPs are active. */
 	const bool& get_has_ECPs() const { return has_ECPs; };
 	/** Copy assignment (deep copy except shared basis definition pointer). */
@@ -592,10 +594,8 @@ public:
 	const double compute_dens(const d3& Pos) const;
 	/** Density with caller-provided scratch arrays (faster, reusable). */
 	const double compute_dens(const d3& Pos, vec2& d, vec& phi) const;
-#if defined(__aarch64__) || defined(_M_ARM64)
-	/** Density at n points, eight at a time; bit-identical to compute_dens per point. ARM only. */
+	/** Density at n points (x, y, z) into rho, in parallel over blocks of points, one GEMM per block. */
 	void compute_dens_batch(const int n, const double* x, const double* y, const double* z, double* rho) const;
-#endif
 	/**Evaluates value of primitives at position relative to atom center*/
 	const double eval_ao(std::array<double, 4>& d, const std::vector<primitive>& prims, const int& m) const;
 	/** Spin density at position (allocating version). */

@@ -441,7 +441,7 @@ list(PREPEND CMAKE_MODULE_PATH
 
 include(NoSpherA2Avx)
 include(NoSpherA2Sanitizers)
-include(ValidateMambaEnvironemt)
+include(ValidateMambaEnvironment)
 include(CopyRuntimeLibraries)
 include(NoSpherA2Optimizations)
 if(NOT ANDROID) # the NDK cross build takes nothing from the micromamba environment
@@ -576,6 +576,10 @@ set(USE_SYSTEM_LIBCINT ON)
 set(BUILD_FPIC ON)
 set(WITH_PYTHON_BINDINGS OFF)
 set(BUILD_SHARED_LIBS OFF)
+# lld cannot read GCC's LTO objects
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    set(WITH_LLD OFF)
+endif()
 
 add_subdirectory(
     occ
@@ -804,8 +808,7 @@ endfunction()
 # NoSpherA2 targets
 # ---------------------------------------------------------------------------
 if(NOSPHERA2_DEPENDENCIES_ONLY)
-    enable_googletests()
-    include(cmake/InstallDependenciesOnly.cmake)
+    include(cmake/DependenciesOnly.cmake)
     return()
 endif()
 

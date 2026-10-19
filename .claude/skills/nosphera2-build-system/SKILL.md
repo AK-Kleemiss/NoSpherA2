@@ -70,15 +70,13 @@ uv run pytest
 
 Set `NOS_EXE` for Python tests when the executable is not on `PATH`. Set `OCC_DATA_PATH` when the runtime data path is not discoverable; CTest defaults this to `occ/share`.
 
-When adding or changing tests, keep `tests/tests.toml`, `tests/src`, `Windows/Tests/Tests.cpp`, and `UNIT_TESTS_STATUS.md` aligned for the affected coverage.
+When adding or changing tests, keep `tests/tests.toml`, `tests/src`, and `UNIT_TESTS_STATUS.md` aligned for the affected coverage.
 
 ## Windows Notes
 
 For preset builds on Windows, use an x64 Visual Studio Developer shell or another environment where Ninja can find `cl.exe` and the MSVC headers. Missing standard headers such as `stdlib.h`, `string.h`, or `stdio.h` usually indicate shell/toolchain setup, not a broken source rewrite.
 
-The Visual Studio solution under `Windows/` is legacy but still useful for DLL/OCC integration debugging. VS tests must remain in-process through `NoSpherA2_DLL.dll`; do not add subprocess fallbacks for crashing tests.
-
-The VS `NoSpherA2`/`NoSpherA2_LIB` projects share an `OutDir` (`Windows\Windows_utils\NoSpherA2_universal.props`) pointing at `build\$(Configuration)_$(Platform)\` (e.g. `build\Release_x64\NoSpherA2.exe`) — a sibling of, but distinct from, the CMake preset output `build\release-windows\bin\NoSpherA2.exe`. `Windows\Tests\Tests.vcxproj` was not repointed and still builds to `Windows\Tests\$(Configuration)_$(Platform)\`.
+The Visual Studio solution was removed in October 2026; CMake/Ninja is the only build system. IDE work on every platform goes through `.vscode/` (CMake Tools with the presets; `cmake.useVsDeveloperEnvironment` supplies the MSVC environment on Windows). In-process tests (e.g. `alanine_integrated_occ`) stay in-process in the gtest binary; do not add subprocess fallbacks for crashing tests.
 
 ## Dependency Boundaries
 

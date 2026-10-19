@@ -23,7 +23,7 @@ struct NAOBasisFunction {
 struct NAO {
 	int atom = 0;
 	int l = 0;
-	int m = 0;      //0 .. 2l, libcint component order
+	int m = 0;      //0 .. 2l, FILE47/ORCA component order: m = 0, +1, -1, +2, -2, ...
 	int shell = 0;  //index inside (atom, l), sorted by decreasing occupancy
 	int n = 0;      //principal quantum number label, n = l + 1 + shell
 	NAOClass type = NAOClass::Rydberg;

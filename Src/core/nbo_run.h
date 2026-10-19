@@ -87,6 +87,8 @@ struct NboBondOrder {
 	//Upper triangle and diagonal of the symmetric table only; on the diagonal covalent and ionic print "---" and stay 0.
 	bool diagonal = false;
 	std::string spin;           //"", "alpha", "beta", "composite"
+	//native only: the bond order's range over the weights with D(w) within 0.1 % of the fit's; < 0 = not computed
+	double range_lo = -1.0, range_hi = -1.0;
 };
 
 //What NRT derives from the converged weights per atom; the valency is the atom's bond-order sum.
@@ -137,12 +139,20 @@ struct NboQpIteration {
 	std::string spin;
 };
 
+//Native only: one spin's D(0) and D(w) in NBO 7's units
+struct NboNrtD {
+	std::string spin;
+	double d_0 = 0.0, d_w = 0.0;
+};
+
 struct NboNrt {
 	bool present = false;
 	int structures_used = 0;
 	int structures_found = 0;
+	//native: ||Gamma - sum_a w_a Gamma_a||_F, over both spins of an open shell
 	double d_w = 0.0;
 	double d_0 = 0.0;
+	std::vector<NboNrtD> spin_d;  //native only, one per spin
 	double search_seconds = 0.0;
 	double gram_seconds = 0.0;
 	double minimize_seconds = 0.0;
@@ -159,6 +169,8 @@ struct NboNrt {
 	std::vector<NboValency> valencies;
 	std::vector<NboNrtCycle> cycles;
 	std::vector<NboTopo> leading_topo;
+	//Native NRT only: the Lewis structure the search starts from, valence lone pairs on the diagonal, one per spin.
+	std::vector<NboTopo> parent_topo;
 	//NRTDTL only.
 	std::vector<NboNrtCandidate> candidates;
 	std::vector<NboQpIteration> qp_iterations;
@@ -210,6 +222,10 @@ NboResults parse_nbo_output(const std::filesystem::path& nbo_file);
 
 /** Write the results as JSON, the format the reference dataset is stored in. */
 void write_nbo_json(const NboResults& results, const std::filesystem::path& json_file);
+
+/** The NRT parent as a "NoSpherA2 Lewis structure" JSON object, the format a parent can be read back from.
+	Lines after the first start with indent; an open shell gets "alpha"/"beta" sub-objects. Empty without a parent. */
+std::string parent_lewis_json(const NboResults& results, const std::string& indent = "");
 
 struct NboTolerances {
 	double charge = 2.0e-3;

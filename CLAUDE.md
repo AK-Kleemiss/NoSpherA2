@@ -74,9 +74,7 @@ name in `Src/core/hip_runtime_shim.cpp`, which defines every `hip*` entry the ke
 (`NOSPHERA2_HIP_RUNTIME=<file>` names one explicitly) and answers `hipErrorNoDevice` when there is
 none - the shim rather than delay-loading because clang registers the kernels with the runtime from
 static initialisers before `main()`, where nothing else can intercept. The CMake HIP language would
-link `libamdhip64` on its own; `CMAKE_HIP_RUNTIME_LIBRARY NONE` in `CMakeLists.txt` stops it. The
-Visual Studio solution does the same through `Windows/Windows_utils/NoSpherA2_gpu.props`: a machine
-with `CUDA_PATH` and `HIP_PATH` gets the fat build.
+link `libamdhip64` on its own; `CMAKE_HIP_RUNTIME_LIBRARY NONE` in `CMakeLists.txt` stops it.
 
 CI builds that fat binary for Linux and Windows on GPU-less runners (`Linux GPU Release`, `Windows
 GPU Release` in `.github/workflows/c-cpp_all.yml`, artifacts `NoSpherA2-linux-x86_64-gpu` and
@@ -94,26 +92,9 @@ path and falls back to the CPU at run time when `MTLCreateSystemDefaultDevice()`
 
 For CMake preset builds, run from an x64 Visual Studio Developer PowerShell or initialize the MSVC environment before invoking CMake/Ninja. If Ninja can find `cl.exe` but compilation fails on missing standard headers such as `stdlib.h`, the shell/toolchain environment is incomplete.
 
-The legacy Visual Studio solution still exists for Windows/OCC integration debugging. If using MSBuild from a normal PowerShell session, pass the full `MSBuild.exe` path and preserve `/p:` switches:
-
-```powershell
-$msbuild = "C:\Program Files\Microsoft Visual Studio\18\Community\MSBuild\Current\Bin\amd64\MSBuild.exe"
-$solDir = "D:\git\NoSpherA2\Windows\"
-
-& $msbuild "D:\git\NoSpherA2\Windows\Tests\Tests.vcxproj" `
-    /p:Configuration=Release /p:Platform=x64 "/p:SolutionDir=$solDir" /v:minimal
-```
-
-Do not invoke MSBuild through Bash for this project; Bash can strip leading `/` from `/p:` switches.
-
-The VS solution's `NoSpherA2`/`NoSpherA2_LIB` projects use a shared `OutDir`
-(`Windows\Windows_utils\NoSpherA2_universal.props`) that writes into the same top-level `build/`
-tree the CMake presets use, but under `build\$(Configuration)_$(Platform)\` (e.g.
-`build\Release_x64\NoSpherA2.exe`, `build\Debug_x64\NoSpherA2.exe`) rather than the CMake preset's
-`build\release-windows\bin\NoSpherA2.exe`. Don't confuse the two when picking an executable to
-run — see `update_good_from_pytest_results.py --build {vs,cmake}` for a way to pick one
-explicitly. `Windows\Tests\Tests.vcxproj` was not repointed and still builds to its own
-`Windows\Tests\$(Configuration)_$(Platform)\` (e.g. `Windows\Tests\Release_x64\Tests.exe`).
+The Visual Studio solution was removed in October 2026; CMake/Ninja is the only build system. For
+IDE work on any platform use the VS Code setup in `.vscode/` (CMake Tools with the presets; on
+Windows it sets up the MSVC environment itself via `cmake.useVsDeveloperEnvironment`).
 
 ## Running Tests
 
@@ -136,21 +117,15 @@ Useful environment variables:
 - `NOS_EXE` - path to the executable for Python tests.
 - `OCC_DATA_PATH` - OCC runtime data directory. CTest defaults this to `occ/share`; local Windows Python runs commonly need `D:\git\NoSpherA2\Lib\occ\share\occ` or the current equivalent.
 - `RUN_FULL_TEST` - truthy value enables slow/full Python integration tests.
+- `NOS_TEST_SHARED_DIR` - set by ctest for every gtest (`<build>/tests/src/shared`). `XcwScfTests.SharedTensorBuild`
+  writes the P1 subset's I tensor there once (ctest fixture `xcw_p1_tensor`) and the XCW tests that test the SCF
+  rather than the tensor read it; a test binary run without it builds its own tensor, with the same numbers.
+- `OMP_WAIT_POLICY=PASSIVE` - set by the `test-base` test preset: ctest runs several tests at once and each opens a
+  thread per core, so spinning idle OpenMP workers would take the cores the other tests compute on.
 
 Tests are golden-file comparisons: the harness runs NoSpherA2 with args from `tests/tests.toml`, captures stdout, and diffs against `.good` reference files in each test subdirectory.
 
-### Windows Visual Studio Tests
-
-The CMake flow is the default for new validation. The Visual Studio test project remains useful when debugging Windows DLL/OCC behavior:
-
-```powershell
-msbuild Windows\Tests\Tests.vcxproj /m /p:Configuration=Release /p:Platform=x64 /p:SolutionDir=D:\git\NoSpherA2\Windows\
-vstest.console.exe Windows\Tests\Release_x64\Tests.exe /Platform:x64
-```
-
-Visual Studio tests must run in-process through `NoSpherA2_DLL.dll`; do not add subprocess fallbacks for failing VS tests, including `alanine_integrated_occ`. If all tests complete in under a second, the test binary or working directory is probably wrong.
-
-For coverage, keep `coverage.runsettings` aligned with the current DLL/test output layout before trusting the report.
+Tests that are documented as in-process (e.g. `alanine_integrated_occ`) must stay in-process in the gtest binary; do not add subprocess fallbacks for failing tests.
 
 ## Agent Rules
 
@@ -194,7 +169,7 @@ and the measured evidence behind each item.
 
 ### Unit-test documentation is mandatory
 
-Whenever an agent adds, removes, modifies, or investigates a test in `tests/tests.toml`, `tests/src`, `Windows/Tests`, `tests/run_test.py`, `TestRunner.h`, or any `.good` reference file, it must:
+Whenever an agent adds, removes, modifies, or investigates a test in `tests/tests.toml`, `tests/src`, `tests/run_test.py`, or any `.good` reference file, it must:
 
 1. Update `UNIT_TESTS_STATUS.md`.
 2. Update the validation-status block in this file and `AGENTS.md` if the overall pass count changes.
@@ -202,7 +177,7 @@ Whenever an agent adds, removes, modifies, or investigates a test in `tests/test
 
 ### Keep test harnesses aligned
 
-`tests/tests.toml`, `tests/src`, and `Windows/Tests/Tests.cpp` should stay in sync where they cover the same workflows. Check all relevant harnesses when adding or removing tests.
+`tests/tests.toml` and `tests/src` should stay in sync where they cover the same workflows. Check both harnesses when adding or removing tests.
 
 ### Keep the wiki in shape
 
@@ -230,8 +205,7 @@ featomic/            Rust/C++ submodule for ML feature generation via metatensor
 libcint/             C submodule for electron integral evaluation
 mdspan/              C++ multidimensional-array reference implementation
 cmake/               Project CMake modules
-scripts/             Micromamba/bootstrap/Visual Studio helper scripts
-Windows/             Legacy Visual Studio solution/projects and Windows test harness
+scripts/             Micromamba/bootstrap/GPU-toolkit helper scripts
 Linux/               Linux packaging/build helper scripts
 ```
 
@@ -260,10 +234,66 @@ Key core modules live in `Src/core`:
 - Golden-file float parsing must support scientific notation and multi-value lines without weakening existing thresholds.
 - Clone with `--recursive`; if submodules are missing, run `git submodule update --init --recursive`.
 - CI and local runs can differ because CI uses a dependency-only cache flow. Compare `.github/workflows/c-cpp_all.yml` step-by-step when a failure only appears in CI.
-- VS tests are always in-process. Never reintroduce subprocess execution to work around a crash; fix the underlying OCC/libcint/DLL issue instead.
+- In-process tests stay in-process. Never reintroduce subprocess execution to work around a crash; fix the underlying OCC/libcint/DLL issue instead.
 - New libcint parallel call sites should pre-allocate per-thread scratch buffers instead of passing `cache=nullptr` inside TBB parallel regions. Use the existing `three_center_max_cache_size<kind>` and `tbb::enumerable_thread_specific` pattern in OCC.
 
 ## Current Validation Notes
+
+As of 2026-10-17 (later), grown XCW models choose their kept operations as K = D.L for nested subgroups L inside H
+(`cell::choose_kept_operations`, replacing `project_into_subgroup`), which always admits per-position weights and keeps
+the fewest I tensor k-points; `ctest` on a CPU-only `release-windows` build (`build/release-windows-cpu`) reports
+**1269 passed, 0 failed, 22 skipped** (2 disabled) of 1293. See `UNIT_TESTS_STATUS.md`.
+
+As of 2026-10-17, grown XCW models delete every fully applied symmetry operation and solve the sym_facts so that every
+position the kept operations reach is counted once (`cell::set_sym_fact_from_position_counts`); `ctest --preset release-linux`
+reports **1267 passed, 0 failed, 22 skipped** (2 disabled) of 1289. See `UNIT_TESTS_STATUS.md`.
+
+As of 2026-10-15, `-anom_disp` is gone: XCW reads positions, U_iso, ADPs and the anomalous dispersion from the CIF
+through XCW_refactor's `read_CIF`, and the P1 XCW cases run on `P1_test.cif`, reproducing XCW_refactor's goldens. `ctest --preset release-linux`
+reports **1266 passed, 0 failed, 22 skipped** (2 disabled) of 1288. See `UNIT_TESTS_STATUS.md`.
+
+As of 2026-10-14, `Src/core/XCW.cpp` runs on XCW_refactor's symmetry handling (`cell.cpp`), its h/-h inversion
+screening of the I tensor and its AO pair screen, and `slow_conv` damps the lambda = 0 step too;
+`ctest --preset release-linux` reports **1262 passed, 0 failed, 22 skipped** (2 disabled) of 1284. See
+`UNIT_TESTS_STATUS.md`.
+As of 2026-10-14, after the Visual Studio solution's removal (CMake-only build, `.vscode/` IDE
+setup), `ctest --preset release-windows` reports **12 failed of 1279** both before and after the
+rework on the same machine in the same sitting, with the identical failing set — all twelve are
+that machine's temp-file locking on `%TEMP%` (`remove: The process cannot access the file ...`),
+not code failures. The rework changed no test behavior. See `UNIT_TESTS_STATUS.md`.
+
+As of 2026-10-13, after the NRT symmetry fixes, `ctest --preset release-linux` reports **1260 passed, 0 failed,
+22 skipped** (2 disabled) of 1282. New: `NboNativeTests.TheAllylCationsMirrorStructuresWeighAlike`,
+`NboNativeTests.TheAllylRadicalIsSymmetricInEachSpin` and `NboNativeTests.ASlightlyDistortedAllylCationStaysNearTheSymmetricOne`
+(fixtures `tests/allyl_occ/`), under what is the default since 2026-10-14 (`-nrt_no_mirror` restores the old behaviour). See
+`UNIT_TESTS_STATUS.md`. At `1349eba` the suite took 255.7 +- 9.1 s wall and 993 +- 40 CPU-s (95 % CI, n = 3) with 3.88 of
+the 4 cores busy. Since the XCW tests share one build of the stored two-electron integrals (`save_eri` /
+`read_eri`): **1261 passed, 0 failed, 22 skipped** (2 disabled) of 1283, 230.6 +- 16.8 s wall and 899 +- 66 CPU-s,
+3.90 of 4 cores busy.
+
+As of 2026-10-13, after `72d83cd`, `ctest --preset release-linux` reports **1257 passed, 0 failed,
+22 skipped** (2 disabled) of 1279. New since `d5a9755`: `NboNativeTests.MethylRadicalSplitsItsBondsPerSpinAsNbo7Does`
+(fixture `tests/ch3_occ/ch3.owf.fchk`), `NboNativeTests.AGrownNrtCycleStatesAFloorItsFitRespects`,
+`NboNativeTests.AnEcpFchkKeepsTheElementAndItsCore` (fixture `tests/hi_occ/hi.owf.fchk`),
+`NrtTests.TheParentsSymmetryImageCompletesTheHexagon` and
+`NrtTests.OppositelyPolarisedOrbitalsOfABondDoNotCancelInItsIonicShare`. After `36e482b` the counts are the
+same. The suite takes 280.5 +- 5.9 s wall, against 334.2 +- 29.5 s before (95 % CI, n = 3 each). Three changes account
+for it: the P1 subset goldens read the I tensor `P1_test_XCW` saves; the adaptive-step fallback test runs on NH3Li; and the
+AO-to-MO step takes eight functions per pass, with outputs identical on GCC. See `UNIT_TESTS_STATUS.md`.
+
+As of 2026-10-13, `ctest --preset release-linux` on `density_source` `d5a9755` reports
+**1252 passed, 0 failed, 22 skipped** (2 disabled) of 1274 on the same 4-core VM. It took
+308.2 +- 13.1 s wall and 1207 +- 47 CPU-s, against 432.8 +- 5.5 s and 1704 +- 22 CPU-s for `80876cc`
+(95 % CI, n = 3 and 4). The changes: the XCW SCF tests read one shared I tensor, the two redundant
+`-xcw_incremental` goldens are gone, NH3Li's spin-resolved ELI-D is computed once, and the test preset
+sets `OMP_WAIT_POLICY=PASSIVE`. See `UNIT_TESTS_STATUS.md`.
+
+As of 2026-10-12, `ctest --preset release-linux` on `density_source` `0e6a0d3` reports
+**1246 passed, 0 failed, 22 skipped** (2 disabled) of 1270 on a GPU-less 4-core VM with GCC 13.3.
+The skips are 12 GPU tests, 7 `RUN_FULL_TEST` cases, two NBO tests that need gennbo and the Ce RGBI
+case behind `NOS_RGBI_SLOW_TESTS`. `0e6a0d3` keeps OCC from linking with lld under GCC, whose LTO
+objects lld cannot read; without it a GCC build fails wherever lld is installed. See
+`UNIT_TESTS_STATUS.md`.
 
 As of 2026-09-24, the in-house NBO analysis (`-nbo_native`, `Src/core/nbo.cpp` and
 `Src/core/nrt.cpp`) is checked in two places: `NrtTests`, `Nbo47Tests` and
@@ -273,7 +303,7 @@ which reports **22 PASS, exit 0**. NRT weights are compared by rank and never by
 reproduces TiCl4's `D(w)`, valencies and bond orders exactly while individual weights move 7.1
 points. `cmake --build --preset release-windows --target NoSpherA2_Tests` links again since
 `tests/src/CellMathTests.cpp` (which calls `cell` members that no longer exist) was excluded, and the
-binary reports **1111 passed, 0 failed, 8 skipped** from `build/release-windows/bin` - the relative
+binary reports **1270 passed, 0 failed, 9 skipped** (2026-10-12) from `build/release-windows/bin` - the relative
 fixture paths in the tests are what makes that the working directory. See `UNIT_TESTS_STATUS.md`.
 
 As of 2026-09-08, `ctest --preset release-linux` reports **267/267 passing** outside the XCW

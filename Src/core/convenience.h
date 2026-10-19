@@ -638,6 +638,8 @@ bool read_fracs_ADPs_from_CIF(const std::filesystem::path& cif, WFN& wavy, cell&
 bool read_fracs_ADPs_from_CIF(const std::filesystem::path& cif, WFN& wavy, std::ofstream& log3, const bool& debug, const bool& grown, const ivec3& symmetry_linking_list);
 
 vec read_U_iso_from_CIF(const std::filesystem::path& cif, WFN& wavy, cell& unit_cell, std::ofstream& log3, const bool& debug);
+double read_CIF(std::istream& cif_input, const cell& unit_cell, int& ncen,
+	std::vector<asym_atom>& asym_atoms, std::vector<vec2>& ADPs, const bool debug);
 
 double double_from_string_with_esd(std::string in);
 
@@ -944,7 +946,6 @@ struct options
 	std::filesystem::path gaussian_path;
 	std::filesystem::path turbomole_path;
 	std::filesystem::path basis_set_path;
-	std::filesystem::path anom_disp_path;
 	std::string occ;
 	std::filesystem::path occ_toml_path;
 	std::filesystem::path cwd;

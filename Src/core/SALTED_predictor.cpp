@@ -35,10 +35,18 @@ SALTEDPredictor::SALTEDPredictor(WFN wavy_in, options& opt_in)
 		return;
 	}
 
-	if (opt_in.salted_model_dirs.size() > 1) {
-		build_merged(wavy_in, opt_in);
+	// A folder brings its lead plus the element models of the elements in this structure (salted_folder_models).
+	pathvec models = opt_in.salted_model_dirs;
+	if (models.size() <= 1 && std::filesystem::is_directory(_path)) {
+		std::set<int> present;
+		for (int a = 0; a < wavy_in.get_ncen(); a++) present.insert(wavy_in.get_atom_charge(a));
+		models = salted_folder_models(_path, present);
+	}
+	if (models.size() > 1) {
+		build_merged(wavy_in, opt_in, models);
 		return;
 	}
+	if (models.size() == 1) _path = models[0];
 
 	// A model may be named by its own file: two models in one folder are otherwise indistinguishable.
 	if (std::filesystem::is_regular_file(_path)) {
@@ -60,14 +68,31 @@ SALTEDPredictor::SALTEDPredictor(WFN wavy_in, options& opt_in)
 	SALTED_BINARY_FILE file = SALTED_BINARY_FILE(_path);
 	file.populate_config(config);
 
-	featomic_system = SALTED_Utils::gen_featomic_system(wavy);
-
 	const auto _t_filter = std::chrono::steady_clock::now();
 	const std::vector<char> use_thakkar = SALTED_Utils::filter_input(wavy, opt_in, config);
 	if (ProgressBar::report_counts)
 		std::cout << "[stages] filter input "
 				  << std::chrono::duration<double>(std::chrono::steady_clock::now() - _t_filter).count()
 				  << " s" << std::endl;
+	// A model trained on ECP densities predicts the valence only. wavy holds just this model's atoms now (the filter
+	// erased the spherical fill, which stays all-electron), so its cores are the ones that go back on
+	if (config.ecp_mode > 0)
+	{
+		wavy.set_has_ECPs(true, true, config.ecp_mode);
+		int n_core = 0;
+		for (int a = 0; a < wavy.get_ncen(); a++) n_core += wavy.get_atom_ECP_electrons(a) != 0;
+		std::cout << "Model " << config.salted_filename.string() << " predicts valence densities (ECP mode "
+				  << config.ecp_mode << "): the core goes back on for " << n_core << " atom(s)." << std::endl;
+	}
+	// The descriptors see the unfiltered input, so unknown species stay neighbours. The isolated atoms of model
+	// species go, though: the filter dropped them from the basis, and left in they would be descriptor centres
+	// with no coefficients (Tsize != n_coef, "model and basis do not belong together"). Isolated means nobody's
+	// neighbour within rcut either, so no other environment changes.
+	std::vector<char> isolated = use_thakkar;
+	for (size_t a = 0; a < isolated.size(); a++)
+		if (std::find(config.species.begin(), config.species.end(), constants::atnr2letter(wavy_in.get_atom_charge(a))) == config.species.end())
+			isolated[a] = 0;
+	featomic_system = SALTED_Utils::gen_featomic_system(wavy_in, isolated);
 	if (!use_thakkar.empty()) {
 		spherical_fill_used = true;
 		estimate_fill_charges(wavy_in, use_thakkar, opt_in);
@@ -106,7 +131,10 @@ void SALTEDPredictor::estimate_fill_charges(const WFN& wavy_in, const std::vecto
 			const bool bohr = wavy_in.get_isBohr();
 			for (int a = 0; a < ncen_in; a++)
 			{
+				// occ's EEQ tables stop at Rn and read past their end above it (U came out +9.2 in COD
+				// 1548085). ponytail: the lanthanide homologue stands in for Fr-Lr, until EEQ has them.
 				nums(a) = wavy_in.get_atom_charge(a);
+				if (nums(a) > 86) nums(a) -= 32;
 				for (int ax = 0; ax < 3; ax++)
 				{
 					const double c = wavy_in.get_atom_coordinate(a, ax);
@@ -127,9 +155,8 @@ void SALTEDPredictor::estimate_fill_charges(const WFN& wavy_in, const std::vecto
 				// the fill stays neutral, so the target must stay neutral too -
 				// otherwise the two disagree and the system total is wrong.
 				const int Zf = wavy_in.get_atom_charge(a);
-				const bool ion_ok = (q(a) > 0.0) ? Thakkar_Cation::available(Zf)
-												 : Thakkar_Anion::available(Zf);
-				if (ion_ok) applied_fill_charge += q(a);
+				const double qf = HE_Spherical_Atom::carried_charge(Zf, q(a));
+				applied_fill_charge += qf;
 				// Position-keyed, in the wavefunction's own units: the fill
 				// rebuilds its wavefunction from the original file, so indices
 				// there are not ours to assume.
@@ -137,7 +164,7 @@ void SALTEDPredictor::estimate_fill_charges(const WFN& wavy_in, const std::vecto
 					wavy_in.get_atom_coordinate(a, 0),
 					wavy_in.get_atom_coordinate(a, 1),
 					wavy_in.get_atom_coordinate(a, 2),
-					ion_ok ? q(a) : 0.0});
+					qf});
 			}
 		}
 		catch (const std::exception &e)
@@ -185,14 +212,14 @@ static ivec coef_offsets(const WFN& w)
 	return off;
 }
 
-void SALTEDPredictor::build_merged(const WFN& wavy_in, options& opt_in)
+void SALTEDPredictor::build_merged(const WFN& wavy_in, options& opt_in, const pathvec& models)
 {
 	// One prediction per model on the whole structure: an atom another model owns is still a neighbour.
 	// Each per-atom block carries its own model's auxiliary basis, so stitching them is a concatenation.
-	std::cout << "Combining " << opt_in.salted_model_dirs.size()
+	std::cout << "Combining " << models.size()
 			  << " SALTED models. Each of them first reports what IT alone cannot predict;"
 			  << " the assignment that counts is printed below." << std::endl;
-	for (const auto& model : opt_in.salted_model_dirs)
+	for (const auto& model : models)
 	{
 		options sub_opt = opt_in;               // its own spherical-fill bookkeeping
 		sub_opt.salted_model_dirs.clear();
@@ -230,17 +257,63 @@ void SALTEDPredictor::build_merged(const WFN& wavy_in, options& opt_in)
 		atom_in_model[a] = sub_index[m][a];
 	}
 
+	// First shell: an element model trained on X and the lead species of its molecules has seen those atoms next
+	// to X, which the lead model never did. An atom bonded to an atom of such a model's element (d < 1.3 (r_a + r_b),
+	// the CSD covalent radii b2c bonds with) comes from that model, and bonded to the elements of two models it is
+	// their mean. Only where the model predicts the atom at all (one trained on X alone does not) and in the basis
+	// its element already has here: the merged basis is one per element.
+	// ponytail: an element model predicts every atom of its species and only the shell is kept; restrict its
+	// descriptor centres to X + shell if a large structure with a metal gets slow
+	auto same_basis = [&](const int m1, const int m2, const int Z) {
+		const auto p1 = (*sub_models[m1]->get_model_basis())[Z], p2 = (*sub_models[m2]->get_model_basis())[Z];
+		return std::equal(p1.begin(), p1.end(), p2.begin(), p2.end(), [](const SimplePrimitive& x, const SimplePrimitive& y) {
+			return x.type == y.type && x.exp == y.exp && x.coefficient == y.coefficient; });
+	};
+	auto radius = [](const int Z) { return Z < 114 ? constants::covalent_radii[Z] : 1.5; };
+	atom_also.assign(wavy_in.get_ncen(), {});
+	ivec n_shell(sub_models.size(), 0);
+	int n_mean = 0;
+	std::set<std::pair<int, int>> other_basis;
+	for (int a = 0; a < wavy_in.get_ncen(); a++)
+	{
+		const int Za = wavy_in.get_atom_charge(a), own = atom_model[a];
+		if (own < 0) continue;
+		ivec shell;
+		for (int b = 0; b < wavy_in.get_ncen(); b++)
+		{
+			const int Zb = wavy_in.get_atom_charge(b), m = element_model[Zb - 1];
+			if (m < 0 || m == own || sub_index[m][a] < 0 || std::find(shell.begin(), shell.end(), m) != shell.end()) continue;
+			if (array_length(wavy_in.get_atom_pos(a), wavy_in.get_atom_pos(b)) > constants::ang2bohr(1.3 * (radius(Za) + radius(Zb))))
+				continue;
+			if (same_basis(m, own, Za - 1)) shell.push_back(m);
+			else other_basis.insert({ m, Za });
+		}
+		if (shell.empty()) continue;
+		atom_model[a] = shell[0];
+		atom_in_model[a] = sub_index[shell[0]][a];
+		for (size_t s = 1; s < shell.size(); s++) atom_also[a].push_back({ shell[s], sub_index[shell[s]][a] });
+		for (const int m : shell) n_shell[m]++;
+		n_mean += shell.size() > 1;
+	}
+
 	for (int m = 0; m < (int)sub_models.size(); m++)
 	{
 		svec elements;
 		int n = 0;
 		for (int Z = 0; Z < 118; Z++)
 			if (element_model[Z] == m) elements.push_back(constants::atnr2letter(Z + 1));
-		for (int a = 0; a < wavy_in.get_ncen(); a++) if (atom_model[a] == m) n++;
+		for (int a = 0; a < wavy_in.get_ncen(); a++)
+			if (atom_model[a] == m && element_model[wavy_in.get_atom_charge(a) - 1] == m) n++;
 		std::cout << "Model " << sub_models[m]->get_salted_filename() << " predicts " << n << " atom(s): ";
 		for (const auto& e : elements) std::cout << e << " ";
+		if (n_shell[m] > 0) std::cout << "+ " << n_shell[m] << " first-shell atom(s)";
 		std::cout << std::endl;
 	}
+	if (n_mean > 0)
+		std::cout << n_mean << " first-shell atom(s) are bonded to the elements of two or more models and take their mean." << std::endl;
+	for (const auto& [m, Z] : other_basis)
+		std::cout << "Model " << sub_models[m]->get_salted_filename() << " has its own basis for " << constants::atnr2letter(Z)
+				  << ", so its first-shell " << constants::atnr2letter(Z) << " atoms stay with the model that owns the element." << std::endl;
 
 	// Only an atom that no model handles goes to the spherical fill.
 	std::vector<char> use_thakkar(wavy_in.get_ncen(), 0);
@@ -261,8 +334,22 @@ void SALTEDPredictor::build_merged(const WFN& wavy_in, options& opt_in)
 				wavy.erase_atom(a);
 				atom_model.erase(atom_model.begin() + a);
 				atom_in_model.erase(atom_in_model.begin() + a);
+				atom_also.erase(atom_also.begin() + a);
 			}
 	}
+
+	// Each atom has the core of the model that predicts it (none for an all-electron one)
+	int ecp_mode = 0;
+	for (int a = 0; a < wavy.get_ncen(); a++)
+	{
+		const SALTEDPredictor& sub = *sub_models[atom_model[a]];
+		if (sub.config.ecp_mode == 0) continue;
+		err_checkf(ecp_mode == 0 || ecp_mode == sub.config.ecp_mode,
+			"The models of this folder were trained with different ECPs", std::cout);
+		ecp_mode = sub.config.ecp_mode;
+		wavy.set_atom_ECP_electrons(a, sub.wavy.get_atom_ECP_electrons(atom_in_model[a]));
+	}
+	if (ecp_mode > 0) wavy.set_has_ECPs(true, false, ecp_mode);
 
 	natoms = wavy.get_ncen();
 	if (wavy.get_nmo() != 0) wavy.clear_MOs();
@@ -313,7 +400,13 @@ vec SALTEDPredictor::merge_predictions()
 		const int m = atom_model[a], p = atom_in_model[a];
 		err_checkf(offsets[m][p + 1] <= (int)parts[m].size(),
 			"Predicted coefficients are shorter than the basis of " + sub_models[m]->get_salted_filename().string(), std::cout);
+		const size_t first = coefs.size();
 		coefs.insert(coefs.end(), parts[m].begin() + offsets[m][p], parts[m].begin() + offsets[m][p + 1]);
+		// A first-shell atom of several models: same basis (build_merged), so the blocks add element by element
+		for (const auto& [m2, p2] : atom_also[a])
+			for (size_t i = first; i < coefs.size(); i++) coefs[i] += parts[m2][offsets[m2][p2] + (i - first)];
+		if (!atom_also[a].empty())
+			for (size_t i = first; i < coefs.size(); i++) coefs[i] /= double(1 + atom_also[a].size());
 	}
 	const ivec merged_offsets = coef_offsets(wavy);
 	err_checkf(coefs.size() == (size_t)merged_offsets.back(),

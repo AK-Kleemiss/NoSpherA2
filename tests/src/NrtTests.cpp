@@ -1,5 +1,6 @@
 #include "pch.h"
 
+#include "core/constants.h"
 #include "core/nbo.h"
 
 //Natural resonance theory on inputs small enough that the answer is known by hand. nrt.cpp's internals sit
@@ -156,7 +157,8 @@ TEST(NrtTests, ParentThatSpansTheDensityTakesAllTheWeight)
     EXPECT_EQ(nrt.structures_used, 1);
     ASSERT_EQ(nrt.weights.size(), 1u);
     EXPECT_NEAR(nrt.weights[0].weight_percent, 100.0, 1e-6);
-    EXPECT_NEAR(nrt.d_w, 0.0, 1e-8);
+    //D(w) = sqrt(|Gamma|^2 - 2 g.w + w.G.w) cancels 4 - 8 + 4: one rounding of the 8 leaves sqrt(ulp(8)) = 4.2e-8
+    EXPECT_LT(nrt.d_w, 1e-6);
     EXPECT_NEAR(nrt.candidates[0].rho_nl, 0.0, 1e-8);
 
     EXPECT_NEAR(bond_total(nrt, 1, 2), 1.0, 1e-8);
@@ -292,6 +294,9 @@ TEST(NrtTests, TwoIdenticalSpinChannelsAddUpToTheClosedShellAnswer)
         NboLewis ls = two_bond_lewis(half, 1.0);
         native_nrt(s, nao, ls, {}, chain_bondable(3), opt, spin, 1.0, log);
         ASSERT_TRUE(s.present) << spin;
+        ASSERT_EQ(s.spin_d.size(), 1u);
+        EXPECT_NEAR(s.spin_d[0].d_0, closed.spin_d[0].d_0, 1e-10) << spin << ": NBO's D is per spin, Gamma / 2 is each spin of the closed shell";
+        EXPECT_NEAR(s.spin_d[0].d_w, closed.spin_d[0].d_w, 1e-10) << spin;
         for (int k = 0; k < 2; k++) {
             const NboBondOrder o = bond_of(s, pair_a[k], pair_b[k]);
             const NboBondOrder c = bond_of(closed, pair_a[k], pair_b[k]);
@@ -498,6 +503,20 @@ TEST(NrtTests, ASmallCandidateBudgetKeepsTheExpensiveArrowsAndMoreThanTheParent)
     for (const std::string& a : full.arrows)
         EXPECT_EQ(a.rfind("ARROWS", 0), 0u) << a;
     EXPECT_FALSE(tight.notes.empty());
+
+    //-nrt_target 0: walk again from every weighted structure until none is left; never a worse fit, and the
+    //notes say why it stopped.
+    opt.nrt_max_candidates = 10000;
+    opt.nrt_target = 0.0;
+    NboNrt grown;
+    native_nrt(grown, nao, lewis, e2, chain_bondable(4), opt, "", 2.0, log);
+    ASSERT_TRUE(grown.present);
+    EXPECT_GE(grown.structures_found, full.structures_found);
+    EXPECT_LE(grown.d_w, full.d_w + 1e-6);
+    bool stop_note = false;
+    for (const std::string& n : grown.notes)
+        stop_note = stop_note || n.find("D(w) target") != std::string::npos;
+    EXPECT_TRUE(stop_note);
 }
 
 TEST(NrtTests, EveryResonanceRowTheResultCarriesIsAlsoPrinted)
@@ -552,4 +571,200 @@ TEST(NrtTests, EveryResonanceRowTheResultCarriesIsAlsoPrinted)
     std::ostringstream none;
     print_nrt(empty, none);
     EXPECT_TRUE(none.str().empty()) << none.str();
+}
+
+//The parent goes out ahead of the NRT section as a matrix and as the JSON an NRT input reads back,
+//and into the .native.nbo.json under "parent_lewis".
+TEST(NrtTests, TheParentIsPrintedAsMatrixAndJsonBeforeTheResonanceSection)
+{
+    const NAOResult nao = h_chain(4);
+    const double r = 1.0 / std::sqrt(2.0);
+    dMatrix2 gamma(4, 4);
+    for (const vec& v : { vec{ r, r, 0.0, 0.0 }, vec{ 0.0, 0.0, 1.0, 0.0 }, vec{ 0.0, 0.0, 0.0, 1.0 } })
+        for (size_t i = 0; i < 4; i++)
+            for (size_t j = 0; j < 4; j++)
+                gamma(i, j) += 2.0 * v[i] * v[j];
+    NboLewis lewis = one_bond(gamma, 4);
+    for (const int a : { 2, 3 }) {
+        NboFunction lp;
+        lp.centers = { a };
+        lp.type = "LP";
+        lp.multiplicity = 1;
+        lp.occupancy = 2.0;
+        lewis.orbitals.push_back(lp);
+        lewis.topo[a][a] = 1;
+    }
+    lewis.n_lewis = 3;
+    NboOptions opt;
+    opt.nrt = true;
+    opt.nrt_exhaustive = true;
+    NboResults res;
+    res.source = "D:/somewhere/h4.wfn";
+    std::ostringstream log;
+    native_nrt(res.nrt, nao, lewis, {}, chain_bondable(4), opt, "", 2.0, log);
+    ASSERT_TRUE(res.nrt.present);
+    ASSERT_EQ(res.nrt.parent_topo.size(), 1u);
+    EXPECT_EQ(res.nrt.parent_topo[0].matrix, (ivec2{ { 0, 1, 0, 0 }, { 1, 0, 0, 0 }, { 0, 0, 1, 0 }, { 0, 0, 0, 1 } }));
+
+    std::ostringstream out;
+    print_nrt(res, out);
+    const std::string text = out.str();
+    const std::string json = "{\n"
+                             "  \"format\": \"NoSpherA2 Lewis structure\",\n"
+                             "  \"version\": 1,\n"
+                             "  \"wavefunction\": \"h4.wfn\",\n"
+                             "  \"atoms\": 4,\n"
+                             "  \"lone_pairs\": { \"H3\": 1, \"H4\": 1 },\n"
+                             "  \"bonds\": [ [\"H1\", \"H2\", 1] ]\n"
+                             "}";
+    const size_t matrix = text.find("\nParent Lewis structure:\n");
+    const size_t block = text.find("\nParent Lewis structure as NRT input (JSON):\n" + json + "\n");
+    const size_t nrt = text.find("\nNatural resonance theory (in house):");
+    ASSERT_NE(matrix, std::string::npos) << text;
+    ASSERT_NE(block, std::string::npos) << text;
+    EXPECT_LT(matrix, block);
+    EXPECT_LT(block, nrt);
+    EXPECT_NE(text.find("            H1    H2    H3    H4\n"
+                        "  H1         .     1     .     .\n"
+                        "  H2         1     .     .     .\n"
+                        "  H3         .     .     1     .\n"
+                        "  H4         .     .     .     1\n"), std::string::npos) << text;
+
+    const std::filesystem::path file = std::filesystem::temp_directory_path() / "NrtTests_parent.native.nbo.json";
+    write_nbo_json(res, file);
+    std::ifstream in(file);
+    const std::string stored((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    in.close();
+    std::filesystem::remove(file);
+    std::string nested = json;
+    for (size_t p = nested.find('\n'); p != std::string::npos; p = nested.find('\n', p + 1)) nested.insert(p + 1, "  ");
+    EXPECT_NE(stored.find("  },\n  \"parent_lewis\": " + nested + "\n}\n"), std::string::npos) << stored;
+}
+
+//An open shell carries one parent per spin, and past 40 atoms the matrix becomes one row per atom.
+TEST(NrtTests, AnOpenShellParentSplitsBySpinAndALargeOneIsPrintedAsRows)
+{
+    NboResults res;
+    res.source = "chain.gbw";
+    res.nrt.present = true;
+    const int na = 41;
+    ivec2 m(na, ivec(na, 0));
+    for (int a = 0; a + 1 < na; a++) m[a][a + 1] = m[a + 1][a] = 1;
+    m[0][0] = 3;
+    res.nrt.parent_topo = { NboTopo{ "alpha", m }, NboTopo{ "beta", m } };
+    for (int a = 0; a < na; a++) {
+        NboAtomPopulation p;
+        p.element = a ? "C" : "Cl";
+        p.index = a + 1;
+        res.npa.push_back(p);
+    }
+    std::ostringstream out;
+    print_nrt(res, out);
+    const std::string text = out.str();
+    EXPECT_NE(text.find("\nParent Lewis structure (alpha spin):\n"), std::string::npos) << text;
+    EXPECT_NE(text.find("\nParent Lewis structure (beta spin):\n"), std::string::npos) << text;
+    EXPECT_NE(text.find("  Cl1             3   C2:1\n"), std::string::npos) << text;
+    EXPECT_NE(text.find("  C2              0   Cl1:1 C3:1\n"), std::string::npos) << text;
+
+    const std::string json = parent_lewis_json(res);
+    EXPECT_EQ(json.rfind("{\n  \"format\": \"NoSpherA2 Lewis structure\",\n  \"version\": 1,\n"
+                         "  \"wavefunction\": \"chain.gbw\",\n  \"atoms\": 41,\n  \"alpha\": {\n"
+                         "    \"lone_pairs\": { \"Cl1\": 3 },\n"
+                         "    \"bonds\": [ [\"Cl1\", \"C2\", 1], [\"C2\", \"C3\", 1], ", 0), 0u) << json;
+    //eight bonds to a line
+    EXPECT_NE(json.find("[\"C8\", \"C9\", 1],\n      [\"C9\", \"C10\", 1]"), std::string::npos) << json;
+    EXPECT_NE(json.find("[\"C40\", \"C41\", 1] ]\n  },\n  \"beta\": {\n"), std::string::npos) << json;
+    EXPECT_EQ(json.substr(json.size() - 7), "]\n  }\n}");
+}
+
+//A hexagon of one-NAO atoms whose density lies halfway between its two Kekule structures, with no E2 to walk on:
+//the second structure is only reachable as the parent's image under the hexagon's rotation, and the two then fit
+//the density exactly with half a bond on every ring pair.
+TEST(NrtTests, TheParentsSymmetryImageCompletesTheHexagon)
+{
+    const int na = 6;
+    const NAOResult nao = h_chain(na);
+    bvec2 ring(na, bvec(na, false));
+    vec2 xyz(na, vec(3, 0.0));
+    dMatrix2 gamma(na, na);
+    for (int a = 0; a < na; a++) {
+        const int b = (a + 1) % na;
+        ring[a][b] = ring[b][a] = true;
+        gamma(a, a) += 0.5;
+        gamma(b, b) += 0.5;
+        gamma(a, b) += 0.5;
+        gamma(b, a) += 0.5;
+        xyz[a][0] = std::cos(2.0 * constants::PI * a / na);
+        xyz[a][1] = std::sin(2.0 * constants::PI * a / na);
+    }
+    NboLewis L;
+    L.gamma = gamma;
+    L.topo.assign(na, ivec(na, 0));
+    for (int a = 0; a < na; a += 2) {
+        NboFunction f;
+        f.centers = { a, a + 1 };
+        f.type = "BD";
+        f.multiplicity = 1;
+        f.occupancy = 1.5;
+        L.orbitals.push_back(f);
+        L.topo[a][a + 1] = L.topo[a + 1][a] = 1;
+    }
+    L.n_lewis = 3;
+    NboOptions opt;
+    opt.nrt = true;
+    opt.nrt_rotate = true;
+    NboNrt nrt;
+    std::ostringstream log;
+    native_nrt(nrt, nao, L, {}, ring, opt, "", 2.0, log, &xyz);
+    ASSERT_TRUE(nrt.present);
+    //9 - 18 + 9 here, so an exact fit reads up to sqrt(ulp(18)) = 2^-24; one Kekule structure alone leaves sqrt(3)
+    EXPECT_LT(nrt.d_w, 1e-6) << "the second Kekule structure is missing";
+    EXPECT_NE(std::find_if(nrt.notes.begin(), nrt.notes.end(), [](const std::string& s) { return s.find("rotated") != std::string::npos; }),
+              nrt.notes.end()) << "the image's orbitals were built, not rotated";
+    for (int a = 0; a < na; a++)
+        EXPECT_NEAR(bond_total(nrt, a + 1, (a + 1) % na + 1), 0.5, 1e-6) << "ring pair " << a + 1;
+    //an exact fit leaves no slack: every range is the bond order itself
+    for (const NboBondOrder& o : nrt.bond_orders)
+        if (!o.diagonal) {
+            EXPECT_NEAR(o.range_lo, o.total, 1e-6);
+            EXPECT_NEAR(o.range_hi, o.total, 1e-6);
+        }
+}
+
+//A double bond whose two orbitals lean to opposite atoms, i = c_A^2 - c_B^2 = +0.6 and -0.6, like Ni(CO)4's donor
+//and back-donor Ni-C orbitals: the ionic share is the weighted |i| of each orbital, 0.6 of the bond order, not
+//|0.6 - 0.6| = 0. Occupancies 2 and 1.8 keep the two orbitals apart.
+TEST(NrtTests, OppositelyPolarisedOrbitalsOfABondDoNotCancelInItsIonicShare)
+{
+    const NAOResult nao = h_chain_shells(2, 2);
+    const vec v1 = { std::sqrt(0.8), 0.0, std::sqrt(0.2), 0.0 };
+    const vec v2 = { 0.0, std::sqrt(0.2), 0.0, std::sqrt(0.8) };
+    dMatrix2 gamma(4, 4);
+    for (int i = 0; i < 4; i++)
+        for (int j = 0; j < 4; j++)
+            gamma(i, j) = 2.0 * v1[i] * v1[j] + 1.8 * v2[i] * v2[j];
+    NboLewis L;
+    L.gamma = gamma;
+    NboFunction f;
+    f.centers = { 0, 1 };
+    f.type = "BD";
+    f.occupancy = 2.0;
+    f.multiplicity = 1;
+    L.orbitals.push_back(f);
+    f.multiplicity = 2;
+    f.occupancy = 1.8;
+    L.orbitals.push_back(f);
+    L.n_lewis = 2;
+    L.topo = { { 0, 2 }, { 2, 0 } };
+    NboOptions opt;
+    opt.nrt = true;
+    NboNrt nrt;
+    std::ostringstream log;
+    native_nrt(nrt, nao, L, {}, chain_bondable(2), opt, "", 2.0, log);
+    ASSERT_TRUE(nrt.present);
+    for (const NboBondOrder& o : nrt.bond_orders)
+        if (!o.diagonal) {
+            EXPECT_NEAR(o.total, 2.0, 1e-12);
+            EXPECT_NEAR(o.ionic, 1.2, 1e-6);
+        }
 }

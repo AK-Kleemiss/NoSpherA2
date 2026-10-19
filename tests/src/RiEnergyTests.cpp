@@ -77,112 +77,83 @@ namespace {
 		vec empty(1, 0.0);
 		griddy.get_grid(1, 0, pos, pos, pos, &charge, grid[0].data(), grid[1].data(), grid[2].data(), grid[4].data(), grid[5].data(), grid[6].data(), empty);
 
-		// Initialize the vectors sf_A and sf_N
+		//Every (l, m) density first, so the phase factor exp(i H.r) of a k-point is evaluated once per grid point
+		//and not once per (l, m): each sum takes the same products in the same order as with std::polar
+		const int np = static_cast<int>(grid[0].size()), nk = static_cast<int>(kpts.size());
+		vec2 dens;
 		cvec2 sf_A, sf_N;
-		sf_A.resize(1);
-		sf_N.resize(1);
-		sf_A[0].resize(kpts.size(), 0.0);
-		sf_N[0].resize(kpts.size(), 0.0);
-
-		bool all_correct = true; //Veryfiy if all m for one l are correct break if one failed
-		bool correct = true; //Verify if the current m is correct
-
-		cdouble max_diff, diff;
 		for (unsigned int type = 0; type <= max_l; type++)
 		{
-			std::cout << "Testing l = " << type << "\n";
-			vec coefs(type * 2 + 1);
-
-			// Initialize the Wavefunction
 			WFN wavy(e_origin::NOT_YET_DEFINED);
 			wavy.push_back_MO(0, 1.0, -13);
 			wavy.push_back_atom("H", 0, 0, 0, 1);
 			wavy.push_back_atom_basis_set(0, c_exp, vals[0], type, 0);
 			const aux_density_table t(wavy.get_atoms());
-
 			for (unsigned int l = 0; l < type * 2 + 1; l++)
 			{
-				int m = static_cast<int>(l) - static_cast<int>(type);
-				for (int i = 0; i < coefs.size(); i++)
-				{
-					coefs[i] = 0.0;
-				}
-				max_diff = 0.0;
+				vec coefs(type * 2 + 1, 0.0);
 				coefs[l] = 1.0;
-
-				calc_aux_density(t, coefs, grid[0].size(), grid[0].data(), grid[1].data(), grid[2].data(), grid[3].data());
-
-				// Empty the vectors sf:A nad sf_N
-				for (int i = 0; i < kpts.size(); i++)
+				dens.emplace_back(np, 0.0);
+				calc_aux_density(t, coefs, np, grid[0].data(), grid[1].data(), grid[2].data(), dens.back().data());
+				sf_A.emplace_back(nk);
+				for (int i = 0; i < nk; i++)
+					sf_A.back()[i] = t.fourier_atom(constants::TWO_PI * kpts[i][0], constants::TWO_PI * kpts[i][1], constants::TWO_PI * kpts[i][2], coefs.data(), 0);
+			}
+		}
+		const int nlm = static_cast<int>(dens.size());
+		sf_N.assign(nlm, cvec(nk, 0.0));
+#pragma omp parallel for
+		for (int i = 0; i < nk; i++)
+		{
+			const double Hx = constants::TWO_PI * kpts[i][0], Hy = constants::TWO_PI * kpts[i][1], Hz = constants::TWO_PI * kpts[i][2];
+			for (int p = 0; p < np; p++)
+			{
+				const double work = Hx * grid[0][p] + Hy * grid[1][p] + Hz * grid[2][p], c = std::cos(work), s = std::sin(work);
+				for (int j = 0; j < nlm; j++)
 				{
-					sf_A[0][i] = 0.0;
-					sf_N[0][i] = 0.0;
+					const double rw = dens[j][p] * grid[4][p];
+					sf_N[j][i] += cdouble(rw * c, rw * s);
 				}
-				double work = 0.0;
-#pragma omp parallel for private(work)
-				for (int i = 0; i < kpts.size(); i++)
+			}
+		}
+		int j = 0;
+		for (unsigned int type = 0; type <= max_l; type++)
+		{
+			std::cout << "Testing l = " << type << "\n";
+			bool all_correct = true;
+			for (unsigned int l = 0; l < type * 2 + 1; l++, j++)
+			{
+				double max_diff = 0.0;
+				for (int i = 0; i < nk; i++)
+					max_diff = std::max(max_diff, abs(sf_A[j][i] - sf_N[j][i]));
+				if (max_diff > 2E-5)
 				{
-					const double Hx = constants::TWO_PI * kpts[i][0], Hy = constants::TWO_PI * kpts[i][1], Hz =constants::TWO_PI * kpts[i][2];
-
-					sf_A[0][i] =
-						t.fourier_atom(
-							Hx,
-							Hy,
-							Hz,
-							coefs.data(),
-							0
-						);
-
-					for (int _p = 0; _p < grid[0].size(); _p++)
-					{
-						work = Hx * grid[0][_p]
-							  + Hy * grid[1][_p]
-							  + Hz * grid[2][_p];
-						sf_N[0][i] += std::polar(grid[3][_p] * grid[4][_p], work);
-					}
-					diff = abs(sf_A[0][i] - sf_N[0][i]);
-					if (abs(diff) > abs(max_diff))
-					{
-						max_diff = diff;
-					}
-					if (abs(diff) > 2E-5)
-					{
-						all_correct = false;
-						correct = false;
-					}
-				}
-				if (!correct)
-				{
-					std::cout << "Error at m: " << m
-							  << "   Max diff: (" << max_diff.real() << "|" << max_diff.imag() << ")\n";
-					correct = true;
+					all_correct = false;
+					std::cout << "Error at m: " << static_cast<int>(l) - static_cast<int>(type) << "   Max diff: (" << max_diff << "|0)\n";
 				}
 			}
 			if (!all_correct)
-				break;
-			std::cout << "| PASSED!\n";
-		}
-		if (!all_correct)
-		{
-			using namespace std;
-			ofstream result("sfacs.dat", ios::out);
-			for (int i = 0; i < kpts.size(); i++)
 			{
-				result << setw(8) << setprecision(2) << fixed << kpts[i][0];
-				result << setw(8) << setprecision(2) << fixed << kpts[i][1];
-				result << setw(8) << setprecision(2) << fixed << kpts[i][2];
-				result << setw(16) << setprecision(8) << scientific << sf_A[0][i].real();
-				result << setw(16) << setprecision(8) << scientific << sf_A[0][i].imag();
-				result << setw(16) << setprecision(8) << scientific << sf_N[0][i].real();
-				result << setw(16) << setprecision(8) << scientific << sf_N[0][i].imag();
-				result << setw(16) << setprecision(8) << scientific << abs(sf_A[0][i] - sf_N[0][i]);
-				result << setw(35) << setprecision(8) << scientific << sf_A[0][i] / sf_N[0][i];
-				result << "\n";
+				using namespace std;
+				ofstream result("sfacs.dat", ios::out);
+				for (int i = 0; i < nk; i++)
+				{
+					result << setw(8) << setprecision(2) << fixed << kpts[i][0];
+					result << setw(8) << setprecision(2) << fixed << kpts[i][1];
+					result << setw(8) << setprecision(2) << fixed << kpts[i][2];
+					result << setw(16) << setprecision(8) << scientific << sf_A[j - 1][i].real();
+					result << setw(16) << setprecision(8) << scientific << sf_A[j - 1][i].imag();
+					result << setw(16) << setprecision(8) << scientific << sf_N[j - 1][i].real();
+					result << setw(16) << setprecision(8) << scientific << sf_N[j - 1][i].imag();
+					result << setw(16) << setprecision(8) << scientific << abs(sf_A[j - 1][i] - sf_N[j - 1][i]);
+					result << setw(35) << setprecision(8) << scientific << sf_A[j - 1][i] / sf_N[j - 1][i];
+					result << "\n";
+				}
+				result.close();
+				std::cout << "Error in the calculations!\n";
+				return 1;
 			}
-			result.flush();
-			result.close();
-			std::cout << "Error in the calculations!\n";
-			return 1;
+			std::cout << "| PASSED!\n";
 		}
 		std::cout << "All tests passed!\n";
 		return 0;

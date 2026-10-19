@@ -6,6 +6,8 @@
 #include <iostream>
 #include "nos_math.h"
 #include "basis_set.h"
+#include "constants.h"
+#include <algorithm>
 
 namespace {
 constexpr int kMaxSaltedBlocks = 10000;
@@ -33,30 +35,47 @@ void skip_exact(std::ifstream& file, const std::streamoff offset, const std::str
 }
 }
 
-std::filesystem::path find_first_salted_file(const std::filesystem::path &directory_path)
+int salted_element_file_Z(const std::filesystem::path &file)
 {
+	const std::string s = file.stem().string();
+	const int Z = constants::get_Z_from_label(s.c_str());
+	return (Z >= 0 && s == constants::atnr2letter(Z + 1)) ? Z + 1 : 0;
+}
+
+// The .salted files of a folder sorted by name, so the choice of a lead does not depend on the file system's order.
+static pathvec salted_files(const std::filesystem::path &directory_path)
+{
+	pathvec files;
 	try
 	{
-		// Iterate through the directory
 		for (const auto &entry : std::filesystem::directory_iterator(directory_path))
-		{
-			// Check if the entry is a regular file and has a .salted extension
 			if (entry.is_regular_file() && entry.path().extension() == ".salted")
-			{
-				return entry.path().filename().string(); // Return the filename
-			}
-		}
+				files.push_back(entry.path());
 	}
 	catch (const std::filesystem::filesystem_error &e)
 	{
 		std::cerr << "Filesystem error: " << e.what() << std::endl;
 	}
-	catch (const std::exception &e)
-	{
-		std::cerr << "General error: " << e.what() << std::endl;
-	}
+	std::sort(files.begin(), files.end());
+	return files;
+}
 
-	return std::filesystem::path(); // Return an empty path if no .salted file is found
+std::filesystem::path find_first_salted_file(const std::filesystem::path &directory_path)
+{
+	const pathvec files = salted_files(directory_path);
+	for (const auto &f : files)
+		if (!salted_element_file_Z(f)) return f.filename();
+	return files.empty() ? std::filesystem::path() : files[0].filename(); // a folder of element models only
+}
+
+pathvec salted_folder_models(const std::filesystem::path &directory_path, const std::set<int> &present_Z)
+{
+	pathvec models;
+	const std::filesystem::path lead = find_first_salted_file(directory_path);
+	if (!lead.empty() && !salted_element_file_Z(lead)) models.push_back(directory_path / lead);
+	for (const auto &f : salted_files(directory_path))
+		if (present_Z.count(salted_element_file_Z(f))) models.push_back(f);
+	return models;
 }
 
 template <typename Scalar>
@@ -451,6 +470,27 @@ void SALTED_BINARY_FILE::populate_config(SALTEDConfig& config) {
 
 	read_config_string("dfbasis");
 	config.dfbasis = std::string(string_out.begin(), string_out.end());
+
+	config.ecp_mode = 0;
+	if (has_block("ECP")) {
+		file.seekg(table_of_contents["ECP"], std::ios::beg);
+		skip_exact(file, 4, "block datatype for ECP");
+		read_exact(file, config.ecp_mode, "ECP mode");
+		err_checkf(config.ecp_mode >= 0 && config.ecp_mode <= 3,
+			"Invalid ECP mode " + std::to_string(config.ecp_mode) + " in " + filepath.string(), std::cout);
+	}
+}
+
+void write_salted_ecp(const std::filesystem::path& in, const std::filesystem::path& out, const int mode)
+{
+	err_checkf(mode >= 1 && mode <= 3, "-salted_ecp takes the mode as -ECP does: 1 def2, 2 xTB, 3 pTB", std::cout);
+	SALTED_BINARY_FILE file(in);
+	std::string block(2 * sizeof(int32_t), '\0');   // datatype word (INT32), then the mode
+	const int32_t words[2] = { 0, mode };
+	std::memcpy(block.data(), words, sizeof(words));
+	const std::set<std::string> drop = file.has_block("ECP") ? std::set<std::string>{ "ECP" } : std::set<std::string>{};
+	file.write_with_blocks(out, 6, drop, { { "ECP", block } });
+	std::cout << "Wrote " << out.string() << ": predicts valence densities of ECP mode " << mode << std::endl;
 }
 
 

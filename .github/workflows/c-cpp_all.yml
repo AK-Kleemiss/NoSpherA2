@@ -24,6 +24,9 @@ env:
   CMAKE_BUILD_PARALLEL_LEVEL: 4
   CTEST_PARALLEL_LEVEL: 4
   CARGO_TERM_COLOR: always
+  # SSE4.2 compatibility build: CI binaries are handed out and must run on any x64 CPU.
+  # Unset, cmake/NoSpherA2Avx.cmake detects the runner and builds AVX2 + FMA, as local builds do.
+  NOS_AVX: "OFF"
 
 jobs:
   build:
@@ -202,12 +205,6 @@ jobs:
         with:
           submodules: recursive
           fetch-depth: 1
-
-      # The .sln lists its sources by hand, CMake globs them; only the Windows jobs need the .sln
-      - name: Check the Visual Studio projects against the CMake globs
-        if: runner.os == 'Windows'
-        shell: bash
-        run: python scripts/check_vcxproj.py
 
       - name: Compute dependency fingerprint
         id: dependency-fingerprint
@@ -445,7 +442,7 @@ jobs:
           Get-ChildItem artifacts
 
       - name: Upload Artifacts
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ${{ matrix.artifact-name }}
           path: ${{ matrix.artifact-path }}
@@ -455,7 +452,7 @@ jobs:
       # (iteration counts, timings), which ctest prints only on failure
       - name: Upload test logs
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: test-logs-${{ matrix.artifact-name }}
           if-no-files-found: ignore
@@ -473,13 +470,13 @@ jobs:
 
     steps:
       - name: Download macOS arm64 artifact
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: NoSpherA2-macos-arm64
           path: downloads/arm64
 
       - name: Download macOS x86_64 artifact
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: NoSpherA2-macos-x86_64
           path: downloads/x86_64
@@ -556,7 +553,7 @@ jobs:
           ls -lah artifacts/NoSpherA2-macos-universal.tar.gz
 
       - name: Upload universal macOS artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: NoSpherA2-macos-universal
           path: artifacts/NoSpherA2-macos-universal.tar.gz
@@ -601,7 +598,7 @@ jobs:
           && cmake --build --preset release-linux --parallel 4
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@b96794f015dfd88f77b49b1c93e0fa7110f94c63 # v4.38.0
+        uses: github/codeql-action/init@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
         with:
           languages: c-cpp
           build-mode: manual
@@ -622,7 +619,7 @@ jobs:
         run: cmake --build --preset release-linux --parallel 4
 
       - name: Perform CodeQL analysis
-        uses: github/codeql-action/analyze@b96794f015dfd88f77b49b1c93e0fa7110f94c63 # v4.38.0
+        uses: github/codeql-action/analyze@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
         with:
           category: /language:c-cpp
 
@@ -658,7 +655,7 @@ jobs:
 
       - name: Upload Flawfinder SARIF artifact
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: flawfinder-results
           path: flawfinder-results.sarif
@@ -666,7 +663,7 @@ jobs:
 
       - name: Upload Flawfinder results to Security tab
         if: always()
-        uses: github/codeql-action/upload-sarif@b96794f015dfd88f77b49b1c93e0fa7110f94c63 # v4.38.0
+        uses: github/codeql-action/upload-sarif@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
         with:
           sarif_file: flawfinder-results.sarif
           category: flawfinder

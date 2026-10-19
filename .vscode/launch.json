@@ -1,80 +1,57 @@
 {
-  "version": "0.2.0",
-  "configurations": [
-    {
-      "name": "NoSpherA2 CMake Release: native NBO",
-      "type": "cppvsdbg",
-      "request": "launch",
-      "program": "${workspaceFolder}/build/release-windows/bin/NoSpherA2.exe",
-      "args": ["-nbo_native", "epoxide.gbw", "-nrt", "-nbo_json", "epoxide-native.nbo.json"],
-      "cwd": "${workspaceFolder}/tests/epoxide_gbw",
-      "console": "integratedTerminal"
-    },
-    {
-      "name": "(gdb) Launch",
-      "type": "cppdbg",
-      "request": "launch",
-      "program": "${workspaceFolder}/build/Debug/bin/NoSpherA2_Debug",
-      "args": [ 
-        "-cif", "epoxide.cif",
-		"-dmin", "0.4",
-		"-wfn", "epoxide.gbw",
-		"-ri_fit", "combo_basis_fit", "-v",
-        "-no-date"
-      ],
-      "stopAtEntry": false,
-      "cwd": "${workspaceFolder}/tests/epoxide_gbw",
-      "environment": [],
-      "externalConsole": false,
-      "MIMode": "gdb",
-      "setupCommands": [
+    // Both configurations debug whatever launch target is selected in the
+    // CMake Tools status bar (NoSpherA2, NoSpherA2_Tests, ...), built from the
+    // active preset. Put the arguments of the run you are chasing into "args"
+    // and set "cwd" to the test directory the input files live in.
+    "version": "0.2.0",
+    "configurations": [
         {
-          "description": "Enable pretty-printing for gdb",
-          "text": "python import sys; sys.path.insert(0, '/usr/share/gcc/python'); from libstdcxx.v6.printers import register_libstdcxx_printers; register_libstdcxx_printers(None)",
-          "ignoreFailures": true
+            "name": "CMake target (Windows)",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${command:cmake.launchTargetPath}",
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal"
         },
         {
-          "description": "Set Disassembly Flavor to Intel",
-          "text": "-gdb-set disassembly-flavor intel",
-          "ignoreFailures": true
-        }
-      ]
-    },
-    {
-      "name": "Python: Current File",
-      "type": "python",
-      "request": "launch",
-      "program": "${file}",
-      "console": "integratedTerminal",
-      "justMyCode": true
-    },
-    {
-      "name": "Python: Optimizer",
-      "type": "python",
-      "request": "launch",
-      "program": "D:\\git\\NoSpherA2\\tests\\ECP_SF\\Atomic_densities\\Rb_fit_minimize.py",
-      "console": "integratedTerminal",
-      "justMyCode": true,
-      "nodebug": true
-    },
-    {
-      "name": "C/C++ Runner: Debug Session",
-      "type": "cppdbg",
-      "request": "launch",
-      "args": [],
-      "stopAtEntry": false,
-      "externalConsole": true,
-      "cwd": "d:/git/NoSpherA2/Src",
-      "program": "d:/git/NoSpherA2/Src/build/Debug/outDebug",
-      "MIMode": "gdb",
-      "miDebuggerPath": "gdb",
-      "setupCommands": [
+            "name": "CMake target (Linux/macOS)",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${command:cmake.launchTargetPath}",
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "osx": {
+                "MIMode": "lldb"
+            },
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ]
+        },
         {
-          "description": "Enable pretty-printing for gdb",
-          "text": "-enable-pretty-printing",
-          "ignoreFailures": true
+            // Example of a concrete debugging session: native NBO on the
+            // epoxide fixture. Copy this block and swap args/cwd for others.
+            "name": "Example: native NBO on epoxide (Windows)",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${command:cmake.launchTargetPath}",
+            "args": ["-nbo_native", "epoxide.gbw", "-nrt", "-nbo_json", "epoxide-native.nbo.json"],
+            "cwd": "${workspaceFolder}/tests/epoxide_gbw",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Python: Current File",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "justMyCode": true
         }
-      ]
-    }
-  ]
+    ]
 }

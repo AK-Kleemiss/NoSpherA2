@@ -399,6 +399,10 @@ class HE_Spherical_Atom
 public:
 	// Falls back to the neutral density if no ion is tabulated for this element.
 	HE_Spherical_Atom(const int atomic_number, const double charge);
+	// Whether a charge of this sign can be carried for this element, by either route.
+	static bool ion_available(const int atomic_number, const double charge);
+	// The part of an estimated charge the fill carries: 0 without an ion, at most the valence shell.
+	static double carried_charge(const int atomic_number, const double charge);
 
 	double get_radial_density(const double &r) const;
 	double get_form_factor(const double &k) const;
@@ -411,7 +415,10 @@ public:
 	// extrapolated even though the electron count stays exact. False once the
 	// delta series covers the charge: that blend is between two adjacent BOUND
 	// states, with every weight in [0, 1].
-	bool is_extrapolating() const { return _weight > 1.0 && !_use_delta; }
+	bool is_extrapolating() const { return _use_gto ? _gto_extrap : (_weight > 1.0 && !_use_delta); }
+	// Heavy elements (GTO_ion_delta_coefs.h): every charge state, the neutral included, is the
+	// scalar-relativistic DKH2 atom, evaluated as Thakkar neutral + tabulated difference.
+	bool uses_gto_tables() const { return _use_gto; }
 	// |q| > 1 reached by walking down the delta_k series rather than
 	// extrapolating. Cations only - atomic anions past -1 are unbound, so there
 	// is no honest reference state to walk towards.
@@ -430,6 +437,10 @@ private:
 	bool _use_delta;
 	int _delta_n;
 	double _delta_frac;
+	// GTO route: rho_q = rho_0(Thakkar) + (1 - _gto_frac) T_{_gto_lo} + _gto_frac T_{_gto_lo+1}.
+	bool _use_gto, _gto_extrap;
+	int _gto_lo;
+	double _gto_frac;
 	Thakkar _neutral;
 	std::unique_ptr<Thakkar> _ion;
 };
@@ -445,55 +456,27 @@ protected:
 
 public:
 	Spherical_Gaussian_Density(const int g_atom_number, const int ECP_m = 1) : atomic_number(g_atom_number),
-		ECP_mode(ECP_m),
-		charge(0)
+		ECP_mode(ECP_m), nex(0), z(NULL), c(NULL), charge(0)
 	{
-		int temp_Z;
+		//Table rows: def2 and xTB run Rb..Rn; pTB runs H..La, then Hf..Rn, with no Ce-Lu fits yet, so those get none.
+		//pTB used to be read at Z - 2: every element got its lighter neighbour's fit (C took B's, B none) and from W on
+		//the read ran past the end of the table, which crashed at random (9 Oct 2026)
+		const vec2* tz = NULL, * tc = NULL;
+		int row = -1;
 		switch (ECP_m)
 		{
-		case 2:
-			temp_Z = atomic_number - 2;
-			if (temp_Z < 0) {
-				nex = 0;
-				z = NULL;
-				c = NULL;
-			}
-			else {
-				nex = static_cast<int>(xtb_corrections::c[temp_Z].size());
-				z = xtb_corrections::z[temp_Z].data();
-				c = xtb_corrections::c[temp_Z].data();
-			}
-			break;
+		case 1: tz = &def_corrections::z; tc = &def_corrections::c; row = atomic_number - 37; break;
+		case 2: tz = &xtb_corrections::z; tc = &xtb_corrections::c; row = atomic_number - 37; break;
 		case 3:
-			temp_Z = atomic_number - 2;
-			if (temp_Z < 0) {
-				nex = 0;
-				z = NULL;
-				c = NULL;
-			}
-			else {
-				nex = static_cast<int>(ptb_corrections::c[temp_Z].size());
-				z = ptb_corrections::z[temp_Z].data();
-				c = ptb_corrections::c[temp_Z].data();
-			}
+			tz = &ptb_corrections::z; tc = &ptb_corrections::c;
+			row = atomic_number <= 57 ? atomic_number - 1 : atomic_number >= 72 ? atomic_number - 15 : -1;
 			break;
-		case 1:
-			temp_Z = atomic_number - 37;
-			if (temp_Z < 0) {
-				nex = 0;
-				z = NULL;
-				c = NULL;
-			}
-			else {
-				nex = static_cast<int>(def_corrections::c[temp_Z].size());
-				z = def_corrections::z[temp_Z].data();
-				c = def_corrections::c[temp_Z].data();
-			}
-			break;
-		default:
-			z = NULL;
-			c = NULL;
-			nex = 0;
+		}
+		if (tc != NULL && row >= 0 && row < static_cast<int>(tc->size()))
+		{
+			nex = static_cast<int>((*tc)[row].size());
+			z = (*tz)[row].data();
+			c = (*tc)[row].data();
 		}
 	};
 	Spherical_Gaussian_Density() : c(NULL), nex(0), z(NULL), charge(0), atomic_number(1), ECP_mode(1) {};

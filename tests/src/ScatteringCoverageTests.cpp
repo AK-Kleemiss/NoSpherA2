@@ -346,13 +346,9 @@ TEST(ScatteringCoverageCifTests, ReadAtomsRejectsRowByLabelAndType)
 		EXPECT_TRUE(labels.empty()) << debug;
 		EXPECT_TRUE(asym.empty()) << debug;
 		EXPECT_EQ(types, (ivec{ 6 })) << debug;
+		EXPECT_NE(log.str().find("CIF row Q1 has type N but the wavefunction atom at its position is C, skipping!"), std::string::npos) << debug;
 		if (debug)
-		{
-			EXPECT_NE(log.str().find("Element symbol not found in label, this is a problem!\n checking type... ALSO FAILED! WILL IGNORE ATOM!"), std::string::npos);
 			EXPECT_NE(log.str().find("I did not find this atom! Tolerances were: "), std::string::npos);
-		}
-		else
-			EXPECT_NE(log.str().find("Atom q1 was not matching by element determined by label reduction or type field, skipping!"), std::string::npos);
 	}
 	//without permission for an empty asymmetric unit the same CIF ends the run
 	{
@@ -381,7 +377,7 @@ TEST(ScatteringCoverageCifTests, ReadAtomsHydrogenLabelRules)
 	const std::vector<probe> probes{
 		{ "Q1 H 0.25 0.35 0.45\n", true, " will check type..." },
 		{ "T1 H 0.25 0.35 0.45\n", true, "" },
-		{ "Q1 C 0.25 0.35 0.45\n", false, " will check type... ALSO FAILED! WILL IGNORE ATOM!" } };
+		{ "Q1 C 0.25 0.35 0.45\n", false, "CIF row Q1 has type C but the wavefunction atom at its position is H, skipping!" } };
 	const double f = constants::ang2bohr(kA);
 	for (const probe& p : probes)
 	{
@@ -451,6 +447,21 @@ TEST(ScatteringCoverageEdTests, ConvertToEdIsMottBethe)
 		EXPECT_NEAR(sf[0][1].real(), E * 4.0 / 0.0625, 1e-9);
 		EXPECT_NEAR(sf[0][1].imag(), -E * 1.0 / 0.0625, 1e-9);
 	}
+}
+
+//pTB removes a core from B on and every such element outside Ce-Lu has a valence correction fit; reading the table at
+//Z - 2 gave B none, C the B row, and from W on read past the end
+TEST(ScatteringCoverageEcpTests, PtbCorrectionRowFollowsTheCore)
+{
+	for (int Z = 1; Z <= constants::heaviest_ECP_element; Z++)
+	{
+		if (Z >= 58 && Z <= 71)
+			continue;
+		const bool has_fit = Spherical_Gaussian_Density(Z, 3).get_form_factor(1.0) != 0.0;
+		EXPECT_EQ(has_fit, constants::ECP_electrons_pTB[Z] > 0) << "Z = " << Z;
+	}
+	EXPECT_EQ(Spherical_Gaussian_Density(64, 3).get_form_factor(1.0), 0.0);
+	EXPECT_EQ(Spherical_Gaussian_Density(90, 3).get_form_factor(1.0), 0.0);
 }
 
 //the IAM path of calculate_scattering_factors: one Thakkar row per asymmetric atom, keyed by atomID
@@ -684,7 +695,13 @@ TEST(ScatteringCoverageTransformTests, CalcSfSumsPhasesAndReportsPreparationTime
 	EXPECT_NEAR(sf[1][1].imag(), 0.0, 1e-12);
 	EXPECT_NE(log.str().find("Initialized FFs"), std::string::npos);
 	EXPECT_NE(log.str().find("asym atom list size: 2 total grid size: 3"), std::string::npos);
-	EXPECT_NE(log.str().find("Time to prepare: 2 s"), std::string::npos);
+	//2 s plus calc_SF's own run time: check the seconds branch, never the count (Debug, ARM, loaded runners add to it)
+	const std::string out = log.str();
+	const size_t prep = out.find("Time to prepare: ");
+	ASSERT_NE(prep, std::string::npos);
+	const std::string prep_line = out.substr(prep, out.find('\n', prep) - prep);
+	EXPECT_NE(prep_line.find(" s"), std::string::npos);
+	EXPECT_EQ(prep_line.find(" ms"), std::string::npos);
 	EXPECT_GE(end1, start);
 	//under a second the preparation time is reported in milliseconds
 	std::ostringstream log2;

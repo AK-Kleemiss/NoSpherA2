@@ -435,8 +435,8 @@ void computeRho(
 												const double w0 = q[4] * dc[x * nb + y];
 												if (w0 == 0.0) continue;
 												const int *ia = &htuv[3 * (nh(la - 1) + x)], *ib = &htuv[3 * (nh(lb - 1) + y)];
-												const double *ex = &E[(ia[0] * (lb + 1) + ib[0]) * nt], *ey = &E[ne + (ia[1] * (lb + 1) + ib[1]) * nt],
-													*ez = &E[2 * static_cast<size_t>(ne) + (ia[2] * (lb + 1) + ib[2]) * nt];
+												const double *ex = &E[static_cast<size_t>(ia[0] * (lb + 1) + ib[0]) * nt], *ey = &E[ne + static_cast<size_t>(ia[1] * (lb + 1) + ib[1]) * nt],
+													*ez = &E[2 * static_cast<size_t>(ne) + static_cast<size_t>(ia[2] * (lb + 1) + ib[2]) * nt];
 												for (int t = 0; t <= ia[0] + ib[0]; t++)
 													for (int u = 0; u <= ia[1] + ib[1]; u++) {
 														const double wtu = w0 * ex[t] * ey[u];
@@ -469,7 +469,7 @@ void computeRho(
 											U[l * l + m] = pref[l] * s;
 										}
 								}
-								const double *u = &U[far_l[P] * far_l[P]];
+								const double *u = &U[static_cast<size_t>(far_l[P]) * far_l[P]];
 								for (int k = 0; k < dp; k++) loc[p0 + k] += mom[P] * u[k];
 								nfar++;
 								continue;

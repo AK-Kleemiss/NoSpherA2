@@ -313,7 +313,7 @@ because the device I tensor differs from the host one in the tenth significant
 figure.
 
 ```powershell
-.\NoSpherA2.exe -wfn mol.gbw -cif mol.cif -hkl mol.hkl -acc 2 -mult 1 -charge 0 -do_XCW -XCW_settings xcw.txt -anom_disp mol.disp -no_gpu
+.\NoSpherA2.exe -wfn mol.gbw -cif mol.cif -hkl mol.hkl -acc 2 -mult 1 -charge 0 -do_XCW -XCW_settings xcw.txt -no_gpu
 ```
 
 ```powershell
@@ -322,7 +322,9 @@ Get-Content .\NoSpherA2.log -Tail 60
 
 The settings file controls where the two-electron integral tensor lives
 (`stream`, `i_tensor_mb`, `save`, `read`, `df_basis`, `i_double`, `i_float`),
-which is the whole memory question for a fit of any size.
+which is the whole memory question for a fit of any size; `save_eri <file>` and
+`read_eri <file>` keep the stored two-electron integrals for a later run on the
+same geometry and basis.
 
 ## 19. Force the GPU, and prove it ran
 
