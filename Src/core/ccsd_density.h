@@ -16,6 +16,9 @@ struct CcsdDensityOptions
 	double tol = 1e-10;             //CCSD energy change and Lambda amplitude change
 	int max_cycle = 200;
 	bool triples = false;           //CCSD(T): the (T) terms in the Lambda equations and in the density
+	bool local = false;             //cluster-in-molecule: one cluster per Pipek-Mezey LMO, densities assembled
+	double cluster_radius = 6.0;    //Angstrom between LMO centres for a cluster
+	double domain_threshold = 0.01; //Mulliken population that puts an atom's PAOs into a cluster's virtual space
 };
 
 struct CcsdDensityResult
@@ -30,6 +33,12 @@ struct CcsdDensityResult
 };
 
 CcsdDensityResult ccsd_natural_orbitals(const occ::qm::Wavefunction &scf, const CcsdDensityOptions &opts, std::ostream &log);
+
+//The same density for larger systems from local clusters (cluster-in-molecule, Li & Piecuch): each valence LMO gets a
+//cluster of nearby LMOs and a PAO virtual domain, solved with the canonical code above; every term is credited to
+//the cluster of its distinguished occupied index and the pieces are summed in the AO basis. With clusters that
+//span the molecule it reproduces ccsd_natural_orbitals.
+CcsdDensityResult local_ccsd_natural_orbitals(const occ::qm::Wavefunction &scf, const CcsdDensityOptions &opts, std::ostream &log);
 
 //-occ with method = "ccsd" or "ccsd(t)": occ's restricted HF, then ccsd_natural_orbitals. The CCSD settings come from
 //the toml's [scf] table (ccsd_frozen_core, ccsd_backend, ri-basis, ccsd_max_memory_gb), which occ's reader does not take.

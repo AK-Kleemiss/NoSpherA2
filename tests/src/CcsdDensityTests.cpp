@@ -126,6 +126,29 @@ TEST(CcsdDensity, OccAndOrcaGiveTheSameDensity)
 	EXPECT_GT(hf_dev, 1e-3);
 }
 
+//clusters that span the molecule (every LMO in every cluster, every atom in every domain) must give the canonical
+//density back: each cluster is then the full problem in rotated orbitals, and the partition sums to the whole
+TEST(CcsdDensity, LocalClustersSpanningTheMoleculeReproduceCanonical)
+{
+	if (!ensure_occ_data_path(nullptr)) GTEST_SKIP() << "OCC_DATA_PATH not set";
+	const occ::qm::Wavefunction scf = tight_rhf();
+	for (const bool triples : { false, true })
+	{
+		CcsdDensityOptions opts;
+		opts.n_frozen = 0;
+		opts.triples = triples;
+		opts.cluster_radius = 1e3;
+		opts.domain_threshold = -1.0;
+		std::ostringstream log;
+		const CcsdDensityResult canonical = ccsd_natural_orbitals(scf, opts, log);
+		const CcsdDensityResult local = local_ccsd_natural_orbitals(scf, opts, log);
+		ASSERT_EQ(local.occupations.size(), canonical.occupations.size());
+		for (long k = 0; k < canonical.occupations.size(); k++)
+			EXPECT_NEAR(local.occupations(k), canonical.occupations(k), 1e-8) << (triples ? "CCSD(T)" : "CCSD") << " natural orbital " << k;
+		EXPECT_NEAR(local.e_corr, canonical.e_corr, 1e-9);
+	}
+}
+
 //the (T) terms in Lambda and in the density; E(T) from the same arrays pins them against PySCF's and ORCA's (T),
 //and the occupations must move off the CCSD ones (by up to 1.6e-3 here)
 TEST(CcsdDensity, OccTriplesDensityMatchesPyscf)
