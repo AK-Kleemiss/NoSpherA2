@@ -3,6 +3,7 @@
 #include "convenience.h"
 
 #include <occ/core/diis.h>
+#include <occ/core/log.h>
 #include <occ/core/util.h>
 #include <occ/driver/method_parser.h>
 #include <occ/main/occ_scf.h>
@@ -14,6 +15,7 @@
 #include <unsupported/Eigen/CXX11/Tensor>
 
 #include <array>
+#include <chrono>
 #include <iomanip>
 #include <ostream>
 
@@ -63,15 +65,15 @@ namespace
 		return s;
 	}
 
-	//numpy a.transpose(perm): out.d[k] = a.d[perm[k]]
-	Tn T(const Tn &a, std::vector<int> perm)
+	//numpy a.transpose(perm): out.d[k] = a.d[perm[k]]. Padded at the front, so the innermost loop runs over the
+	//last real output axis, a plain copy when that axis stays last
+	Tn T(const Tn &a, const std::vector<int> &perm)
 	{
 		constexpr int R = 6;
-		const int r = static_cast<int>(a.d.size());
-		std::vector<int> ad(a.d);
-		ad.resize(R, 1);
-		for (int k = r; k < R; k++) perm.push_back(k);
+		const int r = static_cast<int>(a.d.size()), pad = R - r;
+		std::array<int, R> ad{};
 		std::array<size_t, R> stride{};
+		for (int k = 0; k < R; k++) ad[k] = k < pad ? 1 : a.d[k - pad];
 		size_t s = 1;
 		for (int k = R - 1; k >= 0; k--) { stride[k] = s; s *= static_cast<size_t>(ad[k]); }
 		std::vector<int> od(r);
@@ -79,18 +81,37 @@ namespace
 		Tn out(od);
 		std::array<int, R> n{};
 		std::array<size_t, R> st{};
-		for (int k = 0; k < R; k++) { n[k] = ad[perm[k]]; st[k] = stride[perm[k]]; }
-		size_t w = 0;
-		for (int x0 = 0; x0 < n[0]; x0++)
-			for (int x1 = 0; x1 < n[1]; x1++)
-				for (int x2 = 0; x2 < n[2]; x2++)
-					for (int x3 = 0; x3 < n[3]; x3++)
-						for (int x4 = 0; x4 < n[4]; x4++)
-						{
-							const size_t base = x0 * st[0] + x1 * st[1] + x2 * st[2] + x3 * st[3] + x4 * st[4];
-							for (int x5 = 0; x5 < n[5]; x5++) out.v[w++] = a.v[base + x5 * st[5]];
-						}
+		for (int k = 0; k < R; k++)
+		{
+			const int src = k < pad ? k : pad + perm[k - pad];
+			n[k] = ad[src];
+			st[k] = stride[src];
+		}
+		const long long outer = static_cast<long long>(n[0]) * n[1] * n[2] * n[3] * n[4];
+#pragma omp parallel for if (out.v.size() > (size_t(1) << 18))
+		for (long long q = 0; q < outer; q++)
+		{
+			size_t rem = static_cast<size_t>(q), base = 0;
+			for (int k = 4; k >= 0; k--)
+			{
+				base += (rem % n[k]) * st[k];
+				rem /= n[k];
+			}
+			double *dst = out.v.data() + static_cast<size_t>(q) * n[5];
+			const double *src = a.v.data() + base;
+			if (st[5] == 1)
+				std::copy_n(src, n[5], dst);
+			else
+				for (int x5 = 0; x5 < n[5]; x5++) dst[x5] = src[x5 * st[5]];
+		}
 		return out;
+	}
+
+	bool identity(const std::vector<int> &perm)
+	{
+		for (size_t k = 0; k < perm.size(); k++)
+			if (perm[k] != static_cast<int>(k)) return false;
+		return true;
 	}
 
 	//numpy einsum of two operands: a label in both inputs and not in the output is summed; a label may not
@@ -117,15 +138,18 @@ namespace
 			K *= a.d[la.find(c)];
 		}
 		for (const char c : fb) { pb.push_back(static_cast<int>(lb.find(c))); cd.push_back(b.d[lb.find(c)]); N *= b.d[lb.find(c)]; }
-		const Tn at = T(a, pa), bt = T(b, pb);
+		Tn at, bt;
+		if (!identity(pa)) at = T(a, pa);
+		if (!identity(pb)) bt = T(b, pb);
+		const double *ap = at.v.empty() ? a.v.data() : at.v.data(), *bp = bt.v.empty() ? b.v.data() : bt.v.data();
 		Tn c(cd);
-		using RowMat = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
-		Eigen::Map<RowMat>(c.v.data(), M, N).noalias() =
-			Eigen::Map<const RowMat>(at.v.data(), M, K) * Eigen::Map<const RowMat>(bt.v.data(), K, N);
+		//BLAS, not Eigen: NoSpherA2 builds Eigen with EIGEN_DONT_PARALLELIZE, and MKL threads outside OpenMP regions
+		cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, static_cast<int>(M), static_cast<int>(N), static_cast<int>(K),
+			1.0, ap, static_cast<int>(K), bp, static_cast<int>(N), 0.0, c.v.data(), static_cast<int>(N));
 		const std::string lc = fa + fb;
 		std::vector<int> po;
 		for (const char x : lo) po.push_back(static_cast<int>(lc.find(x)));
-		return T(c, po);
+		return identity(po) ? c : T(c, po);
 	}
 
 	Tn from_tensor(const Eigen::Tensor<double, 2> &t)
@@ -383,7 +407,8 @@ namespace
 	}
 
 	//PySCF ccsd_t_lambda_slow / ccsd_t_rdm_slow: the triples terms that make the Lambda equations and the
-	//density those of CCSD(T). w, v are the p6-symmetrised t3-like arrays over ijkabc, already divided by D.
+	//density those of CCSD(T), evaluated one occupied triple at a time. W[ijk](abc) is PySCF's p6-symmetrised
+	//t3-like array w (likewise V for v), already divided by D, as a v^3 block; nothing o^3 v^3 is ever formed.
 	struct Triples
 	{
 		Tn l1_t, l2_t;  //constant terms added to every Lambda update
@@ -391,67 +416,142 @@ namespace
 		double e_t = 0.0;
 	};
 
-	Tn p6(const Tn &t)
-	{
-		const Tn t1 = t + T(t, { 0, 2, 1, 3, 5, 4 });
-		return t1 + T(t1, { 1, 0, 2, 4, 3, 5 }) + T(t1, { 1, 2, 0, 4, 5, 3 });
-	}
+	using RowMat = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
+	using MapR = Eigen::Map<RowMat>;
+	using CMapR = Eigen::Map<const RowMat>;
 
-	Tn r6(const Tn &w)
-	{
-		return w * 4.0 + T(w, { 0, 1, 2, 4, 5, 3 }) + T(w, { 0, 1, 2, 5, 3, 4 })
-			- T(w, { 0, 1, 2, 5, 4, 3 }) * 2.0 - T(w, { 0, 1, 2, 3, 5, 4 }) * 2.0 - T(w, { 0, 1, 2, 4, 3, 5 }) * 2.0;
-	}
-
-	//r6 combined with the 2/3 F_ijab + 1/3 F_jiab form the RCCSD Lambda equations are solved in
-	Tn as_r6(const Tn &m) { return m * 2.0 - T(m, { 0, 1, 2, 5, 4, 3 }) - T(m, { 0, 1, 2, 3, 5, 4 }); }
-
-	//shortcut: w, v and their combinations are full o^3 v^3 arrays (PySCF's *_slow form); batch over virtual
-	//triples as occ's ccsd_t does before this is wanted past ~10 correlated occupied and ~100 virtual orbitals
 	Triples triples(const Tn &t1, const Tn &t2, const Eris &e)
 	{
 		const int o = e.o, v = e.v;
-		Tn eia({ o, v });
+		const size_t vv = size_t(v) * v, v3 = vv * v;
+		//layouts chosen once so that every product below is a plain GEMM on contiguous blocks
+		const Tn L1 = T(e.ovvv, { 0, 1, 3, 2 });  //[i][a][b][f] = (ia|fb)
+		const Tn L2 = T(e.ovvv, { 0, 3, 1, 2 });  //[k][e][f][b] = (kf|be)
+		const Tn t2T = T(t2, { 0, 1, 3, 2 });     //[k][j][f][c] = t2(kj,cf)
+		const Tn t2_t = T(t2, { 1, 0, 2, 3 });    //[k][m][b][c] = t2(mk,bc)
+		const Tn ovoo_t = T(e.ovoo, { 0, 2, 1, 3 }), ovov_t = T(e.ovov, { 0, 2, 1, 3 });  //[i][j][a][m], [i][j][a][b]
+		auto at = [](const Tn &a, const size_t block, const size_t size) { return a.v.data() + block * size; };
+		auto ix = [v](const int a, const int b, const int c) { return (size_t(a) * v + b) * v + c; };
+
+		//PySCF's un-symmetrised w for one ordered triple: (iafb,kjcf) - (iajm,mkbc), into out as abc
+		const int iv = v, ivv = static_cast<int>(vv);
+		auto gemm = [](const bool ta, const bool tb, const int m, const int n, const int k, const double alpha, const double *a, const int lda,
+			const double *b, const int ldb, const double beta, double *c, const int ldc) {
+			cblas_dgemm(CblasRowMajor, ta ? CblasTrans : CblasNoTrans, tb ? CblasTrans : CblasNoTrans, m, n, k, alpha, a, lda, b, ldb, beta, c, ldc);
+		};
+		auto base_w = [&](const int i, const int j, const int k, double *out) {
+			gemm(false, false, ivv, iv, iv, 1.0, at(L1, i, v3), iv, at(t2T, size_t(k) * o + j, vv), iv, 0.0, out, iv);
+			gemm(false, false, iv, ivv, o, -1.0, at(ovoo_t, size_t(i) * o + j, size_t(v) * o), o, at(t2_t, k, size_t(o) * vv), ivv, 1.0, out, ivv);
+		};
+
+		Triples r;
+		r.l1_t = Tn({ o, v });
+		r.goo = Tn({ o, o });
+		r.gvv = Tn({ v, v });
+		r.dvo = Tn({ v, o });
+		Tn joovv({ o, o, v, v });
+		std::vector<Tn> gvv_i(o, Tn({ v, v })), dvo_i(o, Tn({ v, o }));
+		std::vector<double> e_i(o, 0.0);
+		//W + V/2 and r6(W) of every i of the current (j, k): the oo block pairs W[ijk] with W[i'jk]
+		RowMat WV(o, v3), RW(o, v3);
+		const int nt = omp_get_max_threads();
+		std::vector<std::vector<double>> buf(size_t(nt) * 8, std::vector<double>(v3));
+
+		//everything one block (i, j, k) contributes, given its W and V; wv, rw receive W + V/2 and r6(W)
+		auto block = [&](const int i, const int j, const int k, const double *W, const double *V, double *wv, double *rw, double *m, double *arw) {
+			const double eijk = e.eo(i) + e.eo(j) + e.eo(k);
+			double et = 0.0;
+			for (int a = 0; a < v; a++)
+				for (int b = 0; b < v; b++)
+					for (int c = 0; c < v; c++)
+					{
+						const size_t x = ix(a, b, c), cab = ix(c, a, b), bca = ix(b, c, a), cba = ix(c, b, a), acb = ix(a, c, b), bac = ix(b, a, c);
+						//r6 and as_r6 act on abc only: r6(w) = 4w + w(cab) + w(bca) - 2 [w(cba) + w(acb) + w(bac)]
+						rw[x] = 4.0 * W[x] + W[cab] + W[bca] - 2.0 * (W[cba] + W[acb] + W[bac]);
+						wv[x] = W[x] + 0.5 * V[x];
+						m[x] = 2.0 * (2.0 * W[x] + 0.5 * V[x]) - (2.0 * W[cba] + 0.5 * V[cba]) - (2.0 * W[acb] + 0.5 * V[acb]);
+						arw[x] = 2.0 * W[x] - W[cba] - W[acb];
+						//E(T) = 1/3 sum W D r6(W + V/2) = 1/3 sum D r6(W) (W + V/2): r6 is self-adjoint and D symmetric in abc;
+						//the 1/3 measured against PySCF's ccsd_t (exact to 10 digits)
+						et += (eijk - e.ev(a) - e.ev(b) - e.ev(c)) * rw[x] * wv[x];
+					}
+			e_i[i] += et / 3.0;
+			//l1_t[i] and joovv[i] are this i's alone; the vv, vo parts are per i and summed after the loop
+			MapR(r.l1_t.v.data() + size_t(i) * v, 1, v).noalias() += (CMapR(rw, v, vv) * CMapR(at(ovov_t, size_t(j) * o + k, vv), vv, 1)).transpose();
+			gemm(false, false, iv, iv, ivv, 1.0, m, ivv, at(L2, k, v3), iv, 1.0, joovv.v.data() + (size_t(i) * o + j) * vv, iv);
+			MapR(joovv.v.data() + (size_t(i) * o + j) * vv, vv, 1).noalias() += CMapR(arw, vv, v) * CMapR(e.fov.v.data() + size_t(k) * v, v, 1);
+			//joovv[i, J, ab] -= sum_c (kc|jJ) m[ab, c]
+			gemm(true, true, o, ivv, iv, -1.0, at(ovoo_t, size_t(k) * o + j, size_t(v) * o), o, m, iv, 1.0, joovv.v.data() + size_t(i) * o * vv, ivv);
+			gemm(false, true, iv, iv, ivv, 1.0, wv, ivv, rw, ivv, 1.0, gvv_i[i].v.data(), iv);
+			const Eigen::VectorXd dv = CMapR(rw, vv, v).transpose() * CMapR(at(t2, size_t(i) * o + j, vv), vv, 1);
+			for (int c = 0; c < v; c++) dvo_i[i].at(c, k) += 0.5 * dv(c);
+		};
+
+		//outer (j >= k), inner i. Block (i, k, j) is block (i, j, k) with b and c swapped (W and V are symmetric
+		//under joint permutations), so the mirror costs a copy, not six GEMMs; its oo-block share equals the
+		//(i, j, k) one, hence the weight 2 there. as_r6 does not commute with that swap, so the mirror's other
+		//terms are evaluated from its own swapped W and V.
+		for (int j = 0; j < o; j++)
+			for (int k = 0; k <= j; k++)
+			{
+#pragma omp parallel for schedule(dynamic)
+				for (int i = 0; i < o; i++)
+				{
+					std::vector<double> *B = &buf[size_t(omp_get_thread_num()) * 8];
+					double *b0 = B[0].data(), *b1 = B[1].data(), *b2 = B[2].data(), *b3 = B[3].data(), *b4 = B[4].data(), *b5 = B[5].data();
+					double *W = B[6].data(), *V = B[7].data();
+					base_w(i, j, k, b0);
+					base_w(i, k, j, b1);
+					base_w(j, i, k, b2);
+					base_w(j, k, i, b3);
+					base_w(k, i, j, b4);
+					base_w(k, j, i, b5);
+					//p6 and the division by D in one pass; v's six permutations coincide in pairs, so three terms twice
+					const double eijk = e.eo(i) + e.eo(j) + e.eo(k);
+					const double *Xij = at(ovov_t, size_t(i) * o + j, vv), *Xik = at(ovov_t, size_t(i) * o + k, vv), *Xjk = at(ovov_t, size_t(j) * o + k, vv);
+					const double *Tij = at(t2, size_t(i) * o + j, vv), *Tik = at(t2, size_t(i) * o + k, vv), *Tjk = at(t2, size_t(j) * o + k, vv);
+					const double *t1i = at(t1, i, v), *t1j = at(t1, j, v), *t1k = at(t1, k, v);
+					const double *fi = at(e.fov, i, v), *fj = at(e.fov, j, v), *fk = at(e.fov, k, v);
+					for (int a = 0; a < v; a++)
+						for (int b = 0; b < v; b++)
+							for (int c = 0; c < v; c++)
+							{
+								const size_t x = ix(a, b, c);
+								const double d = eijk - e.ev(a) - e.ev(b) - e.ev(c);
+								W[x] = (b0[x] + b1[ix(a, c, b)] + b2[ix(b, a, c)] + b3[ix(b, c, a)] + b4[ix(c, a, b)] + b5[ix(c, b, a)]) / d;
+								const size_t ab = size_t(a) * v + b, ac = size_t(a) * v + c, bc = size_t(b) * v + c;
+								V[x] = 2.0 * (Xij[ab] * t1k[c] + fk[c] * Tij[ab] + Xik[ac] * t1j[b] + fj[b] * Tik[ac] + Xjk[bc] * t1i[a] + fi[a] * Tjk[bc]) / d;
+							}
+					block(i, j, k, W, V, WV.row(i).data(), RW.row(i).data(), b0, b1);
+					if (j == k) continue;
+					double *Wm = b2, *Vm = b3;
+					for (int a = 0; a < v; a++)
+						for (int b = 0; b < v; b++)
+							for (int c = 0; c < v; c++)
+							{
+								Wm[ix(a, b, c)] = W[ix(a, c, b)];
+								Vm[ix(a, b, c)] = V[ix(a, c, b)];
+							}
+					block(i, k, j, Wm, Vm, b4, b5, b0, b1);
+				}
+				//the response form (PySCF for_grad=True): the full oo block, not only its diagonal
+				cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasTrans, o, o, static_cast<int>(v3), j == k ? 1.0 : 2.0,
+					WV.data(), static_cast<int>(v3), RW.data(), static_cast<int>(v3), 1.0, r.goo.v.data(), o);
+			}
 		for (int i = 0; i < o; i++)
-			for (int a = 0; a < v; a++) eia.at(i, a) = e.eo(i) - e.ev(a);
-		Tn d3({ o, o, o, v, v, v });
+		{
+			r.gvv += gvv_i[i];
+			r.dvo += dvo_i[i];
+			r.e_t += e_i[i];
+			for (int a = 0; a < v; a++) r.l1_t.at(i, a) *= 0.5 / (e.eo(i) - e.ev(a));
+		}
+		joovv += T(joovv, { 1, 0, 3, 2 });
+		r.l2_t = joovv;
 		size_t n = 0;
 		for (int i = 0; i < o; i++)
 			for (int j = 0; j < o; j++)
-				for (int k = 0; k < o; k++)
-					for (int a = 0; a < v; a++)
-						for (int b = 0; b < v; b++)
-							for (int c = 0; c < v; c++) d3.v[n++] = eia.at(i, a) + eia.at(j, b) + eia.at(k, c);
-		const Tn fvo = T(e.fov, { 1, 0 });
-		const Tn w = p6(divided(einsum("iafb,kjcf->ijkabc", e.ovvv, t2) - einsum("iajm,mkbc->ijkabc", e.ovoo, t2), d3));
-		const Tn vv = p6(divided(einsum("iajb,kc->ijkabc", e.ovov, t1) + einsum("ck,ijab->ijkabc", fvo, t2), d3));
-
-		Triples r;
-		const Tn rw = r6(w);
-		r.l1_t = divided(einsum("jbkc,ijkabc->ia", e.ovov, rw), eia) * 0.5;
-		{
-			const Tn m = as_r6(w * 2.0 + vv * 0.5);
-			Tn joovv = einsum("kfbe,ijkaef->ijab", e.ovvv, m) - einsum("ncmj,imnabc->ijab", e.ovoo, m);
-			joovv += T(joovv, { 1, 0, 3, 2 });
-			joovv += einsum("kc,ijkabc->ijab", e.fov, as_r6(w));
-			Tn dijab({ o, o, v, v });
-			n = 0;
-			for (int i = 0; i < o; i++)
-				for (int j = 0; j < o; j++)
-					for (int a = 0; a < v; a++)
-						for (int b = 0; b < v; b++) dijab.v[n++] = eia.at(i, a) + eia.at(j, b);
-			r.l2_t = divided(joovv, dijab);
-		}
-		const Tn wv = w + vv * 0.5;
-		//the response form (PySCF for_grad=True): full oo/vv blocks, not only their diagonals
-		r.goo = einsum("iklabc,jklabc->ij", wv, rw);
-		r.gvv = einsum("ijkacd,ijkbcd->ab", wv, rw);
-		r.dvo = einsum("ijab,ijkabc->ck", t2, rw) * 0.5;
-		//E(T) from the same arrays, 1/3 sum w D r6(w + v/2) (the 1/3 measured against PySCF's ccsd_t, exact to
-		//10 digits): checks w and v against occ's and ORCA's (T)
-		Tn wd = w;
-		for (size_t q = 0; q < wd.v.size(); q++) wd.v[q] *= d3.v[q];
-		r.e_t = dot(wd, r6(wv)) / 3.0;
+				for (int a = 0; a < v; a++)
+					for (int b = 0; b < v; b++) r.l2_t.v[n++] /= e.eo(i) - e.ev(a) + e.eo(j) - e.ev(b);
 		return r;
 	}
 
@@ -513,6 +613,13 @@ CcsdDensityResult ccsd_natural_orbitals(const occ::qm::Wavefunction &scf, const 
 	err_checkf(scf.mo.kind == occ::qm::SpinorbitalKind::Restricted && scf.mo.n_alpha == scf.mo.n_beta,
 		"The CCSD density needs a closed-shell (restricted) reference; open-shell Lambda equations are not implemented", log);
 	CcsdDensityResult result;
+	//stage timings go to occ's log, so NoSpherA2.log and the test goldens built from it stay time-free
+	auto clock = std::chrono::steady_clock::now();
+	auto mark = [&clock](const char *stage) {
+		const auto now = std::chrono::steady_clock::now();
+		occ::log::info("CCSD density: {} took {:.3f} s", stage, std::chrono::duration<double>(now - clock).count());
+		clock = now;
+	};
 	const int nocc_total = static_cast<int>(scf.mo.n_alpha);
 	const int nmo = static_cast<int>(scf.mo.C.cols());
 	//as occ's CCSD driver: -1 is the chemical core, and at least one occupied orbital stays correlated
@@ -534,6 +641,7 @@ CcsdDensityResult ccsd_natural_orbitals(const occ::qm::Wavefunction &scf, const 
 		aux.set_pure(scf.basis.is_pure());
 		cc_eris = occ::qm::cc::df_eris(scf.basis, aux, scf.mo, result.n_frozen, budget);
 	}
+	mark("MO integrals");
 	err_checkf(result.n_frozen + cc_eris.nocc + cc_eris.nvir == nmo, "CCSD density: the correlated space does not cover the MOs", log);
 
 	//the density is linear in T and Lambda, so T is converged further than an energy would need
@@ -543,19 +651,24 @@ CcsdDensityResult ccsd_natural_orbitals(const occ::qm::Wavefunction &scf, const 
 	const occ::qm::cc::CCSDResult cc = occ::qm::cc::ccsd(cc_eris, copts);
 	err_checkf(cc.converged, "CCSD did not converge in " + std::to_string(opts.max_cycle) + " iterations", log);
 	result.e_corr = cc.e_corr;
+	mark("CCSD amplitudes");
 
 	const Eris e = convert(cc_eris);
 	const Tn t1 = from_tensor(cc.t1), t2 = from_tensor(cc.t2);
 	const Imds m = make_intermediates(t1, t2, e);
+	mark("Lambda intermediates");
 	Triples tr;
 	if (opts.triples)
 	{
-		//about eight o^3 v^3 arrays are alive at once in triples()
-		const double gb = 8.0 * 8.0 * std::pow(double(e.o), 3) * std::pow(double(e.v), 3) / (1024.0 * 1024.0 * 1024.0);
-		err_checkf(gb <= opts.max_memory_gb, "The CCSD(T) density holds full o^3 v^3 arrays, about " + std::to_string(gb) +
+		//triples() holds W + V/2 and r6(W) for every i of one (j, k), eight v^3 buffers per thread and two
+		//re-laid-out copies of ovvv
+		const double v3 = std::pow(double(e.v), 3);
+		const double gb = 8.0 * (4.0 * e.o * v3 + 8.0 * v3 * omp_get_max_threads()) / (1024.0 * 1024.0 * 1024.0);
+		err_checkf(gb <= opts.max_memory_gb, "The CCSD(T) density needs about " + std::to_string(gb) +
 			" GB here, over the " + std::to_string(opts.max_memory_gb) + " GB budget (ccsd_max_memory_gb)", log);
 		tr = triples(t1, t2, e);
 		result.e_triples = tr.e_t;
+		mark("triples terms");
 	}
 	Tn l1 = t1, l2 = t2, l1new, l2new;
 	occ::core::diis::DIIS diis(2, 8);
@@ -576,6 +689,7 @@ CcsdDensityResult ccsd_natural_orbitals(const occ::qm::Wavefunction &scf, const 
 		result.lambda_iterations = it;
 		converged = change < opts.tol;
 	}
+	mark("Lambda iterations");
 	err_checkf(converged, "The CCSD Lambda equations did not converge in " + std::to_string(opts.max_cycle) + " iterations", log);
 	result.t1_norm = t1.norm();
 	result.t2_norm = t2.norm();
@@ -598,6 +712,7 @@ CcsdDensityResult ccsd_natural_orbitals(const occ::qm::Wavefunction &scf, const 
 	err_checkf(es.info() == Eigen::Success, "CCSD density: the MO density could not be diagonalised", log);
 	result.occupations = es.eigenvalues().reverse();
 	const occ::Mat U = es.eigenvectors().rowwise().reverse();
+	mark("density and natural orbitals");
 
 	occ::qm::Wavefunction &nat = result.natural;
 	nat = scf;
