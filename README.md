@@ -97,6 +97,8 @@ At runtime, supported GPU paths are enabled by default: Fourier transforms, XCW 
 
 On Windows, configure from the x64 Visual Studio developer environment and use a CUDA/toolset combination supported by NVIDIA. If CMake cannot validate the selected CUDA compiler, configuration continues as a CPU-only build and reports the fallback; choose a compatible MSVC toolset or CUDA release before relying on GPU support.
 
+On Linux aarch64 and Windows ARM64 the [Arm Performance Libraries](https://learn.arm.com/install-guides/armpl/) replace OpenBLAS whenever one is installed (`-DNOSPHERA2_USE_ARMPL=OFF` keeps OpenBLAS). CMake looks in `NOSPHERA2_ARMPL_DIR`, `.mambaenv/armpl`, `ARMPL_DIR`, `~/armpl`, `/opt/arm` and `Program Files\Arm Performance Libraries`, and links ArmPL statically, so nothing extra ships. Arm's site refuses scripted downloads: fetch the package by hand (on Windows the `_Windows.msi`, not the `_Windows_Arm64EC.msi`) and either name it in `NOSPHERA2_ARMPL_PACKAGE` or drop it into `.mambaenv/bootstrap`, and the bootstrap installs it into `.mambaenv/armpl`, which accepts Arm's licence.
+
 #### Step 3: Build the project
 
 ```sh

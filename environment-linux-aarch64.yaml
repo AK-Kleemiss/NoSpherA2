@@ -1,0 +1,13 @@
+name: mambaenv
+channels:
+   - conda-forge
+dependencies:
+   # Explicit Python version ensures the interpreter is present for featomic's CMake checks.
+   - python=3.12
+   - pkgconfig
+   - ninja
+   - rust
+
+   # oneMKL has no aarch64 build. pthreads OpenBLAS, as on Windows ARM64: gcc's libgomp stays
+   # the only OpenMP runtime and pch.h keeps BLAS serial inside the OpenMP regions.
+   - openblas=*=pthreads*

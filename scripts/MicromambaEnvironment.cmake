@@ -427,6 +427,14 @@ function(setup_micromamba_environment)
             )
         endif()
 
+        # A win-arm64 env made on an x64 host holds an ARM64 python.exe that cannot run here, and
+        # the .pyc compile step waits on it forever
+        set(_micromamba_extra_args)
+        if(micromamba_environment_platform STREQUAL "win-arm64"
+           AND micromamba_executable_platform STREQUAL "win-64")
+            set(_micromamba_extra_args --no-pyc)
+        endif()
+
         execute_process(
             COMMAND
                 "${CMAKE_COMMAND}" -E env
@@ -437,6 +445,7 @@ function(setup_micromamba_environment)
                 --platform "${micromamba_environment_platform}"
                 --prefix "${environment_prefix}"
                 --file "${environment_file}"
+                ${_micromamba_extra_args}
             RESULT_VARIABLE environment_result
             OUTPUT_VARIABLE environment_output
             ERROR_VARIABLE environment_error

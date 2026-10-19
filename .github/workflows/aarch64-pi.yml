@@ -4,8 +4,8 @@ name: aarch64 (flowiPi)
 # schedule and workflow_dispatch only act once this file is on the default branch (master).
 on:
   push:
-    # density_source joins once PR #219 lands: until then it has no environment-linux-aarch64.yaml and the bootstrap asks for MKL
-    branches: [linux-aarch64]
+    # density_source only since PR #219 landed there (cf22f61b); linux-aarch64 is retired
+    branches: [density_source]
   schedule:
     - cron: '0 20 * * *'
   workflow_dispatch:
@@ -36,7 +36,17 @@ jobs:
         run: |
           L=/tmp/pi-heavy.lock; [ -e $L ] || (umask 0; touch $L); exec 9< $L; flock 9
           cmake --build --preset release-linux -j2
+      # ctest keeps no results and a run costs ~25 min here, so the last green run's inputs are stamped in build/:
+      # everything in bin/ (both executables and their runtime libraries), every tracked file except docs, Markdown,
+      # .vscode and the other workflows (tests read Src/, NEW_TEST/ and occ/share too), and the ArmPL path.
       - name: test
         run: |
           L=/tmp/pi-heavy.lock; [ -e $L ] || (umask 0; touch $L); exec 9< $L; flock 9
+          K=$({ find build/release-linux/bin -type f -print0 | sort -z | xargs -0 sha256sum
+                git ls-tree -r HEAD | grep -vP '\t(docs/|\.vscode/|.*\.md$|\.github/(?!workflows/aarch64-pi\.yml$))'
+                echo "$NOSPHERA2_ARMPL_DIR"; } | sha256sum | cut -c1-64)
+          S=build/release-linux/.pi_tests_green
+          if [ "$(cat $S 2>/dev/null)" = "$K" ]; then echo "::notice::tests skipped: binaries and test inputs identical to the last green run ($K)"; exit 0; fi
+          rm -f $S
           ctest --preset release-linux --output-on-failure -j1
+          echo "$K" > $S
