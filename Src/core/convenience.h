@@ -447,6 +447,8 @@ std::string trim(const std::string& s);
  * (job object, cgroup); 0 when unknown, and the caller keeps its default.
  */
 size_t available_memory_bytes();
+/** @brief Resident memory this process holds now in bytes; 0 when unknown. */
+size_t resident_memory_bytes();
 
 /** std::getline that drops a CRLF file's trailing \r, which would otherwise spoil comparisons and the last field; every reader uses it. */
 inline std::istream& getline_universal(std::istream& is, std::string& line)

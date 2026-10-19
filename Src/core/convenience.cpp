@@ -30,6 +30,7 @@
 #include <windows.h>
 #include <commdlg.h>
 #include <cderr.h>
+#include <psapi.h>
 #elif defined(__APPLE__)
 #include <mach/mach.h>
 #include <sys/sysctl.h>
@@ -5225,25 +5226,86 @@ size_t available_memory_bytes()
 		}
 		std::fclose(f);
 	}
-	//Under a batch system or container the cgroup limit is the ceiling, while meminfo reports the whole node. v2 first, then v1.
-	for (const char *path : { "/sys/fs/cgroup/memory.max",
-							  "/sys/fs/cgroup/memory/memory.limit_in_bytes" }) {
-		std::FILE *f = std::fopen(path, "r");
-		if (!f) continue;
-		char buf[64] = {};
-		if (std::fgets(buf, sizeof(buf), f)) {
-			unsigned long long lim = 0;
-			//v2 writes "max" when there is none; v1 writes a sentinel near SIZE_MAX
-			if (std::sscanf(buf, "%llu", &lim) == 1 && lim > 0) {
-				const size_t l = static_cast<size_t>(lim);
-				if (l < (static_cast<size_t>(1) << 62) && (avail == 0 || l < avail)) avail = l;
-			}
+	//Under a batch system or container the cgroup is the ceiling, while meminfo reports the whole node.
+	//SLURM sets the limit on the job's and step's cgroup, never on the mount root (AKL:
+	///system.slice/slurmstepd.scope/job_N/step_0/user/task_0), so walk from this process's own
+	//cgroup up to the root and keep the smallest limit minus what that cgroup already uses.
+	//Reclaimable page cache (inactive_file) is not usage: a streamed I tensor file would otherwise eat the budget.
+	auto read_ull = [](const std::string& p, unsigned long long& v) {
+		std::FILE* f = std::fopen(p.c_str(), "r");
+		if (!f) return false;
+		const bool ok = std::fscanf(f, "%llu", &v) == 1; //v2 "max" fails the scan
+		std::fclose(f);
+		return ok;
+	};
+	auto stat_value = [](const std::string& p, const char* key) {
+		unsigned long long v = 0;
+		if (std::FILE* f = std::fopen(p.c_str(), "r")) {
+			char line[256], k[128];
+			unsigned long long x = 0;
+			while (std::fgets(line, sizeof(line), f))
+				if (std::sscanf(line, "%127s %llu", k, &x) == 2 && std::strcmp(k, key) == 0) { v = x; break; }
+			std::fclose(f);
+		}
+		return v;
+	};
+	std::string v2, v1;
+	if (std::FILE* f = std::fopen("/proc/self/cgroup", "r")) {
+		char line[1024];
+		while (std::fgets(line, sizeof(line), f)) {
+			std::string l(line);
+			while (!l.empty() && (l.back() == '\n' || l.back() == '\r')) l.pop_back();
+			const size_t a = l.find(':'), b = a == std::string::npos ? a : l.find(':', a + 1);
+			if (b == std::string::npos) continue;
+			const std::string ctl = "," + l.substr(a + 1, b - a - 1) + ",";
+			if (l.compare(0, a, "0") == 0 && ctl == ",,") v2 = l.substr(b + 1);
+			else if (ctl.find(",memory,") != std::string::npos) v1 = l.substr(b + 1);
 		}
 		std::fclose(f);
-		break;
+	}
+	//Hybrid hosts list both; the memory controller then sits on v1
+	const bool use_v1 = !v1.empty() || !std::filesystem::exists("/sys/fs/cgroup/cgroup.controllers");
+	const std::string mount = use_v1 ? "/sys/fs/cgroup/memory" : "/sys/fs/cgroup";
+	const char* max_f = use_v1 ? "/memory.limit_in_bytes" : "/memory.max";
+	const char* cur_f = use_v1 ? "/memory.usage_in_bytes" : "/memory.current";
+	const char* cache_key = use_v1 ? "total_inactive_file" : "inactive_file";
+	for (std::string dir = use_v1 ? v1 : v2;;) {
+		if (!dir.empty() && dir.back() == '/') dir.pop_back();
+		unsigned long long lim = 0, cur = 0;
+		//v1 writes a sentinel near SIZE_MAX when there is no limit
+		if (read_ull(mount + dir + max_f, lim) && lim > 0 && lim < (1ULL << 62)) {
+			read_ull(mount + dir + cur_f, cur);
+			const unsigned long long cache = stat_value(mount + dir + "/memory.stat", cache_key);
+			cur = cur > cache ? cur - cache : 0;
+			//1, not 0: a full cgroup is "nothing left", 0 would read as "unknown, no cap"
+			const size_t l = lim > cur ? static_cast<size_t>(lim - cur) : 1;
+			if (avail == 0 || l < avail) avail = l;
+		}
+		if (dir.empty()) break;
+		dir.erase(dir.find_last_of('/'));
 	}
 #endif
 	return avail;
+}
+
+size_t resident_memory_bytes()
+{
+#ifdef _WIN32
+	PROCESS_MEMORY_COUNTERS pmc{};
+	return K32GetProcessMemoryInfo(GetCurrentProcess(), &pmc, sizeof(pmc)) ? static_cast<size_t>(pmc.WorkingSetSize) : 0;
+#elif defined(__APPLE__)
+	mach_task_basic_info_data_t info{};
+	mach_msg_type_number_t count = MACH_TASK_BASIC_INFO_COUNT;
+	return task_info(mach_task_self(), MACH_TASK_BASIC_INFO, reinterpret_cast<task_info_t>(&info), &count) == KERN_SUCCESS
+		? static_cast<size_t>(info.resident_size) : 0;
+#else
+	unsigned long long pages = 0, resident = 0;
+	if (std::FILE* f = std::fopen("/proc/self/statm", "r")) {
+		if (std::fscanf(f, "%llu %llu", &pages, &resident) != 2) resident = 0;
+		std::fclose(f);
+	}
+	return static_cast<size_t>(resident) * static_cast<size_t>(sysconf(_SC_PAGESIZE));
+#endif
 }
 
 std::string trim(const std::string &s)

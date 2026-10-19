@@ -433,6 +433,8 @@ private:
 	void start_i_save();
 	void finish_i_save();
 	size_t i_budget(const char*& source, bool& automatic) const;
+	size_t free_memory() const;
+	size_t df_reserved_ = 0;
 	static constexpr const char* i_tensor_default = "I_tensor_stream.bin";
 	i_tensor_file i_file_;
 	bool i_streamed_ = false;

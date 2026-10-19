@@ -1557,21 +1557,34 @@ size_t XCW::i_budget(const char*& source, bool& automatic) const {
 	size_t budget = settings.i_tensor_max_mb * 1024ULL * 1024ULL;
 	source = "i_tensor_mb";
 	automatic = false;
-	if (budget == 0 && opt->mem_given && opt->mem > 0.0) {
-		budget = static_cast<size_t>(opt->mem * 1024.0 * 1024.0);
-		source = "-mem";
-	}
 	if (budget == 0) {
-		const size_t avail = available_memory_bytes();
+		const size_t avail = free_memory();
 		if (avail > 0) {
 			//Four fifths: SCF matrices, grids and OCC's allocations need the rest, and a tensor
-			//that only just fits would page. The platform limit comes from convenience.cpp.
-			budget = avail / 5 * 4;
-			source = "four fifths of the memory this job can have";
-			automatic = true;
+			//that only just fits would page. At least 1, since 0 means "no budget, hold it all".
+			budget = std::max<size_t>(avail / 5 * 4, 1);
+			automatic = !(opt->mem_given && opt->mem > 0.0);
+			source = automatic ? "four fifths of the memory this job can have" : "-mem";
 		}
 	}
 	return budget;
+}
+
+//What the next large allocation may take: the platform's and scheduler's headroom and, with -mem,
+//-mem minus what this process already holds. The density-fitting integrals, the I tensor and the
+//stored ERIs are sized in that order from it, so together they stay under -mem (they used to take
+//half the node, all of -mem and four fifths of the node, and a SLURM job went OOM). OCC fills
+//the density-fitting store only at the first Fock build, after all three decisions, so its
+//size is held back here by hand.
+size_t XCW::free_memory() const {
+	size_t avail = available_memory_bytes();
+	if (opt->mem_given && opt->mem > 0.0) {
+		const size_t cap = static_cast<size_t>(opt->mem * 1024.0 * 1024.0), held = resident_memory_bytes();
+		const size_t left = cap > held ? cap - held : 1;
+		if (avail == 0 || left < avail) avail = left;
+	}
+	if (avail != 0) avail = avail > df_reserved_ ? avail - df_reserved_ : 1;
+	return avail;
 }
 
 //Whether the I tensor is held or streamed, and the largest window that fits the budget
@@ -4025,8 +4038,10 @@ occ::qm::HartreeFock XCW::setup_XCW_procedure(bool read_tensor) {
 		const size_t naux = aux->to_AOBasis(mol.atoms()).nbf();
 		const size_t nbf = occ_basis_set.nbf();
 		const size_t store = naux * nbf * (nbf + 1) / 2 * sizeof(double);
-		const size_t avail = available_memory_bytes();
+		df_reserved_ = 0;
+		const size_t avail = free_memory();
 		const bool stored = avail == 0 || store < avail / 2;
+		if (stored) df_reserved_ = store;
 		hf.set_density_fitting_policy(stored ? occ::qm::IntegralEngineDF::Policy::Stored : occ::qm::IntegralEngineDF::Policy::Direct);
 		std::cout << "XCW density fitting with " << aux->get_name() << ": " << naux << " functions, "
 			<< (store / 1048576.0) << " MB of three-index integrals " << (stored ? "held in memory" : "recomputed every iteration") << std::endl;
@@ -4118,11 +4133,12 @@ void XCW::run_XCW_fitting() {
 			<< (i_on_device_ ? "the device" : "the CPU - device unavailable or the tensor too large") << std::endl;
 	}
 #endif
-	//Four fifths of the free memory, the I tensor's budget, for the stored integrals
+	//Four fifths of what the I tensor left, under -mem when given, for the stored integrals
 	eri_.clear();
 	if (settings.hf_type != occ::qm::SpinorbitalKind::General) {
 		const _time_point eri_t0 = get_time();
-		const size_t avail = available_memory_bytes(), budget = avail ? avail / 5 * 4 : 0;
+		//At least 1: a budget of 0 means "no budget" to stored_eri
+		const size_t avail = free_memory(), budget = avail ? std::max<size_t>(avail / 5 * 4, 1) : 0;
 		const bool read = !settings.eri_read_path.empty() && eri_.load(settings.eri_read_path, hf, budget, XCW_log);
 		if (!read && eri_.build(hf, budget, XCW_log))
 			throughput::record_time("XCW two-electron integrals", false, get_msec(eri_t0, get_time()));
