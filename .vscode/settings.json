@@ -3,10 +3,15 @@
     // CMakePresets.json. Pick a configure preset in the status bar, build with
     // F7, pick a launch target (NoSpherA2 or NoSpherA2_Tests) and debug with
     // ctrl+F5. ctest runs through the Testing panel or the preset's test task.
+    // NoSpherA2_Tests only exists under the "(+tests)" presets; the plain ones
+    // configure with NOSPHERA2_BUILD_TESTS=OFF.
     "cmake.useCMakePresets": "always",
-    // On Windows the presets use Ninja + cl.exe; this makes CMake Tools set up
-    // the MSVC environment itself, so VS Code does not have to be started from
-    // a developer prompt. Ignored on Linux/macOS.
+    // Run ctest with -j (number of CPUs) from the Testing panel; without this
+    // it runs tests one by one. Output panel text may interleave.
+    "cmake.ctest.allowParallelJobs": true,
+    // Group the ~1270 gtests by suite in the Testing panel (Suite.Test names).
+    "cmake.ctest.testSuiteDelimiter": "\\.",
+    "cmake.ctest.testSuiteDelimiterMaxOccurrence": 1,
     "cmake.useVsDeveloperEnvironment": "always",
     // IntelliSense comes from the CMake configure, not a hand-kept
     // c_cpp_properties.json.
