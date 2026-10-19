@@ -1,0 +1,41 @@
+name: aarch64 (flowiPi)
+# Linux aarch64 build + ctest with ArmPL on the self-hosted Raspberry Pi 4 flowiPi (user ghrunner, 4x A72, 1.8 GiB RAM).
+# No pull_request trigger on purpose: in a public repository a fork PR could otherwise run its own code on the Pi.
+# schedule and workflow_dispatch only act once this file is on the default branch (master).
+on:
+  push:
+    branches: [density_source, linux-aarch64]
+  schedule:
+    - cron: '0 20 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: aarch64-pi
+  cancel-in-progress: false
+
+jobs:
+  build-test:
+    runs-on: [self-hosted, linux, ARM64, pi]
+    timeout-minutes: 720  # cold build 2 h 40 min, ctest -j1 50 min (7 Oct 2026)
+    env:
+      NOSPHERA2_ARMPL_DIR: /opt/armpl_26.07_gcc
+      CMAKE_BUILD_PARALLEL_LEVEL: 2
+    steps:
+      # clean: false keeps build/ and .mambaenv/ between runs, so a run only rebuilds what changed
+      - uses: actions/checkout@v4
+        with:
+          clean: false
+          submodules: recursive
+      - name: bootstrap
+        run: cmake -DNOSPHERA2_BOOTSTRAP_GPU=OFF -P scripts/BootstrapMicromamba.cmake
+      - name: configure
+        run: cmake --preset release-linux -DNOSPHERA2_BUILD_TESTS=ON
+      # /tmp/pi-heavy.lock is shared with the nightly Olex2 release tests: never a compile and a test run together
+      - name: build
+        run: |
+          L=/tmp/pi-heavy.lock; [ -e $L ] || (umask 0; touch $L); exec 9< $L; flock 9
+          cmake --build --preset release-linux -j2
+      - name: test
+        run: |
+          L=/tmp/pi-heavy.lock; [ -e $L ] || (umask 0; touch $L); exec 9< $L; flock 9
+          ctest --preset release-linux --output-on-failure -j1
