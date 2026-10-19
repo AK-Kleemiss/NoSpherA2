@@ -239,6 +239,10 @@ Key core modules live in `Src/core`:
 
 ## Current Validation Notes
 
+As of 2026-10-20, `-occ` with `method = "ccsd"` / `"ccsd(t)"` gives the unrelaxed CCSD / CCSD(T) density (canonical, or local
+cluster-in-molecule with `ccsd_local = true`), `-wfn *.mdci.nat` reads ORCA's CCSD natural orbitals, and occ is at upstream 0.9.6;
+`ctest` on a `release-windows` build with CUDA reports **1298 passed, 0 failed, 9 skipped** (2 disabled) of 1309. See `UNIT_TESTS_STATUS.md`.
+
 As of 2026-10-17 (later), grown XCW models choose their kept operations as K = D.L for nested subgroups L inside H
 (`cell::choose_kept_operations`, replacing `project_into_subgroup`), which always admits per-position weights and keeps
 the fewest I tensor k-points; `ctest` on a CPU-only `release-windows` build (`build/release-windows-cpu`) reports

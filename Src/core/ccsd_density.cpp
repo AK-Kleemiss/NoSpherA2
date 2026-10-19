@@ -11,6 +11,8 @@
 #include <occ/qm/cc/integrals.h>
 #include <occ/qm/fitting_basis.h>
 #include <occ/qm/integral_engine.h>
+#include <occ/qm/integral_engine_df.h>
+#include <occ/qm/correlation/df_integrals.h>
 #include <occ/core/units.h>
 #include <Eigen/Dense>
 #include <toml++/toml.hpp>
@@ -24,20 +26,18 @@
 
 namespace
 {
-	//Dense row-major tensor of rank <= 6 with numpy's einsum and transpose, so that the Lambda and density
-	//equations below read term for term like PySCF's ccsd_lambda.py / ccsd_rdm.py and their (T) versions
-	//(restricted, chemist notation, t2 and l2 as ijab, t3-like arrays as ijkabc) they were ported from.
-	//Every contraction is a transpose and one GEMM.
+	//dense row-major tensor (rank <= 6) with numpy's einsum and transpose: the equations below are PySCF's
+	//ccsd_lambda / ccsd_rdm and their (T) versions term for term (chemist notation, t2 as ijab, t3 as ijkabc)
 	struct Tn
 	{
-		std::vector<int> d;
-		std::vector<double> v;
+		ivec d;
+		vec v;
 		Tn() = default;
-		explicit Tn(const std::vector<int> &dims) : d(dims), v(count(dims), 0.0) {}
-		static size_t count(const std::vector<int> &dims)
+		explicit Tn(const ivec &dims) : d(dims), v(count(dims), 0.0) {}
+		static size_t count(const ivec &dims)
 		{
 			size_t n = 1;
-			for (const int x : dims) n *= static_cast<size_t>(x);
+			for (int k = 0; k < static_cast<int>(dims.size()); k++) n *= static_cast<size_t>(dims[k]);
 			return n;
 		}
 		void same_shape(const Tn &o) const
@@ -70,7 +70,7 @@ namespace
 
 	//numpy a.transpose(perm): out.d[k] = a.d[perm[k]]. Padded at the front, so the innermost loop runs over the
 	//last real output axis, a plain copy when that axis stays last
-	Tn T(const Tn &a, const std::vector<int> &perm)
+	Tn T(const Tn &a, const ivec &perm)
 	{
 		constexpr int R = 6;
 		const int r = static_cast<int>(a.d.size()), pad = R - r;
@@ -79,7 +79,7 @@ namespace
 		for (int k = 0; k < R; k++) ad[k] = k < pad ? 1 : a.d[k - pad];
 		size_t s = 1;
 		for (int k = R - 1; k >= 0; k--) { stride[k] = s; s *= static_cast<size_t>(ad[k]); }
-		std::vector<int> od(r);
+		ivec od(r);
 		for (int k = 0; k < r; k++) od[k] = a.d[perm[k]];
 		Tn out(od);
 		std::array<int, R> n{};
@@ -110,7 +110,7 @@ namespace
 		return out;
 	}
 
-	bool identity(const std::vector<int> &perm)
+	bool identity(const ivec &perm)
 	{
 		for (size_t k = 0; k < perm.size(); k++)
 			if (perm[k] != static_cast<int>(k)) return false;
@@ -130,7 +130,7 @@ namespace
 		for (const char c : lb) if (con.find(c) == std::string::npos) fb += c;
 		for (const char c : fa)
 			if (fb.find(c) != std::string::npos) throw std::runtime_error("ccsd_density: einsum '" + spec + "' has a batch label");
-		std::vector<int> pa, pb, cd;
+		ivec pa, pb, cd;
 		size_t M = 1, K = 1, N = 1;
 		for (const char c : fa) { pa.push_back(static_cast<int>(la.find(c))); cd.push_back(a.d[la.find(c)]); M *= a.d[la.find(c)]; }
 		for (const char c : con)
@@ -146,11 +146,10 @@ namespace
 		if (!identity(pb)) bt = T(b, pb);
 		const double *ap = at.v.empty() ? a.v.data() : at.v.data(), *bp = bt.v.empty() ? b.v.data() : bt.v.data();
 		Tn c(cd);
-		//BLAS, not Eigen: NoSpherA2 builds Eigen with EIGEN_DONT_PARALLELIZE, and MKL threads outside OpenMP regions
 		cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, static_cast<int>(M), static_cast<int>(N), static_cast<int>(K),
 			1.0, ap, static_cast<int>(K), bp, static_cast<int>(N), 0.0, c.v.data(), static_cast<int>(N));
 		const std::string lc = fa + fb;
-		std::vector<int> po;
+		ivec po;
 		for (const char x : lo) po.push_back(static_cast<int>(lc.find(x)));
 		return identity(po) ? c : T(c, po);
 	}
@@ -239,7 +238,6 @@ namespace
 		w3 -= einsum("kc,kjbc->bj", fov, t2);
 		w3 += einsum("cb,jc->bj", einsum("kc,kb->cb", fov, t1), t1);
 		Tn w4 = fov;
-
 		const Tn vvov = T(ovvv, { 2, 3, 0, 1 });
 		w1 += einsum("jcba,jc->ba", ovvv, t1 * 2.0);
 		w1 -= einsum("jabc,jc->ba", ovvv, t1);
@@ -288,7 +286,6 @@ namespace
 		w2 += einsum("ib,jb->ij", tmpw4, t1);
 		w3 += einsum("bc,jc->bj", einsum("kb,kc->bc", t1, tmpw4), t1);
 		w4 += tmpw4;
-
 		wvOOv += einsum("bljk,lc->bjkc", einsum("bljd,kd->bljk", voov, t1), t1);
 		wVOov -= einsum("bjlk,lc->bjkc", einsum("bjld,kd->bjlk", voov, t1), t1);
 		Tn VOov = einsum("bjld,klcd->bjkc", g2voov, t2);
@@ -298,7 +295,6 @@ namespace
 		vOOv -= T(oovv, { 2, 1, 0, 3 });
 		wVOov += VOov;
 		wvOOv += vOOv;
-
 		const Tn ov1 = vOOv * 2.0 + VOov, ov2 = VOov * 2.0 + vOOv;
 		wvooo -= einsum("jb,bikc->ckij", t1, ov1);
 		wvooo += einsum("kb,bijc->ckij", t1, ov2);
@@ -306,7 +302,6 @@ namespace
 		wvvov += einsum("ajkc,jb->abkc", ov1, t1);
 		wvvov -= einsum("ajkb,jc->abkc", ov2, t1);
 		wvvov += einsum("laki,klbc->abic", g2ovoo, tau);
-
 		woooo += T(oooo, { 0, 2, 1, 3 });
 		w3 += einsum("bc,jc->bj", w1, t1);
 		w3 -= einsum("kj,kb->bj", w2, t1);
@@ -327,7 +322,6 @@ namespace
 		mia1 -= einsum("jk,kb->jb", einsum("ja,ka->jk", t1, l1), t1);
 		mia1 -= einsum("bd,jd->jb", mba, t1);
 		mia1 -= einsum("lj,lb->jb", mij, t1);
-
 		l2new = from_tensor(e.ladder(to_tensor(l2))); //sum_cd (ac|bd) l2(i,j,c,d)
 		l1new = einsum("ijab,jb->ia", l2new, t1) * 2.0;
 		l1new -= einsum("jiab,jb->ia", l2new, t1);
@@ -336,7 +330,6 @@ namespace
 		Tn w1 = m.w1, w2 = m.w2;
 		for (int a = 0; a < v; a++) w1.at(a, a) -= e.ev(a);
 		for (int i = 0; i < o; i++) w2.at(i, i) -= e.eo(i);
-
 		l1new += e.fov;
 		l1new += einsum("ib,ba->ia", l1, w1);
 		l1new -= einsum("ja,ij->ia", l1, w2);
@@ -344,19 +337,15 @@ namespace
 		l1new -= einsum("ca,ic->ia", mba, m.w4);
 		l1new += einsum("ijab,bj->ia", l2, m.w3) * 2.0;
 		l1new -= einsum("ijba,bj->ia", l2, m.w3);
-
 		l2new += einsum("ia,jb->ijab", l1, m.w4);
 		l2new += einsum("jibc,ca->jiba", l2, w1);
 		l2new -= einsum("jk,kiba->jiba", w2, l2);
-
 		l1new -= einsum("iajk,kj->ia", e.ovoo, mij1) * 2.0;
 		l1new += einsum("jaik,kj->ia", e.ovoo, mij1);
 		l2new -= einsum("jbki,ka->jiba", e.ovoo, l1);
-
 		const Tn tau = t2 + einsum("ia,jb->ijab", t1, t1);
 		const Tn l2tau = einsum("ijcd,klcd->ijkl", l2, tau);
 		const Tn l2t1 = einsum("jidc,kc->ijkd", l2, t1);
-
 		l1new -= einsum("jb,jiab->ia", l1, e.oovv);
 		l1new += einsum("iabc,bc->ia", e.ovvv, mba1) * 2.0;
 		l1new -= einsum("ibca,bc->ia", e.ovvv, mba1);
@@ -428,7 +417,6 @@ namespace
 	{
 		const int o = e.o, v = e.v;
 		const size_t vv = size_t(v) * v, v3 = vv * v;
-		//layouts chosen once so that every product below is a plain GEMM on contiguous blocks
 		const Tn L1 = T(e.ovvv, { 0, 1, 3, 2 });  //[i][a][b][f] = (ia|fb)
 		const Tn L2 = T(e.ovvv, { 0, 3, 1, 2 });  //[k][e][f][b] = (kf|be)
 		const Tn t2T = T(t2, { 0, 1, 3, 2 });     //[k][j][f][c] = t2(kj,cf)
@@ -456,11 +444,11 @@ namespace
 		if (proj) r.gvv_c = Tn({ v, v });
 		Tn joovv({ o, o, v, v });
 		std::vector<Tn> gvv_i(o, Tn({ v, v })), dvo_i(o, Tn({ v, o }));
-		std::vector<double> e_i(o, 0.0);
+		vec e_i(o, 0.0);
 		//W + V/2 and r6(W) of every i of the current (j, k): the oo block pairs W[ijk] with W[i'jk]
 		RowMat WV(o, v3), RW(o, v3);
 		const int nt = omp_get_max_threads();
-		std::vector<std::vector<double>> buf(size_t(nt) * 8, std::vector<double>(v3));
+		vec2 buf(size_t(nt) * 8, vec(v3));
 
 		//everything one block (i, j, k) contributes, given its W and V; wv, rw receive W + V/2 and r6(W)
 		auto block = [&](const int i, const int j, const int k, const double *W, const double *V, double *wv, double *rw, double *m, double *arw) {
@@ -476,8 +464,7 @@ namespace
 						wv[x] = W[x] + 0.5 * V[x];
 						m[x] = 2.0 * (2.0 * W[x] + 0.5 * V[x]) - (2.0 * W[cba] + 0.5 * V[cba]) - (2.0 * W[acb] + 0.5 * V[acb]);
 						arw[x] = 2.0 * W[x] - W[cba] - W[acb];
-						//E(T) = 1/3 sum W D r6(W + V/2) = 1/3 sum D r6(W) (W + V/2): r6 is self-adjoint and D symmetric in abc;
-						//the 1/3 measured against PySCF's ccsd_t (exact to 10 digits)
+						//E(T) = 1/3 sum W D r6(W + V/2) = 1/3 sum D r6(W) (W + V/2), r6 self-adjoint and D symmetric in abc
 						et += (eijk - e.ev(a) - e.ev(b) - e.ev(c)) * rw[x] * wv[x];
 					}
 			e_i[i] += et / 3.0;
@@ -492,17 +479,15 @@ namespace
 			for (int c = 0; c < v; c++) dvo_i[i].at(c, k) += 0.5 * dv(c);
 		};
 
-		//outer (j >= k), inner i. Block (i, k, j) is block (i, j, k) with b and c swapped (W and V are symmetric
-		//under joint permutations), so the mirror costs a copy, not six GEMMs; its oo-block share equals the
-		//(i, j, k) one, hence the weight 2 there. as_r6 does not commute with that swap, so the mirror's other
-		//terms are evaluated from its own swapped W and V.
+		//block (i, k, j) is block (i, j, k) with b and c swapped (joint permutation symmetry): same oo share, hence
+		//the weight 2; as_r6 does not commute with the swap, so its other terms come from the swapped W and V
 		for (int j = 0; j < o; j++)
 			for (int k = 0; k <= j; k++)
 			{
 #pragma omp parallel for schedule(dynamic)
 				for (int i = 0; i < o; i++)
 				{
-					std::vector<double> *B = &buf[size_t(omp_get_thread_num()) * 8];
+					vec *B = &buf[size_t(omp_get_thread_num()) * 8];
 					double *b0 = B[0].data(), *b1 = B[1].data(), *b2 = B[2].data(), *b3 = B[3].data(), *b4 = B[4].data(), *b5 = B[5].data();
 					double *W = B[6].data(), *V = B[7].data();
 					base_w(i, j, k, b0);
@@ -633,7 +618,6 @@ namespace
 		const std::function<void(const char *)> &mark, const occ::Mat *proj = nullptr)
 	{
 		CcSolution s;
-		//the density is linear in T and Lambda, so T is converged further than an energy would need
 		occ::qm::cc::CCSDOptions copts;
 		copts.max_cycle = opts.max_cycle;
 		copts.tol = opts.tol * 1e-2;
@@ -642,7 +626,6 @@ namespace
 		s.e_corr = cc.e_corr;
 		s.cc_iterations = cc.iterations;
 		mark("CCSD amplitudes");
-
 		const Eris e = convert(cc_eris);
 		s.t1 = from_tensor(cc.t1);
 		s.t2 = from_tensor(cc.t2);
@@ -651,8 +634,7 @@ namespace
 		mark("Lambda intermediates");
 		if (opts.triples)
 		{
-			//triples() holds W + V/2 and r6(W) for every i of one (j, k), eight v^3 buffers per thread and two
-			//re-laid-out copies of ovvv
+			//W + V/2 and r6(W) for every i of one (j, k), two re-laid-out ovvv, eight v^3 buffers per thread
 			const double v3 = std::pow(double(e.v), 3);
 			const double gb = 8.0 * (4.0 * e.o * v3 + 8.0 * v3 * omp_get_max_threads()) / (1024.0 * 1024.0 * 1024.0);
 			err_checkf(gb <= opts.max_memory_gb, "The CCSD(T) density needs about " + std::to_string(gb) +
@@ -724,11 +706,11 @@ namespace
 
 	//Pipek-Mezey localisation with Mulliken charges by Jacobi sweeps (Pipek & Mezey, JCP 90, 4916 (1989)): rotates
 	//C's columns among themselves to maximise sum_k sum_A (Q^A_kk)^2
-	occ::Mat pipek_mezey(occ::Mat C, const occ::Mat &S, const std::vector<int> &bf_atom, const int natoms, std::ostream &log)
+	occ::Mat pipek_mezey(occ::Mat C, const occ::Mat &S, const ivec &bf_atom, const int natoms, std::ostream &log)
 	{
 		const int nbf = static_cast<int>(C.rows()), n = static_cast<int>(C.cols());
 		occ::Mat SC = S * C;
-		std::vector<double> qss(natoms), qtt(natoms), qst(natoms);
+		vec qss(natoms), qtt(natoms), qst(natoms);
 		double max_rot = 1.0;
 		int sweep = 0;
 		for (; sweep < 500 && max_rot > 1e-8; sweep++)
@@ -760,12 +742,11 @@ namespace
 					if (std::abs(g) < 1e-14) continue;
 					max_rot = std::max(max_rot, std::abs(g));
 					const double c = std::cos(g), sn = std::sin(g);
-					for (occ::Mat *M : { &C, &SC })
-					{
-						const occ::Vec ca = M->col(a), cb = M->col(b);
-						M->col(a) = c * ca + sn * cb;
-						M->col(b) = c * cb - sn * ca;
-					}
+					const occ::Vec ca = C.col(a), cb = C.col(b), sa = SC.col(a), sb = SC.col(b);
+					C.col(a) = c * ca + sn * cb;
+					C.col(b) = c * cb - sn * ca;
+					SC.col(a) = c * sa + sn * sb;
+					SC.col(b) = c * sb - sn * sa;
 				}
 		}
 		if (max_rot > 1e-8) log << "  Pipek-Mezey: largest rotation still " << max_rot << " after " << sweep << " sweeps" << std::endl;
@@ -780,20 +761,18 @@ namespace
 		return r;
 	}
 
-	//The half-density H (H + H^T is the correlation part of the 1-RDM) one cluster contributes, in the basis
-	//[cluster LMOs | cluster virtuals]; R(k, i) = <LMO k | semicanonical i>. As in the cluster-in-molecule
-	//partition (Li, Piecuch et al.) a term belongs to the cluster of its distinguished occupied index: the free one
-	//for the oo and ov blocks (rows of the central LMOs), Lambda's first index for the vv block (the triples'
-	//first index, through proj in triples())
-	occ::Mat cluster_half_density(const CcSolution &s, const occ::Mat &R, const std::vector<int> &central, const bool with_triples)
+	//one cluster's half-density H (H + H^T: the correlation part of the 1-RDM) in [cluster LMOs | virtuals],
+	//R(k, i) = <LMO k | semicanonical i>; a term belongs to the cluster of its distinguished occupied index (Li &
+	//Piecuch): the free one for oo and ov, Lambda's first for vv, the triples block's first through proj
+	occ::Mat cluster_half_density(const CcSolution &s, const occ::Mat &R, const ivec &central, const bool with_triples)
 	{
 		const int o = s.t1.d[0], v = s.t1.d[1];
 		const Tn Rt = as_tn(R);
 		auto occ1 = [&](const Tn &x) { return einsum("ki,ia->ka", Rt, x); };
 		auto occ2 = [&](const Tn &x) { return einsum("lj,kjab->klab", Rt, einsum("ki,ijab->kjab", Rt, x)); };
 		const Tn t1 = occ1(s.t1), l1 = occ1(s.l1), t2 = occ2(s.t2), l2 = occ2(s.l2);
-		std::vector<bool> is_c(o, false);
-		for (const int k : central) is_c[k] = true;
+		bvec is_c(o, false);
+		for (int c = 0; c < static_cast<int>(central.size()); c++) is_c[central[c]] = true;
 		const Gamma1 g = gamma1(t1, t2, l1, l2);
 		Tn l1c = l1, l2c = l2;
 		const size_t ovv = size_t(o) * v * v;
@@ -824,8 +803,9 @@ namespace
 			dvv += s.tr.gvv_c * 0.5;
 		}
 		occ::Mat H = occ::Mat::Zero(o + v, o + v);
-		for (const int k : central)
+		for (int c = 0; c < static_cast<int>(central.size()); c++)
 		{
+			const int k = central[c];
 			H.block(k, 0, 1, o) = doo.row(k);
 			for (int a = 0; a < v; a++) H(k, o + a) = l1.at(k, a) + dvo(a, k);
 		}
@@ -859,7 +839,6 @@ CcsdDensityResult ccsd_natural_orbitals(const occ::qm::Wavefunction &scf, const 
 	err_checkf(scf.mo.kind == occ::qm::SpinorbitalKind::Restricted && scf.mo.n_alpha == scf.mo.n_beta,
 		"The CCSD density needs a closed-shell (restricted) reference; open-shell Lambda equations are not implemented", log);
 	CcsdDensityResult result;
-	//stage timings go to occ's log, so NoSpherA2.log and the test goldens built from it stay time-free
 	auto clock = std::chrono::steady_clock::now();
 	auto mark = [&clock](const char *stage) {
 		const auto now = std::chrono::steady_clock::now();
@@ -874,7 +853,6 @@ CcsdDensityResult ccsd_natural_orbitals(const occ::qm::Wavefunction &scf, const 
 	const occ::qm::cc::CCIntegrals cc_eris = build_eris(scf.basis, scf.mo, result.n_frozen, opts, backend, aux_name, log);
 	mark("MO integrals");
 	err_checkf(result.n_frozen + cc_eris.nocc + cc_eris.nvir == nmo, "CCSD density: the correlated space does not cover the MOs", log);
-
 	const CcSolution s = solve_cc(cc_eris, opts, log, mark);
 	result.e_corr = s.e_corr;
 	result.e_triples = s.tr.e_t;
@@ -901,7 +879,6 @@ CcsdDensityResult ccsd_natural_orbitals(const occ::qm::Wavefunction &scf, const 
 	const std::string name = opts.triples ? "CCSD(T)" : "CCSD";
 	natural_orbitals(scf, dm, name, scf.energy.total + s.e_corr + result.e_triples, result, log);
 	mark("density and natural orbitals");
-
 	log << "\n" << name << " density (unrelaxed, Lambda equations), " << (backend == "exact" ? std::string("exact integrals") : "DF integrals, " + aux_name) << "\n"
 		<< "  correlated: " << cc_eris.nocc << " occupied, " << cc_eris.nvir << " virtual; frozen core: " << nf << " orbitals\n"
 		<< std::fixed << std::setprecision(10)
@@ -957,42 +934,89 @@ CcsdDensityResult local_ccsd_natural_orbitals(const occ::qm::Wavefunction &scf, 
 		centre.col(k) /= pop.col(k).sum();
 	}
 	mark("localisation");
-
 	const double r_cluster = opts.cluster_radius * occ::units::ANGSTROM_TO_BOHR;
 	occ::Mat Dhalf = occ::Mat::Zero(nbf, nbf);
 	double e_corr = 0.0, e_t = 0.0;
-	long long sum_o = 0, sum_v = 0;
+	long long sum_o = 0, sum_v = 0, sum_cand = 0, sum_dom = 0;
 	int max_o = 0, max_v = 0;
-	std::string backend, aux_name;
-	//one cluster per LMO I (cluster-in-molecule): I first, then every LMO whose centre lies within r_cluster; its
-	//virtual space is the projected AOs of the atoms carrying more than domain_threshold of any cluster LMO
+	std::string backend = occ::util::to_lower_copy(opts.backend), aux_name;
+	const bool use_df = backend == "df" || backend == "ri";
+	//one DF store for the molecule: every cluster's MP2 screening and, with the df backend, its CC integrals
+	const std::string fit = opts.aux_basis.empty() ? occ::qm::resolve_fitting_basis(basis.name(), occ::qm::FittingKind::Correlation) : opts.aux_basis;
+	occ::gto::AOBasis aux = occ::gto::AOBasis::load(basis.atoms(), fit);
+	aux.set_kind(basis.kind());
+	occ::qm::IntegralEngineDF df_engine(basis.atoms(), basis.shells(), aux.shells());
+	occ::qm::DFIntegrals df(df_engine, static_cast<size_t>(opts.max_memory_gb * 1024.0 * 1024.0 * 1024.0));
+	const occ::Mat FL = F * L;
+	occ::Vec fdiag(n);
+	for (int k = 0; k < n; k++) fdiag(k) = L.col(k).dot(FL.col(k));
+	mark("DF store");
+	//one cluster per LMO I: MP2 pairs (I, J) over the candidates within r_cluster, in their PAO domain; pairs above
+	//pair_threshold make the cluster, the natural orbitals of their MP2 virtual density above lno_threshold its
+	//virtual space (local natural orbitals)
 	for (int I = 0; I < n; I++)
 	{
-		std::vector<int> cl{ I };
+		ivec cand{ I };
 		for (int J = 0; J < n; J++)
-			if (J != I && (centre.col(I) - centre.col(J)).norm() < r_cluster) cl.push_back(J);
-		std::vector<int> dom;
+			if (J != I && (centre.col(I) - centre.col(J)).norm() < r_cluster) cand.push_back(J);
+		const int nc = static_cast<int>(cand.size());
+		ivec dom;
 		for (int mu = 0; mu < nbf; mu++)
-			for (const int J : cl)
-				if (pop(bf_atom[mu], J) > opts.domain_threshold)
+			for (int c = 0; c < nc; c++)
+				if (pop(bf_atom[mu], cand[c]) > opts.domain_threshold)
 				{
 					dom.push_back(mu);
 					break;
 				}
-		const int o = static_cast<int>(cl.size());
-		occ::Mat Co(nbf, o), P(nbf, dom.size());
-		for (int k = 0; k < o; k++) Co.col(k) = L.col(cl[k]);
+		occ::Mat P(nbf, dom.size());
 		for (size_t k = 0; k < dom.size(); k++) P.col(k) = Q.col(dom[k]);
 		//orthonormal virtuals from the domain's PAOs, the occupied directions (overlap eigenvalue 0) dropped
 		Eigen::SelfAdjointEigenSolver<occ::Mat> sp(P.transpose() * S * P);
-		std::vector<int> keep;
+		ivec keep;
 		for (int k = 0; k < sp.eigenvalues().size(); k++)
 			if (sp.eigenvalues()(k) > 1e-6) keep.push_back(k);
-		const int v = static_cast<int>(keep.size());
+		const int nd = static_cast<int>(keep.size());
+		occ::Mat Cd(nbf, nd);
+		for (int k = 0; k < nd; k++) Cd.col(k) = P * sp.eigenvectors().col(keep[k]) / std::sqrt(sp.eigenvalues()(keep[k]));
+		Eigen::SelfAdjointEigenSolver<occ::Mat> fd(Cd.transpose() * F * Cd);
+		const occ::Mat Cds = Cd * fd.eigenvectors();
+		const occ::Vec &ed = fd.eigenvalues();
+		//semicanonical MP2 pairs (I, J) with F_II + F_JJ as the occupied energies, the prescreening of DLPNO
+		occ::Mat Lc(nbf, nc);
+		for (int k = 0; k < nc; k++) Lc.col(k) = L.col(cand[k]);
+		const occ::Mat B = df.build_b_tilde(Lc, Cds);  //row k*nd + a: (J_k a|P)
+		ivec cl{ I };
+		occ::Mat Dv = occ::Mat::Zero(nd, nd);
+		for (int k = 0; k < nc; k++)
+		{
+			const occ::Mat K = B.topRows(nd) * B.middleRows(static_cast<Eigen::Index>(k) * nd, nd).transpose();  //(Ia|Jb)
+			occ::Mat t(nd, nd);
+			double e_pair = 0.0;
+			for (int b = 0; b < nd; b++)
+				for (int a = 0; a < nd; a++)
+				{
+					t(a, b) = K(a, b) / (fdiag(I) + fdiag(cand[k]) - ed(a) - ed(b));
+					e_pair += t(a, b) * (2.0 * K(a, b) - K(b, a));
+				}
+			if (k > 0 && !(std::abs(e_pair) > opts.pair_threshold)) continue;
+			if (k > 0) cl.push_back(cand[k]);
+			//the MP2 virtual density of pairs (I, J) and (J, I): sum_c t_ac (2 t_bc - t_cb), t_JI = t_IJ^T
+			Dv += t * (2.0 * t - t.transpose()).transpose();
+			if (k > 0) Dv += t.transpose() * (2.0 * t.transpose() - t).transpose();
+		}
+		Dv = 0.5 * (Dv + Dv.transpose());
+		Eigen::SelfAdjointEigenSolver<occ::Mat> no(Dv);
+		ivec lno;
+		for (int k = 0; k < nd; k++)
+			if (no.eigenvalues()(k) > opts.lno_threshold) lno.push_back(k);
+		const int v = static_cast<int>(lno.size());
 		occ::Mat Cv(nbf, v);
-		for (int k = 0; k < v; k++) Cv.col(k) = P * sp.eigenvectors().col(keep[k]) / std::sqrt(sp.eigenvalues()(keep[k]));
+		for (int k = 0; k < v; k++) Cv.col(k) = Cds * no.eigenvectors().col(lno[k]);
+		const int o = static_cast<int>(cl.size());
+		occ::Mat Co(nbf, o);
+		for (int k = 0; k < o; k++) Co.col(k) = L.col(cl[k]);
 		//semicanonical within the cluster's occupied and within its virtual space, so occ's canonical CCSD applies;
-		//F_ov vanishes because the PAOs are orthogonal to every occupied orbital of the converged SCF
+		//F_ov vanishes because the virtuals are orthogonal to every occupied orbital of the converged SCF
 		Eigen::SelfAdjointEigenSolver<occ::Mat> fo(Co.transpose() * F * Co), fv(Cv.transpose() * F * Cv);
 		const occ::Mat &R = fo.eigenvectors();
 		const occ::Mat Cvs = Cv * fv.eigenvectors();
@@ -1004,7 +1028,9 @@ CcsdDensityResult local_ccsd_natural_orbitals(const occ::qm::Wavefunction &scf, 
 		mo.C << Co * R, Cvs;
 		mo.energies.resize(o + v);
 		mo.energies << fo.eigenvalues(), fv.eigenvalues();
-		const occ::qm::cc::CCIntegrals eris = build_eris(basis, mo, 0, opts, backend, aux_name, log);
+		const occ::qm::cc::CCIntegrals eris = use_df ? occ::qm::cc::df_eris(df, mo, 0) : build_eris(basis, mo, 0, opts, backend, aux_name, log);
+		sum_cand += nc;
+		sum_dom += nd;
 		const occ::Mat proj = R.row(0).transpose();  //LMO I in the semicanonical orbitals
 		const CcSolution s = solve_cc(eris, opts, log, quiet, &proj);
 		const occ::Mat H = cluster_half_density(s, R, { 0 }, opts.triples);
@@ -1012,7 +1038,7 @@ CcsdDensityResult local_ccsd_natural_orbitals(const occ::qm::Wavefunction &scf, 
 		Ccl << Co, Cvs;
 		Dhalf += Ccl * H * Ccl.transpose();
 		e_corr += cluster_energy(s, R, from_tensor(eris.ovov), 0);
-		e_t += s.tr.e_t / o;  //shortcut: (T) energy split evenly over the cluster's LMOs, a log figure only
+		e_t += s.tr.e_t / o;  //a log figure: (T) shared evenly by the cluster's LMOs
 		sum_o += o;
 		sum_v += v;
 		max_o = std::max(max_o, o);
@@ -1026,10 +1052,11 @@ CcsdDensityResult local_ccsd_natural_orbitals(const occ::qm::Wavefunction &scf, 
 	result.e_triples = opts.triples ? e_t : 0.0;
 	natural_orbitals(scf, dm, name, scf.energy.total + e_corr + result.e_triples, result, log);
 	mark("density and natural orbitals");
-
-	log << "\n" << name << " density (cluster-in-molecule, unrelaxed Lambda densities), " << (backend == "exact" ? std::string("exact integrals") : "DF integrals, " + aux_name) << "\n"
-		<< "  " << n << " Pipek-Mezey LMOs, frozen core: " << nf << " orbitals; cluster radius " << opts.cluster_radius << " A, domain threshold " << opts.domain_threshold << "\n"
-		<< "  clusters: occupied " << std::fixed << std::setprecision(1) << double(sum_o) / n << " on average (max " << max_o << "), virtual "
+	log << "\n" << name << " density (cluster-in-molecule, unrelaxed Lambda densities), " << (use_df ? "DF integrals, " + fit : std::string("exact integrals")) << "\n"
+		<< "  " << n << " Pipek-Mezey LMOs, frozen core: " << nf << " orbitals; candidate radius " << opts.cluster_radius << " A, domain threshold "
+		<< opts.domain_threshold << ", pair threshold " << opts.pair_threshold << " Eh, LNO threshold " << opts.lno_threshold << "\n"
+		<< "  candidates " << std::fixed << std::setprecision(1) << double(sum_cand) / n << " LMOs, PAO domains " << double(sum_dom) / n << " virtuals on average\n"
+		<< "  clusters: occupied " << double(sum_o) / n << " on average (max " << max_o << "), virtual "
 		<< double(sum_v) / n << " (max " << max_v << ")\n"
 		<< std::setprecision(10) << "  E(CCSD correlation, sum over clusters) = " << e_corr << "\n"
 		<< "  natural occupations:";
@@ -1056,8 +1083,10 @@ CcsdDensityResult ccsd_density_from_occ_input(const std::string &toml_path, occ:
 	opts.local = scf_table["ccsd_local"].value_or(opts.local);
 	opts.cluster_radius = scf_table["ccsd_cluster_radius"].value_or(opts.cluster_radius);
 	opts.domain_threshold = scf_table["ccsd_domain_threshold"].value_or(opts.domain_threshold);
+	opts.pair_threshold = scf_table["ccsd_pair_threshold"].value_or(opts.pair_threshold);
+	opts.lno_threshold = scf_table["ccsd_lno_threshold"].value_or(opts.lno_threshold);
 	config.method.name = "rhf";
-	//occ's automatic DF/COSX would shift the reference by ~3e-5 Eh in E(HF); exact CCSD wants exact J/K, as ORCA's NoRI
+	//exact CCSD on an exact-J/K reference, as ORCA's NoRI
 	const std::string backend = occ::util::to_lower_copy(opts.backend);
 	if (backend != "df" && backend != "ri") config.method.ri_policy = occ::io::RIPolicy::None;
 	const occ::qm::Wavefunction scf = occ::main::run_scf_external(config, false);

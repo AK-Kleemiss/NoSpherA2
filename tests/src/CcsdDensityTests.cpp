@@ -139,6 +139,9 @@ TEST(CcsdDensity, LocalClustersSpanningTheMoleculeReproduceCanonical)
 		opts.triples = triples;
 		opts.cluster_radius = 1e3;
 		opts.domain_threshold = -1.0;
+		opts.pair_threshold = -1.0;
+		opts.lno_threshold = -1.0;
+		opts.aux_basis = "def2-svp-rifit";  //screening only, all of it off here; occ's cc-pvdz-rifit lacks oxygen
 		std::ostringstream log;
 		const CcsdDensityResult canonical = ccsd_natural_orbitals(scf, opts, log);
 		const CcsdDensityResult local = local_ccsd_natural_orbitals(scf, opts, log);
