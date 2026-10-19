@@ -149,6 +149,10 @@ function(nosphera2_enable_optimizations target_name)
                         >
                 )
             endif()
+            # Android has no MKL to bring libiomp5: the NDK's libomp, linked in statically
+            if(ANDROID)
+                target_link_options("${target_name}" PRIVATE -fopenmp -static-openmp)
+            endif()
         endif()
     endif()
 endfunction()
