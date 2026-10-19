@@ -19,9 +19,10 @@
 
 namespace
 {
-	//Dense row-major tensor of rank <= 4 with numpy's einsum and transpose, so that the Lambda and density
-	//equations below read term for term like PySCF's ccsd_lambda.py / ccsd_rdm.py (restricted, chemist
-	//notation, t2 and l2 as ijab) they were ported from. Every contraction is a transpose and one GEMM.
+	//Dense row-major tensor of rank <= 6 with numpy's einsum and transpose, so that the Lambda and density
+	//equations below read term for term like PySCF's ccsd_lambda.py / ccsd_rdm.py and their (T) versions
+	//(restricted, chemist notation, t2 and l2 as ijab, t3-like arrays as ijkabc) they were ported from.
+	//Every contraction is a transpose and one GEMM.
 	struct Tn
 	{
 		std::vector<int> d;
@@ -53,30 +54,42 @@ namespace
 	Tn operator+(Tn a, const Tn &b) { a += b; return a; }
 	Tn operator-(Tn a, const Tn &b) { a -= b; return a; }
 	Tn operator*(Tn a, const double s) { a *= s; return a; }
+	Tn divided(Tn a, const Tn &d) { a.same_shape(d); for (size_t i = 0; i < a.v.size(); i++) a.v[i] /= d.v[i]; return a; }
+	double dot(const Tn &a, const Tn &b)
+	{
+		a.same_shape(b);
+		double s = 0.0;
+		for (size_t i = 0; i < a.v.size(); i++) s += a.v[i] * b.v[i];
+		return s;
+	}
 
 	//numpy a.transpose(perm): out.d[k] = a.d[perm[k]]
 	Tn T(const Tn &a, std::vector<int> perm)
 	{
+		constexpr int R = 6;
 		const int r = static_cast<int>(a.d.size());
 		std::vector<int> ad(a.d);
-		ad.resize(4, 1);
-		for (int k = r; k < 4; k++) perm.push_back(k);
-		std::array<size_t, 4> stride{};
+		ad.resize(R, 1);
+		for (int k = r; k < R; k++) perm.push_back(k);
+		std::array<size_t, R> stride{};
 		size_t s = 1;
-		for (int k = 3; k >= 0; k--) { stride[k] = s; s *= static_cast<size_t>(ad[k]); }
+		for (int k = R - 1; k >= 0; k--) { stride[k] = s; s *= static_cast<size_t>(ad[k]); }
 		std::vector<int> od(r);
 		for (int k = 0; k < r; k++) od[k] = a.d[perm[k]];
 		Tn out(od);
-		const int n0 = ad[perm[0]], n1 = ad[perm[1]], n2 = ad[perm[2]], n3 = ad[perm[3]];
-		const size_t s0 = stride[perm[0]], s1 = stride[perm[1]], s2 = stride[perm[2]], s3 = stride[perm[3]];
+		std::array<int, R> n{};
+		std::array<size_t, R> st{};
+		for (int k = 0; k < R; k++) { n[k] = ad[perm[k]]; st[k] = stride[perm[k]]; }
 		size_t w = 0;
-		for (int x0 = 0; x0 < n0; x0++)
-			for (int x1 = 0; x1 < n1; x1++)
-				for (int x2 = 0; x2 < n2; x2++)
-				{
-					const size_t base = x0 * s0 + x1 * s1 + x2 * s2;
-					for (int x3 = 0; x3 < n3; x3++) out.v[w++] = a.v[base + x3 * s3];
-				}
+		for (int x0 = 0; x0 < n[0]; x0++)
+			for (int x1 = 0; x1 < n[1]; x1++)
+				for (int x2 = 0; x2 < n[2]; x2++)
+					for (int x3 = 0; x3 < n[3]; x3++)
+						for (int x4 = 0; x4 < n[4]; x4++)
+						{
+							const size_t base = x0 * st[0] + x1 * st[1] + x2 * st[2] + x3 * st[3] + x4 * st[4];
+							for (int x5 = 0; x5 < n[5]; x5++) out.v[w++] = a.v[base + x5 * st[5]];
+						}
 		return out;
 	}
 
@@ -157,7 +170,7 @@ namespace
 	struct Eris
 	{
 		int o = 0, v = 0;
-		Tn foo, fov, fvv, oooo, ovoo, oovv, ovvo, ovvv;
+		Tn foo, fov, fvv, oooo, ovoo, oovv, ovov, ovvo, ovvv;
 		occ::Vec eo, ev;
 		std::function<Eigen::Tensor<double, 4>(const Eigen::Tensor<double, 4> &)> ladder;
 	};
@@ -177,6 +190,7 @@ namespace
 		r.oooo = from_tensor(e.oooo);
 		r.ovoo = from_tensor(e.ovoo);
 		r.oovv = from_tensor(e.oovv);
+		r.ovov = from_tensor(e.ovov);
 		r.ovvo = from_tensor(e.ovvo);
 		r.ovvv = from_tensor(e.ovvv);
 		r.ladder = e.ladder;
@@ -368,29 +382,114 @@ namespace
 					for (int b = 0; b < v; b++) l2new.v[w++] /= e.eo(i) - e.ev(a) + e.eo(j) - e.ev(b);
 	}
 
-	//PySCF ccsd_rdm._gamma1_intermediates and _make_rdm1: the spin-traced density in the correlated MOs,
-	//reference occupation included; symmetric, so no question of <p+q> against <q+p>
-	occ::Mat rdm1(const Tn &t1, const Tn &t2, const Tn &l1, const Tn &l2)
+	//PySCF ccsd_t_lambda_slow / ccsd_t_rdm_slow: the triples terms that make the Lambda equations and the
+	//density those of CCSD(T). w, v are the p6-symmetrised t3-like arrays over ijkabc, already divided by D.
+	struct Triples
 	{
-		const int o = t1.d[0], v = t1.d[1];
-		Tn doo = einsum("ja,ia->ij", t1, l1) * -1.0;
-		Tn dvv = einsum("ia,ib->ab", t1, l1);
-		Tn dvo = T(t1, { 1, 0 }) - einsum("im,ma->ai", einsum("ie,me->im", t1, l1), t1);
+		Tn l1_t, l2_t;  //constant terms added to every Lambda update
+		Tn goo, gvv, dvo;
+		double e_t = 0.0;
+	};
+
+	Tn p6(const Tn &t)
+	{
+		const Tn t1 = t + T(t, { 0, 2, 1, 3, 5, 4 });
+		return t1 + T(t1, { 1, 0, 2, 4, 3, 5 }) + T(t1, { 1, 2, 0, 4, 5, 3 });
+	}
+
+	Tn r6(const Tn &w)
+	{
+		return w * 4.0 + T(w, { 0, 1, 2, 4, 5, 3 }) + T(w, { 0, 1, 2, 5, 3, 4 })
+			- T(w, { 0, 1, 2, 5, 4, 3 }) * 2.0 - T(w, { 0, 1, 2, 3, 5, 4 }) * 2.0 - T(w, { 0, 1, 2, 4, 3, 5 }) * 2.0;
+	}
+
+	//r6 combined with the 2/3 F_ijab + 1/3 F_jiab form the RCCSD Lambda equations are solved in
+	Tn as_r6(const Tn &m) { return m * 2.0 - T(m, { 0, 1, 2, 5, 4, 3 }) - T(m, { 0, 1, 2, 3, 5, 4 }); }
+
+	//shortcut: w, v and their combinations are full o^3 v^3 arrays (PySCF's *_slow form); batch over virtual
+	//triples as occ's ccsd_t does before this is wanted past ~10 correlated occupied and ~100 virtual orbitals
+	Triples triples(const Tn &t1, const Tn &t2, const Eris &e)
+	{
+		const int o = e.o, v = e.v;
+		Tn eia({ o, v });
+		for (int i = 0; i < o; i++)
+			for (int a = 0; a < v; a++) eia.at(i, a) = e.eo(i) - e.ev(a);
+		Tn d3({ o, o, o, v, v, v });
+		size_t n = 0;
+		for (int i = 0; i < o; i++)
+			for (int j = 0; j < o; j++)
+				for (int k = 0; k < o; k++)
+					for (int a = 0; a < v; a++)
+						for (int b = 0; b < v; b++)
+							for (int c = 0; c < v; c++) d3.v[n++] = eia.at(i, a) + eia.at(j, b) + eia.at(k, c);
+		const Tn fvo = T(e.fov, { 1, 0 });
+		const Tn w = p6(divided(einsum("iafb,kjcf->ijkabc", e.ovvv, t2) - einsum("iajm,mkbc->ijkabc", e.ovoo, t2), d3));
+		const Tn vv = p6(divided(einsum("iajb,kc->ijkabc", e.ovov, t1) + einsum("ck,ijab->ijkabc", fvo, t2), d3));
+
+		Triples r;
+		const Tn rw = r6(w);
+		r.l1_t = divided(einsum("jbkc,ijkabc->ia", e.ovov, rw), eia) * 0.5;
+		{
+			const Tn m = as_r6(w * 2.0 + vv * 0.5);
+			Tn joovv = einsum("kfbe,ijkaef->ijab", e.ovvv, m) - einsum("ncmj,imnabc->ijab", e.ovoo, m);
+			joovv += T(joovv, { 1, 0, 3, 2 });
+			joovv += einsum("kc,ijkabc->ijab", e.fov, as_r6(w));
+			Tn dijab({ o, o, v, v });
+			n = 0;
+			for (int i = 0; i < o; i++)
+				for (int j = 0; j < o; j++)
+					for (int a = 0; a < v; a++)
+						for (int b = 0; b < v; b++) dijab.v[n++] = eia.at(i, a) + eia.at(j, b);
+			r.l2_t = divided(joovv, dijab);
+		}
+		const Tn wv = w + vv * 0.5;
+		//the response form (PySCF for_grad=True): full oo/vv blocks, not only their diagonals
+		r.goo = einsum("iklabc,jklabc->ij", wv, rw);
+		r.gvv = einsum("ijkacd,ijkbcd->ab", wv, rw);
+		r.dvo = einsum("ijab,ijkabc->ck", t2, rw) * 0.5;
+		//E(T) from the same arrays, 1/3 sum w D r6(w + v/2) (the 1/3 measured against PySCF's ccsd_t, exact to
+		//10 digits): checks w and v against occ's and ORCA's (T)
+		Tn wd = w;
+		for (size_t q = 0; q < wd.v.size(); q++) wd.v[q] *= d3.v[q];
+		r.e_t = dot(wd, r6(wv)) / 3.0;
+		return r;
+	}
+
+	//PySCF ccsd_rdm._gamma1_intermediates: the CCSD blocks before symmetrisation
+	struct Gamma1
+	{
+		Tn doo, dvv, dvo;
+	};
+
+	Gamma1 gamma1(const Tn &t1, const Tn &t2, const Tn &l1, const Tn &l2)
+	{
+		Gamma1 g;
+		g.doo = einsum("ja,ia->ij", t1, l1) * -1.0;
+		g.dvv = einsum("ia,ib->ab", t1, l1);
+		g.dvo = T(t1, { 1, 0 }) - einsum("im,ma->ai", einsum("ie,me->im", t1, l1), t1);
 		const Tn theta = t2 * 2.0 - T(t2, { 0, 1, 3, 2 });
-		doo -= einsum("jkab,ikab->ij", theta, l2);
-		dvv += einsum("jica,jicb->ab", theta, l2);
-		dvo += einsum("imae,me->ai", theta, l1);
-		dvo -= einsum("mi,ma->ai", einsum("mnef,inef->mi", l2, theta), t1);
-		dvo -= einsum("ie,ae->ai", t1, einsum("mnaf,mnef->ea", l2, theta));
+		g.doo -= einsum("jkab,ikab->ij", theta, l2);
+		g.dvv += einsum("jica,jicb->ab", theta, l2);
+		g.dvo += einsum("imae,me->ai", theta, l1);
+		g.dvo -= einsum("mi,ma->ai", einsum("mnef,inef->mi", l2, theta), t1);
+		g.dvo -= einsum("ie,ae->ai", t1, einsum("mnaf,mnef->ea", l2, theta));
+		return g;
+	}
+
+	//PySCF ccsd_rdm._make_rdm1: the spin-traced density in the correlated MOs, reference occupation included;
+	//symmetric, so no question of <p+q> against <q+p>
+	occ::Mat rdm1(const Gamma1 &g, const Tn &l1)
+	{
+		const int o = l1.d[0], v = l1.d[1];
 		occ::Mat dm = occ::Mat::Zero(o + v, o + v);
 		for (int i = 0; i < o; i++)
 		{
-			for (int j = 0; j < o; j++) dm(i, j) = doo.at(i, j) + doo.at(j, i);
+			for (int j = 0; j < o; j++) dm(i, j) = g.doo.at(i, j) + g.doo.at(j, i);
 			dm(i, i) += 2.0;
-			for (int a = 0; a < v; a++) dm(i, o + a) = dm(o + a, i) = l1.at(i, a) + dvo.at(a, i);
+			for (int a = 0; a < v; a++) dm(i, o + a) = dm(o + a, i) = l1.at(i, a) + g.dvo.at(a, i);
 		}
 		for (int a = 0; a < v; a++)
-			for (int b = 0; b < v; b++) dm(o + a, o + b) = dvv.at(a, b) + dvv.at(b, a);
+			for (int b = 0; b < v; b++) dm(o + a, o + b) = g.dvv.at(a, b) + g.dvv.at(b, a);
 		return dm;
 	}
 
@@ -448,12 +547,27 @@ CcsdDensityResult ccsd_natural_orbitals(const occ::qm::Wavefunction &scf, const 
 	const Eris e = convert(cc_eris);
 	const Tn t1 = from_tensor(cc.t1), t2 = from_tensor(cc.t2);
 	const Imds m = make_intermediates(t1, t2, e);
+	Triples tr;
+	if (opts.triples)
+	{
+		//about eight o^3 v^3 arrays are alive at once in triples()
+		const double gb = 8.0 * 8.0 * std::pow(double(e.o), 3) * std::pow(double(e.v), 3) / (1024.0 * 1024.0 * 1024.0);
+		err_checkf(gb <= opts.max_memory_gb, "The CCSD(T) density holds full o^3 v^3 arrays, about " + std::to_string(gb) +
+			" GB here, over the " + std::to_string(opts.max_memory_gb) + " GB budget (ccsd_max_memory_gb)", log);
+		tr = triples(t1, t2, e);
+		result.e_triples = tr.e_t;
+	}
 	Tn l1 = t1, l2 = t2, l1new, l2new;
 	occ::core::diis::DIIS diis(2, 8);
 	bool converged = false;
 	for (int it = 1; it <= opts.max_cycle && !converged; it++)
 	{
 		update_lambda(t1, t2, l1, l2, e, m, l1new, l2new);
+		if (opts.triples)
+		{
+			l1new += tr.l1_t;
+			l2new += tr.l2_t;
+		}
 		occ::Mat x = flatten(l1new, l2new);
 		occ::Mat err = x - flatten(l1, l2);
 		const double change = err.norm();
@@ -472,7 +586,14 @@ CcsdDensityResult ccsd_natural_orbitals(const occ::qm::Wavefunction &scf, const 
 	const int nf = result.n_frozen;
 	occ::Mat dm = occ::Mat::Zero(nmo, nmo);
 	for (int k = 0; k < nf; k++) dm(k, k) = 2.0;
-	dm.block(nf, nf, nmo - nf, nmo - nf) = rdm1(t1, t2, l1, l2);
+	Gamma1 g = gamma1(t1, t2, l1, l2);
+	if (opts.triples)
+	{
+		g.doo -= tr.goo * 0.5;
+		g.dvv += tr.gvv * 0.5;
+		g.dvo += tr.dvo;
+	}
+	dm.block(nf, nf, nmo - nf, nmo - nf) = rdm1(g, l1);
 	Eigen::SelfAdjointEigenSolver<occ::Mat> es(dm);
 	err_checkf(es.info() == Eigen::Success, "CCSD density: the MO density could not be diagonalised", log);
 	result.occupations = es.eigenvalues().reverse();
@@ -484,14 +605,16 @@ CcsdDensityResult ccsd_natural_orbitals(const occ::qm::Wavefunction &scf, const 
 	nat.mo.occupation = 0.5 * result.occupations;
 	nat.mo.energies = occ::Vec::Zero(nmo); //natural orbitals have occupations, not energies
 	nat.mo.D = 0.5 * scf.mo.C * dm * scf.mo.C.transpose();
-	nat.method = "CCSD";
-	nat.energy.total = scf.energy.total + cc.e_corr;
+	const std::string name = opts.triples ? "CCSD(T)" : "CCSD";
+	nat.method = name;
+	nat.energy.total = scf.energy.total + cc.e_corr + result.e_triples;
 
-	log << "\nCCSD density (unrelaxed, Lambda equations), " << (backend == "exact" ? std::string("exact integrals") : "DF integrals, " + aux_name) << "\n"
+	log << "\n" << name << " density (unrelaxed, Lambda equations), " << (backend == "exact" ? std::string("exact integrals") : "DF integrals, " + aux_name) << "\n"
 		<< "  correlated: " << cc_eris.nocc << " occupied, " << cc_eris.nvir << " virtual; frozen core: " << nf << " orbitals\n"
 		<< std::fixed << std::setprecision(10)
-		<< "  E(CCSD correlation) = " << cc.e_corr << "  (" << cc.iterations << " iterations)\n"
-		<< "  Lambda equations converged in " << result.lambda_iterations << " iterations\n"
+		<< "  E(CCSD correlation) = " << cc.e_corr << "  (" << cc.iterations << " iterations)\n";
+	if (opts.triples) log << "  E(T) = " << result.e_triples << "\n";
+	log << "  Lambda equations converged in " << result.lambda_iterations << " iterations\n"
 		<< std::setprecision(6) << "  |t1| = " << result.t1_norm << "  |t2| = " << result.t2_norm
 		<< "  |l1| = " << result.l1_norm << "  |l2| = " << result.l2_norm << "\n"
 		<< "  natural occupations:";
@@ -504,11 +627,12 @@ CcsdDensityResult ccsd_natural_orbitals(const occ::qm::Wavefunction &scf, const 
 CcsdDensityResult ccsd_density_from_occ_input(const std::string &toml_path, occ::io::OccInput config, std::ostream &log)
 {
 	const auto spec = occ::driver::parse_method_string(config.method.name);
-	err_checkf(spec.kind == occ::driver::MethodKind::CCSD,
-		"Method '" + config.method.name + "' has no density here; CCSD does (method = \"ccsd\")", log);
+	err_checkf(spec.kind == occ::driver::MethodKind::CCSD || spec.kind == occ::driver::MethodKind::CCSD_T,
+		"Method '" + config.method.name + "' has no density here; CCSD and CCSD(T) do (method = \"ccsd\" or \"ccsd(t)\")", log);
 	const auto input = toml::parse_file(toml_path);  //the view below points into it, so it must outlive the reads
 	const auto scf_table = input["scf"];
 	CcsdDensityOptions opts;
+	opts.triples = spec.kind == occ::driver::MethodKind::CCSD_T;
 	if (!spec.backend.empty()) opts.backend = spec.backend;  //"df-ccsd", as occ reads it
 	opts.n_frozen = scf_table["ccsd_frozen_core"].value_or(opts.n_frozen);
 	opts.backend = scf_table["ccsd_backend"].value_or(opts.backend);
@@ -524,8 +648,6 @@ CcsdDensityResult ccsd_density_from_occ_input(const std::string &toml_path, occ:
 occ::qm::Wavefunction wavefunction_from_occ_input(const std::string &toml_path, const occ::io::OccInput &config, std::ostream &log)
 {
 	const auto kind = occ::driver::parse_method_string(config.method.name).kind;
-	err_checkf(kind != occ::driver::MethodKind::CCSD_T,
-		"CCSD(T) has no one-particle density here; use method = \"ccsd\" for the CCSD density", log);
-	if (kind != occ::driver::MethodKind::CCSD) return occ::main::run_scf_external(config, true);
+	if (kind != occ::driver::MethodKind::CCSD && kind != occ::driver::MethodKind::CCSD_T) return occ::main::run_scf_external(config, true);
 	return ccsd_density_from_occ_input(toml_path, config, log).natural;
 }

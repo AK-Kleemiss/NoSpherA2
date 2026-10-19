@@ -1,0 +1,90 @@
+    _   __     _____       __              ___   ___
+   / | / /___ / ___/____  / /_  ___  _____/   | |__ \
+  /  |/ / __ \\__ \/ __ \/ __ \/ _ \/ ___/ /| | __/ /
+ / /|  / /_/ /__/ / /_/ / / / /  __/ /  / ___ |/ __/
+/_/ |_/\____/____/ .___/_/ /_/\___/_/  /_/  |_/____/
+                /_/
+This software is part of the cuQCT software suite developed by Florian Kleemiss.
+Please give credit and cite corresponding pieces!
+This Software is published with BSD-2 clause license.
+Calculating WFN from input file:                             water_ccsdt.toml
+CCSD(T) density (unrelaxed, Lambda equations), exact integrals
+  correlated: 5 occupied, 19 virtual; frozen core: 0 orbitals
+  E(CCSD correlation) = -0.2133274258  (19 iterations)
+  E(T) = -0.0030587051
+  Lambda equations converged in 16 iterations
+  |t1| = 0.016611  |t2| = 0.215950  |l1| = 0.013567  |l2| = 0.220268
+  natural occupations: 1.999916 1.984127 1.971987 1.965110 1.962229 0.028145 0.025910 0.017475 ...
+  sum of occupations: 10.00000000, smallest 4.772e-05
+ done!
+Number of atoms in Wavefunction file: 3 Number of MOs: 24
+[NoSpherA2] Kleemiss et al., Chem. Sci. 12 (2021) 1675, DOI 10.1039/D0SC05526C
+[HAR] Jayatilaka & Dittrich, Acta Cryst. A 64 (2008) 383, DOI 10.1107/S0108767308005709
+[HAR] Capelli et al., IUCrJ 1 (2014) 361, DOI 10.1107/S2052252514014845
+Number of protons: 10
+Number of electrons: 10.000
+Reading:                                  "water.cif" done!
+Generating hkl indices up to d=:              0.80... done!
+Nr of reflections generated:                  4108
+Number of symmetry operations:                   1
+Nr of reflections to be used:                 4108
+Generating k-points...                            ... done!
+Number of k-points to evaluate: 4108
+[Becke grid] Becke, J. Chem. Phys. 88 (1988) 2547, DOI 10.1063/1.454033
+[Hirshfeld] Hirshfeld, Theor. Chim. Acta 44 (1977) 129, DOI 10.1007/BF00549096
+There are:
+   3 atoms read from the wavefunction, of which 
+   3 are identified as asymmetric unit atoms!
+
+Selected accuracy: 1
+Making Integration Grids...
+GridManager: Setting up prototype grids for atom types...
+GridManager: Generating integration grids for atoms...
+GridManager: Generated total of 4872 grid points.
+Starting MBIS iterations...
+MBIS iteration: 1 max change: 0.45
+MBIS iteration: 2 max change: 0.12
+MBIS iteration: 3 max change: 0.07
+MBIS iteration: 4 max change: 0.05
+MBIS iteration: 5 max change: 0.03
+MBIS iteration: 6 max change: 0.02
+MBIS iteration: 7 max change: 0.02
+MBIS iteration: 8 max change: 0.01
+MBIS iteration: 9 max change: 0.01
+MBIS converged after 9 iterations with max charge change: 0.01 and max sig change: 0.00
+Promolecular charges:
+Atom   0: -0.79
+Atom   1: 0.39
+Atom   2: 0.39
+Starting EMBIS iterations...
+EMBIS iteration:    1 max charge/alpha change: 3.29/0.79
+EMBIS iteration:    2 max charge/alpha change: 1.40/0.01
+EMBIS iteration:    3 max charge/alpha change: 0.65/0.01
+EMBIS iteration:    4 max charge/alpha change: 0.34/0.01
+EMBIS iteration:    5 max charge/alpha change: 0.22/0.00
+EMBIS iteration:    6 max charge/alpha change: 0.19/0.00
+EMBIS iteration:    7 max charge/alpha change: 0.17/0.00
+EMBIS iteration:    8 max charge/alpha change: 0.16/0.00
+EMBIS iteration:    9 max charge/alpha change: 0.14/0.00
+EMBIS iteration:   10 max charge/alpha change: 0.13/0.00
+EMBIS iteration:   11 max charge/alpha change: 0.12/0.00
+EMBIS iteration:   12 max charge/alpha change: 0.11/0.00
+EMBIS converged after 12 iterations with max charge change: 0.00 and max sig change: 0.10
+Promolecular charges:
+Atom   0: -0.75
+Atom   1: 0.37
+Atom   2: 0.37
+Table of Charges in electrons
+      Atom     Becke Hirshfeld      TFVC      MBIS     EMBIS
+        O1    -0.149    -0.311    -1.125    -0.794    -0.749
+        H1     0.074     0.156     0.566     0.397     0.375
+        H2     0.074     0.156     0.566     0.397     0.375
+Total number of electrons:
+ Becke:      10.000372
+ Hirshfeld:   9.999694
+ TVFC:        9.992763
+ MBIS:        9.999166
+ EMBIS:       9.999279
+[                Calculating Scattering Factors               ]
+[=============================================================] 100% 
+Writing tsc file...  ... done!

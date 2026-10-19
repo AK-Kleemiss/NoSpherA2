@@ -47,6 +47,16 @@ cif = "water.cif"
 dmin = 0.8
 acc = 1
 
+# CCSD(T): the (T) terms in Lambda and in the density (ORCA's CCSD(T) .mdci.nat carries the CCSD density)
+[ccsd_t_occ_water]
+directory = "ccsd_water"
+
+[ccsd_t_occ_water.args]
+occ = "water_ccsdt.toml"
+cif = "water.cif"
+dmin = 0.8
+acc = 1
+
 [disorder_THPP]
 directory = "disorder"
 good = "disorder_THPP.good"

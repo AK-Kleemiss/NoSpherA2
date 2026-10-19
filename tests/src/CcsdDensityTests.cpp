@@ -1,6 +1,7 @@
 //CCSD densities from both sources NoSpherA2 reads: occ's CCSD with the Lambda-equation density (ccsd_density.cpp)
 //and ORCA's unrelaxed CCSD natural orbitals (.mdci.nat). Water cc-pVDZ, all electrons, the geometry of
-//tests/ccsd_water/water_ccsd.inp. References: PySCF RHF 1e-12, CCSD 1e-11, ccsd_lambda 1e-10, make_rdm1.
+//tests/ccsd_water/water_ccsd.inp. References: PySCF RHF 1e-12, CCSD 1e-11, ccsd_lambda 1e-10, make_rdm1; for
+//CCSD(T) ccsd_t, ccsd_t_lambda_slow 1e-10 and ccsd_t_rdm_slow in its response form (for_grad=True).
 #include "pch.h"
 #include <gtest/gtest.h>
 
@@ -27,6 +28,13 @@ namespace
 		0.024606534618, 0.016958989231, 0.011482604142, 0.005877291267, 0.005610198708, 0.005102431406,
 		0.004501850550, 0.004391650529, 0.001153986147, 0.001135571676, 0.000733257552, 0.000666305288,
 		0.000595994224, 0.000541860862, 0.000498173499, 0.000488628631, 0.000056697599, 0.000039609101};
+	constexpr double ref_e_t = -0.0030587074;  //ORCA 6.1.0 on the same job: -0.003058698
+	constexpr double ref_t_l1 = 0.0135673060, ref_t_l2 = 0.2202679718;
+	constexpr std::array<double, 24> ref_t_occ{
+		1.999915560472, 1.984126920375, 1.971987096386, 1.965109636192, 1.962228897254, 0.028145280442,
+		0.025910267256, 0.017475185700, 0.011824173422, 0.006209180127, 0.005911724793, 0.005345731873,
+		0.004639591047, 0.004522823917, 0.001290017319, 0.001240118379, 0.000812346188, 0.000788191094,
+		0.000716511774, 0.000597192399, 0.000545450072, 0.000541000350, 0.000069385498, 0.000047717671};
 
 	//the -occ path's SCF thresholds (1e-6) are looser than the references; the test pins the Lambda code, not the SCF
 	occ::qm::Wavefunction tight_rhf()
@@ -118,11 +126,27 @@ TEST(CcsdDensity, OccAndOrcaGiveTheSameDensity)
 	EXPECT_GT(hf_dev, 1e-3);
 }
 
-TEST(CcsdDensity, TriplesHaveNoDensityAndAreRefused)
+//the (T) terms in Lambda and in the density; E(T) from the same arrays pins them against PySCF's and ORCA's (T),
+//and the occupations must move off the CCSD ones (by up to 1.6e-3 here)
+TEST(CcsdDensity, OccTriplesDensityMatchesPyscf)
 {
-	occ::io::OccInput config;
-	config.method.name = "ccsd(t)";
+	if (!ensure_occ_data_path(nullptr)) GTEST_SKIP() << "OCC_DATA_PATH not set";
+	CcsdDensityOptions opts;
+	opts.n_frozen = 0;
+	opts.triples = true;
 	std::ostringstream log;
-	EXPECT_EXIT((void)wavefunction_from_occ_input("unused.toml", config, log),
-		::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), ".*");
+	const CcsdDensityResult r = ccsd_natural_orbitals(tight_rhf(), opts, log);
+	EXPECT_NEAR(r.e_corr, ref_e_corr, 1e-8);
+	EXPECT_NEAR(r.e_triples, ref_e_t, 1e-9);
+	EXPECT_NEAR(r.l1_norm, ref_t_l1, 1e-8);
+	EXPECT_NEAR(r.l2_norm, ref_t_l2, 1e-8);
+	ASSERT_EQ(r.occupations.size(), static_cast<long>(ref_t_occ.size()));
+	double moved = 0.0;
+	for (size_t k = 0; k < ref_t_occ.size(); k++)
+	{
+		EXPECT_NEAR(r.occupations(k), ref_t_occ[k], 1e-8) << "natural orbital " << k;
+		moved = std::max(moved, std::abs(r.occupations(k) - ref_occ[k]));
+	}
+	EXPECT_GT(moved, 1e-3);
+	EXPECT_NEAR(r.occupations.sum(), 10.0, 1e-10);
 }

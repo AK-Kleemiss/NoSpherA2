@@ -30,6 +30,7 @@ set_tests_properties(
 set_tests_properties(
     TomlIntegrationTests.CcsdOccWater
     TomlIntegrationTests.CcsdOrcaNat
+    TomlIntegrationTests.CcsdTOccWater
     PROPERTIES
         RESOURCE_LOCK integration_ccsd_water
 )

@@ -15,6 +15,7 @@ struct CcsdDensityOptions
 	double max_memory_gb = 1.0;
 	double tol = 1e-10;             //CCSD energy change and Lambda amplitude change
 	int max_cycle = 200;
+	bool triples = false;           //CCSD(T): the (T) terms in the Lambda equations and in the density
 };
 
 struct CcsdDensityResult
@@ -22,6 +23,7 @@ struct CcsdDensityResult
 	occ::qm::Wavefunction natural;  //natural orbitals in mo.C, occupation/2 in mo.occupation, alpha density in mo.D
 	occ::Vec occupations;           //natural occupation numbers, descending; they sum to the electron count
 	double e_corr = 0.0;
+	double e_triples = 0.0;         //(T) energy, from the same arrays that enter the density
 	int n_frozen = 0;
 	int lambda_iterations = 0;
 	double t1_norm = 0.0, t2_norm = 0.0, l1_norm = 0.0, l2_norm = 0.0;
@@ -29,10 +31,9 @@ struct CcsdDensityResult
 
 CcsdDensityResult ccsd_natural_orbitals(const occ::qm::Wavefunction &scf, const CcsdDensityOptions &opts, std::ostream &log);
 
-//-occ with method = "ccsd": occ's restricted HF, then ccsd_natural_orbitals. The CCSD settings come from the toml's
-//[scf] table (ccsd_frozen_core, ccsd_backend, ri-basis, ccsd_max_memory_gb), which occ's reader does not take.
-//CCSD(T) is refused: the triples correction has no density here, and occ alone would hand back the HF one.
+//-occ with method = "ccsd" or "ccsd(t)": occ's restricted HF, then ccsd_natural_orbitals. The CCSD settings come from
+//the toml's [scf] table (ccsd_frozen_core, ccsd_backend, ri-basis, ccsd_max_memory_gb), which occ's reader does not take.
 CcsdDensityResult ccsd_density_from_occ_input(const std::string &toml_path, occ::io::OccInput config, std::ostream &log);
 
-//every -occ toml goes through here: CCSD gives its natural orbitals, CCSD(T) is refused, anything else is occ's SCF
+//every -occ toml goes through here: CCSD and CCSD(T) give their natural orbitals, anything else is occ's SCF
 occ::qm::Wavefunction wavefunction_from_occ_input(const std::string &toml_path, const occ::io::OccInput &config, std::ostream &log);

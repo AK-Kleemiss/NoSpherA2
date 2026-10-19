@@ -497,6 +497,12 @@ TEST(TomlIntegrationTests, CcsdOrcaNat)
 	EXPECT_TRUE(result.success) << result.message;
 }
 
+TEST(TomlIntegrationTests, CcsdTOccWater)
+{
+	const UT_Result result = run_inprocess_test(get_repo_root(), "ccsd_t_occ_water");
+	EXPECT_TRUE(result.success) << result.message;
+}
+
 TEST(TomlIntegrationTests, DisorderTHPP)
 {
 	const UT_Result result = run_inprocess_test(get_repo_root(), "disorder_THPP");
