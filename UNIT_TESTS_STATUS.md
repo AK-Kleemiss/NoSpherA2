@@ -1,6 +1,14 @@
 # Unit Test Status
 
+**2026-10-20 relaxed MP2 / AutoCI work merged with density_source's XCW_refactor split and NRT changes:** no code conflicts; `ctest` on SPYRO (`release-windows`, MSVC 14.51, CUDA) on the merged tree: 1313 tests, 1302 passed, 0 failed, 9 skipped (2 disabled), 164 s with `-j 6`.
+
 **2026-10-20 relaxed MP2 densities from occ and ORCA:** `-occ` with `method = "mp2"` used to hand back the SCF density (occ's MP2 driver returns the RHF wavefunction with the MP2 energy); it now gives the relaxed MP2 density (MP2 Lagrangian with the Z-vector orbital response, ported from PySCF `grad/mp2.py`, frozen core relaxed too), and SCS/SOS-MP2 is refused. `-wfn base.mp2nat` reads ORCA's relaxed MP2 natural orbitals, and the log names the density from `base.property.txt`. occ's `exact_eris` gained `with_ladder` so MP2 skips the O(v^4) block. New gtests in `tests/src/CcsdDensityTests.cpp`: `CcsdDensity.OccRelaxedMp2DensityMatchesOrca` (water cc-pVDZ against ORCA 6.1.0 `! MP2 NoRI`, `%mp2 density relaxed`, Z_Tol 1e-9: E_corr 1e-7, all 24 natural occupations 1e-6, frozen-core 1s occupation above 2 as in ORCA) and `OrcaMp2NatMatchesOccRelaxedMp2` (fixture `water_mp2.{mp2nat,property.txt}`: the log label, and occ's relaxed MP2 density 1e-5 relative at nine points, the HF one more than 1e-3 off). New integration cases `mp2_occ_water` (`-occ water_mp2.toml`) and `mp2_orca_nat` (`-wfn water_mp2.mp2nat`), same RESOURCE_LOCK `integration_ccsd_water`; their charge tables are identical. `ctest` on SPYRO (`release-windows`, MSVC 14.51, CUDA): 1316 tests, 1305 passed, 0 failed, 9 skipped (2 disabled), 140 s with `-j 6`.
+
+**2026-10-20 XCW settings: `safe <path>` writes the I tensor, `save` is gone:** the bare `safe` (write to `I_tensor_stream.bin`) is removed and `save <path>` is renamed `safe <path>`; `save` is now an unknown keyword. Every settings string in `XcwTests`, `XcwScfTests` and `XcwHaltingReportTests` and `tests/P1_test/test_settings_save.txt` use `safe <path>`; `XcwSettingsTests.SwitchesPathsAndModels` checks that `read` without `safe` leaves the save path empty and that `save` is refused, and `MissingValuesAreReported` expects "Expected a path after 'safe'". No golden output changes. `ctest --preset release-windows-tests` on a CPU-only build: 1305 tests, 1281 passed, 0 failed, 22 skipped (2 disabled).
+
+**2026-10-20 XCW `params` defaults to 1:** `SF_settings::n_params` had no default, so a settings file without `params` put an indeterminate value into the GooF/criterion denominators. It is now 1, and `loadXCWsettings` prints "Warning: Number of crystallographic parameters not set (use the params keyword)! Continuing with a default value of 1...". New: `XcwSettingsTests.MissingParamsDefaultsToOneWithAWarning`. Every golden settings file sets `params`, so no reference output changes. `ctest --preset release-windows-tests` on a CPU-only build: 1305 tests, 1281 passed, 0 failed, 22 skipped (2 disabled), 124 s with `-j 6`.
+
+**2026-10-20 density_source takes XCW_refactor's class split:** `XCW_refactor` (`d09d8c1`) is merged, so `Src/core/XCW.cpp`/`XCW.h` are gone and XCW runs through `structure_factors`, `SCF_wrapper` and `XCW_solver`. density_source's XCW changes since `9ceb5bc` that XCW_refactor did not have are ported: the `-mem`/SLURM budget (`structure_factors::free_memory`, `df_reserved_`, the DF policy in `XCW_solver::setup_system` and the stored-ERI budget now passed to `SCF_wrapper::setup_eri`) and the Android serial-OpenBLAS guard in `structure_factors::eval_I`; `read_CIF`, the grown-model sym_facts and the NEON sincos were already there. `-calc_F` and the `-xcw_gaussian_halt` command-line flag stay removed (`gaussian_halt` goes in the settings file, `*_halt.txt`), and the log is `SCF.log`. The P1 goldens are XCW_refactor's, which differ from ours only in that log name and the order of the I/sigma and basis set lines; `P1_test_XCW_gpu_itensor.good` got the same two text changes and still needs a run on a device. `ConvenienceCoverageTests.cpp` is XCW_refactor's (the WFN-based CIF reader tests went with the readers). `ctest --preset release-windows-tests` on a CPU-only build (MSVC 14.51): 1304 tests, 1280 passed, 0 failed, 22 skipped (2 disabled), 124 s with `-j 6`.
 
 **2026-10-20 ORCA CCSD(T) densities via AutoCI, CCSD/Lambda on ORCA's convergence:** ORCA's MDCI never puts (T) into a density (a CCSD(T) job's `.mdci.nat` is the CCSD one); the CCSD(T) density is AutoCI's, exported by `orca_2json` and read with `-wfn base.json` as natural orbitals of `base.gbw`. `ccsd_tol` (1e-5) is now ORCA's STol, max |D dt| of the CCSD and Lambda amplitudes, and the (T) step folds the b<->c mirror block into one pass. New gtests in `tests/src/CcsdDensityTests.cpp`: `CcsdDensity.OrcaTriplesRunIsReportedAsCcsdDensity` (the `base.property.txt` method and level are logged, a CCSD(T) run's density is flagged as CCSD) and `OrcaAutociTriplesDensityMatchesOcc` (fixture `water_ccsdt_autoci.{gbw,json}`, ORCA 6.1.0 AutoCI unrelaxed density: occupations 2e-6 from PySCF's CCSD(T), density 1e-5 from occ's CCSD(T) at nine points and more than 1e-4 from CCSD); the PySCF comparisons now set `tol = 1e-9`. New integration case `ccsd_t_orca_autoci` (`-wfn water_ccsdt_autoci.json`, RESOURCE_LOCK `integration_ccsd_water`); `ccsd_occ_water.good` and `ccsd_t_occ_water.good` regenerated (iteration counts and E_corr at ORCA's convergence, charge tables unchanged). `ctest` on SPYRO (`release-windows`, MSVC 14.51, CUDA): 1312 tests, 1301 passed, 0 failed, 9 skipped (2 disabled), 135 s with `-j 6`.
 
@@ -13,6 +21,8 @@
 **2026-10-15 XCW reads the anomalous dispersion from the CIF; the P1 cases run on XCW_refactor's input:** `-anom_disp` is gone (option, `options::anom_disp_path`, `XCW::parse_anom_atoms`). `XCW::construct` reads the atom list with XCW_refactor's `read_CIF` (`convenience.cpp`), which takes f' and f'' per type from `_atom_type_scat_dispersion_real/imag` and per site from `_atom_site_dispersion_*`; a grown atom takes its parent's. U_iso, U_ij and the Gram-Charlier C and D come from `read_CIF` too, as on XCW_refactor, instead of `read_U_iso_from_CIF` / `read_fracs_ADPs_from_CIF` (which parsed U_ij in single precision), so `construct` no longer writes `log3.txt` and `XcwHaltingReportTests.GrownConstructUsesTheXyzAtoms` no longer expects it. Every P1 case (`tests.toml`, `XcwScfTests`, `XcwTests`, `ExtinctionTests`, `XcwHaltingReportTests`, `Windows/Tests` `P1_XWR`, `scripts/stress_itensor_gpu.ps1`) runs on `P1_test.cif` instead of `P1_test_NA2.cif` + `anom_disp.txt` (deleted); `XcwScfTests` `golden_energy` is -1961.925585145. The P1 goldens were regenerated and print XCW_refactor's numbers to the last digit, screening lines included (1802 pairs, 33.64 %); only the line order and the log name (`XCW.log`) differ. `P1_test_XCW_gpu_itensor.good` is the CPU run of its input (`-no_gpu`), not yet checked on a device. New: `ConvenienceCoverageCifTests.ReadCifAssignsLabelsTypesPositionsAndUiso`, `ReadCifReadsUijCijkDijklByLabel`, `ReadCifReadsDispersionByTypeAndBySite`, `ReadCifThrowsForUnknownAnisoLabel`, from XCW_refactor. `ctest --preset release-linux`: 1288 run, 1266 passed, 0 failed, 22 skipped (2 disabled); the four `full` P1 goldens pass with `RUN_FULL_TEST=1`.
 
 **2026-10-14 XCW: XCW_refactor's symmetry handling, inversion screening and AO pair screen; `slow_conv` from lambda = 0:** `cell.cpp`/`cell.h` are XCW_refactor's (`cryst_mult`/`sym_fact`, `grown_by`/`grown_from`, `resolve_internal_symmetry`, `apply_grown` with `adjust_sym_facts`), plus one check of ours: an operation leaves the sum only if it maps the whole model onto itself. The grown-structure cell tests no longer specify an implementation; they check that the kept operations, weighted by `sym_fact`, count every site of the cell once (`CellMathIoTests.GrownStructureLinksInversionImage`, `PartiallyGrownStructureKeepsTheInversion`, `UngrownSpecialPositionWeighsByItsStabiliser`, `GrownSaltOnDifferentSitesWeighsByOrbit`, and `GrownP21cClustersCountEverySiteOnce` for the five P21/c clusters that were `#if 0` - its screw-plus-inversion case failed before that check). The I tensor integrates one entry of every h/-h pair (`-tune NOSPHERA2_NO_INVERSION_SCREENING` turns it off); the AO pair screen is XCW_refactor's distance bound, so `XcwPairBoundTests` left with the m-resolved bound. P1 goldens: only the screening lines (1798 pairs, 33.57 %; 8004222 grids subset, 64013865 full) and the shared tensor's size (10.9124 MB). `XcwScfTests.SlowConvStartsFromTheNormalSchedule` became `SlowConvDampsFromTheFirstStep`: the lambda = 0 step reaches the golden energy with slow damping too. `ctest --preset release-linux`: 1284 run, 1262 passed, 0 failed, 22 skipped (2 disabled).
+**2026-10-14 XCW_refactor takes density_source in, the three XCW classes kept:** density_source's `XCW.cpp` changes are ported into `structure_factors`, `SCF_wrapper`, `XCW_solver` and `options::loadXCWsettings` (`basis_overrides`, `save_eri`/`read_eri`, the up-front charge/multiplicity check, the same-basis guess, serial MKL in the SCF, the OpenBLAS guards, `-tune` knobs, the asym lookup error); its m-resolved pair screen is left out, so the screen and the symmetry handling stay XCW_refactor's. `set_sym_fact_from_mult` now runs for ungrown structures too, and `slow_conv` damps the lambda = 0 step (the normal-schedule first step is gone; `XcwScfTests.SlowConvDampsFromTheFirstStep`). `-calc_F` stays removed, so `CliRefusal.RealOptionNoAnalysisReadsIsFatal` lost its `-calc_F` case. `XcwTests` compiles again (`grow_ADPs` takes `grown_from`/`grown_by`, no `slow_conv` field). The P1 subset goldens read the tensor and integrals `P1_test_XCW` saves (`test_settings_save.txt`, `*_read.txt`), `P1_F2_test_XCW_incremental` and `P1_test_XCW_h2_incremental` are gone as on density_source, and every P1 golden prints the basis as `sto-3g-basis`; energies agree with the previous goldens to 3e-10 relative. `P1_test_XCW_gpu_itensor.good` still needs a device. `ctest --preset release-linux`: 1262 passed, 0 failed, 22 skipped (2 disabled) of 1284; the four `full` P1 goldens pass with `RUN_FULL_TEST=1`.
+
 **2026-10-14 Visual Studio solution removed, CMake-only build:** The `Windows/` solution, its
 `Tests` project (the VS/DLL in-process harness), `scripts/SetupVSEnvironment.cmake`,
 `scripts/check_vcxproj.py`, the CI vcxproj-check step and `coverage.runsettings` are gone;
@@ -140,7 +150,7 @@ The full `release-windows` binary, run from `tests/src`, ran 1276 tests: 1267 pa
 
 **2026-09-28 NBO/NRT update:** The `tests/nbo_reference/compare_nbo.py --all` 22 PASS result below compares native output with a stored copy of native output; it is a reproducibility check. The independent gennbo 7 comparison in `tests/nbo_reference_v2/` still fails 25/25 stored molecules. The open-shell NRT unit fix is present on this branch. The `bonding_robustness` sibling was rebuilt on AKL007 (`NoSpherA2` MD5 `8d0ca83f73a6afe6289293822dd5c5b1`): `NrtTests.*` passed 8/8 tests, and a fresh run on the stored ch3, no and o2 `.47` inputs matched gennbo on 26/26 bond-order totals, 16/16 valencies and 16/16 electron counts at the reference printing precision. Ionic/covalent splits still disagree on 8/26 bonds and 12/16 atomic decompositions. This is a focused test of the identical NRT source, not a full-suite or full-corpus result for this branch. A combined `renat5` plus NRT-unit build on the same 22 stored `.47` inputs keeps NPA failed charge entries at 63/452 and reduces NRT valency failures from 320/476 to 284/476 and bond-order failures from 326/702 to 305/702; the external gate still passes 0/22. See `tests/nbo_reference_v2/data_nrt_unit/` for the comparison and binary provenance. The eight-molecule OWSO weight fit remains a MISS in both arms, so no additional NPA accuracy claim is made.
 
-**Last updated: 2026-09-24** (the in-house NBO analysis: `NaoTests.OverlapCarriesTheDensitysPhaseConvention` (nh3bh3, 17.98171 of 18 electrons before the |m| >= 3 phase fix), `Nbo47Tests` on the FILE47 archive, and `NrtTests`' three analytic NRT cases. The NBO/NRT corpus comparison is not a gtest: `py -3.12 tests/nbo_reference/compare_nbo.py --all .` measures the native result against the 22 stored NBO 7.0.9 references and reports 22 PASS, exit 0. `NoSpherA2_Tests` links again: `tests/src/CellMathTests.cpp` calls `cell` members that no longer exist (`grown_subgroup`, `coset_representatives`, `set_subgroup_factors`) and was excluded from the target, so `cmake --build --preset release-windows --target NoSpherA2_Tests` needs no hand-linking. Run the binary from `build/release-windows/bin`, which is what its relative fixture paths assume: 1111 passed, 0 failed, 8 skipped, 2 disabled.) 2026-09-16: (fchk reading goes through the shared `push_back_spherical_shell`/`push_back_cartesian_shell` path with the tonto and molden readers: contractions are normalised on read (NoSpherA2's own fchk writer leaves them unnormalised), pure |m| = 3, 4, 7, 8 functions carry the Gaussian/libcint phase and are flipped to the ORCA convention of the sph2cart tables, Cartesian d/f primitives divided by sqrt((2l-1)!!); the fchk writer picks f coefficients by WFN type, so tonto-ordered wfn files (17 before 16) round-trip, `NiP3_fchk/good.fchk` regenerated. `FormatConsistencyTests.OccFchkMatchesBridge` checks the occ FchkWriter output against the bridge for l = 1..4 to 1e-6, `ElectronCountOnLargestGrid_full` integrates every input format (gbw, molden, fchk Cartesian and pure, wfn, wfx, tonto stdout, xtb) on the accuracy-5 Becke grid to 1e-4 electrons per electron; the accuracy-5 Lebedev table index was out of range (32 -> 31). The corrected occ-fchk reading moved `alanine_occ.good` (Becke count 47.935 -> 47.998). 322/322 with `RUN_FULL_TEST=1` on `release-windows`.) Earlier the same day: (`OccHighAngularTests`: H2 with one primitive per l built through the occ bridge, `HartreeFockMOsAreOrthonormalToH` (l=5 HF, analytic primitive overlap 1e-8), `LoewdinMOsAreOrthonormalToL10` (l=10 Loewdin MOs, libcint's Rys quadrature on MSVC has no roots beyond 11 so no HF above h), `IntegratesElectronCountToL10` (Becke count 2.0 to 1e-4 at l=5 and 10). The bridge now takes p in occ's x,y,z order and divides by ORCA's per-l norm `constants::sph2cart_norm2`; the primitive cutoff is l-aware (`WFN::set_exp_cutoff`), which changed the ELI basin partition slightly, so `nh3li_eli.good` and `hgh2_ecp_eli.good` were regenerated; GridManager maps types to l = 10. `FormatConsistencyTests.SameDensityFromEveryFormat` checks the Gaussian NA2 fchk/wfn pair and the write_wfn round trip of gbw (incl. i functions) and molden inputs to 1e-6; molden and gbw share `WFN::push_back_spherical_shell`. The cutoff is the per-primitive minimum of the bound, 1.5 % over the 42 integration tests. 321/321 with `RUN_FULL_TEST=1` on `release-windows`. Earlier the same day: `Sph2CartTests.MatchesLibcintWithOrcaPhase` pins every `constants::sph2cart` table d-l=10 to libcint's real solid harmonics with ORCA's phase and angular norm (Lukas Seifert's derivation); this caught two swapped g rows and the h/i scale: ORCA's angular norm drops sqrt((2l-1)(2l-3)) from h on, so those tables were regenerated. `GbwHighAngularTests.OccupiedMOsAreNormalised_full` checks every ORCA contraction to 1e-12 and every occupied CuF2 MO to 1e-8 under the analytic primitive overlap, `IntegratesElectronCount_full` the Becke-grid electron count to 1e-3; `ReadsIFunctionFixtures` reads the three CuF2 `i`-function GBWs, verifies Cartesian types through 84 and finite positive grid densities. The twelve P1 XCW goldens regenerated on the corrected atom grids and the CDIIS SCF, gtests for the three `-xcw_incremental` cases, `RGBI_Groups_NH3BH3_sym` pinned to `-rgbi_basis nao`, `NH3BH3_sym_ano.good` regenerated after the ANO population fix; 312/312 with `RUN_FULL_TEST=1` on `release-windows`. 2026-09-14: one GPU binary per OS: the CUDA and HIP kernels compiled side by side into
+**Last updated: 2026-10-08** (inversion screening of the XCW I tensor, new `XcwInversionTests`; the XCW/cell/P1 filter 116 passed, 0 failed, the full suite not rerun. 2026-10-07: `save` keeps a streamed I tensor, `read` with `save` throws, a streamed `read` uses the budget's window, new `XcwHaltingReportTests.StreamedTensorIsSavedWhereSaveSays`; the XCW/P1 filter 87 passed, 0 failed, the full suite not rerun. 2026-10-05: `XCW_solver` builds its own `structure_factors`, `SCF_wrapper` decoupled from both: the XCW suites 74/74 and the seven P1 XCW goldens pass unchanged, the other counts below are those of 2026-10-01. XCW gtests ported to `structure_factors` / `SCF_wrapper` / `XCW_solver`, the eleven CPU P1 XCW goldens regenerated on `P1_test.cif`; 1102 passed, 0 failed, 15 skipped and 16 crashed out of 1133 (the 16 all build and run OCC objects in the test itself - StoredEriTests, OccSecondOrderScf, OccHighAngularTests, BondwiseRobyTests, FormatConsistencyTests.OccFchkMatchesBridge, TomlIntegrationTests.AlanineIntegratedOcc - and exit with code 127 before printing anything, with or without OCC_DATA_PATH; the same OCC SCF passes inside the XCW tests of the same binary and the executable runs alanine_integrated_occ to the end, so the locally built Visual Studio test binary is the suspect, root cause not established; a ctest run of the CMake target is still owed). Earlier the same day: `-anom_disp` removed. 2026-09-30: XCW split into three classes. 2026-09-24: the in-house NBO analysis: `NaoTests.OverlapCarriesTheDensitysPhaseConvention` (nh3bh3, 17.98171 of 18 electrons before the |m| >= 3 phase fix), `Nbo47Tests` on the FILE47 archive, and `NrtTests`' three analytic NRT cases. The NBO/NRT corpus comparison is not a gtest: `py -3.12 tests/nbo_reference/compare_nbo.py --all .` measures the native result against the 22 stored NBO 7.0.9 references and reports 22 PASS, exit 0. `NoSpherA2_Tests` links again: `tests/src/CellMathTests.cpp` calls `cell` members that no longer exist (`grown_subgroup`, `coset_representatives`, `set_subgroup_factors`) and was excluded from the target, so `cmake --build --preset release-windows --target NoSpherA2_Tests` needs no hand-linking. Run the binary from `build/release-windows/bin`, which is what its relative fixture paths assume: 1111 passed, 0 failed, 8 skipped, 2 disabled.) 2026-09-16: (fchk reading goes through the shared `push_back_spherical_shell`/`push_back_cartesian_shell` path with the tonto and molden readers: contractions are normalised on read (NoSpherA2's own fchk writer leaves them unnormalised), pure |m| = 3, 4, 7, 8 functions carry the Gaussian/libcint phase and are flipped to the ORCA convention of the sph2cart tables, Cartesian d/f primitives divided by sqrt((2l-1)!!); the fchk writer picks f coefficients by WFN type, so tonto-ordered wfn files (17 before 16) round-trip, `NiP3_fchk/good.fchk` regenerated. `FormatConsistencyTests.OccFchkMatchesBridge` checks the occ FchkWriter output against the bridge for l = 1..4 to 1e-6, `ElectronCountOnLargestGrid_full` integrates every input format (gbw, molden, fchk Cartesian and pure, wfn, wfx, tonto stdout, xtb) on the accuracy-5 Becke grid to 1e-4 electrons per electron; the accuracy-5 Lebedev table index was out of range (32 -> 31). The corrected occ-fchk reading moved `alanine_occ.good` (Becke count 47.935 -> 47.998). 322/322 with `RUN_FULL_TEST=1` on `release-windows`.) Earlier the same day: (`OccHighAngularTests`: H2 with one primitive per l built through the occ bridge, `HartreeFockMOsAreOrthonormalToH` (l=5 HF, analytic primitive overlap 1e-8), `LoewdinMOsAreOrthonormalToL10` (l=10 Loewdin MOs, libcint's Rys quadrature on MSVC has no roots beyond 11 so no HF above h), `IntegratesElectronCountToL10` (Becke count 2.0 to 1e-4 at l=5 and 10). The bridge now takes p in occ's x,y,z order and divides by ORCA's per-l norm `constants::sph2cart_norm2`; the primitive cutoff is l-aware (`WFN::set_exp_cutoff`), which changed the ELI basin partition slightly, so `nh3li_eli.good` and `hgh2_ecp_eli.good` were regenerated; GridManager maps types to l = 10. `FormatConsistencyTests.SameDensityFromEveryFormat` checks the Gaussian NA2 fchk/wfn pair and the write_wfn round trip of gbw (incl. i functions) and molden inputs to 1e-6; molden and gbw share `WFN::push_back_spherical_shell`. The cutoff is the per-primitive minimum of the bound, 1.5 % over the 42 integration tests. 321/321 with `RUN_FULL_TEST=1` on `release-windows`. Earlier the same day: `Sph2CartTests.MatchesLibcintWithOrcaPhase` pins every `constants::sph2cart` table d-l=10 to libcint's real solid harmonics with ORCA's phase and angular norm (Lukas Seifert's derivation); this caught two swapped g rows and the h/i scale: ORCA's angular norm drops sqrt((2l-1)(2l-3)) from h on, so those tables were regenerated. `GbwHighAngularTests.OccupiedMOsAreNormalised_full` checks every ORCA contraction to 1e-12 and every occupied CuF2 MO to 1e-8 under the analytic primitive overlap, `IntegratesElectronCount_full` the Becke-grid electron count to 1e-3; `ReadsIFunctionFixtures` reads the three CuF2 `i`-function GBWs, verifies Cartesian types through 84 and finite positive grid densities. The twelve P1 XCW goldens regenerated on the corrected atom grids and the CDIIS SCF, gtests for the three `-xcw_incremental` cases, `RGBI_Groups_NH3BH3_sym` pinned to `-rgbi_basis nao`, `NH3BH3_sym_ano.good` regenerated after the ANO population fix; 312/312 with `RUN_FULL_TEST=1` on `release-windows`. 2026-09-14: one GPU binary per OS: the CUDA and HIP kernels compiled side by side into
 their own namespaces, dispatched at run time, neither runtime linked; `Linux GPU Release` and `Windows GPU
 Release` replace the four single-backend CI jobs. Earlier the same day: GPU CI: CUDA and HIP builds for
 Linux and Windows on GPU-less runners, occ `9bde072f7` compiles `ccsd.cpp` at `/O2` again;
@@ -160,6 +170,182 @@ partner's field, D4 dispersion and the density overlap S; `-salted_charge_constr
 with the golden case `SALTED_charge_constraint`, the `-interaction_energy` input modes and the
 `WFN::isBohr` reader fix, the interaction energy itself, the `Int_Params` fix, multipole-restrained
 RI fit, `computeRho` screening fix.)
+
+## 2026-10-10 - inversion screening also for measured h / -h pairs
+
+`make_jobs` (2026-10-08) merges the integrations of the images of one reflection that are each other's inverse, which
+is where a centrosymmetric group with merged data saves (Fe_phen). A P1 list that holds h and -h as separate reflections
+(1597 pairs in `P1_test.hkl`, one operation) has one image per reflection, so nothing merged and the I tensor took as
+long as without screening. `build_I` now also integrates only the lower index of every measured h / -h pair and stores
+the conjugate row for the other (the images of -h are minus those of h, phases and Debye-Waller factors conjugate);
+the device path does the same (copied rows get no columns, their read-back is skipped and a batch of copied rows only
+is not submitted), neither compiled nor run here. The work estimate is now measured
+against one integration per entry of `hkl_enlarged`. P1 with `refactor.txt`: 9.8 s -> 5.0 s of I tensor, 1.53 -> 0.77
+Tflop-equivalents, `SCF.log` and the `NA2_*_Fcalc.txt` identical to the run before. `NOSPHERA2_NO_INVERSION_SCREENING`
+in the environment switches the screening off; the two new gtests use it to compare the screened against the unscreened
+tensor to 1e-12 and check the reported count against the inverse pairs of `hkl_enlarged`:
+`XcwScfTests.InversionScreeningOfMeasuredPairsIsExact` (the P1 subset) and
+`XcwScfTests.InversionScreeningOfSymmetryGeneratedPairsIsExact` (the P1 molecule in P-1 against the upper half of the
+subset, so that every pair comes from the inversion, as in Fe_phen). With `ExtinctionTests`, `XcwHaltingTests`,
+`XcwSettingsTests`, `XcwHaltingReportTests`, `XcwScfTensorFileTests`, `XcwScfTests` and the seven P1 XCW goldens: 45
+passed, 0 failed (`XcwTests.cpp` and `CellMathTests.cpp` do not compile against the uncommitted `cell` changes and were
+left out of that binary, so `XcwInversionTests` did not run). Fe_phen was not rerun: the uncommitted grown-structure
+code stops in the `structure_factors` constructor before the I tensor; `build_I`'s merging is the one of 2026-10-08.
+
+## 2026-10-08 — Inversion screening of the XCW I tensor (`XcwInversionTests`)
+
+`build_I` integrates each k-point of `scatter_data.inversion_cleaned_hkl` only: `cell::remove_inv_vectors`
+looks -h up among all entries of `hkl_enlarged` (binary search, confirmed with `cell::check_inversion`; not
+only images under an inversion operation, which a grown structure need not keep) and returns, per cleaned
+entry, its index and that of its inverse. The grid integral of -q is the conjugate of that of q because the
+AO values and weights are real; the DW, atom phase and translation factors are evaluated for each k-point as
+before. The device path does the same: `itensor_gpu_submit` takes a column per integration (`col_off` per
+reflection) and a second factor array for the conjugate, in `itensor_gpu.cu` (CUDA and HIP) and
+`itensor_metal.mm`. Neither was compiled or run here (no device, no nvcc/hipcc); `structure_factors.cpp`
+compiles with `NOSPHERA2_USE_GPU` defined. New gtest `XcwInversionTests.RemoveInvVectorsKeepsOneOfEveryPair` (pairs from
+different operations, an acentric list that links every entry to itself only, the cleaned set refilled).
+The XCW, cell, I-tensor I/O, extinction and P1 golden filter reports 116 passed, 0 failed, 5 skipped (GPU and
+four `*_full` cases); the P1 subset holds one Friedel pair, so screening is active there and the goldens
+pass unchanged. The "Inversion screening" summary line is gated on `-no_date`. Fe_phen (`tests/Fe_phen`,
+Pbcn grown to the whole molecule, sto-3g, its `settings.txt`, `-no_gpu`): 9102 of 35574 k-points are
+inverses, 26472 of 36408 grid integrations remain, the I tensor takes 434-448 s against 610 s, and the lambda
+table equals the reference `NoSpherA2.log` except the lambda = 0.05 energy, 8e-9 Eh off in its last digits
+(summation order). The full suite was not rerun.
+
+## 2026-10-07 — A streamed I tensor is saved where `save` says, and `read` streams with the budget's window
+
+Two faults of the disk-backed I tensor, both already on `master` and in the pre-refactor `XCW.cpp`:
+`save <path>` did nothing when the tensor had to be streamed (`start_i_save` returned early, and the
+stream went to the `read` path or `I_tensor_stream.bin`), and a tensor `read` from disk and streamed
+always took a 64-reflection window instead of the one the memory budget allows. A streamed build now
+writes into the `save` file directly, a tensor that is actually read from disk throws a
+`std::runtime_error` when `save` or `safe` is set as well (a second copy costs as much as the first;
+`read` of a file that is missing or does not match still builds and saves), and the streamed `read`
+line reports its window ("read a window at a time (1 of 402
+reflections resident)"). The resident `read` path reads straight into the tensor through the new
+`i_tensor_file::read`, without the copy out of the window. New gtest
+`XcwHaltingReportTests.StreamedTensorIsSavedWhereSaveSays`: under a 0.001 MB `-mem` budget the build
+leaves `saved.bin` and no `I_tensor_stream.bin`, `read saved.bin` streams one reflection at a time and
+reproduces the row, and `read saved.bin` with `save copy.bin`, `save saved.bin` or `safe` throws and
+writes nothing. `XcwScfTests.SaveThenReadTensorReproducesLambdaZero` reads in its second run without `save`. The XCW,
+I-tensor I/O, extinction and P1 golden filter (`*Xcw*:*TscIo*:*Extinction*:TomlIntegrationTests.P1*`)
+reports 87 passed, 0 failed, 5 skipped (the GPU and four `*_full` cases); the full suite was not rerun.
+A double-precision tensor saved with `i_double` and read back with `i_float` (the narrowing branch, no
+gtest) gives the same lambda = 0 row as the plain read on the P1 subset.
+
+## 2026-10-05 — XCW_solver builds the structure factors itself, SCF_wrapper decoupled
+
+The XCW gtests now construct the run as `opt.loadXCWsettings(); XCW_solver x(opt); x.run();` (the
+`structure_factors SF(opt);` line is gone from `XcwTests`, `XcwScfTests` and `XcwHaltingReportTests`;
+the grown-structure test reads `x.structure().model_data.ncen`). `ExtinctionTests` and the
+`GrownWithoutXyzFileDies` death test still build a bare `structure_factors`. Nothing else in the tests
+changed, and no golden moved: `ExtinctionTests`, `XcwHaltingTests`, `XcwAdpTests`, `XcwSettingsTests`,
+`XcwHaltingReportTests`, `XcwScfTensorFileTests` and `XcwScfTests` report 74 passed, 0 failed, and the
+seven non-skipped `TomlIntegrationTests.P1*XCW*` golden cases pass (the GPU I tensor case and the four
+`*_full` cases skip as before); Visual Studio `Tests`, `Windows\Tests\Release_x64\Tests.exe` run from
+`tests/src`. `Windows/Tests/Tests.vcxproj` does not find `nlohmann/json.hpp` and libxc's `xc.h` through
+`deps-install-release` in this checkout; they were supplied for the one build through
+`/p:ForceImportBeforeCppTargets` pointing at `build/release-windows/_deps`, no project file was touched.
+`NoSpherA2.log`, `SCF.log` and the six `NA2_*_Fcalc.txt` of the P1 case with `tests/P1_test/refactor.txt`
+are identical to the pre-refactor run, timing lines aside; with `soscf check_hessian` the Hessian-vector
+product agrees with the finite-difference gradient to 2e-10 (RHF) and 1e-10 (UHF).
+
+Later that day `set_DW` was rewritten (the Gram-Charlier terms of ADP levels 2 and 3 generated from the packed tensor layout instead of typed out, one loop for levels 1 to 3; the isotropic loop and the BLAS quadratic form are the old code, because replacing them shifted one `SCF.log` digit) and `XcwAdpTests.DebyeWallerFactorsOfEveryLevelMatchTheExplicitExpansion` was added: it sets ADPs of level 0 to 3 on the atoms of the P1 fixture and compares `DW_facts` with the explicit term-by-term expansion to 1e-13 (the test passed against the old implementation first). The XCW suites are 75 tests, all passing, and the seven P1 XCW goldens pass. The P1 `NoSpherA2.log`, `SCF.log` and `NA2_*_Fcalc.txt` are identical to the pre-refactor run in 9 of 9 runs.
+
+## 2026-10-01 — XCW gtests ported to the three classes, P1 XCW goldens regenerated on `P1_test.cif`
+
+`ExtinctionTests`, `XcwTests`, `XcwScfTests` and `XcwHaltingReportTests` build the run as the driver
+does: `opt.loadXCWsettings(); structure_factors SF(opt); XCW_solver x(SF); x.run();` (since 2026-10-05 `XCW_solver x(opt);`). What changed in
+them:
+
+- The settings errors come from `loadXCWsettings` and need no crystal. `XcwSettingsTests` gained
+  three tests that read `opt.xcw_settings` back field by field: the presets (and that an explicit
+  value beats its preset), the `test_settings.txt` line (which pins `XWR_type = 1` without
+  `weighted`, the field whose missing default had silently switched the perturbation off), and every
+  switch, path and model keyword.
+- The detailed log is `SCF_log` (opened by `SCF_wrapper`), so the runs read that instead of
+  `XCW.log`. The basis line and the extinction banner are only on stdout now.
+- All fixtures use `P1_test.cif`; the lambda = 0 Hartree-Fock energy of that model is
+  -1961.925585145 Eh. `gaussian_halt` and `strong_cutoff` are settings keywords.
+- `grown` without `-xyz` dies through `err_checkf` in the `structure_factors` constructor; the death
+  test checks the exit code only, because the message goes to stdout.
+- `transform_ADPs` is a member of `structure_factors`.
+
+The four `*_full` cases of `tests/tests.toml` take their halting switch from
+`*_halt.txt` copies of their settings files. The two other test files that no longer compiled after
+the refactoring commits were fixed too: `ScatteringFactorTests` / `ScatteringCoverageTests` pass a
+`scatter_data` to `read_hkl_full`, and the `ConvenienceCoverageCifTests` for the removed
+`read_fracs_ADPs_from_CIF` / `read_U_iso_from_CIF` became four `read_CIF` tests on the same data
+(labels, types, positions, U_iso with `?`, U_ij by column name, C and D, f'/f'' from wrapped
+`_atom_type` rows and from `_atom_site_dispersion`, an embedded `;` text field with its own `data_`
+line, a second data block, and an aniso row for an unknown label).
+
+The eleven CPU P1 XCW goldens were regenerated with the harness's default arguments and pass
+in-process (`TomlIntegrationTests.P1*` with `RUN_FULL_TEST=1`: 11 passed, the GPU case skipped).
+`P1_test_XCW_gpu_itensor.good` still holds the `P1_test_NA2.cif` numbers and has to be regenerated
+on a machine with a device.
+
+Built with the Visual Studio `Tests` project; its include paths lack nlohmann/json and libxc, which
+`OccSecondOrderScfTests` reaches through occ's DFT headers, so they were passed through `CL` from
+`build/release-windows/_deps` for this build. Every test in its own process from `tests/src`, as
+ctest does: COUNT.
+
+## 2026-10-01 — `-anom_disp` removed; the P1 XCW cases read their dispersion from `P1_test.cif`
+
+The `-anom_disp` option and `tests/P1_test/anom_disp.txt` are gone: f' and f'' come from the CIF's
+`_atom_type_scat_dispersion_real/imag` loop (or `_atom_site_dispersion_*`). The twelve XCW cases in
+`tests/tests.toml` and `P1_XWR` in `Windows/Tests/Tests.cpp` now use `P1_test.cif`, an Olex2 CIF of the
+same structure with its own model (anisotropic hydrogens, H13a/H13b, slightly different dispersion
+values), so every P1 XCW golden must be regenerated; at lambda 0 the full scan gives criterion 4.8533,
+R1(gt) 0.02531, E = -1961.925585145 Eh.
+
+What `structure_factors` takes from `P1_test.cif` was checked field by field against an independent
+reader: cell, orthogonalisation matrix, the one symmetry operation, wavelength 0.71073, and for all 23
+atoms the label, Z, fractional and Cartesian coordinates, U_iso, the six U_ij, f', f'' and the
+symmetry factor. 0 mismatches; the FCF and `.res` that Olex2 embeds as text fields, with a second
+`data_` line inside, are not read. `ConvenienceCoverageTests` no longer passes `-anom_disp`;
+`XcwScfTests.cpp` and `XcwHaltingReportTests.cpp` still set `opt.anom_disp_path`, which is one more
+thing to port with the rest of those files.
+
+## 2026-09-30 — XCW split into `structure_factors`, `SCF_wrapper` and `XCW_solver`; the XCW gtests do not build
+
+`Src/core/XCW.cpp` / `XCW.h` are gone. Their code lives in three classes: `structure_factors`
+(cell, reflections, Debye-Waller and phase factors, anomalous dispersion, extinction, scale,
+criteria, the I tensor and both `calc_F_calc` overloads), `SCF_wrapper` (one perturbed SCF,
+`do_SCF`, with DIIS, damping, level shift, rescue and TRAH) and `XCW_solver` (the lambda scan,
+the perturbation matrix, Gaussian halting, the tscb output). The settings file is read by
+`options::loadXCWsettings()` into `opt.xcw_settings` before `structure_factors` is built.
+
+Checked by hand with the Visual Studio build (`build\Release_x64\NoSpherA2.exe`, no GPU on this
+machine), not through ctest:
+
+- The full `P1_test.hkl` scan with `test_settings.txt` (lambda 0 to 0.05) reproduces the reference
+  log the refactoring was pinned to line for line apart from the build date and the I tensor
+  timing, and its `XCW.log`, `.wfn`, `.fchk` and `_Fcalc.txt` are those of the last build that
+  still had the `XCW` class.
+- The four subset cases (`P1_test_XCW`, `P1_test_XCW_h2`, `P1_F2_test_XCW`, `P1_F2_test_XCW_h2`),
+  run with the harness defaults `-all_charges -no_date -no_gpu`, differ from their `.good` files
+  in two ways: the basis-set and I/sigma lines are printed twice (once by `structure_factors`,
+  once by `XCW_solver`, which is what the reference log has), and the energies of the perturbed
+  steps differ from the ninth decimal on (1e-9 to 4e-7 Eh; one GooF(F2) 3.6726 for 3.6725). On
+  the full data set the split itself changed no output file, so the digits are older than it.
+  The two extra lines fail these cases until the goldens are regenerated.
+- `save` then `read`, `i_tensor_mb 1` (streamed), `i_float`, `uhf`, `soscf`, `gaussian_halt` and
+  `extinction` run to the end on the subset; the first four give the table of the plain run.
+- `structure_factors::calc_F_calc(const cvec2&)` (atomic scattering factors) against
+  `calc_F_calc(I_tensor&, const dMatrix2&)` on the converged densities of the subset scan, with
+  the scattering factors of the tscb of the same step: sum |dF| / sum |F| = 1.4e-5.
+
+Not done, and the reason `NoSpherA2_Tests` and `Windows/Tests` do not build at the moment:
+`ExtinctionTests.cpp`, `XcwTests.cpp`, `XcwScfTests.cpp` and `XcwHaltingReportTests.cpp` include
+`core/XCW.h` and construct `XCW x(opt)`, which already failed to compile against the
+`XCW(const structure_factors&)` constructor of `7eb36c7`. They have to be ported to
+`opt.loadXCWsettings(); structure_factors SF(opt); XCW_solver x(SF); x.run();`, and several of
+their expectations restated (`log3.txt` is no longer written, `grown` without `-xyz` has a new
+message, a settings file that does not parse now throws from `loadXCWsettings`).
+`ConvenienceOptionsTests` still expects `-calc_F`, `-xcw_gaussian_halt` and `-xcw_strong_cutoff`,
+which are no longer flags (`gaussian_halt` and `strong_cutoff <x>` in the settings file), and the
+four `*_full` cases of `tests/tests.toml` still pass `xcw_gaussian_halt`.
 
 ## 2026-09-24 — Either separator names the same flag
 

@@ -404,20 +404,137 @@ available from it.
 
 Fit the wavefunction against the measured structure factors: a lambda scan in
 which the X-ray agreement statistic is traded against the energy. The dominant
-cost is the two-electron integral ("I") tensor, so the `-XCW_settings` file is
-mostly about where that tensor lives.
+cost is the two-electron integral ("I") tensor, so much of the `-XCW_settings`
+file is about where that tensor lives.
+
+Everything about the crystal comes from `-cif`: cell, symmetry, positions,
+U_iso, U_ij, the Gram-Charlier C and D, the wavelength and the anomalous
+dispersion (`_atom_type_scat_dispersion_real/imag`, or per site
+`_atom_site_dispersion_*`). For every lambda the run writes
+`NA2_<lambda>.tscb`, `.wfn`, `.fchk` and `_Fcalc.txt`, where `<lambda>` loses
+its decimal point and is padded to seven digits (0.01 gives `NA2_0010000`).
+The SCF details go to `SCF.log`.
 
 | Flag | Arguments | Default | Meaning |
 | --- | --- | --- | --- |
-| `-do_XCW` | 0 | off | Run the XCW lambda scan. |
-| `-XCW_settings <file>` | 1 | | Settings file. Keywords include `stream`, `i_tensor_mb`, `save`, `read`, `df_basis`, `i_double`, `i_float`, and `save_eri <file>` / `read_eri <file>`, which write and reuse the stored two-electron integrals (geometry and basis only; a file of another basis or geometry is refused and the integrals are built). |
-| `-calc_F` | 0 | off | Compute structure factors from the fitted wavefunction. |
-| `-xcw_int_precision <eps>` | 1 | `1e-10` | Integral screening threshold. |
-| `-xcw_extrapolate` / `-no_xcw_extrapolate` | 0 | on | Extrapolate between lambda steps. |
-| `-xcw_incremental` / `-no_xcw_incremental` | 0 | off | Build the Fock matrix incrementally. |
-| `-xcw_strong_cutoff <x>` | 1 | `3.0` | Cut-off separating strong from weak reflections. |
-| `-xcw_gaussian_halt` | 0 | off | Halt the scan on the Gaussian-statistics criterion. |
+| `-do_XCW` | 0 | off | Run the XCW lambda scan. Needs `-cif`, `-hkl` and `-XCW_settings`. |
+| `-XCW_settings <file>` | 1 | | Settings file; see [settings-file keywords](#settings-file-keywords). |
+| `-xyz <file>` | 1 | | The grown molecule, for a settings file with `grown`. |
+| `-twin <9 numbers>` | 9 | | Twin laws applied to the reflections, as in [section 2](#2-scattering-factors-and-tsctscb-tables). |
+| `-mem <MB>` | 1 | | When given, caps the I tensor, the density-fitting integrals and the stored two-electron integrals together; without it they are sized from the memory the job can have. |
+| `-acc <0..4>` | 1 | `2` | Integration grid of the I tensor and of each `.tscb`. |
+| `-xcw_int_precision <eps>` | 1 | `1e-10` | Integral screening threshold of the Fock build. |
+| `-xcw_extrapolate` / `-no_xcw_extrapolate` | 0 | on | Seed each lambda step from the density extrapolated through the two previous steps (RHF only). |
+| `-xcw_incremental` / `-no_xcw_incremental` | 0 | off | Build the two-electron Fock part from the change of the density each iteration. |
+| `-rgbi` | 0 | off | Roby-Gould bond indices of each refined wavefunction, written to `NA2_<lambda>_RGBI.txt`. |
 | `-convert_XCW <stdout> <step>` | 2 | | Import lambda steps from a Tonto XCW log. One-shot. |
+
+The I tensor runs on the GPU by default; `-gpu_itensor`, `-gpu_itensor_tensor`,
+`-itensor_hybrid` and `-cpu_itensor_fp32` in [section 10](#10-performance-and-hardware)
+choose how. The partitioning flags of [section 3](#3-partitioning-grids-and-basis)
+and `-all_charges` apply to each `.tscb` written. Developer knobs, through
+`-tune NAME=value`: `NOSPHERA2_XCW_I_FLOAT` (single-precision tensor),
+`NOSPHERA2_NO_INVERSION_SCREENING` (integrate both h and -h) and
+`NOSPHERA2_DEBUG_ASYMFACT` (print the symmetry factors).
+
+Example, run in `tests/P1_test`:
+`NoSpherA2 -do_XCW -no_gpu -cif P1_test.cif -hkl P1_subset.hkl -XCW_settings test_settings_save.txt -no_date`,
+with `test_settings_save.txt` holding
+`normal normal_conv params 177 basis_set sto-3g max_iter 100 F charge 0 mult 1 rhf start 0 step_size 0.01 end 0.05 safe p1_i.bin save_eri p1_eri.bin`.
+
+### Settings-file keywords
+
+The file is one stream of whitespace-separated keywords, on one line or many,
+and case does not matter. A keyword that takes a value is followed by it. An
+unknown keyword stops the run, and so does a file without `basis_set`.
+
+**Model and scan**
+
+| Keyword | Arguments | Default | Meaning |
+| --- | --- | --- | --- |
+| `basis_set <name>` | 1 | required | Orbital basis from the built-in library, e.g. `sto-3g`, `def2-svp`. |
+| `basis_overrides <file>` | 1 | | Per-element replacement bases from a BSE JSON file, relative to the settings file; other elements keep `basis_set`. |
+| `params <n>` | 1 | `1` | Number of refined parameters, subtracted from the reflection count in the GooF and criterion denominators. Without it the run warns and uses 1. |
+| `charge <n>` | 1 | `0` | Total charge of the model. |
+| `mult <n>` | 1 | `1` | Spin multiplicity. |
+| `rhf` \| `uhf` | 0 | `rhf` | Restricted or unrestricted Hartree-Fock. |
+| `grown` | 0 | off | The model is a grown molecule rather than the asymmetric unit; needs `-xyz`. Symmetry operations it applies explicitly leave the sum and the atom weights are solved to count every position once. |
+| `wavelength <lambda>` | 1 | from the CIF | Wavelength in Angstrom; overrides `_diffrn_radiation_wavelength`. |
+| `start <x>` | 1 | `0` | First lambda. |
+| `end <x>` | 1 | `1` | Last lambda, inclusive. |
+| `step_size <x>` | 1 | `0.01` | Lambda increment. |
+
+**Fit target**
+
+| Keyword | Arguments | Default | Meaning |
+| --- | --- | --- | --- |
+| `f` \| `f2` | 0 | `f` | Fit against F or F^2. |
+| `weighted` | 0 | off | Fit the 1/\|H\|^2-weighted residual self-energy criterion instead of the classical goodness of fit. |
+| `i_sigma <x>` | 1 | `2` | Only reflections with I/sigma(I) >= x enter the fit and the scale, i.e. F/sigma(F) >= 2x. R1(all) and Crit(all) still use all. |
+| `extinction <model> [iso\|aniso] [fixed] [start]` | 1-4 | | Extinction correction; `<model>` is `shelx` (`zachariasen`), `bc_gaussian` or `bc_lorentzian`. Isotropic, refined and starting at `1e-4` unless told otherwise. Needs a wavelength. |
+
+**SCF convergence**
+
+One convergence preset and one damping preset; the individual keywords after
+them override single values.
+
+| Preset | Target change | DIIS error | Orbital gradient | Max density change | RMS density change |
+| --- | --- | --- | --- | --- | --- |
+| `sloppy` | `3e-5` | `1e-4` | `5e-4` | `1e-4` | `1e-5` |
+| `normal` (default) | `1e-6` | `1e-5` | `7e-5` | `1e-5` | `1e-6` |
+| `tight` | `5e-7` | `5e-6` | `3e-5` | `1e-6` | `1e-7` |
+| `very_tight` | `1e-7` | `1e-6` | `1e-5` | `1e-7` | `1e-8` |
+
+| Preset | Damping | Level shift | Switched off below DIIS error |
+| --- | --- | --- | --- |
+| `slow_conv` | `0.8` | `1.0` | `1e-5` (both) |
+| `normal_conv` (default) | `0.5` | `0.5` | `1e-3` (damping), `1e-2` (shift) |
+| `fast_conv` | none | none | |
+
+| Keyword | Arguments | Default | Meaning |
+| --- | --- | --- | --- |
+| `conv <x>` | 1 | preset | Change of the target quantity, energy + lambda x penalty. |
+| `conv_diis <x>` | 1 | preset | DIIS error. |
+| `gradient <x>` | 1 | preset | Orbital gradient. |
+| `maxp_diff <x>` | 1 | preset | Largest change of the density matrix. |
+| `rmsp_diff <x>` | 1 | preset | RMS change of the density matrix. |
+| `max_iter <n>` | 1 | `100` | SCF iterations per lambda step. |
+| `damp <alpha>` | 1 | preset | Density damping factor. |
+| `shift <x>` | 1 | preset | Level shift. |
+| `diis_damping <x>` | 1 | preset | DIIS error below which damping is switched off. |
+| `diis_shift <x>` | 1 | preset | DIIS error below which the level shift is switched off. |
+| `soscf` | 0 | off | Second-order (TRAH) steps once the DIIS error is below `1e-2`; without it only when the orbital gradient stalls. |
+| `check_hessian` | 0 | off | Finite-difference check of the Hessian-vector product on the first second-order step, reported in `SCF.log`. |
+| `df_basis <name>` | 1 | | Density-fit the Fock build with this auxiliary basis, e.g. `def2-universal-jkfit`. |
+| `guess_basis <name>` | 1 | | Start the first lambda from a Hartree-Fock converged in this smaller basis, projected into the orbital basis. |
+| `load_wfn` | 0 | off | Start the first lambda from `NA2_<start>.fchk` of an earlier run. |
+
+**I tensor and stored integrals**
+
+The I tensor depends on the structure, the basis and the reflections only, not
+on any refinement setting, so a saved one serves every later scan of the same
+data. Without `stream` or `i_tensor_mb` it is held in memory when it fits four
+fifths of the memory the job can have (or of `-mem`) and streamed when it does
+not.
+
+| Keyword | Arguments | Default | Meaning |
+| --- | --- | --- | --- |
+| `stream` | 0 | | Keep the tensor on disk and read a window of reflections at a time, with a 2048 MB budget. |
+| `i_tensor_mb <n>` | 1 | | The same with an n MB budget. |
+| `safe <path>` | 1 | | Write the tensor to `<path>` while the refinement runs, for a later `read <path>`. |
+| `read [path]` | 0-1 | `I_tensor_stream.bin` | Reuse the tensor at `path` instead of building it; built when the file is missing or does not match. A tensor that is read must not be written again with `safe`. |
+| `i_float` | 0 | off | Hold the tensor in single precision: half the memory. |
+| `i_double` | 0 | off | Keep it in double precision although it was built in single. |
+| `save_eri <path>` | 1 | | Write the stored two-electron integrals for a later run. |
+| `read_eri <path>` | 1 | | Reuse them; a file of another basis or geometry is refused and the integrals are built. |
+
+**Analysis and output**
+
+| Keyword | Arguments | Default | Meaning |
+| --- | --- | --- | --- |
+| `gaussian_halt` | 0 | off | Test the residuals of the strong reflections for normality at each lambda, add the A^2 column and recommend a halting lambda. |
+| `strong_cutoff <x>` | 1 | `3.0` | \|F\|/sigma above which a reflection counts as strong for `gaussian_halt`. |
+| `nbo` | 0 | off | Also write `NA2_<lambda>.47`, an NBO input, for every lambda. |
 
 ## 10. Performance and hardware
 

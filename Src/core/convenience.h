@@ -1,6 +1,7 @@
 ﻿#pragma once
 #include "pch.h"
 #include "throughput.h"
+#include "extinction.h"
 #include "tuning.h"
 
 
@@ -23,6 +24,7 @@ void not_implemented(const std::source_location loc, const std::string& error_me
 #define err_checkf(condition, error_message, file) ((condition) ? (void)0 : error_check(false, std::source_location::current(), error_message, file))
 #define err(error_message, file) error_check(false, std::source_location::current(), error_message, file)
 #define err_not_impl_f(error_message, file) not_implemented(std::source_location::current(), error_message, file)
+
 
 typedef std::complex<double> cdouble;
 typedef std::vector<double> vec;
@@ -114,9 +116,13 @@ struct properties_options
 	ivec MO_numbers;
 	//-ibo_cube <list>: IBOs to write as cubes (ibo_selection syntax)
 	std::string ibo_cube;
+	//-nbo_cube / -nlmo_cube <list>: in-house NBOs / NLMOs to write as cubes (nbo_cube_wfn syntax)
+	std::string nbo_cube, nlmo_cube;
+	//-nbo_lewis <json>: the Lewis structure ($CHOOSE) those NBOs come from, e.g. an NRT run's leading structure
+	std::filesystem::path nbo_lewis;
 	int hirsh_number = 0;
 	bool calc() const {
-		return rho || eli || esp || elf || lap || rdg || hdef || def || hirsh || s_rho || all_mos || fukui || esp_isosurface > 0 || MO_numbers.size() > 0 || !ibo_cube.empty();
+		return rho || eli || esp || elf || lap || rdg || hdef || def || hirsh || s_rho || all_mos || fukui || esp_isosurface > 0 || MO_numbers.size() > 0 || !ibo_cube.empty() || !nbo_cube.empty() || !nlmo_cube.empty();
 	}
 	size_t n_grid_points() const {
 		size_t result = static_cast<size_t>(NbSteps[0]) * NbSteps[1] * NbSteps[2];
@@ -181,6 +187,7 @@ constexpr const std::complex<double> c_one(0, 1.0);
 
 extern std::string help_message;
 std::string NoSpherA2_message(bool no_date = false);
+std::string WAEmpiRe_message();
 extern std::string build_date;
 
 // Fast exp approximation for negative values
@@ -635,11 +642,6 @@ void readxyzMinMax_fromCIF(
 	properties_options& opts,
 	vec2& cm);
 
-bool read_fracs_ADPs_from_CIF(const std::filesystem::path& cif, WFN& wavy, cell& unit_cell, std::ofstream& log3, const bool& debug);
-
-bool read_fracs_ADPs_from_CIF(const std::filesystem::path& cif, WFN& wavy, std::ofstream& log3, const bool& debug, const bool& grown, const ivec3& symmetry_linking_list);
-
-vec read_U_iso_from_CIF(const std::filesystem::path& cif, WFN& wavy, cell& unit_cell, std::ofstream& log3, const bool& debug);
 double read_CIF(std::istream& cif_input, const cell& unit_cell, int& ncen,
 	std::vector<asym_atom>& asym_atoms, std::vector<vec2>& ADPs, const bool debug);
 
@@ -863,13 +865,9 @@ public:
 	{
 		return pow(r, type) * std::exp(-exp * r * r) * normalized_coefficient;
 	};
-	double eval_gaussian_unnormalized(const double& r) const
+	inline double eval_gaussian_unnormalized(const double& r2) const
 	{
-		return pow(r, type) * std::exp(-exp * r * r) * coefficient;
-	};
-	inline double eval_gaussian_unnormalized(const double& rl, const double& r2) const
-	{
-		return rl * std::exp(-exp * r2) * coefficient;
+		return std::exp(-exp * r2) * coefficient;
 	};
 };
 
@@ -1018,10 +1016,144 @@ struct options
 	//set once a streamed run wrote the file itself, so the caller does not overwrite it with an empty one-shot block
 	bool tsc_written_by_stream = false;
 	bool qct = false;
+	// What structure_factors reads: the crystal model, the extinction and the I tensor storage
+	struct SF_settings {
+		// `i_sigma <x>`: only reflections with I/sigma(I) >= x enter chi^2 and the scale, as in
+		// Tonto. Under the reader's sigma(F) = sigma(I)/2F that is F/sigma(F) >= 2x, so the
+		// default 2 is SHELX's I > 2 sigma(I) and F > 4 sigma(F) at once
+		double i_sigma_cutoff = 2;
+		std::string basis_set_name;
+		//`basis_overrides <file>`: per-element replacements of the orbital basis from a BSE JSON file
+		std::filesystem::path basis_overrides;
+		bool grown = false;
+		//`extinction <shelx|bc_gaussian|bc_lorentzian> [iso|aniso] [fixed] [start value]`
+		extinction::model extinction_model = extinction::model::none;
+		bool extinction_aniso = false;
+		bool extinction_refine = true;
+		double extinction_start = 1e-4;
+		//`wavelength <lambda>`, in Angstrom; overrides _diffrn_radiation_wavelength from the CIF
+		double wavelength = 0.0;
+		int n_params = 1;
+		int refine_against = 1;
+		int XWR_type = 1;
+		bool read_tensor;
+		// Largest I tensor held resident, in MB. Above it the tensor goes to disk
+		// and is read back a window of reflections at a time; 0 means no limit,
+		// which is the original behaviour. Set with `i_tensor_mb <n>` in the XCW
+		// settings, or `stream` for the default budget.
+		size_t i_tensor_max_mb;
+		// `i_float` in the settings file: hold the I tensor in single precision. The device
+		// computes it in single anyway, so this stores what was computed rather than a
+		// widened copy of it.
+		bool i_tensor_single = false;
+		bool i_tensor_double = false;
+		// `I_tensor <path>` in the settings file: where the streamed tensor lives. Written
+		// there, and reused from there when it is already the right size for this problem,
+		// so that trying another refinement setting does not rebuild it.
+		std::filesystem::path i_tensor_file_path;
+		// `safe <path>`: write the tensor there for a later `read <path>`, on a thread, so
+		// the refinement starts at once instead of waiting for 100 GB to reach the disk.
+		std::filesystem::path i_tensor_save_path;
+	};
+
+	// What SCF_wrapper reads: the convergence thresholds with their running state, the damping
+	// and level shift schedule, the spin kind and the second-order switches
+	struct SCF_settings {
+		double quant_diff;
+		double current_quant_diff;
+		bool conv_quant_diff = false;
+		double max_diis_error;
+		double current_max_diis_error;
+		bool conv_max_diis_error = false;
+		double gradient;
+		double current_gradient;
+		bool conv_gradient = false;
+		double RMSP_diff;
+		double current_RMSP_diff;
+		bool conv_RMSP_diff = false;
+		double MaxP_diff;
+		double current_MaxP_diff;
+		bool conv_MaxP_diff = false;
+		//The four damping/shift values default to off: `fast_conv` only clears the apply
+		//flags, yet run_lambda copies alpha and level_shift and SCF_iteration mixes the
+		//density with alpha regardless of the flag
+		double diis_stop_damping = 0;
+		//`soscf`: second-order steps as soon as the DIIS error is below trah_.start_threshold, see soscf_step
+		bool soscf = false;
+		//`check_hessian`: finite-difference check of the Hessian-vector product on the first
+		//second-order step, reported in XCW.log
+		bool check_hessian = false;
+		bool apply_shift = true;
+		bool method_apply_shift = true;
+		double diis_stop_shift = 0;
+		bool apply_damping = true;
+		bool method_apply_damping = true;
+		//`guess_basis <name>`: the first lambda starts from a Hartree-Fock converged in this
+		//(smaller) basis by OCC's own driver, its density projected into the orbital basis
+		std::string guess_basis_name;
+		occ::qm::SpinorbitalKind hf_type;
+		double alpha = 0;
+		double level_shift = 0;
+		int max_scf_iterations;
+		int charge = 0;
+		int multiplicity = 1;
+		// Not settings-file keys: filled by XCW_solver from the options when it builds SCF_wrapper
+		bool incremental = true;
+		bool gpu_eri = false;
+		bool no_date = false;
+		// `save_eri <path>` / `read_eri <path>`: the stored two-electron integrals, for a later run on the same geometry and basis
+		std::filesystem::path eri_read_path, eri_save_path;
+
+		// Clears the convergence flags
+		void clear() {
+			conv_quant_diff = false;
+			conv_max_diis_error = false;
+			conv_gradient = false;
+			conv_RMSP_diff = false;
+			conv_MaxP_diff = false;
+			apply_shift = method_apply_shift;
+			apply_damping = method_apply_damping;
+		}
+
+		// Performs the convergence check and sets flags accordingly
+		bool convergence_check() const {
+			if (conv_quant_diff == true && conv_max_diis_error == true && conv_gradient == true && conv_RMSP_diff == true && conv_MaxP_diff == true) {
+				return true;
+			}
+			else {
+				return false;
+			}
+		}
+
+		// Updates the SCF routine in regards to damping and level shift
+		void update(std::ostream& file, double& alpha) {
+			if (current_max_diis_error < diis_stop_damping && apply_damping == true) {
+				apply_damping = false;
+				alpha = 0;
+				print_centered_message("***Turned off damping***", 84, file);
+			}
+			if (current_max_diis_error < diis_stop_shift && apply_shift == true) {
+				apply_shift = false;
+				print_centered_message("***Turned off level shift***", 84, file);
+			}
+		}
+	};
+
+	// What XCW_solver reads itself; the two slices above go to structure_factors and SCF_wrapper
+	struct XCW_settings : SF_settings, SCF_settings {
+		//`df_basis <name>`: density fitting of the Fock build with this auxiliary basis
+		std::string df_basis_name;
+		double xcw_start_value;
+		int num_xcw_steps;
+		double xcw_step_size;
+		bool read_first_guess;
+		bool nbo_output = false;
+		bool xcw_gaussian_halt = false;
+		double xcw_strong_cutoff = 3.0;
+	};
+
+	XCW_settings xcw_settings;
 	bool do_XCW = false;
-	bool xcw_gaussian_halt = false;
-	double xcw_strong_cutoff = 3.0;
-	bool calc_F_calc = false;
 	bool rgbi = false;
 	//-npa: NAO/NPA, run in-process
 	bool npa = false;
@@ -1161,6 +1293,7 @@ struct options
 	//development and test-only switches
 	bool digest_dev_options(const std::string &temp, int &i);
 	void digest_options();
+	void loadXCWsettings();
 	/** @brief The error for a requested analysis with no wavefunction to run on, "" when runnable;
 	 *  without -wfn/-occ run_app_impl skips its wavefunction branch silently. */
 	std::string unrunnable_analysis() const;

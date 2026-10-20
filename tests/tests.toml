@@ -514,10 +514,9 @@ full = true
 [P1_test_XCW_full.args]
 do_XCW = ""
 no_gpu = ""
-xcw_gaussian_halt = ""
 cif = "P1_test.cif"
 hkl = "P1_test.hkl"
-XCW_settings = "test_settings.txt"
+XCW_settings = "test_settings_halt.txt"
 no_date = ""
 
 # h2_weighting variant of P1_test_XCW: fits against the 1/|H|^2-weighted
@@ -551,10 +550,9 @@ full = true
 [P1_test_XCW_h2_full.args]
 do_XCW = ""
 no_gpu = ""
-xcw_gaussian_halt = ""
 cif = "P1_test.cif"
 hkl = "P1_test.hkl"
-XCW_settings = "h2_test_settings.txt"
+XCW_settings = "h2_test_settings_halt.txt"
 no_date = ""
 
 # P1_test_XCW with -xcw_incremental: the two-electron Fock part comes from the change of
@@ -601,10 +599,9 @@ full = true
 [P1_F2_test_XCW_full.args]
 do_XCW = ""
 no_gpu = ""
-xcw_gaussian_halt = ""
 cif = "P1_test.cif"
 hkl = "P1_test.hkl"
-XCW_settings = "test_settings_f2.txt"
+XCW_settings = "test_settings_f2_halt.txt"
 no_date = ""
 
 # h2_weighting variant of P1_F2_test_XCW: 
@@ -630,10 +627,9 @@ full = true
 [P1_F2_test_XCW_h2_full.args]
 do_XCW = ""
 no_gpu = ""
-xcw_gaussian_halt = ""
 cif = "P1_test.cif"
 hkl = "P1_test.hkl"
-XCW_settings = "h2_test_settings_f2.txt"
+XCW_settings = "h2_test_settings_f2_halt.txt"
 no_date = ""
 
 # GPU variants. These run only when a device is present; the test skips otherwise, so

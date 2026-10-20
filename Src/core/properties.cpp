@@ -10,6 +10,7 @@
 #include "cube.h"
 #include "constants.h"
 #include "ibo.h"
+#include "nbo.h"
 #include "GridManager.h"
 #include "isosurface.h"
 #include "SALTED_predictor.h"
@@ -2260,6 +2261,35 @@ void properties_calculation(options &opt)
 			cubes[cube_type::MO_val].set_path((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_IBO_" + to_string(k + 1) + ".cube");
 			Calc_MO(cubes[cube_type::MO_val], ibo.mos[k], local, opt.properties.radius, log2, opt.cif != "");
 			cubes[cube_type::MO_val].write_file(true);
+		}
+	}
+	if (!opt.properties.nbo_cube.empty() || !opt.properties.nlmo_cube.empty())
+	{
+		NboOptions nbo_opt;
+		nbo_opt.threads = std::max(opt.threads, 0);
+		nbo_opt.nrt_parent = opt.properties.nbo_lewis;
+		NboOrbitalSpace space;
+		//write_nbo renormalises the stored basis; the cubes take their primitives from the untouched wavy
+		WFN copy(wavy);
+		NboResults r = native_nbo(copy, nbo_opt, log2, &space);
+		r.name = wavy.get_path().stem().string();
+		print_nbo(r, log2);
+		for (const bool nlmo : {false, true})
+		{
+			const std::string &spec = nlmo ? opt.properties.nlmo_cube : opt.properties.nbo_cube;
+			if (spec.empty())
+				continue;
+			std::vector<std::pair<int, std::string>> picked;
+			const WFN local = nbo_cube_wfn(wavy, r, space, spec, nlmo, picked, log2);
+			for (int k = 0; k < static_cast<int>(picked.size()); k++)
+			{
+				log2 << "Calculating " << (nlmo ? "NLMO " : "NBO ") << picked[k].first << " " << picked[k].second << endl;
+				cubes[cube_type::MO_val].set_zero();
+				cubes[cube_type::MO_val].set_comment1(std::string(nlmo ? "NLMO " : "NBO ") + to_string(picked[k].first) + " " + picked[k].second + " (NoSpherA2 in-house NBO)");
+				cubes[cube_type::MO_val].set_path((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + (nlmo ? "_NLMO_" : "_NBO_") + to_string(picked[k].first) + ".cube");
+				Calc_MO(cubes[cube_type::MO_val], k, local, opt.properties.radius, log2, opt.cif != "");
+				cubes[cube_type::MO_val].write_file(true);
+			}
 		}
 	}
 

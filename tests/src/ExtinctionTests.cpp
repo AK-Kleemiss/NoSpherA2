@@ -1,11 +1,12 @@
-//extinction.h's models against their published forms and finite differences, and the settings keyword
-//through its only entry, the XCW constructor on the P1 fixture
+//The extinction models of Src/core/extinction.h against their published forms and against
+//finite differences, and the settings keyword that switches them on: parsed by
+//options::loadXCWsettings, set up by the structure_factors constructor on the P1 fixture.
 #include "pch.h"
 #include <gtest/gtest.h>
 
 #include "core/cell.h"
 #include "core/extinction.h"
-#include "core/XCW.h"
+#include "core/structure_factors.h"
 
 namespace NoSpherA2UnitTests
 {
@@ -16,8 +17,7 @@ namespace NoSpherA2UnitTests
 			return ::testing::UnitTest::GetInstance()->current_test_info()->name();
 		}
 
-		//what the XCW constructor throws for a settings text that cannot be parsed; a text that
-		//parses would run construct() on an empty cif and take the process with it
+		//what loadXCWsettings throws for a settings text that cannot be parsed
 		std::string ext_parse_error(const std::string& text)
 		{
 			const auto p = std::filesystem::temp_directory_path() / ("nosphera2_ext_settings_" + ext_test_name() + ".txt");
@@ -26,14 +26,14 @@ namespace NoSpherA2UnitTests
 			opt.xcw_settings_path = p;
 			opt.do_XCW = true;
 			std::string what;
-			try { XCW x(opt); }
+			try { opt.loadXCWsettings(); }
 			catch (const std::runtime_error& e) { what = e.what(); }
 			std::filesystem::remove(p);
 			return what;
 		}
 
-		//construct an XCW on the P1 fixture in a scratch directory (construct() writes XCW.log
-		//there) and hand back the log, lowercased; empty when the fixture is missing
+		//build the structure_factors of the P1 fixture in a scratch directory and hand back what
+		//it printed, lowercased; empty when the fixture is missing
 		std::string ext_construct_on_p1(const std::string& text)
 		{
 			const auto fixture = nos_test_repo_root() / "tests" / "P1_test";
@@ -50,10 +50,12 @@ namespace NoSpherA2UnitTests
 			opt.do_XCW = true;
 			const auto old_cwd = std::filesystem::current_path();
 			std::filesystem::current_path(dir);
-			{ XCW x(opt); }
-			std::filesystem::current_path(old_cwd);
 			std::stringstream log;
-			log << std::ifstream(dir / "XCW.log").rdbuf();
+			std::streambuf* const old_cout = std::cout.rdbuf(log.rdbuf());
+			opt.loadXCWsettings();
+			{ structure_factors SF(opt); }
+			std::cout.rdbuf(old_cout);
+			std::filesystem::current_path(old_cwd);
 			std::filesystem::remove_all(dir);
 			std::string out = log.str();
 			std::transform(out.begin(), out.end(), out.begin(), [](unsigned char c) { return (char)std::tolower(c); });

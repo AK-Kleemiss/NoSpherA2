@@ -1,5 +1,5 @@
-//XCW SCF driver and I tensor storage: run_XCW_fitting on the P1 fixture through the
-//settings file, observed through XCW.log, stdout and the files a run leaves behind, plus
+//XCW SCF driver and I tensor storage: XCW_solver::run on the P1 fixture through the
+//settings file, observed through SCF.log, stdout and the files a run leaves behind, plus
 //the i_tensor_file container on its own.
 //
 //Every run uses the sto-3g basis of tests/P1_test at a single lambda on every 8th
@@ -8,13 +8,14 @@
 //subset are nobody's golden, so the runs check determinism (two runs, one answer), physical
 //sanity (finite, bounded, descending) and the one number the subset cannot move: at lambda
 //= 0 the perturbation is zero and the converged energy is the Hartree-Fock energy of
-//P1_test_XCW.good, -1961.923538820 Eh. The last test builds the tensor for H2 in a cubic
+//P1_test_XCW.good, -1961.925585145 Eh. The last test builds the tensor for H2 in a cubic
 //cell and compares every element with the analytic Fourier transform of the Gaussians.
 #include "pch.h"
 #include <gtest/gtest.h>
 
 #include "core/convenience.h"
-#include "core/XCW.h"
+#include "core/XCW_solver.h"
+#include "core/basis_set.h"
 #include "core/i_tensor_stream.h"
 #include "core/tsc_block.h"
 
@@ -101,8 +102,8 @@ namespace {
 	}
 
 	struct p1_run {
-		std::string out;    //what run_XCW_fitting and the constructor printed
-		std::string log;    //XCW.log
+		std::string out;    //what the constructors and XCW_solver::run printed
+		std::string log;    //SCF.log
 		int nr = 0;         //reflections in the hkl file the run was given
 	};
 
@@ -142,20 +143,21 @@ namespace {
 		opt.cpu_itensor_fp32 = !double_tensor;
 		opt.accuracy = accuracy;
 		opt.no_date = true;
-		//As the driver does before constructing XCW: the tscb of a converged step is built
+		//As the driver does before constructing the solver: the tscb of a converged step is built
 		//from CIF disorder group 0 (NoSpherA2.cpp, do_XCW branch)
 		opt.groups[0].push_back(0);
 		p1_run r;
 		{
 			cwd_guard cwd(dir);
 			cout_capture capture;
+			opt.loadXCWsettings();
 			{
-				XCW x(opt);
-				x.run_XCW_fitting();
+				XCW_solver x(opt);
+				x.run();
 			}
 			r.out = capture.buf.str();
 		}
-		r.log = read_text(dir / "XCW.log");
+		r.log = read_text(dir / "SCF.log");
 		return r;
 	}
 
@@ -199,9 +201,9 @@ namespace {
 		return (held_double ? " read shared_i.bin" : " read shared_i.bin i_float") + read_shared_eri(dir);
 	}
 
-	//One line of the lambda table run_XCW_fitting prints per converged step:
+	//One line of the lambda table XCW_solver::run prints per converged step:
 	//lambda(5) criterion(4) GooF2(4) R1(5) energy(9) lambda*criterion(3) quant(9), tab separated.
-	//An XCW.log iteration row has the same seven columns behind a leading tab, with the
+	//An SCF.log iteration row has the same seven columns behind a leading tab, with the
 	//iteration count in the first.
 	struct lambda_row {
 		std::string lambda, criterion, goof2, r1, energy, penalty, quant;
@@ -243,7 +245,7 @@ namespace {
 		return std::isfinite(v) && v > 0.0 && v < 1e3;
 	}
 
-	//P1_test_XCW.good, lambda = 0: the Hartree-Fock energy, which no reflection subset moves
+	//P1_test_XCW.good, lambda = 0: the Hartree-Fock energy of P1_test.cif, which no reflection subset moves
 	constexpr double golden_energy = -1961.925585145;
 	constexpr int p1_nmo = 103;
 	constexpr int p1_pairs = p1_nmo * (p1_nmo + 1) / 2;
@@ -572,7 +574,7 @@ TEST(XcwScfTests, SharedTensorBuild)
 	std::filesystem::create_directories(shared_tensor().parent_path());
 	std::filesystem::remove(shared_tensor());
 	std::filesystem::remove(shared_tensor().parent_path() / "xcw_p1_subset_eri.bin");
-	const p1_run run = run_on_p1(dir, "normal normal_conv params 177 basis_set sto-3g max_iter 1 charge 0 mult 1 f rhf start 0 step_size 0.01 end 0 i_double save i.bin save_eri eri.bin");
+	const p1_run run = run_on_p1(dir, "normal normal_conv params 177 basis_set sto-3g max_iter 1 charge 0 mult 1 f rhf start 0 step_size 0.01 end 0 i_double safe i.bin save_eri eri.bin");
 	ASSERT_NE(run.out.find("I tensor written to i.bin"), std::string::npos) << run.out;
 	ASSERT_TRUE(std::filesystem::exists(dir / "eri.bin")) << run.log;
 	size_t kept = 0;
@@ -585,22 +587,22 @@ TEST(XcwScfTests, SharedTensorBuild)
 }
 
 //lambda = 0 is a plain Hartree-Fock: the energy of P1_test_XCW.good, the .tscb/.wfn/.fchk
-//of that step, damping and level shift switched off along the way. `save` writes the
-//tensor on a thread; a second run `read`s it instead of building and lands on the same
-//numbers.
+//of that step, damping and level shift switched off along the way. `safe` writes the
+//tensor on a thread (`read` of a file not there yet builds it); a second run `read`s it
+//instead of building and lands on the same numbers.
 TEST(XcwScfTests, SaveThenReadTensorReproducesLambdaZero)
 {
 	if (p1_fixture().empty()) GTEST_SKIP() << "fixture tests/P1_test not found";
 	const auto dir = scratch_dir();
-	const std::string settings = common + "f rhf start 0 step_size 0.01 end 0 read tensor.bin save tensor.bin";
+	const std::string settings = common + "f rhf start 0 step_size 0.01 end 0 read tensor.bin safe tensor.bin";
 
 	const p1_run first = run_on_p1(dir, settings + read_shared_eri(dir));
 	EXPECT_EQ(first.nr, 402);
-	EXPECT_NE(first.out.find("XCW orbital basis set: sto-3g-basis"), std::string::npos);
+	EXPECT_NE(first.out.find("XCW orbital basis set: sto-3g"), std::string::npos);
 	EXPECT_EQ(first.out.find("I tensor read from"), std::string::npos);
 	EXPECT_NE(first.out.find("Writing the I tensor to tensor.bin in the background"), std::string::npos) << first.out;
 	EXPECT_NE(first.out.find("I tensor written to tensor.bin"), std::string::npos) << first.out;
-	EXPECT_NE(first.out.find("More detailed output in XCW.log file..."), std::string::npos);
+	EXPECT_NE(first.out.find("More detailed output in SCF.log file..."), std::string::npos);
 	EXPECT_NE(first.out.find("Finished XCW fitting procedure."), std::string::npos);
 	//Distance screening is a property of the structure and the basis, not of the hkl
 	const int screened = static_cast<int>(number_after(first.out, "Screened out "));
@@ -649,7 +651,8 @@ TEST(XcwScfTests, SaveThenReadTensorReproducesLambdaZero)
 	EXPECT_TRUE(single);
 	EXPECT_EQ(std::filesystem::file_size(dir / "tensor.bin"), 40u + 2u * kept * sizeof(int) + i_tensor_file::total_bytes(first.nr, kept, true));
 
-	const p1_run second = run_on_p1(dir, settings + read_shared_eri(dir));
+	//a tensor that is read is not saved again
+	const p1_run second = run_on_p1(dir, common + "f rhf start 0 step_size 0.01 end 0 read tensor.bin" + read_shared_eri(dir));
 	EXPECT_NE(second.out.find("I tensor read from tensor.bin"), std::string::npos) << second.out;
 	EXPECT_NE(second.out.find(", single precision), not recomputed, held in memory"), std::string::npos) << second.out;
 	EXPECT_EQ(second.out.find("Screened out"), std::string::npos);
@@ -828,7 +831,7 @@ TEST(XcwScfTests, FastConvWeightedRunsWithoutDampingOrShift)
 	std::filesystem::remove_all(dir);
 }
 
-//Five iterations at lambda = 0.01 from the core guess, twice: the same five XCW.log rows to
+//Five iterations at lambda = 0.01 from the core guess, twice: the same five SCF.log rows to
 //the last printed digit (the I tensor contraction, the Fock build and DIIS are all in
 //them), energies within a few Hartree of the Hartree-Fock minimum and lower at the end
 //than at the start, criteria positive. No converged result is asked for.
@@ -980,7 +983,7 @@ TEST(XcwScfTests, ITensorOfH2MatchesAnalyticGaussianTransform)
 	}
 	const int nr = static_cast<int>(hkl.size());
 
-	const p1_run run = run_xcw(dir, cif, hkl_path, "normal normal_conv params 1 basis_set sto-3g max_iter 100 charge 0 mult 1 f rhf start 0 step_size 0.01 end 0 save tensor.bin", true, 3);
+	const p1_run run = run_xcw(dir, cif, hkl_path, "normal normal_conv params 1 basis_set sto-3g max_iter 100 charge 0 mult 1 f rhf start 0 step_size 0.01 end 0 safe tensor.bin", true, 3);
 	EXPECT_NE(run.out.find("I tensor written to tensor.bin"), std::string::npos) << run.out;
 	ASSERT_NE(run.log.find("***SCF converged in "), std::string::npos) << run.log;
 

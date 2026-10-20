@@ -20,6 +20,7 @@ struct NboInput {
 	dMatrix2 overlap;
 	std::vector<dMatrix2> density;
 	std::vector<dMatrix2> fock;
+	std::vector<dMatrix2> lcaomo;      //$LCAOMO per spin block, row k = MO k in the AO basis, zero-padded to n rows
 };
 
 //One accepted Lewis or non-Lewis orbital in the NAO basis.
@@ -43,6 +44,15 @@ struct NboLewis {
 	double threshold = 0.0;            //occupancy threshold the ladder stopped at
 	//bond multiplicities of the leading Lewis structure, lone pairs (cores included) on the diagonal
 	ivec2 topo;
+	ivec printed;                      //printed NBO number k + 1 is orbitals[printed[k]]
+};
+
+//-nbo_cube / -nlmo_cube: what native_nbo leaves behind for orbital pictures, closed shell only
+struct NboOrbitalSpace {
+	NAOResult nao;                     //nao.C: AO x NAO in the FILE47 AO order
+	dMatrix2 overlap;
+	dMatrix2 lcaomo;
+	NboLewis lewis;
 };
 
 struct NboOptions {
@@ -64,6 +74,19 @@ struct NboOptions {
 	bool nrt_mirror = true;            //off with -nrt_no_mirror: one-move arrows that separate no charge, orbits completed against the candidates
 	bool nrt_rotate = false;           //-nrt_rotate: an image of a converged structure starts from its orbitals, rotated; moves bond orders by up to 2e-4
 	double nrt_weight_floor = 5.0e-5;  //weights below this are dropped from the reported set
+	//-nrt_tie: the fit pins the residual, not the weights (Gamma_parent + Gamma_ab = Gamma_a + Gamma_b for fixed
+	//orbitals). Among weights whose D(w)^2 lies within this fraction of the optimum take the most parent weight,
+	//then the most on single changes, then doubles, ... 0 = off (the first optimum the minimiser reaches)
+	double nrt_tie = 1.0e-6;
+	//-nrt_ref: multi-reference NRT. After a fit every structure of at least this fraction of the leading weight
+	//becomes a reference, its arrow walk joins the pool and the fit repeats, until no new reference appears (at most
+	//8 cycles); -nrt_tie then ranks by pair moves to the nearest reference. A parent the fit leaves light (benzene's
+	//search puts a lone pair on C1, the Kekule structures carry the weight) no longer decides the pool: the leading
+	//structure nearest the hybrid re-anchors the walk's charge screen each cycle; the leading one (ties to the nearest
+	//the hybrid) is reported as the parent. A walk of nrt_screen_min+
+	//structures builds those of approximate reduced cost below max(nrt_screen, 0) first, the rest stay deferred and
+	//are re-priced after each refit (-nrt_screen off builds all). 0 = off
+	double nrt_ref = 0.5;
 	bool nrt = false;
 	bool nrt_exhaustive = false;       //enumerate every feasible topology instead of arrows
 	bool nrt_ion = true;               //allow candidates that move a bond to a lone pair (NRTION)
@@ -73,6 +96,14 @@ struct NboOptions {
 	//NBO's $CHOOSE: the search places exactly this Lewis structure, valence lone pairs on the diagonal and
 	//bond orders off it; empty = the search picks.  native_nbo fills it from nrt_parent.
 	ivec2 parent_lewis;
+	//-nrt_e2_avg <percent>: E2 belongs to one Lewis structure; rerun search + E2 under $CHOOSE for every NRT
+	//structure degenerate with the leading one (weight within this many percent of it) and average the channels
+	//with the renormalised weights. 0 = off. A plain weight cut lets in high-rho(NL) structures whose E2 is
+	//meaningless (formate: 650 kcal/mol from a 1.9 e rho(NL) structure).
+	double nrt_e2_avg_percent = 0.0;
+	//-nrt_e2_avg_min <percent>: absolute weight floor instead of the window, to reach structures that change the
+	//metal core when the near-degenerate ones differ only in remote ligand resonance. 0 = off.
+	double nrt_e2_avg_min_percent = 0.0;
 	std::filesystem::path nrt_parent;  //-nrt_parent <file.json>, read by read_lewis_structure
 	int threads = 0;                   //0: OpenMP default
 	int search_threads = 0;            //Lewis search only, 0: threads
@@ -136,7 +167,19 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 void refuse_unsupported_nbo_source(const WFN& wavy, std::ostream& log);
 
 //wavy is not const: WFN::write_nbo() renormalises the stored basis.
-NboResults native_nbo(WFN& wavy, const NboOptions& options, std::ostream& log);
+NboResults native_nbo(WFN& wavy, const NboOptions& options, std::ostream& log, NboOrbitalSpace* space = nullptr);
+
+/**
+ * -nbo_cube / -nlmo_cube: a copy of wavy whose MO slot k holds selected orbital k as primitive coefficients, for
+ * Calc_MO.  spec: NBO numbers as print_nbo prints them, "lewis", or labels with ':' for the blank ("LP:Pd1",
+ * "BD*:Pd1-P6"), comma-separated.  An orbital reaches the primitives through the MOs, t = C_MO S x, so wavy must be
+ * the closed-shell wavefunction the FILE47 was written from, with every MO; the lost norm 1 - |t|^2 is logged.
+ * NLMOs are the occupied orbitals of maximum overlap with their Lewis NBOs: the NBOs projected on the occupied
+ * space (Gamma / 2) and Loewdin-orthogonalised, the closed-shell limit of Reed and Weinhold's NLMOs
+ * (J. Chem. Phys. 83 (1985) 1736).  picked[k] is the printed number and label of slot k.
+ */
+WFN nbo_cube_wfn(const WFN& wavy, const NboResults& r, const NboOrbitalSpace& space, const std::string& spec,
+				 bool nlmo, std::vector<std::pair<int, std::string>>& picked, std::ostream& log);
 
 /** Print the tables of a native result in NoSpherA2's table layout; the JSON keeps gennbo's labels. */
 void print_nbo(const NboResults& results, std::ostream& out);

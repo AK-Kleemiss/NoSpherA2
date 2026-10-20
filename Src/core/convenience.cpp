@@ -457,6 +457,19 @@ std::string help_message =
  "                                    them, all, or C2:C3 for every bond-like\n"
  "                                    IBO between two atoms, comma-separated\n"
  "                                    (e.g. 6,C2:C3). Grid as for -MO.\n"
+ "  -nbo_cube <list>                   In-house NBO of -wfn, then cubes\n"
+ "                                    <wfn>_NBO_<n>.cube of the NBOs in <list>:\n"
+ "                                    numbers as the NBO table in\n"
+ "                                    NoSpherA2_cube.log prints them, lewis, or\n"
+ "                                    labels with ':' for the blank (LP:Pd1,\n"
+ "                                    BD*:Pd1-P6, LV:Zn2), comma-separated.\n"
+ "                                    Closed shell, .gbw/.molden with all MOs.\n"
+ "  -nlmo_cube <list>                  The same for the NLMOs of Lewis NBOs:\n"
+ "                                    <wfn>_NLMO_<n>.cube; the log gives each\n"
+ "                                    one's parent-NBO % and atom weights.\n"
+ "  -nbo_lewis <file.json>             NBOs of this Lewis structure for\n"
+ "                                    -nbo_cube/-nlmo_cube (as -nrt_parent; a\n"
+ "                                    .native.nbo.json gives its NRT leader).\n"
  "  -rgbi_no_sym                       RGBI without atomic O_h symmetrization. A\n"
  "                                    free-atom ANO reference stays spherical.\n"
  "  -rgbi_basis <nao|ano>              RGBI basis: occupied NAO or ANO [ano].\n"
@@ -634,7 +647,7 @@ std::string help_message =
  "                                    rotated, instead of the greedy fill: SF6\n"
  "                                    needs half the sweeps; bond orders move by\n"
  "                                    up to 2e-4. Default off.\n"
- "  -nrt_screen <r|off>                With -nrt_target, a walk of 200 or more new\n"
+ "  -nrt_screen <r|off>                With -nrt_target or -nrt_ref, a walk of 200+ new\n"
  "                                    structures builds in full only those whose\n"
  "                                    reduced cost, from approximate orbitals, is\n"
  "                                    below r, 16 at a time with their symmetry\n"
@@ -678,7 +691,35 @@ std::string help_message =
  "                                    are added; bond orders 1-3. A\n"
  "                                    .native.nbo.json is read through its\n"
  "                                    \"parent_lewis\". The log compares its rho(NL)\n"
- "                                    with the search's own best structure.\n\n"
+ "                                    with the search's own best structure.\n"
+ "  -nrt_e2_avg <percent>              E(2) per NRT structure whose weight is within\n"
+ "                                    <percent> of the leading one (degenerate\n"
+ "                                    set), each placed under $CHOOSE, averaged\n"
+ "                                    with the NRT weights renormalised over the\n"
+ "                                    set (implies -nrt; closed shell only).\n"
+ "                                    Channels sum orbitals of one type on the same\n"
+ "                                    centres; a channel a structure lacks counts 0.\n"
+ "  -nrt_e2_avg_min <percent>          As -nrt_e2_avg, but over every NRT structure\n"
+ "                                    of at least this weight: reaches structures\n"
+ "                                    that change a metal core when the near-\n"
+ "                                    degenerate ones differ only far away. Check\n"
+ "                                    rho(NL) per structure: a high one gives E(2)\n"
+ "                                    that means little.\n"
+ "  -nrt_tie <fraction>                The fit fixes the residual, not the weights\n"
+ "                                    (parent + double change = two singles).\n"
+ "                                    Among weights within this fraction of the\n"
+ "                                    best D(w)^2, take the most parent weight,\n"
+ "                                    then single changes, then doubles, ...\n"
+ "                                    Default 1e-6, 0 = off.\n\n"
+ "  -nrt_ref <fraction>                Multi-reference NRT: every structure of at\n"
+ "                                    least this fraction of the leading weight\n"
+ "                                    walks its own arrows into the pool and the\n"
+ "                                    fit repeats (at most 8 cycles); -nrt_tie\n"
+ "                                    ranks by moves to the nearest reference.\n"
+ "                                    The structure nearest the resonance hybrid\n"
+ "                                    re-anchors the walk each cycle; the leading\n"
+ "                                    structure is reported as the parent.\n"
+ "                                    Default 0.5, 0 = off.\n\n"
  "CONVERSION, ML, AND SPECIALISED TOOLS\n"
  "  -gbw2wfn -wfn <file.gbw>            Convert GBW input to .wfn.\n"
  "  -fchk <output.fchk>              Write FCHK output (requires -b and -d).\n"
@@ -785,7 +826,7 @@ std::string help_message =
  "  -coef <file>                        Use externally supplied SALTED\n"
  "                                    coefficients.\n"
  "  -convert_XCW <stdout> <lambda-step> Convert Tonto XCW lambda-step output.\n"
- "  -do_XCW  -calc_F                    XCW/Fcalc modes; anomalous dispersion is read from the CIF.\n"
+ "  -do_XCW                             XCW mode; anomalous dispersion is read from the CIF.\n"
  "  -no_xcw_extrapolate                Seed each lambda step from the last one\n"
  "                                    alone instead of the density extrapolated\n"
  "                                    through the two previous steps.\n"
@@ -806,7 +847,7 @@ std::string help_message =
  "                                                      reflections at a time\n"
  "                                      i_tensor_mb <n> the same, with the\n"
  "                                                      budget named in MB\n"
- "                                      safe / read     save / read with the\n"
+ "                                      read            read the tensor at the\n"
  "                                                      default path\n"
  "                                      read <path>     reuse the streamed\n"
  "                                                      tensor at that path\n"
@@ -817,7 +858,7 @@ std::string help_message =
  "                                                      any refinement\n"
  "                                                      setting, so trying\n"
  "                                                      another one is free\n"
- "                                      save <path>     write the tensor\n"
+ "                                      safe <path>     write the tensor\n"
  "                                                      there while the\n"
  "                                                      refinement runs, for\n"
  "                                                      a later read <path>\n"
@@ -966,6 +1007,21 @@ std::string NoSpherA2_message(bool no_date)
 	}
 	return t;
 }
+
+std::string WAEmpiRe_message()
+{
+	std::string t = " _   _   __ __    _____               __ ___  \n";
+	t.append("| | / | / /   |  / ___/_   __  ____ /_/ __ \\___) \n");
+	t.append("| |/  |/ / /| | / /__/  | /  |/ __ \\__/ /_/ / _ \\ \n");
+	t.append("|  / |  / __  |/ /__/ /||//| / /_/ / / __  /  __/ \n");
+	t.append("|_/  |_/_/  |_/____/_/ |_/ |/ .___/_/_/  |_\\___/ \n");
+	t.append("                           /_/				\n");
+	t.append("Wavefunction Augmentation through Emprirical Restraints \n");
+	t.append("is part of the NoSpherA2 project developed by Florian Kleemiss. \n");
+	return t;
+}
+
+
 
 std::string build_date = ("This Executable was built on: " + std::string(__DATE__) + " " + std::string(__TIME__) + "\n");
 
@@ -1780,681 +1836,6 @@ bool generate_cart2sph_mat(vec2 &d, vec2 &f, vec2 &g, vec2 &h)
 	return true;
 }
 
-bool read_fracs_ADPs_from_CIF(const std::filesystem::path& cif, WFN& wavy, cell& unit_cell, std::ofstream& log3, const bool& debug)
-{
-	using namespace std;
-	vec2 Uij, Cijk, Dijkl;
-	ifstream asym_cif_input(cif, std::ios::in);
-	asym_cif_input.clear();
-	asym_cif_input.seekg(0, asym_cif_input.beg);
-	string line;
-	svec labels;
-	int count_fields = 0;
-	int position_field[3] = { 0, 0, 0 };
-	int label_field = 100;
-	vec2 positions;
-	positions.resize(wavy.get_ncen());
-
-#pragma omp parallel for schedule(dynamic)
-	for (int i = 0; i < wavy.get_ncen(); i++)
-	{
-		positions[i].resize(3);
-	}
-	bool atoms_read = false;
-	while (!asym_cif_input.eof() && !atoms_read)
-	{
-		getline_universal(asym_cif_input, line);
-		if (line.find("loop_") != string::npos)
-		{
-			while (line.find("_") != string::npos)
-			{
-				getline_universal(asym_cif_input, line);
-				if (debug)
-					log3 << "line in loop field definition: " << line << endl;
-				if (line.find("label") != string::npos)
-					label_field = count_fields;
-				else if (line.find("fract_x") != string::npos)
-					position_field[0] = count_fields;
-				else if (line.find("fract_y") != string::npos)
-					position_field[1] = count_fields;
-				else if (line.find("fract_z") != string::npos)
-					position_field[2] = count_fields;
-				else if (label_field == 100)
-				{
-					if (debug)
-						log3 << "I don't think this is the atom block.. moving on!" << endl;
-					break;
-				}
-				count_fields++;
-			}
-			while (line.find("_") == string::npos && line.length() > 3)
-			{
-				atoms_read = true;
-				stringstream s(line);
-				svec fields;
-				fields.resize(count_fields);
-				for (int i = 0; i < count_fields; i++)
-					s >> fields[i];
-				if (debug)
-					log3 << "label: " << fields[label_field] << " frac_position: " << stod(fields[position_field[0]]) << " " << stod(fields[position_field[1]]) << " " << stod(fields[position_field[2]]) << endl;
-				//A CIF whose atom_site loop holds more atoms than the wavefunction has
-				//centres would otherwise be written past the end of 'positions'.
-				err_checkf(labels.size() < positions.size(),
-					"The CIF lists more atoms than the wavefunction has centres, cannot assign U_iso!", std::cout);
-				positions[labels.size()] = unit_cell.get_coords_cartesian(stod(fields[position_field[0]]), stod(fields[position_field[1]]), stod(fields[position_field[2]]));
-				bool found_this_one = false;
-				if (debug)
-					log3 << "label: " << fields[label_field] << " cartesian position: " << positions[labels.size()][0] << " " << positions[labels.size()][1] << " " << positions[labels.size()][2] << endl;
-				for (int i = 0; i < wavy.get_ncen(); i++)
-				{
-					if (is_similar(positions[labels.size()][0], wavy.get_atom_coordinate(i, 0), -1) && is_similar(positions[labels.size()][1], wavy.get_atom_coordinate(i, 1), -1) && is_similar(positions[labels.size()][2], wavy.get_atom_coordinate(i, 2), -1))
-					{
-						if (debug)
-							log3 << "WFN position: " << wavy.get_atom_coordinate(i, 0) << " " << wavy.get_atom_coordinate(i, 1) << " " << wavy.get_atom_coordinate(i, 2) << endl
-							<< "Found an atom: " << fields[label_field] << " Corresponding to atom charge " << wavy.get_atom_charge(i) << endl;
-						wavy.set_atom_label(i, fields[label_field]);
-						wavy.set_atom_frac_coords(i, { stod(fields[position_field[0]]), stod(fields[position_field[1]]), stod(fields[position_field[2]]) });
-						found_this_one = true;
-						break;
-					}
-				}
-				if (!found_this_one && debug)
-					log3 << "I DID NOT FIND THIS ATOM IN THE CIF?! WTF?!" << endl;
-				labels.push_back(fields[label_field]);
-				getline_universal(asym_cif_input, line);
-			}
-		}
-	}
-
-	asym_cif_input.clear();
-	asym_cif_input.seekg(0, asym_cif_input.beg);
-	count_fields = 0;
-	int ADP_field[15] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-	label_field = 100;
-	atoms_read = false;
-	Uij.resize(wavy.get_ncen());
-	while (!asym_cif_input.eof() && !atoms_read)
-	{
-		getline_universal(asym_cif_input, line);
-		if (line.find("loop_") != string::npos)
-		{
-			while (line.find("_") != string::npos)
-			{
-				getline_universal(asym_cif_input, line);
-				if (debug)
-					log3 << "line in loop field definition: " << line << endl;
-				if (line.find("aniso_label") != string::npos)
-					label_field = count_fields;
-				else if (line.find("aniso_U_11") != string::npos)
-					ADP_field[0] = count_fields;
-				else if (line.find("aniso_U_22") != string::npos)
-					ADP_field[1] = count_fields;
-				else if (line.find("aniso_U_33") != string::npos)
-					ADP_field[2] = count_fields;
-				else if (line.find("aniso_U_12") != string::npos)
-					ADP_field[3] = count_fields;
-				else if (line.find("aniso_U_13") != string::npos)
-					ADP_field[4] = count_fields;
-				else if (line.find("aniso_U_23") != string::npos)
-					ADP_field[5] = count_fields;
-				else if (label_field == 100)
-				{
-					if (debug)
-						log3 << "I don't think this is the Uij block.. moving on!" << endl;
-					break;
-				}
-				count_fields++;
-			}
-			while (line.find("_") == string::npos && line.length() > 3)
-			{
-				atoms_read = true;
-				stringstream s(line);
-				svec fields;
-				fields.resize(count_fields);
-				for (int i = 0; i < count_fields; i++)
-					s >> fields[i];
-				if (debug)
-					log3 << "label: " << fields[label_field] << endl;
-				bool found_this_one = false;
-				for (int i = 0; i < wavy.get_ncen(); i++)
-				{
-					if (fields[label_field] == wavy.get_atom_label(i))
-					{
-						Uij[i].resize(6);
-						for (int j = 0; j < 6; j++)
-							Uij[i][j] = stod(fields[ADP_field[j]]);
-						found_this_one = true;
-						break;
-					}
-				}
-				if (!found_this_one && debug)
-					log3 << "I DID NOT FIND THIS ATOM IN THE CIF?! WTF?!" << endl;
-				getline_universal(asym_cif_input, line);
-			}
-		}
-	}
-
-	asym_cif_input.clear();
-	asym_cif_input.seekg(0, asym_cif_input.beg);
-	count_fields = 0;
-	label_field = 100;
-	atoms_read = false;
-	Cijk.resize(wavy.get_ncen());
-	while (!asym_cif_input.eof() && !atoms_read)
-	{
-		getline_universal(asym_cif_input, line);
-		if (line.find("loop_") != string::npos)
-		{
-			while (line.find("_") != string::npos)
-			{
-				getline_universal(asym_cif_input, line);
-				if (debug)
-					log3 << "line in loop field definition: " << line << endl;
-				if (line.find("C_label") != string::npos)
-					label_field = count_fields;
-				else if (line.find("C_111") != string::npos)
-					ADP_field[0] = count_fields;
-				else if (line.find("C_112") != string::npos)
-					ADP_field[1] = count_fields;
-				else if (line.find("C_113") != string::npos)
-					ADP_field[2] = count_fields;
-				else if (line.find("C_122") != string::npos)
-					ADP_field[3] = count_fields;
-				else if (line.find("C_123") != string::npos)
-					ADP_field[4] = count_fields;
-				else if (line.find("C_133") != string::npos)
-					ADP_field[5] = count_fields;
-				else if (line.find("C_222") != string::npos)
-					ADP_field[6] = count_fields;
-				else if (line.find("C_223") != string::npos)
-					ADP_field[7] = count_fields;
-				else if (line.find("C_233") != string::npos)
-					ADP_field[8] = count_fields;
-				else if (line.find("C_333") != string::npos)
-					ADP_field[9] = count_fields;
-				else if (label_field == 100)
-				{
-					if (debug)
-						log3 << "I don't think this is the Cijk block.. moving on!" << endl;
-					break;
-				}
-				count_fields++;
-			}
-			while (line.find("_") == string::npos && line.length() > 3)
-			{
-				atoms_read = true;
-				stringstream s(line);
-				svec fields;
-				fields.resize(count_fields);
-				for (int i = 0; i < count_fields; i++)
-					s >> fields[i];
-				if (debug)
-					log3 << "label: " << fields[label_field] << endl;
-				bool found_this_one = false;
-				for (int i = 0; i < wavy.get_ncen(); i++)
-				{
-					if (fields[label_field] == wavy.get_atom_label(i))
-					{
-						Cijk[i].resize(10);
-						for (int j = 0; j < 10; j++)
-							Cijk[i][j] = stod(fields[ADP_field[j]]);
-						found_this_one = true;
-						break;
-					}
-				}
-				if (!found_this_one && debug)
-					log3 << "I DID NOT FIND THIS ATOM IN THE CIF?! WTF?!" << endl;
-				getline_universal(asym_cif_input, line);
-			}
-		}
-	}
-
-	asym_cif_input.clear();
-	asym_cif_input.seekg(0, asym_cif_input.beg);
-	count_fields = 0;
-	label_field = 100;
-	atoms_read = false;
-	Dijkl.resize(wavy.get_ncen());
-	while (!asym_cif_input.eof() && !atoms_read)
-	{
-		getline_universal(asym_cif_input, line);
-		if (line.find("loop_") != string::npos)
-		{
-			while (line.find("_") != string::npos)
-			{
-				getline_universal(asym_cif_input, line);
-				if (debug)
-					log3 << "line in loop field definition: " << line << endl;
-				if (line.find("D_label") != string::npos)
-					label_field = count_fields;
-				else if (line.find("D_1111") != string::npos)
-					ADP_field[0] = count_fields;
-				else if (line.find("D_1112") != string::npos)
-					ADP_field[1] = count_fields;
-				else if (line.find("D_1113") != string::npos)
-					ADP_field[2] = count_fields;
-				else if (line.find("D_1122") != string::npos)
-					ADP_field[3] = count_fields;
-				else if (line.find("D_1123") != string::npos)
-					ADP_field[4] = count_fields;
-				else if (line.find("D_1133") != string::npos)
-					ADP_field[5] = count_fields;
-				else if (line.find("D_1222") != string::npos)
-					ADP_field[6] = count_fields;
-				else if (line.find("D_1223") != string::npos)
-					ADP_field[7] = count_fields;
-				else if (line.find("D_1233") != string::npos)
-					ADP_field[8] = count_fields;
-				else if (line.find("D_1333") != string::npos)
-					ADP_field[9] = count_fields;
-				else if (line.find("D_2222") != string::npos)
-					ADP_field[10] = count_fields;
-				else if (line.find("D_2223") != string::npos)
-					ADP_field[11] = count_fields;
-				else if (line.find("D_2233") != string::npos)
-					ADP_field[12] = count_fields;
-				else if (line.find("D_2333") != string::npos)
-					ADP_field[13] = count_fields;
-				else if (line.find("D_3333") != string::npos)
-					ADP_field[14] = count_fields;
-				else if (label_field == 100)
-				{
-					if (debug)
-						log3 << "I don't think this is the Dijk block.. moving on!" << endl;
-					break;
-				}
-				count_fields++;
-			}
-			while (line.find("_") == string::npos && line.length() > 3)
-			{
-				atoms_read = true;
-				stringstream s(line);
-				svec fields;
-				fields.resize(count_fields);
-				for (int i = 0; i < count_fields; i++)
-					s >> fields[i];
-				if (debug)
-					log3 << "label: " << fields[label_field] << endl;
-				bool found_this_one = false;
-				for (int i = 0; i < wavy.get_ncen(); i++)
-				{
-					if (fields[label_field] == wavy.get_atom_label(i))
-					{
-						Dijkl[i].resize(15);
-						for (int j = 0; j < 15; j++)
-							Dijkl[i][j] = stod(fields[ADP_field[j]]);
-						found_this_one = true;
-						break;
-					}
-				}
-				if (!found_this_one && debug)
-					log3 << "I DID NOT FIND THIS ATOM IN THE CIF?! WTF?!" << endl;
-				getline_universal(asym_cif_input, line);
-			}
-		}
-	}
-
-	for (int i = 0; i < wavy.get_ncen(); i++)
-		wavy.set_atom_ADPs(i, { Uij[i], Cijk[i], Dijkl[i] });
-
-	return true;
-};
-
-bool read_fracs_ADPs_from_CIF(const std::filesystem::path &cif, WFN &wavy, std::ofstream &log3, const bool &debug, const bool &grown, const ivec3 &symmetry_linking_list)
-{
-	using namespace std;
-	ifstream asym_cif_input(cif, std::ios::in);
-	asym_cif_input.clear();
-	asym_cif_input.seekg(0, asym_cif_input.beg);
-	string line;
-	int ncen;
-	if (!grown) {
-		ncen = wavy.get_ncen();
-	}
-	else {
-		ncen = symmetry_linking_list.size();
-	}
-	svec labels(ncen);
-
-	for (int i = 0; i < ncen; i++) {
-		labels[i] = wavy.get_atoms()[i].get_label();
-	}
-
-	while (getline_universal(asym_cif_input, line)) {
-		if (!line.starts_with("loop_")) {
-			if (debug)
-				log3 << "This is not part of a loop. Moving on.";
-			continue;
-		}
-		if (debug)
-			log3 << "Found a loop!";
-		getline_universal(asym_cif_input, line);
-		if (line.find("_atom_site_aniso_label") != string::npos) {
-			if (debug) {
-				log3 << "This loop contains anisotropic displacement parameters.";
-			}
-			ivec fields;
-			while (line.find("_atom_site_aniso") != string::npos && line.length() > 3) {
-				getline_universal(asym_cif_input, line);
-				if (line.find("U_11") != string::npos)
-					fields.push_back(0);
-				else if (line.find("U_22") != string::npos)
-					fields.push_back(1);
-				else if (line.find("U_33") != string::npos)
-					fields.push_back(2);
-				else if (line.find("U_12") != string::npos)
-					fields.push_back(3);
-				else if (line.find("U_13") != string::npos)
-					fields.push_back(4);
-				else if (line.find("U_23") != string::npos)
-					fields.push_back(5);	
-			}
-			while (line.find_first_not_of(" \t\r\n") != std::string::npos) {
-				std::vector<std::string> entries;
-				std::istringstream iss(line);
-				std::string token;
-				while (entries.size() < 7 && iss >> token)
-					entries.push_back(token);
-				while (entries.size() < 7 && getline_universal(asym_cif_input, line)) {
-					std::istringstream nextLine(line);
-					while (entries.size() < 7 && nextLine >> token)
-						entries.push_back(token);
-				}
-				bool atom_found = false;
-				for (int a = 0; a < ncen; a++) {
-					if (entries[0] == wavy.get_atom(a).get_label()) {
-						vec2 ADPs = wavy.get_atom(a).get_ADPs();
-						if (ADPs.size() != 3)
-							ADPs.resize(3);
-						ADPs[0].resize(6);
-						for (int i = 0; i < 6; i++) {
-							ADPs[0][fields[i]] = stof(entries[i + 1]);
-						}
-						wavy.set_atom_ADPs(a, ADPs);
-						if (grown) {
-							for (int b = 0; b < symmetry_linking_list[a].size(); b++) {
-								if (symmetry_linking_list[a][b].size() != 0) {
-									wavy.set_atom_ADPs(b, ADPs);
-								}
-							}
-						}
-						atom_found = true;
-						break;
-					}
-				}
-				if (!atom_found) throw std::runtime_error("Displacement parameters found for atom that is not recognized!");
-				getline_universal(asym_cif_input, line);
-			}
-		}
-		else if (line.find("_atom_site_anharm_GC_C_label") != string::npos) {
-			if (debug)
-				log3 << "This loop contains anharmonic Gram-Charlier coefficients C.";
-			ivec fields;
-			while (line.find("_atom_site_anharm") != string::npos && line.length() > 3) {
-				getline_universal(asym_cif_input, line);
-				if (line.find("C_111") != string::npos)
-					fields.push_back(0);
-				else if (line.find("C_112") != string::npos)
-					fields.push_back(1);
-				else if (line.find("C_113") != string::npos)
-					fields.push_back(2);
-				else if (line.find("C_122") != string::npos)
-					fields.push_back(3);
-				else if (line.find("C_123") != string::npos)
-					fields.push_back(4);
-				else if (line.find("C_133") != string::npos)
-					fields.push_back(5);
-				else if (line.find("C_222") != string::npos)
-					fields.push_back(6);
-				else if (line.find("C_223") != string::npos)
-					fields.push_back(7);
-				else if (line.find("C_233") != string::npos)
-					fields.push_back(8);
-				else if (line.find("C_333") != string::npos)
-					fields.push_back(9);   
-			}
-			while (line.find_first_not_of(" \t\r\n") != std::string::npos) {
-				std::vector<std::string> entries;
-				std::istringstream iss(line);
-				std::string token;
-				while (entries.size() < 11 && iss >> token) {
-					const int pos = token.find('(');
-					entries.push_back(token);
-				}
-				while (entries.size() < 11 && getline_universal(asym_cif_input, line)) {
-					std::istringstream nextLine(line);
-					while (entries.size() < 11 && nextLine >> token) {
-						entries.push_back(token);
-					}
-				}
-				bool atom_found = false;
-				for (int a = 0; a < ncen; a++) {
-					if (entries[0] == wavy.get_atom(a).get_label()) {
-						vec2 ADPs = wavy.get_atom(a).get_ADPs();
-						if (ADPs.size() != 3)
-							ADPs.resize(3);
-						ADPs[1].resize(10);
-						for (int i = 0; i < 10; i++) {
-							ADPs[1][fields[i]] = stof(entries[i + 1]);
-						}
-						wavy.set_atom_ADPs(a, ADPs);
-						if (grown) {
-							for (int b = 0; b < symmetry_linking_list[a].size(); b++) {
-								if (symmetry_linking_list[a][b].size() != 0) {
-									wavy.set_atom_ADPs(b, ADPs);
-								}
-							}
-						}
-						atom_found = true;
-						break;
-					}
-				}
-				if (!atom_found) throw std::runtime_error("Displacement parameters found for atom that is not recognized!");
-				getline_universal(asym_cif_input, line);
-			}
-		}
-		else if (line.find("_atom_site_anharm_GC_D_label") != string::npos) {
-			if (debug)
-				log3 << "This loop contains anharmonic Gram-Charlier coefficients D.";
-			ivec fields;
-			while (line.find("_atom_site_anharm") != string::npos && line.length() > 3) {
-				getline_universal(asym_cif_input, line);
-				if (line.find("D_1111") != string::npos)
-					fields.push_back(0);
-				else if (line.find("D_1112") != string::npos)
-					fields.push_back(1);
-				else if (line.find("D_1113") != string::npos)
-					fields.push_back(2);
-				else if (line.find("D_1122") != string::npos)
-					fields.push_back(3);
-				else if (line.find("D_1123") != string::npos)
-					fields.push_back(4);
-				else if (line.find("D_1133") != string::npos)
-					fields.push_back(5);
-				else if (line.find("D_1222") != string::npos)
-					fields.push_back(6);
-				else if (line.find("D_1223") != string::npos)
-					fields.push_back(7);
-				else if (line.find("D_1233") != string::npos)
-					fields.push_back(8);
-				else if (line.find("D_1333") != string::npos)
-					fields.push_back(9);
-				else if (line.find("D_2222") != string::npos)
-					fields.push_back(10);
-				else if (line.find("D_2223") != string::npos)
-					fields.push_back(11);
-				else if (line.find("D_2233") != string::npos)
-					fields.push_back(12);
-				else if (line.find("D_2333") != string::npos)
-					fields.push_back(13);
-				else if (line.find("D_3333") != string::npos)
-					fields.push_back(14);
-			}
-			while (line.find_first_not_of(" \t\r\n") != std::string::npos) {
-				std::vector<std::string> entries;
-				std::istringstream iss(line);
-				std::string token;
-				while (entries.size() < 16 && iss >> token)
-					entries.push_back(token);
-				while (entries.size() < 16 && getline_universal(asym_cif_input, line)) {
-					std::istringstream nextLine(line);
-					while (entries.size() < 16 && nextLine >> token)
-						entries.push_back(token);
-				}
-				bool atom_found = false;
-				for (int a = 0; a < ncen; a++) {
-					if (entries[0] == wavy.get_atom(a).get_label()) {
-						vec2 ADPs = wavy.get_atom(a).get_ADPs();
-						if (ADPs.size() != 3)
-							ADPs.resize(3);
-						ADPs[2].resize(15);
-						for (int i = 0; i < 15; i++) {
-							ADPs[2][fields[i]] = stof(entries[i + 1]);
-						}
-						wavy.set_atom_ADPs(a, ADPs);
-						if (grown) {
-							for (int b = 0; b < symmetry_linking_list[a].size(); b++) {
-								if (symmetry_linking_list[a][b].size() != 0) {
-									wavy.set_atom_ADPs(b, ADPs);
-								}
-							}
-						}
-						atom_found = true;
-						break;
-					}
-				}
-				if (!atom_found) throw std::runtime_error("Displacement parameters found for atom that is not recognized!");
-				getline_universal(asym_cif_input, line);
-			}
-		}
-		else {
-			if (debug)
-				log3 << "This was not the right loop. Moving on.";
-			continue;
-		}
-	}
-	return true;
-	// closing function
-};
-
-vec read_U_iso_from_CIF(const std::filesystem::path &cif, WFN &wavy, cell &unit_cell, std::ofstream &log3, const bool& debug)
-{
-	using namespace std;
-	vec U_iso;
-	ifstream asym_cif_input(cif, std::ios::in);
-	asym_cif_input.clear();
-	asym_cif_input.seekg(0, asym_cif_input.beg);
-	string line;
-	svec labels;
-	int count_fields = 0;
-	int position_field[3] = { 0, 0, 0 };
-	int label_field = 100;
-	int U_iso_field = -1;          // <-- NEW: tracks column index of U_iso_or_equiv
-	vec2 positions;
-	positions.resize(wavy.get_ncen());
-
-#pragma omp parallel for schedule(dynamic)
-	for (int i = 0; i < wavy.get_ncen(); i++)
-		positions[i].resize(3);
-
-	U_iso.resize(wavy.get_ncen(), 0.0f);  // <-- NEW: pre-fill with zeros
-
-	bool atoms_read = false;
-	while (!asym_cif_input.eof() && !atoms_read)
-	{
-		getline_universal(asym_cif_input, line);
-		if (line.find("loop_") != string::npos)
-		{
-			while (line.find("_") != string::npos)
-			{
-				getline_universal(asym_cif_input, line);
-				if (debug)
-					log3 << "line in loop field definition: " << line << endl;
-				if (line.find("_atom_site_label") != string::npos          // be specific to avoid
-					&& line.find("aniso") == string::npos)                 // matching aniso_label
-					label_field = count_fields;
-				else if (line.find("fract_x") != string::npos)
-					position_field[0] = count_fields;
-				else if (line.find("fract_y") != string::npos)
-					position_field[1] = count_fields;
-				else if (line.find("fract_z") != string::npos)
-					position_field[2] = count_fields;
-				else if (line.find("U_iso_or_equiv") != string::npos)     // <-- NEW
-					U_iso_field = count_fields;
-				else if (label_field == 100)
-				{
-					if (debug)
-						log3 << "I don't think this is the atom block.. moving on!" << endl;
-					break;
-				}
-				count_fields++;
-			}
-			while (line.find("_") == string::npos && line.length() > 3)
-			{
-				atoms_read = true;
-				stringstream s(line);
-				svec fields;
-				fields.resize(count_fields);
-				for (int i = 0; i < count_fields; i++)
-					s >> fields[i];
-				if (debug)
-					log3 << "label: " << fields[label_field]
-					<< " frac_position: " << stod(fields[position_field[0]])
-					<< " " << stod(fields[position_field[1]])
-					<< " " << stod(fields[position_field[2]]) << endl;
-				err_checkf(labels.size() < positions.size(),
-					"The CIF lists more atoms than the wavefunction has centres, cannot assign U_iso!", std::cout);
-				positions[labels.size()] = unit_cell.get_coords_cartesian(
-					stod(fields[position_field[0]]),
-					stod(fields[position_field[1]]),
-					stod(fields[position_field[2]]));
-				bool found_this_one = false;
-				if (debug)
-					log3 << "label: " << fields[label_field]
-					<< " cartesian position: " << positions[labels.size()][0]
-					<< " " << positions[labels.size()][1]
-					<< " " << positions[labels.size()][2] << endl;
-				for (int i = 0; i < wavy.get_ncen(); i++)
-				{
-					if (is_similar(positions[labels.size()][0], wavy.get_atom_coordinate(i, 0), -1)
-						&& is_similar(positions[labels.size()][1], wavy.get_atom_coordinate(i, 1), -1)
-						&& is_similar(positions[labels.size()][2], wavy.get_atom_coordinate(i, 2), -1))
-					{
-						if (debug)
-							log3 << "WFN position: "
-							<< wavy.get_atom_coordinate(i, 0) << " "
-							<< wavy.get_atom_coordinate(i, 1) << " "
-							<< wavy.get_atom_coordinate(i, 2) << endl
-							<< "Found an atom: " << fields[label_field]
-							<< " Corresponding to atom charge "
-							<< wavy.get_atom_charge(i) << endl;
-						wavy.set_atom_label(i, fields[label_field]);
-						wavy.set_atom_frac_coords(i, {
-							stod(fields[position_field[0]]),
-							stod(fields[position_field[1]]),
-							stod(fields[position_field[2]]) });
-
-						// NEW: read U_iso_or_equiv, guard against '.' / '?' placeholders
-						if (U_iso_field >= 0 && U_iso_field < (int)fields.size())
-						{
-							try { U_iso[i] = (float)stod(fields[U_iso_field]); }
-							catch (...) { U_iso[i] = 0.0f; }
-						}
-
-						found_this_one = true;
-						break;
-					}
-				}
-				if (!found_this_one && debug)
-					log3 << "I DID NOT FIND THIS ATOM IN THE CIF?! WTF?!" << endl;
-				labels.push_back(fields[label_field]);
-				getline_universal(asym_cif_input, line);
-			}
-		}
-	}
-	return U_iso;
-}
-
 double read_CIF(std::istream& cif_input, const cell& unit_cell, int& ncen,
 	std::vector<asym_atom>& asym_atoms, std::vector<vec2>& ADPs, const bool debug)
 {
@@ -3221,8 +2602,8 @@ const std::set<std::string> &nbo_family_suboptions()
 		"-nbo", "-nbo_parse", "-nbo_native", "-nbo_keywords", "-nbo_exe", "-nbo_json",
 		"-nbo_dir", "-nbo_47", "-nbo_e2min", "-nbo_threads", "-nbo_keep47", "-nrt",
 		"-nrt_e2", "-nrt_arrows", "-nrt_bond_scale", "-nrt_max", "-nrt_atoms",
-		"-nrt_exhaustive", "-nrt_no_symmetry", "-nrt_no_components", "-nrt_no_ion", "-nrt_parent",
-		"-nrt_target", "-nrt_screen", "-nrt_rotate", "-nrt_stall", "-nrt_mirror", "-nrt_no_mirror"};
+		"-nrt_exhaustive", "-nrt_no_symmetry", "-nrt_no_components", "-nrt_no_ion", "-nrt_parent", "-nrt_e2_avg", "-nrt_e2_avg_min",
+		"-nrt_target", "-nrt_screen", "-nrt_rotate", "-nrt_stall", "-nrt_mirror", "-nrt_no_mirror", "-nrt_tie", "-nrt_ref"};
 	return known;
 }
 
@@ -3337,6 +2718,16 @@ bool options::digest_io_options(const std::string &temp, int &i)
 			}
 			else if (arguments[j] == "-nrt") opt.nrt = true;
 			else if (arguments[j] == "-nrt_e2") opt.nrt_e2_kcal = std::stod(arguments[j + 1]);
+			else if (arguments[j] == "-nrt_e2_avg") {
+				opt.nrt_e2_avg_percent = std::stod(arguments[j + 1]);
+				opt.nrt = true;
+			}
+			else if (arguments[j] == "-nrt_e2_avg_min") {
+				opt.nrt_e2_avg_min_percent = std::stod(arguments[j + 1]);
+				opt.nrt = true;
+			}
+			else if (arguments[j] == "-nrt_tie") opt.nrt_tie = std::stod(arguments[j + 1]);
+			else if (arguments[j] == "-nrt_ref") opt.nrt_ref = std::stod(arguments[j + 1]);
 			else if (arguments[j] == "-nrt_parent") {
 				opt.nrt_parent = arguments[j + 1];
 				opt.nrt = true;
@@ -3349,7 +2740,10 @@ bool options::digest_io_options(const std::string &temp, int &i)
 				opt.nrt = true;
 			}
 			else if (arguments[j] == "-nrt_screen")
+			{
 				opt.nrt_screen = arguments[j + 1] == "off" ? -1.0 : std::stod(arguments[j + 1]);
+				if (arguments[j + 1] == "off") opt.nrt_screen_min = std::numeric_limits<int>::max();  //-nrt_ref walks unscreened too
+			}
 			else if (arguments[j] == "-nrt_stall") opt.nrt_stall = std::stoi(arguments[j + 1]);
 			else if (arguments[j] == "-nrt_bond_scale")
 				opt.nrt_bond_scale = std::stod(arguments[j + 1]);
@@ -4593,6 +3987,16 @@ bool options::digest_ri_options(const std::string &temp, int &i)
 		err_checkf(i + 1 < argc, "-ibo_cube needs the IBO list", std::cout);
 		properties.ibo_cube = arguments[++i];
 	}
+	else if (temp == "-nbo_cube" || temp == "-nlmo_cube") {
+		err_checkf(i + 1 < argc, temp + " needs the NBO list", std::cout);
+		(temp == "-nbo_cube" ? properties.nbo_cube : properties.nlmo_cube) = arguments[++i];
+	}
+	else if (temp == "-nbo_lewis") {
+		err_checkf(i + 1 < argc, "-nbo_lewis needs a Lewis structure file", std::cout);
+		properties.nbo_lewis = arguments[++i];
+		err_checkf(std::filesystem::exists(properties.nbo_lewis),
+				   "-nbo_lewis: Lewis structure file doesn't exist: " + properties.nbo_lewis.string(), std::cout);
+	}
 	else if (temp == "-npa_summary") {
 		npa = true;
 		npa_orbitals = false;
@@ -4813,28 +4217,9 @@ bool options::digest_xcw_options(const std::string &temp, int &i)
 	}
 	else if (temp == "-do_XCW") {
 		do_XCW = true;
-		// Optional trailing "stepsize max_value" to limit the lambda scan
-		// range, e.g. for quick tests: -do_XCW 0.01 0.01
-		// CURRENTLY NOT IN USE SINCE THIS IS HANDLED IN THE INPUT FILE
-		//if (i + 2 < argc &&
-		//    string(arguments[i + 1]).find("-") != 0 &&
-		//    string(arguments[i + 2]).find("-") != 0)
-		//{
-		//    xcw_lambda_step = stod(arguments[i + 1]);
-		//    xcw_lambda_max = stod(arguments[i + 2]);
-		//}
-	}
-	else if (temp == "-calc_F") {
-		calc_F_calc = true;
-	}
-	else if (temp == "-xcw_gaussian_halt") {
-		xcw_gaussian_halt = true;
-	}
-	else if (temp == "-xcw_strong_cutoff") {
-		xcw_strong_cutoff = stod(arguments[i + 1]);
 	}
 	else if (temp == "-XCW_settings") {
-			xcw_settings_path = arguments[i + 1];
+		xcw_settings_path = arguments[i + 1];
 	}
 	else
 		return false;
@@ -4942,8 +4327,8 @@ void options::refuse_unread_bonding_options()
 	const char *early = quit_early_analysis(*this);
 	//-fba runs RGBI (reading the -rgbi_* modifiers, each of which sets rgbi) and its own NPA, which
 	//reads neither -npa nor -npa_summary; -do_XCW runs RGBI on each refined wavefunction unless a
-	//property cube takes the run first or -calc_F stops it before the fit
-	const bool rgbi_read_early = fba || (do_XCW && !calc_F_calc && !properties.calc());
+	//property cube takes the run first
+	const bool rgbi_read_early = fba || (do_XCW && !properties.calc());
 	const char *bonding = (rgbi && !rgbi_read_early) ? "-rgbi" : (npa ? "-npa" : (ibo ? "-ibo" : nullptr));
 	if (early != nullptr && bonding != nullptr)
 		err_checkf(false, std::string("Cannot do both ") + early + " and " + bonding + " in one run: " +
@@ -5072,6 +4457,447 @@ void options::digest_options()
 	//last, so it sees every flag whichever order they were written in
 	refuse_unread_bonding_options();
 };
+
+void options::loadXCWsettings() {
+	auto lowercase = [](std::string s) {
+		std::transform(s.begin(), s.end(), s.begin(),
+			[](unsigned char c) { return std::tolower(c); });
+		return s;
+		};
+
+	std::string conv_preset = "normal";
+	bool soscf = false, check_hessian = false;
+	std::string speed_preset = "normal_conv";
+
+	/* 1: Classical Jayatilaka XWR
+	   2: Ewald sum XWR */
+	xcw_settings.XWR_type = 1;
+	double quant_diff = 32768, diis_stop_damping = 32768, diis_stop_shift = 32768, max_diis_error = 32768, gradient = 32768, MaxP_diff = 32768, RMSP_diff = 32768, alpha = 32768, level_shift = 32768, start = 32768, end = 32768, step_size = 32768, xcw_strong_cutoff = 3.0;
+	int max_scf_iterations = 32768, charge = 32768, multiplicity = 32768, n_params = 32768, refine_against = 32768;
+	std::string basis_set_name = "Undefined";
+	std::string df_basis_name, guess_basis_name;
+	bool grown = false, read_tensor = false, read_first_guess = false, nbo_output = false, xcw_gaussian_halt = false;
+	extinction::model extinction_model = extinction::model::none;
+	bool extinction_aniso = false, extinction_refine = true;
+	double extinction_start = 1e-4, wavelength = 0.0;
+	bool i_tensor_single = false, i_tensor_double = false;
+	std::filesystem::path i_tensor_file_path;
+	std::filesystem::path i_tensor_save_path;
+	std::filesystem::path eri_read_path, eri_save_path, basis_overrides;
+	// 0 = hold the whole tensor, which is what every run did before this existed.
+	size_t i_tensor_max_mb = 0;
+	occ::qm::SpinorbitalKind hf_type = occ::qm::SpinorbitalKind::Restricted;
+	if (!std::filesystem::exists(xcw_settings_path)) {
+		throw std::runtime_error("Settings file not found! Aborting run!");
+	}
+	else {
+
+		std::ifstream input(xcw_settings_path);
+		using Handler = std::function<void(std::istream&)>;
+		std::unordered_map<std::string, Handler> handlers;
+		handlers["conv"] = [&](std::istream& is) {
+			if (!(is >> quant_diff))
+				throw std::runtime_error("Expected value after 'conv'");
+			};
+
+		handlers["extinction"] = [&](std::istream& is) {
+			//`extinction <model> [iso|aniso] [fixed] [start value]`, the rest of the line in
+			//any order: a word names the model or a flag, a number is the start value
+			std::string rest, token;
+			std::getline(is, rest);
+			std::istringstream words(rest);
+			while (words >> token) {
+				const std::string low = lowercase(token);
+				if (low == "aniso" || low == "anisotropic") extinction_aniso = true;
+				else if (low == "iso" || low == "isotropic") extinction_aniso = false;
+				else if (low == "fixed" || low == "fix") extinction_refine = false;
+				else if (extinction::from_string(low) != extinction::model::none) extinction_model = extinction::from_string(low);
+				else {
+					try { extinction_start = std::stod(token); }
+					catch (const std::exception&) { throw std::runtime_error("Could not read '" + token + "' after 'extinction'"); }
+				}
+			}
+			if (extinction_model == extinction::model::none)
+				throw std::runtime_error("Expected a model (shelx, bc_gaussian or bc_lorentzian) after 'extinction'");
+			};
+
+		handlers["wavelength"] = [&](std::istream& is) {
+			if (!(is >> wavelength))
+				throw std::runtime_error("Expected value after 'wavelength'");
+			};
+
+		handlers["diis_damping"] = [&](std::istream& is) {
+			if (!(is >> diis_stop_damping))
+				throw std::runtime_error("Expected value after 'diis_damping'");
+			};
+
+		handlers["diis_shift"] = [&](std::istream& is) {
+			if (!(is >> diis_stop_shift))
+				throw std::runtime_error("Expected value after 'diis_shift'");
+			};
+
+		handlers["conv_diis"] = [&](std::istream& is) {
+			if (!(is >> max_diis_error))
+				throw std::runtime_error("Expected value after 'conv_diis'");
+			};
+
+		handlers["gradient"] = [&](std::istream& is) {
+			if (!(is >> gradient))
+				throw std::runtime_error("Expected value after 'gradient'");
+			};
+
+		handlers["maxp_diff"] = [&](std::istream& is) {
+			if (!(is >> MaxP_diff))
+				throw std::runtime_error("Expected value after 'MaxP_diff'");
+			};
+
+		handlers["rmsp_diff"] = [&](std::istream& is) {
+			if (!(is >> RMSP_diff))
+				throw std::runtime_error("Expected value after 'RMSP_diff'");
+			};
+
+		handlers["params"] = [&](std::istream& is) {
+			if (!(is >> n_params))
+				throw std::runtime_error("Expected value after 'params'");
+			};
+
+		handlers["damp"] = [&](std::istream& is) {
+			if (!(is >> alpha))
+				throw std::runtime_error("Expected value after 'damp'");
+			};
+
+		handlers["shift"] = [&](std::istream& is) {
+			if (!(is >> level_shift))
+				throw std::runtime_error("Expected value after 'shift'");
+			};
+
+		handlers["max_iter"] = [&](std::istream& is) {
+			if (!(is >> max_scf_iterations))
+				throw std::runtime_error("Expected value after 'max_iter'");
+			};
+
+		handlers["charge"] = [&](std::istream& is) {
+			if (!(is >> charge))
+				throw std::runtime_error("Expected value after 'charge'");
+			};
+
+		handlers["mult"] = [&](std::istream& is) {
+			if (!(is >> multiplicity))
+				throw std::runtime_error("Expected value after 'mult'");
+			};
+
+		handlers["f"] = [&](std::istream&) {
+			refine_against = 1;
+			};
+
+		handlers["f2"] = [&](std::istream&) {
+			refine_against = 2;
+			};
+
+		handlers["i_sigma"] = [&](std::istream& is) {
+			if (!(is >> xcw_settings.i_sigma_cutoff))
+				throw std::runtime_error("Expected value after 'i_sigma'");
+			};
+
+		handlers["weighted"] = [&](std::istream&) {
+			xcw_settings.XWR_type = 2;
+			};
+
+		handlers["basis_set"] = [&](std::istream& is) {
+			if (!(is >> basis_set_name))
+				throw std::runtime_error("Expected basis set name");
+			};
+		handlers["basis_overrides"] = [&](std::istream& is) {
+			std::string path;
+			if (!(is >> std::quoted(path, '"', '\0')) || path.empty())
+				throw std::runtime_error("Expected a JSON file after 'basis_overrides'");
+			basis_overrides = path;
+			if (basis_overrides.is_relative())
+				basis_overrides = std::filesystem::absolute(xcw_settings_path).parent_path() / basis_overrides;
+			};
+		handlers["df_basis"] = [&](std::istream& is) {
+			if (!(is >> df_basis_name))
+				throw std::runtime_error("Expected a fitting basis name after 'df_basis'");
+			};
+		handlers["guess_basis"] = [&](std::istream& is) {
+			if (!(is >> guess_basis_name))
+				throw std::runtime_error("Expected a basis name after 'guess_basis'");
+			};
+
+		handlers["start"] = [&](std::istream& is) {
+			if (!(is >> start))
+				throw std::runtime_error("Expected value after 'start'");
+			};
+
+		handlers["end"] = [&](std::istream& is) {
+			if (!(is >> end))
+				throw std::runtime_error("Expected value after 'end'");
+			};
+
+		handlers["step_size"] = [&](std::istream& is) {
+			if (!(is >> step_size))
+				throw std::runtime_error("Expected value after 'step_size'");
+			};
+
+		handlers["grown"] = [&](std::istream&) {
+			grown = true;
+			};
+
+		handlers["rhf"] = [&](std::istream&) {
+			hf_type = occ::qm::SpinorbitalKind::Restricted;
+			};
+
+		handlers["uhf"] = [&](std::istream&) {
+			hf_type = occ::qm::SpinorbitalKind::Unrestricted;
+			};
+
+		handlers["sloppy"] = [&](std::istream&) {
+			conv_preset = "sloppy";
+			};
+
+		handlers["normal"] = [&](std::istream&) {
+			conv_preset = "normal";
+			};
+
+		handlers["tight"] = [&](std::istream&) {
+			conv_preset = "tight";
+			};
+
+		handlers["very_tight"] = [&](std::istream&) {
+			conv_preset = "very_tight";
+			};
+
+		handlers["slow_conv"] = [&](std::istream&) {
+			speed_preset = "slow_conv";
+			};
+
+		handlers["normal_conv"] = [&](std::istream&) {
+			speed_preset = "normal_conv";
+			};
+
+		handlers["soscf"] = [&](std::istream&) {
+			soscf = true;
+			};
+
+		handlers["check_hessian"] = [&](std::istream&) {
+			check_hessian = true;
+			};
+
+		handlers["fast_conv"] = [&](std::istream&) {
+			speed_preset = "fast_conv";
+			};
+
+		//`read <path>` reuses the streamed tensor at that path, which is the expensive thing
+		//a run produces and which depends only on the geometry, the basis and the
+		//reflections, not on any refinement setting. So trying another lambda range or
+		//convergence preset need not rebuild it. It is held in memory when it fits.
+		//
+		//The path is optional, and the settings file is one whitespace-separated stream of
+		//tokens, so a bare `read` followed by another keyword must not swallow it: take the
+		//next token, put it back if it is a keyword.
+		handlers["read"] = [&](std::istream& is) {
+			read_tensor = true;
+			i_tensor_file_path = "I_tensor_stream.bin";
+			const std::streampos before = is.tellg();
+			std::string token;
+			if (!(is >> token)) { is.clear(); return; }
+			std::string lowered = token;
+			std::transform(lowered.begin(), lowered.end(), lowered.begin(),
+				[](unsigned char c) { return std::tolower(c); });
+			if (handlers.find(lowered) != handlers.end()) {
+				is.clear();
+				is.seekg(before);
+				return;
+			}
+			i_tensor_file_path = token;
+			};
+		handlers["load_wfn"] = [&](std::istream&) {
+			read_first_guess = true;
+			};
+		handlers["nbo"] = [&](std::istream&) {
+			nbo_output = true;
+			};
+		// The tensor is nr_small blocks of nmo(nmo+1)/2 complex doubles and grows
+		// quadratically with the basis, so on anything past a minimal basis it is
+		// the largest thing in the process. `stream` puts it on disk with a
+		// default budget; `i_tensor_mb <n>` names the budget.
+		handlers["stream"] = [&](std::istream&) {
+			if (i_tensor_max_mb == 0) i_tensor_max_mb = 2048;
+			};
+
+		//The tensor comes off the device in single precision and was stored in double, so
+		//half of every byte the SCF loop reads back was padding. Holding it as computed is
+		//half the memory and, measured on the full twisted ethylene, 1.63x on the two walks
+		//each SCF iteration makes over it. Opt-in because it is a change of stored
+		//precision: the lambda scan agrees to 5e-13 and iteration for iteration, but that
+		//is a measurement on one system rather than a proof.
+		//Writing the tensor is worth ~40 minutes to a later run and costs this one nothing:
+		//the refinement only reads the tensor, so a thread can push it to disk while the SCF
+		//gets on with it. The path is what `read <path>` will want afterwards.
+		handlers["safe"] = [&](std::istream& is) {
+			std::string path;
+			if (!(is >> path))
+				throw std::runtime_error("Expected a path after 'safe'");
+			i_tensor_save_path = path;
+			};
+		//The stored two-electron integrals depend on geometry and basis only; read_eri falls back to building
+		//them when the file holds another basis or geometry
+		handlers["save_eri"] = [&](std::istream& is) {
+			std::string path;
+			if (!(is >> path))
+				throw std::runtime_error("Expected a path after 'save_eri'");
+			eri_save_path = path;
+			};
+		handlers["read_eri"] = [&](std::istream& is) {
+			std::string path;
+			if (!(is >> path))
+				throw std::runtime_error("Expected a path after 'read_eri'");
+			eri_read_path = path;
+			};
+
+		handlers["i_float"] = [&](std::istream&) {
+			i_tensor_single = true;
+			};
+
+		handlers["i_double"] = [&](std::istream&) {
+			i_tensor_double = true;
+			};
+
+		handlers["i_tensor_mb"] = [&](std::istream& in2) {
+			long long mb = 0;
+			in2 >> mb;
+			i_tensor_max_mb = (mb > 0) ? static_cast<size_t>(mb) : 0;
+			};
+
+		handlers["gaussian_halt"] = [&](std::istream&) {
+			xcw_gaussian_halt = true;
+			};
+
+		handlers["strong_cutoff"] = [&](std::istream& is) {
+			if (!(is >> xcw_strong_cutoff))
+				throw std::runtime_error("Expected value after 'strong_cutoff'");
+			};
+
+		std::string keyword;
+
+		while (input >> keyword)
+		{
+			keyword = lowercase(keyword);
+
+			auto it = handlers.find(keyword);
+			if (it == handlers.end()) {
+				throw std::runtime_error("Unknown keyword '" + keyword + "'");
+			}
+
+			it->second(input);
+		}
+	}
+
+	if (conv_preset == "sloppy") {
+		xcw_settings.quant_diff = 3e-5;
+		xcw_settings.max_diis_error = 1e-4;
+		xcw_settings.gradient = 5e-4;
+		xcw_settings.MaxP_diff = 1e-4;
+		xcw_settings.RMSP_diff = 1e-5;
+		xcw_settings.max_scf_iterations = 100;
+	}
+	else if (conv_preset == "normal") {
+		xcw_settings.quant_diff = 1e-6;
+		xcw_settings.max_diis_error = 1e-5;
+		xcw_settings.gradient = 7e-5;
+		xcw_settings.MaxP_diff = 1e-5;
+		xcw_settings.RMSP_diff = 1e-6;
+		xcw_settings.max_scf_iterations = 100;
+	}
+	else if (conv_preset == "tight") {
+		xcw_settings.quant_diff = 5e-7;
+		xcw_settings.max_diis_error = 5e-6;
+		xcw_settings.gradient = 3e-5;
+		xcw_settings.MaxP_diff = 1e-6;
+		xcw_settings.RMSP_diff = 1e-7;
+		xcw_settings.max_scf_iterations = 100;
+	}
+	else if (conv_preset == "very_tight") {
+		xcw_settings.quant_diff = 1e-7;
+		xcw_settings.max_diis_error = 1e-6;
+		xcw_settings.gradient = 1e-5;
+		xcw_settings.MaxP_diff = 1e-7;
+		xcw_settings.RMSP_diff = 1e-8;
+		xcw_settings.max_scf_iterations = 100;
+	}
+
+	if (speed_preset == "slow_conv") {
+		xcw_settings.alpha = 0.8;
+		xcw_settings.level_shift = 1;
+		xcw_settings.diis_stop_damping = 1e-5;
+		xcw_settings.diis_stop_shift = 1e-5;
+	}
+	else if (speed_preset == "normal_conv") {
+		xcw_settings.alpha = 0.5;
+		xcw_settings.level_shift = 0.5;
+		xcw_settings.diis_stop_damping = 1e-3;
+		xcw_settings.diis_stop_shift = 1e-2;
+	}
+	else if (speed_preset == "fast_conv") {
+		xcw_settings.method_apply_damping = false;
+		xcw_settings.method_apply_shift = false;
+	}
+
+	if (basis_set_name == "Undefined") {
+		throw std::runtime_error("Basis set name not specified in settings file! Aborting run!");
+	}
+	xcw_settings.basis_set_name = basis_set_name;
+	xcw_settings.basis_overrides = basis_overrides;
+	if (quant_diff != 32768) xcw_settings.quant_diff = quant_diff;
+	if (diis_stop_damping != 32768) xcw_settings.diis_stop_damping = diis_stop_damping;
+	if (diis_stop_shift != 32768) xcw_settings.diis_stop_shift = diis_stop_shift;
+	if (max_diis_error != 32768) xcw_settings.max_diis_error = max_diis_error;
+	if (gradient != 32768) xcw_settings.gradient = gradient;
+	if (MaxP_diff != 32768) xcw_settings.MaxP_diff = MaxP_diff;
+	if (RMSP_diff != 32768) xcw_settings.RMSP_diff = RMSP_diff;
+	if (alpha != 32768) xcw_settings.alpha = alpha;
+	if (level_shift != 32768) xcw_settings.level_shift = level_shift;
+	if (max_scf_iterations != 32768) xcw_settings.max_scf_iterations = max_scf_iterations;
+	xcw_settings.charge = (charge != 32768) ? charge : xcw_settings.charge;
+	xcw_settings.multiplicity = (multiplicity != 32768) ? multiplicity : xcw_settings.multiplicity;
+	if (n_params != 32768) xcw_settings.n_params = n_params;
+	else {
+		xcw_settings.n_params = 1;
+		std::cout << "Warning: Number of crystallographic parameters not set (use the params keyword)! Continuing with a default value of 1..." << std::endl;
+	}
+	xcw_settings.extinction_model = extinction_model;
+	xcw_settings.extinction_aniso = extinction_aniso;
+	xcw_settings.extinction_refine = extinction_refine;
+	xcw_settings.extinction_start = extinction_start;
+	xcw_settings.wavelength = wavelength;
+	if (refine_against != 32768) xcw_settings.refine_against = refine_against;
+	xcw_settings.xcw_start_value = (start != 32768) ? start : 0;
+	xcw_settings.xcw_step_size = (step_size != 32768) ? step_size : 0.01;
+	if (end != 32768) {
+		xcw_settings.num_xcw_steps = static_cast<int>(std::round((end - xcw_settings.xcw_start_value) / xcw_settings.xcw_step_size)) + 1;
+	}
+	else {
+		xcw_settings.num_xcw_steps = static_cast<int>(std::round((1 - xcw_settings.xcw_start_value) / xcw_settings.xcw_step_size)) + 1;
+	}
+	xcw_settings.grown = grown;
+	xcw_settings.hf_type = hf_type;
+	xcw_settings.read_tensor = read_tensor;
+	xcw_settings.read_first_guess = read_first_guess;
+	xcw_settings.i_tensor_max_mb = i_tensor_max_mb;
+	xcw_settings.i_tensor_single = i_tensor_single;
+	xcw_settings.i_tensor_double = i_tensor_double;
+	xcw_settings.i_tensor_file_path = i_tensor_file_path;
+	xcw_settings.i_tensor_save_path = i_tensor_save_path;
+	xcw_settings.eri_read_path = eri_read_path;
+	xcw_settings.eri_save_path = eri_save_path;
+	xcw_settings.nbo_output = nbo_output;
+	xcw_settings.df_basis_name = df_basis_name;
+	xcw_settings.guess_basis_name = guess_basis_name;
+	xcw_settings.soscf = soscf;
+	xcw_settings.check_hessian = check_hessian;
+	xcw_settings.xcw_gaussian_halt = xcw_gaussian_halt;
+	xcw_settings.xcw_strong_cutoff = xcw_strong_cutoff;
+}
 
 std::string options::unrunnable_analysis() const
 {

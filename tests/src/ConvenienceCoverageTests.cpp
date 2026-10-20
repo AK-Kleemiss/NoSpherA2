@@ -100,81 +100,11 @@ namespace
 		return opt;
 	}
 
-	//C1 at (1,2,3) A, O1 at (5,5,5) A, H1 at (7,7,7) A, the fractions 0.1/0.2/0.3, 0.5, 0.7 of a 10 A cube
-	WFN three_atom_wfn()
-	{
-		WFN w(e_origin::NOT_YET_DEFINED);
-		w.push_back_atom("A", constants::ang2bohr(1.0), constants::ang2bohr(2.0), constants::ang2bohr(3.0), 6);
-		w.push_back_atom("B", constants::ang2bohr(5.0), constants::ang2bohr(5.0), constants::ang2bohr(5.0), 8);
-		w.push_back_atom("C", constants::ang2bohr(7.0), constants::ang2bohr(7.0), constants::ang2bohr(7.0), 1);
-		return w;
-	}
-
-	//the atom_site loop lists C1, O1 and N9 (no WFN atom at 0.9), the aniso loop has its U columns in the order
-	//11,22,33,23,13,12, the Gram-Charlier loops give C1 the values 1..10 and 11..25 in column order
+	//C1, O1 and N9 in a 10 A cube; the aniso loop has its U columns in the order 11,22,33,23,13,12,
+	//the Gram-Charlier loops give C1 the values 1..10 and 11..25 in column order. The dispersion
+	//rows wrap onto a second line as Olex2 writes them, N9 gets a site-specific value, and a text
+	//field carrying a second data_ line (Olex2 embeds the FCF that way) must not end the block.
 	const char* const cif_text =
-		"data_cov\n"
-		"_cell_length_a 10.0\n"
-		"_cell_length_b 10.0\n"
-		"_cell_length_c 10.0\n"
-		"\n"
-		"loop_\n"
-		"_atom_site_label\n"
-		"_atom_site_fract_x\n"
-		"_atom_site_fract_y\n"
-		"_atom_site_fract_z\n"
-		"_atom_site_U_iso_or_equiv\n"
-		"C1 0.1 0.2 0.3 0.03125\n"
-		"O1 0.5 0.5 0.5 ?\n"
-		"N9 0.9 0.9 0.9 0.5\n"
-		"\n"
-		"loop_\n"
-		"_atom_site_aniso_label\n"
-		"_atom_site_aniso_U_11\n"
-		"_atom_site_aniso_U_22\n"
-		"_atom_site_aniso_U_33\n"
-		"_atom_site_aniso_U_23\n"
-		"_atom_site_aniso_U_13\n"
-		"_atom_site_aniso_U_12\n"
-		"C1 0.0625 0.125 0.1875 0.25 0.3125 0.375\n"
-		"O1 0.5 0.5 0.5 0.0 0.0 0.0\n"
-		"\n"
-		"loop_\n"
-		"_atom_site_anharm_GC_C_label\n"
-		"_atom_site_anharm_GC_C_111\n"
-		"_atom_site_anharm_GC_C_112\n"
-		"_atom_site_anharm_GC_C_113\n"
-		"_atom_site_anharm_GC_C_122\n"
-		"_atom_site_anharm_GC_C_123\n"
-		"_atom_site_anharm_GC_C_133\n"
-		"_atom_site_anharm_GC_C_222\n"
-		"_atom_site_anharm_GC_C_223\n"
-		"_atom_site_anharm_GC_C_233\n"
-		"_atom_site_anharm_GC_C_333\n"
-		"C1 1 2 3 4 5 6 7 8 9 10\n"
-		"\n"
-		"loop_\n"
-		"_atom_site_anharm_GC_D_label\n"
-		"_atom_site_anharm_GC_D_1111\n"
-		"_atom_site_anharm_GC_D_1112\n"
-		"_atom_site_anharm_GC_D_1113\n"
-		"_atom_site_anharm_GC_D_1122\n"
-		"_atom_site_anharm_GC_D_1123\n"
-		"_atom_site_anharm_GC_D_1133\n"
-		"_atom_site_anharm_GC_D_1222\n"
-		"_atom_site_anharm_GC_D_1223\n"
-		"_atom_site_anharm_GC_D_1233\n"
-		"_atom_site_anharm_GC_D_1333\n"
-		"_atom_site_anharm_GC_D_2222\n"
-		"_atom_site_anharm_GC_D_2223\n"
-		"_atom_site_anharm_GC_D_2233\n"
-		"_atom_site_anharm_GC_D_2333\n"
-		"_atom_site_anharm_GC_D_3333\n"
-		"C1 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25\n"
-		"\n";
-
-	//The same model for read_CIF, with type symbols, dispersion and a second data block
-	const char* const typed_cif_text =
 		"data_cov\n"
 		"_cell_length_a 10.0\n"
 		"_cell_length_b 10.0\n"
@@ -264,44 +194,8 @@ namespace
 		"_atom_site_fract_z\n"
 		"X1 C 0 0 0\n";
 
-	//U_11, U_22, U_33, U_12, U_13, U_23 of C1 in the storage order of the readers
+	//U_11, U_22, U_33, U_12, U_13, U_23 of C1 in the storage order of the reader
 	const vec c1_U = { 0.0625, 0.125, 0.1875, 0.375, 0.3125, 0.25 };
-
-	//the aniso rows of the grown-mode tests: one asymmetric atom C1 with U in 11,22,33,12,13,23 order
-	const char* const grown_cif_text =
-		"data_grown\n"
-		"loop_\n"
-		"_atom_site_aniso_label\n"
-		"_atom_site_aniso_U_11\n"
-		"_atom_site_aniso_U_22\n"
-		"_atom_site_aniso_U_33\n"
-		"_atom_site_aniso_U_12\n"
-		"_atom_site_aniso_U_13\n"
-		"_atom_site_aniso_U_23\n"
-		"C1 0.0625 0.125 0.1875 0.375 0.3125 0.25\n"
-		"\n"
-		"loop_\n"
-		"_atom_site_anharm_GC_C_label\n"
-		"_atom_site_anharm_GC_C_111\n"
-		"_atom_site_anharm_GC_C_112\n"
-		"_atom_site_anharm_GC_C_113\n"
-		"_atom_site_anharm_GC_C_122\n"
-		"_atom_site_anharm_GC_C_123\n"
-		"_atom_site_anharm_GC_C_133\n"
-		"_atom_site_anharm_GC_C_222\n"
-		"_atom_site_anharm_GC_C_223\n"
-		"_atom_site_anharm_GC_C_233\n"
-		"_atom_site_anharm_GC_C_333\n"
-		"C1 1 2 3 4 5 6 7 8 9 10\n"
-		"\n";
-
-	WFN grown_pair_wfn()
-	{
-		WFN w(e_origin::NOT_YET_DEFINED);
-		w.push_back_atom("C1", 0.0, 0.0, 0.0, 6);
-		w.push_back_atom("C1_sym", 2.0, 0.0, 0.0, 6);
-		return w;
-	}
 
 	//read_CIF on text in a 10 A cube; returns the wavelength
 	double read_cif_text(const std::string& text, std::vector<asym_atom>& atoms, vec3& ADPs)
@@ -337,7 +231,7 @@ TEST(ConvenienceCoverageCifTests, ReadCifAssignsLabelsTypesPositionsAndUiso)
 {
 	std::vector<asym_atom> atoms;
 	vec3 ADPs;
-	EXPECT_DOUBLE_EQ(read_cif_text(typed_cif_text, atoms, ADPs), 0.71073);
+	EXPECT_DOUBLE_EQ(read_cif_text(cif_text, atoms, ADPs), 0.71073);
 	ASSERT_EQ(atoms.size(), 3u);
 	ASSERT_EQ(ADPs.size(), 3u);
 	EXPECT_EQ(atoms[0].label, "C1");
@@ -364,7 +258,7 @@ TEST(ConvenienceCoverageCifTests, ReadCifReadsUijCijkDijklByLabel)
 {
 	std::vector<asym_atom> atoms;
 	vec3 ADPs;
-	read_cif_text(typed_cif_text, atoms, ADPs);
+	read_cif_text(cif_text, atoms, ADPs);
 	ASSERT_EQ(ADPs.size(), 3u);
 	ASSERT_EQ(ADPs[0].size(), 3u);
 	ASSERT_EQ(ADPs[0][0].size(), 6u);
@@ -390,7 +284,7 @@ TEST(ConvenienceCoverageCifTests, ReadCifReadsDispersionByTypeAndBySite)
 {
 	std::vector<asym_atom> atoms;
 	vec3 ADPs;
-	read_cif_text(typed_cif_text, atoms, ADPs);
+	read_cif_text(cif_text, atoms, ADPs);
 	ASSERT_EQ(atoms.size(), 3u);
 	EXPECT_DOUBLE_EQ(atoms[0].anom.real(), 0.00313);
 	EXPECT_DOUBLE_EQ(atoms[0].anom.imag(), 0.00162);
@@ -398,7 +292,7 @@ TEST(ConvenienceCoverageCifTests, ReadCifReadsDispersionByTypeAndBySite)
 	EXPECT_DOUBLE_EQ(atoms[1].anom.imag(), 0.00610);
 	EXPECT_DOUBLE_EQ(atoms[2].anom.real(), 0.00612);
 	EXPECT_DOUBLE_EQ(atoms[2].anom.imag(), 0.00332);
-	std::string no_site = typed_cif_text;
+	std::string no_site = cif_text;
 	no_site.replace(no_site.find("N9 0.00612 0.00332"), std::string("N9 0.00612 0.00332").size(), "C1 0.1 0.2");
 	read_cif_text(no_site, atoms, ADPs);
 	EXPECT_DOUBLE_EQ(atoms[0].anom.real(), 0.1);
@@ -409,234 +303,11 @@ TEST(ConvenienceCoverageCifTests, ReadCifReadsDispersionByTypeAndBySite)
 //an aniso row for an atom the atom_site loop does not have is an error, not a silent skip
 TEST(ConvenienceCoverageCifTests, ReadCifThrowsForUnknownAnisoLabel)
 {
-	std::string text = typed_cif_text;
+	std::string text = cif_text;
 	text.replace(text.find("O1 0.5 0.5 0.5 0.0 0.0 0.0"), std::string("O1").size(), "Zz9");
 	std::vector<asym_atom> atoms;
 	vec3 ADPs;
 	EXPECT_THROW(read_cif_text(text, atoms, ADPs), std::runtime_error);
-}
-
-TEST(ConvenienceCoverageCifTests, AdpReaderWithCellAssignsLabelsFracsAndUij)
-{
-	ScratchDir scratch("adp_cell");
-	write_text(scratch.file("a.cif"), cif_text);
-	std::ofstream log(scratch.file("log.txt"));
-	WFN w = three_atom_wfn();
-	cell unit_cell(10.0, 10.0, 10.0, 90.0, 90.0, 90.0);
-
-	EXPECT_TRUE(read_fracs_ADPs_from_CIF(scratch.file("a.cif"), w, unit_cell, log, true));
-
-	EXPECT_EQ(w.get_atom_label(0), "C1");
-	EXPECT_EQ(w.get_atom_label(1), "O1");
-	EXPECT_EQ(w.get_atom_label(2), "C"); //no CIF atom at (7,7,7) A
-	EXPECT_DOUBLE_EQ(w.get_atom(0).get_frac_coordinate(0), 0.1);
-	EXPECT_DOUBLE_EQ(w.get_atom(0).get_frac_coordinate(1), 0.2);
-	EXPECT_DOUBLE_EQ(w.get_atom(0).get_frac_coordinate(2), 0.3);
-	EXPECT_DOUBLE_EQ(w.get_atom(1).get_frac_coordinate(2), 0.5);
-
-	const vec2 c1 = w.get_atom(0).get_ADPs();
-	ASSERT_EQ(c1.size(), 3u);
-	ASSERT_EQ(c1[0].size(), 6u);
-	for (int j = 0; j < 6; j++)
-		EXPECT_DOUBLE_EQ(c1[0][j], c1_U[j]) << j;
-	ASSERT_EQ(c1[1].size(), 10u);
-	ASSERT_EQ(c1[2].size(), 15u);
-	for (int j = 0; j < 6; j++)
-	{
-		EXPECT_DOUBLE_EQ(c1[1][j], 1.0 + j) << j;
-		EXPECT_DOUBLE_EQ(c1[2][j], 11.0 + j) << j;
-	}
-
-	const vec2 o1 = w.get_atom(1).get_ADPs();
-	ASSERT_EQ(o1.size(), 3u);
-	ASSERT_EQ(o1[0].size(), 6u);
-	EXPECT_DOUBLE_EQ(o1[0][0], 0.5);
-	EXPECT_DOUBLE_EQ(o1[0][5], 0.0);
-	EXPECT_TRUE(o1[1].empty());
-	EXPECT_TRUE(o1[2].empty());
-
-	const vec2 h1 = w.get_atom(2).get_ADPs();
-	ASSERT_EQ(h1.size(), 3u);
-	EXPECT_TRUE(h1[0].empty());
-	EXPECT_TRUE(h1[1].empty());
-	EXPECT_TRUE(h1[2].empty());
-	log.close();
-	std::ifstream logged(scratch.file("log.txt"));
-	std::string text((std::istreambuf_iterator<char>(logged)), std::istreambuf_iterator<char>());
-	EXPECT_NE(text.find("I DID NOT FIND THIS ATOM"), std::string::npos); //N9
-}
-
-TEST(ConvenienceCoverageCifTests, AdpReaderWithCellCopiesAllTenCijk)
-{
-	ScratchDir scratch("adp_cell_cijk");
-	write_text(scratch.file("a.cif"), cif_text);
-	std::ofstream log(scratch.file("log.txt"));
-	WFN w = three_atom_wfn();
-	cell unit_cell(10.0, 10.0, 10.0, 90.0, 90.0, 90.0);
-	ASSERT_TRUE(read_fracs_ADPs_from_CIF(scratch.file("a.cif"), w, unit_cell, log, false));
-	const vec2 c1 = w.get_atom(0).get_ADPs();
-	ASSERT_EQ(c1[1].size(), 10u);
-	for (int j = 6; j < 10; j++)
-		EXPECT_DOUBLE_EQ(c1[1][j], 1.0 + j) << j;
-}
-
-TEST(ConvenienceCoverageCifTests, AdpReaderWithCellCopiesAllFifteenDijkl)
-{
-	ScratchDir scratch("adp_cell_dijkl");
-	write_text(scratch.file("a.cif"), cif_text);
-	std::ofstream log(scratch.file("log.txt"));
-	WFN w = three_atom_wfn();
-	cell unit_cell(10.0, 10.0, 10.0, 90.0, 90.0, 90.0);
-	ASSERT_TRUE(read_fracs_ADPs_from_CIF(scratch.file("a.cif"), w, unit_cell, log, false));
-	const vec2 c1 = w.get_atom(0).get_ADPs();
-	ASSERT_EQ(c1[2].size(), 15u);
-	for (int j = 6; j < 15; j++)
-		EXPECT_DOUBLE_EQ(c1[2][j], 11.0 + j) << j;
-}
-
-TEST(ConvenienceCoverageCifTests, LabelReaderReadsUijCijkDijklByLabel)
-{
-	ScratchDir scratch("adp_label");
-	//the label reader gathers its seven tokens across line breaks, so C1's aniso row is wrapped here
-	std::string wrapped = cif_text;
-	const std::string one_line = "C1 0.0625 0.125 0.1875 0.25 0.3125 0.375\n";
-	const size_t at = wrapped.find(one_line);
-	ASSERT_NE(at, std::string::npos);
-	wrapped.replace(at, one_line.size(), "C1 0.0625 0.125\n0.1875 0.25 0.3125 0.375\n");
-	write_text(scratch.file("a.cif"), wrapped);
-	std::ofstream log(scratch.file("log.txt"));
-	WFN w(e_origin::NOT_YET_DEFINED);
-	w.push_back_atom("C1", 0.0, 0.0, 0.0, 6);
-	w.push_back_atom("O1", 3.0, 0.0, 0.0, 8);
-	w.push_back_atom("H1", 5.0, 0.0, 0.0, 1);
-	const ivec3 no_links;
-
-	EXPECT_TRUE(read_fracs_ADPs_from_CIF(scratch.file("a.cif"), w, log, true, false, no_links));
-
-	const vec2 c1 = w.get_atom(0).get_ADPs();
-	ASSERT_EQ(c1.size(), 3u);
-	ASSERT_EQ(c1[0].size(), 6u);
-	for (int j = 0; j < 6; j++)
-		EXPECT_DOUBLE_EQ(c1[0][j], c1_U[j]) << j; //columns 23,13,12 land in slots 5,4,3
-	ASSERT_EQ(c1[1].size(), 10u);
-	for (int j = 0; j < 10; j++)
-		EXPECT_DOUBLE_EQ(c1[1][j], 1.0 + j) << j;
-	ASSERT_EQ(c1[2].size(), 15u);
-	for (int j = 0; j < 15; j++)
-		EXPECT_DOUBLE_EQ(c1[2][j], 11.0 + j) << j;
-
-	const vec2 o1 = w.get_atom(1).get_ADPs();
-	ASSERT_EQ(o1.size(), 3u);
-	ASSERT_EQ(o1[0].size(), 6u);
-	EXPECT_DOUBLE_EQ(o1[0][0], 0.5);
-	EXPECT_DOUBLE_EQ(o1[0][2], 0.5);
-	EXPECT_DOUBLE_EQ(o1[0][3], 0.0);
-	EXPECT_TRUE(o1[1].empty());
-	EXPECT_TRUE(o1[2].empty());
-	EXPECT_TRUE(w.get_atom(2).get_ADPs().empty());
-}
-
-TEST(ConvenienceCoverageCifTests, LabelReaderThrowsForUnknownLabel)
-{
-	ScratchDir scratch("adp_label_unknown");
-	write_text(scratch.file("a.cif"), grown_cif_text);
-	std::ofstream log(scratch.file("log.txt"));
-	WFN w(e_origin::NOT_YET_DEFINED);
-	w.push_back_atom("Zz9", 0.0, 0.0, 0.0, 6);
-	const ivec3 no_links;
-	EXPECT_THROW(read_fracs_ADPs_from_CIF(scratch.file("a.cif"), w, log, false, false, no_links), std::runtime_error);
-}
-
-TEST(ConvenienceCoverageCifTests, LabelReaderGrownCopiesUijToLinkedAtoms)
-{
-	ScratchDir scratch("adp_grown");
-	write_text(scratch.file("a.cif"), grown_cif_text);
-	std::ofstream log(scratch.file("log.txt"));
-	WFN w = grown_pair_wfn();
-	//one asymmetric atom; total atom 0 is itself (no operation), total atom 1 is its image under symop 0
-	ivec3 links(1);
-	links[0].resize(2);
-	links[0][1] = { 0 };
-
-	EXPECT_TRUE(read_fracs_ADPs_from_CIF(scratch.file("a.cif"), w, log, false, true, links));
-
-	for (int a = 0; a < 2; a++)
-	{
-		const vec2 adps = w.get_atom(a).get_ADPs();
-		ASSERT_EQ(adps.size(), 3u) << a;
-		ASSERT_EQ(adps[0].size(), 6u) << a;
-		for (int j = 0; j < 6; j++)
-			EXPECT_DOUBLE_EQ(adps[0][j], c1_U[j]) << a << " " << j;
-	}
-}
-
-TEST(ConvenienceCoverageCifTests, LabelReaderGrownCopiesCijkToLinkedAtoms)
-{
-	ScratchDir scratch("adp_grown_cijk");
-	write_text(scratch.file("a.cif"), grown_cif_text);
-	std::ofstream log(scratch.file("log.txt"));
-	WFN w = grown_pair_wfn();
-	ivec3 links(1);
-	links[0].resize(2);
-	links[0][0] = { 0 };
-	links[0][1] = { 0 };
-
-	ASSERT_TRUE(read_fracs_ADPs_from_CIF(scratch.file("a.cif"), w, log, false, true, links));
-
-	const vec2 image = w.get_atom(1).get_ADPs();
-	ASSERT_EQ(image.size(), 3u);
-	ASSERT_EQ(image[1].size(), 10u);
-	for (int j = 0; j < 10; j++)
-		EXPECT_DOUBLE_EQ(image[1][j], 1.0 + j) << j;
-}
-
-TEST(ConvenienceCoverageCifTests, UisoReaderReadsValuesAndTreatsPlaceholderAsZero)
-{
-	ScratchDir scratch("uiso");
-	write_text(scratch.file("a.cif"), cif_text);
-	std::ofstream log(scratch.file("log.txt"));
-	WFN w = three_atom_wfn();
-	cell unit_cell(10.0, 10.0, 10.0, 90.0, 90.0, 90.0);
-
-	const vec u = read_U_iso_from_CIF(scratch.file("a.cif"), w, unit_cell, log, true);
-
-	ASSERT_EQ(u.size(), 3u);
-	EXPECT_DOUBLE_EQ(u[0], 0.03125); //exact in float
-	EXPECT_DOUBLE_EQ(u[1], 0.0);     //'?'
-	EXPECT_DOUBLE_EQ(u[2], 0.0);     //no CIF atom for H1
-	EXPECT_EQ(w.get_atom_label(0), "C1");
-	EXPECT_EQ(w.get_atom_label(1), "O1");
-	EXPECT_EQ(w.get_atom_label(2), "C");
-	EXPECT_DOUBLE_EQ(w.get_atom(1).get_frac_coordinate(0), 0.5);
-	log.close();
-	std::ifstream logged(scratch.file("log.txt"));
-	std::string text((std::istreambuf_iterator<char>(logged)), std::istreambuf_iterator<char>());
-	EXPECT_NE(text.find("Found an atom: C1"), std::string::npos);
-	EXPECT_NE(text.find("I DID NOT FIND THIS ATOM"), std::string::npos);
-}
-
-TEST(ConvenienceCoverageCifTests, UisoReaderWithoutUisoColumnGivesZeros)
-{
-	ScratchDir scratch("uiso_nocol");
-	write_text(scratch.file("a.cif"),
-		"data_x\n"
-		"loop_\n"
-		"_atom_site_label\n"
-		"_atom_site_fract_x\n"
-		"_atom_site_fract_y\n"
-		"_atom_site_fract_z\n"
-		"C1 0.1 0.2 0.3\n"
-		"\n");
-	std::ofstream log(scratch.file("log.txt"));
-	WFN w = three_atom_wfn();
-	cell unit_cell(10.0, 10.0, 10.0, 90.0, 90.0, 90.0);
-	const vec u = read_U_iso_from_CIF(scratch.file("a.cif"), w, unit_cell, log, false);
-	ASSERT_EQ(u.size(), 3u);
-	EXPECT_DOUBLE_EQ(u[0], 0.0);
-	EXPECT_DOUBLE_EQ(u[1], 0.0);
-	EXPECT_DOUBLE_EQ(u[2], 0.0);
-	EXPECT_EQ(w.get_atom_label(0), "C1");
-	EXPECT_EQ(w.get_atom_label(1), "B");
 }
 
 //---------------------------------------------------------------- cube selection and unsaved files
@@ -1225,30 +896,3 @@ TEST(ConvenienceCoverageDeathTest, BesselFirstKindRefusesNegativeOrderOrArgument
 	EXPECT_EXIT(bessel_first_kind(0, -1.0), ::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), ".*");
 }
 
-TEST(ConvenienceCoverageDeathTest, AdpReaderDiesWhenTheCifHasMoreAtomsThanTheWavefunction)
-{
-	ScratchDir scratch("adp_overflow");
-	write_text(scratch.file("a.cif"), cif_text);
-	EXPECT_EXIT({
-		std::ofstream log(scratch.file("log.txt"));
-		WFN w(e_origin::NOT_YET_DEFINED);
-		w.push_back_atom("A", constants::ang2bohr(1.0), constants::ang2bohr(2.0), constants::ang2bohr(3.0), 6);
-		w.push_back_atom("B", constants::ang2bohr(5.0), constants::ang2bohr(5.0), constants::ang2bohr(5.0), 8);
-		cell unit_cell(10.0, 10.0, 10.0, 90.0, 90.0, 90.0);
-		read_fracs_ADPs_from_CIF(scratch.file("a.cif"), w, unit_cell, log, false);
-	}, ::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), ".*");
-}
-
-TEST(ConvenienceCoverageDeathTest, UisoReaderDiesWhenTheCifHasMoreAtomsThanTheWavefunction)
-{
-	ScratchDir scratch("uiso_overflow");
-	write_text(scratch.file("a.cif"), cif_text);
-	EXPECT_EXIT({
-		std::ofstream log(scratch.file("log.txt"));
-		WFN w(e_origin::NOT_YET_DEFINED);
-		w.push_back_atom("A", constants::ang2bohr(1.0), constants::ang2bohr(2.0), constants::ang2bohr(3.0), 6);
-		w.push_back_atom("B", constants::ang2bohr(5.0), constants::ang2bohr(5.0), constants::ang2bohr(5.0), 8);
-		cell unit_cell(10.0, 10.0, 10.0, 90.0, 90.0, 90.0);
-		read_U_iso_from_CIF(scratch.file("a.cif"), w, unit_cell, log, false);
-	}, ::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), ".*");
-}

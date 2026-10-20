@@ -322,6 +322,16 @@ NboInput read_file47(const std::filesystem::path& file)
 	const vec fock = numbers_of(section_body(text, "$FOCK"));
 	if (fock.size() >= packed * blocks)
 		for (int b = 0; b < blocks; b++) res.fock.push_back(unpack(fock, packed * b, res.n));
+	//full n x n per block, row = MO; only -nbo_cube reads it, so a file without one is no error here
+	const vec mo = numbers_of(section_body(text, "$LCAOMO"));
+	const size_t square = static_cast<size_t>(res.n) * res.n;
+	if (mo.size() >= square * blocks)
+		for (int b = 0; b < blocks; b++) {
+			dMatrix2 C(res.n, res.n);
+			for (int k = 0; k < res.n; k++)
+				for (int i = 0; i < res.n; i++) C(k, i) = mo[square * b + static_cast<size_t>(k) * res.n + i];
+			res.lcaomo.push_back(C);
+		}
 	return res;
 }
 
@@ -856,8 +866,103 @@ std::vector<NboE2Entry> nbo_e2(NboLewis& lewis, const dMatrix2& fock_nao,
 	return out;
 }
 
+//which NRT structures an E2 average used, for the log and the printout
+static std::string e2_avg_window(const NboE2Average& a)
+{
+	std::ostringstream s;
+	if (a.min_percent > 0.0) s << "of weight >= " << a.min_percent << " %";
+	else s << "within " << a.tol_percent << " % of the leading weight";
+	return s.str();
+}
+
 namespace
 {
+	//-nrt_e2_avg: one Lewis structure's E2 says as much about the structure as about the molecule. Every NRT
+	//structure above the cut is placed under $CHOOSE, its E2 summed per channel (type + centres), and the
+	//channels averaged with the NRT weights renormalised over the set; a channel a structure lacks counts 0.
+	void e2_nrt_average(NboResults& res, const NAOResult& nao, const dMatrix2& gamma, const dMatrix2& fock_nao,
+						const bvec2& bondable, const int n_pairs, const double scale, const NboOptions& options,
+						std::ostream& log)
+	{
+		if (scale != 2.0 || !fock_nao.extent(0)) {
+			log << "-nrt_e2_avg: closed shell with a Fock matrix only, skipped" << std::endl;
+			return;
+		}
+		const auto t0 = std::chrono::steady_clock::now();
+		NboE2Average& avg = res.e2_avg;
+		avg.tol_percent = options.nrt_e2_avg_percent;
+		avg.min_percent = options.nrt_e2_avg_min_percent;
+		std::vector<const NboNrtCandidate*> picked;
+		double wsum = 0.0, wmax = 0.0;
+		for (const auto& w : res.nrt.weights) wmax = std::max(wmax, w.weight_percent);
+		const double floor = avg.min_percent > 0.0 ? avg.min_percent : wmax * (1.0 - options.nrt_e2_avg_percent / 100.0);
+		for (size_t i = 0; i < res.nrt.weights.size() && i < res.nrt.candidates.size(); i++)
+			if (res.nrt.weights[i].weight_percent >= floor) {
+				picked.push_back(&res.nrt.candidates[i]);
+				avg.structures.push_back(res.nrt.weights[i].structure);
+				avg.weights.push_back(res.nrt.weights[i].weight_fraction);
+				wsum += res.nrt.weights[i].weight_fraction;
+			}
+		if (picked.empty()) {
+			log << "-nrt_e2_avg: no NRT structures" << std::endl;
+			return;
+		}
+		for (double& w : avg.weights) w /= wsum;
+		const auto atom = [&](const int c) { return constants::atnr2letter(nao.atoms[c].Z) + std::to_string(c + 1); };
+		const auto key = [&](const NboFunction& f) {
+			std::string s = f.type + " ";
+			for (size_t k = 0; k < f.centers.size(); k++) s += (k ? "-" : "") + atom(f.centers[k]);
+			return s;
+		};
+		//One structure per thread, each search single-threaded: a search alone is mostly serial (ladder picks,
+		//Rydberg pivots, Eigen eigensolves), so the structures, which share nothing, are the parallel axis.
+		const int ns = static_cast<int>(picked.size());
+		avg.rho_nl.assign(ns, 0.0);
+		std::vector<std::vector<std::pair<std::pair<std::string, std::string>, double>>> found(ns);
+#ifdef _OPENMP
+		const int nthreads = std::min(ns, options.threads > 0 ? options.threads : omp_get_max_threads());
+#endif
+#pragma omp parallel for schedule(dynamic) num_threads(nthreads)
+		for (int s = 0; s < ns; s++) {
+			NboOptions chosen = options;
+			chosen.parent_lewis = picked[s]->topo;
+			chosen.search_threads = 1;
+			std::ostringstream quiet;
+			NboLewis lewis = nbo_search(nao, gamma, bondable, n_pairs, scale, chosen, quiet);
+			avg.rho_nl[s] = lewis.rho_nl;
+			for (const NboE2Entry& e : nbo_e2(lewis, fock_nao, options.e2_threshold_kcal))
+				found[s].push_back({ { key(lewis.orbitals[e.donor_index - 1]), key(lewis.orbitals[e.acceptor_index - 1]) },
+									 e.energy_kcal });
+		}
+		//per channel, the summed E2 of each structure
+		std::map<std::pair<std::string, std::string>, vec> sums;
+		for (int s = 0; s < ns; s++)
+			for (const auto& [k, e] : found[s]) {
+				vec& v = sums[k];
+				v.resize(ns, 0.0);
+				v[s] += e;
+			}
+		for (const auto& [k, v] : sums) {
+			NboE2Channel c;
+			c.donor = k.first;
+			c.acceptor = k.second;
+			c.min_kcal = *std::min_element(v.begin(), v.end());
+			c.max_kcal = *std::max_element(v.begin(), v.end());
+			for (size_t s = 0; s < v.size(); s++) {
+				c.mean_kcal += avg.weights[s] * v[s];
+				if (v[s] > 0.0) c.present += avg.weights[s];
+			}
+			avg.channels.push_back(c);
+		}
+		std::stable_sort(avg.channels.begin(), avg.channels.end(),
+						 [](const NboE2Channel& a, const NboE2Channel& b) { return a.mean_kcal > b.mean_kcal; });
+		avg.seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
+		log << "-nrt_e2_avg: " << picked.size() << " NRT structure(s) " << e2_avg_window(avg)
+			<< ", covering " << std::fixed << std::setprecision(1) << 100.0 * wsum << " % of the weight, "
+			<< avg.channels.size() << " channels, " << std::setprecision(2) << avg.seconds << " s"
+			<< std::defaultfloat << std::endl;
+	}
+
 	//One spin's worth of the analysis, appended to the results.
 	void analyse_spin(NboResults& res, const NboInput& in, const NAOResult& nao,
 					  const bvec2& bondable, const bvec2& nrt_bondable, const vec2& xyz, const dMatrix2& density,
@@ -905,6 +1010,8 @@ namespace
 		if (options.nrt)
 			//log, not std::cout: under -fba this runs on the NBO thread and cout is RGBI's
 			native_nrt(res.nrt, nao, lewis, e2, nrt_bondable, options, spin, scale, log, &xyz);
+		if (options.nrt && (options.nrt_e2_avg_percent > 0.0 || options.nrt_e2_avg_min_percent > 0.0))
+			e2_nrt_average(res, nao, gamma, fock_nao, bondable, n_pairs, scale, options, log);
 
 		//NBO numbers by type group: the Lewis set in found order, then LV, BD*, RY
 		ivec order;
@@ -952,6 +1059,7 @@ namespace
 			e.acceptor_index = base + position[e.acceptor_index - 1] + 1;
 			res.e2.push_back(e);
 		}
+		lewis.printed = order;
 		out_lewis.push_back(lewis);
 	}
 
@@ -1094,7 +1202,7 @@ void refuse_unsupported_nbo_source(const WFN& wavy, std::ostream& log)
 		"Convert through a spherical .gbw/.molden of the same calculation.", log);
 }
 
-NboResults native_nbo(WFN& wavy, const NboOptions& options, std::ostream& log)
+NboResults native_nbo(WFN& wavy, const NboOptions& options, std::ostream& log, NboOrbitalSpace* space)
 {
 	const auto clock = [] { return std::chrono::steady_clock::now(); };
 	const auto t_f47 = clock();
@@ -1178,8 +1286,15 @@ NboResults native_nbo(WFN& wavy, const NboOptions& options, std::ostream& log)
 			p.total = a.population;
 			res.npa.push_back(p);
 		}
+		if (space) {
+			space->nao = nao;
+			space->overlap = in.overlap;
+			space->lcaomo = in.lcaomo.empty() ? dMatrix2() : in.lcaomo[0];
+			space->lewis = lewis[0];
+		}
 	}
 	else {
+		err_checkf(!space, "-nbo_cube/-nlmo_cube: closed-shell wavefunctions only; this one is open shell", log);
 		err_checkf(options.nrt_parent.empty() && options.parent_lewis.empty(),
 				   "-nrt_parent takes a closed-shell wavefunction; this one is open shell, whose alpha and beta "
 				   "Lewis structures the search places apart", log);
@@ -1334,6 +1449,13 @@ void print_nrt(const NboResults& r, std::ostream& out)
 
 	for (const std::string& spin : spins_of(n.weights)) {
 		out << title("Resonance weights", spin) << "  structure   weight %   change from the parent\n";
+		//structure 0 is the parent, listed only when the fit drops it (a retained one is its own row)
+		const bool retained = std::any_of(n.weights.begin(), n.weights.end(), [&](const NboResonanceWeight& w) {
+			return w.spin == spin && w.changes == "parent";
+		});
+		for (const NboNrtD& d : n.spin_d)
+			if (!retained && d.spin == spin && d.parent_percent >= 0.0)
+				out << setw(11) << 0 << setprecision(2) << setw(11) << d.parent_percent << "   parent\n";
 		for (const NboResonanceWeight& w : n.weights)
 			if (w.spin == spin)
 				out << setw(11) << w.structure << setprecision(2) << setw(11) << w.weight_percent << "   "
@@ -1453,5 +1575,118 @@ void print_nbo(const NboResults& r, std::ostream& out)
 						<< e.fij << "\n";
 		}
 	}
+	if (!r.e2_avg.structures.empty()) {
+		const NboE2Average& a = r.e2_avg;
+		out << "\nSecond-order E(2) averaged over NRT structures " << e2_avg_window(a)
+			<< " (in house; channels sum orbitals of one type on the same centres, weights renormalised):\n";
+		for (size_t i = 0; i < a.structures.size(); i++)
+			out << "  structure " << setw(3) << a.structures[i] << "  weight " << setprecision(4) << setw(7) << a.weights[i]
+				<< "  rho(NL) " << setprecision(5) << a.rho_nl[i] << "\n";
+		out << "  " << left << setw(21) << "donor" << setw(21) << "acceptor" << right << setw(10) << "<E(2)>"
+			<< setw(9) << "min" << setw(9) << "max" << setw(9) << "present" << "\n";
+		for (const NboE2Channel& c : a.channels)
+			out << "  " << left << setw(21) << c.donor << setw(21) << c.acceptor << right << setprecision(2)
+				<< setw(10) << c.mean_kcal << setw(9) << c.min_kcal << setw(9) << c.max_kcal << setw(9) << c.present << "\n";
+	}
 	print_nrt(r, out);
+}
+
+WFN nbo_cube_wfn(const WFN& wavy, const NboResults& r, const NboOrbitalSpace& space, const std::string& spec,
+				 const bool nlmo, std::vector<std::pair<int, std::string>>& picked, std::ostream& log)
+{
+	const char* opt = nlmo ? "-nlmo_cube" : "-nbo_cube";
+	const NboLewis& lewis = space.lewis;
+	const int n = static_cast<int>(space.nao.C.extent(0));
+	err_checkf(!wavy.get_is_unrestricted(), std::string(opt) + ": closed-shell wavefunctions only", log);
+	err_checkf(static_cast<int>(space.lcaomo.extent(0)) == n,
+			   std::string(opt) + ": the FILE47 carries no $LCAOMO to reach the primitives through", log);
+	//selection as printed numbers, 1-based
+	ivec sel;
+	std::stringstream ss(spec);
+	std::string tok;
+	while (std::getline(ss, tok, ',')) {
+		if (tok.empty()) continue;
+		if (tok == "lewis") {
+			for (int k = 1; k <= lewis.n_lewis; k++) sel.push_back(k);
+			continue;
+		}
+		if (std::all_of(tok.begin(), tok.end(), [](unsigned char c) { return std::isdigit(c); })) {
+			const int k = std::stoi(tok);
+			err_checkf(k >= 1 && k <= static_cast<int>(r.orbitals.size()),
+					   std::string(opt) + ": NBO " + tok + " does not exist, there are " + std::to_string(r.orbitals.size()), log);
+			sel.push_back(k);
+			continue;
+		}
+		std::string label = tok;
+		std::replace(label.begin(), label.end(), ':', ' ');
+		const size_t before = sel.size();
+		for (const NboOrbital& o : r.orbitals)
+			if (nbo_label(o) == label) sel.push_back(o.index);
+		//a label from another resonance structure (BD Pd1-Zn2 where this Lewis structure has LP Zn2) is skipped,
+		//not fatal: one batch can then ask for every orbital any structure might hold
+		if (sel.size() == before) log << "Warning: " << opt << ": no NBO labelled " << label << " in this Lewis structure, skipped" << std::endl;
+	}
+	err_checkf(!sel.empty(), std::string(opt) + ": none of the requested NBOs exist", log);
+	err_checkf(static_cast<int>(sel.size()) <= wavy.get_nmo(), std::string(opt) + ": more orbitals than MO slots", log);
+	ivec internal(sel.size());
+	for (size_t k = 0; k < sel.size(); k++) {
+		internal[k] = lewis.printed[sel[k] - 1];
+		//the Lewis set comes first in lewis.orbitals and only it has NLMOs
+		err_checkf(!nlmo || internal[k] < lewis.n_lewis, std::string(opt) + ": NBO " + std::to_string(sel[k]) + " (" +
+				   nbo_label(r.orbitals[sel[k] - 1]) + ") is non-Lewis and has no NLMO", log);
+	}
+
+	//orbitals in the NAO basis, one column per selection
+	MatrixXd V(n, sel.size());
+	if (!nlmo)
+		for (size_t k = 0; k < sel.size(); k++)
+			for (int i = 0; i < n; i++) V(i, k) = lewis.orbitals[internal[k]].coefficients[i];
+	else {
+		//Gamma / 2 projects on the occupied space of a closed-shell determinant; tr P - tr P^2 says how far it is from one
+		const MatrixXd P = to_eigen(lewis.gamma) / 2.0;
+		log << opt << ": occupied-space projector defect tr(P) - tr(P^2) = " << std::scientific << std::setprecision(2)
+			<< P.trace() - P.squaredNorm() << std::defaultfloat << std::endl;
+		const int nl = lewis.n_lewis;
+		MatrixXd B(n, nl);
+		for (int j = 0; j < nl; j++)
+			for (int i = 0; i < n; i++) B(i, j) = lewis.orbitals[j].coefficients[i];
+		const MatrixXd M = P * B;
+		const MatrixXd L = M * sym_power(MatrixXd(M.transpose() * M), -0.5);
+		for (size_t k = 0; k < sel.size(); k++) V.col(k) = L.col(internal[k]);
+	}
+
+	//NAO -> AO -> MO expansion t = C_MO S x -> primitives
+	const MatrixXd T = to_eigen(space.lcaomo) * to_eigen(space.overlap) * to_eigen(space.nao.C) * V;
+	WFN w(wavy);
+	const int nmo = std::min(wavy.get_nmo(), n);
+	picked.clear();
+	for (size_t k = 0; k < sel.size(); k++) {
+		const NboOrbital& o = r.orbitals[sel[k] - 1];
+		picked.emplace_back(sel[k], nbo_label(o));
+		//NAO weights per atom, the largest first
+		std::vector<std::pair<double, int>> share(space.nao.atoms.size());
+		for (size_t a = 0; a < share.size(); a++) share[a] = { 0.0, static_cast<int>(a) };
+		for (int i = 0; i < n; i++) share[space.nao.orbitals[i].atom].first += V(i, k) * V(i, k);
+		std::sort(share.rbegin(), share.rend());
+		double norm = 0.0;
+		for (int m = 0; m < nmo; m++) norm += T(m, k) * T(m, k);
+		log << (nlmo ? "NLMO " : "NBO ") << sel[k] << " " << picked.back().second << std::fixed << std::setprecision(2);
+		if (nlmo) {
+			double parent = 0.0;
+			for (int i = 0; i < n; i++) parent += V(i, k) * lewis.orbitals[internal[k]].coefficients[i];
+			log << ", " << 100.0 * parent * parent << " % parent NBO";
+		}
+		log << ", atoms (%):";
+		for (size_t a = 0; a < share.size() && share[a].first >= 0.005; a++)
+			log << " " << constants::atnr2letter(space.nao.atoms[share[a].second].Z) << share[a].second + 1 << " "
+				<< 100.0 * share[a].first;
+		log << std::scientific << std::setprecision(1) << ", norm lost in the MO expansion " << 1.0 - norm
+			<< std::defaultfloat << std::endl;
+		for (int p = 0; p < wavy.get_nex(); p++) {
+			double v = 0.0;
+			for (int m = 0; m < nmo; m++) v += T(m, k) * wavy.get_MO_coef(m, p);
+			w.set_MO_coef(static_cast<int>(k), p, v);
+		}
+	}
+	return w;
 }
