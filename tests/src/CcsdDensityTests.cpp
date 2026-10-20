@@ -9,6 +9,8 @@
 #include "core/convenience.h"
 #include "core/wfn_class.h"
 #include <occ/io/xyz.h>
+#include <occ/qm/cc/ccsd.h>
+#include <occ/qm/cc/integrals.h>
 #include <occ/qm/hf.h>
 #include <occ/qm/scf.h>
 #include <spdlog/spdlog.h>
@@ -285,4 +287,22 @@ TEST(CcsdDensity, OrcaMp2NatMatchesOccRelaxedMp2)
 			hf_dev = std::max(hf_dev, std::abs(hf.compute_dens(p) / rho - 1.0));
 		}
 	EXPECT_GT(hf_dev, 1e-3);
+}
+
+//occ's MP2-MP4 energies against ORCA 6.1.0 AutoCI (! AUTOCI-MP4 cc-pVDZ NoRI TightSCF) of the same water, all
+//electrons and with the 1s frozen
+TEST(CcsdDensity, OccMpnEnergiesMatchOrca)
+{
+	if (!ensure_occ_data_path(nullptr)) GTEST_SKIP() << "OCC_DATA_PATH not set";
+	const occ::qm::Wavefunction scf = tight_rhf();
+	const auto all = occ::qm::cc::mpn_energies(occ::qm::cc::exact_eris(scf.basis, scf.mo, 0));
+	EXPECT_NEAR(all.e2, -0.204003540949, 1e-7);
+	EXPECT_NEAR(all.e3, -0.006789427245, 5e-8);  //ORCA's TightSCF orbitals move E2 and E3 by ~2e-8
+	EXPECT_NEAR(all.mp4_sdq() - all.mp3(), -0.002229769988, 1e-8);
+	EXPECT_NEAR(all.mp4() - all.mp3(), -0.005233365840, 1e-8);
+	const auto fc = occ::qm::cc::mpn_energies(occ::qm::cc::exact_eris(scf.basis, scf.mo, 1));
+	EXPECT_NEAR(fc.e2, -0.201665956431, 1e-7);
+	EXPECT_NEAR(fc.e3, -0.006997609515, 5e-8);
+	EXPECT_NEAR(fc.mp4_sdq() - fc.mp3(), -0.002257817888, 1e-8);
+	EXPECT_NEAR(fc.mp4() - fc.mp3(), -0.005236880343, 1e-8);
 }
