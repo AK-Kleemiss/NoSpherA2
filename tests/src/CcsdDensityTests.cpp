@@ -306,3 +306,38 @@ TEST(CcsdDensity, OccMpnEnergiesMatchOrca)
 	EXPECT_NEAR(fc.mp4_sdq() - fc.mp3(), -0.002257817888, 1e-8);
 	EXPECT_NEAR(fc.mp4() - fc.mp3(), -0.005236880343, 1e-8);
 }
+
+//unrelaxed MP4 density against ORCA 6.1.0 AutoCI (water_mp4_autoci.inp, %autoci density unrelaxed); that job's MOs are
+//bit-identical to water_ccsdt_autoci's, so its gbw serves the MP4 json too
+TEST(CcsdDensity, OccMp4DensityMatchesOrcaAutoci)
+{
+	if (!ensure_occ_data_path(nullptr)) GTEST_SKIP() << "OCC_DATA_PATH not set";
+	const std::filesystem::path dir = nos_test_repo_root() / "tests" / "ccsd_water", json = dir / "water_mp4_autoci.json";
+	if (!std::filesystem::exists(json)) GTEST_SKIP() << "fixture missing: " << json.string();
+	const std::filesystem::path tmp = std::filesystem::temp_directory_path() / "nos_mp4_autoci";
+	std::filesystem::create_directories(tmp);
+	std::filesystem::copy_file(json, tmp / json.filename(), std::filesystem::copy_options::overwrite_existing);
+	std::filesystem::copy_file(dir / "water_ccsdt_autoci.gbw", tmp / "water_mp4_autoci.gbw", std::filesystem::copy_options::overwrite_existing);
+	WFN orca;
+	std::ostringstream log;
+	ASSERT_TRUE(orca.read_orca_json_density(tmp / json.filename(), log));
+	const occ::qm::Wavefunction scf = tight_rhf();
+	CcsdDensityOptions opts;
+	opts.n_frozen = 0;
+	opts.triples = true;
+	const CcsdDensityResult mp4 = mpn_natural_orbitals(scf, 4, opts, log);
+	EXPECT_NEAR(mp4.e_corr, -0.204003540949 - 0.006789427245 - 0.005233365840, 1e-7);
+	EXPECT_NE(log.str().find("MP4 density (unrelaxed"), std::string::npos) << log.str();
+	opts.triples = false;
+	const WFN occ_wfn(mp4.natural), sdq_wfn(mpn_natural_orbitals(scf, 4, opts, log).natural);
+	double sdq_dev = 0.0;
+	for (unsigned a = 0; a < 3; a++)
+		for (const d3 &shift : { d3{ 0.02, 0.0, 0.03 }, d3{ 0.6, 0.0, 0.3 }, d3{ 0.0, 0.4, -0.4 } })
+		{
+			const d3 p{ orca.get_atom_coordinate(a, 0) + shift[0], orca.get_atom_coordinate(a, 1) + shift[1], orca.get_atom_coordinate(a, 2) + shift[2] };
+			const double rho = orca.compute_dens(p);
+			EXPECT_NEAR(occ_wfn.compute_dens(p) / rho, 1.0, 1e-5) << "atom " << a;
+			sdq_dev = std::max(sdq_dev, std::abs(sdq_wfn.compute_dens(p) / rho - 1.0));
+		}
+	EXPECT_GT(sdq_dev, 1e-4);
+}

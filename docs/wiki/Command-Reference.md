@@ -97,18 +97,19 @@ you are memory-constrained.
 | `-ECP <0..3>` | 1 | `0` | ECP treatment. `1` = ORCA-style def2-ECP, `3` = pTB. Also spelled `-ecp`, `-Ecp`. |
 | `-method <name>` | 1 | | Record the QM method used (goes into the table header). |
 | `-refine [acc]` | 0-1 | `0.1` | Numerical integral accuracy for the refinement path. |
-| `-occ <file>` | 1 | | An occ input (`.toml`) that occ runs, or an occ wavefunction file. With `method = "mp2"`, `"ccsd"` or `"ccsd(t)"` the density is the correlated one (relaxed MP2, unrelaxed CCSD / CCSD(T)), not the SCF one; see [Correlated densities](#correlated-densities-mp2-ccsd-ccsdt) for methods, backends and keys. |
+| `-occ <file>` | 1 | | An occ input (`.toml`) that occ runs, or an occ wavefunction file. With `method = "mp2"`, `"mp3"`, `"mp4(sdq)"`, `"mp4"`, `"ccsd"` or `"ccsd(t)"` the density is the correlated one (relaxed MP2, unrelaxed MP3 / MP4 / CCSD / CCSD(T)), not the SCF one; see [Correlated densities](#correlated-densities-mp2-ccsd-ccsdt) for methods, backends and keys. |
 
 ### Correlated densities: MP2, CCSD, CCSD(T)
 
 `-occ` with a correlated `method` runs occ's RHF and then the density of that method; the natural orbitals go on to the
 scattering factors like any other wavefunction. Closed shell (RHF) only. The densities are occ's
-(`occ/qm/cc/density.h`: `ccsd_density`, `local_ccsd_density`, `mp2_relaxed_density`); NoSpherA2 builds that code
+(`occ/qm/cc/density.h`: `ccsd_density`, `local_ccsd_density`, `mp2_relaxed_density`, `mpn_density`); NoSpherA2 builds that code
 against MKL (`OCC_DENSITY_CBLAS`), and reads the `ccsd_*` keys and writes the log summary.
 
 | `method` | density |
 | --- | --- |
 | `"mp2"` | relaxed MP2: MP2 Lagrangian with the Z-vector orbital response (PySCF `grad/mp2.py`), the frozen core relaxed too. SCS/SOS-MP2 (`mp2_spin_scaling`) is refused. |
+| `"mp3"`, `"mp4(sdq)"`, `"mp4"` | unrelaxed MP3 / MP4(SDQ) / MP4(SDTQ), ORCA AutoCI's density: oo and vv blocks from the MPn Lagrangian, and for MP4 the ov block of the second-order wavefunction's singles-doubles and doubles-triples couplings (MP3 has none). No orbital response; see the note on unrelaxed MP-n densities below. |
 | `"ccsd"` | unrelaxed CCSD from the Lambda equations (PySCF `ccsd_lambda` / `ccsd_rdm`). |
 | `"ccsd(t)"` | unrelaxed CCSD(T): the (T) terms in Lambda and in the density, the response form (PySCF `ccsd_t_lambda_slow` / `ccsd_t_rdm_slow`, `for_grad=True`). |
 
@@ -135,7 +136,8 @@ fitting basis for the orbital basis. THC is not available for densities.
 | `ccsd_local` | `false` | CCSD / CCSD(T) only: cluster-in-molecule densities (one cluster per Pipek-Mezey LMO) for larger systems, with `ccsd_cluster_radius` (8 Å), `ccsd_domain_threshold` (0.01), `ccsd_pair_threshold` (1e-5 Eh) and `ccsd_lno_threshold` (1e-6). Clusters that span the molecule give the canonical density back. |
 
 **Accuracy and cost.** Against ORCA 6.1 (water and benzene cc-pVDZ, ORCA's tolerances): scattering factors within
-~3e-6 e for MP2 (relaxed), CCSD (MDCI) and CCSD(T) (AutoCI); energies within ORCA's convergence (~1e-6 Eh). Canonical
+~3e-6 e for MP2 (relaxed), CCSD (MDCI) and CCSD(T) (AutoCI); energies within ORCA's convergence (~1e-6 Eh). MP3 and
+MP4 against AutoCI (water): natural occupations within 7e-8, energies within 1e-7 Eh, the same charge table. Canonical
 CCSD(T) scales as o³v⁴: on 8 cores, water seconds, benzene ~1 min, naphthalene ~12 min (ORCA MDCI 14 min for its
 CCSD(T) energy and CCSD density, AutoCI 13 min for benzene's CCSD(T) density).
 
@@ -147,7 +149,7 @@ CCSD(T) energy and CCSD density, AutoCI 13 min for benzene's CCSD(T) density).
 - CCSD(T) (and MP2, MP3, MP4, unrelaxed): AutoCI, `! AUTOCI-CCSD(T) NoRI KeepDens` with `%autoci density unrelaxed end`
   (on Windows AutoCI is a separate download, `Orca6.1.0.Win64_autoci*.zip`, unpacked into the ORCA folder), then
   `orca_2json base.gbw` with `base.json.conf` = `{"MOCoefficients": true, "Densities": ["autocipur"]}` and `-wfn base.json`.
-- Unrelaxed MP-n densities are poor for scattering factors: on water they close only a third to a half of the HF to
+- Unrelaxed MP-n densities (ORCA's or occ's, which are the same) are poor for scattering factors: on water they close only a third to a half of the HF to
   CCSD(T) difference (max |Δf| on O against CCSD(T): HF 2.2e-2, MP2 1.5e-2, MP4 1.2e-2, CCSD 1.4e-3 e). Use the
   relaxed MP2 density, CCSD or CCSD(T).
 

@@ -521,6 +521,12 @@ TEST(TomlIntegrationTests, Mp2OrcaNat)
 	EXPECT_TRUE(result.success) << result.message;
 }
 
+TEST(TomlIntegrationTests, Mp4OccWater)
+{
+	const UT_Result result = run_inprocess_test(get_repo_root(), "mp4_occ_water");
+	EXPECT_TRUE(result.success) << result.message;
+}
+
 TEST(TomlIntegrationTests, DisorderTHPP)
 {
 	const UT_Result result = run_inprocess_test(get_repo_root(), "disorder_THPP");

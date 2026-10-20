@@ -34,6 +34,7 @@ set_tests_properties(
     TomlIntegrationTests.CcsdTOrcaAutoci
     TomlIntegrationTests.Mp2OccWater
     TomlIntegrationTests.Mp2OrcaNat
+    TomlIntegrationTests.Mp4OccWater
     PROPERTIES
         RESOURCE_LOCK integration_ccsd_water
 )

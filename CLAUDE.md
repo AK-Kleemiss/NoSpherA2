@@ -240,11 +240,11 @@ Key core modules live in `Src/core`:
 ## Current Validation Notes
 
 As of 2026-10-20, `-occ` with `method = "mp2"` / `"ccsd"` / `"ccsd(t)"` gives the relaxed MP2 / unrelaxed CCSD / CCSD(T)
-density (CC canonical or local cluster-in-molecule, converged to ORCA's STol), `-wfn` reads ORCA's `.mdci.nat`, `.mp2nat` and
-AutoCI densities exported by orca_2json (`base.json`), and occ is at upstream 0.9.6; occ's `mpn_energies` gives MP3 / MP4(SDQ) /
-MP4(SDTQ) energies matching ORCA AutoCI (`CcsdDensity.OccMpnEnergiesMatchOrca`, energies only);
-`ctest` on a `release-windows` build with CUDA reports **1303 passed, 0 failed, 9 skipped**
-(2 disabled) of 1314. See `UNIT_TESTS_STATUS.md`.
+density (CC canonical or local cluster-in-molecule, converged to ORCA's STol), and `"mp3"` / `"mp4(sdq)"` / `"mp4"` the
+unrelaxed MPn density as ORCA's AutoCI (`CcsdDensity.OccMp4DensityMatchesOrcaAutoci`, `mp4_occ_water`); `-wfn` reads ORCA's
+`.mdci.nat`, `.mp2nat` and AutoCI densities exported by orca_2json (`base.json`), and occ is at upstream 0.9.6;
+`ctest` on a `release-windows` build with CUDA reports **1305 passed, 0 failed, 9 skipped**
+(2 disabled) of 1316. See `UNIT_TESTS_STATUS.md`.
 
 As of 2026-10-20 (latest), an XCW settings file without `params` warns and uses 1 (`XcwSettingsTests.MissingParamsDefaultsToOneWithAWarning`);
 `ctest --preset release-windows-tests` on a CPU-only build reports **1281 passed, 0 failed, 22 skipped** (2 disabled) of 1305. See `UNIT_TESTS_STATUS.md`.
