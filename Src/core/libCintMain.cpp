@@ -104,19 +104,10 @@ void compute2C(Int_Params &params, vec &ret) {
 	libcint::CINTOpt* opty = nullptr;
 	Kernel::optimizer(opty, atm.data(), nat, bas.data(), nbas, env.data());
 
-	// Compute integrals
-	vec res((size_t)naoi * (size_t)naoj, 0.0);
-	ret.resize((size_t)naoi * (size_t)naoj, 0.0);
-	Kernel::drv(res.data(), 1, shl_slice.data(), aoloc.data(), opty, atm.data(), nat, bas.data(), nbas, env.data());
-
-	// res is in fortran order, write the result in regular ordering
-	for (int i = 0; i < naoi; i++)
-	{
-		for (int j = 0; j < naoj; j++)
-		{
-			ret[(size_t)j * (size_t)naoi + i] = res[(size_t)i * (size_t)naoj + j];
-		}
-	}
+	// Compute integrals; the 2C drivers mirror the shell triangle, so the result is exactly symmetric
+	// and its fortran order is already the regular ordering
+	ret.assign((size_t)naoi * (size_t)naoj, 0.0);
+	Kernel::drv(ret.data(), 1, shl_slice.data(), aoloc.data(), opty, atm.data(), nat, bas.data(), nbas, env.data());
 }
 template void compute2C<Coulomb2C_SPH>(Int_Params &params, vec &ret);
 template void compute2C<Coulomb2C_CRT>(Int_Params &params, vec &ret);
