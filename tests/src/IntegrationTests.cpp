@@ -503,6 +503,12 @@ TEST(TomlIntegrationTests, CcsdTOccWater)
 	EXPECT_TRUE(result.success) << result.message;
 }
 
+TEST(TomlIntegrationTests, CcsdTOrcaAutoci)
+{
+	const UT_Result result = run_inprocess_test(get_repo_root(), "ccsd_t_orca_autoci");
+	EXPECT_TRUE(result.success) << result.message;
+}
+
 TEST(TomlIntegrationTests, DisorderTHPP)
 {
 	const UT_Result result = run_inprocess_test(get_repo_root(), "disorder_THPP");

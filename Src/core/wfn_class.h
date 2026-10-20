@@ -341,8 +341,13 @@ public:
 	bool read_molden(const std::filesystem::path& filename, std::ostream& file, const bool debug = false);
 	/** Read tonto orbital_energies and molecular_orbitals binary file. */
 	bool read_tonto(const std::filesystem::path& filename, std::ostream& file, const bool debug = false, const std::filesystem::path& energies_filename = "", const std::filesystem::path& orbitals_filename = "");
-	/** Read ORCA .gbw binary file. */
-	bool read_gbw(const std::filesystem::path& filename, std::ostream& file, const bool debug = false, const bool has_ECPs = false);
+	/** Read ORCA .gbw binary file. natural (restricted only): U (MO -> natural orbital, row-major) and the natural occupations
+	 *  replace the file's MOs by C U. */
+	bool read_gbw(const std::filesystem::path& filename, std::ostream& file, const bool debug = false, const bool has_ECPs = false,
+		const std::pair<vec, vec>* natural = nullptr);
+	/** Read an orca_2json export carrying Densities: ORCA's correlated density (AutoCI unrelaxed, AutoCI relaxed, MDCI) as
+	 *  natural orbitals of base.gbw. */
+	bool read_orca_json_density(const std::filesystem::path& filename, std::ostream& file, const bool debug = false);
 	/** Read xTB / pTB binary orbital file. */
 	bool read_ptb(const std::filesystem::path& filename, std::ostream& file, const bool debug = false);
 	/** Write current wavefunction to .wfn file (optionally only occupied). */

@@ -450,9 +450,12 @@ namespace
 		const int nt = omp_get_max_threads();
 		vec2 buf(size_t(nt) * 8, vec(v3));
 
-		//everything one block (i, j, k) contributes, given its W and V; wv, rw receive W + V/2 and r6(W)
-		auto block = [&](const int i, const int j, const int k, const double *W, const double *V, double *wv, double *rw, double *m, double *arw) {
-			const double eijk = e.eo(i) + e.eo(j) + e.eo(k);
+		//block (i, j, k) and, for j > k, its b<->c mirror (i, k, j) (joint permutation symmetry), given W and V of (i, j, k).
+		//The mirror's r6(W) and W + V/2 are the swapped ones, so its E(T), l1, vv and oo shares equal those of (i, j, k):
+		//weight 2. as_r6 does not commute with the swap: m' = as_r6(Y) of the swapped Y = 2W + V/2. F_ov = 0, as in occ's CCSD.
+		auto block = [&](const int i, const int j, const int k, const double *W, const double *V, double *wv, double *rw, double *m, double *mm) {
+			const bool mirror = j != k;
+			const double eijk = e.eo(i) + e.eo(j) + e.eo(k), weight = mirror ? 2.0 : 1.0;
 			double et = 0.0;
 			for (int a = 0; a < v; a++)
 				for (int b = 0; b < v; b++)
@@ -462,25 +465,31 @@ namespace
 						//r6 and as_r6 act on abc only: r6(w) = 4w + w(cab) + w(bca) - 2 [w(cba) + w(acb) + w(bac)]
 						rw[x] = 4.0 * W[x] + W[cab] + W[bca] - 2.0 * (W[cba] + W[acb] + W[bac]);
 						wv[x] = W[x] + 0.5 * V[x];
-						m[x] = 2.0 * (2.0 * W[x] + 0.5 * V[x]) - (2.0 * W[cba] + 0.5 * V[cba]) - (2.0 * W[acb] + 0.5 * V[acb]);
-						arw[x] = 2.0 * W[x] - W[cba] - W[acb];
+						const double y = 2.0 * W[x] + 0.5 * V[x], y_acb = 2.0 * W[acb] + 0.5 * V[acb];
+						m[x] = 2.0 * y - (2.0 * W[cba] + 0.5 * V[cba]) - y_acb;
+						if (mirror) mm[x] = 2.0 * y_acb - (2.0 * W[cab] + 0.5 * V[cab]) - y;
 						//E(T) = 1/3 sum W D r6(W + V/2) = 1/3 sum D r6(W) (W + V/2), r6 self-adjoint and D symmetric in abc
 						et += (eijk - e.ev(a) - e.ev(b) - e.ev(c)) * rw[x] * wv[x];
 					}
-			e_i[i] += et / 3.0;
+			e_i[i] += weight * et / 3.0;
 			//l1_t[i] and joovv[i] are this i's alone; the vv, vo parts are per i and summed after the loop
-			MapR(r.l1_t.v.data() + size_t(i) * v, 1, v).noalias() += (CMapR(rw, v, vv) * CMapR(at(ovov_t, size_t(j) * o + k, vv), vv, 1)).transpose();
+			MapR(r.l1_t.v.data() + size_t(i) * v, 1, v).noalias() += weight * (CMapR(rw, v, vv) * CMapR(at(ovov_t, size_t(j) * o + k, vv), vv, 1)).transpose();
+			gemm(false, true, iv, iv, ivv, weight, wv, ivv, rw, ivv, 1.0, gvv_i[i].v.data(), iv);
+			//joovv[i, j] += m L2[k]; joovv[i, J, ab] -= sum_c (kc|jJ) m[ab, c]; the mirror with j <-> k and m'
 			gemm(false, false, iv, iv, ivv, 1.0, m, ivv, at(L2, k, v3), iv, 1.0, joovv.v.data() + (size_t(i) * o + j) * vv, iv);
-			MapR(joovv.v.data() + (size_t(i) * o + j) * vv, vv, 1).noalias() += CMapR(arw, vv, v) * CMapR(e.fov.v.data() + size_t(k) * v, v, 1);
-			//joovv[i, J, ab] -= sum_c (kc|jJ) m[ab, c]
 			gemm(true, true, o, ivv, iv, -1.0, at(ovoo_t, size_t(k) * o + j, size_t(v) * o), o, m, iv, 1.0, joovv.v.data() + size_t(i) * o * vv, ivv);
-			gemm(false, true, iv, iv, ivv, 1.0, wv, ivv, rw, ivv, 1.0, gvv_i[i].v.data(), iv);
 			const Eigen::VectorXd dv = CMapR(rw, vv, v).transpose() * CMapR(at(t2, size_t(i) * o + j, vv), vv, 1);
 			for (int c = 0; c < v; c++) dvo_i[i].at(c, k) += 0.5 * dv(c);
+			if (!mirror)
+				return;
+			gemm(false, false, iv, iv, ivv, 1.0, mm, ivv, at(L2, j, v3), iv, 1.0, joovv.v.data() + (size_t(i) * o + k) * vv, iv);
+			gemm(true, true, o, ivv, iv, -1.0, at(ovoo_t, size_t(j) * o + k, size_t(v) * o), o, mm, iv, 1.0, joovv.v.data() + size_t(i) * o * vv, ivv);
+			//the mirror's dv(c) = sum_ab r6(W)[acb] t2(ik, ab)
+			Eigen::VectorXd dvm = Eigen::VectorXd::Zero(v);
+			for (int a = 0; a < v; a++) dvm.noalias() += CMapR(rw + size_t(a) * vv, v, v) * CMapR(at(t2, size_t(i) * o + k, vv) + size_t(a) * v, v, 1);
+			for (int c = 0; c < v; c++) dvo_i[i].at(c, j) += 0.5 * dvm(c);
 		};
 
-		//block (i, k, j) is block (i, j, k) with b and c swapped (joint permutation symmetry): same oo share, hence
-		//the weight 2; as_r6 does not commute with the swap, so its other terms come from the swapped W and V
 		for (int j = 0; j < o; j++)
 			for (int k = 0; k <= j; k++)
 			{
@@ -499,9 +508,7 @@ namespace
 					//p6 and the division by D in one pass; v's six permutations coincide in pairs, so three terms twice
 					const double eijk = e.eo(i) + e.eo(j) + e.eo(k);
 					const double *Xij = at(ovov_t, size_t(i) * o + j, vv), *Xik = at(ovov_t, size_t(i) * o + k, vv), *Xjk = at(ovov_t, size_t(j) * o + k, vv);
-					const double *Tij = at(t2, size_t(i) * o + j, vv), *Tik = at(t2, size_t(i) * o + k, vv), *Tjk = at(t2, size_t(j) * o + k, vv);
 					const double *t1i = at(t1, i, v), *t1j = at(t1, j, v), *t1k = at(t1, k, v);
-					const double *fi = at(e.fov, i, v), *fj = at(e.fov, j, v), *fk = at(e.fov, k, v);
 					for (int a = 0; a < v; a++)
 						for (int b = 0; b < v; b++)
 							for (int c = 0; c < v; c++)
@@ -510,19 +517,9 @@ namespace
 								const double d = eijk - e.ev(a) - e.ev(b) - e.ev(c);
 								W[x] = (b0[x] + b1[ix(a, c, b)] + b2[ix(b, a, c)] + b3[ix(b, c, a)] + b4[ix(c, a, b)] + b5[ix(c, b, a)]) / d;
 								const size_t ab = size_t(a) * v + b, ac = size_t(a) * v + c, bc = size_t(b) * v + c;
-								V[x] = 2.0 * (Xij[ab] * t1k[c] + fk[c] * Tij[ab] + Xik[ac] * t1j[b] + fj[b] * Tik[ac] + Xjk[bc] * t1i[a] + fi[a] * Tjk[bc]) / d;
+								V[x] = 2.0 * (Xij[ab] * t1k[c] + Xik[ac] * t1j[b] + Xjk[bc] * t1i[a]) / d;
 							}
 					block(i, j, k, W, V, WV.row(i).data(), RW.row(i).data(), b0, b1);
-					if (j == k) continue;
-					double *Wm = b2, *Vm = b3;
-					for (int a = 0; a < v; a++)
-						for (int b = 0; b < v; b++)
-							for (int c = 0; c < v; c++)
-							{
-								Wm[ix(a, b, c)] = W[ix(a, c, b)];
-								Vm[ix(a, b, c)] = V[ix(a, c, b)];
-							}
-					block(i, k, j, Wm, Vm, b4, b5, b0, b1);
 				}
 				//the vv block attributed by the block's first occupied index, projected onto proj's directions
 				if (proj)
@@ -620,7 +617,7 @@ namespace
 		CcSolution s;
 		occ::qm::cc::CCSDOptions copts;
 		copts.max_cycle = opts.max_cycle;
-		copts.tol = opts.tol * 1e-2;
+		copts.residual_tol = opts.tol;
 		const occ::qm::cc::CCSDResult cc = occ::qm::cc::ccsd(cc_eris, copts);
 		err_checkf(cc.converged, "CCSD did not converge in " + std::to_string(opts.max_cycle) + " iterations", log);
 		s.e_corr = cc.e_corr;
@@ -657,12 +654,20 @@ namespace
 				l2new += s.tr.l2_t;
 			}
 			occ::Mat x = flatten(l1new, l2new);
-			occ::Mat err = x - flatten(l1, l2);
-			const double change = err.norm();
-			diis.extrapolate(x, err);
+			occ::Mat dl = x - flatten(l1, l2);
+			//max |R|, R = D (l_new - l_old)
+			double rmax = 0.0;
+			size_t n = 0;
+			for (int i = 0; i < e.o; i++)
+				for (int a = 0; a < e.v; a++) rmax = std::max(rmax, std::abs(dl(n++) * (e.eo(i) - e.ev(a))));
+			for (int i = 0; i < e.o; i++)
+				for (int j = 0; j < e.o; j++)
+					for (int a = 0; a < e.v; a++)
+						for (int b = 0; b < e.v; b++) rmax = std::max(rmax, std::abs(dl(n++) * (e.eo(i) + e.eo(j) - e.ev(a) - e.ev(b))));
+			diis.extrapolate(x, dl);
 			unflatten(x, l1, l2);
 			s.lambda_iterations = it;
-			converged = change < opts.tol;
+			converged = rmax < opts.tol;
 		}
 		mark("Lambda iterations");
 		err_checkf(converged, "The CCSD Lambda equations did not converge in " + std::to_string(opts.max_cycle) + " iterations", log);
@@ -1144,6 +1149,7 @@ CcsdDensityResult ccsd_density_from_occ_input(const std::string &toml_path, occ:
 	opts.n_frozen = scf_table["ccsd_frozen_core"].value_or(opts.n_frozen);
 	opts.backend = scf_table["ccsd_backend"].value_or(opts.backend);
 	opts.max_memory_gb = scf_table["ccsd_max_memory_gb"].value_or(opts.max_memory_gb);
+	opts.tol = scf_table["ccsd_tol"].value_or(opts.tol);
 	opts.aux_basis = config.basis.ri_basis;
 	opts.local = scf_table["ccsd_local"].value_or(opts.local);
 	opts.cluster_radius = scf_table["ccsd_cluster_radius"].value_or(opts.cluster_radius);

@@ -10,10 +10,10 @@ This Software is published with BSD-2 clause license.
 Calculating WFN from input file:                              water_ccsd.toml
 CCSD density (unrelaxed, Lambda equations), exact integrals
   correlated: 5 occupied, 19 virtual; frozen core: 0 orbitals
-  E(CCSD correlation) = -0.2133274258  (19 iterations)
-  Lambda equations converged in 16 iterations
-  |t1| = 0.016611  |t2| = 0.215950  |l1| = 0.013256  |l2| = 0.212548
-  natural occupations: 1.999917 1.984591 1.973055 1.966977 1.964442 0.026576 0.024607 0.016959 ...
+  E(CCSD correlation) = -0.2133279841  (7 iterations)
+  Lambda equations converged in 6 iterations
+  |t1| = 0.016609  |t2| = 0.215951  |l1| = 0.013256  |l2| = 0.212548
+  natural occupations: 1.999917 1.984591 1.973055 1.966977 1.964442 0.026576 0.024606 0.016959 ...
   sum of occupations: 10.00000000, smallest 3.961e-05
  done!
 Number of atoms in Wavefunction file: 3 Number of MOs: 24

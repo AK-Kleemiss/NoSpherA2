@@ -46,7 +46,7 @@ need the virtuals).
 
 | Flag | Arguments | Meaning |
 | --- | --- | --- |
-| `-wfn <file>` | 1 | The wavefunction. `.gbw`, `.fchk`, `.molden`, `.wfn`, `.wfx`, `.xtb` (pTB), `.ffn`, `.xyz`, and ORCA's natural orbitals `.nat` (`base.mdci.nat` from `%mdci Density Unrelaxed NatOrbs true end`: the CCSD density). |
+| `-wfn <file>` | 1 | The wavefunction. `.gbw`, `.fchk`, `.molden`, `.wfn`, `.wfx`, `.xtb` (pTB), `.ffn`, `.xyz`, and ORCA's natural orbitals `.nat` (`base.mdci.nat` from `%mdci Density Unrelaxed NatOrbs true end`: the CCSD density, also in a CCSD(T) run; the log names the method and level from `base.property.txt`). ORCA's CCSD(T) density comes from AutoCI: `! AUTOCI-CCSD(T) NoRI KeepDens` with `%autoci density unrelaxed end`, then `orca_2json base.gbw` with `base.json.conf` `{"MOCoefficients": true, "Densities": ["autocipur"]}`; `-wfn base.json` reads that density as natural orbitals of `base.gbw` (RHF; AutoCI unrelaxed, then relaxed, then MDCI). |
 | `-xyz <file>` | 1 | Geometry only. With `-SALTED` this doubles as the wavefunction source. |
 | `-cif <file>` | 1 | Crystal structure: cell, symmetry, atom labels. Switches cube evaluation onto the periodic path. |
 | `-hkl <file>` | 1 | Reflection list to compute form factors for. |
@@ -97,7 +97,7 @@ you are memory-constrained.
 | `-ECP <0..3>` | 1 | `0` | ECP treatment. `1` = ORCA-style def2-ECP, `3` = pTB. Also spelled `-ecp`, `-Ecp`. |
 | `-method <name>` | 1 | | Record the QM method used (goes into the table header). |
 | `-refine [acc]` | 0-1 | `0.1` | Numerical integral accuracy for the refinement path. |
-| `-occ <file>` | 1 | | An occ input (`.toml`) that occ runs, or an occ wavefunction file. With `method = "ccsd"` or `"ccsd(t)"` the density is the unrelaxed CCSD / CCSD(T) one; `[scf]` keys `ccsd_frozen_core` (-1 chemical core, 0 all electrons), `ccsd_backend` (`exact`, `df`), `ccsd_max_memory_gb`, and for larger systems `ccsd_local = true` with `ccsd_cluster_radius` (8 A), `ccsd_domain_threshold` (0.01), `ccsd_pair_threshold` (1e-5 Eh), `ccsd_lno_threshold` (1e-6). |
+| `-occ <file>` | 1 | | An occ input (`.toml`) that occ runs, or an occ wavefunction file. With `method = "ccsd"` or `"ccsd(t)"` the density is the unrelaxed CCSD / CCSD(T) one; `[scf]` keys `ccsd_frozen_core` (-1 chemical core, 0 all electrons), `ccsd_backend` (`exact`, `df`), `ccsd_max_memory_gb`, `ccsd_tol` (1e-5: max amplitude residual of CCSD and Lambda, ORCA's STol with TightSCF), and for larger systems `ccsd_local = true` with `ccsd_cluster_radius` (8 A), `ccsd_domain_threshold` (0.01), `ccsd_pair_threshold` (1e-5 Eh), `ccsd_lno_threshold` (1e-6). |
 
 ## 3. Partitioning, grids and basis
 

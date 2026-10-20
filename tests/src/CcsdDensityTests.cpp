@@ -56,6 +56,7 @@ namespace
 		static const CcsdDensityResult result = [] {
 			CcsdDensityOptions opts;
 			opts.n_frozen = 0;
+			opts.tol = 1e-9;  //PySCF comparisons at 1e-8, not ORCA's 1e-5
 			std::ostringstream log;
 			return ccsd_natural_orbitals(tight_rhf(), opts, log);
 		}();
@@ -100,6 +101,28 @@ TEST(CcsdDensity, OrcaNaturalOrbitalsCarryTheCcsdOccupations)
 	EXPECT_NEAR(sum, 10.0, 1e-6);
 }
 
+//ORCA's property file says which density a .mdci.nat holds; a CCSD(T) run's is MDCI(SD), and the log must say so
+TEST(CcsdDensity, OrcaTriplesRunIsReportedAsCcsdDensity)
+{
+	if (!std::filesystem::exists(orca_nat())) GTEST_SKIP() << "fixture missing: " << orca_nat().string();
+	const std::filesystem::path dir = std::filesystem::temp_directory_path() / "nos_mdci_density_label";
+	std::filesystem::create_directories(dir);
+	std::filesystem::copy_file(orca_nat(), dir / "w.mdci.nat", std::filesystem::copy_options::overwrite_existing);
+	const auto read_with = [&](const std::string &energy_method) {
+		std::ofstream(dir / "w.property.txt") << "   &Method [&Type \"String\"] \"" << energy_method << "\"\n"
+			<< "   &Method [&Type \"String\"] \"MDCI(SD)\"\n   &Level [&Type \"String\"] \"Unrelaxed density\"\n";
+		WFN wfn;
+		std::ostringstream log;
+		wfn.read_known_wavefunction_format(dir / "w.mdci.nat", log);
+		return log.str();
+	};
+	const std::string ccsd = read_with("MDCI(SD)"), ccsd_t = read_with("MDCI(SD(T))");
+	EXPECT_NE(ccsd.find("ORCA density in w.mdci.nat: MDCI(SD), Unrelaxed density"), std::string::npos) << ccsd;
+	EXPECT_EQ(ccsd.find("WARNING"), std::string::npos) << ccsd;
+	EXPECT_NE(ccsd_t.find("without (T)"), std::string::npos) << ccsd_t;
+	std::filesystem::remove_all(dir);
+}
+
 //the two independent CCSD implementations must give one density, and that density must not be the HF one
 TEST(CcsdDensity, OccAndOrcaGiveTheSameDensity)
 {
@@ -136,6 +159,7 @@ TEST(CcsdDensity, LocalClustersSpanningTheMoleculeReproduceCanonical)
 	{
 		CcsdDensityOptions opts;
 		opts.n_frozen = 0;
+		opts.tol = 1e-9;  //PySCF comparisons at 1e-8, not ORCA's 1e-5
 		opts.triples = triples;
 		opts.cluster_radius = 1e3;
 		opts.domain_threshold = -1.0;
@@ -159,6 +183,7 @@ TEST(CcsdDensity, OccTriplesDensityMatchesPyscf)
 	if (!ensure_occ_data_path(nullptr)) GTEST_SKIP() << "OCC_DATA_PATH not set";
 	CcsdDensityOptions opts;
 	opts.n_frozen = 0;
+	opts.tol = 1e-9;  //PySCF comparisons at 1e-8, not ORCA's 1e-5
 	opts.triples = true;
 	std::ostringstream log;
 	const CcsdDensityResult r = ccsd_natural_orbitals(tight_rhf(), opts, log);
@@ -175,4 +200,37 @@ TEST(CcsdDensity, OccTriplesDensityMatchesPyscf)
 	}
 	EXPECT_GT(moved, 1e-3);
 	EXPECT_NEAR(r.occupations.sum(), 10.0, 1e-10);
+}
+
+//ORCA's CCSD(T) density is AutoCI's unrelaxed one (MDCI keeps the CCSD density), exported by orca_2json and read as
+//natural orbitals of the job's gbw: PySCF's CCSD(T) occupations to ORCA's STol 1e-5, and occ's CCSD(T) density in space
+TEST(CcsdDensity, OrcaAutociTriplesDensityMatchesOcc)
+{
+	if (!ensure_occ_data_path(nullptr)) GTEST_SKIP() << "OCC_DATA_PATH not set";
+	const std::filesystem::path json = nos_test_repo_root() / "tests" / "ccsd_water" / "water_ccsdt_autoci.json";
+	if (!std::filesystem::exists(json)) GTEST_SKIP() << "fixture missing: " << json.string();
+	WFN orca;
+	std::ostringstream log;
+	ASSERT_TRUE(orca.read_orca_json_density(json, log));
+	EXPECT_NE(log.str().find("ORCA density autocipur"), std::string::npos) << log.str();
+	ASSERT_EQ(orca.get_nmo(), static_cast<int>(ref_t_occ.size()));
+	std::vector<double> occ;
+	for (int i = 0; i < orca.get_nmo(); i++) occ.push_back(orca.get_MO_occ(i));
+	std::sort(occ.rbegin(), occ.rend());
+	for (size_t k = 0; k < ref_t_occ.size(); k++) EXPECT_NEAR(occ[k], ref_t_occ[k], 2e-6) << "natural orbital " << k;
+	CcsdDensityOptions opts;
+	opts.n_frozen = 0;
+	opts.tol = 1e-9;
+	opts.triples = true;
+	const WFN occ_wfn(ccsd_natural_orbitals(tight_rhf(), opts, log).natural), occ_ccsd_wfn(occ_ccsd().natural);
+	double ccsd_dev = 0.0;
+	for (unsigned a = 0; a < 3; a++)
+		for (const d3 &shift : { d3{ 0.02, 0.0, 0.03 }, d3{ 0.6, 0.0, 0.3 }, d3{ 0.0, 0.4, -0.4 } })
+		{
+			const d3 p{ orca.get_atom_coordinate(a, 0) + shift[0], orca.get_atom_coordinate(a, 1) + shift[1], orca.get_atom_coordinate(a, 2) + shift[2] };
+			const double rho = orca.compute_dens(p);
+			EXPECT_NEAR(occ_wfn.compute_dens(p) / rho, 1.0, 1e-5) << "atom " << a;
+			ccsd_dev = std::max(ccsd_dev, std::abs(occ_ccsd_wfn.compute_dens(p) / rho - 1.0));
+		}
+	EXPECT_GT(ccsd_dev, 1e-4);
 }

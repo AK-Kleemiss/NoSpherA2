@@ -12,6 +12,8 @@
 #include "integrator.h"
 #include "cell.h"
 #include "citations.h"
+#include <Eigen/Dense>
+#include <nlohmann/json.hpp>
 
 
 const std::string WFN::hdr(const bool &occupied) const
@@ -35,6 +37,78 @@ const std::string WFN::hdr(const bool &occupied) const
 	return temp.str();
 };
 
+//base.property.txt names the method and level of the density ORCA put into base.mdci.nat
+static void report_orca_mdci_density(const std::filesystem::path &nat, std::ostream &file)
+{
+	std::filesystem::path prop = nat.parent_path() / nat.stem().stem();
+	prop += ".property.txt";
+	std::ifstream in(prop);
+	if (!in.good())
+		return;
+	const auto quoted = [](const std::string &l) {
+		const size_t e = l.find_last_of('"');
+		const size_t b = e == std::string::npos || e == 0 ? std::string::npos : l.find_last_of('"', e - 1);
+		return b == std::string::npos ? std::string() : l.substr(b + 1, e - b - 1);
+	};
+	std::string line, method, density_method, level;
+	bool triples = false;
+	while (std::getline(in, line))
+	{
+		if (line.find("&Method") != std::string::npos)
+			method = quoted(line);
+		else if (line.find("&Level") != std::string::npos && method.rfind("MDCI", 0) == 0)
+		{
+			density_method = method;
+			level = quoted(line);
+		}
+		triples = triples || method == "MDCI(SD(T))";
+	}
+	if (density_method.empty())
+		return;
+	file << "\nORCA density in " << nat.filename().string() << ": " << density_method << ", " << level << "\n";
+	if (triples && density_method != "MDCI(SD(T))")
+		file << "WARNING: ORCA's MDCI CCSD(T) stores the CCSD density, without (T); -occ with method = \"ccsd(t)\" gives the CCSD(T) density\n";
+	if (level != "Unrelaxed density")
+		file << "WARNING: this is not the unrelaxed CC density; %mdci Density Unrelaxed gives it\n";
+}
+
+bool WFN::read_orca_json_density(const std::filesystem::path &filename, std::ostream &file, const bool debug)
+{
+	std::ifstream in(filename);
+	err_checkf(in.good(), "Could not open " + filename.string(), file);
+	const nlohmann::json j = nlohmann::json::parse(in);
+	err_checkf(j.contains("ORCA Header") && j.contains("Molecule") && j["Molecule"].contains("Densities") && j["Molecule"].contains("MolecularOrbitals"),
+		filename.string() + " is no orca_2json export with densities and MOs (base.json.conf: \"Densities\": [\"all\"], \"MOCoefficients\": true)", file);
+	const nlohmann::json &mol = j["Molecule"];
+	err_checkf(mol.value("HFTyp", std::string()) == "RHF", "ORCA json densities are read for RHF references only", file);
+	const char *names[] = { "autocipur", "autocipre", "mdcip" };
+	std::string name;
+	for (int k = 0; k < 3 && name.empty(); k++)
+		if (mol["Densities"].contains(names[k])) name = names[k];
+	err_checkf(!name.empty(), "No correlated density (autocipur, autocipre, mdcip) in " + filename.string(), file);
+	const nlohmann::json &dens = mol["Densities"][name], &mos = mol["MolecularOrbitals"]["MOs"];
+	const int nbf = static_cast<int>(dens.size()), nmo = static_cast<int>(mos.size());
+	Eigen::MatrixXd P(nbf, nbf), C(nbf, nmo);
+	for (int p = 0; p < nbf; p++)
+		for (int q = 0; q < nbf; q++) P(p, q) = dens[p][q].get<double>();
+	for (int k = 0; k < nmo; k++)
+		for (int p = 0; p < nbf; p++) C(p, k) = mos[k]["MOCoefficients"][p].get<double>();
+	//P in the MO basis, X P X^T with X = (C^T C)^-1 C^T: independent of the export's AO order and phases
+	const Eigen::MatrixXd X = (C.transpose() * C).ldlt().solve(C.transpose());
+	const Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> es(X * P * X.transpose());
+	std::pair<vec, vec> natural{vec(size_t(nmo) * nmo), vec(nmo)};
+	for (int j = 0; j < nmo; j++)
+	{
+		const int s = nmo - 1 - j;
+		natural.second[j] = es.eigenvalues()(s);
+		for (int k = 0; k < nmo; k++) natural.first[size_t(k) * nmo + j] = es.eigenvectors()(k, s);
+	}
+	std::filesystem::path gbw = filename;
+	gbw.replace_extension(".gbw");
+	file << "\nORCA density " << name << " from " << filename.filename().string() << " as natural orbitals of " << gbw.filename().string() << "\n";
+	return read_gbw(gbw, file, debug, false, &natural);
+}
+
 void WFN::read_known_wavefunction_format(const std::filesystem::path &fileName, std::ostream &file, const bool debug)
 {
 	if (fileName.extension() == ".wfn")
@@ -50,7 +124,13 @@ void WFN::read_known_wavefunction_format(const std::filesystem::path &fileName, 
 	else if (fileName.extension() == ".molden")
 		err_checkf(read_molden(fileName, file, debug), "Problem reading molden file", file);
 	else if (fileName.extension() == ".gbw" || fileName.extension() == ".nat")  //ORCA natural orbitals (base.mdci.nat) are gbw format
+	{
 		err_checkf(read_gbw(fileName, file, debug), "Problem reading gbw file", file);
+		if (fileName.extension() == ".nat")
+			report_orca_mdci_density(fileName, file);
+	}
+	else if (fileName.extension() == ".json")
+		err_checkf(read_orca_json_density(fileName, file, debug), "Problem reading ORCA json density", file);
 	else if (fileName.extension() == ".xtb")
 		err_checkf(read_ptb(fileName, file, debug), "Problem reading xtb file", file);
 	else if (fileName.extension() == ".stda")
@@ -1250,7 +1330,7 @@ void move_columns(T &matrix, int dimension, int from_col, int num_cols, int to_c
 }
 
 
-bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, const bool debug, const bool _has_ECPs)
+bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, const bool debug, const bool _has_ECPs, const std::pair<vec, vec> *natural)
 {
 	using namespace std;
 	// Details form https://orcaforum.kofo.mpg.de/viewtopic.php?f=8&t=3299&start=20
@@ -1469,6 +1549,22 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
 			if (debug)
 			{
 				file << "I read the cores successfully\nI am expecting " << expected_coefs << " coefficients per MO\n";
+			}
+			if (natural)
+			{
+				err_checkf(operators == 1 && natural->second.size() == size_t(dimension) && natural->first.size() == coef_nr,
+					"natural orbitals need a restricted gbw with " + to_string(dimension) + " MOs", file);
+				//C(p, j) = coefficients[p * dimension + j]; natural orbitals C U, no orbital energies
+				vec rotated(coef_nr, 0.0);
+				for (int p = 0; p < dimension; p++)
+					for (int k = 0; k < dimension; k++)
+					{
+						const double c = coefficients[i][size_t(p) * dimension + k];
+						for (int j = 0; j < dimension; j++) rotated[size_t(p) * dimension + j] += c * natural->first[size_t(k) * dimension + j];
+					}
+				coefficients[i] = rotated;
+				occupations[i] = natural->second;
+				std::fill(energies[i].begin(), energies[i].end(), 0.0);
 			}
 			//Without this, expected_coefs is set to 0 after push_back_MO... no idea why
 			const double constant_expected_coefs = expected_coefs;

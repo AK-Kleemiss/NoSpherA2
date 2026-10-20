@@ -12,7 +12,7 @@ struct CcsdDensityOptions
 	std::string backend = "exact";  //exact | df
 	std::string aux_basis;          //df and the local MP2 screening; empty resolves occ's correlation fitting basis
 	double max_memory_gb = 1.0;
-	double tol = 1e-10;             //CCSD energy change and Lambda amplitude change
+	double tol = 1e-5;              //max |D (t_new - t_old)| of the CCSD and Lambda amplitudes (ORCA's STol, TightSCF)
 	int max_cycle = 200;
 	bool triples = false;           //CCSD(T): the (T) terms in the Lambda equations and in the density
 	bool local = false;             //cluster-in-molecule: one cluster per Pipek-Mezey LMO, densities assembled

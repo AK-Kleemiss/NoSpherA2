@@ -57,6 +57,17 @@ cif = "water.cif"
 dmin = 0.8
 acc = 1
 
+# ORCA's CCSD(T) density: AutoCI unrelaxed (water_ccsdt_autoci.inp), exported by orca_2json, read as natural
+# orbitals of the job's gbw; its charge table matches ccsd_t_occ_water's
+[ccsd_t_orca_autoci]
+directory = "ccsd_water"
+
+[ccsd_t_orca_autoci.args]
+wfn = "water_ccsdt_autoci.json"
+cif = "water.cif"
+dmin = 0.8
+acc = 1
+
 [disorder_THPP]
 directory = "disorder"
 good = "disorder_THPP.good"
