@@ -46,7 +46,7 @@ need the virtuals).
 
 | Flag | Arguments | Meaning |
 | --- | --- | --- |
-| `-wfn <file>` | 1 | The wavefunction. `.gbw`, `.fchk`, `.molden`, `.wfn`, `.wfx`, `.xtb` (pTB), `.ffn`, `.xyz`, and ORCA's natural orbitals `.nat` (`base.mdci.nat` from `%mdci Density Unrelaxed NatOrbs true end`: the CCSD density, also in a CCSD(T) run; the log names the method and level from `base.property.txt`). ORCA's CCSD(T) density comes from AutoCI: `! AUTOCI-CCSD(T) NoRI KeepDens` with `%autoci density unrelaxed end`, then `orca_2json base.gbw` with `base.json.conf` `{"MOCoefficients": true, "Densities": ["autocipur"]}`; `-wfn base.json` reads that density as natural orbitals of `base.gbw` (RHF; AutoCI unrelaxed, then relaxed, then MDCI). |
+| `-wfn <file>` | 1 | The wavefunction. `.gbw`, `.fchk`, `.molden`, `.wfn`, `.wfx`, `.xtb` (pTB), `.ffn`, `.xyz`; ORCA's natural orbitals `base.mdci.nat` (CCSD) and `base.mp2nat` (relaxed MP2), and an `orca_2json` export `base.json` of an AutoCI density (CCSD(T), MP2-MP4). See [Correlated densities](#correlated-densities-mp2-ccsd-ccsdt). |
 | `-xyz <file>` | 1 | Geometry only. With `-SALTED` this doubles as the wavefunction source. |
 | `-cif <file>` | 1 | Crystal structure: cell, symmetry, atom labels. Switches cube evaluation onto the periodic path. |
 | `-hkl <file>` | 1 | Reflection list to compute form factors for. |
@@ -97,7 +97,57 @@ you are memory-constrained.
 | `-ECP <0..3>` | 1 | `0` | ECP treatment. `1` = ORCA-style def2-ECP, `3` = pTB. Also spelled `-ecp`, `-Ecp`. |
 | `-method <name>` | 1 | | Record the QM method used (goes into the table header). |
 | `-refine [acc]` | 0-1 | `0.1` | Numerical integral accuracy for the refinement path. |
-| `-occ <file>` | 1 | | An occ input (`.toml`) that occ runs, or an occ wavefunction file. With `method = "ccsd"` or `"ccsd(t)"` the density is the unrelaxed CCSD / CCSD(T) one; `[scf]` keys `ccsd_frozen_core` (-1 chemical core, 0 all electrons), `ccsd_backend` (`exact`, `df`), `ccsd_max_memory_gb`, `ccsd_tol` (1e-5: max amplitude residual of CCSD and Lambda, ORCA's STol with TightSCF), and for larger systems `ccsd_local = true` with `ccsd_cluster_radius` (8 A), `ccsd_domain_threshold` (0.01), `ccsd_pair_threshold` (1e-5 Eh), `ccsd_lno_threshold` (1e-6). |
+| `-occ <file>` | 1 | | An occ input (`.toml`) that occ runs, or an occ wavefunction file. With `method = "mp2"`, `"ccsd"` or `"ccsd(t)"` the density is the correlated one (relaxed MP2, unrelaxed CCSD / CCSD(T)), not the SCF one; see [Correlated densities](#correlated-densities-mp2-ccsd-ccsdt) for methods, backends and keys. |
+
+### Correlated densities: MP2, CCSD, CCSD(T)
+
+`-occ` with a correlated `method` runs occ's RHF and then builds the density of that method in NoSpherA2; the natural
+orbitals go on to the scattering factors like any other wavefunction. Closed shell (RHF) only.
+
+| `method` | density |
+| --- | --- |
+| `"mp2"` | relaxed MP2: MP2 Lagrangian with the Z-vector orbital response (PySCF `grad/mp2.py`), the frozen core relaxed too. SCS/SOS-MP2 (`mp2_spin_scaling`) is refused. |
+| `"ccsd"` | unrelaxed CCSD from the Lambda equations (PySCF `ccsd_lambda` / `ccsd_rdm`). |
+| `"ccsd(t)"` | unrelaxed CCSD(T): the (T) terms in Lambda and in the density, the response form (PySCF `ccsd_t_lambda_slow` / `ccsd_t_rdm_slow`, `for_grad=True`). |
+
+**Integral backends.** `exact` (default) builds the MO integrals from exact four-index integrals and runs the SCF with
+exact J/K, as ORCA's `NoRI`. Density fitting is `ccsd_backend = "df"`, a `df-` or `ri-` method prefix (`"df-ccsd(t)"`,
+`"ri-mp2"`) or, for MP2, occ's `mp2_backend = "df"`; the fitting basis is `ri-basis` in `[scf]`, else occ's correlation
+fitting basis for the orbital basis. THC is not available for densities.
+
+- DF never stores the O(v⁴) integrals (benzene cc-pVDZ 0.6 GB, naphthalene 3.6 GB in the exact backend), but the Lambda
+  and (T) steps still hold dense o·v³ blocks, and the SCF becomes DF-JK too. At small sizes it is not faster.
+- Benzene cc-pVDZ CCSD(T), DF against exact: 69 s vs 54 s (8 cores), E_corr 4.3e-4 Eh, E(T) 5.6e-5 Eh, scattering
+  factors 7e-5 e (C) — about 25× below the (T) effect, about 40× above the occ/ORCA agreement.
+- occ's `cc-pvdz-rifit` has no oxygen: with cc-pVDZ and O in the molecule set `ri-basis = "def2-svp-rifit"` (or
+  `"cc-pvtz-rifit"`).
+
+**`[scf]` keys** (all `method`s unless noted):
+
+| Key | Default | Meaning |
+| --- | --- | --- |
+| `ccsd_frozen_core` | `-1` | `-1` chemical core (ORCA's default), `0` all electrons, `n` the n lowest occupied. |
+| `ccsd_backend` | `exact` | `exact` or `df` (see above). |
+| `ccsd_max_memory_gb` | `1.0` | Integral and (T) buffer budget. The (T) step needs about 8·(4·o·v³ + 8·v³·threads) bytes (naphthalene cc-pVDZ ~4 GB). |
+| `ccsd_tol` | `1e-5` | CCSD and Lambda convergence: max \|D·Δt\| of the amplitudes, ORCA's MDCI `STol` with TightSCF. The MP2 Z-vector is solved to 1e-10. |
+| `ccsd_local` | `false` | CCSD / CCSD(T) only: cluster-in-molecule densities (one cluster per Pipek-Mezey LMO) for larger systems, with `ccsd_cluster_radius` (8 Å), `ccsd_domain_threshold` (0.01), `ccsd_pair_threshold` (1e-5 Eh) and `ccsd_lno_threshold` (1e-6). Clusters that span the molecule give the canonical density back. |
+
+**Accuracy and cost.** Against ORCA 6.1 (water and benzene cc-pVDZ, ORCA's tolerances): scattering factors within
+~3e-6 e for MP2 (relaxed), CCSD (MDCI) and CCSD(T) (AutoCI); energies within ORCA's convergence (~1e-6 Eh). Canonical
+CCSD(T) scales as o³v⁴: on 8 cores, water seconds, benzene ~1 min, naphthalene ~12 min (ORCA MDCI 14 min for its
+CCSD(T) energy and CCSD density, AutoCI 13 min for benzene's CCSD(T) density).
+
+**Densities from ORCA** (all read with `-wfn`):
+
+- CCSD: `! CCSD NoRI` with `%mdci Density Unrelaxed NatOrbs true end` writes `base.mdci.nat`. MDCI's CCSD(T) run writes
+  the *CCSD* density (no (T)); the log says so when `base.property.txt` lies beside the file.
+- relaxed MP2: `! MP2 NoRI` with `%mp2 Density Relaxed NatOrbs true end` writes `base.mp2nat`.
+- CCSD(T) (and MP2, MP3, MP4, unrelaxed): AutoCI, `! AUTOCI-CCSD(T) NoRI KeepDens` with `%autoci density unrelaxed end`
+  (on Windows AutoCI is a separate download, `Orca6.1.0.Win64_autoci*.zip`, unpacked into the ORCA folder), then
+  `orca_2json base.gbw` with `base.json.conf` = `{"MOCoefficients": true, "Densities": ["autocipur"]}` and `-wfn base.json`.
+- Unrelaxed MP-n densities are poor for scattering factors: on water they close only a third to a half of the HF to
+  CCSD(T) difference (max |Δf| on O against CCSD(T): HF 2.2e-2, MP2 1.5e-2, MP4 1.2e-2, CCSD 1.4e-3 e). Use the
+  relaxed MP2 density, CCSD or CCSD(T).
 
 ## 3. Partitioning, grids and basis
 

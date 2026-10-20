@@ -674,16 +674,17 @@ namespace
 		return s;
 	}
 
-	//occ's integral blocks for mo (exact or DF, as opts.backend), the n_frozen lowest occupied left out
+	//occ's integral blocks for mo (exact or DF, as opts.backend), the n_frozen lowest occupied left out; the exact
+	//vvvv ladder only with_ladder (DF never stores it)
 	occ::qm::cc::CCIntegrals build_eris(const occ::gto::AOBasis &basis, const occ::qm::MolecularOrbitals &mo, const int n_frozen,
-		const CcsdDensityOptions &opts, std::string &backend, std::string &aux_name, std::ostream &log)
+		const CcsdDensityOptions &opts, std::string &backend, std::string &aux_name, std::ostream &log, const bool with_ladder = true)
 	{
 		backend = occ::util::to_lower_copy(opts.backend);
 		if (backend.empty() || backend == "auto" || backend == "conventional") backend = "exact";
 		if (backend == "ri") backend = "df";
-		err_checkf(backend == "exact" || backend == "df", "CCSD density backend '" + opts.backend + "' is not supported (exact | df)", log);
+		err_checkf(backend == "exact" || backend == "df", "Correlated density backend '" + opts.backend + "' is not supported (exact | df)", log);
 		const size_t budget = static_cast<size_t>(opts.max_memory_gb * 1024.0 * 1024.0 * 1024.0);
-		if (backend == "exact") return occ::qm::cc::exact_eris(basis, mo, n_frozen, budget);
+		if (backend == "exact") return occ::qm::cc::exact_eris(basis, mo, n_frozen, budget, with_ladder);
 		aux_name = opts.aux_basis.empty() ? occ::qm::resolve_fitting_basis(basis.name(), occ::qm::FittingKind::Correlation) : opts.aux_basis;
 		auto aux = occ::gto::AOBasis::load(basis.atoms(), aux_name);
 		aux.set_pure(basis.is_pure());
@@ -893,6 +894,106 @@ CcsdDensityResult ccsd_natural_orbitals(const occ::qm::Wavefunction &scf, const 
 		<< std::setprecision(6) << "  |t1| = " << result.t1_norm << "  |t2| = " << result.t2_norm
 		<< "  |l1| = " << result.l1_norm << "  |l2| = " << result.l2_norm << "\n"
 		<< "  natural occupations:";
+	for (int k = 0; k < std::min(nmo, 8); k++) log << " " << result.occupations(k);
+	log << (nmo > 8 ? " ..." : "") << "\n  sum of occupations: " << std::setprecision(8) << result.occupations.sum()
+		<< ", smallest " << std::scientific << std::setprecision(3) << result.occupations(nmo - 1) << std::defaultfloat << std::endl;
+	return result;
+}
+
+CcsdDensityResult mp2_natural_orbitals(const occ::qm::Wavefunction &scf, const CcsdDensityOptions &opts, std::ostream &log)
+{
+	err_checkf(scf.mo.kind == occ::qm::SpinorbitalKind::Restricted && scf.mo.n_alpha == scf.mo.n_beta,
+		"The MP2 density needs a closed-shell (restricted) reference", log);
+	CcsdDensityResult result;
+	auto clock = std::chrono::steady_clock::now();
+	auto mark = [&clock](const char *stage) {
+		const auto now = std::chrono::steady_clock::now();
+		occ::log::info("MP2 density: {} took {:.3f} s", stage, std::chrono::duration<double>(now - clock).count());
+		clock = now;
+	};
+	const int o = static_cast<int>(scf.mo.n_alpha), nmo = static_cast<int>(scf.mo.C.cols());
+	result.n_frozen = std::max(0, std::min(opts.n_frozen < 0 ? occ::qm::cc::num_frozen_core(scf.basis) : opts.n_frozen, o - 1));
+	const int nf = result.n_frozen;
+	std::string backend, aux_name;
+	//every occupied orbital: the orbital response couples the frozen core
+	const Eris e = convert(build_eris(scf.basis, scf.mo, 0, opts, backend, aux_name, log, false));
+	mark("MO integrals");
+	const int v = e.v;
+	//t_ij^ab = (ia|jb) / D_ij^ab on correlated pairs, tt = 2 t - t(ba); E2 = sum tt (ia|jb)
+	const Tn g = T(e.ovov, { 0, 2, 1, 3 });
+	Tn t2 = g;
+	size_t w = 0;
+	for (int i = 0; i < o; i++)
+		for (int j = 0; j < o; j++)
+			for (int a = 0; a < v; a++)
+				for (int b = 0; b < v; b++, w++) t2.v[w] = i < nf || j < nf ? 0.0 : g.v[w] / (e.eo(i) + e.eo(j) - e.ev(a) - e.ev(b));
+	const Tn tt = t2 * 2.0 - T(t2, { 0, 1, 3, 2 });
+	result.e_corr = dot(tt, g);
+	//PySCF grad/mp2.py: P_ij = -2 t_ki^ab tt_kj^ab, P_ab = 2 t_ij^ca tt_ij^cb; Lagrangian I_kc = -2 (ik|jb) tt_ij^cb,
+	//I_dk = -2 (ad|jb) tt_kj^ab, I_mk = -2 (ma|jb) tt_kj^ab; frozen-core block P_fk = I_fk / (e_f - e_k)
+	const Tn p_vv = einsum("ijca,ijcb->ab", t2, tt) * 2.0;
+	Tn p_oo = einsum("kiab,kjab->ij", t2, tt) * -2.0;
+	const Tn i_oc = einsum("jbik,ijcb->kc", e.ovoo, tt) * -2.0;
+	const Tn i_vo = einsum("jbad,kjab->dk", e.ovvv, tt) * -2.0;
+	const Tn i_oo = einsum("majb,kjab->mk", e.ovov, tt) * -2.0;
+	for (int f = 0; f < nf; f++)
+		for (int k = nf; k < o; k++) p_oo.at(f, k) = p_oo.at(k, f) = i_oo.at(f, k) / (e.eo(f) - e.eo(k));
+	//X_am = sum_pq P_pq [2 (am|pq) - (ap|qm)] + I_ma - I_am
+	Tn x = einsum("majk,jk->am", e.ovoo, p_oo) * 2.0 - einsum("jakm,jk->am", e.ovoo, p_oo);
+	x += einsum("mabc,bc->am", e.ovvv, p_vv) * 2.0 - einsum("mcab,bc->am", e.ovvv, p_vv);
+	x += T(i_oc, { 1, 0 }) - i_vo;
+	//Z-vector: (e_a - e_m) z_am + sum_bn [4 (am|bn) - (ab|mn) - (an|bm)] z_bn = -X_am, conjugate gradients
+	//preconditioned by e_a - e_m (the RHF orbital Hessian is positive definite)
+	auto hessian = [&](const Tn &z) {
+		Tn r = einsum("manb,bn->am", e.ovov, z) * 4.0 - einsum("mnab,bn->am", e.oovv, z) - einsum("namb,bn->am", e.ovov, z);
+		for (int a = 0; a < v; a++)
+			for (int m = 0; m < o; m++) r.at(a, m) += (e.ev(a) - e.eo(m)) * z.at(a, m);
+		return r;
+	};
+	auto precondition = [&](const Tn &r) {
+		Tn s = r;
+		for (int a = 0; a < v; a++)
+			for (int m = 0; m < o; m++) s.at(a, m) /= e.ev(a) - e.eo(m);
+		return s;
+	};
+	Tn z = precondition(x * -1.0), res = x * -1.0 - hessian(z);
+	Tn s = precondition(res), dir = s;
+	double rs = dot(res, s);
+	int it = 0;
+	const auto max_abs = [](const Tn &a) {
+		double m = 0.0;
+		for (size_t k = 0; k < a.v.size(); k++) m = std::max(m, std::abs(a.v[k]));
+		return m;
+	};
+	for (; it < opts.max_cycle && max_abs(res) > 1e-10; it++)
+	{
+		const Tn hd = hessian(dir);
+		const double alpha = rs / dot(dir, hd);
+		z += dir * alpha;
+		res -= hd * alpha;
+		s = precondition(res);
+		const double rs_new = dot(res, s);
+		dir = s + dir * (rs_new / rs);
+		rs = rs_new;
+	}
+	err_checkf(max_abs(res) <= 1e-10, "The MP2 Z-vector equations did not converge in " + std::to_string(opts.max_cycle) + " iterations", log);
+	result.lambda_iterations = it;
+	mark("Z-vector");
+	occ::Mat dm = occ::Mat::Zero(nmo, nmo);
+	for (int i = 0; i < o; i++)
+	{
+		dm(i, i) = 2.0;
+		for (int j = 0; j < o; j++) dm(i, j) += p_oo.at(i, j);
+		for (int a = 0; a < v; a++) dm(o + a, i) = dm(i, o + a) = z.at(a, i);
+	}
+	for (int a = 0; a < v; a++)
+		for (int b = 0; b < v; b++) dm(o + a, o + b) = p_vv.at(a, b);
+	natural_orbitals(scf, dm, "MP2", scf.energy.total + result.e_corr, result, log);
+	mark("density and natural orbitals");
+	log << "\nMP2 density (relaxed, Z-vector), " << (backend == "exact" ? std::string("exact integrals") : "DF integrals, " + aux_name) << "\n"
+		<< "  correlated: " << o - nf << " occupied, " << v << " virtual; frozen core: " << nf << " orbitals\n"
+		<< std::fixed << std::setprecision(10) << "  E(MP2 correlation) = " << result.e_corr << "\n"
+		<< "  Z-vector equations converged in " << it << " iterations\n" << std::setprecision(6) << "  natural occupations:";
 	for (int k = 0; k < std::min(nmo, 8); k++) log << " " << result.occupations(k);
 	log << (nmo > 8 ? " ..." : "") << "\n  sum of occupations: " << std::setprecision(8) << result.occupations.sum()
 		<< ", smallest " << std::scientific << std::setprecision(3) << result.occupations(nmo - 1) << std::defaultfloat << std::endl;
@@ -1139,12 +1240,16 @@ CcsdDensityResult local_ccsd_natural_orbitals(const occ::qm::Wavefunction &scf, 
 CcsdDensityResult ccsd_density_from_occ_input(const std::string &toml_path, occ::io::OccInput config, std::ostream &log)
 {
 	const auto spec = occ::driver::parse_method_string(config.method.name);
-	err_checkf(spec.kind == occ::driver::MethodKind::CCSD || spec.kind == occ::driver::MethodKind::CCSD_T,
-		"Method '" + config.method.name + "' has no density here; CCSD and CCSD(T) do (method = \"ccsd\" or \"ccsd(t)\")", log);
+	const bool mp2 = spec.kind == occ::driver::MethodKind::MP2;
+	err_checkf(mp2 || spec.kind == occ::driver::MethodKind::CCSD || spec.kind == occ::driver::MethodKind::CCSD_T,
+		"Method '" + config.method.name + "' has no density here; MP2, CCSD and CCSD(T) do (method = \"mp2\", \"ccsd\" or \"ccsd(t)\")", log);
+	err_checkf(!mp2 || occ::util::to_lower_copy(config.method.mp2_spin_scaling) == "none",
+		"SCS/SOS-MP2 has no density here (mp2_spin_scaling = \"" + config.method.mp2_spin_scaling + "\"); the plain MP2 density is the relaxed one", log);
 	const auto input = toml::parse_file(toml_path);  //the view below points into it, so it must outlive the reads
 	const auto scf_table = input["scf"];
 	CcsdDensityOptions opts;
 	opts.triples = spec.kind == occ::driver::MethodKind::CCSD_T;
+	if (mp2 && config.method.mp2_backend != "auto") opts.backend = config.method.mp2_backend;
 	if (!spec.backend.empty()) opts.backend = spec.backend;  //"df-ccsd", as occ reads it
 	opts.n_frozen = scf_table["ccsd_frozen_core"].value_or(opts.n_frozen);
 	opts.backend = scf_table["ccsd_backend"].value_or(opts.backend);
@@ -1160,13 +1265,16 @@ CcsdDensityResult ccsd_density_from_occ_input(const std::string &toml_path, occ:
 	//exact CCSD on an exact-J/K reference, as ORCA's NoRI
 	const std::string backend = occ::util::to_lower_copy(opts.backend);
 	if (backend != "df" && backend != "ri") config.method.ri_policy = occ::io::RIPolicy::None;
+	err_checkf(!mp2 || !opts.local, "ccsd_local applies to CCSD and CCSD(T), not to MP2", log);
 	const occ::qm::Wavefunction scf = occ::main::run_scf_external(config, false);
+	if (mp2) return mp2_natural_orbitals(scf, opts, log);
 	return opts.local ? local_ccsd_natural_orbitals(scf, opts, log) : ccsd_natural_orbitals(scf, opts, log);
 }
 
 occ::qm::Wavefunction wavefunction_from_occ_input(const std::string &toml_path, const occ::io::OccInput &config, std::ostream &log)
 {
 	const auto kind = occ::driver::parse_method_string(config.method.name).kind;
-	if (kind != occ::driver::MethodKind::CCSD && kind != occ::driver::MethodKind::CCSD_T) return occ::main::run_scf_external(config, true);
+	if (kind != occ::driver::MethodKind::MP2 && kind != occ::driver::MethodKind::CCSD && kind != occ::driver::MethodKind::CCSD_T)
+		return occ::main::run_scf_external(config, true);
 	return ccsd_density_from_occ_input(toml_path, config, log).natural;
 }

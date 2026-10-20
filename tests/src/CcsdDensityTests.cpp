@@ -234,3 +234,55 @@ TEST(CcsdDensity, OrcaAutociTriplesDensityMatchesOcc)
 		}
 	EXPECT_GT(ccsd_dev, 1e-4);
 }
+
+//relaxed MP2 (Z-vector) density against ORCA 6.1.0's relaxed MP2 of the same job (water_mp2.inp, NoRI, Z_Tol 1e-9);
+//with the 1s frozen its occupation rises above 2, as in ORCA
+TEST(CcsdDensity, OccRelaxedMp2DensityMatchesOrca)
+{
+	if (!ensure_occ_data_path(nullptr)) GTEST_SKIP() << "OCC_DATA_PATH not set";
+	constexpr std::array<double, 24> ref_mp2_occ{
+		1.99990672, 1.98705192, 1.97412587, 1.97059053, 1.96862196, 0.02309666, 0.02088708, 0.01730897,
+		0.01033580, 0.00549425, 0.00515392, 0.00470589, 0.00410811, 0.00400362, 0.00092385, 0.00086708,
+		0.00061265, 0.00051036, 0.00045376, 0.00045212, 0.00037840, 0.00034817, 0.00003161, 0.00003068};
+	const occ::qm::Wavefunction scf = tight_rhf();
+	CcsdDensityOptions opts;
+	opts.n_frozen = 0;
+	std::ostringstream log;
+	const CcsdDensityResult r = mp2_natural_orbitals(scf, opts, log);
+	EXPECT_NEAR(r.e_corr, -0.204003541, 1e-7);
+	ASSERT_EQ(r.occupations.size(), static_cast<long>(ref_mp2_occ.size()));
+	for (size_t k = 0; k < ref_mp2_occ.size(); k++)
+		EXPECT_NEAR(r.occupations(k), ref_mp2_occ[k], 1e-6) << "natural orbital " << k;
+	EXPECT_NEAR(r.occupations.sum(), 10.0, 1e-10);
+	opts.n_frozen = 1;
+	const CcsdDensityResult f = mp2_natural_orbitals(scf, opts, log);
+	EXPECT_NEAR(f.e_corr, -0.201665956, 1e-7);
+	EXPECT_NEAR(f.occupations(0), 2.00000262, 1e-6);
+	EXPECT_GT(f.occupations(0), 2.0);
+}
+
+//.mp2nat goes to the gbw reader, the log names it from water_mp2.property.txt, and it is occ's relaxed MP2 density
+TEST(CcsdDensity, OrcaMp2NatMatchesOccRelaxedMp2)
+{
+	if (!ensure_occ_data_path(nullptr)) GTEST_SKIP() << "OCC_DATA_PATH not set";
+	const std::filesystem::path nat = nos_test_repo_root() / "tests" / "ccsd_water" / "water_mp2.mp2nat";
+	if (!std::filesystem::exists(nat)) GTEST_SKIP() << "fixture missing: " << nat.string();
+	WFN orca;
+	std::ostringstream log;
+	orca.read_known_wavefunction_format(nat, log);
+	EXPECT_NE(log.str().find("ORCA density in water_mp2.mp2nat: MP2, Relaxed density"), std::string::npos) << log.str();
+	EXPECT_EQ(log.str().find("WARNING"), std::string::npos) << log.str();
+	CcsdDensityOptions opts;
+	opts.n_frozen = 0;
+	const WFN occ_wfn(mp2_natural_orbitals(tight_rhf(), opts, log).natural), hf(tight_rhf());
+	double hf_dev = 0.0;
+	for (unsigned a = 0; a < 3; a++)
+		for (const d3 &shift : { d3{ 0.02, 0.0, 0.03 }, d3{ 0.6, 0.0, 0.3 }, d3{ 0.0, 0.4, -0.4 } })
+		{
+			const d3 p{ orca.get_atom_coordinate(a, 0) + shift[0], orca.get_atom_coordinate(a, 1) + shift[1], orca.get_atom_coordinate(a, 2) + shift[2] };
+			const double rho = orca.compute_dens(p);
+			EXPECT_NEAR(occ_wfn.compute_dens(p) / rho, 1.0, 1e-5) << "atom " << a;
+			hf_dev = std::max(hf_dev, std::abs(hf.compute_dens(p) / rho - 1.0));
+		}
+	EXPECT_GT(hf_dev, 1e-3);
+}

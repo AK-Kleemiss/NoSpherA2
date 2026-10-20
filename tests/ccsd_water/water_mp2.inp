@@ -1,0 +1,12 @@
+! MP2 cc-pVDZ NoFrozenCore NoRI TightSCF
+%maxcore 2000
+%method Z_Tol 1e-9 end
+%mp2
+  density relaxed
+  natorbs true
+end
+* xyz 0 1
+O   0.000000   0.000000   0.117300
+H   0.000000   0.757200  -0.469200
+H   0.000000  -0.757200  -0.469200
+*

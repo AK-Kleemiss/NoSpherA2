@@ -239,10 +239,10 @@ Key core modules live in `Src/core`:
 
 ## Current Validation Notes
 
-As of 2026-10-20, `-occ` with `method = "ccsd"` / `"ccsd(t)"` gives the unrelaxed CCSD / CCSD(T) density (canonical, or local
-cluster-in-molecule with `ccsd_local = true`) converged to ORCA's STol, `-wfn *.mdci.nat` reads ORCA's CCSD natural orbitals and
-`-wfn base.json` ORCA's AutoCI CCSD(T) density (orca_2json export), and occ is at upstream 0.9.6;
-`ctest` on a `release-windows` build with CUDA reports **1301 passed, 0 failed, 9 skipped** (2 disabled) of 1312. See `UNIT_TESTS_STATUS.md`.
+As of 2026-10-20, `-occ` with `method = "mp2"` / `"ccsd"` / `"ccsd(t)"` gives the relaxed MP2 / unrelaxed CCSD / CCSD(T)
+density (CC canonical or local cluster-in-molecule, converged to ORCA's STol), `-wfn` reads ORCA's `.mdci.nat`, `.mp2nat` and
+AutoCI densities exported by orca_2json (`base.json`), and occ is at upstream 0.9.6;
+`ctest` on a `release-windows` build with CUDA reports **1305 passed, 0 failed, 9 skipped** (2 disabled) of 1316. See `UNIT_TESTS_STATUS.md`.
 
 As of 2026-10-17 (later), grown XCW models choose their kept operations as K = D.L for nested subgroups L inside H
 (`cell::choose_kept_operations`, replacing `project_into_subgroup`), which always admits per-position weights and keeps

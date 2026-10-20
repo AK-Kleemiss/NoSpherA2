@@ -37,10 +37,12 @@ const std::string WFN::hdr(const bool &occupied) const
 	return temp.str();
 };
 
-//base.property.txt names the method and level of the density ORCA put into base.mdci.nat
-static void report_orca_mdci_density(const std::filesystem::path &nat, std::ostream &file)
+//base.property.txt names the method and level of the density ORCA put into base.mdci.nat or base.mp2nat
+static void report_orca_density(const std::filesystem::path &nat, std::ostream &file)
 {
-	std::filesystem::path prop = nat.parent_path() / nat.stem().stem();
+	const std::string name = nat.filename().string(), mdci = ".mdci.nat";
+	const bool is_mdci = name.size() > mdci.size() && name.compare(name.size() - mdci.size(), mdci.size(), mdci) == 0;
+	std::filesystem::path prop = nat.parent_path() / (is_mdci ? name.substr(0, name.size() - mdci.size()) : nat.stem().string());
 	prop += ".property.txt";
 	std::ifstream in(prop);
 	if (!in.good())
@@ -56,7 +58,7 @@ static void report_orca_mdci_density(const std::filesystem::path &nat, std::ostr
 	{
 		if (line.find("&Method") != std::string::npos)
 			method = quoted(line);
-		else if (line.find("&Level") != std::string::npos && method.rfind("MDCI", 0) == 0)
+		else if (line.find("&Level") != std::string::npos && !method.empty() && method != "SCF")
 		{
 			density_method = method;
 			level = quoted(line);
@@ -68,8 +70,10 @@ static void report_orca_mdci_density(const std::filesystem::path &nat, std::ostr
 	file << "\nORCA density in " << nat.filename().string() << ": " << density_method << ", " << level << "\n";
 	if (triples && density_method != "MDCI(SD(T))")
 		file << "WARNING: ORCA's MDCI CCSD(T) stores the CCSD density, without (T); -occ with method = \"ccsd(t)\" gives the CCSD(T) density\n";
-	if (level != "Unrelaxed density")
+	if (density_method.rfind("MDCI", 0) == 0 && level != "Unrelaxed density")
 		file << "WARNING: this is not the unrelaxed CC density; %mdci Density Unrelaxed gives it\n";
+	if (density_method == "MP2" && level != "Relaxed density")
+		file << "WARNING: the unrelaxed MP2 density lacks the orbital response; %mp2 Density Relaxed gives it\n";
 }
 
 bool WFN::read_orca_json_density(const std::filesystem::path &filename, std::ostream &file, const bool debug)
@@ -123,11 +127,11 @@ void WFN::read_known_wavefunction_format(const std::filesystem::path &fileName, 
 		err_checkf(read_xyz(fileName, file, debug), "Problem reading xyz", file);
 	else if (fileName.extension() == ".molden")
 		err_checkf(read_molden(fileName, file, debug), "Problem reading molden file", file);
-	else if (fileName.extension() == ".gbw" || fileName.extension() == ".nat")  //ORCA natural orbitals (base.mdci.nat) are gbw format
+	else if (fileName.extension() == ".gbw" || fileName.extension() == ".nat" || fileName.extension() == ".mp2nat")  //ORCA natural orbitals (base.mdci.nat, base.mp2nat) are gbw format
 	{
 		err_checkf(read_gbw(fileName, file, debug), "Problem reading gbw file", file);
-		if (fileName.extension() == ".nat")
-			report_orca_mdci_density(fileName, file);
+		if (fileName.extension() != ".gbw")
+			report_orca_density(fileName, file);
 	}
 	else if (fileName.extension() == ".json")
 		err_checkf(read_orca_json_density(fileName, file, debug), "Problem reading ORCA json density", file);

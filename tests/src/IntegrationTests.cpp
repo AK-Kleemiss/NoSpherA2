@@ -509,6 +509,18 @@ TEST(TomlIntegrationTests, CcsdTOrcaAutoci)
 	EXPECT_TRUE(result.success) << result.message;
 }
 
+TEST(TomlIntegrationTests, Mp2OccWater)
+{
+	const UT_Result result = run_inprocess_test(get_repo_root(), "mp2_occ_water");
+	EXPECT_TRUE(result.success) << result.message;
+}
+
+TEST(TomlIntegrationTests, Mp2OrcaNat)
+{
+	const UT_Result result = run_inprocess_test(get_repo_root(), "mp2_orca_nat");
+	EXPECT_TRUE(result.success) << result.message;
+}
+
 TEST(TomlIntegrationTests, DisorderTHPP)
 {
 	const UT_Result result = run_inprocess_test(get_repo_root(), "disorder_THPP");
