@@ -296,6 +296,9 @@ namespace
 		bool ion = true;
 		bool use_components = true;
 		bool shift_arrows = false;  //-nrt_mirror
+		//[a][b]: an E2 above the screen from a lone pair on a into an empty valence orbital (LV) on b.  LP a -> bond a-b
+		//fills that LV: a dative bond (P->Ni, Ni->Li, F->B in BF3) is a whole resonance structure, not half an arrow
+		bvec2 dative;
 	};
 
 	bool acceptable(const Topology& s, const Limits& L)
@@ -322,8 +325,9 @@ namespace
 	{
 		const int n = c.topo.n;
 		const int q0 = L.shift_arrows && c.depth == 0 ? separation(c.topo, L) : 0;
-		const auto emit = [&](Topology s, const int x, const int y, const int z = -1) {
-			if (!L.free_atom[x] || !L.free_atom[y]) return;
+		const auto emit = [&](Topology s, const int x, const int y, const int z = -1, const bool whole = false) {
+			//z is the atom a shifted bond leaves: a bond to an atom outside the -nrt_atoms subspace stays put
+			if (!L.free_atom[x] || !L.free_atom[y] || (z >= 0 && !L.free_atom[z])) return;
 			if (!acceptable(s, L)) return;
 			//Two moves that share no atom are two separate charge separations, not one arrow
 			const auto touched = [&](const int t) {
@@ -331,7 +335,7 @@ namespace
 			};
 			if (c.depth > 0 && !touched(x) && !touched(y) && !touched(z)) return;
 			Candidate d;
-			d.arrow = L.shift_arrows && c.depth == 0 && separation(s, L) <= q0;
+			d.arrow = c.depth == 0 && (whole || (L.shift_arrows && separation(s, L) <= q0));
 			d.topo = std::move(s);
 			d.root = c.root;
 			d.depth = c.depth + 1;
@@ -350,7 +354,7 @@ namespace
 					Topology s = c.topo;
 					s.at(a, a)--;
 					s.set(a, b, s.at(a, b) + 1);
-					emit(std::move(s), a, b);
+					emit(std::move(s), a, b, -1, L.dative[a][b]);
 					if (L.ion) {
 						Topology i = c.topo;
 						i.at(a, a)--;
@@ -714,6 +718,36 @@ namespace
 		return M * c.wt.asDiagonal() * c.X;
 	}
 
+	//Rows [r0, r0 + w) of orbitals(c, B, n).  M is block-sparse, so only the few columns with an NAO in the range
+	//enter: the projector route takes every candidate's V once per NAO block, and the full n x k x k product there
+	//cost more than the overlaps themselves
+	MatrixXd orbital_rows(const Candidate& c, const Blocks& B, const int r0, const int w)
+	{
+		const int k = static_cast<int>(c.owner.size());
+		MatrixXd M(w, k);
+		ivec used;
+		size_t p = 0;
+		for (int j = 0; j < k; j++) {
+			const std::pair<int, int>& o = c.owner[j];
+			const int col = static_cast<int>(used.size());
+			bool hit = false;
+			const auto put = [&](const int i) {
+				const double m = c.Mp[p++];
+				if (i < r0 || i >= r0 + w) return;
+				if (!hit) { M.col(col).setZero(); hit = true; }
+				M(i - r0, col) = m;
+			};
+			if (o.first < 0) put(B.core[j]);
+			else
+				for (const int i : o.first == o.second ? B.atom[o.first] : B.pair.at(o)) put(i);
+			if (hit) used.push_back(j);
+		}
+		const int u = static_cast<int>(used.size());
+		MatrixXd WX(u, k);
+		for (int t = 0; t < u; t++) WX.row(t) = c.wt(used[t]) * c.X.row(used[t]);
+		return M.leftCols(u) * WX;
+	}
+
 	//Orbitals of a prescribed topology by the NBO search's steps: greedy fill, self-consistency sweep,
 	//occupancy-weighted orthogonalisation.  The sweep is required: a greedy pass leaves each orbital
 	//biased by later ones and the residual stops distinguishing topologies.  Returns V, empty if infeasible
@@ -800,11 +834,33 @@ namespace
 		//inside it, so a vector criterion never fires.  Anderson mixing starts only near convergence:
 		//from the first sweep it can land on a different fixed point
 		const int nv = k - first_valence;
-		const auto orth = [&]() {
+		constexpr int anderson_depth = 5;
+		constexpr double anderson_start = 1e-3, span_start = 1e-6, span_tol = 1e-10;
+		const auto valence = [&]() {
 			MatrixXd Mv(n, nv);
 			for (int j = first_valence; j < k; j++) Mv.col(j - first_valence) = v[j];
-			Eigen::HouseholderQR<MatrixXd> qr(Mv);
-			return MatrixXd(qr.householderQ() * MatrixXd::Identity(n, nv));
+			return Mv;
+		};
+		//Has the valence span moved off Mo's?  R = Mn - Mo So^-1 Son is Mn's part outside span(Mo), and
+		//||(1 - P_o) Q_n||_F <= ||R||_F / sqrt(lambda_min(Sn)), so this never stops earlier than comparing
+		//orthonormal bases.  Every column lives on its block, so the cost is nv^2 b where a QR took n nv^2
+		const auto span_still = [&](const MatrixXd& Mo, const MatrixXd& Mn) {
+			MatrixXd So(nv, nv), Son(nv, nv), Sn(nv, nv);
+			for (int j = 0; j < nv; j++) {
+				const ivec& idx = *blk[first_valence + j];
+				const int b = static_cast<int>(idx.size());
+				MatrixXd ro(b, nv), rn(b, nv);
+				for (int t = 0; t < b; t++) { ro.row(t) = Mo.row(idx[t]); rn.row(t) = Mn.row(idx[t]); }
+				So.col(j).noalias() = ro.transpose() * ro.col(j);
+				Son.col(j).noalias() = ro.transpose() * rn.col(j);
+				Sn.col(j).noalias() = rn.transpose() * rn.col(j);
+			}
+			const MatrixXd C = So.ldlt().solve(Son);
+			MatrixXd R = Mn;
+			for (int i = 0; i < nv; i++)
+				for (const int t : *blk[first_valence + i]) R.row(t) -= Mo(t, i) * C.row(i);
+			const double lmin = Eigen::SelfAdjointEigenSolver<MatrixXd>(Sn, Eigen::EigenvaluesOnly).eigenvalues()(0);
+			return lmin > 0.0 && R.squaredNorm() < span_tol * span_tol * lmin;
 		};
 		ivec off(nv + 1, 0);
 		for (int j = 0; j < nv; j++) off[j + 1] = off[j] + static_cast<int>(blk[first_valence + j]->size());
@@ -816,9 +872,7 @@ namespace
 			}
 			return x;
 		};
-		constexpr int anderson_depth = 5;
-		constexpr double anderson_start = 1e-3, span_start = 1e-6, span_tol = 1e-10;
-		MatrixXd Q;  //span the sweep started from; a QR costs about a sweep, so only kept near the end
+		MatrixXd Mo;  //valence vectors the sweep started from, only kept near the end
 		std::deque<VectorXd> dX, dF;
 		VectorXd x_prev, f_prev;
 		double least = 0.0;   //-nrt_stall: smallest change since mixing started, and its sweep
@@ -840,14 +894,14 @@ namespace
 			c.sweeps = s + 1;
 			c.change = change;
 			if (change < span_start) {
-				const MatrixXd Qn = orth();
-				if (Q.size() && (Qn - Q * (Q.transpose() * Qn)).norm() < span_tol) {
+				MatrixXd Mn = valence();
+				if (Mo.size() && span_still(Mo, Mn)) {
 					c.converged = true;
 					break;
 				}
-				Q = Qn;
+				Mo = std::move(Mn);
 			}
-			else Q.resize(0, 0);
+			else Mo.resize(0, 0);
 			if (stall > 0 && (x_prev.size() || change <= anderson_start) && (least_at < 0 || change < 0.999 * least)) {
 				least = change;
 				least_at = s;
@@ -878,7 +932,7 @@ namespace
 				occ[o] = block_quad(G0, idx, v[o]);
 				rank1_block(sum, idx, occ[o], v[o]);
 			}
-			if (Q.size()) Q = orth();  //the next sweep starts from the mixed iterate
+			if (Mo.size()) Mo = valence();  //the next sweep starts from the mixed iterate
 			if (stall > 0 && least_at >= 0 && s - least_at >= stall) break;
 		}
 
@@ -1061,6 +1115,54 @@ namespace
 		if (it_out) it_out[0] = std::min(it, maxit);
 		return f;
 	}
+
+	//-nrt_tie: lexicographic tie-break among near-optimal weights. Gamma_parent + Gamma_ab = Gamma_a + Gamma_b for
+	//fixed orbitals, so the fit drains the parent along a flat direction at no cost. Minimise f(w) - lambda c.w with
+	//c = 1e-3^rank (rank = pairs moved from the parent) for the largest lambda whose f stays within (1 + delta) f*:
+	//exactly flat directions move at any lambda > 0, parent first, then singles, ...; the 1e-3 steps make it
+	//lexicographic to ~0.1 % weight. Returns f of the new w; note gets the rank-0 (reference) share and D(w) before -> after.
+	double tie_break(const MatrixXd& G, const VectorXd& g, const double trg2, VectorXd& w, const ivec& rank,
+					 const double delta, const std::string& spin, std::string& note)
+	{
+		const int n = static_cast<int>(w.size());
+		VectorXd c(n), r0 = VectorXd::Zero(n);
+		for (int i = 0; i < n; i++) {
+			c(i) = std::pow(1e-3, std::min(rank[i], 8));
+			if (!rank[i]) r0(i) = 1.0;
+		}
+		const double f0 = objective(G, g, trg2, w), budget = f0 + delta * std::max(f0, 1e-12);
+		VectorXd best = w;
+		double fbest = f0;
+		//one penalised solve from the best feasible weights; true when it stays within the budget
+		auto run = [&](const double lam) {
+			VectorXd x = best;
+			solve_qp(G, g + 0.5 * lam * c, trg2, x, 200000, nullptr, spin, nullptr);
+			const double fx = objective(G, g, trg2, x);
+			if (fx > budget) return false;
+			if (c.dot(x) > c.dot(best)) { best = x; fbest = fx; }
+			return true;
+		};
+		//bracket: lambda in units of f*, doubled until over budget (or halved until within it), then bisected
+		double lo = 0.0, hi = 1e-6 * std::max(f0, 1e-12);
+		if (run(hi)) {
+			for (int k = 0; k < 100 && run(2.0 * hi); k++) hi *= 2.0;
+			lo = hi;
+			hi *= 2.0;
+		}
+		else
+			for (int k = 0; k < 60 && !run(0.5 * hi); k++) hi *= 0.5;
+		if (lo > 0.0)
+			for (int k = 0; k < 20; k++) {
+				const double mid = 0.5 * (lo + hi);
+				(run(mid) ? lo : hi) = mid;
+			}
+		std::ostringstream os;
+		os << "-nrt_tie " << delta << ": reference share " << 100.0 * r0.dot(w) << " % -> " << 100.0 * r0.dot(best)
+		   << " %, D(w) " << std::sqrt(std::max(0.0, f0)) << " -> " << std::sqrt(std::max(0.0, fbest));
+		note = os.str();
+		w = best;
+		return fbest;
+	}
 }
 
 void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
@@ -1103,6 +1205,14 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 	L.shift_arrows = options.nrt_mirror;
 	L.deloc = delocalisation_graph(lewis, e2, options.nrt_e2_kcal, na, L.bondable);
 	L.comp = components(L.deloc);
+	L.dative.assign(na, bvec(na, false));
+	for (const NboE2Entry& e : e2) {
+		const NboFunction& don = lewis.orbitals[e.donor_index - 1];
+		const NboFunction& acc = lewis.orbitals[e.acceptor_index - 1];
+		if (e.energy_kcal < options.nrt_e2_kcal || don.type != "LP" || acc.type != "LV") continue;
+		const int a = don.centers[0], b = acc.centers[0];
+		if (a != b && L.bondable[a][b]) L.dative[a][b] = true;
+	}
 	L.cap.assign(na, 0);
 	L.parent_electrons.assign(na, 0);
 	L.free_atom.assign(na, options.nrt_subspace.empty());
@@ -1160,6 +1270,13 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 	std::vector<Candidate> cands;
 	std::set<ivec> seen;
 	std::set<ivec> walked{ parent.key() };  //roots the arrow walk has started from
+	std::vector<Topology> references{ parent };  //-nrt_tie ranks by pair moves to the nearest of these
+	int ref_cycles = 0;
+	Topology anchor = parent;  //-nrt_ref: the structure the walk's charge screen is anchored to, the leading one
+	int switches = 0;
+	//-nrt_ref walks build only structures whose approximate reduced cost says they lower D(w); the rest stay
+	//deferred and are priced again after every refit, so none is dropped for good
+	const double ref_screen = options.nrt_screen >= 0.0 ? options.nrt_screen : 0.0;
 	{
 		Candidate p;
 		p.topo = parent;
@@ -1288,7 +1405,10 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 								 (capped ? ", the closure stopped at 64 images" : ""));
 			if (!refs.empty() && cands.size() < pool_cap) {
 				const size_t before = cands.size(), n_refs = refs.size();
-				for (const Candidate& r : refs) walked.insert(r.topo.key());
+				for (const Candidate& r : refs) {
+					walked.insert(r.topo.key());
+					references.push_back(r.topo);
+				}
 				const size_t room = std::min(n_refs * static_cast<size_t>(budget), pool_cap - cands.size());
 				for (Candidate& c : grow(std::move(refs), room, false, options.nrt_mirror)) cands.push_back(std::move(c));
 				nrt.notes.push_back(std::to_string(n_refs) + " symmetry reference(s) of the parent walked, " +
@@ -1376,8 +1496,10 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 	std::vector<Candidate> deferred;
 	int screen_rounds = 0;
 	size_t screen_walked = 0, screen_built = 0;
-	const auto approximate = [&](Candidate& c) {
-		if (c.root >= 0) {
+	//a walk structure's start: its root's orbitals on every slot the arrows did not touch, the rest filled greedily
+	const auto seed = [&](Candidate& c) {
+		if (c.root < 0) return;
+		{
 			const Candidate& r = cands[c.root];
 			bvec touched(na, false);
 			for (int a = 0; a < na; a++)
@@ -1394,16 +1516,42 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 				c.owner.push_back(o);
 			}
 		}
-		const MatrixXd V = build_orbitals(c, gamma, B, 3);
+	};
+	const auto approximate = [&](Candidate& c, const int sweeps = 3) {
+		seed(c);
+		const MatrixXd V = build_orbitals(c, gamma, B, sweeps);
 		if (!c.feasible) return;
 		const MatrixXd GV = gamma * V;
 		double tr = 0.0;
 		for (int y = 0; y < V.cols(); y++) tr += V.col(y).dot(GV.col(y));
 		c.g = scale * tr;
 	};
-	const auto admit = [&]() {
-		const int nd = static_cast<int>(deferred.size());
-		if (!nd) return 0;
+	//-nrt_ref parent: of the weighted structures, the one nearest the resonance hybrid sum_i w_i T_i (squared distance
+	//over the upper triangle, lone pairs included), ties to the larger weight. The heaviest structure is no parent when
+	//the weight is spread: Ni(CO)4's carries 4 % and is a Ni=C-O carbanion. Only the references (nrt_ref x the leading weight)
+	//compete: over every weighted structure a 0.3 % one wins. lo >= 0 replaces that floor (the reported parent's tie set)
+	const auto central = [&](const double lo = -1.0) {
+		std::vector<double> hyb(static_cast<size_t>(na) * na, 0.0);
+		for (int i = 0; i < nc; i++)
+			if (w(i) > options.nrt_weight_floor)
+				for (size_t q = 0; q < hyb.size(); q++) hyb[q] += w(i) * cands[i].topo.t[q];
+		const double floor = lo >= 0.0 ? lo : std::max(options.nrt_weight_floor, options.nrt_ref * w.maxCoeff());
+		int best = 0;
+		double bd = std::numeric_limits<double>::max();
+		for (int i = 0; i < nc; i++) {
+			if (w(i) < floor) continue;
+			double d = 0.0;
+			for (int a = 0; a < na; a++)
+				for (int b = a; b < na; b++) {
+					const double x = cands[i].topo.at(a, b) - hyb[static_cast<size_t>(a) * na + b];
+					d += x * x;
+				}
+			if (d < bd - 1e-12 || (d < bd + 1e-12 && w(i) > w(best))) { bd = d; best = i; }
+		}
+		return best;
+	};
+	const auto price = [&](const std::vector<Candidate>& set) {
+		const int nd = static_cast<int>(set.size());
 		MatrixXd gw = MatrixXd::Zero(nn, nn);
 		for (int i = 0; i < nc; i++)
 			if (w(i) > 0.0) {
@@ -1417,18 +1565,24 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 		vec r(nd);
 #pragma omp parallel for schedule(dynamic) num_threads(nt)
 		for (int j = 0; j < nd; j++) {
-			const MatrixXd V = orbitals(deferred[j], B, nn);
+			const MatrixXd V = orbitals(set[j], B, nn);
 			const MatrixXd GV = gw * V;
 			double tr = 0.0;
 			for (int y = 0; y < V.cols(); y++) tr += V.col(y).dot(GV.col(y));
-			r[j] = 2.0 * (scale * tr - deferred[j].g) - 2.0 * level;
+			r[j] = 2.0 * (scale * tr - set[j].g) - 2.0 * level;
 		}
+		return r;
+	};
+	const auto admit = [&](const double cut) {
+		const int nd = static_cast<int>(deferred.size());
+		if (!nd) return 0;
+		const vec r = price(deferred);
 		ivec order(nd);
 		for (int j = 0; j < nd; j++) order[j] = j;
 		std::stable_sort(order.begin(), order.end(), [&](const int a, const int b) { return r[a] < r[b]; });
 		std::set<ivec> pick;
 		bool capped = false;
-		for (int j = 0, seeds = 0; j < nd && seeds < 16 && r[order[j]] < options.nrt_screen; j++)
+		for (int j = 0, seeds = 0; j < nd && seeds < 16 && r[order[j]] < cut; j++)
 			if (pick.insert(deferred[order[j]].topo.key()).second) {
 				seeds++;
 				for (const Topology& t : images_of(deferred[order[j]].topo, maps, L, 64, capped)) pick.insert(t.key());
@@ -1630,9 +1784,10 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 				const size_t rows = static_cast<size_t>(wr) * wc;
 #pragma omp parallel for schedule(static) num_threads(nthreads)
 				for (int a = 0; a < nc; a++) {
-					const MatrixXd V = orbitals(cands[a], B, nn);
+					const MatrixXd Vr = orbital_rows(cands[a], B, r0, wr);
 					Eigen::Map<MatrixXd> Y(Zbuf.data() + static_cast<size_t>(a) * rows, wr, wc);
-					Y.noalias() = V.middleRows(r0, wr) * V.middleRows(c0, wc).transpose();
+					if (c0 == r0) Y.noalias() = Vr * Vr.transpose();
+					else Y.noalias() = Vr * orbital_rows(cands[a], B, c0, wc).transpose();
 				}
 				const Eigen::Map<const MatrixXd> Z(Zbuf.data(), static_cast<Eigen::Index>(rows), nc);
 				const bool diag = blk.first == blk.second;
@@ -1723,13 +1878,145 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 
 		const double dw = std::sqrt(std::max(0.0, f));
 		if (options.nrt_exhaustive || options.nrt_target < 0.0 || dw <= options.nrt_target) {
-			if (cycle > 1)
+			if (options.nrt_target >= 0.0 && cycle > 1 && !ref_cycles)
 				nrt.notes.push_back("D(w) target " + std::to_string(options.nrt_target) + " reached after " +
 									 std::to_string(cycle) + " cycles, " + std::to_string(nc) + " structures");
-			break;
+			if (options.nrt_exhaustive || options.nrt_ref <= 0.0) break;
+			t_cycle0 = clock();
+			//screened structures of the last walk first: refit with each round of admitted ones before new references
+			if (admit(ref_screen)) { screen_rounds++; continue; }
+			//-nrt_ref: structures of nrt_ref x the leading weight no walk has started from become references, with their
+			//symmetry images whatever weight the unsymmetrised fit left those
+			const double heavy = options.nrt_ref * w.maxCoeff();
+			//parent switch: the leading structure anchors the walk's charge screen from here on, so a search parent the
+			//fit leaves light no longer bounds which structures the references reach
+			{
+				const int lead = central();
+				if (cands[lead].topo.key() != anchor.key()) {
+					anchor = cands[lead].topo;
+					for (int a = 0; a < na; a++) {
+						L.parent_electrons[a] = anchor.electrons(a);
+						L.cap[a] = std::max(L.cap[a], anchor.used(a));
+					}
+					switches++;
+					nrt.notes.push_back("-nrt_ref cycle " + std::to_string(ref_cycles + 1) + ": parent switched to " +
+										 change_string(anchor, parent, Z) + " of the search parent, weight " +
+										 std::to_string(100.0 * w(lead)) + " %");
+					log << "NRT" << (spin.empty() ? "" : " " + spin) << ": " << nrt.notes.back() << std::endl;
+				}
+			}
+			std::map<ivec, int> index;
+			for (int i = 0; i < nc; i++) index.emplace(cands[i].topo.key(), i);
+			std::vector<Candidate> roots;
+			bool capped = false;
+			for (int i = 0; i < nc; i++) {
+				if (w(i) < heavy || walked.count(cands[i].topo.key())) continue;
+				std::vector<Topology> orbit{ cands[i].topo };
+				for (Topology& t : images_of(cands[i].topo, maps, L, 64, capped)) orbit.push_back(std::move(t));
+				for (Topology& t : orbit)
+					if (walked.insert(t.key()).second) {
+						references.push_back(t);
+						Candidate r;
+						const auto it = index.find(t.key());
+						r.root = it == index.end() ? -1 : it->second;  //-nrt_screen starts a child from its root's orbitals
+						r.topo = std::move(t);
+						roots.push_back(std::move(r));
+					}
+			}
+			const bool none = roots.empty();  //roots is moved into grow below
+			std::string stop;
+			if (none) stop = ref_cycles ? "no new structure reaches the reference weight" : "";
+			else if (ref_cycles >= 8) stop = "stopped after 8 cycles with " + std::to_string(roots.size()) + " reference(s) unwalked";
+			else if (cands.size() >= pool_cap) stop = "the candidate pool is full at " + std::to_string(pool_cap) + " (-nrt_max raises it)";
+			else {
+				const size_t room = std::min(static_cast<size_t>(budget), pool_cap - cands.size());
+				const size_t before = cands.size();
+				for (Candidate& c : grow(std::move(roots), room, false)) cands.push_back(std::move(c));
+				complete_orbits(before);
+				const size_t fresh = cands.size() - before;
+				//-nrt_screen, 0 unless given: only structures whose approximate reduced cost says they lower D(w) are built
+				if (fresh >= static_cast<size_t>(options.nrt_screen_min)) {
+					const int nw = static_cast<int>(fresh);
+					//-debug: the walk is also built in full and priced both ways, to see what the screen would miss
+					std::vector<Candidate> exact;
+					std::vector<Candidate> pristine;
+					if (options.debug) { exact.assign(cands.begin() + before, cands.end()); pristine = exact; }
+#pragma omp parallel for schedule(dynamic) num_threads(nthreads)
+					for (int x = 0; x < nw; x++) {
+						approximate(cands[before + x]);
+						if (options.debug) {
+							const MatrixXd V = build_orbitals(exact[x], gamma, B, 200, false, options.nrt_stall);
+							if (exact[x].feasible) {
+								const MatrixXd GV = gamma * V;
+								double tr = 0.0;
+								for (int y = 0; y < V.cols(); y++) tr += V.col(y).dot(GV.col(y));
+								exact[x].g = scale * tr;
+							}
+						}
+					}
+					//calibration: the walk approximated with 3, 10 and 30 sweeps; per count the misses at the cut, and the
+					//cut that keeps every improving structure with how many structures it builds
+					if (options.debug)
+						for (const int sw : {3, 10, 30}) {
+							std::vector<Candidate> trial;
+							const auto t0 = std::chrono::steady_clock::now();
+							if (sw == 3) trial.assign(cands.begin() + before, cands.end());
+							else {
+								trial = pristine;
+#pragma omp parallel for schedule(dynamic) num_threads(nthreads)
+								for (int x = 0; x < nw; x++) approximate(trial[x], sw);
+							}
+							const double t_sw = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
+							std::vector<Candidate> both_a, both_e;
+							for (int x = 0; x < nw; x++)
+								if (trial[x].feasible && exact[x].feasible) { both_a.push_back(trial[x]); both_e.push_back(exact[x]); }
+							const vec ra = price(both_a), re = price(both_e);
+							int neg = 0, missed = 0, built = 0;
+							double worst = 0.0, gap = 0.0, need = -1e300;
+							for (size_t j = 0; j < ra.size(); j++) {
+								gap = std::max(gap, ra[j] - re[j]);
+								if (re[j] < 0.0) {
+									neg++;
+									need = std::max(need, ra[j]);
+									if (ra[j] >= ref_screen) { missed++; worst = std::min(worst, re[j]); }
+								}
+							}
+							for (size_t j = 0; j < ra.size(); j++) built += ra[j] <= need;
+							log << "NRT" << (spin.empty() ? "" : " " + spin) << ": screen check " << sw << " sweeps ("
+								<< t_sw << " s) over " << ra.size() << " structures: " << neg << " lower D(w) built in full, "
+								<< missed << " of them priced at or above " << ref_screen << " approximately (most negative "
+								<< worst << "), largest r_approx - r_full " << gap << ", lossless cut " << need << " builds "
+								<< built << "\n";
+						}
+					for (size_t i = before; i < cands.size(); i++)
+						if (cands[i].feasible) deferred.push_back(std::move(cands[i]));
+					cands.resize(before);
+					screen_walked += nw;
+					admit(ref_screen);
+				}
+				nrt.notes.push_back("-nrt_ref cycle " + std::to_string(ref_cycles + 1) + ": D(w) = " + std::to_string(dw) + nbo_d(dw) +
+									 " over " + std::to_string(nc) + " structures, " + std::to_string(references.size()) +
+									 " reference(s), " + std::to_string(fresh) + " new" +
+									 (screen_walked ? ", " + std::to_string(cands.size() - before) + " built" : std::string()));
+				log << "NRT" << (spin.empty() ? "" : " " + spin) << ": " << nrt.notes.back() << std::endl;
+				if (cands.size() == before) stop = fresh ? "no new structure passes the screen" : "the references generate no new structure";
+			}
+			search_seconds += secs(t_cycle0, clock());
+			if (none && !ref_cycles) break;
+			if (!stop.empty()) {
+				nrt.notes.push_back("-nrt_ref " + std::to_string(options.nrt_ref) + ": " + std::to_string(references.size()) +
+									 " reference(s), final D(w) = " + std::to_string(dw) + nbo_d(dw) + " over " +
+									 std::to_string(nc) + " structures; " + stop);
+				log << "NRT" << (spin.empty() ? "" : " " + spin) << ": " << nrt.notes.back() << std::endl;
+				break;
+			}
+			ref_cycles++;
+			t_cycle0 = clock();
+			cycle++;
+			continue;
 		}
 		t_cycle0 = clock();
-		if (admit()) {
+		if (admit(options.nrt_screen)) {
 			screen_rounds++;
 			continue;
 		}
@@ -1761,7 +2048,7 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 					if (cands[i].feasible) deferred.push_back(std::move(cands[i]));
 				cands.resize(before);
 				screen_walked += nw;
-				if (!admit()) stop = "no structure of the walk passes the -nrt_screen threshold";
+				if (!admit(options.nrt_screen)) stop ="no structure of the walk passes the -nrt_screen threshold";
 			}
 		}
 		nrt.notes.push_back("cycle " + std::to_string(cycle) + ": D(w) = " + std::to_string(dw) + nbo_d(dw) +
@@ -1877,6 +2164,20 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 		if (!constants::hide_timings) log << "NRT" << (spin.empty() ? "" : " " + spin) << ": " << os.str() << std::endl;
 	}
 
+	//-nrt_tie rank: electron pairs a structure moved out of the slots of the nearest reference (the parent, its symmetry
+	//references, -nrt_ref's heavy structures), 0 = a reference
+	auto moved = [&](const Topology& t) {
+		int best = std::numeric_limits<int>::max() / 2;
+		if (t.n != na) return best;
+		for (const Topology& ref : references) {
+			int r = 0;
+			for (int a = 0; a < na && r < best; a++)
+				for (int b = a; b < na; b++) r += std::max(0, ref.at(a, b) - t.at(a, b));
+			best = std::min(best, r);
+		}
+		return best;
+	};
+	std::string tie_note;
 	int orbits = 0, in_orbits = 0;
 	if (options.nrt_symmetry) {
 		//Orbits: structures one symmetry map takes into another, or without maps graph-isomorphic structures with
@@ -1926,10 +2227,17 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 			const double rise = std::sqrt(std::max(0.0, fu)) - std::sqrt(std::max(0.0, f));
 			//A rise means the orbits are no symmetry of this density; accepted within 1 % of D(w)
 			if (rise <= 0.01 * std::sqrt(std::max(1e-12, f))) {
+				double fu_tie = fu;
+				if (options.nrt_tie > 0.0) {   //in orbit space: an orbit holding the parent's images ranks as the parent
+					ivec rr(no, std::numeric_limits<int>::max());
+					for (int p = 0; p < no; p++)
+						for (const int i : member[p]) rr[p] = std::min(rr[p], moved(cands[i].topo));
+					fu_tie = tie_break(Gr, gr, trg2, u, rr, options.nrt_tie, spin, tie_note);
+				}
 				w.setZero();
 				for (int p = 0; p < no; p++)
 					for (const int i : member[p]) w(i) = u(p) / static_cast<double>(member[p].size());
-				f = fu;
+				f = fu_tie;
 				nrt.symmetry = std::to_string(orbits) + " graph-invariant orbit(s) covering " +
 							   std::to_string(in_orbits) + " structure(s), " + std::to_string(no) +
 							   " orbit weights solved for, D(w) rise " + std::to_string(rise);
@@ -1946,6 +2254,15 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 			? (std::to_string(orbits) + " graph-invariant orbit(s) covering " +
 			   std::to_string(in_orbits) + " structure(s), weights averaged inside each")
 			: "symmetry screen off";
+	if (options.nrt_tie > 0.0 && tie_note.empty()) {
+		ivec rr(nc);
+		for (int i = 0; i < nc; i++) rr[i] = moved(cands[i].topo);
+		f = tie_break(G, g, trg2, w, rr, options.nrt_tie, spin, tie_note);
+	}
+	if (!tie_note.empty()) {
+		nrt.notes.push_back(tie_note);
+		log << "NRT" << (spin.empty() ? "" : " " + spin) << ": " << tie_note << std::endl;
+	}
 	minimize_seconds += secs(t_min1, clock());
 
 	const auto t_other0 = clock();
@@ -2069,6 +2386,18 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 	std::stable_sort(order.begin(), order.end(), [&](const int a, const int b) {
 		return w(a) > w(b);
 	});
+	//reported parent = the leading structure, as NBO 7 does (ozone's zwitterion, nitromethane's classic form); of a
+	//degenerate lead the one nearest the hybrid. The nearest-hybrid structure anchors the walk only: reported, it picks
+	//the "middle" of a degenerate set (ozone's 1,3 long bond). The search's parent stays in the notes
+	const int head = order.empty() ? 0 : central(w(order[0]) - 5.0e-4);
+	const Topology& shown = cands[head].topo;
+	if (head != 0) {
+		nrt.parent_topo.back().matrix = shown.matrix();
+		nrt.notes.push_back("parent = the leading structure (" + std::to_string(100.0 * w(head)) + " %), " +
+							 change_string(shown, parent, Z) + " of the search parent (" + std::to_string(100.0 * w(0)) + " %)" +
+							 (switches ? ", walk anchor switched " + std::to_string(switches) + " time(s)" : std::string()));
+		log << "NRT" << (spin.empty() ? "" : " " + spin) << ": " << nrt.notes.back() << std::endl;
+	}
 	for (size_t r = 0; r < order.size(); r++) {
 		const int i = order[r];
 		NboResonanceWeight x;
@@ -2077,7 +2406,7 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 		x.spin = spin;
 		x.weight_percent = 100.0 * w(i);
 		x.weight_fraction = w(i);
-		x.changes = change_string(cands[i].topo, parent, Z);
+		x.changes = change_string(cands[i].topo, shown, Z);
 		nrt.weights.push_back(x);
 		NboNrtCandidate c;
 		c.structure = x.structure;
@@ -2102,7 +2431,7 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 	const double d_w = std::sqrt(std::max(0.0, f)), d_0 = std::sqrt(std::max(0.0, f0));
 	nrt.d_w = std::sqrt(nrt.d_w * nrt.d_w + d_w * d_w);
 	nrt.d_0 = std::sqrt(nrt.d_0 * nrt.d_0 + d_0 * d_0);
-	nrt.spin_d.push_back({ spin, nbo_units(d_0), nbo_units(d_w) });
+	nrt.spin_d.push_back({ spin, nbo_units(d_0), nbo_units(d_w), 100.0 * w(head) });
 	nrt.deloc_threshold_kcal = options.nrt_e2_kcal;
 	nrt.max_search_cycles = static_cast<int>(nrt.cycles.size());
 	nrt.initial_topo = nc;

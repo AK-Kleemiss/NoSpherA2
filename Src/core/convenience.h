@@ -114,9 +114,13 @@ struct properties_options
 	ivec MO_numbers;
 	//-ibo_cube <list>: IBOs to write as cubes (ibo_selection syntax)
 	std::string ibo_cube;
+	//-nbo_cube / -nlmo_cube <list>: in-house NBOs / NLMOs to write as cubes (nbo_cube_wfn syntax)
+	std::string nbo_cube, nlmo_cube;
+	//-nbo_lewis <json>: the Lewis structure ($CHOOSE) those NBOs come from, e.g. an NRT run's leading structure
+	std::filesystem::path nbo_lewis;
 	int hirsh_number = 0;
 	bool calc() const {
-		return rho || eli || esp || elf || lap || rdg || hdef || def || hirsh || s_rho || all_mos || fukui || esp_isosurface > 0 || MO_numbers.size() > 0 || !ibo_cube.empty();
+		return rho || eli || esp || elf || lap || rdg || hdef || def || hirsh || s_rho || all_mos || fukui || esp_isosurface > 0 || MO_numbers.size() > 0 || !ibo_cube.empty() || !nbo_cube.empty() || !nlmo_cube.empty();
 	}
 	size_t n_grid_points() const {
 		size_t result = static_cast<size_t>(NbSteps[0]) * NbSteps[1] * NbSteps[2];

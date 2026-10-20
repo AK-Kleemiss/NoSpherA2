@@ -699,16 +699,36 @@ void write_nbo_json(const NboResults& r, const std::filesystem::path& json_file)
 	}
 	f << "  ],\n";
 
+	if (!r.e2_avg.structures.empty()) {
+		const NboE2Average& a = r.e2_avg;
+		f << "  \"e2_nrt_average\": {\"tol_percent\": " << jnum(a.tol_percent) << ", \"min_percent\": " << jnum(a.min_percent) << ", \"seconds\": " << jnum(a.seconds)
+		  << ", \"structures\": [";
+		for (size_t i = 0; i < a.structures.size(); i++)
+			f << (i ? ", " : "") << "{\"structure\": " << a.structures[i] << ", \"weight\": " << jnum(a.weights[i])
+			  << ", \"rho_nl\": " << jnum(a.rho_nl[i]) << "}";
+		f << "],\n    \"channels\": [\n";
+		for (size_t i = 0; i < a.channels.size(); i++) {
+			const NboE2Channel& c = a.channels[i];
+			f << "      {\"donor\": " << jstr(c.donor) << ", \"acceptor\": " << jstr(c.acceptor)
+			  << ", \"mean_kcal\": " << jnum(c.mean_kcal) << ", \"min_kcal\": " << jnum(c.min_kcal)
+			  << ", \"max_kcal\": " << jnum(c.max_kcal) << ", \"present\": " << jnum(c.present) << "}"
+			  << (i + 1 < a.channels.size() ? "," : "") << "\n";
+		}
+		f << "    ]},\n";
+	}
+
 	f << "  \"nrt\": {\"present\": " << (r.nrt.present ? "true" : "false")
 		<< ", \"structures_used\": " << r.nrt.structures_used << ", \"structures_found\": " << r.nrt.structures_found
 		<< ", \"d_0\": " << jnum(r.nrt.d_0) << ", \"d_w\": " << jnum(r.nrt.d_w);
 	if (r.nrt.spin_d.size() == 1)
-		f << ", \"d_0_nbo\": " << jnum(r.nrt.spin_d[0].d_0) << ", \"d_w_nbo\": " << jnum(r.nrt.spin_d[0].d_w);
+		f << ", \"d_0_nbo\": " << jnum(r.nrt.spin_d[0].d_0) << ", \"d_w_nbo\": " << jnum(r.nrt.spin_d[0].d_w)
+		  << ", \"parent_weight_percent\": " << jnum(r.nrt.spin_d[0].parent_percent);
 	if (!r.nrt.spin_d.empty()) {
 		f << ", \"spin_d_nbo\": [";
 		for (size_t i = 0; i < r.nrt.spin_d.size(); i++)
 			f << (i ? ", " : "") << "{\"spin\": " << jstr(r.nrt.spin_d[i].spin) << ", \"d_0\": " << jnum(r.nrt.spin_d[i].d_0)
-			  << ", \"d_w\": " << jnum(r.nrt.spin_d[i].d_w) << "}";
+			  << ", \"d_w\": " << jnum(r.nrt.spin_d[i].d_w) << ", \"parent_weight_percent\": "
+			  << jnum(r.nrt.spin_d[i].parent_percent) << "}";
 		f << "]";
 	}
 	f << ", \"max_search_cycles\": " << r.nrt.max_search_cycles

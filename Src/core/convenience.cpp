@@ -445,6 +445,19 @@ std::string help_message =
  "                                    them, all, or C2:C3 for every bond-like\n"
  "                                    IBO between two atoms, comma-separated\n"
  "                                    (e.g. 6,C2:C3). Grid as for -MO.\n"
+ "  -nbo_cube <list>                   In-house NBO of -wfn, then cubes\n"
+ "                                    <wfn>_NBO_<n>.cube of the NBOs in <list>:\n"
+ "                                    numbers as the NBO table in\n"
+ "                                    NoSpherA2_cube.log prints them, lewis, or\n"
+ "                                    labels with ':' for the blank (LP:Pd1,\n"
+ "                                    BD*:Pd1-P6, LV:Zn2), comma-separated.\n"
+ "                                    Closed shell, .gbw/.molden with all MOs.\n"
+ "  -nlmo_cube <list>                  The same for the NLMOs of Lewis NBOs:\n"
+ "                                    <wfn>_NLMO_<n>.cube; the log gives each\n"
+ "                                    one's parent-NBO % and atom weights.\n"
+ "  -nbo_lewis <file.json>             NBOs of this Lewis structure for\n"
+ "                                    -nbo_cube/-nlmo_cube (as -nrt_parent; a\n"
+ "                                    .native.nbo.json gives its NRT leader).\n"
  "  -rgbi_no_sym                       RGBI without atomic O_h symmetrization. A\n"
  "                                    free-atom ANO reference stays spherical.\n"
  "  -rgbi_basis <nao|ano>              RGBI basis: occupied NAO or ANO [ano].\n"
@@ -622,7 +635,7 @@ std::string help_message =
  "                                    rotated, instead of the greedy fill: SF6\n"
  "                                    needs half the sweeps; bond orders move by\n"
  "                                    up to 2e-4. Default off.\n"
- "  -nrt_screen <r|off>                With -nrt_target, a walk of 200 or more new\n"
+ "  -nrt_screen <r|off>                With -nrt_target or -nrt_ref, a walk of 200+ new\n"
  "                                    structures builds in full only those whose\n"
  "                                    reduced cost, from approximate orbitals, is\n"
  "                                    below r, 16 at a time with their symmetry\n"
@@ -666,7 +679,35 @@ std::string help_message =
  "                                    are added; bond orders 1-3. A\n"
  "                                    .native.nbo.json is read through its\n"
  "                                    \"parent_lewis\". The log compares its rho(NL)\n"
- "                                    with the search's own best structure.\n\n"
+ "                                    with the search's own best structure.\n"
+ "  -nrt_e2_avg <percent>              E(2) per NRT structure whose weight is within\n"
+ "                                    <percent> of the leading one (degenerate\n"
+ "                                    set), each placed under $CHOOSE, averaged\n"
+ "                                    with the NRT weights renormalised over the\n"
+ "                                    set (implies -nrt; closed shell only).\n"
+ "                                    Channels sum orbitals of one type on the same\n"
+ "                                    centres; a channel a structure lacks counts 0.\n"
+ "  -nrt_e2_avg_min <percent>          As -nrt_e2_avg, but over every NRT structure\n"
+ "                                    of at least this weight: reaches structures\n"
+ "                                    that change a metal core when the near-\n"
+ "                                    degenerate ones differ only far away. Check\n"
+ "                                    rho(NL) per structure: a high one gives E(2)\n"
+ "                                    that means little.\n"
+ "  -nrt_tie <fraction>                The fit fixes the residual, not the weights\n"
+ "                                    (parent + double change = two singles).\n"
+ "                                    Among weights within this fraction of the\n"
+ "                                    best D(w)^2, take the most parent weight,\n"
+ "                                    then single changes, then doubles, ...\n"
+ "                                    Default 1e-6, 0 = off.\n\n"
+ "  -nrt_ref <fraction>                Multi-reference NRT: every structure of at\n"
+ "                                    least this fraction of the leading weight\n"
+ "                                    walks its own arrows into the pool and the\n"
+ "                                    fit repeats (at most 8 cycles); -nrt_tie\n"
+ "                                    ranks by moves to the nearest reference.\n"
+ "                                    The structure nearest the resonance hybrid\n"
+ "                                    re-anchors the walk each cycle; the leading\n"
+ "                                    structure is reported as the parent.\n"
+ "                                    Default 0.5, 0 = off.\n\n"
  "CONVERSION, ML, AND SPECIALISED TOOLS\n"
  "  -gbw2wfn -wfn <file.gbw>            Convert GBW input to .wfn.\n"
  "  -fchk <output.fchk>              Write FCHK output (requires -b and -d).\n"
@@ -3209,8 +3250,8 @@ const std::set<std::string> &nbo_family_suboptions()
 		"-nbo", "-nbo_parse", "-nbo_native", "-nbo_keywords", "-nbo_exe", "-nbo_json",
 		"-nbo_dir", "-nbo_47", "-nbo_e2min", "-nbo_threads", "-nbo_keep47", "-nrt",
 		"-nrt_e2", "-nrt_arrows", "-nrt_bond_scale", "-nrt_max", "-nrt_atoms",
-		"-nrt_exhaustive", "-nrt_no_symmetry", "-nrt_no_components", "-nrt_no_ion", "-nrt_parent",
-		"-nrt_target", "-nrt_screen", "-nrt_rotate", "-nrt_stall", "-nrt_mirror", "-nrt_no_mirror"};
+		"-nrt_exhaustive", "-nrt_no_symmetry", "-nrt_no_components", "-nrt_no_ion", "-nrt_parent", "-nrt_e2_avg", "-nrt_e2_avg_min",
+		"-nrt_target", "-nrt_screen", "-nrt_rotate", "-nrt_stall", "-nrt_mirror", "-nrt_no_mirror", "-nrt_tie", "-nrt_ref"};
 	return known;
 }
 
@@ -3325,6 +3366,16 @@ bool options::digest_io_options(const std::string &temp, int &i)
 			}
 			else if (arguments[j] == "-nrt") opt.nrt = true;
 			else if (arguments[j] == "-nrt_e2") opt.nrt_e2_kcal = std::stod(arguments[j + 1]);
+			else if (arguments[j] == "-nrt_e2_avg") {
+				opt.nrt_e2_avg_percent = std::stod(arguments[j + 1]);
+				opt.nrt = true;
+			}
+			else if (arguments[j] == "-nrt_e2_avg_min") {
+				opt.nrt_e2_avg_min_percent = std::stod(arguments[j + 1]);
+				opt.nrt = true;
+			}
+			else if (arguments[j] == "-nrt_tie") opt.nrt_tie = std::stod(arguments[j + 1]);
+			else if (arguments[j] == "-nrt_ref") opt.nrt_ref = std::stod(arguments[j + 1]);
 			else if (arguments[j] == "-nrt_parent") {
 				opt.nrt_parent = arguments[j + 1];
 				opt.nrt = true;
@@ -3337,7 +3388,10 @@ bool options::digest_io_options(const std::string &temp, int &i)
 				opt.nrt = true;
 			}
 			else if (arguments[j] == "-nrt_screen")
+			{
 				opt.nrt_screen = arguments[j + 1] == "off" ? -1.0 : std::stod(arguments[j + 1]);
+				if (arguments[j + 1] == "off") opt.nrt_screen_min = std::numeric_limits<int>::max();  //-nrt_ref walks unscreened too
+			}
 			else if (arguments[j] == "-nrt_stall") opt.nrt_stall = std::stoi(arguments[j + 1]);
 			else if (arguments[j] == "-nrt_bond_scale")
 				opt.nrt_bond_scale = std::stod(arguments[j + 1]);
@@ -4580,6 +4634,16 @@ bool options::digest_ri_options(const std::string &temp, int &i)
 	else if (temp == "-ibo_cube") {
 		err_checkf(i + 1 < argc, "-ibo_cube needs the IBO list", std::cout);
 		properties.ibo_cube = arguments[++i];
+	}
+	else if (temp == "-nbo_cube" || temp == "-nlmo_cube") {
+		err_checkf(i + 1 < argc, temp + " needs the NBO list", std::cout);
+		(temp == "-nbo_cube" ? properties.nbo_cube : properties.nlmo_cube) = arguments[++i];
+	}
+	else if (temp == "-nbo_lewis") {
+		err_checkf(i + 1 < argc, "-nbo_lewis needs a Lewis structure file", std::cout);
+		properties.nbo_lewis = arguments[++i];
+		err_checkf(std::filesystem::exists(properties.nbo_lewis),
+				   "-nbo_lewis: Lewis structure file doesn't exist: " + properties.nbo_lewis.string(), std::cout);
 	}
 	else if (temp == "-npa_summary") {
 		npa = true;

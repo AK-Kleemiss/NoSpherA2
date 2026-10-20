@@ -321,7 +321,8 @@ TEST(NrtTests, TwoIdenticalSpinChannelsAddUpToTheClosedShellAnswer)
             << "the two spin channels of an unpolarised density must add up to the closed-shell bond "
                "order on " << pair_a[k] << "-" << pair_b[k] << ": " << spin_total[k] << " against "
             << c.total;
-        EXPECT_NEAR(spin_ionic[k], c.ionic, 1e-12)
+        //ionic = fraction (exact, checked at 1e-12 above) x total (iterative weights, 1e-8): the sum inherits 1e-8
+        EXPECT_NEAR(spin_ionic[k], c.ionic, 1e-8)
             << "and to its ionic part on " << pair_a[k] << "-" << pair_b[k] << ": " << spin_ionic[k]
             << " against " << c.ionic;
     }

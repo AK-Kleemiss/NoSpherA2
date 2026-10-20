@@ -139,10 +139,11 @@ struct NboQpIteration {
 	std::string spin;
 };
 
-//Native only: one spin's D(0) and D(w) in NBO 7's units
+//Native only: one spin's D(0) and D(w) in NBO 7's units, and the parent's weight
 struct NboNrtD {
 	std::string spin;
 	double d_0 = 0.0, d_w = 0.0;
+	double parent_percent = -1.0;  //the parent Lewis structure's NRT weight, retained or not; < 0 = not known
 };
 
 struct NboNrt {
@@ -181,6 +182,25 @@ struct NboNrt {
 	std::string nrtstr_keylist;               //the $NRTSTR block NBO writes back, verbatim
 };
 
+//One donor -> acceptor channel of the resonance-averaged E2: orbitals of the same type on the same centres
+//summed (LP(1..3) of an atom, the sigma and pi BD of a pair), so it is defined in every structure.
+struct NboE2Channel {
+	std::string donor, acceptor;  //"LP Pd1", "BD* Pd1-P6"
+	double mean_kcal = 0.0;       //weighted mean, 0 in structures without the channel
+	double min_kcal = 0.0, max_kcal = 0.0;
+	double present = 0.0;         //renormalised weight of the structures that have it
+};
+
+struct NboE2Average {
+	double tol_percent = 0.0;     //structures within this % of the leading weight
+	double min_percent = 0.0;     //>0: structures of at least this weight instead
+	std::vector<int> structures;   //NRT structure numbers used
+	std::vector<double> weights;                //their NRT weights, renormalised over the set
+	std::vector<double> rho_nl;                 //rho(NL) of each structure placed under $CHOOSE
+	std::vector<NboE2Channel> channels;
+	double seconds = 0.0;
+};
+
 struct NboResults {
 	std::string name;
 	std::string source;         //the wavefunction the archive came from
@@ -209,6 +229,7 @@ struct NboResults {
 	std::vector<NboNao> nao_beta;
 	std::vector<NboOrbital> orbitals;
 	std::vector<NboE2Entry> e2;
+	NboE2Average e2_avg;          //-nrt_e2_avg, native closed shell only
 	NboNrt nrt;
 };
 
