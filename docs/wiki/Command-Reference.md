@@ -101,8 +101,10 @@ you are memory-constrained.
 
 ### Correlated densities: MP2, CCSD, CCSD(T)
 
-`-occ` with a correlated `method` runs occ's RHF and then builds the density of that method in NoSpherA2; the natural
-orbitals go on to the scattering factors like any other wavefunction. Closed shell (RHF) only.
+`-occ` with a correlated `method` runs occ's RHF and then the density of that method; the natural orbitals go on to the
+scattering factors like any other wavefunction. Closed shell (RHF) only. The densities are occ's
+(`occ/qm/cc/density.h`: `ccsd_density`, `local_ccsd_density`, `mp2_relaxed_density`); NoSpherA2 builds that code
+against MKL (`OCC_DENSITY_CBLAS`), and reads the `ccsd_*` keys and writes the log summary.
 
 | `method` | density |
 | --- | --- |

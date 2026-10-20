@@ -778,6 +778,12 @@ elseif(NOSPHERA2_OPENBLAS)
     endif()
 else()
     find_package(MKL CONFIG REQUIRED)
+    #occ's correlated densities (occ/src/qm/cc/density.cpp) call MKL's cblas_dgemm instead of Eigen's gemm: the
+    #large products as one threaded call, the (T) loop as an OpenMP loop inside which MKL runs serially
+    set_source_files_properties("${CMAKE_SOURCE_DIR}/occ/src/qm/cc/density.cpp" TARGET_DIRECTORY occ_cc_obj PROPERTIES
+        COMPILE_DEFINITIONS "OCC_DENSITY_CBLAS;EIGEN_DONT_PARALLELIZE"
+        COMPILE_OPTIONS "$<IF:$<CXX_COMPILER_ID:MSVC>,/openmp:experimental,-fopenmp>")
+    target_link_libraries(occ_cc PUBLIC MKL::MKL)
 endif()
 
 
