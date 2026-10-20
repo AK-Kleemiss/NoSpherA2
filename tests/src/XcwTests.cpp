@@ -799,7 +799,7 @@ namespace
 		EXPECT_EQ(parse_error("basis_set"), "Expected basis set name");
 		EXPECT_EQ(parse_error("basis_set sto-3g df_basis"), "Expected a fitting basis name after 'df_basis'");
 		EXPECT_EQ(parse_error("basis_set sto-3g guess_basis"), "Expected a basis name after 'guess_basis'");
-		EXPECT_EQ(parse_error("basis_set sto-3g save"), "Expected a path after 'save'");
+		EXPECT_EQ(parse_error("basis_set sto-3g safe"), "Expected a path after 'safe'");
 	}
 
 	// without a basis set the parse completes and then refuses to run
@@ -837,7 +837,7 @@ namespace
 
 	TEST(XcwSettingsTests, TightFastConvergenceStreamedTensorWithoutEnd)
 	{
-		const std::string log = construct_on_p1("tight fast_conv i_float i_tensor_mb 100 stream safe f2 params 177 basis_set sto-3g charge 0 mult 1 uhf start 0 step_size 0.1");
+		const std::string log = construct_on_p1("tight fast_conv i_float i_tensor_mb 100 stream safe out.bin f2 params 177 basis_set sto-3g charge 0 mult 1 uhf start 0 step_size 0.1");
 		if (log.empty()) {
 			GTEST_SKIP() << "tests/P1_test fixture not found";
 		}
@@ -846,7 +846,7 @@ namespace
 
 	TEST(XcwSettingsTests, VeryTightWithSavedTensorAndExplicitCriteria)
 	{
-		const std::string log = construct_on_p1("very_tight normal_conv read tensor.bin save out.bin i_double weighted load_wfn nbo f params 177 basis_set sto-3g "
+		const std::string log = construct_on_p1("very_tight normal_conv read tensor.bin safe out.bin i_double weighted load_wfn nbo f params 177 basis_set sto-3g "
 			"conv 1e-6 diis_damping 1e-3 diis_shift 1e-2 conv_diis 1e-5 gradient 7e-5 maxp_diff 1e-5 rmsp_diff 1e-6 damp 0.5 shift 0.5 max_iter 50 charge 0 mult 1 end 0.01");
 		if (log.empty()) {
 			GTEST_SKIP() << "tests/P1_test fixture not found";
@@ -863,6 +863,19 @@ namespace
 		opt.loadXCWsettings();
 		std::filesystem::remove(p);
 		return opt.xcw_settings;
+	}
+
+	// without `params` the parameter count is 1 and the run says so
+	TEST(XcwSettingsTests, MissingParamsDefaultsToOneWithAWarning)
+	{
+		testing::internal::CaptureStdout();
+		const options::XCW_settings s = parsed("basis_set sto-3g");
+		const std::string out = testing::internal::GetCapturedStdout();
+		EXPECT_EQ(s.n_params, 1);
+		EXPECT_NE(out.find("Warning: Number of crystallographic parameters not set (use the params keyword)! Continuing with a default value of 1..."), std::string::npos) << out;
+		testing::internal::CaptureStdout();
+		EXPECT_EQ(parsed("basis_set sto-3g params 177").n_params, 177);
+		EXPECT_EQ(testing::internal::GetCapturedStdout().find("Warning"), std::string::npos);
 	}
 
 	// the settings of tests/P1_test/test_settings.txt: the normal presets, F, unweighted -
@@ -946,7 +959,7 @@ namespace
 	{
 		const options::XCW_settings s = parsed("basis_set def2-svp df_basis def2-universal-jkfit guess_basis sto-3g f2 weighted uhf charge 1 mult 2 "
 			"start 0.02 step_size 0.005 end 0.04 i_sigma 3 gaussian_halt strong_cutoff 4.5 grown load_wfn nbo soscf check_hessian "
-			"read tensor.bin save out.bin i_float i_double i_tensor_mb 300 wavelength 1.54178 extinction bc_gaussian aniso fixed 2e-4");
+			"read tensor.bin safe out.bin i_float i_double i_tensor_mb 300 wavelength 1.54178 extinction bc_gaussian aniso fixed 2e-4");
 		EXPECT_EQ(s.basis_set_name, "def2-svp");
 		EXPECT_EQ(s.df_basis_name, "def2-universal-jkfit");
 		EXPECT_EQ(s.guess_basis_name, "sto-3g");
@@ -973,12 +986,13 @@ namespace
 		EXPECT_FALSE(s.extinction_refine);
 		EXPECT_DOUBLE_EQ(s.extinction_start, 2e-4);
 
-		//`read` without a path and `safe` both mean the default file; `stream` a 2 GB budget
-		const options::XCW_settings d = parsed("read safe stream basis_set sto-3g");
+		//`read` without a path means the default file, `safe` always names one; `stream` a 2 GB budget
+		const options::XCW_settings d = parsed("read stream basis_set sto-3g");
 		EXPECT_TRUE(d.read_tensor);
 		EXPECT_EQ(d.i_tensor_file_path, std::filesystem::path("I_tensor_stream.bin"));
-		EXPECT_EQ(d.i_tensor_save_path, std::filesystem::path("I_tensor_stream.bin"));
+		EXPECT_TRUE(d.i_tensor_save_path.empty());
 		EXPECT_EQ(d.i_tensor_max_mb, 2048u);
+		EXPECT_EQ(parse_error("basis_set sto-3g save out.bin"), "Unknown keyword 'save'");
 	}
 
 	//cell::remove_inv_vectors keeps the first of every inversion related pair in hkl_enlarged's order and

@@ -1033,7 +1033,7 @@ struct options
 		double extinction_start = 1e-4;
 		//`wavelength <lambda>`, in Angstrom; overrides _diffrn_radiation_wavelength from the CIF
 		double wavelength = 0.0;
-		int n_params;
+		int n_params = 1;
 		int refine_against = 1;
 		int XWR_type = 1;
 		bool read_tensor;
@@ -1051,7 +1051,7 @@ struct options
 		// there, and reused from there when it is already the right size for this problem,
 		// so that trying another refinement setting does not rebuild it.
 		std::filesystem::path i_tensor_file_path;
-		// `save <path>`: write the tensor there for a later `read <path>`, on a thread, so
+		// `safe <path>`: write the tensor there for a later `read <path>`, on a thread, so
 		// the refinement starts at once instead of waiting for 100 GB to reach the disk.
 		std::filesystem::path i_tensor_save_path;
 	};

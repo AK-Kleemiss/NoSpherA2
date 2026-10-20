@@ -667,7 +667,7 @@ structure_factors::I_tensor& structure_factors::eval_I(const occ::gto::AOBasis& 
 		&& i_tensor_file::matches(i_tensor_path(), model_data.nr, model_data.nmo, I_tens.i_compact_, single_on_disk)) {
 		if (!I_tens.i_tensor_save_path.empty())
 			throw std::runtime_error("The I tensor is read from " + i_tensor_path().string() + " and should not be saved again to "
-				+ I_tens.i_tensor_save_path.string() + ": a second copy costs as much memory as the first. Remove `save`/`safe` from the XCW settings.");
+				+ I_tens.i_tensor_save_path.string() + ": a second copy costs as much memory as the first. Remove `safe` from the XCW settings.");
 		//open() checks the header and throws if the shape does not match, which is what
 		//stops a tensor from a different structure being used by accident.
 		const char* source = "";
@@ -844,7 +844,7 @@ void structure_factors::decide_i_storage() {
 		return;
 	}
 	I_tens.i_window_ = static_cast<int>(std::min(w, static_cast<size_t>(model_data.nr)));
-	//Streamed straight into the `save` file when there is one, so saving it costs nothing
+	//Streamed straight into the `safe` file when there is one, so saving it costs nothing
 	const std::filesystem::path path = I_tens.i_tensor_save_path.empty() ? i_tensor_path() : I_tens.i_tensor_save_path;
 	I_tens.i_file_.create(path, model_data.nr, model_data.nmo, I_tens.i_pair_mu_, I_tens.i_pair_nu_, I_tens.i_float_);
 	std::cout << std::fixed << std::setprecision(2)

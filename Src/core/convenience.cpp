@@ -835,7 +835,7 @@ std::string help_message =
  "                                                      reflections at a time\n"
  "                                      i_tensor_mb <n> the same, with the\n"
  "                                                      budget named in MB\n"
- "                                      safe / read     save / read with the\n"
+ "                                      read            read the tensor at the\n"
  "                                                      default path\n"
  "                                      read <path>     reuse the streamed\n"
  "                                                      tensor at that path\n"
@@ -846,7 +846,7 @@ std::string help_message =
  "                                                      any refinement\n"
  "                                                      setting, so trying\n"
  "                                                      another one is free\n"
- "                                      save <path>     write the tensor\n"
+ "                                      safe <path>     write the tensor\n"
  "                                                      there while the\n"
  "                                                      refinement runs, for\n"
  "                                                      a later read <path>\n"
@@ -4675,11 +4675,6 @@ void options::loadXCWsettings() {
 			speed_preset = "fast_conv";
 			};
 
-		//`safe` is `save` to the default path, which is where `read` without a path looks.
-		handlers["safe"] = [&](std::istream&) {
-			i_tensor_save_path = "I_tensor_stream.bin";
-			};
-
 		//`read <path>` reuses the streamed tensor at that path, which is the expensive thing
 		//a run produces and which depends only on the geometry, the basis and the
 		//reflections, not on any refinement setting. So trying another lambda range or
@@ -4727,10 +4722,10 @@ void options::loadXCWsettings() {
 		//Writing the tensor is worth ~40 minutes to a later run and costs this one nothing:
 		//the refinement only reads the tensor, so a thread can push it to disk while the SCF
 		//gets on with it. The path is what `read <path>` will want afterwards.
-		handlers["save"] = [&](std::istream& is) {
+		handlers["safe"] = [&](std::istream& is) {
 			std::string path;
 			if (!(is >> path))
-				throw std::runtime_error("Expected a path after 'save'");
+				throw std::runtime_error("Expected a path after 'safe'");
 			i_tensor_save_path = path;
 			};
 		//The stored two-electron integrals depend on geometry and basis only; read_eri falls back to building
@@ -4854,6 +4849,10 @@ void options::loadXCWsettings() {
 	xcw_settings.charge = (charge != 32768) ? charge : xcw_settings.charge;
 	xcw_settings.multiplicity = (multiplicity != 32768) ? multiplicity : xcw_settings.multiplicity;
 	if (n_params != 32768) xcw_settings.n_params = n_params;
+	else {
+		xcw_settings.n_params = 1;
+		std::cout << "Warning: Number of crystallographic parameters not set (use the params keyword)! Continuing with a default value of 1..." << std::endl;
+	}
 	xcw_settings.extinction_model = extinction_model;
 	xcw_settings.extinction_aniso = extinction_aniso;
 	xcw_settings.extinction_refine = extinction_refine;

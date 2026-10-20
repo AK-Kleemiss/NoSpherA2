@@ -233,7 +233,7 @@ TEST(XcwHaltingReportTests, HaltingReportsAcrossTheExtendedLambdaScan)
 	ASSERT_EQ(n_written, 402);
 	ASSERT_GE(n_strong, 8);
 
-	options opt = make_options(dir, RUN_BASE + "end 0.05 i_tensor_mb 4096 save itensor.bin gaussian_halt" + shared_eri(dir));
+	options opt = make_options(dir, RUN_BASE + "end 0.05 i_tensor_mb 4096 safe itensor.bin gaussian_halt" + shared_eri(dir));
 	opt.cpu_itensor_fp32 = false;
 	const std::string out = run_xcw(dir, opt);
 	const std::string log = read_file(dir / "SCF.log");
@@ -420,10 +420,10 @@ TEST(XcwHaltingReportTests, StreamedTensorRoundTrip)
 	}
 }
 
-//`save` on a tensor that has to be streamed: the stream is written into the save file itself and
+//`safe` on a tensor that has to be streamed: the stream is written into the safe file itself and
 //no default file appears. Read back under the same budget it streams with the window the budget
 //allows (one reflection, where the read used to take 64). A tensor that is read must not be saved
-//again: `read` with `save` throws before the file is opened.
+//again: `read` with `safe` throws before the file is opened.
 TEST(XcwHaltingReportTests, StreamedTensorIsSavedWhereSaveSays)
 {
 	if (!fixture_present()) {
@@ -434,7 +434,7 @@ TEST(XcwHaltingReportTests, StreamedTensorIsSavedWhereSaveSays)
 	write_subset_hkl(dir / "subset.hkl", n_written, n_strong, 1e9);
 	ASSERT_EQ(n_written, 402);
 
-	options opt = make_options(dir, RUN_BASE + "end 0 save saved.bin");
+	options opt = make_options(dir, RUN_BASE + "end 0 safe saved.bin");
 	opt.mem_given = true;
 	opt.mem = 0.001;
 	const std::string out = run_xcw(dir, opt);
@@ -458,7 +458,7 @@ TEST(XcwHaltingReportTests, StreamedTensorIsSavedWhereSaveSays)
 	EXPECT_NEAR(std::stod(row[1]), std::stod(row2[1]), 2e-3);
 	EXPECT_NEAR(std::stod(row[4]), std::stod(row2[4]), 1e-4);
 
-	for (const std::string save : { "save copy.bin", "save saved.bin", "safe" }) {
+	for (const std::string save : { "safe copy.bin", "safe saved.bin" }) {
 		options opt3 = make_options(dir, RUN_BASE + "end 0 read saved.bin " + save);
 		std::string what;
 		try { run_xcw(dir, opt3); }

@@ -239,6 +239,9 @@ Key core modules live in `Src/core`:
 
 ## Current Validation Notes
 
+As of 2026-10-20 (latest), an XCW settings file without `params` warns and uses 1 (`XcwSettingsTests.MissingParamsDefaultsToOneWithAWarning`);
+`ctest --preset release-windows-tests` on a CPU-only build reports **1281 passed, 0 failed, 22 skipped** (2 disabled) of 1305. See `UNIT_TESTS_STATUS.md`.
+
 As of 2026-10-20 (later), density_source carries XCW_refactor's split of XCW into `structure_factors`, `SCF_wrapper` and `XCW_solver` (`XCW.cpp` is gone), with
 density_source's `-mem`/SLURM memory budget and Android OpenBLAS guard ported into it; `ctest --preset release-windows-tests` on a CPU-only build reports
 **1280 passed, 0 failed, 22 skipped** (2 disabled) of 1304. See `UNIT_TESTS_STATUS.md`.

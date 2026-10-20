@@ -574,7 +574,7 @@ TEST(XcwScfTests, SharedTensorBuild)
 	std::filesystem::create_directories(shared_tensor().parent_path());
 	std::filesystem::remove(shared_tensor());
 	std::filesystem::remove(shared_tensor().parent_path() / "xcw_p1_subset_eri.bin");
-	const p1_run run = run_on_p1(dir, "normal normal_conv params 177 basis_set sto-3g max_iter 1 charge 0 mult 1 f rhf start 0 step_size 0.01 end 0 i_double save i.bin save_eri eri.bin");
+	const p1_run run = run_on_p1(dir, "normal normal_conv params 177 basis_set sto-3g max_iter 1 charge 0 mult 1 f rhf start 0 step_size 0.01 end 0 i_double safe i.bin save_eri eri.bin");
 	ASSERT_NE(run.out.find("I tensor written to i.bin"), std::string::npos) << run.out;
 	ASSERT_TRUE(std::filesystem::exists(dir / "eri.bin")) << run.log;
 	size_t kept = 0;
@@ -587,14 +587,14 @@ TEST(XcwScfTests, SharedTensorBuild)
 }
 
 //lambda = 0 is a plain Hartree-Fock: the energy of P1_test_XCW.good, the .tscb/.wfn/.fchk
-//of that step, damping and level shift switched off along the way. `save` writes the
+//of that step, damping and level shift switched off along the way. `safe` writes the
 //tensor on a thread (`read` of a file not there yet builds it); a second run `read`s it
 //instead of building and lands on the same numbers.
 TEST(XcwScfTests, SaveThenReadTensorReproducesLambdaZero)
 {
 	if (p1_fixture().empty()) GTEST_SKIP() << "fixture tests/P1_test not found";
 	const auto dir = scratch_dir();
-	const std::string settings = common + "f rhf start 0 step_size 0.01 end 0 read tensor.bin save tensor.bin";
+	const std::string settings = common + "f rhf start 0 step_size 0.01 end 0 read tensor.bin safe tensor.bin";
 
 	const p1_run first = run_on_p1(dir, settings + read_shared_eri(dir));
 	EXPECT_EQ(first.nr, 402);
@@ -983,7 +983,7 @@ TEST(XcwScfTests, ITensorOfH2MatchesAnalyticGaussianTransform)
 	}
 	const int nr = static_cast<int>(hkl.size());
 
-	const p1_run run = run_xcw(dir, cif, hkl_path, "normal normal_conv params 1 basis_set sto-3g max_iter 100 charge 0 mult 1 f rhf start 0 step_size 0.01 end 0 save tensor.bin", true, 3);
+	const p1_run run = run_xcw(dir, cif, hkl_path, "normal normal_conv params 1 basis_set sto-3g max_iter 100 charge 0 mult 1 f rhf start 0 step_size 0.01 end 0 safe tensor.bin", true, 3);
 	EXPECT_NE(run.out.find("I tensor written to tensor.bin"), std::string::npos) << run.out;
 	ASSERT_NE(run.log.find("***SCF converged in "), std::string::npos) << run.log;
 

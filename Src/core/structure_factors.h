@@ -140,7 +140,7 @@ public:
 	vec inv_H2_;
 	// The I tensor, see eval_I
 	I_tensor I_tens;
-	// The background writer for `save <path>`. Joined, never detached: a thread still
+	// The background writer for `safe <path>`. Joined, never detached: a thread still
 	// running at exit is how the GPU warm-up bug of 939268f happened, and this one holds a
 	// FILE* and reads the resident tensor.
 	std::thread i_writer_;
