@@ -305,7 +305,8 @@ TEST(NrtTests, TwoIdenticalSpinChannelsAddUpToTheClosedShellAnswer)
                 << spin << " bond " << pair_a[k] << "-" << pair_b[k]
                 << ": one electron of this spin where the closed-shell run has a pair is half the "
                    "bond order, not the same bond order";
-            EXPECT_NEAR(o.ionic / o.total, c.ionic / c.total, 1e-12)
+            //two separate fits: 1e-10 like D above; the SSE4.2 Windows build lands 1.7e-12 off, the AVX2 build exact
+            EXPECT_NEAR(o.ionic / o.total, c.ionic / c.total, 1e-10)
                 << spin << " bond " << pair_a[k] << "-" << pair_b[k]
                 << ": the ionic FRACTION is a property of the orbital's polarity and cannot depend on "
                    "whether one electron or two occupy it";
