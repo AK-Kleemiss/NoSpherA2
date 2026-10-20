@@ -239,6 +239,10 @@ Key core modules live in `Src/core`:
 
 ## Current Validation Notes
 
+As of 2026-10-20 (later), density_source carries XCW_refactor's split of XCW into `structure_factors`, `SCF_wrapper` and `XCW_solver` (`XCW.cpp` is gone), with
+density_source's `-mem`/SLURM memory budget and Android OpenBLAS guard ported into it; `ctest --preset release-windows-tests` on a CPU-only build reports
+**1280 passed, 0 failed, 22 skipped** (2 disabled) of 1304. See `UNIT_TESTS_STATUS.md`.
+
 As of 2026-10-20, `-occ` with `method = "ccsd"` / `"ccsd(t)"` gives the unrelaxed CCSD / CCSD(T) density (canonical, or local
 cluster-in-molecule with `ccsd_local = true`) converged to ORCA's STol, `-wfn *.mdci.nat` reads ORCA's CCSD natural orbitals and
 `-wfn base.json` ORCA's AutoCI CCSD(T) density (orca_2json export), and occ is at upstream 0.9.6;
@@ -299,6 +303,26 @@ The skips are 12 GPU tests, 7 `RUN_FULL_TEST` cases, two NBO tests that need gen
 case behind `NOS_RGBI_SLOW_TESTS`. `0e6a0d3` keeps OCC from linking with lld under GCC, whose LTO
 objects lld cannot read; without it a GCC build fails wherever lld is installed. See
 `UNIT_TESTS_STATUS.md`.
+
+As of 2026-10-10, the XCW inversion screening also covers measured h / -h pairs (the row of -h is the conjugate of
+the row of h), next to the merging of inverse images within one reflection of 2026-10-08; P1 takes 5.0 s of I tensor
+instead of 9.8 s, and the XCW suites and P1 goldens report 45 passed, 0 failed. See `UNIT_TESTS_STATUS.md`.
+
+As of 2026-10-08, the XCW I tensor integrates only one k-point of every inversion related pair
+(`cell::remove_inv_vectors`, `XcwInversionTests` new); the XCW/cell/P1 filter reports 116 passed, 0 failed,
+and Fe_phen reproduces its reference lambda table in 448 s of I tensor instead of 610 s. See `UNIT_TESTS_STATUS.md`.
+
+As of 2026-10-07, `save <path>` in the XCW settings keeps a streamed I tensor too (the build streams
+into the save file), a tensor read from disk with `save` set throws, and a streamed `read` takes the window the memory
+budget allows instead of 64 reflections; `XcwHaltingReportTests.StreamedTensorIsSavedWhereSaveSays` is new
+and the XCW/P1 filter reports 87 passed, 0 failed. The full suite was not rerun. See `UNIT_TESTS_STATUS.md`.
+
+As of 2026-10-01, `Src/core/XCW.cpp` is split into `structure_factors`, `SCF_wrapper` and
+`XCW_solver`, the XCW settings file is read by `options::loadXCWsettings()`, anomalous dispersion
+comes only from the CIF (`-anom_disp` is gone) and the P1 XCW cases run on `P1_test.cif`. The XCW
+gtests are ported and the eleven CPU P1 XCW goldens regenerated; `P1_test_XCW_gpu_itensor.good`
+still needs a device. Visual Studio `Tests`, every test in its own process from `tests/src`:
+1102 passed, 0 failed, 15 skipped and 16 crashed out of 1133 (the 16 all build and run OCC objects in the test itself - StoredEriTests, OccSecondOrderScf, OccHighAngularTests, BondwiseRobyTests, FormatConsistencyTests.OccFchkMatchesBridge, TomlIntegrationTests.AlanineIntegratedOcc - and exit with code 127 before printing anything, with or without OCC_DATA_PATH; the same OCC SCF passes inside the XCW tests of the same binary and the executable runs alanine_integrated_occ to the end, so the locally built Visual Studio test binary is the suspect, root cause not established; a ctest run of the CMake target is still owed). See `UNIT_TESTS_STATUS.md`.
 
 As of 2026-09-24, the in-house NBO analysis (`-nbo_native`, `Src/core/nbo.cpp` and
 `Src/core/nrt.cpp`) is checked in two places: `NrtTests`, `Nbo47Tests` and

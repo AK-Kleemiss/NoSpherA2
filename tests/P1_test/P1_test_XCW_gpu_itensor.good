@@ -14,8 +14,8 @@ Number of symmetry operations: 1
 Nr of reflections to be used: 3215
 Generating k-points...                            ... done!
 Number of k-points to evaluate: 3215
-XCW orbital basis set: sto-3g-basis
 XCW: I/sigma(I) >= 2 (F/sigma(F) >= 4): 3146 of 3215 reflections in the fit; R1 and Criterion are over these, R1(all) and Crit(all) over all
+XCW orbital basis set: sto-3g-basis
 GridManager: Setting up prototype grids for atom types...
 GridManager: Generating integration grids for atoms...
 GridManager: Generated total of 93098 grid points.
@@ -23,7 +23,7 @@ Total number of grid points after pruning: 93092
 AO values calculated for all grids.
 Screened out 1802 unique pairs of mu, nu (33.64%) 
 Skipped evaluation of 64843335 grids (16.37%) 
-More detailed output in XCW.log file...
+More detailed output in SCF.log file...
 ____________________________________________________________________________________
  Lambda		Criterion	GooF(F2)	R1(gt)		Total Energy		Perturbation	Target quantity		Crit(all)	R1(all)
 								(Eh)			(a. u.)		(a. u.)

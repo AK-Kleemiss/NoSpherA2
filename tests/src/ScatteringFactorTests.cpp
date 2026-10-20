@@ -539,21 +539,21 @@ TEST(ScatteringFactorTests, ReadHklFullObservationsAndSymmetryExpansion)
 		out << "   1   0   0  100.00    2.00\n   0   0   1 -100.00    4.00\n   0   0   0    0.00    0.00\n";
 	}
 	hkl_list hkl;
-	std::vector<scattering_data> obs;
+	scatter_data obs;
 	std::ostringstream log;
 	const hkl_list enlarged = read_hkl_full(hklfile, hkl, {}, c, log, obs, true);
 	fs::remove(hklfile);
 	//obs is in the order of the hkl set ((0,0,1) before (1,0,0)) and the 0 0 0 row is dropped with its reflection
-	ASSERT_EQ(obs.size(), 2u);
-	EXPECT_DOUBLE_EQ(obs[1].F_obs2, 100.0);
-	EXPECT_DOUBLE_EQ(obs[1].abs_F_obs, 10.0);
-	EXPECT_DOUBLE_EQ(obs[1].F_obs, 10.0);
-	EXPECT_DOUBLE_EQ(obs[1].sigma_obs2, 2.0);
-	EXPECT_DOUBLE_EQ(obs[1].sigma_obs, 0.1);
-	EXPECT_DOUBLE_EQ(obs[0].F_obs2, 100.0);
-	EXPECT_DOUBLE_EQ(obs[0].F_obs, -10.0);
-	EXPECT_DOUBLE_EQ(obs[0].abs_F_obs, 10.0);
-	EXPECT_DOUBLE_EQ(obs[0].sigma_obs, 0.2);
+	ASSERT_EQ(obs.F_obs.size(), 2u);
+	EXPECT_DOUBLE_EQ(obs.F_obs2[1], 100.0);
+	EXPECT_DOUBLE_EQ(obs.abs_F_obs[1], 10.0);
+	EXPECT_DOUBLE_EQ(obs.F_obs[1], 10.0);
+	EXPECT_DOUBLE_EQ(obs.sigma_obs2[1], 2.0);
+	EXPECT_DOUBLE_EQ(obs.sigma_obs[1], 0.1);
+	EXPECT_DOUBLE_EQ(obs.F_obs2[0], 100.0);
+	EXPECT_DOUBLE_EQ(obs.F_obs[0], -10.0);
+	EXPECT_DOUBLE_EQ(obs.abs_F_obs[0], 10.0);
+	EXPECT_DOUBLE_EQ(obs.sigma_obs[0], 0.2);
 	EXPECT_EQ(hkl, (hkl_list{ i3{ 1, 0, 0 }, i3{ 0, 0, 1 } }));
 	//the sixfold axis turns (1,0,0) into the six in-plane vectors; (0,0,1) is invariant
 	hkl_list expected{ i3{ 0, 0, 1 } };
@@ -577,13 +577,13 @@ TEST(ScatteringFactorTests, ReadHklFullStrongReflectionKeepsL)
 		out << "   1   0   012345.67   10.00\n";
 	}
 	hkl_list hkl;
-	std::vector<scattering_data> obs;
+	scatter_data obs;
 	std::ostringstream log;
 	read_hkl_full(hklfile, hkl, {}, c, log, obs, false);
 	fs::remove(hklfile);
 	EXPECT_EQ(hkl, (hkl_list{ i3{ 1, 0, 0 } }));
-	ASSERT_EQ(obs.size(), 1u);
-	EXPECT_NEAR(obs[0].F_obs2, 12345.67, 1e-2);
+	ASSERT_EQ(obs.F_obs.size(), 1u);
+	EXPECT_NEAR(obs.F_obs2[0], 12345.67, 1e-2);
 }
 
 //the WFN CIF reader matches rows to wavefunction atoms by position, stores fractional

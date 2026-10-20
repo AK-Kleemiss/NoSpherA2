@@ -14,10 +14,10 @@ Number of symmetry operations: 1
 Nr of reflections to be used: 402
 Generating k-points...                            ... done!
 Number of k-points to evaluate: 402
-XCW orbital basis set: sto-3g-basis
 XCW: I/sigma(I) >= 2 (F/sigma(F) >= 4): 394 of 402 reflections in the fit; R1 and Criterion are over these, R1(all) and Crit(all) over all
+XCW orbital basis set: sto-3g-basis
 I tensor read from p1_i.bin (10.9002 MB, single precision), not recomputed, held in memory
-More detailed output in XCW.log file...
+More detailed output in SCF.log file...
 ____________________________________________________________________________________
  Lambda		Criterion	GooF(F2)	R1(gt)		Total Energy		Perturbation	Target quantity		Crit(all)	R1(all)
 								(Eh)			(a. u.)		(a. u.)
