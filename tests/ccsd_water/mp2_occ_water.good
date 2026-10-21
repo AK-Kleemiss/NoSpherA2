@@ -63,25 +63,26 @@ EMBIS iteration:    5 max charge/alpha change: 0.21/0.00
 EMBIS iteration:    6 max charge/alpha change: 0.19/0.00
 EMBIS iteration:    7 max charge/alpha change: 0.17/0.00
 EMBIS iteration:    8 max charge/alpha change: 0.16/0.00
-EMBIS iteration:    9 max charge/alpha change: 0.14/0.00
+EMBIS iteration:    9 max charge/alpha change: 0.15/0.00
 EMBIS iteration:   10 max charge/alpha change: 0.13/0.00
 EMBIS iteration:   11 max charge/alpha change: 0.12/0.00
-EMBIS converged after 11 iterations with max charge change: 0.00 and max sig change: 0.11
+EMBIS iteration:   12 max charge/alpha change: 0.11/0.00
+EMBIS converged after 12 iterations with max charge change: 0.00 and max sig change: 0.10
 Promolecular charges:
 Atom   0: -0.77
 Atom   1: 0.38
 Atom   2: 0.38
 Table of Charges in electrons
       Atom     Becke Hirshfeld      TFVC      MBIS     EMBIS
-        O1    -0.158    -0.318    -1.155    -0.809    -0.766
-        H1     0.079     0.159     0.581     0.405     0.383
-        H2     0.079     0.159     0.581     0.405     0.383
+        O1    -0.158    -0.318    -1.155    -0.811    -0.767
+        H1     0.079     0.159     0.581     0.406     0.384
+        H2     0.079     0.159     0.581     0.406     0.384
 Total number of electrons:
  Becke:      10.000372
  Hirshfeld:   9.999700
  TVFC:        9.993403
- MBIS:        9.999171
- EMBIS:       9.999286
+ MBIS:        9.999175
+ EMBIS:       9.999298
 [                Calculating Scattering Factors               ]
 [=============================================================] 100% 
 Writing tsc file...  ... done!

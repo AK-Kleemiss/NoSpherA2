@@ -1117,6 +1117,9 @@ std::vector<std::pair<vec, vec>> make_MBIS_vectors(
 		ECP_correction_helper.emplace_back(c, wavy.get_ECP_mode());
 		ECP_els[j] = atoms[j].get_ECP_electrons();
 	}
+	//Atom A's moments integrate w_A rho over A's own grid with the plain atom weights (HORTON's local WPart),
+	//so no Becke cells are needed. NOS_MBIS_BECKE sums every grid with the Becke weights instead.
+	const bool becke = tuning("NOS_MBIS_BECKE") != nullptr;
 	for (size_t it = 0; it < 2000; it++) {
 		for (int j = 0; j < ncen; j++) {
 			std::fill(sig_pop_vector[j].first.begin(), sig_pop_vector[j].first.end(), 0.0);
@@ -1137,8 +1140,9 @@ std::vector<std::pair<vec, vec>> make_MBIS_vectors(
 			std::pair<vec, vec> *coi;
 			for (int i = 0; i < ncen; i++) {
 				const int end = num_grid_points[i];
-				//5 is the becke weight, 7 the electron density, GridIndex X = 0, Y = 1, Z = 2
-				const double *b_weight = grid[i][5].data(), *dens = grid[i][7].data(), *gx = grid[i][0].data(), *gy = grid[i][1].data(), *gz = grid[i][2].data();
+				//5 is the becke weight, 3 the atom weight, 7 the electron density, GridIndex X = 0, Y = 1, Z = 2
+				const double *b_weight = grid[i][becke ? 5 : 3].data(), *dens = grid[i][7].data(), *gx = grid[i][0].data(), *gy = grid[i][1].data(), *gz = grid[i][2].data();
+				const int j0 = becke ? 0 : i, j1 = becke ? ncen : i + 1;
 #pragma omp for schedule(dynamic, 16) nowait
 				for (int point = 0; point < end; point++) {
 					rho0 = 0.0;
@@ -1182,7 +1186,7 @@ std::vector<std::pair<vec, vec>> make_MBIS_vectors(
 					}
 					if (rho0 == 0.0)
 						continue; // Avoid division by zero, if rho0 is zero, the point does not contribute to the integral
-					for (j = 0; j < ncen; j++) {
+					for (j = j0; j < j1; j++) {
 						nshell = nshell_cache[j];
 						dist_j = &dists[j];
 						pop = pop_local.data() + j * 6;
@@ -1333,7 +1337,8 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
 			}
 		}
 	}
-
+	//as in make_MBIS_vectors: A's own grid with the atom weights, unless NOS_MBIS_BECKE
+	const bool becke = tuning("NOS_MBIS_BECKE") != nullptr;
 	for (size_t it = 0; it < 2000; it++) {
 		for (int j = 0; j < ncen; j++) {
 			std::fill(sig_pop_vector[j].first.begin(), sig_pop_vector[j].first.end(), zeros_6);
@@ -1373,8 +1378,9 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
 			}
 			for (int i = 0; i < ncen; i++) {
 				const int end = num_grid_points[i];
-				//5 is the becke weight, corrected_dens the ECP-corrected electron density, GridIndex X = 0, Y = 1, Z = 2
-				const double *b_weight = grid[i][5].data(), *dens = corrected_dens[i].data(), *gx = grid[i][0].data(), *gy = grid[i][1].data(), *gz = grid[i][2].data();
+				//5 is the becke weight, 3 the atom weight, corrected_dens the ECP-corrected electron density, GridIndex X = 0, Y = 1, Z = 2
+				const double *b_weight = grid[i][becke ? 5 : 3].data(), *dens = corrected_dens[i].data(), *gx = grid[i][0].data(), *gy = grid[i][1].data(), *gz = grid[i][2].data();
+				const int j0 = becke ? 0 : i, j1 = becke ? ncen : i + 1;
 #pragma omp for schedule(dynamic, 16) nowait
 				for (int point = 0; point < end; point++) {
 					rho0 = 0.0;
@@ -1434,7 +1440,7 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
 					if (rho0 == 0.0)
 						continue; // Avoid division by zero, if rho0 is zero, the point does not contribute to the integral
 					const double dens_rho0_inv = density / rho0;
-					for (j = 0; j < ncen; j++) {
+					for (j = j0; j < j1; j++) {
 						d_local = dx.data() + (j * 3);
 						nshell = nshell_cache[j];
 						// Reuse d_cache values instead of recalculating (they're the same as before)

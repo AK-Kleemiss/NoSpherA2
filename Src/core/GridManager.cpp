@@ -620,7 +620,9 @@ void GridManager::generateIntegrationGrids(const WFN &wave, const cell &unit_cel
 	//every-scheme output; Hirshfeld integrates with WEIGHT * single / combined alone. There the CPU skips the pair loop:
 	//get_grid with one centre fills the coordinates and puts the plain atom weight in both columns, which nothing reads.
 	//The device is skipped there too: its launch and copies cost 130 ms on sucrose against 23 ms for the one-centre loop
-	const bool becke = config_.partition_type != PartitionType::Hirshfeld || config_.debug || config_.all_charges;
+	//MBIS and EMBIS fit on each atom's own grid with the atom weights, unless NOS_MBIS_BECKE (make_MBIS_vectors)
+	const bool mbis = config_.partition_type == PartitionType::MBIS || config_.partition_type == PartitionType::EMBIS;
+	const bool becke = (config_.partition_type != PartitionType::Hirshfeld && !(mbis && tuning("NOS_MBIS_BECKE") == nullptr)) || config_.debug || config_.all_charges;
 	const int weight_centers = becke ? total_atoms : 1;
 	//One line per atom on either path, so the debug file does not depend on where the weights ran
 	const auto log_grid = [&](const int i) {
