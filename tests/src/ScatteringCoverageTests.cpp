@@ -449,18 +449,15 @@ TEST(ScatteringCoverageEdTests, ConvertToEdIsMottBethe)
 	}
 }
 
-//pTB removes a core from B on and every such element outside Ce-Lu has a valence correction fit; reading the table at
-//Z - 2 gave B none, C the B row, and from W on read past the end
+//pTB removes a core from B on and every such element has a valence correction fit (Ce-Lu since 21 Oct 2026); reading
+//the table at Z - 2 gave B none, C the B row, and from W on read past the end
 TEST(ScatteringCoverageEcpTests, PtbCorrectionRowFollowsTheCore)
 {
 	for (int Z = 1; Z <= constants::heaviest_ECP_element; Z++)
 	{
-		if (Z >= 58 && Z <= 71)
-			continue;
 		const bool has_fit = Spherical_Gaussian_Density(Z, 3).get_form_factor(1.0) != 0.0;
 		EXPECT_EQ(has_fit, constants::ECP_electrons_pTB[Z] > 0) << "Z = " << Z;
 	}
-	EXPECT_EQ(Spherical_Gaussian_Density(64, 3).get_form_factor(1.0), 0.0);
 	EXPECT_EQ(Spherical_Gaussian_Density(90, 3).get_form_factor(1.0), 0.0);
 }
 

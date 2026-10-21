@@ -458,7 +458,7 @@ public:
 	Spherical_Gaussian_Density(const int g_atom_number, const int ECP_m = 1) : atomic_number(g_atom_number),
 		ECP_mode(ECP_m), nex(0), z(NULL), c(NULL), charge(0)
 	{
-		//Table rows: def2 and xTB run Rb..Rn; pTB runs H..La, then Hf..Rn, with no Ce-Lu fits yet, so those get none.
+		//Table rows: def2 and xTB run Rb..Rn; pTB runs H..Rn (Ce-Lu fits added 21 Oct 2026).
 		//pTB used to be read at Z - 2: every element got its lighter neighbour's fit (C took B's, B none) and from W on
 		//the read ran past the end of the table, which crashed at random (9 Oct 2026)
 		const vec2* tz = NULL, * tc = NULL;
@@ -468,9 +468,7 @@ public:
 		case 1: tz = &def_corrections::z; tc = &def_corrections::c; row = atomic_number - 37; break;
 		case 2: tz = &xtb_corrections::z; tc = &xtb_corrections::c; row = atomic_number - 37; break;
 		case 3:
-			tz = &ptb_corrections::z; tc = &ptb_corrections::c;
-			row = atomic_number <= 57 ? atomic_number - 1 : atomic_number >= 72 ? atomic_number - 15 : -1;
-			break;
+			tz = &ptb_corrections::z; tc = &ptb_corrections::c; row = atomic_number - 1; break;
 		}
 		if (tc != NULL && row >= 0 && row < static_cast<int>(tc->size()))
 		{
