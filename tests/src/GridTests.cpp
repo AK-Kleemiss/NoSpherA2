@@ -308,6 +308,19 @@ TEST(GridSphericalTests, ThakkarFormFactorExactlyAtZeroMatchesTheLimit)
 	EXPECT_NEAR(Thakkar().get_form_factor(0.0), 1.0, 1e-6);
 }
 
+//He is the first element whose coefficients follow another's: it used to read H's
+//coefficient as its own first one and integrated to 4.31 e
+TEST(GridSphericalTests, ThakkarLightAtomsCountTheirElectrons)
+{
+	const auto one = [](const double) { return 1.0; };
+	for (int Z = 2; Z <= 10; Z++) {
+		Thakkar t(Z);
+		const auto rho = [&t](const double r) { return t.get_radial_density(r); };
+		EXPECT_NEAR(radial_integral(rho, one, 1e-6, 40.0, 20000), Z, 2e-2) << "Z " << Z;
+		EXPECT_NEAR(t.get_form_factor(0.0), Z, 2e-2) << "Z " << Z;
+	}
+}
+
 //ECP mode 2 (xTB) knows the 36-, 54- and 68-electron cores as well
 TEST(GridSphericalTests, ThakkarCoreFormFactorEcpMode2)
 {

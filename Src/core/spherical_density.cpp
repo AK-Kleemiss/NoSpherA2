@@ -106,7 +106,9 @@ const int Spherical_Atom::first_ex() const
 
 const int Spherical_Atom::previous_element_coef() const
 {
-	if (atomic_number <= 2)
+	// Was <= 2: He then read H's coefficient while first_ex() skipped H's
+	// exponent, and integrated to 4.31 e.
+	if (atomic_number <= 1)
 		return 0;
 	int counter = 0;
 	for (int temp = atomic_number - 2; temp >= 0; temp--)
