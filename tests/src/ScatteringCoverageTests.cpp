@@ -476,6 +476,68 @@ TEST(ScatteringCoverageIamTests, IamRowsAreThakkarFactors)
 	EXPECT_FALSE(s.opt.tsc_written_by_stream);
 }
 
+//-hkl_scale n: the free-format list is read as it is, whatever -dmin says, and a row h gives the factor at S = h/n
+TEST(ScatteringCoverageIamTests, IamScaledIndicesAreFractional)
+{
+	iam_setup s("iam_scaled");
+	const fs::path list = tmp("iam_scaled.hkl");
+	{
+		std::ofstream out(list);
+		out << "! S = (h k l)/4\n2 0 0\n4 4 4\n-1 6 3\n0 0 0\n";
+	}
+	s.opt.m_hkl_list.clear();
+	s.opt.hkl = list;
+	s.opt.hkl_scale = 4;
+	s.opt.dmin = 0.5;
+	std::ostringstream log;
+	const itsc_block block = s.run(log);
+	fs::remove(list);
+	ASSERT_EQ(block.reflection_size(), 3u);
+	const cvec& row = block.get_sf_for_scatterer(0);
+	for (std::size_t r = 0; r < block.reflection_size(); r++)
+	{
+		const i3 h = block.get_indices(r);
+		const double stl = std::sqrt(double(h[0] * h[0] + h[1] * h[1] + h[2] * h[2])) / (2 * 4 * kA);
+		EXPECT_NEAR(row[r].real(), Thakkar(6).get_form_factor(constants::bohr2ang(constants::FOUR_PI * stl)), 1e-10) << "reflection " << r;
+	}
+}
+
+//-hkl_scale on the grid path: k-points at S = h/n, against F(k) = exp(-k^2/4) of the Gaussian hydrogen
+TEST(ScatteringCoverageIamTests, ScaledIndicesGiveFractionalKpoints)
+{
+	scoped_cwd cwd("scaled_k");
+	write_gaussian_h_wfn(cwd.dir / "gauss.wfn");
+	write_p1_cif(cwd.dir / "s.cif", "H1 H 0.0 0.0 0.0\n");
+	{
+		std::ofstream out(cwd.dir / "s.hkl");
+		out << "1 0 0\n3 2 1\n-2 5 4\n";
+	}
+	options opt;
+	opt.cif = cwd.dir / "s.cif";
+	opt.hkl = cwd.dir / "s.hkl";
+	opt.hkl_scale = 4;
+	opt.groups[0] = ivec{ 0 };
+	opt.partition_type = PartitionType::Becke;
+	opt.tsc_block_size = 0;
+	opt.use_gpu = false;
+	opt.no_date = true;
+	std::vector<WFN> wavy;
+	wavy.emplace_back(cwd.dir / "gauss.wfn", false);
+	svec known;
+	std::ostringstream log;
+	const itsc_block block = calculate_scattering_factors<itsc_block, std::vector<WFN>&>(opt, wavy, log, known, 0);
+	ASSERT_EQ(block.reflection_size(), 3u);
+	const cvec& row = block.get_sf_for_scatterer(0);
+	const double g = constants::TWO_PI / constants::ang2bohr(kA) / 4;
+	for (std::size_t r = 0; r < block.reflection_size(); r++)
+	{
+		const i3 h = block.get_indices(r);
+		const double k2 = g * g * (h[0] * h[0] + h[1] * h[1] + h[2] * h[2]);
+		EXPECT_NEAR(row[r].real(), std::exp(-k2 / 4.0), 2e-3) << "reflection " << r;
+		EXPECT_NEAR(row[r].imag(), 0.0, 2e-3) << "reflection " << r;
+	}
+}
+
 //electron diffraction in the IAM path is Mott-Bethe with the tabulated charge, and -label puts labels on the rows
 TEST(ScatteringCoverageIamTests, IamElectronDiffractionAndLabels)
 {

@@ -158,6 +158,7 @@ void make_k_pts(const bool& read_k_pts,
 			file << "K_point_vector is here! size: " << k_pt[0].size() << endl;
 		// Create local copy of hkl list for faster access
 		const std::vector<i3> hkl_vector(hkl.begin(), hkl.end());
+		const double scale = unit_cell.get_hkl_scale();
 
 #pragma omp parallel for
 		for (int ref = 0; ref < size; ref++)
@@ -167,7 +168,7 @@ void make_k_pts(const bool& read_k_pts,
 			{
 				for (int j = 0; j < 3; j++)
 				{
-					k_pt[x][ref] += unit_cell.get_rcm(x, j) * hkl_[j];
+					k_pt[x][ref] += unit_cell.get_rcm(x, j) * hkl_[j] / scale;
 				}
 			}
 		}
@@ -726,6 +727,25 @@ void generate_hkl_from_options(const options& opt,
 {
 	const bool have_dmin = opt.dmin != 99.0;
 	const bool have_box = opt.hkl_min_max[0][0] != -100 && opt.hkl_min_max[2][1] != 100;
+	if (opt.hkl_scale != 1)
+	{
+		//scaled indices overflow the 3I4 columns of read_hkl; the list is complete, so no images are added
+		err_checkf(opt.hkl != "", "-hkl_scale needs the index list in -hkl", file);
+		file << "Reading: " << std::setw(44) << opt.hkl << std::flush;
+		std::ifstream in(opt.hkl);
+		std::string line;
+		i3 h;
+		while (getline_universal(in, line))
+		{
+			std::istringstream row(line);
+			if (row >> h[0] >> h[1] >> h[2])
+				hkl.emplace(h);
+		}
+		hkl.erase(i3{ 0, 0, 0 });
+		err_checkf(!hkl.empty(), "No reflections read from " + opt.hkl.string(), file);
+		file << " done!\nNr of reflections read in units of 1/" << opt.hkl_scale << ": " << hkl.size() << std::endl;
+		return;
+	}
 	if (have_dmin && opt.electron_diffraction)
 		generate_hkl(opt.dmin / 2.0 - 0.001, hkl, opt.twin_law, unit_cell, file, opt.debug);
 	else if (have_dmin && have_box)
@@ -2691,6 +2711,7 @@ itsc_block calculate_scattering_factors_from_cube(
 #endif
 
 	cell unit_cell(opt.cif, file, opt.debug);
+	unit_cell.set_hkl_scale(opt.hkl_scale);
 	ifstream cif_input(opt.cif.c_str(), ios::in);
 	ivec atom_type_list;
 	ivec asym_atom_to_type_list;
@@ -2904,6 +2925,7 @@ tsc_block_type calculate_scattering_factors(
 
 
 	cell unit_cell(cif, file, opt.debug);
+	unit_cell.set_hkl_scale(opt.hkl_scale);
 	ifstream cif_input(cif.c_str(), std::ios::in);
 	ivec atom_type_list;
 	ivec asym_atom_to_type_list;
