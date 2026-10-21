@@ -9,6 +9,9 @@ Please give credit and cite corresponding pieces!
 This Software is published with BSD-2 clause license.
 Reading:                                   "test.wfn" done!
 Number of atoms in Wavefunction file: 18 Number of MOs: 135
+[NoSpherA2] Kleemiss et al., Chem. Sci. 12 (2021) 1675, DOI 10.1039/D0SC05526C
+[HAR] Jayatilaka & Dittrich, Acta Cryst. A 64 (2008) 383, DOI 10.1107/S0108767308005709
+[HAR] Capelli et al., IUCrJ 1 (2014) 361, DOI 10.1107/S2052252514014845
 Number of protons: 135
 Number of electrons: 135.000000
 Reading:                                   "test.cif" done!
@@ -18,6 +21,8 @@ Number of symmetry operations: 4
 Nr of reflections to be used: 23
 Generating k-points...                            ... done!
 Number of k-points to evaluate: 23
+[Becke grid] Becke, J. Chem. Phys. 88 (1988) 2547, DOI 10.1063/1.454033
+[Hirshfeld] Hirshfeld, Theor. Chim. Acta 44 (1977) 129, DOI 10.1007/BF00549096
 There are:
   18 atoms read from the wavefunction, of which 
   18 are identified as asymmetric unit atoms!
@@ -26,7 +31,7 @@ Selected accuracy: 1
 Making Integration Grids...
 GridManager: Setting up prototype grids for atom types...
 GridManager: Generating integration grids for atoms...
-GridManager: Generated total of 26030 grid points.
+GridManager: Generated total of 24370 grid points.
 Starting MBIS iterations...
 MBIS iteration: 1 max change: 0.395357
 MBIS iteration: 2 max change: 0.569996
@@ -125,7 +130,7 @@ Atom   9: -0.265750
 Atom  10: -0.408227
 Atom  11: 0.212201
 Atom  12: 0.149559
-Atom  13: 0.206575
+Atom  13: 0.206574
 Atom  14: -0.194300
 Atom  15: 0.133507
 Atom  16: 0.146730

@@ -120,45 +120,49 @@ Density Critical Points (9 found):
 
 Assigning basins along the density gradient...
 I found 5 Basins.
+  ELI-D maxima search on the host: auto, the host field costs 2.52 us a point, below 15
 ELI-D maxima from the analytic field: 8
 ELI-D basin boundaries from the analytic field (the default).
 Shell saddle merge (phi 0.9900): 0 same-atom pairs tested, 0 joined.
 
 QTAIM Analysis (voxel sum):
-basin:    0 label:               N0 integrated value:   8.2115 volume:  383.2748
-basin:    1 label:               H1 integrated value:   0.6423 volume:  109.3809
-basin:    2 label:               H2 integrated value:   0.6620 volume:  123.5598
-basin:    3 label:               H3 integrated value:   0.6544 volume:  114.9425
-basin:    4 label:              Li4 integrated value:   2.6457 volume:  445.5324
+basin:    0 label:               N0 integrated value:   8.2172 volume:  383.3206
+basin:    1 label:               H1 integrated value:   0.6379 volume:  108.5630
+basin:    2 label:               H2 integrated value:   0.6645 volume:  123.7495
+basin:    3 label:               H3 integrated value:   0.6512 volume:  115.0472
+basin:    4 label:              Li4 integrated value:   2.6466 volume:  446.2390
 GridManager: Setting up prototype grids for atom types...
 GridManager: Generating integration grids for atoms...
-GridManager: Generated total of 111906 grid points.
-Quadrature points sent along the field: 66249, left the grid: 0
+GridManager: Generated total of 66074 grid points.
+  QTAIM basin field on the host: the basin cube decides
+Quadrature points sent along the field: 65345, left the grid: 0
 
 QTAIM Analysis (atomic quadrature grids):
 [QTAIM] Bader, Atoms in Molecules: A Quantum Theory, Oxford University Press (1990), DOI 10.1093/oso/9780198551683.001.0001
 [QTAIM] Bader, Chem. Rev. 91 (1991) 893, DOI 10.1021/cr00005a013
   basin  label               electrons     charge      volume         maximum        x          y          z
-      1  N0                     8.2121    -1.2121    351.9246         53.1756    -10.483     10.089      2.209
-      2  H1                     0.6525     0.3475    117.2828          0.3121     -9.421      9.375      3.711
-      3  H2                     0.6536     0.3464    116.9064          0.3386    -12.306      9.343      2.332
-      4  H3                     0.6523     0.3477    119.0243          0.3307     -9.671      9.459      0.524
-      5  Li4                    2.7467     0.2533    879.3246          7.9446    -10.574     13.775      2.315
-  total in basins: 12.9172   outside every basin: 0.0848
+      1  N0                     8.2156    -1.2156    352.0097         53.1758    -10.483     10.089      2.209
+      2  H1                     0.6520     0.3480    117.1515          0.3123     -9.421      9.375      3.711
+      3  H2                     0.6518     0.3482    116.8766          0.3402    -12.306      9.343      2.332
+      4  H3                     0.6520     0.3480    119.3362          0.3309     -9.671      9.459      0.524
+      5  Li4                    2.7473     0.2527    880.1800          7.9446    -10.574     13.775      2.315
+  total in basins: 12.9188   outside every basin: 0.0848
 GridManager: Setting up prototype grids for atom types...
 GridManager: Generating integration grids for atoms...
-GridManager: Generated total of 111906 grid points.
-Quadrature points sent along the field: 48298, left the grid: 0
+GridManager: Generated total of 66074 grid points.
+  ELI-D basin field on the host: auto, the host field costs 4 us a point, below 15
+Quadrature points sent along the field: 46898, left the grid: 0
 
 ELI-D Analysis (atomic quadrature grids):
   basin  label               electrons      volume         maximum        x          y          z
-      1  Li4 core               2.0219     16.7524         43.7858    -10.574     13.777      2.315
-      2  Li4 LP                 0.6843    809.8354         14.5564    -10.708     19.268      2.471
+      1  Li4 core               2.0219     16.7635         43.7858    -10.574     13.777      2.315
+      2  Li4 LP                 0.6843    809.8272         14.5564    -10.708     19.268      2.471
       3  N0 core                2.1085      0.4452         12.9571    -10.483     10.089      2.209
-      4  Li4 LP                 0.0911     30.8124         12.6891    -10.676     17.954      2.434
-      5  H1                     1.9167    119.7528          4.6691     -9.399      9.356      3.743
-      6  H2                     1.9205    118.1458          4.6691    -12.344      9.323      2.334
-      7  H3                     1.9365    119.8280          4.6690     -9.653      9.442      0.489
-      8  N0-Li4 bond            2.1717     56.0645          1.9677    -10.517     11.461      2.248
+      4  Li4 LP                 0.0911     30.8130         12.6891    -10.676     17.954      2.434
+      5  H1                     1.9167    119.7560          4.6691     -9.399      9.356      3.743
+      6  H2                     1.9205    118.1500          4.6691    -12.344      9.323      2.334
+      7  H3                     1.9365    119.8317          4.6690     -9.653      9.442      0.489
+      8  N0-Li4 bond            2.1717     56.0647          1.9677    -10.517     11.461      2.248
   total in basins: 12.8512   outside every basin: 0.1559
+
 Spin-resolved ELI-D: off (-no_spin_eli).

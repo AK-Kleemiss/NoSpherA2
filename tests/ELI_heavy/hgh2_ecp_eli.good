@@ -62,14 +62,16 @@ Density Critical Points (5 found):
    V         :    -1.7929e-01   G         :         0.0918   K         :     8.7438e-02   L         :    -4.4108e-03
 
 QTAIM attractors from the analytic field: 3 (3 nuclei, 0 non-nuclear)
+  ELI-D maxima search on the host: auto, the host field costs 2.85 us a point, below 15
 ELI-D maxima from the analytic field: 51
 ELI-D basin boundaries from the analytic field (the default).
 Unified 46 core-shell basins into their atoms' cores, 5 ELI-D basins remain.
 Shell saddle merge (phi 0.9900): 0 same-atom pairs tested, 0 joined.
 GridManager: Setting up prototype grids for atom types...
 GridManager: Generating integration grids for atoms...
-GridManager: Generated total of 65266 grid points.
-Quadrature points sent along the field: 18692, left the grid: 0
+GridManager: Generated total of 56298 grid points.
+  QTAIM basin field on the host: auto, the host field costs 6.87 us a point, below 15
+Quadrature points sent along the field: 18544, left the grid: 0
 
 QTAIM Analysis (atomic quadrature grids):
 [QTAIM] Bader, Atoms in Molecules: A Quantum Theory, Oxford University Press (1990), DOI 10.1093/oso/9780198551683.001.0001
@@ -99,8 +101,9 @@ Delocalization indices (11 occupied orbitals):
   and is short of the basin population above by the core the Thakkar fill added.
 GridManager: Setting up prototype grids for atom types...
 GridManager: Generating integration grids for atoms...
-GridManager: Generated total of 65266 grid points.
-Quadrature points sent along the field: 24910, left the grid: 0
+GridManager: Generated total of 56298 grid points.
+  ELI-D basin field on the host: auto, the host field costs 2.37 us a point, below 15
+Quadrature points sent along the field: 24762, left the grid: 0
 
 ELI-D Analysis (atomic quadrature grids):
   basin  label               electrons      volume         maximum        x          y          z

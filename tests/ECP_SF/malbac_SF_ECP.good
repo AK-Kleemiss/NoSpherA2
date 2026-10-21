@@ -11,9 +11,13 @@ Reading:                                 "malbac.gbw"
 The gbw file's ECP block removes 28 core electrons from the orbitals: treating them as ECP atoms, as -ECP would.
  done!
 Number of atoms in Wavefunction file: 52 Number of MOs: 1133
+[NoSpherA2] Kleemiss et al., Chem. Sci. 12 (2021) 1675, DOI 10.1039/D0SC05526C
+[HAR] Jayatilaka & Dittrich, Acta Cryst. A 64 (2008) 383, DOI 10.1107/S0108767308005709
+[HAR] Capelli et al., IUCrJ 1 (2014) 361, DOI 10.1107/S2052252514014845
 Number of protons: 276
 Number of electrons: 248.000000
 Number of ECP electrons: 28
+[ECP] Kleemiss et al., J. Appl. Cryst. 58 (2025) 374, DOI 10.1107/S1600576725000901
 Reading:                                 "malbac.cif" done!
 Reading:                                 "malbac.hkl" done!
 Nr of reflections read from file: 15646
@@ -21,6 +25,8 @@ Number of symmetry operations: 1
 Nr of reflections to be used: 15646
 Generating k-points...                            ... done!
 Number of k-points to evaluate: 15646
+[Becke grid] Becke, J. Chem. Phys. 88 (1988) 2547, DOI 10.1063/1.454033
+[Hirshfeld] Hirshfeld, Theor. Chim. Acta 44 (1977) 129, DOI 10.1007/BF00549096
 There are:
   52 atoms read from the wavefunction, of which 
   52 are identified as asymmetric unit atoms!
@@ -29,7 +35,7 @@ Selected accuracy: 1
 Making Integration Grids...
 GridManager: Setting up prototype grids for atom types...
 GridManager: Generating integration grids for atoms...
-GridManager: Generated total of 127850 grid points.
+GridManager: Generated total of 111446 grid points.
 Starting MBIS iterations...
 MBIS iteration: 1 max change: 28.039060
 MBIS iteration: 2 max change: 0.141444
@@ -121,7 +127,7 @@ EMBIS iteration:   11 max charge/alpha change: 9.891217/0.010791
 EMBIS iteration:   12 max charge/alpha change: 10.587903/0.009891
 EMBIS iteration:   13 max charge/alpha change: 13.144996/0.009052
 EMBIS iteration:   14 max charge/alpha change: 15.623558/0.008273
-EMBIS iteration:   15 max charge/alpha change: 17.994751/0.007552
+EMBIS iteration:   15 max charge/alpha change: 17.994752/0.007552
 EMBIS iteration:   16 max charge/alpha change: 20.239950/0.006887
 EMBIS iteration:   17 max charge/alpha change: 22.347954/0.006273
 EMBIS iteration:   18 max charge/alpha change: 24.312919/0.005709
@@ -149,7 +155,7 @@ EMBIS iteration:   39 max charge/alpha change: 38.521572/0.002034
 EMBIS iteration:   40 max charge/alpha change: 38.333434/0.002006
 EMBIS iteration:   41 max charge/alpha change: 38.101075/0.001979
 EMBIS iteration:   42 max charge/alpha change: 37.827981/0.001952
-EMBIS iteration:   43 max charge/alpha change: 37.517471/0.001925
+EMBIS iteration:   43 max charge/alpha change: 37.517470/0.001925
 EMBIS iteration:   44 max charge/alpha change: 37.172703/0.001899
 EMBIS iteration:   45 max charge/alpha change: 36.796677/0.001873
 EMBIS iteration:   46 max charge/alpha change: 36.392241/0.001848
@@ -174,7 +180,7 @@ EMBIS iteration:   64 max charge/alpha change: 26.842374/0.001443
 EMBIS iteration:   65 max charge/alpha change: 26.277049/0.001423
 EMBIS iteration:   66 max charge/alpha change: 25.714095/0.001403
 EMBIS iteration:   67 max charge/alpha change: 25.154173/0.001384
-EMBIS iteration:   68 max charge/alpha change: 24.597880/0.001364
+EMBIS iteration:   68 max charge/alpha change: 24.597881/0.001364
 EMBIS iteration:   69 max charge/alpha change: 24.045757/0.001345
 EMBIS iteration:   70 max charge/alpha change: 23.498291/0.001326
 EMBIS iteration:   71 max charge/alpha change: 22.955919/0.001307
@@ -304,11 +310,11 @@ Table of Charges in electrons
        C34    -0.093    -0.059     0.469    -0.115    -0.172
        H34     0.100     0.064    -0.465     0.130     0.171
 Total number of electrons:
- Becke:     275.989187
- Hirshfeld: 275.995622
- TVFC:      275.979501
- MBIS:      276.006759
- EMBIS:     276.007287
+ Becke:     275.989212
+ Hirshfeld: 275.995647
+ TVFC:      275.979526
+ MBIS:      276.006784
+ EMBIS:     276.007312
 [                Calculating Scattering Factors               ]
 [=============================================================] 100% 
 Writing tsc file...  ... done!

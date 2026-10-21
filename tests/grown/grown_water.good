@@ -9,6 +9,9 @@ Please give credit and cite corresponding pieces!
 This Software is published with BSD-2 clause license.
 Reading:                                  "water.wfx" done!
 Number of atoms in Wavefunction file: 48 Number of MOs: 261
+[NoSpherA2] Kleemiss et al., Chem. Sci. 12 (2021) 1675, DOI 10.1039/D0SC05526C
+[HAR] Jayatilaka & Dittrich, Acta Cryst. A 64 (2008) 383, DOI 10.1107/S0108767308005709
+[HAR] Capelli et al., IUCrJ 1 (2014) 361, DOI 10.1107/S2052252514014845
 Number of protons: 261
 Number of electrons: 261.000000
 Reading:                                  "water.cif" done!
@@ -18,6 +21,8 @@ Number of symmetry operations: 2
 Nr of reflections to be used: 3019
 Generating k-points...                            ... done!
 Number of k-points to evaluate: 3019
+[Becke grid] Becke, J. Chem. Phys. 88 (1988) 2547, DOI 10.1063/1.454033
+[Hirshfeld] Hirshfeld, Theor. Chim. Acta 44 (1977) 129, DOI 10.1007/BF00549096
 There are:
   48 atoms read from the wavefunction, of which 
   26 are identified as asymmetric unit atoms!
@@ -26,7 +31,7 @@ Selected accuracy: 1
 Making Integration Grids...
 GridManager: Setting up prototype grids for atom types...
 GridManager: Generating integration grids for atoms...
-GridManager: Generated total of 107274 grid points.
+GridManager: Generated total of 94130 grid points.
 Starting MBIS iterations...
 MBIS iteration: 1 max change: 1.610977
 MBIS iteration: 2 max change: 0.172103
@@ -143,7 +148,7 @@ Atom   0: 1.520920
 Atom   1: 1.503236
 Atom   2: 1.500656
 Atom   3: -0.280286
-Atom   4: -0.278360
+Atom   4: -0.278361
 Atom   5: -1.066647
 Atom   6: -1.058067
 Atom   7: -0.119385
@@ -164,7 +169,7 @@ Atom  21: 0.152467
 Atom  22: 0.153702
 Atom  23: -0.038163
 Atom  24: -0.036641
-Atom  25: 0.177461
+Atom  25: 0.177462
 Atom  26: 0.178224
 Atom  27: -0.641107
 Atom  28: -0.638175
@@ -216,11 +221,11 @@ Table of Charges in electrons
       H10a     0.031     0.144     0.607     0.430     0.395
       H10b     0.044     0.118     0.665     0.466     0.442
 Total number of electrons:
- Becke:     260.962331
- Hirshfeld: 260.998597
- TVFC:      260.961738
- MBIS:      260.991390
- EMBIS:     260.990435
+ Becke:     260.962358
+ Hirshfeld: 260.998625
+ TVFC:      260.961765
+ MBIS:      260.991418
+ EMBIS:     260.990463
 [                Calculating Scattering Factors               ]
 [=============================================================] 100% 
 Writing tsc file...  ... done!

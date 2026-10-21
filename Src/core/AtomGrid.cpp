@@ -148,8 +148,12 @@ AtomGrid::AtomGrid(const double radial_precision,
 	const bool generic_rotation)
 {
 	using namespace std;
-	const int min_num_angular_points_closest =
-		constants::get_closest_num_angular(min_num_angular_points);
+	//The floor only acts inside R_Bragg/5. Up to Ar only the spherical 1s/2s2p core lives there: 6 points moved f by
+	//< 2e-10 against lebedev_low and saved 1.2-2.2x points (grid lab 05). From K on the valence d (or an ECP's
+	//pseudo-valence) reaches inside and wants lebedev_low: EMBIS on Rh with an ECP diverged with 6.
+	//-tune NOS_GRID_OLD_FLOOR restores lebedev_low everywhere.
+	const int min_num_angular_points_closest = proton_charge > 18 || tuning("NOS_GRID_OLD_FLOOR")
+		? constants::get_closest_num_angular(min_num_angular_points) : constants::lebedev_table[0];
 	const int max_num_angular_points_closest =
 		constants::get_closest_num_angular(max_num_angular_points);
 	err_checkf(min_num_angular_points_closest != -1 && max_num_angular_points_closest != -1, "No valid value for angular number found!", file);

@@ -11,6 +11,9 @@ Reading:                              "ZP2_part1.gbw" done!
 Number of atoms in Wavefunction file: 25 Number of MOs: 251
 Reading:                              "ZP2_part2.gbw" done!
 Number of atoms in Wavefunction file: 25 Number of MOs: 251
+[NoSpherA2] Kleemiss et al., Chem. Sci. 12 (2021) 1675, DOI 10.1039/D0SC05526C
+[HAR] Jayatilaka & Dittrich, Acta Cryst. A 64 (2008) 383, DOI 10.1107/S0108767308005709
+[HAR] Capelli et al., IUCrJ 1 (2014) 361, DOI 10.1107/S2052252514014845
 Number of protons: 106
 Number of electrons: 106.000000
 Reading:                                    "ZP2.cif" done!
@@ -20,6 +23,8 @@ Number of symmetry operations:                   4
 Nr of reflections to be used:                 5408
 Generating k-points...                            ... done!
 Number of k-points to evaluate: 5408
+[Becke grid] Becke, J. Chem. Phys. 88 (1988) 2547, DOI 10.1063/1.454033
+[Hirshfeld] Hirshfeld, Theor. Chim. Acta 44 (1977) 129, DOI 10.1007/BF00549096
 There are:
   25 atoms read from the wavefunction, of which 
   25 are identified as asymmetric unit atoms!
@@ -28,7 +33,7 @@ Selected accuracy: 1
 Making Integration Grids...
 GridManager: Setting up prototype grids for atom types...
 GridManager: Generating integration grids for atoms...
-GridManager: Generated total of 49860 grid points.
+GridManager: Generated total of 45536 grid points.
 Starting MBIS iterations...
 MBIS iteration: 1 max change: 0.56
 MBIS iteration: 2 max change: 0.18
@@ -177,9 +182,14 @@ Total number of electrons:
  EMBIS:     105.995754
 [                Calculating Scattering Factors               ]
 [=============================================================] 100% 
+[NoSpherA2] Kleemiss et al., Chem. Sci. 12 (2021) 1675, DOI 10.1039/D0SC05526C
+[HAR] Jayatilaka & Dittrich, Acta Cryst. A 64 (2008) 383, DOI 10.1107/S0108767308005709
+[HAR] Capelli et al., IUCrJ 1 (2014) 361, DOI 10.1107/S2052252514014845
 Number of protons: 106
-Number of electrons: 106.00
+Number of electrons: 106.000000
 Reading:                                    "ZP2.cif" done!
+[Becke grid] Becke, J. Chem. Phys. 88 (1988) 2547, DOI 10.1063/1.454033
+[Hirshfeld] Hirshfeld, Theor. Chim. Acta 44 (1977) 129, DOI 10.1007/BF00549096
 There are:
   25 atoms read from the wavefunction, of which 
   25 are identified as asymmetric unit atoms!
@@ -188,7 +198,7 @@ Selected accuracy: 1
 Making Integration Grids...
 GridManager: Setting up prototype grids for atom types...
 GridManager: Generating integration grids for atoms...
-GridManager: Generated total of 51984 grid points.
+GridManager: Generated total of 45928 grid points.
 Starting MBIS iterations...
 MBIS iteration: 1 max change: 0.559557
 MBIS iteration: 2 max change: 0.193225
@@ -230,45 +240,45 @@ Atom  23: 0.074764
 Atom  24: 0.074426
 Starting EMBIS iterations...
 EMBIS iteration:    1 max charge/alpha change: 2.649632/0.493899
-EMBIS iteration:    2 max charge/alpha change: 1.336491/0.007158
-EMBIS iteration:    3 max charge/alpha change: 0.807180/0.007509
-EMBIS iteration:    4 max charge/alpha change: 0.566587/0.008395
-EMBIS iteration:    5 max charge/alpha change: 0.437831/0.008215
-EMBIS iteration:    6 max charge/alpha change: 0.351301/0.008050
-EMBIS iteration:    7 max charge/alpha change: 0.282560/0.007831
+EMBIS iteration:    2 max charge/alpha change: 1.336502/0.007158
+EMBIS iteration:    3 max charge/alpha change: 0.807192/0.007509
+EMBIS iteration:    4 max charge/alpha change: 0.566596/0.008395
+EMBIS iteration:    5 max charge/alpha change: 0.437837/0.008215
+EMBIS iteration:    6 max charge/alpha change: 0.351305/0.008050
+EMBIS iteration:    7 max charge/alpha change: 0.282563/0.007831
 EMBIS iteration:    8 max charge/alpha change: 0.247813/0.007868
-EMBIS iteration:    9 max charge/alpha change: 0.236451/0.007763
-EMBIS iteration:   10 max charge/alpha change: 0.220520/0.007565
-EMBIS iteration:   11 max charge/alpha change: 0.202391/0.007307
+EMBIS iteration:    9 max charge/alpha change: 0.236452/0.007763
+EMBIS iteration:   10 max charge/alpha change: 0.220521/0.007565
+EMBIS iteration:   11 max charge/alpha change: 0.202392/0.007307
 EMBIS iteration:   12 max charge/alpha change: 0.185205/0.007014
 EMBIS iteration:   13 max charge/alpha change: 0.175435/0.006699
-EMBIS iteration:   14 max charge/alpha change: 0.165069/0.006375
+EMBIS iteration:   14 max charge/alpha change: 0.165070/0.006375
 EMBIS iteration:   15 max charge/alpha change: 0.154553/0.006050
 EMBIS iteration:   16 max charge/alpha change: 0.144181/0.005727
 EMBIS iteration:   17 max charge/alpha change: 0.134142/0.005413
 EMBIS iteration:   18 max charge/alpha change: 0.124553/0.005108
 EMBIS iteration:   19 max charge/alpha change: 0.115478/0.004815
-EMBIS iteration:   20 max charge/alpha change: 0.106949/0.004534
-EMBIS iteration:   21 max charge/alpha change: 0.098973/0.004267
+EMBIS iteration:   20 max charge/alpha change: 0.106950/0.004534
+EMBIS iteration:   21 max charge/alpha change: 0.098974/0.004267
 EMBIS iteration:   22 max charge/alpha change: 0.091542/0.004013
 EMBIS iteration:   23 max charge/alpha change: 0.084638/0.003773
 EMBIS iteration:   24 max charge/alpha change: 0.078237/0.003546
 EMBIS iteration:   25 max charge/alpha change: 0.072311/0.003355
 EMBIS iteration:   26 max charge/alpha change: 0.066832/0.003172
-EMBIS iteration:   27 max charge/alpha change: 0.061770/0.002999
+EMBIS iteration:   27 max charge/alpha change: 0.061771/0.002999
 EMBIS iteration:   28 max charge/alpha change: 0.057097/0.002834
 EMBIS iteration:   29 max charge/alpha change: 0.052784/0.002678
 EMBIS iteration:   30 max charge/alpha change: 0.048804/0.002529
 EMBIS iteration:   31 max charge/alpha change: 0.045133/0.002388
-EMBIS iteration:   32 max charge/alpha change: 0.041746/0.002255
+EMBIS iteration:   32 max charge/alpha change: 0.041747/0.002255
 EMBIS iteration:   33 max charge/alpha change: 0.038622/0.002129
 EMBIS iteration:   34 max charge/alpha change: 0.035740/0.002010
 EMBIS iteration:   35 max charge/alpha change: 0.033081/0.001897
-EMBIS iteration:   36 max charge/alpha change: 0.030626/0.001790
+EMBIS iteration:   36 max charge/alpha change: 0.030627/0.001790
 EMBIS iteration:   37 max charge/alpha change: 0.028361/0.001689
 EMBIS iteration:   38 max charge/alpha change: 0.026270/0.001594
 EMBIS iteration:   39 max charge/alpha change: 0.024338/0.001504
-EMBIS iteration:   40 max charge/alpha change: 0.022554/0.001419
+EMBIS iteration:   40 max charge/alpha change: 0.022555/0.001419
 EMBIS iteration:   41 max charge/alpha change: 0.020906/0.001339
 EMBIS iteration:   42 max charge/alpha change: 0.019383/0.001264
 EMBIS iteration:   43 max charge/alpha change: 0.017975/0.001192
@@ -330,11 +340,11 @@ Table of Charges in electrons
       H28b     0.018     0.032    -0.162     0.078     0.096
       H28c     0.053     0.045    -0.097     0.077     0.095
 Total number of electrons:
- Becke:     106.004043
- Hirshfeld: 105.996796
- TVFC:      105.997444
- MBIS:      105.996141
- EMBIS:     105.997241
+ Becke:     106.004048
+ Hirshfeld: 105.996801
+ TVFC:      105.997449
+ MBIS:      105.996146
+ EMBIS:     105.997246
 [                Calculating Scattering Factors               ]
 [=============================================================] 100% 
 Final number of atoms in .tsc file: 50

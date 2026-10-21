@@ -11,9 +11,13 @@ Reading:                                     "Rh.gbw"
 The gbw file's ECP block removes 28 core electrons from the orbitals: treating them as ECP atoms, as -ECP would.
  done!
 Number of atoms in Wavefunction file: 15 Number of MOs: 189
+[NoSpherA2] Kleemiss et al., Chem. Sci. 12 (2021) 1675, DOI 10.1039/D0SC05526C
+[HAR] Jayatilaka & Dittrich, Acta Cryst. A 64 (2008) 383, DOI 10.1107/S0108767308005709
+[HAR] Capelli et al., IUCrJ 1 (2014) 361, DOI 10.1107/S2052252514014845
 Number of protons: 144
 Number of electrons: 116.000000
 Number of ECP electrons: 28
+[ECP] Kleemiss et al., J. Appl. Cryst. 58 (2025) 374, DOI 10.1107/S1600576725000901
 Reading:                                     "Rh.cif" done!
 Generating hkl indices up to d=:              0.84... done!
 Nr of reflections generated:                  3561
@@ -21,6 +25,8 @@ Number of symmetry operations:                   1
 Nr of reflections to be used:                 3561
 Generating k-points...                            ... done!
 Number of k-points to evaluate: 3561
+[Becke grid] Becke, J. Chem. Phys. 88 (1988) 2547, DOI 10.1063/1.454033
+[Hirshfeld] Hirshfeld, Theor. Chim. Acta 44 (1977) 129, DOI 10.1007/BF00549096
 There are:
   15 atoms read from the wavefunction, of which 
   15 are identified as asymmetric unit atoms!
@@ -29,7 +35,7 @@ Selected accuracy: 1
 Making Integration Grids...
 GridManager: Setting up prototype grids for atom types...
 GridManager: Generating integration grids for atoms...
-GridManager: Generated total of 30582 grid points.
+GridManager: Generated total of 27294 grid points.
 Starting MBIS iterations...
 MBIS iteration: 1 max change: 28.06
 MBIS iteration: 2 max change: 0.35
@@ -233,11 +239,11 @@ Table of Charges in electrons
         H5     0.071     0.045    -0.746     0.022     0.021
         H6     0.095     0.057    -0.740     0.049     0.069
 Total number of electrons:
- Becke:     144.007407
- Hirshfeld: 143.998631
- TVFC:      144.009445
- MBIS:      144.001518
- EMBIS:     144.000582
+ Becke:     144.007439
+ Hirshfeld: 143.998663
+ TVFC:      144.009477
+ MBIS:      144.001550
+ EMBIS:     144.000614
 [                Calculating Scattering Factors               ]
 [=============================================================] 100% 
 Writing tsc file...  ... done!

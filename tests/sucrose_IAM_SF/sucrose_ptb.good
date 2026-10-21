@@ -9,9 +9,14 @@ Please give credit and cite corresponding pieces!
 This Software is published with BSD-2 clause license.
 Reading:                                    "wfn.xtb" done!
 Number of atoms in Wavefunction file: 45 Number of MOs: 409
+[pTB] Grimme, Muller & Hansen, J. Chem. Phys. 158 (2023) 124111, DOI 10.1063/5.0137838
+[NoSpherA2] Kleemiss et al., Chem. Sci. 12 (2021) 1675, DOI 10.1039/D0SC05526C
+[HAR] Jayatilaka & Dittrich, Acta Cryst. A 64 (2008) 383, DOI 10.1107/S0108767308005709
+[HAR] Capelli et al., IUCrJ 1 (2014) 361, DOI 10.1107/S2052252514014845
 Number of protons: 182
 Number of electrons: 136.000000
 Number of ECP electrons: 46
+[ECP] Kleemiss et al., J. Appl. Cryst. 58 (2025) 374, DOI 10.1107/S1600576725000901
 Reading:                                "sucrose.cif" done!
 Generating hkl indices up to d=:              0.80... done!
 Nr of reflections generated:                  2957
@@ -19,6 +24,8 @@ Number of symmetry operations:                   2
 Nr of reflections to be used:                 2957
 Generating k-points...                            ... done!
 Number of k-points to evaluate: 2957
+[Becke grid] Becke, J. Chem. Phys. 88 (1988) 2547, DOI 10.1063/1.454033
+[Hirshfeld] Hirshfeld, Theor. Chim. Acta 44 (1977) 129, DOI 10.1007/BF00549096
 There are:
   45 atoms read from the wavefunction, of which 
   45 are identified as asymmetric unit atoms!
@@ -27,7 +34,7 @@ Selected accuracy: 1
 Making Integration Grids...
 GridManager: Setting up prototype grids for atom types...
 GridManager: Generating integration grids for atoms...
-GridManager: Generated total of 85178 grid points.
+GridManager: Generated total of 83258 grid points.
 Starting MBIS iterations...
 MBIS iteration: 1 max change: 2.48
 MBIS iteration: 2 max change: 0.09
