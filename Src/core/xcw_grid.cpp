@@ -13,23 +13,32 @@
 //structure_factors::xcw_grid. Both walk the same blocks with the same screening, so the
 //tensor path and this one differ by summation order only.
 namespace {
-	//C = A B, A symmetric na x na with its upper triangle set, B na x np, row-major
-	void block_symm(const int na, const int np, const double* a, const double* b, double* c)
+	//B = 2 A B in place, A upper triangular na x na, B na x np, row-major: x^T D x = 2 x^T U x for
+	//U the upper triangle of D with its diagonal halved, half the flops of D B by dsymm
+	void block_trmm(const int na, const int np, const double* a, double* b)
 	{
-		cblas_dsymm(CblasRowMajor, CblasLeft, CblasUpper, na, np, 1.0, a, na, b, np, 0.0, c, np);
+		cblas_dtrmm(CblasRowMajor, CblasLeft, CblasUpper, CblasNoTrans, CblasNonUnit, na, np, 2.0, a, na, b, np);
 	}
-	void block_symm(const int na, const int np, const float* a, const float* b, float* c)
+	void block_trmm(const int na, const int np, const float* a, float* b)
 	{
-		cblas_ssymm(CblasRowMajor, CblasLeft, CblasUpper, na, np, 1.0f, a, na, b, np, 0.0f, c, np);
+		cblas_strmm(CblasRowMajor, CblasLeft, CblasUpper, CblasNoTrans, CblasNonUnit, na, np, 2.0f, a, na, b, np);
 	}
-	//C = A B^T, both na x np row-major
+	//upper triangle of C = A B^T, both na x np row-major; MKL's gemmt skips the lower half
 	void block_abt(const int na, const int np, const double* a, const double* b, double* c)
 	{
+#if !defined(__APPLE__) && !defined(NSA2_OPENBLAS)
+		cblas_dgemmt(CblasRowMajor, CblasUpper, CblasNoTrans, CblasTrans, na, np, 1.0, a, np, b, np, 0.0, c, na);
+#else
 		cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasTrans, na, na, np, 1.0, a, np, b, np, 0.0, c, na);
+#endif
 	}
 	void block_abt(const int na, const int np, const float* a, const float* b, float* c)
 	{
+#if !defined(__APPLE__) && !defined(NSA2_OPENBLAS)
+		cblas_sgemmt(CblasRowMajor, CblasUpper, CblasNoTrans, CblasTrans, na, np, 1.0f, a, np, b, np, 0.0f, c, na);
+#else
 		cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasTrans, na, na, np, 1.0f, a, np, b, np, 0.0f, c, na);
+#endif
 	}
 
 	//What build_I's integration sets per thread: one BLAS thread inside the region, and in
@@ -476,11 +485,13 @@ cvec structure_factors::grid_sfc(const dMatrix2& D)
 			auto run = [&](const auto* X, auto& Db, auto& T) {
 				using F = std::remove_reference_t<decltype(Db[0])>;
 				Db.assign(static_cast<size_t>(na) * na, F(0));
-				T.resize(static_cast<size_t>(na) * np);
-				for (int ii = 0; ii < na; ii++)
-					for (int jj = ii; jj < na; jj++)
-						if (jj == ii || !XG.skip[a[ii]][a[jj]]) Db[static_cast<size_t>(ii) * na + jj] = static_cast<F>(D(a[ii], a[jj]));
-				block_symm(na, np, Db.data(), X, T.data());
+				for (int ii = 0; ii < na; ii++) {
+					Db[static_cast<size_t>(ii) * na + ii] = static_cast<F>(0.5 * D(a[ii], a[ii]));
+					for (int jj = ii + 1; jj < na; jj++)
+						if (!XG.skip[a[ii]][a[jj]]) Db[static_cast<size_t>(ii) * na + jj] = static_cast<F>(D(a[ii], a[jj]));
+				}
+				T.assign(X, X + static_cast<size_t>(na) * np);
+				block_trmm(na, np, Db.data(), T.data());
 				for (int ii = 0; ii < na; ii++) {
 					const auto* x = X + static_cast<size_t>(ii) * np;
 					const auto* t = T.data() + static_cast<size_t>(ii) * np;
