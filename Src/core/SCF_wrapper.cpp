@@ -917,7 +917,8 @@ occ::Vec SCF_wrapper::hessian_vector(occ::qm::SCF<occ::qm::HartreeFock>& scf, co
 		dC.block(row, 0, n, nocc) = Cvir * V;
 		dC.block(row, nocc, n, nvir) = -Cocc * V.transpose();
 		const occ::Mat dCocc = dC.block(row, 0, n, nocc);
-		dD.middleRows(row, n) = dfac * (dCocc * Cocc.transpose() + Cocc * dCocc.transpose());
+		const occ::Mat X = dCocc * Cocc.transpose();
+		dD.middleRows(row, n) = dfac * (X + X.transpose());
 		dCo.block(row, 0, n, nocc) = dCocc;
 	}
 	occ::Mat dF;
@@ -963,7 +964,8 @@ occ::Vec SCF_wrapper::hessian_vector(occ::qm::SCF<occ::qm::HartreeFock>& scf, co
 		const occ::Mat Cocc = mo.C.block(row, 0, n, nocc), Cvir = mo.C.block(row, nocc, n, nvir);
 		const occ::Mat dCocc = dC.block(row, 0, n, nocc), dCvir = dC.block(row, nocc, n, nvir);
 		const occ::Mat F = scf.ctx.F.middleRows(row, n), dFb = dF.middleRows(row, n);
-		const occ::Mat M = fac * (dCvir.transpose() * F * Cocc + Cvir.transpose() * dFb * Cocc + Cvir.transpose() * F * dCocc);
+		//grouped so every product is n x n x nocc, not n x n x n
+		const occ::Mat M = fac * (dCvir.transpose() * (F * Cocc) + Cvir.transpose() * (dFb * Cocc + F * dCocc));
 		for (Eigen::Index i = 0; i < nocc; i++)
 			for (Eigen::Index a = 0; a < nvir; a++, at++) Hv(at) = M(a, i);
 	}
