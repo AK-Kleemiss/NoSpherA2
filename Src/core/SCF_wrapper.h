@@ -51,6 +51,8 @@ public:
 	void setup_eri(const occ::qm::HartreeFock& hf, const size_t avail);
 	// Gives the device back
 	void release_device();
+	// A density-fitted Fock build for the TRAH Hessian products alone
+	void set_hessian_df(occ::qm::HartreeFock&& hf) { hessian_df_ = std::make_unique<occ::qm::HartreeFock>(std::move(hf)); }
 
 	// One SCF solver (for specific lambda step); false when it did not converge
 	bool solve(occ::qm::HartreeFock& hf, const double lambda, occ::qm::Wavefunction& wfn, const bool use_guess, SCF_coupling& coupling);
@@ -64,6 +66,9 @@ private:
 	//memory: the Fock build then contracts them instead of recomputing every quartet per iteration
 	stored_eri eri_;
 	bool eri_on_device_ = false;
+	//Two-electron part of the Hessian products only: the gradient and energy keep the exact
+	//Fock build, so an approximate Hessian costs TRAH steps, never accuracy
+	std::unique_ptr<occ::qm::HartreeFock> hessian_df_;
 
 	occ::core::Molecule mol_;
 	occ::qm::AOBasis basis_;

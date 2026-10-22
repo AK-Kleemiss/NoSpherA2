@@ -1145,6 +1145,8 @@ struct options
 	struct XCW_settings : SF_settings, SCF_settings {
 		//`df_basis <name>`: density fitting of the Fock build with this auxiliary basis
 		std::string df_basis_name;
+		//`hessian_df_basis <name>`: density fitting of the TRAH Hessian products only, iterations keep exact Fock builds
+		std::string hessian_df_basis_name;
 		double xcw_start_value;
 		int num_xcw_steps;
 		double xcw_step_size;

@@ -4492,7 +4492,7 @@ void options::loadXCWsettings() {
 	double quant_diff = 32768, diis_stop_damping = 32768, diis_stop_shift = 32768, max_diis_error = 32768, gradient = 32768, MaxP_diff = 32768, RMSP_diff = 32768, alpha = 32768, level_shift = 32768, start = 32768, end = 32768, step_size = 32768, xcw_strong_cutoff = 3.0;
 	int max_scf_iterations = 32768, charge = 32768, multiplicity = 32768, n_params = 32768, refine_against = 32768;
 	std::string basis_set_name = "Undefined";
-	std::string df_basis_name, guess_basis_name;
+	std::string df_basis_name, hessian_df_basis_name, guess_basis_name;
 	bool grown = false, read_tensor = false, read_first_guess = false, nbo_output = false, xcw_gaussian_halt = false, mask = false;
 	extinction::model extinction_model = extinction::model::none;
 	bool extinction_aniso = false, extinction_refine = true;
@@ -4635,6 +4635,10 @@ void options::loadXCWsettings() {
 		handlers["df_basis"] = [&](std::istream& is) {
 			if (!(is >> df_basis_name))
 				throw std::runtime_error("Expected a fitting basis name after 'df_basis'");
+			};
+		handlers["hessian_df_basis"] = [&](std::istream& is) {
+			if (!(is >> hessian_df_basis_name))
+				throw std::runtime_error("Expected a fitting basis name after 'hessian_df_basis'");
 			};
 		handlers["guess_basis"] = [&](std::istream& is) {
 			if (!(is >> guess_basis_name))
@@ -4914,6 +4918,7 @@ void options::loadXCWsettings() {
 	xcw_settings.eri_save_path = eri_save_path;
 	xcw_settings.nbo_output = nbo_output;
 	xcw_settings.df_basis_name = df_basis_name;
+	xcw_settings.hessian_df_basis_name = hessian_df_basis_name;
 	xcw_settings.guess_basis_name = guess_basis_name;
 	xcw_settings.check_hessian = check_hessian;
 	xcw_settings.xcw_gaussian_halt = xcw_gaussian_halt;

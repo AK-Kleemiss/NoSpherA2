@@ -906,7 +906,7 @@ occ::Vec SCF_wrapper::hessian_vector(occ::qm::SCF<occ::qm::HartreeFock>& scf, co
 	occ::qm::MolecularOrbitals& mo = scf.ctx.mo;
 	const int n = nmo_, nb = mo.kind == occ::qm::SpinorbitalKind::Unrestricted ? 2 : 1;
 	const double fac = nb == 1 ? 4.0 : 2.0, dfac = nb == 1 ? 1.0 : 0.5;
-	occ::Mat dC = occ::Mat::Zero(mo.C.rows(), n), dD = occ::Mat::Zero(mo.D.rows(), n);
+	occ::Mat dC = occ::Mat::Zero(mo.C.rows(), n), dD = occ::Mat::Zero(mo.D.rows(), n), dCo = occ::Mat::Zero(mo.Cocc.rows(), mo.Cocc.cols());
 	Eigen::Index at = 0;
 	for (int b = 0; b < nb; b++) {
 		const Eigen::Index nocc = static_cast<Eigen::Index>(b == 0 ? mo.n_alpha : mo.n_beta), nvir = n - nocc, row = static_cast<Eigen::Index>(b) * n;
@@ -918,10 +918,32 @@ occ::Vec SCF_wrapper::hessian_vector(occ::qm::SCF<occ::qm::HartreeFock>& scf, co
 		dC.block(row, nocc, n, nvir) = -Cocc * V.transpose();
 		const occ::Mat dCocc = dC.block(row, 0, n, nocc);
 		dD.middleRows(row, n) = dfac * (dCocc * Cocc.transpose() + Cocc * dCocc.transpose());
+		dCo.block(row, 0, n, nocc) = dCocc;
 	}
-	//G(dD): the Fock build reads mo.D, and a screen on the density would drop the small dD
 	occ::Mat dF;
-	if (two_electron) {
+	const occ::qm::HartreeFock* df = hessian_df_ ? hessian_df_.get() : !eri_ && scf.m_procedure.using_density_fitting() ? &scf.m_procedure : nullptr;
+	if (two_electron && df) {
+		//occ's fitted exchange reads Cocc, not D: swapping in dD would give the exchange of the
+		//current density. G is linear in the density and dD = (D(X + tY) - D(X - tY)) / 2t for
+		//X = Cocc, Y = dCocc in the density's own convention, so two builds; t keeps X +- tY of
+		//one size, the difference then loses no digits
+		const double y = dCo.norm();
+		dF = occ::Mat::Zero(mo.D.rows(), n);
+		if (y > 0) {
+			const double t = mo.Cocc.norm() / y;
+			occ::qm::MolecularOrbitals m = mo;
+			m.Cocc = mo.Cocc + t * dCo;
+			m.update_density_matrix();
+			dF = df->compute_fock(m);
+			m.Cocc = mo.Cocc - t * dCo;
+			m.update_density_matrix();
+			dF -= df->compute_fock(m);
+			dF /= 2 * t;
+		}
+		builds_.hessian++;
+	}
+	else if (two_electron) {
+		//G(dD): the Fock build reads mo.D, and a screen on the density would drop the small dD
 		std::swap(mo.D, dD);
 		dF = eri_ ? eri_fock(mo, false) : scf.m_procedure.compute_fock(mo, scf.ctx.K);
 		builds_.hessian++;
