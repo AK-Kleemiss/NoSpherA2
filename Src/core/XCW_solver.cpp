@@ -697,34 +697,7 @@ occ::qm::HartreeFock XCW_solver::setup_system() {
 
 	// Handles density fitting basis
 	sf.df_reserved_ = 0;
-	const auto fit = [&](occ::qm::HartreeFock& target, const std::string& name, const char* what) {
-		std::shared_ptr<BasisSet> aux = BasisSetLibrary::get_basis_set(name);
-		if (aux->get_name().find("jkfit") == std::string::npos)
-			std::cout << "WARNING: " << aux->get_name() << " is not a JK-fitting basis; Hartree-Fock exchange is fitted with it all the same. "
-				"def2-universal-jkfit serves the def2 family, cc-pvXz-jkfit the cc-pVXZ family." << std::endl;
-		// Create a list storing all elements of the molecule
-		ivec elements;
-		for (int i = 0; i < static_cast<int>(mol.atoms().size()); i++)
-			if (std::find(elements.begin(), elements.end(), mol.atoms()[i].atomic_number) == elements.end())
-				elements.push_back(mol.atoms()[i].atomic_number);
-		const std::string file = aux->get_name() + "_df.json";
-		aux->write_occ_json(file, elements);
-		target.set_density_fitting_basis(file);
-		//OCC keeps the three-index integrals only under a 512 MB limit and otherwise recomputes
-		//them every iteration, which costs twice a direct build here. Held whenever they fit in
-		//half of what the process can have; they are computed once for the whole lambda scan.
-		const size_t naux = aux->to_AOBasis(mol.atoms()).nbf();
-		const size_t nbf = occ_basis_set.nbf();
-		const size_t store = naux * nbf * (nbf + 1) / 2 * sizeof(double);
-		const size_t avail = sf.free_memory();
-		const bool stored = avail == 0 || store < avail / 2;
-		if (stored) sf.df_reserved_ += store;
-		target.set_density_fitting_policy(stored ? occ::qm::IntegralEngineDF::Policy::Stored : occ::qm::IntegralEngineDF::Policy::Direct);
-		if (opt->xcw_int_precision > 0.0) target.set_precision(opt->xcw_int_precision);
-		std::cout << "XCW density fitting " << what << " with " << aux->get_name() << ": " << naux << " functions, "
-			<< (store / 1048576.0) << " MB of three-index integrals " << (stored ? "held in memory" : "recomputed every build") << std::endl;
-	};
-	if (!opt->xcw_settings.df_basis_name.empty()) fit(hf, opt->xcw_settings.df_basis_name, "of the Fock build");
+	if (!opt->xcw_settings.df_basis_name.empty()) density_fitting(hf, opt->xcw_settings.df_basis_name, "of the Fock build", sf.free_memory());
 
 	if (opt->xcw_int_precision > 0.0) hf.set_precision(opt->xcw_int_precision);
 
@@ -734,13 +707,36 @@ occ::qm::HartreeFock XCW_solver::setup_system() {
 	scf_settings.gpu_eri = opt->gpu_itensor && opt->use_gpu;
 	scf_settings.no_date = opt->no_date;
 	scf_solver = SCF_wrapper(mol, occ_basis_set, scf_settings, writer);
-	if (!opt->xcw_settings.hessian_df_basis_name.empty()) {
-		occ::qm::HartreeFock hf_df(occ_basis_set);
-		fit(hf_df, opt->xcw_settings.hessian_df_basis_name, "of the Hessian products");
-		scf_solver.set_hessian_df(std::move(hf_df));
-	}
 	return hf;
 	// closing function
+}
+
+void XCW_solver::density_fitting(occ::qm::HartreeFock& target, const std::string& name, const char* what, const size_t avail) {
+	const occ::qm::AOBasis& basis = target.aobasis();
+	std::shared_ptr<BasisSet> aux = BasisSetLibrary::get_basis_set(name);
+	if (aux->get_name().find("jkfit") == std::string::npos)
+		std::cout << "WARNING: " << aux->get_name() << " is not a JK-fitting basis; Hartree-Fock exchange is fitted with it all the same. "
+			"def2-universal-jkfit serves the def2 family, cc-pvXz-jkfit the cc-pVXZ family." << std::endl;
+	// Create a list storing all elements of the molecule
+	ivec elements;
+	for (const auto& a : basis.atoms())
+		if (std::find(elements.begin(), elements.end(), a.atomic_number) == elements.end())
+			elements.push_back(a.atomic_number);
+	const std::string file = aux->get_name() + "_df.json";
+	aux->write_occ_json(file, elements);
+	target.set_density_fitting_basis(file);
+	//OCC keeps the three-index integrals only under a 512 MB limit and otherwise recomputes
+	//them every iteration, which costs twice a direct build here. Held whenever they fit in
+	//half of what the process can have; they are computed once for the whole lambda scan.
+	const size_t naux = aux->to_AOBasis(basis.atoms()).nbf();
+	const size_t nbf = basis.nbf();
+	const size_t store = naux * nbf * (nbf + 1) / 2 * sizeof(double);
+	const bool stored = avail == 0 || store < avail / 2;
+	if (stored) sf.df_reserved_ += store;
+	target.set_density_fitting_policy(stored ? occ::qm::IntegralEngineDF::Policy::Stored : occ::qm::IntegralEngineDF::Policy::Direct);
+	if (opt->xcw_int_precision > 0.0) target.set_precision(opt->xcw_int_precision);
+	std::cout << "XCW density fitting " << what << " with " << aux->get_name() << ": " << naux << " functions, "
+		<< (store / 1048576.0) << " MB of three-index integrals " << (stored ? "held in memory" : "recomputed every build") << std::endl;
 }
 
 //Everything a converged step puts on screen, in the order it always has: the halting statistic
@@ -798,7 +794,28 @@ void XCW_solver::run() {
 	}
 #endif
 	// Computes the four center integrals and keeps them in memory if possible
-	scf_solver.setup_eri(hf, sf.free_memory());
+	const size_t avail = sf.free_memory();
+	scf_solver.setup_eri(hf, avail);
+	//The TRAH Hessian products, fitted: the iterations keep exact Fock builds, so only TRAH steps
+	//can change. Without the stored integrals a product costs a direct build, two fitted builds
+	//are cheaper (TEMPO SVP at -mem 2500: 383 -> 296 s, same builds, Fcalc to 1e-4), so they are
+	//fitted by themselves then; `hessian_df_basis none` keeps them exact. Set up after the stored
+	//integrals so it never squeezes them out; those hold up to four fifths of avail
+	const std::string& hdf = opt->xcw_settings.hessian_df_basis_name;
+	std::string hdf_name = hdf == "none" ? "" : hdf;
+	if (hdf.empty() && !scf_solver.has_eri() && opt->xcw_settings.df_basis_name.empty()) {
+		const std::shared_ptr<BasisSet> jk = BasisSetLibrary::get_basis_set("def2-universal-jkfit");
+		const auto& atoms = hf.aobasis().atoms();
+		if (std::all_of(atoms.begin(), atoms.end(), [&](const occ::core::Atom& a) { return jk->has_element(a.atomic_number); }))
+			hdf_name = "def2-universal-jkfit";
+		else
+			std::cout << "XCW: direct Fock builds, but def2-universal-jkfit misses an element; TRAH Hessian products stay exact" << std::endl;
+	}
+	if (!hdf_name.empty()) {
+		occ::qm::HartreeFock hf_df(hf.aobasis());
+		density_fitting(hf_df, hdf_name, "of the Hessian products", scf_solver.has_eri() ? avail / 5 : avail);
+		scf_solver.set_hessian_df(std::move(hf_df));
+	}
 	bool has_guess = false;
 	occ::qm::Wavefunction last_wfn, prev_wfn;
 	const occ::Mat S_ao = hf.compute_overlap_matrix();

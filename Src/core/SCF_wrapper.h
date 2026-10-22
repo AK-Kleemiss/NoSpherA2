@@ -53,6 +53,8 @@ public:
 	void release_device();
 	// A density-fitted Fock build for the TRAH Hessian products alone
 	void set_hessian_df(occ::qm::HartreeFock&& hf) { hessian_df_ = std::make_unique<occ::qm::HartreeFock>(std::move(hf)); }
+	// The two-electron integrals are held: setup_eri found them room
+	bool has_eri() const { return static_cast<bool>(eri_); }
 
 	// One SCF solver (for specific lambda step); false when it did not converge
 	bool solve(occ::qm::HartreeFock& hf, const double lambda, occ::qm::Wavefunction& wfn, const bool use_guess, SCF_coupling& coupling);

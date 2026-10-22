@@ -44,6 +44,8 @@ private:
 
 	// Sets up the molecule, the basis set (and optionally the density fitting basis), creates the SCF_wrapper and returns the Hartree-Fock object
 	occ::qm::HartreeFock setup_system();
+	// Fits target's Fock build with the auxiliary basis `name`, its three-index integrals held when they fit in half of avail
+	void density_fitting(occ::qm::HartreeFock& target, const std::string& name, const char* what, const size_t avail);
 
 	// What a converged lambda step reports: the halting statistic, the table row and the tscb
 	void report_lambda(const double lambda, const occ::qm::Wavefunction& wfn, const bool write_result);

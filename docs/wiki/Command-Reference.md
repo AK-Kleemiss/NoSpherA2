@@ -510,6 +510,7 @@ them override single values.
 | `soscf` | 0 | | Accepted and ignored. A cold start runs DIIS, a warm start (the previous lambda step or a `.fchk` restart) TRAH from its first iteration. |
 | `check_hessian` | 0 | off | Finite-difference check of the Hessian-vector product on the first second-order step, reported in `SCF.log`; enters TRAH once the DIIS error is below `1e-2`. |
 | `df_basis <name>` | 1 | | Density-fit the Fock build with this auxiliary basis, e.g. `def2-universal-jkfit`. |
+| `hessian_df_basis <name>` | 1 | automatic | Density-fit only the TRAH Hessian products; iterations keep exact Fock builds. Unset, `def2-universal-jkfit` is used when the ERIs do not fit in memory; `none` keeps the products exact. |
 | `guess_basis <name>` | 1 | | Start the first lambda from a Hartree-Fock converged in this smaller basis, projected into the orbital basis. |
 | `load_wfn` | 0 | off | Start the first lambda from `NA2_<start>.fchk` of an earlier run. |
 
