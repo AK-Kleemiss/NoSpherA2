@@ -1,6 +1,7 @@
 #include "xcw_grid_gpu.h"
 #include "gpu_backend.h"
 #include "gemm_gpu.cuh"
+#include "cublas_dynamic.h"
 #include "sf_gpu.h"
 #include <algorithm>
 #include <cstdio>
@@ -44,14 +45,21 @@ __global__ void gather_kernel(const int nmo, const int na, const int* __restrict
 	Db[e] = Df[(long long)a[e / na] * nmo + a[e % na]];
 }
 
-//rho_p = 2 w_p Sum_i X_ip T_ip, summed in double as the host does
+//rho_p = 2 w_p Sum_i X_ip T_ip, summed in double as the host does. One thread per point left ~8 blocks on
+//the device, each in a serial fp64 loop (a third of the GPU time); RHO_Y threads share i, reduced in fixed order
+constexpr int RHO_X = 32, RHO_Y = 32;
 __global__ void rho_kernel(const int na, const int np, const float* __restrict__ X, const float* __restrict__ T,
 	const double* __restrict__ w, double* __restrict__ rho)
 {
-	const int p = blockIdx.x * blockDim.x + threadIdx.x;
-	if (p >= np) return;
+	__shared__ double part[RHO_Y][RHO_X];
+	const int p = blockIdx.x * RHO_X + threadIdx.x;
 	double s = 0;
-	for (int i = 0; i < na; i++) s += (double)X[(long long)i * np + p] * T[(long long)i * np + p];
+	if (p < np)
+		for (int i = threadIdx.y; i < na; i += RHO_Y) s += (double)X[(long long)i * np + p] * T[(long long)i * np + p];
+	part[threadIdx.y][threadIdx.x] = s;
+	__syncthreads();
+	if (threadIdx.y != 0 || p >= np) return;
+	for (int y = 1; y < RHO_Y; y++) s += part[y][threadIdx.x];
 	rho[p] = 2.0 * w[p] * s;
 }
 
@@ -75,6 +83,14 @@ __global__ void scatter_kernel(const int nmo, const int na, const int* __restric
 }
 
 unsigned int grid_of(const long long n, const int b) { return (unsigned int)((n + b - 1) / b); }
+
+//cuBLAS when it loads (~2x the built-in kernel on these block shapes), else the built-in one; both on the default stream
+void block_gemm(const bool tA, const bool tB, const int m, const int n, const int k,
+	const float* A, const int lda, const float* B, const int ldb, float* C, const int ldc)
+{
+	if (!cublas_dynamic_gemm(tA, tB, m, n, k, 1.0f, A, lda, B, ldb, 0.0f, C, ldc))
+		gemm_gpu::launch<float>(tA, tB, m, n, k, 1.0f, A, lda, B, ldb, 0.0f, C, ldc, G.P);
+}
 
 } //namespace
 
@@ -139,8 +155,8 @@ bool xcw_grid_gpu_density(const double* D, double* rho)
 		T = Db + (long long)na * na;
 		gather_kernel<<<grid_of((long long)na * na, 256), 256>>>(G.nmo, na, a, G.Df, Db);
 		//row-major T (na x np) = Db X is column-major T^T (np x na) = X^T Db, Db symmetric
-		gemm_gpu::launch<float>(false, false, np, na, na, 1.0f, X, np, Db, na, 0.0f, T, np, G.P);
-		rho_kernel<<<grid_of(np, 128), 128>>>(na, np, X, T, G.w + G.pt_off[i], G.rho + G.pt_off[i]);
+		block_gemm(false, false, np, na, na, X, np, Db, na, T, np);
+		rho_kernel<<<grid_of(np, RHO_X), dim3(RHO_X, RHO_Y)>>>(na, np, X, T, G.w + G.pt_off[i], G.rho + G.pt_off[i]);
 	}
 	GPU_TRY(gpuGetLastError());
 	GPU_TRY(gpuMemcpy(rho, G.rho, sizeof(double) * G.npt, gpuMemcpyDeviceToHost));
@@ -160,8 +176,9 @@ bool xcw_grid_gpu_contract(const double* V, double* out)
 		const float* X = G.X + G.x_off[i];
 		float* Y = G.T, * S = G.T + (long long)na * np;
 		scale_kernel<<<grid_of((long long)na * np, 256), 256>>>(na, np, X, G.rho + G.pt_off[i], Y);
-		//row-major S (na x na) = X Y^T, symmetric, so column-major alike: op(A) = X from X^T stored, op(B) = Y^T
-		gemm_gpu::launch<float>(true, false, na, na, np, 1.0f, X, np, Y, np, 0.0f, S, na, G.P);
+		//row-major S (na x na) = X Y^T, symmetric, so column-major alike: op(A) = X from X^T stored, op(B) = Y^T.
+		//cublasSsyrkx on the half scatter reads was slower (18 vs 13 ms per call on TZVP P1): it tiles into small GEMMs
+		block_gemm(true, false, na, na, np, X, np, Y, np, S, na);
 		scatter_kernel<<<grid_of((long long)na * na, 256), 256>>>(G.nmo, na, a, G.keep, S, G.out);
 	}
 	GPU_TRY(gpuGetLastError());
