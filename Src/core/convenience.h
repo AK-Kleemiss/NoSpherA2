@@ -1079,7 +1079,8 @@ struct options
 		//flags, yet run_lambda copies alpha and level_shift and SCF_iteration mixes the
 		//density with alpha regardless of the flag
 		double diis_stop_damping = 0;
-		//`soscf`: second-order steps as soon as the DIIS error is below trah_.start_threshold, see soscf_step
+		//`soscf`: second-order steps as soon as the DIIS error is below trah_.start_threshold, see soscf_step;
+		//a cold-started lambda step does that anyway, so this extends it to the warm-started ones
 		bool soscf = false;
 		//`check_hessian`: finite-difference check of the Hessian-vector product on the first
 		//second-order step, reported in XCW.log

@@ -97,7 +97,8 @@ private:
 	// best has lost the SCF (seen on the
 	// Fe(phen)2(SCN)2 UHF singlet at lambda 0.04, right after the level shift went off):
 	// rescue_scf restarts it from these orbitals with DIIS cleared and a stronger level shift and
-	// damping held ten times longer, up to three times per step
+	// damping held ten times longer, up to three times per step and only from a cold start;
+	// past that, or warm-started, TRAH takes over from them (see soscf_)
 	occ::qm::MolecularOrbitals best_mo_;
 	// G_last_ at best_mo_.D: a rescue hands it back instead of rebuilding a Fock matrix it had
 	// (TEMPO, 3 of 8 builds were the restored orbitals'); reuse_best_G_ tells the next iteration
@@ -105,6 +106,8 @@ private:
 	bool reuse_best_G_ = false;
 	double best_quant_ = 0;
 	int rescues_ = 0;
+	// this lambda step started from the last one's orbitals: a lost step goes straight to TRAH
+	bool warm_start_ = false;
 	// the stabilisers as the settings gave them, restored at every lambda step
 	struct { double stop_shift, stop_damping, level_shift; } base_{ -1, -1, -1 };
 	static constexpr double rescue_rise_ = 1.0;
@@ -122,8 +125,9 @@ private:
 	// the functional is re-solved at the smaller radius from the retained subspace, and two
 	// rejections at trust_min hand the orbitals back to DIIS. It keeps the occupation, so it
 	// cannot swap orbitals. Entered when the orbital gradient has not halved in
-	// trah_.patience iterations, or with `soscf` once the DIIS error is below its
-	// start_threshold; it stays on for the rest of the lambda step, and the radius it earned
+	// trah_.patience iterations, or on a cold start or with `soscf` once the DIIS error is
+	// below its start_threshold, or from best_mo_ when a step is lost (rescue_rise_) and no rescue
+	// is due: a warm start, or all three used; it stays on for the rest of the lambda step, and the radius it earned
 	// carries into the next one. Micro-iterations do not count towards
 	// max_iter; L-BFGS with a diagonal Hessian wandered for 100+ iterations on the same case
 	// (E +-5e-6 Eh, a halved step every 2-3 iterations) where the curvature of chi^2 is stiff.

@@ -212,6 +212,7 @@ bool SCF_wrapper::do_SCF(const double& lambda, double& alpha, occ::qm::SCF<occ::
 	best_quant_ = std::numeric_limits<double>::infinity();
 	rescues_ = 0;
 	soscf_reset();
+	warm_start_ = has_guess;
 
 	writer_->start_lambda(lambda);
 
@@ -513,7 +514,11 @@ bool SCF_wrapper::SCF_iteration(occ::qm::SCF<occ::qm::HartreeFock>& scf, const d
 	//perturbation is the gradient of lambda * criterion^2 (the chi^2 of Jayatilaka's functional),
 	//so that, not the printed lambda * criterion, is what the SCF descends and what the rescue ranks by
 	const double phi = scf.ctx.energy["total"] + lambda * current_criterion * current_criterion;
-	if (!soscf_ && rescue_scf(scf, phi, alpha)) return false;
+	//a lost step goes to TRAH from the best orbitals where a rescue would not help: a warm start
+	//sits next to its solution, so DIIS overshot it, and a cold start that used its three rescues
+	//has nothing left (TEMPO lambda 0.11: all three gone by iteration 12, TRAH after 30 more)
+	const bool lost = !soscf_ && phi - best_quant_ >= rescue_rise_ && (warm_start_ || rescues_ >= 3);
+	if (!soscf_ && !lost && rescue_scf(scf, phi, alpha)) return false;
 
 	// DIIS extrapolation
 	occ::Mat F_diis = diis_update(scf);
@@ -534,13 +539,16 @@ bool SCF_wrapper::SCF_iteration(occ::qm::SCF<occ::qm::HartreeFock>& scf, const d
 			soscf_patience_iter_ = scf.iter;
 		}
 		//with soscf requested the DIIS stage only has to reach the quadratic region; Fe_phen HS lambda 0.08
-		//oscillated for 30 iterations above the 1e-2 gate while TRAH converged in 6 from that very point
-		const int patience = settings.soscf ? trah_.patience_requested : trah_.patience;
+		//oscillated for 30 iterations above the 1e-2 gate while TRAH converged in 6 from that very point.
+		//A cold start always does it: TEMPO lambda 0 took 8 iterations so against 17 on DIIS
+		const bool second_order = settings.soscf || !warm_start_;
+		const int patience = second_order ? trah_.patience_requested : trah_.patience;
 		const bool stuck = scf.iter - soscf_patience_iter_ >= patience;
-		if (stuck || (settings.soscf && scf.diis_error < trah_.start_threshold)) {
+		if (lost || stuck || (second_order && scf.diis_error < trah_.start_threshold)) {
 			soscf_ = true;
 			std::ostringstream what;
-			what << "***" << (stuck ? "Orbital gradient not halved in " + std::to_string(patience) + " iterations" : "DIIS error below 1e-2")
+			what << "***" << (lost ? "E + lambda chi^2 " + std::to_string(phi - best_quant_) + " Eh above its best"
+				: stuck ? "Orbital gradient not halved in " + std::to_string(patience) + " iterations" : "DIIS error below 1e-2")
 				<< ": second-order steps on the orbital rotations from here***";
 			print_centered_message(what.str(), 84, writer_->log);
 			citations::cite(citations::Method::TRAH, writer_->log);
