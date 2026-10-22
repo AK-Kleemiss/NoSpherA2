@@ -223,6 +223,28 @@ void XCW_solver::report_halting_progress_estimate(bool is_final) {
 	}
 }
 
+//Guess for the next lambda step: the last orbitals rotated on by t times the rotation that led
+//to them from the step before. In the last step's MO frame the previous occupied projector has
+//the occupied-virtual block P(a,i) ~ kappa(a,i) of that rotation, so C exp(-t kappa) by the
+//Cayley transform, per spin. C and D stay consistent, which TRAH needs: it steps from the orbitals
+static void extrapolate_orbitals(occ::qm::MolecularOrbitals& mo, const occ::qm::MolecularOrbitals& prev, const occ::Mat& S, const double t) {
+	const Eigen::Index n = static_cast<Eigen::Index>(mo.n_ao), m = mo.C.cols();
+	const int nb = mo.kind == occ::qm::SpinorbitalKind::Unrestricted ? 2 : 1;
+	for (int b = 0; b < nb; b++) {
+		const Eigen::Index nocc = static_cast<Eigen::Index>(b == 0 ? mo.n_alpha : mo.n_beta);
+		const occ::Mat Cb = mo.C.middleRows(b * n, n);
+		const occ::Mat X = Cb.transpose() * S * prev.C.middleRows(b * n, n).leftCols(nocc);
+		const occ::Mat Pvo = X.bottomRows(m - nocc) * X.topRows(nocc).transpose();
+		occ::Mat K = occ::Mat::Zero(m, m);
+		K.bottomLeftCorner(m - nocc, nocc) = -0.5 * t * Pvo;
+		K.topRightCorner(nocc, m - nocc) = 0.5 * t * Pvo.transpose();
+		const occ::Mat I = occ::Mat::Identity(m, m);
+		mo.C.middleRows(b * n, n) = Cb * (I - K).partialPivLu().solve(I + K);
+	}
+	mo.update_occupied_orbitals();
+	mo.update_density_matrix();
+}
+
 //F_calc of D through the I tensor or on the grid, see structure_factors::xcw_grid; mode 2 runs
 //both and prints how far the grid lands from the tensor
 static void calc_F(structure_factors& sf, structure_factors::I_tensor& I, const dMatrix2& D) {
@@ -806,7 +828,8 @@ void XCW_solver::run() {
 		return std::make_pair(converged, guess);
 	};
 	const double min_lambda_step = opt->xcw_settings.xcw_step_size / 128.0;
-	double last_lambda = opt->xcw_settings.xcw_start_value;
+	double last_lambda = opt->xcw_settings.xcw_start_value, prev_lambda = last_lambda;
+	bool have_prev = false;
 	//The scan used to stop at max_value even when A^2 was still falling there, i.e. on the
 	//scan boundary instead of on lambda*, and only printed "extend the scan" afterwards.
 	//The perturbed steps start from converged orbitals and TRAH takes the ones that DIIS
@@ -818,19 +841,9 @@ void XCW_solver::run() {
 	int extra_steps = 0;
 	for (int step = 0; step < planned_steps; step++) {
 		const double lambda = step * opt->xcw_settings.xcw_step_size + opt->xcw_settings.xcw_start_value;
-		const occ::qm::Wavefunction previous_wfn = last_wfn;
 		occ::qm::Wavefunction guess = last_wfn;
-		if (opt->xcw_extrapolate && step >= 2 && opt->xcw_settings.hf_type == occ::qm::SpinorbitalKind::Restricted) {
-			//The density extrapolated through the two previous steps, pulled back to
-			//idempotency by two McWeeny steps D <- 3DSD - 2DSDSD; the orbitals stay those of
-			//the last step, they only seed the level shift and the gradient
-			occ::Mat D = 2.0 * last_wfn.mo.D - prev_wfn.mo.D;
-			for (int k = 0; k < 2; k++) {
-				const occ::Mat DS = D * S_ao;
-				D = 3.0 * DS * D - 2.0 * DS * DS * D;
-			}
-			guess.mo.D = D;
-		}
+		if (opt->xcw_extrapolate && have_prev)
+			extrapolate_orbitals(guess.mo, prev_wfn.mo, S_ao, (lambda - last_lambda) / (last_lambda - prev_lambda));
 		auto result = run_lambda(lambda, guess, has_guess, true);
 		if (!result.first && step > 0) {
 			double lambda_step = lambda - last_lambda;
@@ -866,7 +879,11 @@ void XCW_solver::run() {
 			std::cout << why.str() << std::endl;
 			break;
 		}
-		prev_wfn = previous_wfn;
+		//after a halving retry last_wfn/last_lambda are its last converged intermediate step
+		//the jump off the unconstrained lambda 0 is far from linear (TEMPO: extrapolating it overshoots, +4 builds)
+		have_prev = has_guess && lambda > last_lambda && last_lambda != 0.0;
+		prev_wfn = std::move(last_wfn);
+		prev_lambda = last_lambda;
 		last_wfn = result.second;
 		last_lambda = lambda;
 		has_guess = true;
