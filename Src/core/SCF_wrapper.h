@@ -124,11 +124,14 @@ private:
 	// occ::qm::trust_radius_update from the model error the step revealed; a step that raises
 	// the functional is re-solved at the smaller radius from the retained subspace, and two
 	// rejections at trust_min hand the orbitals back to DIIS. It keeps the occupation, so it
-	// cannot swap orbitals. Entered when the orbital gradient has not halved in
-	// trah_.patience iterations, or on a cold start or with `soscf` once the DIIS error is
-	// below its start_threshold, or from best_mo_ when a step is lost (rescue_rise_) and no rescue
-	// is due: a warm start, or all three used; it stays on for the rest of the lambda step, and the radius it earned
-	// carries into the next one. Micro-iterations do not count towards
+	// cannot swap orbitals. Entered at the first iteration of a warm start (the previous lambda
+	// step's orbitals, or a restart from its .fchk), when the orbital gradient has not halved in trah_.patience
+	// iterations (patience_requested with `soscf`), with `soscf` once the DIIS error is below its
+	// start_threshold, or from best_mo_ when a step is lost (rescue_rise_) and no rescue is due;
+	// it stays on for the rest of the lambda step, and the radius it earned carries into the
+	// next one. Its steps are preconditioned by trah_pcg_ CG steps on the Hessian without its
+	// two-electron part, solved no tighter than the convergence threshold on the gradient, and
+	// a gradient already below it takes that cheap step alone, without a Fock build. Micro-iterations do not count towards
 	// max_iter; L-BFGS with a diagonal Hessian wandered for 100+ iterations on the same case
 	// (E +-5e-6 Eh, a halved step every 2-3 iterations) where the curvature of chi^2 is stiff.
 	bool soscf_ = false;
@@ -146,11 +149,20 @@ private:
 	occ::Mat soscf_C_;
 	double soscf_phi_ = 0, soscf_pred_ = 0;
 	bool soscf_boundary_ = false;
-	int trah_micro_total_ = 0;
+	int trah_micro_total_ = 0, trah_pcg_total_ = 0;
+	// Fock builds of this lambda step: SCF iterations, Hessian-vector products, rebuilds at the orbitals
+	struct { int iter, hessian, rebuild; } builds_{};
+	static constexpr double unjudged_rise_ = 1e-6;
+	// conjugate-gradient steps of the preconditioner and the residual share they stop at
+	static constexpr int trah_pcg_ = 20;
+	static constexpr double trah_pcg_tol_ = 1e-2;
+	// the Fock matrix of this iteration was built in full from the density of the current orbitals
+	bool soscf_fresh_ = false;
 	void soscf_reset();
 	void soscf_step(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double lambda, const double phi);
 	void trah_solve(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double lambda, const bool extend);
-	occ::Vec hessian_vector(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double lambda, const occ::Vec& v);
+	occ::Vec trah_precondition(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double lambda, const occ::Vec& rhs, const double theta);
+	occ::Vec hessian_vector(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double lambda, const occ::Vec& v, const bool two_electron = true);
 	double rebuild_at(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double lambda, const occ::Mat& C_from, const occ::Vec& kappa);
 	occ::Vec gradient_at(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double lambda, const occ::Mat& C_from, const occ::Vec& kappa);
 	void check_hessian(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double lambda);

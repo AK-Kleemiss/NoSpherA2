@@ -211,6 +211,7 @@ bool SCF_wrapper::do_SCF(const double& lambda, double& alpha, occ::qm::SCF<occ::
 	ediis_.reset();
 	best_quant_ = std::numeric_limits<double>::infinity();
 	rescues_ = 0;
+	builds_ = {};
 	soscf_reset();
 	warm_start_ = has_guess;
 
@@ -254,6 +255,8 @@ bool SCF_wrapper::do_SCF(const double& lambda, double& alpha, occ::qm::SCF<occ::
 		std::stringstream print_;
 		print_ << "***SCF converged in " << scf.iter << " iterations***";
 		print_centered_message(print_.str(), 84, writer_->log);
+		writer_->log << "Fock builds: " << builds_.iter + builds_.hessian + builds_.rebuild << " (" << builds_.iter << " iterations, "
+			<< builds_.hessian << " Hessian products, " << builds_.rebuild << " rebuilds)" << std::endl;
 		writer_->v.lambda = lambda;
 		writer_->v.E_total = scf.ctx.energy["total"];
 		writer_->v.quant = quant;
@@ -261,6 +264,8 @@ bool SCF_wrapper::do_SCF(const double& lambda, double& alpha, occ::qm::SCF<occ::
 	else {
 		writer_->log << "____________________________________________________________________________________\n";
 		print_centered_message("***SCF did not converge***", 84, writer_->log);
+		writer_->log << "Fock builds: " << builds_.iter + builds_.hessian + builds_.rebuild << " (" << builds_.iter << " iterations, "
+			<< builds_.hessian << " Hessian products, " << builds_.rebuild << " rebuilds)" << std::endl;
 		std::ostringstream perturbed_energy;
 		perturbed_energy << " for perturbed energy: " << std::scientific << settings.quant_diff << " (current: " << settings.current_quant_diff << ") \n";
 		std::ostringstream diis_error;
@@ -473,8 +478,8 @@ bool SCF_wrapper::SCF_iteration(occ::qm::SCF<occ::qm::HartreeFock>& scf, const d
 	//screening error does not accumulate. A device that holds the integrals contracts the whole
 	//density each time, nothing to skip.
 	//Off once TRAH is steering: a step is accepted or rejected on a rise of E + lambda chi^2
-	//against the value at the orbitals it left, and trah_.noise puts that threshold at 1e-8 Eh,
-	//far below the screening error of a difference build. Comparing one against the other made
+	//against the value at the orbitals it left, and the noise puts that threshold at 1e-8 Eh
+	//(1e-10 |phi| in heavy cells), far below the screening error of a difference build. Comparing one against the other made
 	//good steps read as rises, and a rejection can only shrink the trust radius, so a single
 	//artefact capped it for the rest of the lambda step. A rotation moves the density by a whole
 	//step anyway, so there was little left to skip. OCC's own loop does the same (it forces a
@@ -497,6 +502,7 @@ bool SCF_wrapper::SCF_iteration(occ::qm::SCF<occ::qm::HartreeFock>& scf, const d
 	}
 	D_last_build_ = scf.ctx.mo.D;
 	scf.ctx.F += G_last_;
+	if (!reused) builds_.iter++;
 	if (!reused) throughput::record_time("XCW Fock build (OCC)", eri_on_device_, get_msec(fock_t0, get_time()));
 	scf.update_scf_energy(false);
 
@@ -525,13 +531,15 @@ bool SCF_wrapper::SCF_iteration(occ::qm::SCF<occ::qm::HartreeFock>& scf, const d
 	settings.current_max_diis_error = scf.diis_error;
 	settings.update(writer_->log, alpha);
 
-	// Convergence check
+	// Convergence check, the change on phi = E + lambda chi^2, the functional that is minimised and
+	// stationary: quant (E + lambda chi) is not, so its change stalls above the threshold while
+	// every other criterion is met (TEMPO lambda 0.01: 20 micro-iterations at |g| 1.6e-4)
 	settings.current_gradient = compute_orbital_gradient(scf);
-	settings.current_quant_diff = std::abs(quant - last_quant);
+	settings.current_quant_diff = std::abs(phi - last_quant);
 	if (SCF_convergence_check(scf, dm_last)) {
 		return true;
 	}
-	last_quant = quant;
+	last_quant = phi;
 
 	if (!soscf_) {
 		if (scf.iter == 1 || settings.current_gradient < 0.5 * soscf_patience_grad_) {
@@ -540,14 +548,22 @@ bool SCF_wrapper::SCF_iteration(occ::qm::SCF<occ::qm::HartreeFock>& scf, const d
 		}
 		//with soscf requested the DIIS stage only has to reach the quadratic region; Fe_phen HS lambda 0.08
 		//oscillated for 30 iterations above the 1e-2 gate while TRAH converged in 6 from that very point.
-		//A cold start always does it: TEMPO lambda 0 took 8 iterations so against 17 on DIIS
-		const bool second_order = settings.soscf || !warm_start_;
+		//A cold start runs DIIS: one Fock build per iteration beats a TRAH macro step far from the
+		//solution (lambda 0: P1 14 builds against 26, TEMPO TZVPP 17 against 31). A warm start goes
+		//straight to the second-order steps: it sits in the quadratic region, where DIIS lost its first
+		//step on TEMPO (the gradient x4 to x6 at iteration 2) and crawled on P1 (x0.6 per iteration)
+		const bool second_order = settings.soscf;
 		const int patience = second_order ? trah_.patience_requested : trah_.patience;
 		const bool stuck = scf.iter - soscf_patience_iter_ >= patience;
-		if (lost || stuck || (second_order && scf.diis_error < trah_.start_threshold)) {
+		const bool warm = warm_start_;
+		if (warm || lost || stuck || (second_order && scf.diis_error < trah_.start_threshold)) {
 			soscf_ = true;
+			occ::qm::MolecularOrbitals probe = scf.ctx.mo;
+			probe.update_occupied_orbitals();
+			probe.update_density_matrix();
+			soscf_fresh_ = last_full_build_ == scf.iter && (probe.D - scf.ctx.mo.D).cwiseAbs().maxCoeff() < 1e-10;
 			std::ostringstream what;
-			what << "***" << (lost ? "E + lambda chi^2 " + std::to_string(phi - best_quant_) + " Eh above its best"
+			what << "***" << (warm ? std::string("Warm start") : lost ? "E + lambda chi^2 " + std::to_string(phi - best_quant_) + " Eh above its best"
 				: stuck ? "Orbital gradient not halved in " + std::to_string(patience) + " iterations" : "DIIS error below 1e-2")
 				<< ": second-order steps on the orbital rotations from here***";
 			print_centered_message(what.str(), 84, writer_->log);
@@ -559,6 +575,7 @@ bool SCF_wrapper::SCF_iteration(occ::qm::SCF<occ::qm::HartreeFock>& scf, const d
 				writer_->log << "\t\tTRAH starts from the best orbitals of this step, " << std::scientific << std::setprecision(2)
 					<< phi - best_quant_ << " Eh below the current ones" << std::endl;
 				scf.ctx.mo = best_mo_;
+				soscf_fresh_ = false;
 			}
 		}
 	}
@@ -615,6 +632,7 @@ void SCF_wrapper::soscf_reset() {
 	//Never above the default, so an easy lambda cannot set a hard one up for a fall.
 	soscf_trust_ = std::clamp(soscf_trust_, trah_.trust_min, trah_.trust_first);
 	trah_micro_total_ = 0;
+	trah_pcg_total_ = 0;
 }
 
 //The gradient of E + lambda chi^2 with respect to the rotation kappa_ai of occupied orbital i
@@ -685,15 +703,23 @@ void SCF_wrapper::rotate_orbitals(occ::qm::SCF<occ::qm::HartreeFock>& scf, const
 //back. Otherwise a fresh gradient starts the next macro step.
 void SCF_wrapper::soscf_step(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double lambda, const double phi) {
 	const bool stepped = soscf_kappa_.size() > 0;
+	//A step the model expects to gain less than the noise of a Fock build cannot be judged by what
+	//the functional does: P1 lambda 0.05, predicted -1e-8 Eh, actual +3e-8 at -1962 Eh, rejected,
+	//and the radius it fell to (1e-4) cost the next lambda step 8 macro steps doubling it back.
+	//It keeps the radius and is taken unless the rise is beyond any noise.
+	//The noise grows with the functional: P1 lambda 0.04 at -1962 Eh, predicted -1.8e-8, actual +3.4e-8,
+	//judged at the fixed 1e-8, and the radius it fell to cost lambda 0.05 seven extra macro steps.
+	const double noise = std::max(trah_.noise, 1e-10 * std::abs(phi));
+	const bool judged = -soscf_pred_ > noise;
 	if (stepped) {
 		const double actual = phi - soscf_phi_;
 		writer_->log << "\t\tTRAH: predicted " << std::scientific << std::setprecision(3) << soscf_pred_
 			<< ", actual " << actual << " Eh, rho " << std::fixed << std::setprecision(2)
 			<< (soscf_pred_ < 0 ? actual / soscf_pred_ : 0.0) << ", model error "
 			<< std::scientific << std::setprecision(1) << std::abs(actual - soscf_pred_) << std::endl;
-		soscf_trust_ = occ::qm::trust_radius_update(soscf_trust_, soscf_kappa_.norm(), soscf_pred_, actual, soscf_boundary_, trah_);
+		if (judged) soscf_trust_ = occ::qm::trust_radius_update(soscf_trust_, soscf_kappa_.norm(), soscf_pred_, actual, soscf_boundary_, trah_);
 	}
-	if (stepped && phi > soscf_phi_ + trah_.noise && soscf_kappa_.cwiseAbs().maxCoeff() > 1e-6) {
+	if (stepped && phi > soscf_phi_ + (judged ? noise : unjudged_rise_) && soscf_kappa_.cwiseAbs().maxCoeff() > 1e-6) {
 		//A radius this small is the model saying it is worthless at these orbitals, not that the
 		//step should be shorter again. Two in a row and DIIS gets the orbitals back, with the
 		//rescue path available again, rather than the lambda step grinding out max_iter on steps
@@ -721,7 +747,7 @@ void SCF_wrapper::soscf_step(occ::qm::SCF<occ::qm::HartreeFock>& scf, const doub
 	//The Roothaan iterations damp the density, so the Fock matrix of the iteration that hands
 	//over belongs to a mix of densities, not to the orbitals: rebuilt from them once, so the
 	//first gradient, Hessian and reference functional are consistent
-	soscf_phi_ = stepped ? phi : rebuild_at(scf, lambda, scf.ctx.mo.C, occ::Vec());
+	soscf_phi_ = stepped || std::exchange(soscf_fresh_, false) ? phi : rebuild_at(scf, lambda, scf.ctx.mo.C, occ::Vec());
 	soscf_grad_ = orbital_rotation_gradient(scf, soscf_hdiag_);
 	trah_B_.clear();
 	trah_HB_.clear();
@@ -744,7 +770,9 @@ void SCF_wrapper::soscf_step(occ::qm::SCF<occ::qm::HartreeFock>& scf, const doub
 void SCF_wrapper::trah_solve(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double lambda, const bool extend) {
 	const occ::Vec& g = soscf_grad_;
 	const double gnorm = g.norm();
-	const double tol = gnorm * std::min(0.1, std::max(1e-3, std::sqrt(gnorm)));
+	//never below the convergence threshold on the orbital gradient: a residual under it buys nothing,
+	//and the last macro step spent 20 products on TEMPO lambda 0.01 getting there
+	const double tol = std::max(gnorm * std::min(0.1, std::max(1e-3, std::sqrt(gnorm))), settings.gradient);
 	auto add = [&](occ::Vec b) {
 		for (int pass = 0; pass < 2; pass++)
 			for (const occ::Vec& Bk : trah_B_) b -= Bk.dot(b) * Bk;
@@ -755,7 +783,17 @@ void SCF_wrapper::trah_solve(occ::qm::SCF<occ::qm::HartreeFock>& scf, const doub
 		trah_B_.push_back(b);
 		return true;
 	};
-	if (extend && trah_B_.empty()) add(-g.cwiseQuotient(soscf_hdiag_));
+	//a gradient already below the convergence threshold only needs the step that settles the density:
+	//the one from the Hessian without its two-electron part, no Fock build (P1: one per lambda step)
+	if (extend && trah_B_.empty() && gnorm < tol) {
+		soscf_kappa_ = trah_precondition(scf, lambda, -g, 0);
+		if (soscf_kappa_.norm() > soscf_trust_) soscf_kappa_ *= soscf_trust_ / soscf_kappa_.norm();
+		soscf_pred_ = g.dot(soscf_kappa_) + 0.5 * soscf_kappa_.dot(hessian_vector(scf, lambda, soscf_kappa_, false));
+		soscf_boundary_ = false;
+		writer_->log << "\t\tTRAH: |g| " << std::scientific << std::setprecision(1) << gnorm << " below the threshold, step without a Fock build, predicted " << soscf_pred_ << " Eh" << std::endl;
+		return;
+	}
+	if (extend && trah_B_.empty()) add(trah_precondition(scf, lambda, -g, 0));
 	//the small problem at shift parameter a: theta, x0, xs and |kappa|
 	occ::Mat Hs;
 	occ::Vec gs;
@@ -829,13 +867,13 @@ void SCF_wrapper::trah_solve(occ::qm::SCF<occ::qm::HartreeFock>& scf, const doub
 		const occ::Vec r = g + Hkappa - theta * kappa;
 		rnorm = r.norm();
 		if (!extend || rnorm < tol || micro >= trah_.micro_max) break;
-		if (!add(-r.cwiseQuotient((soscf_hdiag_.array() - theta).max(1e-2).matrix()))) break;
+		if (!add(trah_precondition(scf, lambda, -r, theta))) break;
 		micro++;
 	}
 	trah_micro_total_ += micro;
 	soscf_kappa_ = kappa;
 	soscf_pred_ = g.dot(kappa) + 0.5 * kappa.dot(Hkappa);
-	writer_->log << "\t\tTRAH: " << micro << " micro-iterations (" << trah_micro_total_ << " in this lambda step), |g| " << std::scientific << std::setprecision(1) << gnorm
+	writer_->log << "\t\tTRAH: " << micro << " micro-iterations (" << trah_micro_total_ << " in this lambda step, " << trah_pcg_total_ << " PCG), |g| " << std::scientific << std::setprecision(1) << gnorm
 		<< ", residual " << rnorm << ", |kappa| " << knorm << (soscf_boundary_ ? " on" : " within") << " the trust radius " << std::fixed << std::setprecision(3) << soscf_trust_
 		<< ", shift " << std::scientific << std::setprecision(1) << theta << ", predicted " << soscf_pred_ << " Eh" << std::endl;
 }
@@ -849,7 +887,7 @@ void SCF_wrapper::trah_solve(occ::qm::SCF<occ::qm::HartreeFock>& scf, const doub
 //H v = fac (dC_vir^T F C_occ + C_vir^T dF C_occ + C_vir^T F dC_occ) with F the perturbed
 //Fock matrix of the current orbitals. The occupied-occupied and virtual-virtual parts of
 //the second-order orbital change leave the functional alone, so this is the exact Hessian.
-occ::Vec SCF_wrapper::hessian_vector(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double lambda, const occ::Vec& v) {
+occ::Vec SCF_wrapper::hessian_vector(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double lambda, const occ::Vec& v, const bool two_electron) {
 	occ::qm::MolecularOrbitals& mo = scf.ctx.mo;
 	const int n = nmo_, nb = mo.kind == occ::qm::SpinorbitalKind::Unrestricted ? 2 : 1;
 	const double fac = nb == 1 ? 4.0 : 2.0, dfac = nb == 1 ? 1.0 : 0.5;
@@ -867,9 +905,14 @@ occ::Vec SCF_wrapper::hessian_vector(occ::qm::SCF<occ::qm::HartreeFock>& scf, co
 		dD.middleRows(row, n) = dfac * (dCocc * Cocc.transpose() + Cocc * dCocc.transpose());
 	}
 	//G(dD): the Fock build reads mo.D, and a screen on the density would drop the small dD
-	std::swap(mo.D, dD);
-	occ::Mat dF = eri_ ? eri_fock(mo, false) : scf.m_procedure.compute_fock(mo, scf.ctx.K);
-	std::swap(mo.D, dD);
+	occ::Mat dF;
+	if (two_electron) {
+		std::swap(mo.D, dD);
+		dF = eri_ ? eri_fock(mo, false) : scf.m_procedure.compute_fock(mo, scf.ctx.K);
+		builds_.hessian++;
+		std::swap(mo.D, dD);
+	}
+	else dF = occ::Mat::Zero(mo.D.rows(), n);
 	if (lambda != 0) {
 		dMatrix2 dD_eff(n, n);
 		build_effective_dm(scf, dD_eff, dD);
@@ -890,6 +933,35 @@ occ::Vec SCF_wrapper::hessian_vector(occ::qm::SCF<occ::qm::HartreeFock>& scf, co
 	return Hv;
 }
 
+//(H - theta)^-1 rhs for the Davidson subspace: the diagonal, refined at lambda > 0 by up to trah_pcg_
+//conjugate-gradient steps on H without its two-electron part, whose products cost a structure
+//factor evaluation instead of a Fock build. That part is what the diagonal misses: chi^2 is
+//stiff along few directions. Davidson takes the exact product of whatever comes back. TEMPO def2-SVP,
+//lambda 0.01-0.05: 70-106 Fock builds per step on the diagonal alone, 21-40 with it.
+occ::Vec SCF_wrapper::trah_precondition(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double lambda, const occ::Vec& rhs, const double theta) {
+	const occ::Vec d = (soscf_hdiag_.array() - theta).max(1e-2).matrix();
+	occ::Vec x = rhs.cwiseQuotient(d);
+	if (lambda == 0) return x;
+	occ::Vec r = rhs - (hessian_vector(scf, lambda, x, false) - theta * x);
+	occ::Vec z = r.cwiseQuotient(d), p = z;
+	double rz = r.dot(z);
+	const double stop = trah_pcg_tol_ * rhs.norm();
+	for (int k = 0; k < trah_pcg_ && r.norm() > stop; k++) {
+		const occ::Vec Ap = hessian_vector(scf, lambda, p, false) - theta * p;
+		const double pAp = p.dot(Ap);
+		if (!(pAp > 0)) break;
+		const double a = rz / pAp;
+		x += a * p;
+		r -= a * Ap;
+		z = r.cwiseQuotient(d);
+		const double rzn = r.dot(z);
+		p = z + (rzn / rz) * p;
+		rz = rzn;
+		trah_pcg_total_++;
+	}
+	return x;
+}
+
 //The orbitals C_from exp(kappa) (the current ones, density rebuilt from them, for an empty
 //kappa) with everything that depends on them rebuilt: structure factors, scale, criteria,
 //perturbation, Fock matrix and energy, the way SCF_iteration does it. Returns E + lambda chi^2
@@ -905,6 +977,7 @@ double SCF_wrapper::rebuild_at(occ::qm::SCF<occ::qm::HartreeFock>& scf, const do
 	coupling_->evaluate(dm_eff);
 	occ::Mat perturbation;
 	coupling_->perturbation(perturbation, scf.ctx.mo.kind == occ::qm::SpinorbitalKind::Unrestricted);
+	builds_.rebuild++;
 	scf.ctx.F = scf.ctx.H + (eri_ ? eri_fock(scf.ctx.mo, false) : scf.m_procedure.compute_fock(scf.ctx.mo, scf.ctx.K));
 	scf.update_scf_energy(false);
 	const double crit = coupling_->quality().criterion;
