@@ -73,6 +73,8 @@ public:
 	// Fills inversion_cleaned_hkl with one entry of every inversion related pair in hkl_enlarged; per entry its
 	// index in hkl_enlarged, followed by the index of its inverse when hkl_enlarged has one
 	static ivec2 remove_inv_vectors(const hkl_list& hkl_enlarged, hkl_list& inversion_cleaned_hkl);
+	// Index in hkl_enlarged of the image of reflection r of hkl under every symmetry operation
+	ivec generate_asym_lookup(const int r, const hkl_list& hkl, const hkl_list& hkl_enlarged) const;
 
 
 

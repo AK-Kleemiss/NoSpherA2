@@ -1019,7 +1019,7 @@ std::string NoSpherA2_message(bool no_date)
 std::string WAEmpiRe_message()
 {
 	std::string t = " _   _   __ __    _____               __ ___  \n";
-	t.append("| | / | / /   |  / ___/_   __  ____ /_/ __ \\___) \n");
+	t.append("| | / | / /   |  / ___/_   __  ____  /_/ __ \\___ \n");
 	t.append("| |/  |/ / /| | / /__/  | /  |/ __ \\__/ /_/ / _ \\ \n");
 	t.append("|  / |  / __  |/ /__/ /||//| / /_/ / / __  /  __/ \n");
 	t.append("|_/  |_/_/  |_/____/_/ |_/ |/ .___/_/_/  |_\\___/ \n");
@@ -2825,6 +2825,10 @@ bool options::digest_io_options(const std::string &temp, int &i)
 	{
 		xyz_file = arguments[i + 1];
 	}
+	else if (temp == "-mask")
+	{
+		mask_file = arguments[i + 1];
+	}
 	else
 		return false;
 	return true;
@@ -4489,7 +4493,7 @@ void options::loadXCWsettings() {
 	int max_scf_iterations = 32768, charge = 32768, multiplicity = 32768, n_params = 32768, refine_against = 32768;
 	std::string basis_set_name = "Undefined";
 	std::string df_basis_name, guess_basis_name;
-	bool grown = false, read_tensor = false, read_first_guess = false, nbo_output = false, xcw_gaussian_halt = false;
+	bool grown = false, read_tensor = false, read_first_guess = false, nbo_output = false, xcw_gaussian_halt = false, mask = false;
 	extinction::model extinction_model = extinction::model::none;
 	bool extinction_aniso = false, extinction_refine = true;
 	double extinction_start = 1e-4, wavelength = 0.0;
@@ -4654,6 +4658,10 @@ void options::loadXCWsettings() {
 
 		handlers["grown"] = [&](std::istream&) {
 			grown = true;
+			};
+
+		handlers["mask"] = [&](std::istream&) {
+			mask = true;
 			};
 
 		handlers["rhf"] = [&](std::istream&) {
@@ -4893,6 +4901,7 @@ void options::loadXCWsettings() {
 		xcw_settings.num_xcw_steps = static_cast<int>(std::round((1 - xcw_settings.xcw_start_value) / xcw_settings.xcw_step_size)) + 1;
 	}
 	xcw_settings.grown = grown;
+	xcw_settings.mask = mask;
 	xcw_settings.hf_type = hf_type;
 	xcw_settings.read_tensor = read_tensor;
 	xcw_settings.read_first_guess = read_first_guess;

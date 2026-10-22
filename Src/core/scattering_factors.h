@@ -355,3 +355,4 @@ struct hkl_sym {
 
 void read_hkl(const std::filesystem::path& hkl_filename, hkl_list& hkl, const vec2& twin_law, cell& unit_cell, std::ostream& file, bool debug = false);
 hkl_list read_hkl_full(const std::filesystem::path& hkl_filename, hkl_list& hkl, const vec2& twin_law, cell& unit_cell, std::ostream& file, scatter_data& obs, bool debug = false);
+void read_mask(const std::filesystem::path& mask_filename, const hkl_list& hkl, const hkl_list& hkl_enlarged, const cell& unit_cell, std::ostream& file, vec2& mask_info, const int& n_r, bool debug = false);

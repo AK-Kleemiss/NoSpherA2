@@ -239,7 +239,7 @@ public:
 	}
 
 	// Builds the (once-cached) ordered list of Miller indices matching the
-	// index r used for F_obs[r]/F_calc[r] (see generate_asym_lookup)
+	// index r used for F_obs[r]/F_calc[r] (see cell::generate_asym_lookup)
 	void ensure_hkl_ordered();
 	// Builds (once) the per-reflection 1/|H|^2 cache used by calc_criteria and the
 	// perturbation when h2 weighting is set. No-op otherwise.
@@ -249,9 +249,6 @@ public:
 	void U_cif2U_star();
 	// Converts all ADP tensors from reciprocal space into real space
 	void U_star2U_cart();
-
-	// Generates a list that links the symmetry operations to symmetry-generated reflexes for given reflex r
-	ivec generate_asym_lookup(const int r);
 
 	// Each of the three setters computes its quantity and stores it; one never called leaves the
 	// value the constructor put there (DW and phases 1, anomalous dispersion 0)

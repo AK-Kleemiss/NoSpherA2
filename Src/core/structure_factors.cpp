@@ -44,6 +44,22 @@ structure_factors::structure_factors(options& opt_in) {
 	unit_cell = cell(cif, std::cout, opt_in.debug, opt_in.do_XCW);
 	scatter_data.hkl_enlarged = read_hkl_full(hkl_filename, scatter_data.hkl, opt_in.twin_law, unit_cell, std::cout, scatter_data, opt_in.debug);
 	double wavelength_ = read_CIF(cif_input, unit_cell, model_data.ncen, asym_atoms, ADPs, opt_in.debug);
+	model_data.nr = scatter_data.hkl.size();
+	// Set F_calc sizes
+	scatter_data.F_calc.resize(model_data.nr, 0);
+	scatter_data.anom_correction.resize(model_data.nr, 0);
+	// Use a mask that is directly saved in the anomalous dispersion correction, that way is most computationally efficient
+	if(opt_in.xcw_settings.mask) {
+		err_checkf(!opt_in.mask_file.empty(), "Please provide an fab file with the `-mask` option or remove the mask keyword from the XCW settings file.", std::cout);
+		// Read out the mask corrections
+		std::filesystem::path mask_filename = opt_in.mask_file;
+		std::cout << "Reading mask from " << mask_filename << std::endl;
+		vec2 mask_info;
+		read_mask(mask_filename, scatter_data.hkl, scatter_data.hkl_enlarged, unit_cell, std::cout, mask_info, model_data.nr, opt_in.debug);
+		for (int r = 0; r < model_data.nr; r++) {
+			scatter_data.anom_correction[r] = cdouble(mask_info[r][0], mask_info[r][1]);
+		}
+	}
 	// Directly convert into reciprocal space so rotation for grown structures can be done directly
 	U_cif2U_star();
 	model_data.wavelength = opt_in.xcw_settings.wavelength > 0.0 ? opt_in.xcw_settings.wavelength : wavelength_;
@@ -106,7 +122,6 @@ structure_factors::structure_factors(options& opt_in) {
 	// Generate k_pts and set the number of reflections
 	make_k_pts(model_data.nr_enlarged != 0 && scatter_data.hkl.size() == 0, opt_in.save_k_pts, unit_cell, scatter_data.hkl_enlarged, k_pt, std::cout, opt_in.debug);
 	model_data.nr_enlarged = scatter_data.hkl_enlarged.size();
-	model_data.nr = scatter_data.hkl.size();
 
 	// Find all reflections that are above the I/sigma cutoff
 	const double i_sigma_cutoff = opt_in.xcw_settings.i_sigma_cutoff;
@@ -122,10 +137,6 @@ structure_factors::structure_factors(options& opt_in) {
 	setup_extinction(cif);
 	err_checkf(model_data.nr_fit > n_params(), "Fewer reflections above the I/sigma cutoff than parameters", std::cout);
 	std::cout << "XCW: I/sigma(I) >= " << i_sigma_cutoff << " (F/sigma(F) >= " << 2 * i_sigma_cutoff << "): " << model_data.nr_fit << " of " << model_data.nr << " reflections in the fit; R1 and Criterion are over these, R1(all) and Crit(all) over all" << std::endl;
-
-	// Set F_calc sizes
-	scatter_data.F_calc.resize(model_data.nr, 0);
-	scatter_data.anom_correction.resize(model_data.nr, 0);
 
 	// Initialize DW factors and phase factors, so that F_calc can be calculated without DW factors or phase factors if they are not requested
 	DW_facts.resize(model_data.ncen, cvec(model_data.nr_enlarged, 1));
@@ -351,7 +362,7 @@ void structure_factors::set_phases() {
 		std::transform(vec.begin(), vec.end(), vec.begin(), [bohr2angstrom](double x) { return x * bohr2angstrom; });
 		return vec; });
 	for (int r = 0; r < model_data.nr; r++) {
-		ivec asym_list = generate_asym_lookup(r);
+		ivec asym_list = unit_cell.generate_asym_lookup(r, scatter_data.hkl, scatter_data.hkl_enlarged);
 		vec q_temp = { k_pt[0][asym_list[0]], k_pt[1][asym_list[0]], k_pt[2][asym_list[0]] };
 		std::transform(q_temp.begin(), q_temp.end(), q_temp.begin(), [angstrom2bohr](double x) { return x * angstrom2bohr; });
 		for (int t = 0; t < trans[0].size(); t++) {
@@ -366,10 +377,11 @@ void structure_factors::set_phases() {
 }
 
 void structure_factors::set_anom() {
+	if(anom_set_) return;
 	int r, at, r_asym;
 	ivec2 asym_lookup(model_data.nr);
 	for (r = 0; r < model_data.nr; r++) {
-		asym_lookup[r] = generate_asym_lookup(r);
+		asym_lookup[r] = unit_cell.generate_asym_lookup(r, scatter_data.hkl, scatter_data.hkl_enlarged);
 	}
 	for (r = 0; r < model_data.nr; r++) {
 		const ivec& lookup = asym_lookup[r];
@@ -381,7 +393,7 @@ void structure_factors::set_anom() {
 			}
 			sum += temp1 * asym_atoms[at].sym_fact * asym_atoms[at].anom;
 		}
-		scatter_data.anom_correction[r] = sum;
+		scatter_data.anom_correction[r] += sum;
 	}
 	anom_set_ = true;
 }
@@ -622,30 +634,6 @@ void structure_factors::create_prims(std::vector<ao_data>& ao_data_shells, const
 		}
 	}
 	model_data.nmo = ao_data_shells.size();
-}
-
-ivec structure_factors::generate_asym_lookup(const int r) {
-	ivec asym_list;
-	auto it = scatter_data.hkl.begin();
-	std::advance(it, r);
-	ivec3 rots = unit_cell.get_sym();
-	i3 tempv;
-	const i3& hkl_temp = *it;
-	for (int s = 0; s < rots[0][0].size(); s++) {
-		tempv = { 0, 0, 0 };
-		for (int h = 0; h < 3; h++) {
-			for (int j = 0; j < 3; j++) {
-				tempv[j] += hkl_temp[h] * rots[j][h][s];
-			}
-		}
-		//a miss would silently read reflection 0's scattering factors
-		auto idx = scatter_data.hkl_enlarged.find(tempv);
-		err_checkf(idx != scatter_data.hkl_enlarged.end(), "Reflection " + std::to_string(hkl_temp[0]) + " " + std::to_string(hkl_temp[1]) + " " +
-			std::to_string(hkl_temp[2]) + " rotated by symmetry operation " + std::to_string(s) + " is not in the enlarged reflection list", std::cout);
-		asym_list.push_back(static_cast<int>(std::distance(scatter_data.hkl_enlarged.begin(), idx)));
-	}
-	return asym_list;
-	// closing function
 }
 
 size_t structure_factors::tri_index(int mu, int nu) const noexcept {
@@ -936,7 +924,7 @@ void structure_factors::build_I(const std::vector<ao_data>& ao_data_shells, doub
 	// Precompute the lookup table linking each unique reflection to its symmetry equivalents
 	ivec2 asym_lookup(model_data.nr);
 	for (r = 0; r < model_data.nr; r++) {
-		asym_lookup[r] = generate_asym_lookup(r);
+		asym_lookup[r] = unit_cell.generate_asym_lookup(r, scatter_data.hkl, scatter_data.hkl_enlarged);
 	}
 	const unsigned int num_syms = unit_cell.get_num_syms();
 	// The AO values and weights are real, so the grid integral sum_p w_p phi_mu phi_nu exp(i q d_p) of -q is the
@@ -2029,7 +2017,7 @@ void structure_factors::build_I(const std::vector<ao_data>& ao_data_shells, doub
 void structure_factors::calc_F_calc(const cvec2& scattering_factors) {
 #pragma omp parallel for
 	for (int r = 0; r < model_data.nr; r++) {
-		const ivec lookup = generate_asym_lookup(r);
+		const ivec lookup = unit_cell.generate_asym_lookup(r, scatter_data.hkl, scatter_data.hkl_enlarged);
 		cdouble sum = scatter_data.anom_correction[r];
 		for (int at = 0; at < model_data.ncen; at++) {
 			cdouble temp1 = 0;

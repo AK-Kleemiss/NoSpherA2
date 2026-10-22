@@ -14,6 +14,7 @@
 
 XCW_solver::XCW_solver(options& opt_in) : opt(&opt_in), sf(opt_in) {
 	std::cout << "XCW orbital basis set: " << sf.orbital_basis->get_name() << std::endl;
+	writer.WAEmpiRe();
 	writer.log << "XCW orbital basis set: " << sf.orbital_basis->get_name() << std::endl;
 }
 
@@ -708,7 +709,6 @@ occ::qm::HartreeFock XCW_solver::setup_system() {
 	scf_settings.incremental = opt->xcw_incremental;
 	scf_settings.gpu_eri = opt->gpu_itensor && opt->use_gpu;
 	scf_settings.no_date = opt->no_date;
-	writer.WAEmpiRe();
 	scf_solver = SCF_wrapper(mol, occ_basis_set, scf_settings, writer);
 	return hf;
 	// closing function

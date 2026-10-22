@@ -447,6 +447,74 @@ hkl_list read_hkl_full(const std::filesystem::path& hkl_filename,
 	return hkl_enlarged;
 }
 
+// Basically a clone of the read_hkl_full function but for reading masks, can be collapsed into a template function in the future
+void read_mask(const std::filesystem::path& mask_filename,
+	const hkl_list& hkl,
+	const hkl_list& hkl_enlarged,
+	const cell& unit_cell,
+	std::ostream& file,
+	vec2& mask_info,
+	const int& n_r,
+	bool debug
+)
+{
+	// Mask values of the fab file at their position in hkl_enlarged
+	cvec mask_enlarged(hkl_enlarged.size(), 0.0);
+	bvec in_fab(hkl_enlarged.size(), false);
+	mask_info.resize(n_r, vec(2, 0.0));
+	i3 hkl_;
+	double real_mask, imag_mask;
+	err_checkf(std::filesystem::exists(mask_filename), "fab file does not exists!", file);
+	std::ifstream mask_input(mask_filename, std::ios::in);
+	mask_input.seekg(0, mask_input.beg);
+	std::string line, temp;
+	//hkl is a set, so it hands the reflections back in (h,k,l) order whatever the file order;
+	//the mask has to follow that order, or F_calc[i] meets the wrong observation
+	std::map<i3, scattering_data> mask_by_hkl;
+	while (!mask_input.eof())
+	{
+		getline_universal(mask_input, line);
+		if (mask_input.eof())
+			break;
+		if (line.size() < 2)
+			continue;
+		if (hkl_text_line(line))
+			continue;
+		err_checkf(line.size() >= 12, "mask line too short for h k l: '" + line + "'", file);
+		std::istringstream iss(line);
+		for (int i = 0; i < 3; i++)
+		{
+			// Values are separated by whitespace, so we can use std::istringstream to parse the line
+			iss >> temp;
+			hkl_[i] = stoi(temp);
+		}
+		iss >> temp;
+		real_mask = stod(temp);
+		iss >> temp;
+		imag_mask = stod(temp);
+		auto it = hkl_enlarged.find(hkl_);
+		if (it != hkl_enlarged.end()) {
+			const size_t pos = std::distance(hkl_enlarged.begin(), it);
+			mask_enlarged[pos] = cdouble(real_mask, imag_mask);
+			in_fab[pos] = true;
+		}
+	}
+	// The fab file lists one reflection of each set of equivalents: F(h) = exp(2 pi i h.t_s) F(h R_s)
+	const vec2 trans = unit_cell.get_trans();
+	auto h = hkl.begin();
+	for (int r = 0; r < n_r; r++, h++) {
+		const ivec lookup = unit_cell.generate_asym_lookup(r, hkl, hkl_enlarged);
+		for (int s = 0; s < lookup.size(); s++) {
+			if (!in_fab[lookup[s]]) continue;
+			const cdouble F = std::exp(cdouble(0, constants::TWO_PI * ((*h)[0] * trans[0][s] + (*h)[1] * trans[1][s] + (*h)[2] * trans[2][s]))) * mask_enlarged[lookup[s]];
+			mask_info[r][0] = F.real();
+			mask_info[r][1] = F.imag();
+			break;
+		}
+	}
+}
+
+
 /**
  * Generates a list of hkl values based on the given parameters.
  *

@@ -141,14 +141,14 @@ double SCF_wrapper::dynamic_damping(const occ::qm::SCF<occ::qm::HartreeFock>& sc
 		new_alpha *= 0.75;
 		quant_diff_mem = quant_diff;
 		if (quant_diff < 10 * scf.convergence_settings.energy_threshold) {
-			print_centered_message("***Turned off damping***", 84, writer_->log);
+			print_centered_message("***Turned off damping***", 100, writer_->log);
 			new_alpha = 0;
 			settings.apply_damping = false;
 		}
 		else {
 			std::stringstream print_;
 			print_ << "***Decreased damping to " << std::fixed << std::setprecision(3) << new_alpha << "***";
-			print_centered_message(print_.str(), 84, writer_->log);
+			print_centered_message(print_.str(), 100, writer_->log);
 		}
 	}
 	return new_alpha;
@@ -251,10 +251,10 @@ bool SCF_wrapper::do_SCF(const double& lambda, double& alpha, occ::qm::SCF<occ::
 	} while (!converged && scf.iter < scf.maxiter);
 
 	if (converged) {
-		writer_->log << "____________________________________________________________________________________\n";
+		writer_->log << "____________________________________________________________________________________________________\n";
 		std::stringstream print_;
 		print_ << "***SCF converged in " << scf.iter << " iterations***";
-		print_centered_message(print_.str(), 84, writer_->log);
+		print_centered_message(print_.str(), 100, writer_->log);
 		writer_->log << "Fock builds: " << builds_.iter + builds_.hessian + builds_.rebuild << " (" << builds_.iter << " iterations, "
 			<< builds_.hessian << " Hessian products, " << builds_.rebuild << " rebuilds)" << std::endl;
 		writer_->v.lambda = lambda;
@@ -262,8 +262,8 @@ bool SCF_wrapper::do_SCF(const double& lambda, double& alpha, occ::qm::SCF<occ::
 		writer_->v.quant = quant;
 	}
 	else {
-		writer_->log << "____________________________________________________________________________________\n";
-		print_centered_message("***SCF did not converge***", 84, writer_->log);
+		writer_->log << "____________________________________________________________________________________________________\n";
+		print_centered_message("***SCF did not converge***", 100, writer_->log);
 		writer_->log << "Fock builds: " << builds_.iter + builds_.hessian + builds_.rebuild << " (" << builds_.iter << " iterations, "
 			<< builds_.hessian << " Hessian products, " << builds_.rebuild << " rebuilds)" << std::endl;
 		std::ostringstream perturbed_energy;
@@ -565,8 +565,8 @@ bool SCF_wrapper::SCF_iteration(occ::qm::SCF<occ::qm::HartreeFock>& scf, const d
 			what << "***" << (warm ? std::string("Warm start") : lost ? "E + lambda chi^2 " + std::to_string(phi - best_quant_) + " Eh above its best"
 				: stuck ? "Orbital gradient not halved in " + std::to_string(patience) + " iterations" : "DIIS error below 1e-2")
 				<< ": second-order steps on the orbital rotations from here***";
-			print_centered_message(what.str(), 84, writer_->log);
-			citations::cite(citations::Method::TRAH, writer_->log);
+			print_centered_message(what.str(), 100, writer_->log);
+			citations::cite(citations::Method::TRAH, writer_->log, 100);
 			//TRAH from the best orbitals of this lambda step, not from wherever DIIS left them: TEMPO
 			//lambda 0.11 (Cordula, AKL) switched at E -148 Eh, 330 Eh above the warm start, and spent
 			//900 micro-iterations climbing back. The first step rebuilds the Fock matrix at them.
@@ -727,7 +727,7 @@ void SCF_wrapper::soscf_step(occ::qm::SCF<occ::qm::HartreeFock>& scf, const doub
 		if (soscf_floored_ >= 2) {
 			std::ostringstream give_up;
 			give_up << "***E + lambda chi^2 still rising at the smallest trust radius: back to DIIS***";
-			print_centered_message(give_up.str(), 84, writer_->log);
+			print_centered_message(give_up.str(), 100, writer_->log);
 			//hand DIIS the orbitals the last accepted step left, not the rejected ones
 			rotate_orbitals(scf, soscf_C_, occ::Vec::Zero(soscf_kappa_.size()));
 			soscf_ = false;
@@ -737,7 +737,7 @@ void SCF_wrapper::soscf_step(occ::qm::SCF<occ::qm::HartreeFock>& scf, const doub
 		std::ostringstream what;
 		what << "***E + lambda chi^2 " << std::scientific << std::setprecision(1) << phi - soscf_phi_
 			<< " Eh above the orbitals the step left: trust radius " << std::scientific << std::setprecision(2) << soscf_trust_ << ", step re-solved***";
-		print_centered_message(what.str(), 84, writer_->log);
+		print_centered_message(what.str(), 100, writer_->log);
 		trah_solve(scf, lambda, false);
 		rotate_orbitals(scf, soscf_C_, soscf_kappa_);
 		return;
@@ -1037,13 +1037,16 @@ bool SCF_wrapper::rescue_scf(occ::qm::SCF<occ::qm::HartreeFock>& scf, const doub
 	settings.diis_stop_damping = (base_.stop_damping > 0 ? base_.stop_damping : 1e-3) / tighten;
 	settings.level_shift = std::max(base_.level_shift, 0.25) * std::pow(2.0, rescues_);
 	alpha = 1.0 - (1.0 - settings.alpha) / std::pow(2.0, rescues_);
-	std::ostringstream what;
-	what << "***E + lambda chi^2 " << std::fixed << std::setprecision(3) << quant - best_quant_
-		<< " Eh above its best: back to the best orbitals, level shift " << std::setprecision(2) << settings.level_shift
+	std::ostringstream what1, what2, what3;
+	what1 << "***E + lambda chi^2 " << std::fixed << std::setprecision(3) << quant - best_quant_
+		<< " Eh above its best: back to the best orbitals";
+	what2 << "level shift " << std::setprecision(2) << settings.level_shift
 		<< ", damping " << alpha << " until DIIS error "
-		<< std::scientific << std::setprecision(0) << settings.diis_stop_shift << " / " << settings.diis_stop_damping
-		<< " (rescue " << rescues_ << "/3)***";
-	print_centered_message(what.str(), 84, writer_->log);
+		<< std::scientific << std::setprecision(0) << settings.diis_stop_shift << " / " << settings.diis_stop_damping;
+	what3 << "(rescue " << rescues_ << "/3)***";
+	print_centered_message(what1.str(), 100, writer_->log);
+	print_centered_message(what2.str(), 100, writer_->log);
+	print_centered_message(what3.str(), 100, writer_->log);
 	scf.ctx.mo = best_mo_;
 	G_last_ = best_G_;
 	reuse_best_G_ = true;

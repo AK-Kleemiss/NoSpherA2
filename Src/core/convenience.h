@@ -947,6 +947,7 @@ struct options
 	std::filesystem::path gaussian_path;
 	std::filesystem::path turbomole_path;
 	std::filesystem::path basis_set_path;
+	std::filesystem::path mask_file;
 	std::string occ;
 	std::filesystem::path occ_toml_path;
 	std::filesystem::path cwd;
@@ -1027,6 +1028,7 @@ struct options
 		//`basis_overrides <file>`: per-element replacements of the orbital basis from a BSE JSON file
 		std::filesystem::path basis_overrides;
 		bool grown = false;
+		bool mask = false;
 		//`extinction <shelx|bc_gaussian|bc_lorentzian> [iso|aniso] [fixed] [start value]`
 		extinction::model extinction_model = extinction::model::none;
 		bool extinction_aniso = false;
