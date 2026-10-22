@@ -536,6 +536,22 @@ bool SCF_wrapper::SCF_iteration(occ::qm::SCF<occ::qm::HartreeFock>& scf, const d
 	// every other criterion is met (TEMPO lambda 0.01: 20 micro-iterations at |g| 1.6e-4)
 	settings.current_gradient = compute_orbital_gradient(scf);
 	settings.current_quant_diff = std::abs(phi - last_quant);
+	//Under TRAH the density criteria judge the step still to come, the one trah_solve takes without
+	//a Fock build once |g| is below the threshold, not the step just taken: judged on that, every
+	//warm lambda step spent an iteration only to see its last step was small (TEMPO, P1). The
+	//orbitals returned are the current ones, consistent with their Fock matrix and Fcalc.
+	if (soscf_ && settings.current_gradient < settings.gradient) {
+		occ::Vec h;
+		const occ::Vec g = orbital_rotation_gradient(scf, h);
+		std::swap(h, soscf_hdiag_);
+		occ::Vec kappa = trah_precondition(scf, lambda, -g, 0);
+		std::swap(h, soscf_hdiag_);
+		if (kappa.norm() > soscf_trust_) kappa *= soscf_trust_ / kappa.norm();
+		const occ::qm::MolecularOrbitals here = scf.ctx.mo;
+		rotate_orbitals(scf, here.C, kappa);
+		dm_last = scf.ctx.mo.D;
+		scf.ctx.mo = here;
+	}
 	if (SCF_convergence_check(scf, dm_last)) {
 		return true;
 	}
