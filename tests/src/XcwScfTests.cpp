@@ -217,18 +217,13 @@ namespace {
 		std::istringstream in(text);
 		std::string line;
 		while (std::getline(in, line)) {
-			if (line.empty() || (line[0] == '\t') != iterations) continue;
-			const size_t first = iterations ? 1 : 0;
-			if (line.size() <= first || !std::isdigit(static_cast<unsigned char>(line[first])) || line.find('\t', first) == std::string::npos) {
-				continue;
-			}
+			//both start with a space or a tab; a lambda carries a decimal point, an iteration count not
+			if (line.empty() || (line[0] != ' ' && line[0] != '\t') || line.find('\t') == std::string::npos) continue;
 			std::vector<std::string> fields;
 			std::istringstream cols(line);
 			std::string f;
-			while (std::getline(cols, f, '\t')) {
-				if (!f.empty()) fields.push_back(f);
-			}
-			if (fields.size() < 7) {
+			while (cols >> f) fields.push_back(f);
+			if (fields.size() < 7 || !std::isdigit(static_cast<unsigned char>(fields[0][0])) || (fields[0].find('.') == std::string::npos) == !iterations) {
 				continue;
 			}
 			rows.push_back({ fields[0], fields[1], fields[2], fields[3], fields[4], fields[5], fields[6] });
@@ -898,8 +893,8 @@ TEST(XcwScfTests, MaxIterOneStopsScanWithoutTscb)
 	EXPECT_EQ(occurrences(run.log, "CONVERGED"), 5u);
 	EXPECT_EQ(occurrences(run.log, "Starting XCW SCF solver with lambda = "), 1u);
 	EXPECT_EQ(run.log.find("Creating .tscb file"), std::string::npos);
-	EXPECT_NE(run.log.find("\t1\t\t"), std::string::npos);
-	EXPECT_EQ(run.log.find("\t2\t\t"), std::string::npos);
+	EXPECT_NE(run.log.find("\n 1\t"), std::string::npos);
+	EXPECT_EQ(run.log.find("\n 2\t"), std::string::npos);
 
 	//step 0 has no converged neighbour to halve the step towards, so the message names the
 	//iteration cap instead of a continuation step
@@ -1065,11 +1060,11 @@ TEST(XcwScfTests, ISigmaCutoffShrinksFitSetAndReportsAllReflections)
 	EXPECT_LT(n_fit, nr) << run.out;
 
 	//the nine columns of the converged row: fit-set criterion and R1(gt) differ from Crit(all) and R1(all)
-	const size_t row = run.out.find("\n0.00000\t");
+	const size_t row = run.out.find("\n 0.00000\t");
 	ASSERT_NE(row, std::string::npos) << run.out;
 	std::vector<std::string> fields;
 	std::istringstream cols(run.out.substr(row + 1, run.out.find('\n', row + 1) - row - 1));
-	for (std::string f; std::getline(cols, f, '\t');) if (!f.empty()) fields.push_back(f);
+	for (std::string f; cols >> f;) fields.push_back(f);
 	ASSERT_EQ(fields.size(), 9u) << run.out;
 	EXPECT_NE(fields[7], fields[1]);
 	EXPECT_NE(fields[8], fields[3]);

@@ -168,26 +168,18 @@ namespace {
 		return out.str();
 	}
 
-	//The cout table row for this lambda ("0.01000\t\t..."), split on the double tabs
+	//The cout table row for this lambda (" 0.01000\t..."), split on the runs of tabs
 	std::vector<std::string> table_row(const std::string& cout_text, const std::string& lambda)
 	{
-		const std::string key = "\n" + lambda + "\t\t";
+		const std::string key = "\n " + lambda + "\t";
 		const size_t start = cout_text.find(key);
 		if (start == std::string::npos) {
 			return {};
 		}
 		const size_t end = cout_text.find('\n', start + 1);
-		const std::string row = cout_text.substr(start + 1, end - start - 1);
+		std::istringstream row(cout_text.substr(start + 1, end - start - 1));
 		std::vector<std::string> fields;
-		size_t pos = 0;
-		while (true) {
-			const size_t next = row.find("\t\t", pos);
-			fields.push_back(row.substr(pos, next == std::string::npos ? std::string::npos : next - pos));
-			if (next == std::string::npos) {
-				break;
-			}
-			pos = next + 2;
-		}
+		for (std::string f; row >> f;) fields.push_back(f);
 		return fields;
 	}
 
