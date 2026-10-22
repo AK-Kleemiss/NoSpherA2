@@ -910,7 +910,7 @@ namespace
 		EXPECT_DOUBLE_EQ(s.xcw_strong_cutoff, 3.0);
 		EXPECT_EQ(s.extinction_model, extinction::model::none);
 		EXPECT_DOUBLE_EQ(s.wavelength, 0.0);
-		EXPECT_FALSE(s.grown || s.read_tensor || s.read_first_guess || s.nbo_output || s.soscf || s.check_hessian);
+		EXPECT_FALSE(s.grown || s.read_tensor || s.read_first_guess || s.nbo_output || s.check_hessian);
 		EXPECT_EQ(s.i_tensor_max_mb, 0u);
 		EXPECT_TRUE(s.i_tensor_file_path.empty() && s.i_tensor_save_path.empty());
 	}
@@ -974,7 +974,7 @@ namespace
 		EXPECT_DOUBLE_EQ(s.i_sigma_cutoff, 3.0);
 		EXPECT_TRUE(s.xcw_gaussian_halt);
 		EXPECT_DOUBLE_EQ(s.xcw_strong_cutoff, 4.5);
-		EXPECT_TRUE(s.grown && s.read_first_guess && s.nbo_output && s.soscf && s.check_hessian);
+		EXPECT_TRUE(s.grown && s.read_first_guess && s.nbo_output && s.check_hessian);
 		EXPECT_TRUE(s.read_tensor);
 		EXPECT_EQ(s.i_tensor_file_path, std::filesystem::path("tensor.bin"));
 		EXPECT_EQ(s.i_tensor_save_path, std::filesystem::path("out.bin"));

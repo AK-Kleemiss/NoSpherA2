@@ -1119,14 +1119,14 @@ TEST(XcwScfTests, ScaleIsStationaryForTheCriterion)
 	std::filesystem::remove_all(dir);
 }
 
-//`soscf` hands the step to the second-order solver once the DIIS error is below 1e-2; from
+//`check_hessian` hands the step to the second-order solver once the DIIS error is below 1e-2; from
 //there the trust-region augmented-Hessian steps on the orbital rotations have to reach the
 //same lambda = 0 minimum as the Roothaan/DIIS iterations, with micro-iterations reported
 TEST(XcwScfTests, SecondOrderStepsReachTheGoldenEnergy)
 {
 	if (p1_fixture().empty()) GTEST_SKIP() << "fixture tests/P1_test not found";
 	const auto dir = scratch_dir();
-	const p1_run run = run_on_p1(dir, common + "f rhf start 0 step_size 0.01 end 0 soscf" + read_shared_tensor(dir));
+	const p1_run run = run_on_p1(dir, common + "f rhf start 0 step_size 0.01 end 0 check_hessian" + read_shared_tensor(dir));
 	EXPECT_NE(run.log.find("second-order steps on the orbital rotations from here"), std::string::npos) << run.log;
 	EXPECT_NE(run.log.find("TRAH: "), std::string::npos) << run.log;
 	EXPECT_NE(run.log.find("***SCF converged in"), std::string::npos) << run.log;
@@ -1145,7 +1145,7 @@ TEST(XcwScfTests, HessianVectorProductMatchesFiniteDifference)
 	if (p1_fixture().empty()) GTEST_SKIP() << "fixture tests/P1_test not found";
 	for (const std::string kind : { "f rhf", "f2 uhf" }) {
 		const auto dir = scratch_dir();
-		const p1_run run = run_on_p1(dir, common + kind + " start 0.02 step_size 0.01 end 0.02 i_double soscf check_hessian" + read_shared_tensor(dir, true));
+		const p1_run run = run_on_p1(dir, common + kind + " start 0.02 step_size 0.01 end 0.02 i_double check_hessian" + read_shared_tensor(dir, true));
 		const size_t at = run.log.find("Hessian check: |Hv - FD| / |FD| = ");
 		ASSERT_NE(at, std::string::npos) << run.log;
 		const double rel = std::stod(run.log.substr(at + std::string("Hessian check: |Hv - FD| / |FD| = ").size()));

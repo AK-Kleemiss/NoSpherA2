@@ -507,8 +507,8 @@ them override single values.
 | `shift <x>` | 1 | preset | Level shift. |
 | `diis_damping <x>` | 1 | preset | DIIS error below which damping is switched off. |
 | `diis_shift <x>` | 1 | preset | DIIS error below which the level shift is switched off. |
-| `soscf` | 0 | off | Second-order (TRAH) steps once the DIIS error is below `1e-2`; without it only when the orbital gradient stalls. |
-| `check_hessian` | 0 | off | Finite-difference check of the Hessian-vector product on the first second-order step, reported in `SCF.log`. |
+| `soscf` | 0 | | Accepted and ignored. A cold start runs DIIS, a warm start (the previous lambda step or a `.fchk` restart) TRAH from its first iteration. |
+| `check_hessian` | 0 | off | Finite-difference check of the Hessian-vector product on the first second-order step, reported in `SCF.log`; enters TRAH once the DIIS error is below `1e-2`. |
 | `df_basis <name>` | 1 | | Density-fit the Fock build with this auxiliary basis, e.g. `def2-universal-jkfit`. |
 | `guess_basis <name>` | 1 | | Start the first lambda from a Hartree-Fock converged in this smaller basis, projected into the orbital basis. |
 | `load_wfn` | 0 | off | Start the first lambda from `NA2_<start>.fchk` of an earlier run. |

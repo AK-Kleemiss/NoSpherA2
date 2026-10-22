@@ -126,7 +126,7 @@ private:
 	// rejections at trust_min hand the orbitals back to DIIS. It keeps the occupation, so it
 	// cannot swap orbitals. Entered at the first iteration of a warm start (the previous lambda
 	// step's orbitals, or a restart from its .fchk), when the orbital gradient has not halved in trah_.patience
-	// iterations (patience_requested with `soscf`), with `soscf` once the DIIS error is below its
+	// iterations (patience_requested with `check_hessian`), with `check_hessian` once the DIIS error is below its
 	// start_threshold, or from best_mo_ when a step is lost (rescue_rise_) and no rescue is due;
 	// it stays on for the rest of the lambda step, and the radius it earned carries into the
 	// next one. Its steps are preconditioned by trah_pcg_ CG steps on the Hessian without its

@@ -546,13 +546,12 @@ bool SCF_wrapper::SCF_iteration(occ::qm::SCF<occ::qm::HartreeFock>& scf, const d
 			soscf_patience_grad_ = settings.current_gradient;
 			soscf_patience_iter_ = scf.iter;
 		}
-		//with soscf requested the DIIS stage only has to reach the quadratic region; Fe_phen HS lambda 0.08
-		//oscillated for 30 iterations above the 1e-2 gate while TRAH converged in 6 from that very point.
 		//A cold start runs DIIS: one Fock build per iteration beats a TRAH macro step far from the
 		//solution (lambda 0: P1 14 builds against 26, TEMPO TZVPP 17 against 31). A warm start goes
 		//straight to the second-order steps: it sits in the quadratic region, where DIIS lost its first
 		//step on TEMPO (the gradient x4 to x6 at iteration 2) and crawled on P1 (x0.6 per iteration)
-		const bool second_order = settings.soscf;
+		//check_hessian needs a second-order step to check, so it enters TRAH at the DIIS error gate
+		const bool second_order = settings.check_hessian;
 		const int patience = second_order ? trah_.patience_requested : trah_.patience;
 		const bool stuck = scf.iter - soscf_patience_iter_ >= patience;
 		const bool warm = warm_start_;

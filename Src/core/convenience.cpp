@@ -4479,7 +4479,7 @@ void options::loadXCWsettings() {
 		};
 
 	std::string conv_preset = "normal";
-	bool soscf = false, check_hessian = false;
+	bool check_hessian = false;
 	std::string speed_preset = "normal_conv";
 
 	/* 1: Classical Jayatilaka XWR
@@ -4688,9 +4688,9 @@ void options::loadXCWsettings() {
 			speed_preset = "normal_conv";
 			};
 
-		handlers["soscf"] = [&](std::istream&) {
-			soscf = true;
-			};
+		//`soscf` is accepted and ignored: cold DIIS + warm TRAH is fixed (ccb566ce), and the key
+		//turned the cold start second-order, which costs Fock builds (P1 lambda 0: 14 -> 26)
+		handlers["soscf"] = [&](std::istream&) {};
 
 		handlers["check_hessian"] = [&](std::istream&) {
 			check_hessian = true;
@@ -4906,7 +4906,6 @@ void options::loadXCWsettings() {
 	xcw_settings.nbo_output = nbo_output;
 	xcw_settings.df_basis_name = df_basis_name;
 	xcw_settings.guess_basis_name = guess_basis_name;
-	xcw_settings.soscf = soscf;
 	xcw_settings.check_hessian = check_hessian;
 	xcw_settings.xcw_gaussian_halt = xcw_gaussian_halt;
 	xcw_settings.xcw_strong_cutoff = xcw_strong_cutoff;
