@@ -128,7 +128,9 @@ TEST(GridAtomGridTests, RadialGridIntegratesGaussian)
 		sum += w[i] * std::exp(-r[i] * r[i]);
 	}
 	EXPECT_NEAR(sum, std::sqrt(constants::PI) / 4.0, 1e-7);
-	EXPECT_EQ(g.get_num_grid_points(), n * 50);
+	//Z <= 18 floors the shells inside R_Bragg/5 at 6 points, not at the 50 asked for; the rest keep 50
+	EXPECT_GT(g.get_num_grid_points(), n * 6);
+	EXPECT_LT(g.get_num_grid_points(), n * 50);
 }
 
 //the full atomic grid of a single centre carries 4 pi in its weights: Int exp(-r^2) = pi^(3/2)
