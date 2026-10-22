@@ -230,6 +230,7 @@ bool SCF_wrapper::do_SCF(const double& lambda, double& alpha, occ::qm::SCF<occ::
 	scf.ctx.K = scf.m_procedure.compute_schwarz_ints();
 	scf.update_scf_energy(false);
 	G_last_.resize(0, 0);
+	reuse_best_G_ = false;
 	last_full_build_ = 0;
 	next_full_build_error_ = 0.0;
 
@@ -479,7 +480,10 @@ bool SCF_wrapper::SCF_iteration(occ::qm::SCF<occ::qm::HartreeFock>& scf, const d
 	//full rebuild while the second-order step is active).
 	const bool incremental = settings.incremental && !soscf_ && !eri_on_device_ && scf.m_procedure.fock_build_properties().density_screened && G_last_.size() > 0
 		&& scf.iter - last_full_build_ < 8 && scf.diis_error > next_full_build_error_;
-	if (incremental) {
+	//a rescue restored best_mo_ and its G: the density is the one G was built from
+	const bool reused = std::exchange(reuse_best_G_, false);
+	if (reused) {}
+	else if (incremental) {
 		occ::Mat D_diff = scf.ctx.mo.D - D_last_build_;
 		std::swap(scf.ctx.mo.D, D_diff);
 		G_last_ += eri_ ? eri_fock(scf.ctx.mo, true) : scf.m_procedure.compute_fock(scf.ctx.mo, scf.ctx.K);
@@ -492,7 +496,7 @@ bool SCF_wrapper::SCF_iteration(occ::qm::SCF<occ::qm::HartreeFock>& scf, const d
 	}
 	D_last_build_ = scf.ctx.mo.D;
 	scf.ctx.F += G_last_;
-	throughput::record_time("XCW Fock build (OCC)", eri_on_device_, get_msec(fock_t0, get_time()));
+	if (!reused) throughput::record_time("XCW Fock build (OCC)", eri_on_device_, get_msec(fock_t0, get_time()));
 	scf.update_scf_energy(false);
 
 	const fit_quality fit = coupling_->quality();
@@ -934,15 +938,16 @@ void SCF_wrapper::check_hessian(occ::qm::SCF<occ::qm::HartreeFock>& scf, const d
 }
 
 //The rescue of a lost SCF step, see best_mo_ in the header. True when it restarted the step:
-//the orbitals are the best ones again, the iteration ends here and the next one rebuilds
-//their Fock matrix in full. Each rescue doubles the level shift, halves the undamped share
-//of the density and holds both ten times longer: restoring the start state with the start
+//the orbitals are the best ones again, the iteration ends here and the next one takes their
+//two-electron part from best_G_ instead of building it again. Each rescue doubles the level
+//shift, halves the undamped share of the density and holds both ten times longer: restoring the start state with the start
 //flags replayed the failure digit for digit (TEMPO, Cordula, three identical rescues). All
 //of it is this lambda step's only, do_SCF resets it.
 bool SCF_wrapper::rescue_scf(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double quant, double& alpha) {
 	if (quant < best_quant_) {
 		best_quant_ = quant;
 		best_mo_ = scf.ctx.mo;
+		best_G_ = G_last_;
 		return false;
 	}
 	if (quant - best_quant_ < rescue_rise_ || rescues_ >= 3) return false;
@@ -960,7 +965,8 @@ bool SCF_wrapper::rescue_scf(occ::qm::SCF<occ::qm::HartreeFock>& scf, const doub
 		<< " (rescue " << rescues_ << "/3)***";
 	print_centered_message(what.str(), 84, writer_->log);
 	scf.ctx.mo = best_mo_;
-	G_last_.resize(0, 0);
+	G_last_ = best_G_;
+	reuse_best_G_ = true;
 	diis_F_.clear();
 	diis_E_.clear();
 	adiis_.reset();

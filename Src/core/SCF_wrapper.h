@@ -99,6 +99,10 @@ private:
 	// rescue_scf restarts it from these orbitals with DIIS cleared and a stronger level shift and
 	// damping held ten times longer, up to three times per step
 	occ::qm::MolecularOrbitals best_mo_;
+	// G_last_ at best_mo_.D: a rescue hands it back instead of rebuilding a Fock matrix it had
+	// (TEMPO, 3 of 8 builds were the restored orbitals'); reuse_best_G_ tells the next iteration
+	occ::Mat best_G_;
+	bool reuse_best_G_ = false;
 	double best_quant_ = 0;
 	int rescues_ = 0;
 	// the stabilisers as the settings gave them, restored at every lambda step
