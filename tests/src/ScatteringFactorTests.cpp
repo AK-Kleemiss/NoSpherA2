@@ -12,8 +12,10 @@
 #include "core/wfn_class.h"
 #include "core/atoms.h"
 #include "core/cube.h"
+#include "core/AtomGrid.h"
 
 #include <filesystem>
+#include <random>
 #include <fstream>
 #include <sstream>
 
@@ -231,6 +233,91 @@ TEST(ScatteringFactorTests, SfacBesselPhaseCycle)
 	const double analytic = constants::PI3_2 * H * std::exp(-H * H / 3.6) / (2.0 * std::pow(0.9, 2.5)) * p1.get_normalized_coefficient() * std::sqrt(3.0 / (4.0 * constants::PI));
 	EXPECT_NEAR(sfac_bessel(p1, k, c1).imag(), analytic, 1e-12);
 	EXPECT_NEAR(sfac_bessel(p1, k, c1).real(), 0.0, 1e-15);
+}
+
+//calc_SF_fourier_bessel against the direct sum sum_p W_p e^{ik.d_p} on a prototype of random shells: past L ~ k r_max
+//the expansion is exact (exact mode to rounding, the |k| table to its cubic interpolation). Two atoms share the first
+//prototype, the second pruned to two points in three; a third sits on a smaller prototype with other shell sizes, so
+//the parts share one column block. Each prototype's outer shell reuses the one before it's directions, as Lebedev
+//shells of one order do. Without a layout every atom is left to the direct sum.
+TEST(ScatteringFactorTests, FourierBesselShellsMatchDirectSum)
+{
+	std::mt19937 rng(7);
+	std::uniform_real_distribution<double> u(-1.0, 1.0);
+	sf_shell_layout lay;
+	lay.protos.resize(2);
+	const std::vector<vec> radii = { { 0.05, 0.4, 1.1, 2.2, 2.5 }, { 0.2, 0.9, 1.6, 1.8 } };
+	for (int P = 0; P < 2; P++)
+	{
+		sf_shell_layout::prototype& pr = lay.protos[P];
+		const int n = P ? 40 : 60;
+		vec dir;
+		for (size_t s = 0; s < radii[P].size(); s++)
+		{
+			const double r = radii[P][s];
+			pr.shell_start.push_back((int)pr.x.size());
+			if (s + 1 < radii[P].size())
+			{
+				dir.clear();
+				for (int p = 0; p < n; p++)
+				{
+					double v[3] = { u(rng), u(rng), u(rng) };
+					const double nv = std::sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
+					for (int c = 0; c < 3; c++)
+						dir.push_back(v[c] / nv);
+				}
+			}
+			for (int p = 0; p < n; p++)
+			{
+				pr.x.push_back(r * dir[3 * p]); pr.y.push_back(r * dir[3 * p + 1]); pr.z.push_back(r * dir[3 * p + 2]);
+			}
+		}
+		pr.shell_start.push_back((int)pr.x.size());
+	}
+	constexpr int na = 3;
+	vec2 d1(na), d2(na), d3(na), dens(na);
+	lay.proto = { 0, 0, 1 };
+	lay.idx.resize(na);
+	for (int a = 0; a < na; a++)
+		for (int p = 0; p < (int)lay.protos[lay.proto[a]].x.size(); p++)
+		{
+			if (a == 1 && p % 3 == 2)
+				continue;
+			const sf_shell_layout::prototype& pr = lay.protos[lay.proto[a]];
+			lay.idx[a].push_back(p);
+			d1[a].push_back(pr.x[p]); d2[a].push_back(pr.y[p]); d3[a].push_back(pr.z[p]);
+			const double r = std::sqrt(pr.x[p] * pr.x[p] + pr.y[p] * pr.y[p] + pr.z[p] * pr.z[p]);
+			dens[a].push_back((1.0 + 0.5 * u(rng)) * std::exp(-r));
+		}
+	vec2 k(3, vec());
+	for (int t = 0; t < 400; t++)
+	{
+		const double s = 5.0 * t / 400.0;
+		k[0].push_back(s * std::cos(0.37 * t)); k[1].push_back(s * std::sin(0.37 * t)); k[2].push_back(0.6 * s * std::cos(0.11 * t));
+	}
+	for (const bool exact : { true, false })
+	{
+		cvec2 sf(na, cvec(k[0].size()));
+		const std::vector<char> done = calc_SF_fourier_bessel(k, dens, &lay, sf, 40, exact);
+		for (int a = 0; a < na; a++)
+		{
+			ASSERT_EQ(done[a], 1);
+			double worst = 0.0, scale = 0.0;
+			for (size_t t = 0; t < k[0].size(); t++)
+			{
+				cdouble ref(0.0, 0.0);
+				for (size_t p = 0; p < dens[a].size(); p++)
+					ref += dens[a][p] * std::exp(cdouble(0.0, k[0][t] * d1[a][p] + k[1][t] * d2[a][p] + k[2][t] * d3[a][p]));
+				worst = std::max(worst, std::abs(sf[a][t] - ref));
+				scale = std::max(scale, std::abs(ref));
+			}
+			//relative to the largest |f| (~100 here): the table's cubic interpolation leaves ~1e-8 of it at r = 2.5
+			EXPECT_LT(worst / scale, exact ? 1e-13 : 1e-7) << "exact=" << exact << " atom " << a << " worst " << worst;
+		}
+	}
+	cvec2 sf(na, cvec(k[0].size()));
+	const std::vector<char> none = calc_SF_fourier_bessel(k, dens, nullptr, sf);
+	EXPECT_EQ(none[0] + none[1] + none[2], 0);
 }
 
 //primitive normalisation matches the textbook Gaussian norm for an s function:

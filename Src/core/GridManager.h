@@ -88,6 +88,9 @@ private:
 	bool needs_helper_grids_ = false;
 	//The wfn atom each grid is centred on; not the grid index once a structure is grown
 	ivec grid_atom_;
+	//Each grid's prototype and each of its points' index there, kept through pruneGrid for sf_shell_layout
+	ivec grid_proto_;
+	ivec2 grid_pidx_;
 	vec grid_key_;
 	//What calculateNonSphericalDensities evaluates; the wave's orbitals when empty
 	DensityBatch density_;
@@ -129,7 +132,9 @@ public:
 	//Sum_p rho w_A r^l Y_lm(r_hat) about each nucleus for the configured scheme, [atom][l*l+l+m], l = 0..lmax
 	vec2 calculatePartitionedMultipoles(const WFN &wave, const int lmax);
 
-	void getDensityVectors(const WFN &wave, const ivec &atom_list, vec2 &d1, vec2 &d2, vec2 &d3, vec2 &dens, const bool get_g = false);
+	//layout, when given, records the prototype point of every kept point (calc_SF's Fourier-Bessel path)
+	void getDensityVectors(const WFN &wave, const ivec &atom_list, vec2 &d1, vec2 &d2, vec2 &d3, vec2 &dens, const bool get_g = false,
+		sf_shell_layout *layout = nullptr);
 	void getDensityVectorsFromCube(const WFN &wave, const ivec &atom_list, const cube &density_cube, vec2 &d1, vec2 &d2, vec2 &d3, vec2 &dens, vec &atom_electrons);
 
 	//Evaluate this density on the grids instead of the wave's orbitals: a Gaussian_Molecule, a Centred<> atom model,

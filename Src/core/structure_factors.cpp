@@ -739,7 +739,7 @@ structure_factors::I_tensor& structure_factors::eval_I(const occ::gto::AOBasis& 
 void structure_factors::start_i_save()
 {
 	//A streamed tensor was built straight into the save file, see decide_i_storage
-	if (I_tens.i_tensor_save_path.empty() || I_tens.i_streamed_) return;
+	if (I_tens.i_tensor_save_path.empty() || I_tens.i_streamed_ || XG.mode == 1) return;
 	const size_t packed = I_tens.i_compact_;
 	const int nr = model_data.nr;
 	const std::filesystem::path path = I_tens.i_tensor_save_path;
@@ -926,7 +926,9 @@ void structure_factors::build_I(const std::vector<ao_data>& ao_data_shells, doub
 	for (int g = 0; g < n_grids; g++) {
 		std::fill(grids[g][GridData::GridIndex::WFN_DENSITY].begin(), grids[g][GridData::GridIndex::WFN_DENSITY].end(), 1.0);
 	}
-	grid_manager.getDensityVectors(dummy_wave, asym_atom_list, d1, d2, d3, weights);
+	//where each point sits in its prototype grid, for the grid route's Fourier-Bessel transform
+	sf_shell_layout layout;
+	grid_manager.getDensityVectors(dummy_wave, asym_atom_list, d1, d2, d3, weights, false, &layout);
 	const int* points = grid_manager.getNeedsHelper() ? GD.helper_num_points_per_atom.data() : GD.num_points_per_atom.data();
 	const int total_points = grid_manager.getTotalGridPoints();
 	std::cout << "Total number of grid points after pruning: " << total_points << std::endl;
@@ -1248,6 +1250,11 @@ void structure_factors::build_I(const std::vector<ao_data>& ao_data_shells, doub
 			if (static_cast<int>(d2[g].size()) >= npts) apply(d2[g].data());
 			if (static_cast<int>(d3[g].size()) >= npts) apply(d3[g].data());
 			if (static_cast<int>(weights[g].size()) >= npts) apply(weights[g].data());
+			if (g < static_cast<int>(layout.idx.size()) && static_cast<int>(layout.idx[g].size()) >= npts) {
+				ivec t(npts);
+				for (int p = 0; p < npts; p++) t[p] = layout.idx[g][perm[p]];
+				layout.idx[g].swap(t);
+			}
 			for (int mu = 0; mu < model_data.nmo; mu++) {
 				vec& v = mu_vals[mu][g];
 				if (static_cast<int>(v.size()) == npts) apply(v.data());
@@ -1352,23 +1359,7 @@ void structure_factors::build_I(const std::vector<ao_data>& ao_data_shells, doub
 		}
 	}
 
-	// Tile the grid points for each atom into blocks of size 64
-	struct MatrixTile {
-		int row_start;
-		int row_count;
-		int col_start;
-		int col_count;
-		size_t result_offset;
-	};
-	struct GridBlock {
-		int point_start;
-		int point_count;
-		ivec active_aos;
-		vec ao_values;
-		std::vector<float> ao_values_f;
-		std::vector<MatrixTile> matrix_tiles;
-		int tile_result_size = 0;
-	};
+	// Tile the grid points for each atom into blocks
 	//128 rows a tile: at 64 the GEMM calls are overhead-bound in both precisions, and above
 	//it a double tile pair leaves the core's L2 while single precision stays flat to 256
 	constexpr int screened_tile_size = 128;
@@ -1592,6 +1583,24 @@ void structure_factors::build_I(const std::vector<ao_data>& ao_data_shells, doub
 			if (!skip[mu][nu]) {
 				skipped_grids += static_cast<long long>(num_syms) * skipped_grids_per_pair[tri_index(mu, nu)];
 			}
+		}
+	}
+	//The grid route is the default; the tensor is built only for NOSPHERA2_XCW_GRID=0 or when it is to be saved
+	const char* xg = tuning("NOSPHERA2_XCW_GRID");
+	if (const int xg_mode = xg ? std::atoi(xg) : (I_tens.i_tensor_save_path.empty() ? 1 : 0); xg_mode != 0) {
+		XG.mode = xg_mode;
+		const bool keep = XG.mode == 2;
+		auto take = [keep](auto& a) -> std::decay_t<decltype(a)> { if (keep) return a; return std::move(a); };
+		XG.blocks = take(grid_blocks);
+		XG.d1 = take(d1); XG.d2 = take(d2); XG.d3 = take(d3); XG.w = take(weights);
+		XG.skip = take(skip); XG.lookup = take(asym_lookup); XG.inversion_link = take(inversion_link);
+		XG.clean_of = take(clean_of); XG.is_inverse = take(is_inverse);
+		plan_grid_fb(layout);
+		std::cout << "XCW on the grid: the I tensor is " << (keep ? "built as well, for comparison" : "not built") << std::endl;
+		if (!keep) {
+			skipped_grids_ = skipped_grids * model_data.nr;
+			time_taken = 0;
+			return;
 		}
 	}
 	bool itensor_on_gpu = false;

@@ -611,6 +611,12 @@ void GridManager::generateIntegrationGrids(const WFN &wave, const cell &unit_cel
 			(*grid)[i][coord].resize((*num_points)[i], 0.0);
 	}
 	grid_atom_ = atom_of;
+	grid_proto_ = proto_of;
+	grid_pidx_.assign(num_atoms_with_grids, ivec());
+	for (int i = 0; i < num_atoms_with_grids; i++) {
+		grid_pidx_[i].resize((*num_points)[i]);
+		std::iota(grid_pidx_[i].begin(), grid_pidx_[i].end(), 0);
+	}
 	//The TFVC weights are only read for that partitioning and for the every-scheme
 	//output, and chi is a line-density extremum search over every atom pair
 	vec chi_matrix;
@@ -866,7 +872,8 @@ PartitionResults GridManager::calculatePartitionedCharges(const WFN &wave, const
 	return results;
 }
 
-void GridManager::getDensityVectors(const WFN &wave, const ivec &atom_list, vec2 &d1, vec2 &d2, vec2 &d3, vec2 &dens, const bool get_g) {
+void GridManager::getDensityVectors(const WFN &wave, const ivec &atom_list, vec2 &d1, vec2 &d2, vec2 &d3, vec2 &dens, const bool get_g,
+	sf_shell_layout *layout) {
 	if (config_.debug) {
 		std::cout << "GridManager: Generating density vectors..." << std::endl;
 	}
@@ -888,6 +895,13 @@ void GridManager::getDensityVectors(const WFN &wave, const ivec &atom_list, vec2
 
 	const int atoms_needing_grids = atom_list.size();
 	d1.resize(atoms_needing_grids); d2.resize(atoms_needing_grids); d3.resize(atoms_needing_grids); dens.resize(atoms_needing_grids);
+	if (layout) {
+		layout->protos.clear();
+		for (const AtomGrid &p : prototype_grids_)
+			layout->protos.push_back({ p.get_gridx(), p.get_gridy(), p.get_gridz(), p.get_shell_start() });
+		layout->proto.assign(atoms_needing_grids, -1);
+		layout->idx.assign(atoms_needing_grids, ivec());
+	}
 	//#pragma omp parallel for schedule(dynamic, 1)
 	for (int g = 0; g < grid->size(); g++) {
 		vec2 &atomic_grid = (*grid)[g];
@@ -926,13 +940,22 @@ void GridManager::getDensityVectors(const WFN &wave, const ivec &atom_list, vec2
 		const double z0 = wave.get_atom_coordinate(atom_list[final_atoms], 2);
 
 		size_t accepted_points = 0;
+		const bool track = layout && g < (int)grid_pidx_.size() && (int)grid_pidx_[g].size() == n_points;
+		int *pi = nullptr;
+		if (track) {
+			layout->proto[final_atoms] = grid_proto_[g];
+			layout->idx[final_atoms].resize(n_points);
+			pi = layout->idx[final_atoms].data();
+		}
 		for (int p = 0; p < n_points; p++) {
 			const double t = rho[p] * w[p];
 			const int keep = std::fabs(t) >= cutoff;  // 0/1
 			res[accepted_points] = t;
 			d1_ptr[accepted_points] = x[p] - x0; d2_ptr[accepted_points] = y[p] - y0; d3_ptr[accepted_points] = z[p] - z0;
+			if (pi) pi[accepted_points] = grid_pidx_[g][p];
 			accepted_points += keep;
 		}
+		if (track) layout->idx[final_atoms].resize(accepted_points);
 
 		//I really like this one... but it seems to be slightly slower than the above version
 		//#pragma omp simd
@@ -1589,8 +1612,10 @@ void GridManager::pruneGrid() {
 		vec2 &dest = pruned_atomic_grids[g];
 
 		int reduced_point = 0;
+		ivec *pidx = g < (int)grid_pidx_.size() && (int)grid_pidx_[g].size() == (*num_points)[g] ? &grid_pidx_[g] : nullptr;
 		for (int p = 0; p < (*num_points)[g]; p++) {
 			if (!kept_local[p]) continue;
+			if (pidx) (*pidx)[reduced_point] = (*pidx)[p];
 
 			dest[GridData::GridIndex::X][reduced_point] = source[GridData::GridIndex::X][p];
 			dest[GridData::GridIndex::Y][reduced_point] = source[GridData::GridIndex::Y][p];
@@ -1605,6 +1630,7 @@ void GridManager::pruneGrid() {
 
 			reduced_point++;
 		}
+		if (pidx) pidx->resize(reduced_point);
 	}
 
 	// Update grid data

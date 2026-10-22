@@ -21,6 +21,8 @@ public:
 	// Sum_r Re(pre_r I_r(mu,nu)) over the fit set, the walk perturbation and the Hessian-vector
 	// product share; out is nmo x nmo, symmetric, without any prefactor
 	void contract_I(occ::Mat& out, const cvec& pre);
+	// contract_I's walk over the tensor itself, the grid route aside
+	void contract_tensor(occ::Mat& out, const cvec& pre);
 
 	// Distributional (Gaussian) halting criterion (see xcw_halting.h and
 	// tests/P1_test/XCW_plan.md). Computes standardized residuals z_h from
@@ -80,6 +82,11 @@ private:
 	SCF_log_writer writer;
 	SCF_wrapper scf_solver;
 	GridManager tsc_grids;
+	// the grid route's tscb (XG.mode 1): the first step's tsc-route table gives the scatterers, the hkl rows,
+	// the asym atom of each scatterer and the hkl_enlarged entry of each row; later steps fill it from grid_sfc
+	ScattererLabels tscb_scat_;
+	ivec2 tscb_hkl_;
+	ivec tscb_atom_, tscb_entry_;
 	// F_calc and scale as save_state left them
 	cvec saved_F_calc_;
 	double saved_scale_ = 0.0;

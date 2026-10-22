@@ -3,9 +3,13 @@
 #if defined(NOSPHERA2_USE_GPU) || defined(NOSPHERA2_USE_METAL)
 #include "itensor_gpu.h"
 #endif
+#ifdef NOSPHERA2_USE_GPU
+#include "xcw_grid_gpu.h"
+#endif
 #include "scattering_factors.h"
 #include "basis_set.h"
 #include "bondwise_analysis.h"
+#include "tuning.h"
 #include <limits>
 
 XCW_solver::XCW_solver(options& opt_in) : opt(&opt_in), sf(opt_in) {
@@ -218,8 +222,22 @@ void XCW_solver::report_halting_progress_estimate(bool is_final) {
 	}
 }
 
+//F_calc of D through the I tensor or on the grid, see structure_factors::xcw_grid; mode 2 runs
+//both and prints how far the grid lands from the tensor
+static void calc_F(structure_factors& sf, structure_factors::I_tensor& I, const dMatrix2& D) {
+	if (sf.XG.mode == 1) { sf.grid_F(D); return; }
+	sf.calc_F_calc(I, D);
+	if (sf.XG.mode != 2) return;
+	const cvec tensor = sf.scatter_data.F_calc;
+	sf.grid_F(D);
+	double d = 0, m = 0;
+	for (size_t r = 0; r < tensor.size(); r++) { d = std::max(d, std::abs(tensor[r] - sf.scatter_data.F_calc[r])); m = std::max(m, std::abs(tensor[r])); }
+	std::cout << "XCW grid check: max |F_grid - F_tensor| " << std::scientific << d << " of max |F| " << m << std::defaultfloat << std::endl;
+	sf.scatter_data.F_calc = tensor;
+}
+
 void XCW_solver::evaluate(const dMatrix2& dm_eff) {
-	sf.calc_F_calc(*I_tens, dm_eff);
+	calc_F(sf, *I_tens, dm_eff);
 	sf.eval_scale();
 	sf.calc_criteria();
 }
@@ -239,7 +257,7 @@ void XCW_solver::restore_state() {
 }
 
 bool XCW_solver::on_device() const {
-	return I_tens->i_on_device_;
+	return I_tens->i_on_device_ || sf.XG.on_device;
 }
 
 void XCW_solver::perturbation(occ::Mat& perturb, const bool unrestricted) {
@@ -289,7 +307,7 @@ occ::Mat XCW_solver::perturbation_response(const dMatrix2& dD_eff, const double 
 	//dF_r = Sum c I_r dD_eff: calc_F_calc's walk with the fixed part zeroed
 	const cvec F0 = sf.scatter_data.F_calc, fixed = sf.scatter_data.anom_correction;
 	std::fill(sf.scatter_data.anom_correction.begin(), sf.scatter_data.anom_correction.end(), cdouble(0.0, 0.0));
-	sf.calc_F_calc(*I_tens, dD_eff);
+	calc_F(sf, *I_tens, dD_eff);
 	const cvec dFr = sf.scatter_data.F_calc;
 	sf.scatter_data.F_calc = F0;
 	sf.scatter_data.anom_correction = fixed;
@@ -357,6 +375,19 @@ occ::Mat XCW_solver::perturbation_response(const dMatrix2& dD_eff, const double 
 }
 
 void XCW_solver::contract_I(occ::Mat& out, const cvec& pre) {
+	if (sf.XG.mode == 1) { sf.grid_contract(out, pre); return; }
+	if (sf.XG.mode == 2) {
+		occ::Mat grid;
+		sf.grid_contract(grid, pre);
+		contract_tensor(out, pre);
+		std::cout << "XCW grid check: max |P_grid - P_tensor| " << std::scientific << (grid - out).cwiseAbs().maxCoeff()
+			<< " of max |P| " << out.cwiseAbs().maxCoeff() << std::defaultfloat << std::endl;
+		return;
+	}
+	contract_tensor(out, pre);
+}
+
+void XCW_solver::contract_tensor(occ::Mat& out, const cvec& pre) {
 	out.setZero(sf.model_data.nmo, sf.model_data.nmo);
 	const int step = std::max(1, I_tens->i_streamed_ ? I_tens->i_window_ : sf.model_data.nr);
 	bool on_device = false;
@@ -459,19 +490,118 @@ void XCW_solver::create_tscb(const occ::qm::Wavefunction& wfn, const double& lam
 	//is an OCC result over a basis this program loaded, so say that: Int_Params then reads the
 	//shells with the convention they actually have.
 	sf_wave_vec[0].set_origin(e_origin::XCW_fit);
-	svec known_atoms_;
 	tsc_block<int, cdouble> result;
-	vec2 known_kpts_;
-	opt->m_hkl_list = sf.scatter_data.hkl_enlarged;
-	opt->grid_cache = &tsc_grids;
-	result.append(calculate_scattering_factors<itsc_block, std::vector<WFN>&>(
-		*opt,
-		sf_wave_vec,
-		writer.log,
-		known_atoms_,
-		0,
-		&sf.k_pt),
-		writer.log);
+	const _time_point fwd_t0 = get_time();
+	//The grid runner already holds rho's partition: its per-atom transform at the converged D is the
+	//tsc table, so after the first step no second grid, no WFN pass and no tsc machinery run per lambda.
+	//NOSPHERA2_XCW_GRID_TSCB_OLD keeps the tsc route on every step
+	const bool grid_tscb = sf.XG.mode == 1 && !opt->electron_diffraction && !tuning("NOSPHERA2_XCW_GRID_TSCB_OLD");
+	cvec sfc;
+	const int nc = static_cast<int>(sf.XG.inversion_link.size());
+	auto grid_value = [&](const int at, const int e) {
+		const cdouble v = sfc[static_cast<size_t>(at) * nc + sf.XG.clean_of[e]];
+		return sf.XG.is_inverse[e] ? std::conj(v) : v;
+	};
+	if (grid_tscb) {
+		const occ::Mat& Dw = wfn.mo.D;
+		const int n = static_cast<int>(Dw.cols());
+		const bool unrestricted = Dw.rows() == 2 * Dw.cols();
+		dMatrix2 D(n, n);
+		for (int i = 0; i < n; i++)
+			for (int j = 0; j < n; j++) D(i, j) = Dw(i, j) + (unrestricted ? Dw(i + n, j) : 0.0);
+		sfc = sf.grid_sfc(D);
+	}
+	if (grid_tscb && !tscb_scat_.empty()) {
+		cvec2 table(tscb_scat_.size(), cvec(tscb_entry_.size()));
+#pragma omp parallel for
+		for (int s = 0; s < static_cast<int>(table.size()); s++)
+			for (size_t r = 0; r < tscb_entry_.size(); r++) table[s][r] = grid_value(tscb_atom_[s], tscb_entry_[r]);
+		result = itsc_block(table, tscb_scat_, tscb_hkl_);
+	}
+	else {
+		svec known_atoms_;
+		opt->m_hkl_list = sf.scatter_data.hkl_enlarged;
+		opt->grid_cache = &tsc_grids;
+		result.append(calculate_scattering_factors<itsc_block, std::vector<WFN>&>(
+			*opt,
+			sf_wave_vec,
+			writer.log,
+			known_atoms_,
+			0,
+			&sf.k_pt),
+			writer.log);
+		//first step on the grid route: learn the table's layout, each scatterer's atom by the closest grid column
+		if (grid_tscb) {
+			std::map<i3, int> e_of;
+			for (const i3& h : sf.scatter_data.hkl_enlarged) e_of.emplace(h, static_cast<int>(e_of.size()));
+			const int nrow = static_cast<int>(result.reflection_size()), ns = static_cast<int>(result.get_scatterers().size());
+			ivec entry(nrow), atom(ns);
+			bool ok = true;
+			for (int r = 0; r < nrow && ok; r++) {
+				const auto it = e_of.find({ (int)result.get_index(0, r), (int)result.get_index(1, r), (int)result.get_index(2, r) });
+				ok = it != e_of.end();
+				if (ok) entry[r] = it->second;
+			}
+			double worst = 0.0;
+			for (int s = 0; s < ns && ok; s++) {
+				const cvec& f = result.get_sf_for_scatterer(s);
+				double best = 1e300;
+				for (int at = 0; at < sf.model_data.ncen; at++) {
+					double d = 0;
+					for (int r = 0; r < std::min(nrow, 256); r++) d += std::norm(f[r] - grid_value(at, entry[r]));
+					if (d < best) { best = d; atom[s] = at; }
+				}
+				double dmax = 0, fmax = 0;
+				for (int r = 0; r < nrow; r++) {
+					dmax = std::max(dmax, std::abs(f[r] - grid_value(atom[s], entry[r])));
+					fmax = std::max(fmax, std::abs(f[r]));
+				}
+				worst = std::max(worst, dmax / fmax);
+			}
+			//ponytail: 1e-2 only catches a wrong layout; the grid-vs-tsc agreement itself is the 5e-5 of the F check
+			ok = ok && worst < 1e-2;
+			std::cout << "XCW grid tscb: max |f_grid - f_tsc| / max |f| " << std::scientific << std::setprecision(2) << worst << std::defaultfloat
+				<< (ok ? ", later steps write the tscb from the grid" : ", layout not matched, the tsc route stays") << std::endl;
+			if (ok) {
+				tscb_scat_ = result.get_scatterers();
+				tscb_hkl_ = result.get_index_vector();
+				tscb_entry_ = entry;
+				tscb_atom_ = atom;
+			}
+		}
+	}
+	//NOSPHERA2_XCW_GRID_FCHECK: F_calc from these grid scattering factors against the I-tensor walk at the same D,
+	//the forward half of an XCW without the I tensor. Rows are matched by hkl, scatterers by label.
+	if (tuning("NOSPHERA2_XCW_GRID_FCHECK")) {
+		const double fwd_ms = get_msec(fwd_t0, get_time());
+		std::map<i3, size_t> row_of;
+		for (size_t r = 0; r < result.reflection_size(); r++)
+			row_of[{ (int)result.get_index(0, r), (int)result.get_index(1, r), (int)result.get_index(2, r) }] = r;
+		const svec names = result.get_scatterers_string();
+		cvec2 sfs(sf.model_data.ncen);
+		for (int at = 0; at < sf.model_data.ncen; at++) {
+			size_t s = std::find(names.begin(), names.end(), sf.asym_atoms[at].label) - names.begin();
+			if (s == names.size()) {
+				if (at == 0) std::cout << "grid F check: scatterer " << names[0] << " for " << sf.asym_atoms[0].label << ", matched by position" << std::endl;
+				s = at;
+			}
+			for (const i3& h : sf.scatter_data.hkl_enlarged)
+				sfs[at].push_back(result.get_sf_for_scatterer(s)[row_of.at(h)]);
+		}
+		const cvec F_I = sf.scatter_data.F_calc;
+		sf.calc_F_calc(sfs);
+		double dmax = 0.0, fmax = 0.0, num = 0.0, den = 0.0;
+		for (size_t r = 0; r < F_I.size(); r++) {
+			const double d = std::abs(sf.scatter_data.F_calc[r] - F_I[r]);
+			dmax = std::max(dmax, d);
+			fmax = std::max(fmax, std::abs(F_I[r]));
+			num += std::abs(std::abs(sf.scatter_data.F_calc[r]) - std::abs(F_I[r]));
+			den += std::abs(F_I[r]);
+		}
+		sf.scatter_data.F_calc = F_I;
+		std::cout << "grid F check lambda " << lambda << ": max|dF|/max|F| " << std::scientific << std::setprecision(2) << dmax / fmax
+			<< " sum||F_grid|-|F_I||/sum|F_I| " << num / den << std::fixed << " forward " << fwd_ms << " ms" << std::endl;
+	}
 	std::string value = std::to_string(lambda);
 	value.erase(std::remove(value.begin(), value.end(), '.'), value.end());
 	while (value.length() < 7) {
@@ -622,12 +752,20 @@ void XCW_solver::run() {
 	//The two walks of an iteration read the whole tensor and the host is bound by its memory
 	//bandwidth doing so; the device reads it several times faster. The host copy stays for
 	//the background writer.
-	if (opt->gpu_itensor && opt->use_gpu && !I_tens->i_streamed_) {
+	if (opt->gpu_itensor && opt->use_gpu && !I_tens->i_streamed_ && sf.XG.mode != 1) {
 		I_tens->i_on_device_ = I_tens->i_float_ ? itensor_gpu_hold(I_tens->I32.data(), sf.model_data.nr, static_cast<int>(I_tens->i_compact_))
 			: itensor_gpu_hold(I_tens->I.data(), sf.model_data.nr, static_cast<int>(I_tens->i_compact_));
 		if (!(opt->no_date))
 			std::cerr << "GPU in use: XCW structure factors and perturbation on "
 			<< (I_tens->i_on_device_ ? "the device" : "the CPU - device unavailable or the tensor too large") << std::endl;
+	}
+#endif
+#ifdef NOSPHERA2_USE_GPU
+	//The grid runner's two block GEMMs; the transform between them stays on the host. Single precision there, so not under i_double
+	if (opt->gpu_itensor && opt->use_gpu && sf.XG.mode == 1 && !I_tens->tensor_double) {
+		const bool held = sf.hold_grid_gpu();
+		if (!(opt->no_date))
+			std::cerr << "GPU in use: XCW grid blocks on " << (held ? "the device" : "the CPU - device unavailable or the blocks too large") << std::endl;
 	}
 #endif
 	// Computes the four center integrals and keeps them in memory if possible
@@ -776,6 +914,10 @@ void XCW_solver::run() {
 #if defined(NOSPHERA2_USE_GPU) || defined(NOSPHERA2_USE_METAL)
 	itensor_gpu_release();
 	I_tens->i_on_device_ = false;
+#endif
+#ifdef NOSPHERA2_USE_GPU
+	xcw_grid_gpu_release();
+	sf.XG.on_device = false;
 #endif
 	scf_solver.release_device();
 

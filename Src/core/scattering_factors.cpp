@@ -13,6 +13,7 @@
 #include "wfn_class.h"
 #include "spherical_density.h"
 #include "AtomGrid.h"
+#include "fourier_bessel.h"
 #include "npy.h"
 #include "integrator.h"
 #include "basis_set.h"
@@ -26,6 +27,7 @@
 #include "gaussian_atom.h"
 #include "GridManager.h"
 #include "cube.h"
+#include "tuning.h"
 #ifdef NOSPHERA2_USE_GPU
 #include "sf_gpu.h"
 #include "itensor_gpu.h"
@@ -1886,6 +1888,395 @@ static inline void sf_anchor(const int nt, const double k1, const double k2, con
 	*acc_r += sf_hsum(sr) + re1;
 	*acc_i += sf_hsum(sm) + im1;
 }
+
+
+std::vector<char> calc_SF_fourier_bessel(const vec2& k_pt, const vec2& dens, const sf_shell_layout* layout,
+	cvec2& sf, const int L_override, const bool exact, const bool force)
+{
+	const int na = static_cast<int>(dens.size());
+	std::vector<char> done(na, 0);
+	if (!layout || static_cast<int>(layout->proto.size()) != na)
+		return done;
+	const long long nk = static_cast<long long>(k_pt[0].size());
+	const double* kx = k_pt[0].data(), * ky = k_pt[1].data(), * kz = k_pt[2].data();
+	vec qk(nk);
+	double qmax = 0.0;
+	for (long long k = 0; k < nk; k++)
+		qmax = std::max(qmax, qk[k] = std::sqrt(kx[k] * kx[k] + ky[k] * ky[k] + kz[k] * kz[k]));
+	//reflections by |k|: a run of them on the same table nodes is one assembly GEMM
+	std::vector<long long> ko(nk);
+	std::iota(ko.begin(), ko.end(), 0LL);
+	std::sort(ko.begin(), ko.end(), [&](const long long u, const long long v) { return qk[u] < qk[v]; });
+	double ms_shells = 0.0, ms_proj = 0.0, ms_tab = 0.0, ms_asm = 0.0; //-gflops phase split
+	constexpr size_t FB_MEM = size_t(1) << 24; //doubles per work array (128 MB): sets the atoms per column block
+	constexpr int FB_BIN = 256, FB_ROWS = 64, FB_PB = 512; //reflections per assembly GEMM, table nodes per radial GEMM,
+	//rule points per Y block of the projection
+	//Direct-sum point x reflection steps per FB flop, timed on sucrose and rubredoxin (8 threads, AVX2, MKL)
+	constexpr double FB_STEP_PER_FLOP = 0.05;
+	_time_point t_ph = get_time();
+	//A prototype's atoms are GEMM columns; it keeps its own shells, cut and Lebedev rules. All prototypes share the
+	//|k| nodes (the finest any asks for) and Y(k^) up to the largest L, so the assembly evaluates Y once per reflection
+	struct fb_rule { int s0, n, Lr; ivec sh; }; //first shell, points, largest Ls of its shells, its shells
+	struct fb_part { int P = 0, ns = 0, L = 0; ivec mem, Ls, sl, rule_of; vec r; std::vector<fb_rule> rules; };
+	std::vector<fb_part> parts;
+	int L = 0;
+	double h = 0.025;
+	for (int P = 0; P < static_cast<int>(layout->protos.size()); P++)
+	{
+		const sf_shell_layout::prototype& pr = layout->protos[P];
+		const ivec& ss = pr.shell_start;
+		fb_part F;
+		F.P = P;
+		double direct = 0.0;
+		for (int a = 0; a < na; a++)
+		{
+			const ivec& ix = layout->idx[a];
+			if (layout->proto[a] != P || ix.empty() || ix.size() != dens[a].size())
+				continue;
+			F.mem.push_back(a);
+			//shells up to the outermost one any atom kept a point on
+			F.ns = std::max(F.ns, static_cast<int>(std::upper_bound(ss.begin(), ss.end(), *std::max_element(ix.begin(), ix.end())) - ss.begin()));
+			direct += double(ix.size()) * double(nk);
+		}
+		if (F.mem.empty())
+			continue;
+		const int ns = F.ns;
+		F.r.resize(ns);
+		int most = 0;
+		for (int s = 0; s < ns; s++)
+		{
+			const int p = ss[s];
+			F.r[s] = std::sqrt(pr.x[p] * pr.x[p] + pr.y[p] * pr.y[p] + pr.z[p] * pr.z[p]);
+			most = std::max(most, ss[s + 1] - ss[s]);
+		}
+		F.L = L_override >= 0 ? L_override : fb_lebedev_degree(most) / 2;
+		//4-point Lagrange in |k|: error ~ (h r)^4 on a shell's term, so h shrinks with the outermost shell
+		const double hP = std::min(0.025, 0.25 / std::max(F.r[ns - 1], 1e-3));
+		const int nqP = static_cast<int>(qmax / hP) + 4;
+		const bool tabP = !exact && nk >= nqP;
+		//j_l(x) < 1e-12 j_0 past x + 9.4 x^(1/3) + 6 (Debye's asymptotics, the 12-digit rule of fast multipole codes),
+		//so a shell keeps only the l its |k| range can reach: exact to that level, and inner shells drop most of L
+		F.Ls.resize(ns);
+		double flops = 2.0 * double(nk) * (tabP ? 4 : 1) * double(F.L + 1) * (F.L + 1);
+		for (int s = 0; s < ns; s++)
+		{
+			const double x = qmax * F.r[s];
+			F.Ls[s] = std::min(F.L, static_cast<int>(std::ceil(x + 9.4 * std::cbrt(x))) + 6);
+			const double nls = double(F.Ls[s] + 1) * (F.Ls[s] + 1);
+			flops += 2.0 * nls * (double(ss[s + 1] - ss[s]) + double(tabP ? nqP : nk));
+		}
+		//the direct sum keeps a prototype it does faster; asking for L or exact forces Fourier-Bessel
+		if (!force && L_override < 0 && !exact && FB_STEP_PER_FLOP * flops * double(F.mem.size()) > direct)
+			continue;
+		L = std::max(L, F.L);
+		h = std::min(h, hP);
+		parts.push_back(std::move(F));
+	}
+	if (parts.empty())
+		return done;
+	const int ne = fb_n_even(L), no = fb_n_odd(L), nl = ne + no;
+	const int nq = static_cast<int>(qmax / h) + 4;
+	const bool table = !exact && nk >= nq;
+	const int S = table ? 4 : 1; //nodes per reflection; exact: the reflections are the nodes
+	const long long nn = table ? nq : nk;
+	const int NC = table ? static_cast<int>(nn) : static_cast<int>(std::min<long long>(nk, 2048));
+	const fb_ylm Y(L);
+	int Mtot = 0;
+	size_t widest = size_t(NC) * nl;
+	for (fb_part& F : parts)
+	{
+		for (const int a : F.mem)
+			done[a] = 1;
+		const sf_shell_layout::prototype& pr = layout->protos[F.P];
+		const ivec& ss = pr.shell_start;
+		const int ns = F.ns;
+		F.sl.assign(L + 1, ns); //first shell reaching l: J_l is zero on every shell before it
+		for (int l = 0; l <= L; l++)
+			for (int s = 0; s < ns && F.sl[l] == ns; s++)
+				if (F.Ls[s] >= l)
+					F.sl[l] = s;
+		//Shells on the same Lebedev rule and rotation share Y_lm(u_p): the projection takes all of a rule's shells at once
+		F.rule_of.resize(ns);
+		for (int s = 0; s < ns; s++)
+		{
+			const int n = ss[s + 1] - ss[s], p1 = ss[s];
+			const double i1 = F.r[s] > 0.0 ? 1.0 / F.r[s] : 0.0;
+			int R = -1;
+			for (int t = 0; t < static_cast<int>(F.rules.size()) && R < 0; t++)
+			{
+				if (F.rules[t].n != n)
+					continue;
+				const int p0 = ss[F.rules[t].s0];
+				const double i0 = F.r[F.rules[t].s0] > 0.0 ? 1.0 / F.r[F.rules[t].s0] : 0.0;
+				bool same = true;
+				for (int i = 0; i < n && same; i++)
+					same = std::abs(pr.x[p0 + i] * i0 - pr.x[p1 + i] * i1) < 1e-10 && std::abs(pr.y[p0 + i] * i0 - pr.y[p1 + i] * i1) < 1e-10
+					&& std::abs(pr.z[p0 + i] * i0 - pr.z[p1 + i] * i1) < 1e-10;
+				if (same)
+					R = t;
+			}
+			if (R < 0)
+			{
+				R = static_cast<int>(F.rules.size());
+				F.rules.push_back({ s, n, 0, {} });
+			}
+			F.rules[R].sh.push_back(s);
+			F.rules[R].Lr = std::max(F.rules[R].Lr, F.Ls[s]);
+			F.rule_of[s] = R;
+		}
+		Mtot += static_cast<int>(F.mem.size());
+		widest = std::max({ widest, size_t(ns) * nl, size_t(ss[ns]) });
+	}
+	//J[l][n][s] = 4pi (+-1) j_l(q_n r_s), zero past Ls[s]: i^l = +-1 (even l) or +-i (odd), the i left to the parity
+	vec J;
+	const auto fill_J = [&](const fb_part& F, const long long n_lo, const int cnt) {
+		const int ns = F.ns;
+		J.assign(size_t(F.L + 1) * cnt * ns, 0.0);
+#pragma omp parallel
+		{
+			vec jl(F.L + 1);
+#pragma omp for schedule(static)
+			for (int n = 0; n < cnt; n++)
+			{
+				const double q = table ? double(n_lo + n) * h : qk[ko[n_lo + n]];
+				for (int s = 0; s < ns; s++)
+				{
+					fb_sph_bessel(F.Ls[s], q * F.r[s], jl.data());
+					for (int l = 0; l <= F.Ls[s]; l++)
+						J[(size_t(l) * cnt + n) * ns + s] = constants::FOUR_PI * (((l >> 1) & 1) ? -1.0 : 1.0) * jl[l];
+				}
+			}
+		}
+	};
+	//assembly runs: reflections (in |k| order) on the same nodes n0..n0+S-1, at most FB_BIN each
+	struct fb_bin { long long k0; int nb, n0; };
+	std::vector<fb_bin> bins;
+	if (table)
+		for (long long k = 0; k < nk;)
+		{
+			const int n0 = std::clamp(static_cast<int>(qk[ko[k]] / h) - 1, 0, nq - 4);
+			long long e = k + 1;
+			while (e < nk && e - k < FB_BIN && std::clamp(static_cast<int>(qk[ko[e]] / h) - 1, 0, nq - 4) == n0)
+				e++;
+			bins.push_back({ k, static_cast<int>(e - k), n0 });
+			k = e;
+		}
+	const int Mc = std::max(1, static_cast<int>(std::min<size_t>(Mtot, FB_MEM / widest)));
+	ms_shells += get_msec(t_ph, get_time());
+	//a column block holds whole or partial prototypes: segment = part, its first member, members, first column
+	struct fb_seg { int f, lo, mp, col; };
+	vec W, Ce, Co, Te, To, Yb, Ct;
+	for (int c0 = 0; c0 < Mtot; c0 += Mc)
+	{
+		const int mc = std::min(Mc, Mtot - c0);
+		std::vector<fb_seg> seg;
+		for (int f = 0, g = 0; f < static_cast<int>(parts.size()); g += static_cast<int>(parts[f].mem.size()), f++)
+		{
+			const int lo = std::max(c0, g), hi = std::min(c0 + mc, g + static_cast<int>(parts[f].mem.size()));
+			if (lo < hi)
+				seg.push_back({ f, lo - g, hi - lo, lo - c0 });
+		}
+		t_ph = get_time();
+		//c_s,lm = sum_p Y_lm(u_p) W_p: per rule one GEMM over the rule's points against its shells x atoms side by side
+		//(W zero where pruned), Y evaluated in blocks of points and the moments scattered to [shell][lm][atom]
+		std::vector<size_t> ceo(seg.size() + 1, 0), coo(seg.size() + 1, 0);
+		for (size_t j = 0; j < seg.size(); j++)
+		{
+			ceo[j + 1] = ceo[j] + size_t(parts[seg[j].f].ns) * ne * seg[j].mp;
+			coo[j + 1] = coo[j] + size_t(parts[seg[j].f].ns) * no * seg[j].mp;
+		}
+		Ce.assign(ceo.back(), 0.0);
+		Co.assign(coo.back(), 0.0);
+		for (size_t j = 0; j < seg.size(); j++)
+		{
+			const fb_part& F = parts[seg[j].f];
+			const sf_shell_layout::prototype& pr = layout->protos[F.P];
+			const ivec& ss = pr.shell_start;
+			const int mp = seg[j].mp, nr = static_cast<int>(F.rules.size());
+			std::vector<size_t> wofs(nr + 1, 0);
+			for (int t = 0; t < nr; t++)
+				wofs[t + 1] = wofs[t] + size_t(F.rules[t].n) * F.rules[t].sh.size() * mp;
+			ivec slot(F.ns), sop(ss[F.ns]); //a shell's place among its rule's shells; a prototype point's shell
+			for (const fb_rule& R : F.rules)
+				for (size_t q = 0; q < R.sh.size(); q++)
+					slot[R.sh[q]] = static_cast<int>(q);
+			for (int s = 0; s < F.ns; s++)
+				std::fill(sop.begin() + ss[s], sop.begin() + ss[s + 1], s);
+			W.assign(wofs.back(), 0.0); //W_t[i][slot][atom]
+			for (int c = 0; c < mp; c++)
+			{
+				const int a = F.mem[seg[j].lo + c];
+				const ivec& ix = layout->idx[a];
+				for (size_t p = 0; p < ix.size(); p++)
+				{
+					const int s = sop[ix[p]], t = F.rule_of[s];
+					W[wofs[t] + (size_t(ix[p] - ss[s]) * F.rules[t].sh.size() + slot[s]) * mp + c] = dens[a][p];
+				}
+			}
+			for (int t = 0; t < nr; t++)
+			{
+				const fb_rule& R = F.rules[t];
+				const int nsh = static_cast<int>(R.sh.size()), N = nsh * mp, re = fb_n_even(R.Lr), ro = fb_n_odd(R.Lr), rl = re + ro;
+				const int p0 = ss[R.s0], nbk = (rl + FB_ROWS - 1) / FB_ROWS;
+				//at r = 0 only l = 0 survives j_l(0)
+				const double ir = F.r[R.s0] > 0.0 ? 1.0 / F.r[R.s0] : 0.0;
+				Yb.resize(size_t(std::min(FB_PB, R.n)) * rl);
+				Ct.resize(size_t(rl) * N);
+				for (int b0 = 0; b0 < R.n; b0 += FB_PB)
+				{
+					const int nb = std::min(FB_PB, R.n - b0);
+#pragma omp parallel
+					{
+#if !defined(__APPLE__) && !defined(NSA2_OPENBLAS)
+						const int mkl_before = mkl_set_num_threads_local(1);
+#endif
+#pragma omp for schedule(static)
+						for (int i = 0; i < nb; i++)
+						{
+							const int p = p0 + b0 + i;
+							Y.eval(pr.x[p] * ir, pr.y[p] * ir, pr.z[p] * ir, Yb.data() + size_t(i) * rl, Yb.data() + size_t(i) * rl + re, R.Lr);
+						}
+#pragma omp for schedule(dynamic)
+						for (int g = 0; g < nbk; g++)
+						{
+							const int r0 = g * FB_ROWS, rows = std::min(FB_ROWS, rl - r0);
+							cblas_dgemm(CblasRowMajor, CblasTrans, CblasNoTrans, rows, N, nb, 1.0, Yb.data() + r0, rl,
+								W.data() + wofs[t] + size_t(b0) * N, N, b0 ? 1.0 : 0.0, Ct.data() + size_t(r0) * N, N);
+						}
+#if !defined(__APPLE__) && !defined(NSA2_OPENBLAS)
+						mkl_set_num_threads_local(mkl_before);
+#endif
+					}
+				}
+#pragma omp parallel for schedule(static)
+				for (int q = 0; q < nsh; q++)
+				{
+					const int s = R.sh[q];
+					for (int i = 0; i < re; i++)
+						std::copy_n(Ct.data() + size_t(i) * N + size_t(q) * mp, mp, Ce.data() + ceo[j] + (size_t(s) * ne + i) * mp);
+					for (int i = 0; i < ro; i++)
+						std::copy_n(Ct.data() + size_t(re + i) * N + size_t(q) * mp, mp, Co.data() + coo[j] + (size_t(s) * no + i) * mp);
+				}
+			}
+		}
+		ms_proj += get_msec(t_ph, get_time());
+		for (long long n_lo = 0; n_lo < nn; n_lo += NC)
+		{
+			const int cnt = static_cast<int>(std::min<long long>(NC, nn - n_lo));
+			t_ph = get_time();
+			if (!table)
+			{
+				bins.clear();
+				for (int j = 0; j < cnt; j++)
+					bins.push_back({ n_lo + j, 1, j });
+			}
+			//T[lm][n][atom] = sum_{s >= sl[l]} J_l[n][s] c_s,lm[atom]: one GEMM per l, block of nodes and segment, scattered
+			//so that a reflection's S nodes are S mc consecutive columns of row lm. Zero past a prototype's own L.
+			Te.assign(size_t(cnt) * ne * mc, 0.0);
+			To.assign(size_t(cnt) * no * mc, 0.0);
+			const int nbk = (cnt + FB_ROWS - 1) / FB_ROWS;
+			for (size_t j = 0; j < seg.size(); j++)
+			{
+				const fb_part& F = parts[seg[j].f];
+				const int ns = F.ns, mp = seg[j].mp;
+				fill_J(F, n_lo, cnt);
+#pragma omp parallel
+				{
+#if !defined(__APPLE__) && !defined(NSA2_OPENBLAS)
+					const int mkl_before = mkl_set_num_threads_local(1);
+#endif
+					vec tb(size_t(FB_ROWS) * (2 * L + 1) * mp);
+#pragma omp for schedule(dynamic)
+					for (int t = 0; t < (L + 1) * nbk; t++)
+					{
+						const int l = L - t / nbk, n0 = (t % nbk) * FB_ROWS, rows = std::min(FB_ROWS, cnt - n0); //big l first
+						if (F.sl[l] == ns)
+							continue;
+						const int width = (l & 1) ? no : ne, o = l * (l - 1) / 2, w = (2 * l + 1) * mp;
+						const double* C = (l & 1) ? Co.data() + coo[j] : Ce.data() + ceo[j];
+						cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, rows, w, ns - F.sl[l], 1.0,
+							J.data() + (size_t(l) * cnt + n0) * ns + F.sl[l], ns, C + (size_t(F.sl[l]) * width + o) * mp, width * mp,
+							0.0, tb.data(), w);
+						double* T = ((l & 1) ? To : Te).data();
+						for (int m = 0; m < 2 * l + 1; m++)
+							for (int n = 0; n < rows; n++)
+								std::copy_n(tb.data() + size_t(n) * w + size_t(m) * mp, mp,
+									T + ((size_t(o) + m) * cnt + n0 + n) * mc + seg[j].col);
+					}
+#if !defined(__APPLE__) && !defined(NSA2_OPENBLAS)
+					mkl_set_num_threads_local(mkl_before);
+#endif
+				}
+			}
+			ms_tab += get_msec(t_ph, get_time());
+			t_ph = get_time();
+			//f(k) = sum_m w_m(|k|) Y(k^) . T[n0 + m]: Y rows times the S nodes x every column in one GEMM per run and
+			//parity, the Lagrange weights applied after
+			ivec colatom(mc);
+			for (const fb_seg& G : seg)
+				for (int c = 0; c < G.mp; c++)
+					colatom[G.col + c] = parts[G.f].mem[G.lo + c];
+#pragma omp parallel
+			{
+#if !defined(__APPLE__) && !defined(NSA2_OPENBLAS)
+				const int mkl_before = mkl_set_num_threads_local(1);
+#endif
+				vec Ye(size_t(FB_BIN) * ne), Yo(size_t(FB_BIN) * no), Ze(size_t(FB_BIN) * S * mc), Zo(size_t(FB_BIN) * S * mc, 0.0),
+					wt(size_t(FB_BIN) * 4);
+#pragma omp for schedule(dynamic)
+				for (int b = 0; b < static_cast<int>(bins.size()); b++)
+				{
+					const fb_bin& B = bins[b];
+					for (int j = 0; j < B.nb; j++)
+					{
+						const long long k = ko[B.k0 + j];
+						const double q = qk[k], iq = q > 0.0 ? 1.0 / q : 0.0;
+						Y.eval(kx[k] * iq, ky[k] * iq, q > 0.0 ? kz[k] * iq : 1.0, Ye.data() + size_t(j) * ne, Yo.data() + size_t(j) * no);
+						double* w = wt.data() + size_t(j) * 4;
+						w[0] = 1.0;
+						if (table)
+						{
+							const double u = q / h - B.n0;
+							w[0] = -(u - 1) * (u - 2) * (u - 3) / 6.0; w[1] = u * (u - 2) * (u - 3) / 2.0;
+							w[2] = -u * (u - 1) * (u - 3) / 2.0; w[3] = u * (u - 1) * (u - 2) / 6.0;
+						}
+					}
+					const int N = S * mc;
+					cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, B.nb, N, ne, 1.0, Ye.data(), ne,
+						Te.data() + size_t(B.n0) * mc, size_t(cnt) * mc, 0.0, Ze.data(), N);
+					if (no > 0)
+						cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, B.nb, N, no, 1.0, Yo.data(), no,
+							To.data() + size_t(B.n0) * mc, size_t(cnt) * mc, 0.0, Zo.data(), N);
+					for (int j = 0; j < B.nb; j++)
+					{
+						const long long k = ko[B.k0 + j];
+						const double* w = wt.data() + size_t(j) * 4, * ze = Ze.data() + size_t(j) * N, * zo = Zo.data() + size_t(j) * N;
+						for (int c = 0; c < mc; c++)
+						{
+							double re = 0.0, im = 0.0;
+							for (int m = 0; m < S; m++)
+							{
+								re += w[m] * ze[m * mc + c];
+								im += w[m] * zo[m * mc + c];
+							}
+							sf[colatom[c]][k] = std::complex<double>(re, im);
+						}
+					}
+				}
+#if !defined(__APPLE__) && !defined(NSA2_OPENBLAS)
+				mkl_set_num_threads_local(mkl_before);
+#endif
+			}
+			ms_asm += get_msec(t_ph, get_time());
+		}
+	}
+	throughput::record_time("FB shells + cost model", false, ms_shells);
+	throughput::record_time("FB projection", false, ms_proj);
+	throughput::record_time("FB radial table", false, ms_tab);
+	throughput::record_time("FB assembly", false, ms_asm);
+	return done;
+}
+
 /**
  * Calculates the scattering factors for a given set of parameters.
  *
@@ -1917,7 +2308,8 @@ void calc_SF(const int& points,
 	bool do_XCW,
 	bool use_gpu,
 	bool gpu_fp64,
-	bool gpu_fp32)
+	bool gpu_fp32,
+	const sf_shell_layout* layout)
 {
 	const long long int imax = static_cast<long long int>(dens.size());
 	const long long int smax = static_cast<long long int>(k_pt[0].size());
@@ -1944,6 +2336,27 @@ void calc_SF(const int& points,
 		else
 			file << "Time to prepare: " << fixed << setprecision(0) << dur << " s" << endl << endl;
 	}
+	//Fourier-Bessel on the prototype shells unless -tune NOS_SF_DIRECT; atoms without a layout (cube grids) and those
+	//the direct sum does faster go on to it, on the device when there is one
+	std::vector<char> fb_done(imax, 0);
+	if (layout && !tuning("NOS_SF_DIRECT")) {
+		const _time_point fb_t0 = get_time();
+		const char* fb_L = tuning("NOS_SF_FB_L");
+		fb_done = calc_SF_fourier_bessel(k_pt, dens, layout, sf, fb_L ? std::atoi(fb_L) : -1,
+			tuning("NOS_SF_FB_EXACT") != nullptr, tuning("NOS_SF_FB_FORCE") != nullptr);
+		throughput::record_time("scattering-factor transform (Fourier-Bessel)", false, get_msec(fb_t0, get_time()));
+		if (debug)
+			file << "Fourier-Bessel transform for " << std::count(fb_done.begin(), fb_done.end(), 1) << " of " << imax
+			<< " atoms, the direct sum for the rest" << endl;
+		if (std::all_of(fb_done.begin(), fb_done.end(), [](const char c) { return c != 0; })) {
+			if (!do_XCW) {
+				ProgressBar fprogress(imax, 60, "=", " ", "Calculating Scattering Factors", file);
+				for (int i = 0; i < imax; i++)
+					fprogress.update();
+			}
+			return;
+		}
+	}
 #ifdef NOSPHERA2_USE_GPU
 	//-gpu_fp64 wins over -gpu_fp32 if both are given: the accurate one is the safer default.
 	const sf_precision prec = gpu_fp64 ? sf_precision::FP64
@@ -1951,23 +2364,27 @@ void calc_SF(const int& points,
 	//An APU's own cores beat its device here unless a precision is asked for (Radeon 780M f32: 176 ms at d 0.5 sucrose,
 	//its Ryzen 8700G 106 ms)
 	if (use_gpu && sf_gpu_available() && (prec != sf_precision::Auto || !itensor_gpu_integrated())) {
-		ivec offs(imax + 1, 0);
+		ivec left; //the atoms Fourier-Bessel left
 		for (int i = 0; i < imax; i++)
-			offs[i + 1] = offs[i] + (int)dens[i].size();
-		const long long tot = offs[imax];
+			if (!fb_done[i])
+				left.push_back(i);
+		const int nleft = (int)left.size();
+		ivec offs(nleft + 1, 0);
+		for (int j = 0; j < nleft; j++)
+			offs[j + 1] = offs[j] + (int)dens[left[j]].size();
+		const long long tot = offs[nleft];
 		vec fd1(tot), fd2(tot), fd3(tot), fde(tot);
-		for (int i = 0; i < imax; i++) {
-			const int lo = offs[i], n = (int)dens[i].size();
+		std::vector<double*> rows(nleft);
+		for (int j = 0; j < nleft; j++) {
+			const int i = left[j], lo = offs[j], n = (int)dens[i].size();
 			for (int p = 0; p < n; p++) {
 				fd1[lo + p] = d1[i][p]; fd2[lo + p] = d2[i][p];
 				fd3[lo + p] = d3[i][p]; fde[lo + p] = dens[i][p];
 			}
+			rows[j] = reinterpret_cast<double*>(sf[i].data());
 		}
-		std::vector<double*> rows(imax);
-		for (int i = 0; i < imax; i++)
-			rows[i] = reinterpret_cast<double*>(sf[i].data());
 		const _time_point sf_gpu_t0 = get_time();
-		if (sf_gpu_run((int)imax, smax, k_pt[0].data(), k_pt[1].data(), k_pt[2].data(),
+		if (sf_gpu_run(nleft, smax, k_pt[0].data(), k_pt[1].data(), k_pt[2].data(),
 			fd1.data(), fd2.data(), fd3.data(), fde.data(), offs.data(), tot,
 			rows.data(), prec)) {
 			//Rate includes the transfers: that is what the caller gets.
@@ -2089,6 +2506,11 @@ void calc_SF(const int& points,
 
 	for (int i = 0; i < imax; i++)
 	{
+		if (fb_done[i]) {
+			if (!do_XCW)
+				progress->update();
+			continue;
+		}
 		pmax = static_cast<long long int>(dens[i].size());
 		sf_cpu_points += static_cast<double>(pmax);
 		dens_local = dens[i].data();
@@ -2607,7 +3029,7 @@ struct spherical_fill_scope
 int make_atomic_grids_wrapper(
 	const WFN& wave, const bvec& needs_grid, const ivec& asym_atom_list, const cell& unit_cell, const svec& labels, //
 	std::vector<_time_point>& time_points, svec& time_descriptions, vec2& d1, vec2& d2, vec2& d3, vec2& dens,
-	const options& opt, std::ostream& file = std::cout) {
+	const options& opt, std::ostream& file = std::cout, sf_shell_layout* layout = nullptr) {
 
 	citations::cite(citations::Method::BeckeGrid, file);
 	if (opt.partition_type == PartitionType::Hirshfeld)
@@ -2663,7 +3085,7 @@ int make_atomic_grids_wrapper(
 	time_points.push_back(get_time());
 	time_descriptions.push_back("calculate charges");
 
-	grid_manager.getDensityVectors(temp, asym_atom_list, d1, d2, d3, dens, opt.get_g);
+	grid_manager.getDensityVectors(temp, asym_atom_list, d1, d2, d3, dens, opt.get_g, layout);
 	time_points.push_back(get_time());
 	time_descriptions.push_back("combined density vectors");
 
@@ -3217,6 +3639,7 @@ tsc_block_type calculate_scattering_factors(
 			opt.partition_type == PartitionType::EMBIS)
 		{
 			vec2 d1, d2, d3, dens;
+			sf_shell_layout layout;
 			const int points = make_atomic_grids_wrapper(
 				*wavy,
 				needs_grid,
@@ -3226,7 +3649,7 @@ tsc_block_type calculate_scattering_factors(
 				time_points,
 				time_descriptions,
 				d1, d2, d3, dens,
-				opt, file);
+				opt, file, &layout);
 
 			_time_point end1;
 			calc_SF(points,
@@ -3241,7 +3664,8 @@ tsc_block_type calculate_scattering_factors(
 				false,
 				opt.use_gpu,
 				opt.gpu_fp64,
-				opt.gpu_fp32);
+				opt.gpu_fp32,
+				&layout);
 
 			time_points.push_back(get_time());
 			time_descriptions.push_back("Fourier transform");

@@ -20,6 +20,7 @@
 #include "core/scattering_factors.h"
 #include "core/i_tensor_stream.h"
 #include "core/XCW_solver.h"
+#include "core/tuning.h"
 
 namespace {
 
@@ -358,7 +359,12 @@ TEST(XcwHaltingReportTests, StreamedTensorRoundTrip)
 	opt.mem_given = true;
 	opt.mem = 0.001;
 	opt.no_date = false;
+	//The streamed tensor is what is under test, and the grid default builds none
+	const char *grid = tuning("NOSPHERA2_XCW_GRID");
+	const std::string grid_old = grid ? grid : "";
+	set_tuning("NOSPHERA2_XCW_GRID", "0");
 	const std::string out = run_xcw(dir, opt);
+	set_tuning("NOSPHERA2_XCW_GRID", grid ? grid_old.c_str() : nullptr);
 	const std::string log = read_file(dir / "SCF.log");
 
 	//the skip branch of evaluate_gaussian_halting, then a summary row with n_used 0 and no lambda*

@@ -18,8 +18,8 @@ XCW: I/sigma(I) >= 2 (F/sigma(F) >= 4): 3146 of 3215 reflections in the fit; R1 
 XCW orbital basis set: sto-3g-basis
 GridManager: Setting up prototype grids for atom types...
 GridManager: Generating integration grids for atoms...
-GridManager: Generated total of 93098 grid points.
-Total number of grid points after pruning: 93092
+GridManager: Generated total of 80442 grid points.
+Total number of grid points after pruning: 80442
 AO values calculated for all grids.
 Screened out 1802 unique pairs of mu, nu (33.64%) 
 Skipped evaluation of 64843335 grids (16.37%) 

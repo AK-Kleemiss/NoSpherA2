@@ -98,6 +98,62 @@ public:
 		std::string basis_set_name;
 	};
 
+	//One GEMM tile of a block's active-AO square, upper triangle only
+	struct MatrixTile {
+		int row_start;
+		int row_count;
+		int col_start;
+		int col_count;
+		size_t result_offset;
+	};
+	//A run of points of one atom grid with the AOs not negligible anywhere on it, ascending,
+	//and their values row-major, one row of point_count per AO
+	struct GridBlock {
+		int point_start;
+		int point_count;
+		ivec active_aos;
+		vec ao_values;
+		std::vector<float> ao_values_f;
+		std::vector<MatrixTile> matrix_tiles;
+		int tile_result_size = 0;
+	};
+	//The grid build_I integrates on, kept instead of the I tensor: the default unless -tune NOSPHERA2_XCW_GRID=0
+	//or `safe` asks for the tensor, and bypassed when `read` finds one.
+	//An evaluation integrates rho = 2 sum_munu D chi_mu chi_nu block by block and transforms it;
+	//the perturbation is the transpose of that chain. Same screening as the tensor: pairs in
+	//skip and AOs below the block threshold count nowhere. With the direct-sum transform the
+	//two agree to round-off; the Fourier-Bessel one differs by the Lebedev rule's aliasing.
+	//Memory is the AO values, not nr x pairs. =2 builds the tensor as well and prints the
+	//difference of both at every evaluation.
+	struct xcw_grid {
+		int mode = 0;
+		std::vector<std::vector<GridBlock>> blocks;
+		vec2 d1, d2, d3, w;
+		ivec2 skip, lookup, inversion_link;
+		ivec clean_of;
+		bvec is_inverse;
+		std::shared_ptr<struct xcw_fb> fb; //the planned Fourier-Bessel transform of every atom grid, null: the direct sum
+		//grid_F's change-only update: a block whose rho can have moved by less than NOSPHERA2_XCW_GRID_DTOL
+		//since it was last integrated keeps its rho. bound = Sum_p w_p (Sum_mu |chi_mu|)^2 per block, so
+		//max|dD| bound bounds Sum_p |w drho| and with it |dF|; drift sums that over the calls it was kept
+		occ::Mat D_last;
+		vec2 rho_last;
+		vec bound, drift;
+		//the block stages run on the device (xcw_grid_gpu.h), atom grid g's points from gpu_off[g] there
+		bool on_device = false;
+		ivec gpu_off;
+	} XG;
+	//Uploads the blocks for xcw_grid_gpu; false keeps them on the host
+	bool hold_grid_gpu();
+	//Plans XG.fb from build_I's layout of the grid points in their prototypes, see xcw_grid.cpp
+	void plan_grid_fb(const struct sf_shell_layout& layout);
+	//F_calc = anomalous + the transform of rho(D), what calc_F_calc(I_tensor, D) gives
+	void grid_F(const dMatrix2& D);
+	//the per-atom transform of rho(D) at the cleaned entries, [g * nc + c]; grid_F's first half and the tscb's table
+	cvec grid_sfc(const dMatrix2& D);
+	//out = Sum_r Re(pre_r I_r(mu, nu)) without forming I, what XCW_solver::contract_I gives
+	void grid_contract(occ::Mat& out, const cvec& pre);
+
 	//The entries of a rank-N symmetric tensor stored packed in the order i <= j <= k (<= l): the powers of x, y
 	//and z each one multiplies and how often its index tuple occurs among all 3^N
 	struct gc_term { int e[3]; double mult; };

@@ -4,6 +4,7 @@
 #include "sf_gpu.h"
 #include "tuning.h"
 #include "itensor_gpu.h"
+#include "xcw_grid_gpu.h"
 #include "grid_gpu.h"
 #include "salted_gpu.h"
 #include "aux_density_gpu.h"
@@ -43,6 +44,11 @@
 	F(bool, itensor_gpu_rows, (const double* w, const std::complex<double>* F0, std::complex<double>* Fv), (w, F0, Fv)) \
 	F(bool, itensor_gpu_cols, (const std::complex<double>* pre, double* out), (pre, out)) \
 	F(void, itensor_gpu_release, (), ()) \
+	F(bool, xcw_grid_gpu_hold, (int nmo, int nb, const int* na, const int* np, const int* pt_off, const int* ao_off, const int* aos, const long long* x_off, const float* X, long long nx, const unsigned char* keep, const double* w, int npt), (nmo, nb, na, np, pt_off, ao_off, aos, x_off, X, nx, keep, w, npt)) \
+	F(bool, xcw_grid_gpu_held, (), ()) \
+	F(bool, xcw_grid_gpu_density, (const double* D, double* rho), (D, rho)) \
+	F(bool, xcw_grid_gpu_contract, (const double* V, double* out), (V, out)) \
+	F(void, xcw_grid_gpu_release, (), ()) \
 	F(bool, eri_gpu_hold, (const double* eri, int n, int npair, const int* pa, const int* pb, const int* first, const int* idx), (eri, n, npair, pa, pb, first, idx)) \
 	F(bool, eri_gpu_JK, (const double* D, double* J, double* K), (D, J, K)) \
 	F(void, eri_gpu_release, (), ()) \

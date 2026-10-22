@@ -497,7 +497,9 @@ rgbi = ""
 # extrema (0)' line twice.
 # P1_test_XCW builds the subset's I tensor and saves it to p1_i.bin; the other subset goldens
 # read it (ctest fixture xcw_p1_golden_tensor). Reading prints one line in place of the build's
-# seven and leaves every number as the build gives it. The stored two-electron integrals go the
+# seven and leaves every number as the build gives it. Saving or reading keeps a case on the
+# tensor; everything else runs on the grid (Fourier-Bessel) route that is now the default, so
+# the four RUN_FULL_TEST scans record the grid and P1_test_XCW_gpu_itensor pins the tensor. The stored two-electron integrals go the
 # same way through p1_eri.bin (save_eri / read_eri), which only XCW.log mentions.
 
 [P1_test_XCW]
@@ -686,6 +688,8 @@ gpu_itensor = ""
 # disagree in the last digits. Pinned to CUTLASS because that is the one always present:
 # left to choose, this test would pass or fail on whether a CUDA toolkit was installed.
 no_gpu_cublas = ""
+# The device I tensor is what this case is about, and XCW now runs on the grid unless told otherwise.
+tune = "NOSPHERA2_XCW_GRID=0"
 
 # The two sincos kernels, each pinned rather than left to the card. Without the explicit
 # flags the precision a run gets depends on the reported fp32:fp64 ratio, so on a consumer

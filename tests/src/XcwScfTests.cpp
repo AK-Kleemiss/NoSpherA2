@@ -18,6 +18,7 @@
 #include "core/basis_set.h"
 #include "core/i_tensor_stream.h"
 #include "core/tsc_block.h"
+#include "core/tuning.h"
 
 #include <cmath>
 #include <complex>
@@ -674,6 +675,12 @@ TEST(XcwScfTests, SaveThenReadTensorReproducesLambdaZero)
 TEST(XcwScfTests, StreamedTensorMatchesInMemory)
 {
 	if (p1_fixture().empty()) GTEST_SKIP() << "fixture tests/P1_test not found";
+	//The streamed tensor is what is under test, and the grid default builds none
+	struct tensor_route {
+		std::string old; bool had = false;
+		tensor_route() { if (const char *e = tuning("NOSPHERA2_XCW_GRID")) { old = e; had = true; } set_tuning("NOSPHERA2_XCW_GRID", "0"); }
+		~tensor_route() { set_tuning("NOSPHERA2_XCW_GRID", had ? old.c_str() : nullptr); }
+	} pin;
 	const auto dir = scratch_dir();
 	const std::string settings = common + "f rhf start 0.01 step_size 0.01 end 0.01";
 

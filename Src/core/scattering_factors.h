@@ -286,6 +286,7 @@ static void add_ECP_contribution(
  * @param start The start time point.
  * @param end1 The end time point.
  * @param debug Flag indicating whether to enable debug mode.
+ * @param layout The prototype points of the density points (GridManager::getDensityVectors); enables Fourier-Bessel.
  */
 void calc_SF(const int& points,
 	const vec2& k_pt,
@@ -302,7 +303,15 @@ void calc_SF(const int& points,
 	bool do_XCW = false,
 	bool use_gpu = true,
 	bool gpu_fp64 = false,
-	bool gpu_fp32 = false);
+	bool gpu_fp32 = false,
+	const struct sf_shell_layout* layout = nullptr);
+
+//Fourier-Bessel transform of atom-centred Lebedev shell grids (see scattering_factors.cpp): fills sf[i] (sized to the
+//k list) for every atom layout places on a prototype grid and that it does faster than the direct sum, and returns
+//which ones; the rest (no layout: cube grids, hand-made points) need the direct sum. L_override < 0 takes L = D/2 of
+//the prototype's largest Lebedev degree; exact skips the |k| table; L_override >= 0, exact or force take every atom.
+std::vector<char> calc_SF_fourier_bessel(const vec2& k_pt, const vec2& dens, const struct sf_shell_layout* layout,
+	cvec2& sf, int L_override = -1, bool exact = false, bool force = false);
 
 double fourier_bessel_integral(
 	const primitive& p,

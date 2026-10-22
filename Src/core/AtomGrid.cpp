@@ -248,6 +248,7 @@ AtomGrid::AtomGrid(const double radial_precision,
 		angular_off = constants::get_angular_order(num_angular) * constants::MAG;
 		err_checkf(angular_off != -constants::MAG, "Invalid angular order!", file);
 		const int start = (int)atom_grid_x_bohr_.size();
+		shell_start_.push_back(start);
 		angular_off -= start;
 		const int size = start + num_angular;
 		atom_grid_x_bohr_.resize(size);
@@ -264,6 +265,7 @@ AtomGrid::AtomGrid(const double radial_precision,
 			atom_grid_w_[iang] = constants::FOUR_PI * angular_w[p] * radial_w;
 		}
 	}
+	shell_start_.push_back((int)atom_grid_x_bohr_.size());
 }
 
 AtomGrid::~AtomGrid() {}

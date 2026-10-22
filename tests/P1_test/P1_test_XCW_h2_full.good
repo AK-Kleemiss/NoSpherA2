@@ -18,9 +18,11 @@ XCW: I/sigma(I) >= 2 (F/sigma(F) >= 4): 3146 of 3215 reflections in the fit; R1 
 XCW orbital basis set: sto-3g-basis
 GridManager: Setting up prototype grids for atom types...
 GridManager: Generating integration grids for atoms...
-GridManager: Generated total of 93098 grid points.
-Total number of grid points after pruning: 93092
+GridManager: Generated total of 80442 grid points.
+Total number of grid points after pruning: 80442
 AO values calculated for all grids.
+XCW grid transform: Fourier-Bessel, L 12, 193 table nodes, 6 prototypes
+XCW on the grid: the I tensor is not built
 Screened out 1802 unique pairs of mu, nu (33.64%) 
 Skipped evaluation of 64843335 grids (16.37%) 
 More detailed output in SCF.log file...
@@ -29,11 +31,12 @@ ________________________________________________________________________________
  Lambda		Criterion	GooF(F2)	R1(gt)		Total Energy		Perturbation	Target quantity		Crit(all)	R1(all)		A^2 (halt)
 								(Eh)			(a. u.)		(a. u.)
 ____________________________________________________________________________________
-0.00000		10.0922		5.0172		0.02505		-1961.925585145		0.000		-1961.925585145		9.9781		0.02560		198.4330
-0.01000		6.1761		3.7734		0.02375		-1961.760148554		0.062		-1961.698387404		6.1075		0.02429		121.8688
-0.02000		5.5003		3.5442		0.02343		-1961.648761631		0.110		-1961.538754992		5.4397		0.02397		122.3902
+0.00000		10.0921		5.0170		0.02505		-1961.925585145		0.000		-1961.925585145		9.9780		0.02559		198.4893
+XCW grid tscb: max |f_grid - f_tsc| / max |f| 2.51e-05, later steps write the tscb from the grid
+0.01000		6.1759		3.7731		0.02374		-1961.760145735		0.062		-1961.698386624		6.1073		0.02428		121.9396
+0.02000		5.5001		3.5440		0.02343		-1961.648760407		0.110		-1961.538758186		5.4394		0.02396		122.4652
 ____________________________________________________________________________
-Recommended halting lambda* = 0.01000 (A^2=121.8688) -- WARNING: binned <z^2> trend test flagged at this lambda; residuals may be spatially correlated, inspect before trusting lambda*.
+Recommended halting lambda* = 0.01000 (A^2=121.9396) -- WARNING: binned <z^2> trend test flagged at this lambda; residuals may be spatially correlated, inspect before trusting lambda*.
   candidate fit: degree=2 -- not enough points yet (need >= degree+3 evaluated lambda steps)
   candidate fit: degree=4 -- not enough points yet (need >= degree+3 evaluated lambda steps)
 Finished XCW fitting procedure.

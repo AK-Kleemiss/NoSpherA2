@@ -41,6 +41,7 @@ file(
 set(NOSPHERA2_CORE_GPU_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/sf_gpu.cu"
     "${CMAKE_CURRENT_SOURCE_DIR}/itensor_gpu.cu"
+    "${CMAKE_CURRENT_SOURCE_DIR}/xcw_grid_gpu.cu"
     "${CMAKE_CURRENT_SOURCE_DIR}/salted_gpu.cu"
     "${CMAKE_CURRENT_SOURCE_DIR}/grid_gpu.cu"
     "${CMAKE_CURRENT_SOURCE_DIR}/blas_gpu.cu"
