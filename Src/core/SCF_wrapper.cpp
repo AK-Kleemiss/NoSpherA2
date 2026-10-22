@@ -77,6 +77,13 @@ void SCF_wrapper::release_device() {
 
 bool SCF_wrapper::solve(occ::qm::HartreeFock& hf, const double lambda, occ::qm::Wavefunction& wfn, const bool use_guess, SCF_coupling& coupling) {
 	coupling_ = &coupling;
+	//the stabilisers as configured, whatever the last lambda step's rescues made of them: divided
+	//per rescue and never restored they reached 1e-33 by TEMPO's lambda 0.11
+	if (base_.level_shift < 0)
+		base_ = { settings.diis_stop_shift, settings.diis_stop_damping, settings.level_shift };
+	settings.diis_stop_shift = base_.stop_shift;
+	settings.diis_stop_damping = base_.stop_damping;
+	settings.level_shift = base_.level_shift;
 	occ::qm::SCF scf(hf, settings.hf_type);
 	double alpha = settings.alpha;
 	bool has_local_guess = use_guess;
@@ -533,6 +540,14 @@ bool SCF_wrapper::SCF_iteration(occ::qm::SCF<occ::qm::HartreeFock>& scf, const d
 				<< ": second-order steps on the orbital rotations from here***";
 			print_centered_message(what.str(), 84, writer_->log);
 			citations::cite(citations::Method::TRAH, writer_->log);
+			//TRAH from the best orbitals of this lambda step, not from wherever DIIS left them: TEMPO
+			//lambda 0.11 (Cordula, AKL) switched at E -148 Eh, 330 Eh above the warm start, and spent
+			//900 micro-iterations climbing back. The first step rebuilds the Fock matrix at them.
+			if (phi > best_quant_ + trah_.noise) {
+				writer_->log << "\t\tTRAH starts from the best orbitals of this step, " << std::scientific << std::setprecision(2)
+					<< phi - best_quant_ << " Eh below the current ones" << std::endl;
+				scf.ctx.mo = best_mo_;
+			}
 		}
 	}
 	if (soscf_) {
@@ -920,8 +935,10 @@ void SCF_wrapper::check_hessian(occ::qm::SCF<occ::qm::HartreeFock>& scf, const d
 
 //The rescue of a lost SCF step, see best_mo_ in the header. True when it restarted the step:
 //the orbitals are the best ones again, the iteration ends here and the next one rebuilds
-//their Fock matrix in full. The stabiliser thresholds stay tightened for the later steps,
-//which are at least as hard.
+//their Fock matrix in full. Each rescue doubles the level shift, halves the undamped share
+//of the density and holds both ten times longer: restoring the start state with the start
+//flags replayed the failure digit for digit (TEMPO, Cordula, three identical rescues). All
+//of it is this lambda step's only, do_SCF resets it.
 bool SCF_wrapper::rescue_scf(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double quant, double& alpha) {
 	if (quant < best_quant_) {
 		best_quant_ = quant;
@@ -930,11 +947,15 @@ bool SCF_wrapper::rescue_scf(occ::qm::SCF<occ::qm::HartreeFock>& scf, const doub
 	}
 	if (quant - best_quant_ < rescue_rise_ || rescues_ >= 3) return false;
 	rescues_++;
-	settings.diis_stop_shift /= 10;
-	settings.diis_stop_damping /= 10;
+	const double tighten = std::pow(10.0, rescues_);
+	settings.diis_stop_shift = (base_.stop_shift > 0 ? base_.stop_shift : 1e-2) / tighten;
+	settings.diis_stop_damping = (base_.stop_damping > 0 ? base_.stop_damping : 1e-3) / tighten;
+	settings.level_shift = std::max(base_.level_shift, 0.25) * std::pow(2.0, rescues_);
+	alpha = 1.0 - (1.0 - settings.alpha) / std::pow(2.0, rescues_);
 	std::ostringstream what;
 	what << "***E + lambda chi^2 " << std::fixed << std::setprecision(3) << quant - best_quant_
-		<< " Eh above its best: back to the best orbitals, level shift and damping on until DIIS error "
+		<< " Eh above its best: back to the best orbitals, level shift " << std::setprecision(2) << settings.level_shift
+		<< ", damping " << alpha << " until DIIS error "
 		<< std::scientific << std::setprecision(0) << settings.diis_stop_shift << " / " << settings.diis_stop_damping
 		<< " (rescue " << rescues_ << "/3)***";
 	print_centered_message(what.str(), 84, writer_->log);
@@ -944,9 +965,8 @@ bool SCF_wrapper::rescue_scf(occ::qm::SCF<occ::qm::HartreeFock>& scf, const doub
 	diis_E_.clear();
 	adiis_.reset();
 	ediis_.reset();
-	settings.apply_shift = settings.method_apply_shift;
-	settings.apply_damping = settings.method_apply_damping;
-	alpha = settings.alpha;
+	settings.apply_shift = true;
+	settings.apply_damping = true;
 	return true;
 }
 

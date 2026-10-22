@@ -96,11 +96,13 @@ private:
 	// the perturbed Fock matrix descends. A step climbing more than rescue_rise_ above that
 	// best has lost the SCF (seen on the
 	// Fe(phen)2(SCN)2 UHF singlet at lambda 0.04, right after the level shift went off):
-	// rescue_scf restarts it from these orbitals with DIIS cleared and the level shift and
-	// damping back on for ten times longer, up to three times per step
+	// rescue_scf restarts it from these orbitals with DIIS cleared and a stronger level shift and
+	// damping held ten times longer, up to three times per step
 	occ::qm::MolecularOrbitals best_mo_;
 	double best_quant_ = 0;
 	int rescues_ = 0;
+	// the stabilisers as the settings gave them, restored at every lambda step
+	struct { double stop_shift, stop_damping, level_shift; } base_{ -1, -1, -1 };
 	static constexpr double rescue_rise_ = 1.0;
 	bool rescue_scf(occ::qm::SCF<occ::qm::HartreeFock>& scf, const double quant, double& alpha);
 
