@@ -64,10 +64,12 @@ namespace citations
 		return "[" + std::string(reference.tag) + "] " + reference.work + ", DOI " + reference.doi;
 	}
 
-	void cite(Method method, std::ostream &os)
+	void cite(Method method, std::ostream &os, const int centered)
 	{
 		for (const Reference &reference : table())
 			if (reference.method == method)
+			if (centered) print_centered_message(format(reference), centered, os);
+			else
 				os << format(reference) << std::endl;
 	}
 

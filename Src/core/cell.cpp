@@ -823,6 +823,28 @@ ivec2 cell::remove_inv_vectors(const hkl_list& hkl_enlarged, hkl_list& inversion
 	return link;
 }
 
+ivec cell::generate_asym_lookup(const int r, const hkl_list& hkl, const hkl_list& hkl_enlarged) const {
+	ivec asym_list;
+	auto it = hkl.begin();
+	std::advance(it, r);
+	i3 tempv;
+	const i3& hkl_temp = *it;
+	for (int s = 0; s < sym[0][0].size(); s++) {
+		tempv = { 0, 0, 0 };
+		for (int h = 0; h < 3; h++) {
+			for (int j = 0; j < 3; j++) {
+				tempv[j] += hkl_temp[h] * sym[j][h][s];
+			}
+		}
+		//a miss would silently read reflection 0's scattering factors
+		auto idx = hkl_enlarged.find(tempv);
+		err_checkf(idx != hkl_enlarged.end(), "Reflection " + std::to_string(hkl_temp[0]) + " " + std::to_string(hkl_temp[1]) + " " +
+			std::to_string(hkl_temp[2]) + " rotated by symmetry operation " + std::to_string(s) + " is not in the enlarged reflection list", std::cout);
+		asym_list.push_back(static_cast<int>(std::distance(hkl_enlarged.begin(), idx)));
+	}
+	return asym_list;
+}
+
 ivec cell::apply_grown(const hkl_list& hkl, hkl_list& hkl_enlarged, std::vector<asym_atom>& asym_atoms) {
 	// Check which symmetry operations are fully applied to the asymmetric unit, ONLY those can be deleted
 	ivec applied_symmetry = confirm_applied_symmetry(asym_atoms);

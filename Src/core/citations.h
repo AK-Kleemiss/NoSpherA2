@@ -2,6 +2,7 @@
 #include <iosfwd>
 #include <string>
 #include <vector>
+#include "convenience.h"
 
 //The literature each method implements, so a run says which paper its numbers come from; entries follow
 //the registered Crossref metadata.  No equation numbers: a wrong one sends a reader to the wrong formula,
@@ -64,7 +65,7 @@ namespace citations
 	std::string format(const Reference &reference);
 
 	//Write one line per reference registered for this method, in the log style of everything else.
-	void cite(Method method, std::ostream &os);
+	void cite(Method method, std::ostream &os, const int centered = 0);
 
 	//The same, to std::cout.
 	void cite(Method method);
