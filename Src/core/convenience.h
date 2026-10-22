@@ -892,6 +892,7 @@ struct options
 	double efield = 0.005;
 	ivec2 groups;
 	ivec2 hkl_min_max{ {-100, 100}, {-100, 100}, {-100, 100} };
+	int hkl_scale = 1;
 	vec2 twin_law;
 	ivec2 combined_tsc_groups;
 	pathvec combined_tsc_calc_files;

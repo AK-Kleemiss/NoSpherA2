@@ -37,6 +37,8 @@ private:
 	double rcm[3][3];
 	double cm[3][3];
 	double upper;
+	//indices are in units of 1/hkl_scale (-hkl_scale); only the reciprocal-space functions see it
+	double hkl_scale = 1.0;
 	std::string crystal_system;
 	ivec3 sym;
 	vec2 trans;
@@ -265,6 +267,8 @@ public:
 	double get_sb() const { return sb; };
 	double get_sg() const { return sg; };
 	double get_rcm(const int& i, const int& j) const { return rcm[i][j]; };
+	double get_hkl_scale() const { return hkl_scale; };
+	void set_hkl_scale(const int s) { hkl_scale = s; };
 	double get_cm(const int& i, const int& j) const { return cm[i][j]; };
 	double get_rcm_angs(const int& i, const int& j) const { return constants::ang2bohr(rcm[i][j] / constants::TWO_PI); };
 	double get_cm_angs(const int& i, const int& j) const { return constants::bohr2ang(cm[i][j]); };
@@ -398,9 +402,9 @@ public:
 	{
 		// d will be in Angstrom
 		// d = sqrt( (1 - cos^2(alpha) - cos^2 (beta) - cos^2 (gamma) + 2ca*cb*cg) / (h^2 /a^2 *sin^2 (alpha) + k^2 / b^2 * sin^2 (beta) + l^2 /c^2 * sin^2(gamma) + 2 kl/bc (cos(beta)cos(gamma) - cos(alpha)) + 2 hl/ac (cos(alpha)cos(gamma) - cos(beta)) + 2 hk/ab (cos(beta)cos(alpha) - cos(gamma))) )
-		double h = hkl[0];
-		double k = hkl[1];
-		double l = hkl[2];
+		double h = hkl[0] / hkl_scale;
+		double k = hkl[1] / hkl_scale;
+		double l = hkl[2] / hkl_scale;
 		double lower2 =
 			h * h * b * b * c * c * sa * sa +
 			k * k * a * a * c * c * sb * sb +

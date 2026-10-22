@@ -224,6 +224,12 @@ std::string help_message =
  "  -hkl_min_max hmin hmax kmin kmax lmin lmax\n"
  "                                    Measured index box; alone it generates the\n"
  "                                    box and its symmetry images instead of -hkl.\n"
+ "  -hkl_scale <n>                     The -hkl file lists h k l in units of 1/n,\n"
+ "                                    whitespace separated, and is taken as it is\n"
+ "                                    (no -dmin, box or twin images): factors at\n"
+ "                                    S = (h,k,l)/n, e.g. the satellites h + m q\n"
+ "                                    of a modulated structure. The table keeps\n"
+ "                                    the scaled integers.\n"
  "  -IAM                               Use Thakkar independent-atom factors.\n"
  "  -tsc_block <n>                     Reflections per block when writing the\n"
  "                                    tsc [1000]. The table is streamed to disk\n"
@@ -2951,6 +2957,11 @@ bool options::digest_run_options(const std::string &temp, int &i)
 		int l_min(stoi(arguments[i + 5]));
 		int l_max(stoi(arguments[i + 6]));
 		hkl_min_max = { {h_min, h_max}, {k_min, k_max}, {l_min, l_max} };
+	}
+	else if (temp == "-hkl_scale")
+	{
+		hkl_scale = stoi(arguments[i + 1]);
+		err_checkf(hkl_scale >= 1, "-hkl_scale needs a positive integer", std::cout);
 	}
 	else if (temp == "-mem")
 	{
