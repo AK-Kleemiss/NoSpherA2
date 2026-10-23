@@ -47,7 +47,7 @@ public:
 	// The basis set from the library (JKFit, where the Olex2 basis sets are now located) on the atoms of mol
 	static occ::qm::AOBasis setup_basis(const occ::core::Molecule& mol, const std::string& basis_set_name);
 
-	// Builds the stored two-electron integrals when they fit in four fifths of avail (0: unknown), and puts them on the device if asked to
+	// Builds the stored two-electron integrals when they fit in avail less a reserve (0: unknown), and puts them on the device if asked to
 	void setup_eri(const occ::qm::HartreeFock& hf, const size_t avail);
 	// Gives the device back
 	void release_device();

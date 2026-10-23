@@ -44,12 +44,16 @@ occ::core::Molecule SCF_wrapper::setup_SCF_mol(const std::vector<asym_atom>& ato
 	return mol;
 }
 
-//Four fifths of what the I tensor left, under -mem when given, for the stored integrals
+//What the I tensor left, under -mem when given, less a reserve, for the stored integrals
 void SCF_wrapper::setup_eri(const occ::qm::HartreeFock& hf, const size_t avail) {
 	eri_.clear();
 	const _time_point eri_t0 = get_time();
+	//The reserve is for what the SCF allocates beside them: a fifth on a small machine, else 1 GB or a
+	//twentieth. TEMPO def2-SVP needs 0.44 GB next to its 3.0 GB of integrals (peak working set 3.44 GB);
+	//what grows with nbf^2 is 2.5 GB at def2-TZVPP even at that rate, against 5.4 GB reserved under -mem 110000.
 	//At least 1: a budget of 0 means "no budget" to stored_eri
-	const size_t budget = avail ? std::max<size_t>(avail / 5 * 4, 1) : 0;
+	const size_t reserve = std::min(avail / 5, std::max<size_t>(size_t(1) << 30, avail / 20));
+	const size_t budget = avail ? std::max<size_t>(avail - reserve, 1) : 0;
 	const bool read = !settings.eri_read_path.empty() && eri_.load(settings.eri_read_path, hf, budget, writer_->log);
 	if (!read && eri_.build(hf, budget, writer_->log))
 		throughput::record_time("XCW two-electron integrals", false, get_msec(eri_t0, get_time()));

@@ -801,7 +801,7 @@ void XCW_solver::run() {
 	//can change. Without the stored integrals a product costs a direct build, two fitted builds
 	//are cheaper (TEMPO SVP at -mem 2500: 383 -> 296 s, same builds, Fcalc to 1e-4), so they are
 	//fitted by themselves then; `hessian_df_basis none` keeps them exact. Set up after the stored
-	//integrals so it never squeezes them out; those hold up to four fifths of avail
+	//integrals so it never squeezes them out; those hold all of avail but a reserve
 	const std::string& hdf = opt->xcw_settings.hessian_df_basis_name;
 	std::string hdf_name = hdf == "none" ? "" : hdf;
 	if (hdf.empty() && !scf_solver.has_eri() && opt->xcw_settings.df_basis_name.empty()) {
