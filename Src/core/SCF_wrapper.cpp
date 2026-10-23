@@ -236,7 +236,6 @@ bool SCF_wrapper::do_SCF(const double& lambda, double& alpha, occ::qm::SCF<occ::
 	last_full_build_ = 0;
 	next_full_build_error_ = 0.0;
 
-	scf.ctx.H = scf.ctx.T + scf.ctx.V;
 	throughput::record_time("XCW initial guess", false, get_msec(guess_t0, get_time()));
 	bool converged;
 	double quant;
