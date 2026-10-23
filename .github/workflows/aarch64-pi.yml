@@ -27,12 +27,19 @@ jobs:
         with:
           clean: false
           submodules: recursive
+      # /tmp is a 922 MB tmpfs here: earlier test runs left their scratch directories in it until it was full and
+      # the build died with "No space left on device" (23 Oct 2026). Clear our own leftovers, and point TMPDIR
+      # (compiler and test scratch) at the runner's temp directory on disk for build and test.
+      - name: clear leftover scratch in /tmp
+        run: find /tmp -maxdepth 1 -user "$(id -un)" \( -name 'nos_nbo47_test_*' -o -name 'nosphera2_xcw_scf_*' \) -exec rm -rf {} +
       - name: bootstrap
         run: cmake -DNOSPHERA2_BOOTSTRAP_GPU=OFF -P scripts/BootstrapMicromamba.cmake
       - name: configure
         run: cmake --preset release-linux -DNOSPHERA2_BUILD_TESTS=ON
       # /tmp/pi-heavy.lock is shared with the nightly Olex2 release tests: never a compile and a test run together
       - name: build
+        env:
+          TMPDIR: ${{ runner.temp }}
         run: |
           L=/tmp/pi-heavy.lock; [ -e $L ] || (umask 0; touch $L); exec 9< $L; flock 9
           cmake --build --preset release-linux -j2
@@ -40,6 +47,8 @@ jobs:
       # everything in bin/ (both executables and their runtime libraries), every tracked file except docs, Markdown,
       # .vscode and the other workflows (tests read Src/, NEW_TEST/ and occ/share too), and the ArmPL path.
       - name: test
+        env:
+          TMPDIR: ${{ runner.temp }}
         run: |
           L=/tmp/pi-heavy.lock; [ -e $L ] || (umask 0; touch $L); exec 9< $L; flock 9
           K=$({ find build/release-linux/bin -type f -print0 | sort -z | xargs -0 sha256sum
