@@ -72,6 +72,18 @@ std::filesystem::path make_temp_dir()
 	throw std::runtime_error("Could not create a unique NBO test directory");
 }
 
+//The timestamped names are never reused, so a directory is removed here once its test has passed
+struct remove_on_pass
+{
+	std::filesystem::path dir;
+	~remove_on_pass()
+	{
+		std::error_code ec;
+		if (!::testing::Test::HasFailure())
+			std::filesystem::remove_all(dir, ec);
+	}
+};
+
 std::string windows_path_to_wsl(std::filesystem::path path)
 {
 	path = std::filesystem::absolute(path);
@@ -125,6 +137,7 @@ TEST(Nbo47, EpoxideGbwWritesValidFile47)
 	ASSERT_TRUE(std::filesystem::exists(input_gbw));
 
 	const auto temp_dir = make_temp_dir();
+	const remove_on_pass cleanup{temp_dir};
 	const auto generated_47 = temp_dir / "epoxide.47";
 
 	WFN wave(input_gbw, false);
@@ -166,6 +179,7 @@ TEST(Nbo47, WriteNboReportsProgressWhenRequested)
 	ASSERT_TRUE(std::filesystem::exists(input_gbw));
 
 	const auto temp_dir = make_temp_dir();
+	const remove_on_pass cleanup{temp_dir};
 	const auto generated_47 = temp_dir / "epoxide.47";
 
 	WFN wave(input_gbw, false);
@@ -187,6 +201,7 @@ TEST(Nbo47, OpenShellNh3LiGbwWritesValidFile47)
 	ASSERT_TRUE(std::filesystem::exists(input_gbw));
 
 	const auto temp_dir = make_temp_dir();
+	const remove_on_pass cleanup{temp_dir};
 	const auto generated_47 = temp_dir / "nh3li.47";
 
 	WFN wave(input_gbw, false);
@@ -242,6 +257,7 @@ TEST(Nbo47, OpenShellNh3LiGennboProducesEnergyAnalysisWhenAvailable)
 	ASSERT_TRUE(std::filesystem::exists(input_gbw));
 
 	const auto temp_dir = make_temp_dir();
+	const remove_on_pass cleanup{temp_dir};
 	const auto generated_47 = temp_dir / "nh3li.47";
 	const auto generated_nbo = temp_dir / "nh3li.nbo";
 
@@ -275,6 +291,7 @@ TEST(NboRun, OpenShellNh3LiSpinResolvedNpaMatchesOrcaSpinPopulations)
 	ASSERT_TRUE(std::filesystem::exists(input_gbw));
 
 	const auto temp_dir = make_temp_dir();
+	const remove_on_pass cleanup{temp_dir};
 	const auto generated_47 = temp_dir / "nh3li.47";
 	const auto generated_nbo = temp_dir / "nh3li.nbo";
 
@@ -322,6 +339,7 @@ TEST(Nbo47, GShellWavefunctionWritesFile47WithCorrectElectronCount)
 	ASSERT_TRUE(std::filesystem::exists(input_gbw));
 
 	const auto temp_dir = make_temp_dir();
+	const remove_on_pass cleanup{temp_dir};
 	const auto generated_47 = temp_dir / "fe.47";
 
 	WFN wave(input_gbw, false);
