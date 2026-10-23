@@ -93,8 +93,6 @@ bool SCF_wrapper::solve(occ::qm::HartreeFock& hf, const double lambda, occ::qm::
 	bool has_local_guess = use_guess;
 	scf.set_charge_multiplicity(settings.charge, settings.multiplicity);
 	scf.maxiter = settings.max_scf_iterations;
-	scf.convergence_settings.level_shift = settings.level_shift;
-	scf.convergence_settings.level_shift_threshold = 0;
 	scf.update_occupied_orbital_count();
 	const bool converged = do_SCF(lambda, alpha, scf, wfn, has_local_guess);
 	wfn = scf.wavefunction();
@@ -212,7 +210,6 @@ bool SCF_wrapper::do_SCF(const double& lambda, double& alpha, occ::qm::SCF<occ::
 	diis_F_.clear();
 	diis_E_.clear();
 	adiis_.reset();
-	ediis_.reset();
 	best_quant_ = std::numeric_limits<double>::infinity();
 	rescues_ = 0;
 	builds_ = {};
@@ -253,67 +250,34 @@ bool SCF_wrapper::do_SCF(const double& lambda, double& alpha, occ::qm::SCF<occ::
 		throughput::record_time("XCW SCF iteration", false, get_msec(scf_t0, get_time()));
 	} while (!converged && scf.iter < scf.maxiter);
 
+	writer_->log << "____________________________________________________________________________________________________\n";
 	if (converged) {
-		writer_->log << "____________________________________________________________________________________________________\n";
 		std::stringstream print_;
 		print_ << "***SCF converged in " << scf.iter << " iterations***";
 		print_centered_message(print_.str(), 100, writer_->log);
-		writer_->log << "Fock builds: " << builds_.iter + builds_.hessian + builds_.rebuild << " (" << builds_.iter << " iterations, "
-			<< builds_.hessian << " Hessian products, " << builds_.rebuild << " rebuilds)" << std::endl;
+	}
+	else
+		print_centered_message("***SCF did not converge***", 100, writer_->log);
+	writer_->log << "Fock builds: " << builds_.iter + builds_.hessian + builds_.rebuild << " (" << builds_.iter << " iterations, "
+		<< builds_.hessian << " Hessian products, " << builds_.rebuild << " rebuilds)" << std::endl;
+	if (converged) {
 		writer_->v.lambda = lambda;
 		writer_->v.E_total = scf.ctx.energy["total"];
 		writer_->v.quant = quant;
 	}
 	else {
-		writer_->log << "____________________________________________________________________________________________________\n";
-		print_centered_message("***SCF did not converge***", 100, writer_->log);
-		writer_->log << "Fock builds: " << builds_.iter + builds_.hessian + builds_.rebuild << " (" << builds_.iter << " iterations, "
-			<< builds_.hessian << " Hessian products, " << builds_.rebuild << " rebuilds)" << std::endl;
-		std::ostringstream perturbed_energy;
-		perturbed_energy << " for perturbed energy: " << std::scientific << settings.quant_diff << " (current: " << settings.current_quant_diff << ") \n";
-		std::ostringstream diis_error;
-		diis_error << " for DIIS error: " << std::scientific << settings.max_diis_error << " (current: " << settings.current_max_diis_error << ") \n";
-		std::ostringstream orbital_gradient;
-		orbital_gradient << " for orbital gradient: " << std::scientific << settings.gradient << " (current: " << settings.current_gradient << ") \n";
-		std::ostringstream max_density_diff;
-		max_density_diff << " for maximum difference in density matrix: " << std::scientific << settings.MaxP_diff << " (current: " << settings.current_MaxP_diff << ") \n";
-		std::ostringstream rmsd_density;
-		rmsd_density << " for RMSD of density matrix: " << std::scientific << settings.RMSP_diff << " (current: " << settings.current_RMSP_diff << ") \n";
-		if (settings.conv_quant_diff) {
-			writer_->log << "CONVERGED";
+		const struct { bool ok; const char* what; double target, current; } rows[] = {
+			{ settings.conv_quant_diff, "perturbed energy", settings.quant_diff, settings.current_quant_diff },
+			{ settings.conv_max_diis_error, "DIIS error", settings.max_diis_error, settings.current_max_diis_error },
+			{ settings.conv_gradient, "orbital gradient", settings.gradient, settings.current_gradient },
+			{ settings.conv_MaxP_diff, "maximum difference in density matrix", settings.MaxP_diff, settings.current_MaxP_diff },
+			{ settings.conv_RMSP_diff, "RMSD of density matrix", settings.RMSP_diff, settings.current_RMSP_diff } };
+		for (const auto& r : rows) {
+			//scientific on a stream of its own, so the log keeps its format
+			std::ostringstream row;
+			row << (r.ok ? "CONVERGED" : "NOT CONVERGED") << " for " << r.what << ": " << std::scientific << r.target << " (current: " << r.current << ") \n";
+			writer_->log << row.str();
 		}
-		else {
-			writer_->log << "NOT CONVERGED";
-		}
-		writer_->log << perturbed_energy.str();
-		if (settings.conv_max_diis_error) {
-			writer_->log << "CONVERGED";
-		}
-		else {
-			writer_->log << "NOT CONVERGED";
-		}
-		writer_->log << diis_error.str();
-		if (settings.conv_gradient) {
-			writer_->log << "CONVERGED";
-		}
-		else {
-			writer_->log << "NOT CONVERGED";
-		}
-		writer_->log << orbital_gradient.str();
-		if (settings.conv_MaxP_diff) {
-			writer_->log << "CONVERGED";
-		}
-		else {
-			writer_->log << "NOT CONVERGED";
-		}
-		writer_->log << max_density_diff.str();
-		if (settings.conv_RMSP_diff) {
-			writer_->log << "CONVERGED";
-		}
-		else {
-			writer_->log << "NOT CONVERGED";
-		}
-		writer_->log << rmsd_density.str();
 	}
 	return converged;
 }
@@ -374,7 +338,7 @@ void SCF_wrapper::solve_orbitals(occ::qm::SCF<occ::qm::HartreeFock>& scf, const 
 
 //occ's ConvergenceAccelerator::update with the CDIIS commutator S D F - F D S from MKL; with
 //the three matrices symmetric it is T - T^T for T = S D F. CDIIS is cdiis_extrapolate below,
-//ADIIS and EDIIS are occ's.
+//ADIIS is occ's, under occ's default strategy ADIIS_CDIIS (NoSpherA2 never sets another).
 occ::Mat SCF_wrapper::diis_update(occ::qm::SCF<occ::qm::HartreeFock>& scf) {
 	const occ::Mat& S = scf.ctx.S;
 	const occ::Mat& D = scf.ctx.mo.D;
@@ -388,10 +352,8 @@ occ::Mat SCF_wrapper::diis_update(occ::qm::SCF<occ::qm::HartreeFock>& scf) {
 	}
 	scf.diis_error = comm.array().abs().maxCoeff();
 	occ::Mat F_cdiis = cdiis_extrapolate(F, comm);
-	const occ::qm::DiisStrategy strategy = scf.convergence_settings.diis_strategy;
-	if (strategy == occ::qm::DiisStrategy::CDIIS || scf.diis_error <= scf.convergence_settings.diis_switch_threshold) return F_cdiis;
-	if (strategy == occ::qm::DiisStrategy::ADIIS_CDIIS) return adiis_.update(scf.ctx.mo.kind, D, F);
-	return ediis_.update(scf.ctx.mo.kind, D, F, scf.ctx.energy["electronic"]);
+	if (scf.diis_error <= scf.convergence_settings.diis_switch_threshold) return F_cdiis;
+	return adiis_.update(scf.ctx.mo.kind, D, F);
 }
 
 //Pulay's CDIIS on the Fock matrix, extrapolating from the second vector on: the perturbed
@@ -1096,7 +1058,6 @@ bool SCF_wrapper::rescue_scf(occ::qm::SCF<occ::qm::HartreeFock>& scf, const doub
 	diis_F_.clear();
 	diis_E_.clear();
 	adiis_.reset();
-	ediis_.reset();
 	settings.apply_shift = true;
 	settings.apply_damping = true;
 	return true;

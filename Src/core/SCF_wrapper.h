@@ -98,7 +98,6 @@ private:
 	std::deque<occ::Mat> diis_F_, diis_E_;
 	static constexpr size_t diis_subspace_ = 8;
 	occ::qm::ADIIS adiis_;
-	occ::qm::EDIIS ediis_;
 	// The best orbitals of the running lambda step and their E + lambda chi^2, the functional
 	// the perturbed Fock matrix descends. A step climbing more than rescue_rise_ above that
 	// best has lost the SCF (seen on the
