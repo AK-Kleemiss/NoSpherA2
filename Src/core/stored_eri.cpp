@@ -216,27 +216,37 @@ bool stored_eri::build(const occ::qm::HartreeFock& hf, const size_t budget_bytes
 //axpy per segment. K's four scatters per integral run along segment c (second index pair_b()): two
 //dots against columns of D, two axpys into columns of the symmetrised K, directly on d = 0..c, else
 //through the index list. The diagonal cd == ab has half weight and is taken back with its segment.
+//With two densities (UHF) one pass over the integrals gives J of their sum and K of each, so the
+//bandwidth-bound stream is read once per Fock build, not once per spin.
 //Per-thread partials merge in thread order, so the result is schedule-independent.
-void stored_eri::JK(const occ::Mat& D, occ::Mat& J, occ::Mat& K, const bool screen) const {
+void stored_eri::jk(const occ::Mat* const* D, const int nd, occ::Mat& J, occ::Mat* K, const bool screen) const {
 	const int n = nbf_, npk = npairs(), nthr = omp_get_max_threads();
 	const int *pa = pa_.data(), *pb = pb_.data(), *first = first_.data();
+	const double* Dd[2] = { D[0]->data(), D[nd - 1]->data() };
 	std::vector<double> dp(npk), fp(npk);
-	for (int k = 0; k < npk; k++) fp[k] = pa[k] == pb[k] ? 1.0 : 2.0, dp[k] = fp[k] * D(pa[k], pb[k]);
-	//Largest element of every row of the difference, and overall
+	for (int k = 0; k < npk; k++) {
+		fp[k] = pa[k] == pb[k] ? 1.0 : 2.0;
+		double s = 0.0;
+		for (int i = 0; i < nd; i++) s += Dd[i][pa[k] + pb[k] * n];
+		dp[k] = fp[k] * s;
+	}
+	//Largest element of every row of the difference (over both spins), and overall
 	std::vector<double> rm;
 	double rmax = 0.0;
 	if (screen) {
-		rm.resize(n);
-		for (int a = 0; a < n; a++) rmax = std::max(rmax, rm[a] = D.row(a).cwiseAbs().maxCoeff());
+		rm.assign(n, 0.0);
+		for (int i = 0; i < nd; i++)
+			for (int a = 0; a < n; a++) rm[a] = std::max(rm[a], D[i]->row(a).cwiseAbs().maxCoeff());
+		for (int a = 0; a < n; a++) rmax = std::max(rmax, rm[a]);
 	}
-	const double* Dd = D.data();
 	std::vector<std::vector<double>> Jp(nthr);
-	std::vector<occ::Mat> Kp(nthr);
+	std::vector<occ::Mat> Kp(nthr * nd);
 #pragma omp parallel
 	{
 		std::vector<double> Jl(npk, 0.0), t(n);
-		occ::Mat Kl = occ::Mat::Zero(n, n);
-		double* Kd = Kl.data();
+		occ::Mat Kl[2];
+		double* Kd[2];
+		for (int i = 0; i < nd; i++) Kl[i] = occ::Mat::Zero(n, n), Kd[i] = Kl[i].data();
 		//c runs to a: cyclic rows balance the triangle and, unlike a dynamic schedule,
 		//keep the per-thread partials and so the summation order fixed for a thread count
 #pragma omp for schedule(static, 1)
@@ -244,9 +254,7 @@ void stored_eri::JK(const occ::Mat& D, occ::Mat& J, occ::Mat& K, const bool scre
 			const int a = pa[k], b = pb[k];
 			if (screen && q_[k] * qmax_ * rmax < threshold) continue;
 			const double* v = v_.get() + (size_t)k * (k + 1) / 2;
-			const double fab = 2.0 * fp[k], dab = fp[k] * Dd[a + b * n];
-			const double *Da = Dd + a * n, *Db = Dd + b * n;
-			double *Ka = Kd + a * n, *Kb = Kd + b * n;
+			const double fab = 2.0 * fp[k], dab = dp[k];
 			for (int c = 0; c <= a; c++) {
 				const int o = first[c], m = (c < a ? first[c + 1] : k + 1) - o;
 				if (m <= 0) continue;
@@ -256,45 +264,52 @@ void stored_eri::JK(const occ::Mat& D, occ::Mat& J, occ::Mat& K, const bool scre
 				//The row's own slot enters J once from the column side and once from the row side
 				Eigen::Map<Eigen::VectorXd>(Jl.data() + o, c < a ? m : m - 1) += dab * vm.head(c < a ? m : m - 1);
 				Jl[k] += vm.dot(Eigen::Map<const Eigen::VectorXd>(dp.data() + o, m));
-				const double kca = fab * Da[c], kcb = fab * Db[c];
 				Eigen::Map<Eigen::VectorXd> tm(t.data(), m);
 				tm = vm.cwiseProduct(Eigen::Map<const Eigen::VectorXd>(fp.data() + o, m));
-				if (pb[o] == 0 && pb[o + m - 1] == m - 1) {
-					Kd[c + a * n] += fab * tm.dot(Eigen::Map<const Eigen::VectorXd>(Db, m));
-					Kd[c + b * n] += fab * tm.dot(Eigen::Map<const Eigen::VectorXd>(Da, m));
-					Eigen::Map<Eigen::VectorXd>(Ka, m) += kcb * tm;
-					Eigen::Map<Eigen::VectorXd>(Kb, m) += kca * tm;
-				}
-				else {
-					double sa = 0.0, sb = 0.0;
-					for (int i = 0; i < m; i++) {
-						const int d = pb[o + i];
-						sa += t[i] * Db[d], sb += t[i] * Da[d];
-						Ka[d] += kcb * t[i], Kb[d] += kca * t[i];
+				const bool direct = pb[o] == 0 && pb[o + m - 1] == m - 1;
+				for (int s = 0; s < nd; s++) {
+					const double *Da = Dd[s] + a * n, *Db = Dd[s] + b * n;
+					double *Ks = Kd[s], *Ka = Ks + a * n, *Kb = Ks + b * n;
+					const double kca = fab * Da[c], kcb = fab * Db[c];
+					if (direct) {
+						Ks[c + a * n] += fab * tm.dot(Eigen::Map<const Eigen::VectorXd>(Db, m));
+						Ks[c + b * n] += fab * tm.dot(Eigen::Map<const Eigen::VectorXd>(Da, m));
+						Eigen::Map<Eigen::VectorXd>(Ka, m) += kcb * tm;
+						Eigen::Map<Eigen::VectorXd>(Kb, m) += kca * tm;
 					}
-					Kd[c + a * n] += fab * sa, Kd[c + b * n] += fab * sb;
-				}
-				if (c == a) {
-					const double h = fp[k] * fp[k] * v[k];
-					Kd[a + a * n] -= h * Db[b], Kd[a + b * n] -= h * Da[b];
-					Ka[b] -= h * Da[b], Kb[b] -= h * Da[a];
+					else {
+						double sa = 0.0, sb = 0.0;
+						for (int i = 0; i < m; i++) {
+							const int d = pb[o + i];
+							sa += t[i] * Db[d], sb += t[i] * Da[d];
+							Ka[d] += kcb * t[i], Kb[d] += kca * t[i];
+						}
+						Ks[c + a * n] += fab * sa, Ks[c + b * n] += fab * sb;
+					}
+					if (c == a) {
+						const double h = fp[k] * fp[k] * v[k];
+						Ks[a + a * n] -= h * Db[b], Ks[a + b * n] -= h * Da[b];
+						Ka[b] -= h * Da[b], Kb[b] -= h * Da[a];
+					}
 				}
 			}
 		}
-		Jp[omp_get_thread_num()].swap(Jl);
-		Kp[omp_get_thread_num()].swap(Kl);
+		const int me = omp_get_thread_num();
+		Jp[me].swap(Jl);
+		for (int i = 0; i < nd; i++) Kp[me * nd + i].swap(Kl[i]);
 	}
 	J = occ::Mat::Zero(n, n);
-	K.resize(n, n);
+	for (int i = 0; i < nd; i++) K[i].resize(n, n);
 	//The partials outweigh the matrices many times, so their sum is parallel too
 #pragma omp parallel for schedule(static)
 	for (int a = 0; a < n; a++) {
-		for (int b = 0; b <= a; b++) {
-			double sk = 0.0;
-			for (int t = 0; t < nthr; t++)
-				if (!Jp[t].empty()) sk += Kp[t](a, b) + Kp[t](b, a);
-			K(a, b) = K(b, a) = 0.125 * sk;
-		}
+		for (int i = 0; i < nd; i++)
+			for (int b = 0; b <= a; b++) {
+				double sk = 0.0;
+				for (int t = 0; t < nthr; t++)
+					if (!Jp[t].empty()) sk += Kp[t * nd + i](a, b) + Kp[t * nd + i](b, a);
+				K[i](a, b) = K[i](b, a) = 0.125 * sk;
+			}
 		for (int k = first[a]; k < first[a + 1]; k++) {
 			double sj = 0.0;
 			for (int t = 0; t < nthr; t++)
@@ -304,6 +319,18 @@ void stored_eri::JK(const occ::Mat& D, occ::Mat& J, occ::Mat& K, const bool scre
 	}
 }
 
+void stored_eri::JK(const occ::Mat& D, occ::Mat& J, occ::Mat& K, const bool screen) const {
+	const occ::Mat* d[1] = { &D };
+	jk(d, 1, J, &K, screen);
+}
+
+void stored_eri::JK(const occ::Mat& Da, const occ::Mat& Db, occ::Mat& J, occ::Mat& Ka, occ::Mat& Kb, const bool screen) const {
+	const occ::Mat* d[2] = { &Da, &Db };
+	occ::Mat K[2];
+	jk(d, 2, J, K, screen);
+	Ka.swap(K[0]), Kb.swap(K[1]);
+}
+
 occ::Mat stored_eri::fock(const occ::qm::MolecularOrbitals& mo, const bool screen, const jk_fn& jk) const {
 	const auto JK_ = [&](const occ::Mat& D, occ::Mat& J, occ::Mat& K) { if (jk) jk(D, J, K); else JK(D, J, K, screen); };
 	occ::Mat J, K;
@@ -311,10 +338,17 @@ occ::Mat stored_eri::fock(const occ::qm::MolecularOrbitals& mo, const bool scree
 		JK_(mo.D, J, K);
 		return 2.0 * J - K;
 	}
-	occ::Mat F = occ::Mat::Zero(mo.D.rows(), mo.D.cols()), Jb, Kb;
-	JK_(occ::qm::block::a(mo.D), J, K);
-	JK_(occ::qm::block::b(mo.D), Jb, Kb);
-	occ::qm::block::a(F) = 2.0 * (J + Jb) - 2.0 * K;
-	occ::qm::block::b(F) = 2.0 * (J + Jb) - 2.0 * Kb;
+	occ::Mat F = occ::Mat::Zero(mo.D.rows(), mo.D.cols()), Kb;
+	const occ::Mat Da = occ::qm::block::a(mo.D), Db = occ::qm::block::b(mo.D);
+	if (jk) {
+		occ::Mat Jb;
+		jk(Da, J, K);
+		jk(Db, Jb, Kb);
+		J += Jb;
+	}
+	else
+		JK(Da, Db, J, K, Kb, screen);
+	occ::qm::block::a(F) = 2.0 * J - 2.0 * K;
+	occ::qm::block::b(F) = 2.0 * J - 2.0 * Kb;
 	return F;
 }

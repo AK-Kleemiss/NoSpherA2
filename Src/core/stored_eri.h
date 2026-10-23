@@ -29,6 +29,8 @@ public:
 	//J_ab = sum_cd (ab|cd) D_cd, K_ab = sum_cd (ac|bd) D_cd. With screen, D is a density difference and a
 	//segment whose Schwarz bound times the largest D element it touches is below threshold is skipped
 	void JK(const occ::Mat& D, occ::Mat& J, occ::Mat& K, bool screen = false) const;
+	//J of Da + Db and K of each in one pass over the integrals (the unrestricted build)
+	void JK(const occ::Mat& Da, const occ::Mat& Db, occ::Mat& J, occ::Mat& Ka, occ::Mat& Kb, bool screen = false) const;
 	//Two-electron Fock part for OCC's half-scaled densities: 2J(D) - K(D) restricted, per spin
 	//2J(Da + Db) - 2K(Ds) unrestricted; jk replaces JK(), for a device holding the integrals
 	occ::Mat fock(const occ::qm::MolecularOrbitals& mo, bool screen = false, const jk_fn& jk = {}) const;
@@ -47,6 +49,9 @@ public:
 	const std::vector<double>& schwarz() const { return q_; }
 
 private:
+	//J of the sum of nd (1 or 2) densities, K of each
+	void jk(const occ::Mat* const* D, int nd, occ::Mat& J, occ::Mat* K, bool screen) const;
+
 	int nbf_ = 0;
 	std::unique_ptr<double[]> v_;
 	std::vector<int> pa_, pb_, first_, idx_;
