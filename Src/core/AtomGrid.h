@@ -15,7 +15,8 @@ public:
 		const int max_l_quantum_number,
 		const double alpha_min[],
 		std::ostream &file,
-		const double radial_step_scale = 1.0);
+		const double radial_step_scale = 1.0,
+		const bool generic_rotation = false);
 
 	~AtomGrid();
 
@@ -50,6 +51,11 @@ public:
 	double get_gridx(const int &i) { return atom_grid_x_bohr_[i]; };
 	double get_gridy(const int &i) { return atom_grid_y_bohr_[i]; };
 	double get_gridz(const int &i) { return atom_grid_z_bohr_[i]; };
+	const vec &get_gridx() const { return atom_grid_x_bohr_; };
+	const vec &get_gridy() const { return atom_grid_y_bohr_; };
+	const vec &get_gridz() const { return atom_grid_z_bohr_; };
+	//shell s holds points [shell_start[s], shell_start[s + 1]), one radius and one Lebedev rule each
+	const ivec &get_shell_start() const { return shell_start_; };
 
 private:
 
@@ -57,11 +63,22 @@ private:
 	vec atom_grid_y_bohr_;
 	vec atom_grid_z_bohr_;
 	vec atom_grid_w_;
+	ivec shell_start_;
 
 	int num_radial_grid_points_;
 
 	vec radial_atom_grid_r_bohr_;
 	vec radial_atom_grid_w_;
+};
+
+//Where each kept density point sits in its atom's prototype grid, so the Fourier-Bessel transform takes shells and
+//Lebedev rules from the prototype instead of guessing them from the points
+struct sf_shell_layout
+{
+	struct prototype { vec x, y, z; ivec shell_start; }; //points about the nucleus, shells as AtomGrid::get_shell_start
+	std::vector<prototype> protos;
+	ivec proto; //[density atom] its prototype, -1 none
+	ivec2 idx;  //[density atom][kept point] index in that prototype
 };
 
 //The line density comes from density when set (a fitted density on an aux-only wfn), else from the orbitals of wfn

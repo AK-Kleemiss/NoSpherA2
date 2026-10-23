@@ -1,13 +1,13 @@
 //The XCW lambda-scan halting statistics (Src/core/xcw_halting.cpp) against analytic
-//values and goldens derived by hand, and the XCW settings-file parser through the only
-//door it has, the XCW constructor: the parse errors it throws need no crystal, the
-//successful parses run construct() on the P1 fixture and are checked through XCW.log.
+//values and goldens derived by hand, and the XCW settings-file parser, options::loadXCWsettings:
+//the parse errors it throws need no crystal, the successful parses build the structure_factors
+//and the XCW_solver of the P1 fixture and are checked through what those print.
 #include "pch.h"
 #include <gtest/gtest.h>
 
 #include "core/convenience.h"
 #include "core/xcw_halting.h"
-#include "core/XCW.h"
+#include "core/XCW_solver.h"
 
 namespace
 {
@@ -50,8 +50,7 @@ namespace
 		return p;
 	}
 
-	//what loadSettings throws for a settings text; every text handed in here must throw,
-	//because a parse that succeeds runs construct() on an empty cif and that exits the process
+	//what loadXCWsettings throws for a settings text, empty when it parses
 	std::string parse_error(const std::string& text)
 	{
 		const auto p = write_settings(text);
@@ -60,7 +59,7 @@ namespace
 		opt.do_XCW = true;
 		std::string what;
 		try {
-			XCW x(opt);
+			opt.loadXCWsettings();
 		}
 		catch (const std::runtime_error& e) {
 			what = e.what();
@@ -69,13 +68,13 @@ namespace
 		return what;
 	}
 
-	//construct an XCW on the P1 fixture with this settings text, in a scratch directory
-	//because construct() writes XCW.log and log3.txt into the working directory; returns
-	//the XCW.log text, empty when the fixture is missing
+	//build the structure_factors and the XCW_solver of the P1 fixture with this settings text,
+	//in a scratch directory because the solver opens its SCF.log there; returns what they
+	//printed, lowercased, empty when the fixture is missing
 	std::string construct_on_p1(const std::string& text)
 	{
 		const auto fixture = nos_test_repo_root() / "tests" / "P1_test";
-		if (!std::filesystem::exists(fixture / "P1_test_NA2.cif") || !std::filesystem::exists(fixture / "P1_test.hkl")) {
+		if (!std::filesystem::exists(fixture / "P1_test.cif") || !std::filesystem::exists(fixture / "P1_test.hkl")) {
 			return "";
 		}
 		const auto dir = std::filesystem::temp_directory_path() / ("nosphera2_xcw_tests_p1_" + test_name());
@@ -84,17 +83,19 @@ namespace
 		std::ofstream(settings) << text;
 		options opt;
 		opt.xcw_settings_path = settings;
-		opt.cif = std::filesystem::absolute(fixture / "P1_test_NA2.cif");
+		opt.cif = std::filesystem::absolute(fixture / "P1_test.cif");
 		opt.hkl = std::filesystem::absolute(fixture / "P1_test.hkl");
 		opt.do_XCW = true;
 		const auto old_cwd = std::filesystem::current_path();
 		std::filesystem::current_path(dir);
-		{
-			XCW x(opt);
-		}
-		std::filesystem::current_path(old_cwd);
 		std::stringstream log;
-		log << std::ifstream(dir / "XCW.log").rdbuf();
+		std::streambuf* const old_cout = std::cout.rdbuf(log.rdbuf());
+		opt.loadXCWsettings();
+		{
+			XCW_solver x(opt);
+		}
+		std::cout.rdbuf(old_cout);
+		std::filesystem::current_path(old_cwd);
 		std::filesystem::remove_all(dir);
 		std::string text_out = log.str();
 		std::transform(text_out.begin(), text_out.end(), text_out.begin(), [](unsigned char c) { return (char)std::tolower(c); });
@@ -536,10 +537,89 @@ namespace
 		EXPECT_FALSE(halting_minimum_beyond_scan(weak, target));
 	}
 
-	// ------------------------------------------------------------------
-	// XCW settings file, through the constructor
+	//set_DW for every ADP level (isotropic, U, U+C, U+C+D) on the atoms of the P1 fixture against the
+	//Gram-Charlier expansion written out term by term: exp(-q.U.q/2) (1 + D4/24 + i (-C3/6))
+	TEST(XcwAdpTests, DebyeWallerFactorsOfEveryLevelMatchTheExplicitExpansion)
+	{
+		const auto fixture = nos_test_repo_root() / "tests" / "P1_test";
+		if (!std::filesystem::exists(fixture / "P1_test.cif") || !std::filesystem::exists(fixture / "P1_test.hkl")) {
+			GTEST_SKIP() << "P1 fixture missing under " << fixture;
+		}
+		const auto dir = std::filesystem::temp_directory_path() / ("nosphera2_xcw_tests_dw_" + test_name());
+		std::filesystem::create_directories(dir);
+		std::ofstream(dir / "settings.txt") << "normal params 177 basis_set sto-3g charge 0 mult 1 rhf start 0 step_size 0.01 end 0";
+		options opt;
+		opt.xcw_settings_path = dir / "settings.txt";
+		opt.cif = std::filesystem::absolute(fixture / "P1_test.cif");
+		opt.hkl = std::filesystem::absolute(fixture / "P1_test.hkl");
+		opt.do_XCW = true;
+		const auto old_cwd = std::filesystem::current_path();
+		std::filesystem::current_path(dir);
+		std::stringstream log;
+		std::streambuf* const old_cout = std::cout.rdbuf(log.rdbuf());
+		opt.loadXCWsettings();
+		structure_factors SF(opt);
+		std::cout.rdbuf(old_cout);
+		std::filesystem::current_path(old_cwd);
+		std::filesystem::remove_all(dir);
 
-	// a missing settings file is refused before anything else is opened
+		const int ncen = SF.model_data.ncen;
+		ASSERT_GE(ncen, 4);
+		//atom a gets level a % 4: 0 isotropic (ADPs left empty), 1 U, 2 U and C, 3 U, C and D
+		for (int a = 0; a < ncen; a++) {
+			const int level = a % 4;
+			vec U = { 0.020 + 0.001 * a, 0.030, 0.025, 0.002, -0.003, 0.004 };
+			vec C(10), D(15);
+			for (int i = 0; i < 10; i++) C[i] = 2e-4 * (i % 3 - 1) * (i + 1);
+			for (int i = 0; i < 15; i++) D[i] = 3e-5 * (i % 4 - 1.5) * (i + 1);
+			SF.ADPs[a].clear();
+			if (level >= 1) SF.ADPs[a] = { U, level >= 2 ? C : vec(), level >= 3 ? D : vec() };
+		}
+		SF.set_DW();
+		EXPECT_TRUE(SF.DW_set_);
+
+		const double ang2bohr = constants::ang2bohr(1);
+		double t2_largest = 0.0, t3_largest = 0.0;
+		for (int a = 0; a < ncen; a++) {
+			const int level = a % 4;
+			const vec2& adp = SF.ADPs[a];
+			for (int h = 0; h < SF.model_data.nr_enlarged; h++) {
+				const double x = SF.k_pt[0][h] * ang2bohr, y = SF.k_pt[1][h] * ang2bohr, z = SF.k_pt[2][h] * ang2bohr;
+				cdouble expected;
+				if (level == 0) {
+					expected = std::exp(-0.5 * SF.asym_atoms[a].U_iso * (x * x + y * y + z * z));
+				}
+				else {
+					const vec& U = adp[0];
+					const double quad = U[0] * x * x + U[1] * y * y + U[2] * z * z + 2 * U[3] * x * y + 2 * U[4] * x * z + 2 * U[5] * y * z;
+					double t2 = 0.0, t3 = 0.0;
+					if (level >= 2) {
+						const vec& C = adp[1];
+						t2 = -1.0 / 6.0 * (C[0] * x * x * x + C[6] * y * y * y + C[9] * z * z * z
+							+ 3 * C[1] * x * x * y + 3 * C[2] * x * x * z + 3 * C[3] * x * y * y + 3 * C[5] * x * z * z + 3 * C[7] * y * y * z + 3 * C[8] * y * z * z
+							+ 6 * C[4] * x * y * z);
+					}
+					if (level >= 3) {
+						const vec& D = adp[2];
+						t3 = (1.0 / 24.0) * (D[0] * x * x * x * x + 4.0 * D[1] * x * x * x * y + 4.0 * D[2] * x * x * x * z
+							+ 6.0 * D[3] * x * x * y * y + 12.0 * D[4] * x * x * y * z + 6.0 * D[5] * x * x * z * z + 4.0 * D[6] * x * y * y * y + 12.0 * D[7] * x * y * y * z
+							+ 12.0 * D[8] * x * y * z * z + 4.0 * D[9] * x * z * z * z + D[10] * y * y * y * y + 4.0 * D[11] * y * y * y * z + 6.0 * D[12] * y * y * z * z
+							+ 4.0 * D[13] * y * z * z * z + D[14] * z * z * z * z);
+					}
+					t2_largest = std::max(t2_largest, std::abs(t2));
+					t3_largest = std::max(t3_largest, std::abs(t3));
+					expected = std::exp(-0.5 * quad) * cdouble(1 + t3, t2);
+				}
+				const cdouble got = SF.DW_facts[a][h];
+				ASSERT_NEAR(got.real(), expected.real(), 1e-13) << "atom " << a << " level " << level << " reflection " << h;
+				ASSERT_NEAR(got.imag(), expected.imag(), 1e-13) << "atom " << a << " level " << level << " reflection " << h;
+			}
+		}
+		//the C and D terms must actually move the factor, or the comparison above says nothing about them
+		EXPECT_GT(t2_largest, 1e-6);
+		EXPECT_GT(t3_largest, 1e-6);
+	}
+
 	//transform_ADPs takes M and applies T'_{ij..} = sum M_pi M_qj .. T_pq.. : for the rank-2 U that is
 	//M^T U M, checked against a hand-multiplied three-fold (which tells M from M^T), and for C and D the
 	//sign pattern of a two-fold along b (every 0 or 2 index flips the sign)
@@ -554,7 +634,7 @@ namespace
 		// x' = -y, y' = x - y, z' = z handed in transposed, as cell stores it
 		const vec2 M = { { 0, 1, 0 }, { -1, -1, 0 }, { 0, 0, 1 } };
 		vec2 rotated = adps;
-		transform_ADPs(rotated, M);
+		cell::transform_ADPs(rotated, M);
 		for (int i = 0; i < 3; i++) {
 			for (int j = 0; j < 3; j++) {
 				double expect = 0.0;
@@ -573,7 +653,7 @@ namespace
 
 		const vec2 twofold_b = { { -1, 0, 0 }, { 0, 1, 0 }, { 0, 0, -1 } };
 		rotated = adps;
-		transform_ADPs(rotated, twofold_b);
+		cell::transform_ADPs(rotated, twofold_b);
 		const int map3[10][3] = { { 0, 0, 0 }, { 0, 0, 1 }, { 0, 0, 2 }, { 0, 1, 1 }, { 0, 1, 2 }, { 0, 2, 2 }, { 1, 1, 1 }, { 1, 1, 2 }, { 1, 2, 2 }, { 2, 2, 2 } };
 		const int map4[15][4] = { { 0, 0, 0, 0 }, { 0, 0, 0, 1 }, { 0, 0, 0, 2 }, { 0, 0, 1, 1 }, { 0, 0, 1, 2 }, { 0, 0, 2, 2 }, { 0, 1, 1, 1 }, { 0, 1, 1, 2 }, { 0, 1, 2, 2 }, { 0, 2, 2, 2 }, { 1, 1, 1, 1 }, { 1, 1, 1, 2 }, { 1, 1, 2, 2 }, { 1, 2, 2, 2 }, { 2, 2, 2, 2 } };
 		const double sign_u[6] = { 1, 1, 1, -1, 1, -1 };
@@ -592,10 +672,89 @@ namespace
 
 		// an atom without ADPs is left alone
 		vec2 none(3);
-		transform_ADPs(none, M);
+		cell::transform_ADPs(none, M);
 		EXPECT_TRUE(none[0].empty() && none[1].empty() && none[2].empty());
 	}
 
+	//grow_ADPs gives a grown atom its parent's U_iso, dispersion and U, rotated by the linking operation.
+	//Checked in Cartesian, independently of how cell stores the operation: with A the cell matrix,
+	//N = diag(a*, b*, c*) and R the fractional rotation of -y, x-y, z, the image of
+	//U_cart = A N U N A^T must be A R A^-1 U_cart (A R A^-1)^T
+	TEST(XcwAdpTests, GrownAdpsAreTheParentsRotatedOntoTheImage)
+	{
+		const auto p = std::filesystem::temp_directory_path() / ("nosphera2_xcw_tests_p3_" + test_name() + ".cif");
+		std::ofstream(p) << "data_p3\n_cell_length_a 5.0\n_cell_length_b 5.0\n_cell_length_c 7.0\n"
+			"_cell_angle_alpha 90\n_cell_angle_beta 90\n_cell_angle_gamma 120\n"
+			"loop_\n_space_group_symop_operation_xyz\n'x, y, z'\n'-y, x-y, z'\n'-x+y, -x, z'\n";
+		std::ostringstream sink;
+		cell c(p, sink, false, true);
+		std::filesystem::remove(p);
+		ASSERT_EQ(c.get_sym()[0][0].size(), 3u);
+
+		std::vector<asym_atom> atoms(2);
+		atoms[0].U_iso = 0.02;
+		atoms[0].anom = cdouble(0.1, 0.2);
+		atoms[1].grown = true;
+		//atom 1 is the image of atom 0 under -y, x-y, z
+		atoms[1].grown_from = 0;
+		atoms[1].grown_by = { 1 };
+		const vec U = { 0.03, 0.05, 0.02, 0.004, -0.006, 0.008 };
+		vec3 ADPs(1, vec2(3));
+		ADPs[0][0] = U;
+		ADPs[0][1] = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };
+		c.grow_ADPs(atoms, ADPs);
+		ASSERT_EQ(ADPs.size(), 2u);
+		EXPECT_EQ(ADPs[0][0], U);
+		EXPECT_DOUBLE_EQ(atoms[1].U_iso, 0.02);
+		EXPECT_EQ(atoms[1].anom, cdouble(0.1, 0.2));
+		ASSERT_EQ(ADPs[1][0].size(), 6u);
+		ASSERT_EQ(ADPs[1][1].size(), 10u);
+
+		const double g = constants::PI * 2.0 / 3.0;
+		const double A[3][3] = { { 5.0, 5.0 * std::cos(g), 0.0 }, { 0.0, 5.0 * std::sin(g), 0.0 }, { 0.0, 0.0, 7.0 } };
+		//a* = b* = 2 / (a sqrt(3)) for gamma = 120, c* = 1 / c
+		const double N[3] = { 2.0 / (5.0 * std::sqrt(3.0)), 2.0 / (5.0 * std::sqrt(3.0)), 1.0 / 7.0 };
+		const double R[3][3] = { { 0, -1, 0 }, { 1, -1, 0 }, { 0, 0, 1 } };
+		const int voigt[3][3] = { { 0, 3, 4 }, { 3, 1, 5 }, { 4, 5, 2 } };
+		auto to_cart = [&](const vec& u, double out[3][3]) {
+			for (int i = 0; i < 3; i++)
+				for (int j = 0; j < 3; j++) {
+					out[i][j] = 0.0;
+					for (int p_ = 0; p_ < 3; p_++)
+						for (int q = 0; q < 3; q++)
+							out[i][j] += A[i][p_] * N[p_] * u[voigt[p_][q]] * N[q] * A[j][q];
+				}
+			};
+		//R_cart = A R A^-1, A upper triangular
+		double Ainv[3][3] = {}, Rc[3][3] = {}, AR[3][3] = {};
+		Ainv[0][0] = 1.0 / A[0][0];
+		Ainv[1][1] = 1.0 / A[1][1];
+		Ainv[2][2] = 1.0 / A[2][2];
+		Ainv[0][1] = -A[0][1] / (A[0][0] * A[1][1]);
+		for (int i = 0; i < 3; i++)
+			for (int j = 0; j < 3; j++)
+				for (int k = 0; k < 3; k++) AR[i][j] += A[i][k] * R[k][j];
+		for (int i = 0; i < 3; i++)
+			for (int j = 0; j < 3; j++)
+				for (int k = 0; k < 3; k++) Rc[i][j] += AR[i][k] * Ainv[k][j];
+		double parent[3][3], image[3][3];
+		to_cart(U, parent);
+		to_cart(ADPs[1][0], image);
+		for (int i = 0; i < 3; i++)
+			for (int j = 0; j < 3; j++) {
+				double expect = 0.0;
+				for (int p_ = 0; p_ < 3; p_++)
+					for (int q = 0; q < 3; q++) expect += Rc[i][p_] * parent[p_][q] * Rc[j][q];
+				EXPECT_NEAR(image[i][j], expect, 1e-12) << i << j;
+			}
+		//the image of a general U is a different tensor in the cell's own axes
+		EXPECT_NE(ADPs[1][0], U);
+	}
+
+	// ------------------------------------------------------------------
+	// XCW settings file, through options::loadXCWsettings
+
+	// a missing settings file is refused before anything else is opened
 	TEST(XcwSettingsTests, MissingSettingsFileThrows)
 	{
 		options opt;
@@ -603,7 +762,7 @@ namespace
 		opt.do_XCW = true;
 		std::string what;
 		try {
-			XCW x(opt);
+			opt.loadXCWsettings();
 		}
 		catch (const std::runtime_error& e) {
 			what = e.what();
@@ -640,7 +799,7 @@ namespace
 		EXPECT_EQ(parse_error("basis_set"), "Expected basis set name");
 		EXPECT_EQ(parse_error("basis_set sto-3g df_basis"), "Expected a fitting basis name after 'df_basis'");
 		EXPECT_EQ(parse_error("basis_set sto-3g guess_basis"), "Expected a basis name after 'guess_basis'");
-		EXPECT_EQ(parse_error("basis_set sto-3g save"), "Expected a path after 'save'");
+		EXPECT_EQ(parse_error("basis_set sto-3g safe"), "Expected a path after 'safe'");
 	}
 
 	// without a basis set the parse completes and then refuses to run
@@ -662,14 +821,11 @@ namespace
 		EXPECT_EQ(parse_error("params 1 read"), "Basis set name not specified in settings file! Aborting run!");
 	}
 
-	// the successful parses run construct() on the P1 fixture, so the only thing to check
-	// after the parser is that the run got as far as opening XCW.log with the basis it
-	// was given; this is the "does not fall over" kind of check. The parsed settings are
-	// private to the XCW and construct() writes nothing else of them into the log, so a
-	// wrong preset value or a swapped keyword cannot be seen from here without an accessor
-	// in Src/; what these do prove is that every keyword below is accepted, that `read`
-	// before a keyword puts it back (a swallowed `basis_set` would leave `sto-3g` as an
-	// unknown keyword and throw), and that the basis token reaches the basis handler
+	// the successful parses build the P1 structure factors and the solver, which prints the
+	// basis it was given; every keyword below is accepted, `read` before a keyword puts it
+	// back (a swallowed `basis_set` would leave `sto-3g` as an unknown keyword and throw), and
+	// the basis token reaches the basis handler. The parsed values themselves are checked
+	// against opt.xcw_settings in the tests after these
 	TEST(XcwSettingsTests, SloppySlowConvergenceWithReadBeforeAKeyword)
 	{
 		const std::string log = construct_on_p1("sloppy slow_conv params 177 read basis_set sto-3g f charge 0 mult 1 rhf start 0 step_size 0.01 end 0.02");
@@ -681,7 +837,7 @@ namespace
 
 	TEST(XcwSettingsTests, TightFastConvergenceStreamedTensorWithoutEnd)
 	{
-		const std::string log = construct_on_p1("tight fast_conv i_float i_tensor_mb 100 stream safe f2 params 177 basis_set sto-3g charge 0 mult 1 uhf start 0 step_size 0.1");
+		const std::string log = construct_on_p1("tight fast_conv i_float i_tensor_mb 100 stream safe out.bin f2 params 177 basis_set sto-3g charge 0 mult 1 uhf start 0 step_size 0.1");
 		if (log.empty()) {
 			GTEST_SKIP() << "tests/P1_test fixture not found";
 		}
@@ -690,11 +846,179 @@ namespace
 
 	TEST(XcwSettingsTests, VeryTightWithSavedTensorAndExplicitCriteria)
 	{
-		const std::string log = construct_on_p1("very_tight normal_conv read tensor.bin save out.bin i_double weighted load_wfn nbo f params 177 basis_set sto-3g "
+		const std::string log = construct_on_p1("very_tight normal_conv read tensor.bin safe out.bin i_double weighted load_wfn nbo f params 177 basis_set sto-3g "
 			"conv 1e-6 diis_damping 1e-3 diis_shift 1e-2 conv_diis 1e-5 gradient 7e-5 maxp_diff 1e-5 rmsp_diff 1e-6 damp 0.5 shift 0.5 max_iter 50 charge 0 mult 1 end 0.01");
 		if (log.empty()) {
 			GTEST_SKIP() << "tests/P1_test fixture not found";
 		}
 		EXPECT_NE(log.find("xcw orbital basis set: sto-3g"), std::string::npos) << log;
+	}
+
+	//the settings a text parses to; the file is removed again
+	options::XCW_settings parsed(const std::string& text)
+	{
+		const auto p = write_settings(text);
+		options opt;
+		opt.xcw_settings_path = p;
+		opt.loadXCWsettings();
+		std::filesystem::remove(p);
+		return opt.xcw_settings;
+	}
+
+	// without `params` the parameter count is 1 and the run says so
+	TEST(XcwSettingsTests, MissingParamsDefaultsToOneWithAWarning)
+	{
+		testing::internal::CaptureStdout();
+		const options::XCW_settings s = parsed("basis_set sto-3g");
+		const std::string out = testing::internal::GetCapturedStdout();
+		EXPECT_EQ(s.n_params, 1);
+		EXPECT_NE(out.find("Warning: Number of crystallographic parameters not set (use the params keyword)! Continuing with a default value of 1..."), std::string::npos) << out;
+		testing::internal::CaptureStdout();
+		EXPECT_EQ(parsed("basis_set sto-3g params 177").n_params, 177);
+		EXPECT_EQ(testing::internal::GetCapturedStdout().find("Warning"), std::string::npos);
+	}
+
+	// the settings of tests/P1_test/test_settings.txt: the normal presets, F, unweighted -
+	// XWR_type has to be 1 without `weighted`, or the perturbation is never built
+	TEST(XcwSettingsTests, NormalPresetsAndTheTestSettingsFile)
+	{
+		const options::XCW_settings s = parsed("normal normal_conv Params 177 basis_set sto-3g max_iter 100 F charge 0 mult 1 rhf start 0 step_size 0.01 end 0.05");
+		EXPECT_EQ(s.basis_set_name, "sto-3g");
+		EXPECT_EQ(s.n_params, 177);
+		EXPECT_EQ(s.refine_against, 1);
+		EXPECT_EQ(s.XWR_type, 1);
+		EXPECT_EQ(s.hf_type, occ::qm::SpinorbitalKind::Restricted);
+		EXPECT_EQ(s.charge, 0);
+		EXPECT_EQ(s.multiplicity, 1);
+		EXPECT_EQ(s.max_scf_iterations, 100);
+		EXPECT_DOUBLE_EQ(s.quant_diff, 1e-6);
+		EXPECT_DOUBLE_EQ(s.max_diis_error, 1e-5);
+		EXPECT_DOUBLE_EQ(s.gradient, 7e-5);
+		EXPECT_DOUBLE_EQ(s.MaxP_diff, 1e-5);
+		EXPECT_DOUBLE_EQ(s.RMSP_diff, 1e-6);
+		EXPECT_DOUBLE_EQ(s.alpha, 0.5);
+		EXPECT_DOUBLE_EQ(s.level_shift, 0.5);
+		EXPECT_DOUBLE_EQ(s.diis_stop_damping, 1e-3);
+		EXPECT_DOUBLE_EQ(s.diis_stop_shift, 1e-2);
+		EXPECT_TRUE(s.method_apply_damping);
+		EXPECT_TRUE(s.method_apply_shift);
+		EXPECT_DOUBLE_EQ(s.xcw_start_value, 0.0);
+		EXPECT_DOUBLE_EQ(s.xcw_step_size, 0.01);
+		EXPECT_EQ(s.num_xcw_steps, 6);
+		EXPECT_DOUBLE_EQ(s.i_sigma_cutoff, 2.0);
+		EXPECT_FALSE(s.xcw_gaussian_halt);
+		EXPECT_DOUBLE_EQ(s.xcw_strong_cutoff, 3.0);
+		EXPECT_EQ(s.extinction_model, extinction::model::none);
+		EXPECT_DOUBLE_EQ(s.wavelength, 0.0);
+		EXPECT_FALSE(s.grown || s.read_tensor || s.read_first_guess || s.nbo_output || s.check_hessian);
+		EXPECT_EQ(s.i_tensor_max_mb, 0u);
+		EXPECT_TRUE(s.i_tensor_file_path.empty() && s.i_tensor_save_path.empty());
+	}
+
+	// the other presets, and an explicit value wins over its preset whichever comes first
+	TEST(XcwSettingsTests, PresetsAndExplicitValues)
+	{
+		const options::XCW_settings sloppy = parsed("sloppy slow_conv basis_set sto-3g");
+		EXPECT_DOUBLE_EQ(sloppy.quant_diff, 3e-5);
+		EXPECT_DOUBLE_EQ(sloppy.max_diis_error, 1e-4);
+		EXPECT_DOUBLE_EQ(sloppy.gradient, 5e-4);
+		EXPECT_DOUBLE_EQ(sloppy.MaxP_diff, 1e-4);
+		EXPECT_DOUBLE_EQ(sloppy.RMSP_diff, 1e-5);
+		EXPECT_DOUBLE_EQ(sloppy.alpha, 0.8);
+		EXPECT_DOUBLE_EQ(sloppy.level_shift, 1.0);
+		EXPECT_DOUBLE_EQ(sloppy.diis_stop_damping, 1e-5);
+		EXPECT_DOUBLE_EQ(sloppy.diis_stop_shift, 1e-5);
+		//without `end` the scan runs to lambda 1
+		EXPECT_EQ(sloppy.num_xcw_steps, 101);
+
+		const options::XCW_settings tight = parsed("tight fast_conv basis_set sto-3g");
+		EXPECT_DOUBLE_EQ(tight.quant_diff, 5e-7);
+		EXPECT_DOUBLE_EQ(tight.max_diis_error, 5e-6);
+		EXPECT_DOUBLE_EQ(tight.gradient, 3e-5);
+		EXPECT_DOUBLE_EQ(tight.MaxP_diff, 1e-6);
+		EXPECT_DOUBLE_EQ(tight.RMSP_diff, 1e-7);
+		EXPECT_FALSE(tight.method_apply_damping);
+		EXPECT_FALSE(tight.method_apply_shift);
+
+		const options::XCW_settings v = parsed("conv 2e-6 damp 0.3 shift 0.7 max_iter 50 very_tight normal_conv basis_set sto-3g diis_damping 2e-3 diis_shift 3e-2 "
+			"conv_diis 4e-5 gradient 5e-5 maxp_diff 6e-5 rmsp_diff 7e-6");
+		EXPECT_DOUBLE_EQ(v.quant_diff, 2e-6);
+		EXPECT_DOUBLE_EQ(v.alpha, 0.3);
+		EXPECT_DOUBLE_EQ(v.level_shift, 0.7);
+		EXPECT_EQ(v.max_scf_iterations, 50);
+		EXPECT_DOUBLE_EQ(v.diis_stop_damping, 2e-3);
+		EXPECT_DOUBLE_EQ(v.diis_stop_shift, 3e-2);
+		EXPECT_DOUBLE_EQ(v.max_diis_error, 4e-5);
+		EXPECT_DOUBLE_EQ(v.gradient, 5e-5);
+		EXPECT_DOUBLE_EQ(v.MaxP_diff, 6e-5);
+		EXPECT_DOUBLE_EQ(v.RMSP_diff, 7e-6);
+	}
+
+	// the switches and the keywords that carry a path, a model or a number
+	TEST(XcwSettingsTests, SwitchesPathsAndModels)
+	{
+		const options::XCW_settings s = parsed("basis_set def2-svp df_basis def2-universal-jkfit guess_basis sto-3g f2 weighted uhf charge 1 mult 2 "
+			"start 0.02 step_size 0.005 end 0.04 i_sigma 3 gaussian_halt strong_cutoff 4.5 grown load_wfn nbo soscf check_hessian "
+			"read tensor.bin safe out.bin i_float i_double i_tensor_mb 300 wavelength 1.54178 extinction bc_gaussian aniso fixed 2e-4");
+		EXPECT_EQ(s.basis_set_name, "def2-svp");
+		EXPECT_EQ(s.df_basis_name, "def2-universal-jkfit");
+		EXPECT_EQ(s.guess_basis_name, "sto-3g");
+		EXPECT_EQ(s.refine_against, 2);
+		EXPECT_EQ(s.XWR_type, 2);
+		EXPECT_EQ(s.hf_type, occ::qm::SpinorbitalKind::Unrestricted);
+		EXPECT_EQ(s.charge, 1);
+		EXPECT_EQ(s.multiplicity, 2);
+		EXPECT_DOUBLE_EQ(s.xcw_start_value, 0.02);
+		EXPECT_DOUBLE_EQ(s.xcw_step_size, 0.005);
+		EXPECT_EQ(s.num_xcw_steps, 5);
+		EXPECT_DOUBLE_EQ(s.i_sigma_cutoff, 3.0);
+		EXPECT_TRUE(s.xcw_gaussian_halt);
+		EXPECT_DOUBLE_EQ(s.xcw_strong_cutoff, 4.5);
+		EXPECT_TRUE(s.grown && s.read_first_guess && s.nbo_output && s.check_hessian);
+		EXPECT_TRUE(s.read_tensor);
+		EXPECT_EQ(s.i_tensor_file_path, std::filesystem::path("tensor.bin"));
+		EXPECT_EQ(s.i_tensor_save_path, std::filesystem::path("out.bin"));
+		EXPECT_TRUE(s.i_tensor_single && s.i_tensor_double);
+		EXPECT_EQ(s.i_tensor_max_mb, 300u);
+		EXPECT_DOUBLE_EQ(s.wavelength, 1.54178);
+		EXPECT_EQ(s.extinction_model, extinction::model::bc_gaussian);
+		EXPECT_TRUE(s.extinction_aniso);
+		EXPECT_FALSE(s.extinction_refine);
+		EXPECT_DOUBLE_EQ(s.extinction_start, 2e-4);
+
+		//`read` without a path means the default file, `safe` always names one; `stream` a 2 GB budget
+		const options::XCW_settings d = parsed("read stream basis_set sto-3g");
+		EXPECT_TRUE(d.read_tensor);
+		EXPECT_EQ(d.i_tensor_file_path, std::filesystem::path("I_tensor_stream.bin"));
+		EXPECT_TRUE(d.i_tensor_save_path.empty());
+		EXPECT_EQ(d.i_tensor_max_mb, 2048u);
+		EXPECT_EQ(parse_error("basis_set sto-3g save out.bin"), "Unknown keyword 'save'");
+	}
+
+	//cell::remove_inv_vectors keeps the first of every inversion related pair in hkl_enlarged's order and
+	//links it to its partner. (-1, -2, 3) and (1, 2, -3) are a pair without either being the inverse
+	//image of (1, 2, 3), which is what images of two different operations look like.
+	TEST(XcwInversionTests, RemoveInvVectorsKeepsOneOfEveryPair)
+	{
+		EXPECT_TRUE(cell::check_inversion({ 1, 2, 3 }, { -1, -2, -3 }));
+		EXPECT_TRUE(cell::check_inversion({ -2, 0, 0 }, { 2, 0, 0 }));
+		EXPECT_FALSE(cell::check_inversion({ 1, 2, 3 }, { 1, 2, 3 }));
+		EXPECT_FALSE(cell::check_inversion({ 1, 2, 3 }, { -1, -2, 3 }));
+
+		//sorted: (-2,0,0) (-1,-2,-3) (-1,-2,3) (0,0,5) (0,1,0) (1,2,-3) (1,2,3) (2,0,0)
+		const hkl_list enlarged = { { 1, 2, 3 }, { -1, -2, -3 }, { 2, 0, 0 }, { -2, 0, 0 }, { 0, 1, 0 }, { -1, -2, 3 }, { 1, 2, -3 }, { 0, 0, 5 } };
+		hkl_list cleaned = { { 9, 9, 9 } };
+		const ivec2 link = cell::remove_inv_vectors(enlarged, cleaned);
+		const ivec2 expected_link = { { 0, 7 }, { 1, 6 }, { 2, 5 }, { 3 }, { 4 } };
+		EXPECT_EQ(link, expected_link);
+		const hkl_list expected_cleaned = { { -2, 0, 0 }, { -1, -2, -3 }, { -1, -2, 3 }, { 0, 0, 5 }, { 0, 1, 0 } };
+		EXPECT_EQ(cleaned, expected_cleaned);
+
+		//nothing to pair: every entry links to itself only, in ascending order
+		const hkl_list acentric = { { 1, 0, 0 }, { 0, 1, 0 }, { 0, 0, 1 }, { 1, 1, 0 } };
+		const ivec2 self_only = cell::remove_inv_vectors(acentric, cleaned);
+		const ivec2 expected_self = { { 0 }, { 1 }, { 2 }, { 3 } };
+		EXPECT_EQ(self_only, expected_self);
+		EXPECT_EQ(cleaned, acentric);
 	}
 }

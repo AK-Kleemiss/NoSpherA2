@@ -967,6 +967,19 @@ TEST(CubeIsoTests, MixColourRamp)
 	EXPECT_EQ(mix_colour(3.0, wild, 0.0, 2.0), (RGB{ 255, 0, 255 }));
 	EXPECT_EQ(mix_colour(0.25, wild, 0.0, 2.0), (RGB{ 0, 25, 25 }));
 	EXPECT_EQ(mtl_name({ 1, 22, 255 }), "FaceMaterial_1_22_255");
+	// A channel equal at both ends of a ramp must stay put: (1 - f) * 255 + f * 255 can give
+	// 254.99999999999997, which int() truncates; the ESP code red 255 -> white 255 -> blue 0 hits it
+	const std::array<std::array<int, 3>, 3> esp_code{ { { 255, 0, 0 }, { 255, 255, 255 }, { 0, 0, 255 } } };
+	const double lim = 0.061768436721054081; //an epoxide surface's ESP range
+	for (int i = 0; i <= 2000; i++)
+	{
+		const double v = -lim + i * (2 * lim / 2000);
+		const RGB c = mix_colour(v, esp_code, -lim, lim);
+		if (v <= 0)
+			ASSERT_EQ(c[0], 255) << "red stays saturated on the negative half, val " << v;
+		else
+			ASSERT_EQ(c[2], 255) << "blue stays saturated on the positive half, val " << v;
+	}
 }
 
 //get_colour from a cube interpolates at the face centre and mixes towards colour 1 by val/low or val/high

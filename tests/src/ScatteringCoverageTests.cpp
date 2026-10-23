@@ -16,6 +16,9 @@
 #include <chrono>
 #include <complex>
 #include <cstdint>
+#include <cstring>
+#include <numeric>
+#include <random>
 #include <set>
 #include <string>
 #include <vector>
@@ -257,21 +260,21 @@ TEST(ScatteringCoverageHklTests, ReadHklFullDerivesFAndSigma)
 	}
 	cell c(kA, kA, kA, 90.0, 90.0, 90.0);
 	hkl_list hkl;
-	std::vector<scattering_data> obs;
+	scatter_data obs;
 	std::ostringstream log;
 	const hkl_list enlarged = read_hkl_full(path, hkl, {}, c, log, obs, false);
 	fs::remove(path);
 	EXPECT_EQ(hkl, (hkl_list{ i3{ 0, 0, 1 }, i3{ 1, 0, 0 } }));
 	EXPECT_EQ(enlarged, hkl);
 	//obs follows the (h,k,l) order of the set, not the file: (0,0,1) comes first
-	ASSERT_EQ(obs.size(), 2u);
-	EXPECT_DOUBLE_EQ(obs[1].F_obs2, 100.0);
-	EXPECT_DOUBLE_EQ(obs[1].F_obs, 10.0);
-	EXPECT_DOUBLE_EQ(obs[1].abs_F_obs, 10.0);
-	EXPECT_DOUBLE_EQ(obs[1].sigma_obs2, 10.0);
-	EXPECT_DOUBLE_EQ(obs[1].sigma_obs, 0.5);
-	EXPECT_DOUBLE_EQ(obs[0].F_obs, 20.0);
-	EXPECT_DOUBLE_EQ(obs[0].sigma_obs, 0.5);
+	ASSERT_EQ(obs.F_obs.size(), 2u);
+	EXPECT_DOUBLE_EQ(obs.F_obs2[1], 100.0);
+	EXPECT_DOUBLE_EQ(obs.F_obs[1], 10.0);
+	EXPECT_DOUBLE_EQ(obs.abs_F_obs[1], 10.0);
+	EXPECT_DOUBLE_EQ(obs.sigma_obs2[1], 10.0);
+	EXPECT_DOUBLE_EQ(obs.sigma_obs[1], 0.5);
+	EXPECT_DOUBLE_EQ(obs.F_obs[0], 20.0);
+	EXPECT_DOUBLE_EQ(obs.sigma_obs[0], 0.5);
 	EXPECT_EQ(parse_after(log.str(), "Nr of reflections read from file: "), 2);
 	EXPECT_EQ(parse_after(log.str(), "Number of symmetry operations: "), 1);
 	EXPECT_EQ(parse_after(log.str(), "Nr of reflections to be used: "), 2);
@@ -290,7 +293,7 @@ TEST(ScatteringCoverageHklTests, ReadHklFullRejectsBrokenRows)
 	}
 	cell c(kA, kA, kA, 90.0, 90.0, 90.0);
 	hkl_list hkl;
-	std::vector<scattering_data> obs;
+	scatter_data obs;
 	std::ostringstream log;
 	EXPECT_EXIT({ read_hkl_full(short_row, hkl, {}, c, log, obs, false); }, ::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), ".*");
 	EXPECT_EXIT({ read_hkl_full(no_dot, hkl, {}, c, log, obs, false); }, ::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), ".*");
@@ -343,13 +346,9 @@ TEST(ScatteringCoverageCifTests, ReadAtomsRejectsRowByLabelAndType)
 		EXPECT_TRUE(labels.empty()) << debug;
 		EXPECT_TRUE(asym.empty()) << debug;
 		EXPECT_EQ(types, (ivec{ 6 })) << debug;
+		EXPECT_NE(log.str().find("CIF row Q1 has type N but the wavefunction atom at its position is C, skipping!"), std::string::npos) << debug;
 		if (debug)
-		{
-			EXPECT_NE(log.str().find("Element symbol not found in label, this is a problem!\n checking type... ALSO FAILED! WILL IGNORE ATOM!"), std::string::npos);
 			EXPECT_NE(log.str().find("I did not find this atom! Tolerances were: "), std::string::npos);
-		}
-		else
-			EXPECT_NE(log.str().find("Atom q1 was not matching by element determined by label reduction or type field, skipping!"), std::string::npos);
 	}
 	//without permission for an empty asymmetric unit the same CIF ends the run
 	{
@@ -378,7 +377,7 @@ TEST(ScatteringCoverageCifTests, ReadAtomsHydrogenLabelRules)
 	const std::vector<probe> probes{
 		{ "Q1 H 0.25 0.35 0.45\n", true, " will check type..." },
 		{ "T1 H 0.25 0.35 0.45\n", true, "" },
-		{ "Q1 C 0.25 0.35 0.45\n", false, " will check type... ALSO FAILED! WILL IGNORE ATOM!" } };
+		{ "Q1 C 0.25 0.35 0.45\n", false, "CIF row Q1 has type C but the wavefunction atom at its position is H, skipping!" } };
 	const double f = constants::ang2bohr(kA);
 	for (const probe& p : probes)
 	{
@@ -450,6 +449,18 @@ TEST(ScatteringCoverageEdTests, ConvertToEdIsMottBethe)
 	}
 }
 
+//pTB removes a core from B on and every such element has a valence correction fit (Ce-Lu since 21 Oct 2026); reading
+//the table at Z - 2 gave B none, C the B row, and from W on read past the end
+TEST(ScatteringCoverageEcpTests, PtbCorrectionRowFollowsTheCore)
+{
+	for (int Z = 1; Z <= constants::heaviest_ECP_element; Z++)
+	{
+		const bool has_fit = Spherical_Gaussian_Density(Z, 3).get_form_factor(1.0) != 0.0;
+		EXPECT_EQ(has_fit, constants::ECP_electrons_pTB[Z] > 0) << "Z = " << Z;
+	}
+	EXPECT_EQ(Spherical_Gaussian_Density(90, 3).get_form_factor(1.0), 0.0);
+}
+
 //the IAM path of calculate_scattering_factors: one Thakkar row per asymmetric atom, keyed by atomID
 TEST(ScatteringCoverageIamTests, IamRowsAreThakkarFactors)
 {
@@ -463,6 +474,68 @@ TEST(ScatteringCoverageIamTests, IamRowsAreThakkarFactors)
 	EXPECT_EQ(block.get_index_vector(), (ivec2{ { 0, 1, 1 }, { 2, 0, 1 }, { 0, 0, 1 } }));
 	expect_iam_rows(block, 0, 6, false);
 	EXPECT_FALSE(s.opt.tsc_written_by_stream);
+}
+
+//-hkl_scale n: the free-format list is read as it is, whatever -dmin says, and a row h gives the factor at S = h/n
+TEST(ScatteringCoverageIamTests, IamScaledIndicesAreFractional)
+{
+	iam_setup s("iam_scaled");
+	const fs::path list = tmp("iam_scaled.hkl");
+	{
+		std::ofstream out(list);
+		out << "! S = (h k l)/4\n2 0 0\n4 4 4\n-1 6 3\n0 0 0\n";
+	}
+	s.opt.m_hkl_list.clear();
+	s.opt.hkl = list;
+	s.opt.hkl_scale = 4;
+	s.opt.dmin = 0.5;
+	std::ostringstream log;
+	const itsc_block block = s.run(log);
+	fs::remove(list);
+	ASSERT_EQ(block.reflection_size(), 3u);
+	const cvec& row = block.get_sf_for_scatterer(0);
+	for (std::size_t r = 0; r < block.reflection_size(); r++)
+	{
+		const i3 h = block.get_indices(r);
+		const double stl = std::sqrt(double(h[0] * h[0] + h[1] * h[1] + h[2] * h[2])) / (2 * 4 * kA);
+		EXPECT_NEAR(row[r].real(), Thakkar(6).get_form_factor(constants::bohr2ang(constants::FOUR_PI * stl)), 1e-10) << "reflection " << r;
+	}
+}
+
+//-hkl_scale on the grid path: k-points at S = h/n, against F(k) = exp(-k^2/4) of the Gaussian hydrogen
+TEST(ScatteringCoverageIamTests, ScaledIndicesGiveFractionalKpoints)
+{
+	scoped_cwd cwd("scaled_k");
+	write_gaussian_h_wfn(cwd.dir / "gauss.wfn");
+	write_p1_cif(cwd.dir / "s.cif", "H1 H 0.0 0.0 0.0\n");
+	{
+		std::ofstream out(cwd.dir / "s.hkl");
+		out << "1 0 0\n3 2 1\n-2 5 4\n";
+	}
+	options opt;
+	opt.cif = cwd.dir / "s.cif";
+	opt.hkl = cwd.dir / "s.hkl";
+	opt.hkl_scale = 4;
+	opt.groups[0] = ivec{ 0 };
+	opt.partition_type = PartitionType::Becke;
+	opt.tsc_block_size = 0;
+	opt.use_gpu = false;
+	opt.no_date = true;
+	std::vector<WFN> wavy;
+	wavy.emplace_back(cwd.dir / "gauss.wfn", false);
+	svec known;
+	std::ostringstream log;
+	const itsc_block block = calculate_scattering_factors<itsc_block, std::vector<WFN>&>(opt, wavy, log, known, 0);
+	ASSERT_EQ(block.reflection_size(), 3u);
+	const cvec& row = block.get_sf_for_scatterer(0);
+	const double g = constants::TWO_PI / constants::ang2bohr(kA) / 4;
+	for (std::size_t r = 0; r < block.reflection_size(); r++)
+	{
+		const i3 h = block.get_indices(r);
+		const double k2 = g * g * (h[0] * h[0] + h[1] * h[1] + h[2] * h[2]);
+		EXPECT_NEAR(row[r].real(), std::exp(-k2 / 4.0), 2e-3) << "reflection " << r;
+		EXPECT_NEAR(row[r].imag(), 0.0, 2e-3) << "reflection " << r;
+	}
 }
 
 //electron diffraction in the IAM path is Mott-Bethe with the tabulated charge, and -label puts labels on the rows
@@ -681,7 +754,13 @@ TEST(ScatteringCoverageTransformTests, CalcSfSumsPhasesAndReportsPreparationTime
 	EXPECT_NEAR(sf[1][1].imag(), 0.0, 1e-12);
 	EXPECT_NE(log.str().find("Initialized FFs"), std::string::npos);
 	EXPECT_NE(log.str().find("asym atom list size: 2 total grid size: 3"), std::string::npos);
-	EXPECT_NE(log.str().find("Time to prepare: 2 s"), std::string::npos);
+	//2 s plus calc_SF's own run time: check the seconds branch, never the count (Debug, ARM, loaded runners add to it)
+	const std::string out = log.str();
+	const size_t prep = out.find("Time to prepare: ");
+	ASSERT_NE(prep, std::string::npos);
+	const std::string prep_line = out.substr(prep, out.find('\n', prep) - prep);
+	EXPECT_NE(prep_line.find(" s"), std::string::npos);
+	EXPECT_EQ(prep_line.find(" ms"), std::string::npos);
 	EXPECT_GE(end1, start);
 	//under a second the preparation time is reported in milliseconds
 	std::ostringstream log2;
@@ -691,6 +770,71 @@ TEST(ScatteringCoverageTransformTests, CalcSfSumsPhasesAndReportsPreparationTime
 	EXPECT_NE(log2.str().find(" ms"), std::string::npos);
 	EXPECT_EQ(log2.str().find("Initialized FFs"), std::string::npos);
 	EXPECT_NEAR(sf2[0][0].imag(), 1.0, 1e-12);
+}
+
+//calc_SF's phase recurrence (steps along l, row jumps of +-3 steps between rows of one h, sincos anchors at block
+//starts, h changes and after SF_ANCHOR multiplies in rows of up to 49) against the direct sum; the same set shuffled,
+//where every reflection anchors. Point counts leave odd tile and lane tails. The bytes do not depend on the thread count.
+TEST(ScatteringCoverageTransformTests, CalcSfRecurrenceMatchesDirectSumAndThreadCount)
+{
+	const double a = 2.0 * constants::PI / kA;
+	vec2 k_sorted(3);
+	for (int h = -4; h <= 4; h++)
+		for (int k = -4; k <= 4; k++)
+		{
+			const int lmax = 24 - 3 * std::abs(k) - std::abs(h);
+			for (int l = -lmax; l <= lmax; l++)
+			{
+				k_sorted[0].push_back(h * a); k_sorted[1].push_back(k * a); k_sorted[2].push_back(l * a);
+			}
+		}
+	std::mt19937 rng(7);
+	std::uniform_real_distribution<double> pos(-8.0, 8.0), w(0.0, 1.0);
+	vec2 dx, dy, dz, dens;
+	double norm = 0.0;
+	for (const int n : { 1, 3, 6, 257, 515 })
+	{
+		vec x(n), y(n), z(n), r(n);
+		for (int p = 0; p < n; p++) { x[p] = pos(rng); y[p] = pos(rng); z[p] = pos(rng); r[p] = w(rng); norm += r[p]; }
+		dx.push_back(x); dy.push_back(y); dz.push_back(z); dens.push_back(r);
+	}
+	std::vector<size_t> order(k_sorted[0].size());
+	std::iota(order.begin(), order.end(), size_t{ 0 });
+	std::shuffle(order.begin(), order.end(), rng);
+	vec2 k_shuffled(3, vec(order.size()));
+	for (size_t s = 0; s < order.size(); s++)
+		for (int c = 0; c < 3; c++)
+			k_shuffled[c][s] = k_sorted[c][order[s]];
+	const int threads = omp_get_max_threads();
+	for (const vec2* k_pt : { &k_sorted, &k_shuffled })
+	{
+		std::ostringstream log;
+		_time_point start = get_time(), end1;
+		cvec2 sf, sf1;
+		calc_SF(0, *k_pt, dx, dy, dz, dens, sf, log, start, end1, false, true, true, false);
+		omp_set_num_threads(1);
+		calc_SF(0, *k_pt, dx, dy, dz, dens, sf1, log, start, end1, false, true, true, false);
+		omp_set_num_threads(threads);
+		double err = 0.0;
+		for (size_t i = 0; i < dens.size(); i++)
+		{
+			ASSERT_EQ(sf[i].size(), (*k_pt)[0].size());
+			EXPECT_EQ(std::memcmp(sf[i].data(), sf1[i].data(), sf[i].size() * sizeof(sf[i][0])), 0) << "atom " << i;
+			for (size_t s = 0; s < sf[i].size(); s++)
+			{
+				std::complex<double> f(0.0, 0.0);
+				for (size_t p = 0; p < dens[i].size(); p++)
+				{
+					const double ph = (*k_pt)[0][s] * dx[i][p] + (*k_pt)[1][s] * dy[i][p] + (*k_pt)[2][s] * dz[i][p];
+					f += dens[i][p] * std::complex<double>(std::cos(ph), std::sin(ph));
+				}
+				err = std::max(err, std::abs(sf[i][s] - f));
+			}
+		}
+		//the tsc carries F to 1e-12 of F(000); the recurrence stays at the 1e-14 level
+		EXPECT_LT(err / norm, 1e-12) << (k_pt == &k_sorted ? "sorted" : "shuffled");
+		std::cout << (k_pt == &k_sorted ? "sorted" : "shuffled") << " hkl: max |F - F_direct| / F(000) = " << err / norm << std::endl;
+	}
 }
 
 //calc_sfac_diffuse: a normalised Gaussian on one hydrogen at the origin gives F = exp(-k^2/4), real,

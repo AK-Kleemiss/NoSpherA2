@@ -52,8 +52,6 @@ namespace {
 			if (!SP.basis_set_loaded()) load_basis_into_WFN(SP.wavy, BasisSetLibrary::get_basis_set(SP.get_dfbasis_name()));
 			coef = SP.gen_SALTED_densities();
 			err_checkf(SP.wavy.get_ncen() == wavy.get_ncen(), "The SALTED model does not cover every atom of " + wavy.get_path().string(), std::cout);
-			if (!opt.salted_charge_constraint)
-				std::cout << "Hint: -salted_charge_constraint pins the electron count of the prediction; a missing fraction of an electron shifts the whole ESP by q/r" << std::endl;
 			aux = SP.wavy;
 			aux.set_origin(e_origin::NOT_YET_DEFINED);
 		}
@@ -91,7 +89,9 @@ Gaussian_Molecule::Gaussian_Molecule(WFN aux_basis, vec coefficients)
 //One Gaussian_Atom per atom with its contiguous run of the coefficients
 void Gaussian_Molecule::slice()
 {
-	err_checkf(static_cast<int>(coefs.size()) == tab.n_coef, "Coefficient count does not match the auxiliary basis", std::cout);
+	err_checkf(static_cast<int>(coefs.size()) == tab.n_coef,
+		"Coefficient count does not match the auxiliary basis: " + std::to_string(coefs.size())
+		+ " coefficients for a basis of " + std::to_string(tab.n_coef), std::cout);
 	const std::vector<::atom>& atoms = *aux.get_atoms_ptr();
 	ats.reserve(tab.n_at);
 	for (int a = 0; a < tab.n_at; a++) {

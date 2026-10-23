@@ -10,11 +10,7 @@ class WFN;
 class cell;
 struct options;
 struct properties_options;
-// NOTE: this enum is coupled BY POSITION to the emplace_back() sequence that
-// builds the cube vector in properties_calculation() (properties.cpp). Nothing
-// enforces the correspondence, so inserting an enumerator in the middle without
-// inserting the matching emplace_back at the same index silently shifts every
-// later property by one. Always append new entries at the end.
+// Coupled by position to the emplace_back sequence in properties_calculation(); append new entries at the end only
 enum cube_type {
 	Rho = 0,
 	RDG = 1,
@@ -169,61 +165,17 @@ void Calc_MO(
 	double radius,
 	std::ostream &file,
 	bool wrap);
-/**
- * Locates the frontier molecular orbitals (HOMO and LUMO) of a wavefunction.
- *
- * There is no stored HOMO/LUMO index in WFN, so the frontier pair is derived
- * from the occupation numbers. Among all occupied MOs the one with the highest
- * orbital energy is taken as the HOMO, and among all unoccupied MOs the one
- * with the lowest orbital energy as the LUMO. Some wavefunction formats carry
- * no meaningful orbital energies (every energy identically zero), in which case
- * the routine falls back to MO ordering: the last occupied and the first
- * unoccupied index.
- *
- * For unrestricted wavefunctions the frontier pair is taken across BOTH spin
- * manifolds, i.e. the global highest occupied and global lowest virtual. That
- * is a deliberate simplification - a spin-resolved Fukui function would need
- * one pair per operator - and is reported to the caller via @p unrestricted.
- *
- * @param wavy The wavefunction to inspect.
- * @param homo Receives the HOMO index, or -1 if no occupied MO exists.
- * @param lumo Receives the LUMO index, or -1 if no virtual MO exists.
- * @param unrestricted Receives whether the wavefunction is unrestricted.
- * @return true if BOTH a HOMO and a LUMO were found.
- */
+// HOMO = highest-energy occupied MO, LUMO = lowest-energy virtual (-1 if none); with all orbital energies zero
+// it falls back to MO order. Unrestricted: one pair across both spins, a simplification flagged by unrestricted.
+// Returns true if both exist
 bool find_frontier_orbitals(
 	const WFN &wavy,
 	int &homo,
 	int &lumo,
 	bool &unrestricted);
-/**
- * Calculates the Fukui functions and the dual descriptor in the
- * frontier-orbital (frozen-orbital) approximation.
- *
- * f+(r) = |psi_LUMO(r)|^2   response to adding an electron; large where the
- *                           molecule is attacked by a NUCLEOPHILE.
- * f-(r) = |psi_HOMO(r)|^2   response to removing an electron; large where the
- *                           molecule is attacked by an ELECTROPHILE.
- * f0(r) = (f+ + f-) / 2     radical attack.
- * df(r) = f+ - f-           dual descriptor; > 0 electrophilic region,
- *                           < 0 nucleophilic region.
- *
- * All four fields derive from the same two orbital amplitudes, so they are
- * evaluated in a single pass over the grid. Only the cubes that are flagged as
- * loaded are filled. Values are accumulated (+=) rather than assigned, which is
- * what the periodic (wrapped) grid path requires.
- *
- * NOTE: Calc_MO returns the orbital AMPLITUDE psi, not the density |psi|^2.
- * The squaring is done here.
- *
- * @param Cubes The cube vector; Fukui_plus/minus/zero and Dual_Descriptor are filled.
- * @param wavy The WFN object containing the wavefunction data.
- * @param homo Index of the HOMO, from find_frontier_orbitals.
- * @param lumo Index of the LUMO, from find_frontier_orbitals.
- * @param radius The radius (Angstrom) around the atoms to evaluate.
- * @param file The output stream for timing information.
- * @param wrap Whether to wrap the grid periodically (set when a CIF is given).
- */
+// Frozen-orbital Fukui functions into the loaded cubes, one grid pass: f+ = |psi_LUMO|^2 (nucleophilic attack),
+// f- = |psi_HOMO|^2 (electrophilic attack), f0 = (f+ + f-)/2, dual descriptor f+ - f- (> 0 electrophilic).
+// Calc_MO gives the amplitude psi, squared here; values accumulate (+=) for the wrapped grid. radius in Angstrom
 void Calc_Fukui(
 	std::vector<cube> &Cubes,
 	const WFN &wavy,
@@ -232,46 +184,16 @@ void Calc_Fukui(
 	double radius,
 	std::ostream &file,
 	bool wrap);
-/**
- * Condensed (atom-summed) Fukui functions under all five atomic partitions.
- *
- * f+_A and f-_A are indexed [partition][atom], with the partition index being
- * PartitionResults::CHARGE_ORDER (S_BECKE, S_TFVC, S_HIRSH, S_MBIS, S_EMBIS).
- */
-// Spelled with explicit std types rather than the svec/vec2 aliases: those live
-// in convenience.h, which properties.h deliberately does not include.
+// Partition index follows PartitionResults::CHARGE_ORDER (Becke, TFVC, Hirshfeld, MBIS, EMBIS)
 struct CondensedFukuiResults {
 	bool valid = false;
 	std::vector<std::string> labels;
 	vec2 f_plus;   // [partition][atom]
 	vec2 f_minus;  // [partition][atom]
 };
-/**
- * Integrates the frontier-orbital densities against every atomic partition
- * weight GridManager knows about, giving the condensed Fukui functions
- *
- *     f+_A = integral w_A(r) |psi_LUMO(r)|^2 dr
- *     f-_A = integral w_A(r) |psi_HOMO(r)|^2 dr
- *
- * for Becke, Hirshfeld, TFVC, MBIS and EMBIS at once.
- *
- * The point-wise Fukui function is dominated by near-nuclear density, so its
- * maxima track the heaviest atom rather than the reactive site. The condensed
- * form is what actually carries the chemistry, and it is the standard object in
- * the conceptual-DFT literature (De Proft et al., J. Comput. Chem. 2002, 23,
- * 1198 condense it with exactly the Hirshfeld weights used here).
- *
- * The partition weights are built from the GROUND-STATE density, as they must
- * be - MBIS and EMBIS are refined self-consistently against it. Only the
- * integrand is swapped for a frontier-orbital density.
- *
- * @param wavy The wavefunction, which must still carry its virtual orbitals.
- * @param homo HOMO index from find_frontier_orbitals.
- * @param lumo LUMO index from find_frontier_orbitals.
- * @param unit_cell Cell for the integration grid.
- * @param accuracy GridManager accuracy level (as used for atomic charges).
- * @param file Output stream for GridManager's own progress reporting.
- */
+// f+_A = int w_A |psi_LUMO|^2, f-_A = int w_A |psi_HOMO|^2 for every GridManager partition (De Proft et al.,
+// J. Comput. Chem. 2002, 23, 1198); the point-wise maxima sit on heavy-atom cores, the condensed form finds the
+// reactive site. Weights stay those of the ground-state density (MBIS/EMBIS are refined against it); wavy needs its virtuals
 CondensedFukuiResults Calc_Condensed_Fukui(
 	const WFN &wavy,
 	int homo,
@@ -279,30 +201,12 @@ CondensedFukuiResults Calc_Condensed_Fukui(
 	const cell &unit_cell,
 	int accuracy,
 	std::ostream &file);
-/**
- * Prints the condensed Fukui table: f+, f- and the dual descriptor, one column
- * per partition, with the per-quantity sum over atoms as a normalisation check
- * (each should be 1).
- */
+// One column per partition; the sums over atoms (each 1) check the normalisation
 void print_condensed_fukui(
 	const CondensedFukuiResults &r,
 	std::ostream &file);
-/**
- * Standalone conceptual-DFT reactivity analysis of one wavefunction.
- *
- * Reads opt.wfn, reports the frontier orbitals and the HOMO-LUMO gap, computes
- * the condensed Fukui functions under all five atomic partitions, names the most
- * electrophilic and most nucleophilic atom, and writes <stem>_fukui.dat.
- *
- * Deliberately does NOT touch the cube machinery: no grid, no radius, no
- * resolution and no CIF are needed, so this answers "where does this molecule
- * react" from a wavefunction alone. Driven by -fukui_analysis; the cube-producing
- * path is -fukui inside a properties run.
- *
- * Dispatched from run_app_impl, NOT from options::digest_options(), so that the
- * console streambuf can be restored first and the table actually reaches the
- * terminal rather than NoSpherA2.log.
- */
+// -fukui_analysis: frontier orbitals, gap and condensed Fukui functions from opt.wfn alone, no cubes, into <stem>_fukui.dat.
+// Dispatched from run_app_impl, not digest_options(), so the console streambuf is restored and the table reaches the terminal
 void fukui_analysis(options &opt, std::ostream &log2 = std::cout);
 /**
  * Calculates the Spin density cube using the provided WFN object.

@@ -41,6 +41,24 @@ struct scattering_data {
 	double sigma_obs2;
 };
 
+// Store scattering data for each reflection
+struct scatter_data {
+	vec F_obs;
+	vec F_obs2;
+	vec sigma_obs;
+	vec sigma_obs2;
+	vec abs_F_obs;
+	cvec F_calc;
+	vec F_calc2;
+	double scale;
+	ivec hkl_mask;
+	hkl_list hkl;
+	hkl_list hkl_enlarged;
+	// hkl_enlarged with one entry of every inversion related pair, see cell::remove_inv_vectors
+	hkl_list inversion_cleaned_hkl;
+	cvec anom_correction;
+};
+
 enum GridIndex
 {
 	x_coord = 0,
@@ -76,8 +94,7 @@ void make_k_pts(const bool& read_k_pts,
 //streams a combined (-mtc) SALTED table in reflection blocks; false means nothing was written, take the ordinary path
 bool stream_mtc_salted(options& opt, std::vector<WFN>& wavy, std::ostream& file, vec2* known_kpts);
 
-//everything a disorder part needs for the transform, gathered once; all of it is reflection-independent,
-//which is what lets the -mtc reflection loop be moved outside the parts
+//per disorder part, gathered once; reflection-independent, so the -mtc reflection loop runs outside the parts
 class Gaussian_Molecule;
 
 struct salted_part_prep
@@ -137,10 +154,8 @@ void generate_hkl(
 	const ivec2& hkl_min_max = ivec2());
 
 /**
- * @brief Fills the hkl list from the options: -dmin and -hkl_min_max together give the
- * orbit of the measured box inside the resolution sphere, either alone gives that set, and
- * without both the -hkl file is read. ED callers get the sphere at dmin/2 - 0.001 and the
- * box is ignored, since the dynamical calculation needs every beam to that resolution.
+ * @brief hkl from -dmin, -hkl_min_max (both: the box orbit inside the sphere), else the -hkl file.
+ * ED gets the whole sphere at dmin/2 - 0.001, box ignored: the dynamical calculation needs every beam.
  */
 void generate_hkl_from_options(
 	const options& opt,
@@ -192,11 +207,8 @@ void generate_fractional_hkl(
  * @param debug Flag indicating whether to enable debug mode.
  */
 /**
- * @brief The magnitude below which a contribution is negligible at a given -acc level.
- *
- * 1e-10 up to -acc 2, 1e-14 at 3, 1e-30 above: the ladder the scattering-factor code has
- * always used, shared so that the XCW I tensor drops AO contributions on the same terms
- * rather than on a constant of its own.
+ * @brief Negligible magnitude at a -acc level, shared so the XCW I tensor screens AO
+ * contributions on the same terms as the scattering factors.
  */
 double cutoff(const int& accuracy);
 
@@ -274,6 +286,7 @@ static void add_ECP_contribution(
  * @param start The start time point.
  * @param end1 The end time point.
  * @param debug Flag indicating whether to enable debug mode.
+ * @param layout The prototype points of the density points (GridManager::getDensityVectors); enables Fourier-Bessel.
  */
 void calc_SF(const int& points,
 	const vec2& k_pt,
@@ -290,7 +303,15 @@ void calc_SF(const int& points,
 	bool do_XCW = false,
 	bool use_gpu = true,
 	bool gpu_fp64 = false,
-	bool gpu_fp32 = false);
+	bool gpu_fp32 = false,
+	const struct sf_shell_layout* layout = nullptr);
+
+//Fourier-Bessel transform of atom-centred Lebedev shell grids (see scattering_factors.cpp): fills sf[i] (sized to the
+//k list) for every atom layout places on a prototype grid and that it does faster than the direct sum, and returns
+//which ones; the rest (no layout: cube grids, hand-made points) need the direct sum. L_override < 0 takes L = D/2 of
+//the prototype's largest Lebedev degree; exact skips the |k| table; L_override >= 0, exact or force take every atom.
+std::vector<char> calc_SF_fourier_bessel(const vec2& k_pt, const vec2& dens, const struct sf_shell_layout* layout,
+	cvec2& sf, int L_override = -1, bool exact = false, bool force = false);
 
 double fourier_bessel_integral(
 	const primitive& p,
@@ -333,4 +354,5 @@ struct hkl_sym {
 };
 
 void read_hkl(const std::filesystem::path& hkl_filename, hkl_list& hkl, const vec2& twin_law, cell& unit_cell, std::ostream& file, bool debug = false);
-hkl_list read_hkl_full(const std::filesystem::path& hkl_filename, hkl_list& hkl, const vec2& twin_law, cell& unit_cell, std::ostream& file, std::vector<scattering_data>& obs, bool debug = false);
+hkl_list read_hkl_full(const std::filesystem::path& hkl_filename, hkl_list& hkl, const vec2& twin_law, cell& unit_cell, std::ostream& file, scatter_data& obs, bool debug = false);
+void read_mask(const std::filesystem::path& mask_filename, const hkl_list& hkl, const hkl_list& hkl_enlarged, const cell& unit_cell, std::ostream& file, vec2& mask_info, const int& n_r, bool debug = false);

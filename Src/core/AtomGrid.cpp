@@ -1,4 +1,5 @@
 #include "pch.h"
+#include "tuning.h"
 #include "convenience.h"
 #include "AtomGrid.h"
 #ifdef NOSPHERA2_USE_GPU
@@ -143,11 +144,16 @@ AtomGrid::AtomGrid(const double radial_precision,
 	const int max_l_quantum_number,
 	const double alpha_min[],
 	std::ostream &file,
-	const double radial_step_scale)
+	const double radial_step_scale,
+	const bool generic_rotation)
 {
 	using namespace std;
-	const int min_num_angular_points_closest =
-		constants::get_closest_num_angular(min_num_angular_points);
+	//The floor only acts inside R_Bragg/5. Up to Ar only the spherical 1s/2s2p core lives there: 6 points moved f by
+	//< 2e-10 against lebedev_low and saved 1.2-2.2x points (grid lab 05). From K on the valence d (or an ECP's
+	//pseudo-valence) reaches inside and wants lebedev_low: EMBIS on Rh with an ECP diverged with 6.
+	//-tune NOS_GRID_OLD_FLOOR restores lebedev_low everywhere.
+	const int min_num_angular_points_closest = proton_charge > 18 || tuning("NOS_GRID_OLD_FLOOR")
+		? constants::get_closest_num_angular(min_num_angular_points) : constants::lebedev_table[0];
 	const int max_num_angular_points_closest =
 		constants::get_closest_num_angular(max_num_angular_points);
 	err_checkf(min_num_angular_points_closest != -1 && max_num_angular_points_closest != -1, "No valid value for angular number found!", file);
@@ -166,6 +172,21 @@ AtomGrid::AtomGrid(const double radial_precision,
 			angular_y.data() + angular_off,
 			angular_z.data() + angular_off,
 			angular_w.data() + angular_off);
+	}
+	//Lebedev grids are O_h symmetric: a molecular mirror on x=0, y=0 or z=0 puts whole grid rings on a
+	//separatrix. A generic rotation (quaternion with no special angles) keeps the quadrature exact and moves them off.
+	if (generic_rotation) {
+		const double w = 0.9, x = 0.2, y = 0.3, z = 0.25, n = w * w + x * x + y * y + z * z;
+		const double R[3][3] = {
+			{ 1 - 2 * (y * y + z * z) / n, 2 * (x * y - w * z) / n, 2 * (x * z + w * y) / n },
+			{ 2 * (x * y + w * z) / n, 1 - 2 * (x * x + z * z) / n, 2 * (y * z - w * x) / n },
+			{ 2 * (x * z - w * y) / n, 2 * (y * z + w * x) / n, 1 - 2 * (x * x + y * y) / n } };
+		for (size_t k = 0; k < angular_x.size(); k++) {
+			const double a = angular_x[k], b = angular_y[k], c = angular_z[k];
+			angular_x[k] = R[0][0] * a + R[0][1] * b + R[0][2] * c;
+			angular_y[k] = R[1][0] * a + R[1][1] * b + R[1][2] * c;
+			angular_z[k] = R[2][0] * a + R[2][1] * b + R[2][2] * c;
+		}
 	}
 
 	// radial parameters
@@ -227,16 +248,16 @@ AtomGrid::AtomGrid(const double radial_precision,
 		angular_off = constants::get_angular_order(num_angular) * constants::MAG;
 		err_checkf(angular_off != -constants::MAG, "Invalid angular order!", file);
 		const int start = (int)atom_grid_x_bohr_.size();
+		shell_start_.push_back(start);
 		angular_off -= start;
 		const int size = start + num_angular;
-		int p = 0;
 		atom_grid_x_bohr_.resize(size);
 		atom_grid_y_bohr_.resize(size);
 		atom_grid_z_bohr_.resize(size);
 		atom_grid_w_.resize(size);
-#pragma omp parallel for private(p)
+		//serial: a few thousand multiplies per shell; a parallel region per shell stalls at its barrier on busy threads
 		for (int iang = start; iang < size; iang++) {
-			p = angular_off + iang;
+			const int p = angular_off + iang;
 			atom_grid_x_bohr_[iang] = angular_x[p] * radial_r;
 			atom_grid_y_bohr_[iang] = angular_y[p] * radial_r;
 			atom_grid_z_bohr_[iang] = angular_z[p] * radial_r;
@@ -244,6 +265,7 @@ AtomGrid::AtomGrid(const double radial_precision,
 			atom_grid_w_[iang] = constants::FOUR_PI * angular_w[p] * radial_w;
 		}
 	}
+	shell_start_.push_back((int)atom_grid_x_bohr_.size());
 }
 
 AtomGrid::~AtomGrid() {}
@@ -313,8 +335,7 @@ vec make_chi(const WFN& wfn, int samples, bool refine, bool debug, const Density
 					auto extrema = find_line_density_extrema(wfn, a, b, rho, samples, refine);
 					size_t use_extr = 0;
 					if (wfn.get_atom_ECP_electrons(a) != 0 || wfn.get_atom_ECP_electrons(b) != 0) {
-						//No sign change in the sampled line (minimum inside the last interval of a polar bond):
-						//extrema[use_extr] below read an empty vector and crashed without a message
+						//No sign change on the sampled line (minimum in the last interval of a polar bond) leaves extrema empty
 						if (extrema.empty()) {
 							std::cout << "WARNING: No density extremum found between atoms " << a << " and " << b << ". Setting chi to 1.0.\n";
 							chi[a * ncen + b] = 1.0;
@@ -415,7 +436,7 @@ vec make_chi(const WFN& wfn, int samples, bool refine, bool debug, const Density
 		}
 	}
 
-	if (std::getenv("NOSPHERA2_CHI_DEBUG")) { // Flawfinder: ignore
+	if (tuning("NOSPHERA2_CHI_DEBUG")) {
 		double s = 0.0;
 		for (int i = 0; i < chi.size(); i++) s += chi[i] * chi[i];
 		std::fprintf(stderr, "chi checksum %.17g size %zu\n", s, chi.size());
@@ -556,6 +577,65 @@ constexpr double f(const double &x)
 	return f;
 }
 
+#if defined(__aarch64__) && !defined(__APPLE__) && \
+	((defined(__clang__) && __clang_major__ >= 14) || (defined(__GNUC__) && !defined(__clang__) && !defined(__STRICT_ANSI__)))
+#define NSA2_BECKE_NEON
+//Becke pairs (a, b), b = a+1, a+2, ... two per NEON op; returns the first b left to the scalar loop (at most one).
+//The scalar loop is one dependent chain of ~70 cycles per pair (division, size adjustment, f3, pa update) and the
+//Cortex-A72 keeps about one pair in flight: 58 cycles/pair. Three vectors side by side: 41 cycles/pair (1.4x).
+//Bit-identical to the scalar loop as the compiler contracts it by default, which the gate pins:
+//1 - mu^2 and mu + u (1 - mu^2) fused, each f3 step h = 0.5 f, t = 1.5 - h f fused, f = t f. GCC in gnu++ modes
+//(-ffp-contract=fast; checked in the disassembly) also fuses the last f = t f into 1 - f3; clang 14+ (-ffp-contract=on,
+//per expression) does not, as f3 is a separate function. Clang's scalar loop is slower, 66 cycles/pair: 1.63x there.
+//An explicit -ffp-contract would break the identity. MSVC contracts differently again; Apple is not measured yet.
+//pa_a only ever gets multiplied or set to 0, and 0 stays 0: its zero tests are collected and applied once at the end,
+//which leaves a bare multiply chain in the loop.
+static int becke_pairs_neon(const int a, const int n, const double* dist, const double* R_v, const double* dist_ab_row,
+	const double* u_row, const int* Z, double* pa_b)
+{
+	const float64x2_t da = vdupq_n_f64(dist[a]), Ra = vdupq_n_f64(R_v[a]), one = vdupq_n_f64(1.0), half = vdupq_n_f64(0.5),
+		c15 = vdupq_n_f64(1.5), two = vdupq_n_f64(2.0), cut = vdupq_n_f64(constants::cutoff), tiny = vdupq_n_f64(1E-250),
+		zero = vdupq_n_f64(0.0);
+	double pa_a = pa_b[a];
+	uint64x2_t dead = vdupq_n_u64(0);
+	bool small = false;
+	const auto f_of = [&](const int b) {
+		const float64x2_t mu = vdivq_f64(vsubq_f64(da, vld1q_f64(dist + b)), vld1q_f64(dist_ab_row + b));
+		const float64x2_t u = vsetq_lane_f64(u_row[Z[b + 1]], vdupq_n_f64(u_row[Z[b]]), 1);
+		float64x2_t f = vbslq_f64(vcagtq_f64(vsubq_f64(Ra, vld1q_f64(R_v + b)), cut), vfmaq_f64(mu, vfmsq_f64(one, mu, mu), u), mu);
+		f = vmulq_f64(vfmsq_f64(c15, vmulq_f64(f, half), f), f);
+		f = vmulq_f64(f, vfmsq_f64(c15, f, vmulq_f64(f, half)));
+#ifdef __clang__
+		return vsubq_f64(one, vmulq_f64(f, vfmsq_f64(c15, f, vmulq_f64(f, half))));
+#else
+		return vfmsq_f64(one, f, vfmsq_f64(c15, f, vmulq_f64(f, half)));
+#endif
+	};
+	const auto apply = [&](const int b, const float64x2_t f) {
+		const float64x2_t pb = vld1q_f64(pa_b + b);
+		const uint64x2_t lt = vcaltq_f64(f, cut);
+		vst1q_f64(pa_b + b, vbslq_f64(lt, pb, vbslq_f64(vcagtq_f64(pb, tiny), vmulq_f64(vmulq_f64(vsubq_f64(two, f), half), pb), zero)));
+		dead = vorrq_u64(dead, lt);
+		const float64x2_t h = vmulq_f64(f, half);
+		small |= !(std::abs(pa_a) > 1E-250);
+		pa_a = vgetq_lane_f64(h, 0) * pa_a;
+		small |= !(std::abs(pa_a) > 1E-250);
+		pa_a = vgetq_lane_f64(h, 1) * pa_a;
+	};
+	int b = a + 1;
+	for (; b + 6 <= n; b += 6) {
+		const float64x2_t f0 = f_of(b), f1 = f_of(b + 2), f2 = f_of(b + 4);
+		apply(b, f0);
+		apply(b + 2, f1);
+		apply(b + 4, f2);
+	}
+	for (; b + 2 <= n; b += 2)
+		apply(b, f_of(b));
+	pa_b[a] = small || (vgetq_lane_u64(dead, 0) | vgetq_lane_u64(dead, 1)) ? 0.0 : pa_a;
+	return b;
+}
+#endif
+
 // JCP 139, 071103 (2013) for TFVC
 // JCP 88, 2547 (1988) for Becke
 std::array<double, 2> get_integration_weights(const int& num_centers,
@@ -575,7 +655,10 @@ std::array<double, 2> get_integration_weights(const int& num_centers,
 	double mu_ab, nu_ab, f, dist_ab;
 	double dist_a, dist_b;
 	double vx, vy, vz;
-	double R_a, R_b, chi_becke, u_ab, chi_mod;
+	double R_a, R_b, u_ab, chi_mod;
+#if !(defined(__aarch64__) || defined(__arm__) || defined(_M_ARM64))
+	double chi_becke;
+#endif
 	const double* chi_off, * bragg = constants::bragg_angstrom;
 	const double& cut = constants::cutoff;
 	//Called once per grid point: no allocation, and the distances to every centre
@@ -602,6 +685,24 @@ std::array<double, 2> get_integration_weights(const int& num_centers,
 			}
 		dist_ab_table = pair_dist.data();
 	}
+#if defined(__aarch64__) || defined(__arm__) || defined(_M_ARM64)
+	//The Becke size adjustment u_ab depends only on the two elements: a table instead of three divisions per pair,
+	//which were 16 % of the grid on a Cortex-A72; the armv7 Cortex-A53 divider is unpipelined too (grid setup 1.36x).
+	//Same formula, same values. x64 keeps the divisions, faster there.
+	static const std::vector<double> u_elem = [] {
+		constexpr int nz = std::size(constants::bragg_angstrom);
+		std::vector<double> u((size_t)nz * nz);
+		for (int za = 0; za < nz; za++)
+			for (int zb = 0; zb < nz; zb++) {
+				const double cb = constants::bragg_angstrom[za] / constants::bragg_angstrom[zb];
+				double v = (cb - 1.0) / (cb + 1.0);
+				v = v / (v * v - 1.0);
+				u[(size_t)za * nz + zb] = v > 0.5 ? 0.5 : v < -0.5 ? -0.5 : v;
+			}
+		return u;
+	}();
+	const double* u_row;
+#endif
 
 	if (chi.size() == 0) [[unlikely]] {
 		for (int a = 0; a < num_centers; a++) {
@@ -618,8 +719,15 @@ std::array<double, 2> get_integration_weights(const int& num_centers,
 
 			R_a = R_v[a];
 			const double *dist_ab_row = dist_ab_table + (size_t)a * num_centers;
+#if defined(__aarch64__) || defined(__arm__) || defined(_M_ARM64)
+			u_row = u_elem.data() + (size_t)proton_charges[a] * std::size(constants::bragg_angstrom);
+#endif
 
+#ifdef NSA2_BECKE_NEON
+			for (int b = becke_pairs_neon(a, num_centers, dist.data(), R_v.data(), dist_ab_row, u_row, proton_charges, pa_b.data()); b < num_centers; b++) {
+#else
 			for (int b = a + 1; b < num_centers; b++) {
+#endif
 				double &pa_b_b = pa_b[b];
 				double &pa_tv_b = pa_tv[b];
 
@@ -630,6 +738,9 @@ std::array<double, 2> get_integration_weights(const int& num_centers,
 				mu_ab = (dist_a - dist_b) / dist_ab;
 
 				if (std::abs(R_a - R_b) > cut) {
+#if defined(__aarch64__) || defined(__arm__) || defined(_M_ARM64)
+					u_ab = u_row[proton_charges[b]];
+#else
 					chi_becke = R_a / R_b;
 					u_ab = (chi_becke - 1.0) / (chi_becke + 1.0);
 					u_ab = u_ab / (u_ab * u_ab - 1.0);
@@ -639,6 +750,7 @@ std::array<double, 2> get_integration_weights(const int& num_centers,
 						u_ab = 0.5;
 					else if (u_ab < -0.5)
 						u_ab = -0.5;
+#endif
 
 					nu_ab = mu_ab + u_ab * (1.0 - mu_ab * mu_ab);
 				}
@@ -678,6 +790,9 @@ std::array<double, 2> get_integration_weights(const int& num_centers,
 			R_a = R_v[a];
 			chi_off = chi.data() + a * num_centers;
 			const double *dist_ab_row = dist_ab_table + (size_t)a * num_centers;
+#if defined(__aarch64__) || defined(__arm__) || defined(_M_ARM64)
+			u_row = u_elem.data() + (size_t)proton_charges[a] * std::size(constants::bragg_angstrom);
+#endif
 
 			for (int b = a + 1; b < num_centers; b++) {
 				double &pa_b_b = pa_b[b];
@@ -715,6 +830,9 @@ std::array<double, 2> get_integration_weights(const int& num_centers,
 
 
 				if (std::abs(R_a - R_b) > cut) {
+#if defined(__aarch64__) || defined(__arm__) || defined(_M_ARM64)
+					u_ab = u_row[proton_charges[b]];
+#else
 					chi_becke = R_a / R_b;
 					u_ab = (chi_becke - 1.0) / (chi_becke + 1.0);
 					u_ab = u_ab / (u_ab * u_ab - 1.0);
@@ -724,6 +842,7 @@ std::array<double, 2> get_integration_weights(const int& num_centers,
 						u_ab = 0.5;
 					else if (u_ab < -0.5)
 						u_ab = -0.5;
+#endif
 
 					nu_ab = mu_ab + u_ab * (1.0 - mu_ab * mu_ab);
 				}
@@ -1004,6 +1123,9 @@ std::vector<std::pair<vec, vec>> make_MBIS_vectors(
 		ECP_correction_helper.emplace_back(c, wavy.get_ECP_mode());
 		ECP_els[j] = atoms[j].get_ECP_electrons();
 	}
+	//Atom A's moments integrate w_A rho over A's own grid with the plain atom weights (HORTON's local WPart),
+	//so no Becke cells are needed. NOS_MBIS_BECKE sums every grid with the Becke weights instead.
+	const bool becke = tuning("NOS_MBIS_BECKE") != nullptr;
 	for (size_t it = 0; it < 2000; it++) {
 		for (int j = 0; j < ncen; j++) {
 			std::fill(sig_pop_vector[j].first.begin(), sig_pop_vector[j].first.end(), 0.0);
@@ -1024,8 +1146,9 @@ std::vector<std::pair<vec, vec>> make_MBIS_vectors(
 			std::pair<vec, vec> *coi;
 			for (int i = 0; i < ncen; i++) {
 				const int end = num_grid_points[i];
-				//5 is the becke weight, 7 the electron density, GridIndex X = 0, Y = 1, Z = 2
-				const double *b_weight = grid[i][5].data(), *dens = grid[i][7].data(), *gx = grid[i][0].data(), *gy = grid[i][1].data(), *gz = grid[i][2].data();
+				//5 is the becke weight, 3 the atom weight, 7 the electron density, GridIndex X = 0, Y = 1, Z = 2
+				const double *b_weight = grid[i][becke ? 5 : 3].data(), *dens = grid[i][7].data(), *gx = grid[i][0].data(), *gy = grid[i][1].data(), *gz = grid[i][2].data();
+				const int j0 = becke ? 0 : i, j1 = becke ? ncen : i + 1;
 #pragma omp for schedule(dynamic, 16) nowait
 				for (int point = 0; point < end; point++) {
 					rho0 = 0.0;
@@ -1069,7 +1192,7 @@ std::vector<std::pair<vec, vec>> make_MBIS_vectors(
 					}
 					if (rho0 == 0.0)
 						continue; // Avoid division by zero, if rho0 is zero, the point does not contribute to the integral
-					for (j = 0; j < ncen; j++) {
+					for (j = j0; j < j1; j++) {
 						nshell = nshell_cache[j];
 						dist_j = &dists[j];
 						pop = pop_local.data() + j * 6;
@@ -1220,7 +1343,8 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
 			}
 		}
 	}
-
+	//as in make_MBIS_vectors: A's own grid with the atom weights, unless NOS_MBIS_BECKE
+	const bool becke = tuning("NOS_MBIS_BECKE") != nullptr;
 	for (size_t it = 0; it < 2000; it++) {
 		for (int j = 0; j < ncen; j++) {
 			std::fill(sig_pop_vector[j].first.begin(), sig_pop_vector[j].first.end(), zeros_6);
@@ -1260,8 +1384,9 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
 			}
 			for (int i = 0; i < ncen; i++) {
 				const int end = num_grid_points[i];
-				//5 is the becke weight, corrected_dens the ECP-corrected electron density, GridIndex X = 0, Y = 1, Z = 2
-				const double *b_weight = grid[i][5].data(), *dens = corrected_dens[i].data(), *gx = grid[i][0].data(), *gy = grid[i][1].data(), *gz = grid[i][2].data();
+				//5 is the becke weight, 3 the atom weight, corrected_dens the ECP-corrected electron density, GridIndex X = 0, Y = 1, Z = 2
+				const double *b_weight = grid[i][becke ? 5 : 3].data(), *dens = corrected_dens[i].data(), *gx = grid[i][0].data(), *gy = grid[i][1].data(), *gz = grid[i][2].data();
+				const int j0 = becke ? 0 : i, j1 = becke ? ncen : i + 1;
 #pragma omp for schedule(dynamic, 16) nowait
 				for (int point = 0; point < end; point++) {
 					rho0 = 0.0;
@@ -1321,7 +1446,7 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
 					if (rho0 == 0.0)
 						continue; // Avoid division by zero, if rho0 is zero, the point does not contribute to the integral
 					const double dens_rho0_inv = density / rho0;
-					for (j = 0; j < ncen; j++) {
+					for (j = j0; j < j1; j++) {
 						d_local = dx.data() + (j * 3);
 						nshell = nshell_cache[j];
 						// Reuse d_cache values instead of recalculating (they're the same as before)

@@ -10,11 +10,16 @@ struct asym_atom {
 	int type;
 	d3 pos;
 	d3 frac_pos;
-	double asym_fact;
+	int cryst_mult;
+	double sym_fact = 1.0;
 	cdouble anom;
 	bool grown = false;
-	// symmetry operation that generates a grown atom from its asymmetric parent, -1 for the parent itself
-	int sym_op = -1;
+	// grown_by and grown_from are used to track the symmetry operation that generated a grown atom from its asymmetric parent (-1 for asymmetric atoms)
+	ivec grown_by = { -1 };
+	// The symmetry operations that map a grown atom back onto its parent, the inverses of grown_by
+	ivec maps_to_parent;
+	int grown_from = -1;
+	double U_iso = 0.0;
 };
 
 /**
@@ -32,6 +37,8 @@ private:
 	double rcm[3][3];
 	double cm[3][3];
 	double upper;
+	//indices are in units of 1/hkl_scale (-hkl_scale); only the reciprocal-space functions see it
+	double hkl_scale = 1.0;
 	std::string crystal_system;
 	ivec3 sym;
 	vec2 trans;
@@ -39,11 +46,38 @@ private:
 	void convert_to_fracs(std::vector<asym_atom>& atoms, const std::string input_unit);
 	vec apply_symmetry(const vec& pos, const int sym_op);
 	bool check_special(const vec& pos1, const vec& pos2, const double& tolerance = 1e-10);
-	ivec confirm_applied_symmetry(ivec3& linking_list);
 	bool check_identity(const int& sym_op);
-	static int orbit_copies(const ivec2& atom_links);
+
+	// Kept operations of a grown model: no applied operation if possible, weights counting every position once, fewest k-points
+	ivec choose_kept_operations(const std::vector<asym_atom>& asym_atoms, const ivec& applied_symmetry);
+	void keep_operations(const ivec& kept, ivec& applied_symmetry, hkl_list& hkl_enlarged, const hkl_list& hkl);
+	int equal_to_concatenation(const int op_a, const int op_b);
+	
 
 public:
+
+	// Sets the symmetry factors for the asymmetric unit
+	void asym_unit_cryst_mult(std::vector<asym_atom>& asym_atoms);
+	// Subgroup projection for grown structures
+	//void set_symmetry_factors(std::vector<asym_atom>& asym_atoms, const ivec3& linking_list, const ivec& applied_symmetry);
+	ivec apply_grown(const hkl_list& hkl, hkl_list& hkl_enlarged, std::vector<asym_atom>& asym_atoms);
+	// U_iso, dispersion and ADPs of the grown atoms from their parents, the ADPs rotated onto the image
+	void grow_ADPs(std::vector<asym_atom>& asym_atoms, vec3& ADPs);
+	// Rotates one atom's U (as read from the CIF), C and D by the rotation of sym_op
+	void rotate_grown_ADPs(vec2& ADPs, const int sym_op) const;
+	// Applies M to the U/C/D tensors of one atom in their Voigt storage: T'_{ij..} = sum_pq.. M_pi M_qj .. T_pq..
+	static void transform_ADPs(vec2& ADPs, const vec2& M);
+	const unsigned int get_num_syms() const { return sym[0][0].size(); }
+	// Whether h1 = -h2
+	static bool check_inversion(const i3& h1, const i3& h2);
+	// Fills inversion_cleaned_hkl with one entry of every inversion related pair in hkl_enlarged; per entry its
+	// index in hkl_enlarged, followed by the index of its inverse when hkl_enlarged has one
+	static ivec2 remove_inv_vectors(const hkl_list& hkl_enlarged, hkl_list& inversion_cleaned_hkl);
+	// Index in hkl_enlarged of the image of reflection r of hkl under every symmetry operation
+	ivec generate_asym_lookup(const int r, const hkl_list& hkl, const hkl_list& hkl_enlarged) const;
+
+
+
 	/**
 	 * @brief Parses a CIF symmetry operation such as "-x+1/2,y,-z+1/2".
 	 *
@@ -65,21 +99,35 @@ public:
 
 	//void get_asym_atoms(std::vector<asym_atom>& asym_atoms, svec& labels, ivec& atom_type_list, ivec& asym_atom_to_type_list, ivec& asym_atom_list);
 	void grow_asym_atoms(std::vector<asym_atom>& asym_atoms, std::vector<asym_atom>& xyz_atoms);
+	void resolve_internal_symmetry(std::vector<asym_atom>& asym_atoms);
 	void eval_symm(std::vector<asym_atom>& asym_atoms, const int& asymmetric_atoms, ivec3& linking_list);
-	ivec apply_grown(ivec3& linking_list);
+	ivec confirm_applied_symmetry(const std::vector<asym_atom>& asym_atoms);
+	// sym_fact of a grown model: every position the kept operations reach is counted exactly once
+	void set_sym_fact_from_position_counts(std::vector<asym_atom>& asym_atoms, const int operations_before_deletion);
+	// sym_fact of an ungrown model: 1 / (number of operations leaving the atom in place)
+	void set_sym_fact_from_mult(std::vector<asym_atom>& asym_atoms) {
+		for (asym_atom& atom : asym_atoms) {
+			atom.sym_fact = 1.0 / static_cast<double>(atom.cryst_mult);
+		}
+	};
 
-	void set_symmetry_factors(std::vector<asym_atom>& asym_atoms, const ivec3& linking_list);
+	// Retired together with orbit_copies below. A declaration whose definition is commented out
+	// does not fail where it is called, it fails at link time in whichever target calls it - which
+	// is how this one took NoSpherA2_Tests down while every other target linked fine.
+	//void set_symmetry_factors(std::vector<asym_atom>& asym_atoms, const ivec3& linking_list);
 
+	// This is an old but working implementation for grown structures.
+	// It is not used currently but kept for reference purposes in case something goes wrong with the new implementation.
 	// Grown clusters and the subgroup H of the space group that maps the cluster onto itself:
 	// the subgroup (only the identity when nothing else does, empty only for an operation list
 	// without one), one operation per left coset gH (identity first) and the weights
 	// |H| / (|stab_G(parent)| * explicit copies) that make the coset sum over the cluster
 	// reproduce the cell density
-	ivec grown_subgroup(const ivec3& linking_list);
-	ivec coset_representatives(const ivec& subgroup);
-	void set_subgroup_factors(std::vector<asym_atom>& asym_atoms, const ivec3& linking_list, const ivec& subgroup);
-	// Index of the operation equal (mod lattice translations) to op_a applied after op_b, -1 if the list has none
-	int compose_ops(const int op_a, const int op_b);
+	//ivec grown_subgroup(const ivec3& linking_list);
+	//ivec coset_representatives(const ivec& subgroup);
+	//void set_subgroup_factors(std::vector<asym_atom>& asym_atoms, const ivec3& linking_list, const ivec& subgroup);
+	//// Index of the operation equal (mod lattice translations) to op_a applied after op_b, -1 if the list has none
+	//int compose_ops(const int op_a, const int op_b);
 
 	cell()
 	{
@@ -221,6 +269,8 @@ public:
 	double get_sb() const { return sb; };
 	double get_sg() const { return sg; };
 	double get_rcm(const int& i, const int& j) const { return rcm[i][j]; };
+	double get_hkl_scale() const { return hkl_scale; };
+	void set_hkl_scale(const int s) { hkl_scale = s; };
 	double get_cm(const int& i, const int& j) const { return cm[i][j]; };
 	double get_rcm_angs(const int& i, const int& j) const { return constants::ang2bohr(rcm[i][j] / constants::TWO_PI); };
 	double get_cm_angs(const int& i, const int& j) const { return constants::bohr2ang(cm[i][j]); };
@@ -354,9 +404,9 @@ public:
 	{
 		// d will be in Angstrom
 		// d = sqrt( (1 - cos^2(alpha) - cos^2 (beta) - cos^2 (gamma) + 2ca*cb*cg) / (h^2 /a^2 *sin^2 (alpha) + k^2 / b^2 * sin^2 (beta) + l^2 /c^2 * sin^2(gamma) + 2 kl/bc (cos(beta)cos(gamma) - cos(alpha)) + 2 hl/ac (cos(alpha)cos(gamma) - cos(beta)) + 2 hk/ab (cos(beta)cos(alpha) - cos(gamma))) )
-		double h = hkl[0];
-		double k = hkl[1];
-		double l = hkl[2];
+		double h = hkl[0] / hkl_scale;
+		double k = hkl[1] / hkl_scale;
+		double l = hkl[2] / hkl_scale;
 		double lower2 =
 			h * h * b * b * c * c * sa * sa +
 			k * k * a * a * c * c * sb * sb +

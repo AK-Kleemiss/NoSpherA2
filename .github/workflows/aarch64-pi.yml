@@ -1,0 +1,61 @@
+name: aarch64 (flowiPi)
+# Linux aarch64 build + ctest with ArmPL on the self-hosted Raspberry Pi 4 flowiPi (user ghrunner, 4x A72, 1.8 GiB RAM).
+# No pull_request trigger on purpose: in a public repository a fork PR could otherwise run its own code on the Pi.
+# schedule and workflow_dispatch only act once this file is on the default branch (master).
+on:
+  push:
+    # density_source only since PR #219 landed there (cf22f61b); linux-aarch64 is retired
+    branches: [density_source]
+  schedule:
+    - cron: '0 20 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: aarch64-pi
+  cancel-in-progress: false
+
+jobs:
+  build-test:
+    runs-on: [self-hosted, linux, ARM64, pi]
+    timeout-minutes: 720  # cold build 2 h 40 min, ctest -j1 50 min (7 Oct 2026)
+    env:
+      NOSPHERA2_ARMPL_DIR: /opt/armpl_26.07_gcc
+      CMAKE_BUILD_PARALLEL_LEVEL: 2
+    steps:
+      # clean: false keeps build/ and .mambaenv/ between runs, so a run only rebuilds what changed
+      - uses: actions/checkout@v4
+        with:
+          clean: false
+          submodules: recursive
+      # /tmp is a 922 MB tmpfs here: earlier test runs left their scratch directories in it until it was full and
+      # the build died with "No space left on device" (23 Oct 2026). Clear our own leftovers, and point TMPDIR
+      # (compiler and test scratch) at the runner's temp directory on disk for build and test.
+      - name: clear leftover scratch in /tmp
+        run: find /tmp -maxdepth 1 -user "$(id -un)" \( -name 'nos_nbo47_test_*' -o -name 'nosphera2_xcw_scf_*' \) -exec rm -rf {} +
+      - name: bootstrap
+        run: cmake -DNOSPHERA2_BOOTSTRAP_GPU=OFF -P scripts/BootstrapMicromamba.cmake
+      - name: configure
+        run: cmake --preset release-linux -DNOSPHERA2_BUILD_TESTS=ON
+      # /tmp/pi-heavy.lock is shared with the nightly Olex2 release tests: never a compile and a test run together
+      - name: build
+        env:
+          TMPDIR: ${{ runner.temp }}
+        run: |
+          L=/tmp/pi-heavy.lock; [ -e $L ] || (umask 0; touch $L); exec 9< $L; flock 9
+          cmake --build --preset release-linux -j2
+      # ctest keeps no results and a run costs ~25 min here, so the last green run's inputs are stamped in build/:
+      # everything in bin/ (both executables and their runtime libraries), every tracked file except docs, Markdown,
+      # .vscode and the other workflows (tests read Src/, NEW_TEST/ and occ/share too), and the ArmPL path.
+      - name: test
+        env:
+          TMPDIR: ${{ runner.temp }}
+        run: |
+          L=/tmp/pi-heavy.lock; [ -e $L ] || (umask 0; touch $L); exec 9< $L; flock 9
+          K=$({ find build/release-linux/bin -type f -print0 | sort -z | xargs -0 sha256sum
+                git ls-tree -r HEAD | grep -vP '\t(docs/|\.vscode/|.*\.md$|\.github/(?!workflows/aarch64-pi\.yml$))'
+                echo "$NOSPHERA2_ARMPL_DIR"; } | sha256sum | cut -c1-64)
+          S=build/release-linux/.pi_tests_green
+          if [ "$(cat $S 2>/dev/null)" = "$K" ]; then echo "::notice::tests skipped: binaries and test inputs identical to the last green run ($K)"; exit 0; fi
+          rm -f $S
+          ctest --preset release-linux --output-on-failure -j1
+          echo "$K" > $S

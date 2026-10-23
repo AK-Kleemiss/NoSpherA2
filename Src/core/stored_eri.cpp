@@ -2,8 +2,7 @@
 #include "stored_eri.h"
 
 namespace {
-	//libcint mallocs its scratch per quartet unless handed one; the size query is the same call
-	//without an output
+	//libcint mallocs scratch per quartet unless handed one; the size query is the same call without output
 	std::array<int, 4> quartet(occ::qm::cint::IntegralEnvironment& env, const bool sph, std::array<int, 4> sh,
 		occ::qm::cint::Optimizer& opt, std::vector<double>& buffer, std::vector<double>& cache) {
 		const size_t need = sph
@@ -18,6 +17,34 @@ namespace {
 	inline size_t packed(const int a, const int b) {
 		return a >= b ? (size_t)a * (a + 1) / 2 + b : (size_t)b * (b + 1) / 2 + a;
 	}
+
+	//FNV-1a over what the integrals depend on: each shell's kind, l, centre, exponents and coefficients
+	uint64_t basis_key(const occ::qm::AOBasis& basis) {
+		uint64_t h = 1469598103934665603ull;
+		const auto mix = [&h](const void* p, const size_t n) {
+			const unsigned char* c = static_cast<const unsigned char*>(p);
+			for (size_t i = 0; i < n; i++) h = (h ^ c[i]) * 1099511628211ull;
+		};
+		for (const occ::qm::Shell& s : basis.shells()) {
+			const int kl[2] = { static_cast<int>(s.kind), static_cast<int>(s.l) };
+			mix(kl, sizeof(kl));
+			mix(s.origin.data(), 3 * sizeof(double));
+			mix(s.exponents.data(), s.exponents.size() * sizeof(double));
+			mix(s.contraction_coefficients.data(), s.contraction_coefficients.size() * sizeof(double));
+		}
+		const double t = stored_eri::threshold;
+		mix(&t, sizeof(t));
+		return h;
+	}
+
+	constexpr char eri_magic[8] = { 'N', 'O', 'S', 'E', 'R', 'I', '0', '1' };
+
+	template <typename T> void put(std::ofstream& f, const T* p, const size_t n) {
+		f.write(reinterpret_cast<const char*>(p), static_cast<std::streamsize>(n * sizeof(T)));
+	}
+	template <typename T> void get(std::ifstream& f, T* p, const size_t n) {
+		f.read(reinterpret_cast<char*>(p), static_cast<std::streamsize>(n * sizeof(T)));
+	}
 }
 
 void stored_eri::clear() {
@@ -27,11 +54,60 @@ void stored_eri::clear() {
 	qmax_ = 0.0;
 }
 
-//Two passes over the significant shell pairs: the diagonal quartets (pq|pq) give the Schwarz
-//bound of every basis-function pair, which decides the kept set, then every unique quartet
-//of kept pairs is computed and each slot written by the one quartet that holds it
+bool stored_eri::save(const std::filesystem::path& path, const occ::qm::HartreeFock& hf) const {
+	if (!v_) return false;
+	std::ofstream f(path, std::ios::binary);
+	const uint64_t key = basis_key(hf.aobasis());
+	const int npk = npairs();
+	f.write(eri_magic, sizeof(eri_magic));
+	put(f, &key, 1), put(f, &nbf_, 1), put(f, &npk, 1), put(f, &qmax_, 1);
+	put(f, pa_.data(), npk), put(f, pb_.data(), npk), put(f, first_.data(), first_.size()), put(f, idx_.data(), idx_.size());
+	put(f, q_.data(), npk), put(f, qseg_.data(), qseg_.size()), put(f, v_.get(), bytes() / sizeof(double));
+	return static_cast<bool>(f);
+}
+
+bool stored_eri::load(const std::filesystem::path& path, const occ::qm::HartreeFock& hf, const size_t budget_bytes, std::ostream& log) {
+	clear();
+	if (!hf.fock_build_properties().density_screened) return false;
+	if (!std::filesystem::exists(path)) {
+		log << "XCW: " << path.string() << " not found, building the two-electron integrals" << std::endl;
+		return false;
+	}
+	std::ifstream f(path, std::ios::binary);
+	char magic[sizeof(eri_magic)] = {};
+	uint64_t key = 0;
+	int nbf = 0, npk = 0;
+	f.read(magic, sizeof(magic));
+	get(f, &key, 1), get(f, &nbf, 1), get(f, &npk, 1);
+	if (!f || !std::equal(magic, magic + sizeof(magic), eri_magic) || key != basis_key(hf.aobasis()) || nbf != static_cast<int>(hf.aobasis().nbf())
+		|| npk < 0) {
+		log << "XCW: " << path.string() << " holds no two-electron integrals of this basis and geometry, building them" << std::endl;
+		return false;
+	}
+	const size_t npair = (size_t)nbf * (nbf + 1) / 2, nint = (size_t)npk * (npk + 1) / 2;
+	if (budget_bytes != 0 && nint * sizeof(double) > budget_bytes) return false;
+	get(f, &qmax_, 1);
+	pa_.resize(npk), pb_.resize(npk), first_.resize(nbf + 1), idx_.resize(npair), q_.resize(npk), qseg_.resize(nbf);
+	get(f, pa_.data(), npk), get(f, pb_.data(), npk), get(f, first_.data(), first_.size()), get(f, idx_.data(), npair);
+	get(f, q_.data(), npk), get(f, qseg_.data(), nbf);
+	v_.reset(new double[nint]);
+	get(f, v_.get(), nint);
+	if (!f || f.peek() != std::char_traits<char>::eof()) {
+		clear();
+		log << "XCW: " << path.string() << " is cut short or too long, building the two-electron integrals" << std::endl;
+		return false;
+	}
+	nbf_ = nbf;
+	log << "XCW: " << nint * sizeof(double) / 1048576.0 << " MB of two-electron integrals over " << npk << " of " << npair
+		<< " basis-function pairs read from " << path.string() << std::endl;
+	return true;
+}
+
+//Diagonal quartets (pq|pq) give each pair's Schwarz bound and so the kept set; then each slot is
+//written by the one unique quartet of kept pairs that holds it
 bool stored_eri::build(const occ::qm::HartreeFock& hf, const size_t budget_bytes, std::ostream& log) {
 	clear();
+	// Returns false for density-fitted calculations
 	if (!hf.fock_build_properties().density_screened) return false;
 	occ::qm::IntegralEngine engine(hf.aobasis());
 	const int nbf = static_cast<int>(engine.nbf()), nsh = static_cast<int>(engine.nsh()), npq = nsh * (nsh + 1) / 2;
@@ -136,33 +212,41 @@ bool stored_eri::build(const occ::qm::HartreeFock& hf, const size_t budget_bytes
 	return true;
 }
 
-//With the off-diagonal pairs of D doubled J is the symmetric packed matrix times that vector,
-//one dot and one axpy per segment. K's four scatters per integral run along the segment c of a
-//row, where the second index is pair_b(): two dots against columns of the symmetric D and two
-//axpys into columns of the (symmetrised) K, on the run d = 0..c directly and through the index
-//list otherwise. The diagonal cd == ab carries half the weight and is taken back with its
-//segment. Per-thread partials merged in thread order, so the result does not depend on the
-//schedule.
-void stored_eri::JK(const occ::Mat& D, occ::Mat& J, occ::Mat& K, const bool screen) const {
+//With off-diagonal D pairs doubled, J is the packed symmetric matrix times that vector, a dot and an
+//axpy per segment. K's four scatters per integral run along segment c (second index pair_b()): two
+//dots against columns of D, two axpys into columns of the symmetrised K, directly on d = 0..c, else
+//through the index list. The diagonal cd == ab has half weight and is taken back with its segment.
+//With two densities (UHF) one pass over the integrals gives J of their sum and K of each, so the
+//bandwidth-bound stream is read once per Fock build, not once per spin.
+//Per-thread partials merge in thread order, so the result is schedule-independent.
+void stored_eri::jk(const occ::Mat* const* D, const int nd, occ::Mat& J, occ::Mat* K, const bool screen) const {
 	const int n = nbf_, npk = npairs(), nthr = omp_get_max_threads();
 	const int *pa = pa_.data(), *pb = pb_.data(), *first = first_.data();
+	const double* Dd[2] = { D[0]->data(), D[nd - 1]->data() };
 	std::vector<double> dp(npk), fp(npk);
-	for (int k = 0; k < npk; k++) fp[k] = pa[k] == pb[k] ? 1.0 : 2.0, dp[k] = fp[k] * D(pa[k], pb[k]);
-	//Largest element of every row of the difference, and overall
+	for (int k = 0; k < npk; k++) {
+		fp[k] = pa[k] == pb[k] ? 1.0 : 2.0;
+		double s = 0.0;
+		for (int i = 0; i < nd; i++) s += Dd[i][pa[k] + pb[k] * n];
+		dp[k] = fp[k] * s;
+	}
+	//Largest element of every row of the difference (over both spins), and overall
 	std::vector<double> rm;
 	double rmax = 0.0;
 	if (screen) {
-		rm.resize(n);
-		for (int a = 0; a < n; a++) rmax = std::max(rmax, rm[a] = D.row(a).cwiseAbs().maxCoeff());
+		rm.assign(n, 0.0);
+		for (int i = 0; i < nd; i++)
+			for (int a = 0; a < n; a++) rm[a] = std::max(rm[a], D[i]->row(a).cwiseAbs().maxCoeff());
+		for (int a = 0; a < n; a++) rmax = std::max(rmax, rm[a]);
 	}
-	const double* Dd = D.data();
 	std::vector<std::vector<double>> Jp(nthr);
-	std::vector<occ::Mat> Kp(nthr);
+	std::vector<occ::Mat> Kp(nthr * nd);
 #pragma omp parallel
 	{
 		std::vector<double> Jl(npk, 0.0), t(n);
-		occ::Mat Kl = occ::Mat::Zero(n, n);
-		double* Kd = Kl.data();
+		occ::Mat Kl[2];
+		double* Kd[2];
+		for (int i = 0; i < nd; i++) Kl[i] = occ::Mat::Zero(n, n), Kd[i] = Kl[i].data();
 		//c runs to a: cyclic rows balance the triangle and, unlike a dynamic schedule,
 		//keep the per-thread partials and so the summation order fixed for a thread count
 #pragma omp for schedule(static, 1)
@@ -170,9 +254,7 @@ void stored_eri::JK(const occ::Mat& D, occ::Mat& J, occ::Mat& K, const bool scre
 			const int a = pa[k], b = pb[k];
 			if (screen && q_[k] * qmax_ * rmax < threshold) continue;
 			const double* v = v_.get() + (size_t)k * (k + 1) / 2;
-			const double fab = 2.0 * fp[k], dab = fp[k] * Dd[a + b * n];
-			const double *Da = Dd + a * n, *Db = Dd + b * n;
-			double *Ka = Kd + a * n, *Kb = Kd + b * n;
+			const double fab = 2.0 * fp[k], dab = dp[k];
 			for (int c = 0; c <= a; c++) {
 				const int o = first[c], m = (c < a ? first[c + 1] : k + 1) - o;
 				if (m <= 0) continue;
@@ -182,45 +264,52 @@ void stored_eri::JK(const occ::Mat& D, occ::Mat& J, occ::Mat& K, const bool scre
 				//The row's own slot enters J once from the column side and once from the row side
 				Eigen::Map<Eigen::VectorXd>(Jl.data() + o, c < a ? m : m - 1) += dab * vm.head(c < a ? m : m - 1);
 				Jl[k] += vm.dot(Eigen::Map<const Eigen::VectorXd>(dp.data() + o, m));
-				const double kca = fab * Da[c], kcb = fab * Db[c];
 				Eigen::Map<Eigen::VectorXd> tm(t.data(), m);
 				tm = vm.cwiseProduct(Eigen::Map<const Eigen::VectorXd>(fp.data() + o, m));
-				if (pb[o] == 0 && pb[o + m - 1] == m - 1) {
-					Kd[c + a * n] += fab * tm.dot(Eigen::Map<const Eigen::VectorXd>(Db, m));
-					Kd[c + b * n] += fab * tm.dot(Eigen::Map<const Eigen::VectorXd>(Da, m));
-					Eigen::Map<Eigen::VectorXd>(Ka, m) += kcb * tm;
-					Eigen::Map<Eigen::VectorXd>(Kb, m) += kca * tm;
-				}
-				else {
-					double sa = 0.0, sb = 0.0;
-					for (int i = 0; i < m; i++) {
-						const int d = pb[o + i];
-						sa += t[i] * Db[d], sb += t[i] * Da[d];
-						Ka[d] += kcb * t[i], Kb[d] += kca * t[i];
+				const bool direct = pb[o] == 0 && pb[o + m - 1] == m - 1;
+				for (int s = 0; s < nd; s++) {
+					const double *Da = Dd[s] + a * n, *Db = Dd[s] + b * n;
+					double *Ks = Kd[s], *Ka = Ks + a * n, *Kb = Ks + b * n;
+					const double kca = fab * Da[c], kcb = fab * Db[c];
+					if (direct) {
+						Ks[c + a * n] += fab * tm.dot(Eigen::Map<const Eigen::VectorXd>(Db, m));
+						Ks[c + b * n] += fab * tm.dot(Eigen::Map<const Eigen::VectorXd>(Da, m));
+						Eigen::Map<Eigen::VectorXd>(Ka, m) += kcb * tm;
+						Eigen::Map<Eigen::VectorXd>(Kb, m) += kca * tm;
 					}
-					Kd[c + a * n] += fab * sa, Kd[c + b * n] += fab * sb;
-				}
-				if (c == a) {
-					const double h = fp[k] * fp[k] * v[k];
-					Kd[a + a * n] -= h * Db[b], Kd[a + b * n] -= h * Da[b];
-					Ka[b] -= h * Da[b], Kb[b] -= h * Da[a];
+					else {
+						double sa = 0.0, sb = 0.0;
+						for (int i = 0; i < m; i++) {
+							const int d = pb[o + i];
+							sa += t[i] * Db[d], sb += t[i] * Da[d];
+							Ka[d] += kcb * t[i], Kb[d] += kca * t[i];
+						}
+						Ks[c + a * n] += fab * sa, Ks[c + b * n] += fab * sb;
+					}
+					if (c == a) {
+						const double h = fp[k] * fp[k] * v[k];
+						Ks[a + a * n] -= h * Db[b], Ks[a + b * n] -= h * Da[b];
+						Ka[b] -= h * Da[b], Kb[b] -= h * Da[a];
+					}
 				}
 			}
 		}
-		Jp[omp_get_thread_num()].swap(Jl);
-		Kp[omp_get_thread_num()].swap(Kl);
+		const int me = omp_get_thread_num();
+		Jp[me].swap(Jl);
+		for (int i = 0; i < nd; i++) Kp[me * nd + i].swap(Kl[i]);
 	}
 	J = occ::Mat::Zero(n, n);
-	K.resize(n, n);
-	//The partials outweigh the matrices many times over, so their sum is parallel too
+	for (int i = 0; i < nd; i++) K[i].resize(n, n);
+	//The partials outweigh the matrices many times, so their sum is parallel too
 #pragma omp parallel for schedule(static)
 	for (int a = 0; a < n; a++) {
-		for (int b = 0; b <= a; b++) {
-			double sk = 0.0;
-			for (int t = 0; t < nthr; t++)
-				if (!Jp[t].empty()) sk += Kp[t](a, b) + Kp[t](b, a);
-			K(a, b) = K(b, a) = 0.125 * sk;
-		}
+		for (int i = 0; i < nd; i++)
+			for (int b = 0; b <= a; b++) {
+				double sk = 0.0;
+				for (int t = 0; t < nthr; t++)
+					if (!Jp[t].empty()) sk += Kp[t * nd + i](a, b) + Kp[t * nd + i](b, a);
+				K[i](a, b) = K[i](b, a) = 0.125 * sk;
+			}
 		for (int k = first[a]; k < first[a + 1]; k++) {
 			double sj = 0.0;
 			for (int t = 0; t < nthr; t++)
@@ -230,6 +319,18 @@ void stored_eri::JK(const occ::Mat& D, occ::Mat& J, occ::Mat& K, const bool scre
 	}
 }
 
+void stored_eri::JK(const occ::Mat& D, occ::Mat& J, occ::Mat& K, const bool screen) const {
+	const occ::Mat* d[1] = { &D };
+	jk(d, 1, J, &K, screen);
+}
+
+void stored_eri::JK(const occ::Mat& Da, const occ::Mat& Db, occ::Mat& J, occ::Mat& Ka, occ::Mat& Kb, const bool screen) const {
+	const occ::Mat* d[2] = { &Da, &Db };
+	occ::Mat K[2];
+	jk(d, 2, J, K, screen);
+	Ka.swap(K[0]), Kb.swap(K[1]);
+}
+
 occ::Mat stored_eri::fock(const occ::qm::MolecularOrbitals& mo, const bool screen, const jk_fn& jk) const {
 	const auto JK_ = [&](const occ::Mat& D, occ::Mat& J, occ::Mat& K) { if (jk) jk(D, J, K); else JK(D, J, K, screen); };
 	occ::Mat J, K;
@@ -237,10 +338,17 @@ occ::Mat stored_eri::fock(const occ::qm::MolecularOrbitals& mo, const bool scree
 		JK_(mo.D, J, K);
 		return 2.0 * J - K;
 	}
-	occ::Mat F = occ::Mat::Zero(mo.D.rows(), mo.D.cols()), Jb, Kb;
-	JK_(occ::qm::block::a(mo.D), J, K);
-	JK_(occ::qm::block::b(mo.D), Jb, Kb);
-	occ::qm::block::a(F) = 2.0 * (J + Jb) - 2.0 * K;
-	occ::qm::block::b(F) = 2.0 * (J + Jb) - 2.0 * Kb;
+	occ::Mat F = occ::Mat::Zero(mo.D.rows(), mo.D.cols()), Kb;
+	const occ::Mat Da = occ::qm::block::a(mo.D), Db = occ::qm::block::b(mo.D);
+	if (jk) {
+		occ::Mat Jb;
+		jk(Da, J, K);
+		jk(Db, Jb, Kb);
+		J += Jb;
+	}
+	else
+		JK(Da, Db, J, K, Kb, screen);
+	occ::qm::block::a(F) = 2.0 * J - 2.0 * K;
+	occ::qm::block::b(F) = 2.0 * J - 2.0 * Kb;
 	return F;
 }

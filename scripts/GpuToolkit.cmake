@@ -47,7 +47,10 @@ function(nosphera2_detect_gpu out_var)
         elseif(EXISTS "/sys/module/amdgpu")
             set(_vendor "AMD")
         else()
-            foreach(_dir "/usr/lib/x86_64-linux-gnu" "/usr/lib64" "/usr/lib" "/lib/x86_64-linux-gnu")
+            # aarch64: Grace Hopper puts the driver in the multiarch dir, a Jetson in its
+            # tegra subdirectory
+            foreach(_dir "/usr/lib/x86_64-linux-gnu" "/usr/lib64" "/usr/lib" "/lib/x86_64-linux-gnu"
+                    "/usr/lib/aarch64-linux-gnu" "/usr/lib/aarch64-linux-gnu/tegra")
                 if(EXISTS "${_dir}/libcuda.so.1")
                     set(_vendor "NVIDIA")
                     break()
@@ -127,8 +130,10 @@ function(nosphera2_bootstrap_rocm_toolkit)
         return()
     endif()
 
+    # CMAKE_HOST_SYSTEM_PROCESSOR is empty in script mode (cmake -P), which skipped every fetch
+    cmake_host_system_information(RESULT _host_processor QUERY OS_PLATFORM)
     if(NOT CMAKE_HOST_SYSTEM_NAME STREQUAL "Linux"
-       OR NOT CMAKE_HOST_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64")
+       OR NOT _host_processor MATCHES "x86_64|AMD64")
         message(STATUS
             "AMD GPU detected. conda-forge packages hipcc for linux-64 only, so nothing can\n"
             "  be fetched here - install the HIP SDK and configure will pick it up.")
@@ -168,6 +173,70 @@ function(nosphera2_bootstrap_rocm_toolkit)
     else()
         message(STATUS "HIP packages installed but no hipcc appeared; building without the GPU path")
     endif()
+endfunction()
+
+# The full ROCm SDK, hipBLAS included, from AMD's pip wheels - what the CI's HIP jobs install.
+# They go into a venv of their own at DIRECTORY (the environment's python only creates it), and
+# root.txt there records `rocm-sdk path --root` for the top-level CMakeLists.txt to pick up.
+# linux_x86_64 and win_amd64 only. Non-fatal like the other two.
+function(nosphera2_bootstrap_rocm_sdk)
+    cmake_parse_arguments(GPU "" "PYTHON;DIRECTORY;VERSION" "" ${ARGN})
+
+    if(EXISTS "${GPU_DIRECTORY}/root.txt")
+        file(READ "${GPU_DIRECTORY}/root.txt" _root)
+        message(STATUS "ROCm SDK already in ${GPU_DIRECTORY}: ${_root}")
+        return()
+    endif()
+
+    cmake_host_system_information(RESULT _host_processor QUERY OS_PLATFORM)
+    if(NOT _host_processor MATCHES "x86_64|AMD64")
+        message(STATUS "AMD publishes the ROCm wheels for x86_64 only; no HIP toolchain fetched")
+        return()
+    endif()
+
+    if(WIN32)
+        set(_venv_bin "${GPU_DIRECTORY}/Scripts")
+        set(_exe ".exe")
+    else()
+        set(_venv_bin "${GPU_DIRECTORY}/bin")
+        set(_exe "")
+    endif()
+
+    message(STATUS "Fetching the ROCm ${GPU_VERSION} SDK wheels into ${GPU_DIRECTORY} (several GB)")
+    execute_process(
+        COMMAND "${GPU_PYTHON}" -m venv "${GPU_DIRECTORY}"
+        RESULT_VARIABLE _result
+    )
+    if(_result EQUAL 0)
+        execute_process(
+            COMMAND "${_venv_bin}/python${_exe}" -m pip install
+                --disable-pip-version-check --no-cache-dir
+                --index-url https://stable.repo.amd.com/rocm/whl-next/
+                "rocm[devel]==${GPU_VERSION}"
+            RESULT_VARIABLE _result
+        )
+    endif()
+    if(_result EQUAL 0)
+        execute_process(COMMAND "${_venv_bin}/rocm-sdk${_exe}" init RESULT_VARIABLE _result)
+    endif()
+    if(_result EQUAL 0)
+        execute_process(
+            COMMAND "${_venv_bin}/rocm-sdk${_exe}" path --root
+            OUTPUT_VARIABLE _root
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+            RESULT_VARIABLE _result
+        )
+    endif()
+    if(NOT _result EQUAL 0 OR _root STREQUAL "")
+        message(STATUS
+            "Could not fetch the ROCm SDK; building without the HIP path.\n"
+            "  This is not an error - NoSpherA2 runs on the CPU.")
+        return()
+    endif()
+
+    file(TO_CMAKE_PATH "${_root}" _root)
+    file(WRITE "${GPU_DIRECTORY}/root.txt" "${_root}")
+    message(STATUS "ROCm SDK ready: ${_root}")
 endfunction()
 
 # Where nvcc would live inside a micromamba environment, which differs by platform.

@@ -10,7 +10,10 @@
     {
       "name": "common-base",
       "hidden": true,
-      "generator": "Ninja"
+      "generator": "Ninja",
+      "cacheVariables": {
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+      }
     },
     {
       "name": "release-base",
@@ -147,7 +150,10 @@
         "windows-base",
         "release-base"
       ],
-      "binaryDir": "${sourceDir}/build/release-windows"
+      "binaryDir": "${sourceDir}/build/release-windows",
+      "cacheVariables": {
+        "NOSPHERA2_BUILD_TESTS": "OFF"
+      }
     },
     {
       "name": "debug-windows",
@@ -156,7 +162,93 @@
         "windows-base",
         "debug-base"
       ],
-      "binaryDir": "${sourceDir}/build/debug-windows"
+      "binaryDir": "${sourceDir}/build/debug-windows",
+      "cacheVariables": {
+        "NOSPHERA2_BUILD_TESTS": "OFF"
+      }
+    },
+    {
+      "name": "release-windows-tests",
+      "displayName": "Release — Windows (+tests)",
+      "inherits": "release-windows",
+      "cacheVariables": {
+        "NOSPHERA2_BUILD_TESTS": "ON"
+      }
+    },
+    {
+      "name": "debug-windows-tests",
+      "displayName": "Debug — Windows (+tests)",
+      "inherits": "debug-windows",
+      "cacheVariables": {
+        "NOSPHERA2_BUILD_TESTS": "ON"
+      }
+    },
+
+    {
+      "name": "windows-arm64-base",
+      "hidden": true,
+      "inherits": "windows-base",
+      "environment": {
+        "CMAKE_GENERATOR_aarch64_pc_windows_msvc": "Ninja",
+        "CMAKE_GENERATOR_aarch64-pc-windows-msvc": "Ninja"
+      },
+      "cacheVariables": {
+        "NOSPHERA2_GPU_AUTO": "OFF",
+        "NOS_AVX": "OFF"
+      }
+    },
+    {
+      "name": "windows-arm64-cross-base",
+      "hidden": true,
+      "inherits": "windows-arm64-base",
+      "description": "x64 host, ARM64 target: run under vcvarsamd64_arm64 after bootstrapping with -DNOSPHERA2_BOOTSTRAP_WIN_ARM64=ON",
+      "environment": {
+        "CMAKE_PREFIX_PATH": "${sourceDir}/.mambaenv/env-win-arm64",
+        "PKG_CONFIG_PATH": "${sourceDir}/.mambaenv/env-win-arm64/Library/lib/pkgconfig;${sourceDir}/.mambaenv/env-win-arm64/Library/share/pkgconfig"
+      },
+      "cacheVariables": {
+        "MICROMAMBA_ENV_PREFIX": "${sourceDir}/.mambaenv/env-win-arm64",
+        "CMAKE_SYSTEM_NAME": "Windows",
+        "CMAKE_SYSTEM_PROCESSOR": "ARM64",
+        "RUST_BUILD_TARGET": "aarch64-pc-windows-msvc",
+        "NOSPHERA2_HOST_BASIS_CONVERTER": "${sourceDir}/build/release-windows/tools/BasisSetConverter/BasisSetConverter.exe"
+      }
+    },
+    {
+      "name": "release-windows-arm64",
+      "displayName": "Release — Windows ARM64",
+      "inherits": [
+        "windows-arm64-base",
+        "release-base"
+      ],
+      "binaryDir": "${sourceDir}/build/release-windows-arm64"
+    },
+    {
+      "name": "debug-windows-arm64",
+      "displayName": "Debug — Windows ARM64",
+      "inherits": [
+        "windows-arm64-base",
+        "debug-base"
+      ],
+      "binaryDir": "${sourceDir}/build/debug-windows-arm64"
+    },
+    {
+      "name": "release-windows-arm64-cross",
+      "displayName": "Release — Windows ARM64 (cross from x64)",
+      "inherits": [
+        "windows-arm64-cross-base",
+        "release-base"
+      ],
+      "binaryDir": "${sourceDir}/build/release-windows-arm64-cross"
+    },
+    {
+      "name": "debug-windows-arm64-cross",
+      "displayName": "Debug — Windows ARM64 (cross from x64)",
+      "inherits": [
+        "windows-arm64-cross-base",
+        "debug-base"
+      ],
+      "binaryDir": "${sourceDir}/build/debug-windows-arm64-cross"
     },
 
     {
@@ -171,7 +263,10 @@
         "lhs": "${hostSystemName}",
         "rhs": "Linux"
       },
-      "binaryDir": "${sourceDir}/build/release-linux"
+      "binaryDir": "${sourceDir}/build/release-linux",
+      "cacheVariables": {
+        "NOSPHERA2_BUILD_TESTS": "OFF"
+      }
     },
     {
       "name": "debug-linux",
@@ -185,7 +280,26 @@
         "lhs": "${hostSystemName}",
         "rhs": "Linux"
       },
-      "binaryDir": "${sourceDir}/build/debug-linux"
+      "binaryDir": "${sourceDir}/build/debug-linux",
+      "cacheVariables": {
+        "NOSPHERA2_BUILD_TESTS": "OFF"
+      }
+    },
+    {
+      "name": "release-linux-tests",
+      "displayName": "Release — Linux (+tests)",
+      "inherits": "release-linux",
+      "cacheVariables": {
+        "NOSPHERA2_BUILD_TESTS": "ON"
+      }
+    },
+    {
+      "name": "debug-linux-tests",
+      "displayName": "Debug — Linux (+tests)",
+      "inherits": "debug-linux",
+      "cacheVariables": {
+        "NOSPHERA2_BUILD_TESTS": "ON"
+      }
     },
 
     {
@@ -195,7 +309,10 @@
         "macos-arm64-base",
         "release-base"
       ],
-      "binaryDir": "${sourceDir}/build/release-macos-arm64"
+      "binaryDir": "${sourceDir}/build/release-macos-arm64",
+      "cacheVariables": {
+        "NOSPHERA2_BUILD_TESTS": "OFF"
+      }
     },
     {
       "name": "release-macos-x86_64",
@@ -204,7 +321,10 @@
         "macos-x86_64-base",
         "release-base"
       ],
-      "binaryDir": "${sourceDir}/build/release-macos-x86_64"
+      "binaryDir": "${sourceDir}/build/release-macos-x86_64",
+      "cacheVariables": {
+        "NOSPHERA2_BUILD_TESTS": "OFF"
+      }
     },
     {
       "name": "debug-macos-arm64",
@@ -213,7 +333,10 @@
         "macos-arm64-base",
         "debug-base"
       ],
-      "binaryDir": "${sourceDir}/build/debug-macos-arm64"
+      "binaryDir": "${sourceDir}/build/debug-macos-arm64",
+      "cacheVariables": {
+        "NOSPHERA2_BUILD_TESTS": "OFF"
+      }
     },
     {
       "name": "debug-macos-x86_64",
@@ -222,7 +345,42 @@
         "macos-x86_64-base",
         "debug-base"
       ],
-      "binaryDir": "${sourceDir}/build/debug-macos-x86_64"
+      "binaryDir": "${sourceDir}/build/debug-macos-x86_64",
+      "cacheVariables": {
+        "NOSPHERA2_BUILD_TESTS": "OFF"
+      }
+    },
+    {
+      "name": "release-macos-arm64-tests",
+      "displayName": "Release — macOS arm64 (+tests)",
+      "inherits": "release-macos-arm64",
+      "cacheVariables": {
+        "NOSPHERA2_BUILD_TESTS": "ON"
+      }
+    },
+    {
+      "name": "release-macos-x86_64-tests",
+      "displayName": "Release — macOS x86_64 (+tests)",
+      "inherits": "release-macos-x86_64",
+      "cacheVariables": {
+        "NOSPHERA2_BUILD_TESTS": "ON"
+      }
+    },
+    {
+      "name": "debug-macos-arm64-tests",
+      "displayName": "Debug — macOS arm64 (+tests)",
+      "inherits": "debug-macos-arm64",
+      "cacheVariables": {
+        "NOSPHERA2_BUILD_TESTS": "ON"
+      }
+    },
+    {
+      "name": "debug-macos-x86_64-tests",
+      "displayName": "Debug — macOS x86_64 (+tests)",
+      "inherits": "debug-macos-x86_64",
+      "cacheVariables": {
+        "NOSPHERA2_BUILD_TESTS": "ON"
+      }
     }
   ],
 
@@ -244,6 +402,36 @@
       "configurePreset": "debug-windows"
     },
     {
+      "name": "release-windows-tests",
+      "inherits": "build-base",
+      "configurePreset": "release-windows-tests"
+    },
+    {
+      "name": "debug-windows-tests",
+      "inherits": "build-base",
+      "configurePreset": "debug-windows-tests"
+    },
+    {
+      "name": "release-windows-arm64",
+      "inherits": "build-base",
+      "configurePreset": "release-windows-arm64"
+    },
+    {
+      "name": "debug-windows-arm64",
+      "inherits": "build-base",
+      "configurePreset": "debug-windows-arm64"
+    },
+    {
+      "name": "release-windows-arm64-cross",
+      "inherits": "build-base",
+      "configurePreset": "release-windows-arm64-cross"
+    },
+    {
+      "name": "debug-windows-arm64-cross",
+      "inherits": "build-base",
+      "configurePreset": "debug-windows-arm64-cross"
+    },
+    {
       "name": "release-linux",
       "inherits": "build-base",
       "configurePreset": "release-linux"
@@ -252,6 +440,16 @@
       "name": "debug-linux",
       "inherits": "build-base",
       "configurePreset": "debug-linux"
+    },
+    {
+      "name": "release-linux-tests",
+      "inherits": "build-base",
+      "configurePreset": "release-linux-tests"
+    },
+    {
+      "name": "debug-linux-tests",
+      "inherits": "build-base",
+      "configurePreset": "debug-linux-tests"
     },
     {
       "name": "release-macos-arm64",
@@ -272,6 +470,26 @@
       "name": "debug-macos-x86_64",
       "inherits": "build-base",
       "configurePreset": "debug-macos-x86_64"
+    },
+    {
+      "name": "release-macos-arm64-tests",
+      "inherits": "build-base",
+      "configurePreset": "release-macos-arm64-tests"
+    },
+    {
+      "name": "release-macos-x86_64-tests",
+      "inherits": "build-base",
+      "configurePreset": "release-macos-x86_64-tests"
+    },
+    {
+      "name": "debug-macos-arm64-tests",
+      "inherits": "build-base",
+      "configurePreset": "debug-macos-arm64-tests"
+    },
+    {
+      "name": "debug-macos-x86_64-tests",
+      "inherits": "build-base",
+      "configurePreset": "debug-macos-x86_64-tests"
     },
     {
       "name": "release-macos-universal",
@@ -288,7 +506,11 @@
     {
       "name": "test-base",
       "hidden": true,
+      "description": "ctest runs several tests at once and each opens a thread per core; passive OpenMP workers sleep at once instead of spinning for 200 ms on the cores the other tests compute on",
       "inheritConfigureEnvironment": true,
+      "environment": {
+        "OMP_WAIT_POLICY": "PASSIVE"
+      },
       "output": {
         "outputOnFailure": true
       }
@@ -305,6 +527,26 @@
       "configurePreset": "debug-windows"
     },
     {
+      "name": "release-windows-tests",
+      "inherits": "test-base",
+      "configurePreset": "release-windows-tests"
+    },
+    {
+      "name": "debug-windows-tests",
+      "inherits": "test-base",
+      "configurePreset": "debug-windows-tests"
+    },
+    {
+      "name": "release-windows-arm64",
+      "inherits": "test-base",
+      "configurePreset": "release-windows-arm64"
+    },
+    {
+      "name": "debug-windows-arm64",
+      "inherits": "test-base",
+      "configurePreset": "debug-windows-arm64"
+    },
+    {
       "name": "release-linux",
       "inherits": "test-base",
       "configurePreset": "release-linux"
@@ -313,6 +555,16 @@
       "name": "debug-linux",
       "inherits": "test-base",
       "configurePreset": "debug-linux"
+    },
+    {
+      "name": "release-linux-tests",
+      "inherits": "test-base",
+      "configurePreset": "release-linux-tests"
+    },
+    {
+      "name": "debug-linux-tests",
+      "inherits": "test-base",
+      "configurePreset": "debug-linux-tests"
     },
     {
       "name": "release-macos-arm64",
@@ -333,6 +585,26 @@
       "name": "debug-macos-x86_64",
       "inherits": "test-base",
       "configurePreset": "debug-macos-x86_64"
+    },
+    {
+      "name": "release-macos-arm64-tests",
+      "inherits": "test-base",
+      "configurePreset": "release-macos-arm64-tests"
+    },
+    {
+      "name": "release-macos-x86_64-tests",
+      "inherits": "test-base",
+      "configurePreset": "release-macos-x86_64-tests"
+    },
+    {
+      "name": "debug-macos-arm64-tests",
+      "inherits": "test-base",
+      "configurePreset": "debug-macos-arm64-tests"
+    },
+    {
+      "name": "debug-macos-x86_64-tests",
+      "inherits": "test-base",
+      "configurePreset": "debug-macos-x86_64-tests"
     }
   ]
 }

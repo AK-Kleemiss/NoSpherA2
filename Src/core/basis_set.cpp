@@ -2,6 +2,7 @@
 #include "basis_set.h"
 #include "convenience.h"
 #include "libCintMain.h"
+#include <occ/gto/io/json_basis.h>
 
 std::shared_ptr<std::array<std::vector<primitive>, 118>> BasisSet::get_data() {
 	if (_convertedData[0].size() == 0) {
@@ -475,16 +476,9 @@ namespace {
 		return basis_name;
 	}
 
-	// Every stored name carries the suffix of the file it was generated from
-	// ("def2-tzvp-basis", "def2-tzvp-rifit", ...), so a plain substring search hits
-	// several entries for almost any query and used to return whichever one the
-	// generator happened to emit first ("def2-tzvp" -> "def2-tzvpd-basis").
-	// Match in decreasing order of specificity instead, and never silently pick one
-	// of several equally good candidates.
-	// Returns the index into basis_sets, or -1; on -1 'candidates' holds the
-	// ambiguous matches (empty if there was no match at all). 'exact' says whether
-	// the name was taken at face value - the name as stored, or the orbital basis
-	// set of that name - so that only a guess gets reported to the user.
+	// Stored names carry their file suffix ("def2-tzvp-basis", "def2-tzvp-rifit"), so a substring search is ambiguous:
+	// match by decreasing specificity and never pick one of several equal candidates. On -1 candidates holds the
+	// ambiguous matches (empty: no match); exact is false for a guess, the only case reported.
 	int find_basis_set_index(const std::string& basis_name, std::vector<std::string>& candidates, bool& exact) {
 		const int count = static_cast<int>(basis_set_count);
 		candidates.clear();
@@ -553,6 +547,55 @@ bool BasisSetLibrary::check_basis_set_exists(std::string basis_name) {
 	return find_basis_set_index(normalize_basis_name(basis_name), candidates, exact) >= 0;
 }
 
+std::shared_ptr<BasisSet> BasisSetLibrary::get_basis_set_with_overrides(const std::string& basis_name, const std::filesystem::path& path) {
+	const auto base = get_basis_set(basis_name);
+	if (!std::filesystem::is_regular_file(path)) throw std::runtime_error("XCW basis overrides file not found: " + path.string());
+	occ::gto::io::JsonBasisReader reader(path.string());
+	const auto& elements = reader.element_map();
+	if (elements.empty()) throw std::runtime_error("XCW basis overrides contain no elements");
+	for (const auto& [z, data] : elements)
+		if (z < 1 || z > 118) throw std::runtime_error("Invalid atomic number in XCW basis overrides");
+	auto result = std::make_shared<BasisSet>();
+	result->set_name(base->get_name() + "_overrides_" + path.filename().string());
+	for (int z = 1; z <= 118; z++) {
+		auto found = elements.find(z);
+		if (found == elements.end()) {
+			if (!base->has_element(z)) continue;
+			const auto prims = (*base)[z - 1];
+			result->set_count_for_element(z - 1, static_cast<int>(prims.size()));
+			for (int p = 0; p < static_cast<int>(prims.size()); p++) result->add_owned_primitive(prims[p]);
+			continue;
+		}
+		const auto& data = found->second;
+		if (data.ecp_electrons != 0 || !data.ecp_shells.empty())
+			throw std::runtime_error("XCW basis overrides must be all-electron, Z = " + std::to_string(z));
+		if (data.electron_shells.empty()) throw std::runtime_error("XCW basis override has no shells, Z = " + std::to_string(z));
+		int count = 0, shell = 0;
+		const int start = result->get_primitive_count();
+		for (int s = 0; s < static_cast<int>(data.electron_shells.size()); s++) {
+			const auto& sh = data.electron_shells[s];
+			if ((sh.function_type != "gto" && sh.function_type != "gto_spherical") || sh.angular_momentum.empty() ||
+				sh.exponents.empty() || sh.coefficients.empty() ||
+				(sh.angular_momentum.size() > 1 && sh.angular_momentum.size() != sh.coefficients.size()))
+				throw std::runtime_error("Invalid Gaussian shell in XCW basis override, Z = " + std::to_string(z));
+			for (int c = 0; c < static_cast<int>(sh.coefficients.size()); c++, shell++) {
+				const int l = sh.angular_momentum[sh.angular_momentum.size() == 1 ? 0 : c];
+				if (l < 0 || l > 10 || sh.coefficients[c].size() != sh.exponents.size())
+					throw std::runtime_error("Invalid contraction in XCW basis override, Z = " + std::to_string(z));
+				if (std::none_of(sh.coefficients[c].begin(), sh.coefficients[c].end(), [](double v) { return v != 0; }))
+					throw std::runtime_error("Zero contraction in XCW basis override, Z = " + std::to_string(z));
+				for (int p = 0; p < static_cast<int>(sh.exponents.size()); p++, count++) {
+					if (!std::isfinite(sh.exponents[p]) || sh.exponents[p] <= 0 || !std::isfinite(sh.coefficients[c][p]))
+						throw std::runtime_error("Invalid primitive in XCW basis override, Z = " + std::to_string(z));
+					result->add_owned_primitive({ 0, l, sh.exponents[p], sh.coefficients[c][p], shell });
+				}
+			}
+		}
+		result->set_range_for_element(z - 1, start, count);
+	}
+	return result;
+}
+
 
 
 int load_basis_into_WFN(WFN& wavy,const std::shared_ptr<BasisSet> b, const bool decontract, const bool complete)
@@ -594,29 +637,10 @@ int load_basis_into_WFN(WFN& wavy,const std::shared_ptr<BasisSet> b, const bool 
 				basis_set_entry bf_ = wavy.get_atom_basis_set_entry(i, b);
 				int temp_type = bf_.get_type();
 				double temp_exp = bf_.get_exponent();
-				int effective_type = 0;
 				//the wfn primitive types are Cartesian (d = 5..10, f = 11..20, ...), so a shell of l emits (l+1)(l+2)/2 primitives
+				//starting at 1 + l(l+1)(l+2)/6; the old switch stopped at h and left i and up at type 0
 				int end = (temp_type + 1) * (temp_type + 2) / 2;
-				switch (temp_type) {
-				case(0):
-					effective_type = 1;
-					break;
-				case(1):
-					effective_type = 2;
-					break;
-				case(2):
-					effective_type = 5;
-					break;
-				case(3):
-					effective_type = 11;
-					break;
-				case(4):
-					effective_type = 21;
-					break;
-				case(5):
-					effective_type = 36;
-					break;
-				}
+				int effective_type = 1 + temp_type * (temp_type + 1) * (temp_type + 2) / 6;
 				for (int idx = 0; idx < end; idx++, nex_++, effective_type++) {
 					exponents_.push_back(temp_exp);
 					types_.push_back(effective_type);
@@ -668,6 +692,22 @@ WFN generate_aux_wfn(const WFN& orbital_wfn, std::vector<std::shared_ptr<BasisSe
 	WFN wavy_aux(e_origin::NOT_YET_DEFINED);
 	wavy_aux.set_atoms(orbital_wfn.get_atoms());
 	wavy_aux.set_ncen(orbital_wfn.get_ncen());
+	// The fitted density carries the charge of the density it fits, or the aux wavefunction looks neutral
+	// downstream. A file-read wavefunction usually leaves the charge unset, so count the occupations: exactly
+	// the electrons the fit sees, ECP cores excluded.
+	if (orbital_wfn.get_nmo() > 0) {
+		double occupied = 0.0;
+		for (int mo = 0; mo < orbital_wfn.get_nmo(); ++mo)
+			occupied += orbital_wfn.get_MO_occ(mo);
+		int nuclear = 0;
+		for (int a = 0; a < orbital_wfn.get_ncen(); ++a)
+			nuclear += orbital_wfn.get_atom_charge(a)
+				- orbital_wfn.get_atom_ECP_electrons(a);
+		wavy_aux.set_charge(nuclear - static_cast<int>(std::lround(occupied)));
+	}
+	else
+		wavy_aux.set_charge(orbital_wfn.get_charge());
+	wavy_aux.set_multi(orbital_wfn.get_multi());
 	wavy_aux.delete_basis_set();
 	load_basis_into_WFN(wavy_aux, combined_aux_basis, decontract);
 

@@ -1,0 +1,40 @@
+{
+ "_note": [
+  "allyl, hco and no2 were never in the lost original run, so there is no stored basis-function",
+  "count to match and accept.py - which iterates index.json - has nothing to check them against.",
+  "The substitute criterion, stated rather than defaulted: the optimisation must report THE",
+  "OPTIMIZATION HAS CONVERGED, and <S**2> must be near 0.75 for a doublet, which is the evidence",
+  "that the SCF converged to the intended state rather than a spin-contaminated one. The basis",
+  "function count is RECORDED here so that any future regeneration has the exact-match criterion",
+  "the other 22 have; it was not available to check the first run against.",
+  "Keywords: ! B3LYP def2-TZVP TightSCF Opt, the same line as index.json records for the 22."
+ ],
+ "_criterion": "converged optimisation + <S**2> within 0.03 of 0.75, basis functions recorded for next time",
+ "allyl": {
+  "accepted": true,
+  "basis_functions": 123,
+  "final_single_point_energy": -117.227034018565,
+  "s_squared": 0.778384,
+  "multiplicity": 2,
+  "optimisation_converged": true,
+  "reasons": ["converged", "<S**2> 0.778384 is 0.028 from 0.75, the largest contamination of the three"]
+ },
+ "hco": {
+  "accepted": true,
+  "basis_functions": 68,
+  "final_single_point_energy": -113.848612257692,
+  "s_squared": 0.753460,
+  "multiplicity": 2,
+  "optimisation_converged": true,
+  "reasons": ["converged", "<S**2> 0.753460"]
+ },
+ "no2": {
+  "accepted": true,
+  "basis_functions": 93,
+  "final_single_point_energy": -205.080839945861,
+  "s_squared": 0.753692,
+  "multiplicity": 2,
+  "optimisation_converged": true,
+  "reasons": ["converged", "<S**2> 0.753692"]
+ }
+}
