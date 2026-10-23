@@ -730,7 +730,8 @@ void XCW_solver::density_fitting(occ::qm::HartreeFock& target, const std::string
 	//half of what the process can have; they are computed once for the whole lambda scan.
 	const size_t naux = aux->to_AOBasis(basis.atoms()).nbf();
 	const size_t nbf = basis.nbf();
-	const size_t store = naux * nbf * (nbf + 1) / 2 * sizeof(double);
+	//OCC holds the full square nbf x nbf per auxiliary function, not the triangle
+	const size_t store = naux * nbf * nbf * sizeof(double);
 	const bool stored = avail == 0 || store < avail / 2;
 	if (stored) sf.df_reserved_ += store;
 	target.set_density_fitting_policy(stored ? occ::qm::IntegralEngineDF::Policy::Stored : occ::qm::IntegralEngineDF::Policy::Direct);
