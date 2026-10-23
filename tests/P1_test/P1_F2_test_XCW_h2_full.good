@@ -27,16 +27,16 @@ Screened out 1802 unique pairs of mu, nu (33.64%)
 Skipped evaluation of 64843335 grids (16.37%) 
 More detailed output in SCF.log file...
 XCW: fitting against the 1/|H|^2-weighted residual self-energy criterion Criterion below is this weighted quantity, not the classical GoF.
-____________________________________________________________________________________
+____________________________________________________________________________________________________________________________
  Lambda		Criterion	GooF(F2)	R1(gt)		Total Energy		Perturbation	Target quantity		Crit(all)	R1(all)		A^2 (halt)
-								(Eh)			(a. u.)		(a. u.)
-____________________________________________________________________________________
-0.00000		10.2017		4.9840		0.02503		-1961.925585145		0.000		-1961.925585145		10.0857		0.02557		195.2364
+									(%)			(Eh)				(a. u.)			(a. u.)
+____________________________________________________________________________________________________________________________
+ 0.00000	10.2017		4.9840		0.02503		-1961.925585145		0.000			-1961.925585145		10.0857		0.02557		195.2364
 XCW grid tscb: max |f_grid - f_tsc| / max |f| 2.51e-05, later steps write the tscb from the grid
-0.01000		6.1465		3.7635		0.02379		-1961.756439463		0.061		-1961.694974479		6.0771		0.02433		124.0314
-0.02000		5.4661		3.5431		0.02349		-1961.644952396		0.109		-1961.535630681		5.4046		0.02402		126.1818
+ 0.01000	6.1465		3.7635		0.02379		-1961.756439395		0.061			-1961.694974422		6.0771		0.02433		124.0315
+ 0.02000	5.4661		3.5431		0.02349		-1961.644952613		0.109			-1961.535630868		5.4046		0.02402		126.1818
 ____________________________________________________________________________
-Recommended halting lambda* = 0.01000 (A^2=124.0314) -- WARNING: binned <z^2> trend test flagged at this lambda; residuals may be spatially correlated, inspect before trusting lambda*.
+Recommended halting lambda* = 0.01000 (A^2=124.0315) -- WARNING: binned <z^2> trend test flagged at this lambda; residuals may be spatially correlated, inspect before trusting lambda*.
   candidate fit: degree=2 -- not enough points yet (need >= degree+3 evaluated lambda steps)
   candidate fit: degree=4 -- not enough points yet (need >= degree+3 evaluated lambda steps)
 Finished XCW fitting procedure.
