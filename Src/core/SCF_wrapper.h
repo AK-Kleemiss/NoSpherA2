@@ -160,8 +160,10 @@ private:
 	// Fock builds of this lambda step: SCF iterations, Hessian-vector products, rebuilds at the orbitals
 	struct { int iter, hessian, rebuild; } builds_{};
 	static constexpr double unjudged_rise_ = 1e-6;
-	// conjugate-gradient steps of the preconditioner and the residual share they stop at
-	static constexpr int trah_pcg_ = 20;
+	// conjugate-gradient steps of the preconditioner and the residual share they stop at. The cap is
+	// what binds: TEMPO def2-SVP 80 -> 82 Fock builds and 910 -> 621 structure factor responses from 20
+	// to 10 steps, P1 unchanged; 5 steps cost 118 builds
+	static constexpr int trah_pcg_ = 10;
 	static constexpr double trah_pcg_tol_ = 1e-2;
 	// the Fock matrix of this iteration was built in full from the density of the current orbitals
 	bool soscf_fresh_ = false;
