@@ -260,8 +260,10 @@ void SALTEDPredictor::build_merged(const WFN& wavy_in, options& opt_in, const pa
 	// First shell: an element model trained on X and the lead species of its molecules has seen those atoms next
 	// to X, which the lead model never did. An atom bonded to an atom of such a model's element (d < 1.3 (r_a + r_b),
 	// the CSD covalent radii b2c bonds with) comes from that model, and bonded to the elements of two models it is
-	// their mean. Only where the model predicts the atom at all (one trained on X alone does not) and in the basis
-	// its element already has here: the merged basis is one per element.
+	// their mean weighted by 1/x^2, x = d / (r_a + r_b) to that model's nearest atom: the shorter bond, relative to the
+	// radii, counts more. Only where the model predicts the atom at all (one trained on X alone does not) and in the
+	// basis its element already has here: the merged basis is one per element.
+	// ponytail: exponent 2 is a guess, fit it on mixed-metal holdouts once there are enough of them
 	// ponytail: an element model predicts every atom of its species and only the shell is kept; restrict its
 	// descriptor centres to X + shell if a large structure with a metal gets slow
 	auto same_basis = [&](const int m1, const int m2, const int Z) {
@@ -278,21 +280,24 @@ void SALTEDPredictor::build_merged(const WFN& wavy_in, options& opt_in, const pa
 	{
 		const int Za = wavy_in.get_atom_charge(a), own = atom_model[a];
 		if (own < 0) continue;
-		ivec shell;
+		std::vector<std::pair<int, double>> shell;  // model, x to its nearest atom
 		for (int b = 0; b < wavy_in.get_ncen(); b++)
 		{
 			const int Zb = wavy_in.get_atom_charge(b), m = element_model[Zb - 1];
-			if (m < 0 || m == own || sub_index[m][a] < 0 || std::find(shell.begin(), shell.end(), m) != shell.end()) continue;
-			if (array_length(wavy_in.get_atom_pos(a), wavy_in.get_atom_pos(b)) > constants::ang2bohr(1.3 * (radius(Za) + radius(Zb))))
-				continue;
-			if (same_basis(m, own, Za - 1)) shell.push_back(m);
-			else other_basis.insert({ m, Za });
+			if (m < 0 || m == own || sub_index[m][a] < 0) continue;
+			const double x = array_length(wavy_in.get_atom_pos(a), wavy_in.get_atom_pos(b)) / constants::ang2bohr(radius(Za) + radius(Zb));
+			if (x > 1.3) continue;
+			if (!same_basis(m, own, Za - 1)) { other_basis.insert({ m, Za }); continue; }
+			auto it = std::find_if(shell.begin(), shell.end(), [m](const auto& s) { return s.first == m; });
+			if (it == shell.end()) shell.push_back({ m, x });
+			else it->second = std::min(it->second, x);
 		}
 		if (shell.empty()) continue;
-		atom_model[a] = shell[0];
-		atom_in_model[a] = sub_index[shell[0]][a];
-		for (size_t s = 1; s < shell.size(); s++) atom_also[a].push_back({ shell[s], sub_index[shell[s]][a] });
-		for (const int m : shell) n_shell[m]++;
+		atom_model[a] = shell[0].first;
+		atom_in_model[a] = sub_index[shell[0].first][a];
+		if (shell.size() > 1)
+			for (const auto& [m, x] : shell) atom_also[a].push_back({ m, sub_index[m][a], 1.0 / (x * x) });
+		for (const auto& s : shell) n_shell[s.first]++;
 		n_mean += shell.size() > 1;
 	}
 
@@ -310,7 +315,7 @@ void SALTEDPredictor::build_merged(const WFN& wavy_in, options& opt_in, const pa
 		std::cout << std::endl;
 	}
 	if (n_mean > 0)
-		std::cout << n_mean << " first-shell atom(s) are bonded to the elements of two or more models and take their mean." << std::endl;
+		std::cout << n_mean << " first-shell atom(s) are bonded to the elements of two or more models and take their mean, weighted by 1/(d/(r_a + r_b))^2." << std::endl;
 	for (const auto& [m, Z] : other_basis)
 		std::cout << "Model " << sub_models[m]->get_salted_filename() << " has its own basis for " << constants::atnr2letter(Z)
 				  << ", so its first-shell " << constants::atnr2letter(Z) << " atoms stay with the model that owns the element." << std::endl;
@@ -403,10 +408,15 @@ vec SALTEDPredictor::merge_predictions()
 		const size_t first = coefs.size();
 		coefs.insert(coefs.end(), parts[m].begin() + offsets[m][p], parts[m].begin() + offsets[m][p + 1]);
 		// A first-shell atom of several models: same basis (build_merged), so the blocks add element by element
-		for (const auto& [m2, p2] : atom_also[a])
-			for (size_t i = first; i < coefs.size(); i++) coefs[i] += parts[m2][offsets[m2][p2] + (i - first)];
-		if (!atom_also[a].empty())
-			for (size_t i = first; i < coefs.size(); i++) coefs[i] /= double(1 + atom_also[a].size());
+		if (atom_also[a].empty()) continue;
+		double wsum = 0.0;
+		std::fill(coefs.begin() + first, coefs.end(), 0.0);
+		for (const auto& [m2, p2, w] : atom_also[a])
+		{
+			for (size_t i = first; i < coefs.size(); i++) coefs[i] += w * parts[m2][offsets[m2][p2] + (i - first)];
+			wsum += w;
+		}
+		for (size_t i = first; i < coefs.size(); i++) coefs[i] /= wsum;
 	}
 	const ivec merged_offsets = coef_offsets(wavy);
 	err_checkf(coefs.size() == (size_t)merged_offsets.back(),

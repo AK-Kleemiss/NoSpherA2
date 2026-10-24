@@ -36,8 +36,9 @@ private:
 	std::vector<std::unique_ptr<SALTEDPredictor>> sub_models{};
 	// Per atom of the merged structure: which sub model predicts it, and its index there
 	ivec atom_model{}, atom_in_model{};
-	// A first-shell atom bonded to the elements of several models: the further (model, index) its mean takes in
-	std::vector<std::vector<std::pair<int, int>>> atom_also{};
+	// A first-shell atom bonded to the elements of several models: every (model, index, weight) of its weighted mean,
+	// the one in atom_model included; empty when one model predicts it
+	std::vector<std::vector<std::tuple<int, int, double>>> atom_also{};
 	void build_merged(const WFN& wavy_in, options& opt_in, const pathvec& models);
 	vec merge_predictions();
 	// Estimate what the spherically filled atoms should carry, so the size of the
