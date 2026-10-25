@@ -317,6 +317,8 @@ public:
 		const int& min_f) const;
 	const double get_form_factor(const double& k_vector) const override;
 	const double get_core_form_factor(const double& k_vector, const int& core_els) const override;
+	//The density get_core_form_factor transforms, as terms {T, N, z}: 4 pi r rho(r) = sum T r^N e^(-z r), bohr
+	std::vector<std::array<double, 3>> core_slater_terms(const int core_els) const;
 	const double get_core_density(const double& dist, const int& core_els);
 	const double get_custom_form_factor(
 		const double& k_vector,
@@ -480,6 +482,10 @@ public:
 	Spherical_Gaussian_Density() : c(NULL), nex(0), z(NULL), charge(0), atomic_number(1), ECP_mode(1) {};
 	virtual const double get_radial_density(const double& dist) const;
 	virtual const double get_form_factor(const double& k_vector) const;
+	//rho(r) = sum c_i exp(-z_i r^2), bohr
+	int size() const { return nex; }
+	double exponent(const int i) const { return z[i]; }
+	double coefficient(const int i) const { return c[i]; }
 	const int get_atomic_number() const { return atomic_number; };
 	const int get_charge() const { return charge; };
 };

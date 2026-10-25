@@ -3627,6 +3627,10 @@ tsc_block_type calculate_scattering_factors(
 		file << setprecision(4) << "Total number of analytical Electrons: " << el_sum << endl;
 		time_points.push_back(get_time());
 		time_descriptions.push_back("Calculation of Charges");
+		if (opt.write_tshb) {
+			ml->write_tshb("experimental.tshb", labels, asym_atom_list, *wavy, opt.ECP_mode, opt.electron_diffraction);
+			file << "Wrote experimental.tshb" << endl;
+		}
 
 		if (prep_out != NULL)
 		{
@@ -3797,6 +3801,10 @@ tsc_block_type calculate_scattering_factors(
 			file << setprecision(4) << "Total number of analytical Electrons: " << el_sum << endl;
 			time_points.push_back(get_time());
 			time_descriptions.push_back("Calculation of Charges");
+			if (opt.write_tshb) {
+				ml.write_tshb("experimental.tshb", labels, asym_atom_list, *wavy, opt.ECP_mode, opt.electron_diffraction);
+				file << "Wrote experimental.tshb" << endl;
+			}
 
 			if (stream_tsc)
 			{

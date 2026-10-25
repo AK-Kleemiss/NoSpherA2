@@ -5,6 +5,7 @@
 #include "SALTED_predictor.h"
 #include "basis_set.h"
 #include "npy.h"
+#include "spherical_density.h"
 #include <random>
 
 Multipoles Gaussian_Atom::electrical_moments(const int lmax) const
@@ -152,6 +153,68 @@ const Interaction_Energy& Gaussian_Molecule::interaction(const Gaussian_Molecule
 	if (it == energies.end())
 		it = energies.emplace(B.id, DensityFitting::interaction_energy(coefs, aux, B.coefs, B.aux, repulsion_K, x_fun)).first;
 	return it->second;
+}
+
+void Gaussian_Molecule::write_tshb(const std::filesystem::path& fn, const svec& labels, const ivec& atoms, const WFN& wave, const int ECP_mode, const bool ED) const
+{
+	err_checkf(labels.size() == atoms.size(), "Labels and atoms do not match for " + fn.string(), std::cout);
+	std::ofstream f(fn, std::ios::binary);
+	err_checkf(f.good(), "Could not open " + fn.string(), std::cout);
+	auto u32 = [&f](const uint32_t v) { f.write(reinterpret_cast<const char*>(&v), 4); };
+	auto str = [&f, &u32](const std::string& s) { u32(static_cast<uint32_t>(s.size())); f.write(s.data(), s.size()); };
+	f.write("TSHB", 4);
+	u32(3);
+	//ED: smtbx applies the Mott-Bethe conversion of convert_to_ED per symmetry equivalent, with the Z stored per atom
+	str(std::string("FRAME: cartesian\nUNITS: angstrom\nSOURCE: NoSpherA2") + (ED ? "\nED: true" : ""));
+	u32(static_cast<uint32_t>(atoms.size()));
+	const double b = constants::bohr2ang(1.0);
+	for (int i = 0; i < atoms.size(); i++) {
+		const int a = atoms[i];
+		str(labels[i]);
+		uint32_t n = 0;
+		for (int s = tab.sh_start[a]; s < tab.sh_start[a + 1]; s++) n += tab.pr_start[s + 1] - tab.pr_start[s];
+		u32(n);
+		for (int s = tab.sh_start[a]; s < tab.sh_start[a + 1]; s++) {
+			const int32_t l = tab.sh_l[s];
+			//n exp(-a r^2) r^l in bohr is n b^-(l+3) exp(-(a/b^2) R^2) R^l in angstrom and e/A^3
+			const double scale = std::pow(b, -(l + 3));
+			for (int p = tab.pr_start[s]; p < tab.pr_start[s + 1]; p++) {
+				const double alpha = tab.pr_exp[p] / (b * b);
+				f.write(reinterpret_cast<const char*>(&l), 4);
+				f.write(reinterpret_cast<const char*>(&alpha), 8);
+				for (int m = 0; m < 2 * l + 1; m++) {
+					const double c = coefs[tab.coef_off[s] + m] * tab.pr_norm[p] * scale;
+					f.write(reinterpret_cast<const char*>(&c), 8);
+				}
+			}
+		}
+		const int n_ecp = wave.get_atom_ECP_electrons(a);
+		std::vector<std::array<double, 3>> sl, ga;
+		std::vector<std::array<double, 2>> ex;
+		if (n_ecp != 0 && ECP_mode == 0)
+			//mode 0 adds n e^(-k/16pi) with k = 4pi stl = 2pi s
+			ex.push_back({ double(n_ecp), 1.0 / 8.0 });
+		else if (n_ecp != 0) {
+			const int Z = wave.get_atom_charge(a);
+			//4 pi r rho = T r^N e^(-z r) in bohr is rho = T / (4 pi b^(N+2)) R^(N-1) e^(-(z/b) R) in angstrom
+			for (const std::array<double, 3>& t : Thakkar(Z, ECP_mode).core_slater_terms(n_ecp))
+				sl.push_back({ t[0] / (constants::FOUR_PI * std::pow(b, t[1] + 2)), t[1] - 1, t[2] / b });
+			const Spherical_Gaussian_Density g(Z, ECP_mode);
+			for (int k = 0; k < g.size(); k++)
+				ga.push_back({ g.coefficient(k) / (b * b * b), g.exponent(k) / (b * b), 0.0 });
+		}
+		//version 2 records: l = 0 Gaussians c e^(-a R^2), Slater terms c R^n e^(-z R), form factor terms a e^(-b s)
+		u32(static_cast<uint32_t>(ga.size()));
+		for (const std::array<double, 3>& g : ga) f.write(reinterpret_cast<const char*>(g.data()), 16);
+		u32(static_cast<uint32_t>(sl.size()));
+		for (const std::array<double, 3>& t : sl) f.write(reinterpret_cast<const char*>(t.data()), 24);
+		u32(static_cast<uint32_t>(ex.size()));
+		for (const std::array<double, 2>& e : ex) f.write(reinterpret_cast<const char*>(e.data()), 16);
+		//version 3: the nuclear charge Mott-Bethe subtracts, the one convert_to_ED uses
+		const int32_t Z = wave.get_atom_charge(a);
+		f.write(reinterpret_cast<const char*>(&Z), 4);
+	}
+	err_checkf(f.good(), "Writing " + fn.string() + " failed", std::cout);
 }
 
 Gaussian_Molecule Gaussian_Molecule::transformed(const vec2& R, const vec& t) const

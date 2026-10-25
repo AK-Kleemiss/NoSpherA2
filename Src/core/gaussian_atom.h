@@ -109,6 +109,11 @@ public:
 	const std::map<std::string, Interaction_Energy>& interactions() const { return energies; }
 	//A new molecule at R x + t (bohr), the coefficients rotated with the atoms
 	Gaussian_Molecule transformed(const vec2& R, const vec& t) const;
+	//The listed atoms as a .tshb for olex2.refine: one shell per primitive in angstrom and e/A^3, pr_norm folded into the
+	//coefficients; the real harmonics are those of spherical_harmonic.h, which smtbx evaluates identically
+	//Atoms of wave with ECP electrons get the core opt.ECP_mode adds to the table: e^(-s/8) for mode 0, the Thakkar core as
+	//Slater terms and the valence correction as l = 0 Gaussians for modes 1-3; version 3 adds Z per atom and "ED: true" when ED
+	void write_tshb(const std::filesystem::path& fn, const svec& labels, const ivec& atoms, const WFN& wave, const int ECP_mode, const bool ED) const;
 	const WFN& basis() const { return aux; }
 	const vec& coefficients() const { return coefs; }
 	const aux_density_table& table() const { return tab; }

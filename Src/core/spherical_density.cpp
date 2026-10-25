@@ -501,6 +501,35 @@ const double Thakkar::get_core_form_factor(const double &k_vector, const int &co
 	return get_custom_form_factor(k_vector, max_s, max_p, max_d, max_f, 0, 0, 0, 0);
 };
 
+std::vector<std::array<double, 3>> Thakkar::core_slater_terms(const int core_els) const
+{
+	err_checkf(_first_ex != 200000000, "No Thakkar core density for Z = " + std::to_string(atomic_number), std::cout);
+	int mx[4] = { 0, 0, 0, 0 };
+	set_core_counts(&mx[0], &mx[1], &mx[2], &mx[3], core_els, ECP_mode);
+	const int* nv[4] = { ns, np, nd, nf };
+	const int lo[4] = { 0, 7, 13, 17 }, hi[4] = { 7, 13, 17, 19 };
+	std::vector<std::array<double, 3>> t;
+	int nr_coef = _prev_coef, nr_ex = _first_ex;
+	//the loops of calc_type, collecting its terms instead of transforming them
+	for (int s = 0; s < 4; s++) {
+		const int l_n = nv[s][atomic_number - 1];
+		int d = 0;
+		for (int m = lo[s]; m < hi[s]; m++)
+			if (occ[_offset + m] != 0) d++;
+		for (int m = lo[s]; m < lo[s] + mx[s]; m++) {
+			if (occ[_offset + m] == 0) continue;
+			const int cn = nr_coef + m - lo[s];
+			for (int i = 0; i < l_n; i++)
+				for (int j = 0; j < l_n - i; j++)
+					t.push_back({ (j != 0 ? 2.0 : 1.0) * occ[_offset + m] * c[cn + i * d] * c[cn + (i + j) * d],
+						double(n[nr_ex + i] + n[nr_ex + i + j] - 1), z[nr_ex + i] + z[nr_ex + i + j] });
+		}
+		nr_coef += d * l_n;
+		nr_ex += l_n;
+	}
+	return t;
+}
+
 const double Thakkar::get_core_density(const double &dist, const int &core_els)
 {
 	int max_s = 0, max_p = 0, max_d = 0, max_f = 0;

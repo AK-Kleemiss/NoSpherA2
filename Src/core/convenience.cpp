@@ -249,7 +249,9 @@ std::string help_message =
  "                                    3=pTB.  Alias: -ecp.\n"
  "  -ED                                Electron-diffraction scattering factors.\n"
  "  -twin <9 values>                   Add a 3x3 twin law; may be repeated.\n"
- "  -old_tsc                           Request the legacy TSC format.\n\n"
+ "  -old_tsc                           Request the legacy TSC format.\n"
+ "  -tshb                              With -ri_fit or -SALTED, also write the\n"
+ "                                    fitted atoms as experimental.tshb.\n\n"
  "PARTITIONING, BASIS, AND PERFORMANCE\n"
  "  -b <basis>  -d <directory>          Basis name/file and Tonto-style basis\n"
  "                                    directory (also needed for -fchk).\n"
@@ -3345,6 +3347,8 @@ bool options::digest_partition_options(const std::string &temp, int &i)
 	{
 		old_tsc = true;
 	}
+	else if (temp == "-tshb")
+		write_tshb = true;
 	else if (temp == "-tfvc" || temp == "-TFVC")
 	{
 		partition_type = PartitionType::TFVC;
