@@ -1152,8 +1152,8 @@ std::vector<std::pair<vec, vec>> make_MBIS_vectors(
 #pragma omp for schedule(dynamic, 16) nowait
 				for (int point = 0; point < end; point++) {
 					rho0 = 0.0;
-					std::fill(dists.begin(), dists.end(), 0.0);
-					std::fill(rho0shell.begin(), rho0shell.end(), 0.0);
+					std::fill(dists.begin() + j0, dists.begin() + j1, 0.0);
+					std::fill(rho0shell.begin() + j0 * 6, rho0shell.begin() + j1 * 6, 0.0);
 					bw = b_weight[point];
 					density = bw * dens[point];
 					_x = gx[point];
@@ -1390,7 +1390,7 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
 #pragma omp for schedule(dynamic, 16) nowait
 				for (int point = 0; point < end; point++) {
 					rho0 = 0.0;
-					std::fill(rho0shell.begin(), rho0shell.end(), 0.0);
+					std::fill(rho0shell.begin() + j0 * 6, rho0shell.begin() + j1 * 6, 0.0);
 					const double b_weight_point = b_weight[point];
 					density = b_weight_point * dens[point];
 
