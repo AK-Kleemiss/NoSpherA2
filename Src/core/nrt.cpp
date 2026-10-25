@@ -128,41 +128,67 @@ namespace
 	struct Topology {
 		int n = 0;
 		ivec t;
+		std::vector<ivec> mc;  //k-centre units (-nbo_centres): sorted atoms, the list sorted, a 3c-4e unit listed twice
 
 		Topology() = default;
 		explicit Topology(const int na) : n(na), t(static_cast<size_t>(na) * na, 0) {}
 		int& at(const int a, const int b) { return t[static_cast<size_t>(a) * n + b]; }
 		int at(const int a, const int b) const { return t[static_cast<size_t>(a) * n + b]; }
 		void set(const int a, const int b, const int v) { at(a, b) = v; at(b, a) = v; }
+		int units_on(const int a) const
+		{
+			int u = 0;
+			for (const ivec& m : mc) u += std::binary_search(m.begin(), m.end(), a);
+			return u;
+		}
+		//mc = s's units under the atom map old -> p[old]
+		void place_units(const Topology& s, const ivec& p)
+		{
+			mc.clear();
+			for (ivec m : s.mc) {
+				for (int& a : m) a = p[a];
+				std::sort(m.begin(), m.end());
+				mc.push_back(std::move(m));
+			}
+			std::sort(mc.begin(), mc.end());
+		}
 
-		//orbitals on the atom: lone pairs plus bond multiplicities
+		//orbitals on the atom: lone pairs plus bond multiplicities plus units.  A unit is one orbital per centre however
+		//many pairs it holds (3c-4e: 3 AOs, 2 pairs), so its m copies count once; per copy put a 4C unit's new centre over cap
 		int used(const int a) const
 		{
 			int u = at(a, a);
+			for (size_t q = 0; q < mc.size(); q++)
+				u += (q == 0 || mc[q] != mc[q - 1]) && std::binary_search(mc[q].begin(), mc[q].end(), a);
 			for (int b = 0; b < n; b++) if (b != a) u += at(a, b);
 			return u;
 		}
-		//Lewis electron count, both electrons of a shared bond counted
+		//Lewis electron count, both electrons of a shared bond counted.  ponytail: a k-centre unit counts 1 per centre
+		//like a bond, 1 - 2/k more than its share, so the charge screen is approximate around units
 		int electrons(const int a) const
 		{
-			int e = 2 * at(a, a);
+			int e = 2 * at(a, a) + units_on(a);
 			for (int b = 0; b < n; b++) if (b != a) e += at(a, b);
 			return e;
 		}
 		int pairs() const
 		{
-			int p = 0;
+			int p = static_cast<int>(mc.size());
 			for (int a = 0; a < n; a++)
 				for (int b = a; b < n; b++) p += at(a, b);
 			return p;
 		}
-		//upper triangle with diagonal: the deduplication key
+		//upper triangle with diagonal, then each unit closed by -1: the deduplication key
 		ivec key() const
 		{
 			ivec k;
 			k.reserve(static_cast<size_t>(n) * (n + 1) / 2);
 			for (int a = 0; a < n; a++)
 				for (int b = a; b < n; b++) k.push_back(at(a, b));
+			for (const ivec& m : mc) {
+				k.insert(k.end(), m.begin(), m.end());
+				k.push_back(-1);
+			}
 			return k;
 		}
 		ivec2 matrix() const
@@ -184,6 +210,13 @@ namespace
 				if (b != a && s.at(a, b))
 					nb.push_back(std::string(constants::atnr2letter(Z[b])) +
 								 std::to_string(s.at(a, b)));
+			std::sort(nb.begin(), nb.end());
+			for (const ivec& m : s.mc)
+				if (std::binary_search(m.begin(), m.end(), a)) {
+					std::string u = "U";
+					for (const int b : m) u += constants::atnr2letter(Z[b]);
+					nb.push_back(u);
+				}
 			std::sort(nb.begin(), nb.end());
 			sig[a] = std::string(constants::atnr2letter(Z[a])) + "|" +
 					 std::to_string(s.at(a, a)) + "|";
@@ -210,6 +243,17 @@ namespace
 												  : (label(a) + "-" + label(b));
 				for (int k = 0; k < std::abs(d); k++) (d > 0 ? add : rem).push_back(what);
 			}
+		const auto unit_label = [&](const ivec& m) {
+			std::string u = std::to_string(m.size()) + "C ";
+			for (size_t i = 0; i < m.size(); i++) u += (i ? "-" : "") + label(m[i]);
+			return u;
+		};
+		std::vector<ivec> only;
+		std::set_difference(s.mc.begin(), s.mc.end(), p.mc.begin(), p.mc.end(), std::back_inserter(only));
+		for (const ivec& m : only) add.push_back(unit_label(m));
+		only.clear();
+		std::set_difference(p.mc.begin(), p.mc.end(), s.mc.begin(), s.mc.end(), std::back_inserter(only));
+		for (const ivec& m : only) rem.push_back(unit_label(m));
 		std::string out;
 		for (size_t i = 0; i < add.size(); i++) out += (i ? ", " : "") + add[i];
 		if (!rem.empty()) {
@@ -274,6 +318,7 @@ namespace
 		VectorXd wt;
 		MatrixXd X;
 		std::vector<std::array<double, 3>> polarity;  //{a, b, c_a^2 - c_b^2} per two-centre orbital
+		std::vector<std::array<double, 3>> unit_bo;   //{a, b, weight} per bond (a == b: lone pair) of each k-centre unit's Lewis fit
 		int sweeps = 0;
 		double change = 0.0;      //largest vector change of the last sweep
 		bool converged = false;   //valence span stopped moving before the sweep cap
@@ -299,10 +344,17 @@ namespace
 		//[a][b]: an E2 above the screen from a lone pair on a into an empty valence orbital (LV) on b.  LP a -> bond a-b
 		//fills that LV: a dative bond (P->Ni, Ni->Li, F->B in BF3) is a whole resonance structure, not half an arrow
 		bvec2 dative;
+		bool units = false;  //three-centre moves: -nbo_centres > 2 or a parent with k-centre units
+		int max_centres = 3;  //-nbo_centres: units grow up to this many centres
 	};
 
 	bool acceptable(const Topology& s, const Limits& L)
 	{
+		//a k-centre unit holds at most k - 1 pairs (3c-4e, 4c-6e): k fills every orbital it has and bonds nothing
+		for (size_t q = 0, r; q < s.mc.size(); q = r) {
+			for (r = q + 1; r < s.mc.size() && s.mc[r] == s.mc[q]; r++);
+			if (r - q >= s.mc[q].size()) return false;
+		}
 		for (int a = 0; a < s.n; a++) {
 			if (s.used(a) > L.cap[a]) return false;
 			if (std::abs(s.electrons(a) - L.parent_electrons[a]) > L.max_charge) return false;
@@ -378,6 +430,61 @@ namespace
 					s.set(a, b, s.at(a, b) - 1);
 					s.set(a, d, s.at(a, d) + 1);
 					emit(std::move(s), a, d, b);
+					//bond a-b opens onto d: a 3c-2e unit, and with a lone pair of d a 3c-4e one (the unit twice).
+					//ponytail: units are made here as 3C and grown to 4C below; unit -> lone pair moves are not made
+					if (!L.units) continue;
+					ivec u{ a, b, d };
+					std::sort(u.begin(), u.end());
+					for (int lp = 0; lp < 2; lp++) {
+						if (lp && c.topo.at(d, d) <= 0) break;
+						Topology m = c.topo;
+						m.set(a, b, m.at(a, b) - 1);
+						if (lp) { m.at(d, d)--; m.mc.push_back(u); }
+						m.mc.push_back(u);
+						std::sort(m.mc.begin(), m.mc.end());
+						emit(std::move(m), a, d, b, true);  //no charge moves: a whole arrow
+					}
+				}
+			}
+		}
+		//a unit closes to a bond between two of its centres
+		for (size_t q = 0; q < c.topo.mc.size(); q++) {
+			if (q && c.topo.mc[q] == c.topo.mc[q - 1]) continue;
+			const ivec& u = c.topo.mc[q];
+			for (size_t i = 0; i < u.size(); i++)
+				for (size_t j = i + 1; j < u.size(); j++) {
+					if (!L.bondable[u[i]][u[j]]) continue;
+					Topology s = c.topo;
+					s.mc.erase(s.mc.begin() + q);
+					s.set(u[i], u[j], s.at(u[i], u[j]) + 1);
+					emit(std::move(s), u[i], u[j], -1, true);
+				}
+		}
+		//a unit grows by a centre d it delocalises into, taking d's lone pair or a bond from d to a centre: m copies of
+		//the unit become m + 1 copies of the larger one (3c-2e + LP -> 4c-4e, 3c-4e + LP -> 4c-6e, as X-TM-Z-N)
+		for (size_t q = 0; q < c.topo.mc.size(); q++) {
+			if (q && c.topo.mc[q] == c.topo.mc[q - 1]) continue;
+			const ivec u = c.topo.mc[q];
+			if (static_cast<int>(u.size()) >= L.max_centres) continue;
+			const int m = static_cast<int>(std::count(c.topo.mc.begin(), c.topo.mc.end(), u));
+			for (int d = 0; d < n; d++) {
+				if (std::binary_search(u.begin(), u.end(), d)) continue;
+				ivec w = u;
+				w.push_back(d);
+				std::sort(w.begin(), w.end());
+				bool lp_done = false;
+				for (const int a : u) {
+					if (L.deloc[a][d] <= 0.0) continue;
+					for (int lp = 0; lp < 2; lp++) {
+						if (lp ? lp_done || c.topo.at(d, d) <= 0 : c.topo.at(a, d) <= 0) continue;
+						Topology s = c.topo;
+						if (lp) { s.at(d, d)--; lp_done = true; }
+						else s.set(a, d, s.at(a, d) - 1);
+						std::erase(s.mc, u);
+						s.mc.insert(s.mc.end(), m + 1, w);
+						std::sort(s.mc.begin(), s.mc.end());
+						emit(std::move(s), a, d, -1, true);
+					}
 				}
 			}
 		}
@@ -397,7 +504,8 @@ namespace
 		}
 		//immovable slots keep their parent value outside the recursion
 		Topology fixed(parent.n);
-		int fixed_pairs = 0;
+		fixed.mc = parent.mc;  //ponytail: -nrt_exhaustive keeps the parent's k-centre units and enumerates around them
+		int fixed_pairs = static_cast<int>(parent.mc.size());
 		for (int a = 0; a < parent.n; a++)
 			for (int b = a; b < parent.n; b++) {
 				const bool movable = (a == b) ? L.free_atom[a]
@@ -450,8 +558,12 @@ namespace
 	}
 
 	//An automorphism pi of the coloured skeleton with pi[u] = v, atoms placed breadth first from u; with distances
-	//(bohr) an isometry to 0.01 bohr
-	bool skeleton_map(const int u, const int v, const ivec& col, const bvec2& adj, const vec2* dist, ivec& pi, long budget)
+	//(bohr) an isometry to 0.01 bohr between heavy atoms and 0.05 bohr for a pair with an H: optimised geometries hold
+	//their point group only to ~0.02 bohr on the H atoms ([Ni(PH3)3Li]+ Cs mirror 0.020 bohr off on H, 0.0035 on the
+	//heavy atoms; at 0.01 throughout no map, Ni-P6 0.39 against Ni-P10 1.35), while a heavy-atom skeleton 0.011 bohr
+	//off is a real distortion (allyl_cation_d C-C) and Pt's false C3 sits at 0.043; the NAO image is still checked
+	//against the density to 1 %
+	bool skeleton_map(const int u, const int v, const ivec& Z, const ivec& col, const bvec2& adj, const vec2* dist, ivec& pi, long budget)
 	{
 		const int n = static_cast<int>(col.size());
 		ivec order, from(n, -1);
@@ -475,7 +587,8 @@ namespace
 				if (used[b] || col[b] != col[a] || (k == 0 && b != v) || (from[a] >= 0 && !adj[pi[from[a]]][b])) continue;
 				bool ok = true;
 				for (int j = 0; j < k && ok; j++)
-					ok = dist ? std::abs((*dist)[a][order[j]] - (*dist)[b][pi[order[j]]]) < 0.01 : adj[a][order[j]] == adj[b][pi[order[j]]];
+					ok = dist ? std::abs((*dist)[a][order[j]] - (*dist)[b][pi[order[j]]]) < (Z[a] == 1 || Z[order[j]] == 1 ? 0.05 : 0.01)
+							  : adj[a][order[j]] == adj[b][pi[order[j]]];
 				if (!ok) continue;
 				pi[a] = b;
 				used[b] = true;
@@ -502,7 +615,7 @@ namespace
 		};
 		for (int u = 0; u < n; u++)
 			for (int v = u + 1; v < n; v++)
-				if (col[v] == col[u] && root(u) != root(v) && skeleton_map(u, v, col, L.bondable, dist, pi, 20000)) {
+				if (col[v] == col[u] && root(u) != root(v) && skeleton_map(u, v, Z, col, L.bondable, dist, pi, 20000)) {
 					maps.push_back(pi);
 					for (int a = 0; a < n; a++) orbit[root(a)] = root(pi[a]);
 				}
@@ -522,6 +635,7 @@ namespace
 				Topology t(n);
 				for (int a = 0; a < n; a++)
 					for (int b = 0; b < n; b++) t.at(p[a], p[b]) = all[i].at(a, b);
+				t.place_units(all[i], p);
 				if (!seen.insert(t.key()).second) continue;
 				if (all.size() > cap) { capped = true; break; }
 				all.push_back(std::move(t));
@@ -701,6 +815,14 @@ namespace
 		std::map<std::pair<int, int>, ivec> pair;
 		vec score_atom;             //leading eigenvalue of the undepleted block: the slot order
 		std::map<std::pair<int, int>, double> score_pair;
+		//k-centre units, owner {-2 - id, -2 - id}; enrolled serially before any build that needs them
+		std::map<ivec, int> unit_id;
+		std::vector<ivec> unit, unit_atoms;
+		vec score_unit;
+		const ivec& idx(const std::pair<int, int>& o) const
+		{
+			return o.first <= -2 ? unit[-2 - o.first] : o.first == o.second ? atom[o.first] : pair.at(o);
+		}
 	};
 
 	//V of a built candidate, the product build_orbitals formed
@@ -711,9 +833,9 @@ namespace
 		size_t p = 0;
 		for (int j = 0; j < k; j++) {
 			const std::pair<int, int>& o = c.owner[j];
-			if (o.first < 0) M(B.core[j], j) = c.Mp[p++];
+			if (o.first == -1) M(B.core[j], j) = c.Mp[p++];
 			else
-				for (const int i : o.first == o.second ? B.atom[o.first] : B.pair.at(o)) M(i, j) = c.Mp[p++];
+				for (const int i : B.idx(o)) M(i, j) = c.Mp[p++];
 		}
 		return M * c.wt.asDiagonal() * c.X;
 	}
@@ -737,9 +859,9 @@ namespace
 				if (!hit) { M.col(col).setZero(); hit = true; }
 				M(i - r0, col) = m;
 			};
-			if (o.first < 0) put(B.core[j]);
+			if (o.first == -1) put(B.core[j]);
 			else
-				for (const int i : o.first == o.second ? B.atom[o.first] : B.pair.at(o)) put(i);
+				for (const int i : B.idx(o)) put(i);
 			if (hit) used.push_back(j);
 		}
 		const int u = static_cast<int>(used.size());
@@ -751,11 +873,15 @@ namespace
 	//Orbitals of a prescribed topology by the NBO search's steps: greedy fill, self-consistency sweep,
 	//occupancy-weighted orthogonalisation.  The sweep is required: a greedy pass leaves each orbital
 	//biased by later ones and the residual stops distinguishing topologies.  Returns V, empty if infeasible
+	void project_simplex(VectorXd& w);
+
 	MatrixXd build_orbitals(Candidate& c, const MatrixXd& G0, const Blocks& B, const int max_sweeps, const bool keep = false,
 							const int stall = 0)
 	{
 		struct Slot { int a, b, mult; double score; };
 		std::vector<Slot> slots;
+		c.polarity.clear();  //approximate() then the full build both reach the end
+		c.unit_bo.clear();
 		for (int a = 0; a < c.topo.n; a++)
 			if (c.topo.at(a, a) > 0) slots.push_back({ a, a, c.topo.at(a, a), B.score_atom[a] });
 		for (int a = 0; a < c.topo.n; a++)
@@ -765,10 +891,16 @@ namespace
 					if (it == B.score_pair.end()) return {};   //not a bondable pair: infeasible
 					slots.push_back({ a, b, c.topo.at(a, b), it->second });
 				}
+		for (size_t q = 0; q < c.topo.mc.size(); q++) {
+			if (q && c.topo.mc[q] == c.topo.mc[q - 1]) { slots.back().mult++; continue; }
+			const auto it = B.unit_id.find(c.topo.mc[q]);
+			if (it == B.unit_id.end()) return {};
+			slots.push_back({ -2 - it->second, -2 - it->second, 1, B.score_unit[it->second] });
+		}
 		//Lone pairs first, as in the search: a bond slot filled earlier takes a metal d pair and keeps
 		//it at every sweep, leaving the ligand pair it should hold unclaimed
 		std::sort(slots.begin(), slots.end(), [](const Slot& x, const Slot& y) {
-			if ((x.a == x.b) != (y.a == y.b)) return x.a == x.b;
+			if ((x.a == x.b && x.a >= 0) != (y.a == y.b && y.a >= 0)) return x.a == x.b && x.a >= 0;
 			if (x.score != y.score) return x.score > y.score;
 			return std::tie(x.a, x.b) < std::tie(y.a, y.b);
 		});
@@ -801,7 +933,7 @@ namespace
 		bvec taken(given, false);
 		ivec open;
 		for (const Slot& sl : slots) {
-			const ivec& idx = (sl.a == sl.b) ? B.atom[sl.a] : B.pair.at({ sl.a, sl.b });
+			const ivec& idx = B.idx({ sl.a, sl.b });
 			if (static_cast<int>(idx.size()) < sl.mult) return {};
 			for (int m = 0; m < sl.mult; m++) {
 				int t = 0;
@@ -954,6 +1086,118 @@ namespace
 			else
 				for (const int i : *blk[j]) c.Mp.push_back(M(i, j));
 		MatrixXd V = orbitals(c, B, n);
+
+		//A k-centre unit needs every centre at >= 10 % in at least one of its orbitals (a 3c-4e nonbonding one has a
+		//node on the middle atom), as the NBO search does; else it is a 2c bond with a tail and the structure books a
+		//bond order the density does not carry (3C Ni-P-Li at 19 % weight on NiLiL0PhPMe3: Ni-Li 0.17, from nothing)
+		std::map<int, vec> held;
+		for (int j = first_valence; j < k; j++) {
+			if (owner[j].first > -2) continue;
+			const ivec& u = B.unit_atoms[-2 - owner[j].first];
+			vec& h = held[owner[j].first];
+			h.resize(u.size(), 0.0);
+			for (size_t t = 0; t < u.size(); t++) {
+				double w = 0.0;
+				for (const int i : B.atom[u[t]]) w += V(i, j) * V(i, j);
+				h[t] = std::max(h[t], w);
+			}
+		}
+		for (const auto& [id, h] : held)
+			if (*std::min_element(h.begin(), h.end()) < 0.10) return {};
+		//...and one hybrid per centre across its pairs, the k AOs that used() books: two pairs on B,H,H that need two
+		//B hybrids are the two B-H bonds restated (diborane's BH2 as 3c-4e took 85 % once copies stopped costing slots)
+		for (const auto& [id, h] : held) {
+			ivec cols;
+			for (int j = first_valence; j < k; j++) if (owner[j].first == id) cols.push_back(j);
+			const ivec& u = B.unit_atoms[-2 - id];
+			const int m = static_cast<int>(cols.size()), ku = static_cast<int>(u.size());
+			MatrixXd C(ku, m);  //row t: centre t's amplitude on its one hybrid in each pair
+			for (int t = 0; t < ku; t++) {
+				MatrixXd P(B.atom[u[t]].size(), m);
+				for (size_t r = 0; r < B.atom[u[t]].size(); r++)
+					for (int s = 0; s < m; s++) P(r, s) = V(B.atom[u[t]][r], cols[s]);
+				const Eigen::SelfAdjointEigenSolver<MatrixXd> es(P.transpose() * P);
+				if (m > 1 && es.eigenvalues()(m - 2) >= 0.10) return {};
+				C.row(t) = std::sqrt(std::max(es.eigenvalues()(m - 1), 0.0)) * es.eigenvectors().col(m - 1).transpose();
+			}
+			//bond order per edge: the unit as its two-centre Lewis assignments (its m pairs as lone pairs on, or bonds
+			//between bondable, centres, one hybrid each), weights >= 0 summing to 1 fitted to D = C C^T in the Frobenius
+			//norm as NRT fits structures.  An assigned bond counts 1 with polarity c_a^2 - c_b^2, so totals and the
+			//ionic split are on the two-centre scale: F-H-F 3c-4e = F- H-F <-> F-H F-.  The Wiberg index it replaces
+			//counted covalency only (Ni-P 0.13 on NiLiL0PhPMe3 4C against 0.22 two-centre, the ionic part lost).
+			//ponytail: a bond's c^2 from D's diagonal, not refitted per assignment
+			const MatrixXd D = C * C.transpose();
+			std::vector<std::vector<std::array<int, 2>>> lew;  //per assignment: {t, t} lone pair, {t, s} bond
+			std::vector<std::array<int, 2>> cur;
+			std::vector<char> busy(ku, 0);
+			const std::function<void(int)> walk = [&](const int t) {
+				if (static_cast<int>(cur.size()) == m) { lew.push_back(cur); return; }
+				if (t == ku) return;
+				if (busy[t]) { walk(t + 1); return; }
+				walk(t + 1);  //hybrid t empty
+				busy[t] = 1;
+				cur.push_back({ t, t });
+				walk(t + 1);
+				cur.pop_back();
+				for (int s = t + 1; s < ku; s++)
+					if (!busy[s] && B.score_pair.count({ std::min(u[t], u[s]), std::max(u[t], u[s]) })) {
+						busy[s] = 1;
+						cur.push_back({ t, s });
+						walk(t + 1);
+						cur.pop_back();
+						busy[s] = 0;
+					}
+				busy[t] = 0;
+			};
+			walk(0);
+			const int nl = static_cast<int>(lew.size());
+			std::vector<MatrixXd> gam(nl, MatrixXd::Zero(ku, ku));
+			for (int q = 0; q < nl; q++)
+				for (const auto& [t, s] : lew[q]) {
+					if (t == s) { gam[q](t, t) = 1.0; continue; }
+					const double ct = D(t, t) / std::max(D(t, t) + D(s, s), 1e-30);
+					gam[q](t, t) = ct;
+					gam[q](s, s) = 1.0 - ct;
+					gam[q](t, s) = gam[q](s, t) = std::copysign(std::sqrt(ct * (1.0 - ct)), D(t, s));
+				}
+			MatrixXd gg(nl, nl);
+			VectorXd gd(nl), wl = VectorXd::Constant(nl, 1.0 / nl);
+			for (int p = 0; p < nl; p++) {
+				gd(p) = (gam[p].array() * D.array()).sum();
+				for (int q = 0; q < nl; q++) gg(p, q) = (gam[p].array() * gam[q].array()).sum();
+			}
+			//projected gradient from the uniform start keeps equivalent assignments equal; ponytail: fixed 2000 steps
+			//of 1/(2 tr G) on a few dozen weights
+			for (int it = 0; it < 2000; it++) {
+				wl -= (gg * wl - gd) / std::max(gg.trace(), 1e-30);
+				project_simplex(wl);
+			}
+			for (int q = 0; q < nl; q++)
+				for (const auto& [t, s] : lew[q]) {
+					c.unit_bo.push_back({ static_cast<double>(u[t]), static_cast<double>(u[s]), wl(q) });
+					if (t != s) c.polarity.push_back({ static_cast<double>(u[t]), static_cast<double>(u[s]),
+														wl(q) * (2.0 * gam[q](t, t) - 1.0) });
+				}
+			if (m < 2) continue;
+			//irreducible: no split of the centres into m groups each carrying one direction (rank 1), else the pairs
+			//are disjoint bonds and lone pairs restated (4C B1-B2-H6-H7 = B1-H6 + B2-H7 cut diborane's D(w) 24 % on
+			//freedom alone).  F-H-F 3c-4e has no such split.  ponytail: brute force over m^k labels, k <= 4
+			ivec g(ku, 0);
+			for (int code = 0, all = static_cast<int>(std::pow(m, ku)); code < all; code++) {
+				for (int t = 0, c = code; t < ku; t++, c /= m) g[t] = c % m;
+				bool split = true;
+				for (int grp = 0; grp < m && split; grp++) {
+					ivec rows;
+					for (int t = 0; t < ku; t++) if (g[t] == grp) rows.push_back(t);
+					if (rows.empty()) { split = false; break; }
+					MatrixXd R(rows.size(), m);
+					for (size_t r = 0; r < rows.size(); r++) R.row(r) = C.row(rows[r]);
+					const VectorXd ev = Eigen::SelfAdjointEigenSolver<MatrixXd>(R.transpose() * R, Eigen::EigenvaluesOnly).eigenvalues();
+					split = ev(m - 2) < 0.10;
+				}
+				if (split) return {};
+			}
+		}
 
 		for (int j = first_valence; j < k; j++) {
 			if (owner[j].first == owner[j].second) continue;
@@ -1195,7 +1439,9 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 		for (int b = 0; b < na; b++)
 			if (b != a) parent.at(a, b) = lewis.topo[a][b];
 	}
-	nrt.parent_topo.push_back(NboTopo{ spin, parent.matrix() });
+	parent.mc = lewis.multi;
+	std::sort(parent.mc.begin(), parent.mc.end());
+	nrt.parent_topo.push_back(NboTopo{ spin, parent.matrix(), parent.mc });
 	const int n_pairs = parent.pairs();
 
 	Limits L;
@@ -1203,6 +1449,9 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 	L.ion = options.nrt_ion;
 	L.use_components = options.nrt_components;
 	L.shift_arrows = options.nrt_mirror;
+	L.units = options.max_centres > 2 || !parent.mc.empty();
+	L.max_centres = options.max_centres;
+	for (const ivec& u : parent.mc) L.max_centres = std::max(L.max_centres, static_cast<int>(u.size()));
 	L.deloc = delocalisation_graph(lewis, e2, options.nrt_e2_kcal, na, L.bondable);
 	L.comp = components(L.deloc);
 	L.dative.assign(na, bvec(na, false));
@@ -1334,7 +1583,18 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 			for (int b = 0; b < na; b++)
 				dist[a][b] = std::hypot((*xyz)[a][0] - (*xyz)[b][0], (*xyz)[a][1] - (*xyz)[b][1], (*xyz)[a][2] - (*xyz)[b][2]);
 	}
-	const std::vector<ivec> maps = options.nrt_symmetry && !options.nrt_exhaustive ? symmetry_maps(Z, L, xyz ? &dist : nullptr) : std::vector<ivec>();
+	const std::vector<ivec> maps = options.nrt_symmetry ? symmetry_maps(Z, L, xyz ? &dist : nullptr) : std::vector<ivec>();
+	//Caps equal over each atom orbit: the parent's hypervalent atom raised only its own, so images_of dropped every
+	//image that moves it (Ni(CO)4's Ni=C8 parent: no C6 image, Ni-C6 0.62 against 1.33, main_tm 24 Oct)
+	const auto even_caps = [&]() {
+		for (bool moved = true; moved;) {
+			moved = false;
+			for (const ivec& p : maps)
+				for (int a = 0; a < na; a++)
+					if (L.cap[p[a]] < L.cap[a]) { L.cap[p[a]] = L.cap[a]; moved = true; }
+		}
+	};
+	even_caps();
 	//the walk's budget can cut through a symmetry orbit; the images of what it kept complete it.  New means not seen,
 	//or under -nrt_mirror not a candidate: seen also holds the dropped intermediates
 	const auto listed = [&]() {
@@ -1360,16 +1620,7 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 				}
 		}
 	};
-	if (options.nrt_exhaustive) {
-		std::vector<Candidate> all;
-		enumerate(parent, L, n_pairs, static_cast<size_t>(budget), all);
-		for (Candidate& c : all)
-			if (seen.insert(c.topo.key()).second)
-				cands.push_back(std::move(c));
-		nrt.notes.push_back("exhaustive enumeration yields " + std::to_string(cands.size()) +
-							 " feasible topologies");
-	}
-	else {
+	{
 		for (Candidate& c : grow({ cands[0] }, static_cast<size_t>(budget), true))
 			cands.push_back(std::move(c));
 		nrt.notes.push_back("half-arrow intermediates dropped: " + std::to_string(intermediates) +
@@ -1419,6 +1670,22 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 			nrt.notes.push_back(std::to_string(cands.size() - before) + " symmetry image(s) complete the walk's orbits");
 		}
 	}
+	//-nrt_exhaustive adds the enumeration to the walk, so it is a superset of the default and cannot fit worse.  Alone it
+	//lost (benzene D(w) 0.092 vs 0.064, acetate 0.098 vs 0.076): the depth-first cap keeps the early slots only and the
+	//enumeration around the search parent misses what the -nrt_ref parent switches reach
+	if (options.nrt_exhaustive) {
+		std::vector<Candidate> all;
+		enumerate(parent, L, n_pairs, static_cast<size_t>(budget), all);
+		const bool cut = all.size() >= static_cast<size_t>(budget);
+		const size_t before = cands.size();
+		for (Candidate& c : all)
+			if (seen.insert(c.topo.key()).second)
+				cands.push_back(std::move(c));
+		if (cut) complete_orbits(before);
+		nrt.notes.push_back("exhaustive enumeration adds " + std::to_string(cands.size() - before) + " topologies" +
+							 (cut ? ", NOT exhaustive: it stopped at the " + std::to_string(budget) +
+										"-candidate budget (raise -nrt_max_candidates)" : ""));
+	}
 	double search_seconds = secs(t_search0, clock());
 
 	const auto t_gram0 = clock();
@@ -1451,6 +1718,20 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 			B.score_pair[{ a, b }] = leading_block(g_nocore, idx, v);
 			B.pair[{ a, b }] = std::move(idx);
 		}
+	//every k-centre unit of cands[from, end): serial, before the parallel builds read B
+	const auto enrol = [&](const size_t from) {
+		for (size_t i = from; i < cands.size(); i++)
+			for (const ivec& u : cands[i].topo.mc) {
+				if (B.unit_id.count(u)) continue;
+				ivec idx;
+				for (const int a : u) idx.insert(idx.end(), B.atom[a].begin(), B.atom[a].end());
+				VectorXd v;
+				B.score_unit.push_back(leading_block(g_nocore, idx, v));
+				B.unit_id[u] = static_cast<int>(B.unit.size());
+				B.unit.push_back(std::move(idx));
+				B.unit_atoms.push_back(u);
+			}
+	};
 
 	//the isometries in the NAO basis: an image of a built structure starts its sweeps from the source's vectors, rotated
 	std::vector<NaoGroup> groups;
@@ -1607,6 +1888,7 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 	};
 	for (int cycle = 1;;) {
 		const int nc0 = static_cast<int>(cands.size());
+		enrol(built);
 		//progress output only where a step takes long enough to watch; -no_date silences it
 		const bool show = !constants::hide_timings && nc0 >= 500;
 		std::optional<ProgressBar> pb;
@@ -1631,6 +1913,12 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 								for (int b = 0; b < na; b++)
 									if (inv) t.at(a, b) = cands[j].topo.at(p[a], p[b]);
 									else t.at(p[a], p[b]) = cands[j].topo.at(a, b);
+							if (inv) {
+								ivec q(na);
+								for (int a = 0; a < na; a++) q[p[a]] = a;
+								t.place_units(cands[j].topo, q);
+							}
+							else t.place_units(cands[j].topo, p);
 							const auto it = index.find(t.key());
 							if (it == index.end() || reached[it->second]) continue;
 							reached[it->second] = true;
@@ -1680,6 +1968,13 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 				c.owner = s.owner;
 				for (std::pair<int, int>& o : c.owner)
 					if (o.first >= 0) o = std::minmax(p[o.first], p[o.second]);
+					else if (o.first <= -2) {
+						ivec u = B.unit_atoms[-2 - o.first];
+						for (int& a : u) a = p[a];
+						std::sort(u.begin(), u.end());
+						const auto it = B.unit_id.find(u);
+						o = it == B.unit_id.end() ? std::make_pair(-1, -1) : std::make_pair(-2 - it->second, -2 - it->second);
+					}
 			}
 			const int nb = static_cast<int>(list.size());
 			if (show && nb >= 500)
@@ -1881,7 +2176,7 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 			if (options.nrt_target >= 0.0 && cycle > 1 && !ref_cycles)
 				nrt.notes.push_back("D(w) target " + std::to_string(options.nrt_target) + " reached after " +
 									 std::to_string(cycle) + " cycles, " + std::to_string(nc) + " structures");
-			if (options.nrt_exhaustive || options.nrt_ref <= 0.0) break;
+			if (options.nrt_ref <= 0.0) break;
 			t_cycle0 = clock();
 			//screened structures of the last walk first: refit with each round of admitted ones before new references
 			if (admit(ref_screen)) { screen_rounds++; continue; }
@@ -1898,6 +2193,7 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 						L.parent_electrons[a] = anchor.electrons(a);
 						L.cap[a] = std::max(L.cap[a], anchor.used(a));
 					}
+					even_caps();
 					switches++;
 					nrt.notes.push_back("-nrt_ref cycle " + std::to_string(ref_cycles + 1) + ": parent switched to " +
 										 change_string(anchor, parent, Z) + " of the search parent, weight " +
@@ -1933,6 +2229,7 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 				const size_t before = cands.size();
 				for (Candidate& c : grow(std::move(roots), room, false)) cands.push_back(std::move(c));
 				complete_orbits(before);
+				enrol(before);
 				const size_t fresh = cands.size() - before;
 				//-nrt_screen, 0 unless given: only structures whose approximate reduced cost says they lower D(w) are built
 				if (fresh >= static_cast<size_t>(options.nrt_screen_min)) {
@@ -2039,6 +2336,7 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 			const size_t before = cands.size();
 			for (Candidate& c : grow(std::move(roots), room, false)) cands.push_back(std::move(c));
 			complete_orbits(before);
+			enrol(before);
 			if (cands.size() == before) stop = "the weighted structures generate no new structure";
 			else if (options.nrt_screen >= 0.0 && cands.size() - before >= static_cast<size_t>(options.nrt_screen_min)) {
 				const int nw = static_cast<int>(cands.size() - before);
@@ -2275,10 +2573,40 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 		for (int a = 0; a < na; a++)
 			for (int b = a; b < na; b++)
 				bo[a][b] += unit * w(i) * cands[i].topo.at(a, b);
+		//k-centre units as their fitted two-centre Lewis assignments (build_orbitals)
+		for (const std::array<double, 3>& e : cands[i].unit_bo) {
+			const int a = static_cast<int>(e[0]), b = static_cast<int>(e[1]);
+			if (a == b || bondable[a][b]) bo[std::min(a, b)][std::max(a, b)] += unit * w(i) * e[2];
+		}
 		for (const std::array<double, 3>& p : cands[i].polarity) {
 			const int a = static_cast<int>(p[0]), b = static_cast<int>(p[1]);
 			pol[std::min(a, b)][std::max(a, b)] += unit * w(i) * std::abs(p[2]);
 		}
+	}
+	const auto pair_orbit = [&](const int a, const int b) {
+		std::set<std::pair<int, int>> orbit{ { a, b } };
+		std::vector<std::pair<int, int>> todo{ { a, b } };
+		while (!todo.empty()) {
+			const std::pair<int, int> q = todo.back();
+			todo.pop_back();
+			for (const ivec& p : maps) {
+				const std::pair<int, int> r{ std::min(p[q.first], p[q.second]), std::max(p[q.first], p[q.second]) };
+				if (orbit.insert(r).second) todo.push_back(r);
+			}
+		}
+		return orbit;
+	};
+	//Polarity averaged over each pair orbit: every structure fits its own orbitals, so equivalent bonds got different
+	//cov/ion splits (Cr(CO)6 cov 0.420-0.544 at equal totals, nrt_tm_reference 24 Oct)
+	if (!maps.empty()) {
+		const vec2 raw = pol;
+		for (int a = 0; a < na; a++)
+			for (int b = a + 1; b < na; b++) {
+				const std::set<std::pair<int, int>> orbit = pair_orbit(a, b);
+				double s = 0.0;
+				for (const std::pair<int, int>& q : orbit) s += raw[q.first][q.second];
+				pol[a][b] = s / static_cast<double>(orbit.size());
+			}
 	}
 
 	//Bond orders the near-optimal fits allow: f(w') >= f + sum_j w'_j r_j with reduced costs r_j >= 0, so within
@@ -2305,20 +2633,15 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 	std::map<std::pair<int, int>, std::pair<double, double>> ranges;
 	const auto bond_range = [&](const int a, const int b) {
 		//one bisection per pair orbit of the symmetry maps
-		std::set<std::pair<int, int>> orbit{ { a, b } };
-		std::vector<std::pair<int, int>> todo{ { a, b } };
-		while (!todo.empty()) {
-			const std::pair<int, int> q = todo.back();
-			todo.pop_back();
-			for (const ivec& p : maps) {
-				const std::pair<int, int> r{ std::min(p[q.first], p[q.second]), std::max(p[q.first], p[q.second]) };
-				if (orbit.insert(r).second) todo.push_back(r);
-			}
-		}
+		const std::set<std::pair<int, int>> orbit = pair_orbit(a, b);
 		const auto known = ranges.find(*orbit.begin());
 		if (known != ranges.end()) return known->second;
 		VectorXd t(nr);
-		for (int i = 0; i < nr; i++) t(i) = unit * cands[nearw[i]].topo.at(a, b);
+		for (int i = 0; i < nr; i++) {
+			t(i) = unit * cands[nearw[i]].topo.at(a, b);
+			for (const std::array<double, 3>& e : cands[nearw[i]].unit_bo)
+				if (std::minmax(static_cast<int>(e[0]), static_cast<int>(e[1])) == std::minmax(a, b)) t(i) += unit * e[2];
+		}
 		double ext[2];
 		for (int s = 0; s < 2; s++) {
 			VectorXd x = wn, best = wn;
@@ -2393,6 +2716,7 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 	const Topology& shown = cands[head].topo;
 	if (head != 0) {
 		nrt.parent_topo.back().matrix = shown.matrix();
+		nrt.parent_topo.back().multi = shown.mc;
 		nrt.notes.push_back("parent = the leading structure (" + std::to_string(100.0 * w(head)) + " %), " +
 							 change_string(shown, parent, Z) + " of the search parent (" + std::to_string(100.0 * w(0)) + " %)" +
 							 (switches ? ", walk anchor switched " + std::to_string(switches) + " time(s)" : std::string()));
@@ -2414,6 +2738,7 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 		c.rho_nl = cands[i].rho_nl;
 		c.spin = spin;
 		c.topo = cands[i].topo.matrix();
+		c.multi = cands[i].topo.mc;
 		nrt.candidates.push_back(c);
 	}
 	//every structure tied for the leading weight
@@ -2422,6 +2747,7 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 		NboTopo t;
 		t.spin = spin;
 		t.matrix = cands[order[r]].topo.matrix();
+		t.multi = cands[order[r]].topo.mc;
 		nrt.leading_topo.push_back(t);
 	}
 

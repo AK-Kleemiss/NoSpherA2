@@ -1443,12 +1443,13 @@ TEST(PropertiesBasinTests, MetalOuterCoreShellKeepsItsOwnBasins)
 	const double r = 0.72;
 	const double six[6][3] = { { r, 0, 0 }, { -r, 0, 0 }, { 0, r, 0 }, { 0, -r, 0 }, { 0, 0, r }, { 0, 0, -r } };
 	for (int k = 0; k < 6; k++) maxima.push_back(d4{ six[k][0], six[k][1], six[k][2], 1.414 + 0.0005 * k });
-	maxima.push_back(d4{ r + 0.25, 0.0, 0.0, 1.4130 });  // a grid duplicate 0.25 bohr off the first, folded
+	// two shell maxima never fold by distance, only by persistence along the field (none here): a grid duplicate
+	// 0.25 bohr off the first would stay, so the analytic maxima carry none
 	const int nb = static_cast<int>(maxima.size());
 	cubei basins({ nb, 1, 1 }, 0, true);
 	for (int b = 0; b < nb; b++) basins.set_value(b, 0, 0, b + 1);
 	EXPECT_EQ(unify_core_basins(basins, maxima, atoms), 1);
-	EXPECT_EQ(unify_shell_basins(basins, maxima, nullptr, 1.2, 0.05, &atoms), 1);
+	EXPECT_EQ(unify_shell_basins(basins, maxima, nullptr, 1.2, 0.05, &atoms), 0);
 	ASSERT_EQ(maxima.size(), 7u);
 	const svec labels = assign_labels_to_basins(maxima, std::vector<atom>{ atoms[0], atom("P", atomID(), 2, 4.2, 0.0, 0.0, 15) }, false, 1);
 	EXPECT_EQ(labels[0], "Ni0 core");

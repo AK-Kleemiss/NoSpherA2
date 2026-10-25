@@ -25,8 +25,8 @@ struct NboInput {
 
 //One accepted Lewis or non-Lewis orbital in the NAO basis.
 struct NboFunction {
-	ivec centers;                      //0-based atom indices, one or two
-	std::string type;                  //CR, LP, BD, BD*, LV, RY
+	ivec centers;                      //0-based atom indices, one to max_centres
+	std::string type;                  //CR, LP, BD, BD*, LV, RY; kC, kCn, kC* for k = 3, 4 (-nbo_centres)
 	int multiplicity = 1;              //sigma = 1, the second and third bond of a multiple bond
 	double occupancy = 0.0;
 	double energy = 0.0;
@@ -44,6 +44,7 @@ struct NboLewis {
 	double threshold = 0.0;            //occupancy threshold the ladder stopped at
 	//bond multiplicities of the leading Lewis structure, lone pairs (cores included) on the diagonal
 	ivec2 topo;
+	std::vector<ivec> multi;           //one sorted atom list per k-centre (k >= 3) Lewis orbital, outside topo
 	ivec printed;                      //printed NBO number k + 1 is orbitals[printed[k]]
 };
 
@@ -96,6 +97,20 @@ struct NboOptions {
 	//NBO's $CHOOSE: the search places exactly this Lewis structure, valence lone pairs on the diagonal and
 	//bond orders off it; empty = the search picks.  native_nbo fills it from nrt_parent.
 	ivec2 parent_lewis;
+	std::vector<ivec> parent_multi;    //its k-centre orbitals, sorted atom lists, one per pair
+	//-nbo_centres k: the ladder also places k'-centre two-electron bonds, 3 <= k' <= k (at most 4), over connected
+	//sets of bondable atoms, once one- and two-centre blocks fail at a threshold; kept only if every centre carries
+	//10 % of the orbital and the search without that unit loses 0.05 e of rho(NL); with -nrt_atoms every centre
+	//lies in that subspace. 2 = off
+	int max_centres = 2;
+	//-nbo_tm_pairs n: a d-block metal holds at most n Lewis pairs (lone pairs + bonds); 0 = its valence NAO count, 6 for
+	//ns + (n-1)d, NBO 7's footing. 9, the default, is the 18-electron space: under 6 Ni(CO)4 Ni-C is 0.64 and Fe(CO)5
+	//0.81/0.68, back-donation invisible; under 9 1.37 and 1.29/1.15 with a lower D(w) in 3 of 3 (Pt(PH3)2ZnCl2 Pt-P
+	//0.63 -> 1.03, D(w) 1.69 -> 1.50). The relax pass lifts the other atoms' caps first; a metal's only when nothing
+	//else fills the pairs, and the log says so. Before this the relax pass lifted every cap at once, so Cr(CO)6 got 9
+	//pairs, Pt(PH3)2AlCl3 7 and Ni(CO)4 6, M-L moving 2x (nrt_tm_reference validation, 24 Oct)
+	int tm_pairs = 9;
+	std::vector<ivec> skip_multi;      //k-centre sets the ladder may not place (the per-unit gate's leave-one-out)
 	//-nrt_e2_avg <percent>: E2 belongs to one Lewis structure; rerun search + E2 under $CHOOSE for every NRT
 	//structure degenerate with the leading one (weight within this many percent of it) and average the channels
 	//with the renormalised weights. 0 = off. A plain weight cut lets in high-rho(NL) structures whose E2 is
@@ -141,10 +156,11 @@ NboLewis nbo_search(const NAOResult& nao, const dMatrix2& gamma, const bvec2& bo
  * -nrt_parent: read a "NoSpherA2 Lewis structure" JSON, or the "parent_lewis" object of a .native.nbo.json,
  * into topo (valence lone pairs on the diagonal, bond orders off it).  n_pairs counts the core pairs too;
  * wavefunction is the file name the structure is checked against.  Returns "" or the one-line reason it is
- * refused; warnings go to log.
+ * refused; warnings go to log.  multi: where "multi_centre" / "three_centre" units go; null refuses them.
  */
 std::string read_lewis_structure(const std::filesystem::path& file, const NAOResult& nao, int n_pairs,
-								 const std::string& wavefunction, ivec2& topo, std::ostream& log);
+								 const std::string& wavefunction, ivec2& topo, std::ostream& log,
+								 std::vector<ivec>* multi = nullptr);
 
 /** Second-order donor-acceptor energies.  Fills the orbital energies, the NBO-basis Fock diagonal, into lewis. */
 std::vector<NboE2Entry> nbo_e2(NboLewis& lewis, const dMatrix2& fock_nao, double threshold_kcal);

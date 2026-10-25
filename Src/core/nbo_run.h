@@ -117,6 +117,7 @@ struct NboNrtCycle {
 struct NboTopo {
 	std::string spin;
 	std::vector<std::vector<int>> matrix;
+	std::vector<std::vector<int>> multi;  //0-based sorted atoms of each k-centre unit (-nbo_centres), outside matrix
 };
 
 //A candidate resonance structure, printed only under NRTDTL: everything examined, not only what survived.
@@ -126,6 +127,7 @@ struct NboNrtCandidate {
 	double rho_nl = 0.0;
 	std::string spin;
 	std::vector<std::vector<int>> topo;
+	std::vector<std::vector<int>> multi;  //as NboTopo::multi
 };
 
 //One step of the QP minimisation, printed only under NRTDTL.
@@ -188,6 +190,8 @@ struct NboE2Channel {
 	std::string donor, acceptor;  //"LP Pd1", "BD* Pd1-P6"
 	double mean_kcal = 0.0;       //weighted mean, 0 in structures without the channel
 	double min_kcal = 0.0, max_kcal = 0.0;
+	double mean_e = 0.0;          //electrons moved, E2/dE summed over the channel's entries, same weights
+	double min_e = 0.0, max_e = 0.0;
 	double present = 0.0;         //renormalised weight of the structures that have it
 };
 

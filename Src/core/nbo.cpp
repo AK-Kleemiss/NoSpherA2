@@ -383,6 +383,33 @@ namespace {
 	};
 }
 
+//Every structure that moves a lone pair on a along an alternating path a-x=y-...-b onto a bond to b, which has
+//a vacancy: LP(a) -> a=x, x=y -> x-y, ..., the last atom gains a bond to b. t is valence-only (no cores on the
+//diagonal), sigma is the bond graph, at most max_pi pi bonds are shifted.
+static void alternating_shifts(ivec2& t, const ivec2& sigma, const bvec& vacant, const int cur, const int max_pi,
+							   bvec& seen, std::vector<ivec2>& out)
+{
+	const int n = static_cast<int>(t.size());
+	for (int x = 0; x < n; x++) {
+		if (seen[x] || sigma[cur][x] < 1) continue;
+		if (vacant[x]) {
+			ivec2 u = t;
+			u[cur][x]++;
+			u[x][cur]++;
+			out.push_back(u);
+		}
+		if (max_pi == 0) continue;
+		for (int y = 0; y < n; y++) {
+			if (seen[y] || y == x || t[x][y] < 2) continue;
+			t[cur][x]++; t[x][cur]++; t[x][y]--; t[y][x]--;
+			seen[x] = seen[y] = true;
+			alternating_shifts(t, sigma, vacant, y, max_pi - 1, seen, out);
+			seen[x] = seen[y] = false;
+			t[cur][x]--; t[x][cur]--; t[x][y]++; t[y][x]++;
+		}
+	}
+}
+
 NboLewis nbo_search(const NAOResult& nao, const dMatrix2& gamma, const bvec2& bondable,
 					const int n_pairs, const double scale, const NboOptions& options, std::ostream& log)
 {
@@ -438,12 +465,66 @@ NboLewis nbo_search(const NAOResult& nao, const dMatrix2& gamma, const bvec2& bo
 	ivec used(natoms, 0);
 	ivec cap(natoms, 0);
 	for (int a = 0; a < natoms; a++) cap[a] = static_cast<int>(idx[a].valence.size());
+	//d-block metals: their cap is -nbo_tm_pairs and the first relax pass keeps it. Only with -nbo_tm_pairs: holding
+	//the default (valence NAO) metal cap while the ligands' caps lift booked Ni(CO)4's d pairs as three Ni-C "bonds"
+	//97 % on Ni (NBO 7: one dative Ni-C and five d lone pairs)
+	std::vector<char> tm(natoms, 0);
+	for (int a = 0; a < natoms; a++) {
+		const int z = nao.atoms[a].Z;
+		tm[a] = (z >= 21 && z <= 30) || (z >= 39 && z <= 48) || z == 57 || (z >= 72 && z <= 80) || z == 89 || (z >= 104 && z <= 112);
+		if (tm[a] && options.tm_pairs > 0) cap[a] = options.tm_pairs;
+	}
+	const bool any_tm = options.tm_pairs > 0 && std::any_of(tm.begin(), tm.end(), [](const char c) { return c != 0; });
 	//$CHOOSE: the ladder only looks at blocks the chosen structure still lacks, so fed its own structure
 	//it accepts the same orbitals in the same order
 	ivec2 want = options.parent_lewis;
+	std::vector<ivec> want_multi = options.parent_multi;
 	const bool chosen = !want.empty();
+	//-nbo_centres: connected sets of 3..max_centres atoms over the bondable graph (a chain or a ring through each
+	//member), searched only where one- and two-centre blocks fail; under $CHOOSE only the chosen sets
+	std::vector<ivec> msets;
+	{
+		std::set<ivec> sets;
+		if (chosen) sets.insert(want_multi.begin(), want_multi.end());
+		else if (options.max_centres > 2) {
+			const auto bonded = [&](const int a, const int b) { return a != b && (bondable.empty() || bondable[a][b]); };
+			for (int b = 0; b < natoms; b++)
+				for (int a = 0; a < natoms; a++)
+					for (int c = a + 1; c < natoms; c++)
+						if (bonded(a, b) && bonded(b, c) && !idx[a].valence.empty() && !idx[b].valence.empty() &&
+							!idx[c].valence.empty()) {
+							ivec s{ a, b, c };
+							std::sort(s.begin(), s.end());
+							sets.insert(s);
+						}
+			for (int k = 4; k <= std::min(options.max_centres, 4); k++) {
+				std::set<ivec> grown;
+				for (const ivec& s : sets) {
+					if (static_cast<int>(s.size()) != k - 1) continue;
+					for (int x = 0; x < natoms; x++) {
+						if (idx[x].valence.empty() || std::count(s.begin(), s.end(), x)) continue;
+						if (std::none_of(s.begin(), s.end(), [&](const int a) { return bonded(a, x); })) continue;
+						ivec t = s;
+						t.push_back(x);
+						std::sort(t.begin(), t.end());
+						grown.insert(t);
+					}
+				}
+				sets.insert(grown.begin(), grown.end());
+			}
+			for (const ivec& s : options.skip_multi) sets.erase(s);
+			//-nrt_atoms: every centre inside the subspace, else ligand ring pi reads as allyl-type 3c units that do
+			//pay their 0.05 e (18 of them, all C-C-C / N-C-C, on NiLi_Empty)
+			const ivec& sub = options.nrt_subspace;
+			if (!sub.empty())
+				std::erase_if(sets, [&](const ivec& s) {
+					return std::any_of(s.begin(), s.end(), [&](const int a) { return std::find(sub.begin(), sub.end(), a + 1) == sub.end(); });
+				});
+		}
+		msets.assign(sets.begin(), sets.end());
+	}
 	if (chosen) {
-		int total = static_cast<int>(res.orbitals.size());
+		int total = static_cast<int>(res.orbitals.size() + want_multi.size());
 		for (int a = 0; a < natoms && a < static_cast<int>(want.size()); a++)
 			for (int b = a; b < natoms; b++) total += want[a][b];
 		err_checkf(static_cast<int>(want.size()) == natoms && total == n_pairs,
@@ -451,8 +532,12 @@ NboLewis nbo_search(const NAOResult& nao, const dMatrix2& gamma, const bvec2& bo
 				   std::to_string(want.size()) + " atoms, this density " + std::to_string(n_pairs) +
 				   " over " + std::to_string(natoms), log);
 	}
-	for (int relax = 0; relax < 2; relax++) {
+	//relax 0: every cap; 1: main-group caps lifted; 2: metal caps too, logged
+	int relax = 0;
+	const auto full = [&](const int a) { return used[a] >= cap[a] && (relax == 0 || (relax == 1 && any_tm && tm[a])); };
+	for (; relax < 3; relax++) {
 	  if (relax && static_cast<int>(res.orbitals.size()) >= n_pairs) break;
+	  if (relax == 2 && !any_tm) break;
 	  for (const double t0 : ladder) {
 		const double t = std::min(t0, options.occupancy_threshold) * scale / 2.0;
 		bool progress = true;
@@ -465,7 +550,7 @@ NboLewis nbo_search(const NAOResult& nao, const dMatrix2& gamma, const bvec2& bo
 #pragma omp parallel for schedule(dynamic) num_threads(nthreads)
 			for (int a = 0; a < natoms; a++) {
 				if (idx[a].valence.empty()) continue;
-				if (!relax && used[a] >= cap[a]) continue;
+				if (full(a)) continue;
 				if (chosen && want[a][a] == 0) continue;
 				lam1[a] = leading_block(G, idx[a].all, cand1[a]);
 				have1[a] = 1;
@@ -494,10 +579,10 @@ NboLewis nbo_search(const NAOResult& nao, const dMatrix2& gamma, const bvec2& bo
 			ivec2 plist;
 			for (int a = 0; a < natoms; a++) {
 				if (idx[a].valence.empty()) continue;
-				if (!relax && used[a] >= cap[a]) continue;
+				if (full(a)) continue;
 				for (int b = a + 1; b < natoms; b++) {
 					if (idx[b].valence.empty()) continue;
-					if (!relax && used[b] >= cap[b]) continue;
+					if (full(b)) continue;
 					if (chosen ? want[a][b] == 0 : !bondable.empty() && !bondable[a][b]) continue;
 					plist.push_back({ a, b });
 				}
@@ -534,11 +619,51 @@ NboLewis nbo_search(const NAOResult& nao, const dMatrix2& gamma, const bvec2& bo
 				used[pb]++;
 				res.threshold = t;
 				progress = true;
+				continue;
+			}
+			//k-centre blocks: a superset of a failed pair always scores higher, so every centre must hold
+			//10 % of the orbital or a bond with a tail would pass as a three-centre bond
+			std::vector<const ivec*> mlist;
+			for (const ivec& s : msets) {
+				if (std::any_of(s.begin(), s.end(), full)) continue;
+				if (chosen && std::find(want_multi.begin(), want_multi.end(), s) == want_multi.end()) continue;
+				mlist.push_back(&s);
+			}
+			const int nm = static_cast<int>(mlist.size());
+			vec lamm(nm, 0.0);
+			std::vector<VectorXd> candm(nm);
+#pragma omp parallel for schedule(dynamic) num_threads(nthreads)
+			for (int c = 0; c < nm; c++) {
+				ivec block;
+				for (const int a : *mlist[c]) block.insert(block.end(), idx[a].all.begin(), idx[a].all.end());
+				lamm[c] = leading_block(G, block, candm[c]);
+			}
+			double bestm = t;
+			int pm = -1;
+			for (int c = 0; c < nm; c++) {
+				if (lamm[c] <= bestm) continue;
+				if (std::any_of(mlist[c]->begin(), mlist[c]->end(), [&](const int a) { return weight_on(candm[c], idx[a].all) < 0.10; })) continue;
+				bestm = lamm[c];
+				pm = c;
+			}
+			if (pm >= 0) {
+				const ivec& s = *mlist[pm];
+				accept(candm[pm], std::to_string(s.size()) + "C", s);
+				res.multi.push_back(s);
+				if (chosen) want_multi.erase(std::find(want_multi.begin(), want_multi.end(), s));
+				for (const int a : s) used[a]++;
+				res.threshold = t;
+				progress = true;
 			}
 		}
 		if (static_cast<int>(res.orbitals.size()) >= n_pairs) break;
 	  }
 	}
+	for (int a = 0; a < natoms; a++)
+		if (tm[a] && used[a] > cap[a])
+			log << "NBO: " << constants::atnr2letter(nao.atoms[a].Z) << a + 1 << " holds " << used[a] << " Lewis pairs, above its "
+				<< cap[a] << ": no other placement filled the " << n_pairs << " pairs. Its bond orders are on a wider valence "
+				<< "space than the other metals'; compare -nbo_tm_pairs runs" << std::endl;
 	//What thresholds, the minority floor and the caps left of a chosen structure (a dative bond, a lone
 	//pair in a Rydberg-heavy block), best block first; the count check above ends the loop.
 	while (chosen && static_cast<int>(res.orbitals.size()) < n_pairs) {
@@ -554,6 +679,20 @@ NboLewis nbo_search(const NAOResult& nao, const dMatrix2& gamma, const bvec2& bo
 				const double lam = leading_block(G, block, v);
 				if (lam > best) { best = lam; bv = v; ba = a; bb = b; }
 			}
+		int bm = -1;
+		for (int c = 0; c < static_cast<int>(want_multi.size()); c++) {
+			ivec block;
+			for (const int a : want_multi[c]) block.insert(block.end(), idx[a].all.begin(), idx[a].all.end());
+			VectorXd v;
+			const double lam = leading_block(G, block, v);
+			if (lam > best) { best = lam; bv = v; bm = c; }
+		}
+		if (bm >= 0) {
+			accept(bv, std::to_string(want_multi[bm].size()) + "C", want_multi[bm]);
+			res.multi.push_back(want_multi[bm]);
+			want_multi.erase(want_multi.begin() + bm);
+			continue;
+		}
 		accept(bv, ba == bb ? "LP" : "BD", ba == bb ? ivec{ ba } : ivec{ ba, bb });
 		res.topo[ba][bb]++;
 		want[ba][bb]--;
@@ -712,6 +851,43 @@ NboLewis nbo_search(const NAOResult& nao, const dMatrix2& gamma, const bvec2& bo
 		A = A * sym_power(MatrixXd(A.transpose() * A), -0.5);
 		for (size_t j = 0; j < non_lewis.size(); j++) non_lewis[j] = A.col(static_cast<int>(j));
 	}
+	//A k-centre bond sum_i c_i h_i leaves k - 1 combinations of its own hybrids. Without what is already placed
+	//(Lewis, antibonds, earlier units: two units on one set share hybrids), G0 diagonalised in them: the least
+	//occupied is kC*, the rest kCn.  ponytail: sequential, not symmetric like the antibonds; order = Lewis order
+	for (int j = 0; j < res.n_lewis; j++) {
+		const ivec& cs = res.orbitals[j].centers;
+		const int k = static_cast<int>(cs.size());
+		if (k < 3) continue;
+		MatrixXd H = MatrixXd::Zero(n, k);
+		VectorXd c(k);
+		for (int i = 0; i < k; i++) {
+			for (const int x : idx[cs[i]].all) H(x, i) = vectors[j](x);
+			c(i) = H.col(i).norm();
+			if (c(i) > 1e-12) H.col(i) /= c(i);
+		}
+		Eigen::SelfAdjointEigenSolver<MatrixXd> pc(MatrixXd(MatrixXd::Identity(k, k) - c * c.transpose() / c.squaredNorm()));
+		MatrixXd A = H * pc.eigenvectors().rightCols(k - 1);
+		MatrixXd P(n, res.n_lewis + static_cast<int>(non_lewis.size()));
+		for (int q = 0; q < res.n_lewis; q++) P.col(q) = vectors[q];
+		for (size_t q = 0; q < non_lewis.size(); q++) P.col(res.n_lewis + static_cast<int>(q)) = non_lewis[q];
+		A -= P * (P.transpose() * A);
+		Eigen::SelfAdjointEigenSolver<MatrixXd> sa(MatrixXd(A.transpose() * A));
+		ivec keep;
+		for (int q = 0; q < k - 1; q++)
+			if (sa.eigenvalues()(q) > 1e-6) keep.push_back(q);
+		if (keep.empty()) continue;
+		MatrixXd B(n, static_cast<int>(keep.size()));
+		for (size_t q = 0; q < keep.size(); q++)
+			B.col(static_cast<int>(q)) = A * sa.eigenvectors().col(keep[q]) / std::sqrt(sa.eigenvalues()(keep[q]));
+		Eigen::SelfAdjointEigenSolver<MatrixXd> eo(MatrixXd(B.transpose() * G0 * B));
+		for (int q = static_cast<int>(keep.size()) - 1; q >= 0; q--) {
+			NboFunction f;
+			f.type = std::to_string(k) + (q ? "Cn" : "C*");
+			f.centers = cs;
+			non_lewis.push_back(B * eo.eigenvectors().col(q));
+			non_lewis_fn.push_back(f);
+		}
+	}
 	p_anti = prof.lap();
 
 	//Project the Rydberg space out of the Lewis and antibond subspaces.
@@ -830,6 +1006,87 @@ NboLewis nbo_search(const NAOResult& nao, const dMatrix2& gamma, const bvec2& bo
 				log << " " << i << ":" << ch_trace[i];
 		log << std::endl;
 	}
+	//The ladder is greedy: in a six-ring it can take two pi bonds that leave the third pi pair on two atoms that
+	//are not neighbours, a half-filled LP on one and a half-filled LV on the other (a mis-paired Kekule structure;
+	//E2 between them then moves more than one electron). Shift the pair along an alternating path onto a bond to
+	//the vacancy under $CHOOSE and keep the lowest rho(NL), the search's own criterion. Each kept step lowers
+	//rho(NL), so the loop ends.
+	while (!chosen) {
+		bvec half_lp(natoms, false), half_lv(natoms, false);
+		for (const NboFunction& f : res.orbitals) {
+			if (f.type == "LP" && f.occupancy < 0.6 * scale) half_lp[f.centers[0]] = true;
+			if (f.type == "LV" && f.occupancy > 0.3 * scale) half_lv[f.centers[0]] = true;
+		}
+		ivec2 base = res.topo;
+		for (int a = 0; a < natoms; a++) base[a][a] -= static_cast<int>(idx[a].core.size());
+		std::vector<ivec2> tries;
+		for (int a = 0; a < natoms; a++) {
+			if (!half_lp[a]) continue;
+			base[a][a]--;
+			bvec seen(natoms, false);
+			seen[a] = true;
+			alternating_shifts(base, res.topo, half_lv, a, 3, seen, tries);
+			base[a][a]++;
+		}
+		std::sort(tries.begin(), tries.end());
+		tries.erase(std::unique(tries.begin(), tries.end()), tries.end());
+		NboLewis best;
+		best.rho_nl = res.rho_nl - 1e-4;
+		bool found = false;
+		for (const ivec2& t : tries) {
+			NboOptions o = options;
+			o.parent_lewis = t;
+			o.parent_multi = res.multi;
+			std::ostringstream quiet;
+			NboLewis r = nbo_search(nao, gamma, bondable, n_pairs, scale, o, quiet);
+			if (r.rho_nl < best.rho_nl) { best = std::move(r); found = true; }
+		}
+		if (!found) break;
+		log << "NBO search: a half-filled lone pair and vacancy re-paired along an alternating path, rho(NL) "
+			<< std::fixed << std::setprecision(5) << res.rho_nl << " -> " << best.rho_nl << " e ("
+			<< tries.size() << " shifts tried)" << std::defaultfloat << std::endl;
+		res = std::move(best);
+	}
+	//-nbo_centres: every k-centre unit pays for itself, the search without it (leave-one-out) loses 0.05 e of
+	//rho(NL), else a delocalised 2c bond (BD + E2) or a slice of a ring pi system reads as a fake 3c unit.  A unit
+	//the re-search swaps in for a dropped one is tested in turn.  The inner searches carry skip_multi, so they do
+	//not gate again.  The 10 % per centre also holds for the final orbital: the ladder checks it on the block
+	//eigenvector, and orthogonalisation turned Ni-P-P units into a P->Ni bond with 0.4 % on the second P (NiZn,
+	//PdZn, PdLi MeCN).  ponytail: one search per unit tested, greedy in list order
+	if (!chosen && options.max_centres > 2 && options.skip_multi.empty() && !res.multi.empty()) {
+		const double need = 0.05 * (scale / 2.0);
+		const double rho_all = res.rho_nl;
+		NboOptions o = options;
+		std::set<ivec> tested;
+		//per centre the best of the unit's orbitals: a 3c-4e nonbonding orbital has a node on the middle atom
+		const auto thin = [&](const ivec& u) {
+			vec h(u.size(), 0.0);
+			for (int j = 0; j < res.n_lewis; j++) {
+				const NboFunction& f = res.orbitals[j];
+				if (f.centers != u) continue;
+				for (size_t t = 0; t < h.size() && t < f.center_weight.size(); t++) h[t] = std::max(h[t], f.center_weight[t]);
+			}
+			return *std::min_element(h.begin(), h.end()) < 0.10;
+		};
+		for (bool again = true; again;) {
+			again = false;
+			for (const ivec& u : std::vector<ivec>(res.multi)) {
+				if (!tested.insert(u).second) continue;
+				o.skip_multi.push_back(u);
+				std::ostringstream quiet;
+				NboLewis r = nbo_search(nao, gamma, bondable, n_pairs, scale, o, quiet);
+				if (thin(u) || r.rho_nl - res.rho_nl < need) {
+					res = std::move(r);
+					again = true;
+					break;
+				}
+				o.skip_multi.pop_back();
+			}
+		}
+		log << "NBO search: " << tested.size() << " k-centre unit(s) tested, " << res.multi.size()
+			<< " kept (each costs >= " << need << " e of rho(NL) when left out, 10 % on every centre), rho(NL) " << std::fixed
+			<< std::setprecision(5) << rho_all << " -> " << res.rho_nl << " e" << std::defaultfloat << std::endl;
+	}
 	return res;
 }
 
@@ -918,7 +1175,15 @@ namespace
 		//Rydberg pivots, Eigen eigensolves), so the structures, which share nothing, are the parallel axis.
 		const int ns = static_cast<int>(picked.size());
 		avg.rho_nl.assign(ns, 0.0);
-		std::vector<std::vector<std::pair<std::pair<std::string, std::string>, double>>> found(ns);
+		//per entry {kcal, electrons}: second order moves q_i (F_ij/dE)^2 = E2/dE into the acceptor, which diverges as
+		//dE -> 0 (a 2 kcal/mol pair read as 2000 e); the 2x2 mixing q_i sin^2(theta) = q_i (1 - |dE|/sqrt(dE^2 + 4F^2))/2
+		//has the same small-F limit and stops at half the donor
+		const auto moved = [](const NboE2Entry& e) {
+			if (e.fij == 0.0) return 0.0;
+			const double occ = e.energy_kcal / constants::kcal_mol_per_hartree * std::abs(e.e_diff) / (e.fij * e.fij);
+			return 0.5 * occ * (1.0 - std::abs(e.e_diff) / std::sqrt(e.e_diff * e.e_diff + 4.0 * e.fij * e.fij));
+		};
+		std::vector<std::vector<std::pair<std::pair<std::string, std::string>, std::pair<double, double>>>> found(ns);
 #ifdef _OPENMP
 		const int nthreads = std::min(ns, options.threads > 0 ? options.threads : omp_get_max_threads());
 #endif
@@ -926,30 +1191,38 @@ namespace
 		for (int s = 0; s < ns; s++) {
 			NboOptions chosen = options;
 			chosen.parent_lewis = picked[s]->topo;
+			chosen.parent_multi = picked[s]->multi;
 			chosen.search_threads = 1;
 			std::ostringstream quiet;
 			NboLewis lewis = nbo_search(nao, gamma, bondable, n_pairs, scale, chosen, quiet);
 			avg.rho_nl[s] = lewis.rho_nl;
 			for (const NboE2Entry& e : nbo_e2(lewis, fock_nao, options.e2_threshold_kcal))
 				found[s].push_back({ { key(lewis.orbitals[e.donor_index - 1]), key(lewis.orbitals[e.acceptor_index - 1]) },
-									 e.energy_kcal });
+									 { e.energy_kcal, moved(e) } });
 		}
-		//per channel, the summed E2 of each structure
-		std::map<std::pair<std::string, std::string>, vec> sums;
+		//per channel, the summed E2 and electrons of each structure
+		std::map<std::pair<std::string, std::string>, std::pair<vec, vec>> sums;
 		for (int s = 0; s < ns; s++)
 			for (const auto& [k, e] : found[s]) {
-				vec& v = sums[k];
+				auto& [v, q] = sums[k];
 				v.resize(ns, 0.0);
-				v[s] += e;
+				q.resize(ns, 0.0);
+				v[s] += e.first;
+				q[s] += e.second;
 			}
-		for (const auto& [k, v] : sums) {
+		for (const auto& [k, vq] : sums) {
+			const vec& v = vq.first;
+			const vec& q = vq.second;
 			NboE2Channel c;
 			c.donor = k.first;
 			c.acceptor = k.second;
 			c.min_kcal = *std::min_element(v.begin(), v.end());
 			c.max_kcal = *std::max_element(v.begin(), v.end());
+			c.min_e = *std::min_element(q.begin(), q.end());
+			c.max_e = *std::max_element(q.begin(), q.end());
 			for (size_t s = 0; s < v.size(); s++) {
 				c.mean_kcal += avg.weights[s] * v[s];
+				c.mean_e += avg.weights[s] * q[s];
 				if (v[s] > 0.0) c.present += avg.weights[s];
 			}
 			avg.channels.push_back(c);
@@ -979,6 +1252,7 @@ namespace
 			//the free search once more, so the log can say what the chosen structure costs
 			NboOptions free = options;
 			free.parent_lewis.clear();
+			free.parent_multi.clear();
 			std::ostringstream quiet;
 			const NboLewis own = nbo_search(nao, gamma, bondable, n_pairs, scale, free, quiet);
 			std::string diff;
@@ -1015,7 +1289,7 @@ namespace
 
 		//NBO numbers by type group: the Lewis set in found order, then LV, BD*, RY
 		ivec order;
-		static const char* groups[] = { "CR", "LP", "BD", "LV", "BD*", "RY" };
+		static const char* groups[] = { "CR", "LP", "BD", "3C", "4C", "LV", "BD*", "3Cn", "4Cn", "3C*", "4C*", "RY" };
 		for (const char* g : groups)
 			for (size_t j = 0; j < lewis.orbitals.size(); j++)
 				if (lewis.orbitals[j].type == g) order.push_back(static_cast<int>(j));
@@ -1097,7 +1371,7 @@ namespace
 }
 
 std::string read_lewis_structure(const std::filesystem::path& file, const NAOResult& nao, const int n_pairs,
-								 const std::string& wavefunction, ivec2& topo, std::ostream& log)
+								 const std::string& wavefunction, ivec2& topo, std::ostream& log, std::vector<ivec>* multi)
 {
 	using nlohmann::json;
 	std::ifstream in(file);
@@ -1114,7 +1388,7 @@ std::string read_lewis_structure(const std::filesystem::path& file, const NAORes
 	if (!j.is_object()) return "expected a JSON object with \"lone_pairs\" and \"bonds\"";
 	for (const auto& [key, value] : j.items()) {
 		static const std::set<std::string> known = { "format", "version", "wavefunction", "atoms", "lone_pairs",
-													 "bonds", "three_centre", "alpha", "beta" };
+													 "bonds", "three_centre", "multi_centre", "alpha", "beta" };
 		if (!known.count(key)) return "unknown key \"" + key + "\"";
 	}
 	if (j.contains("format") && j["format"] != "NoSpherA2 Lewis structure")
@@ -1123,8 +1397,9 @@ std::string read_lewis_structure(const std::filesystem::path& file, const NAORes
 		return "\"version\" " + j["version"].dump() + " is not 1, the only version this build reads";
 	if (j.contains("alpha") || j.contains("beta"))
 		return "per-spin \"alpha\"/\"beta\" structures are not supported: -nrt_parent takes a closed-shell wavefunction";
-	if (j.contains("three_centre") && !(j["three_centre"].is_array() && j["three_centre"].empty()))
-		return "\"three_centre\" bonds are not supported: the search places one- and two-centre orbitals only";
+	for (const char* k : { "three_centre", "multi_centre" })
+		if (!multi && j.contains(k) && !(j[k].is_array() && j[k].empty()))
+			return std::string("\"") + k + "\" bonds are not supported here: the caller places one- and two-centre orbitals only";
 	const int na = static_cast<int>(nao.atoms.size());
 	if (j.contains("atoms") && !(j["atoms"].is_number_integer() && j["atoms"].get<int>() == na))
 		return "\"atoms\" is " + j["atoms"].dump() + ", the wavefunction has " + std::to_string(na);
@@ -1178,7 +1453,26 @@ std::string read_lewis_structure(const std::filesystem::path& file, const NAORes
 			topo[x][y] = topo[y][x] = b[2].get<int>();
 		}
 	}
-	int lps = 0, bonds = 0, cores = 0;
+	//one electron pair per unit over 3 or 4 atoms; "three_centre" is the older name of the same list
+	if (multi) multi->clear();
+	for (const char* k : { "three_centre", "multi_centre" }) {
+		if (!multi || !j.contains(k)) continue;
+		if (!j[k].is_array()) return std::string("\"") + k + "\" must be an array of [A, B, C(, D)]";
+		for (const json& u : j[k]) {
+			if (!u.is_array() || u.size() < 3 || u.size() > 4) return "unit " + u.dump() + " is not [A, B, C(, D)]";
+			ivec s;
+			for (const json& x : u) {
+				int a = -1;
+				const std::string why = atom_of(x, a);
+				if (!why.empty()) return "unit " + u.dump() + ": " + why;
+				s.push_back(a);
+			}
+			std::sort(s.begin(), s.end());
+			if (std::adjacent_find(s.begin(), s.end()) != s.end()) return "unit " + u.dump() + " names an atom twice";
+			multi->push_back(s);
+		}
+	}
+	int lps = 0, bonds = multi ? static_cast<int>(multi->size()) : 0, cores = 0;
 	for (int a = 0; a < na; a++) {
 		lps += topo[a][a];
 		for (int b = a + 1; b < na; b++) bonds += topo[a][b];
@@ -1258,7 +1552,8 @@ NboResults native_nbo(WFN& wavy, const NboOptions& options, std::ostream& log, N
 		NboOptions chosen = options;
 		if (!options.nrt_parent.empty()) {
 			const std::string why = read_lewis_structure(options.nrt_parent, nao, n_pairs,
-														 wavy.get_path().filename().string(), chosen.parent_lewis, log);
+														 wavy.get_path().filename().string(), chosen.parent_lewis, log,
+														 &chosen.parent_multi);
 			err_checkf(why.empty(), "-nrt_parent " + options.nrt_parent.string() + ": " + why, log);
 			//NRT rebuilds the parent's orbitals over its own bondable pairs and cannot place one outside them
 			for (size_t a = 0; a < atoms.size() && options.nrt; a++)
@@ -1583,10 +1878,11 @@ void print_nbo(const NboResults& r, std::ostream& out)
 			out << "  structure " << setw(3) << a.structures[i] << "  weight " << setprecision(4) << setw(7) << a.weights[i]
 				<< "  rho(NL) " << setprecision(5) << a.rho_nl[i] << "\n";
 		out << "  " << left << setw(21) << "donor" << setw(21) << "acceptor" << right << setw(10) << "<E(2)>"
-			<< setw(9) << "min" << setw(9) << "max" << setw(9) << "present" << "\n";
+			<< setw(9) << "min" << setw(9) << "max" << setw(9) << "present" << setw(9) << "<q>/e" << "\n";
 		for (const NboE2Channel& c : a.channels)
 			out << "  " << left << setw(21) << c.donor << setw(21) << c.acceptor << right << setprecision(2)
-				<< setw(10) << c.mean_kcal << setw(9) << c.min_kcal << setw(9) << c.max_kcal << setw(9) << c.present << "\n";
+				<< setw(10) << c.mean_kcal << setw(9) << c.min_kcal << setw(9) << c.max_kcal << setw(9) << c.present
+				<< setprecision(4) << setw(9) << c.mean_e << "\n";
 	}
 	print_nrt(r, out);
 }

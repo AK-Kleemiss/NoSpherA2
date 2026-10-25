@@ -103,7 +103,11 @@ int unify_core_basins(cubei& basin_cube, std::vector<d4>& maxima, const std::vec
 //Fold a shattered shell (maxima close together and near-degenerate in value) into one basin each. max_dist is in bohr,
 //not voxels: the defect worsens as the grid is refined. With atoms, maxima in a metal's outer core shell (see
 //eli_core_radius) merge only within max_dist / 2.
-int unify_shell_basins(cubei& basin_cube, std::vector<d4>& maxima, ivec* basin_map = nullptr, double max_dist = 1.2, double rel_tol = 0.05, const std::vector<atom>* atoms = nullptr, const WFN* wavy = nullptr, const eli_spin_field* eli = nullptr);
+//A shell maximum the persistence merge absorbed (at, about atom o) while its arcs lead within eps into several surviving
+//groups: a shoulder between equivalent shell maxima. exits = {saddle direction about o, exit maximum}; its points go to
+//the exit whose saddle lies nearest in angle (gradient ascent off the flattened cap), not whole into one arbitrary group
+struct shell_split { d3 at, o; std::vector<std::pair<d3, d3>> exits; };
+int unify_shell_basins(cubei& basin_cube, std::vector<d4>& maxima, ivec* basin_map = nullptr, double max_dist = 1.2, double rel_tol = 0.05, const std::vector<atom>* atoms = nullptr, const WFN* wavy = nullptr, const eli_spin_field* eli = nullptr, std::vector<shell_split>* split = nullptr);
 //Atomic overlap matrices S^b_ij = int_b phi_i phi_j on the populations' points and basin assignment, so a basin's
 //trace is its population. One packed lower triangle per basin over the occupied MOs
 struct basin_overlaps {
@@ -198,7 +202,7 @@ private:
 //unify_core_basins reports it); the result then has one entry per basin.
 //eli (with eli_field): the ELI member whose boundaries are followed instead of ELI-D. spin_pop (with eli): per basin
 //{N_alpha, N_beta, int rho_s * ELI-q_s} from the populations' points and weights.
-vec integrate_basins_on_atomic_grids(const cube* cub, const cubei* basin_cube, const std::vector<d4>& maxima, const WFN& wavy, const int accuracy, const bool eli_field, vec& volumes, double& outside, const std::function<double(const d3&)>* core_density = nullptr, const std::function<void(const d3&, d3&)>* core_gradient = nullptr, const int grid_boost = 1, const density_field* field = nullptr, basin_overlaps* ovl = nullptr, const ivec* maximum_basin = nullptr, const eli_spin_field* eli = nullptr, vec2* spin_pop = nullptr);
+vec integrate_basins_on_atomic_grids(const cube* cub, const cubei* basin_cube, const std::vector<d4>& maxima, const WFN& wavy, const int accuracy, const bool eli_field, vec& volumes, double& outside, const std::function<double(const d3&)>* core_density = nullptr, const std::function<void(const d3&, d3&)>* core_gradient = nullptr, const int grid_boost = 1, const density_field* field = nullptr, basin_overlaps* ovl = nullptr, const ivec* maximum_basin = nullptr, const eli_spin_field* eli = nullptr, vec2* spin_pop = nullptr, const std::vector<shell_split>* split = nullptr);
 std::vector<critical_point_seed> find_cube_critical_point_seeds(const cube* cub, bool debug, double value_floor = -1.0, double gradient_epsilon = -1.0);
 std::vector<critical_point> refine_cube_critical_points(const cube* cub, const WFN& wavy, const std::vector<critical_point_seed>& seeds, bool debug, double value_floor = -1.0, double gradient_tolerance = 1e-8, double step_tolerance = 1e-6, int max_iterations = 32);
 std::vector<critical_point> analyze_cube_critical_points(const cube* cub, const WFN& wavy, bool debug, double value_floor = -1.0, double gradient_epsilon = -1.0, double gradient_tolerance = 1e-8, double step_tolerance = 1e-6, int max_iterations = 32);

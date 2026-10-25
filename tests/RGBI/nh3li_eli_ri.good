@@ -120,10 +120,10 @@ Density Critical Points (9 found):
 
 Assigning basins along the density gradient...
 I found 5 Basins.
-  ELI-D maxima search on the host: auto, the host field costs 2.52 us a point, below 15
+  ELI-D maxima search on the host: auto, the host field costs 2.29 us a point, below 15
 ELI-D maxima from the analytic field: 8
 ELI-D basin boundaries from the analytic field (the default).
-Shell saddle merge (phi 0.9900): 0 same-atom pairs tested, 0 joined.
+Shell saddle merge (phi 0.9900, shell persistence 0.0005): 0 same-atom pairs tested, 0 saddle-joined, 0 shell pairs joined.
 
 QTAIM Analysis (voxel sum):
 basin:    0 label:               N0 integrated value:   8.2172 volume:  383.3206
@@ -150,7 +150,7 @@ QTAIM Analysis (atomic quadrature grids):
 GridManager: Setting up prototype grids for atom types...
 GridManager: Generating integration grids for atoms...
 GridManager: Generated total of 66074 grid points.
-  ELI-D basin field on the host: auto, the host field costs 4 us a point, below 15
+  ELI-D basin field on the host: auto, the host field costs 2.44 us a point, below 15
 Quadrature points sent along the field: 46898, left the grid: 0
 
 ELI-D Analysis (atomic quadrature grids):

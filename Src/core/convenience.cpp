@@ -700,6 +700,20 @@ std::string help_message =
  "                                    .native.nbo.json is read through its\n"
  "                                    \"parent_lewis\". The log compares its rho(NL)\n"
  "                                    with the search's own best structure.\n"
+ "                                    \"multi_centre\": [[\"B1\", \"H3\", \"B2\"]] adds\n"
+ "                                    one 3- or 4-centre pair per unit.\n"
+ "  -nbo_tm_pairs <n>                  Lewis pairs a d-block metal may hold (lone\n"
+ "                                    pairs + bonds). 9 (default) = the 18-electron\n"
+ "                                    space, so M-L back-donation shows; 0 = its\n"
+ "                                    valence NAO count, 6, NBO 7's footing. Never lifted\n"
+ "                                    silently (the log says when it must be).\n"
+ "  -nbo_centres <k>                   Also place 3..k-centre bonds (k = 3 or 4;\n"
+ "                                    NBO's 3CBOND) over chains of bondable atoms,\n"
+ "                                    when one- and two-centre blocks fail. Kept if\n"
+ "                                    each centre holds 10 % of the orbital and\n"
+ "                                    rho(NL) drops 0.05 e per unit against the\n"
+ "                                    two-centre search (logged); NRT then moves\n"
+ "                                    pairs between bonds and the units.\n"
  "  -nrt_e2_avg <percent>              E(2) per NRT structure whose weight is within\n"
  "                                    <percent> of the leading one (degenerate\n"
  "                                    set), each placed under $CHOOSE, averaged\n"
@@ -2611,7 +2625,7 @@ const std::set<std::string> &nbo_family_suboptions()
 		"-nbo_dir", "-nbo_47", "-nbo_e2min", "-nbo_threads", "-nbo_keep47", "-nrt",
 		"-nrt_e2", "-nrt_arrows", "-nrt_bond_scale", "-nrt_max", "-nrt_atoms",
 		"-nrt_exhaustive", "-nrt_no_symmetry", "-nrt_no_components", "-nrt_no_ion", "-nrt_parent", "-nrt_e2_avg", "-nrt_e2_avg_min",
-		"-nrt_target", "-nrt_screen", "-nrt_rotate", "-nrt_stall", "-nrt_mirror", "-nrt_no_mirror", "-nrt_tie", "-nrt_ref"};
+		"-nbo_centres", "-nbo_tm_pairs", "-nrt_target", "-nrt_screen", "-nrt_rotate", "-nrt_stall", "-nrt_mirror", "-nrt_no_mirror", "-nrt_tie", "-nrt_ref"};
 	return known;
 }
 
@@ -2733,6 +2747,14 @@ bool options::digest_io_options(const std::string &temp, int &i)
 			else if (arguments[j] == "-nrt_e2_avg_min") {
 				opt.nrt_e2_avg_min_percent = std::stod(arguments[j + 1]);
 				opt.nrt = true;
+			}
+			else if (arguments[j] == "-nbo_tm_pairs") {
+				opt.tm_pairs = std::stoi(arguments[j + 1]);
+				err_checkf(opt.tm_pairs >= 0 && opt.tm_pairs <= 9, "-nbo_tm_pairs takes 0 (valence NAO count) to 9", std::cout);
+			}
+			else if (arguments[j] == "-nbo_centres") {
+				opt.max_centres = std::stoi(arguments[j + 1]);
+				err_checkf(opt.max_centres >= 2 && opt.max_centres <= 4, "-nbo_centres takes 2, 3 or 4", std::cout);
 			}
 			else if (arguments[j] == "-nrt_tie") opt.nrt_tie = std::stod(arguments[j + 1]);
 			else if (arguments[j] == "-nrt_ref") opt.nrt_ref = std::stod(arguments[j + 1]);

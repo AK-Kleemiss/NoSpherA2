@@ -3554,8 +3554,9 @@ static void spin_eli_analysis(const WFN &l_w, const options &opt, const std::vec
 		r.maxima = all;
 		cubei none;
 		ivec core_map, shell_map;
+		std::vector<shell_split> split;
 		unify_core_basins(none, r.maxima, atoms, &core_map);
-		unify_shell_basins(none, r.maxima, &shell_map, shell_dist, shell_tol, &atoms, &l_w, &eval);
+		unify_shell_basins(none, r.maxima, &shell_map, shell_dist, shell_tol, &atoms, &l_w, &eval, &split);
 		if (!shell_map.empty())
 			for (size_t b = 1; b < core_map.size(); b++) core_map[b] = shell_map[core_map[b]];
 		ivec edge_map;
@@ -3563,7 +3564,7 @@ static void spin_eli_analysis(const WFN &l_w, const options &opt, const std::vec
 			for (size_t b = 1; b < core_map.size(); b++) core_map[b] = edge_map[core_map[b]];
 		r.labels = assign_labels_to_basins(r.maxima, atoms, opt.debug, 1);
 		clock.lap(std::string("ELI-D ") + names[f] + " maxima");
-		r.pop = integrate_basins_on_atomic_grids(nullptr, nullptr, all, l_w, opt.accuracy, true, r.vol, r.outside, nullptr, nullptr, opt.basin_grid, nullptr, nullptr, &core_map, &eval, &r.spin);
+		r.pop = integrate_basins_on_atomic_grids(nullptr, nullptr, all, l_w, opt.accuracy, true, r.vol, r.outside, nullptr, nullptr, opt.basin_grid, nullptr, nullptr, &core_map, &eval, &r.spin, &split);
 		r.done = true;
 		clock.lap(std::string("ELI-D ") + names[f] + " basins");
 		double tot = 0.0, ts[2]{ 0.0, 0.0 };
@@ -3936,6 +3937,7 @@ void ELI_analysis(const WFN &wavy, options &opt) {
 	//so the integrator gets the unmerged maxima and the map to the basins
 	std::vector<d4> eli_maxima_all;
 	ivec eli_core_map;
+	std::vector<shell_split> eli_split;
 	auto report = [&](const char *title, const std::pair<cubei, std::vector<d4>> &res, svec &lab, const bool eli, const bool stream) {
 		//The voxel sum needs the basin cube; streaming has none
 		if (!stream) {
@@ -3954,7 +3956,7 @@ void ELI_analysis(const WFN &wavy, options &opt) {
 			std::cout << "  Delocalization indices skipped: " << l_w.get_nmo() << " orbitals over " << res.second.size()
 				<< " basins on " << omp_get_max_threads() << " threads would need " << aom_bytes / (1024 * 1024) << " MB of overlap matrices.\n";
 		const bool mapped = eli && stream && !eli_core_map.empty();
-		const vec pop = integrate_basins_on_atomic_grids(stream ? nullptr : &rho, stream ? nullptr : &(res.first), mapped ? eli_maxima_all : res.second, l_w, opt.accuracy, eli, vol, outside, fill_cores && !eli ? &core_density : nullptr, fill_cores && !eli ? &core_gradient : nullptr, opt.basin_grid, eli ? nullptr : fld, want_aom ? &ovl : nullptr, mapped ? &eli_core_map : nullptr);
+		const vec pop = integrate_basins_on_atomic_grids(stream ? nullptr : &rho, stream ? nullptr : &(res.first), mapped ? eli_maxima_all : res.second, l_w, opt.accuracy, eli, vol, outside, fill_cores && !eli ? &core_density : nullptr, fill_cores && !eli ? &core_gradient : nullptr, opt.basin_grid, eli ? nullptr : fld, want_aom ? &ovl : nullptr, mapped ? &eli_core_map : nullptr, nullptr, nullptr, mapped ? &eli_split : nullptr);
 		const section_log::tee basin_tee(eli ? "eli" : "qtaim", eli ? "ELI-D basins: populations, volumes and maxima"
 			: "QTAIM basins: populations, charges, volumes and maxima");
 		std::cout << "\n" << title << " (atomic quadrature grids):\n";
@@ -4051,7 +4053,7 @@ void ELI_analysis(const WFN &wavy, options &opt) {
 	if (const char *e = tuning("NOS_ELI_SHELL_DIST")) { const double v = std::atof(e); if (v >= 0.0 && v < 10.0) shell_dist = v; }
 	if (const char *e = tuning("NOS_ELI_SHELL_TOL")) { const double v = std::atof(e); if (v >= 0.0 && v < 1.0) shell_tol = v; }
 	ivec eli_shell_map;
-	const int shell_merged = unify_shell_basins(eli_results.first, eli_results.second, stream_eli ? &eli_shell_map : nullptr, shell_dist, shell_tol, &atoms, &l_w);
+	const int shell_merged = unify_shell_basins(eli_results.first, eli_results.second, stream_eli ? &eli_shell_map : nullptr, shell_dist, shell_tol, &atoms, &l_w, nullptr, &eli_split);
 	if (shell_merged) std::cout << "Unified " << shell_merged << " shattered shell basins, " << eli_results.second.size() << " ELI-D basins remain." << std::endl;
 	//The integrator walks to one of eli_maxima_all and then reads eli_core_map, so the second merge
 	//has to be composed into that map rather than replacing it

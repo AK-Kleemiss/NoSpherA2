@@ -478,10 +478,10 @@ TEST(NboNativeTests, NrtParentFilesAreReadOrRefusedWithTheOffendingEntry)
 	const NAOResult nao = water_naos();
 	const std::string head = "{\"format\": \"NoSpherA2 Lewis structure\", \"version\": 1, \"wavefunction\": \"water.gbw\", "
 							 "\"atoms\": 3, \"lone_pairs\": {\"O1\": 2}, \"bonds\": ";
-	const auto read = [&](const std::string& text, ivec2& topo, std::string* warned = nullptr) {
+	const auto read = [&](const std::string& text, ivec2& topo, std::string* warned = nullptr, std::vector<ivec>* multi = nullptr) {
 		const auto f = write_text("nos_nrt_parent_case.json", text);
 		std::ostringstream log;
-		const std::string why = read_lewis_structure(f, nao, 5, "water.gbw", topo, log);
+		const std::string why = read_lewis_structure(f, nao, 5, "water.gbw", topo, log, multi);
 		if (warned) *warned = log.str();
 		std::filesystem::remove(f);
 		return why;
@@ -494,6 +494,11 @@ TEST(NboNativeTests, NrtParentFilesAreReadOrRefusedWithTheOffendingEntry)
 	ASSERT_EQ(read("{\"name\": \"w\", \"parent_lewis\": {\"wavefunction\": \"other.gbw\", \"lone_pairs\": {\"1\": 2}, "
 				   "\"bonds\": [[\"O1\", \"H2\", 1], [\"O1\", \"H3\", 1]]}}", topo, &warned), "");
 	EXPECT_NE(warned.find("other.gbw"), std::string::npos) << warned;
+	//a caller that takes k-centre units gets them sorted, 0-based, and their pair counted
+	std::vector<ivec> multi;
+	ASSERT_EQ(read(head + "[[\"O1\", \"H2\", 1]], \"three_centre\": [[\"H3\", \"O1\", \"H2\"]]}", topo, nullptr, &multi), "");
+	EXPECT_EQ(topo, (ivec2{ { 2, 1, 0 }, { 1, 0, 0 }, { 0, 0, 0 } }));
+	EXPECT_EQ(multi, (std::vector<ivec>{ { 0, 1, 2 } }));
 	const std::vector<std::pair<std::string, std::string>> bad = {
 		{ head + "[[\"O1\", \"H2\", 1], [\"O1\", \"H4\", 1]]}", "atom \"H4\" is outside 1..3" },
 		{ head + "[[\"O1\", \"H2\", 1], [\"O1\", \"C3\", 1]]}", "atom 3 is H, not C" },
@@ -514,6 +519,55 @@ TEST(NboNativeTests, NrtParentFilesAreReadOrRefusedWithTheOffendingEntry)
 	}
 }
 
+//B2H6 (tests/TFVC/b2h6.inp): two-centre bonds leave a bridge H as a 0.9 e lone pair, which NBO 7's 3CBOND search also
+//does. -nbo_centres 3 takes both B-H-B bridges (NBO 7 $CHOOSE: same 28/28/44 % weights), and NRT built on that parent
+//fits the density far better than any two-centre resonance set: D(w) 1.19 -> 0.39, parent 30 % -> 82 %.
+TEST(NboNativeTests, DiboraneBridgesAreThreeCentreBondsAndNrtKeepsThem)
+{
+	const auto p = nos_test_repo_root() / "tests" / "TFVC" / "b2h6.gbw";
+	if (!std::filesystem::exists(p))
+		GTEST_SKIP() << "tests/TFVC/b2h6.gbw not found";
+	WFN wavy(p);
+	NboOptions two;
+	two.nrt = true;
+	NboOptions three = two;
+	three.max_centres = 3;
+	std::ostringstream log2, log3;
+	const NboResults r2 = native_nbo(wavy, two, log2);
+	const NboResults r3 = native_nbo(wavy, three, log3);
+	int bridges = 0;
+	for (const NboOrbital& o : r3.orbitals)
+		if (o.type == "3C") {
+			bridges++;
+			EXPECT_EQ(o.hybrids[0].element + o.hybrids[1].element + o.hybrids[2].element, "BBH");
+		}
+	EXPECT_EQ(bridges, 2) << log3.str();
+	ASSERT_TRUE(r2.nrt.present);
+	ASSERT_TRUE(r3.nrt.present);
+	ASSERT_EQ(r3.nrt.parent_topo.size(), 1u);
+	EXPECT_EQ(r3.nrt.parent_topo[0].multi.size(), 2u);
+	EXPECT_LT(r3.nrt.d_w, 0.5 * r2.nrt.d_w);
+	ASSERT_EQ(r3.nrt.spin_d.size(), 1u);
+	EXPECT_GT(r3.nrt.spin_d[0].parent_percent, 70.0);
+	//a B-H-B unit books its fitted two-centre Lewis assignments (B-Hb <-> Hb-B <-> B-B, one pair in all), so the
+	//bridge pair is counted in full: B-Hb 0.37 each, B-B 0.61 over both bridges; the Wiberg index counted 0.48
+	//covalency and nothing for B-B's share
+	const NboBondOrder* bh = bond_order(r3, "", 1, 3);
+	ASSERT_NE(bh, nullptr);
+	EXPECT_NEAR(bh->total, 0.37, 0.03);
+	const NboBondOrder* bb = bond_order(r3, "", 1, 2);
+	ASSERT_NE(bb, nullptr);
+	EXPECT_NEAR(bb->total, 0.61, 0.03);
+	//-nbo_centres 4: NRT grows units to 4C, but every 4C unit in diborane is two disjoint B-H bonds restated
+	//(4C B1-B2-H6-H7 = B1-H6 + B2-H7) and must be refused; one slipping through bought D(w) 0.425 -> 0.325 on freedom
+	NboOptions four = three;
+	four.max_centres = 4;
+	std::ostringstream log4;
+	const NboResults r4 = native_nbo(wavy, four, log4);
+	ASSERT_TRUE(r4.nrt.present) << log4.str();
+	EXPECT_NEAR(r4.nrt.d_w, r3.nrt.d_w, 1e-4) << log4.str();
+}
+
 //Ni(CO)4, B3LYP/def2-TZVP (def2-SVP does not show the second trap): NBO 7 puts one dative Ni-C bond
 //and d10 lone pairs on Ni. The search used to accept a Ni d pair plus a C lone pair as Ni-C bonds
 //(four electrons, two centres), and NRT then built the
@@ -529,6 +583,7 @@ TEST(NboNativeTests, NickelTetracarbonylKeepsOneDativeBondAndItsParent)
 	NboOptions options;
 	options.nrt = true;
 	options.nrt_rotate = true;
+	options.tm_pairs = 0;  //NBO 7's footing; the default 9 is the next test
 	std::ostringstream log;
 	const NboResults r = native_nbo(wavy, options, log);
 	int ni_c = 0;
@@ -570,4 +625,33 @@ TEST(NboNativeTests, NickelTetracarbonylKeepsOneDativeBondAndItsParent)
 		EXPECT_GE(b.range_hi, b.total - 1e-9);
 		if (r.npa[b.atom1 - 1].element == "Ni") EXPECT_GT(b.range_hi - b.range_lo, 0.2);
 	}
+}
+
+//The default 18-electron cap: d10 stays five lone pairs (no Ni-C "bond" that is a d pair, 97 % Ni, as the staged
+//relax once booked without -nbo_tm_pairs), four equal dative Ni-C, and NRT Ni-C > 1 with back-donation
+TEST(NboNativeTests, NickelTetracarbonylDefaultCapShowsBackDonation)
+{
+	const auto p = nos_test_repo_root() / "tests" / "NiCO4_gbw" / "ni_co_4.gbw";
+	if (!std::filesystem::exists(p))
+		GTEST_SKIP() << "tests/NiCO4_gbw/ni_co_4.gbw not found";
+	WFN wavy(p);
+	NboOptions options;
+	options.nrt = true;
+	std::ostringstream log;
+	const NboResults r = native_nbo(wavy, options, log);
+	int ni_lp = 0, ni_c = 0;
+	for (const NboOrbital &o : r.orbitals) {
+		if (o.type == "LP" && r.npa[o.centers[0] - 1].element == "Ni") ni_lp++;
+		if (o.type == "BD" && o.centers.size() == 2 && (r.npa[o.centers[0] - 1].element == "Ni" || r.npa[o.centers[1] - 1].element == "Ni")) ni_c++;
+	}
+	EXPECT_EQ(ni_lp, 5) << log.str();
+	EXPECT_EQ(ni_c, 4) << log.str();
+	ASSERT_TRUE(r.nrt.present);
+	int n = 0;
+	for (const NboBondOrder &b : r.nrt.bond_orders)
+		if (!b.diagonal && r.npa[b.atom1 - 1].element == "Ni" && r.npa[b.atom2 - 1].element == "C") {
+			EXPECT_GT(b.total, 1.0);
+			n++;
+		}
+	EXPECT_EQ(n, 4);
 }

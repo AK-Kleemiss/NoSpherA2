@@ -18,13 +18,14 @@
 //unrestricted output, so tables are matched on the shape of their numbers: occupancy 5 decimals, E(2) 2, F(L,NL) 3.
 
 namespace {
-	const std::regex re_npa(R"(^\s*([A-Za-z]{1,2})\s+(\d+)\s+(-?\d+\.\d+)\s+(-?\d+\.\d+)\s+(-?\d+\.\d+)\s+(-?\d+\.\d+)\s+(-?\d+\.\d+)(?:\s+(-?\d+\.\d+))?\s*$)");
-	const std::regex re_nao(R"(^\s*(\d+)\s+([A-Za-z]{1,2})\s+(\d+)\s+(\S+)\s+(\S+)\(\s*([^)]*)\)\s+(-?\d+\.\d+)\s+(-?\d+\.\d+)\s*$)");
+	//element and index are fused for atoms >= 100 ("Zn119"), hence \s* between them
+	const std::regex re_npa(R"(^\s*([A-Za-z]{1,2})\s*(\d+)\s+(-?\d+\.\d+)\s+(-?\d+\.\d+)\s+(-?\d+\.\d+)\s+(-?\d+\.\d+)\s+(-?\d+\.\d+)(?:\s+(-?\d+\.\d+))?\s*$)");
+	const std::regex re_nao(R"(^\s*(\d+)\s+([A-Za-z]{1,2})\s*(\d+)\s+(\S+)\s+(\S+)\(\s*([^)]*)\)\s+(-?\d+\.\d+)\s+(-?\d+\.\d+)\s*$)");
 	const std::regex re_nbo_head(R"(^\s*(\d+)\.\s*\(\s*(-?\d+\.\d+)\)\s+(.*\S)\s*$)");
 	const std::regex re_nbo_kind(R"(^([A-Z]{2}\*?)\s*\(\s*(\d+)\)\s*(.*)$)");
-	const std::regex re_center(R"(([A-Z][a-z]?)\s+(\d+))");
+	const std::regex re_center(R"(([A-Z][a-z]?)\s*(\d+))");
 	const std::regex re_comp(R"(([spdfg])\s*[\d.]*\(\s*([\d.]+)%\))");
-	const std::regex re_polar(R"(^\s*\(\s*([\d.]+)%\)\s+(-?[\d.]+)\*\s*([A-Z][a-z]?)\s+(\d+)\s+(.*)$)");
+	const std::regex re_polar(R"(^\s*\(\s*([\d.]+)%\)\s+(-?[\d.]+)\*\s*([A-Z][a-z]?)\s*(\d+)\s+(.*)$)");
 	const std::regex re_summary(R"(^\s*(\d+)\.\s+(\S.*?)\s+(-?\d+\.\d{5})\s+(-?\d+\.\d{5}).*$)");
 	const std::regex re_e2(R"(^\s*(\d+)\.\s+(\S.*?)\s+(\d+)\.\s+(\S.*?)\s+(-?\d+\.\d{2})\s+(-?\d+\.\d{2})\s+(-?\d+\.\d{3})\s*$)");
 	const std::regex re_bo_head(R"(^\s*Atom\s+((?:\d+\s*)+)$)");
@@ -598,6 +599,16 @@ std::string parent_lewis_json(const NboResults& r, const std::string& indent) {
 			for (int b = a + 1; b < na; b++)
 				if (t.matrix[a][b] > 0) o << sep() << "[" << label(a) << ", " << label(b) << ", " << t.matrix[a][b] << "]";
 		o << (k ? " ]" : "]");
+		if (!t.multi.empty()) {
+			o << ",\n" << in << "\"multi_centre\": [";
+			k = 0;
+			for (const std::vector<int>& u : t.multi) {
+				o << sep() << "[";
+				for (size_t i = 0; i < u.size(); i++) o << (i ? ", " : "") << label(u[i]);
+				o << "]";
+			}
+			o << " ]";
+		}
 		return o.str();
 	};
 	std::ostringstream o;
@@ -711,7 +722,8 @@ void write_nbo_json(const NboResults& r, const std::filesystem::path& json_file)
 			const NboE2Channel& c = a.channels[i];
 			f << "      {\"donor\": " << jstr(c.donor) << ", \"acceptor\": " << jstr(c.acceptor)
 			  << ", \"mean_kcal\": " << jnum(c.mean_kcal) << ", \"min_kcal\": " << jnum(c.min_kcal)
-			  << ", \"max_kcal\": " << jnum(c.max_kcal) << ", \"present\": " << jnum(c.present) << "}"
+			  << ", \"max_kcal\": " << jnum(c.max_kcal) << ", \"mean_e\": " << jnum(c.mean_e) << ", \"min_e\": " << jnum(c.min_e)
+			  << ", \"max_e\": " << jnum(c.max_e) << ", \"present\": " << jnum(c.present) << "}"
 			  << (i + 1 < a.channels.size() ? "," : "") << "\n";
 		}
 		f << "    ]},\n";

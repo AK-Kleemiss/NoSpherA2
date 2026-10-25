@@ -131,15 +131,15 @@ Density Critical Points (13 found):
    V         :    -8.5708e-02   G         :         0.0350   K         :     5.0675e-02   L         :     1.5642e-02
 
 QTAIM attractors from the analytic field: 7 (7 nuclei, 0 non-nuclear)
-  ELI-D maxima search on the host: no usable device
-ELI-D maxima from the analytic field: 47
+  ELI-D maxima search on the host: auto, the host field costs 10.9 us a point, below 15
+ELI-D maxima from the analytic field: 43
 ELI-D basin boundaries from the analytic field (the default).
-Unified 34 core-shell basins into their atoms' cores, 13 ELI-D basins remain.
-Shell saddle merge (phi 0.9900): 0 same-atom pairs tested, 0 joined.
+Unified 30 core-shell basins into their atoms' cores, 13 ELI-D basins remain.
+Shell saddle merge (phi 0.9900, shell persistence 0.0005): 0 same-atom pairs tested, 0 saddle-joined, 0 shell pairs joined.
 GridManager: Setting up prototype grids for atom types...
 GridManager: Generating integration grids for atoms...
 GridManager: Generated total of 116688 grid points.
-  QTAIM basin field on the host: auto, the host field costs 13.2 us a point, below 15
+  QTAIM basin field on the host: auto, the host field costs 7.49 us a point, below 15
 Quadrature points sent along the field: 39287, left the grid: 0
 
 QTAIM Analysis (atomic quadrature grids):
@@ -193,23 +193,23 @@ GridManager: Setting up prototype grids for atom types...
 GridManager: Generating integration grids for atoms...
 GridManager: Generated total of 116688 grid points.
   ELI-D basin field on the host: no usable device
-Quadrature points sent along the field: 58907, left the grid: 0
+Quadrature points sent along the field: 59107, left the grid: 0
 
 ELI-D Analysis (atomic quadrature grids):
   basin  label               electrons      volume         maximum        x          y          z
       1  H6                     1.6950     53.7178         13.7822      0.000      0.000     -3.850
       2  H5                     1.6950     53.7178         13.7822     -0.000     -0.000      3.850
       3  H1                     1.6922     55.7378         13.7822      3.850     -0.000      0.000
-      4  H3                     1.7013     55.5457         13.7822      0.000      3.850      0.000
+      4  H3                     1.7013     55.5462         13.7822      0.000      3.850      0.000
       5  H2                     1.6922     55.7378         13.7822     -3.850      0.000     -0.000
-      6  H4                     1.7013     55.5457         13.7822      0.000     -3.850     -0.000
-      7  U0 core               85.8224     61.5077         13.5603      0.000      0.000      0.000
+      6  H4                     1.7013     55.5462         13.7822      0.000     -3.850     -0.000
+      7  U0 core               85.8223     61.5066         13.5603      0.000      0.000      0.000
       8  H2 LP                  0.3279    186.3213         11.2194     -5.465     -0.000     -0.000
       9  H5 LP                  0.3265    183.2216         11.2194      0.000      0.000      5.465
      10  H1 LP                  0.3279    186.3213         11.2194      5.465      0.000     -0.000
-     11  H6 LP                  0.3265    183.2216         11.2194     -0.000      0.000     -5.465
-     12  H3 LP                  0.3282    186.1086         11.2194     -0.000      5.465     -0.000
-     13  H4 LP                  0.3282    186.1086         11.2194     -0.000     -5.465      0.000
+     11  H6 LP                  0.3265    183.2216         11.2194      0.000     -0.000     -5.465
+     12  H3 LP                  0.3282    186.1086         11.2194      0.000      5.465     -0.000
+     13  H4 LP                  0.3282    186.1086         11.2194      0.000     -5.465     -0.000
   total in basins: 97.9643   outside every basin: 0.0355
 
 Spin-resolved ELI-D: skipped, restricted wavefunction - ELI-D(alpha-alpha) = ELI-D(beta-beta) is the ELI-D above and the triplet member a constant multiple of it.

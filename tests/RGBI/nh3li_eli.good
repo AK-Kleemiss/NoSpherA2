@@ -95,14 +95,14 @@ Density Critical Points (9 found):
    V         :    -4.0482e-02   G         :         0.0479   K         :    -7.4285e-03   L         :    -5.5339e-02
 
 QTAIM attractors from the analytic field: 5 (5 nuclei, 0 non-nuclear)
-  ELI-D maxima search on the host: auto, the host field costs 2.47 us a point, below 15
+  ELI-D maxima search on the host: auto, the host field costs 2.28 us a point, below 15
 ELI-D maxima from the analytic field: 8
 ELI-D basin boundaries from the analytic field (the default).
-Shell saddle merge (phi 0.9900): 0 same-atom pairs tested, 0 joined.
+Shell saddle merge (phi 0.9900, shell persistence 0.0005): 0 same-atom pairs tested, 0 saddle-joined, 0 shell pairs joined.
 GridManager: Setting up prototype grids for atom types...
 GridManager: Generating integration grids for atoms...
 GridManager: Generated total of 66074 grid points.
-  QTAIM basin field on the host: auto, the host field costs 1.56 us a point, below 15
+  QTAIM basin field on the host: auto, the host field costs 1.45 us a point, below 15
 Quadrature points sent along the field: 42019, left the grid: 0
 
 QTAIM Analysis (atomic quadrature grids):
@@ -143,7 +143,7 @@ Delocalization indices (13 occupied orbitals):
 GridManager: Setting up prototype grids for atom types...
 GridManager: Generating integration grids for atoms...
 GridManager: Generated total of 66074 grid points.
-  ELI-D basin field on the host: auto, the host field costs 2.71 us a point, below 15
+  ELI-D basin field on the host: auto, the host field costs 2.37 us a point, below 15
 Quadrature points sent along the field: 46898, left the grid: 0
 
 ELI-D Analysis (atomic quadrature grids):
@@ -162,7 +162,7 @@ ELI-D Analysis (atomic quadrature grids):
 
 Spin-resolved ELI-D (Kohout): N_alpha = 7.0000, N_beta = 6.0000. The ELI-D above is the spin-summed field, not a pair function of either spin.
   ELI-D maxima search on the host: the spin-resolved ELI-D
-Shell saddle merge (phi 0.9900): 0 same-atom pairs tested, 0 joined.
+Shell saddle merge (phi 0.9900, shell persistence 0.0005): 0 same-atom pairs tested, 0 saddle-joined, 0 shell pairs joined.
 GridManager: Setting up prototype grids for atom types...
 GridManager: Generating integration grids for atoms...
 GridManager: Generated total of 66074 grid points.
@@ -184,7 +184,7 @@ ELI-D alpha-alpha Analysis (atomic quadrature grids), 54 maxima, 40 unified into
      11  N0-Li4 bond            2.1503     1.0858     1.0645     0.0213   0.7565     43.3358          1.9743    -10.517     11.448      2.248
   total in basins: 12.9198   N_alpha 6.9215 of 7.0000, N_beta 5.9983 of 6.0000   outside every basin: 0.0873
   ELI-D maxima search on the host: the spin-resolved ELI-D
-Shell saddle merge (phi 0.9900): 0 same-atom pairs tested, 0 joined.
+Shell saddle merge (phi 0.9900, shell persistence 0.0005): 0 same-atom pairs tested, 0 saddle-joined, 0 shell pairs joined.
 GridManager: Setting up prototype grids for atom types...
 GridManager: Generating integration grids for atoms...
 GridManager: Generated total of 66074 grid points.
@@ -205,7 +205,7 @@ ELI-D beta-beta Analysis (atomic quadrature grids), 15 maxima, 5 empty surface a
      10  Li4 LP                 0.0100     0.0100     0.0000     0.0100        -     48.0301          0.1750     -3.623     14.882      1.800
   total in basins: 12.9200   N_alpha 6.9217 of 7.0000, N_beta 5.9983 of 6.0000   outside every basin: 0.0871
   ELI-D maxima search on the host: the spin-resolved ELI-D
-Shell saddle merge (phi 0.9900): 0 same-atom pairs tested, 0 joined.
+Shell saddle merge (phi 0.9900, shell persistence 0.0005): 0 same-atom pairs tested, 0 saddle-joined, 0 shell pairs joined.
 GridManager: Setting up prototype grids for atom types...
 GridManager: Generating integration grids for atoms...
 GridManager: Generated total of 66074 grid points.

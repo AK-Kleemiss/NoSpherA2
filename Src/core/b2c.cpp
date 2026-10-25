@@ -1456,13 +1456,12 @@ int unify_core_basins(cubei &basin_cube, std::vector<d4> &maxima, const std::vec
 	return collapse_maxima_groups(basin_cube, maxima, keeper, basin_map);
 }
 
-int unify_shell_basins(cubei &basin_cube, std::vector<d4> &maxima, ivec *basin_map, double max_dist, double rel_tol, const std::vector<atom> *atoms, const WFN *wavy, const eli_spin_field *eli)
+int unify_shell_basins(cubei &basin_cube, std::vector<d4> &maxima, ivec *basin_map, double max_dist, double rel_tol, const std::vector<atom> *atoms, const WFN *wavy, const eli_spin_field *eli, std::vector<shell_split> *split)
 {
 	const int nb = static_cast<int>(maxima.size());
+	if (split) split->clear();
 	if (nb < 2 || max_dist <= 0.0) return 0;
 	const double d2 = max_dist * max_dist;
-	//A metal's outer core shell has real near-degenerate maxima close together, so there only a grid duplicate, half the length apart, is folded
-	const double d2_shell = d2 / 4.0;
 	std::vector<char> shell(nb, 0);
 	if (atoms)
 		for (int b = 0; b < nb; b++) shell[b] = in_outer_core_shell(maxima[b], *atoms);
@@ -1471,7 +1470,11 @@ int unify_shell_basins(cubei &basin_cube, std::vector<d4> &maxima, ivec *basin_m
 	auto find = [&root](int b) { while (root[b] != b) b = root[b] = root[root[b]]; return b; };
 	for (int b = 1; b < nb; b++)
 		for (int c = 0; c < b; c++) {
-			if (std::pow(maxima[b][0] - maxima[c][0], 2) + std::pow(maxima[b][1] - maxima[c][1], 2) + std::pow(maxima[b][2] - maxima[c][2], 2) > (shell[b] || shell[c] ? d2_shell : d2)) continue;
+			//Two outer-core-shell maxima never fold by distance: the fold chained genuine shell maxima through low-contrast
+			//shoulders, transitively (5.4-5.7 e merged basins, Tauchert set). They join by persistence below; a shell-to-
+			//valence pair folds at half the length
+			if (shell[b] && shell[c]) continue;
+			if (std::pow(maxima[b][0] - maxima[c][0], 2) + std::pow(maxima[b][1] - maxima[c][1], 2) + std::pow(maxima[b][2] - maxima[c][2], 2) > (shell[b] || shell[c] ? d2 / 4.0 : d2)) continue;
 			const double hi = std::max(std::abs(maxima[b][3]), std::abs(maxima[c][3]));
 			if (hi > 0.0 && std::abs(maxima[b][3] - maxima[c][3]) > rel_tol * hi) continue;
 			const int rb = find(b), rc = find(c);
@@ -1483,7 +1486,19 @@ int unify_shell_basins(cubei &basin_cube, std::vector<d4> &maxima, ivec *basin_m
 	//them never drops below phi times the lower of the two
 	double phi = 0.99;
 	if (const char *e = tuning("NOS_ELI_SHELL_SADDLE")) { const double v = std::atof(e); if (v >= 0.0 && v < 1.0) phi = v; }
-	if (wavy && phi > 0.0) {
+	//Shell persistence (NOS_ELI_SHELL_PERSIST = eps, default 5e-4, 0 turns it off): two shell maxima of the same atom join,
+	//highest arc first, when the arc between them dips less than eps below the lower of their two groups' maxima (elder
+	//rule). Contrast alone separates the two kinds: spurious shoulders dip <= 2.9e-4, genuine shell saddles >= 7.5e-4
+	//(as little as 0.05 % relative), so neither a distance nor a relative cut works (eli_merged validation, 24 Oct, 8 systems).
+	//Measured safe window 5e-4 to 6e-4 over 9 TM references + 20 Tauchert systems: [PtCl4]2- sigma_h dimple dies at 4e-4,
+	//the NiZn PMe3 shell saddle at 7e-4 (eli_tm_reference + eli_merged, 24 Oct)
+	double eps = 5e-4;
+	if (const char *e = tuning("NOS_ELI_SHELL_PERSIST")) {
+		const double v = std::atof(e);
+		if (v >= 0.0) eps = v;
+		else std::cout << "NOS_ELI_SHELL_PERSIST=" << e << " ignored (must be >= 0), eps stays " << eps << std::endl;
+	}
+	if (wavy && (phi > 0.0 || eps > 0.0)) {
 		auto field = [&](const d3 &p) { double f; d3 g; if (eli) (*eli)(p, f, g, nullptr); else wavy->computeELIGrad(p, f, g); return f; };
 		ivec na(nb, 0);
 		for (int b = 0; b < nb; b++) {
@@ -1510,6 +1525,7 @@ int unify_shell_basins(cubei &basin_cube, std::vector<d4> &maxima, ivec *basin_m
 		for (int b = 1; b < nb; b++)
 			for (int c = 0; c < b; c++) {
 				if (na[b] < 0 || na[b] != na[c] || find(b) == find(c)) continue;
+				if (shell[b] && shell[c] ? !(eps > 0.0) : !(phi > 0.0)) continue;
 				const d3 o = wavy->get_atom_pos(na[b]);
 				const d3 u{ maxima[b][0] - o[0], maxima[b][1] - o[1], maxima[b][2] - o[2] }, v{ maxima[c][0] - o[0], maxima[c][1] - o[1], maxima[c][2] - o[2] };
 				const double ru = array_length(u), rv = array_length(v);
@@ -1517,7 +1533,10 @@ int unify_shell_basins(cubei &basin_cube, std::vector<d4> &maxima, ivec *basin_m
 				if ((u[0] * v[0] + u[1] * v[1] + u[2] * v[2]) / (ru * rv) < -0.5) continue;
 				pairs.emplace_back(b, c);
 			}
-		std::vector<char> join(pairs.size(), 0);
+		//the lowest radial maximum along each arc, and the lower endpoint
+		vec arc(pairs.size(), 0.0), end(pairs.size(), 0.0);
+		//direction about the atom of each arc's lowest interior sample: the saddle a split shoulder exits through
+		std::vector<d3> sad(pairs.size());
 		//ponytail: every candidate pair gets its own arc, 16 x 11 field calls at worst; a merge tree over a sphere of
 		//directions if a shell ever has hundreds of maxima
 #pragma omp parallel for schedule(dynamic)
@@ -1527,29 +1546,75 @@ int unify_shell_basins(cubei &basin_cube, std::vector<d4> &maxima, ivec *basin_m
 			const d3 u{ mb[0] - o[0], mb[1] - o[1], mb[2] - o[2] }, v{ mc[0] - o[0], mc[1] - o[1], mc[2] - o[2] };
 			const double ru = array_length(u), rv = array_length(v);
 			const d3 uh{ u[0] / ru, u[1] / ru, u[2] / ru }, vh{ v[0] / rv, v[1] / rv, v[2] / rv };
-			const double lo = phi * std::min(radial_max(o, uh, ru), radial_max(o, vh, rv));
-			bool ok = true;
-			for (int k = 1; k <= 16 && ok; k++) {
+			end[q] = std::min(radial_max(o, uh, ru), radial_max(o, vh, rv));
+			double lo = end[q], low = std::numeric_limits<double>::max();
+			for (int k = 1; k <= 16; k++) {
 				const double t = k / 17.0;
 				d3 w{ (1.0 - t) * uh[0] + t * vh[0], (1.0 - t) * uh[1] + t * vh[1], (1.0 - t) * uh[2] + t * vh[2] };
 				const double wl = array_length(w);
-				if (!(wl > 1e-6)) { ok = false; break; }
+				if (!(wl > 1e-6)) { lo = -1.0; break; }
 				w = d3{ w[0] / wl, w[1] / wl, w[2] / wl };
-				ok = radial_max(o, w, (1.0 - t) * ru + t * rv) >= lo;
+				const double s = radial_max(o, w, (1.0 - t) * ru + t * rv);
+				if (s < low) { low = s; sad[q] = w; }
+				lo = std::min(lo, s);
 			}
-			join[q] = ok;
+			arc[q] = lo;
 		}
 		const bool log = tuning("NOS_ELI_SHELL_SADDLE_LOG") != nullptr;
-		int joined = 0;
+		int joined = 0, persisted = 0;
+		ivec order;
 		for (size_t q = 0; q < pairs.size(); q++) {
-			if (!join[q]) continue;
+			if (shell[pairs[q].first] && shell[pairs[q].second]) { order.push_back(static_cast<int>(q)); continue; }
+			if (arc[q] < phi * end[q]) continue;
 			joined++;
 			const d4 &mb = maxima[pairs[q].first], &mc = maxima[pairs[q].second];
 			if (log) std::cout << "  saddle join about atom " << na[pairs[q].first] << ": " << mb[0] << " " << mb[1] << " " << mb[2] << " (" << mb[3] << ") + " << mc[0] << " " << mc[1] << " " << mc[2] << " (" << mc[3] << ")" << std::endl;
 			const int rb = find(pairs[q].first), rc = find(pairs[q].second);
 			if (rb != rc) root[std::max(rb, rc)] = std::min(rb, rc);
 		}
-		std::cout << "Shell saddle merge (phi " << phi << "): " << pairs.size() << " same-atom pairs tested, " << joined << " joined." << std::endl;
+		//group maximum = the highest logged member, as collapse_maxima_groups keeps it
+		vec ghi(nb);
+		for (int b = 0; b < nb; b++) ghi[b] = maxima[b][3];
+		for (int b = 0; b < nb; b++) { const int r = find(b); ghi[r] = std::max(ghi[r], ghi[b]); }
+		std::stable_sort(order.begin(), order.end(), [&](const int x, const int y) { return arc[x] > arc[y]; });
+		for (const int q : order) {
+			const int rb = find(pairs[q].first), rc = find(pairs[q].second);
+			if (rb == rc || arc[q] < std::min(ghi[rb], ghi[rc]) - eps) continue;
+			persisted++;
+			//the death to 3 digits: the log's 4 decimals alone carry +-1e-4 against a 3e-4 wide eps window
+			if (log) {
+				char death[16];
+				std::snprintf(death, sizeof death, "%.2e", std::min(ghi[rb], ghi[rc]) - arc[q]);
+				std::cout << "  shell persistence join about atom " << na[pairs[q].first] << ": arc " << arc[q] << " vs " << std::min(ghi[rb], ghi[rc])
+						  << ", death " << death << std::endl;
+			}
+			root[std::max(rb, rc)] = std::min(rb, rc);
+			ghi[std::min(rb, rc)] = std::max(ghi[rb], ghi[rc]);
+		}
+		//The elder rule hands a dying shoulder whole to one of several equally reachable groups (Ni(CO)4: all four ligand-
+		//direction shoulders into -x, 3.7 e against 2.3). Its exits are the surviving group maxima it reaches within eps;
+		//over two or more groups the integrator splits it by saddle. Exits only to group tops: an arc to another shoulder
+		//runs over an axis maximum and would name the wrong group
+		int splits = 0;
+		if (split && eps > 0.0)
+			for (int b = 0; b < nb; b++) {
+				if (!shell[b] || na[b] < 0 || !(maxima[b][3] < ghi[find(b)])) continue;
+				shell_split s{ d3{ maxima[b][0], maxima[b][1], maxima[b][2] }, wavy->get_atom_pos(na[b]), {} };
+				ivec groups;
+				for (size_t q = 0; q < pairs.size(); q++) {
+					const int c = pairs[q].first == b ? pairs[q].second : pairs[q].second == b ? pairs[q].first : -1;
+					if (c < 0 || !shell[c] || maxima[c][3] < ghi[find(c)] || arc[q] < maxima[b][3] - eps) continue;
+					s.exits.emplace_back(sad[q], d3{ maxima[c][0], maxima[c][1], maxima[c][2] });
+					if (log) std::cout << "  shoulder " << b << " exit to " << c << " saddle dir " << sad[q][0] << " " << sad[q][1] << " " << sad[q][2] << ", arc " << arc[q] << std::endl;
+					if (std::find(groups.begin(), groups.end(), find(c)) == groups.end()) groups.push_back(find(c));
+				}
+				if (groups.size() < 2) continue;
+				splits++;
+				split->push_back(std::move(s));
+			}
+		if (splits) std::cout << "Split " << splits << " shell shoulders between their exit basins by saddle direction." << std::endl;
+		std::cout << "Shell saddle merge (phi " << phi << ", shell persistence " << eps << "): " << pairs.size() << " same-atom pairs tested, "
+				  << joined << " saddle-joined, " << persisted << " shell pairs joined." << std::endl;
 	}
 	ivec keeper(nb);
 	for (int b = 0; b < nb; b++) { const int r = find(b); keeper[b] = (r == b ? -1 : r); }
@@ -1886,6 +1951,61 @@ bool bounded_eli_ascent(const WFN &wavy, const eli_spin_field &eli, d3 &p, doubl
 	return true;
 }
 
+//One linearly implicit Euler step of the gradient flow dx/dt = g: (I - tau H) dx = tau g. A TM outer-core shell is a
+//curved ridge whose radial curvature is ~1e4 times the tangential one (Ni(CO)4: 1.4092-1.4145 over the whole shell), so an
+//explicit step longer than g_t/H_rr overshoots the crest and the walk stops rising on a steep slope. The implicit step
+//lands on the crest along the stiff direction and moves tau g along the soft ones; tau -> infinity is the Newton step onto
+//a maximum. H from central differences of the analytic gradient. tau is the largest (doubling from len/|g|) whose step
+//stays within len and keeps I - tau H positive definite, then halved until the field rises. vg(p, g) returns the value.
+//False when no step rises: p is a maximum to the field's precision.
+template <class VG>
+static bool implicit_ascent_step(const VG &vg, d3 &p, double &f, d3 &g, const double len)
+{
+	const double gn = array_length(g);
+	if (!(gn > 0.0) || !std::isfinite(gn)) return false;
+	constexpr double h = 1e-4;
+	double H[3][3];
+	for (int k = 0; k < 3; k++) {
+		d3 a = p, b = p, ga, gb;
+		a[k] += h; b[k] -= h;
+		vg(a, ga); vg(b, gb);
+		for (int i = 0; i < 3; i++) H[i][k] = (ga[i] - gb[i]) / (2.0 * h);
+	}
+	for (int i = 0; i < 3; i++)
+		for (int k = 0; k < i; k++) H[i][k] = H[k][i] = 0.5 * (H[i][k] + H[k][i]);
+	//(I - tau H) d = tau g by Cramer; false unless the matrix is positive definite (Sylvester) and d within len
+	auto solve = [&](const double tau, d3 &d) {
+		double A[3][3];
+		for (int i = 0; i < 3; i++)
+			for (int k = 0; k < 3; k++) A[i][k] = (i == k) - tau * H[i][k];
+		const double m2 = A[0][0] * A[1][1] - A[0][1] * A[1][0];
+		const double det = A[0][0] * (A[1][1] * A[2][2] - A[1][2] * A[2][1]) - A[0][1] * (A[1][0] * A[2][2] - A[1][2] * A[2][0]) + A[0][2] * (A[1][0] * A[2][1] - A[1][1] * A[2][0]);
+		if (!(A[0][0] > 0.0) || !(m2 > 0.0) || !(det > 0.0)) return false;
+		const d3 b{ tau * g[0], tau * g[1], tau * g[2] };
+		for (int c = 0; c < 3; c++) {
+			double M[3][3];
+			for (int i = 0; i < 3; i++)
+				for (int k = 0; k < 3; k++) M[i][k] = k == c ? b[i] : A[i][k];
+			d[c] = (M[0][0] * (M[1][1] * M[2][2] - M[1][2] * M[2][1]) - M[0][1] * (M[1][0] * M[2][2] - M[1][2] * M[2][0]) + M[0][2] * (M[1][0] * M[2][1] - M[1][1] * M[2][0])) / det;
+		}
+		return std::isfinite(d[0] + d[1] + d[2]) && array_length(d) <= len;
+	};
+	double tau = len / gn, best = -1.0;
+	d3 d, dbest{};
+	for (int k = 0; k < 60 && solve(tau, d); k++) { best = tau; dbest = d; tau *= 2.0; }
+	for (tau = 0.5 * len / gn; best < 0.0 && tau > 1e-12 * len / gn; tau *= 0.5)
+		if (solve(tau, d)) { best = tau; dbest = d; }
+	for (int k = 0; k < 30 && best > 0.0; k++) {
+		const d3 t{ p[0] + dbest[0], p[1] + dbest[1], p[2] + dbest[2] };
+		d3 gt;
+		const double ft = vg(t, gt);
+		if (std::isfinite(ft) && ft > f) { p = t; f = ft; g = gt; return true; }
+		best *= 0.5;
+		if (!solve(best, dbest)) break;
+	}
+	return false;
+}
+
 std::vector<d4> analytic_eli_maxima(const WFN &wavy, const bool debug, const eli_spin_field *eli)
 {
 	//rho comes out of computeELIGrad's own orbital pass; the spin field leaves it unset (nullptr)
@@ -2021,6 +2141,30 @@ std::vector<d4> analytic_eli_maxima(const WFN &wavy, const bool debug, const eli
 			if (std::pow(m[0] - ends[s][0], 2) + std::pow(m[1] - ends[s][1], 2) + std::pow(m[2] - ends[s][2], 2) < 0.01) { seen = true; break; }
 		if (!seen) maxima.push_back(ends[s]);
 	}
+	//The explicit climb stops short on a shell's crest, 0.1 bohr from the true maximum with a gradient left (Ni(CO)4: 4 of 14
+	//shell maxima, each stealing up to 0.6 e). Implicit steps finish each walk; then the dedup runs again. A spin field's surface
+	//attractor stays where bounded_eli_ascent left it
+	{
+		auto vg = [&](const d3 &p, d3 &g) { double f; eli_grad(p, f, g); return f; };
+#pragma omp parallel for schedule(dynamic, 1)
+		for (int k = 0; k < static_cast<int>(maxima.size()); k++) {
+			d3 p{ maxima[k][0], maxima[k][1], maxima[k][2] }, g;
+			if (wavy.compute_dens(p) < 2.0 * basin_density_cutoff) continue;
+			double f = vg(p, g);
+			for (int it = 0; it < 200 && implicit_ascent_step(vg, p, f, g, 0.05); it++) {}
+			if (wavy.compute_dens(p) >= basin_density_cutoff && f >= maxima[k][3]) maxima[k] = d4{ p[0], p[1], p[2], f };
+		}
+		std::stable_sort(maxima.begin(), maxima.end(), [](const d4 &x, const d4 &y) { return x[3] > y[3]; });
+		std::vector<d4> polished;
+		for (const d4 &e : maxima) {
+			bool seen = false;
+			for (const d4 &m : polished)
+				if (std::pow(m[0] - e[0], 2) + std::pow(m[1] - e[1], 2) + std::pow(m[2] - e[2], 2) < 0.01) { seen = true; break; }
+			if (!seen) polished.push_back(e);
+		}
+		if (debug) std::cout << "ELI-D maxima after implicit polish: " << polished.size() << " of " << maxima.size() << std::endl;
+		maxima.swap(polished);
+	}
 	//A seed on a mirror plane climbs inside it and can stop on a saddle of the full field. As in the density's accept, six
 	//axis-displaced starts must come back; a saddle loses one to a clearly higher end elsewhere. Not tested: a nuclear
 	//maximum, a spin field's surface attractor and the near-equal maxima on a core shell's ridge, which the core/shell
@@ -2139,6 +2283,8 @@ static bool g_adaptive_step = false;
 static std::atomic<long long> g_adp_steps{ 0 }, g_adp_tries{ 0 }, g_adp_turn{ 0 }, g_adp_fall{ 0 }, g_adp_shrink{ 0 };
 //Trajectories that ran their step budget out
 static std::atomic<long long> g_adp_exhaust{ 0 };
+//ELI-D stalls handed to the implicit ridge walk, and how many of those reached an attractor
+static std::atomic<long long> g_ridge_walks{ 0 }, g_ridge_done{ 0 };
 //Steps a single trajectory may take before it is given up on (NOS_BASIN_STEP_CAP)
 static constexpr int step_cap_default = 2000;
 static int g_step_cap = step_cap_default;
@@ -2321,7 +2467,7 @@ int basin_memo::settled(const d3 &p) const
 	return static_cast<int>(label);
 }
 
-vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, const std::vector<d4> &maxima, const WFN &wavy, const int accuracy, const bool eli_field, vec &volumes, double &outside, const std::function<double(const d3&)> *core_density, const std::function<void(const d3&, d3&)> *core_gradient, const int grid_boost, const density_field *field, basin_overlaps *ovl, const ivec *maximum_basin, const eli_spin_field *eli, vec2 *spin_pop)
+vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, const std::vector<d4> &maxima, const WFN &wavy, const int accuracy, const bool eli_field, vec &volumes, double &outside, const std::function<double(const d3&)> *core_density, const std::function<void(const d3&, d3&)> *core_gradient, const int grid_boost, const density_field *field, basin_overlaps *ovl, const ivec *maximum_basin, const eli_spin_field *eli, vec2 *spin_pop, const std::vector<shell_split> *split)
 {
 	if (!eli_field) eli = nullptr;
 	if (!eli) spin_pop = nullptr;
@@ -2353,11 +2499,52 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 		if (v > 0.0 && v <= 1.0) g_shrink_floor = v;
 	}
 	//The basin a maximum belongs to, 1-based; without a map that is the maximum's own index
-	auto basin_of = [&](const size_t m) { return maximum_basin ? (*maximum_basin)[m + 1] : static_cast<int>(m) + 1; };
+	auto final_of = [&](const size_t m) { return maximum_basin ? (*maximum_basin)[m + 1] : static_cast<int>(m) + 1; };
 	int nb = 0;
 	if (!streaming) nb = basin_cube->max_value();
 	else if (!maximum_basin) nb = static_cast<int>(maxima.size());
-	else for (size_t m = 0; m < maxima.size(); m++) nb = std::max(nb, basin_of(m));
+	else for (size_t m = 0; m < maxima.size(); m++) nb = std::max(nb, final_of(m));
+	//A split shoulder (shell_split) answers walks as basin nb + 1 + k; settle hands the point to the exit whose saddle is
+	//nearest in angle about the atom. Exits are found by position: every later merge keeps a member's exact position
+	struct split_at { d3 o; std::vector<std::pair<d3, int>> exits; int home; };
+	std::vector<split_at> splits;
+	ivec split_of(maxima.size(), -1);
+	if (split && streaming && eli_field) {
+		auto raw = [&](const d3 &x) {
+			for (size_t m = 0; m < maxima.size(); m++)
+				if (std::pow(x[0] - maxima[m][0], 2) + std::pow(x[1] - maxima[m][1], 2) + std::pow(x[2] - maxima[m][2], 2) < 1e-12) return static_cast<int>(m);
+			return -1;
+		};
+		for (const shell_split &s : *split) {
+			const int m = raw(s.at);
+			if (m < 0 || split_of[m] >= 0) continue;
+			split_at t{ s.o, {}, final_of(m) };
+			bool several = false;
+			for (const auto &e : s.exits) {
+				const int c = raw(e.second);
+				if (c < 0) continue;
+				t.exits.emplace_back(e.first, final_of(c));
+				several |= final_of(c) != t.exits.front().second;
+			}
+			if (!several) continue;
+			split_of[m] = static_cast<int>(splits.size());
+			splits.push_back(std::move(t));
+		}
+	}
+	auto basin_of = [&](const size_t m) { return split_of[m] >= 0 ? nb + 1 + split_of[m] : final_of(m); };
+	auto settle = [&](const int n, const d3 &p) {
+		if (n <= nb) return n;
+		const split_at &s = splits[n - nb - 1];
+		const d3 v{ p[0] - s.o[0], p[1] - s.o[1], p[2] - s.o[2] };
+		if (!(array_length(v) > 1e-6)) return s.home;
+		int best = s.home;
+		double cos_best = -2.0;
+		for (const auto &e : s.exits) {
+			const double c = v[0] * e.first[0] + v[1] * e.first[1] + v[2] * e.first[2];
+			if (c > cos_best) { cos_best = c; best = e.second; }
+		}
+		return best;
+	};
 	//The overlap matrices use the populations' points and weights: a point's density is sum_i occ_i phi_i^2, so their
 	//diagonal sums to the population exactly
 	if (ovl && field) ovl = nullptr;
@@ -2696,10 +2883,23 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 		basin_stall_gave_to(b);
 		return b;
 	};
+	//An ELI-D walk that stops rising on a steep slope straddles a ridge crest, not a maximum (Ni(CO)4: 4623 of 4726 stalls at
+	//|g| >= 1e-2, all on the Ni shell). Implicit steps follow the crest to its attractor; 0 when they stop rising first
+	auto ridge_walk = [&](d3 r, const double len) {
+		if (!eli_field) return 0;
+		adp_count(g_ridge_walks);
+		d3 g;
+		double f = value_and_gradient(r, g);
+		for (int s = 0; s < 400; s++) {
+			if (const int m = at_maximum(r)) { adp_count(g_ridge_done); return m; }
+			if (valence(r) < basin_density_cutoff || !implicit_ascent_step(value_and_gradient, r, f, g, len)) return 0;
+		}
+		return 0;
+	};
 	//kind says who asked (climb_outer...). Every clean ending is written to the memo, but only
 	//the edge probes read it: a cell centre or a bisection probe is climbed because it sits within
 	//a cell of the separatrix, which is exactly where a 3x3x3 block can be wrong
-	auto climb = [&](const d3 &p, long long &lb, long long &ll, const int kind) {
+	auto climb_walk = [&](const d3 &p, long long &lb, long long &ll, const int kind) {
 		if (valence(p) < basin_density_cutoff) return 0;
 		bool settled;
 		int b = lookup(p, settled);
@@ -2806,7 +3006,8 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 						pending = 0;
 						continue;
 					}
-					const int n = stalled(p, r, std::sqrt(g[0] * g[0] + g[1] * g[1] + g[2] * g[2]));
+					int n = ridge_walk(r_prev, floor_step);
+					if (!n) n = stalled(p, r, std::sqrt(g[0] * g[0] + g[1] * g[1] + g[2] * g[2]));
 					if (n) return n;
 					break;
 				}
@@ -2865,9 +3066,14 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 			}
 		}
 		//Assign a stalled streaming trajectory by its starting point.
-		if (streaming) { adp_count(g_adp_exhaust); return stalled(p, r); }
+		if (streaming) {
+			adp_count(g_adp_exhaust);
+			if (const int n = ridge_walk(r, step_at(r))) return n;
+			return stalled(p, r);
+		}
 		return b;
 	};
+	auto climb = [&](const d3 &p, long long &lb, long long &ll, const int kind) { return settle(climb_walk(p, lb, ll, kind), p); };
 	//Bisect a radial cell only when its edge trajectories reach different basins.
 	constexpr int bisections = 6;
 	long long boundary_points = 0, lost = 0;
@@ -3043,7 +3249,7 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 					accumulate(bb, w * fr);
 				};
 				if (rho < basin_density_cutoff) { give(0, 1.0); return; }
-				if (!skip.empty() && skip[i]) { give(nearest_maximum(p, stall_reach), 1.0); return; }
+				if (!skip.empty() && skip[i]) { give(settle(nearest_maximum(p, stall_reach), p), 1.0); return; }
 				//A gridded ELI-D takes a cell whose neighbourhood agrees from the grid; streaming has no grid and refines every cell
 				if (eli_field && !streaming && (b == 0 || settled)) { give(b, 1.0); return; }
 				//Climb the cell centre only when the edge probes do not decide its basin.
@@ -3101,7 +3307,7 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 			bool settled;
 			//Streaming has no basin cube to read the nucleus out of; it is one of the maxima by
 			//construction, so the maximum it sits on is its basin
-			const int b = streaming ? at_maximum(wavy.get_atom_pos(a)) : lookup(wavy.get_atom_pos(a), settled);
+			const int b = streaming ? settle(at_maximum(wavy.get_atom_pos(a)), wavy.get_atom_pos(a)) : lookup(wavy.get_atom_pos(a), settled);
 			if (b > 0) pop[b - 1] += ncore;
 			else outside += ncore;
 		}
@@ -3123,7 +3329,9 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 		for (int i = 0; i < 4; i++) sgn[i] = g_stall_gn[i].load();
 		for (int i = 0; i <= g_stall_basins; i++) sto[i] = g_stall_to[i].load();
 		const long long sx = g_adp_exhaust.exchange(0);
+		const long long rw = g_ridge_walks.exchange(0), rd = g_ridge_done.exchange(0);
 		basin_stall_counters_reset();
+		if (g_basin_timing && rw > 0) std::cout << "  " << fieldname << "ridge walks: " << rd << " of " << rw << " stopped walks reached an attractor by implicit steps" << std::endl;
 		//Own stream, so the scientific format does not stay on std::cout
 		if (g_basin_timing && sf + sv + sx > 0) {
 			std::ostringstream line;
