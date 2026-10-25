@@ -240,7 +240,7 @@ void stored_eri::jk(const occ::Mat* const* D, const int nd, occ::Mat& J, occ::Ma
 		for (int a = 0; a < n; a++) rmax = std::max(rmax, rm[a]);
 	}
 	std::vector<std::vector<double>> Jp(nthr);
-	std::vector<occ::Mat> Kp(nthr * nd);
+	std::vector<occ::Mat> Kp((size_t)nthr * nd);
 #pragma omp parallel
 	{
 		std::vector<double> Jl(npk, 0.0), t(n);

@@ -484,7 +484,7 @@ void GTOeval_sph_iter(FPtr_eval feval, FPtr_exp fexp, double fac,
 		if (non0table[bas_id] &&
 			(*fexp)(eprim, pcoord, p_exp, pcoeff, l, np, nc, bgrids, fac1)) {
 			dcart = (l + 1) * (l + 2) / 2;
-			di = nc * dcart;
+			di = (size_t)nc * dcart;
 			ri = env + atm[PTR_COORD + atm_id * ATM_SLOTS];
 			if (l <= 1) { // s, p functions
 				(*feval)(ao + ao_id * ngrids, ri, eprim, pcoord, p_exp, pcoeff,
