@@ -39,7 +39,8 @@ namespace
 	double integrate_density(const HE_Spherical_Atom &a)
 	{
 		const double lo = std::log(1e-8), hi = std::log(40.0);
-		const int n = 400000;
+		//20000 points move every count by at most 3.2e-5 from 400000, far inside the 5e-3 and 2e-2 below
+		const int n = 20000;
 		const double dl = (hi - lo) / (n - 1);
 		double sum = 0.0;
 		for (int i = 0; i < n; i++)
