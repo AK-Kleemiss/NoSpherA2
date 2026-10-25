@@ -40,6 +40,14 @@ static int run_app_impl(int argc, char **argv);
 //The log run_app_impl() writes to, so the catch block below can append the error to it
 static std::filesystem::path current_log_path;
 
+//occ's packed three-centre integrals get half of -mem, else of what the job can have; a df_store_memory_mb in the toml wins
+static void set_occ_df_budget(occ::io::OccInput &config, const options &opt)
+{
+	if (config.method.df_store_memory_mb > 0.0) return;
+	const double avail = opt.mem_given ? opt.mem : available_memory_bytes() / 1048576.0;
+	if (avail > 0.0) config.method.df_store_memory_mb = avail / 2;
+}
+
 //Wrapper so an exception from deep inside a file parser reports instead of fail-fast
 int run_app(int argc, char **argv)
 {
@@ -537,6 +545,7 @@ static int run_app_impl(int argc, char **argv)
 				}
 				log_file << "Running OCC for " << opt.combined_tsc_calc_files[i] << "..." << endl;
 				occ::io::OccInput config = occ::io::read_occ_input_file(opt.combined_tsc_calc_files[i].string());
+				set_occ_df_budget(config, opt);
 				std::filesystem::path log_path = opt.combined_tsc_calc_files[i].stem().string() + ".log";
 				occ::log::set_log_file(log_path.string());
 				occ::parallel::set_num_threads(config.runtime.threads);
@@ -764,6 +773,7 @@ static int run_app_impl(int argc, char **argv)
 					return 1;
 				}
 				occ::io::OccInput config = occ::io::read_occ_input_file(opt.occ);
+				set_occ_df_budget(config, opt);
 				occ::log::set_log_file("NoSpherA2_OCC.log");
 				occ::parallel::set_num_threads(config.runtime.threads);
 				wavy.emplace_back(wavefunction_from_occ_input(opt.occ, config, log_file));

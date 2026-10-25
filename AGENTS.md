@@ -290,6 +290,12 @@ alternative is one flag away in each case.
 
 ## Current Validation Notes
 
+As of 2026-10-25, `-occ` with a `df-basis` stores occ's three-centre integrals packed over the screened shell pairs
+(`occ/qm/df_packed_store.h`, `Policy::Choose` natively) within half of `-mem` or of the job's memory, recomputing what does
+not fit; `DfPackedStoreTests` (new) and the occ goldens pass, and occ's direct general-spin exchange no longer corrupts its
+beta-beta block. `ctest --preset release-linux-tests` on a CPU-only 4-core VM reports **1299 passed, 0 failed, 20 skipped**
+(2 disabled) of 1321. See `UNIT_TESTS_STATUS.md`.
+
 As of 2026-10-20, `-occ` with `method = "mp2"` / `"ccsd"` / `"ccsd(t)"` gives the relaxed MP2 / unrelaxed CCSD / CCSD(T)
 density (CC canonical or local cluster-in-molecule, converged to ORCA's STol), and `"mp3"` / `"mp4(sdq)"` / `"mp4"` the
 unrelaxed MPn density as ORCA's AutoCI (`CcsdDensity.OccMp4DensityMatchesOrcaAutoci`, `mp4_occ_water`); `-wfn` reads ORCA's

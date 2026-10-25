@@ -80,7 +80,7 @@ you are memory-constrained.
 | `-hkl_min_max <h1 h2 k1 k2 l1 l2>` | 6 | `-100..100` each | Bound the generated index range. |
 | `-old_tsc` | 0 | off | Write text `.tsc` instead of binary `.tscb`. |
 | `-tsc_block <n>` | 1 | derived from `-mem` | Reflections per streamed block. `0` means hold the whole table in memory. |
-| `-mem <MB>` | 1 | `1000.0` | Memory budget the block size is derived from. |
+| `-mem <MB>` | 1 | `1000.0` | Memory budget the block size is derived from. When given, half of it also bounds occ's stored density-fitting integrals for `-occ` (see below). |
 | `-tsc_labels` | 0 | off | Key the table rows by atom label instead of atom ID. |
 | `-tsc_labels <table> <cif> [out]` | 2-3 | `<table>.labels.tsc` | Rewrite an existing table's IDs into labels using the CIF. One-shot. |
 | `-merge <a.tsc> <b.tsc> ...` | 2+ | | Merge tables, checking that the reflection sets agree. One-shot. |
@@ -98,6 +98,13 @@ you are memory-constrained.
 | `-method <name>` | 1 | | Record the QM method used (goes into the table header). |
 | `-refine [acc]` | 0-1 | `0.1` | Numerical integral accuracy for the refinement path. |
 | `-occ <file>` | 1 | | An occ input (`.toml`) that occ runs, or an occ wavefunction file. With `method = "mp2"`, `"mp3"`, `"mp4(sdq)"`, `"mp4"`, `"ccsd"` or `"ccsd(t)"` the density is the correlated one (relaxed MP2, unrelaxed MP3 / MP4 / CCSD / CCSD(T)), not the SCF one; see [Correlated densities](#correlated-densities-mp2-ccsd-ccsdt) for methods, backends and keys. |
+
+With density fitting (`df-basis` in `[scf]`), occ stores the three-centre integrals over the screened shell pairs,
+one triangle, packed, so the SCF does not recompute them every Fock build. They get half of `-mem` when it is given, else
+half of the memory the job can have; `df_store_memory_mb` in `[scf]` sets the budget explicitly. Pairs that do not fit
+are recomputed every build for J, and exchange stays integral-direct unless every pair fits. `use_direct_df_kernels = true`
+recomputes everything. Sucrose r2SCAN/def2-SVP: SCF 54.8 s direct, 15.8 s stored (1.16 GB), 28.3 s at
+`df_store_memory_mb = 500`, the same energy to 1e-12 Eh.
 
 ### Correlated densities: MP2, CCSD, CCSD(T)
 
