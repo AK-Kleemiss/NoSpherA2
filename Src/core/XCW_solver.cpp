@@ -796,7 +796,8 @@ void XCW_solver::run() {
 #endif
 	// Computes the four center integrals and keeps them in memory if possible
 	const size_t avail = sf.free_memory();
-	scf_solver.setup_eri(hf, avail);
+	//NOSPHERA2_XCW_ERI_NO_BUDGET holds the integrals whatever -mem leaves for them
+	scf_solver.setup_eri(hf, tuning("NOSPHERA2_XCW_ERI_NO_BUDGET") ? 0 : avail);
 	//The TRAH Hessian products, fitted: the iterations keep exact Fock builds, so only TRAH steps
 	//can change. Without the stored integrals a product costs a direct build, two fitted builds
 	//are cheaper (TEMPO SVP at -mem 2500: 383 -> 296 s, same builds, Fcalc to 1e-4), so they are

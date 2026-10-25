@@ -148,7 +148,7 @@ set_tests_properties(
 
 # XcwScfTests.SharedTensorBuild writes the P1 subset's I tensor and stored two-electron integrals into
 # NOS_TEST_SHARED_DIR; these runs test the SCF, not the tensor, and read them instead of each building the same.
-# SaveThenRead and the two halting-report runs on the P1 subset build their tensors and read only the integrals
+# SaveThenRead and the three halting-report runs on the P1 subset build their tensors and read only the integrals
 set_tests_properties(
     XcwScfTests.SharedTensorBuild
     PROPERTIES
@@ -170,6 +170,7 @@ set_tests_properties(
     XcwScfTests.SaveThenReadTensorReproducesLambdaZero
     XcwHaltingReportTests.HaltingReportsAcrossTheExtendedLambdaScan
     XcwHaltingReportTests.StreamedTensorRoundTrip
+    XcwHaltingReportTests.StreamedTensorIsSavedWhereSaveSays
     PROPERTIES
         FIXTURES_REQUIRED xcw_p1_tensor
 )

@@ -438,7 +438,8 @@ The I tensor runs on the GPU by default; `-gpu_itensor`, `-gpu_itensor_tensor`,
 choose how. The partitioning flags of [section 3](#3-partitioning-grids-and-basis)
 and `-all_charges` apply to each `.tscb` written. Developer knobs, through
 `-tune NAME=value`: `NOSPHERA2_XCW_I_FLOAT` (single-precision tensor),
-`NOSPHERA2_NO_INVERSION_SCREENING` (integrate both h and -h) and
+`NOSPHERA2_NO_INVERSION_SCREENING` (integrate both h and -h),
+`NOSPHERA2_XCW_ERI_NO_BUDGET` (store the two-electron integrals outside `-mem`) and
 `NOSPHERA2_DEBUG_ASYMFACT` (print the symmetry factors).
 
 Example, run in `tests/P1_test`:

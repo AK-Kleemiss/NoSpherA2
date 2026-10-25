@@ -207,6 +207,13 @@ namespace {
 
 	const std::string RUN_BASE = "sloppy normal_conv params 177 basis_set sto-3g max_iter 100 F charge 0 mult 1 rhf start 0 step_size 0.01 ";
 
+	//-mem small enough to stream the tensor leaves no room for the stored integrals; the streaming is under test, not the direct Fock build
+	struct eri_unbudgeted {
+		std::string old; bool had = false;
+		eri_unbudgeted() { if (const char *e = tuning("NOSPHERA2_XCW_ERI_NO_BUDGET")) { old = e; had = true; } set_tuning("NOSPHERA2_XCW_ERI_NO_BUDGET", "1"); }
+		~eri_unbudgeted() { set_tuning("NOSPHERA2_XCW_ERI_NO_BUDGET", had ? old.c_str() : nullptr); }
+	};
+
 }
 
 //Six requested lambda steps with the halting criterion on. A^2 never turns upward on this
@@ -341,6 +348,7 @@ TEST(XcwHaltingReportTests, StreamedTensorRoundTrip)
 	if (!fixture_present()) {
 		GTEST_SKIP() << "P1 fixture missing under " << fixture_dir();
 	}
+	const eri_unbudgeted pin;
 	const auto dir = scratch_dir();
 	int n_written = 0, n_strong = 0;
 	write_subset_hkl(dir / "subset.hkl", n_written, n_strong, 1e9);
@@ -427,12 +435,13 @@ TEST(XcwHaltingReportTests, StreamedTensorIsSavedWhereSaveSays)
 	if (!fixture_present()) {
 		GTEST_SKIP() << "P1 fixture missing under " << fixture_dir();
 	}
+	const eri_unbudgeted pin;
 	const auto dir = scratch_dir();
 	int n_written = 0, n_strong = 0;
 	write_subset_hkl(dir / "subset.hkl", n_written, n_strong, 1e9);
 	ASSERT_EQ(n_written, 402);
 
-	options opt = make_options(dir, RUN_BASE + "end 0 safe saved.bin");
+	options opt = make_options(dir, RUN_BASE + "end 0 safe saved.bin" + shared_eri(dir));
 	opt.mem_given = true;
 	opt.mem = 0.001;
 	const std::string out = run_xcw(dir, opt);
@@ -446,7 +455,7 @@ TEST(XcwHaltingReportTests, StreamedTensorIsSavedWhereSaveSays)
 	const std::vector<std::string> row = table_row(out, "0.00000");
 	ASSERT_EQ(row.size(), 9u) << out;
 
-	options opt2 = make_options(dir, RUN_BASE + "end 0 read saved.bin");
+	options opt2 = make_options(dir, RUN_BASE + "end 0 read saved.bin" + shared_eri(dir));
 	opt2.mem_given = true;
 	opt2.mem = 0.001;
 	const std::string out2 = run_xcw(dir, opt2);
