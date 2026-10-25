@@ -145,20 +145,23 @@ void Thakkar::calc_orbs(
 	// accumulation loses precision to rounding error from the addition
 	// order itself; compensated summation removes that source, leaving
 	// only the true per-term input differences (e.g. libm rounding).
-	double exponent;
 	double comp[19] = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
 	for (int ex = 0; ex < n_vector[atomic_number - 1]; ex++)
 	{
+		//one exp and one power per exponent, shared by every occupied orbital of the shell
+		const double exponent = -z[nr_ex] * dist;
+		const bool live = exponent > -46.5; // Corresponds to at least 1E-20
+		const double ez = live ? exp(exponent) : 0.0;
+		const double pw = live && n[nr_ex] != 1 ? fast_int_pow(dist, n[nr_ex] - 1) : 1.0;
 		for (int m = lower_m; m < upper_m; m++)
 		{
 			if (occ[offset + m] == 0)
 				continue;
-			exponent = -z[nr_ex] * dist;
-			if (exponent > -46.5)
-			{ // Corresponds to at least 1E-20
+			if (live)
+			{
 				const double term = (n[nr_ex] == 1)
-					? c[nr_coef] * exp(exponent)
-					: c[nr_coef] * fast_int_pow(dist, n[nr_ex] - 1) * exp(exponent);
+					? c[nr_coef] * ez
+					: c[nr_coef] * pw * ez;
 				const double y = term - comp[m];
 				const double t = Orb[m] + y;
 				comp[m] = (t - Orb[m]) - y;
