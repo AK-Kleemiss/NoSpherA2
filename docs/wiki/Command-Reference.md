@@ -173,7 +173,7 @@ what the NoSpherA2 paper describes.
 | `-becke` | 0 | Becke fuzzy-cell partitioning. Also `-Becke`, `-BECKE`. |
 | `-tfvc` | 0 | Topological fuzzy Voronoi cells. Also `-TFVC`. |
 | `-mbis` | 0 | Minimal-basis iterative stockholder. Also `-MBIS`. |
-| `-embis` | 0 | Extended MBIS. Also `-EMBIS`. |
+| `-embis` | 0 | Extended MBIS. Also `-EMBIS`. MBIS and EMBIS take their exponentials four at a time (`exp_kernel`, within 1 ulp of the CRT; sucrose charges and tsc identical to print precision); `-tune NOS_EXP_CRT` uses the CRT `exp` instead. |
 | `-ri_fit <basis...>` | 1+ | RI partitioning: fit the density in an auxiliary basis and partition the fit. See [section 8](#8-ri-density-fitting-salted-and-interaction-energies). Also `-RI_FIT`. |
 | `-sfac_diffuse <a> <b> <c> <cif> <wfn> <dmin>` | 6 | Diffuse-scattering form factors. One-shot. |
 | `-atom_sfac <wfn1> <wfn2>` | 2 | Compare the form factors of one atom between two wavefunctions. |

@@ -1126,6 +1126,8 @@ std::vector<std::pair<vec, vec>> make_MBIS_vectors(
 	//Atom A's moments integrate w_A rho over A's own grid with the plain atom weights (HORTON's local WPart),
 	//so no Becke cells are needed. NOS_MBIS_BECKE sums every grid with the Becke weights instead.
 	const bool becke = tuning("NOS_MBIS_BECKE") != nullptr;
+	//NOS_EXP_CRT: the CRT exp instead of exp_kernel, to measure the two against each other
+	const bool crt_exp = tuning("NOS_EXP_CRT") != nullptr;
 	for (size_t it = 0; it < 2000; it++) {
 		for (int j = 0; j < ncen; j++) {
 			std::fill(sig_pop_vector[j].first.begin(), sig_pop_vector[j].first.end(), 0.0);
@@ -1138,7 +1140,8 @@ std::vector<std::pair<vec, vec>> make_MBIS_vectors(
 		vec2 si_part(nthr), pop_part(nthr);
 #pragma omp parallel
 		{
-			vec rho0shell(ncen * 6, 0.0), dists(ncen, 0.0);
+			vec rho0shell(ncen * 6, 0.0), dists(ncen, 0.0), pre(ncen * 6), arg(ncen * 6), ex(ncen * 6);
+			ivec slot(ncen * 6);
 			double tmp = 0.0, density = 0.0, rho0 = 0.0, temp_res = 0.0, r0s = 0.0, sigval, dist_sq, bw, _x, _y, _z;
 			int j, shell, nshell, *ECP_els_j;
 			double dx[3], *dist_j, *pop, *si;
@@ -1156,6 +1159,7 @@ std::vector<std::pair<vec, vec>> make_MBIS_vectors(
 					std::fill(rho0shell.begin() + j0 * 6, rho0shell.begin() + j1 * 6, 0.0);
 					bw = b_weight[point];
 					density = bw * dens[point];
+					int n = 0;
 					_x = gx[point];
 					_y = gy[point];
 					_z = gz[point];
@@ -1183,12 +1187,25 @@ std::vector<std::pair<vec, vec>> make_MBIS_vectors(
 
 						for (shell = 0; shell < nshell; shell++) {
 							sigval = 1.0 / si[shell];
-							tmp = pop[shell] * constants::INV_EIGHT_PI * sigval * sigval * sigval * exp(-*dist_j * sigval);
-							if (abs(tmp) < 1e-20)
-								continue;
-							rho0shell[j * 6 + shell] = tmp;
-							rho0 += tmp;
+							pre[n] = pop[shell] * constants::INV_EIGHT_PI * sigval * sigval * sigval;
+							arg[n] = -*dist_j * sigval;
+							slot[n++] = j * 6 + shell;
 						}
+					}
+					//every exponential of the point in one vector loop, then summed in the order the shells were met
+					if (crt_exp)
+						for (int k = 0; k < n; k++)
+							ex[k] = exp(arg[k]);
+					else
+#pragma omp simd
+						for (int k = 0; k < n; k++)
+							ex[k] = exp_kernel(arg[k]);
+					for (int k = 0; k < n; k++) {
+						tmp = pre[k] * ex[k];
+						if (abs(tmp) < 1e-20)
+							continue;
+						rho0shell[slot[k]] = tmp;
+						rho0 += tmp;
 					}
 					if (rho0 == 0.0)
 						continue; // Avoid division by zero, if rho0 is zero, the point does not contribute to the integral
@@ -1345,6 +1362,7 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
 	}
 	//as in make_MBIS_vectors: A's own grid with the atom weights, unless NOS_MBIS_BECKE
 	const bool becke = tuning("NOS_MBIS_BECKE") != nullptr;
+	const bool crt_exp = tuning("NOS_EXP_CRT") != nullptr;
 	for (size_t it = 0; it < 2000; it++) {
 		for (int j = 0; j < ncen; j++) {
 			std::fill(sig_pop_vector[j].first.begin(), sig_pop_vector[j].first.end(), zeros_6);
@@ -1357,7 +1375,8 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
 		vec2 alpha_part(nthr), pop_part(nthr);
 #pragma omp parallel
 		{
-			vec rho0shell(ncen * 6, 0.0);
+			vec rho0shell(ncen * 6, 0.0), pre(ncen * 6), arg(ncen * 6), ex(ncen * 6);
+			ivec slot(ncen * 6);
 			double tmp = 0.0, density = 0.0, rho0 = 0.0, temp_res = 0.0, r0s = 0.0, g, det;
 			int j, shell, nshell, ind;
 			double *alpha, *d_local, *pop_p;
@@ -1393,6 +1412,7 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
 					std::fill(rho0shell.begin() + j0 * 6, rho0shell.begin() + j1 * 6, 0.0);
 					const double b_weight_point = b_weight[point];
 					density = b_weight_point * dens[point];
+					int n = 0;
 
 					// Pre-load grid coordinates once instead of accessing multiple times
 					const double gx_pt = gx[point];
@@ -1437,11 +1457,23 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
 							const double det_pop_val = det_pop_cache[ind + shell];
 							if (abs(det_pop_val) < constants::cutoff)
 								continue;
-							// Use fast exp approximation for better performance
-							tmp = det_pop_val * exp(-g);
-							rho0shell[ind + shell] = tmp;
-							rho0 += tmp;
+							pre[n] = det_pop_val;
+							arg[n] = -g;
+							slot[n++] = ind + shell;
 						}
+					}
+					//every exponential of the point in one vector loop, then summed in the order the shells were met
+					if (crt_exp)
+						for (int k = 0; k < n; k++)
+							ex[k] = exp(arg[k]);
+					else
+#pragma omp simd
+						for (int k = 0; k < n; k++)
+							ex[k] = exp_kernel(arg[k]);
+					for (int k = 0; k < n; k++) {
+						tmp = pre[k] * ex[k];
+						rho0shell[slot[k]] = tmp;
+						rho0 += tmp;
 					} //We first need to finish building total rho0 before we can calculate the contributions to the sigmas and populations
 					if (rho0 == 0.0)
 						continue; // Avoid division by zero, if rho0 is zero, the point does not contribute to the integral

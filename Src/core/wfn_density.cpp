@@ -59,43 +59,45 @@ namespace
 					else runs.back() = mo + 1;
 				}
 			//Eight functions per pass over phi, added one after the other: every element sees the products in the
-			//order the one-function loop adds them, with an eighth of the loads and stores of phi
+			//order the one-function loop adds them, with an eighth of the loads and stores of phi. The coefficients
+			//of an MO are loaded once for all K components, not once per component
 			const int nt = static_cast<int>(touched.size());
 			int i = 0;
 			for (; i + 8 <= nt; i += 8) {
 				const double* c[8];
-				const double* t[8];
+				double s[K][8];
 				for (int j = 0; j < 8; j++) {
 					c[j] = coef_ao + (size_t)touched[i + j] * nmo;
-					t[j] = v.data() + (size_t)K * touched[i + j];
+					const double* t = v.data() + (size_t)K * touched[i + j];
+					for (int k = 0; k < K; k++) s[k][j] = t[k];
 				}
-				for (int k = 0; k < K; k++) {
-					double* const pk = phi + (size_t)k * nmo;
-					const double s0 = t[0][k], s1 = t[1][k], s2 = t[2][k], s3 = t[3][k], s4 = t[4][k], s5 = t[5][k], s6 = t[6][k], s7 = t[7][k];
-					for (size_t r = 0; r < runs.size(); r += 2)
-						for (int mo = runs[r]; mo < runs[r + 1]; mo++) {
-							double x = pk[mo];
-							x += s0 * c[0][mo];
-							x += s1 * c[1][mo];
-							x += s2 * c[2][mo];
-							x += s3 * c[3][mo];
-							x += s4 * c[4][mo];
-							x += s5 * c[5][mo];
-							x += s6 * c[6][mo];
-							x += s7 * c[7][mo];
-							pk[mo] = x;
+				for (size_t r = 0; r < runs.size(); r += 2)
+#pragma omp simd
+					for (int mo = runs[r]; mo < runs[r + 1]; mo++) {
+						const double c0 = c[0][mo], c1 = c[1][mo], c2 = c[2][mo], c3 = c[3][mo], c4 = c[4][mo], c5 = c[5][mo], c6 = c[6][mo], c7 = c[7][mo];
+						for (int k = 0; k < K; k++) {
+							double x = phi[(size_t)k * nmo + mo];
+							x += s[k][0] * c0;
+							x += s[k][1] * c1;
+							x += s[k][2] * c2;
+							x += s[k][3] * c3;
+							x += s[k][4] * c4;
+							x += s[k][5] * c5;
+							x += s[k][6] * c6;
+							x += s[k][7] * c7;
+							phi[(size_t)k * nmo + mo] = x;
 						}
-				}
+					}
 			}
 			for (; i < nt; i++) {
 				const double* c = coef_ao + (size_t)touched[i] * nmo;
 				const double* t = v.data() + (size_t)K * touched[i];
-				for (int k = 0; k < K; k++) {
-					double* const pk = phi + (size_t)k * nmo;
-					const double ck = t[k];
-					for (size_t r = 0; r < runs.size(); r += 2)
-						for (int mo = runs[r]; mo < runs[r + 1]; mo++) pk[mo] += ck * c[mo];
-				}
+				for (size_t r = 0; r < runs.size(); r += 2)
+#pragma omp simd
+					for (int mo = runs[r]; mo < runs[r + 1]; mo++) {
+						const double cm = c[mo];
+						for (int k = 0; k < K; k++) phi[(size_t)k * nmo + mo] += t[k] * cm;
+					}
 			}
 			for (const int a : touched) hit[a] = 0;
 		}

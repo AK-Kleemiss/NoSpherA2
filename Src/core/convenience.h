@@ -1,5 +1,6 @@
 ﻿#pragma once
 #include "pch.h"
+#include <bit>
 #include "throughput.h"
 #include "extinction.h"
 #include "tuning.h"
@@ -313,6 +314,28 @@ inline void sincos_shared_n(const int n, const double* x, double* s, double* c) 
 // No NEON double lanes (armv7, or an OpenBLAS build off ARM64, which XCW's sincos needs): angle by angle
 inline void sincos_shared_n(const int n, const double* x, double* s, double* c) {
 	for (int p = 0; p < n; p++) sincos_shared(x[p], s + p, c + p);
+}
+#endif
+
+// exp by fdlibm's e_exp: k = round(x / ln2) by the 1.5*2^52 shift, Cody-Waite reduction, the rational kernel, 2^k into
+// the exponent bits; within 1 ulp of the CRT. Selects are bit masks, so a #pragma omp simd loop vectorises it without
+// -fno-trapping-math. x below -708.39 gives 0; for x <= 0 only, 2^k overflows above 709.
+// MSVC takes the CRT: /fp:fast folds (x/ln2 + 1.5*2^52) - 1.5*2^52 back to x/ln2 (MBIS diverged), and with float_control
+// precise the kernel was 15 % slower than its vectorised CRT exp, which these loops get anyway (sucrose MBIS 0.98 -> 0.82 s).
+#ifdef _MSC_VER
+inline double exp_kernel(const double x) { return std::exp(x); }
+#else
+inline double exp_kernel(const double x) {
+	const uint64_t keep = x < -708.39 ? 0 : ~uint64_t(0);
+	const double xc = std::bit_cast<double>((std::bit_cast<uint64_t>(x) & keep) | (std::bit_cast<uint64_t>(-708.39) & ~keep));
+	const double kk = xc * 1.44269504088896338700e+00 + 6755399441055744.0;
+	const double k = kk - 6755399441055744.0;
+	const double hi = xc - k * 6.93147180369123816490e-01, lo = k * 1.90821492927058770002e-10;
+	const double r = hi - lo, t = r * r;
+	const double c = r - t * (1.66666666666666019037e-01 + t * (-2.77777777770155933842e-03 + t * (6.61375632143793436117e-05 +
+		t * (-1.65339022054652515390e-06 + t * 4.13813679705723846039e-08))));
+	const double y = 1.0 - ((lo - (r * c) / (2.0 - c)) - hi);
+	return y * std::bit_cast<double>(((std::bit_cast<uint64_t>(kk) + 1023) << 52) & keep);
 }
 #endif
 
