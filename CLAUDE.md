@@ -239,6 +239,11 @@ Key core modules live in `Src/core`:
 
 ## Current Validation Notes
 
+As of 2026-10-26 (XCW partitions), `-xcw_partition ri` runs XCW on an RI partition of the density ((mu nu|P) from occ, exact
+transpose for the perturbation, `-multipole_moments` restraints to Hirshfeld, TFVC, MBIS or EMBIS moments); `ctest --preset
+release-linux-tests` on a CPU-only 4-core VM reports **1326 passed, 0 failed, 23 skipped** (2 disabled) of 1349. See
+`UNIT_TESTS_STATUS.md`.
+
 As of 2026-10-26 (speed audit), restraint rows enter the RI fit by threads in row order (bit-identical), XCW's later
 steps reuse the factor of the restrained H through `PartitionCache`, and CIF rows are checked against known atoms
 serially; `ctest --preset release-linux-tests` on a CPU-only 4-core VM reports **1325 passed, 0 failed, 23 skipped**

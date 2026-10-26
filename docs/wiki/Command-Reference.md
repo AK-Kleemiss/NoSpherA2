@@ -431,6 +431,7 @@ The SCF details go to `SCF.log`.
 | --- | --- | --- | --- |
 | `-do_XCW` | 0 | off | Run the XCW lambda scan. Needs `-cif`, `-hkl` and `-XCW_settings`. |
 | `-XCW_settings <file>` | 1 | | Settings file; see [settings-file keywords](#settings-file-keywords). |
+| `-xcw_partition grid\|ri` | 1 | `grid` | How XCW shares the density among the atoms for F_calc. `grid`: the grid weights (`-hirsh` default). `ri`: an RI fit of the density in the `-ri_fit` basis (AutoAux without one), (mu nu\|P) from occ held in memory; with `-multipole_moments` its atomic moments are restrained, exactly to the grid's Hirshfeld moments, or for `tfvc`, `mbis`, `embis` to the moments of the previous step's converged density, held fixed within a step. |
 | `-xyz <file>` | 1 | | The grown molecule, for a settings file with `grown`. |
 | `-twin <9 numbers>` | 9 | | Twin laws applied to the reflections, as in [section 2](#2-scattering-factors-and-tsctscb-tables). |
 | `-mem <MB>` | 1 | | When given, caps the I tensor, the density-fitting integrals and the stored two-electron integrals together; without it they are sized from the memory the job can have. |

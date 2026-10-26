@@ -331,7 +331,9 @@ occ::Mat XCW_solver::perturbation_response(const dMatrix2& dD_eff, const double 
 	//dF_r = Sum c I_r dD_eff: calc_F_calc's walk with the fixed part zeroed
 	const cvec F0 = sf.scatter_data.F_calc, fixed = sf.scatter_data.anom_correction;
 	std::fill(sf.scatter_data.anom_correction.begin(), sf.scatter_data.anom_correction.end(), cdouble(0.0, 0.0));
+	sf.XR.response = true;
 	calc_F(sf, *I_tens, dD_eff);
+	sf.XR.response = false;
 	const cvec dFr = sf.scatter_data.F_calc;
 	sf.scatter_data.F_calc = F0;
 	sf.scatter_data.anom_correction = fixed;
@@ -617,7 +619,8 @@ void XCW_solver::create_tscb(const occ::qm::Wavefunction& wfn, const double& lam
 				worst = std::max(worst, dmax / fmax);
 			}
 			//ponytail: 1e-2 only catches a wrong layout; the grid-vs-tsc agreement itself is the 5e-5 of the F check
-			ok = ok && worst < 1e-2;
+			//the RI partition is not the tsc route's, so there the closest atom is all the layout can be matched by
+			ok = ok && (worst < 1e-2 || sf.XR.on);
 			std::cout << "XCW grid tscb: max |f_grid - f_tsc| / max |f| " << std::scientific << std::setprecision(2) << worst << std::defaultfloat
 				<< (ok ? ", later steps write the tscb from the grid" : ", layout not matched, the tsc route stays") << std::endl;
 			if (ok) {
@@ -625,6 +628,12 @@ void XCW_solver::create_tscb(const occ::qm::Wavefunction& wfn, const double& lam
 				tscb_hkl_ = result.get_index_vector();
 				tscb_entry_ = entry;
 				tscb_atom_ = atom;
+			}
+			if (ok && sf.XR.on) {
+				cvec2 table(tscb_scat_.size(), cvec(tscb_entry_.size()));
+				for (int s = 0; s < static_cast<int>(table.size()); s++)
+					for (size_t r = 0; r < tscb_entry_.size(); r++) table[s][r] = grid_value(tscb_atom_[s], tscb_entry_[r]);
+				result = itsc_block(table, tscb_scat_, tscb_hkl_);
 			}
 		}
 	}
@@ -664,6 +673,12 @@ void XCW_solver::create_tscb(const occ::qm::Wavefunction& wfn, const double& lam
 	value.erase(std::remove(value.begin(), value.end(), '.'), value.end());
 	while (value.length() < 7) {
 		value += '0';
+	}
+	//the RI partition restrained to a scheme XCW's grid does not carry: this step's converged density sets the next step's targets
+	if (sf.XR.on && sf.XR.lmax >= 0 && (opt->multipole_scheme == MultipoleScheme::TFVC || opt->multipole_scheme == MultipoleScheme::MBIS || opt->multipole_scheme == MultipoleScheme::EMBIS)) {
+		const DensityFitting::CONFIG c = DensityFitting::config_from_options(*opt);
+		sf.set_ri_targets(DensityFitting::calculate_expected_multipoles(sf_wave_vec[0], c.charge_scheme, sf.XR.lmax, &tshb_cache_));
+		writer.log << "XCW partition: the RI restraints take the moments of this step's density for the next" << std::endl;
 	}
 	std::ostringstream oss;
 	oss << "NA2_" << value << (opt->write_tshb ? ".tshb" : ".tscb");
@@ -812,6 +827,45 @@ void XCW_solver::run() {
 	sf.set_anom();
 	// Computes the I tensor
 	I_tens = &sf.eval_I(hf.aobasis());
+	if (opt->xcw_partition == "ri") {
+		//AutoAux on the XCW atoms unless -ri_fit names a basis
+		WFN atoms_wfn(e_origin::NOT_YET_DEFINED);
+		for (const auto& a : hf.aobasis().atoms())
+			atoms_wfn.push_back_atom(constants::atnr2letter(a.atomic_number), a.x, a.y, a.z, a.atomic_number);
+		//gen_auto_aux reads the WFN-file convention, types from 1; the library stores l
+		for (int a = 0; a < atoms_wfn.get_ncen(); a++)
+			for (const SimplePrimitive& p : (*sf.orbital_basis)[atoms_wfn.get_atom_charge(a) - 1])
+				atoms_wfn.push_back_atom_basis_set(a, p.exp, p.coefficient, p.type + 1, p.shell);
+		std::vector<std::shared_ptr<BasisSet>> aux;
+		for (const auto& b : opt->aux_basis) aux.push_back(std::make_shared<BasisSet>(*b));
+		if (aux.empty())
+			aux.push_back(std::make_shared<BasisSet>());
+		//an empty set is auto_aux, filled for these atoms as generate_aux_wfn fills it
+		for (const auto& b : aux)
+			if (b->get_primitive_count() == 0) b->gen_auto_aux(atoms_wfn);
+		for (size_t i = 1; i < aux.size(); i++) *aux[0] += *aux[i];
+		sf.setup_ri(hf.aobasis(), aux[0]->to_AOBasis(hf.aobasis().atoms()), opt->multipole_lmax, opt->multipole_strength);
+	}
+	//NOSPHERA2_XCW_ADJOINT_CHECK: the perturbation is the transpose of F_calc, Re Sum_r pre_r (F_r(D) - anomalous_r) =
+	//2 <D, P(pre)>, at a random symmetric D and random pre, for whichever partition runs
+	if (tuning("NOSPHERA2_XCW_ADJOINT_CHECK") && sf.XG.mode == 1) {
+		std::mt19937 gen(7);
+		std::uniform_real_distribution<double> u(-1.0, 1.0);
+		const int n = sf.model_data.nmo;
+		dMatrix2 D(n, n);
+		for (int i = 0; i < n; i++)
+			for (int j = i; j < n; j++) D(i, j) = D(j, i) = u(gen);
+		cvec pre(sf.model_data.nr);
+		for (cdouble& p : pre) p = cdouble(u(gen), u(gen));
+		sf.grid_F(D);
+		occ::Mat P;
+		sf.grid_contract(P, pre);
+		double l1 = 0, l2 = 0;
+		for (int r = 0; r < sf.model_data.nr; r++) l1 += std::real(pre[r] * (sf.scatter_data.F_calc[r] - sf.scatter_data.anom_correction[r]));
+		for (int i = 0; i < n; i++)
+			for (int j = 0; j < n; j++) l2 += 2.0 * D(i, j) * P(i, j);
+		std::cout << "XCW adjoint check (" << (sf.XR.on ? "ri" : "grid") << "): " << std::scientific << std::setprecision(3) << std::abs(l1 - l2) / std::abs(l1) << std::defaultfloat << std::endl;
+	}
 #if defined(NOSPHERA2_USE_GPU) || defined(NOSPHERA2_USE_METAL)
 	//The two walks of an iteration read the whole tensor and the host is bound by its memory
 	//bandwidth doing so; the device reads it several times faster. The host copy stays for

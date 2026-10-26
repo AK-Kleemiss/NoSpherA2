@@ -149,10 +149,40 @@ public:
 	void plan_grid_fb(const struct sf_shell_layout& layout);
 	//F_calc = anomalous + the transform of rho(D), what calc_F_calc(I_tensor, D) gives
 	void grid_F(const dMatrix2& D);
-	//the per-atom transform of rho(D) at the cleaned entries, [g * nc + c]; grid_F's first half and the tscb's table
+	//the per-atom transform of rho(D) at the cleaned entries, [g * nc + c]; grid_F's first half and the tscb's table.
+	//The atoms' shares come from the grid weights, or from the RI fit when XR.on
 	cvec grid_sfc(const dMatrix2& D);
 	//out = Sum_r Re(pre_r I_r(mu, nu)) without forming I, what XCW_solver::contract_I gives
 	void grid_contract(occ::Mat& out, const cvec& pre);
+	//the weighted density 2 w_p rho(p) of every atom grid, grid_sfc's first half
+	vec2& grid_rho(const dMatrix2& D);
+	//out += Sum_p chi_mu V_p chi_nu over the blocks, the transpose of grid_rho for V_p = w_p v_p
+	void grid_apply_V(const vec2& V, occ::Mat& out);
+
+	//The atoms' shares of rho as an RI fit (-xcw_partition ri) instead of the grid weights: c = H^-1 (2 B D + R^T S^2 T(D)),
+	//B = (mu nu|P) from occ's density-fitting engine, H = J + R^T S^2 R, R the analytic multipoles of the aux functions about
+	//their atom and T(D) those of the grid partition (Hirshfeld, Becke or TFVC weights, linear in D); f_g(k) = Sum_{P on g}
+	//c_P F_P(k) in closed form. ri_contract runs the chain backwards, so the SCF gets the exact derivative. Targets of a
+	//scheme the grid does not carry (TFVC, MBIS, EMBIS) are set from each converged step for the next (set_ri_targets) and
+	//held fixed within it, so the derivative leaves them out; until the first such set the grid's own moments stand in
+	struct xcw_ri {
+		bool on = false, frozen = false, response = false;
+		int nbf = 0, naux = 0, lmax = -1, n_mom = 0;
+		occ::Mat B;
+		Eigen::LLT<occ::Mat> H;
+		occ::Mat R;
+		vec s2;
+		ivec atom_start;
+		std::vector<cvec> F;
+		vec2 M;
+		vec c, t0;
+		std::vector<occ::Mat> A;
+	} XR;
+	//moments [atom][l*l+l+m] in constants::spherical_harmonic's convention (DensityFitting's) as the fixed targets
+	void set_ri_targets(const vec2& moments);
+	void setup_ri(const occ::qm::AOBasis& ao, const occ::qm::AOBasis& aux, const int lmax, const double strength);
+	cvec ri_sfc(const dMatrix2& D);
+	void ri_contract(const cvec& H, occ::Mat& out);
 
 	//The entries of a rank-N symmetric tensor stored packed in the order i <= j <= k (<= l): the powers of x, y
 	//and z each one multiplies and how often its index tuple occurs among all 3^N

@@ -658,3 +658,38 @@ TEST(TshbJointTests, XcwStepsWriteTheirTshb)
 			EXPECT_FALSE(b.get_record(i).shells.empty()) << b.get_record(i).label;
 	}
 }
+
+//XCW's RI partition (-xcw_partition ri, AutoAux): the perturbation is the exact transpose of F_calc (NOSPHERA2_XCW_ADJOINT_CHECK,
+//random D and weights), unrestrained to round-off and with Hirshfeld moment restraints, whose targets go through the grid, to its
+//single-precision blocks; restrained to MBIS the targets come from the converged step and the scan still runs to its end
+TEST(XcwPartitionTests, RiPartitionPerturbationIsTheTransposeOfFcalc)
+{
+	const std::string cif = fs::absolute(fixture("P1_test/P1_test.cif")).string(), hkl = fs::absolute(fixture("P1_test/P1_subset.hkl")).string();
+	app_dir run("xcw_ri");
+	std::ofstream(run.dir / "settings.txt") << "normal normal_conv params 177 basis_set sto-3g max_iter 100 F charge 0 mult 1 rhf start 0 step_size 0.01 end 0.01";
+	auto check = [&](std::vector<std::string> extra, const double tol)
+	{
+		std::vector<std::string> a{ "-do_XCW", "-no_gpu", "-cif", cif, "-hkl", hkl, "-XCW_settings", "settings.txt", "-xcw_partition", "ri",
+			"-tune", "NOSPHERA2_XCW_ADJOINT_CHECK=1", "-no_date" };
+		a.insert(a.end(), extra.begin(), extra.end());
+		std::stringstream out;
+		std::streambuf* old = std::cout.rdbuf(out.rdbuf());
+		const int rc = run.run(a);
+		std::cout.rdbuf(old);
+		EXPECT_EQ(rc, 0);
+		const std::string log = out.str() + run.log();
+		EXPECT_NE(log.find("XCW partition: RI fit"), std::string::npos) << log;
+		const size_t at = log.find("XCW adjoint check (ri): ");
+		EXPECT_NE(at, std::string::npos);
+		if (at != std::string::npos)
+			EXPECT_LT(std::stod(log.substr(at + 24)), tol) << log.substr(at, 60);
+		return log;
+	};
+	check({}, 1e-10);
+	check({ "-multipole_moments", "hirshfeld", "2" }, 1e-5);
+	const std::string mbis = check({ "-multipole_moments", "mbis", "1" }, 1e-5);
+	EXPECT_TRUE(fs::exists(run.dir / "NA2_0010000.tscb"));
+	std::stringstream scf;
+	scf << std::ifstream(run.dir / "SCF.log").rdbuf();
+	EXPECT_NE(scf.str().find("the RI restraints take the moments of this step's density"), std::string::npos);
+}

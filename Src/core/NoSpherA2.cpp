@@ -972,7 +972,7 @@ static int run_app_impl(int argc, char **argv)
 	{
 		opt.groups[0].push_back(0);
 		opt.loadXCWsettings();
-		//-ri_fit and -multipole_moments describe the -tshb fit of each step; XCW's own table keeps its Hirshfeld partition
+		//-ri_fit and -multipole_moments describe the -tshb fit or the RI partition; XCW's own grid keeps its Hirshfeld weights
 		if (opt.partition_type == PartitionType::RI)
 			opt.partition_type = PartitionType::Hirshfeld;
 		XCW_solver xcw_solver(opt);

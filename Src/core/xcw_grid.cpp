@@ -399,7 +399,7 @@ void structure_factors::grid_F(const dMatrix2& D)
 	sc.lap("F assembly");
 }
 
-cvec structure_factors::grid_sfc(const dMatrix2& D)
+vec2& structure_factors::grid_rho(const dMatrix2& D)
 {
 	const int ng = static_cast<int>(XG.blocks.size()), nc = static_cast<int>(XG.inversion_link.size());
 	//i_double: nothing the SCF reads is rounded to single, as it means for the tensor
@@ -505,6 +505,16 @@ cvec structure_factors::grid_sfc(const dMatrix2& D)
 	}
 	if (sc.on) std::cout << "XCW grid F kept " << kept << " of " << nb << " blocks, bound " << *std::min_element(dd.begin(), dd.end()) << " .. " << *std::max_element(dd.begin(), dd.end()) << "\n";
 	sc.lap("F density");
+	return rho;
+}
+
+cvec structure_factors::grid_sfc(const dMatrix2& D)
+{
+	if (XR.on)
+		return ri_sfc(D);
+	const int ng = static_cast<int>(XG.blocks.size()), nc = static_cast<int>(XG.inversion_link.size());
+	const vec2& rho = grid_rho(D);
+	stage_clock sc;
 	//ponytail: direct sum over points x cleaned entries, P * nc sincos; the exact reference the
 	//Fourier-Bessel transform replaces once it is checked against this
 	cvec sfc(static_cast<size_t>(ng) * nc);
@@ -554,6 +564,10 @@ void structure_factors::grid_contract(occ::Mat& out, const cvec& pre)
 			H[static_cast<size_t>(g) * nc + XG.clean_of[e]] += XG.is_inverse[e] ? std::conj(G) : G;
 		}
 	sc.lap("P assembly");
+	if (XR.on) {
+		ri_contract(H, out);
+		return;
+	}
 	//V(p) = w_p Re Sum_c H(c) exp(i k_c d_p), the transpose of the direct sum
 	vec kx(nc), ky(nc), kz(nc);
 	for (int c = 0; c < nc; c++) {
@@ -584,6 +598,14 @@ void structure_factors::grid_contract(occ::Mat& out, const cvec& pre)
 		}
 	}
 	sc.lap("P transform");
+	grid_apply_V(V, out);
+}
+
+void structure_factors::grid_apply_V(const vec2& V, occ::Mat& out)
+{
+	const int nmo = model_data.nmo, ng = static_cast<int>(XG.blocks.size());
+	const bool fp32 = opt->cpu_itensor_fp32 && !I_tens.tensor_double;
+	stage_clock sc;
 #ifdef NOSPHERA2_USE_GPU
 	if (XG.on_device) {
 		vec Vh(XG.gpu_off[ng]);
