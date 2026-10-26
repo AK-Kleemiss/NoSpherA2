@@ -105,15 +105,6 @@ private:
 		check_stream(out, "Failed to write binary TSHB string");
 	}
 
-	static std::string read_string(std::istream& in)
-	{
-		std::string s(read_scalar<std::uint32_t>(in), '\0');
-		if (!s.empty())
-			in.read(s.data(), static_cast<std::streamsize>(s.size()));
-		check_stream(in, "Failed to read binary TSHB string");
-		return s;
-	}
-
 	template <std::size_t N>
 	static void write_terms(std::ostream& out, const std::vector<std::array<double, N>>& terms)
 	{
@@ -121,16 +112,6 @@ private:
 		for (const auto& t : terms)
 			for (const double v : t)
 				write_scalar(out, v);
-	}
-
-	template <std::size_t N>
-	static std::vector<std::array<double, N>> read_terms(std::istream& in)
-	{
-		std::vector<std::array<double, N>> terms(read_scalar<std::uint32_t>(in));
-		for (auto& t : terms)
-			for (double& v : t)
-				v = read_scalar<double>(in);
-		return terms;
 	}
 
 	//the header write() emits: what the data says, then the free lines the block carries
@@ -227,8 +208,36 @@ public:
 	//versions 1-3 carry labels alone and are keyed by label: version 1 the shells, 2 the spherical records, 3 Z
 	explicit tshb_block(const std::filesystem::path& file_name)
 	{
-		std::ifstream in(file_name, std::ios::binary);
+		std::ifstream in(file_name, std::ios::binary | std::ios::ate);
 		check_stream(in, "Failed to open TSHB file");
+		const std::uint64_t file_size = static_cast<std::uint64_t>(in.tellg());
+		in.seekg(0);
+		//every count and length is held against the bytes left before anything is allocated: a corrupt or truncated file
+		//is an error, never a crash or a gigabyte vector
+		const auto left = [&]() { return file_size - static_cast<std::uint64_t>(in.tellg()); };
+		const auto bound = [&](const std::uint64_t n, const std::uint64_t bytes_each, const char* what)
+		{
+			if (n * bytes_each > left())
+				throw std::runtime_error(std::string("Corrupt or truncated TSHB file ") + file_name.string() + ": " + what + " runs past the end");
+			return n;
+		};
+		const auto string_ = [&]()
+		{
+			const std::uint64_t n = bound(read_scalar<std::uint32_t>(in), 1, "a string");
+			std::string s(n, '\0');
+			if (n) in.read(s.data(), static_cast<std::streamsize>(n));
+			check_stream(in, "Failed to read binary TSHB string");
+			return s;
+		};
+		const auto terms = [&]<std::size_t N>(std::vector<std::array<double, N>>& t)
+		{
+			t.resize(bound(read_scalar<std::uint32_t>(in), 8 * N, "a term list"));
+			for (auto& term : t)
+				for (double& v : term)
+					v = read_scalar<double>(in);
+		};
+		if (file_size < 8)
+			throw std::runtime_error(file_name.string() + " is too short for a TSHB file");
 		char magic[4];
 		in.read(magic, 4);
 		check_stream(in, "Failed to read TSHB magic");
@@ -237,14 +246,16 @@ public:
 		const std::uint32_t version = read_scalar<std::uint32_t>(in);
 		if (version < 1 || version > version_)
 			throw std::runtime_error("Unsupported TSHB version " + std::to_string(version) + " in " + file_name.string());
-		parse_header(read_string(in));
-		const std::uint32_t n = read_scalar<std::uint32_t>(in);
+		parse_header(string_());
+		//the smallest record: label length and shell count, the tag and PART (4), the term counts (2), Z (3)
+		const std::uint64_t min_record = 8 + (version >= 4 ? 5 : 0) + (version >= 2 ? 12 : 0) + (version >= 3 ? 4 : 0);
+		const std::uint64_t n = bound(read_scalar<std::uint32_t>(in), min_record, "the record count");
 		std::vector<tshb_record> records(n);
 		ScattererLabels keys;
 		keys.reserve(n);
 		for (tshb_record& r : records)
 		{
-			r.label = read_string(in);
+			r.label = string_();
 			if (version >= 4)
 			{
 				const std::uint8_t tag = read_scalar<std::uint8_t>(in);
@@ -258,20 +269,22 @@ public:
 			}
 			else
 				keys.emplace_back(r.label);
-			r.shells.resize(read_scalar<std::uint32_t>(in));
+			r.shells.resize(bound(read_scalar<std::uint32_t>(in), 20, "the shell count"));
 			for (tshb_record::shell& s : r.shells)
 			{
 				s.l = read_scalar<std::int32_t>(in);
+				if (s.l < 0 || s.l > constants::ASSOCIATED_LEGENDRE_MAX_L)
+					throw std::runtime_error("Corrupt TSHB file " + file_name.string() + ": shell with l = " + std::to_string(s.l));
 				s.alpha = read_scalar<double>(in);
-				s.c.resize(2 * s.l + 1);
+				s.c.resize(bound(2 * s.l + 1, 8, "shell coefficients"));
 				for (double& c : s.c)
 					c = read_scalar<double>(in);
 			}
 			if (version >= 2)
 			{
-				r.gaussians = read_terms<2>(in);
-				r.slaters = read_terms<3>(in);
-				r.f_terms = read_terms<2>(in);
+				terms(r.gaussians);
+				terms(r.slaters);
+				terms(r.f_terms);
 			}
 			if (version >= 3)
 				r.Z = read_scalar<std::int32_t>(in);

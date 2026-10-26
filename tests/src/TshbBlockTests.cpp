@@ -14,6 +14,7 @@
 #include <complex>
 #include <fstream>
 #include <map>
+#include <random>
 
 //tshb_block (Src/core/tshb_block.h): the per-scatterer densities a .tshb carries, keyed and merged as tsc_block keys and
 //merges rows, and the joint file of a -mtc run against the table the same run makes without -tshb
@@ -202,6 +203,55 @@ TEST(TshbBlockTests, MixedLabelAndIdKeysAreRefused)
 {
 	const ScattererLabels keys{ std::string("C1"), atomID(0.1, 0.2, 0.3, 0, 6) };
 	EXPECT_THROW(tshb_block({ record("C1", 6, 1.0), record("C2", 6, 1.0) }, keys), std::runtime_error);
+}
+
+//a truncated file is an error at every length, and random byte flips give a block or std::runtime_error: never a crash,
+//another exception or an allocation sized by a corrupt count
+TEST(TshbBlockTests, CorruptFilesAreErrorsNotCrashes)
+{
+	const fs::path dir = scratch("fuzz");
+	tshb_record big = record("S1", 16, 1.0, 2);
+	big.shells.push_back({ 2, 0.3, { 1, 2, 3, 4, 5 } });
+	const std::vector<atomID> ids{ atomID(0.1, 0.2, 0.3, 1, 6), atomID(0.4, 0.5, 0.6, 2, 16) };
+	tshb_block({ record("C1", 6, 1.0, 1), big }, ids).write(dir / "good.tshb");
+	const std::string good = bytes(dir / "good.tshb");
+	const fs::path bad = dir / "bad.tshb";
+	auto write = [&bad](const std::string& b) { std::ofstream(bad, std::ios::binary | std::ios::trunc).write(b.data(), b.size()); };
+	ASSERT_EQ(tshb_block(dir / "good.tshb").scatterer_size(), 2u);
+	for (size_t len = 0; len < good.size(); len++)
+	{
+		write(good.substr(0, len));
+		EXPECT_THROW(tshb_block{ bad }, std::runtime_error) << "truncated at " << len << " of " << good.size();
+	}
+	std::mt19937 gen(20261026);
+	std::uniform_int_distribution<size_t> at(0, good.size() - 1);
+	std::uniform_int_distribution<int> byte(0, 255), flips(1, 4);
+	cout_capture quiet;
+	int parsed = 0, refused = 0;
+	for (int trial = 0; trial < 3000; trial++)
+	{
+		std::string b = good;
+		for (int f = flips(gen); f > 0; f--)
+			b[at(gen)] = static_cast<char>(byte(gen));
+		write(b);
+		try
+		{
+			const tshb_block back(bad);
+			EXPECT_LE(back.scatterer_size(), 2u);
+			parsed++;
+		}
+		catch (const std::runtime_error&)
+		{
+			refused++;
+		}
+		catch (const std::exception& e)
+		{
+			ADD_FAILURE() << "trial " << trial << ": " << typeid(e).name() << " " << e.what();
+		}
+	}
+	EXPECT_EQ(parsed + refused, 3000);
+	EXPECT_GT(refused, 0);
+	fs::remove_all(dir);
 }
 
 TEST(TshbBlockTests, Version4RoundTripKeepsIdsPartsAndEd)
