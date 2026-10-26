@@ -634,11 +634,12 @@ static int run_app_impl(int argc, char **argv)
 			}
 		}
 
-		if (opt.tsc_written_by_stream)
+		if (opt.tsc_written_by_stream || opt.tsc_replaced_by_tshb)
 		{
 			//the streamed path already wrote the file block by block; writing the (empty) in-memory block now would truncate it
 			log_file << "Writing tsc file...  ... done!" << endl;
-			log_file << "  (written block by block while the factors were computed)" << endl;
+			log_file << (opt.tsc_replaced_by_tshb ? "  (no table: experimental.tshb holds the fitted densities)"
+				: "  (written block by block while the factors were computed)") << endl;
 			log_file.flush();
 			std::cout.rdbuf(_coutbuf);
 			std::cout << "Finished!" << endl;
@@ -898,10 +899,11 @@ static int run_app_impl(int argc, char **argv)
 					0);
 			}
 			//as above: the streamed path already wrote the file itself
-			if (opt.tsc_written_by_stream)
+			if (opt.tsc_written_by_stream || opt.tsc_replaced_by_tshb)
 			{
 				log_file << "Writing tsc file...  ... done!" << endl;
-				log_file << "  (written block by block while the factors were computed)" << endl;
+				log_file << (opt.tsc_replaced_by_tshb ? "  (no table: experimental.tshb holds the fitted densities)"
+					: "  (written block by block while the factors were computed)") << endl;
 			}
 			else
 			{

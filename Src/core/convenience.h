@@ -1041,6 +1041,8 @@ struct options
 
 	//set once a streamed run wrote the file itself, so the caller does not overwrite it with an empty one-shot block
 	bool tsc_written_by_stream = false;
+	//set when -tshb wrote experimental.tshb instead of the table, so the caller writes no (empty) table either
+	bool tsc_replaced_by_tshb = false;
 	bool qct = false;
 	// What structure_factors reads: the crystal model, the extinction and the I tensor storage
 	struct SF_settings {

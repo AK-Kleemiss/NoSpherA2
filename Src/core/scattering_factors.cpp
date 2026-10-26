@@ -3502,8 +3502,16 @@ tsc_block_type calculate_scattering_factors(
 		&& opt.binary_tsc && !opt.old_tsc;
 	if (block_reflections > 0 && !stream_tsc && (!opt.binary_tsc || opt.old_tsc))
 		file << "Text tsc requested: the table is kept in memory instead of streamed in blocks" << std::endl;
+	//-tshb: the fitted densities replace the table (olex2.refine evaluates them at any reflection), so none is made
+	//not for a combined table or the -mtc preparation, where every part would overwrite the one file, nor when the
+	//Thakkar fill is needed, which a .tshb does not carry: those keep the table and write no .tshb
+	const bool tshb_only = opt.write_tshb && !opt.iam_switch
+		&& (std::is_same_v<calculator_type, SALTEDPredictor &> || opt.partition_type == PartitionType::RI)
+		&& prep_out == NULL && !opt.spherical_fill && opt.combined_tsc_calc_files.size() <= 1
+		&& !opt.needs_Thakkar_fill && !opt.write_CIF && !opt.do_XCW;
+	opt.tsc_replaced_by_tshb = tshb_only;
 	cvec2 sf;
-	if (!stream_tsc)
+	if (!stream_tsc && !tshb_only)
 	{
 		sf.resize(asym_atom_list.size());
 #pragma omp parallel for
@@ -3627,9 +3635,9 @@ tsc_block_type calculate_scattering_factors(
 		file << setprecision(4) << "Total number of analytical Electrons: " << el_sum << endl;
 		time_points.push_back(get_time());
 		time_descriptions.push_back("Calculation of Charges");
-		if (opt.write_tshb) {
+		if (tshb_only) {
 			ml->write_tshb("experimental.tshb", labels, asym_atom_list, *wavy, opt.ECP_mode, opt.electron_diffraction);
-			file << "Wrote experimental.tshb" << endl;
+			file << "Wrote experimental.tshb, no table" << endl;
 		}
 
 		if (prep_out != NULL)
@@ -3647,7 +3655,9 @@ tsc_block_type calculate_scattering_factors(
 			return tsc_block_type();
 		}
 
-		if (stream_tsc)
+		if (tshb_only)
+			;
+		else if (stream_tsc)
 		{
 			ScattererLabels stream_ids;
 			append_scatterer_ids(stream_ids, opt, labels, *wavy, asym_atom_list);
@@ -3712,7 +3722,7 @@ tsc_block_type calculate_scattering_factors(
 		time_descriptions.push_back("Fourier transform");
 
 		//streamed blocks got theirs as they were made; the mode is the model's (-salted_ecp) or -ECP's
-		if (calculator.wavy.get_has_ECPs() && !stream_tsc)
+		if (calculator.wavy.get_has_ECPs() && !sf.empty())
 		{
 			add_ECP_contribution(
 				asym_atom_list,
@@ -3801,12 +3811,11 @@ tsc_block_type calculate_scattering_factors(
 			file << setprecision(4) << "Total number of analytical Electrons: " << el_sum << endl;
 			time_points.push_back(get_time());
 			time_descriptions.push_back("Calculation of Charges");
-			if (opt.write_tshb) {
+			if (tshb_only) {
 				ml.write_tshb("experimental.tshb", labels, asym_atom_list, *wavy, opt.ECP_mode, opt.electron_diffraction);
-				file << "Wrote experimental.tshb" << endl;
+				file << "Wrote experimental.tshb, no table" << endl;
 			}
-
-			if (stream_tsc)
+			else if (stream_tsc)
 			{
 				//as the SALTED case above, but the atoms come from the auxiliary wavefunction, so no spherical remainder
 				ScattererLabels stream_ids;
