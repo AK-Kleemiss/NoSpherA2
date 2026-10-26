@@ -3553,7 +3553,11 @@ tsc_block_type calculate_scattering_factors(
 	time_points.push_back(get_time());
 	time_descriptions.push_back("cif reading");
 
-	if (kpts == NULL || kpts->size() == 0)
+	//a part whose atoms go into the .tshb, and the fill's preparation for it, write records and evaluate no reflection
+	const bool records_only = opt.tshb != nullptr && (opt.spherical_fill ? prep_out != NULL : prep_out == NULL);
+	if (records_only)
+		;
+	else if (kpts == NULL || kpts->size() == 0)
 	{
 		make_k_pts(
 			nr != 0 && hkl.size() == 0,
@@ -3606,7 +3610,7 @@ tsc_block_type calculate_scattering_factors(
 		if (prep_out != NULL)
 		{
 			// hand back what a per-block spherical calculation needs and stop
-			const std::vector<i3> hv(hkl.begin(), hkl.end());
+			const std::vector<i3> hv(records_only ? std::vector<i3>() : std::vector<i3>(hkl.begin(), hkl.end()));
 			prep_out->asym_atom_list = asym_atom_list;
 			prep_out->labels = labels;
 			prep_out->atom_type_list = atom_type_list;

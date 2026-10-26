@@ -290,6 +290,10 @@ alternative is one flag away in each case.
 
 ## Current Validation Notes
 
+As of 2026-10-26 (second speed round), the fit cache keeps the Coulomb factor keyed by the whole aux wavefunction, `.tshb`
+parts make no k-points, and partition rows skip shells beyond their certain cutoff; `ctest --preset release-linux-tests` on a
+CPU-only 4-core VM reports **1327 passed, 0 failed, 23 skipped** (2 disabled) of 1350. See `UNIT_TESTS_STATUS.md`.
+
 As of 2026-10-26 (XCW partitions), `-xcw_partition ri` runs XCW on an RI partition of the density ((mu nu|P) from occ, exact
 transpose for the perturbation, `-multipole_moments` restraints to Hirshfeld, TFVC, MBIS or EMBIS moments); `ctest --preset
 release-linux-tests` on a CPU-only 4-core VM reports **1326 passed, 0 failed, 23 skipped** (2 disabled) of 1349. See

@@ -586,6 +586,33 @@ TEST(FittingIoCoverageIntegratorTests, PartitionCacheReusesTheRestrainedFactorEx
 	l1_plain.partition_cache = nullptr;
 	EXPECT_EQ(DensityFitting::density_fit(wave, aux, l1), DensityFitting::density_fit(wave, aux, l1_plain));
 	EXPECT_EQ(DensityFitting::density_fit(wave, aux, cfg), ref);
+	//the plain fit reuses the cached Coulomb factor and sensitivities, bit for bit
+	DensityFitting::CONFIG plain;
+	const vec plain_ref = DensityFitting::density_fit(wave, aux, plain);
+	plain.partition_cache = &cache;
+	ASSERT_FALSE(cache.j_factor.empty());
+	EXPECT_EQ(DensityFitting::density_fit(wave, aux, plain), plain_ref);
+	EXPECT_EQ(DensityFitting::density_fit(wave, aux, plain), plain_ref);
+}
+
+//partition_rows_on_grid skips a shell beyond aux_density_table::sh_r2 before its exponentials, where the 1e-10 test would
+//skip it anyway; NOSPHERA2_RI_ROWS_NOCUT evaluates every shell. Epoxide and ZP2 PART 1, Hirshfeld through l = 2: equal rows
+TEST(FittingIoCoverageIntegratorTests, PartitionRowsShellCutoffChangesNoRow)
+{
+	for (const std::filesystem::path p : { nos_test_repo_root() / "tests" / "epoxide_gbw" / "epoxide.gbw", nos_test_repo_root() / "tests" / "Hybrid" / "ZP2_part1.gbw" })
+	{
+		if (!std::filesystem::exists(p)) GTEST_SKIP() << p << " not found";
+		WFN wave(p);
+		auto basis = combo_basis();
+		const WFN aux = generate_aux_wfn(wave, basis);
+		const aux_density_table table(aux.get_atoms());
+		StreamCapture out(std::cout);
+		const vec2 rows = DensityFitting::partition_multipole_rows(aux, table, DensityFitting::CHARGE_SCHEME::HIRSHFELD, 2);
+		set_tuning("NOSPHERA2_RI_ROWS_NOCUT", "1");
+		const vec2 ref = DensityFitting::partition_multipole_rows(aux, table, DensityFitting::CHARGE_SCHEME::HIRSHFELD, 2);
+		set_tuning("NOSPHERA2_RI_ROWS_NOCUT", nullptr);
+		EXPECT_EQ(rows, ref) << p;
+	}
 }
 
 TEST(FittingIoCoverageIntegratorTests, LowOrdersStayAtomCentred)

@@ -247,6 +247,8 @@ void DensityFitting::partition_rows_on_grid(const aux_density_table& t, const in
 	const int n_mom = (lmax + 1) * (lmax + 1);
 	vec Y(n_mom), val(t.n_coef);
 	ivec idx(t.n_coef);
+	//NOSPHERA2_RI_ROWS_NOCUT evaluates every shell, the reference the equivalence test compares against
+	const bool cut = static_cast<int>(t.sh_r2.size()) == t.n_sh && tuning("NOSPHERA2_RI_ROWS_NOCUT") == nullptr;
 	for (int p = 0; p < np; p++) {
 		if (w[p] == 0.0) continue;
 		double d[3] = { x[p] - centre[0], y[p] - centre[1], z[p] - centre[2] };
@@ -265,6 +267,8 @@ void DensityFitting::partition_rows_on_grid(const aux_density_table& t, const in
 			const double rb = std::sqrt(r2);
 			const double u[3] = { rb > 0.0 ? dx / rb : 0.0, rb > 0.0 ? dy / rb : 0.0, rb > 0.0 ? dz / rb : 0.0 };
 			for (int s = t.sh_start[b]; s < t.sh_start[b + 1]; s++) {
+				//sh_r2: beyond it |r^l R| < 5e-11 for certain, so the 1e-10 test below would skip the shell as well
+				if (cut && r2 > t.sh_r2[s]) continue;
 				const int l = t.sh_l[s];
 				double radial = 0.0, rbl = 1.0;
 				for (int q = t.pr_start[s]; q < t.pr_start[s + 1]; q++) radial += std::exp(-t.pr_exp[q] * r2) * t.pr_norm[q];
@@ -903,27 +907,57 @@ vec DensityFitting::density_fit(
 	const aux_density_table aux_table(
 		wavy_aux.get_atoms()
 	);
+	//what J and every cached factor depend on: every aux coordinate, exponent, coefficient and type, so another aux
+	//wavefunction rebuilds them
+	vec aux_key{ (double)n_aux };
+	if (config.partition_cache)
+		for (int a = 0; a < wavy_aux.get_ncen(); a++) {
+			const atom& A = wavy_aux.get_atom(a);
+			for (int x = 0; x < 3; x++) aux_key.push_back(A.get_coordinate(x));
+			for (int b = 0; b < (int)A.get_basis_set_size(); b++) {
+				aux_key.push_back(A.get_basis_set_exponent(b));
+				aux_key.push_back(A.get_basis_set_coefficient(b));
+				aux_key.push_back(A.get_basis_set_type(b));
+			}
+		}
 	//eri2c keeps J's Cholesky factor for the unrestrained solve; diag gives J back for the modified fits
 	bool factored = false;
 	vec diag(n_aux);
 	switch (config.metric) {
 	case METRIC_TYPE::COULOMB: {
-		compute2C<Coulomb2C_SPH>(aux_basis, eri2c);
-		for (size_t i = 0; i < n_aux; i++) diag[i] = eri2c[i * (n_aux + 1)];
-		factored = cholesky_factor(eri2c, n_aux) == 0;
-		//row A of X = J^-1 n_A: the change in atom A's population per unit error in rho
+		DensityFitting::PartitionCache* jc = config.partition_cache;
+		const vec& key = aux_key;
 		vec sens;
-		if (factored) {
-			const vec2 rows = atomic_population_rows(aux_table);
-			vec X(rows.size() * n_aux);
-			for (size_t a = 0; a < rows.size(); a++)
-				for (size_t p = 0; p < n_aux; p++) X[a * n_aux + p] = rows[a][p];
-			cholesky_solve(eri2c, n_aux, X, rows.size());
-			sens.assign(n_aux, 0.0);
-			for (size_t a = 0; a < rows.size(); a++)
-				for (size_t p = 0; p < n_aux; p++) sens[p] = std::max(sens[p], std::abs(X[a * n_aux + p]));
+		if (jc && jc->j_key == key) {
+			eri2c = jc->j_factor;
+			diag = jc->j_diag;
+			sens = jc->j_sens;
+			factored = jc->j_factored;
 		}
-		else std::cout << "Coulomb metric not positive definite, the fit runs unscreened" << std::endl;
+		else {
+			compute2C<Coulomb2C_SPH>(aux_basis, eri2c);
+			for (size_t i = 0; i < n_aux; i++) diag[i] = eri2c[i * (n_aux + 1)];
+			factored = cholesky_factor(eri2c, n_aux) == 0;
+			//row A of X = J^-1 n_A: the change in atom A's population per unit error in rho
+			if (factored) {
+				const vec2 rows = atomic_population_rows(aux_table);
+				vec X(rows.size() * n_aux);
+				for (size_t a = 0; a < rows.size(); a++)
+					for (size_t p = 0; p < n_aux; p++) X[a * n_aux + p] = rows[a][p];
+				cholesky_solve(eri2c, n_aux, X, rows.size());
+				sens.assign(n_aux, 0.0);
+				for (size_t a = 0; a < rows.size(); a++)
+					for (size_t p = 0; p < n_aux; p++) sens[p] = std::max(sens[p], std::abs(X[a * n_aux + p]));
+			}
+			if (jc) {
+				jc->j_factor = eri2c;
+				jc->j_diag = diag;
+				jc->j_sens = sens;
+				jc->j_factored = factored;
+				jc->j_key = key;
+			}
+		}
+		if (!factored) std::cout << "Coulomb metric not positive definite, the fit runs unscreened" << std::endl;
 		computeRho<Coulomb3C_SPH>(
 			normal_basis,
 			aux_basis,
@@ -976,8 +1010,9 @@ vec DensityFitting::density_fit(
 	print_fit_configuration(config);
 
 	DensityFitting::PartitionCache* cache = config.constrain_total_electrons ? nullptr : config.partition_cache;
-	const vec h_key{ (double)n_aux, (double)config.metric, (double)config.use_tikhonov, config.tikhonov_lambda, (double)config.multipole_lmax,
+	vec h_key{ (double)config.metric, (double)config.use_tikhonov, config.tikhonov_lambda, (double)config.multipole_lmax,
 		(double)config.charge_scheme, config.multipole_strength, (double)config.grid_higher_moments };
+	h_key.insert(h_key.end(), aux_key.begin(), aux_key.end());
 	const bool reuse = cache && cache->h_key == h_key && !cache->h_factor.empty();
 	if (factored) cholesky_unfactor(eri2c, n_aux, diag);
 	vec H = reuse ? vec() : eri2c;
@@ -989,6 +1024,11 @@ vec DensityFitting::density_fit(
 			n_aux,
 			config.tikhonov_lambda);
 
+	//rows of another aux basis are rebuilt
+	if (config.partition_cache && config.partition_cache->rows_aux != aux_key) {
+		config.partition_cache->rows_lmax = -1;
+		config.partition_cache->rows_aux = aux_key;
+	}
 	const restraint_data restraints = build_restraint_data(
 		wavy,
 		aux_table,

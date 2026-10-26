@@ -26,12 +26,17 @@ namespace DensityFitting
 	//fits one after another on the same atoms and aux basis (XCW's lambda steps): the partition grid keeps its points and
 	//weights and only re-evaluates the density, the partition rows, which do not depend on the density, are kept, and so is
 	//the Cholesky factor of the restrained H = J + restraints, which depends on the aux basis and the fit settings alone
-	//(h_key: n_aux and those settings, rows_lmax/rows_scheme for the rows; another key rebuilds them). The owner drops the cache when the atoms or aux basis change
+	//(h_key: those settings and every aux coordinate, exponent, coefficient and type; rows_lmax/rows_scheme for the rows;
+	//another key rebuilds them). The partition grid follows GridManager's own key
 	struct PartitionCache {
 		std::shared_ptr<GridManager> grid;
 		vec2 rows;
 		int rows_lmax = -1, rows_scheme = -1;
+		vec rows_aux;
 		vec h_factor, h_key;
+		//the Coulomb metric's Cholesky factor, its diagonal and the screening sensitivities, keyed by the aux atoms and basis
+		vec j_factor, j_diag, j_sens, j_key;
+		bool j_factored = false;
 	};
 
 	struct CONFIG {
