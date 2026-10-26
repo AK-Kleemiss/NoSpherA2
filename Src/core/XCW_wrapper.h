@@ -2,7 +2,6 @@
 #include "convenience.h"
 #include "structure_factors.h"
 #include "XCW_solver.h"
-#include "GridManager.h"
 #include "xcw_halting.h"
 
 // Drives the X-ray constrained wavefunction fit: owns the structure factors and the SCF solver and
@@ -79,14 +78,5 @@ private:
 	structure_factors sf;
 	SCF_log_writer writer;
 	XCW_solver scf_solver;
-	GridManager tsc_grids;
-	// the grid route's tscb (XG.mode 1): the first step's tsc-route table gives the scatterers, the hkl rows,
-	// the asym atom of each scatterer and the hkl_enlarged entry of each row; later steps fill it from grid_sfc
-	ScattererLabels tscb_scat_;
-	ivec2 tscb_hkl_;
-	ivec tscb_atom_, tscb_entry_;
-	// F_calc and scale as save_state left them
-	cvec saved_F_calc_;
-	double saved_scale_ = 0.0;
 
 };

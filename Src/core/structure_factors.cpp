@@ -2331,3 +2331,87 @@ void structure_factors::contract_tensor(occ::Mat& out, const cvec& pre) {
 		}
 	}
 }
+
+//The tsc table of the converged density D_wfn for the tscb output. The grid route already holds rho's
+//partition: its per-atom transform at D is the table, so after the first step, whose tsc-route table
+//gives the layout, no second grid, no WFN pass and no tsc machinery run per lambda.
+//NOSPHERA2_XCW_GRID_TSCB_OLD keeps the tsc route on every step
+itsc_block structure_factors::result_table(const occ::Mat& D_wfn, std::vector<WFN>& wavefunctions, std::ostream& log) {
+	itsc_block result;
+	const bool grid_tscb = XG.mode == 1 && !opt->electron_diffraction && !tuning("NOSPHERA2_XCW_GRID_TSCB_OLD");
+	cvec sfc;
+	const int nc = static_cast<int>(XG.inversion_link.size());
+	auto grid_value = [&](const int at, const int e) {
+		const cdouble v = sfc[static_cast<size_t>(at) * nc + XG.clean_of[e]];
+		return XG.is_inverse[e] ? std::conj(v) : v;
+	};
+	if (grid_tscb) {
+		//the spin blocks summed, as the SCF evaluates the structure factors
+		const int n = static_cast<int>(D_wfn.cols());
+		const bool unrestricted = D_wfn.rows() == 2 * D_wfn.cols();
+		dMatrix2 D(n, n);
+		for (int i = 0; i < n; i++)
+			for (int j = 0; j < n; j++) D(i, j) = D_wfn(i, j) + (unrestricted ? D_wfn(i + n, j) : 0.0);
+		sfc = grid_sfc(D);
+	}
+	if (grid_tscb && !tscb_scat_.empty()) {
+		cvec2 table(tscb_scat_.size(), cvec(tscb_entry_.size()));
+#pragma omp parallel for
+		for (int scatterer = 0; scatterer < static_cast<int>(table.size()); scatterer++)
+			for (size_t r = 0; r < tscb_entry_.size(); r++) table[scatterer][r] = grid_value(tscb_atom_[scatterer], tscb_entry_[r]);
+		result = itsc_block(table, tscb_scat_, tscb_hkl_);
+	}
+	else {
+		result.append(tsc_table(wavefunctions, &tsc_grids, log), log);
+		//first step on the grid route: learn the table's layout, each scatterer's atom by the closest grid column
+		if (grid_tscb) {
+			std::map<i3, int> e_of;
+			for (const i3& h : scatter_data.hkl_enlarged) e_of.emplace(h, static_cast<int>(e_of.size()));
+			const int nrow = static_cast<int>(result.reflection_size()), ns = static_cast<int>(result.get_scatterers().size());
+			ivec entry(nrow), atom(ns);
+			bool ok = true;
+			for (int r = 0; r < nrow && ok; r++) {
+				const auto it = e_of.find({ (int)result.get_index(0, r), (int)result.get_index(1, r), (int)result.get_index(2, r) });
+				ok = it != e_of.end();
+				if (ok) entry[r] = it->second;
+			}
+			double worst = 0.0;
+			for (int scatterer = 0; scatterer < ns && ok; scatterer++) {
+				const cvec& f = result.get_sf_for_scatterer(scatterer);
+				double best = 1e300;
+				for (int at = 0; at < model_data.ncen; at++) {
+					double d = 0;
+					for (int r = 0; r < std::min(nrow, 256); r++) d += std::norm(f[r] - grid_value(at, entry[r]));
+					if (d < best) { best = d; atom[scatterer] = at; }
+				}
+				double dmax = 0, fmax = 0;
+				for (int r = 0; r < nrow; r++) {
+					dmax = std::max(dmax, std::abs(f[r] - grid_value(atom[scatterer], entry[r])));
+					fmax = std::max(fmax, std::abs(f[r]));
+				}
+				worst = std::max(worst, dmax / fmax);
+			}
+			//1e-2 only catches a wrong layout; how well grid and tsc agree is what NOSPHERA2_XCW_GRID_FCHECK measures
+			ok = ok && worst < 1e-2;
+			std::cout << "XCW grid tscb: max |f_grid - f_tsc| / max |f| " << std::scientific << std::setprecision(2) << worst << std::defaultfloat
+				<< (ok ? ", later steps write the tscb from the grid" : ", layout not matched, the tsc route stays") << std::endl;
+			if (ok) {
+				tscb_scat_ = result.get_scatterers();
+				tscb_hkl_ = result.get_index_vector();
+				tscb_entry_ = entry;
+				tscb_atom_ = atom;
+			}
+		}
+	}
+	return result;
+}
+
+void structure_factors::save_F_calc() {
+	saved_F_calc_ = scatter_data.F_calc;
+	saved_scale_ = scatter_data.scale;
+}
+
+void structure_factors::restore_F_calc() {
+	scatter_data.F_calc = saved_F_calc_;
+	scatter_data.scale = saved_scale_;
+}

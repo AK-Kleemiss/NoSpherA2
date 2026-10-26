@@ -272,13 +272,11 @@ fit_quality XCW_wrapper::quality() const {
 }
 
 void XCW_wrapper::save_state() {
-	saved_F_calc_ = sf.scatter_data.F_calc;
-	saved_scale_ = sf.scatter_data.scale;
+	sf.save_F_calc();
 }
 
 void XCW_wrapper::restore_state() {
-	sf.scatter_data.F_calc = saved_F_calc_;
-	sf.scatter_data.scale = saved_scale_;
+	sf.restore_F_calc();
 }
 
 bool XCW_wrapper::on_device() const {
@@ -316,76 +314,8 @@ void XCW_wrapper::create_tscb(const occ::qm::Wavefunction& wfn, const double& la
 	//is an OCC result over a basis this program loaded, so say that: Int_Params then reads the
 	//shells with the convention they actually have.
 	sf_wave_vec[0].set_origin(e_origin::XCW_fit);
-	tsc_block<int, cdouble> result;
 	const _time_point fwd_t0 = get_time();
-	//The grid runner already holds rho's partition: its per-atom transform at the converged D is the
-	//tsc table, so after the first step no second grid, no WFN pass and no tsc machinery run per lambda.
-	//NOSPHERA2_XCW_GRID_TSCB_OLD keeps the tsc route on every step
-	const bool grid_tscb = sf.XG.mode == 1 && !opt->electron_diffraction && !tuning("NOSPHERA2_XCW_GRID_TSCB_OLD");
-	cvec sfc;
-	const int nc = static_cast<int>(sf.XG.inversion_link.size());
-	auto grid_value = [&](const int at, const int e) {
-		const cdouble v = sfc[static_cast<size_t>(at) * nc + sf.XG.clean_of[e]];
-		return sf.XG.is_inverse[e] ? std::conj(v) : v;
-	};
-	if (grid_tscb) {
-		const occ::Mat& Dw = wfn.mo.D;
-		const int n = static_cast<int>(Dw.cols());
-		const bool unrestricted = Dw.rows() == 2 * Dw.cols();
-		dMatrix2 D(n, n);
-		for (int i = 0; i < n; i++)
-			for (int j = 0; j < n; j++) D(i, j) = Dw(i, j) + (unrestricted ? Dw(i + n, j) : 0.0);
-		sfc = sf.grid_sfc(D);
-	}
-	if (grid_tscb && !tscb_scat_.empty()) {
-		cvec2 table(tscb_scat_.size(), cvec(tscb_entry_.size()));
-#pragma omp parallel for
-		for (int s = 0; s < static_cast<int>(table.size()); s++)
-			for (size_t r = 0; r < tscb_entry_.size(); r++) table[s][r] = grid_value(tscb_atom_[s], tscb_entry_[r]);
-		result = itsc_block(table, tscb_scat_, tscb_hkl_);
-	}
-	else {
-		result.append(sf.tsc_table(sf_wave_vec, &tsc_grids, writer.log), writer.log);
-		//first step on the grid route: learn the table's layout, each scatterer's atom by the closest grid column
-		if (grid_tscb) {
-			std::map<i3, int> e_of;
-			for (const i3& h : sf.scatter_data.hkl_enlarged) e_of.emplace(h, static_cast<int>(e_of.size()));
-			const int nrow = static_cast<int>(result.reflection_size()), ns = static_cast<int>(result.get_scatterers().size());
-			ivec entry(nrow), atom(ns);
-			bool ok = true;
-			for (int r = 0; r < nrow && ok; r++) {
-				const auto it = e_of.find({ (int)result.get_index(0, r), (int)result.get_index(1, r), (int)result.get_index(2, r) });
-				ok = it != e_of.end();
-				if (ok) entry[r] = it->second;
-			}
-			double worst = 0.0;
-			for (int s = 0; s < ns && ok; s++) {
-				const cvec& f = result.get_sf_for_scatterer(s);
-				double best = 1e300;
-				for (int at = 0; at < sf.model_data.ncen; at++) {
-					double d = 0;
-					for (int r = 0; r < std::min(nrow, 256); r++) d += std::norm(f[r] - grid_value(at, entry[r]));
-					if (d < best) { best = d; atom[s] = at; }
-				}
-				double dmax = 0, fmax = 0;
-				for (int r = 0; r < nrow; r++) {
-					dmax = std::max(dmax, std::abs(f[r] - grid_value(atom[s], entry[r])));
-					fmax = std::max(fmax, std::abs(f[r]));
-				}
-				worst = std::max(worst, dmax / fmax);
-			}
-			//1e-2 only catches a wrong layout; how well grid and tsc agree is what NOSPHERA2_XCW_GRID_FCHECK measures
-			ok = ok && worst < 1e-2;
-			std::cout << "XCW grid tscb: max |f_grid - f_tsc| / max |f| " << std::scientific << std::setprecision(2) << worst << std::defaultfloat
-				<< (ok ? ", later steps write the tscb from the grid" : ", layout not matched, the tsc route stays") << std::endl;
-			if (ok) {
-				tscb_scat_ = result.get_scatterers();
-				tscb_hkl_ = result.get_index_vector();
-				tscb_entry_ = entry;
-				tscb_atom_ = atom;
-			}
-		}
-	}
+	const itsc_block result = sf.result_table(wfn.mo.D, sf_wave_vec, writer.log);
 	//NOSPHERA2_XCW_GRID_FCHECK: F_calc from the scattering factors of this table against the one the SCF
 	//used at the same density
 	if (tuning("NOSPHERA2_XCW_GRID_FCHECK")) {

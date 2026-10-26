@@ -5,6 +5,7 @@
 #include "scattering_factors.h"
 #include "wfn_class.h"
 #include "i_tensor_stream.h"
+#include "GridManager.h"
 #include <occ/qm/hf.h>
 #include <thread>
 
@@ -301,6 +302,21 @@ public:
 	// lambda times the change of the perturbation matrix for a change dD_eff of the density, the scale
 	// moving along; leaves F_calc and the scale as they were
 	occ::Mat perturbation_response(const dMatrix2& dD_eff, const double lambda);
+	// F_calc and scale as they are now, and back
+	void save_F_calc();
+	void restore_F_calc();
+	cvec saved_F_calc_;
+	double saved_scale_ = 0.0;
+
+	// The tsc table of a converged density for the tscb output, see result_table in structure_factors.cpp
+	itsc_block result_table(const occ::Mat& D_wfn, std::vector<WFN>& wavefunctions, std::ostream& log);
+	// What result_table keeps between steps: the integration grids of the tsc route and, on the grid route,
+	// the layout of the first table: its scatterers, hkl rows, the asym atom of each scatterer and the
+	// hkl_enlarged entry of each row
+	GridManager tsc_grids;
+	ScattererLabels tscb_scat_;
+	ivec2 tscb_hkl_;
+	ivec tscb_atom_, tscb_entry_;
 
 	// Evaluates the scaling factor for |F_calc| by least squares fitting, and with it the
 	// extinction coefficients when a model is being refined
