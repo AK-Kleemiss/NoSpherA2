@@ -351,17 +351,22 @@ TEST(TshbBlockTests, Version3IsReadKeyedByLabel)
 	fs::remove_all(dir);
 }
 
-//a Thakkar-filled atom as Slater records gives what the fill writes into the table, in every charge state the Slater
-//tables carry; the tabulated delta_k and GTO routes refuse
-TEST(TshbBlockTests, FillSlaterRecordsReproduceTheSphericalFormFactor)
+//a Thakkar-filled atom as Slater records, with the fitted delta_k (Mg 1.6, Fe 2.5) or GTO (Cs, Au, U) differences as
+//Gaussians, gives what the fill writes into the table
+TEST(TshbBlockTests, FillRecordsReproduceTheSphericalFormFactor)
 {
-	for (const auto& [Z, q] : std::vector<std::pair<int, double>>{ { 1, 0.0 }, { 6, 0.0 }, { 8, -0.45 }, { 11, 0.7 }, { 17, -0.6 }, { 26, 0.9 }, { 7, 0.3 } })
+	const double b = constants::bohr2ang(1.0);
+	for (const auto& [Z, q] : std::vector<std::pair<int, double>>{ { 1, 0.0 }, { 6, 0.0 }, { 8, -0.45 }, { 11, 0.7 }, { 17, -0.6 }, { 26, 0.9 }, { 7, 0.3 },
+		{ 12, 1.6 }, { 26, 2.5 }, { 55, 0.8 }, { 79, 0.0 }, { 92, 2.5 } })
 	{
 		const HE_Spherical_Atom atom(Z, q);
-		std::vector<std::array<double, 3>> terms;
-		ASSERT_TRUE(atom.slater_terms(terms)) << Z << " " << q;
+		std::vector<std::array<double, 3>> slaters;
+		std::vector<std::array<double, 2>> gaussians;
+		atom.terms(slaters, gaussians);
+		EXPECT_EQ(gaussians.empty(), !atom.uses_gto_tables() && !atom.uses_delta_series()) << Z << " " << q;
 		tshb_record r;
-		for (const auto& t : terms) r.slaters.push_back(tshb_slater(t));
+		for (const auto& t : slaters) r.slaters.push_back(tshb_slater(t));
+		for (const auto& g : gaussians) r.gaussians.push_back({ g[0] / (b * b * b), g[1] / (b * b) });
 		double worst = 0.0;
 		for (const double stl : { 0.0, 0.05, 0.2, 0.5, 1.0, 1.5 })
 		{
@@ -371,10 +376,6 @@ TEST(TshbBlockTests, FillSlaterRecordsReproduceTheSphericalFormFactor)
 		}
 		EXPECT_LT(worst, 1e-10) << "Z " << Z << " q " << q;
 	}
-	std::vector<std::array<double, 3>> terms;
-	EXPECT_FALSE(HE_Spherical_Atom(55, 0.8).slater_terms(terms)) << "Cs takes the GTO tables";
-	EXPECT_TRUE(terms.empty());
-	EXPECT_FALSE(HE_Spherical_Atom(12, 1.6).slater_terms(terms)) << "Mg2+ walks the delta_k series";
 }
 
 //the joint .tshb of a -mtc run against the table of the same run without -tshb: every atom once, f(h) to round-off
@@ -489,8 +490,9 @@ TEST(TshbJointTests, SaltedThakkarFillMatchesTheStreamedTable)
 	EXPECT_LT(worst, 1e-8);
 }
 
-//the same structure with Rh in place of Co: Rh takes the tabulated GTO ion data, so the run writes the table instead
-TEST(TshbJointTests, AGtoFillAtomKeepsTheTableAndSaysWhy)
+//the same structure with Rh in place of Co: Rh's fitted GTO difference goes into its record as Gaussians, and the .tshb
+//matches the table of the run without -tshb
+TEST(TshbJointTests, AGtoFillAtomGoesIntoTheTshbAsGaussians)
 {
 	const std::string model = fixture("SALTED/Model"), cif_in = fixture("SALTED/Co110.cif"), xyz_in = fixture("SALTED/Co110.xyz");
 	app_dir run("salted_gto");
@@ -506,11 +508,23 @@ TEST(TshbJointTests, AGtoFillAtomKeepsTheTableAndSaysWhy)
 	};
 	rewrite(cif_in, run.dir / "rh.cif", " Co Co ", " Rh Rh ");
 	rewrite(xyz_in, run.dir / "rh.xyz", "\nCo ", "\nRh ");
-	ASSERT_EQ(run.run({ "-SALTED", model, "-cif", "rh.cif", "-wfn", "rh.xyz", "-dmin", "0.8", "-tshb", "-no_date" }), 0);
-	const std::string log = run.log();
-	EXPECT_NE(log.find("-tshb: the table is written instead, Rh is filled from the tabulated GTO ion data"), std::string::npos) << log;
-	EXPECT_TRUE(fs::exists(run.dir / "experimental.tscb"));
-	EXPECT_FALSE(fs::exists(run.dir / "experimental.tshb"));
+	const std::vector<std::string> args{ "-SALTED", model, "-cif", "rh.cif", "-wfn", "rh.xyz", "-dmin", "0.8", "-no_date" };
+	std::vector<std::string> with = args;
+	with.push_back("-tshb");
+	ASSERT_EQ(run.run(with), 0);
+	EXPECT_NE(run.log().find("Wrote experimental.tshb: 49 atom(s), 7 of them spherical"), std::string::npos) << run.log();
+	EXPECT_FALSE(fs::exists(run.dir / "experimental.tscb"));
+	const tshb_block tshb(run.dir / "experimental.tshb");
+	size_t n_gauss = 0;
+	for (size_t i = 0; i < tshb.scatterer_size(); i++)
+		n_gauss += tshb.get_record(i).Z == 45 ? tshb.get_record(i).gaussians.size() : 0;
+	EXPECT_GT(n_gauss, 0u);
+	ASSERT_EQ(run.run(args), 0);
+	const itsc_block table(run.dir / "experimental.tscb");
+	double f_max = 0.0;
+	const double worst = compare_with_table(tshb, table, cell((run.dir / "rh.cif").string(), std::cout, false), f_max);
+	std::cout << "Rh: max |F| " << f_max << ", max |dF| " << worst << std::endl;
+	EXPECT_LT(worst, 1e-8);
 }
 
 //a run the .tshb cannot stand in for writes the table, no .tshb, and says why

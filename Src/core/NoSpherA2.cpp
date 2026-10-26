@@ -60,27 +60,19 @@ static void start_tshb(options &opt, const std::vector<WFN> &wavy, tshb_block &t
 		log << "-tshb: the table is written instead, " << why << std::endl;
 		return;
 	}
-	opt.tshb_blocked.clear();
 	opt.tshb = &tshb;
 }
 
-//Writes the run's .tshb, complete by construction since every part went into it; false when a filled atom blocked it,
-//and the caller makes the table instead
-static bool finish_tshb(options &opt, tshb_block &tshb, std::ostream &log)
+//Writes the run's .tshb, complete by construction since every part went into it
+static void finish_tshb(options &opt, tshb_block &tshb, std::ostream &log)
 {
 	opt.tshb = nullptr;
-	if (!opt.tshb_blocked.empty()) {
-		log << "-tshb: the table is written instead, " << opt.tshb_blocked << std::endl;
-		opt.tshb_blocked.clear();
-		return false;
-	}
 	tshb.write("experimental.tshb");
 	int spherical = 0;
 	for (size_t i = 0; i < tshb.scatterer_size(); i++)
 		spherical += tshb.get_record(i).shells.empty();
 	log << "Wrote experimental.tshb: " << tshb.scatterer_size() << " atom(s), " << spherical << " of them spherical" << std::endl;
 	opt.tsc_replaced_by_tshb = true;
-	return true;
 }
 
 //occ's packed three-centre integrals get half of -mem, else of what the job can have; a df_store_memory_mb in the toml wins
@@ -672,15 +664,10 @@ static int run_app_impl(int argc, char **argv)
 			}
 		};
 		//Streamed combined table when eligible: parts first, then one pass over reflection blocks; the loop otherwise
-		const bool into_tshb = opt.tshb != nullptr;
 		if (!stream_mtc_salted(opt, wavy, log_file, &known_kpts))
 			run_parts();
-		if (into_tshb && !finish_tshb(opt, tshb, log_file))
-		{
-			result = tsc_block<int, cdouble>();
-			if (!stream_mtc_salted(opt, wavy, log_file, &known_kpts))
-				run_parts();
-		}
+		if (opt.tshb)
+			finish_tshb(opt, tshb, log_file);
 
 		if (opt.tsc_written_by_stream || opt.tsc_replaced_by_tshb)
 		{
@@ -910,7 +897,6 @@ static int run_app_impl(int argc, char **argv)
 			tshb_block tshb;
 			if (opt.write_tshb)
 				start_tshb(opt, wavy, tshb, log_file);
-			const bool into_tshb = opt.tshb != nullptr;
 			auto compute = [&]()
 			{
 				if (!opt.SALTED)
@@ -954,8 +940,8 @@ static int run_app_impl(int argc, char **argv)
 				}
 			};
 			compute();
-			if (into_tshb && !finish_tshb(opt, tshb, log_file))
-				compute();
+			if (opt.tshb)
+				finish_tshb(opt, tshb, log_file);
 			//as above: the streamed path already wrote the file itself
 			if (opt.tsc_written_by_stream || opt.tsc_replaced_by_tshb)
 			{

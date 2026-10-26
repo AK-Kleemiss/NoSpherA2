@@ -410,9 +410,9 @@ public:
 
 	double get_radial_density(const double &r) const;
 	double get_form_factor(const double &k) const;
-	// The density as Thakkar terms {T, N, z} (4 pi r rho = sum T r^N e^(-z r), bohr): the neutral's and the ion's, scaled
-	// by their weights. False, with terms empty, on the delta and GTO routes, whose differences are tabulated
-	bool slater_terms(std::vector<std::array<double, 3>>& terms) const;
+	// The density as Thakkar terms {T, N, z} (4 pi r rho = sum T r^N e^(-z r), bohr), the neutral's and the ion's scaled by
+	// their weights, plus the fitted delta_k or GTO differences as l = 0 Gaussians {c, a} (rho = c e^(-a r^2), bohr)
+	void terms(std::vector<std::array<double, 3>>& slaters, std::vector<std::array<double, 2>>& gaussians) const;
 
 	// f(0), i.e. how many electrons this density actually carries. Equals
 	// Z - charge when an ion was available, Z when it fell back.
@@ -439,15 +439,12 @@ private:
 	int _Z;
 	double _charge, _weight, _electrons, _most_negative;
 	bool _has_ion;
-	// Delta-series route for |q| > 1: rho_q = rho_{_delta_n} - _delta_frac *
-	// delta_{_delta_n+1}, itself built as rho_1 - sum_{k=2.._delta_n} delta_k.
+	// Delta-series route for |q| = n + f > 1: rho_q = rho_1 - sum_{k=2..n} delta_k - f delta_{n+1}; GTO route:
+	// rho_q = rho_0(Thakkar) + (1 - f) T_lo + f T_lo+1. The differences as populations {N, a} on shared exponents,
+	// rho = sum N (a/pi)^(3/2) e^(-a r^2), fitted to the tables
 	bool _use_delta;
-	int _delta_n;
-	double _delta_frac;
-	// GTO route: rho_q = rho_0(Thakkar) + (1 - _gto_frac) T_{_gto_lo} + _gto_frac T_{_gto_lo+1}.
 	bool _use_gto, _gto_extrap;
-	int _gto_lo;
-	double _gto_frac;
+	std::vector<std::array<double, 2>> _gauss;
 	Thakkar _neutral;
 	std::unique_ptr<Thakkar> _ion;
 };

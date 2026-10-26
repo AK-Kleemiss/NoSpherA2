@@ -2,6 +2,8 @@
 
 #include "core/spherical_density.h"
 #include "core/constants.h"
+#include "core/Slater_delta_coefs.h"
+#include "core/GTO_ion_delta_coefs.h"
 
 // The delta_k series replaces the extrapolation rho_q = (1-|q|) rho_0 + |q| rho_ion for |q| > 1 by
 // rho_q = rho_n - f * delta_{n+1}, rho_n = rho_1 - sum_{k=2..n} delta_k, between adjacent bound states.
@@ -310,4 +312,36 @@ TEST(DeltaSeriesTests, LighterElementsKeepTheirTables)
 	EXPECT_FALSE(rb.uses_gto_tables());
 	EXPECT_TRUE(HE_Spherical_Atom::ion_available(37, -0.5));
 	EXPECT_NEAR(rb.get_form_factor(kNearZero), 37.5, kCountTol);
+}
+
+//The fitted Gaussians against the tables they replace, at every tabulated s: each integer charge state of a GTO element is
+//Thakkar + T_q, each delta_k the step between two integer cations. The delta_k f tables carry grid-scale noise past
+//s = 3.5 (2e-3 for Sc delta_3) that no smooth function follows, so they are held to s = 2
+TEST(DeltaSeriesTests, TheFittedDifferencesReproduceTheTables)
+{
+	double worst_gto = 0.0, worst_delta = 0.0;
+	const double ds = GTOIon_s_max / (GTOIon_n_s - 1);
+	for (int Z = 37; Z <= 103; Z++)
+		for (int q = GTOIon_q_min; q <= GTOIon_q_max; q++)
+		{
+			const int t = GTOIon_offset[(Z - 1) * (GTOIon_q_max - GTOIon_q_min + 1) + q - GTOIon_q_min];
+			if (t < 0 || !HE_Spherical_Atom(Z, q).uses_gto_tables()) continue;
+			const HE_Spherical_Atom a(Z, q), n(Z, 0.0);
+			const Thakkar th(Z);
+			for (int j = 1; j < GTOIon_n_s; j++)
+				worst_gto = std::max(worst_gto, std::abs(a.get_form_factor(k_of_s(j * ds)) - th.get_form_factor(k_of_s(j * ds)) - GTOIon_f[t * GTOIon_n_s + j]));
+		}
+	const double dd = SlaterDelta_s_max / (SlaterDelta_n_s - 1);
+	for (int Z = 1; Z <= 103; Z++)
+		for (int k = SlaterDelta_k_min; k <= SlaterDelta_kmax[Z - 1]; k++)
+		{
+			const int t = SlaterDelta_offset[(Z - 1) * (SlaterDelta_k_max - SlaterDelta_k_min + 1) + k - SlaterDelta_k_min];
+			const HE_Spherical_Atom lo(Z, k - 1.0), hi(Z, k);
+			if (t < 0 || !hi.uses_delta_series()) continue;
+			for (int j = 1; j * dd <= 2.0; j++)
+				worst_delta = std::max(worst_delta, std::abs(lo.get_form_factor(k_of_s(j * dd)) - hi.get_form_factor(k_of_s(j * dd)) - SlaterDelta_f[t * SlaterDelta_n_s + j]));
+		}
+	std::cout << "max |df| on the grid: GTO " << worst_gto << ", delta_k (s <= 2) " << worst_delta << std::endl;
+	EXPECT_LT(worst_gto, 3e-4);
+	EXPECT_LT(worst_delta, 1e-4);
 }

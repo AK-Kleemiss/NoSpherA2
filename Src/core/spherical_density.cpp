@@ -898,39 +898,6 @@ Thakkar_Cation::Thakkar_Cation(int g_atom_number) : Thakkar(g_atom_number)
 
 namespace
 {
-	// The delta_k tables live on two fixed grids, both indexable in O(1): r is
-	// LOG-uniform, s is LINEAR-uniform. get_form_factor runs per reflection per
-	// atom type, so a search here would be felt.
-	double delta_rho_at(const int table, const double r)
-	{
-		static const double log_rmin = std::log(SlaterDelta_r_min);
-		static const double dlog =
-			(std::log(SlaterDelta_r_max) - log_rmin) / (SlaterDelta_n_r - 1);
-		const double *t = SlaterDelta_rho + static_cast<size_t>(table) * SlaterDelta_n_r;
-		// Outside the grid the difference is clamped rather than run on: below
-		// r_min it is flat on this scale, above r_max it has decayed to ~0
-		// because delta_k is a valence effect.
-		if (r <= SlaterDelta_r_min) return t[0];
-		if (r >= SlaterDelta_r_max) return t[SlaterDelta_n_r - 1];
-		const double x = (std::log(r) - log_rmin) / dlog;
-		const int i = static_cast<int>(x);
-		const double f = x - i;
-		return (1.0 - f) * t[i] + f * t[i + 1];
-	}
-
-	double delta_f_at(const int table, const double s)
-	{
-		static const double ds =
-			(SlaterDelta_s_max - SlaterDelta_s_min) / (SlaterDelta_n_s - 1);
-		const double *t = SlaterDelta_f + static_cast<size_t>(table) * SlaterDelta_n_s;
-		if (s <= SlaterDelta_s_min) return t[0];
-		if (s >= SlaterDelta_s_max) return t[SlaterDelta_n_s - 1];
-		const double x = (s - SlaterDelta_s_min) / ds;
-		const int i = static_cast<int>(x);
-		const double f = x - i;
-		return (1.0 - f) * t[i] + f * t[i + 1];
-	}
-
 	int delta_table(const int Z, const int k)
 	{
 		if (Z < 1 || Z > 103) return -1;
@@ -939,47 +906,73 @@ namespace
 		return SlaterDelta_offset[(Z - 1) * span + (k - SlaterDelta_k_min)];
 	}
 
-	// The caller's k is 4 pi s a0 (see k_of_reflection); the tables are in s.
-	double s_of_k(const double k)
-	{
-		return constants::ang2bohr(k) / constants::FOUR_PI;
-	}
-
-	// Four-point Lagrange on a uniform grid, x in grid units. The GTO tables carry the
-	// relativistic core contraction, which linear interpolation would blur at the 1e-3 e level.
-	// The end intervals use the four end points one-sided: f_T is quadratic in s near s = 0 and a
-	// linear first interval misses it by 5e-3 e for Au.
-	double cubic_at(const double *t, const int n, const double x)
-	{
-		if (x >= n - 1) return t[n - 1];
-		const int i = std::min(std::max(static_cast<int>(x), 1), n - 3);
-		const double f = x - i;
-		return -f * (f - 1.0) * (f - 2.0) / 6.0 * t[i - 1] + (f + 1.0) * (f - 1.0) * (f - 2.0) / 2.0 * t[i]
-			 - (f + 1.0) * f * (f - 2.0) / 2.0 * t[i + 1] + (f + 1.0) * f * (f - 1.0) / 6.0 * t[i + 2];
-	}
-
 	int gto_table(const int Z, const int q)
 	{
 		const int span = GTOIon_q_max - GTOIon_q_min + 1;
 		return GTOIon_offset[(Z - 1) * span + (q - GTOIon_q_min)];
 	}
 
-	double gto_rho_at(const int table, const double r)
+	//even-tempered exponents a_i = 1e-2 1.3^i bohr^-2 for the fitted differences, up to 9e6 for the GTO tables (r from 1e-5)
+	//and 8e5 for the delta_k tables (r from 1e-3); the tables end at 25 bohr and say nothing about wider or tighter functions
+	const int n_fit = 80, n_fit_delta = 70;
+	double fit_exponent(const int i) { return 1e-2 * std::pow(1.3, i); }
+
+	//A tabulated difference as populations N_i, rho = sum N_i (a_i/pi)^(3/2) e^(-a_i r^2), f = sum N_i e^(-k^2/4a_i), k = 4 pi s a0:
+	//least squares on every tabulated f(s) (s from 0) and rho(r), the r rows weighted to electrons per log-r cell, and
+	//sum N_i = f(0) by eliminating the last; singular values below 1e-13 of the largest are dropped
+	vec fit_table(const int n, const double* f, const int n_s, const double s_max, const double* rho, const int n_r, const double r_min, const double r_max)
 	{
-		static const double log_rmin = std::log(GTOIon_r_min);
-		static const double dlog = (std::log(GTOIon_r_max) - log_rmin) / (GTOIon_n_r - 1);
-		const double *t = GTOIon_rho + static_cast<size_t>(table) * GTOIon_n_r;
-		if (r <= GTOIon_r_min) return t[0];
-		if (r >= GTOIon_r_max) return 0.0;   // both densities have decayed long before
-		return cubic_at(t, GTOIon_n_r, (std::log(r) - log_rmin) / dlog);
+		const int m = n_s + n_r;
+		const double ds = s_max / (n_s - 1), dlnr = std::log(r_max / r_min) / (n_r - 1);
+		Eigen::MatrixXd A(m, n - 1);
+		Eigen::VectorXd y(m);
+		vec row(n);
+		for (int j = 0; j < m; j++) {
+			double target;
+			if (j < n_s) {
+				const double k = constants::FOUR_PI * constants::bohr2ang(j * ds);
+				for (int i = 0; i < n; i++) row[i] = std::exp(-k * k / (4.0 * fit_exponent(i)));
+				target = f[j];
+			}
+			else {
+				const double r = r_min * std::exp((j - n_s) * dlnr), w = constants::FOUR_PI * r * r * r * dlnr;
+				for (int i = 0; i < n; i++) row[i] = w * std::pow(fit_exponent(i) / constants::PI, 1.5) * std::exp(-fit_exponent(i) * r * r);
+				target = w * rho[j - n_s];
+			}
+			for (int i = 0; i < n - 1; i++) A(j, i) = row[i] - row[n - 1];
+			y(j) = target - row[n - 1] * f[0];
+		}
+		Eigen::BDCSVD<Eigen::MatrixXd> svd(A, Eigen::ComputeThinU | Eigen::ComputeThinV);
+		svd.setThreshold(1e-13);
+		const Eigen::VectorXd x = svd.solve(y);
+		vec N(n);
+		N[n - 1] = f[0];
+		for (int i = 0; i < n - 1; i++) {
+			N[i] = x(i);
+			N[n - 1] -= x(i);
+		}
+		return N;
 	}
 
-	double gto_f_at(const int table, const double s)
+	//each table fitted once, on first use
+	const vec& gto_fit(const int table)
 	{
-		static const double ds = (GTOIon_s_max - GTOIon_s_min) / (GTOIon_n_s - 1);
-		const double *t = GTOIon_f + static_cast<size_t>(table) * GTOIon_n_s;
-		if (s <= GTOIon_s_min) return t[0];
-		return cubic_at(t, GTOIon_n_s, (std::min(s, GTOIon_s_max) - GTOIon_s_min) / ds);
+		static const int n = static_cast<int>(std::size(GTOIon_rho)) / GTOIon_n_r;
+		static std::vector<vec> fits(n);
+		static std::vector<std::once_flag> once(n);
+		std::call_once(once[table], [table] { fits[table] = fit_table(n_fit, GTOIon_f + static_cast<size_t>(table) * GTOIon_n_s, GTOIon_n_s, GTOIon_s_max,
+			GTOIon_rho + static_cast<size_t>(table) * GTOIon_n_r, GTOIon_n_r, GTOIon_r_min, GTOIon_r_max); });
+		return fits[table];
+	}
+
+	const vec& delta_fit(const int table)
+	{
+		static const int n = static_cast<int>(std::size(SlaterDelta_rho)) / SlaterDelta_n_r;
+		static std::vector<vec> fits(n);
+		static std::vector<std::once_flag> once(n);
+		std::call_once(once[table], [table] { fits[table] = fit_table(n_fit_delta, SlaterDelta_f + static_cast<size_t>(table) * SlaterDelta_n_s, SlaterDelta_n_s,
+			SlaterDelta_s_max, SlaterDelta_rho + static_cast<size_t>(table) * SlaterDelta_n_r, SlaterDelta_n_r, SlaterDelta_r_min, SlaterDelta_r_max); });
+		return fits[table];
 	}
 
 	bool gto_present(const int Z)
@@ -1026,10 +1019,16 @@ double HE_Spherical_Atom::carried_charge(const int atomic_number, const double c
 HE_Spherical_Atom::HE_Spherical_Atom(const int atomic_number, const double charge)
 	: _Z(atomic_number), _charge(charge), _weight(std::abs(charge)),
 	  _electrons(static_cast<double>(atomic_number)), _most_negative(0.0),
-	  _has_ion(false), _use_delta(false), _delta_n(0), _delta_frac(0.0),
-	  _use_gto(false), _gto_extrap(false), _gto_lo(0), _gto_frac(0.0),
+	  _has_ion(false), _use_delta(false), _use_gto(false), _gto_extrap(false),
 	  _neutral(atomic_number)
 {
+	//the fitted differences share the exponents, so a weighted sum of them is one set of populations
+	auto add_fit = [this](const vec& N, const double w)
+	{
+		if (_gauss.empty())
+			for (int i = 0; i < N.size(); i++) _gauss.push_back({ 0.0, fit_exponent(i) });
+		for (int i = 0; i < N.size(); i++) _gauss[i][0] += w * N[i];
+	};
 	if (gto_route(atomic_number, charge))
 	{
 		// Heavy element: the neutral too is the DKH2 atom, Koga/Thakkar being non-relativistic.
@@ -1038,14 +1037,19 @@ HE_Spherical_Atom::HE_Spherical_Atom(const int atomic_number, const double charg
 		_weight = 0.0;
 		const int q_lo = GTOIon_anion[atomic_number - 1] ? -1 : 0;
 		const int q_hi = GTOIon_qmax[atomic_number - 1];
+		int lo = 0;
+		double frac = 0.0;
 		if (std::abs(charge) >= 1e-12 && ion_available(atomic_number, charge) && q_hi > q_lo)
 		{
-			_gto_lo = std::clamp(static_cast<int>(std::floor(charge)), q_lo, q_hi - 1);
-			_gto_frac = charge - _gto_lo;
-			_gto_extrap = _gto_frac < 0.0 || _gto_frac > 1.0;
+			lo = std::clamp(static_cast<int>(std::floor(charge)), q_lo, q_hi - 1);
+			frac = charge - lo;
+			_gto_extrap = frac < 0.0 || frac > 1.0;
 			_has_ion = true;
 			_electrons = static_cast<double>(atomic_number) - charge;
 		}
+		add_fit(gto_fit(gto_table(atomic_number, lo)), 1.0 - frac);
+		if (frac != 0.0)
+			add_fit(gto_fit(gto_table(atomic_number, lo + 1)), frac);
 		for (double r = 1e-4; r < 30.0; r *= 1.05)
 		{
 			const double d = get_radial_density(r);
@@ -1101,8 +1105,10 @@ HE_Spherical_Atom::HE_Spherical_Atom(const int atomic_number, const double charg
 		if (ok)
 		{
 			_use_delta = true;
-			_delta_n = n;
-			_delta_frac = frac;
+			for (int k = SlaterDelta_k_min; k <= n; k++)
+				add_fit(delta_fit(delta_table(atomic_number, k)), -1.0);
+			if (frac > 0.0)
+				add_fit(delta_fit(delta_table(atomic_number, n + 1)), -frac);
 		}
 	}
 
@@ -1122,69 +1128,47 @@ HE_Spherical_Atom::HE_Spherical_Atom(const int atomic_number, const double charg
 
 double HE_Spherical_Atom::get_radial_density(const double &r) const
 {
+	double d = 0.0;
+	for (int i = 0; i < _gauss.size(); i++)
+		d += _gauss[i][0] * std::pow(_gauss[i][1] / constants::PI, 1.5) * std::exp(-_gauss[i][1] * r * r);
 	if (_use_gto)
-	{
-		double d = _neutral.get_radial_density(r) + (1.0 - _gto_frac) * gto_rho_at(gto_table(_Z, _gto_lo), r);
-		if (_gto_frac != 0.0)
-			d += _gto_frac * gto_rho_at(gto_table(_Z, _gto_lo + 1), r);
-		return d;
-	}
+		return _neutral.get_radial_density(r) + d;
 	if (_use_delta)
-	{
-		// rho_1 stays the tabulated Slater cation; only the steps down from it
-		// come from the delta tables.
-		double d = _ion->get_radial_density(r);
-		for (int k = SlaterDelta_k_min; k <= _delta_n; k++)
-			d -= delta_rho_at(delta_table(_Z, k), r);
-		if (_delta_frac > 0.0)
-			d -= _delta_frac * delta_rho_at(delta_table(_Z, _delta_n + 1), r);
-		return d;
-	}
+		return _ion->get_radial_density(r) + d;
 	const double n = _neutral.get_radial_density(r);
 	if (!_has_ion) return n;
 	return (1.0 - _weight) * n + _weight * _ion->get_radial_density(r);
 }
 
-bool HE_Spherical_Atom::slater_terms(std::vector<std::array<double, 3>>& terms) const
+void HE_Spherical_Atom::terms(std::vector<std::array<double, 3>>& slaters, std::vector<std::array<double, 2>>& gaussians) const
 {
-	terms.clear();
-	if (_use_gto || _use_delta || _Z < 1 || _Z > 103)
-		return false;
-	const double w_neutral = _has_ion ? 1.0 - _weight : 1.0;
-	for (std::array<double, 3> t : _neutral.slater_terms()) {
-		t[0] *= w_neutral;
-		terms.push_back(t);
-	}
-	if (_has_ion)
-		for (std::array<double, 3> t : _ion->slater_terms()) {
-			t[0] *= _weight;
-			terms.push_back(t);
+	slaters.clear();
+	gaussians.clear();
+	const double w_neutral = _use_delta ? 0.0 : _has_ion && !_use_gto ? 1.0 - _weight : 1.0;
+	const double w_ion = _use_delta ? 1.0 : _has_ion && !_use_gto ? _weight : 0.0;
+	if (w_neutral != 0.0)
+		for (std::array<double, 3> t : _neutral.slater_terms()) {
+			t[0] *= w_neutral;
+			slaters.push_back(t);
 		}
-	return true;
+	if (w_ion != 0.0)
+		for (std::array<double, 3> t : _ion->slater_terms()) {
+			t[0] *= w_ion;
+			slaters.push_back(t);
+		}
+	for (int i = 0; i < _gauss.size(); i++)
+		gaussians.push_back({ _gauss[i][0] * std::pow(_gauss[i][1] / constants::PI, 1.5), _gauss[i][1] });
 }
 
 double HE_Spherical_Atom::get_form_factor(const double &k) const
 {
+	double d = 0.0;
+	for (int i = 0; i < _gauss.size(); i++)
+		d += _gauss[i][0] * std::exp(-k * k / (4.0 * _gauss[i][1]));
 	if (_use_gto)
-	{
-		const double s = s_of_k(k);
-		double d = _neutral.get_form_factor(k) + (1.0 - _gto_frac) * gto_f_at(gto_table(_Z, _gto_lo), s);
-		if (_gto_frac != 0.0)
-			d += _gto_frac * gto_f_at(gto_table(_Z, _gto_lo + 1), s);
-		return d;
-	}
+		return _neutral.get_form_factor(k) + d;
 	if (_use_delta)
-	{
-		// Same walk in reciprocal space - the transform is linear, so the
-		// electron count comes out as f(0) = (Z-1) - (n-1) - frac = Z - q.
-		const double s = s_of_k(k);
-		double d = _ion->get_form_factor(k);
-		for (int kk = SlaterDelta_k_min; kk <= _delta_n; kk++)
-			d -= delta_f_at(delta_table(_Z, kk), s);
-		if (_delta_frac > 0.0)
-			d -= _delta_frac * delta_f_at(delta_table(_Z, _delta_n + 1), s);
-		return d;
-	}
+		return _ion->get_form_factor(k) + d;
 	const double n = _neutral.get_form_factor(k);
 	if (!_has_ion) return n;
 	return (1.0 - _weight) * n + _weight * _ion->get_form_factor(k);

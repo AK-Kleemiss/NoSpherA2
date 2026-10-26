@@ -1046,8 +1046,6 @@ struct options
 	bool tsc_replaced_by_tshb = false;
 	//the run's .tshb while every part goes into it instead of the table; null otherwise
 	tshb_block* tshb = nullptr;
-	//why a fill atom cannot be a .tshb record (tabulated ion data): the run writes the table instead
-	std::string tshb_blocked;
 	bool qct = false;
 	// What structure_factors reads: the crystal model, the extinction and the I tensor storage
 	struct SF_settings {

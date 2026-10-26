@@ -3083,7 +3083,7 @@ std::vector<HE_Spherical_Atom> make_he_evaluators(const salted_part_prep& sph,
 }
 
 //the filled atoms of a part into the run's .tshb: the whole atom (every occupied orbital) as Slater records in the charge
-//state make_he_evaluators gives the streamed table, Z on each; tabulated (delta_k, GTO) ions block the .tshb instead
+//state make_he_evaluators gives the streamed table, Z on each, and the fitted delta_k or GTO differences as Gaussians
 void fill_tshb(const salted_part_prep& sph, WFN& fill_wavy, options& opt, std::ostream& file)
 {
 	if (sph.asym_atom_list.empty())
@@ -3092,7 +3092,9 @@ void fill_tshb(const salted_part_prep& sph, WFN& fill_wavy, options& opt, std::o
 	ScattererLabels keys;
 	append_scatterer_ids(keys, opt, sph.labels, fill_wavy, sph.asym_atom_list);
 	std::vector<tshb_record> records(sph.asym_atom_list.size());
-	std::vector<std::array<double, 3>> terms;
+	std::vector<std::array<double, 3>> slaters;
+	std::vector<std::array<double, 2>> gaussians;
+	const double b = constants::bohr2ang(1.0);
 	for (size_t a = 0; a < records.size(); a++)
 	{
 		const int idx = sph.asym_atom_list[a];
@@ -3100,13 +3102,11 @@ void fill_tshb(const salted_part_prep& sph, WFN& fill_wavy, options& opt, std::o
 		r.label = sph.labels[a];
 		r.part = fill_wavy.get_atom_group_nr(idx);
 		r.Z = fill_wavy.get_atom_charge(idx);
-		if (!spheres[a].slater_terms(terms))
-		{
-			opt.tshb_blocked = r.label + " is filled from the tabulated " + (spheres[a].uses_gto_tables() ? "GTO ion" : "delta_k") + " data";
-			return;
-		}
-		for (const std::array<double, 3>& t : terms)
+		spheres[a].terms(slaters, gaussians);
+		for (const std::array<double, 3>& t : slaters)
 			r.slaters.push_back(tshb_slater(t));
+		for (const std::array<double, 2>& g : gaussians)
+			r.gaussians.push_back({ g[0] / (b * b * b), g[1] / (b * b) });
 	}
 	opt.tshb->append(tshb_block(std::move(records), keys, opt.electron_diffraction), file);
 	file << "Spherical fill: " << sph.asym_atom_list.size() << " atom(s) go into the .tshb as Slater records" << std::endl;

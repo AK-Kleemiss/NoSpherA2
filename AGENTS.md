@@ -290,6 +290,11 @@ alternative is one flag away in each case.
 
 ## Current Validation Notes
 
+As of 2026-10-26 (latest), the GTO and delta_k ion differences of the Thakkar fill are fitted Gaussians, so `-tshb` takes
+every fill atom and never reruns for the table; `DeltaSeriesTests.TheFittedDifferencesReproduceTheTables` is new. `ctest
+--preset release-linux-tests` on a CPU-only 4-core VM reports **1318 passed, 0 failed, 23 skipped** (2 disabled) of 1341.
+See `UNIT_TESTS_STATUS.md`.
+
 As of 2026-10-26 (later), `-ri_fit` stops on a wavefunction without a basis set (`.wfx`, `.wfn`) and on a plain fit that
 holds its electrons to worse than 1e-3 N; two `FittingIoCoverageIntegratorDeathTest` cases are new. `ctest --preset
 release-linux-tests` on a CPU-only 4-core VM reports **1317 passed, 0 failed, 23 skipped** (2 disabled) of 1340. See
