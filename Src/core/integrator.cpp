@@ -9,6 +9,7 @@
 #include "aux_density.h"
 #include "nao.h"
 #include "citations.h"
+#include "tuning.h"
 #include <occ/disp/d4.h>
 #include <occ/interaction/polarization.h>
 
@@ -373,12 +374,15 @@ static partition_multipole_data calculate_partition_multipoles(
 	result.targets = grid_manager.calculatePartitionedMultipoles(temp, lmax);
 	//MBIS and EMBIS weights follow the density, so their rows are rebuilt every time
 	const bool keep = cache && scheme != DensityFitting::CHARGE_SCHEME::MBIS && scheme != DensityFitting::CHARGE_SCHEME::EMBIS;
-	if (keep && !cache->rows.empty())
+	if (keep && cache->rows_lmax == lmax && cache->rows_scheme == (int)scheme)
 		result.rows = cache->rows;
 	else
 		result.rows = partition_rows(wavy, table, grid_manager, lmax, 2);
-	if (keep && cache->rows.empty())
+	if (keep && (cache->rows_lmax != lmax || cache->rows_scheme != (int)scheme)) {
 		cache->rows = result.rows;
+		cache->rows_lmax = lmax;
+		cache->rows_scheme = (int)scheme;
+	}
 	return result;
 }
 
@@ -545,7 +549,8 @@ static void apply_multipole_restraints(
 	const WFN& wavy_aux,
 	const DensityFitting::CONFIG& config,
 	const restraint_data& restraints,
-	const size_t n_aux)
+	const size_t n_aux,
+	const bool g_only = false)
 {
 	if (config.multipole_lmax < 0)
 		return;
@@ -555,6 +560,13 @@ static void apply_multipole_restraints(
 		* (config.multipole_lmax + 1);
 
 	ivec skipped(config.multipole_lmax + 1, 0);
+	//the rows are collected and added to H by threads over its rows, each element in row order as add_penalty_row adds them,
+	//so H is the same to the last bit (a GEMM reorders the sums, and the ill-conditioned fit moves the coefficients by 3e-7
+	//relative); NOSPHERA2_RI_PENALTY_LOOP keeps add_penalty_row
+	const bool loop = tuning("NOSPHERA2_RI_PENALTY_LOOP") != nullptr;
+	std::vector<const vec*> rows;
+	std::vector<ivec> nonzero;
+	vec alphas, targets;
 
 	for (int a = 0; a < n_atoms; ++a) {
 		const double r_cov = constants::ang2bohr(
@@ -578,18 +590,39 @@ static void apply_multipole_restraints(
 					}
 				}
 
-				add_penalty_row(
-					H,
-					g,
-					row,
-					restraints.multipole_targets[a][k],
-					row_scale,
-					n_aux);
+				if (loop && !g_only) {
+					add_penalty_row(H, g, row, restraints.multipole_targets[a][k], row_scale, n_aux);
+					continue;
+				}
+				err_checkf(row.size() == n_aux, "Restraint row does not match the auxiliary basis", std::cout);
+				if (row_scale == 0.0) continue;
+				rows.push_back(&row);
+				nonzero.emplace_back();
+				for (int i = 0; i < (int)n_aux; ++i)
+					if (row[i] != 0.0) nonzero.back().push_back(i);
+				alphas.push_back(row_scale * row_scale);
+				targets.push_back(restraints.multipole_targets[a][k]);
 			}
 
 			if (!has_l)
 				skipped[l]++;
 		}
+	}
+
+	if (!loop || g_only) {
+#pragma omp parallel for schedule(dynamic, 16)
+		for (int i = 0; i < (int)n_aux; ++i)
+			for (size_t r = 0; r < rows.size(); ++r) {
+				const vec& row = *rows[r];
+				if (row[i] == 0.0) continue;
+				g[i] += alphas[r] * row[i] * targets[r];
+				if (g_only) continue;
+				const double a = alphas[r] * row[i];
+				double* Hi = H.data() + static_cast<size_t>(i) * n_aux;
+				const ivec& nz = nonzero[r];
+				for (int q = 0; q < (int)nz.size(); ++q)
+					Hi[nz[q]] += a * row[nz[q]];
+			}
 	}
 
 	for (int l = 1; l <= (restraints.grid_higher_moments ? 1 : config.multipole_lmax); ++l) {
@@ -942,11 +975,15 @@ vec DensityFitting::density_fit(
 
 	print_fit_configuration(config);
 
+	DensityFitting::PartitionCache* cache = config.constrain_total_electrons ? nullptr : config.partition_cache;
+	const vec h_key{ (double)n_aux, (double)config.metric, (double)config.use_tikhonov, config.tikhonov_lambda, (double)config.multipole_lmax,
+		(double)config.charge_scheme, config.multipole_strength, (double)config.grid_higher_moments };
+	const bool reuse = cache && cache->h_key == h_key && !cache->h_factor.empty();
 	if (factored) cholesky_unfactor(eri2c, n_aux, diag);
-	vec H = eri2c;
+	vec H = reuse ? vec() : eri2c;
 	vec g = rho;
 
-	if (config.use_tikhonov)
+	if (config.use_tikhonov && !reuse)
 		apply_tikhonov_regularization(
 			H,
 			n_aux,
@@ -963,7 +1000,8 @@ vec DensityFitting::density_fit(
 		wavy_aux,
 		config,
 		restraints,
-		n_aux);
+		n_aux,
+		reuse);
 
 	vec total_row;
 	const vec* total_row_ptr = nullptr;
@@ -983,12 +1021,29 @@ vec DensityFitting::density_fit(
 	}
 
 	std::cout << "Solving density-fitting system..." << std::endl;
-	rho = solve_quadratic_fit(
-		H,
-		g,
-		n_aux,
-		total_row_ptr,
-		total_target);
+	if (reuse) {
+		rho = g;
+		cholesky_solve(cache->h_factor, n_aux, rho);
+	}
+	else if (cache) {
+		//what solve_quadratic_fit does without the total row, keeping the factor; an H that is not positive definite is not kept
+		vec Hc = H;
+		rho = g;
+		if (cholesky_factor(Hc, n_aux) == 0) {
+			cholesky_solve(Hc, n_aux, rho);
+			cache->h_factor = std::move(Hc);
+			cache->h_key = h_key;
+		}
+		else
+			rho = solve_quadratic_fit(H, g, n_aux);
+	}
+	else
+		rho = solve_quadratic_fit(
+			H,
+			g,
+			n_aux,
+			total_row_ptr,
+			total_target);
 
 	if (config.multipole_lmax >= 0)
 		print_multipole_report(

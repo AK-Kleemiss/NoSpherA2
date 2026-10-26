@@ -290,6 +290,11 @@ alternative is one flag away in each case.
 
 ## Current Validation Notes
 
+As of 2026-10-26 (speed audit), restraint rows enter the RI fit by threads in row order (bit-identical), XCW's later
+steps reuse the factor of the restrained H through `PartitionCache`, and CIF rows are checked against known atoms
+serially; `ctest --preset release-linux-tests` on a CPU-only 4-core VM reports **1325 passed, 0 failed, 23 skipped**
+(2 disabled) of 1348. See `UNIT_TESTS_STATUS.md`.
+
 As of 2026-10-26 (XCW -tshb), XCW writes an RI fit of each step's converged density as `NA2_<lambda>.tshb` under `-tshb`
 (AutoAux by default, `-multipole_moments` honoured, partition grid and rows cached over the steps); `ctest --preset
 release-linux-tests` on a CPU-only 4-core VM reports **1323 passed, 0 failed, 23 skipped** (2 disabled) of 1346. See
