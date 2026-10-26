@@ -22,6 +22,7 @@
 #include "section_log.h"
 #include "eqc.h"
 #include "ccsd_density.h"
+#include "tshb_block.h"
 #include <future>
 #ifdef NOSPHERA2_USE_GPU
 #include "grid_gpu.h"
@@ -39,6 +40,48 @@ static int run_app_impl(int argc, char **argv);
 
 //The log run_app_impl() writes to, so the catch block below can append the error to it
 static std::filesystem::path current_log_path;
+
+//-tshb in place of the table, for the whole run: every part a fitted density (-SALTED, or -ri_fit on orbitals) and nothing
+//that needs the table itself; otherwise the table is written and the log says why
+static void start_tshb(options &opt, const std::vector<WFN> &wavy, tshb_block &tshb, std::ostream &log)
+{
+	std::string why;
+	if (opt.iam_switch)
+		why = "-IAM";
+	else if (!opt.SALTED && opt.partition_type != PartitionType::RI)
+		why = "the partition is no fitted density (-ri_fit or -SALTED)";
+	else if (!opt.SALTED && std::any_of(wavy.begin(), wavy.end(), [](const WFN &w) { return w.get_origin() == 7; }))
+		why = "a part has no orbitals to fit";
+	else if (opt.write_CIF)
+		why = "-cif needs the table";
+	else if (opt.do_XCW)
+		why = "XCW computes its own factors";
+	if (!why.empty()) {
+		log << "-tshb: the table is written instead, " << why << std::endl;
+		return;
+	}
+	opt.tshb_blocked.clear();
+	opt.tshb = &tshb;
+}
+
+//Writes the run's .tshb, complete by construction since every part went into it; false when a filled atom blocked it,
+//and the caller makes the table instead
+static bool finish_tshb(options &opt, tshb_block &tshb, std::ostream &log)
+{
+	opt.tshb = nullptr;
+	if (!opt.tshb_blocked.empty()) {
+		log << "-tshb: the table is written instead, " << opt.tshb_blocked << std::endl;
+		opt.tshb_blocked.clear();
+		return false;
+	}
+	tshb.write("experimental.tshb");
+	int spherical = 0;
+	for (size_t i = 0; i < tshb.scatterer_size(); i++)
+		spherical += tshb.get_record(i).shells.empty();
+	log << "Wrote experimental.tshb: " << tshb.scatterer_size() << " atom(s), " << spherical << " of them spherical" << std::endl;
+	opt.tsc_replaced_by_tshb = true;
+	return true;
+}
 
 //occ's packed three-centre integrals get half of -mem, else of what the job can have; a df_store_memory_mb in the toml wins
 static void set_occ_df_budget(occ::io::OccInput &config, const options &opt)
@@ -581,57 +624,62 @@ static int run_app_impl(int argc, char **argv)
 		svec known_scatterer;
 		vec2 known_kpts;
 		tsc_block<int, cdouble> result;
-		//Streamed combined table when eligible: parts first, then one pass over reflection blocks; falls through to the loop otherwise
-		if (stream_mtc_salted(opt, wavy, log_file, &known_kpts))
+		tshb_block tshb;
+		if (opt.write_tshb)
+			start_tshb(opt, wavy, tshb, log_file);
+		//every part into the table, or into the .tshb while opt.tshb is set; a part supplies only the atoms no earlier part did
+		auto run_parts = [&]()
 		{
-			//Olex2 greps the log for this exact string; changing it reads as a failed run
-			log_file << "Writing tsc file...  ... done!" << endl;
-			log_file << "  (written block by block while the factors were computed)" << endl;
-			log_file.flush();
-			std::cout.rdbuf(_coutbuf);
-			std::cout << "Finished!" << endl;
-			return 0;
-		}
-
-		for (int i = 0; i < opt.combined_tsc_calc_files.size(); i++)
-		{
-			known_scatterer = result.get_scatterers_string();
-			if (!opt.SALTED)
+			for (int i = 0; i < opt.combined_tsc_calc_files.size(); i++)
 			{
-				if (wavy[i].get_origin() == 7)
-					opt.iam_switch = true;
-				result.append(calculate_scattering_factors<itsc_block, std::vector<WFN>&>(
-					opt,
-					wavy,
-					log_file,
-					known_scatterer,
-					i,
-					&known_kpts),
-					log_file);
-			}
-			else if (opt.SALTED)
-			{
-				std::shared_ptr<SALTEDPredictor> temp_pred = std::make_shared<SALTEDPredictor>(wavy[i], opt);
-				filesystem::path salted_model_path = temp_pred->get_salted_filename();
-				log_file << "Using " << salted_model_path << " for the prediction" << endl;
-
-				if (!temp_pred->basis_set_loaded()) {
-					string df_basis_name = temp_pred->get_dfbasis_name();
-					std::shared_ptr<BasisSet> aux_basis = BasisSetLibrary::get_basis_set(df_basis_name);
-					load_basis_into_WFN(temp_pred->wavy, aux_basis);
+				known_scatterer = opt.tshb ? opt.tshb->get_scatterers_string() : result.get_scatterers_string();
+				if (!opt.SALTED)
+				{
+					if (wavy[i].get_origin() == 7)
+						opt.iam_switch = true;
+					result.append(calculate_scattering_factors<itsc_block, std::vector<WFN>&>(
+						opt,
+						wavy,
+						log_file,
+						known_scatterer,
+						i,
+						&known_kpts),
+						log_file);
 				}
+				else if (opt.SALTED)
+				{
+					std::shared_ptr<SALTEDPredictor> temp_pred = std::make_shared<SALTEDPredictor>(wavy[i], opt);
+					filesystem::path salted_model_path = temp_pred->get_salted_filename();
+					log_file << "Using " << salted_model_path << " for the prediction" << endl;
 
-				if (opt.debug)
-					log_file << "Entering scattering ML Factor Calculation with H part!" << endl;
-				result.append(calculate_scattering_factors<itsc_block, SALTEDPredictor &>(
-					opt,
-					*temp_pred,
-					log_file,
-					known_scatterer,
-					i,
-					&known_kpts),
-					log_file);
+					if (!temp_pred->basis_set_loaded()) {
+						string df_basis_name = temp_pred->get_dfbasis_name();
+						std::shared_ptr<BasisSet> aux_basis = BasisSetLibrary::get_basis_set(df_basis_name);
+						load_basis_into_WFN(temp_pred->wavy, aux_basis);
+					}
+
+					if (opt.debug)
+						log_file << "Entering scattering ML Factor Calculation with H part!" << endl;
+					result.append(calculate_scattering_factors<itsc_block, SALTEDPredictor &>(
+						opt,
+						*temp_pred,
+						log_file,
+						known_scatterer,
+						i,
+						&known_kpts),
+						log_file);
+				}
 			}
+		};
+		//Streamed combined table when eligible: parts first, then one pass over reflection blocks; the loop otherwise
+		const bool into_tshb = opt.tshb != nullptr;
+		if (!stream_mtc_salted(opt, wavy, log_file, &known_kpts))
+			run_parts();
+		if (into_tshb && !finish_tshb(opt, tshb, log_file))
+		{
+			result = tsc_block<int, cdouble>();
+			if (!stream_mtc_salted(opt, wavy, log_file, &known_kpts))
+				run_parts();
 		}
 
 		if (opt.tsc_written_by_stream || opt.tsc_replaced_by_tshb)
@@ -859,45 +907,55 @@ static int run_app_impl(int argc, char **argv)
 			opt.groups[0].push_back(0);
 			itsc_block res;
 			svec empty({});
-			if (!opt.SALTED)
+			tshb_block tshb;
+			if (opt.write_tshb)
+				start_tshb(opt, wavy, tshb, log_file);
+			const bool into_tshb = opt.tshb != nullptr;
+			auto compute = [&]()
 			{
-				// Calculate tsc file from given files
-				if (opt.debug)
-					log_file << "Entering scattering Factor Calculation!" << endl;
-				if (opt.electron_diffraction)
-					log_file << "Making Electron diffraction scattering factors, be carefull what you are doing!" << endl;
-				if (wavy[0].get_origin() == 7)
-					opt.iam_switch = true;
-				res = calculate_scattering_factors<itsc_block, std::vector<WFN> &>(
-					opt,
-					wavy,
-					log_file,
-					empty,
-					0);
-			}
-			else
-			{
-				// Fill WFN wil the primitives of the JKFit basis (currently hardcoded)
-				// const std::vector<std::vector<primitive>> basis(QZVP_JKfit.begin(), QZVP_JKfit.end());
-
-				std::unique_ptr<SALTEDPredictor> temp_pred = std::make_unique<SALTEDPredictor>(wavy[0], opt);
-				string df_basis_name = temp_pred->get_dfbasis_name();
-				filesystem::path salted_model_path = temp_pred->get_salted_filename();
-				log_file << "Using " << salted_model_path << " for the prediction" << endl;
-				if (!temp_pred->basis_set_loaded()) { //If the basis set was supplied by the SALTED model file, do not overwrite it
-					std::shared_ptr<BasisSet> aux_basis = BasisSetLibrary::get_basis_set(df_basis_name);
-					load_basis_into_WFN(temp_pred->wavy, aux_basis);
+				if (!opt.SALTED)
+				{
+					// Calculate tsc file from given files
+					if (opt.debug)
+						log_file << "Entering scattering Factor Calculation!" << endl;
+					if (opt.electron_diffraction)
+						log_file << "Making Electron diffraction scattering factors, be carefull what you are doing!" << endl;
+					if (wavy[0].get_origin() == 7)
+						opt.iam_switch = true;
+					res = calculate_scattering_factors<itsc_block, std::vector<WFN> &>(
+						opt,
+						wavy,
+						log_file,
+						empty,
+						0);
 				}
+				else
+				{
+					// Fill WFN wil the primitives of the JKFit basis (currently hardcoded)
+					// const std::vector<std::vector<primitive>> basis(QZVP_JKfit.begin(), QZVP_JKfit.end());
 
-				if (opt.debug)
-					log_file << "Entering scattering ML Factor Calculation with H part!" << endl;
-				res = calculate_scattering_factors<itsc_block, SALTEDPredictor &>(
-					opt,
-					*temp_pred,
-					log_file,
-					empty,
-					0);
-			}
+					std::unique_ptr<SALTEDPredictor> temp_pred = std::make_unique<SALTEDPredictor>(wavy[0], opt);
+					string df_basis_name = temp_pred->get_dfbasis_name();
+					filesystem::path salted_model_path = temp_pred->get_salted_filename();
+					log_file << "Using " << salted_model_path << " for the prediction" << endl;
+					if (!temp_pred->basis_set_loaded()) { //If the basis set was supplied by the SALTED model file, do not overwrite it
+						std::shared_ptr<BasisSet> aux_basis = BasisSetLibrary::get_basis_set(df_basis_name);
+						load_basis_into_WFN(temp_pred->wavy, aux_basis);
+					}
+
+					if (opt.debug)
+						log_file << "Entering scattering ML Factor Calculation with H part!" << endl;
+					res = calculate_scattering_factors<itsc_block, SALTEDPredictor &>(
+						opt,
+						*temp_pred,
+						log_file,
+						empty,
+						0);
+				}
+			};
+			compute();
+			if (into_tshb && !finish_tshb(opt, tshb, log_file))
+				compute();
 			//as above: the streamed path already wrote the file itself
 			if (opt.tsc_written_by_stream || opt.tsc_replaced_by_tshb)
 			{

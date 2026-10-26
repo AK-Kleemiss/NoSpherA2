@@ -79,11 +79,12 @@ you are memory-constrained.
 | `-dmin <d>` | 1 | `99.0` (off) | Generate a full reflection sphere down to this resolution instead of reading `-hkl`. |
 | `-hkl_min_max <h1 h2 k1 k2 l1 l2>` | 6 | `-100..100` each | Bound the generated index range. |
 | `-old_tsc` | 0 | off | Write text `.tsc` instead of binary `.tscb`. |
+| `-tshb` | 0 | off | With `-ri_fit` or `-SALTED`, write the fitted densities as `experimental.tshb` (Gaussians times real spherical harmonics, keyed like the table's scatterers, version 4) instead of the table; olex2.refine evaluates them analytically. One file per run: every `-mtc`/`-cmtc` part goes into it (an atom from the first part that has it, as in the table) and Thakkar-filled atoms as Slater records in their fill charge. The table is written instead, with a `-tshb:` line giving the reason, for `-IAM`, a grid partition, `-cif`, XCW and fill atoms on the tabulated ion data (heavier than Kr, or charges beyond +1). |
 | `-tsc_block <n>` | 1 | derived from `-mem` | Reflections per streamed block. `0` means hold the whole table in memory. |
 | `-mem <MB>` | 1 | `1000.0` | Memory budget the block size is derived from. When given, half of it also bounds occ's stored density-fitting integrals for `-occ` (see below). |
 | `-tsc_labels` | 0 | off | Key the table rows by atom label instead of atom ID. |
 | `-tsc_labels <table> <cif> [out]` | 2-3 | `<table>.labels.tsc` | Rewrite an existing table's IDs into labels using the CIF. One-shot. |
-| `-merge <a.tsc> <b.tsc> ...` | 2+ | | Merge tables, checking that the reflection sets agree. One-shot. |
+| `-merge <a.tsc> <b.tsc> ...` | 2+ | | Merge tables, checking that the reflection sets agree. Given `.tshb` files instead, merges them into `combined.tshb`, the first file winning for an atom in several, as the table merge does. One-shot. |
 | `-merge_nocheck <a> <b> ...` | 2+ | | Merge without the consistency check. One-shot. |
 | `-tscb <file>` | 1 | | Convert between `.tsc` and `.tscb` (the direction follows the input extension). Rejects any other extension with "Wrong file ending!". One-shot. |
 | `-IAM` | 0 | off | Write spherical (independent-atom-model) form factors — the reference case. |

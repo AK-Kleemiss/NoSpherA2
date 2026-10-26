@@ -3026,6 +3026,36 @@ std::vector<HE_Spherical_Atom> make_he_evaluators(const salted_part_prep& sph,
 	return out;
 }
 
+//the filled atoms of a part into the run's .tshb: the whole atom (every occupied orbital) as Slater records in the charge
+//state make_he_evaluators gives the streamed table, Z on each; tabulated (delta_k, GTO) ions block the .tshb instead
+void fill_tshb(const salted_part_prep& sph, WFN& fill_wavy, options& opt, std::ostream& file)
+{
+	if (sph.asym_atom_list.empty())
+		return;
+	const std::vector<HE_Spherical_Atom> spheres = make_he_evaluators(sph, fill_wavy, opt, file);
+	ScattererLabels keys;
+	append_scatterer_ids(keys, opt, sph.labels, fill_wavy, sph.asym_atom_list);
+	std::vector<tshb_record> records(sph.asym_atom_list.size());
+	std::vector<std::array<double, 3>> terms;
+	for (size_t a = 0; a < records.size(); a++)
+	{
+		const int idx = sph.asym_atom_list[a];
+		tshb_record& r = records[a];
+		r.label = sph.labels[a];
+		r.part = fill_wavy.get_atom_group_nr(idx);
+		r.Z = fill_wavy.get_atom_charge(idx);
+		if (!spheres[a].slater_terms(terms))
+		{
+			opt.tshb_blocked = r.label + " is filled from the tabulated " + (spheres[a].uses_gto_tables() ? "GTO ion" : "delta_k") + " data";
+			return;
+		}
+		for (const std::array<double, 3>& t : terms)
+			r.slaters.push_back(tshb_slater(t));
+	}
+	opt.tshb->append(tshb_block(std::move(records), keys, opt.electron_diffraction), file);
+	file << "Spherical fill: " << sph.asym_atom_list.size() << " atom(s) go into the .tshb as Slater records" << std::endl;
+}
+
 //rows for atoms the SALTED model could not predict (unknown species, or nothing inside the descriptor cutoff)
 //a Thakkar factor depends only on element and reflection, so these chunk like everything else here
 void append_spherical_rows(cvec2& chunk,
@@ -3502,14 +3532,11 @@ tsc_block_type calculate_scattering_factors(
 		&& opt.binary_tsc && !opt.old_tsc;
 	if (block_reflections > 0 && !stream_tsc && (!opt.binary_tsc || opt.old_tsc))
 		file << "Text tsc requested: the table is kept in memory instead of streamed in blocks" << std::endl;
-	//-tshb: the fitted densities replace the table (olex2.refine evaluates them at any reflection), so none is made
-	//not for a combined table or the -mtc preparation, where every part would overwrite the one file, nor when the
-	//Thakkar fill is needed, which a .tshb does not carry: those keep the table and write no .tshb
-	const bool tshb_only = opt.write_tshb && !opt.iam_switch
+	//-tshb: the fitted densities go into the run's .tshb (opt.tshb, set by the caller once the run qualifies) and no
+	//table is made; olex2.refine evaluates them at any reflection. The fill call and the -mtc preparation never decide it
+	const bool tshb_only = opt.tshb != nullptr && !opt.iam_switch
 		&& (std::is_same_v<calculator_type, SALTEDPredictor &> || opt.partition_type == PartitionType::RI)
-		&& prep_out == NULL && !opt.spherical_fill && opt.combined_tsc_calc_files.size() <= 1
-		&& !opt.needs_Thakkar_fill && !opt.write_CIF && !opt.do_XCW;
-	opt.tsc_replaced_by_tshb = tshb_only;
+		&& prep_out == NULL && !opt.spherical_fill;
 	cvec2 sf;
 	if (!stream_tsc && !tshb_only)
 	{
@@ -3636,8 +3663,11 @@ tsc_block_type calculate_scattering_factors(
 		time_points.push_back(get_time());
 		time_descriptions.push_back("Calculation of Charges");
 		if (tshb_only) {
-			ml->write_tshb("experimental.tshb", labels, asym_atom_list, *wavy, opt.ECP_mode, opt.electron_diffraction);
-			file << "Wrote experimental.tshb, no table" << endl;
+			//keyed as the table's rows, the core as the table adds it: the model's ECP mode
+			ScattererLabels keys;
+			append_scatterer_ids(keys, opt, labels, *wavy, asym_atom_list);
+			opt.tshb->append(ml->tshb(labels, keys, asym_atom_list, *wavy, calculator.wavy.get_ECP_mode(), opt.electron_diffraction), file);
+			file << labels.size() << " atom(s) go into the .tshb, no table" << endl;
 		}
 
 		if (prep_out != NULL)
@@ -3812,8 +3842,10 @@ tsc_block_type calculate_scattering_factors(
 			time_points.push_back(get_time());
 			time_descriptions.push_back("Calculation of Charges");
 			if (tshb_only) {
-				ml.write_tshb("experimental.tshb", labels, asym_atom_list, *wavy, opt.ECP_mode, opt.electron_diffraction);
-				file << "Wrote experimental.tshb, no table" << endl;
+				ScattererLabels keys;
+				append_scatterer_ids(keys, opt, labels, *wavy, asym_atom_list);
+				opt.tshb->append(ml.tshb(labels, keys, asym_atom_list, *wavy, wavy->get_ECP_mode(), opt.electron_diffraction), file);
+				file << labels.size() << " atom(s) go into the .tshb, no table" << endl;
 			}
 			else if (stream_tsc)
 			{
@@ -3899,13 +3931,27 @@ tsc_block_type calculate_scattering_factors(
 		//no_date is not part of spherical_fill_scope: only this caller suppresses the banner
 		const bool no_date_was = opt.no_date;
 		opt.no_date = true;
-		tsc_block<int, cdouble> blocky_thakkar;
+		if (tshb_only)
 		{
-			const spherical_fill_scope fill(opt, hkl);
-			blocky_thakkar = calculate_scattering_factors<itsc_block, std::vector<WFN> &>(opt, tempy, file, labels, fill_nr);
+			//the atoms alone: their records need no reflections
+			salted_part_prep spherical;
+			{
+				const spherical_fill_scope fill(opt, hkl);
+				calculate_scattering_factors<itsc_block, std::vector<WFN> &>(opt, tempy, file, labels, fill_nr, kpts, &spherical);
+			}
+			opt.no_date = no_date_was;
+			fill_tshb(spherical, tempy[fill_nr], opt, file);
 		}
-		opt.no_date = no_date_was;
-		blocky.append(std::move(blocky_thakkar), file);
+		else
+		{
+			tsc_block<int, cdouble> blocky_thakkar;
+			{
+				const spherical_fill_scope fill(opt, hkl);
+				blocky_thakkar = calculate_scattering_factors<itsc_block, std::vector<WFN> &>(opt, tempy, file, labels, fill_nr);
+			}
+			opt.no_date = no_date_was;
+			blocky.append(std::move(blocky_thakkar), file);
+		}
 		time_points.push_back(get_time());
 		time_descriptions.push_back("Spherical Atoms");
 	}
@@ -3936,7 +3982,8 @@ bool stream_mtc_salted(options& opt, std::vector<WFN>& wavy, std::ostream& file,
 	const size_t n_parts = opt.combined_tsc_calc_files.size();
 	//electron diffraction is not excluded: the prep carries the stl, so no unit cell is needed down here
 	//the stream writer is binary only, a text table has to go through the in-memory path
-	if (opt.tsc_block_size == 0 || !opt.SALTED || n_parts < 2 || opt.iam_switch || !opt.binary_tsc || opt.old_tsc)
+	//a .tshb run makes no table, so the sequential loop (equal row for row) collects the parts instead
+	if (opt.tsc_block_size == 0 || !opt.SALTED || n_parts < 2 || opt.iam_switch || !opt.binary_tsc || opt.old_tsc || opt.tshb)
 		return false;
 
 	std::vector<std::shared_ptr<SALTEDPredictor>> preds;

@@ -66,9 +66,18 @@ set_tests_properties(
     PROPERTIES
         RESOURCE_LOCK integration_ELI_heavy
 )
+# Tests using tests/rubredoxin_cmtc: both write NoSpherA2.log there
+set_tests_properties(
+    TomlIntegrationTests.RubredoxinCmtc
+    TomlIntegrationTests.RubredoxinCmtcTshb
+    PROPERTIES
+        RESOURCE_LOCK integration_rubredoxin_cmtc
+)
+
 # Tests using tests/SALTED
 set_tests_properties(
     TomlIntegrationTests.SALTED
+    TomlIntegrationTests.SaltedFillTshb
     TomlIntegrationTests.SALTED_write_coefs
     TomlIntegrationTests.SALTED_coef_file
     SALTEDTests.ReadingSALTEDBinaryFile

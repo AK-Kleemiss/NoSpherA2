@@ -307,6 +307,48 @@ mtc_mult = [1, 1, 1, 1]
 mtc_charge = [0, 0, 0, 0]
 mtc_ECP = [0, 0, 0, 0]
 
+# -cmtc into one .tshb: the four fragments' fitted atoms, C_3/N_3/O_3 once (from fragment 2, the first that has them)
+[rubredoxin_cmtc_tshb]
+directory = "rubredoxin_cmtc"
+good = "rubredoxin_cmtc_tshb.good"
+
+[rubredoxin_cmtc_tshb.args]
+hkl = "1yk4_h.hkl"
+acc = 1
+ri_fit = "combo_basis_fit"
+tshb = ""
+cmtc = [
+  "residues/1.gbw",
+  "residues/1.cif",
+  0,
+  "residues/2.gbw",
+  "residues/2.cif",
+  0.1,
+  "residues/3.gbw",
+  "residues/3.cif",
+  0.2,
+  "residues/4.gbw",
+  "residues/4.cif",
+  0
+]
+mtc_mult = [1, 1, 1, 1]
+mtc_charge = [0, 0, 0, 0]
+mtc_ECP = [0, 0, 0, 0]
+
+# -tshb with the Thakkar fill: the model lacks Co and F, which go into the joint .tshb as Slater records in their EEQ
+# charge; tests/src/TshbBlockTests.cpp holds the per-atom comparison with the table
+[SALTED_fill_tshb]
+directory = "SALTED"
+good = "SALTED_fill_tshb.good"
+
+[SALTED_fill_tshb.args]
+SALTED = "Model"
+cif = "Co110.cif"
+wfn = "Co110.xyz"
+dmin = 0.8
+no_gpu_salted = ""
+tshb = ""
+
 [SALTED]
 directory = "SALTED"
 

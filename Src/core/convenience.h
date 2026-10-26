@@ -13,6 +13,7 @@ class cell;
 class atom;
 class GridManager;
 class BasisSet;
+class tshb_block;
 struct asym_atom;
 enum PartitionType { Becke, TFVC, Hirshfeld, RI, MBIS, EMBIS };
 enum class MultipoleScheme { TFVC, HIRSHFELD, MBIS, EMBIS, NUCLEAR, MULLIKEN, SANDERSON };
@@ -1043,6 +1044,10 @@ struct options
 	bool tsc_written_by_stream = false;
 	//set when -tshb wrote experimental.tshb instead of the table, so the caller writes no (empty) table either
 	bool tsc_replaced_by_tshb = false;
+	//the run's .tshb while every part goes into it instead of the table; null otherwise
+	tshb_block* tshb = nullptr;
+	//why a fill atom cannot be a .tshb record (tabulated ion data): the run writes the table instead
+	std::string tshb_blocked;
 	bool qct = false;
 	// What structure_factors reads: the crystal model, the extinction and the I tensor storage
 	struct SF_settings {

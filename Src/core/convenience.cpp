@@ -2,6 +2,7 @@
 #include "convenience.h"
 #include "cell.h"
 #include "tsc_block.h"
+#include "tshb_block.h"
 #include "tsc_label_converter.h"
 #include "test_functions.h"
 #include "integrator.h"
@@ -252,7 +253,10 @@ std::string help_message =
  "  -old_tsc                           Request the legacy TSC format.\n"
  "  -tshb                              With -ri_fit or -SALTED, write the fitted\n"
  "                                    atoms as experimental.tshb instead of the\n"
- "                                    table (kept for -mtc, Thakkar fill, -cif).\n\n"
+ "                                    table, one file for all -mtc/-cmtc parts\n"
+ "                                    and the Thakkar fill. The table is kept\n"
+ "                                    for -IAM, grid partitions, -cif, XCW and\n"
+ "                                    fills on tabulated ion data.\n\n"
  "PARTITIONING, BASIS, AND PERFORMANCE\n"
  "  -b <basis>  -d <directory>          Basis name/file and Tonto-style basis\n"
  "                                    directory (also needed for -fchk).\n"
@@ -379,7 +383,9 @@ std::string help_message =
  "                                    (default: <table>.labels.tsc). Without\n"
  "                                    operands: force label-based scatterers in\n"
  "                                    binary .tscb output (default behavior).\n"
- "  -merge <table ...>                 Merge .tsc/.tscb tables with checks.\n"
+ "  -merge <table ...>                 Merge .tsc/.tscb tables with checks, or\n"
+ "                                    .tshb files into combined.tshb (first\n"
+ "                                    file wins for an atom in several).\n"
  "  -merge_nocheck <table ...>         Merge tables only when you know their\n"
  "                                    HKL indices are identical.\n\n"
  "MULTI-FRAGMENT WORKFLOWS\n"
@@ -3175,7 +3181,13 @@ bool options::digest_partition_options(const std::string &temp, int &i)
 			filenames.push_back(arguments[i + n]);
 			n++;
 		}
-		merge_tscs("combine", filenames, old_tsc);
+		//.tshb files carry densities, no reflections: merged by key alone, first wins, as the tables merge their columns
+		const auto n_tshb = std::count_if(filenames.begin(), filenames.end(), [](const std::filesystem::path& f) { return f.extension() == ".tshb"; });
+		err_checkf(n_tshb == 0 || n_tshb == (long)filenames.size(), "-merge takes either tables or .tshb files, not both", std::cout);
+		if (n_tshb > 0)
+			merge_tshbs(filenames);
+		else
+			merge_tscs("combine", filenames, old_tsc);
 		finished = true; return true;
 	}
 	else if (temp == "-merge_nocheck")
@@ -3187,7 +3199,13 @@ bool options::digest_partition_options(const std::string &temp, int &i)
 			filenames.push_back(arguments[i + n]);
 			n++;
 		}
-		merge_tscs_without_checks("combine", filenames, old_tsc);
+		//.tshb files carry densities, no reflections: merged by key alone, first wins, as the tables merge their columns
+		const auto n_tshb = std::count_if(filenames.begin(), filenames.end(), [](const std::filesystem::path& f) { return f.extension() == ".tshb"; });
+		err_checkf(n_tshb == 0 || n_tshb == (long)filenames.size(), "-merge takes either tables or .tshb files, not both", std::cout);
+		if (n_tshb > 0)
+			merge_tshbs(filenames);
+		else
+			merge_tscs_without_checks("combine", filenames, old_tsc);
 		finished = true; return true;
 	}
 	else if (temp == "-salted_fold")

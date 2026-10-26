@@ -319,6 +319,8 @@ public:
 	const double get_core_form_factor(const double& k_vector, const int& core_els) const override;
 	//The density get_core_form_factor transforms, as terms {T, N, z}: 4 pi r rho(r) = sum T r^N e^(-z r), bohr
 	std::vector<std::array<double, 3>> core_slater_terms(const int core_els) const;
+	//The same terms for the s, p, d, f orbitals up to the given counts; the defaults are the whole atom
+	std::vector<std::array<double, 3>> slater_terms(const int max_s = 7, const int max_p = 6, const int max_d = 4, const int max_f = 2) const;
 	const double get_core_density(const double& dist, const int& core_els);
 	const double get_custom_form_factor(
 		const double& k_vector,
@@ -408,6 +410,9 @@ public:
 
 	double get_radial_density(const double &r) const;
 	double get_form_factor(const double &k) const;
+	// The density as Thakkar terms {T, N, z} (4 pi r rho = sum T r^N e^(-z r), bohr): the neutral's and the ion's, scaled
+	// by their weights. False, with terms empty, on the delta and GTO routes, whose differences are tabulated
+	bool slater_terms(std::vector<std::array<double, 3>>& terms) const;
 
 	// f(0), i.e. how many electrons this density actually carries. Equals
 	// Z - charge when an ion was available, Z when it fell back.

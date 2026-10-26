@@ -481,6 +481,7 @@ public:
 	// Fractional coordinates and disorder group form the CIF-derived
 	// SCATTERER_ID. Rebuild it when either value changes so a subsequent MTC
 	// comparison cannot reuse an ID from another PART.
+	int get_group_nr() const { return group_nr; };
 	void set_group_nr(const int group_nr) {
 		this->group_nr = group_nr;
 		if (charge >= 1 && charge <= 255)

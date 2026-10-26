@@ -503,9 +503,15 @@ const double Thakkar::get_core_form_factor(const double &k_vector, const int &co
 
 std::vector<std::array<double, 3>> Thakkar::core_slater_terms(const int core_els) const
 {
-	err_checkf(_first_ex != 200000000, "No Thakkar core density for Z = " + std::to_string(atomic_number), std::cout);
 	int mx[4] = { 0, 0, 0, 0 };
 	set_core_counts(&mx[0], &mx[1], &mx[2], &mx[3], core_els, ECP_mode);
+	return slater_terms(mx[0], mx[1], mx[2], mx[3]);
+}
+
+std::vector<std::array<double, 3>> Thakkar::slater_terms(const int max_s, const int max_p, const int max_d, const int max_f) const
+{
+	err_checkf(_first_ex != 200000000, "No Thakkar density for Z = " + std::to_string(atomic_number), std::cout);
+	const int mx[4] = { max_s, max_p, max_d, max_f };
 	const int* nv[4] = { ns, np, nd, nf };
 	const int lo[4] = { 0, 7, 13, 17 }, hi[4] = { 7, 13, 17, 19 };
 	std::vector<std::array<double, 3>> t;
@@ -1137,6 +1143,24 @@ double HE_Spherical_Atom::get_radial_density(const double &r) const
 	const double n = _neutral.get_radial_density(r);
 	if (!_has_ion) return n;
 	return (1.0 - _weight) * n + _weight * _ion->get_radial_density(r);
+}
+
+bool HE_Spherical_Atom::slater_terms(std::vector<std::array<double, 3>>& terms) const
+{
+	terms.clear();
+	if (_use_gto || _use_delta || _Z < 1 || _Z > 103)
+		return false;
+	const double w_neutral = _has_ion ? 1.0 - _weight : 1.0;
+	for (std::array<double, 3> t : _neutral.slater_terms()) {
+		t[0] *= w_neutral;
+		terms.push_back(t);
+	}
+	if (_has_ion)
+		for (std::array<double, 3> t : _ion->slater_terms()) {
+			t[0] *= _weight;
+			terms.push_back(t);
+		}
+	return true;
 }
 
 double HE_Spherical_Atom::get_form_factor(const double &k) const

@@ -5,8 +5,13 @@
 #include "SALTED_utilities.h"
 #include <map>
 #include <optional>
+#include "tshb_block.h"
 
 using DensityFitting::Interaction_Energy;
+
+//A Thakkar term { T, N, z } of 4 pi r rho = T r^N e^(-z r) in bohr as the .tshb Slater record { c, n, z } of
+//rho = c R^n e^(-z R) in angstrom: c = T / (4 pi b^(N+2)), n = N - 1, z / b
+std::array<double, 3> tshb_slater(const std::array<double, 3>& thakkar_term);
 
 //Atomic multipoles q_lm about the nucleus for l = 0..lmax, stored at [l*l+l+m] in the Racah normalisation
 //sqrt(4pi/(2l+1)) Int rho r^l Y_lm (e bohr^l); q(0,0) is the electron count
@@ -109,11 +114,11 @@ public:
 	const std::map<std::string, Interaction_Energy>& interactions() const { return energies; }
 	//A new molecule at R x + t (bohr), the coefficients rotated with the atoms
 	Gaussian_Molecule transformed(const vec2& R, const vec& t) const;
-	//The listed atoms as a .tshb for olex2.refine: one shell per primitive in angstrom and e/A^3, pr_norm folded into the
-	//coefficients; the real harmonics are those of spherical_harmonic.h, which smtbx evaluates identically
-	//Atoms of wave with ECP electrons get the core opt.ECP_mode adds to the table: e^(-s/8) for mode 0, the Thakkar core as
-	//Slater terms and the valence correction as l = 0 Gaussians for modes 1-3; version 3 adds Z per atom and "ED: true" when ED
-	void write_tshb(const std::filesystem::path& fn, const svec& labels, const ivec& atoms, const WFN& wave, const int ECP_mode, const bool ED) const;
+	//The listed atoms as .tshb records keyed like the table (keys[i] for atoms[i]): one shell per primitive in angstrom and
+	//e/A^3, pr_norm folded into the coefficients; the real harmonics are those of spherical_harmonic.h, which smtbx evaluates
+	//identically. Atoms of wave with ECP electrons get the core ECP_mode adds to the table: e^(-s/8) for mode 0, the Thakkar
+	//core as Slater terms and the valence correction as l = 0 Gaussians for modes 1-3
+	tshb_block tshb(const svec& labels, const ScattererLabels& keys, const ivec& atoms, const WFN& wave, const int ECP_mode, const bool ED) const;
 	const WFN& basis() const { return aux; }
 	const vec& coefficients() const { return coefs; }
 	const aux_density_table& table() const { return tab; }

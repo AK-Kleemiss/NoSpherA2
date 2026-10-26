@@ -6,6 +6,7 @@
 *.nbo_log
 *.eqc_log
 *.tscb
+*.tshb
 !tests/epoxide_gbw/fixture.tscb
 *.densities
 *.cube

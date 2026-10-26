@@ -765,6 +765,18 @@ TEST(TomlIntegrationTests, RubredoxinCmtc)
 	EXPECT_TRUE(result.success) << result.message;
 }
 
+TEST(TomlIntegrationTests, RubredoxinCmtcTshb)
+{
+	const UT_Result result = run_inprocess_test(get_repo_root(), "rubredoxin_cmtc_tshb");
+	EXPECT_TRUE(result.success) << result.message;
+}
+
+TEST(TomlIntegrationTests, SaltedFillTshb)
+{
+	const UT_Result result = run_inprocess_test(get_repo_root(), "SALTED_fill_tshb");
+	EXPECT_TRUE(result.success) << result.message;
+}
+
 TEST(TomlIntegrationTests, SALTED)
 {
 	const UT_Result result = run_inprocess_test(get_repo_root(), "SALTED");

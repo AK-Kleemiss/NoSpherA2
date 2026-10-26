@@ -239,6 +239,11 @@ Key core modules live in `Src/core`:
 
 ## Current Validation Notes
 
+As of 2026-10-26, `-tshb` writes one version-4 `experimental.tshb` per run (`tshb_block`, keyed like the table, first wins)
+covering every `-mtc`/`-cmtc` part and the Thakkar fill, and `-merge` merges .tshb files; `TshbBlockTests`, `TshbJointTests` and two
+goldens are new. `ctest --preset release-linux-tests` on a CPU-only 4-core VM reports **1313 passed, 0 failed, 23 skipped** (2 disabled)
+of 1338. See `UNIT_TESTS_STATUS.md`.
+
 As of 2026-10-25, `-occ` with a `df-basis` stores occ's three-centre integrals packed over the screened shell pairs
 (`occ/qm/df_packed_store.h`, `Policy::Choose` natively) within half of `-mem` or of the job's memory, recomputing what does
 not fit; `DfPackedStoreTests` (new) and the occ goldens pass, and occ's direct general-spin exchange no longer corrupts its
