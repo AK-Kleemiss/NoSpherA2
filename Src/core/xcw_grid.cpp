@@ -409,8 +409,8 @@ cvec structure_factors::grid_sfc(const dMatrix2& D)
 	for (int g = 0; g < ng; g++)
 		for (int b = 0; b < static_cast<int>(XG.blocks[g].size()); b++) list.emplace_back(g, b);
 	const int nb = static_cast<int>(list.size()), nmo = static_cast<int>(D.extent(0));
-	//NOSPHERA2_XCW_GRID_DTOL: per block bound on the |dF| a kept rho may carry; off by default: XCW moves D on
-	//every pair each cycle, so on P1 the bound is 1e-5..1 per block and 1e-4 keeps 14 % of blocks for 2.5e-4 in F
+	//NOSPHERA2_XCW_GRID_DTOL: per block bound on the |dF| a kept rho may carry; off by default: an SCF moves
+	//every element of D each cycle, so few blocks stay below any useful bound
 	const char* dt = tuning("NOSPHERA2_XCW_GRID_DTOL");
 	const double dtol = dt && !XG.on_device ? std::atof(dt) : 0.0;
 	const bool fresh = static_cast<int>(XG.bound.size()) != nb || XG.D_last.rows() != nmo;
@@ -456,6 +456,7 @@ cvec structure_factors::grid_sfc(const dMatrix2& D)
 		for (int j = 0; j < nmo; j++) XG.D_last(i, j) = D(i, j);
 	sc.lap("F change test");
 #ifdef NOSPHERA2_USE_GPU
+	//GPU: rho of every block from D by the device's GEMMs, the same values as the loop below
 	if (XG.on_device) {
 		vec Dh(static_cast<size_t>(nmo) * nmo), r(XG.gpu_off[ng]);
 		for (int i = 0; i < nmo; i++)
@@ -505,8 +506,8 @@ cvec structure_factors::grid_sfc(const dMatrix2& D)
 	}
 	if (sc.on) std::cout << "XCW grid F kept " << kept << " of " << nb << " blocks, bound " << *std::min_element(dd.begin(), dd.end()) << " .. " << *std::max_element(dd.begin(), dd.end()) << "\n";
 	sc.lap("F density");
-	//ponytail: direct sum over points x cleaned entries, P * nc sincos; the exact reference the
-	//Fourier-Bessel transform replaces once it is checked against this
+	//The transform of rho: Fourier-Bessel when planned, else the direct sum over points x cleaned
+	//entries (P * nc sincos), the exact reference
 	cvec sfc(static_cast<size_t>(ng) * nc);
 	if (XG.fb) XG.fb->forward(rho, sfc);
 	else {
@@ -585,6 +586,7 @@ void structure_factors::grid_contract(occ::Mat& out, const cvec& pre)
 	}
 	sc.lap("P transform");
 #ifdef NOSPHERA2_USE_GPU
+	//GPU: the transposed chain, the potential of every block contracted into out on the device
 	if (XG.on_device) {
 		vec Vh(XG.gpu_off[ng]);
 		for (int g = 0; g < ng; g++) std::copy(V[g].begin(), V[g].end(), Vh.begin() + XG.gpu_off[g]);
@@ -642,6 +644,7 @@ bool structure_factors::hold_grid_gpu()
 {
 	XG.on_device = false;
 #ifdef NOSPHERA2_USE_GPU
+	//GPU: uploads the AO values of every block; without a device the grid stays on the host
 	const int nmo = model_data.nmo, ng = static_cast<int>(XG.blocks.size());
 	XG.gpu_off.assign(ng + 1, 0);
 	for (int g = 0; g < ng; g++) XG.gpu_off[g + 1] = XG.gpu_off[g] + static_cast<int>(XG.w[g].size());

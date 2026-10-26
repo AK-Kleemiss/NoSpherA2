@@ -365,11 +365,11 @@ void structure_factors::set_phases() {
 		ivec asym_list = unit_cell.generate_asym_lookup(r, scatter_data.hkl, scatter_data.hkl_enlarged);
 		vec q_temp = { k_pt[0][asym_list[0]], k_pt[1][asym_list[0]], k_pt[2][asym_list[0]] };
 		std::transform(q_temp.begin(), q_temp.end(), q_temp.begin(), [angstrom2bohr](double x) { return x * angstrom2bohr; });
-		for (int t = 0; t < trans[0].size(); t++) {
-			vec trans_temp = { trans[0][t], trans[1][t], trans[2][t] };
+		for (int sym_op = 0; sym_op < trans[0].size(); sym_op++) {
+			vec trans_temp = { trans[0][sym_op], trans[1][sym_op], trans[2][sym_op] };
 			trans_temp = dot(cm, trans_temp, true);
 			cdouble exponent(0, dot_BLAS(q_temp, trans_temp, false));
-			translation_phase_facts[r][t] = std::exp(exponent);
+			translation_phase_facts[r][sym_op] = std::exp(exponent);
 		}
 	}
 	phases_set_ = true;
@@ -378,18 +378,19 @@ void structure_factors::set_phases() {
 
 void structure_factors::set_anom() {
 	if(anom_set_) return;
-	int r, at, r_asym;
+	int r, at, sym_op;
 	ivec2 asym_lookup(model_data.nr);
 	for (r = 0; r < model_data.nr; r++) {
 		asym_lookup[r] = unit_cell.generate_asym_lookup(r, scatter_data.hkl, scatter_data.hkl_enlarged);
 	}
 	for (r = 0; r < model_data.nr; r++) {
+		//lookup[sym_op]: the hkl_enlarged entry of reflection r under symmetry operation sym_op
 		const ivec& lookup = asym_lookup[r];
 		cdouble sum = 0;
 		for (at = 0; at < model_data.ncen; at++) {
 			cdouble temp1 = 0;
-			for (r_asym = 0; r_asym < lookup.size(); r_asym++) {
-				temp1 += phase_facts[at][lookup[r_asym]] * DW_facts[at][lookup[r_asym]] * translation_phase_facts[r][r_asym];
+			for (sym_op = 0; sym_op < lookup.size(); sym_op++) {
+				temp1 += phase_facts[at][lookup[sym_op]] * DW_facts[at][lookup[sym_op]] * translation_phase_facts[r][sym_op];
 			}
 			sum += temp1 * asym_atoms[at].sym_fact * asym_atoms[at].anom;
 		}
@@ -488,10 +489,8 @@ std::string structure_factors::extinction_report() const {
 //The scale that minimises the criterion the SCF descends: k over the fit set from
 //Sum w (k|Fc| - |Fo|)^2 / sigma^2, or k^2 from Sum w (k^2|Fc|^2 - Fo^2)^2 / sigma(I)^2 against
 //F^2, with w the 1/|H|^2 weights of XWR_type 2. perturbation takes the scale as given, so the
-//scale had better be stationary for the criterion, or the SCF descends a different
-//functional than the one it prints: an unweighted fit of k put Fe(phen)2(SCN)2 (chi^2 12.96
-//vs 12.30 at the weighted k, dchi^2/dk 2e3) 4 mEh above the previous step's orbitals at
-//every converged lambda >= 0.03.
+//scale has to be stationary for the criterion, or the SCF descends a different functional
+//than the one it prints; with weights, an unweighted k is not.
 void structure_factors::eval_scale() {
 	ensure_inv_H2_weights();
 	update_extinction();
@@ -961,22 +960,23 @@ void structure_factors::build_I(const std::vector<ao_data>& ao_data_shells, doub
 	}
 	// The integrations of reflection r: with inversion screening one per cleaned entry its k-points land on, carrying
 	// the summed translation phases of the operations landing on the entry and on its inverse; without, one per operation
+	//c: the cleaned entry integrated; self / inv: whether an operation lands on it or on its inverse, t_*: their summed translation phases
 	struct k_job { int c; bool self, inv; cdouble t_self, t_inv; };
 	auto make_jobs = [&](const int r, std::vector<k_job>& jobs) {
 		jobs.clear();
 		if (row_copy[r]) return;
-		for (int s = 0; s < static_cast<int>(num_syms); s++) {
-			const int e = asym_lookup[r][s];
+		for (int sym_op = 0; sym_op < static_cast<int>(num_syms); sym_op++) {
+			const int e = asym_lookup[r][sym_op];
 			int j = inversion_screening ? 0 : static_cast<int>(jobs.size());
 			while (j < jobs.size() && jobs[j].c != clean_of[e]) j++;
 			if (j == jobs.size()) jobs.push_back({ clean_of[e], false, false, 0.0, 0.0 });
 			if (is_inverse[e]) {
 				jobs[j].inv = true;
-				jobs[j].t_inv += translation_phase_facts[r][s];
+				jobs[j].t_inv += translation_phase_facts[r][sym_op];
 			}
 			else {
 				jobs[j].self = true;
-				jobs[j].t_self += translation_phase_facts[r][s];
+				jobs[j].t_self += translation_phase_facts[r][sym_op];
 			}
 		}
 	};
@@ -1007,7 +1007,8 @@ void structure_factors::build_I(const std::vector<ao_data>& ao_data_shells, doub
 		grid_positions[at] = { dummy_wave.get_atom_pos(at)[0], dummy_wave.get_atom_pos(at)[1], dummy_wave.get_atom_pos(at)[2] };
 	}
 
-	// Precompute screening
+	// AO pair screening: an AO pair mu, nu on different centres is skipped when the bound on its overlap, summed over
+	// the primitives k of mu and l of nu, falls below e_tol
 	std::chrono::high_resolution_clock::time_point screening_start = std::chrono::high_resolution_clock::now();
 	ivec2 skip(model_data.nmo, ivec(model_data.nmo, 0));
 	{
@@ -1628,6 +1629,7 @@ void structure_factors::build_I(const std::vector<ao_data>& ao_data_shells, doub
 		}
 	};
 #if defined(NOSPHERA2_USE_GPU) || defined(NOSPHERA2_USE_METAL)
+	//GPU: sets the device up for the I tensor GEMMs; the CPU threads below integrate whatever it does not take.
 	//Read with use_gpu rather than on its own, so -no_gpu means what it says. Checking the
 	//pair here rather than clearing the flag at parse time keeps it order-independent.
 	if (opt->gpu_itensor && opt->use_gpu) {
@@ -1730,6 +1732,7 @@ void structure_factors::build_I(const std::vector<ao_data>& ao_data_shells, doub
 		pb.emplace((unsigned long long)model_data.nr, 60, "=", "|", "Calculating XCW integrals...", std::cout);
 	}
 #if defined(NOSPHERA2_USE_GPU) || defined(NOSPHERA2_USE_METAL)
+	//GPU: one host thread feeds the device batches of reflections next to the CPU workers
 	if (itensor_on_gpu) gpu_thread = std::thread([&]() {
 		const auto gpu_start = std::chrono::high_resolution_clock::now();
 		//The device takes reflections in batches; the CPU threads keep taking them one at
@@ -2021,8 +2024,8 @@ void structure_factors::calc_F_calc(const cvec2& scattering_factors) {
 		cdouble sum = scatter_data.anom_correction[r];
 		for (int at = 0; at < model_data.ncen; at++) {
 			cdouble temp1 = 0;
-			for (int r_asym = 0; r_asym < lookup.size(); r_asym++) {
-				temp1 += scattering_factors[at][lookup[r_asym]] * phase_facts[at][lookup[r_asym]] * DW_facts[at][lookup[r_asym]] * translation_phase_facts[r][r_asym];
+			for (int sym_op = 0; sym_op < lookup.size(); sym_op++) {
+				temp1 += scattering_factors[at][lookup[sym_op]] * phase_facts[at][lookup[sym_op]] * DW_facts[at][lookup[sym_op]] * translation_phase_facts[r][sym_op];
 			}
 			sum += temp1 * asym_atoms[at].sym_fact;
 		}
@@ -2042,6 +2045,7 @@ void structure_factors::calc_F_calc(I_tensor& I, const dMatrix2& D) {
 	//so it is recorded and rethrown after the region.
 	std::string io_error;
 #if defined(NOSPHERA2_USE_GPU) || defined(NOSPHERA2_USE_METAL)
+	//GPU: the same walk over the device copy of the tensor, the pair weights folded into D
 	if (I.i_on_device_) {
 		vec w(I.i_compact_);
 		for (size_t k = 0; k < I.i_compact_; k++)
@@ -2260,6 +2264,7 @@ void structure_factors::contract_tensor(occ::Mat& out, const cvec& pre) {
 	const int step = std::max(1, I_tens.i_streamed_ ? I_tens.i_window_ : model_data.nr);
 	bool on_device = false;
 #if defined(NOSPHERA2_USE_GPU) || defined(NOSPHERA2_USE_METAL)
+	//GPU: the same contraction over the device copy of the tensor; the CPU walk below is skipped
 	if (I_tens.i_on_device_) {
 		vec dev(I_tens.i_compact_);
 		err_checkf(itensor_gpu_cols(pre.data(), dev.data()), "I tensor walk on the device failed", std::cout);
