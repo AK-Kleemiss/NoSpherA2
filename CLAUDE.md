@@ -239,6 +239,11 @@ Key core modules live in `Src/core`:
 
 ## Current Validation Notes
 
+As of 2026-10-26 (later), `-ri_fit` stops on a wavefunction without a basis set (`.wfx`, `.wfn`) and on a plain fit that
+holds its electrons to worse than 1e-3 N; two `FittingIoCoverageIntegratorDeathTest` cases are new. `ctest --preset
+release-linux-tests` on a CPU-only 4-core VM reports **1317 passed, 0 failed, 23 skipped** (2 disabled) of 1340. See
+`UNIT_TESTS_STATUS.md`.
+
 As of 2026-10-26, `-tshb` writes one version-4 `experimental.tshb` per run (`tshb_block`, keyed like the table, first wins)
 covering every `-mtc`/`-cmtc` part and the Thakkar fill, and `-merge` merges .tshb files; `TshbBlockTests`, `TshbJointTests` and two
 goldens are new. `ctest --preset release-linux-tests` on a CPU-only 4-core VM reports **1313 passed, 0 failed, 23 skipped** (2 disabled)

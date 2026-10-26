@@ -781,6 +781,19 @@ static void print_fit_configuration(
 		<< std::endl;
 }
 
+//Restraints and Tikhonov trade the electron count for their targets, so only the plain fit has to hold it; the ECP cores are not fitted
+static vec checked_fit(const WFN& wavy, const WFN& wavy_aux, vec&& coefs)
+{
+	const std::vector<atom>& atoms = *wavy_aux.get_atoms_ptr();
+	const vec pop = calc_atomic_density(atoms, coefs);
+	double fitted = 0.0;
+	for (int a = 0; a < pop.size(); a++) fitted += pop[a] - atoms[a].get_ECP_electrons();
+	const double expected = explicit_electron_count(wavy);
+	err_checkf(std::abs(fitted - expected) <= 1e-3 * expected, "The density fit holds " + std::to_string(fitted) + " of the " + std::to_string(expected)
+		+ " electrons of " + wavy.get_path().string() + ": the auxiliary basis does not describe this density", std::cout);
+	return std::move(coefs);
+}
+
 vec DensityFitting::density_fit(
 	const WFN& wavy,
 	const WFN& wavy_aux,
@@ -790,6 +803,8 @@ vec DensityFitting::density_fit(
 	vec rho;
 
 	Int_Params normal_basis(wavy);
+	err_checkf(normal_basis.get_nao() > 0, "-ri_fit needs the basis set of the wavefunction, and " + wavy.get_path().string()
+		+ " carries none (.wfx and .wfn hold primitives only): give a .gbw, .fchk or .molden", std::cout);
 	Int_Params aux_basis(wavy_aux);
 	dMatrix2 dm = wavy.get_dm();
 	//An ORCA-convention density (gbw, molden) has the opposite sign on |m| = 3, 4, 7, 8 to libcint's (ab|P), as in ao_overlap
@@ -900,7 +915,7 @@ vec DensityFitting::density_fit(
 
 		std::cout << "==============================================\n"
 			<< std::endl;
-		return rho;
+		return checked_fit(wavy, wavy_aux, std::move(rho));
 	}
 
 	print_fit_configuration(config);

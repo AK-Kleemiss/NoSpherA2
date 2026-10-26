@@ -574,6 +574,37 @@ TEST(FittingIoCoverageIntegratorTests, DensityFitRejectsInvalidConfigurations)
 	EXPECT_EXIT(DensityFitting::density_fit(wave, aux, negative_lambda), ::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), ".*");
 }
 
+//A .wfx holds primitives and no basis set, so there is nothing to fit (disorder_THPP's .wfx fitted 0 electrons and the
+//table went out anyway). error_check writes to cout; the child points cout at stderr for the matcher
+TEST(FittingIoCoverageIntegratorDeathTest, AWavefunctionWithoutBasisSetStopsTheFit)
+{
+	const std::filesystem::path p = nos_test_repo_root() / "tests" / "eqc_ch3f_wfx" / "parent.wfx";
+	if (!std::filesystem::exists(p)) GTEST_SKIP() << "tests/eqc_ch3f_wfx/parent.wfx not found";
+	WFN wave(p);
+	auto basis = combo_basis();
+	const WFN aux = generate_aux_wfn(wave, basis);
+	EXPECT_EXIT({ std::cout.rdbuf(std::cerr.rdbuf()); DensityFitting::density_fit(wave, aux, DensityFitting::CONFIG()); },
+		::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), "carries none");
+}
+
+//Only s functions carry charge, so an auxiliary basis of p shells fits none of epoxide's 24 electrons
+TEST(FittingIoCoverageIntegratorDeathTest, AFitThatLosesElectronsStops)
+{
+	const std::filesystem::path p = epoxide_fixture();
+	if (p.empty()) GTEST_SKIP() << "tests/epoxide_gbw/epoxide.gbw not found";
+	WFN wave(p);
+	std::shared_ptr<BasisSet> p_only = std::make_shared<BasisSet>();
+	p_only->set_name("p_only");
+	for (const int z : { 1, 6, 8 }) {
+		p_only->set_count_for_element(z - 1, 1);
+		p_only->add_owned_primitive({ 0, 1, 0.8, 1.0, 0 });
+	}
+	std::vector<std::shared_ptr<BasisSet>> basis{ p_only };
+	const WFN aux = generate_aux_wfn(wave, basis);
+	EXPECT_EXIT({ std::cout.rdbuf(std::cerr.rdbuf()); DensityFitting::density_fit(wave, aux, DensityFitting::CONFIG()); },
+		::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), "holds 0.000000 of the 24.000000 electrons");
+}
+
 //A zero coefficient vector fits no electrons: every population is 0.000, every charge is Z,
 //the deviation from the nuclear expectation exceeds one electron only for the three heavy atoms
 //(the H deviation of exactly 1.000 does not cross the strict > 1 threshold), and the total line
