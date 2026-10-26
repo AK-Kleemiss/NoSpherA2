@@ -25,8 +25,8 @@ public:
 	// Only called when `gaussian_halt` is set.
 	void evaluate_gaussian_halting(const double lambda);
 
-	// Takes the converged wavefunction and creates the tscb file
-	void create_tscb(const occ::qm::Wavefunction& wfn, const double& lambda);
+	// Writes the files of a converged lambda step: tscb, wfn, fchk, F_calc table, NBO and RGBI as asked
+	void write_step_results(const occ::qm::Wavefunction& wfn, const double lambda);
 
 	// Per-lambda Gaussian halting diagnostics, see evaluate_gaussian_halting.
 	std::vector<GaussianHaltEntry> gaussian_halt_history_;

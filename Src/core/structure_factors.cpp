@@ -2415,3 +2415,17 @@ void structure_factors::restore_F_calc() {
 	scatter_data.F_calc = saved_F_calc_;
 	scatter_data.scale = saved_scale_;
 }
+
+//F_obs, sigma, scale * |F_calc| and the phase of every reflection, for an R-factor against another route
+//(an ORCA tsc through Olex2, or a Laue check between symmetry-equivalent rows)
+void structure_factors::write_F_calc(const std::string& path) {
+	ensure_hkl_ordered();
+	std::ofstream fc(path);
+	fc << "#    h    k    l          F_obs        sig(F)   scale*|F_calc|     phase(deg)   R1(gt) = " << std::setprecision(5) << quality_criteria.R1 << " R1(all) = " << quality_criteria.R1_all << " scale = " << std::setprecision(10) << scatter_data.scale << "\n";
+	for (int r = 0; r < model_data.nr; r++) {
+		const cdouble& f = scatter_data.F_calc[r];
+		fc << std::setw(5) << hkl_ordered_[r][0] << std::setw(5) << hkl_ordered_[r][1] << std::setw(5) << hkl_ordered_[r][2]
+			<< std::fixed << std::setprecision(4) << std::setw(15) << scatter_data.F_obs[r] << std::setw(14) << scatter_data.sigma_obs[r]
+			<< std::setw(17) << scatter_data.scale * ext_sqrt_y(r) * std::abs(f) << std::setw(15) << std::arg(f) * 180.0 / constants::PI << "\n";
+	}
+}

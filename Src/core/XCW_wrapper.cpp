@@ -307,7 +307,10 @@ void XCW_wrapper::flip_high_m_phases(occ::qm::Wavefunction& w) {
 	w.mo.update_density_matrix();
 }
 
-void XCW_wrapper::create_tscb(const occ::qm::Wavefunction& wfn, const double& lambda) {
+//The files of a converged lambda step, all named NA2_<lambda>: the scattering factor table (.tscb), the
+//wavefunction (.wfn, .fchk, and .47 for NBO when asked), the F_calc it was scored on and, with -rgbi,
+//the RGBI analysis of the refined wavefunction
+void XCW_wrapper::write_step_results(const occ::qm::Wavefunction& wfn, const double lambda) {
 	writer.log << "Creating .tscb file from converged SCF calculation..." << std::endl;
 	std::vector<WFN> sf_wave_vec(1, { wfn, false });
 	//The constructor marks anything taken from OCC as OCC-origin. What this refinement holds
@@ -334,58 +337,35 @@ void XCW_wrapper::create_tscb(const occ::qm::Wavefunction& wfn, const double& la
 		std::cout << "grid F check lambda " << lambda << ": max|dF|/max|F| " << std::scientific << std::setprecision(2) << dmax / fmax
 			<< " sum||F_grid|-|F_I||/sum|F_I| " << num / den << std::fixed << " forward " << fwd_ms << " ms" << std::endl;
 	}
-	const std::string value = lambda_tag(lambda);
-	std::ostringstream oss;
-	oss << "NA2_" << value << ".tscb";
-	result.write_tscb_file("test.cif", oss.str());
-	std::ostringstream oss2;
-	oss2 << "NA2_" << value << ".wfn";
-	sf_wave_vec[0].write_wfn(oss2.str(), false, true);
-	//the structure factors this step was scored on, for an R-factor against another route
-	//(an ORCA tsc through Olex2, or a Laue check between symmetry-equivalent rows)
-	{
-		sf.ensure_hkl_ordered();
-		std::ofstream fc("NA2_" + value + "_Fcalc.txt");
-		if (!sf.ext_p_.empty()) {
-			std::cout << "XCW lambda " << lambda << ": " << sf.extinction_report() << std::endl;
-			writer.log << "XCW lambda " << lambda << ": " << sf.extinction_report() << std::endl;
-		}
-		fc << "#    h    k    l          F_obs        sig(F)   scale*|F_calc|     phase(deg)   R1(gt) = " << std::setprecision(5) << sf.quality_criteria.R1 << " R1(all) = " << sf.quality_criteria.R1_all << " scale = " << std::setprecision(10) << sf.scatter_data.scale << "\n";
-		for (int r = 0; r < sf.model_data.nr; r++) {
-			const cdouble& f = sf.scatter_data.F_calc[r];
-			fc << std::setw(5) << sf.hkl_ordered_[r][0] << std::setw(5) << sf.hkl_ordered_[r][1] << std::setw(5) << sf.hkl_ordered_[r][2]
-				<< std::fixed << std::setprecision(4) << std::setw(15) << sf.scatter_data.F_obs[r] << std::setw(14) << sf.scatter_data.sigma_obs[r]
-				<< std::setw(17) << sf.scatter_data.scale * sf.ext_sqrt_y(r) * std::abs(f) << std::setw(15) << std::arg(f) * 180.0 / constants::PI << "\n";
-		}
+	const std::string base = "NA2_" + lambda_tag(lambda);
+	result.write_tscb_file("test.cif", base + ".tscb");
+	sf_wave_vec[0].write_wfn(base + ".wfn", false, true);
+	if (!sf.ext_p_.empty()) {
+		std::cout << "XCW lambda " << lambda << ": " << sf.extinction_report() << std::endl;
+		writer.log << "XCW lambda " << lambda << ": " << sf.extinction_report() << std::endl;
 	}
-	std::ostringstream oss3;
-	oss3 << "NA2_" << value << ".fchk";
+	sf.write_F_calc(base + "_Fcalc.txt");
 	//OCC's fchk writer reorders to Gaussian's basis functions but keeps libcint's phases,
 	//and Gaussian's f(+-3), g(+-3), g(+-4) are the opposite sign; the file has to carry
 	//Gaussian's so that anything reading an fchk gets the density right
 	{
 		occ::qm::Wavefunction w = wfn;
 		flip_high_m_phases(w);
-		w.save(oss3.str());
+		w.save(base + ".fchk");
 	}
-	if (opt->xcw_settings.nbo_output) {
-		std::ostringstream oss4;
-		oss4 << "NA2_" << value << ".47";
-		sf_wave_vec[0].write_nbo(oss4.str(), opt->debug, &writer.log);
-	}
+	if (opt->xcw_settings.nbo_output)
+		sf_wave_vec[0].write_nbo(base + ".47", opt->debug, &writer.log);
 	//Neither file written above can carry this analysis - a .wfn has bare primitives and
 	//the fchk reader keeps no shells - so -rgbi runs it here, on the refined wavefunction,
 	//and its report goes to a file of its own per lambda
 	if (opt->rgbi) {
-		std::ostringstream oss5;
-		oss5 << "NA2_" << value << "_RGBI.txt";
-		std::ofstream rgbi_out(oss5.str());
+		std::ofstream rgbi_out(base + "_RGBI.txt");
 		std::streambuf* const cout_buf = std::cout.rdbuf(rgbi_out.rdbuf());
 		Roby_information Roby(sf_wave_vec[0], opt->rgbi_group_sets, !opt->rgbi_no_sym,
 			opt->rgbi_orbital_basis == RGBIOrbitalBasis::ANO, opt->rgbi_EVs, opt->rgbi_theta,
 			opt->rgbi_legacy_cutoff);
 		std::cout.rdbuf(cout_buf);
-		writer.log << "RGBI analysis written to " << oss5.str() << std::endl;
+		writer.log << "RGBI analysis written to " << base << "_RGBI.txt" << std::endl;
 	}
 }
 
@@ -459,7 +439,7 @@ void XCW_wrapper::report_lambda(const double lambda, const occ::qm::Wavefunction
 	writer.lambda_line();
 	if (write_result) {
 		const _time_point tscb_t0 = get_time();
-		create_tscb(wfn, lambda);
+		write_step_results(wfn, lambda);
 		throughput::record_time("XCW tscb", false, get_msec(tscb_t0, get_time()));
 	}
 }
@@ -524,7 +504,7 @@ void XCW_wrapper::setup_scf_integrals(const occ::qm::HartreeFock& hf) {
 bool XCW_wrapper::read_start_guess(occ::qm::Wavefunction& wfn) {
 	if (!opt->xcw_settings.read_first_guess) return false;
 	wfn = occ::qm::Wavefunction::load("NA2_" + lambda_tag(opt->xcw_settings.xcw_start_value) + ".fchk");
-	//Written in Gaussian's phases by create_tscb; OCC's loader does not undo that
+	//Written in Gaussian's phases by write_step_results; OCC's loader does not undo that
 	flip_high_m_phases(wfn);
 	return true;
 }

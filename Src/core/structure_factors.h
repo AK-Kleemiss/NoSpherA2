@@ -302,6 +302,8 @@ public:
 	// lambda times the change of the perturbation matrix for a change dD_eff of the density, the scale
 	// moving along; leaves F_calc and the scale as they were
 	occ::Mat perturbation_response(const dMatrix2& dD_eff, const double lambda);
+	// The F_calc table of the current density, one reflection per line
+	void write_F_calc(const std::string& path);
 	// F_calc and scale as they are now, and back
 	void save_F_calc();
 	void restore_F_calc();
