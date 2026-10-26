@@ -205,6 +205,39 @@ TEST(TshbBlockTests, MixedLabelAndIdKeysAreRefused)
 	EXPECT_THROW(tshb_block({ record("C1", 6, 1.0), record("C2", 6, 1.0) }, keys), std::runtime_error);
 }
 
+//-merge marks the result complete only when every input says so and every scatterer of the run is in it
+TEST(TshbBlockTests, MergeIsCompleteOnlyWhenEveryInputIsAndTheRunIsCovered)
+{
+	const fs::path dir = scratch("coverage");
+	const atomID c1(0.1, 0.1, 0.1, 0, 6), o1(0.2, 0.2, 0.2, 1, 8), n1(0.3, 0.3, 0.3, 2, 7), h1(0.4, 0.4, 0.4, 0, 1);
+	tshb_block({ record("C1", 6, 1.0), record("O1", 8, 1.0, 1) }, std::vector<atomID>{ c1, o1 }).write(dir / "a.tshb");
+	tshb_block({ record("N1", 7, 1.0, 2) }, std::vector<atomID>{ n1 }).write(dir / "b.tshb");
+	tshb_block partial({ record("H1", 1, 1.0) }, std::vector<atomID>{ h1 });
+	partial.set_complete(false);
+	partial.write(dir / "h.tshb");
+	EXPECT_FALSE(tshb_block(dir / "h.tshb").is_complete());
+	const std::vector<std::pair<std::string, atomID>> run3{ { "C1", c1 }, { "O1", o1 }, { "N1", n1 } };
+	const std::vector<std::pair<std::string, atomID>> run4{ { "C1", c1 }, { "O1", o1 }, { "N1", n1 }, { "H1", h1 } };
+	auto merged = [&](const pathvec& files, const std::vector<std::pair<std::string, atomID>>* run)
+	{
+		cout_capture quiet;
+		EXPECT_TRUE(merge_tshbs(files, dir / "m.tshb", run));
+		const std::string text = bytes(dir / "m.tshb");
+		const bool complete = tshb_block(dir / "m.tshb").is_complete();
+		EXPECT_NE(text.find(complete ? "COVERAGE: complete" : "COVERAGE: partial"), std::string::npos);
+		return complete;
+	};
+	EXPECT_TRUE(merged({ dir / "a.tshb", dir / "b.tshb" }, &run3));
+	EXPECT_FALSE(merged({ dir / "a.tshb", dir / "b.tshb" }, &run4)) << "H1 is in no input";
+	EXPECT_FALSE(merged({ dir / "a.tshb", dir / "b.tshb", dir / "h.tshb" }, &run4)) << "h.tshb is partial";
+	EXPECT_FALSE(merged({ dir / "a.tshb", dir / "b.tshb" }, nullptr)) << "without the run's atoms nothing says the inputs are all of it";
+	//label keys are held against the labels
+	tshb_block({ record("C1", 6, 1.0) }, svec{ "C1" }).write(dir / "l.tshb");
+	const std::vector<std::pair<std::string, atomID>> run_c{ { "C1", c1 } };
+	EXPECT_TRUE(merged({ dir / "l.tshb" }, &run_c));
+	fs::remove_all(dir);
+}
+
 //a truncated file is an error at every length, and random byte flips give a block or std::runtime_error: never a crash,
 //another exception or an allocation sized by a corrupt count
 TEST(TshbBlockTests, CorruptFilesAreErrorsNotCrashes)
@@ -408,6 +441,9 @@ TEST(TshbJointTests, MergeOfTheFragmentFilesIsTheJointFile)
 	runs.push_back(rubredoxin({ 1, 2, 3, 4 }));
 	for (const int f : { 1, 2, 3, 4 })
 		runs.push_back(rubredoxin({ f }));
+	std::vector<std::string> merge_cif{ "-merge", "f1.tshb", "f2.tshb", "f3.tshb", "f4.tshb", "-cif" };
+	for (const int f : { 1, 2, 3, 4 })
+		merge_cif.push_back(fixture("rubredoxin_cmtc/residues/") + std::to_string(f) + ".cif");
 	app_dir run("merge");
 	for (size_t i = 0; i < runs.size(); i++)
 	{
@@ -415,8 +451,12 @@ TEST(TshbJointTests, MergeOfTheFragmentFilesIsTheJointFile)
 		ASSERT_EQ(run.run(runs[i]), 0) << i;
 		fs::rename(run.dir / "experimental.tshb", run.dir / (i == 0 ? std::string("joint.tshb") : "f" + std::to_string(i) + ".tshb"));
 	}
+	//without the CIFs nothing says the four fragments are the whole structure
 	ASSERT_EQ(run.run({ "-merge", "f1.tshb", "f2.tshb", "f3.tshb", "f4.tshb" }), 0);
+	EXPECT_FALSE(tshb_block(run.dir / "combined.tshb").is_complete());
+	ASSERT_EQ(run.run(merge_cif), 0);
 	ASSERT_TRUE(fs::exists(run.dir / "combined.tshb"));
+	EXPECT_TRUE(tshb_block(run.dir / "combined.tshb").is_complete());
 	EXPECT_EQ(bytes(run.dir / "combined.tshb"), bytes(run.dir / "joint.tshb"));
 	size_t sum = 0;
 	for (const int f : { 1, 2, 3, 4 })

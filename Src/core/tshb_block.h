@@ -35,6 +35,7 @@ private:
 	ScattererLabels scatterers_;
 	std::string header_;               // lines beyond the ones write() derives from the data
 	bool electron_diffraction_ = false;
+	bool complete_ = true;             // every scatterer of the run is in the block; a read file says so in its header
 
 	static constexpr std::uint32_t version_ = 4;
 
@@ -123,7 +124,7 @@ private:
 		std::string h = "FRAME: cartesian\nUNITS: angstrom\nSOURCE: NoSpherA2";
 		if (electron_diffraction_)
 			h += "\nED: true";
-		h += "\nCOVERAGE: complete\nPARTS:";
+		h += std::string("\nCOVERAGE: ") + (complete_ ? "complete" : "partial") + "\nPARTS:";
 		for (const std::int32_t p : parts)
 			h += " " + std::to_string(p);
 		if (!header_.empty())
@@ -136,10 +137,14 @@ private:
 	{
 		std::istringstream in(h);
 		std::string line;
+		//a file that does not say it is complete (versions 1-3 never do) is not taken for complete
+		complete_ = false;
 		while (getline_universal(in, line))
 		{
 			if (line == "ED: true")
 				electron_diffraction_ = true;
+			else if (line == "COVERAGE: complete")
+				complete_ = true;
 			else if (line.rfind("FRAME:", 0) == 0 || line.rfind("UNITS:", 0) == 0 || line.rfind("SOURCE:", 0) == 0 ||
 				line.rfind("COVERAGE:", 0) == 0 || line.rfind("PARTS:", 0) == 0)
 				continue;
@@ -152,13 +157,19 @@ private:
 	void append_impl(Block&& rhs, std::ostream& log)
 	{
 		if (rhs.scatterers_.empty())
+		{
+			complete_ = complete_ && rhs.complete_;
 			return;
+		}
 		if (scatterers_.empty())
 		{
+			const bool was_complete = complete_;
 			*this = std::forward<Block>(rhs);
+			complete_ = complete_ && was_complete;
 			return;
 		}
 		err_checkf(electron_diffraction_ == rhs.electron_diffraction_, "Appending an ED .tshb block to an X-ray one!", log);
+		complete_ = complete_ && rhs.complete_;
 
 		std::unordered_set<ScattererLabel> existing(scatterers_.begin(), scatterers_.end());
 		for (std::size_t i = 0; i < rhs.scatterers_.size(); ++i)
@@ -400,11 +411,16 @@ public:
 
 	void set_ED(bool value) noexcept { electron_diffraction_ = value; }
 	[[nodiscard]] bool get_ED() const noexcept { return electron_diffraction_; }
+	void set_complete(bool value) noexcept { complete_ = value; }
+	[[nodiscard]] bool is_complete() const noexcept { return complete_; }
 	[[nodiscard]] const std::string& get_header() const noexcept { return header_; }
 };
 
-//-merge for .tshb: first-wins on the key as tsc_block::append, written once to output
-inline bool merge_tshbs(const pathvec& files, const std::filesystem::path& output = "combined.tshb")
+//-merge for .tshb: first-wins on the key as tsc_block::append, written once to output. COVERAGE stays complete only when
+//every input says so and run_atoms (label and atomID of every scatterer of the run, from its CIF) are all among the merged
+//keys; without run_atoms nothing tells whether the inputs make up the run, so the file is marked partial
+inline bool merge_tshbs(const pathvec& files, const std::filesystem::path& output = "combined.tshb",
+	const std::vector<std::pair<std::string, atomID>>* run_atoms = nullptr)
 {
 	if (files.empty())
 		return false;
@@ -416,10 +432,29 @@ inline bool merge_tshbs(const pathvec& files, const std::filesystem::path& outpu
 			std::cout << "Reading file number " << i + 1 << ": " << files[i] << '\n';
 			const tshb_block part(files[i]);
 			const std::size_t before = combined.scatterer_size();
+			if (!part.is_complete())
+				std::cout << files[i] << " is not marked complete\n";
 			combined.append(part, std::cout);
 			std::cout << "Read " << part.scatterer_size() << " atoms, " << combined.scatterer_size() - before << " are new.\n";
 		}
-		std::cout << "Writing combined file...\n";
+		bool covered = false;
+		if (run_atoms)
+		{
+			const ScattererLabels& keys = combined.get_scatterers();
+			const std::unordered_set<ScattererLabel> have(keys.begin(), keys.end());
+			const bool ids = !keys.empty() && std::holds_alternative<atomID>(keys.front());
+			std::size_t missing = 0;
+			for (const auto& [label, id] : *run_atoms)
+				if (!have.count(ids ? ScattererLabel(id) : ScattererLabel(label)) && missing++ < 10)
+					std::cout << "In no input: " << label << '\n';
+			if (missing)
+				std::cout << missing << " scatterer(s) of the CIF are in no input\n";
+			covered = missing == 0;
+		}
+		else
+			std::cout << "No CIF to check the inputs against\n";
+		combined.set_complete(combined.is_complete() && covered);
+		std::cout << "Writing combined file, COVERAGE: " << (combined.is_complete() ? "complete" : "partial") << "...\n";
 		combined.write(output);
 		std::cout << "Done!\n";
 		return true;

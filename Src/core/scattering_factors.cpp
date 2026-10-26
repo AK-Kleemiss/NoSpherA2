@@ -1008,6 +1008,62 @@ static bool read_cif_loop_row(std::istream &input, std::string &line, int n, sve
 }
 
 
+std::vector<std::pair<std::string, atomID>> cif_scatterer_keys(const pathvec& cifs)
+{
+	using namespace std;
+	vector<pair<string, atomID>> out;
+	unordered_set<string> seen;
+	for (const filesystem::path& cif : cifs)
+	{
+		ifstream in(cif);
+		err_checkf(in.good(), "Could not open " + cif.string(), std::cout);
+		string line;
+		bool done = false;
+		while (!done && getline_universal(in, line))
+		{
+			if (line.find("loop_") == string::npos)
+				continue;
+			int n = 0, label = -1, type = -1, group = -1, pos[3] = { -1, -1, -1 };
+			getline_universal(in, line);
+			while (trim(line).find("_") == 0)
+			{
+				if (line.find("_atom_site_label") != string::npos) label = n;
+				else if (line.find("type_symbol") != string::npos) type = n;
+				else if (line.find("disorder_group") != string::npos) group = n;
+				else if (line.find("fract_x") != string::npos) pos[0] = n;
+				else if (line.find("fract_y") != string::npos) pos[1] = n;
+				else if (line.find("fract_z") != string::npos) pos[2] = n;
+				getline_universal(in, line);
+				n++;
+			}
+			if (label < 0 || type < 0 || pos[0] < 0 || pos[1] < 0 || pos[2] < 0)
+				continue;
+			//the rows as read_atoms_from_CIF reads them, so the atomID is the one the table and the .tshb carry
+			while (trim(line).find("_") > 0 && trim(line).find("loop_") != 0 && line.length() > 3)
+			{
+				svec f;
+				err_checkf(read_cif_loop_row(in, line, n, f), "CIF ends inside an atom loop row, last line: '" + line + "'", std::cout);
+				for (string* s : { &f[label], &f[type] })
+					s->erase(remove_if(s->begin(), s->end(), ::isspace), s->end());
+				int part = 0;
+				if (group >= 0 && f[group] != "." && f[group] != "?" && !f[group].empty())
+					try { part = stoi(f[group]); }
+					catch (const exception&) { part = 0; }
+				const int Z = constants::get_Z_from_label(f[type].c_str()) + 1;
+				if (Z > 0)
+				{
+					const atomID id(stod(f[pos[0]]), stod(f[pos[1]]), stod(f[pos[2]]), part, Z);
+					if (seen.insert(id.to_hex_string()).second)
+						out.emplace_back(f[label], id);
+				}
+				getline_universal(in, line);
+			}
+			done = true;
+		}
+	}
+	return out;
+}
+
 svec read_atoms_from_CIF(std::ifstream& cif_input,
 	const ivec& input_groups,
 	const cell& unit_cell,

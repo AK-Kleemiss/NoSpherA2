@@ -3,6 +3,7 @@
 #include "cell.h"
 #include "tsc_block.h"
 #include "tshb_block.h"
+#include "scattering_factors.h"
 #include "tsc_label_converter.h"
 #include "test_functions.h"
 #include "integrator.h"
@@ -385,7 +386,10 @@ std::string help_message =
  "                                    binary .tscb output (default behavior).\n"
  "  -merge <table ...>                 Merge .tsc/.tscb tables with checks, or\n"
  "                                    .tshb files into combined.tshb (first\n"
- "                                    file wins for an atom in several).\n"
+ "                                    file wins for an atom in several);\n"
+ "                                    -cif <cif ...> after the .tshb files\n"
+ "                                    names the run's atoms, and only then can\n"
+ "                                    the result be marked complete.\n"
  "  -merge_nocheck <table ...>         Merge tables only when you know their\n"
  "                                    HKL indices are identical.\n\n"
  "MULTI-FRAGMENT WORKFLOWS\n"
@@ -2658,6 +2662,17 @@ namespace {
 }
 
 //file, format and conversion options
+//-merge a.tshb b.tshb [-cif x.cif ...]: the CIFs name every scatterer of the run; without them the merged file is partial
+static void merge_tshb_args(const pathvec& files, const svec& arguments, const int argc, int at)
+{
+	pathvec cifs;
+	if (at < argc && arguments[at] == "-cif")
+		for (at++; at < argc && arguments[at].find("-") != 0; at++)
+			cifs.push_back(arguments[at]);
+	const std::vector<std::pair<std::string, atomID>> keys = cifs.empty() ? std::vector<std::pair<std::string, atomID>>{} : cif_scatterer_keys(cifs);
+	merge_tshbs(files, "combined.tshb", cifs.empty() ? nullptr : &keys);
+}
+
 bool options::digest_io_options(const std::string &temp, int &i)
 {
 	using namespace std;
@@ -3185,7 +3200,7 @@ bool options::digest_partition_options(const std::string &temp, int &i)
 		const auto n_tshb = std::count_if(filenames.begin(), filenames.end(), [](const std::filesystem::path& f) { return f.extension() == ".tshb"; });
 		err_checkf(n_tshb == 0 || n_tshb == (long)filenames.size(), "-merge takes either tables or .tshb files, not both", std::cout);
 		if (n_tshb > 0)
-			merge_tshbs(filenames);
+			merge_tshb_args(filenames, arguments, argc, i + n);
 		else
 			merge_tscs("combine", filenames, old_tsc);
 		finished = true; return true;
@@ -3203,7 +3218,7 @@ bool options::digest_partition_options(const std::string &temp, int &i)
 		const auto n_tshb = std::count_if(filenames.begin(), filenames.end(), [](const std::filesystem::path& f) { return f.extension() == ".tshb"; });
 		err_checkf(n_tshb == 0 || n_tshb == (long)filenames.size(), "-merge takes either tables or .tshb files, not both", std::cout);
 		if (n_tshb > 0)
-			merge_tshbs(filenames);
+			merge_tshb_args(filenames, arguments, argc, i + n);
 		else
 			merge_tscs_without_checks("combine", filenames, old_tsc);
 		finished = true; return true;

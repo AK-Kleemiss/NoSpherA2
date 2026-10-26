@@ -94,6 +94,10 @@ void make_k_pts(const bool& read_k_pts,
 //streams a combined (-mtc) SALTED table in reflection blocks; false means nothing was written, take the ordinary path
 bool stream_mtc_salted(options& opt, std::vector<WFN>& wavy, std::ostream& file, vec2* known_kpts);
 
+//label and atomID of every _atom_site row of the CIFs, each atomID once, as the table keys them: what -merge holds a merged
+//.tshb against before it calls it complete
+std::vector<std::pair<std::string, atomID>> cif_scatterer_keys(const pathvec& cifs);
+
 //per disorder part, gathered once; reflection-independent, so the -mtc reflection loop runs outside the parts
 class Gaussian_Molecule;
 

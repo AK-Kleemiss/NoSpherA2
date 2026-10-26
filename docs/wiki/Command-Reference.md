@@ -84,7 +84,7 @@ you are memory-constrained.
 | `-mem <MB>` | 1 | `1000.0` | Memory budget the block size is derived from. When given, half of it also bounds occ's stored density-fitting integrals for `-occ` (see below). |
 | `-tsc_labels` | 0 | off | Key the table rows by atom label instead of atom ID. |
 | `-tsc_labels <table> <cif> [out]` | 2-3 | `<table>.labels.tsc` | Rewrite an existing table's IDs into labels using the CIF. One-shot. |
-| `-merge <a.tsc> <b.tsc> ...` | 2+ | | Merge tables, checking that the reflection sets agree. Given `.tshb` files instead, merges them into `combined.tshb`, the first file winning for an atom in several, as the table merge does. One-shot. |
+| `-merge <a.tsc> <b.tsc> ...` | 2+ | | Merge tables, checking that the reflection sets agree. Given `.tshb` files instead, merges them into `combined.tshb`, the first file winning for an atom in several, as the table merge does; `-merge a.tshb b.tshb -cif x.cif [y.cif ...]` checks the result against every atom of the CIFs, and the header says `COVERAGE: complete` only when every input does and no CIF atom is missing, `partial` otherwise (always without `-cif`). One-shot. |
 | `-merge_nocheck <a> <b> ...` | 2+ | | Merge without the consistency check. One-shot. |
 | `-tscb <file>` | 1 | | Convert between `.tsc` and `.tscb` (the direction follows the input extension). Rejects any other extension with "Wrong file ending!". One-shot. |
 | `-IAM` | 0 | off | Write spherical (independent-atom-model) form factors — the reference case. |
