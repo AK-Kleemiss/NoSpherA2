@@ -617,7 +617,7 @@ void XCW_wrapper::run() {
 		have_prev = has_guess && lambda > last_lambda && last_lambda != 0.0;
 		prev_wfn = std::move(last_wfn);
 		prev_lambda = last_lambda;
-		last_wfn = wfn;
+		last_wfn = std::move(wfn);
 		last_lambda = lambda;
 		has_guess = true;
 		if (opt->xcw_settings.xcw_gaussian_halt && step + 1 == planned_steps)

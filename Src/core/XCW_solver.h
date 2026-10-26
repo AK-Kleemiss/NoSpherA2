@@ -48,8 +48,8 @@ protected:
 	void add_model_fock(occ::Mat& F) const override;
 	void add_model_response(const scf_t& scf, const occ::Mat& dD, occ::Mat& dF) override;
 	bool model_active() const override { return lambda != 0; }
-	void save_model_state() override { coupling_->save_state(); }
-	void restore_model_state() override { coupling_->restore_state(); }
+	void save_model_state() override;
+	void restore_model_state() override;
 	void begin_log() override { writer_->start_lambda(lambda); }
 	void log_iteration(const scf_t& scf) override;
 	void end_log(const scf_t& scf) override;
@@ -58,9 +58,9 @@ protected:
 private:
 
 	SCF_coupling* coupling_ = nullptr;
-	// The perturbation matrix and the fit quality at the density of the last evaluate_model
-	occ::Mat perturbation_;
-	fit_quality fit_{};
+	// The perturbation matrix and the fit quality at the density of the last evaluate_model, and their saved copies
+	occ::Mat perturbation_, saved_perturbation_;
+	fit_quality fit_{}, saved_fit_{};
 	// E + lambda chi of the last iteration, the target quantity of the log
 	double quant_ = 0;
 	// The density matrix the structure factors are calculated from, the spin blocks summed

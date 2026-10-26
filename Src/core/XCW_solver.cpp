@@ -62,6 +62,18 @@ void XCW_solver::add_model_response(const scf_t& scf, const occ::Mat& dD, occ::M
 	for (int b = 0; b < spin_blocks; b++) dF.middleRows(static_cast<Eigen::Index>(b) * nmo_, nmo_) += dP;
 }
 
+void XCW_solver::save_model_state() {
+	coupling_->save_state();
+	saved_perturbation_ = perturbation_;
+	saved_fit_ = fit_;
+}
+
+void XCW_solver::restore_model_state() {
+	coupling_->restore_state();
+	perturbation_ = saved_perturbation_;
+	fit_ = saved_fit_;
+}
+
 void XCW_solver::log_iteration(const scf_t& scf) {
 	const double E = scf.ctx.energy.at("total"), penalty = fit_.criterion * lambda;
 	quant_ = E + penalty;
