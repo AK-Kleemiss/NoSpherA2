@@ -124,7 +124,7 @@ namespace
 
 	//every scatterer of the table once in the .tshb and the reverse; f(h) of each record against its row, max |dF|; the
 	//largest |F| of the table comes back in f_max so a comparison of two empty tables cannot pass
-	double compare_with_table(const tshb_block& tshb, const itsc_block& table, const cell& unit_cell, double& f_max)
+	double compare_with_table(const tshb_block& tshb, const itsc_block& table, const cell& unit_cell, double& f_max, double* rel_max = nullptr)
 	{
 		std::map<std::string, size_t> row;
 		const svec keys = table.get_scatterers_string();
@@ -151,8 +151,11 @@ namespace
 					for (int j = 0; j < 3; j++)
 						k[x] += unit_cell.get_rcm(x, j) * h[j] / scale;
 				for (double& v : k) v = constants::ang2bohr(v);
-				worst = std::max(worst, std::abs(record_form_factor(tshb.get_record(a), k) - sf[r]));
+				const double d = std::abs(record_form_factor(tshb.get_record(a), k) - sf[r]);
+				worst = std::max(worst, d);
 				f_max = std::max(f_max, std::abs(sf[r]));
+				if (rel_max && std::abs(sf[r]) > 0.0)
+					*rel_max = std::max(*rel_max, d / std::abs(sf[r]));
 			}
 		}
 		return worst;
@@ -573,6 +576,63 @@ TEST(TshbJointTests, SaltedDisorderedPartsMatchTheirTableAndMergeToTheJointFile)
 	const tshb_block joint(run.dir / "joint.tshb"), p1(run.dir / "p1.tshb"), p2(run.dir / "p2.tshb");
 	EXPECT_EQ(joint.scatterer_size(), 50u);
 	EXPECT_EQ(p1.scatterer_size() + p2.scatterer_size(), 50u) << "no PART 0 atoms: nothing shared";
+	ASSERT_EQ(run.run({ "-merge", "p1.tshb", "p2.tshb", "-cif", cif }), 0);
+	EXPECT_TRUE(tshb_block(run.dir / "combined.tshb").is_complete());
+	EXPECT_EQ(bytes(run.dir / "combined.tshb"), bytes(run.dir / "joint.tshb"));
+}
+
+//a part without orbitals (an .xyz) in a -ri_fit -tshb run: its atoms go in as the fill's spherical records, neutral and at
+//full occupancy, and match the table of the run without -tshb, which takes IAM for that part; the file is complete, and
+//the per-part files merged with the CIF are the joint file byte for byte
+TEST(TshbJointTests, AnOrbitalLessPartGoesInAsSphericalRecords)
+{
+	const std::string cif = fs::absolute(fixture("Hybrid/ZP2.cif")).string();
+	auto parts = [&](const std::vector<std::string>& files)
+	{
+		std::vector<std::string> a{ "-cif", cif, "-dmin", "0.9", "-acc", "1", "-ri_fit", "combo_basis_fit", "-no_date", "-mtc" };
+		for (const std::string& f : files)
+		{
+			a.push_back(fs::absolute(fixture("Hybrid/" + f)).string());
+			a.push_back(f.find("part1") != std::string::npos ? "0.1" : "0.2");
+		}
+		for (const std::string f : { "-mtc_mult", "-mtc_charge", "-mtc_ECP" })
+		{
+			a.push_back(f);
+			for (size_t i = 0; i < files.size(); i++) a.push_back(f == "-mtc_mult" ? "1" : "0");
+		}
+		return a;
+	};
+	std::vector<std::vector<std::string>> runs{ parts({ "ZP2_part1.gbw", "ZP2_part2.xyz" }), parts({ "ZP2_part1.gbw" }), parts({ "ZP2_part2.xyz" }) };
+	const std::string names[3] = { "joint.tshb", "p1.tshb", "p2.tshb" };
+	app_dir run("orbitalless");
+	ASSERT_EQ(run.run(runs[0]), 0);
+	const itsc_block table(run.dir / "experimental.tscb");
+	for (int i = 0; i < 3; i++)
+	{
+		runs[i].push_back("-tshb");
+		ASSERT_EQ(run.run(runs[i]), 0) << i;
+		EXPECT_EQ(run.log().find("-tshb: the table is written instead"), std::string::npos) << run.log();
+		fs::rename(run.dir / "experimental.tshb", run.dir / names[i]);
+	}
+	EXPECT_NE(run.log().find("Spherical fill: 25 atom(s) go into the .tshb as Slater records"), std::string::npos) << run.log();
+	const tshb_block joint = tshb_block::read(run.dir / "joint.tshb");
+	EXPECT_EQ(joint.scatterer_size(), 50u);
+	EXPECT_TRUE(joint.is_complete());
+	EXPECT_NE(bytes(run.dir / "joint.tshb").find("COVERAGE: complete\nPARTS: 1 2"), std::string::npos);
+	size_t spherical = 0;
+	for (size_t i = 0; i < joint.scatterer_size(); i++)
+		if (joint.get_record(i).shells.empty())
+		{
+			spherical++;
+			EXPECT_EQ(joint.get_record(i).part, 2);
+			EXPECT_GT(joint.get_record(i).Z, 0);
+		}
+	EXPECT_EQ(spherical, 25u);
+	double f_max = 0.0, rel = 0.0;
+	const double worst = compare_with_table(joint, table, cell(cif, std::cout, false), f_max, &rel);
+	std::cout << "orbital-less part: " << joint.scatterer_size() << " atoms, " << table.reflection_size() << " reflections, max |F| " << f_max
+		<< ", max |dF| " << worst << ", max |dF|/|F| " << rel << std::endl;
+	EXPECT_LT(worst, 1e-8);
 	ASSERT_EQ(run.run({ "-merge", "p1.tshb", "p2.tshb", "-cif", cif }), 0);
 	EXPECT_TRUE(tshb_block(run.dir / "combined.tshb").is_complete());
 	EXPECT_EQ(bytes(run.dir / "combined.tshb"), bytes(run.dir / "joint.tshb"));

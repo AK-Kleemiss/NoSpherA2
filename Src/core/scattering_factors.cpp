@@ -3622,6 +3622,17 @@ tsc_block_type calculate_scattering_factors(
 			}
 			return tsc_block_type();
 		}
+		//a part without orbitals in a -tshb run: its atoms as the fill's spherical records, no table
+		if (opt.tshb != nullptr && !opt.spherical_fill)
+		{
+			salted_part_prep sph;
+			sph.asym_atom_list = asym_atom_list;
+			sph.labels = labels;
+			sph.atom_type_list = atom_type_list;
+			sph.asym_atom_to_type_list = asym_atom_to_type_list;
+			fill_tshb(sph, *wavy, opt, file);
+			return tsc_block_type();
+		}
 		std::vector<Thakkar> spherical_atoms = make_spherical_evaluators(atom_type_list);
 		const int imax = (int)asym_atom_list.size();
 		const std::vector<i3> hkl_vector(hkl.begin(), hkl.end());

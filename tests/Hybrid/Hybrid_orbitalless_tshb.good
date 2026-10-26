@@ -1,0 +1,81 @@
+    _   __     _____       __              ___   ___
+   / | / /___ / ___/____  / /_  ___  _____/   | |__ \
+  /  |/ / __ \\__ \/ __ \/ __ \/ _ \/ ___/ /| | __/ /
+ / /|  / /_/ /__/ / /_/ / / / /  __/ /  / ___ |/ __/
+/_/ |_/\____/____/ .___/_/ /_/\___/_/  /_/  |_/____/
+                /_/
+This software is part of the cuQCT software suite developed by Florian Kleemiss.
+Please give credit and cite corresponding pieces!
+This Software is published with BSD-2 clause license.
+Reading:                              "ZP2_part1.gbw" done!
+Number of atoms in Wavefunction file: 25 Number of MOs: 251
+Reading:                              "ZP2_part2.xyz" done!
+Number of atoms in Wavefunction file: 25 Number of MOs: 0
+[NoSpherA2] Kleemiss et al., Chem. Sci. 12 (2021) 1675, DOI 10.1039/D0SC05526C
+[HAR] Jayatilaka & Dittrich, Acta Cryst. A 64 (2008) 383, DOI 10.1107/S0108767308005709
+[HAR] Capelli et al., IUCrJ 1 (2014) 361, DOI 10.1107/S2052252514014845
+Number of protons: 106
+Number of electrons: 106.000000
+Reading:                                    "ZP2.cif" done!
+Generating hkl indices up to d=:              0.90... done!
+Nr of reflections generated:                  5408
+Number of symmetry operations:                   4
+Nr of reflections to be used:                 5408
+Generating k-points...                            ... done!
+Number of k-points to evaluate: 5408
+
+Generating densities... 
+
+=== Density Fitting ===
+[RI fit] Seifert et al., Z. Kristallogr. Cryst. Mater. 241 (2026) 283, DOI 10.1515/zkri-2026-0013
+Normal basis functions: 251
+Auxiliary basis functions: 2045
+Metric: Coulomb
+[                   Calculating Eri3c Matrix                  ]
+[#############################################################] 100% 
+Charge-weighted Schwarz screening (3e-07 e) kept 2464501 of 3693105 shell triplets
+Far field (erfc < 1e-14) took 1039147 of 2464501 triplets as point multipoles from 70834 pair-atom sums
+Solving unrestrained linear system...
+==============================================
+
+                                        ... done!
+Table of Charges in electrons
+       Atom  Charge_RI
+       F11    -0.334
+       F12    -0.157
+       O11    -0.892
+       N11    -0.630
+       N12     0.957
+       N13    -1.235
+       C11     0.037
+       C12     1.090
+       C13    -2.811
+       C14     2.067
+       C15    -0.689
+       C16     0.712
+       C17     1.264
+       C18    -0.540
+       H11     0.575
+       H13     0.571
+      H15a    -0.031
+      H15b    -0.038
+      H16a    -0.050
+      H16b     0.195
+      H17a     0.019
+      H17b    -0.121
+      H18a    -0.198
+      H18b     0.266
+      H18c    -0.028
+Total number of analytical Electrons: 106.0016
+25 atom(s) go into the .tshb, no table
+                                         ... done!
+[NoSpherA2] Kleemiss et al., Chem. Sci. 12 (2021) 1675, DOI 10.1039/D0SC05526C
+[IAM] Kleemiss, Peyerimhoff & Bodensteiner, J. Appl. Cryst. 57 (2024) 161, DOI 10.1107/S1600576723010981
+[IAM] Koga, Tatewaki & Thakkar, Phys. Rev. A 47 (1993) 4510, DOI 10.1103/PhysRevA.47.4510
+Number of protons: 106
+Number of electrons: 0.0000
+Reading:                                    "ZP2.cif" done!
+Spherical fill: 25 atom(s) go into the .tshb as Slater records
+Wrote experimental.tshb: 50 atom(s), 25 of them spherical
+Writing tsc file...  ... done!
+  (no table: experimental.tshb holds the fitted densities)

@@ -290,6 +290,11 @@ alternative is one flag away in each case.
 
 ## Current Validation Notes
 
+As of 2026-10-26 (orbital-less parts), `-tshb` writes the spherical fill records for a part without orbitals instead of
+refusing; XCW stays refused (its F_calc and an RI fit of its density differ by up to 6.6e-2 relative). `ctest --preset
+release-linux-tests` on a CPU-only 4-core VM reports **1322 passed, 0 failed, 23 skipped** (2 disabled) of 1345. See
+`UNIT_TESTS_STATUS.md`.
+
 As of 2026-10-26 (final), restrained RI fits are checked at 1e-2 N, the streamed `-mtc` SALTED table keeps each part's fill
 charges, and `SALTED_disorder_tshb` plus `TshbJointTests.SaltedDisorderedPartsMatchTheirTableAndMergeToTheJointFile` are new.
 `ctest --preset release-linux-tests` on a CPU-only 4-core VM reports **1320 passed, 0 failed, 23 skipped** (2 disabled) of

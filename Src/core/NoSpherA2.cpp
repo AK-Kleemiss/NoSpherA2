@@ -50,8 +50,6 @@ static void start_tshb(options &opt, const std::vector<WFN> &wavy, tshb_block &t
 		why = "-IAM";
 	else if (!opt.SALTED && opt.partition_type != PartitionType::RI)
 		why = "the partition is no fitted density (-ri_fit or -SALTED)";
-	else if (!opt.SALTED && std::any_of(wavy.begin(), wavy.end(), [](const WFN &w) { return w.get_origin() == 7; }))
-		why = "a part has no orbitals to fit";
 	else if (opt.write_CIF)
 		why = "-cif needs the table";
 	else if (opt.do_XCW)
@@ -627,7 +625,10 @@ static int run_app_impl(int argc, char **argv)
 				known_scatterer = opt.tshb ? opt.tshb->get_scatterers_string() : result.get_scatterers_string();
 				if (!opt.SALTED)
 				{
-					if (wavy[i].get_origin() == 7)
+					//a .tshb run takes the spherical records for an orbital-less part only (-IAM never gets here)
+					if (opt.tshb)
+						opt.iam_switch = wavy[i].get_origin() == 7;
+					else if (wavy[i].get_origin() == 7)
 						opt.iam_switch = true;
 					result.append(calculate_scattering_factors<itsc_block, std::vector<WFN>&>(
 						opt,

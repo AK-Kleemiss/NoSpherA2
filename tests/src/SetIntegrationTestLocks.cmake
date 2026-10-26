@@ -78,6 +78,7 @@ set_tests_properties(
 set_tests_properties(
     TomlIntegrationTests.HybridMode
     TomlIntegrationTests.SaltedDisorderTshb
+    TomlIntegrationTests.HybridOrbitallessTshb
     PROPERTIES
         RESOURCE_LOCK integration_hybrid
 )
