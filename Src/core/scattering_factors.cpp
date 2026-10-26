@@ -1193,7 +1193,7 @@ svec read_atoms_from_CIF(std::ifstream& cif_input,
 					group_nr,
 					row_Z);
 				const std::string atom_ID = cif_atom_id.to_hex_string();
-#pragma omp parallel for reduction(|| : old_atom)
+				//serial: a parallel region per CIF row costs a thread wake-up per row, more than the comparisons themselves
 				for (int run = 0; run < known_atoms.size(); run++)
 				{
 					if (fields[label_field] == known_atoms[run] || atom_ID == known_atoms[run])
