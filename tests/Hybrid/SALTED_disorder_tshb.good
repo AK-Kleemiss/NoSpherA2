@@ -1,0 +1,138 @@
+    _   __     _____       __              ___   ___
+   / | / /___ / ___/____  / /_  ___  _____/   | |__ \
+  /  |/ / __ \\__ \/ __ \/ __ \/ _ \/ ___/ /| | __/ /
+ / /|  / /_/ /__/ / /_/ / / / /  __/ /  / ___ |/ __/
+/_/ |_/\____/____/ .___/_/ /_/\___/_/  /_/  |_/____/
+                /_/
+This software is part of the cuQCT software suite developed by Florian Kleemiss.
+Please give credit and cite corresponding pieces!
+This Software is published with BSD-2 clause license.
+Reading:                              "ZP2_part1.gbw" done!
+Number of atoms in Wavefunction file: 25 Number of MOs: 251
+Reading:                              "ZP2_part2.gbw" done!
+Number of atoms in Wavefunction file: 25 Number of MOs: 251
+WARNING: Not all species in the structure are known to the model. The following species are not known: F F 
+I will fill out these atoms using spherical Thakkar densities!
+Using "model.salted" for the prediction
+Reading:                                    "ZP2.cif" done!
+Generating hkl indices up to d=:              0.90... done!
+Nr of reflections generated:                  5408
+Number of symmetry operations:                   4
+Nr of reflections to be used:                 5408
+Generating k-points...                            ... done!
+Number of k-points to evaluate: 5408
+
+Generating densities... 
+[SALTED] Grisafi, Lewis, Rossi & Ceriotti, J. Chem. Theory Comput. 19 (2023) 4451, DOI 10.1021/acs.jctc.2c00850
+Descriptor sets identical: sharing one copy
+[              Calculating descriptors for l = 0              ]
+[#############################################################] 100% 
+[              Calculating descriptors for l = 1              ]
+[#############################################################] 100% 
+[              Calculating descriptors for l = 2              ]
+[#############################################################] 100% 
+[              Calculating descriptors for l = 3              ]
+[#############################################################] 100% 
+[              Calculating descriptors for l = 4              ]
+[#############################################################] 100% 
+[              Calculating descriptors for l = 5              ]
+[#############################################################] 100% 
+                                           ... done!
+Table of Charges in electrons
+       Atom      ML
+       O11    -0.644
+       N11    -0.890
+       N12    -1.049
+       N13    -0.867
+       C11     0.294
+       C12     0.263
+       C13     0.280
+       C14     0.390
+       C15     0.276
+       C16     0.275
+       C17     0.280
+       C18     0.278
+       H11     0.173
+       H13     0.194
+      H15a     0.031
+      H15b     0.048
+      H16a     0.045
+      H16b     0.062
+      H17a     0.028
+      H17b     0.026
+      H18a     0.113
+      H18b     0.072
+      H18c     0.073
+Total number of analytical Electrons: 88.2483
+23 atom(s) go into the .tshb, no table
+                                          ... done!
+Performing the remaining calculation of spherical atoms...
+[NoSpherA2] Kleemiss et al., Chem. Sci. 12 (2021) 1675, DOI 10.1039/D0SC05526C
+[IAM] Kleemiss, Peyerimhoff & Bodensteiner, J. Appl. Cryst. 57 (2024) 161, DOI 10.1107/S1600576723010981
+[IAM] Koga, Tatewaki & Thakkar, Phys. Rev. A 47 (1993) 4510, DOI 10.1103/PhysRevA.47.4510
+Number of protons: 106
+Number of electrons: 106.0000
+Reading:                                    "ZP2.cif" done!
+Spherical fill: 2 of 2 atom(s) given a fractional charge (-0.2152 to -0.2097).
+Spherical fill: 2 atom(s) go into the .tshb as Slater records
+WARNING: Not all species in the structure are known to the model. The following species are not known: F F 
+I will fill out these atoms using spherical Thakkar densities!
+Using "model.salted" for the prediction
+Reading:                                    "ZP2.cif" done!
+
+Generating densities... 
+[SALTED] Grisafi, Lewis, Rossi & Ceriotti, J. Chem. Theory Comput. 19 (2023) 4451, DOI 10.1021/acs.jctc.2c00850
+Descriptor sets identical: sharing one copy
+[              Calculating descriptors for l = 0              ]
+[#############################################################] 100% 
+[              Calculating descriptors for l = 1              ]
+[#############################################################] 100% 
+[              Calculating descriptors for l = 2              ]
+[#############################################################] 100% 
+[              Calculating descriptors for l = 3              ]
+[#############################################################] 100% 
+[              Calculating descriptors for l = 4              ]
+[#############################################################] 100% 
+[              Calculating descriptors for l = 5              ]
+[#############################################################] 100% 
+                                           ... done!
+Table of Charges in electrons
+       Atom      ML
+       O21    -0.643
+       N21    -0.889
+       N22    -1.048
+       N23    -0.885
+       C21     0.292
+       C22     0.261
+       C23     0.272
+       C24     0.391
+       C25     0.270
+       C26     0.270
+       C27     0.284
+       C28     0.281
+       H21     0.173
+       H23     0.193
+      H25a     0.054
+      H25b     0.024
+      H26a     0.047
+      H26b     0.028
+      H27a     0.017
+      H27b     0.016
+      H28a     0.075
+      H28b     0.077
+      H28c     0.067
+Total number of analytical Electrons: 88.3723
+23 atom(s) go into the .tshb, no table
+                                          ... done!
+Performing the remaining calculation of spherical atoms...
+[NoSpherA2] Kleemiss et al., Chem. Sci. 12 (2021) 1675, DOI 10.1039/D0SC05526C
+[IAM] Kleemiss, Peyerimhoff & Bodensteiner, J. Appl. Cryst. 57 (2024) 161, DOI 10.1107/S1600576723010981
+[IAM] Koga, Tatewaki & Thakkar, Phys. Rev. A 47 (1993) 4510, DOI 10.1103/PhysRevA.47.4510
+Number of protons: 106
+Number of electrons: 106.0000
+Reading:                                    "ZP2.cif" done!
+Spherical fill: 2 of 2 atom(s) given a fractional charge (-0.2240 to -0.2112).
+Spherical fill: 2 atom(s) go into the .tshb as Slater records
+Wrote experimental.tshb: 50 atom(s), 4 of them spherical
+Writing tsc file...  ... done!
+  (no table: experimental.tshb holds the fitted densities)

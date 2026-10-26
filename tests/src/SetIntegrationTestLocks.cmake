@@ -74,6 +74,14 @@ set_tests_properties(
         RESOURCE_LOCK integration_rubredoxin_cmtc
 )
 
+# Tests using tests/Hybrid: both write NoSpherA2.log there
+set_tests_properties(
+    TomlIntegrationTests.HybridMode
+    TomlIntegrationTests.SaltedDisorderTshb
+    PROPERTIES
+        RESOURCE_LOCK integration_hybrid
+)
+
 # Tests using tests/SALTED
 set_tests_properties(
     TomlIntegrationTests.SALTED

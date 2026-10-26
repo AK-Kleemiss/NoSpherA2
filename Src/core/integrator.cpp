@@ -781,15 +781,15 @@ static void print_fit_configuration(
 		<< std::endl;
 }
 
-//Restraints and Tikhonov trade the electron count for their targets, so only the plain fit has to hold it; the ECP cores are not fitted
-static vec checked_fit(const WFN& wavy, const WFN& wavy_aux, vec&& coefs)
+//The fit holds the wavefunction's electrons to tol N, ECP cores aside; restraints pull on the count, Tikhonov drains it and is not checked
+static vec checked_fit(const WFN& wavy, const WFN& wavy_aux, const double tol, vec&& coefs)
 {
 	const std::vector<atom>& atoms = *wavy_aux.get_atoms_ptr();
 	const vec pop = calc_atomic_density(atoms, coefs);
 	double fitted = 0.0;
 	for (int a = 0; a < pop.size(); a++) fitted += pop[a] - atoms[a].get_ECP_electrons();
 	const double expected = explicit_electron_count(wavy);
-	err_checkf(std::abs(fitted - expected) <= 1e-3 * expected, "The density fit holds " + std::to_string(fitted) + " of the " + std::to_string(expected)
+	err_checkf(std::abs(fitted - expected) <= tol * expected, "The density fit holds " + std::to_string(fitted) + " of the " + std::to_string(expected)
 		+ " electrons of " + wavy.get_path().string() + ": the auxiliary basis does not describe this density", std::cout);
 	return std::move(coefs);
 }
@@ -915,7 +915,7 @@ vec DensityFitting::density_fit(
 
 		std::cout << "==============================================\n"
 			<< std::endl;
-		return checked_fit(wavy, wavy_aux, std::move(rho));
+		return checked_fit(wavy, wavy_aux, 1e-3, std::move(rho));
 	}
 
 	print_fit_configuration(config);
@@ -989,7 +989,9 @@ vec DensityFitting::density_fit(
 
 	std::cout << "==============================================\n"
 		<< std::endl;
-	return rho;
+	if (config.use_tikhonov)
+		return rho;
+	return checked_fit(wavy, wavy_aux, 1e-2, std::move(rho));
 }
 
 DensityFitting::CONFIG DensityFitting::config_from_options(const options& opt)

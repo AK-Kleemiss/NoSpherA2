@@ -349,6 +349,23 @@ dmin = 0.8
 no_gpu_salted = ""
 tshb = ""
 
+# Two disordered parts, PART 1 and PART 2 from their own wavefunctions, predicted by SALTED into one .tshb; the model
+# lacks two atoms per part, which come in as Slater records
+[SALTED_disorder_tshb]
+directory = "Hybrid"
+good = "SALTED_disorder_tshb.good"
+
+[SALTED_disorder_tshb.args]
+SALTED = "../SALTED/Model"
+cif = "ZP2.cif"
+dmin = 0.9
+no_gpu_salted = ""
+tshb = ""
+mtc = ["ZP2_part1.gbw", 0.1, "ZP2_part2.gbw", 0.2]
+mtc_mult = [1, 1]
+mtc_charge = [0, 0]
+mtc_ECP = [0, 0]
+
 [SALTED]
 directory = "SALTED"
 

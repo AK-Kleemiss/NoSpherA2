@@ -390,7 +390,7 @@ available from it.
 
 | Flag | Arguments | Default | Meaning |
 | --- | --- | --- | --- |
-| `-ri_fit <basis> [basis ...]` | 1+ | | RI-fit the density in these auxiliary basis sets, and use RI partitioning. Also `-RI_FIT`. Needs a wavefunction with its basis set (`.gbw`, `.fchk`, `.molden`; a `.wfx` or `.wfn` stops), and without `-multipole_moments` stops when the fit holds the wavefunction's electrons to worse than 0.1 %. |
+| `-ri_fit <basis> [basis ...]` | 1+ | | RI-fit the density in these auxiliary basis sets, and use RI partitioning. Also `-RI_FIT`. Needs a wavefunction with its basis set (`.gbw`, `.fchk`, `.molden`; a `.wfx` or `.wfn` stops), and stops when the fit holds the wavefunction's electrons to worse than 0.1 % (1 % with `-multipole_moments`). |
 | `-ri_fit auto_aux [elements...] [basis...]` | 1+ | | Generate the auxiliary set automatically; element symbols right after `auto_aux` restrict which elements it is generated for, the basis names that follow fill the rest (first match wins). |
 | `-multipole_moments <scheme> [lmax]` | 1-2 | off; omitted `lmax` is `0` | Restrain atomic moments up to `lmax` (0-8). The fit restrains atom-centred auxiliary coefficients for charges and dipoles; orders 2 and above use grid-partitioned rows for stability. It does not constrain the total electron count exactly. `Hirshfeld`, `TFVC`, `MBIS` and `EMBIS` supply the targets. `Nuclear`, `Mulliken` and `Sanderson` use atom-centred charge-only order 0; any supplied order is ignored. |
 | `-multipole_strength <w>` | 1 | `1.0` | Weight of the multipole restraints. Must be positive. |

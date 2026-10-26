@@ -587,7 +587,7 @@ TEST(FittingIoCoverageIntegratorDeathTest, AWavefunctionWithoutBasisSetStopsTheF
 		::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), "carries none");
 }
 
-//Only s functions carry charge, so an auxiliary basis of p shells fits none of epoxide's 24 electrons
+//Only s functions carry charge, so an auxiliary basis of p shells fits none of epoxide's 24 electrons, restrained or not
 TEST(FittingIoCoverageIntegratorDeathTest, AFitThatLosesElectronsStops)
 {
 	const std::filesystem::path p = epoxide_fixture();
@@ -602,6 +602,11 @@ TEST(FittingIoCoverageIntegratorDeathTest, AFitThatLosesElectronsStops)
 	std::vector<std::shared_ptr<BasisSet>> basis{ p_only };
 	const WFN aux = generate_aux_wfn(wave, basis);
 	EXPECT_EXIT({ std::cout.rdbuf(std::cerr.rdbuf()); DensityFitting::density_fit(wave, aux, DensityFitting::CONFIG()); },
+		::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), "holds 0.000000 of the 24.000000 electrons");
+	DensityFitting::CONFIG restrained;
+	restrained.multipole_lmax = 1;
+	restrained.charge_scheme = DensityFitting::CHARGE_SCHEME::HIRSHFELD;
+	EXPECT_EXIT({ std::cout.rdbuf(std::cerr.rdbuf()); DensityFitting::density_fit(wave, aux, restrained); },
 		::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), "holds 0.000000 of the 24.000000 electrons");
 }
 

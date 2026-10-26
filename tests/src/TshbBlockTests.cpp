@@ -537,3 +537,43 @@ TEST(TshbJointTests, AGridPartitionKeepsTheTableAndSaysWhy)
 	EXPECT_TRUE(fs::exists(run.dir / "experimental.tscb"));
 	EXPECT_FALSE(fs::exists(run.dir / "experimental.tshb"));
 }
+
+//disorder under SALTED: PART 1 and PART 2 predicted from their own wavefunctions into one .tshb, each part's atoms once and
+//against the table of the same run; the two single-part files merged with the CIF are the joint file byte for byte
+TEST(TshbJointTests, SaltedDisorderedPartsMatchTheirTableAndMergeToTheJointFile)
+{
+	const std::string cif = fs::absolute(fixture("Hybrid/ZP2.cif")).string(), model = fixture("SALTED/Model");
+	auto parts = [&](const std::vector<int>& p)
+	{
+		std::vector<std::string> a{ "-SALTED", model, "-cif", cif, "-dmin", "0.9", "-no_date", "-mtc" };
+		for (const int i : p)
+		{
+			a.push_back(fixture("Hybrid/ZP2_part") + std::to_string(i) + ".gbw");
+			a.push_back("0." + std::to_string(i));
+		}
+		for (const std::string f : { "-mtc_mult", "-mtc_charge", "-mtc_ECP" })
+		{
+			a.push_back(f);
+			for (size_t i = 0; i < p.size(); i++) a.push_back(f == "-mtc_mult" ? "1" : "0");
+		}
+		return a;
+	};
+	joint_against_table("salted_disorder", parts({ 1, 2 }), cif);
+	//the fixture paths are relative to the starting directory, so every argument list is made before app_dir moves away
+	std::vector<std::vector<std::string>> runs{ parts({ 1, 2 }), parts({ 1 }), parts({ 2 }) };
+	const std::string names[3] = { "joint.tshb", "p1.tshb", "p2.tshb" };
+	app_dir run("salted_disorder_merge");
+	for (int i = 0; i < 3; i++)
+	{
+		std::vector<std::string>& a = runs[i];
+		a.push_back("-tshb");
+		ASSERT_EQ(run.run(a), 0) << i;
+		fs::rename(run.dir / "experimental.tshb", run.dir / names[i]);
+	}
+	const tshb_block joint(run.dir / "joint.tshb"), p1(run.dir / "p1.tshb"), p2(run.dir / "p2.tshb");
+	EXPECT_EQ(joint.scatterer_size(), 50u);
+	EXPECT_EQ(p1.scatterer_size() + p2.scatterer_size(), 50u) << "no PART 0 atoms: nothing shared";
+	ASSERT_EQ(run.run({ "-merge", "p1.tshb", "p2.tshb", "-cif", cif }), 0);
+	EXPECT_TRUE(tshb_block(run.dir / "combined.tshb").is_complete());
+	EXPECT_EQ(bytes(run.dir / "combined.tshb"), bytes(run.dir / "joint.tshb"));
+}

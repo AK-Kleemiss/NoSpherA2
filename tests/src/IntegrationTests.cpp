@@ -777,6 +777,12 @@ TEST(TomlIntegrationTests, SaltedFillTshb)
 	EXPECT_TRUE(result.success) << result.message;
 }
 
+TEST(TomlIntegrationTests, SaltedDisorderTshb)
+{
+	const UT_Result result = run_inprocess_test(get_repo_root(), "SALTED_disorder_tshb");
+	EXPECT_TRUE(result.success) << result.message;
+}
+
 TEST(TomlIntegrationTests, SALTED)
 {
 	const UT_Result result = run_inprocess_test(get_repo_root(), "SALTED");

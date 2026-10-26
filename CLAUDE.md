@@ -239,6 +239,11 @@ Key core modules live in `Src/core`:
 
 ## Current Validation Notes
 
+As of 2026-10-26 (final), restrained RI fits are checked at 1e-2 N, the streamed `-mtc` SALTED table keeps each part's fill
+charges, and `SALTED_disorder_tshb` plus `TshbJointTests.SaltedDisorderedPartsMatchTheirTableAndMergeToTheJointFile` are new.
+`ctest --preset release-linux-tests` on a CPU-only 4-core VM reports **1320 passed, 0 failed, 23 skipped** (2 disabled) of
+1343. See `UNIT_TESTS_STATUS.md`.
+
 As of 2026-10-26 (latest), the GTO and delta_k ion differences of the Thakkar fill are fitted Gaussians, so `-tshb` takes
 every fill atom and never reruns for the table; `DeltaSeriesTests.TheFittedDifferencesReproduceTheTables` is new. `ctest
 --preset release-linux-tests` on a CPU-only 4-core VM reports **1318 passed, 0 failed, 23 skipped** (2 disabled) of 1341.

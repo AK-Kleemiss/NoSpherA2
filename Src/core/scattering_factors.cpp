@@ -4044,10 +4044,13 @@ bool stream_mtc_salted(options& opt, std::vector<WFN>& wavy, std::ostream& file,
 
 	std::vector<std::shared_ptr<SALTEDPredictor>> preds;
 	std::vector<salted_part_prep> preps;
+	//each predictor replaces opt.spherical_fill_charges with its part's EEQ charges; the fill below needs every part's
+	std::vector<std::vector<std::array<double, 4>>> charges(n_parts);
 	svec known;
 	for (size_t i = 0; i < n_parts; i++)
 	{
 		auto pred = std::make_shared<SALTEDPredictor>(wavy[i], opt);
+		charges[i] = opt.spherical_fill_charges;
 		if (!pred->basis_set_loaded())
 			load_basis_into_WFN(pred->wavy, BasisSetLibrary::get_basis_set(pred->get_dfbasis_name()));
 		salted_part_prep prep;
@@ -4108,6 +4111,7 @@ bool stream_mtc_salted(options& opt, std::vector<WFN>& wavy, std::ostream& file,
 				known.push_back(spherical[i].labels[a]);
 			append_scatterer_ids(spherical_ids[i], opt, spherical[i].labels,
 				tempy[i], spherical[i].asym_atom_list);
+			opt.spherical_fill_charges = charges[i];
 			spheres[i] = make_he_evaluators(spherical[i], tempy[i], opt, file);
 		}
 		file << "Spherical remainder: " << n_filled
