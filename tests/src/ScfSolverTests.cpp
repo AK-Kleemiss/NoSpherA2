@@ -14,7 +14,7 @@ namespace
 	const char* water = "3\n\nO 0.000 0.000 0.117\nH 0.000 0.757 -0.469\nH 0.000 -0.757 -0.469\n";
 	const char* methyl = "4\n\nC 0.000 0.000 0.000\nH 1.079 0.000 0.000\nH -0.540 0.935 0.000\nH -0.540 -0.935 0.000\n";
 
-	//The `tight` convergence preset and the `normal_conv` damping and level shift of the XCW settings file
+	//The `very_tight` convergence preset and the `normal_conv` damping and level shift of the XCW settings file
 	options::SCF_settings tight_settings(const occ::qm::SpinorbitalKind kind, const int multiplicity) {
 		options::SCF_settings s;
 		s.quant_diff = 1e-7;
