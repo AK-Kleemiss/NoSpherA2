@@ -44,7 +44,7 @@ occ::core::Molecule SCF_solver::setup_SCF_mol(const std::vector<asym_atom>& atom
 	return mol;
 }
 
-//What the I tensor left, under -mem when given, less a reserve, for the stored integrals
+//avail is the memory left for the stored integrals (under -mem when given); they get it less a reserve
 void SCF_solver::setup_eri(const occ::qm::HartreeFock& hf, const size_t avail) {
 	eri_.clear();
 	const _time_point eri_t0 = get_time();
@@ -331,8 +331,8 @@ occ::Mat SCF_solver::diis_update(scf_t& scf) {
 	return adiis_.update(scf.ctx.mo.kind, D, F);
 }
 
-//Pulay's CDIIS on the Fock matrix, extrapolating from the second vector on: the perturbed
-//Roothaan map is stiff and the plain steps occ's DIIS takes first already leave the linear
+//Pulay's CDIIS on the Fock matrix, extrapolating from the second vector on: with a model term
+//the Roothaan map is stiff and the plain steps occ's DIIS takes first already leave the linear
 //regime. B c = 1 over B_ij = <E_i|E_j>, scaled by its largest diagonal element, is solved by
 //the pseudo-inverse over the eigenvalues above eigenvalue_cutoff: near convergence the errors
 //are almost collinear and a QR solve returns coefficients in the hundreds that amplify the

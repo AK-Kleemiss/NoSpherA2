@@ -1266,7 +1266,7 @@ void structure_factors::build_I(const std::vector<ao_data>& ao_data_shells, doub
 	//NOSPHERA2_ITENSOR_AOSTATS=1: how much of each block's AO set is actually carrying
 	//anything. The active set comes from a cutoff clamped into an 11-12 bohr band
 	//(std::clamp above), so it is set by the distance between two atom centres and barely
-	//by the block - a 266-point block keeps 756 of 852 AOs and a 7968-point one keeps 803.
+	//by the block: small and large blocks keep nearly the same AOs.
 	//Work is sum over blocks of na^2 * points, so what an OCC-style per-batch bounding
 	//sphere would save is quadratic in whatever this measures. The AO values are already
 	//computed here, so the honest number is a max over the points they hold, not an estimate.
