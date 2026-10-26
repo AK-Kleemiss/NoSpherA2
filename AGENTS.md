@@ -290,6 +290,11 @@ alternative is one flag away in each case.
 
 ## Current Validation Notes
 
+As of 2026-10-26 (XCW refactor, run 1), `SCF_wrapper` is `SCF_solver`, a plain Hartree-Fock SCF extended by the
+`XCW_solver` child, and the XCW driver is `XCW_wrapper` (see `REFACTOR.md`); `ScfSolverTests` (3) are new. `ctest --preset
+release-windows-tests -j 6` on a CPU-only build reports **1323 passed, 0 failed, 23 skipped** (2 disabled) of 1346. See
+`UNIT_TESTS_STATUS.md`.
+
 As of 2026-10-26 (final), restrained RI fits are checked at 1e-2 N, the streamed `-mtc` SALTED table keeps each part's fill
 charges, and `SALTED_disorder_tshb` plus `TshbJointTests.SaltedDisorderedPartsMatchTheirTableAndMergeToTheJointFile` are new.
 `ctest --preset release-linux-tests` on a CPU-only 4-core VM reports **1320 passed, 0 failed, 23 skipped** (2 disabled) of
