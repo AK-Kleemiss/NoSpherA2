@@ -10,7 +10,7 @@
 #include "isosurface.h"
 #include "cif.h"
 #include "bondwise_analysis.h"
-#include "XCW_solver.h"
+#include "XCW_wrapper.h"
 #include "geometry_aid.h"
 #include "crystal_energies.h"
 #include "nao.h"
@@ -973,8 +973,8 @@ static int run_app_impl(int argc, char **argv)
 	{
 		opt.groups[0].push_back(0);
 		opt.loadXCWsettings();
-		XCW_solver xcw_solver(opt);
-		xcw_solver.run();
+		XCW_wrapper xcw_wrapper(opt);
+		xcw_wrapper.run();
 		log_file.flush();
 		std::cout.rdbuf(_coutbuf);
 		return 0;

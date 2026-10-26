@@ -151,7 +151,7 @@ public:
 	void grid_F(const dMatrix2& D);
 	//the per-atom transform of rho(D) at the cleaned entries, [g * nc + c]; grid_F's first half and the tscb's table
 	cvec grid_sfc(const dMatrix2& D);
-	//out = Sum_r Re(pre_r I_r(mu, nu)) without forming I, what XCW_solver::contract_I gives
+	//out = Sum_r Re(pre_r I_r(mu, nu)) without forming I, what XCW_wrapper::contract_I gives
 	void grid_contract(occ::Mat& out, const cvec& pre);
 
 	//The entries of a rank-N symmetric tensor stored packed in the order i <= j <= k (<= l): the powers of x, y

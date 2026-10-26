@@ -1,7 +1,7 @@
 //XCW: the Gaussian halting reports (evaluate_gaussian_halting, the progress estimate and
 //the summary), the disk-backed I tensor (decide_i_storage / i_budget / start_i_save /
 //finish_i_save / open_i_stream_for_reading) and the grown branch of the structure_factors
-//constructor, all driven through XCW_solver::run() on a 402-reflection subset of the P1 fixture that each
+//constructor, all driven through XCW_wrapper::run() on a 402-reflection subset of the P1 fixture that each
 //test writes into its own scratch directory. XcwTests.cpp owns the halting maths and the
 //settings parser; nothing here repeats those.
 #include "pch.h"
@@ -19,7 +19,7 @@
 #include "core/cell.h"
 #include "core/scattering_factors.h"
 #include "core/i_tensor_stream.h"
-#include "core/XCW_solver.h"
+#include "core/XCW_wrapper.h"
 #include "core/tuning.h"
 
 namespace {
@@ -162,7 +162,7 @@ namespace {
 		CoutCapture out;
 		opt.loadXCWsettings();
 		{
-			XCW_solver x(opt);
+			XCW_wrapper x(opt);
 			x.run();
 		}
 		return out.str();
@@ -522,7 +522,7 @@ TEST(XcwHaltingReportTests, GrownConstructUsesTheXyzAtoms)
 		CoutCapture capture;
 		opt.loadXCWsettings();
 		{
-			XCW_solver x(opt);
+			XCW_wrapper x(opt);
 			EXPECT_TRUE(opt.xcw_settings.grown);
 			EXPECT_EQ(x.structure().model_data.ncen, 23);
 		}

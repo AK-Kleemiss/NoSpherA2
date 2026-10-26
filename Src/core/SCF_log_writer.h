@@ -2,7 +2,7 @@
 #include "convenience.h"
 
 // Writes what an XCW run reports about its SCF: the line per iteration to SCF.log and the line
-// per converged lambda to the console. SCF_wrapper and XCW_solver each fill in what they know in
+// per converged lambda to the console. XCW_solver and XCW_wrapper each fill in what they know in
 // `v` and then ask for the line, so neither needs to see the other's data.
 class SCF_log_writer {
 

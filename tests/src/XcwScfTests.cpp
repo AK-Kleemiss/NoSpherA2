@@ -1,4 +1,4 @@
-//XCW SCF driver and I tensor storage: XCW_solver::run on the P1 fixture through the
+//XCW SCF driver and I tensor storage: XCW_wrapper::run on the P1 fixture through the
 //settings file, observed through SCF.log, stdout and the files a run leaves behind, plus
 //the i_tensor_file container on its own.
 //
@@ -14,7 +14,7 @@
 #include <gtest/gtest.h>
 
 #include "core/convenience.h"
-#include "core/XCW_solver.h"
+#include "core/XCW_wrapper.h"
 #include "core/basis_set.h"
 #include "core/i_tensor_stream.h"
 #include "core/tsc_block.h"
@@ -103,7 +103,7 @@ namespace {
 	}
 
 	struct p1_run {
-		std::string out;    //what the constructors and XCW_solver::run printed
+		std::string out;    //what the constructors and XCW_wrapper::run printed
 		std::string log;    //SCF.log
 		int nr = 0;         //reflections in the hkl file the run was given
 	};
@@ -153,7 +153,7 @@ namespace {
 			cout_capture capture;
 			opt.loadXCWsettings();
 			{
-				XCW_solver x(opt);
+				XCW_wrapper x(opt);
 				x.run();
 			}
 			r.out = capture.buf.str();
@@ -202,7 +202,7 @@ namespace {
 		return (held_double ? " read shared_i.bin" : " read shared_i.bin i_float") + read_shared_eri(dir);
 	}
 
-	//One line of the lambda table XCW_solver::run prints per converged step:
+	//One line of the lambda table XCW_wrapper::run prints per converged step:
 	//lambda(5) criterion(4) GooF2(4) R1(5) energy(9) lambda*criterion(3) quant(9), tab separated.
 	//An SCF.log iteration row has the same seven columns behind a leading tab, with the
 	//iteration count in the first.

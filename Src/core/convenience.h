@@ -1088,7 +1088,7 @@ struct options
 		std::filesystem::path i_tensor_save_path;
 	};
 
-	// What SCF_wrapper reads: the convergence thresholds with their running state, the damping
+	// What the SCF solver reads: the convergence thresholds with their running state, the damping
 	// and level shift schedule, the spin kind and the second-order switches
 	struct SCF_settings {
 		double quant_diff;
@@ -1128,7 +1128,7 @@ struct options
 		int max_scf_iterations;
 		int charge = 0;
 		int multiplicity = 1;
-		// Not settings-file keys: filled by XCW_solver from the options when it builds SCF_wrapper
+		// Not settings-file keys: filled by XCW_wrapper from the options when it builds the SCF solver
 		bool incremental = true;
 		bool gpu_eri = false;
 		bool no_date = false;
@@ -1170,7 +1170,7 @@ struct options
 		}
 	};
 
-	// What XCW_solver reads itself; the two slices above go to structure_factors and SCF_wrapper
+	// What XCW_wrapper reads itself; the two slices above go to structure_factors and the SCF solver
 	struct XCW_settings : SF_settings, SCF_settings {
 		//`df_basis <name>`: density fitting of the Fock build with this auxiliary basis
 		std::string df_basis_name;
