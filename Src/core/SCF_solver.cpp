@@ -97,7 +97,7 @@ bool SCF_solver::run(occ::qm::HartreeFock& hf, occ::qm::Wavefunction& wfn, const
 }
 
 void SCF_solver::begin_log() {
-	writer_->log << "Starting " << label_ << " SCF solver\n";
+	writer_->log << "Starting the " << label_ << " solver\n";
 	writer_->log << "____________________________________________________________________________________________________\n";
 	writer_->log << " Iteration\tTotal Energy (Eh)\n";
 }
