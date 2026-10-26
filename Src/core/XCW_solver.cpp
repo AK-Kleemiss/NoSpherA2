@@ -8,6 +8,7 @@
 #endif
 #include "scattering_factors.h"
 #include "basis_set.h"
+#include "gaussian_atom.h"
 #include "bondwise_analysis.h"
 #include "tuning.h"
 #include <limits>
@@ -506,6 +507,40 @@ void XCW_solver::flip_high_m_phases(occ::qm::Wavefunction& w) {
 	w.mo.update_density_matrix();
 }
 
+//The converged density of this step as an RI fit, honouring -multipole_moments, keyed and ordered as the table's scatterers.
+//The fit is another partition than the table's, so the two differ at the 1e-2 level in F; -ri_fit names the aux basis,
+//AutoAux otherwise
+void XCW_solver::write_tshb(WFN& wave, const tsc_block<int, cdouble>& table, const std::string& name)
+{
+	if (tshb_aux_.get_ncen() == 0) {
+		std::vector<std::shared_ptr<BasisSet>> aux = opt->aux_basis;
+		if (aux.empty())
+			aux.push_back(std::make_shared<BasisSet>(wave));
+		tshb_aux_ = generate_aux_wfn(wave, aux, false);
+	}
+	DensityFitting::CONFIG config = DensityFitting::config_from_options(*opt);
+	config.partition_cache = &tshb_cache_;
+	const Gaussian_Molecule ml(tshb_aux_, DensityFitting::density_fit(wave, tshb_aux_, config));
+	const ScattererLabels& keys = table.get_scatterers();
+	const svec names = table.get_scatterers_string();
+	//the scatterers keep their order over the steps, and only the first step's wavefunction went through the CIF reader
+	//that gives its atoms their ids
+	if (tshb_atoms_.empty()) {
+		tshb_atoms_.assign(keys.size(), -1);
+		for (int s = 0; s < keys.size(); s++) {
+			for (int a = 0; a < wave.get_ncen() && tshb_atoms_[s] < 0; a++)
+				if (wave.get_id_for_atom(a).to_hex_string() == names[s] || wave.get_atom_label(a) == names[s])
+					tshb_atoms_[s] = a;
+			err_checkf(tshb_atoms_[s] >= 0, "-tshb: no atom of the XCW wavefunction for scatterer " + names[s], writer.log);
+		}
+	}
+	svec labels(keys.size());
+	for (int s = 0; s < keys.size(); s++)
+		labels[s] = sf.asym_atoms[tshb_atoms_[s]].label;
+	ml.tshb(labels, keys, tshb_atoms_, wave, wave.get_ECP_mode(), opt->electron_diffraction).write(name);
+	writer.log << "Wrote " << name << ": " << keys.size() << " atom(s), RI fit of the converged density" << std::endl;
+}
+
 void XCW_solver::create_tscb(const occ::qm::Wavefunction& wfn, const double& lambda) {
 	writer.log << "Creating .tscb file from converged SCF calculation..." << std::endl;
 	std::vector<WFN> sf_wave_vec(1, { wfn, false });
@@ -631,8 +666,11 @@ void XCW_solver::create_tscb(const occ::qm::Wavefunction& wfn, const double& lam
 		value += '0';
 	}
 	std::ostringstream oss;
-	oss << "NA2_" << value << ".tscb";
-	result.write_tscb_file("test.cif", oss.str());
+	oss << "NA2_" << value << (opt->write_tshb ? ".tshb" : ".tscb");
+	if (opt->write_tshb)
+		write_tshb(sf_wave_vec[0], result, oss.str());
+	else
+		result.write_tscb_file("test.cif", oss.str());
 	std::ostringstream oss2;
 	oss2 << "NA2_" << value << ".wfn";
 	sf_wave_vec[0].write_wfn(oss2.str(), false, true);

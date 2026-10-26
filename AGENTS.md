@@ -290,6 +290,11 @@ alternative is one flag away in each case.
 
 ## Current Validation Notes
 
+As of 2026-10-26 (XCW -tshb), XCW writes an RI fit of each step's converged density as `NA2_<lambda>.tshb` under `-tshb`
+(AutoAux by default, `-multipole_moments` honoured, partition grid and rows cached over the steps); `ctest --preset
+release-linux-tests` on a CPU-only 4-core VM reports **1323 passed, 0 failed, 23 skipped** (2 disabled) of 1346. See
+`UNIT_TESTS_STATUS.md`.
+
 As of 2026-10-26 (orbital-less parts), `-tshb` writes the spherical fill records for a part without orbitals instead of
 refusing; XCW stays refused (its F_calc and an RI fit of its density differ by up to 6.6e-2 relative). `ctest --preset
 release-linux-tests` on a CPU-only 4-core VM reports **1322 passed, 0 failed, 23 skipped** (2 disabled) of 1345. See

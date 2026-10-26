@@ -52,8 +52,6 @@ static void start_tshb(options &opt, const std::vector<WFN> &wavy, tshb_block &t
 		why = "the partition is no fitted density (-ri_fit or -SALTED)";
 	else if (opt.write_CIF)
 		why = "-cif needs the table";
-	else if (opt.do_XCW)
-		why = "XCW computes its own factors";
 	if (!why.empty()) {
 		log << "-tshb: the table is written instead, " << why << std::endl;
 		return;
@@ -974,6 +972,9 @@ static int run_app_impl(int argc, char **argv)
 	{
 		opt.groups[0].push_back(0);
 		opt.loadXCWsettings();
+		//-ri_fit and -multipole_moments describe the -tshb fit of each step; XCW's own table keeps its Hirshfeld partition
+		if (opt.partition_type == PartitionType::RI)
+			opt.partition_type = PartitionType::Hirshfeld;
 		XCW_solver xcw_solver(opt);
 		xcw_solver.run();
 		log_file.flush();

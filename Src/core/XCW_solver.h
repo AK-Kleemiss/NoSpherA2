@@ -3,6 +3,7 @@
 #include "structure_factors.h"
 #include "SCF_wrapper.h"
 #include "GridManager.h"
+#include "integrator.h"
 #include "xcw_halting.h"
 
 // Drives the wavefunction fitting: owns the structure factors and the SCF and is the only place that talks to both
@@ -89,6 +90,12 @@ private:
 	ScattererLabels tscb_scat_;
 	ivec2 tscb_hkl_;
 	ivec tscb_atom_, tscb_entry_;
+	// -tshb: the aux wavefunction of the converged density's RI fit and the restraints' partition grid, made at the first
+	// step and kept, since every step has the same atoms and basis
+	WFN tshb_aux_{ e_origin::NOT_YET_DEFINED };
+	DensityFitting::PartitionCache tshb_cache_;
+	ivec tshb_atoms_;
+	void write_tshb(WFN& wave, const tsc_block<int, cdouble>& table, const std::string& name);
 	// F_calc and scale as save_state left them
 	cvec saved_F_calc_;
 	double saved_scale_ = 0.0;

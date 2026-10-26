@@ -155,12 +155,24 @@ static WFN setup_partition_grid(
 	return temp;
 }
 
+//with a cache the GridManager is the cached one, which keeps its grid and weights while the atoms stay the same
+static GridManager& partition_grid(DensityFitting::PartitionCache* cache, GridManager& local)
+{
+	if (!cache)
+		return local;
+	if (!cache->grid)
+		cache->grid = std::make_shared<GridManager>();
+	return *cache->grid;
+}
+
 vec2 DensityFitting::calculate_expected_multipoles(
 	const WFN& wavy,
 	const CHARGE_SCHEME& scheme,
-	const int lmax)
+	const int lmax,
+	PartitionCache* cache)
 {
-	GridManager grid_manager;
+	GridManager local;
+	GridManager& grid_manager = partition_grid(cache, local);
 	const WFN temp = setup_partition_grid(wavy, scheme, grid_manager);
 	return grid_manager.calculatePartitionedMultipoles(temp, lmax);
 }
@@ -350,14 +362,23 @@ static partition_multipole_data calculate_partition_multipoles(
 	const WFN& wavy,
 	const aux_density_table& table,
 	const DensityFitting::CHARGE_SCHEME scheme,
-	const int lmax)
+	const int lmax,
+	DensityFitting::PartitionCache* cache)
 {
-	GridManager grid_manager;
+	GridManager local;
+	GridManager& grid_manager = partition_grid(cache, local);
 	const WFN temp = setup_partition_grid(wavy, scheme, grid_manager);
 
 	partition_multipole_data result;
 	result.targets = grid_manager.calculatePartitionedMultipoles(temp, lmax);
-	result.rows = partition_rows(wavy, table, grid_manager, lmax, 2);
+	//MBIS and EMBIS weights follow the density, so their rows are rebuilt every time
+	const bool keep = cache && scheme != DensityFitting::CHARGE_SCHEME::MBIS && scheme != DensityFitting::CHARGE_SCHEME::EMBIS;
+	if (keep && !cache->rows.empty())
+		result.rows = cache->rows;
+	else
+		result.rows = partition_rows(wavy, table, grid_manager, lmax, 2);
+	if (keep && cache->rows.empty())
+		cache->rows = result.rows;
 	return result;
 }
 
@@ -445,7 +466,8 @@ static restraint_data build_restraint_data(
 			wavy,
 			aux_table,
 			config.charge_scheme,
-			data.lmax);
+			data.lmax,
+			config.partition_cache);
 
 		data.multipole_targets = std::move(result.targets);
 		data.multipole_rows = std::move(result.rows);
@@ -457,7 +479,7 @@ static restraint_data build_restraint_data(
 	}
 	else {
 		data.multipole_targets = DensityFitting::calculate_expected_multipoles(
-			wavy, config.charge_scheme, config.multipole_lmax);
+			wavy, config.charge_scheme, config.multipole_lmax, config.partition_cache);
 		data.multipole_rows = analytic_multipole_rows(
 			aux_table, config.multipole_lmax);
 	}

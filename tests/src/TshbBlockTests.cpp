@@ -637,3 +637,24 @@ TEST(TshbJointTests, AnOrbitalLessPartGoesInAsSphericalRecords)
 	EXPECT_TRUE(tshb_block(run.dir / "combined.tshb").is_complete());
 	EXPECT_EQ(bytes(run.dir / "combined.tshb"), bytes(run.dir / "joint.tshb"));
 }
+
+//XCW with -tshb: every lambda step writes the RI fit of its converged density (AutoAux without -ri_fit) as NA2_<lambda>.tshb
+//instead of the table, complete and keyed as the table's scatterers
+TEST(TshbJointTests, XcwStepsWriteTheirTshb)
+{
+	const std::string cif = fs::absolute(fixture("P1_test/P1_test.cif")).string(), hkl = fs::absolute(fixture("P1_test/P1_subset.hkl")).string();
+	app_dir run("xcw");
+	std::ofstream(run.dir / "settings.txt") << "normal normal_conv params 177 basis_set sto-3g max_iter 100 F charge 0 mult 1 rhf start 0 step_size 0.01 end 0.01";
+	ASSERT_EQ(run.run({ "-do_XCW", "-no_gpu", "-cif", cif, "-hkl", hkl, "-XCW_settings", "settings.txt", "-tshb", "-no_date" }), 0);
+	for (const std::string step : { "NA2_0000000", "NA2_0010000" })
+	{
+		ASSERT_TRUE(fs::exists(run.dir / (step + ".tshb"))) << step;
+		EXPECT_FALSE(fs::exists(run.dir / (step + ".tscb"))) << step;
+		const tshb_block b = tshb_block::read(run.dir / (step + ".tshb"));
+		EXPECT_EQ(b.scatterer_size(), 23u);
+		EXPECT_TRUE(b.is_complete());
+		EXPECT_NE(bytes(run.dir / (step + ".tshb")).find("COVERAGE: complete"), std::string::npos);
+		for (size_t i = 0; i < b.scatterer_size(); i++)
+			EXPECT_FALSE(b.get_record(i).shells.empty()) << b.get_record(i).label;
+	}
+}
