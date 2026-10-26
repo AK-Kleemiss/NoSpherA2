@@ -44,8 +44,9 @@ void structure_factors::setup_ri(const occ::qm::AOBasis& ao, const occ::qm::AOBa
 	XR.lmax = lmax;
 	XR.n_mom = (lmax + 1) * (lmax + 1);
 	occ::qm::IntegralEngineDF df(ao.atoms(), ao.shells(), aux.shells());
-	const occ::Mat I = occ::Mat::Identity(n, n);
-	XR.B = df.build_b_direct(I, I);
+	//occ's store, column P the nbf x nbf block (mu nu|P)
+	df.compute_stored_integrals();
+	XR.B = df.integral_store();
 	occ::Mat H = df.aux_engine().one_electron_operator(occ::qm::cint::Operator::coulomb, false);
 	//the aux functions by atom: a basis lists its shells atom by atom
 	const ivec& bf_atom = aux.bf_to_atom();
@@ -146,7 +147,8 @@ cvec structure_factors::ri_sfc(const dMatrix2& D)
 	occ::Vec Dv(static_cast<size_t>(n) * n);
 	for (int i = 0; i < n; i++)
 		for (int j = 0; j < n; j++) Dv(static_cast<size_t>(i) * n + j) = D(i, j);
-	occ::Vec g = 2.0 * (XR.B.transpose() * Dv);
+	occ::Vec g(XR.naux);
+	cblas_dgemv(CblasColMajor, CblasTrans, (int)XR.B.rows(), XR.naux, 2.0, XR.B.data(), (int)XR.B.rows(), Dv.data(), 1, 0.0, g.data(), 1);
 	//the fixed targets are F's constant part, left out of a response to dD as the anomalous part is
 	if (XR.lmax >= 0 && XR.frozen && !XR.response)
 		g += XR.R.transpose() * Eigen::Map<const occ::Vec>(XR.t0.data(), XR.t0.size());
@@ -194,7 +196,8 @@ void structure_factors::ri_contract(const cvec& H, occ::Mat& out)
 		}
 	}
 	const occ::Vec w = XR.H.solve(u);
-	const occ::Vec o = XR.B * w;
+	occ::Vec o(XR.B.rows());
+	cblas_dgemv(CblasColMajor, CblasNoTrans, (int)XR.B.rows(), XR.naux, 1.0, XR.B.data(), (int)XR.B.rows(), w.data(), 1, 0.0, o.data(), 1);
 	out.resize(n, n);
 	for (int i = 0; i < n; i++)
 		for (int j = 0; j < n; j++) out(i, j) = o(static_cast<size_t>(i) * n + j);
