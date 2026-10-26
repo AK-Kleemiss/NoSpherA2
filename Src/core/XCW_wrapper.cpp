@@ -19,7 +19,7 @@ XCW_wrapper::XCW_wrapper(options& opt_in) : opt(&opt_in), sf(opt_in) {
 }
 
 //z_h = (|F_obs,h| - |F_calc,h|) / sigma_h for the converged F_calc/F_scale over
-//strong reflections (|F_obs|/sigma >= opt->xcw_strong_cutoff), tested against
+//strong reflections (|F_obs|/sigma >= xcw_strong_cutoff), tested against
 //N(0,1) after a global shape/scale rescale. Full reflection set only; the
 //free/working-set cross-validation variant is not implemented.
 //Background: tests/P1_test/XCW_plan.md, Src/core/xcw_halting.h.
@@ -113,7 +113,7 @@ void XCW_wrapper::evaluate_gaussian_halting(const double lambda) {
 	gaussian_halt_history_.push_back(entry);
 }
 
-//Full per-lambda table to XCW_log, then the final recommendation
+//Full per-lambda table to the SCF log, then the final recommendation
 void XCW_wrapper::report_gaussian_halting_summary() {
 	if (gaussian_halt_history_.empty()) {
 		return;
@@ -137,7 +137,7 @@ void XCW_wrapper::report_gaussian_halting_summary() {
 
 //lambda* is the argmin of A^2 over steps with enough strong reflections. A flagged
 //binned-trend test means spatially correlated residuals that a marginal normality
-//test would miss, so it is warned about. See XCW.h for the full behaviour.
+//test would miss, so it is warned about. See XCW_wrapper.h for the full behaviour.
 void XCW_wrapper::report_halting_progress_estimate(bool is_final) {
 	const GaussianHaltEntry* best = nullptr;
 	double max_valid_lambda = 0.0;
@@ -221,6 +221,14 @@ void XCW_wrapper::report_halting_progress_estimate(bool is_final) {
 			*s << "\n";
 		}
 	}
+}
+
+//lambda as the result files name it: its digits without the point, padded to seven (0.01 -> 0010000)
+static std::string lambda_tag(const double lambda) {
+	std::string value = std::to_string(lambda);
+	value.erase(std::remove(value.begin(), value.end(), '.'), value.end());
+	while (value.length() < 7) value += '0';
+	return value;
 }
 
 //Guess for the next lambda step: the last orbitals rotated on by t times the rotation that led
@@ -396,11 +404,7 @@ void XCW_wrapper::create_tscb(const occ::qm::Wavefunction& wfn, const double& la
 		std::cout << "grid F check lambda " << lambda << ": max|dF|/max|F| " << std::scientific << std::setprecision(2) << dmax / fmax
 			<< " sum||F_grid|-|F_I||/sum|F_I| " << num / den << std::fixed << " forward " << fwd_ms << " ms" << std::endl;
 	}
-	std::string value = std::to_string(lambda);
-	value.erase(std::remove(value.begin(), value.end(), '.'), value.end());
-	while (value.length() < 7) {
-		value += '0';
-	}
+	const std::string value = lambda_tag(lambda);
 	std::ostringstream oss;
 	oss << "NA2_" << value << ".tscb";
 	result.write_tscb_file("test.cif", oss.str());
@@ -455,9 +459,7 @@ void XCW_wrapper::create_tscb(const occ::qm::Wavefunction& wfn, const double& la
 	}
 }
 
-/* Sets up the system for the XCW procedure
-* Sets up OCC molecule, loads a basis set (optional density fitting basis) and returns the Hartree-Fock object
-*/
+//The OCC molecule, the orbital basis (and the density fitting basis when one is set) and the SCF solver
 occ::qm::HartreeFock XCW_wrapper::setup_system() {
 
 	// Sets up the OCC molecule
@@ -532,23 +534,16 @@ void XCW_wrapper::report_lambda(const double lambda, const occ::qm::Wavefunction
 	}
 }
 
-void XCW_wrapper::run() {
-	//OCC parallelises through TBB, which does not read OMP_NUM_THREADS. Not a speedup - it
-	//already used every core - but it makes -cpus bind the 82% of a run that OCC owns.
-	occ::parallel::set_num_threads(opt->threads > 0 ? opt->threads : omp_get_max_threads());
-	// Sets up the OCC objects (molecule and basis set)
-	occ::qm::HartreeFock hf = setup_system();
-	/* Calculate Debye - Waller and phase factors and anomalous dispersion corrections and sets them
-	* If they are not set, the default values are used; DW = 1, phases = 1, anom = 0 */
+//The structure factor side of the run: Debye-Waller and phase factors, the anomalous dispersion
+//corrections and the I tensor (or the grid that replaces it), on the device when asked to
+void XCW_wrapper::setup_structure_factors(const occ::qm::HartreeFock& hf) {
 	sf.set_DW();
 	sf.set_phases();
 	sf.set_anom();
-	// Computes the I tensor
 	structure_factors::I_tensor& I_tens = sf.eval_I(hf.aobasis());
 #if defined(NOSPHERA2_USE_GPU) || defined(NOSPHERA2_USE_METAL)
-	//The two walks of an iteration read the whole tensor and the host is bound by its memory
-	//bandwidth doing so; the device reads it several times faster. The host copy stays for
-	//the background writer.
+	//GPU: a copy of the resident tensor on the device, where both walks of an iteration then run;
+	//the host is bound by its memory bandwidth reading it. The host copy stays for the background writer.
 	if (opt->gpu_itensor && opt->use_gpu && !I_tens.i_streamed_ && sf.XG.mode != 1) {
 		I_tens.i_on_device_ = I_tens.i_float_ ? itensor_gpu_hold(I_tens.I32.data(), sf.model_data.nr, static_cast<int>(I_tens.i_compact_))
 			: itensor_gpu_hold(I_tens.I.data(), sf.model_data.nr, static_cast<int>(I_tens.i_compact_));
@@ -558,22 +553,26 @@ void XCW_wrapper::run() {
 	}
 #endif
 #ifdef NOSPHERA2_USE_GPU
-	//The grid runner's two block GEMMs; the transform between them stays on the host. Single precision there, so not under i_double
+	//GPU: the grid route's two block GEMMs on the device, the transform between them stays on the host.
+	//Single precision there, so not under i_double
 	if (opt->gpu_itensor && opt->use_gpu && sf.XG.mode == 1 && !I_tens.tensor_double) {
 		const bool held = sf.hold_grid_gpu();
 		if (!(opt->no_date))
 			std::cerr << "GPU in use: XCW grid blocks on " << (held ? "the device" : "the CPU - device unavailable or the blocks too large") << std::endl;
 	}
 #endif
-	// Computes the four center integrals and keeps them in memory if possible
+}
+
+//The two-electron integrals of the SCF: stored when they fit in memory, and a density-fitted Fock
+//build for the TRAH Hessian products
+void XCW_wrapper::setup_scf_integrals(const occ::qm::HartreeFock& hf) {
 	const size_t avail = sf.free_memory();
 	//NOSPHERA2_XCW_ERI_NO_BUDGET holds the integrals whatever -mem leaves for them
 	scf_solver.setup_eri(hf, tuning("NOSPHERA2_XCW_ERI_NO_BUDGET") ? 0 : avail);
-	//The TRAH Hessian products, fitted: the iterations keep exact Fock builds, so only TRAH steps
-	//can change. Without the stored integrals a product costs a direct build, two fitted builds
-	//are cheaper (TEMPO SVP at -mem 2500: 383 -> 296 s, same builds, Fcalc to 1e-4), so they are
-	//fitted by themselves then; `hessian_df_basis none` keeps them exact. Set up after the stored
-	//integrals so it never squeezes them out; those hold all of avail but a reserve
+	//Fitted Hessian products only change the TRAH steps, never the converged result. Without stored
+	//integrals a product costs a direct build and two fitted builds are cheaper, so they are fitted
+	//then by default; `hessian_df_basis none` keeps them exact. Set up after the stored integrals so
+	//it never squeezes them out
 	const std::string& hdf = opt->xcw_settings.hessian_df_basis_name;
 	std::string hdf_name = hdf == "none" ? "" : hdf;
 	if (hdf.empty() && !scf_solver.has_eri() && opt->xcw_settings.df_basis_name.empty()) {
@@ -589,26 +588,86 @@ void XCW_wrapper::run() {
 		density_fitting(hf_df, hdf_name, "of the Hessian products", scf_solver.has_eri() ? avail / 5 : avail);
 		scf_solver.set_hessian_df(std::move(hf_df));
 	}
-	bool has_guess = false;
-	occ::qm::Wavefunction last_wfn, prev_wfn;
-	const occ::Mat S_ao = hf.compute_overlap_matrix();
-	if (opt->xcw_settings.read_first_guess) {
-		std::ostringstream oss2;
-		std::string start_value_str = std::to_string(opt->xcw_settings.xcw_start_value);
-		start_value_str.erase(std::remove(start_value_str.begin(), start_value_str.end(), '.'), start_value_str.end());
-		if (start_value_str.length() > 7) {
-			start_value_str = start_value_str.substr(0, 7);
-		}
-		else if (start_value_str.length() < 7) {
-			start_value_str.append(7 - start_value_str.length(), '0');
-		}
-		oss2 << "NA2_" << start_value_str << ".fchk";
-		last_wfn = occ::qm::Wavefunction::load(oss2.str());
-		//Written in Gaussian's phases by create_tscb; OCC's loader does not undo that
-		flip_high_m_phases(last_wfn);
-		has_guess = true;
-	}
+}
 
+//The orbitals a previous run wrote for the start lambda, when the settings ask for them
+bool XCW_wrapper::read_start_guess(occ::qm::Wavefunction& wfn) {
+	if (!opt->xcw_settings.read_first_guess) return false;
+	wfn = occ::qm::Wavefunction::load("NA2_" + lambda_tag(opt->xcw_settings.xcw_start_value) + ".fchk");
+	//Written in Gaussian's phases by create_tscb; OCC's loader does not undo that
+	flip_high_m_phases(wfn);
+	return true;
+}
+
+//One SCF at lambda from the orbitals in wfn (a fresh guess unless use_guess), reported when it
+//converged; wfn holds the result
+bool XCW_wrapper::run_lambda(occ::qm::HartreeFock& hf, const double lambda, occ::qm::Wavefunction& wfn, const bool use_guess, const bool write_result) {
+	scf_solver.lambda = lambda;
+	const bool converged = scf_solver.run(hf, wfn, use_guess);
+	if (converged) report_lambda(lambda, wfn, write_result);
+	return converged;
+}
+
+//After lambda failed from last_lambda: halve the step until one converges, then try lambda again
+//from there, until lambda converges or the step falls below min_step. last_lambda and last_wfn
+//follow every intermediate step that converged
+bool XCW_wrapper::approach_lambda(occ::qm::HartreeFock& hf, const double lambda, const double min_step, double& last_lambda, occ::qm::Wavefunction& last_wfn, occ::qm::Wavefunction& wfn) {
+	double lambda_step = lambda - last_lambda;
+	bool converged = false;
+	while (!converged && lambda_step > min_step) {
+		lambda_step *= 0.5;
+		const double trial_lambda = std::min(lambda, last_lambda + lambda_step);
+		writer.log << "XCW: retrying lambda " << std::fixed << std::setprecision(8) << trial_lambda
+			<< " from converged lambda " << last_lambda << " with step " << lambda_step << std::endl;
+		std::cout << "XCW: retrying lambda " << std::fixed << std::setprecision(8) << trial_lambda
+			<< " with step " << lambda_step << std::endl;
+		occ::qm::Wavefunction trial = last_wfn;
+		if (!run_lambda(hf, trial_lambda, trial, true, trial_lambda == lambda)) continue;
+		if (trial_lambda == lambda) {
+			wfn = std::move(trial);
+			return true;
+		}
+		last_lambda = trial_lambda;
+		last_wfn = trial;
+		lambda_step = std::min(2.0 * lambda_step, lambda - last_lambda);
+		wfn = last_wfn;
+		converged = run_lambda(hf, lambda, wfn, true, true);
+	}
+	return converged;
+}
+
+//At the end of the planned scan with A^2 still falling, one more step, up to max_extra_steps
+//beyond the requested range, so a trend that never turns at most doubles the scan
+void XCW_wrapper::extend_scan(const double lambda, int& planned_steps, int& extra_steps, const int max_extra_steps) {
+	double estimated_minimum = 0.0;
+	if (!halting_minimum_beyond_scan(gaussian_halt_history_, estimated_minimum)) return;
+	std::ostringstream msg;
+	msg << std::fixed << std::setprecision(5)
+		<< "XCW: A^2 is still falling at lambda " << lambda << ", so the minimum is outside the requested range - ";
+	if (extra_steps < max_extra_steps) {
+		planned_steps++;
+		extra_steps++;
+		msg << "extending the scan to lambda " << (lambda + opt->xcw_settings.xcw_step_size)
+			<< " (extra step " << extra_steps << " of at most " << max_extra_steps << ")";
+		if (estimated_minimum > 0.0)
+			msg << ", extrapolated minimum near lambda ~= " << estimated_minimum;
+	}
+	else
+		msg << "stopping anyway, the scan has already been extended by its limit of "
+			<< max_extra_steps << " steps; raise max_value in -do_XCW to continue";
+	writer.log << msg.str() << std::endl;
+	std::cout << msg.str() << std::endl;
+}
+
+void XCW_wrapper::run() {
+	//OCC parallelises through TBB, which does not read OMP_NUM_THREADS; this makes -cpus bind OCC's part of the run too
+	occ::parallel::set_num_threads(opt->threads > 0 ? opt->threads : omp_get_max_threads());
+	occ::qm::HartreeFock hf = setup_system();
+	setup_structure_factors(hf);
+	setup_scf_integrals(hf);
+	occ::qm::Wavefunction last_wfn, prev_wfn;
+	bool has_guess = read_start_guess(last_wfn);
+	const occ::Mat S_ao = hf.compute_overlap_matrix();
 	std::cout << "More detailed output in SCF.log file..." << std::endl;
 	if (opt->xcw_settings.XWR_type == 2) {
 		std::cout << "XCW: fitting against the 1/|H|^2-weighted residual self-energy criterion "
@@ -617,56 +676,23 @@ void XCW_wrapper::run() {
 			<< "Criterion below are this weighted quantity, not the classical GoF." << std::endl;
 	}
 	SCF_log_writer::console_header(opt->xcw_settings.xcw_gaussian_halt);
-
-	// Runs the lambda steps for XCW fitting
-	auto run_lambda = [&](const double lambda, occ::qm::Wavefunction guess, const bool use_guess, const bool write_result) {
-		scf_solver.lambda = lambda;
-		const bool converged = scf_solver.run(hf, guess, use_guess);
-		if (converged) report_lambda(lambda, guess, write_result);
-		return std::make_pair(converged, guess);
-	};
+	//The lambda scan: each step starts from the orbitals of the last converged one, extrapolated
+	//along the path of the two before when asked to (-xcw_extrapolate)
 	const double min_lambda_step = opt->xcw_settings.xcw_step_size / 128.0;
 	double last_lambda = opt->xcw_settings.xcw_start_value, prev_lambda = last_lambda;
 	bool have_prev = false;
-	//The scan used to stop at max_value even when A^2 was still falling there, i.e. on the
-	//scan boundary instead of on lambda*, and only printed "extend the scan" afterwards.
-	//The perturbed steps start from converged orbitals and TRAH takes the ones that DIIS
-	//cannot, so running past the requested range is stable enough to just do it. Capped at
-	//the requested number of steps, so a trend that never curves upward at most doubles the
-	//scan rather than running away
-	int planned_steps = opt->xcw_settings.num_xcw_steps;
+	int planned_steps = opt->xcw_settings.num_xcw_steps, extra_steps = 0;
 	const int max_extra_steps = opt->xcw_settings.num_xcw_steps;
-	int extra_steps = 0;
 	for (int step = 0; step < planned_steps; step++) {
 		const double lambda = step * opt->xcw_settings.xcw_step_size + opt->xcw_settings.xcw_start_value;
-		occ::qm::Wavefunction guess = last_wfn;
+		occ::qm::Wavefunction wfn = last_wfn;
 		if (opt->xcw_extrapolate && have_prev)
-			extrapolate_orbitals(guess.mo, prev_wfn.mo, S_ao, (lambda - last_lambda) / (last_lambda - prev_lambda));
-		auto result = run_lambda(lambda, guess, has_guess, true);
-		if (!result.first && step > 0) {
-			double lambda_step = lambda - last_lambda;
-			while (!result.first && lambda_step > min_lambda_step) {
-				lambda_step *= 0.5;
-				const double trial_lambda = std::min(lambda, last_lambda + lambda_step);
-				writer.log << "XCW: retrying lambda " << std::fixed << std::setprecision(8) << trial_lambda
-					<< " from converged lambda " << last_lambda << " with step " << lambda_step << std::endl;
-				std::cout << "XCW: retrying lambda " << std::fixed << std::setprecision(8) << trial_lambda
-					<< " with step " << lambda_step << std::endl;
-				auto trial = run_lambda(trial_lambda, last_wfn, true, trial_lambda == lambda);
-				if (trial.first) {
-					if (trial_lambda == lambda) {
-						result = std::move(trial);
-						break;
-					}
-					last_lambda = trial_lambda;
-					last_wfn = trial.second;
-					lambda_step = std::min(2.0 * lambda_step, lambda - last_lambda);
-					result = run_lambda(lambda, last_wfn, true, true);
-				}
-			}
-		}
-		if (!result.first) {
-			//step 0 has no converged neighbour to continue from, so the halving loop never ran
+			extrapolate_orbitals(wfn.mo, prev_wfn.mo, S_ao, (lambda - last_lambda) / (last_lambda - prev_lambda));
+		bool converged = run_lambda(hf, lambda, wfn, has_guess, true);
+		if (!converged && step > 0)
+			converged = approach_lambda(hf, lambda, min_lambda_step, last_lambda, last_wfn, wfn);
+		if (!converged) {
+			//step 0 has no converged neighbour to continue from, so it is not retried
 			std::ostringstream why;
 			why << "XCW: unable to converge lambda " << std::fixed << std::setprecision(8) << lambda;
 			if (step == 0)
@@ -677,64 +703,34 @@ void XCW_wrapper::run() {
 			std::cout << why.str() << std::endl;
 			break;
 		}
-		//after a halving retry last_wfn/last_lambda are its last converged intermediate step
-		//the jump off the unconstrained lambda 0 is far from linear (TEMPO: extrapolating it overshoots, +4 builds)
+		//the jump off the unconstrained lambda 0 is far from linear, so it is never extrapolated
 		have_prev = has_guess && lambda > last_lambda && last_lambda != 0.0;
 		prev_wfn = std::move(last_wfn);
 		prev_lambda = last_lambda;
-		last_wfn = result.second;
+		last_wfn = wfn;
 		last_lambda = lambda;
 		has_guess = true;
-
-		//At the end of the planned scan, keep going while the minimum is still ahead
-		if (opt->xcw_settings.xcw_gaussian_halt && step + 1 == planned_steps) {
-			double estimated_minimum = 0.0;
-			if (halting_minimum_beyond_scan(gaussian_halt_history_, estimated_minimum)) {
-				std::ostringstream msg;
-				msg << std::fixed << std::setprecision(5)
-					<< "XCW: A^2 is still falling at lambda " << lambda << ", so the minimum is outside the requested range - ";
-				if (extra_steps < max_extra_steps) {
-					planned_steps++;
-					extra_steps++;
-					msg << "extending the scan to lambda " << (lambda + opt->xcw_settings.xcw_step_size)
-						<< " (extra step " << extra_steps << " of at most " << max_extra_steps << ")";
-					if (estimated_minimum > 0.0) {
-						msg << ", extrapolated minimum near lambda ~= " << estimated_minimum;
-					}
-				}
-				else {
-					msg << "stopping anyway, the scan has already been extended by its limit of "
-						<< max_extra_steps << " steps; raise max_value in -do_XCW to continue";
-				}
-				writer.log << msg.str() << std::endl;
-				std::cout << msg.str() << std::endl;
-			}
-		}
-
-		//Progress estimate every 5 lambda steps; the last step is skipped because the
-		//summary below always prints a final one
-		if (opt->xcw_settings.xcw_gaussian_halt && (step + 1) % 5 == 0 && step + 1 < planned_steps) {
+		if (opt->xcw_settings.xcw_gaussian_halt && step + 1 == planned_steps)
+			extend_scan(lambda, planned_steps, extra_steps, max_extra_steps);
+		//Progress estimate every 5 lambda steps; not at the last one, the summary below prints a final one
+		if (opt->xcw_settings.xcw_gaussian_halt && (step + 1) % 5 == 0 && step + 1 < planned_steps)
 			report_halting_progress_estimate(false);
-		}
 	}
-
-	if (opt->xcw_settings.xcw_gaussian_halt) {
+	if (opt->xcw_settings.xcw_gaussian_halt)
 		report_gaussian_halting_summary();
-	}
-
-	//Before the run ends: the writer holds a file handle and reads the resident tensor, and
-	//by now it has usually been finished for a long while - the refinement takes far longer
-	//than the write. Joining is what keeps it from outliving the process.
+	//The background writer of the I tensor holds a file and reads the resident tensor: joined
+	//before the run ends, it cannot outlive the process
 	sf.finish_i_save();
 #if defined(NOSPHERA2_USE_GPU) || defined(NOSPHERA2_USE_METAL)
+	//GPU: gives the device copy of the I tensor back
 	itensor_gpu_release();
-	I_tens.i_on_device_ = false;
+	sf.I_tens.i_on_device_ = false;
 #endif
 #ifdef NOSPHERA2_USE_GPU
+	//GPU: gives the grid blocks back
 	xcw_grid_gpu_release();
 	sf.XG.on_device = false;
 #endif
 	scf_solver.release_device();
-
 	std::cout << "Finished XCW fitting procedure." << std::endl;
 }

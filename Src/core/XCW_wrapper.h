@@ -39,6 +39,19 @@ private:
 	// Fits target's Fock build with the auxiliary basis `name`, its three-index integrals held when they fit in half of avail
 	void density_fitting(occ::qm::HartreeFock& target, const std::string& name, const char* what, const size_t avail);
 
+	// Debye-Waller and phase factors, anomalous dispersion and the I tensor (or its grid)
+	void setup_structure_factors(const occ::qm::HartreeFock& hf);
+	// The stored two-electron integrals and the density-fitted Hessian products of the SCF
+	void setup_scf_integrals(const occ::qm::HartreeFock& hf);
+	// The orbitals of an earlier run at the start lambda, when the settings ask for them
+	bool read_start_guess(occ::qm::Wavefunction& wfn);
+
+	// One SCF at lambda from the orbitals in wfn, reported when it converged
+	bool run_lambda(occ::qm::HartreeFock& hf, const double lambda, occ::qm::Wavefunction& wfn, const bool use_guess, const bool write_result);
+	// Reaches a lambda that failed in smaller steps from the last converged one
+	bool approach_lambda(occ::qm::HartreeFock& hf, const double lambda, const double min_step, double& last_lambda, occ::qm::Wavefunction& last_wfn, occ::qm::Wavefunction& wfn);
+	// Adds a step to the scan while the Gaussian halting minimum lies beyond it
+	void extend_scan(const double lambda, int& planned_steps, int& extra_steps, const int max_extra_steps);
 	// What a converged lambda step reports: the halting statistic, the table row and the tscb
 	void report_lambda(const double lambda, const occ::qm::Wavefunction& wfn, const bool write_result);
 
