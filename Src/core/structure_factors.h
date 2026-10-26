@@ -151,7 +151,7 @@ public:
 	void grid_F(const dMatrix2& D);
 	//the per-atom transform of rho(D) at the cleaned entries, [g * nc + c]; grid_F's first half and the tscb's table
 	cvec grid_sfc(const dMatrix2& D);
-	//out = Sum_r Re(pre_r I_r(mu, nu)) without forming I, what XCW_wrapper::contract_I gives
+	//out = Sum_r Re(pre_r I_r(mu, nu)) without forming I, what contract_tensor gives
 	void grid_contract(occ::Mat& out, const cvec& pre);
 
 	//The entries of a rank-N symmetric tensor stored packed in the order i <= j <= k (<= l): the powers of x, y
@@ -278,10 +278,29 @@ public:
 	size_t free_memory() const;
 	size_t df_reserved_ = 0;
 
-	// Calculates F_calc from the atomic scattering factors of every atom over hkl_enlarged
+	// F_calc from the atomic scattering factors of every atom over hkl_enlarged
 	void calc_F_calc(const cvec2& scattering_factors);
-	// Calculates F_calc from the I tensor and a density matrix
+	// F_calc from the I tensor and a density matrix
 	void calc_F_calc(I_tensor& I, const dMatrix2& D);
+	// F_calc from a density matrix, through the I tensor or on the grid as XG.mode says
+	void calc_F_calc(const dMatrix2& D);
+	// F_calc from the scattering factors of a tsc table
+	void calc_F_calc(const itsc_block& tsc);
+	// F_calc from wavefunctions, through the tsc table tsc_table computes for them
+	void calc_F_calc(std::vector<WFN>& wavefunctions, GridManager* grids, std::ostream& log);
+	// The tsc table of the wavefunctions at every entry of hkl_enlarged; grids keeps the integration grids for the next call
+	itsc_block tsc_table(std::vector<WFN>& wavefunctions, GridManager* grids, std::ostream& log);
+
+	// out = Sum_r Re(pre_r I_r(mu,nu)) over the fit set, the walk the perturbation and its response
+	// share; nmo x nmo, symmetric, without any prefactor. On the grid or through the I tensor as XG.mode says
+	void contract_I(occ::Mat& out, const cvec& pre);
+	// contract_I's walk over the tensor itself
+	void contract_tensor(occ::Mat& out, const cvec& pre);
+	// The perturbation matrix: the derivative of the fit criterion with respect to the density matrix, nmo rows per spin block
+	void perturbation(occ::Mat& perturb, const bool unrestricted, std::ostream& log);
+	// lambda times the change of the perturbation matrix for a change dD_eff of the density, the scale
+	// moving along; leaves F_calc and the scale as they were
+	occ::Mat perturbation_response(const dMatrix2& dD_eff, const double lambda);
 
 	// Evaluates the scaling factor for |F_calc| by least squares fitting, and with it the
 	// extinction coefficients when a model is being refined

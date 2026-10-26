@@ -2081,3 +2081,248 @@ void structure_factors::calc_F_calc(I_tensor& I, const dMatrix2& D) {
 	}
 	if (!io_error.empty()) throw std::runtime_error(io_error);
 }
+
+//F_calc of D through the I tensor or on the grid, see xcw_grid; mode 2 runs both and prints how far
+//the grid lands from the tensor
+void structure_factors::calc_F_calc(const dMatrix2& D) {
+	if (XG.mode == 1) { grid_F(D); return; }
+	calc_F_calc(I_tens, D);
+	if (XG.mode != 2) return;
+	const cvec tensor = scatter_data.F_calc;
+	grid_F(D);
+	double d = 0, m = 0;
+	for (size_t r = 0; r < tensor.size(); r++) { d = std::max(d, std::abs(tensor[r] - scatter_data.F_calc[r])); m = std::max(m, std::abs(tensor[r])); }
+	std::cout << "XCW grid check: max |F_grid - F_tensor| " << std::scientific << d << " of max |F| " << m << std::defaultfloat << std::endl;
+	scatter_data.F_calc = tensor;
+}
+
+//F_calc from the scattering factors of a tsc table: rows matched by hkl, scatterers by label, by
+//position where the labels differ
+void structure_factors::calc_F_calc(const itsc_block& tsc) {
+	std::map<i3, size_t> row_of;
+	for (size_t r = 0; r < tsc.reflection_size(); r++)
+		row_of[{ (int)tsc.get_index(0, r), (int)tsc.get_index(1, r), (int)tsc.get_index(2, r) }] = r;
+	const svec names = tsc.get_scatterers_string();
+	cvec2 sfs(model_data.ncen);
+	for (int at = 0; at < model_data.ncen; at++) {
+		size_t s = std::find(names.begin(), names.end(), asym_atoms[at].label) - names.begin();
+		if (s == names.size()) {
+			if (at == 0) std::cout << "F_calc from a tsc table: scatterer " << names[0] << " for " << asym_atoms[0].label << ", matched by position" << std::endl;
+			s = at;
+		}
+		for (const i3& h : scatter_data.hkl_enlarged)
+			sfs[at].push_back(tsc.get_sf_for_scatterer(s)[row_of.at(h)]);
+	}
+	calc_F_calc(sfs);
+}
+
+//The tsc table of the wavefunctions at every entry of hkl_enlarged, by the usual tsc route
+itsc_block structure_factors::tsc_table(std::vector<WFN>& wavefunctions, GridManager* grids, std::ostream& log) {
+	svec known_atoms;
+	opt->m_hkl_list = scatter_data.hkl_enlarged;
+	opt->grid_cache = grids;
+	return calculate_scattering_factors<itsc_block, std::vector<WFN>&>(*opt, wavefunctions, log, known_atoms, 0, &k_pt);
+}
+
+void structure_factors::calc_F_calc(std::vector<WFN>& wavefunctions, GridManager* grids, std::ostream& log) {
+	calc_F_calc(tsc_table(wavefunctions, grids, log));
+}
+
+void structure_factors::perturbation(occ::Mat& perturb, const bool unrestricted, std::ostream& log) {
+	ensure_inv_H2_weights();
+
+	//The four (XWR_type, refine_against) combinations differ only in the per-reflection
+	//scalar and the prefactor, so one walk over I serves all of them
+	const int xwr = static_cast<int>(opt->xcw_settings.XWR_type), ref = static_cast<int>(opt->xcw_settings.refine_against);
+	const bool against_F2 = (ref == 2);
+	const bool weighted = (xwr == 2);
+	const bool valid = (xwr == 1 || xwr == 2) && (ref == 1 || ref == 2);
+	if (!valid) log << "Invalid refinement option" << std::endl;
+	const double scale_sq = scatter_data.scale * scatter_data.scale;
+	const double prefactor = against_F2
+		? 4.0 * scale_sq / (model_data.nr_fit - n_params())
+		: 2.0 * scatter_data.scale / (model_data.nr_fit - n_params());
+
+	cvec pre(model_data.nr);
+#pragma omp parallel for
+	for (int r = 0; r < model_data.nr; r++) {
+		if (!valid || !scatter_data.hkl_mask[r]) continue;
+		cdouble precompute;
+		//with extinction the model is I = y |Fc|^2, so the residual carries sqrt(y)|Fc| and the
+		//carrier d/dD picks up dI/d|Fc|^2 (F^2) or d(sqrt(y)|Fc|)/d|Fc| (F); both are 1 without
+		//a model, and the expressions below are then exactly the ones this always used
+		if (against_F2) {
+			const double I = ext_y(r) * std::pow(std::abs(scatter_data.F_calc[r]), 2);
+			precompute = ext_g(r) * std::conj(scatter_data.F_calc[r]) * (scale_sq * I - scatter_data.F_obs2[r]) / (scatter_data.sigma_obs2[r] * scatter_data.sigma_obs2[r]);
+		}
+		else {
+			const double F_calc_abs = std::abs(scatter_data.F_calc[r]);
+			precompute = ext_m(r) * std::conj(scatter_data.F_calc[r]) * (scatter_data.scale * ext_sqrt_y(r) * F_calc_abs - scatter_data.abs_F_obs[r]) / (scatter_data.sigma_obs[r] * scatter_data.sigma_obs[r] * F_calc_abs);
+		}
+		if (weighted) precompute *= inv_H2_[r];
+		pre[r] = precompute;
+	}
+	contract_I(perturb, pre);
+	perturb *= prefactor;
+	if (unrestricted) {
+		perturb.conservativeResize(2 * model_data.nmo, Eigen::NoChange);
+		perturb.bottomRows(model_data.nmo) = perturb.topRows(model_data.nmo);
+	}
+	//closing function
+}
+
+occ::Mat structure_factors::perturbation_response(const dMatrix2& dD_eff, const double lambda) {
+	//dF_r = Sum c I_r dD_eff: calc_F_calc's walk with the fixed part zeroed
+	const cvec F0 = scatter_data.F_calc, fixed = scatter_data.anom_correction;
+	std::fill(scatter_data.anom_correction.begin(), scatter_data.anom_correction.end(), cdouble(0.0, 0.0));
+	calc_F_calc(dD_eff);
+	const cvec dFr = scatter_data.F_calc;
+	scatter_data.F_calc = F0;
+	scatter_data.anom_correction = fixed;
+	//the scale's response from the weighted least-squares scale of eval_scale
+	const bool against_F2 = opt->xcw_settings.refine_against == 2, weighted = opt->xcw_settings.XWR_type == 2;
+	const double k = scatter_data.scale, s = k * k;
+	const int chunk = 128, nchunk = (model_data.nr + chunk - 1) / chunk;
+	vec dnum(nchunk), dden(nchunk), den(nchunk);
+#pragma omp parallel for schedule(static)
+	for (int ch = 0; ch < nchunk; ch++) {
+		for (int r = ch * chunk; r < std::min((ch + 1) * chunk, model_data.nr); r++) {
+			if (!scatter_data.hkl_mask[r]) continue;
+			//ponytail: the extinction shape is frozen over the step (dy/d|Fc| dropped), so
+			//sqrt(y)|Fc| and m d|Fc| reproduce I and dI exactly but their own curvature is
+			//neglected. Only the Hessian's step proposal degrades - TRAH accepts on the
+			//exact energy rebuild_at returns, and perturbation's gradient stays exact.
+			const double w = weighted ? inv_H2_[r] : 1.0, Fa = ext_sqrt_y(r) * std::abs(F0[r]);
+			const double dFa = std::abs(F0[r]) > 0 ? ext_m(r) * std::real(std::conj(F0[r]) * dFr[r]) / std::abs(F0[r]) : 0.0;
+			if (against_F2) {
+				const double wi = w / (scatter_data.sigma_obs2[r] * scatter_data.sigma_obs2[r]);
+				dnum[ch] += wi * 2.0 * Fa * dFa * scatter_data.F_obs2[r];
+				dden[ch] += wi * 4.0 * Fa * Fa * Fa * dFa;
+				den[ch] += wi * Fa * Fa * Fa * Fa;
+			}
+			else {
+				const double wi = w / (scatter_data.sigma_obs[r] * scatter_data.sigma_obs[r]);
+				dnum[ch] += wi * dFa * scatter_data.F_obs[r];
+				dden[ch] += wi * 2.0 * Fa * dFa;
+				den[ch] += wi * Fa * Fa;
+			}
+		}
+	}
+	double dnum_sum = 0, dden_sum = 0, den_sum = 0;
+	for (int ch = 0; ch < nchunk; ch++) { dnum_sum += dnum[ch]; dden_sum += dden[ch]; den_sum += den[ch]; }
+	//F: dk = (dN - k dD) / D; F^2: ds = (dN - s dD) / D for s = k^2
+	const double dscale = den_sum != 0 ? (dnum_sum - (against_F2 ? s : k) * dden_sum) / den_sum : 0.0;
+	//d(q_r) for q_r = prefactor's scale power times perturbation's scalar, both moving:
+	//F: q = w conj(F) (k^2 - k Fo / |F|) / sigma^2; F^2: q = w conj(F) (s^2 |F|^2 - s Fo^2) / sigma_I^2
+	cvec dq(model_data.nr);
+#pragma omp parallel for
+	for (int r = 0; r < model_data.nr; r++) {
+		if (!scatter_data.hkl_mask[r]) continue;
+		const double w = weighted ? inv_H2_[r] : 1.0, Fm = std::abs(F0[r]);
+		if (Fm == 0) continue;
+		//as above: the model amplitude is sqrt(y)|Fc| and its response m d|Fc|, with the
+		//shape frozen. The carrier conj(F) keeps perturbation's chain factor.
+		const double Fa = ext_sqrt_y(r) * Fm, dFa = ext_m(r) * std::real(std::conj(F0[r]) * dFr[r]) / Fm;
+		const cdouble carrier = (against_F2 ? ext_g(r) : ext_m(r)) * std::conj(F0[r]);
+		const cdouble dcarrier = (against_F2 ? ext_g(r) : ext_m(r)) * std::conj(dFr[r]);
+		if (against_F2) {
+			const double wi = w / (scatter_data.sigma_obs2[r] * scatter_data.sigma_obs2[r]), Fo2 = scatter_data.F_obs2[r];
+			dq[r] = wi * (dcarrier * (s * s * Fa * Fa - s * Fo2)
+				+ carrier * (2.0 * s * dscale * Fa * Fa + 2.0 * s * s * Fa * dFa - dscale * Fo2));
+		}
+		else {
+			const double wi = w / (scatter_data.sigma_obs[r] * scatter_data.sigma_obs[r]), Fo = scatter_data.abs_F_obs[r];
+			dq[r] = wi * (dcarrier * (k * k * ext_sqrt_y(r) - k * Fo / Fm)
+				+ carrier * (dscale * (2.0 * k * ext_sqrt_y(r) - Fo / Fm) + k * Fo * std::real(std::conj(F0[r]) * dFr[r]) / (Fm * Fm * Fm)));
+		}
+	}
+	occ::Mat dP;
+	contract_I(dP, dq);
+	dP *= (against_F2 ? 4.0 : 2.0) / (model_data.nr_fit - n_params()) * lambda;
+	return dP;
+}
+
+void structure_factors::contract_I(occ::Mat& out, const cvec& pre) {
+	if (XG.mode == 1) { grid_contract(out, pre); return; }
+	if (XG.mode == 2) {
+		occ::Mat grid;
+		grid_contract(grid, pre);
+		contract_tensor(out, pre);
+		std::cout << "XCW grid check: max |P_grid - P_tensor| " << std::scientific << (grid - out).cwiseAbs().maxCoeff()
+			<< " of max |P| " << out.cwiseAbs().maxCoeff() << std::defaultfloat << std::endl;
+		return;
+	}
+	contract_tensor(out, pre);
+}
+
+void structure_factors::contract_tensor(occ::Mat& out, const cvec& pre) {
+	out.setZero(model_data.nmo, model_data.nmo);
+	const int step = std::max(1, I_tens.i_streamed_ ? I_tens.i_window_ : model_data.nr);
+	bool on_device = false;
+#if defined(NOSPHERA2_USE_GPU) || defined(NOSPHERA2_USE_METAL)
+	if (I_tens.i_on_device_) {
+		vec dev(I_tens.i_compact_);
+		err_checkf(itensor_gpu_cols(pre.data(), dev.data()), "I tensor walk on the device failed", std::cout);
+		for (size_t k = 0; k < I_tens.i_compact_; k++) out(I_tens.i_pair_mu_[k], I_tens.i_pair_nu_[k]) = dev[k];
+		on_device = true;
+	}
+#endif
+	// See calc_F_calc: an exception must not leave an OpenMP structured block.
+	std::string io_error;
+	//One region, one accumulator per thread, one reduction, however many windows the
+	//budget implies: an nmo x nmo matrix per window is what made narrow windows dear
+	std::vector<occ::Mat> parts(omp_get_max_threads());
+#pragma omp parallel if (!on_device)
+	{
+		occ::Mat local = occ::Mat::Zero(model_data.nmo, model_data.nmo);
+		double* local_ptr = local.data();
+		for (int r0 = 0; !on_device && r0 < model_data.nr; r0 += step) {
+			const int r1 = std::min(r0 + step, model_data.nr);
+			if (I_tens.i_streamed_) {
+#pragma omp single
+				{
+					try { I_tens.i_file_.load(r0, r1); }
+					catch (const std::exception& e) { io_error = e.what(); }
+				}
+			}
+			//No nowait: the next window's read must not start until every thread has read this one
+#pragma omp for
+			for (int r = r0; r < r1; r++) {
+				if (!io_error.empty()) continue;
+				const cdouble precompute = pre[r];
+				if (precompute == cdouble(0.0, 0.0)) continue;
+				//As in calc_F_calc: one walk over whichever element type is resident, with
+				//the accumulation in double either way.
+				auto accumulate = [&](const auto* I_r) {
+					const int* pmu = I_tens.i_pair_mu_.data();
+					const int* pnu = I_tens.i_pair_nu_.data();
+					for (size_t k = 0; k < I_tens.i_compact_; k++) {
+						const double vr = static_cast<double>(I_r[k].real());
+						const double vi = static_cast<double>(I_r[k].imag());
+						local_ptr[pnu[k] * model_data.nmo + pmu[k]] += precompute.real() * vr - precompute.imag() * vi;
+					}
+				};
+				if (I_tens.i_float_) accumulate(I_tens.i_block32(r)); else accumulate(I_tens.i_block(r));
+			}
+		}
+		parts[omp_get_thread_num()].swap(local);
+	}
+	if (!io_error.empty()) throw std::runtime_error(io_error);
+	//The partials outweigh the matrix many times over, so their sum is parallel too
+	if (!on_device) {
+#pragma omp parallel for schedule(static)
+		for (int mu = 0; mu < model_data.nmo; mu++) {
+			for (int nu = mu; nu < model_data.nmo; nu++) {
+				double sum = 0.0;
+				for (int t = 0; t < static_cast<int>(parts.size()); t++)
+					if (parts[t].size() != 0) sum += parts[t](mu, nu);
+				out(mu, nu) = sum;
+			}
+		}
+	}
+	for (int mu = 0; mu < model_data.nmo; mu++) {
+		for (int nu = mu + 1; nu < model_data.nmo; nu++) {
+			out(nu, mu) = out(mu, nu);
+		}
+	}
+}

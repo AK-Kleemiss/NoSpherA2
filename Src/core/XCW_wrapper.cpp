@@ -245,24 +245,18 @@ static void extrapolate_orbitals(occ::qm::MolecularOrbitals& mo, const occ::qm::
 	mo.update_density_matrix();
 }
 
-//F_calc of D through the I tensor or on the grid, see structure_factors::xcw_grid; mode 2 runs
-//both and prints how far the grid lands from the tensor
-static void calc_F(structure_factors& sf, structure_factors::I_tensor& I, const dMatrix2& D) {
-	if (sf.XG.mode == 1) { sf.grid_F(D); return; }
-	sf.calc_F_calc(I, D);
-	if (sf.XG.mode != 2) return;
-	const cvec tensor = sf.scatter_data.F_calc;
-	sf.grid_F(D);
-	double d = 0, m = 0;
-	for (size_t r = 0; r < tensor.size(); r++) { d = std::max(d, std::abs(tensor[r] - sf.scatter_data.F_calc[r])); m = std::max(m, std::abs(tensor[r])); }
-	std::cout << "XCW grid check: max |F_grid - F_tensor| " << std::scientific << d << " of max |F| " << m << std::defaultfloat << std::endl;
-	sf.scatter_data.F_calc = tensor;
-}
-
 void XCW_wrapper::evaluate(const dMatrix2& dm_eff) {
-	calc_F(sf, *I_tens, dm_eff);
+	sf.calc_F_calc(dm_eff);
 	sf.eval_scale();
 	sf.calc_criteria();
+}
+
+void XCW_wrapper::perturbation(occ::Mat& perturb, const bool unrestricted) {
+	sf.perturbation(perturb, unrestricted, writer.log);
+}
+
+occ::Mat XCW_wrapper::perturbation_response(const dMatrix2& dD_eff, const double lambda) {
+	return sf.perturbation_response(dD_eff, lambda);
 }
 
 fit_quality XCW_wrapper::quality() const {
@@ -280,206 +274,7 @@ void XCW_wrapper::restore_state() {
 }
 
 bool XCW_wrapper::on_device() const {
-	return I_tens->i_on_device_ || sf.XG.on_device;
-}
-
-void XCW_wrapper::perturbation(occ::Mat& perturb, const bool unrestricted) {
-	sf.ensure_inv_H2_weights();
-
-	//The four (XWR_type, refine_against) combinations differ only in the per-reflection
-	//scalar and the prefactor, so one walk over I serves all of them
-	const int xwr = static_cast<int>(opt->xcw_settings.XWR_type), ref = static_cast<int>(opt->xcw_settings.refine_against);
-	const bool against_F2 = (ref == 2);
-	const bool weighted = (xwr == 2);
-	const bool valid = (xwr == 1 || xwr == 2) && (ref == 1 || ref == 2);
-	if (!valid) writer.log << "Invalid refinement option" << std::endl;
-	const double scale_sq = sf.scatter_data.scale * sf.scatter_data.scale;
-	const double prefactor = against_F2
-		? 4.0 * scale_sq / (sf.model_data.nr_fit - sf.n_params())
-		: 2.0 * sf.scatter_data.scale / (sf.model_data.nr_fit - sf.n_params());
-
-	cvec pre(sf.model_data.nr);
-#pragma omp parallel for
-	for (int r = 0; r < sf.model_data.nr; r++) {
-		if (!valid || !sf.scatter_data.hkl_mask[r]) continue;
-		cdouble precompute;
-		//with extinction the model is I = y |Fc|^2, so the residual carries sqrt(y)|Fc| and the
-		//carrier d/dD picks up dI/d|Fc|^2 (F^2) or d(sqrt(y)|Fc|)/d|Fc| (F); both are 1 without
-		//a model, and the expressions below are then exactly the ones this always used
-		if (against_F2) {
-			const double I = sf.ext_y(r) * std::pow(std::abs(sf.scatter_data.F_calc[r]), 2);
-			precompute = sf.ext_g(r) * std::conj(sf.scatter_data.F_calc[r]) * (scale_sq * I - sf.scatter_data.F_obs2[r]) / (sf.scatter_data.sigma_obs2[r] * sf.scatter_data.sigma_obs2[r]);
-		}
-		else {
-			const double F_calc_abs = std::abs(sf.scatter_data.F_calc[r]);
-			precompute = sf.ext_m(r) * std::conj(sf.scatter_data.F_calc[r]) * (sf.scatter_data.scale * sf.ext_sqrt_y(r) * F_calc_abs - sf.scatter_data.abs_F_obs[r]) / (sf.scatter_data.sigma_obs[r] * sf.scatter_data.sigma_obs[r] * F_calc_abs);
-		}
-		if (weighted) precompute *= sf.inv_H2_[r];
-		pre[r] = precompute;
-	}
-	contract_I(perturb, pre);
-	perturb *= prefactor;
-	if (unrestricted) {
-		perturb.conservativeResize(2 * sf.model_data.nmo, Eigen::NoChange);
-		perturb.bottomRows(sf.model_data.nmo) = perturb.topRows(sf.model_data.nmo);
-	}
-	//closing function
-}
-
-occ::Mat XCW_wrapper::perturbation_response(const dMatrix2& dD_eff, const double lambda) {
-	//dF_r = Sum c I_r dD_eff: calc_F_calc's walk with the fixed part zeroed
-	const cvec F0 = sf.scatter_data.F_calc, fixed = sf.scatter_data.anom_correction;
-	std::fill(sf.scatter_data.anom_correction.begin(), sf.scatter_data.anom_correction.end(), cdouble(0.0, 0.0));
-	calc_F(sf, *I_tens, dD_eff);
-	const cvec dFr = sf.scatter_data.F_calc;
-	sf.scatter_data.F_calc = F0;
-	sf.scatter_data.anom_correction = fixed;
-	//the scale's response from the weighted least-squares scale of eval_scale
-	const bool against_F2 = opt->xcw_settings.refine_against == 2, weighted = opt->xcw_settings.XWR_type == 2;
-	const double k = sf.scatter_data.scale, s = k * k;
-	const int chunk = 128, nchunk = (sf.model_data.nr + chunk - 1) / chunk;
-	vec dnum(nchunk), dden(nchunk), den(nchunk);
-#pragma omp parallel for schedule(static)
-	for (int ch = 0; ch < nchunk; ch++) {
-		for (int r = ch * chunk; r < std::min((ch + 1) * chunk, sf.model_data.nr); r++) {
-			if (!sf.scatter_data.hkl_mask[r]) continue;
-			//ponytail: the extinction shape is frozen over the step (dy/d|Fc| dropped), so
-			//sqrt(y)|Fc| and m d|Fc| reproduce I and dI exactly but their own curvature is
-			//neglected. Only the Hessian's step proposal degrades - TRAH accepts on the
-			//exact energy rebuild_at returns, and perturbation's gradient stays exact.
-			const double w = weighted ? sf.inv_H2_[r] : 1.0, Fa = sf.ext_sqrt_y(r) * std::abs(F0[r]);
-			const double dFa = std::abs(F0[r]) > 0 ? sf.ext_m(r) * std::real(std::conj(F0[r]) * dFr[r]) / std::abs(F0[r]) : 0.0;
-			if (against_F2) {
-				const double wi = w / (sf.scatter_data.sigma_obs2[r] * sf.scatter_data.sigma_obs2[r]);
-				dnum[ch] += wi * 2.0 * Fa * dFa * sf.scatter_data.F_obs2[r];
-				dden[ch] += wi * 4.0 * Fa * Fa * Fa * dFa;
-				den[ch] += wi * Fa * Fa * Fa * Fa;
-			}
-			else {
-				const double wi = w / (sf.scatter_data.sigma_obs[r] * sf.scatter_data.sigma_obs[r]);
-				dnum[ch] += wi * dFa * sf.scatter_data.F_obs[r];
-				dden[ch] += wi * 2.0 * Fa * dFa;
-				den[ch] += wi * Fa * Fa;
-			}
-		}
-	}
-	double dnum_sum = 0, dden_sum = 0, den_sum = 0;
-	for (int ch = 0; ch < nchunk; ch++) { dnum_sum += dnum[ch]; dden_sum += dden[ch]; den_sum += den[ch]; }
-	//F: dk = (dN - k dD) / D; F^2: ds = (dN - s dD) / D for s = k^2
-	const double dscale = den_sum != 0 ? (dnum_sum - (against_F2 ? s : k) * dden_sum) / den_sum : 0.0;
-	//d(q_r) for q_r = prefactor's scale power times perturbation's scalar, both moving:
-	//F: q = w conj(F) (k^2 - k Fo / |F|) / sigma^2; F^2: q = w conj(F) (s^2 |F|^2 - s Fo^2) / sigma_I^2
-	cvec dq(sf.model_data.nr);
-#pragma omp parallel for
-	for (int r = 0; r < sf.model_data.nr; r++) {
-		if (!sf.scatter_data.hkl_mask[r]) continue;
-		const double w = weighted ? sf.inv_H2_[r] : 1.0, Fm = std::abs(F0[r]);
-		if (Fm == 0) continue;
-		//as above: the model amplitude is sqrt(y)|Fc| and its response m d|Fc|, with the
-		//shape frozen. The carrier conj(F) keeps perturbation's chain factor.
-		const double Fa = sf.ext_sqrt_y(r) * Fm, dFa = sf.ext_m(r) * std::real(std::conj(F0[r]) * dFr[r]) / Fm;
-		const cdouble carrier = (against_F2 ? sf.ext_g(r) : sf.ext_m(r)) * std::conj(F0[r]);
-		const cdouble dcarrier = (against_F2 ? sf.ext_g(r) : sf.ext_m(r)) * std::conj(dFr[r]);
-		if (against_F2) {
-			const double wi = w / (sf.scatter_data.sigma_obs2[r] * sf.scatter_data.sigma_obs2[r]), Fo2 = sf.scatter_data.F_obs2[r];
-			dq[r] = wi * (dcarrier * (s * s * Fa * Fa - s * Fo2)
-				+ carrier * (2.0 * s * dscale * Fa * Fa + 2.0 * s * s * Fa * dFa - dscale * Fo2));
-		}
-		else {
-			const double wi = w / (sf.scatter_data.sigma_obs[r] * sf.scatter_data.sigma_obs[r]), Fo = sf.scatter_data.abs_F_obs[r];
-			dq[r] = wi * (dcarrier * (k * k * sf.ext_sqrt_y(r) - k * Fo / Fm)
-				+ carrier * (dscale * (2.0 * k * sf.ext_sqrt_y(r) - Fo / Fm) + k * Fo * std::real(std::conj(F0[r]) * dFr[r]) / (Fm * Fm * Fm)));
-		}
-	}
-	occ::Mat dP;
-	contract_I(dP, dq);
-	dP *= (against_F2 ? 4.0 : 2.0) / (sf.model_data.nr_fit - sf.n_params()) * lambda;
-	return dP;
-}
-
-void XCW_wrapper::contract_I(occ::Mat& out, const cvec& pre) {
-	if (sf.XG.mode == 1) { sf.grid_contract(out, pre); return; }
-	if (sf.XG.mode == 2) {
-		occ::Mat grid;
-		sf.grid_contract(grid, pre);
-		contract_tensor(out, pre);
-		std::cout << "XCW grid check: max |P_grid - P_tensor| " << std::scientific << (grid - out).cwiseAbs().maxCoeff()
-			<< " of max |P| " << out.cwiseAbs().maxCoeff() << std::defaultfloat << std::endl;
-		return;
-	}
-	contract_tensor(out, pre);
-}
-
-void XCW_wrapper::contract_tensor(occ::Mat& out, const cvec& pre) {
-	out.setZero(sf.model_data.nmo, sf.model_data.nmo);
-	const int step = std::max(1, I_tens->i_streamed_ ? I_tens->i_window_ : sf.model_data.nr);
-	bool on_device = false;
-#if defined(NOSPHERA2_USE_GPU) || defined(NOSPHERA2_USE_METAL)
-	if (I_tens->i_on_device_) {
-		vec dev(I_tens->i_compact_);
-		err_checkf(itensor_gpu_cols(pre.data(), dev.data()), "I tensor walk on the device failed", std::cout);
-		for (size_t k = 0; k < I_tens->i_compact_; k++) out(I_tens->i_pair_mu_[k], I_tens->i_pair_nu_[k]) = dev[k];
-		on_device = true;
-	}
-#endif
-	// See calc_F_calc: an exception must not leave an OpenMP structured block.
-	std::string io_error;
-	//One region, one accumulator per thread, one reduction, however many windows the
-	//budget implies: an nmo x nmo matrix per window is what made narrow windows dear
-	std::vector<occ::Mat> parts(omp_get_max_threads());
-#pragma omp parallel if (!on_device)
-	{
-		occ::Mat local = occ::Mat::Zero(sf.model_data.nmo, sf.model_data.nmo);
-		double* local_ptr = local.data();
-		for (int r0 = 0; !on_device && r0 < sf.model_data.nr; r0 += step) {
-			const int r1 = std::min(r0 + step, sf.model_data.nr);
-			if (I_tens->i_streamed_) {
-#pragma omp single
-				{
-					try { I_tens->i_file_.load(r0, r1); }
-					catch (const std::exception& e) { io_error = e.what(); }
-				}
-			}
-			//No nowait: the next window's read must not start until every thread has read this one
-#pragma omp for
-			for (int r = r0; r < r1; r++) {
-				if (!io_error.empty()) continue;
-				const cdouble precompute = pre[r];
-				if (precompute == cdouble(0.0, 0.0)) continue;
-				//As in calc_F_calc: one walk over whichever element type is resident, with
-				//the accumulation in double either way.
-				auto accumulate = [&](const auto* I_r) {
-					const int* pmu = I_tens->i_pair_mu_.data();
-					const int* pnu = I_tens->i_pair_nu_.data();
-					for (size_t k = 0; k < I_tens->i_compact_; k++) {
-						const double vr = static_cast<double>(I_r[k].real());
-						const double vi = static_cast<double>(I_r[k].imag());
-						local_ptr[pnu[k] * sf.model_data.nmo + pmu[k]] += precompute.real() * vr - precompute.imag() * vi;
-					}
-				};
-				if (I_tens->i_float_) accumulate(I_tens->i_block32(r)); else accumulate(I_tens->i_block(r));
-			}
-		}
-		parts[omp_get_thread_num()].swap(local);
-	}
-	if (!io_error.empty()) throw std::runtime_error(io_error);
-	//The partials outweigh the matrix many times over, so their sum is parallel too
-	if (!on_device) {
-#pragma omp parallel for schedule(static)
-		for (int mu = 0; mu < sf.model_data.nmo; mu++) {
-			for (int nu = mu; nu < sf.model_data.nmo; nu++) {
-				double sum = 0.0;
-				for (int t = 0; t < static_cast<int>(parts.size()); t++)
-					if (parts[t].size() != 0) sum += parts[t](mu, nu);
-				out(mu, nu) = sum;
-			}
-		}
-	}
-	for (int mu = 0; mu < sf.model_data.nmo; mu++) {
-		for (int nu = mu + 1; nu < sf.model_data.nmo; nu++) {
-			out(nu, mu) = out(mu, nu);
-		}
-	}
+	return sf.I_tens.i_on_device_ || sf.XG.on_device;
 }
 
 //The sign of f(+-3), g(+-3) and g(+-4) in every orbital, in OCC's own m = -l..l order,
@@ -542,17 +337,7 @@ void XCW_wrapper::create_tscb(const occ::qm::Wavefunction& wfn, const double& la
 		result = itsc_block(table, tscb_scat_, tscb_hkl_);
 	}
 	else {
-		svec known_atoms_;
-		opt->m_hkl_list = sf.scatter_data.hkl_enlarged;
-		opt->grid_cache = &tsc_grids;
-		result.append(calculate_scattering_factors<itsc_block, std::vector<WFN>&>(
-			*opt,
-			sf_wave_vec,
-			writer.log,
-			known_atoms_,
-			0,
-			&sf.k_pt),
-			writer.log);
+		result.append(sf.tsc_table(sf_wave_vec, &tsc_grids, writer.log), writer.log);
 		//first step on the grid route: learn the table's layout, each scatterer's atom by the closest grid column
 		if (grid_tscb) {
 			std::map<i3, int> e_of;
@@ -581,7 +366,7 @@ void XCW_wrapper::create_tscb(const occ::qm::Wavefunction& wfn, const double& la
 				}
 				worst = std::max(worst, dmax / fmax);
 			}
-			//ponytail: 1e-2 only catches a wrong layout; the grid-vs-tsc agreement itself is the 5e-5 of the F check
+			//1e-2 only catches a wrong layout; how well grid and tsc agree is what NOSPHERA2_XCW_GRID_FCHECK measures
 			ok = ok && worst < 1e-2;
 			std::cout << "XCW grid tscb: max |f_grid - f_tsc| / max |f| " << std::scientific << std::setprecision(2) << worst << std::defaultfloat
 				<< (ok ? ", later steps write the tscb from the grid" : ", layout not matched, the tsc route stays") << std::endl;
@@ -593,26 +378,12 @@ void XCW_wrapper::create_tscb(const occ::qm::Wavefunction& wfn, const double& la
 			}
 		}
 	}
-	//NOSPHERA2_XCW_GRID_FCHECK: F_calc from these grid scattering factors against the I-tensor walk at the same D,
-	//the forward half of an XCW without the I tensor. Rows are matched by hkl, scatterers by label.
+	//NOSPHERA2_XCW_GRID_FCHECK: F_calc from the scattering factors of this table against the one the SCF
+	//used at the same density
 	if (tuning("NOSPHERA2_XCW_GRID_FCHECK")) {
 		const double fwd_ms = get_msec(fwd_t0, get_time());
-		std::map<i3, size_t> row_of;
-		for (size_t r = 0; r < result.reflection_size(); r++)
-			row_of[{ (int)result.get_index(0, r), (int)result.get_index(1, r), (int)result.get_index(2, r) }] = r;
-		const svec names = result.get_scatterers_string();
-		cvec2 sfs(sf.model_data.ncen);
-		for (int at = 0; at < sf.model_data.ncen; at++) {
-			size_t s = std::find(names.begin(), names.end(), sf.asym_atoms[at].label) - names.begin();
-			if (s == names.size()) {
-				if (at == 0) std::cout << "grid F check: scatterer " << names[0] << " for " << sf.asym_atoms[0].label << ", matched by position" << std::endl;
-				s = at;
-			}
-			for (const i3& h : sf.scatter_data.hkl_enlarged)
-				sfs[at].push_back(result.get_sf_for_scatterer(s)[row_of.at(h)]);
-		}
 		const cvec F_I = sf.scatter_data.F_calc;
-		sf.calc_F_calc(sfs);
+		sf.calc_F_calc(result);
 		double dmax = 0.0, fmax = 0.0, num = 0.0, den = 0.0;
 		for (size_t r = 0; r < F_I.size(); r++) {
 			const double d = std::abs(sf.scatter_data.F_calc[r] - F_I[r]);
@@ -773,22 +544,22 @@ void XCW_wrapper::run() {
 	sf.set_phases();
 	sf.set_anom();
 	// Computes the I tensor
-	I_tens = &sf.eval_I(hf.aobasis());
+	structure_factors::I_tensor& I_tens = sf.eval_I(hf.aobasis());
 #if defined(NOSPHERA2_USE_GPU) || defined(NOSPHERA2_USE_METAL)
 	//The two walks of an iteration read the whole tensor and the host is bound by its memory
 	//bandwidth doing so; the device reads it several times faster. The host copy stays for
 	//the background writer.
-	if (opt->gpu_itensor && opt->use_gpu && !I_tens->i_streamed_ && sf.XG.mode != 1) {
-		I_tens->i_on_device_ = I_tens->i_float_ ? itensor_gpu_hold(I_tens->I32.data(), sf.model_data.nr, static_cast<int>(I_tens->i_compact_))
-			: itensor_gpu_hold(I_tens->I.data(), sf.model_data.nr, static_cast<int>(I_tens->i_compact_));
+	if (opt->gpu_itensor && opt->use_gpu && !I_tens.i_streamed_ && sf.XG.mode != 1) {
+		I_tens.i_on_device_ = I_tens.i_float_ ? itensor_gpu_hold(I_tens.I32.data(), sf.model_data.nr, static_cast<int>(I_tens.i_compact_))
+			: itensor_gpu_hold(I_tens.I.data(), sf.model_data.nr, static_cast<int>(I_tens.i_compact_));
 		if (!(opt->no_date))
 			std::cerr << "GPU in use: XCW structure factors and perturbation on "
-			<< (I_tens->i_on_device_ ? "the device" : "the CPU - device unavailable or the tensor too large") << std::endl;
+			<< (I_tens.i_on_device_ ? "the device" : "the CPU - device unavailable or the tensor too large") << std::endl;
 	}
 #endif
 #ifdef NOSPHERA2_USE_GPU
 	//The grid runner's two block GEMMs; the transform between them stays on the host. Single precision there, so not under i_double
-	if (opt->gpu_itensor && opt->use_gpu && sf.XG.mode == 1 && !I_tens->tensor_double) {
+	if (opt->gpu_itensor && opt->use_gpu && sf.XG.mode == 1 && !I_tens.tensor_double) {
 		const bool held = sf.hold_grid_gpu();
 		if (!(opt->no_date))
 			std::cerr << "GPU in use: XCW grid blocks on " << (held ? "the device" : "the CPU - device unavailable or the blocks too large") << std::endl;
@@ -957,7 +728,7 @@ void XCW_wrapper::run() {
 	sf.finish_i_save();
 #if defined(NOSPHERA2_USE_GPU) || defined(NOSPHERA2_USE_METAL)
 	itensor_gpu_release();
-	I_tens->i_on_device_ = false;
+	I_tens.i_on_device_ = false;
 #endif
 #ifdef NOSPHERA2_USE_GPU
 	xcw_grid_gpu_release();
