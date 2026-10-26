@@ -60,7 +60,9 @@ namespace
 			reference.convergence_settings.energy_threshold = 1e-10;
 			result.reference = reference.compute_scf_energy();
 		}
-		const std::filesystem::path log_path = std::filesystem::temp_directory_path() / "nos_scf_solver_test.log";
+		//one log per test: ctest runs them side by side
+		const std::filesystem::path log_path = std::filesystem::temp_directory_path() /
+			("nos_scf_solver_" + std::string(::testing::UnitTest::GetInstance()->current_test_info()->name()) + ".log");
 		{
 			SCF_log_writer writer(log_path.string());
 			SCF_solver solver(mol, basis, tight_settings(kind, multiplicity), writer);
@@ -73,7 +75,8 @@ namespace
 		std::ifstream in(log_path);
 		result.log.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
 		in.close();
-		std::filesystem::remove(log_path);
+		std::error_code ec;
+		std::filesystem::remove(log_path, ec);
 		return result;
 	}
 }
