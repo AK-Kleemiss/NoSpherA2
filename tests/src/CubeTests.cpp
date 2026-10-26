@@ -902,7 +902,8 @@ TEST(CubeIsoTests, BoxCubeAroundOneAtom)
 //marching cubes on R^2 - r^2 at iso 0 gives a closed sphere: vertices at |r| = R, area 4 pi R^2 and volume 4/3 pi R^3,
 //and every directed edge is matched by its reverse exactly once (closed and consistently oriented, so a dropped table
 //entry or a flipped winding fails here where the 8 % area tolerance would not); the origin -2.53 keeps every node off
-//the sphere so no zero-length edges appear
+//the sphere so no zero-length edges appear. The field falls outward, as a density does, so every face must be
+//counter-clockwise seen from outside (Olex2 culls the other side of a transparent surface) and the volume positive
 TEST(CubeIsoTests, SphereAreaAndVolume)
 {
 	const double R = 2.0, h = 0.25, o = -2.53;
@@ -927,6 +928,9 @@ TEST(CubeIsoTests, SphereAreaAndVolume)
 		}
 		const d3 c = t.calc_center();
 		EXPECT_NEAR(array_length(c), R, 0.03);
+		const d3 a = { t.get_v(2)[0] - t.get_v(1)[0], t.get_v(2)[1] - t.get_v(1)[1], t.get_v(2)[2] - t.get_v(1)[2] };
+		const d3 b = { t.get_v(3)[0] - t.get_v(1)[0], t.get_v(3)[1] - t.get_v(1)[1], t.get_v(3)[2] - t.get_v(1)[2] };
+		EXPECT_GT(vec_dot(vec_cross(a, b), c), 0.0) << "face at " << c[0] << " " << c[1] << " " << c[2] << " faces inward";
 	}
 	int unmatched = 0;
 	for (const auto& [e, n] : edges)
@@ -934,7 +938,7 @@ TEST(CubeIsoTests, SphereAreaAndVolume)
 			unmatched++;
 	EXPECT_EQ(unmatched, 0) << "of " << edges.size() << " directed edges";
 	EXPECT_NEAR(area, 4 * constants::PI * R * R, 0.08 * 4 * constants::PI * R * R);
-	EXPECT_NEAR(std::abs(volume), 4.0 / 3.0 * constants::PI * R * R * R, 0.03 * 4.0 / 3.0 * constants::PI * R * R * R);
+	EXPECT_NEAR(volume, 4.0 / 3.0 * constants::PI * R * R * R, 0.03 * 4.0 / 3.0 * constants::PI * R * R * R);
 	EXPECT_EQ(Triangle({ 0, 0, 0 }, { 1, 0, 0 }, { 0, 1, 0 }).calc_area(), 0.5);
 	EXPECT_TRUE(marchingCubes(cube({ 1, 3, 3 }, 0, true), 0.0).empty());
 	EXPECT_TRUE(marchingCubes(cube({ 3, 3, 1 }, 0, true), 0.0).empty());
