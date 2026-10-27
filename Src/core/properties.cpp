@@ -18,6 +18,7 @@
 #include "b2c.h"
 #include "density_source.h"
 #include "citations.h"
+#include "eli_family.h"
 
 std::vector<Thakkar> make_thakkar_interpolators()
 {
@@ -673,6 +674,45 @@ void Calc_S_Rho(
 		print_time(start, end, file);
 	}
 };
+
+//ELI-D(aa), ELI-D(bb) and the triplet ELI-D of [III] at every point from one eli_family::spin_fields call; a member not in
+//want stays unloaded and unwritten. Where rho_s or g is not positive (a spin channel without electrons there, far tails)
+//eli_d gives 0, and sanitize_finite keeps that cube's values finite as -eli does
+void Calc_Eli_Spin(
+	std::vector<cube> &cubes,
+	const WFN &wavy,
+	std::ostream &file,
+	bool &nodate)
+{
+	using namespace std;
+	_time_point start = get_time();
+	const double factor = eli_family::triplet_density_factor(wavy);
+	cube &aa = cubes[cube_type::Eli_aa], &bb = cubes[cube_type::Eli_bb], &tr = cubes[cube_type::Eli_triplet];
+	ProgressBar *progress = NULL;
+	if (!nodate)
+		progress = new ProgressBar(aa.get_size(0), 50, "=", " ", "Calculating Values");
+#pragma omp parallel for schedule(dynamic)
+	for (int i = 0; i < aa.get_size(0); i++)
+	{
+		eli_family::SpinFields f;
+		for (int j = 0; j < aa.get_size(1); j++)
+			for (int k = 0; k < aa.get_size(2); k++)
+			{
+				eli_family::spin_fields(wavy, aa.get_pos(i, j, k), f);
+				aa.set_value(i, j, k, sanitize_finite(eli_family::eli_d(f.rho[0], eli_family::g_same_spin(f, 0))));
+				if (bb.get_loaded()) bb.set_value(i, j, k, sanitize_finite(eli_family::eli_d(f.rho[1], eli_family::g_same_spin(f, 1))));
+				if (tr.get_loaded()) tr.set_value(i, j, k, sanitize_finite(eli_family::eli_d(factor * (f.rho[0] + f.rho[1]), eli_family::g_triplet(f))));
+			}
+		if (!nodate)
+			progress->update();
+	}
+	if (!nodate)
+	{
+		delete (progress);
+		_time_point end = get_time();
+		print_time(start, end, file);
+	}
+}
 
 void Calc_Prop(
 	std::vector<cube> &Cubes,
@@ -2129,6 +2169,14 @@ void properties_calculation(options &opt)
 	cubes.emplace_back(opt.properties.NbSteps, wavy.get_ncen(), opt.properties.fukui);
 	cubes.emplace_back(opt.properties.NbSteps, wavy.get_ncen(), opt.properties.fukui);
 	cubes.emplace_back(opt.properties.NbSteps, wavy.get_ncen(), opt.properties.fukui);
+	//-eli_spin: the members the orbitals carry, aa only for a closed shell (bb identical, triplet a constant multiple)
+	std::vector<eli_family::Member> eli_members;
+	if (opt.properties.eli_spin)
+		eli_members = eli_family::eli_variants_for(wavy);
+	auto has_member = [&](const eli_family::Member m) { return std::find(eli_members.begin(), eli_members.end(), m) != eli_members.end(); };
+	cubes.emplace_back(opt.properties.NbSteps, wavy.get_ncen(), opt.properties.eli_spin);
+	cubes.emplace_back(opt.properties.NbSteps, wavy.get_ncen(), has_member(eli_family::Member::eli_d_bb));
+	cubes.emplace_back(opt.properties.NbSteps, wavy.get_ncen(), has_member(eli_family::Member::eli_d_triplet));
 
 	for (cube &cube : cubes)
 		cube.give_parent_wfn(wavy);
@@ -2164,6 +2212,9 @@ void properties_calculation(options &opt)
 	cubes[cube_type::Fukui_minus].set_comment1("Calculated Fukui f- (HOMO density, electrophilic attack) using NoSpherA2");
 	cubes[cube_type::Fukui_zero].set_comment1("Calculated Fukui f0 (radical attack) using NoSpherA2");
 	cubes[cube_type::Dual_Descriptor].set_comment1("Calculated dual descriptor f+ minus f- using NoSpherA2");
+	cubes[cube_type::Eli_aa].set_comment1("Calculated alpha-alpha ELI-D using NoSpherA2");
+	cubes[cube_type::Eli_bb].set_comment1("Calculated beta-beta ELI-D using NoSpherA2");
+	cubes[cube_type::Eli_triplet].set_comment1("Calculated triplet ELI-D using NoSpherA2");
 	for (auto cube : cubes)
 		cube.set_comment2("from " + wavy.get_path().string());
 
@@ -2180,6 +2231,9 @@ void properties_calculation(options &opt)
 	cubes[cube_type::Fukui_minus].set_path((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_fukui_minus.cube");
 	cubes[cube_type::Fukui_zero].set_path((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_fukui_zero.cube");
 	cubes[cube_type::Dual_Descriptor].set_path((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_dual_descriptor.cube");
+	cubes[cube_type::Eli_aa].set_path((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_eli_aa.cube");
+	cubes[cube_type::Eli_bb].set_path((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_eli_bb.cube");
+	cubes[cube_type::Eli_triplet].set_path((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_eli_triplet.cube");
 
 	log2 << "\nCalculating:" << endl;
 	if (opt.properties.hdef || opt.properties.def || opt.properties.hirsh)
@@ -2208,6 +2262,8 @@ void properties_calculation(options &opt)
 		log2 << "Spin density, ";
 	if (opt.properties.fukui)
 		log2 << "Fukui functions and dual descriptor, ";
+	if (opt.properties.eli_spin)
+		log2 << "spin-resolved ELI-D, ";
 	log2 << endl;
 
 	//Which paper each of those grids implements.  Same guards as the list above.
@@ -2223,6 +2279,10 @@ void properties_calculation(options &opt)
 		citations::cite(citations::Method::ESP, log2);
 	if (opt.properties.fukui)
 		citations::cite(citations::Method::Fukui, log2);
+	if (opt.properties.eli_spin) {
+		if (!opt.properties.eli) citations::cite(citations::Method::ELID, log2);
+		citations::cite(citations::Method::ELIFamily, log2);
+	}
 
 	log2 << "Calculating for " << fixed << setprecision(0) << opt.properties.NbSteps[0] * opt.properties.NbSteps[1] * opt.properties.NbSteps[2] << " Gridpoints." << endl;
 
@@ -2481,6 +2541,15 @@ void properties_calculation(options &opt)
 
 	if (opt.properties.s_rho)
 		Calc_S_Rho(cubes[cube_type::Spin_Density], wavy, log2, opt.no_date);
+	if (opt.properties.eli_spin) {
+		if (!cubes[cube_type::Eli_bb].get_loaded())
+			log2 << "Spin-resolved ELI-D: the wavefunction carries no spin polarisation, so ELI-D(bb) = ELI-D(aa) and the triplet member is a constant multiple of it; writing aa only" << endl;
+		log2 << "Calculating spin-resolved ELI-D..." << endl;
+		Calc_Eli_Spin(cubes, wavy, log2, opt.no_date);
+		cubes[cube_type::Eli_aa].write_file(true);
+		if (cubes[cube_type::Eli_bb].get_loaded()) cubes[cube_type::Eli_bb].write_file(true);
+		if (cubes[cube_type::Eli_triplet].get_loaded()) cubes[cube_type::Eli_triplet].write_file(true);
+	}
 
 	log2 << "Writing cubes to Disk..." << flush;
 	if (opt.properties.rdg)

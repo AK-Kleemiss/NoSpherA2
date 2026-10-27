@@ -27,7 +27,10 @@ enum cube_type {
 	Fukui_plus = 12,
 	Fukui_minus = 13,
 	Fukui_zero = 14,
-	Dual_Descriptor = 15
+	Dual_Descriptor = 15,
+	Eli_aa = 16,
+	Eli_bb = 17,
+	Eli_triplet = 18
 };
 
 /**
@@ -216,6 +219,13 @@ void fukui_analysis(options &opt, std::ostream &log2 = std::cout);
  * @param file The output stream to write the results to.
  * @param nodate A boolean flag indicating whether to include the date in the output.
  */
+//ELI-D(aa), ELI-D(bb) and triplet ELI-D into cubes[cube_type::Eli_aa..Eli_triplet] in one pass; unloaded members are skipped
+void Calc_Eli_Spin(
+	std::vector<cube> &cubes,
+	const WFN &wavy,
+	std::ostream &file,
+	bool &nodate);
+
 void Calc_S_Rho(
 	cube &Cube_S_Rho,
 	const WFN &wavy,

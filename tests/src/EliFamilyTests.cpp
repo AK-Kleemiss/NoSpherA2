@@ -2,6 +2,8 @@
 
 #include "core/eli_family.h"
 #include "core/b2c.h"
+#include "core/properties.h"
+#include "core/cube.h"
 
 //Kohout's ELI family: the UEG limit fixes the normalisation constants analytically, regression rows
 //come from DGrid 5.2 grids (the conventions they encode are in eli_family.h).
@@ -541,4 +543,71 @@ TEST(EliFamily, BrokenSymmetryIsDecidedByTheOrbitals)
 	}
 	EXPECT_FALSE(eli_family::alpha_beta_orbitals_differ(wave));
 	EXPECT_EQ(eli_family::eli_variants_for(wave, &warn).size(), 2u) << warn;
+}
+
+//-eli_spin's grid pass (Calc_Eli_Spin) against the point functions at every voxel of a small grid, to 1e-12: the UHF
+//methyl radical writes aa, bb and triplet; the closed-shell allyl cation writes aa only, equal to -eli's ELI-D there
+namespace
+{
+	std::vector<cube> eli_spin_cubes(const WFN& w, const bool bb, const bool triplet)
+	{
+		std::vector<cube> c;
+		for (int t = 0; t <= cube_type::Eli_triplet; t++)
+			c.emplace_back(std::array<int, 3>{ 5, 6, 7 }, w.get_ncen(), t == cube_type::Eli_aa || (t == cube_type::Eli_bb && bb) || (t == cube_type::Eli_triplet && triplet));
+		for (cube& x : c) {
+			for (int i = 0; i < 3; i++) {
+				x.set_origin(i, -2.1 + 0.3 * i);
+				for (int j = 0; j < 3; j++) x.set_vector(i, j, i == j ? 0.83 : 0.05);
+			}
+			x.calc_dv();
+		}
+		return c;
+	}
+}
+
+TEST(EliSpinTests, GridMembersAreThePointFunctions)
+{
+	const std::filesystem::path f = nos_test_repo_root() / "tests" / "ch3_occ" / "ch3.owf.fchk";
+	if (!std::filesystem::exists(f)) GTEST_SKIP() << "missing fixture " << f.string();
+	WFN w(f);
+	const std::vector<eli_family::Member> m = eli_family::eli_variants_for(w);
+	ASSERT_NE(std::find(m.begin(), m.end(), eli_family::Member::eli_d_triplet), m.end());
+	std::vector<cube> c = eli_spin_cubes(w, true, true);
+	bool nodate = true;
+	std::ostringstream log;
+	Calc_Eli_Spin(c, w, log, nodate);
+	const double factor = eli_family::triplet_density_factor(w);
+	double worst = 0, sum_bb = 0;
+	for (int i = 0; i < 5; i++)
+		for (int j = 0; j < 6; j++)
+			for (int k = 0; k < 7; k++) {
+				const d3 p = c[cube_type::Eli_aa].get_pos(i, j, k);
+				worst = std::max(worst, std::abs(c[cube_type::Eli_aa].get_value(i, j, k) - calculate_eli_d(w, p, 0)));
+				worst = std::max(worst, std::abs(c[cube_type::Eli_bb].get_value(i, j, k) - calculate_eli_d(w, p, 1)));
+				worst = std::max(worst, std::abs(c[cube_type::Eli_triplet].get_value(i, j, k) - calculate_eli_d_triplet(w, p, factor)));
+				sum_bb += std::abs(c[cube_type::Eli_bb].get_value(i, j, k) - c[cube_type::Eli_aa].get_value(i, j, k));
+			}
+	EXPECT_LT(worst, 1e-12);
+	EXPECT_GT(sum_bb, 1e-3);
+}
+
+TEST(EliSpinTests, ClosedShellWritesAaEqualToEliD)
+{
+	const std::filesystem::path f = nos_test_repo_root() / "tests" / "allyl_occ" / "allyl_cation.owf.fchk";
+	if (!std::filesystem::exists(f)) GTEST_SKIP() << "missing fixture " << f.string();
+	WFN w(f);
+	const std::vector<eli_family::Member> m = eli_family::eli_variants_for(w);
+	EXPECT_EQ(std::find(m.begin(), m.end(), eli_family::Member::eli_d_bb), m.end());
+	std::vector<cube> c = eli_spin_cubes(w, false, false);
+	bool nodate = true;
+	std::ostringstream log;
+	Calc_Eli_Spin(c, w, log, nodate);
+	double worst = 0;
+	for (int i = 0; i < 5; i++)
+		for (int j = 0; j < 6; j++)
+			for (int k = 0; k < 7; k++) {
+				const double ref = w.computeELI(c[cube_type::Eli_aa].get_pos(i, j, k)), v = c[cube_type::Eli_aa].get_value(i, j, k);
+				worst = std::max(worst, std::abs(v - ref) / std::max(1.0, std::abs(ref)));
+			}
+	EXPECT_LT(worst, 1e-12);
 }

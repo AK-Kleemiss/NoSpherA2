@@ -225,6 +225,7 @@ is a separate flag and several can be written in one run.
 | `-rho` | 0 | off | Electron density cube. |
 | `-lap` | 0 | off | Laplacian of the density. |
 | `-eli` | 0 | off | ELI-D cube. |
+| `-eli_spin` | 0 | off | Spin-resolved ELI-D cubes from one pass: `<stem>_eli_aa.cube`, `_eli_bb.cube`, `_eli_triplet.cube` (aa only for a closed shell, which equals `-eli`); 0 where a spin channel has no density. `scripts/vmd/eli_spin.py` turns them into a VMD scene. |
 | `-elf` | 0 | off | Electron localisation function. |
 | `-esp` | 0 | off | Electrostatic potential. |
 | `-rdg` | 0 | off | Reduced density gradient (NCI). |

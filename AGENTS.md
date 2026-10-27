@@ -309,6 +309,11 @@ grid, `-print_F` writes the `_Fcalc.txt` tables and `XCW_log_writer` carries the
 release-windows-tests -j 6` on a CPU-only build reports **1322 passed, 0 failed, 22 skipped** (2 disabled) of 1346, and the
 four `P1_*_full` goldens pass. See `UNIT_TESTS_STATUS.md` and `REFACTOR.md`.
 
+As of 2026-10-27 (-eli_spin, on b456eec), `-eli_spin` writes the spin-resolved ELI-D cubes from one pass and
+`scripts/vmd/eli_spin.py` turns a wavefunction into a VMD scene; two `EliSpinTests` and `TomlIntegrationTests.EliSpinCh3`
+are new. `ctest --preset release-linux-tests` on a CPU-only 4-core VM reports **1336 passed, 0 failed, 23 skipped**
+(2 disabled) of 1359. See `UNIT_TESTS_STATUS.md`.
+
 As of 2026-10-27 (XCW refactor merged with density_source `33fa9685`), the density-following TFVC/MBIS/EMBIS shares run in the
 new structure: their refit between solves, the lambda 0 fit and the share report in `XCW_wrapper`, `NOSPHERA2_XCW_ADJOINT_CHECK`
 after the first step; `ctest --preset release-windows-tests -j 6` on a CPU-only build reports **1333 passed, 0 failed, 23 skipped**
