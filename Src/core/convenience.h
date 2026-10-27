@@ -97,6 +97,8 @@ struct properties_options
 	bool def = false;
 	bool hirsh = false;
 	bool s_rho = false;
+	//ELI-D(aa), ELI-D(bb) and the triplet ELI-D as three cubes from one spin-resolved pass
+	bool eli_spin = false;
 	bool all_mos = false;
 	//Fukui functions f+/f-/f0 and the dual descriptor, frozen-orbital approximation
 	bool fukui = false;
@@ -124,7 +126,7 @@ struct properties_options
 	std::filesystem::path nbo_lewis;
 	int hirsh_number = 0;
 	bool calc() const {
-		return rho || eli || esp || elf || lap || rdg || hdef || def || hirsh || s_rho || all_mos || fukui || esp_isosurface > 0 || MO_numbers.size() > 0 || !ibo_cube.empty() || !nbo_cube.empty() || !nlmo_cube.empty();
+		return rho || eli || eli_spin || esp || elf || lap || rdg || hdef || def || hirsh || s_rho || all_mos || fukui || esp_isosurface > 0 || MO_numbers.size() > 0 || !ibo_cube.empty() || !nbo_cube.empty() || !nlmo_cube.empty();
 	}
 	size_t n_grid_points() const {
 		size_t result = static_cast<size_t>(NbSteps[0]) * NbSteps[1] * NbSteps[2];

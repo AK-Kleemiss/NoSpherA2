@@ -741,6 +741,12 @@ TEST(TomlIntegrationTests, Fukui)
 	EXPECT_TRUE(result.success) << result.message;
 }
 
+TEST(TomlIntegrationTests, EliSpinCh3)
+{
+	const UT_Result result = run_inprocess_test(get_repo_root(), "eli_spin_ch3");
+	EXPECT_TRUE(result.success) << result.message;
+}
+
 TEST(TomlIntegrationTests, FukuiPBC)
 {
 	const UT_Result result = run_inprocess_test(get_repo_root(), "fukui_pbc");

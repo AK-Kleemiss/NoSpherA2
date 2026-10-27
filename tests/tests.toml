@@ -221,6 +221,19 @@ fukui = true
 resolution = 1.5
 radius = 2.0
 
+# Spin-resolved ELI-D (-eli_spin) of the UHF methyl radical: aa, bb and triplet from one spin_fields pass. The golden is the
+# triplet cube on a coarse grid; EliSpinTests check every member against eli_family point by point.
+[eli_spin_ch3]
+directory = "ch3_occ"
+good = "eli_spin_ch3.good"
+actual = "ch3.owf_eli_triplet.cube"
+
+[eli_spin_ch3.args]
+wfn = "ch3.owf.fchk"
+eli_spin = true
+resolution = 0.5
+radius = 2.0
+
 # EQC energy decomposition, Mode 1: ethane HF/def2-SVP from an ORCA 6.1 gbw,
 # re-converged in occ, then split into two CH3 radicals (UHF, seeded from the
 # parent's density block). No ORCA .out is shipped, so E(ORCA) reads n/a. The

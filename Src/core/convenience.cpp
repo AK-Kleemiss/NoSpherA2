@@ -409,6 +409,9 @@ std::string help_message =
  "                                    integrated electron count.\n"
  "  -elf  -eli  -lap  -rdg  -esp       Request ELF, ELI, Laplacian, RDG, or\n"
  "                                    electrostatic-potential properties.\n"
+ "  -eli_spin                          Spin-resolved ELI-D cubes: <wfn>_eli_aa,\n"
+ "                                    _eli_bb and _eli_triplet (aa only for a\n"
+ "                                    closed shell), from one pass.\n"
  "  -esp_isosurface [rho]              Electron-density isosurface [0.002 au]\n"
  "                                    coloured by the ESP, written as\n"
  "                                    <wfn>_rho_esp.obj (red negative, blue\n"
@@ -3538,6 +3541,8 @@ bool options::digest_property_options(const std::string &temp, int &i)
 	}
 	else if (temp == "-eli")
 		properties.eli = true;
+	else if (temp == "-eli_spin")
+		properties.eli_spin = true;
 	//The basins use the analytic field; resolution and radius only shape the cube built for -basin_cube
 	//and a fitted density
 	else if (temp == "-eli_analysis") {
