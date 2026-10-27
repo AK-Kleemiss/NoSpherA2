@@ -100,7 +100,7 @@ void structure_factors::setup_ri(const occ::qm::AOBasis& ao, const occ::qm::AOBa
 		const double r_cov = constants::ang2bohr(constants::covalent_radii[asym_atoms[g].type]);
 		for (int l = 0; l <= lmax; l++)
 			for (int m = 0; m <= 2 * l; m++)
-				XR.s2[static_cast<size_t>(g) * XR.n_mom + l * l + m] = std::pow(strength * (l == 0 ? std::sqrt(constants::FOUR_PI) : std::pow(r_cov, -l)), 2);
+				XR.s2[static_cast<size_t>(g) * XR.n_mom + static_cast<size_t>(l) * l + m] = std::pow(strength * (l == 0 ? std::sqrt(constants::FOUR_PI) : std::pow(r_cov, -l)), 2);
 	}
 	for (size_t s = 0; s < aux.size(); s++) {
 		const auto& sh = aux[s];
@@ -120,7 +120,7 @@ void structure_factors::setup_ri(const occ::qm::AOBasis& ao, const occ::qm::AOBa
 		}
 		if (l <= lmax)
 			for (int m = 0; m <= 2 * l; m++)
-				XR.R(static_cast<size_t>(g) * XR.n_mom + l * l + m, P0 + m) = moment;
+				XR.R(static_cast<size_t>(g) * XR.n_mom + static_cast<size_t>(l) * l + m, P0 + m) = moment;
 		(void)np;
 	}
 	//the grid partition's moments about each nucleus, r^l Y_lm at the points of the atom's grid, and per l the map from
@@ -285,7 +285,7 @@ void structure_factors::set_ri_targets(const vec2& moments)
 			for (int m = 0; m <= 2 * l; m++) {
 				double t = 0;
 				for (int k = 0; k <= 2 * l; k++) t += XR.A[l](m, k) * moments[a][l * l + k];
-				const size_t row = static_cast<size_t>(a) * XR.n_mom + l * l + m;
+				const size_t row = static_cast<size_t>(a) * XR.n_mom + static_cast<size_t>(l) * l + m;
 				XR.t0[row] = XR.s2[row] * t;
 			}
 	XR.frozen = true;
