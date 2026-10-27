@@ -2179,7 +2179,9 @@ occ::Mat structure_factors::perturbation_response(const dMatrix2& dD_eff, const 
 	//dF_r = Sum c I_r dD_eff: calc_F_calc's walk with the fixed part zeroed
 	const cvec F0 = scatter_data.F_calc, fixed = scatter_data.anom_correction;
 	std::fill(scatter_data.anom_correction.begin(), scatter_data.anom_correction.end(), cdouble(0.0, 0.0));
+	XR.response = true;
 	calc_F_calc(dD_eff);
+	XR.response = false;
 	const cvec dFr = scatter_data.F_calc;
 	scatter_data.F_calc = F0;
 	scatter_data.anom_correction = fixed;
@@ -2392,7 +2394,8 @@ itsc_block structure_factors::result_table(const occ::Mat& D_wfn, std::vector<WF
 				worst = std::max(worst, dmax / fmax);
 			}
 			//1e-2 only catches a wrong layout; how well grid and tsc agree is what NOSPHERA2_XCW_GRID_FCHECK measures
-			ok = ok && worst < 1e-2;
+			//the RI partition is not the tsc route's, so there the closest atom is all the layout can be matched by
+			ok = ok && (worst < 1e-2 || XR.on);
 			std::cout << "XCW grid tscb: max |f_grid - f_tsc| / max |f| " << std::scientific << std::setprecision(2) << worst << std::defaultfloat
 				<< (ok ? ", later steps write the tscb from the grid" : ", layout not matched, the tsc route stays") << std::endl;
 			if (ok) {
@@ -2400,6 +2403,12 @@ itsc_block structure_factors::result_table(const occ::Mat& D_wfn, std::vector<WF
 				tscb_hkl_ = result.get_index_vector();
 				tscb_entry_ = entry;
 				tscb_atom_ = atom;
+			}
+			if (ok && XR.on) {
+				cvec2 table(tscb_scat_.size(), cvec(tscb_entry_.size()));
+				for (int scatterer = 0; scatterer < static_cast<int>(table.size()); scatterer++)
+					for (size_t r = 0; r < tscb_entry_.size(); r++) table[scatterer][r] = grid_value(tscb_atom_[scatterer], tscb_entry_[r]);
+				result = itsc_block(table, tscb_scat_, tscb_hkl_);
 			}
 		}
 	}

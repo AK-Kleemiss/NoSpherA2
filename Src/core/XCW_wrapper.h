@@ -2,6 +2,7 @@
 #include "convenience.h"
 #include "structure_factors.h"
 #include "XCW_solver.h"
+#include "integrator.h"
 #include "xcw_halting.h"
 
 // Drives the X-ray constrained wavefunction fit: owns the structure factors and the SCF solver and
@@ -25,7 +26,7 @@ public:
 	// Only called when `gaussian_halt` is set.
 	void evaluate_gaussian_halting(const double lambda);
 
-	// Writes the files of a converged lambda step: tscb, wfn, fchk, F_calc table, NBO and RGBI as asked
+	// Writes the files of a converged lambda step: tscb (or tshb), wfn, fchk, F_calc table, NBO and RGBI as asked
 	void write_step_results(const occ::qm::Wavefunction& wfn, const double lambda);
 
 	// Per-lambda Gaussian halting diagnostics, see evaluate_gaussian_halting.
@@ -73,6 +74,14 @@ private:
 	void report_halting_progress_estimate(bool is_final);
 
 	static void flip_high_m_phases(occ::qm::Wavefunction& w);
+
+	// -tshb: the converged density of a step as an RI fit, its scatterers keyed and ordered as the table's
+	void write_tshb(WFN& wave, const tsc_block<int, cdouble>& table, const std::string& name);
+	// The aux wavefunction of that fit, the restraints' partition grid and the table's atoms, made at the
+	// first step and kept, since every step has the same atoms and basis
+	WFN tshb_aux_{ e_origin::NOT_YET_DEFINED };
+	DensityFitting::PartitionCache tshb_cache_;
+	ivec tshb_atoms_;
 
 	options* opt;
 	structure_factors sf;

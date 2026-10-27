@@ -871,6 +871,12 @@ std::string help_message =
  "                                    direct build needs -xcw_int_precision 1e-12.\n"
  "  -xcw_int_precision <p>             Integral screening threshold of the XCW\n"
  "                                    Fock build, default 1e-10 (OCC's own 1e-12).\n"
+ "  -xcw_partition grid|ri             How XCW shares the density among the atoms:\n"
+ "                                    grid (default) by the -hirsh, -becke or\n"
+ "                                    -tfvc weights, ri by an RI fit in the\n"
+ "                                    -ri_fit basis (AutoAux without one), its\n"
+ "                                    moments restrained to that grid partition\n"
+ "                                    by -multipole_moments.\n"
  "  -XCW_settings <file>                Keywords for -do_XCW. Besides the\n"
  "                                    refinement settings, three control how\n"
  "                                    the I tensor - nr_refl blocks of\n"
@@ -4297,6 +4303,11 @@ bool options::digest_xcw_options(const std::string &temp, int &i)
 	}
 	else if (temp == "-XCW_settings") {
 		xcw_settings_path = arguments[i + 1];
+	}
+	else if (temp == "-xcw_partition") {
+		err_checkf(i + 1 < argc, "-xcw_partition takes grid or ri", std::cout);
+		xcw_partition = arguments[++i];
+		err_checkf(xcw_partition == "grid" || xcw_partition == "ri", "-xcw_partition takes grid or ri, not " + xcw_partition, std::cout);
 	}
 	else
 		return false;

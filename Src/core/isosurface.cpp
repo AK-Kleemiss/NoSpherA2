@@ -718,7 +718,9 @@ std::vector<Triangle> marchingCubes(const cube& volumeData, const double isoVal)
 						break; // no more triangles for this cubeIndex
 					}
 
-					slabs[x].emplace_back(vertList[e0], vertList[e1], vertList[e2]);
+					//the table winds a face towards the corners >= isoVal; reversed, a field falling outward (density, Hirshfeld weight)
+					//gets counter-clockwise outward faces, the obj convention Olex2's poly loader and other viewers keep
+					slabs[x].emplace_back(vertList[e0], vertList[e2], vertList[e1]);
 				}
 			}
 		}

@@ -256,8 +256,9 @@ void GridManager::setup3DGridsForMolecule(const WFN &wave, const ivec &atom_list
 	}
 	grid_key_ = key;
 
-	// Clear previous data
+	// Clear previous data; a reused manager would otherwise skip the density on the new grid
 	grid_data_.clear();
+	non_spherical_densities_calculated_ = false;
 	prototype_grids_.clear();
 	atom_type_list_.clear();
 

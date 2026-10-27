@@ -1189,6 +1189,8 @@ struct options
 
 	XCW_settings xcw_settings;
 	bool do_XCW = false;
+	//-xcw_partition: how XCW shares rho among the atoms, "grid" (the -hirsh/-becke/-tfvc weights) or "ri" (an RI fit)
+	std::string xcw_partition = "grid";
 	bool rgbi = false;
 	//-npa: NAO/NPA, run in-process
 	bool npa = false;

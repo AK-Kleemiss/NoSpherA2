@@ -146,6 +146,22 @@ mtc_mult = [1, 1]
 mtc_charge = [0, 0]
 mtc_ECP = [0, 0]
 
+# PART 1 RI-fitted from its .gbw, PART 2 an .xyz without orbitals: its atoms go into the one .tshb as spherical records
+[Hybrid_orbitalless_tshb]
+directory = "Hybrid"
+good = "Hybrid_orbitalless_tshb.good"
+
+[Hybrid_orbitalless_tshb.args]
+cif = "ZP2.cif"
+dmin = 0.9
+acc = 1
+ri_fit = "combo_basis_fit"
+tshb = ""
+mtc = ["ZP2_part1.gbw", 0.1, "ZP2_part2.xyz", 0.2]
+mtc_mult = [1, 1]
+mtc_charge = [0, 0]
+mtc_ECP = [0, 0]
+
 [malbac_SF_ECP]
 directory = "ECP_SF"
 

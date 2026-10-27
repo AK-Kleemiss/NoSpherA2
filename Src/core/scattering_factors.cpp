@@ -1193,7 +1193,7 @@ svec read_atoms_from_CIF(std::ifstream& cif_input,
 					group_nr,
 					row_Z);
 				const std::string atom_ID = cif_atom_id.to_hex_string();
-#pragma omp parallel for reduction(|| : old_atom)
+				//serial: a parallel region per CIF row costs a thread wake-up per row, more than the comparisons themselves
 				for (int run = 0; run < known_atoms.size(); run++)
 				{
 					if (fields[label_field] == known_atoms[run] || atom_ID == known_atoms[run])
@@ -3553,7 +3553,11 @@ tsc_block_type calculate_scattering_factors(
 	time_points.push_back(get_time());
 	time_descriptions.push_back("cif reading");
 
-	if (kpts == NULL || kpts->size() == 0)
+	//a part whose atoms go into the .tshb, and the fill's preparation for it, write records and evaluate no reflection
+	const bool records_only = opt.tshb != nullptr && (opt.spherical_fill ? prep_out != NULL : prep_out == NULL);
+	if (records_only)
+		;
+	else if (kpts == NULL || kpts->size() == 0)
 	{
 		make_k_pts(
 			nr != 0 && hkl.size() == 0,
@@ -3606,7 +3610,7 @@ tsc_block_type calculate_scattering_factors(
 		if (prep_out != NULL)
 		{
 			// hand back what a per-block spherical calculation needs and stop
-			const std::vector<i3> hv(hkl.begin(), hkl.end());
+			const std::vector<i3> hv(records_only ? std::vector<i3>() : std::vector<i3>(hkl.begin(), hkl.end()));
 			prep_out->asym_atom_list = asym_atom_list;
 			prep_out->labels = labels;
 			prep_out->atom_type_list = atom_type_list;
@@ -3620,6 +3624,17 @@ tsc_block_type calculate_scattering_factors(
 				prep_out->stl_of_reflection[s] = stl;
 				prep_out->k_of_reflection[s] = constants::bohr2ang(constants::FOUR_PI * stl);
 			}
+			return tsc_block_type();
+		}
+		//a part without orbitals in a -tshb run: its atoms as the fill's spherical records, no table
+		if (opt.tshb != nullptr && !opt.spherical_fill)
+		{
+			salted_part_prep sph;
+			sph.asym_atom_list = asym_atom_list;
+			sph.labels = labels;
+			sph.atom_type_list = atom_type_list;
+			sph.asym_atom_to_type_list = asym_atom_to_type_list;
+			fill_tshb(sph, *wavy, opt, file);
 			return tsc_block_type();
 		}
 		std::vector<Thakkar> spherical_atoms = make_spherical_evaluators(atom_type_list);

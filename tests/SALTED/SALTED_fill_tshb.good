@@ -17,8 +17,6 @@ Generating hkl indices up to d=:              0.80... done!
 Nr of reflections generated:                  4407
 Number of symmetry operations:                   1
 Nr of reflections to be used:                 4407
-Generating k-points...                            ... done!
-Number of k-points to evaluate: 4407
 
 Generating densities... 
 [SALTED] Grisafi, Lewis, Rossi & Ceriotti, J. Chem. Theory Comput. 19 (2023) 4451, DOI 10.1021/acs.jctc.2c00850
@@ -90,8 +88,6 @@ Performing the remaining calculation of spherical atoms...
 Number of protons: 285
 Number of electrons: 0.0000
 Reading:                                  "Co110.cif" done!
-Generating k-points...                            ... done!
-Number of k-points to evaluate: 4407
 Spherical fill: 7 of 7 atom(s) given a fractional charge (-0.2056 to 0.6344).
 Spherical fill: 7 atom(s) go into the .tshb as Slater records
 Wrote experimental.tshb: 49 atom(s), 7 of them spherical

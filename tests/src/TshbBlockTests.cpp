@@ -124,7 +124,7 @@ namespace
 
 	//every scatterer of the table once in the .tshb and the reverse; f(h) of each record against its row, max |dF|; the
 	//largest |F| of the table comes back in f_max so a comparison of two empty tables cannot pass
-	double compare_with_table(const tshb_block& tshb, const itsc_block& table, const cell& unit_cell, double& f_max)
+	double compare_with_table(const tshb_block& tshb, const itsc_block& table, const cell& unit_cell, double& f_max, double* rel_max = nullptr)
 	{
 		std::map<std::string, size_t> row;
 		const svec keys = table.get_scatterers_string();
@@ -151,8 +151,11 @@ namespace
 					for (int j = 0; j < 3; j++)
 						k[x] += unit_cell.get_rcm(x, j) * h[j] / scale;
 				for (double& v : k) v = constants::ang2bohr(v);
-				worst = std::max(worst, std::abs(record_form_factor(tshb.get_record(a), k) - sf[r]));
+				const double d = std::abs(record_form_factor(tshb.get_record(a), k) - sf[r]);
+				worst = std::max(worst, d);
 				f_max = std::max(f_max, std::abs(sf[r]));
+				if (rel_max && std::abs(sf[r]) > 0.0)
+					*rel_max = std::max(*rel_max, d / std::abs(sf[r]));
 			}
 		}
 		return worst;
@@ -576,4 +579,117 @@ TEST(TshbJointTests, SaltedDisorderedPartsMatchTheirTableAndMergeToTheJointFile)
 	ASSERT_EQ(run.run({ "-merge", "p1.tshb", "p2.tshb", "-cif", cif }), 0);
 	EXPECT_TRUE(tshb_block(run.dir / "combined.tshb").is_complete());
 	EXPECT_EQ(bytes(run.dir / "combined.tshb"), bytes(run.dir / "joint.tshb"));
+}
+
+//a part without orbitals (an .xyz) in a -ri_fit -tshb run: its atoms go in as the fill's spherical records, neutral and at
+//full occupancy, and match the table of the run without -tshb, which takes IAM for that part; the file is complete, and
+//the per-part files merged with the CIF are the joint file byte for byte
+TEST(TshbJointTests, AnOrbitalLessPartGoesInAsSphericalRecords)
+{
+	const std::string cif = fs::absolute(fixture("Hybrid/ZP2.cif")).string();
+	auto parts = [&](const std::vector<std::string>& files)
+	{
+		std::vector<std::string> a{ "-cif", cif, "-dmin", "0.9", "-acc", "1", "-ri_fit", "combo_basis_fit", "-no_date", "-mtc" };
+		for (const std::string& f : files)
+		{
+			a.push_back(fs::absolute(fixture("Hybrid/" + f)).string());
+			a.push_back(f.find("part1") != std::string::npos ? "0.1" : "0.2");
+		}
+		for (const std::string f : { "-mtc_mult", "-mtc_charge", "-mtc_ECP" })
+		{
+			a.push_back(f);
+			for (size_t i = 0; i < files.size(); i++) a.push_back(f == "-mtc_mult" ? "1" : "0");
+		}
+		return a;
+	};
+	std::vector<std::vector<std::string>> runs{ parts({ "ZP2_part1.gbw", "ZP2_part2.xyz" }), parts({ "ZP2_part1.gbw" }), parts({ "ZP2_part2.xyz" }) };
+	const std::string names[3] = { "joint.tshb", "p1.tshb", "p2.tshb" };
+	app_dir run("orbitalless");
+	ASSERT_EQ(run.run(runs[0]), 0);
+	const itsc_block table(run.dir / "experimental.tscb");
+	for (int i = 0; i < 3; i++)
+	{
+		runs[i].push_back("-tshb");
+		ASSERT_EQ(run.run(runs[i]), 0) << i;
+		EXPECT_EQ(run.log().find("-tshb: the table is written instead"), std::string::npos) << run.log();
+		fs::rename(run.dir / "experimental.tshb", run.dir / names[i]);
+	}
+	EXPECT_NE(run.log().find("Spherical fill: 25 atom(s) go into the .tshb as Slater records"), std::string::npos) << run.log();
+	const tshb_block joint = tshb_block::read(run.dir / "joint.tshb");
+	EXPECT_EQ(joint.scatterer_size(), 50u);
+	EXPECT_TRUE(joint.is_complete());
+	EXPECT_NE(bytes(run.dir / "joint.tshb").find("COVERAGE: complete\nPARTS: 1 2"), std::string::npos);
+	size_t spherical = 0;
+	for (size_t i = 0; i < joint.scatterer_size(); i++)
+		if (joint.get_record(i).shells.empty())
+		{
+			spherical++;
+			EXPECT_EQ(joint.get_record(i).part, 2);
+			EXPECT_GT(joint.get_record(i).Z, 0);
+		}
+	EXPECT_EQ(spherical, 25u);
+	double f_max = 0.0, rel = 0.0;
+	const double worst = compare_with_table(joint, table, cell(cif, std::cout, false), f_max, &rel);
+	std::cout << "orbital-less part: " << joint.scatterer_size() << " atoms, " << table.reflection_size() << " reflections, max |F| " << f_max
+		<< ", max |dF| " << worst << ", max |dF|/|F| " << rel << std::endl;
+	EXPECT_LT(worst, 1e-8);
+	ASSERT_EQ(run.run({ "-merge", "p1.tshb", "p2.tshb", "-cif", cif }), 0);
+	EXPECT_TRUE(tshb_block(run.dir / "combined.tshb").is_complete());
+	EXPECT_EQ(bytes(run.dir / "combined.tshb"), bytes(run.dir / "joint.tshb"));
+}
+
+//XCW with -tshb: every lambda step writes the RI fit of its converged density (AutoAux without -ri_fit) as NA2_<lambda>.tshb
+//instead of the table, complete and keyed as the table's scatterers
+TEST(TshbJointTests, XcwStepsWriteTheirTshb)
+{
+	const std::string cif = fs::absolute(fixture("P1_test/P1_test.cif")).string(), hkl = fs::absolute(fixture("P1_test/P1_subset.hkl")).string();
+	app_dir run("xcw");
+	std::ofstream(run.dir / "settings.txt") << "normal normal_conv params 177 basis_set sto-3g max_iter 100 F charge 0 mult 1 rhf start 0 step_size 0.01 end 0.01";
+	ASSERT_EQ(run.run({ "-do_XCW", "-no_gpu", "-cif", cif, "-hkl", hkl, "-XCW_settings", "settings.txt", "-tshb", "-no_date" }), 0);
+	for (const std::string step : { "NA2_0000000", "NA2_0010000" })
+	{
+		ASSERT_TRUE(fs::exists(run.dir / (step + ".tshb"))) << step;
+		EXPECT_FALSE(fs::exists(run.dir / (step + ".tscb"))) << step;
+		const tshb_block b = tshb_block::read(run.dir / (step + ".tshb"));
+		EXPECT_EQ(b.scatterer_size(), 23u);
+		EXPECT_TRUE(b.is_complete());
+		EXPECT_NE(bytes(run.dir / (step + ".tshb")).find("COVERAGE: complete"), std::string::npos);
+		for (size_t i = 0; i < b.scatterer_size(); i++)
+			EXPECT_FALSE(b.get_record(i).shells.empty()) << b.get_record(i).label;
+	}
+}
+
+//XCW's RI partition (-xcw_partition ri, AutoAux): the perturbation is the exact transpose of F_calc (NOSPHERA2_XCW_ADJOINT_CHECK,
+//random D and weights), unrestrained to round-off and with Hirshfeld moment restraints, whose targets go through the grid, to its
+//single-precision blocks; restrained to MBIS the targets come from the converged step and the scan still runs to its end
+TEST(XcwPartitionTests, RiPartitionPerturbationIsTheTransposeOfFcalc)
+{
+	const std::string cif = fs::absolute(fixture("P1_test/P1_test.cif")).string(), hkl = fs::absolute(fixture("P1_test/P1_subset.hkl")).string();
+	app_dir run("xcw_ri");
+	std::ofstream(run.dir / "settings.txt") << "normal normal_conv params 177 basis_set sto-3g max_iter 100 F charge 0 mult 1 rhf start 0 step_size 0.01 end 0.01";
+	auto check = [&](std::vector<std::string> extra, const double tol)
+	{
+		std::vector<std::string> a{ "-do_XCW", "-no_gpu", "-cif", cif, "-hkl", hkl, "-XCW_settings", "settings.txt", "-xcw_partition", "ri",
+			"-tune", "NOSPHERA2_XCW_ADJOINT_CHECK=1", "-no_date" };
+		a.insert(a.end(), extra.begin(), extra.end());
+		std::stringstream out;
+		std::streambuf* old = std::cout.rdbuf(out.rdbuf());
+		const int rc = run.run(a);
+		std::cout.rdbuf(old);
+		EXPECT_EQ(rc, 0);
+		const std::string log = out.str() + run.log();
+		EXPECT_NE(log.find("XCW partition: RI fit"), std::string::npos) << log;
+		const size_t at = log.find("XCW adjoint check (ri): ");
+		EXPECT_NE(at, std::string::npos);
+		if (at != std::string::npos)
+			EXPECT_LT(std::stod(log.substr(at + 24)), tol) << log.substr(at, 60);
+		return log;
+	};
+	check({}, 1e-10);
+	check({ "-multipole_moments", "hirshfeld", "2" }, 1e-5);
+	const std::string mbis = check({ "-multipole_moments", "mbis", "1" }, 1e-5);
+	EXPECT_TRUE(fs::exists(run.dir / "NA2_0010000.tscb"));
+	std::stringstream scf;
+	scf << std::ifstream(run.dir / "SCF.log").rdbuf();
+	EXPECT_NE(scf.str().find("the RI restraints take the moments of this step's density"), std::string::npos);
 }

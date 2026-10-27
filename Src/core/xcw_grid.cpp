@@ -8,6 +8,7 @@
 #if defined(__SSE2__) || defined(_M_X64)
 #include <xmmintrin.h>
 #endif
+#include <random>
 
 //XCW structure factors and perturbation on build_I's grid instead of through the I tensor, see
 //structure_factors::xcw_grid. Both walk the same blocks with the same screening, so the
@@ -399,7 +400,7 @@ void structure_factors::grid_F(const dMatrix2& D)
 	sc.lap("F assembly");
 }
 
-cvec structure_factors::grid_sfc(const dMatrix2& D)
+vec2& structure_factors::grid_rho(const dMatrix2& D)
 {
 	const int ng = static_cast<int>(XG.blocks.size()), nc = static_cast<int>(XG.inversion_link.size());
 	//i_double: nothing the SCF reads is rounded to single, as it means for the tensor
@@ -506,6 +507,16 @@ cvec structure_factors::grid_sfc(const dMatrix2& D)
 	}
 	if (sc.on) std::cout << "XCW grid F kept " << kept << " of " << nb << " blocks, bound " << *std::min_element(dd.begin(), dd.end()) << " .. " << *std::max_element(dd.begin(), dd.end()) << "\n";
 	sc.lap("F density");
+	return rho;
+}
+
+cvec structure_factors::grid_sfc(const dMatrix2& D)
+{
+	if (XR.on)
+		return ri_sfc(D);
+	const int ng = static_cast<int>(XG.blocks.size()), nc = static_cast<int>(XG.inversion_link.size());
+	const vec2& rho = grid_rho(D);
+	stage_clock sc;
 	//The transform of rho: Fourier-Bessel when planned, else the direct sum over points x cleaned
 	//entries (P * nc sincos), the exact reference
 	cvec sfc(static_cast<size_t>(ng) * nc);
@@ -555,6 +566,10 @@ void structure_factors::grid_contract(occ::Mat& out, const cvec& pre)
 			H[static_cast<size_t>(g) * nc + XG.clean_of[e]] += XG.is_inverse[e] ? std::conj(G) : G;
 		}
 	sc.lap("P assembly");
+	if (XR.on) {
+		ri_contract(H, out);
+		return;
+	}
 	//V(p) = w_p Re Sum_c H(c) exp(i k_c d_p), the transpose of the direct sum
 	vec kx(nc), ky(nc), kz(nc);
 	for (int c = 0; c < nc; c++) {
@@ -585,6 +600,34 @@ void structure_factors::grid_contract(occ::Mat& out, const cvec& pre)
 		}
 	}
 	sc.lap("P transform");
+	grid_apply_V(V, out);
+}
+
+void structure_factors::check_adjoint()
+{
+	std::mt19937 gen(7);
+	std::uniform_real_distribution<double> u(-1.0, 1.0);
+	const int n = model_data.nmo;
+	dMatrix2 D(n, n);
+	for (int i = 0; i < n; i++)
+		for (int j = i; j < n; j++) D(i, j) = D(j, i) = u(gen);
+	cvec pre(model_data.nr);
+	for (cdouble& p : pre) p = cdouble(u(gen), u(gen));
+	grid_F(D);
+	occ::Mat P;
+	grid_contract(P, pre);
+	double l1 = 0, l2 = 0;
+	for (int r = 0; r < model_data.nr; r++) l1 += std::real(pre[r] * (scatter_data.F_calc[r] - scatter_data.anom_correction[r]));
+	for (int i = 0; i < n; i++)
+		for (int j = 0; j < n; j++) l2 += 2.0 * D(i, j) * P(i, j);
+	std::cout << "XCW adjoint check (" << (XR.on ? "ri" : "grid") << "): " << std::scientific << std::setprecision(3) << std::abs(l1 - l2) / std::abs(l1) << std::defaultfloat << std::endl;
+}
+
+void structure_factors::grid_apply_V(const vec2& V, occ::Mat& out)
+{
+	const int nmo = model_data.nmo, ng = static_cast<int>(XG.blocks.size());
+	const bool fp32 = opt->cpu_itensor_fp32 && !I_tens.tensor_double;
+	stage_clock sc;
 #ifdef NOSPHERA2_USE_GPU
 	//GPU: the transposed chain, the potential of every block contracted into out on the device
 	if (XG.on_device) {

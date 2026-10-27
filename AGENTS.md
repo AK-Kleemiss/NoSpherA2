@@ -290,6 +290,35 @@ alternative is one flag away in each case.
 
 ## Current Validation Notes
 
+As of 2026-10-27 (XCW refactor merged with density_source `0efc6add`), the `-tshb` step fits and the `-xcw_partition ri`
+layer run in the new structure (`XCW_wrapper::write_tshb`, `structure_factors::setup_ri` / `check_adjoint`); `ctest --preset
+release-windows-tests -j 6` on a CPU-only build reports **1330 passed, 0 failed, 23 skipped** (2 disabled) of 1355, and the
+four `P1_*_full` goldens pass. See `UNIT_TESTS_STATUS.md` and `REFACTOR.md`.
+
+As of 2026-10-26 (second speed round), the fit cache keeps the Coulomb factor keyed by the whole aux wavefunction, `.tshb`
+parts make no k-points, and partition rows skip shells beyond their certain cutoff; `ctest --preset release-linux-tests` on a
+CPU-only 4-core VM reports **1327 passed, 0 failed, 23 skipped** (2 disabled) of 1350. See `UNIT_TESTS_STATUS.md`.
+
+As of 2026-10-26 (XCW partitions), `-xcw_partition ri` runs XCW on an RI partition of the density ((mu nu|P) from occ, exact
+transpose for the perturbation, `-multipole_moments` restraints to Hirshfeld, TFVC, MBIS or EMBIS moments); `ctest --preset
+release-linux-tests` on a CPU-only 4-core VM reports **1326 passed, 0 failed, 23 skipped** (2 disabled) of 1349. See
+`UNIT_TESTS_STATUS.md`.
+
+As of 2026-10-26 (speed audit), restraint rows enter the RI fit by threads in row order (bit-identical), XCW's later
+steps reuse the factor of the restrained H through `PartitionCache`, and CIF rows are checked against known atoms
+serially; `ctest --preset release-linux-tests` on a CPU-only 4-core VM reports **1325 passed, 0 failed, 23 skipped**
+(2 disabled) of 1348. See `UNIT_TESTS_STATUS.md`.
+
+As of 2026-10-26 (XCW -tshb), XCW writes an RI fit of each step's converged density as `NA2_<lambda>.tshb` under `-tshb`
+(AutoAux by default, `-multipole_moments` honoured, partition grid and rows cached over the steps); `ctest --preset
+release-linux-tests` on a CPU-only 4-core VM reports **1323 passed, 0 failed, 23 skipped** (2 disabled) of 1346. See
+`UNIT_TESTS_STATUS.md`.
+
+As of 2026-10-26 (orbital-less parts), `-tshb` writes the spherical fill records for a part without orbitals instead of
+refusing; XCW stays refused (its F_calc and an RI fit of its density differ by up to 6.6e-2 relative). `ctest --preset
+release-linux-tests` on a CPU-only 4-core VM reports **1322 passed, 0 failed, 23 skipped** (2 disabled) of 1345. See
+`UNIT_TESTS_STATUS.md`.
+
 As of 2026-10-26 (XCW refactor, run 1), `SCF_wrapper` is `SCF_solver`, a plain Hartree-Fock SCF extended by the
 `XCW_solver` child, and the XCW driver is `XCW_wrapper` (see `REFACTOR.md`); `ScfSolverTests` (3) are new. `ctest --preset
 release-windows-tests -j 6` on a CPU-only build reports **1323 passed, 0 failed, 23 skipped** (2 disabled) of 1346. See

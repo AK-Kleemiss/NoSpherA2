@@ -2,6 +2,7 @@
 #include "convenience.h"
 #include "density_source.h"
 struct aux_density_table;
+class GridManager;
 
 
 namespace DensityFitting
@@ -22,6 +23,22 @@ namespace DensityFitting
 		SANDERSON_ESTIMATE
 	};
 
+	//fits one after another on the same atoms and aux basis (XCW's lambda steps): the partition grid keeps its points and
+	//weights and only re-evaluates the density, the partition rows, which do not depend on the density, are kept, and so is
+	//the Cholesky factor of the restrained H = J + restraints, which depends on the aux basis and the fit settings alone
+	//(h_key: those settings and every aux coordinate, exponent, coefficient and type; rows_lmax/rows_scheme for the rows;
+	//another key rebuilds them). The partition grid follows GridManager's own key
+	struct PartitionCache {
+		std::shared_ptr<GridManager> grid;
+		vec2 rows;
+		int rows_lmax = -1, rows_scheme = -1;
+		vec rows_aux;
+		vec h_factor, h_key;
+		//the Coulomb metric's Cholesky factor, its diagonal and the screening sensitivities, keyed by the aux atoms and basis
+		vec j_factor, j_diag, j_sens, j_key;
+		bool j_factored = false;
+	};
+
 	struct CONFIG {
 		METRIC_TYPE metric = METRIC_TYPE::COULOMB; // Metric to use for density fitting
 		bool analyze_quality = false; // Whether to analyze the quality of the density fitting
@@ -33,6 +50,8 @@ namespace DensityFitting
 		CHARGE_SCHEME charge_scheme = CHARGE_SCHEME::TFVC;
 		int multipole_lmax = -1; // >= 0: restrain atomic moments through this order; 0 restrains charges only
 		double multipole_strength = 1.0;
+
+		PartitionCache* partition_cache = nullptr;
 
 		std::optional<ivec> asym_atm_list = std::nullopt; //Currently unsued till fixed!// Optional list of atom indices to only compute atoms actually present in the assymetic unit
 	};
@@ -46,7 +65,7 @@ namespace DensityFitting
 
 	// Helper functions for multipole restraints
 	// Grid moments of the partitioned density about each nucleus, [atom][l*l+l+m] for l = 0..lmax, electrons only
-	vec2 calculate_expected_multipoles(const WFN& wavy, const CHARGE_SCHEME& scheme, const int lmax);
+	vec2 calculate_expected_multipoles(const WFN& wavy, const CHARGE_SCHEME& scheme, const int lmax, PartitionCache* cache = nullptr);
 	// Rows [atom*(lmax+1)^2 + l*l+l+m] over the aux functions whose product with the coefficients is Int w_a rho r^l Y_lm
 	// about each nucleus, w_a the partition weight of scheme on the atoms of wavy; TFVC/MBIS/EMBIS take the density from
 	// density (density_batch of a Gaussian_Molecule) or else from wavy's orbitals

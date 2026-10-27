@@ -526,6 +526,95 @@ TEST(FittingIoCoverageIntegratorTests, AtomCentredMultipoleRestraintsReport)
 	EXPECT_NEAR(monopoles, fitted_electrons(population_rows(aux), c), 1e-6);
 }
 
+//The restraint rows go into H by threads over its rows; NOSPHERA2_RI_PENALTY_LOOP keeps the old rank-1 update per row.
+//Epoxide (7 atoms) and ZP2 PART 1 (25 atoms), Hirshfeld through l = 2 with grid rows: the coefficients are bit for bit equal
+TEST(FittingIoCoverageIntegratorTests, RestraintRowsByThreadsMatchTheRowByRowUpdate)
+{
+	for (const std::filesystem::path p : { nos_test_repo_root() / "tests" / "epoxide_gbw" / "epoxide.gbw", nos_test_repo_root() / "tests" / "Hybrid" / "ZP2_part1.gbw" })
+	{
+		if (!std::filesystem::exists(p)) GTEST_SKIP() << p << " not found";
+		WFN wave(p);
+		auto basis = combo_basis();
+		const WFN aux = generate_aux_wfn(wave, basis);
+		DensityFitting::CONFIG cfg;
+		cfg.multipole_lmax = 2;
+		cfg.grid_higher_moments = true;
+		cfg.charge_scheme = DensityFitting::CHARGE_SCHEME::HIRSHFELD;
+		StreamCapture out(std::cout);
+		const vec c = DensityFitting::density_fit(wave, aux, cfg);
+		set_tuning("NOSPHERA2_RI_PENALTY_LOOP", "1");
+		const vec ref = DensityFitting::density_fit(wave, aux, cfg);
+		set_tuning("NOSPHERA2_RI_PENALTY_LOOP", nullptr);
+		ASSERT_EQ(c.size(), ref.size());
+		double d = 0.0, m = 0.0;
+		for (size_t i = 0; i < c.size(); i++)
+		{
+			d = std::max(d, std::abs(c[i] - ref[i]));
+			m = std::max(m, std::abs(ref[i]));
+		}
+		EXPECT_EQ(d, 0.0) << p << " max |c| " << m;
+	}
+}
+
+//With a PartitionCache the restrained H is factored once and its factor reused while the aux basis and fit settings stay
+//(XCW's steps); the cached grid, rows and factor give the coefficients of an uncached fit bit for bit, and other settings
+//(another lmax) rebuild the factor instead of reusing it
+TEST(FittingIoCoverageIntegratorTests, PartitionCacheReusesTheRestrainedFactorExactly)
+{
+	const std::filesystem::path p = epoxide_fixture();
+	if (p.empty()) GTEST_SKIP() << "tests/epoxide_gbw/epoxide.gbw not found";
+	WFN wave(p);
+	auto basis = combo_basis();
+	const WFN aux = generate_aux_wfn(wave, basis);
+	DensityFitting::CONFIG cfg;
+	cfg.multipole_lmax = 2;
+	cfg.grid_higher_moments = true;
+	cfg.charge_scheme = DensityFitting::CHARGE_SCHEME::HIRSHFELD;
+	StreamCapture out(std::cout);
+	const vec ref = DensityFitting::density_fit(wave, aux, cfg);
+	DensityFitting::PartitionCache cache;
+	cfg.partition_cache = &cache;
+	const vec first = DensityFitting::density_fit(wave, aux, cfg);
+	ASSERT_FALSE(cache.h_factor.empty());
+	const vec second = DensityFitting::density_fit(wave, aux, cfg);
+	EXPECT_EQ(first, ref);
+	EXPECT_EQ(second, ref);
+	DensityFitting::CONFIG l1 = cfg;
+	l1.multipole_lmax = 1;
+	l1.grid_higher_moments = false;
+	DensityFitting::CONFIG l1_plain = l1;
+	l1_plain.partition_cache = nullptr;
+	EXPECT_EQ(DensityFitting::density_fit(wave, aux, l1), DensityFitting::density_fit(wave, aux, l1_plain));
+	EXPECT_EQ(DensityFitting::density_fit(wave, aux, cfg), ref);
+	//the plain fit reuses the cached Coulomb factor and sensitivities, bit for bit
+	DensityFitting::CONFIG plain;
+	const vec plain_ref = DensityFitting::density_fit(wave, aux, plain);
+	plain.partition_cache = &cache;
+	ASSERT_FALSE(cache.j_factor.empty());
+	EXPECT_EQ(DensityFitting::density_fit(wave, aux, plain), plain_ref);
+	EXPECT_EQ(DensityFitting::density_fit(wave, aux, plain), plain_ref);
+}
+
+//partition_rows_on_grid skips a shell beyond aux_density_table::sh_r2 before its exponentials, where the 1e-10 test would
+//skip it anyway; NOSPHERA2_RI_ROWS_NOCUT evaluates every shell. Epoxide and ZP2 PART 1, Hirshfeld through l = 2: equal rows
+TEST(FittingIoCoverageIntegratorTests, PartitionRowsShellCutoffChangesNoRow)
+{
+	for (const std::filesystem::path p : { nos_test_repo_root() / "tests" / "epoxide_gbw" / "epoxide.gbw", nos_test_repo_root() / "tests" / "Hybrid" / "ZP2_part1.gbw" })
+	{
+		if (!std::filesystem::exists(p)) GTEST_SKIP() << p << " not found";
+		WFN wave(p);
+		auto basis = combo_basis();
+		const WFN aux = generate_aux_wfn(wave, basis);
+		const aux_density_table table(aux.get_atoms());
+		StreamCapture out(std::cout);
+		const vec2 rows = DensityFitting::partition_multipole_rows(aux, table, DensityFitting::CHARGE_SCHEME::HIRSHFELD, 2);
+		set_tuning("NOSPHERA2_RI_ROWS_NOCUT", "1");
+		const vec2 ref = DensityFitting::partition_multipole_rows(aux, table, DensityFitting::CHARGE_SCHEME::HIRSHFELD, 2);
+		set_tuning("NOSPHERA2_RI_ROWS_NOCUT", nullptr);
+		EXPECT_EQ(rows, ref) << p;
+	}
+}
+
 TEST(FittingIoCoverageIntegratorTests, LowOrdersStayAtomCentred)
 {
 	const std::filesystem::path p = epoxide_fixture();

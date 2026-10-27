@@ -53,12 +53,13 @@ Done in run 1:
 - [x] `options::SCF_settings` thresholds default to the `normal` preset (they were uninitialised, harmless only while the settings parser always filled them)
 - [x] `ScfSolverTests` (new, 3): the plain SCF_solver against OCC's own SCF (water RHF, methyl radical UHF, def2-SVP, 1e-7 Eh) and a warm restart that goes straight to TRAH and converges in at most 3 iterations
 - [x] Tests unchanged, timings and memory compared against the baseline (below)
+- [x] Merged density_source at the deadline (`0efc6add`, seven commits: `-tshb` for XCW steps, `-xcw_partition ri`, fit caches). Their XCW parts went into the new structure: the RI partition's setup (`structure_factors::setup_ri(ao)`, AutoAux or `-ri_fit`) and the `NOSPHERA2_XCW_ADJOINT_CHECK` check (`structure_factors::check_adjoint`) into structure_factors, the RI branch of the tscb layout into `result_table`, the `XR.response` switch into `perturbation_response`, and the step's `.tshb` fit (`write_tshb`, its aux wavefunction and `PartitionCache`) plus the RI restraint targets into `XCW_wrapper::write_step_results`
 
 Next:
 - [ ] SCF_solver for other theory levels: it is tied to `occ::qm::SCF<occ::qm::HartreeFock>` (`scf_t`). DFT (`occ::dft::DFT`) needs the procedure as a template parameter or behind an interface; the stored-ERI Fock build and the TRAH Hessian product are Hartree-Fock specific as they stand
 - [ ] `SCF_log_writer` still has the XCW columns (criterion, GooF, R1); the base SCF writes its own simpler lines. A log per child would be cleaner
 - [ ] `structure_factors::build_I` is about 1150 lines: split it into the screening, the grid setup and the integration, and decide whether the I tensor route stays now that the grid route is the default
-- [ ] `create_tscb` in XCW_wrapper still writes six kinds of output (tscb, wfn, Fcalc.txt, fchk, NBO .47, RGBI); an output writer of its own would leave XCW_wrapper with the scan alone
+- [ ] `write_step_results` in XCW_wrapper still writes seven kinds of output (tscb or the `.tshb` RI fit, wfn, Fcalc.txt, fchk, NBO .47, RGBI); an output writer of its own, holding the `.tshb` fit's cache, would leave XCW_wrapper with the scan alone
 - [ ] The Gaussian halting functions still have blank-line-grouped bodies from before; reformat them when they are next touched
 
 ## What to look out for
