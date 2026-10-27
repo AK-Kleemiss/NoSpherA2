@@ -799,7 +799,7 @@ namespace
 		EXPECT_EQ(parse_error("basis_set"), "Expected basis set name");
 		EXPECT_EQ(parse_error("basis_set sto-3g df_basis"), "Expected a fitting basis name after 'df_basis'");
 		EXPECT_EQ(parse_error("basis_set sto-3g guess_basis"), "Expected a basis name after 'guess_basis'");
-		EXPECT_EQ(parse_error("basis_set sto-3g safe"), "Expected a path after 'safe'");
+		EXPECT_EQ(parse_error("basis_set sto-3g save_eri"), "Expected a path after 'save_eri'");
 	}
 
 	// without a basis set the parse completes and then refuses to run
@@ -809,44 +809,30 @@ namespace
 		EXPECT_EQ(parse_error(""), "Basis set name not specified in settings file! Aborting run!");
 	}
 
-	// `read` takes an optional path: a keyword after it is put back (so `read basis_set`
-	// reaches the basis_set handler, which then wants its name), a bare token is the path
-	// (so `bogus` is the unknown keyword, not `tensor.bin`), and `read` at the end of the
-	// file is fine (the error is then the missing basis, not a read failure)
-	TEST(XcwSettingsTests, ReadKeywordTakesAnOptionalPath)
-	{
-		EXPECT_EQ(parse_error("read basis_set"), "Expected basis set name");
-		EXPECT_EQ(parse_error("read Basis_Set"), "Expected basis set name");
-		EXPECT_EQ(parse_error("read tensor.bin bogus"), "Unknown keyword 'bogus'");
-		EXPECT_EQ(parse_error("params 1 read"), "Basis set name not specified in settings file! Aborting run!");
-	}
-
 	// the successful parses build the P1 structure factors and the solver, which prints the
-	// basis it was given; every keyword below is accepted, `read` before a keyword puts it
-	// back (a swallowed `basis_set` would leave `sto-3g` as an unknown keyword and throw), and
-	// the basis token reaches the basis handler. The parsed values themselves are checked
-	// against opt.xcw_settings in the tests after these
-	TEST(XcwSettingsTests, SloppySlowConvergenceWithReadBeforeAKeyword)
+	// basis it was given; every keyword below is accepted. The parsed values themselves are
+	// checked against opt.xcw_settings in the tests after these
+	TEST(XcwSettingsTests, SloppySlowConvergence)
 	{
-		const std::string log = construct_on_p1("sloppy slow_conv params 177 read basis_set sto-3g f charge 0 mult 1 rhf start 0 step_size 0.01 end 0.02");
+		const std::string log = construct_on_p1("sloppy slow_conv params 177 basis_set sto-3g f charge 0 mult 1 rhf start 0 step_size 0.01 end 0.02");
 		if (log.empty()) {
 			GTEST_SKIP() << "tests/P1_test fixture not found";
 		}
 		EXPECT_NE(log.find("xcw orbital basis set: sto-3g"), std::string::npos) << log;
 	}
 
-	TEST(XcwSettingsTests, TightFastConvergenceStreamedTensorWithoutEnd)
+	TEST(XcwSettingsTests, TightFastConvergenceWithoutEnd)
 	{
-		const std::string log = construct_on_p1("tight fast_conv i_float i_tensor_mb 100 stream safe out.bin f2 params 177 basis_set sto-3g charge 0 mult 1 uhf start 0 step_size 0.1");
+		const std::string log = construct_on_p1("tight fast_conv f2 params 177 basis_set sto-3g charge 0 mult 1 uhf start 0 step_size 0.1");
 		if (log.empty()) {
 			GTEST_SKIP() << "tests/P1_test fixture not found";
 		}
 		EXPECT_NE(log.find("xcw orbital basis set: sto-3g"), std::string::npos) << log;
 	}
 
-	TEST(XcwSettingsTests, VeryTightWithSavedTensorAndExplicitCriteria)
+	TEST(XcwSettingsTests, VeryTightWithDoubleGridAndExplicitCriteria)
 	{
-		const std::string log = construct_on_p1("very_tight normal_conv read tensor.bin safe out.bin i_double weighted load_wfn nbo f params 177 basis_set sto-3g "
+		const std::string log = construct_on_p1("very_tight normal_conv i_double weighted load_wfn nbo f params 177 basis_set sto-3g "
 			"conv 1e-6 diis_damping 1e-3 diis_shift 1e-2 conv_diis 1e-5 gradient 7e-5 maxp_diff 1e-5 rmsp_diff 1e-6 damp 0.5 shift 0.5 max_iter 50 charge 0 mult 1 end 0.01");
 		if (log.empty()) {
 			GTEST_SKIP() << "tests/P1_test fixture not found";
@@ -896,7 +882,7 @@ namespace
 		EXPECT_DOUBLE_EQ(s.gradient, 7e-5);
 		EXPECT_DOUBLE_EQ(s.MaxP_diff, 1e-5);
 		EXPECT_DOUBLE_EQ(s.RMSP_diff, 1e-6);
-		EXPECT_DOUBLE_EQ(s.alpha, 0.5);
+		EXPECT_DOUBLE_EQ(s.alpha_damp, 0.5);
 		EXPECT_DOUBLE_EQ(s.level_shift, 0.5);
 		EXPECT_DOUBLE_EQ(s.diis_stop_damping, 1e-3);
 		EXPECT_DOUBLE_EQ(s.diis_stop_shift, 1e-2);
@@ -910,9 +896,7 @@ namespace
 		EXPECT_DOUBLE_EQ(s.xcw_strong_cutoff, 3.0);
 		EXPECT_EQ(s.extinction_model, extinction::model::none);
 		EXPECT_DOUBLE_EQ(s.wavelength, 0.0);
-		EXPECT_FALSE(s.grown || s.read_tensor || s.read_first_guess || s.nbo_output || s.check_hessian);
-		EXPECT_EQ(s.i_tensor_max_mb, 0u);
-		EXPECT_TRUE(s.i_tensor_file_path.empty() && s.i_tensor_save_path.empty());
+		EXPECT_FALSE(s.grown || s.read_first_guess || s.nbo_output || s.check_hessian || s.grid_double);
 	}
 
 	// the other presets, and an explicit value wins over its preset whichever comes first
@@ -924,7 +908,7 @@ namespace
 		EXPECT_DOUBLE_EQ(sloppy.gradient, 5e-4);
 		EXPECT_DOUBLE_EQ(sloppy.MaxP_diff, 1e-4);
 		EXPECT_DOUBLE_EQ(sloppy.RMSP_diff, 1e-5);
-		EXPECT_DOUBLE_EQ(sloppy.alpha, 0.8);
+		EXPECT_DOUBLE_EQ(sloppy.alpha_damp, 0.8);
 		EXPECT_DOUBLE_EQ(sloppy.level_shift, 1.0);
 		EXPECT_DOUBLE_EQ(sloppy.diis_stop_damping, 1e-5);
 		EXPECT_DOUBLE_EQ(sloppy.diis_stop_shift, 1e-5);
@@ -943,7 +927,7 @@ namespace
 		const options::XCW_settings v = parsed("conv 2e-6 damp 0.3 shift 0.7 max_iter 50 very_tight normal_conv basis_set sto-3g diis_damping 2e-3 diis_shift 3e-2 "
 			"conv_diis 4e-5 gradient 5e-5 maxp_diff 6e-5 rmsp_diff 7e-6");
 		EXPECT_DOUBLE_EQ(v.quant_diff, 2e-6);
-		EXPECT_DOUBLE_EQ(v.alpha, 0.3);
+		EXPECT_DOUBLE_EQ(v.alpha_damp, 0.3);
 		EXPECT_DOUBLE_EQ(v.level_shift, 0.7);
 		EXPECT_EQ(v.max_scf_iterations, 50);
 		EXPECT_DOUBLE_EQ(v.diis_stop_damping, 2e-3);
@@ -959,7 +943,7 @@ namespace
 	{
 		const options::XCW_settings s = parsed("basis_set def2-svp df_basis def2-universal-jkfit guess_basis sto-3g f2 weighted uhf charge 1 mult 2 "
 			"start 0.02 step_size 0.005 end 0.04 i_sigma 3 gaussian_halt strong_cutoff 4.5 grown load_wfn nbo soscf check_hessian "
-			"read tensor.bin safe out.bin i_float i_double i_tensor_mb 300 wavelength 1.54178 extinction bc_gaussian aniso fixed 2e-4");
+			"i_double wavelength 1.54178 extinction bc_gaussian aniso fixed 2e-4");
 		EXPECT_EQ(s.basis_set_name, "def2-svp");
 		EXPECT_EQ(s.df_basis_name, "def2-universal-jkfit");
 		EXPECT_EQ(s.guess_basis_name, "sto-3g");
@@ -975,24 +959,17 @@ namespace
 		EXPECT_TRUE(s.xcw_gaussian_halt);
 		EXPECT_DOUBLE_EQ(s.xcw_strong_cutoff, 4.5);
 		EXPECT_TRUE(s.grown && s.read_first_guess && s.nbo_output && s.check_hessian);
-		EXPECT_TRUE(s.read_tensor);
-		EXPECT_EQ(s.i_tensor_file_path, std::filesystem::path("tensor.bin"));
-		EXPECT_EQ(s.i_tensor_save_path, std::filesystem::path("out.bin"));
-		EXPECT_TRUE(s.i_tensor_single && s.i_tensor_double);
-		EXPECT_EQ(s.i_tensor_max_mb, 300u);
+		EXPECT_TRUE(s.grid_double);
 		EXPECT_DOUBLE_EQ(s.wavelength, 1.54178);
 		EXPECT_EQ(s.extinction_model, extinction::model::bc_gaussian);
 		EXPECT_TRUE(s.extinction_aniso);
 		EXPECT_FALSE(s.extinction_refine);
 		EXPECT_DOUBLE_EQ(s.extinction_start, 2e-4);
 
-		//`read` without a path means the default file, `safe` always names one; `stream` a 2 GB budget
-		const options::XCW_settings d = parsed("read stream basis_set sto-3g");
-		EXPECT_TRUE(d.read_tensor);
-		EXPECT_EQ(d.i_tensor_file_path, std::filesystem::path("I_tensor_stream.bin"));
-		EXPECT_TRUE(d.i_tensor_save_path.empty());
-		EXPECT_EQ(d.i_tensor_max_mb, 2048u);
+		//the keywords of the I tensor, which is no longer built, are unknown
 		EXPECT_EQ(parse_error("basis_set sto-3g save out.bin"), "Unknown keyword 'save'");
+		EXPECT_EQ(parse_error("basis_set sto-3g safe out.bin"), "Unknown keyword 'safe'");
+		EXPECT_EQ(parse_error("basis_set sto-3g read"), "Unknown keyword 'read'");
 	}
 
 	//cell::remove_inv_vectors keeps the first of every inversion related pair in hkl_enlarged's order and

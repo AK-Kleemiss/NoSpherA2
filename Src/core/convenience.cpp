@@ -284,11 +284,11 @@ std::string help_message =
  "  -cpus <n>                          Maximum worker threads [all available].\n"
  "  -mem <MB>                          Memory budget for everything sliceable\n"
  "                                    [unset]. When given, the tsc block size\n"
- "                                    and the XCW I tensor window are chosen\n"
+ "                                    and XCW's stored integrals are chosen\n"
  "                                    to fit it, and anything that fits whole\n"
  "                                    is held whole, that being the fastest\n"
- "                                    arrangement. An explicit -tsc_block or\n"
- "                                    XCW i_tensor_mb overrides it.\n"
+ "                                    arrangement. An explicit -tsc_block\n"
+ "                                    overrides it.\n"
  "  -pbc <n>                           Periodic-boundary setting.\n\n"
  "GPU ACCELERATION\n"
  "  A CUDA or ROCm device is found and used on its own; nothing needs to be\n"
@@ -301,27 +301,13 @@ std::string help_message =
  "  (scattering factors)               The Fourier transform runs on the device\n"
  "                                    whenever one is present and the problem\n"
  "                                    fits. Roughly 5-30x the CPU loop.\n"
- "  -gpu_itensor / -no_gpu_itensor     The XCW I tensor contractions, much the\n"
- "                                    largest of these paths: roughly 4-18x, set\n"
- "                                    mostly by how fast the host CPU is. Single\n"
+ "  -gpu_itensor / -no_gpu_itensor     XCW's grid block products and its\n"
+ "                                    stored-integral Fock build. Single\n"
  "                                    precision by default, which moves the total\n"
  "                                    energy in the tenth significant figure.\n"
- "  -no_cpu_itensor_fp32               Build the I tensor on the CPU in double;\n"
- "                                    single precision, as the device path\n"
- "                                    runs, is the default.\n"
- "  -itensor_hybrid                    Let the CPU threads take reflections of\n"
- "                                    the I tensor alongside the device. The\n"
- "                                    split is decided by timing and the two\n"
- "                                    sides differ in the last bits, so the\n"
- "                                    result is no longer reproducible run to\n"
- "                                    run; worth it on a card whose double\n"
- "                                    precision is slower than the host.\n"
- "  -gpu_itensor_tensor                FP16 Tensor Core operands with FP32\n"
- "                                    accumulation for the I tensor, about\n"
- "                                    2x faster than the FP32 GEMM default\n"
- "                                    but off in the fourth decimal of the\n"
- "                                    energy; -no_gpu_itensor_tensor is the\n"
- "                                    default.\n"
+ "  -no_cpu_itensor_fp32               XCW's grid block products on the CPU in\n"
+ "                                    double; single precision, as the device\n"
+ "                                    path runs, is the default.\n"
  "  -gpu_salted / -no_gpu_salted       The SALTED descriptor combination\n"
  "                                    (equicomb). It falls back to the CPU when\n"
  "                                    no usable device is present.\n"
@@ -338,7 +324,7 @@ std::string help_message =
  "  -gpu_blas                          Offer large dense matrix products to the\n"
  "                                    device. Small ones stay on the CPU, where\n"
  "                                    they beat what the transfers would allow.\n"
- "  -no_gpu_cublas                     Keep the I tensor GEMM off cuBLAS. By\n"
+ "  -no_gpu_cublas                     Keep the XCW grid GEMMs off cuBLAS. By\n"
  "                                    default cuBLAS is used when the machine has\n"
  "                                    it, being the fastest of the three, and the\n"
  "                                    built-in kernels otherwise - CUTLASS in\n"
@@ -350,9 +336,9 @@ std::string help_message =
  "                                    comparing logs across machines.\n"
  "\n"
  "  Precision:\n"
- "  -gpu_fp64                          Keep the device in double throughout: the\n"
- "                                    sincos in the transform and the I tensor\n"
- "                                    alike. Costs almost nothing on a card with\n"
+ "  -gpu_fp64                          Keep the device in double throughout the\n"
+ "                                    sincos of the transform. Costs almost\n"
+ "                                    nothing on a card with\n"
  "                                    real double-precision units and a great deal\n"
  "                                    on one without, which is why it is asked for\n"
  "                                    rather than detected.\n"
@@ -865,6 +851,8 @@ std::string help_message =
  "                                    coefficients.\n"
  "  -convert_XCW <stdout> <lambda-step> Convert Tonto XCW lambda-step output.\n"
  "  -do_XCW                             XCW mode; anomalous dispersion is read from the CIF.\n"
+ "  -print_F                           Write the F_calc table of every converged\n"
+ "                                    lambda step, NA2_<lambda>_Fcalc.txt.\n"
  "  -no_xcw_extrapolate                Seed each lambda step from the last one\n"
  "                                    alone instead of the density extrapolated\n"
  "                                    through the two previous steps.\n"
@@ -881,31 +869,7 @@ std::string help_message =
  "                                    moments restrained to that grid partition\n"
  "                                    by -multipole_moments.\n"
  "  -XCW_settings <file>                Keywords for -do_XCW. Besides the\n"
- "                                    refinement settings, three control how\n"
- "                                    the I tensor - nr_refl blocks of\n"
- "                                    nmo(nmo+1)/2 complex doubles, quadratic\n"
- "                                    in the basis and usually the largest\n"
- "                                    thing in the process - is kept:\n"
- "                                      stream          put it on disk and\n"
- "                                                      read a window of\n"
- "                                                      reflections at a time\n"
- "                                      i_tensor_mb <n> the same, with the\n"
- "                                                      budget named in MB\n"
- "                                      read            read the tensor at the\n"
- "                                                      default path\n"
- "                                      read <path>     reuse the streamed\n"
- "                                                      tensor at that path\n"
- "                                                      instead of building\n"
- "                                                      it: it depends on the\n"
- "                                                      structure, basis and\n"
- "                                                      reflections, not on\n"
- "                                                      any refinement\n"
- "                                                      setting, so trying\n"
- "                                                      another one is free\n"
- "                                      safe <path>     write the tensor\n"
- "                                                      there while the\n"
- "                                                      refinement runs, for\n"
- "                                                      a later read <path>\n"
+ "                                    refinement settings:\n"
  "                                      save_eri <path> write the stored\n"
  "                                                      two-electron integrals\n"
  "                                      read_eri <path> reuse them: they depend\n"
@@ -922,20 +886,9 @@ std::string help_message =
  "                                                      auxiliary basis from\n"
  "                                                      the built-in library,\n"
  "                                                      e.g. def2-universal-jkfit\n"
- "                                      i_double        hold, stream and save\n"
- "                                                      it in double although\n"
- "                                                      it was built in single\n"
- "                                      i_float         hold it in single\n"
- "                                                      precision, which is\n"
- "                                                      what the device\n"
- "                                                      computed: half the\n"
- "                                                      memory and 1.6x on\n"
- "                                                      the SCF loop\n"
- "                                    Without any of them the tensor is held\n"
- "                                    in memory when it fits the memory this\n"
- "                                    job can have, and streamed when it does\n"
- "                                    not - held is far faster, both SCF\n"
- "                                    walks reading it once per iteration.\n"
+ "                                      i_double        the grid's AO values\n"
+ "                                                      and block products\n"
+ "                                                      in double precision\n"
  "                                    Prefer a GENEROUS budget: holding 12%\n"
  "                                    of the tensor cost 8% more time than\n"
  "                                    holding all of it, while shrinking to\n"
@@ -3680,26 +3633,20 @@ bool options::digest_property_options(const std::string &temp, int &i)
 		cpu_itensor_fp32 = true;
 	else if (temp == "-no_cpu_itensor_fp32")
 		cpu_itensor_fp32 = false;
-	else if (temp == "-itensor_hybrid")
-		itensor_hybrid = true;
-	else if (temp == "-no_itensor_hybrid")
-		itensor_hybrid = false;
 	else if (temp == "-xcw_extrapolate")
 		xcw_extrapolate = true;
 	else if (temp == "-no_xcw_extrapolate")
 		xcw_extrapolate = false;
 	else if (temp == "-xcw_incremental")
 		xcw_incremental = true;
+	else if (temp == "-print_F")
+		print_F = true;
 	else if (temp == "-no_xcw_incremental")
 		xcw_incremental = false;
 	else if (temp == "-xcw_int_precision")
 		xcw_int_precision = stod(arguments[i + 1]);
 	else if (temp == "-no_gpu_itensor")
 		gpu_itensor = false;
-	else if (temp == "-gpu_itensor_tensor")
-		gpu_itensor_tensor = true;
-	else if (temp == "-no_gpu_itensor_tensor")
-		gpu_itensor_tensor = false;
 	else if (temp == "-gpu_cublas")
 		gpu_cublas = true;
 	else if (temp == "-no_gpu_cublas")
@@ -4569,16 +4516,12 @@ void options::loadXCWsettings() {
 	int max_scf_iterations = 32768, charge = 32768, multiplicity = 32768, n_params = 32768, refine_against = 32768;
 	std::string basis_set_name = "Undefined";
 	std::string df_basis_name, hessian_df_basis_name, guess_basis_name;
-	bool grown = false, read_tensor = false, read_first_guess = false, nbo_output = false, xcw_gaussian_halt = false, mask = false;
+	bool grown = false, read_first_guess = false, nbo_output = false, xcw_gaussian_halt = false, mask = false;
 	extinction::model extinction_model = extinction::model::none;
 	bool extinction_aniso = false, extinction_refine = true;
 	double extinction_start = 1e-4, wavelength = 0.0;
-	bool i_tensor_single = false, i_tensor_double = false;
-	std::filesystem::path i_tensor_file_path;
-	std::filesystem::path i_tensor_save_path;
+	bool grid_double = false;
 	std::filesystem::path eri_read_path, eri_save_path, basis_overrides;
-	// 0 = hold the whole tensor, which is what every run did before this existed.
-	size_t i_tensor_max_mb = 0;
 	occ::qm::SpinorbitalKind hf_type = occ::qm::SpinorbitalKind::Restricted;
 	if (!std::filesystem::exists(xcw_settings_path)) {
 		throw std::runtime_error("Settings file not found! Aborting run!");
@@ -4788,58 +4731,11 @@ void options::loadXCWsettings() {
 			speed_preset = "fast_conv";
 			};
 
-		//`read <path>` reuses the streamed tensor at that path, which is the expensive thing
-		//a run produces and which depends only on the geometry, the basis and the
-		//reflections, not on any refinement setting. So trying another lambda range or
-		//convergence preset need not rebuild it. It is held in memory when it fits.
-		//
-		//The path is optional, and the settings file is one whitespace-separated stream of
-		//tokens, so a bare `read` followed by another keyword must not swallow it: take the
-		//next token, put it back if it is a keyword.
-		handlers["read"] = [&](std::istream& is) {
-			read_tensor = true;
-			i_tensor_file_path = "I_tensor_stream.bin";
-			const std::streampos before = is.tellg();
-			std::string token;
-			if (!(is >> token)) { is.clear(); return; }
-			std::string lowered = token;
-			std::transform(lowered.begin(), lowered.end(), lowered.begin(),
-				[](unsigned char c) { return std::tolower(c); });
-			if (handlers.find(lowered) != handlers.end()) {
-				is.clear();
-				is.seekg(before);
-				return;
-			}
-			i_tensor_file_path = token;
-			};
 		handlers["load_wfn"] = [&](std::istream&) {
 			read_first_guess = true;
 			};
 		handlers["nbo"] = [&](std::istream&) {
 			nbo_output = true;
-			};
-		// The tensor is nr_small blocks of nmo(nmo+1)/2 complex doubles and grows
-		// quadratically with the basis, so on anything past a minimal basis it is
-		// the largest thing in the process. `stream` puts it on disk with a
-		// default budget; `i_tensor_mb <n>` names the budget.
-		handlers["stream"] = [&](std::istream&) {
-			if (i_tensor_max_mb == 0) i_tensor_max_mb = 2048;
-			};
-
-		//The tensor comes off the device in single precision and was stored in double, so
-		//half of every byte the SCF loop reads back was padding. Holding it as computed is
-		//half the memory and, measured on the full twisted ethylene, 1.63x on the two walks
-		//each SCF iteration makes over it. Opt-in because it is a change of stored
-		//precision: the lambda scan agrees to 5e-13 and iteration for iteration, but that
-		//is a measurement on one system rather than a proof.
-		//Writing the tensor is worth ~40 minutes to a later run and costs this one nothing:
-		//the refinement only reads the tensor, so a thread can push it to disk while the SCF
-		//gets on with it. The path is what `read <path>` will want afterwards.
-		handlers["safe"] = [&](std::istream& is) {
-			std::string path;
-			if (!(is >> path))
-				throw std::runtime_error("Expected a path after 'safe'");
-			i_tensor_save_path = path;
 			};
 		//The stored two-electron integrals depend on geometry and basis only; read_eri falls back to building
 		//them when the file holds another basis or geometry
@@ -4856,19 +4752,10 @@ void options::loadXCWsettings() {
 			eri_read_path = path;
 			};
 
-		handlers["i_float"] = [&](std::istream&) {
-			i_tensor_single = true;
-			};
-
 		handlers["i_double"] = [&](std::istream&) {
-			i_tensor_double = true;
+			grid_double = true;
 			};
 
-		handlers["i_tensor_mb"] = [&](std::istream& in2) {
-			long long mb = 0;
-			in2 >> mb;
-			i_tensor_max_mb = (mb > 0) ? static_cast<size_t>(mb) : 0;
-			};
 
 		handlers["gaussian_halt"] = [&](std::istream&) {
 			xcw_gaussian_halt = true;
@@ -4928,13 +4815,13 @@ void options::loadXCWsettings() {
 	}
 
 	if (speed_preset == "slow_conv") {
-		xcw_settings.alpha = 0.8;
+		xcw_settings.alpha_damp = 0.8;
 		xcw_settings.level_shift = 1;
 		xcw_settings.diis_stop_damping = 1e-5;
 		xcw_settings.diis_stop_shift = 1e-5;
 	}
 	else if (speed_preset == "normal_conv") {
-		xcw_settings.alpha = 0.5;
+		xcw_settings.alpha_damp = 0.5;
 		xcw_settings.level_shift = 0.5;
 		xcw_settings.diis_stop_damping = 1e-3;
 		xcw_settings.diis_stop_shift = 1e-2;
@@ -4956,7 +4843,7 @@ void options::loadXCWsettings() {
 	if (gradient != 32768) xcw_settings.gradient = gradient;
 	if (MaxP_diff != 32768) xcw_settings.MaxP_diff = MaxP_diff;
 	if (RMSP_diff != 32768) xcw_settings.RMSP_diff = RMSP_diff;
-	if (alpha != 32768) xcw_settings.alpha = alpha;
+	if (alpha != 32768) xcw_settings.alpha_damp = alpha;
 	if (level_shift != 32768) xcw_settings.level_shift = level_shift;
 	if (max_scf_iterations != 32768) xcw_settings.max_scf_iterations = max_scf_iterations;
 	xcw_settings.charge = (charge != 32768) ? charge : xcw_settings.charge;
@@ -4983,13 +4870,8 @@ void options::loadXCWsettings() {
 	xcw_settings.grown = grown;
 	xcw_settings.mask = mask;
 	xcw_settings.hf_type = hf_type;
-	xcw_settings.read_tensor = read_tensor;
 	xcw_settings.read_first_guess = read_first_guess;
-	xcw_settings.i_tensor_max_mb = i_tensor_max_mb;
-	xcw_settings.i_tensor_single = i_tensor_single;
-	xcw_settings.i_tensor_double = i_tensor_double;
-	xcw_settings.i_tensor_file_path = i_tensor_file_path;
-	xcw_settings.i_tensor_save_path = i_tensor_save_path;
+	xcw_settings.grid_double = grid_double;
 	xcw_settings.eri_read_path = eri_read_path;
 	xcw_settings.eri_save_path = eri_save_path;
 	xcw_settings.nbo_output = nbo_output;
@@ -5170,7 +5052,7 @@ size_t available_memory_bytes()
 	//SLURM sets the limit on the job's and step's cgroup, never on the mount root (AKL:
 	///system.slice/slurmstepd.scope/job_N/step_0/user/task_0), so walk from this process's own
 	//cgroup up to the root and keep the smallest limit minus what that cgroup already uses.
-	//Reclaimable page cache (inactive_file) is not usage: a streamed I tensor file would otherwise eat the budget.
+	//Reclaimable page cache (inactive_file) is not usage: a large file just written would otherwise eat the budget.
 	auto read_ull = [](const std::string& p, unsigned long long& v) {
 		std::FILE* f = std::fopen(p.c_str(), "r");
 		if (!f) return false;

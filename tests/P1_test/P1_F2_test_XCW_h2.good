@@ -16,14 +16,21 @@ Generating k-points...                            ... done!
 Number of k-points to evaluate: 402
 XCW: I/sigma(I) >= 2 (F/sigma(F) >= 4): 394 of 402 reflections in the fit; R1 and Criterion are over these, R1(all) and Crit(all) over all
 XCW orbital basis set: sto-3g-basis
-I tensor read from p1_i.bin (10.9002 MB, single precision), not recomputed, held in memory
+Screened out 1802 unique pairs of mu, nu (33.64%) 
+GridManager: Setting up prototype grids for atom types...
+GridManager: Generating integration grids for atoms...
+GridManager: Generated total of 80442 grid points.
+Total number of grid points after pruning: 80442
+AO values calculated for all grids.
+XCW grid transform: Fourier-Bessel, L 12, 193 table nodes, 6 prototypes
 More detailed output in SCF.log file...
-XCW: fitting against the 1/|H|^2-weighted residual self-energy criterion Criterion below is this weighted quantity, not the classical GoF.
+XCW: fitting against the 1/|H|^2-weighted residual self-energy criterion Criterion below is the square of this weighted quantity, not the classical GooF^2.
 ____________________________________________________________________________________________________________________________
  Lambda		Criterion	GooF(F2)	R1(gt)		Total Energy		Perturbation	Target quantity		Crit(all)	R1(all)
 									(%)			(Eh)				(a. u.)			(a. u.)
 ____________________________________________________________________________________________________________________________
- 0.00000	10.5566		5.6181		0.02515		-1961.925585145		0.000			-1961.925585145		10.3676		0.02558
- 0.01000	5.9799		3.9693		0.02247		-1961.749857006		0.060			-1961.690057558		5.8731		0.02285
- 0.02000	5.0430		3.5938		0.02148		-1961.602470312		0.101			-1961.501610253		4.9530		0.02183
+ 0.00000	111.4437		5.6181		0.02515		-1961.925585145		0.000			-1961.925585145		107.4880		0.02558
+XCW grid tscb: max |f_grid - f_tsc| / max |f| 2.65e-05, later steps write the tscb from the grid
+ 0.01000	35.7606		3.9693		0.02247		-1961.749856953		0.358			-1961.392250722		34.4942		0.02285
+ 0.02000	25.4326		3.5938		0.02148		-1961.602467824		0.509			-1961.093815709		24.5332		0.02183
 Finished XCW fitting procedure.

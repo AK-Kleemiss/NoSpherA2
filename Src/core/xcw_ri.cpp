@@ -56,7 +56,6 @@ void structure_factors::setup_ri(const occ::qm::AOBasis& ao)
 
 void structure_factors::setup_ri(const occ::qm::AOBasis& ao, const occ::qm::AOBasis& aux_in, const int lmax, const double strength, const MultipoleScheme scheme)
 {
-	err_checkf(XG.mode == 1, "-xcw_partition ri runs on the grid route: not with NOSPHERA2_XCW_GRID=0 or a saved I tensor", std::cout);
 	occ::qm::AOBasis aux = aux_in;
 	aux.set_pure(true);
 	const int ng = model_data.ncen, nc = static_cast<int>(XG.inversion_link.size()), n = static_cast<int>(ao.nbf()), na = static_cast<int>(aux.nbf());

@@ -109,9 +109,9 @@ Useful environment variables:
 - `NOS_EXE` - path to the executable for Python tests.
 - `OCC_DATA_PATH` - OCC runtime data directory. CTest defaults this to `occ/share`; local Windows Python runs commonly need `D:\git\NoSpherA2\Lib\occ\share\occ` or the current equivalent.
 - `RUN_FULL_TEST` - truthy value enables slow/full Python integration tests.
-- `NOS_TEST_SHARED_DIR` - set by ctest for every gtest (`<build>/tests/src/shared`). `XcwScfTests.SharedTensorBuild`
-  writes the P1 subset's I tensor there once (ctest fixture `xcw_p1_tensor`) and the XCW tests that test the SCF
-  rather than the tensor read it; a test binary run without it builds its own tensor, with the same numbers.
+- `NOS_TEST_SHARED_DIR` - set by ctest for every gtest (`<build>/tests/src/shared`). `XcwScfTests.SharedEriBuild`
+  writes the P1 molecule's stored two-electron integrals there once (ctest fixture `xcw_p1_eri`) and the XCW tests that
+  test the SCF read them; a test binary run without it builds its own, with the same numbers.
 - `OMP_WAIT_POLICY=PASSIVE` - set by the `test-base` test preset: ctest runs several tests at once and each opens a
   thread per core, so spinning idle OpenMP workers would take the cores the other tests compute on.
 
@@ -294,6 +294,20 @@ As of 2026-10-27 (shares cost), XCW's TFVC shares take a TFVC-only weight pass a
 fits refit inside a solve until the density settles; `XcwPartitionTests.TfvcShareKernelIsTheStandAloneOne` is new. Ported onto the
 XCW refactor, `ctest --preset release-windows -j4` (GPU present) reports **1351 passed, 0 failed, 10 skipped** (2 disabled) of 1363. See
 `UNIT_TESTS_STATUS.md`.
+
+As of 2026-10-27 (XCW refactor, run 3), XCW's Criterion is GooF^2 against F or F^2, the perturbation lambda times it and
+the target quantity `quant_` E + perturbation, the functional the SCF minimises (`phi` is gone; the SCF path is unchanged,
+it already minimised E + lambda GooF^2), and `grid_contract` sums its blocks in a load-independent order; the nine P1 XCW goldens
+were regenerated (Criterion, Perturbation, Target quantity and Crit(all) columns). `RUN_FULL_TEST=1 ctest --preset
+release-windows-tests -j 6` on a CPU-only build reports **1329 passed, 0 failed, 15 skipped** (2 disabled) of 1346. See
+`UNIT_TESTS_STATUS.md` and `REFACTOR.md`.
+
+As of 2026-10-27 (XCW refactor, run 2), the XCW I tensor route is gone: XCW runs on its integration grid only
+(`structure_factors::setup_grid` with `link_symmetry_equivalents`, `screen_ao_pairs`, `setup_atom_grids`,
+`build_grid_blocks`), the `safe`/`read`/`stream`/`i_tensor_mb`/`i_float` keywords are unknown, the subset goldens run on the
+grid, `-print_F` writes the `_Fcalc.txt` tables and `XCW_log_writer` carries the crystallographic log columns. `ctest --preset
+release-windows-tests -j 6` on a CPU-only build reports **1322 passed, 0 failed, 22 skipped** (2 disabled) of 1346, and the
+four `P1_*_full` goldens pass. See `UNIT_TESTS_STATUS.md` and `REFACTOR.md`.
 
 As of 2026-10-27 (-eli_spin, on b456eec), `-eli_spin` writes the spin-resolved ELI-D cubes from one pass and
 `scripts/vmd/eli_spin.py` turns a wavefunction into a VMD scene; two `EliSpinTests` and `TomlIntegrationTests.EliSpinCh3`

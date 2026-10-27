@@ -1542,7 +1542,7 @@ void read_atoms_from_CIF(std::ifstream& cif_input, const cell& unit_cell, int& n
 	}
 }
 
-//Declared in the header so the XCW I tensor screens on the same ladder: what counts as
+//Declared in the header so the XCW grid screens on the same ladder: what counts as
 //negligible is the run's accuracy setting, and there should be one answer to that.
 double cutoff(const int& accuracy)
 {

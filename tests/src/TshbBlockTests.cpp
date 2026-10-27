@@ -731,9 +731,10 @@ static void density_following_shares(const std::string& scheme)
 		return v[col];
 	};
 	auto r1 = [&](const std::string& lambda) { return row(log, lambda, 3); };
-	//the converged result is the same fixed point within the SCF and refit tolerances: criterion to 1e-4, R1 to 1e-5
+	//the converged result is the same fixed point within the SCF and refit tolerances: GooF to 1e-4, so its square, the
+	//criterion (about 20 here), to 1e-3, R1 to 1e-5
 	for (const std::string l : { " 0.00000\t", " 0.05000\t" }) {
-		EXPECT_NEAR(row(log, l, 1), row(old_log, l, 1), 1e-4) << l;
+		EXPECT_NEAR(row(log, l, 1), row(old_log, l, 1), 1e-3) << l;
 		EXPECT_NEAR(row(log, l, 3), row(old_log, l, 3), 1e-5) << l;
 	}
 	const double r0 = r1(" 0.00000\t"), r5 = r1(" 0.05000\t");

@@ -1,14 +1,42 @@
 #pragma once
 #include "convenience.h"
 
-// Writes what an XCW run reports about its SCF: the line per iteration to SCF.log and the line
-// per converged lambda to the console. XCW_solver and XCW_wrapper each fill in what they know in
-// `v` and then ask for the line, so neither needs to see the other's data.
+// The SCF.log of a solver: the head of a run, the line of every iteration (its number and the total
+// energy) and whatever the solver reports along the way through `log`.
 class SCF_log_writer {
 
 public:
 
 	SCF_log_writer(const std::string& file = "SCF.log") { log.open(file); }
+	virtual ~SCF_log_writer() = default;
+
+	std::ofstream log;
+
+	void WAEmpiRe() { log << WAEmpiRe_message() << std::endl; }
+
+	// The head of the iteration table of one run of the solver called label
+	void start_run(const std::string& label) {
+		log << "Starting the " << label << " solver\n";
+		log << "____________________________________________________________________________________________________\n";
+		log << " Iteration\tTotal Energy (Eh)\n";
+	}
+
+	// One SCF iteration
+	void iteration_line(const int iter, const double E_total) {
+		log << " " << iter << "\t\t\t" << std::fixed << std::setprecision(9) << E_total << std::endl;
+	}
+};
+
+// The XCW log: the crystallographic indicators (criterion, GooF, R1) next to the energy of every SCF
+// iteration in SCF.log, and the row of every converged lambda on the console. XCW_solver and
+// XCW_wrapper each fill in what they know in `v` and then ask for the line, so neither needs to see
+// the other's data.
+class XCW_log_writer : public SCF_log_writer {
+
+public:
+
+	using SCF_log_writer::SCF_log_writer;
+	using SCF_log_writer::iteration_line;
 
 	struct values {
 		int iter = 0;
@@ -16,10 +44,7 @@ public:
 		bool has_A2 = false;
 	};
 
-	std::ofstream log;
 	values v;
-
-	void WAEmpiRe() { log << WAEmpiRe_message() << std::endl; }
 
 	// The head of the table of one lambda step in SCF.log
 	void start_lambda(const double lambda) {
