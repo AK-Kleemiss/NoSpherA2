@@ -62,7 +62,7 @@ void structure_factors::update_grid_weights(const vec2& rho, const dMatrix2& D)
 	const auto t0 = std::chrono::steady_clock::now();
 	const int ng = static_cast<int>(W.np.size());
 	const char* tl = tuning("NOSPHERA2_XCW_WEIGHT_TOL");
-	const double tol = tl ? std::atof(tl) : 1e-6;
+	const double tol = std::max(XG.tol, tl ? std::atof(tl) : 1e-6);
 	if (W.part == PartitionType::TFVC) {
 		//chi from the line densities of D itself, rho = 2 chi^T D chi as grid_rho has it
 		const int n = static_cast<int>(D.extent(0));
@@ -86,15 +86,19 @@ void structure_factors::update_grid_weights(const vec2& rho, const dMatrix2& D)
 		vec dab(static_cast<size_t>(ng) * ng);
 		for (int a = 0; a < ng; a++)
 			for (int b = 0; b < ng; b++) dab[static_cast<size_t>(a) * ng + b] = std::hypot(W.x[b] - W.x[a], W.y[b] - W.y[a], W.z[b] - W.z[a]);
+		//NOSPHERA2_XCW_TFVC_OLD: the Becke and TFVC pass of the stand-alone grid, the reference
+		const bool old_tfvc = tuning("NOSPHERA2_XCW_TFVC_OLD") != nullptr;
 #pragma omp parallel
 		{
-			vec pa_b(ng), pa_tv(ng);
+			vec pa(ng), dist(ng), pa_b(ng);
 			for (int g = 0; g < ng; g++) {
 				const vec2& G = W.grid[g];
 #pragma omp for schedule(dynamic, 256) nowait
 				for (int p = 0; p < W.np[g]; p++)
-					XG.w[g][p] = XG.w0[g][p] * get_integration_weights(ng, W.Z.data(), W.x.data(), W.y.data(), W.z.data(), g,
-						G[GridData::GridIndex::X][p], G[GridData::GridIndex::Y][p], G[GridData::GridIndex::Z][p], pa_b, pa_tv, W.chi, dab.data())[1];
+					XG.w[g][p] = XG.w0[g][p] * (old_tfvc ? get_integration_weights(ng, W.Z.data(), W.x.data(), W.y.data(), W.z.data(), g,
+						G[GridData::GridIndex::X][p], G[GridData::GridIndex::Y][p], G[GridData::GridIndex::Z][p], pa_b, pa, W.chi, dab.data())[1]
+						: get_tfvc_weight(ng, W.x.data(), W.y.data(), W.z.data(), g, G[GridData::GridIndex::X][p], G[GridData::GridIndex::Y][p],
+						G[GridData::GridIndex::Z][p], pa, dist, W.chi, dab.data()));
 			}
 		}
 	}
@@ -102,13 +106,16 @@ void structure_factors::update_grid_weights(const vec2& rho, const dMatrix2& D)
 		for (int g = 0; g < ng; g++)
 			for (int p = 0; p < W.np[g]; p++) W.grid[g][GridData::GridIndex::WFN_DENSITY][p] = rho[g][p] / XG.w0[g][p];
 		std::ostream none(nullptr);
+		//NOSPHERA2_XCW_WEIGHT_MIX: Anderson depth of the fits, 0 the plain fixed point
+		const char* mx = tuning("NOSPHERA2_XCW_WEIGHT_MIX");
+		const int mix = mx ? std::atoi(mx) : 6;
 		int k = 0;
 		if (W.part == PartitionType::MBIS || W.embis.empty()) {
-			W.mbis = make_MBIS_vectors(W.atoms, W.grid, W.np, false, none, W.mbis, tol, &k);
+			W.mbis = make_MBIS_vectors(W.atoms, W.grid, W.np, false, none, W.mbis, tol, &k, mix);
 			W.sweeps += k;
 		}
 		if (W.part == PartitionType::EMBIS) {
-			W.embis = make_EMBIS_tensors(W.atoms, W.grid, W.np, false, W.mbis, none, W.embis, tol, &k);
+			W.embis = make_EMBIS_tensors(W.atoms, W.grid, W.np, false, W.mbis, none, W.embis, tol, &k, mix);
 			W.sweeps += k;
 		}
 		std::vector<MBIS_Atom> m;

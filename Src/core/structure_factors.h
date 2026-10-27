@@ -147,6 +147,7 @@ public:
 		//current share s, which grid_rho recomputes from its own rho when refresh is set; rho_s is then its partitioned rho
 		vec2 w0, rho_s;
 		bool refresh = false;
+		double tol = 0.0; //the MBIS/EMBIS refit's criterion when set, else NOSPHERA2_XCW_WEIGHT_TOL
 		std::shared_ptr<struct xcw_weights> ws;
 	} XG;
 	//build_I's grid as TFVC, MBIS or EMBIS partition it; the Hirshfeld shares it was built with stand until rho is known

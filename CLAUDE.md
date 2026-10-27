@@ -239,6 +239,11 @@ Key core modules live in `Src/core`:
 
 ## Current Validation Notes
 
+As of 2026-10-27 (shares cost), XCW's TFVC shares take a TFVC-only weight pass and MBIS/EMBIS Anderson-mixed, warm, loose-early
+fits refit inside a solve until the density settles; `XcwPartitionTests.TfvcShareKernelIsTheStandAloneOne` is new. Ported onto the
+XCW refactor, `ctest --preset release-windows -j4` (GPU present) reports **1351 passed, 0 failed, 10 skipped** (2 disabled) of 1363. See
+`UNIT_TESTS_STATUS.md`.
+
 As of 2026-10-27 (XCW refactor merged with density_source `33fa9685`), the density-following TFVC/MBIS/EMBIS shares run in the
 new structure: their refit between solves, the lambda 0 fit and the share report in `XCW_wrapper`, `NOSPHERA2_XCW_ADJOINT_CHECK`
 after the first step; `ctest --preset release-windows-tests -j 6` on a CPU-only build reports **1333 passed, 0 failed, 23 skipped**
