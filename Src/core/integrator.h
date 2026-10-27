@@ -66,6 +66,8 @@ namespace DensityFitting
 	// Helper functions for multipole restraints
 	// Grid moments of the partitioned density about each nucleus, [atom][l*l+l+m] for l = 0..lmax, electrons only
 	vec2 calculate_expected_multipoles(const WFN& wavy, const CHARGE_SCHEME& scheme, const int lmax, PartitionCache* cache = nullptr);
+	// The electrons on each atom of Nuclear, Sanderson and Mulliken (from wavy's density matrix)
+	vec population_targets(const WFN& wavy, const CHARGE_SCHEME scheme);
 	// Rows [atom*(lmax+1)^2 + l*l+l+m] over the aux functions whose product with the coefficients is Int w_a rho r^l Y_lm
 	// about each nucleus, w_a the partition weight of scheme on the atoms of wavy; TFVC/MBIS/EMBIS take the density from
 	// density (density_batch of a Gaussian_Molecule) or else from wavy's orbitals

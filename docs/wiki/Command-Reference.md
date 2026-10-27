@@ -431,7 +431,7 @@ The SCF details go to `SCF.log`.
 | --- | --- | --- | --- |
 | `-do_XCW` | 0 | off | Run the XCW lambda scan. Needs `-cif`, `-hkl` and `-XCW_settings`. |
 | `-XCW_settings <file>` | 1 | | Settings file; see [settings-file keywords](#settings-file-keywords). |
-| `-xcw_partition grid\|ri` | 1 | `grid` | How XCW shares the density among the atoms for F_calc. `grid`: the grid weights (`-hirsh` default). `ri`: an RI fit of the density in the `-ri_fit` basis (AutoAux without one), (mu nu\|P) from occ held in memory; with `-multipole_moments` its atomic moments are restrained, exactly to the grid's Hirshfeld moments, or for `tfvc`, `mbis`, `embis` to the moments of the previous step's converged density, held fixed within a step. |
+| `-xcw_partition grid\|ri` | 1 | `grid` | How XCW shares the density among the atoms for F_calc. `grid`: the grid weights (`-hirsh` default). `ri`: an RI fit of the density in the `-ri_fit` basis (AutoAux without one), (mu nu\|P) from occ held in memory; with `-multipole_moments` its atomic moments are restrained to the grid partition of that scheme (`hirshfeld`, `tfvc`, `mbis`, `embis`, exact derivative at fixed shares), to Mulliken charges (linear in D, exact) or to fixed Nuclear / Sanderson charges. `-tfvc`, `-mbis` and `-embis` work on the `grid` route too: their shares are refit to XCW's own density (stand-alone `make_chi` / MBIS / EMBIS fits on the XCW grid, MBIS and EMBIS to 1e-6) between SCF solves of a step until the refit moves F by less than 1e-5 of max \|F\|; they need the grid route (not with `read`, `safe` or `NOSPHERA2_XCW_GRID`). |
 | `-xyz <file>` | 1 | | The grown molecule, for a settings file with `grown`. |
 | `-twin <9 numbers>` | 9 | | Twin laws applied to the reflections, as in [section 2](#2-scattering-factors-and-tsctscb-tables). |
 | `-mem <MB>` | 1 | | When given, caps the I tensor, the density-fitting integrals and the stored two-electron integrals together; without it they are sized from the memory the job can have. |
@@ -449,7 +449,7 @@ and `-all_charges` apply to each `.tscb` written. Developer knobs, through
 `-tune NAME=value`: `NOSPHERA2_XCW_I_FLOAT` (single-precision tensor),
 `NOSPHERA2_NO_INVERSION_SCREENING` (integrate both h and -h),
 `NOSPHERA2_XCW_ERI_NO_BUDGET` (store the two-electron integrals outside `-mem`) and
-`NOSPHERA2_DEBUG_ASYMFACT` (print the symmetry factors).
+`NOSPHERA2_DEBUG_ASYMFACT` (print the symmetry factors). For density-following shares: `NOSPHERA2_XCW_WEIGHT_UPDATE=k` (refit at every k-th evaluation inside the SCF instead of between solves; `0` freezes them per step, the reference), `NOSPHERA2_XCW_WEIGHT_FTOL` (default `1e-5`), `NOSPHERA2_XCW_WEIGHT_TOL` (MBIS/EMBIS fit, default `1e-6`), `NOSPHERA2_XCW_WEIGHT_CHECK` (how far the shares move F and R1 over a step) and `NOSPHERA2_XCW_ADJOINT_CHECK` (now after the first step).
 
 Example, run in `tests/P1_test`:
 `NoSpherA2 -do_XCW -no_gpu -cif P1_test.cif -hkl P1_subset.hkl -XCW_settings test_settings_save.txt -no_date`,

@@ -261,7 +261,10 @@ static void calc_F(structure_factors& sf, structure_factors::I_tensor& I, const 
 }
 
 void XCW_solver::evaluate(const dMatrix2& dm_eff) {
+	sf.XG.refresh = sf.XG.ws && lambda_ != 0.0 && (weight_every_ > 0 ? weight_count_ % weight_every_ == 0 : weight_every_ == 0 && weight_count_ == 0);
+	weight_count_++;
 	calc_F(sf, *I_tens, dm_eff);
+	sf.XG.refresh = false;
 	sf.eval_scale();
 	sf.calc_criteria();
 }
@@ -569,7 +572,19 @@ void XCW_solver::create_tscb(const occ::qm::Wavefunction& wfn, const double& lam
 		dMatrix2 D(n, n);
 		for (int i = 0; i < n; i++)
 			for (int j = 0; j < n; j++) D(i, j) = Dw(i, j) + (unrestricted ? Dw(i + n, j) : 0.0);
+		//the shares of the density the table is of; frozen per step they stay the step's
+		sf.XG.refresh = sf.XG.ws && weight_every_ > 0 && lambda != 0.0;
 		sfc = sf.grid_sfc(D);
+		sf.XG.refresh = false;
+		if (sf.XG.ws && (!sf.XR.on || sf.XR.lmax >= 0)) {
+			writer.log << "XCW grid charges at lambda " << std::fixed << std::setprecision(5) << lambda << ":" << std::setprecision(6);
+			for (int a = 0; a < sf.model_data.ncen; a++) {
+				double e = 0;
+				for (int p = 0; p < static_cast<int>(sf.XG.rho_s[a].size()); p++) e += sf.XG.rho_s[a][p];
+				writer.log << " " << sf.asym_atoms[a].label << " " << sf.asym_atoms[a].type - e;
+			}
+			writer.log << std::endl;
+		}
 	}
 	if (grid_tscb && !tscb_scat_.empty()) {
 		cvec2 table(tscb_scat_.size(), cvec(tscb_entry_.size()));
@@ -619,8 +634,9 @@ void XCW_solver::create_tscb(const occ::qm::Wavefunction& wfn, const double& lam
 				worst = std::max(worst, dmax / fmax);
 			}
 			//ponytail: 1e-2 only catches a wrong layout; the grid-vs-tsc agreement itself is the 5e-5 of the F check
-			//the RI partition is not the tsc route's, so there the closest atom is all the layout can be matched by
-			ok = ok && (worst < 1e-2 || sf.XR.on);
+			//the RI partition is not the tsc route's, nor are shares fit tighter than the stand-alone MBIS and EMBIS stop, so there
+			//the closest atom is all the layout can be matched by
+			ok = ok && (worst < 1e-2 || sf.XR.on || sf.XG.ws);
 			std::cout << "XCW grid tscb: max |f_grid - f_tsc| / max |f| " << std::scientific << std::setprecision(2) << worst << std::defaultfloat
 				<< (ok ? ", later steps write the tscb from the grid" : ", layout not matched, the tsc route stays") << std::endl;
 			if (ok) {
@@ -629,7 +645,7 @@ void XCW_solver::create_tscb(const occ::qm::Wavefunction& wfn, const double& lam
 				tscb_entry_ = entry;
 				tscb_atom_ = atom;
 			}
-			if (ok && sf.XR.on) {
+			if (ok && (sf.XR.on || sf.XG.ws)) {
 				cvec2 table(tscb_scat_.size(), cvec(tscb_entry_.size()));
 				for (int s = 0; s < static_cast<int>(table.size()); s++)
 					for (size_t r = 0; r < tscb_entry_.size(); r++) table[s][r] = grid_value(tscb_atom_[s], tscb_entry_[r]);
@@ -673,12 +689,6 @@ void XCW_solver::create_tscb(const occ::qm::Wavefunction& wfn, const double& lam
 	value.erase(std::remove(value.begin(), value.end(), '.'), value.end());
 	while (value.length() < 7) {
 		value += '0';
-	}
-	//the RI partition restrained to a scheme XCW's grid does not carry: this step's converged density sets the next step's targets
-	if (sf.XR.on && sf.XR.lmax >= 0 && (opt->multipole_scheme == MultipoleScheme::TFVC || opt->multipole_scheme == MultipoleScheme::MBIS || opt->multipole_scheme == MultipoleScheme::EMBIS)) {
-		const DensityFitting::CONFIG c = DensityFitting::config_from_options(*opt);
-		sf.set_ri_targets(DensityFitting::calculate_expected_multipoles(sf_wave_vec[0], c.charge_scheme, sf.XR.lmax, &tshb_cache_));
-		writer.log << "XCW partition: the RI restraints take the moments of this step's density for the next" << std::endl;
 	}
 	std::ostringstream oss;
 	oss << "NA2_" << value << (opt->write_tshb ? ".tshb" : ".tscb");
@@ -796,6 +806,20 @@ void XCW_solver::density_fitting(occ::qm::HartreeFock& target, const std::string
 //Everything a converged step puts on screen, in the order it always has: the halting statistic
 //first so its A^2 can be the last column of the row
 void XCW_solver::report_lambda(const double lambda, const occ::qm::Wavefunction& wfn, const bool write_result) {
+	//lambda 0 does not feel F: density-following shares are fit once, to the converged density, and the row is of them
+	if (lambda == 0.0 && sf.XG.ws) {
+		const occ::Mat& Dw = wfn.mo.D;
+		const int n = static_cast<int>(Dw.cols());
+		const bool unrestricted = Dw.rows() == 2 * Dw.cols();
+		dMatrix2 D(n, n);
+		for (int i = 0; i < n; i++)
+			for (int j = 0; j < n; j++) D(i, j) = Dw(i, j) + (unrestricted ? Dw(i + n, j) : 0.0);
+		sf.XG.refresh = true;
+		calc_F(sf, *I_tens, D);
+		sf.XG.refresh = false;
+		sf.eval_scale();
+		sf.calc_criteria();
+	}
 	if (opt->xcw_settings.xcw_gaussian_halt)
 		evaluate_gaussian_halting(lambda);
 	const fit_quality fit = quality();
@@ -812,6 +836,123 @@ void XCW_solver::report_lambda(const double lambda, const occ::qm::Wavefunction&
 		create_tscb(wfn, lambda);
 		throughput::record_time("XCW tscb", false, get_msec(tscb_t0, get_time()));
 	}
+	if (tuning("NOSPHERA2_XCW_WEIGHT_CHECK") && sf.XG.ws)
+		weight_check(wfn, lambda);
+	const std::string shares = sf.grid_weight_report();
+	if (!shares.empty()) {
+		std::ostringstream s;
+		s << "XCW lambda " << std::fixed << std::setprecision(5) << lambda << ": " << shares;
+		if (weight_every_ < 0 && lambda != 0.0) s << ", " << weight_rounds_ << " more solves";
+		std::cout << s.str() << std::endl;
+		writer.log << s.str() << std::endl;
+	}
+	weight_rounds_ = 0;
+}
+
+//The shares refit to the converged density of wfn, F_calc, scale and criteria left of them; true while the refit moved F by more
+//than NOSPHERA2_XCW_WEIGHT_FTOL (1e-5) of max |F|
+bool XCW_solver::refit_moves(const occ::qm::Wavefunction& wfn, const double lambda)
+{
+	const occ::Mat& Dw = wfn.mo.D;
+	const int n = static_cast<int>(Dw.cols());
+	const bool unrestricted = Dw.rows() == 2 * Dw.cols();
+	dMatrix2 D(n, n);
+	for (int i = 0; i < n; i++)
+		for (int j = 0; j < n; j++) D(i, j) = Dw(i, j) + (unrestricted ? Dw(i + n, j) : 0.0);
+	calc_F(sf, *I_tens, D);
+	const cvec F0 = sf.scatter_data.F_calc;
+	sf.XG.refresh = true;
+	calc_F(sf, *I_tens, D);
+	sf.XG.refresh = false;
+	sf.eval_scale();
+	sf.calc_criteria();
+	double d = 0, m = 0;
+	for (int r = 0; r < sf.model_data.nr; r++) {
+		d = std::max(d, std::abs(sf.scatter_data.F_calc[r] - F0[r]));
+		m = std::max(m, std::abs(F0[r]));
+	}
+	const char* ft = tuning("NOSPHERA2_XCW_WEIGHT_FTOL");
+	const bool moved = d > (ft ? std::atof(ft) : 1e-5) * m;
+	writer.log << "XCW lambda " << std::fixed << std::setprecision(5) << lambda << ": shares refit to the converged density, max |dF| "
+		<< std::scientific << std::setprecision(3) << d << " of max |F| " << m << (moved ? ", solved again" : "") << std::defaultfloat << std::endl;
+	weight_rounds_ += moved;
+	return moved;
+}
+
+//Fixed targets of the RI restraints are F's constant part like the anomalous one, so they are left out as in a response
+void XCW_solver::adjoint_check()
+{
+	std::mt19937 gen(7);
+	std::uniform_real_distribution<double> u(-1.0, 1.0);
+	const int n = sf.model_data.nmo;
+	dMatrix2 D(n, n);
+	for (int i = 0; i < n; i++)
+		for (int j = i; j < n; j++) D(i, j) = D(j, i) = u(gen);
+	cvec pre(sf.model_data.nr);
+	for (int r = 0; r < sf.model_data.nr; r++) pre[r] = cdouble(u(gen), u(gen));
+	const cvec F = sf.scatter_data.F_calc;
+	sf.XR.response = true;
+	sf.grid_F(D);
+	sf.XR.response = false;
+	occ::Mat P;
+	sf.grid_contract(P, pre);
+	double l1 = 0, l2 = 0;
+	for (int r = 0; r < sf.model_data.nr; r++) l1 += std::real(pre[r] * (sf.scatter_data.F_calc[r] - sf.scatter_data.anom_correction[r]));
+	for (int i = 0; i < n; i++)
+		for (int j = 0; j < n; j++) l2 += 2.0 * D(i, j) * P(i, j);
+	sf.scatter_data.F_calc = F;
+	std::cout << "XCW adjoint check (" << (sf.XR.on ? "ri" : "grid") << "): " << std::scientific << std::setprecision(3) << std::abs(l1 - l2) / std::abs(l1) << std::defaultfloat << std::endl;
+}
+
+//F(D1, s1) against F(D1, s0), what the shares' move over the step does, and F(D1, s0) against F(D0, s0), what the density's does,
+//D0 and s0 the step before's; the first is the derivative term the perturbation leaves out, taken over a whole step
+void XCW_solver::weight_check(const occ::qm::Wavefunction& wfn, const double lambda)
+{
+	const occ::Mat& Dw = wfn.mo.D;
+	const int n = static_cast<int>(Dw.cols());
+	const occ::Mat D1 = Dw.rows() == 2 * Dw.cols() ? occ::Mat(Dw.topRows(n) + Dw.bottomRows(n)) : Dw;
+	const vec2 w1 = sf.XG.w;
+	if (weight_D_.size() == 0) {
+		weight_D_ = D1;
+		weight_w_ = w1;
+		return;
+	}
+	const cvec F_keep = sf.scatter_data.F_calc;
+	const double scale_keep = sf.scatter_data.scale;
+	const auto q_keep = sf.quality_criteria;
+	double R1[3];
+	cvec F[3];
+	const occ::Mat* Ds[3] = { &D1, &D1, &weight_D_ };
+	const vec2* ws[3] = { &w1, &weight_w_, &weight_w_ };
+	for (int c = 0; c < 3; c++) {
+		dMatrix2 D(n, n);
+		for (int i = 0; i < n; i++)
+			for (int j = 0; j < n; j++) D(i, j) = (*Ds[c])(i, j);
+		sf.XG.w = *ws[c];
+		sf.grid_F(D);
+		sf.solve_scale();
+		sf.calc_criteria();
+		F[c] = sf.scatter_data.F_calc;
+		R1[c] = sf.quality_criteria.R1;
+	}
+	double dw = 0, dd = 0, fm = 0;
+	for (int r = 0; r < sf.model_data.nr; r++) {
+		dw = std::max(dw, std::abs(F[0][r] - F[1][r]));
+		dd = std::max(dd, std::abs(F[1][r] - F[2][r]));
+		fm = std::max(fm, std::abs(F[0][r]));
+	}
+	std::ostringstream s;
+	s << "XCW share check lambda " << std::fixed << std::setprecision(5) << lambda << ": max |dF| over the step from the shares "
+		<< std::scientific << std::setprecision(3) << dw << ", from the density " << dd << " (max |F| " << fm << "); R1(gt) "
+		<< std::fixed << std::setprecision(5) << R1[0] << " with this step's shares, " << R1[1] << " with the last step's";
+	std::cout << s.str() << std::endl;
+	writer.log << s.str() << std::endl;
+	sf.XG.w = w1;
+	sf.scatter_data.F_calc = F_keep;
+	sf.scatter_data.scale = scale_keep;
+	sf.quality_criteria = q_keep;
+	weight_D_ = D1;
+	weight_w_ = w1;
 }
 
 void XCW_solver::run() {
@@ -844,28 +985,10 @@ void XCW_solver::run() {
 		for (const auto& b : aux)
 			if (b->get_primitive_count() == 0) b->gen_auto_aux(atoms_wfn);
 		for (size_t i = 1; i < aux.size(); i++) *aux[0] += *aux[i];
-		sf.setup_ri(hf.aobasis(), aux[0]->to_AOBasis(hf.aobasis().atoms()), opt->multipole_lmax, opt->multipole_strength);
+		sf.setup_ri(hf.aobasis(), aux[0]->to_AOBasis(hf.aobasis().atoms()), opt->multipole_lmax, opt->multipole_strength, opt->multipole_scheme);
 	}
-	//NOSPHERA2_XCW_ADJOINT_CHECK: the perturbation is the transpose of F_calc, Re Sum_r pre_r (F_r(D) - anomalous_r) =
-	//2 <D, P(pre)>, at a random symmetric D and random pre, for whichever partition runs
-	if (tuning("NOSPHERA2_XCW_ADJOINT_CHECK") && sf.XG.mode == 1) {
-		std::mt19937 gen(7);
-		std::uniform_real_distribution<double> u(-1.0, 1.0);
-		const int n = sf.model_data.nmo;
-		dMatrix2 D(n, n);
-		for (int i = 0; i < n; i++)
-			for (int j = i; j < n; j++) D(i, j) = D(j, i) = u(gen);
-		cvec pre(sf.model_data.nr);
-		for (cdouble& p : pre) p = cdouble(u(gen), u(gen));
-		sf.grid_F(D);
-		occ::Mat P;
-		sf.grid_contract(P, pre);
-		double l1 = 0, l2 = 0;
-		for (int r = 0; r < sf.model_data.nr; r++) l1 += std::real(pre[r] * (sf.scatter_data.F_calc[r] - sf.scatter_data.anom_correction[r]));
-		for (int i = 0; i < n; i++)
-			for (int j = 0; j < n; j++) l2 += 2.0 * D(i, j) * P(i, j);
-		std::cout << "XCW adjoint check (" << (sf.XR.on ? "ri" : "grid") << "): " << std::scientific << std::setprecision(3) << std::abs(l1 - l2) / std::abs(l1) << std::defaultfloat << std::endl;
-	}
+	const char* wu = tuning("NOSPHERA2_XCW_WEIGHT_UPDATE");
+	weight_every_ = wu ? std::max(0, std::atoi(wu)) : -1;
 #if defined(NOSPHERA2_USE_GPU) || defined(NOSPHERA2_USE_METAL)
 	//The two walks of an iteration read the whole tensor and the host is bound by its memory
 	//bandwidth doing so; the device reads it several times faster. The host copy stays for
@@ -941,7 +1064,13 @@ void XCW_solver::run() {
 
 	// Runs the lambda steps for XCW fitting
 	auto run_lambda = [&](const double lambda, occ::qm::Wavefunction guess, const bool use_guess, const bool write_result) {
-		const bool converged = scf_solver.solve(hf, lambda, guess, use_guess, *this);
+		weight_count_ = 0;
+		lambda_ = lambda;
+		bool converged = scf_solver.solve(hf, lambda, guess, use_guess, *this);
+		//shares held within a solve and refit to its density until that no longer moves F: the fixed point refitting at every
+		//evaluation goes for, with every solve one objective for TRAH to accept steps on
+		for (int round = 0; converged && weight_every_ < 0 && sf.XG.ws && lambda != 0.0 && round < 20 && refit_moves(guess, lambda); round++)
+			converged = scf_solver.solve(hf, lambda, guess, true, *this);
 		if (converged) report_lambda(lambda, guess, write_result);
 		return std::make_pair(converged, guess);
 	};
@@ -963,6 +1092,9 @@ void XCW_solver::run() {
 		if (opt->xcw_extrapolate && have_prev)
 			extrapolate_orbitals(guess.mo, prev_wfn.mo, S_ao, (lambda - last_lambda) / (last_lambda - prev_lambda));
 		auto result = run_lambda(lambda, guess, has_guess, true);
+		//after the first step, so that density-following shares are the scheme's
+		if (step == 0 && result.first && tuning("NOSPHERA2_XCW_ADJOINT_CHECK") && sf.XG.mode == 1)
+			adjoint_check();
 		if (!result.first && step > 0) {
 			double lambda_step = lambda - last_lambda;
 			while (!result.first && lambda_step > min_lambda_step) {

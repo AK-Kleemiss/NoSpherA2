@@ -10,6 +10,9 @@
 #include "core/spherical_density.h"
 #include "core/spherical_harmonic.h"
 #include "core/tshb_block.h"
+#include "core/GridManager.h"
+#include "core/AtomGrid.h"
+#include "core/wfn_class.h"
 
 #include <complex>
 #include <fstream>
@@ -688,8 +691,84 @@ TEST(XcwPartitionTests, RiPartitionPerturbationIsTheTransposeOfFcalc)
 	check({}, 1e-10);
 	check({ "-multipole_moments", "hirshfeld", "2" }, 1e-5);
 	const std::string mbis = check({ "-multipole_moments", "mbis", "1" }, 1e-5);
+	EXPECT_NE(mbis.find("MBIS shares:"), std::string::npos);
 	EXPECT_TRUE(fs::exists(run.dir / "NA2_0010000.tscb"));
 	std::stringstream scf;
 	scf << std::ifstream(run.dir / "SCF.log").rdbuf();
-	EXPECT_NE(scf.str().find("the RI restraints take the moments of this step's density"), std::string::npos);
+	EXPECT_NE(scf.str().find("shares refit to the converged density"), std::string::npos);
+	for (const std::string s : { "mulliken", "nuclear", "sanderson" })
+		check({ "-multipole_moments", s }, 1e-10);
 }
+
+//TFVC, MBIS and EMBIS shares on XCW's grid follow the density (xcw_weights.cpp): on the P1 subset R1(gt) at lambda 0 is within
+//10 % of Hirshfeld's 0.0253 (P1_test_XCW.good) and falls at 0.05, the perturbation is the transpose of F_calc at the held shares,
+//and at the converged lambda 0 density the charges are the stand-alone ones on GridManager's grid of the written wfn: TFVC as
+//it gives them, MBIS and EMBIS fitted there to 1e-8 (the stand-alone 1e-3 stop leaves them up to 5e-2 e off)
+static void density_following_shares(const std::string& scheme)
+{
+	const std::string cif = fs::absolute(fixture("P1_test/P1_test.cif")).string(), hkl = fs::absolute(fixture("P1_test/P1_subset.hkl")).string();
+	app_dir run("xcw_" + scheme);
+	std::ofstream(run.dir / "settings.txt") << "normal normal_conv params 177 basis_set sto-3g max_iter 100 F charge 0 mult 1 rhf start 0 step_size 0.05 end 0.05";
+	std::stringstream out;
+	std::streambuf* old = std::cout.rdbuf(out.rdbuf());
+	const int rc = run.run({ "-do_XCW", "-no_gpu", "-cif", cif, "-hkl", hkl, "-XCW_settings", "settings.txt", "-" + scheme, "-tune", "NOSPHERA2_XCW_ADJOINT_CHECK=1", "-no_date" });
+	std::cout.rdbuf(old);
+	ASSERT_EQ(rc, 0);
+	const std::string log = out.str() + run.log();
+	auto r1 = [&](const std::string& row) {
+		const size_t at = log.find("\n" + row);
+		EXPECT_NE(at, std::string::npos) << row;
+		std::istringstream l(log.substr(at + 1));
+		double v[4] = { 0, 0, 0, 1 };
+		for (int i = 0; i < 4; i++) l >> v[i];
+		return v[3];
+	};
+	const double r0 = r1(" 0.00000\t"), r5 = r1(" 0.05000\t");
+	EXPECT_LT(std::abs(r0 - 0.0253), 0.1 * 0.0253) << r0;
+	EXPECT_LT(r5, r0);
+	const size_t at = log.find("XCW adjoint check (grid): ");
+	ASSERT_NE(at, std::string::npos);
+	EXPECT_LT(std::stod(log.substr(at + 26)), 1e-5);
+	std::stringstream scf;
+	scf << std::ifstream(run.dir / "SCF.log").rdbuf();
+	const size_t c = scf.str().find("XCW grid charges at lambda 0.00000:");
+	ASSERT_NE(c, std::string::npos);
+	std::istringstream line(scf.str().substr(c + 35, scf.str().find('\n', c) - c - 35));
+	vec q;
+	std::string label;
+	double v;
+	while (line >> label >> v) q.push_back(v);
+	WFN w(run.dir / "NA2_0000000.wfn");
+	ASSERT_EQ(static_cast<int>(q.size()), w.get_ncen());
+	GridConfiguration config;
+	config.partition_type = scheme == "tfvc" ? PartitionType::TFVC : scheme == "mbis" ? PartitionType::MBIS : PartitionType::EMBIS;
+	GridManager gm(config);
+	ivec atoms(w.get_ncen());
+	for (int a = 0; a < w.get_ncen(); a++) atoms[a] = a;
+	const cell uc(cif, std::cout, false);
+	gm.setup3DGridsForMolecule(w, atoms, {}, uc);
+	vec ref(w.get_ncen());
+	if (scheme == "tfvc") {
+		const PartitionResults p = gm.calculatePartitionedCharges(w, uc);
+		for (int a = 0; a < w.get_ncen(); a++) ref[a] = w.get_atom_charge(a) - p.atom_charges[PartitionResults::CHARGE_ORDER::S_TFVC][a];
+	}
+	else {
+		GridData& G = gm.getGridData();
+		std::ostream none(nullptr);
+		const auto m = make_MBIS_vectors(w, G.helper_grids, G.helper_num_points_per_atom, false, none, {}, 1e-8);
+		const auto e = scheme == "embis" ? make_EMBIS_tensors(w, G.helper_grids, G.helper_num_points_per_atom, false, m, none, {}, 1e-8) : std::vector<std::pair<vec2, vec>>();
+		for (int a = 0; a < w.get_ncen(); a++) {
+			ref[a] = w.get_atom_charge(a);
+			const vec& pop = scheme == "embis" ? e[a].second : m[a].second;
+			for (int i = 0; i < static_cast<int>(pop.size()); i++) ref[a] -= pop[i];
+		}
+	}
+	double worst = 0;
+	for (int a = 0; a < w.get_ncen(); a++) worst = std::max(worst, std::abs(q[a] - ref[a]));
+	std::cout << scheme << ": R1(gt) " << r0 << " -> " << r5 << ", max |q_XCW - q_stand-alone| " << worst << std::endl;
+	EXPECT_LT(worst, 2e-4);
+}
+
+TEST(XcwPartitionTests, TfvcSharesFollowTheDensity) { density_following_shares("tfvc"); }
+TEST(XcwPartitionTests, MbisSharesFollowTheDensity) { density_following_shares("mbis"); }
+TEST(XcwPartitionTests, EmbisSharesFollowTheDensity) { density_following_shares("embis"); }

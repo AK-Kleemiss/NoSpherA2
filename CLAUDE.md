@@ -239,6 +239,11 @@ Key core modules live in `Src/core`:
 
 ## Current Validation Notes
 
+As of 2026-10-27 (XCW density-following shares), `-tfvc`, `-mbis` and `-embis` run XCW on shares refit to its own density
+between SCF solves, and the RI partition takes TFVC/MBIS/EMBIS targets from those shares, Mulliken targets linear in D and fixed
+Nuclear/Sanderson ones; three `XcwPartitionTests` are new. `ctest --preset release-linux-tests` on a CPU-only 4-core VM reports
+**1330 passed, 0 failed, 23 skipped** (2 disabled) of 1353. See `UNIT_TESTS_STATUS.md`.
+
 As of 2026-10-26 (second speed round), the fit cache keeps the Coulomb factor keyed by the whole aux wavefunction, `.tshb`
 parts make no k-points, and partition rows skip shells beyond their certain cutoff; `ctest --preset release-linux-tests` on a
 CPU-only 4-core VM reports **1327 passed, 0 failed, 23 skipped** (2 disabled) of 1350. See `UNIT_TESTS_STATUS.md`.

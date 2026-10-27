@@ -99,5 +99,19 @@ private:
 	// F_calc and scale as save_state left them
 	cvec saved_F_calc_;
 	double saved_scale_ = 0.0;
+	// TFVC, MBIS and EMBIS shares (XG.ws) are refit between solves of a lambda step until they hold still (-1, refit_moves),
+	// at every weight_every_-th evaluation, or (0) once at the step's first, never at lambda_ 0; weight_count_ counts the
+	// evaluations of the step, weight_rounds_ the solves refits asked for. weight_D_ and weight_w_ hold the density and
+	// shares of the step before for NOSPHERA2_XCW_WEIGHT_CHECK
+	int weight_every_ = -1, weight_count_ = 0, weight_rounds_ = 0;
+	double lambda_ = 0.0;
+	occ::Mat weight_D_;
+	vec2 weight_w_;
+	// The perturbation is the transpose of F_calc: Re Sum_r pre_r (F_r(D) - anomalous_r) = 2 <D, P(pre)> at a random symmetric
+	// D and random pre, with the shares the grid holds (NOSPHERA2_XCW_ADJOINT_CHECK)
+	void adjoint_check();
+	bool refit_moves(const occ::qm::Wavefunction& wfn, const double lambda);
+	// How far the shares move F and R1(gt) over the step against what the density alone moves (NOSPHERA2_XCW_WEIGHT_CHECK)
+	void weight_check(const occ::qm::Wavefunction& wfn, const double lambda);
 
 };

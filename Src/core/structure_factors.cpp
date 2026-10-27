@@ -648,6 +648,10 @@ structure_factors::I_tensor& structure_factors::eval_I(const occ::gto::AOBasis& 
 	// Creates the primitive data for each shell, needed to compute the I tensor
 	std::vector<structure_factors::ao_data> ao_data_shells;
 	create_prims(ao_data_shells, aobasis);
+	const bool share = opt->partition_type == PartitionType::TFVC || opt->partition_type == PartitionType::MBIS || opt->partition_type == PartitionType::EMBIS;
+	const char* xg = tuning("NOSPHERA2_XCW_GRID");
+	err_checkf(!share || ((!xg || std::atoi(xg) == 1) && !I_tens.read_tensor && I_tens.i_tensor_save_path.empty()),
+		"TFVC, MBIS and EMBIS shares follow the density, which a tensor cannot: XCW runs them on the grid, without read, safe or NOSPHERA2_XCW_GRID", std::cout);
 
 	bool single_on_disk = false;
 	// Path for reading the I tensor from disk
@@ -708,6 +712,7 @@ structure_factors::I_tensor& structure_factors::eval_I(const occ::gto::AOBasis& 
 		long long screen_counter = 0;
 		long long skipped_grids = 0;
 		build_I(ao_data_shells, time_taken, screen_counter, skipped_grids);
+		if (share) setup_grid_weights(aobasis);
 		if (!(opt->no_date)) {
 			std::cout << std::fixed << std::setprecision(2) << "Time taken for XCW integrals: " << time_taken << " seconds. \n";
 		}
@@ -878,9 +883,12 @@ void structure_factors::build_I(const std::vector<ao_data>& ao_data_shells, doub
 	cvec2 XCW_integral_old;
 
 	// Grid setup
+	//TFVC, MBIS and EMBIS shares need rho: the grid is Hirshfeld's, plain atom weights and pruned on the promolecule, and
+	//setup_grid_weights takes it from there
+	const bool share = opt->partition_type == PartitionType::TFVC || opt->partition_type == PartitionType::MBIS || opt->partition_type == PartitionType::EMBIS;
 	GridConfiguration config;
 	config.accuracy = opt->accuracy;
-	config.partition_type = opt->partition_type;
+	config.partition_type = share ? PartitionType::Hirshfeld : opt->partition_type;
 	config.no_density_eval = true;
 	config.pbc = opt->pbc;
 	config.debug = opt->debug;
@@ -1581,6 +1589,8 @@ void structure_factors::build_I(const std::vector<ao_data>& ao_data_shells, doub
 		auto take = [keep](auto& a) -> std::decay_t<decltype(a)> { if (keep) return a; return std::move(a); };
 		XG.blocks = take(grid_blocks);
 		XG.d1 = take(d1); XG.d2 = take(d2); XG.d3 = take(d3); XG.w = take(weights);
+		XG.w0.clear();
+		for (int g = 0; share && g < n_atom_grids; g++) XG.w0.emplace_back(grids[g][GridData::GridIndex::WEIGHT].begin(), grids[g][GridData::GridIndex::WEIGHT].begin() + points[g]);
 		XG.skip = take(skip); XG.lookup = take(asym_lookup); XG.inversion_link = take(inversion_link);
 		XG.clean_of = take(clean_of); XG.is_inverse = take(is_inverse);
 		plan_grid_fb(layout);
