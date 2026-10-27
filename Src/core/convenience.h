@@ -1162,11 +1162,11 @@ struct options
 			if (current_max_diis_error < diis_stop_damping && apply_damping == true) {
 				apply_damping = false;
 				alpha = 0;
-				print_centered_message("***Turned off damping***", 84, file);
+				print_centered_message("***Turned off damping***", 100, file);
 			}
 			if (current_max_diis_error < diis_stop_shift && apply_shift == true) {
 				apply_shift = false;
-				print_centered_message("***Turned off level shift***", 84, file);
+				print_centered_message("***Turned off level shift***", 100, file);
 			}
 		}
 	};
