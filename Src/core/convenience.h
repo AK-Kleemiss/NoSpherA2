@@ -1092,8 +1092,8 @@ struct options
 		double current_MaxP_diff = 0;
 		bool conv_MaxP_diff = false;
 		//The four damping/shift values default to off: `fast_conv` only clears the apply
-		//flags, yet run_lambda copies alpha and level_shift and SCF_iteration mixes the
-		//density with alpha regardless of the flag
+		//flags, yet run_lambda copies alpha_damp and level_shift and SCF_iteration mixes the
+		//density with alpha_damp regardless of the flag
 		double diis_stop_damping = 0;
 		//`check_hessian`: finite-difference check of the Hessian-vector product on the first
 		//second-order step, reported in SCF.log; it enters TRAH once the DIIS error is below
@@ -1108,7 +1108,7 @@ struct options
 		//(smaller) basis by OCC's own driver, its density projected into the orbital basis
 		std::string guess_basis_name;
 		occ::qm::SpinorbitalKind hf_type = occ::qm::SpinorbitalKind::Restricted;
-		double alpha = 0;
+		double alpha_damp = 0;
 		double level_shift = 0;
 		int max_scf_iterations = 100;
 		int charge = 0;
@@ -1142,10 +1142,10 @@ struct options
 		}
 
 		// Updates the SCF routine in regards to damping and level shift
-		void update(std::ostream& file, double& alpha) {
+		void update(std::ostream& file, double& alpha_damp) {
 			if (current_max_diis_error < diis_stop_damping && apply_damping == true) {
 				apply_damping = false;
-				alpha = 0;
+				alpha_damp = 0;
 				print_centered_message("***Turned off damping***", 100, file);
 			}
 			if (current_max_diis_error < diis_stop_shift && apply_shift == true) {

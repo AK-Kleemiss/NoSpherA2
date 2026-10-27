@@ -581,8 +581,9 @@ void structure_factors::calc_criteria() {
 
 double structure_factors::criterion(const bool all) const {
 	const bool weighted = quality_criteria.goof_type == 2, against_F2 = quality_criteria.refine_against == 2;
-	if (all) return weighted ? (against_F2 ? quality_criteria.weighted_GooF2_all : quality_criteria.weighted_GooF1_all) : (against_F2 ? quality_criteria.GooF2_all : quality_criteria.GooF1_all);
-	return weighted ? (against_F2 ? quality_criteria.weighted_GooF2 : quality_criteria.weighted_GooF1) : (against_F2 ? quality_criteria.GooF2 : quality_criteria.GooF1);
+	const double goof = all ? (weighted ? (against_F2 ? quality_criteria.weighted_GooF2_all : quality_criteria.weighted_GooF1_all) : (against_F2 ? quality_criteria.GooF2_all : quality_criteria.GooF1_all))
+		: (weighted ? (against_F2 ? quality_criteria.weighted_GooF2 : quality_criteria.weighted_GooF1) : (against_F2 ? quality_criteria.GooF2 : quality_criteria.GooF1));
+	return goof * goof;
 }
 
 //Per-reflection 1/|H|^2 weights for the residual self-energy criterion,

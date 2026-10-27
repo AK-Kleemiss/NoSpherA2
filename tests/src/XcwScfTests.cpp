@@ -406,7 +406,7 @@ TEST(XcwScfTests, SmallBasisGuessStartsFromConvergedDensity)
 }
 
 //A closed shell in UHF is the RHF answer; the criterion column under `f2` is GooF(F2)
-//itself. The unrestricted branches of the effective density, the level shift and the
+//squared. The unrestricted branches of the effective density, the level shift and the
 //orbital gradient all run here, and the RHF run on the same subset is the reference.
 TEST(XcwScfTests, UnrestrictedClosedShellAgainstF2MatchesRestricted)
 {
@@ -418,7 +418,7 @@ TEST(XcwScfTests, UnrestrictedClosedShellAgainstF2MatchesRestricted)
 	EXPECT_EQ(occurrences(run.log, "***Turned off level shift***"), 1u);
 	const auto rows = lambda_rows(run.out);
 	ASSERT_EQ(rows.size(), 1u) << run.out;
-	EXPECT_EQ(rows[0].criterion, rows[0].goof2);
+	EXPECT_NEAR(rows[0].d(rows[0].criterion), rows[0].d(rows[0].goof2) * rows[0].d(rows[0].goof2), 1e-4 * rows[0].d(rows[0].goof2) + 1e-4);
 	EXPECT_NEAR(rows[0].d(rows[0].energy), golden_energy, 1e-6);
 	EXPECT_EQ(rows[0].quant, rows[0].energy);
 	EXPECT_TRUE(std::filesystem::exists(dir / "NA2_0000000.tscb"));

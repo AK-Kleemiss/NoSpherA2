@@ -657,7 +657,8 @@ void structure_factors::grid_apply_V(const vec2& V, occ::Mat& out)
 		return;
 	}
 #endif
-	//out(mu, nu) = Sum_p chi_mu V chi_nu over the blocks both are active on, screened pairs left out
+	//out(mu, nu) = Sum_p chi_mu V chi_nu over the blocks both are active on, screened pairs left out.
+	//Blocks dealt round-robin in fours and the thread partials merged in thread order: the same sum under any load
 	std::vector<std::pair<int, int>> list;
 	for (int g = 0; g < ng; g++)
 		for (int b = 0; b < static_cast<int>(XG.blocks[g].size()); b++) list.emplace_back(g, b);
@@ -668,7 +669,7 @@ void structure_factors::grid_apply_V(const vec2& V, occ::Mat& out)
 		occ::Mat local = occ::Mat::Zero(nmo, nmo);
 		vec Yd, Sd;
 		std::vector<float> Yf, Sf;
-#pragma omp for schedule(dynamic)
+#pragma omp for schedule(static, 4)
 		for (int i = 0; i < static_cast<int>(list.size()); i++) {
 			const int g = list[i].first;
 			const GridBlock& b = XG.blocks[g][list[i].second];

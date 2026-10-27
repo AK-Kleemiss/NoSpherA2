@@ -22,7 +22,7 @@ namespace
 		s.gradient = 1e-5;
 		s.MaxP_diff = 1e-7;
 		s.RMSP_diff = 1e-8;
-		s.alpha = 0.5;
+		s.alpha_damp = 0.5;
 		s.level_shift = 0.5;
 		s.diis_stop_damping = 1e-3;
 		s.diis_stop_shift = 1e-2;

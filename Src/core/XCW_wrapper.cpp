@@ -731,9 +731,9 @@ void XCW_wrapper::run() {
 	std::cout << "More detailed output in SCF.log file..." << std::endl;
 	if (opt->xcw_settings.XWR_type == 2) {
 		std::cout << "XCW: fitting against the 1/|H|^2-weighted residual self-energy criterion "
-			<< "Criterion below is this weighted quantity, not the classical GoF." << std::endl;
+			<< "Criterion below is the square of this weighted quantity, not the classical GooF^2." << std::endl;
 		writer.log << "XCW: fitting against the 1/|H|^2-weighted residual self-energy criterion "
-			<< "Criterion below are this weighted quantity, not the classical GoF." << std::endl;
+			<< "Criterion below is the square of this weighted quantity, not the classical GooF^2." << std::endl;
 	}
 	XCW_log_writer::console_header(opt->xcw_settings.xcw_gaussian_halt);
 	//The lambda scan: each step starts from the orbitals of the last converged one, extrapolated

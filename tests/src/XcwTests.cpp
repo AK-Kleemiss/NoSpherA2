@@ -882,7 +882,7 @@ namespace
 		EXPECT_DOUBLE_EQ(s.gradient, 7e-5);
 		EXPECT_DOUBLE_EQ(s.MaxP_diff, 1e-5);
 		EXPECT_DOUBLE_EQ(s.RMSP_diff, 1e-6);
-		EXPECT_DOUBLE_EQ(s.alpha, 0.5);
+		EXPECT_DOUBLE_EQ(s.alpha_damp, 0.5);
 		EXPECT_DOUBLE_EQ(s.level_shift, 0.5);
 		EXPECT_DOUBLE_EQ(s.diis_stop_damping, 1e-3);
 		EXPECT_DOUBLE_EQ(s.diis_stop_shift, 1e-2);
@@ -908,7 +908,7 @@ namespace
 		EXPECT_DOUBLE_EQ(sloppy.gradient, 5e-4);
 		EXPECT_DOUBLE_EQ(sloppy.MaxP_diff, 1e-4);
 		EXPECT_DOUBLE_EQ(sloppy.RMSP_diff, 1e-5);
-		EXPECT_DOUBLE_EQ(sloppy.alpha, 0.8);
+		EXPECT_DOUBLE_EQ(sloppy.alpha_damp, 0.8);
 		EXPECT_DOUBLE_EQ(sloppy.level_shift, 1.0);
 		EXPECT_DOUBLE_EQ(sloppy.diis_stop_damping, 1e-5);
 		EXPECT_DOUBLE_EQ(sloppy.diis_stop_shift, 1e-5);
@@ -927,7 +927,7 @@ namespace
 		const options::XCW_settings v = parsed("conv 2e-6 damp 0.3 shift 0.7 max_iter 50 very_tight normal_conv basis_set sto-3g diis_damping 2e-3 diis_shift 3e-2 "
 			"conv_diis 4e-5 gradient 5e-5 maxp_diff 6e-5 rmsp_diff 7e-6");
 		EXPECT_DOUBLE_EQ(v.quant_diff, 2e-6);
-		EXPECT_DOUBLE_EQ(v.alpha, 0.3);
+		EXPECT_DOUBLE_EQ(v.alpha_damp, 0.3);
 		EXPECT_DOUBLE_EQ(v.level_shift, 0.7);
 		EXPECT_EQ(v.max_scf_iterations, 50);
 		EXPECT_DOUBLE_EQ(v.diis_stop_damping, 2e-3);

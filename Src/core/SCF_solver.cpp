@@ -86,12 +86,12 @@ bool SCF_solver::run(occ::qm::HartreeFock& hf, occ::qm::Wavefunction& wfn, const
 	settings.diis_stop_damping = base_.stop_damping;
 	settings.level_shift = base_.level_shift;
 	occ::qm::SCF scf(hf, settings.hf_type);
-	double alpha = settings.alpha;
+	double alpha_damp = settings.alpha_damp;
 	bool has_local_guess = use_guess;
 	scf.set_charge_multiplicity(settings.charge, settings.multiplicity);
 	scf.maxiter = settings.max_scf_iterations;
 	scf.update_occupied_orbital_count();
-	const bool converged = do_SCF(alpha, scf, wfn, has_local_guess);
+	const bool converged = do_SCF(alpha_damp, scf, wfn, has_local_guess);
 	wfn = scf.wavefunction();
 	return converged;
 }
@@ -105,7 +105,7 @@ void SCF_solver::log_iteration(const scf_t& scf) {
 }
 
 //The same walk as OCC's SOAD guess with a converged Hartree-Fock density in place of the
-//tabulated atoms: F = H + G(D_small) through the mixed-basis build, the orbitals from its
+//tabulated atoms: F = H + fock_2e(D_small) through the mixed-basis build, the orbitals from its
 //diagonalisation. The spin blocks are summed, the first iteration polarises them again.
 void SCF_solver::small_basis_guess(scf_t& scf) {
 	const occ::qm::AOBasis small_bs = setup_basis(mol_, settings.guess_basis_name);
@@ -141,23 +141,23 @@ occ::qm::AOBasis SCF_solver::setup_basis(const occ::core::Molecule& mol, const s
 	return basis_set->to_AOBasis(mol.atoms());
 }
 
-double SCF_solver::dynamic_damping(const scf_t& scf, const double& current_alpha, const double& quant_diff, double& quant_diff_mem) {
-	double new_alpha = current_alpha;
+double SCF_solver::dynamic_damping(const scf_t& scf, const double& current_alpha_damp, const double& quant_diff, double& quant_diff_mem) {
+	double new_alpha_damp = current_alpha_damp;
 	if (quant_diff < quant_diff_mem / 10) {
-		new_alpha *= 0.75;
+		new_alpha_damp *= 0.75;
 		quant_diff_mem = quant_diff;
 		if (quant_diff < 10 * scf.convergence_settings.energy_threshold) {
 			print_centered_message("***Turned off damping***", 100, writer_->log);
-			new_alpha = 0;
+			new_alpha_damp = 0;
 			settings.apply_damping = false;
 		}
 		else {
 			std::stringstream print_;
-			print_ << "***Decreased damping to " << std::fixed << std::setprecision(3) << new_alpha << "***";
+			print_ << "***Decreased damping to " << std::fixed << std::setprecision(3) << new_alpha_damp << "***";
 			print_centered_message(print_.str(), 100, writer_->log);
 		}
 	}
-	return new_alpha;
+	return new_alpha_damp;
 	// closing function
 }
 
@@ -178,7 +178,7 @@ void SCF_solver::apply_level_shift(const occ::Mat& C_old, const scf_t& scf, occ:
 	}
 }
 
-bool SCF_solver::do_SCF(double& alpha, scf_t& scf, occ::qm::Wavefunction& last_wfn, bool& has_guess) {
+bool SCF_solver::do_SCF(double& alpha_damp, scf_t& scf, occ::qm::Wavefunction& last_wfn, bool& has_guess) {
 #if !defined(__APPLE__) && !defined(NSA2_OPENBLAS)
 	//The SCF's own MKL calls (DIIS, the diagonalisation) run serial: they are small against the Fock
 	//build, and threaded they wait for a time slice at every barrier once another job loads the host
@@ -188,10 +188,10 @@ bool SCF_solver::do_SCF(double& alpha, scf_t& scf, occ::qm::Wavefunction& last_w
 	diis_F_.clear();
 	diis_E_.clear();
 	adiis_.reset();
-	best_phi_ = std::numeric_limits<double>::infinity();
+	best_quant_ = std::numeric_limits<double>::infinity();
 	rescues_ = 0;
 	builds_ = {};
-	soscf_reset();
+	trah_reset();
 	warm_start_ = has_guess;
 	begin_log();
 
@@ -209,20 +209,20 @@ bool SCF_solver::do_SCF(double& alpha, scf_t& scf, occ::qm::Wavefunction& last_w
 	}
 	scf.ctx.K = scf.m_procedure.compute_schwarz_ints();
 	scf.update_scf_energy(false);
-	G_last_.resize(0, 0);
-	reuse_best_G_ = false;
+	fock_2e_last_.resize(0, 0);
+	reuse_best_fock_2e_ = false;
 	last_full_build_ = 0;
 	next_full_build_error_ = 0.0;
 
 	throughput::record_time((label_ + " initial guess").c_str(), false, get_msec(guess_t0, get_time()));
 	bool converged;
-	double last_phi = 0;
+	double last_quant = 0;
 	double quant_diff_mem = 0;
 	occ::Mat dm_last = scf.ctx.mo.D;
 	const std::string iteration_timer = label_ + " SCF iteration";
 	do {
 		const _time_point scf_t0 = get_time();
-		converged = SCF_iteration(scf, alpha, quant_diff_mem, last_phi, dm_last);
+		converged = SCF_iteration(scf, alpha_damp, quant_diff_mem, last_quant, dm_last);
 		throughput::record_time(iteration_timer.c_str(), false, get_msec(scf_t0, get_time()));
 	} while (!converged && scf.iter < scf.maxiter);
 
@@ -269,9 +269,9 @@ double SCF_solver::compute_orbital_gradient(const scf_t& scf) {
 		occ::Mat Cocc_beta = C_beta.leftCols(scf.ctx.mo.n_beta);
 		occ::Mat Cvir_alpha = C_alpha.rightCols(C_alpha.cols() - Cocc_alpha.cols());
 		occ::Mat Cvir_beta = C_beta.rightCols(C_beta.cols() - Cocc_beta.cols());
-		occ::Mat G_alpha = Cvir_alpha.transpose() * scf.ctx.F.topRows(nmo_) * Cocc_alpha;
-		occ::Mat G_beta = Cvir_beta.transpose() * scf.ctx.F.bottomRows(nmo_) * Cocc_beta;
-		return (std::hypot(G_alpha.norm(), G_beta.norm()));
+		occ::Mat grad_alpha = Cvir_alpha.transpose() * scf.ctx.F.topRows(nmo_) * Cocc_alpha;
+		occ::Mat grad_beta = Cvir_beta.transpose() * scf.ctx.F.bottomRows(nmo_) * Cocc_beta;
+		return (std::hypot(grad_alpha.norm(), grad_beta.norm()));
 	}
 	err_not_impl_f("Orbital gradient for a general spinorbital kind", std::cout);
 	return 0.0;
@@ -386,7 +386,7 @@ void SCF_solver::get_density_criteria(double& RMSP_diff, double& maxP_diff, cons
 	// closing function
 }
 
-bool SCF_solver::SCF_iteration(scf_t& scf, double& alpha, double& quant_diff_mem, double& last_phi, occ::Mat& dm_last) {
+bool SCF_solver::SCF_iteration(scf_t& scf, double& alpha_damp, double& quant_diff_mem, double& last_quant, occ::Mat& dm_last) {
 	scf.iter++;
 	const occ::Mat dm_old = scf.ctx.mo.D;
 	//the model term at the density this iteration's Fock matrix is built from
@@ -394,7 +394,7 @@ bool SCF_solver::SCF_iteration(scf_t& scf, double& alpha, double& quant_diff_mem
 	scf.m_procedure.update_core_hamiltonian(scf.ctx.mo, scf.ctx.H);
 	scf.ctx.F = scf.ctx.H;
 	const _time_point fock_t0 = get_time();
-	//G(D) = G(D_last) + G(D - D_last): the direct kernel screens shell quartets on the density's
+	//fock_2e(D) = fock_2e(D_last) + fock_2e(D - D_last): the direct kernel screens shell quartets on the density's
 	//shell-block norms and the stored one skips integral segments on the difference's elements,
 	//and the difference shrinks as the SCF converges. Rebuilt in full every 8 iterations or once
 	//the DIIS error has fallen tenfold since the last full build, as OCC's own loop does, so the
@@ -402,54 +402,54 @@ bool SCF_solver::SCF_iteration(scf_t& scf, double& alpha, double& quant_diff_mem
 	//density each time, nothing to skip.
 	//Off while TRAH steers: it accepts or rejects a step on a rise of the functional far smaller
 	//than the screening error of a difference build, and a rotation moves the whole density anyway
-	const bool incremental = settings.incremental && !soscf_ && !eri_on_device_ && scf.m_procedure.fock_build_properties().density_screened && G_last_.size() > 0
+	const bool incremental = settings.incremental && !trah_active_ && !eri_on_device_ && scf.m_procedure.fock_build_properties().density_screened && fock_2e_last_.size() > 0
 		&& scf.iter - last_full_build_ < 8 && scf.diis_error > next_full_build_error_;
-	//a rescue restored best_mo_ and its G: the density is the one G was built from
-	const bool reused = std::exchange(reuse_best_G_, false);
+	//a rescue restored best_mo_ and its fock_2e: the density is the one it was built from
+	const bool reused = std::exchange(reuse_best_fock_2e_, false);
 	if (reused) {}
 	else if (incremental) {
 		occ::Mat D_diff = scf.ctx.mo.D - D_last_build_;
 		std::swap(scf.ctx.mo.D, D_diff);
-		G_last_ += two_electron_fock(scf, true);
+		fock_2e_last_ += two_electron_fock(scf, true);
 		std::swap(scf.ctx.mo.D, D_diff);
 	}
 	else {
-		G_last_ = two_electron_fock(scf, false);
+		fock_2e_last_ = two_electron_fock(scf, false);
 		last_full_build_ = scf.iter;
 		next_full_build_error_ = scf.diis_error / 10.0;
 	}
 	D_last_build_ = scf.ctx.mo.D;
-	scf.ctx.F += G_last_;
+	scf.ctx.F += fock_2e_last_;
 	if (!reused) builds_.iter++;
 	if (!reused) throughput::record_time((label_ + " Fock build (OCC)").c_str(), eri_on_device_, get_msec(fock_t0, get_time()));
 	scf.update_scf_energy(false);
+	//the target quantity, the functional the SCF descends and the rescue ranks by
+	quant_ = scf.ctx.energy["total"] + model_energy();
 	log_iteration(scf);
 	add_model_fock(scf.ctx.F);
-	//the functional the SCF descends and the rescue ranks by
-	const double phi = scf.ctx.energy["total"] + model_energy();
 	//a lost step goes to TRAH from the best orbitals where a rescue would not help: a warm start
 	//sits next to its solution, so DIIS overshot it, and a cold start may have used all three rescues
-	const bool lost = !soscf_ && phi - best_phi_ >= rescue_rise_ && (warm_start_ || rescues_ >= 3);
-	if (!soscf_ && !lost && rescue_scf(scf, phi, alpha)) return false;
+	const bool lost = !trah_active_ && quant_ - best_quant_ >= rescue_rise_ && (warm_start_ || rescues_ >= 3);
+	if (!trah_active_ && !lost && rescue_scf(scf, quant_, alpha_damp)) return false;
 
 	// DIIS extrapolation
 	occ::Mat F_diis = diis_update(scf);
 	settings.current_max_diis_error = scf.diis_error;
-	settings.update(writer_->log, alpha);
+	settings.update(writer_->log, alpha_damp);
 
-	// Convergence check on the change of phi, the functional that is minimised and stationary
+	// Convergence check on the change of the target quantity, the functional that is minimised and stationary
 	settings.current_gradient = compute_orbital_gradient(scf);
-	settings.current_quant_diff = std::abs(phi - last_phi);
+	settings.current_quant_diff = std::abs(quant_ - last_quant);
 	//Under TRAH the density criteria judge the step still to come, the one trah_solve would take
 	//without a Fock build once |g| is below the threshold, not the step just taken. The orbitals
 	//returned are the current ones, consistent with their Fock matrix and model term.
-	if (soscf_ && settings.current_gradient < settings.gradient) {
+	if (trah_active_ && settings.current_gradient < settings.gradient) {
 		occ::Vec h;
 		const occ::Vec g = orbital_rotation_gradient(scf, h);
-		std::swap(h, soscf_hdiag_);
+		std::swap(h, trah_hdiag_);
 		occ::Vec kappa = trah_precondition(scf, -g, 0);
-		std::swap(h, soscf_hdiag_);
-		if (kappa.norm() > soscf_trust_) kappa *= soscf_trust_ / kappa.norm();
+		std::swap(h, trah_hdiag_);
+		if (kappa.norm() > trah_trust_) kappa *= trah_trust_ / kappa.norm();
 		const occ::qm::MolecularOrbitals here = scf.ctx.mo;
 		rotate_orbitals(scf, here.C, kappa);
 		dm_last = scf.ctx.mo.D;
@@ -458,12 +458,12 @@ bool SCF_solver::SCF_iteration(scf_t& scf, double& alpha, double& quant_diff_mem
 	if (SCF_convergence_check(scf, dm_last)) {
 		return true;
 	}
-	last_phi = phi;
+	last_quant = quant_;
 
-	if (!soscf_) {
-		if (scf.iter == 1 || settings.current_gradient < 0.5 * soscf_patience_grad_) {
-			soscf_patience_grad_ = settings.current_gradient;
-			soscf_patience_iter_ = scf.iter;
+	if (!trah_active_) {
+		if (scf.iter == 1 || settings.current_gradient < 0.5 * trah_patience_grad_) {
+			trah_patience_grad_ = settings.current_gradient;
+			trah_patience_iter_ = scf.iter;
 		}
 		//A cold start runs DIIS: far from the solution one Fock build per iteration beats a TRAH macro
 		//step. A warm start goes straight to the second-order steps: it sits in the quadratic region,
@@ -471,32 +471,32 @@ bool SCF_solver::SCF_iteration(scf_t& scf, double& alpha, double& quant_diff_mem
 		//TRAH at the DIIS error gate
 		const bool second_order = settings.check_hessian;
 		const int patience = second_order ? trah_.patience_requested : trah_.patience;
-		const bool stuck = scf.iter - soscf_patience_iter_ >= patience;
+		const bool stuck = scf.iter - trah_patience_iter_ >= patience;
 		const bool warm = warm_start_;
 		if (warm || lost || stuck || (second_order && scf.diis_error < trah_.start_threshold)) {
-			soscf_ = true;
+			trah_active_ = true;
 			occ::qm::MolecularOrbitals probe = scf.ctx.mo;
 			probe.update_occupied_orbitals();
 			probe.update_density_matrix();
-			soscf_fresh_ = last_full_build_ == scf.iter && (probe.D - scf.ctx.mo.D).cwiseAbs().maxCoeff() < 1e-10;
+			trah_fresh_ = last_full_build_ == scf.iter && (probe.D - scf.ctx.mo.D).cwiseAbs().maxCoeff() < 1e-10;
 			std::ostringstream what;
-			what << "***" << (warm ? std::string("Warm start") : lost ? functional_name() + " " + std::to_string(phi - best_phi_) + " Eh above its best"
+			what << "***" << (warm ? std::string("Warm start") : lost ? functional_name() + " " + std::to_string(quant_ - best_quant_) + " Eh above its best"
 				: stuck ? "Orbital gradient not halved in " + std::to_string(patience) + " iterations" : "DIIS error below 1e-2")
 				<< ": second-order steps on the orbital rotations from here***";
 			print_centered_message(what.str(), 100, writer_->log);
 			citations::cite(citations::Method::TRAH, writer_->log, 100);
 			//TRAH from the best orbitals of this run, not from wherever DIIS left them, which can be far
 			//uphill. The first step rebuilds the Fock matrix at them.
-			if (phi > best_phi_ + trah_.noise) {
+			if (quant_ > best_quant_ + trah_.noise) {
 				writer_->log << "\t\tTRAH starts from the best orbitals of this step, " << std::scientific << std::setprecision(2)
-					<< phi - best_phi_ << " Eh below the current ones" << std::endl;
+					<< quant_ - best_quant_ << " Eh below the current ones" << std::endl;
 				scf.ctx.mo = best_mo_;
-				soscf_fresh_ = false;
+				trah_fresh_ = false;
 			}
 		}
 	}
-	if (soscf_) {
-		soscf_step(scf, phi);
+	if (trah_active_) {
+		trah_step(scf, quant_);
 		dm_last = dm_old;
 		return false;
 	}
@@ -516,36 +516,36 @@ bool SCF_solver::SCF_iteration(scf_t& scf, double& alpha, double& quant_diff_mem
 			quant_diff_mem = settings.current_quant_diff;
 		}
 		if (scf.iter > 2) {
-			alpha = dynamic_damping(scf, alpha, settings.current_quant_diff, quant_diff_mem);
+			alpha_damp = dynamic_damping(scf, alpha_damp, settings.current_quant_diff, quant_diff_mem);
 		}
 	}
 
-	scf.ctx.mo.D *= (1 - alpha);
-	scf.ctx.mo.D += alpha * dm_old;
+	scf.ctx.mo.D *= (1 - alpha_damp);
+	scf.ctx.mo.D += alpha_damp * dm_old;
 	dm_last = dm_old;
 	return false;
 
 	//closing function
 }
 
-void SCF_solver::soscf_reset() {
-	soscf_ = false;
-	soscf_patience_iter_ = 0;
-	soscf_patience_grad_ = 0;
+void SCF_solver::trah_reset() {
+	trah_active_ = false;
+	trah_patience_iter_ = 0;
+	trah_patience_grad_ = 0;
 	trah_B_.clear();
 	trah_HB_.clear();
-	soscf_kappa_.resize(0);
-	soscf_grad_.resize(0);
-	soscf_hdiag_.resize(0);
-	soscf_C_.resize(0, 0);
-	soscf_phi_ = std::numeric_limits<double>::infinity();
-	soscf_pred_ = 0;
-	soscf_boundary_ = false;
-	soscf_floored_ = 0;
+	trah_kappa_.resize(0);
+	trah_grad_.resize(0);
+	trah_hdiag_.resize(0);
+	trah_C_.resize(0, 0);
+	trah_quant_ = std::numeric_limits<double>::infinity();
+	trah_pred_ = 0;
+	trah_boundary_ = false;
+	trah_floored_ = 0;
 	//The radius the last run reached carries into this one: consecutive runs solve nearly the same
 	//problem, and learning the radius again costs a rejected macro step per halving. Never above the
 	//default, so an easy run cannot set a hard one up for a fall.
-	soscf_trust_ = std::clamp(soscf_trust_, trah_.trust_min, trah_.trust_first);
+	trah_trust_ = std::clamp(trah_trust_, trah_.trust_min, trah_.trust_first);
 	trah_micro_total_ = 0;
 	trah_pcg_total_ = 0;
 }
@@ -607,78 +607,78 @@ void SCF_solver::rotate_orbitals(scf_t& scf, const occ::Mat& C_from, const occ::
 	mo.update_density_matrix();
 }
 
-//One second-order macro iteration, see soscf_ in the header. phi is the functional at the
+//One second-order macro iteration, see trah_active_ in the header. quant is the functional at the
 //current orbitals, which the last step produced. If it lies above the value at the orbitals the
 //step left by more than the noise of a Fock build, the step is rejected and solved again at the
 //smaller radius in the subspace the micro-iterations already built. The radius follows
 //occ::qm::trust_radius_update either way: it grows or shrinks with how well the quadratic model
 //predicted the change. Two rejections at the smallest radius end the second-order phase and give
 //DIIS the orbitals back. Otherwise a fresh gradient starts the next macro step.
-void SCF_solver::soscf_step(scf_t& scf, const double phi) {
-	const bool stepped = soscf_kappa_.size() > 0;
+void SCF_solver::trah_step(scf_t& scf, const double quant) {
+	const bool stepped = trah_kappa_.size() > 0;
 	//A step the model expects to gain less than the noise of a Fock build cannot be judged by what
 	//the functional does: it keeps the radius and is taken unless the rise is beyond any noise.
 	//The noise grows with the size of the functional.
-	const double noise = std::max(trah_.noise, 1e-10 * std::abs(phi));
-	const bool judged = -soscf_pred_ > noise;
+	const double noise = std::max(trah_.noise, 1e-10 * std::abs(quant));
+	const bool judged = -trah_pred_ > noise;
 	if (stepped) {
-		const double actual = phi - soscf_phi_;
-		writer_->log << "\t\tTRAH: predicted " << std::scientific << std::setprecision(3) << soscf_pred_
+		const double actual = quant - trah_quant_;
+		writer_->log << "\t\tTRAH: predicted " << std::scientific << std::setprecision(3) << trah_pred_
 			<< ", actual " << actual << " Eh, rho " << std::fixed << std::setprecision(2)
-			<< (soscf_pred_ < 0 ? actual / soscf_pred_ : 0.0) << ", model error "
-			<< std::scientific << std::setprecision(1) << std::abs(actual - soscf_pred_) << std::endl;
-		if (judged) soscf_trust_ = occ::qm::trust_radius_update(soscf_trust_, soscf_kappa_.norm(), soscf_pred_, actual, soscf_boundary_, trah_);
+			<< (trah_pred_ < 0 ? actual / trah_pred_ : 0.0) << ", model error "
+			<< std::scientific << std::setprecision(1) << std::abs(actual - trah_pred_) << std::endl;
+		if (judged) trah_trust_ = occ::qm::trust_radius_update(trah_trust_, trah_kappa_.norm(), trah_pred_, actual, trah_boundary_, trah_);
 	}
-	if (stepped && phi > soscf_phi_ + (judged ? noise : unjudged_rise_) && soscf_kappa_.cwiseAbs().maxCoeff() > 1e-6) {
+	if (stepped && quant > trah_quant_ + (judged ? noise : unjudged_rise_) && trah_kappa_.cwiseAbs().maxCoeff() > 1e-6) {
 		//A radius this small is the model saying it is worthless at these orbitals, not that the
 		//step should be shorter again. Two in a row and DIIS gets the orbitals back, with the
 		//rescue path available again, rather than the run grinding out max_iter on steps too short
 		//to move anything.
-		soscf_floored_ = soscf_trust_ <= trah_.trust_min * 1.000001 ? soscf_floored_ + 1 : 0;
-		if (soscf_floored_ >= 2) {
+		trah_floored_ = trah_trust_ <= trah_.trust_min * 1.000001 ? trah_floored_ + 1 : 0;
+		if (trah_floored_ >= 2) {
 			std::ostringstream give_up;
 			give_up << "***" << functional_name() << " still rising at the smallest trust radius: back to DIIS***";
 			print_centered_message(give_up.str(), 100, writer_->log);
 			//hand DIIS the orbitals the last accepted step left, not the rejected ones
-			rotate_orbitals(scf, soscf_C_, occ::Vec::Zero(soscf_kappa_.size()));
-			soscf_ = false;
-			soscf_kappa_.resize(0);
+			rotate_orbitals(scf, trah_C_, occ::Vec::Zero(trah_kappa_.size()));
+			trah_active_ = false;
+			trah_kappa_.resize(0);
 			return;
 		}
 		std::ostringstream what;
-		what << "***" << functional_name() << " " << std::scientific << std::setprecision(1) << phi - soscf_phi_
-			<< " Eh above the orbitals the step left: trust radius " << std::scientific << std::setprecision(2) << soscf_trust_ << ", step re-solved***";
+		what << "***" << functional_name() << " " << std::scientific << std::setprecision(1) << quant - trah_quant_
+			<< " Eh above the orbitals the step left: trust radius " << std::scientific << std::setprecision(2) << trah_trust_ << ", step re-solved***";
 		print_centered_message(what.str(), 100, writer_->log);
 		trah_solve(scf, false);
-		rotate_orbitals(scf, soscf_C_, soscf_kappa_);
+		rotate_orbitals(scf, trah_C_, trah_kappa_);
 		return;
 	}
-	soscf_floored_ = 0;
+	trah_floored_ = 0;
 	//The Roothaan iterations damp the density, so the Fock matrix of the iteration that hands
 	//over belongs to a mix of densities, not to the orbitals: rebuilt from them once, so the
 	//first gradient, Hessian and reference functional are consistent
-	soscf_phi_ = stepped || std::exchange(soscf_fresh_, false) ? phi : rebuild_at(scf, scf.ctx.mo.C, occ::Vec());
-	soscf_grad_ = orbital_rotation_gradient(scf, soscf_hdiag_);
+	trah_quant_ = stepped || std::exchange(trah_fresh_, false) ? quant : rebuild_at(scf, scf.ctx.mo.C, occ::Vec());
+	trah_grad_ = orbital_rotation_gradient(scf, trah_hdiag_);
 	trah_B_.clear();
 	trah_HB_.clear();
-	soscf_C_ = scf.ctx.mo.C;
+	trah_C_ = scf.ctx.mo.C;
 	if (settings.check_hessian && !stepped) check_hessian(scf);
 	trah_solve(scf, true);
-	rotate_orbitals(scf, soscf_C_, soscf_kappa_);
+	rotate_orbitals(scf, trah_C_, trah_kappa_);
 }
 
 //The step of the current macro iteration: the lowest eigenvector of the augmented Hessian
 //[[0, a g^T], [a g, H]] in the Davidson subspace trah_B_ (H trah_B_ in trah_HB_), scaled to
 //kappa = x / (a x0), with a >= 1 raised by bisection until |kappa| fits the trust radius
 //(a = 1 is the plain augmented-Hessian step). With extend, the subspace grows by the
-//preconditioned residual of the level-shifted Newton equation (H - theta) kappa = -g, one
+//preconditioned residual of the level-shifted Newton equation (H - ah_shift) kappa = -g, one
 //exact Hessian-vector product per micro-iteration, until the residual is below a fraction of
 //the gradient that shrinks with it, or trah_.micro_max is reached; without, the retained
 //subspace is re-solved at the current radius (after a rejected step the Fock matrix belongs
-//to the rejected orbitals, so no product could be added). Sets soscf_kappa_, the predicted
+//to the rejected orbitals, so no product could be added). Sets trah_kappa_, the predicted
 //decrease g.kappa + kappa.H kappa / 2 and whether the step lies on the boundary.
 void SCF_solver::trah_solve(scf_t& scf, const bool extend) {
-	const occ::Vec& g = soscf_grad_;
+	const occ::Vec& g = trah_grad_;
 	const double gnorm = g.norm();
 	//never below the convergence threshold on the orbital gradient: a residual under it buys nothing
 	const double tol = std::max(gnorm * std::min(0.1, std::max(1e-3, std::sqrt(gnorm))), settings.gradient);
@@ -695,18 +695,18 @@ void SCF_solver::trah_solve(scf_t& scf, const bool extend) {
 	//a gradient already below the convergence threshold only needs the step that settles the density:
 	//the one from the Hessian without its two-electron part, no Fock build
 	if (extend && trah_B_.empty() && gnorm < tol) {
-		soscf_kappa_ = trah_precondition(scf, -g, 0);
-		if (soscf_kappa_.norm() > soscf_trust_) soscf_kappa_ *= soscf_trust_ / soscf_kappa_.norm();
-		soscf_pred_ = g.dot(soscf_kappa_) + 0.5 * soscf_kappa_.dot(hessian_vector(scf, soscf_kappa_, false));
-		soscf_boundary_ = false;
-		writer_->log << "\t\tTRAH: |g| " << std::scientific << std::setprecision(1) << gnorm << " below the threshold, step without a Fock build, predicted " << soscf_pred_ << " Eh" << std::endl;
+		trah_kappa_ = trah_precondition(scf, -g, 0);
+		if (trah_kappa_.norm() > trah_trust_) trah_kappa_ *= trah_trust_ / trah_kappa_.norm();
+		trah_pred_ = g.dot(trah_kappa_) + 0.5 * trah_kappa_.dot(hessian_vector(scf, trah_kappa_, false));
+		trah_boundary_ = false;
+		writer_->log << "\t\tTRAH: |g| " << std::scientific << std::setprecision(1) << gnorm << " below the threshold, step without a Fock build, predicted " << trah_pred_ << " Eh" << std::endl;
 		return;
 	}
 	if (extend && trah_B_.empty()) add(trah_precondition(scf, -g, 0));
-	//the small problem at shift parameter a: theta, x0, xs and |kappa|
+	//the small problem at shift parameter a: ah_shift, x0, xs and |kappa|
 	occ::Mat Hs;
 	occ::Vec gs;
-	double theta = 0, x0 = 1, alpha = 1;
+	double ah_shift = 0, x0 = 1, alpha = 1;
 	occ::Vec xs;
 	auto reduced = [&](const double a, double& th, double& v0, occ::Vec& v) {
 		const Eigen::Index m = gs.size();
@@ -734,18 +734,18 @@ void SCF_solver::trah_solve(scf_t& scf, const bool extend) {
 			for (Eigen::Index j = 0; j <= i; j++) Hs(i, j) = Hs(j, i) = 0.5 * (trah_B_[i].dot(trah_HB_[j]) + trah_B_[j].dot(trah_HB_[i]));
 		}
 		alpha = 1;
-		knorm = reduced(alpha, theta, x0, xs);
-		soscf_boundary_ = knorm > soscf_trust_;
-		if (soscf_boundary_) {
+		knorm = reduced(alpha, ah_shift, x0, xs);
+		trah_boundary_ = knorm > trah_trust_;
+		if (trah_boundary_) {
 			//|kappa| falls monotonically with a: bracket, then bisect on log a
 			double lo = 1, hi = 1;
-			while (hi < 1e8 && reduced(hi, theta, x0, xs) > soscf_trust_) { lo = hi; hi *= 2; }
+			while (hi < 1e8 && reduced(hi, ah_shift, x0, xs) > trah_trust_) { lo = hi; hi *= 2; }
 			for (int it = 0; it < 60 && hi / lo > 1 + 1e-6; it++) {
 				const double mid = std::sqrt(lo * hi);
-				if (reduced(mid, theta, x0, xs) > soscf_trust_) lo = mid; else hi = mid;
+				if (reduced(mid, ah_shift, x0, xs) > trah_trust_) lo = mid; else hi = mid;
 			}
 			alpha = hi;
-			knorm = reduced(alpha, theta, x0, xs);
+			knorm = reduced(alpha, ah_shift, x0, xs);
 		}
 		kappa = occ::Vec::Zero(g.size());
 		Hkappa = occ::Vec::Zero(g.size());
@@ -757,39 +757,39 @@ void SCF_solver::trah_solve(scf_t& scf, const bool extend) {
 			kappa /= alpha * x0;
 			Hkappa /= alpha * x0;
 			//the bisection tolerance may leave the step a hair outside: scale, do not resolve
-			if (knorm > soscf_trust_) {
-				kappa *= soscf_trust_ / knorm;
-				Hkappa *= soscf_trust_ / knorm;
-				knorm = soscf_trust_;
+			if (knorm > trah_trust_) {
+				kappa *= trah_trust_ / knorm;
+				Hkappa *= trah_trust_ / knorm;
+				knorm = trah_trust_;
 			}
 		}
 		else {
 			//no finite step from the subspace: the preconditioned gradient, scaled into the radius.
 			//Its curvature may come from a Fock build only while the Fock matrix still belongs to
 			//these orbitals - after a rejected step (!extend) the diagonal is all there is
-			kappa = -g.cwiseQuotient(soscf_hdiag_);
-			kappa *= soscf_trust_ / kappa.norm();
-			Hkappa = extend ? hessian_vector(scf, kappa) : soscf_hdiag_.cwiseProduct(kappa);
-			knorm = soscf_trust_;
-			soscf_boundary_ = true;
+			kappa = -g.cwiseQuotient(trah_hdiag_);
+			kappa *= trah_trust_ / kappa.norm();
+			Hkappa = extend ? hessian_vector(scf, kappa) : trah_hdiag_.cwiseProduct(kappa);
+			knorm = trah_trust_;
+			trah_boundary_ = true;
 		}
-		const occ::Vec r = g + Hkappa - theta * kappa;
+		const occ::Vec r = g + Hkappa - ah_shift * kappa;
 		rnorm = r.norm();
 		if (!extend || rnorm < tol || micro >= trah_.micro_max) break;
-		if (!add(trah_precondition(scf, -r, theta))) break;
+		if (!add(trah_precondition(scf, -r, ah_shift))) break;
 		micro++;
 	}
 	trah_micro_total_ += micro;
-	soscf_kappa_ = kappa;
-	soscf_pred_ = g.dot(kappa) + 0.5 * kappa.dot(Hkappa);
+	trah_kappa_ = kappa;
+	trah_pred_ = g.dot(kappa) + 0.5 * kappa.dot(Hkappa);
 	writer_->log << "\t\tTRAH: " << micro << " micro-iterations (" << trah_micro_total_ << " in this " << step_name_ << ", " << trah_pcg_total_ << " PCG), |g| " << std::scientific << std::setprecision(1) << gnorm
-		<< ", residual " << rnorm << ", |kappa| " << knorm << (soscf_boundary_ ? " on" : " within") << " the trust radius " << std::fixed << std::setprecision(3) << soscf_trust_
-		<< ", shift " << std::scientific << std::setprecision(1) << theta << ", predicted " << soscf_pred_ << " Eh" << std::endl;
+		<< ", residual " << rnorm << ", |kappa| " << knorm << (trah_boundary_ ? " on" : " within") << " the trust radius " << std::fixed << std::setprecision(3) << trah_trust_
+		<< ", shift " << std::scientific << std::setprecision(1) << ah_shift << ", predicted " << trah_pred_ << " Eh" << std::endl;
 }
 
 //H v for the rotation direction v, the derivative of orbital_rotation_gradient along it:
 //dC_occ = C_vir V, dC_vir = -C_occ V^T from C exp(kappa); dD from the density's own
-//convention (C_occ C_occ^T, halved per spin block for UHF); dF = G(dD) by the same Fock
+//convention (C_occ C_occ^T, halved per spin block for UHF); dF = fock_2e(dD) by the same Fock
 //build the SCF uses, plus the response of the model term (add_model_response); and
 //H v = fac (dC_vir^T F C_occ + C_vir^T dF C_occ + C_vir^T F dC_occ) with F the Fock matrix
 //of the current orbitals, model term included. The occupied-occupied and virtual-virtual parts of
@@ -817,7 +817,7 @@ occ::Vec SCF_solver::hessian_vector(scf_t& scf, const occ::Vec& v, const bool tw
 	const occ::qm::HartreeFock* df = hessian_df_ ? hessian_df_.get() : !eri_ && scf.m_procedure.using_density_fitting() ? &scf.m_procedure : nullptr;
 	if (two_electron && df) {
 		//occ's fitted exchange reads Cocc, not D: swapping in dD would give the exchange of the
-		//current density. G is linear in the density and dD = (D(X + tY) - D(X - tY)) / 2t for
+		//current density. fock_2e is linear in the density and dD = (D(X + tY) - D(X - tY)) / 2t for
 		//X = Cocc, Y = dCocc in the density's own convention, so two builds; t keeps X +- tY of
 		//one size, the difference then loses no digits
 		const double y = dCo.norm();
@@ -836,7 +836,7 @@ occ::Vec SCF_solver::hessian_vector(scf_t& scf, const occ::Vec& v, const bool tw
 		builds_.hessian++;
 	}
 	else if (two_electron) {
-		//G(dD): the Fock build reads mo.D, and a screen on the density would drop the small dD
+		//fock_2e(dD): the Fock build reads mo.D, and a screen on the density would drop the small dD
 		std::swap(mo.D, dD);
 		dF = two_electron_fock(scf, false);
 		builds_.hessian++;
@@ -859,21 +859,21 @@ occ::Vec SCF_solver::hessian_vector(scf_t& scf, const occ::Vec& v, const bool tw
 	return Hv;
 }
 
-//(H - theta)^-1 rhs for the Davidson subspace: the diagonal, refined when there is a model term
+//(H - ah_shift)^-1 rhs for the Davidson subspace: the diagonal, refined when there is a model term
 //by up to trah_pcg_ conjugate-gradient steps on H without its two-electron part, whose products
 //cost a model evaluation instead of a Fock build. That part is what the diagonal misses: a model
-//term like chi^2 is stiff along few directions. Davidson takes the exact product of whatever
+//term like XCW's criterion is stiff along few directions. Davidson takes the exact product of whatever
 //comes back, so this only decides how many Fock builds the step costs.
-occ::Vec SCF_solver::trah_precondition(scf_t& scf, const occ::Vec& rhs, const double theta) {
-	const occ::Vec d = (soscf_hdiag_.array() - theta).max(1e-2).matrix();
+occ::Vec SCF_solver::trah_precondition(scf_t& scf, const occ::Vec& rhs, const double ah_shift) {
+	const occ::Vec d = (trah_hdiag_.array() - ah_shift).max(1e-2).matrix();
 	occ::Vec x = rhs.cwiseQuotient(d);
 	if (!model_active()) return x;
-	occ::Vec r = rhs - (hessian_vector(scf, x, false) - theta * x);
+	occ::Vec r = rhs - (hessian_vector(scf, x, false) - ah_shift * x);
 	occ::Vec z = r.cwiseQuotient(d), p = z;
 	double rz = r.dot(z);
 	const double stop = trah_pcg_tol_ * rhs.norm();
 	for (int k = 0; k < trah_pcg_ && r.norm() > stop; k++) {
-		const occ::Vec Ap = hessian_vector(scf, p, false) - theta * p;
+		const occ::Vec Ap = hessian_vector(scf, p, false) - ah_shift * p;
 		const double pAp = p.dot(Ap);
 		if (!(pAp > 0)) break;
 		const double a = rz / pAp;
@@ -927,7 +927,7 @@ occ::Vec SCF_solver::gradient_at(scf_t& scf, const occ::Mat& C_from, const occ::
 void SCF_solver::check_hessian(scf_t& scf) {
 	std::mt19937 rng(7);
 	std::normal_distribution<double> gauss;
-	occ::Vec v(soscf_grad_.size());
+	occ::Vec v(trah_grad_.size());
 	for (Eigen::Index i = 0; i < v.size(); i++) v(i) = gauss(rng);
 	v /= v.norm();
 	const occ::Vec Hv = hessian_vector(scf, v);
@@ -940,37 +940,37 @@ void SCF_solver::check_hessian(scf_t& scf) {
 
 //The rescue of a lost SCF step, see best_mo_ in the header. True when it restarted the step:
 //the orbitals are the best ones again, the iteration ends here and the next one takes their
-//two-electron part from best_G_ instead of building it again. Each rescue doubles the level
+//two-electron part from best_fock_2e_ instead of building it again. Each rescue doubles the level
 //shift, halves the undamped share of the density and holds both ten times longer: the start
 //state with the start settings would only repeat the failure. All of it lasts for this run
 //only, do_SCF resets it.
-bool SCF_solver::rescue_scf(scf_t& scf, const double phi, double& alpha) {
-	if (phi < best_phi_) {
-		best_phi_ = phi;
+bool SCF_solver::rescue_scf(scf_t& scf, const double quant, double& alpha_damp) {
+	if (quant < best_quant_) {
+		best_quant_ = quant;
 		best_mo_ = scf.ctx.mo;
-		best_G_ = G_last_;
+		best_fock_2e_ = fock_2e_last_;
 		return false;
 	}
-	if (phi - best_phi_ < rescue_rise_ || rescues_ >= 3) return false;
+	if (quant - best_quant_ < rescue_rise_ || rescues_ >= 3) return false;
 	rescues_++;
 	const double tighten = std::pow(10.0, rescues_);
 	settings.diis_stop_shift = (base_.stop_shift > 0 ? base_.stop_shift : 1e-2) / tighten;
 	settings.diis_stop_damping = (base_.stop_damping > 0 ? base_.stop_damping : 1e-3) / tighten;
 	settings.level_shift = std::max(base_.level_shift, 0.25) * std::pow(2.0, rescues_);
-	alpha = 1.0 - (1.0 - settings.alpha) / std::pow(2.0, rescues_);
+	alpha_damp = 1.0 - (1.0 - settings.alpha_damp) / std::pow(2.0, rescues_);
 	std::ostringstream what1, what2, what3;
-	what1 << "***" << functional_name() << " " << std::fixed << std::setprecision(3) << phi - best_phi_
+	what1 << "***" << functional_name() << " " << std::fixed << std::setprecision(3) << quant - best_quant_
 		<< " Eh above its best: back to the best orbitals";
 	what2 << "level shift " << std::setprecision(2) << settings.level_shift
-		<< ", damping " << alpha << " until DIIS error "
+		<< ", damping " << alpha_damp << " until DIIS error "
 		<< std::scientific << std::setprecision(0) << settings.diis_stop_shift << " / " << settings.diis_stop_damping;
 	what3 << "(rescue " << rescues_ << "/3)***";
 	print_centered_message(what1.str(), 100, writer_->log);
 	print_centered_message(what2.str(), 100, writer_->log);
 	print_centered_message(what3.str(), 100, writer_->log);
 	scf.ctx.mo = best_mo_;
-	G_last_ = best_G_;
-	reuse_best_G_ = true;
+	fock_2e_last_ = best_fock_2e_;
+	reuse_best_fock_2e_ = true;
 	diis_F_.clear();
 	diis_E_.clear();
 	adiis_.reset();

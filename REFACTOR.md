@@ -20,13 +20,15 @@ This class is the one that calls SCF_solver's run() and mediates between the two
 - **The SCF never sees the structure factors directly (decided 2026-10-26).** The SCF talks to the crystallographic side only through the abstract `SCF_coupling` interface (`XCW_solver.h`: `evaluate_cryst_crit`, `cryst_crit`, `perturbation_matrix`, `perturbation_matrix_response`, `save_F_calc`/`restore_F_calc`, `grid_on_device`; renamed in run 2 so that each says what it computes). XCW_wrapper implements it on top of its `structure_factors` object and hands itself to the XCW child of SCF_solver. This keeps the SCF_solver base free of crystallography, so other children (energy decompositions etc.) need no structure factors at all.
 - **How SCF_solver is extended (run 1).** `SCF_solver` is not pure abstract: on its own it solves the plain Hartree-Fock system, as "the basic SCF_solver" above should. A child adds a *model term* to the energy through protected virtual hooks, and the DIIS, rescue, TRAH and convergence machinery then works on E + that term without knowing what it is:
   - `evaluate_model_term(scf, timed)`: called at the current density before every Fock build
-  - `model_energy()`: the term added to E (XCW: lambda chi^2)
+  - `model_energy()`: the term added to E (XCW: the perturbation lambda * Criterion)
   - `add_model_fock(F)`: its derivative, added to the Fock matrix (XCW: lambda times the perturbation matrix)
   - `add_model_response(scf, dD, dF)` and `model_active()`: the term's part of the TRAH Hessian-vector product
   - `save_model_state()` / `restore_model_state()`: around the finite-difference Hessian check
   - `begin_log()`, `log_iteration(scf)`, `end_log(scf)`, `functional_name()`: what the SCF log prints
 
   `XCW_solver` (the child) overrides them with the coupling and holds `lambda`; `XCW_wrapper::run_lambda` sets `scf_solver.lambda` and calls `scf_solver.run(hf, wfn, use_guess)`.
+- **The XCW quantities (decided 2026-10-27, run 3).** `calc_criteria` computes GooF(F) and GooF(F^2) (`GooF1`, `GooF2`). The GooF(F2) column always prints GooF(F^2). Criterion = GooF^2 against what is refined against (F or F^2, weighted under `h2`), Perturbation = lambda * Criterion, `quant` (Target quantity) = E + Perturbation. `quant_` is the functional the SCF minimises and tests convergence on; there is no separate `phi`.
+- **SCF_solver names (decided 2026-10-27, run 3).** `fock_2e` for the two-electron Fock part (was `G`), `grad_alpha`/`grad_beta` for the virtual-occupied Fock blocks (the orbital gradient), `ah_shift` for the augmented-Hessian eigenvalue (was `theta`), `alpha_damp` for the density damping weight (also `SCF_settings::alpha_damp`), `trah_*` for everything of the second-order solver (was `soscf_*`; the on/off flag is `trah_active_`). `quant`, `kappa` and the augmented-Hessian scaling `alpha` in `trah_solve` keep their names. `stored_eri` keeps its name: it holds exactly the four-centre (ab|cd); occ holds the three-centre density-fitting integrals.
 - **Only the grid route stays (decided 2026-10-27).** The I tensor is no longer built: F_calc and the perturbation come from the grid every evaluation, which every partition scheme (TFVC/MBIS/EMBIS shares, the RI partition) works on. This replaces "the class should still be used to calculate the I tensor" above.
 - **Code style (decided 2026-10-26).** CLAUDE.md's house style applies (terse, no blank lines inside functions, project typedefs, `#pragma omp` at column 0, tabs), together with what is asked for below:
   - Comment-sparse, but enough comments to see what is going on and which part of the code does what: mostly one-liners, sometimes two or three lines. Longer explanations only for theory-heavy parts (SOSCF, TRAH), in simple language.
@@ -43,7 +45,8 @@ When the deadline comes, merge the then current density_source into XCW_refactor
 | Run | Deadline | Goal |
 |-----|----------|------|
 | 1 | 2026-10-27 09:00 | Baseline; SCF_wrapper -> SCF_solver + XCW child; XCW_solver -> XCW_wrapper; comment pass; PR onto density_source (merged as #232) |
-| 2 | open | I tensor route removed, build_I split, self-documenting names, XCW log child, `-print_F` |
+| 2 | 2026-10-27 | I tensor route removed, build_I split, self-documenting names, XCW log child, `-print_F` |
+| 3 | open | Criterion = GooF^2, quant = E + lambda * Criterion (phi gone), SCF_solver names |
 
 ### Agenda
 Done in run 1 (details in the git history of #232):
@@ -62,11 +65,14 @@ Run 2 (asked for 2026-10-27):
 - [x] One-line comments on the calls that hide a lot of work (`XCW_wrapper::run`, `setup_structure_factors`, `setup_scf_integrals`, `run_lambda`, `write_step_results`)
 - [x] `SCF_coupling` functions renamed (see Decisions); the model hook `evaluate_model` is `evaluate_model_term`
 - [x] REFACTOR.md shortened, tracking in one table
-- [ ] `stored_eri`: holds only the four-index (ab|cd) integrals today; renaming waits for the user (what else is it meant to hold?)
-- [ ] SCF_solver quantities (`G`, `phi`, `theta`, `alpha`, `quant_`): reported to the user, renamed once the names are chosen
 - [ ] GPU/Metal I tensor kernels (`itensor_gpu.cu` build/hold/rows/cols, their `gpu_dispatch.cpp` entries, `itensor_gemm.cuh`, `itensor_metal.mm` and with it `NOSPHERA2_USE_METAL`) are unused since the route went; removed in a commit a GPU build can compile, since nothing here compiles them. `itensor_gpu_available`/`_integrated` and `eri_gpu_*` stay
 - [ ] A GPU golden for the grid route (the tensor one, `P1_test_XCW_gpu_itensor`, is gone; it needs a device to record)
 - [ ] `-gpu_itensor` / `-cpu_itensor_fp32` and the `i_double` keyword keep their names (they now set the grid); renaming them is a user decision
+
+Run 3 (asked for 2026-10-27):
+- [x] Criterion printed and weighed as GooF^2, Perturbation = lambda * Criterion, quant = E + Perturbation; `phi` merged into `quant_` (see Decisions). The goldens' Criterion, Perturbation, Target quantity and Crit(all) columns change; energies and the SCF path do not, the functional was already E + lambda GooF^2
+- [x] SCF_solver renames (see Decisions); `stored_eri` keeps its name
+- [x] `grid_contract` deals its blocks with `schedule(static, 4)` instead of `dynamic`: the per-thread sums of the perturbation no longer depend on load (squaring the criterion made the ninth decimal of the target quantity vary between identical runs under `-j 6`)
 
 Later:
 - [ ] SCF_solver for other theory levels: it is tied to `occ::qm::SCF<occ::qm::HartreeFock>` (`scf_t`); DFT needs the procedure as a template parameter or behind an interface
@@ -90,5 +96,6 @@ Wall time in s (mean, scatter ±0.1 s for the small cases and ±0.3-0.9 s for `s
 | merge `0efc6add` | 4.37 | 4.29 | 3.92 | 4.35 | 21.06 | 1330/1355 |
 | merge `33fa9685` | 4.65 | 4.56 | 4.09 | 4.64 | 22.61 | 1333/1358 |
 | run 2 (no I tensor) | 4.29 | 4.26 | 3.84 | 4.30 | 20.77 | 1322/1346 |
+| run 3 (GooF^2, static contraction) | 4.62 | 4.55 | 4.09 | 4.66 | 22.01 | 1329/1346 (`RUN_FULL_TEST=1`) |
 
-Every step was within the run-to-run scatter of the build before it measured in the same sitting (`merge 33fa9685` ran in a busier sitting, its predecessor measured 4.54, 4.56, 4.20, 4.74, 21.99 there), needed the same number of Fock builds (68, 68, 47, 74, 62) and gave lambda tables and F_calc within thread noise of each other. Run 2's predecessor measured 4.37, 4.39, 4.03, 4.41, 21.05 in its sitting; the 12 fewer tests are the tensor's (file, streaming, device golden). With `RUN_FULL_TEST=1` the four `P1_*_full` goldens pass in every build.
+Every step was within the run-to-run scatter of the build before it measured in the same sitting (`merge 33fa9685` ran in a busier sitting, its predecessor measured 4.54, 4.56, 4.20, 4.74, 21.99 there), needed the same number of Fock builds (68, 68, 47, 74, 62) and gave lambda tables and F_calc within thread noise of each other. Run 2's predecessor measured 4.37, 4.39, 4.03, 4.41, 21.05 in its sitting; the 12 fewer tests are the tensor's (file, streaming, device golden). Run 3 sat in a slower sitting: there its predecessor (the same code with the dynamic schedule) measured 4.43, 4.48, 4.06, 4.62, 21.62; the 0.03-0.4 s are the static schedule, `static, 1` (22.17 s svp) and `static, 16` (23.30 s) were slower. Its lambda tables match its predecessor's. With `RUN_FULL_TEST=1` the four `P1_*_full` goldens pass in every build.

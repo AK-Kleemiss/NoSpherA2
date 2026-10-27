@@ -31,7 +31,7 @@ void XCW_solver::effective_dm(const scf_t& scf, const occ::Mat& D, dMatrix2& dm_
 }
 
 //Structure factors, scale and criteria of the current density and the perturbation matrix, the
-//derivative of chi^2 with respect to the density
+//derivative of the criterion with respect to the density
 void XCW_solver::evaluate_model_term(const scf_t& scf, const bool timed) {
 	const _time_point t0 = get_time();
 	dMatrix2 dm_eff(nmo_, nmo_);
@@ -42,10 +42,9 @@ void XCW_solver::evaluate_model_term(const scf_t& scf, const bool timed) {
 	if (timed) throughput::record_time("XCW structure factors + perturbation", coupling_->grid_on_device(), get_msec(t0, get_time()));
 }
 
-//perturbation_ is the derivative of lambda * criterion^2 (the chi^2 of Jayatilaka's functional),
-//so that, not the printed lambda * criterion, is what the SCF minimises
+//The perturbation lambda criterion, criterion = GooF^2 (the normalised chi^2 of Jayatilaka's functional)
 double XCW_solver::model_energy() const {
-	return lambda * fit_.criterion * fit_.criterion;
+	return lambda * fit_.criterion;
 }
 
 void XCW_solver::add_model_fock(occ::Mat& F) const {
@@ -75,9 +74,7 @@ void XCW_solver::restore_model_state() {
 }
 
 void XCW_solver::log_iteration(const scf_t& scf) {
-	const double E = scf.ctx.energy.at("total"), penalty = fit_.criterion * lambda;
-	quant_ = E + penalty;
-	xcw_writer_->v = { scf.iter, lambda, fit_.criterion, fit_.GooF2, fit_.R1, E, penalty, quant_, fit_.criterion_all, fit_.R1_all, 0.0, false };
+	xcw_writer_->v = { scf.iter, lambda, fit_.criterion, fit_.GooF2, fit_.R1, scf.ctx.energy.at("total"), model_energy(), quant_, fit_.criterion_all, fit_.R1_all, 0.0, false };
 	xcw_writer_->iteration_line();
 }
 

@@ -239,6 +239,13 @@ Key core modules live in `Src/core`:
 
 ## Current Validation Notes
 
+As of 2026-10-27 (XCW refactor, run 3), XCW's Criterion is GooF^2 against F or F^2, the perturbation lambda times it and
+the target quantity `quant_` E + perturbation, the functional the SCF minimises (`phi` is gone; the SCF path is unchanged,
+it already minimised E + lambda GooF^2), and `grid_contract` sums its blocks in a load-independent order; the nine P1 XCW goldens
+were regenerated (Criterion, Perturbation, Target quantity and Crit(all) columns). `RUN_FULL_TEST=1 ctest --preset
+release-windows-tests -j 6` on a CPU-only build reports **1329 passed, 0 failed, 15 skipped** (2 disabled) of 1346. See
+`UNIT_TESTS_STATUS.md` and `REFACTOR.md`.
+
 As of 2026-10-27 (XCW refactor, run 2), the XCW I tensor route is gone: XCW runs on its integration grid only
 (`structure_factors::setup_grid` with `link_symmetry_equivalents`, `screen_ao_pairs`, `setup_atom_grids`,
 `build_grid_blocks`), the `safe`/`read`/`stream`/`i_tensor_mb`/`i_float` keywords are unknown, the subset goldens run on the

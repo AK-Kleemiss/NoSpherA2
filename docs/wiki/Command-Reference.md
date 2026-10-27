@@ -444,6 +444,11 @@ The SCF details go to `SCF.log`.
 | `-print_F` | 0 | off | Write the F_calc table of every converged lambda step, `NA2_<lambda>_Fcalc.txt`. |
 | `-convert_XCW <stdout> <step>` | 2 | | Import lambda steps from a Tonto XCW log. One-shot. |
 
+The lambda table prints the Criterion, GooF^2 against F or F^2 (whichever is
+refined against; its 1/\|H\|^2-weighted form under `weighted`), GooF(F^2) always,
+R1, the energy, the perturbation lambda x Criterion and the target quantity,
+energy + perturbation, which each lambda step minimises.
+
 The grid's block products run on the GPU by default; `-gpu_itensor` and
 `-cpu_itensor_fp32` in [section 10](#10-performance-and-hardware) choose how. The
 partitioning flags of [section 3](#3-partitioning-grids-and-basis) and
@@ -509,7 +514,7 @@ them override single values.
 
 | Keyword | Arguments | Default | Meaning |
 | --- | --- | --- | --- |
-| `conv <x>` | 1 | preset | Change of the target quantity, energy + lambda x penalty. |
+| `conv <x>` | 1 | preset | Change of the target quantity, energy + lambda x Criterion. |
 | `conv_diis <x>` | 1 | preset | DIIS error. |
 | `gradient <x>` | 1 | preset | Orbital gradient. |
 | `maxp_diff <x>` | 1 | preset | Largest change of the density matrix. |

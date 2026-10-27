@@ -4810,13 +4810,13 @@ void options::loadXCWsettings() {
 	}
 
 	if (speed_preset == "slow_conv") {
-		xcw_settings.alpha = 0.8;
+		xcw_settings.alpha_damp = 0.8;
 		xcw_settings.level_shift = 1;
 		xcw_settings.diis_stop_damping = 1e-5;
 		xcw_settings.diis_stop_shift = 1e-5;
 	}
 	else if (speed_preset == "normal_conv") {
-		xcw_settings.alpha = 0.5;
+		xcw_settings.alpha_damp = 0.5;
 		xcw_settings.level_shift = 0.5;
 		xcw_settings.diis_stop_damping = 1e-3;
 		xcw_settings.diis_stop_shift = 1e-2;
@@ -4838,7 +4838,7 @@ void options::loadXCWsettings() {
 	if (gradient != 32768) xcw_settings.gradient = gradient;
 	if (MaxP_diff != 32768) xcw_settings.MaxP_diff = MaxP_diff;
 	if (RMSP_diff != 32768) xcw_settings.RMSP_diff = RMSP_diff;
-	if (alpha != 32768) xcw_settings.alpha = alpha;
+	if (alpha != 32768) xcw_settings.alpha_damp = alpha;
 	if (level_shift != 32768) xcw_settings.level_shift = level_shift;
 	if (max_scf_iterations != 32768) xcw_settings.max_scf_iterations = max_scf_iterations;
 	xcw_settings.charge = (charge != 32768) ? charge : xcw_settings.charge;

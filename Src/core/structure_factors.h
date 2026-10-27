@@ -309,7 +309,7 @@ public:
 	// 1/|H|^2 weighting (XCW_plan.md sec. 6.2, residual self-energy
 	// criterion) instead of the traditional unweighted sums.
 	void calc_criteria();
-	// The criterion the SCF descends (XWR_type x refine_against), over the fit set or over all
+	// The criterion GooF^2 against F or F^2 (XWR_type x refine_against), over the fit set or over all
 	double criterion(bool all) const;
 
 	extinction_settings extinction_settings;
