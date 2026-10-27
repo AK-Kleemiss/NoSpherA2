@@ -770,6 +770,25 @@ wfn = "olex2/Wfn_job/sucrose.wfx"
 acc = 1
 gpu_fp32 = ""
 
+# P1_test_XCW with the grid block GEMMs and the stored-integral Fock build on the device
+# (-gpu_itensor). Its own reference: the device answer differs from P1_test_XCW.good in the
+# tenth significant figure, and that difference is the evidence the device ran. The device
+# GEMM is cuBLAS when the machine has it and CUTLASS otherwise, and the two disagree in the
+# last digits, so it is pinned to CUTLASS, the one always present. Reads p1_eri.bin like the
+# other subset goldens.
+[P1_test_XCW_gpu]
+directory = "P1_test"
+good = "P1_test_XCW_gpu.good"
+
+[P1_test_XCW_gpu.args]
+do_XCW = ""
+cif = "P1_test.cif"
+hkl = "P1_subset.hkl"
+XCW_settings = "test_settings_read.txt"
+no_date = ""
+gpu_itensor = ""
+no_gpu_cublas = ""
+
 # ---------------------------------------------------------------------------
 # One-shot options and property cubes (19 Sep 2026). Each of these ran zero
 # times under the gtest suite before; they are small inputs on coarse grids so

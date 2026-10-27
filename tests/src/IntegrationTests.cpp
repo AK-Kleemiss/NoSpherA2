@@ -593,6 +593,17 @@ TEST(TomlIntegrationTests, sucrose_SF_gpu_fp32)
 	EXPECT_TRUE(result.success) << result.message;
 }
 
+// The grid block GEMMs run in single precision on the device, which moves the energies, hence its own reference.
+TEST(TomlIntegrationTests, P1_test_XCW_gpu)
+{
+	if (!gpu_device_present()) {
+		GTEST_SKIP() << "No GPU device present; the -gpu_itensor path cannot run here";
+	}
+	ensure_p1_eri();
+	const UT_Result result = run_inprocess_test(get_repo_root(), "P1_test_XCW_gpu");
+	EXPECT_TRUE(result.success) << result.message;
+}
+
 TEST(TomlIntegrationTests, P1_test_XCW_full)
 {
 	if (const char* env = std::getenv("RUN_FULL_TEST"); !env || std::string(env) == "0" || std::string(env) == "false") {
