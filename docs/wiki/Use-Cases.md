@@ -309,8 +309,8 @@ Every contacting pair in a crystal, from a job file:
 ## 18. X-ray constrained wavefunction fitting
 
 The lambda scan. `-no_gpu` is not required, but the regression tests pin it
-because the device I tensor differs from the host one in the tenth significant
-figure.
+because the device grid products differ from the host ones in the tenth
+significant figure.
 
 ```powershell
 .\NoSpherA2.exe -wfn mol.gbw -cif mol.cif -hkl mol.hkl -acc 2 -mult 1 -charge 0 -do_XCW -XCW_settings xcw.txt -no_gpu
@@ -320,11 +320,10 @@ figure.
 Get-Content .\NoSpherA2.log -Tail 60
 ```
 
-The settings file controls where the two-electron integral tensor lives
-(`stream`, `i_tensor_mb`, `safe`, `read`, `df_basis`, `i_double`, `i_float`),
-which is the whole memory question for a fit of any size; `save_eri <file>` and
-`read_eri <file>` keep the stored two-electron integrals for a later run on the
-same geometry and basis.
+The settings file chooses the density fitting of the Fock build (`df_basis`) and
+the grid precision (`i_double`); `save_eri <file>` and `read_eri <file>` keep the
+stored two-electron integrals for a later run on the same geometry and basis.
+`-print_F` writes the F_calc table of every step.
 
 ## 19. Force the GPU, and prove it ran
 

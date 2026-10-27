@@ -415,46 +415,48 @@ available from it.
 ## 9. X-ray constrained wavefunction fitting
 
 Fit the wavefunction against the measured structure factors: a lambda scan in
-which the X-ray agreement statistic is traded against the energy. The dominant
-cost is the two-electron integral ("I") tensor, so much of the `-XCW_settings`
-file is about where that tensor lives.
+which the X-ray agreement statistic is traded against the energy. Every SCF
+iteration integrates the density on the atom grids and transforms it into
+F_calc; the SCF's two-electron integrals are stored when they fit in memory.
 
 Everything about the crystal comes from `-cif`: cell, symmetry, positions,
 U_iso, U_ij, the Gram-Charlier C and D, the wavelength and the anomalous
 dispersion (`_atom_type_scat_dispersion_real/imag`, or per site
 `_atom_site_dispersion_*`). For every lambda the run writes
-`NA2_<lambda>.tscb`, `.wfn`, `.fchk` and `_Fcalc.txt`, where `<lambda>` loses
-its decimal point and is padded to seven digits (0.01 gives `NA2_0010000`).
+`NA2_<lambda>.tscb`, `.wfn` and `.fchk` (and `_Fcalc.txt` with `-print_F`), where
+`<lambda>` loses its decimal point and is padded to seven digits (0.01 gives
+`NA2_0010000`).
 The SCF details go to `SCF.log`.
 
 | Flag | Arguments | Default | Meaning |
 | --- | --- | --- | --- |
 | `-do_XCW` | 0 | off | Run the XCW lambda scan. Needs `-cif`, `-hkl` and `-XCW_settings`. |
 | `-XCW_settings <file>` | 1 | | Settings file; see [settings-file keywords](#settings-file-keywords). |
-| `-xcw_partition grid\|ri` | 1 | `grid` | How XCW shares the density among the atoms for F_calc. `grid`: the grid weights (`-hirsh` default). `ri`: an RI fit of the density in the `-ri_fit` basis (AutoAux without one), (mu nu\|P) from occ held in memory; with `-multipole_moments` its atomic moments are restrained to the grid partition of that scheme (`hirshfeld`, `tfvc`, `mbis`, `embis`, exact derivative at fixed shares), to Mulliken charges (linear in D, exact) or to fixed Nuclear / Sanderson charges. `-tfvc`, `-mbis` and `-embis` work on the `grid` route too: their shares are refit to XCW's own density (stand-alone `make_chi` / MBIS / EMBIS fits on the XCW grid, MBIS and EMBIS to 1e-6) between SCF solves of a step until the refit moves F by less than 1e-5 of max \|F\|; they need the grid route (not with `read`, `safe` or `NOSPHERA2_XCW_GRID`). |
+| `-xcw_partition grid\|ri` | 1 | `grid` | How XCW shares the density among the atoms for F_calc. `grid`: the grid weights (`-hirsh` default). `ri`: an RI fit of the density in the `-ri_fit` basis (AutoAux without one), (mu nu\|P) from occ held in memory; with `-multipole_moments` its atomic moments are restrained to the grid partition of that scheme (`hirshfeld`, `tfvc`, `mbis`, `embis`, exact derivative at fixed shares), to Mulliken charges (linear in D, exact) or to fixed Nuclear / Sanderson charges. `-tfvc`, `-mbis` and `-embis` work on the `grid` route too: their shares are refit to XCW's own density (stand-alone `make_chi` / MBIS / EMBIS fits on the XCW grid, MBIS and EMBIS to 1e-6) between SCF solves of a step until the refit moves F by less than 1e-5 of max \|F\|. |
 | `-xyz <file>` | 1 | | The grown molecule, for a settings file with `grown`. |
 | `-twin <9 numbers>` | 9 | | Twin laws applied to the reflections, as in [section 2](#2-scattering-factors-and-tsctscb-tables). |
-| `-mem <MB>` | 1 | | When given, caps the I tensor, the density-fitting integrals and the stored two-electron integrals together; without it they are sized from the memory the job can have. |
-| `-acc <0..4>` | 1 | `2` | Integration grid of the I tensor and of each `.tscb`. |
+| `-mem <MB>` | 1 | | When given, caps the density-fitting integrals and the stored two-electron integrals together; without it they are sized from the memory the job can have. |
+| `-acc <0..4>` | 1 | `2` | XCW's integration grid and that of each `.tscb`. |
 | `-xcw_int_precision <eps>` | 1 | `1e-10` | Integral screening threshold of the Fock build. |
 | `-xcw_extrapolate` / `-no_xcw_extrapolate` | 0 | on | Seed each lambda step from the density extrapolated through the two previous steps (RHF only). |
 | `-xcw_incremental` / `-no_xcw_incremental` | 0 | off | Build the two-electron Fock part from the change of the density each iteration. |
 | `-rgbi` | 0 | off | Roby-Gould bond indices of each refined wavefunction, written to `NA2_<lambda>_RGBI.txt`. |
+| `-print_F` | 0 | off | Write the F_calc table of every converged lambda step, `NA2_<lambda>_Fcalc.txt`. |
 | `-convert_XCW <stdout> <step>` | 2 | | Import lambda steps from a Tonto XCW log. One-shot. |
 
-The I tensor runs on the GPU by default; `-gpu_itensor`, `-gpu_itensor_tensor`,
-`-itensor_hybrid` and `-cpu_itensor_fp32` in [section 10](#10-performance-and-hardware)
-choose how. The partitioning flags of [section 3](#3-partitioning-grids-and-basis)
-and `-all_charges` apply to each `.tscb` written. Developer knobs, through
-`-tune NAME=value`: `NOSPHERA2_XCW_I_FLOAT` (single-precision tensor),
-`NOSPHERA2_NO_INVERSION_SCREENING` (integrate both h and -h),
+The grid's block products run on the GPU by default; `-gpu_itensor` and
+`-cpu_itensor_fp32` in [section 10](#10-performance-and-hardware) choose how. The
+partitioning flags of [section 3](#3-partitioning-grids-and-basis) and
+`-all_charges` apply to each `.tscb` written. Developer knobs, through
+`-tune NAME=value`: `NOSPHERA2_XCW_GRID_DIRECT` (direct-sum transform instead of
+Fourier-Bessel), `NOSPHERA2_NO_INVERSION_SCREENING` (integrate both h and -h),
 `NOSPHERA2_XCW_ERI_NO_BUDGET` (store the two-electron integrals outside `-mem`) and
 `NOSPHERA2_DEBUG_ASYMFACT` (print the symmetry factors). For density-following shares: `NOSPHERA2_XCW_WEIGHT_UPDATE=k` (refit at every k-th evaluation inside the SCF instead of between solves; `0` freezes them per step, the reference), `NOSPHERA2_XCW_WEIGHT_FTOL` (default `1e-5`), `NOSPHERA2_XCW_WEIGHT_TOL` (MBIS/EMBIS fit, default `1e-6`), `NOSPHERA2_XCW_WEIGHT_CHECK` (how far the shares move F and R1 over a step) and `NOSPHERA2_XCW_ADJOINT_CHECK` (now after the first step).
 
 Example, run in `tests/P1_test`:
 `NoSpherA2 -do_XCW -no_gpu -cif P1_test.cif -hkl P1_subset.hkl -XCW_settings test_settings_save.txt -no_date`,
 with `test_settings_save.txt` holding
-`normal normal_conv params 177 basis_set sto-3g max_iter 100 F charge 0 mult 1 rhf start 0 step_size 0.01 end 0.05 safe p1_i.bin save_eri p1_eri.bin`.
+`normal normal_conv params 177 basis_set sto-3g max_iter 100 F charge 0 mult 1 rhf start 0 step_size 0.01 end 0.05 save_eri p1_eri.bin`.
 
 ### Settings-file keywords
 
@@ -524,22 +526,14 @@ them override single values.
 | `guess_basis <name>` | 1 | | Start the first lambda from a Hartree-Fock converged in this smaller basis, projected into the orbital basis. |
 | `load_wfn` | 0 | off | Start the first lambda from `NA2_<start>.fchk` of an earlier run. |
 
-**I tensor and stored integrals**
+**Stored integrals and grid precision**
 
-The I tensor depends on the structure, the basis and the reflections only, not
-on any refinement setting, so a saved one serves every later scan of the same
-data. Without `stream` or `i_tensor_mb` it is held in memory when it fits four
-fifths of the memory the job can have (or of `-mem`) and streamed when it does
-not.
+The stored two-electron integrals depend on the structure and the basis only, so
+saved ones serve every later scan of the same model.
 
 | Keyword | Arguments | Default | Meaning |
 | --- | --- | --- | --- |
-| `stream` | 0 | | Keep the tensor on disk and read a window of reflections at a time, with a 2048 MB budget. |
-| `i_tensor_mb <n>` | 1 | | The same with an n MB budget. |
-| `safe <path>` | 1 | | Write the tensor to `<path>` while the refinement runs, for a later `read <path>`. |
-| `read [path]` | 0-1 | `I_tensor_stream.bin` | Reuse the tensor at `path` instead of building it; built when the file is missing or does not match. A tensor that is read must not be written again with `safe`. |
-| `i_float` | 0 | off | Hold the tensor in single precision: half the memory. |
-| `i_double` | 0 | off | Keep it in double precision although it was built in single. |
+| `i_double` | 0 | off | The grid's AO values and block products in double precision instead of single. |
 | `save_eri <path>` | 1 | | Write the stored two-electron integrals for a later run. |
 | `read_eri <path>` | 1 | | Reuse them; a file of another basis or geometry is refused and the integrals are built. |
 
@@ -553,8 +547,8 @@ not.
 
 ## 10. Performance and hardware
 
-GPU acceleration is **on by default** for the Fourier transform, the XCW I
-tensor, the SALTED equicomb step, the Becke/TFVC grid weights and the fitted
+GPU acceleration is **on by default** for the Fourier transform, the XCW grid
+products, the SALTED equicomb step, the Becke/TFVC grid weights and the fitted
 density, with a silent CPU fallback when no device or runtime is found. Single
 precision is used where it is safe; the double-precision alternative is one flag
 away in each case. See
@@ -571,12 +565,10 @@ for the sizes of the differences.
 | `-gpu_grid` / `-no_gpu_grid` | 0 | on | Grid weights on the GPU. |
 | `-gpu_density` / `-no_gpu_density` | 0 | on | Fitted-density evaluation on the GPU. |
 | `-gpu_salted` / `-no_gpu_salted` | 0 | on | SALTED equicomb on the GPU. |
-| `-gpu_itensor` / `-no_gpu_itensor` | 0 | on | XCW I tensor on the GPU. |
-| `-gpu_itensor_tensor` / `-no_gpu_itensor_tensor` | 0 | off | Tensor-core path for the I tensor. |
+| `-gpu_itensor` / `-no_gpu_itensor` | 0 | on | XCW grid products and stored-integral Fock build on the GPU. |
 | `-gpu_cublas` / `-no_gpu_cublas` | 0 | on | Use cuBLAS when the runtime is present. |
 | `-gpu_blas` | 0 | off | Route the dense linear algebra through the GPU BLAS. |
-| `-cpu_itensor_fp32` / `-no_cpu_itensor_fp32` | 0 | on | Single precision for the CPU I tensor. |
-| `-itensor_hybrid` / `-no_itensor_hybrid` | 0 | off | Split the I tensor between CPU and GPU. |
+| `-cpu_itensor_fp32` / `-no_cpu_itensor_fp32` | 0 | on | Single precision for XCW's grid products on the CPU. |
 | `-gflops` | 0 | off | Report achieved GFLOP/s. |
 | `-basin_grid <n>` | 1 | `1` | Basin-integration grid level (also a cost knob). |
 

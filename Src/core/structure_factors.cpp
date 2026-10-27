@@ -1,15 +1,11 @@
 #include "pch.h"
 #include "tuning.h"
 #include "structure_factors.h"
-#if defined(NOSPHERA2_USE_GPU) || defined(NOSPHERA2_USE_METAL)
-#include "itensor_gpu.h"
-#endif
 #include "wfn_class.h"
 #include "scattering_factors.h"
 #include "GridManager.h"
 #include "nos_math.h"
 #include "basis_set.h"
-#include <mutex>
 #include <limits>
 
 
@@ -19,12 +15,6 @@ structure_factors::structure_factors(options& opt_in) {
 	// Load the settings from the options object
 	model_data.n_params = opt_in.xcw_settings.n_params;
 	extinction_settings.extinction_model = opt_in.xcw_settings.extinction_model;
-	I_tens.read_tensor = opt_in.xcw_settings.read_tensor;
-	I_tens.i_tensor_file_path = opt_in.xcw_settings.i_tensor_file_path;
-	I_tens.i_tensor_save_path = opt_in.xcw_settings.i_tensor_save_path;
-	I_tens.tensor_single = opt_in.xcw_settings.i_tensor_single;
-	I_tens.tensor_double = opt_in.xcw_settings.i_tensor_double;
-	I_tens.basis_set_name = opt_in.xcw_settings.basis_set_name;
 	orbital_basis = opt_in.xcw_settings.basis_overrides.empty() ? BasisSetLibrary::get_basis_set(opt_in.xcw_settings.basis_set_name) :
 		BasisSetLibrary::get_basis_set_with_overrides(opt_in.xcw_settings.basis_set_name, opt_in.xcw_settings.basis_overrides);
 	extinction_settings.aniso = opt_in.xcw_settings.extinction_aniso;
@@ -32,7 +22,6 @@ structure_factors::structure_factors(options& opt_in) {
 	extinction_settings.start = opt_in.xcw_settings.extinction_start;
 	quality_criteria.refine_against = opt_in.xcw_settings.refine_against;
 	quality_criteria.goof_type = opt_in.xcw_settings.XWR_type;
-	I_tens.i_tensor_max_mb = opt_in.xcw_settings.i_tensor_max_mb;
 
 
 	// Setup file paths
@@ -635,255 +624,17 @@ void structure_factors::create_prims(std::vector<ao_data>& ao_data_shells, const
 	model_data.nmo = ao_data_shells.size();
 }
 
-size_t structure_factors::tri_index(int mu, int nu) const noexcept {
-	return mu * model_data.nmo - (mu * (mu - 1)) / 2 + (nu - mu);
-}
-
-structure_factors::I_tensor& structure_factors::eval_I(const occ::gto::AOBasis& aobasis) {
+void structure_factors::setup_grid(const occ::gto::AOBasis& aobasis) {
 	if (!DW_set_) std::cout << "Debye-Waller factors are not computed and set to 1. Continuing." << std::endl;
 	if (!phases_set_) std::cout << "Phase factors are not computed and set to 1. Continuing." << std::endl;
 	if (!anom_set_) std::cout << "Anomalous dispersion corrections are not computed and set to 0. Continuing." << std::endl;
-
-	// Creates the primitive data for each shell, needed to compute the I tensor
-	std::vector<structure_factors::ao_data> ao_data_shells;
+	std::vector<ao_data> ao_data_shells;
 	create_prims(ao_data_shells, aobasis);
-	const bool share = opt->partition_type == PartitionType::TFVC || opt->partition_type == PartitionType::MBIS || opt->partition_type == PartitionType::EMBIS;
-	const char* xg = tuning("NOSPHERA2_XCW_GRID");
-	err_checkf(!share || ((!xg || std::atoi(xg) == 1) && !I_tens.read_tensor && I_tens.i_tensor_save_path.empty()),
-		"TFVC, MBIS and EMBIS shares follow the density, which a tensor cannot: XCW runs them on the grid, without read, safe or NOSPHERA2_XCW_GRID", std::cout);
-
-	bool single_on_disk = false;
-	// Path for reading the I tensor from disk
-	if (I_tens.read_tensor && !I_tens.i_tensor_file_path.empty()
-		&& i_tensor_file::matches(i_tensor_path(), model_data.nr, model_data.nmo, I_tens.i_compact_, single_on_disk)) {
-		if (!I_tens.i_tensor_save_path.empty())
-			throw std::runtime_error("The I tensor is read from " + i_tensor_path().string() + " and should not be saved again to "
-				+ I_tens.i_tensor_save_path.string() + ": a second copy costs as much memory as the first. Remove `safe` from the XCW settings.");
-		//open() checks the header and throws if the shape does not match, which is what
-		//stops a tensor from a different structure being used by accident.
-		const char* source = "";
-		bool automatic = false;
-		const size_t w = items_within_budget(static_cast<size_t>(model_data.nr),
-			i_tensor_file::block_bytes(I_tens.i_compact_, single_on_disk), i_budget(source, automatic));
-		I_tens.i_streamed_ = w != 0;
-		//Streamed, the window the budget allows, as decide_i_storage gives a built tensor; held, the
-		//read below only passes through the window when it narrows
-		I_tens.i_window_ = I_tens.i_streamed_ ? static_cast<int>(std::min(w, static_cast<size_t>(model_data.nr))) : std::max(1, std::min(model_data.nr, 64));
-		open_i_stream_for_reading(i_tensor_path());
-		// Figure out which pair of mu,nu each compact index corresponds to
-		I_tens.i_pair_mu_ = I_tens.i_file_.pair_mu();
-		I_tens.i_pair_nu_ = I_tens.i_file_.pair_nu();
-		//The file's element type is kept as it is: a single-precision tensor cannot regain
-		//anything by widening, and a double one is narrowed only on request
-		const char* f = tuning("NOSPHERA2_XCW_I_FLOAT");
-		I_tens.i_float_ = single_on_disk || (!I_tens.i_streamed_ && (I_tens.tensor_single || (f && std::atoi(f) != 0)));
-		std::cout << "I tensor read from " << i_tensor_path().string()
-			<< " (" << (i_tensor_file::total_bytes(model_data.nr, I_tens.i_compact_, single_on_disk) / 1048576.0)
-			<< " MB" << (single_on_disk ? ", single precision" : "") << "), not recomputed"
-			<< (I_tens.i_streamed_ ? ", read a window at a time" : ", held in memory");
-		if (I_tens.i_streamed_) std::cout << " (" << I_tens.i_window_ << " of " << model_data.nr << " reflections resident)";
-		std::cout << std::endl;
-		if (I_tens.i_float_ && !single_on_disk)
-			std::cout << "NOTE: the tensor on disk is double precision; it is narrowed to single as i_float asks" << std::endl;
-		if (single_on_disk && I_tens.tensor_double)
-			std::cout << "NOTE: the tensor on disk is single precision; i_double cannot widen it, it is used as stored" << std::endl;
-		if (!I_tens.i_streamed_) {
-			//Read straight into the tensor in the file's element type; only narrowing a double file goes through the window
-			const size_t n = I_tens.i_compact_;
-			if (I_tens.i_float_) I_tens.I32.resize(static_cast<size_t>(model_data.nr) * n);
-			else I_tens.I.resize(static_cast<size_t>(model_data.nr) * n);
-			for (int r0 = 0; r0 < model_data.nr; r0 += I_tens.i_window_) {
-				const int r1 = std::min(model_data.nr, r0 + I_tens.i_window_);
-				const size_t o = static_cast<size_t>(r0) * n;
-				if (!I_tens.i_float_) I_tens.i_file_.read(r0, r1, I_tens.I.data() + o);
-				else if (single_on_disk) I_tens.i_file_.read(r0, r1, I_tens.I32.data() + o);
-				else {
-					I_tens.i_file_.load(r0, r1);
-					std::copy_n(I_tens.i_file_.block(r0), static_cast<size_t>(r1 - r0) * n, I_tens.I32.data() + o);
-				}
-			}
-			I_tens.i_file_.close();
-		}
-	}
-	// Path for computing the I tensor (through build_I)
-	else {
-		double time_taken;
-		long long screen_counter = 0;
-		long long skipped_grids = 0;
-		build_I(ao_data_shells, time_taken, screen_counter, skipped_grids);
-		if (share) setup_grid_weights(aobasis);
-		if (!(opt->no_date)) {
-			std::cout << std::fixed << std::setprecision(2) << "Time taken for XCW integrals: " << time_taken << " seconds. \n";
-		}
-		start_i_save();
-		std::cout << std::fixed << std::setprecision(2) << "Screened out " << screen_counter << " unique pairs of mu, nu (" << static_cast<size_t>(screen_counter) / (static_cast<double>(model_data.nmo * (model_data.nmo + 1)) / 2) * 100.00 << "%) \n";
-		std::cout << std::fixed << std::setprecision(2) << "Skipped evaluation of " << skipped_grids << " grids (" << static_cast<double>(skipped_grids) / ((static_cast<double>(model_data.nmo * (model_data.nmo + 1)) / 2) * model_data.nr_enlarged * model_data.ncen) * 100.00 << "%) \n";
-
-	}
-	return I_tens;
-	// closing function
-}
-
-//Whether the I tensor is held or streamed, and the largest window that fits the budget
-//The tensor is written on a thread while the refinement runs. Nothing in the SCF modifies
-//it - both walks only read - so a reader alongside them needs no lock, and the run pays only
-//the disk bandwidth, which it is not competing for while it works out of memory.
-void structure_factors::start_i_save()
-{
-	//A streamed tensor was built straight into the save file, see decide_i_storage
-	if (I_tens.i_tensor_save_path.empty() || I_tens.i_streamed_ || XG.mode == 1) return;
-	const size_t packed = I_tens.i_compact_;
-	const int nr = model_data.nr;
-	const std::filesystem::path path = I_tens.i_tensor_save_path;
-	const bool from_float = I_tens.i_float_;
-	std::cout << "Writing the I tensor to " << path.string()
-		<< " in the background; a later run can `read " << path.string()
-		<< "` instead of building it" << std::endl;
-	i_writer_ = std::thread([this, path, nr, packed, from_float]() {
-		try {
-			i_tensor_file out;
-			out.create(path, nr, model_data.nmo, I_tens.i_pair_mu_, I_tens.i_pair_nu_, from_float);
-			for (int r = 0; r < nr; r++) {
-				if (from_float) out.write_block(r, I_tens.I32.data() + static_cast<size_t>(r) * packed);
-				else out.write_block(r, I_tens.I.data() + static_cast<size_t>(r) * packed);
-			}
-			out.finish_write();
-		}
-		catch (const std::exception& e) { i_writer_error_ = e.what(); }
-		catch (...) { i_writer_error_ = "unknown error"; }
-		});
-}
-
-//Called before the run ends, and before anything that could invalidate the tensor. A thread
-//left running past main is the bug 939268f was about; this one also holds a file handle.
-void structure_factors::finish_i_save()
-{
-	if (!i_writer_.joinable()) return;
-	i_writer_.join();
-	if (!i_writer_error_.empty())
-		std::cout << "Could not write the I tensor to "
-			<< I_tens.i_tensor_save_path.string() << ": " << i_writer_error_
-			<< " (the refinement itself is unaffected)" << std::endl;
-	else
-		std::cout << "I tensor written to " << I_tens.i_tensor_save_path.string() << std::endl;
-}
-
-size_t structure_factors::i_budget(const char*& source, bool& automatic) const {
-	size_t budget = I_tens.i_tensor_max_mb * 1024ULL * 1024ULL;
-	source = "i_tensor_mb";
-	automatic = false;
-	if (budget == 0) {
-		const size_t avail = free_memory();
-		if (avail > 0) {
-			//Four fifths: the SCF matrices, the grids and OCC's own allocations live in the
-			//rest, and a tensor that only just fits would page rather than run. What the
-			//process can have is a platform question - a cgroup here, a job object on
-			//Windows, page classes on a Mac - and lives in convenience.cpp.
-			//At least 1, since 0 means "no budget, hold it all".
-			budget = std::max<size_t>(avail / 5 * 4, 1);
-			automatic = !(opt->mem_given && opt->mem > 0.0);
-			source = automatic ? "four fifths of the memory this job can have" : "-mem";
-		}
-	}
-	return budget;
-}
-
-//What the next large allocation may take: the platform's and scheduler's headroom and, with -mem,
-//-mem minus what this process already holds. The density-fitting integrals, the I tensor and the
-//stored ERIs are sized in that order from it, so together they stay under -mem (they used to take
-//half the node, all of -mem and four fifths of the node, and a SLURM job went OOM). OCC fills
-//the density-fitting store only at the first Fock build, after all three decisions, so its
-//size is held back here by hand.
-size_t structure_factors::free_memory() const {
-	size_t avail = available_memory_bytes();
-	if (opt->mem_given && opt->mem > 0.0) {
-		const size_t cap = static_cast<size_t>(opt->mem * 1024.0 * 1024.0), held = resident_memory_bytes();
-		const size_t left = cap > held ? cap - held : 1;
-		if (avail == 0 || left < avail) avail = left;
-	}
-	if (avail != 0) avail = avail > df_reserved_ ? avail - df_reserved_ : 1;
-	return avail;
-}
-
-void structure_factors::decide_i_storage() {
-	const size_t per_block = i_tensor_file::block_bytes(I_tens.i_compact_, I_tens.i_float_);
-	const size_t total = i_tensor_file::total_bytes(model_data.nr, I_tens.i_compact_, I_tens.i_float_);
-
-	//The settings file budget wins, then -mem; with neither, what the process can actually
-	//have. Left to a keyword this is the single most expensive decision in an XCW run and
-	//the wrong answer is silent: both SCF walks re-read the whole tensor every iteration, so
-	//streaming a tensor that would have fit is many times slower on the stage a
-	//lambda scan spends its life in.
-	//Nobody should have to know that to get it right.
-	const char* source = "";
-	bool automatic = false;
-	const size_t budget = i_budget(source, automatic);
-	//items_within_budget returns 0 for "hold everything": no file, no re-read twice per SCF iteration
-	const size_t w = items_within_budget(static_cast<size_t>(model_data.nr), per_block, budget);
-	I_tens.i_streamed_ = (w != 0);
-	if (!I_tens.i_streamed_) {
-		//Announced only when someone asked about memory: saying it unconditionally
-		//shifts every reference output by a line, and the automatic budget would say it on
-		//every run - including the reference tests, which is why it stays quiet there.
-		if ((budget > 0 && !automatic) || ProgressBar::report_counts) {
-			std::cout << std::fixed << std::setprecision(2)
-				<< "I tensor held in memory: " << (total / 1048576.0) << " MB"
-				<< (I_tens.i_float_ ? " (single precision)" : "");
-			if (budget > 0)
-				std::cout << " (fits the " << (budget / 1048576.0) << " MB " << source << " budget)";
-			std::cout << std::endl;
-		}
-		return;
-	}
-	I_tens.i_window_ = static_cast<int>(std::min(w, static_cast<size_t>(model_data.nr)));
-	//Streamed straight into the `safe` file when there is one, so saving it costs nothing
-	const std::filesystem::path path = I_tens.i_tensor_save_path.empty() ? i_tensor_path() : I_tens.i_tensor_save_path;
-	I_tens.i_file_.create(path, model_data.nr, model_data.nmo, I_tens.i_pair_mu_, I_tens.i_pair_nu_, I_tens.i_float_);
-	std::cout << std::fixed << std::setprecision(2)
-		<< "I tensor streamed to disk: " << (total / 1048576.0) << " MB" << (I_tens.i_float_ ? " (single precision)" : "") << " total, "
-		<< I_tens.i_window_ << " of " << model_data.nr << " reflections resident ("
-		<< (I_tens.i_window_ * per_block / 1048576.0) << " MB) to fit " << source
-		<< " (" << (budget / 1048576.0) << " MB)" << std::endl;
-	if (I_tens.i_window_ == 1 && per_block > budget)
-		std::cout << "  NOTE: one reflection alone is " << (per_block / 1048576.0)
-		<< " MB, over the budget. Running one at a time." << std::endl;
-	if (!I_tens.i_tensor_save_path.empty())
-		std::cout << "The streamed I tensor is saved in " << path.string() << "; a later run can `read "
-		<< path.string() << "` instead of building it" << std::endl;
-}
-
-std::filesystem::path structure_factors::i_tensor_path() const {
-	return I_tens.i_tensor_file_path.empty()
-		? std::filesystem::path(i_tensor_default)
-		: I_tens.i_tensor_file_path;
-}
-
-void structure_factors::open_i_stream_for_reading(const std::filesystem::path& p) {
-	I_tens.i_file_.open(p, static_cast<size_t>(I_tens.i_window_));
-}
-
-//One tile of the CPU I tensor, C = A * B^T row-major with k the block's points
-static void tile_gemm(const int m, const int n, const int k, const double* a, const double* b, double* c)
-{
-	cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasTrans, m, n, k, 1.0, a, k, b, k, 0.0, c, n);
-}
-
-static void tile_gemm(const int m, const int n, const int k, const float* a, const float* b, float* c)
-{
-	cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasTrans, m, n, k, 1.0f, a, k, b, k, 0.0f, c, n);
-}
-
-void structure_factors::build_I(const std::vector<ao_data>& ao_data_shells, double& time_taken, long long& screen_counter, long long& skipped_grids_) {
-	long long skipped_grids = 0;
-	const int packed_size = (model_data.nmo * (model_data.nmo + 1)) / 2;
-	int at = 0, mu = 0, nu = 0, r = 0, s = 0, r_asym = 0;
-
-	cvec XCW_integrals;
-	cvec2 XCW_integral_old;
-
-	// Grid setup
-	//TFVC, MBIS and EMBIS shares need rho: the grid is Hirshfeld's, plain atom weights and pruned on the promolecule, and
-	//setup_grid_weights takes it from there
+	XG.fp32 = opt->cpu_itensor_fp32 && !opt->xcw_settings.grid_double;
+	link_symmetry_equivalents();
+	screen_ao_pairs(ao_data_shells);
+	//TFVC, MBIS and EMBIS shares need rho: their grid is Hirshfeld's, with plain atom weights and pruned on the
+	//promolecule, and setup_grid_weights takes it from there
 	const bool share = opt->partition_type == PartitionType::TFVC || opt->partition_type == PartitionType::MBIS || opt->partition_type == PartitionType::EMBIS;
 	GridConfiguration config;
 	config.accuracy = opt->accuracy;
@@ -893,307 +644,186 @@ void structure_factors::build_I(const std::vector<ao_data>& ao_data_shells, doub
 	config.debug = opt->debug;
 	config.all_charges = opt->all_charges;
 	GridManager grid_manager(config);
-	// Construct a dummy wavefunction from the asym atoms (needed for grids)
 	WFN dummy_wave;
-	for (int at = 0; at < model_data.ncen; at++) {
-		atom temp_atom;
-		temp_atom.set_coordinate(0, asym_atoms[at].pos[0]);
-		temp_atom.set_coordinate(1, asym_atoms[at].pos[1]);
-		temp_atom.set_coordinate(2, asym_atoms[at].pos[2]);
-		temp_atom.set_charge(asym_atoms[at].type);
-		dummy_wave.push_back_atom(temp_atom);
-	}
-	// Load the basis set into the dummy wavefunction
-	load_basis_into_WFN(dummy_wave, orbital_basis, false, true);
-	dummy_wave.delete_unoccupied_MOs();
-	bvec needs_grid(model_data.ncen, true);
-	ivec asym_atom_list(model_data.ncen);
-	for (int at = 0; at < model_data.ncen; at++) {
-		asym_atom_list[at] = at;
-	}
-	grid_manager.setup3DGridsForMolecule(dummy_wave, asym_atom_list, needs_grid, unit_cell);
-
-	// Evaluation of density on the grids for grid pruning
-	GridData& GD = grid_manager.getGridData();
-	vec2* grids = grid_manager.getNeedsHelper() ? GD.helper_grids.data() : GD.atomic_grids.data();
-	vec2 d1, d2, d3, weights;
-	const int n_grids = grid_manager.getNeedsHelper() ? GD.helper_grids.size() : GD.atomic_grids.size();
-	for (int g = 0; g < n_grids; g++) {
-		std::fill(grids[g][GridData::GridIndex::WFN_DENSITY].begin(), grids[g][GridData::GridIndex::WFN_DENSITY].end(), 1.0);
-	}
-	//where each point sits in its prototype grid, for the grid route's Fourier-Bessel transform
 	sf_shell_layout layout;
-	grid_manager.getDensityVectors(dummy_wave, asym_atom_list, d1, d2, d3, weights, false, &layout);
-	const int* points = grid_manager.getNeedsHelper() ? GD.helper_num_points_per_atom.data() : GD.num_points_per_atom.data();
-	const int total_points = grid_manager.getTotalGridPoints();
-	std::cout << "Total number of grid points after pruning: " << total_points << std::endl;
+	setup_atom_grids(grid_manager, dummy_wave, layout);
+	build_grid_blocks(ao_data_shells, grid_manager, dummy_wave, layout);
+	//the Fourier-Bessel transform of every atom grid, planned once on its prototype
+	plan_grid_fb(layout);
+	if (share) setup_grid_weights(aobasis);
+}
 
-	// Precompute the lookup table linking each unique reflection to its symmetry equivalents
-	ivec2 asym_lookup(model_data.nr);
-	for (r = 0; r < model_data.nr; r++) {
-		asym_lookup[r] = unit_cell.generate_asym_lookup(r, scatter_data.hkl, scatter_data.hkl_enlarged);
+void structure_factors::link_symmetry_equivalents() {
+	XG.lookup.resize(model_data.nr);
+	for (int r = 0; r < model_data.nr; r++)
+		XG.lookup[r] = unit_cell.generate_asym_lookup(r, scatter_data.hkl, scatter_data.hkl_enlarged);
+	//The AO values and weights are real, so the grid integral of -q is the conjugate of that of q: only the entries of
+	//inversion_cleaned_hkl are integrated
+	if (tuning("NOSPHERA2_NO_INVERSION_SCREENING")) {
+		XG.inversion_link.clear();
+		for (int e = 0; e < model_data.nr_enlarged; e++) XG.inversion_link.push_back({ e });
 	}
-	const unsigned int num_syms = unit_cell.get_num_syms();
-	// The AO values and weights are real, so the grid integral sum_p w_p phi_mu phi_nu exp(i q d_p) of -q is the
-	// conjugate of that of q: only the entries of inversion_cleaned_hkl are integrated
-	const bool no_screening = tuning("NOSPHERA2_NO_INVERSION_SCREENING") != nullptr;
-	ivec2 inversion_link;
-	if (no_screening)
-		for (int e = 0; e < model_data.nr_enlarged; e++) inversion_link.push_back({ e });
 	else
-		inversion_link = unit_cell.remove_inv_vectors(scatter_data.hkl_enlarged, scatter_data.inversion_cleaned_hkl);
-	const bool inversion_screening = static_cast<int>(inversion_link.size()) != model_data.nr_enlarged;
-	ivec clean_of(model_data.nr_enlarged);
-	bvec is_inverse(model_data.nr_enlarged, false);
-	for (int c = 0; c < inversion_link.size(); c++)
-		for (int i = 0; i < inversion_link[c].size(); i++) {
-			clean_of[inversion_link[c][i]] = c;
-			is_inverse[inversion_link[c][i]] = i == 1;
+		XG.inversion_link = unit_cell.remove_inv_vectors(scatter_data.hkl_enlarged, scatter_data.inversion_cleaned_hkl);
+	XG.clean_of.assign(model_data.nr_enlarged, 0);
+	XG.is_inverse.assign(model_data.nr_enlarged, false);
+	for (int c = 0; c < static_cast<int>(XG.inversion_link.size()); c++)
+		for (int i = 0; i < static_cast<int>(XG.inversion_link[c].size()); i++) {
+			XG.clean_of[XG.inversion_link[c][i]] = c;
+			XG.is_inverse[XG.inversion_link[c][i]] = i == 1;
 		}
-	// A reflection whose inverse is measured too has the conjugate of the inverse's row, the images of -h being minus those
-	// of h with conjugate phases: only the lower of the two is integrated
-	ivec row_partner(model_data.nr, -1);
-	bvec row_copy(model_data.nr, false);
-	if (!no_screening) {
-		const std::vector<i3> hv(scatter_data.hkl.begin(), scatter_data.hkl.end());
-		for (r = 0; r < model_data.nr; r++) {
-			if (row_copy[r]) continue;
-			const i3 minus_h = { -hv[r][0], -hv[r][1], -hv[r][2] };
-			const int j = static_cast<int>(std::lower_bound(hv.begin(), hv.end(), minus_h) - hv.begin());
-			if (j > r && j < model_data.nr && cell::check_inversion(hv[r], hv[j])) {
-				row_partner[r] = j;
-				row_copy[j] = true;
-			}
-		}
-	}
-	// The integrations of reflection r: with inversion screening one per cleaned entry its k-points land on, carrying
-	// the summed translation phases of the operations landing on the entry and on its inverse; without, one per operation
-	//c: the cleaned entry integrated; self / inv: whether an operation lands on it or on its inverse, t_*: their summed translation phases
-	struct k_job { int c; bool self, inv; cdouble t_self, t_inv; };
-	auto make_jobs = [&](const int r, std::vector<k_job>& jobs) {
-		jobs.clear();
-		if (row_copy[r]) return;
-		for (int sym_op = 0; sym_op < static_cast<int>(num_syms); sym_op++) {
-			const int e = asym_lookup[r][sym_op];
-			int j = inversion_screening ? 0 : static_cast<int>(jobs.size());
-			while (j < jobs.size() && jobs[j].c != clean_of[e]) j++;
-			if (j == jobs.size()) jobs.push_back({ clean_of[e], false, false, 0.0, 0.0 });
-			if (is_inverse[e]) {
-				jobs[j].inv = true;
-				jobs[j].t_inv += translation_phase_facts[r][sym_op];
-			}
-			else {
-				jobs[j].self = true;
-				jobs[j].t_self += translation_phase_facts[r][sym_op];
-			}
-		}
-	};
-	// The basis function independent factor of atom grid g at k-point e
-	auto grid_factor = [&](const int g, const int e) {
-		const double sym_fact = asym_atoms[g].sym_fact;
-		const cdouble DW = DW_facts[g][e], ph = phase_facts[g][e];
-		return cdouble(sym_fact * (DW.real() * ph.real() - DW.imag() * ph.imag()),
-			sym_fact * (DW.real() * ph.imag() + DW.imag() * ph.real()));
-	};
-	long long n_integrations = 0;
-	{
-		std::vector<k_job> jobs;
-		for (r = 0; r < model_data.nr; r++) {
-			make_jobs(r, jobs);
-			n_integrations += jobs.size();
-		}
-	}
-	if (inversion_screening && !(opt->no_date)) {
+	if (static_cast<int>(XG.inversion_link.size()) != model_data.nr_enlarged && !(opt->no_date)) {
 		const size_t n_inv = scatter_data.hkl_enlarged.size() - scatter_data.inversion_cleaned_hkl.size();
 		std::cout << std::fixed << std::setprecision(2) << "Inversion screening: Screened out " << n_inv << " of " << scatter_data.hkl_enlarged.size()
 			<< " symmetry generated reflections (" << 100.0 * n_inv / scatter_data.hkl_enlarged.size() << "%)" << std::endl;
 	}
+}
 
-	// Save the grid positions for each atom in the dummy wavefunction (used for screening)
-	vec2 grid_positions(model_data.ncen);
+//An AO pair mu, nu on different centres is skipped when the bound on its overlap, summed over the primitives k of mu and l
+//of nu, falls below e_tol
+void structure_factors::screen_ao_pairs(const std::vector<ao_data>& ao_data_shells) {
+	const _time_point screening_start = get_time();
+	const int nmo = model_data.nmo;
+	XG.skip.assign(nmo, ivec(nmo, 0));
+	const double e_tol = 0.0005;
+	const double sqrt_inv_four_pi = std::sqrt(constants::INV_FOUR_PI);
+	//the largest value of each primitive's radial part times the largest of its spherical harmonic
+	auto peak_factors = [&](const ao_data& ao) {
+		const int type = ao.prims[0].get_type();
+		const double type_half = type * 0.5, sph_max = constants::spherical_harmonic_max(type, ao.m);
+		vec N(ao.prims.size());
+		for (int k = 0; k < static_cast<int>(ao.prims.size()); k++)
+			N[k] = type == 0 ? sqrt_inv_four_pi : sph_max * std::exp(-type_half) * std::pow(type / ao.prims[k].get_exp(), type_half);
+		return N;
+	};
+	long long screened = 0;
+	for (int mu = 0; mu < nmo; mu++) {
+		const std::vector<primitive>& mu_primitives = ao_data_shells[mu].prims;
+		const vec N_k = peak_factors(ao_data_shells[mu]);
+		for (int nu = mu + 1; nu < nmo; nu++) {
+			const d3& a = ao_data_shells[mu].pos, & b = ao_data_shells[nu].pos;
+			const double dist2 = (a[0] - b[0]) * (a[0] - b[0]) + (a[1] - b[1]) * (a[1] - b[1]) + (a[2] - b[2]) * (a[2] - b[2]);
+			if (dist2 < 1e-5) continue;
+			const std::vector<primitive>& nu_primitives = ao_data_shells[nu].prims;
+			const vec N_l = peak_factors(ao_data_shells[nu]);
+			double estimate = 0.0;
+			for (int k = 0; k < static_cast<int>(mu_primitives.size()); k++)
+				for (int l = 0; l < static_cast<int>(nu_primitives.size()); l++) {
+					const double k_exp = mu_primitives[k].get_exp(), l_exp = nu_primitives[l].get_exp();
+					const double inv_exp_sum = 1.0 / (k_exp + l_exp);
+					const double N_kl = N_k[k] * N_l[l] * std::pow(constants::TWO_PI * inv_exp_sum, 1.5);
+					estimate += std::abs(mu_primitives[k].get_coef() * nu_primitives[l].get_coef()) * N_kl * std::exp(-0.5 * k_exp * l_exp * inv_exp_sum * dist2);
+				}
+			if (estimate < e_tol) {
+				XG.skip[mu][nu] = 1;
+				screened++;
+			}
+		}
+	}
+	if (!opt->no_date)
+		std::cout << "Time taken for AO screening: " << get_msec(screening_start, get_time()) << " ms" << std::endl;
+	std::cout << std::fixed << std::setprecision(2) << "Screened out " << screened << " unique pairs of mu, nu ("
+		<< screened / (static_cast<double>(nmo) * (nmo + 1) / 2) * 100.0 << "%) " << std::endl;
+}
+
+void structure_factors::setup_atom_grids(GridManager& grid_manager, WFN& dummy_wave, sf_shell_layout& layout) {
+	//the atoms of the asymmetric unit with the orbital basis, which the grids are built for
 	for (int at = 0; at < model_data.ncen; at++) {
-		grid_positions[at] = { dummy_wave.get_atom_pos(at)[0], dummy_wave.get_atom_pos(at)[1], dummy_wave.get_atom_pos(at)[2] };
+		atom temp_atom;
+		for (int x = 0; x < 3; x++) temp_atom.set_coordinate(x, asym_atoms[at].pos[x]);
+		temp_atom.set_charge(asym_atoms[at].type);
+		dummy_wave.push_back_atom(temp_atom);
 	}
+	load_basis_into_WFN(dummy_wave, orbital_basis, false, true);
+	dummy_wave.delete_unoccupied_MOs();
+	ivec asym_atom_list(model_data.ncen);
+	for (int at = 0; at < model_data.ncen; at++) asym_atom_list[at] = at;
+	grid_manager.setup3DGridsForMolecule(dummy_wave, asym_atom_list, bvec(model_data.ncen, true), unit_cell);
+	//a flat density for the pruning, which is all the partition weights need here
+	GridData& GD = grid_manager.getGridData();
+	std::vector<vec2>& grids = grid_manager.getNeedsHelper() ? GD.helper_grids : GD.atomic_grids;
+	for (vec2& grid : grids)
+		std::fill(grid[GridData::GridIndex::WFN_DENSITY].begin(), grid[GridData::GridIndex::WFN_DENSITY].end(), 1.0);
+	grid_manager.getDensityVectors(dummy_wave, asym_atom_list, XG.d1, XG.d2, XG.d3, XG.w, false, &layout);
+	std::cout << "Total number of grid points after pruning: " << grid_manager.getTotalGridPoints() << std::endl;
+}
 
-	// AO pair screening: an AO pair mu, nu on different centres is skipped when the bound on its overlap, summed over
-	// the primitives k of mu and l of nu, falls below e_tol
-	std::chrono::high_resolution_clock::time_point screening_start = std::chrono::high_resolution_clock::now();
-	ivec2 skip(model_data.nmo, ivec(model_data.nmo, 0));
-	{
-		const double e_tol = 0.0005;
-		double estimate = 0.0;
-		const double sqrt_inv_four_pi = std::sqrt(constants::INV_FOUR_PI);
-		for (mu = 0; mu < model_data.nmo; mu++) {
-			const std::vector<primitive>& mu_primitives = ao_data_shells[mu].prims;
-			const int mu_type = mu_primitives[0].get_type();
-			const double mu_type_half = static_cast<double>(mu_type) * 0.5;
-			const double min_mu_type_half_exp = std::exp(-mu_type_half);
-			const double sph_harmonic_max_mu = constants::spherical_harmonic_max(mu_type, ao_data_shells[mu].m);
-			vec N_k_cache(mu_primitives.size());
-			for (int k = 0; k < mu_primitives.size(); k++) {
-				const double k_exp = mu_primitives[k].get_exp();
-				N_k_cache[k] = mu_type == 0 ? sqrt_inv_four_pi : sph_harmonic_max_mu * min_mu_type_half_exp * std::pow(mu_type / k_exp, mu_type_half);
-			}
-			for (nu = mu + 1; nu < model_data.nmo; nu++) {
-				const double dist2 = (ao_data_shells[mu].pos[0] - ao_data_shells[nu].pos[0]) * (ao_data_shells[mu].pos[0] - ao_data_shells[nu].pos[0]) +
-					(ao_data_shells[mu].pos[1] - ao_data_shells[nu].pos[1]) * (ao_data_shells[mu].pos[1] - ao_data_shells[nu].pos[1]) +
-					(ao_data_shells[mu].pos[2] - ao_data_shells[nu].pos[2]) * (ao_data_shells[mu].pos[2] - ao_data_shells[nu].pos[2]);
-				if (dist2 < 1e-5) {
-					continue;
-				}
-				const std::vector<primitive>& nu_primitives = ao_data_shells[nu].prims;
-				const double nu_type = static_cast<double>(nu_primitives[0].get_type());
-				const double nu_type_half = static_cast<double>(nu_type) * 0.5;
-				const double min_nu_type_half_exp = std::exp(-nu_type_half);
-				const double sph_harmonic_max_nu = constants::spherical_harmonic_max(nu_type, ao_data_shells[nu].m);
-				vec N_l_cache(nu_primitives.size());
-				for (int l = 0; l < nu_primitives.size(); l++) {
-					const double l_exp = nu_primitives[l].get_exp();
-					N_l_cache[l] = nu_type == 0 ? sqrt_inv_four_pi : sph_harmonic_max_nu * min_nu_type_half_exp * std::pow(nu_type / l_exp, nu_type_half);
-				}
-				estimate = 0.0;
-				for (int k = 0; k < mu_primitives.size(); k++) {
-					const double k_coef = mu_primitives[k].get_coef();
-					const double k_exp = mu_primitives[k].get_exp();
-					const double N_k = N_k_cache[k];
-					for (int l = 0; l < nu_primitives.size(); l++) {
-						const double l_coef = nu_primitives[l].get_coef();
-						const double l_exp = nu_primitives[l].get_exp();
-						const double inv_exp_sum = 1.0 / (k_exp + l_exp);
-						const double N_l = N_l_cache[l];
-						const double combined_coeffs = std::abs(k_coef * l_coef);
-						const double N_kl = N_k * N_l * std::pow(constants::TWO_PI * inv_exp_sum, 1.5);
-						const double gamma = 0.5 * k_exp * l_exp * inv_exp_sum;
-						const double gaussian = std::exp(-gamma*dist2);
-						estimate += combined_coeffs * N_kl * gaussian;
-					}
-				}
-				if (estimate < e_tol) {
-					skip[mu][nu] = 1;
-				}
-			}
-		}
-	}
-
-	std::chrono::high_resolution_clock::time_point screening_end = std::chrono::high_resolution_clock::now();
-	if (!opt->no_date) {
-		std::cout << std::fixed << std::setprecision(5) << "Time taken for AO screening: " << std::chrono::duration_cast<std::chrono::microseconds>(screening_end - screening_start).count() << " microseconds." << "\n";
-	}
-
-	// Grid screening
-	constexpr double maximum_ao_grid_cutoff = 12;
-	constexpr double minimum_ao_grid_cutoff = 11;
-	double minimum_primitive_exponent = std::numeric_limits<double>::max();
-	vec ao_grid_cutoff_squared(model_data.nmo);
-	{
-		vec ao_minimum_exponent(model_data.nmo);
-		for (int ao = 0; ao < model_data.nmo; ao++) {
-			double min_exp = std::numeric_limits<double>::max();
-			for (const primitive& prim : ao_data_shells[ao].prims) {
-				min_exp = std::min(min_exp, prim.get_exp());
-			}
-			ao_minimum_exponent[ao] = min_exp;
-			minimum_primitive_exponent = std::min(minimum_primitive_exponent, min_exp);
-		}
-		for (int ao = 0; ao < model_data.nmo; ao++) {
-			const double adaptive_cutoff = maximum_ao_grid_cutoff * std::sqrt(minimum_primitive_exponent / ao_minimum_exponent[ao]);
-			const double cutoff = std::clamp(adaptive_cutoff, minimum_ao_grid_cutoff, maximum_ao_grid_cutoff);
-			ao_grid_cutoff_squared[ao] = cutoff * cutoff;
-		}
-	}
-
+void structure_factors::build_grid_blocks(const std::vector<ao_data>& ao_data_shells, GridManager& grid_manager, const WFN& dummy_wave, sf_shell_layout& layout) {
+	const int nmo = model_data.nmo;
+	GridData& GD = grid_manager.getGridData();
+	vec2* grids = grid_manager.getNeedsHelper() ? GD.helper_grids.data() : GD.atomic_grids.data();
+	const int* points = grid_manager.getNeedsHelper() ? GD.helper_num_points_per_atom.data() : GD.num_points_per_atom.data();
+	const int n_grids = static_cast<int>(grid_manager.getNeedsHelper() ? GD.helper_grids.size() : GD.atomic_grids.size());
 	const int n_atom_grids = std::min(n_grids, model_data.ncen);
-	ivec2 ao_prefix_end(model_data.nmo, ivec(n_atom_grids));
-	bvec2 ao_within_cutoff(model_data.nmo, bvec(n_atom_grids));
-
-	// Compute radial distance for every grid point
+	//Each AO counts out to a cutoff of 11 to 12 bohr, the wider the more diffuse its widest primitive
+	constexpr double maximum_ao_grid_cutoff = 12, minimum_ao_grid_cutoff = 11;
+	vec ao_min_exp(nmo, std::numeric_limits<double>::max()), ao_grid_cutoff_squared(nmo);
+	for (int ao = 0; ao < nmo; ao++)
+		for (const primitive& prim : ao_data_shells[ao].prims) ao_min_exp[ao] = std::min(ao_min_exp[ao], prim.get_exp());
+	const double min_exp = *std::min_element(ao_min_exp.begin(), ao_min_exp.end());
+	for (int ao = 0; ao < nmo; ao++) {
+		const double cutoff = std::clamp(maximum_ao_grid_cutoff * std::sqrt(min_exp / ao_min_exp[ao]), minimum_ao_grid_cutoff, maximum_ao_grid_cutoff);
+		ao_grid_cutoff_squared[ao] = cutoff * cutoff;
+	}
+	//the distance of every point from its atom, and per AO and atom grid whether the AO reaches the atom and up to which
+	//point (points are radially ordered) an AO on that atom is not cut off
 	vec2 grid_radial_distances(n_atom_grids);
 	for (int g = 0; g < n_atom_grids; g++) {
-		vec& radial_distances = grid_radial_distances[g];
-		radial_distances.resize(points[g]);
-		const double* x_ptr = grids[g][GridData::GridIndex::X].data();
-		const double* y_ptr = grids[g][GridData::GridIndex::Y].data();
-		const double* z_ptr = grids[g][GridData::GridIndex::Z].data();
+		grid_radial_distances[g].resize(points[g]);
 		for (int p = 0; p < points[g]; p++) {
-			const double dx = x_ptr[p] - grid_positions[g][0];
-			const double dy = y_ptr[p] - grid_positions[g][1];
-			const double dz = z_ptr[p] - grid_positions[g][2];
-			radial_distances[p] = std::sqrt(dx * dx + dy * dy + dz * dz);
+			const double dx = grids[g][GridData::GridIndex::X][p] - asym_atoms[g].pos[0];
+			const double dy = grids[g][GridData::GridIndex::Y][p] - asym_atoms[g].pos[1];
+			const double dz = grids[g][GridData::GridIndex::Z][p] - asym_atoms[g].pos[2];
+			grid_radial_distances[g][p] = std::sqrt(dx * dx + dy * dy + dz * dz);
 		}
 	}
-
+	ivec2 ao_prefix_end(nmo, ivec(n_atom_grids));
+	bvec2 ao_within_cutoff(nmo, bvec(n_atom_grids));
 #pragma omp parallel for schedule(static)
-	for (int ao = 0; ao < model_data.nmo; ao++) {
-		const ao_data& ao_shell = ao_data_shells[ao];
+	for (int ao = 0; ao < nmo; ao++) {
 		const double cutoff2 = ao_grid_cutoff_squared[ao];
-		const double cutoff = std::sqrt(cutoff2);
-		bvec& within_row = ao_within_cutoff[ao];
-		ivec& prefix_row = ao_prefix_end[ao];
-		// Compute distance between grid center and AO center
 		for (int g = 0; g < n_atom_grids; g++) {
-			const double dx = grid_positions[g][0] - ao_shell.pos[0];
-			const double dy = grid_positions[g][1] - ao_shell.pos[1];
-			const double dz = grid_positions[g][2] - ao_shell.pos[2];
+			const double dx = asym_atoms[g].pos[0] - ao_data_shells[ao].pos[0];
+			const double dy = asym_atoms[g].pos[1] - ao_data_shells[ao].pos[1];
+			const double dz = asym_atoms[g].pos[2] - ao_data_shells[ao].pos[2];
 			const double d2 = dx * dx + dy * dy + dz * dz;
-			within_row[g] = d2 <= cutoff2;
-			prefix_row[g] = (d2 < 1e-12)
-				? static_cast<int>(std::upper_bound(grid_radial_distances[g].begin(), grid_radial_distances[g].end(), cutoff) - grid_radial_distances[g].begin())
+			ao_within_cutoff[ao][g] = d2 <= cutoff2;
+			ao_prefix_end[ao][g] = d2 < 1e-12
+				? static_cast<int>(std::upper_bound(grid_radial_distances[g].begin(), grid_radial_distances[g].end(), std::sqrt(cutoff2)) - grid_radial_distances[g].begin())
 				: points[g];
 		}
 	}
-
-	// Precompute AO values
-	std::chrono::high_resolution_clock::time_point start_AOs = std::chrono::high_resolution_clock::now();
-	vec3 mu_vals(model_data.nmo, vec2(n_grids));
+	//AO values on every point within their cutoff
+	const _time_point start_AOs = get_time();
+	vec3 mu_vals(nmo, vec2(n_grids));
 #pragma omp parallel for schedule(dynamic)
-	for (mu = 0; mu < model_data.nmo; mu++) {
-		const ao_data& mu_prims = ao_data_shells[mu];
-		const std::vector<primitive>& mu_primitives = mu_prims.prims;
-		const double mp0 = mu_prims.pos[0];
-		const double mp1 = mu_prims.pos[1];
-		const double mp2 = mu_prims.pos[2];
+	for (int mu = 0; mu < nmo; mu++) {
+		const ao_data& ao = ao_data_shells[mu];
 		for (int g = 0; g < n_grids; g++) {
-			vec2& atom_grid = grids[g];
-			const double* x_ptr = atom_grid[GridData::GridIndex::X].data();
-			const double* y_ptr = atom_grid[GridData::GridIndex::Y].data();
-			const double* z_ptr = atom_grid[GridData::GridIndex::Z].data();
+			const double* x_ptr = grids[g][GridData::GridIndex::X].data();
+			const double* y_ptr = grids[g][GridData::GridIndex::Y].data();
+			const double* z_ptr = grids[g][GridData::GridIndex::Z].data();
 			mu_vals[mu][g].resize(points[g]);
-			double* local_mu_vals_ptr = mu_vals[mu][g].data();
+			double* values = mu_vals[mu][g].data();
 			const int prefix_end = g < n_atom_grids ? ao_prefix_end[mu][g] : points[g];
 			for (int p = 0; p < prefix_end; p++) {
-				d4 d_mu{ x_ptr[p] - mp0, y_ptr[p] - mp1 , z_ptr[p] - mp2 , 0 };
+				d4 d_mu{ x_ptr[p] - ao.pos[0], y_ptr[p] - ao.pos[1], z_ptr[p] - ao.pos[2], 0 };
 				d_mu[3] = d_mu[0] * d_mu[0] + d_mu[1] * d_mu[1] + d_mu[2] * d_mu[2];
-				const double root_d3 = std::sqrt(d_mu[3]);
-				if (d_mu[3] > ao_grid_cutoff_squared[mu]) {
-					local_mu_vals_ptr[p] = 0.0;
-				}
-				else {
-					local_mu_vals_ptr[p] = dummy_wave.eval_ao(d_mu, mu_primitives, mu_prims.m, root_d3);
-				}
+				values[p] = d_mu[3] > ao_grid_cutoff_squared[mu] ? 0.0 : dummy_wave.eval_ao(d_mu, ao.prims, ao.m, std::sqrt(d_mu[3]));
 			}
 		}
 	}
-	std::chrono::high_resolution_clock::time_point end_AOs = std::chrono::high_resolution_clock::now();
 	std::cout << "AO values calculated for all grids." << std::endl;
 	if (!(opt->no_date))
-		std::cout << "Time taken for AO values computation: " << std::chrono::duration_cast<std::chrono::milliseconds>(end_AOs - start_AOs).count() << " milliseconds." << std::endl;
-
-	//Morton-order every atom grid's points, so that a run of consecutive points is a
-	//compact ball rather than a spherical shell.
-	//Work is sum over blocks of n_active^2 * points, so this is quadratic in what it saves.
-	//Sums over points are order independent, so the reordering changes no result.
-	//Compaction and the AO threshold are worth nothing apart and a great deal together:
-	//reordering alone is slower (the blocks shrink and n_active does not), the threshold
-	//alone barely moves the work, and together they are faster with the GooF, energies and
-	//convergence lines identical.
-	//So only reorder when the threshold can actually prune
+		std::cout << "Time taken for AO values computation: " << get_msec(start_AOs, get_time()) << " ms" << std::endl;
+	//Morton order makes a run of consecutive points a compact ball rather than a spherical shell, so that a block keeps
+	//few AOs; the work is sum over blocks of n_active^2 points. Sums over points do not depend on the order, and only
+	//an AO threshold that can prune makes the reordering worth it
 	const double ao_block_threshold = [&] {
-		const char* e = tuning("NOSPHERA2_ITENSOR_AO_TOL");
-		if (e) { const double v = std::atof(e); return v >= 0.0 ? v : 0.0; }
-		return cutoff(opt->accuracy);
+		const char* e = tuning("NOSPHERA2_XCW_GRID_AO_TOL");
+		return e ? std::max(0.0, std::atof(e)) : cutoff(opt->accuracy);
 	}();
-	const bool morton_applied = (tuning("NOSPHERA2_ITENSOR_NO_MORTON") == nullptr)
-		&& ao_block_threshold >= 1e-20;
+	const bool morton_applied = !tuning("NOSPHERA2_XCW_GRID_NO_MORTON") && ao_block_threshold >= 1e-20;
 	if (morton_applied) {
 #pragma omp parallel for schedule(dynamic)
 		for (int g = 0; g < n_atom_grids; g++) {
@@ -1209,8 +839,9 @@ void structure_factors::build_I(const std::vector<ao_data>& ao_data_shells, doub
 				lo[1] = std::min(lo[1], ys[p]); hi[1] = std::max(hi[1], ys[p]);
 				lo[2] = std::min(lo[2], zs[p]); hi[2] = std::max(hi[2], zs[p]);
 			}
+			//21 bits per axis, interleaved to a 63-bit key
 			auto spread = [](const unsigned int v) {
-				unsigned long long x = v & 0x1fffffu;   //21 bits, three of them interleave to 63
+				unsigned long long x = v & 0x1fffffu;
 				x = (x | (x << 32)) & 0x1f00000000ffffull;
 				x = (x | (x << 16)) & 0x1f0000ff0000ffull;
 				x = (x | (x << 8))  & 0x100f00f00f00f00full;
@@ -1239,244 +870,54 @@ void structure_factors::build_I(const std::vector<ao_data>& ao_data_shells, doub
 			};
 			apply(xs); apply(ys); apply(zs);
 			apply(grid[GridData::GridIndex::WEIGHT].data());
-			//The coordinates and weights the phase factor and the GEMM actually use are
-			//these, taken from getDensityVectors above and not the grid arrays: reordering
-			//the AO values without them pairs each value with another point's coordinate,
-			//which is wrong everywhere rather than only where a screening decision was made.
-			if (static_cast<int>(d1[g].size()) >= npts) apply(d1[g].data());
-			if (static_cast<int>(d2[g].size()) >= npts) apply(d2[g].data());
-			if (static_cast<int>(d3[g].size()) >= npts) apply(d3[g].data());
-			if (static_cast<int>(weights[g].size()) >= npts) apply(weights[g].data());
+			//every array that is paired with a point moves with it
+			if (static_cast<int>(XG.d1[g].size()) >= npts) apply(XG.d1[g].data());
+			if (static_cast<int>(XG.d2[g].size()) >= npts) apply(XG.d2[g].data());
+			if (static_cast<int>(XG.d3[g].size()) >= npts) apply(XG.d3[g].data());
+			if (static_cast<int>(XG.w[g].size()) >= npts) apply(XG.w[g].data());
 			if (g < static_cast<int>(layout.idx.size()) && static_cast<int>(layout.idx[g].size()) >= npts) {
 				ivec t(npts);
 				for (int p = 0; p < npts; p++) t[p] = layout.idx[g][perm[p]];
 				layout.idx[g].swap(t);
 			}
-			for (int mu = 0; mu < model_data.nmo; mu++) {
+			for (int mu = 0; mu < nmo; mu++) {
 				vec& v = mu_vals[mu][g];
-				if (static_cast<int>(v.size()) == npts) apply(v.data());
-				else if (!v.empty()) {
-					//Values were only filled to the radial prefix; the tail is zero and the
-					//permutation mixes the two, so grow it before reordering.
-					v.resize(npts, 0.0);
-					apply(v.data());
-				}
+				if (v.empty()) continue;
+				//values filled only to the radial prefix: the zero tail is mixed in by the permutation
+				v.resize(npts, 0.0);
+				apply(v.data());
 			}
-			//Radial distance follows its point, and the band bounds below are recomputed
-			//from it - they are no longer monotone, which is what the chunking wants.
 			vec& rd = grid_radial_distances[g];
 			if (static_cast<int>(rd.size()) == npts) apply(rd.data());
 		}
 	}
-
-
-
-	//NOSPHERA2_ITENSOR_AOSTATS=1: how much of each block's AO set is actually carrying
-	//anything. The active set comes from a cutoff clamped into an 11-12 bohr band
-	//(std::clamp above), so it is set by the distance between two atom centres and barely
-	//by the block: small and large blocks keep nearly the same AOs.
-	//Work is sum over blocks of na^2 * points, so what an OCC-style per-batch bounding
-	//sphere would save is quadratic in whatever this measures. The AO values are already
-	//computed here, so the honest number is a max over the points they hold, not an estimate.
-	if (tuning("NOSPHERA2_ITENSOR_AOSTATS")) {
-		for (int g = 0; g < n_atom_grids; g++) {
-			const int npts = points[g];
-			if (npts <= 0) continue;
-			//max |chi| per AO over this grid, and over the first eighth of it as a stand-in
-			//for a compact spatial batch
-			const int batch = std::max(1, npts / 8);
-			long long active_full = 0, active_batch = 0, kept = 0;
-			for (int ao = 0; ao < model_data.nmo; ao++) kept += ao_within_cutoff[ao][g] ? 1 : 0;
-			for (int ao = 0; ao < model_data.nmo; ao++) {
-				const vec& v = mu_vals[ao][g];
-				if (v.empty()) continue;
-				double mx_full = 0.0, mx_batch = 0.0;
-				const int end = std::min<int>(static_cast<int>(v.size()), npts);
-				for (int p = 0; p < end; p++) {
-					const double a = std::abs(v[p]);
-					mx_full = std::max(mx_full, a);
-					if (p < batch) mx_batch = std::max(mx_batch, a);
-				}
-				if (mx_full > 1e-10) active_full++;
-				if (mx_batch > 1e-10) active_batch++;
-			}
-			std::fprintf(stderr, "aostats grid %d: points %d  nmo %d  kept by cutoff %d"
-				"  carrying |chi|>1e-10: whole grid %lld  first eighth %lld\n",
-				g, npts, model_data.nmo, static_cast<int>(kept),
-				active_full, active_batch);
-		}
-	}
-
-	ivec2 active_grids(packed_size);
-	ivec skipped_grids_per_pair(packed_size, 0);
-	for (mu = 0; mu < model_data.nmo; mu++) {
-		const std::vector<bool>& mu_within = ao_within_cutoff[mu];
-		for (nu = mu; nu < model_data.nmo; nu++) {
-			if (skip[mu][nu]) {
-				continue;
-			}
-			const bvec& nu_within = ao_within_cutoff[nu];
-			const size_t pair_idx = tri_index(mu, nu);
-			ivec& pair_grids = active_grids[pair_idx];
-			pair_grids.reserve(n_atom_grids);
-			for (int g = 0; g < n_atom_grids; g++) {
-				if (mu_within[g] && nu_within[g]) {
-					pair_grids.push_back(g);
-				}
-			}
-			skipped_grids_per_pair[pair_idx] = n_atom_grids - static_cast<int>(pair_grids.size());
-		}
-	}
-	//Only the pairs that survive the screening are stored, in (mu, nu) order; tri_compact
-	//takes a packed slot to its stored index, -1 when screened out
-	ivec tri_compact(packed_size, -1);
-	I_tens.i_pair_mu_.clear();
-	I_tens.i_pair_nu_.clear();
-	for (mu = 0; mu < model_data.nmo; mu++)
-		for (nu = mu; nu < model_data.nmo; nu++)
-			if (!skip[mu][nu]) {
-				tri_compact[tri_index(mu, nu)] = static_cast<int>(I_tens.i_pair_mu_.size());
-				I_tens.i_pair_mu_.push_back(mu);
-				I_tens.i_pair_nu_.push_back(nu);
-			}
-	I_tens.i_compact_ = I_tens.i_pair_mu_.size();
+	//the values of the AOs that reach each atom grid, one row of points per AO
 	ivec2 grid_active_aos(n_atom_grids);
 	vec2 grid_ao_values(n_atom_grids);
 #pragma omp parallel for schedule(dynamic)
-	for (int g = 0; g < n_atom_grids; g++) {
-		ivec& active_aos = grid_active_aos[g];
-		vec& values = grid_ao_values[g];
-		for (int mu = 0; mu < model_data.nmo; mu++) {
-			if (!ao_within_cutoff[mu][g]) {
-				continue;
-			}
-			active_aos.push_back(mu);
-			const vec& values_for_ao = mu_vals[mu][g];
-			values.insert(values.end(), values_for_ao.begin(), values_for_ao.end());
+	for (int g = 0; g < n_atom_grids; g++)
+		for (int mu = 0; mu < nmo; mu++) {
+			if (!ao_within_cutoff[mu][g]) continue;
+			grid_active_aos[g].push_back(mu);
+			grid_ao_values[g].insert(grid_ao_values[g].end(), mu_vals[mu][g].begin(), mu_vals[mu][g].end());
 		}
-	}
-
-	// Tile the grid points for each atom into blocks
-	//128 rows a tile: at 64 the GEMM calls are overhead-bound in both precisions, and above
-	//it a double tile pair leaves the core's L2 while single precision stays flat to 256
-	constexpr int screened_tile_size = 128;
-	std::vector<std::vector<GridBlock>> grid_blocks(n_atom_grids);
-	auto make_matrix_tiles = [&](GridBlock& block) {
-		const int n_active = static_cast<int>(block.active_aos.size());
-		size_t result_offset = 0;
-		for (int row_start = 0; row_start < n_active; row_start += screened_tile_size) {
-			const int row_count = std::min(screened_tile_size, n_active - row_start);
-			for (int col_start = row_start; col_start < n_active; col_start += screened_tile_size) {
-				const int col_count = std::min(screened_tile_size, n_active - col_start);
-				bool needed = false;
-				for (int row = row_start; row < row_start + row_count && !needed; ++row) {
-					const int first_col = (row_start == col_start) ? row : col_start;
-					for (int col = first_col; col < col_start + col_count; ++col) {
-						if (!skip[block.active_aos[row]][block.active_aos[col]]) {
-							needed = true;
-							break;
-						}
-					}
-				}
-				if (needed) {
-					block.matrix_tiles.push_back({ row_start, row_count, col_start, col_count, result_offset });
-					result_offset += static_cast<size_t>(row_count) * col_count;
-				}
-			}
-		}
-		block.tile_result_size = static_cast<int>(result_offset);
-		};
-	//NOSPHERA2_ITENSOR_SKIPSTATS=1: what a spatial reordering of the active AOs would buy.
-	//Half the mu,nu pairs are screened out and none of the 64x64 tiles are, because AO index
-	//order is atom order as the CIF lists them and dead pairs land scattered. Sorting the
-	//active AOs of a block along a Morton curve over their centres puts distant atoms in
-	//distant tiles, which is the only way a tile becomes wholly dead. Measured here, per
-	//block, before anyone writes a kernel that depends on it.
-	auto skipstats = [&](const int g, const ivec& active, const int npoints) {
-		if (!tuning("NOSPHERA2_ITENSOR_SKIPSTATS")) return;
-		const int na = static_cast<int>(active.size());
-		if (na < 2) return;
-		auto tiles_alive = [&](const ivec& order, const int T) {
-			int alive = 0, total = 0;
-			for (int r0 = 0; r0 < na; r0 += T)
-				for (int c0 = r0; c0 < na; c0 += T) {
-					total++;
-					bool needed = false;
-					for (int r = r0; r < std::min(r0 + T, na) && !needed; r++) {
-						const int first = (r0 == c0) ? r : c0;
-						for (int c = first; c < std::min(c0 + T, na); c++)
-							if (!skip[order[r]][order[c]]) { needed = true; break; }
-					}
-					if (needed) alive++;
-				}
-			return std::pair<int, int>{ alive, total };
-		};
-		//Morton key over the AO centres, 10 bits per axis on the block's own bounding box
-		std::array<double, 3> lo{ 1e30, 1e30, 1e30 }, hi{ -1e30, -1e30, -1e30 };
-		for (const int ao : active)
-			for (int d = 0; d < 3; d++) {
-				lo[d] = std::min(lo[d], ao_data_shells[ao].pos[d]);
-				hi[d] = std::max(hi[d], ao_data_shells[ao].pos[d]);
-			}
-		auto spread = [](unsigned int v) {
-			unsigned long long x = v & 0x3ffu;
-			x = (x | (x << 16)) & 0x30000ffull; x = (x | (x << 8)) & 0x300f00full;
-			x = (x | (x << 4)) & 0x30c30c3ull;  x = (x | (x << 2)) & 0x9249249ull;
-			return x;
-		};
-		std::vector<std::pair<unsigned long long, int>> keyed;
-		keyed.reserve(na);
-		for (const int ao : active) {
-			unsigned int c[3];
-			for (int d = 0; d < 3; d++) {
-				const double span = hi[d] - lo[d];
-				const double t = span > 1e-12 ? (ao_data_shells[ao].pos[d] - lo[d]) / span : 0.0;
-				c[d] = static_cast<unsigned int>(std::min(1023.0, std::max(0.0, t * 1023.0)));
-			}
-			keyed.emplace_back(spread(c[0]) | (spread(c[1]) << 1) | (spread(c[2]) << 2), ao);
-		}
-		std::sort(keyed.begin(), keyed.end());
-		ivec sorted_order(na), plain_order(na);
-		for (int i = 0; i < na; i++) { sorted_order[i] = keyed[i].second; plain_order[i] = active[i]; }
-		long long pairs = 0, dead = 0;
-		for (int i = 0; i < na; i++)
-			for (int j = i; j < na; j++) { pairs++; dead += skip[active[i]][active[j]] ? 1 : 0; }
-		std::fprintf(stderr, "skipstats grid %d: na %d points %d  pairs dead %.1f%%", g, na, npoints,
-			100.0 * (double)dead / (double)pairs);
-		for (const int T : { 32, 64, 128 }) {
-			const auto [a0, t0] = tiles_alive(plain_order, T);
-			const auto [a1, t1] = tiles_alive(sorted_order, T);
-			std::fprintf(stderr, "  | T=%d tiles pruned: as-is %.1f%% morton %.1f%%", T,
-				100.0 * (1.0 - (double)a0 / t0), 100.0 * (1.0 - (double)a1 / t1));
-		}
-		std::fprintf(stderr, "\n");
-	};
-
-	//Counted the way the mu,nu screening is, so a run says what this cost it as well as
-	//what it saved: how many AO-block entries were dropped, and what that did to the work
-	//the GEMMs actually do.
+	vec3().swap(mu_vals);
+	//Blocks of about NOSPHERA2_XCW_GRID_CHUNK points (1024, 0: the three radial bands), each keeping the AOs above
+	//ao_block_threshold somewhere on it; the threshold is the -acc ladder the scattering factors screen on
+	const int chunk = [] {
+		const char* e = tuning("NOSPHERA2_XCW_GRID_CHUNK");
+		return e ? std::atoi(e) : 1024;
+	}();
+	XG.blocks.assign(n_atom_grids, {});
 	long long ao_slots_carrying = 0, ao_slots_kept = 0;
-	//ao_block_threshold is defined above, with the reordering it enables. What counts as
-	//nothing is the run's -acc setting, not a number invented here: cutoff() is the same
-	//ladder the scattering-factor code screens on, 1e-10 up to -acc 2 and 1e-14 at 3.
 #pragma omp parallel for schedule(dynamic) reduction(+:ao_slots_carrying, ao_slots_kept)
 	for (int g = 0; g < n_atom_grids; g++) {
 		const ivec& active_aos = grid_active_aos[g];
-		const vec& full_ao_values = grid_ao_values[g];
 		const vec& radial_distances = grid_radial_distances[g];
 		const int inner_end = static_cast<int>(std::upper_bound(radial_distances.begin(), radial_distances.end(), minimum_ao_grid_cutoff) - radial_distances.begin());
 		const int middle_end = static_cast<int>(std::upper_bound(radial_distances.begin(), radial_distances.end(), maximum_ao_grid_cutoff) - radial_distances.begin());
-		const std::array<int, 4> block_bounds{ 0, inner_end, middle_end, points[g] };
-		//A block keeps every AO that is non-zero anywhere in it, and the work is
-		//sum over blocks of n_active^2 * points, so the block's spatial extent is what sets
-		//the cost.
-		//NOSPHERA2_ITENSOR_CHUNK sets the target; 0 restores the three whole bands.
-		const int chunk = [] {
-			const char* e = tuning("NOSPHERA2_ITENSOR_CHUNK");
-			return e ? std::atoi(e) : 1024;
-		}();
-		//Even chunks rather than a short tail: a 40-point remainder is a GEMM that costs a
-		//launch and returns almost nothing.
+		const std::array<int, 4> band_bounds{ 0, inner_end, middle_end, points[g] };
+		//even chunks rather than a short tail, which would cost a GEMM call for almost nothing
 		auto cut = [&](const int from, const int to, std::vector<std::pair<int, int>>& out) {
 			const int n = to - from;
 			if (n <= 0) return;
@@ -1486,543 +927,66 @@ void structure_factors::build_I(const std::vector<ao_data>& ao_data_shells, doub
 			for (int p0 = from; p0 < to; p0 += per) out.emplace_back(p0, std::min(p0 + per, to));
 		};
 		std::vector<std::pair<int, int>> spans;
-		if (morton_applied) {
+		if (morton_applied)
 			cut(0, points[g], spans);
-		}
-		else {
-			for (int block_index = 0; block_index < 3; block_index++)
-				cut(block_bounds[block_index], block_bounds[block_index + 1], spans);
-		}
+		else
+			for (int band = 0; band < 3; band++) cut(band_bounds[band], band_bounds[band + 1], spans);
 		for (const auto& [point_start, point_end] : spans) {
-			const int point_count = point_end - point_start;
-			if (point_count == 0) {
-				continue;
-			}
-			GridBlock block{ point_start, point_count };
+			if (point_end == point_start) continue;
+			GridBlock block{ point_start, point_end - point_start };
 			for (int local_ao = 0; local_ao < static_cast<int>(active_aos.size()); local_ao++) {
-				const double* full_row = full_ao_values.data() + static_cast<size_t>(local_ao) * points[g];
+				const double* full_row = grid_ao_values[g].data() + static_cast<size_t>(local_ao) * points[g];
 				double largest = 0.0;
-				for (int p = point_start; p < point_end; p++)
-					largest = std::max(largest, std::abs(full_row[p]));
+				for (int p = point_start; p < point_end; p++) largest = std::max(largest, std::abs(full_row[p]));
 				if (largest > 0.0) ao_slots_carrying++;
 				if (largest > ao_block_threshold) {
 					block.active_aos.push_back(active_aos[local_ao]);
 					block.ao_values.insert(block.ao_values.end(), full_row + point_start, full_row + point_end);
 				}
 			}
-			if (!block.active_aos.empty()) {
-				ao_slots_kept += static_cast<long long>(block.active_aos.size());
-				make_matrix_tiles(block);
-				if (opt->cpu_itensor_fp32) block.ao_values_f.assign(block.ao_values.begin(), block.ao_values.end());
-				skipstats(g, block.active_aos, block.point_count);
-				grid_blocks[g].push_back(std::move(block));
-			}
+			if (block.active_aos.empty()) continue;
+			ao_slots_kept += static_cast<long long>(block.active_aos.size());
+			if (XG.fp32) block.ao_values_f.assign(block.ao_values.begin(), block.ao_values.end());
+			XG.blocks[g].push_back(std::move(block));
 		}
 	}
 	if (!(opt->no_date) && ao_slots_carrying > 0) {
 		const long long dropped = ao_slots_carrying - ao_slots_kept;
-		std::cout << std::fixed << std::setprecision(2)
-			<< "Screened out " << dropped << " of " << ao_slots_carrying
-			<< " AO-block entries (" << 100.0 * static_cast<double>(dropped)
-			/ static_cast<double>(ao_slots_carrying) << "%) below "
-			<< std::scientific << std::setprecision(0) << ao_block_threshold
-			<< std::fixed << std::setprecision(2) << " on their block\n";
-
-		double work_done = 0.0, work_unscreened = 0.0;
-		for (int g = 0; g < n_atom_grids; g++)
-			for (const GridBlock& b : grid_blocks[g]) {
-				const double na = static_cast<double>(b.active_aos.size());
-				work_done += na * na * b.point_count;
-				work_unscreened += static_cast<double>(model_data.nmo) * model_data.nmo * b.point_count;
-			}
-		//Unscreened is one integration for every entry of hkl_enlarged, screened only the integrations inversion screening leaves
-		work_done *= static_cast<double>(n_integrations);
-		work_unscreened *= static_cast<double>(model_data.nr_enlarged);
-		if (work_done > 0.0)
-			std::cout << std::fixed << std::setprecision(2)
-				<< "I tensor work after all screening: " << (work_done / 1e12)
-				<< " of " << (work_unscreened / 1e12) << " Tflop-equivalents ("
-				<< std::setprecision(2) << 100.0 * work_done / work_unscreened << "%, "
-				<< (work_unscreened / work_done) << "x less than unscreened)\n";
+		std::cout << std::fixed << std::setprecision(2) << "Screened out " << dropped << " of " << ao_slots_carrying << " AO-block entries ("
+			<< 100.0 * static_cast<double>(dropped) / static_cast<double>(ao_slots_carrying) << "%) below "
+			<< std::scientific << std::setprecision(0) << ao_block_threshold << std::fixed << std::setprecision(2) << " on their block\n";
 	}
-
-	//The whole cost of the device path in one number: sum over blocks of n_active^2 times
-	//points, which is what the GEMMs do per reflection and symmetry operation. Printed under
-	//-gflops so a chunk size can be judged without running a reflection.
+	//-gflops: the work of one evaluation, sum over blocks of n_active^2 points, so a chunk size can be judged
 	if (throughput::enabled()) {
 		double work = 0.0;
-		long long nblocks = 0, na_min = 1LL << 60, na_max = 0, pts_min = 1LL << 60, pts_max = 0;
+		long long nblocks = 0;
 		for (int g = 0; g < n_atom_grids; g++)
-			for (const GridBlock& b : grid_blocks[g]) {
-				const long long na = static_cast<long long>(b.active_aos.size());
-				work += static_cast<double>(na) * na * b.point_count;
+			for (const GridBlock& b : XG.blocks[g]) {
+				work += static_cast<double>(b.active_aos.size()) * b.active_aos.size() * b.point_count;
 				nblocks++;
-				na_min = std::min(na_min, na); na_max = std::max(na_max, na);
-				pts_min = std::min<long long>(pts_min, b.point_count);
-				pts_max = std::max<long long>(pts_max, b.point_count);
 			}
-		std::fprintf(stderr, "I tensor blocks: %lld, n_active %lld-%lld, points %lld-%lld, "
-			"sum n_active^2 * points = %.3e (lower is less work per reflection)\n",
-			nblocks, na_min, na_max, pts_min, pts_max, work);
+		std::fprintf(stderr, "XCW grid blocks: %lld, sum n_active^2 * points = %.3e\n", nblocks, work);
 	}
-	ivec2().swap(grid_active_aos);
-	vec2().swap(grid_ao_values);
-	vec2().swap(grid_radial_distances);
-	vec3().swap(mu_vals);
+	//the integration weights alone, before any density-following share multiplies them in
+	XG.w0.clear();
+	const bool share = opt->partition_type == PartitionType::TFVC || opt->partition_type == PartitionType::MBIS || opt->partition_type == PartitionType::EMBIS;
+	for (int g = 0; share && g < n_atom_grids; g++)
+		XG.w0.emplace_back(grids[g][GridData::GridIndex::WEIGHT].begin(), grids[g][GridData::GridIndex::WEIGHT].begin() + points[g]);
+}
 
-	std::optional<ProgressBar> pb;
-	auto start = std::chrono::high_resolution_clock::now();
-
-	// Bookkeeping skipped pairs and grids
-	for (int mu = 0; mu < model_data.nmo; mu++) {
-		for (int nu = mu; nu < model_data.nmo; nu++) {
-			screen_counter += skip[mu][nu];
-			if (!skip[mu][nu]) {
-				skipped_grids += static_cast<long long>(num_syms) * skipped_grids_per_pair[tri_index(mu, nu)];
-			}
-		}
+//What the next large allocation may take: the platform's and scheduler's headroom and, with -mem,
+//-mem minus what this process already holds. The density-fitting integrals and the stored integrals
+//are sized in that order from it, so together they stay under -mem. OCC fills the density-fitting
+//store only at its first Fock build, after both decisions, so its size is held back here by hand.
+size_t structure_factors::free_memory() const {
+	size_t avail = available_memory_bytes();
+	if (opt->mem_given && opt->mem > 0.0) {
+		const size_t cap = static_cast<size_t>(opt->mem * 1024.0 * 1024.0), held = resident_memory_bytes();
+		const size_t left = cap > held ? cap - held : 1;
+		if (avail == 0 || left < avail) avail = left;
 	}
-	//The grid route is the default; the tensor is built only for NOSPHERA2_XCW_GRID=0 or when it is to be saved
-	const char* xg = tuning("NOSPHERA2_XCW_GRID");
-	if (const int xg_mode = xg ? std::atoi(xg) : (I_tens.i_tensor_save_path.empty() ? 1 : 0); xg_mode != 0) {
-		XG.mode = xg_mode;
-		const bool keep = XG.mode == 2;
-		auto take = [keep](auto& a) -> std::decay_t<decltype(a)> { if (keep) return a; return std::move(a); };
-		XG.blocks = take(grid_blocks);
-		XG.d1 = take(d1); XG.d2 = take(d2); XG.d3 = take(d3); XG.w = take(weights);
-		XG.w0.clear();
-		for (int g = 0; share && g < n_atom_grids; g++) XG.w0.emplace_back(grids[g][GridData::GridIndex::WEIGHT].begin(), grids[g][GridData::GridIndex::WEIGHT].begin() + points[g]);
-		XG.skip = take(skip); XG.lookup = take(asym_lookup); XG.inversion_link = take(inversion_link);
-		XG.clean_of = take(clean_of); XG.is_inverse = take(is_inverse);
-		plan_grid_fb(layout);
-		std::cout << "XCW on the grid: the I tensor is " << (keep ? "built as well, for comparison" : "not built") << std::endl;
-		if (!keep) {
-			skipped_grids_ = skipped_grids * model_data.nr;
-			time_taken = 0;
-			return;
-		}
-	}
-	bool itensor_on_gpu = false;
-	double itensor_gpu_dense_flops = 0.0;
-	//The device and the CPU threads draw reflections from one counter, the CPU stopping
-	//once the device would finish what is left before a thread finished one more.
-	std::atomic<int> next_refl{0};
-	std::atomic<long long> gpu_ns_per_refl{0};
-	std::mutex i_write_mutex;
-	std::thread gpu_thread;
-	//Row r of the tensor and, when the inverse of r is measured too, the conjugate row of that one, whichever way the tensor is held
-	auto store_rows = [&](const int r, const cdouble* row) {
-		const size_t n = I_tens.i_compact_;
-		cvec flipped;
-		for (int i = 0; i < 2; i++) {
-			const int rr = i == 0 ? r : row_partner[r];
-			if (rr < 0) break;
-			const cdouble* src = row;
-			if (i == 1) {
-				flipped.resize(n);
-				for (size_t t = 0; t < n; t++) flipped[t] = std::conj(row[t]);
-				src = flipped.data();
-			}
-			const size_t at = static_cast<size_t>(rr) * n;
-			if (I_tens.i_streamed_) {
-				//A write is packed_size * 16 bytes against a whole reflection's worth
-				//of integration, so the lock is not on the hot path
-				std::lock_guard<std::mutex> lock(i_write_mutex);
-				I_tens.i_file_.write_block(rr, src);
-			}
-			else if (I_tens.i_float_) {
-				std::complex<float>* const dst = I_tens.I32.data() + at;
-				for (size_t t = 0; t < n; t++) dst[t] = std::complex<float>(static_cast<float>(src[t].real()), static_cast<float>(src[t].imag()));
-			}
-			else if (src != I_tens.I.data() + at)
-				std::copy(src, src + n, I_tens.I.data() + at);
-		}
-	};
-#if defined(NOSPHERA2_USE_GPU) || defined(NOSPHERA2_USE_METAL)
-	//GPU: sets the device up for the I tensor GEMMs; the CPU threads below integrate whatever it does not take.
-	//Read with use_gpu rather than on its own, so -no_gpu means what it says. Checking the
-	//pair here rather than clearing the flag at parse time keeps it order-independent.
-	if (opt->gpu_itensor && opt->use_gpu) {
-		//Flatten what the device needs: the AO values never change with the reflection,
-		//so they are uploaded once and every reflection reuses them.
-		ivec bg, bps, bpc, bna, goff(n_atom_grids + 1, 0);
-		std::vector<long long> bao, baos;
-		vec ao_all;
-		ivec aos_all;
-		for (int gg = 0; gg < n_atom_grids; gg++) goff[gg + 1] = goff[gg] + points[gg];
-		for (int gg = 0; gg < n_atom_grids; gg++) {
-			for (const GridBlock& blkk : grid_blocks[gg]) {
-				bg.push_back(gg);
-				bps.push_back(blkk.point_start);
-				bpc.push_back(blkk.point_count);
-				bna.push_back(static_cast<int>(blkk.active_aos.size()));
-				bao.push_back(static_cast<long long>(ao_all.size()));
-				baos.push_back(static_cast<long long>(aos_all.size()));
-				ao_all.insert(ao_all.end(), blkk.ao_values.begin(), blkk.ao_values.end());
-				aos_all.insert(aos_all.end(), blkk.active_aos.begin(), blkk.active_aos.end());
-			}
-		}
-		ivec compact_flat(static_cast<size_t>(model_data.nmo) * model_data.nmo, -1);
-		for (int m = 0; m < model_data.nmo; m++)
-			for (int n = m; n < model_data.nmo; n++)
-				compact_flat[static_cast<size_t>(m) * model_data.nmo + n] = tri_compact[tri_index(m, n)];
-		vec fd1, fd2, fd3, fw;
-		for (int gg = 0; gg < n_atom_grids; gg++) {
-			fd1.insert(fd1.end(), d1[gg].begin(), d1[gg].begin() + points[gg]);
-			fd2.insert(fd2.end(), d2[gg].begin(), d2[gg].begin() + points[gg]);
-			fd3.insert(fd3.end(), d3[gg].begin(), d3[gg].begin() + points[gg]);
-			fw.insert(fw.end(), weights[gg].begin(), weights[gg].begin() + points[gg]);
-		}
-		itensor_gpu_layout L;
-		L.nmo = model_data.nmo; L.packed = static_cast<int>(I_tens.i_compact_); L.n_grids = n_atom_grids;
-		L.n_blocks = static_cast<int>(bg.size());
-		L.blk_grid = bg.data(); L.blk_point_start = bps.data(); L.blk_point_count = bpc.data();
-		L.blk_n_active = bna.data(); L.blk_ao_off = bao.data(); L.blk_aos_off = baos.data();
-		L.ao_all = ao_all.data(); L.ao_all_len = static_cast<long long>(ao_all.size());
-		L.aos_all = aos_all.data(); L.aos_all_len = static_cast<long long>(aos_all.size());
-		L.compact = compact_flat.data(); L.grid_point_off = goff.data();
-		L.d1 = fd1.data(); L.d2 = fd2.data(); L.d3 = fd3.data(); L.weights = fw.data();
-		L.n_points = static_cast<long long>(fd1.size());
-		//-gpu_fp64 raises the whole device path to double. It is worth asking for on a card
-		//with real double-precision units and expensive on one without, which is why it is
-		//asked for rather than detected.
-		const sf_precision iprec = opt->gpu_fp64 ? sf_precision::FP64 : sf_precision::FP32;
-		const auto init_start = std::chrono::high_resolution_clock::now();
-		itensor_on_gpu = itensor_gpu_init(L, iprec, opt->gpu_itensor_tensor);
-		if (itensor_on_gpu && throughput::enabled())
-			std::fprintf(stderr, "I tensor GPU: %.3f s upload and plan\n",
-				std::chrono::duration<double>(std::chrono::high_resolution_clock::now() - init_start).count());
-		//What the device path actually issues, the blocks padded to their batch shapes,
-		//real and imaginary halves together. Counted the way the path runs, or the GFLOP/s
-		//row is fiction.
-		if (itensor_on_gpu)
-			itensor_gpu_dense_flops = itensor_gpu_issued_flops() * static_cast<double>(n_integrations);
-		//Say which processor produced the numbers, and which GEMM: the three do not agree
-		//in the last digits, so a log that does not name one cannot be compared with
-		//another. Gated like the other timing lines so the golden-file tests, which run
-		//with no_date, keep their reference output.
-		//
-		//stderr, not cout, for the reason the shape diagnostic in itensor_gpu.cu gives:
-		//cout is redirected into the log and moved again later in the run, so anything
-		//written here never reached either the terminal or the file.
-		if (!(opt->no_date)) {
-			std::cerr << "GPU in use: XCW I tensor on ";
-			if (itensor_on_gpu)
-				std::cerr << "the device (" << (opt->gpu_fp64 ? "double" : "single")
-				<< "-precision " << itensor_gpu_gemm_name() << " GEMM)"
-				<< (opt->itensor_hybrid ? " with the CPU threads taking reflections alongside" : "");
-			else
-				std::cerr << "the CPU - device unavailable or problem too large";
-			std::cerr << std::endl;
-		}
-	}
-#endif
-	//Held in the precision it is built in unless the settings say otherwise: single when
-	//any path that contributes runs single. nr_small * i_compact_ deliberately in size_t,
-	//the product passes 2^31 at nmo = 500 with 20k reflections.
-	{
-		const char* f = tuning("NOSPHERA2_XCW_I_FLOAT");
-		const bool single_build = (itensor_on_gpu && !opt->gpu_fp64)
-			|| ((!itensor_on_gpu || opt->itensor_hybrid) && opt->cpu_itensor_fp32);
-		I_tens.i_float_ = I_tens.tensor_single || (f && std::atoi(f) != 0) || (single_build && !I_tens.tensor_double);
-		if (single_build && !I_tens.i_float_)
-			std::cout << "NOTE: the I tensor is built in single precision and held in double as i_double asks" << std::endl;
-		if (!single_build && I_tens.i_float_)
-			std::cout << "NOTE: the I tensor is built in double precision and narrowed to single as i_float asks" << std::endl;
-	}
-	decide_i_storage();
-	if (!I_tens.i_streamed_) {
-		if (I_tens.i_float_)
-			I_tens.I32.assign(static_cast<size_t>(model_data.nr) * I_tens.i_compact_, std::complex<float>{});
-		else
-			I_tens.I.assign(static_cast<size_t>(model_data.nr) * I_tens.i_compact_, cdouble{});
-	}
-	//After the storage line: the bar owns the console from here until the last reflection
-	if (!(opt->no_date)) {
-		pb.emplace((unsigned long long)model_data.nr, 60, "=", "|", "Calculating XCW integrals...", std::cout);
-	}
-#if defined(NOSPHERA2_USE_GPU) || defined(NOSPHERA2_USE_METAL)
-	//GPU: one host thread feeds the device batches of reflections next to the CPU workers
-	if (itensor_on_gpu) gpu_thread = std::thread([&]() {
-		const auto gpu_start = std::chrono::high_resolution_clock::now();
-		//The device takes reflections in batches; the CPU threads keep taking them one at
-		//a time from the same counter
-		const int gpu_batch = itensor_gpu_batch(static_cast<int>(num_syms));
-		cvec blk_gpu(static_cast<size_t>(gpu_batch) * I_tens.i_compact_, cdouble{});
-		//A column per integration, at most num_syms per reflection
-		vec kxs(static_cast<size_t>(gpu_batch) * num_syms), kys(kxs.size()), kzs(kxs.size());
-		cvec facs(kxs.size() * n_atom_grids), facs_inv(facs.size());
-		ivec col_off(gpu_batch + 1);
-		std::vector<k_job> jobs_gpu;
-		int done = 0;
-		auto collect_gpu = [&](const int rr0, const int n, const int slot) {
-			std::fill(blk_gpu.begin(), blk_gpu.end(), cdouble{});
-			if (!itensor_gpu_collect(slot, blk_gpu.data(), static_cast<long long>(I_tens.i_compact_)))
-				err_checkf(false, "I tensor GPU read-back failed", std::cout);
-			//A row whose inverse is measured too had no columns and comes back empty; the row it is copied from writes it
-			for (int r = 0; r < n; r++)
-				if (!row_copy[rr0 + r]) store_rows(rr0 + r, blk_gpu.data() + static_cast<size_t>(r) * I_tens.i_compact_);
-			done += n;
-			gpu_ns_per_refl = std::chrono::duration_cast<std::chrono::nanoseconds>(
-				std::chrono::high_resolution_clock::now() - gpu_start).count() / done;
-			if (!(opt->no_date) && pb) for (int r = 0; r < n; r++) pb->update();
-		};
-		//Two result slots: a batch is collected after the next one has been submitted, so
-		//the read-back overlaps that calculation
-		int prev = -1, prev_n = 0, slot = 0;
-		for (;;) {
-			const int rr0 = next_refl.fetch_add(gpu_batch);
-			if (rr0 >= model_data.nr) break;
-			const int n = std::min(gpu_batch, model_data.nr - rr0);
-			//The integrations of the CPU path: at the cleaned entry, its inverse taking the conjugate
-			int c = 0;
-			for (int r = 0; r < n; r++) {
-				col_off[r] = c;
-				make_jobs(rr0 + r, jobs_gpu);
-				for (int jb = 0; jb < static_cast<int>(jobs_gpu.size()); jb++, c++) {
-					const k_job& job = jobs_gpu[jb];
-					const int idx = inversion_link[job.c][0];
-					const int inv_idx = job.inv ? inversion_link[job.c][1] : idx;
-					kxs[c] = k_pt[0][idx];
-					kys[c] = k_pt[1][idx];
-					kzs[c] = k_pt[2][idx];
-					for (int gg = 0; gg < n_atom_grids; gg++) {
-						const size_t f = static_cast<size_t>(c) * n_atom_grids + gg;
-						facs[f] = job.self ? grid_factor(gg, idx) * job.t_self : cdouble(0.0, 0.0);
-						facs_inv[f] = job.inv ? grid_factor(gg, inv_idx) * job.t_inv : cdouble(0.0, 0.0);
-					}
-				}
-			}
-			col_off[n] = c;
-			if (c == 0) {
-				//Every row of the batch is the conjugate of one integrated elsewhere
-				done += n;
-				if (!(opt->no_date) && pb) for (int r = 0; r < n; r++) pb->update();
-				continue;
-			}
-			if (!itensor_gpu_submit(slot, n, col_off.data(), kxs.data(), kys.data(), kzs.data(), facs.data(), facs_inv.data()))
-				err_checkf(false, "I tensor GPU evaluation failed", std::cout);
-			if (prev >= 0) collect_gpu(prev, prev_n, slot ^ 1);
-			prev = rr0; prev_n = n;
-			slot ^= 1;
-		}
-		if (prev >= 0) collect_gpu(prev, prev_n, slot ^ 1);
-		if (throughput::enabled())
-			std::fprintf(stderr, "I tensor GPU: %.3f s wall time, %d of %d reflections\n",
-				std::chrono::duration<double>(std::chrono::high_resolution_clock::now() - gpu_start).count(),
-				done, model_data.nr);
-		itensor_gpu_free();
-		//No bookkeeping here: the loop above runs for both paths and eval_I multiplies the
-		//total by nr_small on the way out, so anything added here counts twice.
-	});
-#endif
-	//Counted serially from the block structure both paths walk, so the CPU and GPU rows are
-	//the same work measured two ways and no counter is touched by two threads.
-	double itensor_flops = 0.0;
-	double itensor_unscreened_tile_flops = 0.0;
-	for (int g = 0; g < n_atom_grids; g++)
-		for (const GridBlock& block : grid_blocks[g]) {
-			for (const MatrixTile& tile : block.matrix_tiles)
-				//real and imaginary passes, hence the factor of two
-				itensor_flops += 2.0 * throughput::flops_gemm(tile.row_count, tile.col_count,
-					block.point_count);
-			const int n_active = static_cast<int>(block.active_aos.size());
-			for (int row = 0; row < n_active; row += screened_tile_size) {
-				const int row_count = std::min(screened_tile_size, n_active - row);
-				for (int col = row; col < n_active; col += screened_tile_size)
-					itensor_unscreened_tile_flops += 2.0 * throughput::flops_gemm(row_count,
-						std::min(screened_tile_size, n_active - col), block.point_count);
-			}
-		}
-	itensor_flops *= static_cast<double>(n_integrations);
-	itensor_unscreened_tile_flops *= static_cast<double>(n_integrations);
-	if (itensor_on_gpu && throughput::enabled()) {
-		const double screened = itensor_unscreened_tile_flops > 0.0
-			? 100.0 * (1.0 - itensor_flops / itensor_unscreened_tile_flops) : 0.0;
-		std::fprintf(stderr, "I tensor GPU: %.3f dense GEMM GFLOP; CPU tiles %.3f unscreened, %.3f after overlap screening (%.1f%% pruned)\n",
-			itensor_gpu_dense_flops / 1.0e9, itensor_unscreened_tile_flops / 1.0e9,
-			itensor_flops / 1.0e9, screened);
-	}
-
-	if (!itensor_on_gpu || opt->itensor_hybrid)
-	{
-		//One core stays free for the thread feeding the device, which must not queue
-		//behind a tile GEMM to submit the next reflection
-		const int cpu_threads = itensor_on_gpu ? std::max(1, omp_get_max_threads() - 1) : omp_get_max_threads();
-#ifdef __ANDROID__
-		//Once its thread count is set explicitly, OpenMP OpenBLAS threads calls made inside a
-		//parallel region too, and they all queue for its one buffer slot spinning in sched_yield
-		const int blas_threads = openblas_get_num_threads();
-		openblas_set_num_threads(1);
-#endif
-#pragma omp parallel num_threads(cpu_threads) reduction(+:skipped_grids)
-		{
-			std::vector<k_job> jobs;
-			vec phase_angles;
-			vec phase_sines;
-			vec phase_cosines;
-			vec w, c;
-			std::vector<float> wf, cf;
-			//One reflection's block while streaming or holding the tensor in single. No ordering is needed on
-			//the way out: the file is reflection-major and the writer seeks to r's offset
-			cvec blk;
-			if (I_tens.i_streamed_ || I_tens.i_float_) blk.assign(I_tens.i_compact_, cdouble{});
-
-#if !defined(__APPLE__) && !defined(NSA2_OPENBLAS)
-			mkl_set_num_threads_local(1);
-#endif
-#if defined(__SSE2__) || defined(_M_X64)
-			//Single precision underflows into subnormals on this data - AO tails of 1e-40 are
-			//ordinary here - and an x86 core handles those a hundred times slower. Flush
-			//them, as the device does; the double path never gets near 1e-308.
-			const unsigned int csr_before = _mm_getcsr();
-			if (opt->cpu_itensor_fp32) _mm_setcsr(csr_before | 0x8040);
-#endif
-
-			size_t max_points = 0;
-			for (int g = 0; g < n_grids; g++) {
-				max_points = std::max(max_points, static_cast<size_t>(points[g]));
-			}
-			cvec phase_buffer(max_points);
-			phase_angles.resize(max_points);
-			phase_sines.resize(max_points);
-			phase_cosines.resize(max_points);
-			size_t max_ao_block_size = 0, max_tile_result_size = 0;
-			for (int g = 0; g < n_grids; g++) {
-				for (const GridBlock& block : grid_blocks[g]) {
-					max_ao_block_size = std::max(max_ao_block_size, block.ao_values.size());
-					for (const MatrixTile& tile : block.matrix_tiles) {
-						max_tile_result_size = std::max(max_tile_result_size, tile.result_offset + static_cast<size_t>(tile.row_count) * tile.col_count);
-					}
-				}
-			}
-			if (opt->cpu_itensor_fp32) {
-				wf.resize(2 * max_ao_block_size);
-				cf.resize(2 * max_tile_result_size);
-			}
-			else {
-				w.resize(2 * max_ao_block_size);
-				c.resize(2 * max_tile_result_size);
-			}
-
-			long long my_ns = 0;
-			int my_done = 0;
-			for (;;) {
-				int r = next_refl.load();
-				if (r >= model_data.nr) break;
-				if (itensor_on_gpu && my_done > 0 && gpu_ns_per_refl.load() > 0 &&
-					static_cast<long long>(model_data.nr - r) * gpu_ns_per_refl.load() < my_ns / my_done) break;
-				if (!next_refl.compare_exchange_strong(r, r + 1)) continue;
-				if (row_copy[r]) {
-					if (!(opt->no_date) && pb) pb->update();
-					continue;
-				}
-				const auto r_start = std::chrono::high_resolution_clock::now();
-				if (I_tens.i_streamed_ || I_tens.i_float_) std::fill(blk.begin(), blk.end(), cdouble{});
-				cdouble* const I_r = (I_tens.i_streamed_ || I_tens.i_float_) ? blk.data()
-					: I_tens.I.data() + static_cast<size_t>(r) * I_tens.i_compact_;
-				make_jobs(r, jobs);
-				// Precompute weighted phase factors for integration
-				for (int jb = 0; jb < jobs.size(); jb++) {
-					const k_job& job = jobs[jb];
-					// Integrated at the cleaned entry, the operations landing on its inverse take the conjugate
-					const int idx = inversion_link[job.c][0];
-					const int inv_idx = job.inv ? inversion_link[job.c][1] : idx;
-					const double kx = k_pt[0][idx], ky = k_pt[1][idx], kz = k_pt[2][idx];
-					for (int g = 0; g < n_grids; g++) {
-						const int np_g = points[g];
-						double* const angles = phase_angles.data();
-						double* const sines = phase_sines.data();
-						double* const cosines = phase_cosines.data();
-						for (int p = 0; p < points[g]; p++) {
-							angles[p] = kx * d1[g][p] + ky * d2[g][p] + kz * d3[g][p];
-						}
-#if defined(__APPLE__)
-						for (int p = 0; p < points[g]; p++) {
-							__sincos(angles[p], &sines[p], &cosines[p]);
-						}
-#elif defined(NSA2_OPENBLAS)
-						sincos_shared_n(np_g, angles, sines, cosines);
-#else
-						vdSinCos(np_g, angles, sines, cosines);
-#endif
-						cdouble* const phase_g = phase_buffer.data();
-						const double* w_g = weights[g].data();
-						for (int p = 0; p < np_g; p++) {
-							phase_g[p] = cdouble(w_g[p] * cosines[p], w_g[p] * sines[p]);
-						}
-						// Precompute basis function independent factors
-						const cdouble factor = grid_factor(g, idx) * job.t_self, factor_inv = grid_factor(g, inv_idx) * job.t_inv;
-						// This is where the magic happens
-						for (const GridBlock& block : grid_blocks[g]) {
-							const ivec& active_aos = block.active_aos;
-							const int n_active = static_cast<int>(active_aos.size());
-							const int np = block.point_count;
-							const cdouble* phase_values = phase_g + block.point_start;
-							//Weighted rows interleaved, 2j real and 2j + 1 imaginary of AO j, so a
-							//tile's B rows are contiguous and one GEMM of twice the width returns
-							//both parts; the result then alternates real, imaginary per column.
-							auto tiles = [&](const auto* ao, auto* wv, auto* cv) {
-								for (int local_mu = 0; local_mu < n_active; local_mu++) {
-									const auto* ao_row = ao + static_cast<size_t>(local_mu) * np;
-									auto* rw = wv + static_cast<size_t>(2 * local_mu) * np;
-									auto* iw = rw + np;
-									for (int p = 0; p < np; p++) {
-										rw[p] = ao_row[p] * phase_values[p].real();
-										iw[p] = ao_row[p] * phase_values[p].imag();
-									}
-								}
-								for (const MatrixTile& tile : block.matrix_tiles)
-									tile_gemm(tile.row_count, 2 * tile.col_count, np, ao + static_cast<size_t>(tile.row_start) * np,
-										wv + static_cast<size_t>(2 * tile.col_start) * np, cv + 2 * tile.result_offset);
-								for (const MatrixTile& tile : block.matrix_tiles) {
-									for (int tile_row = 0; tile_row < tile.row_count; tile_row++) {
-										const int mu = active_aos[tile.row_start + tile_row];
-										const int first_tile_col = (tile.row_start == tile.col_start) ? tile_row : 0;
-										const auto* crow = cv + 2 * tile.result_offset + static_cast<size_t>(tile_row) * 2 * tile.col_count;
-										for (int tile_col = first_tile_col; tile_col < tile.col_count; tile_col++) {
-											const int nu = active_aos[tile.col_start + tile_col];
-											const int t = tri_compact[tri_index(mu, nu)];
-											if (t < 0) continue;
-											const cdouble v(crow[2 * tile_col], crow[2 * tile_col + 1]);
-											if (job.self) I_r[t] += v * factor;
-											if (job.inv) I_r[t] += std::conj(v) * factor_inv;
-										}
-									}
-								}
-							};
-							if (opt->cpu_itensor_fp32) tiles(block.ao_values_f.data(), wf.data(), cf.data());
-							else tiles(block.ao_values.data(), w.data(), c.data());
-						}
-					}
-				}
-				store_rows(r, I_r);
-				my_ns += std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - r_start).count();
-				my_done++;
-				if (!(opt->no_date) && pb) {
-					pb->update();
-				}
-			}
-#if defined(__SSE2__) || defined(_M_X64)
-			_mm_setcsr(csr_before);
-#endif
-
-		}
-#ifdef __ANDROID__
-		openblas_set_num_threads(blas_threads);
-#endif
-	}
-	if (gpu_thread.joinable()) gpu_thread.join();
-	if (I_tens.i_streamed_) {
-		I_tens.i_file_.finish_write();
-		open_i_stream_for_reading(I_tens.i_file_.path());
-	}
-	auto end = std::chrono::high_resolution_clock::now();
-	auto duration = end - start;
-	skipped_grids_ = skipped_grids * model_data.nr;
-	time_taken = std::chrono::duration<double>(duration).count();
-	throughput::record("XCW I tensor", itensor_on_gpu, itensor_flops,
-		1.0e3 * std::chrono::duration<double>(duration).count());
+	if (avail != 0) avail = avail > df_reserved_ ? avail - df_reserved_ : 1;
+	return avail;
 }
 
 //F_r = Sum_at sym_fact Sum_s f_at(h R_s) exp(i h R_s x_at) T_at(h R_s) exp(2 pi i h t_s) plus the
@@ -2043,71 +1007,9 @@ void structure_factors::calc_F_calc(const cvec2& scattering_factors) {
 	}
 }
 
-void structure_factors::calc_F_calc(I_tensor& I, const dMatrix2& D) {
-	// Density matrix from occ is half of what I need, so times 2 and times (2x2)=4
-	//Streamed or resident the walk is the same; the outer loop is one window when
-	//the tensor is resident
-	const int step = std::max(1, I.i_streamed_ ? I.i_window_ : model_data.nr);
-	//The parallel region wraps the window loop: entering one per window would pay
-	//team startup and a barrier for a few reflections of work. omp single does the
-	//read, and its implicit barrier stops a thread entering a window not yet loaded.
-	//load() can throw and an exception must not leave an OpenMP structured block,
-	//so it is recorded and rethrown after the region.
-	std::string io_error;
-#if defined(NOSPHERA2_USE_GPU) || defined(NOSPHERA2_USE_METAL)
-	//GPU: the same walk over the device copy of the tensor, the pair weights folded into D
-	if (I.i_on_device_) {
-		vec w(I.i_compact_);
-		for (size_t k = 0; k < I.i_compact_; k++)
-			w[k] = (I.i_pair_mu_[k] == I.i_pair_nu_[k] ? 2.0 : 4.0) * D(I.i_pair_mu_[k], I.i_pair_nu_[k]);
-		err_checkf(itensor_gpu_rows(w.data(), scatter_data.anom_correction.data(), scatter_data.F_calc.data()), "I tensor walk on the device failed", std::cout);
-		return;
-	}
-#endif
-#pragma omp parallel
-	{
-		for (int r0 = 0; r0 < model_data.nr; r0 += step) {
-			const int r1 = std::min(r0 + step, model_data.nr);
-			if (I.i_streamed_) {
-#pragma omp single
-				{
-					try { I.i_file_.load(r0, r1); }
-					catch (const std::exception& e) { io_error = e.what(); }
-				}
-			}
-#pragma omp for schedule(static)
-			for (int r = r0; r < r1; ++r) {
-				if (!io_error.empty()) continue;
-				//One walk, either element type: the accumulation stays in double whatever
-				//the tensor is stored as, so float storage costs precision in the stored
-				//value and nothing in the sum.
-				auto accumulate = [&](const auto* I_r) {
-					cdouble sum = scatter_data.anom_correction[r];
-					const int* pmu = I.i_pair_mu_.data();
-					const int* pnu = I.i_pair_nu_.data();
-					for (size_t k = 0; k < I.i_compact_; k++)
-						sum += (pmu[k] == pnu[k] ? 2.0 : 4.0) * cdouble(I_r[k]) * D(pmu[k], pnu[k]);
-					scatter_data.F_calc[r] = sum;
-				};
-				if (I.i_float_) accumulate(I.i_block32(r)); else accumulate(I.i_block(r));
-			}
-		}
-	}
-	if (!io_error.empty()) throw std::runtime_error(io_error);
-}
-
-//F_calc of D through the I tensor or on the grid, see xcw_grid; mode 2 runs both and prints how far
-//the grid lands from the tensor
+//F_calc of D on XCW's grid, see xcw_grid
 void structure_factors::calc_F_calc(const dMatrix2& D) {
-	if (XG.mode == 1) { grid_F(D); return; }
-	calc_F_calc(I_tens, D);
-	if (XG.mode != 2) return;
-	const cvec tensor = scatter_data.F_calc;
 	grid_F(D);
-	double d = 0, m = 0;
-	for (size_t r = 0; r < tensor.size(); r++) { d = std::max(d, std::abs(tensor[r] - scatter_data.F_calc[r])); m = std::max(m, std::abs(tensor[r])); }
-	std::cout << "XCW grid check: max |F_grid - F_tensor| " << std::scientific << d << " of max |F| " << m << std::defaultfloat << std::endl;
-	scatter_data.F_calc = tensor;
 }
 
 //F_calc from the scattering factors of a tsc table: rows matched by hkl, scatterers by label, by
@@ -2146,7 +1048,7 @@ void structure_factors::perturbation(occ::Mat& perturb, const bool unrestricted,
 	ensure_inv_H2_weights();
 
 	//The four (XWR_type, refine_against) combinations differ only in the per-reflection
-	//scalar and the prefactor, so one walk over I serves all of them
+	//scalar and the prefactor, so one contraction serves all of them
 	const int xwr = static_cast<int>(opt->xcw_settings.XWR_type), ref = static_cast<int>(opt->xcw_settings.refine_against);
 	const bool against_F2 = (ref == 2);
 	const bool weighted = (xwr == 2);
@@ -2176,7 +1078,7 @@ void structure_factors::perturbation(occ::Mat& perturb, const bool unrestricted,
 		if (weighted) precompute *= inv_H2_[r];
 		pre[r] = precompute;
 	}
-	contract_I(perturb, pre);
+	grid_contract(perturb, pre);
 	perturb *= prefactor;
 	if (unrestricted) {
 		perturb.conservativeResize(2 * model_data.nmo, Eigen::NoChange);
@@ -2186,7 +1088,7 @@ void structure_factors::perturbation(occ::Mat& perturb, const bool unrestricted,
 }
 
 occ::Mat structure_factors::perturbation_response(const dMatrix2& dD_eff, const double lambda) {
-	//dF_r = Sum c I_r dD_eff: calc_F_calc's walk with the fixed part zeroed
+	//dF_r = dF_r/dD dD_eff: calc_F_calc with the fixed part zeroed
 	const cvec F0 = scatter_data.F_calc, fixed = scatter_data.anom_correction;
 	std::fill(scatter_data.anom_correction.begin(), scatter_data.anom_correction.end(), cdouble(0.0, 0.0));
 	XR.response = true;
@@ -2253,95 +1155,9 @@ occ::Mat structure_factors::perturbation_response(const dMatrix2& dD_eff, const 
 		}
 	}
 	occ::Mat dP;
-	contract_I(dP, dq);
+	grid_contract(dP, dq);
 	dP *= (against_F2 ? 4.0 : 2.0) / (model_data.nr_fit - n_params()) * lambda;
 	return dP;
-}
-
-void structure_factors::contract_I(occ::Mat& out, const cvec& pre) {
-	if (XG.mode == 1) { grid_contract(out, pre); return; }
-	if (XG.mode == 2) {
-		occ::Mat grid;
-		grid_contract(grid, pre);
-		contract_tensor(out, pre);
-		std::cout << "XCW grid check: max |P_grid - P_tensor| " << std::scientific << (grid - out).cwiseAbs().maxCoeff()
-			<< " of max |P| " << out.cwiseAbs().maxCoeff() << std::defaultfloat << std::endl;
-		return;
-	}
-	contract_tensor(out, pre);
-}
-
-void structure_factors::contract_tensor(occ::Mat& out, const cvec& pre) {
-	out.setZero(model_data.nmo, model_data.nmo);
-	const int step = std::max(1, I_tens.i_streamed_ ? I_tens.i_window_ : model_data.nr);
-	bool on_device = false;
-#if defined(NOSPHERA2_USE_GPU) || defined(NOSPHERA2_USE_METAL)
-	//GPU: the same contraction over the device copy of the tensor; the CPU walk below is skipped
-	if (I_tens.i_on_device_) {
-		vec dev(I_tens.i_compact_);
-		err_checkf(itensor_gpu_cols(pre.data(), dev.data()), "I tensor walk on the device failed", std::cout);
-		for (size_t k = 0; k < I_tens.i_compact_; k++) out(I_tens.i_pair_mu_[k], I_tens.i_pair_nu_[k]) = dev[k];
-		on_device = true;
-	}
-#endif
-	// See calc_F_calc: an exception must not leave an OpenMP structured block.
-	std::string io_error;
-	//One region, one accumulator per thread, one reduction, however many windows the
-	//budget implies: an nmo x nmo matrix per window is what made narrow windows dear
-	std::vector<occ::Mat> parts(omp_get_max_threads());
-#pragma omp parallel if (!on_device)
-	{
-		occ::Mat local = occ::Mat::Zero(model_data.nmo, model_data.nmo);
-		double* local_ptr = local.data();
-		for (int r0 = 0; !on_device && r0 < model_data.nr; r0 += step) {
-			const int r1 = std::min(r0 + step, model_data.nr);
-			if (I_tens.i_streamed_) {
-#pragma omp single
-				{
-					try { I_tens.i_file_.load(r0, r1); }
-					catch (const std::exception& e) { io_error = e.what(); }
-				}
-			}
-			//No nowait: the next window's read must not start until every thread has read this one
-#pragma omp for
-			for (int r = r0; r < r1; r++) {
-				if (!io_error.empty()) continue;
-				const cdouble precompute = pre[r];
-				if (precompute == cdouble(0.0, 0.0)) continue;
-				//As in calc_F_calc: one walk over whichever element type is resident, with
-				//the accumulation in double either way.
-				auto accumulate = [&](const auto* I_r) {
-					const int* pmu = I_tens.i_pair_mu_.data();
-					const int* pnu = I_tens.i_pair_nu_.data();
-					for (size_t k = 0; k < I_tens.i_compact_; k++) {
-						const double vr = static_cast<double>(I_r[k].real());
-						const double vi = static_cast<double>(I_r[k].imag());
-						local_ptr[pnu[k] * model_data.nmo + pmu[k]] += precompute.real() * vr - precompute.imag() * vi;
-					}
-				};
-				if (I_tens.i_float_) accumulate(I_tens.i_block32(r)); else accumulate(I_tens.i_block(r));
-			}
-		}
-		parts[omp_get_thread_num()].swap(local);
-	}
-	if (!io_error.empty()) throw std::runtime_error(io_error);
-	//The partials outweigh the matrix many times over, so their sum is parallel too
-	if (!on_device) {
-#pragma omp parallel for schedule(static)
-		for (int mu = 0; mu < model_data.nmo; mu++) {
-			for (int nu = mu; nu < model_data.nmo; nu++) {
-				double sum = 0.0;
-				for (int t = 0; t < static_cast<int>(parts.size()); t++)
-					if (parts[t].size() != 0) sum += parts[t](mu, nu);
-				out(mu, nu) = sum;
-			}
-		}
-	}
-	for (int mu = 0; mu < model_data.nmo; mu++) {
-		for (int nu = mu + 1; nu < model_data.nmo; nu++) {
-			out(nu, mu) = out(mu, nu);
-		}
-	}
 }
 
 //The tsc table of the converged density D_wfn for the tscb output. The grid route already holds rho's
@@ -2350,7 +1166,7 @@ void structure_factors::contract_tensor(occ::Mat& out, const cvec& pre) {
 //NOSPHERA2_XCW_GRID_TSCB_OLD keeps the tsc route on every step
 itsc_block structure_factors::result_table(const occ::Mat& D_wfn, std::vector<WFN>& wavefunctions, std::ostream& log, const bool refit_shares) {
 	itsc_block result;
-	const bool grid_tscb = XG.mode == 1 && !opt->electron_diffraction && !tuning("NOSPHERA2_XCW_GRID_TSCB_OLD");
+	const bool grid_tscb = !opt->electron_diffraction && !tuning("NOSPHERA2_XCW_GRID_TSCB_OLD");
 	cvec sfc;
 	const int nc = static_cast<int>(XG.inversion_link.size());
 	auto grid_value = [&](const int at, const int e) {

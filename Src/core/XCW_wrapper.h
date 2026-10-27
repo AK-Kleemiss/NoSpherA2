@@ -26,7 +26,7 @@ public:
 	// Only called when `gaussian_halt` is set.
 	void evaluate_gaussian_halting(const double lambda);
 
-	// Writes the files of a converged lambda step: tscb (or tshb), wfn, fchk, F_calc table, NBO and RGBI as asked
+	// Writes the files of a converged lambda step: tscb (or tshb), wfn, fchk, and the F_calc table, NBO and RGBI as asked
 	void write_step_results(const occ::qm::Wavefunction& wfn, const double lambda);
 
 	// Per-lambda Gaussian halting diagnostics, see evaluate_gaussian_halting.
@@ -39,7 +39,7 @@ private:
 	// Fits target's Fock build with the auxiliary basis `name`, its three-index integrals held when they fit in half of avail
 	void density_fitting(occ::qm::HartreeFock& target, const std::string& name, const char* what, const size_t avail);
 
-	// Debye-Waller and phase factors, anomalous dispersion and the I tensor (or its grid)
+	// Debye-Waller and phase factors, anomalous dispersion and XCW's integration grid
 	void setup_structure_factors(const occ::qm::HartreeFock& hf);
 	// The stored two-electron integrals and the density-fitted Hessian products of the SCF
 	void setup_scf_integrals(const occ::qm::HartreeFock& hf);
@@ -56,13 +56,13 @@ private:
 	void report_lambda(const double lambda, const occ::qm::Wavefunction& wfn, const bool write_result);
 
 	// SCF_coupling: what the SCF asks of the structure factors, see XCW_solver.h
-	void evaluate(const dMatrix2& dm_eff) override;
-	void perturbation(occ::Mat& perturb, const bool unrestricted) override;
-	fit_quality quality() const override;
-	occ::Mat perturbation_response(const dMatrix2& dD_eff, const double lambda) override;
-	void save_state() override;
-	void restore_state() override;
-	bool on_device() const override;
+	void evaluate_cryst_crit(const dMatrix2& dm_eff) override;
+	fit_quality cryst_crit() const override;
+	void perturbation_matrix(occ::Mat& perturb, const bool unrestricted) override;
+	occ::Mat perturbation_matrix_response(const dMatrix2& dD_eff, const double lambda) override;
+	void save_F_calc() override;
+	void restore_F_calc() override;
+	bool grid_on_device() const override;
 
 	// The full per-lambda Gaussian halting table (SCF log only), then the final estimate; once at the end of run()
 	void report_gaussian_halting_summary();
@@ -97,7 +97,7 @@ private:
 
 	options* opt;
 	structure_factors sf;
-	SCF_log_writer writer;
+	XCW_log_writer writer;
 	XCW_solver scf_solver;
 
 };

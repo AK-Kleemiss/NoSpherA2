@@ -10,9 +10,7 @@
 #endif
 #include <random>
 
-//XCW structure factors and perturbation on build_I's grid instead of through the I tensor, see
-//structure_factors::xcw_grid. Both walk the same blocks with the same screening, so the
-//tensor path and this one differ by summation order only.
+//XCW structure factors and perturbation on setup_grid's grid, see structure_factors::xcw_grid
 namespace {
 	//B = 2 A B in place, A upper triangular na x na, B na x np, row-major: x^T D x = 2 x^T U x for
 	//U the upper triangle of D with its diagonal halved, half the flops of D B by dsymm
@@ -42,8 +40,8 @@ namespace {
 #endif
 	}
 
-	//What build_I's integration sets per thread: one BLAS thread inside the region, and in
-	//single precision the subnormal AO tails flushed
+	//What a block loop sets per thread: one BLAS thread inside the region, and in single precision the
+	//subnormal AO tails flushed
 	struct block_thread {
 		unsigned int csr = 0;
 		explicit block_thread(const bool fp32)
@@ -78,7 +76,7 @@ namespace {
 	};
 }
 
-//calc_SF_fourier_bessel's transform (fourier_bessel.h) planned once on build_I's grid and reused every
+//calc_SF_fourier_bessel's transform (fourier_bessel.h) planned once on setup_grid's grid and reused every
 //lambda, atom by atom, with its exact transpose for grid_contract. f(k) = Sum_p rho_p e^{ik.d_p} by
 //shells: projection C_s,lm = Sum_{p in s} rho_p Y_lm(u_p), radial T_lm(q_n) = Sum_s J_l(q_n r_s) C_s,lm,
 //assembly f = Sum_m w_m(|k|) Y(k^) . T(q_{n0+m}).
@@ -403,8 +401,7 @@ void structure_factors::grid_F(const dMatrix2& D)
 vec2& structure_factors::grid_rho(const dMatrix2& D)
 {
 	const int ng = static_cast<int>(XG.blocks.size()), nc = static_cast<int>(XG.inversion_link.size());
-	//i_double: nothing the SCF reads is rounded to single, as it means for the tensor
-	const bool fp32 = opt->cpu_itensor_fp32 && !I_tens.tensor_double;
+	const bool fp32 = XG.fp32;
 	std::vector<std::pair<int, int>> list;
 	stage_clock sc;
 	for (int g = 0; g < ng; g++)
@@ -470,7 +467,7 @@ vec2& structure_factors::grid_rho(const dMatrix2& D)
 	}
 #endif
 	//w_p rho(p) = 2 w_p Sum_munu D chi_mu chi_nu with D restricted to the block's AOs and the
-	//screened pairs zeroed: the Sum_{mu<=nu} (2|4) D I of calc_F_calc on the tensor
+	//screened pairs zeroed
 #pragma omp parallel
 	{
 		const block_thread bt(fp32);
@@ -559,7 +556,7 @@ cvec structure_factors::grid_sfc(const dMatrix2& D)
 void structure_factors::grid_contract(occ::Mat& out, const cvec& pre)
 {
 	const int nmo = model_data.nmo, ng = static_cast<int>(XG.blocks.size()), nc = static_cast<int>(XG.inversion_link.size());
-	const bool fp32 = opt->cpu_itensor_fp32 && !I_tens.tensor_double;
+	const bool fp32 = XG.fp32;
 	out.setZero(nmo, nmo);
 	stage_clock sc;
 	//Transpose of grid_F's assembly: A(e) = Sum_{r,s -> e} pre_r t_rs, then per atom the factor
@@ -644,7 +641,7 @@ void structure_factors::check_adjoint()
 void structure_factors::grid_apply_V(const vec2& V, occ::Mat& out)
 {
 	const int nmo = model_data.nmo, ng = static_cast<int>(XG.blocks.size());
-	const bool fp32 = opt->cpu_itensor_fp32 && !I_tens.tensor_double;
+	const bool fp32 = XG.fp32;
 	stage_clock sc;
 #ifdef NOSPHERA2_USE_GPU
 	//GPU: the transposed chain, the potential of every block contracted into out on the device

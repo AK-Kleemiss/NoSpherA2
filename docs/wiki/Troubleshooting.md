@@ -184,7 +184,7 @@ equivalent derived quantity):
 | --- | --- |
 | `calc_SF` with `-gpu_fp64` | 1.2e-14 |
 | `calc_SF` default (fp32 transcendentals and sum) | 1.8e-8 |
-| I tensor with `-gpu_itensor` (fp32 GEMM) | 2.1e-11 |
+| XCW with `-gpu_itensor` (fp32 GEMM; measured on the former I tensor path) | 2.1e-11 |
 | `-gpu_salted` | 5.0e-13 |
 
 All of those are orders of magnitude below the ~1 % experimental uncertainty, and

@@ -911,7 +911,7 @@ struct options
 	d3 sfac_diffuse = { 0.0, 0.0, 0.0 };
 	double dmin = 99.0;
 	double mem = 1000.0; // In MB
-	//Set only when -mem was passed; only then is mem a budget the tsc block size and XCW I tensor window are fitted to
+	//Set only when -mem was passed; only then is mem a budget the tsc block size and XCW's stored integrals are fitted to
 	bool mem_given = false;
 	double efield = 0.005;
 	ivec2 groups;
@@ -1047,7 +1047,7 @@ struct options
 	//the run's .tshb while every part goes into it instead of the table; null otherwise
 	tshb_block* tshb = nullptr;
 	bool qct = false;
-	// What structure_factors reads: the crystal model, the extinction and the I tensor storage
+	// What structure_factors reads: the crystal model, the extinction and the grid precision
 	struct SF_settings {
 		// `i_sigma <x>`: only reflections with I/sigma(I) >= x enter chi^2 and the scale, as in
 		// Tonto. Under the reader's sigma(F) = sigma(I)/2F that is F/sigma(F) >= 2x, so the
@@ -1068,24 +1068,8 @@ struct options
 		int n_params = 1;
 		int refine_against = 1;
 		int XWR_type = 1;
-		bool read_tensor;
-		// Largest I tensor held resident, in MB. Above it the tensor goes to disk
-		// and is read back a window of reflections at a time; 0 means no limit,
-		// which is the original behaviour. Set with `i_tensor_mb <n>` in the XCW
-		// settings, or `stream` for the default budget.
-		size_t i_tensor_max_mb;
-		// `i_float` in the settings file: hold the I tensor in single precision. The device
-		// computes it in single anyway, so this stores what was computed rather than a
-		// widened copy of it.
-		bool i_tensor_single = false;
-		bool i_tensor_double = false;
-		// `I_tensor <path>` in the settings file: where the streamed tensor lives. Written
-		// there, and reused from there when it is already the right size for this problem,
-		// so that trying another refinement setting does not rebuild it.
-		std::filesystem::path i_tensor_file_path;
-		// `safe <path>`: write the tensor there for a later `read <path>`, on a thread, so
-		// the refinement starts at once instead of waiting for 100 GB to reach the disk.
-		std::filesystem::path i_tensor_save_path;
+		// `i_double` in the settings file: the XCW grid's AO values and block products in double precision
+		bool grid_double = false;
 	};
 
 	// What the SCF solver reads: the convergence thresholds with their running state, the damping
@@ -1212,13 +1196,9 @@ struct options
 	bool use_gpu = true;
 	//-gpu_fp64 keeps the double sincos on a card that would otherwise pick the fp32 one
 	bool gpu_fp64 = false;
-	//Single-precision tiles for the CPU I tensor, as the device path runs; sgemm is twice
+	//Single-precision AO values and block products on the XCW grid, as the device path runs; sgemm is twice
 	//dgemm's rate. -no_cpu_itensor_fp32 keeps double.
 	bool cpu_itensor_fp32 = true;
-	//-itensor_hybrid lets the CPU threads take reflections alongside the device. Off by
-	//default: the two sides differ in the last bits and a shared counter decides which rows
-	//each takes, so the result changes from run to run. For a card slow in double only.
-	bool itensor_hybrid = false;
 	//Seed each lambda step from the density extrapolated through the two previous steps
 	//rather than the last one alone; the step is small and the trajectory smooth.
 	bool xcw_extrapolate = true;
@@ -1229,6 +1209,8 @@ struct options
 	//error accumulates to a gradient floor of 3e-5 and the SCF never meets its 1e-5, and the
 	//full build at 1e-10 is the faster of the two anyway.
 	bool xcw_incremental = false;
+	//-print_F: every converged lambda step writes its F_calc table, NA2_<lambda>_Fcalc.txt
+	bool print_F = false;
 	//Integral screening threshold of the XCW Fock build; OCC's own default is 1e-12.
 	double xcw_int_precision = 1e-10;
 	//-gflops reports achieved GFLOP/s per stage for the CPU and GPU paths at the end of a
@@ -1240,14 +1222,10 @@ struct options
 	//a run uses depends on the card, so neither path can be pinned. -gpu_fp64 wins if both
 	//are given, the accurate path being the safer thing to fall back to.
 	bool gpu_fp32 = false;
-	//-no_gpu_itensor keeps the XCW I tensor GEMMs on the CPU. On by default: it is much the
-	//largest of the device paths, and it moves the total energy only in the tenth
-	//significant figure. Read together with use_gpu, so -no_gpu turns it off as well.
+	//-no_gpu_itensor keeps the XCW grid GEMMs and the stored integrals' Fock build on the CPU. On by
+	//default: it moves the total energy only in the tenth significant figure. Read together with
+	//use_gpu, so -no_gpu turns it off as well.
 	bool gpu_itensor = true;
-	//FP16 Tensor Core operands with FP32 accumulation for the I tensor. Off by default: the
-	//half-precision operands move the XCW energies in the fourth decimal, plain FP32 GEMM
-	//sits within 1e-8 Eh of double.
-	bool gpu_itensor_tensor = false;
 	//SALTED descriptor combination uses the device when one is available; -no_gpu_salted keeps it on the CPU.
 	bool gpu_salted = true;
 	//-no_gpu_grid keeps the Becke/TFVC integration weights on the CPU
@@ -1259,7 +1237,7 @@ struct options
 	bool gpu_density = true;
 	//-gpu_blas offers large dense GEMMs in nos_math to the device
 	bool gpu_blas = false;
-	//The I tensor GEMM goes through cuBLAS when the machine has it, and through the
+	//The XCW grid GEMMs go through cuBLAS when the machine has it, and through the
 	//built-in CUTLASS path otherwise. cuBLAS is 1.65x faster on a V100 and level with
 	//CUTLASS within measurement noise on consumer cards, so preferring it costs nothing
 	//where it does not help. -no_gpu_cublas pins CUTLASS, which is what the reference tests

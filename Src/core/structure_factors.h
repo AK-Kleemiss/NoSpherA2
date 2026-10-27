@@ -4,10 +4,8 @@
 #include "extinction.h"
 #include "scattering_factors.h"
 #include "wfn_class.h"
-#include "i_tensor_stream.h"
 #include "GridManager.h"
 #include <occ/qm/hf.h>
-#include <thread>
 
 class structure_factors {
 
@@ -60,53 +58,6 @@ public:
 		int m;
 	};
 
-	// The I tensor: held resident, or written to disk and read back a window
-	// of reflections at a time. See decide_i_storage.
-	struct I_tensor {
-		// Held resident only while it fits i_tensor_max_mb; otherwise empty
-		// and i_file_ carries the tensor. Read through i_block(r) either way.
-		cvec I;
-		//A tensor built in single precision is held, streamed and saved in single: half the
-		//memory and half the traffic of the two walks per iteration, and the values are the
-		//ones the GEMM produced either way. i_float / i_double in the settings override the
-		//choice the build precision makes.
-		std::vector<std::complex<float>> I32;
-		bool i_float_ = false;
-		//A copy of the resident tensor on the device does both SCF walks there
-		bool i_on_device_ = false;
-		i_tensor_file i_file_;
-		bool i_streamed_ = false;
-		int i_window_ = 0;
-		//Only the (mu, nu) pairs the overlap screening kept are stored, i_compact_ of the
-		//nmo (nmo + 1) / 2, in the order these two lists give
-		ivec i_pair_mu_, i_pair_nu_;
-		size_t i_compact_ = 0;
-		// The packed (mu, nu) run of reflection r, from the loaded window or from the resident tensor
-		const cdouble* i_block(const int r) const
-		{
-			return i_streamed_ ? i_file_.block(r) : I.data() + static_cast<size_t>(r) * i_compact_;
-		}
-		const std::complex<float>* i_block32(const int r) const
-		{
-			return i_streamed_ ? i_file_.block32(r) : I32.data() + static_cast<size_t>(r) * i_compact_;
-		}
-		bool read_tensor;
-		std::filesystem::path i_tensor_file_path;
-		std::filesystem::path i_tensor_save_path;
-		bool tensor_single;
-		bool tensor_double;
-		size_t i_tensor_max_mb;
-		std::string basis_set_name;
-	};
-
-	//One GEMM tile of a block's active-AO square, upper triangle only
-	struct MatrixTile {
-		int row_start;
-		int row_count;
-		int col_start;
-		int col_count;
-		size_t result_offset;
-	};
 	//A run of points of one atom grid with the AOs not negligible anywhere on it, ascending,
 	//and their values row-major, one row of point_count per AO
 	struct GridBlock {
@@ -115,19 +66,12 @@ public:
 		ivec active_aos;
 		vec ao_values;
 		std::vector<float> ao_values_f;
-		std::vector<MatrixTile> matrix_tiles;
-		int tile_result_size = 0;
 	};
-	//The grid build_I integrates on, kept instead of the I tensor: the default unless -tune NOSPHERA2_XCW_GRID=0
-	//or `safe` asks for the tensor, and bypassed when `read` finds one.
-	//An evaluation integrates rho = 2 sum_munu D chi_mu chi_nu block by block and transforms it;
-	//the perturbation is the transpose of that chain. Same screening as the tensor: pairs in
-	//skip and AOs below the block threshold count nowhere. With the direct-sum transform the
-	//two agree to round-off; the Fourier-Bessel one differs by the Lebedev rule's aliasing.
-	//Memory is the AO values, not nr x pairs. =2 builds the tensor as well and prints the
-	//difference of both at every evaluation.
+	//XCW's integration grid, set up by setup_grid. An evaluation integrates rho = 2 sum_munu D chi_mu chi_nu block by
+	//block and transforms it; the perturbation is the transpose of that chain. AO pairs in skip and AOs below the block
+	//threshold count nowhere. Memory is the AO values of the blocks, in single precision when fp32
 	struct xcw_grid {
-		int mode = 0;
+		bool fp32 = true;
 		std::vector<std::vector<GridBlock>> blocks;
 		vec2 d1, d2, d3, w;
 		ivec2 skip, lookup, inversion_link;
@@ -149,7 +93,7 @@ public:
 		bool refresh = false;
 		std::shared_ptr<struct xcw_weights> ws;
 	} XG;
-	//build_I's grid as TFVC, MBIS or EMBIS partition it; the Hirshfeld shares it was built with stand until rho is known
+	//setup_grid's grid as TFVC, MBIS or EMBIS partition it; the Hirshfeld shares it was built with stand until rho is known
 	void setup_grid_weights(const occ::qm::AOBasis& ao);
 	//the scheme's shares from rho = w0 rho(p) of D, each fit starting from the last one
 	void update_grid_weights(const vec2& rho, const dMatrix2& D);
@@ -157,14 +101,15 @@ public:
 	std::string grid_weight_report();
 	//Uploads the blocks for xcw_grid_gpu; false keeps them on the host
 	bool hold_grid_gpu();
-	//Plans XG.fb from build_I's layout of the grid points in their prototypes, see xcw_grid.cpp
+	//Plans XG.fb from setup_grid's layout of the grid points in their prototypes, see xcw_grid.cpp
 	void plan_grid_fb(const struct sf_shell_layout& layout);
-	//F_calc = anomalous + the transform of rho(D), what calc_F_calc(I_tensor, D) gives
+	//F_calc = anomalous + the transform of rho(D)
 	void grid_F(const dMatrix2& D);
 	//the per-atom transform of rho(D) at the cleaned entries, [g * nc + c]; grid_F's first half and the tscb's table.
 	//The atoms' shares come from the grid weights, or from the RI fit when XR.on
 	cvec grid_sfc(const dMatrix2& D);
-	//out = Sum_r Re(pre_r I_r(mu, nu)) without forming I, what contract_tensor gives
+	//out = Sum_r Re(pre_r dF_r/dD(mu, nu)) over the fit set, the transpose of grid_F: the walk the perturbation and its
+	//response share; nmo x nmo, symmetric, without any prefactor
 	void grid_contract(occ::Mat& out, const cvec& pre);
 	//the weighted density 2 w_p rho(p) of every atom grid, grid_sfc's first half
 	vec2& grid_rho(const dMatrix2& D);
@@ -241,14 +186,6 @@ public:
 	std::vector<i3> hkl_ordered_;
 	// 1/|H_r|^2 per reflection, see ensure_inv_H2_weights.
 	vec inv_H2_;
-	// The I tensor, see eval_I
-	I_tensor I_tens;
-	// The background writer for `safe <path>`. Joined, never detached: a thread still
-	// running at exit is how the GPU warm-up bug of 939268f happened, and this one holds a
-	// FILE* and reads the resident tensor.
-	std::thread i_writer_;
-	std::string i_writer_error_;
-	static constexpr const char* i_tensor_default = "I_tensor_stream.bin";
 
 
 	// The parameters the criteria divide by: the settings file's `params` plus the extinction
@@ -310,26 +247,26 @@ public:
 
 	// Creates primitive vectors from the basis set for calculating the XCW integrals
 	void create_prims(std::vector<ao_data>& ao_data_shells, const occ::qm::AOBasis& occ_basis_set);
-	// Helper function for flattening the I tensor
-	size_t tri_index(int mu, int nu) const noexcept;
-	// Calculates the I tensor with the DW and phase factors as set, or reads it from file
-	I_tensor& eval_I(const occ::gto::AOBasis& aobasis);
-	// The grid integration behind eval_I
-	void build_I(const std::vector<ao_data>& ao_data_shells, double& time_taken, long long& screen_counter, long long& skipped_grids);
-	void decide_i_storage();
-	void open_i_stream_for_reading(const std::filesystem::path& p);
-	std::filesystem::path i_tensor_path() const;
-	void start_i_save();
-	void finish_i_save();
-	size_t i_budget(const char*& source, bool& automatic) const;
+	// XCW's integration grid (XG) with the DW and phase factors as set: the symmetry links of the reflections, the
+	// AO pair screen, the atom grids and the AO values on them in blocks, and the shares of the partition scheme
+	void setup_grid(const occ::gto::AOBasis& aobasis);
+	// The k-points of every reflection's symmetry images (XG.lookup) and which of them inversion makes conjugates
+	// of others, so that only one of each pair is integrated (XG.inversion_link, clean_of, is_inverse)
+	void link_symmetry_equivalents();
+	// XG.skip: the AO pairs on different centres whose overlap bound is negligible
+	void screen_ao_pairs(const std::vector<ao_data>& ao_data_shells);
+	// The atom grids of the asymmetric unit in grid_manager, pruned on the promolecule, as XG.d1..d3 and XG.w, the dummy
+	// wavefunction they were built for and where each point sits in its prototype grid
+	void setup_atom_grids(GridManager& grid_manager, WFN& dummy_wave, struct sf_shell_layout& layout);
+	// The AO values on the atom grids, Morton-ordered and cut into blocks that keep only the AOs not negligible
+	// on them (XG.blocks)
+	void build_grid_blocks(const std::vector<ao_data>& ao_data_shells, GridManager& grid_manager, const WFN& dummy_wave, struct sf_shell_layout& layout);
 	size_t free_memory() const;
 	size_t df_reserved_ = 0;
 
 	// F_calc from the atomic scattering factors of every atom over hkl_enlarged
 	void calc_F_calc(const cvec2& scattering_factors);
-	// F_calc from the I tensor and a density matrix
-	void calc_F_calc(I_tensor& I, const dMatrix2& D);
-	// F_calc from a density matrix, through the I tensor or on the grid as XG.mode says
+	// F_calc from a density matrix, on XCW's grid
 	void calc_F_calc(const dMatrix2& D);
 	// F_calc from the scattering factors of a tsc table
 	void calc_F_calc(const itsc_block& tsc);
@@ -338,11 +275,6 @@ public:
 	// The tsc table of the wavefunctions at every entry of hkl_enlarged; grids keeps the integration grids for the next call
 	itsc_block tsc_table(std::vector<WFN>& wavefunctions, GridManager* grids, std::ostream& log);
 
-	// out = Sum_r Re(pre_r I_r(mu,nu)) over the fit set, the walk the perturbation and its response
-	// share; nmo x nmo, symmetric, without any prefactor. On the grid or through the I tensor as XG.mode says
-	void contract_I(occ::Mat& out, const cvec& pre);
-	// contract_I's walk over the tensor itself
-	void contract_tensor(occ::Mat& out, const cvec& pre);
 	// The perturbation matrix: the derivative of the fit criterion with respect to the density matrix, nmo rows per spin block
 	void perturbation(occ::Mat& perturb, const bool unrestricted, std::ostream& log);
 	// lambda times the change of the perturbation matrix for a change dD_eff of the density, the scale

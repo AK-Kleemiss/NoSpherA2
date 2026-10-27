@@ -1,8 +1,5 @@
 #include "pch.h"
 #include "XCW_wrapper.h"
-#if defined(NOSPHERA2_USE_GPU) || defined(NOSPHERA2_USE_METAL)
-#include "itensor_gpu.h"
-#endif
 #ifdef NOSPHERA2_USE_GPU
 #include "xcw_grid_gpu.h"
 #endif
@@ -264,7 +261,7 @@ static dMatrix2 spin_summed(const occ::Mat& Dw) {
 	return D;
 }
 
-void XCW_wrapper::evaluate(const dMatrix2& dm_eff) {
+void XCW_wrapper::evaluate_cryst_crit(const dMatrix2& dm_eff) {
 	//density-following shares refit at this evaluation only when NOSPHERA2_XCW_WEIGHT_UPDATE asks for it
 	sf.XG.refresh = sf.XG.ws && scf_solver.lambda != 0.0 && (weight_every_ > 0 ? weight_count_ % weight_every_ == 0 : weight_every_ == 0 && weight_count_ == 0);
 	weight_count_++;
@@ -274,28 +271,28 @@ void XCW_wrapper::evaluate(const dMatrix2& dm_eff) {
 	sf.calc_criteria();
 }
 
-void XCW_wrapper::perturbation(occ::Mat& perturb, const bool unrestricted) {
+void XCW_wrapper::perturbation_matrix(occ::Mat& perturb, const bool unrestricted) {
 	sf.perturbation(perturb, unrestricted, writer.log);
 }
 
-occ::Mat XCW_wrapper::perturbation_response(const dMatrix2& dD_eff, const double lambda) {
+occ::Mat XCW_wrapper::perturbation_matrix_response(const dMatrix2& dD_eff, const double lambda) {
 	return sf.perturbation_response(dD_eff, lambda);
 }
 
-fit_quality XCW_wrapper::quality() const {
+fit_quality XCW_wrapper::cryst_crit() const {
 	return { sf.criterion(false), sf.quality_criteria.GooF2, sf.quality_criteria.R1, sf.criterion(true), sf.quality_criteria.R1_all };
 }
 
-void XCW_wrapper::save_state() {
+void XCW_wrapper::save_F_calc() {
 	sf.save_F_calc();
 }
 
-void XCW_wrapper::restore_state() {
+void XCW_wrapper::restore_F_calc() {
 	sf.restore_F_calc();
 }
 
-bool XCW_wrapper::on_device() const {
-	return sf.I_tens.i_on_device_ || sf.XG.on_device;
+bool XCW_wrapper::grid_on_device() const {
+	return sf.XG.on_device;
 }
 
 //The sign of f(+-3), g(+-3) and g(+-4) in every orbital, in OCC's own m = -l..l order,
@@ -355,8 +352,8 @@ void XCW_wrapper::write_tshb(WFN& wave, const tsc_block<int, cdouble>& table, co
 }
 
 //The files of a converged lambda step, all named NA2_<lambda>: the scattering factor table (.tscb, or the
-//.tshb fit with -tshb), the wavefunction (.wfn, .fchk, and .47 for NBO when asked), the F_calc it was scored on and, with -rgbi,
-//the RGBI analysis of the refined wavefunction
+//.tshb fit with -tshb), the wavefunction (.wfn, .fchk, and .47 for NBO when asked), with -print_F the F_calc it was
+//scored on and, with -rgbi, the RGBI analysis of the refined wavefunction
 void XCW_wrapper::write_step_results(const occ::qm::Wavefunction& wfn, const double lambda) {
 	writer.log << "Creating .tscb file from converged SCF calculation..." << std::endl;
 	std::vector<WFN> sf_wave_vec(1, { wfn, false });
@@ -365,6 +362,7 @@ void XCW_wrapper::write_step_results(const occ::qm::Wavefunction& wfn, const dou
 	//shells with the convention they actually have.
 	sf_wave_vec[0].set_origin(e_origin::XCW_fit);
 	const _time_point fwd_t0 = get_time();
+	//the scattering factor table of the converged density: by the tsc route at the first step, from the grid after it
 	const itsc_block result = sf.result_table(wfn.mo.D, sf_wave_vec, writer.log, weight_every_ > 0 && lambda != 0.0);
 	//the atomic charges of density-following shares, from the partitioned rho of the table
 	if (sf.XG.ws && (!sf.XR.on || sf.XR.lmax >= 0)) {
@@ -404,7 +402,8 @@ void XCW_wrapper::write_step_results(const occ::qm::Wavefunction& wfn, const dou
 		std::cout << "XCW lambda " << lambda << ": " << sf.extinction_report() << std::endl;
 		writer.log << "XCW lambda " << lambda << ": " << sf.extinction_report() << std::endl;
 	}
-	sf.write_F_calc(base + "_Fcalc.txt");
+	if (opt->print_F)
+		sf.write_F_calc(base + "_Fcalc.txt");
 	//OCC's fchk writer reorders to Gaussian's basis functions but keeps libcint's phases,
 	//and Gaussian's f(+-3), g(+-3), g(+-4) are the opposite sign; the file has to carry
 	//Gaussian's so that anything reading an fchk gets the density right
@@ -496,7 +495,7 @@ void XCW_wrapper::report_lambda(const double lambda, const occ::qm::Wavefunction
 	}
 	if (opt->xcw_settings.xcw_gaussian_halt)
 		evaluate_gaussian_halting(lambda);
-	const fit_quality fit = quality();
+	const fit_quality fit = cryst_crit();
 	writer.v.criterion = fit.criterion;
 	writer.v.GooF2 = fit.GooF2;
 	writer.v.R1 = fit.R1;
@@ -592,32 +591,22 @@ void XCW_wrapper::weight_check(const occ::qm::Wavefunction& wfn, const double la
 }
 
 //The structure factor side of the run: Debye-Waller and phase factors, the anomalous dispersion
-//corrections, the I tensor (or the grid that replaces it) and the RI partition when asked for, on the device
-//when asked to
+//corrections, XCW's integration grid and the RI partition when asked for, on the device when asked to
 void XCW_wrapper::setup_structure_factors(const occ::qm::HartreeFock& hf) {
 	sf.set_DW();
 	sf.set_phases();
 	sf.set_anom();
-	structure_factors::I_tensor& I_tens = sf.eval_I(hf.aobasis());
+	//the symmetry links of the reflections, the AO pair screen, the atom grids and the AO values on them in blocks
+	sf.setup_grid(hf.aobasis());
+	//(mu nu|P) and the factorised fit metric of the RI partition
 	if (opt->xcw_partition == "ri")
 		sf.setup_ri(hf.aobasis());
 	const char* wu = tuning("NOSPHERA2_XCW_WEIGHT_UPDATE");
 	weight_every_ = wu ? std::max(0, std::atoi(wu)) : -1;
-#if defined(NOSPHERA2_USE_GPU) || defined(NOSPHERA2_USE_METAL)
-	//GPU: a copy of the resident tensor on the device, where both walks of an iteration then run;
-	//the host is bound by its memory bandwidth reading it. The host copy stays for the background writer.
-	if (opt->gpu_itensor && opt->use_gpu && !I_tens.i_streamed_ && sf.XG.mode != 1) {
-		I_tens.i_on_device_ = I_tens.i_float_ ? itensor_gpu_hold(I_tens.I32.data(), sf.model_data.nr, static_cast<int>(I_tens.i_compact_))
-			: itensor_gpu_hold(I_tens.I.data(), sf.model_data.nr, static_cast<int>(I_tens.i_compact_));
-		if (!(opt->no_date))
-			std::cerr << "GPU in use: XCW structure factors and perturbation on "
-			<< (I_tens.i_on_device_ ? "the device" : "the CPU - device unavailable or the tensor too large") << std::endl;
-	}
-#endif
 #ifdef NOSPHERA2_USE_GPU
-	//GPU: the grid route's two block GEMMs on the device, the transform between them stays on the host.
+	//GPU: the grid's two block GEMMs on the device, the transform between them stays on the host.
 	//Single precision there, so not under i_double
-	if (opt->gpu_itensor && opt->use_gpu && sf.XG.mode == 1 && !I_tens.tensor_double) {
+	if (opt->gpu_itensor && opt->use_gpu && !opt->xcw_settings.grid_double) {
 		const bool held = sf.hold_grid_gpu();
 		if (!(opt->no_date))
 			std::cerr << "GPU in use: XCW grid blocks on " << (held ? "the device" : "the CPU - device unavailable or the blocks too large") << std::endl;
@@ -629,7 +618,7 @@ void XCW_wrapper::setup_structure_factors(const occ::qm::HartreeFock& hf) {
 //build for the TRAH Hessian products
 void XCW_wrapper::setup_scf_integrals(const occ::qm::HartreeFock& hf) {
 	const size_t avail = sf.free_memory();
-	//NOSPHERA2_XCW_ERI_NO_BUDGET holds the integrals whatever -mem leaves for them
+	//read (read_eri) or built when they fit what is left; NOSPHERA2_XCW_ERI_NO_BUDGET holds them whatever -mem leaves
 	scf_solver.setup_eri(hf, tuning("NOSPHERA2_XCW_ERI_NO_BUDGET") ? 0 : avail);
 	//Fitted Hessian products only change the TRAH steps, never the converged result. Without stored
 	//integrals a product costs a direct build and two fitted builds are cheaper, so they are fitted
@@ -666,6 +655,7 @@ bool XCW_wrapper::read_start_guess(occ::qm::Wavefunction& wfn) {
 bool XCW_wrapper::run_lambda(occ::qm::HartreeFock& hf, const double lambda, occ::qm::Wavefunction& wfn, const bool use_guess, const bool write_result) {
 	scf_solver.lambda = lambda;
 	weight_count_ = 0;
+	//DIIS iterations with damping, level shift and rescue, then TRAH steps where DIIS stalls
 	bool converged = scf_solver.run(hf, wfn, use_guess);
 	//shares held within a solve and refit to its density until that no longer moves F: the fixed point refitting at every
 	//evaluation goes for, with every solve one objective for TRAH to accept steps on
@@ -729,8 +719,11 @@ void XCW_wrapper::extend_scan(const double lambda, int& planned_steps, int& extr
 void XCW_wrapper::run() {
 	//OCC parallelises through TBB, which does not read OMP_NUM_THREADS; this makes -cpus bind OCC's part of the run too
 	occ::parallel::set_num_threads(opt->threads > 0 ? opt->threads : omp_get_max_threads());
+	//the molecule, the orbital basis and the SCF solver
 	occ::qm::HartreeFock hf = setup_system();
+	//DW, phase and anomalous dispersion factors, the integration grid with its AO values and the RI partition
 	setup_structure_factors(hf);
+	//the stored two-electron integrals and the density-fitted Hessian products of the SCF
 	setup_scf_integrals(hf);
 	occ::qm::Wavefunction last_wfn, prev_wfn;
 	bool has_guess = read_start_guess(last_wfn);
@@ -742,7 +735,7 @@ void XCW_wrapper::run() {
 		writer.log << "XCW: fitting against the 1/|H|^2-weighted residual self-energy criterion "
 			<< "Criterion below are this weighted quantity, not the classical GoF." << std::endl;
 	}
-	SCF_log_writer::console_header(opt->xcw_settings.xcw_gaussian_halt);
+	XCW_log_writer::console_header(opt->xcw_settings.xcw_gaussian_halt);
 	//The lambda scan: each step starts from the orbitals of the last converged one, extrapolated
 	//along the path of the two before when asked to (-xcw_extrapolate)
 	const double min_lambda_step = opt->xcw_settings.xcw_step_size / 128.0;
@@ -755,9 +748,10 @@ void XCW_wrapper::run() {
 		occ::qm::Wavefunction wfn = last_wfn;
 		if (opt->xcw_extrapolate && have_prev)
 			extrapolate_orbitals(wfn.mo, prev_wfn.mo, S_ao, (lambda - last_lambda) / (last_lambda - prev_lambda));
+		//one SCF at this lambda and, when it converged, its row and its files
 		bool converged = run_lambda(hf, lambda, wfn, has_guess, true);
 		//after the first step, so that density-following shares are the scheme's
-		if (step == 0 && converged && tuning("NOSPHERA2_XCW_ADJOINT_CHECK") && sf.XG.mode == 1)
+		if (step == 0 && converged && tuning("NOSPHERA2_XCW_ADJOINT_CHECK"))
 			sf.check_adjoint();
 		if (!converged && step > 0)
 			converged = approach_lambda(hf, lambda, min_lambda_step, last_lambda, last_wfn, wfn);
@@ -788,14 +782,6 @@ void XCW_wrapper::run() {
 	}
 	if (opt->xcw_settings.xcw_gaussian_halt)
 		report_gaussian_halting_summary();
-	//The background writer of the I tensor holds a file and reads the resident tensor: joined
-	//before the run ends, it cannot outlive the process
-	sf.finish_i_save();
-#if defined(NOSPHERA2_USE_GPU) || defined(NOSPHERA2_USE_METAL)
-	//GPU: gives the device copy of the I tensor back
-	itensor_gpu_release();
-	sf.I_tens.i_on_device_ = false;
-#endif
 #ifdef NOSPHERA2_USE_GPU
 	//GPU: gives the grid blocks back
 	xcw_grid_gpu_release();

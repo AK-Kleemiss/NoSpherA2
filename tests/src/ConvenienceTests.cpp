@@ -1099,30 +1099,27 @@ TEST(ConvenienceOptionsTests, IsosurfaceAndAnalysisOptionsReadOptionalValues)
 // the gpu and xcw toggles flip their fields, the numeric ones read a value
 TEST(ConvenienceOptionsTests, GpuAndXcwTogglesFlipTheirFields)
 {
-	const options opt = parse({ "-no_gpu", "-gpu_fp64", "-gpu_fp32", "-no_gpu_itensor", "-gpu_itensor_tensor", "-no_gpu_cublas",
+	const options opt = parse({ "-no_gpu", "-gpu_fp64", "-gpu_fp32", "-no_gpu_itensor", "-no_gpu_cublas",
 		"-no_gpu_salted", "-no_gpu_grid", "-no_gpu_density", "-gpu_blas", "-no_cpu_itensor_fp32",
-		"-itensor_hybrid", "-no_xcw_extrapolate", "-xcw_incremental", "-xcw_int_precision", "1e-12",
+		"-no_xcw_extrapolate", "-xcw_incremental", "-xcw_int_precision", "1e-12",
 		"-do_XCW", "-XCW_settings", "settings.toml" });
 	EXPECT_FALSE(opt.use_gpu);
 	EXPECT_TRUE(opt.gpu_fp64);
 	EXPECT_TRUE(opt.gpu_fp32);
 	EXPECT_FALSE(opt.gpu_itensor);
-	EXPECT_TRUE(opt.gpu_itensor_tensor);
 	EXPECT_FALSE(opt.gpu_cublas);
 	EXPECT_FALSE(opt.gpu_salted);
 	EXPECT_FALSE(opt.gpu_grid);
 	EXPECT_FALSE(opt.gpu_density);
 	EXPECT_TRUE(opt.gpu_blas);
 	EXPECT_FALSE(opt.cpu_itensor_fp32);
-	EXPECT_TRUE(opt.itensor_hybrid);
 	EXPECT_FALSE(opt.xcw_extrapolate);
 	EXPECT_TRUE(opt.xcw_incremental);
 	EXPECT_NEAR(opt.xcw_int_precision, 1e-12, 1e-25);
 	EXPECT_TRUE(opt.do_XCW);
 	EXPECT_EQ(opt.xcw_settings_path, std::filesystem::path("settings.toml"));
-	const options back = parse({ "-no_gpu_itensor", "-gpu_itensor", "-no_itensor_hybrid", "-xcw_extrapolate", "-no_xcw_incremental", "-gpu_cublas", "-gpu_grid", "-gpu_density", "-gpu_salted", "-cpu_itensor_fp32" });
+	const options back = parse({ "-no_gpu_itensor", "-gpu_itensor", "-xcw_extrapolate", "-no_xcw_incremental", "-gpu_cublas", "-gpu_grid", "-gpu_density", "-gpu_salted", "-cpu_itensor_fp32" });
 	EXPECT_TRUE(back.gpu_itensor);
-	EXPECT_FALSE(back.itensor_hybrid);
 	EXPECT_TRUE(back.xcw_extrapolate);
 	EXPECT_FALSE(back.xcw_incremental);
 	EXPECT_TRUE(back.gpu_cublas);

@@ -47,10 +47,10 @@ protected:
 
 	using scf_t = occ::qm::SCF<occ::qm::HartreeFock>;
 
-	// The model term, nothing in the plain SCF. evaluate_model sees the current density before every
+	// The model term, nothing in the plain SCF. evaluate_model_term sees the current density before every
 	// Fock build (timed from an SCF iteration, not from a TRAH rebuild); model_energy is the term the
 	// functional adds to E and add_model_fock its derivative, added to the Fock matrix
-	virtual void evaluate_model(const scf_t& scf, const bool timed) {}
+	virtual void evaluate_model_term(const scf_t& scf, const bool timed) {}
 	virtual double model_energy() const { return 0.0; }
 	virtual void add_model_fock(occ::Mat& F) const {}
 	// The model's part of the Hessian-vector product for the density change dD, added to dF

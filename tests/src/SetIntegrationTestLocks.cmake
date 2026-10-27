@@ -110,21 +110,20 @@ set_tests_properties(
     TomlIntegrationTests.P1_F2_test_XCW_h2
     TomlIntegrationTests.P1_F2_test_XCW_full
     TomlIntegrationTests.P1_F2_test_XCW_h2_full
-    TomlIntegrationTests.P1_test_XCW_gpu_itensor
     TomlIntegrationTests.P1_test_XCW_incremental
     PROPERTIES
         RESOURCE_LOCK integration_P1_test
 )
-# P1_test_XCW saves the subset's I tensor as tests/P1_test/p1_i.bin and its two-electron integrals as p1_eri.bin;
-# the other subset goldens read them
-set_tests_properties(TomlIntegrationTests.P1_test_XCW PROPERTIES FIXTURES_SETUP xcw_p1_golden_tensor)
+# P1_test_XCW saves the P1 molecule's stored two-electron integrals as tests/P1_test/p1_eri.bin; the other subset
+# goldens read them
+set_tests_properties(TomlIntegrationTests.P1_test_XCW PROPERTIES FIXTURES_SETUP xcw_p1_golden_eri)
 set_tests_properties(
     TomlIntegrationTests.P1_test_XCW_h2
     TomlIntegrationTests.P1_F2_test_XCW
     TomlIntegrationTests.P1_F2_test_XCW_h2
     TomlIntegrationTests.P1_test_XCW_incremental
     PROPERTIES
-        FIXTURES_REQUIRED xcw_p1_golden_tensor
+        FIXTURES_REQUIRED xcw_p1_golden_eri
 )
 
 # Tests using tests/epoxide_gbw: all of them write NoSpherA2.log there, the SF_* ones
@@ -164,16 +163,16 @@ set_tests_properties(
         RESOURCE_LOCK tests_src_cwd
 )
 
-# XcwScfTests.SharedTensorBuild writes the P1 subset's I tensor and stored two-electron integrals into
-# NOS_TEST_SHARED_DIR; these runs test the SCF, not the tensor, and read them instead of each building the same.
-# SaveThenRead and the three halting-report runs on the P1 subset build their tensors and read only the integrals
+# XcwScfTests.SharedEriBuild writes the P1 molecule's stored two-electron integrals into NOS_TEST_SHARED_DIR;
+# these runs test the SCF, not the integrals, and read them instead of each building the same
 set_tests_properties(
-    XcwScfTests.SharedTensorBuild
+    XcwScfTests.SharedEriBuild
     PROPERTIES
-        FIXTURES_SETUP xcw_p1_tensor
+        FIXTURES_SETUP xcw_p1_eri
 )
 set_tests_properties(
-    XcwScfTests.StreamedTensorMatchesInMemory
+    XcwScfTests.LambdaZeroIsTheHartreeFockEnergy
+    XcwScfTests.LambdaPointZeroOneRaisesTheEnergy
     XcwScfTests.OrbitalJsonOverridesMatchTheLibraryBasis
     XcwScfTests.SmallBasisGuessStartsFromConvergedDensity
     XcwScfTests.UnrestrictedClosedShellAgainstF2MatchesRestricted
@@ -181,14 +180,12 @@ set_tests_properties(
     XcwScfTests.FiveIterationsAreDeterministicAndPhysical
     XcwScfTests.MaxIterOneStopsScanWithoutTscb
     XcwScfTests.ISigmaCutoffShrinksFitSetAndReportsAllReflections
-    XcwScfTests.SlowConvStartsFromTheNormalSchedule
+    XcwScfTests.SlowConvDampsFromTheFirstStep
     XcwScfTests.ScaleIsStationaryForTheCriterion
     XcwScfTests.SecondOrderStepsReachTheGoldenEnergy
     XcwScfTests.HessianVectorProductMatchesFiniteDifference
-    XcwScfTests.SaveThenReadTensorReproducesLambdaZero
     XcwHaltingReportTests.HaltingReportsAcrossTheExtendedLambdaScan
-    XcwHaltingReportTests.StreamedTensorRoundTrip
-    XcwHaltingReportTests.StreamedTensorIsSavedWhereSaveSays
+    XcwHaltingReportTests.TooFewStrongReflectionsSkipTheHalting
     PROPERTIES
-        FIXTURES_REQUIRED xcw_p1_tensor
+        FIXTURES_REQUIRED xcw_p1_eri
 )

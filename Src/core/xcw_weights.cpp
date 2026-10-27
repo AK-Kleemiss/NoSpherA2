@@ -7,7 +7,7 @@
 #include "tuning.h"
 
 //TFVC, MBIS and EMBIS shares on XCW's grid from the density the SCF carries, see structure_factors::xcw_grid. The fits are
-//the stand-alone ones, make_chi, make_MBIS_vectors and make_EMBIS_tensors, on build_I's points, each MBIS/EMBIS fit
+//the stand-alone ones, make_chi, make_MBIS_vectors and make_EMBIS_tensors, on setup_grid's points, each MBIS/EMBIS fit
 //starting from the last. Their response to rho is left out of the perturbation: within an evaluation the shares are fixed
 struct xcw_weights {
 	PartitionType part = PartitionType::Hirshfeld;

@@ -109,9 +109,9 @@ Useful environment variables:
 - `NOS_EXE` - path to the executable for Python tests.
 - `OCC_DATA_PATH` - OCC runtime data directory. CTest defaults this to `occ/share`; local Windows Python runs commonly need `D:\git\NoSpherA2\Lib\occ\share\occ` or the current equivalent.
 - `RUN_FULL_TEST` - truthy value enables slow/full Python integration tests.
-- `NOS_TEST_SHARED_DIR` - set by ctest for every gtest (`<build>/tests/src/shared`). `XcwScfTests.SharedTensorBuild`
-  writes the P1 subset's I tensor there once (ctest fixture `xcw_p1_tensor`) and the XCW tests that test the SCF
-  rather than the tensor read it; a test binary run without it builds its own tensor, with the same numbers.
+- `NOS_TEST_SHARED_DIR` - set by ctest for every gtest (`<build>/tests/src/shared`). `XcwScfTests.SharedEriBuild`
+  writes the P1 molecule's stored two-electron integrals there once (ctest fixture `xcw_p1_eri`) and the XCW tests that
+  test the SCF read them; a test binary run without it builds its own, with the same numbers.
 - `OMP_WAIT_POLICY=PASSIVE` - set by the `test-base` test preset: ctest runs several tests at once and each opens a
   thread per core, so spinning idle OpenMP workers would take the cores the other tests compute on.
 
@@ -289,6 +289,13 @@ alternative is one flag away in each case.
 - New libcint parallel call sites should pre-allocate per-thread scratch buffers instead of passing `cache=nullptr` inside TBB parallel regions. Use the existing `three_center_max_cache_size<kind>` and `tbb::enumerable_thread_specific` pattern in OCC.
 
 ## Current Validation Notes
+
+As of 2026-10-27 (XCW refactor, run 2), the XCW I tensor route is gone: XCW runs on its integration grid only
+(`structure_factors::setup_grid` with `link_symmetry_equivalents`, `screen_ao_pairs`, `setup_atom_grids`,
+`build_grid_blocks`), the `safe`/`read`/`stream`/`i_tensor_mb`/`i_float` keywords are unknown, the subset goldens run on the
+grid, `-print_F` writes the `_Fcalc.txt` tables and `XCW_log_writer` carries the crystallographic log columns. `ctest --preset
+release-windows-tests -j 6` on a CPU-only build reports **1322 passed, 0 failed, 22 skipped** (2 disabled) of 1346, and the
+four `P1_*_full` goldens pass. See `UNIT_TESTS_STATUS.md` and `REFACTOR.md`.
 
 As of 2026-10-27 (XCW refactor merged with density_source `33fa9685`), the density-following TFVC/MBIS/EMBIS shares run in the
 new structure: their refit between solves, the lambda 0 fit and the share report in `XCW_wrapper`, `NOSPHERA2_XCW_ADJOINT_CHECK`

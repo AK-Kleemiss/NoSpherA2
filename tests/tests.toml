@@ -554,28 +554,20 @@ rgbi = ""
 # this also exercises the STO-3G L-shell fix (see UNIT_TESTS_STATUS.md) as a
 # real regression test, not just a manual smoke test.
 #
-# Every XCW test below pins no_gpu, for the reference output rather than for speed. The I
-# tensor runs on the device by default now, and the device answer differs from the CPU one
+# Every XCW test below pins no_gpu, for the reference output rather than for speed. The grid
+# block products run on the device by default, and the device answer differs from the CPU one
 # in the tenth significant figure - enough to change these logs. Left unpinned, each would
 # pass on a machine with no usable GPU and fail on one with a card, which is the same trap
-# the fp32/fp64 tests further down already document. P1_test_XCW_gpu_itensor is the
-# deliberate exception and carries its own reference.
+# the fp32/fp64 tests further down already document.
 #
 # P1_subset.hkl is every 8th reflection of P1_test.hkl (402 of 3215), the same subset
-# XcwScfTests builds. The I tensor costs 3 s on it instead of 100+ s, and the seven
-# non-full cases below run on it: the Hartree-Fock energy at lambda 0 is unchanged, the
-# GooFs and the lambda trajectory are those of the subset. The RUN_FULL_TEST scans and
-# the GPU I tensor case keep the full hkl - their goldens record the halting criterion
-# and the device path on the real data set. The goldens carry the -all_charges default,
-# so the TFVC pass in each tscb creation is part of them: from lambda 0.04 on the subset
-# density has no minimum along N8-H8 and the F/F2 scans log its 'Unexpected number of
-# extrema (0)' line twice.
-# P1_test_XCW builds the subset's I tensor and saves it to p1_i.bin; the other subset goldens
-# read it (ctest fixture xcw_p1_golden_tensor). Reading prints one line in place of the build's
-# seven and leaves every number as the build gives it. Saving or reading keeps a case on the
-# tensor; everything else runs on the grid (Fourier-Bessel) route that is now the default, so
-# the four RUN_FULL_TEST scans record the grid and P1_test_XCW_gpu_itensor pins the tensor. The stored two-electron integrals go the
-# same way through p1_eri.bin (save_eri / read_eri), which only XCW.log mentions.
+# XcwScfTests builds, and the five non-full cases below run on it: the Hartree-Fock energy at
+# lambda 0 is unchanged, the GooFs and the lambda trajectory are those of the subset. The
+# RUN_FULL_TEST scans keep the full hkl - their goldens record the halting criterion on the
+# real data set. The goldens carry the -all_charges default, so the TFVC pass in each tscb
+# creation is part of them.
+# P1_test_XCW saves the stored two-electron integrals to p1_eri.bin (save_eri); the other subset
+# goldens read them (read_eri, ctest fixture xcw_p1_golden_eri), which only SCF.log mentions.
 
 [P1_test_XCW]
 directory = "P1_test"
@@ -721,8 +713,7 @@ no_date = ""
 
 # GPU variants. These run only when a device is present; the test skips otherwise, so
 # the suite stays green on a CPU-only machine. The grid-weight path is bit-identical to
-# the CPU, so it reuses the CPU reference; the I tensor path is single-precision and
-# carries its own.
+# the CPU, so it reuses the CPU reference.
 
 # Its own reference rather than the CPU one, and deliberately so. The weights themselves
 # are bit-identical - the only line that differs is the note saying the device ran them -
@@ -747,24 +738,6 @@ acc = 1
 gpu_grid = ""
 # The reference carries the GPU note, so this case keeps it where every other test drops it.
 no_date_but_gpu = ""
-
-[P1_test_XCW_gpu_itensor]
-directory = "P1_test"
-good = "P1_test_XCW_gpu_itensor.good"
-
-[P1_test_XCW_gpu_itensor.args]
-do_XCW = ""
-cif = "P1_test.cif"
-hkl = "P1_test.hkl"
-XCW_settings = "test_settings.txt"
-no_date = ""
-gpu_itensor = ""
-# The device GEMM is cuBLAS when the machine has it and CUTLASS otherwise, and the two
-# disagree in the last digits. Pinned to CUTLASS because that is the one always present:
-# left to choose, this test would pass or fail on whether a CUDA toolkit was installed.
-no_gpu_cublas = ""
-# The device I tensor is what this case is about, and XCW now runs on the grid unless told otherwise.
-tune = "NOSPHERA2_XCW_GRID=0"
 
 # The two sincos kernels, each pinned rather than left to the card. Without the explicit
 # flags the precision a run gets depends on the reported fp32:fp64 ratio, so on a consumer

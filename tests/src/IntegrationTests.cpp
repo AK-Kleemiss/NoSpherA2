@@ -539,10 +539,10 @@ TEST(TomlIntegrationTests, P1_test_XCW)
 	EXPECT_TRUE(result.success) << result.message;
 }
 
-// The other subset goldens read the I tensor P1_test_XCW saves; outside ctest's fixture order they make it first
-static void ensure_p1_tensor()
+// The other subset goldens read the stored integrals P1_test_XCW saves; outside ctest's fixture order they make them first
+static void ensure_p1_eri()
 {
-	if (!std::filesystem::exists(get_repo_root() / "tests" / "P1_test" / "p1_i.bin"))
+	if (!std::filesystem::exists(get_repo_root() / "tests" / "P1_test" / "p1_eri.bin"))
 		run_inprocess_test(get_repo_root(), "P1_test_XCW");
 }
 
@@ -571,16 +571,6 @@ TEST(TomlIntegrationTests, sucrose_SF_gpu_grid)
 		GTEST_SKIP() << "No GPU device present; the -gpu_grid path cannot run here";
 	}
 	const UT_Result result = run_inprocess_test(get_repo_root(), "sucrose_SF_gpu_grid");
-	EXPECT_TRUE(result.success) << result.message;
-}
-
-// The I tensor contracts in single precision, which moves the total energy, hence its own reference.
-TEST(TomlIntegrationTests, P1_test_XCW_gpu_itensor)
-{
-	if (!gpu_device_present()) {
-		GTEST_SKIP() << "No GPU device present; the -gpu_itensor path cannot run here";
-	}
-	const UT_Result result = run_inprocess_test(get_repo_root(), "P1_test_XCW_gpu_itensor");
 	EXPECT_TRUE(result.success) << result.message;
 }
 
@@ -617,7 +607,7 @@ TEST(TomlIntegrationTests, P1_test_XCW_full)
 // classical GoF^2 (see Src/core/xcw_halting.h and structure_factors::ensure_inv_H2_weights).
 TEST(TomlIntegrationTests, P1_test_XCW_h2)
 {
-	ensure_p1_tensor();
+	ensure_p1_eri();
 	const UT_Result result = run_inprocess_test(get_repo_root(), "P1_test_XCW_h2");
 	EXPECT_TRUE(result.success) << result.message;
 }
@@ -634,7 +624,7 @@ TEST(TomlIntegrationTests, P1_test_XCW_h2_full)
 
 TEST(TomlIntegrationTests, P1_F2_test_XCW)
 {
-	ensure_p1_tensor();
+	ensure_p1_eri();
 	const UT_Result result = run_inprocess_test(get_repo_root(), "P1_F2_test_XCW");
 	EXPECT_TRUE(result.success) << result.message;
 }
@@ -643,7 +633,7 @@ TEST(TomlIntegrationTests, P1_F2_test_XCW)
 // the goldens equal the full builds to SCF convergence, so a broken segment skip shows here.
 TEST(TomlIntegrationTests, P1_test_XCW_incremental)
 {
-	ensure_p1_tensor();
+	ensure_p1_eri();
 	const UT_Result result = run_inprocess_test(get_repo_root(), "P1_test_XCW_incremental");
 	EXPECT_TRUE(result.success) << result.message;
 }
@@ -659,7 +649,7 @@ TEST(TomlIntegrationTests, P1_F2_test_XCW_full)
 
 TEST(TomlIntegrationTests, P1_F2_test_XCW_h2)
 {
-	ensure_p1_tensor();
+	ensure_p1_eri();
 	const UT_Result result = run_inprocess_test(get_repo_root(), "P1_F2_test_XCW_h2");
 	EXPECT_TRUE(result.success) << result.message;
 }

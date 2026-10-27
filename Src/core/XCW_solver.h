@@ -7,25 +7,26 @@ struct fit_quality {
 };
 
 // What the SCF needs from the structure factors, implemented by XCW_wrapper so that the SCF never
-// sees the structure factors, the I tensor or the reflection data
+// sees the structure factors, the grid or the reflection data
 class SCF_coupling {
 
 public:
 
 	virtual ~SCF_coupling() = default;
-	// F_calc, scale and criteria of the effective density
-	virtual void evaluate(const dMatrix2& dm_eff) = 0;
-	// The perturbation matrix of the last evaluate, nmo rows per spin block
-	virtual void perturbation(occ::Mat& perturb, const bool unrestricted) = 0;
-	virtual fit_quality quality() const = 0;
+	// F_calc, scale and the crystallographic refinement criteria of the effective density
+	virtual void evaluate_cryst_crit(const dMatrix2& dm_eff) = 0;
+	// The criteria evaluate_cryst_crit found
+	virtual fit_quality cryst_crit() const = 0;
+	// The perturbation matrix, the derivative of chi^2 at the last evaluate_cryst_crit, nmo rows per spin block
+	virtual void perturbation_matrix(occ::Mat& perturb, const bool unrestricted) = 0;
 	// lambda times the change of the perturbation matrix for a change of the effective density,
 	// the scale moving along; leaves F_calc and the scale as they were
-	virtual occ::Mat perturbation_response(const dMatrix2& dD_eff, const double lambda) = 0;
+	virtual occ::Mat perturbation_matrix_response(const dMatrix2& dD_eff, const double lambda) = 0;
 	// F_calc and scale as they are now, and back
-	virtual void save_state() = 0;
-	virtual void restore_state() = 0;
-	// Whether the I tensor is walked on the device, for the timing record
-	virtual bool on_device() const = 0;
+	virtual void save_F_calc() = 0;
+	virtual void restore_F_calc() = 0;
+	// Whether the grid blocks are on the device, for the timing record
+	virtual bool grid_on_device() const = 0;
 };
 
 // The SCF of one lambda step of the X-ray constrained wavefunction fit: it minimises
@@ -36,21 +37,21 @@ class XCW_solver : public SCF_solver {
 public:
 
 	XCW_solver() = default;
-	XCW_solver(const occ::core::Molecule& mol, const occ::qm::AOBasis& basis, const options::SCF_settings& settings, SCF_log_writer& writer, SCF_coupling& coupling);
+	XCW_solver(const occ::core::Molecule& mol, const occ::qm::AOBasis& basis, const options::SCF_settings& settings, XCW_log_writer& writer, SCF_coupling& coupling);
 
 	// The weight of chi^2, set before every run
 	double lambda = 0.0;
 
 protected:
 
-	void evaluate_model(const scf_t& scf, const bool timed) override;
+	void evaluate_model_term(const scf_t& scf, const bool timed) override;
 	double model_energy() const override;
 	void add_model_fock(occ::Mat& F) const override;
 	void add_model_response(const scf_t& scf, const occ::Mat& dD, occ::Mat& dF) override;
 	bool model_active() const override { return lambda != 0; }
 	void save_model_state() override;
 	void restore_model_state() override;
-	void begin_log() override { writer_->start_lambda(lambda); }
+	void begin_log() override { xcw_writer_->start_lambda(lambda); }
 	void log_iteration(const scf_t& scf) override;
 	void end_log(const scf_t& scf) override;
 	std::string functional_name() const override { return "E + lambda chi^2"; }
@@ -58,7 +59,9 @@ protected:
 private:
 
 	SCF_coupling* coupling_ = nullptr;
-	// The perturbation matrix and the fit quality at the density of the last evaluate_model, and their saved copies
+	// The same writer as writer_, with the crystallographic columns
+	XCW_log_writer* xcw_writer_ = nullptr;
+	// The perturbation matrix and the fit quality at the density of the last evaluate_model_term, and their saved copies
 	occ::Mat perturbation_, saved_perturbation_;
 	fit_quality fit_{}, saved_fit_{};
 	// E + lambda chi of the last iteration, the target quantity of the log

@@ -211,7 +211,7 @@ void generate_fractional_hkl(
  * @param debug Flag indicating whether to enable debug mode.
  */
 /**
- * @brief Negligible magnitude at a -acc level, shared so the XCW I tensor screens AO
+ * @brief Negligible magnitude at a -acc level, shared so the XCW grid screens AO
  * contributions on the same terms as the scattering factors.
  */
 double cutoff(const int& accuracy);

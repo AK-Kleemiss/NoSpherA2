@@ -1,14 +1,12 @@
 //XCW: the Gaussian halting reports (evaluate_gaussian_halting, the progress estimate and
-//the summary), the disk-backed I tensor (decide_i_storage / i_budget / start_i_save /
-//finish_i_save / open_i_stream_for_reading) and the grown branch of the structure_factors
-//constructor, all driven through XCW_wrapper::run() on a 402-reflection subset of the P1 fixture that each
-//test writes into its own scratch directory. XcwTests.cpp owns the halting maths and the
+//the summary) and the grown branch of the structure_factors constructor, all driven through
+//XCW_wrapper::run() on a 402-reflection subset of the P1 fixture that each test writes into its
+//own scratch directory. XcwTests.cpp owns the halting maths and the
 //settings parser; nothing here repeats those.
 #include "pch.h"
 #include <gtest/gtest.h>
 
 #include <array>
-#include <cstdint>
 #include <iomanip>
 #include <set>
 #include <string>
@@ -18,9 +16,7 @@
 #include "core/convenience.h"
 #include "core/cell.h"
 #include "core/scattering_factors.h"
-#include "core/i_tensor_stream.h"
 #include "core/XCW_wrapper.h"
-#include "core/tuning.h"
 
 namespace {
 
@@ -128,7 +124,7 @@ namespace {
 		}
 	}
 
-	//The P1 molecule's stored two-electron integrals, which XcwScfTests.SharedTensorBuild writes under ctest; without
+	//The P1 molecule's stored two-electron integrals, which XcwScfTests.SharedEriBuild writes under ctest; without
 	//them the run builds its own, with the same numbers
 	std::string shared_eri(const std::filesystem::path& dir)
 	{
@@ -183,45 +179,14 @@ namespace {
 		return fields;
 	}
 
-	//"Screened out S unique pairs" -> S; with no_date off eval_I prints its own
-	//"Screened out D of C AO-block entries" line first, so the pairs line is located by its tail
-	long long screened_pairs(const std::string& cout_text)
-	{
-		const std::string key = "Screened out ";
-		const size_t tail = cout_text.find(" unique pairs of mu, nu");
-		if (tail == std::string::npos) {
-			return -1;
-		}
-		const size_t pos = cout_text.rfind(key, tail);
-		if (pos == std::string::npos) {
-			return -1;
-		}
-		return std::stoll(cout_text.substr(pos + key.size()));
-	}
-
-	//nmo for sto-3g on the P1 molecule: 2 S x 9 + Cl 9 + 7 C x 5 + 4 O x 5 + 3 N x 5 + 6 H x 1
-	constexpr int P1_NMO = 103;
-	constexpr long long P1_PAIRS = static_cast<long long>(P1_NMO) * (P1_NMO + 1) / 2;
-	//i_tensor_file header: 5 int64 fields, then pair_mu and pair_nu as int32 each
-	constexpr std::uintmax_t HEADER_FIXED_BYTES = 40;
-
 	const std::string RUN_BASE = "sloppy normal_conv params 177 basis_set sto-3g max_iter 100 F charge 0 mult 1 rhf start 0 step_size 0.01 ";
-
-	//-mem small enough to stream the tensor leaves no room for the stored integrals; the streaming is under test, not the direct Fock build
-	struct eri_unbudgeted {
-		std::string old; bool had = false;
-		eri_unbudgeted() { if (const char *e = tuning("NOSPHERA2_XCW_ERI_NO_BUDGET")) { old = e; had = true; } set_tuning("NOSPHERA2_XCW_ERI_NO_BUDGET", "1"); }
-		~eri_unbudgeted() { set_tuning("NOSPHERA2_XCW_ERI_NO_BUDGET", had ? old.c_str() : nullptr); }
-	};
 
 }
 
 //Six requested lambda steps with the halting criterion on. A^2 never turns upward on this
 //fixture, so the scan extends itself by its cap of six more steps: a per-lambda block for each
 //of the twelve, progress updates after the fifth and tenth, the summary table with twelve rows
-//and the final recommendation on both streams; the double-precision tensor is held in memory
-//under the i_tensor_mb budget and saved on the writer thread, and a second run reads it back
-//instead of rebuilding it.
+//and the final recommendation on both streams.
 TEST(XcwHaltingReportTests, HaltingReportsAcrossTheExtendedLambdaScan)
 {
 	if (!fixture_present()) {
@@ -233,7 +198,7 @@ TEST(XcwHaltingReportTests, HaltingReportsAcrossTheExtendedLambdaScan)
 	ASSERT_EQ(n_written, 402);
 	ASSERT_GE(n_strong, 8);
 
-	options opt = make_options(dir, RUN_BASE + "end 0.05 i_tensor_mb 4096 safe itensor.bin gaussian_halt" + shared_eri(dir));
+	options opt = make_options(dir, RUN_BASE + "end 0.05 gaussian_halt" + shared_eri(dir));
 	opt.cpu_itensor_fp32 = false;
 	const std::string out = run_xcw(dir, opt);
 	const std::string log = read_file(dir / "SCF.log");
@@ -284,71 +249,18 @@ TEST(XcwHaltingReportTests, HaltingReportsAcrossTheExtendedLambdaScan)
 	const std::string summary_a2 = log.substr(a2_start, log.find('\t', a2_start) - a2_start);
 	EXPECT_EQ(row0[9], summary_a2);
 
-	//decide_i_storage: held, double precision, budget named
-	EXPECT_NE(out.find("I tensor held in memory: "), std::string::npos) << out;
-	EXPECT_NE(out.find(" MB (fits the 4096.00 MB i_tensor_mb budget)"), std::string::npos) << out;
-	EXPECT_EQ(out.find("(single precision)"), std::string::npos);
-	EXPECT_EQ(out.find("I tensor streamed to disk"), std::string::npos);
-
-	//start_i_save / finish_i_save, the write finished before the run ends
-	EXPECT_NE(out.find("Writing the I tensor to itensor.bin in the background; a later run can `read itensor.bin` instead of building it"), std::string::npos) << out;
-	const size_t written = out.find("I tensor written to itensor.bin");
-	const size_t finished = out.find("Finished XCW fitting procedure.");
-	ASSERT_NE(written, std::string::npos) << out;
-	ASSERT_NE(finished, std::string::npos) << out;
-	EXPECT_LT(written, finished);
-	EXPECT_EQ(out.find("Could not write the I tensor"), std::string::npos);
-
-	//the file on disk has the header and nr blocks of kept complex doubles
-	const long long screened = screened_pairs(out);
-	ASSERT_GT(screened, 0) << out;
-	const size_t expected_kept = static_cast<size_t>(P1_PAIRS - screened);
-	size_t kept = 0;
-	bool single = true;
-	ASSERT_TRUE(std::filesystem::exists(dir / "itensor.bin"));
-	ASSERT_TRUE(i_tensor_file::matches(dir / "itensor.bin", n_written, P1_NMO, kept, single));
-	EXPECT_FALSE(single);
-	EXPECT_EQ(kept, expected_kept);
-	EXPECT_EQ(std::filesystem::file_size(dir / "itensor.bin"),
-		HEADER_FIXED_BYTES + 8 * static_cast<std::uintmax_t>(kept) + static_cast<std::uintmax_t>(n_written) * kept * 16);
-
-	//eval_I read branch: the saved tensor is loaded, not rebuilt, and gives the same rows
-	options opt2 = make_options(dir, RUN_BASE + "end 0.01 i_tensor_mb 4096 read itensor.bin gaussian_halt" + shared_eri(dir));
-	opt2.cpu_itensor_fp32 = false;
-	const std::string out2 = run_xcw(dir, opt2);
-	EXPECT_NE(out2.find("I tensor read from itensor.bin ("), std::string::npos) << out2;
-	EXPECT_NE(out2.find(" MB), not recomputed, held in memory"), std::string::npos) << out2;
-	EXPECT_EQ(out2.find("Screened out"), std::string::npos);
-	EXPECT_EQ(out2.find("Writing the I tensor"), std::string::npos);
-	EXPECT_EQ(out2.find("NOTE: the tensor on disk"), std::string::npos);
-	for (const std::string lambda : { "0.00000", "0.01000" }) {
-		const std::vector<std::string> a = table_row(out, lambda);
-		const std::vector<std::string> b = table_row(out2, lambda);
-		ASSERT_EQ(a.size(), 10u) << out;
-		ASSERT_EQ(b.size(), 10u) << out2;
-		EXPECT_NEAR(std::stod(a[1]), std::stod(b[1]), 2e-3) << "criterion at " << lambda;
-		EXPECT_NEAR(std::stod(a[2]), std::stod(b[2]), 2e-3) << "GooF at " << lambda;
-		EXPECT_NEAR(std::stod(a[3]), std::stod(b[3]), 1e-3) << "R1 at " << lambda;
-		EXPECT_NEAR(std::stod(a[4]), std::stod(b[4]), 1e-4) << "energy at " << lambda;
-		EXPECT_NEAR(std::stod(a[5]), std::stod(b[5]), 2e-3) << "perturbation at " << lambda;
-	}
-
 	if (!::testing::Test::HasFailure()) {
 		std::filesystem::remove_all(dir);
 	}
 }
 
-//A -mem budget below one reflection's block forces the single-precision tensor onto disk one
-//reflection at a time; the file appears at the default path with the right shape, a second run
-//with a bare `read` streams it back through open_i_stream_for_reading and reproduces the row.
 //The halting criterion with an impossible cutoff takes the "too few strong reflections" exit,
-//which the summary still lists and the recommendation stays silent about.
-TEST(XcwHaltingReportTests, StreamedTensorRoundTrip)
+//which the summary still lists and the recommendation stays silent about
+TEST(XcwHaltingReportTests, TooFewStrongReflectionsSkipTheHalting)
 {
 	if (!fixture_present()) {
 		GTEST_SKIP() << "P1 fixture missing under " << fixture_dir();
 	}
-	const eri_unbudgeted pin;
 	const auto dir = scratch_dir();
 	int n_written = 0, n_strong = 0;
 	write_subset_hkl(dir / "subset.hkl", n_written, n_strong, 1e9);
@@ -356,15 +268,8 @@ TEST(XcwHaltingReportTests, StreamedTensorRoundTrip)
 	ASSERT_EQ(n_strong, 0);
 
 	options opt = make_options(dir, RUN_BASE + "end 0 gaussian_halt strong_cutoff 1e9" + shared_eri(dir));
-	opt.mem_given = true;
-	opt.mem = 0.001;
 	opt.no_date = false;
-	//The streamed tensor is what is under test, and the grid default builds none
-	const char *grid = tuning("NOSPHERA2_XCW_GRID");
-	const std::string grid_old = grid ? grid : "";
-	set_tuning("NOSPHERA2_XCW_GRID", "0");
 	const std::string out = run_xcw(dir, opt);
-	set_tuning("NOSPHERA2_XCW_GRID", grid ? grid_old.c_str() : nullptr);
 	const std::string log = read_file(dir / "SCF.log");
 
 	//the skip branch of evaluate_gaussian_halting, then a summary row with n_used 0 and no lambda*
@@ -380,100 +285,9 @@ TEST(XcwHaltingReportTests, StreamedTensorRoundTrip)
 	ASSERT_EQ(row.size(), 10u) << out;
 	EXPECT_EQ(row[9], "0.0000");
 
-	//no_date off prints the integral timing
-	EXPECT_NE(out.find("Time taken for XCW integrals: "), std::string::npos) << out;
-
-	//decide_i_storage streamed branch with the -mem source and the one-at-a-time note
-	const std::regex streamed{ R"(I tensor streamed to disk: [0-9]+\.[0-9]{2} MB \(single precision\) total, 1 of 402 reflections resident \([0-9]+\.[0-9]{2} MB\) to fit -mem \(0\.00 MB\))" };
-	EXPECT_TRUE(std::regex_search(out, streamed)) << out;
-	const std::regex note{ R"(  NOTE: one reflection alone is [0-9]+\.[0-9]{2} MB, over the budget\. Running one at a time\.)" };
-	EXPECT_TRUE(std::regex_search(out, note)) << out;
-	EXPECT_EQ(out.find("I tensor held in memory"), std::string::npos);
-	EXPECT_EQ(out.find("Writing the I tensor"), std::string::npos);
+	//no_date off prints the grid setup's timing
+	EXPECT_NE(out.find("Time taken for AO values computation: "), std::string::npos) << out;
 	EXPECT_NE(out.find("Finished XCW fitting procedure."), std::string::npos);
-
-	//the default file, single precision, one block per reflection
-	const long long screened = screened_pairs(out);
-	ASSERT_GT(screened, 0) << out;
-	const size_t expected_kept = static_cast<size_t>(P1_PAIRS - screened);
-	const auto stream_file = dir / "I_tensor_stream.bin";
-	ASSERT_TRUE(std::filesystem::exists(stream_file));
-	size_t kept = 0;
-	bool single = false;
-	ASSERT_TRUE(i_tensor_file::matches(stream_file, n_written, P1_NMO, kept, single));
-	EXPECT_TRUE(single);
-	EXPECT_EQ(kept, expected_kept);
-	EXPECT_EQ(std::filesystem::file_size(stream_file),
-		HEADER_FIXED_BYTES + 8 * static_cast<std::uintmax_t>(kept) + static_cast<std::uintmax_t>(n_written) * kept * 8);
-
-	//read it back a window at a time under the same budget
-	options opt2 = make_options(dir, RUN_BASE + "end 0 read" + shared_eri(dir));
-	opt2.mem_given = true;
-	opt2.mem = 0.001;
-	const std::string out2 = run_xcw(dir, opt2);
-	EXPECT_NE(out2.find("I tensor read from I_tensor_stream.bin ("), std::string::npos) << out2;
-	EXPECT_NE(out2.find(" MB, single precision), not recomputed, read a window at a time"), std::string::npos) << out2;
-	EXPECT_EQ(out2.find("Screened out"), std::string::npos);
-	EXPECT_EQ(out2.find("I tensor streamed to disk"), std::string::npos);
-	const std::vector<std::string> row2 = table_row(out2, "0.00000");
-	ASSERT_EQ(row2.size(), 9u) << out2;
-	EXPECT_NEAR(std::stod(row[1]), std::stod(row2[1]), 2e-3);
-	EXPECT_NEAR(std::stod(row[2]), std::stod(row2[2]), 2e-3);
-	EXPECT_NEAR(std::stod(row[4]), std::stod(row2[4]), 1e-4);
-
-	if (!::testing::Test::HasFailure()) {
-		std::filesystem::remove_all(dir);
-	}
-}
-
-//`safe` on a tensor that has to be streamed: the stream is written into the safe file itself and
-//no default file appears. Read back under the same budget it streams with the window the budget
-//allows (one reflection, where the read used to take 64). A tensor that is read must not be saved
-//again: `read` with `safe` throws before the file is opened.
-TEST(XcwHaltingReportTests, StreamedTensorIsSavedWhereSaveSays)
-{
-	if (!fixture_present()) {
-		GTEST_SKIP() << "P1 fixture missing under " << fixture_dir();
-	}
-	const eri_unbudgeted pin;
-	const auto dir = scratch_dir();
-	int n_written = 0, n_strong = 0;
-	write_subset_hkl(dir / "subset.hkl", n_written, n_strong, 1e9);
-	ASSERT_EQ(n_written, 402);
-
-	options opt = make_options(dir, RUN_BASE + "end 0 safe saved.bin" + shared_eri(dir));
-	opt.mem_given = true;
-	opt.mem = 0.001;
-	const std::string out = run_xcw(dir, opt);
-	EXPECT_NE(out.find("I tensor streamed to disk: "), std::string::npos) << out;
-	EXPECT_NE(out.find("The streamed I tensor is saved in saved.bin; a later run can `read saved.bin` instead of building it"), std::string::npos) << out;
-	EXPECT_EQ(out.find("Writing the I tensor"), std::string::npos);
-	EXPECT_FALSE(std::filesystem::exists(dir / "I_tensor_stream.bin"));
-	size_t kept = 0;
-	bool single = false;
-	ASSERT_TRUE(i_tensor_file::matches(dir / "saved.bin", n_written, P1_NMO, kept, single));
-	const std::vector<std::string> row = table_row(out, "0.00000");
-	ASSERT_EQ(row.size(), 9u) << out;
-
-	options opt2 = make_options(dir, RUN_BASE + "end 0 read saved.bin" + shared_eri(dir));
-	opt2.mem_given = true;
-	opt2.mem = 0.001;
-	const std::string out2 = run_xcw(dir, opt2);
-	EXPECT_NE(out2.find("not recomputed, read a window at a time (1 of 402 reflections resident)"), std::string::npos) << out2;
-	const std::vector<std::string> row2 = table_row(out2, "0.00000");
-	ASSERT_EQ(row2.size(), 9u) << out2;
-	EXPECT_NEAR(std::stod(row[1]), std::stod(row2[1]), 2e-3);
-	EXPECT_NEAR(std::stod(row[4]), std::stod(row2[4]), 1e-4);
-
-	for (const std::string save : { "safe copy.bin", "safe saved.bin" }) {
-		options opt3 = make_options(dir, RUN_BASE + "end 0 read saved.bin " + save);
-		std::string what;
-		try { run_xcw(dir, opt3); }
-		catch (const std::runtime_error& e) { what = e.what(); }
-		EXPECT_NE(what.find("The I tensor is read from saved.bin and should not be saved again"), std::string::npos) << save << ": " << what;
-	}
-	EXPECT_FALSE(std::filesystem::exists(dir / "copy.bin"));
-	EXPECT_FALSE(std::filesystem::exists(dir / "I_tensor_stream.bin"));
 
 	if (!::testing::Test::HasFailure()) {
 		std::filesystem::remove_all(dir);

@@ -25,7 +25,6 @@
 #include "core/npy.h"
 #include "core/libCintMain.h"
 #include "core/throughput.h"
-#include "core/i_tensor_stream.h"
 #include "core/tsc_label_converter.h"
 #include "core/sphere_lebedev_rule.h"
 #include <occ/qm/hf.h>

@@ -97,13 +97,11 @@ bool SCF_solver::run(occ::qm::HartreeFock& hf, occ::qm::Wavefunction& wfn, const
 }
 
 void SCF_solver::begin_log() {
-	writer_->log << "Starting the " << label_ << " solver\n";
-	writer_->log << "____________________________________________________________________________________________________\n";
-	writer_->log << " Iteration\tTotal Energy (Eh)\n";
+	writer_->start_run(label_);
 }
 
 void SCF_solver::log_iteration(const scf_t& scf) {
-	writer_->log << " " << scf.iter << "\t\t\t" << std::fixed << std::setprecision(9) << scf.ctx.energy.at("total") << std::endl;
+	writer_->iteration_line(scf.iter, scf.ctx.energy.at("total"));
 }
 
 //The same walk as OCC's SOAD guess with a converged Hartree-Fock density in place of the
@@ -392,7 +390,7 @@ bool SCF_solver::SCF_iteration(scf_t& scf, double& alpha, double& quant_diff_mem
 	scf.iter++;
 	const occ::Mat dm_old = scf.ctx.mo.D;
 	//the model term at the density this iteration's Fock matrix is built from
-	evaluate_model(scf, true);
+	evaluate_model_term(scf, true);
 	scf.m_procedure.update_core_hamiltonian(scf.ctx.mo, scf.ctx.H);
 	scf.ctx.F = scf.ctx.H;
 	const _time_point fock_t0 = get_time();
@@ -899,7 +897,7 @@ double SCF_solver::rebuild_at(scf_t& scf, const occ::Mat& C_from, const occ::Vec
 		scf.ctx.mo.update_occupied_orbitals();
 		scf.ctx.mo.update_density_matrix();
 	}
-	evaluate_model(scf, false);
+	evaluate_model_term(scf, false);
 	builds_.rebuild++;
 	scf.ctx.F = scf.ctx.H + two_electron_fock(scf, false);
 	scf.update_scf_energy(false);
