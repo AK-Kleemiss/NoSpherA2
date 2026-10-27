@@ -1092,18 +1092,21 @@ std::vector<std::pair<vec, vec>> make_MBIS_vectors(
 	const vec3 &grid,
 	const ivec &num_grid_points,
 	const bool debug,
-	std::ostream &file)
+	std::ostream &file,
+	const std::vector<std::pair<vec, vec>> &start,
+	const double crit,
+	int *sweeps)
 {
 	using sp_vec = std::vector<std::pair<vec, vec>>;
 	const auto atoms = wavy.get_atoms();
 	vec charges(atoms.size(), 0.0);
 	vec last_charges(atoms.size(), 0.0);
 	vec zeros_6(6, 0.0);
-	sp_vec sig_pop_vector;
-	for (const auto &atom : atoms) {
-		sig_pop_vector.emplace_back(get_shsig_shpop(atom.get_charge()));
-	}
-	const double crit = 0.001;
+	sp_vec sig_pop_vector = start;
+	if (start.empty())
+		for (const auto &atom : atoms) {
+			sig_pop_vector.emplace_back(get_shsig_shpop(atom.get_charge()));
+		}
 	sp_vec copy_of_input = sig_pop_vector;
 	double varmax = 0, varsig = 0;
 	// Cache atom coordinates and charges to avoid repeated function calls
@@ -1129,6 +1132,7 @@ std::vector<std::pair<vec, vec>> make_MBIS_vectors(
 	//NOS_EXP_CRT: the CRT exp instead of exp_kernel, to measure the two against each other
 	const bool crt_exp = tuning("NOS_EXP_CRT") != nullptr;
 	for (size_t it = 0; it < 2000; it++) {
+		if (sweeps) *sweeps = static_cast<int>(it) + 1;
 		for (int j = 0; j < ncen; j++) {
 			std::fill(sig_pop_vector[j].first.begin(), sig_pop_vector[j].first.end(), 0.0);
 			std::fill(sig_pop_vector[j].second.begin(), sig_pop_vector[j].second.end(), 0.0);
@@ -1273,23 +1277,25 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
 	const ivec &num_grid_points,
 	const bool debug,
 	const std::vector<std::pair<vec, vec>> MBIS_vectors,
-	std::ostream &file)
+	std::ostream &file,
+	const std::vector<std::pair<vec2, vec>> &start,
+	const double crit,
+	int *sweeps)
 {
 	using sp_vec = std::vector<std::pair<vec2, vec>>;
-	const double crit = 0.001;
 	auto atoms = wavy.get_atoms();
 	vec charges(atoms.size(), 0.0);
 	vec last_charges(atoms.size(), 0.0);
 	double varmax = 0, varsig = 0;
-	sp_vec sig_pop_vector;
+	sp_vec sig_pop_vector = start;
 	vec zeros_6(6, 0.0);
 	sp_vec tens1, tens2;
-	if (MBIS_vectors.size() == 0) {
+	if (start.empty() && MBIS_vectors.size() == 0) {
 		for (auto &atom : atoms) {
 			sig_pop_vector.emplace_back(get_shalpha_shpop(atom.get_charge()));
 		}
 	}
-	else {
+	else if (start.empty()) {
 		for (auto &vector : MBIS_vectors) {
 			sig_pop_vector.emplace_back(std::make_pair(sigma_to_alpha(vector), vector.second));
 		}
@@ -1364,6 +1370,7 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
 	const bool becke = tuning("NOS_MBIS_BECKE") != nullptr;
 	const bool crt_exp = tuning("NOS_EXP_CRT") != nullptr;
 	for (size_t it = 0; it < 2000; it++) {
+		if (sweeps) *sweeps = static_cast<int>(it) + 1;
 		for (int j = 0; j < ncen; j++) {
 			std::fill(sig_pop_vector[j].first.begin(), sig_pop_vector[j].first.end(), zeros_6);
 			std::fill(sig_pop_vector[j].second.begin(), sig_pop_vector[j].second.end(), 0.0);

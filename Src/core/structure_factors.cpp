@@ -647,6 +647,10 @@ structure_factors::I_tensor& structure_factors::eval_I(const occ::gto::AOBasis& 
 	// Creates the primitive data for each shell, needed to compute the I tensor
 	std::vector<structure_factors::ao_data> ao_data_shells;
 	create_prims(ao_data_shells, aobasis);
+	const bool share = opt->partition_type == PartitionType::TFVC || opt->partition_type == PartitionType::MBIS || opt->partition_type == PartitionType::EMBIS;
+	const char* xg = tuning("NOSPHERA2_XCW_GRID");
+	err_checkf(!share || ((!xg || std::atoi(xg) == 1) && !I_tens.read_tensor && I_tens.i_tensor_save_path.empty()),
+		"TFVC, MBIS and EMBIS shares follow the density, which a tensor cannot: XCW runs them on the grid, without read, safe or NOSPHERA2_XCW_GRID", std::cout);
 
 	bool single_on_disk = false;
 	// Path for reading the I tensor from disk
@@ -707,6 +711,7 @@ structure_factors::I_tensor& structure_factors::eval_I(const occ::gto::AOBasis& 
 		long long screen_counter = 0;
 		long long skipped_grids = 0;
 		build_I(ao_data_shells, time_taken, screen_counter, skipped_grids);
+		if (share) setup_grid_weights(aobasis);
 		if (!(opt->no_date)) {
 			std::cout << std::fixed << std::setprecision(2) << "Time taken for XCW integrals: " << time_taken << " seconds. \n";
 		}
@@ -877,9 +882,12 @@ void structure_factors::build_I(const std::vector<ao_data>& ao_data_shells, doub
 	cvec2 XCW_integral_old;
 
 	// Grid setup
+	//TFVC, MBIS and EMBIS shares need rho: the grid is Hirshfeld's, plain atom weights and pruned on the promolecule, and
+	//setup_grid_weights takes it from there
+	const bool share = opt->partition_type == PartitionType::TFVC || opt->partition_type == PartitionType::MBIS || opt->partition_type == PartitionType::EMBIS;
 	GridConfiguration config;
 	config.accuracy = opt->accuracy;
-	config.partition_type = opt->partition_type;
+	config.partition_type = share ? PartitionType::Hirshfeld : opt->partition_type;
 	config.no_density_eval = true;
 	config.pbc = opt->pbc;
 	config.debug = opt->debug;
@@ -1582,6 +1590,8 @@ void structure_factors::build_I(const std::vector<ao_data>& ao_data_shells, doub
 		auto take = [keep](auto& a) -> std::decay_t<decltype(a)> { if (keep) return a; return std::move(a); };
 		XG.blocks = take(grid_blocks);
 		XG.d1 = take(d1); XG.d2 = take(d2); XG.d3 = take(d3); XG.w = take(weights);
+		XG.w0.clear();
+		for (int g = 0; share && g < n_atom_grids; g++) XG.w0.emplace_back(grids[g][GridData::GridIndex::WEIGHT].begin(), grids[g][GridData::GridIndex::WEIGHT].begin() + points[g]);
 		XG.skip = take(skip); XG.lookup = take(asym_lookup); XG.inversion_link = take(inversion_link);
 		XG.clean_of = take(clean_of); XG.is_inverse = take(is_inverse);
 		plan_grid_fb(layout);
@@ -2338,7 +2348,7 @@ void structure_factors::contract_tensor(occ::Mat& out, const cvec& pre) {
 //partition: its per-atom transform at D is the table, so after the first step, whose tsc-route table
 //gives the layout, no second grid, no WFN pass and no tsc machinery run per lambda.
 //NOSPHERA2_XCW_GRID_TSCB_OLD keeps the tsc route on every step
-itsc_block structure_factors::result_table(const occ::Mat& D_wfn, std::vector<WFN>& wavefunctions, std::ostream& log) {
+itsc_block structure_factors::result_table(const occ::Mat& D_wfn, std::vector<WFN>& wavefunctions, std::ostream& log, const bool refit_shares) {
 	itsc_block result;
 	const bool grid_tscb = XG.mode == 1 && !opt->electron_diffraction && !tuning("NOSPHERA2_XCW_GRID_TSCB_OLD");
 	cvec sfc;
@@ -2354,7 +2364,9 @@ itsc_block structure_factors::result_table(const occ::Mat& D_wfn, std::vector<WF
 		dMatrix2 D(n, n);
 		for (int i = 0; i < n; i++)
 			for (int j = 0; j < n; j++) D(i, j) = D_wfn(i, j) + (unrestricted ? D_wfn(i + n, j) : 0.0);
+		XG.refresh = XG.ws && refit_shares;
 		sfc = grid_sfc(D);
+		XG.refresh = false;
 	}
 	if (grid_tscb && !tscb_scat_.empty()) {
 		cvec2 table(tscb_scat_.size(), cvec(tscb_entry_.size()));
@@ -2394,8 +2406,9 @@ itsc_block structure_factors::result_table(const occ::Mat& D_wfn, std::vector<WF
 				worst = std::max(worst, dmax / fmax);
 			}
 			//1e-2 only catches a wrong layout; how well grid and tsc agree is what NOSPHERA2_XCW_GRID_FCHECK measures
-			//the RI partition is not the tsc route's, so there the closest atom is all the layout can be matched by
-			ok = ok && (worst < 1e-2 || XR.on);
+			//the RI partition is not the tsc route's, nor are shares fit tighter than the stand-alone MBIS and EMBIS stop, so there
+			//the closest atom is all the layout can be matched by
+			ok = ok && (worst < 1e-2 || XR.on || XG.ws);
 			std::cout << "XCW grid tscb: max |f_grid - f_tsc| / max |f| " << std::scientific << std::setprecision(2) << worst << std::defaultfloat
 				<< (ok ? ", later steps write the tscb from the grid" : ", layout not matched, the tsc route stays") << std::endl;
 			if (ok) {
@@ -2404,7 +2417,7 @@ itsc_block structure_factors::result_table(const occ::Mat& D_wfn, std::vector<WF
 				tscb_entry_ = entry;
 				tscb_atom_ = atom;
 			}
-			if (ok && XR.on) {
+			if (ok && (XR.on || XG.ws)) {
 				cvec2 table(tscb_scat_.size(), cvec(tscb_entry_.size()));
 				for (int scatterer = 0; scatterer < static_cast<int>(table.size()); scatterer++)
 					for (size_t r = 0; r < tscb_entry_.size(); r++) table[scatterer][r] = grid_value(tscb_atom_[scatterer], tscb_entry_[r]);

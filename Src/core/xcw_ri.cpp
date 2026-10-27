@@ -2,7 +2,9 @@
 #include "structure_factors.h"
 #include "constants.h"
 #include "basis_set.h"
+#include "integrator.h"
 #include <occ/qm/integral_engine_df.h>
+#include <occ/qm/integral_engine.h>
 #include <occ/gto/gto.h>
 
 //XCW's per-atom form factors from an RI fit of rho(D) instead of the grid weights, see structure_factors::xcw_ri
@@ -49,10 +51,10 @@ void structure_factors::setup_ri(const occ::qm::AOBasis& ao)
 	for (const auto& b : aux)
 		if (b->get_primitive_count() == 0) b->gen_auto_aux(atoms_wfn);
 	for (size_t i = 1; i < aux.size(); i++) *aux[0] += *aux[i];
-	setup_ri(ao, aux[0]->to_AOBasis(ao.atoms()), opt->multipole_lmax, opt->multipole_strength);
+	setup_ri(ao, aux[0]->to_AOBasis(ao.atoms()), opt->multipole_lmax, opt->multipole_strength, opt->multipole_scheme);
 }
 
-void structure_factors::setup_ri(const occ::qm::AOBasis& ao, const occ::qm::AOBasis& aux_in, const int lmax, const double strength)
+void structure_factors::setup_ri(const occ::qm::AOBasis& ao, const occ::qm::AOBasis& aux_in, const int lmax, const double strength, const MultipoleScheme scheme)
 {
 	err_checkf(XG.mode == 1, "-xcw_partition ri runs on the grid route: not with NOSPHERA2_XCW_GRID=0 or a saved I tensor", std::cout);
 	occ::qm::AOBasis aux = aux_in;
@@ -158,8 +160,22 @@ void structure_factors::setup_ri(const occ::qm::AOBasis& ao, const occ::qm::AOBa
 	XR.H.compute(H);
 	err_checkf(XR.H.info() == Eigen::Success, "-xcw_partition ri: the fit metric is not positive definite", std::cout);
 	XR.on = true;
+	XR.mulliken = lmax == 0 && scheme == MultipoleScheme::MULLIKEN;
+	if (XR.mulliken) {
+		XR.S = occ::qm::IntegralEngine(ao).one_electron_operator(occ::qm::cint::Operator::overlap);
+		XR.bf_atom.assign(ao.bf_to_atom().begin(), ao.bf_to_atom().end());
+	}
+	else if (lmax == 0 && (scheme == MultipoleScheme::NUCLEAR || scheme == MultipoleScheme::SANDERSON)) {
+		WFN atoms(e_origin::NOT_YET_DEFINED);
+		for (int g = 0; g < ng; g++) atoms.push_back_atom(asym_atoms[g].label, asym_atoms[g].pos[0], asym_atoms[g].pos[1], asym_atoms[g].pos[2], asym_atoms[g].type);
+		const vec pop = DensityFitting::population_targets(atoms, scheme == MultipoleScheme::NUCLEAR ? DensityFitting::CHARGE_SCHEME::NUCLEAR : DensityFitting::CHARGE_SCHEME::SANDERSON_ESTIMATE);
+		vec2 m(ng, vec(1));
+		for (int g = 0; g < ng; g++) m[g][0] = pop[g] / std::sqrt(constants::FOUR_PI);
+		set_ri_targets(m);
+	}
+	const char* names[] = { "TFVC", "Hirshfeld", "MBIS", "EMBIS", "Nuclear", "Mulliken", "Sanderson" };
 	std::cout << "XCW partition: RI fit, " << na << " auxiliary functions, (mu nu|P) " << (bytes >> 20) << " MB"
-		<< (lmax >= 0 ? ", moments restrained to the grid partition through l = " + std::to_string(lmax) : std::string()) << std::endl;
+		<< (lmax >= 0 ? ", moments restrained to " + std::string(names[static_cast<int>(scheme)]) + "'s through l = " + std::to_string(lmax) : std::string()) << std::endl;
 }
 
 cvec structure_factors::ri_sfc(const dMatrix2& D)
@@ -171,8 +187,18 @@ cvec structure_factors::ri_sfc(const dMatrix2& D)
 	occ::Vec g(XR.naux);
 	cblas_dgemv(CblasColMajor, CblasTrans, (int)XR.B.rows(), XR.naux, 2.0, XR.B.data(), (int)XR.B.rows(), Dv.data(), 1, 0.0, g.data(), 1);
 	//the fixed targets are F's constant part, left out of a response to dD as the anomalous part is
-	if (XR.lmax >= 0 && XR.frozen && !XR.response)
-		g += XR.R.transpose() * Eigen::Map<const occ::Vec>(XR.t0.data(), XR.t0.size());
+	if (XR.lmax >= 0 && XR.frozen) {
+		if (!XR.response) g += XR.R.transpose() * Eigen::Map<const occ::Vec>(XR.t0.data(), XR.t0.size());
+	}
+	else if (XR.lmax >= 0 && XR.mulliken) {
+		//2 Sum_{mu on a} (D S)_mumu with Y_00 in occ's convention
+		const double y = XR.A[0](0, 0) / std::sqrt(constants::FOUR_PI);
+		occ::Vec T = occ::Vec::Zero(XR.R.rows());
+		for (int i = 0; i < n; i++)
+			for (int j = 0; j < n; j++) T(XR.bf_atom[i]) += 2.0 * y * D(i, j) * XR.S(j, i);
+		for (int a = 0; a < ng; a++) T(a) *= XR.s2[a];
+		g += XR.R.transpose() * T;
+	}
 	else if (XR.lmax >= 0) {
 		const vec2& rho = grid_rho(D);
 		occ::Vec T = occ::Vec::Zero(XR.R.rows());
@@ -224,8 +250,16 @@ void structure_factors::ri_contract(const cvec& H, occ::Mat& out)
 		for (int j = 0; j < n; j++) out(i, j) = o(static_cast<size_t>(i) * n + j);
 	if (XR.lmax < 0 || XR.frozen)
 		return;
-	//the restraint targets' share: V_p = w_p Sum_k z_k r^l Y_k, z = S^2 R w, through the grid blocks
 	const occ::Vec z = XR.R * w;
+	if (XR.mulliken) {
+		//T's transpose, y s2_a z_a S over the rows of atom a, made symmetric
+		const double y = XR.A[0](0, 0) / std::sqrt(constants::FOUR_PI);
+		for (int i = 0; i < n; i++)
+			for (int j = 0; j < n; j++)
+				out(i, j) += 0.5 * y * (XR.s2[XR.bf_atom[i]] * z(XR.bf_atom[i]) + XR.s2[XR.bf_atom[j]] * z(XR.bf_atom[j])) * XR.S(i, j);
+		return;
+	}
+	//the restraint targets' share: V_p = w_p Sum_k z_k r^l Y_k, z = S^2 R w, through the grid blocks
 	vec2 V(ng);
 	for (int a = 0; a < ng; a++) {
 		const int np = static_cast<int>(XG.w[a].size());

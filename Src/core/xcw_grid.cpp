@@ -415,6 +415,8 @@ vec2& structure_factors::grid_rho(const dMatrix2& D)
 	const char* dt = tuning("NOSPHERA2_XCW_GRID_DTOL");
 	const double dtol = dt && !XG.on_device ? std::atof(dt) : 0.0;
 	const bool fresh = static_cast<int>(XG.bound.size()) != nb || XG.D_last.rows() != nmo;
+	//rho itself with the integration weights alone when the shares follow it
+	const vec2& wr = XG.ws ? XG.w0 : XG.w;
 	if (fresh) {
 		XG.bound.assign(nb, 0.0);
 		XG.drift.assign(nb, 0.0);
@@ -424,7 +426,7 @@ vec2& structure_factors::grid_rho(const dMatrix2& D)
 		for (int i = 0; i < nb; i++) {
 			const GridBlock& b = XG.blocks[list[i].first][list[i].second];
 			const int na = static_cast<int>(b.active_aos.size()), np = b.point_count;
-			const double* w = XG.w[list[i].first].data() + b.point_start;
+			const double* w = wr[list[i].first].data() + b.point_start;
 			double s = 0;
 			for (int p = 0; p < np; p++) {
 				double a = 0;
@@ -501,13 +503,24 @@ vec2& structure_factors::grid_rho(const dMatrix2& D)
 				}
 			};
 			if (fp32) run(b.ao_values_f.data(), Df, Tf); else run(b.ao_values.data(), Dd, Td);
-			const double* w = XG.w[g].data() + b.point_start;
+			const double* w = wr[g].data() + b.point_start;
 			for (int p = 0; p < np; p++) r[p] *= 2.0 * w[p];
 		}
 	}
 	if (sc.on) std::cout << "XCW grid F kept " << kept << " of " << nb << " blocks, bound " << *std::min_element(dd.begin(), dd.end()) << " .. " << *std::max_element(dd.begin(), dd.end()) << "\n";
 	sc.lap("F density");
-	return rho;
+	if (!XG.ws) return rho;
+	if (XG.refresh) {
+		update_grid_weights(rho, D);
+		XG.refresh = false;
+		sc.lap("F shares");
+	}
+#pragma omp parallel for schedule(dynamic)
+	for (int g = 0; g < ng; g++) {
+		XG.rho_s[g].resize(rho[g].size());
+		for (int p = 0; p < static_cast<int>(rho[g].size()); p++) XG.rho_s[g][p] = rho[g][p] * XG.w[g][p] / XG.w0[g][p];
+	}
+	return XG.rho_s;
 }
 
 cvec structure_factors::grid_sfc(const dMatrix2& D)
@@ -613,13 +626,18 @@ void structure_factors::check_adjoint()
 		for (int j = i; j < n; j++) D(i, j) = D(j, i) = u(gen);
 	cvec pre(model_data.nr);
 	for (cdouble& p : pre) p = cdouble(u(gen), u(gen));
+	const cvec F = scatter_data.F_calc;
+	//fixed RI targets are F's constant part like the anomalous one, so they are left out as in a response
+	XR.response = true;
 	grid_F(D);
+	XR.response = false;
 	occ::Mat P;
 	grid_contract(P, pre);
 	double l1 = 0, l2 = 0;
 	for (int r = 0; r < model_data.nr; r++) l1 += std::real(pre[r] * (scatter_data.F_calc[r] - scatter_data.anom_correction[r]));
 	for (int i = 0; i < n; i++)
 		for (int j = 0; j < n; j++) l2 += 2.0 * D(i, j) * P(i, j);
+	scatter_data.F_calc = F;
 	std::cout << "XCW adjoint check (" << (XR.on ? "ri" : "grid") << "): " << std::scientific << std::setprecision(3) << std::abs(l1 - l2) / std::abs(l1) << std::defaultfloat << std::endl;
 }
 
@@ -696,7 +714,7 @@ bool structure_factors::hold_grid_gpu()
 	std::vector<float> X;
 	vec w;
 	for (int g = 0; g < ng; g++) {
-		w.insert(w.end(), XG.w[g].begin(), XG.w[g].end());
+		w.insert(w.end(), (XG.ws ? XG.w0 : XG.w)[g].begin(), (XG.ws ? XG.w0 : XG.w)[g].end());
 		for (const GridBlock& b : XG.blocks[g]) {
 			na.push_back(static_cast<int>(b.active_aos.size())); np.push_back(b.point_count);
 			pt.push_back(XG.gpu_off[g] + b.point_start);

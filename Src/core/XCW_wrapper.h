@@ -83,6 +83,18 @@ private:
 	DensityFitting::PartitionCache tshb_cache_;
 	ivec tshb_atoms_;
 
+	// TFVC, MBIS and EMBIS shares (sf.XG.ws) follow the density: refit between the solves of a step until they hold still (-1),
+	// at every weight_every_-th evaluation of a solve, or (0) once at its first; at lambda 0 once, to the converged density.
+	// weight_count_ counts the evaluations of the step, weight_rounds_ the solves the refits asked for
+	int weight_every_ = -1, weight_count_ = 0, weight_rounds_ = 0;
+	// The density and shares of the step before, for NOSPHERA2_XCW_WEIGHT_CHECK
+	dMatrix2 weight_D_;
+	vec2 weight_w_;
+	// Refits the shares to the converged density of wfn; true while that moved F by more than NOSPHERA2_XCW_WEIGHT_FTOL of max |F|
+	bool refit_moves(const occ::qm::Wavefunction& wfn, const double lambda);
+	// How far the shares move F and R1(gt) over a step against what the density alone moves (NOSPHERA2_XCW_WEIGHT_CHECK)
+	void weight_check(const occ::qm::Wavefunction& wfn, const double lambda);
+
 	options* opt;
 	structure_factors sf;
 	SCF_log_writer writer;

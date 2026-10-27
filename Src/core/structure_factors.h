@@ -143,7 +143,18 @@ public:
 		//the block stages run on the device (xcw_grid_gpu.h), atom grid g's points from gpu_off[g] there
 		bool on_device = false;
 		ivec gpu_off;
+		//TFVC, MBIS and EMBIS shares follow rho (xcw_weights.cpp): w0 holds the integration weights alone and w = w0 s for the
+		//current share s, which grid_rho recomputes from its own rho when refresh is set; rho_s is then its partitioned rho
+		vec2 w0, rho_s;
+		bool refresh = false;
+		std::shared_ptr<struct xcw_weights> ws;
 	} XG;
+	//build_I's grid as TFVC, MBIS or EMBIS partition it; the Hirshfeld shares it was built with stand until rho is known
+	void setup_grid_weights(const occ::qm::AOBasis& ao);
+	//the scheme's shares from rho = w0 rho(p) of D, each fit starting from the last one
+	void update_grid_weights(const vec2& rho, const dMatrix2& D);
+	//the fits since the last call in one line, empty for the fixed shares
+	std::string grid_weight_report();
 	//Uploads the blocks for xcw_grid_gpu; false keeps them on the host
 	bool hold_grid_gpu();
 	//Plans XG.fb from build_I's layout of the grid points in their prototypes, see xcw_grid.cpp
@@ -162,18 +173,18 @@ public:
 
 	//The atoms' shares of rho as an RI fit (-xcw_partition ri) instead of the grid weights: c = H^-1 (2 B D + R^T S^2 T(D)),
 	//B = (mu nu|P) from occ's density-fitting engine, H = J + R^T S^2 R, R the analytic multipoles of the aux functions about
-	//their atom and T(D) those of the grid partition (Hirshfeld, Becke or TFVC weights, linear in D); f_g(k) = Sum_{P on g}
-	//c_P F_P(k) in closed form. ri_contract runs the chain backwards, so the SCF gets the exact derivative. Targets of a
-	//scheme the grid does not carry (TFVC, MBIS, EMBIS) are set from each converged step for the next (set_ri_targets) and
-	//held fixed within it, so the derivative leaves them out; until the first such set the grid's own moments stand in
+	//their atom and T(D) those of the grid partition (Hirshfeld, Becke, or TFVC, MBIS and EMBIS shares as they follow rho, fixed
+	//within an evaluation), linear in D; f_g(k) = Sum_{P on g} c_P F_P(k) in closed form. ri_contract runs the chain backwards,
+	//so the SCF gets the exact derivative at fixed shares. Nuclear and Sanderson charges are fixed targets (set_ri_targets,
+	//frozen: left out of a response like the anomalous part), Mulliken's 2 Sum_{mu on a} (D S)_mumu linear in D as the grid's
 	struct xcw_ri {
-		bool on = false, frozen = false, response = false;
+		bool on = false, frozen = false, response = false, mulliken = false;
 		int nbf = 0, naux = 0, lmax = -1, n_mom = 0;
 		occ::Mat B;
 		Eigen::LLT<occ::Mat> H;
-		occ::Mat R;
+		occ::Mat R, S;
 		vec s2;
-		ivec atom_start;
+		ivec atom_start, bf_atom;
 		std::vector<cvec> F;
 		vec2 M;
 		vec c, t0;
@@ -181,11 +192,11 @@ public:
 	} XR;
 	//moments [atom][l*l+l+m] in constants::spherical_harmonic's convention (DensityFitting's) as the fixed targets
 	void set_ri_targets(const vec2& moments);
-	void setup_ri(const occ::qm::AOBasis& ao, const occ::qm::AOBasis& aux, const int lmax, const double strength);
+	void setup_ri(const occ::qm::AOBasis& ao, const occ::qm::AOBasis& aux, const int lmax, const double strength, const MultipoleScheme scheme);
 	//the same in the -ri_fit basis, AutoAux on the atoms of ao without one, restrained as -multipole_moments says
 	void setup_ri(const occ::qm::AOBasis& ao);
 	//Re Sum_r pre_r (F_r(D) - anomalous_r) against 2 <D, P(pre)> at a random D and pre, printed: the perturbation has
-	//to be the transpose of F_calc, whichever partition runs
+	//to be the transpose of F_calc, whichever partition runs, with the shares the grid holds
 	void check_adjoint();
 	cvec ri_sfc(const dMatrix2& D);
 	void ri_contract(const cvec& H, occ::Mat& out);
@@ -345,8 +356,9 @@ public:
 	cvec saved_F_calc_;
 	double saved_scale_ = 0.0;
 
-	// The tsc table of a converged density for the tscb output, see result_table in structure_factors.cpp
-	itsc_block result_table(const occ::Mat& D_wfn, std::vector<WFN>& wavefunctions, std::ostream& log);
+	// The tsc table of a converged density for the tscb output, see result_table in structure_factors.cpp;
+	// refit_shares fits density-following shares to it first
+	itsc_block result_table(const occ::Mat& D_wfn, std::vector<WFN>& wavefunctions, std::ostream& log, const bool refit_shares);
 	// What result_table keeps between steps: the integration grids of the tsc route and, on the grid route,
 	// the layout of the first table: its scatterers, hkl rows, the asym atom of each scatterer and the
 	// hkl_enlarged entry of each row

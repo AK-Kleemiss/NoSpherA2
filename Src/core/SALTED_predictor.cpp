@@ -286,7 +286,9 @@ void SALTEDPredictor::build_merged(const WFN& wavy_in, options& opt_in, const pa
 			const int Zb = wavy_in.get_atom_charge(b), m = element_model[Zb - 1];
 			if (m < 0 || m == own || sub_index[m][a] < 0) continue;
 			const double x = array_length(wavy_in.get_atom_pos(a), wavy_in.get_atom_pos(b)) / constants::ang2bohr(radius(Za) + radius(Zb));
-			if (x > 1.3) continue;
+			// Below half the radius sum b is no bond partner but a co-sited atom (EXYZ, EADP mixed sites) or another
+			// disorder part: x = 0 made the weight 1/x^2 infinite and the mean NaN, and it handed a to b's model.
+			if (x > 1.3 || x < 0.5) continue;
 			if (!same_basis(m, own, Za - 1)) { other_basis.insert({ m, Za }); continue; }
 			auto it = std::find_if(shell.begin(), shell.end(), [m](const auto& s) { return s.first == m; });
 			if (it == shell.end()) shell.push_back({ m, x });

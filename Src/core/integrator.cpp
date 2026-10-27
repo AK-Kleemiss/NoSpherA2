@@ -400,7 +400,7 @@ struct restraint_data
 	vec2 multipole_rows;
 };
 
-static vec simple_population_targets(const WFN& wavy, const DensityFitting::CHARGE_SCHEME scheme)
+vec DensityFitting::population_targets(const WFN& wavy, const CHARGE_SCHEME scheme)
 {
 	vec populations(wavy.get_ncen(), 0.0);
 	if (scheme == DensityFitting::CHARGE_SCHEME::NUCLEAR) {
@@ -463,7 +463,7 @@ static restraint_data build_restraint_data(
 	if (config.multipole_lmax < 0)
 		return data;
 	if (is_population_only_scheme(config.charge_scheme)) {
-		const vec populations = simple_population_targets(wavy, config.charge_scheme);
+		const vec populations = DensityFitting::population_targets(wavy, config.charge_scheme);
 		data.multipole_targets.resize(wavy.get_ncen(), vec(1));
 		for (int a = 0; a < wavy.get_ncen(); ++a)
 			data.multipole_targets[a][0] = populations[a] / std::sqrt(constants::FOUR_PI);

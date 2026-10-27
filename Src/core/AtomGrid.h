@@ -107,12 +107,16 @@ double get_r_outer(const double &max_error,
 
 double get_h(const double &max_error, const int &l, const double &guess);
 
+//start: the shells to iterate from instead of the element guess; sweeps: the iterations it took
 std::vector<std::pair<vec, vec>> make_MBIS_vectors(
 	const WFN &wavy,
 	const vec3 &grid,
 	const ivec &num_grid_points,
 	const bool debug = false,
-	std::ostream &file = std::cout);
+	std::ostream &file = std::cout,
+	const std::vector<std::pair<vec, vec>> &start = {},
+	const double crit = 0.001,
+	int *sweeps = nullptr);
 
 std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
 	const WFN &wavy,
@@ -120,4 +124,7 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
 	const ivec &num_grid_points,
 	const bool debug = false,
 	const std::vector<std::pair<vec, vec>> MBIS_vectors = {},
-	std::ostream &file = std::cout);
+	std::ostream &file = std::cout,
+	const std::vector<std::pair<vec2, vec>> &start = {},
+	const double crit = 0.001,
+	int *sweeps = nullptr);

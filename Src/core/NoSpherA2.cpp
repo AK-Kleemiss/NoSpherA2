@@ -972,9 +972,14 @@ static int run_app_impl(int argc, char **argv)
 	{
 		opt.groups[0].push_back(0);
 		opt.loadXCWsettings();
-		//-ri_fit and -multipole_moments describe the -tshb fit or the RI partition; XCW's own grid keeps its Hirshfeld weights
-		if (opt.partition_type == PartitionType::RI)
-			opt.partition_type = PartitionType::Hirshfeld;
+		//-ri_fit and -multipole_moments describe the -tshb fit or the RI partition; XCW's own grid keeps its Hirshfeld weights,
+		//or with -xcw_partition ri carries the shares of the scheme its restraints follow
+		if (opt.partition_type == PartitionType::RI) {
+			const MultipoleScheme m = opt.multipole_scheme;
+			const bool ri = opt.xcw_partition == "ri" && opt.multipole_lmax >= 0;
+			opt.partition_type = ri && m == MultipoleScheme::TFVC ? PartitionType::TFVC : ri && m == MultipoleScheme::MBIS ? PartitionType::MBIS
+				: ri && m == MultipoleScheme::EMBIS ? PartitionType::EMBIS : PartitionType::Hirshfeld;
+		}
 		XCW_wrapper xcw_wrapper(opt);
 		xcw_wrapper.run();
 		log_file.flush();

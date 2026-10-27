@@ -54,6 +54,7 @@ Done in run 1:
 - [x] `ScfSolverTests` (new, 3): the plain SCF_solver against OCC's own SCF (water RHF, methyl radical UHF, def2-SVP, 1e-7 Eh) and a warm restart that goes straight to TRAH and converges in at most 3 iterations
 - [x] Tests unchanged, timings and memory compared against the baseline (below)
 - [x] Merged density_source at the deadline (`0efc6add`, seven commits: `-tshb` for XCW steps, `-xcw_partition ri`, fit caches). Their XCW parts went into the new structure: the RI partition's setup (`structure_factors::setup_ri(ao)`, AutoAux or `-ri_fit`) and the `NOSPHERA2_XCW_ADJOINT_CHECK` check (`structure_factors::check_adjoint`) into structure_factors, the RI branch of the tscb layout into `result_table`, the `XR.response` switch into `perturbation_response`, and the step's `.tshb` fit (`write_tshb`, its aux wavefunction and `PartitionCache`) plus the RI restraint targets into `XCW_wrapper::write_step_results`
+- [x] Merged density_source again (`33fa9685`, three commits: density-following TFVC/MBIS/EMBIS shares on XCW's grid, RI restraints for every scheme, a SALTED fix, the typing net). The share machinery (`xcw_weights.cpp`, `XG.w0`/`XG.ws`) is structure_factors' and merged as is; the driver side went into XCW_wrapper: the refit between the solves of a step (`run_lambda`, `refit_moves`), the per-evaluation refit of `NOSPHERA2_XCW_WEIGHT_UPDATE` (`evaluate`), the lambda 0 fit and share report (`report_lambda`), the grid charges (`write_step_results`) and `NOSPHERA2_XCW_WEIGHT_CHECK` (`weight_check`). `result_table` takes whether to refit the shares to the table's density, and `check_adjoint` runs after the first step. The RI targets set from each step's density are gone upstream, since they now come from the shares
 
 Next:
 - [ ] SCF_solver for other theory levels: it is tied to `occ::qm::SCF<occ::qm::HartreeFock>` (`scf_t`). DFT (`occ::dft::DFT`) needs the procedure as a template parameter or behind an interface; the stored-ERI Fock build and the TRAH Hessian product are Hartree-Fock specific as they stand
@@ -134,3 +135,21 @@ Every difference is within the run-to-run scatter: the refactor costs no time an
 | P1_full_svp | merge | 21.06 ± 0.06 | 305.6 ± 1.0 | 4007.0 | 4060.5 |
 
 Again within the scatter, with the same Fock build counts and outputs within the baseline's own noise.
+
+### Second merge with density_source (2026-10-27)
+`33fa9685` merged (three commits: density-following TFVC/MBIS/EMBIS shares and RI restraints for every scheme, ported as listed in the agenda, a SALTED fix and the typing net). `ctest --preset release-windows-tests -j 6`: **1333 passed, 0 failed, 23 skipped** (2 disabled) of 1358, 138.4 s; the three new `XcwPartitionTests.*SharesFollowTheDensity` pass unchanged, and so do the four `P1_*_full` goldens. The benchmark cases run on Hirshfeld weights, so the new share code is idle in them; `merge` is the binary of the first merge, the two binaries alternating run by run (4 runs each, the machine busier than in the sittings above):
+
+| Case | Build | Wall (s) | CPU (s) | Peak working set (MB) | Peak commit (MB) |
+|------|-------|---------:|--------:|----------------------:|-----------------:|
+| P1_full_F | merge | 4.54 ± 0.05 | 62.1 ± 1.9 | 267.6 | 281.5 |
+| P1_full_F | merge 2 | 4.65 ± 0.20 | 62.7 ± 1.2 | 267.3 | 281.2 |
+| P1_full_F2 | merge | 4.56 ± 0.16 | 61.1 ± 1.0 | 267.9 | 281.6 |
+| P1_full_F2 | merge 2 | 4.56 ± 0.15 | 63.2 ± 1.0 | 268.0 | 281.1 |
+| P1_full_h2 | merge | 4.20 ± 0.25 | 56.3 ± 0.5 | 266.9 | 281.2 |
+| P1_full_h2 | merge 2 | 4.09 ± 0.09 | 57.1 ± 0.7 | 267.4 | 281.2 |
+| P1_subset_F | merge | 4.74 ± 0.23 | 63.2 ± 1.4 | 263.2 | 276.9 |
+| P1_subset_F | merge 2 | 4.64 ± 0.18 | 64.0 ± 1.5 | 263.1 | 276.9 |
+| P1_full_svp | merge | 21.99 ± 0.74 | 305.8 ± 1.8 | 4007.2 | 4060.1 |
+| P1_full_svp | merge 2 | 22.61 ± 0.89 | 305.0 ± 3.2 | 4007.1 | 4060.4 |
+
+Within the scatter, with the same Fock build counts (68, 68, 47, 74, 62) and the lambda tables and F_calc within thread noise of each other.
