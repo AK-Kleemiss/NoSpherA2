@@ -499,12 +499,14 @@ if(MSVC)
             "${_libcint_ivdep_text}"
         )
 
-        get_filename_component(_libcint_ivdep_out_dir
-            "${_libcint_ivdep_out}"
-            DIRECTORY
-        )
-        file(MAKE_DIRECTORY "${_libcint_ivdep_out_dir}")
-        file(WRITE "${_libcint_ivdep_out}" "${_libcint_ivdep_text}")
+        # write only on change: a fresh mtime recompiles cint after every configure
+        set(_libcint_ivdep_old "")
+        if(EXISTS "${_libcint_ivdep_out}")
+            file(READ "${_libcint_ivdep_out}" _libcint_ivdep_old)
+        endif()
+        if(NOT _libcint_ivdep_old STREQUAL _libcint_ivdep_text)
+            file(WRITE "${_libcint_ivdep_out}" "${_libcint_ivdep_text}")
+        endif()
 
         list(REMOVE_ITEM _cint_sources "${_libcint_ivdep_source}")
         list(APPEND _cint_sources "${_libcint_ivdep_out}")
@@ -555,6 +557,10 @@ if(MSVC AND CMAKE_CXX_COMPILER_ARCHITECTURE_ID STREQUAL "ARM64")
     target_compile_options(Eigen3::Eigen INTERFACE
         "$<$<COMPILE_LANGUAGE:CXX>:/FI${CMAKE_CURRENT_SOURCE_DIR}/cmake/eigen5_compat.h>")
 endif()
+
+# No C++ modules here; oneTBB's policy range would turn on module scanning, and every configure
+# rewrites its CXXDependInfo.json, which recompiles all of tbb
+set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
 
 #Android: oneTBB static, so the APK ships one executable and no libtbb.so.12 (a versioned SONAME
 #cannot live in jniLibs). occ's own CPMAddPackage(oneTBB) then reuses this one.
