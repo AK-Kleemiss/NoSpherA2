@@ -79,13 +79,43 @@ void structure_factors::update_grid_weights(const vec2& rho, const dMatrix2& D)
 		//make_chi's warnings once each, not at every fit
 		std::stringstream said;
 		std::streambuf* const old = std::cout.rdbuf(said.rdbuf());
-		W.chi = make_chi(W.atoms, 40, true, false, line);
-		std::cout.rdbuf(old);
-		if (said.str() != W.said) std::cout << said.str();
-		W.said = said.str();
 		vec dab(static_cast<size_t>(ng) * ng);
 		for (int a = 0; a < ng; a++)
 			for (int b = 0; b < ng; b++) dab[static_cast<size_t>(a) * ng + b] = std::hypot(W.x[b] - W.x[a], W.y[b] - W.y[a], W.z[b] - W.z[a]);
+		vec chi = make_chi(W.atoms, 40, true, false, line);
+		//a neighbour pair whose line density has no minimum falls back to chi 1 in make_chi; here it takes d_A/d_B at the
+		//inflection where the minimum and the maximum met (vertex of the sampled slope), so chi stays continuous in rho
+		for (int a = 0; a < ng && !tuning("NOSPHERA2_XCW_CHI_FALLBACK"); a++)
+			for (int b = a + 1; b < ng; b++) {
+				if (chi[a * ng + b] != 1.0 || dab[a * ng + b] > constants::far_away) continue;
+				const double mx = 0.5 * (W.x[a] + W.x[b]), my = 0.5 * (W.y[a] + W.y[b]), mz = 0.5 * (W.z[a] + W.z[b]);
+				bool nb = true;
+				for (int c = 0; c < ng && nb; c++)
+					nb = c == a || c == b || std::hypot(mx - W.x[c], my - W.y[c], mz - W.z[c]) >= 0.5 * dab[a * ng + b];
+				if (!nb) continue;
+				const int m = 40;
+				vec t(m), x(m), y(m), z(m), r(m);
+				for (int i = 0; i < m; i++) {
+					t[i] = 1e-6 + i * (1.0 - 2e-6) / (m - 1);
+					x[i] = W.x[a] + t[i] * (W.x[b] - W.x[a]); y[i] = W.y[a] + t[i] * (W.y[b] - W.y[a]); z[i] = W.z[a] + t[i] * (W.z[b] - W.z[a]);
+				}
+				line(m, x.data(), y.data(), z.data(), r.data());
+				int k = 1, turns = 0;
+				for (int i = 1; i < m - 1; i++) {
+					turns += (r[i] - r[i - 1]) * (r[i + 1] - r[i]) < 0.0;
+					if (std::abs(r[i + 1] - r[i]) < std::abs(r[k + 1] - r[k])) k = i;
+				}
+				if (turns > 0 || k + 2 >= m) continue;
+				const double s0 = r[k] - r[k - 1], s1 = r[k + 1] - r[k], s2 = r[k + 2] - r[k + 1], den = s0 - 2.0 * s1 + s2;
+				const double u = std::abs(den) > 0.0 ? std::clamp(0.5 * (s0 - s2) / den, -1.0, 1.0) : 0.0;
+				const double tt = t[k] + (0.5 + u) * (t[1] - t[0]);
+				chi[a * ng + b] = tt / (1.0 - tt);
+				chi[b * ng + a] = 1.0 / chi[a * ng + b];
+			}
+		W.chi = chi;
+		std::cout.rdbuf(old);
+		if (said.str() != W.said) std::cout << said.str();
+		W.said = said.str();
 		//NOSPHERA2_XCW_TFVC_OLD: the Becke and TFVC pass of the stand-alone grid, the reference
 		const bool old_tfvc = tuning("NOSPHERA2_XCW_TFVC_OLD") != nullptr;
 #pragma omp parallel

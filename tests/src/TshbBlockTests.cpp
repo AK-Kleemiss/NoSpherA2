@@ -688,7 +688,11 @@ TEST(XcwPartitionTests, RiPartitionPerturbationIsTheTransposeOfFcalc)
 			EXPECT_LT(std::stod(log.substr(at + 24)), tol) << log.substr(at, 60);
 		return log;
 	};
-	check({}, 1e-10);
+	const std::string plain = check({ "-tune", "NOSPHERA2_XCW_RI_PACK_CHECK" }, 1e-10);
+	const size_t pk = plain.find("XCW RI packed store check: max |dg| / max |g| ");
+	ASSERT_NE(pk, std::string::npos);
+	EXPECT_LT(std::stod(plain.substr(pk + 46)), 1e-12);
+	check({ "-tune", "NOSPHERA2_XCW_RI_FULL" }, 1e-10);
 	check({ "-multipole_moments", "hirshfeld", "2" }, 1e-5);
 	const std::string mbis = check({ "-multipole_moments", "mbis", "1" }, 1e-5);
 	EXPECT_NE(mbis.find("MBIS shares:"), std::string::npos);
@@ -794,6 +798,31 @@ static void density_following_shares(const std::string& scheme)
 }
 
 TEST(XcwPartitionTests, TfvcSharesFollowTheDensity) { density_following_shares("tfvc"); }
+
+//RI restrained to TFVC on the P1 subset through lambda 0.03: N8-H8's line density loses its minimum on the way, and with
+//make_chi's fallback chi = 1 the shares flipped between solves until the 20-solve cap (NOSPHERA2_XCW_CHI_FALLBACK); with
+//chi at the inflection every step settles without a second solve
+TEST(XcwPartitionTests, RiTfvcRefitsSettle)
+{
+	const std::string cif = fs::absolute(fixture("P1_test/P1_test.cif")).string(), hkl = fs::absolute(fixture("P1_test/P1_subset.hkl")).string();
+	app_dir run("xcw_ri_tfvc");
+	std::ofstream(run.dir / "settings.txt") << "normal normal_conv params 177 basis_set sto-3g max_iter 100 F charge 0 mult 1 rhf start 0 step_size 0.01 end 0.03";
+	std::stringstream out;
+	std::streambuf* old = std::cout.rdbuf(out.rdbuf());
+	const int rc = run.run({ "-do_XCW", "-no_gpu", "-cif", cif, "-hkl", hkl, "-XCW_settings", "settings.txt", "-xcw_partition", "ri", "-multipole_moments", "tfvc", "2", "-no_date" });
+	std::cout.rdbuf(old);
+	ASSERT_EQ(rc, 0);
+	const std::string log = out.str() + run.log();
+	int steps = 0;
+	for (size_t at = log.find("TFVC shares:"); at != std::string::npos; at = log.find("TFVC shares:", at + 1)) {
+		const size_t e = log.find('\n', at);
+		const std::string line = log.substr(at, e - at);
+		if (line.find("more solves") == std::string::npos) continue;
+		steps++;
+		EXPECT_NE(line.find(", 0 more solves"), std::string::npos) << line;
+	}
+	EXPECT_EQ(steps, 3);
+}
 
 //get_tfvc_weight is get_integration_weights' TFVC share, the same operations: equal to round-off on random points and chi
 TEST(XcwPartitionTests, TfvcShareKernelIsTheStandAloneOne)

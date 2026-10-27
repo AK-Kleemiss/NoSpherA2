@@ -3,6 +3,7 @@
 #include "constants.h"
 #include "basis_set.h"
 #include "integrator.h"
+#include "tuning.h"
 #include <occ/qm/integral_engine_df.h>
 #include <occ/qm/integral_engine.h>
 #include <occ/gto/gto.h>
@@ -69,6 +70,36 @@ void structure_factors::setup_ri(const occ::qm::AOBasis& ao, const occ::qm::AOBa
 	//occ's store, column P the nbf x nbf block (mu nu|P)
 	df.compute_stored_integrals();
 	XR.B = df.integral_store();
+	//(mu nu|P) = (nu mu|P): only mu <= nu is kept, row mu n - mu (mu - 1) / 2 + nu - mu, half the store;
+	//NOSPHERA2_XCW_RI_FULL keeps the square
+	XR.packed = tuning("NOSPHERA2_XCW_RI_FULL") == nullptr;
+	if (XR.packed) {
+		occ::Mat P(static_cast<size_t>(n) * (n + 1) / 2, na);
+#pragma omp parallel for schedule(static)
+		for (int c = 0; c < na; c++) {
+			size_t k = 0;
+			for (int i = 0; i < n; i++)
+				for (int j = i; j < n; j++) P(k++, c) = XR.B(static_cast<size_t>(i) * n + j, c);
+		}
+		//NOSPHERA2_XCW_RI_PACK_CHECK: 2 B^T D of the square and of the packed store at a random symmetric D
+		if (tuning("NOSPHERA2_XCW_RI_PACK_CHECK")) {
+			std::mt19937 gen(11);
+			std::uniform_real_distribution<double> u(-1.0, 1.0);
+			occ::Mat D(n, n);
+			for (int i = 0; i < n; i++)
+				for (int j = i; j < n; j++) D(i, j) = D(j, i) = u(gen);
+			occ::Vec Df(static_cast<size_t>(n) * n), Dp(P.rows());
+			for (int i = 0, k = 0; i < n; i++)
+				for (int j = 0; j < n; j++) {
+					Df(static_cast<size_t>(i) * n + j) = D(i, j);
+					if (j >= i) Dp(k++) = j == i ? D(i, j) : D(i, j) + D(j, i);
+				}
+			const occ::Vec a = 2.0 * (XR.B.transpose() * Df), b = 2.0 * (P.transpose() * Dp);
+			std::cout << "XCW RI packed store check: max |dg| / max |g| " << std::scientific << std::setprecision(3)
+				<< (a - b).cwiseAbs().maxCoeff() / a.cwiseAbs().maxCoeff() << std::defaultfloat << std::endl;
+		}
+		XR.B.swap(P);
+	}
 	occ::Mat H = df.aux_engine().one_electron_operator(occ::qm::cint::Operator::coulomb, false);
 	//the aux functions by atom: a basis lists its shells atom by atom
 	const ivec& bf_atom = aux.bf_to_atom();
@@ -173,16 +204,16 @@ void structure_factors::setup_ri(const occ::qm::AOBasis& ao, const occ::qm::AOBa
 		set_ri_targets(m);
 	}
 	const char* names[] = { "TFVC", "Hirshfeld", "MBIS", "EMBIS", "Nuclear", "Mulliken", "Sanderson" };
-	std::cout << "XCW partition: RI fit, " << na << " auxiliary functions, (mu nu|P) " << (bytes >> 20) << " MB"
+	std::cout << "XCW partition: RI fit, " << na << " auxiliary functions, (mu nu|P) " << ((XR.B.size() * sizeof(double)) >> 20) << " MB"
 		<< (lmax >= 0 ? ", moments restrained to " + std::string(names[static_cast<int>(scheme)]) + "'s through l = " + std::to_string(lmax) : std::string()) << std::endl;
 }
 
 cvec structure_factors::ri_sfc(const dMatrix2& D)
 {
 	const int ng = model_data.ncen, nc = static_cast<int>(XG.inversion_link.size()), n = XR.nbf;
-	occ::Vec Dv(static_cast<size_t>(n) * n);
-	for (int i = 0; i < n; i++)
-		for (int j = 0; j < n; j++) Dv(static_cast<size_t>(i) * n + j) = D(i, j);
+	occ::Vec Dv(XR.B.rows());
+	for (int i = 0, k = 0; i < n; i++)
+		for (int j = XR.packed ? i : 0; j < n; j++) Dv(XR.packed ? k++ : static_cast<size_t>(i) * n + j) = XR.packed && j != i ? D(i, j) + D(j, i) : D(i, j);
 	occ::Vec g(XR.naux);
 	cblas_dgemv(CblasColMajor, CblasTrans, (int)XR.B.rows(), XR.naux, 2.0, XR.B.data(), (int)XR.B.rows(), Dv.data(), 1, 0.0, g.data(), 1);
 	//the fixed targets are F's constant part, left out of a response to dD as the anomalous part is
@@ -245,8 +276,11 @@ void structure_factors::ri_contract(const cvec& H, occ::Mat& out)
 	occ::Vec o(XR.B.rows());
 	cblas_dgemv(CblasColMajor, CblasNoTrans, (int)XR.B.rows(), XR.naux, 1.0, XR.B.data(), (int)XR.B.rows(), w.data(), 1, 0.0, o.data(), 1);
 	out.resize(n, n);
-	for (int i = 0; i < n; i++)
-		for (int j = 0; j < n; j++) out(i, j) = o(static_cast<size_t>(i) * n + j);
+	for (int i = 0, k = 0; i < n; i++)
+		for (int j = XR.packed ? i : 0; j < n; j++) {
+			out(i, j) = o(XR.packed ? k++ : static_cast<size_t>(i) * n + j);
+			if (XR.packed) out(j, i) = out(i, j);
+		}
 	if (XR.lmax < 0 || XR.frozen)
 		return;
 	const occ::Vec z = XR.R * w;

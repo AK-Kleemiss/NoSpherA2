@@ -124,7 +124,7 @@ public:
 	//so the SCF gets the exact derivative at fixed shares. Nuclear and Sanderson charges are fixed targets (set_ri_targets,
 	//frozen: left out of a response like the anomalous part), Mulliken's 2 Sum_{mu on a} (D S)_mumu linear in D as the grid's
 	struct xcw_ri {
-		bool on = false, frozen = false, response = false, mulliken = false;
+		bool on = false, frozen = false, response = false, mulliken = false, packed = false;
 		int nbf = 0, naux = 0, lmax = -1, n_mom = 0;
 		occ::Mat B;
 		Eigen::LLT<occ::Mat> H;

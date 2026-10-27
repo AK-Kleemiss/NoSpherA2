@@ -290,6 +290,11 @@ alternative is one flag away in each case.
 
 ## Current Validation Notes
 
+As of 2026-10-28 (TFVC chi, packed RI store), XCW's TFVC chi is continuous where a bond's line density loses its minimum and
+the RI partition stores (mu nu|P) over mu <= nu; `XcwPartitionTests.RiTfvcRefitsSettle` is new. `ctest --preset
+release-linux-tests` on a CPU-only 4-core VM reports **1335 passed, 0 failed, 23 skipped** (2 disabled) of 1360. See
+`UNIT_TESTS_STATUS.md`.
+
 As of 2026-10-27 (shares cost), XCW's TFVC shares take a TFVC-only weight pass and MBIS/EMBIS Anderson-mixed, warm, loose-early
 fits refit inside a solve until the density settles; `XcwPartitionTests.TfvcShareKernelIsTheStandAloneOne` is new. Ported onto the
 XCW refactor, `ctest --preset release-windows -j4` (GPU present) reports **1351 passed, 0 failed, 10 skipped** (2 disabled) of 1363. See
