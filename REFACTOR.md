@@ -116,3 +116,21 @@ The same cases on the same machine; `baseline_b` is the baseline binary measured
 | P1_full_svp | run 1 | 20.98 ± 0.05 | 305.1 ± 1.1 | 4005.9 | 4059.5 |
 
 Every difference is within the run-to-run scatter: the refactor costs no time and no memory. The outputs (`NoSpherA2.log`, `SCF.log`, `NA2_*_Fcalc.txt`, `.tscb`) differ from the baseline's by no more than two baseline runs differ from each other, since the threaded sums are not bit-reproducible: lambda-table energies by up to about 2e-11 relative, F_calc in the last printed digit. Every case needs the same number of Fock builds as before. The step-halving retry and `load_wfn`, which no test covers, were checked by hand (a `max_iter 5` scan with 0.04 steps from a read-in lambda 0): the same retry sequence and lambda table as the baseline.
+
+### Merge with density_source (2026-10-27)
+`0efc6add` merged (seven commits, `-tshb` step fits and `-xcw_partition ri`, ported as listed in the agenda). `ctest --preset release-windows-tests -j 6`: **1330 passed, 0 failed, 23 skipped** (2 disabled) of 1355, 120.0 s; the four `P1_*_full` goldens pass. The benchmark cases use neither new option, so they measure that the merge leaves the default path alone; `baseline_c` is the baseline binary again in the same sitting:
+
+| Case | Build | Wall (s) | CPU (s) | Peak working set (MB) | Peak commit (MB) |
+|------|-------|---------:|--------:|----------------------:|-----------------:|
+| P1_full_F | baseline_c | 4.61 ± 0.19 | 61.1 ± 1.0 | 267.2 | 281.2 |
+| P1_full_F | merge | 4.37 ± 0.11 | 62.1 ± 0.8 | 267.7 | 281.5 |
+| P1_full_F2 | baseline_c | 4.51 ± 0.15 | 61.0 ± 0.5 | 267.4 | 281.2 |
+| P1_full_F2 | merge | 4.29 ± 0.04 | 61.3 ± 0.5 | 267.8 | 281.8 |
+| P1_full_h2 | baseline_c | 4.00 ± 0.05 | 55.4 ± 0.2 | 267.1 | 281.0 |
+| P1_full_h2 | merge | 3.92 ± 0.04 | 56.0 ± 0.5 | 267.6 | 281.3 |
+| P1_subset_F | baseline_c | 4.43 ± 0.06 | 61.9 ± 0.9 | 263.0 | 277.0 |
+| P1_subset_F | merge | 4.35 ± 0.07 | 62.1 ± 1.1 | 263.3 | 276.8 |
+| P1_full_svp | baseline_c | 21.12 ± 0.06 | 302.7 ± 1.2 | 4009.5 | 4060.2 |
+| P1_full_svp | merge | 21.06 ± 0.06 | 305.6 ± 1.0 | 4007.0 | 4060.5 |
+
+Again within the scatter, with the same Fock build counts and outputs within the baseline's own noise.
