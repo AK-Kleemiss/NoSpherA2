@@ -87,6 +87,10 @@ private:
 	// at every weight_every_-th evaluation of a solve, or (0) once at its first; at lambda 0 once, to the converged density.
 	// weight_count_ counts the evaluations of the step, weight_rounds_ the solves the refits asked for
 	int weight_every_ = -1, weight_count_ = 0, weight_rounds_ = 0;
+	double weight_dtol_ = 1e-3;
+	bool weight_hold_ = false, weight_moved_ = false;
+	// The density of the last refit, against which NOSPHERA2_XCW_WEIGHT_DTOL measures the move
+	dMatrix2 weight_D_fit_;
 	// The density and shares of the step before, for NOSPHERA2_XCW_WEIGHT_CHECK
 	dMatrix2 weight_D_;
 	vec2 weight_w_;

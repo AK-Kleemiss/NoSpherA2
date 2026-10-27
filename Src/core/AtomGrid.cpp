@@ -876,6 +876,48 @@ std::array<double, 2> get_integration_weights(const int& num_centers,
 	return { std::abs(w_becke) > cut ? pa_b[center_index] / w_becke : 1.0, std::abs(w_tfvc) > cut ? pa_tv[center_index] / w_tfvc : 1.0 };
 }
 
+double get_tfvc_weight(const int num_centers, const double* x_c, const double* y_c, const double* z_c, const int center_index,
+	const double x, const double y, const double z, vec& pa, vec& dist, const vec& chi, const double* dist_ab)
+{
+	const double cut = constants::cutoff;
+	for (int a = 0; a < num_centers; a++) {
+		pa[a] = 1.0;
+		const double vx = x_c[a] - x, vy = y_c[a] - y, vz = z_c[a] - z;
+		dist[a] = std::sqrt(vx * vx + vy * vy + vz * vz);
+	}
+	for (int a = 0; a < num_centers; a++) {
+		double& pa_a = pa[a];
+		if (dist[a] > constants::far_away) {
+			pa_a = 0.0;
+			continue;
+		}
+		const double* chi_off = chi.data() + a * num_centers, * dist_ab_row = dist_ab + (size_t)a * num_centers;
+		for (int b = a + 1; b < num_centers; b++) {
+			double& pa_b = pa[b];
+			const double mu_ab = (dist[a] - dist[b]) / dist_ab_row[b];
+			const double chi_mod = *(chi_off + b) * (1.0 - mu_ab);
+			double nu_ab = 1.0 + mu_ab;
+			nu_ab = (nu_ab - chi_mod) / (nu_ab + chi_mod);
+			const double f = 1.0 - f4(nu_ab);
+			if (std::abs(f) < cut)
+				pa_a = 0.0;
+			else {
+				if (pa_a > 1E-250 || pa_a < -1E-250)
+					pa_a *= 0.5 * f;
+				else
+					pa_a = 0.0;
+				if (pa_b > 1E-250 || pa_b < -1E-250)
+					pa_b *= 0.5 * (2.0 - f);
+				else
+					pa_b = 0.0;
+			}
+		}
+	}
+	double w = 0.0;
+	for (int a = 0; a < num_centers; a++) w += pa[a];
+	return std::abs(w) > cut ? pa[center_index] / w : 1.0;
+}
+
 // TCA 106, 178 (2001), eq. 25
 // we evaluate r_inner for s functions
 const double get_r_inner(const double &max_error, const double &alpha_inner)
@@ -1085,6 +1127,35 @@ vec2 sigma_to_alpha(const std::pair<vec, vec> &sigma) {
 	return shalpha;
 }
 
+//Anderson mixing of a fixed point x = G(x) over the last m steps: x' = G(x) - Sum_j c_j dG_j, c minimising
+//|f - Sum_j c_j df_j| for f = G(x) - x; false (and the history dropped) when there is none yet
+struct anderson_mix {
+	int m = 0;
+	std::vector<vec> x, g;
+	bool step(const vec& xi, const vec& gi, vec& out)
+	{
+		x.push_back(xi);
+		g.push_back(gi);
+		if (static_cast<int>(x.size()) > m + 1) { x.erase(x.begin()); g.erase(g.begin()); }
+		const int k = static_cast<int>(x.size()) - 1, n = static_cast<int>(xi.size());
+		if (k < 1) return false;
+		Eigen::MatrixXd dF(n, k), dG(n, k);
+		Eigen::VectorXd f(n);
+		for (int i = 0; i < n; i++) {
+			f(i) = g[k][i] - x[k][i];
+			for (int j = 0; j < k; j++) {
+				dG(i, j) = g[j + 1][i] - g[j][i];
+				dF(i, j) = dG(i, j) - (x[j + 1][i] - x[j][i]);
+			}
+		}
+		const Eigen::VectorXd c = dF.completeOrthogonalDecomposition().solve(f);
+		const Eigen::VectorXd o = Eigen::Map<const Eigen::VectorXd>(gi.data(), n) - dG * c;
+		out.assign(o.data(), o.data() + n);
+		return true;
+	}
+	void reset() { x.clear(); g.clear(); }
+};
+
 // grids here are the total_grid in the SF calculator functions, just as a not to myself and future me
 //Implemented according to the modified Multiwfn version by FJR and Anker
 std::vector<std::pair<vec, vec>> make_MBIS_vectors(
@@ -1095,9 +1166,11 @@ std::vector<std::pair<vec, vec>> make_MBIS_vectors(
 	std::ostream &file,
 	const std::vector<std::pair<vec, vec>> &start,
 	const double crit,
-	int *sweeps)
+	int *sweeps,
+	const int anderson)
 {
 	using sp_vec = std::vector<std::pair<vec, vec>>;
+	anderson_mix mix{ anderson };
 	const auto atoms = wavy.get_atoms();
 	vec charges(atoms.size(), 0.0);
 	vec last_charges(atoms.size(), 0.0);
@@ -1133,6 +1206,7 @@ std::vector<std::pair<vec, vec>> make_MBIS_vectors(
 	const bool crt_exp = tuning("NOS_EXP_CRT") != nullptr;
 	for (size_t it = 0; it < 2000; it++) {
 		if (sweeps) *sweeps = static_cast<int>(it) + 1;
+		const sp_vec last_input = anderson > 0 ? copy_of_input : sp_vec();
 		for (int j = 0; j < ncen; j++) {
 			std::fill(sig_pop_vector[j].first.begin(), sig_pop_vector[j].first.end(), 0.0);
 			std::fill(sig_pop_vector[j].second.begin(), sig_pop_vector[j].second.end(), 0.0);
@@ -1262,6 +1336,23 @@ std::vector<std::pair<vec, vec>> make_MBIS_vectors(
 			return sig_pop_vector;
 		}
 		copy_of_input = sig_pop_vector;
+		if (anderson > 0) {
+			//sigma and population of every shell, the mixed step kept only while all stay positive
+			vec xi, gi, xo;
+			for (int j = 0; j < ncen; j++)
+				for (int shell = 0; shell < nshell_cache[j]; shell++) {
+					xi.push_back(last_input[j].first[shell]); xi.push_back(last_input[j].second[shell]);
+					gi.push_back(sig_pop_vector[j].first[shell]); gi.push_back(sig_pop_vector[j].second[shell]);
+				}
+			bool ok = mix.step(xi, gi, xo);
+			for (int t = 1; ok && t < static_cast<int>(xo.size()); t += 2) ok = xo[t - 1] > 0.0 && xo[t] >= 0.0;
+			if (!ok && xo.size()) mix.reset();
+			for (int j = 0, t = 0; ok && j < ncen; j++)
+				for (int shell = 0; shell < nshell_cache[j]; shell++, t += 2) {
+					copy_of_input[j].first[shell] = xo[t];
+					copy_of_input[j].second[shell] = xo[t + 1];
+				}
+		}
 		last_charges = charges;
 
 	}
@@ -1280,9 +1371,11 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
 	std::ostream &file,
 	const std::vector<std::pair<vec2, vec>> &start,
 	const double crit,
-	int *sweeps)
+	int *sweeps,
+	const int anderson)
 {
 	using sp_vec = std::vector<std::pair<vec2, vec>>;
+	anderson_mix mix{ anderson };
 	auto atoms = wavy.get_atoms();
 	vec charges(atoms.size(), 0.0);
 	vec last_charges(atoms.size(), 0.0);
@@ -1371,6 +1464,7 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
 	const bool crt_exp = tuning("NOS_EXP_CRT") != nullptr;
 	for (size_t it = 0; it < 2000; it++) {
 		if (sweeps) *sweeps = static_cast<int>(it) + 1;
+		const sp_vec last_input = anderson > 0 ? copy_of_input : sp_vec();
 		for (int j = 0; j < ncen; j++) {
 			std::fill(sig_pop_vector[j].first.begin(), sig_pop_vector[j].first.end(), zeros_6);
 			std::fill(sig_pop_vector[j].second.begin(), sig_pop_vector[j].second.end(), 0.0);
@@ -1579,6 +1673,26 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
 			return sig_pop_vector;
 		}
 		copy_of_input = sig_pop_vector;
+		if (anderson > 0) {
+			//the six alpha and the population of every shell, the mixed step kept only while each alpha stays positive definite
+			vec xi, gi, xo;
+			for (int j = 0; j < ncen; j++)
+				for (int shell = 0; shell < nshell_cache[j]; shell++) {
+					for (int c = 0; c < 6; c++) { xi.push_back(last_input[j].first[shell][c]); gi.push_back(sig_pop_vector[j].first[shell][c]); }
+					xi.push_back(last_input[j].second[shell]); gi.push_back(sig_pop_vector[j].second[shell]);
+				}
+			bool ok = mix.step(xi, gi, xo);
+			for (int t = 0; ok && t < static_cast<int>(xo.size()); t += 7) {
+				const double* a = xo.data() + t;
+				ok = a[0] > 0.0 && a[0] * a[3] - a[1] * a[1] > 0.0 && a[0] * a[3] * a[5] - a[0] * a[4] * a[4] - a[3] * a[2] * a[2] - a[5] * a[1] * a[1] + 2 * a[1] * a[2] * a[4] > 0.0 && a[6] >= 0.0;
+			}
+			if (!ok && xo.size()) mix.reset();
+			for (int j = 0, t = 0; ok && j < ncen; j++)
+				for (int shell = 0; shell < nshell_cache[j]; shell++, t += 7) {
+					for (int c = 0; c < 6; c++) copy_of_input[j].first[shell][c] = xo[t + c];
+					copy_of_input[j].second[shell] = xo[t + 6];
+				}
+		}
 		last_charges = charges;
 
 	}

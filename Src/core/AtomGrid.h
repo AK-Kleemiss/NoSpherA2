@@ -98,6 +98,10 @@ std::array<double, 2> get_integration_weights(const int &num_centers,
 	const vec &chi,
 	const double *dist_ab = nullptr); //interatomic distances, num_centers x num_centers, or computed per call
 
+//get_integration_weights' TFVC share alone, the same operations in the same order; dist and pa num_centers long
+double get_tfvc_weight(const int num_centers, const double* x_c, const double* y_c, const double* z_c, const int center_index,
+	const double x, const double y, const double z, vec& pa, vec& dist, const vec& chi, const double* dist_ab);
+
 const double get_r_inner(const double &max_error, const double &alpha_inner);
 
 double get_r_outer(const double &max_error,
@@ -107,7 +111,8 @@ double get_r_outer(const double &max_error,
 
 double get_h(const double &max_error, const int &l, const double &guess);
 
-//start: the shells to iterate from instead of the element guess; sweeps: the iterations it took
+//start: the shells to iterate from instead of the element guess; sweeps: the iterations it took; anderson: steps of
+//Anderson mixing on the shell parameters, 0 the plain fixed point
 std::vector<std::pair<vec, vec>> make_MBIS_vectors(
 	const WFN &wavy,
 	const vec3 &grid,
@@ -116,7 +121,8 @@ std::vector<std::pair<vec, vec>> make_MBIS_vectors(
 	std::ostream &file = std::cout,
 	const std::vector<std::pair<vec, vec>> &start = {},
 	const double crit = 0.001,
-	int *sweeps = nullptr);
+	int *sweeps = nullptr,
+	const int anderson = 0);
 
 std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
 	const WFN &wavy,
@@ -127,4 +133,5 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
 	std::ostream &file = std::cout,
 	const std::vector<std::pair<vec2, vec>> &start = {},
 	const double crit = 0.001,
-	int *sweeps = nullptr);
+	int *sweeps = nullptr,
+	const int anderson = 0);

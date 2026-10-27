@@ -709,20 +709,34 @@ static void density_following_shares(const std::string& scheme)
 	const std::string cif = fs::absolute(fixture("P1_test/P1_test.cif")).string(), hkl = fs::absolute(fixture("P1_test/P1_subset.hkl")).string();
 	app_dir run("xcw_" + scheme);
 	std::ofstream(run.dir / "settings.txt") << "normal normal_conv params 177 basis_set sto-3g max_iter 100 F charge 0 mult 1 rhf start 0 step_size 0.05 end 0.05";
-	std::stringstream out;
-	std::streambuf* old = std::cout.rdbuf(out.rdbuf());
-	const int rc = run.run({ "-do_XCW", "-no_gpu", "-cif", cif, "-hkl", hkl, "-XCW_settings", "settings.txt", "-" + scheme, "-tune", "NOSPHERA2_XCW_ADJOINT_CHECK=1", "-no_date" });
-	std::cout.rdbuf(old);
-	ASSERT_EQ(rc, 0);
-	const std::string log = out.str() + run.log();
-	auto r1 = [&](const std::string& row) {
-		const size_t at = log.find("\n" + row);
-		EXPECT_NE(at, std::string::npos) << row;
-		std::istringstream l(log.substr(at + 1));
+	auto xcw = [&](std::vector<std::string> extra) {
+		std::vector<std::string> a{ "-do_XCW", "-no_gpu", "-cif", cif, "-hkl", hkl, "-XCW_settings", "settings.txt", "-" + scheme, "-no_date" };
+		a.insert(a.end(), extra.begin(), extra.end());
+		std::stringstream out;
+		std::streambuf* old = std::cout.rdbuf(out.rdbuf());
+		const int rc = run.run(a);
+		std::cout.rdbuf(old);
+		EXPECT_EQ(rc, 0);
+		return out.str() + run.log();
+	};
+	//the round-10 path: plain fixed-point fits to 1e-6, the Becke and TFVC pass, refits between solves only
+	const std::string old_log = xcw({ "-tune", "NOSPHERA2_XCW_TFVC_OLD", "-tune", "NOSPHERA2_XCW_WEIGHT_MIX=0", "-tune", "NOSPHERA2_XCW_WEIGHT_DTOL=0" });
+	const std::string log = xcw({ "-tune", "NOSPHERA2_XCW_ADJOINT_CHECK=1" });
+	auto row = [](const std::string& text, const std::string& lambda, const int col) {
+		const size_t at = text.find("\n" + lambda);
+		EXPECT_NE(at, std::string::npos) << lambda;
+		std::istringstream l(text.substr(at + 1));
 		double v[4] = { 0, 0, 0, 1 };
 		for (int i = 0; i < 4; i++) l >> v[i];
-		return v[3];
+		return v[col];
 	};
+	auto r1 = [&](const std::string& lambda) { return row(log, lambda, 3); };
+	//the converged result is the same fixed point within the SCF and refit tolerances: GooF to 1e-4, so its square, the
+	//criterion (about 20 here), to 1e-3, R1 to 1e-5
+	for (const std::string l : { " 0.00000\t", " 0.05000\t" }) {
+		EXPECT_NEAR(row(log, l, 1), row(old_log, l, 1), 1e-3) << l;
+		EXPECT_NEAR(row(log, l, 3), row(old_log, l, 3), 1e-5) << l;
+	}
 	const double r0 = r1(" 0.00000\t"), r5 = r1(" 0.05000\t");
 	EXPECT_LT(std::abs(r0 - 0.0253), 0.1 * 0.0253) << r0;
 	EXPECT_LT(r5, r0);
@@ -756,6 +770,16 @@ static void density_following_shares(const std::string& scheme)
 		GridData& G = gm.getGridData();
 		std::ostream none(nullptr);
 		const auto m = make_MBIS_vectors(w, G.helper_grids, G.helper_num_points_per_atom, false, none, {}, 1e-8);
+		//Anderson mixing reaches the same fixed point in fewer sweeps
+		int plain = 0, mixed = 0;
+		const auto m0 = make_MBIS_vectors(w, G.helper_grids, G.helper_num_points_per_atom, false, none, {}, 1e-8, &plain);
+		const auto m6 = make_MBIS_vectors(w, G.helper_grids, G.helper_num_points_per_atom, false, none, {}, 1e-8, &mixed, 6);
+		for (int a = 0; a < w.get_ncen(); a++)
+			for (int i = 0; i < static_cast<int>(m0[a].second.size()); i++) {
+				EXPECT_NEAR(m0[a].second[i], m6[a].second[i], 1e-6);
+				EXPECT_NEAR(m0[a].first[i], m6[a].first[i], 1e-6);
+			}
+		EXPECT_LT(mixed, plain);
 		const auto e = scheme == "embis" ? make_EMBIS_tensors(w, G.helper_grids, G.helper_num_points_per_atom, false, m, none, {}, 1e-8) : std::vector<std::pair<vec2, vec>>();
 		for (int a = 0; a < w.get_ncen(); a++) {
 			ref[a] = w.get_atom_charge(a);
@@ -770,5 +794,29 @@ static void density_following_shares(const std::string& scheme)
 }
 
 TEST(XcwPartitionTests, TfvcSharesFollowTheDensity) { density_following_shares("tfvc"); }
+
+//get_tfvc_weight is get_integration_weights' TFVC share, the same operations: equal to round-off on random points and chi
+TEST(XcwPartitionTests, TfvcShareKernelIsTheStandAloneOne)
+{
+	std::mt19937 gen(5);
+	std::uniform_real_distribution<double> u(-4.0, 4.0), c(0.5, 2.0);
+	const int n = 12;
+	vec x(n), y(n), z(n), chi(n * n), dab(n * n), pa(n), pb(n), dist(n);
+	ivec Z(n);
+	for (int a = 0; a < n; a++) { x[a] = u(gen); y[a] = u(gen); z[a] = u(gen); Z[a] = 1 + a % 8; }
+	for (int a = 0; a < n; a++)
+		for (int b = 0; b < n; b++) {
+			dab[a * n + b] = std::hypot(x[b] - x[a], y[b] - y[a], z[b] - z[a]);
+			if (b > a) { chi[a * n + b] = c(gen); chi[b * n + a] = 1.0 / chi[a * n + b]; }
+		}
+	double worst = 0;
+	for (int p = 0; p < 2000; p++) {
+		const int g = p % n;
+		const double px = x[g] + u(gen), py = y[g] + u(gen), pz = z[g] + u(gen);
+		const double ref = get_integration_weights(n, Z.data(), x.data(), y.data(), z.data(), g, px, py, pz, pb, pa, chi, dab.data())[1];
+		worst = std::max(worst, std::abs(ref - get_tfvc_weight(n, x.data(), y.data(), z.data(), g, px, py, pz, pa, dist, chi, dab.data())));
+	}
+	EXPECT_LT(worst, 1e-14);
+}
 TEST(XcwPartitionTests, MbisSharesFollowTheDensity) { density_following_shares("mbis"); }
 TEST(XcwPartitionTests, EmbisSharesFollowTheDensity) { density_following_shares("embis"); }

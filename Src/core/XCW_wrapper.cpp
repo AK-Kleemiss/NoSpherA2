@@ -265,8 +265,23 @@ void XCW_wrapper::evaluate_cryst_crit(const dMatrix2& dm_eff) {
 	//density-following shares refit at this evaluation only when NOSPHERA2_XCW_WEIGHT_UPDATE asks for it
 	sf.XG.refresh = sf.XG.ws && scf_solver.lambda != 0.0 && (weight_every_ > 0 ? weight_count_ % weight_every_ == 0 : weight_every_ == 0 && weight_count_ == 0);
 	weight_count_++;
+	//between solves refits also follow the density inside one while it moves by more than NOSPHERA2_XCW_WEIGHT_DTOL, and hold
+	//still for the rest of the solve once it moves less, so that TRAH near convergence sees one objective
+	if (sf.XG.ws && scf_solver.lambda != 0.0 && weight_every_ < 0 && weight_dtol_ > 0.0 && !weight_hold_) {
+		const int n = static_cast<int>(dm_eff.extent(0));
+		double d = static_cast<int>(weight_D_fit_.extent(0)) == n ? 0.0 : 1e300;
+		for (int i = 0; i < n && d <= weight_dtol_; i++)
+			for (int j = 0; j < n; j++) d = std::max(d, std::abs(dm_eff(i, j) - weight_D_fit_(i, j)));
+		sf.XG.refresh = d > weight_dtol_;
+		weight_hold_ = !sf.XG.refresh && weight_moved_;
+		weight_moved_ = weight_moved_ || sf.XG.refresh;
+		//a refit mid-solve needs no more than the density it follows has: 1e-2 of that move, between the tight 1e-6 and 1e-3
+		sf.XG.tol = std::min(1e-3, 1e-2 * d);
+	}
+	if (sf.XG.refresh) weight_D_fit_ = dm_eff;
 	sf.calc_F_calc(dm_eff);
 	sf.XG.refresh = false;
+	sf.XG.tol = 0.0;
 	sf.eval_scale();
 	sf.calc_criteria();
 }
@@ -487,8 +502,9 @@ void XCW_wrapper::density_fitting(occ::qm::HartreeFock& target, const std::strin
 void XCW_wrapper::report_lambda(const double lambda, const occ::qm::Wavefunction& wfn, const bool write_result) {
 	//lambda 0 does not feel F: density-following shares are fit once, to the converged density, and the row is of them
 	if (lambda == 0.0 && sf.XG.ws) {
+		weight_D_fit_ = spin_summed(wfn.mo.D);
 		sf.XG.refresh = true;
-		sf.calc_F_calc(spin_summed(wfn.mo.D));
+		sf.calc_F_calc(weight_D_fit_);
 		sf.XG.refresh = false;
 		sf.eval_scale();
 		sf.calc_criteria();
@@ -527,6 +543,7 @@ bool XCW_wrapper::refit_moves(const occ::qm::Wavefunction& wfn, const double lam
 	const dMatrix2 D = spin_summed(wfn.mo.D);
 	sf.calc_F_calc(D);
 	const cvec F0 = sf.scatter_data.F_calc;
+	weight_D_fit_ = D;
 	sf.XG.refresh = true;
 	sf.calc_F_calc(D);
 	sf.XG.refresh = false;
@@ -603,6 +620,8 @@ void XCW_wrapper::setup_structure_factors(const occ::qm::HartreeFock& hf) {
 		sf.setup_ri(hf.aobasis());
 	const char* wu = tuning("NOSPHERA2_XCW_WEIGHT_UPDATE");
 	weight_every_ = wu ? std::max(0, std::atoi(wu)) : -1;
+	const char* wd = tuning("NOSPHERA2_XCW_WEIGHT_DTOL");
+	weight_dtol_ = wd ? std::atof(wd) : 1e-3;
 #ifdef NOSPHERA2_USE_GPU
 	//GPU: the grid's two block GEMMs on the device, the transform between them stays on the host.
 	//Single precision there, so not under i_double
@@ -655,12 +674,13 @@ bool XCW_wrapper::read_start_guess(occ::qm::Wavefunction& wfn) {
 bool XCW_wrapper::run_lambda(occ::qm::HartreeFock& hf, const double lambda, occ::qm::Wavefunction& wfn, const bool use_guess, const bool write_result) {
 	scf_solver.lambda = lambda;
 	weight_count_ = 0;
+	weight_hold_ = weight_moved_ = false;
 	//DIIS iterations with damping, level shift and rescue, then TRAH steps where DIIS stalls
 	bool converged = scf_solver.run(hf, wfn, use_guess);
 	//shares held within a solve and refit to its density until that no longer moves F: the fixed point refitting at every
 	//evaluation goes for, with every solve one objective for TRAH to accept steps on
 	for (int round = 0; converged && weight_every_ < 0 && sf.XG.ws && lambda != 0.0 && round < 20 && refit_moves(wfn, lambda); round++)
-		converged = scf_solver.run(hf, wfn, true);
+		converged = (weight_hold_ = true) && scf_solver.run(hf, wfn, true);
 	if (converged) report_lambda(lambda, wfn, write_result);
 	return converged;
 }

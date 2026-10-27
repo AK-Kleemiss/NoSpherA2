@@ -290,6 +290,11 @@ alternative is one flag away in each case.
 
 ## Current Validation Notes
 
+As of 2026-10-27 (shares cost), XCW's TFVC shares take a TFVC-only weight pass and MBIS/EMBIS Anderson-mixed, warm, loose-early
+fits refit inside a solve until the density settles; `XcwPartitionTests.TfvcShareKernelIsTheStandAloneOne` is new. Ported onto the
+XCW refactor, `ctest --preset release-windows -j4` (GPU present) reports **1351 passed, 0 failed, 10 skipped** (2 disabled) of 1363. See
+`UNIT_TESTS_STATUS.md`.
+
 As of 2026-10-27 (XCW refactor, run 3), XCW's Criterion is GooF^2 against F or F^2, the perturbation lambda times it and
 the target quantity `quant_` E + perturbation, the functional the SCF minimises (`phi` is gone; the SCF path is unchanged,
 it already minimised E + lambda GooF^2), and `grid_contract` sums its blocks in a load-independent order; the nine P1 XCW goldens
