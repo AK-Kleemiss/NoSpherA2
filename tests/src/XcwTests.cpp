@@ -1,13 +1,13 @@
 //The XCW lambda-scan halting statistics (Src/core/xcw_halting.cpp) against analytic
 //values and goldens derived by hand, and the XCW settings-file parser, options::loadXCWsettings:
 //the parse errors it throws need no crystal, the successful parses build the structure_factors
-//and the XCW_solver of the P1 fixture and are checked through what those print.
+//and the XCW_wrapper of the P1 fixture and are checked through what those print.
 #include "pch.h"
 #include <gtest/gtest.h>
 
 #include "core/convenience.h"
 #include "core/xcw_halting.h"
-#include "core/XCW_solver.h"
+#include "core/XCW_wrapper.h"
 
 namespace
 {
@@ -68,7 +68,7 @@ namespace
 		return what;
 	}
 
-	//build the structure_factors and the XCW_solver of the P1 fixture with this settings text,
+	//build the structure_factors and the XCW_wrapper of the P1 fixture with this settings text,
 	//in a scratch directory because the solver opens its SCF.log there; returns what they
 	//printed, lowercased, empty when the fixture is missing
 	std::string construct_on_p1(const std::string& text)
@@ -92,7 +92,7 @@ namespace
 		std::streambuf* const old_cout = std::cout.rdbuf(log.rdbuf());
 		opt.loadXCWsettings();
 		{
-			XCW_solver x(opt);
+			XCW_wrapper x(opt);
 		}
 		std::cout.rdbuf(old_cout);
 		std::filesystem::current_path(old_cwd);

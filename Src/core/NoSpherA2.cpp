@@ -10,7 +10,7 @@
 #include "isosurface.h"
 #include "cif.h"
 #include "bondwise_analysis.h"
-#include "XCW_solver.h"
+#include "XCW_wrapper.h"
 #include "geometry_aid.h"
 #include "crystal_energies.h"
 #include "nao.h"
@@ -980,8 +980,8 @@ static int run_app_impl(int argc, char **argv)
 			opt.partition_type = ri && m == MultipoleScheme::TFVC ? PartitionType::TFVC : ri && m == MultipoleScheme::MBIS ? PartitionType::MBIS
 				: ri && m == MultipoleScheme::EMBIS ? PartitionType::EMBIS : PartitionType::Hirshfeld;
 		}
-		XCW_solver xcw_solver(opt);
-		xcw_solver.run();
+		XCW_wrapper xcw_wrapper(opt);
+		xcw_wrapper.run();
 		log_file.flush();
 		std::cout.rdbuf(_coutbuf);
 		return 0;

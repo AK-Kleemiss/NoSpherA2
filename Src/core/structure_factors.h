@@ -5,6 +5,7 @@
 #include "scattering_factors.h"
 #include "wfn_class.h"
 #include "i_tensor_stream.h"
+#include "GridManager.h"
 #include <occ/qm/hf.h>
 #include <thread>
 
@@ -163,7 +164,7 @@ public:
 	//the per-atom transform of rho(D) at the cleaned entries, [g * nc + c]; grid_F's first half and the tscb's table.
 	//The atoms' shares come from the grid weights, or from the RI fit when XR.on
 	cvec grid_sfc(const dMatrix2& D);
-	//out = Sum_r Re(pre_r I_r(mu, nu)) without forming I, what XCW_solver::contract_I gives
+	//out = Sum_r Re(pre_r I_r(mu, nu)) without forming I, what contract_tensor gives
 	void grid_contract(occ::Mat& out, const cvec& pre);
 	//the weighted density 2 w_p rho(p) of every atom grid, grid_sfc's first half
 	vec2& grid_rho(const dMatrix2& D);
@@ -192,6 +193,11 @@ public:
 	//moments [atom][l*l+l+m] in constants::spherical_harmonic's convention (DensityFitting's) as the fixed targets
 	void set_ri_targets(const vec2& moments);
 	void setup_ri(const occ::qm::AOBasis& ao, const occ::qm::AOBasis& aux, const int lmax, const double strength, const MultipoleScheme scheme);
+	//the same in the -ri_fit basis, AutoAux on the atoms of ao without one, restrained as -multipole_moments says
+	void setup_ri(const occ::qm::AOBasis& ao);
+	//Re Sum_r pre_r (F_r(D) - anomalous_r) against 2 <D, P(pre)> at a random D and pre, printed: the perturbation has
+	//to be the transpose of F_calc, whichever partition runs, with the shares the grid holds
+	void check_adjoint();
 	cvec ri_sfc(const dMatrix2& D);
 	void ri_contract(const cvec& H, occ::Mat& out);
 
@@ -319,10 +325,47 @@ public:
 	size_t free_memory() const;
 	size_t df_reserved_ = 0;
 
-	// Calculates F_calc from the atomic scattering factors of every atom over hkl_enlarged
+	// F_calc from the atomic scattering factors of every atom over hkl_enlarged
 	void calc_F_calc(const cvec2& scattering_factors);
-	// Calculates F_calc from the I tensor and a density matrix
+	// F_calc from the I tensor and a density matrix
 	void calc_F_calc(I_tensor& I, const dMatrix2& D);
+	// F_calc from a density matrix, through the I tensor or on the grid as XG.mode says
+	void calc_F_calc(const dMatrix2& D);
+	// F_calc from the scattering factors of a tsc table
+	void calc_F_calc(const itsc_block& tsc);
+	// F_calc from wavefunctions, through the tsc table tsc_table computes for them
+	void calc_F_calc(std::vector<WFN>& wavefunctions, GridManager* grids, std::ostream& log);
+	// The tsc table of the wavefunctions at every entry of hkl_enlarged; grids keeps the integration grids for the next call
+	itsc_block tsc_table(std::vector<WFN>& wavefunctions, GridManager* grids, std::ostream& log);
+
+	// out = Sum_r Re(pre_r I_r(mu,nu)) over the fit set, the walk the perturbation and its response
+	// share; nmo x nmo, symmetric, without any prefactor. On the grid or through the I tensor as XG.mode says
+	void contract_I(occ::Mat& out, const cvec& pre);
+	// contract_I's walk over the tensor itself
+	void contract_tensor(occ::Mat& out, const cvec& pre);
+	// The perturbation matrix: the derivative of the fit criterion with respect to the density matrix, nmo rows per spin block
+	void perturbation(occ::Mat& perturb, const bool unrestricted, std::ostream& log);
+	// lambda times the change of the perturbation matrix for a change dD_eff of the density, the scale
+	// moving along; leaves F_calc and the scale as they were
+	occ::Mat perturbation_response(const dMatrix2& dD_eff, const double lambda);
+	// The F_calc table of the current density, one reflection per line
+	void write_F_calc(const std::string& path);
+	// F_calc and scale as they are now, and back
+	void save_F_calc();
+	void restore_F_calc();
+	cvec saved_F_calc_;
+	double saved_scale_ = 0.0;
+
+	// The tsc table of a converged density for the tscb output, see result_table in structure_factors.cpp;
+	// refit_shares fits density-following shares to it first
+	itsc_block result_table(const occ::Mat& D_wfn, std::vector<WFN>& wavefunctions, std::ostream& log, const bool refit_shares);
+	// What result_table keeps between steps: the integration grids of the tsc route and, on the grid route,
+	// the layout of the first table: its scatterers, hkl rows, the asym atom of each scatterer and the
+	// hkl_enlarged entry of each row
+	GridManager tsc_grids;
+	ScattererLabels tscb_scat_;
+	ivec2 tscb_hkl_;
+	ivec tscb_atom_, tscb_entry_;
 
 	// Evaluates the scaling factor for |F_calc| by least squares fitting, and with it the
 	// extinction coefficients when a model is being refined

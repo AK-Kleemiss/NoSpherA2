@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "structure_factors.h"
 #include "constants.h"
+#include "basis_set.h"
 #include "integrator.h"
 #include <occ/qm/integral_engine_df.h>
 #include <occ/qm/integral_engine.h>
@@ -31,6 +32,26 @@ namespace {
 		}
 		return d;
 	}
+}
+
+void structure_factors::setup_ri(const occ::qm::AOBasis& ao)
+{
+	WFN atoms_wfn(e_origin::NOT_YET_DEFINED);
+	for (const auto& a : ao.atoms())
+		atoms_wfn.push_back_atom(constants::atnr2letter(a.atomic_number), a.x, a.y, a.z, a.atomic_number);
+	//gen_auto_aux reads the WFN-file convention, types from 1; the library stores l
+	for (int a = 0; a < atoms_wfn.get_ncen(); a++)
+		for (const SimplePrimitive& p : (*orbital_basis)[atoms_wfn.get_atom_charge(a) - 1])
+			atoms_wfn.push_back_atom_basis_set(a, p.exp, p.coefficient, p.type + 1, p.shell);
+	std::vector<std::shared_ptr<BasisSet>> aux;
+	for (const auto& b : opt->aux_basis) aux.push_back(std::make_shared<BasisSet>(*b));
+	if (aux.empty())
+		aux.push_back(std::make_shared<BasisSet>());
+	//an empty set is auto_aux, filled for these atoms as generate_aux_wfn fills it
+	for (const auto& b : aux)
+		if (b->get_primitive_count() == 0) b->gen_auto_aux(atoms_wfn);
+	for (size_t i = 1; i < aux.size(); i++) *aux[0] += *aux[i];
+	setup_ri(ao, aux[0]->to_AOBasis(ao.atoms()), opt->multipole_lmax, opt->multipole_strength, opt->multipole_scheme);
 }
 
 void structure_factors::setup_ri(const occ::qm::AOBasis& ao, const occ::qm::AOBasis& aux_in, const int lmax, const double strength, const MultipoleScheme scheme)

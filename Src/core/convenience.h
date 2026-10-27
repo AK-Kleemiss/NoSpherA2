@@ -1088,30 +1088,31 @@ struct options
 		std::filesystem::path i_tensor_save_path;
 	};
 
-	// What SCF_wrapper reads: the convergence thresholds with their running state, the damping
+	// What the SCF solver reads: the convergence thresholds with their running state, the damping
 	// and level shift schedule, the spin kind and the second-order switches
 	struct SCF_settings {
-		double quant_diff;
-		double current_quant_diff;
+		//The thresholds default to the `normal` preset of the XCW settings file
+		double quant_diff = 1e-6;
+		double current_quant_diff = 0;
 		bool conv_quant_diff = false;
-		double max_diis_error;
-		double current_max_diis_error;
+		double max_diis_error = 1e-5;
+		double current_max_diis_error = 0;
 		bool conv_max_diis_error = false;
-		double gradient;
-		double current_gradient;
+		double gradient = 7e-5;
+		double current_gradient = 0;
 		bool conv_gradient = false;
-		double RMSP_diff;
-		double current_RMSP_diff;
+		double RMSP_diff = 1e-6;
+		double current_RMSP_diff = 0;
 		bool conv_RMSP_diff = false;
-		double MaxP_diff;
-		double current_MaxP_diff;
+		double MaxP_diff = 1e-5;
+		double current_MaxP_diff = 0;
 		bool conv_MaxP_diff = false;
 		//The four damping/shift values default to off: `fast_conv` only clears the apply
 		//flags, yet run_lambda copies alpha and level_shift and SCF_iteration mixes the
 		//density with alpha regardless of the flag
 		double diis_stop_damping = 0;
 		//`check_hessian`: finite-difference check of the Hessian-vector product on the first
-		//second-order step, reported in XCW.log; it enters TRAH once the DIIS error is below
+		//second-order step, reported in SCF.log; it enters TRAH once the DIIS error is below
 		//trah_.start_threshold, so a cold start has a step to check
 		bool check_hessian = false;
 		bool apply_shift = true;
@@ -1122,13 +1123,13 @@ struct options
 		//`guess_basis <name>`: the first lambda starts from a Hartree-Fock converged in this
 		//(smaller) basis by OCC's own driver, its density projected into the orbital basis
 		std::string guess_basis_name;
-		occ::qm::SpinorbitalKind hf_type;
+		occ::qm::SpinorbitalKind hf_type = occ::qm::SpinorbitalKind::Restricted;
 		double alpha = 0;
 		double level_shift = 0;
-		int max_scf_iterations;
+		int max_scf_iterations = 100;
 		int charge = 0;
 		int multiplicity = 1;
-		// Not settings-file keys: filled by XCW_solver from the options when it builds SCF_wrapper
+		// Not settings-file keys: filled by XCW_wrapper from the options when it builds the SCF solver
 		bool incremental = true;
 		bool gpu_eri = false;
 		bool no_date = false;
@@ -1161,16 +1162,16 @@ struct options
 			if (current_max_diis_error < diis_stop_damping && apply_damping == true) {
 				apply_damping = false;
 				alpha = 0;
-				print_centered_message("***Turned off damping***", 84, file);
+				print_centered_message("***Turned off damping***", 100, file);
 			}
 			if (current_max_diis_error < diis_stop_shift && apply_shift == true) {
 				apply_shift = false;
-				print_centered_message("***Turned off level shift***", 84, file);
+				print_centered_message("***Turned off level shift***", 100, file);
 			}
 		}
 	};
 
-	// What XCW_solver reads itself; the two slices above go to structure_factors and SCF_wrapper
+	// What XCW_wrapper reads itself; the two slices above go to structure_factors and the SCF solver
 	struct XCW_settings : SF_settings, SCF_settings {
 		//`df_basis <name>`: density fitting of the Fock build with this auxiliary basis
 		std::string df_basis_name;

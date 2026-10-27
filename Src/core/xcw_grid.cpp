@@ -8,6 +8,7 @@
 #if defined(__SSE2__) || defined(_M_X64)
 #include <xmmintrin.h>
 #endif
+#include <random>
 
 //XCW structure factors and perturbation on build_I's grid instead of through the I tensor, see
 //structure_factors::xcw_grid. Both walk the same blocks with the same screening, so the
@@ -409,8 +410,8 @@ vec2& structure_factors::grid_rho(const dMatrix2& D)
 	for (int g = 0; g < ng; g++)
 		for (int b = 0; b < static_cast<int>(XG.blocks[g].size()); b++) list.emplace_back(g, b);
 	const int nb = static_cast<int>(list.size()), nmo = static_cast<int>(D.extent(0));
-	//NOSPHERA2_XCW_GRID_DTOL: per block bound on the |dF| a kept rho may carry; off by default: XCW moves D on
-	//every pair each cycle, so on P1 the bound is 1e-5..1 per block and 1e-4 keeps 14 % of blocks for 2.5e-4 in F
+	//NOSPHERA2_XCW_GRID_DTOL: per block bound on the |dF| a kept rho may carry; off by default: an SCF moves
+	//every element of D each cycle, so few blocks stay below any useful bound
 	const char* dt = tuning("NOSPHERA2_XCW_GRID_DTOL");
 	const double dtol = dt && !XG.on_device ? std::atof(dt) : 0.0;
 	const bool fresh = static_cast<int>(XG.bound.size()) != nb || XG.D_last.rows() != nmo;
@@ -458,6 +459,7 @@ vec2& structure_factors::grid_rho(const dMatrix2& D)
 		for (int j = 0; j < nmo; j++) XG.D_last(i, j) = D(i, j);
 	sc.lap("F change test");
 #ifdef NOSPHERA2_USE_GPU
+	//GPU: rho of every block from D by the device's GEMMs, the same values as the loop below
 	if (XG.on_device) {
 		vec Dh(static_cast<size_t>(nmo) * nmo), r(XG.gpu_off[ng]);
 		for (int i = 0; i < nmo; i++)
@@ -528,8 +530,8 @@ cvec structure_factors::grid_sfc(const dMatrix2& D)
 	const int ng = static_cast<int>(XG.blocks.size()), nc = static_cast<int>(XG.inversion_link.size());
 	const vec2& rho = grid_rho(D);
 	stage_clock sc;
-	//ponytail: direct sum over points x cleaned entries, P * nc sincos; the exact reference the
-	//Fourier-Bessel transform replaces once it is checked against this
+	//The transform of rho: Fourier-Bessel when planned, else the direct sum over points x cleaned
+	//entries (P * nc sincos), the exact reference
 	cvec sfc(static_cast<size_t>(ng) * nc);
 	if (XG.fb) XG.fb->forward(rho, sfc);
 	else {
@@ -614,12 +616,38 @@ void structure_factors::grid_contract(occ::Mat& out, const cvec& pre)
 	grid_apply_V(V, out);
 }
 
+void structure_factors::check_adjoint()
+{
+	std::mt19937 gen(7);
+	std::uniform_real_distribution<double> u(-1.0, 1.0);
+	const int n = model_data.nmo;
+	dMatrix2 D(n, n);
+	for (int i = 0; i < n; i++)
+		for (int j = i; j < n; j++) D(i, j) = D(j, i) = u(gen);
+	cvec pre(model_data.nr);
+	for (cdouble& p : pre) p = cdouble(u(gen), u(gen));
+	const cvec F = scatter_data.F_calc;
+	//fixed RI targets are F's constant part like the anomalous one, so they are left out as in a response
+	XR.response = true;
+	grid_F(D);
+	XR.response = false;
+	occ::Mat P;
+	grid_contract(P, pre);
+	double l1 = 0, l2 = 0;
+	for (int r = 0; r < model_data.nr; r++) l1 += std::real(pre[r] * (scatter_data.F_calc[r] - scatter_data.anom_correction[r]));
+	for (int i = 0; i < n; i++)
+		for (int j = 0; j < n; j++) l2 += 2.0 * D(i, j) * P(i, j);
+	scatter_data.F_calc = F;
+	std::cout << "XCW adjoint check (" << (XR.on ? "ri" : "grid") << "): " << std::scientific << std::setprecision(3) << std::abs(l1 - l2) / std::abs(l1) << std::defaultfloat << std::endl;
+}
+
 void structure_factors::grid_apply_V(const vec2& V, occ::Mat& out)
 {
 	const int nmo = model_data.nmo, ng = static_cast<int>(XG.blocks.size());
 	const bool fp32 = opt->cpu_itensor_fp32 && !I_tens.tensor_double;
 	stage_clock sc;
 #ifdef NOSPHERA2_USE_GPU
+	//GPU: the transposed chain, the potential of every block contracted into out on the device
 	if (XG.on_device) {
 		vec Vh(XG.gpu_off[ng]);
 		for (int g = 0; g < ng; g++) std::copy(V[g].begin(), V[g].end(), Vh.begin() + XG.gpu_off[g]);
@@ -677,6 +705,7 @@ bool structure_factors::hold_grid_gpu()
 {
 	XG.on_device = false;
 #ifdef NOSPHERA2_USE_GPU
+	//GPU: uploads the AO values of every block; without a device the grid stays on the host
 	const int nmo = model_data.nmo, ng = static_cast<int>(XG.blocks.size());
 	XG.gpu_off.assign(ng + 1, 0);
 	for (int g = 0; g < ng; g++) XG.gpu_off[g + 1] = XG.gpu_off[g] + static_cast<int>(XG.w[g].size());

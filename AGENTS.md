@@ -290,6 +290,16 @@ alternative is one flag away in each case.
 
 ## Current Validation Notes
 
+As of 2026-10-27 (XCW refactor merged with density_source `33fa9685`), the density-following TFVC/MBIS/EMBIS shares run in the
+new structure: their refit between solves, the lambda 0 fit and the share report in `XCW_wrapper`, `NOSPHERA2_XCW_ADJOINT_CHECK`
+after the first step; `ctest --preset release-windows-tests -j 6` on a CPU-only build reports **1333 passed, 0 failed, 23 skipped**
+(2 disabled) of 1358, and the four `P1_*_full` goldens pass. See `UNIT_TESTS_STATUS.md` and `REFACTOR.md`.
+
+As of 2026-10-27 (XCW refactor merged with density_source `0efc6add`), the `-tshb` step fits and the `-xcw_partition ri`
+layer run in the new structure (`XCW_wrapper::write_tshb`, `structure_factors::setup_ri` / `check_adjoint`); `ctest --preset
+release-windows-tests -j 6` on a CPU-only build reports **1330 passed, 0 failed, 23 skipped** (2 disabled) of 1355, and the
+four `P1_*_full` goldens pass. See `UNIT_TESTS_STATUS.md` and `REFACTOR.md`.
+
 As of 2026-10-27 (XCW density-following shares), `-tfvc`, `-mbis` and `-embis` run XCW on shares refit to its own density
 between SCF solves, and the RI partition takes TFVC/MBIS/EMBIS targets from those shares, Mulliken targets linear in D and fixed
 Nuclear/Sanderson ones; three `XcwPartitionTests` are new. `ctest --preset release-linux-tests` on a CPU-only 4-core VM reports
@@ -317,6 +327,11 @@ release-linux-tests` on a CPU-only 4-core VM reports **1323 passed, 0 failed, 23
 As of 2026-10-26 (orbital-less parts), `-tshb` writes the spherical fill records for a part without orbitals instead of
 refusing; XCW stays refused (its F_calc and an RI fit of its density differ by up to 6.6e-2 relative). `ctest --preset
 release-linux-tests` on a CPU-only 4-core VM reports **1322 passed, 0 failed, 23 skipped** (2 disabled) of 1345. See
+`UNIT_TESTS_STATUS.md`.
+
+As of 2026-10-26 (XCW refactor, run 1), `SCF_wrapper` is `SCF_solver`, a plain Hartree-Fock SCF extended by the
+`XCW_solver` child, and the XCW driver is `XCW_wrapper` (see `REFACTOR.md`); `ScfSolverTests` (3) are new. `ctest --preset
+release-windows-tests -j 6` on a CPU-only build reports **1323 passed, 0 failed, 23 skipped** (2 disabled) of 1346. See
 `UNIT_TESTS_STATUS.md`.
 
 As of 2026-10-26 (final), restrained RI fits are checked at 1e-2 N, the streamed `-mtc` SALTED table keeps each part's fill

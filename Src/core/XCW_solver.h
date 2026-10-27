@@ -1,117 +1,68 @@
 #pragma once
-#include "convenience.h"
-#include "structure_factors.h"
-#include "SCF_wrapper.h"
-#include "GridManager.h"
-#include "integrator.h"
-#include "xcw_halting.h"
+#include "SCF_solver.h"
 
-// Drives the wavefunction fitting: owns the structure factors and the SCF and is the only place that talks to both
-class XCW_solver : private SCF_coupling {
+// The crystallographic quantities of the current density, as the SCF prints and descends them
+struct fit_quality {
+	double criterion, GooF2, R1, criterion_all, R1_all;
+};
+
+// What the SCF needs from the structure factors, implemented by XCW_wrapper so that the SCF never
+// sees the structure factors, the I tensor or the reflection data
+class SCF_coupling {
 
 public:
 
-	// Builds the structure factors from the options, which XCW_solver keeps to hand out their parts
-	XCW_solver(options& opt_in);
+	virtual ~SCF_coupling() = default;
+	// F_calc, scale and criteria of the effective density
+	virtual void evaluate(const dMatrix2& dm_eff) = 0;
+	// The perturbation matrix of the last evaluate, nmo rows per spin block
+	virtual void perturbation(occ::Mat& perturb, const bool unrestricted) = 0;
+	virtual fit_quality quality() const = 0;
+	// lambda times the change of the perturbation matrix for a change of the effective density,
+	// the scale moving along; leaves F_calc and the scale as they were
+	virtual occ::Mat perturbation_response(const dMatrix2& dD_eff, const double lambda) = 0;
+	// F_calc and scale as they are now, and back
+	virtual void save_state() = 0;
+	virtual void restore_state() = 0;
+	// Whether the I tensor is walked on the device, for the timing record
+	virtual bool on_device() const = 0;
+};
 
-	// Does the XCW fitting routine
-	void run();
+// The SCF of one lambda step of the X-ray constrained wavefunction fit: it minimises
+// E + lambda chi^2, with chi^2, its derivative (the perturbation matrix) and the response of that
+// derivative taken from the coupling
+class XCW_solver : public SCF_solver {
 
-	const structure_factors& structure() const { return sf; }
+public:
 
-	// Sum_r Re(pre_r I_r(mu,nu)) over the fit set, the walk perturbation and the Hessian-vector
-	// product share; out is nmo x nmo, symmetric, without any prefactor
-	void contract_I(occ::Mat& out, const cvec& pre);
-	// contract_I's walk over the tensor itself, the grid route aside
-	void contract_tensor(occ::Mat& out, const cvec& pre);
+	XCW_solver() = default;
+	XCW_solver(const occ::core::Molecule& mol, const occ::qm::AOBasis& basis, const options::SCF_settings& settings, SCF_log_writer& writer, SCF_coupling& coupling);
 
-	// Distributional (Gaussian) halting criterion (see xcw_halting.h and
-	// tests/P1_test/XCW_plan.md). Computes standardized residuals z_h from
-	// the current F_calc/obs/scale, evaluates the Anderson-Darling
-	// statistic and supporting diagnostics, logs them, and stores the
-	// result for the final lambda* recommendation. Only called when
-	// `gaussian_halt` is set.
-	void evaluate_gaussian_halting(const double lambda);
+	// The weight of chi^2, set before every run
+	double lambda = 0.0;
 
-	// Takes the converged wavefunction and creates the tscb file
-	void create_tscb(const occ::qm::Wavefunction& wfn, const double& lambda);
+protected:
 
-	// Properties related to the I tensor of sf, see structure_factors::eval_I (NOT THE I TENSOR ITSELF)
-	structure_factors::I_tensor* I_tens;
-	// Per-lambda Gaussian halting diagnostics, see evaluate_gaussian_halting.
-	std::vector<GaussianHaltEntry> gaussian_halt_history_;
+	void evaluate_model(const scf_t& scf, const bool timed) override;
+	double model_energy() const override;
+	void add_model_fock(occ::Mat& F) const override;
+	void add_model_response(const scf_t& scf, const occ::Mat& dD, occ::Mat& dF) override;
+	bool model_active() const override { return lambda != 0; }
+	void save_model_state() override;
+	void restore_model_state() override;
+	void begin_log() override { writer_->start_lambda(lambda); }
+	void log_iteration(const scf_t& scf) override;
+	void end_log(const scf_t& scf) override;
+	std::string functional_name() const override { return "E + lambda chi^2"; }
 
 private:
 
-	// Sets up the molecule, the basis set (and optionally the density fitting basis), creates the SCF_wrapper and returns the Hartree-Fock object
-	occ::qm::HartreeFock setup_system();
-	// Fits target's Fock build with the auxiliary basis `name`, its three-index integrals held when they fit in half of avail
-	void density_fitting(occ::qm::HartreeFock& target, const std::string& name, const char* what, const size_t avail);
-
-	// What a converged lambda step reports: the halting statistic, the table row and the tscb
-	void report_lambda(const double lambda, const occ::qm::Wavefunction& wfn, const bool write_result);
-
-	// SCF_coupling: what the SCF asks of the structure factors, see SCF_wrapper.h
-	void evaluate(const dMatrix2& dm_eff) override;
-	void perturbation(occ::Mat& perturb, const bool unrestricted) override;
-	fit_quality quality() const override;
-	occ::Mat perturbation_response(const dMatrix2& dD_eff, const double lambda) override;
-	void save_state() override;
-	void restore_state() override;
-	bool on_device() const override;
-
-	// Prints the full per-lambda Gaussian-halting table (XCW_log only), then
-	// calls report_halting_progress_estimate(true). Called once at the end
-	// of run().
-	void report_gaussian_halting_summary();
-
-	// Prints the recommended lambda* = argmin A^2 so far (subject to the
-	// binned-trend test), a scan-boundary warning if that argmin sits at
-	// the last evaluated lambda, and -- fitting the A^2(lambda) trend so
-	// far with a small family of polynomial models and picking the best by
-	// AIC (see xcw_halting.h) -- an extrapolated estimate of where the
-	// true minimum likely lies, with the fit's residual/quality diagnostics
-	// for every candidate model tried. Called periodically during the scan
-	// (is_final=false, every 5 lambda steps) and once more at the end
-	// (is_final=true, from report_gaussian_halting_summary). Uses whatever
-	// is in gaussian_halt_history_ at call time, so periodic calls are
-	// naturally based on partial data.
-	void report_halting_progress_estimate(bool is_final);
-
-	static void flip_high_m_phases(occ::qm::Wavefunction& w);
-
-	options* opt;
-	structure_factors sf;
-	SCF_log_writer writer;
-	SCF_wrapper scf_solver;
-	GridManager tsc_grids;
-	// the grid route's tscb (XG.mode 1): the first step's tsc-route table gives the scatterers, the hkl rows,
-	// the asym atom of each scatterer and the hkl_enlarged entry of each row; later steps fill it from grid_sfc
-	ScattererLabels tscb_scat_;
-	ivec2 tscb_hkl_;
-	ivec tscb_atom_, tscb_entry_;
-	// -tshb: the aux wavefunction of the converged density's RI fit and the restraints' partition grid, made at the first
-	// step and kept, since every step has the same atoms and basis
-	WFN tshb_aux_{ e_origin::NOT_YET_DEFINED };
-	DensityFitting::PartitionCache tshb_cache_;
-	ivec tshb_atoms_;
-	void write_tshb(WFN& wave, const tsc_block<int, cdouble>& table, const std::string& name);
-	// F_calc and scale as save_state left them
-	cvec saved_F_calc_;
-	double saved_scale_ = 0.0;
-	// TFVC, MBIS and EMBIS shares (XG.ws) are refit between solves of a lambda step until they hold still (-1, refit_moves),
-	// at every weight_every_-th evaluation, or (0) once at the step's first, never at lambda_ 0; weight_count_ counts the
-	// evaluations of the step, weight_rounds_ the solves refits asked for. weight_D_ and weight_w_ hold the density and
-	// shares of the step before for NOSPHERA2_XCW_WEIGHT_CHECK
-	int weight_every_ = -1, weight_count_ = 0, weight_rounds_ = 0;
-	double lambda_ = 0.0;
-	occ::Mat weight_D_;
-	vec2 weight_w_;
-	// The perturbation is the transpose of F_calc: Re Sum_r pre_r (F_r(D) - anomalous_r) = 2 <D, P(pre)> at a random symmetric
-	// D and random pre, with the shares the grid holds (NOSPHERA2_XCW_ADJOINT_CHECK)
-	void adjoint_check();
-	bool refit_moves(const occ::qm::Wavefunction& wfn, const double lambda);
-	// How far the shares move F and R1(gt) over the step against what the density alone moves (NOSPHERA2_XCW_WEIGHT_CHECK)
-	void weight_check(const occ::qm::Wavefunction& wfn, const double lambda);
-
+	SCF_coupling* coupling_ = nullptr;
+	// The perturbation matrix and the fit quality at the density of the last evaluate_model, and their saved copies
+	occ::Mat perturbation_, saved_perturbation_;
+	fit_quality fit_{}, saved_fit_{};
+	// E + lambda chi of the last iteration, the target quantity of the log
+	double quant_ = 0;
+	// The density matrix the structure factors are calculated from, the spin blocks summed
+	void effective_dm(const scf_t& scf, const occ::Mat& D, dMatrix2& dm_eff) const;
 };
