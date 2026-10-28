@@ -3,6 +3,7 @@
 
 #include "core/basis_set.h"
 #include "core/stored_eri.h"
+#include "core/tuning.h"
 #if defined(NOSPHERA2_USE_GPU)
 #include "core/itensor_gpu.h"
 #endif
@@ -99,6 +100,23 @@ TEST(StoredEriTests, UnrestrictedMatchesTheDirectBuild)
 	expect_incremental(c, eri, 1e-9, "methyl def2-SVP UHF");
 }
 
+//The dynamic row schedule changes only the summation order: J and K agree with the fixed cyclic order to round-off
+TEST(StoredEriTests, DynamicScheduleMatchesTheStaticOne)
+{
+	const scf_case c = run(two_waters, "def2-SVP", occ::qm::SpinorbitalKind::Restricted);
+	stored_eri eri;
+	ASSERT_TRUE(eri.build(*c.hf, 0, std::cout));
+	occ::Mat J, K, Js, Ks;
+	eri.JK(c.converged.D, J, K);
+	set_tuning("NOSPHERA2_ERI_STATIC", "1");
+	eri.JK(c.converged.D, Js, Ks);
+	set_tuning("NOSPHERA2_ERI_STATIC", nullptr);
+	const double dj = max_abs(J - Js) / max_abs(Js), dk = max_abs(K - Ks) / max_abs(Ks);
+	std::cout << "dynamic against static: max |dJ| / |J| " << dj << ", max |dK| / |K| " << dk << std::endl;
+	EXPECT_LT(dj, 1e-12);
+	EXPECT_LT(dk, 1e-12);
+}
+
 TEST(StoredEriTests, BudgetRefusesWhatDoesNotFit)
 {
 	const scf_case c = run(water, "sto-3g", occ::qm::SpinorbitalKind::Restricted);
@@ -130,8 +148,11 @@ TEST(StoredEriTests, SavedIntegralsReadBackExactlyAndOnlyForTheirBasis)
 	EXPECT_EQ(std::memcmp(read.data(), built.data(), built.bytes()), 0);
 	const occ::Mat D = c.converged.D;
 	occ::Mat Jb, Kb, Jr, Kr;
+	//the fixed row order, so the same integrals give the same bits
+	set_tuning("NOSPHERA2_ERI_STATIC", "1");
 	built.JK(D, Jb, Kb);
 	read.JK(D, Jr, Kr);
+	set_tuning("NOSPHERA2_ERI_STATIC", nullptr);
 	EXPECT_EQ((Jb - Jr).cwiseAbs().maxCoeff(), 0.0);
 	EXPECT_EQ((Kb - Kr).cwiseAbs().maxCoeff(), 0.0);
 	//water alone: other atoms, other pairs

@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "stored_eri.h"
+#include "tuning.h"
 
 namespace {
 	//libcint mallocs scratch per quartet unless handed one; the size query is the same call without output
@@ -218,7 +219,7 @@ bool stored_eri::build(const occ::qm::HartreeFock& hf, const size_t budget_bytes
 //through the index list. The diagonal cd == ab has half weight and is taken back with its segment.
 //With two densities (UHF) one pass over the integrals gives J of their sum and K of each, so the
 //bandwidth-bound stream is read once per Fock build, not once per spin.
-//Per-thread partials merge in thread order, so the result is schedule-independent.
+//Per-thread partials merge in thread order; with the dynamic row schedule the sums are reproducible to round-off only.
 void stored_eri::jk(const occ::Mat* const* D, const int nd, occ::Mat& J, occ::Mat* K, const bool screen) const {
 	const int n = nbf_, npk = npairs(), nthr = omp_get_max_threads();
 	const int *pa = pa_.data(), *pb = pb_.data(), *first = first_.data();
@@ -241,18 +242,19 @@ void stored_eri::jk(const occ::Mat* const* D, const int nd, occ::Mat& J, occ::Ma
 	}
 	std::vector<std::vector<double>> Jp(nthr);
 	std::vector<occ::Mat> Kp((size_t)nthr * nd);
+	//Rows grow with k and screening thins them unevenly, so a static schedule leaves threads waiting at the barrier.
+	//Dynamic, longest rows first: which thread sums which row now varies from run to run, so J and K vary at
+	//round-off (1e-15 relative), not bit for bit. -tune NOSPHERA2_ERI_STATIC keeps the fixed cyclic order.
+	const bool fixed = tuning("NOSPHERA2_ERI_STATIC") != nullptr;
 #pragma omp parallel
 	{
 		std::vector<double> Jl(npk, 0.0), t(n);
 		occ::Mat Kl[2];
 		double* Kd[2];
 		for (int i = 0; i < nd; i++) Kl[i] = occ::Mat::Zero(n, n), Kd[i] = Kl[i].data();
-		//c runs to a: cyclic rows balance the triangle and, unlike a dynamic schedule,
-		//keep the per-thread partials and so the summation order fixed for a thread count
-#pragma omp for schedule(static, 1)
-		for (int k = 0; k < npk; k++) {
+		const auto row = [&](const int k) {
 			const int a = pa[k], b = pb[k];
-			if (screen && q_[k] * qmax_ * rmax < threshold) continue;
+			if (screen && q_[k] * qmax_ * rmax < threshold) return;
 			const double* v = v_.get() + (size_t)k * (k + 1) / 2;
 			const double fab = 2.0 * fp[k], dab = dp[k];
 			for (int c = 0; c <= a; c++) {
@@ -293,6 +295,14 @@ void stored_eri::jk(const occ::Mat* const* D, const int nd, occ::Mat& J, occ::Ma
 					}
 				}
 			}
+		};
+		if (fixed) {
+#pragma omp for schedule(static, 1)
+			for (int k = 0; k < npk; k++) row(k);
+		}
+		else {
+#pragma omp for schedule(dynamic, 1)
+			for (int k = npk - 1; k >= 0; k--) row(k);
 		}
 		const int me = omp_get_thread_num();
 		Jp[me].swap(Jl);
