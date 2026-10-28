@@ -304,10 +304,11 @@ WFN::WFN(const occ::qm::Wavefunction &occ_WF, bool from_file) : WFN()
 		}
 	}
 	else if (occ_WF.mo.kind == occ::qm::Unrestricted) {
+		// occ's spin blocks are 0.5 C C^T each, so Da + Db alone holds half the electrons
 		for (int i = 0; i < nmo_; i++) {
-			DM(i, i) = occ_WF.mo.D(i, i) + occ_WF.mo.D(i + nmo_, i);
+			DM(i, i) = 2 * (occ_WF.mo.D(i, i) + occ_WF.mo.D(i + nmo_, i));
 			for (int j = i + 1; j < nmo_; j++) {
-				DM(i, j) = occ_WF.mo.D(i, j) + occ_WF.mo.D(i + nmo_, j);
+				DM(i, j) = 2 * (occ_WF.mo.D(i, j) + occ_WF.mo.D(i + nmo_, j));
 				DM(j, i) = DM(i, j);
 			}
 		}

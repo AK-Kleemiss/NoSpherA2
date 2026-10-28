@@ -100,5 +100,7 @@ namespace BasisSetLibrary {
 }
 
 int load_basis_into_WFN(WFN& wavy, const std::shared_ptr<BasisSet> b,const bool decontract = false, const bool complete = false);
+// AutoAux for the elements of orbital_wfn that current_basis lacks, those only
+void gen_missing_basis_auto_aux(const WFN& orbital_wfn, std::shared_ptr<BasisSet>& current_basis);
 WFN generate_aux_wfn(const WFN& orbital_wfn, std::vector<std::shared_ptr<BasisSet>>& aux_basis, const bool decontract = false);
 

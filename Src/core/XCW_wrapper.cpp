@@ -418,6 +418,9 @@ void XCW_wrapper::write_tshb(WFN& wave, const tsc_block<int, cdouble>& table, co
 //.tshb fit with -tshb), the wavefunction (.wfn, .fchk, and .47 for NBO when asked), with -print_F the F_calc it was
 //scored on and, with -rgbi, the RGBI analysis of the refined wavefunction
 void XCW_wrapper::write_step_results(const occ::qm::Wavefunction& wfn, const double lambda) {
+	//what the step's writers print (tscb check, AutoAux, the .tshb fit) goes to SCF.log, so the console keeps
+	//only the lambda table; fatal errors still reach the console, error_check restores cout first
+	struct cout_restore { std::streambuf* b; ~cout_restore() { std::cout.rdbuf(b); } } console{ std::cout.rdbuf(writer.log.rdbuf()) };
 	writer.log << "Creating .tscb file from converged SCF calculation..." << std::endl;
 	std::vector<WFN> sf_wave_vec(1, { wfn, false });
 	//The constructor marks anything taken from OCC as OCC-origin. What this refinement holds
@@ -462,10 +465,8 @@ void XCW_wrapper::write_step_results(const occ::qm::Wavefunction& wfn, const dou
 	if (!opt->write_tshb || tuning("NOSPHERA2_XCW_TSHB_TABLE"))
 		result.write_tscb_file("test.cif", base + ".tscb");
 	sf_wave_vec[0].write_wfn(base + ".wfn", false, true);
-	if (!sf.ext_p_.empty()) {
-		std::cout << "XCW lambda " << lambda << ": " << sf.extinction_report() << std::endl;
+	if (!sf.ext_p_.empty())
 		writer.log << "XCW lambda " << lambda << ": " << sf.extinction_report() << std::endl;
-	}
 	if (opt->print_F)
 		sf.write_F_calc(base + "_Fcalc.txt");
 	//OCC's fchk writer reorders to Gaussian's basis functions but keeps libcint's phases,
@@ -519,7 +520,19 @@ occ::qm::HartreeFock XCW_wrapper::setup_system() {
 
 void XCW_wrapper::density_fitting(occ::qm::HartreeFock& target, const std::string& name, const char* what, const size_t avail) {
 	const occ::qm::AOBasis& basis = target.aobasis();
-	std::shared_ptr<BasisSet> aux = BasisSetLibrary::get_basis_set(name);
+	//a copy: the library's set is shared, and AutoAux adds the elements it lacks (U in def2-universal-jkfit)
+	std::shared_ptr<BasisSet> aux = std::make_shared<BasisSet>(*BasisSetLibrary::get_basis_set(name));
+	if (!std::all_of(basis.atoms().begin(), basis.atoms().end(), [&](const occ::core::Atom& a) { return aux->has_element(a.atomic_number); })) {
+		//gen_auto_aux reads the WFN-file convention, types from 1; the library stores l
+		WFN atoms_wfn(e_origin::NOT_YET_DEFINED);
+		for (const auto& a : basis.atoms()) {
+			const int i = atoms_wfn.get_ncen();
+			atoms_wfn.push_back_atom(constants::atnr2letter(a.atomic_number), a.x, a.y, a.z, a.atomic_number);
+			for (const SimplePrimitive& p : (*sf.orbital_basis)[a.atomic_number - 1])
+				atoms_wfn.push_back_atom_basis_set(i, p.exp, p.coefficient, p.type + 1, p.shell);
+		}
+		gen_missing_basis_auto_aux(atoms_wfn, aux);
+	}
 	if (aux->get_name().find("jkfit") == std::string::npos)
 		std::cout << "WARNING: " << aux->get_name() << " is not a JK-fitting basis; Hartree-Fock exchange is fitted with it all the same. "
 			"def2-universal-jkfit serves the def2 family, cc-pvXz-jkfit the cc-pVXZ family." << std::endl;
@@ -694,14 +707,9 @@ void XCW_wrapper::setup_scf_integrals(const occ::qm::HartreeFock& hf) {
 	//it never squeezes them out
 	const std::string& hdf = opt->xcw_settings.hessian_df_basis_name;
 	std::string hdf_name = hdf == "none" ? "" : hdf;
-	if (hdf.empty() && !scf_solver.has_eri() && opt->xcw_settings.df_basis_name.empty()) {
-		const std::shared_ptr<BasisSet> jk = BasisSetLibrary::get_basis_set("def2-universal-jkfit");
-		const auto& atoms = hf.aobasis().atoms();
-		if (std::all_of(atoms.begin(), atoms.end(), [&](const occ::core::Atom& a) { return jk->has_element(a.atomic_number); }))
-			hdf_name = "def2-universal-jkfit";
-		else
-			std::cout << "XCW: direct Fock builds, but def2-universal-jkfit misses an element; TRAH Hessian products stay exact" << std::endl;
-	}
+	//elements def2-universal-jkfit lacks get AutoAux in density_fitting
+	if (hdf.empty() && !scf_solver.has_eri() && opt->xcw_settings.df_basis_name.empty())
+		hdf_name = "def2-universal-jkfit";
 	if (!hdf_name.empty()) {
 		occ::qm::HartreeFock hf_df(hf.aobasis());
 		density_fitting(hf_df, hdf_name, "of the Hessian products", scf_solver.has_eri() ? avail / 5 : avail);

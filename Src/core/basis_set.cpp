@@ -584,10 +584,14 @@ std::shared_ptr<BasisSet> BasisSetLibrary::get_basis_set_with_overrides(const st
 					throw std::runtime_error("Invalid contraction in XCW basis override, Z = " + std::to_string(z));
 				if (std::none_of(sh.coefficients[c].begin(), sh.coefficients[c].end(), [](double v) { return v != 0; }))
 					throw std::runtime_error("Zero contraction in XCW basis override, Z = " + std::to_string(z));
-				for (int p = 0; p < static_cast<int>(sh.exponents.size()); p++, count++) {
+				for (int p = 0; p < static_cast<int>(sh.exponents.size()); p++) {
 					if (!std::isfinite(sh.exponents[p]) || sh.exponents[p] <= 0 || !std::isfinite(sh.coefficients[c][p]))
 						throw std::runtime_error("Invalid primitive in XCW basis override, Z = " + std::to_string(z));
+					// A general contraction lists every exponent for every contraction; the zeros would each cost a
+					// full primitive in every integral (an all-electron U set: ~10^5 x the ERI work)
+					if (sh.coefficients[c][p] == 0) continue;
 					result->add_owned_primitive({ 0, l, sh.exponents[p], sh.coefficients[c][p], shell });
+					count++;
 				}
 			}
 		}
