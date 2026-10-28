@@ -87,11 +87,12 @@ void structure_factors::update_grid_weights(const vec2& rho, const dMatrix2& D)
 		//inflection where the minimum and the maximum met (vertex of the sampled slope), so chi stays continuous in rho
 		for (int a = 0; a < ng && !tuning("NOSPHERA2_XCW_CHI_FALLBACK"); a++)
 			for (int b = a + 1; b < ng; b++) {
-				if (chi[a * ng + b] != 1.0 || dab[a * ng + b] > constants::far_away) continue;
+				const size_t ab = static_cast<size_t>(a) * ng + b, ba = static_cast<size_t>(b) * ng + a;
+				if (chi[ab] != 1.0 || dab[ab] > constants::far_away) continue;
 				const double mx = 0.5 * (W.x[a] + W.x[b]), my = 0.5 * (W.y[a] + W.y[b]), mz = 0.5 * (W.z[a] + W.z[b]);
 				bool nb = true;
 				for (int c = 0; c < ng && nb; c++)
-					nb = c == a || c == b || std::hypot(mx - W.x[c], my - W.y[c], mz - W.z[c]) >= 0.5 * dab[a * ng + b];
+					nb = c == a || c == b || std::hypot(mx - W.x[c], my - W.y[c], mz - W.z[c]) >= 0.5 * dab[ab];
 				if (!nb) continue;
 				const int m = 40;
 				vec t(m), x(m), y(m), z(m), r(m);
@@ -109,8 +110,8 @@ void structure_factors::update_grid_weights(const vec2& rho, const dMatrix2& D)
 				const double s0 = r[k] - r[k - 1], s1 = r[k + 1] - r[k], s2 = r[k + 2] - r[k + 1], den = s0 - 2.0 * s1 + s2;
 				const double u = std::abs(den) > 0.0 ? std::clamp(0.5 * (s0 - s2) / den, -1.0, 1.0) : 0.0;
 				const double tt = t[k] + (0.5 + u) * (t[1] - t[0]);
-				chi[a * ng + b] = tt / (1.0 - tt);
-				chi[b * ng + a] = 1.0 / chi[a * ng + b];
+				chi[ab] = tt / (1.0 - tt);
+				chi[ba] = 1.0 / chi[ab];
 			}
 		W.chi = chi;
 		std::cout.rdbuf(old);
