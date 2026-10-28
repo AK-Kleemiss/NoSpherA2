@@ -1207,10 +1207,17 @@ itsc_block structure_factors::result_table(const occ::Mat& D_wfn, std::vector<WF
 				if (ok) entry[r] = it->second;
 			}
 			double worst = 0.0;
+			const svec names = result.get_scatterers_string();
 			for (int scatterer = 0; scatterer < ns && ok; scatterer++) {
 				const cvec& f = result.get_sf_for_scatterer(scatterer);
 				double best = 1e300;
-				for (int at = 0; at < model_data.ncen; at++) {
+				//by the atom's id or label, as write_tshb keys them: two atoms of one element can be closer in f across a partition
+				//change (RI against the tsc route's Hirshfeld) than to themselves; else the closest grid column
+				atom[scatterer] = -1;
+				for (int at = 0; at < model_data.ncen && at < wavefunctions[0].get_ncen() && !tuning("NOSPHERA2_XCW_TSCB_BY_F"); at++)
+					if (wavefunctions[0].get_id_for_atom(at).to_hex_string() == names[scatterer] || asym_atoms[at].label == names[scatterer]) atom[scatterer] = at;
+				const bool named = atom[scatterer] >= 0;
+				for (int at = 0; at < model_data.ncen && !named; at++) {
 					double d = 0;
 					for (int r = 0; r < std::min(nrow, 256); r++) d += std::norm(f[r] - grid_value(at, entry[r]));
 					if (d < best) { best = d; atom[scatterer] = at; }

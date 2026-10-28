@@ -6,6 +6,7 @@
 #include "scattering_factors.h"
 #include "basis_set.h"
 #include "gaussian_atom.h"
+#include "SALTED_utilities.h"
 #include "bondwise_analysis.h"
 #include "tuning.h"
 #include <limits>
@@ -334,6 +335,47 @@ void XCW_wrapper::flip_high_m_phases(occ::qm::Wavefunction& w) {
 	w.mo.update_density_matrix();
 }
 
+vec XCW_wrapper::ri_tshb_coefficients() {
+	const occ::qm::AOBasis& A = sf.XR.aux;
+	if (tshb_map_.empty()) {
+		const aux_density_table t(*tshb_aux_.get_atoms_ptr());
+		if (t.n_sh != static_cast<int>(A.size()) || t.n_coef != sf.XR.naux) return vec();
+		std::mt19937 gen(5);
+		std::normal_distribution<double> nd;
+		vec unit(t.n_coef, 0.0);
+		const int np = 48;
+		for (int s = 0; s < t.n_sh; s++) {
+			const int l = t.sh_l[s], m = 2 * l + 1, o = t.coef_off[s];
+			if (static_cast<int>(A[s].l) != l || static_cast<int>(A.first_bf()[s]) != o) { tshb_map_.clear(); return vec(); }
+			//points where the shell is not negligible: the spread of its most diffuse primitive
+			double amin = A[s].exponents(0);
+			for (int q = 1; q < static_cast<int>(A[s].num_primitives()); q++) amin = std::min(amin, A[s].exponents(q));
+			occ::Mat3N p(3, np);
+			for (int i = 0; i < np; i++)
+				for (int d = 0; d < 3; d++) p(d, i) = A[s].origin(d) + nd(gen) / std::sqrt(2.0 * amin);
+			occ::Mat N(np, m);
+			for (int k = 0; k < m; k++) {
+				unit[o + k] = 1.0;
+				for (int i = 0; i < np; i++) N(i, k) = t(p(0, i), p(1, i), p(2, i), unit.data());
+				unit[o + k] = 0.0;
+			}
+			const occ::Mat O = occ::gto::evaluate_basis(A, p, 0).phi.middleCols(o, m);
+			//phi_occ = phi_nos X, so rho = phi_occ c = phi_nos (X c)
+			const occ::Mat X = N.colPivHouseholderQr().solve(O);
+			if ((N * X - O).cwiseAbs().maxCoeff() > 1e-9 * O.cwiseAbs().maxCoeff()) { tshb_map_.clear(); return vec(); }
+			tshb_map_.push_back(X);
+		}
+	}
+	const aux_density_table t(*tshb_aux_.get_atoms_ptr());
+	vec c(t.n_coef, 0.0);
+	for (int s = 0; s < t.n_sh; s++) {
+		const int m = 2 * t.sh_l[s] + 1, o = t.coef_off[s];
+		for (int i = 0; i < m; i++)
+			for (int k = 0; k < m; k++) c[static_cast<size_t>(o) + i] += tshb_map_[s](i, k) * sf.XR.c[static_cast<size_t>(o) + k];
+	}
+	return c;
+}
+
 //The fit is another partition than the table's, so the two differ at the 1e-2 level in F; -ri_fit names
 //the aux basis, AutoAux otherwise
 void XCW_wrapper::write_tshb(WFN& wave, const tsc_block<int, cdouble>& table, const std::string& name) {
@@ -341,11 +383,17 @@ void XCW_wrapper::write_tshb(WFN& wave, const tsc_block<int, cdouble>& table, co
 		std::vector<std::shared_ptr<BasisSet>> aux = opt->aux_basis;
 		if (aux.empty())
 			aux.push_back(std::make_shared<BasisSet>(wave));
+		//on the RI partition the basis it fits in, so its coefficients carry over
+		if (sf.XR.on) aux = { sf.XR.aux_set };
 		tshb_aux_ = generate_aux_wfn(wave, aux, false);
 	}
 	DensityFitting::CONFIG config = DensityFitting::config_from_options(*opt);
 	config.partition_cache = &tshb_cache_;
-	const Gaussian_Molecule ml(tshb_aux_, DensityFitting::density_fit(wave, tshb_aux_, config));
+	//the RI partition's own fit when it runs, so the .tshb and the scored F share one fit; NOSPHERA2_XCW_TSHB_FIT fits anew
+	vec c = sf.XR.on && !tuning("NOSPHERA2_XCW_TSHB_FIT") ? ri_tshb_coefficients() : vec();
+	const bool own = !c.empty();
+	if (!own) c = DensityFitting::density_fit(wave, tshb_aux_, config);
+	const Gaussian_Molecule ml(tshb_aux_, c);
 	const ScattererLabels& keys = table.get_scatterers();
 	const svec names = table.get_scatterers_string();
 	//the scatterers keep their order over the steps, and only the first step's wavefunction went through
@@ -363,7 +411,7 @@ void XCW_wrapper::write_tshb(WFN& wave, const tsc_block<int, cdouble>& table, co
 	for (int scatterer = 0; scatterer < keys.size(); scatterer++)
 		labels[scatterer] = sf.asym_atoms[tshb_atoms_[scatterer]].label;
 	ml.tshb(labels, keys, tshb_atoms_, wave, wave.get_ECP_mode(), opt->electron_diffraction).write(name);
-	writer.log << "Wrote " << name << ": " << keys.size() << " atom(s), RI fit of the converged density" << std::endl;
+	writer.log << "Wrote " << name << ": " << keys.size() << " atom(s), " << (own ? "the RI partition's fit" : "RI fit of the converged density") << std::endl;
 }
 
 //The files of a converged lambda step, all named NA2_<lambda>: the scattering factor table (.tscb, or the
@@ -410,7 +458,8 @@ void XCW_wrapper::write_step_results(const occ::qm::Wavefunction& wfn, const dou
 	const std::string base = "NA2_" + lambda_tag(lambda);
 	if (opt->write_tshb)
 		write_tshb(sf_wave_vec[0], result, base + ".tshb");
-	else
+	//NOSPHERA2_XCW_TSHB_TABLE: the table beside the .tshb, to compare the two
+	if (!opt->write_tshb || tuning("NOSPHERA2_XCW_TSHB_TABLE"))
 		result.write_tscb_file("test.cif", base + ".tscb");
 	sf_wave_vec[0].write_wfn(base + ".wfn", false, true);
 	if (!sf.ext_p_.empty()) {

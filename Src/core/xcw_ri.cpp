@@ -52,6 +52,7 @@ void structure_factors::setup_ri(const occ::qm::AOBasis& ao)
 	for (const auto& b : aux)
 		if (b->get_primitive_count() == 0) b->gen_auto_aux(atoms_wfn);
 	for (size_t i = 1; i < aux.size(); i++) *aux[0] += *aux[i];
+	XR.aux_set = aux[0];
 	setup_ri(ao, aux[0]->to_AOBasis(ao.atoms()), opt->multipole_lmax, opt->multipole_strength, opt->multipole_scheme);
 }
 
@@ -59,6 +60,7 @@ void structure_factors::setup_ri(const occ::qm::AOBasis& ao, const occ::qm::AOBa
 {
 	occ::qm::AOBasis aux = aux_in;
 	aux.set_pure(true);
+	XR.aux = aux;
 	const int ng = model_data.ncen, nc = static_cast<int>(XG.inversion_link.size()), n = static_cast<int>(ao.nbf()), na = static_cast<int>(aux.nbf());
 	const size_t bytes = static_cast<size_t>(n) * n * na * sizeof(double);
 	err_checkf(free_memory() == 0 || bytes < free_memory(), "-xcw_partition ri holds (mu nu|P), " + std::to_string(bytes >> 20) + " MB, more than -mem leaves", std::cout);

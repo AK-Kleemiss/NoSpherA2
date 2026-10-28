@@ -239,6 +239,10 @@ Key core modules live in `Src/core`:
 
 ## Current Validation Notes
 
+As of 2026-10-28 (RI .tshb), XCW's RI `.tshb` is the RI partition's own fit and the first step matches the table's scatterers
+to atoms by id; `XcwPartitionTests.RiTshbIsTheRiTable` is new. `ctest --preset release-linux-tests` on a CPU-only 4-core VM
+reports **1328 passed, 0 failed, 23 skipped** (2 disabled) of 1353. See `UNIT_TESTS_STATUS.md`.
+
 As of 2026-10-28 (TFVC chi, packed RI store), XCW's TFVC chi is continuous where a bond's line density loses its minimum and
 the RI partition stores (mu nu|P) over mu <= nu; `XcwPartitionTests.RiTfvcRefitsSettle` is new. `ctest --preset
 release-linux-tests` on a CPU-only 4-core VM reports **1335 passed, 0 failed, 23 skipped** (2 disabled) of 1360. See

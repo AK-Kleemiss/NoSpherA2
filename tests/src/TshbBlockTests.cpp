@@ -662,6 +662,37 @@ TEST(TshbJointTests, XcwStepsWriteTheirTshb)
 	}
 }
 
+//XCW -xcw_partition ri -tshb: each step's .tshb is the RI partition's own fit (XR.c mapped onto NoSpherA2's aux table shell
+//by shell), so its F is the RI route's table to round-off (the separate density fit, NOSPHERA2_XCW_TSHB_FIT, is 1e-7 off). The
+//table's scatterers are matched to their atoms by id: by closest f (NOSPHERA2_XCW_TSCB_BY_F) the RI table gave two atoms of
+//one element each other's f, 5e-2 of max |F|
+TEST(XcwPartitionTests, RiTshbIsTheRiTable)
+{
+	const std::string cif = fs::absolute(fixture("P1_test/P1_test.cif")).string(), hkl = fs::absolute(fixture("P1_test/P1_subset.hkl")).string();
+	app_dir run("xcw_ri_tshb");
+	std::ofstream(run.dir / "settings.txt") << "normal normal_conv params 177 basis_set sto-3g max_iter 100 F charge 0 mult 1 rhf start 0 step_size 0.01 end 0.01";
+	auto worst = [&](std::vector<std::string> extra) {
+		std::vector<std::string> a{ "-do_XCW", "-no_gpu", "-cif", cif, "-hkl", hkl, "-XCW_settings", "settings.txt", "-xcw_partition", "ri", "-tshb",
+			"-tune", "NOSPHERA2_XCW_TSHB_TABLE", "-no_date" };
+		a.insert(a.end(), extra.begin(), extra.end());
+		EXPECT_EQ(run.run(a), 0);
+		double w = 0.0;
+		for (const std::string step : { "NA2_0000000", "NA2_0010000" }) {
+			double f_max = 0.0, rel = 0.0;
+			w = std::max(w, compare_with_table(tshb_block::read(run.dir / (step + ".tshb")), itsc_block(run.dir / (step + ".tscb")), cell(cif, std::cout, false), f_max, &rel) / f_max);
+		}
+		return w;
+	};
+	const double own = worst({});
+	std::stringstream scf;
+	scf << std::ifstream(run.dir / "SCF.log").rdbuf();
+	EXPECT_NE(scf.str().find("the RI partition's fit"), std::string::npos);
+	std::cout << "RI .tshb against the RI table: max |dF| / max |F| " << own << std::endl;
+	EXPECT_LT(own, 1e-10);
+	EXPECT_GT(worst({ "-tune", "NOSPHERA2_XCW_TSHB_FIT" }), 1e-12);
+	EXPECT_GT(worst({ "-tune", "NOSPHERA2_XCW_TSCB_BY_F" }), 1e-3);
+}
+
 //XCW's RI partition (-xcw_partition ri, AutoAux): the perturbation is the exact transpose of F_calc (NOSPHERA2_XCW_ADJOINT_CHECK,
 //random D and weights), unrestrained to round-off and with Hirshfeld moment restraints, whose targets go through the grid, to its
 //single-precision blocks; restrained to MBIS the targets come from the converged step and the scan still runs to its end

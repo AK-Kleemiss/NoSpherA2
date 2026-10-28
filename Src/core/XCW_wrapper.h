@@ -77,6 +77,11 @@ private:
 
 	// -tshb: the converged density of a step as an RI fit, its scatterers keyed and ordered as the table's
 	void write_tshb(WFN& wave, const tsc_block<int, cdouble>& table, const std::string& name);
+	// -xcw_partition ri: XR.c as coefficients of tshb_aux_, through one (2l+1)^2 map per shell from occ's functions to
+	// NoSpherA2's (fitted once on points about the shell, kept for the run, the aux basis being fixed); empty when the
+	// two bases do not line up shell for shell, and write_tshb fits the density instead
+	vec ri_tshb_coefficients();
+	std::vector<occ::Mat> tshb_map_;
 	// The aux wavefunction of that fit, the restraints' partition grid and the table's atoms, made at the
 	// first step and kept, since every step has the same atoms and basis
 	WFN tshb_aux_{ e_origin::NOT_YET_DEFINED };

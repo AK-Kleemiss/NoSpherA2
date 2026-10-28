@@ -135,6 +135,8 @@ public:
 		vec2 M;
 		vec c, t0;
 		std::vector<occ::Mat> A;
+		occ::qm::AOBasis aux; //the fit's basis, pure, in occ's order and normalisation: XR.c's
+		std::shared_ptr<BasisSet> aux_set; //the same basis as BasisSet, for a .tshb on it
 	} XR;
 	//moments [atom][l*l+l+m] in constants::spherical_harmonic's convention (DensityFitting's) as the fixed targets
 	void set_ri_targets(const vec2& moments);
