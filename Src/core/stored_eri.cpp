@@ -219,7 +219,7 @@ bool stored_eri::build(const occ::qm::HartreeFock& hf, const size_t budget_bytes
 //through the index list. The diagonal cd == ab has half weight and is taken back with its segment.
 //With two densities (UHF) one pass over the integrals gives J of their sum and K of each, so the
 //bandwidth-bound stream is read once per Fock build, not once per spin.
-//Per-thread partials merge in thread order; with the dynamic row schedule the sums are reproducible to round-off only.
+//Per-thread partials merge in thread order; with -tune NOSPHERA2_ERI_DYNAMIC the sums are reproducible to round-off only.
 void stored_eri::jk(const occ::Mat* const* D, const int nd, occ::Mat& J, occ::Mat* K, const bool screen) const {
 	const int n = nbf_, npk = npairs(), nthr = omp_get_max_threads();
 	const int *pa = pa_.data(), *pb = pb_.data(), *first = first_.data();
@@ -242,10 +242,11 @@ void stored_eri::jk(const occ::Mat* const* D, const int nd, occ::Mat& J, occ::Ma
 	}
 	std::vector<std::vector<double>> Jp(nthr);
 	std::vector<occ::Mat> Kp((size_t)nthr * nd);
-	//Rows grow with k and screening thins them unevenly, so a static schedule leaves threads waiting at the barrier.
-	//Dynamic, longest rows first: which thread sums which row now varies from run to run, so J and K vary at
-	//round-off (1e-15 relative), not bit for bit. -tune NOSPHERA2_ERI_STATIC keeps the fixed cyclic order.
-	const bool fixed = tuning("NOSPHERA2_ERI_STATIC") != nullptr;
+	//Fixed cyclic rows: J and K are bit for bit the same on every run with the same thread count, which the XCW
+	//tests rely on (two runs compared digit for digit). -tune NOSPHERA2_ERI_DYNAMIC hands rows out dynamically,
+	//longest first, for less waiting at the barrier; J and K then vary at round-off (1e-15 relative) between
+	//runs, and no gain was measured on P1 XCW (within +-5 % at 4 and 12 threads).
+	const bool fixed = tuning("NOSPHERA2_ERI_DYNAMIC") == nullptr;
 #pragma omp parallel
 	{
 		std::vector<double> Jl(npk, 0.0), t(n);

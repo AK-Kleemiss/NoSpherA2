@@ -457,8 +457,8 @@ partitioning flags of [section 3](#3-partitioning-grids-and-basis) and
 `-tune NAME=value`: `NOSPHERA2_XCW_GRID_DIRECT` (direct-sum transform instead of
 Fourier-Bessel), `NOSPHERA2_NO_INVERSION_SCREENING` (integrate both h and -h),
 `NOSPHERA2_XCW_ERI_NO_BUDGET` (store the two-electron integrals outside `-mem`),
-`NOSPHERA2_ERI_STATIC` (the stored-integral Fock build in a fixed cyclic row order, bit for bit
-reproducible; the default dynamic order is reproducible to round-off, about 1e-15 relative) and
+`NOSPHERA2_ERI_DYNAMIC` (the stored-integral Fock build hands rows out dynamically, reproducible to
+round-off, about 1e-15 relative; the default fixed cyclic order is bit for bit reproducible) and
 `NOSPHERA2_DEBUG_ASYMFACT` (print the symmetry factors). For density-following shares: `NOSPHERA2_XCW_WEIGHT_UPDATE=k` (refit at every k-th evaluation inside the SCF instead of between solves; `0` freezes them per step, the reference), `NOSPHERA2_XCW_WEIGHT_FTOL` (default `1e-5`), `NOSPHERA2_XCW_WEIGHT_TOL` (MBIS/EMBIS fit, default `1e-6`), `NOSPHERA2_XCW_WEIGHT_DTOL` (density move that refits inside a solve, default `1e-3`, `0` between solves only), `NOSPHERA2_XCW_WEIGHT_MIX` (Anderson depth of the MBIS/EMBIS fits, default `6`, `0` the plain fixed point), `NOSPHERA2_XCW_TFVC_OLD` (the stand-alone Becke+TFVC weight pass instead of the TFVC-only one), `NOSPHERA2_XCW_CHI_FALLBACK` (make_chi's chi = 1 for a bond whose line density has no minimum, instead of d_A/d_B at the line's inflection), `NOSPHERA2_XCW_WEIGHT_CHECK` (how far the shares move F and R1 over a step) and `NOSPHERA2_XCW_ADJOINT_CHECK` (now after the first step).
 
 Example, run in `tests/P1_test`:
