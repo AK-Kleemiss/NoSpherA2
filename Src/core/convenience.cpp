@@ -3338,6 +3338,7 @@ bool options::digest_partition_options(const std::string &temp, int &i)
 		wfn = arguments[i + 5];
 		dmin = fromString<double>(arguments[i + 6]);
 		calc_sfac_diffuse(*this, std::cout);
+		finished = true; return true;
 	}
 	else if (temp == "-old_tsc")
 	{
@@ -4450,6 +4451,11 @@ void options::digest_options()
 		catch (const missing_argument &)
 		{
 			err_checkf(false, "Option " + temp + " needs more values than were given after it", log_file);
+		}
+		//one-shot options run their whole calculation in here; running out of memory is not a bad value
+		catch (const std::bad_alloc &)
+		{
+			err_checkf(false, "Option " + temp + " ran out of memory", log_file);
 		}
 		catch (const std::exception &e)
 		{
