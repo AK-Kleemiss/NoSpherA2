@@ -849,16 +849,18 @@ void generate_fractional_hkl(const double& dmin,
 	const int extreme = 201;
 	double dmin_l = 0.9 * dmin;
 	const int lim = static_cast<int>(extreme / stepsize[0]);
+	const int lim_k = static_cast<int>(extreme / stepsize[1]);
 #pragma omp parallel for private(hkl_)
 	for (int h = -lim; h < lim; h++)
 	{
 		const double _h = h * stepsize[0];
-		for (double k = -extreme; k < extreme; k += stepsize[1])
+		//k as index * step like h and l: a running sum drifts off the grid the symmetry images land on
+		for (int k = -lim_k; k < lim_k; k++)
 		{
 			// only need 0 to extreme, since we have no DISP signal
 			for (int l = 0; l < lim; l++)
 			{
-				hkl_ = { _h, k, l * stepsize[2] };
+				hkl_ = { _h, k * stepsize[1], l * stepsize[2] };
 				if (unit_cell.get_d_of_hkl(hkl_) >= dmin_l)
 				{
 #pragma omp critical
@@ -924,6 +926,13 @@ void generate_fractional_hkl(const double& dmin,
 			{
 				for (int j = 0; j < 3; j++)
 					tempv[j] += hkl__[h] * sym[j][h][s];
+			}
+			//h - k of two grid values misses the grid value by an ulp and std::set keys on exact doubles
+			for (int j = 0; j < 3; j++)
+			{
+				const double n = std::round(tempv[j] / stepsize[j]);
+				if (std::abs(tempv[j] / stepsize[j] - n) < 1e-6)
+					tempv[j] = n * stepsize[j];
 			}
 			hkl_enlarged.emplace(tempv);
 		}
@@ -4256,8 +4265,13 @@ void calc_sfac_diffuse(const options& opt, std::ostream& log_file)
 	generate_fractional_hkl(opt.dmin, hkl, opt.twin_law, unit_cell, log_file, opt.sfac_diffuse, opt.debug);
 
 	const long long int size = static_cast<long long int>(hkl.size());
+	//k_pt, sf and the tsc_block's copies of sf and the indices are alive together when the block is built
+	const double need = double(size) * (48.0 + 32.0 * dens.size());
+	const size_t avail = available_memory_bytes();
+	err_checkf(avail == 0 || need < avail, "-sfac_diffuse: " + std::to_string(size) + " fractional reflections x " +
+		std::to_string(dens.size()) + " atoms need ~" + std::to_string(int(need / 1073741824.0) + 1) + " GB, " +
+		std::to_string(avail >> 30) + " GB are free; use a larger step or dmin", std::cout);
 	vec2 k_pt;
-	k_pt.reserve(3 * size);
 	k_pt.resize(3);
 #pragma omp parallel for
 	for (int i = 0; i < 3; i++)
@@ -4288,7 +4302,6 @@ void calc_sfac_diffuse(const options& opt, std::ostream& log_file)
 	long long int pmax = static_cast<long long int>(dens[0].size());
 	//const long long int step = max(static_cast<long long int>(floor(smax / 20)), 1LL);
 	std::cout << "Done with making k_pt " << smax << " " << imax << " " << pmax << endl;
-	sf.reserve(imax * smax);
 	sf.resize(imax);
 #pragma omp parallel for
 	for (int i = 0; i < imax; i++)

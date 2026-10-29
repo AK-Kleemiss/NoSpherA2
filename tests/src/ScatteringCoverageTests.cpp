@@ -247,6 +247,29 @@ TEST(ScatteringCoverageHklTests, FractionalHklTwinLawAndDebugLog)
 	EXPECT_EQ(log.str().find("Number of symmetry operations: "), std::string::npos);
 }
 
+//P6 maps the l >= 0 grid onto itself, so it must give the P1 list: with a step that is inexact in
+//binary its images used to land beside the generated doubles and made the list six times longer
+TEST(ScatteringCoverageHklTests, FractionalHklHexagonalImagesStayOnGrid)
+{
+	const fs::path cif = tmp("hex_p6.cif");
+	{
+		std::ofstream out(cif);
+		out << "data_hex\n_cell_length_a 4.0\n_cell_length_b 4.0\n_cell_length_c 4.0\n"
+			<< "_cell_angle_alpha 90\n_cell_angle_beta 90\n_cell_angle_gamma 120\n_cell_volume 55.4256\n"
+			<< "loop_\n_space_group_symop_operation_xyz\n'x, y, z'\n'x-y, x, z'\n'-y, x-y, z'\n"
+			<< "'-x, -y, z'\n'-x+y, -x, z'\n'y, -x+y, z'\n";
+	}
+	std::ostringstream log;
+	cell p6(cif, log, false), p1(4.0, 4.0, 4.0, 90.0, 90.0, 120.0);
+	fs::remove(cif);
+	hkl_list_d hkl6, hkl1;
+	generate_fractional_hkl(6.0, hkl6, {}, p6, log, d3{ 0.1, 0.1, 0.1 }, false);
+	generate_fractional_hkl(6.0, hkl1, {}, p1, log, d3{ 0.1, 0.1, 0.1 }, false);
+	EXPECT_EQ(p6.get_sym()[0][0].size(), 6u);
+	EXPECT_GT(hkl1.size(), 100u);
+	EXPECT_EQ(hkl6, hkl1);
+}
+
 //read_hkl_full: text and one-character lines are skipped, F and sigma(F) follow from F^2 and sigma(F^2)
 TEST(ScatteringCoverageHklTests, ReadHklFullDerivesFAndSigma)
 {
