@@ -311,30 +311,6 @@ bool XCW_wrapper::grid_on_device() const {
 	return sf.XG.on_device;
 }
 
-//The sign of f(+-3), g(+-3) and g(+-4) in every orbital, in OCC's own m = -l..l order,
-//and the density matrix rebuilt from them. Applied once on the way out and once on the
-//way back in, it is its own inverse.
-void XCW_wrapper::flip_high_m_phases(occ::qm::Wavefunction& w) {
-	int row = 0;
-	const int spins = w.mo.kind == occ::qm::SpinorbitalKind::Unrestricted ? 2 : 1;
-	for (const auto& shell : w.basis.shells()) {
-		const int nsph = 2 * shell.l + 1;
-		if (shell.l >= 3)
-			for (int spin = 0; spin < spins; spin++) {
-				const int base = spin * w.nbf + row;
-				w.mo.C.row(base).array() *= -1.0;
-				w.mo.C.row(base + nsph - 1).array() *= -1.0;
-				if (shell.l >= 4) {
-					w.mo.C.row(base + 1).array() *= -1.0;
-					w.mo.C.row(base + nsph - 2).array() *= -1.0;
-				}
-			}
-		row += nsph;
-	}
-	w.mo.update_occupied_orbitals();
-	w.mo.update_density_matrix();
-}
-
 vec XCW_wrapper::ri_tshb_coefficients() {
 	const occ::qm::AOBasis& A = sf.XR.aux;
 	if (tshb_map_.empty()) {
@@ -469,14 +445,9 @@ void XCW_wrapper::write_step_results(const occ::qm::Wavefunction& wfn, const dou
 		writer.log << "XCW lambda " << lambda << ": " << sf.extinction_report() << std::endl;
 	if (opt->print_F)
 		sf.write_F_calc(base + "_Fcalc.txt");
-	//OCC's fchk writer reorders to Gaussian's basis functions but keeps libcint's phases,
-	//and Gaussian's f(+-3), g(+-3), g(+-4) are the opposite sign; the file has to carry
-	//Gaussian's so that anything reading an fchk gets the density right
-	{
-		occ::qm::Wavefunction w = wfn;
-		flip_high_m_phases(w);
-		w.save(base + ".fchk");
-	}
+	//OCC's fchk is already in Gaussian's phases, which are libcint's (FormatConsistencyTests.OccFchkMatchesBridge);
+	//flipping f(+-3), g(+-3), g(+-4) here wrote ORCA's and every fchk reader lost ~0.5 % of the electrons
+	occ::qm::Wavefunction(wfn).save(base + ".fchk"); //save() is not const
 	if (opt->xcw_settings.nbo_output)
 		sf_wave_vec[0].write_nbo(base + ".47", opt->debug, &writer.log);
 	//Neither file written above can carry this analysis - a .wfn has bare primitives and
@@ -721,8 +692,6 @@ void XCW_wrapper::setup_scf_integrals(const occ::qm::HartreeFock& hf) {
 bool XCW_wrapper::read_start_guess(occ::qm::Wavefunction& wfn) {
 	if (!opt->xcw_settings.read_first_guess) return false;
 	wfn = occ::qm::Wavefunction::load("NA2_" + lambda_tag(opt->xcw_settings.xcw_start_value) + ".fchk");
-	//Written in Gaussian's phases by write_step_results; OCC's loader does not undo that
-	flip_high_m_phases(wfn);
 	return true;
 }
 

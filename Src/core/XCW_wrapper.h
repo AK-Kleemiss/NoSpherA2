@@ -73,8 +73,6 @@ private:
 	// steps during the scan (is_final false) and once at the end, from whatever history there is
 	void report_halting_progress_estimate(bool is_final);
 
-	static void flip_high_m_phases(occ::qm::Wavefunction& w);
-
 	// -tshb: the converged density of a step as an RI fit, its scatterers keyed and ordered as the table's
 	void write_tshb(WFN& wave, const tsc_block<int, cdouble>& table, const std::string& name);
 	// -xcw_partition ri: XR.c as coefficients of tshb_aux_, through one (2l+1)^2 map per shell from occ's functions to
