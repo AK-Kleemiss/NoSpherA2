@@ -280,6 +280,30 @@ TEST(ScatteringCoverageHklTests, ReadHklFullDerivesFAndSigma)
 	EXPECT_EQ(parse_after(log.str(), "Nr of reflections to be used: "), 2);
 }
 
+//-twin: the fit set and obs stay the measured reflections, the table set gains R h of every measured h
+TEST(ScatteringCoverageHklTests, ReadHklFullTwinMatesOnlyInTheTable)
+{
+	const fs::path path = tmp("twin.hkl");
+	{
+		std::ofstream out(path);
+		out << "   1   2   3  100.00   10.00\n"
+			<< "   0   1   1  400.00   20.00\n";
+	}
+	cell c(kA, kA, kA, 90.0, 90.0, 90.0);
+	hkl_list hkl;
+	scatter_data obs;
+	std::ostringstream log;
+	const vec2 law{ { -1, 0, 0, 0, -1, 0, 0, 0, 1 } };
+	const hkl_list enlarged = read_hkl_full(path, hkl, law, c, log, obs, false);
+	fs::remove(path);
+	EXPECT_EQ(hkl, (hkl_list{ i3{ 0, 1, 1 }, i3{ 1, 2, 3 } }));
+	EXPECT_EQ(obs.F_obs.size(), hkl.size());
+	EXPECT_DOUBLE_EQ(obs.F_obs[0], 20.0);
+	EXPECT_EQ(obs.hkl_table, (hkl_list{ i3{ -1, -2, 3 }, i3{ 0, -1, 1 }, i3{ 0, 1, 1 }, i3{ 1, 2, 3 } }));
+	EXPECT_EQ(enlarged, obs.hkl_table);
+	EXPECT_EQ(parse_after(log.str(), "Nr of reflections to be used: "), 2);
+}
+
 //a row too short for h k l, a row without an F^2 value and a file holding only 0 0 0 each stop the run
 TEST(ScatteringCoverageHklTests, ReadHklFullRejectsBrokenRows)
 {

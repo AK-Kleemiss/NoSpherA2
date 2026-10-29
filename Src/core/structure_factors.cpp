@@ -80,7 +80,7 @@ structure_factors::structure_factors(options& opt_in) {
 			// Fourth step of the symmetry resolution: Copy U_iso, the dispersion and the ADPs of each grown atom's parent, the ADPs rotated onto the symmetry generated atoms
 			unit_cell.grow_ADPs(asym_atoms, ADPs);
 			// Fifth step of the symmetry resolution: Delete the fully applied operations and solve the symmetry factors for the operations that are kept
-			applied_symmetry = unit_cell.apply_grown(scatter_data.hkl, scatter_data.hkl_enlarged, asym_atoms);
+			applied_symmetry = unit_cell.apply_grown(scatter_data.hkl_table, scatter_data.hkl_enlarged, asym_atoms);
 		}
 		else {
 			// Symmetry factors of an ungrown model, also for an atom on a special position

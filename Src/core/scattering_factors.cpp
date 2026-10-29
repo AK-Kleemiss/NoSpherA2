@@ -381,19 +381,17 @@ hkl_list read_hkl_full(const std::filesystem::path& hkl_filename,
 	}
 	file << " done!\nNr of reflections read from file: " << hkl.size() << std::endl;
 
-	if (debug)
-		file << "Number of reflections before twin: " << hkl.size() << std::endl;
+	//The fit stays on the measured reflections (hkl, in step with obs); the twin images R h only join the set
+	//the written table covers, so a twinned refinement finds every twin mate it asks for
+	obs.hkl_table = hkl;
+	for (const i3& hkl__ : hkl)
+		for (int i = 0; i < twin_law.size(); i++)
+			obs.hkl_table.emplace(i3{
+				int(std::lround(twin_law[i][0] * hkl__[0] + twin_law[i][1] * hkl__[1] + twin_law[i][2] * hkl__[2])),
+				int(std::lround(twin_law[i][3] * hkl__[0] + twin_law[i][4] * hkl__[1] + twin_law[i][5] * hkl__[2])),
+				int(std::lround(twin_law[i][6] * hkl__[0] + twin_law[i][7] * hkl__[1] + twin_law[i][8] * hkl__[2])) });
 	if (twin_law.size() > 0)
-	{
-		for (const i3& hkl__ : hkl)
-			for (int i = 0; i < twin_law.size(); i++)
-				hkl.emplace(i3{
-					int(std::lround(twin_law[i][0] * hkl__[0] + twin_law[i][1] * hkl__[1] + twin_law[i][2] * hkl__[2])),
-					int(std::lround(twin_law[i][3] * hkl__[0] + twin_law[i][4] * hkl__[1] + twin_law[i][5] * hkl__[2])),
-					int(std::lround(twin_law[i][6] * hkl__[0] + twin_law[i][7] * hkl__[1] + twin_law[i][8] * hkl__[2])) });
-	}
-	if (debug)
-		file << "Number of reflections after twin: " << hkl.size() << std::endl;
+		file << "Reflections in the table with " << twin_law.size() << " twin law(s): " << obs.hkl_table.size() << std::endl;
 
 	ivec3 sym(3);
 	for (int i = 0; i < 3; i++)
@@ -419,7 +417,7 @@ hkl_list read_hkl_full(const std::filesystem::path& hkl_filename,
 
 	i3 tempv;
 	hkl_list hkl_enlarged;
-	hkl_enlarged = hkl;
+	hkl_enlarged = obs.hkl_table;
 	for (int s = 0; s < sym[0][0].size(); s++)
 	{
 		if (sym[0][0][s] == 1 && sym[1][1][s] == 1 && sym[2][2][s] == 1 &&
@@ -428,7 +426,7 @@ hkl_list read_hkl_full(const std::filesystem::path& hkl_filename,
 		{
 			continue;
 		}
-		for (const i3& hkl__ : hkl)
+		for (const i3& hkl__ : obs.hkl_table)
 		{
 			tempv = { 0, 0, 0 };
 			for (int h = 0; h < 3; h++)
@@ -440,9 +438,6 @@ hkl_list read_hkl_full(const std::filesystem::path& hkl_filename,
 		}
 	}
 
-	// Remove 0 0 0 if it exists
-	if (hkl.find(i3{ 0, 0, 0 }) != hkl.end())
-		hkl.erase(i3{ 0, 0, 0 });
 	file << "Nr of reflections to be used: " << hkl.size() << std::endl;
 	return hkl_enlarged;
 }
