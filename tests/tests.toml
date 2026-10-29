@@ -669,6 +669,24 @@ hkl = "P1_subset.hkl"
 XCW_settings = "test_settings_read.txt"
 no_date = ""
 
+# P1_test_XCW_incremental's fit with a twin law (twofold about c*): the twin mates R h only
+# widen the table (785 rows for 402 measured), so the lambda table matches P1_test_XCW's
+# (GoF, R, chi2 to every printed digit). Only the table line, the k-point count and the
+# Fourier-Bessel node count differ; every R h being in the table is ReadHklFullTwinMatesOnlyInTheTable.
+
+[P1_test_XCW_twin]
+directory = "P1_test"
+good = "P1_test_XCW_twin.good"
+
+[P1_test_XCW_twin.args]
+do_XCW = ""
+no_gpu = ""
+cif = "P1_test.cif"
+hkl = "P1_subset.hkl"
+XCW_settings = "test_settings_read.txt"
+no_date = ""
+twin = [-1, 0, 0, 0, -1, 0, 0, 0, 1]
+
 # P1_test_XCW against the F^2 criterion
 
 [P1_F2_test_XCW]
