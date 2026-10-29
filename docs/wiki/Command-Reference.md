@@ -288,13 +288,13 @@ outside it is reported separately from the finite basin populations and volumes.
 
 Localised-orbital bonding descriptors. Two independent routes:
 
-* **In house**: `-nbo_native` runs the NBO search, the hybrid analysis, second-
+* **In house**: `-nbo` runs the NBO search, the hybrid analysis, second-
   order perturbative (E2) donor-acceptor energies and natural resonance theory
   (NRT) inside NoSpherA2, with no external program. NRT is solved as a convex QP
   over the simplex and parallelised over candidate structures. Each NRT bond
   order comes with its range over the weights whose D(w) lies within 0.1 % of the
   fit's: the fit determines a bond order only that far (benzene C-C 1.44-1.57).
-* **External**: `-nbo` writes a `.47` archive, calls `gennbo`, and parses the
+* **External**: `-nbo_external` writes a `.47` archive, calls `gennbo`, and parses the
   result. `-nbo_parse` parses an existing output.
 
 `-rgbi` is a separate scheme (resonance-group bond indices) and `-npa` gives
@@ -307,8 +307,8 @@ All of these need a contracted basis, so `.gbw`, `.fchk` or `.molden` — not
 
 | Flag | Arguments | Default | Meaning |
 | --- | --- | --- | --- |
-| `-nbo_native <wfn>` | 1 | | NBO search, hybrids, E2 and NRT in house. |
-| `-nbo <wfn>` | 1 | | Write a `.47`, run external `gennbo`, parse the output. |
+| `-nbo <wfn>` | 1 | | NBO search, hybrids, E2 and NRT in house. |
+| `-nbo_external <wfn>` | 1 | | Write a `.47`, run external `gennbo`, parse the output. |
 | `-nbo_parse <file>` | 1 | | Parse an existing `gennbo` output. |
 | `-convert_to_47 <wfn>` | 1 | | Write the `.47` archive and stop. |
 | `-nbo_keywords <"...">` | 1 | | Extra `$NBO` keylist entries. |
@@ -346,7 +346,7 @@ All of these need a contracted basis, so `.gbw`, `.fchk` or `.molden` — not
 | `-rgbi_EVs` | 0 | off | Report the RGBI eigenvalues. |
 
 **Every `-nbo_*` and `-nrt*` sub-option must appear *after* the
-`-nbo_native`/`-nbo`/`-nbo_parse`/`-convert_to_47` flag it belongs to** — they
+`-nbo`/`-nbo_external`/`-nbo_parse`/`-convert_to_47` flag it belongs to** — they
 are read by a loop starting at that flag's position, so anything earlier on the
 line is ignored without a warning.
 

@@ -501,7 +501,7 @@ std::string help_message =
  "                                    (-laplacian_bonds), the QTAIM and ELI-D\n"
  "                                    basins of -eli_analysis, and beside them\n"
  "                                    on a thread of its own native NBO with\n"
- "                                    NPA, E2 and NRT (JSON as -nbo_native\n"
+ "                                    NPA, E2 and NRT (JSON as -nbo\n"
  "                                    writes it, log block printed last).\n"
  "  -eli_analysis <wfn> [resolution radius]\n"
  "                                    QTAIM and ELI-D basins: critical points\n"
@@ -596,7 +596,7 @@ std::string help_message =
  "  -convert_to_47 <wfn>               Write an NBO File47 (.47). Add\n"
 "                                    -nbo_keywords \"NRT NRTE2=5\" to fill the\n"
 "                                    $NBO keylist.\n"
-"  -nbo <wfn>                         Write the .47, run the external NBO on it\n"
+"  -nbo_external <wfn>                Write the .47, run the external NBO on it\n"
 "                                    and parse the output into <stem>.nbo.json:\n"
 "                                    NPA, NAO, NBOs with hybridisations, the E2\n"
 "                                    donor-acceptor table and NRT weights and\n"
@@ -608,12 +608,13 @@ std::string help_message =
 "                                    wsl:<path> names a binary inside WSL.\n"
 "  -nbo_parse <out.nbo>               Parse an NBO output that already exists into\n"
 "                                    <stem>.nbo.json. Options: -nbo_json <file>.\n"
- "  -nbo_native <wfn>                  The same analysis without the external\n"
+ "  -nbo <wfn>                         The same analysis without the external\n"
  "                                    program: NAOs and NPA, the NBO search with\n"
  "                                    hybridisations, E2, and with -nrt natural\n"
  "                                    resonance theory. Writes\n"
- "                                    <stem>.native.nbo.json in the format -nbo\n"
- "                                    writes, so tests/nbo_reference/compare_nbo.py\n"
+ "                                    <stem>.native.nbo.json in the format\n"
+ "                                    -nbo_external writes, so\n"
+ "                                    tests/nbo_reference/compare_nbo.py\n"
  "                                    measures the two against each other.\n"
  "                                    Options: -nbo_json <file>, -nbo_e2min <kcal>\n"
  "                                    (default 0.5, what enters the E2 table),\n"
@@ -623,7 +624,7 @@ std::string help_message =
  "                                    wavefunction, -nbo_keep47 to keep the one it\n"
  "                                    builds.\n"
  "  -nrt                               Natural resonance theory after the search\n"
- "                                    (with -nbo_native): the candidate resonance\n"
+ "                                    (with -nbo): the candidate resonance\n"
  "                                    structures, the convex quadratic program\n"
  "                                    that weights them, and the bond orders,\n"
  "                                    valencies and topology matrices those\n"
@@ -2596,7 +2597,7 @@ static std::vector<std::shared_ptr<BasisSet>> get_aux_basis(const int argc, cons
 const std::set<std::string> &nbo_family_suboptions()
 {
 	static const std::set<std::string> known = {
-		"-nbo", "-nbo_parse", "-nbo_native", "-nbo_keywords", "-nbo_exe", "-nbo_json",
+		"-nbo", "-nbo_external", "-nbo_parse", "-nbo_native", "-nbo_keywords", "-nbo_exe", "-nbo_json",
 		"-nbo_dir", "-nbo_47", "-nbo_e2min", "-nbo_threads", "-nbo_keep47", "-nrt",
 		"-nrt_e2", "-nrt_arrows", "-nrt_bond_scale", "-nrt_max", "-nrt_atoms",
 		"-nrt_exhaustive", "-nrt_no_symmetry", "-nrt_no_components", "-nrt_no_ion", "-nrt_parent", "-nrt_e2_avg", "-nrt_e2_avg_min",
@@ -2666,9 +2667,9 @@ bool options::digest_io_options(const std::string &temp, int &i)
 		wavy.write_nbo(_wfn.replace_extension(".47"), debug, &std::cout, keys);
 		finished = true; return true;
 	}
-	else if (temp == "-nbo") {
-		err_checkf(argc >= i + 2, "Not enough arguments for -nbo\nPlease provide a wavefunction!", std::cout);
-		refuse_unknown_nbo_suboption(arguments, i + 2, "-nbo");
+	else if (temp == "-nbo_external") {
+		err_checkf(argc >= i + 2, "Not enough arguments for -nbo_external\nPlease provide a wavefunction!", std::cout);
+		refuse_unknown_nbo_suboption(arguments, i + 2, "-nbo_external");
 		NboRunOptions opt;
 		opt.wavefunction = arguments[i + 1];
 		opt.debug = debug;
@@ -2682,7 +2683,7 @@ bool options::digest_io_options(const std::string &temp, int &i)
 		citations::cite(citations::Method::NBOProgram, std::cout);
 		//finished is set, so only this check keeps a failed gennbo from exiting 0.
 		const int nbo_rc = run_nbo(opt, std::cout);
-		err_checkf(nbo_rc == 0, "-nbo: gennbo did not finish (exit code " + std::to_string(nbo_rc) +
+		err_checkf(nbo_rc == 0, "-nbo_external: gennbo did not finish (exit code " + std::to_string(nbo_rc) +
 									"), see the messages above",
 				   std::cout);
 		return true;
@@ -2701,10 +2702,17 @@ bool options::digest_io_options(const std::string &temp, int &i)
 		finished = true;
 		return true;
 	}
-	else if (temp == "-nbo_native") {
-		//Same JSON as -nbo, so tests/nbo_reference/compare_nbo.py compares the two.
-		err_checkf(argc >= i + 2, "Not enough arguments for -nbo_native\nPlease provide a wavefunction!", std::cout);
-		refuse_unknown_nbo_suboption(arguments, i + 2, "-nbo_native");
+	else if (temp == "-nbo" || temp == "-nbo_native") {
+		//-nbo_native is the old name, kept for scripts and Olex2 builds that still send it.
+		//Same JSON as -nbo_external, so tests/nbo_reference/compare_nbo.py compares the two.
+		err_checkf(argc >= i + 2, "Not enough arguments for " + temp + "\nPlease provide a wavefunction!", std::cout);
+		refuse_unknown_nbo_suboption(arguments, i + 2, temp);
+		//-nbo ran gennbo until 29 Oct 2026; its options here mean an old command line, not a native run
+		for (int j = i + 2; j < argc; j++)
+			err_checkf(arguments[j] != "-nbo_exe" && arguments[j] != "-nbo_keywords" && arguments[j] != "-nbo_dir",
+					   arguments[j] + " belongs to the external gennbo run, which is -nbo_external now; " + temp +
+						   " is the in-house analysis and would ignore it",
+					   std::cout);
 		std::filesystem::path _wfn = arguments[i + 1];
 		err_checkf(std::filesystem::exists(_wfn), "wavefunction doesn't exist: " + _wfn.string(), std::cout);
 		NboOptions opt;
@@ -4390,10 +4398,10 @@ void options::refuse_unread_bonding_options()
 		err_checkf(false, "Option " + o + " is an NBO/NRT option and this run is " + running +
 							  (fba ? ", which runs NBO and NRT at their defaults and does not read it: the "
 									 "option would be ignored and the run would still exit 0. Use "
-									 "-nbo_native <wavefunction> -nrt for NRT options, or drop " + o
+									 "-nbo <wavefunction> -nrt for NRT options, or drop " + o
 								   : ", which does not read it: no NBO analysis was asked for, so the "
 									 "option would be ignored and the run would still exit 0. Add "
-									 "-nbo_native <wavefunction>, or drop " + o),
+									 "-nbo <wavefunction>, or drop " + o),
 				   log_file);
 	}
 }
@@ -4467,7 +4475,7 @@ void options::digest_options()
 		if (temp == "-v" || temp == "-v2" || temp == "-debug" || temp == "-h" || temp == "--h" ||
 			temp == "-help" || temp == "--help")
 			continue;
-		//consumed by the -nbo/-nbo_native handler itself, in whichever order they were written
+		//consumed by the -nbo/-nbo_external handler itself, in whichever order they were written
 		if (nbo_family_suboptions().count(temp))
 			continue;
 		if (const char *family = owning_analysis(temp))

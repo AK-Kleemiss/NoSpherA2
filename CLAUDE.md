@@ -433,7 +433,7 @@ gtests are ported and the eleven CPU P1 XCW goldens regenerated; `P1_test_XCW_gp
 still needs a device. Visual Studio `Tests`, every test in its own process from `tests/src`:
 1102 passed, 0 failed, 15 skipped and 16 crashed out of 1133 (the 16 all build and run OCC objects in the test itself - StoredEriTests, OccSecondOrderScf, OccHighAngularTests, BondwiseRobyTests, FormatConsistencyTests.OccFchkMatchesBridge, TomlIntegrationTests.AlanineIntegratedOcc - and exit with code 127 before printing anything, with or without OCC_DATA_PATH; the same OCC SCF passes inside the XCW tests of the same binary and the executable runs alanine_integrated_occ to the end, so the locally built Visual Studio test binary is the suspect, root cause not established; a ctest run of the CMake target is still owed). See `UNIT_TESTS_STATUS.md`.
 
-As of 2026-09-24, the in-house NBO analysis (`-nbo_native`, `Src/core/nbo.cpp` and
+As of 2026-09-24, the in-house NBO analysis (`-nbo`, `Src/core/nbo.cpp` and
 `Src/core/nrt.cpp`) is checked in two places: `NrtTests`, `Nbo47Tests` and
 `NaoTests.OverlapCarriesTheDensitysPhaseConvention` as gtests, and
 `py -3.12 tests/nbo_reference/compare_nbo.py --all .` against the 22 stored NBO 7.0.9 references,

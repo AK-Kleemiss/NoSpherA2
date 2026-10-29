@@ -223,10 +223,10 @@ compare sorted tables rather than diffing files.
 ## 13. NBO, E2 and NRT on a small molecule
 
 Run entirely inside NoSpherA2 — no `gennbo` installation. Every sub-option must
-come **after** `-nbo_native`.
+come **after** `-nbo`.
 
 ```powershell
-.\NoSpherA2.exe -nbo_native nico4.gbw -nrt -nrt_arrows -nbo_e2min 0.5 -nbo_threads 12 -nbo_json nico4_nbo.json
+.\NoSpherA2.exe -nbo nico4.gbw -nrt -nrt_arrows -nbo_e2min 0.5 -nbo_threads 12 -nbo_json nico4_nbo.json
 ```
 
 ```powershell
@@ -236,7 +236,7 @@ Get-Content .\NoSpherA2.log -Tail 80
 To use an external NBO 7 instead:
 
 ```powershell
-.\NoSpherA2.exe -nbo nico4.gbw -nbo_exe C:\NBO7\bin\gennbo.exe -nbo_keywords "NRT NRTSYM=off" -nbo_keep47
+.\NoSpherA2.exe -nbo_external nico4.gbw -nbo_exe C:\NBO7\bin\gennbo.exe -nbo_keywords "NRT NRTSYM=off" -nbo_keep47
 ```
 
 Or just write the archive and stop:

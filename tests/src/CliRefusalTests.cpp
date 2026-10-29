@@ -120,14 +120,27 @@ TEST(CliRefusal, MisspelledOptionInAnAnalysisFamilyIsFatal)
 	EXPECT_EXIT(parse({"-topologyy", "x.gbw"}), ::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), ".*");
 }
 
-//-nbo/-nrt options are read by the -nbo_native handler from the tokens after its wavefunction, out of
-//sight of the check above; a real fixture, since the run must die on the option before computing
-TEST(CliRefusal, MisspelledNrtOptionAfterNboNativeIsFatal)
+//-nbo/-nrt options are read by the -nbo handler from the tokens after its wavefunction, out of
+//sight of the check above; a real fixture, since the run must die on the option before computing.
+//-nbo_native is the old name of -nbo and must reach the same handler
+TEST(CliRefusal, MisspelledNrtOptionAfterNboIsFatal)
 {
 	const auto wfn = fixture("RGBI_groups/nh3li.gbw");
 	ASSERT_TRUE(std::filesystem::exists(wfn));
-	EXPECT_EXIT(parse({"-nbo_native", wfn.string(), "-nrt_maxx", "5"}),
-				::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), ".*");
+	for (const char* flag : {"-nbo", "-nbo_native", "-nbo_external"})
+		EXPECT_EXIT(parse({flag, wfn.string(), "-nrt_maxx", "5"}),
+					::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), ".*") << flag;
+}
+
+//-nbo ran gennbo until 29 Oct 2026: an old external command line must not run the native analysis
+//with its gennbo options silently dropped
+TEST(CliRefusal, GennboOptionAfterNboIsFatal)
+{
+	const auto wfn = fixture("RGBI_groups/nh3li.gbw");
+	ASSERT_TRUE(std::filesystem::exists(wfn));
+	for (const char* opt : {"-nbo_exe", "-nbo_keywords", "-nbo_dir"})
+		EXPECT_EXIT(parse({"-nbo", wfn.string(), opt, "x"}),
+					::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), ".*") << opt;
 }
 
 //-nrt_parent: a missing file dies at parse time, a structure that does not fit the wavefunction before
@@ -137,11 +150,11 @@ TEST(CliRefusal, NrtParentThatDoesNotFitIsFatal)
 	const auto wfn = fixture("TFVC/ethane.gbw");
 	if (!std::filesystem::exists(wfn))
 		GTEST_SKIP() << wfn.string() << " not found";
-	EXPECT_EXIT(parse({"-nbo_native", wfn.string(), "-nrt_parent", "no_such_structure.json"}),
+	EXPECT_EXIT(parse({"-nbo", wfn.string(), "-nrt_parent", "no_such_structure.json"}),
 				::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), ".*");
 	const auto bad = std::filesystem::temp_directory_path() / "nos_cli_nrt_parent.json";
 	std::ofstream(bad) << "{\"bonds\": [[\"C1\", \"C2\", 1]]}";
-	EXPECT_EXIT(parse({"-nbo_native", wfn.string(), "-nrt_parent", bad.string()}),
+	EXPECT_EXIT(parse({"-nbo", wfn.string(), "-nrt_parent", bad.string()}),
 				::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), ".*");
 	EXPECT_EXIT(parse({"-fba", wfn.string(), "-nrt_parent", bad.string()}),
 				::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), ".*");
@@ -155,7 +168,7 @@ TEST(CliRefusal, NrtOnAOneElectronWavefunctionRefusesInsteadOfCrashing)
 	const auto wfn = fixture("ptb_H_file/H.gbw");
 	if (!std::filesystem::exists(wfn))
 		GTEST_SKIP() << wfn.string() << " not found";
-	EXPECT_EXIT(parse({"-nbo_native", wfn.string(), "-nrt"}),
+	EXPECT_EXIT(parse({"-nbo", wfn.string(), "-nrt"}),
 				::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), ".*");
 }
 
@@ -172,7 +185,7 @@ TEST(CliRefusal, PositionalWavefunctionThatDoesNotExistIsFatal)
 				::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), ".*");
 }
 
-//An unclaimed family flag is fatal, and the -nbo/-nbo_native handlers read their -nbo_*/-nrt_* options
+//An unclaimed family flag is fatal, and the -nbo/-nbo_external handlers read their -nbo_*/-nrt_* options
 //where no digester sees them, so those must be listed in nbo_family_suboptions().  Scanning the parser
 //source catches a new flag that is neither digested nor listed before it aborts real runs
 TEST(CliRefusal, AnalysisFlagsAreEitherDigestedOrListed)
@@ -214,7 +227,7 @@ TEST(CliRefusal, AnalysisFlagsAreEitherDigestedOrListed)
 		<< [&] { std::string s; for (const auto& o : orphans) s += o + " "; return s; }();
 }
 
-//A real option the running analysis never reads: -nbo_* belong to the -nbo_native handler, and
+//A real option the running analysis never reads: -nbo_* belong to the -nbo handler, and
 //run_app_impl's early-exit analyses return before the RGBI/NPA block, so the unknown-option check misses both
 TEST(CliRefusal, RealOptionNoAnalysisReadsIsFatal)
 {
@@ -239,7 +252,7 @@ TEST(CliRefusal, RealOptionNoAnalysisReadsIsFatal)
 	parse({"-fba", wfn.string(), "-rgbi_no_sym", "-rgbi_basis", "nao"});
 }
 
-//-nrt and -nbo_json belong to the -nbo_native handler, so no top-level digester claims them; they
+//-nrt and -nbo_json belong to the -nbo handler, so no top-level digester claims them; they
 //must still parse in any order
 TEST(CliRefusal, RealOptionsStillParse)
 {

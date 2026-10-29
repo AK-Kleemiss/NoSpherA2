@@ -57,10 +57,10 @@ The rules that follow from that:
 | `-no_gpu_salted` | `-SALTED_COEFS` | the GPU path runs anyway (the globals are set later) |
 | `-old_tsc`, `-tsc_block` | `-merge`, `-tscb` | silently ignored |
 | `-repulsion_exchange`, `-repulsion_overlap`, `-no_gpu_density` | `-interaction_energy` | never read |
-| `-nbo_native` / `-nbo` / `-nbo_parse` / `-convert_to_47` | every `-nbo_*` and `-nrt*` sub-option | the sub-options are silently ignored |
+| `-nbo` / `-nbo_external` / `-nbo_parse` / `-convert_to_47` | every `-nbo_*` and `-nrt*` sub-option | the sub-options are silently ignored |
 
 The NBO case is the one that looks most wrong: the sub-options are collected by a
-loop that starts at the position of the parent flag, so `-nrt -nbo_native x.gbw`
+loop that starts at the position of the parent flag, so `-nrt -nbo x.gbw`
 runs an NBO analysis with no NRT and says nothing about it. Always write the
 parent flag first.
 
