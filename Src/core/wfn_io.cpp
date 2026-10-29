@@ -1644,10 +1644,12 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
 			std::map<int, int> type_end;
 			std::vector<basis_set_entry> basis = _atom.get_basis_set();
 			int temp_bas_idx = 0;
+			const int atom_start = index;
 			for (unsigned int shell = 0; shell < _atom.get_shellcount_size(); shell++) {
 				int type = basis[temp_bas_idx].get_type() - 1;
 				temp_bas_idx += _atom.get_shellcount(shell);
-				if (type_end.find(type + 1) == type_end.end()) {
+				const auto higher = type_end.upper_bound(type);
+				if (higher == type_end.end()) {
 					type_end[type] = index + 2 * type + 1;
 				}
 				else {
@@ -1656,16 +1658,17 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
 							 << " for atom " << atom_index + 1 << ", shell " << shell + 1
 							 << " into the internal coefficient order.\n";
 					}
-					move_columns(reorderd_coefs_s1.container(), dimension, index, 2 * type + 1, type_end[type]);
+					//behind the last block of l or below; every block above l moves up by 2l + 1 (ORCA's def2-*D put s, p, d
+					//after g, so a second moved shell lands wrong if only the next l is shifted)
+					const int to = higher == type_end.begin() ? atom_start : std::prev(higher)->second;
+					move_columns(reorderd_coefs_s1.container(), dimension, index, 2 * type + 1, to);
 
 					if (operators == 2) {
-						move_columns(reorderd_coefs_s2.container(), dimension, index, 2 * type + 1, type_end[type]);
+						move_columns(reorderd_coefs_s2.container(), dimension, index, 2 * type + 1, to);
 					}
 
-					//Add one to each value in the map
-					for (int i = type; i <= type + 1; i++) {
-						type_end[i] += 2 * type + 1;
-					}
+					for (auto it = higher; it != type_end.end(); ++it) it->second += 2 * type + 1;
+					type_end[type] = to + 2 * type + 1;
 				}
 				index += 2 * type + 1;
 			}
