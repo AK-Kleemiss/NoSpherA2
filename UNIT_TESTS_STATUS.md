@@ -237,6 +237,19 @@ with the golden case `SALTED_charge_constraint`, the `-interaction_energy` input
 `WFN::isBohr` reader fix, the interaction energy itself, the `Int_Params` fix, multipole-restrained
 RI fit, `computeRho` screening fix.)
 
+## 2026-10-30 — XCW anharmonic ADPs against cctbx (`XcwAdpTests.DebyeWallerFactorsMatchCctbxGramCharlier`)
+
+`tests/xcw_anharmonic/mixed/` is the epoxide (P21/n) with Gram-Charlier loops as `xcw.py` writes them:
+O1 C only, C2 D only (zero C row), C3 C and D, H isotropic. `cctbx_dw.txt` is the smtbx T(h) of every
+asymmetric-unit atom at every +-hR (an f = 1 atom at the P1 origin, so F = T); `cctbx_fcalc.txt` is the
+smtbx F_calc of the model from `table.tscb`, a synthetic label table (IAM f0 times a Friedel-consistent
+aspheric factor) that both codes read bit for bit. The test builds `structure_factors` from the CIF
+(read_CIF, U_cif2U_star, U_star2U_cart), runs `set_DW`, `set_phases`, `set_anom` and `calc_F_calc(tsc)`
+and asks |dT| < 1e-12 and |dF| < 1e-13 max|F|. The fixture is 15 reflections, 392 factors, 28 KB; measured: 3.9e-16 on T, 2.8e-14 of max|F| 2.5 on F.
+`NOS_XCW_GC_CASES=<dir>` adds that dir's case folders; on the full epoxide hkl (harm, C only, D only,
+C+D, mixed; 58,534 factors each, the XCW λ = 0 table) T agrees to 4.7e-16 and F to 1.0e-13 of 46 in
+every case, the same as the harmonic case. 1 test, passing.
+
 ## 2026-10-10 - inversion screening also for measured h / -h pairs
 
 `make_jobs` (2026-10-08) merges the integrations of the images of one reflection that are each other's inverse, which

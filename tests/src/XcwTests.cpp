@@ -620,6 +620,101 @@ namespace
 		EXPECT_GT(t3_largest, 1e-6);
 	}
 
+	//set_DW end to end from the CIF (read_CIF, U_cif2U_star, U_star2U_cart) against cctbx: tests/xcw_anharmonic/*/
+	//holds an epoxide (P21/n) CIF with Gram-Charlier loops as xcw.py writes them and cctbx_dw.txt, the smtbx
+	//T(h) of every asymmetric-unit atom at +-hR, written by an f = 1 atom at the P1 origin, so F(h) = T(h).
+	//mixed/: O1 C only, C2 D only (zero C row, as Olex2 writes an order-4 atom), C3 C and D, H isotropic.
+	//NOS_XCW_GC_CASES=<dir> adds that dir's case subfolders (the full-hkl validation set).
+	TEST(XcwAdpTests, DebyeWallerFactorsMatchCctbxGramCharlier)
+	{
+		std::vector<std::filesystem::path> cases;
+		std::vector<std::filesystem::path> roots = { nos_test_repo_root() / "tests" / "xcw_anharmonic" };
+		if (const char* extra = std::getenv("NOS_XCW_GC_CASES")) roots.emplace_back(extra);
+		for (const auto& root : roots) {
+			if (!std::filesystem::is_directory(root)) continue;
+			for (const auto& e : std::filesystem::directory_iterator(root))
+				if (std::filesystem::exists(e.path() / "cctbx_dw.txt")) cases.push_back(e.path());
+		}
+		if (cases.empty()) GTEST_SKIP() << "no cases under tests/xcw_anharmonic";
+		for (const auto& c : cases) {
+			std::map<std::pair<std::string, i3>, cdouble> ref;
+			std::ifstream in(c / "cctbx_dw.txt");
+			std::string line;
+			while (std::getline(in, line)) {
+				if (line.empty() || line[0] == '#') continue;
+				std::istringstream s(line);
+				std::string label;
+				i3 h;
+				double re, im;
+				s >> label >> h[0] >> h[1] >> h[2] >> re >> im;
+				ref[{ label, h }] = cdouble(re, im);
+			}
+			ASSERT_FALSE(ref.empty()) << c;
+			const auto dir = std::filesystem::temp_directory_path() / ("nosphera2_xcw_tests_gc_" + test_name() + "_" + c.filename().string());
+			std::filesystem::create_directories(dir);
+			std::ofstream(dir / "settings.txt") << "normal params 1 basis_set sto-3g charge 0 mult 1 rhf start 0 step_size 0.01 end 0";
+			options opt;
+			opt.xcw_settings_path = dir / "settings.txt";
+			opt.cif = std::filesystem::absolute(c / "epoxide.cif");
+			opt.hkl = std::filesystem::absolute(c / "epoxide.hkl");
+			opt.do_XCW = true;
+			const auto old_cwd = std::filesystem::current_path();
+			std::filesystem::current_path(dir);
+			std::stringstream log;
+			std::streambuf* const old_cout = std::cout.rdbuf(log.rdbuf());
+			opt.loadXCWsettings();
+			structure_factors SF(opt);
+			SF.set_DW();
+			//cctbx_fcalc.txt: smtbx F_calc of the same model from table.tscb, which both codes read bit for bit
+			const bool fc = std::filesystem::exists(c / "cctbx_fcalc.txt");
+			if (fc) {
+				SF.set_phases();
+				SF.set_anom();
+				SF.calc_F_calc(itsc_block(c / "table.tscb"));
+			}
+			std::cout.rdbuf(old_cout);
+			std::filesystem::current_path(old_cwd);
+			std::filesystem::remove_all(dir);
+
+			double worst = 0.0;
+			size_t n = 0;
+			for (int a = 0; a < SF.model_data.ncen; a++) {
+				int h = 0;
+				for (const i3& hk : SF.scatter_data.hkl_enlarged) {
+					const auto it = ref.find({ SF.asym_atoms[a].label, hk });
+					ASSERT_NE(it, ref.end()) << c << " " << SF.asym_atoms[a].label << " " << hk[0] << " " << hk[1] << " " << hk[2];
+					worst = std::max(worst, std::abs(SF.DW_facts[a][h] - it->second));
+					n++;
+					h++;
+				}
+			}
+			std::cout << "cctbx GC " << c.filename().string() << ": " << n << " factors, max |T_NoSpherA2 - T_cctbx| " << worst << std::endl;
+			EXPECT_LT(worst, 1e-12) << c;
+			if (!fc) continue;
+			std::map<i3, cdouble> fref;
+			std::ifstream fin(c / "cctbx_fcalc.txt");
+			while (std::getline(fin, line)) {
+				if (line.empty() || line[0] == '#') continue;
+				std::istringstream s(line);
+				i3 h;
+				double re, im;
+				s >> h[0] >> h[1] >> h[2] >> re >> im;
+				fref[h] = cdouble(re, im);
+			}
+			double fworst = 0.0, fmax = 0.0;
+			int r = 0;
+			for (const i3& hk : SF.scatter_data.hkl) {
+				const auto it = fref.find(hk);
+				ASSERT_NE(it, fref.end()) << c << " F_calc " << hk[0] << " " << hk[1] << " " << hk[2];
+				fworst = std::max(fworst, std::abs(SF.scatter_data.F_calc[r] - it->second));
+				fmax = std::max(fmax, std::abs(it->second));
+				r++;
+			}
+			std::cout << "cctbx GC " << c.filename().string() << ": " << r << " F_calc, max |F_NoSpherA2 - F_smtbx| " << fworst << " of max |F| " << fmax << std::endl;
+			EXPECT_LT(fworst, 1e-13 * fmax) << c;
+		}
+	}
+
 	//transform_ADPs takes M and applies T'_{ij..} = sum M_pi M_qj .. T_pq.. : for the rank-2 U that is
 	//M^T U M, checked against a hand-multiplied three-fold (which tells M from M^T), and for C and D the
 	//sign pattern of a two-fold along b (every 0 or 2 index flips the sign)
