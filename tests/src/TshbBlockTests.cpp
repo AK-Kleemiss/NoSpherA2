@@ -16,6 +16,7 @@
 
 #include <complex>
 #include <fstream>
+#include <limits>
 #include <map>
 #include <random>
 
@@ -154,8 +155,17 @@ namespace
 					for (int j = 0; j < 3; j++)
 						k[x] += unit_cell.get_rcm(x, j) * h[j] / scale;
 				for (double& v : k) v = constants::ang2bohr(v);
-				const double d = std::abs(record_form_factor(tshb.get_record(a), k) - sf[r]);
-				worst = std::max(worst, d);
+				const cdouble ft = record_form_factor(tshb.get_record(a), k);
+				const double d = std::abs(ft - sf[r]);
+				//a NaN would vanish in std::max: the first non-finite dF names its side and record, the rest stay inf
+				if (!std::isfinite(d) && std::isfinite(worst)) {
+					const tshb_record& rec = tshb.get_record(a);
+					std::ostringstream s;
+					for (const auto& sh : rec.shells) s << " (l " << sh.l << " a " << sh.alpha << ")";
+					ADD_FAILURE() << rec.label << " h " << h[0] << " " << h[1] << " " << h[2] << ": .tshb f " << ft << ", table f " << sf[r]
+						<< "; shells" << s.str() << ", " << rec.slaters.size() << " Slater, " << rec.gaussians.size() << " Gaussian terms";
+				}
+				worst = std::isfinite(d) ? std::max(worst, d) : std::numeric_limits<double>::infinity();
 				f_max = std::max(f_max, std::abs(sf[r]));
 				if (rel_max && std::abs(sf[r]) > 0.0)
 					*rel_max = std::max(*rel_max, d / std::abs(sf[r]));
@@ -679,7 +689,9 @@ TEST(XcwPartitionTests, RiTshbIsTheRiTable)
 		double w = 0.0;
 		for (const std::string step : { "NA2_0000000", "NA2_0010000" }) {
 			double f_max = 0.0, rel = 0.0;
-			w = std::max(w, compare_with_table(tshb_block::read(run.dir / (step + ".tshb")), itsc_block(run.dir / (step + ".tscb")), cell(cif, std::cout, false), f_max, &rel) / f_max);
+			const double d = compare_with_table(tshb_block::read(run.dir / (step + ".tshb")), itsc_block(run.dir / (step + ".tscb")), cell(cif, std::cout, false), f_max, &rel);
+			EXPECT_GT(f_max, 0.0) << step << ".tscb is all zero, max |dF| " << d;
+			w = std::max(w, d / f_max);
 		}
 		return w;
 	};
