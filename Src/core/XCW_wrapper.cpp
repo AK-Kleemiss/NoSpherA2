@@ -559,6 +559,8 @@ void XCW_wrapper::report_lambda(const double lambda, const occ::qm::Wavefunction
 	writer.v.wR2_all = fit.wR2_all;
 	writer.v.has_A2 = opt->xcw_settings.xcw_gaussian_halt && !gaussian_halt_history_.empty();
 	if (writer.v.has_A2) writer.v.A2 = gaussian_halt_history_.back().A2;
+	writer.v.scale = sf.scatter_data.scale;
+	writer.v.extinction = sf.extinction_report();
 	writer.lambda_line();
 	last_row_ = writer.v;
 	if (write_result) {
@@ -895,7 +897,9 @@ void XCW_wrapper::run() {
 		std::ostringstream s;
 		s << "XCW final model: lambda " << std::fixed << std::setprecision(5) << v.lambda << " R1 " << v.R1 << " wR2 " << v.wR2;
 		if (v.R1_all != v.R1 || v.wR2_all != v.wR2) s << " R1(all) " << v.R1_all << " wR2(all) " << v.wR2_all;
-		s << " GooF " << std::setprecision(4) << v.GooF2 << " weight " << sf.weight_report();
+		s << " GooF " << std::setprecision(4) << v.GooF2 << " scale " << std::setprecision(6) << v.scale;
+		if (!v.extinction.empty()) s << " " << v.extinction;
+		s << " weight " << sf.weight_report();
 		writer.log << s.str() << std::endl;
 		std::cout << s.str() << std::endl;
 	}

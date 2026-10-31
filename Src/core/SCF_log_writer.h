@@ -43,6 +43,9 @@ public:
 		double lambda = 0, criterion = 0, GooF2 = 0, R1 = 0, E_total = 0, penalty = 0, quant = 0, criterion_all = 0, R1_all = 0, A2 = 0;
 		bool has_A2 = false;
 		double wR2 = 0, wR2_all = 0;
+		//not a table column: the final-model line prints them for the last converged lambda
+		double scale = 0;
+		std::string extinction;
 	};
 
 	values v;

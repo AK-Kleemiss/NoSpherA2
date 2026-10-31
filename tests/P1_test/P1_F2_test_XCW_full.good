@@ -64,5 +64,5 @@ Recommended halting lambda* = 0.11000 (A^2=106.2228) -- WARNING: binned <z^2> tr
   candidate fit: degree=2 RSS=259.8921 R^2=0.9670 AIC=44.9043
   candidate fit: degree=4 RSS=5.7740 R^2=0.9993 AIC=3.2215 [chosen]
 WARNING: A^2 is still falling at the last evaluated lambda (0.11000); this is a scan-boundary value, not a confirmed interior minimum. Extend the scan (larger max_value in -do_XCW stepsize max_value) to find the true optimum. The degree-4 fit places its minimum at lambda ~= 0.10829, inside the range already scanned, which contradicts A^2 still falling at the last step; the trend is too flat here to extrapolate from, only further steps can decide it.
-XCW final model: lambda 0.11000 R1 0.02203 wR2 0.03432 R1(all) 0.02256 wR2(all) 0.03435 GooF 3.2434 weight sigma
+XCW final model: lambda 0.11000 R1 0.02203 wR2 0.03432 R1(all) 0.02256 wR2(all) 0.03435 GooF 3.2434 scale 5.231739 weight sigma
 Finished XCW fitting procedure.

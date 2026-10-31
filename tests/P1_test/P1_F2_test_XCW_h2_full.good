@@ -36,5 +36,5 @@ ____________________________________________________________________________
 Recommended halting lambda* = 0.01000 (A^2=124.0315) -- WARNING: binned <z^2> trend test flagged at this lambda; residuals may be spatially correlated, inspect before trusting lambda*.
   candidate fit: degree=2 -- not enough points yet (need >= degree+3 evaluated lambda steps)
   candidate fit: degree=4 -- not enough points yet (need >= degree+3 evaluated lambda steps)
-XCW final model: lambda 0.02000 R1 0.02349 wR2 0.03750 R1(all) 0.02402 wR2(all) 0.03753 GooF 3.5431 weight sigma
+XCW final model: lambda 0.02000 R1 0.02349 wR2 0.03750 R1(all) 0.02402 wR2(all) 0.03753 GooF 3.5431 scale 5.224048 weight sigma
 Finished XCW fitting procedure.
