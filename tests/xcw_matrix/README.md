@@ -200,6 +200,12 @@ the scheme weights and k are then filled from that model, and the lambda 0 SCF s
 lambda 0 is therefore 0.664 (m5) and 0.963 (m17), not exactly 1. Settling extinction first moved the rows that combine
 refined extinction with a non-sigma scheme (m5, m9, m16, m19 beyond tolerance; m12, m15, m22, mON in the last digits).
 
+`chebyshev_opt` floors the fitted variance at the reflection's own σ² (31 Oct 2026). Before that, the fitted series
+for m19 dipped through zero: 123 of 364 reflections got w = 0 and their neighbours up to 300× the typical weight.
+Which side of the root a reflection landed on was round-off, so m19 failed on Linux and macOS (wR2 0.1460 vs 0.1455)
+and moved to wR2 0.094 when every σ was raised by 0.01. With the floor m19 has GooF 0.977 and the same perturbation
+moves wR2 by 3e-5. Rows 19, 20, 21 and ON were regenerated; the other rows do not use the scheme.
+
 ## ctest
 
 `XcwMatrixTests.MatchesGolden/m<id>` runs each of the 26 rows in process with `-cpus 1`, in a scratch directory under

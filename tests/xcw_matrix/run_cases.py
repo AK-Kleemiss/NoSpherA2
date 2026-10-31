@@ -67,9 +67,10 @@ def run(exe, c, work, cpus):
         res.update(lam=float(row["Lambda"]), crit=float(row["Criterion"]))
     m = re.search(r"^XCW final model: (.*)$", log, re.M)
     if m:
-        kv = dict(zip(*[iter(m.group(1).split())] * 2))
+        # pairs only up to the scale: "extinction(SHELX (Zachariasen)) p" and the weight report are not key/value
+        kv = dict(zip(*[iter(m.group(1).split(" scale ")[0].split())] * 2))
         res.update(lam=float(kv["lambda"]), r1=float(kv["R1"]), wr2=float(kv["wR2"]), r1all=float(kv["R1(all)"]),
-                   wr2all=float(kv["wR2(all)"]), goof=float(kv["GooF"]), wscheme=kv["weight"])
+                   wr2all=float(kv["wR2(all)"]), goof=float(kv["GooF"]), wscheme=m.group(1).split(" weight ")[1].split()[0])
     m = re.search(r"Generated total of (\d+) grid", log)
     res["grid"] = int(m.group(1)) if m else None
     scf = (d / "SCF.log").read_text(errors="replace") if (d / "SCF.log").exists() else ""

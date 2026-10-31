@@ -802,7 +802,14 @@ void structure_factors::update_cryst_weights() {
 		sig_F_.resize(nr);
 		sig_I_.resize(nr);
 		for (int r = 0; r < nr; r++) {
-			const double w = scheme == ws::unit ? 1.0 : scheme == ws::stl ? std::pow(unit_cell.get_stl_of_hkl(hkl_ordered_[r]), weight_ab_[0]) : chebyshev_weight(t[r], weight_ab_);
+			double w = scheme == ws::unit ? 1.0 : scheme == ws::stl ? std::pow(unit_cell.get_stl_of_hkl(hkl_ordered_[r]), weight_ab_[0]) : chebyshev_weight(t[r], weight_ab_);
+			//chebyshev_opt: the fitted variance is floored at the reflection's own sigma^2, never trusted beyond counting
+			//statistics. Unfloored, a series that dips through 0 drops whole Fc ranges (w = 0) and puts 1/(~0) on its
+			//neighbours, and which side of the root they land on is round-off (NH3 m19: 123 of 364 at 0, others 300x)
+			if (scheme == ws::chebyshev_opt) {
+				const double so = F2 ? scatter_data.sigma_obs2[r] : scatter_data.sigma_obs[r];
+				if (so > 0.0 && (!(w > 0.0) || w * so * so > 1.0)) w = 1.0 / (so * so);
+			}
 			const double s = w > 0.0 ? 1.0 / std::sqrt(w) : inf;
 			if (F2) {
 				sig_I_[r] = s;
