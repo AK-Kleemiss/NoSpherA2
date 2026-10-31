@@ -14,6 +14,7 @@
 XCW_wrapper::XCW_wrapper(options& opt_in) : opt(&opt_in), sf(opt_in) {
 	std::cout << "XCW orbital basis set: " << sf.orbital_basis->get_name() << std::endl;
 	writer.WAEmpiRe();
+	sf.weight_log_ = &writer.log;
 	writer.log << "XCW orbital basis set: " << sf.orbital_basis->get_name() << std::endl;
 	writer.log << sf.model_summary << std::endl;
 	const auto& xs = opt_in.xcw_settings;

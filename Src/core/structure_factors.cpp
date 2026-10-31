@@ -675,7 +675,10 @@ void structure_factors::ensure_cryst_weights() {
 	if (!sig_I_.empty()) return;
 	sig_F_ = scatter_data.sigma_obs;
 	sig_I_ = scatter_data.sigma_obs2;
-	if (opt->xcw_settings.weight == options::SF_settings::weight_scheme::sigma && opt->xcw_settings.robust_c <= 0) return;
+	using ws = options::SF_settings::weight_scheme;
+	const ws scheme = opt->xcw_settings.weight;
+	if (scheme == ws::sigma && opt->xcw_settings.robust_c <= 0) return;
+	rescale_pending_ = opt->xcw_settings.weight_rescale && (scheme == ws::unit || scheme == ws::stl || scheme == ws::chebyshev);
 	solve_scale();
 	update_cryst_weights();
 }
@@ -750,6 +753,7 @@ std::string structure_factors::weight_report() const {
 	if (!p.empty())
 		s << (xs.weight == ws::shelx || xs.weight == ws::shelx_opt ? " WGHT" : xs.weight == ws::stl ? " a" : (cheb && weight_ab_.empty() && xs.weight == ws::chebyshev_opt) ? " n" : " A");
 	for (const double v : p) s << " " << v;
+	if (weight_k_ != 1.0) s << " k " << weight_k_;
 	return s.str();
 }
 
@@ -801,6 +805,31 @@ void structure_factors::update_cryst_weights() {
 				const double si = 2.0 * scatter_data.abs_F_obs[r] * s;
 				sig_F_[r] = s;
 				sig_I_[r] = si > 0.0 ? si : inf;
+			}
+		}
+		//REWEIGHT: k = 1/S^2 of the base scheme at its own scale (which k leaves alone), S^2 as criterion() has it
+		if (rescale_pending_) {
+			rescale_pending_ = false;
+			solve_scale();
+			const bool weighted = quality_criteria.goof_type == 2;
+			double chi2 = 0.0;
+			for (int r = 0; r < nr; r++) {
+				if (!scatter_data.hkl_mask[r]) continue;
+				const double z = fit_residual(r) / (F2 ? sig_I_[r] : sig_F_[r]);
+				chi2 += z * z * (weighted ? inv_H2_[r] : 1.0);
+			}
+			const double S2 = chi2 / static_cast<double>(model_data.nr_fit - n_params());
+			if (S2 > 0.0 && std::isfinite(S2)) weight_k_ = 1.0 / S2;
+			std::ostringstream s;
+			s << "XCW weight rescale k=" << std::setprecision(6) << weight_k_ << " (S=1 at scan start)";
+			std::cout << s.str() << std::endl;
+			if (weight_log_) *weight_log_ << s.str() << std::endl;
+		}
+		if (weight_k_ != 1.0) {
+			const double f = 1.0 / std::sqrt(weight_k_);
+			for (int r = 0; r < nr; r++) {
+				sig_F_[r] *= f;
+				sig_I_[r] *= f;
 			}
 		}
 	}

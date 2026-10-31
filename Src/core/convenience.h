@@ -1079,6 +1079,9 @@ struct options
 		weight_scheme weight = weight_scheme::sigma;
 		vec weight_params;
 		double robust_c = 0.0;
+		// `weight_rescale off` (CLI -xcw_weight_rescale 0) keeps unit/stl/chebyshev weights absolute; by default
+		// they are multiplied once, at the first fill, by the k that makes the scan's criterion S = 1 (CRYSTALS REWEIGHT)
+		bool weight_rescale = true;
 		// `i_double` in the settings file: the XCW grid's AO values and block products in double precision
 		bool grid_double = false;
 	};

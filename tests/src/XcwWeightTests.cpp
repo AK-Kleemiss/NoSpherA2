@@ -201,6 +201,58 @@ namespace NoSpherA2UnitTests
 		EXPECT_NEAR(chebyshev_weight(0.9, { 1.0, 2.0, 3.0, 4.0 }), 1.0 / (1.0 + 2.0 * 0.9 + 3.0 * 0.62 + 4.0 * 0.216), 1e-14);
 	}
 
+	//REWEIGHT: unit and chebyshev times k at the first fill make the scan's own criterion S^2 = 1 there, classical and
+	//1/|H|^2-weighted, against F and F^2; k is then held, and `weight_rescale off` keeps the absolute weights
+	TEST(XcwWeightTests, RescaleMakesStartGooFOne)
+	{
+		for (const ws scheme : { ws::unit, ws::chebyshev })
+			for (const int goof : { 1, 2 })
+				for (const int against : { 1, 2 }) {
+					options opt;
+					opt.xcw_settings.weight = scheme;
+					opt.xcw_settings.weight_params = { 1.0, 0.5, 0.2 };
+					structure_factors sf;
+					fill(sf, opt);
+					sf.model_data.nr_fit = sf.model_data.nr = 4;
+					auto& d = sf.scatter_data;
+					d.F_obs.push_back(5.0);
+					d.abs_F_obs.push_back(5.0);
+					d.F_obs2.push_back(25.0);
+					d.sigma_obs2.push_back(3.0);
+					d.sigma_obs.push_back(0.3);
+					d.hkl_mask.push_back(1);
+					d.F_calc = { 2.0, 4.0, 8.0, 3.0 };
+					sf.unit_cell = cell(10.0, 10.0, 10.0, 90.0, 90.0, 90.0);
+					d.hkl = { i3{ 1, 0, 0 }, i3{ 0, 2, 0 }, i3{ 1, 1, 0 }, i3{ 1, 1, 1 } };
+					sf.quality_criteria.refine_against = against;
+					sf.quality_criteria.goof_type = goof;
+					sf.ensure_inv_H2_weights();
+					sf.ensure_cryst_weights();
+					sf.calc_criteria();
+					EXPECT_NEAR(sf.criterion(false), 1.0, 1e-12) << static_cast<int>(scheme) << " " << goof << " " << against;
+					EXPECT_NE(sf.weight_k_, 1.0);
+					//held: a refill at the same Fc and scale gives the same weights, S stays 1
+					const double k = sf.weight_k_;
+					sf.update_cryst_weights();
+					sf.calc_criteria();
+					EXPECT_EQ(sf.weight_k_, k);
+					EXPECT_NEAR(sf.criterion(false), 1.0, 1e-12);
+					EXPECT_NE(sf.weight_report().find(" k "), std::string::npos);
+				}
+		options opt;
+		opt.xcw_settings.weight = ws::unit;
+		opt.xcw_settings.weight_rescale = false;
+		structure_factors sf;
+		fill(sf, opt);
+		sf.quality_criteria.refine_against = 1;
+		sf.quality_criteria.goof_type = 1;
+		sf.ensure_cryst_weights();
+		EXPECT_EQ(sf.weight_k_, 1.0);
+		EXPECT_EQ(sf.sig_F_, vec(3, 1.0));
+		EXPECT_FALSE(parsed_weight("basis_set sto-3g params 10 weight unit weight_rescale off").weight_rescale);
+		EXPECT_TRUE(parsed_weight("basis_set sto-3g params 10 weight unit").weight_rescale);
+	}
+
 	//Delta^2 planted as sum A_r T_r(t): the least-squares fit gives A back
 	TEST(XcwWeightTests, ChebyshevFitRecoversCoefficients)
 	{

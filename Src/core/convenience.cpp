@@ -875,6 +875,10 @@ std::string help_message =
  "                                    Fc), chebyshev_opt n (A_r refit every\n"
  "                                    step); robust adds Tukey's biweight, c\n"
  "                                    default 6. The settings keyword `weight`.\n"
+ "  -xcw_weight_rescale 0|1            unit, stl and chebyshev weights times the k\n"
+ "                                    giving S = 1 at the scan's start, held for\n"
+ "                                    the scan (default 1, CRYSTALS REWEIGHT).\n"
+ "                                    The settings keyword `weight_rescale off`.\n"
  "  -xcw_partition grid|ri             How XCW shares the density among the atoms:\n"
  "                                    grid (default) by the -hirsh, -becke,\n"
  "                                    -tfvc, -mbis or -embis weights, ri by an RI fit in the\n"
@@ -4323,6 +4327,10 @@ bool options::digest_xcw_options(const std::string &temp, int &i)
 		std::istringstream is(words);
 		read_xcw_weight(is, xcw_settings);
 	}
+	else if (temp == "-xcw_weight_rescale") {
+		err_checkf(i + 1 < argc && (arguments[i + 1] == "0" || arguments[i + 1] == "1"), "-xcw_weight_rescale takes 0 or 1", std::cout);
+		xcw_settings.weight_rescale = arguments[++i] == "1";
+	}
 	else if (temp == "-xcw_partition") {
 		err_checkf(i + 1 < argc, "-xcw_partition takes grid or ri", std::cout);
 		xcw_partition = arguments[++i];
@@ -4714,6 +4722,15 @@ void options::loadXCWsettings() {
 
 		handlers["weight"] = [&](std::istream& is) {
 			read_xcw_weight(is, xcw_settings);
+			};
+
+		handlers["weight_rescale"] = [&](std::istream& is) {
+			std::string v;
+			is >> v;
+			v = lowercase(v);
+			if (v == "off" || v == "0") xcw_settings.weight_rescale = false;
+			else if (v == "on" || v == "1") xcw_settings.weight_rescale = true;
+			else throw std::runtime_error("Expected on or off after 'weight_rescale'");
 			};
 
 		handlers["basis_set"] = [&](std::istream& is) {

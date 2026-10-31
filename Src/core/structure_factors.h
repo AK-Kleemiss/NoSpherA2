@@ -202,6 +202,13 @@ public:
 	// The scheme's current parameters (a, b of SHELX, a of stl, A_r of Chebyshev), from the settings until
 	// shelx_opt / chebyshev_opt move them
 	vec weight_ab_;
+	// unit, stl, chebyshev: every w times weight_k_, set once at the first fill (ensure_cryst_weights) so that the
+	// criterion S^2 of the base scheme is 1 there, then held for the whole scan: rescaling at every step would pin
+	// S to 1 and take the stopping signal with it. Robust goes on top (its z = Delta sqrt(w) is scale-free)
+	double weight_k_ = 1.0;
+	bool rescale_pending_ = false;
+	// where the rescale line goes besides the console (the XCW SCF.log)
+	std::ostream* weight_log_ = nullptr;
 	// "shelx_opt WGHT 0.1 0" / "robust(c 6) chebyshev_opt A 1 0.5", for the logs
 	std::string weight_report() const;
 	// Fills sig_F_ and sig_I_ from the scheme, the current F_calc and scale (so only after calc_F_calc).
