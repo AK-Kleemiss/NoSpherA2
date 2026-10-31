@@ -456,6 +456,7 @@ void read_mask(const std::filesystem::path& mask_filename,
 	// Mask values of the fab file at their position in hkl_enlarged
 	cvec mask_enlarged(hkl_enlarged.size(), 0.0);
 	bvec in_fab(hkl_enlarged.size(), false);
+	const std::vector<i3> enlarged(hkl_enlarged.begin(), hkl_enlarged.end());
 	mask_info.resize(n_r, vec(2, 0.0));
 	i3 hkl_;
 	double real_mask, imag_mask;
@@ -487,9 +488,10 @@ void read_mask(const std::filesystem::path& mask_filename,
 		real_mask = stod(temp);
 		iss >> temp;
 		imag_mask = stod(temp);
-		auto it = hkl_enlarged.find(hkl_);
-		if (it != hkl_enlarged.end()) {
-			const size_t pos = std::distance(hkl_enlarged.begin(), it);
+		//a binary search in the sorted copy: a set iterator distance is linear in hkl_enlarged
+		const auto it = std::lower_bound(enlarged.begin(), enlarged.end(), hkl_);
+		if (it != enlarged.end() && *it == hkl_) {
+			const size_t pos = it - enlarged.begin();
 			mask_enlarged[pos] = cdouble(real_mask, imag_mask);
 			in_fab[pos] = true;
 		}
@@ -497,8 +499,9 @@ void read_mask(const std::filesystem::path& mask_filename,
 	// The fab file lists one reflection of each set of equivalents: F(h) = exp(2 pi i h.t_s) F(h R_s)
 	const vec2 trans = unit_cell.get_trans();
 	auto h = hkl.begin();
+	const ivec2 lookups = unit_cell.generate_asym_lookup(hkl, hkl_enlarged);
 	for (int r = 0; r < n_r; r++, h++) {
-		const ivec lookup = unit_cell.generate_asym_lookup(r, hkl, hkl_enlarged);
+		const ivec& lookup = lookups[r];
 		for (int s = 0; s < lookup.size(); s++) {
 			if (!in_fab[lookup[s]]) continue;
 			const cdouble F = std::exp(cdouble(0, constants::TWO_PI * ((*h)[0] * trans[0][s] + (*h)[1] * trans[1][s] + (*h)[2] * trans[2][s]))) * mask_enlarged[lookup[s]];

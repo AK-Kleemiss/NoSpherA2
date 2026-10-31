@@ -142,12 +142,17 @@ structure_factors::structure_factors(options& opt_in) {
 		if (opt_in.xcw_settings.grown) {
 			// Fourth step of the symmetry resolution: Copy U_iso, the dispersion and the ADPs of each grown atom's parent, the ADPs rotated onto the symmetry generated atoms
 			unit_cell.grow_ADPs(asym_atoms, ADPs);
-			// Fifth step of the symmetry resolution: Delete the fully applied operations and solve the symmetry factors for the operations that are kept
+		}
+		if (opt_in.xcw_settings.grown && tuning("NOSPHERA2_XCW_GROWN_COPYSUM")) {
+			// Old route: delete the fully applied operations and sum every grown copy's own f over the kept ones. A site's copies
+			// are then not averaged over the operations, which is not the F Olex2 refines from the tscb (R1 0.777 vs 0.748 % on PPh4UF6)
 			applied_symmetry = unit_cell.apply_grown(scatter_data.hkl_table, scatter_data.hkl_enlarged, asym_atoms);
 		}
 		else {
-			// Symmetry factors of an ungrown model, also for an atom on a special position
+			// Symmetry factors of an ungrown model, also for an atom on a special position. A grown cluster only shapes the
+			// density and its partition: F is the asymmetric unit's f over all operations, as Olex2 computes it from the tscb
 			unit_cell.set_sym_fact_from_mult(asym_atoms);
+			for (asym_atom& at : asym_atoms) if (at.grown) at.sym_fact = 0.0;
 		}
 		summary << "Operations F_calc sums over (" << unit_cell.get_num_syms() << "):";
 		for (int op = 0; op < unit_cell.get_num_syms(); op++) summary << "  " << unit_cell.symop_string(op);
@@ -421,8 +426,9 @@ void structure_factors::set_phases() {
 	std::transform(cm.begin(), cm.end(), cm.begin(), [bohr2angstrom](std::vector<double>& vec) {
 		std::transform(vec.begin(), vec.end(), vec.begin(), [bohr2angstrom](double x) { return x * bohr2angstrom; });
 		return vec; });
+	const ivec2 lookup = unit_cell.generate_asym_lookup(scatter_data.hkl, scatter_data.hkl_enlarged);
 	for (int r = 0; r < model_data.nr; r++) {
-		ivec asym_list = unit_cell.generate_asym_lookup(r, scatter_data.hkl, scatter_data.hkl_enlarged);
+		const ivec& asym_list = lookup[r];
 		vec q_temp = { k_pt[0][asym_list[0]], k_pt[1][asym_list[0]], k_pt[2][asym_list[0]] };
 		std::transform(q_temp.begin(), q_temp.end(), q_temp.begin(), [angstrom2bohr](double x) { return x * angstrom2bohr; });
 		for (int sym_op = 0; sym_op < trans[0].size(); sym_op++) {
@@ -439,10 +445,7 @@ void structure_factors::set_phases() {
 void structure_factors::set_anom() {
 	if(anom_set_) return;
 	int r, at, sym_op;
-	ivec2 asym_lookup(model_data.nr);
-	for (r = 0; r < model_data.nr; r++) {
-		asym_lookup[r] = unit_cell.generate_asym_lookup(r, scatter_data.hkl, scatter_data.hkl_enlarged);
-	}
+	const ivec2 asym_lookup = unit_cell.generate_asym_lookup(scatter_data.hkl, scatter_data.hkl_enlarged);
 	for (r = 0; r < model_data.nr; r++) {
 		//lookup[sym_op]: the hkl_enlarged entry of reflection r under symmetry operation sym_op
 		const ivec& lookup = asym_lookup[r];
@@ -726,9 +729,7 @@ void structure_factors::setup_grid(const occ::gto::AOBasis& aobasis) {
 }
 
 void structure_factors::link_symmetry_equivalents() {
-	XG.lookup.resize(model_data.nr);
-	for (int r = 0; r < model_data.nr; r++)
-		XG.lookup[r] = unit_cell.generate_asym_lookup(r, scatter_data.hkl, scatter_data.hkl_enlarged);
+	XG.lookup = unit_cell.generate_asym_lookup(scatter_data.hkl, scatter_data.hkl_enlarged);
 	//The AO values and weights are real, so the grid integral of -q is the conjugate of that of q: only the entries of
 	//inversion_cleaned_hkl are integrated
 	if (tuning("NOSPHERA2_NO_INVERSION_SCREENING")) {
@@ -1064,9 +1065,10 @@ size_t structure_factors::free_memory() const {
 //F_r = Sum_at sym_fact Sum_s f_at(h R_s) exp(i h R_s x_at) T_at(h R_s) exp(2 pi i h t_s) plus the
 //anomalous dispersion correction, with the atomic scattering factors laid out like DW_facts
 void structure_factors::calc_F_calc(const cvec2& scattering_factors) {
+	const ivec2 lookups = unit_cell.generate_asym_lookup(scatter_data.hkl, scatter_data.hkl_enlarged);
 #pragma omp parallel for
 	for (int r = 0; r < model_data.nr; r++) {
-		const ivec lookup = unit_cell.generate_asym_lookup(r, scatter_data.hkl, scatter_data.hkl_enlarged);
+		const ivec& lookup = lookups[r];
 		cdouble sum = scatter_data.anom_correction[r];
 		for (int at = 0; at < model_data.ncen; at++) {
 			cdouble temp1 = 0;

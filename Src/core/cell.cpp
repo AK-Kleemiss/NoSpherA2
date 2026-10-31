@@ -849,26 +849,28 @@ ivec2 cell::remove_inv_vectors(const hkl_list& hkl_enlarged, hkl_list& inversion
 	return link;
 }
 
-ivec cell::generate_asym_lookup(const int r, const hkl_list& hkl, const hkl_list& hkl_enlarged) const {
-	ivec asym_list;
-	auto it = hkl.begin();
-	std::advance(it, r);
-	i3 tempv;
-	const i3& hkl_temp = *it;
-	for (int s = 0; s < sym[0][0].size(); s++) {
-		tempv = { 0, 0, 0 };
-		for (int h = 0; h < 3; h++) {
-			for (int j = 0; j < 3; j++) {
-				tempv[j] += hkl_temp[h] * sym[j][h][s];
-			}
+//All reflections at once: a std::set iterator walks linearly, so an index per reflection from the set cost
+//O(nr nsym n_enlarged); a sorted copy and a binary search make it O(nr nsym log n_enlarged)
+ivec2 cell::generate_asym_lookup(const hkl_list& hkl, const hkl_list& hkl_enlarged) const {
+	const std::vector<i3> enlarged(hkl_enlarged.begin(), hkl_enlarged.end());
+	const int nsym = static_cast<int>(sym[0][0].size());
+	ivec2 lookup(hkl.size(), ivec(nsym));
+	int r = 0;
+	for (const i3& hkl_temp : hkl) {
+		for (int s = 0; s < nsym; s++) {
+			i3 tempv = { 0, 0, 0 };
+			for (int h = 0; h < 3; h++)
+				for (int j = 0; j < 3; j++) tempv[j] += hkl_temp[h] * sym[j][h][s];
+			//a miss would silently read reflection 0's scattering factors
+			const auto idx = std::lower_bound(enlarged.begin(), enlarged.end(), tempv);
+			if (idx == enlarged.end() || *idx != tempv)
+				err_checkf(false, "Reflection " + std::to_string(hkl_temp[0]) + " " + std::to_string(hkl_temp[1]) + " " +
+					std::to_string(hkl_temp[2]) + " rotated by symmetry operation " + std::to_string(s) + " is not in the enlarged reflection list", std::cout);
+			lookup[r][s] = static_cast<int>(idx - enlarged.begin());
 		}
-		//a miss would silently read reflection 0's scattering factors
-		auto idx = hkl_enlarged.find(tempv);
-		err_checkf(idx != hkl_enlarged.end(), "Reflection " + std::to_string(hkl_temp[0]) + " " + std::to_string(hkl_temp[1]) + " " +
-			std::to_string(hkl_temp[2]) + " rotated by symmetry operation " + std::to_string(s) + " is not in the enlarged reflection list", std::cout);
-		asym_list.push_back(static_cast<int>(std::distance(hkl_enlarged.begin(), idx)));
+		r++;
 	}
-	return asym_list;
+	return lookup;
 }
 
 ivec cell::apply_grown(const hkl_list& hkl, hkl_list& hkl_enlarged, std::vector<asym_atom>& asym_atoms) {

@@ -92,6 +92,7 @@ struct xcw_fb {
 	};
 	std::vector<proto> protos;
 	ivec proto_of; //[atom]
+	bvec off; //[atom] no weight in F (a grown copy): neither transformed nor contracted, its sf column left 0
 	std::vector<std::vector<std::vector<std::pair<int, int>>>> at; //[atom][rule] (point, its place i nsh + slot in W)
 	int ne = 0, no = 0, nn = 0, S = 1; //Y(k^) widths for the largest L, |k| nodes, nodes per entry
 	ivec n0; //[entry] first node
@@ -104,6 +105,7 @@ struct xcw_fb {
 		vec2 C(ng), T(ng);
 		std::vector<std::pair<int, int>> tp, tr;
 		for (int g = 0; g < ng; g++) {
+			if (off[g]) continue;
 			const proto& P = protos[proto_of[g]];
 			C[g].assign(static_cast<size_t>(P.ns) * P.nl(), 0.0);
 			T[g].assign(static_cast<size_t>(nn) * P.nl(), 0.0);
@@ -144,6 +146,7 @@ struct xcw_fb {
 		for (int c = 0; c < nc; c++) {
 			const double* ye = Ye.data() + static_cast<size_t>(c) * ne, * yo = Yo.data() + static_cast<size_t>(c) * no, * w = wt.data() + static_cast<size_t>(c) * S;
 			for (int g = 0; g < ng; g++) {
+				if (off[g]) continue;
 				const proto& P = protos[proto_of[g]];
 				const int nl = P.nl();
 				double re = 0, im = 0;
@@ -167,6 +170,7 @@ struct xcw_fb {
 		vec2 gT(ng), gC(ng);
 		std::vector<std::pair<int, int>> tp, tr;
 		for (int g = 0; g < ng; g++) {
+			if (off[g]) continue;
 			const proto& P = protos[proto_of[g]];
 			gC[g].assign(static_cast<size_t>(P.ns) * P.nl(), 0.0);
 			for (int t = 0; t < static_cast<int>(P.rules.size()); t++) tp.emplace_back(g, t);
@@ -178,6 +182,7 @@ struct xcw_fb {
 			vec gCt, gW;
 #pragma omp for schedule(dynamic)
 			for (int g = 0; g < ng; g++) {
+				if (off[g]) continue;
 				const proto& P = protos[proto_of[g]];
 				const int nl = P.nl();
 				gT[g].assign(static_cast<size_t>(nn) * nl, 0.0);
@@ -232,6 +237,8 @@ void structure_factors::plan_grid_fb(const sf_shell_layout& layout)
 	auto fb = std::make_shared<xcw_fb>();
 	xcw_fb& F = *fb;
 	F.proto_of.assign(ng, -1);
+	F.off.assign(ng, false);
+	for (int g = 0; g < ng; g++) F.off[g] = asym_atoms[g].sym_fact == 0.0;
 	ivec pmap(layout.protos.size(), -1);
 	for (int g = 0; g < ng; g++) {
 		const int P = layout.proto[g];
@@ -384,6 +391,7 @@ void structure_factors::grid_F(const dMatrix2& D)
 		const ivec& lk = XG.lookup[r];
 		cdouble sum = scatter_data.anom_correction[r];
 		for (int g = 0; g < ng; g++) {
+			if (asym_atoms[g].sym_fact == 0.0) continue; //a grown copy: partition only
 			cdouble t = 0;
 			for (int s = 0; s < static_cast<int>(lk.size()); s++) {
 				const int e = lk[s];
@@ -537,6 +545,7 @@ cvec structure_factors::grid_sfc(const dMatrix2& D)
 		const int idx = XG.inversion_link[c][0];
 		const double kx = k_pt[0][idx], ky = k_pt[1][idx], kz = k_pt[2][idx];
 		for (int g = 0; g < ng; g++) {
+			if (asym_atoms[g].sym_fact == 0.0) continue;
 			const double* x = XG.d1[g].data(), * y = XG.d2[g].data(), * z = XG.d3[g].data(), * r = rho[g].data();
 			double sr = 0, si = 0;
 			for (size_t p = 0; p < rho[g].size(); p++) {
@@ -570,7 +579,7 @@ void structure_factors::grid_contract(occ::Mat& out, const cvec& pre)
 	cvec H(static_cast<size_t>(ng) * nc, cdouble(0, 0));
 #pragma omp parallel for
 	for (int g = 0; g < ng; g++)
-		for (int e = 0; e < model_data.nr_enlarged; e++) {
+		for (int e = 0; e < model_data.nr_enlarged && asym_atoms[g].sym_fact != 0.0; e++) {
 			if (A[e] == cdouble(0, 0)) continue;
 			const cdouble G = A[e] * phase_facts[g][e] * DW_facts[g][e] * asym_atoms[g].sym_fact;
 			H[static_cast<size_t>(g) * nc + XG.clean_of[e]] += XG.is_inverse[e] ? std::conj(G) : G;
@@ -596,6 +605,7 @@ void structure_factors::grid_contract(occ::Mat& out, const cvec& pre)
 	else
 	for (int g = 0; g < ng; g++) {
 		V[g].assign(XG.w[g].size(), 0.0);
+		if (asym_atoms[g].sym_fact == 0.0) continue;
 		const cdouble* h = H.data() + static_cast<size_t>(g) * nc;
 #pragma omp parallel for schedule(static)
 		for (int p = 0; p < static_cast<int>(V[g].size()); p++) {

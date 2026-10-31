@@ -129,7 +129,8 @@ void structure_factors::setup_ri(const occ::qm::AOBasis& ao, const occ::qm::AOBa
 	const cdouble il[4] = { { 1, 0 }, { 0, 1 }, { -1, 0 }, { 0, -1 } };
 	for (int g = 0; g < ng; g++) {
 		const int p0 = XR.atom_start[g], np = XR.atom_start[g + 1] - p0;
-		XR.F[g].assign(static_cast<size_t>(nc) * np, cdouble(0, 0));
+		//a grown copy has no weight in F and no table
+		if (asym_atoms[g].sym_fact != 0.0) XR.F[g].assign(static_cast<size_t>(nc) * np, cdouble(0, 0));
 		const double r_cov = constants::ang2bohr(constants::covalent_radii[asym_atoms[g].type]);
 		for (int l = 0; l <= lmax; l++)
 			for (int m = 0; m <= 2 * l; m++)
@@ -142,7 +143,7 @@ void structure_factors::setup_ri(const occ::qm::AOBasis& ao, const occ::qm::AOBa
 		for (int p = 0; p < sh.num_primitives(); p++)
 			moment += sh.contraction_coefficients(p, 0) * std::tgamma(l + 1.5) / (2.0 * std::pow(sh.exponents(p), l + 1.5));
 #pragma omp parallel for
-		for (int c = 0; c < nc; c++) {
+		for (int c = 0; c < (XR.F[g].empty() ? 0 : nc); c++) {
 			double rad = 0.0;
 			for (int p = 0; p < sh.num_primitives(); p++) {
 				const double a = sh.exponents(p);
@@ -251,6 +252,7 @@ cvec structure_factors::ri_sfc(const dMatrix2& D)
 #pragma omp parallel for schedule(dynamic)
 	for (int a = 0; a < ng; a++) {
 		const int p0 = XR.atom_start[a], np = XR.atom_start[a + 1] - p0;
+		if (XR.F[a].empty()) continue;
 		for (int e = 0; e < nc; e++) {
 			cdouble s = 0;
 			for (int j = 0; j < np; j++) s += XR.F[a][static_cast<size_t>(j) * nc + e] * c(p0 + j);
@@ -270,7 +272,7 @@ void structure_factors::ri_contract(const cvec& H, occ::Mat& out)
 		const int p0 = XR.atom_start[a], np = XR.atom_start[a + 1] - p0;
 		for (int j = 0; j < np; j++) {
 			double s = 0;
-			for (int e = 0; e < nc; e++) s += std::real(H[static_cast<size_t>(a) * nc + e] * XR.F[a][static_cast<size_t>(j) * nc + e]);
+			for (int e = 0; e < (XR.F[a].empty() ? 0 : nc); e++) s += std::real(H[static_cast<size_t>(a) * nc + e] * XR.F[a][static_cast<size_t>(j) * nc + e]);
 			u(p0 + j) = s;
 		}
 	}
