@@ -7,6 +7,7 @@
 #include "nos_math.h"
 #include "basis_set.h"
 #include <limits>
+#include <numeric>
 
 
 structure_factors::structure_factors(options& opt_in) {
@@ -496,8 +497,8 @@ bool structure_factors::refine_extinction_step() {
 			if (ext_x(r) < 0.0) return std::numeric_limits<double>::infinity();
 			const double w = weighted ? inv_H2_[r] : 1.0;
 			const double d = against_F2
-				? (s * ext_y_[r] * std::norm(scatter_data.F_calc[r]) - scatter_data.F_obs2[r]) / scatter_data.sigma_obs2[r]
-				: (k * ext_sqrt_y_[r] * std::abs(scatter_data.F_calc[r]) - scatter_data.abs_F_obs[r]) / scatter_data.sigma_obs[r];
+				? (s * ext_y_[r] * std::norm(scatter_data.F_calc[r]) - scatter_data.F_obs2[r]) / sig_I_[r]
+				: (k * ext_sqrt_y_[r] * std::abs(scatter_data.F_calc[r]) - scatter_data.abs_F_obs[r]) / sig_F_[r];
 			sum += w * d * d;
 		}
 		return sum;
@@ -511,13 +512,13 @@ bool structure_factors::refine_extinction_step() {
 		const double w = weighted ? inv_H2_[r] : 1.0, Fm = std::abs(scatter_data.F_calc[r]);
 		double resid = 0.0, dmodel = 0.0;   //d(model)/dP_p = dmodel * a_{r,p}
 		if (against_F2) {
-			resid = (s * ext_y_[r] * Fm * Fm - scatter_data.F_obs2[r]) / scatter_data.sigma_obs2[r];
-			dmodel = s * Fm * Fm * ext_dyc_[r] / scatter_data.sigma_obs2[r];
+			resid = (s * ext_y_[r] * Fm * Fm - scatter_data.F_obs2[r]) / sig_I_[r];
+			dmodel = s * Fm * Fm * ext_dyc_[r] / sig_I_[r];
 		}
 		else {
 			if (ext_sqrt_y_[r] <= 0.0) continue;
-			resid = (k * ext_sqrt_y_[r] * Fm - scatter_data.abs_F_obs[r]) / scatter_data.sigma_obs[r];
-			dmodel = k * Fm * ext_dyc_[r] / (2.0 * ext_sqrt_y_[r] * scatter_data.sigma_obs[r]);
+			resid = (k * ext_sqrt_y_[r] * Fm - scatter_data.abs_F_obs[r]) / sig_F_[r];
+			dmodel = k * Fm * ext_dyc_[r] / (2.0 * ext_sqrt_y_[r] * sig_F_[r]);
 		}
 		chi2 += w * resid * resid;
 		if (dmodel == 0.0) continue;
@@ -557,6 +558,7 @@ std::string structure_factors::extinction_report() const {
 void structure_factors::eval_scale() {
 	ensure_inv_H2_weights();
 	update_extinction();
+	ensure_cryst_weights();
 	solve_scale();
 	if (ext_p_.empty() || !extinction_settings.refine) return;
 	//the scale and the extinction coefficients are coupled through the same residual, so
@@ -580,12 +582,12 @@ void structure_factors::solve_scale() {
 			const double w = weighted ? inv_H2_[i] : 1.0;
 			const double calc = ext_sqrt_y(i) * std::abs(scatter_data.F_calc[i]);
 			if (against_F2) {
-				const double calc2 = calc * calc, wi = w / (scatter_data.sigma_obs2[i] * scatter_data.sigma_obs2[i]);
+				const double calc2 = calc * calc, wi = w / (sig_I_[i] * sig_I_[i]);
 				numerators[c] += wi * calc2 * scatter_data.F_obs2[i];
 				denominators[c] += wi * calc2 * calc2;
 			}
 			else {
-				const double wi = w / (scatter_data.sigma_obs[i] * scatter_data.sigma_obs[i]);
+				const double wi = w / (sig_F_[i] * sig_F_[i]);
 				numerators[c] += wi * calc * scatter_data.F_obs[i];
 				denominators[c] += wi * calc * calc;
 			}
@@ -602,10 +604,11 @@ void structure_factors::solve_scale() {
 
 void structure_factors::calc_criteria() {
 	ensure_inv_H2_weights();
+	ensure_cryst_weights();
 	//index 0: the fit set, 1: all reflections
 	const double prefactor[2] = { 1.0 / static_cast<double>(model_data.nr_fit - n_params()), 1.0 / static_cast<double>(model_data.nr - n_params()) };
 	const int chunk = 128, nchunk = (model_data.nr + chunk - 1) / chunk;
-	vec2 goof1(2, vec(nchunk)), goof2(2, vec(nchunk)), wgoof1(2, vec(nchunk)), wgoof2(2, vec(nchunk)), r1_num(2, vec(nchunk)), r1_den(2, vec(nchunk));
+	vec2 goof1(2, vec(nchunk)), goof2(2, vec(nchunk)), wgoof1(2, vec(nchunk)), wgoof2(2, vec(nchunk)), r1_num(2, vec(nchunk)), r1_den(2, vec(nchunk)), wr2_num(2, vec(nchunk)), wr2_den(2, vec(nchunk));
 	const double scale = scatter_data.scale;
 	const cdouble* F_calc_0 = scatter_data.F_calc.data();
 #pragma omp parallel for schedule(static)
@@ -615,12 +618,17 @@ void structure_factors::calc_criteria() {
 			const double scaled_F_calc = scale * ext_sqrt_y(i) * std::abs(F_calc_0[i]);
 			const double scaled_difference = scaled_F_calc - scatter_data.F_obs[i];
 			const double diff2 = (scaled_F_calc * scaled_F_calc) - scatter_data.F_obs2[i];
-			const double weighted_diff1 = scaled_difference / scatter_data.sigma_obs[i];
-			const double weighted_diff2 = diff2 / scatter_data.sigma_obs2[i];
+			const double weighted_diff1 = scaled_difference / sig_F_[i];
+			const double weighted_diff2 = diff2 / sig_I_[i];
 			const double weighted_diff1_sq = weighted_diff1 * weighted_diff1;
 			const double weighted_diff2_sq = weighted_diff2 * weighted_diff2;
 			const double w = quality_criteria.goof_type == 2 ? inv_H2_[i] : 0.0;
+			//wR2 takes Fo^2 with its sign, as SHELXL does; F_obs2 holds |Fo^2|
+			const double fo2 = scatter_data.F_obs[i] < 0 ? -scatter_data.F_obs2[i] : scatter_data.F_obs2[i];
+			const double wr_d = (scaled_F_calc * scaled_F_calc - fo2) / sig_I_[i], wr_o = fo2 / sig_I_[i];
 			for (int set = scatter_data.hkl_mask[i] ? 0 : 1; set < 2; set++) {
+				wr2_num[set][c] += wr_d * wr_d;
+				wr2_den[set][c] += wr_o * wr_o;
 				goof1[set][c] += weighted_diff1_sq;
 				goof2[set][c] += weighted_diff2_sq;
 				wgoof1[set][c] += weighted_diff1_sq * w;
@@ -630,9 +638,11 @@ void structure_factors::calc_criteria() {
 			}
 		}
 	}
-	double sum[6][2] = {};
+	double sum[8][2] = {};
 	for (int set = 0; set < 2; set++) {
 		for (int c = 0; c < nchunk; c++) {
+			sum[6][set] += wr2_num[set][c];
+			sum[7][set] += wr2_den[set][c];
 			sum[0][set] += goof1[set][c];
 			sum[1][set] += goof2[set][c];
 			sum[2][set] += wgoof1[set][c];
@@ -651,6 +661,211 @@ void structure_factors::calc_criteria() {
 	quality_criteria.GooF2_all = std::sqrt(prefactor[1] * sum[1][1]);
 	quality_criteria.weighted_GooF1_all = std::sqrt(prefactor[1] * sum[2][1]);
 	quality_criteria.weighted_GooF2_all = std::sqrt(prefactor[1] * sum[3][1]);
+	quality_criteria.wR2 = sum[7][0] > 0.0 ? std::sqrt(sum[6][0] / sum[7][0]) : 0.0;
+	quality_criteria.wR2_all = sum[7][1] > 0.0 ? std::sqrt(sum[6][1] / sum[7][1]) : 0.0;
+}
+
+//cctbx smtbx/refinement/weighting_schemes.h, mainstream_shelx_weighting::compute
+double shelx_weight(const double fo_sq, const double sigma, const double fc_sq, const double K, const double a, const double b) {
+	const double p = (std::max(fo_sq, 0.) + 2 * K * fc_sq) / 3.;
+	return 1. / (sigma * sigma + std::pow(a * p, 2) + b * K * p);
+}
+
+void structure_factors::ensure_cryst_weights() {
+	if (!sig_I_.empty()) return;
+	sig_F_ = scatter_data.sigma_obs;
+	sig_I_ = scatter_data.sigma_obs2;
+	if (opt->xcw_settings.weight == options::SF_settings::weight_scheme::sigma) return;
+	solve_scale();
+	update_cryst_weights();
+}
+
+//The default keeps the read sigmas. SHELX: w on Fo^2 from cctbx's formula with Fc^2 = y|Fc|^2 and K = scale^2,
+//both scales put Fo^2 ~ scale^2 y |Fc|^2. Against F the same w is propagated as the reader propagates sigma,
+//sigma(F) = sigma(Fo^2)/(2|Fo|), i.e. w_F = 4 Fo^2 w: first-order error propagation, SHELXL's for L.S. on F
+//and cctbx's f_sq_as_f away from Fo ~ 0 (there sigma(F) is infinite and the reflection weighs nothing, as now)
+void structure_factors::update_cryst_weights() {
+	using ws = options::SF_settings::weight_scheme;
+	const ws scheme = opt->xcw_settings.weight;
+	if (scheme == ws::sigma) {
+		sig_F_ = scatter_data.sigma_obs;
+		sig_I_ = scatter_data.sigma_obs2;
+		return;
+	}
+	if (weight_ab_.empty()) weight_ab_ = opt->xcw_settings.weight_params;
+	const int nr = model_data.nr;
+	const double K = scatter_data.scale * scatter_data.scale, a = weight_ab_[0], b = weight_ab_[1];
+	sig_F_.resize(nr);
+	sig_I_.resize(nr);
+	for (int r = 0; r < nr; r++) {
+		const double fo2 = scatter_data.F_obs[r] < 0 ? -scatter_data.F_obs2[r] : scatter_data.F_obs2[r];
+		sig_I_[r] = 1.0 / std::sqrt(shelx_weight(fo2, scatter_data.sigma_obs2[r], ext_y(r) * std::norm(scatter_data.F_calc[r]), K, a, b));
+		sig_F_[r] = sig_I_[r] * 0.5 / scatter_data.abs_F_obs[r];
+	}
+}
+
+namespace {
+	//The data of new_shelx_weighting.optimise_parameters after its sort: Fo^2 clipped at 0, sigma(Fo^2) and
+	//Fc^2 in ascending Fc^2, the 10 bin limits, K and its n = N // (N - n_params)
+	struct shelx_bins {
+		vec fo, sig, fc;
+		size_t lim[11];
+		double K;
+		double n;
+		//calcres / the grid's variance: Sum over the bins of (GooF_bin - 1)^2, GooF_bin = sqrt(chi^2 n / count)
+		double variance(const double a, const double b) const {
+			double v = 0.0;
+			for (int i = 0; i < 10; i++) {
+				const size_t count = lim[i + 1] - lim[i];
+				if (count == 0) continue;
+				double chi = 0.0;
+				for (size_t j = lim[i]; j < lim[i + 1]; j++) {
+					const double d = fo[j] - K * fc[j];
+					chi += shelx_weight(fo[j], sig[j], fc[j], K, a, b) * d * d;
+				}
+				const double g = std::sqrt(chi * n / static_cast<double>(count)) - 1.0;
+				v += g * g;
+			}
+			return v;
+		}
+		void residuals(const double a, const double b, double e[10]) const {
+			for (int i = 0; i < 10; i++) {
+				const size_t count = lim[i + 1] - lim[i];
+				double chi = 0.0;
+				for (size_t j = lim[i]; j < lim[i + 1]; j++) {
+					const double d = fo[j] - K * fc[j];
+					chi += shelx_weight(fo[j], sig[j], fc[j], K, a, b) * d * d;
+				}
+				e[i] = count ? std::sqrt(chi * n / static_cast<double>(count)) - 1.0 : 0.0;
+			}
+		}
+	};
+
+	//optimise_parameters_old: SHELXL's 9 x 9 grid search, step for step (the last point of a tie wins)
+	vec shelx_grid_search(const shelx_bins& B, double start_a, double start_b) {
+		double a_step = 0.2 * start_a, b_step = 0.4 * start_b;
+		while (a_step > 1e-4 && b_step > 5e-3) {
+			start_a = std::max(start_a, 4 * a_step) - 4 * a_step;
+			start_b = std::max(start_b, 4 * b_step) - 4 * b_step;
+			double min_variance = 9e9;
+			int j_min = 0, k_min = 0;
+			double b = start_b;
+			for (int j = 0; j < 9; j++) {
+				double a = start_a;
+				b += b_step;
+				for (int k = 0; k < 9; k++) {
+					a += a_step;
+					const double variance = B.variance(a, b);
+					min_variance = std::min(variance, min_variance);
+					if (variance == min_variance) { j_min = j; k_min = k; }
+				}
+			}
+			start_a += k_min * a_step;
+			start_b += j_min * b_step;
+			if (k_min == 8) { a_step *= 2; continue; }
+			else if (k_min != 0) a_step /= 4;
+			if (j_min == 8) { b_step *= 2; continue; }
+			else if (j_min != 0) b_step /= 4;
+			if (start_a <= 1e-4) a_step /= 4;
+			if (start_b <= 1e-3) b_step /= 4;
+		}
+		if (start_a > 0.2) { start_a = 0.2; start_b = 0; }
+		return { start_a, start_b };
+	}
+}
+
+//cctbx smtbx/refinement/weighting_schemes.py, new_shelx_weighting.optimise_parameters: the start values, the
+//sort, the 10 bins, n and calcres exactly. Where it calls scipy's SLSQP with a, b >= 0, this runs a bounded
+//Levenberg-Marquardt on the 10 bin residuals GooF_bin - 1 (whose square sum is calcres): the same minimum of
+//the same function from the same start; where SLSQP fails it falls back to optimise_parameters_old, so does this
+vec optimise_shelx_weights(const vec& fo_sq, const vec& sigma, const vec& fc_sq, const double K, const int n_params) {
+	const size_t N = fo_sq.size();
+	if (N == 0 || K <= 0.0) return { 0.1, 0.0 };
+	shelx_bins B;
+	B.K = K;
+	//start values, SHELXL's formulae on Fo^2/K, sigma/K and Fc^2
+	double x = 0, y = 0, z = 0;
+	for (size_t i = 0; i < N; i++) {
+		const double fo2 = std::max(fo_sq[i], 0.0) / K, s = sigma[i] / K, s2 = s * s, fc2 = fc_sq[i];
+		const double p = (fo2 + 2. * fc2) / 3., p2 = p * p;
+		x += (std::pow(fo2 - fc2, 2) - s) * (p2 / s2);
+		y += p2 * p2 / s2;
+		z += p;
+	}
+	const double start_a = std::sqrt(std::max(0.0001, 0.64 * x / std::max(1e-8, y)));
+	const double start_b = 0.5 * z * start_a * start_a / static_cast<double>(N);
+	//sorted by Fc^2 / max(Fc^2)
+	std::vector<size_t> perm(N);
+	std::iota(perm.begin(), perm.end(), size_t(0));
+	std::stable_sort(perm.begin(), perm.end(), [&](const size_t i, const size_t j) { return fc_sq[i] < fc_sq[j]; });
+	B.fo.resize(N); B.sig.resize(N); B.fc.resize(N);
+	for (size_t i = 0; i < N; i++) {
+		B.fo[i] = std::max(fo_sq[perm[i]], 0.0);
+		B.sig[i] = sigma[perm[i]];
+		B.fc[i] = fc_sq[perm[i]];
+	}
+	B.lim[0] = 0;
+	for (int i = 0; i < 10; i++)
+		B.lim[i + 1] = static_cast<size_t>(std::ceil(static_cast<double>((i + 1) * N) / 10.0));
+	const long long Nl = static_cast<long long>(N), denom = Nl - n_params;
+	B.n = static_cast<double>(denom > 0 ? Nl / denom : 1);
+
+	//bounded Levenberg-Marquardt, the Jacobian by differences, steps clipped onto a, b >= 0
+	double p[2] = { start_a, start_b }, e[10], f = B.variance(p[0], p[1]);
+	double mu = 1e-3;
+	bool ok = std::isfinite(f);
+	for (int it = 0; ok && it < 500; it++) {
+		double J[10][2], ep[10], em[10];
+		B.residuals(p[0], p[1], e);
+		for (int c = 0; c < 2; c++) {
+			const double h = 1e-7 * std::max(std::abs(p[c]), 1e-3);
+			double q[2] = { p[0], p[1] }, lo = std::max(p[c] - h, 0.0);
+			q[c] = p[c] + h; B.residuals(q[0], q[1], ep);
+			q[c] = lo; B.residuals(q[0], q[1], em);
+			for (int i = 0; i < 10; i++) J[i][c] = (ep[i] - em[i]) / (p[c] + h - lo);
+		}
+		double A[2][2] = {}, g[2] = {};
+		for (int i = 0; i < 10; i++)
+			for (int c = 0; c < 2; c++) {
+				g[c] += J[i][c] * e[i];
+				for (int d = 0; d < 2; d++) A[c][d] += J[i][c] * J[i][d];
+			}
+		const double floor = 1e-12 * (A[0][0] + A[1][1]) + 1e-300;
+		bool moved = false;
+		double np[2] = { p[0], p[1] }, nf = f;
+		for (; mu < 1e12; mu *= 10) {
+			const double d00 = A[0][0] + mu * std::max(A[0][0], floor), d11 = A[1][1] + mu * std::max(A[1][1], floor);
+			const double det = d00 * d11 - A[0][1] * A[1][0];
+			if (!(det > 0)) continue;
+			np[0] = std::max(0.0, p[0] + (-g[0] * d11 + g[1] * A[0][1]) / det);
+			np[1] = std::max(0.0, p[1] + (-g[1] * d00 + g[0] * A[1][0]) / det);
+			nf = B.variance(np[0], np[1]);
+			if (nf < f) { moved = true; break; }
+		}
+		if (!moved) break;
+		const double dp = std::abs(np[0] - p[0]) + std::abs(np[1] - p[1]);
+		p[0] = np[0]; p[1] = np[1];
+		const double df = f - nf;
+		f = nf;
+		mu = std::max(mu / 10, 1e-12);
+		if (dp <= 1e-12 * (1.0 + std::abs(p[0]) + std::abs(p[1])) || df <= 1e-16 * std::max(f, 1e-300)) break;
+	}
+	ok = ok && std::isfinite(f) && std::isfinite(p[0]) && std::isfinite(p[1]);
+	if (ok) return { p[0], p[1] };
+	std::cout << "Warning: optimisation of weighting parameters failed, falling back to old method." << std::endl;
+	return shelx_grid_search(B, start_a, start_b);
+}
+
+void structure_factors::optimise_cryst_weights() {
+	std::vector<double> fo, sig, fc;
+	for (int r = 0; r < model_data.nr; r++) {
+		if (!scatter_data.hkl_mask[r]) continue;
+		fo.push_back(scatter_data.F_obs[r] < 0 ? -scatter_data.F_obs2[r] : scatter_data.F_obs2[r]);
+		sig.push_back(scatter_data.sigma_obs2[r]);
+		fc.push_back(ext_y(r) * std::norm(scatter_data.F_calc[r]));
+	}
+	weight_ab_ = optimise_shelx_weights(fo, sig, fc, scatter_data.scale * scatter_data.scale, n_params());
+	update_cryst_weights();
 }
 
 double structure_factors::criterion(const bool all) const {
@@ -1120,6 +1335,7 @@ void structure_factors::calc_F_calc(std::vector<WFN>& wavefunctions, GridManager
 
 void structure_factors::perturbation(occ::Mat& perturb, const bool unrestricted, std::ostream& log) {
 	ensure_inv_H2_weights();
+	ensure_cryst_weights();
 
 	//The four (XWR_type, refine_against) combinations differ only in the per-reflection
 	//scalar and the prefactor, so one contraction serves all of them
@@ -1143,11 +1359,11 @@ void structure_factors::perturbation(occ::Mat& perturb, const bool unrestricted,
 		//a model, and the expressions below are then exactly the ones this always used
 		if (against_F2) {
 			const double I = ext_y(r) * std::pow(std::abs(scatter_data.F_calc[r]), 2);
-			precompute = ext_g(r) * std::conj(scatter_data.F_calc[r]) * (scale_sq * I - scatter_data.F_obs2[r]) / (scatter_data.sigma_obs2[r] * scatter_data.sigma_obs2[r]);
+			precompute = ext_g(r) * std::conj(scatter_data.F_calc[r]) * (scale_sq * I - scatter_data.F_obs2[r]) / (sig_I_[r] * sig_I_[r]);
 		}
 		else {
 			const double F_calc_abs = std::abs(scatter_data.F_calc[r]);
-			precompute = ext_m(r) * std::conj(scatter_data.F_calc[r]) * (scatter_data.scale * ext_sqrt_y(r) * F_calc_abs - scatter_data.abs_F_obs[r]) / (scatter_data.sigma_obs[r] * scatter_data.sigma_obs[r] * F_calc_abs);
+			precompute = ext_m(r) * std::conj(scatter_data.F_calc[r]) * (scatter_data.scale * ext_sqrt_y(r) * F_calc_abs - scatter_data.abs_F_obs[r]) / (sig_F_[r] * sig_F_[r] * F_calc_abs);
 		}
 		if (weighted) precompute *= inv_H2_[r];
 		pre[r] = precompute;
@@ -1187,13 +1403,13 @@ occ::Mat structure_factors::perturbation_response(const dMatrix2& dD_eff, const 
 			const double w = weighted ? inv_H2_[r] : 1.0, Fa = ext_sqrt_y(r) * std::abs(F0[r]);
 			const double dFa = std::abs(F0[r]) > 0 ? ext_m(r) * std::real(std::conj(F0[r]) * dFr[r]) / std::abs(F0[r]) : 0.0;
 			if (against_F2) {
-				const double wi = w / (scatter_data.sigma_obs2[r] * scatter_data.sigma_obs2[r]);
+				const double wi = w / (sig_I_[r] * sig_I_[r]);
 				dnum[ch] += wi * 2.0 * Fa * dFa * scatter_data.F_obs2[r];
 				dden[ch] += wi * 4.0 * Fa * Fa * Fa * dFa;
 				den[ch] += wi * Fa * Fa * Fa * Fa;
 			}
 			else {
-				const double wi = w / (scatter_data.sigma_obs[r] * scatter_data.sigma_obs[r]);
+				const double wi = w / (sig_F_[r] * sig_F_[r]);
 				dnum[ch] += wi * dFa * scatter_data.F_obs[r];
 				dden[ch] += wi * 2.0 * Fa * dFa;
 				den[ch] += wi * Fa * Fa;
@@ -1218,12 +1434,12 @@ occ::Mat structure_factors::perturbation_response(const dMatrix2& dD_eff, const 
 		const cdouble carrier = (against_F2 ? ext_g(r) : ext_m(r)) * std::conj(F0[r]);
 		const cdouble dcarrier = (against_F2 ? ext_g(r) : ext_m(r)) * std::conj(dFr[r]);
 		if (against_F2) {
-			const double wi = w / (scatter_data.sigma_obs2[r] * scatter_data.sigma_obs2[r]), Fo2 = scatter_data.F_obs2[r];
+			const double wi = w / (sig_I_[r] * sig_I_[r]), Fo2 = scatter_data.F_obs2[r];
 			dq[r] = wi * (dcarrier * (s * s * Fa * Fa - s * Fo2)
 				+ carrier * (2.0 * s * dscale * Fa * Fa + 2.0 * s * s * Fa * dFa - dscale * Fo2));
 		}
 		else {
-			const double wi = w / (scatter_data.sigma_obs[r] * scatter_data.sigma_obs[r]), Fo = scatter_data.abs_F_obs[r];
+			const double wi = w / (sig_F_[r] * sig_F_[r]), Fo = scatter_data.abs_F_obs[r];
 			dq[r] = wi * (dcarrier * (k * k * ext_sqrt_y(r) - k * Fo / Fm)
 				+ carrier * (dscale * (2.0 * k * ext_sqrt_y(r) - Fo / Fm) + k * Fo * std::real(std::conj(F0[r]) * dFr[r]) / (Fm * Fm * Fm)));
 		}

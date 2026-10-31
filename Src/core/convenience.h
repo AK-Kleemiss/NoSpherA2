@@ -1070,6 +1070,12 @@ struct options
 		int n_params = 1;
 		int refine_against = 1;
 		int XWR_type = 1;
+		// `weight sigma | shelx <a> <b> | shelx_opt <a0> <b0>` (CLI -xcw_weight): the crystallographic weight
+		// of every fit sum, see structure_factors::update_cryst_weights. A new scheme is one more value here
+		// and one more case there; weight_params holds its parameters in the order the keyword reads them
+		enum class weight_scheme { sigma, shelx, shelx_opt };
+		weight_scheme weight = weight_scheme::sigma;
+		vec weight_params;
 		// `i_double` in the settings file: the XCW grid's AO values and block products in double precision
 		bool grid_double = false;
 	};

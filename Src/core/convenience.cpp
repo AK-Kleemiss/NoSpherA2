@@ -866,6 +866,11 @@ std::string help_message =
  "  -xcw_strong_cutoff <z>             z-score above which a reflection counts as\n"
  "                                    strong in the XCW diagnostics, default 3;\n"
  "                                    a settings-file keyword overrides it.\n"
+ "  -xcw_weight sigma|shelx a b|shelx_opt a b\n"
+ "                                    Crystallographic weight of the XCW fit:\n"
+ "                                    1/sigma^2 (default), SHELXL WGHT a b, or\n"
+ "                                    WGHT a b re-optimised after every lambda\n"
+ "                                    step; the settings keyword `weight` too.\n"
  "  -xcw_partition grid|ri             How XCW shares the density among the atoms:\n"
  "                                    grid (default) by the -hirsh, -becke,\n"
  "                                    -tfvc, -mbis or -embis weights, ri by an RI fit in the\n"
@@ -4252,6 +4257,28 @@ bool options::digest_ri_options(const std::string &temp, int &i)
 };
 
 //X-ray constrained wavefunction fitting
+//`sigma`, `shelx <a> <b>` or `shelx_opt <a0> <b0>`: the settings file's `weight` and the CLI's -xcw_weight
+static void read_xcw_weight(std::istream& is, options::XCW_settings& s)
+{
+	using ws = options::SF_settings::weight_scheme;
+	std::string scheme;
+	if (!(is >> scheme))
+		throw std::runtime_error("Expected sigma, shelx or shelx_opt after 'weight'");
+	std::transform(scheme.begin(), scheme.end(), scheme.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+	if (scheme == "sigma") {
+		s.weight = ws::sigma;
+		s.weight_params.clear();
+		return;
+	}
+	if (scheme != "shelx" && scheme != "shelx_opt")
+		throw std::runtime_error("Unknown weight '" + scheme + "', expected sigma, shelx or shelx_opt");
+	double a = 0, b = 0;
+	if (!(is >> a >> b) || a < 0 || b < 0)
+		throw std::runtime_error("Expected two values a, b >= 0 after 'weight " + scheme + "'");
+	s.weight = scheme == "shelx" ? ws::shelx : ws::shelx_opt;
+	s.weight_params = { a, b };
+}
+
 bool options::digest_xcw_options(const std::string &temp, int &i)
 {
 	using namespace std;
@@ -4269,6 +4296,13 @@ bool options::digest_xcw_options(const std::string &temp, int &i)
 	}
 	else if (temp == "-XCW_settings") {
 		xcw_settings_path = arguments[i + 1];
+	}
+	else if (temp == "-xcw_weight") {
+		err_checkf(i + 1 < argc, "-xcw_weight takes sigma, shelx <a> <b> or shelx_opt <a0> <b0>", std::cout);
+		std::string words = arguments[i + 1];
+		for (int k = i + 2; k < std::min(argc, i + 4); k++) words += " " + arguments[k];
+		std::istringstream is(words);
+		read_xcw_weight(is, xcw_settings);
 	}
 	else if (temp == "-xcw_partition") {
 		err_checkf(i + 1 < argc, "-xcw_partition takes grid or ri", std::cout);
@@ -4656,6 +4690,10 @@ void options::loadXCWsettings() {
 
 		handlers["weighted"] = [&](std::istream&) {
 			xcw_settings.XWR_type = 2;
+			};
+
+		handlers["weight"] = [&](std::istream& is) {
+			read_xcw_weight(is, xcw_settings);
 			};
 
 		handlers["basis_set"] = [&](std::istream& is) {

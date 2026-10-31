@@ -29,6 +29,9 @@ public:
 		double GooF2_all;
 		double weighted_GooF1_all;
 		double weighted_GooF2_all;
+		// wR2 = sqrt(Sum w (Fo^2 - Fc^2)^2 / Sum w Fo^4) with the crystallographic weight, fit set and all
+		double wR2;
+		double wR2_all;
 		int refine_against; // 1 for F and 2 for F^2
 		int goof_type; // 1 for traditional GooF and 2 for Coulomb weighted GooF
 	};
@@ -192,6 +195,22 @@ public:
 	std::vector<i3> hkl_ordered_;
 	// 1/|H_r|^2 per reflection, see ensure_inv_H2_weights.
 	vec inv_H2_;
+	// The crystallographic weight of every fit sum (scale, extinction, criteria, perturbation), held as the
+	// sigma(F) and sigma(F^2) it amounts to, sigma = 1/sqrt(w): the default scheme copies the read sigmas,
+	// so every (x/sigma)^2 there stays bit for bit what it was. Filled by update_cryst_weights.
+	vec sig_F_, sig_I_;
+	// The scheme's current parameters (a, b of SHELX), from the settings until shelx_opt moves them
+	vec weight_ab_;
+	// Fills sig_F_ and sig_I_ from the scheme, the current F_calc and scale (so only after calc_F_calc).
+	// The weights then stay fixed until the next call: no derivative wrt F_calc. The 1/|H|^2 of XWR_type 2
+	// still multiplies on top at every site, so each scheme works with both criteria
+	void update_cryst_weights();
+	// The first fill, from eval_scale or calc_criteria: the read sigmas, and for another scheme its weights
+	// at the scale of that 1/sigma^2 fit and the F_calc of the moment. No-op once filled
+	void ensure_cryst_weights();
+	// shelx_opt: a and b re-optimised on the fit set as cctbx's new_shelx_weighting.optimise_parameters
+	// does, against the current F_calc and scale; refills the weights
+	void optimise_cryst_weights();
 
 
 	// The parameters the criteria divide by: the settings file's `params` plus the extinction
@@ -323,3 +342,10 @@ public:
 
 	// closing class
 };
+
+// SHELXL's weight on Fo^2 as cctbx's mainstream/new_shelx_weighting computes it, with Fc^2 unscaled and
+// K the scale on it (Fo^2 ~ K Fc^2): P = (max(Fo^2, 0) + 2 K Fc^2)/3, w = 1/(sigma^2 + (a P)^2 + b K P)
+double shelx_weight(double fo_sq, double sigma, double fc_sq, double K, double a, double b);
+// cctbx new_shelx_weighting.optimise_parameters: a, b from the start values of SHELXL's formulae that
+// make the GooF of 10 bins by Fc^2/max(Fc^2) closest to 1; {a, b}
+vec optimise_shelx_weights(const vec& fo_sq, const vec& sigma, const vec& fc_sq, double K, int n_params);
