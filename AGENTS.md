@@ -143,6 +143,14 @@ When touching tests:
 - Update `UNIT_TESTS_STATUS.md` whenever adding, removing, modifying, or investigating tests.
 - Update the validation-status block in this file and `CLAUDE.md` if the overall validated pass count changes.
 
+## Keep the Wiki in Shape
+
+`docs/wiki/` is the source of the GitHub wiki (`https://github.com/AK-Kleemiss/NoSpherA2.wiki.git`, pushed by hand). Update it in the same commit as the code:
+
+- A flag that is added, renamed or given a new default goes into `docs/wiki/Command-Reference.md`.
+- A `-tune` knob — any literal name read through `tuning()` or its wrappers `tuning_double`, `read_threshold`, `nao_knob` — that is added, renamed, removed or given a new default goes into `docs/wiki/Tuning-Knobs.md`. `python scripts/check_tuning_knobs.py` must then report that page and sources agree; a new wrapper goes into the script's `CALL` pattern, or its knobs stay invisible.
+- `CLAUDE.md` ("Keep the wiki in shape") has the full rules.
+
 ## Code Style
 
 This codebase is terse, dense and comment-sparse. There is no formatter, so style

@@ -454,7 +454,7 @@ The grid's block products run on the GPU by default; `-gpu_itensor` and
 `-cpu_itensor_fp32` in [section 10](#10-performance-and-hardware) choose how. The
 partitioning flags of [section 3](#3-partitioning-grids-and-basis) and
 `-all_charges` apply to each `.tscb` written. Developer knobs, through
-`-tune NAME=value`: `NOSPHERA2_XCW_GRID_DIRECT` (direct-sum transform instead of
+`-tune NAME=value` (all of them in [Tuning knobs](Tuning-Knobs.md#xcw-x-ray-constrained-wavefunctions)): `NOSPHERA2_XCW_GRID_DIRECT` (direct-sum transform instead of
 Fourier-Bessel), `NOSPHERA2_NO_INVERSION_SCREENING` (integrate both h and -h),
 `NOSPHERA2_XCW_ERI_NO_BUDGET` (store the two-electron integrals outside `-mem`),
 `NOSPHERA2_ERI_DYNAMIC` (the stored-integral Fock build hands rows out dynamically, reproducible to
@@ -590,6 +590,7 @@ interface and can change without notice.
 | --- | --- |
 | `-test` | Run the built-in test suite. |
 | `-profiling [root]` | Profiling run; `root` defaults to `tests`. Also `-profile`. |
+| `-tune NAME[=VALUE]` | Set a developer knob for this run; a bare `NAME` means `1`. Every knob is listed in [Tuning knobs](Tuning-Knobs.md). |
 | `-partitioning_test` | Partitioning regression test. |
 | `-test_RI` | RI-fitting regression test. |
 | `-RI_WFN_DIFF` | Compare a fitted density against the wavefunction it came from. |

@@ -50,6 +50,8 @@ log.
   computes, how to read its output, and the literature behind it.
 * **[Troubleshooting](Troubleshooting.md)** — the guards the code actually
   raises, the flag-order rules, and the known traps.
+* **[Tuning knobs](Tuning-Knobs.md)** — every `-tune` developer knob, its
+  default and its effect.
 
 `.\NoSpherA2.exe -h` prints a self-contained help text with the same
 information in a single screenful-per-section form. It is generated from the
