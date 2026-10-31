@@ -181,9 +181,10 @@ Whenever an agent adds, removes, modifies, or investigates a test in `tests/test
 
 ### Keep the wiki in shape
 
-`docs/wiki/` holds the four pages of the GitHub wiki — `Home.md`, `Command-Reference.md`, `Use-Cases.md`, `Troubleshooting.md` — and is the source; the published copy is its own repository, `https://github.com/AK-Kleemiss/NoSpherA2.wiki.git`, cloned and pushed by hand. A flag that is added, renamed or given a new default must be updated in `docs/wiki/Command-Reference.md` in the same commit, or the wiki is wrong the moment the change lands.
+`docs/wiki/` holds the pages of the GitHub wiki — `Home.md`, `Command-Reference.md`, `Tuning-Knobs.md`, `Use-Cases.md`, `Troubleshooting.md`, `EQC-Energy-Decomposition.md` — and is the source; the published copy is its own repository, `https://github.com/AK-Kleemiss/NoSpherA2.wiki.git`, cloned and pushed by hand. A flag that is added, renamed or given a new default must be updated in `docs/wiki/Command-Reference.md` in the same commit, or the wiki is wrong the moment the change lands.
 
 - Document what the parser accepts, not what `-h` claims. The pages were written from the seven `digest_*` functions in `Src/core/convenience.cpp` and the defaults in `struct options` and `struct properties_options`; reading them that way is what found `-hdef`, the cuBLAS default and the `acc = 0` examples.
+- A `-tune` knob — any literal name read through `tuning()` or its wrappers `tuning_double`, `read_threshold`, `nao_knob` — that is added, renamed, removed or given a new default must be updated in `docs/wiki/Tuning-Knobs.md` in the same commit. `python scripts/check_tuning_knobs.py` must then report that page and sources agree; a new wrapper goes into the script's `CALL` pattern, or its knobs stay invisible.
 - Every command shown on a page must be one that runs. Take it from `tests/tests.toml` rather than composing it.
 - The published copy links pages without the extension (`](Troubleshooting#flag-order-matters)`), the in-repo copy with it. That is the only permitted difference between the two.
 
