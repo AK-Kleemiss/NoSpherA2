@@ -863,6 +863,9 @@ std::string help_message =
  "                                    direct build needs -xcw_int_precision 1e-12.\n"
  "  -xcw_int_precision <p>             Integral screening threshold of the XCW\n"
  "                                    Fock build, default 1e-10 (OCC's own 1e-12).\n"
+ "  -xcw_strong_cutoff <z>             z-score above which a reflection counts as\n"
+ "                                    strong in the XCW diagnostics, default 3;\n"
+ "                                    a settings-file keyword overrides it.\n"
  "  -xcw_partition grid|ri             How XCW shares the density among the atoms:\n"
  "                                    grid (default) by the -hirsh, -becke,\n"
  "                                    -tfvc, -mbis or -embis weights, ri by an RI fit in the\n"
@@ -3654,6 +3657,8 @@ bool options::digest_property_options(const std::string &temp, int &i)
 		xcw_incremental = false;
 	else if (temp == "-xcw_int_precision")
 		xcw_int_precision = stod(arguments[i + 1]);
+	else if (temp == "-xcw_strong_cutoff")
+		xcw_settings.xcw_strong_cutoff = stod(arguments[i + 1]);
 	else if (temp == "-no_gpu_itensor")
 		gpu_itensor = false;
 	else if (temp == "-gpu_cublas")
@@ -4526,7 +4531,7 @@ void options::loadXCWsettings() {
 	/* 1: Classical Jayatilaka XWR
 	   2: Ewald sum XWR */
 	xcw_settings.XWR_type = 1;
-	double quant_diff = 32768, diis_stop_damping = 32768, diis_stop_shift = 32768, max_diis_error = 32768, gradient = 32768, MaxP_diff = 32768, RMSP_diff = 32768, alpha = 32768, level_shift = 32768, start = 32768, end = 32768, step_size = 32768, xcw_strong_cutoff = 3.0;
+	double quant_diff = 32768, diis_stop_damping = 32768, diis_stop_shift = 32768, max_diis_error = 32768, gradient = 32768, MaxP_diff = 32768, RMSP_diff = 32768, alpha = 32768, level_shift = 32768, start = 32768, end = 32768, step_size = 32768, xcw_strong_cutoff = xcw_settings.xcw_strong_cutoff;
 	int max_scf_iterations = 32768, charge = 32768, multiplicity = 32768, n_params = 32768, refine_against = 32768;
 	std::string basis_set_name = "Undefined";
 	std::string df_basis_name, hessian_df_basis_name, guess_basis_name;

@@ -68,6 +68,8 @@ public:
 	// Applies M to the U/C/D tensors of one atom in their Voigt storage: T'_{ij..} = sum_pq.. M_pi M_qj .. T_pq..
 	static void transform_ADPs(vec2& ADPs, const vec2& M);
 	const unsigned int get_num_syms() const { return sym[0][0].size(); }
+	// Operation sym_op as a CIF symop, "-y+1/2,x,-z"; the translation as stored, not reduced into [0,1)
+	std::string symop_string(const int sym_op) const;
 	// Whether h1 = -h2
 	static bool check_inversion(const i3& h1, const i3& h2);
 	// Fills inversion_cleaned_hkl with one entry of every inversion related pair in hkl_enlarged; per entry its

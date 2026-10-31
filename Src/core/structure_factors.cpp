@@ -33,6 +33,27 @@ structure_factors::structure_factors(options& opt_in) {
 	unit_cell = cell(cif, std::cout, opt_in.debug, opt_in.do_XCW);
 	scatter_data.hkl_enlarged = read_hkl_full(hkl_filename, scatter_data.hkl, opt_in.twin_law, unit_cell, std::cout, scatter_data, opt_in.debug);
 	double wavelength_ = read_CIF(cif_input, unit_cell, model_data.ncen, asym_atoms, ADPs, opt_in.debug);
+	// The ADPs as the CIF gives them, for the model summary; U_cif2U_star below rescales them in place
+	std::ostringstream adp_summary;
+	adp_summary << std::fixed << std::setprecision(6)
+		<< "ADPs used (Angstrom^2, U11 U22 U33 U12 U13 U23 or Uiso); grown atoms take their parent's, rotated by its operation\n";
+	for (int a = 0; a < asym_atoms.size(); a++) {
+		adp_summary << "  " << std::left << std::setw(6) << asym_atoms[a].label << std::right;
+		if (ADPs[a].empty() || ADPs[a][0].empty()) adp_summary << "  Uiso " << asym_atoms[a].U_iso;
+		else for (double u : ADPs[a][0]) adp_summary << std::setw(11) << u;
+		adp_summary << "\n";
+	}
+	for (int order = 1; order < 3; order++) {
+		bool header = false;
+		for (int a = 0; a < asym_atoms.size(); a++) {
+			if (ADPs[a].size() <= order || ADPs[a][order].empty()) continue;
+			if (!header) adp_summary << "Gram-Charlier " << (order == 1 ? "C (111 112 113 122 123 133 222 223 233 333)" : "D (1111 ... 3333, CIF order)") << " as read\n";
+			header = true;
+			adp_summary << "  " << std::left << std::setw(6) << asym_atoms[a].label << std::right << std::scientific << std::setprecision(4);
+			for (double c : ADPs[a][order]) adp_summary << std::setw(12) << c;
+			adp_summary << std::fixed << std::setprecision(6) << "\n";
+		}
+	}
 	model_data.nr = scatter_data.hkl.size();
 	// Set F_calc sizes
 	scatter_data.F_calc.resize(model_data.nr, 0);
@@ -76,6 +97,48 @@ structure_factors::structure_factors(options& opt_in) {
 			unit_cell.resolve_internal_symmetry(asym_atoms);
 		}
 		model_data.ncen = asym_atoms.size();
+		// Here, before apply_grown deletes operations, grown_by still indexes the CIF's operations
+		std::ostringstream summary;
+		summary << std::fixed << std::setprecision(5);
+		int n_asym = 0;
+		for (const asym_atom& at : asym_atoms) n_asym += !at.grown;
+		summary << "XCW model: " << n_asym << " asymmetric unit atoms, " << asym_atoms.size() - n_asym << " grown, "
+			<< asym_atoms.size() << " in the calculation; " << unit_cell.get_num_syms() << " symmetry operations\n"
+			<< "Asymmetric unit:\n";
+		for (int a = 0; a < asym_atoms.size(); a++) {
+			const asym_atom& at = asym_atoms[a];
+			if (at.grown) continue;
+			summary << std::setw(5) << a << " " << std::left << std::setw(6) << at.label << std::setw(3) << constants::atnr2letter(at.type) << std::right
+				<< std::setw(10) << at.frac_pos[0] << std::setw(10) << at.frac_pos[1] << std::setw(10) << at.frac_pos[2]
+				<< "  site multiplicity 1/" << at.cryst_mult << "\n";
+		}
+		summary << adp_summary.str();
+		if (n_asym < asym_atoms.size()) {
+			summary << "Grown atoms: parent, operation, lattice translation, fractional coordinates\n";
+			const vec2 t = unit_cell.get_trans();
+			for (int a = 0; a < asym_atoms.size(); a++) {
+				const asym_atom& at = asym_atoms[a];
+				if (!at.grown) continue;
+				summary << std::setw(5) << a << " " << std::setw(3) << constants::atnr2letter(at.type);
+				if (at.grown_from < 0) {
+					summary << "  NO PARENT: no operation maps an asymmetric unit atom onto it";
+				}
+				else {
+					const int op = at.grown_by[0];
+					const asym_atom& p = asym_atoms[at.grown_from];
+					std::ostringstream shift;
+					for (int i = 0; i < 3; i++) {
+						double image = t[i][op];
+						for (int j = 0; j < 3; j++) image += unit_cell.get_sym(j, i, op) * p.frac_pos[j];
+						shift << (i ? "," : "") << std::lround(at.frac_pos[i] - image);
+					}
+					summary << "  from " << std::left << std::setw(6) << p.label << std::setw(22) << unit_cell.symop_string(op) << std::right
+						<< std::setw(10) << "(" + shift.str() + ")";
+					if (at.grown_by.size() > 1) summary << " +" << at.grown_by.size() - 1 << " more op(s)";
+				}
+				summary << std::setw(10) << at.frac_pos[0] << std::setw(10) << at.frac_pos[1] << std::setw(10) << at.frac_pos[2] << "\n";
+			}
+		}
 		if (opt_in.xcw_settings.grown) {
 			// Fourth step of the symmetry resolution: Copy U_iso, the dispersion and the ADPs of each grown atom's parent, the ADPs rotated onto the symmetry generated atoms
 			unit_cell.grow_ADPs(asym_atoms, ADPs);
@@ -86,6 +149,14 @@ structure_factors::structure_factors(options& opt_in) {
 			// Symmetry factors of an ungrown model, also for an atom on a special position
 			unit_cell.set_sym_fact_from_mult(asym_atoms);
 		}
+		summary << "Operations F_calc sums over (" << unit_cell.get_num_syms() << "):";
+		for (int op = 0; op < unit_cell.get_num_syms(); op++) summary << "  " << unit_cell.symop_string(op);
+		summary << "\nsym_fact:";
+		for (int a = 0; a < asym_atoms.size(); a++)
+			summary << (a % 8 ? "  " : "\n  ") << std::left << std::setw(6) << (asym_atoms[a].grown ? "#" + std::to_string(a) : asym_atoms[a].label) << std::right
+			<< std::setprecision(4) << asym_atoms[a].sym_fact;
+		summary << "\n";
+		model_summary = summary.str();
 		if (tuning("NOSPHERA2_DEBUG_ASYMFACT")) {
 			std::cerr << "applied_symmetry (deleted):";
 			for (int s : applied_symmetry) std::cerr << " " << s;

@@ -125,6 +125,32 @@ vec cell::apply_symmetry(const vec& pos, const int sym_op) {
 	// closing function
 }
 
+std::string cell::symop_string(const int sym_op) const {
+	std::string s;
+	for (int i = 0; i < 3; i++) {
+		std::string c;
+		//sym holds R transposed, see apply_symmetry
+		for (int j = 0; j < 3; j++) {
+			const int r = sym[j][i][sym_op];
+			if (r == 0) continue;
+			c += r < 0 ? "-" : "+";
+			if (std::abs(r) != 1) c += std::to_string(std::abs(r));
+			c += "xyz"[j];
+		}
+		const double t = trans[i][sym_op];
+		if (std::abs(t) > 1e-8) {
+			int d = 1;
+			while (d < 12 && std::abs(t * d - std::round(t * d)) > 1e-6) d++;
+			const long n = std::lround(t * d);
+			c += (n < 0 ? "-" : "+") + std::to_string(std::abs(n)) + (d > 1 ? "/" + std::to_string(d) : "");
+		}
+		if (c.empty()) c = "0";
+		if (c[0] == '+') c.erase(0, 1);
+		s += (i ? "," : "") + c;
+	}
+	return s;
+}
+
 void cell::convert_to_fracs(std::vector<asym_atom>& atoms, const std::string input_unit) {
 	for (asym_atom& atom : atoms) {
 		occ::Vec temp_cart_pos(3);

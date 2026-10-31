@@ -171,6 +171,9 @@ public:
 	cell unit_cell;
 	// Store the atoms of the asymmetric unit (or the grown unit)
 	std::vector<asym_atom> asym_atoms;
+	// The asymmetric unit, the grown cluster with the operation behind each grown atom, the kept operations
+	// and the sym_facts, for the SCF.log before the first cycle
+	std::string model_summary;
 	// The orbital basis, the library one or its per-element overrides
 	std::shared_ptr<BasisSet> orbital_basis;
 	// Store the k points

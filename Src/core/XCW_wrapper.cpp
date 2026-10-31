@@ -15,6 +15,7 @@ XCW_wrapper::XCW_wrapper(options& opt_in) : opt(&opt_in), sf(opt_in) {
 	std::cout << "XCW orbital basis set: " << sf.orbital_basis->get_name() << std::endl;
 	writer.WAEmpiRe();
 	writer.log << "XCW orbital basis set: " << sf.orbital_basis->get_name() << std::endl;
+	writer.log << sf.model_summary << std::endl;
 }
 
 //z_h = (|F_obs,h| - |F_calc,h|) / sigma_h for the converged F_calc/F_scale over
@@ -769,6 +770,25 @@ void XCW_wrapper::run() {
 	occ::qm::HartreeFock hf = setup_system();
 	//DW, phase and anomalous dispersion factors, the integration grid with its AO values and the RI partition
 	setup_structure_factors(hf);
+	//NOSPHERA2_XCW_RCHECK=<fchk>: scale, extinction and R1 of that converged wavefunction against this model and
+	//data, its F_calc in rcheck_Fcalc.txt, then stop; no integrals, no SCF
+	if (const char* rc = tuning("NOSPHERA2_XCW_RCHECK")) {
+		const occ::qm::Wavefunction w = occ::qm::Wavefunction::load(rc);
+		weight_D_fit_ = spin_summed(w.mo.D);
+		sf.XG.refresh = true;
+		sf.calc_F_calc(weight_D_fit_);
+		sf.XG.refresh = false;
+		//the SCF calls eval_scale every iteration, so scale and extinction have settled by convergence
+		for (int i = 0; i < 10; i++) sf.eval_scale();
+		sf.calc_criteria();
+		std::ostringstream s;
+		s << "XCW RCHECK " << rc << ": R1 " << sf.quality_criteria.R1 << " R1(all) " << sf.quality_criteria.R1_all
+			<< " scale " << sf.scatter_data.scale << " " << sf.extinction_report();
+		std::cout << s.str() << std::endl;
+		writer.log << s.str() << std::endl;
+		sf.write_F_calc("rcheck_Fcalc.txt");
+		return;
+	}
 	//the stored two-electron integrals and the density-fitted Hessian products of the SCF
 	setup_scf_integrals(hf);
 	occ::qm::Wavefunction last_wfn, prev_wfn;
