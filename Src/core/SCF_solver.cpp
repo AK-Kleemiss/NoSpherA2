@@ -224,7 +224,7 @@ bool SCF_solver::do_SCF(double& alpha_damp, scf_t& scf, occ::qm::Wavefunction& l
 		const _time_point scf_t0 = get_time();
 		converged = SCF_iteration(scf, alpha_damp, quant_diff_mem, last_quant, dm_last);
 		throughput::record_time(iteration_timer.c_str(), false, get_msec(scf_t0, get_time()));
-	} while (!converged && scf.iter < scf.maxiter);
+	} while (!converged && !trah_stalled_ && scf.iter < scf.maxiter);
 
 	writer_->log << "____________________________________________________________________________________________________\n";
 	if (converged) {
@@ -542,6 +542,9 @@ void SCF_solver::trah_reset() {
 	trah_pred_ = 0;
 	trah_boundary_ = false;
 	trah_floored_ = 0;
+	trah_stalled_handoffs_ = 0;
+	trah_handoff_quant_ = trah_handoff_grad_ = std::numeric_limits<double>::infinity();
+	trah_stalled_ = false;
 	//The radius the last run reached carries into this one: consecutive runs solve nearly the same
 	//problem, and learning the radius again costs a rejected macro step per halving. Never above the
 	//default, so an easy run cannot set a hard one up for a fall.
@@ -639,6 +642,21 @@ void SCF_solver::trah_step(scf_t& scf, const double quant) {
 			std::ostringstream give_up;
 			give_up << "***" << functional_name() << " still rising at the smallest trust radius: back to DIIS***";
 			print_centered_message(give_up.str(), 100, writer_->log);
+			//Progress since the last hand-off: a lower functional beyond the noise, or a gradient halved (the
+			//patience rule). Without either, DIIS and TRAH are passing the same orbitals back and forth.
+			const double gnorm = trah_grad_.norm();
+			if (trah_quant_ < trah_handoff_quant_ - noise || gnorm < 0.5 * trah_handoff_grad_) {
+				trah_handoff_quant_ = trah_quant_;
+				trah_handoff_grad_ = gnorm;
+				trah_stalled_handoffs_ = 0;
+			}
+			else if (++trah_stalled_handoffs_ >= trah_stall_handoffs_) {
+				std::ostringstream stall;
+				stall << "***" << trah_stalled_handoffs_ + 1 << " hand-offs to DIIS without a lower " << functional_name()
+					<< " or a halved gradient: giving up this SCF***";
+				print_centered_message(stall.str(), 100, writer_->log);
+				trah_stalled_ = true;
+			}
 			//hand DIIS the orbitals the last accepted step left, not the rejected ones
 			rotate_orbitals(scf, trah_C_, occ::Vec::Zero(trah_kappa_.size()));
 			trah_active_ = false;

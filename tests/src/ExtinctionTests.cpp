@@ -193,6 +193,23 @@ namespace NoSpherA2UnitTests
 		EXPECT_EQ(ext_parse_error("wavelength"), "Expected value after 'wavelength'");
 	}
 
+	// a bare `extinction shelx` stops at the next keyword, which is read as usual
+	TEST(ExtinctionTests, SettingsKeywordStopsAtTheNextKeyword)
+	{
+		EXPECT_EQ(ext_parse_error("extinction shelx conv"), "Expected value after 'conv'");
+		const auto p = std::filesystem::temp_directory_path() / ("nosphera2_ext_settings_" + ext_test_name() + ".txt");
+		std::ofstream(p) << "basis_set sto-3g extinction shelx save_eri x.eri extinction shelx fixed 0.2 weighted";
+		options opt;
+		opt.xcw_settings_path = p;
+		opt.do_XCW = true;
+		EXPECT_NO_THROW(opt.loadXCWsettings());
+		std::filesystem::remove(p);
+		EXPECT_EQ(opt.xcw_settings.eri_save_path, std::filesystem::path("x.eri"));
+		EXPECT_EQ(opt.xcw_settings.extinction_model, extinction::model::shelx);
+		EXPECT_FALSE(opt.xcw_settings.extinction_refine);
+		EXPECT_DOUBLE_EQ(opt.xcw_settings.extinction_start, 0.2);
+	}
+
 	// the whole path: keyword -> settings -> setup_extinction, with the wavelength coming from
 	// _diffrn_radiation_wavelength in the fixture's CIF, which is the only place it can
 	TEST(ExtinctionTests, IsotropicModelIsSetUpFromTheCifWavelength)

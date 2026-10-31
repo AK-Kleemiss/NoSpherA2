@@ -150,6 +150,14 @@ private:
 	double trah_trust_ = trah_.trust_first;
 	// Consecutive rejected steps taken at the smallest radius
 	int trah_floored_ = 0;
+	// TRAH -> DIIS hand-offs in a row that found neither a lower functional nor a halved gradient than the
+	// hand-off before (trah_handoff_quant_/_grad_). DIIS can hand back the very orbitals TRAH gave up on, and a
+	// warm start sends them straight back to TRAH: trah_stall_handoffs_ of those end the run as not converged,
+	// so the caller's retry (the XCW half step) starts at once instead of after max_iter.
+	int trah_stalled_handoffs_ = 0;
+	double trah_handoff_quant_ = 0, trah_handoff_grad_ = 0;
+	bool trah_stalled_ = false;
+	static constexpr int trah_stall_handoffs_ = 2;
 	std::vector<occ::Vec> trah_B_, trah_HB_;
 	occ::Vec trah_kappa_, trah_grad_, trah_hdiag_;
 	occ::Mat trah_C_;

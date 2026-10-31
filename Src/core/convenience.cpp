@@ -4609,17 +4609,17 @@ void options::loadXCWsettings() {
 			};
 
 		handlers["extinction"] = [&](std::istream& is) {
-			//`extinction <model> [iso|aniso] [fixed] [start value]`, the rest of the line in
-			//any order: a word names the model or a flag, a number is the start value
-			std::string rest, token;
-			std::getline(is, rest);
-			std::istringstream words(rest);
-			while (words >> token) {
+			//`extinction <model> [iso|aniso] [fixed] [start value]` in any order: a word names the model
+			//or a flag, a number is the start value, and the next settings keyword ends it and is read
+			//as usual, so `extinction shelx` need not be the last keyword
+			std::string token, next;
+			while (is >> token) {
 				const std::string low = lowercase(token);
 				if (low == "aniso" || low == "anisotropic") extinction_aniso = true;
 				else if (low == "iso" || low == "isotropic") extinction_aniso = false;
 				else if (low == "fixed" || low == "fix") extinction_refine = false;
 				else if (extinction::from_string(low) != extinction::model::none) extinction_model = extinction::from_string(low);
+				else if (handlers.count(low)) { next = low; break; }
 				else {
 					try { extinction_start = std::stod(token); }
 					catch (const std::exception&) { throw std::runtime_error("Could not read '" + token + "' after 'extinction'"); }
@@ -4627,6 +4627,7 @@ void options::loadXCWsettings() {
 			}
 			if (extinction_model == extinction::model::none)
 				throw std::runtime_error("Expected a model (shelx, bc_gaussian or bc_lorentzian) after 'extinction'");
+			if (!next.empty()) handlers.at(next)(is);
 			};
 
 		handlers["wavelength"] = [&](std::istream& is) {
