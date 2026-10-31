@@ -118,4 +118,181 @@ namespace NoSpherA2UnitTests
 		EXPECT_EQ(parsed_weight("basis_set sto-3g params 10").weight, ws::sigma);
 		EXPECT_THROW(parsed_weight("basis_set sto-3g params 10 weight shelx -1 0"), std::runtime_error);
 	}
+
+	TEST(XcwWeightTests, SettingsKeywordMoreSchemes)
+	{
+		const std::string head = "basis_set sto-3g params 10 weight ";
+		options::XCW_settings s = parsed_weight(head + "unit");
+		EXPECT_EQ(s.weight, ws::unit);
+		EXPECT_TRUE(s.weight_params.empty());
+		EXPECT_EQ(s.robust_c, 0.0);
+		s = parsed_weight(head + "stl 1");
+		EXPECT_EQ(s.weight, ws::stl);
+		EXPECT_EQ(s.weight_params, (vec{ 1.0 }));
+		//a variable count of A_r, stopping at the next keyword
+		s = parsed_weight("weight Chebyshev 1 0.5 -0.2 basis_set sto-3g params 10");
+		EXPECT_EQ(s.weight, ws::chebyshev);
+		EXPECT_EQ(s.weight_params, (vec{ 1.0, 0.5, -0.2 }));
+		s = parsed_weight(head + "chebyshev_opt 3");
+		EXPECT_EQ(s.weight, ws::chebyshev_opt);
+		EXPECT_EQ(s.weight_params, (vec{ 3.0 }));
+		//robust: c after the scheme's values, 6 when left out; for chebyshev the last value is c
+		s = parsed_weight(head + "robust shelx 0.1 0 4");
+		EXPECT_EQ(s.weight, ws::shelx);
+		EXPECT_EQ(s.weight_params, (vec{ 0.1, 0.0 }));
+		EXPECT_EQ(s.robust_c, 4.0);
+		s = parsed_weight(head + "robust sigma");
+		EXPECT_EQ(s.weight, ws::sigma);
+		EXPECT_EQ(s.robust_c, 6.0);
+		s = parsed_weight(head + "robust chebyshev 1 0.5 6");
+		EXPECT_EQ(s.weight_params, (vec{ 1.0, 0.5 }));
+		EXPECT_EQ(s.robust_c, 6.0);
+		for (const char* bad : { "stl", "unit 1", "chebyshev", "chebyshev_opt 0", "chebyshev_opt 1.5", "robust chebyshev 1", "robust sigma -1", "robust sigma 0", "tukey" })
+			EXPECT_THROW(parsed_weight(head + bad), std::runtime_error) << bad;
+	}
+
+	//w = 1 and w = (sin theta/lambda)^a in the refined metric, sigma(F) and sigma(F^2) linked by 2|Fo|
+	TEST(XcwWeightTests, UnitAndStlByHand)
+	{
+		for (const int against : { 1, 2 }) {
+			options opt;
+			opt.xcw_settings.weight = ws::unit;
+			structure_factors sf;
+			fill(sf, opt);
+			sf.quality_criteria.refine_against = against;
+			sf.update_cryst_weights();
+			for (int r = 0; r < 3; r++) {
+				const double fo = sf.scatter_data.abs_F_obs[r];
+				EXPECT_DOUBLE_EQ(sf.sig_I_[r], against == 2 ? 1.0 : 2.0 * fo);
+				EXPECT_DOUBLE_EQ(sf.sig_F_[r], against == 2 ? 0.5 / fo : 1.0);
+			}
+		}
+		options opt;
+		opt.xcw_settings.weight = ws::stl;
+		opt.xcw_settings.weight_params = { 2.0 };
+		structure_factors sf;
+		fill(sf, opt);
+		sf.quality_criteria.refine_against = 2;
+		sf.unit_cell = cell(10.0, 10.0, 10.0, 90.0, 90.0, 90.0);
+		//in set order (0 2 0), (1 0 0), (1 1 0): sin theta/lambda = 1/(2d) = 0.1, 0.05, sqrt(2)/20; w = stl^2
+		sf.scatter_data.hkl = { i3{ 1, 0, 0 }, i3{ 0, 2, 0 }, i3{ 1, 1, 0 } };
+		sf.update_cryst_weights();
+		const double stl[3] = { 0.1, 0.05, std::sqrt(2.0) / 20.0 };
+		for (int r = 0; r < 3; r++) EXPECT_NEAR(sf.sig_I_[r], 1.0 / stl[r], 1e-12 / stl[r]);
+	}
+
+	//w = 1/sum A_r T_r(t), t = 2 Fc/max(Fc) - 1: |Fc| = 2, 4, 8 is t = -0.5, 0, 1
+	TEST(XcwWeightTests, ChebyshevByHand)
+	{
+		options opt;
+		opt.xcw_settings.weight = ws::chebyshev;
+		opt.xcw_settings.weight_params = { 1.0, 0.5, 0.2 };
+		structure_factors sf;
+		fill(sf, opt);
+		sf.quality_criteria.refine_against = 2;
+		sf.scatter_data.F_calc = { 2.0, 4.0, 8.0 };
+		sf.update_cryst_weights();
+		//1 - 0.25 + 0.2 (2 0.25 - 1), 1 - 0.2, 1 + 0.5 + 0.2
+		const double sum[3] = { 0.65, 0.8, 1.7 };
+		for (int r = 0; r < 3; r++) EXPECT_NEAR(sf.sig_I_[r], std::sqrt(sum[r]), 1e-12);
+		//a sum <= 0 is weight 0, sigma infinite
+		EXPECT_EQ(chebyshev_weight(-1.0, { 1.0, 2.0 }), 0.0);
+		//t = 0.9: T2 = 0.62, T3 = 0.216
+		EXPECT_NEAR(chebyshev_weight(0.9, { 1.0, 2.0, 3.0, 4.0 }), 1.0 / (1.0 + 2.0 * 0.9 + 3.0 * 0.62 + 4.0 * 0.216), 1e-14);
+	}
+
+	//Delta^2 planted as sum A_r T_r(t): the least-squares fit gives A back
+	TEST(XcwWeightTests, ChebyshevFitRecoversCoefficients)
+	{
+		const vec A = { 3.0, -1.0, 0.5, 0.25 };
+		vec t(200), d2(200);
+		for (int i = 0; i < 200; i++) {
+			t[i] = -1.0 + 2.0 * i / 199.0;
+			const double T[4] = { 1.0, t[i], 2.0 * t[i] * t[i] - 1.0, 4.0 * t[i] * t[i] * t[i] - 3.0 * t[i] };
+			d2[i] = 0.0;
+			for (int r = 0; r < 4; r++) d2[i] += A[r] * T[r];
+		}
+		const vec fit = fit_chebyshev(t, d2, 4);
+		ASSERT_EQ(fit.size(), 4u);
+		for (int r = 0; r < 4; r++) EXPECT_NEAR(fit[r], A[r], 1e-6);
+
+		//through structure_factors: Fo^2 = k^2 Fc^2 + sqrt(sum A_r T_r(t)) on 50 reflections, chebyshev_opt 3 at its first fill
+		options opt;
+		opt.xcw_settings.weight = ws::chebyshev_opt;
+		opt.xcw_settings.weight_params = { 3.0 };
+		structure_factors sf;
+		sf.opt = &opt;
+		sf.quality_criteria.refine_against = 2;
+		const int N = 50;
+		sf.model_data.nr = sf.model_data.nr_fit = N;
+		auto& d = sf.scatter_data;
+		d.scale = std::sqrt(2.0);
+		const vec B = { 4.0, 1.0, 0.5 };
+		for (int r = 0; r < N; r++) {
+			const double fc = r + 1.0, tt = 2.0 * fc / N - 1.0;
+			const double fo2 = 2.0 * fc * fc + std::sqrt(B[0] + B[1] * tt + B[2] * (2.0 * tt * tt - 1.0));
+			d.F_calc.push_back(fc);
+			d.F_obs2.push_back(fo2);
+			d.F_obs.push_back(std::sqrt(fo2));
+			d.abs_F_obs.push_back(std::sqrt(fo2));
+			d.sigma_obs2.push_back(1.0);
+			d.sigma_obs.push_back(0.5 / std::sqrt(fo2));
+			d.hkl_mask.push_back(1);
+		}
+		sf.update_cryst_weights();
+		ASSERT_EQ(sf.weight_ab_.size(), 3u);
+		for (int r = 0; r < 3; r++) EXPECT_NEAR(sf.weight_ab_[r], B[r], 1e-6);
+	}
+
+	//Tukey's biweight on 1/sigma^2: the planted outliers get w = 0, every other reflection w = f/sigma^2 with
+	//f = (1 - (z/(c s))^2)^2, z = Delta/sigma, s = median|z|/0.6745
+	TEST(XcwWeightTests, RobustZeroesPlantedOutliers)
+	{
+		for (const int against : { 1, 2 }) {
+			options opt;
+			opt.xcw_settings.robust_c = 6.0;
+			structure_factors sf;
+			sf.opt = &opt;
+			sf.quality_criteria.refine_against = against;
+			const int N = 41;
+			sf.model_data.nr = sf.model_data.nr_fit = N;
+			auto& d = sf.scatter_data;
+			d.scale = std::sqrt(2.0);
+			for (int r = 0; r < N; r++) {
+				const double fo2 = 80.0 + (r == 3 || r == 17 ? 500.0 : 0.6 * ((r * 7) % 11 - 5));
+				d.F_calc.push_back(std::sqrt(40.0));
+				d.F_obs2.push_back(fo2);
+				d.F_obs.push_back(std::sqrt(fo2));
+				d.abs_F_obs.push_back(std::sqrt(fo2));
+				d.sigma_obs2.push_back(2.0);
+				d.sigma_obs.push_back(1.0 / std::sqrt(fo2));
+				d.hkl_mask.push_back(1);
+			}
+			sf.update_cryst_weights();
+			const vec& s = against == 2 ? d.sigma_obs2 : d.sigma_obs;
+			const vec& sig = against == 2 ? sf.sig_I_ : sf.sig_F_;
+			vec z(N), a(N);
+			for (int r = 0; r < N; r++) {
+				z[r] = (against == 2 ? 80.0 - d.F_obs2[r] : std::sqrt(80.0) - d.F_obs[r]) / s[r];
+				a[r] = std::abs(z[r]);
+			}
+			std::sort(a.begin(), a.end());
+			const double cs = 6.0 * a[N / 2] / 0.6745;
+			for (int r = 0; r < N; r++) {
+				const double w = 1.0 / (sig[r] * sig[r]);
+				if (r == 3 || r == 17) {
+					EXPECT_EQ(w, 0.0) << r;
+					continue;
+				}
+				const double u = z[r] / cs, f = (1.0 - u * u) * (1.0 - u * u);
+				ASSERT_LT(std::abs(u), 1.0);
+				EXPECT_NEAR(w, f / (s[r] * s[r]), 1e-12 / (s[r] * s[r])) << r;
+			}
+		}
+		//even count: the median is the mean of the middle two; a zero scale leaves every factor 1
+		const vec f = tukey_biweight({ 1.0, -2.0, 3.0, 100.0 }, { 1, 1, 1, 1 }, 1.0);
+		EXPECT_EQ(f[3], 0.0);
+		EXPECT_NEAR(f[0], std::pow(1.0 - std::pow(0.6745 / 2.5, 2), 2), 1e-14);
+		EXPECT_EQ(tukey_biweight({ 0.0, 0.0, 5.0 }, { 1, 1, 1 }, 6.0), (vec{ 1.0, 1.0, 1.0 }));
+	}
 }

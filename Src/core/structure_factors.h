@@ -199,8 +199,11 @@ public:
 	// sigma(F) and sigma(F^2) it amounts to, sigma = 1/sqrt(w): the default scheme copies the read sigmas,
 	// so every (x/sigma)^2 there stays bit for bit what it was. Filled by update_cryst_weights.
 	vec sig_F_, sig_I_;
-	// The scheme's current parameters (a, b of SHELX), from the settings until shelx_opt moves them
+	// The scheme's current parameters (a, b of SHELX, a of stl, A_r of Chebyshev), from the settings until
+	// shelx_opt / chebyshev_opt move them
 	vec weight_ab_;
+	// "shelx_opt WGHT 0.1 0" / "robust(c 6) chebyshev_opt A 1 0.5", for the logs
+	std::string weight_report() const;
 	// Fills sig_F_ and sig_I_ from the scheme, the current F_calc and scale (so only after calc_F_calc).
 	// The weights then stay fixed until the next call: no derivative wrt F_calc. The 1/|H|^2 of XWR_type 2
 	// still multiplies on top at every site, so each scheme works with both criteria
@@ -209,8 +212,10 @@ public:
 	// at the scale of that 1/sigma^2 fit and the F_calc of the moment. No-op once filled
 	void ensure_cryst_weights();
 	// shelx_opt: a and b re-optimised on the fit set as cctbx's new_shelx_weighting.optimise_parameters
-	// does, against the current F_calc and scale; refills the weights
+	// does, against the current F_calc and scale; chebyshev_opt: A_r fit to Delta^2 (fit_chebyshev). Refills the weights
 	void optimise_cryst_weights();
+	double fit_residual(int r) const;
+	vec chebyshev_t() const;
 
 
 	// The parameters the criteria divide by: the settings file's `params` plus the extinction
@@ -349,3 +354,10 @@ double shelx_weight(double fo_sq, double sigma, double fc_sq, double K, double a
 // cctbx new_shelx_weighting.optimise_parameters: a, b from the start values of SHELXL's formulae that
 // make the GooF of 10 bins by Fc^2/max(Fc^2) closest to 1; {a, b}
 vec optimise_shelx_weights(const vec& fo_sq, const vec& sigma, const vec& fc_sq, double K, int n_params);
+// Carruthers & Watkin (1979): w = 1/Sum_r A_r T_r(t), 0 where the sum is not positive
+double chebyshev_weight(double t, const vec& A);
+// chebyshev_opt: the A_0..A_{n-1} whose Sum A_r T_r(t_i) fits d2_i (the squared residuals) in least squares
+vec fit_chebyshev(const vec& t, const vec& d2, int n);
+// Tukey's biweight on z_i = Delta_i sqrt(w_i): f_i = (1 - (z_i/(c s))^2)^2 for |z_i| < c s, else 0, with the robust
+// scale s = median(|z|)/0.6745 over the reflections where in_scale is non-zero
+vec tukey_biweight(const vec& z, const ivec& in_scale, double c);

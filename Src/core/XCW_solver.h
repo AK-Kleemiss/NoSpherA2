@@ -3,7 +3,7 @@
 
 // The crystallographic quantities of the current density, as the SCF prints and descends them
 struct fit_quality {
-	double criterion, GooF2, R1, criterion_all, R1_all;
+	double criterion, GooF2, R1, criterion_all, R1_all, wR2, wR2_all;
 };
 
 // What the SCF needs from the structure factors, implemented by XCW_wrapper so that the SCF never

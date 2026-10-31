@@ -866,11 +866,15 @@ std::string help_message =
  "  -xcw_strong_cutoff <z>             z-score above which a reflection counts as\n"
  "                                    strong in the XCW diagnostics, default 3;\n"
  "                                    a settings-file keyword overrides it.\n"
- "  -xcw_weight sigma|shelx a b|shelx_opt a b\n"
+ "  -xcw_weight [robust] <scheme> [values] [c]\n"
  "                                    Crystallographic weight of the XCW fit:\n"
- "                                    1/sigma^2 (default), SHELXL WGHT a b, or\n"
- "                                    WGHT a b re-optimised after every lambda\n"
- "                                    step; the settings keyword `weight` too.\n"
+ "                                    sigma (1/sigma^2, default), unit, stl a\n"
+ "                                    ((sin th/lambda)^a), shelx a b (WGHT),\n"
+ "                                    shelx_opt a b (WGHT refit every step),\n"
+ "                                    chebyshev A0 .. (1/Sum A_r T_r(t), t from\n"
+ "                                    Fc), chebyshev_opt n (A_r refit every\n"
+ "                                    step); robust adds Tukey's biweight, c\n"
+ "                                    default 6. The settings keyword `weight`.\n"
  "  -xcw_partition grid|ri             How XCW shares the density among the atoms:\n"
  "                                    grid (default) by the -hirsh, -becke,\n"
  "                                    -tfvc, -mbis or -embis weights, ri by an RI fit in the\n"
@@ -4257,26 +4261,39 @@ bool options::digest_ri_options(const std::string &temp, int &i)
 };
 
 //X-ray constrained wavefunction fitting
-//`sigma`, `shelx <a> <b>` or `shelx_opt <a0> <b0>`: the settings file's `weight` and the CLI's -xcw_weight
+//`[robust] sigma | unit | stl <a> | shelx <a> <b> | shelx_opt <a0> <b0> | chebyshev <A0> [A1 ..] | chebyshev_opt <n>`
+//and, under robust, Tukey's c (default 6; after chebyshev, whose count is free, the last number and required):
+//the settings file's `weight` and the CLI's -xcw_weight. Numbers are taken while the next token starts like one
 static void read_xcw_weight(std::istream& is, options::XCW_settings& s)
 {
 	using ws = options::SF_settings::weight_scheme;
-	std::string scheme;
-	if (!(is >> scheme))
-		throw std::runtime_error("Expected sigma, shelx or shelx_opt after 'weight'");
-	std::transform(scheme.begin(), scheme.end(), scheme.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-	if (scheme == "sigma") {
-		s.weight = ws::sigma;
-		s.weight_params.clear();
-		return;
+	static const std::map<std::string, std::pair<ws, int>> schemes = { { "sigma", { ws::sigma, 0 } }, { "unit", { ws::unit, 0 } },
+		{ "stl", { ws::stl, 1 } }, { "shelx", { ws::shelx, 2 } }, { "shelx_opt", { ws::shelx_opt, 2 } },
+		{ "chebyshev", { ws::chebyshev, -1 } }, { "chebyshev_opt", { ws::chebyshev_opt, 1 } } };
+	const auto word = [&is]() { std::string w; is >> w; std::transform(w.begin(), w.end(), w.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); }); return w; };
+	std::string scheme = word();
+	const bool robust = scheme == "robust";
+	if (robust) scheme = word();
+	const auto it = schemes.find(scheme);
+	if (it == schemes.end())
+		throw std::runtime_error("Unknown weight '" + scheme + "', expected [robust] sigma, unit, stl, shelx, shelx_opt, chebyshev or chebyshev_opt");
+	vec p;
+	for (double x; is >> std::ws, (std::isdigit(is.peek()) || is.peek() == '-' || is.peek() == '+' || is.peek() == '.') && (is >> x);) p.push_back(x);
+	const int n = it->second.second;
+	double c = 6.0;
+	if (robust && ((n < 0 && p.size() > 1) || (n >= 0 && p.size() == static_cast<size_t>(n) + 1))) {
+		c = p.back();
+		p.pop_back();
 	}
-	if (scheme != "shelx" && scheme != "shelx_opt")
-		throw std::runtime_error("Unknown weight '" + scheme + "', expected sigma, shelx or shelx_opt");
-	double a = 0, b = 0;
-	if (!(is >> a >> b) || a < 0 || b < 0)
-		throw std::runtime_error("Expected two values a, b >= 0 after 'weight " + scheme + "'");
-	s.weight = scheme == "shelx" ? ws::shelx : ws::shelx_opt;
-	s.weight_params = { a, b };
+	else if (robust && n < 0) p.clear();
+	if ((n >= 0 && p.size() != static_cast<size_t>(n)) || (n < 0 && p.empty()))
+		throw std::runtime_error("Wrong number of values after 'weight " + std::string(robust ? "robust " : "") + scheme + "'");
+	if (std::any_of(p.begin(), p.end(), [&](double v) { return (it->second.first == ws::shelx || it->second.first == ws::shelx_opt) && v < 0; })
+		|| (it->second.first == ws::chebyshev_opt && (p[0] < 1 || p[0] != std::floor(p[0]))) || !(c > 0))
+		throw std::runtime_error("Out-of-range value after 'weight " + scheme + "'");
+	s.weight = it->second.first;
+	s.weight_params = p;
+	s.robust_c = robust ? c : 0.0;
 }
 
 bool options::digest_xcw_options(const std::string &temp, int &i)
@@ -4298,9 +4315,11 @@ bool options::digest_xcw_options(const std::string &temp, int &i)
 		xcw_settings_path = arguments[i + 1];
 	}
 	else if (temp == "-xcw_weight") {
-		err_checkf(i + 1 < argc, "-xcw_weight takes sigma, shelx <a> <b> or shelx_opt <a0> <b0>", std::cout);
+		err_checkf(i + 1 < argc, "-xcw_weight takes [robust] sigma, unit, stl, shelx, shelx_opt, chebyshev or chebyshev_opt", std::cout);
+		//every following argument up to the next option (a negative number is not one)
 		std::string words = arguments[i + 1];
-		for (int k = i + 2; k < std::min(argc, i + 4); k++) words += " " + arguments[k];
+		for (int k = i + 2; k < argc && (arguments[k][0] != '-' || (arguments[k].size() > 1 && (std::isdigit(static_cast<unsigned char>(arguments[k][1])) || arguments[k][1] == '.'))); k++)
+			words += " " + arguments[k];
 		std::istringstream is(words);
 		read_xcw_weight(is, xcw_settings);
 	}

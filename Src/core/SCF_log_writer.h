@@ -42,6 +42,7 @@ public:
 		int iter = 0;
 		double lambda = 0, criterion = 0, GooF2 = 0, R1 = 0, E_total = 0, penalty = 0, quant = 0, criterion_all = 0, R1_all = 0, A2 = 0;
 		bool has_A2 = false;
+		double wR2 = 0, wR2_all = 0;
 	};
 
 	values v;
@@ -50,31 +51,34 @@ public:
 	void start_lambda(const double lambda) {
 		log << "Starting XCW SCF solver with lambda = " << std::fixed << std::setprecision(5) << lambda << "\n";
 		log << "____________________________________________________________________________________________________\n";
-		log << " Iteration\tCriterion\tGooF(F^2)\tR1(gt)\t\tTotal Energy\t\tPerturbation\tTarget quantity\n";
-		log << "\t\t\t\t\t\t\t\t\t(%)\t\t\t(Eh)\t\t\t\t(a. u.)\t\t\t(a. u.)\n";
+		log << " Iteration\tCriterion\tGooF(F^2)\tR1(gt)\t\twR2\t\t\tTotal Energy\t\tPerturbation\tTarget quantity\n";
+		log << "\t\t\t\t\t\t\t\t\t(%)\t\t\t\t\t\t(Eh)\t\t\t\t(a. u.)\t\t\t(a. u.)\n";
 		log << "____________________________________________________________________________________________________\n";
 	}
 
-	// One SCF iteration: v.iter, criterion, GooF2, R1, E_total, penalty and quant
+	// One SCF iteration: v.iter, criterion, GooF2, R1, wR2, E_total, penalty and quant
 	void iteration_line() {
-		log << " " << v.iter << "\t\t\t" << std::fixed << std::setprecision(4) << v.criterion << "\t\t" << v.GooF2 << "\t\t" << std::setprecision(5) << v.R1 << "\t\t" << std::fixed << std::setprecision(9) << v.E_total << "\t\t" << std::fixed << std::setprecision(3) << v.penalty << "\t\t\t" << std::fixed << std::setprecision(9) << v.quant << std::endl;
+		log << " " << v.iter << "\t\t\t" << std::fixed << std::setprecision(4) << v.criterion << "\t\t" << v.GooF2 << "\t\t" << std::setprecision(5) << v.R1 << "\t\t" << v.wR2 << "\t\t" << std::fixed << std::setprecision(9) << v.E_total << "\t\t" << std::fixed << std::setprecision(3) << v.penalty << "\t\t\t" << std::fixed << std::setprecision(9) << v.quant << std::endl;
 	}
 
 	// The head of the console table, once per run
 	static void console_header(const bool with_A2) {
 		std::cout << "____________________________________________________________________________________________________________________________\n";
-		std::cout << " Lambda\t\tCriterion\tGooF(F2)\tR1(gt)\t\tTotal Energy\t\tPerturbation\tTarget quantity\t\tCrit(all)\tR1(all)";
+		std::cout << " Lambda\t\tCriterion\tGooF(F2)\tR1(gt)\t\tTotal Energy\t\tPerturbation\tTarget quantity\t\tCrit(all)\tR1(all)\t\twR2\t\twR2(all)";
 		if (with_A2) std::cout << "\t\tA^2 (halt)";
 		std::cout << "\n";
 		std::cout << "\t\t\t\t\t\t\t\t\t(%)\t\t\t(Eh)\t\t\t\t(a. u.)\t\t\t(a. u.)\n";
 		std::cout << "____________________________________________________________________________________________________________________________\n";
 	}
 
-	// The row of a converged lambda: v.lambda, criterion, GooF2, R1, E_total, quant, criterion_all, R1_all and A2 when has_A2
-	void lambda_line() const {
-		std::cout << " " << std::fixed << std::setprecision(5) << v.lambda << "\t" << std::fixed << std::setprecision(4) << v.criterion << "\t\t" << v.GooF2 << "\t\t" << std::setprecision(5) << v.R1 << "\t\t" << std::fixed << std::setprecision(9) << v.E_total << "\t\t" << std::fixed << std::setprecision(3) << v.lambda * v.criterion << "\t\t\t" << std::fixed << std::setprecision(9) << v.quant
-			<< "\t\t" << std::setprecision(4) << v.criterion_all << "\t\t" << std::setprecision(5) << v.R1_all;
-		if (v.has_A2) std::cout << "\t\t" << std::setprecision(4) << v.A2;
-		std::cout << std::endl;
+	// The row of a converged lambda: v.lambda, criterion, GooF2, R1, E_total, quant, criterion_all, R1_all, wR2, wR2_all
+	// and A2 when has_A2; to the console and, prefixed "XCW lambda row", to SCF.log
+	void lambda_line() {
+		std::ostringstream s;
+		s << " " << std::fixed << std::setprecision(5) << v.lambda << "\t" << std::fixed << std::setprecision(4) << v.criterion << "\t\t" << v.GooF2 << "\t\t" << std::setprecision(5) << v.R1 << "\t\t" << std::fixed << std::setprecision(9) << v.E_total << "\t\t" << std::fixed << std::setprecision(3) << v.lambda * v.criterion << "\t\t\t" << std::fixed << std::setprecision(9) << v.quant
+			<< "\t\t" << std::setprecision(4) << v.criterion_all << "\t\t" << std::setprecision(5) << v.R1_all << "\t\t" << v.wR2 << "\t\t" << v.wR2_all;
+		if (v.has_A2) s << "\t\t" << std::setprecision(4) << v.A2;
+		std::cout << s.str() << std::endl;
+		log << "XCW lambda row:" << s.str() << std::endl;
 	}
 };

@@ -26,10 +26,11 @@ XCW grid transform: Fourier-Bessel, L 12, 193 table nodes, 6 prototypes
 More detailed output in SCF.log file...
 XCW: fitting against the 1/|H|^2-weighted residual self-energy criterion Criterion below is the square of this weighted quantity, not the classical GooF^2.
 ____________________________________________________________________________________________________________________________
- Lambda		Criterion	GooF(F2)	R1(gt)		Total Energy		Perturbation	Target quantity		Crit(all)	R1(all)
+ Lambda		Criterion	GooF(F2)	R1(gt)		Total Energy		Perturbation	Target quantity		Crit(all)	R1(all)		wR2		wR2(all)
 									(%)			(Eh)				(a. u.)			(a. u.)
 ____________________________________________________________________________________________________________________________
- 0.00000	111.4437		5.6181		0.02515		-1961.925585145		0.000			-1961.925585145		107.4880		0.02558
- 0.01000	35.7606		3.9693		0.02247		-1961.749856953		0.358			-1961.392250722		34.4942		0.02285
- 0.02000	25.4326		3.5938		0.02148		-1961.602467824		0.509			-1961.093815709		24.5332		0.02183
+ 0.00000	111.4437		5.6181		0.02515		-1961.925585145		0.000			-1961.925585145		107.4880		0.02558		0.04952		0.04954
+ 0.01000	35.7606		3.9693		0.02247		-1961.749856953		0.358			-1961.392250722		34.4942		0.02285		0.03499		0.03500
+ 0.02000	25.4326		3.5938		0.02148		-1961.602467824		0.509			-1961.093815709		24.5332		0.02183		0.03168		0.03169
+XCW final model: lambda 0.02000 R1 0.02148 wR2 0.03168 R1(all) 0.02183 wR2(all) 0.03169 GooF 3.5938 weight sigma
 Finished XCW fitting procedure.

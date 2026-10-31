@@ -74,7 +74,7 @@ void XCW_solver::restore_model_state() {
 }
 
 void XCW_solver::log_iteration(const scf_t& scf) {
-	xcw_writer_->v = { scf.iter, lambda, fit_.criterion, fit_.GooF2, fit_.R1, scf.ctx.energy.at("total"), model_energy(), quant_, fit_.criterion_all, fit_.R1_all, 0.0, false };
+	xcw_writer_->v = { scf.iter, lambda, fit_.criterion, fit_.GooF2, fit_.R1, scf.ctx.energy.at("total"), model_energy(), quant_, fit_.criterion_all, fit_.R1_all, 0.0, false, fit_.wR2, fit_.wR2_all };
 	xcw_writer_->iteration_line();
 }
 

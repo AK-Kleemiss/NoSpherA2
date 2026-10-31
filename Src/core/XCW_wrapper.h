@@ -105,6 +105,8 @@ private:
 	options* opt;
 	structure_factors sf;
 	XCW_log_writer writer;
+	// The lambda row of the last converged step, for the final model summary
+	XCW_log_writer::values last_row_{};
 	XCW_solver scf_solver;
 
 };

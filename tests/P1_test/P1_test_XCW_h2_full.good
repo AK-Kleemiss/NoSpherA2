@@ -26,14 +26,15 @@ XCW grid transform: Fourier-Bessel, L 12, 193 table nodes, 6 prototypes
 More detailed output in SCF.log file...
 XCW: fitting against the 1/|H|^2-weighted residual self-energy criterion Criterion below is the square of this weighted quantity, not the classical GooF^2.
 ____________________________________________________________________________________________________________________________
- Lambda		Criterion	GooF(F2)	R1(gt)		Total Energy		Perturbation	Target quantity		Crit(all)	R1(all)		A^2 (halt)
+ Lambda		Criterion	GooF(F2)	R1(gt)		Total Energy		Perturbation	Target quantity		Crit(all)	R1(all)		wR2		wR2(all)		A^2 (halt)
 									(%)			(Eh)				(a. u.)			(a. u.)
 ____________________________________________________________________________________________________________________________
- 0.00000	101.8506		5.0170		0.02505		-1961.925585145		0.000			-1961.925585145		99.5614		0.02559		198.4893
- 0.01000	38.1419		3.7731		0.02374		-1961.760145899		0.381			-1961.378726936		37.2995		0.02428		121.9396
- 0.02000	30.2513		3.5440		0.02343		-1961.648760981		0.605			-1961.043735973		29.5875		0.02396		122.4655
+ 0.00000	101.8506		5.0170		0.02505		-1961.925585145		0.000			-1961.925585145		99.5614		0.02559		0.05309		0.05312		198.4893
+ 0.01000	38.1419		3.7731		0.02374		-1961.760145899		0.381			-1961.378726936		37.2995		0.02428		0.03993		0.03996		121.9396
+ 0.02000	30.2513		3.5440		0.02343		-1961.648760981		0.605			-1961.043735973		29.5875		0.02396		0.03751		0.03753		122.4655
 ____________________________________________________________________________
 Recommended halting lambda* = 0.01000 (A^2=121.9396) -- WARNING: binned <z^2> trend test flagged at this lambda; residuals may be spatially correlated, inspect before trusting lambda*.
   candidate fit: degree=2 -- not enough points yet (need >= degree+3 evaluated lambda steps)
   candidate fit: degree=4 -- not enough points yet (need >= degree+3 evaluated lambda steps)
+XCW final model: lambda 0.02000 R1 0.02343 wR2 0.03751 R1(all) 0.02396 wR2(all) 0.03753 GooF 3.5440 weight sigma
 Finished XCW fitting procedure.

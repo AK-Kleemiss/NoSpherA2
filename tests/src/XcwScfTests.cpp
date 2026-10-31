@@ -200,7 +200,7 @@ namespace {
 	//One line of the lambda table XCW_wrapper::run prints per converged step:
 	//lambda(5) criterion(4) GooF2(4) R1(5) energy(9) lambda*criterion(3) quant(9), tab separated.
 	//An SCF.log iteration row has the same seven columns behind a leading tab, with the
-	//iteration count in the first.
+	//iteration count in the first and wR2 after R1.
 	struct lambda_row {
 		std::string lambda, criterion, goof2, r1, energy, penalty, quant;
 		double d(const std::string& s) const { return std::stod(s); }
@@ -221,7 +221,9 @@ namespace {
 			if (fields.size() < 7 || !std::isdigit(static_cast<unsigned char>(fields[0][0])) || (fields[0].find('.') == std::string::npos) == !iterations) {
 				continue;
 			}
-			rows.push_back({ fields[0], fields[1], fields[2], fields[3], fields[4], fields[5], fields[6] });
+			//an iteration row carries wR2 between R1 and the energy
+			const size_t e = iterations && fields.size() >= 8 ? 5 : 4;
+			rows.push_back({ fields[0], fields[1], fields[2], fields[3], fields[e], fields[e + 1], fields[e + 2] });
 		}
 		return rows;
 	}
@@ -691,15 +693,16 @@ TEST(XcwScfTests, ISigmaCutoffShrinksFitSetAndReportsAllReflections)
 	EXPECT_GT(n_fit, 0);
 	EXPECT_LT(n_fit, nr) << run.out;
 
-	//the nine columns of the converged row: fit-set criterion and R1(gt) differ from Crit(all) and R1(all)
+	//the eleven columns of the converged row: fit-set criterion, R1(gt) and wR2 differ from Crit(all), R1(all) and wR2(all)
 	const size_t row = run.out.find("\n 0.00000\t");
 	ASSERT_NE(row, std::string::npos) << run.out;
 	std::vector<std::string> fields;
 	std::istringstream cols(run.out.substr(row + 1, run.out.find('\n', row + 1) - row - 1));
 	for (std::string f; cols >> f;) fields.push_back(f);
-	ASSERT_EQ(fields.size(), 9u) << run.out;
+	ASSERT_EQ(fields.size(), 11u) << run.out;
 	EXPECT_NE(fields[7], fields[1]);
 	EXPECT_NE(fields[8], fields[3]);
+	EXPECT_NE(fields[10], fields[9]);
 	std::filesystem::remove_all(dir);
 }
 

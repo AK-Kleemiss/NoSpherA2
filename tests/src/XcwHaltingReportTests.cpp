@@ -240,14 +240,14 @@ TEST(XcwHaltingReportTests, HaltingReportsAcrossTheExtendedLambdaScan)
 	EXPECT_EQ(count_of(log, "candidate fit: degree=2 RSS="), 3);
 
 	//the cout table carries the A^2 column, equal to the summary row's A^2
-	EXPECT_NE(out.find("Target quantity\t\tCrit(all)\tR1(all)\t\tA^2 (halt)"), std::string::npos) << out;
+	EXPECT_NE(out.find("Target quantity\t\tCrit(all)\tR1(all)\t\twR2\t\twR2(all)\t\tA^2 (halt)"), std::string::npos) << out;
 	const std::vector<std::string> row0 = table_row(out, "0.00000");
-	ASSERT_EQ(row0.size(), 10u) << out;
+	ASSERT_EQ(row0.size(), 12u) << out;
 	const size_t srow = log.find("\n\t0.00000\t");
 	ASSERT_NE(srow, std::string::npos);
 	const size_t a2_start = srow + std::string("\n\t0.00000\t").size();
 	const std::string summary_a2 = log.substr(a2_start, log.find('\t', a2_start) - a2_start);
-	EXPECT_EQ(row0[9], summary_a2);
+	EXPECT_EQ(row0[11], summary_a2);
 
 	if (!::testing::Test::HasFailure()) {
 		std::filesystem::remove_all(dir);
@@ -282,8 +282,8 @@ TEST(XcwHaltingReportTests, TooFewStrongReflectionsSkipTheHalting)
 	EXPECT_EQ(log.find("Recommended halting lambda*"), std::string::npos);
 	EXPECT_EQ(out.find("Recommended halting lambda*"), std::string::npos);
 	const std::vector<std::string> row = table_row(out, "0.00000");
-	ASSERT_EQ(row.size(), 10u) << out;
-	EXPECT_EQ(row[9], "0.0000");
+	ASSERT_EQ(row.size(), 12u) << out;
+	EXPECT_EQ(row[11], "0.0000");
 
 	//no_date off prints the grid setup's timing
 	EXPECT_NE(out.find("Time taken for AO values computation: "), std::string::npos) << out;

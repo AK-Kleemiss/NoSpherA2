@@ -675,32 +675,144 @@ void structure_factors::ensure_cryst_weights() {
 	if (!sig_I_.empty()) return;
 	sig_F_ = scatter_data.sigma_obs;
 	sig_I_ = scatter_data.sigma_obs2;
-	if (opt->xcw_settings.weight == options::SF_settings::weight_scheme::sigma) return;
+	if (opt->xcw_settings.weight == options::SF_settings::weight_scheme::sigma && opt->xcw_settings.robust_c <= 0) return;
 	solve_scale();
 	update_cryst_weights();
+}
+
+double chebyshev_weight(const double t, const vec& A) {
+	double sum = 0.0, T0 = 1.0, T1 = t;
+	for (size_t r = 0; r < A.size(); r++) {
+		sum += A[r] * (r == 0 ? T0 : T1);
+		if (r > 0) { const double T2 = 2.0 * t * T1 - T0; T0 = T1; T1 = T2; }
+	}
+	return sum > 0.0 ? 1.0 / sum : 0.0;
+}
+
+vec fit_chebyshev(const vec& t, const vec& d2, const int n) {
+	Eigen::MatrixXd M(static_cast<Eigen::Index>(t.size()), n);
+	Eigen::VectorXd b(static_cast<Eigen::Index>(t.size()));
+	for (Eigen::Index i = 0; i < M.rows(); i++) {
+		double T0 = 1.0, T1 = t[i];
+		for (int r = 0; r < n; r++) {
+			M(i, r) = r == 0 ? T0 : T1;
+			if (r > 0) { const double T2 = 2.0 * t[i] * T1 - T0; T0 = T1; T1 = T2; }
+		}
+		b(i) = d2[i];
+	}
+	const Eigen::VectorXd A = M.colPivHouseholderQr().solve(b);
+	return vec(A.data(), A.data() + A.size());
+}
+
+vec tukey_biweight(const vec& z, const ivec& in_scale, const double c) {
+	vec a, f(z.size(), 1.0);
+	for (size_t i = 0; i < z.size(); i++)
+		if (in_scale[i] && std::isfinite(z[i])) a.push_back(std::abs(z[i]));
+	if (a.empty()) return f;
+	const size_t h = a.size() / 2;
+	std::nth_element(a.begin(), a.begin() + h, a.end());
+	const double med = a.size() % 2 ? a[h] : 0.5 * (a[h] + *std::max_element(a.begin(), a.begin() + h));
+	const double cs = c * med / 0.6745;
+	if (!(cs > 0.0)) return f;
+	for (size_t i = 0; i < z.size(); i++) {
+		if (!std::isfinite(z[i])) continue;
+		const double u = z[i] / cs, v = 1.0 - u * u;
+		f[i] = std::abs(u) < 1.0 ? v * v : 0.0;
+	}
+	return f;
+}
+
+//Delta of the refined metric, as the criterion has it: k sqrt(y)|Fc| - Fo, or k^2 y|Fc|^2 - |Fo^2|
+double structure_factors::fit_residual(const int r) const {
+	const double c = scatter_data.scale * ext_sqrt_y(r) * std::abs(scatter_data.F_calc[r]);
+	return quality_criteria.refine_against == 2 ? c * c - scatter_data.F_obs2[r] : c - scatter_data.F_obs[r];
+}
+
+//Chebyshev's variable from Fc whatever is refined: t = 2 Fc/max(Fc) - 1, Fc = sqrt(y)|F_calc| over all reflections
+vec structure_factors::chebyshev_t() const {
+	vec t(model_data.nr);
+	double mx = 0.0;
+	for (int r = 0; r < model_data.nr; r++) mx = std::max(mx, t[r] = ext_sqrt_y(r) * std::abs(scatter_data.F_calc[r]));
+	for (double& x : t) x = mx > 0.0 ? 2.0 * x / mx - 1.0 : -1.0;
+	return t;
+}
+
+std::string structure_factors::weight_report() const {
+	using ws = options::SF_settings::weight_scheme;
+	static const char* names[] = { "sigma", "shelx", "shelx_opt", "unit", "stl", "chebyshev", "chebyshev_opt" };
+	const auto& xs = opt->xcw_settings;
+	std::ostringstream s;
+	s << std::setprecision(6);
+	if (xs.robust_c > 0) s << "robust(c " << xs.robust_c << ") ";
+	s << names[static_cast<int>(xs.weight)];
+	const bool cheb = xs.weight == ws::chebyshev || xs.weight == ws::chebyshev_opt;
+	const vec& p = weight_ab_.empty() ? xs.weight_params : weight_ab_;
+	if (!p.empty())
+		s << (xs.weight == ws::shelx || xs.weight == ws::shelx_opt ? " WGHT" : xs.weight == ws::stl ? " a" : (cheb && weight_ab_.empty() && xs.weight == ws::chebyshev_opt) ? " n" : " A");
+	for (const double v : p) s << " " << v;
+	return s.str();
 }
 
 //The default keeps the read sigmas. SHELX: w on Fo^2 from cctbx's formula with Fc^2 = y|Fc|^2 and K = scale^2,
 //both scales put Fo^2 ~ scale^2 y |Fc|^2. Against F the same w is propagated as the reader propagates sigma,
 //sigma(F) = sigma(Fo^2)/(2|Fo|), i.e. w_F = 4 Fo^2 w: first-order error propagation, SHELXL's for L.S. on F
 //and cctbx's f_sq_as_f away from Fo ~ 0 (there sigma(F) is infinite and the reflection weighs nothing, as now)
+//unit, stl and Chebyshev: w in the refined metric (on F against F, on Fo^2 against F^2), the other sigma propagated
+//the same way, sigma(Fo^2) = 2|Fo| sigma(F); w = 0 is sigma = inf, so the reflection drops out of every sum.
+//robust: Tukey's biweight on z = Delta sqrt(w) of the refined metric, its scale over the fit set, w' = f w
 void structure_factors::update_cryst_weights() {
 	using ws = options::SF_settings::weight_scheme;
 	const ws scheme = opt->xcw_settings.weight;
-	if (scheme == ws::sigma) {
-		sig_F_ = scatter_data.sigma_obs;
-		sig_I_ = scatter_data.sigma_obs2;
+	const int nr = model_data.nr;
+	const bool F2 = quality_criteria.refine_against == 2;
+	const double inf = std::numeric_limits<double>::infinity();
+	if (scheme == ws::chebyshev_opt && weight_ab_.empty()) {
+		optimise_cryst_weights();
 		return;
 	}
 	if (weight_ab_.empty()) weight_ab_ = opt->xcw_settings.weight_params;
-	const int nr = model_data.nr;
-	const double K = scatter_data.scale * scatter_data.scale, a = weight_ab_[0], b = weight_ab_[1];
-	sig_F_.resize(nr);
-	sig_I_.resize(nr);
+	if (scheme == ws::sigma) {
+		sig_F_ = scatter_data.sigma_obs;
+		sig_I_ = scatter_data.sigma_obs2;
+	}
+	else if (scheme == ws::shelx || scheme == ws::shelx_opt) {
+		const double K = scatter_data.scale * scatter_data.scale, a = weight_ab_[0], b = weight_ab_[1];
+		sig_F_.resize(nr);
+		sig_I_.resize(nr);
+		for (int r = 0; r < nr; r++) {
+			const double fo2 = scatter_data.F_obs[r] < 0 ? -scatter_data.F_obs2[r] : scatter_data.F_obs2[r];
+			sig_I_[r] = 1.0 / std::sqrt(shelx_weight(fo2, scatter_data.sigma_obs2[r], ext_y(r) * std::norm(scatter_data.F_calc[r]), K, a, b));
+			sig_F_[r] = sig_I_[r] * 0.5 / scatter_data.abs_F_obs[r];
+		}
+	}
+	else {
+		const vec t = scheme == ws::chebyshev || scheme == ws::chebyshev_opt ? chebyshev_t() : vec();
+		if (scheme == ws::stl) ensure_hkl_ordered();
+		sig_F_.resize(nr);
+		sig_I_.resize(nr);
+		for (int r = 0; r < nr; r++) {
+			const double w = scheme == ws::unit ? 1.0 : scheme == ws::stl ? std::pow(unit_cell.get_stl_of_hkl(hkl_ordered_[r]), weight_ab_[0]) : chebyshev_weight(t[r], weight_ab_);
+			const double s = w > 0.0 ? 1.0 / std::sqrt(w) : inf;
+			if (F2) {
+				sig_I_[r] = s;
+				sig_F_[r] = s * 0.5 / scatter_data.abs_F_obs[r];
+			}
+			else {
+				const double si = 2.0 * scatter_data.abs_F_obs[r] * s;
+				sig_F_[r] = s;
+				sig_I_[r] = si > 0.0 ? si : inf;
+			}
+		}
+	}
+	if (opt->xcw_settings.robust_c <= 0) return;
+	vec z(nr);
+	for (int r = 0; r < nr; r++) z[r] = fit_residual(r) / (F2 ? sig_I_[r] : sig_F_[r]);
+	const vec f = tukey_biweight(z, scatter_data.hkl_mask, opt->xcw_settings.robust_c);
 	for (int r = 0; r < nr; r++) {
-		const double fo2 = scatter_data.F_obs[r] < 0 ? -scatter_data.F_obs2[r] : scatter_data.F_obs2[r];
-		sig_I_[r] = 1.0 / std::sqrt(shelx_weight(fo2, scatter_data.sigma_obs2[r], ext_y(r) * std::norm(scatter_data.F_calc[r]), K, a, b));
-		sig_F_[r] = sig_I_[r] * 0.5 / scatter_data.abs_F_obs[r];
+		if (f[r] == 1.0) continue;
+		const double k = f[r] > 0.0 ? 1.0 / std::sqrt(f[r]) : inf;
+		sig_F_[r] *= k;
+		sig_I_[r] *= k;
 	}
 }
 
@@ -857,6 +969,19 @@ vec optimise_shelx_weights(const vec& fo_sq, const vec& sigma, const vec& fc_sq,
 }
 
 void structure_factors::optimise_cryst_weights() {
+	if (opt->xcw_settings.weight == options::SF_settings::weight_scheme::chebyshev_opt) {
+		const vec t = chebyshev_t();
+		vec tf, d2;
+		for (int r = 0; r < model_data.nr; r++) {
+			if (!scatter_data.hkl_mask[r]) continue;
+			const double d = fit_residual(r);
+			tf.push_back(t[r]);
+			d2.push_back(d * d);
+		}
+		weight_ab_ = fit_chebyshev(tf, d2, static_cast<int>(opt->xcw_settings.weight_params[0]));
+		update_cryst_weights();
+		return;
+	}
 	std::vector<double> fo, sig, fc;
 	for (int r = 0; r < model_data.nr; r++) {
 		if (!scatter_data.hkl_mask[r]) continue;

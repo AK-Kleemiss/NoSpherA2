@@ -17,9 +17,8 @@ XCW_wrapper::XCW_wrapper(options& opt_in) : opt(&opt_in), sf(opt_in) {
 	writer.log << "XCW orbital basis set: " << sf.orbital_basis->get_name() << std::endl;
 	writer.log << sf.model_summary << std::endl;
 	const auto& xs = opt_in.xcw_settings;
-	if (xs.weight != options::SF_settings::weight_scheme::sigma)
-		writer.log << "Weighting: " << (xs.weight == options::SF_settings::weight_scheme::shelx ? "shelx" : "shelx_opt") << " a "
-		<< xs.weight_params[0] << " b " << xs.weight_params[1] << " on top of the " << (xs.XWR_type == 2 ? "1/|H|^2-weighted" : "classical") << " criterion" << std::endl;
+	if (xs.weight != options::SF_settings::weight_scheme::sigma || xs.robust_c > 0)
+		writer.log << "Weighting: " << sf.weight_report() << " on top of the " << (xs.XWR_type == 2 ? "1/|H|^2-weighted" : "classical") << " criterion" << std::endl;
 }
 
 //z_h = (|F_obs,h| - |F_calc,h|) / sigma_h for the converged F_calc/F_scale over
@@ -301,7 +300,7 @@ occ::Mat XCW_wrapper::perturbation_matrix_response(const dMatrix2& dD_eff, const
 }
 
 fit_quality XCW_wrapper::cryst_crit() const {
-	return { sf.criterion(false), sf.quality_criteria.GooF2, sf.quality_criteria.R1, sf.criterion(true), sf.quality_criteria.R1_all };
+	return { sf.criterion(false), sf.quality_criteria.GooF2, sf.quality_criteria.R1, sf.criterion(true), sf.quality_criteria.R1_all, sf.quality_criteria.wR2, sf.quality_criteria.wR2_all };
 }
 
 void XCW_wrapper::save_F_calc() {
@@ -555,9 +554,12 @@ void XCW_wrapper::report_lambda(const double lambda, const occ::qm::Wavefunction
 	writer.v.R1 = fit.R1;
 	writer.v.criterion_all = fit.criterion_all;
 	writer.v.R1_all = fit.R1_all;
+	writer.v.wR2 = fit.wR2;
+	writer.v.wR2_all = fit.wR2_all;
 	writer.v.has_A2 = opt->xcw_settings.xcw_gaussian_halt && !gaussian_halt_history_.empty();
 	if (writer.v.has_A2) writer.v.A2 = gaussian_halt_history_.back().A2;
 	writer.lambda_line();
+	last_row_ = writer.v;
 	if (write_result) {
 		const _time_point tscb_t0 = get_time();
 		write_step_results(wfn, lambda);
@@ -707,7 +709,10 @@ bool XCW_wrapper::run_lambda(occ::qm::HartreeFock& hf, const double lambda, occ:
 	const ws scheme = opt->xcw_settings.weight;
 	//SHELX weights held fixed for the whole step (as SHELXL within a cycle), P from the Fc it starts from; the
 	//first step fills them at its first evaluation (ensure_cryst_weights)
-	if (scheme != ws::sigma && !sf.sig_I_.empty()) sf.update_cryst_weights();
+	if ((scheme != ws::sigma || opt->xcw_settings.robust_c > 0) && !sf.sig_I_.empty()) {
+		sf.update_cryst_weights();
+		writer.log << "XCW weight: " << sf.weight_report() << std::endl;
+	}
 	scf_solver.lambda = lambda;
 	weight_count_ = 0;
 	weight_hold_ = weight_moved_ = false;
@@ -718,13 +723,12 @@ bool XCW_wrapper::run_lambda(occ::qm::HartreeFock& hf, const double lambda, occ:
 	for (int round = 0; converged && weight_every_ < 0 && sf.XG.ws && lambda != 0.0 && round < 20 && refit_moves(wfn, lambda); round++)
 		converged = (weight_hold_ = true) && scf_solver.run(hf, wfn, true);
 	if (converged) report_lambda(lambda, wfn, write_result);
-	//new_shelx: a, b refit to this step's converged Fc, used from the next step on
-	if (converged && scheme == ws::shelx_opt) {
+	//new_shelx / chebyshev_opt: a, b or A_r refit to this step's converged Fc, used from the next step on
+	if (converged && (scheme == ws::shelx_opt || scheme == ws::chebyshev_opt)) {
 		sf.optimise_cryst_weights();
-		std::ostringstream s;
-		s << "XCW WGHT " << std::fixed << std::setprecision(6) << sf.weight_ab_[0] << " " << sf.weight_ab_[1];
-		writer.log << s.str() << std::endl;
-		std::cout << s.str() << std::endl;
+		const std::string s = "XCW weight refit: " + sf.weight_report();
+		writer.log << s << std::endl;
+		std::cout << s << std::endl;
 	}
 	return converged;
 }
@@ -797,20 +801,23 @@ void XCW_wrapper::run() {
 		sf.XG.refresh = false;
 		//the SCF calls eval_scale every iteration, so scale and extinction have settled by convergence
 		for (int i = 0; i < 10; i++) sf.eval_scale();
-		//shelx_opt: refit a, b and the scale and extinction under them until a, b hold to 1e-4
-		for (int i = 0; i < 50 && opt->xcw_settings.weight == options::SF_settings::weight_scheme::shelx_opt; i++) {
+		//shelx_opt / chebyshev_opt: refit the parameters and the scale and extinction under them until they hold to 1e-4
+		const auto ws = opt->xcw_settings.weight;
+		for (int i = 0; i < 50 && (ws == options::SF_settings::weight_scheme::shelx_opt || ws == options::SF_settings::weight_scheme::chebyshev_opt); i++) {
 			const vec ab = sf.weight_ab_;
 			sf.optimise_cryst_weights();
 			for (int j = 0; j < 10; j++) sf.eval_scale();
-			std::cout << "XCW WGHT " << std::fixed << std::setprecision(6) << sf.weight_ab_[0] << " " << sf.weight_ab_[1] << std::endl;
-			if (ab.size() == 2 && std::abs(ab[0] - sf.weight_ab_[0]) < 1e-4 && std::abs(ab[1] - sf.weight_ab_[1]) < 1e-4) break;
+			std::cout << "XCW weight refit: " << sf.weight_report() << std::endl;
+			bool held = ab.size() == sf.weight_ab_.size();
+			for (size_t k = 0; held && k < ab.size(); k++) held = std::abs(ab[k] - sf.weight_ab_[k]) < 1e-4;
+			if (held) break;
 		}
 		sf.calc_criteria();
 		std::ostringstream s;
 		s << "XCW RCHECK " << rc << ": R1 " << sf.quality_criteria.R1 << " R1(all) " << sf.quality_criteria.R1_all
 			<< " wR2 " << sf.quality_criteria.wR2 << " wR2(all) " << sf.quality_criteria.wR2_all
 			<< " GooF " << sf.quality_criteria.GooF2 << " scale " << sf.scatter_data.scale << " " << sf.extinction_report();
-		if (!sf.weight_ab_.empty()) s << " WGHT " << sf.weight_ab_[0] << " " << sf.weight_ab_[1];
+		s << " weight " << sf.weight_report();
 		std::cout << s.str() << std::endl;
 		writer.log << s.str() << std::endl;
 		sf.write_F_calc("rcheck_Fcalc.txt");
@@ -881,10 +888,13 @@ void XCW_wrapper::run() {
 	sf.XG.on_device = false;
 #endif
 	scf_solver.release_device();
-	if (!sf.weight_ab_.empty()) {
+	//the model summary of the last converged step; the (all) values only where the fit set leaves reflections out
+	{
+		const XCW_log_writer::values& v = last_row_;
 		std::ostringstream s;
-		s << "XCW final weighting: WGHT " << std::fixed << std::setprecision(6) << sf.weight_ab_[0] << " " << sf.weight_ab_[1]
-			<< (opt->xcw_settings.weight == options::SF_settings::weight_scheme::shelx_opt ? " (shelx_opt)" : " (shelx)");
+		s << "XCW final model: lambda " << std::fixed << std::setprecision(5) << v.lambda << " R1 " << v.R1 << " wR2 " << v.wR2;
+		if (v.R1_all != v.R1 || v.wR2_all != v.wR2) s << " R1(all) " << v.R1_all << " wR2(all) " << v.wR2_all;
+		s << " GooF " << std::setprecision(4) << v.GooF2 << " weight " << sf.weight_report();
 		writer.log << s.str() << std::endl;
 		std::cout << s.str() << std::endl;
 	}
