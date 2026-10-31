@@ -26,6 +26,19 @@ set_tests_properties(
         RESOURCE_LOCK integration_sucrose_IAM_SF
 )
 
+# Tests using tests/ccsd_water
+set_tests_properties(
+    TomlIntegrationTests.CcsdOccWater
+    TomlIntegrationTests.CcsdOrcaNat
+    TomlIntegrationTests.CcsdTOccWater
+    TomlIntegrationTests.CcsdTOrcaAutoci
+    TomlIntegrationTests.Mp2OccWater
+    TomlIntegrationTests.Mp2OrcaNat
+    TomlIntegrationTests.Mp4OccWater
+    PROPERTIES
+        RESOURCE_LOCK integration_ccsd_water
+)
+
 # Tests using tests/TFVC
 set_tests_properties(
     TomlIntegrationTests.TFVC
@@ -46,19 +59,39 @@ set_tests_properties(
         RESOURCE_LOCK integration_RGBI_groups
 )
 
-# Tests using tests/SALTED
+# Tests using tests/ELI_heavy
 set_tests_properties(
     TomlIntegrationTests.ELI_HgH2_ECP
     TomlIntegrationTests.ELI_UH6
     PROPERTIES
         RESOURCE_LOCK integration_ELI_heavy
 )
+# Tests using tests/rubredoxin_cmtc: both write NoSpherA2.log there
+set_tests_properties(
+    TomlIntegrationTests.RubredoxinCmtc
+    TomlIntegrationTests.RubredoxinCmtcTshb
+    PROPERTIES
+        RESOURCE_LOCK integration_rubredoxin_cmtc
+)
+
+# Tests using tests/Hybrid: both write NoSpherA2.log there
+set_tests_properties(
+    TomlIntegrationTests.HybridMode
+    TomlIntegrationTests.SaltedDisorderTshb
+    TomlIntegrationTests.HybridOrbitallessTshb
+    PROPERTIES
+        RESOURCE_LOCK integration_hybrid
+)
+
+# Tests using tests/SALTED
 set_tests_properties(
     TomlIntegrationTests.SALTED
-    TomlIntegrationTests.SALTEDChargeConstraint
+    TomlIntegrationTests.SaltedFillTshb
     TomlIntegrationTests.SALTED_write_coefs
     TomlIntegrationTests.SALTED_coef_file
     SALTEDTests.ReadingSALTEDBinaryFile
+    SaltedFchkPredictorTests.PredictWaterMonomer
+    SaltedFchkPredictorTests.FoldedModelPredictsTheSame
     BesselTests.AnalyticFourier
     PROPERTIES
         RESOURCE_LOCK integration_SALTED
@@ -75,24 +108,34 @@ set_tests_properties(
     TomlIntegrationTests.P1_test_XCW_h2_full
     TomlIntegrationTests.P1_F2_test_XCW
     TomlIntegrationTests.P1_F2_test_XCW_h2
-    TomlIntegrationTests.P1_test_XCW_full
-    TomlIntegrationTests.P1_test_XCW_h2_full
     TomlIntegrationTests.P1_F2_test_XCW_full
     TomlIntegrationTests.P1_F2_test_XCW_h2_full
-    TomlIntegrationTests.P1_test_XCW_gpu_itensor
     TomlIntegrationTests.P1_test_XCW_incremental
-    TomlIntegrationTests.P1_test_XCW_h2_incremental
-    TomlIntegrationTests.P1_F2_test_XCW_incremental
+    TomlIntegrationTests.P1_test_XCW_twin
+    TomlIntegrationTests.P1_test_XCW_gpu
     PROPERTIES
         RESOURCE_LOCK integration_P1_test
 )
+# P1_test_XCW saves the P1 molecule's stored two-electron integrals as tests/P1_test/p1_eri.bin; the other subset
+# goldens read them
+set_tests_properties(TomlIntegrationTests.P1_test_XCW PROPERTIES FIXTURES_SETUP xcw_p1_golden_eri)
+set_tests_properties(
+    TomlIntegrationTests.P1_test_XCW_h2
+    TomlIntegrationTests.P1_F2_test_XCW
+    TomlIntegrationTests.P1_F2_test_XCW_h2
+    TomlIntegrationTests.P1_test_XCW_incremental
+    TomlIntegrationTests.P1_test_XCW_twin
+    TomlIntegrationTests.P1_test_XCW_gpu
+    PROPERTIES
+        FIXTURES_REQUIRED xcw_p1_golden_eri
+)
 
 # Tests using tests/epoxide_gbw: all of them write NoSpherA2.log there, the SF_* ones
-# the same experimental.tsc, the cube_* ones the same epoxide_rho.cube
+# the same experimental.tsc, the cube_* ones the same epoxide_rho.cube; the label converter
+# tests read the fixture.tsc that tscb_to_tsc rewrites
 set_tests_properties(
     TomlIntegrationTests.RiFit
     TomlIntegrationTests.RiFitMultipoles
-    TomlIntegrationTests.ri_fit_multipoles_centre
     TomlIntegrationTests.cube_rho
     TomlIntegrationTests.cube_esp
     TomlIntegrationTests.cube_elf
@@ -108,6 +151,45 @@ set_tests_properties(
     TomlIntegrationTests.SF_becke
     TomlIntegrationTests.SF_mbis
     TomlIntegrationTests.SF_embis
+    TscLabelConverterTests.FixtureIdsMapOntoEpoxideLabels
+    TscLabelConverterTests.ErrorsAreReportedNotThrown
     PROPERTIES
         RESOURCE_LOCK integration_epoxide_gbw
+)
+
+# Tests that call run_app in the ctest working directory tests/src: all of them write
+# tests/src/NoSpherA2.log
+set_tests_properties(
+    GeometryAidTests.RunAppWritesDescriptorNpyTheWayOlex2CallsIt
+    GeometryAidTests.ClassifierWritesOneProbabilityRowPerAtomThroughBothFlags
+    CrystalEnergyTests.RunAppWritesThePairTableWithInvertedCoefficients
+    PROPERTIES
+        RESOURCE_LOCK tests_src_cwd
+)
+
+# XcwScfTests.SharedEriBuild writes the P1 molecule's stored two-electron integrals into NOS_TEST_SHARED_DIR;
+# these runs test the SCF, not the integrals, and read them instead of each building the same
+set_tests_properties(
+    XcwScfTests.SharedEriBuild
+    PROPERTIES
+        FIXTURES_SETUP xcw_p1_eri
+)
+set_tests_properties(
+    XcwScfTests.LambdaZeroIsTheHartreeFockEnergy
+    XcwScfTests.LambdaPointZeroOneRaisesTheEnergy
+    XcwScfTests.OrbitalJsonOverridesMatchTheLibraryBasis
+    XcwScfTests.SmallBasisGuessStartsFromConvergedDensity
+    XcwScfTests.UnrestrictedClosedShellAgainstF2MatchesRestricted
+    XcwScfTests.FastConvWeightedRunsWithoutDampingOrShift
+    XcwScfTests.FiveIterationsAreDeterministicAndPhysical
+    XcwScfTests.MaxIterOneStopsScanWithoutTscb
+    XcwScfTests.ISigmaCutoffShrinksFitSetAndReportsAllReflections
+    XcwScfTests.SlowConvDampsFromTheFirstStep
+    XcwScfTests.ScaleIsStationaryForTheCriterion
+    XcwScfTests.SecondOrderStepsReachTheGoldenEnergy
+    XcwScfTests.HessianVectorProductMatchesFiniteDifference
+    XcwHaltingReportTests.HaltingReportsAcrossTheExtendedLambdaScan
+    XcwHaltingReportTests.TooFewStrongReflectionsSkipTheHalting
+    PROPERTIES
+        FIXTURES_REQUIRED xcw_p1_eri
 )

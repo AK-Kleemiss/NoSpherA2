@@ -153,6 +153,7 @@ void GTOint2c(int (*intor)(double*, int*, int*, int*, int, int*, int, double*, l
 	const int njsh = jsh1 - jsh0;
 	const size_t naoi = ao_loc[ish1] - ao_loc[ish0];
 	const size_t naoj = ao_loc[jsh1] - ao_loc[jsh0];
+	hermi = hermi && ish0 == jsh0 && ish1 == jsh1;
 	const int cache_size = GTOmax_cache_size(intor, shls_slice, 2,
 		atm, natm, bas, nbas, env);
 #pragma omp parallel
@@ -167,6 +168,8 @@ void GTOint2c(int (*intor)(double*, int*, int*, int*, int, int*, int, double*, l
 			ish = ij / njsh;
 			jsh = ij % njsh;
 
+			//hermi: the operator is symmetric and the slices identical, so block (jsh, ish) is block (ish, jsh) transposed
+			if (hermi && jsh < ish) continue;
 			ish += ish0;
 			jsh += jsh0;
 			shls[0] = ish;
@@ -175,6 +178,21 @@ void GTOint2c(int (*intor)(double*, int*, int*, int*, int, int*, int, double*, l
 			j0 = ao_loc[jsh] - ao_loc[jsh0];
 			(*intor)(mat + j0 * naoi + i0, dims, shls,
 				atm, natm, bas, nbas, env, opt, cache);
+			if (hermi) {
+				const int di = ao_loc[ish + 1] - ao_loc[ish], dj = ao_loc[jsh + 1] - ao_loc[jsh];
+				if (jsh == ish) {
+					//the transposed element of the same call, as the former fortran-to-C copy stored it
+					for (int jj = 0; jj < dj; jj++)
+						for (int ii = 0; ii < jj; ii++) {
+							const size_t p = (size_t)(i0 + ii) + (size_t)(j0 + jj) * naoi, q = (size_t)(j0 + jj) + (size_t)(i0 + ii) * naoi;
+							const double t = mat[p]; mat[p] = mat[q]; mat[q] = t;
+						}
+				}
+				else
+					for (int jj = 0; jj < dj; jj++)
+						for (int ii = 0; ii < di; ii++)
+							mat[(size_t)(j0 + jj) + (size_t)(i0 + ii) * naoi] = mat[(size_t)(i0 + ii) + (size_t)(j0 + jj) * naoi];
+			}
 		}
 		free(cache);
 	}
@@ -218,7 +236,7 @@ extern "C" {
 	} \
 	void Kernel::drv(double* out, int comp, int* shl_slice, int* aoloc, \
 		libcint::CINTOpt* opt, int* atm, int nat, int* bas, int nbas, double* env) { \
-		driver_func(integral_func, out, comp, 0, shl_slice, aoloc, opt, atm, nat, bas, nbas, env); \
+		driver_func(integral_func, out, comp, 1, shl_slice, aoloc, opt, atm, nat, bas, nbas, env); \
 	} \
 	ivec Kernel::gen_loc(ivec& bas, int nbas) { \
 		return make_loc<coord_type>(bas, nbas); \
@@ -466,7 +484,7 @@ void GTOeval_sph_iter(FPtr_eval feval, FPtr_exp fexp, double fac,
 		if (non0table[bas_id] &&
 			(*fexp)(eprim, pcoord, p_exp, pcoeff, l, np, nc, bgrids, fac1)) {
 			dcart = (l + 1) * (l + 2) / 2;
-			di = nc * dcart;
+			di = (size_t)nc * dcart;
 			ri = env + atm[PTR_COORD + atm_id * ATM_SLOTS];
 			if (l <= 1) { // s, p functions
 				(*feval)(ao + ao_id * ngrids, ri, eprim, pcoord, p_exp, pcoeff,

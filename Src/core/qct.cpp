@@ -549,7 +549,7 @@ void bonding_menu(options& opt, std::vector<WFN>& wavy, int active) {
 	}
 	case 5:
 		if (wavy[active].get_nmo() == 0) return notice("Roby-Gould bond indices need molecular orbitals.");
-		{ Roby_information roby(wavy[active], opt.rgbi_group_sets, !opt.rgbi_no_sym, opt.rgbi_orbital_basis == RGBIOrbitalBasis::ANO, opt.rgbi_EVs, opt.rgbi_theta); }
+		{ Roby_information roby(wavy[active], opt.rgbi_group_sets, !opt.rgbi_no_sym, opt.rgbi_orbital_basis == RGBIOrbitalBasis::ANO, opt.rgbi_EVs, opt.rgbi_theta, opt.rgbi_legacy_cutoff); }
 		return;
 	case 6: ELI_analysis(wavy[active], opt); return;
 	case 7: {
@@ -637,7 +637,7 @@ int QCT(options& opt, std::vector<WFN>& wavy)
 		case 'G':
 			if (!need_wfn(wavy)) break;
 			if (wavy[active].get_nmo() == 0) { notice("Roby-Gould bond indices need molecular orbitals."); break; }
-			{ Roby_information roby(wavy[active], opt.rgbi_group_sets, !opt.rgbi_no_sym, opt.rgbi_orbital_basis == RGBIOrbitalBasis::ANO, opt.rgbi_EVs, opt.rgbi_theta); }
+			{ Roby_information roby(wavy[active], opt.rgbi_group_sets, !opt.rgbi_no_sym, opt.rgbi_orbital_basis == RGBIOrbitalBasis::ANO, opt.rgbi_EVs, opt.rgbi_theta, opt.rgbi_legacy_cutoff); }
 			break;
 		case 'N': bonding_menu(opt, wavy, active); break;
 		case 'U':

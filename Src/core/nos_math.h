@@ -150,8 +150,23 @@ void get_submatrix(const T2& full, T& sub, const ivec& val_indices, const ivec& 
 template <typename T, typename T2>
 void get_submatrices(const T2& D_full, const T2& S_full, T& D_sub, T& S_sub, const ivec& indices);
 
+//How the pseudo-inverse decided the rank. The cutoff is a hard threshold, so a singular value near it decides the rank
+//alone and two matrices differing by a rotation can fall on opposite sides, splitting symmetry-equivalent groups. A caller
+//preserving a symmetry needs this report; filling it does not change the inverse.
+struct PinvRank {
+	int n = 0;                     //min(rows, cols), i.e. how many singular values there were
+	int kept = 0;                  //how many were above the cutoff and inverted
+	double largest = 0.0;          //the largest singular value, for a relative view of the cutoff
+	double smallest_kept = 0.0;    //the smallest one that was inverted (0.0 if none was)
+	double largest_dropped = 0.0;  //the largest one that was zeroed (0.0 if none was)
+	//True when a value within a decade of the cutoff on either side, not a gap in the spectrum, fixed the rank
+	bool marginal(const double cutoff) const {
+		return (kept > 0 && smallest_kept < 10.0 * cutoff) || largest_dropped > 0.1 * cutoff;
+	}
+};
+
 //calculates the Moore-Penrose pseudo-inverse of a matrix A using SVD
-dMatrix2 LAPACKE_invert(const dMatrix2& A, const double cutoff = 1E-5);
+dMatrix2 LAPACKE_invert(const dMatrix2& A, const double cutoff = 1E-5, PinvRank* rank_out = nullptr);
 
 // Symmetric eigendecomposition of A (n x n, row-major). On return, W holds the
 // ascending eigenvalues and A holds the eigenvectors as columns, row-major
@@ -161,7 +176,9 @@ dMatrix2 LAPACKE_invert(const dMatrix2& A, const double cutoff = 1E-5);
 bool try_make_Eigenvalues(vec& A, vec& W);
 // Same as try_make_Eigenvalues but aborts via err_checkf on failure.
 void make_Eigenvalues(vec& A, vec& W);
-vec mat_sqrt(vec& A, vec& W, const double cutoff = 1E-5);
+//Zeroing eigenvalues below the cutoff is a rank decision like the pseudo-inverse's (RGBI's pair overlap spectra reach
+//1e-8), so it is reported the same way.
+vec mat_sqrt(vec& A, vec& W, const double cutoff = 1E-5, PinvRank* rank_out = nullptr);
 
 template <typename T>
 void swap_rows_cols_symm(T& mat, const int i, const int j);
@@ -181,6 +198,14 @@ void _test_lahva();
 int solve_linear_system(const vec2& A, vec& b);
 int solve_linear_system(vec& A, const size_t& size_A, vec& b);
 int solve_linear_system(vec& A, const unsigned long long& rows_A, const unsigned long long& cols_A, vec& b);
+//Symmetric n x n A, either storage order. cholesky_factor writes L over one triangle and keeps the other (returns LAPACK
+//info; on > 0, not positive definite, A is unchanged); cholesky_solve overwrites the nrhs systems stored one after another
+//in b; cholesky_unfactor rebuilds A from the kept triangle and the saved diagonal.
+int cholesky_factor(vec& A, const size_t& n);
+void cholesky_solve(const vec& L, const size_t& n, vec& b, const size_t& nrhs = 1);
+void cholesky_unfactor(vec& A, const size_t& n, const vec& diag);
+//Half the flops of LU for a positive definite A, which then holds L; otherwise A is restored and LU solves it.
+int solve_spd_system(vec& A, const size_t& n, vec& b);
 
 //Small implementation of the non-negative least squares problem
 // A small struct to hold results

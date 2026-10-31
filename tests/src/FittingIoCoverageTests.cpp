@@ -8,6 +8,7 @@
 #include "core/cube.h"
 #include "core/npy.h"
 #include "core/nos_math.h"
+#include "core/nao.h"
 #include "core/integrator.h"
 #include "core/integration_params.h"
 #include "core/libCintKernels.h"
@@ -226,16 +227,12 @@ TEST(FittingIoCoverageIntegratorTests, ReorderPRotatesOnlyPShells)
 		EXPECT_DOUBLE_EQ(out[i], expected[i]) << i;
 }
 
-//Defaults map to an unrestrained fit with the CONFIG defaults untouched; a non-negative lmax
-//switches the charge restraints on, lmax > 0 the multipole restraints, and every partition
-//scheme maps to its charge scheme (Becke/RI fall back to Hirshfeld).
+//A non-negative lmax enables multipole restraints, including charge-only lmax=0.
 TEST(FittingIoCoverageIntegratorTests, ConfigFromOptionsMapsEveryScheme)
 {
 	options opt;
 	DensityFitting::CONFIG cfg = DensityFitting::config_from_options(opt);
 	EXPECT_FALSE(cfg.analyze_quality);
-	EXPECT_FALSE(cfg.restrain_charges);
-	EXPECT_FALSE(cfg.restrain_multipoles);
 	EXPECT_FALSE(cfg.use_tikhonov);
 	EXPECT_EQ(cfg.multipole_lmax, -1);
 	EXPECT_EQ(cfg.charge_scheme, DensityFitting::CHARGE_SCHEME::TFVC);
@@ -243,135 +240,44 @@ TEST(FittingIoCoverageIntegratorTests, ConfigFromOptionsMapsEveryScheme)
 	opt.debug = true;
 	opt.multipole_lmax = 0;
 	opt.multipole_strength = 2.5;
-	opt.multipole_partition = false;
-	opt.multipole_scheme = PartitionType::TFVC;
+	opt.multipole_scheme = MultipoleScheme::TFVC;
 	cfg = DensityFitting::config_from_options(opt);
 	EXPECT_TRUE(cfg.analyze_quality);
-	EXPECT_TRUE(cfg.restrain_charges);
-	EXPECT_FALSE(cfg.restrain_multipoles);
-	EXPECT_FALSE(cfg.partition_restraints);
+	EXPECT_FALSE(cfg.grid_higher_moments);
+	EXPECT_FALSE(cfg.constrain_total_electrons);
 	EXPECT_EQ(cfg.multipole_lmax, 0);
 	EXPECT_DOUBLE_EQ(cfg.multipole_strength, 2.5);
 	EXPECT_EQ(cfg.charge_scheme, DensityFitting::CHARGE_SCHEME::TFVC);
 
-	opt.multipole_lmax = 2;
-	opt.multipole_partition = true;
-	opt.multipole_scheme = PartitionType::MBIS;
+	opt.multipole_lmax = 1;
 	cfg = DensityFitting::config_from_options(opt);
-	EXPECT_TRUE(cfg.restrain_multipoles);
-	EXPECT_TRUE(cfg.partition_restraints);
+	EXPECT_FALSE(cfg.grid_higher_moments);
+	EXPECT_FALSE(cfg.constrain_total_electrons);
+
+	opt.multipole_lmax = 2;
+	opt.multipole_scheme = MultipoleScheme::MBIS;
+	cfg = DensityFitting::config_from_options(opt);
+	EXPECT_TRUE(cfg.grid_higher_moments);
+	EXPECT_FALSE(cfg.constrain_total_electrons);
 	EXPECT_EQ(cfg.multipole_lmax, 2);
 	EXPECT_EQ(cfg.charge_scheme, DensityFitting::CHARGE_SCHEME::MBIS);
 
-	opt.multipole_scheme = PartitionType::EMBIS;
+	opt.multipole_scheme = MultipoleScheme::EMBIS;
 	EXPECT_EQ(DensityFitting::config_from_options(opt).charge_scheme, DensityFitting::CHARGE_SCHEME::EMBIS);
-	opt.multipole_scheme = PartitionType::Hirshfeld;
+	opt.multipole_scheme = MultipoleScheme::HIRSHFELD;
 	EXPECT_EQ(DensityFitting::config_from_options(opt).charge_scheme, DensityFitting::CHARGE_SCHEME::HIRSHFELD);
-	opt.multipole_scheme = PartitionType::Becke;
-	EXPECT_EQ(DensityFitting::config_from_options(opt).charge_scheme, DensityFitting::CHARGE_SCHEME::HIRSHFELD);
-	opt.multipole_scheme = PartitionType::RI;
-	EXPECT_EQ(DensityFitting::config_from_options(opt).charge_scheme, DensityFitting::CHARGE_SCHEME::HIRSHFELD);
+	opt.multipole_scheme = MultipoleScheme::NUCLEAR;
+	EXPECT_EQ(DensityFitting::config_from_options(opt).charge_scheme, DensityFitting::CHARGE_SCHEME::NUCLEAR);
+	EXPECT_EQ(DensityFitting::config_from_options(opt).multipole_lmax, 0);
+	EXPECT_FALSE(DensityFitting::config_from_options(opt).grid_higher_moments);
+	EXPECT_FALSE(DensityFitting::config_from_options(opt).constrain_total_electrons);
+	opt.multipole_scheme = MultipoleScheme::MULLIKEN;
+	EXPECT_EQ(DensityFitting::config_from_options(opt).charge_scheme, DensityFitting::CHARGE_SCHEME::MULLIKEN);
+	opt.multipole_scheme = MultipoleScheme::SANDERSON;
+	EXPECT_EQ(DensityFitting::config_from_options(opt).charge_scheme, DensityFitting::CHARGE_SCHEME::SANDERSON_ESTIMATE);
 }
 
-//Non-adaptive: every atom gets the base coefficient. Adaptive with n_aux = 100 and three atoms
-//(H, C, O): base * (1 - 0.1 log10 100) * min(2, 1 + 0.1 sqrt 3) = 0.8 * 1.1732051 = 0.9385641,
-//then times min(2, 1 + 0.02 Z) = 1.02 / 1.12 / 1.16.
-TEST(FittingIoCoverageIntegratorTests, RestraintWeightsPlainAndAdaptive)
-{
-	WFN aux(e_origin::NOT_YET_DEFINED);
-	aux.push_back_atom("H", 0.0, 0.0, 0.0, 1);
-	aux.push_back_atom("C", 1.0, 0.0, 0.0, 6);
-	aux.push_back_atom("O", 2.0, 0.0, 0.0, 8);
-	{
-		StreamCapture out(std::cout);
-		const vec w = DensityFitting::restraint_weights(aux, 100, 0.5, false);
-		ASSERT_EQ(w.size(), 3u);
-		for (double v : w) EXPECT_DOUBLE_EQ(v, 0.5);
-		EXPECT_NE(out.str().find("Setting charge-restraint row scale to: 0.500000"), std::string::npos) << out.str();
-	}
-	{
-		StreamCapture out(std::cout);
-		const vec w = DensityFitting::restraint_weights(aux, 100, 1.0, true);
-		ASSERT_EQ(w.size(), 3u);
-		const double coef = 0.8 * (1.0 + std::sqrt(3.0) * 0.1);
-		EXPECT_NEAR(w[0], coef * 1.02, 1e-12);
-		EXPECT_NEAR(w[1], coef * 1.12, 1e-12);
-		EXPECT_NEAR(w[2], coef * 1.16, 1e-12);
-	}
-}
-
-//Nuclear populations are Z; the Sanderson estimate follows the closed formula from the Allen
-//electronegativities; an out-of-range scheme warns on stderr and falls back to nuclear.
-TEST(FittingIoCoverageIntegratorTests, ExpectedPopulationsNuclearSandersonAndUnknown)
-{
-	const std::filesystem::path p = epoxide_fixture();
-	if (p.empty()) GTEST_SKIP() << "tests/epoxide_gbw/epoxide.gbw not found";
-	WFN wave(p);
-	auto basis = combo_basis();
-	const WFN aux = generate_aux_wfn(wave, basis);
-	ASSERT_EQ(aux.get_ncen(), 7);
-
-	const vec nuclear = DensityFitting::calculate_expected_populations(wave, aux, DensityFitting::CHARGE_SCHEME::NUCLEAR);
-	ASSERT_EQ(nuclear.size(), 7u);
-	for (int a = 0; a < 7; a++)
-		EXPECT_DOUBLE_EQ(nuclear[a], (double)aux.get_atom_charge(a)) << a;
-	EXPECT_NEAR(std::accumulate(nuclear.begin(), nuclear.end(), 0.0), 24.0, 1e-12);
-
-	double chi_compound = 1.0;
-	for (int a = 0; a < 7; a++)
-		chi_compound *= constants::allen_electronegativities[wave.get_atom_charge(a) - 1];
-	chi_compound = std::pow(chi_compound, 1.0 / 7.0);
-	const vec sanderson = DensityFitting::calculate_expected_populations(wave, aux, DensityFitting::CHARGE_SCHEME::SANDERSON_ESTIMATE);
-	ASSERT_EQ(sanderson.size(), 7u);
-	for (int a = 0; a < 7; a++)
-	{
-		const double chi = constants::allen_electronegativities[aux.get_atom_charge(a) - 1];
-		EXPECT_NEAR(sanderson[a], aux.get_atom_charge(a) + (chi_compound - chi) / (1.57 * std::sqrt(chi)), 1e-12) << a;
-	}
-
-	StreamCapture errcap(std::cerr);
-	const vec unknown = DensityFitting::calculate_expected_populations(wave, aux, static_cast<DensityFitting::CHARGE_SCHEME>(99));
-	ASSERT_EQ(unknown.size(), 7u);
-	for (int a = 0; a < 7; a++)
-		EXPECT_DOUBLE_EQ(unknown[a], nuclear[a]) << a;
-	EXPECT_NE(errcap.str().find("Warning: Unknown charge scheme"), std::string::npos) << errcap.str();
-}
-
-//Mulliken populations sum to Tr(D S) = the electron count of the neutral molecule.
-TEST(FittingIoCoverageIntegratorTests, ExpectedPopulationsMullikenSumsToElectronCount)
-{
-	const std::filesystem::path p = epoxide_fixture();
-	if (p.empty()) GTEST_SKIP() << "tests/epoxide_gbw/epoxide.gbw not found";
-	WFN wave(p);
-	auto basis = combo_basis();
-	const WFN aux = generate_aux_wfn(wave, basis);
-	const vec pop = DensityFitting::calculate_expected_populations(wave, aux, DensityFitting::CHARGE_SCHEME::MULLIKEN);
-	ASSERT_EQ(pop.size(), 7u);
-	EXPECT_NEAR(std::accumulate(pop.begin(), pop.end(), 0.0), 24.0, 1e-5);
-	for (int a = 0; a < 7; a++)
-		EXPECT_GT(pop[a], 0.0) << a;
-}
-
-//Hirshfeld populations on the coarse grid: all positive and summing to the electron count.
-TEST(FittingIoCoverageIntegratorTests, ExpectedPopulationsHirshfeldSumsToElectronCount)
-{
-	const std::filesystem::path p = epoxide_fixture();
-	if (p.empty()) GTEST_SKIP() << "tests/epoxide_gbw/epoxide.gbw not found";
-	WFN wave(p);
-	auto basis = combo_basis();
-	const WFN aux = generate_aux_wfn(wave, basis);
-	StreamCapture out(std::cout);
-	const vec pop = DensityFitting::calculate_expected_populations(wave, aux, DensityFitting::CHARGE_SCHEME::HIRSHFELD);
-	ASSERT_EQ(pop.size(), 7u);
-	EXPECT_NEAR(std::accumulate(pop.begin(), pop.end(), 0.0), 24.0, 0.2);
-	for (int a = 0; a < 7; a++)
-	{
-		EXPECT_GT(pop[a], 0.0) << a;
-		EXPECT_LT(pop[a], 10.0) << a;
-	}
-}
-
-//The unrestrained Coulomb fit is the plain solve of (aux|aux) c = (aux|rho); the fitted
+//The unrestrained Coulomb fit, unscreened, is the plain solve of (aux|aux) c = (aux|rho); the fitted
 //density carries the 24 electrons of epoxide and the quality report is printed on request.
 TEST(FittingIoCoverageIntegratorTests, UnrestrainedCoulombFitMatchesDirectSolve)
 {
@@ -387,7 +293,9 @@ TEST(FittingIoCoverageIntegratorTests, UnrestrainedCoulombFitMatchesDirectSolve)
 	DensityFitting::CONFIG cfg;
 	cfg.analyze_quality = true;
 	StreamCapture out(std::cout);
+	set_tuning("NOS_RI_SCREEN", "0");
 	const vec c = DensityFitting::density_fit(wave, aux, cfg);
+	set_tuning("NOS_RI_SCREEN", nullptr);
 	ASSERT_EQ(c.size(), sys.n);
 	double cmax = 0.0;
 	for (double v : c_ref) cmax = std::max(cmax, std::fabs(v));
@@ -434,6 +342,20 @@ TEST(FittingIoCoverageIntegratorTests, OverlapMetricFitMatchesDirectSolve)
 	EXPECT_NE(out.str().find("Metric: Overlap"), std::string::npos);
 }
 
+//A gbw keeps ORCA's sign on the |m| = 3, 4 components of f and g shells, libcint's (ab|P) does not;
+//without the flip in density_fit, water with O in def2-QZVP fits to 9.9981 e instead of 9.9998 (sucrose lost 0.18 e).
+TEST(FittingIoCoverageIntegratorTests, CoulombFitOfOrcaFAndGShellsKeepsTheElectronCount)
+{
+	const std::filesystem::path p = nos_test_repo_root() / "tests" / "eqc_water_fg" / "water.gbw";
+	if (!std::filesystem::exists(p)) GTEST_SKIP() << "tests/eqc_water_fg/water.gbw not found";
+	WFN wave(p);
+	std::vector<std::shared_ptr<BasisSet>> basis{ BasisSetLibrary::get_basis_set("def2-universal-jkfit") };
+	const WFN aux = generate_aux_wfn(wave, basis);
+	StreamCapture out(std::cout);
+	const vec c = DensityFitting::density_fit(wave, aux, DensityFitting::CONFIG());
+	EXPECT_NEAR(fitted_electrons(population_rows(aux), c), 10.0, 1e-3);
+}
+
 //Tikhonov with lambda = 1 solves (H + I) c = g exactly.
 TEST(FittingIoCoverageIntegratorTests, TikhonovShiftsTheDiagonal)
 {
@@ -458,57 +380,9 @@ TEST(FittingIoCoverageIntegratorTests, TikhonovShiftsTheDiagonal)
 	const std::string log = out.str();
 	EXPECT_NE(log.find("Fit controls:"), std::string::npos);
 	EXPECT_NE(log.find("Tikhonov: on (lambda=1"), std::string::npos);
-	EXPECT_NE(log.find("Atomic charge restraints: off"), std::string::npos);
 	EXPECT_NE(log.find("Multipole restraints: off"), std::string::npos);
 	EXPECT_NE(log.find("Exact total-electron constraint: off"), std::string::npos);
 	EXPECT_NE(log.find("Solving density-fitting system..."), std::string::npos);
-}
-
-//Atom-centred nuclear-charge restraints with a fixed row scale w = 0.5 add w^2 r_a r_a^T to the
-//(Tikhonov-shifted) matrix and w^2 Z_a r_a to the right-hand side, one row per atom.
-TEST(FittingIoCoverageIntegratorTests, NuclearChargeRestraintsAddPenaltyRows)
-{
-	const std::filesystem::path p = epoxide_fixture();
-	if (p.empty()) GTEST_SKIP() << "tests/epoxide_gbw/epoxide.gbw not found";
-	WFN wave(p);
-	auto basis = combo_basis();
-	const WFN aux = generate_aux_wfn(wave, basis);
-	const CoulombSystem sys = coulomb_system(wave, aux);
-	const vec2 rows = population_rows(aux);
-	ASSERT_EQ(rows.size(), 7u);
-	ASSERT_EQ(rows[0].size(), sys.n);
-	vec H = sys.H, g = sys.g;
-	for (size_t i = 0; i < sys.n; i++) H[i * sys.n + i] += 1.0;
-	for (int a = 0; a < 7; a++)
-	{
-		const double Z = aux.get_atom_charge(a);
-		for (size_t i = 0; i < sys.n; i++)
-		{
-			g[i] += 0.25 * rows[a][i] * Z;
-			for (size_t j = 0; j < sys.n; j++)
-				H[i * sys.n + j] += 0.25 * rows[a][i] * rows[a][j];
-		}
-	}
-
-	DensityFitting::CONFIG cfg;
-	cfg.use_tikhonov = true;
-	cfg.tikhonov_lambda = 1.0;
-	cfg.restrain_charges = true;
-	cfg.charge_scheme = DensityFitting::CHARGE_SCHEME::NUCLEAR;
-	cfg.adaptive_restraint = false;
-	cfg.restraint_strength = 0.5;
-	cfg.analyze_quality = true;
-	StreamCapture out(std::cout);
-	const vec c = DensityFitting::density_fit(wave, aux, cfg);
-	ASSERT_EQ(c.size(), sys.n);
-	EXPECT_LT(relative_residual(H, c, g), 1e-9);
-	const std::string log = out.str();
-	EXPECT_NE(log.find("Atomic charge restraints: on (Nuclear Charge)"), std::string::npos);
-	EXPECT_NE(log.find("Restraint definition: atom centred"), std::string::npos);
-	EXPECT_NE(log.find("Setting charge-restraint row scale to: 0.500000"), std::string::npos);
-	EXPECT_NE(log.find("Added charge restraints for 7 atoms."), std::string::npos);
-	EXPECT_NE(log.find("=== Density Fitting Quality Analysis ==="), std::string::npos);
-	EXPECT_NE(log.find(", Expected = "), std::string::npos);
 }
 
 //The exact total-electron constraint pins the fitted electron count to 24.
@@ -532,6 +406,92 @@ TEST(FittingIoCoverageIntegratorTests, TotalElectronConstraintIsExact)
 	EXPECT_NE(log.find("Exact total-electron constraint: target = 24.0000000000"), std::string::npos);
 }
 
+//With lmax=0, the atom-centred multipole rows add population penalties and no higher moments.
+TEST(FittingIoCoverageIntegratorTests, AtomCentredMonopolesAddPenaltyRows)
+{
+	const std::filesystem::path p = epoxide_fixture();
+	if (p.empty()) GTEST_SKIP() << "tests/epoxide_gbw/epoxide.gbw not found";
+	WFN wave(p);
+	auto basis = combo_basis();
+	const WFN aux = generate_aux_wfn(wave, basis);
+	const CoulombSystem sys = coulomb_system(wave, aux);
+	const vec2 rows = population_rows(aux);
+	const vec2 targets = DensityFitting::calculate_expected_multipoles(wave, DensityFitting::CHARGE_SCHEME::HIRSHFELD, 0);
+	vec H = sys.H, g = sys.g;
+	for (size_t i = 0; i < sys.n; i++) H[i * sys.n + i] += 1.0;
+	for (int a = 0; a < 7; a++) {
+		const double target = std::sqrt(constants::FOUR_PI) * targets[a][0];
+		for (size_t i = 0; i < sys.n; i++) {
+			g[i] += 0.25 * rows[a][i] * target;
+			for (size_t j = 0; j < sys.n; j++)
+				H[i * sys.n + j] += 0.25 * rows[a][i] * rows[a][j];
+		}
+	}
+	DensityFitting::CONFIG cfg;
+	cfg.use_tikhonov = true;
+	cfg.tikhonov_lambda = 1.0;
+	cfg.multipole_lmax = 0;
+	cfg.multipole_strength = 0.5;
+	cfg.charge_scheme = DensityFitting::CHARGE_SCHEME::HIRSHFELD;
+	StreamCapture out(std::cout);
+	const vec c = DensityFitting::density_fit(wave, aux, cfg);
+	ASSERT_EQ(c.size(), sys.n);
+	EXPECT_LT(relative_residual(H, c, g), 1e-9);
+	EXPECT_NE(out.str().find("Added multipole restraints up to l=0 for 7 atoms."), std::string::npos);
+}
+
+TEST(FittingIoCoverageIntegratorTests, NuclearMullikenSandersonUseMonopoleRows)
+{
+	const std::filesystem::path p = epoxide_fixture();
+	if (p.empty()) GTEST_SKIP() << "tests/epoxide_gbw/epoxide.gbw not found";
+	WFN wave(p);
+	auto basis = combo_basis();
+	const WFN aux = generate_aux_wfn(wave, basis);
+	const CoulombSystem sys = coulomb_system(wave, aux);
+	const vec2 rows = population_rows(aux);
+	vec nuclear(7), sanderson(7), mulliken(7, 0.0);
+	double compound = 1.0;
+	for (int a = 0; a < 7; a++) compound *= constants::allen_electronegativities[wave.get_atom_charge(a) - 1];
+	compound = std::pow(compound, 1.0 / 7.0);
+	for (int a = 0; a < 7; a++) {
+		const double chi = constants::allen_electronegativities[wave.get_atom_charge(a) - 1];
+		nuclear[a] = wave.get_atom_charge(a);
+		sanderson[a] = nuclear[a] + (compound - chi) / (1.57 * std::sqrt(chi));
+	}
+	const dMatrix2 dm = wave.get_dm(), S = ao_overlap(wave);
+	size_t mu_begin = 0;
+	for (int a = 0; a < 7; a++) {
+		const atom A = wave.get_atom(a);
+		int prim = 0;
+		size_t n_ao = 0;
+		for (size_t s = 0; s < A.get_shellcount().size(); s++) {
+			n_ao += 2 * (A.get_basis_set_entry(prim).get_type() - 1) + 1;
+			prim += A.get_shellcount()[s];
+		}
+		for (size_t m = mu_begin; m < mu_begin + n_ao; m++)
+			for (size_t n = 0; n < dm.extent(1); n++) mulliken[a] += dm(m, n) * S(n, m);
+		mu_begin += n_ao;
+	}
+	for (const auto& item : { std::pair{ DensityFitting::CHARGE_SCHEME::NUCLEAR, nuclear }, std::pair{ DensityFitting::CHARGE_SCHEME::MULLIKEN, mulliken }, std::pair{ DensityFitting::CHARGE_SCHEME::SANDERSON_ESTIMATE, sanderson } }) {
+		vec H = sys.H, g = sys.g;
+		for (size_t i = 0; i < sys.n; i++) H[i * sys.n + i] += 1.0;
+		for (int a = 0; a < 7; a++)
+			for (size_t i = 0; i < sys.n; i++) {
+				g[i] += 0.25 * rows[a][i] * item.second[a];
+				for (size_t j = 0; j < sys.n; j++) H[i * sys.n + j] += 0.25 * rows[a][i] * rows[a][j];
+			}
+		DensityFitting::CONFIG cfg;
+		cfg.use_tikhonov = true;
+		cfg.tikhonov_lambda = 1.0;
+		cfg.multipole_lmax = 0;
+		cfg.multipole_strength = 0.5;
+		cfg.charge_scheme = item.first;
+		StreamCapture out(std::cout);
+		const vec c = DensityFitting::density_fit(wave, aux, cfg);
+		EXPECT_LT(relative_residual(H, c, g), 1e-9) << static_cast<int>(item.first);
+	}
+}
+
 //Atom-centred multipole restraints up to l = 1 print the configuration and the multipole report.
 //No Tikhonov term: lambda = 1 on the Coulomb metric damps the diffuse s functions and loses
 //about 0.2 e, so only the restraint-only fit keeps the electron count within 0.1.
@@ -543,7 +503,6 @@ TEST(FittingIoCoverageIntegratorTests, AtomCentredMultipoleRestraintsReport)
 	auto basis = combo_basis();
 	const WFN aux = generate_aux_wfn(wave, basis);
 	DensityFitting::CONFIG cfg;
-	cfg.restrain_multipoles = true;
 	cfg.multipole_lmax = 1;
 	cfg.charge_scheme = DensityFitting::CHARGE_SCHEME::HIRSHFELD;
 	StreamCapture out(std::cout);
@@ -567,9 +526,40 @@ TEST(FittingIoCoverageIntegratorTests, AtomCentredMultipoleRestraintsReport)
 	EXPECT_NEAR(monopoles, fitted_electrons(population_rows(aux), c), 1e-6);
 }
 
-//Grid-partitioned charge restraints (Hirshfeld targets) keep the electron count and are
-//labelled as such in the configuration and the report.
-TEST(FittingIoCoverageIntegratorTests, GridPartitionedChargeRestraints)
+//The restraint rows go into H by threads over its rows; NOSPHERA2_RI_PENALTY_LOOP keeps the old rank-1 update per row.
+//Epoxide (7 atoms) and ZP2 PART 1 (25 atoms), Hirshfeld through l = 2 with grid rows: the coefficients are bit for bit equal
+TEST(FittingIoCoverageIntegratorTests, RestraintRowsByThreadsMatchTheRowByRowUpdate)
+{
+	for (const std::filesystem::path p : { nos_test_repo_root() / "tests" / "epoxide_gbw" / "epoxide.gbw", nos_test_repo_root() / "tests" / "Hybrid" / "ZP2_part1.gbw" })
+	{
+		if (!std::filesystem::exists(p)) GTEST_SKIP() << p << " not found";
+		WFN wave(p);
+		auto basis = combo_basis();
+		const WFN aux = generate_aux_wfn(wave, basis);
+		DensityFitting::CONFIG cfg;
+		cfg.multipole_lmax = 2;
+		cfg.grid_higher_moments = true;
+		cfg.charge_scheme = DensityFitting::CHARGE_SCHEME::HIRSHFELD;
+		StreamCapture out(std::cout);
+		const vec c = DensityFitting::density_fit(wave, aux, cfg);
+		set_tuning("NOSPHERA2_RI_PENALTY_LOOP", "1");
+		const vec ref = DensityFitting::density_fit(wave, aux, cfg);
+		set_tuning("NOSPHERA2_RI_PENALTY_LOOP", nullptr);
+		ASSERT_EQ(c.size(), ref.size());
+		double d = 0.0, m = 0.0;
+		for (size_t i = 0; i < c.size(); i++)
+		{
+			d = std::max(d, std::abs(c[i] - ref[i]));
+			m = std::max(m, std::abs(ref[i]));
+		}
+		EXPECT_EQ(d, 0.0) << p << " max |c| " << m;
+	}
+}
+
+//With a PartitionCache the restrained H is factored once and its factor reused while the aux basis and fit settings stay
+//(XCW's steps); the cached grid, rows and factor give the coefficients of an uncached fit bit for bit, and other settings
+//(another lmax) rebuild the factor instead of reusing it
+TEST(FittingIoCoverageIntegratorTests, PartitionCacheReusesTheRestrainedFactorExactly)
 {
 	const std::filesystem::path p = epoxide_fixture();
 	if (p.empty()) GTEST_SKIP() << "tests/epoxide_gbw/epoxide.gbw not found";
@@ -577,22 +567,78 @@ TEST(FittingIoCoverageIntegratorTests, GridPartitionedChargeRestraints)
 	auto basis = combo_basis();
 	const WFN aux = generate_aux_wfn(wave, basis);
 	DensityFitting::CONFIG cfg;
-	cfg.restrain_charges = true;
-	cfg.partition_restraints = true;
+	cfg.multipole_lmax = 2;
+	cfg.grid_higher_moments = true;
+	cfg.charge_scheme = DensityFitting::CHARGE_SCHEME::HIRSHFELD;
+	StreamCapture out(std::cout);
+	const vec ref = DensityFitting::density_fit(wave, aux, cfg);
+	DensityFitting::PartitionCache cache;
+	cfg.partition_cache = &cache;
+	const vec first = DensityFitting::density_fit(wave, aux, cfg);
+	ASSERT_FALSE(cache.h_factor.empty());
+	const vec second = DensityFitting::density_fit(wave, aux, cfg);
+	EXPECT_EQ(first, ref);
+	EXPECT_EQ(second, ref);
+	DensityFitting::CONFIG l1 = cfg;
+	l1.multipole_lmax = 1;
+	l1.grid_higher_moments = false;
+	DensityFitting::CONFIG l1_plain = l1;
+	l1_plain.partition_cache = nullptr;
+	EXPECT_EQ(DensityFitting::density_fit(wave, aux, l1), DensityFitting::density_fit(wave, aux, l1_plain));
+	EXPECT_EQ(DensityFitting::density_fit(wave, aux, cfg), ref);
+	//the plain fit reuses the cached Coulomb factor and sensitivities, bit for bit
+	DensityFitting::CONFIG plain;
+	const vec plain_ref = DensityFitting::density_fit(wave, aux, plain);
+	plain.partition_cache = &cache;
+	ASSERT_FALSE(cache.j_factor.empty());
+	EXPECT_EQ(DensityFitting::density_fit(wave, aux, plain), plain_ref);
+	EXPECT_EQ(DensityFitting::density_fit(wave, aux, plain), plain_ref);
+}
+
+//partition_rows_on_grid skips a shell beyond aux_density_table::sh_r2 before its exponentials, where the 1e-10 test would
+//skip it anyway; NOSPHERA2_RI_ROWS_NOCUT evaluates every shell. Epoxide and ZP2 PART 1, Hirshfeld through l = 2: equal rows
+TEST(FittingIoCoverageIntegratorTests, PartitionRowsShellCutoffChangesNoRow)
+{
+	for (const std::filesystem::path p : { nos_test_repo_root() / "tests" / "epoxide_gbw" / "epoxide.gbw", nos_test_repo_root() / "tests" / "Hybrid" / "ZP2_part1.gbw" })
+	{
+		if (!std::filesystem::exists(p)) GTEST_SKIP() << p << " not found";
+		WFN wave(p);
+		auto basis = combo_basis();
+		const WFN aux = generate_aux_wfn(wave, basis);
+		const aux_density_table table(aux.get_atoms());
+		StreamCapture out(std::cout);
+		const vec2 rows = DensityFitting::partition_multipole_rows(aux, table, DensityFitting::CHARGE_SCHEME::HIRSHFELD, 2);
+		set_tuning("NOSPHERA2_RI_ROWS_NOCUT", "1");
+		const vec2 ref = DensityFitting::partition_multipole_rows(aux, table, DensityFitting::CHARGE_SCHEME::HIRSHFELD, 2);
+		set_tuning("NOSPHERA2_RI_ROWS_NOCUT", nullptr);
+		EXPECT_EQ(rows, ref) << p;
+	}
+}
+
+TEST(FittingIoCoverageIntegratorTests, LowOrdersStayAtomCentred)
+{
+	const std::filesystem::path p = epoxide_fixture();
+	if (p.empty()) GTEST_SKIP() << "tests/epoxide_gbw/epoxide.gbw not found";
+	WFN wave(p);
+	auto basis = combo_basis();
+	const WFN aux = generate_aux_wfn(wave, basis);
+	DensityFitting::CONFIG cfg;
+	cfg.multipole_lmax = 0;
+	cfg.grid_higher_moments = true;
 	cfg.charge_scheme = DensityFitting::CHARGE_SCHEME::HIRSHFELD;
 	StreamCapture out(std::cout);
 	const vec c = DensityFitting::density_fit(wave, aux, cfg);
 	ASSERT_FALSE(c.empty());
 	EXPECT_NEAR(fitted_electrons(population_rows(aux), c), 24.0, 0.1);
 	const std::string log = out.str();
-	EXPECT_NE(log.find("Atomic charge restraints: on (Hirshfeld)"), std::string::npos);
-	EXPECT_NE(log.find("Restraint definition: grid partitioned"), std::string::npos);
-	EXPECT_NE(log.find("Added charge restraints for 7 atoms."), std::string::npos);
-	EXPECT_EQ(log.find("Atomic multipoles of the fitted density"), std::string::npos);
+	EXPECT_NE(log.find("Multipole restraints: on (lmax=0, Hirshfeld)"), std::string::npos);
+	EXPECT_NE(log.find("Restraint definition: atom centred"), std::string::npos);
+	EXPECT_NE(log.find("Added multipole restraints up to l=0 for 7 atoms."), std::string::npos);
+	EXPECT_NE(log.find("Atomic multipoles of the fitted density"), std::string::npos);
+	EXPECT_EQ(log.find("partitioned on the grid"), std::string::npos);
 }
 
-//The restraint set-up refuses lmax outside 1..8, a non-grid scheme for multipoles or
-//partitioned charges, and a negative Tikhonov parameter.
+//The restraint set-up refuses lmax above 8, a non-grid scheme, and a negative Tikhonov parameter.
 TEST(FittingIoCoverageIntegratorTests, DensityFitRejectsInvalidConfigurations)
 {
 	const std::filesystem::path p = epoxide_fixture();
@@ -602,27 +648,55 @@ TEST(FittingIoCoverageIntegratorTests, DensityFitRejectsInvalidConfigurations)
 	const WFN aux = generate_aux_wfn(wave, basis);
 
 	DensityFitting::CONFIG too_high;
-	too_high.restrain_multipoles = true;
 	too_high.multipole_lmax = 9;
 	too_high.charge_scheme = DensityFitting::CHARGE_SCHEME::HIRSHFELD;
 	EXPECT_EXIT(DensityFitting::density_fit(wave, aux, too_high), ::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), ".*");
 
 	DensityFitting::CONFIG nuclear_multipoles;
-	nuclear_multipoles.restrain_multipoles = true;
 	nuclear_multipoles.multipole_lmax = 1;
-	nuclear_multipoles.charge_scheme = DensityFitting::CHARGE_SCHEME::NUCLEAR;
+	nuclear_multipoles.charge_scheme = static_cast<DensityFitting::CHARGE_SCHEME>(99);
 	EXPECT_EXIT(DensityFitting::density_fit(wave, aux, nuclear_multipoles), ::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), ".*");
-
-	DensityFitting::CONFIG nuclear_partition;
-	nuclear_partition.restrain_charges = true;
-	nuclear_partition.partition_restraints = true;
-	nuclear_partition.charge_scheme = DensityFitting::CHARGE_SCHEME::NUCLEAR;
-	EXPECT_EXIT(DensityFitting::density_fit(wave, aux, nuclear_partition), ::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), ".*");
 
 	DensityFitting::CONFIG negative_lambda;
 	negative_lambda.use_tikhonov = true;
 	negative_lambda.tikhonov_lambda = -1.0;
 	EXPECT_EXIT(DensityFitting::density_fit(wave, aux, negative_lambda), ::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), ".*");
+}
+
+//A .wfx holds primitives and no basis set, so there is nothing to fit (disorder_THPP's .wfx fitted 0 electrons and the
+//table went out anyway). error_check writes to cout; the child points cout at stderr for the matcher
+TEST(FittingIoCoverageIntegratorDeathTest, AWavefunctionWithoutBasisSetStopsTheFit)
+{
+	const std::filesystem::path p = nos_test_repo_root() / "tests" / "eqc_ch3f_wfx" / "parent.wfx";
+	if (!std::filesystem::exists(p)) GTEST_SKIP() << "tests/eqc_ch3f_wfx/parent.wfx not found";
+	WFN wave(p);
+	auto basis = combo_basis();
+	const WFN aux = generate_aux_wfn(wave, basis);
+	EXPECT_EXIT({ std::cout.rdbuf(std::cerr.rdbuf()); DensityFitting::density_fit(wave, aux, DensityFitting::CONFIG()); },
+		::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), "carries none");
+}
+
+//Only s functions carry charge, so an auxiliary basis of p shells fits none of epoxide's 24 electrons, restrained or not
+TEST(FittingIoCoverageIntegratorDeathTest, AFitThatLosesElectronsStops)
+{
+	const std::filesystem::path p = epoxide_fixture();
+	if (p.empty()) GTEST_SKIP() << "tests/epoxide_gbw/epoxide.gbw not found";
+	WFN wave(p);
+	std::shared_ptr<BasisSet> p_only = std::make_shared<BasisSet>();
+	p_only->set_name("p_only");
+	for (const int z : { 1, 6, 8 }) {
+		p_only->set_count_for_element(z - 1, 1);
+		p_only->add_owned_primitive({ 0, 1, 0.8, 1.0, 0 });
+	}
+	std::vector<std::shared_ptr<BasisSet>> basis{ p_only };
+	const WFN aux = generate_aux_wfn(wave, basis);
+	EXPECT_EXIT({ std::cout.rdbuf(std::cerr.rdbuf()); DensityFitting::density_fit(wave, aux, DensityFitting::CONFIG()); },
+		::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), "holds 0.000000 of the 24.000000 electrons");
+	DensityFitting::CONFIG restrained;
+	restrained.multipole_lmax = 1;
+	restrained.charge_scheme = DensityFitting::CHARGE_SCHEME::HIRSHFELD;
+	EXPECT_EXIT({ std::cout.rdbuf(std::cerr.rdbuf()); DensityFitting::density_fit(wave, aux, restrained); },
+		::testing::ExitedWithCode(ERROR_CHECK_EXIT_CODE), "holds 0.000000 of the 24.000000 electrons");
 }
 
 //A zero coefficient vector fits no electrons: every population is 0.000, every charge is Z,
@@ -666,7 +740,7 @@ TEST(FittingIoCoverageIntegratorTests, DemonstrateEnhancedFittingPrintsCompariso
 	const std::string log = out.str();
 	EXPECT_NE(log.find("=== Enhanced Density Fitting Demonstration ==="), std::string::npos);
 	EXPECT_NE(log.find("--- Method 0: Unrestrained (Baseline) ---"), std::string::npos);
-	EXPECT_NE(log.find("--- Method 1: Enhanced Adaptive Restraints ---"), std::string::npos);
+	EXPECT_NE(log.find("--- Method 1: Monopole Restraints ---"), std::string::npos);
 	EXPECT_NE(log.find("--- Method 2: Hybrid Regularization ---"), std::string::npos);
 	EXPECT_NE(log.find("Time for unrestrained fit: "), std::string::npos);
 	EXPECT_NE(log.find("(0) | Unrestrained: RRS = "), std::string::npos);
@@ -700,6 +774,7 @@ TEST(FittingIoCoverageIntegratorTests, QmRiDifferenceCubeWritesThreeCubes)
 			hi = std::max(hi, wave.get_atom_coordinate(a, i));
 		}
 		steps[i] = (int)std::ceil(constants::bohr2ang(hi - lo + 2.0 * constants::ang2bohr(3.0)) / 0.1);
+		steps[i] += steps[i] % 2;   // readxyzMinMax_fromWFN rounds the count up to even so the box centre lands on a grid plane
 	}
 
 	StreamCapture out(std::cout);

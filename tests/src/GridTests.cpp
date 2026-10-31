@@ -128,7 +128,9 @@ TEST(GridAtomGridTests, RadialGridIntegratesGaussian)
 		sum += w[i] * std::exp(-r[i] * r[i]);
 	}
 	EXPECT_NEAR(sum, std::sqrt(constants::PI) / 4.0, 1e-7);
-	EXPECT_EQ(g.get_num_grid_points(), n * 50);
+	//Z <= 18 floors the shells inside R_Bragg/5 at 6 points, not at the 50 asked for; the rest keep 50
+	EXPECT_GT(g.get_num_grid_points(), n * 6);
+	EXPECT_LT(g.get_num_grid_points(), n * 50);
 }
 
 //the full atomic grid of a single centre carries 4 pi in its weights: Int exp(-r^2) = pi^(3/2)
@@ -308,6 +310,19 @@ TEST(GridSphericalTests, ThakkarFormFactorExactlyAtZeroMatchesTheLimit)
 	EXPECT_NEAR(Thakkar().get_form_factor(0.0), 1.0, 1e-6);
 }
 
+//He is the first element whose coefficients follow another's: it used to read H's
+//coefficient as its own first one and integrated to 4.31 e
+TEST(GridSphericalTests, ThakkarLightAtomsCountTheirElectrons)
+{
+	const auto one = [](const double) { return 1.0; };
+	for (int Z = 2; Z <= 10; Z++) {
+		Thakkar t(Z);
+		const auto rho = [&t](const double r) { return t.get_radial_density(r); };
+		EXPECT_NEAR(radial_integral(rho, one, 1e-6, 40.0, 20000), Z, 2e-2) << "Z " << Z;
+		EXPECT_NEAR(t.get_form_factor(0.0), Z, 2e-2) << "Z " << Z;
+	}
+}
+
 //ECP mode 2 (xTB) knows the 36-, 54- and 68-electron cores as well
 TEST(GridSphericalTests, ThakkarCoreFormFactorEcpMode2)
 {
@@ -465,6 +480,25 @@ TEST(GridSphericalTests, CubicSplineHelpersReproduceSmoothFunction)
 	EXPECT_EQ(c.get_radial_dist().size(), c.get_radial_density_table().size());
 	for (double r : { 0.5, 1.0, 2.0 })
 		EXPECT_NEAR(c.get_interpolated_density_spline(r), c.get_radial_density(r), 1e-4 * c.get_radial_density(r));
+}
+
+//the table_log2 estimate in log_spline_index brackets the interval a binary search finds, on the nodes,
+//one ulp either side of them and between them, for both spacings in use (MBIS 1.0025, Thakkar 1.005)
+TEST(GridSphericalTests, LogSplineIndexMatchesBinarySearch)
+{
+	for (const auto &[incr, start] : { std::pair{ 1.0025, 1e-8 }, std::pair{ 1.005, 1e-7 } }) {
+		vec x;
+		for (double r = start; r < 30.0; r *= incr)
+			x.push_back(r);
+		const double lincr = std::log(incr);
+		for (size_t k = 0; k + 1 < x.size(); k++)
+			for (const double r : { x[k], std::nextafter(x[k], 1e300), 0.5 * (x[k] + x[k + 1]), std::nextafter(x[k + 1], 0.0) }) {
+				const int ref = static_cast<int>(std::upper_bound(x.begin(), x.end(), r) - x.begin()) - 1;
+				ASSERT_EQ(log_spline_index(x, r, lincr, start), ref) << "incr " << incr << " r " << r;
+			}
+	}
+	EXPECT_NEAR(table_log2(3.0), std::log2(3.0), 3e-6);
+	EXPECT_EQ(table_log2(0.25), -2.0);
 }
 
 //the configuration helpers: cutoff by accuracy and the scheme names

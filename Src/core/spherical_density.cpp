@@ -4,6 +4,7 @@
 #include "Thakkar_coefs.h"
 #include "Slater_ion_coefs.h"
 #include "Slater_delta_coefs.h"
+#include "GTO_ion_delta_coefs.h"
 #include "ECPs_corrections.h"
 #include "constants.h"
 
@@ -105,7 +106,9 @@ const int Spherical_Atom::first_ex() const
 
 const int Spherical_Atom::previous_element_coef() const
 {
-	if (atomic_number <= 2)
+	// Was <= 2: He then read H's coefficient while first_ex() skipped H's
+	// exponent, and integrated to 4.31 e.
+	if (atomic_number <= 1)
 		return 0;
 	int counter = 0;
 	for (int temp = atomic_number - 2; temp >= 0; temp--)
@@ -142,20 +145,23 @@ void Thakkar::calc_orbs(
 	// accumulation loses precision to rounding error from the addition
 	// order itself; compensated summation removes that source, leaving
 	// only the true per-term input differences (e.g. libm rounding).
-	double exponent;
 	double comp[19] = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
 	for (int ex = 0; ex < n_vector[atomic_number - 1]; ex++)
 	{
+		//one exp and one power per exponent, shared by every occupied orbital of the shell
+		const double exponent = -z[nr_ex] * dist;
+		const bool live = exponent > -46.5; // Corresponds to at least 1E-20
+		const double ez = live ? exp(exponent) : 0.0;
+		const double pw = live && n[nr_ex] != 1 ? fast_int_pow(dist, n[nr_ex] - 1) : 1.0;
 		for (int m = lower_m; m < upper_m; m++)
 		{
 			if (occ[offset + m] == 0)
 				continue;
-			exponent = -z[nr_ex] * dist;
-			if (exponent > -46.5)
-			{ // Corresponds to at least 1E-20
+			if (live)
+			{
 				const double term = (n[nr_ex] == 1)
-					? c[nr_coef] * exp(exponent)
-					: c[nr_coef] * fast_int_pow(dist, n[nr_ex] - 1) * exp(exponent);
+					? c[nr_coef] * ez
+					: c[nr_coef] * pw * ez;
 				const double y = term - comp[m];
 				const double t = Orb[m] + y;
 				comp[m] = (t - Orb[m]) - y;
@@ -171,24 +177,30 @@ void Thakkar::calc_orbs(
 void Thakkar::calc_orbs_deriv(int& nr_ex, int& nr_coef, const double& dist, const int& offset, const int* n_vector,
 	const int lower_m, const int upper_m, double* Orb, double* dOrb, double* ddOrb) const
 {
-	for (int ex = 0; ex < n_vector[atomic_number - 1]; ex++) {
+	for (int ex = 0; ex < n_vector[atomic_number - 1]; ex++, nr_ex++) {
+		const double zz = z[nr_ex], exponent = -zz * dist;
+		if (exponent <= -46.5) {
+			for (int m = lower_m; m < upper_m; m++)
+				nr_coef += occ[offset + m] != 0;
+			continue;
+		}
+		//r^(n-1) exp(-z r): the powers r^(n-1), r^(n-2), r^(n-3), each 0 where its exponent is negative; one exp and one
+		//set of powers per exponent, shared by every occupied orbital of the shell
+		const int nn = n[nr_ex];
+		const double ez = exp(exponent);
+		const double p1 = nn >= 2 ? fast_int_pow(dist, nn - 1) : 1.0;
+		const double p2 = nn >= 3 ? fast_int_pow(dist, nn - 2) : (nn == 2 ? 1.0 : 0.0);
+		const double p3 = nn >= 4 ? fast_int_pow(dist, nn - 3) : (nn == 3 ? 1.0 : 0.0);
+		const double q1 = (nn - 1) * p2 - zz * p1;
+		const double q2 = (nn - 1) * (nn - 2) * p3 - 2 * zz * (nn - 1) * p2 + zz * zz * p1;
 		for (int m = lower_m; m < upper_m; m++) {
 			if (occ[offset + m] == 0) continue;
-			const double zz = z[nr_ex], exponent = -zz * dist;
-			if (exponent > -46.5) {
-				//r^(n-1) exp(-z r): the powers r^(n-1), r^(n-2), r^(n-3), each 0 where its exponent is negative
-				const int nn = n[nr_ex];
-				const double e = c[nr_coef] * exp(exponent);
-				const double p1 = nn >= 2 ? fast_int_pow(dist, nn - 1) : 1.0;
-				const double p2 = nn >= 3 ? fast_int_pow(dist, nn - 2) : (nn == 2 ? 1.0 : 0.0);
-				const double p3 = nn >= 4 ? fast_int_pow(dist, nn - 3) : (nn == 3 ? 1.0 : 0.0);
-				Orb[m] += e * p1;
-				dOrb[m] += e * ((nn - 1) * p2 - zz * p1);
-				ddOrb[m] += e * ((nn - 1) * (nn - 2) * p3 - 2 * zz * (nn - 1) * p2 + zz * zz * p1);
-			}
+			const double e = c[nr_coef] * ez;
+			Orb[m] += e * p1;
+			dOrb[m] += e * q1;
+			ddOrb[m] += e * q2;
 			nr_coef++;
 		}
-		nr_ex++;
 	}
 }
 
@@ -319,24 +331,20 @@ const double Thakkar::get_radial_custom_density(const double &dist,
 	return Rho / (constants::FOUR_PI);
 };
 
-constexpr double cosinus_integral(const int N, const double z, const double k);
-
-static constexpr double sinus_integral(const int N, const double z, const double k)
+// The integral 0 - inf r ^ N e ^ -zr sin(kr) dr by partial integration, using int e^ax sin(bx) dx = -e^-ax/(a^2+b^2) * (a sin(bx) + b cos(bx))
+// and its cosine partner: S(n) = n/(z^2+k^2) (z S(n-1) + k C(n-1)), C(n) = n/(z^2+k^2) (z C(n-1) - k S(n-1)), S(0) = k/(z^2+k^2), C(0) = z/(z^2+k^2)
+// walked upwards: the mutual recursion recomputed both chains at every level, 2^N calls for the same N steps
+static double sinus_integral(const int N, const double z, const double k)
 {
-	// Calculates the integral 0 - inf r ^ N e ^ -zr sin(kr) dr through recursion using the general integral int e^ax sin(bx) dx = -e^-ax/(a^2+b^2) * (a sin(bx) + b cos(bx)) and partial integration
-	if (N == 0)
-		return k / (z * z + k * k);
-	else
-		return N / (z * z + k * k) * (z * sinus_integral(N - 1, z, k) + k * cosinus_integral(N - 1, z, k));
-};
-
-constexpr double cosinus_integral(const int N, const double z, const double k)
-{
-	// Calculates the integral 0 - inf r ^ N e ^ -zr cos(kr) dr through recursion using the general integral int e^ax cos(bx) dx = -e^-ax/(a^2+b^2) * (a cos(bx) - b sin(bx)) and partial integration
-	if (N == 0)
-		return z / (z * z + k * k);
-	else
-		return N / (z * z + k * k) * (z * cosinus_integral(N - 1, z, k) - k * sinus_integral(N - 1, z, k));
+	const double d = z * z + k * k;
+	double s = k / d, c = z / d;
+	for (int n = 1; n <= N; n++)
+	{
+		const double s_n = n / d * (z * s + k * c);
+		c = n / d * (z * c - k * s);
+		s = s_n;
+	}
+	return s;
 };
 
 const double Thakkar::get_form_factor(const double &k_vector) const
@@ -493,17 +501,47 @@ const double Thakkar::get_core_form_factor(const double &k_vector, const int &co
 	return get_custom_form_factor(k_vector, max_s, max_p, max_d, max_f, 0, 0, 0, 0);
 };
 
+std::vector<std::array<double, 3>> Thakkar::core_slater_terms(const int core_els) const
+{
+	int mx[4] = { 0, 0, 0, 0 };
+	set_core_counts(&mx[0], &mx[1], &mx[2], &mx[3], core_els, ECP_mode);
+	return slater_terms(mx[0], mx[1], mx[2], mx[3]);
+}
+
+std::vector<std::array<double, 3>> Thakkar::slater_terms(const int max_s, const int max_p, const int max_d, const int max_f) const
+{
+	err_checkf(_first_ex != 200000000, "No Thakkar density for Z = " + std::to_string(atomic_number), std::cout);
+	const int mx[4] = { max_s, max_p, max_d, max_f };
+	const int* nv[4] = { ns, np, nd, nf };
+	const int lo[4] = { 0, 7, 13, 17 }, hi[4] = { 7, 13, 17, 19 };
+	std::vector<std::array<double, 3>> t;
+	int nr_coef = _prev_coef, nr_ex = _first_ex;
+	//the loops of calc_type, collecting its terms instead of transforming them
+	for (int s = 0; s < 4; s++) {
+		const int l_n = nv[s][atomic_number - 1];
+		int d = 0;
+		for (int m = lo[s]; m < hi[s]; m++)
+			if (occ[_offset + m] != 0) d++;
+		for (int m = lo[s]; m < lo[s] + mx[s]; m++) {
+			if (occ[_offset + m] == 0) continue;
+			const int cn = nr_coef + m - lo[s];
+			for (int i = 0; i < l_n; i++)
+				for (int j = 0; j < l_n - i; j++)
+					t.push_back({ (j != 0 ? 2.0 : 1.0) * occ[_offset + m] * c[cn + i * d] * c[cn + (i + j) * d],
+						double(n[nr_ex + i] + n[nr_ex + i + j] - 1), z[nr_ex + i] + z[nr_ex + i + j] });
+		}
+		nr_coef += d * l_n;
+		nr_ex += l_n;
+	}
+	return t;
+}
+
 const double Thakkar::get_core_density(const double &dist, const int &core_els)
 {
 	int max_s = 0, max_p = 0, max_d = 0, max_f = 0;
 	set_core_counts(&max_s, &max_p, &max_d, &max_f, core_els, ECP_mode);
 	return get_radial_custom_density(dist, max_s, max_p, max_d, max_f, 0, 0, 0, 0);
 };
-
-static double calc_int(const int &occ, const double &coef, const double &exp, const int &radial_exp, const double &k_vector)
-{
-	return occ * coef * sinus_integral(radial_exp, exp, k_vector);
-}
 
 static double calc_int_at_k0(const int &occ, const double &coef, const double &exp, const int &radial_exp, const double &)
 {
@@ -522,34 +560,40 @@ double Thakkar::calc_type(
 	const int &max,
 	const int &min) const
 {
-
-	std::function<double(const int &, const double &, const double &, const int &, const double &)> func;
-	if (k_vector == 0)
-		func = calc_int_at_k0;
-	else
-		func = calc_int;
 	const int l_n = n_vector[atomic_number - 1];
 	double temp, result = 0;
 	int i_j_distance = 0;
 	for (int m = lower_m; m < upper_m; m++)
 		if (occ[offset + m] != 0)
 			i_j_distance++;
+	// the radial integral of an exponent pair is the same for every orbital m: one table per call, filled on first use,
+	// every term still formed as occ * coef * integral in the same order; the tables hold at most 15 functions per type
+	constexpr int max_l_n = 16;
+	err_checkf(l_n <= max_l_n, "Thakkar table with more than 16 functions of one type", std::cout);
+	double integral[max_l_n * max_l_n];
+	bool have_integrals = false;
 	for (int m = lower_m + min; m < lower_m + max; m++)
 	{
 		const int offset_m = offset + m;
 		if (occ[offset_m] == 0)
 			continue;
+		if (!have_integrals && k_vector != 0)
+		{
+			for (int i = 0; i < l_n; i++)
+				for (int j = 0; j < l_n - i; j++)
+					integral[i * max_l_n + j] = sinus_integral(n[nr_ex + i] + n[nr_ex + i + j] - 1, z[nr_ex + i] + z[nr_ex + i + j], k_vector);
+			have_integrals = true;
+		}
 		const int coef_n = nr_coef + m - lower_m;
 		for (int i = 0; i < l_n; i++)
 		{
 			const int nr_ex_i = nr_ex + i;
 			for (int j = 0; j < l_n - i; j++)
 			{
-				temp = func(occ[offset_m],
-					c[coef_n + i * i_j_distance] * c[coef_n + (i + j) * i_j_distance],
-					z[nr_ex_i] + z[nr_ex_i + j],
-					n[nr_ex_i] + n[nr_ex_i + j] - 1,
-					k_vector);
+				const double coef = c[coef_n + i * i_j_distance] * c[coef_n + (i + j) * i_j_distance];
+				temp = k_vector == 0
+					? calc_int_at_k0(occ[offset_m], coef, z[nr_ex_i] + z[nr_ex_i + j], n[nr_ex_i] + n[nr_ex_i + j] - 1, k_vector)
+					: occ[offset_m] * coef * integral[i * max_l_n + j];
 				if (j != 0)
 					result += 2 * temp;
 				else
@@ -622,6 +666,20 @@ double Thakkar::get_interpolated_density(const double &dist) const {
 
 double Thakkar::get_interpolated_density_spline(const double &dist) const {
 	return cubic_spline_interpolate_spherical_density(radial_density, radial_dist, radial_second_deriv, dist, lincr, start);
+};
+
+double Thakkar::spline_reach() const {
+	// On [r_k, r_k+1] the spline is at most max(y_k, y_k+1) + 2/(3 sqrt 3) (|y''_k| + |y''_k+1|) h^2 / 6, since
+	// |a^3 - a| <= 2/(3 sqrt 3) on [0, 1]; 0.4 and 0.99E-10 leave room for rounding against the 1E-10 cut
+	for (size_t k = radial_dist.size() - 1; k-- > 0;)
+	{
+		const double h = radial_dist[k + 1] - radial_dist[k];
+		const double bound = std::max(radial_density[k], radial_density[k + 1]) +
+			0.4 * (std::abs(radial_second_deriv[k]) + std::abs(radial_second_deriv[k + 1])) * h * h / 6.0;
+		if (bound >= 0.99E-10)
+			return radial_dist[k + 1];
+	}
+	return radial_dist[0];
 };
 
 MBIS_Atom::MBIS_Atom(const int g_atom_number, const vec &g_sig, const vec &g_pop)
@@ -840,39 +898,6 @@ Thakkar_Cation::Thakkar_Cation(int g_atom_number) : Thakkar(g_atom_number)
 
 namespace
 {
-	// The delta_k tables live on two fixed grids, both indexable in O(1): r is
-	// LOG-uniform, s is LINEAR-uniform. get_form_factor runs per reflection per
-	// atom type, so a search here would be felt.
-	double delta_rho_at(const int table, const double r)
-	{
-		static const double log_rmin = std::log(SlaterDelta_r_min);
-		static const double dlog =
-			(std::log(SlaterDelta_r_max) - log_rmin) / (SlaterDelta_n_r - 1);
-		const double *t = SlaterDelta_rho + static_cast<size_t>(table) * SlaterDelta_n_r;
-		// Outside the grid the difference is clamped rather than run on: below
-		// r_min it is flat on this scale, above r_max it has decayed to ~0
-		// because delta_k is a valence effect.
-		if (r <= SlaterDelta_r_min) return t[0];
-		if (r >= SlaterDelta_r_max) return t[SlaterDelta_n_r - 1];
-		const double x = (std::log(r) - log_rmin) / dlog;
-		const int i = static_cast<int>(x);
-		const double f = x - i;
-		return (1.0 - f) * t[i] + f * t[i + 1];
-	}
-
-	double delta_f_at(const int table, const double s)
-	{
-		static const double ds =
-			(SlaterDelta_s_max - SlaterDelta_s_min) / (SlaterDelta_n_s - 1);
-		const double *t = SlaterDelta_f + static_cast<size_t>(table) * SlaterDelta_n_s;
-		if (s <= SlaterDelta_s_min) return t[0];
-		if (s >= SlaterDelta_s_max) return t[SlaterDelta_n_s - 1];
-		const double x = (s - SlaterDelta_s_min) / ds;
-		const int i = static_cast<int>(x);
-		const double f = x - i;
-		return (1.0 - f) * t[i] + f * t[i + 1];
-	}
-
 	int delta_table(const int Z, const int k)
 	{
 		if (Z < 1 || Z > 103) return -1;
@@ -881,19 +906,158 @@ namespace
 		return SlaterDelta_offset[(Z - 1) * span + (k - SlaterDelta_k_min)];
 	}
 
-	// The caller's k is 4 pi s a0 (see k_of_reflection); the tables are in s.
-	double s_of_k(const double k)
+	int gto_table(const int Z, const int q)
 	{
-		return constants::ang2bohr(k) / constants::FOUR_PI;
+		const int span = GTOIon_q_max - GTOIon_q_min + 1;
+		return GTOIon_offset[(Z - 1) * span + (q - GTOIon_q_min)];
 	}
+
+	//even-tempered exponents a_i = 1e-2 1.3^i bohr^-2 for the fitted differences, up to 9e6 for the GTO tables (r from 1e-5)
+	//and 8e5 for the delta_k tables (r from 1e-3); the tables end at 25 bohr and say nothing about wider or tighter functions
+	const int n_fit = 80, n_fit_delta = 70;
+	double fit_exponent(const int i) { return 1e-2 * std::pow(1.3, i); }
+
+	//A tabulated difference as populations N_i, rho = sum N_i (a_i/pi)^(3/2) e^(-a_i r^2), f = sum N_i e^(-k^2/4a_i), k = 4 pi s a0:
+	//least squares on every tabulated f(s) (s from 0) and rho(r), the r rows weighted to electrons per log-r cell, and
+	//sum N_i = f(0) by eliminating the last; singular values below 1e-13 of the largest are dropped
+	vec fit_table(const int n, const double* f, const int n_s, const double s_max, const double* rho, const int n_r, const double r_min, const double r_max)
+	{
+		const int m = n_s + n_r;
+		const double ds = s_max / (n_s - 1), dlnr = std::log(r_max / r_min) / (n_r - 1);
+		Eigen::MatrixXd A(m, n - 1);
+		Eigen::VectorXd y(m);
+		vec row(n);
+		for (int j = 0; j < m; j++) {
+			double target;
+			if (j < n_s) {
+				const double k = constants::FOUR_PI * constants::bohr2ang(j * ds);
+				for (int i = 0; i < n; i++) row[i] = std::exp(-k * k / (4.0 * fit_exponent(i)));
+				target = f[j];
+			}
+			else {
+				const double r = r_min * std::exp((j - n_s) * dlnr), w = constants::FOUR_PI * r * r * r * dlnr;
+				for (int i = 0; i < n; i++) row[i] = w * std::pow(fit_exponent(i) / constants::PI, 1.5) * std::exp(-fit_exponent(i) * r * r);
+				target = w * rho[j - n_s];
+			}
+			for (int i = 0; i < n - 1; i++) A(j, i) = row[i] - row[n - 1];
+			y(j) = target - row[n - 1] * f[0];
+		}
+		Eigen::BDCSVD<Eigen::MatrixXd> svd(A, Eigen::ComputeThinU | Eigen::ComputeThinV);
+		svd.setThreshold(1e-13);
+		const Eigen::VectorXd x = svd.solve(y);
+		vec N(n);
+		N[n - 1] = f[0];
+		for (int i = 0; i < n - 1; i++) {
+			N[i] = x(i);
+			N[n - 1] -= x(i);
+		}
+		return N;
+	}
+
+	//each table fitted once, on first use
+	const vec& gto_fit(const int table)
+	{
+		static const int n = static_cast<int>(std::size(GTOIon_rho)) / GTOIon_n_r;
+		static std::vector<vec> fits(n);
+		static std::vector<std::once_flag> once(n);
+		std::call_once(once[table], [table] { fits[table] = fit_table(n_fit, GTOIon_f + static_cast<size_t>(table) * GTOIon_n_s, GTOIon_n_s, GTOIon_s_max,
+			GTOIon_rho + static_cast<size_t>(table) * GTOIon_n_r, GTOIon_n_r, GTOIon_r_min, GTOIon_r_max); });
+		return fits[table];
+	}
+
+	const vec& delta_fit(const int table)
+	{
+		static const int n = static_cast<int>(std::size(SlaterDelta_rho)) / SlaterDelta_n_r;
+		static std::vector<vec> fits(n);
+		static std::vector<std::once_flag> once(n);
+		std::call_once(once[table], [table] { fits[table] = fit_table(n_fit_delta, SlaterDelta_f + static_cast<size_t>(table) * SlaterDelta_n_s, SlaterDelta_n_s,
+			SlaterDelta_s_max, SlaterDelta_rho + static_cast<size_t>(table) * SlaterDelta_n_r, SlaterDelta_n_r, SlaterDelta_r_min, SlaterDelta_r_max); });
+		return fits[table];
+	}
+
+	bool gto_present(const int Z)
+	{
+		return Z >= 1 && Z <= 103 && GTOIon_qmax[Z - 1] >= 0;
+	}
+
+	// An anion DKH2 did not bind (Rb-, Mo-, Sb- ...) keeps its Slater anion on the old route.
+	// ponytail: that side then blends from the non-relativistic neutral; a GTO-neutral + Slater
+	// anion delta would close the step at q = 0, if a 5th-row anion fill ever matters.
+	bool gto_route(const int Z, const double q)
+	{
+		return gto_present(Z) && (q >= 0.0 || GTOIon_anion[Z - 1] == 1 || !Thakkar_Anion::available(Z));
+	}
+
+	// Electrons outside the noble-gas core and any filled d10/f14 below the valence shell: U 6, Pb 4, Lu 3
+	int valence_electrons(const int Z)
+	{
+		const int ng = Z > 86 ? 86 : Z > 54 ? 54 : Z > 36 ? 36 : Z > 18 ? 18 : Z > 10 ? 10 : Z > 2 ? 2 : 0;
+		int n = Z - ng;
+		if (ng >= 54 && n > 16) n -= 14;   // past the f-block (Lu, Lr onwards)
+		if (ng >= 18 && n > 12) n -= 10;   // p-block below a filled d10
+		return n;
+	}
+}
+
+bool HE_Spherical_Atom::ion_available(const int atomic_number, const double charge)
+{
+	if (gto_route(atomic_number, charge))
+		return charge > 0.0 ? GTOIon_qmax[atomic_number - 1] >= 1
+			 : charge < 0.0 ? GTOIon_anion[atomic_number - 1] == 1 : true;
+	return charge > 0.0 ? Thakkar_Cation::available(atomic_number)
+		 : charge < 0.0 ? Thakkar_Anion::available(atomic_number) : true;
+}
+
+// A cation never loses more than its valence shell; EEQ can overshoot that, the tables cannot follow it
+double HE_Spherical_Atom::carried_charge(const int atomic_number, const double charge)
+{
+	if (!ion_available(atomic_number, charge))
+		return 0.0;
+	return std::min(charge, static_cast<double>(valence_electrons(atomic_number)));
 }
 
 HE_Spherical_Atom::HE_Spherical_Atom(const int atomic_number, const double charge)
 	: _Z(atomic_number), _charge(charge), _weight(std::abs(charge)),
 	  _electrons(static_cast<double>(atomic_number)), _most_negative(0.0),
-	  _has_ion(false), _use_delta(false), _delta_n(0), _delta_frac(0.0),
+	  _has_ion(false), _use_delta(false), _use_gto(false), _gto_extrap(false),
 	  _neutral(atomic_number)
 {
+	//the fitted differences share the exponents, so a weighted sum of them is one set of populations
+	auto add_fit = [this](const vec& N, const double w)
+	{
+		if (_gauss.empty())
+			for (int i = 0; i < N.size(); i++) _gauss.push_back({ 0.0, fit_exponent(i) });
+		for (int i = 0; i < N.size(); i++) _gauss[i][0] += w * N[i];
+	};
+	if (gto_route(atomic_number, charge))
+	{
+		// Heavy element: the neutral too is the DKH2 atom, Koga/Thakkar being non-relativistic.
+		// Between two computed states the weights stay in [0, 1]; beyond them it extrapolates.
+		_use_gto = true;
+		_weight = 0.0;
+		const int q_lo = GTOIon_anion[atomic_number - 1] ? -1 : 0;
+		const int q_hi = GTOIon_qmax[atomic_number - 1];
+		int lo = 0;
+		double frac = 0.0;
+		if (std::abs(charge) >= 1e-12 && ion_available(atomic_number, charge) && q_hi > q_lo)
+		{
+			lo = std::clamp(static_cast<int>(std::floor(charge)), q_lo, q_hi - 1);
+			frac = charge - lo;
+			_gto_extrap = frac < 0.0 || frac > 1.0;
+			_has_ion = true;
+			_electrons = static_cast<double>(atomic_number) - charge;
+		}
+		add_fit(gto_fit(gto_table(atomic_number, lo)), 1.0 - frac);
+		if (frac != 0.0)
+			add_fit(gto_fit(gto_table(atomic_number, lo + 1)), frac);
+		for (double r = 1e-4; r < 30.0; r *= 1.05)
+		{
+			const double d = get_radial_density(r);
+			if (d < _most_negative) _most_negative = d;
+		}
+		return;
+	}
+
 	if (std::abs(charge) < 1e-12)
 		return;   // neutral: nothing to blend
 
@@ -941,8 +1105,10 @@ HE_Spherical_Atom::HE_Spherical_Atom(const int atomic_number, const double charg
 		if (ok)
 		{
 			_use_delta = true;
-			_delta_n = n;
-			_delta_frac = frac;
+			for (int k = SlaterDelta_k_min; k <= n; k++)
+				add_fit(delta_fit(delta_table(atomic_number, k)), -1.0);
+			if (frac > 0.0)
+				add_fit(delta_fit(delta_table(atomic_number, n + 1)), -frac);
 		}
 	}
 
@@ -962,36 +1128,47 @@ HE_Spherical_Atom::HE_Spherical_Atom(const int atomic_number, const double charg
 
 double HE_Spherical_Atom::get_radial_density(const double &r) const
 {
+	double d = 0.0;
+	for (int i = 0; i < _gauss.size(); i++)
+		d += _gauss[i][0] * std::pow(_gauss[i][1] / constants::PI, 1.5) * std::exp(-_gauss[i][1] * r * r);
+	if (_use_gto)
+		return _neutral.get_radial_density(r) + d;
 	if (_use_delta)
-	{
-		// rho_1 stays the tabulated Slater cation; only the steps down from it
-		// come from the delta tables.
-		double d = _ion->get_radial_density(r);
-		for (int k = SlaterDelta_k_min; k <= _delta_n; k++)
-			d -= delta_rho_at(delta_table(_Z, k), r);
-		if (_delta_frac > 0.0)
-			d -= _delta_frac * delta_rho_at(delta_table(_Z, _delta_n + 1), r);
-		return d;
-	}
+		return _ion->get_radial_density(r) + d;
 	const double n = _neutral.get_radial_density(r);
 	if (!_has_ion) return n;
 	return (1.0 - _weight) * n + _weight * _ion->get_radial_density(r);
 }
 
+void HE_Spherical_Atom::terms(std::vector<std::array<double, 3>>& slaters, std::vector<std::array<double, 2>>& gaussians) const
+{
+	slaters.clear();
+	gaussians.clear();
+	const double w_neutral = _use_delta ? 0.0 : _has_ion && !_use_gto ? 1.0 - _weight : 1.0;
+	const double w_ion = _use_delta ? 1.0 : _has_ion && !_use_gto ? _weight : 0.0;
+	if (w_neutral != 0.0)
+		for (std::array<double, 3> t : _neutral.slater_terms()) {
+			t[0] *= w_neutral;
+			slaters.push_back(t);
+		}
+	if (w_ion != 0.0)
+		for (std::array<double, 3> t : _ion->slater_terms()) {
+			t[0] *= w_ion;
+			slaters.push_back(t);
+		}
+	for (int i = 0; i < _gauss.size(); i++)
+		gaussians.push_back({ _gauss[i][0] * std::pow(_gauss[i][1] / constants::PI, 1.5), _gauss[i][1] });
+}
+
 double HE_Spherical_Atom::get_form_factor(const double &k) const
 {
+	double d = 0.0;
+	for (int i = 0; i < _gauss.size(); i++)
+		d += _gauss[i][0] * std::exp(-k * k / (4.0 * _gauss[i][1]));
+	if (_use_gto)
+		return _neutral.get_form_factor(k) + d;
 	if (_use_delta)
-	{
-		// Same walk in reciprocal space - the transform is linear, so the
-		// electron count comes out as f(0) = (Z-1) - (n-1) - frac = Z - q.
-		const double s = s_of_k(k);
-		double d = _ion->get_form_factor(k);
-		for (int kk = SlaterDelta_k_min; kk <= _delta_n; kk++)
-			d -= delta_f_at(delta_table(_Z, kk), s);
-		if (_delta_frac > 0.0)
-			d -= _delta_frac * delta_f_at(delta_table(_Z, _delta_n + 1), s);
-		return d;
-	}
+		return _ion->get_form_factor(k) + d;
 	const double n = _neutral.get_form_factor(k);
 	if (!_has_ion) return n;
 	return (1.0 - _weight) * n + _weight * _ion->get_form_factor(k);

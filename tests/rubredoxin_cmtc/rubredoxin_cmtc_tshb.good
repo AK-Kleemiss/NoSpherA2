@@ -1,0 +1,204 @@
+    _   __     _____       __              ___   ___
+   / | / /___ / ___/____  / /_  ___  _____/   | |__ \
+  /  |/ / __ \\__ \/ __ \/ __ \/ _ \/ ___/ /| | __/ /
+ / /|  / /_/ /__/ / /_/ / / / /  __/ /  / ___ |/ __/
+/_/ |_/\____/____/ .___/_/ /_/\___/_/  /_/  |_/____/
+                /_/
+This software is part of the cuQCT software suite developed by Florian Kleemiss.
+Please give credit and cite corresponding pieces!
+This Software is published with BSD-2 clause license.
+Reading:                             "residues/1.gbw" done!
+Number of atoms in Wavefunction file: 18 Number of MOs: 364
+Reading:                             "residues/2.gbw" done!
+Number of atoms in Wavefunction file: 34 Number of MOs: 700
+Reading:                             "residues/3.gbw" done!
+Number of atoms in Wavefunction file: 34 Number of MOs: 700
+Reading:                             "residues/4.gbw" done!
+Number of atoms in Wavefunction file: 31 Number of MOs: 642
+[NoSpherA2] Kleemiss et al., Chem. Sci. 12 (2021) 1675, DOI 10.1039/D0SC05526C
+[HAR] Jayatilaka & Dittrich, Acta Cryst. A 64 (2008) 383, DOI 10.1107/S0108767308005709
+[HAR] Capelli et al., IUCrJ 1 (2014) 361, DOI 10.1107/S2052252514014845
+Number of protons: 57
+Number of electrons: 56.000000
+Reading:                             "residues/1.cif" done!
+Reading:                                 "1yk4_h.hkl" done!
+Nr of reflections read from file: 200
+Number of symmetry operations: 4
+Nr of reflections to be used: 200
+
+Generating densities... 
+
+=== Density Fitting ===
+[RI fit] Seifert et al., Z. Kristallogr. Cryst. Mater. 241 (2026) 283, DOI 10.1515/zkri-2026-0013
+Normal basis functions: 364
+Auxiliary basis functions: 1303
+Metric: Coulomb
+[                   Calculating Eri3c Matrix                  ]
+[#############################################################] 100% 
+Charge-weighted Schwarz screening (3e-07 e) kept 2524319 of 3158124 shell triplets
+Far field (erfc < 1e-14) took 569677 of 2524319 triplets as point multipoles from 60821 pair-atom sums
+Solving unrestrained linear system...
+==============================================
+
+                                        ... done!
+Table of Charges in electrons
+       Atom  Charge_RI
+       N_2    -0.119
+      Ha_2     0.279
+      Hb_2     0.302
+      Hc_2     0.293
+      CA_2    -0.518
+     HAa_2     0.087
+      CB_2     0.242
+     HBa_2     0.046
+     HBb_2     0.023
+     HBc_2    -0.010
+       C_2     0.815
+       O_2    -0.314
+Total number of analytical Electrons: 56.0004
+12 atom(s) go into the .tshb, no table
+                                         ... done!
+[NoSpherA2] Kleemiss et al., Chem. Sci. 12 (2021) 1675, DOI 10.1039/D0SC05526C
+[HAR] Jayatilaka & Dittrich, Acta Cryst. A 64 (2008) 383, DOI 10.1107/S0108767308005709
+[HAR] Capelli et al., IUCrJ 1 (2014) 361, DOI 10.1107/S2052252514014845
+Number of protons: 111
+Number of electrons: 110.0000
+Reading:                             "residues/2.cif" done!
+
+Generating densities... 
+
+=== Density Fitting ===
+[RI fit] Seifert et al., Z. Kristallogr. Cryst. Mater. 241 (2026) 283, DOI 10.1515/zkri-2026-0013
+Normal basis functions: 700
+Auxiliary basis functions: 2504
+Metric: Coulomb
+[                   Calculating Eri3c Matrix                  ]
+[#############################################################] 100% 
+Charge-weighted Schwarz screening (3e-07 e) kept 12231937 of 22122360 shell triplets
+Far field (erfc < 1e-14) took 5727463 of 12231937 triplets as point multipoles from 449972 pair-atom sums
+Solving unrestrained linear system...
+==============================================
+
+                                        ... done!
+Table of Charges in electrons
+       Atom  Charge_RI
+       N_3    -0.469
+       C_3     1.013
+       O_3    -0.326
+      Ha_3     0.262
+      CA_3    -0.655
+     HAa_3     0.111
+      CB_3     0.150
+     HBa_3    -0.005
+     HBb_3     0.016
+      CG_3     0.062
+     HGa_3     0.071
+     HGb_3    -0.054
+      CD_3    -0.511
+     HDa_3     0.038
+     HDb_3     0.009
+      CE_3     0.680
+     HEa_3     0.048
+     HEb_3     0.035
+      NZ_3    -0.346
+     HZa_3     0.297
+     HZb_3     0.288
+     HZc_3     0.299
+Total number of analytical Electrons: 110.0002
+22 atom(s) go into the .tshb, no table
+                                         ... done!
+[NoSpherA2] Kleemiss et al., Chem. Sci. 12 (2021) 1675, DOI 10.1039/D0SC05526C
+[HAR] Jayatilaka & Dittrich, Acta Cryst. A 64 (2008) 383, DOI 10.1107/S0108767308005709
+[HAR] Capelli et al., IUCrJ 1 (2014) 361, DOI 10.1107/S2052252514014845
+Number of protons: 111
+Number of electrons: 110.0000
+Reading:                             "residues/3.cif" done!
+
+Generating densities... 
+
+=== Density Fitting ===
+[RI fit] Seifert et al., Z. Kristallogr. Cryst. Mater. 241 (2026) 283, DOI 10.1515/zkri-2026-0013
+Normal basis functions: 700
+Auxiliary basis functions: 2504
+Metric: Coulomb
+[                   Calculating Eri3c Matrix                  ]
+[#############################################################] 100% 
+Charge-weighted Schwarz screening (3e-07 e) kept 12505084 of 22122360 shell triplets
+Far field (erfc < 1e-14) took 5737924 of 12505084 triplets as point multipoles from 452760 pair-atom sums
+Solving unrestrained linear system...
+==============================================
+
+                                        ... done!
+Table of Charges in electrons
+       Atom  Charge_RI
+      Hb_3     0.283
+      C1_3    -0.655
+      H1_3     0.195
+      C2_3     1.260
+     H2a_3    -0.040
+     H2b_3    -0.141
+      C3_3    -0.544
+     H3a_3    -0.053
+     H3b_3     0.016
+      C4_3    -0.015
+     H4a_3     0.094
+     H4b_3     0.034
+      C5_3     0.218
+     H5a_3    -0.020
+     H5b_3     0.096
+      N1_3    -0.181
+     H1a_3     0.242
+     H1b_3     0.312
+     H1c_3     0.305
+Total number of analytical Electrons: 110.0003
+19 atom(s) go into the .tshb, no table
+                                         ... done!
+[NoSpherA2] Kleemiss et al., Chem. Sci. 12 (2021) 1675, DOI 10.1039/D0SC05526C
+[HAR] Jayatilaka & Dittrich, Acta Cryst. A 64 (2008) 383, DOI 10.1107/S0108767308005709
+[HAR] Capelli et al., IUCrJ 1 (2014) 361, DOI 10.1107/S2052252514014845
+Number of protons: 102
+Number of electrons: 102.0000
+Reading:                             "residues/4.cif" done!
+
+Generating densities... 
+
+=== Density Fitting ===
+[RI fit] Seifert et al., Z. Kristallogr. Cryst. Mater. 241 (2026) 283, DOI 10.1515/zkri-2026-0013
+Normal basis functions: 642
+Auxiliary basis functions: 2296
+Metric: Coulomb
+[                   Calculating Eri3c Matrix                  ]
+[#############################################################] 100% 
+Charge-weighted Schwarz screening (3e-07 e) kept 10771541 of 17007718 shell triplets
+Far field (erfc < 1e-14) took 4216429 of 10771541 triplets as point multipoles from 360939 pair-atom sums
+Solving unrestrained linear system...
+==============================================
+
+                                        ... done!
+Table of Charges in electrons
+       Atom  Charge_RI
+       N_4    -0.652
+       H_4     0.285
+      CA_4    -0.524
+      HA_4     0.087
+      CB_4     0.636
+     HBa_4    -0.012
+     HBb_4    -0.049
+      CG_4    -1.032
+      HG_4    -0.167
+     CD1_4     0.503
+    HD1a_4    -0.082
+    HD1b_4    -0.014
+    HD1c_4    -0.052
+     CD2_4     0.843
+    HD2a_4    -0.038
+    HD2b_4    -0.085
+    HD2c_4    -0.064
+       C_4     0.781
+       O_4    -0.326
+Total number of analytical Electrons: 102.0003
+19 atom(s) go into the .tshb, no table
+                                         ... done!
+Wrote experimental.tshb: 72 atom(s), 0 of them spherical
+Writing tsc file...  ... done!
+  (no table: experimental.tshb holds the fitted densities)

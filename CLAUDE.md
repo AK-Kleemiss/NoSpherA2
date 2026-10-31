@@ -44,7 +44,7 @@ The executable is written to the preset build tree under `bin`, for example `bui
 
 Important CMake options:
 
-- `NOSPHERA2_BUILD_TESTS=ON` builds the C++ GTest/CTest suite in `tests/src`.
+- `NOSPHERA2_BUILD_TESTS=ON` builds the C++ GTest/CTest suite in `tests/src`. Every desktop release/debug preset has a `-tests` variant (`release-windows-tests`, `debug-linux-tests`, `release-macos-arm64-tests`, ...) that sets it in the same build tree as its plain counterpart, which sets it OFF explicitly (for VS Code's CMake Tools, where `-D` flags cannot be passed).
 - `NOSPHERA2_BUILD_DLL=ON` builds the optional Windows DLL target from `Src/dll`.
 - `NOSPHERA2_DEPENDENCIES_ONLY=ON` configures/builds dependency targets and then returns before building NoSpherA2. CI uses this to cache dependency build trees.
 
@@ -58,11 +58,15 @@ that is present; set it OFF and name the backend to build for a machine other th
 vendor still supports (the lists live in `CMakeLists.txt`) instead of the local card only. The
 bootstrap script takes `-DNOSPHERA2_BOOTSTRAP_GPU_VENDOR=NVIDIA -DNOSPHERA2_BOOTSTRAP_CUDA_VERSION=12.9`
 to fetch a conda-forge CUDA toolkit without a GPU, and `-DNOSPHERA2_BOOTSTRAP_GPU=OFF` to fetch none.
+`-DNOSPHERA2_BOOTSTRAP_GPU_VENDOR=ALL` sets up the CI's fat build locally: the CUDA toolkit plus
+the ROCm SDK wheels (`NOSPHERA2_BOOTSTRAP_ROCM_VERSION`, default the CI's 10.0.0) in a venv at
+`.mambaenv/rocm`, whose `root.txt` makes configure switch on both backends and take the HIP compiler
+from there. Skipped when a ROCm is already installed (`HIP_PATH`, `ROCM_PATH`, `/opt/rocm`).
 
 Both backends at once make a fat binary: every kernel source is compiled twice, once per backend,
 into its own namespace (`Src/core/gpu_api.h`, `NOSPHERA2_GPU_BACKEND_NS`), and
 `Src/core/gpu_dispatch.cpp` defines the global entry points by forwarding to the backend that has a
-device (CUDA probed first; `NOSPHERA2_GPU_BACKEND=cuda|hip` in the environment overrides). A function
+device (CUDA probed first; `-tune NOSPHERA2_GPU_BACKEND=cuda|hip` overrides). A function
 added to one of the six GPU headers has to be added to the X-macro in `gpu_dispatch.cpp` too, or the
 fat link fails on it. Neither runtime is linked: cudart is static, and the HIP runtime is opened by
 name in `Src/core/hip_runtime_shim.cpp`, which defines every `hip*` entry the kernel objects import,
@@ -70,9 +74,7 @@ name in `Src/core/hip_runtime_shim.cpp`, which defines every `hip*` entry the ke
 (`NOSPHERA2_HIP_RUNTIME=<file>` names one explicitly) and answers `hipErrorNoDevice` when there is
 none - the shim rather than delay-loading because clang registers the kernels with the runtime from
 static initialisers before `main()`, where nothing else can intercept. The CMake HIP language would
-link `libamdhip64` on its own; `CMAKE_HIP_RUNTIME_LIBRARY NONE` in `CMakeLists.txt` stops it. The
-Visual Studio solution does the same through `Windows/Windows_utils/NoSpherA2_gpu.props`: a machine
-with `CUDA_PATH` and `HIP_PATH` gets the fat build.
+link `libamdhip64` on its own; `CMAKE_HIP_RUNTIME_LIBRARY NONE` in `CMakeLists.txt` stops it.
 
 CI builds that fat binary for Linux and Windows on GPU-less runners (`Linux GPU Release`, `Windows
 GPU Release` in `.github/workflows/c-cpp_all.yml`, artifacts `NoSpherA2-linux-x86_64-gpu` and
@@ -90,26 +92,9 @@ path and falls back to the CPU at run time when `MTLCreateSystemDefaultDevice()`
 
 For CMake preset builds, run from an x64 Visual Studio Developer PowerShell or initialize the MSVC environment before invoking CMake/Ninja. If Ninja can find `cl.exe` but compilation fails on missing standard headers such as `stdlib.h`, the shell/toolchain environment is incomplete.
 
-The legacy Visual Studio solution still exists for Windows/OCC integration debugging. If using MSBuild from a normal PowerShell session, pass the full `MSBuild.exe` path and preserve `/p:` switches:
-
-```powershell
-$msbuild = "C:\Program Files\Microsoft Visual Studio\18\Community\MSBuild\Current\Bin\amd64\MSBuild.exe"
-$solDir = "D:\git\NoSpherA2\Windows\"
-
-& $msbuild "D:\git\NoSpherA2\Windows\Tests\Tests.vcxproj" `
-    /p:Configuration=Release /p:Platform=x64 "/p:SolutionDir=$solDir" /v:minimal
-```
-
-Do not invoke MSBuild through Bash for this project; Bash can strip leading `/` from `/p:` switches.
-
-The VS solution's `NoSpherA2`/`NoSpherA2_LIB` projects use a shared `OutDir`
-(`Windows\Windows_utils\NoSpherA2_universal.props`) that writes into the same top-level `build/`
-tree the CMake presets use, but under `build\$(Configuration)_$(Platform)\` (e.g.
-`build\Release_x64\NoSpherA2.exe`, `build\Debug_x64\NoSpherA2.exe`) rather than the CMake preset's
-`build\release-windows\bin\NoSpherA2.exe`. Don't confuse the two when picking an executable to
-run — see `update_good_from_pytest_results.py --build {vs,cmake}` for a way to pick one
-explicitly. `Windows\Tests\Tests.vcxproj` was not repointed and still builds to its own
-`Windows\Tests\$(Configuration)_$(Platform)\` (e.g. `Windows\Tests\Release_x64\Tests.exe`).
+The Visual Studio solution was removed in October 2026; CMake/Ninja is the only build system. For
+IDE work on any platform use the VS Code setup in `.vscode/` (CMake Tools with the presets; on
+Windows it sets up the MSVC environment itself via `cmake.useVsDeveloperEnvironment`).
 
 ## Running Tests
 
@@ -132,21 +117,15 @@ Useful environment variables:
 - `NOS_EXE` - path to the executable for Python tests.
 - `OCC_DATA_PATH` - OCC runtime data directory. CTest defaults this to `occ/share`; local Windows Python runs commonly need `D:\git\NoSpherA2\Lib\occ\share\occ` or the current equivalent.
 - `RUN_FULL_TEST` - truthy value enables slow/full Python integration tests.
+- `NOS_TEST_SHARED_DIR` - set by ctest for every gtest (`<build>/tests/src/shared`). `XcwScfTests.SharedEriBuild`
+  writes the P1 molecule's stored two-electron integrals there once (ctest fixture `xcw_p1_eri`) and the XCW tests that
+  test the SCF read them; a test binary run without it builds its own, with the same numbers.
+- `OMP_WAIT_POLICY=PASSIVE` - set by the `test-base` test preset: ctest runs several tests at once and each opens a
+  thread per core, so spinning idle OpenMP workers would take the cores the other tests compute on.
 
 Tests are golden-file comparisons: the harness runs NoSpherA2 with args from `tests/tests.toml`, captures stdout, and diffs against `.good` reference files in each test subdirectory.
 
-### Windows Visual Studio Tests
-
-The CMake flow is the default for new validation. The Visual Studio test project remains useful when debugging Windows DLL/OCC behavior:
-
-```powershell
-msbuild Windows\Tests\Tests.vcxproj /m /p:Configuration=Release /p:Platform=x64 /p:SolutionDir=D:\git\NoSpherA2\Windows\
-vstest.console.exe Windows\Tests\Release_x64\Tests.exe /Platform:x64
-```
-
-Visual Studio tests must run in-process through `NoSpherA2_DLL.dll`; do not add subprocess fallbacks for failing VS tests, including `alanine_integrated_occ`. If all tests complete in under a second, the test binary or working directory is probably wrong.
-
-For coverage, keep `coverage.runsettings` aligned with the current DLL/test output layout before trusting the report.
+Tests that are documented as in-process (e.g. `alanine_integrated_occ`) must stay in-process in the gtest binary; do not add subprocess fallbacks for failing tests.
 
 ## Agent Rules
 
@@ -190,7 +169,7 @@ and the measured evidence behind each item.
 
 ### Unit-test documentation is mandatory
 
-Whenever an agent adds, removes, modifies, or investigates a test in `tests/tests.toml`, `tests/src`, `Windows/Tests`, `tests/run_test.py`, `TestRunner.h`, or any `.good` reference file, it must:
+Whenever an agent adds, removes, modifies, or investigates a test in `tests/tests.toml`, `tests/src`, `tests/run_test.py`, or any `.good` reference file, it must:
 
 1. Update `UNIT_TESTS_STATUS.md`.
 2. Update the validation-status block in this file and `AGENTS.md` if the overall pass count changes.
@@ -198,7 +177,16 @@ Whenever an agent adds, removes, modifies, or investigates a test in `tests/test
 
 ### Keep test harnesses aligned
 
-`tests/tests.toml`, `tests/src`, and `Windows/Tests/Tests.cpp` should stay in sync where they cover the same workflows. Check all relevant harnesses when adding or removing tests.
+`tests/tests.toml` and `tests/src` should stay in sync where they cover the same workflows. Check both harnesses when adding or removing tests.
+
+### Keep the wiki in shape
+
+`docs/wiki/` holds the pages of the GitHub wiki — `Home.md`, `Command-Reference.md`, `Tuning-Knobs.md`, `Use-Cases.md`, `Troubleshooting.md`, `EQC-Energy-Decomposition.md` — and is the source; the published copy is its own repository, `https://github.com/AK-Kleemiss/NoSpherA2.wiki.git`, cloned and pushed by hand. A flag that is added, renamed or given a new default must be updated in `docs/wiki/Command-Reference.md` in the same commit, or the wiki is wrong the moment the change lands.
+
+- Document what the parser accepts, not what `-h` claims. The pages were written from the seven `digest_*` functions in `Src/core/convenience.cpp` and the defaults in `struct options` and `struct properties_options`; reading them that way is what found `-hdef`, the cuBLAS default and the `acc = 0` examples.
+- A `-tune` knob — any literal name read through `tuning()` or its wrappers `tuning_double`, `read_threshold`, `nao_knob` — that is added, renamed, removed or given a new default must be updated in `docs/wiki/Tuning-Knobs.md` in the same commit. `python scripts/check_tuning_knobs.py` must then report that page and sources agree; a new wrapper goes into the script's `CALL` pattern, or its knobs stay invisible.
+- Every command shown on a page must be one that runs. Take it from `tests/tests.toml` rather than composing it.
+- The published copy links pages without the extension (`](Troubleshooting#flag-order-matters)`), the in-repo copy with it. That is the only permitted difference between the two.
 
 ### Respect submodule boundaries
 
@@ -218,8 +206,7 @@ featomic/            Rust/C++ submodule for ML feature generation via metatensor
 libcint/             C submodule for electron integral evaluation
 mdspan/              C++ multidimensional-array reference implementation
 cmake/               Project CMake modules
-scripts/             Micromamba/bootstrap/Visual Studio helper scripts
-Windows/             Legacy Visual Studio solution/projects and Windows test harness
+scripts/             Micromamba/bootstrap/GPU-toolkit helper scripts
 Linux/               Linux packaging/build helper scripts
 ```
 
@@ -248,10 +235,215 @@ Key core modules live in `Src/core`:
 - Golden-file float parsing must support scientific notation and multi-value lines without weakening existing thresholds.
 - Clone with `--recursive`; if submodules are missing, run `git submodule update --init --recursive`.
 - CI and local runs can differ because CI uses a dependency-only cache flow. Compare `.github/workflows/c-cpp_all.yml` step-by-step when a failure only appears in CI.
-- VS tests are always in-process. Never reintroduce subprocess execution to work around a crash; fix the underlying OCC/libcint/DLL issue instead.
+- In-process tests stay in-process. Never reintroduce subprocess execution to work around a crash; fix the underlying OCC/libcint/DLL issue instead.
 - New libcint parallel call sites should pre-allocate per-thread scratch buffers instead of passing `cache=nullptr` inside TBB parallel regions. Use the existing `three_center_max_cache_size<kind>` and `tbb::enumerable_thread_specific` pattern in OCC.
 
 ## Current Validation Notes
+
+As of 2026-10-28 (RI .tshb), XCW's RI `.tshb` is the RI partition's own fit and the first step matches the table's scatterers
+to atoms by id; `XcwPartitionTests.RiTshbIsTheRiTable` is new. `ctest --preset release-linux-tests` on a CPU-only 4-core VM
+reports **1328 passed, 0 failed, 23 skipped** (2 disabled) of 1353. See `UNIT_TESTS_STATUS.md`.
+
+As of 2026-10-28 (TFVC chi, packed RI store), XCW's TFVC chi is continuous where a bond's line density loses its minimum and
+the RI partition stores (mu nu|P) over mu <= nu; `XcwPartitionTests.RiTfvcRefitsSettle` is new. `ctest --preset
+release-linux-tests` on a CPU-only 4-core VM reports **1335 passed, 0 failed, 23 skipped** (2 disabled) of 1360. See
+`UNIT_TESTS_STATUS.md`.
+
+As of 2026-10-27 (shares cost), XCW's TFVC shares take a TFVC-only weight pass and MBIS/EMBIS Anderson-mixed, warm, loose-early
+fits refit inside a solve until the density settles; `XcwPartitionTests.TfvcShareKernelIsTheStandAloneOne` is new. Ported onto the
+XCW refactor, `ctest --preset release-windows -j4` (GPU present) reports **1351 passed, 0 failed, 10 skipped** (2 disabled) of 1363. See
+`UNIT_TESTS_STATUS.md`.
+
+As of 2026-10-27 (XCW refactor, run 3), XCW's Criterion is GooF^2 against F or F^2, the perturbation lambda times it and
+the target quantity `quant_` E + perturbation, the functional the SCF minimises (`phi` is gone; the SCF path is unchanged,
+it already minimised E + lambda GooF^2), and `grid_contract` sums its blocks in a load-independent order; the nine P1 XCW goldens
+were regenerated (Criterion, Perturbation, Target quantity and Crit(all) columns). `RUN_FULL_TEST=1 ctest --preset
+release-windows-tests -j 6` on a CPU-only build reports **1329 passed, 0 failed, 15 skipped** (2 disabled) of 1346. See
+`UNIT_TESTS_STATUS.md` and `REFACTOR.md`.
+
+As of 2026-10-27 (XCW refactor, run 2), the XCW I tensor route is gone: XCW runs on its integration grid only
+(`structure_factors::setup_grid` with `link_symmetry_equivalents`, `screen_ao_pairs`, `setup_atom_grids`,
+`build_grid_blocks`), the `safe`/`read`/`stream`/`i_tensor_mb`/`i_float` keywords are unknown, the subset goldens run on the
+grid, `-print_F` writes the `_Fcalc.txt` tables and `XCW_log_writer` carries the crystallographic log columns. `ctest --preset
+release-windows-tests -j 6` on a CPU-only build reports **1322 passed, 0 failed, 22 skipped** (2 disabled) of 1346, and the
+four `P1_*_full` goldens pass. See `UNIT_TESTS_STATUS.md` and `REFACTOR.md`.
+
+As of 2026-10-27 (-eli_spin, on b456eec), `-eli_spin` writes the spin-resolved ELI-D cubes from one pass and
+`scripts/vmd/eli_spin.py` turns a wavefunction into a VMD scene; two `EliSpinTests` and `TomlIntegrationTests.EliSpinCh3`
+are new. `ctest --preset release-linux-tests` on a CPU-only 4-core VM reports **1336 passed, 0 failed, 23 skipped**
+(2 disabled) of 1359. See `UNIT_TESTS_STATUS.md`.
+
+
+As of 2026-10-27 (XCW refactor merged with density_source `33fa9685`), the density-following TFVC/MBIS/EMBIS shares run in the
+new structure: their refit between solves, the lambda 0 fit and the share report in `XCW_wrapper`, `NOSPHERA2_XCW_ADJOINT_CHECK`
+after the first step; `ctest --preset release-windows-tests -j 6` on a CPU-only build reports **1333 passed, 0 failed, 23 skipped**
+(2 disabled) of 1358, and the four `P1_*_full` goldens pass. See `UNIT_TESTS_STATUS.md` and `REFACTOR.md`.
+
+As of 2026-10-27 (XCW refactor merged with density_source `0efc6add`), the `-tshb` step fits and the `-xcw_partition ri`
+layer run in the new structure (`XCW_wrapper::write_tshb`, `structure_factors::setup_ri` / `check_adjoint`); `ctest --preset
+release-windows-tests -j 6` on a CPU-only build reports **1330 passed, 0 failed, 23 skipped** (2 disabled) of 1355, and the
+four `P1_*_full` goldens pass. See `UNIT_TESTS_STATUS.md` and `REFACTOR.md`.
+
+As of 2026-10-27 (XCW density-following shares), `-tfvc`, `-mbis` and `-embis` run XCW on shares refit to its own density
+between SCF solves, and the RI partition takes TFVC/MBIS/EMBIS targets from those shares, Mulliken targets linear in D and fixed
+Nuclear/Sanderson ones; three `XcwPartitionTests` are new. `ctest --preset release-linux-tests` on a CPU-only 4-core VM reports
+**1330 passed, 0 failed, 23 skipped** (2 disabled) of 1353. See `UNIT_TESTS_STATUS.md`.
+
+As of 2026-10-26 (second speed round), the fit cache keeps the Coulomb factor keyed by the whole aux wavefunction, `.tshb`
+parts make no k-points, and partition rows skip shells beyond their certain cutoff; `ctest --preset release-linux-tests` on a
+CPU-only 4-core VM reports **1327 passed, 0 failed, 23 skipped** (2 disabled) of 1350. See `UNIT_TESTS_STATUS.md`.
+
+As of 2026-10-26 (XCW partitions), `-xcw_partition ri` runs XCW on an RI partition of the density ((mu nu|P) from occ, exact
+transpose for the perturbation, `-multipole_moments` restraints to Hirshfeld, TFVC, MBIS or EMBIS moments); `ctest --preset
+release-linux-tests` on a CPU-only 4-core VM reports **1326 passed, 0 failed, 23 skipped** (2 disabled) of 1349. See
+`UNIT_TESTS_STATUS.md`.
+
+As of 2026-10-26 (speed audit), restraint rows enter the RI fit by threads in row order (bit-identical), XCW's later
+steps reuse the factor of the restrained H through `PartitionCache`, and CIF rows are checked against known atoms
+serially; `ctest --preset release-linux-tests` on a CPU-only 4-core VM reports **1325 passed, 0 failed, 23 skipped**
+(2 disabled) of 1348. See `UNIT_TESTS_STATUS.md`.
+
+As of 2026-10-26 (XCW -tshb), XCW writes an RI fit of each step's converged density as `NA2_<lambda>.tshb` under `-tshb`
+(AutoAux by default, `-multipole_moments` honoured, partition grid and rows cached over the steps); `ctest --preset
+release-linux-tests` on a CPU-only 4-core VM reports **1323 passed, 0 failed, 23 skipped** (2 disabled) of 1346. See
+`UNIT_TESTS_STATUS.md`.
+
+As of 2026-10-26 (orbital-less parts), `-tshb` writes the spherical fill records for a part without orbitals instead of
+refusing; XCW stays refused (its F_calc and an RI fit of its density differ by up to 6.6e-2 relative). `ctest --preset
+release-linux-tests` on a CPU-only 4-core VM reports **1322 passed, 0 failed, 23 skipped** (2 disabled) of 1345. See
+`UNIT_TESTS_STATUS.md`.
+
+As of 2026-10-26 (XCW refactor, run 1), `SCF_wrapper` is `SCF_solver`, a plain Hartree-Fock SCF extended by the
+`XCW_solver` child, and the XCW driver is `XCW_wrapper` (see `REFACTOR.md`); `ScfSolverTests` (3) are new. `ctest --preset
+release-windows-tests -j 6` on a CPU-only build reports **1323 passed, 0 failed, 23 skipped** (2 disabled) of 1346. See
+`UNIT_TESTS_STATUS.md`.
+
+As of 2026-10-26 (final), restrained RI fits are checked at 1e-2 N, the streamed `-mtc` SALTED table keeps each part's fill
+charges, and `SALTED_disorder_tshb` plus `TshbJointTests.SaltedDisorderedPartsMatchTheirTableAndMergeToTheJointFile` are new.
+`ctest --preset release-linux-tests` on a CPU-only 4-core VM reports **1320 passed, 0 failed, 23 skipped** (2 disabled) of
+1343. See `UNIT_TESTS_STATUS.md`.
+
+As of 2026-10-26 (latest), the GTO and delta_k ion differences of the Thakkar fill are fitted Gaussians, so `-tshb` takes
+every fill atom and never reruns for the table; `DeltaSeriesTests.TheFittedDifferencesReproduceTheTables` is new. `ctest
+--preset release-linux-tests` on a CPU-only 4-core VM reports **1318 passed, 0 failed, 23 skipped** (2 disabled) of 1341.
+See `UNIT_TESTS_STATUS.md`.
+
+As of 2026-10-26 (later), `-ri_fit` stops on a wavefunction without a basis set (`.wfx`, `.wfn`) and on a plain fit that
+holds its electrons to worse than 1e-3 N; two `FittingIoCoverageIntegratorDeathTest` cases are new. `ctest --preset
+release-linux-tests` on a CPU-only 4-core VM reports **1317 passed, 0 failed, 23 skipped** (2 disabled) of 1340. See
+`UNIT_TESTS_STATUS.md`.
+
+As of 2026-10-26, `-tshb` writes one version-4 `experimental.tshb` per run (`tshb_block`, keyed like the table, first wins)
+covering every `-mtc`/`-cmtc` part and the Thakkar fill, and `-merge` merges .tshb files; `TshbBlockTests`, `TshbJointTests` and two
+goldens are new. `ctest --preset release-linux-tests` on a CPU-only 4-core VM reports **1313 passed, 0 failed, 23 skipped** (2 disabled)
+of 1338. See `UNIT_TESTS_STATUS.md`.
+
+As of 2026-10-25, `-occ` with a `df-basis` stores occ's three-centre integrals packed over the screened shell pairs
+(`occ/qm/df_packed_store.h`, `Policy::Choose` natively) within half of `-mem` or of the job's memory, recomputing what does
+not fit; `DfPackedStoreTests` (new) and the occ goldens pass, and occ's direct general-spin exchange no longer corrupts its
+beta-beta block. `ctest --preset release-linux-tests` on a CPU-only 4-core VM reports **1299 passed, 0 failed, 20 skipped**
+(2 disabled) of 1321. See `UNIT_TESTS_STATUS.md`.
+
+As of 2026-10-20, `-occ` with `method = "mp2"` / `"ccsd"` / `"ccsd(t)"` gives the relaxed MP2 / unrelaxed CCSD / CCSD(T)
+density (CC canonical or local cluster-in-molecule, converged to ORCA's STol), and `"mp3"` / `"mp4(sdq)"` / `"mp4"` the
+unrelaxed MPn density as ORCA's AutoCI (`CcsdDensity.OccMp4DensityMatchesOrcaAutoci`, `mp4_occ_water`); `-wfn` reads ORCA's
+`.mdci.nat`, `.mp2nat` and AutoCI densities exported by orca_2json (`base.json`), and occ is at upstream 0.9.6;
+`ctest` on a `release-windows` build with CUDA reports **1305 passed, 0 failed, 9 skipped**
+(2 disabled) of 1316. See `UNIT_TESTS_STATUS.md`.
+
+As of 2026-10-20 (latest), an XCW settings file without `params` warns and uses 1 (`XcwSettingsTests.MissingParamsDefaultsToOneWithAWarning`);
+`ctest --preset release-windows-tests` on a CPU-only build reports **1281 passed, 0 failed, 22 skipped** (2 disabled) of 1305. See `UNIT_TESTS_STATUS.md`.
+
+As of 2026-10-20 (later), density_source carries XCW_refactor's split of XCW into `structure_factors`, `SCF_wrapper` and `XCW_solver` (`XCW.cpp` is gone), with
+density_source's `-mem`/SLURM memory budget and Android OpenBLAS guard ported into it; `ctest --preset release-windows-tests` on a CPU-only build reports
+**1280 passed, 0 failed, 22 skipped** (2 disabled) of 1304. See `UNIT_TESTS_STATUS.md`.
+
+As of 2026-10-17 (later), grown XCW models choose their kept operations as K = D.L for nested subgroups L inside H
+(`cell::choose_kept_operations`, replacing `project_into_subgroup`), which always admits per-position weights and keeps
+the fewest I tensor k-points; `ctest` on a CPU-only `release-windows` build (`build/release-windows-cpu`) reports
+**1269 passed, 0 failed, 22 skipped** (2 disabled) of 1293. See `UNIT_TESTS_STATUS.md`.
+
+As of 2026-10-17, grown XCW models delete every fully applied symmetry operation and solve the sym_facts so that every
+position the kept operations reach is counted once (`cell::set_sym_fact_from_position_counts`); `ctest --preset release-linux`
+reports **1267 passed, 0 failed, 22 skipped** (2 disabled) of 1289. See `UNIT_TESTS_STATUS.md`.
+
+As of 2026-10-15, `-anom_disp` is gone: XCW reads positions, U_iso, ADPs and the anomalous dispersion from the CIF
+through XCW_refactor's `read_CIF`, and the P1 XCW cases run on `P1_test.cif`, reproducing XCW_refactor's goldens. `ctest --preset release-linux`
+reports **1266 passed, 0 failed, 22 skipped** (2 disabled) of 1288. See `UNIT_TESTS_STATUS.md`.
+
+As of 2026-10-14, `Src/core/XCW.cpp` runs on XCW_refactor's symmetry handling (`cell.cpp`), its h/-h inversion
+screening of the I tensor and its AO pair screen, and `slow_conv` damps the lambda = 0 step too;
+`ctest --preset release-linux` reports **1262 passed, 0 failed, 22 skipped** (2 disabled) of 1284. See
+`UNIT_TESTS_STATUS.md`.
+As of 2026-10-14, after the Visual Studio solution's removal (CMake-only build, `.vscode/` IDE
+setup), `ctest --preset release-windows` reports **12 failed of 1279** both before and after the
+rework on the same machine in the same sitting, with the identical failing set — all twelve are
+that machine's temp-file locking on `%TEMP%` (`remove: The process cannot access the file ...`),
+not code failures. The rework changed no test behavior. See `UNIT_TESTS_STATUS.md`.
+
+As of 2026-10-13, after the NRT symmetry fixes, `ctest --preset release-linux` reports **1260 passed, 0 failed,
+22 skipped** (2 disabled) of 1282. New: `NboNativeTests.TheAllylCationsMirrorStructuresWeighAlike`,
+`NboNativeTests.TheAllylRadicalIsSymmetricInEachSpin` and `NboNativeTests.ASlightlyDistortedAllylCationStaysNearTheSymmetricOne`
+(fixtures `tests/allyl_occ/`), under what is the default since 2026-10-14 (`-nrt_no_mirror` restores the old behaviour). See
+`UNIT_TESTS_STATUS.md`. At `1349eba` the suite took 255.7 +- 9.1 s wall and 993 +- 40 CPU-s (95 % CI, n = 3) with 3.88 of
+the 4 cores busy. Since the XCW tests share one build of the stored two-electron integrals (`save_eri` /
+`read_eri`): **1261 passed, 0 failed, 22 skipped** (2 disabled) of 1283, 230.6 +- 16.8 s wall and 899 +- 66 CPU-s,
+3.90 of 4 cores busy.
+
+As of 2026-10-13, after `72d83cd`, `ctest --preset release-linux` reports **1257 passed, 0 failed,
+22 skipped** (2 disabled) of 1279. New since `d5a9755`: `NboNativeTests.MethylRadicalSplitsItsBondsPerSpinAsNbo7Does`
+(fixture `tests/ch3_occ/ch3.owf.fchk`), `NboNativeTests.AGrownNrtCycleStatesAFloorItsFitRespects`,
+`NboNativeTests.AnEcpFchkKeepsTheElementAndItsCore` (fixture `tests/hi_occ/hi.owf.fchk`),
+`NrtTests.TheParentsSymmetryImageCompletesTheHexagon` and
+`NrtTests.OppositelyPolarisedOrbitalsOfABondDoNotCancelInItsIonicShare`. After `36e482b` the counts are the
+same. The suite takes 280.5 +- 5.9 s wall, against 334.2 +- 29.5 s before (95 % CI, n = 3 each). Three changes account
+for it: the P1 subset goldens read the I tensor `P1_test_XCW` saves; the adaptive-step fallback test runs on NH3Li; and the
+AO-to-MO step takes eight functions per pass, with outputs identical on GCC. See `UNIT_TESTS_STATUS.md`.
+
+As of 2026-10-13, `ctest --preset release-linux` on `density_source` `d5a9755` reports
+**1252 passed, 0 failed, 22 skipped** (2 disabled) of 1274 on the same 4-core VM. It took
+308.2 +- 13.1 s wall and 1207 +- 47 CPU-s, against 432.8 +- 5.5 s and 1704 +- 22 CPU-s for `80876cc`
+(95 % CI, n = 3 and 4). The changes: the XCW SCF tests read one shared I tensor, the two redundant
+`-xcw_incremental` goldens are gone, NH3Li's spin-resolved ELI-D is computed once, and the test preset
+sets `OMP_WAIT_POLICY=PASSIVE`. See `UNIT_TESTS_STATUS.md`.
+
+As of 2026-10-12, `ctest --preset release-linux` on `density_source` `0e6a0d3` reports
+**1246 passed, 0 failed, 22 skipped** (2 disabled) of 1270 on a GPU-less 4-core VM with GCC 13.3.
+The skips are 12 GPU tests, 7 `RUN_FULL_TEST` cases, two NBO tests that need gennbo and the Ce RGBI
+case behind `NOS_RGBI_SLOW_TESTS`. `0e6a0d3` keeps OCC from linking with lld under GCC, whose LTO
+objects lld cannot read; without it a GCC build fails wherever lld is installed. See
+`UNIT_TESTS_STATUS.md`.
+
+As of 2026-10-10, the XCW inversion screening also covers measured h / -h pairs (the row of -h is the conjugate of
+the row of h), next to the merging of inverse images within one reflection of 2026-10-08; P1 takes 5.0 s of I tensor
+instead of 9.8 s, and the XCW suites and P1 goldens report 45 passed, 0 failed. See `UNIT_TESTS_STATUS.md`.
+
+As of 2026-10-08, the XCW I tensor integrates only one k-point of every inversion related pair
+(`cell::remove_inv_vectors`, `XcwInversionTests` new); the XCW/cell/P1 filter reports 116 passed, 0 failed,
+and Fe_phen reproduces its reference lambda table in 448 s of I tensor instead of 610 s. See `UNIT_TESTS_STATUS.md`.
+
+As of 2026-10-07, `save <path>` in the XCW settings keeps a streamed I tensor too (the build streams
+into the save file), a tensor read from disk with `save` set throws, and a streamed `read` takes the window the memory
+budget allows instead of 64 reflections; `XcwHaltingReportTests.StreamedTensorIsSavedWhereSaveSays` is new
+and the XCW/P1 filter reports 87 passed, 0 failed. The full suite was not rerun. See `UNIT_TESTS_STATUS.md`.
+
+As of 2026-10-01, `Src/core/XCW.cpp` is split into `structure_factors`, `SCF_wrapper` and
+`XCW_solver`, the XCW settings file is read by `options::loadXCWsettings()`, anomalous dispersion
+comes only from the CIF (`-anom_disp` is gone) and the P1 XCW cases run on `P1_test.cif`. The XCW
+gtests are ported and the eleven CPU P1 XCW goldens regenerated; `P1_test_XCW_gpu_itensor.good`
+still needs a device. Visual Studio `Tests`, every test in its own process from `tests/src`:
+1102 passed, 0 failed, 15 skipped and 16 crashed out of 1133 (the 16 all build and run OCC objects in the test itself - StoredEriTests, OccSecondOrderScf, OccHighAngularTests, BondwiseRobyTests, FormatConsistencyTests.OccFchkMatchesBridge, TomlIntegrationTests.AlanineIntegratedOcc - and exit with code 127 before printing anything, with or without OCC_DATA_PATH; the same OCC SCF passes inside the XCW tests of the same binary and the executable runs alanine_integrated_occ to the end, so the locally built Visual Studio test binary is the suspect, root cause not established; a ctest run of the CMake target is still owed). See `UNIT_TESTS_STATUS.md`.
+
+As of 2026-09-24, the in-house NBO analysis (`-nbo`, `Src/core/nbo.cpp` and
+`Src/core/nrt.cpp`) is checked in two places: `NrtTests`, `Nbo47Tests` and
+`NaoTests.OverlapCarriesTheDensitysPhaseConvention` as gtests, and
+`py -3.12 tests/nbo_reference/compare_nbo.py --all .` against the 22 stored NBO 7.0.9 references,
+which reports **22 PASS, exit 0**. NRT weights are compared by rank and never by label - gennbo
+reproduces TiCl4's `D(w)`, valencies and bond orders exactly while individual weights move 7.1
+points. `cmake --build --preset release-windows --target NoSpherA2_Tests` links again since
+`tests/src/CellMathTests.cpp` (which calls `cell` members that no longer exist) was excluded, and the
+binary reports **1270 passed, 0 failed, 9 skipped** (2026-10-12) from `build/release-windows/bin` - the relative
+fixture paths in the tests are what makes that the working directory. See `UNIT_TESTS_STATUS.md`.
 
 As of 2026-09-08, `ctest --preset release-linux` reports **267/267 passing** outside the XCW
 cases (`-E XCW`), including the new `TomlIntegrationTests.ELI_NH3Li` golden case for the

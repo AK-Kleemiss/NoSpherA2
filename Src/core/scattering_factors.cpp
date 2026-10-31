@@ -13,9 +13,11 @@
 #include "wfn_class.h"
 #include "spherical_density.h"
 #include "AtomGrid.h"
+#include "fourier_bessel.h"
 #include "npy.h"
 #include "integrator.h"
 #include "basis_set.h"
+#include "citations.h"
 #ifdef NOSPHERA2_USE_GPU
 #include "SALTED_equicomb.h"
 #include "grid_gpu.h"
@@ -25,8 +27,10 @@
 #include "gaussian_atom.h"
 #include "GridManager.h"
 #include "cube.h"
+#include "tuning.h"
 #ifdef NOSPHERA2_USE_GPU
 #include "sf_gpu.h"
+#include "itensor_gpu.h"
 #endif
 
 
@@ -118,7 +122,6 @@ void save_k_points(vec2& k_pt, hkl_list& hkl)
 		}
 		hkl_ = next(hkl_);
 	}
-	k_points_file.flush();
 	k_points_file.close();
 }
 
@@ -157,6 +160,7 @@ void make_k_pts(const bool& read_k_pts,
 			file << "K_point_vector is here! size: " << k_pt[0].size() << endl;
 		// Create local copy of hkl list for faster access
 		const std::vector<i3> hkl_vector(hkl.begin(), hkl.end());
+		const double scale = unit_cell.get_hkl_scale();
 
 #pragma omp parallel for
 		for (int ref = 0; ref < size; ref++)
@@ -166,7 +170,7 @@ void make_k_pts(const bool& read_k_pts,
 			{
 				for (int j = 0; j < 3; j++)
 				{
-					k_pt[x][ref] += unit_cell.get_rcm(x, j) * hkl_[j];
+					k_pt[x][ref] += unit_cell.get_rcm(x, j) * hkl_[j] / scale;
 				}
 			}
 		}
@@ -178,6 +182,13 @@ void make_k_pts(const bool& read_k_pts,
 	{
 		read_k_points(k_pt, hkl, file);
 	}
+}
+
+//header/comment lines carry a letter or bracket; uppercase X Y Z are left out as before.
+//strpbrk instead of the per-line std::regex, which made read_hkl most of rubredoxin's 0.9 s k-point phase (148k lines, i7-7700HQ)
+static bool hkl_text_line(const std::string& line)
+{
+	return std::strpbrk(line.c_str(), "abcdefghijklmnopqrstuvwxyz()ABCDEFGHIJKLMNOPQRSTUVW") != nullptr;
 }
 
 /**
@@ -203,7 +214,6 @@ void read_hkl(const std::filesystem::path& hkl_filename,
 	err_checkf(std::filesystem::exists(hkl_filename), "HKL file does not exists!", file);
 	std::ifstream hkl_input(hkl_filename, std::ios::in);
 	hkl_input.seekg(0, hkl_input.beg);
-	std::regex r{ R"([abcdefghijklmnopqrstuvwxyz\(\)ABCDEFGHIJKLMNOPQRSTUVW])" };
 	std::string line, temp;
 	while (!hkl_input.eof())
 	{
@@ -212,8 +222,7 @@ void read_hkl(const std::filesystem::path& hkl_filename,
 			break;
 		if (line.size() < 2)
 			continue;
-		std::cmatch result;
-		if (regex_search(line.c_str(), result, r))
+		if (hkl_text_line(line))
 			continue;
 		err_checkf(line.size() >= 12, "hkl line too short for h k l: '" + line + "'", file);
 		// if (debug) file << "hkl: ";
@@ -245,9 +254,9 @@ void read_hkl(const std::filesystem::path& hkl_filename,
 		for (const i3& hkl__ : hkl)
 			for (int i = 0; i < twin_law.size(); i++)
 				hkl.emplace(i3{
-					static_cast<int>(twin_law[i][0] * hkl__[0] + twin_law[i][1] * hkl__[1] + twin_law[i][2] * hkl__[2]),
-					static_cast<int>(twin_law[i][3] * hkl__[0] + twin_law[i][4] * hkl__[1] + twin_law[i][5] * hkl__[2]),
-					static_cast<int>(twin_law[i][6] * hkl__[0] + twin_law[i][7] * hkl__[1] + twin_law[i][8] * hkl__[2]) });
+					int(std::lround(twin_law[i][0] * hkl__[0] + twin_law[i][1] * hkl__[1] + twin_law[i][2] * hkl__[2])),
+					int(std::lround(twin_law[i][3] * hkl__[0] + twin_law[i][4] * hkl__[1] + twin_law[i][5] * hkl__[2])),
+					int(std::lround(twin_law[i][6] * hkl__[0] + twin_law[i][7] * hkl__[1] + twin_law[i][8] * hkl__[2])) });
 	}
 	if (debug)
 		file << "Number of reflections after twin: " << hkl.size() << std::endl;
@@ -274,42 +283,8 @@ void read_hkl(const std::filesystem::path& hkl_filename,
 	else
 		file << "Number of symmetry operations: " << sym[0][0].size() << std::endl;
 
-	i3 tempv;
-	hkl_list hkl_enlarged = hkl;
-	for (int s = 0; s < sym[0][0].size(); s++)
-	{
-		if (sym[0][0][s] == 1 && sym[1][1][s] == 1 && sym[2][2][s] == 1 &&
-			sym[0][1][s] == 0 && sym[0][2][s] == 0 && sym[1][2][s] == 0 &&
-			sym[1][0][s] == 0 && sym[2][0][s] == 0 && sym[2][1][s] == 0)
-		{
-			continue;
-		}
-		for (const i3& hkl__ : hkl)
-		{
-			tempv = { 0, 0, 0 };
-			for (int h = 0; h < 3; h++)
-			{
-				for (int j = 0; j < 3; j++)
-					tempv[j] += hkl__[h] * sym[j][h][s];
-			}
-			hkl_enlarged.emplace(tempv);
-		}
-	}
-
-	for (const i3& hkl__ : hkl_enlarged)
-	{
-		tempv = hkl__;
-		tempv[0] *= -1;
-		tempv[1] *= -1;
-		tempv[2] *= -1;
-		if (hkl_enlarged.find(tempv) != hkl_enlarged.end())
-		{
-			hkl_enlarged.erase(tempv);
-		}
-	}
-	if (unit_cell.get_sym().empty()) {
-		hkl = hkl_enlarged;
-	}
+	//the list stays the file's reflections: a symmetry-enlarged, Friedel-pruned copy used to be built
+	//here and kept only if get_sym() was empty, which it never is (cell always holds its 3 rows)
 	// Remove 0 0 0 if it exists
 	if (hkl.find(i3{ 0, 0, 0 }) != hkl.end())
 		hkl.erase(i3{ 0, 0, 0 });
@@ -321,7 +296,7 @@ hkl_list read_hkl_full(const std::filesystem::path& hkl_filename,
 	const vec2& twin_law,
 	cell& unit_cell,
 	std::ostream& file,
-	std::vector<scattering_data>& obs,
+	scatter_data& obs,
 	bool debug
 )
 {
@@ -331,7 +306,6 @@ hkl_list read_hkl_full(const std::filesystem::path& hkl_filename,
 	err_checkf(std::filesystem::exists(hkl_filename), "HKL file does not exists!", file);
 	std::ifstream hkl_input(hkl_filename, std::ios::in);
 	hkl_input.seekg(0, hkl_input.beg);
-	std::regex r{ R"([abcdefghijklmnopqrstuvwxyz\(\)ABCDEFGHIJKLMNOPQRSTUVW])" };
 	std::string line, temp;
 	//hkl is a set, so it hands the reflections back in (h,k,l) order whatever the file order;
 	//obs has to follow that order, or F_calc[i] meets the wrong observation
@@ -343,8 +317,7 @@ hkl_list read_hkl_full(const std::filesystem::path& hkl_filename,
 			break;
 		if (line.size() < 2)
 			continue;
-		std::cmatch result;
-		if (regex_search(line.c_str(), result, r))
+		if (hkl_text_line(line))
 			continue;
 		err_checkf(line.size() >= 12, "hkl line too short for h k l: '" + line + "'", file);
 		// if (debug) file << "hkl: ";
@@ -392,24 +365,33 @@ hkl_list read_hkl_full(const std::filesystem::path& hkl_filename,
 	}
 	hkl_input.close();
 	err_checkf(!hkl.empty(), "No reflections read from " + hkl_filename.string(), file);
-	obs.clear();
-	for (const i3& h : hkl)
-		obs.push_back(obs_by_hkl.at(h));
+	obs.abs_F_obs.clear();
+	obs.F_obs.clear();
+	obs.F_obs2.clear();
+	obs.sigma_obs.clear();
+	obs.sigma_obs2.clear();
+	std::vector<scattering_data> obs_vector;
+	for (const i3& h : hkl) {
+		scattering_data temp(obs_by_hkl.at(h));
+		obs.abs_F_obs.push_back(temp.abs_F_obs);
+		obs.F_obs.push_back(temp.F_obs);
+		obs.F_obs2.push_back(temp.F_obs2);
+		obs.sigma_obs.push_back(temp.sigma_obs);
+		obs.sigma_obs2.push_back(temp.sigma_obs2);
+	}
 	file << " done!\nNr of reflections read from file: " << hkl.size() << std::endl;
 
-	if (debug)
-		file << "Number of reflections before twin: " << hkl.size() << std::endl;
+	//The fit stays on the measured reflections (hkl, in step with obs); the twin images R h only join the set
+	//the written table covers, so a twinned refinement finds every twin mate it asks for
+	obs.hkl_table = hkl;
+	for (const i3& hkl__ : hkl)
+		for (int i = 0; i < twin_law.size(); i++)
+			obs.hkl_table.emplace(i3{
+				int(std::lround(twin_law[i][0] * hkl__[0] + twin_law[i][1] * hkl__[1] + twin_law[i][2] * hkl__[2])),
+				int(std::lround(twin_law[i][3] * hkl__[0] + twin_law[i][4] * hkl__[1] + twin_law[i][5] * hkl__[2])),
+				int(std::lround(twin_law[i][6] * hkl__[0] + twin_law[i][7] * hkl__[1] + twin_law[i][8] * hkl__[2])) });
 	if (twin_law.size() > 0)
-	{
-		for (const i3& hkl__ : hkl)
-			for (int i = 0; i < twin_law.size(); i++)
-				hkl.emplace(i3{
-					static_cast<int>(twin_law[i][0] * hkl__[0] + twin_law[i][1] * hkl__[1] + twin_law[i][2] * hkl__[2]),
-					static_cast<int>(twin_law[i][3] * hkl__[0] + twin_law[i][4] * hkl__[1] + twin_law[i][5] * hkl__[2]),
-					static_cast<int>(twin_law[i][6] * hkl__[0] + twin_law[i][7] * hkl__[1] + twin_law[i][8] * hkl__[2]) });
-	}
-	if (debug)
-		file << "Number of reflections after twin: " << hkl.size() << std::endl;
+		file << "Reflections in the table with " << twin_law.size() << " twin law(s): " << obs.hkl_table.size() << std::endl;
 
 	ivec3 sym(3);
 	for (int i = 0; i < 3; i++)
@@ -435,7 +417,7 @@ hkl_list read_hkl_full(const std::filesystem::path& hkl_filename,
 
 	i3 tempv;
 	hkl_list hkl_enlarged;
-	hkl_enlarged = hkl;
+	hkl_enlarged = obs.hkl_table;
 	for (int s = 0; s < sym[0][0].size(); s++)
 	{
 		if (sym[0][0][s] == 1 && sym[1][1][s] == 1 && sym[2][2][s] == 1 &&
@@ -444,7 +426,7 @@ hkl_list read_hkl_full(const std::filesystem::path& hkl_filename,
 		{
 			continue;
 		}
-		for (const i3& hkl__ : hkl)
+		for (const i3& hkl__ : obs.hkl_table)
 		{
 			tempv = { 0, 0, 0 };
 			for (int h = 0; h < 3; h++)
@@ -456,12 +438,80 @@ hkl_list read_hkl_full(const std::filesystem::path& hkl_filename,
 		}
 	}
 
-	// Remove 0 0 0 if it exists
-	if (hkl.find(i3{ 0, 0, 0 }) != hkl.end())
-		hkl.erase(i3{ 0, 0, 0 });
 	file << "Nr of reflections to be used: " << hkl.size() << std::endl;
 	return hkl_enlarged;
 }
+
+// Basically a clone of the read_hkl_full function but for reading masks, can be collapsed into a template function in the future
+void read_mask(const std::filesystem::path& mask_filename,
+	const hkl_list& hkl,
+	const hkl_list& hkl_enlarged,
+	const cell& unit_cell,
+	std::ostream& file,
+	vec2& mask_info,
+	const int& n_r,
+	bool debug
+)
+{
+	// Mask values of the fab file at their position in hkl_enlarged
+	cvec mask_enlarged(hkl_enlarged.size(), 0.0);
+	bvec in_fab(hkl_enlarged.size(), false);
+	const std::vector<i3> enlarged(hkl_enlarged.begin(), hkl_enlarged.end());
+	mask_info.resize(n_r, vec(2, 0.0));
+	i3 hkl_;
+	double real_mask, imag_mask;
+	err_checkf(std::filesystem::exists(mask_filename), "fab file does not exists!", file);
+	std::ifstream mask_input(mask_filename, std::ios::in);
+	mask_input.seekg(0, mask_input.beg);
+	std::string line, temp;
+	//hkl is a set, so it hands the reflections back in (h,k,l) order whatever the file order;
+	//the mask has to follow that order, or F_calc[i] meets the wrong observation
+	std::map<i3, scattering_data> mask_by_hkl;
+	while (!mask_input.eof())
+	{
+		getline_universal(mask_input, line);
+		if (mask_input.eof())
+			break;
+		if (line.size() < 2)
+			continue;
+		if (hkl_text_line(line))
+			continue;
+		err_checkf(line.size() >= 12, "mask line too short for h k l: '" + line + "'", file);
+		std::istringstream iss(line);
+		for (int i = 0; i < 3; i++)
+		{
+			// Values are separated by whitespace, so we can use std::istringstream to parse the line
+			iss >> temp;
+			hkl_[i] = stoi(temp);
+		}
+		iss >> temp;
+		real_mask = stod(temp);
+		iss >> temp;
+		imag_mask = stod(temp);
+		//a binary search in the sorted copy: a set iterator distance is linear in hkl_enlarged
+		const auto it = std::lower_bound(enlarged.begin(), enlarged.end(), hkl_);
+		if (it != enlarged.end() && *it == hkl_) {
+			const size_t pos = it - enlarged.begin();
+			mask_enlarged[pos] = cdouble(real_mask, imag_mask);
+			in_fab[pos] = true;
+		}
+	}
+	// The fab file lists one reflection of each set of equivalents: F(h) = exp(2 pi i h.t_s) F(h R_s)
+	const vec2 trans = unit_cell.get_trans();
+	auto h = hkl.begin();
+	const ivec2 lookups = unit_cell.generate_asym_lookup(hkl, hkl_enlarged);
+	for (int r = 0; r < n_r; r++, h++) {
+		const ivec& lookup = lookups[r];
+		for (int s = 0; s < lookup.size(); s++) {
+			if (!in_fab[lookup[s]]) continue;
+			const cdouble F = std::exp(cdouble(0, constants::TWO_PI * ((*h)[0] * trans[0][s] + (*h)[1] * trans[1][s] + (*h)[2] * trans[2][s]))) * mask_enlarged[lookup[s]];
+			mask_info[r][0] = F.real();
+			mask_info[r][1] = F.imag();
+			break;
+		}
+	}
+}
+
 
 /**
  * Generates a list of hkl values based on the given parameters.
@@ -484,11 +534,8 @@ void generate_hkl(const double& dmin,
 	using namespace std;
 	const ivec3 sym = unit_cell.get_sym();
 	const int n_sym = sym[0][0].size();
-	//An index box narrows the sphere to the orbit of the measured indices: h is kept when one
-	//of its images h.R, or the Friedel mate of one, lies in the box. That is the set cctbx's
-	//table reader resolves for a measured list (smtbx table_based.h walks h.R over the
-	//rotations and falls back to -h.R), and since a rotation preserves d every image of a
-	//box index is inside the sphere already, so nothing the reader asks for is dropped.
+	//An index box keeps h when an image h.R, or its Friedel mate, lies in the box: the set smtbx table_based.h
+	//resolves for a measured list. A rotation preserves d, so every image of a box index is inside the sphere.
 	//sym[j][h][s] holds R^T, so the products below form h.R, the cctbx convention.
 	const bool boxed = hkl_min_max.size() == 3;
 	if (boxed)
@@ -515,9 +562,8 @@ void generate_hkl(const double& dmin,
 		return false;
 	};
 	file << "Generating hkl indices up to d=: " << fixed << setw(17) << setprecision(2) << dmin << flush;
-	//The sphere d*^2 <= 1/d_keep^2 (cctbx index_generator, smtbx n_beam.h) is closed under
-	//the point group, so the Friedel half l > 0 | l = 0, k > 0 | k = l = 0, h > 0 is the list.
-	//d_keep sits 1e-3 inside dmin so a reflection at dmin from a rounded cell is never lost.
+	//The sphere d*^2 <= 1/d_keep^2 (cctbx index_generator) is closed under the point group, so its Friedel half
+	//l > 0 | l = 0, k > 0 | k = l = 0, h > 0 is the list; d_keep sits 1e-3 inside dmin to keep a reflection at dmin from a rounded cell.
 	const double d_keep = dmin * (1.0 - 1e-3);
 	const double s_max = 1.0 / (d_keep * d_keep);
 	const array<double, 6> G = unit_cell.get_reciprocal_metric();
@@ -572,9 +618,9 @@ void generate_hkl(const double& dmin,
 		for (const i3& hkl__ : hkl)
 			for (int i = 0; i < twin_law.size(); i++)
 				twinned.emplace(i3{
-					int(twin_law[i][0] * hkl__[0] + twin_law[i][1] * hkl__[1] + twin_law[i][2] * hkl__[2]),
-					int(twin_law[i][3] * hkl__[0] + twin_law[i][4] * hkl__[1] + twin_law[i][5] * hkl__[2]),
-					int(twin_law[i][6] * hkl__[0] + twin_law[i][7] * hkl__[1] + twin_law[i][8] * hkl__[2]) });
+					int(std::lround(twin_law[i][0] * hkl__[0] + twin_law[i][1] * hkl__[1] + twin_law[i][2] * hkl__[2])),
+					int(std::lround(twin_law[i][3] * hkl__[0] + twin_law[i][4] * hkl__[1] + twin_law[i][5] * hkl__[2])),
+					int(std::lround(twin_law[i][6] * hkl__[0] + twin_law[i][7] * hkl__[1] + twin_law[i][8] * hkl__[2])) });
 		if (debug)
 			file << "Number of reflections after twin: " << twinned.size() << endl;
 		i3 tempv;
@@ -635,9 +681,8 @@ void generate_hkl(const ivec2& hkl_min_max,
 	reflections out to half the measured spacing, and it is the latter a
 	dynamical calculation asks for. A box and a resolution shell are different
 	shapes: the shell reaches further along the shorter axes, so this leaves a
-	gap there. Olex2 sends -dmin for ED, which generates the sphere and ignores
-	the box; this stays for callers that pass only a box, and says so rather
-	than looking complete.
+	gap there. Olex2 sends -dmin for ED, which generates the sphere; this
+	serves callers that pass only a box.
 	*/
 	if (ED) {
 		h_max *= 2, k_max *= 2, l_max *= 2;
@@ -670,9 +715,9 @@ void generate_hkl(const ivec2& hkl_min_max,
 		for (const i3& hkl__ : hkl)
 			for (int i = 0; i < twin_law.size(); i++)
 				hkl.emplace(i3{
-					int(twin_law[i][0] * hkl__[0] + twin_law[i][1] * hkl__[1] + twin_law[i][2] * hkl__[2]),
-					int(twin_law[i][3] * hkl__[0] + twin_law[i][4] * hkl__[1] + twin_law[i][5] * hkl__[2]),
-					int(twin_law[i][6] * hkl__[0] + twin_law[i][7] * hkl__[1] + twin_law[i][8] * hkl__[2]) });
+					int(std::lround(twin_law[i][0] * hkl__[0] + twin_law[i][1] * hkl__[1] + twin_law[i][2] * hkl__[2])),
+					int(std::lround(twin_law[i][3] * hkl__[0] + twin_law[i][4] * hkl__[1] + twin_law[i][5] * hkl__[2])),
+					int(std::lround(twin_law[i][6] * hkl__[0] + twin_law[i][7] * hkl__[1] + twin_law[i][8] * hkl__[2])) });
 	}
 	if (debug)
 		file << "Number of reflections after twin: " << hkl.size() << endl;
@@ -750,6 +795,25 @@ void generate_hkl_from_options(const options& opt,
 {
 	const bool have_dmin = opt.dmin != 99.0;
 	const bool have_box = opt.hkl_min_max[0][0] != -100 && opt.hkl_min_max[2][1] != 100;
+	if (opt.hkl_scale != 1)
+	{
+		//scaled indices overflow the 3I4 columns of read_hkl; the list is complete, so no images are added
+		err_checkf(opt.hkl != "", "-hkl_scale needs the index list in -hkl", file);
+		file << "Reading: " << std::setw(44) << opt.hkl << std::flush;
+		std::ifstream in(opt.hkl);
+		std::string line;
+		i3 h;
+		while (getline_universal(in, line))
+		{
+			std::istringstream row(line);
+			if (row >> h[0] >> h[1] >> h[2])
+				hkl.emplace(h);
+		}
+		hkl.erase(i3{ 0, 0, 0 });
+		err_checkf(!hkl.empty(), "No reflections read from " + opt.hkl.string(), file);
+		file << " done!\nNr of reflections read in units of 1/" << opt.hkl_scale << ": " << hkl.size() << std::endl;
+		return;
+	}
 	if (have_dmin && opt.electron_diffraction)
 		generate_hkl(opt.dmin / 2.0 - 0.001, hkl, opt.twin_law, unit_cell, file, opt.debug);
 	else if (have_dmin && have_box)
@@ -788,16 +852,18 @@ void generate_fractional_hkl(const double& dmin,
 	const int extreme = 201;
 	double dmin_l = 0.9 * dmin;
 	const int lim = static_cast<int>(extreme / stepsize[0]);
+	const int lim_k = static_cast<int>(extreme / stepsize[1]);
 #pragma omp parallel for private(hkl_)
 	for (int h = -lim; h < lim; h++)
 	{
 		const double _h = h * stepsize[0];
-		for (double k = -extreme; k < extreme; k += stepsize[1])
+		//k as index * step like h and l: a running sum drifts off the grid the symmetry images land on
+		for (int k = -lim_k; k < lim_k; k++)
 		{
 			// only need 0 to extreme, since we have no DISP signal
 			for (int l = 0; l < lim; l++)
 			{
-				hkl_ = { _h, k, l * stepsize[2] };
+				hkl_ = { _h, k * stepsize[1], l * stepsize[2] };
 				if (unit_cell.get_d_of_hkl(hkl_) >= dmin_l)
 				{
 #pragma omp critical
@@ -864,6 +930,13 @@ void generate_fractional_hkl(const double& dmin,
 				for (int j = 0; j < 3; j++)
 					tempv[j] += hkl__[h] * sym[j][h][s];
 			}
+			//h - k of two grid values misses the grid value by an ulp and std::set keys on exact doubles
+			for (int j = 0; j < 3; j++)
+			{
+				const double n = std::round(tempv[j] / stepsize[j]);
+				if (std::abs(tempv[j] / stepsize[j] - n) < 1e-6)
+					tempv[j] = n * stepsize[j];
+			}
 			hkl_enlarged.emplace(tempv);
 		}
 	}
@@ -905,19 +978,8 @@ void generate_fractional_hkl(const double& dmin,
  * @param file The output stream for the file.
  * @param debug A boolean indicating whether to enable debug mode.
  */
-// Read exactly n whitespace-separated values of one CIF loop row.
-//
-// Two things a real CIF does that "one stringstream per line" does not survive:
-//
-//   * a row may be WRAPPED over several lines. CIF has an 80-column heritage and
-//     writers still break long rows. Seen on a disordered structure whose carbon
-//     rows carry 14 of 15 values with the last on the following line - the empty
-//     field then reached std::stoi and aborted the whole run.
-//   * a value may be QUOTED and contain spaces, e.g. 'x, y, z'. Splitting on
-//     whitespace turns one value into three.
-//
-// Returns false if the file ends with the row incomplete. `line` is left holding
-// the last line consumed, which is what the surrounding loops expect.
+// Reads exactly n values of one CIF loop row: a row may wrap over several lines and a quoted value ('x, y, z')
+// may contain spaces. False if the file ends mid-row; line keeps the last line consumed, as the callers expect.
 static bool read_cif_loop_row(std::istream &input, std::string &line, int n, svec &fields)
 {
 	fields.assign(n, "");
@@ -952,6 +1014,62 @@ static bool read_cif_loop_row(std::istream &input, std::string &line, int n, sve
 	}
 }
 
+
+std::vector<std::pair<std::string, atomID>> cif_scatterer_keys(const pathvec& cifs)
+{
+	using namespace std;
+	vector<pair<string, atomID>> out;
+	unordered_set<string> seen;
+	for (const filesystem::path& cif : cifs)
+	{
+		ifstream in(cif);
+		err_checkf(in.good(), "Could not open " + cif.string(), std::cout);
+		string line;
+		bool done = false;
+		while (!done && getline_universal(in, line))
+		{
+			if (line.find("loop_") == string::npos)
+				continue;
+			int n = 0, label = -1, type = -1, group = -1, pos[3] = { -1, -1, -1 };
+			getline_universal(in, line);
+			while (trim(line).find("_") == 0)
+			{
+				if (line.find("_atom_site_label") != string::npos) label = n;
+				else if (line.find("type_symbol") != string::npos) type = n;
+				else if (line.find("disorder_group") != string::npos) group = n;
+				else if (line.find("fract_x") != string::npos) pos[0] = n;
+				else if (line.find("fract_y") != string::npos) pos[1] = n;
+				else if (line.find("fract_z") != string::npos) pos[2] = n;
+				getline_universal(in, line);
+				n++;
+			}
+			if (label < 0 || type < 0 || pos[0] < 0 || pos[1] < 0 || pos[2] < 0)
+				continue;
+			//the rows as read_atoms_from_CIF reads them, so the atomID is the one the table and the .tshb carry
+			while (trim(line).find("_") > 0 && trim(line).find("loop_") != 0 && line.length() > 3)
+			{
+				svec f;
+				err_checkf(read_cif_loop_row(in, line, n, f), "CIF ends inside an atom loop row, last line: '" + line + "'", std::cout);
+				for (string* s : { &f[label], &f[type] })
+					s->erase(remove_if(s->begin(), s->end(), ::isspace), s->end());
+				int part = 0;
+				if (group >= 0 && f[group] != "." && f[group] != "?" && !f[group].empty())
+					try { part = stoi(f[group]); }
+					catch (const exception&) { part = 0; }
+				const int Z = constants::get_Z_from_label(f[type].c_str()) + 1;
+				if (Z > 0)
+				{
+					const atomID id(stod(f[pos[0]]), stod(f[pos[1]]), stod(f[pos[2]]), part, Z);
+					if (seen.insert(id.to_hex_string()).second)
+						out.emplace_back(f[label], id);
+				}
+				getline_universal(in, line);
+			}
+			done = true;
+		}
+	}
+	return out;
+}
 
 svec read_atoms_from_CIF(std::ifstream& cif_input,
 	const ivec& input_groups,
@@ -1055,8 +1173,7 @@ svec read_atoms_from_CIF(std::ifstream& cif_input,
 				int group_nr = 0;
 				if (group_field != -1 && fields[group_field] != "." && fields[group_field] != "?"
 					&& !fields[group_field].empty()) {
-					// Belt and braces: an unreadable disorder group should not abort a
-					// run that is otherwise perfectly fine.
+					// An unreadable disorder group must not abort the run.
 					try { group_nr = std::stoi(fields[group_field]); }
 					catch (const std::exception &) {
 						file << "Could not read disorder group for atom " << fields[label_field]
@@ -1077,12 +1194,13 @@ svec read_atoms_from_CIF(std::ifstream& cif_input,
 					continue;
 				}
 				bool old_atom = false;
+				const int row_Z = constants::get_Z_from_label(fields[type_field].c_str()) + 1; //0 when the type is no plain symbol
 				const atomID cif_atom_id(
 					stod(fields[position_field[0]]), stod(fields[position_field[1]]), stod(fields[position_field[2]]),
 					group_nr,
-					constants::get_Z_from_label(fields[type_field].c_str()) + 1);
+					row_Z);
 				const std::string atom_ID = cif_atom_id.to_hex_string();
-#pragma omp parallel for reduction(|| : old_atom)
+				//serial: a parallel region per CIF row costs a thread wake-up per row, more than the comparisons themselves
 				for (int run = 0; run < known_atoms.size(); run++)
 				{
 					if (fields[label_field] == known_atoms[run] || atom_ID == known_atoms[run])
@@ -1098,6 +1216,7 @@ svec read_atoms_from_CIF(std::ifstream& cif_input,
 					continue;
 				}
 				vec tolerances(3);
+				int wrong_element = -1; //free wfn atom at the row's position, of another element
 				for (int i = 0; i < wave.get_ncen(); i++)
 				{
 					for (int j = 0; j < 3; j++)
@@ -1113,6 +1232,20 @@ svec read_atoms_from_CIF(std::ifstream& cif_input,
 					}
 					if (is_similar_abs(position[0], wave.get_atom_coordinate(i, 0), tolerances[0]) && is_similar_abs(position[1], wave.get_atom_coordinate(i, 1), tolerances[1]) && is_similar_abs(position[2], wave.get_atom_coordinate(i, 2), tolerances[2]))
 					{
+						/* Each wfn atom belongs to one row, and to a row of its own element.
+						A mixed site (EXYZ Se1 S1) puts two atoms on one position and the label
+						test below takes "se1" for sulfur, so Se1 claimed the S atom, S1 claimed
+						it again and the table got a column too many (COD 7236927). Two H 0.06 A
+						apart in different PARTs did the same (2238091).
+						ponytail: first free atom in wfn order, right while Olex2 writes the xyz in
+						row order; pick the nearest free atom if that ever stops holding. */
+						if (!labels[i].empty())
+							continue;
+						if (row_Z > 0 && wave.get_atom_charge(i) != row_Z)
+						{
+							wrong_element = i;
+							continue;
+						}
 						wave.set_atom_frac_coords(i, { stod(fields[position_field[0]]), stod(fields[position_field[1]]), stod(fields[position_field[2]]) });
 						wave.set_atom_group_nr(i, group_nr);
 						// Store exactly the identifier used above for the MTC duplicate check.
@@ -1208,6 +1341,9 @@ svec read_atoms_from_CIF(std::ifstream& cif_input,
 				}
 				else if (!old_atom)
 				{
+					if (wrong_element != -1)
+						file << "\nCIF row " << fields[label_field] << " has type " << fields[type_field] << " but the wavefunction atom at its position is "
+							<< constants::atnr2letter(wave.get_atom_charge(wrong_element)) << ", skipping!\n";
 					if (debug)
 					{
 						file << "I did not find this atom! Tolerances were: ";
@@ -1291,13 +1427,7 @@ void read_atoms_from_CIF(std::ifstream& cif_input, const cell& unit_cell, int& n
 	{
 		if (line.empty())
 			continue;
-		// Trim whitespace at both ends, not just the front. The header comparisons
-		// below are exact, and a CIF written on Windows - which is what Olex2 hands
-		// out - ends every line with \r, so "_atom_site_label\r" never matched and
-		// the atom loop went unrecognised. That left the caller with no atoms at all
-		// and the next reader indexing an empty array, i.e. a segfault on a file the
-		// rest of NoSpherA2 reads without complaint, since the older CIF readers
-		// compare with find() rather than ==.
+		// Trim both ends: the header comparisons below are exact, and a CIF from Windows (Olex2) ends lines with \r.
 		std::string trimmed = trim(line);
 		if (trimmed.empty())
 			continue;
@@ -1419,315 +1549,7 @@ void read_atoms_from_CIF(std::ifstream& cif_input, const cell& unit_cell, int& n
 	}
 }
 
-//svec read_anom_disp_from_CIF(std::ifstream& cif_input,
-//    const ivec& input_groups,
-//    const cell& unit_cell,
-//    const WFN& wave,
-//    const svec& known_atoms,
-//    ivec& atom_type_list,
-//    ivec& asym_atom_to_type_list,
-//    ivec& asym_atom_list,
-//    bvec& needs_grid,
-//    std::ostream& file,
-//    bvec& constant_atoms,
-//    const bool SALTED,
-//    const bool debug)
-//{
-//    using namespace std;
-//    if (debug)
-//        file << "start working on cif" << endl;
-//    bool atoms_read = false;
-//    int count_fields = 0;
-//    int group_field = -1;
-//    int type_field = -1;
-//    int position_field[3] = { -1, -1, -1 };
-//    int label_field = 1000;
-//    string line;
-//    cif_input.clear();
-//    cif_input.seekg(0, cif_input.beg);
-//    svec labels(wave.get_ncen(), "");
-//    if (debug && input_groups.size() > 0)
-//        file << "Group size: " << input_groups.size() << endl;
-//    else if (debug)
-//        file << "Starting search loop" << endl;
-//    while (!cif_input.eof() && !atoms_read)
-//    {
-//        getline_universal(cif_input, line);
-//        // if (debug)
-//        //     file << "line: " << line << endl;
-//        if (line.find("loop_") != string::npos)
-//        {
-//            count_fields = 0;
-//            getline_universal(cif_input, line);
-//            if (debug)
-//                file << "line in loop field definition: " << trim(line) << endl;
-//            while (trim(line).find("_") == 0)
-//            {
-//                if (line.find("label") != string::npos)
-//                    label_field = count_fields;
-//                else if (line.find("type_symbol") != string::npos)
-//                    type_field = count_fields;
-//                else if (line.find("disorder_group") != string::npos)
-//                    group_field = count_fields;
-//                else if (line.find("fract_x") != string::npos)
-//                    position_field[0] = count_fields;
-//                else if (line.find("fract_y") != string::npos)
-//                    position_field[1] = count_fields;
-//                else if (line.find("fract_z") != string::npos)
-//                    position_field[2] = count_fields;
-//                else if (label_field == 1000)
-//                {
-//                    if (debug)
-//                        file << "I don't think this is the atom block.. moving on!" << endl;
-//                    break;
-//                }
-//                getline_universal(cif_input, line);
-//                count_fields++;
-//            }
-//            if (label_field != 1000) {
-//                err_checkf(position_field[0] != -1, "No x position found, impossible to continue!", std::cout);
-//                err_checkf(position_field[1] != -1, "No y position found, impossible to continue!", std::cout);
-//                err_checkf(position_field[2] != -1, "No z position found, impossible to continue!", std::cout);
-//                err_checkf(type_field != -1, "No type found, impossible to continue!", std::cout);
-//            }
-//            while (trim(line).find("_") > 0 && line.length() > 3)
-//            {
-//                atoms_read = true;
-//                stringstream s(line);
-//                svec fields;
-//                fields.resize(count_fields);
-//                int nr = -1;
-//                for (int i = 0; i < count_fields; i++)
-//                    s >> fields[i];
-//                fields[label_field].erase(remove_if(fields[label_field].begin(), fields[label_field].end(), ::isspace), fields[label_field].end());
-//                fields[type_field].erase(remove_if(fields[type_field].begin(), fields[type_field].end(), ::isspace), fields[type_field].end());
-//                if (debug)
-//                    file << "label: " << setw(8) << fields[label_field] << " type: " << fields[type_field] << " frac. pos: "
-//                    << setw(6) << fixed << setprecision(3) << stod(fields[position_field[0]]) << "+/-" << get_decimal_precision_from_CIF_number(fields[position_field[0]]) << " "
-//                    << setw(6) << fixed << setprecision(3) << stod(fields[position_field[1]]) << "+/-" << get_decimal_precision_from_CIF_number(fields[position_field[1]]) << " "
-//                    << setw(6) << fixed << setprecision(3) << stod(fields[position_field[2]]) << "+/-" << get_decimal_precision_from_CIF_number(fields[position_field[2]]) << " " << flush;
-//                vec position = unit_cell.get_coords_cartesian(
-//                    stod(fields[position_field[0]]),
-//                    stod(fields[position_field[1]]),
-//                    stod(fields[position_field[2]]));
-//                vec precisions = unit_cell.get_coords_cartesian(
-//                    min(0.01, get_decimal_precision_from_CIF_number(fields[position_field[0]])),
-//                    min(0.01, get_decimal_precision_from_CIF_number(fields[position_field[1]])),
-//                    min(0.01, get_decimal_precision_from_CIF_number(fields[position_field[2]])));
-//                for (int i = 0; i < 3; i++)
-//                {
-//                    precisions[i] = abs(precisions[i]);
-//                }
-//                if (debug)
-//                    file << " cart. pos.: " << setw(8) << position[0] << "+/-" << precisions[0] << " " << setw(8) << position[1] << "+/-" << precisions[1] << " " << setw(8) << position[2] << "+/-" << precisions[2] << endl;
-//
-//                bool old_atom = false;
-//#pragma omp parallel for reduction(|| : old_atom)
-//                for (int run = 0; run < known_atoms.size(); run++)
-//                {
-//                    if (fields[label_field] == known_atoms[run])
-//                    {
-//                        if (SALTED && (group_field == -1 || fields[group_field].c_str()[0] == '.'))
-//                            continue;
-//                        old_atom = true;
-//                        if (debug)
-//                            file << "I already know this one! " << fields[label_field] << " " << known_atoms[run] << endl;
-//                    }
-//                }
-//                if (old_atom)
-//                {
-//                    getline_universal(cif_input, line);
-//                    continue;
-//                }
-//                vec tolerances(3);
-//                for (int i = 0; i < wave.get_ncen(); i++)
-//                {
-//                    for (int j = 0; j < 3; j++)
-//                    {
-//                        tolerances[j] = 2 * max(min(abs(precisions[j]), 1.0), 0.01);
-//                    }
-//                    if (is_similar_abs(position[0], wave.get_atom_coordinate(i, 0), tolerances[0]) && is_similar_abs(position[1], wave.get_atom_coordinate(i, 1), tolerances[1]) && is_similar_abs(position[2], wave.get_atom_coordinate(i, 2), tolerances[2]))
-//                    {
-//                        string element = constants::atnr2letter(wave.get_atom_charge(i));
-//                        err_checkf(element != "PROBLEM", "Problem identifying atoms!", std::cout);
-//                        string label = fields[label_field];
-//                        string type = fields[type_field];
-//                        transform(element.begin(), element.end(), element.begin(), asciitolower);
-//                        transform(label.begin(), label.end(), label.begin(), asciitolower);
-//                        transform(type.begin(), type.end(), type.begin(), asciitolower);
-//                        if (debug)
-//                        {
-//                            file << "ASYM:  " << setw(8) << element << " charge: " << setw(17) << wave.get_atom_charge(i) << "                             wfn cart. pos: "
-//                                << fixed << setprecision(3) << setw(16) << wave.get_atom_coordinate(i, 0) << " "
-//                                << fixed << setprecision(3) << setw(16) << wave.get_atom_coordinate(i, 1) << " "
-//                                << fixed << setprecision(3) << setw(16) << wave.get_atom_coordinate(i, 2) << flush;
-//                            if (input_groups.size() > 0 && group_field != -1)
-//                            {
-//                                file << " checking disorder group: " << fields[group_field] << " vs. ";
-//                                for (int g = 0; g < input_groups.size(); g++)
-//                                    file << input_groups[g] << ",";
-//                            }
-//                        }
-//                        if (input_groups.size() > 0)
-//                        {
-//                            bool yep = false;
-//                            for (int g = 0; g < input_groups.size(); g++)
-//                            {
-//                                if (group_field == -1) {
-//                                    yep = true;
-//                                    break;
-//                                }
-//                                if (fields[group_field].c_str()[0] == '.' && input_groups[g] == 0)
-//                                {
-//                                    if (debug)
-//                                        file << "appears to be group 0" << endl;
-//                                    yep = true;
-//                                    break;
-//                                }
-//                                else if (stoi(fields[group_field]) == input_groups[g])
-//                                    yep = true;
-//                            }
-//                            if (!yep)
-//                            {
-//                                if (debug)
-//                                    file << "Wrong part!" << endl;
-//                                continue;
-//                            }
-//                        }
-//                        if (label.find(element) == string::npos || label.find(element) > 2)
-//                        {
-//                            if (element != "h")
-//                            {
-//                                if (debug)
-//                                {
-//                                    file << "\nElement symbol not found in label, this is a problem!\n checking type...";
-//                                    if (type.find(element) == string::npos || label.find(element) > 2)
-//                                    {
-//                                        file << " ALSO FAILED! WILL IGNORE ATOM!\n";
-//                                        continue;
-//                                    }
-//                                }
-//                                else
-//                                {
-//                                    if (type.find(element) == string::npos || label.find(element) > 2)
-//                                    {
-//                                        file << "\nAtom " << label << " was not matching by element determined by label reduction or type field, skipping!\n";
-//                                        continue;
-//                                    }
-//                                }
-//                            }
-//                            else if (label.find("d") == string::npos && label.find("t") == string::npos)
-//                            {
-//                                if (debug)
-//                                {
-//                                    file << "\nElement symbol not found in label, this is a problem!\n will check type...";
-//                                    if (type.find(element) == string::npos || label.find(element) > 2)
-//                                    {
-//                                        file << " ALSO FAILED! WILL IGNORE ATOM!\n";
-//                                        continue;
-//                                    }
-//                                }
-//                                else
-//                                {
-//                                    if (type.find(element) == string::npos || label.find(element) > 2)
-//                                    {
-//                                        file << "\nAtom " << label << " was not matching by element determined by label reduction or type field, skipping!\n";
-//                                        continue;
-//                                    }
-//                                }
-//                            }
-//                        }
-//
-//
-//                        labels[i] = fields[label_field];
-//                        asym_atom_list.push_back(i);
-//                        needs_grid[i] = true;
-//                        nr = i;
-//                        break;
-//                    }
-//                }
-//                if (debug)
-//                    file << " nr= " << nr << endl;
-//                if (nr != -1)
-//                {
-//                    bool already_there = false;
-//                    for (int i = 0; i < atom_type_list.size(); i++)
-//                        if (atom_type_list[i] == wave.get_atom_charge(nr))
-//                        {
-//                            already_there = true;
-//                            asym_atom_to_type_list.push_back(i);
-//                            break;
-//                        }
-//                    if (already_there == false && wave.get_atom_charge(nr) != 119)
-//                    {
-//                        asym_atom_to_type_list.push_back((int)atom_type_list.size());
-//                        atom_type_list.push_back(wave.get_atom_charge(nr));
-//                    }
-//                }
-//                else if (!old_atom)
-//                {
-//                    if (debug)
-//                    {
-//                        file << "I did not find this atom! Tolerances were: ";
-//                        for (int j = 0; j < 3; j++)
-//                        {
-//                            file << setw(12) << fixed << setprecision(8) << tolerances[j];
-//                        }
-//                        file << endl;
-//                    }
-//                }
-//                getline_universal(cif_input, line);
-//            }
-//        }
-//    }
-//
-//    // Add missing atom types to be able to calc sphericals correctly
-//    for (int nr = 0; nr < wave.get_ncen(); nr++)
-//    {
-//        bool already_there = false;
-//        for (int i = 0; i < atom_type_list.size(); i++)
-//        {
-//            if (atom_type_list[i] == wave.get_atom_charge(nr))
-//            {
-//                already_there = true;
-//                break;
-//            }
-//        }
-//        if (already_there == false && wave.get_atom_charge(nr) != 119)
-//        {
-//            atom_type_list.push_back(wave.get_atom_charge(nr));
-//        }
-//    }
-//
-//    err_checkf(asym_atom_list.size() <= wave.get_ncen(), "More asymmetric unit atoms detected than in the wavefunction! Aborting!", file);
-//    err_checkf(asym_atom_list.size() != 0, "0 asym atoms is imposible! something is wrong with reading the CIF!", file);
-//
-//    for (int i = 0; i < atom_type_list.size(); i++)
-//        err_checkf((atom_type_list[i] <= 113 || atom_type_list[i] == 119) && atom_type_list[i] > 0, "Unreasonable atom type detected: " + toString(atom_type_list[i]) + " (Happens if Atoms were not identified correctly)", file);
-//    file << " done!" << endl;
-//    if (debug)
-//    {
-//        file << "There are " << atom_type_list.size() << " types of atoms" << endl;
-//        for (int i = 0; i < atom_type_list.size(); i++)
-//            file << setw(4) << atom_type_list[i];
-//        file << endl
-//            << "asym_atoms_to_type_list: " << endl;
-//        for (int i = 0; i < asym_atom_to_type_list.size(); i++)
-//            file << setw(4) << asym_atom_to_type_list[i];
-//        file << endl;
-//        file << "Charges of atoms:" << endl;
-//        for (int i = 0; i < wave.get_ncen(); i++)
-//            file << setw(4) << wave.get_atom_charge(i);
-//        file << endl;
-//    }
-//    int size = static_cast<int>(asym_atom_list.size());
-//    svec labels2;
-//    for (int i = 0; i < size; i++)
-//        labels2.emplace_back(labels[asym_atom_list[i]]);
-//    return labels2;
-//}
-
-//Declared in the header so the XCW I tensor screens on the same ladder: what counts as
+//Declared in the header so the XCW grid screens on the same ladder: what counts as
 //negligible is the run's accuracy setting, and there should be one answer to that.
 double cutoff(const int& accuracy)
 {
@@ -1790,7 +1612,36 @@ static inline cdouble sfac_bessel_r(const primitive& p, const double* k_point, c
 	}
 }
 
-//a streaming caller owns one bar for the whole table and passes it in, else every block draws its own
+namespace {
+//Atoms whose shells match (one element of one basis) share their transformed basis functions
+struct salted_sf_group {
+	int t = 0;                 //template atom
+	ivec members;              //indices into asym_atom_list
+	int ne = 0, nf = 0;        //columns: the ne even-l ones first, then the odd
+	ivec col_shell, col_lm;    //shell offset from the template's first, and l*l + m
+	vec col_sign;              //PI3_2 times the sign of i^l
+	vec Ce, Co;                //[members][ne] and [members][nf - ne], the coefficients in column order
+};
+
+bool salted_same_shells(const aux_density_table& t, const int a, const int b)
+{
+	const int n = t.sh_start[a + 1] - t.sh_start[a];
+	if (n != t.sh_start[b + 1] - t.sh_start[b]) return false;
+	for (int i = 0; i < n; i++) {
+		const int sa = t.sh_start[a] + i, sb = t.sh_start[b] + i, np = t.pr_start[sa + 1] - t.pr_start[sa];
+		if (t.sh_l[sa] != t.sh_l[sb] || np != t.pr_start[sb + 1] - t.pr_start[sb]) return false;
+		for (int p = 0; p < np; p++)
+			if (t.pr_uniq[t.pr_start[sa] + p] != t.pr_uniq[t.pr_start[sb] + p] || t.pr_norm[t.pr_start[sa] + p] != t.pr_norm[t.pr_start[sb] + p]) return false;
+	}
+	return true;
+}
+}
+
+//The transform as one GEMM per group of atoms with the same shells: B[j][k] = i^l PI3_2 R_s(|k|) Y_lm(k^) depends on the
+//basis function alone, so the form factors of a group are its coefficient rows times B, even l into the real part and odd
+//l into the imaginary. The functions are atom-centred, so there is no phase. A per-atom loop recomputed Y_lm per shell
+//and summed scalar complex terms, ~25 ns per atom and reflection on 8 threads. aux_density_table::fourier_atom is the
+//one-atom reference. A streaming caller owns one bar for the whole table and passes it in, else every block draws its own.
 void calc_SF_SALTED(
 	const vec2& k_pt,
 	const vec& coefs,
@@ -1802,6 +1653,8 @@ void calc_SF_SALTED(
 	const int num_asym_atoms = static_cast<int>(asym_atom_list.size());
 	const int nk = static_cast<int>(k_pt[0].size());
 	sf.resize(num_asym_atoms);
+	//in parallel: a whole-sphere table is GBs, and one thread zeroing it page by page left the transform flat in threads
+#pragma omp parallel for schedule(dynamic)
 	for (int ia = 0; ia < num_asym_atoms; ++ia)
 		sf[ia].assign(nk, constants::cnull);
 	std::unique_ptr<ProgressBar> local_pb;
@@ -1810,42 +1663,771 @@ void calc_SF_SALTED(
 	ProgressBar& pb = progress ? *progress : *local_pb;
 	const int n_uniq = static_cast<int>(table.uniq_exp.size());
 
-#pragma omp parallel
-	{
-		//the radial factor (H/2)^l exp(-H^2/4a) / a^(l+3/2) of aux_density_table::fourier_atom depends on (a, l) and |k| alone,
-		//so it is tabulated once per k-point over the distinct pairs instead of per primitive per atom
-		vec radial(n_uniq);
-#pragma omp for
-		for (int ik = 0; ik < nk; ++ik)
-		{
-			const double kx = k_pt[0][ik], ky = k_pt[1][ik], kz = k_pt[2][ik];
+	std::vector<salted_sf_group> groups;
+	for (int ia = 0; ia < num_asym_atoms; ++ia) {
+		const int a = asym_atom_list[ia];
+		auto g = std::find_if(groups.begin(), groups.end(), [&](const salted_sf_group& x) { return salted_same_shells(table, x.t, a); });
+		if (g == groups.end()) {
+			groups.emplace_back();
+			g = groups.end() - 1;
+			g->t = a;
+		}
+		g->members.push_back(ia);
+	}
+	int lmax = 0, nsh_max = 0, nf_max = 0, nm_max = 0;
+	for (salted_sf_group& g : groups) {
+		const int s0 = table.sh_start[g.t], s1 = table.sh_start[g.t + 1];
+		ivec col_off;
+		for (int odd = 0; odd < 2; odd++)
+			for (int s = s0; s < s1; s++) {
+				const int l = table.sh_l[s];
+				if ((l & 1) != odd) continue;
+				for (int m = 0; m <= 2 * l; m++) {
+					g.col_shell.push_back(s - s0);
+					g.col_lm.push_back(l * l + m);
+					g.col_sign.push_back((l & 2) ? -constants::PI3_2 : constants::PI3_2);
+					col_off.push_back(table.coef_off[s] - table.coef_off[s0] + m);
+				}
+				lmax = std::max(lmax, l);
+				if (!odd) g.ne += 2 * l + 1;
+			}
+		g.nf = static_cast<int>(col_off.size());
+		const int no = g.nf - g.ne;
+		g.Ce.resize(g.members.size() * g.ne);
+		g.Co.resize(g.members.size() * no);
+		for (size_t i = 0; i < g.members.size(); i++) {
+			const double* c = coefs.data() + table.coef_off[table.sh_start[asym_atom_list[g.members[i]]]];
+			for (int j = 0; j < g.ne; j++)
+				g.Ce[i * g.ne + j] = c[col_off[j]];
+			for (int j = 0; j < no; j++)
+				g.Co[i * no + j] = c[col_off[g.ne + j]];
+		}
+		nsh_max = std::max(nsh_max, s1 - s0);
+		nf_max = std::max(nf_max, g.nf);
+		nm_max = std::max(nm_max, static_cast<int>(g.members.size()));
+	}
+	//reflections per GEMM: a block of B stays in L2 at ~150 functions an atom
+	constexpr int KB = 64;
+	const int nblk = (nk + KB - 1) / KB;
+	//unit + 16 - m is 1 at index m and 0 elsewhere for m <= 16, so the contraction returns Y_lm alone
+	static constexpr double unit[33] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1 };
+	//the radial factor (H/2)^l exp(-H^2/4a) / a^(l+3/2) depends on (a, l) and |k| alone, so it is tabulated per k over the
+	//distinct pairs; rad and Y hold KB reflections from k0
+	auto tabulate = [&](vec& rad, vec& Y, const int k0, const int kb) {
+		for (int kk = 0; kk < kb; kk++) {
+			const double kx = k_pt[0][k0 + kk], ky = k_pt[1][k0 + kk], kz = k_pt[2][k0 + kk];
 			const double H2 = kx * kx + ky * ky + kz * kz, H = std::sqrt(H2);
 			const double k[3] = { H > 0.0 ? kx / H : 0.0, H > 0.0 ? ky / H : 0.0, H > 0.0 ? kz / H : 1.0 };
-			for (int u = 0; u < n_uniq; u++)
-			{
+			for (int u = 0; u < n_uniq; u++) {
 				double Hl_over_2l = 1.0;
 				for (int i = 0; i < table.uniq_l[u]; i++)
 					Hl_over_2l *= 0.5 * H;
-				radial[u] = Hl_over_2l * std::exp(-H2 / (4.0 * table.uniq_exp[u])) / table.uniq_exp_l32[u];
+				rad[u * KB + kk] = Hl_over_2l * std::exp(-H2 / (4.0 * table.uniq_exp[u])) / table.uniq_exp_l32[u];
 			}
-			for (int ia = 0; ia < num_asym_atoms; ++ia)
-			{
-				const int a = asym_atom_list[ia];
-				cdouble v = constants::cnull;
-				for (int s = table.sh_start[a]; s < table.sh_start[a + 1]; ++s)
-				{
-					const int l = table.sh_l[s];
-					double r = 0.0;
-					for (int p = table.pr_start[s]; p < table.pr_start[s + 1]; ++p)
-						r += table.pr_norm[p] * radial[table.pr_uniq[p]];
-					v += constants::i_pows[l & 3] * (constants::PI3_2 * r * constants::spherical_harmonic(l, k[0], k[1], k[2], coefs.data() + table.coef_off[s]));
-				}
-				sf[ia][ik] = v;
-			}
-			pb.update();
+			for (int l = 0; l <= lmax; l++)
+				for (int m = 0; m <= 2 * l; m++)
+					Y[(l * l + m) * KB + kk] = constants::spherical_harmonic(l, k[0], k[1], k[2], unit + 16 - m);
 		}
+	};
+	//B[j * ld + kk] of group g from the tables, rs the contracted shells
+	auto fill_B = [&](const vec& rad, const vec& Y, vec& rs, const salted_sf_group& g, const int kb, double* B, const size_t ld) {
+		const int s0 = table.sh_start[g.t];
+		for (int i = 0; i < table.sh_start[g.t + 1] - s0; i++) {
+			double* r = &rs[i * KB];
+			std::fill(r, r + kb, 0.0);
+			for (int p = table.pr_start[s0 + i]; p < table.pr_start[s0 + i + 1]; p++) {
+				const double w = table.pr_norm[p], * q = &rad[table.pr_uniq[p] * KB];
+				for (int kk = 0; kk < kb; kk++) r[kk] += w * q[kk];
+			}
+		}
+		for (int j = 0; j < g.nf; j++) {
+			const double c = g.col_sign[j], * r = &rs[g.col_shell[j] * KB], * y = &Y[g.col_lm[j] * KB];
+			double* d = B + j * ld;
+			for (int kk = 0; kk < kb; kk++) d[kk] = c * r[kk] * y[kk];
+		}
+	};
+	//re (nm x kb) = Ce B[:ne, :], im = Co B[ne:, :]. Not offloaded: GEMM on the device lost on every card tried,
+	//V100 included, since B and the form factors cross the bus (branch salted-ft-gpu-attempt)
+	auto products = [&](const salted_sf_group& g, const int kb, const double* B, const int ldb, vec& re, vec& im, const int ldc) {
+		const int nm = static_cast<int>(g.members.size()), no = g.nf - g.ne;
+		const auto gemm = [&](const int k, const double* A, const double* Bk, vec& C) {
+			if (k == 0) { std::fill(C.begin(), C.end(), 0.0); return; }
+			cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, nm, kb, k, 1.0, A, k, Bk, ldb, 0.0, C.data(), ldc);
+		};
+		gemm(g.ne, g.Ce.data(), B, re);
+		gemm(no, g.Co.data(), B + static_cast<size_t>(g.ne) * ldb, im);
+	};
+
+#pragma omp parallel
+	{
+#if !defined(__APPLE__) && !defined(NSA2_OPENBLAS)
+		const int mkl_before = mkl_set_num_threads_local(1);
+#endif
+		vec rad(static_cast<size_t>(n_uniq) * KB), Y(static_cast<size_t>(lmax + 1) * (lmax + 1) * KB), rs(static_cast<size_t>(nsh_max) * KB),
+			Bt(static_cast<size_t>(nf_max) * KB), re(static_cast<size_t>(nm_max) * KB), im(static_cast<size_t>(nm_max) * KB);
+#pragma omp for schedule(dynamic)
+		for (int b = 0; b < nblk; b++)
+		{
+			const int k0 = b * KB, kb = std::min(KB, nk - k0);
+			tabulate(rad, Y, k0, kb);
+			for (const salted_sf_group& g : groups) {
+				fill_B(rad, Y, rs, g, kb, Bt.data(), KB);
+				products(g, kb, Bt.data(), KB, re, im, KB);
+				for (size_t i = 0; i < g.members.size(); i++) {
+					cdouble* out = sf[g.members[i]].data() + k0;
+					for (int kk = 0; kk < kb; kk++) out[kk] = cdouble(re[i * KB + kk], im[i * KB + kk]);
+				}
+			}
+			pb.update(kb);
+		}
+#if !defined(__APPLE__) && !defined(NSA2_OPENBLAS)
+		mkl_set_num_threads_local(mkl_before);
+#endif
 	}
 }
+//calc_SF phase recurrence: reflections per task, points per L1 tile, multiplies between sincos anchors, max row-jump steps
+constexpr int SF_BLOCK = 64, SF_TILE = 256, SF_ANCHOR = 32, SF_NMAX = 4;
+//calc_SF lanes: NEON on every ARM64 (Apple included), AVX or SSE2 on x86, plain doubles elsewhere (armv7). sf_fma and
+//sf_fms are fused where the ISA has it: c + a b and c - a b.
+#if defined(__aarch64__) || defined(_M_ARM64)
+using sf_v = float64x2_t;
+constexpr int SF_W = 2;
+static inline sf_v sf_ld(const double* p) { return vld1q_f64(p); }
+static inline void sf_st(double* p, const sf_v a) { vst1q_f64(p, a); }
+static inline sf_v sf_set(const double a) { return vdupq_n_f64(a); }
+static inline sf_v sf_add(const sf_v a, const sf_v b) { return vaddq_f64(a, b); }
+static inline sf_v sf_mul(const sf_v a, const sf_v b) { return vmulq_f64(a, b); }
+static inline sf_v sf_fma(const sf_v c, const sf_v a, const sf_v b) { return vfmaq_f64(c, a, b); }
+static inline sf_v sf_fms(const sf_v c, const sf_v a, const sf_v b) { return vfmsq_f64(c, a, b); }
+static inline double sf_hsum(const sf_v a) { return vgetq_lane_f64(a, 0) + vgetq_lane_f64(a, 1); }
+#elif defined(__AVX__)
+using sf_v = __m256d;
+constexpr int SF_W = 4;
+static inline sf_v sf_ld(const double* p) { return _mm256_loadu_pd(p); }
+static inline void sf_st(double* p, const sf_v a) { _mm256_storeu_pd(p, a); }
+static inline sf_v sf_set(const double a) { return _mm256_set1_pd(a); }
+static inline sf_v sf_add(const sf_v a, const sf_v b) { return _mm256_add_pd(a, b); }
+static inline sf_v sf_mul(const sf_v a, const sf_v b) { return _mm256_mul_pd(a, b); }
+#if defined(__FMA__) || defined(__AVX2__)
+static inline sf_v sf_fma(const sf_v c, const sf_v a, const sf_v b) { return _mm256_fmadd_pd(a, b, c); }
+static inline sf_v sf_fms(const sf_v c, const sf_v a, const sf_v b) { return _mm256_fnmadd_pd(a, b, c); }
+#else
+static inline sf_v sf_fma(const sf_v c, const sf_v a, const sf_v b) { return _mm256_add_pd(c, _mm256_mul_pd(a, b)); }
+static inline sf_v sf_fms(const sf_v c, const sf_v a, const sf_v b) { return _mm256_sub_pd(c, _mm256_mul_pd(a, b)); }
+#endif
+static inline double sf_hsum(const sf_v a) { alignas(32) double l[4]; _mm256_store_pd(l, a); return ((l[0] + l[1]) + l[2]) + l[3]; }
+static inline sf_v sf_sub(const sf_v a, const sf_v b) { return _mm256_sub_pd(a, b); }
+static inline sf_v sf_and(const sf_v a, const sf_v b) { return _mm256_and_pd(a, b); }
+static inline sf_v sf_andnot(const sf_v a, const sf_v b) { return _mm256_andnot_pd(a, b); }
+static inline sf_v sf_or(const sf_v a, const sf_v b) { return _mm256_or_pd(a, b); }
+static inline sf_v sf_xor(const sf_v a, const sf_v b) { return _mm256_xor_pd(a, b); }
+static inline bool sf_small(const sf_v a) { return _mm256_movemask_pd(_mm256_cmp_pd(_mm256_andnot_pd(_mm256_set1_pd(-0.0), a), _mm256_set1_pd(1e5), _CMP_LT_OQ)) == 15; }
+static inline __m128i sf_round_i(const sf_v a) { return _mm256_cvtpd_epi32(a); }
+static inline sf_v sf_from_i(const __m128i q) { return _mm256_cvtepi32_pd(q); }
+static inline sf_v sf_wide(const __m128i m) { return _mm256_castsi256_pd(_mm256_insertf128_si256(_mm256_castsi128_si256(_mm_unpacklo_epi32(m, m)), _mm_unpackhi_epi32(m, m), 1)); }
+#elif defined(__SSE2__) || defined(_M_X64)
+#include <emmintrin.h>
+using sf_v = __m128d;
+constexpr int SF_W = 2;
+static inline sf_v sf_ld(const double* p) { return _mm_loadu_pd(p); }
+static inline void sf_st(double* p, const sf_v a) { _mm_storeu_pd(p, a); }
+static inline sf_v sf_set(const double a) { return _mm_set1_pd(a); }
+static inline sf_v sf_add(const sf_v a, const sf_v b) { return _mm_add_pd(a, b); }
+static inline sf_v sf_mul(const sf_v a, const sf_v b) { return _mm_mul_pd(a, b); }
+static inline sf_v sf_fma(const sf_v c, const sf_v a, const sf_v b) { return _mm_add_pd(c, _mm_mul_pd(a, b)); }
+static inline sf_v sf_fms(const sf_v c, const sf_v a, const sf_v b) { return _mm_sub_pd(c, _mm_mul_pd(a, b)); }
+static inline double sf_hsum(const sf_v a) { alignas(16) double l[2]; _mm_store_pd(l, a); return l[0] + l[1]; }
+static inline sf_v sf_sub(const sf_v a, const sf_v b) { return _mm_sub_pd(a, b); }
+static inline sf_v sf_and(const sf_v a, const sf_v b) { return _mm_and_pd(a, b); }
+static inline sf_v sf_andnot(const sf_v a, const sf_v b) { return _mm_andnot_pd(a, b); }
+static inline sf_v sf_or(const sf_v a, const sf_v b) { return _mm_or_pd(a, b); }
+static inline sf_v sf_xor(const sf_v a, const sf_v b) { return _mm_xor_pd(a, b); }
+static inline bool sf_small(const sf_v a) { return _mm_movemask_pd(_mm_cmplt_pd(_mm_andnot_pd(_mm_set1_pd(-0.0), a), _mm_set1_pd(1e5))) == 3; }
+static inline __m128i sf_round_i(const sf_v a) { return _mm_cvtpd_epi32(a); }
+static inline sf_v sf_from_i(const __m128i q) { return _mm_cvtepi32_pd(q); }
+static inline sf_v sf_wide(const __m128i m) { return _mm_castsi128_pd(_mm_unpacklo_epi32(m, m)); }
+#else
+using sf_v = double;
+constexpr int SF_W = 1;
+static inline sf_v sf_ld(const double* p) { return *p; }
+static inline void sf_st(double* p, const sf_v a) { *p = a; }
+static inline sf_v sf_set(const double a) { return a; }
+static inline sf_v sf_add(const sf_v a, const sf_v b) { return a + b; }
+static inline sf_v sf_mul(const sf_v a, const sf_v b) { return a * b; }
+static inline sf_v sf_fma(const sf_v c, const sf_v a, const sf_v b) { return c + a * b; }
+static inline sf_v sf_fms(const sf_v c, const sf_v a, const sf_v b) { return c - a * b; }
+static inline double sf_hsum(const sf_v a) { return a; }
+#endif
+#if !(defined(__aarch64__) || defined(_M_ARM64)) && (defined(__AVX__) || defined(__SSE2__) || defined(_M_X64))
+//sincos_shared (convenience.h) on the SF_W x86 lanes: the same reduction and kernels, the quadrant from cvtpd_epi32
+//(round to nearest, as nearbyint) as int32 masks widened to the 64-bit lanes. |x| < 1e5 only, sf_sincos_n tests it.
+static inline void sf_sincos_v(const sf_v x, sf_v* s, sf_v* c)
+{
+	const __m128i qi = sf_round_i(sf_mul(x, sf_set(0.63661977236758134308)));
+	const sf_v q = sf_from_i(qi);
+	const sf_v r = sf_fms(sf_fms(sf_fms(x, q, sf_set(1.57079632673412561417e+00)), q, sf_set(6.07710050630396597660e-11)),
+		q, sf_set(2.02226624871116645580e-21));
+	const sf_v z = sf_mul(r, r);
+	sf_v ps = sf_fma(sf_set(-2.50507602534068634195e-08), z, sf_set(1.58969099521155010221e-10));
+	ps = sf_fma(sf_set(2.75573137070700676789e-06), z, ps);
+	ps = sf_fma(sf_set(-1.98412698298579493134e-04), z, ps);
+	ps = sf_fma(sf_set(8.33333333332248946124e-03), z, ps);
+	ps = sf_fma(sf_set(-1.66666666666666324348e-01), z, ps);
+	const sf_v sr = sf_fma(r, sf_mul(r, z), ps);
+	sf_v pc = sf_fma(sf_set(2.08757232129817482790e-09), z, sf_set(-1.13596475577881948265e-11));
+	pc = sf_fma(sf_set(-2.75573143513906633035e-07), z, pc);
+	pc = sf_fma(sf_set(2.48015872894767294178e-05), z, pc);
+	pc = sf_fma(sf_set(-1.38888888888741095749e-03), z, pc);
+	pc = sf_fma(sf_set(4.16666666666666019037e-02), z, pc);
+	const sf_v hz = sf_mul(sf_set(0.5), z), w = sf_sub(sf_set(1.0), hz);
+	const sf_v cr = sf_add(w, sf_fma(sf_sub(sf_sub(sf_set(1.0), w), hz), sf_mul(z, z), pc));
+	//quadrant q & 3: odd swaps sin and cos, q & 2 negates sin, (q + 1) & 2 negates cos
+	const __m128i one = _mm_set1_epi32(1);
+	const sf_v odd = sf_wide(_mm_cmpeq_epi32(_mm_and_si128(qi, one), one)), sign = sf_set(-0.0);
+	const sf_v sgn_s = sf_and(sf_wide(_mm_slli_epi32(qi, 30)), sign);
+	const sf_v sgn_c = sf_and(sf_wide(_mm_slli_epi32(_mm_add_epi32(qi, one), 30)), sign);
+	*s = sf_xor(sf_or(sf_and(odd, cr), sf_andnot(odd, sr)), sgn_s);
+	*c = sf_xor(sf_or(sf_and(odd, sr), sf_andnot(odd, cr)), sgn_c);
+}
+#endif
+//n sines and cosines from one shared reduction: the NEON kernels on ARM64, sf_sincos_v on x86, else sincos_shared
+//lane by lane (half the time of glibc's sincos)
+static inline void sf_sincos_n(const int n, const double* x, double* s, double* c)
+{
+#if defined(__aarch64__) || defined(_M_ARM64)
+	sincos_shared_n(n, x, s, c);
+#else
+	int p = 0;
+#if defined(__AVX__) || defined(__SSE2__) || defined(_M_X64)
+	for (; p + SF_W <= n; p += SF_W)
+	{
+		const sf_v v = sf_ld(x + p);
+		if (sf_small(v)) { sf_v sv, cv; sf_sincos_v(v, &sv, &cv); sf_st(s + p, sv); sf_st(c + p, cv); }
+		else for (int e = p; e < p + SF_W; e++) sincos_shared(x[e], s + e, c + e);
+	}
+#endif
+	for (; p < n; p++) sincos_shared(x[p], s + p, c + p);
+#endif
+}
+//M consecutive recurrence steps of calc_SF in one pass over a tile: Q stays in registers between steps, so the A72's
+//~16 bytes/cycle of vector results go to multiplies instead of reloading Q. Two vectors run side by side to hide the
+//chain latency. Every product and sum is the one a single step forms, in the same order: bit-identical to M = 1
+//(MSVC /fp:fast may reassociate the intrinsic sums and differ by a few ulp).
+template <int M>
+static inline void sf_steps(const int nt, double* qr, double* qi, const double* tr, const double* ti, double* acc_r, double* acc_i)
+{
+	const int ntw = nt - nt % SF_W;
+	sf_v sr[M], sm[M];
+	for (int k = 0; k < M; k++) sr[k] = sm[k] = sf_set(0.0);
+	int q = 0;
+	for (; q + 2 * SF_W <= ntw; q += 2 * SF_W)
+	{
+		sf_v a0 = sf_ld(qr + q), b0 = sf_ld(qi + q), a1 = sf_ld(qr + q + SF_W), b1 = sf_ld(qi + q + SF_W);
+		const sf_v c0 = sf_ld(tr + q), d0 = sf_ld(ti + q), c1 = sf_ld(tr + q + SF_W), d1 = sf_ld(ti + q + SF_W);
+		for (int k = 0; k < M; k++)
+		{
+			const sf_v nr0 = sf_fms(sf_mul(a0, c0), b0, d0), ni0 = sf_fma(sf_mul(a0, d0), b0, c0);
+			const sf_v nr1 = sf_fms(sf_mul(a1, c1), b1, d1), ni1 = sf_fma(sf_mul(a1, d1), b1, c1);
+			sr[k] = sf_add(sf_add(sr[k], nr0), nr1); sm[k] = sf_add(sf_add(sm[k], ni0), ni1);
+			a0 = nr0; b0 = ni0; a1 = nr1; b1 = ni1;
+		}
+		sf_st(qr + q, a0); sf_st(qi + q, b0); sf_st(qr + q + SF_W, a1); sf_st(qi + q + SF_W, b1);
+	}
+	if (q < ntw)
+	{
+		sf_v a = sf_ld(qr + q), b = sf_ld(qi + q);
+		const sf_v c2 = sf_ld(tr + q), d = sf_ld(ti + q);
+		for (int k = 0; k < M; k++)
+		{
+			const sf_v nr = sf_fms(sf_mul(a, c2), b, d), ni = sf_fma(sf_mul(a, d), b, c2);
+			sr[k] = sf_add(sr[k], nr); sm[k] = sf_add(sm[k], ni);
+			a = nr; b = ni;
+		}
+		sf_st(qr + q, a); sf_st(qi + q, b);
+	}
+	double re1[M] = {}, im1[M] = {};
+	for (int e = ntw; e < nt; e++)
+	{
+		double a = qr[e], b = qi[e];
+		for (int k = 0; k < M; k++)
+		{
+			const double nr = a * tr[e] - b * ti[e], ni = a * ti[e] + b * tr[e];
+			a = nr; b = ni;
+			re1[k] += a; im1[k] += b;
+		}
+		qr[e] = a; qi[e] = b;
+	}
+	for (int k = 0; k < M; k++)
+	{
+		acc_r[k] += sf_hsum(sr[k]) + re1[k];
+		acc_i[k] += sf_hsum(sm[k]) + im1[k];
+	}
+}
+//Row jump: Q = R e^{i db.r} (e^{i dc.r}, or its conjugate for n < 0)^|n| from the saved row start R, summed like a step.
+static inline void sf_jump(const int nt, const int n, const double* rr, const double* ri, const double* br, const double* bi,
+	const double* tr, const double* ti, double* qr, double* qi, double* acc_r, double* acc_i)
+{
+	const int ntw = nt - nt % SF_W, an = n < 0 ? -n : n;
+	const double sg = n < 0 ? -1.0 : 1.0;
+	const sf_v sgv = sf_set(sg);
+	sf_v sr = sf_set(0.0), sm = sf_set(0.0);
+	for (int q = 0; q < ntw; q += SF_W)
+	{
+		const sf_v a0 = sf_ld(rr + q), b0 = sf_ld(ri + q), c = sf_ld(br + q), d = sf_ld(bi + q);
+		const sf_v c2 = sf_ld(tr + q), d2 = sf_mul(sgv, sf_ld(ti + q));
+		sf_v a = sf_fms(sf_mul(a0, c), b0, d), b = sf_fma(sf_mul(a0, d), b0, c);
+		for (int k = 0; k < an; k++)
+		{
+			const sf_v na = sf_fms(sf_mul(a, c2), b, d2);
+			b = sf_fma(sf_mul(a, d2), b, c2);
+			a = na;
+		}
+		sf_st(qr + q, a); sf_st(qi + q, b);
+		sr = sf_add(sr, a); sm = sf_add(sm, b);
+	}
+	double re1 = 0.0, im1 = 0.0;
+	for (int e = ntw; e < nt; e++)
+	{
+		double a = rr[e] * br[e] - ri[e] * bi[e], b = rr[e] * bi[e] + ri[e] * br[e];
+		const double c2 = tr[e], d2 = sg * ti[e];
+		for (int k = 0; k < an; k++)
+		{
+			const double na = a * c2 - b * d2;
+			b = a * d2 + b * c2;
+			a = na;
+		}
+		qr[e] = a; qi[e] = b;
+		re1 += a; im1 += b;
+	}
+	*acc_r += sf_hsum(sr) + re1;
+	*acc_i += sf_hsum(sm) + im1;
+}
+//Anchor: Q = rho e^{i k.r} from a sincos per point, summed like a step
+static inline void sf_anchor(const int nt, const double k1, const double k2, const double k3, const double* x, const double* y,
+	const double* z, const double* r, double* qr, double* qi, double* acc_r, double* acc_i)
+{
+	alignas(32) double ph[SF_TILE], sn[SF_TILE], cs[SF_TILE];
+	const int ntw = nt - nt % SF_W;
+	const sf_v k1v = sf_set(k1), k2v = sf_set(k2), k3v = sf_set(k3);
+	int q = 0;
+	for (; q < ntw; q += SF_W)
+		sf_st(ph + q, sf_fma(sf_fma(sf_mul(k1v, sf_ld(x + q)), k2v, sf_ld(y + q)), k3v, sf_ld(z + q)));
+	for (; q < nt; q++)
+		ph[q] = k1 * x[q] + k2 * y[q] + k3 * z[q];
+	sf_sincos_n(nt, ph, sn, cs);
+	sf_v sr = sf_set(0.0), sm = sf_set(0.0);
+	for (q = 0; q + 2 * SF_W <= ntw; q += 2 * SF_W)
+	{
+		const sf_v r0 = sf_ld(r + q), r1 = sf_ld(r + q + SF_W);
+		const sf_v a0 = sf_mul(r0, sf_ld(cs + q)), b0 = sf_mul(r0, sf_ld(sn + q));
+		const sf_v a1 = sf_mul(r1, sf_ld(cs + q + SF_W)), b1 = sf_mul(r1, sf_ld(sn + q + SF_W));
+		sf_st(qr + q, a0); sf_st(qi + q, b0); sf_st(qr + q + SF_W, a1); sf_st(qi + q + SF_W, b1);
+		sr = sf_add(sf_add(sr, a0), a1); sm = sf_add(sf_add(sm, b0), b1);
+	}
+	if (q < ntw)
+	{
+		const sf_v rv = sf_ld(r + q), a = sf_mul(rv, sf_ld(cs + q)), b = sf_mul(rv, sf_ld(sn + q));
+		sf_st(qr + q, a); sf_st(qi + q, b);
+		sr = sf_add(sr, a); sm = sf_add(sm, b);
+	}
+	double re1 = 0.0, im1 = 0.0;
+	for (int e = ntw; e < nt; e++)
+	{
+		qr[e] = r[e] * cs[e]; qi[e] = r[e] * sn[e];
+		re1 += qr[e]; im1 += qi[e];
+	}
+	*acc_r += sf_hsum(sr) + re1;
+	*acc_i += sf_hsum(sm) + im1;
+}
+
+
+std::vector<char> calc_SF_fourier_bessel(const vec2& k_pt, const vec2& dens, const sf_shell_layout* layout,
+	cvec2& sf, const int L_override, const bool exact, const bool force)
+{
+	const int na = static_cast<int>(dens.size());
+	std::vector<char> done(na, 0);
+	if (!layout || static_cast<int>(layout->proto.size()) != na)
+		return done;
+	const long long nk = static_cast<long long>(k_pt[0].size());
+	const double* kx = k_pt[0].data(), * ky = k_pt[1].data(), * kz = k_pt[2].data();
+	vec qk(nk);
+	double qmax = 0.0;
+	for (long long k = 0; k < nk; k++)
+		qmax = std::max(qmax, qk[k] = std::sqrt(kx[k] * kx[k] + ky[k] * ky[k] + kz[k] * kz[k]));
+	//reflections by |k|: a run of them on the same table nodes is one assembly GEMM
+	std::vector<long long> ko(nk);
+	std::iota(ko.begin(), ko.end(), 0LL);
+	std::sort(ko.begin(), ko.end(), [&](const long long u, const long long v) { return qk[u] < qk[v]; });
+	double ms_shells = 0.0, ms_proj = 0.0, ms_tab = 0.0, ms_asm = 0.0; //-gflops phase split
+	constexpr size_t FB_MEM = size_t(1) << 24; //doubles per work array (128 MB): sets the atoms per column block
+	constexpr int FB_BIN = 256, FB_ROWS = 64, FB_PB = 512; //reflections per assembly GEMM, table nodes per radial GEMM,
+	//rule points per Y block of the projection
+	//Direct-sum point x reflection steps per FB flop, timed on sucrose and rubredoxin (8 threads, AVX2, MKL)
+	constexpr double FB_STEP_PER_FLOP = 0.05;
+	_time_point t_ph = get_time();
+	//A prototype's atoms are GEMM columns; it keeps its own shells, cut and Lebedev rules. All prototypes share the
+	//|k| nodes (the finest any asks for) and Y(k^) up to the largest L, so the assembly evaluates Y once per reflection
+	struct fb_rule { int s0, n, Lr; ivec sh; }; //first shell, points, largest Ls of its shells, its shells
+	struct fb_part { int P = 0, ns = 0, L = 0; ivec mem, Ls, sl, rule_of; vec r; std::vector<fb_rule> rules; };
+	std::vector<fb_part> parts;
+	int L = 0;
+	double h = 0.025;
+	for (int P = 0; P < static_cast<int>(layout->protos.size()); P++)
+	{
+		const sf_shell_layout::prototype& pr = layout->protos[P];
+		const ivec& ss = pr.shell_start;
+		fb_part F;
+		F.P = P;
+		double direct = 0.0;
+		for (int a = 0; a < na; a++)
+		{
+			const ivec& ix = layout->idx[a];
+			if (layout->proto[a] != P || ix.empty() || ix.size() != dens[a].size())
+				continue;
+			F.mem.push_back(a);
+			//shells up to the outermost one any atom kept a point on
+			F.ns = std::max(F.ns, static_cast<int>(std::upper_bound(ss.begin(), ss.end(), *std::max_element(ix.begin(), ix.end())) - ss.begin()));
+			direct += double(ix.size()) * double(nk);
+		}
+		if (F.mem.empty())
+			continue;
+		const int ns = F.ns;
+		F.r.resize(ns);
+		int most = 0;
+		for (int s = 0; s < ns; s++)
+		{
+			const int p = ss[s];
+			F.r[s] = std::sqrt(pr.x[p] * pr.x[p] + pr.y[p] * pr.y[p] + pr.z[p] * pr.z[p]);
+			most = std::max(most, ss[s + 1] - ss[s]);
+		}
+		F.L = L_override >= 0 ? L_override : fb_lebedev_degree(most) / 2;
+		//4-point Lagrange in |k|: error ~ (h r)^4 on a shell's term, so h shrinks with the outermost shell
+		const double hP = std::min(0.025, 0.25 / std::max(F.r[ns - 1], 1e-3));
+		const int nqP = static_cast<int>(qmax / hP) + 4;
+		const bool tabP = !exact && nk >= nqP;
+		//j_l(x) < 1e-12 j_0 past x + 9.4 x^(1/3) + 6 (Debye's asymptotics, the 12-digit rule of fast multipole codes),
+		//so a shell keeps only the l its |k| range can reach: exact to that level, and inner shells drop most of L
+		F.Ls.resize(ns);
+		double flops = 2.0 * double(nk) * (tabP ? 4 : 1) * double(F.L + 1) * (F.L + 1);
+		for (int s = 0; s < ns; s++)
+		{
+			const double x = qmax * F.r[s];
+			F.Ls[s] = std::min(F.L, static_cast<int>(std::ceil(x + 9.4 * std::cbrt(x))) + 6);
+			const double nls = double(F.Ls[s] + 1) * (F.Ls[s] + 1);
+			flops += 2.0 * nls * (double(ss[s + 1] - ss[s]) + double(tabP ? nqP : nk));
+		}
+		//the direct sum keeps a prototype it does faster; asking for L or exact forces Fourier-Bessel
+		if (!force && L_override < 0 && !exact && FB_STEP_PER_FLOP * flops * double(F.mem.size()) > direct)
+			continue;
+		L = std::max(L, F.L);
+		h = std::min(h, hP);
+		parts.push_back(std::move(F));
+	}
+	if (parts.empty())
+		return done;
+	const int ne = fb_n_even(L), no = fb_n_odd(L), nl = ne + no;
+	const int nq = static_cast<int>(qmax / h) + 4;
+	const bool table = !exact && nk >= nq;
+	const int S = table ? 4 : 1; //nodes per reflection; exact: the reflections are the nodes
+	const long long nn = table ? nq : nk;
+	const int NC = table ? static_cast<int>(nn) : static_cast<int>(std::min<long long>(nk, 2048));
+	const fb_ylm Y(L);
+	int Mtot = 0;
+	size_t widest = size_t(NC) * nl;
+	for (fb_part& F : parts)
+	{
+		for (const int a : F.mem)
+			done[a] = 1;
+		const sf_shell_layout::prototype& pr = layout->protos[F.P];
+		const ivec& ss = pr.shell_start;
+		const int ns = F.ns;
+		F.sl.assign(L + 1, ns); //first shell reaching l: J_l is zero on every shell before it
+		for (int l = 0; l <= L; l++)
+			for (int s = 0; s < ns && F.sl[l] == ns; s++)
+				if (F.Ls[s] >= l)
+					F.sl[l] = s;
+		//Shells on the same Lebedev rule and rotation share Y_lm(u_p): the projection takes all of a rule's shells at once
+		F.rule_of.resize(ns);
+		for (int s = 0; s < ns; s++)
+		{
+			const int n = ss[s + 1] - ss[s], p1 = ss[s];
+			const double i1 = F.r[s] > 0.0 ? 1.0 / F.r[s] : 0.0;
+			int R = -1;
+			for (int t = 0; t < static_cast<int>(F.rules.size()) && R < 0; t++)
+			{
+				if (F.rules[t].n != n)
+					continue;
+				const int p0 = ss[F.rules[t].s0];
+				const double i0 = F.r[F.rules[t].s0] > 0.0 ? 1.0 / F.r[F.rules[t].s0] : 0.0;
+				bool same = true;
+				for (int i = 0; i < n && same; i++)
+					same = std::abs(pr.x[p0 + i] * i0 - pr.x[p1 + i] * i1) < 1e-10 && std::abs(pr.y[p0 + i] * i0 - pr.y[p1 + i] * i1) < 1e-10
+					&& std::abs(pr.z[p0 + i] * i0 - pr.z[p1 + i] * i1) < 1e-10;
+				if (same)
+					R = t;
+			}
+			if (R < 0)
+			{
+				R = static_cast<int>(F.rules.size());
+				F.rules.push_back({ s, n, 0, {} });
+			}
+			F.rules[R].sh.push_back(s);
+			F.rules[R].Lr = std::max(F.rules[R].Lr, F.Ls[s]);
+			F.rule_of[s] = R;
+		}
+		Mtot += static_cast<int>(F.mem.size());
+		widest = std::max({ widest, size_t(ns) * nl, size_t(ss[ns]) });
+	}
+	//J[l][n][s] = 4pi (+-1) j_l(q_n r_s), zero past Ls[s]: i^l = +-1 (even l) or +-i (odd), the i left to the parity
+	vec J;
+	const auto fill_J = [&](const fb_part& F, const long long n_lo, const int cnt) {
+		const int ns = F.ns;
+		J.assign(size_t(F.L + 1) * cnt * ns, 0.0);
+#pragma omp parallel
+		{
+			vec jl(F.L + 1);
+#pragma omp for schedule(static)
+			for (int n = 0; n < cnt; n++)
+			{
+				const double q = table ? double(n_lo + n) * h : qk[ko[n_lo + n]];
+				for (int s = 0; s < ns; s++)
+				{
+					fb_sph_bessel(F.Ls[s], q * F.r[s], jl.data());
+					for (int l = 0; l <= F.Ls[s]; l++)
+						J[(size_t(l) * cnt + n) * ns + s] = constants::FOUR_PI * (((l >> 1) & 1) ? -1.0 : 1.0) * jl[l];
+				}
+			}
+		}
+	};
+	//assembly runs: reflections (in |k| order) on the same nodes n0..n0+S-1, at most FB_BIN each
+	struct fb_bin { long long k0; int nb, n0; };
+	std::vector<fb_bin> bins;
+	if (table)
+		for (long long k = 0; k < nk;)
+		{
+			const int n0 = std::clamp(static_cast<int>(qk[ko[k]] / h) - 1, 0, nq - 4);
+			long long e = k + 1;
+			while (e < nk && e - k < FB_BIN && std::clamp(static_cast<int>(qk[ko[e]] / h) - 1, 0, nq - 4) == n0)
+				e++;
+			bins.push_back({ k, static_cast<int>(e - k), n0 });
+			k = e;
+		}
+	const int Mc = std::max(1, static_cast<int>(std::min<size_t>(Mtot, FB_MEM / widest)));
+	ms_shells += get_msec(t_ph, get_time());
+	//a column block holds whole or partial prototypes: segment = part, its first member, members, first column
+	struct fb_seg { int f, lo, mp, col; };
+	vec W, Ce, Co, Te, To, Yb, Ct;
+	for (int c0 = 0; c0 < Mtot; c0 += Mc)
+	{
+		const int mc = std::min(Mc, Mtot - c0);
+		std::vector<fb_seg> seg;
+		for (int f = 0, g = 0; f < static_cast<int>(parts.size()); g += static_cast<int>(parts[f].mem.size()), f++)
+		{
+			const int lo = std::max(c0, g), hi = std::min(c0 + mc, g + static_cast<int>(parts[f].mem.size()));
+			if (lo < hi)
+				seg.push_back({ f, lo - g, hi - lo, lo - c0 });
+		}
+		t_ph = get_time();
+		//c_s,lm = sum_p Y_lm(u_p) W_p: per rule one GEMM over the rule's points against its shells x atoms side by side
+		//(W zero where pruned), Y evaluated in blocks of points and the moments scattered to [shell][lm][atom]
+		std::vector<size_t> ceo(seg.size() + 1, 0), coo(seg.size() + 1, 0);
+		for (size_t j = 0; j < seg.size(); j++)
+		{
+			ceo[j + 1] = ceo[j] + size_t(parts[seg[j].f].ns) * ne * seg[j].mp;
+			coo[j + 1] = coo[j] + size_t(parts[seg[j].f].ns) * no * seg[j].mp;
+		}
+		Ce.assign(ceo.back(), 0.0);
+		Co.assign(coo.back(), 0.0);
+		for (size_t j = 0; j < seg.size(); j++)
+		{
+			const fb_part& F = parts[seg[j].f];
+			const sf_shell_layout::prototype& pr = layout->protos[F.P];
+			const ivec& ss = pr.shell_start;
+			const int mp = seg[j].mp, nr = static_cast<int>(F.rules.size());
+			std::vector<size_t> wofs(nr + 1, 0);
+			for (int t = 0; t < nr; t++)
+				wofs[t + 1] = wofs[t] + size_t(F.rules[t].n) * F.rules[t].sh.size() * mp;
+			ivec slot(F.ns), sop(ss[F.ns]); //a shell's place among its rule's shells; a prototype point's shell
+			for (const fb_rule& R : F.rules)
+				for (size_t q = 0; q < R.sh.size(); q++)
+					slot[R.sh[q]] = static_cast<int>(q);
+			for (int s = 0; s < F.ns; s++)
+				std::fill(sop.begin() + ss[s], sop.begin() + ss[s + 1], s);
+			W.assign(wofs.back(), 0.0); //W_t[i][slot][atom]
+			for (int c = 0; c < mp; c++)
+			{
+				const int a = F.mem[seg[j].lo + c];
+				const ivec& ix = layout->idx[a];
+				for (size_t p = 0; p < ix.size(); p++)
+				{
+					const int s = sop[ix[p]], t = F.rule_of[s];
+					W[wofs[t] + (size_t(ix[p] - ss[s]) * F.rules[t].sh.size() + slot[s]) * mp + c] = dens[a][p];
+				}
+			}
+			for (int t = 0; t < nr; t++)
+			{
+				const fb_rule& R = F.rules[t];
+				const int nsh = static_cast<int>(R.sh.size()), N = nsh * mp, re = fb_n_even(R.Lr), ro = fb_n_odd(R.Lr), rl = re + ro;
+				const int p0 = ss[R.s0], nbk = (rl + FB_ROWS - 1) / FB_ROWS;
+				//at r = 0 only l = 0 survives j_l(0)
+				const double ir = F.r[R.s0] > 0.0 ? 1.0 / F.r[R.s0] : 0.0;
+				Yb.resize(size_t(std::min(FB_PB, R.n)) * rl);
+				Ct.resize(size_t(rl) * N);
+				for (int b0 = 0; b0 < R.n; b0 += FB_PB)
+				{
+					const int nb = std::min(FB_PB, R.n - b0);
+#pragma omp parallel
+					{
+#if !defined(__APPLE__) && !defined(NSA2_OPENBLAS)
+						const int mkl_before = mkl_set_num_threads_local(1);
+#endif
+#pragma omp for schedule(static)
+						for (int i = 0; i < nb; i++)
+						{
+							const int p = p0 + b0 + i;
+							Y.eval(pr.x[p] * ir, pr.y[p] * ir, pr.z[p] * ir, Yb.data() + size_t(i) * rl, Yb.data() + size_t(i) * rl + re, R.Lr);
+						}
+#pragma omp for schedule(dynamic)
+						for (int g = 0; g < nbk; g++)
+						{
+							const int r0 = g * FB_ROWS, rows = std::min(FB_ROWS, rl - r0);
+							cblas_dgemm(CblasRowMajor, CblasTrans, CblasNoTrans, rows, N, nb, 1.0, Yb.data() + r0, rl,
+								W.data() + wofs[t] + size_t(b0) * N, N, b0 ? 1.0 : 0.0, Ct.data() + size_t(r0) * N, N);
+						}
+#if !defined(__APPLE__) && !defined(NSA2_OPENBLAS)
+						mkl_set_num_threads_local(mkl_before);
+#endif
+					}
+				}
+#pragma omp parallel for schedule(static)
+				for (int q = 0; q < nsh; q++)
+				{
+					const int s = R.sh[q];
+					for (int i = 0; i < re; i++)
+						std::copy_n(Ct.data() + size_t(i) * N + size_t(q) * mp, mp, Ce.data() + ceo[j] + (size_t(s) * ne + i) * mp);
+					for (int i = 0; i < ro; i++)
+						std::copy_n(Ct.data() + size_t(re + i) * N + size_t(q) * mp, mp, Co.data() + coo[j] + (size_t(s) * no + i) * mp);
+				}
+			}
+		}
+		ms_proj += get_msec(t_ph, get_time());
+		for (long long n_lo = 0; n_lo < nn; n_lo += NC)
+		{
+			const int cnt = static_cast<int>(std::min<long long>(NC, nn - n_lo));
+			t_ph = get_time();
+			if (!table)
+			{
+				bins.clear();
+				for (int j = 0; j < cnt; j++)
+					bins.push_back({ n_lo + j, 1, j });
+			}
+			//T[lm][n][atom] = sum_{s >= sl[l]} J_l[n][s] c_s,lm[atom]: one GEMM per l, block of nodes and segment, scattered
+			//so that a reflection's S nodes are S mc consecutive columns of row lm. Zero past a prototype's own L.
+			Te.assign(size_t(cnt) * ne * mc, 0.0);
+			To.assign(size_t(cnt) * no * mc, 0.0);
+			const int nbk = (cnt + FB_ROWS - 1) / FB_ROWS;
+			for (size_t j = 0; j < seg.size(); j++)
+			{
+				const fb_part& F = parts[seg[j].f];
+				const int ns = F.ns, mp = seg[j].mp;
+				fill_J(F, n_lo, cnt);
+#pragma omp parallel
+				{
+#if !defined(__APPLE__) && !defined(NSA2_OPENBLAS)
+					const int mkl_before = mkl_set_num_threads_local(1);
+#endif
+					vec tb(size_t(FB_ROWS) * (2 * L + 1) * mp);
+#pragma omp for schedule(dynamic)
+					for (int t = 0; t < (L + 1) * nbk; t++)
+					{
+						const int l = L - t / nbk, n0 = (t % nbk) * FB_ROWS, rows = std::min(FB_ROWS, cnt - n0); //big l first
+						if (F.sl[l] == ns)
+							continue;
+						const int width = (l & 1) ? no : ne, o = l * (l - 1) / 2, w = (2 * l + 1) * mp;
+						const double* C = (l & 1) ? Co.data() + coo[j] : Ce.data() + ceo[j];
+						cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, rows, w, ns - F.sl[l], 1.0,
+							J.data() + (size_t(l) * cnt + n0) * ns + F.sl[l], ns, C + (size_t(F.sl[l]) * width + o) * mp, width * mp,
+							0.0, tb.data(), w);
+						double* T = ((l & 1) ? To : Te).data();
+						for (int m = 0; m < 2 * l + 1; m++)
+							for (int n = 0; n < rows; n++)
+								std::copy_n(tb.data() + size_t(n) * w + size_t(m) * mp, mp,
+									T + ((size_t(o) + m) * cnt + n0 + n) * mc + seg[j].col);
+					}
+#if !defined(__APPLE__) && !defined(NSA2_OPENBLAS)
+					mkl_set_num_threads_local(mkl_before);
+#endif
+				}
+			}
+			ms_tab += get_msec(t_ph, get_time());
+			t_ph = get_time();
+			//f(k) = sum_m w_m(|k|) Y(k^) . T[n0 + m]: Y rows times the S nodes x every column in one GEMM per run and
+			//parity, the Lagrange weights applied after
+			ivec colatom(mc);
+			for (const fb_seg& G : seg)
+				for (int c = 0; c < G.mp; c++)
+					colatom[G.col + c] = parts[G.f].mem[G.lo + c];
+#pragma omp parallel
+			{
+#if !defined(__APPLE__) && !defined(NSA2_OPENBLAS)
+				const int mkl_before = mkl_set_num_threads_local(1);
+#endif
+				vec Ye(size_t(FB_BIN) * ne), Yo(size_t(FB_BIN) * no), Ze(size_t(FB_BIN) * S * mc), Zo(size_t(FB_BIN) * S * mc, 0.0),
+					wt(size_t(FB_BIN) * 4);
+#pragma omp for schedule(dynamic)
+				for (int b = 0; b < static_cast<int>(bins.size()); b++)
+				{
+					const fb_bin& B = bins[b];
+					for (int j = 0; j < B.nb; j++)
+					{
+						const long long k = ko[B.k0 + j];
+						const double q = qk[k], iq = q > 0.0 ? 1.0 / q : 0.0;
+						Y.eval(kx[k] * iq, ky[k] * iq, q > 0.0 ? kz[k] * iq : 1.0, Ye.data() + size_t(j) * ne, Yo.data() + size_t(j) * no);
+						double* w = wt.data() + size_t(j) * 4;
+						w[0] = 1.0;
+						if (table)
+						{
+							const double u = q / h - B.n0;
+							w[0] = -(u - 1) * (u - 2) * (u - 3) / 6.0; w[1] = u * (u - 2) * (u - 3) / 2.0;
+							w[2] = -u * (u - 1) * (u - 3) / 2.0; w[3] = u * (u - 1) * (u - 2) / 6.0;
+						}
+					}
+					const int N = S * mc;
+					cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, B.nb, N, ne, 1.0, Ye.data(), ne,
+						Te.data() + size_t(B.n0) * mc, size_t(cnt) * mc, 0.0, Ze.data(), N);
+					if (no > 0)
+						cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, B.nb, N, no, 1.0, Yo.data(), no,
+							To.data() + size_t(B.n0) * mc, size_t(cnt) * mc, 0.0, Zo.data(), N);
+					for (int j = 0; j < B.nb; j++)
+					{
+						const long long k = ko[B.k0 + j];
+						const double* w = wt.data() + size_t(j) * 4, * ze = Ze.data() + size_t(j) * N, * zo = Zo.data() + size_t(j) * N;
+						for (int c = 0; c < mc; c++)
+						{
+							double re = 0.0, im = 0.0;
+							for (int m = 0; m < S; m++)
+							{
+								re += w[m] * ze[m * mc + c];
+								im += w[m] * zo[m * mc + c];
+							}
+							sf[colatom[c]][k] = std::complex<double>(re, im);
+						}
+					}
+				}
+#if !defined(__APPLE__) && !defined(NSA2_OPENBLAS)
+				mkl_set_num_threads_local(mkl_before);
+#endif
+			}
+			ms_asm += get_msec(t_ph, get_time());
+		}
+	}
+	throughput::record_time("FB shells + cost model", false, ms_shells);
+	throughput::record_time("FB projection", false, ms_proj);
+	throughput::record_time("FB radial table", false, ms_tab);
+	throughput::record_time("FB assembly", false, ms_asm);
+	return done;
+}
+
 /**
  * Calculates the scattering factors for a given set of parameters.
  *
@@ -1877,7 +2459,8 @@ void calc_SF(const int& points,
 	bool do_XCW,
 	bool use_gpu,
 	bool gpu_fp64,
-	bool gpu_fp32)
+	bool gpu_fp32,
+	const sf_shell_layout* layout)
 {
 	const long long int imax = static_cast<long long int>(dens.size());
 	const long long int smax = static_cast<long long int>(k_pt[0].size());
@@ -1904,33 +2487,58 @@ void calc_SF(const int& points,
 		else
 			file << "Time to prepare: " << fixed << setprecision(0) << dur << " s" << endl << endl;
 	}
+	//Fourier-Bessel on the prototype shells unless -tune NOS_SF_DIRECT; atoms without a layout (cube grids) and those
+	//the direct sum does faster go on to it, on the device when there is one
+	std::vector<char> fb_done(imax, 0);
+	if (layout && !tuning("NOS_SF_DIRECT")) {
+		const _time_point fb_t0 = get_time();
+		const char* fb_L = tuning("NOS_SF_FB_L");
+		fb_done = calc_SF_fourier_bessel(k_pt, dens, layout, sf, fb_L ? std::atoi(fb_L) : -1,
+			tuning("NOS_SF_FB_EXACT") != nullptr, tuning("NOS_SF_FB_FORCE") != nullptr);
+		throughput::record_time("scattering-factor transform (Fourier-Bessel)", false, get_msec(fb_t0, get_time()));
+		if (debug)
+			file << "Fourier-Bessel transform for " << std::count(fb_done.begin(), fb_done.end(), 1) << " of " << imax
+			<< " atoms, the direct sum for the rest" << endl;
+		if (std::all_of(fb_done.begin(), fb_done.end(), [](const char c) { return c != 0; })) {
+			if (!do_XCW) {
+				ProgressBar fprogress(imax, 60, "=", " ", "Calculating Scattering Factors", file);
+				for (int i = 0; i < imax; i++)
+					fprogress.update();
+			}
+			return;
+		}
+	}
 #ifdef NOSPHERA2_USE_GPU
-	if (use_gpu && sf_gpu_available()) {
-		ivec offs(imax + 1, 0);
+	//-gpu_fp64 wins over -gpu_fp32 if both are given: the accurate one is the safer default.
+	const sf_precision prec = gpu_fp64 ? sf_precision::FP64
+		: gpu_fp32 ? sf_precision::FP32 : sf_precision::Auto;
+	//An APU's own cores beat its device here unless a precision is asked for (Radeon 780M f32: 176 ms at d 0.5 sucrose,
+	//its Ryzen 8700G 106 ms)
+	if (use_gpu && sf_gpu_available() && (prec != sf_precision::Auto || !itensor_gpu_integrated())) {
+		ivec left; //the atoms Fourier-Bessel left
 		for (int i = 0; i < imax; i++)
-			offs[i + 1] = offs[i] + (int)dens[i].size();
-		const long long tot = offs[imax];
+			if (!fb_done[i])
+				left.push_back(i);
+		const int nleft = (int)left.size();
+		ivec offs(nleft + 1, 0);
+		for (int j = 0; j < nleft; j++)
+			offs[j + 1] = offs[j] + (int)dens[left[j]].size();
+		const long long tot = offs[nleft];
 		vec fd1(tot), fd2(tot), fd3(tot), fde(tot);
-		for (int i = 0; i < imax; i++) {
-			const int lo = offs[i], n = (int)dens[i].size();
+		std::vector<double*> rows(nleft);
+		for (int j = 0; j < nleft; j++) {
+			const int i = left[j], lo = offs[j], n = (int)dens[i].size();
 			for (int p = 0; p < n; p++) {
 				fd1[lo + p] = d1[i][p]; fd2[lo + p] = d2[i][p];
 				fd3[lo + p] = d3[i][p]; fde[lo + p] = dens[i][p];
 			}
+			rows[j] = reinterpret_cast<double*>(sf[i].data());
 		}
-		std::vector<double*> rows(imax);
-		for (int i = 0; i < imax; i++)
-			rows[i] = reinterpret_cast<double*>(sf[i].data());
-		//-gpu_fp64 wins over -gpu_fp32 if both are given: between two explicit requests the
-		//accurate one is the safer default.
-		const sf_precision prec = gpu_fp64 ? sf_precision::FP64
-			: gpu_fp32 ? sf_precision::FP32 : sf_precision::Auto;
 		const _time_point sf_gpu_t0 = get_time();
-		if (sf_gpu_run((int)imax, smax, k_pt[0].data(), k_pt[1].data(), k_pt[2].data(),
+		if (sf_gpu_run(nleft, smax, k_pt[0].data(), k_pt[1].data(), k_pt[2].data(),
 			fd1.data(), fd2.data(), fd3.data(), fde.data(), offs.data(), tot,
 			rows.data(), prec)) {
-			//Transfers included. What decides where this work belongs is the rate the caller
-			//actually gets, not the one the kernel would post with the copies left out.
+			//Rate includes the transfers: that is what the caller gets.
 			throughput::record("scattering-factor transform", true,
 				throughput::flops_ndft(static_cast<double>(tot), static_cast<double>(smax)),
 				get_msec(sf_gpu_t0, get_time()));
@@ -1944,7 +2552,7 @@ void calc_SF(const int& points,
 				_time_point gend = get_time();
 				const int ratio = sf_gpu_fp64_ratio();
 				file << "GPU in use: scattering-factor Fourier transform on " << sf_gpu_backend() << ": " << get_msec(end1, gend) << " ms ("
-					 << (sf_gpu_uses_fp32(prec) ? "reduced-argument f32 sincos" : "f64 sincos")
+					 << (sf_gpu_uses_fp32(prec) ? "centre-relative f32 phase and sincos" : "f64 sincos")
 					 << ", fp32:fp64 ratio " << ratio << ")" << std::endl;
 			}
 			return;
@@ -1955,9 +2563,7 @@ void calc_SF(const int& points,
 	if (!do_XCW) {
 		progress = new ProgressBar(imax, 60, "=", " ", "Calculating Scattering Factors", file);
 	}
-	long long int pmax, p, s;
-	complex<double>* sf_local;
-	double work, rho, c, si, re, im;
+	long long int pmax;
 	const double* d1_local, * d2_local, * d3_local, * dens_local;
 
 	// Pre-fetch k_pt data pointers for better cache locality
@@ -1965,14 +2571,97 @@ void calc_SF(const int& points,
 	const double* k2_data = k_pt[1].data();
 	const double* k3_data = k_pt[2].data();
 
-	//Timed around the whole atom loop, not inside it. The inner loop is an omp parallel for,
-	//and a per-thread timer there would sum concurrent time into a total larger than the
-	//wall clock - a profile that cannot be true is worse than none.
+	//Timed around the atom loop: a timer inside the omp parallel for would sum thread time beyond the wall clock.
 	const _time_point sf_cpu_t0 = get_time();
 	double sf_cpu_points = 0.0;
 
+	//Phase recurrence: the reflections are a sorted hkl set, so most consecutive k differ by one step dc (c*), and
+	//Q_p = rho_p e^{i k.r_p} continues as Q_p e^{i dc.r_p}, one complex multiply instead of a sincos. Q is re-anchored
+	//with a sincos at block starts, row breaks no row jump (below) reaches and every SF_ANCHOR multiplies, so the
+	//drift stays at rounding level (1e-14 relative on sucrose against the direct sum).
+	//dc is taken where two successive steps agree, at the smallest |k| for the least rounding; cont[s] marks
+	//k[s] = k[s-1] + dc. An unsorted k list leaves cont all false and every reflection anchors.
+	constexpr signed char SF_STEP = 100, SF_ANC = 101; //sf_op values; anything else is a row jump by that many dc steps
+	double dc[3] = { 0.0, 0.0, 0.0 }, db[3] = { 0.0, 0.0, 0.0 };
+	bool jumps = false;
+	std::vector<char> cont(smax, 0);
+	std::vector<signed char> sf_op(smax, SF_ANC);
+	{
+		double kmax = 0.0, best = std::numeric_limits<double>::max();
+		for (long long t = 0; t < smax; t++)
+			kmax = std::max({ kmax, std::abs(k1_data[t]), std::abs(k2_data[t]), std::abs(k3_data[t]) });
+		const double tol = 1e-13 * (1.0 + kmax);
+		const auto steps_by = [&](const long long t, const double* d) {
+			return std::abs(k1_data[t] - k1_data[t - 1] - d[0]) <= tol && std::abs(k2_data[t] - k2_data[t - 1] - d[1]) <= tol
+				&& std::abs(k3_data[t] - k3_data[t - 1] - d[2]) <= tol;
+		};
+		for (long long t = 2; t < smax; t++) {
+			const double d[3] = { k1_data[t - 1] - k1_data[t - 2], k2_data[t - 1] - k2_data[t - 2], k3_data[t - 1] - k3_data[t - 2] };
+			const double n = k1_data[t - 1] * k1_data[t - 1] + k2_data[t - 1] * k2_data[t - 1] + k3_data[t - 1] * k3_data[t - 1];
+			if (n < best && steps_by(t, d)) { best = n; std::copy(d, d + 3, dc); }
+		}
+		if (best < std::numeric_limits<double>::max())
+			for (long long t = 1; t < smax; t++)
+				cont[t] = steps_by(t, dc);
+		//Row jumps: a row start that is the saved start of the previous row (or the block's first reflection) plus
+		//db and n whole dc steps, |n| <= SF_NMAX, is reached as R e^{i db.r} e^{+-i dc.r}^|n| instead of anchored.
+		//db is the commonest difference between consecutive row starts, reduced by whole dc steps. Every complex
+		//multiply since the last sincos counts towards SF_ANCHOR, along the chain of saved row starts too.
+		const double dcc = dc[0] * dc[0] + dc[1] * dc[1] + dc[2] * dc[2];
+		const auto reduce = [&](const long long t, const long long u, const double* base, double* v) {
+			v[0] = k1_data[t] - k1_data[u] - base[0]; v[1] = k2_data[t] - k2_data[u] - base[1]; v[2] = k3_data[t] - k3_data[u] - base[2];
+			const long long n = std::llround((v[0] * dc[0] + v[1] * dc[1] + v[2] * dc[2]) / dcc);
+			v[0] -= n * dc[0]; v[1] -= n * dc[1]; v[2] -= n * dc[2];
+			return n;
+		};
+		const auto same = [&](const double* v, const double* w) {
+			return std::abs(v[0] - w[0]) <= tol && std::abs(v[1] - w[1]) <= tol && std::abs(v[2] - w[2]) <= tol;
+		};
+		const double zero[3] = { 0.0, 0.0, 0.0 };
+		if (dcc > 0.0)
+		{
+			std::vector<std::array<double, 3>> cand;
+			for (long long t = 1, u = 0; t < smax; t++)
+				if (!cont[t]) { double v[3]; reduce(t, u, zero, v); cand.push_back({ v[0], v[1], v[2] }); u = t; }
+			size_t most = 1;
+			for (size_t c = 0; c < std::min<size_t>(cand.size(), 32); c++)
+			{
+				const size_t hits = std::count_if(cand.begin(), cand.end(), [&](const std::array<double, 3>& w) { return same(cand[c].data(), w.data()); });
+				if (hits > most) { most = hits; std::copy(cand[c].begin(), cand[c].end(), db); jumps = true; }
+			}
+		}
+		for (long long b0 = 0; b0 < smax; b0 += SF_BLOCK)
+		{
+			const long long b1 = std::min<long long>(b0 + SF_BLOCK, smax);
+			long long rs = b0;
+			int since = 0, rs_since = 0;
+			for (long long t = b0; t < b1; t++)
+			{
+				if (t > b0 && cont[t] && since < SF_ANCHOR) { sf_op[t] = SF_STEP; since++; continue; }
+				since = 0;
+				if (jumps && t > b0 && !cont[t])
+				{
+					double v[3];
+					const long long n = reduce(t, rs, db, v);
+					if (same(v, zero) && std::llabs(n) <= SF_NMAX && rs_since + 1 + std::llabs(n) <= SF_ANCHOR)
+					{
+						sf_op[t] = static_cast<signed char>(n);
+						since = rs_since + 1 + static_cast<int>(std::llabs(n));
+					}
+				}
+				if (t == b0 || !cont[t]) { rs = t; rs_since = since; }
+			}
+		}
+	}
+	vec e_ph, e_re, e_im, b_re, b_im;
+
 	for (int i = 0; i < imax; i++)
 	{
+		if (fb_done[i]) {
+			if (!do_XCW)
+				progress->update();
+			continue;
+		}
 		pmax = static_cast<long long int>(dens[i].size());
 		sf_cpu_points += static_cast<double>(pmax);
 		dens_local = dens[i].data();
@@ -1980,97 +2669,63 @@ void calc_SF(const int& points,
 		d2_local = d2[i].data();
 		d3_local = d3[i].data();
 
-#pragma omp parallel for private(work, rho, c, si, re, im, s, p)
-		for (s = 0; s < smax; s++)
+		e_ph.resize(pmax); e_re.resize(pmax); e_im.resize(pmax);
+		for (long long t = 0; t < pmax; t++)
+			e_ph[t] = dc[0] * d1_local[t] + dc[1] * d2_local[t] + dc[2] * d3_local[t];
+		sf_sincos_n(static_cast<int>(pmax), e_ph.data(), e_im.data(), e_re.data());
+		if (jumps)
 		{
-			re = 0.0, im = 0.0;
-			const double& k1_local = k1_data[s];
-			const double& k2_local = k2_data[s];
-			const double& k3_local = k3_data[s];
-			sf_local = sf[i].data();
-			// Process loop in blocks of 4 for better instruction-level parallelism
-			const long long int pmax_vec = (pmax / 4) * 4;
-
-			// Vectorized main loop processing 4 elements at a time
-			for (p = 0; p < pmax_vec; p += 4)
+			b_re.resize(pmax); b_im.resize(pmax);
+			for (long long t = 0; t < pmax; t++)
+				e_ph[t] = db[0] * d1_local[t] + db[1] * d2_local[t] + db[2] * d3_local[t];
+			sf_sincos_n(static_cast<int>(pmax), e_ph.data(), b_im.data(), b_re.data());
+		}
+		const double* er = e_re.data(), * ei = e_im.data(), * bre = b_re.data(), * bim = b_im.data();
+		//Blocks of SF_BLOCK reflections per task; per SF_TILE points (L1-resident Q) the block's reflections in order
+#pragma omp parallel for schedule(dynamic, 1)
+		for (long long b0 = 0; b0 < smax; b0 += SF_BLOCK)
+		{
+			const int nb = static_cast<int>(std::min<long long>(SF_BLOCK, smax - b0));
+			double qr[SF_TILE], qi[SF_TILE], rr[SF_TILE], ri[SF_TILE], acc_r[SF_BLOCK] = {}, acc_i[SF_BLOCK] = {};
+			for (long long t0 = 0; t0 < pmax; t0 += SF_TILE)
 			{
-				// Load 4 density values
-				const double rho0 = dens_local[p];
-				const double rho1 = dens_local[p + 1];
-				const double rho2 = dens_local[p + 2];
-				const double rho3 = dens_local[p + 3];
-
-				// Calculate work values for 4 points using FMA pattern
-				const double work0 = k1_local * d1_local[p] + k2_local * d2_local[p] + k3_local * d3_local[p];
-				const double work1 = k1_local * d1_local[p + 1] + k2_local * d2_local[p + 1] + k3_local * d3_local[p + 1];
-				const double work2 = k1_local * d1_local[p + 2] + k2_local * d2_local[p + 2] + k3_local * d3_local[p + 2];
-				const double work3 = k1_local * d1_local[p + 3] + k2_local * d2_local[p + 3] + k3_local * d3_local[p + 3];
-
-#if (defined(__GNUC__) || defined(__clang__)) && !defined(__APPLE__)
-				double si0, c0, si1, c1, si2, c2, si3, c3;
-				sincos(work0, &si0, &c0);
-				sincos(work1, &si1, &c1);
-				sincos(work2, &si2, &c2);
-				sincos(work3, &si3, &c3);
-
-				re += rho0 * c0 + rho1 * c1 + rho2 * c2 + rho3 * c3;
-				im += rho0 * si0 + rho1 * si1 + rho2 * si2 + rho3 * si3;
-#elif defined(__APPLE__)
-				double si0, c0, si1, c1, si2, c2, si3, c3;
-				__sincos(work0, &si0, &c0);
-				__sincos(work1, &si1, &c1);
-				__sincos(work2, &si2, &c2);
-				__sincos(work3, &si3, &c3);
-
-				re += rho0 * c0 + rho1 * c1 + rho2 * c2 + rho3 * c3;
-				im += rho0 * si0 + rho1 * si1 + rho2 * si2 + rho3 * si3;
-#elif defined(_MSC_VER) && defined(__AVX__)
-				//one SVML call for both instead of the separate sin4 and cos4 the vectoriser emits
-				__m256d cv;
-				const __m256d sv = _mm256_sincos_pd(&cv, _mm256_set_pd(work3, work2, work1, work0));
-				const __m256d rv = _mm256_loadu_pd(dens_local + p);
-				alignas(32) double cr[4], sr[4];
-				_mm256_store_pd(cr, _mm256_mul_pd(rv, cv));
-				_mm256_store_pd(sr, _mm256_mul_pd(rv, sv));
-				re += cr[0] + cr[1] + cr[2] + cr[3];
-				im += sr[0] + sr[1] + sr[2] + sr[3];
-#else
-				const double c0 = cos(work0);
-				const double si0 = sin(work0);
-				const double c1 = cos(work1);
-				const double si1 = sin(work1);
-				const double c2 = cos(work2);
-				const double si2 = sin(work2);
-				const double c3 = cos(work3);
-				const double si3 = sin(work3);
-
-				re += rho0 * c0 + rho1 * c1 + rho2 * c2 + rho3 * c3;
-				im += rho0 * si0 + rho1 * si1 + rho2 * si2 + rho3 * si3;
-#endif
+				const int nt = static_cast<int>(std::min<long long>(SF_TILE, pmax - t0));
+				const double* r = dens_local + t0, * x = d1_local + t0, * y = d2_local + t0, * z = d3_local + t0;
+				const double* tr = er + t0, * ti = ei + t0;
+				for (int j = 0; j < nb;)
+				{
+					const long long sj = b0 + j;
+					if (sf_op[sj] == SF_STEP)
+					{
+						//steps j .. j+m-1 all continue the row, none reaching the anchor limit
+						int m = 1;
+						while (m < 4 && j + m < nb && sf_op[sj + m] == SF_STEP) m++;
+						switch (m)
+						{
+						case 1: sf_steps<1>(nt, qr, qi, tr, ti, acc_r + j, acc_i + j); break;
+						case 2: sf_steps<2>(nt, qr, qi, tr, ti, acc_r + j, acc_i + j); break;
+						case 3: sf_steps<3>(nt, qr, qi, tr, ti, acc_r + j, acc_i + j); break;
+						default: sf_steps<4>(nt, qr, qi, tr, ti, acc_r + j, acc_i + j); break;
+						}
+						j += m;
+						continue;
+					}
+					if (sf_op[sj] != SF_ANC)
+						sf_jump(nt, sf_op[sj], rr, ri, bre + t0, bim + t0, tr, ti, qr, qi, acc_r + j, acc_i + j);
+					else
+						sf_anchor(nt, k1_data[sj], k2_data[sj], k3_data[sj], x, y, z, r, qr, qi, acc_r + j, acc_i + j);
+					//a row start is kept for the next row's jump
+					if (j == 0 || !cont[sj])
+					{
+						std::copy(qr, qr + nt, rr);
+						std::copy(qi, qi + nt, ri);
+					}
+					j++;
+				}
 			}
-
-			// Handle remaining elements
-			for (p = pmax_vec; p < pmax; p++)
-			{
-				rho = dens_local[p];
-				work = k1_local * d1_local[p] + k2_local * d2_local[p] + k3_local * d3_local[p];
-#if (defined(__GNUC__) || defined(__clang__)) && !defined(__APPLE__)
-				sincos(work, &si, &c);
-				re += rho * c;
-				im += rho * si;
-#elif defined(__APPLE__)
-				__sincos(work, &si, &c);
-				re += rho * c;
-				im += rho * si;
-#else
-				c = cos(work);
-				si = sin(work);
-				re += rho * c;
-				im += rho * si;
-#endif
-			}
-			sf_local[s].real(re);
-			sf_local[s].imag(im);
+			complex<double>* out = sf[i].data() + b0;
+			for (int j = 0; j < nb; j++)
+				out[j] = complex<double>(acc_r[j], acc_i[j]);
 		}
 		if (!do_XCW) {
 			progress->update();
@@ -2161,18 +2816,17 @@ void calc_SF_CUDA(const int& points,
  * @param mode The mode of operation. 0 = Gaussian tight core function, 1,2,3 = Thakkar core density based on the ECP type used
  * @param debug Flag indicating whether to enable debug mode.
  */
+//column s of sf belongs to stl[s], so a streamed block gets its core as readily as a whole table
 static void add_ECP_contribution(const ivec& asym_atom_list,
 	const WFN& wave,
 	cvec2& sf,
-	const cell& cell,
-	hkl_list& hkl,
+	const vec& stl,
 	std::ostream& file,
 	const int& mode,
 	const bool debug)
 {
 	using namespace std;
 	double k = 1.0;
-	hkl_list_it it = hkl.begin();
 	err_checkf(mode >= 0, "Invalid mode for ECP contribution!", file);
 	if (mode == 0)
 	{ // Using a gaussian tight core function
@@ -2188,11 +2842,10 @@ static void add_ECP_contribution(const ivec& asym_atom_list,
 					<< " and at 1 angstrom: " << exp(-pow(constants::bohr2ang(k), 2) / 16.0 / constants::PI) * wave.get_atom_ECP_electrons(asym_atom_list[i]) << "\n";
 			}
 		}
-#pragma omp parallel for private(it, k)
-		for (int s = 0; s < sf[0].size(); s++)
+#pragma omp parallel for private(k)
+		for (int s = 0; s < (int)stl.size(); s++)
 		{
-			it = next(hkl.begin(), s);
-			k = constants::FOUR_PI * cell.get_stl_of_hkl(*it);
+			k = constants::FOUR_PI * stl[s];
 			for (int i = 0; i < asym_atom_list.size(); i++)
 			{
 				sf[i][s] += wave.get_atom_ECP_electrons(asym_atom_list[i]) * exp(-k / 16.0 / constants::PI);
@@ -2234,12 +2887,11 @@ static void add_ECP_contribution(const ivec& asym_atom_list,
 			}
 		}
 
-#pragma omp parallel for private(it, k)
-		for (int s = 0; s < sf[0].size(); s++)
+#pragma omp parallel for private(k)
+		for (int s = 0; s < (int)stl.size(); s++)
 		{
 			int n_el = 0, charge = 0;
-			it = next(hkl.begin(), s);
-			k = constants::FOUR_PI * constants::bohr2ang(cell.get_stl_of_hkl(*it));
+			k = constants::FOUR_PI * constants::bohr2ang(stl[s]);
 			for (int i = 0; i < asym_atom_list.size(); i++)
 			{
 				n_el = wave.get_atom_ECP_electrons(asym_atom_list[i]);
@@ -2256,6 +2908,22 @@ static void add_ECP_contribution(const ivec& asym_atom_list,
 	{
 		err_not_impl_f("No higher ECP mode than 3 implemented!", file);
 	}
+}
+
+static void add_ECP_contribution(const ivec& asym_atom_list,
+	const WFN& wave,
+	cvec2& sf,
+	const cell& cell,
+	hkl_list& hkl,
+	std::ostream& file,
+	const int& mode,
+	const bool debug)
+{
+	vec stl;
+	stl.reserve(hkl.size());
+	for (const auto& h : hkl)
+		stl.push_back(cell.get_stl_of_hkl(h));
+	add_ECP_contribution(asym_atom_list, wave, sf, stl, file, mode, debug);
 }
 
 /**
@@ -2371,21 +3039,15 @@ int build_fill_wavefunctions(const options& opt, const int nr, std::vector<WFN>&
 	return nr;
 }
 
-//One evaluator per ATOM, not per element type. Two atoms of the same element in
-//different environments carry different EEQ charges, and the tsc gives each atom
-//its own row anyway, so there is nothing to be gained by sharing.
-//
-//Charges are matched by position because the fill rebuilds its wavefunction from
-//the original file; that is also how CIF atoms are matched to WFN atoms here.
-//An atom with no recorded charge, or an element with no tabulated ion, falls
-//back to the neutral density.
+//One evaluator per atom: same-element atoms carry different EEQ charges. Charges are matched by position, as the
+//fill rebuilds its wavefunction from the original file; no recorded charge or no tabulated ion falls back to neutral.
 std::vector<HE_Spherical_Atom> make_he_evaluators(const salted_part_prep& sph,
 	const WFN& fill_wavy, const options& opt, std::ostream& file)
 {
 	std::vector<HE_Spherical_Atom> out;
 	out.reserve(sph.asym_atom_list.size());
 	int n_charged = 0, n_extrap = 0, n_nofit = 0, n_delta = 0;
-	double worst_neg = 0.0;
+	double worst_neg = 0.0, q_min = 1e300, q_max = -1e300;
 	for (size_t a = 0; a < sph.asym_atom_list.size(); a++)
 	{
 		const int idx = sph.asym_atom_list[a];
@@ -2402,7 +3064,7 @@ std::vector<HE_Spherical_Atom> make_he_evaluators(const salted_part_prep& sph,
 			}
 			if (d < best) { best = d; q = e[3]; }
 		}
-		if (std::abs(q) > 1e-6) n_charged++;
+		if (std::abs(q) > 1e-6) { n_charged++; q_min = std::min(q_min, q); q_max = std::max(q_max, q); }
 		else if (!opt.spherical_fill_charges.empty()) n_nofit++;
 		out.emplace_back(Z, q);
 		if (out.back().is_extrapolating()) n_extrap++;
@@ -2412,11 +3074,11 @@ std::vector<HE_Spherical_Atom> make_he_evaluators(const salted_part_prep& sph,
 	if (n_charged)
 	{
 		file << "Spherical fill: " << n_charged << " of " << out.size()
-			 << " atom(s) given a fractional charge";
+			 << " atom(s) given a fractional charge (" << q_min << " to " << q_max << ")";
 		if (n_delta)
 			file << ", " << n_delta << " past +1 via the delta_k series (interpolated between bound states)";
 		if (n_extrap)
-			file << ", " << n_extrap << " beyond the tabulated +/-1 ion (shape extrapolated)";
+			file << ", " << n_extrap << " beyond the tabulated ions (shape extrapolated)";
 		file << "." << std::endl;
 		if (worst_neg < -1e-8)
 			file << "      most negative density from the blend: " << worst_neg
@@ -2427,6 +3089,36 @@ std::vector<HE_Spherical_Atom> make_he_evaluators(const salted_part_prep& sph,
 	return out;
 }
 
+//the filled atoms of a part into the run's .tshb: the whole atom (every occupied orbital) as Slater records in the charge
+//state make_he_evaluators gives the streamed table, Z on each, and the fitted delta_k or GTO differences as Gaussians
+void fill_tshb(const salted_part_prep& sph, WFN& fill_wavy, options& opt, std::ostream& file)
+{
+	if (sph.asym_atom_list.empty())
+		return;
+	const std::vector<HE_Spherical_Atom> spheres = make_he_evaluators(sph, fill_wavy, opt, file);
+	ScattererLabels keys;
+	append_scatterer_ids(keys, opt, sph.labels, fill_wavy, sph.asym_atom_list);
+	std::vector<tshb_record> records(sph.asym_atom_list.size());
+	std::vector<std::array<double, 3>> slaters;
+	std::vector<std::array<double, 2>> gaussians;
+	const double b = constants::bohr2ang(1.0);
+	for (size_t a = 0; a < records.size(); a++)
+	{
+		const int idx = sph.asym_atom_list[a];
+		tshb_record& r = records[a];
+		r.label = sph.labels[a];
+		r.part = fill_wavy.get_atom_group_nr(idx);
+		r.Z = fill_wavy.get_atom_charge(idx);
+		spheres[a].terms(slaters, gaussians);
+		for (const std::array<double, 3>& t : slaters)
+			r.slaters.push_back(tshb_slater(t));
+		for (const std::array<double, 2>& g : gaussians)
+			r.gaussians.push_back({ g[0] / (b * b * b), g[1] / (b * b) });
+	}
+	opt.tshb->append(tshb_block(std::move(records), keys, opt.electron_diffraction), file);
+	file << "Spherical fill: " << sph.asym_atom_list.size() << " atom(s) go into the .tshb as Slater records" << std::endl;
+}
+
 //rows for atoms the SALTED model could not predict (unknown species, or nothing inside the descriptor cutoff)
 //a Thakkar factor depends only on element and reflection, so these chunk like everything else here
 void append_spherical_rows(cvec2& chunk,
@@ -2435,21 +3127,22 @@ void append_spherical_rows(cvec2& chunk,
 	const bool electron_diffraction,
 	const size_t lo, const size_t hi)
 {
-	for (size_t a = 0; a < sph.asym_atom_list.size(); a++)
-	{
-		const int t = sph.asym_atom_to_type_list[a];
-		cvec row(hi - lo);
-		for (size_t r = lo; r < hi; r++)
+	const size_t first = chunk.size();
+	const size_t n_atoms = sph.asym_atom_list.size();
+	chunk.resize(first + n_atoms, cvec(hi - lo));
+	//every value is independent, so the threads split the reflections; this ran serially and outlasted the prediction
+#pragma omp parallel for
+	for (int s = 0; s < (int)(hi - lo); s++)
+		for (size_t a = 0; a < n_atoms; a++)
 		{
-			const double f = spheres[a].get_form_factor(sph.k_of_reflection[r]);
+			const int t = sph.asym_atom_to_type_list[a];
+			const double f = spheres[a].get_form_factor(sph.k_of_reflection[lo + s]);
 			//IAM form of Mott-Bethe: tabulated charge, no imaginary part
-			row[r - lo] = electron_diffraction
+			chunk[first + a][s] = electron_diffraction
 				? cdouble(constants::ED_fact * (sph.atom_type_list[t] - f) /
-					pow(sph.stl_of_reflection[r], 2), 0.0)
+					pow(sph.stl_of_reflection[lo + s], 2), 0.0)
 				: cdouble(f, 0.0);
 		}
-		chunk.push_back(std::move(row));
-	}
 }
 
 //writes a tsc as a sequence of reflection blocks; peak memory is queue depth * scatterers * block size * 16 bytes
@@ -2511,13 +3204,25 @@ struct spherical_fill_scope
 	spherical_fill_scope& operator=(const spherical_fill_scope&) = delete;
 };
 
-}  // namespace
+}
 
 
 int make_atomic_grids_wrapper(
 	const WFN& wave, const bvec& needs_grid, const ivec& asym_atom_list, const cell& unit_cell, const svec& labels, //
 	std::vector<_time_point>& time_points, svec& time_descriptions, vec2& d1, vec2& d2, vec2& d3, vec2& dens,
-	const options& opt, std::ostream& file = std::cout) {
+	const options& opt, std::ostream& file = std::cout, sf_shell_layout* layout = nullptr) {
+
+	citations::cite(citations::Method::BeckeGrid, file);
+	if (opt.partition_type == PartitionType::Hirshfeld)
+		citations::cite(citations::Method::Hirshfeld, file);
+	else if (opt.partition_type == PartitionType::TFVC)
+		citations::cite(citations::Method::TFVC, file);
+	else if (opt.partition_type == PartitionType::MBIS || opt.partition_type == PartitionType::EMBIS) {
+		citations::cite(citations::Method::MBIS, file);
+		//EMBIS is MBIS with an ellipsoidal sigma: both papers
+		if (opt.partition_type == PartitionType::EMBIS)
+			citations::cite(citations::Method::EMBIS, file);
+	}
 
 	const int atoms_with_grids = vec_sum(needs_grid);
 	err_checkf(atoms_with_grids > 0, "No atoms with grids to generate!", file);
@@ -2561,7 +3266,7 @@ int make_atomic_grids_wrapper(
 	time_points.push_back(get_time());
 	time_descriptions.push_back("calculate charges");
 
-	grid_manager.getDensityVectors(temp, asym_atom_list, d1, d2, d3, dens, opt.get_g);
+	grid_manager.getDensityVectors(temp, asym_atom_list, d1, d2, d3, dens, opt.get_g, layout);
 	time_points.push_back(get_time());
 	time_descriptions.push_back("combined density vectors");
 
@@ -2589,6 +3294,7 @@ itsc_block calculate_scattering_factors_from_cube(
 #endif
 
 	cell unit_cell(opt.cif, file, opt.debug);
+	unit_cell.set_hkl_scale(opt.hkl_scale);
 	ifstream cif_input(opt.cif.c_str(), ios::in);
 	ivec atom_type_list;
 	ivec asym_atom_to_type_list;
@@ -2769,10 +3475,17 @@ tsc_block_type calculate_scattering_factors(
 			}
 		}
 		err_checkf(opt.groups[nr].size() >= 1, "Not enough groups specified to work with!", file);
+		citations::cite(citations::Method::NoSpherA2, file);
+		if (opt.iam_switch)
+			citations::cite(citations::Method::IAM, file);
+		else
+			citations::cite(citations::Method::HAR, file);
 		file << "Number of protons: " << wavy->get_nr_electrons() << endl
 			<< "Number of electrons: " << fixed << wavy->count_nr_electrons() << endl;
-		if (wavy->get_has_ECPs())
+		if (wavy->get_has_ECPs()) {
 			file << "Number of ECP electrons: " << wavy->get_nr_ECP_electrons() << endl;
+			citations::cite(citations::Method::ECP, file);
+		}
 		// err_checkf(exists(asym_cif), "Asym/Wfn CIF does not exists!", file);
 		if (opt.debug)
 			file << "Working with: " << wavy->get_path() << endl;
@@ -2795,6 +3508,7 @@ tsc_block_type calculate_scattering_factors(
 
 
 	cell unit_cell(cif, file, opt.debug);
+	unit_cell.set_hkl_scale(opt.hkl_scale);
 	ifstream cif_input(cif.c_str(), std::ios::in);
 	ivec atom_type_list;
 	ivec asym_atom_to_type_list;
@@ -2814,22 +3528,11 @@ tsc_block_type calculate_scattering_factors(
 		needs_grid,
 		file,
 		opt.debug,
-		opt.allow_empty_asym);
+		//a -mtc part whose new atoms the model all dropped (a lone metal or isolated ion in its own PART) predicts
+		//nothing; stream_mtc_salted gives it only its spherical rows
+		opt.allow_empty_asym || (prep_out && opt.needs_Thakkar_fill && std::is_same_v<calculator_type, SALTEDPredictor&>));
 
 	cif_input.close();
-
-	//empty only means a broken CIF unless the caller allowed it: a spherical fill of an already covered part finds nothing
-	if (asym_atom_list.empty())
-	{
-		if (prep_out) *prep_out = salted_part_prep();
-		return tsc_block_type();
-	}
-
-	if (opt.debug)
-		file << "There are " << atom_type_list.size() << " Types of atoms and " << asym_atom_to_type_list.size() << " atoms in total" << endl;
-
-	time_points.push_back(get_time());
-	time_descriptions.push_back("cif reading");
 
 	vec2 k_pt;
 	hkl_list hkl;
@@ -2842,7 +3545,26 @@ tsc_block_type calculate_scattering_factors(
 		generate_hkl_from_options(opt, hkl, unit_cell, file);
 		opt.m_hkl_list = hkl;
 	}
-	if (kpts == NULL || kpts->size() == 0)
+
+	//empty only means a broken CIF unless the caller allowed it: a spherical fill of an already covered part finds nothing.
+	//After the hkl list, which the later parts take from part 0 even when part 0 is the empty one (COD 2018514)
+	if (asym_atom_list.empty())
+	{
+		if (prep_out) *prep_out = salted_part_prep();
+		return tsc_block_type();
+	}
+
+	if (opt.debug)
+		file << "There are " << atom_type_list.size() << " Types of atoms and " << asym_atom_to_type_list.size() << " atoms in total" << endl;
+
+	time_points.push_back(get_time());
+	time_descriptions.push_back("cif reading");
+
+	//a part whose atoms go into the .tshb, and the fill's preparation for it, write records and evaluate no reflection
+	const bool records_only = opt.tshb != nullptr && (opt.spherical_fill ? prep_out != NULL : prep_out == NULL);
+	if (records_only)
+		;
+	else if (kpts == NULL || kpts->size() == 0)
 	{
 		make_k_pts(
 			nr != 0 && hkl.size() == 0,
@@ -2877,8 +3599,13 @@ tsc_block_type calculate_scattering_factors(
 		&& opt.binary_tsc && !opt.old_tsc;
 	if (block_reflections > 0 && !stream_tsc && (!opt.binary_tsc || opt.old_tsc))
 		file << "Text tsc requested: the table is kept in memory instead of streamed in blocks" << std::endl;
+	//-tshb: the fitted densities go into the run's .tshb (opt.tshb, set by the caller once the run qualifies) and no
+	//table is made; olex2.refine evaluates them at any reflection. The fill call and the -mtc preparation never decide it
+	const bool tshb_only = opt.tshb != nullptr && !opt.iam_switch
+		&& (std::is_same_v<calculator_type, SALTEDPredictor &> || opt.partition_type == PartitionType::RI)
+		&& prep_out == NULL && !opt.spherical_fill;
 	cvec2 sf;
-	if (!stream_tsc)
+	if (!stream_tsc && !tshb_only)
 	{
 		sf.resize(asym_atom_list.size());
 #pragma omp parallel for
@@ -2890,7 +3617,7 @@ tsc_block_type calculate_scattering_factors(
 		if (prep_out != NULL)
 		{
 			// hand back what a per-block spherical calculation needs and stop
-			const std::vector<i3> hv(hkl.begin(), hkl.end());
+			const std::vector<i3> hv(records_only ? std::vector<i3>() : std::vector<i3>(hkl.begin(), hkl.end()));
 			prep_out->asym_atom_list = asym_atom_list;
 			prep_out->labels = labels;
 			prep_out->atom_type_list = atom_type_list;
@@ -2904,6 +3631,17 @@ tsc_block_type calculate_scattering_factors(
 				prep_out->stl_of_reflection[s] = stl;
 				prep_out->k_of_reflection[s] = constants::bohr2ang(constants::FOUR_PI * stl);
 			}
+			return tsc_block_type();
+		}
+		//a part without orbitals in a -tshb run: its atoms as the fill's spherical records, no table
+		if (opt.tshb != nullptr && !opt.spherical_fill)
+		{
+			salted_part_prep sph;
+			sph.asym_atom_list = asym_atom_list;
+			sph.labels = labels;
+			sph.atom_type_list = atom_type_list;
+			sph.asym_atom_to_type_list = asym_atom_to_type_list;
+			fill_tshb(sph, *wavy, opt, file);
 			return tsc_block_type();
 		}
 		std::vector<Thakkar> spherical_atoms = make_spherical_evaluators(atom_type_list);
@@ -2928,10 +3666,14 @@ tsc_block_type calculate_scattering_factors(
 						const double stl = unit_cell.get_stl_of_hkl(hkl_vector[lo + s]);
 						const double k = constants::bohr2ang(constants::FOUR_PI * stl);
 						const double h2 = pow(stl, 2);
+						//once per element, not once per atom
+						vec f_type(spherical_atoms.size());
+						for (size_t t = 0; t < spherical_atoms.size(); t++)
+							f_type[t] = spherical_atoms[t].get_form_factor(k);
 						for (int i = 0; i < imax; i++)
 						{
 							const int type = asym_atom_to_type_list[i];
-							const double f = spherical_atoms[type].get_form_factor(k);
+							const double f = f_type[type];
 							//IAM form of Mott-Bethe: tabulated charge, no imaginary part
 							chunk[i][s] = opt.electron_diffraction
 								? cdouble(constants::ED_fact * (atom_type_list[type] - f) / h2, 0.0)
@@ -2950,10 +3692,13 @@ tsc_block_type calculate_scattering_factors(
 				const double stl = unit_cell.get_stl_of_hkl(hkl_vector[s]);
 				const double k = constants::bohr2ang(constants::FOUR_PI * stl);
 				const double h2 = pow(stl, 2);
+				vec f_type(spherical_atoms.size());
+				for (size_t t = 0; t < spherical_atoms.size(); t++)
+					f_type[t] = spherical_atoms[t].get_form_factor(k);
 				for (int i = 0; i < imax; i++)
 				{
 					const int type = asym_atom_to_type_list[i];
-					const double f = spherical_atoms[type].get_form_factor(k);
+					const double f = f_type[type];
 					//IAM form of Mott-Bethe: tabulated charge, no imaginary part
 					sf[i][s] = opt.electron_diffraction
 						? cdouble(constants::ED_fact * (atom_type_list[type] - f) / h2, 0.0)
@@ -2995,6 +3740,13 @@ tsc_block_type calculate_scattering_factors(
 		file << setprecision(4) << "Total number of analytical Electrons: " << el_sum << endl;
 		time_points.push_back(get_time());
 		time_descriptions.push_back("Calculation of Charges");
+		if (tshb_only) {
+			//keyed as the table's rows, the core as the table adds it: the model's ECP mode
+			ScattererLabels keys;
+			append_scatterer_ids(keys, opt, labels, *wavy, asym_atom_list);
+			opt.tshb->append(ml->tshb(labels, keys, asym_atom_list, *wavy, calculator.wavy.get_ECP_mode(), opt.electron_diffraction), file);
+			file << labels.size() << " atom(s) go into the .tshb, no table" << endl;
+		}
 
 		if (prep_out != NULL)
 		{
@@ -3011,7 +3763,9 @@ tsc_block_type calculate_scattering_factors(
 			return tsc_block_type();
 		}
 
-		if (stream_tsc)
+		if (tshb_only)
+			;
+		else if (stream_tsc)
 		{
 			ScattererLabels stream_ids;
 			append_scatterer_ids(stream_ids, opt, labels, *wavy, asym_atom_list);
@@ -3049,6 +3803,15 @@ tsc_block_type calculate_scattering_factors(
 				[&](const size_t lo, const size_t hi, ProgressBar& progress)
 				{
 					cvec2 chunk = ml->scattering_factors(slice_k_points(k_pt, lo, hi), asym_atom_list, &progress);
+					//the core before Mott-Bethe, which wants all electrons
+					if (calculator.wavy.get_has_ECPs())
+					{
+						vec stl(hi - lo);
+						for (size_t s = lo; s < hi; s++)
+							stl[s - lo] = unit_cell.get_stl_of_hkl(hkl_v[s]);
+						add_ECP_contribution(asym_atom_list, calculator.wavy, chunk, stl, file,
+							calculator.wavy.get_ECP_mode(), false);
+					}
 					//Mott-Bethe never looks outside one reflection, so a block is as valid a unit as a table
 					if (opt.electron_diffraction)
 						convert_to_ED(asym_atom_list, *wavy, chunk, unit_cell,
@@ -3066,7 +3829,8 @@ tsc_block_type calculate_scattering_factors(
 		time_points.push_back(get_time());
 		time_descriptions.push_back("Fourier transform");
 
-		if (calculator.wavy.get_has_ECPs())
+		//streamed blocks got theirs as they were made; the mode is the model's (-salted_ecp) or -ECP's
+		if (calculator.wavy.get_has_ECPs() && !sf.empty())
 		{
 			add_ECP_contribution(
 				asym_atom_list,
@@ -3075,7 +3839,7 @@ tsc_block_type calculate_scattering_factors(
 				unit_cell,
 				hkl,
 				file,
-				opt.ECP_mode,
+				calculator.wavy.get_ECP_mode(),
 				opt.debug);
 		}
 	}
@@ -3087,6 +3851,7 @@ tsc_block_type calculate_scattering_factors(
 			opt.partition_type == PartitionType::EMBIS)
 		{
 			vec2 d1, d2, d3, dens;
+			sf_shell_layout layout;
 			const int points = make_atomic_grids_wrapper(
 				*wavy,
 				needs_grid,
@@ -3096,7 +3861,7 @@ tsc_block_type calculate_scattering_factors(
 				time_points,
 				time_descriptions,
 				d1, d2, d3, dens,
-				opt, file);
+				opt, file, &layout);
 
 			_time_point end1;
 			calc_SF(points,
@@ -3111,7 +3876,8 @@ tsc_block_type calculate_scattering_factors(
 				false,
 				opt.use_gpu,
 				opt.gpu_fp64,
-				opt.gpu_fp32);
+				opt.gpu_fp32,
+				&layout);
 
 			time_points.push_back(get_time());
 			time_descriptions.push_back("Fourier transform");
@@ -3153,8 +3919,13 @@ tsc_block_type calculate_scattering_factors(
 			file << setprecision(4) << "Total number of analytical Electrons: " << el_sum << endl;
 			time_points.push_back(get_time());
 			time_descriptions.push_back("Calculation of Charges");
-
-			if (stream_tsc)
+			if (tshb_only) {
+				ScattererLabels keys;
+				append_scatterer_ids(keys, opt, labels, *wavy, asym_atom_list);
+				opt.tshb->append(ml.tshb(labels, keys, asym_atom_list, *wavy, wavy->get_ECP_mode(), opt.electron_diffraction), file);
+				file << labels.size() << " atom(s) go into the .tshb, no table" << endl;
+			}
+			else if (stream_tsc)
 			{
 				//as the SALTED case above, but the atoms come from the auxiliary wavefunction, so no spherical remainder
 				ScattererLabels stream_ids;
@@ -3166,6 +3937,13 @@ tsc_block_type calculate_scattering_factors(
 					[&](const size_t lo, const size_t hi, ProgressBar& progress)
 					{
 						cvec2 chunk = ml.scattering_factors(slice_k_points(k_pt, lo, hi), asym_atom_list, &progress);
+						if (wavy->get_has_ECPs())
+						{
+							vec stl(hi - lo);
+							for (size_t s = lo; s < hi; s++)
+								stl[s - lo] = unit_cell.get_stl_of_hkl(hkl_v[s]);
+							add_ECP_contribution(asym_atom_list, *wavy, chunk, stl, file, opt.ECP_mode, false);
+						}
 						if (opt.electron_diffraction)
 							convert_to_ED(asym_atom_list, *wavy, chunk, unit_cell,
 								std::vector<i3>(hkl_v.begin() + lo, hkl_v.begin() + hi));
@@ -3181,7 +3959,8 @@ tsc_block_type calculate_scattering_factors(
 		else {
 			std::cout << "Unknown Partition type, stopping here!" << std::endl;
 		}
-		if (wavy->get_has_ECPs())
+		//a streamed RI table is empty here, its blocks got the core as they were made; Hirshfeld fills sf even when streaming
+		if (wavy->get_has_ECPs() && !sf.empty())
 		{
 			add_ECP_contribution(
 				asym_atom_list,
@@ -3195,8 +3974,9 @@ tsc_block_type calculate_scattering_factors(
 		}
 	}
 
-	//not when streaming: sf is empty there and each block was converted as it was produced
-	if (opt.electron_diffraction && !opt.iam_switch && !stream_tsc)
+	//not when streamed: sf is empty there and each block was converted as it was produced (calc_SF fills sf whole
+	//even under stream_tsc, so a Hirshfeld table still needs it)
+	if (opt.electron_diffraction && !opt.iam_switch && !sf.empty())
 	{
 		convert_to_ED(asym_atom_list,
 			*wavy,
@@ -3229,13 +4009,27 @@ tsc_block_type calculate_scattering_factors(
 		//no_date is not part of spherical_fill_scope: only this caller suppresses the banner
 		const bool no_date_was = opt.no_date;
 		opt.no_date = true;
-		tsc_block<int, cdouble> blocky_thakkar;
+		if (tshb_only)
 		{
-			const spherical_fill_scope fill(opt, hkl);
-			blocky_thakkar = calculate_scattering_factors<itsc_block, std::vector<WFN> &>(opt, tempy, file, labels, fill_nr);
+			//the atoms alone: their records need no reflections
+			salted_part_prep spherical;
+			{
+				const spherical_fill_scope fill(opt, hkl);
+				calculate_scattering_factors<itsc_block, std::vector<WFN> &>(opt, tempy, file, labels, fill_nr, kpts, &spherical);
+			}
+			opt.no_date = no_date_was;
+			fill_tshb(spherical, tempy[fill_nr], opt, file);
 		}
-		opt.no_date = no_date_was;
-		blocky.append(std::move(blocky_thakkar), file);
+		else
+		{
+			tsc_block<int, cdouble> blocky_thakkar;
+			{
+				const spherical_fill_scope fill(opt, hkl);
+				blocky_thakkar = calculate_scattering_factors<itsc_block, std::vector<WFN> &>(opt, tempy, file, labels, fill_nr);
+			}
+			opt.no_date = no_date_was;
+			blocky.append(std::move(blocky_thakkar), file);
+		}
 		time_points.push_back(get_time());
 		time_descriptions.push_back("Spherical Atoms");
 	}
@@ -3266,15 +4060,19 @@ bool stream_mtc_salted(options& opt, std::vector<WFN>& wavy, std::ostream& file,
 	const size_t n_parts = opt.combined_tsc_calc_files.size();
 	//electron diffraction is not excluded: the prep carries the stl, so no unit cell is needed down here
 	//the stream writer is binary only, a text table has to go through the in-memory path
-	if (opt.tsc_block_size == 0 || !opt.SALTED || n_parts < 2 || opt.iam_switch || !opt.binary_tsc || opt.old_tsc)
+	//a .tshb run makes no table, so the sequential loop (equal row for row) collects the parts instead
+	if (opt.tsc_block_size == 0 || !opt.SALTED || n_parts < 2 || opt.iam_switch || !opt.binary_tsc || opt.old_tsc || opt.tshb)
 		return false;
 
 	std::vector<std::shared_ptr<SALTEDPredictor>> preds;
 	std::vector<salted_part_prep> preps;
+	//each predictor replaces opt.spherical_fill_charges with its part's EEQ charges; the fill below needs every part's
+	std::vector<std::vector<std::array<double, 4>>> charges(n_parts);
 	svec known;
 	for (size_t i = 0; i < n_parts; i++)
 	{
 		auto pred = std::make_shared<SALTEDPredictor>(wavy[i], opt);
+		charges[i] = opt.spherical_fill_charges;
 		if (!pred->basis_set_loaded())
 			load_basis_into_WFN(pred->wavy, BasisSetLibrary::get_basis_set(pred->get_dfbasis_name()));
 		salted_part_prep prep;
@@ -3300,13 +4098,16 @@ bool stream_mtc_salted(options& opt, std::vector<WFN>& wavy, std::ostream& file,
 	//a table must hold either all atomIDs or all labels; salted_part_prep::labels holds hex strings while the
 	//predicted parts contribute atomID objects, so the spherical rows are converted here rather than passed through
 	std::vector<ScattererLabels> spherical_ids(n_parts);
-	//built inside the block below: the per-atom charges are matched against the
-	//fill wavefunctions, which only exist there
+	//built in the block below, where the fill wavefunctions the charges are matched against exist
 	std::vector<std::vector<HE_Spherical_Atom>> spheres(n_parts);
+	//every part reads the same reflections, but a part the model predicts nothing of returns none
+	const auto ref = std::find_if(preps.begin(), preps.end(), [](const salted_part_prep& p) { return !p.hkl_v.empty(); });
+	err_checkf(ref != preps.end(), "The SALTED model predicts no atom of any part", file);
+	const std::vector<i3>& hkl_v = ref->hkl_v;
 	if (opt.needs_Thakkar_fill)
 	{
 		hkl_list fill_reflections;
-		for (const auto& h : preps[0].hkl_v)
+		for (const auto& h : hkl_v)
 			fill_reflections.emplace(h);
 		const spherical_fill_scope fill(opt, fill_reflections);
 
@@ -3323,15 +4124,16 @@ bool stream_mtc_salted(options& opt, std::vector<WFN>& wavy, std::ostream& file,
 			have_spherical[i] = spherical[i].asym_atom_list.empty() ? 0 : 1;
 			if (!have_spherical[i]) continue;
 			n_filled += spherical[i].asym_atom_list.size();
-			err_checkf(spherical[i].k_of_reflection.size() == preps[0].hkl_v.size(),
+			err_checkf(spherical[i].k_of_reflection.size() == hkl_v.size(),
 				"Spherical remainder of part " + std::to_string(i + 1) + " covers " +
 				std::to_string(spherical[i].k_of_reflection.size()) +
-				" reflections, the parts cover " + std::to_string(preps[0].hkl_v.size()), file);
+				" reflections, the parts cover " + std::to_string(hkl_v.size()), file);
 			// keep feeding `known`, so a later part cannot claim these atoms again
 			for (size_t a = 0; a < spherical[i].labels.size(); a++)
 				known.push_back(spherical[i].labels[a]);
 			append_scatterer_ids(spherical_ids[i], opt, spherical[i].labels,
 				tempy[i], spherical[i].asym_atom_list);
+			opt.spherical_fill_charges = charges[i];
 			spheres[i] = make_he_evaluators(spherical[i], tempy[i], opt, file);
 		}
 		file << "Spherical remainder: " << n_filled
@@ -3348,11 +4150,11 @@ bool stream_mtc_salted(options& opt, std::vector<WFN>& wavy, std::ostream& file,
 			ids.emplace_back(sid);
 	}
 
-	const size_t n_refl = preps[0].hkl_v.size();
+	const size_t n_refl = hkl_v.size();
 	file << "Combined tsc: " << ids.size() << " scatterers from "
 		<< n_parts << " parts" << std::endl;
 	//the bar counts reflections * parts, since every part is evaluated for every block
-	stream_blocks(opt, file, "experimental.tscb", ids, preps[0].hkl_v,
+	stream_blocks(opt, file, "experimental.tscb", ids, hkl_v,
 		n_refl * preps.size(),
 		[&](const size_t lo, const size_t hi, ProgressBar& progress)
 		{
@@ -3360,11 +4162,20 @@ bool stream_mtc_salted(options& opt, std::vector<WFN>& wavy, std::ostream& file,
 			combined.reserve(ids.size());
 			for (size_t p = 0; p < preps.size(); p++)
 			{
+				if (!preps[p].mol)  // the model predicts nothing in this part, only its spherical rows
+				{
+					if (have_spherical[p])
+						append_spherical_rows(combined, spherical[p], spheres[p], opt.electron_diffraction, lo, hi);
+					continue;
+				}
 				cvec2 chunk = preps[p].mol->scattering_factors(slice_k_points(preps[p].k_pt, lo, hi), preps[p].asym_atom_list, &progress);
+				const vec stl(preps[p].stl_of_reflection.begin() + lo, preps[p].stl_of_reflection.begin() + hi);
+				//the core before Mott-Bethe, as in the single-table stream
+				if (preds[p]->wavy.get_has_ECPs())
+					add_ECP_contribution(preps[p].asym_atom_list, preds[p]->wavy, chunk, stl, file,
+						preds[p]->wavy.get_ECP_mode(), false);
 				if (opt.electron_diffraction)
-					convert_to_ED(preps[p].asym_atom_list, preds[p]->wavy, chunk,
-						vec(preps[p].stl_of_reflection.begin() + lo,
-							preps[p].stl_of_reflection.begin() + hi));
+					convert_to_ED(preps[p].asym_atom_list, preds[p]->wavy, chunk, stl);
 				for (auto& row : chunk)
 					combined.push_back(std::move(row));
 				// this part's spherical remainder, where the id list put it
@@ -3457,8 +4268,13 @@ void calc_sfac_diffuse(const options& opt, std::ostream& log_file)
 	generate_fractional_hkl(opt.dmin, hkl, opt.twin_law, unit_cell, log_file, opt.sfac_diffuse, opt.debug);
 
 	const long long int size = static_cast<long long int>(hkl.size());
+	//k_pt, sf and the tsc_block's copies of sf and the indices are alive together when the block is built
+	const double need = double(size) * (48.0 + 32.0 * dens.size());
+	const size_t avail = available_memory_bytes();
+	err_checkf(avail == 0 || need < avail, "-sfac_diffuse: " + std::to_string(size) + " fractional reflections x " +
+		std::to_string(dens.size()) + " atoms need ~" + std::to_string(int(need / 1073741824.0) + 1) + " GB, " +
+		std::to_string(avail >> 30) + " GB are free; use a larger step or dmin", std::cout);
 	vec2 k_pt;
-	k_pt.reserve(3 * size);
 	k_pt.resize(3);
 #pragma omp parallel for
 	for (int i = 0; i < 3; i++)
@@ -3489,7 +4305,6 @@ void calc_sfac_diffuse(const options& opt, std::ostream& log_file)
 	long long int pmax = static_cast<long long int>(dens[0].size());
 	//const long long int step = max(static_cast<long long int>(floor(smax / 20)), 1LL);
 	std::cout << "Done with making k_pt " << smax << " " << imax << " " << pmax << endl;
-	sf.reserve(imax * smax);
 	sf.resize(imax);
 #pragma omp parallel for
 	for (int i = 0; i < imax; i++)

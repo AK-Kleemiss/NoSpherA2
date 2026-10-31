@@ -1,4 +1,5 @@
 #include "pch.h"
+#include "tuning.h"
 #include "convenience.h"
 #include "AtomGrid.h"
 #ifdef NOSPHERA2_USE_GPU
@@ -143,11 +144,16 @@ AtomGrid::AtomGrid(const double radial_precision,
 	const int max_l_quantum_number,
 	const double alpha_min[],
 	std::ostream &file,
-	const double radial_step_scale)
+	const double radial_step_scale,
+	const bool generic_rotation)
 {
 	using namespace std;
-	const int min_num_angular_points_closest =
-		constants::get_closest_num_angular(min_num_angular_points);
+	//The floor only acts inside R_Bragg/5. Up to Ar only the spherical 1s/2s2p core lives there: 6 points moved f by
+	//< 2e-10 against lebedev_low and saved 1.2-2.2x points (grid lab 05). From K on the valence d (or an ECP's
+	//pseudo-valence) reaches inside and wants lebedev_low: EMBIS on Rh with an ECP diverged with 6.
+	//-tune NOS_GRID_OLD_FLOOR restores lebedev_low everywhere.
+	const int min_num_angular_points_closest = proton_charge > 18 || tuning("NOS_GRID_OLD_FLOOR")
+		? constants::get_closest_num_angular(min_num_angular_points) : constants::lebedev_table[0];
 	const int max_num_angular_points_closest =
 		constants::get_closest_num_angular(max_num_angular_points);
 	err_checkf(min_num_angular_points_closest != -1 && max_num_angular_points_closest != -1, "No valid value for angular number found!", file);
@@ -166,6 +172,21 @@ AtomGrid::AtomGrid(const double radial_precision,
 			angular_y.data() + angular_off,
 			angular_z.data() + angular_off,
 			angular_w.data() + angular_off);
+	}
+	//Lebedev grids are O_h symmetric: a molecular mirror on x=0, y=0 or z=0 puts whole grid rings on a
+	//separatrix. A generic rotation (quaternion with no special angles) keeps the quadrature exact and moves them off.
+	if (generic_rotation) {
+		const double w = 0.9, x = 0.2, y = 0.3, z = 0.25, n = w * w + x * x + y * y + z * z;
+		const double R[3][3] = {
+			{ 1 - 2 * (y * y + z * z) / n, 2 * (x * y - w * z) / n, 2 * (x * z + w * y) / n },
+			{ 2 * (x * y + w * z) / n, 1 - 2 * (x * x + z * z) / n, 2 * (y * z - w * x) / n },
+			{ 2 * (x * z - w * y) / n, 2 * (y * z + w * x) / n, 1 - 2 * (x * x + y * y) / n } };
+		for (size_t k = 0; k < angular_x.size(); k++) {
+			const double a = angular_x[k], b = angular_y[k], c = angular_z[k];
+			angular_x[k] = R[0][0] * a + R[0][1] * b + R[0][2] * c;
+			angular_y[k] = R[1][0] * a + R[1][1] * b + R[1][2] * c;
+			angular_z[k] = R[2][0] * a + R[2][1] * b + R[2][2] * c;
+		}
 	}
 
 	// radial parameters
@@ -227,16 +248,16 @@ AtomGrid::AtomGrid(const double radial_precision,
 		angular_off = constants::get_angular_order(num_angular) * constants::MAG;
 		err_checkf(angular_off != -constants::MAG, "Invalid angular order!", file);
 		const int start = (int)atom_grid_x_bohr_.size();
+		shell_start_.push_back(start);
 		angular_off -= start;
 		const int size = start + num_angular;
-		int p = 0;
 		atom_grid_x_bohr_.resize(size);
 		atom_grid_y_bohr_.resize(size);
 		atom_grid_z_bohr_.resize(size);
 		atom_grid_w_.resize(size);
-#pragma omp parallel for private(p)
+		//serial: a few thousand multiplies per shell; a parallel region per shell stalls at its barrier on busy threads
 		for (int iang = start; iang < size; iang++) {
-			p = angular_off + iang;
+			const int p = angular_off + iang;
 			atom_grid_x_bohr_[iang] = angular_x[p] * radial_r;
 			atom_grid_y_bohr_[iang] = angular_y[p] * radial_r;
 			atom_grid_z_bohr_[iang] = angular_z[p] * radial_r;
@@ -244,6 +265,7 @@ AtomGrid::AtomGrid(const double radial_precision,
 			atom_grid_w_[iang] = constants::FOUR_PI * angular_w[p] * radial_w;
 		}
 	}
+	shell_start_.push_back((int)atom_grid_x_bohr_.size());
 }
 
 AtomGrid::~AtomGrid() {}
@@ -313,8 +335,7 @@ vec make_chi(const WFN& wfn, int samples, bool refine, bool debug, const Density
 					auto extrema = find_line_density_extrema(wfn, a, b, rho, samples, refine);
 					size_t use_extr = 0;
 					if (wfn.get_atom_ECP_electrons(a) != 0 || wfn.get_atom_ECP_electrons(b) != 0) {
-						//No sign change in the sampled line (minimum inside the last interval of a polar bond):
-						//extrema[use_extr] below read an empty vector and crashed without a message
+						//No sign change on the sampled line (minimum in the last interval of a polar bond) leaves extrema empty
 						if (extrema.empty()) {
 							std::cout << "WARNING: No density extremum found between atoms " << a << " and " << b << ". Setting chi to 1.0.\n";
 							chi[a * ncen + b] = 1.0;
@@ -415,7 +436,7 @@ vec make_chi(const WFN& wfn, int samples, bool refine, bool debug, const Density
 		}
 	}
 
-	if (std::getenv("NOSPHERA2_CHI_DEBUG")) { // Flawfinder: ignore
+	if (tuning("NOSPHERA2_CHI_DEBUG")) {
 		double s = 0.0;
 		for (int i = 0; i < chi.size(); i++) s += chi[i] * chi[i];
 		std::fprintf(stderr, "chi checksum %.17g size %zu\n", s, chi.size());
@@ -556,6 +577,65 @@ constexpr double f(const double &x)
 	return f;
 }
 
+#if defined(__aarch64__) && !defined(__APPLE__) && \
+	((defined(__clang__) && __clang_major__ >= 14) || (defined(__GNUC__) && !defined(__clang__) && !defined(__STRICT_ANSI__)))
+#define NSA2_BECKE_NEON
+//Becke pairs (a, b), b = a+1, a+2, ... two per NEON op; returns the first b left to the scalar loop (at most one).
+//The scalar loop is one dependent chain of ~70 cycles per pair (division, size adjustment, f3, pa update) and the
+//Cortex-A72 keeps about one pair in flight: 58 cycles/pair. Three vectors side by side: 41 cycles/pair (1.4x).
+//Bit-identical to the scalar loop as the compiler contracts it by default, which the gate pins:
+//1 - mu^2 and mu + u (1 - mu^2) fused, each f3 step h = 0.5 f, t = 1.5 - h f fused, f = t f. GCC in gnu++ modes
+//(-ffp-contract=fast; checked in the disassembly) also fuses the last f = t f into 1 - f3; clang 14+ (-ffp-contract=on,
+//per expression) does not, as f3 is a separate function. Clang's scalar loop is slower, 66 cycles/pair: 1.63x there.
+//An explicit -ffp-contract would break the identity. MSVC contracts differently again; Apple is not measured yet.
+//pa_a only ever gets multiplied or set to 0, and 0 stays 0: its zero tests are collected and applied once at the end,
+//which leaves a bare multiply chain in the loop.
+static int becke_pairs_neon(const int a, const int n, const double* dist, const double* R_v, const double* dist_ab_row,
+	const double* u_row, const int* Z, double* pa_b)
+{
+	const float64x2_t da = vdupq_n_f64(dist[a]), Ra = vdupq_n_f64(R_v[a]), one = vdupq_n_f64(1.0), half = vdupq_n_f64(0.5),
+		c15 = vdupq_n_f64(1.5), two = vdupq_n_f64(2.0), cut = vdupq_n_f64(constants::cutoff), tiny = vdupq_n_f64(1E-250),
+		zero = vdupq_n_f64(0.0);
+	double pa_a = pa_b[a];
+	uint64x2_t dead = vdupq_n_u64(0);
+	bool small = false;
+	const auto f_of = [&](const int b) {
+		const float64x2_t mu = vdivq_f64(vsubq_f64(da, vld1q_f64(dist + b)), vld1q_f64(dist_ab_row + b));
+		const float64x2_t u = vsetq_lane_f64(u_row[Z[b + 1]], vdupq_n_f64(u_row[Z[b]]), 1);
+		float64x2_t f = vbslq_f64(vcagtq_f64(vsubq_f64(Ra, vld1q_f64(R_v + b)), cut), vfmaq_f64(mu, vfmsq_f64(one, mu, mu), u), mu);
+		f = vmulq_f64(vfmsq_f64(c15, vmulq_f64(f, half), f), f);
+		f = vmulq_f64(f, vfmsq_f64(c15, f, vmulq_f64(f, half)));
+#ifdef __clang__
+		return vsubq_f64(one, vmulq_f64(f, vfmsq_f64(c15, f, vmulq_f64(f, half))));
+#else
+		return vfmsq_f64(one, f, vfmsq_f64(c15, f, vmulq_f64(f, half)));
+#endif
+	};
+	const auto apply = [&](const int b, const float64x2_t f) {
+		const float64x2_t pb = vld1q_f64(pa_b + b);
+		const uint64x2_t lt = vcaltq_f64(f, cut);
+		vst1q_f64(pa_b + b, vbslq_f64(lt, pb, vbslq_f64(vcagtq_f64(pb, tiny), vmulq_f64(vmulq_f64(vsubq_f64(two, f), half), pb), zero)));
+		dead = vorrq_u64(dead, lt);
+		const float64x2_t h = vmulq_f64(f, half);
+		small |= !(std::abs(pa_a) > 1E-250);
+		pa_a = vgetq_lane_f64(h, 0) * pa_a;
+		small |= !(std::abs(pa_a) > 1E-250);
+		pa_a = vgetq_lane_f64(h, 1) * pa_a;
+	};
+	int b = a + 1;
+	for (; b + 6 <= n; b += 6) {
+		const float64x2_t f0 = f_of(b), f1 = f_of(b + 2), f2 = f_of(b + 4);
+		apply(b, f0);
+		apply(b + 2, f1);
+		apply(b + 4, f2);
+	}
+	for (; b + 2 <= n; b += 2)
+		apply(b, f_of(b));
+	pa_b[a] = small || (vgetq_lane_u64(dead, 0) | vgetq_lane_u64(dead, 1)) ? 0.0 : pa_a;
+	return b;
+}
+#endif
+
 // JCP 139, 071103 (2013) for TFVC
 // JCP 88, 2547 (1988) for Becke
 std::array<double, 2> get_integration_weights(const int& num_centers,
@@ -575,7 +655,10 @@ std::array<double, 2> get_integration_weights(const int& num_centers,
 	double mu_ab, nu_ab, f, dist_ab;
 	double dist_a, dist_b;
 	double vx, vy, vz;
-	double R_a, R_b, chi_becke, u_ab, chi_mod;
+	double R_a, R_b, u_ab, chi_mod;
+#if !(defined(__aarch64__) || defined(__arm__) || defined(_M_ARM64))
+	double chi_becke;
+#endif
 	const double* chi_off, * bragg = constants::bragg_angstrom;
 	const double& cut = constants::cutoff;
 	//Called once per grid point: no allocation, and the distances to every centre
@@ -602,6 +685,24 @@ std::array<double, 2> get_integration_weights(const int& num_centers,
 			}
 		dist_ab_table = pair_dist.data();
 	}
+#if defined(__aarch64__) || defined(__arm__) || defined(_M_ARM64)
+	//The Becke size adjustment u_ab depends only on the two elements: a table instead of three divisions per pair,
+	//which were 16 % of the grid on a Cortex-A72; the armv7 Cortex-A53 divider is unpipelined too (grid setup 1.36x).
+	//Same formula, same values. x64 keeps the divisions, faster there.
+	static const std::vector<double> u_elem = [] {
+		constexpr int nz = std::size(constants::bragg_angstrom);
+		std::vector<double> u((size_t)nz * nz);
+		for (int za = 0; za < nz; za++)
+			for (int zb = 0; zb < nz; zb++) {
+				const double cb = constants::bragg_angstrom[za] / constants::bragg_angstrom[zb];
+				double v = (cb - 1.0) / (cb + 1.0);
+				v = v / (v * v - 1.0);
+				u[(size_t)za * nz + zb] = v > 0.5 ? 0.5 : v < -0.5 ? -0.5 : v;
+			}
+		return u;
+	}();
+	const double* u_row;
+#endif
 
 	if (chi.size() == 0) [[unlikely]] {
 		for (int a = 0; a < num_centers; a++) {
@@ -618,8 +719,15 @@ std::array<double, 2> get_integration_weights(const int& num_centers,
 
 			R_a = R_v[a];
 			const double *dist_ab_row = dist_ab_table + (size_t)a * num_centers;
+#if defined(__aarch64__) || defined(__arm__) || defined(_M_ARM64)
+			u_row = u_elem.data() + (size_t)proton_charges[a] * std::size(constants::bragg_angstrom);
+#endif
 
+#ifdef NSA2_BECKE_NEON
+			for (int b = becke_pairs_neon(a, num_centers, dist.data(), R_v.data(), dist_ab_row, u_row, proton_charges, pa_b.data()); b < num_centers; b++) {
+#else
 			for (int b = a + 1; b < num_centers; b++) {
+#endif
 				double &pa_b_b = pa_b[b];
 				double &pa_tv_b = pa_tv[b];
 
@@ -630,6 +738,9 @@ std::array<double, 2> get_integration_weights(const int& num_centers,
 				mu_ab = (dist_a - dist_b) / dist_ab;
 
 				if (std::abs(R_a - R_b) > cut) {
+#if defined(__aarch64__) || defined(__arm__) || defined(_M_ARM64)
+					u_ab = u_row[proton_charges[b]];
+#else
 					chi_becke = R_a / R_b;
 					u_ab = (chi_becke - 1.0) / (chi_becke + 1.0);
 					u_ab = u_ab / (u_ab * u_ab - 1.0);
@@ -639,6 +750,7 @@ std::array<double, 2> get_integration_weights(const int& num_centers,
 						u_ab = 0.5;
 					else if (u_ab < -0.5)
 						u_ab = -0.5;
+#endif
 
 					nu_ab = mu_ab + u_ab * (1.0 - mu_ab * mu_ab);
 				}
@@ -678,6 +790,9 @@ std::array<double, 2> get_integration_weights(const int& num_centers,
 			R_a = R_v[a];
 			chi_off = chi.data() + a * num_centers;
 			const double *dist_ab_row = dist_ab_table + (size_t)a * num_centers;
+#if defined(__aarch64__) || defined(__arm__) || defined(_M_ARM64)
+			u_row = u_elem.data() + (size_t)proton_charges[a] * std::size(constants::bragg_angstrom);
+#endif
 
 			for (int b = a + 1; b < num_centers; b++) {
 				double &pa_b_b = pa_b[b];
@@ -715,6 +830,9 @@ std::array<double, 2> get_integration_weights(const int& num_centers,
 
 
 				if (std::abs(R_a - R_b) > cut) {
+#if defined(__aarch64__) || defined(__arm__) || defined(_M_ARM64)
+					u_ab = u_row[proton_charges[b]];
+#else
 					chi_becke = R_a / R_b;
 					u_ab = (chi_becke - 1.0) / (chi_becke + 1.0);
 					u_ab = u_ab / (u_ab * u_ab - 1.0);
@@ -724,6 +842,7 @@ std::array<double, 2> get_integration_weights(const int& num_centers,
 						u_ab = 0.5;
 					else if (u_ab < -0.5)
 						u_ab = -0.5;
+#endif
 
 					nu_ab = mu_ab + u_ab * (1.0 - mu_ab * mu_ab);
 				}
@@ -755,6 +874,48 @@ std::array<double, 2> get_integration_weights(const int& num_centers,
 	}
 
 	return { std::abs(w_becke) > cut ? pa_b[center_index] / w_becke : 1.0, std::abs(w_tfvc) > cut ? pa_tv[center_index] / w_tfvc : 1.0 };
+}
+
+double get_tfvc_weight(const int num_centers, const double* x_c, const double* y_c, const double* z_c, const int center_index,
+	const double x, const double y, const double z, vec& pa, vec& dist, const vec& chi, const double* dist_ab)
+{
+	const double cut = constants::cutoff;
+	for (int a = 0; a < num_centers; a++) {
+		pa[a] = 1.0;
+		const double vx = x_c[a] - x, vy = y_c[a] - y, vz = z_c[a] - z;
+		dist[a] = std::sqrt(vx * vx + vy * vy + vz * vz);
+	}
+	for (int a = 0; a < num_centers; a++) {
+		double& pa_a = pa[a];
+		if (dist[a] > constants::far_away) {
+			pa_a = 0.0;
+			continue;
+		}
+		const double* chi_off = chi.data() + a * num_centers, * dist_ab_row = dist_ab + (size_t)a * num_centers;
+		for (int b = a + 1; b < num_centers; b++) {
+			double& pa_b = pa[b];
+			const double mu_ab = (dist[a] - dist[b]) / dist_ab_row[b];
+			const double chi_mod = *(chi_off + b) * (1.0 - mu_ab);
+			double nu_ab = 1.0 + mu_ab;
+			nu_ab = (nu_ab - chi_mod) / (nu_ab + chi_mod);
+			const double f = 1.0 - f4(nu_ab);
+			if (std::abs(f) < cut)
+				pa_a = 0.0;
+			else {
+				if (pa_a > 1E-250 || pa_a < -1E-250)
+					pa_a *= 0.5 * f;
+				else
+					pa_a = 0.0;
+				if (pa_b > 1E-250 || pa_b < -1E-250)
+					pa_b *= 0.5 * (2.0 - f);
+				else
+					pa_b = 0.0;
+			}
+		}
+	}
+	double w = 0.0;
+	for (int a = 0; a < num_centers; a++) w += pa[a];
+	return std::abs(w) > cut ? pa[center_index] / w : 1.0;
 }
 
 // TCA 106, 178 (2001), eq. 25
@@ -966,6 +1127,35 @@ vec2 sigma_to_alpha(const std::pair<vec, vec> &sigma) {
 	return shalpha;
 }
 
+//Anderson mixing of a fixed point x = G(x) over the last m steps: x' = G(x) - Sum_j c_j dG_j, c minimising
+//|f - Sum_j c_j df_j| for f = G(x) - x; false (and the history dropped) when there is none yet
+struct anderson_mix {
+	int m = 0;
+	std::vector<vec> x, g;
+	bool step(const vec& xi, const vec& gi, vec& out)
+	{
+		x.push_back(xi);
+		g.push_back(gi);
+		if (static_cast<int>(x.size()) > m + 1) { x.erase(x.begin()); g.erase(g.begin()); }
+		const int k = static_cast<int>(x.size()) - 1, n = static_cast<int>(xi.size());
+		if (k < 1) return false;
+		Eigen::MatrixXd dF(n, k), dG(n, k);
+		Eigen::VectorXd f(n);
+		for (int i = 0; i < n; i++) {
+			f(i) = g[k][i] - x[k][i];
+			for (int j = 0; j < k; j++) {
+				dG(i, j) = g[j + 1][i] - g[j][i];
+				dF(i, j) = dG(i, j) - (x[j + 1][i] - x[j][i]);
+			}
+		}
+		const Eigen::VectorXd c = dF.completeOrthogonalDecomposition().solve(f);
+		const Eigen::VectorXd o = Eigen::Map<const Eigen::VectorXd>(gi.data(), n) - dG * c;
+		out.assign(o.data(), o.data() + n);
+		return true;
+	}
+	void reset() { x.clear(); g.clear(); }
+};
+
 // grids here are the total_grid in the SF calculator functions, just as a not to myself and future me
 //Implemented according to the modified Multiwfn version by FJR and Anker
 std::vector<std::pair<vec, vec>> make_MBIS_vectors(
@@ -973,18 +1163,23 @@ std::vector<std::pair<vec, vec>> make_MBIS_vectors(
 	const vec3 &grid,
 	const ivec &num_grid_points,
 	const bool debug,
-	std::ostream &file)
+	std::ostream &file,
+	const std::vector<std::pair<vec, vec>> &start,
+	const double crit,
+	int *sweeps,
+	const int anderson)
 {
 	using sp_vec = std::vector<std::pair<vec, vec>>;
+	anderson_mix mix{ anderson };
 	const auto atoms = wavy.get_atoms();
 	vec charges(atoms.size(), 0.0);
 	vec last_charges(atoms.size(), 0.0);
 	vec zeros_6(6, 0.0);
-	sp_vec sig_pop_vector;
-	for (const auto &atom : atoms) {
-		sig_pop_vector.emplace_back(get_shsig_shpop(atom.get_charge()));
-	}
-	const double crit = 0.001;
+	sp_vec sig_pop_vector = start;
+	if (start.empty())
+		for (const auto &atom : atoms) {
+			sig_pop_vector.emplace_back(get_shsig_shpop(atom.get_charge()));
+		}
 	sp_vec copy_of_input = sig_pop_vector;
 	double varmax = 0, varsig = 0;
 	// Cache atom coordinates and charges to avoid repeated function calls
@@ -1004,7 +1199,14 @@ std::vector<std::pair<vec, vec>> make_MBIS_vectors(
 		ECP_correction_helper.emplace_back(c, wavy.get_ECP_mode());
 		ECP_els[j] = atoms[j].get_ECP_electrons();
 	}
+	//Atom A's moments integrate w_A rho over A's own grid with the plain atom weights (HORTON's local WPart),
+	//so no Becke cells are needed. NOS_MBIS_BECKE sums every grid with the Becke weights instead.
+	const bool becke = tuning("NOS_MBIS_BECKE") != nullptr;
+	//NOS_EXP_CRT: the CRT exp instead of exp_kernel, to measure the two against each other
+	const bool crt_exp = tuning("NOS_EXP_CRT") != nullptr;
 	for (size_t it = 0; it < 2000; it++) {
+		if (sweeps) *sweeps = static_cast<int>(it) + 1;
+		const sp_vec last_input = anderson > 0 ? copy_of_input : sp_vec();
 		for (int j = 0; j < ncen; j++) {
 			std::fill(sig_pop_vector[j].first.begin(), sig_pop_vector[j].first.end(), 0.0);
 			std::fill(sig_pop_vector[j].second.begin(), sig_pop_vector[j].second.end(), 0.0);
@@ -1016,7 +1218,8 @@ std::vector<std::pair<vec, vec>> make_MBIS_vectors(
 		vec2 si_part(nthr), pop_part(nthr);
 #pragma omp parallel
 		{
-			vec rho0shell(ncen * 6, 0.0), dists(ncen, 0.0);
+			vec rho0shell(ncen * 6, 0.0), dists(ncen, 0.0), pre(ncen * 6), arg(ncen * 6), ex(ncen * 6);
+			ivec slot(ncen * 6);
 			double tmp = 0.0, density = 0.0, rho0 = 0.0, temp_res = 0.0, r0s = 0.0, sigval, dist_sq, bw, _x, _y, _z;
 			int j, shell, nshell, *ECP_els_j;
 			double dx[3], *dist_j, *pop, *si;
@@ -1024,15 +1227,17 @@ std::vector<std::pair<vec, vec>> make_MBIS_vectors(
 			std::pair<vec, vec> *coi;
 			for (int i = 0; i < ncen; i++) {
 				const int end = num_grid_points[i];
-				//5 is the becke weight, 7 the electron density, GridIndex X = 0, Y = 1, Z = 2
-				const double *b_weight = grid[i][5].data(), *dens = grid[i][7].data(), *gx = grid[i][0].data(), *gy = grid[i][1].data(), *gz = grid[i][2].data();
+				//5 is the becke weight, 3 the atom weight, 7 the electron density, GridIndex X = 0, Y = 1, Z = 2
+				const double *b_weight = grid[i][becke ? 5 : 3].data(), *dens = grid[i][7].data(), *gx = grid[i][0].data(), *gy = grid[i][1].data(), *gz = grid[i][2].data();
+				const int j0 = becke ? 0 : i, j1 = becke ? ncen : i + 1;
 #pragma omp for schedule(dynamic, 16) nowait
 				for (int point = 0; point < end; point++) {
 					rho0 = 0.0;
-					std::fill(dists.begin(), dists.end(), 0.0);
-					std::fill(rho0shell.begin(), rho0shell.end(), 0.0);
+					std::fill(dists.begin() + j0, dists.begin() + j1, 0.0);
+					std::fill(rho0shell.begin() + j0 * 6, rho0shell.begin() + j1 * 6, 0.0);
 					bw = b_weight[point];
 					density = bw * dens[point];
+					int n = 0;
 					_x = gx[point];
 					_y = gy[point];
 					_z = gz[point];
@@ -1060,16 +1265,29 @@ std::vector<std::pair<vec, vec>> make_MBIS_vectors(
 
 						for (shell = 0; shell < nshell; shell++) {
 							sigval = 1.0 / si[shell];
-							tmp = pop[shell] * constants::INV_EIGHT_PI * sigval * sigval * sigval * exp(-*dist_j * sigval);
-							if (abs(tmp) < 1e-20)
-								continue;
-							rho0shell[j * 6 + shell] = tmp;
-							rho0 += tmp;
+							pre[n] = pop[shell] * constants::INV_EIGHT_PI * sigval * sigval * sigval;
+							arg[n] = -*dist_j * sigval;
+							slot[n++] = j * 6 + shell;
 						}
+					}
+					//every exponential of the point in one vector loop, then summed in the order the shells were met
+					if (crt_exp)
+						for (int k = 0; k < n; k++)
+							ex[k] = exp(arg[k]);
+					else
+#pragma omp simd
+						for (int k = 0; k < n; k++)
+							ex[k] = exp_kernel(arg[k]);
+					for (int k = 0; k < n; k++) {
+						tmp = pre[k] * ex[k];
+						if (abs(tmp) < 1e-20)
+							continue;
+						rho0shell[slot[k]] = tmp;
+						rho0 += tmp;
 					}
 					if (rho0 == 0.0)
 						continue; // Avoid division by zero, if rho0 is zero, the point does not contribute to the integral
-					for (j = 0; j < ncen; j++) {
+					for (j = j0; j < j1; j++) {
 						nshell = nshell_cache[j];
 						dist_j = &dists[j];
 						pop = pop_local.data() + j * 6;
@@ -1118,6 +1336,23 @@ std::vector<std::pair<vec, vec>> make_MBIS_vectors(
 			return sig_pop_vector;
 		}
 		copy_of_input = sig_pop_vector;
+		if (anderson > 0) {
+			//sigma and population of every shell, the mixed step kept only while all stay positive
+			vec xi, gi, xo;
+			for (int j = 0; j < ncen; j++)
+				for (int shell = 0; shell < nshell_cache[j]; shell++) {
+					xi.push_back(last_input[j].first[shell]); xi.push_back(last_input[j].second[shell]);
+					gi.push_back(sig_pop_vector[j].first[shell]); gi.push_back(sig_pop_vector[j].second[shell]);
+				}
+			bool ok = mix.step(xi, gi, xo);
+			for (int t = 1; ok && t < static_cast<int>(xo.size()); t += 2) ok = xo[t - 1] > 0.0 && xo[t] >= 0.0;
+			if (!ok && xo.size()) mix.reset();
+			for (int j = 0, t = 0; ok && j < ncen; j++)
+				for (int shell = 0; shell < nshell_cache[j]; shell++, t += 2) {
+					copy_of_input[j].first[shell] = xo[t];
+					copy_of_input[j].second[shell] = xo[t + 1];
+				}
+		}
 		last_charges = charges;
 
 	}
@@ -1133,23 +1368,27 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
 	const ivec &num_grid_points,
 	const bool debug,
 	const std::vector<std::pair<vec, vec>> MBIS_vectors,
-	std::ostream &file)
+	std::ostream &file,
+	const std::vector<std::pair<vec2, vec>> &start,
+	const double crit,
+	int *sweeps,
+	const int anderson)
 {
 	using sp_vec = std::vector<std::pair<vec2, vec>>;
-	const double crit = 0.001;
+	anderson_mix mix{ anderson };
 	auto atoms = wavy.get_atoms();
 	vec charges(atoms.size(), 0.0);
 	vec last_charges(atoms.size(), 0.0);
 	double varmax = 0, varsig = 0;
-	sp_vec sig_pop_vector;
+	sp_vec sig_pop_vector = start;
 	vec zeros_6(6, 0.0);
 	sp_vec tens1, tens2;
-	if (MBIS_vectors.size() == 0) {
+	if (start.empty() && MBIS_vectors.size() == 0) {
 		for (auto &atom : atoms) {
 			sig_pop_vector.emplace_back(get_shalpha_shpop(atom.get_charge()));
 		}
 	}
-	else {
+	else if (start.empty()) {
 		for (auto &vector : MBIS_vectors) {
 			sig_pop_vector.emplace_back(std::make_pair(sigma_to_alpha(vector), vector.second));
 		}
@@ -1220,8 +1459,12 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
 			}
 		}
 	}
-
+	//as in make_MBIS_vectors: A's own grid with the atom weights, unless NOS_MBIS_BECKE
+	const bool becke = tuning("NOS_MBIS_BECKE") != nullptr;
+	const bool crt_exp = tuning("NOS_EXP_CRT") != nullptr;
 	for (size_t it = 0; it < 2000; it++) {
+		if (sweeps) *sweeps = static_cast<int>(it) + 1;
+		const sp_vec last_input = anderson > 0 ? copy_of_input : sp_vec();
 		for (int j = 0; j < ncen; j++) {
 			std::fill(sig_pop_vector[j].first.begin(), sig_pop_vector[j].first.end(), zeros_6);
 			std::fill(sig_pop_vector[j].second.begin(), sig_pop_vector[j].second.end(), 0.0);
@@ -1233,7 +1476,8 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
 		vec2 alpha_part(nthr), pop_part(nthr);
 #pragma omp parallel
 		{
-			vec rho0shell(ncen * 6, 0.0);
+			vec rho0shell(ncen * 6, 0.0), pre(ncen * 6), arg(ncen * 6), ex(ncen * 6);
+			ivec slot(ncen * 6);
 			double tmp = 0.0, density = 0.0, rho0 = 0.0, temp_res = 0.0, r0s = 0.0, g, det;
 			int j, shell, nshell, ind;
 			double *alpha, *d_local, *pop_p;
@@ -1260,14 +1504,16 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
 			}
 			for (int i = 0; i < ncen; i++) {
 				const int end = num_grid_points[i];
-				//5 is the becke weight, corrected_dens the ECP-corrected electron density, GridIndex X = 0, Y = 1, Z = 2
-				const double *b_weight = grid[i][5].data(), *dens = corrected_dens[i].data(), *gx = grid[i][0].data(), *gy = grid[i][1].data(), *gz = grid[i][2].data();
+				//5 is the becke weight, 3 the atom weight, corrected_dens the ECP-corrected electron density, GridIndex X = 0, Y = 1, Z = 2
+				const double *b_weight = grid[i][becke ? 5 : 3].data(), *dens = corrected_dens[i].data(), *gx = grid[i][0].data(), *gy = grid[i][1].data(), *gz = grid[i][2].data();
+				const int j0 = becke ? 0 : i, j1 = becke ? ncen : i + 1;
 #pragma omp for schedule(dynamic, 16) nowait
 				for (int point = 0; point < end; point++) {
 					rho0 = 0.0;
-					std::fill(rho0shell.begin(), rho0shell.end(), 0.0);
+					std::fill(rho0shell.begin() + j0 * 6, rho0shell.begin() + j1 * 6, 0.0);
 					const double b_weight_point = b_weight[point];
 					density = b_weight_point * dens[point];
+					int n = 0;
 
 					// Pre-load grid coordinates once instead of accessing multiple times
 					const double gx_pt = gx[point];
@@ -1312,16 +1558,28 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
 							const double det_pop_val = det_pop_cache[ind + shell];
 							if (abs(det_pop_val) < constants::cutoff)
 								continue;
-							// Use fast exp approximation for better performance
-							tmp = det_pop_val * exp(-g);
-							rho0shell[ind + shell] = tmp;
-							rho0 += tmp;
+							pre[n] = det_pop_val;
+							arg[n] = -g;
+							slot[n++] = ind + shell;
 						}
+					}
+					//every exponential of the point in one vector loop, then summed in the order the shells were met
+					if (crt_exp)
+						for (int k = 0; k < n; k++)
+							ex[k] = exp(arg[k]);
+					else
+#pragma omp simd
+						for (int k = 0; k < n; k++)
+							ex[k] = exp_kernel(arg[k]);
+					for (int k = 0; k < n; k++) {
+						tmp = pre[k] * ex[k];
+						rho0shell[slot[k]] = tmp;
+						rho0 += tmp;
 					} //We first need to finish building total rho0 before we can calculate the contributions to the sigmas and populations
 					if (rho0 == 0.0)
 						continue; // Avoid division by zero, if rho0 is zero, the point does not contribute to the integral
 					const double dens_rho0_inv = density / rho0;
-					for (j = 0; j < ncen; j++) {
+					for (j = j0; j < j1; j++) {
 						d_local = dx.data() + (j * 3);
 						nshell = nshell_cache[j];
 						// Reuse d_cache values instead of recalculating (they're the same as before)
@@ -1415,6 +1673,26 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
 			return sig_pop_vector;
 		}
 		copy_of_input = sig_pop_vector;
+		if (anderson > 0) {
+			//the six alpha and the population of every shell, the mixed step kept only while each alpha stays positive definite
+			vec xi, gi, xo;
+			for (int j = 0; j < ncen; j++)
+				for (int shell = 0; shell < nshell_cache[j]; shell++) {
+					for (int c = 0; c < 6; c++) { xi.push_back(last_input[j].first[shell][c]); gi.push_back(sig_pop_vector[j].first[shell][c]); }
+					xi.push_back(last_input[j].second[shell]); gi.push_back(sig_pop_vector[j].second[shell]);
+				}
+			bool ok = mix.step(xi, gi, xo);
+			for (int t = 0; ok && t < static_cast<int>(xo.size()); t += 7) {
+				const double* a = xo.data() + t;
+				ok = a[0] > 0.0 && a[0] * a[3] - a[1] * a[1] > 0.0 && a[0] * a[3] * a[5] - a[0] * a[4] * a[4] - a[3] * a[2] * a[2] - a[5] * a[1] * a[1] + 2 * a[1] * a[2] * a[4] > 0.0 && a[6] >= 0.0;
+			}
+			if (!ok && xo.size()) mix.reset();
+			for (int j = 0, t = 0; ok && j < ncen; j++)
+				for (int shell = 0; shell < nshell_cache[j]; shell++, t += 7) {
+					for (int c = 0; c < 6; c++) copy_of_input[j].first[shell][c] = xo[t + c];
+					copy_of_input[j].second[shell] = xo[t + 6];
+				}
+		}
 		last_charges = charges;
 
 	}

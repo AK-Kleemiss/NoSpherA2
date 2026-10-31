@@ -1,40 +1,38 @@
 #pragma once
 #include <occ/qm/hf.h>
+#include <filesystem>
 #include <functional>
 #include <memory>
 #include <ostream>
 #include <vector>
 
-//Two-electron integrals (ab|cd) over the basis-function pairs a >= b that survive OCC's
-//shell-pair screen and a Schwarz screen, packed over the 8-fold symmetry. The kept pairs are
-//numbered in (a, b) order and the integrals are the lower triangle over that numbering, slot
-//of k >= l at k(k+1)/2 + l. The pairs of one first index c are consecutive, first_pair()[c]
-//to first_pair()[c + 1], so the part of a row over c is a contiguous segment whose second
-//indices are pair_b(). With every pair kept the layout is the plain packed one and each
-//segment is the run d = 0..c. Built once per run when the integrals fit the budget; a Fock
-//build then contracts them instead of recomputing every quartet per iteration.
+//(ab|cd) over the pairs a >= b surviving OCC's shell-pair screen and a Schwarz screen, packed over the
+//8-fold symmetry: kept pairs numbered in (a, b) order, integrals the lower triangle over that numbering,
+//k >= l at k(k+1)/2 + l. The pairs of first index c run first_pair()[c] .. first_pair()[c + 1], so a
+//row's part over c is a contiguous segment with second indices pair_b(); with every pair kept, d = 0..c.
+//Built once when the integrals fit the budget; Fock builds then contract them instead of recomputing.
 class stored_eri {
 public:
-	//OCC's quartet threshold: a pair whose Schwarz bound times the largest one falls below it
-	//is dropped from the store, and a stored segment whose bound times the density difference
-	//falls below it is skipped in a screened contraction
+	//OCC's quartet threshold: drops a pair whose Schwarz bound times the largest falls below it, and
+	//in a screened contraction skips a segment whose bound times the density difference does
 	static constexpr double threshold = 1e-12;
 	using jk_fn = std::function<void(const occ::Mat&, occ::Mat&, occ::Mat&)>;
 
-	//Computes and packs the integrals; false, holding nothing, when they exceed budget_bytes
-	//(0 for no budget) or when hf's Fock build is not the quartet one
+	//False, holding nothing, over budget_bytes (0: no budget) or when hf's Fock build is not the quartet one
 	bool build(const occ::qm::HartreeFock& hf, size_t budget_bytes, std::ostream& log);
+	//What build() holds, written and read back bit for bit; load() refuses a file of another basis or geometry
+	bool save(const std::filesystem::path& path, const occ::qm::HartreeFock& hf) const;
+	bool load(const std::filesystem::path& path, const occ::qm::HartreeFock& hf, size_t budget_bytes, std::ostream& log);
 	void clear();
 	explicit operator bool() const { return static_cast<bool>(v_); }
 
-	//J_ab = sum_cd (ab|cd) D_cd and K_ab = sum_cd (ac|bd) D_cd. With screen set D is a density
-	//difference and every segment whose Schwarz bound times the largest difference element it
-	//touches stays below the threshold is skipped, the way OCC's direct build skips shell
-	//quartets on the density's shell-block norms
+	//J_ab = sum_cd (ab|cd) D_cd, K_ab = sum_cd (ac|bd) D_cd. With screen, D is a density difference and a
+	//segment whose Schwarz bound times the largest D element it touches is below threshold is skipped
 	void JK(const occ::Mat& D, occ::Mat& J, occ::Mat& K, bool screen = false) const;
-	//OCC's two-electron Fock part for its half-scaled densities: 2J(D) - K(D) restricted, and
-	//per spin 2J(Da + Db) - 2K(Ds) unrestricted. A jk of the caller's replaces JK(), for a
-	//device that holds the integrals
+	//J of Da + Db and K of each in one pass over the integrals (the unrestricted build)
+	void JK(const occ::Mat& Da, const occ::Mat& Db, occ::Mat& J, occ::Mat& Ka, occ::Mat& Kb, bool screen = false) const;
+	//Two-electron Fock part for OCC's half-scaled densities: 2J(D) - K(D) restricted, per spin
+	//2J(Da + Db) - 2K(Ds) unrestricted; jk replaces JK(), for a device holding the integrals
 	occ::Mat fock(const occ::qm::MolecularOrbitals& mo, bool screen = false, const jk_fn& jk = {}) const;
 
 	int nbf() const { return nbf_; }
@@ -51,6 +49,9 @@ public:
 	const std::vector<double>& schwarz() const { return q_; }
 
 private:
+	//J of the sum of nd (1 or 2) densities, K of each
+	void jk(const occ::Mat* const* D, int nd, occ::Mat& J, occ::Mat* K, bool screen) const;
+
 	int nbf_ = 0;
 	std::unique_ptr<double[]> v_;
 	std::vector<int> pa_, pb_, first_, idx_;
