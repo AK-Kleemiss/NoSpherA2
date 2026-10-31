@@ -192,11 +192,13 @@ criterion, and holds it fixed. The knobs are `weight_rescale off` and `-xcw_weig
 
 | row | before | after | k |
 |---|---|---|---|
-| m5 | 463 s, lambda 0.00305 | 0.38 s, lambda 0.02 | 7.29e-5 |
+| m5 | 463 s, lambda 0.00305 | 0.38 s, lambda 0.02 | 7.40e-5 |
 | m17 | 298 s, lambda 0.00328 | 0.69 s, lambda 0.02 | 1.58e-5 |
 
-k comes from the first fill (guess Fc, start extinction). The criterion at lambda 0 is therefore 0.654 (m5) and
-0.963 (m17), not exactly 1.
+k comes from the initial guess. Scale and extinction are first settled on the guess under 1/σ² (as `eval_scale` does);
+the scheme weights and k are then filled from that model, and the lambda 0 SCF starts with them. The criterion at
+lambda 0 is therefore 0.664 (m5) and 0.963 (m17), not exactly 1. Settling extinction first moved the rows that combine
+refined extinction with a non-sigma scheme (m5, m9, m16, m19 beyond tolerance; m12, m15, m22, mON in the last digits).
 
 ## ctest
 
@@ -289,5 +291,6 @@ with all operations. `NOSPHERA2_XCW_GROWN_COPYSUM=1` (the old copy-sum) is not c
 1. wR2 is printed now (`XCW final model:`, with the scheme weights). `run_cases.py` keeps its sigma-weighted
    recompute as a cross-check: it asserts the recompute against `wR2(all)` on sigma rows.
    - The scale still comes from the `-print_F` header.
-2. The rescale k comes from the first fill, not from a converged lambda-0 model, so S at lambda 0 is not exactly 1.
+2. The rescale k comes from the initial guess (settled scale and extinction), not from a converged lambda-0 model, so
+   S at lambda 0 is not exactly 1. This is deliberate: the weights are fixed before the lambda 0 SCF starts.
 3. Goldens never compare timings. The `wall` and `cpu` columns of `run_cases.py` are for this README only.

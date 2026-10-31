@@ -679,7 +679,14 @@ void structure_factors::ensure_cryst_weights() {
 	const ws scheme = opt->xcw_settings.weight;
 	if (scheme == ws::sigma && opt->xcw_settings.robust_c <= 0) return;
 	rescale_pending_ = opt->xcw_settings.weight_rescale && (scheme == ws::unit || scheme == ws::stl || scheme == ws::chebyshev);
+	//the first evaluation is the initial guess: scale and extinction settled on it under 1/sigma^2 (as eval_scale does),
+	//then the scheme and its k from that model, and the lambda 0 SCF starts with them
+	update_extinction();
 	solve_scale();
+	for (int it = 0; it < 5 && !ext_p_.empty() && extinction_settings.refine && refine_extinction_step(); it++) {
+		update_extinction();
+		solve_scale();
+	}
 	update_cryst_weights();
 }
 

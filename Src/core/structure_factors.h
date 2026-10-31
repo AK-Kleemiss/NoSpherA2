@@ -216,7 +216,7 @@ public:
 	// still multiplies on top at every site, so each scheme works with both criteria
 	void update_cryst_weights();
 	// The first fill, from eval_scale or calc_criteria: the read sigmas, and for another scheme its weights
-	// at the scale of that 1/sigma^2 fit and the F_calc of the moment. No-op once filled
+	// at the scale and extinction of that 1/sigma^2 fit and the F_calc of the moment (the initial guess). No-op once filled
 	void ensure_cryst_weights();
 	// shelx_opt: a and b re-optimised on the fit set as cctbx's new_shelx_weighting.optimise_parameters
 	// does, against the current F_calc and scale; chebyshev_opt: A_r fit to Delta^2 (fit_chebyshev). Refills the weights
