@@ -581,6 +581,11 @@ rgbi = ""
 # creation is part of them.
 # P1_test_XCW saves the stored two-electron integrals to p1_eri.bin (save_eri); the other subset
 # goldens read them (read_eri, ctest fixture xcw_p1_golden_eri), which only SCF.log mentions.
+#
+# The XCW permutation matrix (weighting x anharmonic x extinction x grown x F/F^2 x target, 26 NH3
+# rows in tests/xcw_matrix) is not a table here: it runs in process as the gtest XcwMatrixTests,
+# which compares R1, wR2, GooF, scale, extinction and final lambda with tolerances against
+# tests/xcw_matrix/matrix.good, so round-off in the last printed digit does not fail it.
 
 [P1_test_XCW]
 directory = "P1_test"

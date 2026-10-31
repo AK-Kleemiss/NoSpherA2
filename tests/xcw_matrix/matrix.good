@@ -1,0 +1,28 @@
+# XcwMatrixTests reference, written by run_cases.py --cases matrix --golden (no timings, by design)
+# id	cif	grown	lambda	R1	wR2	GooF	scale	extinction	settings
+D	nh3.cif	0	0.02	0.04931	0.09514	2.1512	9.970333831	-	normal normal_conv params 22 basis_set sto-3g F charge 0 mult 1 rhf start 0 step_size 0.01 end 0.02
+1	nh3.cif	0	0.02	0.04448	0.08774	1.9872	9.903663957	0.25154	normal normal_conv params 22 basis_set sto-3g F charge 0 mult 1 rhf start 0 step_size 0.01 end 0.02 weighted extinction shelx
+2	nh3_C.cif	1	0.02	0.04622	0.0904	2.044	9.982375474	0.2	normal normal_conv params 22 basis_set sto-3g F2 charge 0 mult 1 rhf start 0 step_size 0.01 end 0.02 grown extinction shelx fixed 0.2
+3	nh3_CD.cif	1	0.02	0.05026	0.09695	2.1921	9.724873468	-	normal normal_conv params 22 basis_set sto-3g F2 charge 0 mult 1 rhf start 0 step_size 0.01 end 0.02 grown weighted
+4	nh3.cif	1	0.02	0.05298	0.08186	0.8917	9.834745821	-	normal normal_conv params 22 basis_set sto-3g F charge 0 mult 1 rhf start 0 step_size 0.01 end 0.02 grown weight unit
+5	nh3_C.cif	0	0.02	0.04866	0.02064	0.6939	9.901179226	0.20495	normal normal_conv params 22 basis_set sto-3g F2 charge 0 mult 1 rhf start 0 step_size 0.01 end 0.02 weight unit extinction shelx
+6	nh3_CD.cif	0	0.02	0.04863	0.07494	0.5667	9.869858161	0.2	normal normal_conv params 22 basis_set sto-3g F charge 0 mult 1 rhf start 0 step_size 0.01 end 0.02 weighted weight unit extinction shelx fixed 0.2
+7	nh3.cif	0	0.02	0.04842	0.02579	0.784	9.898680648	0.2	normal normal_conv params 22 basis_set sto-3g F2 charge 0 mult 1 rhf start 0 step_size 0.01 end 0.02 weight stl 1 extinction shelx fixed 0.2
+8	nh3_C.cif	1	0.02	0.05442	0.10468	0.741	9.744549905	-	normal normal_conv params 22 basis_set sto-3g F charge 0 mult 1 rhf start 0 step_size 0.01 end 0.02 grown weighted weight stl 1
+9	nh3_CD.cif	1	0.02	0.04631	0.09264	0.8508	10.08837034	0.38488	normal normal_conv params 22 basis_set sto-3g F charge 0 mult 1 rhf start 0 step_size 0.01 end 0.02 grown weight stl 1 extinction shelx
+10	nh3.cif	0	0.02	0.05151	0.14816	1.1496	9.908482071	-	normal normal_conv params 22 basis_set sto-3g F2 charge 0 mult 1 rhf start 0 step_size 0.01 end 0.02 weighted weight shelx 0.1 0
+11	nh3_C.cif	1	0.02	0.05127	0.14148	1.0631	10.26504959	0.2	normal normal_conv params 22 basis_set sto-3g F charge 0 mult 1 rhf start 0 step_size 0.01 end 0.02 grown weight shelx 0.1 0 extinction shelx fixed 0.2
+12	nh3_CD.cif	1	0.02	0.04823	0.13895	1.0475	10.25883939	0.8211	normal normal_conv params 22 basis_set sto-3g F charge 0 mult 1 rhf start 0 step_size 0.01 end 0.02 grown weight shelx 0.1 0 extinction shelx
+13	nh3.cif	1	0.02	0.05159	0.14736	1.0128	9.960623239	-	normal normal_conv params 22 basis_set sto-3g F charge 0 mult 1 rhf start 0 step_size 0.01 end 0.02 grown weighted weight shelx_opt 0.1 0
+14	nh3_C.cif	0	0.02	0.04998	0.14218	0.9947	10.20301823	0.2	normal normal_conv params 22 basis_set sto-3g F2 charge 0 mult 1 rhf start 0 step_size 0.01 end 0.02 weight shelx_opt 0.1 0 extinction shelx fixed 0.2
+15	nh3_CD.cif	1	0.02	0.04754	0.14241	1.0104	10.0151818	0.39434	normal normal_conv params 22 basis_set sto-3g F charge 0 mult 1 rhf start 0 step_size 0.01 end 0.02 grown weighted weight shelx_opt 0.1 0 extinction shelx
+16	nh3.cif	1	0.02	0.04745	0.08748	0.8426	10.00540212	0.31726	normal normal_conv params 22 basis_set sto-3g F charge 0 mult 1 rhf start 0 step_size 0.01 end 0.02 grown weight chebyshev 1 0.5 0.2 extinction shelx
+17	nh3_C.cif	0	0.02	0.05726	0.03441	0.4746	9.629899402	-	normal normal_conv params 22 basis_set sto-3g F2 charge 0 mult 1 rhf start 0 step_size 0.01 end 0.02 weighted weight chebyshev 1 0.5 0.2
+18	nh3_CD.cif	1	0.02	0.04964	0.08702	0.5819	9.838552578	0.2	normal normal_conv params 22 basis_set sto-3g F charge 0 mult 1 rhf start 0 step_size 0.01 end 0.02 grown weighted weight chebyshev 1 0.5 0.2 extinction shelx fixed 0.2
+19	nh3.cif	1	0.02	0.04705	0.17191	1.772	10.06553822	0.35859	normal normal_conv params 22 basis_set sto-3g F charge 0 mult 1 rhf start 0 step_size 0.01 end 0.02 grown weighted weight chebyshev_opt 3 extinction shelx
+20	nh3_C.cif	0	0.02	0.05517	0.07619	0.3888	9.748820114	-	normal normal_conv params 22 basis_set sto-3g F2 charge 0 mult 1 rhf start 0 step_size 0.01 end 0.02 weight chebyshev_opt 3
+21	nh3_CD.cif	1	0.02	0.04796	0.02992	0.4495	9.87750923	0.2	normal normal_conv params 22 basis_set sto-3g F2 charge 0 mult 1 rhf start 0 step_size 0.01 end 0.02 grown weighted weight chebyshev_opt 3 extinction shelx fixed 0.2
+22	nh3.cif	0	0.02	0.04856	0.12992	0.959	10.23511751	0.77334	normal normal_conv params 22 basis_set sto-3g F2 charge 0 mult 1 rhf start 0 step_size 0.01 end 0.02 weight robust shelx 0.1 0 6 extinction shelx
+23	nh3_C.cif	1	0.02	0.04862	0.13808	1.0368	9.983148601	0.2	normal normal_conv params 22 basis_set sto-3g F charge 0 mult 1 rhf start 0 step_size 0.01 end 0.02 grown weighted weight robust shelx 0.1 0 6 extinction shelx fixed 0.2
+24	nh3_CD.cif	1	0.02	0.05361	0.13262	0.9703	10.23662548	-	normal normal_conv params 22 basis_set sto-3g F charge 0 mult 1 rhf start 0 step_size 0.01 end 0.02 grown weight robust shelx 0.1 0 6
+ON	nh3_CD.cif	1	0.02	0.04874	0.00774	0.4692	9.841467997	0.16997	normal normal_conv params 22 basis_set sto-3g F2 charge 0 mult 1 rhf start 0 step_size 0.01 end 0.02 grown weighted weight chebyshev_opt 3 extinction shelx
