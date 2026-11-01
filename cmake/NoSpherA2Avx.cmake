@@ -79,3 +79,30 @@ if(WIN32 AND CMAKE_CXX_COMPILER_ARCHITECTURE_ID STREQUAL "x64")
         add_compile_options($<$<COMPILE_LANGUAGE:CXX>:/arch:SSE4.2>)
     endif()
 endif()
+
+#Start-up refusal on a CPU without the instruction set chosen above (app/isa_check.c), where it is
+#actually applied. Its own code must run on any x86-64: no SSE3+, no LTO, no C++ precompiled header.
+#DLL for a library, which must fail its load instead of exiting the host.
+function(nosphera2_isa_check target)
+    cmake_parse_arguments(ARG "DLL" "" "" ${ARGN})
+    if(NOT (NOS_X86 AND (LINUX OR WIN32)))
+        return()
+    endif()
+    if(NOS_USE_AVX2)
+        set(isa 3)
+    elseif(NOS_USE_AVX)
+        set(isa 2)
+    else()
+        set(isa 1)
+    endif()
+    set(defs "NOS_BUILT_ISA=${isa}")
+    if(ARG_DLL)
+        list(APPEND defs NOS_ISA_DLL)
+    endif()
+    set(src "${PROJECT_SOURCE_DIR}/app/isa_check.c")
+    target_sources(${target} PRIVATE "${src}")
+    set_source_files_properties("${src}" PROPERTIES
+        COMPILE_DEFINITIONS "${defs}"
+        COMPILE_OPTIONS "$<IF:$<C_COMPILER_ID:MSVC>,/GL-,-fno-lto;-mno-sse3>"
+        SKIP_PRECOMPILE_HEADERS ON)
+endfunction()

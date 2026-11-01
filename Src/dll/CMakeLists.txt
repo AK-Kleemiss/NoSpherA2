@@ -23,6 +23,7 @@ add_library(
 )
 
 nosphera2_enable_optimizations(NoSpherA2Dll)
+nosphera2_isa_check(NoSpherA2Dll DLL)
 
 add_library(
     NoSpherA2::Dll

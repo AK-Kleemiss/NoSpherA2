@@ -11,6 +11,8 @@ add_executable(
     ${NOSPHERA2_APP_SOURCES}
 )
 
+nosphera2_isa_check(NoSpherA2)
+
 if(WIN32)
     target_sources(
         NoSpherA2
