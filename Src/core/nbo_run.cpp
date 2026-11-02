@@ -729,6 +729,34 @@ void write_nbo_json(const NboResults& r, const std::filesystem::path& json_file)
 		f << "    ]},\n";
 	}
 
+	//native, correlated density or -v: absent otherwise, so older readers see nothing new
+	if (!r.budget.empty()) {
+		f << "  \"density_transfer\": {\"e2_refused\": " << jstr(r.e2_refused) << ", \"fock\": " << jstr(r.transfer_fock)
+		  << ",\n    \"transfers\": [\n";
+		for (size_t i = 0; i < r.transfer.size(); i++) {
+			const NboTransfer& t = r.transfer[i];
+			f << "      {\"donor_index\": " << t.donor_index << ", \"donor\": " << jstr(t.donor) << ", \"acceptor_index\": "
+			  << t.acceptor_index << ", \"acceptor\": " << jstr(t.acceptor) << ", \"spin\": " << jstr(t.spin) << ", \"q\": "
+			  << jnum(t.q) << ", \"e2d_kcal\": " << (r.transfer_fock.empty() ? std::string("null") : jnum(t.e2d_kcal)) << "}"
+			  << (i + 1 < r.transfer.size() ? "," : "") << "\n";
+		}
+		f << "    ],\n    \"budget\": [\n";
+		for (size_t i = 0; i < r.budget.size(); i++) {
+			const NboAcceptorBudget& b = r.budget[i];
+			f << "      {\"index\": " << b.index << ", \"label\": " << jstr(b.label) << ", \"spin\": " << jstr(b.spin)
+			  << ", \"occupancy\": " << jnum(b.occupancy) << ", \"q_lewis\": " << jnum(b.q_lewis) << ", \"q_nonlewis\": "
+			  << jnum(b.q_nonlewis) << ", \"s\": " << jnum(b.s) << "}" << (i + 1 < r.budget.size() ? "," : "") << "\n";
+		}
+		f << "    ],\n    \"local_noon\": [\n";
+		for (size_t i = 0; i < r.local_noon.size(); i++) {
+			const NboLocalNoon& l = r.local_noon[i];
+			f << "      {\"bond_index\": " << l.bond_index << ", \"antibond_index\": " << l.antibond_index << ", \"label\": "
+			  << jstr(l.label) << ", \"spin\": " << jstr(l.spin) << ", \"n_plus\": " << jnum(l.n_plus) << ", \"n_minus\": "
+			  << jnum(l.n_minus) << ", \"b_eff\": " << jnum(l.b_eff) << "}" << (i + 1 < r.local_noon.size() ? "," : "") << "\n";
+		}
+		f << "    ]},\n";
+	}
+
 	f << "  \"nrt\": {\"present\": " << (r.nrt.present ? "true" : "false")
 		<< ", \"structures_used\": " << r.nrt.structures_used << ", \"structures_found\": " << r.nrt.structures_found
 		<< ", \"d_0\": " << jnum(r.nrt.d_0) << ", \"d_w\": " << jnum(r.nrt.d_w);

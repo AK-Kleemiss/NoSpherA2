@@ -4,6 +4,7 @@
 #include "wfn_class.h"
 #include "constants.h"
 #include "convenience.h"
+#include "eli_family.h"
 
 #include <Eigen/Dense>
 #include <fstream>
@@ -1125,7 +1126,7 @@ std::vector<NboE2Entry> nbo_e2(NboLewis& lewis, const dMatrix2& fock_nao,
 
 void density_transfer(const NboLewis& lewis, const dMatrix2& gamma, const double scale, const double q_floor,
 					  std::vector<NboTransfer>& transfer, std::vector<NboAcceptorBudget>& budget,
-					  std::vector<NboLocalNoon>& local_noon)
+					  std::vector<NboLocalNoon>& local_noon, const dMatrix2& fock_nao)
 {
 	const int n = static_cast<int>(lewis.orbitals.size());
 	const MatrixXd G = to_eigen(gamma);
@@ -1134,6 +1135,9 @@ void density_transfer(const NboLewis& lewis, const dMatrix2& gamma, const double
 		for (int i = 0; i < G.rows(); i++)
 			V(i, j) = lewis.orbitals[j].coefficients[i];
 	const MatrixXd D = V.transpose() * G * V;
+	//one determinant: q = c F_jk^2/dE^2 to second order, so q dE = c F_jk^2/dE is E2 itself
+	const Eigen::VectorXd e = fock_nao.extent(0) ? Eigen::VectorXd((V.transpose() * to_eigen(fock_nao) * V).diagonal())
+												 : Eigen::VectorXd::Zero(n);
 	for (int j = lewis.n_lewis; j < n; j++) {
 		//1e-12: a full acceptor (c - D_jj = 0) has no hole to fill; only keeps the division finite
 		const double hole = std::max(scale - D(j, j), 1e-12);
@@ -1150,6 +1154,7 @@ void density_transfer(const NboLewis& lewis, const dMatrix2& gamma, const double
 			t.donor_index = k + 1;
 			t.acceptor_index = j + 1;
 			t.q = q;
+			t.e2d_kcal = q * (e(j) - e(k)) * constants::kcal_mol_per_hartree;
 			transfer.push_back(t);
 		}
 		budget.push_back(b);
@@ -1309,6 +1314,9 @@ namespace
 			res.e2_refused = why.str();
 		}
 		const dMatrix2 fock_nao = fock.extent(0) && !correlated ? nao_operator(fock, nao.C) : dMatrix2();
+		//NO input: native_nbo hands over the reference SCF's Fock, which prices the transfers (E2(D)); E2 stays refused
+		const dMatrix2 price_nao = correlated && fock.extent(0) && !options.reference_scf.empty() ? nao_operator(fock, nao.C)
+																								  : fock_nao;
 		const auto clock = [] { return std::chrono::steady_clock::now(); };
 		auto t = clock();
 		NboLewis lewis = nbo_search(nao, gamma, bondable, n_pairs, scale, options, log);
@@ -1401,7 +1409,9 @@ namespace
 			std::vector<NboTransfer> transfer;
 			std::vector<NboAcceptorBudget> budget;
 			std::vector<NboLocalNoon> local_noon;
-			density_transfer(lewis, gamma, scale, 1e-4, transfer, budget, local_noon);
+			density_transfer(lewis, gamma, scale, 1e-4, transfer, budget, local_noon, price_nao);
+			if (price_nao.extent(0) && res.transfer_fock.empty())
+				res.transfer_fock = correlated ? "reference SCF " + options.reference_scf.filename().string() : "this wavefunction";
 			const auto renumber = [&](int& index, std::string& label) {
 				label = e2_label(lewis.orbitals[index - 1], nao.atoms);
 				index = base + position[index - 1] + 1;
@@ -1606,12 +1616,50 @@ NboResults native_nbo(WFN& wavy, const NboOptions& options, std::ostream& log, N
 		}
 		temporary = !options.keep_file47;
 	}
-	const NboInput in = read_file47(f47);
+	NboInput in = read_file47(f47);
 	if (temporary) {
 		//Windows refuses to delete a file another process holds open (the CI runner's virus scanner on the
 		//freshly written .47); a stale temp file must not throw away an analysis that has its input already
 		std::error_code ec;
 		std::filesystem::remove(f47, ec);
+	}
+	//natural orbitals carry no orbital energies, so their FILE47 Fock is meaningless: take the reference SCF's,
+	//which analyse_spin uses for E2(D) only. Same basis or nothing: the overlap matrices must agree
+	NboOptions run = options;
+	run.reference_scf.clear();
+	if (!eli_family::noon_summary(wavy).idempotent) {
+		std::filesystem::path ref = options.reference_scf;
+		if (ref.empty()) {
+			//strip one extension at a time: job.mdci.nat -> job.mdci.gbw, job.gbw; dots in the job name survive
+			for (std::filesystem::path stem = wavy.get_path(); ref.empty() && stem.has_extension(); stem.replace_extension()) {
+				const std::filesystem::path sibling = std::filesystem::path(stem).replace_extension(".gbw");
+				if (sibling != wavy.get_path() && std::filesystem::exists(sibling)) ref = sibling;
+			}
+		}
+		std::string why = ref.empty() ? "no reference SCF (-nbo_ref, or <base>.gbw beside the input)" : "";
+		if (!ref.empty()) {
+			WFN scf(ref);
+			const std::filesystem::path ref47 = std::filesystem::path(f47).replace_extension(".ref.47");
+			refuse_unsupported_nbo_source(scf, log);
+			if (scf.write_nbo(ref47, false, nullptr, "")) {
+				NboInput r = read_file47(ref47);
+				double ds = r.overlap.extent(0) == in.overlap.extent(0) ? 0.0 : 1.0;
+				for (size_t i = 0; ds == 0.0 && i < in.overlap.extent(0); i++)
+					for (size_t j = 0; j < in.overlap.extent(1); j++) ds = std::max(ds, std::abs(r.overlap(i, j) - in.overlap(i, j)));
+				//1e-8: both FILE47s round the same integrals to 12 digits; anything more is another basis or geometry
+				if (ds > 1e-8) why = ref.string() + " is another basis or geometry (overlap differs by " + std::to_string(ds) + ")";
+				else if (r.open_shell != in.open_shell || r.fock.size() != in.fock.size()) why = ref.string() + " differs in spin treatment";
+				else {
+					in.fock = r.fock;
+					run.reference_scf = ref;
+				}
+			}
+			else why = "could not write the FILE47 of " + ref.string();
+			std::error_code ec;
+			std::filesystem::remove(ref47, ec);
+		}
+		log << "E2(D) of the correlated density: " << (why.empty() ? "Fock of the reference SCF " + ref.string() : "none, " + why)
+			<< std::endl;
 	}
 
 	NboResults res;
@@ -1641,7 +1689,7 @@ NboResults native_nbo(WFN& wavy, const NboOptions& options, std::ostream& log, N
 		double electrons = 0.0;
 		for (const NAOAtom& a : nao.atoms) electrons += a.population;
 		const int n_pairs = static_cast<int>(std::llround(electrons / 2.0));
-		NboOptions chosen = options;
+		NboOptions chosen = run;
 		if (!options.nrt_parent.empty()) {
 			const std::string why = read_lewis_structure(options.nrt_parent, nao, n_pairs,
 														 wavy.get_path().filename().string(), chosen.parent_lewis, log,
@@ -1698,7 +1746,7 @@ NboResults native_nbo(WFN& wavy, const NboOptions& options, std::ostream& log, N
 			analyse_spin(res, in, total_nao, bondable, nrt_bondable, xyz, in.density[s],
 						 static_cast<int>(in.fock.size()) > s ? in.fock[s] : dMatrix2(),
 						 static_cast<int>(std::llround(electrons)), 1.0, s ? "beta" : "alpha",
-						 options, lewis, log);
+						 run, lewis, log);
 		}
 		vec occ(total_nao.orbitals.size(), 0.0);
 		for (size_t i = 0; i < occ.size(); i++)
@@ -1965,16 +2013,26 @@ void print_nbo(const NboResults& r, std::ostream& out)
 	}
 	for (const std::string& spin : spins_of(r.budget)) {
 		const double c = spin.empty() ? 2.0 : 1.0;
-		out << title("Donor -> acceptor occupancies of the density, no Fock matrix", spin, "in house")
-			<< "  q(k->j) = D(j,k)^2/(" << c << " - D(j,j)) in the NBO basis, largest first, q >= 1e-4 e:\n  "
-			<< left << setw(21) << "donor" << setw(21) << "acceptor" << right << setw(11) << "q / e" << "\n";
+		const bool priced = !r.transfer_fock.empty();
+		out << title(priced ? "Donor -> acceptor occupancies of the density, density-derived E2(D)"
+							: "Donor -> acceptor occupancies of the density, no Fock matrix", spin, "in house")
+			<< "  q(k->j) = D(j,k)^2/(" << c << " - D(j,j)) in the NBO basis, largest first, q >= 1e-4 e";
+		if (priced)
+			out << ";\n  E2(D) = q (F(j,j) - F(k,k)) on the NBO-basis Fock diagonal of " << r.transfer_fock
+				<< ", E(2) to second order for one determinant";
+		out << ":\n  " << left << setw(21) << "donor" << setw(21) << "acceptor" << right << setw(11) << "q / e";
+		if (priced) out << setw(16) << "E2(D) kcal/mol";
+		out << "\n";
 		std::vector<NboTransfer> sorted;
 		for (const NboTransfer& t : r.transfer)
 			if (t.spin == spin) sorted.push_back(t);
 		std::stable_sort(sorted.begin(), sorted.end(), [](const NboTransfer& a, const NboTransfer& b) { return a.q > b.q; });
-		for (const NboTransfer& t : sorted)
+		for (const NboTransfer& t : sorted) {
 			out << "  " << left << setw(21) << name(spin, t.donor_index, t.donor) << setw(21)
-				<< name(spin, t.acceptor_index, t.acceptor) << right << fixed << setprecision(5) << setw(11) << t.q << "\n";
+				<< name(spin, t.acceptor_index, t.acceptor) << right << fixed << setprecision(5) << setw(11) << t.q;
+			if (priced) out << setprecision(2) << setw(16) << t.e2d_kcal;
+			out << "\n";
+		}
 		//D(j,j) = q(Lewis) + q(non-Lewis) + s; s, the part no donor explains, is 0 for one determinant
 		out << "  Acceptor budget, occupancy = q from Lewis + q from non-Lewis + s:\n  " << left << setw(21) << "acceptor"
 			<< right << setw(11) << "occupancy" << setw(11) << "q(L)" << setw(11) << "q(NL)" << setw(11) << "s" << "\n";

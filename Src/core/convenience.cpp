@@ -622,7 +622,9 @@ std::string help_message =
  "                                    -nbo_47 <file> to read an existing FILE47\n"
  "                                    instead of building one from the\n"
  "                                    wavefunction, -nbo_keep47 to keep the one it\n"
- "                                    builds.\n"
+ "                                    builds, -nbo_ref <scf> for the SCF whose Fock\n"
+ "                                    prices natural-orbital input (E2(D); default\n"
+ "                                    <base>.gbw beside it).\n"
  "  -nrt                               Natural resonance theory after the search\n"
  "                                    (with -nbo): the candidate resonance\n"
  "                                    structures, the convex quadratic program\n"
@@ -2614,7 +2616,7 @@ const std::set<std::string> &nbo_family_suboptions()
 {
 	static const std::set<std::string> known = {
 		"-nbo", "-nbo_external", "-nbo_parse", "-nbo_native", "-nbo_keywords", "-nbo_exe", "-nbo_json",
-		"-nbo_dir", "-nbo_47", "-nbo_e2min", "-nbo_threads", "-nbo_keep47", "-nrt",
+		"-nbo_dir", "-nbo_47", "-nbo_ref", "-nbo_e2min", "-nbo_threads", "-nbo_keep47", "-nrt",
 		"-nrt_e2", "-nrt_arrows", "-nrt_bond_scale", "-nrt_max", "-nrt_atoms",
 		"-nrt_exhaustive", "-nrt_no_symmetry", "-nrt_no_components", "-nrt_no_ion", "-nrt_parent", "-nrt_e2_avg", "-nrt_e2_avg_min",
 		"-nbo_centres", "-nbo_tm_pairs", "-nrt_target", "-nrt_screen", "-nrt_rotate", "-nrt_stall", "-nrt_mirror", "-nrt_no_mirror", "-nrt_tie", "-nrt_ref"};
@@ -2737,6 +2739,7 @@ bool options::digest_io_options(const std::string &temp, int &i)
 		for (int j = i + 2; j + 1 < argc; j++) {
 			if (arguments[j] == "-nbo_json") json = arguments[j + 1];
 			else if (arguments[j] == "-nbo_47") opt.file47 = arguments[j + 1];
+			else if (arguments[j] == "-nbo_ref") opt.reference_scf = arguments[j + 1];
 			else if (arguments[j] == "-nbo_e2min") opt.e2_threshold_kcal = std::stod(arguments[j + 1]);
 			else if (arguments[j] == "-nbo_threads") opt.threads = std::stoi(arguments[j + 1]);
 			//This branch returns before the main digester reads a later -cpus.

@@ -319,6 +319,7 @@ All of these need a contracted basis, so `.gbw`, `.fchk` or `.molden` — not
 | `-nbo_e2min <kcal>` | 1 | | Drop E2 interactions below this threshold. |
 | `-nbo_threads <n>` | 1 | | Threads for the native NBO/NRT search. |
 | `-nbo_keep47` | 0 | off | Do not delete the `.47` afterwards. |
+| `-nbo_ref <scf>` | 1 | `<base>.gbw` beside the input | Natural-orbital (correlated) input: the SCF wavefunction whose Fock prices the donor → acceptor transfers, E2(D) = q (F_jj − F_kk). E2 itself stays refused. |
 | `-nrt` | 0 | off | Run NRT (native) / request it in the keylist (external). |
 | `-nrt_e2 <n>` | 1 | | NRT E2 threshold. |
 | `-nrt_arrows` | 0 | off | Report NRT arrow (charge-transfer) contributions. |

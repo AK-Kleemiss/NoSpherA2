@@ -124,6 +124,9 @@ struct NboOptions {
 	int search_threads = 0;            //Lewis search only, 0: threads
 									   //-fba runs it serial: its regions are too fine to share a loaded machine
 	std::filesystem::path file47;      //read this instead of writing a fresh one
+	//-nbo_ref: the SCF wavefunction whose Fock prices a correlated density's donor -> acceptor transfers, E2(D).
+	//Empty: native_nbo takes <base>.gbw beside natural-orbital input (ORCA's job.mp2nat / job.mdci.nat next to job.gbw)
+	std::filesystem::path reference_scf;
 	bool keep_file47 = false;
 	bool debug = false;
 };
@@ -168,11 +171,12 @@ std::vector<NboE2Entry> nbo_e2(NboLewis& lewis, const dMatrix2& fock_nao, double
 /**
  * Fock-free donor -> acceptor decomposition of gamma in lewis' NBO basis (nbo_run.h, NboTransfer), for every
  * non-Lewis acceptor, and the local NOON of each BD/BD* pair; indices 1-based into lewis.orbitals, labels empty.
- * Transfers below q_floor are left out of transfer but kept in the budget sums.
+ * Transfers below q_floor are left out of transfer but kept in the budget sums.  fock_nao, if given, prices
+ * each transfer: E2(D) = q (F_jj - F_kk) on the NBO-basis Fock diagonal.
  */
 void density_transfer(const NboLewis& lewis, const dMatrix2& gamma, double scale, double q_floor,
 					  std::vector<NboTransfer>& transfer, std::vector<NboAcceptorBudget>& budget,
-					  std::vector<NboLocalNoon>& local_noon);
+					  std::vector<NboLocalNoon>& local_noon, const dMatrix2& fock_nao = dMatrix2());
 
 /**
  * Natural resonance theory on one spin's NAO basis, appended to nrt.  e2's donor/acceptor indices must

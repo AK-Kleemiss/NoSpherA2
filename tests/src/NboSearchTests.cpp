@@ -205,3 +205,37 @@ TEST(NboSearchTests, DensityTransferOfACorrelatedBondKeepsTheBudget)
         if (theta == 0.0) EXPECT_NEAR(b[0].s, nu, 1e-12) << "n = " << ng;
     }
 }
+
+//One determinant in two NAOs, a donor mixed into an acceptor by F_kj: E2(D) = q dE and E2 = q_k F^2/dE agree to
+//second order in F/dE (here 2 %), and E2(D) is 0 without a Fock.
+TEST(NboSearchTests, DensityTransferPricesOneDeterminantAtE2)
+{
+    NboLewis L;
+    L.n_lewis = 1;
+    NboFunction donor, acceptor;
+    donor.type = "LP", acceptor.type = "LV";
+    donor.centers = acceptor.centers = { 0 };
+    donor.coefficients = { 1.0, 0.0 };
+    acceptor.coefficients = { 0.0, 1.0 };
+    L.orbitals = { donor, acceptor };
+    const double ek = -0.5, ej = 0.3, f = 0.04;
+    dMatrix2 fock(2, 2);
+    fock(0, 0) = ek, fock(1, 1) = ej, fock(0, 1) = fock(1, 0) = f;
+    //the occupied eigenvector of the 2 x 2 Fock, (cos, -sin) with tan 2 theta = 2 F/dE, doubly occupied
+    const double th = 0.5 * std::atan(2.0 * f / (ej - ek)), c = std::cos(th), s = std::sin(th);
+    dMatrix2 gamma(2, 2);
+    gamma(0, 0) = 2.0 * c * c, gamma(1, 1) = 2.0 * s * s, gamma(0, 1) = gamma(1, 0) = -2.0 * c * s;
+    L.orbitals[0].occupancy = gamma(0, 0);
+    L.orbitals[1].occupancy = gamma(1, 1);
+    const std::vector<NboE2Entry> e2 = nbo_e2(L, fock, 0.0);
+    ASSERT_EQ(e2.size(), 1u);
+    std::vector<NboTransfer> t, bare;
+    std::vector<NboAcceptorBudget> b;
+    std::vector<NboLocalNoon> l;
+    density_transfer(L, gamma, 2.0, 0.0, t, b, l, fock);
+    ASSERT_EQ(t.size(), 1u);
+    EXPECT_NEAR(t[0].e2d_kcal, e2[0].energy_kcal, 0.02 * e2[0].energy_kcal);
+    density_transfer(L, gamma, 2.0, 0.0, bare, b, l);
+    ASSERT_EQ(bare.size(), 1u);
+    EXPECT_EQ(bare[0].e2d_kcal, 0.0);
+}

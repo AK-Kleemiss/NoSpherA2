@@ -213,6 +213,8 @@ struct NboTransfer {
 	int donor_index = 0, acceptor_index = 0;
 	std::string donor, acceptor;
 	double q = 0.0;
+	//E2(D) = q (F_jj - F_kk) in kcal/mol, the density-derived E2 (= E2 to second order for one determinant); 0 without a Fock
+	double e2d_kcal = 0.0;
 };
 struct NboAcceptorBudget {
 	std::string spin;
@@ -257,11 +259,12 @@ struct NboResults {
 	std::vector<NboOrbital> orbitals;
 	std::vector<NboE2Entry> e2;
 	std::string e2_refused;       //native, non-idempotent density: why there is no E2
-	//native, non-idempotent density or -nbo_debug only; not in the JSON
+	//native, non-idempotent density or -nbo_debug only; JSON "density_transfer"
 	std::vector<NboTransfer> transfer;
 	std::vector<NboAcceptorBudget> budget;
 	std::vector<NboLocalNoon> local_noon;
-	NboE2Average e2_avg;          //-nrt_e2_avg, native closed shell only
+	std::string transfer_fock;    //whose Fock priced the transfers (E2(D)); empty = none
+	NboE2Average e2_avg;         //-nrt_e2_avg, native closed shell only
 	NboNrt nrt;
 };
 

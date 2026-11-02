@@ -119,7 +119,7 @@ struct basin_overlaps {
 	size_t triangle() const { return (size_t)nmo * (nmo + 1) / 2; }
 	double at(const int b, const int i, const int j) const { return S[b][packed(i, j)]; }
 };
-//delta(A,B) = 2 m sum_{ij, same spin} n_i n_j S^A_ij S^B_ij, lambda(A) the same with B = A,
+//delta(A,B) = 2 m sum_{ij, same spin} sqrt(n_i n_j) S^A_ij S^B_ij (Mueller; n_i n_j for 0/1), lambda(A) the same with B = A,
 //over spin-orbital occupations n in [0,1]; m = 2 for a restricted wavefunction, whose single
 //set of MOs stands for both spins, 1 when alpha and beta are listed separately
 struct delocalization_result {

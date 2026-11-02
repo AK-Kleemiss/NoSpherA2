@@ -4002,6 +4002,17 @@ void ELI_analysis(const WFN &wavy, options &opt) {
 			std::cout.flush();
 			section_log::heading("qtaim", "Localization and delocalization indices");
 			report_delocalization(l_w, ovl, lab, std::cout);
+			//-v: the overlap matrices to qtaim.aom, so an exact 2-RDM from outside (a CI vector) can be
+			//contracted on the same basins: nmo nbasins, then MO index + occupation, then one packed triangle per basin
+			if (opt.debug) {
+				std::ofstream aom("qtaim.aom");
+				aom << std::setprecision(17) << ovl.nmo << " " << ovl.S.size() << "\n";
+				for (int i = 0; i < ovl.nmo; i++) aom << ovl.mo_index[i] << " " << l_w.get_MO_occ(ovl.mo_index[i]) << "\n";
+				for (size_t b = 0; b < ovl.S.size(); b++) {
+					aom << lab[b] << "\n";
+					for (const double s : ovl.S[b]) aom << s << "\n";
+				}
+			}
 		}
 	};
 	if (l_w.get_nmo() == 0) {
