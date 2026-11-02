@@ -46,7 +46,7 @@ need the virtuals).
 
 | Flag | Arguments | Meaning |
 | --- | --- | --- |
-| `-wfn <file>` | 1 | The wavefunction. `.gbw`, `.fchk`, `.molden`, `.wfn`, `.wfx`, `.xtb` (pTB), `.ffn`, `.xyz`; ORCA's natural orbitals `base.mdci.nat` (CCSD) and `base.mp2nat` (relaxed MP2), and an `orca_2json` export `base.json` of an AutoCI density (CCSD(T), MP2-MP4). See [Correlated densities](#correlated-densities-mp2-ccsd-ccsdt). |
+| `-wfn <file>` | 1 | The wavefunction. `.gbw`, `.fchk`, `.molden`, `.wfn`, `.wfx`, `.xtb` (pTB), `.ffn`, `.xyz`; ORCA's natural orbitals `base.mdci.nat` (CCSD) and `base.mp2nat` (relaxed MP2), and an `orca_2json` export `base.json` of an AutoCI density (CCSD(T), MP2-MP4). See [Correlated densities](#correlated-densities-mp2-ccsd-ccsdt) and, for analysis of correlated input, [Correlated wavefunctions](Correlated-Wavefunctions.md). |
 | `-xyz <file>` | 1 | Geometry only. With `-SALTED` this doubles as the wavefunction source. |
 | `-cif <file>` | 1 | Crystal structure: cell, symmetry, atom labels. Switches cube evaluation onto the periodic path. |
 | `-hkl <file>` | 1 | Reflection list to compute form factors for. |
@@ -149,7 +149,7 @@ MP4 against AutoCI (water): natural occupations within 7e-8, energies within 1e-
 CCSD(T) scales as o³v⁴: on 8 cores, water seconds, benzene ~1 min, naphthalene ~12 min (ORCA MDCI 14 min for its
 CCSD(T) energy and CCSD density, AutoCI 13 min for benzene's CCSD(T) density).
 
-**Densities from ORCA** (all read with `-wfn`):
+**Densities from ORCA** (all read with `-wfn`; CASSCF, full CI, PySCF molden files, Gaussian and what each analysis means on them: [Correlated wavefunctions](Correlated-Wavefunctions.md)):
 
 - CCSD: `! CCSD NoRI` with `%mdci Density Unrelaxed NatOrbs true end` writes `base.mdci.nat`. MDCI's CCSD(T) run writes
   the *CCSD* density (no (T)); the log says so when `base.property.txt` lies beside the file.
@@ -273,6 +273,7 @@ delocalisation indices (LI/DI).
 | `-topology <wfn>` | 1 | | Every critical point of rho — nuclear, bond, ring, cage — with the Poincare-Hopf check. Console output. One-shot. |
 | `-eli_analysis <wfn> <resolution> <radius>` | 3 | | QTAIM + ELI-D basins, populations, LI/DI. |
 | `-eli_family <wfn> [points]` | 1-2 | | ELI-D alpha/beta/triplet and ELI-q as point values. Console output. One-shot. |
+| `-fba <wfn>` | 1 | | Full bonding analysis in one run: RGBI, Laplacian along every bond, the QTAIM and ELI-D basins of `-eli_analysis`, and native NBO with NPA, E2 and NRT. On natural-orbital input the DI is the Mueller one and E2 becomes E2(D) against the sibling `<base>.gbw`; see [Correlated wavefunctions](Correlated-Wavefunctions.md). |
 | `-qtaim_eli <rho.cube> <eli.cube> <atoms> [bg]` | 3-4 | `bg 0` | Mask an ELI-D cube to the QTAIM basins of the listed atoms. `<atoms>` is comma-separated, **0-based**. One-shot. |
 | `-qtaim_eli <wfn> <atoms> [res] [radius] [bg]` | 2-5 | | The same, computing both fields from a wavefunction. One-shot. |
 | `-basin_grid <n>` | 1 | `1` | Basin-integration grid level. |
@@ -303,7 +304,9 @@ intrinsic bond orbitals (Knizia, JCTC 9 (2013) 4834) against the MINAO
 reference basis, closed shell only.
 
 All of these need a contracted basis, so `.gbw`, `.fchk` or `.molden` — not
-`.wfn`/`.wfx`.
+`.wfn`/`.wfx`. On natural-orbital (correlated) input E2 is refused and replaced by the density
+transfer and E2(D), and the DI uses the Mueller pair density; see
+[Correlated wavefunctions](Correlated-Wavefunctions.md).
 
 | Flag | Arguments | Default | Meaning |
 | --- | --- | --- | --- |

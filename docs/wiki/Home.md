@@ -50,6 +50,9 @@ log.
   computes, how to read its output, and the literature behind it.
 * **[Troubleshooting](Troubleshooting.md)** — the guards the code actually
   raises, the flag-order rules, and the known traps.
+* **[Correlated wavefunctions](Correlated-Wavefunctions.md)** — loading MP2, CCSD,
+  CCSD(T), CASSCF and CI natural orbitals from ORCA, occ and PySCF, and which
+  analyses are exact, approximate or refused on them.
 * **[Tuning knobs](Tuning-Knobs.md)** — every `-tune` developer knob, its
   default and its effect.
 
