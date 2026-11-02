@@ -1383,10 +1383,31 @@ namespace
 		if (e2_beyond)
 			log << "E2: " << e2_beyond << " donor-acceptor pair(s) with |F(i,j)| >= 10 (E(j)-E(i)) left out, second "
 				<< "order is off by an order of magnitude there (the exact two-level mixing gains at most q|F|)" << std::endl;
+		std::vector<NboTransfer> transfer;
+		std::vector<NboAcceptorBudget> budget;
+		std::vector<NboLocalNoon> local_noon;
+		if (correlated || options.debug)
+			density_transfer(lewis, gamma, scale, 1e-4, transfer, budget, local_noon, price_nao);
 		//before the renumbering below, while e2's indices still point into lewis.orbitals
-		if (options.nrt)
+		if (options.nrt) {
+			//A correlated density has no E2 (refused above), and without it NRT finds no delocalising pair and keeps
+			//the parent alone (twisted ethylene, p-benzyne: 1 structure at 100 %). E2(D), E2 to second order for one
+			//determinant, marks the pairs instead; unpriced (no reference SCF) there is nothing to mark them with.
+			std::vector<NboE2Entry> priced;
+			if (correlated && price_nao.extent(0))
+				for (const NboTransfer& t : transfer) {
+					NboE2Entry x;
+					x.donor_index = t.donor_index;
+					x.acceptor_index = t.acceptor_index;
+					x.energy_kcal = t.e2d_kcal;
+					priced.push_back(x);
+				}
+			else if (correlated)
+				log << "NRT" << (spin.empty() ? "" : " " + spin) << ": correlated density without a reference SCF, no "
+					<< "E2 or E2(D) to mark delocalising pairs; only the parent structure is reachable" << std::endl;
 			//log, not std::cout: under -fba this runs on the NBO thread and cout is RGBI's
-			native_nrt(res.nrt, nao, lewis, e2, nrt_bondable, options, spin, scale, log, &xyz);
+			native_nrt(res.nrt, nao, lewis, correlated ? priced : e2, nrt_bondable, options, spin, scale, log, &xyz);
+		}
 		if (options.nrt && (options.nrt_e2_avg_percent > 0.0 || options.nrt_e2_avg_min_percent > 0.0))
 			e2_nrt_average(res, nao, gamma, fock_nao, bondable, n_pairs, scale, options, log);
 
@@ -1437,10 +1458,6 @@ namespace
 			res.e2.push_back(e);
 		}
 		if (correlated || options.debug) {
-			std::vector<NboTransfer> transfer;
-			std::vector<NboAcceptorBudget> budget;
-			std::vector<NboLocalNoon> local_noon;
-			density_transfer(lewis, gamma, scale, 1e-4, transfer, budget, local_noon, price_nao);
 			if (price_nao.extent(0) && res.transfer_fock.empty())
 				res.transfer_fock = correlated ? "reference SCF " + options.reference_scf.filename().string() : "this wavefunction";
 			const auto renumber = [&](int& index, std::string& label) {
