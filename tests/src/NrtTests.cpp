@@ -770,3 +770,38 @@ TEST(NrtTests, OppositelyPolarisedOrbitalsOfABondDoNotCancelInItsIonicShare)
             EXPECT_NEAR(o.ionic, 1.2, 1e-6);
         }
 }
+
+//H2 at dissociation as a correlated density: n+ = n- = 1, Gamma = 1. Bond and antibond are degenerate, so
+//nothing prices the pair; NboE2Entry::split opens it, and the spin-free fit is H+ H- / H- H+ at 50 % each.
+TEST(NrtTests, ASplitBondReachesItsMirrorIonicPairAtAnyPrice)
+{
+    const NAOResult nao = h_chain(2);
+    dMatrix2 gamma(2, 2);
+    gamma(0, 0) = gamma(1, 1) = 1.0;
+    NboLewis lewis = one_bond(gamma, 2);
+    NboFunction anti = lewis.orbitals[0];
+    anti.type = "BD*";
+    anti.occupancy = 0.0;
+    lewis.orbitals.push_back(anti);
+    std::vector<NboE2Entry> e2(1);
+    e2[0].donor_index = 1;
+    e2[0].acceptor_index = 2;
+    e2[0].energy_kcal = 0.0;
+    NboOptions opt;
+    opt.nrt = true;
+    std::ostringstream log;
+
+    NboNrt priced;
+    native_nrt(priced, nao, lewis, e2, chain_bondable(2), opt, "", 2.0, log);
+    ASSERT_TRUE(priced.present);
+    EXPECT_EQ(priced.structures_found, 1) << "an unpriced pair below the screen opens nothing";
+
+    e2[0].split = true;
+    NboNrt split;
+    native_nrt(split, nao, lewis, e2, chain_bondable(2), opt, "", 2.0, log);
+    ASSERT_TRUE(split.present);
+    ASSERT_GE(split.weights.size(), 2u);  //the covalent parent at 0 % may be dropped
+    EXPECT_NEAR(split.weights[0].weight_percent, 50.0, 1e-3);
+    EXPECT_NEAR(split.weights[1].weight_percent, 50.0, 1e-3);
+    EXPECT_LT(split.d_w, 1e-4);
+}

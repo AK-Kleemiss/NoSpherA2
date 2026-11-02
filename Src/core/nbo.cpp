@@ -1410,6 +1410,9 @@ namespace
 					x.donor_index = l.bond_index;
 					x.acceptor_index = l.antibond_index;
 					x.energy_kcal = l.e2d_kcal;
+					//a bond that fails NBO's own pair test is breaking: ethylene's pi at 90 deg (n+ 1.11) splits, its
+					//C-H (n+ 1.97, priced at 12 kcal/mol) does not.  Not by price: pi and pi* are degenerate there
+					x.split = l.n_plus < options.occupancy_threshold * scale / 2.0;
 					priced.push_back(x);
 				}
 			}

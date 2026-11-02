@@ -67,6 +67,7 @@ struct NboE2Entry {
 	double e_diff = 0.0;        //E(NL)-E(L), a.u.
 	double fij = 0.0;           //F(L,NL), a.u.
 	bool beyond_second_order = false; //|F| >= E(NL)-E(L): E(2) exceeds the exact two-level gain q|F|
+	bool split = false;         //correlated NRT only: a bond whose n+ fails occupancy_threshold (NboLocalNoon), open at any price
 };
 
 struct NboResonanceWeight {

@@ -270,14 +270,15 @@ namespace
 	{
 		vec2 g(na, vec(na, 0.0));
 		for (const NboE2Entry& e : e2) {
-			if (e.energy_kcal < kcal) continue;
+			//a split bond (NboE2Entry::split) is open at any price: a diradical's bond and antibond are degenerate
+			if (e.energy_kcal < kcal && !e.split) continue;
 			ivec c = lewis.orbitals[e.donor_index - 1].centers;
 			const ivec& ac = lewis.orbitals[e.acceptor_index - 1].centers;
 			c.insert(c.end(), ac.begin(), ac.end());
 			for (size_t i = 0; i < c.size(); i++)
 				for (size_t j = i + 1; j < c.size(); j++)
 					if (c[i] != c[j] && bondable[c[i]][c[j]]) {
-						const double p = std::max(g[c[i]][c[j]], e.energy_kcal);
+						const double p = std::max({ g[c[i]][c[j]], e.energy_kcal, e.split ? kcal : 0.0 });
 						g[c[i]][c[j]] = g[c[j]][c[i]] = p;
 					}
 		}
@@ -344,6 +345,9 @@ namespace
 		//[a][b]: an E2 above the screen from a lone pair on a into an empty valence orbital (LV) on b.  LP a -> bond a-b
 		//fills that LV: a dative bond (P->Ni, Ni->Li, F->B in BF3) is a whole resonance structure, not half an arrow
 		bvec2 dative;
+		//[a][b]: a correlated density's bond a-b whose own antibond is occupied (NboE2Entry::split).  Bond -> lone pair
+		//on either end is then a whole structure: H2 at 5 A is H+ H- / H- H+ to a spin-free fit, and no second move exists
+		bvec2 split;
 		bool units = false;  //three-centre moves: -nbo_centres > 2 or a parent with k-centre units
 		int max_centres = 3;  //-nbo_centres: units grow up to this many centres
 	};
@@ -422,7 +426,7 @@ namespace
 					Topology s = c.topo;
 					s.set(a, b, s.at(a, b) - 1);
 					s.at(a, a)++;
-					emit(std::move(s), a, b);
+					emit(std::move(s), a, b, -1, L.split[a][b]);
 				}
 				for (int d = 0; d < n; d++) {
 					if (d == a || d == b || L.deloc[a][d] <= 0.0) continue;
@@ -1461,6 +1465,11 @@ void native_nrt(NboNrt& nrt, const NAOResult& nao, const NboLewis& lewis,
 		if (e.energy_kcal < options.nrt_e2_kcal || don.type != "LP" || acc.type != "LV") continue;
 		const int a = don.centers[0], b = acc.centers[0];
 		if (a != b && L.bondable[a][b]) L.dative[a][b] = true;
+	}
+	L.split.assign(na, bvec(na, false));
+	for (const NboE2Entry& e : e2) {
+		const ivec& c = lewis.orbitals[e.donor_index - 1].centers;
+		if (e.split && c.size() == 2) L.split[c[0]][c[1]] = L.split[c[1]][c[0]] = true;
 	}
 	L.cap.assign(na, 0);
 	L.parent_electrons.assign(na, 0);
