@@ -52,6 +52,7 @@ void WFN::reset()
 	path.clear();
 	method.clear();
 	MOs.clear();
+	natural_rotation.clear();
 	coef_primitive_major.clear();
 	coef_primitive_major_valid = false;
 	prim_exp_group.clear();
@@ -2461,6 +2462,7 @@ WFN &WFN::operator=(const WFN &right)
 	has_ECPs = right.has_ECPs;
 	isBohr = right.isBohr;
 	is_unrestricted = right.is_unrestricted;
+	natural_rotation = right.natural_rotation;
 	fill_pre();
 	fill_Afac_pre();
 	return *this;

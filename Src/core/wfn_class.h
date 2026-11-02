@@ -198,6 +198,7 @@ private:
 	bool has_ECPs;
 	bool isBohr = false; // True if the coordinates of the atoms are given in Bohr
 	bool is_unrestricted = false; // True if the wavefunction is unrestricted (different alpha and beta MOs)
+	vec natural_rotation; // U(k,j) at [k*nmo+j] when read_gbw turned the gbw orbitals into natural orbitals C U; a CI in the gbw orbitals follows it
 	// precomputed factors and helper functions for ESP calc
 	static long long int pre[9][5][5][9];
 	constexpr static void fill_pre();
@@ -366,6 +367,7 @@ public:
 	};
 	/** Get whether this is an unrestricted calculation */
 	bool get_is_unrestricted() const { return is_unrestricted; };
+	const vec& get_natural_rotation() const { return natural_rotation; };
 	/** Print primitive information to stdout. */
 	void print_primitive(const int& nr) const;
 	/** Assign total charge (overwrites existing). */

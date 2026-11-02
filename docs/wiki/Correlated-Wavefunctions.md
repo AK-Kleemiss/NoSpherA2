@@ -165,12 +165,36 @@ correlated value with no further approximation.
 | scattering factors, `.tsc`/`.tscb` | exact | Fourier transform of ρ |
 | QTAIM populations and charges | exact | integrals of ρ |
 | NPA, NAO occupancies, NBO occupancies | exact | from the 1-RDM in the NAO basis |
-| delocalisation index DI and localisation index λ | **approximate**: Müller pair density, √(n_i n_j) | the exact DI needs the 2-RDM; see [section 9](#9-how-good-the-müller-di-is) |
-| ELI-D, ELI-q (and their α/β/triplet members) | **approximate**: the single-determinant formulas evaluated with the natural orbitals and their occupations | the correlated ELI needs the 2-RDM |
+| delocalisation index DI and localisation index λ | **exact** with an ORCA determinant print beside the gbw (below), else **approximate**: Müller pair density, √(n_i n_j) | the exact DI needs the 2-RDM; see [section 9](#9-how-good-the-müller-di-is) |
+| ELI-D, ELI-q (and their α/β/triplet members) | **approximate**: the single-determinant formulas evaluated with the natural orbitals and their occupations; the log prints a WARNING when no 2-RDM was found | the correlated ELI needs the 2-RDM |
 | RGBI | **approximate**: a 1-RDM bond index on the natural orbitals | no 2-RDM behind it |
 | E2 (second-order donor-acceptor energies) | **refused**, with a message | natural orbitals have no orbital energies; replaced by the density transfer and E2(D) ([section 7](#7-e2d-and-the-reference-scf--nbo_ref)) |
 | NRT | fed by E2(D) instead of E2 | |
-| ELIA | **not available** | needs the αβ block of the 2-RDM, which no wfn/wfx/molden/fchk carries; `-eli_family` says so |
+| ELIA | **exact** with an ORCA determinant print beside the gbw, else **not available** | needs the αβ block of the 2-RDM, which no wfn/wfx/molden/fchk/gbw carries; `-eli_family` says so |
+
+**Exact DI/λ and ELIA from an ORCA CASSCF or CI.** No gbw or `.densities` file holds a CI vector or a 2-RDM; the
+determinant print in the output does. Run the CAS with
+
+```
+%casscf ... PrintWF det
+ ci TPrintWF 1e-14 end
+end
+```
+
+and keep the output as `<stem>.out` (or `.log`) next to `<stem>.gbw`. `-fba` and `-eli_family` then build the spin
+2-RDM from the determinants and log
+
+```
+  2-RDM: 10554 determinants from lih_fci.out, 0 internal + 19 active orbitals, |1 - norm| 7.1e-11, 1-RDM vs occupations 1.0e-09
+  pair density: exact, from the CI 2-RDM
+```
+
+`-eli_family` adds the columns `ELIA` = ρ₂^αβ(r,r)/(ρ_α ρ_β) and `ELI-q_s,2` = 4ρ₂^αβ(r,r)/ρ², the singlet ELI-q
+from the 2-RDM; the other members stay on the 1-RDM. The 2-RDM is refused, with the reason in the log and the Müller
+path used instead, for a multi-root (state-averaged) print, an unrestricted gbw, more than 64 active orbitals, a CI norm off by more than
+1e-6 (TPrintWF too loose), a full CI whose natural orbitals had to be rebuilt while internal orbitals are present, and a CI 1-RDM that misses the
+gbw occupations by more than 1e-4 (truncated print, other orbitals). LiH cc-pVDZ full CI: ELIA at six points agrees
+with an independent PySCF FCI to 1e-3; DI(Li,H) exact 0.1855 vs Müller 0.1843.
 
 For an SCF wavefunction every one of these is bit-identical to what it was before correlated input was supported:
 √(n_i n_j) = n_i n_j for occupations 0 and 1, and the 1-RDM is idempotent.
@@ -218,7 +242,7 @@ The JSON carries the transfers in its `density_transfer` block, with `e2d_kcal` 
 ```
 Natural occupation numbers: n from 0.00000 to 2.00000, sum of negative n 0.00000
   N_U (Head-Gordon) 0.25066 e, N_D (Takatsuka) 0.49513 e, HONO/LUNO 1.96246/0.02655, y 0.00053
-  idempotent: no, a correlated 1-RDM: DI/lambda use the Mueller pair density, E2 is refused
+  idempotent: no, a correlated 1-RDM: DI/lambda/ELIA exact from a printed CI 2-RDM, else Mueller; E2 is refused
 ```
 
 | Entry | Meaning |

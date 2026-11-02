@@ -9,6 +9,7 @@
 #include "GridManager.h"
 #include "fiber_loop.h"
 #include "eli_family.h"
+#include "ci_rdm2.h"
 #include <limits>
 #include <map>
 
@@ -3383,7 +3384,7 @@ vec integrate_basins_on_atomic_grids(const cube *cub, const cubei *basin_cube, c
 	return pop;
 }
 
-delocalization_result delocalization_indices(const WFN &wavy, const basin_overlaps &ovl)
+delocalization_result delocalization_indices(const WFN &wavy, const basin_overlaps &ovl, const CiRdm2 *rdm)
 {
 	delocalization_result r;
 	const int nb = static_cast<int>(ovl.S.size());
@@ -3416,6 +3417,57 @@ delocalization_result delocalization_indices(const WFN &wavy, const basin_overla
 			if (!ovl.outside.empty()) s += ovl.outside[basin_overlaps::packed(i, j)];
 			r.identity_error = std::max(r.identity_error, std::abs(s - (i == j ? 1.0 : 0.0)));
 		}
+	if (rdm) {
+		//Mean-field part over the natural orbitals, both spins in one occupation
+		auto mean_field = [&](const vec &a, const vec &b) {
+			double s = 0.0;
+			for (int i = 0; i < n; i++)
+				for (int j = 0; j <= i; j++) {
+					const size_t k = basin_overlaps::packed(i, j);
+					const double t = (na[i] + nbeta[i]) * (na[j] + nbeta[j]) * a[k] * b[k];
+					s += i == j ? t : 2.0 * t;
+				}
+			return s;
+		};
+		//The cumulant L as an m^2 x m^2 matrix, so C(A,B) = s_A^T L s_B with s_A[t*m+u] = S^A_tu
+		const int m = rdm->n;
+		const size_t m2 = size_t(m) * m;
+		vec L(rdm->G);
+		for (int t = 0; t < m; t++)
+			for (int v = 0; v < m; v++) {
+				const double nn = wavy.get_MO_occ(rdm->first + t) * wavy.get_MO_occ(rdm->first + v);
+				L[rdm->at(t, t, v, v)] -= nn;
+				L[rdm->at(t, v, v, t)] += 0.5 * nn;
+			}
+		//An active orbital below the AOM's 1e-8 occupation cut has no overlaps, and its cumulant is as small
+		ivec slot(m, -1);
+		for (int i = 0; i < n; i++) {
+			const int t = ovl.mo_index[i] - rdm->first;
+			if (t >= 0 && t < m) slot[t] = i;
+		}
+		const bool out = !ovl.outside.empty();
+		vec2 s(nb + 1, vec(m2, 0.0)), Ls(nb + 1, vec(m2, 0.0));
+		for (int b = 0; b < nb + (out ? 1 : 0); b++) {
+			const vec &S = b < nb ? ovl.S[b] : ovl.outside;
+			for (int t = 0; t < m; t++)
+				for (int u = 0; u < m; u++)
+					if (slot[t] >= 0 && slot[u] >= 0) s[b][size_t(t) * m + u] = S[basin_overlaps::packed(slot[t], slot[u])];
+			for (size_t i = 0; i < m2; i++)
+				Ls[b][i] = std::inner_product(s[b].begin(), s[b].end(), L.begin() + i * m2, 0.0);
+		}
+		auto C = [&](const int a, const int b) { return std::inner_product(s[a].begin(), s[a].end(), Ls[b].begin(), 0.0); };
+		r.exact = true;
+		for (int b = 0; b < nb; b++) {
+			r.lambda[b] = 0.5 * mean_field(ovl.S[b], ovl.S[b]) - C(b, b);
+			if (out) r.outside_half[b] = 0.5 * mean_field(ovl.S[b], ovl.outside) - C(b, nb);
+		}
+		for (int a = 0; a < nb; a++)
+			for (int b = a + 1; b < nb; b++) {
+				r.pairs.push_back({ a, b });
+				r.di.push_back(mean_field(ovl.S[a], ovl.S[b]) - 2.0 * C(a, b));
+			}
+		return r;
+	}
 	//The pair sum is symmetric in i and j, so the triangle is taken once and doubled off the
 	//diagonal.  Mueller (Buijse-Baerends) exchange-correlation hole, sqrt(n_i n_j) per spin: n_i n_j for
 	//0/1 occupations, and for natural orbitals it keeps lambda(A) + sum_B delta(A,B)/2 = N(A), which n_i n_j
@@ -3446,12 +3498,20 @@ delocalization_result delocalization_indices(const WFN &wavy, const basin_overla
 
 void report_delocalization(const WFN &wavy, const basin_overlaps &ovl, const svec &labels, std::ostream &log, const double threshold)
 {
-	const delocalization_result r = delocalization_indices(wavy, ovl);
+	if (ovl.S.empty() || ovl.nmo == 0) return;
+	//A correlated 1-RDM: the exact pair density of a CI printed next to the wavefunction, Mueller's otherwise
+	const bool correlated = !eli_family::noon_summary(wavy).idempotent;
+	CiRdm2 rdm;
+	std::ostringstream why;
+	const bool exact = correlated && load_ci_rdm2(wavy, rdm, why);
+	const delocalization_result r = delocalization_indices(wavy, ovl, exact ? &rdm : nullptr);
 	const int nb = static_cast<int>(r.lambda.size());
-	if (nb == 0 || ovl.nmo == 0) return;
 	auto name = [&](const int b) { return b < static_cast<int>(labels.size()) ? labels[b] : std::to_string(b + 1); };
 	log << "\nDelocalization indices (" << ovl.nmo << " occupied orbitals):\n";
 	citations::cite(citations::Method::LIDI, log);
+	if (correlated)
+		log << why.str() << (exact ? "  pair density: exact, from the CI 2-RDM\n"
+			: "  pair density: Mueller, a 1-RDM approximation; exact indices need the CI 2-RDM\n");
 	log << "  sum over basins and outside of S^A - identity: " << std::scientific << std::setprecision(2) << r.identity_error
 		<< std::fixed << "   (the quadrature's own error; AIMAll's integrations reach ~1e-3)\n";
 	//delta(A,B) summed over B is the count an atom shares with everything else; with lambda(A)

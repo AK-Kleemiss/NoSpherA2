@@ -2,6 +2,7 @@
 #include "eli_family.h"
 #include "constants.h"
 #include "citations.h"
+#include "ci_rdm2.h"
 
 namespace eli_family
 {
@@ -60,7 +61,7 @@ namespace eli_family
 			<< ", sum of negative n " << s.negative << "\n  N_U (Head-Gordon) " << s.N_U << " e, N_D (Takatsuka) " << s.N_D << " e";
 		if (s.y >= 0.0) log << ", HONO/LUNO " << s.n_hono << "/" << s.n_luno << ", y " << s.y;
 		log << "\n  idempotent: " << (s.idempotent ? "yes, a single determinant per spin" :
-			"no, a correlated 1-RDM: DI/lambda use the Mueller pair density, E2 is refused") << "\n";
+			"no, a correlated 1-RDM: DI/lambda/ELIA exact from a printed CI 2-RDM, else Mueller; E2 is refused") << "\n";
 		log.flags(flags);
 		log.precision(prec);
 	}
@@ -293,9 +294,11 @@ namespace eli_family
 			"exactly rho_alpha*rho_beta, so the antiparallel pair population per micro-cell is\n"
 			"uniform and ELIA is constant throughout space. The same holds for the singlet ELI-q of\n"
 			"Eq. 53 of Part III, which is identically 1 for a closed-shell determinant. Both need the\n"
-			"alpha-beta block of a correlated 2-matrix, which no wfn/wfx/molden/fchk file carries.\n"
+			"alpha-beta block of a correlated 2-matrix, which no wfn/wfx/molden/fchk/gbw file carries.\n"
 			"DGrid 5.2 agrees: fed a single-determinant molden it writes an identically zero ELIA\n"
-			"field and reports 'ALPHA-BETA 2-matrix element missing'.";
+			"field and reports 'ALPHA-BETA 2-matrix element missing'. For an ORCA CASSCF/CI gbw the\n"
+			"2-matrix is built from the determinant print: %casscf PrintWF det, TPrintWF 1e-14 end,\n"
+			"output kept as <stem>.out next to the gbw.";
 	}
 
 	void report(const std::filesystem::path& wfn_path, const std::filesystem::path& points_file)
@@ -325,15 +328,26 @@ namespace eli_family
 		std::cout << "\n";
 		if (!warning.empty()) std::cout << "  WARNING: " << warning << "\n";
 		std::cout << "  rho^(t)/rho = " << factor << "  (DGrid 5.2 convention, 1 - N_beta/(2(N-1)))\n"
-			<< "  ELI-D(UEG) = " << ueg_eli_d() << ", ELI-q(UEG) = " << ueg_eli_q() << "\n"
-			<< "  " << elia_status() << std::endl;
+			<< "  ELI-D(UEG) = " << ueg_eli_d() << ", ELI-q(UEG) = " << ueg_eli_q() << "\n";
+		//A correlated 1-RDM: ELIA from the on-top density of a printed CI, the 1-RDM members are its approximation
+		const bool correlated = !noon_summary(wave).idempotent;
+		CiRdm2 rdm;
+		std::ostringstream why;
+		const bool exact = correlated && load_ci_rdm2(wave, rdm, why);
+		if (exact)
+			std::cout << why.str() << "  ELIA = rho_2^ab(r,r)/(rho_a rho_b) and the singlet ELI-q 4 rho_2^ab(r,r)/rho^2 from that 2-RDM;\n"
+				<< "  the other members use the correlated 1-RDM alone" << std::endl;
+		else
+			std::cout << (correlated ? why.str() + "  WARNING: correlated wavefunction without its 2-RDM: ELI-D/ELI-q are the 1-RDM approximation\n" : "")
+				<< "  " << elia_status() << std::endl;
 		if (points_file.empty()) return;
 		std::ifstream in(points_file);
 		err_checkf(in.good(), "Could not open " + points_file.string(), std::cout);
 		//All ingredients, T_s = sum n_i |grad phi_i|^2, then the members, so the dump compares against DGrid
 		std::cout << "#         x           y           z         rho_a         rho_b"
 			<< "           T_a           T_b     |grad_a|^2     |grad_b|^2      grad_a.b"
-			<< "      ELI-D_aa      ELI-D_bb      ELI-q_aa      ELI-q_bb       ELI-D_t        ELIA_s\n";
+			<< "      ELI-D_aa      ELI-D_bb      ELI-q_aa      ELI-q_bb       ELI-D_t        ELIA_s"
+			<< (exact ? "          ELIA     ELI-q_s,2\n" : "\n");
 		std::string line;
 		while (std::getline(in, line))
 		{
@@ -358,7 +372,15 @@ namespace eli_family
 				<< std::setw(14) << eli_d(f.rho[0], ga) << std::setw(14) << eli_d(f.rho[1], gb)
 				<< std::setw(14) << eli_q(f.rho[0], ga) << std::setw(14) << eli_q(f.rho[1], gb)
 				<< std::setw(14) << eli_d(factor * (f.rho[0] + f.rho[1]), g_triplet(f))
-				<< std::setw(14) << elia_singlet_eli_q(f) << "\n";
+				<< std::setw(14) << elia_singlet_eli_q(f);
+			if (exact)
+			{
+				double r2[2];
+				const double ot = ci_on_top_ab(wave, rdm, p, r2);
+				const double prod = r2[0] * r2[1], rho = r2[0] + r2[1];
+				std::cout << std::setw(14) << (prod > 0.0 ? ot / prod : 0.0) << std::setw(14) << (rho > 0.0 ? 4.0 * ot / (rho * rho) : 0.0);
+			}
+			std::cout << "\n";
 		}
 		std::cout << std::flush;
 	}

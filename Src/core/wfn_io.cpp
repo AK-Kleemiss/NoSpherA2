@@ -1628,6 +1628,7 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
 					}
 				coefficients[i] = rotated;
 				occupations[i] = natural->second;
+				natural_rotation = natural->first;
 				std::fill(energies[i].begin(), energies[i].end(), 0.0);
 			}
 			//Without this, expected_coefs is set to 0 after push_back_MO... no idea why

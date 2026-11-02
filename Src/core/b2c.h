@@ -129,8 +129,13 @@ struct delocalization_result {
 	vec di;                                //delta for each pair, same order
 	vec outside_half;                      //delta(A,outside)/2
 	double identity_error = 0.0;           //max |sum_A S^A_ij + S^outside_ij - delta_ij|
+	bool exact = false;                    //from a CI 2-RDM, not the Mueller pair density
 };
-delocalization_result delocalization_indices(const WFN& wavy, const basin_overlaps& ovl);
+//With a CI 2-RDM (restricted): delta(A,B) = sum_ij n_i n_j S^A_ij S^B_ij - 2 sum_tuvw S^A_tu S^B_vw L_tuvw, the mean-field
+//part over natural orbitals plus the active-space cumulant L = Gamma - (n_t n_v d_tu d_vw - n_t n_v d_tw d_uv / 2);
+//lambda(A) = half the first term with B = A, minus the cumulant once.  Exact, so the sum rule holds with it as well
+struct CiRdm2;
+delocalization_result delocalization_indices(const WFN& wavy, const basin_overlaps& ovl, const CiRdm2* rdm = nullptr);
 void report_delocalization(const WFN& wavy, const basin_overlaps& ovl, const svec& labels, std::ostream& log, const double threshold = 0.01);
 //Beta sphere: a radius around an attractor that no ascent leaves, so points inside are assigned without climbing and
 //a trajectory entering it stops. Streaming quadrature only, on by default; -no_beta_spheres turns them off.
