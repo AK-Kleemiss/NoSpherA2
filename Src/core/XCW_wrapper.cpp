@@ -22,7 +22,7 @@ XCW_wrapper::XCW_wrapper(options& opt_in) : opt(&opt_in), sf(opt_in) {
 		writer.log << "Weighting: " << sf.weight_report() << " on top of the " << (xs.XWR_type == 2 ? "1/|H|^2-weighted" : "classical") << " criterion" << std::endl;
 }
 
-//z_h = (|F_obs,h| - |F_calc,h|) / sigma_h for the converged F_calc/F_scale over
+//z_h = (k sqrt(y_h) |F_calc,h| - |F_obs,h|) / sigma_h for the converged F_calc, scale k and extinction y over
 //strong reflections (|F_obs|/sigma >= xcw_strong_cutoff), tested against
 //N(0,1) after a global shape/scale rescale. Full reflection set only; the
 //free/working-set cross-validation variant is not implemented.
@@ -46,7 +46,7 @@ void XCW_wrapper::evaluate_gaussian_halting(const double lambda) {
 		if (f_over_sigma < opt->xcw_settings.xcw_strong_cutoff) {
 			continue;
 		}
-		const double scaled_F_calc = sf.scatter_data.scale * std::abs(sf.scatter_data.F_calc[i]);
+		const double scaled_F_calc = sf.scatter_data.scale * sf.ext_sqrt_y(i) * std::abs(sf.scatter_data.F_calc[i]);
 		const double diff = scaled_F_calc - sf.scatter_data.abs_F_obs[i];
 		z_raw.push_back(diff / sf.scatter_data.sigma_obs[i]);
 		resolution.push_back(sf.unit_cell.get_stl_of_hkl(sf.hkl_ordered_[i]));

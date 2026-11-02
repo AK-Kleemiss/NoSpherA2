@@ -3,7 +3,7 @@
 #include <limits>
 
 // Gaussian halting criterion for the XCW/XRW lambda scan: at each converged lambda,
-// z_h = (|F_obs,h| - |F_calc,h|) / sigma_h is tested against a fully specified N(0,1) by Anderson-Darling.
+// z_h = (k sqrt(y_h) |F_calc,h| - |F_obs,h|) / sigma_h (scale k, extinction y_h as in the criterion) is tested against a fully specified N(0,1) by Anderson-Darling.
 // lambda* = argmin A^2 is where the fit stops modelling systematic deficiency and starts absorbing noise.
 
 // Diagnostics of one converged lambda step.
