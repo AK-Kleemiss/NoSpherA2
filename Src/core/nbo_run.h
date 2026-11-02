@@ -229,6 +229,8 @@ struct NboLocalNoon {
 	int bond_index = 0, antibond_index = 0;
 	std::string label;
 	double n_plus = 0.0, n_minus = 0.0, b_eff = 0.0;
+	//n- (F_aa - F_bb) in kcal/mol, E2(D)'s q dE with the antibond's own share as q; 0 without a Fock
+	double e2d_kcal = 0.0;
 };
 
 struct NboResults {

@@ -1201,6 +1201,7 @@ void density_transfer(const NboLewis& lewis, const dMatrix2& gamma, const double
 			l.n_plus = mid + half;
 			l.n_minus = mid - half;
 			l.b_eff = half;
+			l.e2d_kcal = l.n_minus * (e(a) - e(b)) * constants::kcal_mol_per_hartree;
 			local_noon.push_back(l);
 			break;
 		}
@@ -1393,8 +1394,10 @@ namespace
 			//A correlated density has no E2 (refused above), and without it NRT finds no delocalising pair and keeps
 			//the parent alone (twisted ethylene, p-benzyne: 1 structure at 100 %). E2(D), E2 to second order for one
 			//determinant, marks the pairs instead; unpriced (no reference SCF) there is nothing to mark them with.
+			//A bond and its own antibond differ in symmetry (D_jk = 0), so a bond breaking into a diradical (N2 at
+			//3 A, H2 at 5 A, ethylene at 90 deg) has no transfer at all; its antibond's own share n- marks it.
 			std::vector<NboE2Entry> priced;
-			if (correlated && price_nao.extent(0))
+			if (correlated && price_nao.extent(0)) {
 				for (const NboTransfer& t : transfer) {
 					NboE2Entry x;
 					x.donor_index = t.donor_index;
@@ -1402,6 +1405,14 @@ namespace
 					x.energy_kcal = t.e2d_kcal;
 					priced.push_back(x);
 				}
+				for (const NboLocalNoon& l : local_noon) {
+					NboE2Entry x;
+					x.donor_index = l.bond_index;
+					x.acceptor_index = l.antibond_index;
+					x.energy_kcal = l.e2d_kcal;
+					priced.push_back(x);
+				}
+			}
 			else if (correlated)
 				log << "NRT" << (spin.empty() ? "" : " " + spin) << ": correlated density without a reference SCF, no "
 					<< "E2 or E2(D) to mark delocalising pairs; only the parent structure is reachable" << std::endl;

@@ -1,6 +1,7 @@
 #include "pch.h"
 
 #include "core/nbo.h"
+#include "core/constants.h"
 
 //NBO search on densities whose accepted orbital set is known by hand; corner arithmetic and the
 //level-scheduled Gauss-Seidel sweep are equivalences, so results must be exact and thread-independent.
@@ -204,6 +205,14 @@ TEST(NboSearchTests, DensityTransferOfACorrelatedBondKeepsTheBudget)
         EXPECT_NEAR(l[0].n_minus, nu, 1e-12);
         EXPECT_NEAR(l[0].b_eff, 0.5 * (ng - nu), 1e-12);
         if (theta == 0.0) EXPECT_NEAR(b[0].s, nu, 1e-12) << "n = " << ng;
+        //priced by its own share n- dE, also at n = 1/1 where no transfer is left to price (NRT's only mark there)
+        const double eb = -0.5, ea = 0.3;
+        dMatrix2 fock(2, 2);
+        for (int i = 0; i < 2; i++)
+            for (int j = 0; j < 2; j++) fock(i, j) = eb * bd.coefficients[i] * bd.coefficients[j] + ea * anti.coefficients[i] * anti.coefficients[j];
+        t.clear(), b.clear(), l.clear();
+        density_transfer(L, gamma, 2.0, 0.0, t, b, l, fock);
+        EXPECT_NEAR(l[0].e2d_kcal, nu * (ea - eb) * constants::kcal_mol_per_hartree, 1e-9) << "n = " << ng;
     }
 }
 
