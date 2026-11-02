@@ -340,13 +340,17 @@ bvec2 bondable_pairs(const std::vector<atom>& atoms, const double scale)
 {
 	const size_t na = atoms.size();
 	bvec2 out(na, bvec(na, false));
+	const auto dist2 = [&](const size_t a, const size_t b) {
+		double d2 = 0.0;
+		for (unsigned int k = 0; k < 3; k++) {
+			const double d = atoms[a].get_coordinate(k) - atoms[b].get_coordinate(k);
+			d2 += d * d;
+		}
+		return d2;
+	};
 	for (size_t a = 0; a < na; a++)
 		for (size_t b = a + 1; b < na; b++) {
-			double d2 = 0.0;
-			for (unsigned int k = 0; k < 3; k++) {
-				const double d = atoms[a].get_coordinate(k) - atoms[b].get_coordinate(k);
-				d2 += d * d;
-			}
+			const double d2 = dist2(a, b);
 			const int za = atoms[a].get_charge(), zb = atoms[b].get_charge();
 			const double ra = za > 0 && za < 114 ? constants::covalent_radii[za] : 1.5;
 			const double rb = zb > 0 && zb < 114 ? constants::covalent_radii[zb] : 1.5;
@@ -369,6 +373,18 @@ bvec2 bondable_pairs(const std::vector<atom>& atoms, const double scale)
 			}
 			out[a][b] = out[b][a] = ok;
 		}
+	//An atom left without any partner may still pair with its nearest neighbour(s): the CSD radii are made for an
+	//additive tolerance, so the scaled cut misses short H-H (H2 at 0.74 A > 1.3 * 0.46 A) and every stretched bond,
+	//and the search then splits the pair into a lone pair and an empty orbital. A one-centre block is still tried
+	//first at each threshold, so this only adds a candidate where nothing else would place the electrons.
+	for (size_t a = 0; a < na; a++) {
+		if (std::find(out[a].begin(), out[a].end(), true) != out[a].end()) continue;
+		double closest = std::numeric_limits<double>::max();
+		for (size_t b = 0; b < na; b++)
+			if (b != a) closest = std::min(closest, dist2(a, b));
+		for (size_t b = 0; b < na; b++)
+			if (b != a && dist2(a, b) <= closest * (1.0 + 1e-8)) out[a][b] = out[b][a] = true;
+	}
 	return out;
 }
 
