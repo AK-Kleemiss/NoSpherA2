@@ -236,7 +236,9 @@ MBIS and EMBIS at every order.
   analysis on it.
 * **ELIA is identically `1 - zeta^2`** for any single determinant, hence
   identically 1 for a closed shell. It is deliberately excluded from basin
-  analysis.
+  analysis. A correlated ELIA needs the ORCA `PrintWF det` output as
+  `<stem>.out` beside the CAS/CI `.gbw`; without it `-eli_family` logs
+  "no 2-RDM" and why ([required input](Correlated-Wavefunctions.md#6-what-is-exact-what-is-approximate-what-is-refused)).
 * **Triplet ELI-D** is informative only for genuinely open-shell wavefunctions,
   and its prefactor follows DGrid rather than Kohout's Eq. 5, so a comparison
   against the paper shows a constant factor.

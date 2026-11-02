@@ -181,8 +181,25 @@ determinant print in the output does. Run the CAS with
 end
 ```
 
-and keep the output as `<stem>.out` (or `.log`) next to `<stem>.gbw`. `-fba` and `-eli_family` then build the spin
-2-RDM from the determinants and log
+and keep the output as `<stem>.out` (or `.log`) next to `<stem>.gbw`.
+
+**Required input**, all in one folder with one stem:
+
+| File | Needed for | Notes |
+| --- | --- | --- |
+| `<stem>.gbw` | always | the file given to `-fba` / `-eli_family`; restricted orbitals |
+| `<stem>.out` or `<stem>.log` | exact DI/λ, ELIA, ELI-q_s,2 | ORCA's stdout from the same job: `PrintWF det`, `TPrintWF 1e-14`, `nroots 1` (no state average), at most 64 active orbitals |
+| `<stem>.densities` + `<stem>.densitiesinfo` | full CI only | the natural orbitals over every orbital; not needed for a CAS with internal orbitals |
+
+Without the `.out`, or with any of the refusals below, the run continues on the Müller DI and `-eli_family` prints
+no ELIA column, with the reason in the log.
+
+ORCA has no binary file to use instead. The CASSCF module does write the CI vector
+(`<stem>.CIData.tmp.CIVEC_mult-*_root-*.tmp`, in the CSF basis) and the spin-summed active 2-RDM (`<stem>.casg2.tmp`,
+n²×n² doubles, trace N(N−1)/2) during the run, but deletes both at the end. No input keyword keeps them, and neither
+the gbw, `.densities` nor `orca_2json` carries a 2-RDM. The determinant print is the only persistent source.
+
+`-fba` and `-eli_family` then build the spin 2-RDM from the determinants and log
 
 ```
   2-RDM: 10554 determinants from lih_fci.out, 0 internal + 19 active orbitals, |1 - norm| 7.1e-11, 1-RDM vs occupations 1.0e-09

@@ -184,6 +184,10 @@ The rest of Kohout's ELI family as point values, printed to the console:
 .\NoSpherA2.exe -eli_family nh3li.gbw
 ```
 
+On an SCF gbw this prints no ELIA column, because ELIA is identically 1 − ζ² there. For ELIA from a CASSCF/CI, keep
+the ORCA output of a `PrintWF det` / `TPrintWF 1e-14` run as `<stem>.out` next to `<stem>.gbw`
+([required input](Correlated-Wavefunctions.md#6-what-is-exact-what-is-approximate-what-is-refused)).
+
 And an ELI-D field masked to the QTAIM basins of selected atoms (0-based
 indices):
 

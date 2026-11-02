@@ -272,8 +272,8 @@ delocalisation indices (LI/DI).
 | --- | --- | --- | --- |
 | `-topology <wfn>` | 1 | | Every critical point of rho — nuclear, bond, ring, cage — with the Poincare-Hopf check. Console output. One-shot. |
 | `-eli_analysis <wfn> <resolution> <radius>` | 3 | | QTAIM + ELI-D basins, populations, LI/DI. |
-| `-eli_family <wfn> [points]` | 1-2 | | ELI-D alpha/beta/triplet and ELI-q as point values. Console output. One-shot. |
-| `-fba <wfn>` | 1 | | Full bonding analysis in one run: RGBI, Laplacian along every bond, the QTAIM and ELI-D basins of `-eli_analysis`, and native NBO with NPA, E2 and NRT. On natural-orbital input the DI is the Mueller one and E2 becomes E2(D) against the sibling `<base>.gbw`; see [Correlated wavefunctions](Correlated-Wavefunctions.md). |
+| `-eli_family <wfn> [points]` | 1-2 | | ELI-D alpha/beta/triplet and ELI-q as point values. Console output. One-shot. ELIA and ELI-q_s,2 need the 2-RDM: an ORCA CAS/CI `.gbw` with its `PrintWF det` output as `<stem>.out` beside it; see [Correlated wavefunctions](Correlated-Wavefunctions.md#6-what-is-exact-what-is-approximate-what-is-refused). |
+| `-fba <wfn>` | 1 | | Full bonding analysis in one run: RGBI, Laplacian along every bond, the QTAIM and ELI-D basins of `-eli_analysis`, and native NBO with NPA, E2 and NRT. On natural-orbital input the DI is the Mueller one and E2 becomes E2(D) against the sibling `<base>.gbw`; the exact DI/λ needs an ORCA CAS/CI `PrintWF det` output as `<stem>.out` beside the `.gbw`. See [Correlated wavefunctions](Correlated-Wavefunctions.md). |
 | `-qtaim_eli <rho.cube> <eli.cube> <atoms> [bg]` | 3-4 | `bg 0` | Mask an ELI-D cube to the QTAIM basins of the listed atoms. `<atoms>` is comma-separated, **0-based**. One-shot. |
 | `-qtaim_eli <wfn> <atoms> [res] [radius] [bg]` | 2-5 | | The same, computing both fields from a wavefunction. One-shot. |
 | `-basin_grid <n>` | 1 | `1` | Basin-integration grid level. |
