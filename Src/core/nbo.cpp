@@ -1123,6 +1123,58 @@ std::vector<NboE2Entry> nbo_e2(NboLewis& lewis, const dMatrix2& fock_nao,
 	return out;
 }
 
+void density_transfer(const NboLewis& lewis, const dMatrix2& gamma, const double scale, const double q_floor,
+					  std::vector<NboTransfer>& transfer, std::vector<NboAcceptorBudget>& budget,
+					  std::vector<NboLocalNoon>& local_noon)
+{
+	const int n = static_cast<int>(lewis.orbitals.size());
+	const MatrixXd G = to_eigen(gamma);
+	MatrixXd V(G.rows(), n);
+	for (int j = 0; j < n; j++)
+		for (int i = 0; i < G.rows(); i++)
+			V(i, j) = lewis.orbitals[j].coefficients[i];
+	const MatrixXd D = V.transpose() * G * V;
+	for (int j = lewis.n_lewis; j < n; j++) {
+		//1e-12: a full acceptor (c - D_jj = 0) has no hole to fill; only keeps the division finite
+		const double hole = std::max(scale - D(j, j), 1e-12);
+		NboAcceptorBudget b;
+		b.index = j + 1;
+		b.occupancy = D(j, j);
+		b.s = (scale * D(j, j) - D.col(j).squaredNorm()) / hole;
+		for (int k = 0; k < n; k++) {
+			if (k == j) continue;
+			const double q = D(j, k) * D(j, k) / hole;
+			(k < lewis.n_lewis ? b.q_lewis : b.q_nonlewis) += q;
+			if (q < q_floor) continue;
+			NboTransfer t;
+			t.donor_index = k + 1;
+			t.acceptor_index = j + 1;
+			t.q = q;
+			transfer.push_back(t);
+		}
+		budget.push_back(b);
+	}
+	std::vector<bool> used(n, false);
+	for (int b = 0; b < lewis.n_lewis; b++) {
+		const NboFunction& f = lewis.orbitals[b];
+		if (f.type != "BD") continue;
+		for (int a = lewis.n_lewis; a < n; a++) {
+			const NboFunction& g = lewis.orbitals[a];
+			if (used[a] || g.type != "BD*" || g.centers != f.centers || g.multiplicity != f.multiplicity) continue;
+			used[a] = true;
+			const double mid = 0.5 * (D(b, b) + D(a, a)), half = std::hypot(0.5 * (D(b, b) - D(a, a)), D(a, b));
+			NboLocalNoon l;
+			l.bond_index = b + 1;
+			l.antibond_index = a + 1;
+			l.n_plus = mid + half;
+			l.n_minus = mid - half;
+			l.b_eff = half;
+			local_noon.push_back(l);
+			break;
+		}
+	}
+}
+
 //which NRT structures an E2 average used, for the log and the printout
 static std::string e2_avg_window(const NboE2Average& a)
 {
@@ -1244,7 +1296,19 @@ namespace
 					  const NboOptions& options, std::vector<NboLewis>& out_lewis, std::ostream& log)
 	{
 		const dMatrix2 gamma = nao_density(density, in.overlap, nao.C);
-		const dMatrix2 fock_nao = fock.extent(0) ? nao_operator(fock, nao.C) : dMatrix2();
+		//tr(c gamma - gamma^2) = sum n(c - n) over natural orbitals: 0 for one determinant (the FILE47 keeps 12
+		//digits), > 0 for a correlated 1-RDM, whose natural orbitals carry no energies for E2 to divide by
+		const MatrixXd G = to_eigen(gamma);
+		const double n_d = scale * G.trace() - G.squaredNorm();
+		const bool correlated = n_d > 1e-6;
+		if (correlated && res.e2_refused.empty()) {
+			std::ostringstream why;
+			why << "E2 refused: the density is not idempotent (tr(cD - D^2) = " << std::fixed << std::setprecision(5) << n_d
+				<< " e" << (spin.empty() ? "" : ", " + spin) << "), a correlated 1-RDM; E2 = q F^2/dE needs the Fock matrix "
+				<< "of a single determinant. The Fock-free donor -> acceptor occupancies below take its place.";
+			res.e2_refused = why.str();
+		}
+		const dMatrix2 fock_nao = fock.extent(0) && !correlated ? nao_operator(fock, nao.C) : dMatrix2();
 		const auto clock = [] { return std::chrono::steady_clock::now(); };
 		auto t = clock();
 		NboLewis lewis = nbo_search(nao, gamma, bondable, n_pairs, scale, options, log);
@@ -1332,6 +1396,34 @@ namespace
 			e.donor_index = base + position[e.donor_index - 1] + 1;
 			e.acceptor_index = base + position[e.acceptor_index - 1] + 1;
 			res.e2.push_back(e);
+		}
+		if (correlated || options.debug) {
+			std::vector<NboTransfer> transfer;
+			std::vector<NboAcceptorBudget> budget;
+			std::vector<NboLocalNoon> local_noon;
+			density_transfer(lewis, gamma, scale, 1e-4, transfer, budget, local_noon);
+			const auto renumber = [&](int& index, std::string& label) {
+				label = e2_label(lewis.orbitals[index - 1], nao.atoms);
+				index = base + position[index - 1] + 1;
+			};
+			for (NboTransfer& t : transfer) {
+				t.spin = spin;
+				renumber(t.donor_index, t.donor);
+				renumber(t.acceptor_index, t.acceptor);
+				res.transfer.push_back(t);
+			}
+			for (NboAcceptorBudget& b : budget) {
+				b.spin = spin;
+				renumber(b.index, b.label);
+				res.budget.push_back(b);
+			}
+			for (NboLocalNoon& l : local_noon) {
+				std::string antibond;
+				l.spin = spin;
+				renumber(l.bond_index, l.label);
+				renumber(l.antibond_index, antibond);
+				res.local_noon.push_back(l);
+			}
 		}
 		lewis.printed = order;
 		out_lewis.push_back(lewis);
@@ -1850,14 +1942,15 @@ void print_nbo(const NboResults& r, std::ostream& out)
 				<< " e\n";
 	}
 
+	//"4 BD O1-H2": the number finds the orbital in the table above, the label says what it is
+	std::map<std::pair<std::string, int>, const NboOrbital*> by_index;
+	for (const NboOrbital& o : r.orbitals) by_index[{ o.spin, o.index }] = &o;
+	const auto name = [&by_index](const std::string& spin, const int index, const std::string& fallback) {
+		const auto it = by_index.find({ spin, index });
+		return it == by_index.end() ? fallback : std::to_string(index) + " " + nbo_label(*it->second);
+	};
+	if (!r.e2_refused.empty()) out << "\n" << r.e2_refused << "\n";
 	if (!r.e2.empty()) {
-		//"4 BD O1-H2": the number finds the orbital in the table above, the label says what it is
-		std::map<std::pair<std::string, int>, const NboOrbital*> by_index;
-		for (const NboOrbital& o : r.orbitals) by_index[{ o.spin, o.index }] = &o;
-		const auto name = [&by_index](const std::string& spin, const int index, const std::string& fallback) {
-			const auto it = by_index.find({ spin, index });
-			return it == by_index.end() ? fallback : std::to_string(index) + " " + nbo_label(*it->second);
-		};
 		for (const std::string& spin : spins_of(r.e2)) {
 			out << title("Second-order donor-acceptor energies in the NBO basis", spin, "in house") << "  "
 				<< left << setw(21) << "donor" << setw(21) << "acceptor" << right << setw(14) << "E(2) kcal/mol"
@@ -1868,6 +1961,45 @@ void print_nbo(const NboResults& r, std::ostream& out)
 						<< name(spin, e.acceptor_index, e.acceptor) << right << fixed << setprecision(2)
 						<< setw(14) << e.energy_kcal << setprecision(3) << setw(15) << e.e_diff << setw(12)
 						<< e.fij << "\n";
+		}
+	}
+	for (const std::string& spin : spins_of(r.budget)) {
+		const double c = spin.empty() ? 2.0 : 1.0;
+		out << title("Donor -> acceptor occupancies of the density, no Fock matrix", spin, "in house")
+			<< "  q(k->j) = D(j,k)^2/(" << c << " - D(j,j)) in the NBO basis, largest first, q >= 1e-4 e:\n  "
+			<< left << setw(21) << "donor" << setw(21) << "acceptor" << right << setw(11) << "q / e" << "\n";
+		std::vector<NboTransfer> sorted;
+		for (const NboTransfer& t : r.transfer)
+			if (t.spin == spin) sorted.push_back(t);
+		std::stable_sort(sorted.begin(), sorted.end(), [](const NboTransfer& a, const NboTransfer& b) { return a.q > b.q; });
+		for (const NboTransfer& t : sorted)
+			out << "  " << left << setw(21) << name(spin, t.donor_index, t.donor) << setw(21)
+				<< name(spin, t.acceptor_index, t.acceptor) << right << fixed << setprecision(5) << setw(11) << t.q << "\n";
+		//D(j,j) = q(Lewis) + q(non-Lewis) + s; s, the part no donor explains, is 0 for one determinant
+		out << "  Acceptor budget, occupancy = q from Lewis + q from non-Lewis + s:\n  " << left << setw(21) << "acceptor"
+			<< right << setw(11) << "occupancy" << setw(11) << "q(L)" << setw(11) << "q(NL)" << setw(11) << "s" << "\n";
+		int hidden = 0;
+		double sum[4] = { 0.0, 0.0, 0.0, 0.0 };
+		for (const NboAcceptorBudget& b : r.budget) {
+			if (b.spin != spin) continue;
+			sum[0] += b.occupancy, sum[1] += b.q_lewis, sum[2] += b.q_nonlewis, sum[3] += b.s;
+			if (b.occupancy < rydberg_floor) {
+				hidden++;
+				continue;
+			}
+			out << "  " << left << setw(21) << name(spin, b.index, b.label) << right << fixed << setprecision(5)
+				<< setw(11) << b.occupancy << setw(11) << b.q_lewis << setw(11) << b.q_nonlewis << setw(11) << printable(b.s) << "\n";
+		}
+		out << "  " << left << setw(21) << ("total" + (hidden ? " (" + std::to_string(hidden) + " < 1e-4 e unlisted)" : std::string())) << right
+			<< setw(11) << sum[0] << setw(11) << sum[1] << setw(11) << sum[2] << setw(11) << printable(sum[3]) << "\n";
+		bool any = false;
+		for (const NboLocalNoon& l : r.local_noon) {
+			if (l.spin != spin) continue;
+			if (!any) out << "  Local natural occupations of each BD/BD* pair, b_eff = (n+ - n-)/2:\n  " << left << setw(21) << "bond"
+						  << right << setw(11) << "n+" << setw(11) << "n-" << setw(11) << "b_eff" << "\n";
+			any = true;
+			out << "  " << left << setw(21) << name(spin, l.bond_index, l.label) << right << fixed << setprecision(5)
+				<< setw(11) << l.n_plus << setw(11) << l.n_minus << setw(11) << l.b_eff << "\n";
 		}
 	}
 	if (!r.e2_avg.structures.empty()) {

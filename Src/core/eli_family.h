@@ -38,6 +38,19 @@ namespace eli_family
 	//confirmed on the spin density near each nucleus
 	bool alpha_beta_orbitals_differ(const WFN& wave);
 
+	//Natural-orbital occupation numbers: how far the 1-RDM is from one determinant.  Per spin orbital m in
+	//[0, 1] as mo_spin_occupations splits them, N_U = sum min(m, 1 - m) (Head-Gordon) and N_D = sum 2 m(1 - m)
+	//(Takatsuka), i.e. sum min(n, 2 - n) and sum n(2 - n) over spatial NOs.  y: Yamaguchi's 1 - 2T/(1 + T^2),
+	//T = (n_HONO - n_LUNO)/2, spatial orbitals only (-1 otherwise).  Zero for every SCF wavefunction.
+	struct NoonSummary
+	{
+		double n_min = 0.0, n_max = 0.0, negative = 0.0, N_U = 0.0, N_D = 0.0;
+		double n_hono = 0.0, n_luno = 0.0, y = -1.0;
+		bool idempotent = true;
+	};
+	NoonSummary noon_summary(const WFN& wave);
+	void print_noon_header(const NoonSummary& s, std::ostream& log);
+
 	void spin_fields(const WFN& wave, const d3& p, SpinFields& f);
 
 	//Same-spin pair-density curvature, [I] Eq. 27 / [III] Eq. 29: g^s = rho_s T_s - 1/4 |grad rho_s|^2,

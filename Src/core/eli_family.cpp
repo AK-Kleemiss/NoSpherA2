@@ -24,6 +24,47 @@ namespace eli_family
 		return singles > 0 && (stated == 0 || stated == singles + 1) ? SpinSplit::restricted_open : SpinSplit::halves;
 	}
 
+	NoonSummary noon_summary(const WFN& wave)
+	{
+		NoonSummary s;
+		const SpinSplit how = spin_split(wave);
+		vec occ;
+		for (int mo = 0; mo < wave.get_nmo(); mo++)
+		{
+			const double n = wave.get_MO_occ(mo);
+			occ.push_back(n);
+			s.negative += std::min(n, 0.0);
+			double m[2];
+			mo_spin_occupations(n, wave.get_MO_op(mo), how, m);
+			for (const double x : m) s.N_U += std::min(x, 1.0 - x), s.N_D += 2.0 * x * (1.0 - x);
+		}
+		if (occ.empty()) return s;
+		std::sort(occ.begin(), occ.end(), std::greater<double>());
+		s.n_max = occ.front(), s.n_min = occ.back();
+		//1e-6 e: SCF occupations are exact integers on every reader
+		s.idempotent = s.N_D < 1e-6;
+		if (how == SpinSplit::unrestricted) return s;
+		const size_t hono = static_cast<size_t>(std::max(1LL, std::llround(0.5 * std::accumulate(occ.begin(), occ.end(), 0.0)))) - 1;
+		s.n_hono = occ[std::min(hono, occ.size() - 1)];
+		s.n_luno = hono + 1 < occ.size() ? occ[hono + 1] : 0.0;
+		const double T = 0.5 * (s.n_hono - s.n_luno);
+		s.y = 1.0 - 2.0 * T / (1.0 + T * T);
+		return s;
+	}
+
+	void print_noon_header(const NoonSummary& s, std::ostream& log)
+	{
+		const auto flags = log.flags();
+		const auto prec = log.precision();
+		log << "Natural occupation numbers: n from " << std::fixed << std::setprecision(5) << s.n_min << " to " << s.n_max
+			<< ", sum of negative n " << s.negative << "\n  N_U (Head-Gordon) " << s.N_U << " e, N_D (Takatsuka) " << s.N_D << " e";
+		if (s.y >= 0.0) log << ", HONO/LUNO " << s.n_hono << "/" << s.n_luno << ", y " << s.y;
+		log << "\n  idempotent: " << (s.idempotent ? "yes, a single determinant per spin" :
+			"no, a correlated 1-RDM: DI/lambda use the Mueller pair density, E2 is refused") << "\n";
+		log.flags(flags);
+		log.precision(prec);
+	}
+
 	bool alpha_beta_orbitals_differ(const WFN& wave)
 	{
 		std::vector<int> occ[2];

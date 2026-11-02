@@ -149,3 +149,59 @@ TEST(NboSearchTests, ADensityWithNoLewisStructureSaysSoInsteadOfCrashing)
         },
         ExitedWithErrCheckfCode(), ".*");
 }
+
+//One determinant: every acceptor is filled by its donors alone (s = 0), and the acceptors' q sum to rho(NL).
+TEST(NboSearchTests, DensityTransferOfAnIdempotentDensityHasNoRemainder)
+{
+    const NboLewis L = search_at(1);
+    ASSERT_EQ(L.orbitals.size(), 12u);
+    std::vector<NboTransfer> t;
+    std::vector<NboAcceptorBudget> b;
+    std::vector<NboLocalNoon> l;
+    density_transfer(L, density_of(two_fragment_bonds(), 2.0), 2.0, 0.0, t, b, l);
+    ASSERT_EQ(b.size(), 12u - L.n_lewis);
+    double q = 0.0, occ = 0.0;
+    for (const NboAcceptorBudget& x : b) {
+        EXPECT_NEAR(x.s, 0.0, 1e-10) << "acceptor " << x.index;
+        EXPECT_NEAR(x.q_lewis + x.q_nonlewis, x.occupancy, 1e-10) << "acceptor " << x.index;
+        q += x.q_lewis + x.q_nonlewis;
+        occ += x.occupancy;
+    }
+    EXPECT_NEAR(occ, L.rho_nl, 1e-10);
+    EXPECT_NEAR(q, L.rho_nl, 1e-10);
+    for (const NboLocalNoon& x : l) EXPECT_NEAR(x.b_eff, 1.0, 1e-8) << "bond " << x.bond_index;
+}
+
+//H2 in two NAOs, natural orbitals rotated by theta off the BD/BD* pair: the 2 x 2 block returns the natural
+//occupations, occupancy = q + s, and at n = 1/1 (the dissociated singlet) q = 0, s = 1, b_eff = 0.
+TEST(NboSearchTests, DensityTransferOfACorrelatedBondKeepsTheBudget)
+{
+    const double r = std::sqrt(0.5);
+    NboLewis L;
+    L.n_lewis = 1;
+    NboFunction bd, anti;
+    bd.type = "BD", anti.type = "BD*";
+    bd.centers = anti.centers = { 0, 1 };
+    bd.coefficients = { r, r };
+    anti.coefficients = { r, -r };
+    L.orbitals = { bd, anti };
+    for (const auto& [ng, theta] : std::vector<std::pair<double, double>>{ { 1.9, 0.0 }, { 1.6, 0.3 }, { 1.0, 0.0 } }) {
+        const double nu = 2.0 - ng, c = std::cos(theta), s = std::sin(theta);
+        //natural orbitals c BD + s BD*, -s BD + c BD* in the NAO basis
+        const vec g = { r * (c + s), r * (c - s) }, u = { r * (c - s), -r * (c + s) };
+        dMatrix2 gamma(2, 2);
+        for (int i = 0; i < 2; i++)
+            for (int j = 0; j < 2; j++) gamma(i, j) = ng * g[i] * g[j] + nu * u[i] * u[j];
+        std::vector<NboTransfer> t;
+        std::vector<NboAcceptorBudget> b;
+        std::vector<NboLocalNoon> l;
+        density_transfer(L, gamma, 2.0, 0.0, t, b, l);
+        ASSERT_EQ(b.size(), 1u);
+        ASSERT_EQ(l.size(), 1u);
+        EXPECT_NEAR(b[0].q_lewis + b[0].s, b[0].occupancy, 1e-12);
+        EXPECT_NEAR(l[0].n_plus, ng, 1e-12);
+        EXPECT_NEAR(l[0].n_minus, nu, 1e-12);
+        EXPECT_NEAR(l[0].b_eff, 0.5 * (ng - nu), 1e-12);
+        if (theta == 0.0) EXPECT_NEAR(b[0].s, nu, 1e-12) << "n = " << ng;
+    }
+}

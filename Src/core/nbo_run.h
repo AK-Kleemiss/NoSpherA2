@@ -205,6 +205,29 @@ struct NboE2Average {
 	double seconds = 0.0;
 };
 
+//Donor -> acceptor occupancy of the density itself in the NBO basis D, no Fock matrix: q(k->j) = D_jk^2/(c - D_jj),
+//c = 2 closed shell, 1 per spin.  With s_j = (cD - D^2)_jj/(c - D_jj), D_jj = sum_{k!=j} q(k->j) + s_j exactly;
+//s is 0 for a single determinant and the acceptor's share that no donor explains for a correlated 1-RDM.
+struct NboTransfer {
+	std::string spin;
+	int donor_index = 0, acceptor_index = 0;
+	std::string donor, acceptor;
+	double q = 0.0;
+};
+struct NboAcceptorBudget {
+	std::string spin;
+	int index = 0;
+	std::string label;
+	double occupancy = 0.0, q_lewis = 0.0, q_nonlewis = 0.0, s = 0.0;
+};
+//BD/BD* pair's 2x2 block of D: local natural occupations n+ >= n-, Roos effective bond order (n+ - n-)/2 (per spin, alpha + beta add up to it)
+struct NboLocalNoon {
+	std::string spin;
+	int bond_index = 0, antibond_index = 0;
+	std::string label;
+	double n_plus = 0.0, n_minus = 0.0, b_eff = 0.0;
+};
+
 struct NboResults {
 	std::string name;
 	std::string source;         //the wavefunction the archive came from
@@ -233,6 +256,11 @@ struct NboResults {
 	std::vector<NboNao> nao_beta;
 	std::vector<NboOrbital> orbitals;
 	std::vector<NboE2Entry> e2;
+	std::string e2_refused;       //native, non-idempotent density: why there is no E2
+	//native, non-idempotent density or -nbo_debug only; not in the JSON
+	std::vector<NboTransfer> transfer;
+	std::vector<NboAcceptorBudget> budget;
+	std::vector<NboLocalNoon> local_noon;
 	NboE2Average e2_avg;          //-nrt_e2_avg, native closed shell only
 	NboNrt nrt;
 };

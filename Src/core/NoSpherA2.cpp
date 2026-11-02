@@ -19,6 +19,7 @@
 #include "nbo_run.h"
 #include "citations.h"
 #include "b2c.h"
+#include "eli_family.h"
 #include "section_log.h"
 #include "eqc.h"
 #include "ccsd_density.h"
@@ -283,6 +284,8 @@ static int run_app_impl(int argc, char **argv)
 		//Refused here, not by write_nbo on the NBO thread, whose exit would tear down RGBI mid-run
 		WFN nbo_wfn = read_wfn();
 		refuse_unsupported_nbo_source(nbo_wfn, std::cout);
+		eli_family::print_noon_header(eli_family::noon_summary(nbo_wfn), log_file);
+		log_file << endl;
 		auto nbo_done = std::async(std::launch::async, [&nbo_log, &opt, &json](WFN w) {
 			const auto t0 = std::chrono::steady_clock::now();
 			NboOptions nbo;

@@ -3417,14 +3417,17 @@ delocalization_result delocalization_indices(const WFN &wavy, const basin_overla
 			r.identity_error = std::max(r.identity_error, std::abs(s - (i == j ? 1.0 : 0.0)));
 		}
 	//The pair sum is symmetric in i and j, so the triangle is taken once and doubled off the
-	//diagonal
+	//diagonal.  Mueller (Buijse-Baerends) exchange-correlation hole, sqrt(n_i n_j) per spin: n_i n_j for
+	//0/1 occupations, and for natural orbitals it keeps lambda(A) + sum_B delta(A,B)/2 = N(A), which n_i n_j
+	//breaks.  Relaxed densities' small negative n are clipped inside the root only.
 	auto pair_sum = [&](const vec &a, const vec &b) {
 		double s = 0.0;
 		for (int i = 0; i < n; i++)
 			for (int j = 0; j <= i; j++) {
 				if (spin[i] != spin[j]) continue;
 				const size_t k = basin_overlaps::packed(i, j);
-				const double t = (na[i] * na[j] + nbeta[i] * nbeta[j]) * a[k] * b[k];
+				const double t = (std::sqrt(std::max(na[i], 0.0) * std::max(na[j], 0.0)) +
+					std::sqrt(std::max(nbeta[i], 0.0) * std::max(nbeta[j], 0.0))) * a[k] * b[k];
 				s += i == j ? t : 2.0 * t;
 			}
 		return s;

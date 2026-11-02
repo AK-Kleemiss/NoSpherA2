@@ -166,6 +166,15 @@ std::string read_lewis_structure(const std::filesystem::path& file, const NAORes
 std::vector<NboE2Entry> nbo_e2(NboLewis& lewis, const dMatrix2& fock_nao, double threshold_kcal);
 
 /**
+ * Fock-free donor -> acceptor decomposition of gamma in lewis' NBO basis (nbo_run.h, NboTransfer), for every
+ * non-Lewis acceptor, and the local NOON of each BD/BD* pair; indices 1-based into lewis.orbitals, labels empty.
+ * Transfers below q_floor are left out of transfer but kept in the budget sums.
+ */
+void density_transfer(const NboLewis& lewis, const dMatrix2& gamma, double scale, double q_floor,
+					  std::vector<NboTransfer>& transfer, std::vector<NboAcceptorBudget>& budget,
+					  std::vector<NboLocalNoon>& local_noon);
+
+/**
  * Natural resonance theory on one spin's NAO basis, appended to nrt.  e2's donor/acceptor indices must
  * still be 1-based into lewis.orbitals, i.e. passed before analyse_spin renumbers them.
  * D(w) is the plain Frobenius norm of Gamma - sum_a w_a Gamma_a, summed in squares over the spins of an open
