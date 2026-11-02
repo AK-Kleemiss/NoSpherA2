@@ -76,6 +76,68 @@ static void report_orca_density(const std::filesystem::path &nat, std::ostream &
 		file << "WARNING: the unrelaxed MP2 density lacks the orbital response; %mp2 Density Relaxed gives it\n";
 }
 
+//Eigenvectors U (U(k, j) at [k * n + j]) and eigenvalues of an MO-basis 1-RDM, largest occupation first
+static std::pair<vec, vec> natural_orbitals_of(const Eigen::MatrixXd &G)
+{
+	const int n = static_cast<int>(G.rows());
+	const Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> es(G);
+	std::pair<vec, vec> natural{vec(size_t(n) * n), vec(n)};
+	for (int j = 0; j < n; j++)
+	{
+		const int s = n - 1 - j;
+		natural.second[j] = es.eigenvalues()(s);
+		for (int k = 0; k < n; k++) natural.first[size_t(k) * n + j] = es.eigenvectors()(k, s);
+	}
+	return natural;
+}
+
+//An ORCA full CI (every orbital active, "Skipping orbital update") writes no natural orbitals: the gbw keeps the guess
+//orbitals with diag(gamma) as occupations, ignoring ActOrbs NatOrbs. The CI 1-RDM is base.scfp in base.densities, in
+//the gbw's own AO basis. True when it belongs to these orbitals (diagonal = occupations) but is not diagonal in them.
+static bool orca_densities_natural(const std::filesystem::path &gbw, const vec &coefs, const vec &occ, const int n, std::pair<vec, vec> &natural, std::ostream &file)
+{
+	std::filesystem::path dens = gbw, info = gbw;
+	dens.replace_extension(".densities");
+	info.replace_extension(".densitiesinfo");
+	if (!std::filesystem::exists(dens) || !std::filesystem::exists(info))
+	{
+		file << "NOTE: fractional occupations in " << gbw.filename().string() << " but no " << dens.filename().string()
+			<< " to check them against; an ORCA full CI (every orbital active) leaves its guess orbitals, not natural orbitals, in the gbw\n";
+		return false;
+	}
+	//densitiesinfo names the stored matrices "base.<name>" in file order
+	std::ifstream in(info, std::ios::binary);
+	const std::string raw((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+	const std::string stem = gbw.stem().string() + ".";
+	int count = 0, scfp = -1;
+	for (size_t at = raw.find(stem); at != std::string::npos; at = raw.find(stem, at + 1), count++)
+		if (raw.compare(at + stem.size(), 4, "scfp") == 0 && (at + stem.size() + 4 == raw.size() || !std::isgraph(static_cast<unsigned char>(raw[at + stem.size() + 4]))))
+			scfp = count;
+	const uintmax_t nn = uintmax_t(n) * n;
+	if (scfp < 0 || std::filesystem::file_size(dens) != count * nn * sizeof(double))
+		return false;
+	Eigen::MatrixXd P(n, n), C(n, n);
+	std::ifstream d(dens, std::ios::binary);
+	d.seekg(std::streamoff(scfp * nn * sizeof(double)));
+	d.read(reinterpret_cast<char *>(P.data()), std::streamsize(nn * sizeof(double)));
+	if (!d)
+		return false;
+	for (int p = 0; p < n; p++)
+		for (int k = 0; k < n; k++) C(p, k) = coefs[size_t(p) * n + k];
+	const Eigen::MatrixXd X = C.partialPivLu().inverse(), G = X * P * X.transpose();
+	double diag = 0, off = 0;
+	for (int j = 0; j < n; j++)
+		for (int k = 0; k < n; k++)
+			(j == k ? diag : off) = std::max(j == k ? diag : off, std::abs(G(j, k) - (j == k ? occ[j] : 0.0)));
+	if (diag > 1e-6 || off < 1e-6)
+		return false;
+	natural = natural_orbitals_of(G);
+	file << "WARNING: the orbitals in " << gbw.filename().string() << " do not diagonalise the density " << stem << "scfp in "
+		<< dens.filename().string() << " (largest off-diagonal " << std::scientific << std::setprecision(2) << off << std::defaultfloat
+		<< "; ORCA writes no natural orbitals for a full CI). Using the natural orbitals of that density.\n";
+	return true;
+}
+
 bool WFN::read_orca_json_density(const std::filesystem::path &filename, std::ostream &file, const bool debug)
 {
 	std::ifstream in(filename);
@@ -99,14 +161,7 @@ bool WFN::read_orca_json_density(const std::filesystem::path &filename, std::ost
 		for (int p = 0; p < nbf; p++) C(p, k) = mos[k]["MOCoefficients"][p].get<double>();
 	//P in the MO basis, X P X^T with X = (C^T C)^-1 C^T: independent of the export's AO order and phases
 	const Eigen::MatrixXd X = (C.transpose() * C).ldlt().solve(C.transpose());
-	const Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> es(X * P * X.transpose());
-	std::pair<vec, vec> natural{vec(size_t(nmo) * nmo), vec(nmo)};
-	for (int j = 0; j < nmo; j++)
-	{
-		const int s = nmo - 1 - j;
-		natural.second[j] = es.eigenvalues()(s);
-		for (int k = 0; k < nmo; k++) natural.first[size_t(k) * nmo + j] = es.eigenvectors()(k, s);
-	}
+	const std::pair<vec, vec> natural = natural_orbitals_of(X * P * X.transpose());
 	std::filesystem::path gbw = filename;
 	gbw.replace_extension(".gbw");
 	file << "\nORCA density " << name << " from " << filename.filename().string() << " as natural orbitals of " << gbw.filename().string() << "\n";
@@ -1526,6 +1581,7 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
 		vec2 energies(operators);
 		ivec2 irreps(operators);
 		ivec2 cores(operators);
+		std::pair<vec, vec> from_density;
 		if (operators > 1)
 			is_unrestricted = true;
 		for (int i = 0; i < operators; i++)
@@ -1554,6 +1610,10 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
 			{
 				file << "I read the cores successfully\nI am expecting " << expected_coefs << " coefficients per MO\n";
 			}
+			if (!natural && operators == 1 && filename.extension() == ".gbw"
+				&& std::any_of(occupations[0].begin(), occupations[0].end(), [](const double o) { return std::min({ std::abs(o), std::abs(o - 1), std::abs(o - 2) }) > 1e-6; })
+				&& orca_densities_natural(filename, coefficients[0], occupations[0], dimension, from_density, file))
+				natural = &from_density;
 			if (natural)
 			{
 				err_checkf(operators == 1 && natural->second.size() == size_t(dimension) && natural->first.size() == coef_nr,
