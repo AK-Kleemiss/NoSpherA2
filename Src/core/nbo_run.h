@@ -66,6 +66,7 @@ struct NboE2Entry {
 	double energy_kcal = 0.0;   //E(2)
 	double e_diff = 0.0;        //E(NL)-E(L), a.u.
 	double fij = 0.0;           //F(L,NL), a.u.
+	bool beyond_second_order = false; //|F| >= E(NL)-E(L): E(2) exceeds the exact two-level gain q|F|
 };
 
 struct NboResonanceWeight {

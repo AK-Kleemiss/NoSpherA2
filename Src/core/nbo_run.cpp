@@ -706,6 +706,7 @@ void write_nbo_json(const NboResults& r, const std::filesystem::path& json_file)
 			<< ", \"acceptor_index\": " << e.acceptor_index << ", \"acceptor\": " << jstr(e.acceptor)
 			<< ", \"spin\": " << jstr(e.spin) << ", \"energy_kcal\": " << jnum(e.energy_kcal)
 			<< ", \"e_diff\": " << jnum(e.e_diff) << ", \"fij\": " << jnum(e.fij)
+			<< (e.beyond_second_order ? ", \"beyond_second_order\": true" : "")
 			<< "}" << (i + 1 < r.e2.size() ? "," : "") << "\n";
 	}
 	f << "  ],\n";

@@ -239,3 +239,33 @@ TEST(NboSearchTests, DensityTransferPricesOneDeterminantAtE2)
     ASSERT_EQ(bare.size(), 1u);
     EXPECT_EQ(bare[0].e2d_kcal, 0.0);
 }
+
+//|F| at or above the gap: second order exceeds the exact two-level gain q|F|, flagged; at ten times the gap left out.
+TEST(NboSearchTests, E2FlagsAndDropsPairsBeyondSecondOrder)
+{
+    NboLewis L;
+    L.n_lewis = 1;
+    NboFunction donor, acceptor;
+    donor.type = "LP", acceptor.type = "LV";
+    donor.centers = acceptor.centers = { 0 };
+    donor.coefficients = { 1.0, 0.0 };
+    acceptor.coefficients = { 0.0, 1.0 };
+    donor.occupancy = 2.0, acceptor.occupancy = 0.0;
+    L.orbitals = { donor, acceptor };
+    dMatrix2 fock(2, 2);
+    fock(0, 0) = -0.5, fock(1, 1) = -0.495, fock(0, 1) = fock(1, 0) = 0.1;
+    int beyond = 0;
+    EXPECT_TRUE(nbo_e2(L, fock, 0.0, &beyond).empty());
+    EXPECT_EQ(beyond, 1);
+    fock(1, 1) = -0.45;
+    beyond = 0;
+    std::vector<NboE2Entry> e2 = nbo_e2(L, fock, 0.0, &beyond);
+    ASSERT_EQ(e2.size(), 1u);
+    EXPECT_TRUE(e2[0].beyond_second_order);
+    EXPECT_EQ(beyond, 0);
+    fock(1, 1) = 0.3;
+    e2 = nbo_e2(L, fock, 0.0, &beyond);
+    ASSERT_EQ(e2.size(), 1u);
+    EXPECT_FALSE(e2[0].beyond_second_order);
+    EXPECT_EQ(beyond, 0);
+}

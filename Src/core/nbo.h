@@ -165,8 +165,10 @@ std::string read_lewis_structure(const std::filesystem::path& file, const NAORes
 								 const std::string& wavefunction, ivec2& topo, std::ostream& log,
 								 std::vector<ivec>* multi = nullptr);
 
-/** Second-order donor-acceptor energies.  Fills the orbital energies, the NBO-basis Fock diagonal, into lewis. */
-std::vector<NboE2Entry> nbo_e2(NboLewis& lewis, const dMatrix2& fock_nao, double threshold_kcal);
+/** Second-order donor-acceptor energies.  Fills the orbital energies, the NBO-basis Fock diagonal, into lewis.
+ *  Pairs with |F(i,j)| >= E(j)-E(i) are flagged beyond_second_order (second order above the exact two-level q|F|);
+ *  at |F(i,j)| >= 10 (E(j)-E(i)) they are left out and counted in beyond. */
+std::vector<NboE2Entry> nbo_e2(NboLewis& lewis, const dMatrix2& fock_nao, double threshold_kcal, int* beyond = nullptr);
 
 /**
  * Fock-free donor -> acceptor decomposition of gamma in lewis' NBO basis (nbo_run.h, NboTransfer), for every

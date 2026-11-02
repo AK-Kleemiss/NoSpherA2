@@ -1108,7 +1108,7 @@ NboLewis nbo_search(const NAOResult& nao, const dMatrix2& gamma, const bvec2& bo
 }
 
 std::vector<NboE2Entry> nbo_e2(NboLewis& lewis, const dMatrix2& fock_nao,
-							   const double threshold_kcal)
+							   const double threshold_kcal, int* beyond)
 {
 	std::vector<NboE2Entry> out;
 	if (fock_nao.extent(0) == 0) return out;
@@ -1128,7 +1128,16 @@ std::vector<NboE2Entry> nbo_e2(NboLewis& lewis, const dMatrix2& fock_nao,
 			//E(2) = -q_i F(i,j)^2 / (eps_j - eps_i), printed as a stabilisation in kcal/mol
 			const double e2 = lewis.orbitals[i].occupancy * f * f / de * constants::kcal_mol_per_hartree;
 			if (e2 < threshold_kcal) continue;
+			//The exact two-level mixing gains q(sqrt(dE^2/4 + F^2) - dE/2) <= q|F|; at |F| >= dE second order exceeds
+			//that by about |F|/dE. NBO 7 still prints such rows (ozone LP -> BD* at 187 kcal/mol, F/dE 1.3), so they
+			//are flagged; at ten times the gap the number is meaningless (a split H2 bond printed LP -> LV at dE 3e-7
+			//as 1.35e9 kcal/mol) and is left out.
+			if (std::abs(f) >= 10.0 * de) {
+				if (beyond) (*beyond)++;
+				continue;
+			}
 			NboE2Entry entry;
+			entry.beyond_second_order = std::abs(f) >= de;
 			entry.donor_index = i + 1;
 			entry.acceptor_index = j + 1;
 			entry.energy_kcal = e2;
@@ -1366,8 +1375,12 @@ namespace
 		}
 		res.search_seconds += std::chrono::duration<double>(clock() - t).count();
 		t = clock();
-		std::vector<NboE2Entry> e2 = nbo_e2(lewis, fock_nao, options.e2_threshold_kcal);
+		int e2_beyond = 0;
+		std::vector<NboE2Entry> e2 = nbo_e2(lewis, fock_nao, options.e2_threshold_kcal, &e2_beyond);
 		res.e2_seconds += std::chrono::duration<double>(clock() - t).count();
+		if (e2_beyond)
+			log << "E2: " << e2_beyond << " donor-acceptor pair(s) with |F(i,j)| >= 10 (E(j)-E(i)) left out, second "
+				<< "order is off by an order of magnitude there (the exact two-level mixing gains at most q|F|)" << std::endl;
 		//before the renumbering below, while e2's indices still point into lewis.orbitals
 		if (options.nrt)
 			//log, not std::cout: under -fba this runs on the NBO thread and cout is RGBI's
@@ -2019,12 +2032,17 @@ void print_nbo(const NboResults& r, std::ostream& out)
 			out << title("Second-order donor-acceptor energies in the NBO basis", spin, "in house") << "  "
 				<< left << setw(21) << "donor" << setw(21) << "acceptor" << right << setw(14) << "E(2) kcal/mol"
 				<< setw(15) << "E(j)-E(i) Eh" << setw(12) << "F(i,j) Eh" << "\n";
+			bool flagged = false;
 			for (const NboE2Entry& e : r.e2)
-				if (e.spin == spin)
+				if (e.spin == spin) {
 					out << "  " << left << setw(21) << name(spin, e.donor_index, e.donor) << setw(21)
 						<< name(spin, e.acceptor_index, e.acceptor) << right << fixed << setprecision(2)
 						<< setw(14) << e.energy_kcal << setprecision(3) << setw(15) << e.e_diff << setw(12)
-						<< e.fij << "\n";
+						<< e.fij << (e.beyond_second_order ? " !" : "") << "\n";
+					flagged |= e.beyond_second_order;
+				}
+			if (flagged)
+				out << "  ! |F(i,j)| >= E(j)-E(i): beyond second order, the exact two-level mixing gains at most q|F|\n";
 		}
 	}
 	for (const std::string& spin : spins_of(r.budget)) {
