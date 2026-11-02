@@ -169,6 +169,7 @@ TEST(NboSearchTests, DensityTransferOfAnIdempotentDensityHasNoRemainder)
     }
     EXPECT_NEAR(occ, L.rho_nl, 1e-10);
     EXPECT_NEAR(q, L.rho_nl, 1e-10);
+    for (const NboTransfer& x : t) EXPECT_LE(x.donor_index, L.n_lewis) << "non-Lewis donor in the transfer list";
     for (const NboLocalNoon& x : l) EXPECT_NEAR(x.b_eff, 1.0, 1e-8) << "bond " << x.bond_index;
 }
 

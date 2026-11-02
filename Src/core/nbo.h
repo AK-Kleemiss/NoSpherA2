@@ -173,8 +173,8 @@ std::vector<NboE2Entry> nbo_e2(NboLewis& lewis, const dMatrix2& fock_nao, double
 /**
  * Fock-free donor -> acceptor decomposition of gamma in lewis' NBO basis (nbo_run.h, NboTransfer), for every
  * non-Lewis acceptor, and the local NOON of each BD/BD* pair; indices 1-based into lewis.orbitals, labels empty.
- * Transfers below q_floor are left out of transfer but kept in the budget sums.  fock_nao, if given, prices
- * each transfer: E2(D) = q (F_jj - F_kk) on the NBO-basis Fock diagonal.
+ * Transfers below q_floor or from a non-Lewis donor are left out of transfer but kept in the budget sums.
+ * fock_nao, if given, prices each transfer: E2(D) = q (F_jj - F_kk) on the NBO-basis Fock diagonal.
  */
 void density_transfer(const NboLewis& lewis, const dMatrix2& gamma, double scale, double q_floor,
 					  std::vector<NboTransfer>& transfer, std::vector<NboAcceptorBudget>& budget,

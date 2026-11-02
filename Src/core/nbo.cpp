@@ -1174,7 +1174,9 @@ void density_transfer(const NboLewis& lewis, const dMatrix2& gamma, const double
 			if (k == j) continue;
 			const double q = D(j, k) * D(j, k) / hole;
 			(k < lewis.n_lewis ? b.q_lewis : b.q_nonlewis) += q;
-			if (q < q_floor) continue;
+			//Lewis donors only, as E2: between two non-Lewis NBOs nothing is donated and F_jj - F_kk has no sign to
+			//trust (twisted ethylene BD*(C-H) -> pi* priced at -10 kcal/mol); their q stays in the budget's q(NL)
+			if (q < q_floor || k >= lewis.n_lewis) continue;
 			NboTransfer t;
 			t.donor_index = k + 1;
 			t.acceptor_index = j + 1;
