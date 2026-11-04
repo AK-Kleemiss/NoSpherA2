@@ -2,6 +2,7 @@
 #include "core/nbo.h"
 #include "core/wfn_class.h"
 
+#include <algorithm>
 #include <cmath>
 #include <fstream>
 #include <map>
@@ -44,6 +45,39 @@ namespace {
 		for (const NboBondOrder& o : r.nrt.bond_orders)
 			if (!o.diagonal && o.spin == spin && o.atom1 == a && o.atom2 == b) return &o;
 		return nullptr;
+	}
+
+	//what nbo_cube_wfn logs per orbital: 1 - |t|^2 of the NAO -> AO -> MO expansion
+	vec norms_lost(const std::string& log)
+	{
+		vec out;
+		const std::string key = "norm lost in the MO expansion ";
+		for (size_t at = log.find(key); at != std::string::npos; at = log.find(key, at + 1))
+			out.push_back(std::stod(log.substr(at + key.size())));
+		return out;
+	}
+
+	//"..., atoms (%): C1 55.32 H2 44.21, norm lost ..." -> the leading centre's label and share
+	std::vector<std::pair<std::string, double>> leading_centres(const std::string& log)
+	{
+		std::vector<std::pair<std::string, double>> out;
+		const std::string key = "atoms (%): ";
+		for (size_t at = log.find(key); at != std::string::npos; at = log.find(key, at + 1)) {
+			std::istringstream line(log.substr(at + key.size()));
+			std::string label;
+			double share = 0.0;
+			line >> label >> share;
+			out.emplace_back(label, share);
+		}
+		return out;
+	}
+
+	//first printed NBO of the given type in a spin block, 0 if the block has none
+	int first_of(const NboResults& r, const std::string& spin, const std::string& type)
+	{
+		for (const NboOrbital& o : r.orbitals)
+			if (o.spin == spin && o.type == type) return o.index;
+		return 0;
 	}
 
 }  // namespace
@@ -240,6 +274,95 @@ TEST(NboNativeTests, MethylRadicalSplitsItsBondsPerSpinAsNbo7Does)
 	EXPECT_EQ(bonds, 6);
 	ASSERT_EQ(r.nrt.spin_d.size(), 2u);
 	EXPECT_GT(r.nrt.spin_d[1].d_0, r.nrt.spin_d[0].d_0) << "the radical's spin carries the larger D";
+}
+
+//-nbo_cube on the same CH3 doublet.  print_nbo numbers alpha then beta in one sequence, so a number
+//alone has to find its spin block, and each block has to reach the primitives through its own $LCAOMO
+//and its own spin's MOs.  Taking the wrong block is silent in every other respect - the cube still
+//comes out, it is just the wrong orbital - but the expansion t = C_MO S x only recovers the whole NBO
+//when C_MO is the block the orbital was found in, so the logged 1 - |t|^2 is what catches it.
+TEST(NboNativeTests, OpenShellNboCubesComeFromTheirOwnSpinsMOs)
+{
+	const auto p = nos_test_repo_root() / "tests" / "ch3_occ" / "ch3.owf.fchk";
+	if (!std::filesystem::exists(p))
+		GTEST_SKIP() << "tests/ch3_occ/ch3.owf.fchk not found";
+	WFN wavy(p);
+	WFN copy(wavy);  //native_nbo renormalises the stored basis; the cubes take the untouched one
+	NboOptions options;
+	std::ostringstream log;
+	NboOrbitalSpace space;
+	const NboResults r = native_nbo(copy, options, log, &space);
+	ASSERT_TRUE(r.open_shell);
+	ASSERT_EQ(space.lewis.size(), 2u) << "an open shell leaves one orbital space per spin";
+	ASSERT_EQ(space.lcaomo.size(), 2u);
+
+	const int a = first_of(r, "alpha", "BD"), b = first_of(r, "beta", "BD");
+	ASSERT_GT(a, 0);
+	ASSERT_GT(b, 0);
+	EXPECT_GT(b, a) << "beta is numbered after alpha in one running sequence";
+
+	std::ostringstream cube_log;
+	std::vector<std::pair<int, std::string>> picked;
+	const WFN w = nbo_cube_wfn(wavy, r, space, std::to_string(a) + "," + std::to_string(b), false, picked, cube_log);
+	ASSERT_EQ(picked.size(), 2u);
+	EXPECT_NE(picked[0].second.find("alpha"), std::string::npos) << picked[0].second;
+	EXPECT_NE(picked[1].second.find("beta"), std::string::npos) << picked[1].second;
+
+	const vec lost = norms_lost(cube_log.str());
+	ASSERT_EQ(lost.size(), 2u) << cube_log.str();
+	for (const double l : lost)
+		EXPECT_LT(std::abs(l), 1e-8) << "the expansion did not recover the NBO:\n" << cube_log.str();
+
+	//A beta orbital is found in block 1 but printed with a number that counts from alpha, so its
+	//coefficients come out of lewis[1].printed[number - 1 - base]. Drop that offset and the number
+	//still resolves - to a different orbital of the same block - and nothing above notices. The atom
+	//shares the cube is built from have to be the ones the NBO table reported for that very orbital.
+	const auto lead = leading_centres(cube_log.str());
+	ASSERT_EQ(lead.size(), 2u) << cube_log.str();
+	for (size_t k = 0; k < 2; k++) {
+		const NboOrbital& o = *std::find_if(r.orbitals.begin(), r.orbitals.end(),
+											[&](const NboOrbital& x) { return x.index == picked[k].first; });
+		const NboHybrid* best = nullptr;
+		for (const NboHybrid& h : o.hybrids)
+			if (!best || h.weight_percent > best->weight_percent) best = &h;
+		ASSERT_NE(best, nullptr);
+		EXPECT_EQ(lead[k].first, best->element + std::to_string(best->center)) << cube_log.str();
+		EXPECT_NEAR(lead[k].second, best->weight_percent, 0.01) << cube_log.str();
+	}
+
+	//a doublet's alpha and beta C-H bonds are different orbitals, so the two slots must differ
+	bool differ = false;
+	for (int e = 0; e < wavy.get_nex() && !differ; e++)
+		differ = std::abs(w.get_MO_coef(0, e) - w.get_MO_coef(1, e)) > 1e-8;
+	EXPECT_TRUE(differ) << "both slots hold the same orbital";
+}
+
+//The closed-shell path through the same code: one block, numbers unchanged, no spin in the label.
+TEST(NboNativeTests, ClosedShellNboCubesKeepOneUnlabelledBlock)
+{
+	const auto p = ethane_fixture();
+	if (p.empty())
+		GTEST_SKIP() << "tests/TFVC/ethane.gbw not found";
+	WFN wavy(p);
+	WFN copy(wavy);
+	NboOptions options;
+	std::ostringstream log;
+	NboOrbitalSpace space;
+	const NboResults r = native_nbo(copy, options, log, &space);
+	ASSERT_FALSE(r.open_shell);
+	ASSERT_EQ(space.lewis.size(), 1u);
+
+	const int c = first_of(r, "", "BD");
+	ASSERT_GT(c, 0);
+	std::ostringstream cube_log;
+	std::vector<std::pair<int, std::string>> picked;
+	nbo_cube_wfn(wavy, r, space, std::to_string(c), false, picked, cube_log);
+	ASSERT_EQ(picked.size(), 1u);
+	EXPECT_EQ(picked[0].first, c);
+	EXPECT_EQ(picked[0].second.find("alpha"), std::string::npos) << picked[0].second;
+	const vec lost = norms_lost(cube_log.str());
+	ASSERT_EQ(lost.size(), 1u) << cube_log.str();
+	EXPECT_LT(std::abs(lost[0]), 1e-8) << cube_log.str();
 }
 
 //Allyl, `occ scf` B3LYP(VWN5)/def2-SVP at the geometry of tests/nbo_reference_v2/data/allyl made exactly C2v:

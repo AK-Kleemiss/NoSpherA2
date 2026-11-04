@@ -48,12 +48,14 @@ struct NboLewis {
 	ivec printed;                      //printed NBO number k + 1 is orbitals[printed[k]]
 };
 
-//-nbo_cube / -nlmo_cube: what native_nbo leaves behind for orbital pictures, closed shell only
+//-nbo_cube / -nlmo_cube: what native_nbo leaves behind for orbital pictures.  One entry per spin
+//block - a closed shell has one, an open shell alpha then beta - over the one NAO basis both spins'
+//searches share.
 struct NboOrbitalSpace {
 	NAOResult nao;                     //nao.C: AO x NAO in the FILE47 AO order
 	dMatrix2 overlap;
-	dMatrix2 lcaomo;
-	NboLewis lewis;
+	std::vector<dMatrix2> lcaomo;
+	std::vector<NboLewis> lewis;
 };
 
 struct NboOptions {
@@ -204,9 +206,12 @@ NboResults native_nbo(WFN& wavy, const NboOptions& options, std::ostream& log, N
  * -nbo_cube / -nlmo_cube: a copy of wavy whose MO slot k holds selected orbital k as primitive coefficients, for
  * Calc_MO.  spec: NBO numbers as print_nbo prints them, "lewis", or labels with ':' for the blank ("LP:Pd1",
  * "BD*:Pd1-P6"), comma-separated.  An orbital reaches the primitives through the MOs, t = C_MO S x, so wavy must be
- * the closed-shell wavefunction the FILE47 was written from, with every MO; the lost norm 1 - |t|^2 is logged.
+ * the wavefunction the FILE47 was written from, with every MO; the lost norm 1 - |t|^2 is logged.
+ * Open shell: print_nbo numbers alpha then beta in one running sequence, so a number names its spin block on its
+ * own and a label selects the orbital in both.  Each block reaches the primitives through its own $LCAOMO and its
+ * own spin's MOs, so the two never mix.
  * NLMOs are the occupied orbitals of maximum overlap with their Lewis NBOs: the NBOs projected on the occupied
- * space (Gamma / 2) and Loewdin-orthogonalised, the closed-shell limit of Reed and Weinhold's NLMOs
+ * space (Gamma / c, c = 2 closed shell, 1 per spin) and Loewdin-orthogonalised, Reed and Weinhold's NLMOs
  * (J. Chem. Phys. 83 (1985) 1736).  picked[k] is the printed number and label of slot k.
  */
 WFN nbo_cube_wfn(const WFN& wavy, const NboResults& r, const NboOrbitalSpace& space, const std::string& spec,
