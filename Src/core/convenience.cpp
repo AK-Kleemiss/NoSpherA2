@@ -3078,6 +3078,8 @@ bool options::digest_run_options(const std::string &temp, int &i)
 		mult = stoi(arguments[i + 1]);
 	else if (temp == "-no_date")
 		no_date = constants::hide_gpu_notes = constants::hide_timings = true;
+	else if (temp == "-out")
+		; //run_app opened the log before options are digested; listed so it is not "unknown"
 	else if (temp == "-no_date_but_gpu")
 	{
 		no_date = constants::hide_timings = true;
