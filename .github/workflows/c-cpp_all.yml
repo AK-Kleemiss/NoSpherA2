@@ -206,6 +206,17 @@ jobs:
           submodules: recursive
           fetch-depth: 1
 
+      # CUDA plus the ROCm SDK leave the stock Ubuntu runner only a few GB, and
+      # the sccache restore then ran it out of disk (run 41811557191). Toolchains
+      # this job never uses are dropped first; df shows the headroom in the log.
+      - name: Free disk space
+        if: runner.os == 'Linux' && matrix.gpu
+        shell: bash
+        run: |
+          df -h /
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL
+          df -h /
+
       - name: Compute dependency fingerprint
         id: dependency-fingerprint
         shell: bash
@@ -375,6 +386,15 @@ jobs:
 
       - name: Build
         run: cmake --build --preset "${{ matrix.build-preset }}" --parallel 4
+
+      # where the disk went, for the next time a GPU job runs short
+      - name: Disk usage after build
+        if: always() && runner.os == 'Linux' && matrix.gpu
+        shell: bash
+        run: |
+          df -h /
+          du -sh "$GITHUB_WORKSPACE"/* "$GITHUB_WORKSPACE"/.[!.]* "${HIP_PATH:-/nonexistent}" 2>/dev/null | sort -h | tail -n 8
+        continue-on-error: true
 
       # The stats go to the run overview here, not from the action's own summary
       # (zeros, see above); always() also covers a run cancelled during Build
