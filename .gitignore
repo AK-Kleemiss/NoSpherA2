@@ -115,6 +115,7 @@ tests/epoxide_gbw/epoxide.gbw_bondwise_laplacian_*.dat
 tests/epoxide_gbw/*.mtl
 tests/epoxide_gbw/NBO/epoxide.inp
 tests/isosurface/Hirshfeld_surface.dat
+tests/polarizabilities/polarizabilities.dat
 tests/isosurface/*.mtl
 tests/partition/DFT.cif
 tests/partition/converted.wfn
