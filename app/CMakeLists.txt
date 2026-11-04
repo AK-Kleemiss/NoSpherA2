@@ -27,8 +27,6 @@ if(WIN32)
     )
 endif()
 
-nosphera2_enable_optimizations(NoSpherA2)
-
 target_compile_features(
     NoSpherA2
     PRIVATE
@@ -45,7 +43,9 @@ set_target_properties(
 )
 
 #Everywhere but Android the exe is only a launcher for the shared library (main.cpp), which it
-#loads at run time from its own directory; the library target copies the runtimes into bin
+#loads at run time from its own directory; the library target copies the runtimes into bin.
+#No nosphera2_enable_optimizations for it: on macOS that links OpenMP::OpenMP_CXX, which gave
+#the launcher a libomp import and the build's absolute rpath, so a shipped copy did not start
 if(NOT ANDROID)
     add_dependencies(NoSpherA2 NoSpherA2Dll)
     target_link_libraries(NoSpherA2 PRIVATE ${CMAKE_DL_LIBS})
@@ -53,6 +53,7 @@ if(NOT ANDROID)
 endif()
 
 target_compile_definitions(NoSpherA2 PRIVATE NOS_STATIC_APP)
+nosphera2_enable_optimizations(NoSpherA2)
 
 target_link_libraries(
     NoSpherA2

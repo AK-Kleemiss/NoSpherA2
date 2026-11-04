@@ -78,6 +78,10 @@ set_target_properties(
 if(LINUX)
     target_link_options(NoSpherA2Dll PRIVATE "LINKER:--version-script=${CMAKE_CURRENT_SOURCE_DIR}/exports.map")
     set_property(TARGET NoSpherA2Dll APPEND PROPERTY LINK_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/exports.map")
+elseif(APPLE)
+    #the same two names (Mach-O prefixes an underscore); without it the dylib exported ~8,800 symbols
+    target_link_options(NoSpherA2Dll PRIVATE "LINKER:-exported_symbols_list,${CMAKE_CURRENT_SOURCE_DIR}/exports_macos.txt")
+    set_property(TARGET NoSpherA2Dll APPEND PROPERTY LINK_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/exports_macos.txt")
 endif()
 
 nosphera2_copy_runtime_libraries(NoSpherA2Dll)
