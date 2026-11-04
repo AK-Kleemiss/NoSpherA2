@@ -83,7 +83,6 @@ cmake --preset release-windows -DNOSPHERA2_BUILD_TESTS=ON
 ```
 
 - `NOSPHERA2_BUILD_TESTS` (default: `OFF`): build the CTest/GTest suite.
-- `NOSPHERA2_BUILD_DLL` (default: `OFF`): build the optional Windows DLL.
 - `NOSPHERA2_DEPENDENCIES_ONLY` (default: `OFF`): build dependency targets only; this is intended for dependency-cache preparation.
 - `NOSPHERA2_GPU_AUTO` (default: `ON`): select CUDA for an NVIDIA driver or HIP for an AMD driver detected on the build host. Set it to `OFF` when choosing a backend explicitly.
 - `NOSPHERA2_USE_CUDA` (default: `OFF`): compile the CUDA GPU paths. This can be enabled explicitly on a GPU-less build host when a CUDA compiler is available.

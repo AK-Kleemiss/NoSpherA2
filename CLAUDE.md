@@ -45,7 +45,6 @@ The executable is written to the preset build tree under `bin`, for example `bui
 Important CMake options:
 
 - `NOSPHERA2_BUILD_TESTS=ON` builds the C++ GTest/CTest suite in `tests/src`. Every desktop release/debug preset has a `-tests` variant (`release-windows-tests`, `debug-linux-tests`, `release-macos-arm64-tests`, ...) that sets it in the same build tree as its plain counterpart, which sets it OFF explicitly (for VS Code's CMake Tools, where `-D` flags cannot be passed).
-- `NOSPHERA2_BUILD_DLL=ON` builds the optional Windows DLL target from `Src/dll`.
 - `NOSPHERA2_DEPENDENCIES_ONLY=ON` configures/builds dependency targets and then returns before building NoSpherA2. CI uses this to cache dependency build trees.
 
 CI configures with `NOSPHERA2_BUILD_TESTS=ON` and `NOSPHERA2_DEPENDENCIES_ONLY=OFF` after restoring or creating a dependency-only cache.
@@ -195,9 +194,9 @@ Do not casually edit vendored submodules. For local parent-side workarounds, pre
 ## Source Layout
 
 ```text
-app/                 CLI executable target (`NoSpherA2`)
+app/                 CLI executable (`NoSpherA2`): a launcher that loads the shared library beside it (static on Android)
 Src/core/            Core C++ library target (`NoSpherA2Core`, alias `NoSpherA2::Core`)
-Src/dll/             Optional DLL target when `NOSPHERA2_BUILD_DLL=ON`
+Src/dll/             Shared library (`NoSpherA2.dll`/`libNoSpherA2.so`/`.dylib`): `nosphera2_main` for the exe, `nosphera2_run` for Olex2
 tests/src/           C++ GTest/CTest integration and unit tests
 tests/               Python pytest harness and golden-file test cases
 BasisSetGenerator/   Basis-set converter used to generate `Src/basis_data.cpp`

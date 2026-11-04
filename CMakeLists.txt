@@ -16,7 +16,6 @@ else()
     set(NOSPHERA2_OPENBLAS OFF)
 endif()
 
-option(NOSPHERA2_BUILD_DLL "Build the NoSpherA2 DLL" OFF)
 option(NOSPHERA2_BUILD_TESTS "Build NoSpherA2 tests" OFF)
 option(NOSPHERA2_DEPENDENCIES_ONLY "Build dependencies without building NoSpherA2" OFF)
 option(NOSPHERA2_PROFILE_SYMBOLS "Release code with a PDB, so VTune and the VS profiler resolve functions (scripts/profile_cpu.ps1)" OFF)
@@ -592,6 +591,11 @@ add_subdirectory(
     "${CMAKE_BINARY_DIR}/_deps/occ"
     EXCLUDE_FROM_ALL
 )
+#libxc ignores CMAKE_POSITION_INDEPENDENT_CODE (it takes occ's BUILD_FPIC, OFF), but it is linked
+#into the shared library
+if(TARGET xc)
+    set_target_properties(xc PROPERTIES POSITION_INDEPENDENT_CODE ON)
+endif()
 #32-bit Android: clang 18 at -O3 needs >45 min per big generated libecpint Q*.cpp for i686 (6 min
 #on arm64); ECP integrals only run for ECP basis sets, so -O1 there costs nothing for light atoms
 if(ANDROID AND CMAKE_SIZEOF_VOID_P EQUAL 4 AND TARGET libecpint_static)
@@ -839,7 +843,8 @@ install(
 )
 
 
-if(NOSPHERA2_BUILD_DLL)
+#the shared library carries the code; app/ is its launcher (Android: one static exe)
+if(NOT ANDROID)
     add_subdirectory(Src/dll)
 endif()
 

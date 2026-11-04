@@ -35,19 +35,30 @@ target_compile_features(
         cxx_std_20
 )
 
-target_link_libraries(
-    NoSpherA2
-    PRIVATE
-        NoSpherA2::Core
-)
-
 set_target_properties(
     NoSpherA2
     PROPERTIES
         RUNTIME_OUTPUT_DIRECTORY
             "${CMAKE_BINARY_DIR}/bin"
+        #NoSpherA2.pdb is the library's
+        PDB_NAME NoSpherA2_exe
 )
 
+#Everywhere but Android the exe is only a launcher for the shared library (main.cpp), which it
+#loads at run time from its own directory; the library target copies the runtimes into bin
+if(NOT ANDROID)
+    add_dependencies(NoSpherA2 NoSpherA2Dll)
+    target_link_libraries(NoSpherA2 PRIVATE ${CMAKE_DL_LIBS})
+    return()
+endif()
+
+target_compile_definitions(NoSpherA2 PRIVATE NOS_STATIC_APP)
+
+target_link_libraries(
+    NoSpherA2
+    PRIVATE
+        NoSpherA2::Core
+)
 
 nosphera2_copy_runtime_libraries(NoSpherA2)
 

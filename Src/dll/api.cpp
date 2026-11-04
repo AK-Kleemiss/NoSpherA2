@@ -15,3 +15,12 @@ extern "C" NOS_API int NOS_CALLCONV nosphera2_run(int argc, char** argv)
 	nos_in_process = true;
 	return run_app(argc, argv);
 }
+
+// The NoSpherA2 executable (app/main.cpp) is only a launcher for this: exit() still ends the process,
+// exactly as it did when the exe carried the code itself
+extern "C" NOS_API int NOS_CALLCONV nosphera2_main(int argc, char** argv)
+{
+	if (nos_isa_refused)
+		return 86;
+	return run_app(argc, argv);
+}

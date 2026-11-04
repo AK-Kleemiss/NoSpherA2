@@ -1,0 +1,4 @@
+{
+  global: nosphera2_run; nosphera2_main;
+  local: *;
+};

@@ -38,8 +38,8 @@ The top-level CMake project configures dependencies and then builds project targ
 - `libcint`, `occ`, `mdspan`, and `featomic/featomic` are consumed with `add_subdirectory`.
 - `BasisSetGenerator` builds `BasisSetConverter`, which generates `Src/basis_data.cpp`.
 - `Src/core` builds the static `NoSpherA2Core` target and alias `NoSpherA2::Core`.
-- `app` builds the `NoSpherA2` executable.
-- `Src/dll` builds the optional DLL when `NOSPHERA2_BUILD_DLL=ON`.
+- `Src/dll` builds the shared library (`NoSpherA2.dll`, `libNoSpherA2.so`, `libNoSpherA2.dylib`) into `bin`; it carries all the code.
+- `app` builds the `NoSpherA2` executable, a launcher that loads that library from its own directory (`nosphera2_main`), so the exe never runs without it. Android links one static exe instead.
 - `tests/src` builds `NoSpherA2_Tests` when `NOSPHERA2_BUILD_TESTS=ON`.
 
 Runtime outputs are under the preset build tree's `bin` directory, for example `build/release-windows/bin/NoSpherA2.exe`.
@@ -47,7 +47,6 @@ Runtime outputs are under the preset build tree's `bin` directory, for example `
 ## CMake Options
 
 - Use `-DNOSPHERA2_BUILD_TESTS=ON` before running CTest.
-- Use `-DNOSPHERA2_BUILD_DLL=ON` only when the Windows DLL target is needed.
 - Use `-DNOSPHERA2_DEPENDENCIES_ONLY=ON` only for dependency-cache or dependency-prebuild workflows. The top-level `CMakeLists.txt` returns before adding NoSpherA2 targets in this mode.
 
 CI restores or builds a dependency-only tree, saves that cache, then reconfigures the same build directory with `NOSPHERA2_BUILD_TESTS=ON` and `NOSPHERA2_DEPENDENCIES_ONLY=OFF`.
