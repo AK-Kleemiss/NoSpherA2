@@ -3027,7 +3027,9 @@ BondGraph make_bond_graph(const WFN &w)
 			const double half = array_length(A, B) / 2;
 			bool gabriel = true;
 			for (int c = 0; c < n && gabriel; c++)
-				if (c != a && c != b && array_length(mid, w.get_atom_pos(c)) < half) gabriel = false;
+				// on the sphere counts as inside: benzene para pairs have all four other C on it, and
+				// an optimized geometry is off by ~1e-5 relative, so a strict < kept one of the three
+				if (c != a && c != b && array_length(mid, w.get_atom_pos(c)) <= half * (1 + 1e-3)) gabriel = false;
 			if (!gabriel) continue;
 			const double x = chi.empty() ? 1.0 : chi[(size_t)a * n + b], t = x / (1 + x);
 			g.pair.push_back({ a, b });
