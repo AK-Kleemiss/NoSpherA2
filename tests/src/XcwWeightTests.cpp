@@ -33,7 +33,8 @@ namespace NoSpherA2UnitTests
 
 		options::XCW_settings parsed_weight(const std::string& text)
 		{
-			const auto p = std::filesystem::temp_directory_path() / "nosphera2_xcw_weight_settings.txt";
+			//one file per test: ctest runs the tests of this file in parallel
+			const auto p = std::filesystem::temp_directory_path() / ("nosphera2_xcw_weight_settings_" + std::string(::testing::UnitTest::GetInstance()->current_test_info()->name()) + ".txt");
 			std::ofstream(p) << text;
 			options opt;
 			opt.xcw_settings_path = p;
