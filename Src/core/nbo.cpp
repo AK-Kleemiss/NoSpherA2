@@ -1786,12 +1786,11 @@ NboResults native_nbo(WFN& wavy, const NboOptions& options, std::ostream& log, N
 		if (space) {
 			space->nao = nao;
 			space->overlap = in.overlap;
-			space->lcaomo = in.lcaomo.empty() ? dMatrix2() : in.lcaomo[0];
-			space->lewis = lewis[0];
+			space->lcaomo.push_back(in.lcaomo.empty() ? dMatrix2() : in.lcaomo[0]);
+			space->lewis.push_back(lewis[0]);
 		}
 	}
 	else {
-		err_checkf(!space, "-nbo_cube/-nlmo_cube: closed-shell wavefunctions only; this one is open shell", log);
 		err_checkf(options.nrt_parent.empty() && options.parent_lewis.empty(),
 				   "-nrt_parent takes a closed-shell wavefunction; this one is open shell, whose alpha and beta "
 				   "Lewis structures the search places apart", log);
@@ -1809,6 +1808,14 @@ NboResults native_nbo(WFN& wavy, const NboOptions& options, std::ostream& log, N
 						 static_cast<int>(in.fock.size()) > s ? in.fock[s] : dMatrix2(),
 						 static_cast<int>(std::llround(electrons)), 1.0, s ? "beta" : "alpha",
 						 run, lewis, log);
+		}
+		if (space) {
+			space->nao = total_nao;
+			space->overlap = in.overlap;
+			for (int s = 0; s < 2; s++) {
+				space->lcaomo.push_back(static_cast<int>(in.lcaomo.size()) > s ? in.lcaomo[s] : dMatrix2());
+				space->lewis.push_back(lewis[s]);
+			}
 		}
 		vec occ(total_nao.orbitals.size(), 0.0);
 		for (size_t i = 0; i < occ.size(); i++)
@@ -2148,11 +2155,23 @@ WFN nbo_cube_wfn(const WFN& wavy, const NboResults& r, const NboOrbitalSpace& sp
 				 const bool nlmo, std::vector<std::pair<int, std::string>>& picked, std::ostream& log)
 {
 	const char* opt = nlmo ? "-nlmo_cube" : "-nbo_cube";
-	const NboLewis& lewis = space.lewis;
+	const int nspin = static_cast<int>(space.lewis.size());
 	const int n = static_cast<int>(space.nao.C.extent(0));
-	err_checkf(!wavy.get_is_unrestricted(), std::string(opt) + ": closed-shell wavefunctions only", log);
-	err_checkf(static_cast<int>(space.lcaomo.extent(0)) == n,
-			   std::string(opt) + ": the FILE47 carries no $LCAOMO to reach the primitives through", log);
+	err_checkf(nspin > 0, std::string(opt) + ": the NBO search left no orbital space behind", log);
+	for (int s = 0; s < nspin; s++)
+		err_checkf(static_cast<int>(space.lcaomo[s].extent(0)) == n,
+				   std::string(opt) + ": the FILE47 carries no $LCAOMO to reach the primitives through", log);
+	//print_nbo numbers the spin blocks in one running sequence, so a printed number says which block it
+	//is in and where it sits in that block's Lewis set.
+	ivec block_count(nspin, 0), block_base(nspin, 0);
+	for (const NboOrbital& o : r.orbitals)
+		block_count[nspin > 1 && o.spin == "beta" ? 1 : 0]++;
+	for (int s = 1; s < nspin; s++) block_base[s] = block_base[s - 1] + block_count[s - 1];
+	const auto block_of = [&](const int printed) {
+		int s = 0;
+		while (s + 1 < nspin && printed > block_base[s + 1]) s++;
+		return s;
+	};
 	//selection as printed numbers, 1-based
 	ivec sel;
 	std::stringstream ss(spec);
@@ -2160,7 +2179,8 @@ WFN nbo_cube_wfn(const WFN& wavy, const NboResults& r, const NboOrbitalSpace& sp
 	while (std::getline(ss, tok, ',')) {
 		if (tok.empty()) continue;
 		if (tok == "lewis") {
-			for (int k = 1; k <= lewis.n_lewis; k++) sel.push_back(k);
+			for (int s = 0; s < nspin; s++)
+				for (int k = 1; k <= space.lewis[s].n_lewis; k++) sel.push_back(block_base[s] + k);
 			continue;
 		}
 		if (std::all_of(tok.begin(), tok.end(), [](unsigned char c) { return std::isdigit(c); })) {
@@ -2181,64 +2201,85 @@ WFN nbo_cube_wfn(const WFN& wavy, const NboResults& r, const NboOrbitalSpace& sp
 	}
 	err_checkf(!sel.empty(), std::string(opt) + ": none of the requested NBOs exist", log);
 	err_checkf(static_cast<int>(sel.size()) <= wavy.get_nmo(), std::string(opt) + ": more orbitals than MO slots", log);
-	ivec internal(sel.size());
-	for (size_t k = 0; k < sel.size(); k++) {
-		internal[k] = lewis.printed[sel[k] - 1];
-		//the Lewis set comes first in lewis.orbitals and only it has NLMOs
-		err_checkf(!nlmo || internal[k] < lewis.n_lewis, std::string(opt) + ": NBO " + std::to_string(sel[k]) + " (" +
-				   nbo_label(r.orbitals[sel[k] - 1]) + ") is non-Lewis and has no NLMO", log);
-	}
 
-	//orbitals in the NAO basis, one column per selection
-	MatrixXd V(n, sel.size());
-	if (!nlmo)
-		for (size_t k = 0; k < sel.size(); k++)
-			for (int i = 0; i < n; i++) V(i, k) = lewis.orbitals[internal[k]].coefficients[i];
-	else {
-		//Gamma / 2 projects on the occupied space of a closed-shell determinant; tr P - tr P^2 says how far it is from one
-		const MatrixXd P = to_eigen(lewis.gamma) / 2.0;
-		log << opt << ": occupied-space projector defect tr(P) - tr(P^2) = " << std::scientific << std::setprecision(2)
-			<< P.trace() - P.squaredNorm() << std::defaultfloat << std::endl;
-		const int nl = lewis.n_lewis;
-		MatrixXd B(n, nl);
-		for (int j = 0; j < nl; j++)
-			for (int i = 0; i < n; i++) B(i, j) = lewis.orbitals[j].coefficients[i];
-		const MatrixXd M = P * B;
-		const MatrixXd L = M * sym_power(MatrixXd(M.transpose() * M), -0.5);
-		for (size_t k = 0; k < sel.size(); k++) V.col(k) = L.col(internal[k]);
+	//row m of a block's $LCAOMO is that spin's m-th MO in WFN order: the order write_nbo filled
+	//CMO and CMO_beta in.  A closed shell has one block over every MO.
+	std::vector<ivec> mo_row(nspin);
+	for (int m = 0; m < wavy.get_nmo(); m++) {
+		const int op = nspin > 1 ? wavy.get_MO_op(m) : 0;
+		if (op >= 0 && op < nspin) mo_row[op].push_back(m);
 	}
+	//slots are filled block by block, so a selection spanning both spins keeps each orbital with its own
+	//$LCAOMO and its own spin's primitives
+	std::vector<ivec> by_block(nspin);
+	for (const int g : sel) by_block[block_of(g)].push_back(g);
 
-	//NAO -> AO -> MO expansion t = C_MO S x -> primitives
-	const MatrixXd T = to_eigen(space.lcaomo) * to_eigen(space.overlap) * to_eigen(space.nao.C) * V;
 	WFN w(wavy);
-	const int nmo = std::min(wavy.get_nmo(), n);
 	picked.clear();
-	for (size_t k = 0; k < sel.size(); k++) {
-		const NboOrbital& o = r.orbitals[sel[k] - 1];
-		picked.emplace_back(sel[k], nbo_label(o));
-		//NAO weights per atom, the largest first
-		std::vector<std::pair<double, int>> share(space.nao.atoms.size());
-		for (size_t a = 0; a < share.size(); a++) share[a] = { 0.0, static_cast<int>(a) };
-		for (int i = 0; i < n; i++) share[space.nao.orbitals[i].atom].first += V(i, k) * V(i, k);
-		std::sort(share.rbegin(), share.rend());
-		double norm = 0.0;
-		for (int m = 0; m < nmo; m++) norm += T(m, k) * T(m, k);
-		log << (nlmo ? "NLMO " : "NBO ") << sel[k] << " " << picked.back().second << std::fixed << std::setprecision(2);
-		if (nlmo) {
-			double parent = 0.0;
-			for (int i = 0; i < n; i++) parent += V(i, k) * lewis.orbitals[internal[k]].coefficients[i];
-			log << ", " << 100.0 * parent * parent << " % parent NBO";
+	for (int s = 0; s < nspin; s++) {
+		const ivec& want = by_block[s];
+		if (want.empty()) continue;
+		const NboLewis& lewis = space.lewis[s];
+		const std::string tag = nspin > 1 ? (s ? " beta" : " alpha") : "";
+		ivec internal(want.size());
+		for (size_t k = 0; k < want.size(); k++) {
+			internal[k] = lewis.printed[want[k] - 1 - block_base[s]];
+			//the Lewis set comes first in lewis.orbitals and only it has NLMOs
+			err_checkf(!nlmo || internal[k] < lewis.n_lewis, std::string(opt) + ": NBO " + std::to_string(want[k]) + " (" +
+					   nbo_label(r.orbitals[want[k] - 1]) + ") is non-Lewis and has no NLMO", log);
 		}
-		log << ", atoms (%):";
-		for (size_t a = 0; a < share.size() && share[a].first >= 0.005; a++)
-			log << " " << constants::atnr2letter(space.nao.atoms[share[a].second].Z) << share[a].second + 1 << " "
-				<< 100.0 * share[a].first;
-		log << std::scientific << std::setprecision(1) << ", norm lost in the MO expansion " << 1.0 - norm
-			<< std::defaultfloat << std::endl;
-		for (int p = 0; p < wavy.get_nex(); p++) {
-			double v = 0.0;
-			for (int m = 0; m < nmo; m++) v += T(m, k) * wavy.get_MO_coef(m, p);
-			w.set_MO_coef(static_cast<int>(k), p, v);
+
+		//orbitals in the NAO basis, one column per selection
+		MatrixXd V(n, want.size());
+		if (!nlmo)
+			for (size_t k = 0; k < want.size(); k++)
+				for (int i = 0; i < n; i++) V(i, k) = lewis.orbitals[internal[k]].coefficients[i];
+		else {
+			//Gamma / c projects on the occupied space of a single determinant, c = 2 for a closed shell and 1
+			//per spin; tr P - tr P^2 says how far it is from one
+			const MatrixXd P = to_eigen(lewis.gamma) / (nspin > 1 ? 1.0 : 2.0);
+			log << opt << tag << ": occupied-space projector defect tr(P) - tr(P^2) = " << std::scientific
+				<< std::setprecision(2) << P.trace() - P.squaredNorm() << std::defaultfloat << std::endl;
+			const int nl = lewis.n_lewis;
+			MatrixXd B(n, nl);
+			for (int j = 0; j < nl; j++)
+				for (int i = 0; i < n; i++) B(i, j) = lewis.orbitals[j].coefficients[i];
+			const MatrixXd M = P * B;
+			const MatrixXd L = M * sym_power(MatrixXd(M.transpose() * M), -0.5);
+			for (size_t k = 0; k < want.size(); k++) V.col(k) = L.col(internal[k]);
+		}
+
+		//NAO -> AO -> MO expansion t = C_MO S x -> primitives
+		const MatrixXd T = to_eigen(space.lcaomo[s]) * to_eigen(space.overlap) * to_eigen(space.nao.C) * V;
+		const int nmo = std::min(static_cast<int>(mo_row[s].size()), n);
+		for (size_t k = 0; k < want.size(); k++) {
+			const NboOrbital& o = r.orbitals[want[k] - 1];
+			const int slot = static_cast<int>(picked.size());
+			picked.emplace_back(want[k], nbo_label(o) + tag);
+			//NAO weights per atom, the largest first
+			std::vector<std::pair<double, int>> share(space.nao.atoms.size());
+			for (size_t a = 0; a < share.size(); a++) share[a] = { 0.0, static_cast<int>(a) };
+			for (int i = 0; i < n; i++) share[space.nao.orbitals[i].atom].first += V(i, k) * V(i, k);
+			std::sort(share.rbegin(), share.rend());
+			double norm = 0.0;
+			for (int m = 0; m < nmo; m++) norm += T(m, k) * T(m, k);
+			log << (nlmo ? "NLMO " : "NBO ") << want[k] << " " << picked.back().second << std::fixed << std::setprecision(2);
+			if (nlmo) {
+				double parent = 0.0;
+				for (int i = 0; i < n; i++) parent += V(i, k) * lewis.orbitals[internal[k]].coefficients[i];
+				log << ", " << 100.0 * parent * parent << " % parent NBO";
+			}
+			log << ", atoms (%):";
+			for (size_t a = 0; a < share.size() && share[a].first >= 0.005; a++)
+				log << " " << constants::atnr2letter(space.nao.atoms[share[a].second].Z) << share[a].second + 1 << " "
+					<< 100.0 * share[a].first;
+			log << std::scientific << std::setprecision(1) << ", norm lost in the MO expansion " << 1.0 - norm
+				<< std::defaultfloat << std::endl;
+			for (int p = 0; p < wavy.get_nex(); p++) {
+				double v = 0.0;
+				for (int m = 0; m < nmo; m++) v += T(m, k) * wavy.get_MO_coef(mo_row[s][m], p);
+				w.set_MO_coef(slot, p, v);
+			}
 		}
 	}
 	return w;
