@@ -1059,7 +1059,7 @@ namespace
 		EXPECT_EQ(s.extinction_model, extinction::model::bc_gaussian);
 		EXPECT_TRUE(s.extinction_aniso);
 		EXPECT_FALSE(s.extinction_refine);
-		EXPECT_DOUBLE_EQ(s.extinction_start, 2e-4);
+		EXPECT_EQ(s.extinction_start, vec{ 2e-4 });
 
 		//the keywords of the I tensor, which is no longer built, are unknown
 		EXPECT_EQ(parse_error("basis_set sto-3g save out.bin"), "Unknown keyword 'save'");

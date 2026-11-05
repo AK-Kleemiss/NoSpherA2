@@ -4661,7 +4661,8 @@ void options::loadXCWsettings() {
 	bool grown = false, read_first_guess = false, nbo_output = false, xcw_gaussian_halt = false, mask = false;
 	extinction::model extinction_model = extinction::model::none;
 	bool extinction_aniso = false, extinction_refine = true;
-	double extinction_start = 1e-4, wavelength = 0.0;
+	vec extinction_start = { 1e-4 };
+	double wavelength = 0.0;
 	bool grid_double = false;
 	std::filesystem::path eri_read_path, eri_save_path, basis_overrides;
 	occ::qm::SpinorbitalKind hf_type = occ::qm::SpinorbitalKind::Restricted;
@@ -4681,8 +4682,9 @@ void options::loadXCWsettings() {
 		handlers["extinction"] = [&](std::istream& is) {
 			//`extinction <model> [iso|aniso] [fixed] [start value]` in any order: a word names the model
 			//or a flag, a number is the start value, and the next settings keyword ends it and is read
-			//as usual, so `extinction shelx` need not be the last keyword
+			//as usual, so `extinction shelx` need not be the last keyword; six numbers are the aniso tensor
 			std::string token, next;
+			vec starts;
 			while (is >> token) {
 				const std::string low = lowercase(token);
 				if (low == "aniso" || low == "anisotropic") extinction_aniso = true;
@@ -4691,12 +4693,17 @@ void options::loadXCWsettings() {
 				else if (extinction::from_string(low) != extinction::model::none) extinction_model = extinction::from_string(low);
 				else if (handlers.count(low)) { next = low; break; }
 				else {
-					try { extinction_start = std::stod(token); }
+					try { starts.push_back(std::stod(token)); }
 					catch (const std::exception&) { throw std::runtime_error("Could not read '" + token + "' after 'extinction'"); }
 				}
 			}
 			if (extinction_model == extinction::model::none)
 				throw std::runtime_error("Expected a model (shelx, bc_gaussian or bc_lorentzian) after 'extinction'");
+			if (starts.size() == 6 && !extinction_aniso)
+				throw std::runtime_error("Six extinction start values are the anisotropic tensor and need 'aniso'");
+			if (!starts.empty() && starts.size() != 1 && starts.size() != 6)
+				throw std::runtime_error("Expected 1 or 6 extinction start values, got " + std::to_string(starts.size()));
+			if (!starts.empty()) extinction_start = starts;
 			if (!next.empty()) handlers.at(next)(is);
 			};
 

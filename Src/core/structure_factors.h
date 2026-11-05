@@ -51,7 +51,7 @@ public:
 		extinction::model extinction_model;
 		bool aniso;
 		bool refine;
-		double start;
+		vec start;
 	};
 
 	// Data for contracted basis function

@@ -1060,11 +1060,12 @@ struct options
 		std::filesystem::path basis_overrides;
 		bool grown = false;
 		bool mask = false;
-		//`extinction <shelx|bc_gaussian|bc_lorentzian> [iso|aniso] [fixed] [start value]`
+		//`extinction <shelx|bc_gaussian|bc_lorentzian> [iso|aniso] [fixed] [start value]`; the start is one x,
+		//or with aniso the six X11 X22 X33 X12 X13 X23 of the tensor
 		extinction::model extinction_model = extinction::model::none;
 		bool extinction_aniso = false;
 		bool extinction_refine = true;
-		double extinction_start = 1e-4;
+		vec extinction_start = { 1e-4 };
 		//`wavelength <lambda>`, in Angstrom; overrides _diffrn_radiation_wavelength from the CIF
 		double wavelength = 0.0;
 		int n_params = 1;

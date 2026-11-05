@@ -218,9 +218,13 @@ void structure_factors::setup_extinction(const std::filesystem::path& cif) {
 		"settings file, or _diffrn_radiation_wavelength in " + cif.string(), std::cout);
 	ensure_hkl_ordered();
 	const size_t np = extinction_settings.aniso ? 6 : 1;
-	//the anisotropic tensor starts isotropic, where x(h) is the start value for every h
-	ext_p_.assign(np, 0.0);
-	for (size_t p = 0; p < (extinction_settings.aniso ? 3u : 1u); p++) ext_p_[p] = extinction_settings.start;
+	//six start values are the tensor itself; one starts it isotropic, where x(h) is that value for every h
+	const vec& start = extinction_settings.start;
+	if (start.size() == np) ext_p_ = start;
+	else {
+		ext_p_.assign(np, 0.0);
+		for (size_t p = 0; p < (extinction_settings.aniso ? 3u : 1u); p++) ext_p_[p] = start[0];
+	}
 	ext_c_.resize(model_data.nr);
 	ext_cos2t_.resize(model_data.nr);
 	if (extinction_settings.aniso) ext_a_.resize(static_cast<size_t>(model_data.nr) * np);
@@ -249,7 +253,8 @@ void structure_factors::setup_extinction(const std::filesystem::path& cif) {
 	banner << "XCW extinction: " << extinction::name(extinction_settings.extinction_model)
 		<< (extinction_settings.aniso ? ", anisotropic (azimuth-averaged, 6 parameters)" : ", isotropic (1 parameter)")
 		<< (extinction_settings.refine ? ", refined with the scale" : ", held fixed")
-		<< ", lambda = " << lambda << " A, start value " << extinction_settings.start;
+		<< ", lambda = " << lambda << " A, start value";
+	for (const double v : ext_p_) banner << " " << v;
 	std::cout << banner.str() << std::endl;
 }
 

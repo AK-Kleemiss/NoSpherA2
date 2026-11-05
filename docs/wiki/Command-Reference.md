@@ -499,7 +499,7 @@ unknown keyword stops the run, and so does a file without `basis_set`.
 | `f` \| `f2` | 0 | `f` | Fit against F or F^2. |
 | `weighted` | 0 | off | Fit the 1/\|H\|^2-weighted residual self-energy criterion instead of the classical goodness of fit. |
 | `i_sigma <x>` | 1 | `2` | Only reflections with I/sigma(I) >= x enter the fit and the scale, i.e. F/sigma(F) >= 2x. R1(all) and Crit(all) still use all. |
-| `extinction <model> [iso\|aniso] [fixed] [start]` | 1-4 | | Extinction correction; `<model>` is `shelx` (`zachariasen`), `bc_gaussian` or `bc_lorentzian`. Isotropic, refined and starting at `1e-4` unless told otherwise. Needs a wavelength. |
+| `extinction <model> [iso\|aniso] [fixed] [start]` | 1-9 | | Extinction correction; `<model>` is `shelx` (`zachariasen`), `bc_gaussian` or `bc_lorentzian`. Isotropic, refined and starting at `1e-4` unless told otherwise. With `aniso` the start may be the six tensor values `X11 X22 X33 X12 X13 X23`; one value starts the tensor isotropic. Needs a wavelength. |
 
 **SCF convergence**
 

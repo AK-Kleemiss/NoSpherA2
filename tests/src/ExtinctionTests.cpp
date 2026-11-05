@@ -207,7 +207,23 @@ namespace NoSpherA2UnitTests
 		EXPECT_EQ(opt.xcw_settings.eri_save_path, std::filesystem::path("x.eri"));
 		EXPECT_EQ(opt.xcw_settings.extinction_model, extinction::model::shelx);
 		EXPECT_FALSE(opt.xcw_settings.extinction_refine);
-		EXPECT_DOUBLE_EQ(opt.xcw_settings.extinction_start, 0.2);
+		EXPECT_EQ(opt.xcw_settings.extinction_start, vec{ 0.2 });
+	}
+
+	// six numbers are the start tensor X11 X22 X33 X12 X13 X23, which needs aniso; any other count is an error
+	TEST(ExtinctionTests, SettingsKeywordTakesTheTensorAsStart)
+	{
+		EXPECT_EQ(ext_parse_error("extinction shelx 1 2 3 4 5 6"),
+			"Six extinction start values are the anisotropic tensor and need 'aniso'");
+		EXPECT_EQ(ext_parse_error("extinction shelx aniso 1e-3 2e-3"), "Expected 1 or 6 extinction start values, got 2");
+		const auto p = std::filesystem::temp_directory_path() / ("nosphera2_ext_settings_" + ext_test_name() + ".txt");
+		std::ofstream(p) << "basis_set sto-3g extinction 0.05 0.03 0.07 shelx 0.01 -0.005 0.008 aniso";
+		options opt;
+		opt.xcw_settings_path = p;
+		opt.do_XCW = true;
+		EXPECT_NO_THROW(opt.loadXCWsettings());
+		std::filesystem::remove(p);
+		EXPECT_EQ(opt.xcw_settings.extinction_start, (vec{ 0.05, 0.03, 0.07, 0.01, -0.005, 0.008 }));
 	}
 
 	// the whole path: keyword -> settings -> setup_extinction, with the wavelength coming from
@@ -231,7 +247,17 @@ namespace NoSpherA2UnitTests
 		if (log.empty()) GTEST_SKIP() << "tests/P1_test fixture not found";
 		EXPECT_NE(log.find("becker-coppens, lorentzian mosaic, anisotropic (azimuth-averaged, 6 parameters), held fixed"), std::string::npos) << log;
 		EXPECT_NE(log.find("lambda = 1.54178 a"), std::string::npos) << log;
-		EXPECT_NE(log.find("start value 0.0005"), std::string::npos) << log;
+		EXPECT_NE(log.find("start value 0.0005 0.0005 0.0005 0 0 0"), std::string::npos) << log;
+	}
+
+	// a start tensor from the settings file is what the refinement begins from
+	TEST(ExtinctionTests, AnisotropicModelStartsFromTheGivenTensor)
+	{
+		const std::string log = ext_construct_on_p1(
+			"params 177 basis_set sto-3g charge 0 mult 1 rhf start 0 step_size 0.01 end 0.02 "
+			"extinction shelx aniso 0.05 0.03 0.07 0.01 -0.005 0.008");
+		if (log.empty()) GTEST_SKIP() << "tests/P1_test fixture not found";
+		EXPECT_NE(log.find("start value 0.05 0.03 0.07 0.01 -0.005 0.008"), std::string::npos) << log;
 	}
 
 	// setup_extinction builds the scattering vector in Cartesian as sum_j rcm(i,j) h_j and
