@@ -19,4 +19,5 @@
 
 extern "C" {
 	NOS_API int NOS_CALLCONV nosphera2_run(int argc, char** argv);
+	NOS_API int NOS_CALLCONV nosphera2_main(int argc, char** argv);
 }

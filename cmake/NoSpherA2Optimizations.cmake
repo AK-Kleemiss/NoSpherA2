@@ -41,6 +41,8 @@ function(nosphera2_enable_optimizations target_name)
                     /Zc:inline
                 >
                 $<$<COMPILE_LANGUAGE:CXX>:/openmp:experimental>
+                # unoptimised Debug objects outgrow the COFF section limit (C1128)
+                $<$<AND:$<CONFIG:Debug>,$<COMPILE_LANGUAGE:CXX>>:/bigobj>
                 $<$<AND:$<BOOL:${NOSPHERA2_PROFILE_SYMBOLS}>,$<COMPILE_LANGUAGE:CXX>>:/Zi>
         )
         if(NOSPHERA2_PROFILE_SYMBOLS)
@@ -52,12 +54,15 @@ function(nosphera2_enable_optimizations target_name)
         #reads /OPT:REF as its own /O flag followed by rubbish, warning once per character.
         #They were ignored there rather than misapplied, so this was noise rather than a
         #defect, but it buried real warnings and made every build look unclean.
-        target_link_options(
-            "${target_name}"
-            PRIVATE
-                "$<HOST_LINK:/NODEFAULTLIB:vcomp>"
-                "$<HOST_LINK:/NODEFAULTLIB:vcompd>"
-        )
+        #ARM64 has no libiomp5; there vcomp is the OpenMP runtime
+        if(NOT NOSPHERA2_OPENBLAS)
+            target_link_options(
+                "${target_name}"
+                PRIVATE
+                    "$<HOST_LINK:/NODEFAULTLIB:vcomp>"
+                    "$<HOST_LINK:/NODEFAULTLIB:vcompd>"
+            )
+        endif()
 
         get_target_property(target_type "${target_name}" TYPE)
 
@@ -143,6 +148,10 @@ function(nosphera2_enable_optimizations target_name)
                             LINKER:--gc-sections
                         >
                 )
+            endif()
+            # Android has no MKL to bring libiomp5: the NDK's libomp, linked in statically
+            if(ANDROID)
+                target_link_options("${target_name}" PRIVATE -fopenmp -static-openmp)
             endif()
         endif()
     endif()

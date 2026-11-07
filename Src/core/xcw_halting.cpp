@@ -6,8 +6,7 @@ double std_normal_cdf(const double z) {
 	return 0.5 * std::erfc(-z / std::sqrt(2.0));
 }
 
-// Rational approximation of the standard normal quantile function
-// (Acklam's algorithm), accurate to ~1.15e-9 absolute error over (0,1).
+// Standard normal quantile, Acklam's rational approximation (absolute error < 1.15e-9 on (0,1))
 double std_normal_inv_cdf(const double p) {
 	static constexpr double a[6] = {
 		-3.969683028665376e+01,  2.209460984245205e+02, -2.759285104469687e+02,

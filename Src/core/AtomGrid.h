@@ -15,7 +15,8 @@ public:
 		const int max_l_quantum_number,
 		const double alpha_min[],
 		std::ostream &file,
-		const double radial_step_scale = 1.0);
+		const double radial_step_scale = 1.0,
+		const bool generic_rotation = false);
 
 	~AtomGrid();
 
@@ -50,6 +51,11 @@ public:
 	double get_gridx(const int &i) { return atom_grid_x_bohr_[i]; };
 	double get_gridy(const int &i) { return atom_grid_y_bohr_[i]; };
 	double get_gridz(const int &i) { return atom_grid_z_bohr_[i]; };
+	const vec &get_gridx() const { return atom_grid_x_bohr_; };
+	const vec &get_gridy() const { return atom_grid_y_bohr_; };
+	const vec &get_gridz() const { return atom_grid_z_bohr_; };
+	//shell s holds points [shell_start[s], shell_start[s + 1]), one radius and one Lebedev rule each
+	const ivec &get_shell_start() const { return shell_start_; };
 
 private:
 
@@ -57,11 +63,22 @@ private:
 	vec atom_grid_y_bohr_;
 	vec atom_grid_z_bohr_;
 	vec atom_grid_w_;
+	ivec shell_start_;
 
 	int num_radial_grid_points_;
 
 	vec radial_atom_grid_r_bohr_;
 	vec radial_atom_grid_w_;
+};
+
+//Where each kept density point sits in its atom's prototype grid, so the Fourier-Bessel transform takes shells and
+//Lebedev rules from the prototype instead of guessing them from the points
+struct sf_shell_layout
+{
+	struct prototype { vec x, y, z; ivec shell_start; }; //points about the nucleus, shells as AtomGrid::get_shell_start
+	std::vector<prototype> protos;
+	ivec proto; //[density atom] its prototype, -1 none
+	ivec2 idx;  //[density atom][kept point] index in that prototype
 };
 
 //The line density comes from density when set (a fitted density on an aux-only wfn), else from the orbitals of wfn
@@ -81,6 +98,10 @@ std::array<double, 2> get_integration_weights(const int &num_centers,
 	const vec &chi,
 	const double *dist_ab = nullptr); //interatomic distances, num_centers x num_centers, or computed per call
 
+//get_integration_weights' TFVC share alone, the same operations in the same order; dist and pa num_centers long
+double get_tfvc_weight(const int num_centers, const double* x_c, const double* y_c, const double* z_c, const int center_index,
+	const double x, const double y, const double z, vec& pa, vec& dist, const vec& chi, const double* dist_ab);
+
 const double get_r_inner(const double &max_error, const double &alpha_inner);
 
 double get_r_outer(const double &max_error,
@@ -90,12 +111,18 @@ double get_r_outer(const double &max_error,
 
 double get_h(const double &max_error, const int &l, const double &guess);
 
+//start: the shells to iterate from instead of the element guess; sweeps: the iterations it took; anderson: steps of
+//Anderson mixing on the shell parameters, 0 the plain fixed point
 std::vector<std::pair<vec, vec>> make_MBIS_vectors(
 	const WFN &wavy,
 	const vec3 &grid,
 	const ivec &num_grid_points,
 	const bool debug = false,
-	std::ostream &file = std::cout);
+	std::ostream &file = std::cout,
+	const std::vector<std::pair<vec, vec>> &start = {},
+	const double crit = 0.001,
+	int *sweeps = nullptr,
+	const int anderson = 0);
 
 std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
 	const WFN &wavy,
@@ -103,4 +130,8 @@ std::vector<std::pair<vec2, vec>> make_EMBIS_tensors(
 	const ivec &num_grid_points,
 	const bool debug = false,
 	const std::vector<std::pair<vec, vec>> MBIS_vectors = {},
-	std::ostream &file = std::cout);
+	std::ostream &file = std::cout,
+	const std::vector<std::pair<vec2, vec>> &start = {},
+	const double crit = 0.001,
+	int *sweeps = nullptr,
+	const int anderson = 0);

@@ -46,5 +46,6 @@ function(nosphera2_lipo_file filename)
 endfunction()
 
 nosphera2_lipo_file("NoSpherA2")
+nosphera2_lipo_file("libNoSpherA2.dylib")
 nosphera2_lipo_file("libtbb.12.dylib")
 nosphera2_lipo_file("libomp.dylib")

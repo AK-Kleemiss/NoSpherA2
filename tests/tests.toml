@@ -26,6 +26,78 @@ cif = "alanine.cif"
 dmin = 0.5
 acc = 1
 
+# CCSD scattering factors of water, cc-pVDZ, all electrons: occ's CCSD with the Lambda-equation density, and
+# ORCA's unrelaxed CCSD natural orbitals of the same job (water_ccsd.inp). The two charge tables agree;
+# tests/src/CcsdDensityTests.cpp holds the tight comparisons against PySCF.
+[ccsd_occ_water]
+directory = "ccsd_water"
+
+[ccsd_occ_water.args]
+occ = "water_ccsd.toml"
+cif = "water.cif"
+dmin = 0.8
+acc = 1
+
+[ccsd_orca_nat]
+directory = "ccsd_water"
+
+[ccsd_orca_nat.args]
+wfn = "water_ccsd.mdci.nat"
+cif = "water.cif"
+dmin = 0.8
+acc = 1
+
+# CCSD(T): the (T) terms in Lambda and in the density (ORCA's CCSD(T) .mdci.nat carries the CCSD density)
+[ccsd_t_occ_water]
+directory = "ccsd_water"
+
+[ccsd_t_occ_water.args]
+occ = "water_ccsdt.toml"
+cif = "water.cif"
+dmin = 0.8
+acc = 1
+
+# ORCA's CCSD(T) density: AutoCI unrelaxed (water_ccsdt_autoci.inp), exported by orca_2json, read as natural
+# orbitals of the job's gbw; its charge table matches ccsd_t_occ_water's
+[ccsd_t_orca_autoci]
+directory = "ccsd_water"
+
+[ccsd_t_orca_autoci.args]
+wfn = "water_ccsdt_autoci.json"
+cif = "water.cif"
+dmin = 0.8
+acc = 1
+
+# relaxed MP2 (Z-vector) density from occ, and ORCA's relaxed MP2 natural orbitals of the same job (water_mp2.inp);
+# the two charge tables agree
+[mp2_occ_water]
+directory = "ccsd_water"
+
+[mp2_occ_water.args]
+occ = "water_mp2.toml"
+cif = "water.cif"
+dmin = 0.8
+acc = 1
+
+[mp2_orca_nat]
+directory = "ccsd_water"
+
+[mp2_orca_nat.args]
+wfn = "water_mp2.mp2nat"
+cif = "water.cif"
+dmin = 0.8
+acc = 1
+
+# unrelaxed MP4 density from occ, ORCA AutoCI's (water_mp4_autoci.inp)
+[mp4_occ_water]
+directory = "ccsd_water"
+
+[mp4_occ_water.args]
+occ = "water_mp4.toml"
+cif = "water.cif"
+dmin = 0.8
+acc = 1
+
 [disorder_THPP]
 directory = "disorder"
 good = "disorder_THPP.good"
@@ -70,6 +142,22 @@ dmin = 0.9
 acc = 1
 
 mtc = ["ZP2_part1.gbw", 0.1, "ZP2_part2.gbw", 0.2]
+mtc_mult = [1, 1]
+mtc_charge = [0, 0]
+mtc_ECP = [0, 0]
+
+# PART 1 RI-fitted from its .gbw, PART 2 an .xyz without orbitals: its atoms go into the one .tshb as spherical records
+[Hybrid_orbitalless_tshb]
+directory = "Hybrid"
+good = "Hybrid_orbitalless_tshb.good"
+
+[Hybrid_orbitalless_tshb.args]
+cif = "ZP2.cif"
+dmin = 0.9
+acc = 1
+ri_fit = "combo_basis_fit"
+tshb = ""
+mtc = ["ZP2_part1.gbw", 0.1, "ZP2_part2.xyz", 0.2]
 mtc_mult = [1, 1]
 mtc_charge = [0, 0]
 mtc_ECP = [0, 0]
@@ -133,6 +221,65 @@ fukui = true
 resolution = 1.5
 radius = 2.0
 
+# Spin-resolved ELI-D (-eli_spin) of the UHF methyl radical: aa, bb and triplet from one spin_fields pass. The golden is the
+# triplet cube on a coarse grid; EliSpinTests check every member against eli_family point by point.
+[eli_spin_ch3]
+directory = "ch3_occ"
+good = "eli_spin_ch3.good"
+actual = "ch3.owf_eli_triplet.cube"
+
+[eli_spin_ch3.args]
+wfn = "ch3.owf.fchk"
+eli_spin = true
+resolution = 0.5
+radius = 2.0
+
+# EQC energy decomposition, Mode 1: ethane HF/def2-SVP from an ORCA 6.1 gbw,
+# re-converged in occ, then split into two CH3 radicals (UHF, seeded from the
+# parent's density block). No ORCA .out is shipped, so E(ORCA) reads n/a. The
+# golden pins the occ energy at the gbw orbitals, the SCF iteration counts and
+# the reaction terms, which match X-analysis -m 2 on the same ORCA runs to
+# 1e-4 eV (Delta E to 1e-6 eV).
+[eqc_ethane]
+directory = "eqc_ethane"
+good = "eqc_ethane.good"
+actual = "ethane.eqc_log"
+
+[eqc_ethane.args]
+eqc = "ethane.gbw"
+eqc_frag = ["0,2-4", 0, 2, "1,5-7", 0, 2]
+
+# EQC with f and g shells: distorted water, O def2-QZVP and H def2-SVP, ORCA
+# 6.1 RHF NORI, E(ORCA) -76.059090444. A wrong sign on f(+-3), g(+-3) or
+# g(+-4) makes the gbw orbitals non-orthonormal in occ's basis, so the golden's
+# seed energy turns into nan and an extra fallback line appears.
+[eqc_water_fg]
+directory = "eqc_water_fg"
+good = "eqc_water_fg.good"
+actual = "water.eqc_log"
+
+[eqc_water_fg.args]
+eqc = "water.gbw"
+eqc_frag = ["0,1", 0, 2, 2, 0, 2]
+
+[eqc_ch3f_pbe0]
+directory = "eqc_ch3f_pbe0"
+good = "eqc_ch3f_pbe0.good"
+actual = "parent.eqc_log"
+
+[eqc_ch3f_pbe0.args]
+eqc = "parent.gbw"
+eqc_frag = ["0,2-4", 1, 1, 1, -1, 1]
+eqc_method = "pbe0"
+
+[eqc_ch3f_wfx]
+directory = "eqc_ch3f_wfx"
+good = "eqc_ch3f_wfx.good"
+actual = "parent.eqc_log"
+
+[eqc_ch3f_wfx.args]
+eqc_wfn = ["parent.wfx", "ch3p.wfx", "fm.wfx"]
+
 [intermolecular_nci]
 directory = "intermolecular_nci"
 good = "good.dat"
@@ -189,6 +336,65 @@ mtc_mult = [1, 1, 1, 1]
 mtc_charge = [0, 0, 0, 0]
 mtc_ECP = [0, 0, 0, 0]
 
+# -cmtc into one .tshb: the four fragments' fitted atoms, C_3/N_3/O_3 once (from fragment 2, the first that has them)
+[rubredoxin_cmtc_tshb]
+directory = "rubredoxin_cmtc"
+good = "rubredoxin_cmtc_tshb.good"
+
+[rubredoxin_cmtc_tshb.args]
+hkl = "1yk4_h.hkl"
+acc = 1
+ri_fit = "combo_basis_fit"
+tshb = ""
+cmtc = [
+  "residues/1.gbw",
+  "residues/1.cif",
+  0,
+  "residues/2.gbw",
+  "residues/2.cif",
+  0.1,
+  "residues/3.gbw",
+  "residues/3.cif",
+  0.2,
+  "residues/4.gbw",
+  "residues/4.cif",
+  0
+]
+mtc_mult = [1, 1, 1, 1]
+mtc_charge = [0, 0, 0, 0]
+mtc_ECP = [0, 0, 0, 0]
+
+# -tshb with the Thakkar fill: the model lacks Co and F, which go into the joint .tshb as Slater records in their EEQ
+# charge; tests/src/TshbBlockTests.cpp holds the per-atom comparison with the table
+[SALTED_fill_tshb]
+directory = "SALTED"
+good = "SALTED_fill_tshb.good"
+
+[SALTED_fill_tshb.args]
+SALTED = "Model"
+cif = "Co110.cif"
+wfn = "Co110.xyz"
+dmin = 0.8
+no_gpu_salted = ""
+tshb = ""
+
+# Two disordered parts, PART 1 and PART 2 from their own wavefunctions, predicted by SALTED into one .tshb; the model
+# lacks two atoms per part, which come in as Slater records
+[SALTED_disorder_tshb]
+directory = "Hybrid"
+good = "SALTED_disorder_tshb.good"
+
+[SALTED_disorder_tshb.args]
+SALTED = "../SALTED/Model"
+cif = "ZP2.cif"
+dmin = 0.9
+no_gpu_salted = ""
+tshb = ""
+mtc = ["ZP2_part1.gbw", 0.1, "ZP2_part2.gbw", 0.2]
+mtc_mult = [1, 1]
+mtc_charge = [0, 0]
+mtc_ECP = [0, 0]
+
 [SALTED]
 directory = "SALTED"
 
@@ -198,18 +404,6 @@ cif = "test_cysteine.cif"
 wfn = "test_cysteine.xyz"
 dmin = 0.73
 no_gpu_salted = ""
-
-[SALTED_charge_constraint]
-directory = "SALTED"
-good = "SALTED_charge_constraint.good"
-
-[SALTED_charge_constraint.args]
-SALTED = "Model"
-cif = "test_cysteine.cif"
-wfn = "test_cysteine.xyz"
-dmin = 0.73
-no_gpu_salted = ""
-salted_charge_constraint = ""
 
 [sucrose_IAM]
 directory = "sucrose_IAM_SF"
@@ -328,14 +522,17 @@ directory = "RGBI"
 good = "nh3li_eli.good"
 
 [ELI_NH3Li.args]
-eli_analysis = ["../RGBI_groups/nh3li.gbw", 0.1, 3.0]
+eli_analysis = "../RGBI_groups/nh3li.gbw"
 
+# The ELI-D tables come from the orbitals even with -ri_fit, so they are ELI_NH3Li's byte for
+# byte; -no_spin_eli keeps the spin-resolved half of them from being computed a second time.
 [ELI_NH3Li_RI]
 directory = "RGBI"
 good = "nh3li_eli_ri.good"
 
 [ELI_NH3Li_RI.args]
 ri_fit = "def2-universal-jkfit"
+no_spin_eli = ""
 eli_analysis = ["../RGBI_groups/nh3li.gbw", 0.1, 3.0]
 
 [ELI_HgH2_ECP]
@@ -344,14 +541,14 @@ good = "hgh2_ecp_eli.good"
 
 [ELI_HgH2_ECP.args]
 ECP = 1
-eli_analysis = ["hgh2_ecp.gbw", 0.05, 3.0]
+eli_analysis = "hgh2_ecp.gbw"
 
 [ELI_UH6]
 directory = "ELI_heavy"
 good = "uh6_eli.good"
 
 [ELI_UH6.args]
-eli_analysis = ["uh6.gbw", 0.1, 2.5]
+eli_analysis = "uh6.gbw"
 
 [RGBI_NH3Li_ANO]
 directory = "RGBI"
@@ -370,22 +567,25 @@ rgbi = ""
 # this also exercises the STO-3G L-shell fix (see UNIT_TESTS_STATUS.md) as a
 # real regression test, not just a manual smoke test.
 #
-# Every XCW test below pins no_gpu, for the reference output rather than for speed. The I
-# tensor runs on the device by default now, and the device answer differs from the CPU one
+# Every XCW test below pins no_gpu, for the reference output rather than for speed. The grid
+# block products run on the device by default, and the device answer differs from the CPU one
 # in the tenth significant figure - enough to change these logs. Left unpinned, each would
 # pass on a machine with no usable GPU and fail on one with a card, which is the same trap
-# the fp32/fp64 tests further down already document. P1_test_XCW_gpu_itensor is the
-# deliberate exception and carries its own reference.
+# the fp32/fp64 tests further down already document.
 #
 # P1_subset.hkl is every 8th reflection of P1_test.hkl (402 of 3215), the same subset
-# XcwScfTests builds. The I tensor costs 3 s on it instead of 100+ s, and the seven
-# non-full cases below run on it: the Hartree-Fock energy at lambda 0 is unchanged, the
-# GooFs and the lambda trajectory are those of the subset. The RUN_FULL_TEST scans and
-# the GPU I tensor case keep the full hkl - their goldens record the halting criterion
-# and the device path on the real data set. The goldens carry the -all_charges default,
-# so the TFVC pass in each tscb creation is part of them: from lambda 0.04 on the subset
-# density has no minimum along N8-H8 and the F/F2 scans log its 'Unexpected number of
-# extrema (0)' line twice.
+# XcwScfTests builds, and the five non-full cases below run on it: the Hartree-Fock energy at
+# lambda 0 is unchanged, the GooFs and the lambda trajectory are those of the subset. The
+# RUN_FULL_TEST scans keep the full hkl - their goldens record the halting criterion on the
+# real data set. The goldens carry the -all_charges default, so the TFVC pass in each tscb
+# creation is part of them.
+# P1_test_XCW saves the stored two-electron integrals to p1_eri.bin (save_eri); the other subset
+# goldens read them (read_eri, ctest fixture xcw_p1_golden_eri), which only SCF.log mentions.
+#
+# The XCW permutation matrix (weighting x anharmonic x extinction x grown x F/F^2 x target, 26 NH3
+# rows in tests/xcw_matrix) is not a table here: it runs in process as the gtest XcwMatrixTests,
+# which compares R1, wR2, GooF, scale, extinction and final lambda with tolerances against
+# tests/xcw_matrix/matrix.good, so round-off in the last printed digit does not fail it.
 
 [P1_test_XCW]
 directory = "P1_test"
@@ -394,10 +594,9 @@ good = "P1_test_XCW.good"
 [P1_test_XCW.args]
 do_XCW = ""
 no_gpu = ""
-cif = "P1_test_NA2.cif"
+cif = "P1_test.cif"
 hkl = "P1_subset.hkl"
-anom_disp = "anom_disp.txt"
-XCW_settings = "test_settings.txt"
+XCW_settings = "test_settings_save.txt"
 no_date = ""
 
 # Longer lambda scan exercising the Gaussian halting criterion over a real
@@ -412,11 +611,9 @@ full = true
 [P1_test_XCW_full.args]
 do_XCW = ""
 no_gpu = ""
-xcw_gaussian_halt = ""
-cif = "P1_test_NA2.cif"
+cif = "P1_test.cif"
 hkl = "P1_test.hkl"
-anom_disp = "anom_disp.txt"
-XCW_settings = "test_settings.txt"
+XCW_settings = "test_settings_halt.txt"
 no_date = ""
 
 # h2_weighting variant of P1_test_XCW: fits against the 1/|H|^2-weighted
@@ -429,10 +626,9 @@ good = "P1_test_XCW_h2.good"
 [P1_test_XCW_h2.args]
 do_XCW = ""
 no_gpu = ""
-cif = "P1_test_NA2.cif"
+cif = "P1_test.cif"
 hkl = "P1_subset.hkl"
-anom_disp = "anom_disp.txt"
-XCW_settings = "h2_test_settings.txt"
+XCW_settings = "h2_test_settings_read.txt"
 no_date = ""
 
 # h2_weighting variant of P1_test_XCW_full, same RUN_FULL_TEST gating,
@@ -451,18 +647,18 @@ full = true
 [P1_test_XCW_h2_full.args]
 do_XCW = ""
 no_gpu = ""
-xcw_gaussian_halt = ""
-cif = "P1_test_NA2.cif"
+cif = "P1_test.cif"
 hkl = "P1_test.hkl"
-anom_disp = "anom_disp.txt"
-XCW_settings = "h2_test_settings.txt"
+XCW_settings = "h2_test_settings_halt.txt"
 no_date = ""
 
-# The same three fits with -xcw_incremental: the two-electron Fock part comes from the
-# change of the density between iterations, contracted from the stored integrals with
-# the segments the difference cannot reach skipped, and rebuilt in full every eighth
-# iteration or when the DIIS error has fallen tenfold. -xcw_int_precision 1e-12 as the
-# flag's help asks, since the direct build (no memory for the integrals) needs it.
+# P1_test_XCW with -xcw_incremental: the two-electron Fock part comes from the change of
+# the density between iterations, contracted from the stored integrals with the segments
+# the difference cannot reach skipped, and rebuilt in full every eighth iteration or when
+# the DIIS error has fallen tenfold. -xcw_int_precision 1e-12 as the flag's help asks,
+# since the direct build (no memory for the integrals) needs it. The incremental build
+# never sees the criterion, so one fit covers it; the F2 and h2 fits gave goldens
+# identical to their full builds as well.
 
 [P1_test_XCW_incremental]
 directory = "P1_test"
@@ -473,41 +669,28 @@ do_XCW = ""
 no_gpu = ""
 xcw_incremental = ""
 xcw_int_precision = "1e-12"
-cif = "P1_test_NA2.cif"
+cif = "P1_test.cif"
 hkl = "P1_subset.hkl"
-anom_disp = "anom_disp.txt"
-XCW_settings = "test_settings.txt"
+XCW_settings = "test_settings_read.txt"
 no_date = ""
 
-[P1_test_XCW_h2_incremental]
-directory = "P1_test"
-good = "P1_test_XCW_h2_incremental.good"
+# P1_test_XCW_incremental's fit with a twin law (twofold about c*): the twin mates R h only
+# widen the table (785 rows for 402 measured), so the lambda table matches P1_test_XCW's
+# (GoF, R, chi2 to every printed digit). Only the table line, the k-point count and the
+# Fourier-Bessel node count differ; every R h being in the table is ReadHklFullTwinMatesOnlyInTheTable.
 
-[P1_test_XCW_h2_incremental.args]
+[P1_test_XCW_twin]
+directory = "P1_test"
+good = "P1_test_XCW_twin.good"
+
+[P1_test_XCW_twin.args]
 do_XCW = ""
 no_gpu = ""
-xcw_incremental = ""
-xcw_int_precision = "1e-12"
-cif = "P1_test_NA2.cif"
+cif = "P1_test.cif"
 hkl = "P1_subset.hkl"
-anom_disp = "anom_disp.txt"
-XCW_settings = "h2_test_settings.txt"
+XCW_settings = "test_settings_read.txt"
 no_date = ""
-
-[P1_F2_test_XCW_incremental]
-directory = "P1_test"
-good = "P1_F2_test_XCW_incremental.good"
-
-[P1_F2_test_XCW_incremental.args]
-do_XCW = ""
-no_gpu = ""
-xcw_incremental = ""
-xcw_int_precision = "1e-12"
-cif = "P1_test_NA2.cif"
-hkl = "P1_subset.hkl"
-anom_disp = "anom_disp.txt"
-XCW_settings = "test_settings_f2.txt"
-no_date = ""
+twin = [-1, 0, 0, 0, -1, 0, 0, 0, 1]
 
 # P1_test_XCW against the F^2 criterion
 
@@ -518,10 +701,9 @@ good = "P1_F2_test_XCW.good"
 [P1_F2_test_XCW.args]
 do_XCW = ""
 no_gpu = ""
-cif = "P1_test_NA2.cif"
+cif = "P1_test.cif"
 hkl = "P1_subset.hkl"
-anom_disp = "anom_disp.txt"
-XCW_settings = "test_settings_f2.txt"
+XCW_settings = "test_settings_f2_read.txt"
 no_date = ""
 
 [P1_F2_test_XCW_full]
@@ -532,11 +714,9 @@ full = true
 [P1_F2_test_XCW_full.args]
 do_XCW = ""
 no_gpu = ""
-xcw_gaussian_halt = ""
-cif = "P1_test_NA2.cif"
+cif = "P1_test.cif"
 hkl = "P1_test.hkl"
-anom_disp = "anom_disp.txt"
-XCW_settings = "test_settings_f2.txt"
+XCW_settings = "test_settings_f2_halt.txt"
 no_date = ""
 
 # h2_weighting variant of P1_F2_test_XCW: 
@@ -549,10 +729,9 @@ good = "P1_F2_test_XCW_h2.good"
 
 do_XCW = ""
 no_gpu = ""
-cif = "P1_test_NA2.cif"
+cif = "P1_test.cif"
 hkl = "P1_subset.hkl"
-anom_disp = "anom_disp.txt"
-XCW_settings = "h2_test_settings_f2.txt"
+XCW_settings = "h2_test_settings_f2_read.txt"
 no_date = ""
 
 [P1_F2_test_XCW_h2_full]
@@ -563,17 +742,14 @@ full = true
 [P1_F2_test_XCW_h2_full.args]
 do_XCW = ""
 no_gpu = ""
-xcw_gaussian_halt = ""
-cif = "P1_test_NA2.cif"
+cif = "P1_test.cif"
 hkl = "P1_test.hkl"
-anom_disp = "anom_disp.txt"
-XCW_settings = "h2_test_settings_f2.txt"
+XCW_settings = "h2_test_settings_f2_halt.txt"
 no_date = ""
 
 # GPU variants. These run only when a device is present; the test skips otherwise, so
 # the suite stays green on a CPU-only machine. The grid-weight path is bit-identical to
-# the CPU, so it reuses the CPU reference; the I tensor path is single-precision and
-# carries its own.
+# the CPU, so it reuses the CPU reference.
 
 # Its own reference rather than the CPU one, and deliberately so. The weights themselves
 # are bit-identical - the only line that differs is the note saying the device ran them -
@@ -599,30 +775,13 @@ gpu_grid = ""
 # The reference carries the GPU note, so this case keeps it where every other test drops it.
 no_date_but_gpu = ""
 
-[P1_test_XCW_gpu_itensor]
-directory = "P1_test"
-good = "P1_test_XCW_gpu_itensor.good"
-
-[P1_test_XCW_gpu_itensor.args]
-do_XCW = ""
-cif = "P1_test_NA2.cif"
-hkl = "P1_test.hkl"
-anom_disp = "anom_disp.txt"
-XCW_settings = "test_settings.txt"
-no_date = ""
-gpu_itensor = ""
-# The device GEMM is cuBLAS when the machine has it and CUTLASS otherwise, and the two
-# disagree in the last digits. Pinned to CUTLASS because that is the one always present:
-# left to choose, this test would pass or fail on whether a CUDA toolkit was installed.
-no_gpu_cublas = ""
-
 # The two sincos kernels, each pinned rather than left to the card. Without the explicit
 # flags the precision a run gets depends on the reported fp32:fp64 ratio, so on a consumer
 # part both of these would be the f32 kernel and on a V100 both would be the f64 one - the
 # suite would report two passes having tested one path twice.
 #
 # Both are held to the same CPU reference, which is the point: the f64 kernel agrees to
-# ~1e-14 and the reduced-argument f32 one to ~2e-8, and both are inside what the reference
+# ~1e-14 and the all-f32 one to ~4e-8 of max |F|, and both are inside what the reference
 # comparison accepts. That is the numerical-agreement contract in AGENTS.md, checked.
 
 [sucrose_SF_gpu_fp64]
@@ -646,6 +805,25 @@ hkl = "olex2/Wfn_job/sucrose.hkl"
 wfn = "olex2/Wfn_job/sucrose.wfx"
 acc = 1
 gpu_fp32 = ""
+
+# P1_test_XCW with the grid block GEMMs and the stored-integral Fock build on the device
+# (-gpu_itensor). Its own reference: the device answer differs from P1_test_XCW.good in the
+# tenth significant figure, and that difference is the evidence the device ran. The device
+# GEMM is cuBLAS when the machine has it and CUTLASS otherwise, and the two disagree in the
+# last digits, so it is pinned to CUTLASS, the one always present. Reads p1_eri.bin like the
+# other subset goldens.
+[P1_test_XCW_gpu]
+directory = "P1_test"
+good = "P1_test_XCW_gpu.good"
+
+[P1_test_XCW_gpu.args]
+do_XCW = ""
+cif = "P1_test.cif"
+hkl = "P1_subset.hkl"
+XCW_settings = "test_settings_read.txt"
+no_date = ""
+gpu_itensor = ""
+no_gpu_cublas = ""
 
 # ---------------------------------------------------------------------------
 # One-shot options and property cubes (19 Sep 2026). Each of these ran zero
@@ -819,19 +997,6 @@ dmin = 1.5
 acc = 1
 embis = true
 old_tsc = true
-
-# Centre-moment restraints instead of the partition default, with a non-default weight
-[ri_fit_multipoles_centre]
-directory = "epoxide_gbw"
-
-[ri_fit_multipoles_centre.args]
-wfn = "epoxide.gbw"
-cif = "epoxide.cif"
-dmin = 0.4
-ri_fit = "combo_basis_fit"
-multipole_moments = ["Hirshfeld", 2]
-multipole_centre = true
-multipole_strength = 0.5
 
 # Promolecular Hirshfeld surface of the asymmetric unit inside the packed cluster;
 # the golden is the per-vertex d_i/d_e/d_norm/shape-index/curvedness table

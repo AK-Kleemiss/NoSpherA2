@@ -27,7 +27,7 @@ Making Integration Grids...
 GridManager: Setting up prototype grids for atom types...
 GridManager: Generating integration grids for atoms...
 GPU in use: atomic grid weights (Becke and TFVC) on CUDA
-GridManager: Generated total of 85446 grid points.
+GridManager: Generated total of 78230 grid points.
 Starting MBIS iterations...
 MBIS iteration: 1 max change: 0.661515
 MBIS iteration: 2 max change: 0.092714
@@ -156,7 +156,7 @@ Atom  36: 0.208604
 Atom  37: 0.114903
 Atom  38: 0.188361
 Atom  39: 0.107772
-Atom  40: 0.022148
+Atom  40: 0.034595
 Atom  41: 0.095068
 Atom  42: 0.127993
 Atom  43: 0.087916
@@ -203,7 +203,7 @@ Table of Charges in electrons
        H9a     0.127     0.064    -0.094     0.111     0.115
        C10    -0.186     0.008     0.783     0.095     0.191
       H10a     0.126     0.049    -0.089     0.081     0.108
-       C11    -0.144     0.019     0.717     0.073     0.024
+       C11    -0.144     0.019     0.718     0.080     0.034
        H11     0.112     0.052    -0.101     0.087     0.095
        C12    -0.161    -0.007     0.844     0.102     0.129
       H12a     0.098     0.057    -0.082     0.082     0.087

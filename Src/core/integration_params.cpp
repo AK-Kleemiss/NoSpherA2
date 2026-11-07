@@ -133,7 +133,10 @@ void Int_Params::collect_basis_data()
 			exponents.push_back(basis[shell].get_exponent());
 		}
 		// Normalize the GTOs depending on the context
-		if (wfn_origin == e_origin::gbw || wfn_origin == e_origin::wfx)
+		//molden (orca_2mkl) and fchk (after read_fchk) coefficients multiply bare x^l exp(-a r^2) with the
+		//contracted shell already normalised, as gbw's do: they need this factor, not normalize_gto().
+		if (wfn_origin == e_origin::gbw || wfn_origin == e_origin::wfx || wfn_origin == e_origin::molden
+			|| wfn_origin == e_origin::fchk)
 		{
 			for (int i = 0; i < coefficients.size(); i++)
 			{
@@ -180,9 +183,8 @@ void Int_Params::collect_basis_data()
 				"overlap computed from this basis will not have a unit diagonal.\n";
 		}
 
-		//OCC and NOT_YET_DEFINED store l in get_type(), every file reader (gbw, wfx, tonto, ptb, xtb,
-		//molden, fchk, XCW_fit) stores l + 1
-		const int type_offset = (wfn_origin == e_origin::NOT_YET_DEFINED || wfn_origin == e_origin::OCC) ? 0 : 1;
+		//get_type() is l for the aux bases (NOT_YET_DEFINED), l + 1 for every wavefunction basis incl. OCC
+		const int type_offset = (wfn_origin == e_origin::NOT_YET_DEFINED) ? 0 : 1;
 		int max_l = 1;
 		for (int func = 0; func < basis.size(); func++)
 		{

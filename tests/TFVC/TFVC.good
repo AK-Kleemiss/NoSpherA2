@@ -9,6 +9,9 @@ Please give credit and cite corresponding pieces!
 This Software is published with BSD-2 clause license.
 Reading:                                  "water.gbw" done!
 Number of atoms in Wavefunction file: 4 Number of MOs: 73
+[NoSpherA2] Kleemiss et al., Chem. Sci. 12 (2021) 1675, DOI 10.1039/D0SC05526C
+[HAR] Jayatilaka & Dittrich, Acta Cryst. A 64 (2008) 383, DOI 10.1107/S0108767308005709
+[HAR] Capelli et al., IUCrJ 1 (2014) 361, DOI 10.1107/S2052252514014845
 Number of protons: 12
 Number of electrons: 12.000000
 Reading:                                  "water.cif" done!
@@ -18,6 +21,8 @@ Number of symmetry operations:                   1
 Nr of reflections to be used:                 3561
 Generating k-points...                            ... done!
 Number of k-points to evaluate: 3561
+[Becke grid] Becke, J. Chem. Phys. 88 (1988) 2547, DOI 10.1063/1.454033
+[Hirshfeld] Hirshfeld, Theor. Chim. Acta 44 (1977) 129, DOI 10.1007/BF00549096
 There are:
    4 atoms read from the wavefunction, of which 
    4 are identified as asymmetric unit atoms!
@@ -26,55 +31,55 @@ Selected accuracy: 1
 Making Integration Grids...
 GridManager: Setting up prototype grids for atom types...
 GridManager: Generating integration grids for atoms...
-GridManager: Generated total of 8822 grid points.
+GridManager: Generated total of 8186 grid points.
 Starting MBIS iterations...
-MBIS iteration: 1 max change: 0.452251
-MBIS iteration: 2 max change: 0.126346
-MBIS iteration: 3 max change: 0.0708187
-MBIS iteration: 4 max change: 0.0482686
-MBIS iteration: 5 max change: 0.0339659
-MBIS iteration: 6 max change: 0.024166
-MBIS iteration: 7 max change: 0.0173594
-MBIS iteration: 8 max change: 0.012595
-MBIS iteration: 9 max change: 0.00922858
-MBIS iteration: 10 max change: 0.0068241
-MBIS converged after 10 iterations with max charge change: 0.00508744 and max sig change: 0.000860113
+MBIS iteration: 1 max change: 0.45
+MBIS iteration: 2 max change: 0.13
+MBIS iteration: 3 max change: 0.07
+MBIS iteration: 4 max change: 0.05
+MBIS iteration: 5 max change: 0.03
+MBIS iteration: 6 max change: 0.02
+MBIS iteration: 7 max change: 0.02
+MBIS iteration: 8 max change: 0.01
+MBIS iteration: 9 max change: 0.01
+MBIS iteration: 10 max change: 0.01
+MBIS converged after 10 iterations with max charge change: 0.01 and max sig change: 0.00
 Promolecular charges:
-Atom   0: -0.806911
-Atom   1: 0.403727
-Atom   2: 0.403724
-Atom   3: 5.58478e-05
+Atom   0: -0.81
+Atom   1: 0.40
+Atom   2: 0.40
+Atom   3: -0.00
 Starting EMBIS iterations...
-EMBIS iteration:    1 max charge/alpha change: 3.20136/0.810731
-EMBIS iteration:    2 max charge/alpha change: 1.25271/0.00943117
-EMBIS iteration:    3 max charge/alpha change: 0.551748/0.00864216
-EMBIS iteration:    4 max charge/alpha change: 0.236184/0.00637245
-EMBIS iteration:    5 max charge/alpha change: 0.149039/0.00461283
-EMBIS iteration:    6 max charge/alpha change: 0.131282/0.00342987
-EMBIS iteration:    7 max charge/alpha change: 0.122377/0.00264218
-EMBIS iteration:    8 max charge/alpha change: 0.116125/0.00210202
-EMBIS iteration:    9 max charge/alpha change: 0.109953/0.00171599
-EMBIS iteration:   10 max charge/alpha change: 0.103109/0.00142836
-EMBIS iteration:   11 max charge/alpha change: 0.0980118/0.00120593
-EMBIS iteration:   12 max charge/alpha change: 0.0918246/0.00102857
-EMBIS converged after 12 iterations with max charge change: 0.000883703 and max sig change: 0.0844607
+EMBIS iteration:    1 max charge/alpha change: 3.20/0.81
+EMBIS iteration:    2 max charge/alpha change: 1.26/0.01
+EMBIS iteration:    3 max charge/alpha change: 0.55/0.01
+EMBIS iteration:    4 max charge/alpha change: 0.24/0.01
+EMBIS iteration:    5 max charge/alpha change: 0.15/0.00
+EMBIS iteration:    6 max charge/alpha change: 0.13/0.00
+EMBIS iteration:    7 max charge/alpha change: 0.12/0.00
+EMBIS iteration:    8 max charge/alpha change: 0.12/0.00
+EMBIS iteration:    9 max charge/alpha change: 0.11/0.00
+EMBIS iteration:   10 max charge/alpha change: 0.10/0.00
+EMBIS iteration:   11 max charge/alpha change: 0.10/0.00
+EMBIS iteration:   12 max charge/alpha change: 0.09/0.00
+EMBIS converged after 12 iterations with max charge change: 0.00 and max sig change: 0.09
 Promolecular charges:
-Atom   0: -0.767235
-Atom   1: 0.38389
-Atom   2: 0.383886
-Atom   3: 5.57163e-05
+Atom   0: -0.77
+Atom   1: 0.38
+Atom   2: 0.38
+Atom   3: -0.00
 Table of Charges in electrons
       Atom     Becke Hirshfeld      TFVC      MBIS     EMBIS
-        O1    -0.165    -0.303    -1.103    -0.811    -0.767
+        O1    -0.165    -0.304    -1.103    -0.812    -0.768
         H1     0.083     0.152     0.551     0.406     0.384
         H2     0.083     0.152     0.551     0.406     0.384
-        He     0.000     0.000     0.000     0.000     0.000
+        He     0.000    -0.000     0.000    -0.000    -0.000
 Total number of electrons:
- Becke:      11.999404
- Hirshfeld:  11.999828
- TVFC:       11.999835
- MBIS:       11.999366
- EMBIS:      11.999432
+ Becke:      11.999701
+ Hirshfeld:  12.000140
+ TVFC:       12.000150
+ MBIS:       11.999662
+ EMBIS:      11.999732
 [                Calculating Scattering Factors               ]
 [=============================================================] 100% 
 Writing tsc file...  ... done!

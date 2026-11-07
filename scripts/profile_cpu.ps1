@@ -3,8 +3,9 @@
 #   powershell -File scripts\profile_cpu.ps1 -AppArgs "<NoSpherA2 arguments>" [-Exe <path>] [-WorkingDir <dir>]
 #       [-Tool auto|vtune|vs] [-Output <dir or file.diagsession>] [-Top 30]
 #
-# Build the Profile|x64 configuration of Windows\NoSpherA2\NoSpherA2.sln first: release code generation with
-# full symbols, so the samples resolve to the functions and lines of the binary users actually run.
+# Build with -DNOSPHERA2_PROFILE_SYMBOLS=ON first (release code generation with full symbols), e.g.
+#   cmake --preset release-windows -DNOSPHERA2_PROFILE_SYMBOLS=ON && cmake --build --preset release-windows
+# so the samples resolve to the functions and lines of the binary users actually run.
 #
 # Tool vtune (default when Intel VTune is installed): user-mode sampling, prints the top functions by self time
 # and leaves the result directory for "vtune -report hotspots -r <dir> -group-by source-line" and friends.
@@ -23,7 +24,7 @@ param(
 )
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
-if ($Exe -eq "") { $Exe = Join-Path $root "build\Profile_x64\NoSpherA2.exe" }
+if ($Exe -eq "") { $Exe = Join-Path $root "build\release-windows\bin\NoSpherA2.exe" }
 $Exe = (Resolve-Path $Exe).Path
 $WorkingDir = (Resolve-Path $WorkingDir).Path
 $stamp = Get-Date -Format "yyyyMMdd_HHmmss"

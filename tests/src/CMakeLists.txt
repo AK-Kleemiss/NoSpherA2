@@ -64,6 +64,8 @@ gtest_discover_tests(
     PROPERTIES
         ENVIRONMENT
             "OCC_DATA_PATH=${NOSPHERA2_OCC_DATA_PATH}"
+        ENVIRONMENT_MODIFICATION
+            "NOS_TEST_SHARED_DIR=set:${CMAKE_CURRENT_BINARY_DIR}/shared"
 )
 
 set_property(

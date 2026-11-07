@@ -20,6 +20,46 @@ vmd -e mol_fukui.vmd
 | `<stem>_dual_descriptor.cube` | df(r) = f+ - f- |
 | `<stem>_fukui.dat` | frontier orbital indices/energies and the integrated norms |
 
+## Spin-resolved ELI-D (alpha-alpha, beta-beta, triplet)
+
+One command from an open-shell wavefunction to the scene:
+
+```sh
+python scripts/vmd/eli_spin.py mol.fchk --resolution 0.1 --radius 3.5 --vmd
+```
+
+It runs `NoSpherA2 -wfn mol.fchk -eli_spin -resolution 0.1 -radius 3.5`, writes `mol_eli_spin.vmd` with
+`make_eli_spin_vmd.py` and starts `vmd -e mol_eli_spin.vmd` when VMD is on PATH. The two steps by hand:
+
+```sh
+NoSpherA2 -wfn mol.fchk -eli_spin -resolution 0.1 -radius 3.5
+python scripts/vmd/make_eli_spin_vmd.py .
+vmd -e mol_eli_spin.vmd
+```
+
+| File | Quantity |
+|---|---|
+| `<stem>_eli_aa.cube` | ELI-D(aa), alpha-alpha pairs (Kohout 2004) |
+| `<stem>_eli_bb.cube` | ELI-D(bb), beta-beta pairs (open shell only) |
+| `<stem>_eli_triplet.cube` | ELI-D(t), triplet-coupled pairs (Kohout, Wagner, Grin 2008; open shell only) |
+| `<stem>_eli.cube`, `<stem>_s_rho.cube`, `<stem>_rho.cube` | with `-eli`, `-s_rho`, `-rho` on the same command, same grid |
+
+All three come from one spin-resolved evaluation per grid point. A closed-shell (restricted, no singles) wavefunction
+gets `_eli_aa` only, equal to the `-eli` cube: there bb = aa and the triplet member is a constant multiple of aa.
+Restricted open-shell input splits a singly occupied orbital to alpha. Where a spin channel has no density (bb of a
+one-beta-electron system, far tails) the cube holds 0.
+
+The scene: the molecule once (licorice), the members as volumes on it, one transparent isosurface representation each,
+aa blue, bb red, triplet green, all at ELI-D 1.6 by default (`--iso`, `--iso-aa`, `--iso-bb`, `--iso-triplet`); toggle
+them in Graphics > Representations. `--rho-clip [V]` colours the surfaces by `<stem>_rho.cube` (run with `-rho`, or
+`eli_spin.py --rho`), the colour scale starting at rho = V; `--side-by-side` loads one copy per member, shifted along x.
+
+Reading them: aa and bb localise the same-spin pairs of each channel, so they differ only where the unpaired density
+sits - for a radical the aa surface swells around the radical centre while bb keeps the closed-shell shape. The triplet
+member counts pairs of either same-spin channel together with the triplet-coupled ab part; its basins are where
+same-spin pairing is strongest overall. ELI-D 1.6 encloses bond and lone-pair attractors; go lower (1.3-1.4) for
+diffuse radical lobes.
+
 ## If VMD says "Cannot read file of type ..."
 
 ```

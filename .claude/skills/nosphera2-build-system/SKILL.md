@@ -38,8 +38,8 @@ The top-level CMake project configures dependencies and then builds project targ
 - `libcint`, `occ`, `mdspan`, and `featomic/featomic` are consumed with `add_subdirectory`.
 - `BasisSetGenerator` builds `BasisSetConverter`, which generates `Src/basis_data.cpp`.
 - `Src/core` builds the static `NoSpherA2Core` target and alias `NoSpherA2::Core`.
-- `app` builds the `NoSpherA2` executable.
-- `Src/dll` builds the optional DLL when `NOSPHERA2_BUILD_DLL=ON`.
+- `Src/dll` builds the shared library (`NoSpherA2.dll`, `libNoSpherA2.so`, `libNoSpherA2.dylib`) into `bin`; it carries all the code.
+- `app` builds the `NoSpherA2` executable, a launcher that loads that library from its own directory (`nosphera2_main`), so the exe never runs without it. Android links one static exe instead.
 - `tests/src` builds `NoSpherA2_Tests` when `NOSPHERA2_BUILD_TESTS=ON`.
 
 Runtime outputs are under the preset build tree's `bin` directory, for example `build/release-windows/bin/NoSpherA2.exe`.
@@ -47,7 +47,6 @@ Runtime outputs are under the preset build tree's `bin` directory, for example `
 ## CMake Options
 
 - Use `-DNOSPHERA2_BUILD_TESTS=ON` before running CTest.
-- Use `-DNOSPHERA2_BUILD_DLL=ON` only when the Windows DLL target is needed.
 - Use `-DNOSPHERA2_DEPENDENCIES_ONLY=ON` only for dependency-cache or dependency-prebuild workflows. The top-level `CMakeLists.txt` returns before adding NoSpherA2 targets in this mode.
 
 CI restores or builds a dependency-only tree, saves that cache, then reconfigures the same build directory with `NOSPHERA2_BUILD_TESTS=ON` and `NOSPHERA2_DEPENDENCIES_ONLY=OFF`.
@@ -70,15 +69,13 @@ uv run pytest
 
 Set `NOS_EXE` for Python tests when the executable is not on `PATH`. Set `OCC_DATA_PATH` when the runtime data path is not discoverable; CTest defaults this to `occ/share`.
 
-When adding or changing tests, keep `tests/tests.toml`, `tests/src`, `Windows/Tests/Tests.cpp`, and `UNIT_TESTS_STATUS.md` aligned for the affected coverage.
+When adding or changing tests, keep `tests/tests.toml`, `tests/src`, and `UNIT_TESTS_STATUS.md` aligned for the affected coverage.
 
 ## Windows Notes
 
 For preset builds on Windows, use an x64 Visual Studio Developer shell or another environment where Ninja can find `cl.exe` and the MSVC headers. Missing standard headers such as `stdlib.h`, `string.h`, or `stdio.h` usually indicate shell/toolchain setup, not a broken source rewrite.
 
-The Visual Studio solution under `Windows/` is legacy but still useful for DLL/OCC integration debugging. VS tests must remain in-process through `NoSpherA2_DLL.dll`; do not add subprocess fallbacks for crashing tests.
-
-The VS `NoSpherA2`/`NoSpherA2_LIB` projects share an `OutDir` (`Windows\Windows_utils\NoSpherA2_universal.props`) pointing at `build\$(Configuration)_$(Platform)\` (e.g. `build\Release_x64\NoSpherA2.exe`) — a sibling of, but distinct from, the CMake preset output `build\release-windows\bin\NoSpherA2.exe`. `Windows\Tests\Tests.vcxproj` was not repointed and still builds to `Windows\Tests\$(Configuration)_$(Platform)\`.
+The Visual Studio solution was removed in October 2026; CMake/Ninja is the only build system. IDE work on every platform goes through `.vscode/` (CMake Tools with the presets; `cmake.useVsDeveloperEnvironment` supplies the MSVC environment on Windows). In-process tests (e.g. `alanine_integrated_occ`) stay in-process in the gtest binary; do not add subprocess fallbacks for crashing tests.
 
 ## Dependency Boundaries
 

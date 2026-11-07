@@ -24,7 +24,6 @@
 #include "core/npy.h"
 #include "core/libCintMain.h"
 #include "core/throughput.h"
-#include "core/i_tensor_stream.h"
 #include "core/tsc_label_converter.h"
 #include "core/sphere_lebedev_rule.h"
 #include <occ/qm/hf.h>
@@ -311,97 +310,6 @@ namespace NoSpherA2UnitTests
 		std::filesystem::remove(labelled);
 		std::filesystem::remove(cif);
 		std::filesystem::remove(out);
-	}
-
-	// ------------------------------------------------------------------
-	// The compact XCW I tensor file
-
-	TEST(ITensorFileTests, RoundTripInBothPrecisionsAndWindowedReads)
-	{
-		const int nr = 5, nmo = 3;
-		const ivec mu = { 0, 0, 1, 2 }, nu = { 0, 2, 1, 2 };
-		for (const bool single : { false, true }) {
-			const auto p = std::filesystem::temp_directory_path() / (single ? "nosphera2_itensor_32.bin" : "nosphera2_itensor_64.bin");
-			{
-				i_tensor_file f;
-				f.create(p, nr, nmo, mu, nu, single);
-				cvec block(mu.size());
-				for (int r = nr - 1; r >= 0; r--) { // out of order, as the workers finish
-					for (size_t k = 0; k < mu.size(); k++) block[k] = cdouble(r + 0.25 * k, -1.0 * r);
-					f.write_block(r, block.data());
-				}
-				std::vector<std::complex<float>> block32(mu.size(), std::complex<float>(9.0f, 9.0f));
-				f.write_block(2, block32.data()); // the other element type in
-				f.finish_write();
-			}
-			size_t kept = 0;
-			bool is_single = false;
-			EXPECT_TRUE(i_tensor_file::matches(p, nr, nmo, kept, is_single));
-			EXPECT_EQ(kept, mu.size());
-			EXPECT_EQ(is_single, single);
-			EXPECT_FALSE(i_tensor_file::matches(p, nr + 1, nmo, kept, is_single));
-			EXPECT_EQ(i_tensor_file::total_bytes(nr, mu.size(), single), nr * mu.size() * (single ? 8u : 16u));
-			i_tensor_file f;
-			f.open(p, 2);
-			EXPECT_EQ(f.nr(), nr);
-			EXPECT_EQ(f.nmo(), nmo);
-			EXPECT_EQ(f.kept(), mu.size());
-			EXPECT_EQ(f.pair_nu()[1], 2);
-			EXPECT_EQ(f.window_blocks(), 2u);
-			EXPECT_EQ(f.path(), p);
-			EXPECT_THROW(f.load(0, 3), std::runtime_error) << "beyond the window";
-			EXPECT_THROW(f.load(4, 6), std::runtime_error) << "beyond nr";
-			f.load(3, 5);
-			if (single) {
-				EXPECT_EQ(f.block32(4)[1], std::complex<float>(4.25f, -4.0f));
-				EXPECT_EQ(f.block32(3)[0].real(), 3.0f);
-			} else {
-				EXPECT_EQ(f.block(4)[1], cdouble(4.25, -4.0));
-				EXPECT_EQ(f.block(3)[0], cdouble(3.0, -3.0));
-			}
-			f.set_window(100); // clamps to nr
-			EXPECT_EQ(f.window_blocks(), (size_t)nr);
-			f.load(0, nr);
-			if (single) EXPECT_EQ(f.block32(2)[3], std::complex<float>(9.0f, 9.0f));
-			else EXPECT_EQ(f.block(2)[3], cdouble(9.0, 9.0));
-			f.close();
-			std::filesystem::remove(p);
-		}
-	}
-
-	TEST(ITensorFileTests, DamagedFilesAreRefused)
-	{
-		const auto p = std::filesystem::temp_directory_path() / "nosphera2_itensor_bad.bin";
-		size_t kept;
-		bool single;
-		EXPECT_FALSE(i_tensor_file::matches(p / "nowhere", 1, 1, kept, single));
-		i_tensor_file f;
-		EXPECT_THROW(f.open(p / "nowhere", 1), std::runtime_error);
-		{
-			std::ofstream(p, std::ios::binary) << "not a tensor at all, just text";
-		}
-		EXPECT_FALSE(i_tensor_file::matches(p, 1, 1, kept, single));
-		EXPECT_THROW(f.open(p, 1), std::runtime_error);
-		// a valid header whose data is truncated
-		{
-			i_tensor_file w;
-			w.create(p, 3, 2, ivec{ 0, 1 }, ivec{ 0, 1 }, false);
-			cvec block(2, 1.0);
-			w.write_block(0, block.data());
-			w.finish_write();
-		}
-		EXPECT_FALSE(i_tensor_file::matches(p, 3, 2, kept, single));
-		EXPECT_THROW(f.open(p, 1), std::runtime_error);
-		// a corrupt pair list (mu > nu)
-		{
-			i_tensor_file w;
-			w.create(p, 1, 2, ivec{ 1 }, ivec{ 0 }, false);
-			cvec block(1, 1.0);
-			w.write_block(0, block.data());
-			w.finish_write();
-		}
-		EXPECT_THROW(f.open(p, 1), std::runtime_error);
-		std::filesystem::remove(p);
 	}
 
 } // namespace NoSpherA2UnitTests

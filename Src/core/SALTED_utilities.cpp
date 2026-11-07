@@ -1,5 +1,8 @@
 #include "pch.h"
+#include "tuning.h"
 #include "SALTED_utilities.h"
+#include "basis_set.h"
+#include <set>
 #include "integration_params.h"
 #include "SALTED_io.h"
 #include "constants.h"
@@ -59,29 +62,32 @@ int SALTED_Utils::get_lmax_max(std::unordered_map<std::string, int>& lmax)
 	return lmax_max;
 }
 
-void SALTED_Utils::set_lmax_nmax(std::unordered_map<std::string, int>& lmax, std::unordered_map<std::string, int>& nmax, const std::array<std::vector<primitive>, 118>& basis_set, std::vector<std::string> species)
+void SALTED_Utils::set_lmax_nmax(std::unordered_map<std::string, int>& lmax, std::unordered_map<std::string, int>& nmax, const BasisSet& basis_set, std::vector<std::string> species)
 {
 	// lmax = {"C": 5, "H":2,...} with the numbers beeing the maximum angular momentum (type) for the given atom
 	// nmax = {C0: 10, C1: 7, ...} with the numbers beeing the maximum number of primitives for the given atom and type
 
-	for (auto& spe : species)
+	for (const auto& spe : species)
 	{
-		int atom_index = constants::get_Z_from_label(spe.c_str());
-		// get the last element of the basis set for the given atom
-		lmax[spe] = basis_set[atom_index].back().get_type();
-		// initialize nmax with symbol + type
-		for (int i = 0; i < basis_set[atom_index].back().get_type() + 1; i++)
-		{
-			nmax[spe + std::to_string(i)] = 0;
-		}
-		// count the number of primitives for the given atom and type
-		for (int i = 0; i < basis_set[atom_index].size(); i++)
-		{
-			nmax[spe + std::to_string(basis_set[atom_index][i].get_type())] += 1;
-		}
+		const int Z = constants::get_Z_from_label(spe.c_str());
+		const auto& primitives = basis_set[Z];
+
+		// shell_ids[l] contains all unique shells with angular momentum l.
+		std::unordered_map<int, std::unordered_set<int>> shell_ids;
+
+		for (const auto& primitive : primitives)
+			shell_ids[primitive.type].insert(primitive.shell);
+
+		const auto max_l = std::ranges::max(
+			primitives | std::views::transform(&SimplePrimitive::type)
+		);
+
+		lmax[spe] = max_l;
+
+		for (int l = 0; l <= max_l; ++l)
+			nmax[spe + std::to_string(l)] = static_cast<int>(shell_ids[l].size());
 	}
 }
-
 
 std::vector<char> SALTED_Utils::filter_input(WFN& wavy, options& opt, const SALTEDConfig& config) {
 	// Two kinds of atom cannot be predicted, and both are handed to the spherical
@@ -98,34 +104,70 @@ std::vector<char> SALTED_Utils::filter_input(WFN& wavy, options& opt, const SALT
 	// neighbours whose species is outside neighspe. An atom with neighbours but no
 	// ALLOWED ones therefore still reaches equicomb - the zero guard there catches
 	// it, leaves it spherical rather than NaN, and says so in the log.
+
+	auto is_species_of_atom_defined_in_model = [&config](const std::string& atom_symbol) {
+		return std::find(config.species.begin(), config.species.end(), atom_symbol) == config.species.end(); };
+
 	const int ncen_in = wavy.get_ncen();
 	std::vector<char> use_thakkar(ncen_in, 0);
 	for (int a = 0; a < ncen_in; a++)
-		if (std::find(config.species.begin(), config.species.end(), std::string(constants::atnr2letter(wavy.get_atom_charge(a)))) == config.species.end())
+	{
+		if (is_species_of_atom_defined_in_model(constants::atnr2letter(wavy.get_atom_charge(a))))
 			use_thakkar[a] = 1;
+	}
 	const int n_unknown = static_cast<int>(std::count(use_thakkar.begin(), use_thakkar.end(), (char)1));
 
 	const double rcut = std::min(config.rcut1, config.rcut2);
 	// rcut is in Angstrom, the coordinates may not be
 	const double rcut_internal = wavy.get_isBohr() ? constants::ang2bohr(rcut) : rcut;
 	const double cut_sq = rcut_internal * rcut_internal;
+	// Cells of edge rcut: a neighbour within rcut sits in the atom's own cell or one of the 26
+	// around it, so the test grows with the atom count rather than its square. No periodic
+	// images, because the featomic system has no cell either.
+	std::vector<std::array<double, 3>> pos(ncen_in);
+	std::array<double, 3> lo;
+	lo.fill(std::numeric_limits<double>::max());
+	for (int a = 0; a < ncen_in; a++)
+		for (int ax = 0; ax < 3; ax++)
+		{
+			pos[a][ax] = wavy.get_atom_coordinate(a, ax);
+			lo[ax] = std::min(lo[ax], pos[a][ax]);
+		}
+	auto cell = [&](const int a, const int ax) { return static_cast<long long>((pos[a][ax] - lo[ax]) / rcut_internal); };
+	long long n_cell[3] = { 1, 1, 1 };
+	for (int a = 0; a < ncen_in; a++)
+		for (int ax = 0; ax < 3; ax++)
+			n_cell[ax] = std::max(n_cell[ax], cell(a, ax) + 1);
+	auto key = [&](const long long x, const long long y, const long long z) { return x + n_cell[0] * (y + n_cell[1] * z); };
+	std::unordered_map<long long, ivec> cells;
+	for (int a = 0; a < ncen_in; a++)
+		cells[key(cell(a, 0), cell(a, 1), cell(a, 2))].push_back(a);
+
 	int n_isolated = 0;
 #pragma omp parallel for reduction(+ : n_isolated)
 	for (int a = 0; a < ncen_in; a++)
 	{
 		if (use_thakkar[a]) continue;
 		bool lonely = true;
-		for (int b = 0; b < ncen_in && lonely; b++)
-		{
-			if (b == a) continue;
-			double d_sq = 0.0;
-			for (unsigned int ax = 0; ax < 3; ax++)
-			{
-				const double dx = wavy.get_atom_coordinate(a, ax) - wavy.get_atom_coordinate(b, ax);
-				d_sq += dx * dx;
-			}
-			if (d_sq < cut_sq) lonely = false;
-		}
+		const long long cx = cell(a, 0), cy = cell(a, 1), cz = cell(a, 2);
+		for (long long x = std::max(cx - 1, 0LL); x <= std::min(cx + 1, n_cell[0] - 1) && lonely; x++)
+			for (long long y = std::max(cy - 1, 0LL); y <= std::min(cy + 1, n_cell[1] - 1) && lonely; y++)
+				for (long long z = std::max(cz - 1, 0LL); z <= std::min(cz + 1, n_cell[2] - 1) && lonely; z++)
+				{
+					const auto it = cells.find(key(x, y, z));
+					if (it == cells.end()) continue;
+					for (const int b : it->second)
+					{
+						if (b == a) continue;
+						double d_sq = 0.0;
+						for (int ax = 0; ax < 3; ax++)
+						{
+							const double dx = pos[a][ax] - pos[b][ax];
+							d_sq += dx * dx;
+						}
+						if (d_sq < cut_sq) { lonely = false; break; }
+					}
+				}
 		if (lonely)
 		{
 			use_thakkar[a] = 1;   // distinct indices, and char so there is no bitfield to race on
@@ -140,7 +182,7 @@ std::vector<char> SALTED_Utils::filter_input(WFN& wavy, options& opt, const SALT
 			std::cout << "WARNING: Not all species in the structure are known to the model. The following species are not known: ";
 			for (int a = 0; a < ncen_in; a++)
 			{
-				if (std::find(config.species.begin(), config.species.end(), std::string(constants::atnr2letter(wavy.get_atom_charge(a)))) == config.species.end())
+				if (is_species_of_atom_defined_in_model(constants::atnr2letter(wavy.get_atom_charge(a))))
 				{
 					std::cout << constants::atnr2letter(wavy.get_atom_charge(a)) << " ";
 				}
@@ -192,7 +234,7 @@ std::string SALTED_Utils::FeatomicHyperParameters::to_json() const
 }
 
 
-// Used to generate metatensor::TensorMap and save the buffer location into the descriptor_buffer
+// Runs featomic's spherical expansion for the SALTED keys
 static metatensor::TensorMap get_feats_projs(featomic::SimpleSystem featomic_system, const SALTED_Utils::FeatomicHyperParameters& parameters)
 {
 	// size_t nspe1 = neighspe.size();
@@ -208,7 +250,7 @@ static metatensor::TensorMap get_feats_projs(featomic::SimpleSystem featomic_sys
 			{
 				int32_t neigh_z = constants::get_Z_from_label(neigh_spe.c_str()) + 1;
 				// Directly emplace back initializer_lists into keys_array
-				keys_array.push_back({ l, 1, center_z, neigh_z});
+				keys_array.push_back({ l, 1, center_z, neigh_z });
 			}
 		}
 	}
@@ -247,50 +289,99 @@ static metatensor::TensorMap get_feats_projs(featomic::SimpleSystem featomic_sys
 	calc_opts.selected_keys = keys_selection;
 	calc_opts.use_native_system = true;
 	// run the calculation
-	metatensor::TensorMap descriptor = calculator.compute(featomic_system, calc_opts);
-
-	// The descriptor is a metatensor `TensorMap`, containing multiple blocks.
-	// We can transform it to a single block containing a dense representation,
-	// with one sample for each atom-centered environment.
-	descriptor = descriptor.keys_to_samples("center_type");
-	descriptor = descriptor.keys_to_properties("neighbor_type");
-	// descriptor.save("spx_pred.npy");
-
-	return descriptor;
+	// one block per (o3_lambda, o3_sigma, center_type, neighbor_type); get_expansion_coeffs
+	// densifies them itself
+	return calculator.compute(featomic_system, calc_opts);
 }
 
-// Reads the descriptor buffer and fills the expansion coefficients vector
-static SALTEDDescriptors get_expansion_coeffs(std::vector<uint8_t> descriptor_buffer, const featomic::SimpleSystem& featomic_system, const SALTED_Utils::FeatomicHyperParameters& parameters)
+static size_t label_column(const metatensor::Labels& labels, const char* name)
 {
-	int n_atoms = (int)featomic_system.size();
-	int nspe = (int)parameters.species.size();
-	metatensor::TensorMap descriptor = metatensor::TensorMap::load_buffer(descriptor_buffer);
-	const int nchannels = nspe * parameters.max_radial;
-	SALTEDDescriptors omega(n_atoms, nchannels, parameters.max_angular);
-	for (int l = 0; l < parameters.max_angular + 1; ++l)
-	{
-		cvec2 c2r = SALTED_Utils::complex_to_real_transformation({ (2 * l) + 1 })[0];
-		metatensor::TensorBlock descriptor_block = descriptor.block_by_id(l);
-		metatensor::NDArray<double> descriptor_values = descriptor_block.values();
+	const auto& names = labels.names();
+	for (size_t i = 0; i < names.size(); ++i)
+		if (std::strcmp(names[i], name) == 0) return i;
+	throw std::runtime_error(std::string("featomic labels lack the dimension ") + name);
+}
 
-		// descriptor_values is contiguous in its property (d) dimension. The
-		// packed l slab keeps the corresponding output m values contiguous.
-		for (int a = 0; a < n_atoms; ++a)
-		{
-			for (int r = 0; r < 2 * l + 1; ++r)
-			{
-				for (int d = 0; d < nchannels; ++d)
-				{
-					cdouble* output = omega.block(a, d, l);
-					const double value = descriptor_values(a, r, d);
-					for (int c = 0; c < 2 * l + 1; ++c)
-					{
-						output[c] += conj(c2r[r][c]) * value;
+// Packs featomic's raw blocks into omega exactly as keys_to_samples("center_type") followed by
+// keys_to_properties("neighbor_type") (both sorting samples) would have laid them out, without
+// building the merged TensorMap and without a save/load buffer round trip, which together
+// cost more than featomic's own compute of the blocks:
+//  - rows are the sorted union of the centre atoms of the lambda = 0 blocks
+//  - channels of one lambda are the neighbour types in first-key order, each followed by its n
+//  - a sample a neighbour block lacks stays zero
+// Every output element sums its r contributions in the same order as the merged loop did, so
+// the result is bit-identical; blocks of one lambda write disjoint (row, channel) cells.
+static SALTEDDescriptors get_expansion_coeffs(metatensor::TensorMap& descriptor, const SALTED_Utils::FeatomicHyperParameters& parameters)
+{
+	const metatensor::Labels keys = descriptor.keys();
+	const int32_t* key = keys.values().data();
+	const size_t key_width = keys.size(), n_blocks = keys.count();
+	const size_t k_lambda = label_column(keys, "o3_lambda"), k_neighbor = label_column(keys, "neighbor_type");
+
+	std::vector<int> row_of;
+	int nchannels = 0;
+	{
+		std::vector<int32_t> neighbors;
+		for (size_t b = 0; b < n_blocks; ++b) {
+			if (key[b * key_width + k_lambda] != 0) continue;
+			metatensor::TensorBlock block = descriptor.block_by_id(b);
+			const metatensor::Labels samples = block.samples();
+			const int32_t* s = samples.values().data();
+			const size_t width = samples.size(), atom = label_column(samples, "atom");
+			for (size_t i = 0; i < samples.count(); ++i) {
+				const int32_t a = s[i * width + atom];
+				if (static_cast<size_t>(a) >= row_of.size()) row_of.resize(static_cast<size_t>(a) + 1, -1);
+				row_of[a] = 0;
+			}
+			const int32_t neighbor = key[b * key_width + k_neighbor];
+			if (std::find(neighbors.begin(), neighbors.end(), neighbor) == neighbors.end()) {
+				neighbors.push_back(neighbor);
+				nchannels += static_cast<int>(block.properties().count());
+			}
+		}
+	}
+	int n_atoms = 0;
+	for (int& r : row_of)
+		if (r >= 0) r = n_atoms++;
+
+	SALTEDDescriptors omega(n_atoms, nchannels, parameters.max_angular);
+	for (int l = 0; l <= parameters.max_angular; ++l)
+	{
+		const int m = 2 * l + 1;
+		const cvec2 c2r = SALTED_Utils::complex_to_real_transformation({ m })[0];
+		std::vector<std::pair<int32_t, int>> channel_of; // neighbour type -> first channel
+		int next_channel = 0;
+		for (size_t b = 0; b < n_blocks; ++b) {
+			if (key[b * key_width + k_lambda] != l) continue;
+			metatensor::TensorBlock block = descriptor.block_by_id(b);
+			const metatensor::Labels samples = block.samples();
+			const metatensor::NDArray<double> values = block.values();
+			const int nprop = static_cast<int>(values.shape()[2]);
+			const int32_t neighbor = key[b * key_width + k_neighbor];
+			auto it = std::find_if(channel_of.begin(), channel_of.end(), [&](const auto& e) { return e.first == neighbor; });
+			if (it == channel_of.end()) {
+				channel_of.emplace_back(neighbor, next_channel);
+				it = channel_of.end() - 1;
+				next_channel += nprop;
+			}
+			const int first_channel = it->second;
+			const int32_t* s = samples.values().data();
+			const size_t width = samples.size(), atom = label_column(samples, "atom");
+			const double* v = values.data();
+			const int n_samples = static_cast<int>(samples.count());
+#pragma omp parallel for schedule(static)
+			for (int i = 0; i < n_samples; ++i) {
+				const int row = row_of[s[i * width + atom]];
+				for (int r = 0; r < m; ++r) {
+					const double* value = v + (static_cast<size_t>(i) * m + r) * nprop;
+					for (int d = 0; d < nprop; ++d) {
+						cdouble* output = omega.block(row, first_channel + d, l);
+						for (int c = 0; c < m; ++c)
+							output[c] += conj(c2r[r][c]) * value[d];
 					}
 				}
 			}
 		}
-		c2r.clear();
 	}
 
 	return omega;
@@ -300,8 +391,7 @@ static SALTEDDescriptors get_expansion_coeffs(std::vector<uint8_t> descriptor_bu
 SALTEDDescriptors SALTED_Utils::calculate_SALTED_descriptors(const featomic::SimpleSystem& featomic_system, const SALTED_Utils::FeatomicHyperParameters& parameters)
 {
 	metatensor::TensorMap descriptor = get_feats_projs(featomic_system, parameters);
-	std::vector<uint8_t> descriptor_buffer = descriptor.save_buffer();
-	return get_expansion_coeffs(descriptor_buffer, featomic_system, parameters);
+	return get_expansion_coeffs(descriptor, parameters);
 }
 
 
@@ -336,7 +426,7 @@ namespace
 metatensor::TensorMap SALTED_Utils::calculate_SOAP_Powerspectrum(featomic::SimpleSystem featomic_system, const SALTED_Utils::FeatomicHyperParameters& parameters) {
 	// Phase timings, off unless NOSPHERA2_TIME_SOAP is set. Caching the
 	// calculator does not remove the fixed per-call cost; it is in what follows.
-	const bool time_phases = std::getenv("NOSPHERA2_TIME_SOAP") != nullptr; // Flawfinder: ignore
+	const bool time_phases = tuning("NOSPHERA2_TIME_SOAP") != nullptr;
 	auto mark = std::chrono::steady_clock::now();
 	auto lap = [&mark](const char* what, bool on) {
 		if (!on) return;
@@ -351,7 +441,7 @@ metatensor::TensorMap SALTED_Utils::calculate_SOAP_Powerspectrum(featomic::Simpl
 	lap("calculator", time_phases);
 
 	std::vector<std::array<int32_t,3>> keys_array;
-	//keys for centre types the system does not contain cost only metatensor bookkeeping, 0.15 s a call for the full 726
+	//keys for centre types the system does not contain cost only metatensor bookkeeping, which for the full 726 is a large share of a call
 	std::set<int32_t> present(featomic_system.types(), featomic_system.types() + featomic_system.size());
 	for (const std::string& center_type : parameters.species)
 	{
@@ -441,6 +531,25 @@ aux_density_table::aux_density_table(const std::vector<atom>& atoms)
 				pr_uniq.push_back(slot);
 			}
 			coefficients = Int_Params::normalize_gto(coefficients, exponents, l);
+			{
+				// |r^l R| <= N t^(l/2) exp(-a t), t = r^2, N = sum |n_p|, a the smallest exponent; its log h(t) falls beyond
+				// t = l / 2a, so bisect there for h = ln 5e-11, half the kernels' 1e-10 so rounding cannot make a skip differ
+				double N = 0.0, a_min = DBL_MAX;
+				for (int p = 0; p < sc[s]; ++p) N += std::abs(coefficients[p]), a_min = std::min(a_min, exponents[p]);
+				const double target = std::log(5E-11);
+				auto h = [&](const double t) { return std::log(N) + (l == 0 ? 0.0 : 0.5 * l * std::log(t)) - a_min * t; };
+				double lo = l / (2.0 * a_min), hi = std::max(2.0 * lo, 1.0);
+				if (h(lo) < target) hi = lo;
+				else {
+					while (h(hi) >= target) lo = hi, hi *= 2.0;
+					for (int it = 0; it < 100; it++) {
+						const double mid = 0.5 * (lo + hi);
+						if (mid <= lo || mid >= hi) break;
+						(h(mid) < target ? hi : lo) = mid;
+					}
+				}
+				sh_r2.push_back(hi);
+			}
 
 			pr_norm.insert(
 				pr_norm.end(),
@@ -477,22 +586,22 @@ aux_density_table::aux_density_table(const std::vector<atom>& atoms)
 
 double aux_density_table::operator()(const double x, const double y, const double z, const double* coefs) const
 {
-	return aux_density::at(x, y, z, n_at, cx.data(), cy.data(), cz.data(), r2_max.data(), sh_start.data(), sh_l.data(), pr_start.data(), coef_off.data(), pr_exp.data(), pr_norm.data(), coefs);
+	return aux_density::at(x, y, z, n_at, cx.data(), cy.data(), cz.data(), r2_max.data(), sh_start.data(), sh_l.data(), pr_start.data(), coef_off.data(), pr_exp.data(), pr_norm.data(), coefs, sh_r2.data());
 }
 
 double aux_density_table::operator()(const double x, const double y, const double z, const double* coefs, double& gx, double& gy, double& gz) const
 {
-	return aux_density::at_grad(x, y, z, n_at, cx.data(), cy.data(), cz.data(), r2_max.data(), sh_start.data(), sh_l.data(), pr_start.data(), coef_off.data(), pr_exp.data(), pr_norm.data(), coefs, gx, gy, gz);
+	return aux_density::at_grad(x, y, z, n_at, cx.data(), cy.data(), cz.data(), r2_max.data(), sh_start.data(), sh_l.data(), pr_start.data(), coef_off.data(), pr_exp.data(), pr_norm.data(), coefs, gx, gy, gz, sh_r2.data());
 }
 
 double aux_density_table::operator()(const double x, const double y, const double z, const double* coefs, double& gx, double& gy, double& gz, double& lap) const
 {
-	return aux_density::at_lap(x, y, z, n_at, cx.data(), cy.data(), cz.data(), r2_max.data(), sh_start.data(), sh_l.data(), pr_start.data(), coef_off.data(), pr_exp.data(), pr_norm.data(), coefs, gx, gy, gz, lap);
+	return aux_density::at_lap(x, y, z, n_at, cx.data(), cy.data(), cz.data(), r2_max.data(), sh_start.data(), sh_l.data(), pr_start.data(), coef_off.data(), pr_exp.data(), pr_norm.data(), coefs, gx, gy, gz, lap, sh_r2.data());
 }
 
 double aux_density_table::operator()(const double x, const double y, const double z, const double* coefs, double& gx, double& gy, double& gz, double* H) const
 {
-	return aux_density::at_hess(x, y, z, n_at, cx.data(), cy.data(), cz.data(), r2_max.data(), sh_start.data(), sh_l.data(), pr_start.data(), coef_off.data(), pr_exp.data(), pr_norm.data(), coefs, gx, gy, gz, H);
+	return aux_density::at_hess(x, y, z, n_at, cx.data(), cy.data(), cz.data(), r2_max.data(), sh_start.data(), sh_l.data(), pr_start.data(), coef_off.data(), pr_exp.data(), pr_norm.data(), coefs, gx, gy, gz, H, sh_r2.data());
 }
 
 static inline cdouble apply_i_to_l(
@@ -606,8 +715,8 @@ void calc_aux_density(const aux_density_table& t, const vec& coefficients, const
 	err_checkf(hess == nullptr || gx != nullptr, "The Hessian of the fitted density needs the gradient arrays", std::cout);
 #ifdef NOSPHERA2_USE_GPU
 	if (aux_density_gpu_enabled() && aux_density_gpu_eval(t.n_at, t.cx.data(), t.cy.data(), t.cz.data(), t.r2_max.data(), t.n_sh, t.sh_start.data(), t.sh_l.data(), t.pr_start.data(), t.coef_off.data(), t.n_pr, t.pr_exp.data(), t.pr_norm.data(), t.n_coef, coefficients.data(), np, x, y, z, rho, gx, gy, gz, lap, hess)) {
-		static std::atomic<bool> announced{ false };
-		if (!announced.exchange(true) && !constants::hide_gpu_notes)
+		static std::atomic<unsigned> announced{ 0 };
+		if (constants::first_this_run(announced) && !constants::hide_gpu_notes)
 			std::cout << "GPU in use: fitted density on the grid" << std::endl;
 		return;
 	}
@@ -757,164 +866,6 @@ vec calc_atomic_density(
 	return atom_elecs;
 }
 
-double apply_charge_constraint(const std::vector<atom>& atoms, vec& coefs,
-							   int net_charge, bool spherical_fill_used,
-							   int n_filled, double filled_eeq_charge,
-							   double applied_fill_charge, std::ostream& file)
-{
-	// The auxiliary fit does not conserve the integral: measured over this
-	// training set the REFERENCE coefficients are already -0.208 % short and
-	// the ML prediction -0.235 %, so most of the deficit is inherited from the
-	// density fitting rather than learned. The exact target is fixed by the
-	// composition, so it can be imposed here.
-	//
-	// With the spherical Thakkar fill active, `atoms` is already only the
-	// ML-predicted subset (the predictor erases the filled atoms from its
-	// copy of the wavefunction), and Thakkar densities are exactly neutral,
-	// so the sum of nuclear charges over THESE atoms is the right target.
-	//
-	// Only l=0 functions have a non-zero integral, so only they are scaled.
-	// The scaling is GLOBAL on purpose: the atom-centred auxiliary basis is not
-	// an atomic-charge partition (measured per-element ratios span 0.899 for Al
-	// to 1.150 for B, with ~10 % scatter, which is bonding rather than error),
-	// so a per-element correction would distort the chemistry to fix a total.
-	vec atom_elecs = calc_atomic_density(atoms, coefs);
-
-	double predicted = 0.0, target = 0.0, ecp = 0.0;
-	for (int a = 0; a < static_cast<int>(atoms.size()); a++)
-	{
-		predicted += atom_elecs[a];
-		target += static_cast<double>(atoms[a].get_charge());
-		ecp += static_cast<double>(atoms[a].get_ECP_electrons());
-	}
-	// calc_atomic_density folds the ECP electrons in, but those do not come
-	// from the coefficients and must not be rescaled.
-	const double from_coefs = predicted - ecp;
-	double target_from_coefs = target - ecp;
-
-	// A charged system does not integrate to the sum of the nuclear charges.
-	// Ignoring this would silently pull an anion back to neutral: -1 on a
-	// 300-electron system is 0.33 %, well inside the sanity guard below, so it
-	// would be applied without complaint and be wrong.
-	// The spherically filled atoms are no longer assumed neutral: each carries
-	// Z - q. Those q electrons have to come from somewhere, and the only place
-	// they can come from is the predicted region - so the target moves by
-	// exactly the charge the fill took on. Without this the two halves disagree
-	// and the SYSTEM total stops being exact, which is the one guarantee this
-	// whole mechanism exists to provide.
-	if (std::abs(applied_fill_charge) > 1e-12)
-	{
-		target_from_coefs += applied_fill_charge;
-		file << "Charge constraint: " << std::showpos << std::fixed << std::setprecision(3)
-			 << applied_fill_charge << std::noshowpos
-			 << " e moved to the spherically filled atom(s), so the predicted"
-			 << " region is targeted accordingly and the system total stays exact."
-			 << std::endl;
-	}
-
-	if (net_charge != 0)
-	{
-		if (spherical_fill_used)
-		{
-			// Some atoms are Thakkar-filled, so `atoms` is only the ML subset.
-			// Thakkar densities are strictly neutral, but how a NET charge
-			// divides between the ML region and the filled region is not
-			// defined here. Refusing beats guessing.
-			file << "Charge constraint SKIPPED: net charge " << net_charge
-				 << " on a structure that also uses the spherical fill. The split"
-				 << " of that charge between the predicted and filled regions is"
-				 << " undefined, so the density is left alone." << std::endl;
-			return 1.0;
-		}
-		target_from_coefs -= static_cast<double>(net_charge);
-		file << "Charge constraint: net charge " << net_charge
-			 << " taken into account." << std::endl;
-	}
-
-	if (from_coefs <= 0.0 || target_from_coefs <= 0.0)
-	{
-		file << "Charge constraint skipped: non-positive electron count." << std::endl;
-		return 1.0;
-	}
-	// With the spherical fill in play the target assumes every filled atom is
-	// NEUTRAL. That is exactly right for a Thakkar density of a neutral atom
-	// and wrong whenever the filled atom is a formal ion. Seen in practice on a
-	// calcium salt: Ca filled as neutral (20 e) puts the ML target at 116, the
-	// model predicted 116.48 because the organic part is really a dianion, and
-	// the constraint then pulled it the WRONG way. The net charge is zero, so
-	// no charge check can catch this - say so and let the user judge.
-	if (spherical_fill_used)
-	{
-		// The TOTAL stays exact either way - the filled atoms carry a fixed
-		// neutral count and the rest is imposed here - so F(000) is safe. What
-		// the neutral assumption gets wrong is WHERE the electrons sit, and an
-		// exact total hides that. Quantify it instead.
-		if (std::isnan(filled_eeq_charge))
-		{
-			file << "NOTE: " << n_filled << " atom(s) are spherically filled and their"
-				 << " charge could not be estimated, so they are left neutral." << std::endl;
-		}
-		else
-		{
-			const double missed = filled_eeq_charge - applied_fill_charge;
-			file << "NOTE: " << n_filled << " atom(s) are spherically filled. EEQ puts "
-				 << std::showpos << std::fixed << std::setprecision(2) << filled_eeq_charge
-				 << std::noshowpos << " e on them, of which " << std::showpos
-				 << applied_fill_charge << std::noshowpos << " e is applied." << std::endl;
-			if (std::abs(missed) > 0.05)
-				file << "      " << std::showpos << std::setprecision(2) << missed
-					 << std::noshowpos << " e could not be applied because no ion is"
-					 << " tabulated for that element; those atoms stay neutral and that"
-					 << " charge remains on the predicted region." << std::endl;
-		}
-	}
-
-	const double factor = target_from_coefs / from_coefs;
-	if (std::abs(factor - 1.0) > 0.05)
-	{
-		file << "Charge constraint SKIPPED: factor " << factor
-			 << " is further than 5 % from unity, which means something else is"
-			 << " wrong - refusing to paper over it." << std::endl;
-		return 1.0;
-	}
-
-	int coef_counter = 0;
-	for (int a = 0; a < static_cast<int>(atoms.size()); a++)
-	{
-		int prim = 0;
-		for (unsigned int shell = 0; shell < atoms[a].get_shellcount().size(); shell++)
-		{
-			const int type = atoms[a].get_basis_set_entry(prim).get_type();
-			if (type != 0)
-			{
-				coef_counter += (2 * type + 1);
-				prim += atoms[a].get_shellcount()[shell];
-				continue;
-			}
-			prim += atoms[a].get_shellcount()[shell];
-			coefs[coef_counter] *= factor;
-			coef_counter++;
-		}
-	}
-
-	// On the training chemistry this factor sits at 1.00235 +/- 0.0008. A much
-	// larger one means the density shape is being extrapolated, and a fixed
-	// integral would otherwise hide that.
-	if (std::abs(factor - 1.0) > 0.005)
-	{
-		file << "NOTE: correction of " << std::fixed << std::setprecision(3)
-			 << 100.0 * (factor - 1.0) << " % is well outside the ~0.24 % seen on"
-			 << " training-like systems - treat this prediction with caution."
-			 << std::endl;
-	}
-
-	file << "Charge constraint applied: " << std::fixed << std::setprecision(4)
-		 << from_coefs << " -> " << target_from_coefs << " electrons over "
-		 << atoms.size() << (spherical_fill_used ? " ML-predicted" : "")
-		 << " atoms (factor " << std::setprecision(8) << factor << ")" << std::endl;
-	return factor;
-}
-
 void calc_cube_ML(const vec& data, WFN& dummy, cube& cube_data, const int& atom_nr)
 {
 	_time_point start = get_time();
@@ -1008,10 +959,14 @@ void create_SALTED_training_data(const WFN& orbital, const WFN& aux, const optio
 	std::cout << "Calculating density fitting coefficients..." << std::endl;
 	DensityFitting::CONFIG config = DensityFitting::config_from_options(opts);
 	config.analyze_quality = true;
-	//config.restrain_type = DensityFitting::RESTRAINT_TYPE::SIMPLE_AND_TIK;
-	//config.charge_scheme = DensityFitting::CHARGE_SCHEME::HIRSHFELD;
-	//if (wavy->get_origin() == e_origin::ptb)
-	//    config.restraint_strength = 1.0e-4;
+
+	// SALTED learns one coefficient block per atom; keep all restrained moments on their centres.
+	if (config.grid_higher_moments) {
+		std::cout
+			<< "SALTED training: restraining higher moments on their centres."
+			<< std::endl;
+		config.grid_higher_moments = false;
+	}
 
 	vec coefs = DensityFitting::density_fit(orbital, aux, config);
 

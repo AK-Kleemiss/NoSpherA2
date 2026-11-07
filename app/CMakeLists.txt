@@ -11,21 +11,21 @@ add_executable(
     ${NOSPHERA2_APP_SOURCES}
 )
 
+nosphera2_isa_check(NoSpherA2)
+
 if(WIN32)
     target_sources(
         NoSpherA2
         PRIVATE
-            "${PROJECT_SOURCE_DIR}/Windows/NoSpherA2/Resource.rc"
+            "${CMAKE_CURRENT_SOURCE_DIR}/resources/Resource.rc"
     )
 
     target_include_directories(
         NoSpherA2
         PRIVATE
-            "${PROJECT_SOURCE_DIR}/Windows/NoSpherA2"
+            "${CMAKE_CURRENT_SOURCE_DIR}/resources"
     )
 endif()
-
-nosphera2_enable_optimizations(NoSpherA2)
 
 target_compile_features(
     NoSpherA2
@@ -33,19 +33,33 @@ target_compile_features(
         cxx_std_20
 )
 
-target_link_libraries(
-    NoSpherA2
-    PRIVATE
-        NoSpherA2::Core
-)
-
 set_target_properties(
     NoSpherA2
     PROPERTIES
         RUNTIME_OUTPUT_DIRECTORY
             "${CMAKE_BINARY_DIR}/bin"
+        #NoSpherA2.pdb is the library's
+        PDB_NAME NoSpherA2_exe
 )
 
+#Everywhere but Android the exe is only a launcher for the shared library (main.cpp), which it
+#loads at run time from its own directory; the library target copies the runtimes into bin.
+#No nosphera2_enable_optimizations for it: on macOS that links OpenMP::OpenMP_CXX, which gave
+#the launcher a libomp import and the build's absolute rpath, so a shipped copy did not start
+if(NOT ANDROID)
+    add_dependencies(NoSpherA2 NoSpherA2Dll)
+    target_link_libraries(NoSpherA2 PRIVATE ${CMAKE_DL_LIBS})
+    return()
+endif()
+
+target_compile_definitions(NoSpherA2 PRIVATE NOS_STATIC_APP)
+nosphera2_enable_optimizations(NoSpherA2)
+
+target_link_libraries(
+    NoSpherA2
+    PRIVATE
+        NoSpherA2::Core
+)
 
 nosphera2_copy_runtime_libraries(NoSpherA2)
 

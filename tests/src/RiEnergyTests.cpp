@@ -1,5 +1,6 @@
 
 #include "pch.h"
+#include "core/tuning.h"
 
 #include "core/convenience.h"
 #include "core/constants.h"
@@ -24,12 +25,12 @@
 #include "core/npy.h"
 #include "core/libCintMain.h"
 #include "core/throughput.h"
-#include "core/i_tensor_stream.h"
 #include "core/tsc_label_converter.h"
 #include "core/sphere_lebedev_rule.h"
 #include <occ/qm/hf.h>
 #include <occ/qm/scf.h>
 #include <spdlog/spdlog.h>
+#include <random>
 #undef I
 #ifdef NOSPHERA2_USE_GPU
 #include "core/blas_gpu.h"
@@ -75,112 +76,83 @@ namespace {
 		vec empty(1, 0.0);
 		griddy.get_grid(1, 0, pos, pos, pos, &charge, grid[0].data(), grid[1].data(), grid[2].data(), grid[4].data(), grid[5].data(), grid[6].data(), empty);
 
-		// Initialize the vectors sf_A and sf_N
+		//Every (l, m) density first, so the phase factor exp(i H.r) of a k-point is evaluated once per grid point
+		//and not once per (l, m): each sum takes the same products in the same order as with std::polar
+		const int np = static_cast<int>(grid[0].size()), nk = static_cast<int>(kpts.size());
+		vec2 dens;
 		cvec2 sf_A, sf_N;
-		sf_A.resize(1);
-		sf_N.resize(1);
-		sf_A[0].resize(kpts.size(), 0.0);
-		sf_N[0].resize(kpts.size(), 0.0);
-
-		bool all_correct = true; //Veryfiy if all m for one l are correct break if one failed
-		bool correct = true; //Verify if the current m is correct
-
-		cdouble max_diff, diff;
 		for (unsigned int type = 0; type <= max_l; type++)
 		{
-			std::cout << "Testing l = " << type << "\n";
-			vec coefs(type * 2 + 1);
-
-			// Initialize the Wavefunction
 			WFN wavy(e_origin::NOT_YET_DEFINED);
 			wavy.push_back_MO(0, 1.0, -13);
 			wavy.push_back_atom("H", 0, 0, 0, 1);
 			wavy.push_back_atom_basis_set(0, c_exp, vals[0], type, 0);
 			const aux_density_table t(wavy.get_atoms());
-
 			for (unsigned int l = 0; l < type * 2 + 1; l++)
 			{
-				int m = static_cast<int>(l) - static_cast<int>(type);
-				for (int i = 0; i < coefs.size(); i++)
-				{
-					coefs[i] = 0.0;
-				}
-				max_diff = 0.0;
+				vec coefs(type * 2 + 1, 0.0);
 				coefs[l] = 1.0;
-
-				calc_aux_density(t, coefs, grid[0].size(), grid[0].data(), grid[1].data(), grid[2].data(), grid[3].data());
-
-				// Empty the vectors sf:A nad sf_N
-				for (int i = 0; i < kpts.size(); i++)
+				dens.emplace_back(np, 0.0);
+				calc_aux_density(t, coefs, np, grid[0].data(), grid[1].data(), grid[2].data(), dens.back().data());
+				sf_A.emplace_back(nk);
+				for (int i = 0; i < nk; i++)
+					sf_A.back()[i] = t.fourier_atom(constants::TWO_PI * kpts[i][0], constants::TWO_PI * kpts[i][1], constants::TWO_PI * kpts[i][2], coefs.data(), 0);
+			}
+		}
+		const int nlm = static_cast<int>(dens.size());
+		sf_N.assign(nlm, cvec(nk, 0.0));
+#pragma omp parallel for
+		for (int i = 0; i < nk; i++)
+		{
+			const double Hx = constants::TWO_PI * kpts[i][0], Hy = constants::TWO_PI * kpts[i][1], Hz = constants::TWO_PI * kpts[i][2];
+			for (int p = 0; p < np; p++)
+			{
+				const double work = Hx * grid[0][p] + Hy * grid[1][p] + Hz * grid[2][p], c = std::cos(work), s = std::sin(work);
+				for (int j = 0; j < nlm; j++)
 				{
-					sf_A[0][i] = 0.0;
-					sf_N[0][i] = 0.0;
+					const double rw = dens[j][p] * grid[4][p];
+					sf_N[j][i] += cdouble(rw * c, rw * s);
 				}
-				double work = 0.0;
-#pragma omp parallel for private(work)
-				for (int i = 0; i < kpts.size(); i++)
+			}
+		}
+		int j = 0;
+		for (unsigned int type = 0; type <= max_l; type++)
+		{
+			std::cout << "Testing l = " << type << "\n";
+			bool all_correct = true;
+			for (unsigned int l = 0; l < type * 2 + 1; l++, j++)
+			{
+				double max_diff = 0.0;
+				for (int i = 0; i < nk; i++)
+					max_diff = std::max(max_diff, abs(sf_A[j][i] - sf_N[j][i]));
+				if (max_diff > 2E-5)
 				{
-					const double Hx = constants::TWO_PI * kpts[i][0], Hy = constants::TWO_PI * kpts[i][1], Hz =constants::TWO_PI * kpts[i][2];
-
-					sf_A[0][i] =
-						t.fourier_atom(
-							Hx,
-							Hy,
-							Hz,
-							coefs.data(),
-							0
-						);
-
-					for (int _p = 0; _p < grid[0].size(); _p++)
-					{
-						work = Hx * grid[0][_p]
-							  + Hy * grid[1][_p]
-							  + Hz * grid[2][_p];
-						sf_N[0][i] += std::polar(grid[3][_p] * grid[4][_p], work);
-					}
-					diff = abs(sf_A[0][i] - sf_N[0][i]);
-					if (abs(diff) > abs(max_diff))
-					{
-						max_diff = diff;
-					}
-					if (abs(diff) > 2E-5)
-					{
-						all_correct = false;
-						correct = false;
-					}
-				}
-				if (!correct)
-				{
-					std::cout << "Error at m: " << m
-							  << "   Max diff: (" << max_diff.real() << "|" << max_diff.imag() << ")\n";
-					correct = true;
+					all_correct = false;
+					std::cout << "Error at m: " << static_cast<int>(l) - static_cast<int>(type) << "   Max diff: (" << max_diff << "|0)\n";
 				}
 			}
 			if (!all_correct)
-				break;
-			std::cout << "| PASSED!\n";
-		}
-		if (!all_correct)
-		{
-			using namespace std;
-			ofstream result("sfacs.dat", ios::out);
-			for (int i = 0; i < kpts.size(); i++)
 			{
-				result << setw(8) << setprecision(2) << fixed << kpts[i][0];
-				result << setw(8) << setprecision(2) << fixed << kpts[i][1];
-				result << setw(8) << setprecision(2) << fixed << kpts[i][2];
-				result << setw(16) << setprecision(8) << scientific << sf_A[0][i].real();
-				result << setw(16) << setprecision(8) << scientific << sf_A[0][i].imag();
-				result << setw(16) << setprecision(8) << scientific << sf_N[0][i].real();
-				result << setw(16) << setprecision(8) << scientific << sf_N[0][i].imag();
-				result << setw(16) << setprecision(8) << scientific << abs(sf_A[0][i] - sf_N[0][i]);
-				result << setw(35) << setprecision(8) << scientific << sf_A[0][i] / sf_N[0][i];
-				result << "\n";
+				using namespace std;
+				ofstream result("sfacs.dat", ios::out);
+				for (int i = 0; i < nk; i++)
+				{
+					result << setw(8) << setprecision(2) << fixed << kpts[i][0];
+					result << setw(8) << setprecision(2) << fixed << kpts[i][1];
+					result << setw(8) << setprecision(2) << fixed << kpts[i][2];
+					result << setw(16) << setprecision(8) << scientific << sf_A[j - 1][i].real();
+					result << setw(16) << setprecision(8) << scientific << sf_A[j - 1][i].imag();
+					result << setw(16) << setprecision(8) << scientific << sf_N[j - 1][i].real();
+					result << setw(16) << setprecision(8) << scientific << sf_N[j - 1][i].imag();
+					result << setw(16) << setprecision(8) << scientific << abs(sf_A[j - 1][i] - sf_N[j - 1][i]);
+					result << setw(35) << setprecision(8) << scientific << sf_A[j - 1][i] / sf_N[j - 1][i];
+					result << "\n";
+				}
+				result.close();
+				std::cout << "Error in the calculations!\n";
+				return 1;
 			}
-			result.flush();
-			result.close();
-			std::cout << "Error in the calculations!\n";
-			return 1;
+			std::cout << "| PASSED!\n";
 		}
 		std::cout << "All tests passed!\n";
 		return 0;
@@ -347,15 +319,56 @@ namespace NoSpherA2UnitTests
 		EXPECT_NEAR(norm2, 1.0, 1e-12);
 	}
 
+	// calc_SF_SALTED groups atoms by their shells and transforms each group as one GEMM; the one-atom
+	// fourier_atom is the reference. Two C share a basis, a third C has another exponent so it must not
+	// join them, l runs to 4 with a contracted shell, the asym list is a shuffled subset, and k = 0 and
+	// a partial last block of reflections are included.
+	TEST(AuxDensityTableTests, GroupedFourierTransformMatchesTheOneAtomReference)
+	{
+		struct sh { int l; vec e, c; };
+		auto make = [](const char* el, int Z, double x, const std::vector<sh>& shells) {
+			atom A(el, {}, 0, x, 0.0, 0.0, Z);
+			std::vector<unsigned int> count;
+			for (size_t s = 0; s < shells.size(); s++) {
+				for (size_t p = 0; p < shells[s].e.size(); p++)
+					A.push_back_basis_set(shells[s].e[p], shells[s].c[p], shells[s].l, static_cast<int>(s));
+				count.push_back(static_cast<unsigned int>(shells[s].e.size()));
+			}
+			A.set_shellcount(count);
+			return A;
+		};
+		const std::vector<sh> C = { {0, {8.0, 1.5}, {0.6, 0.4}}, {0, {0.4}, {1.0}}, {1, {1.2}, {1.0}}, {2, {0.9}, {1.0}}, {3, {0.7}, {1.0}}, {4, {0.6}, {1.0}} };
+		std::vector<sh> C2 = C;
+		C2[2].e = { 1.3 };
+		const std::vector<sh> H = { {0, {2.0}, {1.0}}, {1, {0.8}, {1.0}}, {2, {0.5}, {1.0}} };
+		const aux_density_table t({ make("C", 6, 0.0, C), make("H", 1, 1.0, H), make("C", 6, 2.0, C), make("C", 6, 3.0, C2), make("H", 1, 4.0, H) });
+
+		std::mt19937 rng(7);
+		std::uniform_real_distribution<double> u(-1.0, 1.0);
+		vec coefs(t.n_coef);
+		for (double& c : coefs) c = u(rng);
+		const ivec asym = { 3, 0, 4, 2 };
+		auto check = [&](const int nk) {
+			vec2 k(3, vec(nk, 0.0));
+			for (int i = 1; i < nk; i++)
+				for (int d = 0; d < 3; d++) k[d][i] = 3.0 * u(rng);
+			cvec2 sf;
+			calc_SF_SALTED(k, coefs, t, asym, sf, nullptr);
+			ASSERT_EQ(sf.size(), asym.size());
+			for (size_t ia = 0; ia < asym.size(); ia++)
+				for (int i = 0; i < nk; i++) {
+					const cdouble ref = t.fourier_atom(k[0][i], k[1][i], k[2][i], coefs.data(), asym[ia]);
+					ASSERT_NEAR(sf[ia][i].real(), ref.real(), 1e-12 * (1.0 + std::abs(ref))) << "atom " << asym[ia] << " k " << i << " of " << nk;
+					ASSERT_NEAR(sf[ia][i].imag(), ref.imag(), 1e-12 * (1.0 + std::abs(ref))) << "atom " << asym[ia] << " k " << i << " of " << nk;
+				}
+		};
+		check(150);
+	}
+
 #ifdef NOSPHERA2_USE_GPU
 	static void set_min_flop_env(const char* value)
 	{
-#ifdef _WIN32
-		_putenv_s("NOSPHERA2_BLAS_GPU_MIN_FLOP", value ? value : "");
-#else
-		if (value) setenv("NOSPHERA2_BLAS_GPU_MIN_FLOP", value, 1);
-		else unsetenv("NOSPHERA2_BLAS_GPU_MIN_FLOP");
-#endif
+		set_tuning("NOSPHERA2_BLAS_GPU_MIN_FLOP", value);
 	}
 
 	// blas_gpu_dgemm ships and, until this test, was reached by nothing at all: its size

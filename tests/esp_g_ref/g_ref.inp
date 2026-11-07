@@ -1,0 +1,10 @@
+! HF def2-QZVPP TightSCF KeepDens NoUseSym
+# def2-QZVPP puts a g shell on O (7s4p3d2f1g) and an f shell on H, so this is the exact upper
+# edge of what the ESP pair table supports. Small enough to run on a laptop core in seconds.
+%pal nprocs 1 end
+%maxcore 2000
+* xyz 0 1
+O   0.000000   0.000000   0.000000
+H   0.000000   0.757000   0.587000
+H   0.000000  -0.757000   0.587000
+*
