@@ -442,11 +442,14 @@ TEST(GridSphericalTests, SphericalGaussianDensityFormFactorMatchesRadialIntegral
 }
 
 //the k = 0 branch must be the limit of the k > 0 branch, c (pi/z)^(3/2) per Gaussian
+//the refitted G integrate to 0, so f(0) is round-off and needs an absolute floor
 TEST(GridSphericalTests, SphericalGaussianDensityFormFactorContinuousAtZero)
 {
 	Spherical_Gaussian_Density d(37, 1);
 	const double f_small = d.get_form_factor(1e-8);
-	EXPECT_NEAR(d.get_form_factor(0.0), f_small, 1e-6 * f_small);
+	//old: purely relative, ~0 tolerance against a ~1e-16 f(0) since c422b1ac
+	//EXPECT_NEAR(d.get_form_factor(0.0), f_small, 1e-6 * f_small);
+	EXPECT_NEAR(d.get_form_factor(0.0), f_small, 1e-6 * std::abs(f_small) + 1e-9);
 }
 
 //the header spline helpers reproduce a smooth function on a logarithmic table, the index
