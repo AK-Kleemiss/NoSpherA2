@@ -19,6 +19,30 @@
 #include <future>
 
 
+// inorganic: no carbon bonded to H, C or a metal (carbonate, cyanide and carbide stay inorganic); organometallic: such
+// a carbon and a metal anywhere (carbonyls, metal salts of organic acids); organic: such a carbon and no metal.
+// Bonded as in build_merged's first shell, 0.5 <= d / (r_a + r_b) <= 1.3.
+std::string salted_structure_class(const WFN& wavy)
+{
+	auto metal = [](const int Z) { return !std::set<int>{1, 2, 5, 6, 7, 8, 9, 10, 14, 15, 16, 17, 18, 33, 34, 35, 36, 52, 53, 54, 85, 86}.count(Z); };
+	auto radius = [](const int Z) { return Z < 114 ? constants::covalent_radii[Z] : 1.5; };
+	bool has_metal = false, organic_C = false;
+	for (int a = 0; a < wavy.get_ncen(); a++)
+	{
+		const int Za = wavy.get_atom_charge(a);
+		has_metal = has_metal || metal(Za);
+		if (Za != 6 || organic_C) continue;
+		for (int b = 0; b < wavy.get_ncen() && !organic_C; b++)
+		{
+			const int Zb = wavy.get_atom_charge(b);
+			if (b == a || (Zb != 1 && Zb != 6 && !metal(Zb))) continue;
+			const double x = array_length(wavy.get_atom_pos(a), wavy.get_atom_pos(b)) / constants::ang2bohr(radius(Za) + radius(Zb));
+			organic_C = x >= 0.5 && x <= 1.3;
+		}
+	}
+	return !organic_C ? "inorganic" : has_metal ? "organometallic" : "organic";
+}
+
 SALTEDPredictor::SALTEDPredictor(WFN wavy_in, options& opt_in)
 {
 	std::filesystem::path _path = opt_in.salted_model_dir;
@@ -36,11 +60,22 @@ SALTEDPredictor::SALTEDPredictor(WFN wavy_in, options& opt_in)
 	}
 
 	// A folder brings its lead plus the element models of the elements in this structure (salted_folder_models).
+	// Its subfolder of the structure's class (salted_structure_class) comes first, the folder itself fills the gaps:
+	// its lead and each <El>.salted only where the subfolder has none.
 	pathvec models = opt_in.salted_model_dirs;
 	if (models.size() <= 1 && std::filesystem::is_directory(_path)) {
 		std::set<int> present;
 		for (int a = 0; a < wavy_in.get_ncen(); a++) present.insert(wavy_in.get_atom_charge(a));
-		models = salted_folder_models(_path, present);
+		const std::filesystem::path sub = _path / salted_structure_class(wavy_in);
+		models.clear();
+		if (std::filesystem::is_directory(sub)) {
+			std::cout << "Structure class " << sub.filename().string() << ": models from " << sub.string() << " first" << std::endl;
+			models = salted_folder_models(sub, present);
+		}
+		const pathvec own = models;
+		for (const auto& m : salted_folder_models(_path, present))
+			if (std::none_of(own.begin(), own.end(), [&](const auto& o) { return salted_element_file_Z(o) == salted_element_file_Z(m); }))
+				models.push_back(m);
 	}
 	if (models.size() > 1) {
 		build_merged(wavy_in, opt_in, models);
