@@ -60,22 +60,26 @@ SALTEDPredictor::SALTEDPredictor(WFN wavy_in, options& opt_in)
 	}
 
 	// A folder brings its lead plus the element models of the elements in this structure (salted_folder_models).
-	// Its subfolder of the structure's class (salted_structure_class) comes first, the folder itself fills the gaps:
-	// its lead and each <El>.salted only where the subfolder has none.
+	// Every subfolder (at any depth) is a subgroup and brings its own: the one of the structure's class
+	// (salted_structure_class) first, the others sorted, the folder itself last. The first is each element's default,
+	// the others its alternatives, chosen per atom by SOAP similarity (build_merged, merge_predictions).
 	pathvec models = opt_in.salted_model_dirs;
 	if (models.size() <= 1 && std::filesystem::is_directory(_path)) {
 		std::set<int> present;
 		for (int a = 0; a < wavy_in.get_ncen(); a++) present.insert(wavy_in.get_atom_charge(a));
 		const std::filesystem::path sub = _path / salted_structure_class(wavy_in);
-		models.clear();
+		pathvec dirs;
+		for (const auto& e : std::filesystem::recursive_directory_iterator(_path))
+			if (e.is_directory() && e.path() != sub) dirs.push_back(e.path());
+		std::sort(dirs.begin(), dirs.end());
 		if (std::filesystem::is_directory(sub)) {
 			std::cout << "Structure class " << sub.filename().string() << ": models from " << sub.string() << " first" << std::endl;
-			models = salted_folder_models(sub, present);
+			dirs.insert(dirs.begin(), sub);
 		}
-		const pathvec own = models;
-		for (const auto& m : salted_folder_models(_path, present))
-			if (std::none_of(own.begin(), own.end(), [&](const auto& o) { return salted_element_file_Z(o) == salted_element_file_Z(m); }))
-				models.push_back(m);
+		dirs.push_back(_path);
+		models.clear();
+		for (const auto& d : dirs)
+			for (const auto& m : salted_folder_models(d, present)) models.push_back(m);
 	}
 	if (models.size() > 1) {
 		build_merged(wavy_in, opt_in, models);
@@ -269,15 +273,18 @@ void SALTEDPredictor::build_merged(const WFN& wavy_in, options& opt_in, const pa
 
 	// An element goes to the first model that predicts it, and all its atoms with
 	// it: the auxiliary basis lives per element, so two models cannot share one.
+	// Its own <El>.salted first, then a lead, then any other: an element model also predicts its first shell's species.
 	std::vector<ivec> sub_index;
 	for (const auto& sub : sub_models) sub_index.push_back(map_atoms(wavy_in, sub->wavy));
+	auto model_name = [&](const int m) { return (sub_models[m]->SALTED_DIR.filename() / sub_models[m]->get_salted_filename()).string(); };
 	ivec element_model(118, -1);
 	for (int a = 0; a < wavy_in.get_ncen(); a++)
 	{
 		const int Z = wavy_in.get_atom_charge(a) - 1;
 		if (element_model[Z] >= 0) continue;
+		auto rank = [&](const int m) { const int Zf = salted_element_file_Z(sub_models[m]->get_salted_filename()); return Zf == Z + 1 ? 0 : Zf == 0 ? 1 : 2; };
 		for (int m = 0; m < (int)sub_models.size(); m++)
-			if (sub_index[m][a] >= 0) { element_model[Z] = m; break; }
+			if (sub_index[m][a] >= 0 && (element_model[Z] < 0 || rank(m) < rank(element_model[Z]))) element_model[Z] = m;
 	}
 
 	wavy = wavy_in;
@@ -337,6 +344,20 @@ void SALTEDPredictor::build_merged(const WFN& wavy_in, options& opt_in, const pa
 		for (const auto& s : shell) n_shell[s.first]++;
 		n_mean += shell.size() > 1;
 	}
+	// The alternatives of an atom: the files of its model's element (the leads, for a lead) in the other subgroups,
+	// in the basis and core its element has here. merge_predictions gives it to the one it resembles most.
+	atom_alt.assign(wavy_in.get_ncen(), {});
+	for (int a = 0; a < wavy_in.get_ncen(); a++)
+	{
+		const int own = atom_model[a];
+		if (own < 0 || !atom_also[a].empty()) continue;
+		const int Zf = salted_element_file_Z(sub_models[own]->get_salted_filename());
+		for (int m = 0; m < (int)sub_models.size(); m++)
+			if (sub_index[m][a] >= 0 && salted_element_file_Z(sub_models[m]->get_salted_filename()) == Zf && same_basis(m, own, wavy_in.get_atom_charge(a) - 1)
+				&& sub_models[m]->config.ecp_mode == sub_models[own]->config.ecp_mode)
+				atom_alt[a].push_back({ m, sub_index[m][a] });
+		if (atom_alt[a].size() < 2) atom_alt[a].clear();
+	}
 
 	for (int m = 0; m < (int)sub_models.size(); m++)
 	{
@@ -346,7 +367,7 @@ void SALTEDPredictor::build_merged(const WFN& wavy_in, options& opt_in, const pa
 			if (element_model[Z] == m) elements.push_back(constants::atnr2letter(Z + 1));
 		for (int a = 0; a < wavy_in.get_ncen(); a++)
 			if (atom_model[a] == m && element_model[wavy_in.get_atom_charge(a) - 1] == m) n++;
-		std::cout << "Model " << sub_models[m]->get_salted_filename() << " predicts " << n << " atom(s): ";
+		std::cout << "Model " << model_name(m) << " predicts " << n << " atom(s): ";
 		for (const auto& e : elements) std::cout << e << " ";
 		if (n_shell[m] > 0) std::cout << "+ " << n_shell[m] << " first-shell atom(s)";
 		std::cout << std::endl;
@@ -354,7 +375,7 @@ void SALTEDPredictor::build_merged(const WFN& wavy_in, options& opt_in, const pa
 	if (n_mean > 0)
 		std::cout << n_mean << " first-shell atom(s) are bonded to the elements of two or more models and take their mean, weighted by 1/(d/(r_a + r_b))^2." << std::endl;
 	for (const auto& [m, Z] : other_basis)
-		std::cout << "Model " << sub_models[m]->get_salted_filename() << " has its own basis for " << constants::atnr2letter(Z)
+		std::cout << "Model " << model_name(m) << " has its own basis for " << constants::atnr2letter(Z)
 				  << ", so its first-shell " << constants::atnr2letter(Z) << " atoms stay with the model that owns the element." << std::endl;
 
 	// Only an atom that no model handles goes to the spherical fill.
@@ -377,6 +398,7 @@ void SALTEDPredictor::build_merged(const WFN& wavy_in, options& opt_in, const pa
 				atom_model.erase(atom_model.begin() + a);
 				atom_in_model.erase(atom_in_model.begin() + a);
 				atom_also.erase(atom_also.begin() + a);
+				atom_alt.erase(atom_alt.begin() + a);
 			}
 	}
 
@@ -435,6 +457,32 @@ vec SALTEDPredictor::merge_predictions()
 			+ std::to_string(parts.back().size()) + " coefficients for a basis of "
 			+ std::to_string(offsets.back().back()) + " - model and basis do not belong together", std::cout);
 	}
+	// Subgroups: an atom goes to the alternative whose reference environments it is closest to, the default on a tie
+	// ponytail: cosines of models with different rcut/sig/neighspe are compared as they are; rescale per model if that biases the pick
+	ivec moved(sub_models.size(), 0);
+	vec s_new(sub_models.size(), 0.0), s_old(sub_models.size(), 0.0);
+	auto score = [&](const std::pair<int, int>& c) {
+		const vec& s = sub_models[c.first]->env_score;
+		return c.second < (int)s.size() ? s[c.second] : -1.0;
+	};
+	for (int a = 0; a < (int)atom_alt.size(); a++)
+	{
+		if (atom_alt[a].empty()) continue;
+		const std::pair<int, int> own{ atom_model[a], atom_in_model[a] };
+		std::pair<int, int> best = own;
+		for (const auto& c : atom_alt[a])
+			if (score(c) > score(best)) best = c;
+		if (best == own) continue;
+		moved[best.first]++;
+		s_new[best.first] += score(best);
+		s_old[best.first] += score(own);
+		atom_model[a] = best.first;
+		atom_in_model[a] = best.second;
+	}
+	for (int m = 0; m < (int)sub_models.size(); m++)
+		if (moved[m] > 0)
+			std::cout << "SOAP similarity: " << moved[m] << " atom(s) to " << (sub_models[m]->SALTED_DIR.filename() / sub_models[m]->get_salted_filename()).string()
+					  << " (closest reference " << s_new[m] / moved[m] << " vs " << s_old[m] / moved[m] << " in the default)" << std::endl;
 
 	vec coefs;
 	for (int a = 0; a < wavy.get_ncen(); a++)
@@ -835,7 +883,7 @@ SALTEDPredictor::lambda_blocks SALTEDPredictor::read_model_lambda(const int lam)
 	return out;
 }
 
-void SALTEDPredictor::install_model_lambda(lambda_blocks blocks)
+void SALTEDPredictor::install_model_lambda(lambda_blocks blocks, const int lam)
 {
 	for (auto &[key, V, feats] : blocks)
 	{
@@ -843,7 +891,10 @@ void SALTEDPredictor::install_model_lambda(lambda_blocks blocks)
 		Vmat[key] = std::move(V);
 		// ENVW has V^T F already, G is used as it is (predict)
 		if (config.zeta == 1.0 && Vmat[key].extent(0) != 0)
+		{
+			if (lam == 0) ref0[key] = feats;   // the kernel itself is never formed at zeta = 1, env_score wants it
 			power_env_sparse[key] = dot(Vmat[key], feats, true, false);
+		}
 		else
 			power_env_sparse[key] = std::move(feats);
 	}
@@ -923,6 +974,7 @@ vec SALTEDPredictor::predict()
 		psi_nm[spe_idx].resize(lmax[config.species[spe_idx]] + 1);
 	// The only quantity that crosses lambda: set at lam = 0, reused above it when zeta != 1
 	std::vector<dMatrix2> kernell0(config.species.size());
+	env_score.assign(natoms, -1.0);
 	for (int lam = 0; lam <= lmax_max; lam++)
 	{
 		vec p;
@@ -950,7 +1002,7 @@ vec SALTEDPredictor::predict()
 		// on a second thread gave that thread its own OpenMP/MKL team, whose spin-wait then cost
 		// the kernels below more than the overlap could ever hide
 		const auto _t_wait = std::chrono::steady_clock::now();
-		install_model_lambda(next_lambda.get());
+		install_model_lambda(next_lambda.get(), lam);
 		if (lam < lmax_max)
 			next_lambda = std::async(std::launch::async, &SALTEDPredictor::read_model_lambda, this, lam + 1);
 		const double model_wait = _elapsed(_t_wait);
@@ -1016,6 +1068,24 @@ vec SALTEDPredictor::predict()
 			//at a sixty-fourth rate on a consumer part and each call ships its own operands.
 			//It would pay on a datacentre part.
 			dMatrix2 kernel_nm = dot(pvec_lam, power_env_sparse[spe + to_string(lam)], false, true);
+			if (lam == 0)
+			{
+				// Each atom's closest reference environment as a cosine in the sparsified feature space (the stored
+				// norms are those of the full one), so models with different FPS selections compare
+				const dMatrix2 k1 = config.zeta == 1 && ref0.count(key) ? dot(pvec_lam, ref0[key], false, true) : dMatrix2();
+				const dMatrix2& k = config.zeta == 1 ? k1 : kernel_nm;
+				const dMatrix2& R = config.zeta == 1 ? ref0[key] : power_env_sparse[key];
+				auto norm = [](const dMatrix2& A, const int r) { double s = 0.0; for (int f = 0; f < (int)A.extent(1); f++) s += A(r, f) * A(r, f); return std::sqrt(s); };
+				vec rn(k.extent(1));
+				for (int j = 0; j < (int)k.extent(1); j++) rn[j] = norm(R, j);
+				for (int i = 0; i < (int)k.extent(0); i++)
+				{
+					double s = -1.0;
+					const double pn = norm(pvec_lam, i);
+					for (int j = 0; j < (int)k.extent(1); j++) s = std::max(s, k(i, j) / (pn * rn[j] + 1e-300));
+					env_score[atom_idx[spe][i]] = s;
+				}
+			}
 
 			if (config.zeta == 1)
 			{
@@ -1253,6 +1323,7 @@ void SALTEDPredictor::shrink_intermediate_vectors()
 	wigner3j.clear();
 	av_coefs.clear();
 	power_env_sparse.clear();
+	ref0.clear();
 	featsize.clear();
 	v1.shrink_to_fit();
 	v2.shrink_to_fit();

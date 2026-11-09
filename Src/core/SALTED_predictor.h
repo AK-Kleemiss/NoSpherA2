@@ -39,6 +39,10 @@ private:
 	// A first-shell atom bonded to the elements of several models: every (model, index, weight) of its weighted mean,
 	// the one in atom_model included; empty when one model predicts it
 	std::vector<std::vector<std::tuple<int, int, double>>> atom_also{};
+	// Per atom: (model, index) of the same element's files in the other subgroups, its own included; empty without any
+	std::vector<std::vector<std::pair<int, int>>> atom_alt{};
+	// Per atom of this model: the cosine to its closest reference environment at l = 0 (predict), -1 where unknown
+	vec env_score{};
 	void build_merged(const WFN& wavy_in, options& opt_in, const pathvec& models);
 	vec merge_predictions();
 	// Estimate what the spherically filled atoms should carry, so the size of the
@@ -92,6 +96,8 @@ private:
 	std::unordered_map<int, std::vector<int64_t>> vfps{};
 	std::unordered_map<int, vec> wigner3j{};
 	std::unordered_map<std::string, dMatrix2> power_env_sparse{};
+	// zeta = 1, unfolded: the l = 0 reference features before the projector goes in
+	std::unordered_map<std::string, dMatrix2> ref0{};
 	std::unordered_map<std::string, vec> av_coefs{};
 	std::unordered_map<int, int> featsize{};
 
@@ -102,7 +108,7 @@ private:
 	// (species+lambda key, projector, features); read and install split for the prefetch
 	using lambda_blocks = std::vector<std::tuple<std::string, dMatrix2, dMatrix2>>;
 	lambda_blocks read_model_lambda(const int lam);
-	void install_model_lambda(lambda_blocks blocks);
+	void install_model_lambda(lambda_blocks blocks, const int lam);
 
 	vec predict();
 };
