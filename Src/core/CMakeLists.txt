@@ -154,6 +154,20 @@ add_library(
 
 nosphera2_enable_optimizations(NoSpherA2Core)
 
+#The commit goes into the build-date line (convenience.cpp); read at every build, not at configure,
+#so a tree built again after a commit or checkout cannot carry the old hash.
+find_package(Git QUIET)
+set(NOSPHERA2_GIT_COMMIT_HEADER "${CMAKE_CURRENT_BINARY_DIR}/generated/git_commit.h")
+add_custom_target(
+    NoSpherA2GitCommit
+    COMMAND "${CMAKE_COMMAND}" "-DGIT_EXECUTABLE=${GIT_EXECUTABLE}" "-DSRC=${PROJECT_SOURCE_DIR}"
+            "-DOUT=${NOSPHERA2_GIT_COMMIT_HEADER}" -P "${PROJECT_SOURCE_DIR}/cmake/GitCommit.cmake"
+    BYPRODUCTS "${NOSPHERA2_GIT_COMMIT_HEADER}"
+    VERBATIM
+)
+add_dependencies(NoSpherA2Core NoSpherA2GitCommit)
+target_include_directories(NoSpherA2Core PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated")
+
 if(MSVC)
     set_source_files_properties("${CMAKE_CURRENT_SOURCE_DIR}/structure_factors.cpp" PROPERTIES COMPILE_OPTIONS "/bigobj")
 endif()

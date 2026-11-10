@@ -27,6 +27,7 @@
 #include "citations.h"
 #include "b2c.h"
 #include "section_log.h"
+#include "git_commit.h"
 
 #ifdef _WIN32
 #include <windows.h>
@@ -1105,7 +1106,7 @@ std::string WAEmpiRe_message()
 
 
 
-std::string build_date = ("This Executable was built on: " + std::string(__DATE__) + " " + std::string(__TIME__) + "\n");
+std::string build_date = ("This Executable was built on: " + std::string(__DATE__) + " " + std::string(__TIME__) + " from git commit " NOSPHERA2_GIT_COMMIT "\n");
 
 bool ensure_occ_data_path(const char *argv0)
 {
