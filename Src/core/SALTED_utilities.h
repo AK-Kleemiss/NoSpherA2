@@ -66,8 +66,8 @@ namespace SALTED_Utils
 	void set_lmax_nmax(std::unordered_map<std::string, int> &lmax, std::unordered_map<std::string, int> &nmax, const BasisSet& basis_set, std::vector<std::string> species);
 	int get_lmax_max(std::unordered_map<std::string, int> &lmax);
 
-	// skip[a] != 0 leaves atom a out
-	inline featomic::SimpleSystem gen_featomic_system(const WFN& wfn, const std::vector<char>& skip = {})
+	// skip[a] != 0 leaves atom a out, z[a] replaces its nuclear charge as the featomic type
+	inline featomic::SimpleSystem gen_featomic_system(const WFN& wfn, const std::vector<char>& skip = {}, const ivec& z = {})
 	{
 		featomic::SimpleSystem featomic_system;
 		const auto& atoms = *wfn.get_atoms_ptr();
@@ -78,7 +78,7 @@ namespace SALTED_Utils
 			d3 xyz = { constants::bohr2ang(a.get_coordinate(0)),
 										  constants::bohr2ang(a.get_coordinate(1)),
 										  constants::bohr2ang(a.get_coordinate(2)) };
-			featomic_system.add_atom(a.get_charge(), xyz);
+			featomic_system.add_atom(z.empty() ? a.get_charge() : z[i], xyz);
 		}
 		return featomic_system;
 	}

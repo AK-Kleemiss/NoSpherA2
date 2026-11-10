@@ -131,7 +131,21 @@ SALTEDPredictor::SALTEDPredictor(WFN wavy_in, options& opt_in)
 	for (size_t a = 0; a < isolated.size(); a++)
 		if (std::find(config.species.begin(), config.species.end(), constants::atnr2letter(wavy_in.get_atom_charge(a))) == config.species.end())
 			isolated[a] = 0;
-	featomic_system = SALTED_Utils::gen_featomic_system(wavy_in, isolated);
+	// A model with the pseudo neighbours Md and No sees every element it neither predicts nor lists as a neighbour
+	// in one of two channels, nonmetal (No) or metal (Md), as its training saw the counter-ions around an anion
+	ivec z;
+	auto has = [](const std::vector<std::string>& v, const std::string& s) { return std::find(v.begin(), v.end(), s) != v.end(); };
+	if (has(config.neighspe1, "Md") && has(config.neighspe1, "No")) {
+		const ivec nonmetal = { 1, 2, 5, 6, 7, 8, 9, 10, 14, 15, 16, 17, 18, 32, 33, 34, 35, 36, 51, 52, 53, 54, 85, 86 };
+		z.resize(wavy_in.get_ncen());
+		for (int a = 0; a < wavy_in.get_ncen(); a++) {
+			z[a] = wavy_in.get_atom_charge(a);
+			const std::string l = constants::atnr2letter(z[a]);
+			if (z[a] > 0 && !has(config.species, l) && !has(config.neighspe1, l) && !has(config.neighspe2, l))
+				z[a] = std::find(nonmetal.begin(), nonmetal.end(), z[a]) != nonmetal.end() ? 102 : 101;
+		}
+	}
+	featomic_system = SALTED_Utils::gen_featomic_system(wavy_in, isolated, z);
 	if (!use_thakkar.empty()) {
 		spherical_fill_used = true;
 		estimate_fill_charges(wavy_in, use_thakkar, opt_in);
