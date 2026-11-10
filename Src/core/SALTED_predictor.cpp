@@ -61,7 +61,7 @@ SALTEDPredictor::SALTEDPredictor(WFN wavy_in, options& opt_in)
 
 	// A folder brings its lead plus the element models of the elements in this structure (salted_folder_models).
 	// Every subfolder (at any depth) is a subgroup and brings its own: the one of the structure's class
-	// (salted_structure_class) first, the others sorted, the folder itself last. The first is each element's default,
+	// (salted_structure_class) first, then the folder itself, the others sorted last. The first is each element's default,
 	// the others its alternatives, chosen per atom by SOAP similarity (build_merged, merge_predictions).
 	pathvec models = opt_in.salted_model_dirs;
 	if (models.size() <= 1 && std::filesystem::is_directory(_path)) {
@@ -72,11 +72,11 @@ SALTEDPredictor::SALTEDPredictor(WFN wavy_in, options& opt_in)
 		for (const auto& e : std::filesystem::recursive_directory_iterator(_path))
 			if (e.is_directory() && e.path() != sub) dirs.push_back(e.path());
 		std::sort(dirs.begin(), dirs.end());
+		dirs.insert(dirs.begin(), _path);
 		if (std::filesystem::is_directory(sub)) {
 			std::cout << "Structure class " << sub.filename().string() << ": models from " << sub.string() << " first" << std::endl;
 			dirs.insert(dirs.begin(), sub);
 		}
-		dirs.push_back(_path);
 		models.clear();
 		for (const auto& d : dirs)
 			for (const auto& m : salted_folder_models(d, present)) models.push_back(m);
