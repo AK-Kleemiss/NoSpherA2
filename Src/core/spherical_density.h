@@ -35,7 +35,17 @@ inline double table_log2(const double x)
 	uint64_t b;
 	std::memcpy(&b, &x, sizeof b);
 	const int i = static_cast<int>((b >> 44) & 0xff);
+#if defined(__arm__)
+	// armv7 has no uint64 -> double instruction and calls __aeabi_ul2d (3 % of a sucrose NCI run on the
+	// Galaxy Tab A); 1.f from the same 44 bits under exponent 0, minus 1, is the same f exactly. On x64
+	// and arm64 the conversion is one instruction and this is ~5 % slower
+	const uint64_t one_f_bits = 0x3FF0000000000000ULL | ((b & ((uint64_t(1) << 44) - 1)) << 8);
+	double one_f;
+	std::memcpy(&one_f, &one_f_bits, sizeof one_f);
+	const double f = one_f - 1.0;
+#else
 	const double f = static_cast<double>(b & ((uint64_t(1) << 44) - 1)) * 0x1p-44;
+#endif
 	return static_cast<int>(b >> 52) - 1023 + log2_mantissa_table[i] + (log2_mantissa_table[i + 1] - log2_mantissa_table[i]) * f;
 }
 
