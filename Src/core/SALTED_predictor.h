@@ -43,6 +43,9 @@ private:
 	std::vector<std::vector<std::pair<int, int>>> atom_alt{};
 	// Per atom of this model: the cosine to its closest reference environment at l = 0 (predict), -1 where unknown
 	vec env_score{};
+	// The atoms of wavy predict() makes descriptor centres, sorted, all when empty; score_only stops it after env_score
+	ivec centres{};
+	bool score_only = false;
 	void build_merged(const WFN& wavy_in, options& opt_in, const pathvec& models);
 	vec merge_predictions();
 	// Estimate what the spherically filled atoms should carry, so the size of the

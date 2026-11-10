@@ -112,7 +112,8 @@ namespace SALTED_Utils
 		std::string to_json() const;
 	};
 
-	SALTEDDescriptors calculate_SALTED_descriptors(const featomic::SimpleSystem& featomic_system, const SALTED_Utils::FeatomicHyperParameters& parameters);
+	// centres: the featomic atoms that get a descriptor row, all when empty
+	SALTEDDescriptors calculate_SALTED_descriptors(const featomic::SimpleSystem& featomic_system, const SALTED_Utils::FeatomicHyperParameters& parameters, const std::vector<int32_t>& centres = {});
 	metatensor::TensorMap calculate_SOAP_Powerspectrum(featomic::SimpleSystem featomic_system, const SALTED_Utils::FeatomicHyperParameters& parameters);
 }
 

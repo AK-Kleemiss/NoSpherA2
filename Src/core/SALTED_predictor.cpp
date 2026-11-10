@@ -267,7 +267,7 @@ static ivec coef_offsets(const WFN& w)
 
 void SALTEDPredictor::build_merged(const WFN& wavy_in, options& opt_in, const pathvec& models)
 {
-	// One prediction per model on the whole structure: an atom another model owns is still a neighbour.
+	// Each model predicts the atoms it keeps (merge_predictions) on the whole structure: an atom another model owns is still a neighbour.
 	// Each per-atom block carries its own model's auxiliary basis, so stitching them is a concatenation.
 	std::cout << "Combining " << models.size()
 			  << " SALTED models. Each of them first reports what IT alone cannot predict;"
@@ -320,8 +320,6 @@ void SALTEDPredictor::build_merged(const WFN& wavy_in, options& opt_in, const pa
 	// radii, counts more. Only where the model predicts the atom at all (one trained on X alone does not) and in the
 	// basis its element already has here: the merged basis is one per element.
 	// ponytail: exponent 2 is a guess, fit it on mixed-metal holdouts once there are enough of them
-	// ponytail: an element model predicts every atom of its species and only the shell is kept; restrict its
-	// descriptor centres to X + shell if a large structure with a metal gets slow
 	auto same_basis = [&](const int m1, const int m2, const int Z) {
 		const auto p1 = (*sub_models[m1]->get_model_basis())[Z], p2 = (*sub_models[m2]->get_model_basis())[Z];
 		return std::equal(p1.begin(), p1.end(), p2.begin(), p2.end(), [](const SimplePrimitive& x, const SimplePrimitive& y) {
@@ -460,16 +458,24 @@ void SALTEDPredictor::build_merged(const WFN& wavy_in, options& opt_in, const pa
 
 vec SALTEDPredictor::merge_predictions()
 {
-	std::vector<vec> parts;
-	std::vector<ivec> offsets;
-	for (auto& sub : sub_models)
+	const int nm = (int)sub_models.size();
+	// The l = 0 similarity of the alternatives first, on their atoms only: the pick decides what is predicted
+	std::vector<ivec> at(nm);
+	for (const auto& alt : atom_alt)
+		for (const auto& c : alt) at[c.first].push_back(c.second);
+	for (int m = 0; m < nm; m++)
 	{
-		parts.push_back(sub->gen_SALTED_densities());
-		offsets.push_back(coef_offsets(sub->wavy));
-		err_checkf(parts.back().size() == (size_t)offsets.back().back(),
-			"Model " + sub_models[parts.size() - 1]->get_salted_filename().string() + " predicted "
-			+ std::to_string(parts.back().size()) + " coefficients for a basis of "
-			+ std::to_string(offsets.back().back()) + " - model and basis do not belong together", std::cout);
+		if (at[m].empty()) continue;
+		std::sort(at[m].begin(), at[m].end());
+		at[m].erase(std::unique(at[m].begin(), at[m].end()), at[m].end());
+		auto& sub = *sub_models[m];
+		sub.centres = at[m];
+		sub.score_only = true;
+		sub.setup_atomic_environment();
+		sub.read_model_data();
+		sub.predict();
+		sub.shrink_intermediate_vectors();
+		sub.score_only = false;
 	}
 	// Subgroups: an atom goes to the alternative whose reference environments it is closest to, the default on a tie
 	// ponytail: cosines of models with different rcut/sig/neighspe are compared as they are; rescale per model if that biases the pick
@@ -497,7 +503,28 @@ vec SALTEDPredictor::merge_predictions()
 		if (moved[m] > 0)
 			std::cout << "SOAP similarity: " << moved[m] << " atom(s) to " << (sub_models[m]->SALTED_DIR.filename() / sub_models[m]->get_salted_filename()).string()
 					  << " (closest reference " << s_new[m] / moved[m] << " vs " << s_old[m] / moved[m] << " in the default)" << std::endl;
-
+	// Each model predicts the atoms it keeps, all of its structure as neighbours; one that keeps all runs as before
+	std::vector<ivec> need(nm);
+	for (int a = 0; a < wavy.get_ncen(); a++)
+	{
+		need[atom_model[a]].push_back(atom_in_model[a]);
+		for (const auto& [m2, p2, w] : atom_also[a]) need[m2].push_back(p2);
+	}
+	std::vector<vec> parts(nm);
+	std::vector<ivec> offsets(nm);
+	for (int m = 0; m < nm; m++)
+	{
+		if (need[m].empty()) continue;
+		std::sort(need[m].begin(), need[m].end());
+		need[m].erase(std::unique(need[m].begin(), need[m].end()), need[m].end());
+		auto& sub = sub_models[m];
+		sub->centres = (int)need[m].size() == sub->wavy.get_ncen() ? ivec() : need[m];
+		parts[m] = sub->gen_SALTED_densities();
+		offsets[m] = coef_offsets(sub->wavy);
+		err_checkf(parts[m].size() == (size_t)offsets[m].back(),
+			"Model " + sub->get_salted_filename().string() + " predicted " + std::to_string(parts[m].size())
+			+ " coefficients for a basis of " + std::to_string(offsets[m].back()) + " - model and basis do not belong together", std::cout);
+	}
 	vec coefs;
 	for (int a = 0; a < wavy.get_ncen(); a++)
 	{
@@ -676,11 +703,20 @@ void SALTEDPredictor::setup_atomic_environment()
 
 	// The element from the nuclear charge, never the atom label: a .wfx names its atoms "O1", "H2", which
 	// matched no species and left nothing to predict. Deuterium is read with Z = 1 and so already arrives as H.
-	for (int i = 0; i < featomic_system.size(); i++)
+	// The k-th species atom of the featomic system is atom k of wavy
+	atomic_symbols.clear();
+	atom_idx.clear();
+	natom_dict.clear();
+	std::vector<int32_t> sel;
+	for (int i = 0, k = 0; i < featomic_system.size(); i++)
 	{
 		const std::string label = constants::Labels[featomic_system.types()[i]];
-		if (std::find(config.species.begin(), config.species.end(), label) != config.species.end())
+		if (std::find(config.species.begin(), config.species.end(), label) == config.species.end()) continue;
+		if (centres.empty() || std::binary_search(centres.begin(), centres.end(), k)) {
 			atomic_symbols.emplace_back(label);
+			if (!centres.empty()) sel.push_back(i);
+		}
+		k++;
 	}
 	// The atoms featomic makes a descriptor centre of; counted here, from the same symbols, so the two cannot disagree
 	natoms = static_cast<int>(atomic_symbols.size());
@@ -723,7 +759,7 @@ void SALTEDPredictor::setup_atomic_environment()
 
 	// RASCALINE (Generate descriptors)
 	const auto _t_desc = std::chrono::steady_clock::now();
-	v1 = SALTED_Utils::calculate_SALTED_descriptors(featomic_system, hp);
+	v1 = SALTED_Utils::calculate_SALTED_descriptors(featomic_system, hp, sel);
 
 	if ((config.nrad2 != config.nrad1) || (config.nang2 != config.nang1) || (config.sig2 != config.sig1) || (config.rcut2 != config.rcut1) || (config.neighspe2 != config.neighspe1))
 	{
@@ -732,7 +768,7 @@ void SALTEDPredictor::setup_atomic_environment()
 		hp.atomic_gaussian_width = config.sig2;
 		hp.cutoff_radius = config.rcut2;
 		hp.neighspe = config.neighspe2;
-		v2 = SALTED_Utils::calculate_SALTED_descriptors(featomic_system, hp);
+		v2 = SALTED_Utils::calculate_SALTED_descriptors(featomic_system, hp, sel);
 	}
 	else
 	{
@@ -988,7 +1024,7 @@ vec SALTEDPredictor::predict()
 		psi_nm[spe_idx].resize(lmax[config.species[spe_idx]] + 1);
 	// The only quantity that crosses lambda: set at lam = 0, reused above it when zeta != 1
 	std::vector<dMatrix2> kernell0(config.species.size());
-	env_score.assign(natoms, -1.0);
+	env_score.assign(wavy.get_ncen(), -1.0);
 	for (int lam = 0; lam <= lmax_max; lam++)
 	{
 		vec p;
@@ -1017,7 +1053,7 @@ vec SALTEDPredictor::predict()
 		// the kernels below more than the overlap could ever hide
 		const auto _t_wait = std::chrono::steady_clock::now();
 		install_model_lambda(next_lambda.get(), lam);
-		if (lam < lmax_max)
+		if (lam < lmax_max && !score_only)
 			next_lambda = std::async(std::launch::async, &SALTEDPredictor::read_model_lambda, this, lam + 1);
 		const double model_wait = _elapsed(_t_wait);
 		_t_model_wait += model_wait;
@@ -1097,7 +1133,7 @@ vec SALTEDPredictor::predict()
 					double s = -1.0;
 					const double pn = norm(pvec_lam, i);
 					for (int j = 0; j < (int)k.extent(1); j++) s = std::max(s, k(i, j) / (pn * rn[j] + 1e-300));
-					env_score[atom_idx[spe][i]] = s;
+					env_score[centres.empty() ? atom_idx[spe][i] : centres[atom_idx[spe][i]]] = s;
 				}
 			}
 
@@ -1141,6 +1177,7 @@ vec SALTEDPredictor::predict()
 		}
 		_t_kernels += _elapsed(_t_kn);
 		free_model_lambda(lam);
+		if (score_only) return {};
 	}
 
 	unordered_map<string, dMatrix1> C{};
@@ -1195,7 +1232,9 @@ vec SALTEDPredictor::predict()
 	// rather than fail later on a total count.
 	if (bbasis_set_loaded)
 	{
-		const aux_density_table t(*wavy.get_atoms_ptr());
+		std::vector<atom> at;
+		for (const int a : centres) at.push_back(wavy.get_atom(a));
+		const aux_density_table t(centres.empty() ? *wavy.get_atoms_ptr() : at);
 		if (Tsize != t.n_coef)
 		{
 			std::cout << "The model predicts " << Tsize << " coefficients, the basis in the model file holds "
@@ -1318,7 +1357,19 @@ vec SALTEDPredictor::gen_SALTED_densities()
 
 
 	vec coefs = predict();
-
+	// Only the centres were predicted: their blocks at their place in the whole structure, zero elsewhere
+	if (!centres.empty() && !score_only)
+	{
+		const ivec off = coef_offsets(wavy);
+		vec full(off.back(), 0.0);
+		for (int r = 0, i = 0; r < (int)centres.size(); r++)
+		{
+			const int a = centres[r], n = off[a + 1] - off[a];
+			std::copy(coefs.begin() + i, coefs.begin() + i + n, full.begin() + off[a]);
+			i += n;
+		}
+		coefs.swap(full);
+	}
 	shrink_intermediate_vectors();
 	return coefs;
 }

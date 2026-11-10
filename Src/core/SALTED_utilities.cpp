@@ -235,7 +235,7 @@ std::string SALTED_Utils::FeatomicHyperParameters::to_json() const
 
 
 // Runs featomic's spherical expansion for the SALTED keys
-static metatensor::TensorMap get_feats_projs(featomic::SimpleSystem featomic_system, const SALTED_Utils::FeatomicHyperParameters& parameters)
+static metatensor::TensorMap get_feats_projs(featomic::SimpleSystem featomic_system, const SALTED_Utils::FeatomicHyperParameters& parameters, const std::vector<int32_t>& centres)
 {
 	// size_t nspe1 = neighspe.size();
 	std::vector<std::array<int32_t, 4>> keys_array;
@@ -288,6 +288,8 @@ static metatensor::TensorMap get_feats_projs(featomic::SimpleSystem featomic_sys
 	featomic::CalculationOptions calc_opts;
 	calc_opts.selected_keys = keys_selection;
 	calc_opts.use_native_system = true;
+	if (!centres.empty())
+		calc_opts.selected_samples = featomic::LabelsSelection::subset(metatensor::Labels(std::vector<std::string>{ "atom" }, centres.data(), centres.size()));
 	// run the calculation
 	// one block per (o3_lambda, o3_sigma, center_type, neighbor_type); get_expansion_coeffs
 	// densifies them itself
@@ -388,9 +390,9 @@ static SALTEDDescriptors get_expansion_coeffs(metatensor::TensorMap& descriptor,
 }
 
 
-SALTEDDescriptors SALTED_Utils::calculate_SALTED_descriptors(const featomic::SimpleSystem& featomic_system, const SALTED_Utils::FeatomicHyperParameters& parameters)
+SALTEDDescriptors SALTED_Utils::calculate_SALTED_descriptors(const featomic::SimpleSystem& featomic_system, const SALTED_Utils::FeatomicHyperParameters& parameters, const std::vector<int32_t>& centres)
 {
-	metatensor::TensorMap descriptor = get_feats_projs(featomic_system, parameters);
+	metatensor::TensorMap descriptor = get_feats_projs(featomic_system, parameters, centres);
 	return get_expansion_coeffs(descriptor, parameters);
 }
 
