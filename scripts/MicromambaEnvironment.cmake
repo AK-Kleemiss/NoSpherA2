@@ -421,6 +421,13 @@ function(setup_micromamba_environment)
             )
         else()
             set(micromamba_operation "create")
+            # A failed create leaves only .mambarc behind, and every later create then refuses
+            # with "Non-conda folder exists at prefix"; clear exactly that leftover, nothing else
+            file(GLOB _prefix_left LIST_DIRECTORIES true "${environment_prefix}/*")
+            list(REMOVE_ITEM _prefix_left "${environment_prefix}/.mambarc")
+            if(EXISTS "${environment_prefix}/.mambarc" AND NOT _prefix_left)
+                file(REMOVE_RECURSE "${environment_prefix}")
+            endif()
             message(STATUS
                 "Creating micromamba environment: "
                 "${environment_prefix}"
