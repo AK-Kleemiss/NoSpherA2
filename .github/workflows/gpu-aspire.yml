@@ -25,7 +25,9 @@ jobs:
     timeout-minutes: 600
     defaults:
       run:
-        shell: pwsh
+        # Windows PowerShell 5.1, not pwsh: pwsh 7 is only a zip install on Aspire, outside the machine Path,
+        # and after msvc-dev-cmd rewrites Path the runner reported "pwsh: command not found"
+        shell: powershell
     env:
       CMAKE_BUILD_PARALLEL_LEVEL: 6
     steps:
